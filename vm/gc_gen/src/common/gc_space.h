@@ -30,8 +30,8 @@ struct GC;
 typedef struct Space{
   void* heap_start;
   void* heap_end;
-  unsigned int reserved_heap_size;
-  unsigned int committed_heap_size;
+  POINTER_SIZE_INT reserved_heap_size;
+  POINTER_SIZE_INT committed_heap_size;
   unsigned int num_collections;
   int64 time_collections;
   float survive_ratio;
@@ -39,12 +39,12 @@ typedef struct Space{
   GC* gc;
   Boolean move_object;
   /*Size allocted after last collection. */
-  unsigned int alloced_size;
+  POINTER_SIZE_INT alloced_size;
   /*For_statistic*/  
-  unsigned int surviving_size;
+  POINTER_SIZE_INT surviving_size;
 }Space;
 
-inline unsigned int space_committed_size(Space* space){ return space->committed_heap_size;}
+inline POINTER_SIZE_INT space_committed_size(Space* space){ return space->committed_heap_size;}
 inline void* space_heap_start(Space* space){ return space->heap_start; }
 inline void* space_heap_end(Space* space){ return space->heap_end; }
 
@@ -63,8 +63,8 @@ typedef struct Blocked_Space {
   /* <-- first couple of fields are overloadded as Space */
   void* heap_start;
   void* heap_end;
-  unsigned int reserved_heap_size;
-  unsigned int committed_heap_size;
+  POINTER_SIZE_INT reserved_heap_size;
+  POINTER_SIZE_INT committed_heap_size;
   unsigned int num_collections;
   int64 time_collections;
   float survive_ratio;
@@ -72,9 +72,9 @@ typedef struct Blocked_Space {
   GC* gc;
   Boolean move_object;
   /*Size allocted after last collection. */
-  unsigned int alloced_size;
+  POINTER_SIZE_INT alloced_size;
   /*For_statistic*/  
-  unsigned int surviving_size;
+  POINTER_SIZE_INT surviving_size;
   /* END of Space --> */
 
   Block* blocks; /* short-cut for mpsace blockheader access, not mandatory */
@@ -123,14 +123,14 @@ inline void blocked_space_shrink(Blocked_Space* space, unsigned int changed_size
   assert( ((Block_Header*)decommit_base)->block_idx >= space->free_block_idx);
   
   void* old_end = (void*)&space->blocks[space->num_managed_blocks];
-  unsigned int decommit_size = (POINTER_SIZE_INT)old_end - (POINTER_SIZE_INT)decommit_base;
+  POINTER_SIZE_INT decommit_size = (POINTER_SIZE_INT)old_end - (POINTER_SIZE_INT)decommit_base;
   assert(decommit_size && !(decommit_size%GC_BLOCK_SIZE_BYTES));
   
   Boolean result = vm_decommit_mem(decommit_base, decommit_size);
   assert(result == TRUE);
   
   space->committed_heap_size = (POINTER_SIZE_INT)decommit_base - (POINTER_SIZE_INT)space->heap_start;
-  space->num_managed_blocks = space->committed_heap_size >> GC_BLOCK_SHIFT_COUNT;
+  space->num_managed_blocks = (unsigned int)(space->committed_heap_size >> GC_BLOCK_SHIFT_COUNT);
   
   Block_Header* new_last_block = (Block_Header*)&space->blocks[space->num_managed_blocks - 1];
   space->ceiling_block_idx = new_last_block->block_idx;
@@ -143,10 +143,10 @@ inline void blocked_space_extend(Blocked_Space* space, unsigned int changed_size
   
   void* old_base = (void*)&space->blocks[space->num_managed_blocks];
   void* commit_base = (void*)round_down_to_size((POINTER_SIZE_INT)old_base, SPACE_ALLOC_UNIT);
-  unsigned int block_diff_count = ((POINTER_SIZE_INT)old_base - (POINTER_SIZE_INT)commit_base) >> GC_BLOCK_SHIFT_COUNT;
+  unsigned int block_diff_count = (unsigned int)(((POINTER_SIZE_INT)old_base - (POINTER_SIZE_INT)commit_base) >> GC_BLOCK_SHIFT_COUNT);
   block_inc_count += block_diff_count;
   
-  unsigned int commit_size = block_inc_count << GC_BLOCK_SHIFT_COUNT;
+  POINTER_SIZE_INT commit_size = block_inc_count << GC_BLOCK_SHIFT_COUNT;
   void* result = vm_commit_mem(commit_base, commit_size);
   assert(result == commit_base);
 
@@ -167,7 +167,7 @@ inline void blocked_space_extend(Blocked_Space* space, unsigned int changed_size
   }
   last_block->next = NULL;
   space->ceiling_block_idx = last_block->block_idx;
-  space->num_managed_blocks = space->committed_heap_size >> GC_BLOCK_SHIFT_COUNT;
+  space->num_managed_blocks = (unsigned int)(space->committed_heap_size >> GC_BLOCK_SHIFT_COUNT);
 }
 
 #endif //#ifndef _GC_SPACE_H_

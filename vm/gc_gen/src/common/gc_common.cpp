@@ -33,9 +33,9 @@ unsigned int SPACE_ALLOC_UNIT;
 
 extern Boolean GC_VERIFY;
 
-extern unsigned int NOS_SIZE;
-extern unsigned int MIN_NOS_SIZE;
-extern unsigned int MIN_LOS_SIZE;
+extern POINTER_SIZE_INT NOS_SIZE;
+extern POINTER_SIZE_INT MIN_NOS_SIZE;
+extern POINTER_SIZE_INT MIN_LOS_SIZE;
 
 extern Boolean FORCE_FULL_COMPACT;
 extern Boolean MINOR_ALGORITHM;
@@ -45,9 +45,9 @@ extern unsigned int NUM_COLLECTORS;
 extern unsigned int MINOR_COLLECTORS;
 extern unsigned int MAJOR_COLLECTORS;
 
-unsigned int HEAP_SIZE_DEFAULT = 256 * MB;
-unsigned int min_heap_size_bytes = 32 * MB;
-unsigned int max_heap_size_bytes = 0;
+POINTER_SIZE_INT HEAP_SIZE_DEFAULT = 256 * MB;
+POINTER_SIZE_INT min_heap_size_bytes = 32 * MB;
+POINTER_SIZE_INT max_heap_size_bytes = 0;
 
 extern Boolean JVMTI_HEAP_ITERATION ;
 
@@ -126,8 +126,8 @@ static size_t get_size_property(const char* name)
 
 void gc_parse_options(GC* gc) 
 {
-  unsigned int max_heap_size = HEAP_SIZE_DEFAULT;
-  unsigned int min_heap_size = min_heap_size_bytes;
+  POINTER_SIZE_INT max_heap_size = HEAP_SIZE_DEFAULT;
+  POINTER_SIZE_INT min_heap_size = min_heap_size_bytes;
   
   if (is_property_set("gc.mx", VM_PROPERTIES) == 1) {
     max_heap_size = get_size_property("gc.mx");

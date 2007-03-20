@@ -33,7 +33,7 @@ static void fspace_destruct_blocks(Fspace* fspace)
 struct GC_Gen;
 void gc_set_nos(GC_Gen* gc, Space* space);
 
-void fspace_initialize(GC* gc, void* start, unsigned int fspace_size, unsigned int commit_size) 
+void fspace_initialize(GC* gc, void* start, POINTER_SIZE_INT fspace_size, POINTER_SIZE_INT commit_size) 
 {    
   assert( (fspace_size%GC_BLOCK_SIZE_BYTES) == 0 );
   Fspace* fspace = (Fspace *)STD_MALLOC(sizeof(Fspace));

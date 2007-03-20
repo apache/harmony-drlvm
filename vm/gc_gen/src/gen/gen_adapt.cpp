@@ -338,7 +338,7 @@ void gc_gen_adapt(GC_Gen* gc, int64 pause_time)
 
   POINTER_SIZE_INT curr_nos_size = space_committed_size((Space*)fspace);
 
-  if( abs((POINTER_SIZE_SINT)new_nos_size - (POINTER_SIZE_SINT)curr_nos_size) < NOS_COPY_RESERVE_DELTA )
+  if( abs((int)(new_nos_size - curr_nos_size)) < NOS_COPY_RESERVE_DELTA )
     return;
   
   /* below are ajustment */  
@@ -348,14 +348,14 @@ void gc_gen_adapt(GC_Gen* gc, int64 pause_time)
   fspace->heap_start = nos_boundary;
   fspace->blocks = (Block*)nos_boundary;
   fspace->committed_heap_size = new_nos_size;
-  fspace->num_managed_blocks = new_nos_size >> GC_BLOCK_SHIFT_COUNT;
+  fspace->num_managed_blocks = (unsigned int)(new_nos_size >> GC_BLOCK_SHIFT_COUNT);
   fspace->num_total_blocks = fspace->num_managed_blocks;
   fspace->first_block_idx = ((Block_Header*)nos_boundary)->block_idx;
   fspace->free_block_idx = fspace->first_block_idx;
 
   mspace->heap_end = nos_boundary;
   mspace->committed_heap_size = new_mos_size;
-  mspace->num_managed_blocks = new_mos_size >> GC_BLOCK_SHIFT_COUNT;
+  mspace->num_managed_blocks = (unsigned int)(new_mos_size >> GC_BLOCK_SHIFT_COUNT);
   mspace->num_total_blocks = mspace->num_managed_blocks;
   mspace->ceiling_block_idx = ((Block_Header*)nos_boundary)->block_idx - 1;
 

@@ -36,8 +36,8 @@ void update_mspace_info_for_los_extension(Mspace *mspace)
   if(tuner->kind != TRANS_FROM_MOS_TO_LOS)
     return;
   
-  unsigned int tune_size = tuner->tuning_size;
-  unsigned int tune_blocks = tune_size >> GC_BLOCK_SHIFT_COUNT;
+  POINTER_SIZE_INT tune_size = tuner->tuning_size;
+  unsigned int tune_blocks = (unsigned int)(tune_size >> GC_BLOCK_SHIFT_COUNT);
 
   mspace->blocks = &mspace->blocks[tune_blocks];
   mspace->heap_start = mspace->blocks;
@@ -132,7 +132,7 @@ void gc_init_block_for_collectors(GC* gc, Mspace* mspace)
     Blocked_Space* nos = (Blocked_Space*)gc_get_nos((GC_Gen*)gc);
     Block_Header* nos_last_block = (Block_Header*)&nos->blocks[nos->num_managed_blocks-1];
     Block_Header* mos_first_block = (Block_Header*)&mspace->blocks[0];
-    unsigned int trans_blocks = (tuner->tuning_size >> GC_BLOCK_SHIFT_COUNT);
+    unsigned int trans_blocks = (unsigned int)(tuner->tuning_size >> GC_BLOCK_SHIFT_COUNT);
     nos_last_block->next = mos_first_block;
     ((Block_Header*)&(mspace->blocks[trans_blocks - 1]))->next = NULL;
     

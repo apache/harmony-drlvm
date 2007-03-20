@@ -63,22 +63,22 @@ extern char* large_page_hint;
 #define THREAD_OK       TM_ERROR_NONE
 
 inline int vm_wait_event(VmEventHandle event)
-{   IDATA stat = hysem_wait(event);
-    assert(stat == TM_ERROR_NONE); return stat;
+{   int stat = (int)hysem_wait(event);
+    assert(stat == THREAD_OK); return stat;
 }
 
 inline int vm_set_event(VmEventHandle event)
-{   IDATA stat = hysem_post(event);
-    assert(stat == TM_ERROR_NONE); return stat;
+{   int stat = (int)hysem_post(event);
+    assert(stat == THREAD_OK); return stat;
 }
 
 inline int vm_reset_event(VmEventHandle event)
-{   IDATA stat = hysem_set(event,0);
-    assert(stat == TM_ERROR_NONE); return stat;
+{   int stat = (int)hysem_set(event,0);
+    assert(stat == THREAD_OK); return stat;
 }
 
 inline int vm_create_event(VmEventHandle* event)
-{  return hysem_create(event, 0, 1); }
+{  return (int)hysem_create(event, 0, 1); }
 
 inline void vm_thread_yield()
 {  hythread_yield(); }
@@ -93,7 +93,7 @@ inline int vm_create_thread(int (*func)(void*), void *data)
   UDATA priority = 0;
   UDATA suspend = 0;
   
-  return hythread_create(ret_thread, stacksize, priority, suspend, 
+  return (int)hythread_create(ret_thread, stacksize, priority, suspend, 
                              (hythread_entrypoint_t)func, data);
 }
 
@@ -136,7 +136,7 @@ inline unsigned int vm_get_system_alloc_unit()
 #endif
 }
 
-inline void *vm_map_mem(void* start, unsigned int size) 
+inline void *vm_map_mem(void* start, POINTER_SIZE_INT size) 
 {
   void* address;
 #ifdef _WINDOWS_
@@ -150,7 +150,7 @@ inline void *vm_map_mem(void* start, unsigned int size)
   return address;
 }
 
-inline Boolean vm_unmap_mem(void* start, unsigned int size) 
+inline Boolean vm_unmap_mem(void* start, POINTER_SIZE_INT size) 
 {
   unsigned int result;
 #ifdef _WINDOWS_
@@ -164,7 +164,7 @@ inline Boolean vm_unmap_mem(void* start, unsigned int size)
   return result;
 }
 
-inline void *vm_alloc_mem(void* start, unsigned int size) 
+inline void *vm_alloc_mem(void* start, POINTER_SIZE_INT size) 
 {
   void* address;
 #ifdef _WINDOWS_
@@ -178,12 +178,12 @@ inline void *vm_alloc_mem(void* start, unsigned int size)
   return address;
 }
 
-inline Boolean vm_free_mem(void* start, unsigned int size) 
+inline Boolean vm_free_mem(void* start, POINTER_SIZE_INT size) 
 {
   return vm_unmap_mem(start, size);
 }
 
-inline void *vm_reserve_mem(void* start, unsigned int size) 
+inline void *vm_reserve_mem(void* start, POINTER_SIZE_INT size) 
 {
   void* address;
 #ifdef _WINDOWS_
@@ -201,12 +201,12 @@ inline void *vm_reserve_mem(void* start, unsigned int size)
   return address;
 }
 
-inline Boolean vm_release_mem(void* start, unsigned int size) 
+inline Boolean vm_release_mem(void* start, POINTER_SIZE_INT size) 
 {
   return vm_unmap_mem(start, size);
 }
 
-inline void *vm_commit_mem(void* start, unsigned int size) 
+inline void *vm_commit_mem(void* start, POINTER_SIZE_INT size) 
 {
   void* address;
 #ifdef _WINDOWS_
@@ -220,7 +220,7 @@ inline void *vm_commit_mem(void* start, unsigned int size)
   return address;
 }
 
-inline Boolean vm_decommit_mem(void* start, unsigned int size) 
+inline Boolean vm_decommit_mem(void* start, POINTER_SIZE_INT size) 
 {
   unsigned int result;
 #ifdef _WINDOWS_

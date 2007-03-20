@@ -28,8 +28,8 @@ typedef struct Mspace{
   /* <-- first couple of fields are overloadded as Space */
   void* heap_start;
   void* heap_end;
-  unsigned int reserved_heap_size;
-  unsigned int committed_heap_size;
+  POINTER_SIZE_INT reserved_heap_size;
+  POINTER_SIZE_INT committed_heap_size;
   unsigned int num_collections;
   int64 time_collections;
   float survive_ratio;
@@ -37,9 +37,9 @@ typedef struct Mspace{
   GC* gc;
   Boolean move_object;
   /*Size allocted after last collection.*/
-  unsigned int alloced_size;
+  POINTER_SIZE_INT alloced_size;
   /*For_statistic: size survived after major*/  
-  unsigned int surviving_size;
+  POINTER_SIZE_INT surviving_size;
   /* END of Space --> */
     
   Block* blocks; /* short-cut for mpsace blockheader access, not mandatory */
@@ -59,7 +59,7 @@ typedef struct Mspace{
   POINTER_SIZE_INT expected_threshold;
 }Mspace;
 
-void mspace_initialize(GC* gc, void* reserved_base, unsigned int mspace_size, unsigned int commit_size);
+void mspace_initialize(GC* gc, void* reserved_base, POINTER_SIZE_INT mspace_size, POINTER_SIZE_INT commit_size);
 void mspace_destruct(Mspace* mspace);
 
 void* mspace_alloc(unsigned size, Allocator *allocator);

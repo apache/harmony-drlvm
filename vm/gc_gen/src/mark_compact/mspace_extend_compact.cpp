@@ -45,7 +45,7 @@ static void set_first_and_end_block_to_move(Collector *collector, unsigned int m
     first_block_to_move = (Block *)space_heap_start((Space *)fspace);
 }
 
-static unsigned int fspace_shrink(Fspace *fspace)
+static POINTER_SIZE_INT fspace_shrink(Fspace *fspace)
 {
   void *committed_nos_end = (void *)((POINTER_SIZE_INT)space_heap_start((Space *)fspace) + fspace->committed_heap_size);
   
@@ -65,7 +65,7 @@ static unsigned int fspace_shrink(Fspace *fspace)
   assert(result == TRUE);
   
   fspace->committed_heap_size = (POINTER_SIZE_INT)decommit_base - (POINTER_SIZE_INT)fspace->heap_start;
-  fspace->num_managed_blocks = fspace->committed_heap_size >> GC_BLOCK_SHIFT_COUNT;
+  fspace->num_managed_blocks = (unsigned int)(fspace->committed_heap_size >> GC_BLOCK_SHIFT_COUNT);
   
   Block_Header *new_last_block = (Block_Header *)&fspace->blocks[fspace->num_managed_blocks - 1];
   fspace->ceiling_block_idx = new_last_block->block_idx;
@@ -111,7 +111,7 @@ static Block *mspace_extend_without_link(Mspace *mspace, Fspace *fspace, unsigne
   }
   last_block->next = NULL;
   mspace->ceiling_block_idx = last_block->block_idx;
-  mspace->num_managed_blocks = mspace->committed_heap_size >> GC_BLOCK_SHIFT_COUNT;
+  mspace->num_managed_blocks = (unsigned int)(mspace->committed_heap_size >> GC_BLOCK_SHIFT_COUNT);
   
   return (Block *)commit_base;
 }
@@ -280,18 +280,18 @@ void mspace_extend_compact(Collector *collector)
      Block *old_nos_boundary = fspace->blocks;
      nos_boundary = &mspace->blocks[mspace->free_block_idx - mspace->first_block_idx];
      assert(nos_boundary > old_nos_boundary);
-     unsigned int mem_change_size = ((Block *)nos_boundary - old_nos_boundary) << GC_BLOCK_SHIFT_COUNT;
+     POINTER_SIZE_INT mem_change_size = ((Block *)nos_boundary - old_nos_boundary) << GC_BLOCK_SHIFT_COUNT;
      fspace->heap_start = nos_boundary;
      fspace->blocks = (Block *)nos_boundary;
      fspace->committed_heap_size -= mem_change_size;
-     fspace->num_managed_blocks = fspace->committed_heap_size >> GC_BLOCK_SHIFT_COUNT;
+     fspace->num_managed_blocks = (unsigned int)(fspace->committed_heap_size >> GC_BLOCK_SHIFT_COUNT);
      fspace->num_total_blocks = fspace->num_managed_blocks;
      fspace->first_block_idx = ((Block_Header *)nos_boundary)->block_idx;
      fspace->free_block_idx = fspace->first_block_idx;
      
      mspace->heap_end = nos_boundary;
      mspace->committed_heap_size += mem_change_size;
-     mspace->num_managed_blocks = mspace->committed_heap_size >> GC_BLOCK_SHIFT_COUNT;
+     mspace->num_managed_blocks = (unsigned int)(mspace->committed_heap_size >> GC_BLOCK_SHIFT_COUNT);
      mspace->num_total_blocks = mspace->num_managed_blocks;
      mspace->ceiling_block_idx = ((Block_Header *)nos_boundary)->block_idx - 1;
 

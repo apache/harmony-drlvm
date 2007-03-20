@@ -37,29 +37,29 @@ enum Transform_Kind {
 typedef struct Space_Tuner{
     Transform_Kind kind;
 
-    unsigned int tuning_size;
-    unsigned int conservative_tuning_size;
-    unsigned int least_tuning_size;
+    POINTER_SIZE_INT tuning_size;
+    POINTER_SIZE_INT conservative_tuning_size;
+    POINTER_SIZE_INT least_tuning_size;
     unsigned int force_tune;
     
     /*LOS alloc speed sciecne last los variation*/    
-    unsigned int speed_los;
+    POINTER_SIZE_INT speed_los;
     /*MOS alloc speed sciecne last los variation*/    
-    unsigned int speed_mos;
+    POINTER_SIZE_INT speed_mos;
 
     /*Total wasted memory of los science last los variation*/
-    unsigned int wast_los;
+    POINTER_SIZE_INT wast_los;
     /*Total wasted memory of mos science last los variation*/
-    unsigned int wast_mos;
+    POINTER_SIZE_INT wast_mos;
 
-    unsigned int current_dw;
+    POINTER_SIZE_INT current_dw;
     /*NOS survive size of last minor, this could be the least meaningful space unit when talking about tuning.*/
-    unsigned int current_ds;
+    POINTER_SIZE_INT current_ds;
 
     /*Threshold for deta wast*/
-    unsigned int threshold;
+    POINTER_SIZE_INT threshold;
     /*Minimun tuning size for los variation*/
-    unsigned int min_tuning_size;
+    POINTER_SIZE_INT min_tuning_size;
 
     /*Cost of normal major compaction*/
     unsigned int fast_cost;

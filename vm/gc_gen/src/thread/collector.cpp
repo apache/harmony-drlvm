@@ -26,6 +26,7 @@
 
 unsigned int MINOR_COLLECTORS = 0;
 unsigned int MAJOR_COLLECTORS = 0;
+static volatile unsigned int live_collector_num = 0;
 
 void collector_restore_obj_info(Collector* collector)
 {
@@ -144,7 +145,10 @@ static int collector_thread_func(void *arg)
     
     /* waken up and check for new task */
     TaskType task_func = collector->task_func;
-    if(task_func == NULL) return 1;
+    if(task_func == NULL){
+      atomic_dec32(&live_collector_num);
+      return 1;
+    }
       
     task_func(collector);
 
@@ -176,9 +180,12 @@ static void collector_init_thread(Collector *collector)
 
 static void collector_terminate_thread(Collector* collector)
 {
+  assert(live_collector_num);
+  unsigned int old_live_collector_num = live_collector_num;
   collector->task_func = NULL; /* NULL to notify thread exit */
   notify_collector_to_work(collector);
-  vm_thread_yield(); /* give collector time to die */
+  while(old_live_collector_num == live_collector_num)
+    vm_thread_yield(); /* give collector time to die */
   
   delete collector->trace_stack;  
   return;
@@ -193,6 +200,7 @@ void collector_destruct(GC* gc)
     STD_FREE(collector);
    
   }
+  assert(live_collector_num == 0);
   
   STD_FREE(gc->collectors);
   return;
@@ -227,7 +235,8 @@ void collector_initialize(GC* gc)
     gc->collectors[i] = collector;
   }
 
-  gc->num_collectors = NUM_COLLECTORS? NUM_COLLECTORS:num_processors; 
+  gc->num_collectors = NUM_COLLECTORS? NUM_COLLECTORS:num_processors;
+  live_collector_num = gc->num_collectors;
 
   return;
 }

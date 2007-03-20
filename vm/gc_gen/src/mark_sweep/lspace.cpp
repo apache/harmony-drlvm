@@ -31,7 +31,7 @@ void gc_set_los(GC_Gen* gc, Space* lspace);
   #define LOS_HEAD_RESERVE_FOR_HEAP_NULL (0*KB)
 #endif
 
-void lspace_initialize(GC* gc, void* start, unsigned int lspace_size)
+void lspace_initialize(GC* gc, void* start, POINTER_SIZE_INT lspace_size)
 {
   Lspace* lspace = (Lspace*)STD_MALLOC( sizeof(Lspace));
   assert(lspace);

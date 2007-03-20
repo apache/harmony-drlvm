@@ -28,7 +28,7 @@ struct Lspace;
 Space* gc_get_mos(GC_Gen* gc);
 Space* gc_get_nos(GC_Gen* gc);
 Space* gc_get_los(GC_Gen* gc);
-unsigned int mspace_get_expected_threshold(Mspace* mspace);
+POINTER_SIZE_INT mspace_get_expected_threshold(Mspace* mspace);
 unsigned int lspace_get_failure_size(Lspace* lspace);
     
 /*Now just prepare the alloc_size field of mspace, used to compute new los size.*/
@@ -52,12 +52,12 @@ void gc_space_tune_prepare(GC* gc, unsigned int cause)
   tuner->speed_mos += mspace->alloced_size;
 
   /*For_statistic wasted memory*/
-  unsigned int curr_used_los = lspace->surviving_size + lspace->alloced_size;
+  POINTER_SIZE_INT curr_used_los = lspace->surviving_size + lspace->alloced_size;
   assert(curr_used_los < lspace->committed_heap_size);
-  unsigned int curr_wast_los = lspace->committed_heap_size - curr_used_los;
+  POINTER_SIZE_INT curr_wast_los = lspace->committed_heap_size - curr_used_los;
   tuner->wast_los += curr_wast_los;
-  unsigned int curr_used_mos = mspace->surviving_size + mspace->alloced_size;
-  unsigned int curr_wast_mos = mspace_get_expected_threshold((Mspace*)mspace) - curr_used_mos;
+  POINTER_SIZE_INT curr_used_mos = mspace->surviving_size + mspace->alloced_size;
+  POINTER_SIZE_INT curr_wast_mos = mspace_get_expected_threshold((Mspace*)mspace) - curr_used_mos;
   tuner->wast_mos += curr_wast_mos;
   tuner->current_dw = abs((int)tuner->wast_mos - (int)tuner->wast_los);
 
@@ -90,24 +90,25 @@ void gc_space_tune_before_gc(GC* gc, unsigned int cause)
   Blocked_Space* fspace = (Blocked_Space*)gc_get_nos((GC_Gen*)gc);
   Space* lspace = (Space*)gc_get_los((GC_Gen*)gc);
 
-  unsigned int los_expect_survive_sz = (unsigned int)((float)(lspace->surviving_size + lspace->alloced_size) * lspace->survive_ratio);
-  unsigned int los_expect_free_sz = lspace->committed_heap_size - los_expect_survive_sz;
+  POINTER_SIZE_INT los_expect_survive_sz = (POINTER_SIZE_INT)((float)(lspace->surviving_size + lspace->alloced_size) * lspace->survive_ratio);
+  POINTER_SIZE_INT los_expect_free_sz = lspace->committed_heap_size - los_expect_survive_sz;
   
-  unsigned int mos_expect_survive_sz = (unsigned int)((float)(mspace->surviving_size + mspace->alloced_size) * mspace->survive_ratio);
-  unsigned int mos_expect_free_sz = mspace_get_expected_threshold((Mspace*)mspace) - mos_expect_survive_sz;
+  POINTER_SIZE_INT mos_expect_survive_sz = (POINTER_SIZE_INT)((float)(mspace->surviving_size + mspace->alloced_size) * mspace->survive_ratio);
+  POINTER_SIZE_INT mos_expect_free_sz = mspace_get_expected_threshold((Mspace*)mspace) - mos_expect_survive_sz;
   
-  unsigned int total_free = los_expect_free_sz + mos_expect_free_sz;
+  POINTER_SIZE_INT total_free = los_expect_free_sz + mos_expect_free_sz;
 
   float new_los_ratio = (float)tuner->speed_los / (float)(tuner->speed_los  + tuner->speed_mos);
-  unsigned int new_free_los_sz = (unsigned int)((float)total_free * new_los_ratio);
+  POINTER_SIZE_INT new_free_los_sz = (POINTER_SIZE_INT)((float)total_free * new_los_ratio);
   
-  if((int)new_free_los_sz - (int)los_expect_free_sz > (int)tuner->min_tuning_size){
+  if(new_free_los_sz > los_expect_free_sz && 
+         (new_free_los_sz - los_expect_free_sz > tuner->min_tuning_size)){
     tuner->kind = TRANS_FROM_MOS_TO_LOS;
     tuner->tuning_size = round_up_to_size(new_free_los_sz - los_expect_free_sz, SPACE_ALLOC_UNIT);
     tuner->least_tuning_size = round_up_to_size(lspace_get_failure_size((Lspace*)lspace), SPACE_ALLOC_UNIT);
     tuner->conservative_tuning_size = round_up_to_size(((tuner->tuning_size + tuner->least_tuning_size) >> 1), SPACE_ALLOC_UNIT);
     
-     unsigned int none_los_size;
+     POINTER_SIZE_INT none_los_size;
  #ifdef STATIC_NOS_MAPPING
      none_los_size = mspace->committed_heap_size;
  #else
@@ -174,7 +175,7 @@ void gc_space_tune_before_gc_fixed_size(GC* gc, unsigned int cause)
       tuner->conservative_tuning_size = ((tuner->tuning_size + tuner->min_tuning_size) >> 1);
     }
     
-    unsigned int none_los_size;
+    POINTER_SIZE_INT none_los_size;
 #ifdef STATIC_NOS_MAPPING
     none_los_size = mspace->committed_heap_size;
 #else

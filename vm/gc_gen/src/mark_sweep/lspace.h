@@ -29,8 +29,8 @@ typedef struct Lspace{
   /* <-- first couple of fields are overloadded as Space */
   void* heap_start;
   void* heap_end;
-  unsigned int reserved_heap_size;
-  unsigned int committed_heap_size;
+  POINTER_SIZE_INT reserved_heap_size;
+  POINTER_SIZE_INT committed_heap_size;
   unsigned int num_collections;
   int64 time_collections;
   float survive_ratio;
@@ -38,9 +38,9 @@ typedef struct Lspace{
   GC* gc;
   Boolean move_object;
   /*For_statistic: size allocated science last time collect los, ie. last major*/
-  unsigned int alloced_size;
+  POINTER_SIZE_INT alloced_size;
   /*For_statistic: size survived after lspace_sweep*/  
-  unsigned int surviving_size;
+  POINTER_SIZE_INT surviving_size;
   /* END of Space --> */
 
   Free_Area_Pool* free_pool;
@@ -48,15 +48,15 @@ typedef struct Lspace{
   unsigned int failure_size;
 }Lspace;
 
-void lspace_initialize(GC* gc, void* reserved_base, unsigned int lspace_size);
+void lspace_initialize(GC* gc, void* reserved_base, POINTER_SIZE_INT lspace_size);
 void lspace_destruct(Lspace* lspace);
 Managed_Object_Handle lspace_alloc(unsigned int size, Allocator* allocator);
 void lspace_sweep(Lspace* lspace);
 void lspace_reset_after_collection(Lspace* lspace);
 void lspace_collection(Lspace* lspace);
 
-inline unsigned int lspace_free_memory_size(Lspace* lspace){ /* FIXME:: */ return 0; }
-inline unsigned int lspace_committed_size(Lspace* lspace){ return lspace->committed_heap_size; }
+inline POINTER_SIZE_INT lspace_free_memory_size(Lspace* lspace){ /* FIXME:: */ return 0; }
+inline POINTER_SIZE_INT lspace_committed_size(Lspace* lspace){ return lspace->committed_heap_size; }
 
 inline Partial_Reveal_Object* lspace_get_next_marked_object( Lspace* lspace, unsigned int* iterate_index)
 {
@@ -71,12 +71,12 @@ inline Partial_Reveal_Object* lspace_get_next_marked_object( Lspace* lspace, uns
         if(next_area_start < (POINTER_SIZE_INT)lspace->heap_end){
             //If there is a living object at this addr, return it, and update iterate_index
             if(obj_is_marked_in_vt((Partial_Reveal_Object*)next_area_start)){
-                unsigned int obj_size = ALIGN_UP_TO_KILO(vm_object_size((Partial_Reveal_Object*)next_area_start));
+                unsigned int obj_size = (unsigned int)ALIGN_UP_TO_KILO(vm_object_size((Partial_Reveal_Object*)next_area_start));
                 *iterate_index = (unsigned int)((next_area_start + obj_size - (POINTER_SIZE_INT)lspace->heap_start) >> BIT_SHIFT_TO_KILO);
                 return (Partial_Reveal_Object*)next_area_start;
             //If this is a dead object, go on to find  a living one.
             }else{
-                unsigned int obj_size = ALIGN_UP_TO_KILO(vm_object_size((Partial_Reveal_Object*)next_area_start));
+                unsigned int obj_size = (unsigned int)ALIGN_UP_TO_KILO(vm_object_size((Partial_Reveal_Object*)next_area_start));
                 next_area_start += obj_size;
             }
         }else{

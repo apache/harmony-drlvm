@@ -31,7 +31,7 @@ struct GC_Gen;
 extern void gc_set_mos(GC_Gen* gc, Space* space);
 extern Space* gc_get_nos(GC_Gen* gc);
 
-void mspace_initialize(GC* gc, void* start, unsigned int mspace_size, unsigned int commit_size)
+void mspace_initialize(GC* gc, void* start, POINTER_SIZE_INT mspace_size, POINTER_SIZE_INT commit_size)
 {
   Mspace* mspace = (Mspace*)STD_MALLOC( sizeof(Mspace));
   assert(mspace);
@@ -99,7 +99,7 @@ void mspace_block_iterator_init(Mspace* mspace)
 {
   GC* gc = mspace->gc;
   if(gc->tuner->kind == TRANS_FROM_MOS_TO_LOS){
-    unsigned int tuning_blocks = ((mspace->gc)->tuner->tuning_size >> GC_BLOCK_SHIFT_COUNT);
+    unsigned int tuning_blocks = (unsigned int)((mspace->gc)->tuner->tuning_size >> GC_BLOCK_SHIFT_COUNT);
     mspace->block_iterator = (Block_Header*)&(mspace->blocks[tuning_blocks]);
     return;
   }
@@ -168,7 +168,7 @@ void mspace_set_expected_threshold(Mspace* mspace, POINTER_SIZE_INT threshold)
     return;
 }
 
-unsigned int mspace_get_expected_threshold(Mspace* mspace)
+POINTER_SIZE_INT mspace_get_expected_threshold(Mspace* mspace)
 {
     return mspace->expected_threshold;
 }

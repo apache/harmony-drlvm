@@ -34,13 +34,21 @@ inline unsigned int word_get_first_set_lsb(POINTER_SIZE_INT target_word)
       :"=r"(bit_offset)
       :"m"(target_word)
     );
-#else /*WIN32 Platform*/
+#else /* Windows Platform*/
+#if defined(WIN32) && !defined(_WIN64)
     __asm{
       bsf eax, target_word
       mov bit_offset, eax
     }
+#else /* _WIN64 */
+    bit_offset = 0;
+    while( ! (target_word & ((POINTER_SIZE_INT)1 << bit_offset)) ){
+    	bit_offset++;
+    }
+#endif /* _WIN64 */
 #endif /* ifdef PLATFORM_POSIX else*/
 
+  assert(bit_offset < BITS_PER_WORD);
   return (unsigned int)bit_offset;
 
 }

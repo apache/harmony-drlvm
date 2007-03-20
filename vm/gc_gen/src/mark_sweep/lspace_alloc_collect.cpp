@@ -44,7 +44,7 @@ static void* free_pool_former_lists_atomic_take_area_piece(Free_Area_Pool* pool,
     Free_Area* free_area;
     void* p_result;
     int remain_size;
-    unsigned int alloc_size = ALIGN_UP_TO_KILO(size);
+    POINTER_SIZE_INT alloc_size = ALIGN_UP_TO_KILO(size);
     unsigned int new_list_nr = 0;
     Lockable_Bidir_List* head = &pool->sized_area_list[list_hint];
 
@@ -168,7 +168,7 @@ void* lspace_alloc(unsigned int size, Allocator *allocator)
                     memset(p_result, 0, size);
                     unsigned int vold = lspace->alloced_size;
                     unsigned int vnew = vold + alloc_size;
-                    while( vold != atomic_cas32(&lspace->alloced_size, vnew, vold) ){
+                    while( vold != atomic_cas32((volatile unsigned int*)&lspace->alloced_size, vnew, vold) ){
                         vold = lspace->alloced_size;
                         vnew = vold + alloc_size;
                     }
@@ -187,7 +187,7 @@ void* lspace_alloc(unsigned int size, Allocator *allocator)
                     memset(p_result, 0, size);
                     unsigned int vold = lspace->alloced_size;
                     unsigned int vnew = vold + alloc_size;
-                    while( vold != atomic_cas32(&lspace->alloced_size, vnew, vold) ){
+                    while( vold != atomic_cas32((volatile unsigned int*)&lspace->alloced_size, vnew, vold) ){
                         vold = lspace->alloced_size;
                         vnew = vold + alloc_size;
                     }

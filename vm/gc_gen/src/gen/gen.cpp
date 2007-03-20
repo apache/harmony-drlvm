@@ -27,13 +27,13 @@
 #include "../common/compressed_ref.h"
 
 /* fspace size limit is not interesting. only for manual tuning purpose */
-unsigned int min_nos_size_bytes = 16 * MB;
-unsigned int max_nos_size_bytes = 256 * MB;
-unsigned int min_los_size_bytes = 4*MB;
-unsigned int NOS_SIZE = 0;
-unsigned int MIN_LOS_SIZE = 0;
-unsigned int MIN_NOS_SIZE = 0;
-unsigned int MAX_NOS_SIZE = 0;
+POINTER_SIZE_INT min_nos_size_bytes = 16 * MB;
+POINTER_SIZE_INT max_nos_size_bytes = 256 * MB;
+POINTER_SIZE_INT min_los_size_bytes = 4*MB;
+POINTER_SIZE_INT NOS_SIZE = 0;
+POINTER_SIZE_INT MIN_LOS_SIZE = 0;
+POINTER_SIZE_INT MIN_NOS_SIZE = 0;
+POINTER_SIZE_INT MAX_NOS_SIZE = 0;
 
 static unsigned int MINOR_ALGO = 0;
 static unsigned int MAJOR_ALGO = 0;
@@ -50,7 +50,7 @@ void* nos_boundary;
 
 static void gc_gen_get_system_info(GC_Gen *gc_gen) 
 {
-  gc_gen->_machine_page_size_bytes = port_vmem_page_sizes()[0];
+  gc_gen->_machine_page_size_bytes = (unsigned int)port_vmem_page_sizes()[0];
   gc_gen->_num_processors = port_CPUs_number();
   gc_gen->_system_alloc_unit = vm_get_system_alloc_unit();
   SPACE_ALLOC_UNIT = max(gc_gen->_system_alloc_unit, GC_BLOCK_SIZE_BYTES);
@@ -58,7 +58,7 @@ static void gc_gen_get_system_info(GC_Gen *gc_gen)
 
 void* alloc_large_pages(size_t size, const char* hint);
 
-void gc_gen_initialize(GC_Gen *gc_gen, unsigned int min_heap_size, unsigned int max_heap_size) 
+void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_SIZE_INT max_heap_size) 
 {
   assert(gc_gen); 
   gc_gen_get_system_info(gc_gen); 
@@ -70,14 +70,14 @@ void gc_gen_initialize(GC_Gen *gc_gen, unsigned int min_heap_size, unsigned int 
 
   min_nos_size_bytes *=  gc_gen->_num_processors;
 
-  unsigned int min_nos_size_threshold = max_heap_size>>5;
+  POINTER_SIZE_INT min_nos_size_threshold = max_heap_size>>5;
   if(min_nos_size_bytes  > min_nos_size_threshold){
     min_nos_size_bytes = round_down_to_size(min_nos_size_threshold,SPACE_ALLOC_UNIT);
   }
   
   if( MIN_NOS_SIZE )  min_nos_size_bytes = MIN_NOS_SIZE;
 
-  unsigned int los_size = max_heap_size >> 7;
+  POINTER_SIZE_INT los_size = max_heap_size >> 7;
   if(MIN_LOS_SIZE) min_los_size_bytes = MIN_LOS_SIZE;
   if(los_size < min_los_size_bytes ) 
     los_size = min_los_size_bytes ;
@@ -87,9 +87,9 @@ void gc_gen_initialize(GC_Gen *gc_gen, unsigned int min_heap_size, unsigned int 
   /* let's compute and reserve the space for committing */
   
   /* heuristic nos + mos + LOS = max, and nos*ratio = mos */
-  unsigned int nos_reserve_size,  nos_commit_size; 
-  unsigned int mos_reserve_size, mos_commit_size; 
-  unsigned int los_mos_size;
+  POINTER_SIZE_INT nos_reserve_size,  nos_commit_size; 
+  POINTER_SIZE_INT mos_reserve_size, mos_commit_size; 
+  POINTER_SIZE_INT los_mos_size;
   
   /*Give GC a hint of gc survive ratio.*/
   gc_gen->survive_ratio = 0.2f;
@@ -104,7 +104,7 @@ void gc_gen_initialize(GC_Gen *gc_gen, unsigned int min_heap_size, unsigned int 
   }else{  
     los_mos_size = max_heap_size;
     mos_reserve_size = los_mos_size - los_size;
-    nos_commit_size = (unsigned int)(((float)(max_heap_size - los_size))/(1.0f + gc_gen->survive_ratio));
+    nos_commit_size = (POINTER_SIZE_INT)(((float)(max_heap_size - los_size))/(1.0f + gc_gen->survive_ratio));
     nos_reserve_size = mos_reserve_size;
   }
     
@@ -438,7 +438,7 @@ void gc_gen_iterate_heap(GC_Gen *gc)
     }else{
       cont = vm_iterate_object((Managed_Object_Handle)lspace_obj);
       if (!cont) return;
-      unsigned int obj_size = ALIGN_UP_TO_KILO(vm_object_size((Partial_Reveal_Object *)lspace_obj));
+      unsigned int obj_size = (unsigned int)ALIGN_UP_TO_KILO(vm_object_size((Partial_Reveal_Object *)lspace_obj));
       lspace_obj = lspace_obj + obj_size;
     }
   }

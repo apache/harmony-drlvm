@@ -33,39 +33,9 @@ extern Boolean forward_first_half;
 /* boundary splitting fspace into forwarding part and remaining part */
 extern void* object_forwarding_boundary; 
 
-typedef struct Fspace {
-  /* <-- first couple of fields are overloaded as Space */
-  void* heap_start;
-  void* heap_end;
-  unsigned int reserved_heap_size;
-  unsigned int committed_heap_size;
-  unsigned int num_collections;
-  int64 time_collections;
-  float survive_ratio;
-  unsigned int collect_algorithm;
-  GC* gc;
-  Boolean move_object;
-  /*Size allocted after last collection. Not available in fspace now.*/
-  unsigned int alloced_size;
-  /*For_statistic: not available now for fspace*/  
-  unsigned int surviving_size;
-  /* END of Space --> */
+typedef Blocked_Space Fspace;
 
-  Block* blocks; /* short-cut for mpsace blockheader access, not mandatory */
-  
-  /* FIXME:: the block indices should be replaced with block header addresses */
-  unsigned int first_block_idx;
-  unsigned int ceiling_block_idx;
-  volatile unsigned int free_block_idx;
-  
-  unsigned int num_used_blocks;
-  unsigned int num_managed_blocks;
-  unsigned int num_total_blocks;
-  /* END of Blocked_Space --> */
-      
-} Fspace;
-
-void fspace_initialize(GC* gc, void* start, unsigned int fspace_size, unsigned int commit_size);
+void fspace_initialize(GC* gc, void* start, POINTER_SIZE_INT fspace_size, POINTER_SIZE_INT commit_size);
 void fspace_destruct(Fspace *fspace);
 
 void* fspace_alloc(unsigned size, Allocator *allocator);
