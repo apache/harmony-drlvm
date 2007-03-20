@@ -36,14 +36,12 @@
  *                              HYTHREAD_PRIORITY_MIN<br>
  * 
  * @returns 0 on success or negative value on failure (priority wasn't changed)
- * 
- * 
  */
 IDATA VMCALL hythread_set_priority(hythread_t thread, UDATA priority) {
-    apr_status_t apr_status = apr_thread_set_priority(thread->os_handle, priority); 
-    if (apr_status != APR_SUCCESS) return CONVERT_ERROR(apr_status);
+    int r = os_thread_set_priority(thread->os_handle, priority);
+    if (r) return r;
     thread->priority = priority;
-    return TM_ERROR_NONE;
+    return 0;
 }
 
 /**

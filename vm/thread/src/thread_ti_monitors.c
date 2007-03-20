@@ -63,11 +63,11 @@ IDATA VMCALL jthread_raw_monitor_create(jrawMonitorID* mon_ptr) {
         if (status != TM_ERROR_NONE) return status;
     }
     
-    status =hymutex_lock(jvmti_monitor_table_lock);
+    status =hymutex_lock(&jvmti_monitor_table_lock);
     if (status != TM_ERROR_NONE) return status;
     *mon_ptr = array_add(jvmti_monitor_table, monitor);
 
-    status =hymutex_unlock(jvmti_monitor_table_lock);
+    status =hymutex_unlock(&jvmti_monitor_table_lock);
     if (status != TM_ERROR_NONE) return status;
     if (!(*mon_ptr)) return TM_ERROR_OUT_OF_MEMORY;
 
@@ -93,10 +93,10 @@ IDATA VMCALL jthread_raw_monitor_destroy(jrawMonitorID mon_ptr) {
             return status;
     }
     
-    status =hymutex_lock(jvmti_monitor_table_lock);
+    status =hymutex_lock(&jvmti_monitor_table_lock);
     if (status != TM_ERROR_NONE) return status;
     array_delete(jvmti_monitor_table, (UDATA)mon_ptr);
-    status =hymutex_unlock(jvmti_monitor_table_lock);
+    status =hymutex_unlock(&jvmti_monitor_table_lock);
     return status;
 }
 

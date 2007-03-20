@@ -131,7 +131,6 @@ Version: $Revision$
 
                         <libset libs="hythr" dir="${build.semi.dir}/vm/hythr/_bin" />
                         <libset libs="encoder" dir="${build.semi.dir}/vm/encoder/_bin" />
-                        <libset libs="apr-1" dir="${build.semi.dir}/extra/apr/_bin" />
                         <libset libs="aprutil-1" dir="${build.semi.dir}/extra/aprutil/_bin" />
                         <libset libs="port" dir="${build.semi.dir}/vm/port/_bin" />
                         <libset libs="log4cxx" dir="${build.semi.dir}/extra/log4cxx/_bin" />

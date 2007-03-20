@@ -46,16 +46,16 @@ IDATA VMCALL hythread_park(I_64 millis, IDATA nanos) {
      hythread_t t = tm_self_tls;     
      assert(t);
 
-     hymutex_lock(t->mutex);
+     hymutex_lock(&t->mutex);
 
      if (t->state & TM_THREAD_STATE_UNPARKED) {
         t->state &= ~TM_THREAD_STATE_UNPARKED;
-        hymutex_unlock(t->mutex);
+        hymutex_unlock(&t->mutex);
         return (t->state & TM_THREAD_STATE_INTERRUPTED) ? TM_ERROR_INTERRUPT : TM_ERROR_NONE;
      }
 
      t->state |= TM_THREAD_STATE_PARKED;
-     status = hycond_wait_interruptable(t->condition, t->mutex, millis, nanos);
+     status = hycond_wait_interruptable(&t->condition, &t->mutex, millis, nanos);
      t->state &= ~TM_THREAD_STATE_PARKED;
 
      //the status should be restored for j.u.c.LockSupport
@@ -63,7 +63,7 @@ IDATA VMCALL hythread_park(I_64 millis, IDATA nanos) {
          t->state |= TM_THREAD_STATE_INTERRUPTED;
      }
 
-     hymutex_unlock(t->mutex);
+     hymutex_unlock(&t->mutex);
      return status;
 }
 
@@ -83,14 +83,14 @@ void VMCALL hythread_unpark(hythread_t thread) {
         return;
     }
     
-    hymutex_lock(thread->mutex);
+    hymutex_lock(&thread->mutex);
 
     if (thread->state & TM_THREAD_STATE_PARKED) {
         thread->state &= ~TM_THREAD_STATE_PARKED;
-        hycond_notify_all(thread->condition);
+        hycond_notify_all(&thread->condition);
     } else {
         thread->state |= TM_THREAD_STATE_UNPARKED;
     }
 
-    hymutex_unlock(thread->mutex);
+    hymutex_unlock(&thread->mutex);
 }

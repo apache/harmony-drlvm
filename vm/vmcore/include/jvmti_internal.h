@@ -155,6 +155,7 @@ class DebugUtilsTI {
         // TI event thread data
         hythread_t event_thread;
         hycond_t event_cond;
+        int event_cond_initialized;
 
         DebugUtilsTI();
 

@@ -47,7 +47,7 @@ float const PERF_COEFFICIENT = 3;
 /*
  * Locks for waiting
  */
-hymutex_t tm_mutex_lock = NULL;
+hymutex_t tm_mutex_lock;
 hycond_t tm_condition_lock = NULL;
 apr_thread_mutex_t* apr_mutex_lock = NULL;
 apr_thread_cond_t* apr_condition_lock = NULL;
@@ -55,7 +55,7 @@ apr_thread_cond_t* apr_condition_lock = NULL;
 /*
 * Locks for concurrent mutex tests
 */
-hymutex_t tm_concurrent_mutex_lock = NULL;
+hymutex_t tm_concurrent_mutex_lock;
 apr_thread_mutex_t* apr_concurrent_mutex_lock = NULL;
 
 /*

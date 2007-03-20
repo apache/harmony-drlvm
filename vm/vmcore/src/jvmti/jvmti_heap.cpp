@@ -124,12 +124,11 @@ jvmtiSetTag(jvmtiEnv* env,
         return JVMTI_ERROR_INVALID_OBJECT;
 
     if (ti_env->tags == NULL) {
-        assert(ti_env->lock);
-        hymutex_lock(ti_env->lock);
+        hymutex_lock(&ti_env->lock);
         if (ti_env->tags == NULL) {
             ti_env->tags = new TITags;
         }
-        hymutex_unlock(ti_env->lock);
+        hymutex_unlock(&ti_env->lock);
     }
 
     if (ti_env->tags == NULL) {

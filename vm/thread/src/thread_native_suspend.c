@@ -201,7 +201,7 @@ static void send_suspend_request(hythread_t thread) {
                 
     apr_atomic_inc32((apr_uint32_t *)&(thread->suspend_request));
 
-    apr_thread_yield_other(thread->os_handle);
+    os_thread_yield_other(thread->os_handle);
 
     TRACE(("TM: suspend request sent: %p request count: %d",thread , thread->suspend_request));
 }

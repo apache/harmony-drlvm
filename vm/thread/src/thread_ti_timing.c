@@ -62,6 +62,7 @@ IDATA VMCALL jthread_get_thread_blocked_time(jthread java_thread, jlong *nanos_p
 IDATA VMCALL jthread_get_thread_cpu_time(jthread java_thread, jlong *nanos_ptr) {
 
     hythread_t tm_native_thread;
+    int64 kernel_time;
     assert(nanos_ptr);
 
     if (NULL == java_thread) {
@@ -70,8 +71,7 @@ IDATA VMCALL jthread_get_thread_cpu_time(jthread java_thread, jlong *nanos_ptr) 
         tm_native_thread = vm_jthread_get_tm_data(java_thread);
     }
 
-    return CONVERT_ERROR(apr_get_thread_time(tm_native_thread->os_handle,
-        (apr_int64_t*) nanos_ptr));
+    return hythread_get_thread_times(tm_native_thread, &kernel_time, nanos_ptr);
 }
 
 /**
@@ -92,13 +92,13 @@ IDATA VMCALL jthread_get_thread_cpu_timer_info(jvmtiTimerInfo* info_ptr) {
 IDATA VMCALL jthread_get_thread_user_cpu_time(jthread java_thread, jlong *nanos_ptr) {
 
     hythread_t tm_native_thread;
-    apr_time_t kernel_time;
-    apr_time_t user_time;
+    int64 kernel_time;
+    int64 user_time;
 
     assert(java_thread);
     assert(nanos_ptr);
     tm_native_thread = vm_jthread_get_tm_data(java_thread);
-    apr_thread_times(tm_native_thread->os_handle, &user_time, &kernel_time);
+    hythread_get_thread_times(tm_native_thread, &kernel_time, &user_time);
     *nanos_ptr = user_time;
 
     return TM_ERROR_NONE;

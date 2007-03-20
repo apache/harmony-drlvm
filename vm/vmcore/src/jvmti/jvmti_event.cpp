@@ -2268,16 +2268,14 @@ jvmti_event_thread_function(void *args)
     hymutex_t event_mutex;
     UNREF IDATA stat = hymutex_create(&event_mutex, TM_MUTEX_NESTED);
     assert(stat == TM_ERROR_NONE);
-    hycond_t event_cond;
-    stat = hycond_create(&event_cond);
+    stat = hycond_create(&ti->event_cond);
     assert(stat == TM_ERROR_NONE);
-    ti->event_cond = event_cond;
 
     // event thread loop
     while(true) {
-        hymutex_lock(event_mutex);
-        hycond_wait(event_cond, event_mutex);
-        hymutex_unlock(event_mutex);
+        hymutex_lock(&event_mutex);
+        hycond_wait(&ti->event_cond, &event_mutex);
+        hymutex_unlock(&event_mutex);
 
         if(!ti->event_thread) {
             // event thread is NULL,
@@ -2290,9 +2288,9 @@ jvmti_event_thread_function(void *args)
     }
 
     // release wait loop environment
-    stat = hymutex_destroy(event_mutex);
+    stat = hymutex_destroy(&event_mutex);
     assert(stat == TM_ERROR_NONE);
-    stat = hycond_destroy(event_cond);
+    stat = hycond_destroy(&ti->event_cond);
     assert(stat == TM_ERROR_NONE);
 
     return 0;
@@ -2333,14 +2331,8 @@ jvmti_destroy_event_thread()
         return;
     }
 
-    // getting condition
-    hycond_t event_cond = ti->event_cond;
-    ti->event_thread = NULL;
-    ti->event_cond = NULL;
-
     // notify event thread
-    assert(event_cond);
-    UNREF IDATA stat = hycond_notify(event_cond);
+    UNREF IDATA stat = hycond_notify(&ti->event_cond);
     assert(stat == TM_ERROR_NONE);
     return;
 }
@@ -2349,12 +2341,11 @@ void
 jvmti_notify_data_dump_request()
 {
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
-    if( !ti->event_thread || !ti->event_cond ) {
+    if( !ti->event_thread) {
         // nothing to do
         return;
     }
-    assert(ti->event_cond);
-    UNREF IDATA stat = hycond_notify(ti->event_cond);
+    UNREF IDATA stat = hycond_notify(&ti->event_cond);
     assert(stat == TM_ERROR_NONE);
     return;
 }

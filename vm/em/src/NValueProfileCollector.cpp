@@ -125,7 +125,7 @@ void ValueProfileCollector::insert_into_tnv_table (struct Simple_TNV_Table* TNV_
 
 ValueMethodProfile* ValueProfileCollector::createProfile(Method_Handle mh, uint32 numkeys, uint32 keys[])
 {
-    hymutex_lock(profilesLock);
+    hymutex_lock(&profilesLock);
     ValueMethodProfile* profile = new ValueMethodProfile(this, mh);
     VPInstructionProfileData* vpmap = new VPInstructionProfileData[numkeys];
     // Allocate space for value maps
@@ -147,7 +147,7 @@ ValueMethodProfile* ValueProfileCollector::createProfile(Method_Handle mh, uint3
     }
     assert(profilesByMethod.find(mh) == profilesByMethod.end());
     profilesByMethod[mh] = profile;
-    hymutex_unlock(profilesLock);
+    hymutex_unlock(&profilesLock);
     return profile;
 }
 
@@ -191,7 +191,7 @@ ValueProfileCollector::~ValueProfileCollector()
         ValueMethodProfile* profile = it->second;
         delete profile;
     }
-    hymutex_destroy(profilesLock);
+    hymutex_destroy(&profilesLock);
 }
 
 ValueMethodProfile::ValueMethodProfile(ValueProfileCollector* pc, Method_Handle mh)
@@ -202,7 +202,7 @@ ValueMethodProfile::ValueMethodProfile(ValueProfileCollector* pc, Method_Handle 
 
 ValueMethodProfile::~ValueMethodProfile()
 {
-    hymutex_destroy(lock);
+    hymutex_destroy(&lock);
 }
 
 void ValueMethodProfile::addNewValue(uint32 instructionKey, POINTER_SIZE_INT valueToAdd)

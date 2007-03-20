@@ -46,6 +46,12 @@ Version: $Revision: 1.4.2.4 $
                 <include name="thread/src/*native*.c" />
                 <!-- include name="thread/src/*task*.c" / -->
                 <include name="thread/src/thread_init.c" />
+                <select os="win">
+                  <include name="thread/src/win/*.c" />
+                </select>
+                <select os="lnx">
+                  <include name="thread/src/linux/*.c" />
+                </select>
             </fileset>
 
             <select os="win" cfg="release" cxx="icl">

@@ -643,26 +643,26 @@ IDATA VMCALL jthread_wait_for_all_nondaemon_threads() {
     jvmti_thread = hythread_get_private_data(native_thread);
     lib = native_thread->library;
 
-    status = hymutex_lock(lib->TM_LOCK);
+    status = hymutex_lock(&lib->TM_LOCK);
     if (status != TM_ERROR_NONE) return status;    
 
     if (lib->nondaemon_thread_count == 1 && !jvmti_thread->daemon) {
-        status = hymutex_unlock(lib->TM_LOCK);
+        status = hymutex_unlock(&lib->TM_LOCK);
         return status;
     }
 
     while ((!jvmti_thread->daemon && lib->nondaemon_thread_count > 1)
             || (jvmti_thread->daemon && lib->nondaemon_thread_count > 0)) {
-        status = hycond_wait(lib->nondaemon_thread_cond, lib->TM_LOCK);
+        status = hycond_wait(&lib->nondaemon_thread_cond, &lib->TM_LOCK);
         //check interruption and other problems
         TRACE(("TM wait for nondaemons notified, count: %d", lib->nondaemon_thread_count));
         if (status != TM_ERROR_NONE) {
-            hymutex_unlock(lib->TM_LOCK);
+            hymutex_unlock(&lib->TM_LOCK);
             return status;
         }
     }
     
-    status = hymutex_unlock(lib->TM_LOCK);
+    status = hymutex_unlock(&lib->TM_LOCK);
     return status;
 }
 
@@ -709,11 +709,11 @@ IDATA increase_nondaemon_threads_count(hythread_t self) {
     
     lib = self->library;
 
-    status = hymutex_lock(lib->TM_LOCK);
+    status = hymutex_lock(&lib->TM_LOCK);
     if (status != TM_ERROR_NONE) return status;
     
     lib->nondaemon_thread_count++;
-    status = hymutex_unlock(lib->TM_LOCK);
+    status = hymutex_unlock(&lib->TM_LOCK);
     return status;
 }
 
@@ -723,11 +723,11 @@ IDATA countdown_nondaemon_threads(hythread_t self) {
 
     lib = self->library;
     
-    status = hymutex_lock(lib->TM_LOCK);
+    status = hymutex_lock(&lib->TM_LOCK);
     if (status != TM_ERROR_NONE) return status;
     
     if (lib->nondaemon_thread_count <= 0) {
-        status = hymutex_unlock(lib->TM_LOCK);
+        status = hymutex_unlock(&lib->TM_LOCK);
         if (status != TM_ERROR_NONE) return status;
         return TM_ERROR_ILLEGAL_STATE;
     }
@@ -735,14 +735,14 @@ IDATA countdown_nondaemon_threads(hythread_t self) {
     TRACE(("TM: nondaemons decreased, thread: %p count: %d\n", self, lib->nondaemon_thread_count));
     lib->nondaemon_thread_count--;
     if (lib->nondaemon_thread_count <= 1) {
-        status = hycond_notify_all(lib->nondaemon_thread_cond); 
+        status = hycond_notify_all(&lib->nondaemon_thread_cond); 
         TRACE(("TM: nondaemons all dead, thread: %p count: %d\n", self, lib->nondaemon_thread_count));
         if (status != TM_ERROR_NONE) {
-            hymutex_unlock(lib->TM_LOCK);
+            hymutex_unlock(&lib->TM_LOCK);
             return status;
         }
     }
     
-    status = hymutex_unlock(lib->TM_LOCK);
+    status = hymutex_unlock(&lib->TM_LOCK);
     return status;
 }

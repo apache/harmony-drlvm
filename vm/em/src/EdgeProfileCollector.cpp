@@ -113,7 +113,7 @@ EdgeProfileCollector::~EdgeProfileCollector()
         EdgeMethodProfile* profile = it->second;
         delete profile;
     }
-    hymutex_destroy(profilesLock);
+    hymutex_destroy(&profilesLock);
 }
 
 
@@ -176,7 +176,7 @@ EdgeMethodProfile* EdgeProfileCollector::createProfile( Method_Handle mh,
                                                         uint32* counterKeys,
                                                         uint32 checkSum)
 {
-    hymutex_lock(profilesLock);
+    hymutex_lock(&profilesLock);
 
     EdgeMethodProfile* profile = new EdgeMethodProfile(this, mh);
 
@@ -192,7 +192,7 @@ EdgeMethodProfile* EdgeProfileCollector::createProfile( Method_Handle mh,
     profilesByMethod[mh] = profile;
     newProfiles.push_back(profile);
 
-    hymutex_unlock(profilesLock);
+    hymutex_unlock(&profilesLock);
 
     return profile;
 }
@@ -234,10 +234,10 @@ static void logReadyProfile(const std::string& catName, const std::string& profi
 void EdgeProfileCollector::onTimeout()
 {
     if(!newProfiles.empty()) {
-        hymutex_lock(profilesLock);
+        hymutex_lock(&profilesLock);
         greenProfiles.insert(greenProfiles.end(), newProfiles.begin(), newProfiles.end());
         newProfiles.clear();
-        hymutex_unlock(profilesLock);
+        hymutex_unlock(&profilesLock);
     }
 
     std::vector<EdgeMethodProfile*>::iterator it = greenProfiles.begin();

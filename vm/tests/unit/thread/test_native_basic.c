@@ -41,6 +41,7 @@ int test_hythread_create(void){
     apr_pool_t *pool;
     void **args; 
     hythread_t thread = NULL;
+    int r;
     
     apr_pool_create(&pool, NULL);
 
@@ -49,13 +50,14 @@ int test_hythread_create(void){
     hythread_group_create((hythread_group_t *)&args[0]); 
     
     args[1] = apr_palloc(pool, sizeof(jthread_threadattr_t));
-    ((jthread_threadattr_t *)args[1])->stacksize = 1024;
+    ((jthread_threadattr_t *)args[1])->stacksize = 1024000;
     ((jthread_threadattr_t *)args[1])->priority  = 1;
     
-    hythread_create_with_group(&thread, args[0], 1024, 1, 0, start_proc, args);
+    r = hythread_create_with_group(&thread, args[0], 1024000, 1, 0, start_proc, args);
+    tf_assert(r == 0 && "thread creation failed");
 
-    hythread_join(thread);
-    // TODO: should check that created thread finished without errors.
+    r = hythread_join(thread);
+    tf_assert(r == 0 && "thread join failed");
     return TEST_PASSED;
 }
 
@@ -145,6 +147,7 @@ int test_hythread_create_many(void){
     void **args; 
     hythread_t thread = NULL;
     hythread_group_t group = NULL;
+    int r;
     
     char *buf;
     int i = 10;
@@ -158,19 +161,21 @@ int test_hythread_create_many(void){
         args[0] = group; 
         
         args[1] = apr_palloc(pool, sizeof(jthread_threadattr_t));
-        ((jthread_threadattr_t *)args[1])->stacksize = 1024;
+        ((jthread_threadattr_t *)args[1])->stacksize = 1024000;
         ((jthread_threadattr_t *)args[1])->priority  = 1;
         
         thread = NULL;
 
-        hythread_create_with_group(&thread, group, 1024, 1, 0, start_proc, args);
+        r = hythread_create_with_group(&thread, group, 1024000, 1, 0, start_proc, args);
+        tf_assert(r == 0 && "thread creation failed");
         buf = (char *)apr_pcalloc(pool, sizeof(char)*12);
 
         /*
           sprintf(buf, "Thread %d\0", i);
           hythread_set_name(thread, buf);
         */
-        hythread_join(thread);
+        r = hythread_join(thread);
+        tf_assert(r == 0 && "thread join failed");
     }
 
     //check thread structures:

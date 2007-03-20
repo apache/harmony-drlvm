@@ -49,6 +49,7 @@ hythread_join_interruptable
 hythread_get_self_id
 hythread_get_id
 hythread_get_thread
+hythread_get_thread_times
 hythread_struct_init
 hythread_cancel_all
 hythread_group_create
@@ -146,7 +147,6 @@ array_add
 array_create
 array_delete
 array_get
-get_local_pool
 get_java_thread_group
 
 Java_org_apache_harmony_drlvm_thread_ThreadHelper_getThreadIdOffset

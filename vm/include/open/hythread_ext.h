@@ -116,6 +116,7 @@ e between safe point function call overhead and suspension time overhead.
 #if !defined(HYTHREAD_EXT_H)
 #define HYTHREAD_EXT_H
 
+#include "open/types.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -129,8 +130,19 @@ extern "C" {
  */
 //@{
 
-typedef struct HyMutex *hymutex_t;
-typedef struct HyCond  *hycond_t;
+#ifdef __linux__
+#include <pthread.h>
+#define hymutex_t pthread_mutex_t
+#define hycond_t pthread_cond_t
+#endif // __linux__
+
+#ifdef _WIN32
+#define hymutex_t CRITICAL_SECTION
+#define hycond_t struct HyCond
+#include "hycond_win.h"
+#endif // _WIN32
+
+
 typedef struct HyLatch *hylatch_t;
 typedef struct HyThreadGroup *hythread_group_t;
 typedef struct HyThread *hythread_iterator_t;
@@ -180,6 +192,7 @@ IDATA VMCALL hythread_set_private_data(hythread_t  t, void* data);
 
 UDATA VMCALL hythread_tls_get_offset(hythread_tls_key_t key);
 UDATA VMCALL hythread_tls_get_suspend_request_offset();
+UDATA VMCALL hythread_get_thread_times(hythread_t thread, int64* pkernel, int64* puser);
 
 
 //@}
@@ -188,12 +201,12 @@ UDATA VMCALL hythread_tls_get_suspend_request_offset();
 //@{
 
 IDATA VMCALL hycond_create (hycond_t *cond);
-IDATA VMCALL hycond_wait (hycond_t cond, hymutex_t mutex);
-IDATA VMCALL hycond_wait_timed (hycond_t cond, hymutex_t mutex, I_64 millis, IDATA nanos);
-IDATA VMCALL hycond_wait_interruptable (hycond_t cond, hymutex_t mutex, I_64 millis, IDATA nanos);
-IDATA VMCALL hycond_notify (hycond_t cond);
-IDATA VMCALL hycond_notify_all (hycond_t cond);
-IDATA VMCALL hycond_destroy (hycond_t cond);
+IDATA VMCALL hycond_wait (hycond_t *cond, hymutex_t *mutex);
+IDATA VMCALL hycond_wait_timed (hycond_t *cond, hymutex_t *mutex, I_64 millis, IDATA nanos);
+IDATA VMCALL hycond_wait_interruptable (hycond_t *cond, hymutex_t *mutex, I_64 millis, IDATA nanos);
+IDATA VMCALL hycond_notify (hycond_t *cond);
+IDATA VMCALL hycond_notify_all (hycond_t *cond);
+IDATA VMCALL hycond_destroy (hycond_t *cond);
 
 //@}
 /** @name Safe suspension support
@@ -254,10 +267,10 @@ IDATA hysem_set(hysem_t sem, IDATA count);
 //@{
 
 IDATA hymutex_create (hymutex_t *mutex, UDATA flags);
-IDATA hymutex_lock(hymutex_t mutex);
-IDATA hymutex_trylock (hymutex_t mutex);
-IDATA hymutex_unlock (hymutex_t mutex);
-IDATA hymutex_destroy (hymutex_t mutex);
+IDATA hymutex_lock(hymutex_t *mutex);
+IDATA hymutex_trylock (hymutex_t *mutex);
+IDATA hymutex_unlock (hymutex_t *mutex);
+IDATA hymutex_destroy (hymutex_t *mutex);
 
 //@}
 /** @name Thin monitors support

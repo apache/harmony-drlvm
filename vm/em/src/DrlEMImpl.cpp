@@ -116,7 +116,7 @@ DrlEMImpl::DrlEMImpl() : jh(NULL), _execute_method(NULL) {
 
 DrlEMImpl::~DrlEMImpl() {
     deallocateResources();
-    hymutex_destroy(recompilationLock);
+    hymutex_destroy(&recompilationLock);
 }
 
 void DrlEMImpl::initProfileAccess() {
@@ -763,15 +763,15 @@ bool DrlEMImpl::initProfileCollectors(RChain* chain, const std::string& config) 
 
 void DrlEMImpl::methodProfileIsReady(MethodProfile* mp) {
     
-    hymutex_lock(recompilationLock);
+    hymutex_lock(&recompilationLock);
     if (methodsInRecompile.find((Method_Profile_Handle)mp)!=methodsInRecompile.end()) {
         //method is already recompiling by another thread or by this thread(recursion)
-        hymutex_unlock(recompilationLock);
+        hymutex_unlock(&recompilationLock);
         return;
     }
     methodsInRecompile.insert((Method_Profile_Handle)mp);
     nMethodsRecompiled++;
-    hymutex_unlock(recompilationLock);
+    hymutex_unlock(&recompilationLock);
 
     const char* methodName = NULL;
     const char* className = NULL;
@@ -812,9 +812,9 @@ void DrlEMImpl::methodProfileIsReady(MethodProfile* mp) {
             }
         }
     }
-    hymutex_lock(recompilationLock);
+    hymutex_lock(&recompilationLock);
     methodsInRecompile.erase((Method_Profile_Handle)mp);
-    hymutex_unlock(recompilationLock);
+    hymutex_unlock(&recompilationLock);
 }
 
 ProfileCollector* DrlEMImpl::getProfileCollector(EM_PCTYPE type, JIT_Handle jh, EM_JIT_PC_Role jitRole) const {

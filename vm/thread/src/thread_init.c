@@ -39,8 +39,9 @@ apr_pool_t *TM_POOL = NULL;
 apr_threadkey_t *TM_THREAD_KEY;
 
 //Thread manager global lock
-hymutex_t TM_START_LOCK = NULL;
-hymutex_t FAT_MONITOR_TABLE_LOCK = NULL;
+hymutex_t TM_START_LOCK;
+static int TM_INITIALIZED = 0;
+hymutex_t FAT_MONITOR_TABLE_LOCK;
 #define GLOBAL_MONITOR_NAME "global_monitor"
 hythread_monitor_t p_global_monitor;
 
@@ -138,10 +139,8 @@ void VMCALL hythread_init(hythread_library_t lib) {
     }
     assert(TM_LIBRARY == lib);
 
-    // Check if someone already initialized the library.
-    if (TM_START_LOCK != NULL) {
-        return;
-    }
+    if (TM_INITIALIZED) return;
+    TM_INITIALIZED = 1;
      
     apr_status = apr_initialize();
     assert(apr_status == APR_SUCCESS);
@@ -206,7 +205,7 @@ void VMCALL hythread_lib_lock(hythread_t self) {
     IDATA status;
     
     assert(self == hythread_self());
-    status = hymutex_lock(self->library->TM_LOCK);
+    status = hymutex_lock(&self->library->TM_LOCK);
     assert(status == TM_ERROR_NONE);
 }
 
@@ -219,7 +218,7 @@ void VMCALL hythread_lib_unlock(hythread_t self) {
     IDATA status;
 
     assert(self == hythread_self());
-    status = hymutex_unlock(self->library->TM_LOCK);
+    status = hymutex_unlock(&self->library->TM_LOCK);
     assert(status == TM_ERROR_NONE);
 }
 
@@ -236,13 +235,13 @@ IDATA VMCALL hythread_global_lock() {
     // we need not care about suspension if the thread
     // is not even tattached to hythread
     if (self == NULL)
-        return hymutex_lock(TM_LIBRARY->TM_LOCK);
+        return hymutex_lock(&TM_LIBRARY->TM_LOCK);
 
     // suspend_disable_count must be 0 on potentially
     // blocking operation to prevent suspension deadlocks,
     // meaning that the thread is safe for suspension
     saved_count = reset_suspend_disable();
-    r = hymutex_lock(TM_LIBRARY->TM_LOCK);
+    r = hymutex_lock(&TM_LIBRARY->TM_LOCK);
     if (r) return r;
 
     // make sure we do not get a global thread lock
@@ -250,10 +249,10 @@ IDATA VMCALL hythread_global_lock() {
     while (self->suspend_request) {
         // give up global thread lock before safepoint,
         // because this thread can be suspended at a safepoint
-        r = hymutex_unlock(TM_LIBRARY->TM_LOCK);
+        r = hymutex_unlock(&TM_LIBRARY->TM_LOCK);
         if (r) return r;
         hythread_safe_point();
-        r = hymutex_lock(TM_LIBRARY->TM_LOCK);
+        r = hymutex_lock(&TM_LIBRARY->TM_LOCK);
         if (r) return r;
     }
 
@@ -268,7 +267,7 @@ IDATA VMCALL hythread_global_lock() {
  * 
  */
 IDATA VMCALL hythread_global_unlock() {
-    return hymutex_unlock(TM_LIBRARY->TM_LOCK);;
+    return hymutex_unlock(&TM_LIBRARY->TM_LOCK);;
 }
 
 hythread_group_t  get_java_thread_group(void) {
@@ -319,11 +318,11 @@ static IDATA destroy_group_list() {
 }
 
 IDATA acquire_start_lock() {
-    return hymutex_lock(TM_START_LOCK);
+    return hymutex_lock(&TM_START_LOCK);
 }
 
 IDATA release_start_lock() {
-    return hymutex_unlock(TM_START_LOCK);
+    return hymutex_unlock(&TM_START_LOCK);
 }
 
 /*

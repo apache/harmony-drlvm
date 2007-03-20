@@ -36,25 +36,25 @@ Lock_Manager::Lock_Manager()
 
 Lock_Manager::~Lock_Manager()
 {
-    UNREF IDATA stat = hymutex_destroy (lock);
+    UNREF IDATA stat = hymutex_destroy (&lock);
     assert(stat==TM_ERROR_NONE);
 }
 
 void Lock_Manager::_lock()
 {
-    UNREF IDATA stat = hymutex_lock(lock);
+    UNREF IDATA stat = hymutex_lock(&lock);
     assert(stat==TM_ERROR_NONE);
 }
 
 bool Lock_Manager::_tryLock()
 {     
-    IDATA stat = hymutex_trylock(lock);
+    IDATA stat = hymutex_trylock(&lock);
     return stat==TM_ERROR_NONE;    
 }
 
 void Lock_Manager::_unlock()
 {
-    UNREF IDATA stat = hymutex_unlock(lock);
+    UNREF IDATA stat = hymutex_unlock(&lock);
     assert(stat==TM_ERROR_NONE);
 }
 
@@ -97,6 +97,6 @@ void Lock_Manager::_unlock_enum_or_null()
 
 bool Lock_Manager::_lock_enum_or_null(bool UNREF return_null_on_fail)
 {
-    IDATA stat = hymutex_lock(lock);
+    IDATA stat = hymutex_lock(&lock);
     return stat==TM_ERROR_NONE;
 }

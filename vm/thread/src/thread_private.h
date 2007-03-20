@@ -33,6 +33,10 @@
 #include <assert.h>
 #include "apr_thread_ext.h"
 
+#ifdef __linux__
+#include <pthread.h>
+#endif // __linux__
+
 // temporary remove logging
 #define TRACE(a) //printf a; printf("\n")
 //#include "clog.h"
@@ -101,37 +105,14 @@ __forceinline hythread_t tmn_self_macro() {
 #define tm_self_tls (hythread_self())
 #endif
 
-/**
- * get_local_pool() function return apr pool associated with the current thread.
- * the memory could be allocated without lock using this pool
- * deallocation should be done in the same thread, otherwise 
- * local_pool_cleanup_register() should be called
- */
-apr_pool_t* get_local_pool();
- 
-/**
- * local_pool_cleanup_register() synchronously register the cleanup function.
- * It should be called to request cleanup in thread local pool, from other thread
- * Usage scenario:
- * IDATA hymutex_destroy (tm_mutex_t *mutex) {
- *        apr_pool_t *pool = apr_thread_mutex_pool_get ((apr_thread_mutex_t*)mutex);
- *        if (pool != get_local_pool()) {
- *              return local_pool_cleanup_register(hymutex_destroy, mutex);
- *      }
- *      apr_thread_mutex_destroy(mutex);
- *  return TM_ERROR_NONE;
- * }
- *  
- */
-IDATA local_pool_cleanup_register(void* func, void* data); 
 
-
-
-// Direct mappings to porting layer / APR 
-#define HyCond apr_thread_cond_t
-#define HyMutex apr_thread_mutex_t 
-//#define tm_rwlock_t apr_rwlock_t 
-//#define _tm_threadkey_t apr_threadkey_t 
+#ifdef __linux__
+#define osthread_t pthread_t
+#elif _WIN32
+#define osthread_t HANDLE
+#else // !_WIN32 && !__linux__
+#error "threading is only supported on __linux__ or _WIN32"
+#endif // !_WIN32 && !__linux__
 
 
 extern hythread_group_t TM_DEFAULT_GROUP;
@@ -223,7 +204,7 @@ typedef struct HyThread {
     /**
      * Handle to OS thread.
      */
-    apr_thread_t *os_handle;    
+    osthread_t os_handle;
         
     /**
      * Placeholder for any data to be associated with this thread.
@@ -262,7 +243,7 @@ typedef struct HyThread {
     /**
      * Current conditional variable thread is waiting on (used for interrupting)
      */
-    hycond_t current_condition;
+    hycond_t *current_condition;
 
 // State
 
@@ -297,11 +278,6 @@ typedef struct HyThread {
      * ID for this thread. The maximum number of threads is governed by the size of lockword record.
      */
     IDATA thread_id;
-
-    /**
-     * Memory pool in with this thread allocated
-     */
-    apr_pool_t *pool;
 
     /**
      * APR thread attributes
@@ -485,12 +461,6 @@ typedef struct HyThreadMonitor {
     int notify_flag;
 
     /**
-     * monitor sub pool
-     * will be destroyed by monitor_destroy()
-     */
-    apr_pool_t *pool;
-
-    /**
      * Owner thread ID. 
      */
     IDATA thread_id;
@@ -553,12 +523,6 @@ typedef struct HySemaphore {
      * Mutex associated with the semaphore data.
      */
     hymutex_t mutex;         
-
-    /**
-     * semaphore sub pool
-     * will be destroyed by sem_destroy()
-     */
-    apr_pool_t *pool;     
 } HySemaphore;
 
 // Global variables 
@@ -620,7 +584,7 @@ IDATA acquire_start_lock(void);
 IDATA release_start_lock(void);
 
 IDATA thread_sleep_impl(I_64 millis, IDATA nanos, IDATA interruptable);
-IDATA condvar_wait_impl(hycond_t cond, hymutex_t mutex, I_64 ms, IDATA nano, IDATA interruptable);
+IDATA condvar_wait_impl(hycond_t *cond, hymutex_t *mutex, I_64 ms, IDATA nano, IDATA interruptable);
 IDATA monitor_wait_impl(hythread_monitor_t mon_ptr, I_64 ms, IDATA nano, IDATA interruptable);
 IDATA thin_monitor_wait_impl(hythread_thin_monitor_t *lockword_ptr, I_64 ms, IDATA nano, IDATA interruptable);
 IDATA sem_wait_impl(hysem_t sem, I_64 ms, IDATA nano, IDATA interruptable);
@@ -653,6 +617,20 @@ void *array_get(array_t array, UDATA index);
 void thread_start_count();
 void thread_end_count();
 
+/*
+ * portability functions, private for thread module
+ */
+int os_thread_create(osthread_t* phandle, UDATA stacksize, UDATA priority,
+        int (VMAPICALL *func)(void*), void *data);
+int os_thread_set_priority(osthread_t thread, int priority);
+osthread_t os_thread_current();
+int os_thread_cancel(osthread_t);
+int os_thread_join(osthread_t);
+void os_thread_exit(int status);
+void os_thread_yield_other(osthread_t);
+int os_get_thread_times(osthread_t os_thread, int64* pkernel, int64* puser);
+
+int os_cond_timedwait(hycond_t *cond, hymutex_t *mutex, I_64 ms, IDATA nano);
 
 #ifdef __cplusplus
 }

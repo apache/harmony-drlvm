@@ -91,8 +91,8 @@ public:
 public:
     ValueMethodProfile(ValueProfileCollector* pc, Method_Handle mh);
     ~ValueMethodProfile();
-    void lockProfile() {hymutex_lock(lock);}
-    void unlockProfile() {hymutex_unlock(lock);}
+    void lockProfile() {hymutex_lock(&lock);}
+    void unlockProfile() {hymutex_unlock(&lock);}
     void dumpValues(std::ostream& os);
     void addNewValue(uint32 instructionKey, POINTER_SIZE_INT valueToAdd);
     POINTER_SIZE_INT getResult(uint32 instructionKey);

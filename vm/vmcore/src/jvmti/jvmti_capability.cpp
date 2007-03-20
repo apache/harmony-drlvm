@@ -402,14 +402,13 @@ jvmtiRelinquishCapabilities(jvmtiEnv* env,
     if (removed_caps.can_tag_objects) {
         // clear tags on relinquishing can_tag_objects capability
         ti_env = reinterpret_cast<TIEnv *>(env);
-        assert(ti_env->lock);
-        hymutex_lock(ti_env->lock);
+        hymutex_lock(&ti_env->lock);
         if (ti_env->tags) {
             ti_env->tags->clear();
             delete ti_env->tags;
             ti_env->tags = NULL;
         }
-        hymutex_unlock(ti_env->lock);
+        hymutex_unlock(&ti_env->lock);
 
         ti->reset_global_capability(DebugUtilsTI::TI_GC_ENABLE_TAG_OBJECTS);
     }

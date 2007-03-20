@@ -261,7 +261,7 @@ jint JNICALL create_jvmti_environment(JavaVM *vm_ext, void **env, jint version)
     error_code = newenv->allocate_extension_event_callbacks_table();
     if (error_code != JVMTI_ERROR_NONE)
     {
-        hymutex_destroy(newenv->lock);
+        hymutex_destroy(&newenv->lock);
         _deallocate((unsigned char *)newenv);
         *env = NULL;
         return error_code;
@@ -309,7 +309,7 @@ void DebugUtilsTI::setExecutionMode(Global_Env *p_env)
 
 DebugUtilsTI::DebugUtilsTI() :
     event_thread(NULL),
-    event_cond(NULL),
+    event_cond_initialized(0),
     agent_counter(1),
     access_watch_list(NULL),
     modification_watch_list(NULL),

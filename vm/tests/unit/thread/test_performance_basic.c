@@ -31,9 +31,9 @@ void* APR_THREAD_FUNC proc_apr_empty(apr_thread_t *thread, void *args) {
 }
 
 int proc_waiting(void *args) {
-    hymutex_lock(tm_mutex_lock);
-    hycond_wait(tm_condition_lock, tm_mutex_lock);
-    hymutex_unlock(tm_mutex_lock);
+    hymutex_lock(&tm_mutex_lock);
+    hycond_wait(&tm_condition_lock, &tm_mutex_lock);
+    hymutex_unlock(&tm_mutex_lock);
     return 0;
 }
 
@@ -133,13 +133,12 @@ int test_hymutex_create_destroy(void) {
         for (i = 0; i < ITERATIONS; i++) {
             stat = hymutex_create(&tm_mutex_lock, APR_THREAD_MUTEX_DEFAULT);
             assert(!stat);
-            stat = hymutex_destroy(tm_mutex_lock);
+            stat = hymutex_destroy(&tm_mutex_lock);
             assert(!stat);
         }
         end = apr_time_now();
         difference = difference + (end - start);
     }
-    tm_mutex_lock = NULL;
     difference = difference / PERF_FIDELITY;
     tested_threads_destroy();
 
@@ -192,15 +191,15 @@ int test_hymutex_lock_unlock(void) {
     for (j = 0; j < PERF_FIDELITY; j++) {
         start = apr_time_now();
         for (i = 0; i < ITERATIONS; i++) {
-            stat = hymutex_lock(tm_mutex_lock);
+            stat = hymutex_lock(&tm_mutex_lock);
             assert(!stat);
-            stat = hymutex_unlock(tm_mutex_lock);
+            stat = hymutex_unlock(&tm_mutex_lock);
             assert(!stat);
         }
         end = apr_time_now();
         difference = difference + (end - start);
     }
-    stat = hymutex_destroy(tm_mutex_lock);
+    stat = hymutex_destroy(&tm_mutex_lock);
     assert(!stat);
     difference = difference / PERF_FIDELITY;
     tested_threads_destroy();
@@ -254,15 +253,15 @@ int test_hymutex_trylock_unlock(void) {
     for (j = 0; j < PERF_FIDELITY; j++) {
         start = apr_time_now();
         for (i = 0; i < ITERATIONS; i++) {
-            stat = hymutex_trylock(tm_mutex_lock);
+            stat = hymutex_trylock(&tm_mutex_lock);
             assert(!stat);
-            stat = hymutex_unlock(tm_mutex_lock);
+            stat = hymutex_unlock(&tm_mutex_lock);
             assert(!stat);
         }
         end = apr_time_now();
         difference = difference + (end - start);
     }
-    stat = hymutex_destroy(tm_mutex_lock);
+    stat = hymutex_destroy(&tm_mutex_lock);
     assert(!stat);
     difference = difference / PERF_FIDELITY;
     tested_threads_destroy();
@@ -466,7 +465,7 @@ int test_hythread_set_private_data(void) {
     assert(!stat);
     stat = hythread_join(thread);
     assert(!stat);
-    stat = hymutex_destroy(tm_mutex_lock);
+    stat = hymutex_destroy(&tm_mutex_lock);
     assert(!stat);
     stat = hycond_destroy(tm_condition_lock);
     assert(!stat);
@@ -562,7 +561,7 @@ int test_hythread_get_private_data(void) {
     assert(!stat);
     stat = hythread_join(thread);
     assert(!stat);
-    stat = hymutex_destroy(tm_mutex_lock);
+    stat = hymutex_destroy(&tm_mutex_lock);
     assert(!stat);
     stat = hycond_destroy(tm_condition_lock);
     assert(!stat);

@@ -139,7 +139,7 @@ IDATA unreserve_lock(hythread_thin_monitor_t *lockword_ptr) {
     IDATA status;
     // trylock used to prevent cyclic suspend deadlock
     // the java_monitor_enter calls safe_point between attempts.
-    /*status = hymutex_trylock(TM_LOCK);
+    /*status = hymutex_trylock(&TM_LOCK);
     if (status !=TM_ERROR_NONE) {
         return status;
     }*/
@@ -151,7 +151,7 @@ IDATA unreserve_lock(hythread_thin_monitor_t *lockword_ptr) {
     owner = hythread_get_thread(lock_id);
     TRACE(("Unreserved other %d \n", ++unreserve_count/*, vm_get_object_class_name(lockword_ptr-1)*/));
     if (!IS_RESERVED(lockword) || IS_FAT_LOCK(lockword)) {
-        // hymutex_unlock(TM_LOCK);
+        // hymutex_unlock(&TM_LOCK);
         return TM_ERROR_NONE;
     }
     // suspend owner 
@@ -186,11 +186,11 @@ IDATA unreserve_lock(hythread_thin_monitor_t *lockword_ptr) {
 
     // resume owner
     if (owner) {
-        apr_thread_yield_other(owner->os_handle);
+        os_thread_yield_other(owner->os_handle);
         hythread_resume(owner);
     }
 
-    /* status = hymutex_unlock(TM_LOCK);*/
+    /* status = hymutex_unlock(&TM_LOCK);*/
 
     // Gregory - This lock, right after it was unreserved, may be
     // inflated by another thread and therefore instead of recursion
@@ -561,12 +561,12 @@ hythread_monitor_t VMCALL inflate_lock(hythread_thin_monitor_t *lockword_ptr) {
     IDATA fat_monitor_id;
     I_32 lockword;
     int i;
-    status=hymutex_lock(FAT_MONITOR_TABLE_LOCK);
+    status=hymutex_lock(&FAT_MONITOR_TABLE_LOCK);
     assert(status == TM_ERROR_NONE);
     TRACE(("inflate tmj%d\n", ++inflate_count));
     lockword = *lockword_ptr;
     if (IS_FAT_LOCK (lockword)) {
-        status = hymutex_unlock(FAT_MONITOR_TABLE_LOCK);
+        status = hymutex_unlock(&FAT_MONITOR_TABLE_LOCK);
         assert(status == TM_ERROR_NONE);
         return locktable_get_fat_monitor(FAT_LOCK_ID(lockword));
     }
@@ -587,7 +587,7 @@ hythread_monitor_t VMCALL inflate_lock(hythread_thin_monitor_t *lockword_ptr) {
     assert(status == TM_ERROR_NONE);  
     status = hythread_monitor_enter(fat_monitor);
     if (status != TM_ERROR_NONE) {
-        hymutex_unlock(FAT_MONITOR_TABLE_LOCK);
+        hymutex_unlock(&FAT_MONITOR_TABLE_LOCK);
         return NULL;
     } 
     
@@ -603,7 +603,7 @@ hythread_monitor_t VMCALL inflate_lock(hythread_thin_monitor_t *lockword_ptr) {
     TRACE(("FAT ID : 0x%x", *lockword_ptr));
     fat_monitor->inflate_count++;
     fat_monitor->inflate_owner=tm_self_tls;
-    status=hymutex_unlock(FAT_MONITOR_TABLE_LOCK);
+    status=hymutex_unlock(&FAT_MONITOR_TABLE_LOCK);
     assert(status == TM_ERROR_NONE);
 #ifdef LOCK_RESERVATION
     assert(!IS_RESERVED(*lockword_ptr));

@@ -38,11 +38,11 @@ static int interrupter_thread_function(void *args);
 void VMCALL hythread_interrupt(hythread_t thread) {
     IDATA status;
     hythread_t thr = NULL;
-    hymutex_lock(thread->mutex);
+    hymutex_lock(&thread->mutex);
     thread->state |= TM_THREAD_STATE_INTERRUPTED;
     
     if (thread == tm_self_tls) {
-        hymutex_unlock(thread->mutex);
+        hymutex_unlock(&thread->mutex);
         return;
     }
 
@@ -62,29 +62,29 @@ void VMCALL hythread_interrupt(hythread_t thread) {
 	}
     }
 
-    hymutex_unlock(thread->mutex);
+    hymutex_unlock(&thread->mutex);
 }
+
 static int interrupter_thread_function(void *args) {
     hythread_t thread = (hythread_t)args; 
     hythread_monitor_t monitor = NULL;
-    hymutex_lock(thread->mutex);
+    hymutex_lock(&thread->mutex);
 
     if (thread->waited_monitor) {
         monitor = thread->waited_monitor;
     } else {
-        hymutex_unlock(thread->mutex);
+        hymutex_unlock(&thread->mutex);
         hythread_exit(NULL);
         return 0; 
     } 
 
-    hymutex_unlock(thread->mutex);
+    hymutex_unlock(&thread->mutex);
 
+    hythread_monitor_enter(monitor);
+    hythread_monitor_notify_all(monitor);
 
-   hythread_monitor_enter(monitor);
-   hythread_monitor_notify_all(monitor);
-
-   hythread_exit(monitor);
-   return 0;
+    hythread_exit(monitor);
+    return 0;
 }
 
 /** 
@@ -95,10 +95,10 @@ static int interrupter_thread_function(void *args) {
  */
 UDATA VMCALL hythread_clear_interrupted_other(hythread_t thread) {
     int interrupted;
-    hymutex_lock(thread->mutex);
+    hymutex_lock(&thread->mutex);
     interrupted = thread->state & TM_THREAD_STATE_INTERRUPTED;
     thread->state &= ~TM_THREAD_STATE_INTERRUPTED;
-    hymutex_unlock(thread->mutex);
+    hymutex_unlock(&thread->mutex);
     return interrupted ? TM_ERROR_INTERRUPT : TM_ERROR_NONE;
 }
 

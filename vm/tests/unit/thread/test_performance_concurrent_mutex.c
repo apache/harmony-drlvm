@@ -52,9 +52,9 @@ int proc_concurrent(void *args) {
 
     int j = 0;
 
-    hymutex_lock(tm_mutex_lock);
-    hycond_wait(tm_condition_lock, tm_mutex_lock);
-    hymutex_unlock(tm_mutex_lock);
+    hymutex_lock(&tm_mutex_lock);
+    hycond_wait(&tm_condition_lock, &tm_mutex_lock);
+    hymutex_unlock(&tm_mutex_lock);
 
     for (j = 0; j < iterations; j++) {
         hymutex_lock(tm_concurrent_mutex_lock);
@@ -308,11 +308,11 @@ int test_hythread_cuncurrent_mutex_tm(hythread_t threads_array[],
         hythread_join(threads_array[i]);
     }       
     end = apr_time_now();
-    stat = hymutex_destroy(tm_concurrent_mutex_lock);
+    stat = hymutex_destroy(&tm_concurrent_mutex_lock);
     assert(!stat);
-    stat = hymutex_destroy(tm_mutex_lock);
+    stat = hymutex_destroy(&tm_mutex_lock);
     assert(!stat);
-    stat = hycond_destroy(tm_condition_lock);
+    stat = hycond_destroy(&tm_condition_lock);
     assert(!stat);
     return (end - start);
 }

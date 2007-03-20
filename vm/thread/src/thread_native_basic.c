@@ -40,7 +40,7 @@ typedef struct {
 
 extern hythread_group_t TM_DEFAULT_GROUP;
 extern hythread_library_t TM_LIBRARY;
-static void* APR_THREAD_FUNC thread_start_proc(apr_thread_t* thd, void *p_args);
+static int VMAPICALL thread_start_proc(void *arg);
 static hythread_t allocate_thread();
 static void reset_thread(hythread_t thread);
 static IDATA register_to_group(hythread_t thread, hythread_group_t group);
@@ -91,13 +91,11 @@ static void thread_set_self(hythread_t thread);
  * @param[in] attr threadattr to use to determine how to create the thread, or NULL for default attributes
  * @param[in] func function to run in the new thread
  * @param[in] data argument to be passed to starting function
- * @sa apr_thread_create()
  */
 IDATA VMCALL hythread_create_with_group(hythread_t *ret_thread, hythread_group_t group, UDATA stacksize, UDATA priority, UDATA suspend, hythread_entrypoint_t func, void *data) {
-    apr_threadattr_t *apr_attrs;
     hythread_t  new_thread;
     thread_start_proc_data * start_proc_data;
-    apr_status_t apr_status;
+    int r;
    
     if (ret_thread) {
         hythread_struct_init(ret_thread);
@@ -111,18 +109,12 @@ IDATA VMCALL hythread_create_with_group(hythread_t *ret_thread, hythread_group_t
     }
 
     new_thread->library = hythread_self()->library;
-    if (stacksize) {
-        apr_threadattr_create(&apr_attrs, new_thread->pool);
-        apr_threadattr_stacksize_set(apr_attrs, stacksize);
-        new_thread->apr_attrs  = apr_attrs;
-    } else {
-        new_thread->apr_attrs = NULL;
-    }
-
     new_thread->priority = priority ? priority : HYTHREAD_PRIORITY_NORMAL;
     //new_thread->suspend_request = suspend ? 1 : 0;
     
-    start_proc_data = (thread_start_proc_data *) apr_palloc(new_thread->pool, sizeof(thread_start_proc_data));
+    start_proc_data =
+        (thread_start_proc_data *) malloc(sizeof(thread_start_proc_data));
+
     if (start_proc_data == NULL) {
         return TM_ERROR_OUT_OF_MEMORY;
     }
@@ -133,14 +125,15 @@ IDATA VMCALL hythread_create_with_group(hythread_t *ret_thread, hythread_group_t
     start_proc_data->start_proc = func;
     start_proc_data->start_proc_args = data;
 
-    // Create APR thread using the given attributes;
-    apr_status = apr_thread_create(&(new_thread->os_handle), // new thread OS handle 
-            new_thread->apr_attrs,                           // thread attr created here
-            thread_start_proc,                               //
-            (void *)start_proc_data,                         //thread_proc attrs 
-            new_thread->pool); 
+    // we need to make sure thread will not register itself with a thread group
+    // until os_thread_create returned and initialized thread->os_handle properly
+    hythread_global_lock();
+    r = os_thread_create(&new_thread->os_handle, stacksize,
+            priority, thread_start_proc, (void *)start_proc_data);
+    assert(/* error */ r || new_thread->os_handle /* or thread created ok */);
+    hythread_global_unlock();
    
-    return CONVERT_ERROR(apr_status);
+    return r;
 }
 
 /**
@@ -177,9 +170,6 @@ IDATA VMCALL hythread_create(hythread_t *ret_thread, UDATA stacksize, UDATA prio
  */
 IDATA hythread_attach_to_group(hythread_t * handle, hythread_library_t lib, hythread_group_t group) {
     hythread_t thread;
-    apr_thread_t *os_handle = NULL; 
-    apr_os_thread_t *os_thread;
-    apr_status_t apr_status;
 
     if (lib == NULL) {
         lib = TM_LIBRARY;
@@ -203,15 +193,8 @@ IDATA hythread_attach_to_group(hythread_t * handle, hythread_library_t lib, hyth
         return TM_ERROR_OUT_OF_MEMORY;
     }
     thread->library = lib;
-    os_thread = apr_palloc(thread->pool, sizeof(apr_os_thread_t));
-    if (os_thread == NULL) {
-        return TM_ERROR_OUT_OF_MEMORY;
-    } 
-    *os_thread = apr_os_thread_current();
-    apr_status = apr_os_thread_put(&os_handle, os_thread, thread->pool);
-    if (apr_status != APR_SUCCESS) return CONVERT_ERROR(apr_status);
-    
-    thread->os_handle = os_handle;
+    thread->os_handle = os_thread_current();
+    assert(thread->os_handle);
 
     TRACE(("TM: native attached: native: %p ",  tm_self_tls));
     
@@ -434,11 +417,11 @@ IDATA thread_sleep_impl(I_64 millis, IDATA nanos, IDATA interruptable) {
     // Report error in case current thread is not attached
     if (!thread) return TM_ERROR_UNATTACHED_THREAD;
     
-    hymutex_lock(thread->mutex);
+    hymutex_lock(&thread->mutex);
     thread->state |= TM_THREAD_STATE_SLEEPING;
-    status = condvar_wait_impl(thread->condition, thread->mutex, millis, nanos, interruptable);
+    status = condvar_wait_impl(&thread->condition, &thread->mutex, millis, nanos, interruptable);
     thread->state &= ~TM_THREAD_STATE_SLEEPING;
-    hymutex_unlock(thread->mutex);
+    hymutex_unlock(&thread->mutex);
 
     return (status == TM_ERROR_INTERRUPT && interruptable) ? TM_ERROR_INTERRUPT : TM_ERROR_NONE;
 }
@@ -541,7 +524,7 @@ IDATA VMCALL hythread_get_group(hythread_group_t *group, hythread_t thread) {
  * @return none
  */
 void VMCALL hythread_cancel(hythread_t thread) {
-    apr_thread_cancel(thread->os_handle);
+    os_thread_cancel(thread->os_handle);
 }
 
 /** 
@@ -597,7 +580,9 @@ static IDATA register_to_group(hythread_t thread, hythread_group_t group) {
     
     // Acquire global TM lock to prevent concurrent access to thread list
     status = hythread_global_lock(NULL);
-    if (status != TM_ERROR_NONE) return status;
+    assert(status == 0);
+
+    assert(thread->os_handle);
 
     thread_set_self(thread);
     assert(thread == tm_self_tls);
@@ -631,22 +616,16 @@ static IDATA register_to_group(hythread_t thread, hythread_group_t group) {
  * @return created and initialized thread_t structure
  */
 static hythread_t allocate_thread() {
-    apr_pool_t *pool;
-    apr_status_t apr_status;
     hythread_t ptr;
     IDATA status;
 
-    apr_status = apr_pool_create(&pool, TM_POOL);
-    if ((apr_status != APR_SUCCESS) || (pool == NULL)) return NULL;
-
-    ptr = (hythread_t )apr_pcalloc(pool, sizeof(HyThread));
+    ptr = (hythread_t )calloc(1, sizeof(HyThread));
     if (ptr == NULL) return NULL;
 
-    ptr->pool       = pool;
-    ptr->os_handle  = NULL;
+    ptr->os_handle  = (osthread_t)NULL;
     ptr->priority   = HYTHREAD_PRIORITY_NORMAL;
     // not implemented
-    //ptr->big_thread_local_storage = (void **)apr_pcalloc(pool, sizeof(void*)*tm_tls_capacity);
+    //ptr->big_thread_local_storage = (void **)calloc(1, sizeof(void*)*tm_tls_capacity);
     
     // Suspension
     ptr->suspend_request = 0;
@@ -667,17 +646,17 @@ static hythread_t allocate_thread() {
 }
 
 static void reset_thread(hythread_t thread) {
-    apr_status_t apr_status;
+    int r;
     IDATA status;
     if (thread->os_handle) {
-        apr_thread_join(&apr_status, thread->os_handle);
-        assert(!apr_status);
+        r = os_thread_join(thread->os_handle);
+        assert(!r);
     }
 
-    thread->os_handle  = NULL;
+    thread->os_handle  = (osthread_t)NULL;
     thread->priority   = HYTHREAD_PRIORITY_NORMAL;
     // not implemented
-    //ptr->big_thread_local_storage = (void **)apr_pcalloc(pool, sizeof(void*)*tm_tls_capacity);
+    //ptr->big_thread_local_storage = (void **)calloc(1, sizeof(void*)*tm_tls_capacity);
 
     // Suspension
     thread->suspend_request = 0;
@@ -696,30 +675,36 @@ static void reset_thread(hythread_t thread) {
 // Wrapper around user thread start proc. Used to perform some duty jobs 
 // right after thread is started.
 //////
-static void* APR_THREAD_FUNC thread_start_proc(apr_thread_t* thd, void *p_args) {
+static int VMAPICALL thread_start_proc(void *arg) {
     IDATA status;
     hythread_t thread;
     thread_start_proc_data * start_proc_data;
+    hythread_entrypoint_t start_proc;
+    hythread_group_t group;
+    void *data;
     
-    start_proc_data = (thread_start_proc_data *) p_args;
+    start_proc_data = (thread_start_proc_data *) arg;
     thread = start_proc_data->thread;
+    start_proc = start_proc_data->start_proc;
+    data = start_proc_data->start_proc_args;
+    group = start_proc_data->group;
+    free(start_proc_data);
 
     TRACE(("TM: native thread started: native: %p tm: %p", apr_os_thread_current(), thread));
 
-    status = register_to_group(thread, start_proc_data->group);
+    status = register_to_group(thread, group);
     if (status != TM_ERROR_NONE) {
         thread->exit_value = status;
-        return &thread->exit_value;
+        return thread->exit_value;
     }
 
     // Also, should it be executed under TM global lock?
-    thread->os_handle = thd; // DELETE?
     status = hythread_set_priority(thread, thread->priority);
     //assert(status == TM_ERROR_NONE);//now we down - fixme
     thread->state |= TM_THREAD_STATE_RUNNABLE;
 
     // Do actual call of the thread body supplied by the user.
-    start_proc_data->start_proc(start_proc_data->start_proc_args);
+    start_proc(data);
 
     // Shutdown sequence.
     status = hythread_global_lock(NULL);
@@ -735,9 +720,7 @@ static void* APR_THREAD_FUNC thread_start_proc(apr_thread_t* thd, void *p_args) 
     status = hythread_global_unlock(NULL);
     assert(status == TM_ERROR_NONE);    
     
-    // TODO: It seems it is there is no need to call apr_thread_exit.
-    // Current thread should automatically exit upon returning from this function.
-    return (void *)(IDATA)apr_thread_exit(thd, APR_SUCCESS);
+    return 0;
 }
 
 extern HY_CFUNC void VMCALL 
@@ -747,20 +730,20 @@ extern HY_CFUNC void VMCALL
         monitor->recursion_count = 0;
         hythread_monitor_exit(monitor);
     }
-    apr_thread_exit(hythread_self()->os_handle, APR_SUCCESS);     
+    os_thread_exit(0);
     // unreachable statement
     abort();
 }
 
-apr_pool_t* get_local_pool() {
-    hythread_t self = tm_self_tls;
-    return self == NULL ? TM_POOL : self->pool;
-}
- 
 /**
-  * TODO: implement this function to reduce memory leaks.
-  */
-IDATA local_pool_cleanup_register(void* func, void* data) {
-   return TM_ERROR_NONE;
+ * Queries user and kernel time of the thread, in nanoseconds.
+ *
+ * @param thread        thread block pointer
+ * @param[out] pkernel  pointer to a variable to store kernel time into
+ * @param[out] puser    pointer to a variable to store user time into
+ *
+ * @returns     0 on success, system error code otherwise
+ */
+UDATA hythread_get_thread_times(hythread_t thread, int64* pkernel, int64* puser) {
+    return os_get_thread_times(thread->os_handle, pkernel, puser);
 }
-

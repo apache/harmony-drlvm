@@ -41,25 +41,25 @@
  * @sa java.util.concurrent.CountDownLatch 
  */
 IDATA VMCALL hylatch_create(hylatch_t *latch, IDATA count) {
+    int r;
     hylatch_t l;
-    apr_pool_t *pool = get_local_pool(); 
-    apr_status_t apr_status;
     
-    l = apr_palloc(pool, sizeof(HyLatch));
+    l = malloc(sizeof(HyLatch));
     if (l == NULL) {
-            return TM_ERROR_OUT_OF_MEMORY;
+        return TM_ERROR_OUT_OF_MEMORY;
     }
-    apr_status = apr_thread_mutex_create((apr_thread_mutex_t**)&(l->mutex), TM_MUTEX_DEFAULT, pool);
-    if (apr_status != APR_SUCCESS) return CONVERT_ERROR(apr_status);
+    r = hymutex_create(&l->mutex, TM_MUTEX_DEFAULT);
+    if (r) goto cleanup;
+    r = hycond_create(&l->condition);
+    if (r) goto cleanup;
         
-    apr_status = apr_thread_cond_create((apr_thread_cond_t**)&(l->condition), pool);
-
-    if (apr_status != APR_SUCCESS) return CONVERT_ERROR(apr_status);
-
     l->count = count;
-    l->pool = pool;
     *latch = l;
     return TM_ERROR_NONE;
+
+cleanup:
+    free(l);
+    return r;
 }
 
 //wait method implementation
@@ -67,19 +67,19 @@ IDATA VMCALL hylatch_create(hylatch_t *latch, IDATA count) {
 static IDATA latch_wait_impl(hylatch_t latch, I_64 ms, IDATA nano, IDATA interruptable) {
     IDATA status;
         
-    status = hymutex_lock(latch->mutex);
+    status = hymutex_lock(&latch->mutex);
     if (status != TM_ERROR_NONE) return status;
     while (latch->count) {
-        status = condvar_wait_impl(latch->condition, latch->mutex, ms, nano, interruptable);
+        status = condvar_wait_impl(&latch->condition, &latch->mutex, ms, nano, interruptable);
         //check interruption and other problems
         if (status != TM_ERROR_NONE) {
-            hymutex_unlock(latch->mutex);
+            hymutex_unlock(&latch->mutex);
             return status;
         }
 
         if (ms || nano) break;
     }
-    status = hymutex_unlock(latch->mutex);
+    status = hymutex_unlock(&latch->mutex);
     if (status != TM_ERROR_NONE) return status;
 
     return TM_ERROR_NONE;
@@ -136,10 +136,10 @@ IDATA VMCALL hylatch_wait_interruptable(hylatch_t latch, I_64 ms, IDATA nano) {
 IDATA VMCALL hylatch_set(hylatch_t latch, IDATA count) {
     IDATA status;
     
-    status = hymutex_lock(latch->mutex);
+    status = hymutex_lock(&latch->mutex);
     if (status != TM_ERROR_NONE) return status;
     latch->count = count;
-    status = hymutex_unlock(latch->mutex);
+    status = hymutex_unlock(&latch->mutex);
     if (status != TM_ERROR_NONE) return status;
 
     return TM_ERROR_NONE;       
@@ -155,23 +155,23 @@ IDATA VMCALL hylatch_set(hylatch_t latch, IDATA count) {
 IDATA VMCALL hylatch_count_down(hylatch_t latch) {
     IDATA status;
     
-    status = hymutex_lock(latch->mutex);
+    status = hymutex_lock(&latch->mutex);
     if (status != TM_ERROR_NONE) return status;
     if (latch->count <= 0) {
-        status = hymutex_unlock(latch->mutex);
+        status = hymutex_unlock(&latch->mutex);
         if (status != TM_ERROR_NONE) return status;
         return TM_ERROR_ILLEGAL_STATE;
     }
     latch->count--;
     if (latch->count == 0) {
-        status = hycond_notify_all(latch->condition); 
+        status = hycond_notify_all(&latch->condition); 
         if (status != TM_ERROR_NONE) {
-            hymutex_unlock(latch->mutex);
+            hymutex_unlock(&latch->mutex);
             return status;
         }
     }
             
-    status = hymutex_unlock(latch->mutex);
+    status = hymutex_unlock(&latch->mutex);
     if (status != TM_ERROR_NONE) return status;
         
     return TM_ERROR_NONE;       
@@ -188,10 +188,10 @@ IDATA VMCALL hylatch_count_down(hylatch_t latch) {
 IDATA VMCALL hylatch_get_count(IDATA *count, hylatch_t latch) {
     IDATA status;
     
-    status = hymutex_lock(latch->mutex);
+    status = hymutex_lock(&latch->mutex);
     if (status != TM_ERROR_NONE) return status;
     *count = latch->count;
-    status = hymutex_unlock(latch->mutex);
+    status = hymutex_unlock(&latch->mutex);
     if (status != TM_ERROR_NONE) return status;
 
     return TM_ERROR_NONE;       
@@ -202,14 +202,10 @@ IDATA VMCALL hylatch_get_count(IDATA *count, hylatch_t latch) {
  * @param[in] latch the latch 
  */
 IDATA VMCALL hylatch_destroy(hylatch_t latch) {
-    apr_pool_t *pool = latch->pool;
-    if (pool != get_local_pool()) {
-        return local_pool_cleanup_register(hylatch_destroy, latch);
-    }
-    apr_thread_mutex_destroy((apr_thread_mutex_t*)latch->mutex);
-    apr_thread_cond_destroy((apr_thread_cond_t*)latch->condition);
-    // apr_pool_free(pool, latch);
+    hymutex_destroy(&latch->mutex);
+    hycond_destroy(&latch->condition);
 
+    free(latch);
     return TM_ERROR_NONE;       
 }
 

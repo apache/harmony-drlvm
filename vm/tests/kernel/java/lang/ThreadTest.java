@@ -527,7 +527,7 @@ public class ThreadTest extends TestCase {
         ThreadGroup tg = new ThreadGroup("newGroup");
         String name = "t1";
         Square s = new Square(25);
-        Thread t = new Thread(tg, s, name, 1);
+        Thread t = new Thread(tg, s, name, 0);
         t.start();
         waitTime = waitDuration;
         StackTraceElement ste[] = t.getStackTrace();
@@ -549,7 +549,14 @@ public class ThreadTest extends TestCase {
         Square s = new Square(25);
         StackTraceElement ste[] = null; 
         try {
-            Thread t = new Thread(tg, s, name, Long.MAX_VALUE);
+            Thread t;
+            try {
+                t = new Thread(tg, s, name, Long.MAX_VALUE);
+            } catch (OutOfMemoryError e) {
+                // fall back to default stack size if can't allocate
+                // Long.MAX_VALUE bytes for stack
+                t = new Thread(tg, s, name, 0);
+            }
             t.start();
             waitTime = waitDuration;
             ste = t.getStackTrace();
