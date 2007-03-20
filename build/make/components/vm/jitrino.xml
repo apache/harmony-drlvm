@@ -209,12 +209,16 @@ Version: $Revision: 1.6.2.8 $
                     <compilerarg value="/wd4702" />
                     <compilerarg value="/wd4100" />
                     <compilerarg value="/wd4127" />
+                    <select cfg="release">
+                        <compilerarg value="/wd4718" />
+                    </select>
                     <!--
                       #4201 - W4, nonstandart extention - nameless struct or union
                       #4702 - W4, unreachable code (fired in STL's <list>)
                       #4512 - assigment operator can not be generated
                       #4100 - unreferenced formal parameter
                       #4127 - conditional expression is constant
+                      #4718 - release: recursive call has no side effects, deleting
 
                       # specify where to put the per-compilation unit pdb
                       # this is needed to make the parallel compilation to work with cl: 
