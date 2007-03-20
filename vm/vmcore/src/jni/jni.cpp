@@ -1463,6 +1463,7 @@ VMEXPORT jint JNICALL DestroyJavaVM(JavaVM * vm)
     
     // Destroy VM environment.
     delete java_vm->vm_env;
+    java_vm->vm_env = NULL;
     
     // Destroy VM pool.
     apr_pool_destroy(java_vm->pool);

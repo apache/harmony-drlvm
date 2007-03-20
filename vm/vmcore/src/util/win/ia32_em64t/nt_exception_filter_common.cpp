@@ -52,16 +52,39 @@ static void print_callstack(LPEXCEPTION_POINTERS nt_exception) {
 
 static LONG process_crash(LPEXCEPTION_POINTERS nt_exception, const char* msg = NULL)
 {
+static DWORD saved_eip_index = TlsAlloc();
+static BOOL UNREF tmp_init = TlsSetValue(saved_eip_index, (LPVOID)0);
+
     Registers regs;
     nt_to_vm_context(nt_exception->ContextRecord, &regs);
 
     // Check crash location to prevent infinite recursion
-    if (regs.get_ip() == p_TLS_vmthread->regs.get_ip())
+    if (regs.get_ip() == (void*)TlsGetValue(saved_eip_index))
         return EXCEPTION_CONTINUE_SEARCH;
     // Store registers to compare IP in future
-    p_TLS_vmthread->regs = regs;
+    TlsSetValue(saved_eip_index, (LPVOID)regs.get_ip());
 
-    if (get_boolean_property("vm.assert_dialog", TRUE, VM_PROPERTIES))
+    switch (nt_exception->ExceptionRecord->ExceptionCode)
+    {
+    case EXCEPTION_DATATYPE_MISALIGNMENT:
+    case EXCEPTION_ILLEGAL_INSTRUCTION:
+    case EXCEPTION_ACCESS_VIOLATION:
+    case EXCEPTION_PRIV_INSTRUCTION:
+    case EXCEPTION_FLT_DIVIDE_BY_ZERO:
+    case EXCEPTION_FLT_OVERFLOW:
+    case EXCEPTION_FLT_UNDERFLOW:
+    case EXCEPTION_INT_DIVIDE_BY_ZERO:
+    case EXCEPTION_INT_OVERFLOW:
+        break;
+
+    case EXCEPTION_STACK_OVERFLOW:
+    default:
+        return EXCEPTION_CONTINUE_SEARCH;
+    }
+
+    // We can't obtain a value of property if loader_env is NULL
+    if (VM_Global_State::loader_env == NULL ||
+        get_boolean_property("vm.assert_dialog", TRUE, VM_PROPERTIES))
         return EXCEPTION_CONTINUE_SEARCH;
 
     print_state(nt_exception, msg);
@@ -204,28 +227,32 @@ LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception
     PCONTEXT context = nt_exception->ContextRecord;
     Registers regs;
     bool flag_replaced = false;
+    VM_thread* vmthread = p_TLS_vmthread;
 
     // Convert NT context to Registers
     nt_to_vm_context(context, &regs);
     POINTER_SIZE_INT saved_eip = (POINTER_SIZE_INT)regs.get_ip();
 
-    assert(p_TLS_vmthread);
-    // If exception is occured in processor instruction previously
-    // instrumented by breakpoint, the actual exception address will reside
-    // in jvmti_jit_breakpoints_handling_buffer
-    // We should replace exception address with saved address of instruction
-    POINTER_SIZE_INT break_buf =
-        (POINTER_SIZE_INT)p_TLS_vmthread->jvmti_jit_breakpoints_handling_buffer;
-    if (saved_eip >= break_buf &&
-        saved_eip < break_buf + 50)
-    {
-        flag_replaced = true;
-        regs.set_ip(p_TLS_vmthread->jvmti_saved_exception_registers.get_ip());
-        vm_to_nt_context(&regs, context);
-    }
+    bool in_java = false;
 
-    TRACE2("signals", ("VEH received an exception: code = %x, ip = %p, sp = %p",
-        nt_exception->ExceptionRecord->ExceptionCode, regs.get_ip(), regs_get_sp(&regs)));
+    if (vmthread)
+    {
+        // If exception is occured in processor instruction previously
+        // instrumented by breakpoint, the actual exception address will reside
+        // in jvmti_jit_breakpoints_handling_buffer
+        // We should replace exception address with saved address of instruction
+        POINTER_SIZE_INT break_buf =
+            (POINTER_SIZE_INT)vmthread->jvmti_jit_breakpoints_handling_buffer;
+        if (saved_eip >= break_buf &&
+            saved_eip < break_buf + 50)
+        {
+            flag_replaced = true;
+            regs.set_ip(vmthread->jvmti_saved_exception_registers.get_ip());
+            vm_to_nt_context(&regs, context);
+        }
+
+        in_java = (vm_identify_eip(regs.get_ip()) == VM_TYPE_JAVA);
+    }
 
     // the possible reasons for hardware exception are
     //  - segfault or division by zero in java code
@@ -240,16 +267,20 @@ LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception
     //  - other (internal VM error or debugger breakpoint)
     //    => delegate to default handler
 
-    bool in_java = (vm_identify_eip(regs.get_ip()) == VM_TYPE_JAVA);
-
-    // delegate "other" cases to default handler
-    if (!in_java && code != STATUS_STACK_OVERFLOW)
+    // delegate "other" cases to crash handler
+    // Crash handler shouls be invoked when VM_thread is not attached to VM
+    // or exception has occured in native code and it's not STACK_OVERFLOW
+    if (!vmthread ||
+        (!in_java && code != STATUS_STACK_OVERFLOW))
     {
         LONG result = process_crash(nt_exception);
         regs.set_ip((void*)saved_eip);
         vm_to_nt_context(&regs, context);
         return result;
     }
+
+    TRACE2("signals", ("VEH received an exception: code = %x, ip = %p, sp = %p",
+        nt_exception->ExceptionRecord->ExceptionCode, regs.get_ip(), regs_get_sp(&regs)));
 
     // if HWE occured in java code, suspension should also have been disabled
     assert(!in_java || !hythread_is_suspend_enabled());
@@ -267,7 +298,7 @@ LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception
                 ("StackOverflowError detected at ip = %p, esp = %p",
                  regs.get_ip(), regs_get_sp(&regs)));
 
-            p_TLS_vmthread->restore_guard_page = true;
+            vmthread->restore_guard_page = true;
             exn_class = env->java_lang_StackOverflowError_Class;
             if (in_java) {
                 // stack overflow occured in java code:
@@ -339,7 +370,7 @@ LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception
 
     // save register context of hardware exception site
     // into thread-local registers snapshot
-    p_TLS_vmthread->regs = regs;
+    vmthread->regs = regs;
 
     // __cdecl <=> push parameters in the reversed order
     // push in_java argument onto stack
