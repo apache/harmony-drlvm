@@ -1,0 +1,10 @@
+## These tests are too slow
+java/lang/RuntimeAdditionalTest*.java
+
+# HARMONY-3214
+java/lang/ClassGenericsTest.java
+java/lang/ClassGenericsTest4.java
+
+# HARMONY-2453
+java/lang/SystemTest.java
+
