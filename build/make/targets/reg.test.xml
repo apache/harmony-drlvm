@@ -175,12 +175,12 @@
                     </and>
                 </condition>
 
-                <antcall target="embed.manifest" />
+                <antcall target="reg.embed.manifest" />
             </sequential>
         </for>
     </target>
 
-    <target name="embed.manifest" if="add.manifest">
+    <target name="reg.embed.manifest" if="add.manifest">
         <echo message="Adding manifest to ${reg.test.native.path}/${outfile}${shlib.suffix}" />
         <exec executable="mt.exe">
             <arg value="-nologo" />

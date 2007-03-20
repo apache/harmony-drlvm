@@ -19,6 +19,9 @@
         <target name="test" depends="smoke.test, check-result"/>
     </select>
     <select arch="ia32,em64t">
+        <select arch="em64t" os="win">
+            <propertyregex property="test.mode" input="jet,int" regexp="" replace="" override="on" />
+        </select>
         <target name="test" depends="jvmti.test, cunit.test, smoke.test, kernel.test, check-result"/>
     </select>
     

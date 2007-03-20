@@ -95,12 +95,12 @@
                     </and>
                 </condition>
 
-                <antcall target="embed.manifest" />
+                <antcall target="jvmti.embed.manifest" />
             </sequential>
         </for>
     </target>
 
-    <target name="embed.manifest" if="add.manifest">
+    <target name="jvmti.embed.manifest" if="add.manifest">
         <echo message="Adding manifest to ${jvmti.test.native.path}/${outputdir}/${outputdir}${shlib.suffix}" />
         <exec executable="mt.exe">
             <arg value="-nologo" />

@@ -103,12 +103,12 @@ Version: $Revision: 1.4.2.11 $
                     </and>
                 </condition>
 
-                <antcall target="embed.manifest" />
+                <antcall target="smoke.embed.manifest" />
             </sequential>
         </for>
     </target>
 
-    <target name="embed.manifest" if="add.manifest">
+    <target name="smoke.embed.manifest" if="add.manifest">
         <echo message="Adding manifest to ${smoke.test.native.path}/${outputdir}/${outputfile}${shlib.suffix}" />
         <exec executable="mt.exe">
             <arg value="-nologo" />
