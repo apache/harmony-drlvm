@@ -5763,12 +5763,12 @@ EscAnalyzer::checkCnG(CnGNode* scnode, bool check_loc) {
                 if ( (check_loc && (getEscState(scnode)==NO_ESCAPE)) ||
                     (!check_loc && (getEscState(scnode)!=NO_ESCAPE)) ) {
                     storeId = true;
-                    } else {
-                        if (_scinfo) {
-                            os_sc << "----scalar no opt:     check_loc " << check_loc 
-                                << "  state " << getEscState(scnode) << std::endl;
-                        }
+                } else {
+                    if (_scinfo) {
+                        os_sc << "----scalar no opt:     check_loc " << check_loc 
+                            << "  state " << getEscState(scnode) << std::endl;
                     }
+                }
             } else {
                 if (_scinfo) {
                     os_sc << "----scalar no opt: LOBJ  final fields " << ob_fin_fld_count 
@@ -5791,7 +5791,7 @@ EscAnalyzer::checkCnG(CnGNode* scnode, bool check_loc) {
                     os_sc << "************* " << ((Opnd*)scnode->refObj)->getType()->getName() 
                         << std::endl;
                 }
-                assert(vnode==0);
+                assert(vnode!=NULL);
                 CnGNode* lobj = getLObj(vnode);  // scalarizable load object
                 if (lobj != NULL) {
                     if (_scinfo) {
