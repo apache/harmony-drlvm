@@ -702,6 +702,9 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 			Name="kernel_classes"
 			Filter="">
 			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_ClassLoader.h">
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_EMThreadSupport.cpp">
 			</File>
 			<File
@@ -775,6 +778,12 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_util_concurrent_locks_LockSupport.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_drlvm_VMHelper.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_drlvm_VMHelper.h">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_drlvm_VMHelperFastPath.cpp">
