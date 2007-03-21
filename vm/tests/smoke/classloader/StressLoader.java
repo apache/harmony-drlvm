@@ -22,7 +22,6 @@ package classloader;
 
 /**
  * Test loading from multiple threads.
- * @keyword XXX_bug_1373
  */
 public class StressLoader extends Thread {
     final static int COUNT = 250; // VM has a thread limit

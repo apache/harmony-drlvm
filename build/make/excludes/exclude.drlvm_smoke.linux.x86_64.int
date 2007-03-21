@@ -6,3 +6,6 @@ gc/Mark.java
 
 # HARMONY-2977
 io/Integers.java
+
+# HARMONY-2772 fails intermittently 
+stress/Mix.java
