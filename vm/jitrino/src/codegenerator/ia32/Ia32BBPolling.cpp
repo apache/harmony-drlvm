@@ -20,7 +20,7 @@
  */
 
 #include "Ia32IRManager.h"
-#include "VMInterface.h"
+#include "DrlVMInterface.h"
 
 namespace Jitrino
 {
