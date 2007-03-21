@@ -1,0 +1,11 @@
+<project name="RUN HARMONY-3404 Regression Test">
+    <target name="run-test">
+        <run-junit-test 
+            test="org.apache.harmony.drlvm.tests.regression.h3404.H3404">
+            <junit-element>
+              <sysproperty key="java.library.path" value="${reg.test.native.path}/H3404"/>
+            </junit-element>
+        </run-junit-test>
+    </target>
+</project>
+

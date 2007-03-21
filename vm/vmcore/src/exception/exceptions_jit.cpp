@@ -201,13 +201,24 @@ static void exn_propagate_exception(
         si_goto_previous(si);
     }
 
-    assert(!si_is_native(si));
+    Method *interrupted_method;
+    NativeCodePtr interrupted_method_location;
+    JIT *interrupted_method_jit;
 
-    CodeChunkInfo *interrupted_cci = si_get_code_chunk_info(si);
-    assert(interrupted_cci);
-    Method *interrupted_method = interrupted_cci->get_method();
-    NativeCodePtr interrupted_method_location = si_get_ip(si);
-    JIT *interrupted_method_jit = interrupted_cci->get_jit();
+    if (!si_is_native(si))
+    {
+        CodeChunkInfo *interrupted_cci = si_get_code_chunk_info(si);
+        assert(interrupted_cci);
+        interrupted_method = interrupted_cci->get_method();
+        interrupted_method_location = si_get_ip(si);
+        interrupted_method_jit = interrupted_cci->get_jit();
+    }
+    else
+    {
+        interrupted_method = m2n_get_method(si_get_m2n(si));
+        interrupted_method_location = 0;
+        interrupted_method_jit = 0;
+    }
 
     if (NULL != *exn_obj)
     {
@@ -218,6 +229,7 @@ static void exn_propagate_exception(
         // So in this case IP reported by stack iterator is past the athrow bytecode
         // and should be moved back to be inside of bytecode location for interrupted
         // method.
+
         interrupted_method_location = (NativeCodePtr)((POINTER_SIZE_INT)interrupted_method_location - 1);
 
         // Determine the type of the exception for the type tests below.
@@ -248,112 +260,116 @@ static void exn_propagate_exception(
     Class_Handle search_exn_class = !VM_Global_State::loader_env->IsVmShutdowning()
         ? exn_class : VM_Global_State::loader_env->JavaLangObject_Class;
 
-    bool same_frame = true;
-    while (!si_is_past_end(si) && !si_is_native(si)) {
-        CodeChunkInfo *cci = si_get_code_chunk_info(si);
-        assert(cci);
-        Method *method = cci->get_method();
-        JIT *jit = cci->get_jit();
-        assert(method && jit);
-        NativeCodePtr ip = si_get_ip(si);
-        bool is_ip_past = !!si_get_jit_context(si)->is_ip_past;
+    if (!si_is_native(si))
+    {
+        bool same_frame = true;
+        while (!si_is_past_end(si) && !si_is_native(si)) {
+            CodeChunkInfo *cci = si_get_code_chunk_info(si);
+            assert(cci);
+            Method *method = cci->get_method();
+            JIT *jit = cci->get_jit();
+            assert(method && jit);
+            NativeCodePtr ip = si_get_ip(si);
+            bool is_ip_past = !!si_get_jit_context(si)->is_ip_past;
 
 #ifdef VM_STATS
-        cci->num_throws++;
+            cci->num_throws++;
 #endif // VM_STATS
 
-        // Examine this frame's exception handlers looking for a match
-        unsigned num_handlers = cci->get_num_target_exception_handlers();
-        for (unsigned i = 0; i < num_handlers; i++) {
-            Target_Exception_Handler_Ptr handler =
-                cci->get_target_exception_handler_info(i);
-            if (!handler)
-                continue;
-            if (handler->is_in_range(ip, is_ip_past)
-                && handler->is_assignable(search_exn_class)) {
-                // Found a handler that catches the exception.
+            // Examine this frame's exception handlers looking for a match
+            unsigned num_handlers = cci->get_num_target_exception_handlers();
+            for (unsigned i = 0; i < num_handlers; i++) {
+                Target_Exception_Handler_Ptr handler =
+                    cci->get_target_exception_handler_info(i);
+                if (!handler)
+                    continue;
+                if (handler->is_in_range(ip, is_ip_past)
+                    && handler->is_assignable(search_exn_class)) {
+                    // Found a handler that catches the exception.
 #ifdef VM_STATS
-                cci->num_catches++;
-                if (same_frame) {
-                    VM_Statistics::get_vm_stats().num_exceptions_caught_same_frame++;
-                }
-                if (handler->is_exc_obj_dead()) {
-                    VM_Statistics::get_vm_stats().num_exceptions_dead_object++;
-                    if (!*exn_obj) {
-                        VM_Statistics::get_vm_stats().num_exceptions_object_not_created++;
+                    cci->num_catches++;
+                    if (same_frame) {
+                        VM_Statistics::get_vm_stats().num_exceptions_caught_same_frame++;
                     }
-                }
+                    if (handler->is_exc_obj_dead()) {
+                        VM_Statistics::get_vm_stats().num_exceptions_dead_object++;
+                        if (!*exn_obj) {
+                            VM_Statistics::get_vm_stats().num_exceptions_object_not_created++;
+                        }
+                    }
 #endif // VM_STATS
-                // Setup handler context
-                jit->fix_handler_context(method, si_get_jit_context(si));
-                si_set_ip(si, handler->get_handler_ip(), false);
+                    // Setup handler context
+                    jit->fix_handler_context(method, si_get_jit_context(si));
+                    si_set_ip(si, handler->get_handler_ip(), false);
 
-                // Start single step in exception handler
-                if (ti->isEnabled() && ti->is_single_step_enabled())
-                {
-                    VM_thread *vm_thread = p_TLS_vmthread;
-                    ti->vm_brpt->lock();
-                    if (NULL != vm_thread->ss_state)
+                    // Start single step in exception handler
+                    if (ti->isEnabled() && ti->is_single_step_enabled())
                     {
-                        uint16 bc;
-                        NativeCodePtr ip = handler->get_handler_ip();
-                        OpenExeJpdaError UNREF result =
-                            jit->get_bc_location_for_native(method, ip, &bc);
-                        assert(EXE_ERROR_NONE == result);
+                        VM_thread *vm_thread = p_TLS_vmthread;
+                        ti->vm_brpt->lock();
+                        if (NULL != vm_thread->ss_state)
+                        {
+                            uint16 bc;
+                            NativeCodePtr ip = handler->get_handler_ip();
+                            OpenExeJpdaError UNREF result =
+                                jit->get_bc_location_for_native(method, ip, &bc);
+                            assert(EXE_ERROR_NONE == result);
 
-                        jvmti_StepLocation method_start = {(Method *)method, ip, bc, false};
+                            jvmti_StepLocation method_start = {(Method *)method, ip, bc, false};
 
-                        jvmti_set_single_step_breakpoints(ti, vm_thread,
+                            jvmti_set_single_step_breakpoints(ti, vm_thread,
                                 &method_start, 1);
+                        }
+                        ti->vm_brpt->unlock();
                     }
-                    ti->vm_brpt->unlock();
-                }
 
-                // Create exception if necessary
-                if (!*exn_obj && !handler->is_exc_obj_dead()) {
-                    *exn_obj = create_lazy_exception(exn_class, exn_constr,
-                        jit_exn_constr_args, vm_exn_constr_args);
-                }
-
-                if (jvmti_is_exception_event_requested()) {
                     // Create exception if necessary
-                    if (NULL == *exn_obj) {
+                    if (!*exn_obj && !handler->is_exc_obj_dead()) {
                         *exn_obj = create_lazy_exception(exn_class, exn_constr,
                             jit_exn_constr_args, vm_exn_constr_args);
                     }
 
-                    BEGIN_RAISE_AREA;
-                    // Reload exception object pointer because it could have
-                    // moved while calling JVMTI callback
-                    *exn_obj = jvmti_jit_exception_event_callback_call(*exn_obj,
-                        interrupted_method_jit, interrupted_method,
-                        interrupted_method_location,
-                        jit, method, handler->get_handler_ip());
-                    END_RAISE_AREA;
+                    if (jvmti_is_exception_event_requested()) {
+                        // Create exception if necessary
+                        if (NULL == *exn_obj) {
+                            *exn_obj = create_lazy_exception(exn_class, exn_constr,
+                                jit_exn_constr_args, vm_exn_constr_args);
+                        }
+
+                        BEGIN_RAISE_AREA;
+                        // Reload exception object pointer because it could have
+                        // moved while calling JVMTI callback
+
+                        *exn_obj = jvmti_jit_exception_event_callback_call(*exn_obj,
+                            interrupted_method_jit, interrupted_method,
+                            interrupted_method_location,
+                            jit, method, handler->get_handler_ip());
+
+                        END_RAISE_AREA;
+                    }
+
+                    TRACE2("exn", ("setting return pointer to %d", exn_obj));
+
+                    si_set_return_pointer(si, (void **) exn_obj);
+                    si_free(throw_si);
+                    return;
                 }
-
-                TRACE2("exn", ("setting return pointer to %d", exn_obj));
-
-                si_set_return_pointer(si, (void **) exn_obj);
-                si_free(throw_si);
-                return;
             }
+
+            // No appropriate handler found, undo synchronization
+            vm_monitor_exit_synchronized_method(si);
+
+            BEGIN_RAISE_AREA;
+            jvalue ret_val = {(jlong)0};
+            jvmti_process_method_exception_exit_event(
+                reinterpret_cast<jmethodID>(method), JNI_TRUE, ret_val, si);
+            END_RAISE_AREA;
+
+            // Goto previous frame
+            si_goto_previous(si);
+            same_frame = false;
         }
-
-        // No appropriate handler found, undo synchronization
-        vm_monitor_exit_synchronized_method(si);
-
-        BEGIN_RAISE_AREA;
-        jvalue ret_val = {(jlong)0};
-        jvmti_process_method_exception_exit_event(
-            reinterpret_cast<jmethodID>(method), JNI_TRUE, ret_val, si);
-        END_RAISE_AREA;
-
-        // Goto previous frame
-        si_goto_previous(si);
-        same_frame = false;
     }
-
     // Exception propagates to the native code
     assert(si_is_native(si));
 
@@ -371,6 +387,7 @@ static void exn_propagate_exception(
 
     // Reload exception object pointer because it could have
     // moved while calling JVMTI callback
+
     *exn_obj = jvmti_jit_exception_event_callback_call(*exn_obj,
         interrupted_method_jit, interrupted_method, interrupted_method_location,
         NULL, NULL, NULL);

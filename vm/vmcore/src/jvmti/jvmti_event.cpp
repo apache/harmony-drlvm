@@ -1497,22 +1497,19 @@ ManagedObject *jvmti_jit_exception_event_callback_call(ManagedObject *exn_object
 
     jlocation location = -1, catch_location = -1;
 
-    if (NULL == jit)
-    {
-        LWARN(37, "Zero interrupted method encountered");
-        return exn_object;
-    }
-
     uint16 bc = 0;
-    OpenExeJpdaError UNREF result = jit->get_bc_location_for_native(
-        method, native_location, &bc);
-    TRACE2("jvmti.event.exn",
-        "Exception method = " << (Method_Handle)method << " location " << bc);
-    if (EXE_ERROR_NONE != result)
-        LWARN(38, "JIT {0} {1} returned error {2} for exception method {3} location {4}" 
-                  << jit << "get_bc_location_for_native"
-                  << result << (Method_Handle)method << native_location);
-    location = bc;
+    if (NULL != jit)
+    {
+        OpenExeJpdaError UNREF result = jit->get_bc_location_for_native(
+            method, native_location, &bc);
+        TRACE2("jvmti.event.exn",
+            "Exception method = " << (Method_Handle)method << " location " << bc);
+        if (EXE_ERROR_NONE != result)
+            LWARN(38, "JIT {0} {1} returned error {2} for exception method {3} location {4}" 
+                << jit << "get_bc_location_for_native"
+                << result << (Method_Handle)method << native_location);
+        location = bc;
+    }
 
     if (catch_method)
     {
