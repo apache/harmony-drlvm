@@ -20,7 +20,7 @@
  */
 
 #include "Ia32IRManager.h"
-#include "DrlVMInterface.h"
+#include "VMInterface.h"
 
 namespace Jitrino
 {
@@ -271,7 +271,7 @@ BBPolling::getOrCreateTLSBaseReg(Edge* e)
 #endif
         // Basic Block for flag address calculating. (To be inserted before the loopHeaders)
         Node * bbpFlagAddrBlock = irManager.getFlowGraph()->createBlockNode();
-#ifdef PLATFORM_POSIX
+#if defined (PLATFORM_POSIX) || defined (_EM64T_)
          // TLS base can be obtained by calling get_thread_ptr()  (from vm_threads.h)
          Opnd * target=irManager.newImmOpnd( irManager.getTypeManager().getUnmanagedPtrType(irManager.getTypeManager().getIntPtrType()),
                                              Opnd::RuntimeInfo::Kind_HelperAddress,
