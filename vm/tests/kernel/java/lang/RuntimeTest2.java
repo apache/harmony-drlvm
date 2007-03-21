@@ -386,9 +386,8 @@ public class RuntimeTest2 extends TestCase {
                     } catch (Exception e) {
                     }
                 }
-                if (count == 0) {
-                    fail("exec(String[], String[], File).check001: where is " +
-                            "the date's answer/request?");
+                if (count < 0) {
+                    fail("check001: the date's reply has not been received");
                 }
 
                 int ia = is.available();
@@ -406,17 +405,6 @@ public class RuntimeTest2 extends TestCase {
                     bb[ii] = (byte) 0;
                 }
 
-                // byte[] ans = {'1','1','-','1','3','-','0','4','\n'};
-                // os.write(ans);
-                // os.write('1');
-                // os.write('3');
-                // os.write('-');
-                // os.write('1');
-                // os.write('3');
-                // os.write('-');
-                // os.write('1');
-                // os.write('3');
-                // os.write('\n');
                 os.write('x');
                 os.write('x');
                 os.write('-');
@@ -428,17 +416,18 @@ public class RuntimeTest2 extends TestCase {
                 os.write('\n');
                 os.flush();
 
-                // wait for is.available != 0
-                count = 100;
-                while (is.available() < 1 && count-- > 0) {
+                // wait for is.available > 9 which means that 'is' contains
+                // both the above written value and the consequent 
+                // 'date' command's reply
+                count = 300;
+                while (is.available() < 10 && count-- > 0) {
                     try {
                         Thread.sleep(200);
                     } catch (Exception e) {
                     }
                 }
-                if (count == 0) {
-                    fail("exec(String[], String[], File).check003: where is " +
-                            "the date's reaction on the incorrect entering?");
+                if (count < 0) {
+                    fail("check003: the date's reply has not been received");
                 }
                 ia = is.available();
                 byte[] bbb = new byte[ia];
@@ -446,8 +435,7 @@ public class RuntimeTest2 extends TestCase {
                 r1 = new String(bbb);
                 if (r1.indexOf("The system cannot accept the date entered") == -1
                         && r1.indexOf("Enter the new date") == -1) {
-                    fail("exec(String[], String[], File).check004: where is " +
-                            "the date's reaction on the incorrect enterring?");
+                    fail("check004: unexpected output: " + r1);
                 }
                 os.write('\n');
                 try {
