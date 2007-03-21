@@ -28,7 +28,7 @@
 				EnableEnhancedInstructionSet="2"
 				UsePrecompiledHeader="2"
 				WarningLevel="3"
-				WarnAsError="TRUE"
+				WarnAsError="FALSE"
 				Detect64BitPortabilityProblems="FALSE"
 				DebugInformationFormat="3"
 				DisableSpecificWarnings="4100;4127;4201;4511;4512;4702"/>
@@ -87,6 +87,7 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 				EnableEnhancedInstructionSet="2"
 				UsePrecompiledHeader="2"
 				WarningLevel="4"
+				WarnAsError="FALSE"
 				Detect64BitPortabilityProblems="FALSE"
 				DebugInformationFormat="3"
 				DisableSpecificWarnings="4100;4127;4201;4511;4512;4702"/>
@@ -149,6 +150,12 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\codelowerer.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\CodeSelectors.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\CodeSelectors.h">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\constantfolder.cpp">

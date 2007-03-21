@@ -19,7 +19,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\util\ia32\base_natives&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\util\win\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\lil\ia32\pim\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\encoder\ia32_em64t&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\zlib\include&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\apr\include\apr-1&quot;"
+				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\util\ia32\base_natives&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\util\win\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\lil\ia32\pim\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\encoder\ia32_em64t&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\zlib\include&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\apr\include\apr-1&quot;;&quot;$(ProjectDir)\..\..\..\..\..\working_classlib\deploy\include\icu4c&quot;"
 				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;BUILDING_VM;GC_V4;USE_DLL_JIT;APR_DECLARE_STATIC;PLATFORM_NT;_WIN32_WINNT=0x0501;_IA32_"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
@@ -32,10 +32,10 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="port.lib apr-1.lib aprutil-1.lib zdll.lib log4cxx.lib hythr.lib jthread.lib advapi32.lib odbc32.lib userenv.lib ws2_32.lib mswsock.lib"
+				AdditionalDependencies="port.lib apr-1.lib aprutil-1.lib zdll.lib log4cxx.lib hythr.lib jthread.lib advapi32.lib odbc32.lib userenv.lib ws2_32.lib mswsock.lib icuuc.lib"
 				OutputFile="$(OutDir)/harmonyvm.dll"
 				LinkIncremental="2"
-				AdditionalLibraryDirectories="&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\vm\port\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\apr\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\aprutil\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\zlib\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\log4cxx\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\vm\hythr\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\vm\jthread\_bin&quot;"
+				AdditionalLibraryDirectories="&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\vm\port\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\apr\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\aprutil\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\zlib\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\log4cxx\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\vm\hythr\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\vm\jthread\_bin&quot;;&quot;$(ProjectDir)\..\..\..\..\..\working_classlib\deploy\lib&quot;"
 				ModuleDefinitionFile=""
 				GenerateDebugInformation="TRUE"
 				ProgramDatabaseFile="$(OutDir)/harmonyvm.pdb"
@@ -76,7 +76,7 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 			CharacterSet="2">
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\util\ia32\base_natives&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\util\win\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\lil\ia32\pim\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\encoder\ia32_em64t&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\zlib\include&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\apr\include\apr-1&quot;"
+				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\util\ia32\base_natives&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\util\win\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\lil\ia32\pim\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\encoder\ia32_em64t&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\zlib\include&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\apr\include\apr-1&quot;;&quot;$(ProjectDir)\..\..\..\..\..\working_classlib\deploy\include\icu4c&quot;"
 				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;BUILDING_VM;GC_V4;USE_DLL_JIT;APR_DECLARE_STATIC;PLATFORM_NT;_WIN32_WINNT=0x0501;_IA32_"
 				RuntimeLibrary="0"
 				UsePrecompiledHeader="0"
@@ -87,10 +87,10 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="port.lib apr-1.lib aprutil-1.lib zdll.lib log4cxx.lib hythr.lib jthread.lib advapi32.lib odbc32.lib userenv.lib ws2_32.lib mswsock.lib"
+				AdditionalDependencies="port.lib apr-1.lib aprutil-1.lib zdll.lib log4cxx.lib hythr.lib jthread.lib advapi32.lib odbc32.lib userenv.lib ws2_32.lib mswsock.lib icuuc.lib"
 				OutputFile="$(OutDir)/harmonyvm.dll"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\vm\port\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\apr\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\aprutil\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\zlib\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\log4cxx\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\vm\hythr\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\vm\jthread\_bin&quot;"
+				AdditionalLibraryDirectories="&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\vm\port\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\apr\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\aprutil\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\zlib\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\log4cxx\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\vm\hythr\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\vm\jthread\_bin&quot;;&quot;$(ProjectDir)\..\..\..\..\..\working_classlib\deploy\lib&quot;"
 				GenerateDebugInformation="TRUE"
 				ProgramDatabaseFile="$(OutDir)/harmonyvm.pdb"
 				SubSystem="2"
@@ -442,6 +442,9 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 				RelativePath="..\..\..\..\vm\vmcore\src\class_support\Initialize.cpp">
 			</File>
 			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\class_support\inline_info.cpp">
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\class_support\java_type.cpp">
 			</File>
 			<File
@@ -521,9 +524,6 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\init\vm_init.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\init\vm_main.cpp">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\init\vm_properties.cpp">
@@ -922,9 +922,6 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 				RelativePath="..\..\..\..\vm\vmcore\src\thread\object_generic.cpp">
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\thread\suspend.cpp">
-			</File>
-			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\thread\thread_dump.cpp">
 			</File>
 			<File
@@ -936,16 +933,6 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\thread\verify_stack_enumeration.cpp">
 			</File>
-			<Filter
-				Name="hythr"
-				Filter="">
-				<File
-					RelativePath="..\..\..\..\vm\vmcore\src\thread\hythr\hythreads.cpp">
-				</File>
-				<File
-					RelativePath="..\..\..\..\vm\vmcore\src\thread\hythr\hythreads.h">
-				</File>
-			</Filter>
 		</Filter>
 		<Filter
 			Name="util"
@@ -1004,6 +991,13 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 					</File>
 					<File
 						RelativePath="..\..\..\..\vm\vmcore\src\util\win\include\vm_process.h">
+					</File>
+				</Filter>
+				<Filter
+					Name="ia32_em64t"
+					Filter="">
+					<File
+						RelativePath="..\..\..\..\vm\vmcore\src\util\win\ia32_em64t\nt_exception_filter_common.cpp">
 					</File>
 				</Filter>
 			</Filter>
@@ -1114,9 +1108,6 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\vmstart\src\compmgr\component_manager_impl.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmstart\src\main.cpp">
 			</File>
 		</Filter>
 		<Filter

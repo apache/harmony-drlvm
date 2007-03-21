@@ -20,15 +20,16 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\apr\include\apr-1&quot;"
-				PreprocessorDefinitions="PLATFORM_NT;APR_DECLARE_STATIC;WIN32;_DEBUG;_WINDOWS;_USRDLL"
+				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\apr\include\apr-1&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\thread\src&quot;"
+				PreprocessorDefinitions="PLATFORM_NT;APR_DECLARE_STATIC;WIN32;_DEBUG;_WINDOWS;_USRDLL;_WIN32_WINNT=0x0501"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				Detect64BitPortabilityProblems="FALSE"
-				DebugInformationFormat="4"/>
+				DebugInformationFormat="4"
+				CompileAs="0"/>
 			<Tool
 				Name="VCCustomBuildTool"/>
 			<Tool
@@ -37,6 +38,7 @@
 				OutputFile="$(OutDir)\hythr.dll"
 				LinkIncremental="2"
 				AdditionalLibraryDirectories="&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\aprutil\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\log4cxx\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\apr\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\vm\port\_bin&quot;"
+				IgnoreDefaultLibraryNames=""
 				ModuleDefinitionFile="$(ProjectDir)\..\..\..\..\vm\thread\src\hythr.def"
 				GenerateDebugInformation="TRUE"
 				ProgramDatabaseFile="$(OutDir)/hythr.pdb"
@@ -76,13 +78,14 @@ copy $(OutDir)\hythr.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationNam
 			CharacterSet="2">
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\apr\include\apr-1&quot;"
-				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;PLATFORM_NT;APR_DECLARE_STATIC"
+				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\apr\include\apr-1&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\thread\src&quot;"
+				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;PLATFORM_NT;APR_DECLARE_STATIC;_WIN32_WINNT=0x0501"
 				RuntimeLibrary="0"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				Detect64BitPortabilityProblems="FALSE"
-				DebugInformationFormat="3"/>
+				DebugInformationFormat="3"
+				CompileAs="0"/>
 			<Tool
 				Name="VCCustomBuildTool"/>
 			<Tool
@@ -128,6 +131,19 @@ copy $(OutDir)\hythr.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationNam
 	<References>
 	</References>
 	<Files>
+		<Filter
+			Name="win"
+			Filter="">
+			<File
+				RelativePath="..\..\..\..\vm\thread\src\win\os_condvar.c">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\thread\src\win\os_mutex.c">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\thread\src\win\os_thread.c">
+			</File>
+		</Filter>
 		<File
 			RelativePath="..\..\..\..\vm\thread\src\thread_init.c">
 		</File>
@@ -154,9 +170,6 @@ copy $(OutDir)\hythr.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationNam
 		</File>
 		<File
 			RelativePath="..\..\..\..\vm\thread\src\thread_native_latch.c">
-		</File>
-		<File
-			RelativePath="..\..\..\..\vm\thread\src\thread_native_mutex.c">
 		</File>
 		<File
 			RelativePath="..\..\..\..\vm\thread\src\thread_native_park.c">

@@ -127,6 +127,12 @@ copy $(OutDir)\gc_gen.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationNa
 			Name="common"
 			Filter="">
 			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\common\compressed_ref.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\common\compressed_ref.h">
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\gc_gen\src\common\fix_repointed_refs.h">
 			</File>
 			<File
