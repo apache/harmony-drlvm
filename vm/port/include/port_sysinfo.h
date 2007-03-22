@@ -22,6 +22,12 @@
 #ifndef _PORT_SYSINFO_H_
 #define _PORT_SYSINFO_H_
 
+/**
+* @file
+* System information routines
+*
+*/
+
 #include "open/types.h"
 #include "port_general.h"
 #include <apr_pools.h>
@@ -29,46 +35,71 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+/**
+ * @defgroup port_sysinfo System information routines
+ * @ingroup port_apr
+ * @{
+ */
 
 /**
- * Determines absolute path of the executing process.
+ * Determines the absolute path of the executing process.
+ * @param[out] self_name - the pointer to the requested path string
+ * @param pool           - a pool to allocate return buffer
+ * @return <code>APR_SUCCESS</code> if OK; otherwise, an error code.
  */
 APR_DECLARE(apr_status_t) port_executable_name(char** self_name,
                                    apr_pool_t* pool);
 
 /**
-* Returns number of processors in the system.
+* Returns the number of processors in the system.
 */
 APR_DECLARE(int) port_CPUs_number(void);
 
 /**
-* Returns name of CPU architecture.
+* Returns the name of CPU architecture.
 */
 APR_DECLARE(const char *) port_CPU_architecture(void);
 
 /**
-* Returns OS name and version.
+* Provides the name and version of the host operating system.
+* @param[out] os_name - the pointer to the OS name string
+* @param[out] os_ver  - the pointer to the OS version string
+* @param pool         - a pool to allocate return buffers
+* @return <code>APR_SUCCESS</code> if OK; otherwise, an error code.
 */
 APR_DECLARE(apr_status_t) port_OS_name_version(char** os_name, char** os_ver, 
                                    apr_pool_t* pool);
 
 /**
-* Returns name of active account.
+* Returns the name of the account under which the current process is executed.
+* @param[out] account - the pointer to the requested name string
+* @param pool         - a pool to allocate the return buffer
+* @return <code>APR_SUCCESS</code> if OK; otherwise, an error code.
 */
 APR_DECLARE(apr_status_t) port_user_name(char** account,
                              apr_pool_t* pool);
 
 /**
-* Returns home path of active account.
+* Returns the home path of the account under which the process is executed.
+* @param[out] path - the pointer to the requested path string
+* @param pool      - a pool to allocate return buffer
+* @return <code>APR_SUCCESS</code> if OK; otherwise, an error code.
 */
 APR_DECLARE(apr_status_t) port_user_home(char** path,
                              apr_pool_t* pool);
 
 /**
- * Returns name of current system time zone.
+ * Returns the name of current system time zone. Time zone names are defined 
+ * in the <i>tz</i> database, see ftp://elsie.nci.nih.gov/pub/.
+ * @param[out] tzname - the pointer to the name string
+ * @param pool        - a pool to allocate return buffer
+ * @return <code>APR_SUCCESS</code> if OK; otherwise, an error code.
  */
 APR_DECLARE(apr_status_t) port_user_timezone(char** tzname,
                                              apr_pool_t* pool);
+
+/** @} */
+
 
 #ifdef __cplusplus
 }

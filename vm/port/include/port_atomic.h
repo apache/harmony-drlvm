@@ -22,8 +22,22 @@
 #ifndef _PORT_ATOMIC_H_
 #define _PORT_ATOMIC_H_
 
+/**
+* @file
+* Atomic operations
+*/
+
 #include "open/types.h"
 #include "port_general.h"
+
+/**
+ * @defgroup port_atomic Atomic operations
+ *
+ * All atomic operations are perfomance critical,
+ * thus they are defined as inlined for most platforms in this file.
+ * @ingroup port_apr
+ * @{
+ */
 
 #ifdef __cplusplus
 extern "C" {
@@ -37,43 +51,50 @@ extern "C" {
 #define INLINE static
 #endif
 #endif
-/**
- * All atomic operrations are perfomance critical, 
- * thus they are defined as inlined for most platforms in this file
- */
- 
- #if defined(_IPF_)
 
-    
+ 
+ #if defined(_IPF_) || defined(DOXYGEN)
+
 /**
-* Atomic compare and exchange operation
-* @data[in, out]
-* @value[in] new value
-* @comp[in] value to compare with
-* return old value
+* The atomic compare and exchange operation on <code>uint8</code>.
+* The function compares the current value of the specified <i>data</i>
+* with the <i>comp</i> value and if they match, swaps the <i>data</i>
+* with the <i>value</i>.
+* @param[in, out] data  - the pointer to the value
+* @param[in] value      - the new value
+* @param[in] comp       - the value to compare with
+* @return The old value.
 */
 APR_DECLARE(uint8) port_atomic_cas8(volatile uint8 * data, 
                                                uint8 value, uint8 comp);
 
-/**
-* Atomic compare and exchange operation
-* @data[in, out]
-* @value[in] new value
-* @comp[in] value to compare with
-* return old value
+/**  
+* The atomic compare and exchange operation on uint16. 
+* The function compares the current value of the specified <i>data</i>
+* with the <i>comp</i> value and if they match, swaps the <i>data</i>
+* with the <i>value</i>.
+* @param[in, out] data - the pointer to the value
+* @param[in] value     - the new value
+* @param[in] comp      - the value to compare with
+* @return The old value.
 */
 APR_DECLARE(uint16) port_atomic_cas16(volatile uint16 * data, 
                                                  uint16 value, uint16 comp);
 
-/**
-* Atomic compare and exchange operation
-* @data[in, out]
-* @value[in] new value
-* @comp[in] value to compare with
-* return old value
+/**  
+* The atomic compare and exchange operation on uint64. 
+* The function compares the current value of the specified <i>data</i>
+* with the <i>comp</i> value and if they match, swaps the <i>data</i>
+* with the <i>value</i>.
+* @param[in, out] data - the pointer to the value
+* @param[in] value     - the new value
+* @param[in] comp      - the value to compare with
+* @return The old value.
 */
 APR_DECLARE(uint64) port_atomic_cas64(volatile uint64 * data, 
                                                  uint64 value, uint64 comp);
+
+/** @} */
 
 #elif defined(WIN32) && !defined(_WIN64)
 

@@ -27,17 +27,33 @@
 extern "C" {
 #endif
 
+/**
+* @file
+* High resolution timer
+*/
+
+/**
+ * @defgroup port_timer High resolution timer
+ * @ingroup port_apr
+ * @{
+ */
+
     /**
-     * High resolution timer, in nanoseconds.
+     * High resolution timer, in nanoseconds. 
+     * The timer is not tied to system clocks, rather intended for precise 
+     * measuring of elapsed time intervals.
      */
     typedef apr_int64_t apr_nanotimer_t;
 
     /**
     * Returns the value of the system timer with the best possible accuracy.
-    * This value is not tied to the absolute time, but intended for precise 
-    * measuring of elapsed time intervals.
+    * The difference between two subsequent invocations returns the number of
+    * passed nanoseconds.
     */
     APR_DECLARE(apr_nanotimer_t) port_nanotimer();
+
+/** @} */
+
 
 #ifdef __cplusplus
 }

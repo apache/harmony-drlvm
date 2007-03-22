@@ -22,17 +22,40 @@
 #ifndef _PORT_FILEPATH_H_
 #define _PORT_FILEPATH_H_
 
+/**
+* @file
+* Filepath manipulation routines
+*
+*/
+
 #include "port_general.h"
 #include <apr_pools.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+/**
+ * @defgroup port_filepath Filepath manipulation routines
+ * @ingroup port_apr
+ * @{
+ */
 
 /**
- * File system separators definitions.
- * @non_apr
+ * @defgroup file_sep File system separators definitions.
+ * @{
  */
+#ifdef DOXYGEN
+/** The platform-specific file name separator char delimiting entities in a filepath. */
+#define PORT_FILE_SEPARATOR
+/** The platform-specific file path separator char delimiting filepaths in a path list. */
+#define PORT_PATH_SEPARATOR
+/** The platform-specific file name separator as a string. */
+#define PORT_FILE_SEPARATOR_STR
+/** The platform-specific file name separator as a string. */
+#define PORT_PATH_SEPARATOR_STR
+#endif
+/** @} */
+
 #ifdef PLATFORM_POSIX
 #   define PORT_FILE_SEPARATOR '/'
 #   define PORT_PATH_SEPARATOR ':'
@@ -44,9 +67,13 @@ extern "C" {
 #   define PORT_FILE_SEPARATOR_STR "\\"
 #   define PORT_PATH_SEPARATOR_STR ";"
 #endif
+
 /**
-* Sticks together filepath parts.
-* @non_apr
+* Sticks together filepath parts delimiting them by a platform-specific file separator.
+* A typical example is obtaining a path to file by the directory path and the file name.
+* @param root  - the beginning of the file path
+* @param trail - the ending of the file path
+* @return The resulting filepath.
 */
 APR_DECLARE(char *) port_filepath_merge(const char* root,
                           const char* trail,
@@ -54,11 +81,21 @@ APR_DECLARE(char *) port_filepath_merge(const char* root,
 
 
 /**
-* Returns canonical form of the specified path.
-* @non_apr
+* Provides the <i>canonical form</i> of the specified path.
+* This means that the function returns the standardized absolute path to a resource
+* that can be addressed via different file paths.
+* The canonical form is reasonable to use as a resource identifier. 
+* @note The canonical form cannot be guaranteed to be the only unique name
+* due to various file systems specifics.
+* @param original - the path to be canonicalized
+* @param pool     - the pool to allocate return buffer
+* @return The canonical name of the specified path.
 */
 APR_DECLARE(char*) port_filepath_canonical(const char* original,
                                       apr_pool_t* pool);
+
+/** @} */
+
 
 #ifdef __cplusplus
 }
