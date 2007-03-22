@@ -1794,13 +1794,9 @@ CG_OpndHandle*    InstCodeSelector::ldStaticAddr(Type* fieldRefType, FieldDesc *
 #ifndef _EM64T_
     Opnd * addr=irManager.newImmOpnd(fieldRefType, Opnd::RuntimeInfo::Kind_StaticFieldAddress, fieldDesc);
 #else
-    Opnd * addr;
-    if(!fieldRefType->isReference()) {
-        addr =  irManager.newOpnd(fieldRefType);
-        appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, addr, irManager.newImmOpnd(fieldRefType, Opnd::RuntimeInfo::Kind_StaticFieldAddress, fieldDesc)));
-    } else {
-        addr = irManager.newImmOpnd(irManager.getTypeFromTag(Type::CompressedObject), Opnd::RuntimeInfo::Kind_StaticFieldAddress, fieldDesc);
-    }
+    Opnd* immOp = irManager.newImmOpnd(fieldRefType, Opnd::RuntimeInfo::Kind_StaticFieldAddress, fieldDesc);
+    Opnd* addr =  irManager.newOpnd(typeManager.getUnmanagedPtrType(fieldRefType));
+    appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, addr, immOp));
 #endif
     return addr;
 }

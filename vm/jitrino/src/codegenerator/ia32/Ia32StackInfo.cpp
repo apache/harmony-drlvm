@@ -352,10 +352,15 @@ void StackInfo::fixHandlerContext(JitFrameContext* context)
 
 void StackInfo::registerInsts(IRManager& irm) 
 {
-    if (!irm.getMethodDesc().isStatic()) {
+    MethodDesc& md = irm.getMethodDesc();
+    if (!md.isStatic()) {
 #ifdef _EM64T_
-        EntryPointPseudoInst * entryPointInst = irm.getEntryPointInst();
-        offsetOfThis = (uint32)entryPointInst->thisOpnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement)->getImmValue();
+        if ((md.isSynchronized() || md.isMethodClassIsLikelyExceptionType())) {
+            EntryPointPseudoInst * entryPointInst = irm.getEntryPointInst();
+            offsetOfThis = (uint32)entryPointInst->thisOpnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement)->getImmValue();
+        } else {
+            offsetOfThis = 0;
+        }
 #else
         EntryPointPseudoInst * entryPointInst = irm.getEntryPointInst();
         offsetOfThis = (uint32)entryPointInst->getOpnd(0)->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement)->getImmValue();

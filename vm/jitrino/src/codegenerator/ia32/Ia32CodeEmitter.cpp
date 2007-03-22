@@ -520,7 +520,7 @@ void CodeEmitter::postPass()
                     Type* targetType = irManager->getTypeManager().getInt64Type();
 
                     Opnd* targetVal = irManager->newImmOpnd(targetType,(int64)targetCodeStartAddr);
-                    Opnd* targetReg = irManager->newRegOpnd(targetType, RegName_R14);
+                    Opnd* targetReg = irManager->newRegOpnd(targetType, RegName_R11);
                     
                     Inst* movInst = irManager->newInst(Mnemonic_MOV, targetReg, targetVal);
 
@@ -605,12 +605,12 @@ bool RuntimeInterface::recompiledMethodEvent(BinaryRewritingInterface& binaryRew
 /*
         EncoderBase::Operands args;
         args.clear();
-        args.add(RegName_R14);
+        args.add(RegName_R11);
         // direct call <imm> is relative, but call <reg> use an absolute address to jump
         args.add(EncoderBase::Operand(OpndSize_64, (int64)targetAddr));
         char * ip = EncoderBase::encode((char*)callAddr, Mnemonic_MOV, args);
         args.clear();
-        args.add(RegName_R14);
+        args.add(RegName_R11);
         EncoderBase::encode(ip, Mnemonic_CALL, args);
 */
     } else

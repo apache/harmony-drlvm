@@ -1281,12 +1281,6 @@ void IRManager::calculateTotalRegUsage(OpndKind regKind) {
         if (opnd->isPlacedIn(regKind))
             gpTotalRegUsage |= getRegMask(opnd->getRegName());
     }
-#ifdef _EM64T_
-    //FIXME!!
-    gpTotalRegUsage |= getRegMask(RegName_R15);
-    gpTotalRegUsage |= getRegMask(RegName_R13);
-    gpTotalRegUsage |= getRegMask(RegName_R14);
-#endif
 }
 //_________________________________________________________________________________________________
 uint32 IRManager::getTotalRegUsage(OpndKind regKind)const {
@@ -1663,7 +1657,9 @@ void IRManager::resetOpndConstraints()
 void IRManager::finalizeCallSites()
 {
 #ifdef _EM64T_
-    if (!getMethodDesc().isStatic()) {
+    MethodDesc& md = getMethodDesc();
+    if (!md.isStatic() 
+            && (md.isSynchronized() || md.isMethodClassIsLikelyExceptionType())) {
         Type* thisType = entryPointInst->getOpnd(0)->getType();
         entryPointInst->thisOpnd = newMemOpnd(thisType, MemOpndKind_StackAutoLayout, getRegOpnd(STACK_REG), 0); 
         entryPointInst->getBasicBlock()->appendInst(newCopyPseudoInst(Mnemonic_MOV, entryPointInst->thisOpnd, entryPointInst->getOpnd(0)));

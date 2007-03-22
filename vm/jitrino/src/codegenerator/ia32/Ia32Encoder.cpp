@@ -233,25 +233,9 @@ uint8* Encoder::emit(uint8* stream, const Inst * inst)
                 RegName indexReg = pindex == NULL ? RegName_Null : pindex->getRegName();
 #ifdef _EM64T_
                 // adapter: all PTR types go as 64 bits
-                const RegName TMP_BASE = RegName_R13;
-                bool is_ptr = is_ptr_type(p->getType());
-                if (pindex== NULL && pbase == NULL) {
-                    // have only displacement - load displacement to register
-                    RegName reg = (RegName)(TMP_BASE + args.count());
-                    OPNDS tmp(reg, OPND(OpndSize_64, pdisp->getImmValue()));
-                    stream = (uint8*)EncoderBase::encode((char*)stream, Mnemonic_MOV, tmp);
-                    OPND mem(sz, reg, 0);
-                    args.add(mem);
-                }
-                else {
-                    EncoderBase::Operand o(is_ptr ? OpndSize_64 : sz, 
-                        baseReg, indexReg,
-                        NULL == pscale ? 0 : (unsigned char)pscale->getImmValue(),
-                        disp
-                        );
-                    args.add(o);
-                }
-#else 
+                assert(pindex != NULL || pbase != NULL);
+                sz = is_ptr_type(p->getType()) ? OpndSize_64 : sz;
+#endif
                 EncoderBase::Operand o(sz, 
                     baseReg,
                     indexReg,
@@ -260,7 +244,6 @@ uint8* Encoder::emit(uint8* stream, const Inst * inst)
                     );
                 args.add( o );
 
-#endif
             }
             break;
         default:
