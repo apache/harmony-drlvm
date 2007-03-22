@@ -110,7 +110,7 @@ void EdgeProfilerInstrumentationPass::_run(IRManager& irm)
     
     ProfilingInterface* pi = irm.getProfilingInterface();
     if (!pi->hasMethodProfile(ProfileType_Edge, md, JITProfilingRole_GEN)) {
-        pi->createEdgeMethodProfile(mm , md,  (uint32)counterKeys.size(),  (uint32*)&counterKeys.front(), _checkSum);
+        pi->createEdgeMethodProfile(mm , md,  (uint32)counterKeys.size(),  counterKeys.empty()?NULL:(uint32*)&counterKeys.front(), _checkSum);
     }
 
     irm.getCompilationInterface().unlockMethodData();
@@ -509,12 +509,14 @@ static Node* selectNodeToInstrument(IRManager& irm, Edge* edge) {
 }
 
 static bool hasCatch( Node* node ) {
-    Inst* first = (Inst*)node->getFirstInst();
-    assert(first->isLabel());
-    if (first->getNextInst()!=NULL && first->getNextInst()->getOpcode() == Op_Catch) {
-        return true;
-    }
-    return false;
+    Inst* inst = (Inst*)node->getFirstInst();
+    assert(inst->isLabel());
+    // Op_Catch is allowed to be not in the second position only (after label inst) 
+    // but in arbitrary position if Op_Phi insts present.
+    do {
+        inst = inst->getNextInst();
+    } while (inst!=NULL && inst->getOpcode() == Op_Phi);
+    return inst != NULL && inst->getOpcode() == Op_Catch;
 }
 
 /*static bool hasCounter( Node* node ) {
