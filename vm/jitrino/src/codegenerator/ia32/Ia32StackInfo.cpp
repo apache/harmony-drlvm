@@ -232,6 +232,14 @@ void StackInfo::unwind(MethodDesc* pMethodDesc, JitFrameContext* context, bool i
         context->p_r12 = (POINTER_SIZE_INT *)  offset;
         offset += offset_step;
     }
+    if(getRegMask(RegName_RDI) & icalleeMask) {
+        context->p_rdi = (POINTER_SIZE_INT *)  offset;
+        offset += offset_step;
+    }
+    if(getRegMask(RegName_RSI) & icalleeMask) {
+        context->p_rsi = (POINTER_SIZE_INT *)  offset;
+        offset += offset_step;
+    }
     if(getRegMask(RegName_RBP) & icalleeMask) {
         context->p_rbp = (POINTER_SIZE_INT *)  offset;
         offset += offset_step;
@@ -294,6 +302,12 @@ POINTER_SIZE_INT* StackInfo::getRegOffset(const JitFrameContext* context, RegNam
                 return context->p_rbp;
             case RegName_RBX:
                 return context->p_rbx;
+#ifdef _WIN64
+            case RegName_RSI:
+                return context->p_rsi;
+            case RegName_RDI:
+                return context->p_rdi;
+#endif
 #else
             case RegName_ESI:
                 return context->p_esi;

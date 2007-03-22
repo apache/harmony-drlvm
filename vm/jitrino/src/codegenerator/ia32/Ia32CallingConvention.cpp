@@ -170,7 +170,9 @@ Constraint  STDCALLCallingConvention::getCalleeSavedRegs(OpndKind regKind)const
 {
     switch (regKind){
         case OpndKind_GPReg:
-#ifdef _EM64T_
+#ifdef _WIN64
+            return (Constraint(RegName_RBX)|RegName_RBP|RegName_R12|RegName_R13|RegName_R14|RegName_R15|RegName_RSI|RegName_RDI);
+#elif _EM64T_
             return (Constraint(RegName_RBX)|RegName_RBP|RegName_R12|RegName_R13|RegName_R14|RegName_R15);
 #else
             return (Constraint(RegName_EBX)|RegName_EBP|RegName_ESI|RegName_EDI);

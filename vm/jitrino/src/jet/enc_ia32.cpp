@@ -305,6 +305,10 @@ static bool is_callee_save(RegName reg)
     if (equals(reg, RegName_EBX))   return true;
     if (equals(reg, RegName_EBP))   return true;
 #ifdef _EM64T_
+#ifdef _WIN64
+    if (equals(reg, RegName_RDI))   return true;
+    if (equals(reg, RegName_RSI))   return true;
+#endif
     if (equals(reg, RegName_R12))   return true;
     if (equals(reg, RegName_R13))   return true;
     if (equals(reg, RegName_R14))   return true;

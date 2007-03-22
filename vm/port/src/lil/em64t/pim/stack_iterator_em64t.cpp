@@ -117,6 +117,10 @@ static void si_unwind_from_m2n(StackIterator * si) {
         si->jit_frame_context.p_rbp = &current_m2n_frame->rbp;
         si->jit_frame_context.p_rip = &current_m2n_frame->rip;
 
+#ifdef _WIN64
+        si->jit_frame_context.p_rdi = &current_m2n_frame->rdi;
+        si->jit_frame_context.p_rsi = &current_m2n_frame->rsi;
+#endif
         si->jit_frame_context.p_rbx = &current_m2n_frame->rbx;
         si->jit_frame_context.p_r12 = &current_m2n_frame->r12;
         si->jit_frame_context.p_r13 = &current_m2n_frame->r13;
