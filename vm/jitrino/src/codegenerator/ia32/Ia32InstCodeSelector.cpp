@@ -156,6 +156,10 @@ void __stdcall add_value_profile_value(EM_ProfileAccessInterface* profileAccessI
     profileAccessInterface->value_profiler_add_value(mpHandle, index, value);
 }
 
+void __stdcall fill_array_with_const(uint32 copyOp, uint32 arrayRef, uint32 arrayBound, uint32 baseOp) {
+    assert(0);
+    return;
+}
 
 //_______________________________________________________________________________________________________________
 uint32 InstCodeSelector::_tauUnsafe;
@@ -177,6 +181,8 @@ void InstCodeSelector::onCFGInit(IRManager& irManager)
 
     irManager.registerInternalHelperInfo("initialize_array", IRManager::InternalHelperInfo((void*)&initialize_array,&CallingConvention_STDCALL));
     irManager.registerInternalHelperInfo("add_value_profile_value", IRManager::InternalHelperInfo((void*)&add_value_profile_value,&CallingConvention_STDCALL));
+
+    irManager.registerInternalHelperInfo("fill_array_with_const", IRManager::InternalHelperInfo((void*)&fill_array_with_const,&CallingConvention_STDCALL));
 }
 
 //_______________________________________________________________________________________________________________
@@ -2837,8 +2843,18 @@ CG_OpndHandle* InstCodeSelector::callhelper(uint32              numArgs,
         appendInsts(irManager.newInternalRuntimeHelperCallInst("add_value_profile_value", nArgs, newArgs, dstOpnd));
         break;
     }
+    case FillArrayWithConst:
+    {
+        assert(numArgs == 4);
+        Opnd * newArgs[4] = {(Opnd *)args[0], (Opnd *)args[1], (Opnd *)args[2], (Opnd *)args[3]};
+        appendInsts(irManager.newInternalRuntimeHelperCallInst("fill_array_with_const", numArgs, newArgs, dstOpnd));
+        break;
+    }
     default:
+    {
         assert(0);
+        break;
+    }
     }
     return dstOpnd;
 }

@@ -468,6 +468,8 @@ void JitHelperCallInst::handlePrintEscape(::std::ostream& os, char code) const {
         os << "LockedCmpExchange"; break;
     case AddValueProfileValue:
         os << "AddValueProfileValue"; break;
+    case FillArrayWithConst:
+        os << "FillArrayWithConst"; break;
     default:
         assert(0); break;
         }

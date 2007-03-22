@@ -409,6 +409,7 @@ JitHelperCallOp::Id _BlockCodeSelector::convertJitHelperId(JitHelperCallId callI
     case ReadThisState: return JitHelperCallOp::ReadThisState;
     case LockedCompareAndExchange: return JitHelperCallOp::LockedCompareAndExchange;
     case AddValueProfileValue: return JitHelperCallOp::AddValueProfileValue;
+    case FillArrayWithConst: return JitHelperCallOp::FillArrayWithConst;
     }
     assert(0);
     return JitHelperCallOp::InitializeArray; // to keep compiler quiet

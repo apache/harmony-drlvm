@@ -166,6 +166,7 @@ class JitHelperCallOp {
 public:
     enum Id {
         InitializeArray,
+        FillArrayWithConst,
         PseudoCanThrow,
         SaveThisState,
         ReadThisState,

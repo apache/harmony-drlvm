@@ -131,11 +131,21 @@ void EarlyPropagation::runImpl()
                         opndInfo.sourceOpndId = EmptyUint32;
                     }
                 }
+                /*
+                Here is the previous version to test whether the inst is copy or not.
                 bool isCopy = inst->getMnemonic() == Mnemonic_MOV ||(
                         (inst->getMnemonic() == Mnemonic_ADD || inst->getMnemonic() == Mnemonic_SUB) && 
                         inst->getOpnd(3)->isPlacedIn(OpndKind_Imm) && inst->getOpnd(3)->getImmValue()==0
                         && inst->getOpnd(3)->getRuntimeInfo()==NULL
                     );
+                It considered special case of 'dst = src +/- 0' as copy. 
+                In fact there are more similar cases like 'IMUL src, 1 ; shift src, 0' etc.
+                Such checks are obsolete now, Should as peephole takes care about such copies.
+
+                Anyway, the code above had a bug: 'inst->getOpnd(3)' crashes in instructions 
+                in native form (like ADD def_use, use).
+                */
+                const bool isCopy = inst->getMnemonic() == Mnemonic_MOV;
 
                 if (isCopy){ // CopyPseudoInst or mov
                     Opnd * defOpnd = inst->getOpnd(0);
