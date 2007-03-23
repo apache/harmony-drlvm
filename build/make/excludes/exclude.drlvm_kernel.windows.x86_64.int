@@ -9,5 +9,5 @@ java/lang/ClassGenericsTest4.java
 java/lang/SystemTest.java
 
 # unreported winx64-specific failure
-java/lang/RuntimeTest2
+java/lang/RuntimeTest2.java
 
