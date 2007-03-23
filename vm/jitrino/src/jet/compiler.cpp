@@ -874,13 +874,21 @@ bool Compiler::comp_gen_insts(unsigned pc, unsigned parentPC,
     if (bbinfo.processed) {
         if (bbinfo.jsr_target) {
             // we're processing JSR subroutine
-            assert(jsr_lead == pc);
-            // Simply load the state back to the parent's
-            BBState* prevState = m_bbStates[parentPC];
-            assert(m_jsrStates.find(jsr_lead) != m_jsrStates.end());
-            const BBState* jsrState = m_jsrStates[jsr_lead];
-            //prevState.jframe.init(&jsrState.jframe);
-            *prevState = *jsrState;
+            if (jsr_lead != NOTHING) {
+                assert(jsr_lead == pc);
+                // Simply load the state back to the parent's
+                BBState* prevState = m_bbStates[parentPC];
+                assert(m_jsrStates.find(jsr_lead) != m_jsrStates.end());
+                const BBState* jsrState = m_jsrStates[jsr_lead];
+                //prevState.jframe.init(&jsrState.jframe);
+                *prevState = *jsrState;
+            }
+            else {
+                // we have a fall through (and not through a JSR) path 
+                // to a subroutine
+                // do nothing here - we only need to return the state 
+                // back for JSR
+            }
         }
         return false;
     }
@@ -888,15 +896,15 @@ bool Compiler::comp_gen_insts(unsigned pc, unsigned parentPC,
     BBState * parentState;
     {
         const BBInfo& parentBB = m_bbs[parentPC];
-        // If we see that parent block was a JSR subroutine, this in fact 
-        // means that the parent block ended with a JSR call, and then 
+        // If we see that parent block was a JSR subroutine, this may mean
+        // that the parent block ended with a JSR call, and then 
         // 'parentPC' of this block was substituted (see the appropriate 
         // code in comp_gen_code_bb()).
-        // So, in this block we must use the state after the JSR subroutine.
+        // So, in this case we must use the state after the JSR subroutine.
         // The 'jsr_lead != parentPC' prevents from taking state from m_jsrStates
         // when the parentPC is the real parent, that is in a JSR subroutine
         // with several blocks.
-        if (parentBB.jsr_target && jsr_lead != parentPC) {
+        if (parentBB.jsr_target && jsr_lead != parentPC && jsr_lead != pc) {
             assert(m_jsrStates.find(parentPC) != m_jsrStates.end());
             parentState = m_jsrStates[parentPC];
         }

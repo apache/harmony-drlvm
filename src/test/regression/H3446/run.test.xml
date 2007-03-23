@@ -1,0 +1,9 @@
+<project name="RUN HARMONY-3446 Regression Test">
+    <target name="run-test">
+        <run-junit-test
+            test="org.apache.harmony.drlvm.tests.regression.h3446.SubSubTest"
+            vmarg="-Xem:jet -XX:-vm.assert_dialog">
+        </run-junit-test>
+    </target>
+</project>
+
