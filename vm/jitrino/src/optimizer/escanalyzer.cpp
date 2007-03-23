@@ -4837,7 +4837,7 @@ EscAnalyzer::doLOScalarReplacement(ObjIds* loids) {
         collectStLdInsts(onode, scObjFlds);
 
         if (_scinfo) {
-            os_sc << " found objects " << scObjFlds->size() << std::endl;
+            os_sc << " doLOSR: found object fields " << scObjFlds->size() << std::endl;
         }
 
         if (onode->nodeType == NT_LDOBJ) {
@@ -5107,7 +5107,7 @@ EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
             }
             collectStLdInsts(nonode, nscObjFlds);
             if (_scinfo) {
-                os_sc << " found objects for newobj " << nscObjFlds->size() << std::endl;
+                os_sc << " doEOSR: found object fields for newobj " << nscObjFlds->size() << std::endl;
             }
             if (!checkObjFlds(nscObjFlds, scObjFlds)) {
                 if (_scinfo) {
@@ -5124,14 +5124,12 @@ EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
         collectCallInsts(onode->cngNodeId, vc_insts, vcids);
 
         if (_scinfo) {
-            os_sc << " found objects " << scObjFlds->size() << " vc_inst " << vc_insts->size()  
+            os_sc << " doEOSR: found object fields " << scObjFlds->size() << " vc_inst " << vc_insts->size()  
                 << std::endl;
         }
         if (_scinfo) {
-            if (lobj_opt) {
-                for (it3=vc_insts->begin(); it3!=vc_insts->end(); it3++) {
-                    (*it3)->print(os_sc); os_sc << std::endl;
-                }
+            for (it3=vc_insts->begin(); it3!=vc_insts->end(); it3++) {
+                (*it3)->print(os_sc); os_sc << std::endl;
             }
         }
 
@@ -5147,12 +5145,12 @@ EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
         Edge* excedge = NULL;
         VarOpnd* ob_flag_opnd = _opndManager.createVarOpnd(typeInt32, false);
         VarOpnd* ob_var_opnd = _opndManager.createVarOpnd(nobj_inst->getDst()->getType(), false);
-        SsaTmpOpnd* ob_init_opnd = NULL;
+        SsaTmpOpnd* ob_init_opnd = _opndManager.createSsaTmpOpnd(ob_var_opnd->getType());
         uint32 ob_id = onode->opndId;
         Node* ob_exc_tnode = NULL;
         Insts::iterator itvc;
         ScObjFlds::iterator ito;
-        Node* node_no = NULL;
+        Node* node_no = nobj_inst->getNode();
         ScObjFld* sco = NULL;
 
         insertLdConst(1);
@@ -5167,8 +5165,6 @@ EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
             lobj_inst = lonode->nInst;
         }
         if (scObjFlds->size() > 0) {
-            ob_init_opnd = _opndManager.createSsaTmpOpnd(ob_var_opnd->getType());
-            node_no = nobj_inst->getNode();
             for (ito = scObjFlds->begin( ); ito != scObjFlds->end( ); ito++ ){
                 sco = (*ito);
                 if (sco->ls_insts->size()==0)
@@ -6190,11 +6186,6 @@ EscAnalyzer::restoreEOCreation(Insts* vc_insts, ScObjFlds* scObjFlds, VarOpnd* o
                 Inst* stv = _instFactory.makeStVar(sco->fldVarOpnd,fl_tmp_opnd_ld);
                 node_after1->appendInst(stv);
             }
-            if (tnode!=NULL) {
-                node_obj1=fg.splitNodeAtInstruction(newobj,splitAfter,false,
-                    _instFactory.makeLabel());
-                fg.addEdge(node_obj,tnode);
-            }
             if (node_after1 != NULL) {
                 if (_scinfo) {
                     os_sc << "!!!! to restore not final fields "  << std::endl;
@@ -6206,19 +6197,24 @@ EscAnalyzer::restoreEOCreation(Insts* vc_insts, ScObjFlds* scObjFlds, VarOpnd* o
                 fg.addEdge(node_var,node_after1);
                 fg.addEdge(node_after1,node_after);
             }
-            if (_scinfo) {
-                os_sc << "++++ objectCreate: after"  << std::endl;
-                FlowGraph::print(os_sc,node_before);
-                FlowGraph::print(os_sc,node_obj);
-                if (node_obj1 != NULL) {
-                   FlowGraph::print(os_sc,node_obj1);
-                }
-                FlowGraph::print(os_sc,node_var);
-                if (node_after1 != NULL) {
-                    FlowGraph::print(os_sc,node_after1);
-                }
-                os_sc << "++++ objectCreate: after end"  << std::endl;
+        }
+        if (tnode!=NULL) {
+            node_obj1=fg.splitNodeAtInstruction(newobj,splitAfter,false,
+                _instFactory.makeLabel());
+            fg.addEdge(node_obj,tnode);
+        }
+        if (_scinfo) {
+            os_sc << "++++ objectCreate: after"  << std::endl;
+            FlowGraph::print(os_sc,node_before);
+            FlowGraph::print(os_sc,node_obj);
+            if (node_obj1 != NULL) {
+                FlowGraph::print(os_sc,node_obj1);
             }
+            FlowGraph::print(os_sc,node_var);
+            if (node_after1 != NULL) {
+                FlowGraph::print(os_sc,node_after1);
+            }
+            os_sc << "++++ objectCreate: after end"  << std::endl;
         }
     }
 } // restoreEOCreation(Insts* vc_insts, ScObjFlds* objs, VarOpnd* ob_var_opnd,...)
