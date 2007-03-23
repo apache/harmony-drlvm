@@ -1,0 +1,13 @@
+## These tests are too slow
+java/lang/RuntimeAdditionalTest*.java
+
+# HARMONY-3110
+java/lang/reflect/FieldTest.java
+org/apache/harmony/lang/annotation/AllTypesTest.java
+
+# HARMONY-2453
+java/lang/SystemTest.java
+
+## following are tests that fail due to unknown bugs
+java/lang/ClassAnnotationsTest.java
+
