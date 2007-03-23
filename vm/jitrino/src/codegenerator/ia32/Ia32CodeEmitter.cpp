@@ -395,20 +395,27 @@ void CodeEmitter::emitCode( void ) {
             }
 
 #ifdef _EM64T_
+            bool patchCall = false;
             if (inst->hasKind(Inst::Kind_ControlTransferInst) && 
                    ((ControlTransferInst*)inst)->isDirect() && 
                    inst->getMnemonic() == Mnemonic_CALL) 
             {
-                if ((POINTER_SIZE_INT)ip & 0xF) 
-                {
-                    unsigned align = 0x10 - (unsigned)((POINTER_SIZE_INT)ip & 0xF);
-                    ip = (uint8*)EncoderBase::nops((char*)ip, align);
-                }
-                uint8 * instStartIp = ip;
-                assert(fit32(instStartIp-blockStartIp));
-                inst->setCodeOffset( (uint32)(instStartIp-blockStartIp) );
-                ip = inst->emit(ip);
-                ip = (uint8*)EncoderBase::nops((char*)ip, 0x10 - inst->getCodeSize());
+                ControlTransferInst* callInst =  (ControlTransferInst*)inst;
+                Opnd::RuntimeInfo * rt = callInst->getOpnd(callInst->getTargetOpndIndex())->getRuntimeInfo();
+                bool helperCall = rt && (rt->getKind() == Opnd::RuntimeInfo::Kind_InternalHelperAddress || rt->getKind() == Opnd::RuntimeInfo::Kind_HelperAddress);
+                patchCall = !helperCall;
+            }
+            if (patchCall) {
+                 if ((POINTER_SIZE_INT)ip & 0xF) 
+                 {
+                     unsigned align = 0x10 - (unsigned)((POINTER_SIZE_INT)ip & 0xF);
+                     ip = (uint8*)EncoderBase::nops((char*)ip, align);
+                 }
+                 uint8 * instStartIp = ip;
+                 assert(fit32(instStartIp-blockStartIp));
+                 inst->setCodeOffset( (uint32)(instStartIp-blockStartIp) );
+                 ip = inst->emit(ip);
+                 ip = (uint8*)EncoderBase::nops((char*)ip, 0x10 - inst->getCodeSize());
             } else {
 #endif
             uint8 * instStartIp = ip;

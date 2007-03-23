@@ -535,7 +535,7 @@ CallInst * IRManager::newRuntimeHelperCallInst(CompilationInterface::RuntimeHelp
     uint32 numArgs, Opnd ** args, Opnd * retOpnd, InlineInfo* ii)
 {
     Inst * instList = NULL;
-    Opnd * target=newImmOpnd(typeManager.getUnmanagedPtrType(typeManager.getIntPtrType()), Opnd::RuntimeInfo::Kind_HelperAddress, (void*)helperId);
+    Opnd * target=newImmOpnd(typeManager.getInt32Type(), Opnd::RuntimeInfo::Kind_HelperAddress, (void*)helperId);
     const CallingConvention * cc=getCallingConvention(helperId);
     appendToInstList(instList,newCallInst(target, cc, numArgs, args, retOpnd));
     return (CallInst *)instList;
@@ -547,7 +547,7 @@ CallInst * IRManager::newInternalRuntimeHelperCallInst(const char * internalHelp
     const InternalHelperInfo * info=getInternalHelperInfo(internalHelperID);
     assert(info!=NULL);
     Inst * instList = NULL;
-    Opnd * target=newImmOpnd(typeManager.getUnmanagedPtrType(typeManager.getIntPtrType()), Opnd::RuntimeInfo::Kind_InternalHelperAddress, (void*)newInternalString(internalHelperID));
+    Opnd * target=newImmOpnd(typeManager.getInt32Type(), Opnd::RuntimeInfo::Kind_InternalHelperAddress, (void*)newInternalString(internalHelperID));
     const CallingConvention * cc=info->callingConvention;
     appendToInstList(instList,newCallInst(target, cc, numArgs, args, retOpnd));
     return (CallInst *)instList;
@@ -1683,8 +1683,22 @@ void IRManager::finalizeCallSites()
                     for (uint32 i=0, n=(uint32)stackOpndInfos.size(); i<n; i++) {
                         sz += sizeof(POINTER_SIZE_INT); 
                     }
+                    unsigned corr = 0;
+
                     if(sz&15) {
-                        unsigned corr = 16-(sz&15);
+                        corr += 16-(sz&15);
+                    }
+#ifdef _WIN64
+                    Opnd::RuntimeInfo * rt = callInst->getOpnd(callInst->getTargetOpndIndex())->getRuntimeInfo();
+
+                    if (callInst->isDirect() && rt && rt->getKind() == Opnd::RuntimeInfo::Kind_InternalHelperAddress) {
+                        uint32 nRegOpnds = (uint32)(callInst->getOpndCount(Inst::OpndRole_Auxilary|Inst::OpndRole_Use) - stackOpndInfos.size());
+                        uint32 shadowSize = nRegOpnds * sizeof(POINTER_SIZE_INT);
+                        corr += shadowSize;
+                    }
+#endif
+                    if (corr)
+                    {
                         node->prependInst(newInst(Mnemonic_SUB, getRegOpnd(STACK_REG), newImmOpnd(typeManager.getInt32Type(), corr)), inst);
                         node->appendInst(newInst(Mnemonic_ADD, getRegOpnd(STACK_REG), newImmOpnd(typeManager.getInt32Type(), corr)), inst);
                     }
