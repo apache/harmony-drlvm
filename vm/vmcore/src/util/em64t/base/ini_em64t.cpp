@@ -323,9 +323,9 @@ void JIT_execute_method_default(JIT_Handle jh, jmethodID methodID,
             break;
         case JAVA_TYPE_FLOAT:
             if (fr_nargs < MAX_FR) {
-                fr_args[fr_nargs++] = (double) args[arg_num++].f;
+                *(float *)&fr_args[fr_nargs++] = args[arg_num++].f;
             } else {
-                *(double *)(stack_args + stack_nargs) = (double) args[arg_num++].f;
+                *(float *)(stack_args + stack_nargs) = args[arg_num++].f;
                 ++stack_nargs;
             }
             break;
