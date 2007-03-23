@@ -51,6 +51,8 @@
 #include "jit_runtime_support.h"
 #include "jvmti_direct.h"
 #include "stack_trace.h"
+#include "finalizer_thread.h"
+#include "ref_enqueue_thread.h"
 
 #ifdef _IPF_
 #include "stub_code_utils.h"
@@ -510,7 +512,10 @@ JNIEXPORT jint JNICALL JNI_CreateJavaVM(JavaVM ** p_vm, JNIEnv ** p_jni_env,
     }
     assert(jthread_self() != NULL);
     *p_jni_env = jni_env;
-
+    
+    finalizer_threads_init(java_vm);   /* added for NATIVE FINALIZER THREAD */
+    ref_enqueue_thread_init(java_vm);  /* added for NATIVE REFERENCE ENQUEUE THREAD */
+    
     // Now JVMTIThread keeps global reference. Discared temporary global reference.
     jni_env->DeleteGlobalRef(java_thread);
 

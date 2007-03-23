@@ -99,6 +99,15 @@ IDATA VMCALL hycond_wait_timed(hycond_t *cond, hymutex_t *mutex, I_64 ms, IDATA 
 }
 
 /**
+ * Instructs the current thread to wait until signaled to wake up or timeout.
+ * Directly using OS interfaces.
+ * This function does not implement interruptability and thread state functionality.
+ */
+IDATA VMCALL hycond_wait_timed_raw(hycond_t *cond, hymutex_t *mutex, I_64 ms, IDATA nano) {
+    return os_cond_timedwait(cond, mutex, ms, nano);
+}
+
+/**
  * Instructs the current thread to wait until signaled to wake up or
  * the specified timeout is elapsed.
  *

@@ -29,6 +29,7 @@
 #include "../finalizer_weakref/finalizer_weakref.h"
 
 static GC* p_global_gc = NULL;
+Boolean mutator_need_block;
 
 void gc_tls_init();
 
@@ -55,6 +56,8 @@ int gc_init()
 #endif
   collector_initialize(gc);
   gc_init_heap_verification(gc);
+  
+  mutator_need_block = FALSE;
 
   return JNI_OK;
 }
@@ -203,6 +206,14 @@ void gc_iterate_heap() {
     gc_gen_iterate_heap((GC_Gen *)p_global_gc);
 }
 
+void gc_set_mutator_block_flag()
+{  mutator_need_block = TRUE; }
 
+Boolean gc_clear_mutator_block_flag()
+{
+  Boolean old_flag = mutator_need_block;
+  mutator_need_block = FALSE;
+  return old_flag;
+}
 
 

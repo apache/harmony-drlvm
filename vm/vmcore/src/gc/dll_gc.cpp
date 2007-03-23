@@ -41,6 +41,8 @@ static int32 default_gc_get_hashcode(Managed_Object_Handle);
 static Managed_Object_Handle default_gc_get_next_live_object(void*);
 static void default_gc_iterate_heap();
 static void default_gc_finalize_on_exit();
+static void default_gc_set_mutator_block_flag();
+static Boolean default_gc_clear_mutator_block_flag();
 static int64 default_gc_max_memory();
 static void default_gc_wrapup();
 static Boolean default_gc_requires_barriers();
@@ -126,6 +128,8 @@ int32 (*gc_get_hashcode0) (Managed_Object_Handle p_object) = 0;
 void (*gc_iterate_heap)() = 0;
 
 void (*gc_finalize_on_exit)() = 0;
+void (*gc_set_mutator_block_flag)() = 0;
+Boolean (*gc_clear_mutator_block_flag)() = 0;
 
 static apr_dso_handle_sym_t getFunction(apr_dso_handle_t *handle, const char *name, const char *dllName)
 {
@@ -263,6 +267,15 @@ void vm_add_gc(const char *dllName)
     gc_finalize_on_exit = (void (*)())
         getFunctionOptional(handle, "gc_finalize_on_exit", dllName,
             (apr_dso_handle_sym_t)default_gc_finalize_on_exit);
+
+    gc_set_mutator_block_flag = (void (*)())
+        getFunctionOptional(handle, "gc_set_mutator_block_flag", dllName,
+            (apr_dso_handle_sym_t)default_gc_set_mutator_block_flag);
+
+    gc_clear_mutator_block_flag = (Boolean (*)())
+        getFunctionOptional(handle, "gc_clear_mutator_block_flag", dllName,
+            (apr_dso_handle_sym_t)default_gc_clear_mutator_block_flag);
+
     gc_get_hashcode0 = (int32 (*)(Managed_Object_Handle))
         getFunctionOptional(handle, "gc_get_hashcode", dllName, (apr_dso_handle_sym_t) default_gc_get_hashcode);
 
@@ -493,6 +506,18 @@ static void default_gc_iterate_heap()
 static void default_gc_finalize_on_exit()
 {
     WARN_ONCE(12, "The GC did not provide finalization on exit");
+}
+
+static void default_gc_set_mutator_block_flag()
+{
+    WARN_ONCE(43, "The GC did not provide set mutator block flag");
+}
+
+
+static Boolean default_gc_clear_mutator_block_flag()
+{
+    WARN_ONCE(44, "The GC did not provide clear mutator block flag");
+    return FALSE;
 }
 
 static int64 default_gc_max_memory()

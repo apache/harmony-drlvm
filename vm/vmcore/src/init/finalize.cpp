@@ -476,6 +476,11 @@ int Objects_To_Finalize::do_finalization(int quantity) {
             return i;
         }
         
+        if(get_native_finalizer_thread_flag()){
+            int finalizable_obj_num = getLength();
+            sched_heavy_finalizer_in_finalization(finalizable_obj_num, i);
+        }
+        
         tmn_suspend_disable();
         assert(handle->object->vt()->clss);
         Class *clss = handle->object->vt()->clss;
@@ -484,8 +489,7 @@ int Objects_To_Finalize::do_finalization(int quantity) {
         /* BEGIN: modified for NATIVE FINALIZER THREAD */
         if(native_finalizer_thread_flag) {
             native_finalizer_on_exit = get_finalizer_on_exit_flag();
-
-            if (native_finalizer_on_exit  && is_class_ignored(clss)) {
+            if(native_finalizer_on_exit  && is_class_ignored(clss)) {
                 tmn_suspend_enable();
                 continue;
             }
@@ -577,6 +581,10 @@ static Objects_To_Finalize objects_to_finalize;
 void vm_finalize_object(Managed_Object_Handle p_obj)
 {
     objects_to_finalize.add_object((ManagedObject *)p_obj);
+    if(get_native_finalizer_thread_flag()){
+        int finalizable_obj_num = objects_to_finalize.getLength();
+        sched_heavy_finalizer(finalizable_obj_num);
+    }
 } //vm_finalize_object
 
 void vm_run_pending_finalizers()
@@ -639,6 +647,12 @@ void vm_enqueue_reference(Managed_Object_Handle obj)
     TRACE2("ref", obj << " is being added to enqueue list");
     references_to_enqueue.add_object((ManagedObject *)obj);
 } // vm_enqueue_reference
+
+void vm_activate_ref_enqueue_thread()
+{
+    if(get_native_ref_enqueue_thread_flag())
+        activate_ref_enqueue_thread();
+}
 
 void vm_enqueue_references()
 {

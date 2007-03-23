@@ -21,60 +21,24 @@
 #ifndef _REF_ENQUEUE_THREAD_H_
 #define _REF_ENQUEUE_THREAD_H_
 
+#include <assert.h>
 #include "jni_types.h"
 #include "open/hythread_ext.h"
-#include <assert.h>
 #include "open/types.h"
-#include <apr_atomic.h>
-
-#ifndef _FINALIZER_WEAKREF_PLATFORM_
-#define _FINALIZER_WEAKREF_PLATFORM_
-
-#define VmEventHandle   hysem_t
-
-inline int vm_wait_event(VmEventHandle event)
-{
-    IDATA stat = hysem_wait(event);
-    assert(stat == TM_ERROR_NONE); return stat;
-}
-inline int vm_set_event(VmEventHandle event, IDATA count)
-{
-    IDATA stat = hysem_set(event, count);
-    assert(stat == TM_ERROR_NONE); return stat;
-}
-inline int vm_post_event(VmEventHandle event)
-{
-    IDATA stat = hysem_set(event, 1);
-    assert(stat == TM_ERROR_NONE); return stat;
-}
-inline int vm_create_event(VmEventHandle* event, unsigned int initial_count, unsigned int max_count)
-{
-    return hysem_create(event, initial_count, max_count);
-}
 
 
-typedef volatile unsigned int SpinLock;
-enum Lock_State{
-  FREE_LOCK,
-  LOCKED
-};
+#define REF_ENQUEUE_THREAD_PRIORITY HYTHREAD_PRIORITY_USER_MAX
+#define REF_ENQUEUE_THREAD_NUM 1
 
-#define gc_try_lock(x) (!apr_atomic_cas32(&(x), LOCKED, FREE_LOCK))
-#define gc_lock(x) while( !gc_try_lock(x)){ while( x==LOCKED );}
-#define gc_unlock(x) do{ x = FREE_LOCK;}while(0)
 
-#endif
-
-#define REF_ENQUEUE_THREAD_PRIORITY (HYTHREAD_PRIORITY_USER_MAX - 1)
-
-struct ref_enqueue_thread_info {
-    SpinLock lock;
-    VmEventHandle reference_pending_event;
+typedef struct Ref_Enqueue_Thread_Info {
+    hysem_t pending_sem;
     Boolean shutdown;
-};
+}Ref_Enqueue_Thread_Info;
+
 
 extern Boolean get_native_ref_enqueue_thread_flag();
-extern void ref_enqueue_thread_init(JavaVM *java_vm, JNIEnv *jni_env);
+extern void ref_enqueue_thread_init(JavaVM *java_vm);
 extern void ref_enqueue_shutdown(void);
 extern void activate_ref_enqueue_thread(void);
 

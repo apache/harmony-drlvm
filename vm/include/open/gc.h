@@ -563,6 +563,8 @@ extern int32 (*gc_get_hashcode0) (Managed_Object_Handle p_object);
 extern Managed_Object_Handle (*gc_get_next_live_object)(void *iterator);
 extern void (*gc_iterate_heap)();
 extern void (*gc_finalize_on_exit)();
+extern void (*gc_set_mutator_block_flag)();
+extern Boolean (*gc_clear_mutator_block_flag)();
 
 
 
@@ -742,6 +744,15 @@ GCExport void gc_iterate_heap();
  */
 GCExport void gc_finalize_on_exit();
 
+/**
+ * Sets the mutator need block flag in case of heavy finalizable object load
+ */
+GCExport void gc_set_mutator_block_flag();
+
+/**
+ * Clears the mutator need block flag when heavy finalizable object load lightens
+ */
+GCExport Boolean gc_clear_mutator_block_flag();
 
 //@}
 /** @name Routines to support soft, weak, and phantom reference objects

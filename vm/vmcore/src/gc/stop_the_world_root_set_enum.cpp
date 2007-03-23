@@ -194,6 +194,7 @@ void vm_hint_finalize() {
     // Several Reference Queues may need to be notified because the GC added References to them. Do that now.
     //LOG2("ref", "Enqueueing references");
     //vm_enqueue_references();
+    vm_activate_ref_enqueue_thread();
     
     // For now we run the finalizers immediately in the context of the thread which requested GC.
     // Eventually we may have a different scheme, e.g., a dedicated finalize thread.
@@ -234,4 +235,5 @@ void vm_enumerate_thread(VM_thread *thread)
 //////////////////////////////////////////////////////////////////////////////
 ///////////////////////  LINUX/ WINDOWS specific /////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
+
 

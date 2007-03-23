@@ -47,8 +47,6 @@
 #include "slot.h"
 #include "classpath_const.h"
 #include "finalize.h"
-#include "finalizer_thread.h"   /* added for NATIVE FINALIZER THREAD */
-#include "ref_enqueue_thread.h" /* added for NATIVE REFERENCE ENQUEUE THREAD */
 
 #ifdef PLATFORM_NT
 // 20040427 Used to turn on heap checking on every allocation
@@ -702,9 +700,6 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
 
     status = vm_attach(java_vm, &jni_env, NULL);
     if (status != JNI_OK) return status;
-    
-    finalizer_threads_init(java_vm, jni_env);   /* added for NATIVE FINALIZER THREAD */
-    ref_enqueue_thread_init(java_vm, jni_env);  /* added for NATIVE REFERENCE ENQUEUE THREAD */
     
     // "Tool Interface" initialization
     status = vm_env->TI->Init(java_vm);

@@ -21,7 +21,7 @@
 #ifndef _FINREF_H_
 #define _FINREF_H_
 
-#define BUILD_IN_REFERENT
+//#define BUILD_IN_REFERENT
 
 #include "finalizer_weakref_metadata.h"
 #include "../thread/collector.h"

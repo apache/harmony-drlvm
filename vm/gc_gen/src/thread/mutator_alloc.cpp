@@ -51,6 +51,8 @@ void gc_alloc_statistic_obj_distrubution(unsigned int size)
 }
 #endif
 
+extern Boolean mutator_need_block;
+
 Managed_Object_Handle gc_alloc(unsigned size, Allocation_Handle ah, void *unused_gc_tls) 
 {
   Managed_Object_Handle p_obj = NULL;
@@ -60,6 +62,10 @@ Managed_Object_Handle gc_alloc(unsigned size, Allocation_Handle ah, void *unused
   assert(ah);
 
   Allocator* allocator = (Allocator*)gc_get_tls();
+  Boolean type_has_fin = type_has_finalizer((Partial_Reveal_VTable*)uncompress_vt((VT)ah));
+  
+  if(type_has_fin && !IGNORE_FINREF && mutator_need_block)
+    vm_heavy_finalizer_block_mutator();
 
 #ifdef GC_OBJ_SIZE_STATISTIC
   gc_alloc_statistic_obj_distrubution(size);
@@ -75,7 +81,7 @@ Managed_Object_Handle gc_alloc(unsigned size, Allocation_Handle ah, void *unused
     
   obj_set_vt((Partial_Reveal_Object*)p_obj, (VT)ah);
   
-  if(!IGNORE_FINREF && type_has_finalizer( (Partial_Reveal_VTable *) uncompress_vt((VT)ah) ))
+  if(type_has_fin && !IGNORE_FINREF)
     mutator_add_finalizer((Mutator*)allocator, (Partial_Reveal_Object*)p_obj);
     
   return (Managed_Object_Handle)p_obj;

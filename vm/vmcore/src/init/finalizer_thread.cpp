@@ -20,60 +20,81 @@
 
 #include "finalizer_thread.h"
 #include "ref_enqueue_thread.h"
-#include "open/gc.h"
-#include "port_sysinfo.h"
 #include "finalize.h"
 #include "vm_threads.h"
-#include "../../../thread/src/thread_private.h"
+#include "init.h"
+#include "open/jthread.h"
 
-static Boolean native_finalizer_thread_flag = FALSE;
-static struct finalizer_thread_info *finalizer_thread_info = NULL;
+static Boolean native_fin_thread_flag = FALSE;
+static Fin_Thread_Info *fin_thread_info = NULL;
+unsigned int cpu_num_bits;
 
+static uint32 atomic_inc32(volatile apr_uint32_t *mem)
+{  return (uint32)apr_atomic_inc32(mem); }
+
+static uint32 atomic_dec32(volatile apr_uint32_t *mem)
+{  return (uint32)apr_atomic_dec32(mem); }
 
 Boolean get_native_finalizer_thread_flag()
-{
-  return native_finalizer_thread_flag;
-}
+{  return native_fin_thread_flag; }
 
 void set_native_finalizer_thread_flag(Boolean flag)
-{
-  native_finalizer_thread_flag = flag;
-}
+{  native_fin_thread_flag = flag; }
 
 Boolean get_finalizer_shutdown_flag()
-{
-  return finalizer_thread_info->shutdown;
-}
+{  return fin_thread_info->shutdown; }
 
 Boolean get_finalizer_on_exit_flag()
+{  return fin_thread_info->on_exit; }
+
+static unsigned int coarse_log(unsigned int num)
 {
-  return finalizer_thread_info->on_exit;
+    unsigned int i = sizeof(unsigned int) << 3;
+    unsigned int comp = 1 << (i-1);
+    while(i--){
+        if(num & comp)
+            return i;
+        num = num << 1;
+    }
+    return 0;
 }
 
 static int finalizer_thread_func(void **args);
 
-void finalizer_threads_init(JavaVM *java_vm, JNIEnv *jni_env)
+void finalizer_threads_init(JavaVM *java_vm)
 {
-    if(!native_finalizer_thread_flag)
+    if(!native_fin_thread_flag)
         return;
     
-    finalizer_thread_info = (struct finalizer_thread_info *)STD_MALLOC(sizeof(struct finalizer_thread_info));
-    finalizer_thread_info->lock = FREE_LOCK;
-    finalizer_thread_info->thread_num = port_CPUs_number();
-    finalizer_thread_info->working_thread_num = 0;
-    finalizer_thread_info->shutdown = FALSE;
-    finalizer_thread_info->on_exit = FALSE;
+    fin_thread_info = (Fin_Thread_Info *)STD_MALLOC(sizeof(Fin_Thread_Info));
+    fin_thread_info->thread_num = port_CPUs_number();
+    cpu_num_bits = coarse_log(fin_thread_info->thread_num);
+    fin_thread_info->working_thread_num = 0;
+    fin_thread_info->end_waiting_num = 0;
+    fin_thread_info->shutdown = FALSE;
+    fin_thread_info->on_exit = FALSE;
     
-    int status = vm_create_event(&finalizer_thread_info->finalizer_pending_event, 0, finalizer_thread_info->thread_num);
-    assert(status == TM_ERROR_NONE);
-    status = vm_create_event(&finalizer_thread_info->finalization_end_event, 0, 1);
+    IDATA status = hysem_create(&fin_thread_info->pending_sem, 0, fin_thread_info->thread_num);
     assert(status == TM_ERROR_NONE);
     
-    void **args = (void **)STD_MALLOC(sizeof(void *)*2);
-    args[0] = (void *)java_vm;
-    args[1] = (void *)jni_env;
-    for(int i = 0; i < finalizer_thread_info->thread_num; i++){
-        status = (unsigned int)hythread_create(NULL, 0, 0, 0, (hythread_entrypoint_t)finalizer_thread_func, args);
+    status = hycond_create(&fin_thread_info->end_cond);
+    assert(status == TM_ERROR_NONE);
+    status = hymutex_create(&fin_thread_info->end_mutex, TM_MUTEX_DEFAULT);
+    assert(status == TM_ERROR_NONE);
+    
+    status = hycond_create(&fin_thread_info->mutator_block_cond);
+    assert(status == TM_ERROR_NONE);
+    status = hymutex_create(&fin_thread_info->mutator_block_mutex, TM_MUTEX_DEFAULT);
+    assert(status == TM_ERROR_NONE);
+    
+    fin_thread_info->thread_ids = (hythread_t *)STD_MALLOC(sizeof(hythread_t) * fin_thread_info->thread_num);
+    
+    for(unsigned int i = 0; i < fin_thread_info->thread_num; i++){
+        void **args = (void **)STD_MALLOC(sizeof(void *) * 2);
+        args[0] = (void *)java_vm;
+        args[1] = (void *)(i + 1);
+        fin_thread_info->thread_ids[i] = NULL;
+        status = hythread_create(&fin_thread_info->thread_ids[i], 0, FINALIZER_THREAD_PRIORITY, 0, (hythread_entrypoint_t)finalizer_thread_func, args);
         assert(status == TM_ERROR_NONE);
     }
 }
@@ -82,38 +103,54 @@ void finalizer_shutdown(Boolean start_finalization_on_exit)
 {
     if(start_finalization_on_exit){
         tmn_suspend_disable();
-        gc_force_gc();      
+        gc_force_gc();
         tmn_suspend_enable();
         activate_finalizer_threads(TRUE);
         tmn_suspend_disable();
         gc_finalize_on_exit();
         tmn_suspend_enable();
-        gc_lock(finalizer_thread_info->lock);
-        finalizer_thread_info->on_exit = TRUE;
-        gc_unlock(finalizer_thread_info->lock);
+        fin_thread_info->on_exit = TRUE;
         activate_finalizer_threads(TRUE);
     }
-    gc_lock(finalizer_thread_info->lock);
-    finalizer_thread_info->shutdown = TRUE;
-    gc_unlock(finalizer_thread_info->lock);
+    fin_thread_info->shutdown = TRUE;
     ref_enqueue_shutdown();
-    activate_finalizer_threads(FALSE);
+    activate_finalizer_threads(TRUE);
+}
+
+/* Restrict waiting time; Unit: msec */
+static unsigned int restrict_wait_time(unsigned int wait_time, unsigned int max_time)
+{
+    if(!wait_time) return 1;
+    if(wait_time > max_time) return max_time;
+    return wait_time;
 }
 
 static void wait_finalization_end(void)
 {
-    vm_wait_event(finalizer_thread_info->finalization_end_event);
+    hymutex_lock(&fin_thread_info->end_mutex);
+    while(unsigned int fin_obj_num = vm_get_finalizable_objects_quantity()){
+        unsigned int wait_time = restrict_wait_time(fin_obj_num + 100, FIN_MAX_WAIT_TIME << 7);
+        atomic_inc32(&fin_thread_info->end_waiting_num);
+        IDATA status = hycond_wait_timed(&fin_thread_info->end_cond, &fin_thread_info->end_mutex, (I_64)wait_time, 0);
+        atomic_dec32(&fin_thread_info->end_waiting_num);
+        if(status != TM_ERROR_NONE) break;
+    }
+    hymutex_unlock(&fin_thread_info->end_mutex);
 }
 
 void activate_finalizer_threads(Boolean wait)
 {
-    gc_lock(finalizer_thread_info->lock);
-    vm_set_event(finalizer_thread_info->finalizer_pending_event,
-                    finalizer_thread_info->thread_num - finalizer_thread_info->working_thread_num);
-    gc_unlock(finalizer_thread_info->lock);
+    IDATA stat = hysem_set(fin_thread_info->pending_sem, fin_thread_info->thread_num);
+    assert(stat == TM_ERROR_NONE);
     
     if(wait)
         wait_finalization_end();
+}
+
+static void notify_finalization_end(void)
+{
+    if(vm_get_finalizable_objects_quantity()==0 && fin_thread_info->working_thread_num==0)
+        hycond_notify_all(&fin_thread_info->end_cond);
 }
 
 void vmmemory_manager_runfinalization(void)
@@ -121,60 +158,90 @@ void vmmemory_manager_runfinalization(void)
     activate_finalizer_threads(TRUE);
 }
 
-
-static int do_finalization_func(void)
-{
-    return vm_do_finalization(0);
-}
-
 static void wait_pending_finalizer(void)
 {
-    vm_wait_event(finalizer_thread_info->finalizer_pending_event);
-}
-
-static void notify_finalization_end(void)
-{
-    vm_post_event(finalizer_thread_info->finalization_end_event);
-}
-
-static void finalizer_notify_work_done(void)
-{
-    gc_lock(finalizer_thread_info->lock);
-    --finalizer_thread_info->working_thread_num;
-    if(finalizer_thread_info->working_thread_num == 0)
-        notify_finalization_end();
-    gc_unlock(finalizer_thread_info->lock);
+    IDATA stat = hysem_wait(fin_thread_info->pending_sem);
+    assert(stat == TM_ERROR_NONE);
 }
 
 static int finalizer_thread_func(void **args)
 {
     JavaVM *java_vm = (JavaVM *)args[0];
-    JNIEnv *jni_env = (JNIEnv *)args[1];
+    JNIEnv *jni_env;
+    jthread java_thread;
+    char *name = "finalizer";
+    jboolean daemon = JNI_TRUE;
+    int thread_id = (int)args[1];
     
-    IDATA status = vm_attach(java_vm, &jni_env, NULL);
-    if(status != TM_ERROR_NONE)
-        return status;
+    IDATA status = vm_attach_internal(&jni_env, &java_thread, java_vm, NULL, name, daemon);
+    assert(status == JNI_OK);
+    status = jthread_attach(jni_env, java_thread, daemon);
+    assert(status == TM_ERROR_NONE);
+    
+    /* Choice: use VM_thread or hythread to indicate the finalizer thread ?
+     * Now we use hythread
+     * p_TLS_vmthread->finalize_thread_flags = thread_id;
+     */
     
     while(true){
         /* Waiting for pending finalizers */
         wait_pending_finalizer();
         
-        gc_lock(finalizer_thread_info->lock);
-        ++finalizer_thread_info->working_thread_num;
-        gc_unlock(finalizer_thread_info->lock);
-        
         /* do the real finalization work */
-        do_finalization_func();
+        atomic_inc32(&fin_thread_info->working_thread_num);
+        vm_do_finalization(0);
+        atomic_dec32(&fin_thread_info->working_thread_num);
         
-        finalizer_notify_work_done();
+        vm_heavy_finalizer_resume_mutator();
         
-        gc_lock(finalizer_thread_info->lock);
-        if(finalizer_thread_info->shutdown){
-            gc_unlock(finalizer_thread_info->lock);
+        if(fin_thread_info->end_waiting_num)
+            notify_finalization_end();
+        
+        if(fin_thread_info->shutdown)
             break;
-        }
-        gc_unlock(finalizer_thread_info->lock);
     }
-
-    return TM_ERROR_NONE;
+    
+    vm_heavy_finalizer_resume_mutator();
+    status = jthread_detach(java_thread);
+    return status;
 }
+
+
+/* Heavy finalizable object load handling mechanism */
+
+/* Choice: use VM_thread or hythread to indicate the finalizer thread ?
+ * Now we use hythread
+ * p_TLS_vmthread->finalize_thread_flags = thread_id;
+ */
+static Boolean self_is_finalizer_thread(void)
+{
+    hythread_t self = hythread_self();
+    
+    for(unsigned int i=0; i<fin_thread_info->thread_num; ++i)
+        if(self == fin_thread_info->thread_ids[i])
+            return TRUE;
+    
+    return FALSE;
+}
+
+void vm_heavy_finalizer_block_mutator(void)
+{
+    /* Maybe self test is not needed. This needs further test. */
+    if(self_is_finalizer_thread())
+        return;
+    
+    hymutex_lock(&fin_thread_info->mutator_block_mutex);
+    unsigned int fin_obj_num = vm_get_finalizable_objects_quantity();
+    fin_obj_num = fin_obj_num >> (MUTATOR_BLOCK_THRESHOLD_BITS + cpu_num_bits);
+    unsigned int wait_time = restrict_wait_time(fin_obj_num, FIN_MAX_WAIT_TIME);
+    if(fin_obj_num)
+        IDATA status = hycond_wait_timed_raw(&fin_thread_info->mutator_block_cond, &fin_thread_info->mutator_block_mutex, wait_time, 0);
+    hymutex_unlock(&fin_thread_info->mutator_block_mutex);
+}
+
+void vm_heavy_finalizer_resume_mutator(void)
+{
+    if(gc_clear_mutator_block_flag())
+        hycond_notify_all(&fin_thread_info->mutator_block_cond);
+}
+

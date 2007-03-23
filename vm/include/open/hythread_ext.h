@@ -203,6 +203,7 @@ UDATA VMCALL hythread_get_thread_times(hythread_t thread, int64* pkernel, int64*
 IDATA VMCALL hycond_create (hycond_t *cond);
 IDATA VMCALL hycond_wait (hycond_t *cond, hymutex_t *mutex);
 IDATA VMCALL hycond_wait_timed (hycond_t *cond, hymutex_t *mutex, I_64 millis, IDATA nanos);
+IDATA VMCALL hycond_wait_timed_raw(hycond_t * cond, hymutex_t * mutex, I_64 ms, IDATA nano);
 IDATA VMCALL hycond_wait_interruptable (hycond_t *cond, hymutex_t *mutex, I_64 millis, IDATA nanos);
 IDATA VMCALL hycond_notify (hycond_t *cond);
 IDATA VMCALL hycond_notify_all (hycond_t *cond);

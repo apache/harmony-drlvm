@@ -27,7 +27,7 @@
 #include "../mark_sweep/lspace.h"
 #include "../gen/gen.h"
 
-Boolean IGNORE_FINREF = TRUE;
+Boolean IGNORE_FINREF = FALSE;
 
 
 static inline Boolean obj_is_dead_in_gen_minor_gc(Partial_Reveal_Object *p_obj)

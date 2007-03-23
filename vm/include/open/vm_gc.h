@@ -182,6 +182,8 @@ VMEXPORT void vm_finalize_object(Managed_Object_Handle p_obj);
 
 VMEXPORT void set_native_finalizer_thread_flag(Boolean flag);
 
+VMEXPORT void vm_heavy_finalizer_block_mutator(void);
+
 /**
  * GC should call this function when an phantom reference object
  * is to be enqueued, i.e. when the reference is not reachable anymore.

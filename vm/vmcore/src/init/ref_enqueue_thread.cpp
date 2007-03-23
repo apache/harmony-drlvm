@@ -21,92 +21,82 @@
 #include "ref_enqueue_thread.h"
 #include "finalize.h"
 #include "vm_threads.h"
-#include "../../../thread/src/thread_private.h"
+#include "init.h"
+#include "open/jthread.h"
 
-static Boolean native_ref_enqueue_thread_flag = FALSE;
-static struct ref_enqueue_thread_info *ref_enqueue_thread_info = NULL;
+
+static Boolean native_ref_thread_flag = FALSE;
+static Ref_Enqueue_Thread_Info *ref_thread_info = NULL;
 
 
 Boolean get_native_ref_enqueue_thread_flag()
-{
-  return native_ref_enqueue_thread_flag;
-}
+{  return native_ref_thread_flag; }
 
 void set_native_ref_enqueue_thread_flag(Boolean flag)
-{
-  native_ref_enqueue_thread_flag = flag;
-}
+{  native_ref_thread_flag = flag; }
+
 
 static int ref_enqueue_thread_func(void **args);
 
-void ref_enqueue_thread_init(JavaVM *java_vm, JNIEnv *jni_env)
+void ref_enqueue_thread_init(JavaVM *java_vm)
 {
-    if(!get_native_ref_enqueue_thread_flag())
+    if(!native_ref_thread_flag)
         return;
     
-    ref_enqueue_thread_info = (struct ref_enqueue_thread_info *)STD_MALLOC(sizeof(struct ref_enqueue_thread_info));
-    ref_enqueue_thread_info->lock = FREE_LOCK;
-    ref_enqueue_thread_info->shutdown = FALSE;
+    ref_thread_info = (Ref_Enqueue_Thread_Info *)STD_MALLOC(sizeof(Ref_Enqueue_Thread_Info));
+    ref_thread_info->shutdown = FALSE;
     
-    int status = vm_create_event(&ref_enqueue_thread_info->reference_pending_event, 0, 1);
+    IDATA status = hysem_create(&ref_thread_info->pending_sem, 0, REF_ENQUEUE_THREAD_NUM);
     assert(status == TM_ERROR_NONE);
     
-    void **args = (void **)STD_MALLOC(sizeof(void *)*2);
+    void **args = (void **)STD_MALLOC(sizeof(void *));
     args[0] = (void *)java_vm;
-    args[1] = (void *)jni_env;
-    status = (unsigned int)hythread_create(NULL, 0, REF_ENQUEUE_THREAD_PRIORITY, 0, (hythread_entrypoint_t)ref_enqueue_thread_func, args);
+    status = hythread_create(NULL, 0, REF_ENQUEUE_THREAD_PRIORITY, 0, (hythread_entrypoint_t)ref_enqueue_thread_func, args);
     assert(status == TM_ERROR_NONE);
 }
 
 void ref_enqueue_shutdown(void)
 {
-    gc_lock(ref_enqueue_thread_info->lock);
-    ref_enqueue_thread_info->shutdown = TRUE;
-    gc_unlock(ref_enqueue_thread_info->lock);
+    ref_thread_info->shutdown = TRUE;
     activate_ref_enqueue_thread();
 }
 
 void activate_ref_enqueue_thread(void)
 {
-    vm_post_event(ref_enqueue_thread_info->reference_pending_event);
-}
-
-
-static int ref_enqueue_func(void)
-{
-    vm_ref_enqueue_func();
-    return 0;
+    IDATA stat = hysem_set(ref_thread_info->pending_sem, REF_ENQUEUE_THREAD_NUM);
+    assert(stat == TM_ERROR_NONE);
 }
 
 static void wait_pending_reference(void)
 {
-    vm_wait_event(ref_enqueue_thread_info->reference_pending_event);
+    IDATA stat = hysem_wait(ref_thread_info->pending_sem);
+    assert(stat == TM_ERROR_NONE);
 }
-
 
 static int ref_enqueue_thread_func(void **args)
 {
     JavaVM *java_vm = (JavaVM *)args[0];
-    JNIEnv *jni_env = (JNIEnv *)args[1];
+    JNIEnv *jni_env;
+    jthread java_thread;
+    char *name = "ref handler";
+    jboolean daemon = JNI_TRUE;
     
-    IDATA status = vm_attach(java_vm, &jni_env, NULL);
-    if(status != TM_ERROR_NONE)
-        return status;
+    IDATA status = vm_attach_internal(&jni_env, &java_thread, java_vm, NULL, name, daemon);
+    assert(status == JNI_OK);
+    status = jthread_attach(jni_env, java_thread, daemon);
+    assert(status == TM_ERROR_NONE);
     
     while(true){
         /* Waiting for pending weak references */
         wait_pending_reference();
         
         /* do the real reference enqueue work */
-        ref_enqueue_func();
-                
-        gc_lock(ref_enqueue_thread_info->lock);
-        if(ref_enqueue_thread_info->shutdown){
-            gc_unlock(ref_enqueue_thread_info->lock);
+        vm_ref_enqueue_func();
+        
+        if(ref_thread_info->shutdown)
             break;
-        }
-        gc_unlock(ref_enqueue_thread_info->lock);
     }
-
-    return TM_ERROR_NONE;
+    
+    status = jthread_detach(java_thread);
+    return status;
 }

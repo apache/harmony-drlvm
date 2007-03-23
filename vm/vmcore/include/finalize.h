@@ -49,6 +49,7 @@ void vm_enumerate_objects_to_be_finalized();
 void vm_enumerate_references_to_enqueue();
 int vm_get_references_quantity();
 
+void vm_activate_ref_enqueue_thread();
 void vm_enqueue_references();
 void vm_ref_enqueue_func(void);   // added for NATIVE REFERENCE ENQUEUE THREAD
 

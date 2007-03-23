@@ -90,6 +90,7 @@ hysem_destroy
 hycond_create
 hycond_wait
 hycond_wait_timed
+hycond_wait_timed_raw
 hycond_wait_interruptable
 hycond_notify
 hycond_notify_all
