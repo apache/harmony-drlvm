@@ -119,6 +119,7 @@ bool jvmti_process_breakpoint_event(TIEnv *env, VMBreakPoint* bp, void* UNREF da
     }
 
     oh_discard_local_handle(hThread);
+    hythread_exception_safe_point();
     tmn_suspend_disable();
 
     return true;

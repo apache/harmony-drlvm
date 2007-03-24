@@ -907,7 +907,8 @@ Opcode_##CMP(StackFrame& frame) {                   \
     frame.ip += 3;                                  \
     }                                               \
     frame.stack.pop();                              \
-    hythread_safe_point();                                \
+    hythread_safe_point();                          \
+    hythread_exception_safe_point();                \
 }
 
 DEF_OPCODE_CMP(IFEQ,==0) // Opcode_IFEQ
@@ -932,7 +933,8 @@ Opcode_IF_ICMP ## NAME(StackFrame& frame) {                     \
         DEBUG_BYTECODE(val1 << " " << val0 << " branch not taken");\
     }                                                           \
     frame.stack.pop(2);                                         \
-    hythread_safe_point();                                           \
+    hythread_safe_point();                                      \
+    hythread_exception_safe_point();                            \
 }
 
 DEF_OPCODE_IF_ICMPXX(EQ,==) // Opcode_IF_ICMPEQ OPCODE_IF_ACMPEQ
@@ -2050,6 +2052,10 @@ Opcode_INVOKEVIRTUAL(StackFrame& frame) {
             << method->get_name()->bytes << "/"
             << method->get_descriptor()->bytes<< endl);
 
+    hythread_exception_safe_point();
+    if(check_current_thread_exception()) {
+        return;
+    }
     hythread_safe_point();
     interpreterInvokeVirtual(frame, method);
 }
@@ -2066,6 +2072,10 @@ Opcode_INVOKEINTERFACE(StackFrame& frame) {
             << method->get_name()->bytes << "/"
             << method->get_descriptor()->bytes << endl);
 
+    hythread_exception_safe_point();
+    if(check_current_thread_exception()) {
+        return;
+    }
     hythread_safe_point();
     interpreterInvokeInterface(frame, method);
 }
@@ -2085,6 +2095,7 @@ Opcode_INVOKESTATIC(StackFrame& frame) {
     // FIXME: is it possible to move the code into !cp_is_resolved condition above?
     class_initialize(method->get_class());
 
+    hythread_exception_safe_point();
     if (check_current_thread_exception()) {
         return;
     }
@@ -2104,6 +2115,11 @@ Opcode_INVOKESPECIAL(StackFrame& frame) {
     DEBUG_BYTECODE(class_get_name(method_get_class(method)) << "."
             << method->get_name()->bytes << "/"
              << method->get_descriptor()->bytes << endl);
+
+    hythread_exception_safe_point();
+    if (check_current_thread_exception()) {
+        return;
+    }
 
     hythread_safe_point();
     interpreterInvokeSpecial(frame, method);
@@ -2156,6 +2172,7 @@ Opcode_LOOKUPSWITCH(StackFrame& frame) {
 static inline void
 Opcode_GOTO(StackFrame& frame) {
     hythread_safe_point();
+    hythread_exception_safe_point();
     DEBUG_BYTECODE("going to instruction");
     frame.ip += read_int16(frame.ip + 1);
 }
@@ -2163,6 +2180,7 @@ Opcode_GOTO(StackFrame& frame) {
 static inline void
 Opcode_GOTO_W(StackFrame& frame) {
     hythread_safe_point();
+    hythread_exception_safe_point();
     DEBUG_BYTECODE("going to instruction");
     frame.ip += read_int32(frame.ip + 1);
 }

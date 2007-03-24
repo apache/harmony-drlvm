@@ -628,11 +628,10 @@ static hythread_t allocate_thread() {
     //ptr->big_thread_local_storage = (void **)calloc(1, sizeof(void*)*tm_tls_capacity);
     
     // Suspension
-    ptr->suspend_request = 0;
-    ptr->suspend_disable_count = 0;
+    ptr->request = 0;
+    ptr->suspend_count = 0;
+    ptr->disable_count = 0;
     status = hylatch_create(&ptr->join_event, 1);
-    assert(status == TM_ERROR_NONE);
-    status = hylatch_create(&ptr->safe_region_event, 1);
     assert(status == TM_ERROR_NONE);
     status = hysem_create(&ptr->resume_event, 0, 1);
     assert(status == TM_ERROR_NONE);
@@ -653,23 +652,27 @@ static void reset_thread(hythread_t thread) {
         assert(!r);
     }
 
+    hymutex_lock(&thread->mutex);
+
     thread->os_handle  = (osthread_t)NULL;
     thread->priority   = HYTHREAD_PRIORITY_NORMAL;
     // not implemented
     //ptr->big_thread_local_storage = (void **)calloc(1, sizeof(void*)*tm_tls_capacity);
 
     // Suspension
-    thread->suspend_request = 0;
-    thread->suspend_disable_count = 0;
+    thread->request = 0;
+    thread->suspend_count = 0;
+    thread->disable_count = 0;
     thread->safepoint_callback = NULL;
+    thread->state = TM_THREAD_STATE_ALLOCATED;
+
+    hymutex_unlock(&thread->mutex);
+
     status = hylatch_set(thread->join_event, 1);
-    assert(status == TM_ERROR_NONE);
-    status = hylatch_set(thread->safe_region_event, 1);
     assert(status == TM_ERROR_NONE);
     status = hysem_set(thread->resume_event, 0);
     assert(status == TM_ERROR_NONE);
     
-    thread->state = TM_THREAD_STATE_ALLOCATED;
 }
 
 // Wrapper around user thread start proc. Used to perform some duty jobs 

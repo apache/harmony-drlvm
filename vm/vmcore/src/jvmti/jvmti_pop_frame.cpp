@@ -53,8 +53,6 @@ static void jvmti_pop_frame_callback()
 
     } else if (is_unwindable()) {
         // unwindable frame, wait for resume
-        TRACE(("PopFrame callback is entering safe_point"));
-        hythread_safe_point();
         TRACE(("PopFrame callback is FRAME_SAFE_POINT"));
 
         // switch execution to the previous frame
@@ -396,6 +394,10 @@ void jvmti_safe_point()
     Registers regs;
     M2nFrame* top_frame = m2n_get_last_frame();
     set_pop_frame_registers(top_frame, &regs);
+
+    TRACE(("entering exception_safe_point"));
+    hythread_exception_safe_point();
+    TRACE(("left exception_safe_point"));
 
     TRACE(("entering safe_point"));
     hythread_safe_point();

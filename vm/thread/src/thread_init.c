@@ -246,7 +246,7 @@ IDATA VMCALL hythread_global_lock() {
 
     // make sure we do not get a global thread lock
     // while being requested to suspend
-    while (self->suspend_request) {
+    while (self->request) {
         // give up global thread lock before safepoint,
         // because this thread can be suspended at a safepoint
         r = hymutex_unlock(&TM_LIBRARY->TM_LOCK);
@@ -258,7 +258,7 @@ IDATA VMCALL hythread_global_lock() {
 
     // do not use set_suspend_disable() as we do not
     // want safe points happening under global lock
-    self->suspend_disable_count = saved_count;
+    self->disable_count = saved_count;
     return 0;
 }
 

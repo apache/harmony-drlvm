@@ -81,7 +81,7 @@ methodGetStacknGCInfoBlockSize(Method_Handle method, JIT_Handle jit)
 // TODO: free TLS key on JIT deinitilization
 uint32
 flagTLSSuspendRequestOffset(){
-    return hythread_tls_get_suspend_request_offset();
+    return hythread_tls_get_request_offset();
 }
 
 uint32

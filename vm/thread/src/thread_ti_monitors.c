@@ -115,6 +115,7 @@ IDATA VMCALL jthread_raw_monitor_enter(jrawMonitorID mon_ptr) {
     }
     stat = hythread_monitor_enter(monitor);
     hythread_safe_point();
+    hythread_exception_safe_point();
     return stat;
 }
 
@@ -145,6 +146,7 @@ IDATA VMCALL jthread_raw_monitor_exit(jrawMonitorID mon_ptr) {
     }
     stat = hythread_monitor_exit(monitor);
     hythread_safe_point();
+    hythread_exception_safe_point();
     return stat;
 }
 

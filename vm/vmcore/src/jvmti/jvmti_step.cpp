@@ -671,6 +671,7 @@ static bool jvmti_process_jit_single_step_event(TIEnv* UNREF unused_env,
         jvmti_setup_jit_single_step(ti, m, location);
 
     oh_discard_local_handle(hThread);
+    hythread_exception_safe_point();
     tmn_suspend_disable();
 
     return true;

@@ -22,6 +22,7 @@
 
 #include <open/jthread.h>
 #include <open/hythread_ext.h>
+#include <apr_atomic.h>
 #include "open/thread_externals.h"
 #include "thread_private.h"
 #include "jni.h"
@@ -423,9 +424,6 @@ void stop_callback(void) {
     tm_java_thread = hythread_get_private_data(tm_native_thread);
     excn = tm_java_thread->stop_exception;
     
-    tm_native_thread->suspend_request = 0;
-    hysem_post(tm_native_thread->resume_event);
-    
     jthread_throw_exception_object(excn);
 }
 
@@ -467,6 +465,7 @@ IDATA jthread_exception_stop(jthread java_thread, jobject excn) {
     jvmti_thread_t tm_java_thread;
     hythread_t tm_native_thread;
     JNIEnv* env;
+    IDATA res;
 
     tm_native_thread = jthread_get_native_thread(java_thread);
     tm_java_thread = hythread_get_private_data(tm_native_thread);
@@ -475,7 +474,23 @@ IDATA jthread_exception_stop(jthread java_thread, jobject excn) {
     env = jthread_get_JNI_env(jthread_self());
     tm_java_thread->stop_exception = (*env)->NewGlobalRef(env,excn);
     
-    return hythread_set_safepoint_callback(tm_native_thread, stop_callback);
+    res = hythread_set_safepoint_callback(tm_native_thread, stop_callback);
+
+    while (tm_native_thread->suspend_count > 0) {
+        apr_atomic_dec32(&tm_native_thread->suspend_count);
+        apr_atomic_dec32(&tm_native_thread->request);
+    }
+
+    // if there is no competition, it would be 1, but if someone else
+    // is suspending the same thread simultaneously, it could be greater than 1
+    assert(tm_native_thread->request > 0);
+
+    // notify the thread that it may wake up now,
+    // so that it would eventually reach exception safepoint
+    // and execute callback
+    hysem_post(tm_native_thread->resume_event);
+
+    return res;
 }
 
 /**

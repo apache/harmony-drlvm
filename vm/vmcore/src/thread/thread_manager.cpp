@@ -167,6 +167,8 @@ IDATA jthread_throw_exception(char* name, char* message) {
 
 IDATA jthread_throw_exception_object(jobject object) {
     if (interpreter_enabled()) {
+        // FIXME - Function set_current_thread_exception does the same
+        // actions as exn_raise_object, and it should be replaced.
         set_current_thread_exception(object->object);
     } else {
         if (is_unwindable()) {

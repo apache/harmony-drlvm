@@ -134,8 +134,6 @@ typedef struct HyThreadLibrary {
     hycond_t  nondaemon_thread_cond;
 } HyThreadLibrary;
 
-
-
 /**
  * Native thread control structure.
  */
@@ -156,30 +154,70 @@ typedef struct HyThread {
 // Suspension 
     
     /**
-     * Number of suspend requests made for this thread.
+     * Number of requests made for this thread, it includes both
+     * suspend requests and safe point callback requests.
+     * The field is modified by atomic operations.
+     *
+     * Increment in functions:
+     *    1. send_suspend_request()
+     *          - sets suspend request for a given thread
+     *    2. hythread_set_safepoint_callback()
+     *          - sets safe point callback request for a given thread
+     *
+     * Decrement in functions:
+     *    1. hythread_resume()
+     *          - removes suspend request for a given thread
+     *    2. hythread_exception_safe_point()
+     *          - removes safe point callback request for current thread
      */
-    int32 suspend_request;
+    int32 request;
+
+    /**
+     * Number of suspend requests made for this thread.
+     * The field is modified by atomic operations.
+     *
+     * After increment/decrement of suspend_count, request field
+     * should be incremented/decremented too.
+     */
+    int32 suspend_count;
     
     /**
-     * Flag indicating that thread can safely be suspended.
+     * Field indicating that thread can safely be suspended.
+     * Safe suspension is enabled on value 0.
+     *
+     * The disable_count is increased/decreaded in
+     * hythread_suspend_disable()/hythread_suspend_enable() function
+     * for current thread only.
+     *
+     * Also disable_count could be reset to value 0 and restored in
+     * reset_suspend_disable()/set_suspend_disable() function
+     * for current thread only.
+     *
+     * Function hythread_exception_safe_point() sets disable_count to
+     * value 1 before safe point callback function calling and restores
+     * it after the call.
+     *
+     * Function thread_safe_point_impl() sets disable_count to
+     * value 0 before entering to the safe point and restores it
+     * after exitting.
      */
-    int16 suspend_disable_count;
+    int16 disable_count;
         
     /**
-     * Event used to notify interested threads whenever thread enters the safe region.
-     */
-    hylatch_t safe_region_event;
-
-    /**
-     * Event used to notify suspended thread that it needs to wake up.
-     */   
-    hysem_t resume_event;
-
-    /**
      * Function to be executed at safepoint upon thread resume.
+     *
+     * Field is set in hythread_set_safepoint_callback() function
+     * and reset hythread_exception_safe_point() function.
+     *
+     * After set/reset of safepoint_callback, request field
+     * should be incremented/decremented too.
      */
     hythread_event_callback_proc safepoint_callback;
 
+    /**
+     * Event used to notify suspended thread that it needs to wake up.
+     */
+    hysem_t resume_event;
 
 // Basic manipulation fields
 

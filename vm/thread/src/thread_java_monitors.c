@@ -88,6 +88,7 @@ IDATA VMCALL jthread_monitor_enter(jobject monitor) {
     while (TM_ERROR_NONE !=unreserve_lock(lockword)) {
         hythread_yield();
         hythread_safe_point();
+        hythread_exception_safe_point();
         lockword = vm_object_get_lockword_addr(monitor);
     }
     status = hythread_thin_monitor_try_enter(lockword);
@@ -115,6 +116,7 @@ IDATA VMCALL jthread_monitor_enter(jobject monitor) {
     lockword = vm_object_get_lockword_addr(monitor);
     while ((status = hythread_thin_monitor_try_enter(lockword)) == TM_ERROR_EBUSY) {
         hythread_safe_point();
+        hythread_exception_safe_point();
         lockword = vm_object_get_lockword_addr(monitor);
  
         if (is_fat_lock(*lockword)) {

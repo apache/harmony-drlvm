@@ -78,7 +78,8 @@ e between safe point function call overhead and suspension time overhead.
  * Each thread managed by TM has the following fields:
  * <ul>
  * <li>    safe_region 226 boolean flag which reports whether suspend is safe at this moment or not.
- * <li>    suspend_request 226 integer indicating how many requests for suspension were made for this thread
+ * <li>    request 226 integer indicating if any request for suspension were made for this thread
+ * <li>    suspend_count 226 integer indicating how many requests for suspension were made for this thread
  * <li>    safe_region_event 226 event indicating that thread has reached safe region
  * <li>    resume_event 226 event indicating that thread needs to be awakened
  * </ul>
@@ -87,11 +88,11 @@ e between safe point function call overhead and suspension time overhead.
  * The safe thread suspension algorithm works as follows:
  * <pre>
  *   1.  GC thread invokes thread_supend() method of a thread manager which does the following:
- *       a.  If  Java thread was already requested to suspend, increase the suspend_request count and return;
- *       b.  Increase suspend_request for Java thread;
+ *       a.  If  Java thread was already requested to suspend, increase the suspend_count count and return;
+ *       b.  Increase suspend_count for Java thread;
  *       c.  If Java thread is currently in unsafe region, wait while it reaches the safe region.
  *   2.  GC thread, after completing the enumeration-related activities, calls the resume_thread() method which does the following:
- *       a.  If suspend_request was previously set, decrease the number of suspend requests;
+ *       a.  If suspend_count was previously set, decrease the number of suspend requests;
  *       b.  If the number of suspend requests reaches zero, notifies the Java thread that it can wake up now.
  *   3.  A Java thread may reach safe point, which is denoted by calling the safe_point() method in the Java thread. 
  *       The safe_point() method does the following:
@@ -191,9 +192,8 @@ void* VMCALL hythread_get_private_data(hythread_t  t);
 IDATA VMCALL hythread_set_private_data(hythread_t  t, void* data);
 
 UDATA VMCALL hythread_tls_get_offset(hythread_tls_key_t key);
-UDATA VMCALL hythread_tls_get_suspend_request_offset();
+UDATA VMCALL hythread_tls_get_request_offset();
 UDATA VMCALL hythread_get_thread_times(hythread_t thread, int64* pkernel, int64* puser);
-
 
 //@}
 /** @name Conditional variable
@@ -218,10 +218,10 @@ IDATA hythread_is_suspend_enabled();
 void hythread_suspend_enable();
 void hythread_suspend_disable();
 void hythread_safe_point();
+void VMCALL hythread_exception_safe_point();
 IDATA VMCALL hythread_suspend_other(hythread_t thread);
 
 IDATA VMCALL hythread_set_safepoint_callback(hythread_t thread, hythread_event_callback_proc callback);
-hythread_event_callback_proc VMCALL hythread_get_safepoint_callback(hythread_t t);
 IDATA VMCALL hythread_suspend_all(hythread_iterator_t *t, hythread_group_t group);
 IDATA VMCALL hythread_resume_all(hythread_group_t  group);
 

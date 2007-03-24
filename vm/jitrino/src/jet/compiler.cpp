@@ -1456,7 +1456,7 @@ void Compiler::initStatics(void)
     // Collect runtime constants
     //
     rt_array_length_offset = vector_length_offset();
-    rt_suspend_req_flag_offset = (unsigned)hythread_tls_get_suspend_request_offset();
+    rt_suspend_req_flag_offset = (unsigned)hythread_tls_get_request_offset();
     rt_vtable_offset = object_get_vtable_offset();
     
     Class_Handle clss;

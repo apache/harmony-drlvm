@@ -114,10 +114,10 @@ IDATA VMCALL hythread_tls_free(hythread_tls_key_t key) {
 }
 
 /**
- * Returns 'suspend_request' field offset in HyThread struct
+ * Returns 'request' field offset in HyThread struct
  */
-UDATA VMCALL hythread_tls_get_suspend_request_offset() {
-    return (UDATA)&((hythread_t)0)->suspend_request;
+UDATA VMCALL hythread_tls_get_request_offset() {
+    return (UDATA)&((hythread_t)0)->request;
 }
 
 /**
