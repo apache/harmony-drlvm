@@ -140,21 +140,7 @@ jvmtiGetFieldDeclaringClass(jvmtiEnv* env,
     if (! is_valid_class_object(klass))
         return JVMTI_ERROR_INVALID_CLASS;
     
-    Class *cl = jclass_to_struct_Class(klass);
-    if( cl == NULL ) return JVMTI_ERROR_NULL_POINTER;
-
     if( !field ) return JVMTI_ERROR_INVALID_FIELDID;
-
-    bool present = false;
-    for( unsigned i = 0; i < cl->get_number_of_fields(); i++ ) {
-        if( (jfieldID)cl->get_field(i) == field ) {
-            present = true;
-            break;
-        }
-    }
-
-    if( !present )
-        return JVMTI_ERROR_INVALID_FIELDID;
 
     if( !declaring_class_ptr ) return JVMTI_ERROR_NULL_POINTER;
 

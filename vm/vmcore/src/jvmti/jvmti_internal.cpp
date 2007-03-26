@@ -45,7 +45,7 @@ static Boolean is_valid_instance(jobject obj, Class* clss)
         return false;
     }
 
-    // Check that object is an instance of java.lang.Thread or extends it
+    // Check that object is an instance of clss or subclasss
     if (mo->vt() == NULL)
     {
         tmn_suspend_enable();
