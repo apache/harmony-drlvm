@@ -60,7 +60,7 @@ JNIEXPORT jboolean JNICALL Java_java_lang_VMThreadManager_holdsLock
 JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_interrupt
   (JNIEnv * UNREF jenv, jclass clazz, jobject jthread)
 {
-    return jthread_interrupt(jthread);
+    return (jint)jthread_interrupt(jthread);
 }
 
 /*
@@ -71,7 +71,7 @@ JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_interrupt
 JNIEXPORT jboolean JNICALL Java_java_lang_VMThreadManager_isInterrupted__
   (JNIEnv * UNREF jenv, jclass clazz)
 {
-    return jthread_clear_interrupted(jthread_self());
+    return (jthread_clear_interrupted(jthread_self()) == TM_ERROR_INTERRUPT)?JNI_TRUE:JNI_FALSE;
 }
 
 /*
@@ -93,7 +93,7 @@ JNIEXPORT jboolean JNICALL Java_java_lang_VMThreadManager_isInterrupted__Ljava_l
 JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_notify
   (JNIEnv * UNREF jenv, jclass clazz, jobject monitor)
 {
-    return jthread_monitor_notify(monitor);
+    return (jint)jthread_monitor_notify(monitor);
 }
 
 /*
@@ -104,7 +104,7 @@ JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_notify
 JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_notifyAll
   (JNIEnv * UNREF jenv, jclass clazz, jobject monitor)
 {
-    return jthread_monitor_notify_all(monitor);
+    return (jint)jthread_monitor_notify_all(monitor);
 }
 
 /*
@@ -115,7 +115,7 @@ JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_notifyAll
 JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_resume
   (JNIEnv * UNREF jenv, jclass clazz, jobject thread)
 {
-    return jthread_resume(thread);
+    return (jint)jthread_resume(thread);
 }
 
 /*
@@ -126,7 +126,7 @@ JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_resume
 JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_setPriority
   (JNIEnv * UNREF jenv, jclass clazz, jobject UNREF thread, jint UNREF priority)
 {
-    return jthread_set_priority(thread, priority);
+    return (jint)jthread_set_priority(thread, priority);
 }
 
 /*
@@ -137,7 +137,7 @@ JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_setPriority
 JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_sleep
   (JNIEnv * UNREF jenv, jclass clazz, jlong millis, jint nanos)
 {
-    return jthread_sleep(millis, nanos); 
+    return (jint)jthread_sleep(millis, nanos); 
 }
 
 /*
@@ -175,7 +175,7 @@ JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_start
 JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_stop
   (JNIEnv *env, jclass clazz, jobject UNREF thread, jthrowable UNREF threadDeathException)
 {
-    return jthread_exception_stop(thread, threadDeathException);
+    return (jint)jthread_exception_stop(thread, threadDeathException);
 }
 
 /*
@@ -186,7 +186,7 @@ JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_stop
 JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_suspend
   (JNIEnv * UNREF jenv, jclass clazz, jobject jthread)
 {
-    return jthread_suspend(jthread);
+    return (jint)jthread_suspend(jthread);
 }
 
 
@@ -199,7 +199,7 @@ JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_wait
   (JNIEnv *env, jclass clazz, jobject monitor, jlong millis, jint UNREF nanos)
 {
     // TODO: need to evaluate return code properly
-    return jthread_monitor_timed_wait(monitor, millis, nanos);
+    return (jint)jthread_monitor_timed_wait(monitor, millis, nanos);
 }
 
 /*
@@ -210,7 +210,7 @@ JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_wait
 JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_yield
   (JNIEnv * UNREF jenv, jclass clazz)
 {
-    return jthread_yield();
+    return (jint)jthread_yield();
 }
 
 /*
@@ -242,7 +242,7 @@ JNIEXPORT jboolean JNICALL Java_java_lang_VMThreadManager_isAlive
 JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_join
   (JNIEnv * UNREF jenv, jclass clazz, jobject thread, jlong millis, jint nanos)
 {
-    return jthread_timed_join(thread, millis, nanos);
+    return (jint)jthread_timed_join(thread, millis, nanos);
 }
 
 /*
@@ -254,7 +254,7 @@ JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_getState
   (JNIEnv * UNREF jenv, jclass clazz, jobject jthread)
 {
     jint state;	
-    int stat;
+    IDATA stat;
     
     stat = jthread_get_state(jthread, &state);
     assert(stat == TM_ERROR_NONE);

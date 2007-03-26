@@ -137,7 +137,7 @@ uint32* EdgeMethodProfile::getCounter( uint32 key ) const
     if (val!=key) {
         return NULL;
     }
-    uint32 idx = it - cntMap.begin();
+    uint32 idx = (uint32)(it - cntMap.begin());
     return (uint32*)&counters.front() + idx;
 }
 

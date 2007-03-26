@@ -60,7 +60,7 @@ struct TIIterationState {
 
     // used to trace the heap
     unsigned char *markbits;
-    unsigned markbits_size;
+    UDATA markbits_size;
     std::stack<ManagedObject*> *markstack;
 
     // some data is set up in enclosing scope and saved here,

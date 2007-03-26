@@ -36,7 +36,7 @@ void set_native_ref_enqueue_thread_flag(Boolean flag)
 {  native_ref_thread_flag = flag; }
 
 
-static int ref_enqueue_thread_func(void **args);
+static IDATA ref_enqueue_thread_func(void **args);
 
 void ref_enqueue_thread_init(JavaVM *java_vm)
 {
@@ -73,7 +73,7 @@ static void wait_pending_reference(void)
     assert(stat == TM_ERROR_NONE);
 }
 
-static int ref_enqueue_thread_func(void **args)
+static IDATA ref_enqueue_thread_func(void **args)
 {
     JavaVM *java_vm = (JavaVM *)args[0];
     JNIEnv *jni_env;

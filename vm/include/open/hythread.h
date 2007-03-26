@@ -29,8 +29,8 @@ typedef UDATA hythread_tls_key_t;
 
 #define HYTHREAD_PROC VMCALL
 
-typedef int(HYTHREAD_PROC* hythread_entrypoint_t)(void*);
-typedef void(HYTHREAD_PROC* hythread_tls_finalizer_t)(void*);
+typedef IDATA (HYTHREAD_PROC* hythread_entrypoint_t)(void*);
+typedef void (HYTHREAD_PROC* hythread_tls_finalizer_t)(void*);
 typedef struct HyThread *hythread_t;
 typedef struct HyThreadMonitor *hythread_monitor_t;
 typedef struct HySemaphore *hysem_t;

@@ -147,7 +147,7 @@ void *vm_allocate_thread_dummies(JavaVM *java_vm) {
 /**
  * Runs java.lang.Thread.detach() method.
  */
-static IDATA run_java_detach(jthread java_thread) {
+static jint run_java_detach(jthread java_thread) {
     static Method * detach = NULL;
     const char * method_name = "detach";
     const char * descriptor = "(Ljava/lang/Throwable;)V";

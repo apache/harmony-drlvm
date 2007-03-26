@@ -155,7 +155,7 @@ static void vm_shutdown_stop_java_threads(Global_Env * vm_env) {
  */
 jint vm_destroy(JavaVM_Internal * java_vm, jthread java_thread)
 {
-    jint status;
+    IDATA status;
     JNIEnv * jni_env;
     jobject uncaught_exception;
 
@@ -182,7 +182,7 @@ jint vm_destroy(JavaVM_Internal * java_vm, jthread java_thread)
 
     // Execute pending shutdown hooks & finalizers
     status = exec_shutdown_sequence(jni_env);
-    if (status != JNI_OK) return status;
+    if (status != JNI_OK) return (jint)status;
 
     // Raise uncaught exception to current thread.
     // It will be properly processed in jthread_detach().
@@ -222,7 +222,7 @@ jint vm_destroy(JavaVM_Internal * java_vm, jthread java_thread)
     return JNI_OK;
 }
 
-static int vm_interrupt_process(void * data) {
+static IDATA vm_interrupt_process(void * data) {
     hythread_t * threadBuf;
     int i;
 
@@ -241,7 +241,7 @@ static int vm_interrupt_process(void * data) {
 /**
  * Initiates VM shutdown sequence.
  */
-static int vm_interrupt_entry_point(void * data) {
+static IDATA vm_interrupt_entry_point(void * data) {
     JNIEnv * jni_env;
     JavaVMAttachArgs args;
     JavaVM * java_vm;
@@ -263,7 +263,7 @@ static int vm_interrupt_entry_point(void * data) {
 /**
  * Dumps all java stacks.
  */
-static int vm_dump_entry_point(void * data) {
+static IDATA vm_dump_entry_point(void * data) {
     JNIEnv * jni_env;
     JavaVMAttachArgs args;
     JavaVM * java_vm;
@@ -292,7 +292,7 @@ void vm_interrupt_handler(int UNREF x) {
     JavaVM ** vmBuf;
     hythread_t * threadBuf;
     int nVMs;
-    jint status;
+    IDATA status;
 
     status = JNI_GetCreatedJavaVMs(NULL, 0, &nVMs);
     assert(nVMs <= 1);
@@ -340,10 +340,11 @@ void vm_dump_handler(int UNREF x) {
     status = JNI_GetCreatedJavaVMs(vmBuf, nVMs, &nVMs);
     assert(nVMs <= 1);
 
+    IDATA htstatus;
     if (status != JNI_OK) goto cleanup;
 
-    status = hythread_attach(NULL);
-    if (status != TM_ERROR_NONE) goto cleanup;
+    htstatus = hythread_attach(NULL);
+    if (htstatus != TM_ERROR_NONE) goto cleanup;
 
     // Create a new thread for each VM to avoid scalability and deadlock problems.
     for (int i = 0; i < nVMs; i++) {

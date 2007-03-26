@@ -124,7 +124,7 @@ jvmtiGetAllThreads(jvmtiEnv* env,
      //jthread_get_all_threads(threads_ptr, threads_count_ptr);
 
     iterator=jthread_iterator_create();
-    java_thread_count = jthread_iterator_size(iterator);
+    java_thread_count = (jint)jthread_iterator_size(iterator);
     //allocate memory
     err=jvmtiAllocate(env,java_thread_count*sizeof(jthread),(unsigned char**)&java_threads);
     if (err != JVMTI_ERROR_NONE){

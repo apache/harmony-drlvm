@@ -553,7 +553,7 @@ static jint vm_create_jthread(jthread * thread_object, JNIEnv * jni_env, jobject
     native_thread = hythread_self();
     args[3].j = (POINTER_SIZE_INT) native_thread;
     args[4].j = 0;
-    args[5].i = hythread_get_priority(native_thread);
+    args[5].i = (jint)hythread_get_priority(native_thread);
     args[6].z = daemon;
     
     vm_execute_java_method_array((jmethodID) constructor, 0, args);
@@ -585,7 +585,7 @@ jint vm_attach_internal(JNIEnv ** p_jni_env, jthread * java_thread, JavaVM * jav
 
     native_thread = hythread_self();
     if (!native_thread) {
-        status = hythread_attach_to_group(&native_thread,
+        status = (jint)hythread_attach_to_group(&native_thread,
             ((JavaVM_Internal *)java_vm)->vm_env->hythread_lib, NULL);
         if (status != TM_ERROR_NONE) return JNI_ERR;
     }

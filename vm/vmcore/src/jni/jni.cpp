@@ -505,10 +505,12 @@ JNIEXPORT jint JNICALL JNI_CreateJavaVM(JavaVM ** p_vm, JNIEnv ** p_jni_env,
     if (status != JNI_OK) goto done;
 
     // Attaches main thread to TM.
-    status = jthread_attach(jni_env, java_thread, daemon);
-    if (status != TM_ERROR_NONE) {
-        status = JNI_ERR;
-        goto done;
+    {
+        IDATA jtstatus = jthread_attach(jni_env, java_thread, daemon);
+        if (jtstatus != TM_ERROR_NONE) {
+            status = JNI_ERR;
+            goto done;
+        }
     }
     assert(jthread_self() != NULL);
     *p_jni_env = jni_env;
@@ -1450,8 +1452,8 @@ VMEXPORT jint JNICALL DestroyJavaVM(JavaVM * vm)
         status = vm_attach_internal(&jni_env, &java_thread, java_vm, NULL, name, daemon);
         if (status != JNI_OK) return status;
 
-        status = jthread_attach(jni_env, java_thread, daemon);
-        if (status != TM_ERROR_NONE) return JNI_ERR;
+        IDATA jtstatus = jthread_attach(jni_env, java_thread, daemon);
+        if (jtstatus != TM_ERROR_NONE) return JNI_ERR;
         // Now JVMTIThread keeps global reference. Discared temporary global reference.
         jni_env->DeleteGlobalRef(java_thread);
 
@@ -1508,7 +1510,7 @@ static jint attach_current_thread(JavaVM * java_vm, void ** p_jni_env, void * ar
 
     // Attaches current thread to VM.
     status = vm_attach_internal(&jni_env, &java_thread, java_vm, group, name, daemon);
-    if (status != JNI_OK) return status;
+    if (status != JNI_OK) return (jint)status;
 
     *p_jni_env = jni_env;
 

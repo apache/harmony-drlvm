@@ -168,9 +168,9 @@ static void ti_enumerate_root(void* root, Managed_Object_Handle obj)
     assert(state);
     if (JVMTI_HEAP_ROOT_STACK_LOCAL == state->root_kind
             || JVMTI_HEAP_ROOT_JNI_LOCAL == state->root_kind) {
-        jint depth = state->depth;
+        jint depth = (jint)state->depth;
         jmethodID method = state->method;
-        jint slot = ((UDATA)state->frame_base - (UDATA)root)/sizeof(void*);
+        jint slot = (jint)(((UDATA)state->frame_base - (UDATA)root)/sizeof(void*));
 
         vm_ti_enumerate_stack_root((jvmtiEnv*)ti_env, 
                 root, obj, state->root_kind, 

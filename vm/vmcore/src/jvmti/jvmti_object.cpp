@@ -250,7 +250,7 @@ jvmtiGetObjectMonitorUsage(jvmtiEnv* env,
         owner = oh_copy_to_local_handle(owner);
 
     info_ptr->owner = owner;
-    info_ptr->entry_count = jthread_get_lock_recursion(object, info_ptr->owner);
+    info_ptr->entry_count = (jint)jthread_get_lock_recursion(object, info_ptr->owner);
     info_ptr->waiter_count = ii;
     info_ptr->waiters = enter_wait_array;
     info_ptr->notify_waiter_count = jj;

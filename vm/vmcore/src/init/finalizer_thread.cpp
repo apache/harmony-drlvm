@@ -59,7 +59,7 @@ static unsigned int coarse_log(unsigned int num)
     return 0;
 }
 
-static int finalizer_thread_func(void **args);
+static IDATA finalizer_thread_func(void **args);
 
 void finalizer_threads_init(JavaVM *java_vm)
 {
@@ -164,7 +164,7 @@ static void wait_pending_finalizer(void)
     assert(stat == TM_ERROR_NONE);
 }
 
-static int finalizer_thread_func(void **args)
+static IDATA finalizer_thread_func(void **args)
 {
     JavaVM *java_vm = (JavaVM *)args[0];
     JNIEnv *jni_env;
