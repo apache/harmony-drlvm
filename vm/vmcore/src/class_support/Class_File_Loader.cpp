@@ -1183,6 +1183,7 @@ bool Handler::parse(Class* clss, unsigned code_length,
             clss->get_name()->bytes << ": illegal handler_pc"
             << " for exception handler of code attribute for method "
             << method->get_name()->bytes << method->get_descriptor()->bytes);
+        return false;       
     }
 
     uint16 catch_index;
@@ -2625,21 +2626,21 @@ bool ConstantPool::check(Global_Env* env, Class* clss, bool is_trusted_cl)
         case CONSTANT_InterfaceMethodref:
         {
             unsigned class_index = get_ref_class_index(i);
+            if (!valid_cpi(clss, class_index, CONSTANT_Class, "for class name at CONSTANT_*ref entry")) {
+                return false;
+            }
             unsigned name_type_index = get_ref_name_and_type_index(i);
+            if (!valid_cpi(clss, name_type_index, CONSTANT_NameAndType, "for name-and-type at CONSTANT_*ref entry")) {
+                return false;
+            }            
             const char *next = NULL;
             String *name;
             String *descriptor;
             unsigned name_index = get_name_and_type_name_index(name_type_index);
-            unsigned descriptor_index = get_name_and_type_descriptor_index(name_type_index);
-            if (!valid_cpi(clss, class_index, CONSTANT_Class, "for class name at CONSTANT_*ref entry")) {
-                return false;
-            }
-            if (!valid_cpi(clss, name_type_index, CONSTANT_NameAndType, "for name-and-type at CONSTANT_*ref entry")) {
-                return false;
-            }
             if(!valid_cpi(clss, name_index, CONSTANT_Utf8, "for name at CONSTANT_*ref entry")) {
                 return false;
-            }
+            }        
+            unsigned descriptor_index = get_name_and_type_descriptor_index(name_type_index);
             if (!valid_cpi(clss, descriptor_index, CONSTANT_Utf8, "for descriptor at CONSTANT_*ref entry")) {
                 return false;
             }
