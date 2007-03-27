@@ -16,3 +16,6 @@ gc/Mark.java
 
 # HARMONY-2772 fails intermittently 
 stress/Mix.java
+
+# HARMONY-3495 hangs intermittently
+gc/NPE.java
