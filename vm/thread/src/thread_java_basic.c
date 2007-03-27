@@ -481,9 +481,14 @@ IDATA jthread_exception_stop(jthread java_thread, jobject excn) {
         apr_atomic_dec32(&tm_native_thread->request);
     }
 
-    // if there is no competition, it would be 1, but if someone else
-    // is suspending the same thread simultaneously, it could be greater than 1
-    assert(tm_native_thread->request > 0);
+    // if there is no competition, it would be 1, but if someone else is
+    // suspending the same thread simultaneously, it could be greater than 1
+    // if safepoint callback isn't set it could be equal to 0.
+    //
+    // The following assertion may be false because at each time
+    // one of the conditions is true, and the other is false, but
+    // when checking the whole condition it may be failse in the result.
+    // assert(tm_native_thread->request > 0 || tm_native_thread->safepoint_callback == NULL);
 
     // notify the thread that it may wake up now,
     // so that it would eventually reach exception safepoint
