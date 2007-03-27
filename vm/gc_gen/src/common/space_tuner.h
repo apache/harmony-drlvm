@@ -70,6 +70,7 @@ typedef struct Space_Tuner{
 void gc_space_tune_prepare(GC* gc, unsigned int cause);
 void gc_space_tune_before_gc(GC* gc, unsigned int cause);
 void gc_space_tune_before_gc_fixed_size(GC* gc, unsigned int cause);
+Boolean retune_los_size(GC *gc);
 void gc_space_tuner_reset(GC* gc);
 void gc_space_tuner_initialize(GC* gc);
 

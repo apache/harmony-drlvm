@@ -90,8 +90,6 @@ static FORCE_INLINE void scan_object(Collector* collector, Partial_Reveal_Object
    The same object can be traced by the thread itself, or by other thread.
 */
 
-#include "../verify/verify_live_heap.h"
-
 static FORCE_INLINE void forward_object(Collector *collector, REF *p_ref) 
 {
   Space* space = collector->collect_space; 

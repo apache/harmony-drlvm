@@ -41,7 +41,13 @@ void add_root_set_entry_interior_pointer(void **slot, int offset, Boolean is_pin
   //check size;
   if( interior_pointer_set.size() == interior_pointer_num_count ) 
   {
-    unsigned int size = interior_pointer_num_count == 0 ? initial_vector_size : interior_pointer_set.size()*2;
+    int size ;
+    if(interior_pointer_num_count == 0){
+      size = initial_vector_size ;
+      
+    }else{
+      size = (unsigned int)interior_pointer_set.size()*2;
+    }
     interior_pointer_set.resize(size);
   }
 
@@ -83,5 +89,6 @@ void gc_reset_interior_pointer_table()
   interior_pointer_num_count = 0;
   //this function is for the case of out of memory which need to call update_rootset_interior_pointer multi-times
 }
+
 
 

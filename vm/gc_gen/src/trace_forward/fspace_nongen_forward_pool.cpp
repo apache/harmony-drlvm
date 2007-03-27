@@ -80,7 +80,6 @@ static FORCE_INLINE void scan_object(Collector* collector, Partial_Reveal_Object
    The same object can be traced by the thread itself, or by other thread.
 */
 
-#include "../verify/verify_live_heap.h"
 static FORCE_INLINE void forward_object(Collector* collector, REF *p_ref) 
 {
   GC* gc = collector->gc;
@@ -116,11 +115,6 @@ static FORCE_INLINE void forward_object(Collector* collector, REF *p_ref)
   /* otherwise, we successfully forwarded */
   write_slot(p_ref, p_target_obj);
 
-  /* we forwarded it, we need remember it for verification. */
-  if(verify_live_heap) {
-    event_collector_move_obj(p_obj, p_target_obj, collector);
-  }
-  
   scan_object(collector, p_target_obj); 
   return;
 }

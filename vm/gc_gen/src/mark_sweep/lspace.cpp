@@ -39,7 +39,7 @@ void lspace_initialize(GC* gc, void* start, POINTER_SIZE_INT lspace_size)
 
   /* commit mspace mem */    
   void* reserved_base = start;
-  unsigned int committed_size = lspace_size;
+  POINTER_SIZE_INT committed_size = lspace_size;
   if(!large_page_hint)
     vm_commit_mem(reserved_base, lspace_size);
   memset(reserved_base, 0, lspace_size);
@@ -111,7 +111,7 @@ void lspace_collection(Lspace* lspace)
   return;
 }
 
-unsigned int lspace_get_failure_size(Lspace* lspace)
+POINTER_SIZE_INT lspace_get_failure_size(Lspace* lspace)
 {
   return lspace->failure_size;
 }

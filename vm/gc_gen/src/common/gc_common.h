@@ -351,8 +351,8 @@ struct Space_Tuner;
 typedef struct GC{
   void* heap_start;
   void* heap_end;
-  unsigned int reserved_heap_size;
-  unsigned int committed_heap_size;
+  POINTER_SIZE_INT reserved_heap_size;
+  POINTER_SIZE_INT committed_heap_size;
   unsigned int num_collections;
   int64 time_collections;
   float survive_ratio;

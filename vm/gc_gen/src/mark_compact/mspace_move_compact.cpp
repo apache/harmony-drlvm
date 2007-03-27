@@ -28,8 +28,6 @@ Space* gc_get_nos(GC_Gen* gc);
 Space* gc_get_mos(GC_Gen* gc);
 Space* gc_get_los(GC_Gen* gc);
 
-#include "../verify/verify_live_heap.h"
-
 static void mspace_move_objects(Collector* collector, Mspace* mspace) 
 {
   Block_Header* curr_block = collector->cur_compact_block;
@@ -82,20 +80,6 @@ static void mspace_move_objects(Collector* collector, Mspace* mspace)
       POINTER_SIZE_INT sector_distance = (POINTER_SIZE_INT)src_sector_addr - (POINTER_SIZE_INT)dest_sector_addr;
       curr_block->table[curr_sector] = sector_distance;
 
-      if (verify_live_heap) {
-           Partial_Reveal_Object *rescan_obj = (Partial_Reveal_Object *)src_sector_addr;
-           void *rescan_pos = (Partial_Reveal_Object *)((POINTER_SIZE_INT)rescan_obj + vm_object_size(rescan_obj));
-           while ((POINTER_SIZE_INT)rescan_obj < (POINTER_SIZE_INT)src_sector_addr + curr_sector_size) {
-            Partial_Reveal_Object* targ_obj = (Partial_Reveal_Object *)((POINTER_SIZE_INT)rescan_obj- sector_distance);
-             if(is_fallback)
-               event_collector_doublemove_obj(rescan_obj, targ_obj, collector);
-             else
-               event_collector_move_obj(rescan_obj, targ_obj, collector);
-              rescan_obj = block_get_next_marked_object(curr_block, &rescan_pos);
-              if(rescan_obj == NULL) break;
-           }
-      }
-      
       memmove(dest_sector_addr, src_sector_addr, curr_sector_size);
 
       dest_sector_addr = (void*)((POINTER_SIZE_INT)dest_sector_addr + curr_sector_size);
@@ -209,7 +193,7 @@ void move_compact_mspace(Collector* collector)
   while(num_fixing_collectors != num_active_collectors + 1);
 
    /* Dealing with out of memory in mspace */  
-  if(mspace->free_block_idx > fspace->first_block_idx){    
+  if((mspace->free_block_idx > fspace->first_block_idx) || ((fspace->num_managed_blocks == 0) && (mspace->free_block_idx < fspace->first_block_idx))){    
      atomic_cas32( &num_extending_collectors, 0, num_active_collectors);        
      mspace_extend_compact(collector);        
      atomic_inc32(&num_extending_collectors);    

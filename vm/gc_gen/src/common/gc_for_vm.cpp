@@ -161,6 +161,11 @@ int64 gc_total_memory()
   return (int64)((POINTER_SIZE_INT)gc_gen_total_memory_size((GC_Gen*)p_global_gc)); 
 }
 
+int64 gc_max_memory() 
+{
+  return (int64)((POINTER_SIZE_INT)gc_gen_total_memory_size((GC_Gen*)p_global_gc)); 
+}
+
 void gc_vm_initialized()
 { return; }
 
@@ -179,8 +184,27 @@ Managed_Object_Handle gc_get_next_live_object(void *iterator)
 unsigned int gc_time_since_last_gc()
 {  assert(0); return 0; }
 
+#define GCGEN_HASH_MASK 0x7c
 int32 gc_get_hashcode(Managed_Object_Handle p_object) 
-{  return 23; }
+{  
+   Partial_Reveal_Object *obj = (Partial_Reveal_Object *)p_object;
+   if(!obj) return 0;
+   assert(address_belongs_to_gc_heap(obj, p_global_gc));
+   Obj_Info_Type info = get_obj_info_raw(obj);
+   int hash = info & GCGEN_HASH_MASK;
+   if (!hash) {
+       hash = (((unsigned int)obj) >> 3) & GCGEN_HASH_MASK;
+       if(!hash)  hash = (23 & GCGEN_HASH_MASK);
+       unsigned int new_info = (unsigned int)(info | hash);
+       while (true) {
+         unsigned int temp = atomic_cas32(&obj->obj_info, new_info, info);
+         if (temp == info) break;
+         info = get_obj_info_raw(obj);
+         new_info = (unsigned int)(info | hash);
+       }
+   }
+   return hash;
+}
 
 void gc_finalize_on_exit()
 {
@@ -215,5 +239,6 @@ Boolean gc_clear_mutator_block_flag()
   mutator_need_block = FALSE;
   return old_flag;
 }
+
 
 

@@ -40,7 +40,7 @@ static unsigned int MAJOR_ALGO = 0;
 
 Boolean GEN_NONGEN_SWITCH = FALSE;
 
-Boolean JVMTI_HEAP_ITERATION = false;
+Boolean JVMTI_HEAP_ITERATION = true;
 
 #ifndef STATIC_NOS_MAPPING
 void* nos_boundary;
@@ -268,7 +268,7 @@ void gc_decide_collection_kind(GC_Gen* gc, unsigned int cause)
   /* this is for debugging. */
   gc->last_collect_kind = gc->collect_kind;
   
-  if(gc->force_major_collect || cause== GC_CAUSE_LOS_IS_FULL || FORCE_FULL_COMPACT)
+  if(gc->force_major_collect || cause== GC_CAUSE_LOS_IS_FULL || FORCE_FULL_COMPACT || (gc->nos->num_managed_blocks == 0))
     gc->collect_kind = MAJOR_COLLECTION;
   else
     gc->collect_kind = MINOR_COLLECTION;
@@ -364,6 +364,9 @@ void gc_gen_reclaim_heap(GC_Gen* gc)
 
     gc_reset_collect_result((GC*)gc);
     gc->collect_kind = FALLBACK_COLLECTION;    
+
+    if(verify_live_heap)
+      event_gc_collect_kind_changed((GC*)gc);
 
     mspace_collection(gc->mos); /* fspace collection is included */
     lspace_collection(gc->los);

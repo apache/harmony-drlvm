@@ -76,6 +76,9 @@ static void collector_reset_thread(Collector *collector)
   collector_reset_weakref_sets(collector);
 #endif
 
+  if(collector->gc->cause == GC_CAUSE_LOS_IS_FULL)
+    collector->non_los_live_obj_size = 0;
+  
   collector->result = TRUE;
   return;
 }

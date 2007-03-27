@@ -31,7 +31,7 @@ unsigned int Cur_Forward_Bit = 0x2;
 
 unsigned int SPACE_ALLOC_UNIT;
 
-extern Boolean GC_VERIFY;
+extern char* GC_VERIFY;
 
 extern POINTER_SIZE_INT NOS_SIZE;
 extern POINTER_SIZE_INT MIN_NOS_SIZE;
@@ -223,7 +223,9 @@ void gc_parse_options(GC* gc)
   }
 
   if (is_property_set("gc.verify", VM_PROPERTIES) == 1) {
-    GC_VERIFY = get_boolean_property("gc.verify");
+    char* value = get_property("gc.verify", VM_PROPERTIES);
+    GC_VERIFY = strdup(value);
+    destroy_property_value(value);
   }
 
   if (is_property_set("gc.gen_nongen_switch", VM_PROPERTIES) == 1){
@@ -316,5 +318,6 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
   vm_resume_threads_after();
   return;
 }
+
 
 

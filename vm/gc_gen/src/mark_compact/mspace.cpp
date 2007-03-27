@@ -38,7 +38,7 @@ void mspace_initialize(GC* gc, void* start, POINTER_SIZE_INT mspace_size, POINTE
   memset(mspace, 0, sizeof(Mspace));
   
   mspace->reserved_heap_size = mspace_size;
-  mspace->num_total_blocks = mspace_size >> GC_BLOCK_SHIFT_COUNT;
+  mspace->num_total_blocks = (unsigned int)(mspace_size >> GC_BLOCK_SHIFT_COUNT);
 
   void* reserved_base = start;
   /* commit mspace mem */
@@ -55,7 +55,7 @@ void mspace_initialize(GC* gc, void* start, POINTER_SIZE_INT mspace_size, POINTE
   mspace->heap_end = (void *)((POINTER_SIZE_INT)reserved_base + commit_size);
 #endif
 
-  mspace->num_managed_blocks = commit_size >> GC_BLOCK_SHIFT_COUNT;
+  mspace->num_managed_blocks = (unsigned int)(commit_size >> GC_BLOCK_SHIFT_COUNT);
   
   mspace->first_block_idx = GC_BLOCK_INDEX_FROM(gc->heap_start, reserved_base);
   mspace->ceiling_block_idx = mspace->first_block_idx + mspace->num_managed_blocks - 1;
@@ -172,4 +172,5 @@ POINTER_SIZE_INT mspace_get_expected_threshold(Mspace* mspace)
 {
     return mspace->expected_threshold;
 }
+
 

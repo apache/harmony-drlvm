@@ -45,12 +45,12 @@ typedef struct Lspace{
 
   Free_Area_Pool* free_pool;
   /*Size of allocation which caused lspace alloc failure.*/
-  unsigned int failure_size;
+  POINTER_SIZE_INT failure_size;
 }Lspace;
 
 void lspace_initialize(GC* gc, void* reserved_base, POINTER_SIZE_INT lspace_size);
 void lspace_destruct(Lspace* lspace);
-Managed_Object_Handle lspace_alloc(unsigned int size, Allocator* allocator);
+Managed_Object_Handle lspace_alloc(POINTER_SIZE_INT size, Allocator* allocator);
 void lspace_sweep(Lspace* lspace);
 void lspace_reset_after_collection(Lspace* lspace);
 void lspace_collection(Lspace* lspace);
@@ -71,12 +71,12 @@ inline Partial_Reveal_Object* lspace_get_next_marked_object( Lspace* lspace, uns
         if(next_area_start < (POINTER_SIZE_INT)lspace->heap_end){
             //If there is a living object at this addr, return it, and update iterate_index
             if(obj_is_marked_in_vt((Partial_Reveal_Object*)next_area_start)){
-                unsigned int obj_size = (unsigned int)ALIGN_UP_TO_KILO(vm_object_size((Partial_Reveal_Object*)next_area_start));
+                POINTER_SIZE_INT obj_size = ALIGN_UP_TO_KILO(vm_object_size((Partial_Reveal_Object*)next_area_start));
                 *iterate_index = (unsigned int)((next_area_start + obj_size - (POINTER_SIZE_INT)lspace->heap_start) >> BIT_SHIFT_TO_KILO);
                 return (Partial_Reveal_Object*)next_area_start;
             //If this is a dead object, go on to find  a living one.
             }else{
-                unsigned int obj_size = (unsigned int)ALIGN_UP_TO_KILO(vm_object_size((Partial_Reveal_Object*)next_area_start));
+                POINTER_SIZE_INT obj_size = ALIGN_UP_TO_KILO(vm_object_size((Partial_Reveal_Object*)next_area_start));
                 next_area_start += obj_size;
             }
         }else{
@@ -96,6 +96,6 @@ void lspace_fix_after_copy_nursery(Collector* collector, Lspace* lspace);
 
 void lspace_fix_repointed_refs(Collector* collector, Lspace* lspace);
 
-unsigned int lspace_get_failure_size(Lspace* lspace);
+POINTER_SIZE_INT lspace_get_failure_size(Lspace* lspace);
 
 #endif /*_LSPACE_H_ */

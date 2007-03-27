@@ -21,7 +21,7 @@
 #include "gc_thread.h"
 
 static hythread_tls_key_t tls_gc_key;       
-unsigned int tls_gc_offset;
+POINTER_SIZE_INT tls_gc_offset;
 
 void gc_tls_init()
 {

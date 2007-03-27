@@ -40,10 +40,12 @@ void slide_compact_mspace(Collector* collector);
 void move_compact_mspace(Collector* collector);
 
 void fallback_mark_scan_heap(Collector* collector);
+void los_extention_mark_scan_heap(Collector *collector);
 
 void mspace_extend_compact(Collector *collector);
 
 extern Boolean IS_MOVE_COMPACT;
 
 #endif /* _MSPACE_COLLECT_COMPACT_H_ */
+
 

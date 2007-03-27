@@ -39,11 +39,11 @@ static unsigned int free_pool_nr_list_is_empty(Free_Area_Pool* pool, unsigned in
     Bidir_List* head = (Bidir_List*)(&pool->sized_area_list[list_index]);
     return (head->next == head);
 }
-static void* free_pool_former_lists_atomic_take_area_piece(Free_Area_Pool* pool, unsigned int list_hint, unsigned int size)
+static void* free_pool_former_lists_atomic_take_area_piece(Free_Area_Pool* pool, unsigned int list_hint, POINTER_SIZE_INT size)
 {
     Free_Area* free_area;
     void* p_result;
-    int remain_size;
+    POINTER_SIZE_SINT remain_size;
     POINTER_SIZE_INT alloc_size = ALIGN_UP_TO_KILO(size);
     unsigned int new_list_nr = 0;
     Lockable_Bidir_List* head = &pool->sized_area_list[list_hint];
@@ -93,11 +93,11 @@ static void* free_pool_former_lists_atomic_take_area_piece(Free_Area_Pool* pool,
     return NULL;
 }
 
-static void* free_pool_last_list_atomic_take_area_piece(Free_Area_Pool* pool, unsigned int size)
+static void* free_pool_last_list_atomic_take_area_piece(Free_Area_Pool* pool, POINTER_SIZE_INT size)
 {
     void* p_result;
-    int remain_size = 0;
-    unsigned int alloc_size = ALIGN_UP_TO_KILO(size);
+    POINTER_SIZE_SINT remain_size = 0;
+    POINTER_SIZE_INT alloc_size = ALIGN_UP_TO_KILO(size);
     Free_Area* free_area = NULL;
     Free_Area* new_area = NULL;
     unsigned int new_list_nr = 0;        
@@ -148,12 +148,12 @@ static void* free_pool_last_list_atomic_take_area_piece(Free_Area_Pool* pool, un
     return NULL;
 }
 
-void* lspace_alloc(unsigned int size, Allocator *allocator)
+void* lspace_alloc(POINTER_SIZE_INT size, Allocator *allocator)
 {
     unsigned int try_count = 0;
     void* p_result = NULL;
     unsigned int  list_hint = 0;
-    unsigned int alloc_size = ALIGN_UP_TO_KILO(size);
+    POINTER_SIZE_INT alloc_size = ALIGN_UP_TO_KILO(size);
     Lspace* lspace = (Lspace*)gc_get_los((GC_Gen*)allocator->gc);
     Free_Area_Pool* pool = lspace->free_pool;
 
@@ -166,9 +166,9 @@ void* lspace_alloc(unsigned int size, Allocator *allocator)
                 p_result = free_pool_former_lists_atomic_take_area_piece(pool, list_hint, alloc_size);
                 if(p_result){
                     memset(p_result, 0, size);
-                    unsigned int vold = lspace->alloced_size;
-                    unsigned int vnew = vold + alloc_size;
-                    while( vold != atomic_cas32((volatile unsigned int*)&lspace->alloced_size, vnew, vold) ){
+                    POINTER_SIZE_INT vold = lspace->alloced_size;
+                    POINTER_SIZE_INT vnew = vold + alloc_size;
+                    while( vold != atomic_casptrsz(&lspace->alloced_size, vnew, vold) ){                      
                         vold = lspace->alloced_size;
                         vnew = vold + alloc_size;
                     }
@@ -185,9 +185,9 @@ void* lspace_alloc(unsigned int size, Allocator *allocator)
                 p_result = free_pool_last_list_atomic_take_area_piece(pool, alloc_size);
                 if(p_result){
                     memset(p_result, 0, size);
-                    unsigned int vold = lspace->alloced_size;
-                    unsigned int vnew = vold + alloc_size;
-                    while( vold != atomic_cas32((volatile unsigned int*)&lspace->alloced_size, vnew, vold) ){
+                    POINTER_SIZE_INT vold = lspace->alloced_size;
+                    POINTER_SIZE_INT vnew = vold + alloc_size;
+                    while( vold != atomic_casptrsz(&lspace->alloced_size, vnew, vold) ){                      
                         vold = lspace->alloced_size;
                         vnew = vold + alloc_size;
                     }
@@ -214,7 +214,7 @@ void lspace_reset_after_collection(Lspace* lspace)
 {
     GC* gc = lspace->gc;
     Space_Tuner* tuner = gc->tuner;
-    unsigned int trans_size = tuner->tuning_size;
+    POINTER_SIZE_INT trans_size = tuner->tuning_size;
     assert(!(trans_size%GC_BLOCK_SIZE_BYTES));
     //For_LOS_extend
     if(tuner->kind == TRANS_FROM_MOS_TO_LOS){
@@ -242,7 +242,8 @@ void lspace_sweep(Lspace* lspace)
   /* reset the pool first because its info is useless now. */
   free_area_pool_reset(lspace->free_pool);
 
-  unsigned int mark_bit_idx = 0, cur_size = 0;
+  unsigned int mark_bit_idx = 0;
+  POINTER_SIZE_INT cur_size = 0;
   void *cur_area_start, *cur_area_end;
 
   Partial_Reveal_Object* p_prev_obj = (Partial_Reveal_Object *)lspace->heap_start;

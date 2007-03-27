@@ -25,7 +25,6 @@
 #include "../gen/gen.h"
 #include "../common/fix_repointed_refs.h"
 #include "../common/interior_pointer.h"
-#include "../verify/verify_live_heap.h"
 
 static volatile Block *mos_first_new_block = NULL;
 static volatile Block *nos_first_free_block = NULL;
@@ -279,21 +278,22 @@ void mspace_extend_compact(Collector *collector)
   if( ++old_num == num_active_collectors ){
      Block *old_nos_boundary = fspace->blocks;
      nos_boundary = &mspace->blocks[mspace->free_block_idx - mspace->first_block_idx];
-     assert(nos_boundary > old_nos_boundary);
+     if(fspace->num_managed_blocks != 0)
+       assert(nos_boundary > old_nos_boundary);
      POINTER_SIZE_INT mem_change_size = ((Block *)nos_boundary - old_nos_boundary) << GC_BLOCK_SHIFT_COUNT;
      fspace->heap_start = nos_boundary;
      fspace->blocks = (Block *)nos_boundary;
      fspace->committed_heap_size -= mem_change_size;
      fspace->num_managed_blocks = (unsigned int)(fspace->committed_heap_size >> GC_BLOCK_SHIFT_COUNT);
      fspace->num_total_blocks = fspace->num_managed_blocks;
-     fspace->first_block_idx = ((Block_Header *)nos_boundary)->block_idx;
+     fspace->first_block_idx = mspace->free_block_idx;
      fspace->free_block_idx = fspace->first_block_idx;
      
      mspace->heap_end = nos_boundary;
      mspace->committed_heap_size += mem_change_size;
      mspace->num_managed_blocks = (unsigned int)(mspace->committed_heap_size >> GC_BLOCK_SHIFT_COUNT);
      mspace->num_total_blocks = mspace->num_managed_blocks;
-     mspace->ceiling_block_idx = ((Block_Header *)nos_boundary)->block_idx - 1;
+     mspace->ceiling_block_idx = mspace->free_block_idx - 1;
 
      num_space_changing_collectors ++;
   }

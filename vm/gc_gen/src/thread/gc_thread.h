@@ -27,7 +27,7 @@
 #define ALLOC_ZEROING
 #define ZEROING_SIZE  2*KB
 
-extern unsigned int tls_gc_offset;
+extern POINTER_SIZE_INT tls_gc_offset;
 
 inline void* gc_get_tls()
 { 

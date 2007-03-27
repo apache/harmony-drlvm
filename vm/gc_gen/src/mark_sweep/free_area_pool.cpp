@@ -38,7 +38,7 @@ void free_area_pool_reset(Free_Area_Pool* pool)
   free_area_pool_init(pool);
 }
 
-Free_Area* free_pool_find_size_area(Free_Area_Pool* pool, unsigned int size)
+Free_Area* free_pool_find_size_area(Free_Area_Pool* pool, POINTER_SIZE_INT size)
 {
   assert(size >= GC_OBJ_SIZE_THRESHOLD);
   

@@ -41,7 +41,7 @@ void fspace_initialize(GC* gc, void* start, POINTER_SIZE_INT fspace_size, POINTE
   memset(fspace, 0, sizeof(Fspace));
     
   fspace->reserved_heap_size = fspace_size;
-  fspace->num_total_blocks = fspace_size >> GC_BLOCK_SHIFT_COUNT;
+  fspace->num_total_blocks = (unsigned int)(fspace_size >> GC_BLOCK_SHIFT_COUNT);
 
   void* reserved_base = start;
   /* commit fspace mem */    
@@ -58,7 +58,7 @@ void fspace_initialize(GC* gc, void* start, POINTER_SIZE_INT fspace_size, POINTE
   fspace->heap_end = (void *)((POINTER_SIZE_INT)reserved_base + fspace->committed_heap_size);
 #endif
 
-  fspace->num_managed_blocks = commit_size >> GC_BLOCK_SHIFT_COUNT;
+  fspace->num_managed_blocks = (unsigned int)(commit_size >> GC_BLOCK_SHIFT_COUNT);
   
   fspace->first_block_idx = GC_BLOCK_INDEX_FROM(gc->heap_start, reserved_base);
   fspace->ceiling_block_idx = fspace->first_block_idx + fspace->num_managed_blocks - 1;
@@ -130,9 +130,9 @@ void fspace_reset_for_allocation(Fspace* fspace)
   
   Block* blocks = fspace->blocks;
   unsigned int num_freed = 0;
-  unsigned int new_start_idx = fspace->free_block_idx - first_idx;
-  unsigned int new_last_idx = fspace->ceiling_block_idx - first_idx;
-  for(unsigned int i = new_start_idx; i <= new_last_idx; i++){
+  int new_start_idx = (int)(fspace->free_block_idx) - (int)first_idx;
+  int new_last_idx = (int)fspace->ceiling_block_idx - (int)first_idx;
+  for(int i = new_start_idx; i <= new_last_idx; i++){
     Block_Header* block = (Block_Header*)&(blocks[i]);
     block->src = NULL;
     block->next_src = NULL;

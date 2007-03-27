@@ -61,6 +61,8 @@ Managed_Object_Handle gc_alloc(unsigned size, Allocation_Handle ah, void *unused
   assert((size % GC_OBJECT_ALIGNMENT) == 0);
   assert(ah);
 
+  size = (size & NEXT_TO_HIGH_BIT_CLEAR_MASK);
+  
   Allocator* allocator = (Allocator*)gc_get_tls();
   Boolean type_has_fin = type_has_finalizer((Partial_Reveal_VTable*)uncompress_vt((VT)ah));
   

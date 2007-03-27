@@ -29,7 +29,7 @@ Space* gc_get_mos(GC_Gen* gc);
 Space* gc_get_nos(GC_Gen* gc);
 Space* gc_get_los(GC_Gen* gc);
 POINTER_SIZE_INT mspace_get_expected_threshold(Mspace* mspace);
-unsigned int lspace_get_failure_size(Lspace* lspace);
+POINTER_SIZE_INT lspace_get_failure_size(Lspace* lspace);
     
 /*Now just prepare the alloc_size field of mspace, used to compute new los size.*/
 void gc_space_tune_prepare(GC* gc, unsigned int cause)
@@ -162,7 +162,7 @@ void gc_space_tune_before_gc_fixed_size(GC* gc, unsigned int cause)
   /*For non gen virable sized NOS*/
   else
   {
-    unsigned int los_fail_sz = lspace_get_failure_size((Lspace*)lspace);
+    POINTER_SIZE_INT los_fail_sz = lspace_get_failure_size((Lspace*)lspace);
     
     if(los_fail_sz > GC_LOS_MIN_VARY_SIZE){
       /*Fixme: we should set the least_tuning_size after finding out the biggest free area in LOS, this number could be zero*/
@@ -198,6 +198,46 @@ void gc_space_tune_before_gc_fixed_size(GC* gc, unsigned int cause)
   if(tuner->tuning_size == 0) tuner->kind = TRANS_NOTHING;
 
   return;  
+}
+
+#include "../thread/collector.h"
+#include "../mark_sweep/lspace.h"
+Boolean retune_los_size(GC *gc)
+{
+  POINTER_SIZE_INT non_los_live_obj_size = 0;
+  unsigned int collector_num = gc->num_active_collectors;
+  
+  for(unsigned int i = collector_num; i--;){
+    Collector *collector = gc->collectors[i];
+    non_los_live_obj_size += collector->non_los_live_obj_size;
+  }
+  POINTER_SIZE_INT non_los_live_block_num = (non_los_live_obj_size + GC_BLOCK_SIZE_BYTES) >> GC_BLOCK_SHIFT_COUNT;
+  non_los_live_block_num += collector_num << 2;
+  
+  Lspace *los = (Lspace*)gc_get_los((GC_Gen*)gc);
+  Space_Tuner *tuner = gc->tuner;
+  POINTER_SIZE_INT failure_size = los->failure_size;
+  POINTER_SIZE_INT min_tuning_block_num = round_up_to_size(failure_size, SPACE_ALLOC_UNIT) >> GC_BLOCK_SHIFT_COUNT;
+  POINTER_SIZE_INT tuning_block_num = tuner->tuning_size >> GC_BLOCK_SHIFT_COUNT;
+  POINTER_SIZE_INT heap_block_num = gc->committed_heap_size >> GC_BLOCK_SHIFT_COUNT;
+  POINTER_SIZE_INT los_block_num = los->committed_heap_size >> GC_BLOCK_SHIFT_COUNT;
+  
+  POINTER_SIZE_INT live_block_num = los_block_num + non_los_live_block_num;
+  while(live_block_num + tuning_block_num > heap_block_num){
+    if(tuning_block_num == min_tuning_block_num){  //has not enough space to extend los
+      tuner->tuning_size = 0;
+      tuner->kind = TRANS_NOTHING;
+      return FALSE;
+    }
+    tuning_block_num -= (SPACE_ALLOC_UNIT >> GC_BLOCK_SHIFT_COUNT) << 2;
+    if(tuning_block_num < min_tuning_block_num)
+      tuning_block_num = min_tuning_block_num;
+  }
+  
+  POINTER_SIZE_INT tuning_size = tuning_block_num << GC_BLOCK_SHIFT_COUNT;
+  if(tuner->tuning_size != tuning_size)   // retune los extension size
+    tuner->tuning_size = tuning_size;
+  return TRUE;
 }
 
 void  gc_space_tuner_reset(GC* gc)

@@ -56,6 +56,7 @@ typedef struct Collector{
   
   void(*task_func)(void*) ;   /* current task */
   
+  POINTER_SIZE_INT non_los_live_obj_size;
   unsigned int result;
  
 }Collector;

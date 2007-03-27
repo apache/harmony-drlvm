@@ -77,11 +77,18 @@ void* fspace_alloc(unsigned size, Allocator *allocator)
 
   /* ran out local block, grab a new one*/  
   Fspace* fspace = (Fspace*)allocator->alloc_space;
+  int attempts = 0;
   while( !fspace_alloc_block(fspace, allocator)){
     vm_gc_lock_enum();
     /* after holding lock, try if other thread collected already */
     if ( !space_has_free_block((Blocked_Space*)fspace) ) {  
-      gc_reclaim_heap(allocator->gc, GC_CAUSE_NOS_IS_FULL); 
+        if(attempts == 0) {
+          gc_reclaim_heap(allocator->gc, GC_CAUSE_NOS_IS_FULL); 
+          attempts = 1;
+        }else{
+          vm_gc_unlock_enum();  
+          return NULL;
+        }
     }    
     vm_gc_unlock_enum();  
   }
@@ -91,4 +98,5 @@ void* fspace_alloc(unsigned size, Allocator *allocator)
   return p_return;
   
 }
+
 

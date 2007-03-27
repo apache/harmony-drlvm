@@ -46,11 +46,11 @@ typedef struct Free_Area{
   Bidir_List* next;
   Bidir_List* prev;
   /* END of Bidir_List --> */
-  unsigned int size;
+  POINTER_SIZE_INT size;
 }Free_Area;
 
 /* this is the only interface for new area creation */
-inline Free_Area* free_area_new(void* start, unsigned int size)
+inline Free_Area* free_area_new(void* start, POINTER_SIZE_INT size)
 {
   assert(ADDRESS_IS_KB_ALIGNED(start));
   assert(ADDRESS_IS_KB_ALIGNED(size));
@@ -90,12 +90,12 @@ inline unsigned int pool_list_get_next_flag(Free_Area_Pool* pool, unsigned int s
   return words_get_next_set_lsb(pool->list_bit_flag, NUM_FLAG_WORDS, start_idx);
 }
 
-inline unsigned int pool_list_index_with_size(unsigned int size)
+inline unsigned int pool_list_index_with_size(POINTER_SIZE_INT size)
 {
   assert(size >= GC_OBJ_SIZE_THRESHOLD);
   
   unsigned int index;
-  index = size >> BIT_SHIFT_TO_KILO;
+  index = (unsigned int) (size >> BIT_SHIFT_TO_KILO);
   if(index > MAX_LIST_INDEX) index = MAX_LIST_INDEX;
   return index;
 }

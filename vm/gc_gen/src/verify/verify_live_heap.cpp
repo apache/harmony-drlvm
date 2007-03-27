@@ -1,40 +1,136 @@
-/*
- *  Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
- *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
- */
-
-/**
- * @author Xiao-Feng Li, 2006/10/05
- */
-
 #include "verify_live_heap.h"
+#include "verifier_common.h"
+#include "verify_gc_effect.h"
+#include "verify_mutator_effect.h"
 
-Boolean GC_VERIFY = FALSE;
+char* GC_VERIFY = NULL;
 Boolean verify_live_heap;
 
-void gc_verify_heap(GC* gc, Boolean is_before_gc)
-{ return; }
+Heap_Verifier* heap_verifier;
+
 
 void gc_init_heap_verification(GC* gc)
-{ return; }
+{
+  if(GC_VERIFY == NULL){
+    verify_live_heap = FALSE;
+    return;
+  }
+  heap_verifier = (Heap_Verifier*) STD_MALLOC(sizeof(Heap_Verifier));
+  assert(heap_verifier);
+  memset(heap_verifier, 0, sizeof(Heap_Verifier));
+
+  heap_verifier->gc = gc;
+
+  verifier_metadata_initialize(heap_verifier);
+  verifier_init_mutator_verifiers(heap_verifier);
+  verifier_init_GC_verifier(heap_verifier);
+  verifier_init_object_scanner(heap_verifier);
+
+  heap_verifier->is_before_gc = heap_verifier->gc_is_gen_mode = FALSE;
+  heap_verifier->need_verify_gc =  heap_verifier->need_verify_rootset
+    = heap_verifier->need_verify_allocation =  heap_verifier->need_verify_writebarrier = FALSE;
+  
+  if(!verifier_parse_options(heap_verifier, GC_VERIFY)){
+    printf("GC Verify options error, verifier will not start.\n");
+    gc_terminate_heap_verification(gc);
+    return;
+  }
+  
+  verify_live_heap = TRUE;
+  return;
+}
 
 void gc_terminate_heap_verification(GC* gc)
-{ return; }
+{
+  gc_verifier_metadata_destruct(heap_verifier);
+  verifier_destruct_mutator_verifiers(heap_verifier);
+  verifier_destruct_GC_verifier(heap_verifier);
+  STD_FREE(heap_verifier);
+  heap_verifier = NULL;
+  return; 
+}
 
-void event_collector_move_obj(Partial_Reveal_Object *p_old, Partial_Reveal_Object *p_new, Collector* collector)
-{ return; }
+void verify_heap_before_gc(GC* gc)
+{
+  verifier_log_start();
+  verifier_set_gc_collect_kind(heap_verifier->gc_verifier, gc->collect_kind);  
+  verifier_set_gen_mode(heap_verifier);
+  verifier_reset_mutator_verification(heap_verifier);
+  verifier_reset_gc_verification(heap_verifier);
 
-void event_collector_doublemove_obj(Partial_Reveal_Object *p_old, Partial_Reveal_Object *p_new, Collector* collector)
-{ return; }
+  if(need_scan_all_objs(heap_verifier))
+    (*heap_verifier->all_obj_scanner)(heap_verifier);  
+
+  /*verify mutator side effect before gc after scanning all objs.*/
+  if(need_verify_mutator_effect(heap_verifier))
+    verify_mutator_effect(heap_verifier);
+
+  if(need_scan_live_objs(heap_verifier))
+    (*heap_verifier->live_obj_scanner)(heap_verifier);
+  
+  verifier_log_before_gc(heap_verifier);
+
+}
+
+void verify_heap_after_gc(GC* gc)
+{
+  verifier_log_start();
+  if(need_scan_live_objs(heap_verifier))
+    (*heap_verifier->live_obj_scanner)(heap_verifier);
+  if(need_verify_gc_effect(heap_verifier))
+    verify_gc_effect(heap_verifier);
+
+  verifier_log_after_gc(heap_verifier);
+  
+  verifier_clear_mutator_verification(heap_verifier);
+  verifier_clear_gc_verification(heap_verifier);
+}
+
+void gc_verify_heap(GC* gc, Boolean is_before_gc)
+{
+  heap_verifier->is_before_gc = is_before_gc;
+
+  if(is_before_gc){
+    verify_heap_before_gc(gc);
+  }else{
+    verify_heap_after_gc(gc);
+  }
+}
+
+void event_gc_collect_kind_changed(GC* gc)
+{
+  /*GC collection kind were changed from normal MINOR or MAJOR  to FALLBACK MAJOR*/
+  assert(gc->collect_kind == FALLBACK_COLLECTION);
+  if(!heap_verifier->need_verify_gc) return;
+  
+  verifier_log_start();
+  /*finish the fallbacked gc verify*/
+  heap_verifier->is_before_gc = FALSE;
+  verifier_set_fallback_collection(heap_verifier->gc_verifier, TRUE);  
+  (*heap_verifier->live_obj_scanner)(heap_verifier);  
+  verify_gc_effect(heap_verifier);
+  printf("GC Fall Back, GC end.\n");
+  verifier_log_after_gc(heap_verifier);
+  verifier_clear_gc_verification(heap_verifier);
+
+  /*start fallback major gc verify */
+  heap_verifier->is_before_gc = TRUE;
+  verifier_set_fallback_collection(heap_verifier->gc_verifier, TRUE);  
+  verifier_set_gc_collect_kind(heap_verifier->gc_verifier, gc->collect_kind);
+  verifier_set_gen_mode(heap_verifier);
+  verifier_reset_gc_verification(heap_verifier);
+
+  (*heap_verifier->live_obj_scanner)(heap_verifier);
+  
+}
+
+void event_mutator_allocate_newobj(Partial_Reveal_Object* p_newobj, POINTER_SIZE_INT size, VT vt_raw)
+{
+  verifier_event_mutator_allocate_newobj(p_newobj, size, vt_raw);
+}
+
+Heap_Verifier* get_heap_verifier()
+{ return heap_verifier; }
+
+
 

@@ -153,6 +153,7 @@ static Block_Header *get_next_dest_block(Mspace *mspace)
     cur_dest_block = (Block_Header*)next_block_for_dest;
     while(cur_dest_block->status == BLOCK_DEST){
       cur_dest_block = cur_dest_block->next;
+      if(!cur_dest_block) break;
     }
     next_block_for_dest = cur_dest_block;
   } else {
@@ -162,6 +163,7 @@ static Block_Header *get_next_dest_block(Mspace *mspace)
   unsigned int total_dest_counter = 0;
   Block_Header *last_dest_block = (Block_Header *)last_block_for_dest;
   for(; cur_dest_block <= last_dest_block; cur_dest_block = cur_dest_block->next){
+    if(!cur_dest_block)  return NULL;
     if(cur_dest_block->status == BLOCK_DEST){
       continue;
     }
@@ -262,8 +264,6 @@ static inline void gc_init_block_for_sliding_compact(GC *gc, Mspace *mspace)
   return;
 }
 
-
-#include "../verify/verify_live_heap.h"
 extern unsigned int mspace_free_block_idx;
 
 static void mspace_sliding_compact(Collector* collector, Mspace* mspace)
@@ -291,14 +291,6 @@ static void mspace_sliding_compact(Collector* collector, Mspace* mspace)
       unsigned int obj_size = (unsigned int)((POINTER_SIZE_INT)start_pos - (POINTER_SIZE_INT)p_obj);
       if(p_obj != p_target_obj){
         memmove(p_target_obj, p_obj, obj_size);
-
-        if(verify_live_heap){
-          /* we forwarded it, we need remember it for verification */
-          if(is_fallback)
-            event_collector_doublemove_obj(p_obj, p_target_obj, collector);
-          else
-            event_collector_move_obj(p_obj, p_target_obj, collector);
-        }
       }
       set_obj_info(p_target_obj, 0);
       
@@ -346,14 +338,18 @@ void slide_compact_mspace(Collector* collector)
             have references  that are going to be repointed */
   unsigned int old_num = atomic_cas32( &num_marking_collectors, 0, num_active_collectors+1);
 
-  if(!gc_match_kind(gc, FALLBACK_COLLECTION))
-    mark_scan_heap(collector);
-  else
+  if(gc_match_kind(gc, FALLBACK_COLLECTION))
     fallback_mark_scan_heap(collector);
+  else if(gc->cause == GC_CAUSE_LOS_IS_FULL)
+    los_extention_mark_scan_heap(collector);
+  else
+    mark_scan_heap(collector);
   
   old_num = atomic_inc32(&num_marking_collectors);
   if( ++old_num == num_active_collectors ){
     /* last collector's world here */
+    if(gc->cause == GC_CAUSE_LOS_IS_FULL)
+      retune_los_size(gc);
     /* prepare for next phase */
     gc_init_block_for_collectors(gc, mspace);
     
@@ -434,7 +430,7 @@ void slide_compact_mspace(Collector* collector)
   while(num_restoring_collectors != num_active_collectors + 1);
 
   /* Dealing with out of memory in mspace */
-  if(mspace->free_block_idx > fspace->first_block_idx){
+  if((mspace->free_block_idx > fspace->first_block_idx) || ((fspace->num_managed_blocks == 0) && (mspace->free_block_idx < fspace->first_block_idx))){    
     atomic_cas32( &num_extending_collectors, 0, num_active_collectors);
     
     mspace_extend_compact(collector);
