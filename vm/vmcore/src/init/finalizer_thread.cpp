@@ -171,7 +171,6 @@ static IDATA finalizer_thread_func(void **args)
     jthread java_thread;
     char *name = "finalizer";
     jboolean daemon = JNI_TRUE;
-    int thread_id = (int)args[1];
     
     IDATA status = vm_attach_internal(&jni_env, &java_thread, java_vm, NULL, name, daemon);
     assert(status == JNI_OK);
