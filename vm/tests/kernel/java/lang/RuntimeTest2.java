@@ -420,7 +420,7 @@ public class RuntimeTest2 extends TestCase {
                 // both the above written value and the consequent 
                 // 'date' command's reply
                 count = 300;
-                while (is.available() < 10 && count-- > 0) {
+                while (is.available() < 11 && count-- > 0) {
                     try {
                         Thread.sleep(200);
                     } catch (Exception e) {
