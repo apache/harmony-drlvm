@@ -269,12 +269,15 @@ Devirtualizer::genGuardedDirectCall(IRManager &regionIRM, Node* node, Inst* call
                                                              ldSlot->getMethodDesc());
         virtualCallBlock->appendInst(ldSlot2);
         icall->setSrc(0, funPtr2);
-        // Move ldInterfaceVTable to the virtual call block
+        // Duplicate ldInterfaceVTable in virtual call block
         Inst* ldVTable = vtable->getInst();
         if (ldVTable->getOpcode() == Op_TauLdIntfcVTableAddr) {
-            ldVTable->unlink();
-            ldSlot->unlink();
-            ldVTable->insertBefore(ldSlot2);
+            Opnd* slot = ldVTable->getSrc(0);
+            Type* type = ldVTable->asTypeInst()->getTypeInfo();
+            Opnd* vtable2 = _opndManager.createSsaTmpOpnd(vtable->getType());
+            Inst* ldVTable2 = _instFactory.makeTauLdIntfcVTableAddr(vtable2, slot, type);
+            ldSlot2->setSrc(0, vtable2);
+            ldVTable2->insertBefore(ldSlot2);
         }
     }
     virtualCallBlock->appendInst(virtualCall);
