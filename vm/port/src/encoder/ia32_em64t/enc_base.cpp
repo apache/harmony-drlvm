@@ -590,42 +590,33 @@ char* EncoderBase::encodeModRM(char* stream, const Operands& opnds,
 
 char * EncoderBase::nops(char * stream, unsigned howMany)
 {
-    // 1-byte NOP: - The True NOP (xchg EAX, EAX)
-    static const unsigned char nop1 = 0x90;
-    // 2-byte NOP: mov reg, reg     - MOV EAX, EAX: 89 C0
-    static const unsigned short nop2 = 0x9090;
-    // 3-byte NOP: lea reg, 0 (reg) (8-bit displacement) - 
-    // LEA EAX, reg+0x00 : 8D 40 00
-    static const unsigned short nop3_01 = 0x9090;
-    static const unsigned char nop3_2 = 0x90;
-    // 6-byte NOP: lea reg, 0 (reg) (32-bit displacement) -  
-    // LEA EAX, reg+0x00000000: 8D 80 00000000
-    static const unsigned short nop6_01 = 0x9090;
-    static const unsigned int nop6_2345 = 0x90909090;
+    // Recommended multi-byte NOPs from the Intel architecture manual
+    static const unsigned char nops[10][9] = {
+        { 0, },                                                     // 0, this line is dummy and not used in the loop below
+        { 0x90, },                                                  // 1-byte NOP
+        { 0x66, 0x90, },                                            // 2
+        { 0x0F, 0x1F, 0x00, },                                      // 3
+        { 0x0F, 0x1F, 0x40, 0x00, },                                // 4
+        { 0x0F, 0x1F, 0x44, 0x00, 0x00, },                          // 5
+        { 0x66, 0x0F, 0x1F, 0x44, 0x00, 0x00, },                    // 6
+        { 0x0F, 0x1F, 0x80, 0x00, 0x00, 0x00, 0x00, },              // 7
+        { 0x0F, 0x1F, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00, },        // 8
+        { 0x66, 0x0F, 0x1F, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00 },   // 9-byte NOP
+    };
 
-    char * aligned = stream + howMany;
-
-    for ( ; howMany>=6; howMany -= 6) {
-        *(unsigned short*)&stream[0] = nop6_01;
-        *(unsigned int*)&stream[2] = nop6_2345;
-        stream += sizeof(short) + sizeof(unsigned);
+    // Start from delivering the longest possible NOPs, then proceed with shorter ones
+    for (unsigned nopSize=9; nopSize!=0; nopSize--) {
+        while(howMany>=nopSize) {
+            const unsigned char* nopBytes = nops[nopSize];
+            for (unsigned i=0; i<nopSize; i++) {
+                stream[i] = nopBytes[i];
+            }
+            stream += nopSize;
+            howMany -= nopSize;
+        }
     }
-    for ( ; howMany>=3; howMany -= 3) {
-        *(unsigned short*)&stream[0] = nop3_01;
-        *(unsigned char*)&stream[2] = nop3_2;
-        stream += sizeof(short) + sizeof(char);
-    }
-    
-    if (howMany>=2) {
-        howMany -= 2;
-        *(unsigned short*)&stream[0] = nop2;
-        stream += sizeof(short);
-    }
-    if (howMany) {
-        *(unsigned char*)stream = nop1;
-        //not used below // stream += sizeof(unsigned char);
-    }
-    return aligned;
+    char* end = stream + howMany;
+    return end;
 }
 
 char * EncoderBase::prefix(char* stream, InstPrefix pref)
