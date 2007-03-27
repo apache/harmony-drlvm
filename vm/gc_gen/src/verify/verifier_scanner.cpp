@@ -257,9 +257,9 @@ static FORCE_INLINE void verifier_scan_object_slots(Partial_Reveal_Object *p_obj
       p_ref = obj_get_referent_field(p_obj);
       if(!is_unreachable_obj(p_obj)){ 
         verify_write_barrier(p_ref, heap_verifier);
-        if(*p_ref  != NULL)   verify_live_object_slot(p_ref, heap_verifier);
+        if(*p_ref  != COMPRESSED_NULL)   verify_live_object_slot(p_ref, heap_verifier);
       }else{
-        if(*p_ref  != NULL)   verify_all_object_slot(p_ref, heap_verifier);
+        if(*p_ref  != COMPRESSED_NULL)   verify_all_object_slot(p_ref, heap_verifier);
       }
     } 
 #endif

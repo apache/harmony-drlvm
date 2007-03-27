@@ -430,7 +430,7 @@ void slide_compact_mspace(Collector* collector)
   while(num_restoring_collectors != num_active_collectors + 1);
 
   /* Dealing with out of memory in mspace */
-  if((mspace->free_block_idx > fspace->first_block_idx) || ((fspace->num_managed_blocks == 0) && (mspace->free_block_idx < fspace->first_block_idx))){    
+  if(mspace->free_block_idx > fspace->first_block_idx){
     atomic_cas32( &num_extending_collectors, 0, num_active_collectors);
     
     mspace_extend_compact(collector);

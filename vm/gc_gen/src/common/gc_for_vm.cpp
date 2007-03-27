@@ -193,7 +193,7 @@ int32 gc_get_hashcode(Managed_Object_Handle p_object)
    Obj_Info_Type info = get_obj_info_raw(obj);
    int hash = info & GCGEN_HASH_MASK;
    if (!hash) {
-       hash = (((unsigned int)obj) >> 3) & GCGEN_HASH_MASK;
+       hash = (((POINTER_SIZE_INT)obj) >> 3) & GCGEN_HASH_MASK;
        if(!hash)  hash = (23 & GCGEN_HASH_MASK);
        unsigned int new_info = (unsigned int)(info | hash);
        while (true) {
@@ -239,6 +239,3 @@ Boolean gc_clear_mutator_block_flag()
   mutator_need_block = FALSE;
   return old_flag;
 }
-
-
-

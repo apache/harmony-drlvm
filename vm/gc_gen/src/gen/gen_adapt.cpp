@@ -22,7 +22,7 @@
 #include "../common/space_tuner.h"
 #include <math.h>
 
-#define NOS_COPY_RESERVE_DELTA (GC_BLOCK_SIZE_BYTES<<5)
+#define NOS_COPY_RESERVE_DELTA (GC_BLOCK_SIZE_BYTES<<1)
 /*Tune this number in case that MOS could be too small, so as to avoid or put off fall back.*/
 #define GC_MOS_MIN_EXTRA_REMAIN_SIZE (36*MB)
 /*Switch on this MACRO when we want lspace->survive_ratio to be sensitive.*/
@@ -194,7 +194,7 @@ static void gc_decide_next_collect(GC_Gen* gc, int64 pause_time)
   Blocked_Space* fspace = (Blocked_Space*)gc->nos;
   Blocked_Space* mspace = (Blocked_Space*)gc->mos;
 
-  float survive_ratio = 0;
+  float survive_ratio = 0.2f;
 
   POINTER_SIZE_INT mos_free_size = space_free_memory_size(mspace);
   POINTER_SIZE_INT nos_free_size = space_free_memory_size(fspace);
@@ -206,11 +206,14 @@ static void gc_decide_next_collect(GC_Gen* gc, int64 pause_time)
   
       Tslow = (float)pause_time;
       SMax = total_free_size;
-      gc->force_major_collect = FALSE;
+      /*If fall back happens, and nos_boundary is up to heap_ceiling, then we force major.*/
+      if(gc->nos->num_managed_blocks == 0)
+        gc->force_major_collect = TRUE;
+      else gc->force_major_collect = FALSE;
       
-      POINTER_SIZE_INT major_survive_size = space_committed_size((Space*)mspace) - mos_free_size;
       /*If major is caused by LOS, or collection kind is EXTEND_COLLECTION, all survive ratio is not updated.*/
       if((gc->cause != GC_CAUSE_LOS_IS_FULL) && (!gc_match_kind((GC*)gc, EXTEND_COLLECTION))){
+        POINTER_SIZE_INT major_survive_size = space_committed_size((Space*)mspace) - mos_free_size;
         survive_ratio = (float)major_survive_size/(float)space_committed_size((Space*)mspace);
         mspace->survive_ratio = survive_ratio;
       }
@@ -285,20 +288,17 @@ Boolean gc_compute_new_space_size(GC_Gen* gc, POINTER_SIZE_INT* mos_size, POINTE
     total_size = (POINTER_SIZE_INT)gc->heap_end - (POINTER_SIZE_INT)mspace->heap_start;
 #endif
 
-  /* check if curr nos size is too small to shrink */
-  /*
-  if(curr_nos_size <= min_nos_size_bytes){
-    //after major, should not allow this size 
-    assert(gc_match_kind((GC*)gc, MINOR_COLLECTION));
-    return FALSE;
-  }
-  */
-  
   POINTER_SIZE_INT total_free = total_size - used_mos_size;
+  /*If total free is smaller than one block, there is no room for us to adjust*/
+  if(total_free < GC_BLOCK_SIZE_BYTES)  return FALSE;
+
   /* predict NOS + NOS*ratio = total_free_size */
   POINTER_SIZE_INT nos_reserve_size;
   nos_reserve_size = (POINTER_SIZE_INT)(((float)total_free)/(1.0f + fspace->survive_ratio));
-  new_nos_size = round_down_to_size((POINTER_SIZE_INT)nos_reserve_size, SPACE_ALLOC_UNIT);
+  /*Nos should not be too small*/
+  if(nos_reserve_size <= GC_BLOCK_SIZE_BYTES)  nos_reserve_size = GC_BLOCK_SIZE_BYTES;
+  new_nos_size = round_down_to_size((POINTER_SIZE_INT)nos_reserve_size, GC_BLOCK_SIZE_BYTES);
+
 #ifdef STATIC_NOS_MAPPING
   if(new_nos_size > fspace->reserved_heap_size) new_nos_size = fspace->reserved_heap_size;
 #endif  

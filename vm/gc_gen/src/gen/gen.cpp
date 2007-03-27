@@ -268,7 +268,7 @@ void gc_decide_collection_kind(GC_Gen* gc, unsigned int cause)
   /* this is for debugging. */
   gc->last_collect_kind = gc->collect_kind;
   
-  if(gc->force_major_collect || cause== GC_CAUSE_LOS_IS_FULL || FORCE_FULL_COMPACT || (gc->nos->num_managed_blocks == 0))
+  if(gc->force_major_collect || cause== GC_CAUSE_LOS_IS_FULL || FORCE_FULL_COMPACT)
     gc->collect_kind = MAJOR_COLLECTION;
   else
     gc->collect_kind = MINOR_COLLECTION;
