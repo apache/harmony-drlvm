@@ -16,3 +16,6 @@ gc/Mark.java
 
 # HARMONY-2772 
 stress/Mix.java
+
+# HARMONY-3299 intermittent
+stress/Sync.java

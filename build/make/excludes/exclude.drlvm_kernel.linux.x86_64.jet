@@ -8,9 +8,3 @@ java/lang/RuntimeAdditionalTest39.java
 java/lang/RuntimeAdditionalTest40.java
 java/lang/RuntimeAdditionalTest41.java
 java/lang/RuntimeAdditionalTest42.java
-
-## following are tests that fail due to bugs
-
-java/lang/ClassAnnotationsTest.java
-java/lang/reflect/FieldTest.java
-org/apache/harmony/lang/annotation/AllTypesTest.java
