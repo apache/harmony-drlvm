@@ -16,7 +16,6 @@
  */
 /**
  * @author Vyacheslav P. Shakin
- * @version $Revision: 1.14.12.1.4.4 $
  */
 
 #include "Ia32Inst.h"
@@ -101,11 +100,15 @@ bool Opnd::replaceMemOpndSubOpnd(Opnd * opndOld, Opnd * opndNew)
     bool replaced = false;
     if (memOpndKind != MemOpndKind_Null){
         assert(isPlacedIn(OpndKind_Mem));
-        for (uint32 i=0; i<MemOpndSubOpndKind_Count; i++)
+        for (uint32 i=0; i<MemOpndSubOpndKind_Count; i++) {
             if (memOpndSubOpnds[i]!=NULL && memOpndSubOpnds[i]==opndOld) {
                 setMemOpndSubOpnd((MemOpndSubOpndKind)i, opndNew);
                 replaced = true;
             }
+        }
+        if (replaced) {
+            normalizeMemSubOpnds();
+        }
     }
     return replaced;
 }
@@ -116,15 +119,34 @@ bool Opnd::replaceMemOpndSubOpnds(Opnd * const * opndMap)
     bool replaced = false;
     if (memOpndKind != MemOpndKind_Null){
         assert(isPlacedIn(OpndKind_Mem));
-        for (uint32 i=0; i<MemOpndSubOpndKind_Count; i++)
+        for (uint32 i=0; i<MemOpndSubOpndKind_Count; i++) {
             if (memOpndSubOpnds[i]!=NULL && opndMap[memOpndSubOpnds[i]->id]!=NULL){
                 setMemOpndSubOpnd((MemOpndSubOpndKind)i, opndMap[memOpndSubOpnds[i]->id]);
                 replaced = true;
             }
+        }
+        if (replaced) {
+            normalizeMemSubOpnds();
+        }
     }
     return replaced;
 }
 
+
+void Opnd::normalizeMemSubOpnds(void)
+{
+    if (!isPlacedIn(OpndKind_Mem)) {
+        return;
+    }
+    Opnd* base = getMemOpndSubOpnd(MemOpndSubOpndKind_Base);
+    Opnd* disp = getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement);
+    if (base != NULL && base->isPlacedIn(OpndKind_Imm)) {
+        assert(disp == NULL || !disp->isPlacedIn(OpndKind_Imm));
+        // can't call setMemOpndSubOpnd() as it fights against zero opnd.
+        memOpndSubOpnds[MemOpndSubOpndKind_Displacement] = base;//== setMemOpndSubOpnd(MemOpndSubOpndKind_Displacement, base);
+        memOpndSubOpnds[MemOpndSubOpndKind_Base] = disp; //==setMemOpndSubOpnd(MemOpndSubOpndKind_Base, disp);
+    }
+}
 
 #ifdef _DEBUG
 //_________________________________________________________________________________________________

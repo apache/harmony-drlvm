@@ -16,7 +16,6 @@
  */
 /**
  * @author Vyacheslav P. Shakin
- * @version $Revision: 1.18.12.2.4.3 $
  */
 
 #ifndef _IA32_INST_H_
@@ -325,6 +324,11 @@ public:
 protected:
     bool replaceMemOpndSubOpnd(Opnd * opndOld, Opnd * opndNew);
     bool replaceMemOpndSubOpnds(Opnd * const * opndMap);
+    /**
+     * 'Normalizes' memory sub opnds. That is ensures that an immediate is 
+     * placed at the displacement, and a register gets placed ad the base.
+     */
+    void normalizeMemSubOpnds(void);
 
     void addRefCount(uint32& index, uint32 blockExecCount);
 
