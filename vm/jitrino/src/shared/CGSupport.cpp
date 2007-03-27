@@ -242,7 +242,7 @@ uint64 getVectorEntry(void* vectorHandler, uint64 key) {
     //PhaseTimer tm(getEntryTimer, "getEntry");
     assert(vectorHandler);
     StlVector<uint64>* theVector = (StlVector<uint64>*) vectorHandler;
-    if (key > (uint64) theVector->size()) return ILLEGAL_VALUE;
+    if (key >= (uint64) theVector->size()) return ILLEGAL_VALUE;
     return (*theVector)[(size_t)key];
 }
 //static Timer* setEntryTimer = NULL;
