@@ -112,8 +112,8 @@ void unreserve_self_lock(hythread_thin_monitor_t *lockword_ptr) {
     I_32 lockword_new;
     TRACE(("unreserve self_id %d lock owner %d", hythread_get_id(hythread_self()), THREAD_ID(lockword)));
     assert(hythread_get_id(hythread_self()) == THREAD_ID(lockword));
-    assert(!IS_FAT_LOCK(*lockword_ptr));
-    assert(IS_RESERVED(lockword));
+    assert (!IS_FAT_LOCK(*lockword_ptr));
+    assert (IS_RESERVED(lockword));
     TRACE(("Unreserved self %d \n", ++unreserve_count_self/*, vm_get_object_class_name(lockword_ptr-1)*/));  
        
     // Set reservation bit to 1 and reduce recursion count

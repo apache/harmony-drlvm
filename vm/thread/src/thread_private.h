@@ -62,48 +62,13 @@
 // FS14_TLS_USE define turns on windows specific TLS access optimization 
 // We use free TIB slot with 14 offset, see following article for details 
 // http://www.microsoft.com/msj/archive/S2CE.aspx
-#define FS14_TLS_USE
+//#define FS14_TLS_USE
 #endif
-
-/*
-#ifdef _EM64T_
-#define APR_TLS_USE
-#endif
-*/
 
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
-// optimization code
-#if !defined (APR_TLS_USE ) && !defined (FS14_TLS_USE) 
 
-#ifdef PLATFORM_POSIX
-extern __thread hythread_t tm_self_tls;
-#else
-extern __declspec(thread) hythread_t tm_self_tls;
-#endif //PLATFORM_POSIX
-
-#else
-#if defined (WIN32) && defined (FS14_TLS_USE)
-
-__forceinline hythread_t tmn_self_macro() {
-    register hythread_t t;
-    _asm { mov eax, fs:[0x14]
-           mov t, eax;
-    }
-    return t;
-}
-
-
-#define store_tm_self(self)  (__asm(mov self, fs:[0x14]))
-#define tm_self_tls (tmn_self_macro())
-#endif 
-
-#endif
-
-#ifdef APR_TLS_USE
-#define tm_self_tls (hythread_self())
-#endif
 
 
 #ifdef __linux__
@@ -146,13 +111,9 @@ typedef struct HyThread {
     void* reserved;
 #endif
 
-    /**
-     * Each thread keeps a pointer to the library it belongs to.
-     */
-    HyThreadLibrary * library;
+// Public fields exported by HyThread_public. If you change these fields,
+// please, check fields in hythread.h/HyThread_public
 
-// Suspension 
-    
     /**
      * Number of requests made for this thread, it includes both
      * suspend requests and safe point callback requests.
@@ -172,15 +133,6 @@ typedef struct HyThread {
      */
     int32 request;
 
-    /**
-     * Number of suspend requests made for this thread.
-     * The field is modified by atomic operations.
-     *
-     * After increment/decrement of suspend_count, request field
-     * should be incremented/decremented too.
-     */
-    int32 suspend_count;
-    
     /**
      * Field indicating that thread can safely be suspended.
      * Safe suspension is enabled on value 0.
@@ -202,6 +154,40 @@ typedef struct HyThread {
      * after exitting.
      */
     int16 disable_count;
+
+
+    /**
+     * Group for this thread. Different groups are needed in order 
+     * to be able to quickly iterate over the specific group.
+     * Examples are: Java threads, GC private threads.
+     * Equal to the address of the head of the list of threads for this group.
+     */
+    hythread_group_t  group; 
+
+    /**
+     * Array representing thread local storage
+     */
+    void *thread_local_storage[10];
+
+
+// Private fields
+
+    /**
+     * Each thread keeps a pointer to the library it belongs to.
+     */
+    HyThreadLibrary * library;
+
+// Suspension 
+    
+    /**
+     * Number of suspend requests made for this thread.
+     * The field is modified by atomic operations.
+     *
+     * After increment/decrement of suspend_count, request field
+     * should be incremented/decremented too.
+     */
+    int32 suspend_count;
+    
         
     /**
      * Function to be executed at safepoint upon thread resume.
@@ -220,14 +206,6 @@ typedef struct HyThread {
     hysem_t resume_event;
 
 // Basic manipulation fields
-
-    /**
-     * Group for this thread. Different groups are needed in order 
-     * to be able to quickly iterate over the specific group.
-     * Examples are: Java threads, GC private threads.
-     * Equal to the address of the head of the list of threads for this group.
-     */
-    hythread_group_t  group; 
     
     /**
      * Points to the next thread within the group.
@@ -321,11 +299,6 @@ typedef struct HyThread {
      * APR thread attributes
      */
     apr_threadattr_t *apr_attrs;
-
-    /**
-     * Array representing thread local storage
-     */
-    void *thread_local_storage[10];
 
     /**
      * Extension to the standard local storage slot.

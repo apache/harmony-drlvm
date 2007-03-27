@@ -62,6 +62,7 @@ hythread_suspend_enable
 hythread_suspend_disable
 hythread_exception_safe_point
 hythread_safe_point
+hythread_safe_point_other
 hythread_suspend_other
 hythread_set_safepoint_callback
 hythread_suspend_all
@@ -149,5 +150,6 @@ array_create
 array_delete
 array_get
 get_java_thread_group
+
 
 Java_org_apache_harmony_drlvm_thread_ThreadHelper_getThreadIdOffset

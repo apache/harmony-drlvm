@@ -29,7 +29,7 @@
 //@{
 
 int16 tm_tls_capacity = 16;
-int16 tm_tls_size = 0;
+int16 tm_tls_size = TM_THREAD_QUANTITY_OF_PREDEFINED_TLS_KEYS;
 
 static void tls_finalizer_placeholder(void *args) {}
 
@@ -73,13 +73,6 @@ IDATA VMCALL hythread_tls_alloc_with_finalizer(hythread_tls_key_t *handle, hythr
     }
 
     return -1;
-}
-
-/**
- * Returns a thread's TLS value.
- */
-void* VMCALL hythread_tls_get(hythread_t thread, hythread_tls_key_t key) {
-    return thread->thread_local_storage[key];
 }
 
 /**
