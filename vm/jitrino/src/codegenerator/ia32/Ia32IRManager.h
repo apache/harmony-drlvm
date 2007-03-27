@@ -332,7 +332,7 @@ public:
 
     void calculateTotalRegUsage(OpndKind regKind);
 
-    static bool isGCSafePoint(const Inst* inst)  {return inst->getMnemonic() == Mnemonic_CALL;}
+    static bool isGCSafePoint(const Inst* inst); 
 
     static bool isThreadInterruptablePoint(const Inst* inst) {
         if ( inst->getMnemonic() == Mnemonic_CALL ) {

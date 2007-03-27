@@ -339,7 +339,7 @@ private:
 
     //-------------------------------------------------------------------------
     Opnd(uint32 _id, Type * t, Constraint c)
-        :id(_id), firstId(_id), type(t), memOpndKind(MemOpndKind_Null), segReg(RegName_Null)
+        :id(_id), firstId(_id), type(t), memOpndKind(MemOpndKind_Null), segReg(RegName_Null), immValue(0), runtimeInfo(NULL)
         { constraints[ConstraintKind_Initial]=constraints[ConstraintKind_Calculated]=c; }
 
     //-------------------------------------------------------------------------
@@ -352,12 +352,12 @@ private:
     DefScope        defScope;
     Inst *          definingInst;
     uint32          refCount;
-        RegName                 segReg;
+    RegName         segReg;
 
     union{
         RegName     regName;
         struct{
-            int64       immValue;
+            int64           immValue;
             RuntimeInfo *   runtimeInfo;
         };
         Opnd *      memOpndSubOpnds[MemOpndSubOpndKind_Count];

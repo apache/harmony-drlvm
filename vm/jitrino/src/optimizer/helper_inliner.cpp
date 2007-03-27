@@ -405,7 +405,7 @@ void NewObjHelperInliner::doInline() {
     if (fallNode->getInDegree()>1) {
         fallNode = irm->getFlowGraph().spliceBlockOnEdge(fallEdge, instFactory->makeLabel());
     }
-    fallNode->prependInst(instFactory->makeConv(mod, type->tag, dstOpnd, callResOpnd));
+    fallNode->prependInst(instFactory->makeConvUnmanaged(mod, type->tag, dstOpnd, callResOpnd));
 
     inlineVMHelper(call);
 #endif
@@ -453,7 +453,7 @@ void NewArrayHelperInliner::doInline() {
     if (fallNode->getInDegree()>1) {
         fallNode = irm->getFlowGraph().spliceBlockOnEdge(fallEdge, instFactory->makeLabel());
     }
-    fallNode->prependInst(instFactory->makeConv(mod, arrayType->tag, dstOpnd, callResOpnd));
+    fallNode->prependInst(instFactory->makeConvUnmanaged(mod, arrayType->tag, dstOpnd, callResOpnd));
     
     inlineVMHelper(call);
 #endif

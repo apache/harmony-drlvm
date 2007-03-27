@@ -2235,7 +2235,22 @@ Edge* IRManager::createEdge(MemoryManager& mm, Node::Kind srcKind, Node::Kind ds
     }
     return ControlFlowGraphFactory::createEdge(mm, srcKind, dstKind);
 }
-
+bool IRManager::isGCSafePoint(const Inst* inst) {
+    if (inst->getMnemonic() == Mnemonic_CALL) {
+        const CallInst* callInst =  (const CallInst*)inst;
+        Opnd* callTarget = callInst->getOpnd(callInst->getTargetOpndIndex());
+        Opnd::RuntimeInfo * rt = callTarget->isPlacedIn(OpndKind_Immediate)?callTarget->getRuntimeInfo():NULL;
+        bool isInternalHelper = rt && rt->getKind() == Opnd::RuntimeInfo::Kind_InternalHelperAddress;
+        bool isNonGCVMHelper = false;
+        if (!isInternalHelper) {
+            isNonGCVMHelper = rt && rt->getKind() == Opnd::RuntimeInfo::Kind_HelperAddress 
+                && (CompilationInterface::RuntimeHelperId)(POINTER_SIZE_INT)rt->getValue(0) == CompilationInterface::Helper_GetTLSBase;
+        }
+        bool isGCPoint = !isInternalHelper && !isNonGCVMHelper;
+        return isGCPoint;
+    }
+    return false;
+}
 
 
 //=============================================================================================

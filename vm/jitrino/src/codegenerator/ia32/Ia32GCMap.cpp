@@ -81,6 +81,37 @@ void GCMap::processBasicBlock(IRManager& irm, const Node* block) {
     }
 }
 
+
+#ifdef _DEBUG
+
+static bool isManaged(Opnd* op) { return op->getType()->isObject() || op->getType()->isManagedPtr();}
+
+static void checkManaged2UnmanagedConv(IRManager& irm, Opnd* opnd) {
+    const Nodes& nodes = irm.getFlowGraph()->getNodes();
+    for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
+        Node* node = *it;
+        if (node->isBlockNode()) {
+            for (Inst* inst = (Inst*)node->getLastInst(); inst!=NULL; inst = inst->getPrevInst()) {
+                if (inst->getMnemonic() != Mnemonic_MOV) {
+                    continue;
+                }
+                Opnd* op0 = inst->getOpnd(0);
+                Opnd* op1 = inst->getOpnd(1);
+                if (op0!=opnd && op1!=opnd) {
+                    continue;
+                }
+                if (isManaged(op0)==isManaged(op1)) {
+                    continue;
+                }
+                Opnd* managedOpnd = isManaged(op0)?op0:op1;
+                //the only managed->unmanaged conversion type is allowed is for static (non-gc) fields
+                assert(managedOpnd->isPlacedIn(OpndKind_Immediate)); 
+            }
+        }
+    }
+}
+#endif
+
 void  GCMap::registerGCSafePoint(IRManager& irm, const BitSet& ls, Inst* inst) {
     POINTER_SIZE_INT eip = (POINTER_SIZE_INT)inst->getCodeStartAddr()+inst->getCodeSize();
     GCSafePoint* gcSafePoint = new (mm) GCSafePoint(mm, eip);
@@ -99,9 +130,14 @@ void  GCMap::registerGCSafePoint(IRManager& irm, const BitSet& ls, Inst* inst) {
 #endif
     BitSet::IterB liveOpnds(ls);
     assert(inst->hasKind(Inst::Kind_CallInst));
+    
     Opnd * callRes = inst->getOpndCount(Inst::OpndRole_AllDefs)>0 ? inst->getOpnd(0) : NULL;
     for (int i = liveOpnds.getNext(); i != -1; i = liveOpnds.getNext()) {
         Opnd* opnd = irm.getOpnd(i);
+#ifdef _DEBUG
+        if (opnd->getType()->isUnmanagedPtr()) checkManaged2UnmanagedConv(irm, opnd);
+#endif
+        
         if (callRes == opnd) {
             continue;
         }

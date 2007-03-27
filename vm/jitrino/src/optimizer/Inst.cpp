@@ -1783,6 +1783,10 @@ InstFactory::makeSelect(Opnd* dst, Opnd* src1, Opnd* src2, Opnd *src3) {
 
 // conversion
 Inst* InstFactory::makeConv(Modifier mod, Type::Tag toType, Opnd* dst, Opnd* src) {
+    //use convUnmanaged to convert between managed and unmanaged types
+    assert (!(dst->getType()->isUnmanagedPtr() && src->getType()->isObject()) 
+        && !(dst->getType()->isObject() && src->getType()->isUnmanagedPtr())); 
+
     return makeInst(Op_Conv, mod, toType, dst, src);
 }
 
