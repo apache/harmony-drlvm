@@ -144,7 +144,7 @@ static Method* prepare_exc_creating(Class* exc_class, jvalue* args,
         string_create_from_utf8(exc_message, (unsigned) strlen(exc_message));
 
     if (!arg_obj) {
-        exn_throw_object(VM_Global_State::loader_env->java_lang_OutOfMemoryError);
+        exn_raise_object(VM_Global_State::loader_env->java_lang_OutOfMemoryError);
         return NULL;
     }
     jobject arg = oh_allocate_local_handle();
@@ -189,7 +189,7 @@ static Method* prepare_exc_creating(Class* exc_class, jvalue* args,
         string_create_from_utf8(exc_message, (unsigned) strlen(exc_message));
 
     if (!arg_obj) {
-        exn_throw_object(VM_Global_State::loader_env->java_lang_OutOfMemoryError);
+        exn_raise_object(VM_Global_State::loader_env->java_lang_OutOfMemoryError);
         return NULL;
     }
     jobject arg = oh_allocate_local_handle();

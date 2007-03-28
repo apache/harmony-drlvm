@@ -242,7 +242,7 @@ Class* ClassLoader::DefineClass(Global_Env* env, const char* class_name,
         size_t mess_size = strlen(mess_templ) + className->len + 1;
         char* err_mess = (char*)STD_ALLOCA(mess_size);
         sprintf(err_mess, mess_templ, className->bytes);
-        exn_raise_by_name("java/lang/LinkageError", err_mess);
+        exn_raise_object(exn_create("java/lang/LinkageError", err_mess));
         TRACE(err_mess);
         return NULL;
     }
