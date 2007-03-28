@@ -122,6 +122,13 @@ VM_thread * get_a_thread_block(JavaVM_Internal * java_vm) {
     }
     return p_vmthread;
 } 
+            
+VM_thread *get_vm_thread(hythread_t thr) {
+    if (thr == NULL) {
+        return NULL;
+    }
+    return (VM_thread *)hythread_tls_get(thr, TLS_key_pvmthread);
+}
 
 VM_thread *get_vm_thread_ptr_safe(JNIEnv *jenv, jobject jThreadObj)
 {
@@ -139,8 +146,12 @@ VM_thread *get_thread_ptr_stub()
   
 vm_thread_accessor* get_thread_ptr = get_thread_ptr_stub;
 void init_TLS_data() {
-    //printf ("init TLS data, TLS key = %x \n", TLS_key_pvmthread);
-    TLS_key_pvmthread = TM_THREAD_VM_TLS_KEY;
+    hythread_tls_alloc(&TLS_key_pvmthread);
+#ifndef _EM64T_
+    get_thread_ptr = (vm_thread_accessor*) get_tls_helper(TLS_key_pvmthread);
+    //printf ("init fast call %p\n", get_thread_ptr);
+#endif
+
 }
   
 void set_TLS_data(VM_thread *thread) {

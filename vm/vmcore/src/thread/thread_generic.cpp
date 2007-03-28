@@ -44,10 +44,8 @@ using namespace std;
 #include <apr_pools.h>
 
 #include "open/hythread.h"
-#include "open/hythread_ext.h"
 #include "open/jthread.h"
 #include "open/thread_externals.h"
-
 #include "open/types.h"
 #include "open/vm_util.h"
 #include "open/gc.h"
@@ -214,12 +212,14 @@ jint vm_attach(JavaVM * java_vm, JNIEnv ** p_jni_env,
     // mode until current thread is not attaced to VM.
     assert(hythread_is_suspend_enabled());
 
+    hythread_t hythread = hythread_self();
+
     if (p_vmt_dummies != NULL) {
 	// VMThread structure is already allocated, we only need to set
 	// TLS
 	set_TLS_data (p_vm_thread);
     } else {
-	p_vm_thread = get_vm_thread(hythread_self());
+	p_vm_thread = get_vm_thread(hythread);
 	
 	if (p_vm_thread != NULL) {
 	    assert (java_vm == p_vm_thread->jni_env->vm); 

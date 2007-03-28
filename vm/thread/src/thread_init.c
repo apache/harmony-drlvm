@@ -270,7 +270,7 @@ IDATA VMCALL hythread_global_unlock() {
     return hymutex_unlock(&TM_LIBRARY->TM_LOCK);;
 }
 
-hythread_group_t VMCALL get_java_thread_group(void) {
+hythread_group_t  get_java_thread_group(void) {
     return TM_DEFAULT_GROUP;
 }
 

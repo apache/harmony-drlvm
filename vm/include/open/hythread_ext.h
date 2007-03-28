@@ -123,17 +123,7 @@ e between safe point function call overhead and suspension time overhead.
 extern "C" {
 #endif
 
-#include "open/hythread.h"
-
-#include <open/types.h>
-#include <apr_pools.h>
-#include <apr_thread_mutex.h>
-#include <apr_thread_cond.h>
-#include <apr_thread_rwlock.h>
-#include <apr_portable.h>
-
-#include <assert.h>
-#include "apr_thread_ext.h"
+#include "hythread.h"
 
 //@{
 /**
@@ -155,7 +145,7 @@ extern "C" {
 
 
 typedef struct HyLatch *hylatch_t;
-
+typedef struct HyThreadGroup *hythread_group_t;
 typedef struct HyThread *hythread_iterator_t;
 typedef struct HyThreadLibrary *hythread_library_t;
 
@@ -163,7 +153,6 @@ typedef I_32  hythread_thin_monitor_t;
 
 typedef void (*hythread_event_callback_proc)(void);
 
- 
 //@}
 /** @name Thread Manager initialization / shutdown
  */
@@ -178,7 +167,6 @@ void VMCALL hythread_init(hythread_library_t lib);
 void VMCALL hythread_shutdown();
 IDATA VMCALL hythread_lib_create(hythread_library_t * lib);
 void VMCALL hythread_lib_destroy(hythread_library_t lib);
-hythread_group_t VMCALL get_java_thread_group(void);
 
 //@}
 /** @name  Basic manipulation 
@@ -197,7 +185,7 @@ IDATA VMCALL hythread_get_id(hythread_t t);
 hythread_t VMCALL hythread_get_thread(IDATA id);
 IDATA VMCALL hythread_struct_init(hythread_t *ret_thread);
 IDATA VMCALL hythread_cancel_all(hythread_group_t group);
-IDATA hythread_group_create(hythread_group_t *group);
+ IDATA hythread_group_create(hythread_group_t *group);
 IDATA VMCALL hythread_group_release(hythread_group_t group);
 IDATA VMCALL hythread_group_get_list(hythread_group_t **list, int* size);
 void* VMCALL hythread_get_private_data(hythread_t  t);
@@ -226,11 +214,10 @@ IDATA VMCALL hycond_destroy (hycond_t *cond);
  */
 //@{
 
-hy_inline IDATA VMCALL hythread_is_suspend_enabled();
-hy_inline void VMCALL hythread_suspend_enable();
-hy_inline void VMCALL hythread_suspend_disable();
+IDATA hythread_is_suspend_enabled();
+void hythread_suspend_enable();
+void hythread_suspend_disable();
 void hythread_safe_point();
-void hythread_safe_point_other(hythread_t thread);
 void VMCALL hythread_exception_safe_point();
 IDATA VMCALL hythread_suspend_other(hythread_t thread);
 
@@ -324,102 +311,6 @@ int VMCALL hythread_is_interrupted(hythread_t thread) ;
 int VMCALL hythread_is_in_native(hythread_t thread) ;
 int VMCALL hythread_is_daemon(hythread_t thread) ;
 
-
-
-
-// inline functions declarations
-
-
-/**
- * Returns non-zero if thread is suspended.
- */
-hy_inline IDATA VMCALL hythread_is_suspend_enabled(){
-    return ((HyThread_public *)tm_self_tls)->disable_count == 0;
-}
-
-
-/**
- * Denotes the beginning of the code region where safe suspension is possible.
- *
- * The method decreases the disable_count field. The disable_count could be
- * recursive, so safe suspension region is enabled on value 0.
- *
- * <p>
- * A thread marks itself with functions hythread_suspend_enable()
- * and hythread_suspend_disable() in order to denote a safe region of code.
- * A thread may also call hythread_safe_point() method to denote a selected
- * point where safe suspension is possible.
- */
-hy_inline void VMCALL hythread_suspend_enable() {
-    assert(!hythread_is_suspend_enabled());
-
-#ifdef FS14_TLS_USE
-    // the macros could work for WIN32
-    __asm {
-        mov eax, fs:[0x14]
-        dec[eax] HyThread_public.disable_count
-    }
-#else
-    {
-        register hythread_t thread = tm_self_tls;
-        ((HyThread_public *)thread)->disable_count--;
-    }
-#endif
-}
-
-/**
- * Denotes the end of the code region where safe suspension was possible.
- *
- * The method increases the disable_count field. The disable_count could be
- * recursive, so safe suspension region is enabled on value 0.
- * If there was a suspension request set for this thread, the method invokes
- * hythread_safe_point().
- * <p>
- * A thread marks itself with functions hythread_suspend_enable()
- * and hythread_suspend_disable() in order to denote a safe region of code.
- * A thread may also call hythread_safe_point() method to denote a selected
- * point where safe suspension is possible.
- */
-hy_inline void VMCALL hythread_suspend_disable()
-{
-    register hythread_t thread;
-
-    // Check that current thread is in default thread group.
-    // Justification: GC suspends and enumerates threads from
-    // default group only.
-    assert(((HyThread_public *)tm_self_tls)->group == get_java_thread_group());
-
-#ifdef FS14_TLS_USE
-    // the macros could work for WIN32
-    __asm {
-        mov eax, fs:[0x14]
-        inc[eax] HyThread_public.disable_count
-        mov eax,[eax] HyThread_public.request
-        test eax, eax
-        jnz suspended
-    }
-    return;
-
-  suspended:
-    thread = tm_self_tls;
-
-#else
-    thread = tm_self_tls;
-    ((HyThread_public *)thread)->disable_count++;
-#endif
-
-    if (((HyThread_public *)thread)->request && 
-	((HyThread_public *)thread)->disable_count == 1) {
-        // enter to safe point if suspend request was set
-        // and suspend disable was made a moment ago
-        // (it's a point of entry to the unsafe region)
-        hythread_safe_point_other(thread);
-    }
-    return;
-}
-
-#define TM_THREAD_VM_TLS_KEY 0
-#define TM_THREAD_QUANTITY_OF_PREDEFINED_TLS_KEYS 1
 
  //@}
  /**

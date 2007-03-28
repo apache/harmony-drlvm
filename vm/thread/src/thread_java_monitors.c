@@ -359,7 +359,7 @@ IDATA VMCALL jthread_monitor_timed_wait(jobject monitor, jlong millis, jint nano
     return status;
 }
 
-void add_owned_monitor(jobject monitor){
+void add_owned_monitor(jobject monitor) {
     hythread_t tm_native_thread = hythread_self();
     jvmti_thread_t tm_java_thread = hythread_get_private_data(tm_native_thread);
     int disable_status;
@@ -415,7 +415,7 @@ void remove_owned_monitor(jobject monitor) {
     //assert(0); monitor - it is no valid monitor
 }
 
-void set_contended_monitor(jobject monitor){
+void set_contended_monitor(jobject monitor) {
     hythread_t tm_native_thread = hythread_self();
     IDATA suspend_status;
     
@@ -429,7 +429,7 @@ void set_contended_monitor(jobject monitor){
     set_suspend_disable(suspend_status);
 }
 
-void set_wait_monitor(jobject monitor){
+void set_wait_monitor(jobject monitor) {
     hythread_t tm_native_thread = hythread_self();
     IDATA suspend_status;
     
