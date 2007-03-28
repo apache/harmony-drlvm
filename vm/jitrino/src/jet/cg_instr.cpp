@@ -443,7 +443,7 @@ void CodeGen::gen_write_barrier(JavaByteCodes opcode, Field_Handle fieldHandle)
         baseObject = Val(jobj, NULL_REF);
         rlock(baseObject);
         void* fieldAddress = field_get_address(fieldHandle);
-        slotAddress = Opnd(jobj, (jlong)(int_ptr)fieldAddress);
+        slotAddress = Opnd(jobj, (int_ptr)fieldAddress);
         rlock(slotAddress);
     }
     else if (opcode == OPCODE_AASTORE) {

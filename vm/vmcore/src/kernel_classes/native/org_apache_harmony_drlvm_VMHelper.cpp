@@ -53,7 +53,7 @@ JNIEXPORT jlong JNICALL Java_org_apache_harmony_drlvm_VMHelper_getCompressedMode
 JNIEXPORT jlong JNICALL Java_org_apache_harmony_drlvm_VMHelper_getCompressedModeObjectBaseOffset(JNIEnv *, jclass) {
     bool cm = (jboolean)VM_Global_State::loader_env->compress_references;
     if (cm) {
-        return (jlong)VM_Global_State::loader_env->heap_base;;
+        return (jlong)(POINTER_SIZE_INT)VM_Global_State::loader_env->heap_base;;
     }
     return -1;
 }

@@ -239,7 +239,7 @@ public:
         if (is_reg()) {
             return Opnd(jt, reg());
         }
-        return Opnd(jt, lval());
+        return Opnd(jt, (int_ptr)lval());
     }
     //
     AR      reg(void) const { return m_kind == opnd_reg ? m_reg : ar_x; }
@@ -423,4 +423,5 @@ private:
 }}; // ~namespace Jitrino::Jet
 
 #endif      // ~__VAL_H_INCLUDED__
+
 

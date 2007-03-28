@@ -92,7 +92,7 @@ void finalizer_threads_init(JavaVM *java_vm)
     for(unsigned int i = 0; i < fin_thread_info->thread_num; i++){
         void **args = (void **)STD_MALLOC(sizeof(void *) * 2);
         args[0] = (void *)java_vm;
-        args[1] = (void *)(i + 1);
+        args[1] = (void *)(UDATA)(i + 1);
         fin_thread_info->thread_ids[i] = NULL;
         status = hythread_create(&fin_thread_info->thread_ids[i], 0, FINALIZER_THREAD_PRIORITY, 0, (hythread_entrypoint_t)finalizer_thread_func, args);
         assert(status == TM_ERROR_NONE);
