@@ -387,7 +387,7 @@ hy_inline void VMCALL hythread_suspend_disable()
     // Check that current thread is in default thread group.
     // Justification: GC suspends and enumerates threads from
     // default group only.
-    assert(((HyThread_public *)tm_self_tls)->group == get_java_thread_group());
+    assert(((HyThread_public *)hythread_self())->group == get_java_thread_group());
 
 #ifdef FS14_TLS_USE
     // the macros could work for WIN32

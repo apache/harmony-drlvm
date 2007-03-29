@@ -17,6 +17,7 @@ hythread_park
 hythread_monitor_init_with_name
 hythread_monitor_try_enter
 hythread_self
+hythread_self_slow
 hythread_tls_free
 hythread_yield
 hythread_suspend

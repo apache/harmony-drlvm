@@ -400,7 +400,7 @@ typedef struct HyThread_public {
    
 
 
-#if defined WIN32 && !defined _EM64T_
+#if (defined (WIN32) && !defined (_WIN64))
 
 //use optimized asm monitor enter and exit helpers
 #define ASM_MONITOR_HELPER
@@ -410,8 +410,7 @@ typedef struct HyThread_public {
 // http://www.microsoft.com/msj/archive/S2CE.aspx
 #define FS14_TLS_USE
 
-#elif defined _EM64T_ && defined WINDOWS
-
+#elif defined _WIN64
 #define APR_TLS_USE
 #endif
 
@@ -430,8 +429,8 @@ hy_inline hythread_t VMCALL hythread_self() {
     return hythread_self_slow();
 }
 
-#define tm_self_tls (hythread_self_slow())
 
+#define tm_self_tls (hythread_self_slow())
 
 #ifdef __cplusplus
 }
