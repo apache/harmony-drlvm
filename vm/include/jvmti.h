@@ -26,26 +26,42 @@
 /*
  * Supported JVMTI versions
  */
+/** Constant which specifies JNI interface mask */
 #define JVMTI_VERSION_INTERFACE_JNI 0x00000000
+/** Constant which specifies JVMTI interface mask */
 #define JVMTI_VERSION_INTERFACE_JVMTI 0x30000000
+/** Constant which specifies VM externals interface mask */
 #define JVMTI_VERSION_MASK_INTERFACE_TYPE 0x70000000
+/** Constant which specifies major JVMTI version interface mask */
 #define JVMTI_VERSION_MASK_MAJOR 0x0FFF0000
+/** Constant which specifies minor JVMTI version interface mask */
 #define JVMTI_VERSION_MASK_MINOR 0x0000FF00
+/** Constant which specifies micro JVMTI version interface mask */
 #define JVMTI_VERSION_MASK_MICRO 0x000000FF
+/** Constant which specifies major JVMTI version left shit */
 #define JVMTI_VERSION_SHIFT_MAJOR 16
+/** Constant which specifies minor JVMTI version left shit */
 #define JVMTI_VERSION_SHIFT_MINOR 8
+/** Constant which specifies micro JVMTI version left shit */
 #define JVMTI_VERSION_SHIFT_MICRO 0
 
+/** JVMTI major version supported by VM */
 #define JVMTI_VERSION_MAJOR 1
+/** JVMTI minor version supported by VM */
 #define JVMTI_VERSION_MINOR 0
+/** JVMTI micro version supported by VM */
 #define JVMTI_VERSION_MICRO 36
 
+/** Constant which defines JVMTI version identifier for JVMTI version
+ * 1.0.0 */
 #define JVMTI_VERSION_1_0 \
     (JVMTI_VERSION_INTERFACE_JVMTI | \
     (JVMTI_VERSION_MAJOR << JVMTI_VERSION_SHIFT_MAJOR) | \
-    (JVMTI_VERSION_MINOR << JVMTI_VERSION_SHIFT_MINOR) | \
-    (JVMTI_VERSION_MICRO << JVMTI_VERSION_SHIFT_MICRO))
+    (0 << JVMTI_VERSION_SHIFT_MINOR) | \
+    (0 << JVMTI_VERSION_SHIFT_MICRO))
 
+/** Constant which defines JVMTI version identifier for JVMTI version
+ * supported by VM */
 #define JVMTI_VERSION \
     (JVMTI_VERSION_INTERFACE_JVMTI | \
     (JVMTI_VERSION_MAJOR << JVMTI_VERSION_SHIFT_MAJOR) | \
@@ -58,25 +74,35 @@ extern "C"
 #endif
 
     /**
-     * Agent Start-Up.
-     * The library must export a start-up function with the following
-     * prototype:
+     * Agent StartUp function prototype which should be exported by agent library
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#onload">specification</a>
+     * for details.
      */
     JNIEXPORT jint JNICALL
         Agent_OnLoad(JavaVM * vm, char *options, void *reserved);
 
     /**
-     * Agent Shutdown.
-     * The library may optionally export a shutdown function with the
-     * following prototype:
+     * Agent Shutdown prototype which should be exported by agent library
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#onunload">specification</a>
+     * for details.
      */
     JNIEXPORT void JNICALL Agent_OnUnload(JavaVM * vm);
 
 #ifdef __cplusplus
-}               /* extern "C" { */
+}
 #endif
 
-
+/**
+ * JVMTI interface functions table for use in C sources
+ *
+ * See <a
+ * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#FunctionSection">specification</a>
+ * for details.
+ */
 struct ti_interface
 {
     void *reserved1;
@@ -673,6 +699,13 @@ struct ti_interface
 };
 
 
+/**
+ * JVMTI interface functions table for use in C++ sources
+ *
+ * See <a
+ * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#FunctionSection">specification</a>
+ * for details.
+ */
 struct jvmtiEnv_struct
 {
     const struct ti_interface *funcs;

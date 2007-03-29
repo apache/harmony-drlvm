@@ -14,14 +14,14 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Gregory Shimansky
- * @version $Revision: 1.1.2.1.4.3 $
- */  
-
 /**
- * @file This file describes the JNI interface as per the JNI
- * specification 1.5 available from Sun.
+ * @file
+ * This file describes the JNI interface as per the JNI
+ * specification 1.5 available from Sun
+ *
+ * See <a
+ * href="http://java.sun.com/j2se/1.5.0/docs/guide/jni/spec/jniTOC.html">specification</a>
+ * for details.
  */
 
 #ifndef _JNI_H_
@@ -34,12 +34,25 @@
 /*
  * Supported JNI versions
  */
+/**
+ * Constant which specifies JNI interface version 1.1
+ */
 #define JNI_VERSION_1_1 0x00010001
+/**
+ * Constant which specifies JNI interface version 1.2
+ */
 #define JNI_VERSION_1_2 0x00010002
+/**
+ * Constant which specifies JNI interface version 1.4
+ */
 #define JNI_VERSION_1_4 0x00010004
 
-/*
- * JNI Native Method Interface - C
+/**
+ * JNI Native Method Interface table for use in C sources
+ *
+ * See <a
+ * href="http://java.sun.com/j2se/1.5.0/docs/guide/jni/spec/functions.html#wp23720">specification</a>
+ * for details
  */
 struct JNINativeInterface_ {
     void *reserved0;
@@ -592,8 +605,12 @@ struct JNINativeInterface_ {
 };
 
 
-/*
- * JNI Native Interface - C++
+/**
+ * JNI Native Method Interface table for use in C++ sources
+ *
+ * See <a
+ * href="http://java.sun.com/j2se/1.5.0/docs/guide/jni/spec/functions.html#wp23720">specification</a>
+ * for details
  */
 struct JNIEnv_External {
     const struct JNINativeInterface_ *functions;
@@ -1672,14 +1689,26 @@ struct JNIEnv_External {
 
 };
 
-/*
- * JNI Invocation Interface
+/**
+ * Structure which describes one Java VM invocation argument
+ *
+ * See <a
+ * href="http://java.sun.com/j2se/1.5.0/docs/guide/jni/spec/invocation.html#wp16334">specification</a>
+ * for details.
  */
 typedef struct JavaVMOption {
     char *optionString;
     void *extraInfo;
 } JavaVMOption;
 
+/**
+ * Structure which describes one Java VM invocation arguments for JNI
+ * interface version 1.2 and greater
+ *
+ * See <a
+ * href="http://java.sun.com/j2se/1.5.0/docs/guide/jni/spec/invocation.html#wp16334">specification</a>
+ * for details.
+ */
 typedef struct JavaVMInitArgs {
     jint version;
     jint nOptions;
@@ -1687,12 +1716,26 @@ typedef struct JavaVMInitArgs {
     jboolean ignoreUnrecognized;
 } JavaVMInitArgs;
 
+/**
+ * Structure which describes arguments for attaching a native thread to a Java VM
+ *
+ * See <a
+ * href="http://java.sun.com/j2se/1.5.0/docs/guide/jni/spec/invocation.html#attach_current_thread">specification</a>
+ * for details.
+ */
 typedef struct JavaVMAttachArgs {
     jint version;  
     char *name;
     jobject group;
 } JavaVMAttachArgs;
 
+/**
+ * JNI Invocation Interface table for use in C sources
+ *
+ * See <a
+ * href="http://java.sun.com/j2se/1.5.0/docs/guide/jni/spec/invocation.html#invocation_api_functions">
+ * specification</a> for details
+ */
 struct JNIInvokeInterface_ {
     void* reserved0;
     void* reserved1;
@@ -1708,6 +1751,13 @@ struct JNIInvokeInterface_ {
     jint (JNICALL *AttachCurrentThreadAsDaemon)(JavaVM*, void** penv, void* args);
 };
 
+/**
+ * JNI Invocation Interface table for use in C++ sources
+ *
+ * See <a
+ * href="http://java.sun.com/j2se/1.5.0/docs/guide/jni/spec/invocation.html#invocation_api_functions">
+ * specification</a> for details
+ */
 struct JavaVM_External {
     const struct JNIInvokeInterface_* functions;
 
@@ -1739,18 +1789,44 @@ struct JavaVM_External {
 extern "C" {
 #endif
 
+/**
+ * @def _JNI_EXPORT_
+ * Function attribute used when building VM from sources
+ */
 #ifdef BUILDING_VM
 #define _JNI_EXPORT_ JNIEXPORT
 #else
 #define _JNI_EXPORT_ JNIIMPORT
 #endif
 
+/**
+ * Function to get the default VM arguments
+ *
+ * See <a
+ * href="http://java.sun.com/j2se/1.5.0/docs/guide/jni/spec/invocation.html#wp16064">specification</a>
+ * for details.
+ */
 _JNI_EXPORT_ jint JNICALL JNI_GetDefaultJavaVMInitArgs(void * vm_args);
 
+/**
+ * Function to get an array of already created Java VMs in the current
+ * process
+ *
+ * See <a
+ * href="http://java.sun.com/j2se/1.5.0/docs/guide/jni/spec/invocation.html#wp633">specification</a>
+ * for details.
+ */
 _JNI_EXPORT_ jint JNICALL JNI_GetCreatedJavaVMs(JavaVM ** vmBuf,
                                                 jsize bufLen,
                                                 jsize * nVMs);
 
+/**
+ * Creates Java VM in the current process
+ *
+ * See <a
+ * href="http://java.sun.com/j2se/1.5.0/docs/guide/jni/spec/invocation.html#wp16334">specification</a>
+ * for details.
+ */
 _JNI_EXPORT_ jint JNICALL JNI_CreateJavaVM(JavaVM ** p_vm, JNIEnv ** p_env,
                                            void * vm_args);
 

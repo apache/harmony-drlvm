@@ -14,7 +14,15 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
- 
+
+/**
+ * @file
+ * Definition of JVMTI interface types
+ *
+ * See <a
+ * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html">specification</a>
+ * for details.
+ */
 #ifndef _JVMTI_TYPES_H_
 #define _JVMTI_TYPES_H_
 
@@ -32,27 +40,85 @@ extern "C"
     struct jvmtiEnv_struct;
 
 #ifdef __cplusplus
+    /**
+     * JVMTI environment definition for use in C++ sources
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#environments">specification</a>
+     * for details.
+     */
     typedef jvmtiEnv_struct jvmtiEnv;
 #else
+    /**
+     * JVMTI environment definition for use in C sources
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#environments">specification</a>
+     * for details.
+     */
     typedef const struct ti_interface *jvmtiEnv;
 #endif
 
+    /**
+     * Reference type which describes a java.lang.Thread instance
+     * object in native function
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jthread">specification</a>
+     * for details.
+     */
     typedef jobject jthread;
+    /**
+     * 64-bit type which defines executable positon inside of method
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jlocation">specification</a>
+     * for details.
+     */
     typedef jlong jlocation;
+    /**
+     * Reference type which describes a java.lang.ThreadGroup instance
+     * object in native function
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jthreadGroup">specification</a>
+     * for details.
+     */
     typedef jobject jthreadGroup;
+    /**
+     * Raw monitor ID type
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jrawMonitorID">specification</a>
+     * for details.
+     */
     typedef int jrawMonitorID;
+    /**
+     * JNI API interface table type for usage in C
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jni/spec/design.html#wp16696">specification</a>
+     * for details. */
     typedef struct JNINativeInterface_ jniNativeInterface;
 
 
     /**
-     * Pointer to a function which could be launched
-     * as a separate system thread.
+     * Pointer to a function which could be launched as a separate
+     * agent thread
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiStartFunction">specification</a>
+     * for details.
      */
     typedef void (JNICALL * jvmtiStartFunction)
         (jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *arg);
 
     /**
-     * Error codes.
+     * Error codes which JVMTI API functions may return
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#ErrorSection">specification</a>
+     * for details.
      */
     typedef enum
     {
@@ -108,39 +174,72 @@ extern "C"
     } jvmtiError;
 
     /**
-     * Class status flags (from spec)
+     * Class status flags which <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#GetClassStatus">GetClassStatus</a>
+     * function may return
      */
     enum
     {
         /**
-         * Class bytecodes have been verified.
+         * Class bytecodes have been verified
+         *
+         * See <a
+         * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#JVMTI_CLASS_STATUS_VERIFIED">specification</a>
+         * for details.
          */
         JVMTI_CLASS_STATUS_VERIFIED = 1,
         /**
-         * Class preparation is complete.
+         * Class preparation is complete
+         *
+         * See <a
+         * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#JVMTI_CLASS_STATUS_PREPARED">specification</a>
+         * for details.
          */
         JVMTI_CLASS_STATUS_PREPARED = 2,
         /**
-         * Class initialization is complete. Static initializer has been run.
+         * Class initialization is complete. Static initializer has been run
+         *
+         * See <a
+         * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#JVMTI_CLASS_STATUS_INITIALIZED">specification</a>
+         * for details.
          */
         JVMTI_CLASS_STATUS_INITIALIZED = 4,
         /**
-         * Error during initialization makes class unusable.
+         * Error during initialization makes class unusable
+         *
+         * See <a
+         * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#JVMTI_CLASS_STATUS_ERROR">specification</a>
+         * for details.
          */
         JVMTI_CLASS_STATUS_ERROR = 8,
         /**
-         * Class is an array. If set, all other bits are zero.
+         * Class is an array. If set, all other bits are zero
+         *
+         * See <a
+         * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#JVMTI_CLASS_STATUS_ARRAY">specification</a>
+         * for details.
          */
         JVMTI_CLASS_STATUS_ARRAY = 16,
         /**
-         * Class is a primitive class (for example, <code>java.lang.Integer.TYPE</code>).
-         * If set, all other bits are zero.
+         * Class is a primitive class (for example,
+         * <code>java.lang.Integer.TYPE</code>).  If set, all other
+         * bits are zero
+         *
+         * See <a
+         * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#JVMTI_CLASS_STATUS_PRIMITIVE">specification</a>
+         * for details.
          */
         JVMTI_CLASS_STATUS_PRIMITIVE = 32
     };
 
     /**
-     * Thread states (from spec).
+     * Thread states which may be returned by <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#GetThreadState">GetThreadState</a>
+     * function
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#GetThreadState">specification</a>
+     * for details.
      */
     enum
     {
@@ -162,6 +261,16 @@ extern "C"
         JVMTI_THREAD_STATE_VENDOR_3 = 0x40000000
     };
 
+    /**
+     * Thread states masks which may be used to filter out thread
+     * states in bit mask returned by <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#GetThreadState">specification</a>
+     * function
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#GetThreadState">specification</a>
+     * for details.
+     */
     enum
     {
         JVMTI_JAVA_LANG_THREAD_STATE_MASK =
@@ -187,7 +296,11 @@ extern "C"
     };
 
     /**
-     * Thread priorities (from spec).
+     * Thread priorities
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiThreadPriority">specification</a>
+     * for details.
      */
     enum
     {
@@ -197,7 +310,13 @@ extern "C"
     };
 
     /**
-     * Thread data (from spec).
+     * Thread information structure returned by <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#GetThreadInfo">GetThreadInfo</a>
+     * function
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiThreadInfo">specification</a>
+     * for details.
      */
     typedef struct
     {
@@ -209,7 +328,13 @@ extern "C"
     } jvmtiThreadInfo;
 
     /**
-     * Thread group data (from spec).
+     * Thread group information structure returned by <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#GetThreadGroupInfo">GetThreadGroupInfo</a>
+     * function
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiThreadGroupInfo">specification</a>
+     * for details.
      */
     typedef struct
     {
@@ -220,7 +345,11 @@ extern "C"
     } jvmtiThreadGroupInfo;
 
     /**
-     * Stack frame data (from spec).
+     * Single stack frame information structure
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiFrameInfo">specification</a>
+     * for details.
      */
     typedef struct
     {
@@ -229,7 +358,11 @@ extern "C"
     } jvmtiFrameInfo;
 
     /**
-     * Thread stack data (from spec).
+     * Single thread stack information structure
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiStackInfo">specification</a>
+     * for details.
      */
     typedef struct
     {
@@ -240,8 +373,12 @@ extern "C"
     } jvmtiStackInfo;
 
     /**
-     * Event numbers (from spec). Custom events could be added
-     * after <code>JVMTI_MAX_EVENT_TYPE_VAL</code>.
+     * Event numbers. Custom events could be added after
+     * <code>JVMTI_MAX_EVENT_TYPE_VAL</code>.
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#EventIndex">specification</a>
+     * for details.
      */
     typedef enum
     {
@@ -280,10 +417,19 @@ extern "C"
         JVMTI_MAX_EVENT_TYPE_VAL = 84
     } jvmtiEvent;
 
+    /**
+     * Total number of events specified in JVMTI interface
+     */
 #define TOTAL_EVENT_TYPE_NUM (JVMTI_MAX_EVENT_TYPE_VAL - JVMTI_MIN_EVENT_TYPE_VAL + 1)
 
     /**
-     * Root types.
+     * Root types used in JVMTI <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#Heap">heap
+     * iteration</a>
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiHeapRootKind">specification</a>
+     * for details.
      */
     typedef enum
     {
@@ -297,7 +443,13 @@ extern "C"
     } jvmtiHeapRootKind;
 
     /**
-     * Generic iteration control.
+     * Generic iteration control used in JVMTI <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#Heap">heap
+     * iteration</a>
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiIterationControl">specification</a>
+     * for details.
      */
     typedef enum
     {
@@ -307,7 +459,13 @@ extern "C"
     } jvmtiIterationControl;
 
     /**
-     * Describes enumerated references.
+     * Describes enumerated references in JVMTI <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#Heap">heap
+     * iteration</a>
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiObjectReferenceKind">specification</a>
+     * for details.
      */
     typedef enum
     {
@@ -323,8 +481,13 @@ extern "C"
     } jvmtiObjectReferenceKind;
 
     /**
-     * Mostly tag support resides on VM side, but GC
-     * should be aware of it.
+     * Tagged objects filters used in JVMTI <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#Heap">heap
+     * iteration</a>
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiHeapObjectFilter">specification</a>
+     * for details.
      */
     typedef enum
     {
@@ -333,6 +496,13 @@ extern "C"
         JVMTI_HEAP_OBJECT_EITHER = 3
     } jvmtiHeapObjectFilter;
 
+    /**
+     * Monitor usage information structure
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiMonitorUsage">specification</a>
+     * for details.
+     */
     typedef struct
     {
         jthread owner;
@@ -343,12 +513,26 @@ extern "C"
         jthread *notify_waiters;
     } jvmtiMonitorUsage;
 
+    /**
+     * Line numbers information structure
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiLineNumberEntry">specification</a>
+     * for details.
+     */
     typedef struct
     {
         jlocation start_location;
         jint line_number;
     } jvmtiLineNumberEntry;
 
+    /**
+     * Local variables information structure
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiLocalVariableEntry">specification</a>
+     * for details.
+     */
     typedef struct
     {
         jlocation start_location;
@@ -360,67 +544,175 @@ extern "C"
     } jvmtiLocalVariableEntry;
 
     /**
-     * Event management is exposed to other <code>OPEN</code> components.
+     * Callback function type for VMInit event
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#VMInit">specification</a>
+     * for details.
      */
-
     typedef void (JNICALL * jvmtiEventVMInit)
         (jvmtiEnv * jvmti_env, JNIEnv * jni_env, jthread thread);
 
+    /**
+     * Callback function type for SingleStep event
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#SingleStep">specification</a>
+     * for details.
+     */
     typedef void (JNICALL * jvmtiEventSingleStep)
         (jvmtiEnv * jvmti_env, JNIEnv * jni_env, jthread thread,
         jmethodID method, jlocation location);
 
+    /**
+     * Callback function type for Breakpoint event
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#Breakpoint">specification</a>
+     * for details.
+     */
     typedef void (JNICALL * jvmtiEventBreakpoint)
         (jvmtiEnv * jvmti_env, JNIEnv * jni_env, jthread thread,
         jmethodID method, jlocation location);
 
+    /**
+     * Callback function type for FieldAccess event
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#FieldAccess">specification</a>
+     * for details.
+     */
     typedef void (JNICALL * jvmtiEventFieldAccess)
         (jvmtiEnv * jvmti_env, JNIEnv * jni_env, jthread thread,
         jmethodID method, jlocation location, jclass field_clazz,
         jobject object, jfieldID field);
 
+    /**
+     * Callback function type for FieldModification event
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#FieldModification">specification</a>
+     * for details.
+     */
     typedef void (JNICALL * jvmtiEventFieldModification)
         (jvmtiEnv * jvmti_env, JNIEnv * jni_env, jthread thread,
         jmethodID method, jlocation location, jclass field_clazz,
         jobject object, jfieldID field, char signature_type, jvalue new_value);
 
+    /**
+     * Callback function type for FramePop event
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#FramePop">specification</a>
+     * for details.
+     */
     typedef void (JNICALL * jvmtiEventFramePop)
         (jvmtiEnv * jvmti_env, JNIEnv * jni_env, jthread thread,
         jmethodID method, jboolean was_popped_by_exception);
 
+    /**
+     * Callback function type for MethodEntry event
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#MethodEntry">specification</a>
+     * for details.
+     */
     typedef void (JNICALL * jvmtiEventMethodEntry)
         (jvmtiEnv * jvmti_env, JNIEnv * jni_env, jthread thread,
         jmethodID method);
 
+    /**
+     * Callback function type for MethodExit event
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#MethodExit">specification</a>
+     * for details.
+     */
     typedef void (JNICALL * jvmtiEventMethodExit)
         (jvmtiEnv * jvmti_env, JNIEnv * jni_env, jthread thread,
         jmethodID method, jboolean was_popped_by_exception, jvalue return_value);
 
+    /**
+     * Callback function type for NativeMethodBind event
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#NativeMethodBind">specification</a>
+     * for details.
+     */
     typedef void (JNICALL * jvmtiEventNativeMethodBind)
         (jvmtiEnv * jvmti_env, JNIEnv * jni_env, jthread thread,
         jmethodID method, void *address, void **new_address_ptr);
 
+    /**
+     * Callback function type for Exception event
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#Exception">specification</a>
+     * for details.
+     */
     typedef void (JNICALL * jvmtiEventException)
         (jvmtiEnv * jvmti_env, JNIEnv * jni_env, jthread thread,
         jmethodID method, jlocation location, jobject exception,
         jmethodID catch_method, jlocation catch_location);
 
+    /**
+     * Callback function type for ExceptionCatch event
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#ExceptionCatch">specification</a>
+     * for details.
+     */
     typedef void (JNICALL * jvmtiEventExceptionCatch)
         (jvmtiEnv * jvmti_env, JNIEnv * jni_env,
         jthread thread, jmethodID method, jlocation location, jobject exception);
 
+    /**
+     * Callback function type for ThreadStart event
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#ThreadStart">specification</a>
+     * for details.
+     */
     typedef void (JNICALL * jvmtiEventThreadStart)
         (jvmtiEnv * jvmti_env, JNIEnv * jni_env, jthread thread);
 
+    /**
+     * Callback function type for ThreadEnd event
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#ThreadEnd">specification</a>
+     * for details.
+     */
     typedef void (JNICALL * jvmtiEventThreadEnd)
         (jvmtiEnv * jvmti_env, JNIEnv * jni_env, jthread thread);
 
+    /**
+     * Callback function type for ClassLoad event
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#ClassLoad">specification</a>
+     * for details.
+     */
     typedef void (JNICALL * jvmtiEventClassLoad)
         (jvmtiEnv * jvmti_env, JNIEnv * jni_env, jthread thread, jclass clazz);
 
+    /**
+     * Callback function type for ClassPrepare event
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#ClassPrepare">specification</a>
+     * for details.
+     */
     typedef void (JNICALL * jvmtiEventClassPrepare)
         (jvmtiEnv * jvmti_env, JNIEnv * jni_env, jthread thread, jclass clazz);
 
+    /**
+     * Callback function type for ClassFileLoadHook event
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#ClassFileLoadHook">specification</a>
+     * for details.
+     */
     typedef void (JNICALL * jvmtiEventClassFileLoadHook)
         (jvmtiEnv * jvmti_env, JNIEnv * jni_env,
         jclass class_being_redefined, jobject loader,
@@ -428,63 +720,183 @@ extern "C"
         jint class_data_len, const unsigned char *class_data,
         jint * new_class_data_len, unsigned char **new_class_data);
 
+    /**
+     * Callback function type for VMStart event
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#VMStart">specification</a>
+     * for details.
+     */
     typedef void (JNICALL * jvmtiEventVMStart)
         (jvmtiEnv * jvmti_env, JNIEnv * jni_env);
 
+    /**
+     * Callback function type for VMDeath event
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#VMDeath">specification</a>
+     * for details.
+     */
     typedef void (JNICALL * jvmtiEventVMDeath)
         (jvmtiEnv * jvmti_env, JNIEnv * jni_env);
 
+    /**
+     * Native to bytecode location mapping information
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiAddrLocationMap>specification</a>
+     * for details.
+     */
     typedef struct
     {
         const void *start_address;
         jlocation location;
     } jvmtiAddrLocationMap;
 
+    /**
+     * Callback function type for CompiledMethodLoad event
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#CompiledMethodLoad">specification</a>
+     * for details.
+     */
     typedef void (JNICALL * jvmtiEventCompiledMethodLoad)
         (jvmtiEnv * jvmti_env, jmethodID method, jint code_size,
         const void *code_addr, jint map_length,
         const jvmtiAddrLocationMap * almap, const void *compile_info);
 
+    /**
+     * Callback function type for CompiledMethodUnload event
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#CompiledMethodUnload">specification</a>
+     * for details.
+     */
     typedef void (JNICALL * jvmtiEventCompiledMethodUnload)
         (jvmtiEnv * jvmti_env, jmethodID method, const void *code_addr);
 
+    /**
+     * Callback function type for DynamicCodeGenerated event
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#DynamicCodeGenerated">specification</a>
+     * for details.
+     */
     typedef void (JNICALL * jvmtiEventDynamicCodeGenerated)
         (jvmtiEnv * jvmti_env,
         const char *name, const void *address, jint length);
 
+    /**
+     * Callback function type for DataDumpRequest event
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#DataDumpRequest">specification</a>
+     * for details.
+     */
     typedef void (JNICALL * jvmtiEventDataDumpRequest) (jvmtiEnv * jvmti_env);
 
+    /**
+     * Callback function type for DataResetRequest event
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#DataResetRequest">specification</a>
+     * for details.
+     */
     typedef void (JNICALL * jvmtiEventDataResetRequest) (jvmtiEnv * jvmti_env);
 
+    /**
+     * Callback function type for MonitorContendedEnter event
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#MonitorContendedEnter">specification</a>
+     * for details.
+     */
     typedef void (JNICALL * jvmtiEventMonitorContendedEnter)
         (jvmtiEnv * jvmti_env, JNIEnv * jni_env, jthread thread, jobject object);
 
+    /**
+     * Callback function type for MonitorContendedEntered event
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#MonitorContendedEntered">specification</a>
+     * for details.
+     */
     typedef void (JNICALL * jvmtiEventMonitorContendedEntered)
         (jvmtiEnv * jvmti_env, JNIEnv * jni_env, jthread thread, jobject object);
 
+    /**
+     * Callback function type for MonitorWait event
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#MonitorWait">specification</a>
+     * for details.
+     */
     typedef void (JNICALL * jvmtiEventMonitorWait)
         (jvmtiEnv * jvmti_env, JNIEnv * jni_env, jthread thread,
         jobject object, jlong timeout);
 
+    /**
+     * Callback function type for MonitorWaited event
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#MonitorWaited">specification</a>
+     * for details.
+     */
     typedef void (JNICALL * jvmtiEventMonitorWaited)
         (jvmtiEnv * jvmti_env, JNIEnv * jni_env, jthread thread,
         jobject object, jboolean timed_out);
 
+    /**
+     * Callback function type for VMObjectAlloc event
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#VMObjectAlloc">specification</a>
+     * for details.
+     */
     typedef void (JNICALL * jvmtiEventVMObjectAlloc)
         (jvmtiEnv * jvmti_env, JNIEnv * jni_env, jthread thread,
         jobject object, jclass object_clazz, jlong size);
 
+    /**
+     * Callback function type for ObjectFree event
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#ObjectFree">specification</a>
+     * for details.
+     */
     typedef void (JNICALL * jvmtiEventObjectFree)
         (jvmtiEnv * jvmti_env, jlong tag);
 
+    /**
+     * Callback function type for GarbageCollectionStart event
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#GarbageCollectionStart">specification</a>
+     * for details.
+     */
     typedef void (JNICALL * jvmtiEventGarbageCollectionStart)
         (jvmtiEnv * jvmti_env);
 
+    /**
+     * Callback function type for GarbageCollectionFinish event
+     *
+     * See <a href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#GarbageCollectionFinish">specification</a> for details.
+     */
     typedef void (JNICALL * jvmtiEventGarbageCollectionFinish)
         (jvmtiEnv * jvmti_env);
 
+    /**
+     * Callback type for reserved event types
+     */
     typedef void *jvmtiEventReserved;
 
+    /**
+     * Event callbacks table
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiEventCallbacks>specification</a>
+     * for details.
+     */
     typedef struct
     {
         jvmtiEventVMInit VMInit;
@@ -525,6 +937,13 @@ extern "C"
     } jvmtiEventCallbacks;
 
 
+    /**
+     * Arguments kinds for extension events callbacks
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiParamKind>specification</a>
+     * for details.
+     */
     typedef enum
     {
         JVMTI_KIND_IN = 91,
@@ -536,6 +955,13 @@ extern "C"
         JVMTI_KIND_OUT_BUF = 97
     } jvmtiParamKind;
 
+    /**
+     * Arguments types for extension events callbacks
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiParamKind>specification</a>
+     * for details.
+     */
     typedef enum
     {
         JVMTI_TYPE_JBYTE = 101,
@@ -557,6 +983,13 @@ extern "C"
         JVMTI_TYPE_JNIENV = 117
     } jvmtiParamTypes;
 
+    /**
+     * Arguments information for extension events callbacks
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiParamInfo>specification</a>
+     * for details.
+     */
     typedef struct
     {
         char *name;
@@ -565,15 +998,36 @@ extern "C"
         jboolean null_ok;
     } jvmtiParamInfo;
 
+    /**
+     * Callback function type for extension events
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiExtensionFunction>specification</a>
+     * for details.
+     */
     typedef jvmtiError
         (JNICALL * jvmtiExtensionFunction) (jvmtiEnv * jvmti_env, ...);
 
+    /**
+     * Event generation mode
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiEventMode>specification</a>
+     * for details.
+     */
     typedef enum
     {
         JVMTI_ENABLE = 1,
         JVMTI_DISABLE = 0
     } jvmtiEventMode;
 
+    /**
+     * Extenstion functions information structure
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiExtensionFunctionInfo>specification</a>
+     * for details.
+     */
     typedef struct
     {
         jvmtiExtensionFunction func;
@@ -585,6 +1039,13 @@ extern "C"
         jvmtiError *errors;
     } jvmtiExtensionFunctionInfo;
 
+    /**
+     * Extension events information structure
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiExtensionEventInfo>specification</a>
+     * for details.
+     */
     typedef struct
     {
         jint extension_event_index;
@@ -595,8 +1056,11 @@ extern "C"
     } jvmtiExtensionEventInfo;
 
     /**
-     * <code>OPEN</code> components should be aware of event management
-     * capabilities.
+     * Bit table of JVMTI capabilities supported by VM
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiCapabilities>specification</a>
+     * for details.
      */
     typedef struct
     {
@@ -641,6 +1105,13 @@ extern "C"
         unsigned int:16;
     } jvmtiCapabilities;
 
+    /**
+     * Timer type identifier
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiTimerKind>specification</a>
+     * for details.
+     */
     typedef enum
     {
         JVMTI_TIMER_USER_CPU = 30,
@@ -648,6 +1119,13 @@ extern "C"
         JVMTI_TIMER_ELAPSED = 32
     } jvmtiTimerKind;
 
+    /**
+     * Timer information structure
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiTimerInfo>specification</a>
+     * for details.
+     */
     typedef struct
     {
         jlong max_value;
@@ -658,6 +1136,13 @@ extern "C"
         jlong reserved2;
     } jvmtiTimerInfo;
 
+    /**
+     * VM operation phase identifier
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiPhase>specification</a>
+     * for details.
+     */
     typedef enum
     {
         JVMTI_PHASE_ONLOAD = 1,
@@ -667,6 +1152,13 @@ extern "C"
         JVMTI_PHASE_DEAD = 8
     } jvmtiPhase;
 
+    /**
+     * VM verbosity level
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiVerboseFlag>specification</a>
+     * for details.
+     */
     typedef enum
     {
         JVMTI_VERBOSE_OTHER = 0,
@@ -675,6 +1167,13 @@ extern "C"
         JVMTI_VERBOSE_JNI = 4
     } jvmtiVerboseFlag;
 
+    /**
+     * JLocation format identifier
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiJlocationFormat>specification</a>
+     * for details.
+     */
     typedef enum
     {
         JVMTI_JLOCATION_JVMBCI = 1,
@@ -682,27 +1181,73 @@ extern "C"
         JVMTI_JLOCATION_OTHER = 0
     } jvmtiJlocationFormat;
 
+    /**
+     * Callback function type for <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#Heap">heap
+     * iteration</a> callback which is called for all objects
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiHeapObjectCallback>specification</a>
+     * for details.
+     */
     typedef jvmtiIterationControl
         (JNICALL * jvmtiHeapObjectCallback)
         (jlong class_tag, jlong size, jlong * tag_ptr, void *user_data);
 
+    /**
+     * Callback function type for <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#Heap">heap
+     * iteration</a> callback which is called for all root set
+     * references
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiHeapRootCallback>specification</a>
+     * for details.
+     */
     typedef jvmtiIterationControl
         (JNICALL * jvmtiHeapRootCallback)
         (jvmtiHeapRootKind root_kind, jlong class_tag, jlong size,
         jlong * tag_ptr, void *user_data);
 
+    /**
+     * Callback function type for <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#Heap">heap
+     * iteration</a> callback which is called for objects referenced
+     * from thread stacks
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiStackReferenceCallback>specification</a>
+     * for details.
+     */
     typedef jvmtiIterationControl
         (JNICALL * jvmtiStackReferenceCallback)
         (jvmtiHeapRootKind root_kind, jlong class_tag, jlong size,
         jlong * tag_ptr, jlong thread_tag, jint depth, jmethodID method,
         jint slot, void *user_data);
 
+    /**
+     * Callback function type for <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#Heap">heap
+     * iteration</a> callback which is called for objects referenced
+     * from object fields
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiObjectReferenceCallback>specification</a>
+     * for details.
+     */
     typedef jvmtiIterationControl
         (JNICALL * jvmtiObjectReferenceCallback)
         (jvmtiObjectReferenceKind reference_kind, jlong class_tag, jlong size,
         jlong * tag_ptr, jlong referrer_tag, jint referrer_index,
         void *user_data);
 
+    /**
+     * Class redefinition information structure
+     *
+     * See <a
+     * href="http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#jvmtiClassDefinition>specification</a>
+     * for details.
+     */
     typedef struct
     {
         jclass klass;
@@ -713,7 +1258,7 @@ extern "C"
     typedef void (JNICALL * jvmtiExtensionEvent) (jvmtiEnv * jvmti_env, ...);
 
 #ifdef __cplusplus
-}               /* extern "C" { */
+}               /* extern "C" */
 #endif
 
 
