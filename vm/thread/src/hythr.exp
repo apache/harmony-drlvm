@@ -16,6 +16,7 @@ hythread_park;
 hythread_monitor_init_with_name;
 hythread_monitor_try_enter;
 hythread_self;
+tm_self_tls;
 hythread_tls_free;
 hythread_yield;
 hythread_suspend;
@@ -61,6 +62,7 @@ hythread_suspend_enable;
 hythread_suspend_disable;
 hythread_exception_safe_point;
 hythread_safe_point;
+hythread_safe_point_other;
 hythread_suspend_other;
 hythread_set_safepoint_callback;
 hythread_suspend_all;
@@ -162,6 +164,7 @@ array_get;
 get_java_thread_group;
 
 Java_org_apache_harmony_drlvm_thread_ThreadHelper_getThreadIdOffset;
+
 
 local: *;
 };

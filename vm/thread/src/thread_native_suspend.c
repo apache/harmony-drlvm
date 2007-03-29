@@ -35,95 +35,6 @@ static void thread_safe_point_impl(hythread_t thread);
 //@{
 
 /**
- * Returns non-zero if thread is suspended.
- */
-IDATA VMCALL hythread_is_suspend_enabled()
-{
-    return tm_self_tls->disable_count == 0;
-}
-
-
-/**
- * Denotes the beginning of the code region where safe suspension is possible.
- *
- * The method decreases the disable_count field. The disable_count could be
- * recursive, so safe suspension region is enabled on value 0.
- *
- * <p>
- * A thread marks itself with functions hythread_suspend_enable()
- * and hythread_suspend_disable() in order to denote a safe region of code.
- * A thread may also call hythread_safe_point() method to denote a selected
- * point where safe suspension is possible.
- */
-void VMCALL hythread_suspend_enable()
-{
-    assert(!hythread_is_suspend_enabled());
-
-#ifdef FS14_TLS_USE
-    // the macros could work for WIN32
-    __asm {
-        mov eax, fs:[0x14]
-        dec[eax] HyThread.disable_count
-    }
-#else
-    {
-        register hythread_t thread = tm_self_tls;
-        thread->disable_count--;
-    }
-#endif
-}
-
-/**
- * Denotes the end of the code region where safe suspension was possible.
- *
- * The method increases the disable_count field. The disable_count could be
- * recursive, so safe suspension region is enabled on value 0.
- * If there was a suspension request set for this thread, the method invokes
- * hythread_safe_point().
- * <p>
- * A thread marks itself with functions hythread_suspend_enable()
- * and hythread_suspend_disable() in order to denote a safe region of code.
- * A thread may also call hythread_safe_point() method to denote a selected
- * point where safe suspension is possible.
- */
-void VMCALL hythread_suspend_disable()
-{
-    register hythread_t thread;
-
-    // Check that current thread is in default thread group.
-    // Justification: GC suspends and enumerates threads from
-    // default group only.
-    assert(tm_self_tls->group == TM_DEFAULT_GROUP);
-
-#ifdef FS14_TLS_USE
-    // the macros could work for WIN32
-    __asm {
-        mov eax, fs:[0x14]
-        inc[eax] HyThread.disable_count
-        mov eax,[eax] HyThread.request
-        test eax, eax
-        jnz suspended
-    }
-    return;
-
-  suspended:
-    thread = tm_self_tls;
-
-#else
-    thread = tm_self_tls;
-    thread->disable_count++;
-#endif
-
-    if (thread->request && thread->disable_count == 1) {
-        // enter to safe point if suspend request was set
-        // and suspend disable was made a moment ago
-        // (it's a point of entry to the unsafe region)
-        thread_safe_point_impl(thread);
-    }
-    return;
-}
-
-/**
  * Denotes a single point where safe exception throwing is possible.
  */
 void VMCALL hythread_exception_safe_point()
@@ -189,6 +100,16 @@ void VMCALL hythread_safe_point()
 {
     thread_safe_point_impl(tm_self_tls);
 }
+
+/**
+ * Same as hythread_safe_point, but inserts safe point for given thread 
+ * other thread.
+ */
+void VMCALL hythread_safe_point_other(hythread_t thread)
+{
+    thread_safe_point_impl(tm_self_tls);
+}
+
 
 /**
  * Denotes a single point where safe suspension is

@@ -28,8 +28,15 @@
 #undef LOG_DOMAIN
 #define LOG_DOMAIN "tm.native"
 
+#ifdef PLATFORM_POSIX
+#   define hy_inline inline
+#else
+#   define hy_inline
+#endif //PLATFORM_POSIX
+
 #include <open/hythread_ext.h>
 #include "thread_private.h"
+
 
 typedef struct {
     hythread_t thread;
@@ -37,7 +44,6 @@ typedef struct {
     hythread_entrypoint_t start_proc;
     void * start_proc_args;
 } thread_start_proc_data;
-
 extern hythread_group_t TM_DEFAULT_GROUP;
 extern hythread_library_t TM_LIBRARY;
 static int VMAPICALL thread_start_proc(void *arg);
@@ -344,7 +350,7 @@ void VMCALL hythread_yield() {
  * @see hythread_attach
  *
  */
-hythread_t hythread_self() {
+hythread_t hythread_self_slow() {
     hythread_t  thread;
     apr_status_t UNUSED apr_status;
     
@@ -370,11 +376,8 @@ static void thread_set_self(hythread_t  thread) {
  * @see hythread_attach
  *
  */
-NAKED hythread_t hythread_self() {
-    _asm { mov eax, fs:[0x14]
-           ret;
-    }
-    //return tm_self_tls;
+hythread_t hythread_self_slow() {
+    return hythread_self();
 }
 
 static void thread_set_self(hythread_t  thread) {
@@ -395,8 +398,8 @@ static void thread_set_self(hythread_t  thread) {
  * @see hythread_attach
  *
  */
-hythread_t hythread_self() {
-    return tm_self_tls;
+hythread_t hythread_self_slow() {
+    return hythread_self();
 }
 
 static void thread_set_self(hythread_t  thread) {
@@ -733,6 +736,7 @@ extern HY_CFUNC void VMCALL
         monitor->recursion_count = 0;
         hythread_monitor_exit(monitor);
     }
+
     os_thread_exit(0);
     // unreachable statement
     abort();

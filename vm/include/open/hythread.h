@@ -21,9 +21,25 @@
 #if defined(__cplusplus)
 extern "C" {
 #endif
+#include <open/types.h>
+
 
 #include <stddef.h>
 #include "hycomp.h"
+
+/* 
+ * Idea behind these declarations is to make some functions static inlined for 
+ * all files that include hythread_ext.h/hythread.h except one, that 
+ * will export this functions in DLL 
+ */
+   
+#ifndef hy_inline
+#  ifdef PLATFORM_POSIX
+#    define hy_inline inline static
+#  else
+#     define hy_inline static __forceinline 
+#  endif //PLATFORM_POSIX
+#endif // hy_inline
 
 typedef UDATA hythread_tls_key_t;
 
@@ -32,6 +48,7 @@ typedef UDATA hythread_tls_key_t;
 typedef IDATA (HYTHREAD_PROC* hythread_entrypoint_t)(void*);
 typedef void (HYTHREAD_PROC* hythread_tls_finalizer_t)(void*);
 typedef struct HyThread *hythread_t;
+typedef struct HyThreadGroup *hythread_group_t;
 typedef struct HyThreadMonitor *hythread_monitor_t;
 typedef struct HySemaphore *hysem_t;
 
@@ -104,6 +121,7 @@ typedef struct HyThreadMonitorTracing {
 
 #define HYSIZEOF_HyThreadMonitorTracing 24
 
+
 extern HY_CFUNC void VMCALL
 hythread_detach PROTOTYPE((hythread_t thread));
 extern HY_CFUNC UDATA VMCALL
@@ -147,9 +165,12 @@ extern HY_CFUNC IDATA VMCALL
 hythread_monitor_init_with_name PROTOTYPE((hythread_monitor_t* handle, UDATA flags, char* name));
 extern HY_CFUNC IDATA VMCALL 
 hythread_monitor_try_enter PROTOTYPE((hythread_monitor_t monitor));
+extern HY_CFUNC hythread_t VMCALL
+hythread_self_slow PROTOTYPE(());
 extern HY_CFUNC void VMCALL 
 hythread_jlm_thread_clear PROTOTYPE((hythread_t thread));
-extern HY_CFUNC hythread_t VMCALL hythread_self PROTOTYPE((void));
+
+
 extern HY_CFUNC IDATA VMCALL 
 hythread_tls_free PROTOTYPE((hythread_tls_key_t key));
 extern HY_CFUNC UDATA VMCALL
@@ -245,8 +266,6 @@ extern HY_CFUNC HyThreadMonitorTracing* VMCALL
 hythread_monitor_get_tracing PROTOTYPE((hythread_monitor_t monitor));
 extern HY_CFUNC UDATA VMCALL 
 hythread_get_priority PROTOTYPE((hythread_t thread));
-extern HY_CFUNC void* VMCALL
-hythread_tls_get PROTOTYPE((hythread_t thread, hythread_tls_key_t key));
 extern HY_CFUNC char* VMCALL 
 hythread_monitor_get_name PROTOTYPE((hythread_monitor_t monitor));
 extern HY_CFUNC hythread_monitor_t VMCALL 
@@ -284,6 +303,201 @@ extern HY_CFUNC UDATA  VMCALL hythread_spinlock_swapState (hythread_monitor_t mo
 #define hythread_global_monitor() (*(hythread_monitor_t*)hythread_global("global_monitor"))
 #define hythread_monitor_init(pMon,flags)  hythread_monitor_init_with_name(pMon,flags, #pMon)
 #define hythread_monitor_set_name(pMon,pName)
+
+/**
+ * Native thread control structure's public fields.
+ */
+
+typedef struct HyThread_public {
+
+#ifndef POSIX
+    // This is dummy pointer for Microsoft Visual Studio debugging
+    // If this is removed, Visual Studio, when attached to VM, will show
+    // no symbolic information
+    void* reserved;
+#endif
+
+// Public fields exported by HyThread_public. If you change these fields,
+// please, check fields in thread_private.h/HyThread
+
+    /**
+     * Number of requests made for this thread, it includes both
+     * suspend requests and safe point callback requests.
+     * The field is modified by atomic operations.
+     *
+     * Increment in functions:
+     *    1. send_suspend_request()
+     *          - sets suspend request for a given thread
+     *    2. hythread_set_safepoint_callback()
+     *          - sets safe point callback request for a given thread
+     *
+     * Decrement in functions:
+     *    1. hythread_resume()
+     *          - removes suspend request for a given thread
+     *    2. hythread_exception_safe_point()
+     *          - removes safe point callback request for current thread
+     */
+    int32 request;
+
+    /**
+     * Field indicating that thread can safely be suspended.
+     * Safe suspension is enabled on value 0.
+     *
+     * The disable_count is increased/decreaded in
+     * hythread_suspend_disable()/hythread_suspend_enable() function
+     * for current thread only.
+     *
+     * Also disable_count could be reset to value 0 and restored in
+     * reset_suspend_disable()/set_suspend_disable() function
+     * for current thread only.
+     *
+     * Function hythread_exception_safe_point() sets disable_count to
+     * value 1 before safe point callback function calling and restores
+     * it after the call.
+     *
+     * Function thread_safe_point_impl() sets disable_count to
+     * value 0 before entering to the safe point and restores it
+     * after exitting.
+     */
+    int16 disable_count;
+
+
+    /**
+     * Group for this thread. Different groups are needed in order 
+     * to be able to quickly iterate over the specific group.
+     * Examples are: Java threads, GC private threads.
+     * Equal to the address of the head of the list of threads for this group.
+     */
+    hythread_group_t  group; 
+
+    /**
+     * Array representing thread local storage
+     */
+    void *thread_local_storage[10];
+
+} HyThread_public;
+
+
+
+/* 
+ * FS14_TLS_USE 
+ *
+ *  FS14_TLS_USE declaration turns on windows specific TLS access optimization
+ *  We use free TIB slot with 14 offset, see following article for details
+ *  http://www.microsoft.com/msj/archive/S2CE.aspx (currently it's used on
+ *  Windows 32-bit)
+ *
+ * APR_TLS_USE
+ *
+ *  When APR_TLS_USE is declared DRLVM uses APR functions for getting current
+ *  thread. (currently it's used only on Windows 64-bit)
+ *
+ * If none of these defined, current thread id is kept in the tm_self_tls 
+ * variable which is declared as __thread, thread local variable for gcc 
+ * (*note Thread-Local:: in gcc.info), in thread_native_basic.c. This 
+ * way it works on Linux.
+ */
+   
+
+
+#if defined WIN32 && !defined _EM64T_
+
+//use optimized asm monitor enter and exit helpers
+#define ASM_MONITOR_HELPER
+
+// FS14_TLS_USE define turns on windows specific TLS access optimization
+// We use free TIB slot with 14 offset, see following article for details
+// http://www.microsoft.com/msj/archive/S2CE.aspx
+#define FS14_TLS_USE
+
+#elif defined _EM64T_ && defined WINDOWS
+
+#define APR_TLS_USE
+#endif
+
+
+ 
+
+#ifdef APR_TLS_USE
+
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+hy_inline hythread_t VMCALL hythread_self() {
+    extern hythread_t hythread_self_slow();
+    return hythread_self_slow();
+}
+
+#define tm_self_tls (hythread_self_slow())
+
+
+#ifdef __cplusplus
+}
+#endif
+
+#elif defined FS14_TLS_USE
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
+hy_inline hythread_t VMCALL hythread_self() {
+    register hythread_t t;
+    _asm { mov eax, fs:[0x14]
+           mov t, eax;
+    }
+    return t;
+}
+
+#define tm_self_tls (hythread_self())
+
+
+#ifdef __cplusplus
+}
+#endif
+
+#else
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
+#ifdef PLATFORM_POSIX
+extern __thread hythread_t tm_self_tls;
+#else
+extern __declspec(thread) hythread_t tm_self_tls;
+#endif //PLATFORM_POSIX
+
+
+hy_inline hythread_t VMCALL hythread_self() {
+    return tm_self_tls;
+}
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
+
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
+/**
+ * Returns a thread's TLS value.
+ */
+hy_inline void* VMCALL
+hythread_tls_get(hythread_t thread, hythread_tls_key_t key) {
+    return ((struct HyThread_public *)thread)->thread_local_storage[key];
+}
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
+
+
 
 #if defined(__cplusplus)
 }

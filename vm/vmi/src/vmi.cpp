@@ -20,10 +20,10 @@
  */  
 #include <assert.h>
 
+#include "open/hythread.h"
 
 #include "platform_lowlevel.h"
 #include "vm_trace.h"
-
 #include "zipsup.h"
 #include "environment.h"
 #include "properties.h"

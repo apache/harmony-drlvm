@@ -34,7 +34,8 @@
 #include <apr_pools.h>
 
 #include "open/types.h"
-#include "open/hythread.h"
+//#include "open/hythread.h"
+#include <open/hythread_ext.h>
 #include "open/ti_thread.h"
 
 #include "vm_core_types.h"
@@ -46,7 +47,7 @@
 
 
 // 
-#define tmn_suspend_disable assert(hythread_is_suspend_enabled());hythread_suspend_disable 
+#define tmn_suspend_disable assert(hythread_is_suspend_enabled());hythread_suspend_disable
 #define tmn_suspend_enable assert(!hythread_is_suspend_enabled());hythread_suspend_enable
 #define tmn_suspend_disable_recursive hythread_suspend_disable
 #define tmn_suspend_enable_recursive hythread_suspend_enable
@@ -173,14 +174,28 @@ public:
 typedef  VM_thread *vm_thread_accessor();
 VMEXPORT extern vm_thread_accessor *get_thread_ptr;
 
-VMEXPORT VM_thread *get_vm_thread(hythread_t thr);
+//VMEXPORT VM_thread *get_vm_thread(hythread_t thr);
+//VMEXPORT VM_thread *get_vm_thread_self();
+
+inline VM_thread *get_vm_thread_fast_self() {
+	register hythread_t thr = hythread_self();
+
+    return (VM_thread *)hythread_tls_get(thr, TM_THREAD_VM_TLS_KEY);
+}
+
+inline VM_thread *get_vm_thread(hythread_t thr) {
+    if (thr == NULL) {
+        return NULL;
+    }
+    return (VM_thread *)hythread_tls_get(thr, TM_THREAD_VM_TLS_KEY);
+}
 
 VMEXPORT void init_TLS_data();
 
 VMEXPORT void set_TLS_data(VM_thread *thread) ;
 uint16 get_self_stack_key();
 
-#define p_TLS_vmthread (get_thread_ptr())
+#define p_TLS_vmthread (get_vm_thread_fast_self())
 
 Registers *thread_gc_get_context(VM_thread *, VmRegisterContext &);
 void thread_gc_set_context(VM_thread *);

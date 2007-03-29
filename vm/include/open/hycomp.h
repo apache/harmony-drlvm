@@ -78,8 +78,13 @@
  * </ul>
  */
 #ifdef LINUX
+#ifdef _EM64T_
+typedef long int I_64;
+typedef unsigned long int U_64;
+#else
 typedef long long I_64;
 typedef unsigned long long U_64;
+#endif
 
 typedef double SYS_FLOAT;
 #define HYCONST64(x) x##LL
