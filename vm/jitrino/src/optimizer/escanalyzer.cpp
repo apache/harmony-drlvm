@@ -4791,8 +4791,6 @@ void
 EscAnalyzer::doLOScalarReplacement(ObjIds* loids) {
     ObjIds::iterator lo_it;
     CnGNode* onode;
-    Opnd* oopnd;
-    Type* otype;
     Inst* inst;
     Inst* st_inst;
     Insts::iterator it3;
@@ -4817,8 +4815,6 @@ EscAnalyzer::doLOScalarReplacement(ObjIds* loids) {
         if (onode->nodeRefType == NR_PRIM) {
             continue;
         }
-        oopnd = (Opnd*)(onode->refObj);
-        otype = oopnd->getType();
         if (_scinfo) {
             os_sc << " - - method: ";
             irManager.getMethodDesc().printFullName(os_sc); 
@@ -4871,7 +4867,6 @@ EscAnalyzer::doLOScalarReplacement(ObjIds* loids) {
                     VarOpnd* fl_var_opnd = _opndManager.createVarOpnd(fl_type, false);
                     SsaTmpOpnd* fl_init_opnd = _opndManager.createSsaTmpOpnd(fl_type);
                     Inst* ld_init_val_inst = NULL;
-                    Inst* st_init_val_inst = NULL;
                     sco->fldVarOpnd = fl_var_opnd;
 
                     if (_scinfo) {
@@ -4882,7 +4877,6 @@ EscAnalyzer::doLOScalarReplacement(ObjIds* loids) {
                     } else {
                         ld_init_val_inst = _instFactory.makeLdConst(fl_init_opnd, 0);
                     }
-                    st_init_val_inst = _instFactory.makeStVar(fl_var_opnd, fl_init_opnd);
 
                     scalarizeOFldUsage(sco);
                     if (_scinfo) {
@@ -4945,8 +4939,6 @@ void
 EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
     ObjIds::iterator lo_it;
     CnGNode* onode;
-    Opnd* oopnd;
-    Type* otype;
     Inst* inst;
     Insts::iterator it3;
     OpndManager& _opndManager = irManager.getOpndManager();
@@ -4980,8 +4972,6 @@ EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
         } else {
             lobj_opt = true;
         }
-        oopnd = (Opnd*)(onode->refObj);
-        otype = oopnd->getType();
         double path_prob = -1;
         path_prob = checkLocalPath(onode->nInst);
         os_sc<<"pp      " << (path_prob )<<std::endl;
@@ -5182,7 +5172,6 @@ EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
                 VarOpnd* fl_var_opnd = _opndManager.createVarOpnd(fl_type, false);
                 SsaTmpOpnd* fl_init_opnd = _opndManager.createSsaTmpOpnd(fl_type);
                 Inst* ld_init_val_inst = NULL;
-                Inst* st_init_val_inst = NULL;
                 sco->fldVarOpnd = fl_var_opnd;
 
                 if (_scinfo) {
@@ -5193,7 +5182,6 @@ EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
                 } else {
                     ld_init_val_inst = _instFactory.makeLdConst(fl_init_opnd, 0);
                 }
-                st_init_val_inst = _instFactory.makeStVar(fl_var_opnd, fl_init_opnd);
                 scalarizeOFldUsage(sco);
                 if (_scinfo) {
                     os_sc << "++++ old newobj added fld_var: before"  << std::endl;
@@ -5462,7 +5450,6 @@ void
 EscAnalyzer::checkOpndUsage(ObjIds* lnoids, ObjIds* lloids, bool check_loc) {
     const Nodes& nodes = irManager.getFlowGraph().getNodes();
     Nodes::const_iterator niter;
-    bool maydo = true;
     bool do_break = false;
 
     if (_scinfo) {
@@ -5498,7 +5485,6 @@ EscAnalyzer::checkOpndUsage(ObjIds* lnoids, ObjIds* lloids, bool check_loc) {
                         if (opcode == Op_IndirectMemoryCall || opcode == Op_DirectCall)
                             continue;
 
-                    maydo = false;
                     if (_scinfo) {
                         os_sc << " no   remove " << opnd->getId() << std::endl; 
                     }
@@ -5525,7 +5511,6 @@ EscAnalyzer::checkOpndUsage(ObjIds* lnoids, ObjIds* lloids, bool check_loc) {
                             continue;
                         }
                     }
-                    maydo = false;
                     if (_scinfo) {
                         os_sc << " lo   remove " << opnd->getId() << std::endl; 
                     }

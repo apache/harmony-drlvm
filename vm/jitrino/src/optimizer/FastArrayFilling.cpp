@@ -100,7 +100,6 @@ FastArrayFillPass::_run(IRManager& irManager)
         Opnd* inc = NULL;
         Opnd * arrayBound = NULL;
         Opnd * fillBound = NULL;
-        Opnd *startIndex;
         Inst * inst = ((Inst *)startNode->getLastInst());
         bool found = false;
 
@@ -174,7 +173,6 @@ FastArrayFillPass::_run(IRManager& irManager)
 
         //check StVar
         if (inst->getOpcode() == Op_StVar && inst->getDst() == index) {
-            startIndex = inst->getSrc(0);
             inst = inst->getPrevInst();
             //check StInd
             if (inst->getOpcode() == Op_TauStInd && inst->getSrc(0) == constValue && inst->getSrc(1) == arrayBase) {
@@ -232,7 +230,6 @@ FastArrayFillPass::_run(IRManager& irManager)
                 break;
             default:
                 continue;
-                break;
         }
 
         ControlFlowGraph& fg = irManager.getFlowGraph();
