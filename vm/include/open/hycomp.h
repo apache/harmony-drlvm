@@ -78,7 +78,7 @@
  * </ul>
  */
 #ifdef LINUX
-#ifdef _EM64T_
+#if defined(_EM64T_) || defined(_IPF_)
 typedef long int I_64;
 typedef unsigned long int U_64;
 #else
