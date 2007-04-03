@@ -27,7 +27,7 @@
 				RuntimeLibrary="1"
 				EnableEnhancedInstructionSet="2"
 				UsePrecompiledHeader="2"
-				WarningLevel="3"
+				WarningLevel="4"
 				WarnAsError="FALSE"
 				Detect64BitPortabilityProblems="FALSE"
 				DebugInformationFormat="3"
@@ -87,7 +87,7 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 				EnableEnhancedInstructionSet="2"
 				UsePrecompiledHeader="2"
 				WarningLevel="4"
-				WarnAsError="FALSE"
+				WarnAsError="TRUE"
 				Detect64BitPortabilityProblems="FALSE"
 				DebugInformationFormat="3"
 				DisableSpecificWarnings="4100;4127;4201;4511;4512;4702"/>
@@ -195,6 +195,9 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\escapeanalyzer.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\FastArrayFilling.cpp">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\FlowGraph.cpp">
@@ -540,25 +543,16 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 					RelativePath="..\..\..\..\vm\jitrino\src\vm\drl\DrlEMInterface.cpp">
 				</File>
 				<File
-					RelativePath="..\..\..\..\vm\jitrino\src\vm\drl\DrlEMInterface.h">
-				</File>
-				<File
 					RelativePath="..\..\..\..\vm\jitrino\src\vm\drl\DrlJITInterface.cpp">
 				</File>
 				<File
 					RelativePath="..\..\..\..\vm\jitrino\src\vm\drl\DrlVMInterface.cpp">
-				</File>
-				<File
-					RelativePath="..\..\..\..\vm\jitrino\src\vm\drl\DrlVMInterface.h">
 				</File>
 			</Filter>
 		</Filter>
 		<Filter
 			Name="codegen"
 			Filter="">
-			<File
-				RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\CodeGenIntfc.cpp">
-			</File>
 			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\CodeGenIntfc.h">
 			</File>
@@ -657,6 +651,9 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 				</File>
 				<File
 					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32Encoder.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32FastArrayFilling.cpp">
 				</File>
 				<File
 					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32GCMap.cpp">
@@ -845,9 +842,6 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 				RelativePath="..\..\..\..\vm\jitrino\src\shared\Event.h">
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\jitrino\src\shared\Exceptions.h">
-			</File>
-			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\shared\FixFileName.cpp">
 			</File>
 			<File
@@ -952,9 +946,6 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 			Filter="">
 			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\dynopt\EdgeProfiler.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\jitrino\src\dynopt\EdgeProfiler.h">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\dynopt\StaticProfiler.cpp">
