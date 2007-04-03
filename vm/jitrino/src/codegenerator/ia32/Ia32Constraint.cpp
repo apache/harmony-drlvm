@@ -114,13 +114,20 @@ Constraint Constraint::getAliasConstraint(OpndSize s, uint32 offset)const
 
     uint32 newKind=kind, newMask=0;
     uint32 newRegKind=newKind & OpndKind_Reg;
-    if (newRegKind == OpndKind_GPReg || ( (newRegKind & OpndKind_GPReg) && sz <= OpndSize_16) ){
+    OpndSize maxSubregisterSize =
+#ifdef _EM64T_
+                                    OpndSize_32;
+#else
+                                    OpndSize_16;
+#endif
+
+    if (newRegKind == OpndKind_GPReg || ( (newRegKind & OpndKind_GPReg) && sz <= maxSubregisterSize) ){
 #ifndef _EM64T_
         if (sz==OpndSize_8 && (s==OpndSize_16 || s==OpndSize_32))
             newMask=((mask>>4)|mask)&0xf;
         else if (sz==OpndSize_16)
             newMask=mask;
-#else
+#else   // all registers on EM64T have respective subregisters
         newMask=mask;
 #endif
     }else if (newRegKind==OpndKind_FPReg || newRegKind==OpndKind_XMMReg){

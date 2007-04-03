@@ -1978,9 +1978,11 @@ void InstCodeSelector::simpleStInd(Opnd * addr,
         Opnd* dst = irManager.newMemOpndAutoKind(irManager.getTypeFromTag(memType), addr);
         copyOpnd(dst, src);
     } else  if(memType > Type::Float) {
-        src = simpleOp_I8(Mnemonic_SUB, src->getType(), src, irManager.newImmOpnd(typeManager.getIntPtrType(), (POINTER_SIZE_INT)VMInterface::getHeapBase()));
+        Opnd * heap_base = irManager.newImmOpnd(typeManager.getIntPtrType(), (POINTER_SIZE_INT)VMInterface::getHeapBase());
+        Opnd * compressed_src = irManager.newOpnd(typeManager.compressType(src->getType()));
         Opnd * opnd = irManager.newMemOpndAutoKind(typeManager.compressType(src->getType()), addr);
-        appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, opnd, src));
+        appendInsts(irManager.newInstEx(Mnemonic_SUB, 1, compressed_src, src, heap_base));
+        appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, opnd, compressed_src));
     } else {
         Opnd * dst = irManager.newMemOpndAutoKind(irManager.getTypeFromTag(memType), addr);
         copyOpnd(dst, src);
