@@ -787,14 +787,15 @@ GCExport void gc_set_mutator_block_flag();
  */
 GCExport Boolean gc_clear_mutator_block_flag();
 
+
+// XXX move this elsewhere -salikh
+#ifdef JNIEXPORT
+
 //@}
 /** @name Routines to support soft, weak, and phantom reference objects
  */
 //@{
 
-
-// XXX move this elsewhere -salikh
-#ifdef JNIEXPORT
 /**
  * reference   - the reference object to register.
  * referent    - the referent of the reference object that is to be
@@ -843,6 +844,7 @@ JNIEXPORT void JNICALL
 Java_java_lang_ref_Reference_register_weak_ref (JNIEnv *the_env, jobject p_obj, 
                                                 jobject referent);
 /*******/
+//@}
 #endif
 
 
