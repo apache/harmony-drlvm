@@ -569,6 +569,30 @@ void FixupSyncEdgesWalker2::applyToCFGNode(Node *node)
     }
 }
 
+// synchronization inlining
+struct ObjectSynchronizationInfo {
+    uint32 threadIdReg;      // the register number that holds id of the current thread
+    uint32 syncHeaderOffset; // offset in bytes of the sync header from the start of the object   
+    uint32 syncHeaderWidth;  // width in bytes of the sync header
+    uint32 lockOwnerOffset;  // offset in bytes of the lock owner field from the start of the object
+    uint32 lockOwnerWidth;   // width in bytes of the lock owner field in the sync header
+    bool   jitClearsCcv;     // whether the JIT needs to clear ar.ccv
+};
+
+// should flush to zero be allowed for floating-point operations ?
+//bool         isFlushToZeroAllowed() {
+//  return flushToZeroAllowed;
+//}
+//
+//  Returns true if jit may inline VM functionality for monitorenter and monitorexit
+//  If true is returned 'syncInfo' is filled in with the synchronization parameters.
+//
+bool         mayInlineObjectSynchronization(ObjectSynchronizationInfo & syncInfo) {
+    assert(0);
+    return false;
+}
+
+
 void SyncOpt::runPass()
 {
     if (Log::isEnabled()) {
@@ -630,13 +654,12 @@ void SyncOpt::runPass()
 
     uint32 lockWidth = 2;
     
-    CompilationInterface &compIntfc = irManager.getCompilationInterface();
-    CompilationInterface::ObjectSynchronizationInfo syncInfo;
-    if (compIntfc.mayInlineObjectSynchronization(syncInfo)) 
+    ObjectSynchronizationInfo syncInfo;
+    if (mayInlineObjectSynchronization(syncInfo)) 
         lockWidth = syncInfo.lockOwnerWidth;
 
-    CompilationInterface::ObjectSynchronizationInfo syncInfoFromVM;
-    bool mayInlineSync = irManager.getCompilationInterface().mayInlineObjectSynchronization(syncInfoFromVM);
+    ObjectSynchronizationInfo syncInfoFromVM;
+    bool mayInlineSync = mayInlineObjectSynchronization(syncInfoFromVM);
     if (flags.balance && mayInlineSync)
     {
         TypeManager &typeManager = irManager.getTypeManager();

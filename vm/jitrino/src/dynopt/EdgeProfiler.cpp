@@ -21,9 +21,8 @@
 * @version $Revision$
 */
 
-
+#include "EMInterface.h"
 #include "Jitrino.h"
-#include "EdgeProfiler.h"
 #include "Inst.h"
 #include "Stl.h"
 #include "StaticProfiler.h"

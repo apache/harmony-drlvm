@@ -297,8 +297,9 @@ VMEXPORT Byte *method_allocate_jit_data_block(Method_Handle method,
 
 /**
  * The following values should be used as the "heat" argument for 
- * calls like method_allocate_code_block() or 
+ * calls like  
  * <code>malloc_fixed_code_for_jit()</code>.
+ * FIXME merge with CodeBlockHeat enumeration
  */
 
 #define CODE_BLOCK_HEAT_COLD 0
@@ -313,6 +314,15 @@ typedef enum Code_Allocation_ActionEnum {
     CAA_Simulate,
     CAA_Allocate
 }Code_Allocation_Action;
+
+//
+// Code block heat - used when a method is split into hot and cold parts
+//
+typedef enum {
+    CodeBlockHeatMin,
+    CodeBlockHeatDefault,
+    CodeBlockHeatMax
+} CodeBlockHeat;
  
 
 /**
@@ -336,7 +346,7 @@ method_allocate_code_block(Method_Handle m,
                            JIT_Handle j,
                            size_t size,
                            size_t alignment,
-                           unsigned heat,
+                           CodeBlockHeat heat,
                            int id,
                            Code_Allocation_Action action);
 

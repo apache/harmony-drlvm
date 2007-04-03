@@ -24,22 +24,14 @@
 #ifndef _JITRINO_H_
 #define _JITRINO_H_
 
-#include "open/types.h"
-#include "jit_export.h"
 #include "VMInterface.h"
 #include "Stl.h"
-#include <assert.h>
-
-// this 'ifndef' makes Jitrino (in jitrino_dev branch) build successfully both on 
-//   Q2-05 and jitrino_dev versions of VM headers
-// to be removed as soon as Q2-05 VM headers are NOT needed
-//
-#ifndef INLINE_INFO_PTR
-#define INLINE_INFO_PTR
-typedef void * InlineInfoPtr;
-#endif
 
 namespace Jitrino {
+
+// assert which works even in release mode
+// prints message, something about line and file, and hard-exits
+#define jitrino_assert(e) { if (!(e)) { crash("Assertion failed at %s:%d", __FILE__ ,__LINE__); } }
 
 void crash (const char* fmt, ...);
 
@@ -64,8 +56,7 @@ public:
 #ifdef USE_SECURITY_OBJECT
     static void* GetAddressOfSecurityObject(MethodDesc* methodDesc, const ::JitFrameContext* context);
 #endif
-    static bool  RecompiledMethodEvent(BinaryRewritingInterface&  binaryRewritingInterface,
-                                       MethodDesc * recompiledMethodDesc, void * data);
+    static bool  RecompiledMethodEvent(MethodDesc * recompiledMethodDesc, void * data);
     static MemoryManager& getGlobalMM() { return *global_mm; }
 
     static bool GetBcLocationForNative(MethodDesc* method, uint64 native_pc, uint16 *bc_pc);

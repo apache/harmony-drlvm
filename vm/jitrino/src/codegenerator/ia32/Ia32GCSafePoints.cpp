@@ -330,7 +330,8 @@ int32 GCSafePointsInfo::getOffsetFromImmediate(Opnd* offsetOpnd) const {
 #ifndef _EM64T_
         return (int32)offsetOpnd->getImmValue();
 #else
-        return offsetOpnd->getImmValue() == (int64)irm.getCompilationInterface().getHeapBase()?0:(int32)offsetOpnd->getImmValue();
+        return offsetOpnd->getImmValue() == (int64)VMInterface::getHeapBase() ?
+            0 : (int32)offsetOpnd->getImmValue();
 #endif
     }
     return MPTR_OFFSET_UNKNOWN;

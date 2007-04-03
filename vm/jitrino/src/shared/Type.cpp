@@ -25,6 +25,7 @@
 #include "Opnd.h"
 #include "Type.h"
 #include "VMInterface.h"
+#include "PlatformDependant.h"
 
 namespace Jitrino {
 
@@ -341,6 +342,7 @@ TypeManager::TypeManager(MemoryManager& mm) :
     tauType=voidType=booleanType=charType=intPtrType=int8Type=int16Type=NULL;
     int32Type=int64Type=uintPtrType=uint8Type=uint16Type=NULL;
        uint32Type=uint64Type=singleType=doubleType=floatType=NULL;
+       systemObjectVMTypeHandle = systemClassVMTypeHandle = systemStringVMTypeHandle = NULL;
 }
 
 NamedType* 
@@ -354,17 +356,11 @@ TypeManager::initBuiltinType(Type::Tag tag) {
 }
 
 void
-TypeManager::init(CompilationInterface &compInt) {
-    init();
-    areReferencesCompressed = compInt.areReferencesCompressed();
-}
-
-void
 TypeManager::init() {
-    areReferencesCompressed = false;
-    void* systemStringVMTypeHandle = getSystemStringVMTypeHandle();
-    void* systemObjectVMTypeHandle = getSystemObjectVMTypeHandle();
-    void* systemClassVMTypeHandle  = getSystemClassVMTypeHandle();
+    areReferencesCompressed = VMInterface::areReferencesCompressed();
+    void* systemStringVMTypeHandle = VMInterface::getSystemStringVMTypeHandle();
+    void* systemObjectVMTypeHandle = VMInterface::getSystemObjectVMTypeHandle();
+    void* systemClassVMTypeHandle  = VMInterface::getSystemClassVMTypeHandle();
     theSystemStringType = new (memManager) 
         ObjectType(Type::SystemString,systemStringVMTypeHandle,*this);
     theSystemObjectType = new (memManager) 
@@ -423,7 +419,7 @@ TypeManager::getArrayType(Type* elemType, bool isCompressed, void* arrayVMTypeHa
                 isUnboxed = false;
             }
             if (arrayVMTypeHandle == NULL) {
-                arrayVMTypeHandle = getArrayVMTypeHandle(elemNamedType->getVMTypeHandle(),isUnboxed);
+                arrayVMTypeHandle = VMInterface::getArrayVMTypeHandle(elemNamedType->getVMTypeHandle(),isUnboxed);
             }
             type = new (memManager) 
                 ArrayType(elemNamedType,arrayVMTypeHandle,*this, isCompressed);
@@ -439,11 +435,11 @@ TypeManager::getArrayType(Type* elemType, bool isCompressed, void* arrayVMTypeHa
 
 ObjectType*    
 TypeManager::getObjectType(void* vmTypeHandle, bool isCompressed) {
-    if (isArrayType(vmTypeHandle)) {
-        void* elemClassHandle = getArrayElemVMTypeHandle(vmTypeHandle);
+    if (VMInterface::isArrayType(vmTypeHandle)) {
+        void* elemClassHandle = VMInterface::getArrayElemVMTypeHandle(vmTypeHandle);
         assert(elemClassHandle != NULL); 
         NamedType* elemType;
-        if (isArrayOfPrimitiveElements(vmTypeHandle)) {
+        if (VMInterface::isArrayOfPrimitiveElements(vmTypeHandle)) {
             elemType = getValueType(elemClassHandle);
         } else {
             elemType = getObjectType(elemClassHandle, areReferencesCompressed);
@@ -465,12 +461,8 @@ NamedType*
 TypeManager::getValueType(void* vmTypeHandle) {
     NamedType* type = userValueTypes.lookup(vmTypeHandle);
     if (type == NULL) {
-        if (isEnumType(vmTypeHandle)) {
-            Type* underlyingType = getUnderlyingType(vmTypeHandle);
-            type = new (memManager) EnumType(vmTypeHandle,*this,underlyingType);
-        } else {
-            type = new (memManager) UserValueType(vmTypeHandle,*this);
-        }
+        assert(0);
+        type = new (memManager) UserValueType(vmTypeHandle,*this);
         userValueTypes.insert(vmTypeHandle,type);
     }
     return type;
@@ -478,52 +470,47 @@ TypeManager::getValueType(void* vmTypeHandle) {
 
 bool    
 ObjectType::_isFinalClass()    {
-    return typeManager.isFinalType(vmTypeHandle);
+    return VMInterface::isFinalType(vmTypeHandle);
 }
 
 bool    
 ObjectType::isInterface() {
-    return typeManager.isInterfaceType(vmTypeHandle);
+    return VMInterface::isInterfaceType(vmTypeHandle);
 }
 
 bool    
 ObjectType::isAbstract() {
-    return typeManager.isAbstractType(vmTypeHandle);
+    return VMInterface::isAbstractType(vmTypeHandle);
 }
 
 bool    
 NamedType::needsInitialization(){
-    return typeManager.needsInitialization(vmTypeHandle);
+    return VMInterface::needsInitialization(vmTypeHandle);
 }
 
 bool    
 NamedType::isFinalizable(){
-    return typeManager.isFinalizable(vmTypeHandle);
+    return VMInterface::isFinalizable(vmTypeHandle);
 }
 
 bool    
 NamedType::isBeforeFieldInit() {
-    return typeManager.isBeforeFieldInit(vmTypeHandle);
+    return VMInterface::isBeforeFieldInit(vmTypeHandle);
 }
 
 bool    
 NamedType::isLikelyExceptionType() {
-    return typeManager.isLikelyExceptionType(vmTypeHandle);
-}
-
-bool    
-NamedType::isVariableSizeType() {
-    return typeManager.isVariableSizeType(vmTypeHandle);
+    return VMInterface::isLikelyExceptionType(vmTypeHandle);
 }
 
 void*
 NamedType::getRuntimeIdentifier() {
-    return typeManager.getRuntimeClassHandle(vmTypeHandle);
+    return vmTypeHandle;
 }
 
 ObjectType*
 ObjectType::getSuperType() {
-    void* superTypeVMTypeHandle = typeManager.getSuperTypeVMTypeHandle(vmTypeHandle);
+    void* superTypeVMTypeHandle = VMInterface::getSuperTypeVMTypeHandle(vmTypeHandle);
     if (superTypeVMTypeHandle)
         return typeManager.getObjectType(superTypeVMTypeHandle,
                                          isCompressedReference());
@@ -537,7 +524,7 @@ ObjectType::getSuperType() {
 //
 void*    
 ObjectType::getVTable() {
-    return typeManager.getVTable(vmTypeHandle);
+    return VMInterface::getVTable(vmTypeHandle);
 }
 
 //
@@ -545,14 +532,14 @@ ObjectType::getVTable() {
 //
 void*    
 ObjectType::getAllocationHandle() {
-    return typeManager.getAllocationHandle(vmTypeHandle);
+    return VMInterface::getAllocationHandle(vmTypeHandle);
 }
 //
 // returns true if this type is a subclass of otherType
 //
 bool
 ObjectType::isSubClassOf(NamedType *other) {
-    return typeManager.isSubClassOf(vmTypeHandle,other->getRuntimeIdentifier());
+    return VMInterface::isSubClassOf(vmTypeHandle,other->getRuntimeIdentifier());
 }
 
 //
@@ -622,35 +609,27 @@ TypeManager::compressType(Type *uncompRefType)
 //
 uint32
 ObjectType::getObjectSize() {
-    return typeManager.getBoxedSize(vmTypeHandle);
-}
-
-//
-// for boxed value types, returns byte offset of the un-boxed value
-//
-uint32
-ObjectType::getUnboxedOffset() {
-    return typeManager.getUnboxedOffset(vmTypeHandle);
+    return VMInterface::getObjectSize(vmTypeHandle);
 }
 
 const char* 
 ObjectType::getName() {
-    return typeManager.getTypeName(vmTypeHandle);
+    return VMInterface::getTypeName(vmTypeHandle);
 }
 
 const char* 
 ObjectType::getNameQualifier() {
-    return typeManager.getTypeNameQualifier(vmTypeHandle);
+    return VMInterface::getTypeNameQualifier(vmTypeHandle);
 }
 
 bool 
 ObjectType::getFastInstanceOfFlag() {
-    return typeManager.getClassFastInstanceOfFlag(vmTypeHandle);
+    return VMInterface::getClassFastInstanceOfFlag(vmTypeHandle);
 }
 
 int 
 ObjectType::getClassDepth() {
-    return typeManager.getClassDepth(vmTypeHandle);
+    return VMInterface::getClassDepth(vmTypeHandle);
 }
 
 //
@@ -659,7 +638,7 @@ ObjectType::getClassDepth() {
 uint32    
 ArrayType::getArrayElemOffset()    {
     bool isUnboxed = elemType->isValueType();
-    return typeManager.getArrayElemOffset(elemType->getVMTypeHandle(),isUnboxed);
+    return VMInterface::getArrayElemOffset(elemType->getVMTypeHandle(),isUnboxed);
 }
 
 //
@@ -667,7 +646,7 @@ ArrayType::getArrayElemOffset()    {
 //
 uint32    
 ArrayType::getArrayLengthOffset() {
-    return typeManager.getArrayLengthOffset();
+    return VMInterface::getArrayLengthOffset();
 }
 
 // predefined value types
@@ -700,38 +679,12 @@ Type::getName() {
 
 const char* 
 UserValueType::getName() {
-    return typeManager.getTypeName(vmTypeHandle);
+    return VMInterface::getTypeName(vmTypeHandle);
 }
 
 const char* 
 UserValueType::getNameQualifier() {
-    return typeManager.getTypeNameQualifier(vmTypeHandle);
-}
-
-uint32
-UserValueType::getUnboxedSize() {
-    return typeManager.getUnboxedSize(vmTypeHandle);
-}
-
-uint32
-UserValueType::getUnboxedAlignment() {
-    return typeManager.getUnboxedAlignment(vmTypeHandle);
-}
-
-//
-// returns the number of fields in the value type
-//
-uint32
-UserValueType::getUnboxedNumFields() {
-    return typeManager.getUnboxedNumFields(vmTypeHandle);
-}
-
-//
-// returns the field with the given index 
-//
-FieldDesc*
-UserValueType::getUnboxedFieldDesc(uint32 index) {
-    return typeManager.getUnboxedFieldDesc(vmTypeHandle,index);
+    return VMInterface::getTypeNameQualifier(vmTypeHandle);
 }
 
 //-----------------------------------------------------------------------------
@@ -828,7 +781,7 @@ void    PtrType::print(::std::ostream& os) {
 
 Type* MethodPtrType::getParamType(uint32 i)
 {
-    return (i==0 && object ? typeManager.getSingletonType(object) : methodSig->getParamType(i));
+    return (i==0 && object ? typeManager.getSingletonType(object) : methodDesc->getParamType(i));
 }
 
 void    MethodPtrType::print(::std::ostream& os) {
@@ -837,7 +790,7 @@ void    MethodPtrType::print(::std::ostream& os) {
     } else {
         os << "method:";
     }
-    os << massageStr(typeManager.getMethodName(methodDesc));
+    os << massageStr(methodDesc->getName());
 }
 
 void    VTablePtrType::print(::std::ostream& os) {

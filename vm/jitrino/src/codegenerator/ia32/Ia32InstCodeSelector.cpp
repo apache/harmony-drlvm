@@ -24,19 +24,11 @@
 #include "Ia32CodeGenerator.h"
 #include "Ia32Printer.h"
 #include "EMInterface.h"
-#include "DrlVMInterface.h"
+#include "VMInterface.h"
 #include "Opcode.h"
-#include "open/em_profile_access.h"
-#include "open/vm.h"
 
 #include <float.h>
 #include <math.h>
-
-#ifdef PLATFORM_POSIX
-#define _isnan isnan
-#define _finite finite
-#endif
-
 
 namespace Jitrino
 {
@@ -1354,7 +1346,7 @@ void InstCodeSelector::bzero(CompareZeroOp::Types opType,
     CompareOp::Types zeroType = getCompareOpTypesFromCompareZeroOpTypes(opType);
     Opnd * op = (Opnd*) src;
     cmpToEflags(CompareOp::Eq, 
-        zeroType, op, irManager.newImmOpnd(op->getType(),(zeroType == CompareOp::Ref) || (zeroType == CompareOp::CompRef) ? (POINTER_SIZE_INT)compilationInterface.getHeapBase() : 0));
+        zeroType, op, irManager.newImmOpnd(op->getType(),(zeroType == CompareOp::Ref) || (zeroType == CompareOp::CompRef) ? (POINTER_SIZE_INT)VMInterface::getHeapBase() : 0));
 #else
     cmpToEflags(CompareOp::Eq, 
         getCompareOpTypesFromCompareZeroOpTypes(opType), (Opnd*)src, 0);
@@ -1373,7 +1365,7 @@ void InstCodeSelector::bnzero(CompareZeroOp::Types opType,
     CompareOp::Types zeroType = getCompareOpTypesFromCompareZeroOpTypes(opType);
     Opnd * op = (Opnd*) src;
     cmpToEflags(CompareOp::Eq, 
-        zeroType, op, irManager.newImmOpnd(op->getType(),(zeroType == CompareOp::Ref) || (zeroType == CompareOp::CompRef) ? (POINTER_SIZE_INT)compilationInterface.getHeapBase() : 0));
+        zeroType, op, irManager.newImmOpnd(op->getType(),(zeroType == CompareOp::Ref) || (zeroType == CompareOp::CompRef) ? (POINTER_SIZE_INT)VMInterface::getHeapBase() : 0));
 #else
     cmpToEflags(CompareOp::Eq, 
         getCompareOpTypesFromCompareZeroOpTypes(opType), (Opnd*)src, 0);
@@ -1528,7 +1520,7 @@ CG_OpndHandle*    InstCodeSelector::ldnull(bool compressed) {
     if (compressed) {
         return irManager.newImmOpnd(typeManager.getCompressedNullObjectType(), 0);
     } else {
-        return irManager.newImmOpnd(typeManager.getNullObjectType(), (POINTER_SIZE_INT)compilationInterface.getHeapBase());
+        return irManager.newImmOpnd(typeManager.getNullObjectType(), (POINTER_SIZE_INT)VMInterface::getHeapBase());
     }
 #endif
 }
@@ -1956,7 +1948,7 @@ CG_OpndHandle* InstCodeSelector::simpleLdInd(Type * dstType, Opnd * addr,
         appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, tmp, opnd));
         copyOpnd(dst, tmp);
         Type* unmanagedPtrType = typeManager.getUnmanagedPtrType(typeManager.getInt8Type());
-        dst = simpleOp_I8(Mnemonic_ADD, dstType, dst, irManager.newImmOpnd(unmanagedPtrType, (POINTER_SIZE_INT)compilationInterface.getHeapBase()));
+        dst = simpleOp_I8(Mnemonic_ADD, dstType, dst, irManager.newImmOpnd(unmanagedPtrType, (POINTER_SIZE_INT)VMInterface::getHeapBase()));
         return dst;
     } else {
         Opnd * opnd = irManager.newMemOpndAutoKind(irManager.getTypeFromTag(memType), addr);
@@ -1986,7 +1978,7 @@ void InstCodeSelector::simpleStInd(Opnd * addr,
         Opnd* dst = irManager.newMemOpndAutoKind(irManager.getTypeFromTag(memType), addr);
         copyOpnd(dst, src);
     } else  if(memType > Type::Float) {
-        src = simpleOp_I8(Mnemonic_SUB, src->getType(), src, irManager.newImmOpnd(typeManager.getIntPtrType(), (POINTER_SIZE_INT)compilationInterface.getHeapBase()));
+        src = simpleOp_I8(Mnemonic_SUB, src->getType(), src, irManager.newImmOpnd(typeManager.getIntPtrType(), (POINTER_SIZE_INT)VMInterface::getHeapBase()));
         Opnd * opnd = irManager.newMemOpndAutoKind(typeManager.compressType(src->getType()), addr);
         appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, opnd, src));
     } else {
@@ -2298,7 +2290,7 @@ CG_OpndHandle* InstCodeSelector::ldRef(Type *dstType,
 
 #ifdef _EM64T_
         Opnd * base = irManager.newOpnd(irManager.getTypeFromTag(Type::Object));
-        copyOpnd(base, irManager.newImmOpnd(base->getType(), (POINTER_SIZE_INT)compilationInterface.getHeapBase()));
+        copyOpnd(base, irManager.newImmOpnd(base->getType(), (POINTER_SIZE_INT)VMInterface::getHeapBase()));
         Opnd * tmp = irManager.newImmOpnd(irManager.getTypeFromTag(Type::UInt64),
                                           Opnd::RuntimeInfo::Kind_StringAddress,
                                           enclosingMethod, (void*)(POINTER_SIZE_INT)refToken);
@@ -2460,7 +2452,7 @@ CG_OpndHandle* InstCodeSelector::tau_ldVTableAddr(Type* dstType,
 #else
     Opnd * vtableAddr=irManager.newOpnd(dstType);
 
-    int64 heapBase = (int64) compilationInterface.getVTableBase();
+    int64 heapBase = (int64) VMInterface::getVTableBase();
     Opnd * acc =  simpleOp_I8(Mnemonic_ADD, dstType, (Opnd *)base, irManager.newImmOpnd(dstType, Opnd::RuntimeInfo::Kind_VTableAddrOffset));
     Opnd * sourceVTableAddr=irManager.newMemOpnd(typeManager.getInt32Type(), acc, 0, 0, irManager.newImmOpnd(typeManager.getUInt32Type(), 0));
     acc=irManager.newOpnd(dstType);
@@ -2761,7 +2753,7 @@ CG_OpndHandle* InstCodeSelector::callhelper(uint32              numArgs,
                                                 irManager.newMemOpnd(typeManager.getUnmanagedPtrType(typeManager.getInt32Type()),
                                                                      MemOpndKind_Any, 
                                                                      tlsBaseReg, 
-                                                                     flagTLSThreadStateOffset()),
+                                                                     VMInterface::flagTLSThreadStateOffset()),
                                                 (Opnd*)args[0]));
 #endif // PLATFORM_POSIX
         
@@ -2785,12 +2777,12 @@ CG_OpndHandle* InstCodeSelector::callhelper(uint32              numArgs,
                                                 irManager.newMemOpnd(typeManager.getInt32Type(),
                                                                      MemOpndKind_Any, 
                                                                      tlsBaseReg, 
-                                                                     flagTLSThreadStateOffset())));
+                                                                     VMInterface::flagTLSThreadStateOffset())));
         appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, 
                                                 irManager.newMemOpnd(typeManager.getInt32Type(),
                                                                      MemOpndKind_Any, 
                                                                      tlsBaseReg, 
-                                                                     flagTLSThreadStateOffset()),
+                                                                     VMInterface::flagTLSThreadStateOffset()),
                                                 irManager.newImmOpnd(typeManager.getInt32Type(),1)));
 #endif
 
@@ -2976,14 +2968,6 @@ void  InstCodeSelector::copyValueObj(Type* objType, CG_OpndHandle *dstAddr, CG_O
 
 #define FAST_PATH_MONITOR_ENTER_SUCCESS_PROB  0.99
 #define FAST_PATH_MONITOR_EXIT_SUCCESS_PROB   0.99
-
-//_______________________________________________________________________________________________________________
-//  Check if we should inline synchronization
-
-bool InstCodeSelector::inlineSync(CompilationInterface::ObjectSynchronizationInfo& syncInfo) 
-{
-    return false;
-}
 
 //_______________________________________________________________________________________________________________
 //  Acquire monitor for an object

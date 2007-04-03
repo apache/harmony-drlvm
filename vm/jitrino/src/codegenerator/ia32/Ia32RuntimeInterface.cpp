@@ -42,7 +42,7 @@ void RuntimeInterface::unwindStack(MethodDesc* methodDesc, JitFrameContext* cont
 
 void* RuntimeInterface::getAddressOfThis(MethodDesc * methodDesc, const JitFrameContext* context, bool isFirst) {
     assert(!methodDesc->isStatic());
-    if (!methodDesc->isSynchronized() &&  !methodDesc->isMethodClassIsLikelyExceptionType()) {
+    if (!methodDesc->isSynchronized() &&  !methodDesc->isParentClassIsLikelyExceptionType()) {
         static const uint64 default_this=0;
         return (void*)&default_this;
     }

@@ -31,9 +31,9 @@
 #include "Log.h"
 #include "CountWriters.h"
 #include "XTimer.h"
-#include "DrlVMInterface.h"
+#include "VMInterface.h"
 
-#ifndef PLATFORM_POSIX
+#ifdef _WIN32
     #pragma pack(push)
     #include <windows.h>
     #define vsnprintf _vsnprintf
@@ -42,7 +42,8 @@
     #include <stdarg.h>
     #include <sys/stat.h>
     #include <sys/types.h>
-#endif //PLATFORM_POSIX
+#endif 
+
 #include "CGSupport.h"
 #include "PlatformDependant.h"
 #include "JITInstanceContext.h"
@@ -78,7 +79,7 @@ bool initialized_parameters = false;
 void initialize_parameters(CompilationContext* compilationContext, MethodDesc &md)
 {
     // BCMap Info Required
-    ((DrlVMCompilationInterface*)(compilationContext->getVMCompilationInterface()))->setBCMapInfoRequired(true);
+    compilationContext->getVMCompilationInterface()->setBCMapInfoRequired(true);
 
     // do onetime things
     if (!initialized_parameters) {
@@ -347,10 +348,9 @@ Jitrino::GetAddressOfSecurityObject(MethodDesc* methodDesc, const ::JitFrameCont
 #endif
 
 bool  
-Jitrino::RecompiledMethodEvent(BinaryRewritingInterface & binaryRewritingInterface,
-                               MethodDesc *               recompiledMethodDesc, 
+Jitrino::RecompiledMethodEvent(MethodDesc *               recompiledMethodDesc, 
                                void *                     data) {
-    return runtimeInterface->recompiledMethodEvent(binaryRewritingInterface, recompiledMethodDesc, data);
+    return runtimeInterface->recompiledMethodEvent(recompiledMethodDesc, data);
 }
 
 bool 

@@ -139,7 +139,8 @@
 
 #include <assert.h>
 #include "trace.h"
-#include "../shared/mkernel.h"
+#include "mkernel.h"
+#include "PlatformDependant.h"
 
 #include <set>
 #include <string>

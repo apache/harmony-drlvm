@@ -974,7 +974,7 @@ bool InternalProfiler::passFilter(Inst * inst, Filter& filter) {
     if(filter.isInitLocals.isInitialized) {
         if(!rt || ((rt->getKind() != Opnd::RuntimeInfo::Kind_MethodDirectAddr) && (rt->getKind() != Opnd::RuntimeInfo::Kind_MethodDirectAddr)))
             return false;
-        res = filter.isInitLocals.value == ((MethodDesc *)rt->getValue(0))->isInitLocals();
+        res = filter.isInitLocals.value == false;
         if(filter.isInitLocals.isNegative)
             res = !res;
 

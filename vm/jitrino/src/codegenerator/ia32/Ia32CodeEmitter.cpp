@@ -51,7 +51,7 @@ public:
     }
 
 
-    CompilationInterface::CodeBlockHeat getCodeSectionHeat(uint32 sectionID)const;
+    CodeBlockHeat getCodeSectionHeat(uint32 sectionID)const;
 
 protected:
     uint32 getNeedInfo()const{ return NeedInfo_LivenessInfo; }
@@ -590,8 +590,7 @@ void CodeEmitter::registerDirectCall(Inst * inst)
 }
 
 //________________________________________________________________________________________
-bool RuntimeInterface::recompiledMethodEvent(BinaryRewritingInterface& binaryRewritingInterface,
-                           MethodDesc *              recompiledMethodDesc, 
+bool RuntimeInterface::recompiledMethodEvent(MethodDesc *recompiledMethodDesc, 
                            void *                    data) 
 {
     Byte ** indirectAddr = (Byte **)recompiledMethodDesc->getIndirectAddress();
@@ -630,15 +629,15 @@ bool RuntimeInterface::recompiledMethodEvent(BinaryRewritingInterface& binaryRew
 }
 
 //________________________________________________________________________________________
-CompilationInterface::CodeBlockHeat CodeEmitter::getCodeSectionHeat(uint32 sectionID)const
+CodeBlockHeat CodeEmitter::getCodeSectionHeat(uint32 sectionID)const
 {
-    CompilationInterface::CodeBlockHeat heat;
+    CodeBlockHeat heat;
     if (irManager->getCompilationContext()->hasDynamicProfileToUse())
-        heat = CompilationInterface::CodeBlockHeatDefault;
+        heat = CodeBlockHeatDefault;
     else if (sectionID==0)
-        heat = CompilationInterface::CodeBlockHeatMax;
+        heat = CodeBlockHeatMax;
     else
-        heat = CompilationInterface::CodeBlockHeatMin;
+        heat = CodeBlockHeatMin;
     
     return heat;
 }
@@ -667,7 +666,7 @@ void CodeEmitter::registerExceptionHandlers()
     }
 
     uint32 handlerInfoCount=(uint32)exceptionHandlerInfos.size();
-    irManager->getCompilationInterface().setNumExceptionHandler(handlerInfoCount);
+    irManager->getMethodDesc().setNumExceptionHandler(handlerInfoCount);
     for (uint32 i=0; i<handlerInfoCount; i++){
         const ExceptionHandlerInfo & info=exceptionHandlerInfos[i];
         if (Log::isEnabled()) {
@@ -678,7 +677,7 @@ void CodeEmitter::registerExceptionHandlers()
             Log::out() << ::std::endl;
         }
 
-        irManager->getCompilationInterface().
+        irManager->getMethodDesc().
             setExceptionHandlerInfo(i,
                 (Byte*)info.regionStart, (Byte*)info.regionEnd,
                 (Byte*)info.handlerAddr,
@@ -928,6 +927,7 @@ void CodeEmitter::reportCompiledInlinees() {
 
 
 }}; // ~Jitrino::Ia32
+
 
 
 

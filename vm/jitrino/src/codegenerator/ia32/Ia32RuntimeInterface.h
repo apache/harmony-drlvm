@@ -56,8 +56,7 @@ public:
 
     virtual void* getAddressOfSecurityObject(MethodDesc* methodDesc, const JitFrameContext* context) { assert(0); return NULL; }
 
-    virtual bool  recompiledMethodEvent(BinaryRewritingInterface & binaryRewritingInterface,
-        MethodDesc * methodDesc, void * data);
+    virtual bool  recompiledMethodEvent(MethodDesc * methodDesc, void * data);
 
     virtual bool getBcLocationForNative(MethodDesc* method, uint64 native_pc, uint16 *bc_pc);
     virtual bool getNativeLocationForBc(MethodDesc* method,  uint16 bc_pc, uint64 *native_pc);

@@ -25,36 +25,25 @@
 #include <iostream>
 #include <assert.h>
 
-#include "DrlVMInterface.h"
+#include "open/hythread_ext.h"
+
+#include "Type.h"
+#include "VMInterface.h"
 #include "CompilationContext.h"
 #include "Log.h"
 #include "JITInstanceContext.h"
-#include "jit_intf.h"
-#include "open/hythread_ext.h"
+#include "PlatformDependant.h"
+#include "mkernel.h"
 
+/**
+* @brief A lock used to protect method's data in multi-threaded compilation.
+*/
+Jitrino::Mutex g_compileLock;
 
 namespace Jitrino {
 
-Mutex g_compileLock;
 
-//////////////////////////////////////////////////////////////////////////////
-//                          Utilities
-//////////////////////////////////////////////////////////////////////////////
 
-Boolean mtd_vars_is_managed_pointer(Method_Handle mh, unsigned idx)
-{
-    return false;
-}; 
-
-Boolean mtd_ret_type_is_managed_pointer(Method_Signature_Handle msh)
-{
-    return false;
-}; 
-
-Boolean mtd_args_is_managed_pointer(Method_Signature_Handle msh, unsigned idx)
-{
-    return false;
-}; 
 
 // The JIT info block is laid out as:
 //    header
@@ -77,15 +66,20 @@ methodGetStacknGCInfoBlockSize(Method_Handle method, JIT_Handle jit)
     return (size - sizeof(void *));     // skip the header
 }
 
-// TODO: move both methods below to the base VMInterface level
+void*       
+VMInterface::getTypeHandleFromVTable(void* vtHandle){
+    return vtable_get_class((VTable_Handle)vtHandle);
+}
+
+
 // TODO: free TLS key on JIT deinitilization
 uint32
-flagTLSSuspendRequestOffset(){
+VMInterface::flagTLSSuspendRequestOffset(){
     return hythread_tls_get_request_offset();
 }
 
 uint32
-flagTLSThreadStateOffset() {
+VMInterface::flagTLSThreadStateOffset() {
     static hythread_tls_key_t key = 0;
     static size_t offset = 0;
     if (key == 0) {
@@ -97,13 +91,13 @@ flagTLSThreadStateOffset() {
 }
 
 //////////////////////////////////////////////////////////////////////////////
-///////////////////////// DrlVMTypeManager /////////////////////////////////////
+///////////////////////// VMTypeManager /////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 //
 // VM specific type manager
 //
 void*
-DrlVMTypeManager::getBuiltinValueTypeVMTypeHandle(Type::Tag type) {
+TypeManager::getBuiltinValueTypeVMTypeHandle(Type::Tag type) {
     switch (type) {
     case Type::Void:    return class_get_class_of_primitive_type(VM_DATA_TYPE_VOID);
     case Type::Boolean: return class_get_class_of_primitive_type(VM_DATA_TYPE_BOOLEAN);
@@ -127,144 +121,96 @@ DrlVMTypeManager::getBuiltinValueTypeVMTypeHandle(Type::Tag type) {
     return NULL;
 }
 
+void 
+VMInterface::rewriteCodeBlock(Byte* codeBlock, Byte*  newCode, size_t size) {
+    vm_patch_code_block(codeBlock, newCode, size);
+}
+
 void*
-DrlVMTypeManager::getSystemObjectVMTypeHandle() {
+VMInterface::getSystemObjectVMTypeHandle() {
     return get_system_object_class();
 }
 
 void*
-DrlVMTypeManager::getSystemClassVMTypeHandle() {
+VMInterface::getSystemClassVMTypeHandle() {
     return get_system_class_class();
 }
 
 void*
-DrlVMTypeManager::getSystemStringVMTypeHandle() {
+VMInterface::getSystemStringVMTypeHandle() {
     return get_system_string_class();
 }
 
 void*
-DrlVMTypeManager::getArrayVMTypeHandle(void* elemVMTypeHandle,bool isUnboxed) {
+VMInterface::getArrayVMTypeHandle(void* elemVMTypeHandle,bool isUnboxed) {
     if (isUnboxed)
         return class_get_array_of_unboxed((Class_Handle) elemVMTypeHandle);
     return class_get_array_of_class((Class_Handle) elemVMTypeHandle);
 }
 
 const char* 
-DrlVMTypeManager::getTypeNameQualifier(void* vmTypeHandle) {
+VMInterface::getTypeNameQualifier(void* vmTypeHandle) {
     return class_get_package_name((Class_Handle) vmTypeHandle);
 }
 
 void*
-DrlVMTypeManager::getArrayElemVMTypeHandle(void* vmTypeHandle) {
+VMInterface::getArrayElemVMTypeHandle(void* vmTypeHandle) {
     return class_get_array_element_class((Class_Handle) vmTypeHandle);
 }
 
-const char* DrlVMTypeManager::getTypeName(void* vmTypeHandle) {
+const char* VMInterface::getTypeName(void* vmTypeHandle) {
     return class_get_name((Class_Handle) vmTypeHandle);
 }
 
 bool
-DrlVMTypeManager::isArrayOfPrimitiveElements(void* vmClassHandle) {
+VMInterface::isArrayOfPrimitiveElements(void* vmClassHandle) {
     return type_info_is_primitive(class_get_element_type_info((Class_Handle) vmClassHandle))?true:false;
 }
 
 bool
-DrlVMTypeManager::isEnumType(void* vmTypeHandle) {
-    return false;
+VMInterface::isEnumType(void* vmTypeHandle) {
+    return class_is_enum((Class_Handle) vmTypeHandle);
 }
 
 bool
-DrlVMTypeManager::isValueType(void* vmTypeHandle) {
+VMInterface::isValueType(void* vmTypeHandle) {
     return class_is_primitive((Class_Handle) vmTypeHandle);
 }
 
 bool
-DrlVMTypeManager::isLikelyExceptionType(void* vmTypeHandle) {
+VMInterface::isLikelyExceptionType(void* vmTypeHandle) {
     return class_hint_is_exceptiontype((Class_Handle) vmTypeHandle)?true:false;
 }
 
 bool
-DrlVMTypeManager::isVariableSizeType(void* vmTypeHandle) {
-    return isArrayType(vmTypeHandle);
-}
-
-const char*
-DrlVMTypeManager::getMethodName(MethodDesc* methodDesc) {
-    return methodDesc->getName();
-}
-
-
-bool
-DrlVMTypeManager::isSystemStringType(void* vmTypeHandle) {
-    // We should also be looking at namespace
-    if (vmTypeHandle == systemStringVMTypeHandle)
-        return true;
-    const char* name = getTypeName(vmTypeHandle);
-    if (systemStringVMTypeHandle == NULL && strcmp(name,"String") == 0) {
-        // Built-in System.String type
-        systemStringVMTypeHandle = vmTypeHandle;
-        return true;
-    }
-    return false;
-}
-
-bool
-DrlVMTypeManager::isSystemObjectType(void* vmTypeHandle) {
-    // We should also be looking at namespace
-    if (vmTypeHandle == systemObjectVMTypeHandle)
-        return true;
-    const char* name = getTypeName(vmTypeHandle);
-    if (systemObjectVMTypeHandle == NULL && strcmp(name,"Object") == 0) {
-        // Built-in System.Object type
-        systemObjectVMTypeHandle = vmTypeHandle;
-        return true;
-    }
-    return false;
-}
-
-bool
-DrlVMTypeManager::isSystemClassType(void* vmTypeHandle) {
-    // We should also be looking at namespace
-    if (vmTypeHandle == systemClassVMTypeHandle)
-        return true;
-    const char* name = getTypeName(vmTypeHandle);
-    if (systemClassVMTypeHandle == NULL && strcmp(name,"Class") == 0) {
-        // Built-in System.Class type
-        systemClassVMTypeHandle = vmTypeHandle;
-        return true;
-    }
-    return false;
-}
-
-bool
-DrlVMTypeManager::isBeforeFieldInit(void* vmTypeHandle) {
+VMInterface::isBeforeFieldInit(void* vmTypeHandle) {
     return class_is_before_field_init((Class_Handle) vmTypeHandle)?true:false;
 }
 
 bool        
-DrlVMTypeManager::getClassFastInstanceOfFlag(void* vmTypeHandle) {
+VMInterface::getClassFastInstanceOfFlag(void* vmTypeHandle) {
     return class_get_fast_instanceof_flag((Class_Handle) vmTypeHandle)?true:false;
 }
 
 int 
-DrlVMTypeManager::getClassDepth(void* vmTypeHandle) {
+VMInterface::getClassDepth(void* vmTypeHandle) {
     return class_get_depth((Class_Handle) vmTypeHandle);
 }
 
 uint32
-DrlVMTypeManager::getArrayLengthOffset() {
+VMInterface::getArrayLengthOffset() {
     return vector_length_offset();
 }
 
 uint32
-DrlVMTypeManager::getArrayElemOffset(void* vmElemTypeHandle,bool isUnboxed) {
+VMInterface::getArrayElemOffset(void* vmElemTypeHandle,bool isUnboxed) {
     if (isUnboxed)
         return vector_first_element_offset_unboxed((Class_Handle) vmElemTypeHandle);
     return vector_first_element_offset_class_handle((Class_Handle) vmElemTypeHandle);
 }
 
 bool
-DrlVMTypeManager::isSubClassOf(void* vmTypeHandle1,void* vmTypeHandle2) {
+VMInterface::isSubClassOf(void* vmTypeHandle1,void* vmTypeHandle2) {
     if (vmTypeHandle1 == (void*)(POINTER_SIZE_INT)0xdeadbeef ||
         vmTypeHandle2 == (void*)(POINTER_SIZE_INT)0xdeadbeef ) {
         return false;
@@ -273,262 +219,233 @@ DrlVMTypeManager::isSubClassOf(void* vmTypeHandle1,void* vmTypeHandle2) {
 }    
 
 uint32
-DrlVMTypeManager::getUnboxedOffset(void* vmTypeHandle) {
-    assert(false); return 0;
-}
-
-uint32
-DrlVMTypeManager::getBoxedSize(void * vmTypeHandle) {
+VMInterface::getObjectSize(void * vmTypeHandle) {
     return class_get_boxed_data_size((Class_Handle) vmTypeHandle);
 }
 
-uint32
-DrlVMTypeManager::getUnboxedSize(void* vmTypeHandle) {
-    assert(false); return 0;
+void*       VMInterface::getSuperTypeVMTypeHandle(void* vmTypeHandle) {
+    return class_get_super_class((Class_Handle)vmTypeHandle);
+}
+bool        VMInterface::isArrayType(void* vmTypeHandle) {
+    return class_is_array((Class_Handle)vmTypeHandle)?true:false;
+}
+bool        VMInterface::isFinalType(void* vmTypeHandle) {
+    return class_property_is_final((Class_Handle)vmTypeHandle)?true:false;
+}
+bool        VMInterface::isInterfaceType(void* vmTypeHandle)  {
+    return class_property_is_interface2((Class_Handle)vmTypeHandle)?true:false;
+}
+bool        VMInterface::isAbstractType(void* vmTypeHandle) {
+    return class_property_is_abstract((Class_Handle)vmTypeHandle)?true:false;
+}
+bool        VMInterface::needsInitialization(void* vmTypeHandle) {
+    return class_needs_initialization((Class_Handle)vmTypeHandle)?true:false;
+}
+bool        VMInterface::isFinalizable(void* vmTypeHandle) {
+    return class_is_finalizable((Class_Handle)vmTypeHandle)?true:false;
+}
+bool        VMInterface::isInitialized(void* vmTypeHandle) {
+    return class_is_initialized((Class_Handle)vmTypeHandle)?true:false;
+}
+void*       VMInterface::getVTable(void* vmTypeHandle) {
+    return (void *) class_get_vtable((Class_Handle)vmTypeHandle);
 }
 
-uint32
-DrlVMTypeManager::getUnboxedAlignment(void* vmTypeHandle) {
-    return class_get_alignment((Class_Handle) vmTypeHandle);
+//
+// Allocation handle to be used with calls to runtime support functions for
+// object allocation
+//
+void*       VMInterface::getAllocationHandle(void* vmTypeHandle) {
+    return (void *) class_get_allocation_handle((Class_Handle) vmTypeHandle);
 }
 
-uint32
-DrlVMTypeManager::getUnboxedNumFields(void* vmTypeHandle) {
-    assert(0);
-    return 0;
-}    
-
-FieldDesc*
-DrlVMTypeManager::getUnboxedFieldDesc(void* vmTypeHandle,uint32 index) {
-    assert(0);
-    return NULL;
+uint32      VMInterface::getVTableOffset()
+{
+    return object_get_vtable_offset();
 }
 
-Type*
-DrlVMTypeManager::getUnderlyingType(void* enumVMTypeHandle) {
-    assert(false); return 0;
+void*       VMInterface::getTypeHandleFromAllocationHandle(void* vmAllocationHandle)
+{
+    return allocation_handle_get_class((Allocation_Handle)vmAllocationHandle);
 }
+
+
 
 //////////////////////////////////////////////////////////////////////////////
-///////////////////////// DrlVMMethodSignatureDesc /////////////////////////////
+///////////////////////// MethodDesc //////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
-Type**
-DrlVMMethodSignatureDesc::getParamTypes() {
-    if (paramTypes != NULL)
-        return paramTypes;
-    uint32 numParams = getNumParams();
-    paramTypes = new (compilationInterface->getMemManager()) Type* [numParams];
-    for (uint32 i=0; i<numParams; i++) {
-        paramTypes[i] = getParamType(i);
-    }
-    return paramTypes;
-}
 
 uint32    
-DrlVMMethodSignatureDesc::getNumParams() {
-    return method_args_get_number(drlSigHandle);
+MethodDesc::getNumParams() const {
+    return method_args_get_number(methodSig);
 }
 
 Type*    
-DrlVMMethodSignatureDesc::getParamType(uint32 paramIndex) {
-    Type_Info_Handle typeHandle = method_args_get_type_info(drlSigHandle,paramIndex);
-    bool isManagedPointer = 
-        mtd_args_is_managed_pointer(drlSigHandle,paramIndex)?true:false;
-    return compilationInterface->getTypeFromDrlVMTypeHandle(typeHandle,isManagedPointer);
+MethodDesc::getParamType(uint32 paramIndex) const {
+    Type_Info_Handle typeHandle = method_args_get_type_info(methodSig,paramIndex);
+    return compilationInterface->getTypeFromDrlVMTypeHandle(typeHandle);
 }
 
 Type*
-DrlVMMethodSignatureDesc::getReturnType() {
-    bool isManagedPointer = 
-        mtd_ret_type_is_managed_pointer(drlSigHandle)?true:false;
-    Type_Info_Handle typeHandle = method_ret_type_get_type_info(drlSigHandle);
-    return compilationInterface->getTypeFromDrlVMTypeHandle(typeHandle,isManagedPointer);
+MethodDesc::getReturnType() const {
+    Type_Info_Handle typeHandle = method_ret_type_get_type_info(methodSig);
+    return compilationInterface->getTypeFromDrlVMTypeHandle(typeHandle);
 }
 
-//////////////////////////////////////////////////////////////////////////////
-///////////////////////// DrlVMMethodDesc //////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////
-
-bool
-DrlVMMethodDesc::isVarPinned(uint32 varIndex) {
-    return false;
+Class_Handle MethodDesc::getParentHandle() const {
+    return method_get_class(drlMethod);
 }
 
-Type*
-DrlVMMethodDesc::getVarType(uint32 varIndex) {
-    bool isManagedPointer = 
-        mtd_vars_is_managed_pointer(drlMethod,varIndex)?true:false;
-    Type_Info_Handle typeHandle = method_vars_get_type_info(drlMethod,varIndex);
-    return compilationInterface->getTypeFromDrlVMTypeHandle(typeHandle,isManagedPointer);
+void MethodDesc::getHandlerInfo(unsigned index, unsigned* beginOffset, unsigned* endOffset, unsigned* handlerOffset, unsigned* handlerClassIndex) const {
+    method_get_handler_info(drlMethod,index,beginOffset,endOffset,handlerOffset,handlerClassIndex);
 }
-
-NamedType*
-DrlVMMethodDesc::getParentType()    {
-    TypeManager& typeManager = compilationInterface->getTypeManager();
-    Class_Handle parentClassHandle = method_get_class(drlMethod);
-    if (class_is_primitive(parentClassHandle))
-        return typeManager.getValueType(parentClassHandle);
-    return typeManager.getObjectType(parentClassHandle);
-}
-
-unsigned 
-DrlVMMethodDesc::parseJavaHandlers(ExceptionCallback& callback) {
-    uint32 numHandlers = getNumHandlers();
-    for (uint32 i=0; i<numHandlers; i++) {
-        unsigned beginOffset,endOffset,handlerOffset,handlerClassIndex;
-        method_get_handler_info(drlMethod,i,&beginOffset,&endOffset,
-                             &handlerOffset,&handlerClassIndex);
-        if (!callback.catchBlock(beginOffset,endOffset-beginOffset,
-                                 handlerOffset,0,handlerClassIndex))
-        {
-            // handlerClass failed to be resolved. LinkingException throwing helper
-            // will be generated instead of method's body
-            return handlerClassIndex;
-        }
-    }
-    return MAX_UINT32; // all catchBlocks were processed successfully
-}
-
-void 
-DrlVMMethodDesc::parseCliHandlers(ExceptionCallback& callback) {
-    assert(false);
-
-}
-
 
 // accessors for method info, code and data
-Byte*        DrlVMMethodDesc::getInfoBlock() {
-    Method_Handle drlMethod = getDrlVMMethod();
+Byte*        MethodDesc::getInfoBlock() const {
     return methodGetStacknGCInfoBlock(drlMethod, getJitHandle());
 }
 
-uint32        DrlVMMethodDesc::getInfoBlockSize() {
-    Method_Handle drlMethod = getDrlVMMethod();
+uint32       MethodDesc::getInfoBlockSize() const {
     return methodGetStacknGCInfoBlockSize(drlMethod, getJitHandle());
 }
 
-Byte*        DrlVMMethodDesc::getCodeBlockAddress(int32 id) {
-    Method_Handle drlMethod = getDrlVMMethod();
+Byte*        MethodDesc::getCodeBlockAddress(int32 id) const {
     return method_get_code_block_addr_jit_new(drlMethod,getJitHandle(), id);
 }
 
-uint32        DrlVMMethodDesc::getCodeBlockSize(int32 id) {
-    Method_Handle drlMethod = getDrlVMMethod();
+uint32       MethodDesc::getCodeBlockSize(int32 id) const {
     return method_get_code_block_size_jit_new(drlMethod,getJitHandle(), id);
 }
 
-POINTER_SIZE_INT
-DrlVMMethodDesc::getUniqueId()
-{
-#ifdef _IPF_
-//    assert(0);
-    return 0;
-#else
-    Method_Handle       mh = getDrlVMMethod();
-    return (POINTER_SIZE_INT)mh;
-#endif
-}
-
 bool
-DrlVMMethodDesc::isNoInlining() {
+MethodDesc::isNoInlining() const {
     return method_is_no_inlining(drlMethod)?true:false;
 }    
 
 bool
-DrlVMMethodDesc::isRequireSecObject() {
+MethodDesc::isRequireSecObject() {
     return method_is_require_security_object(drlMethod)?true:false;
 }
 
 bool
-DrlVMMethodDesc::isMethodClassIsLikelyExceptionType() {
-    Class_Handle ch = method_get_class(drlMethod);
-    assert(ch!=NULL);
-    return class_hint_is_exceptiontype(ch)?true:false;
+TypeMemberDesc::isParentClassIsLikelyExceptionType() const {
+    Class_Handle ch = getParentHandle();
+    return class_hint_is_exceptiontype(ch);
 }
 
-bool
-DrlVMMethodDesc::isAddressFinal()    {
-    return false;
+const char*
+CompilationInterface::getSignatureString(MethodDesc* enclosingMethodDesc, uint32 methodToken) {
+    Class_Handle enclosingDrlVMClass = enclosingMethodDesc->getParentHandle();
+    return class_get_cp_entry_signature(enclosingDrlVMClass, (unsigned short)methodToken);
 }
 
+Method_Side_Effects
+MethodDesc::getSideEffect() const {
+    return method_get_side_effects(drlMethod);
+}
+
+void
+MethodDesc::setSideEffect(Method_Side_Effects mse) {
+    method_set_side_effects(drlMethod, mse);
+}
+
+void        
+MethodDesc::setNumExceptionHandler(uint32 numHandlers) {
+    method_set_num_target_handlers(drlMethod,getJitHandle(),numHandlers);
+}
+
+void
+MethodDesc::setExceptionHandlerInfo(uint32 exceptionHandlerNumber,
+                                    Byte*  startAddr,
+                                    Byte*  endAddr,
+                                    Byte*  handlerAddr,
+                                    NamedType*  exceptionType,
+                                    bool   exceptionObjIsDead) {
+                                        void* exn_handle;
+                                        assert(exceptionType);
+                                        if (exceptionType->isSystemObject())
+                                            exn_handle = NULL;
+                                        else
+                                            exn_handle = exceptionType->getRuntimeIdentifier();
+                                        method_set_target_handler_info(drlMethod,
+                                            getJitHandle(),
+                                            exceptionHandlerNumber,
+                                            startAddr,
+                                            endAddr,
+                                            handlerAddr,
+                                            (Class_Handle) exn_handle,
+                                            exceptionObjIsDead ? TRUE : FALSE);
+                                    }
+
+
 //////////////////////////////////////////////////////////////////////////////
-///////////////////////// DrlVMFieldDesc ///////////////////////////////////////
+///////////////////////// FieldDesc ///////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
 bool
-DrlVMFieldDesc::isLiteral()    {
+FieldDesc::isLiteral() const {
     return field_is_literal(drlField)?true:false;
 }
 
-bool
-DrlVMFieldDesc::isUnmanagedStatic()    {
-    return false;
+Class_Handle FieldDesc::getParentHandle() const {
+    return field_get_class(drlField);
 }
 
 NamedType*
-DrlVMFieldDesc::getParentType()    {
+TypeMemberDesc::getParentType()    {
     TypeManager& typeManager = compilationInterface->getTypeManager();
-    Class_Handle parentClassHandle = field_get_class(drlField);
-    if (class_is_primitive(parentClassHandle))
+    Class_Handle parentClassHandle = getParentHandle();
+    if (class_is_primitive(parentClassHandle)) {
+        assert(0);
         return typeManager.getValueType(parentClassHandle);
+    }
     return typeManager.getObjectType(parentClassHandle);
 }
 
 Type*
-DrlVMFieldDesc::getFieldType() {
+FieldDesc::getFieldType() {
     Type_Info_Handle typeHandle = field_get_type_info_of_field_value(drlField);
-    return compilationInterface->getTypeFromDrlVMTypeHandle(typeHandle,false);
+    return compilationInterface->getTypeFromDrlVMTypeHandle(typeHandle);
 }
 
 uint32
-DrlVMFieldDesc::getOffset() {
-    if(getParentType()->isObject()) {
-        return field_get_offset(drlField);
-    }
-    else {
-        assert(false); return 0;
-    }
+FieldDesc::getOffset() const {
+    return field_get_offset(drlField);
 }
 
 
 //////////////////////////////////////////////////////////////////////////////
-//////////////////////////// DrlVMClassHierachyMethodIterator //////////////////
+//////////////////////////// ClassHierachyMethodIterator //////////////////
 //////////////////////////////////////////////////////////////////////////////
+
+ClassHierarchyMethodIterator::ClassHierarchyMethodIterator(
+    CompilationInterface& compilationInterface, ObjectType* objType, MethodDesc* methodDesc)
+    : compilationInterface(compilationInterface)
+{
+    valid = method_iterator_initialize(&iterator, methodDesc->getMethodHandle(), 
+        (Class_Handle) objType->getVMTypeHandle());
+}
+
+bool ClassHierarchyMethodIterator::hasNext() const { 
+    Method_Handle handle = method_iterator_get_current(&iterator); 
+    return handle != NULL; 
+}
+
 MethodDesc* 
-DrlVMClassHierarchyMethodIterator::getNext() { 
+ClassHierarchyMethodIterator::getNext() { 
     MethodDesc* desc = compilationInterface.getMethodDesc(method_iterator_get_current(&iterator)); 
     method_iterator_advance(&iterator); 
     return desc; 
 }
 
-
 //////////////////////////////////////////////////////////////////////////////
-//////////////////////////// DrlVMCompilationInterface /////////////////////////
+//////////////////////////// CompilationInterface /////////////////////////
 //////////////////////////////////////////////////////////////////////////////
-
-void 
-DrlVMCompilationInterface::hardAssert(const char *message, int line, const char *file)
-{
-    ::std::cerr << message << " at line " << line << " of file " << file << ::std::endl;
-    exit(1);
-}
 
 Type*
-DrlVMCompilationInterface::getTypeFromDrlVMTypeHandle(Type_Info_Handle typeHandle) {
-    return getTypeFromDrlVMTypeHandle(typeHandle, false);
-}
-
-Type*
-DrlVMCompilationInterface::getTypeFromDrlVMTypeHandle(Type_Info_Handle typeHandle,
-                                                                  bool isManagedPointer) {
+CompilationInterface::getTypeFromDrlVMTypeHandle(Type_Info_Handle typeHandle) {
     Type* type = NULL;
-    if (isManagedPointer) {
-        Type_Info_Handle pointedToTypeHandle = type_info_get_type_info(typeHandle);
-        Type* pointedToType = getTypeFromDrlVMTypeHandle(pointedToTypeHandle);
-        if (!pointedToType)
-            return NULL;
-        type = typeManager.getManagedPtrType(pointedToType);
-    } else if (type_info_is_void(typeHandle)) {
+    if (type_info_is_void(typeHandle)) {
         // void return type
         type = typeManager.getVoidType();
     } else if (type_info_is_reference(typeHandle)) {
@@ -549,8 +466,6 @@ DrlVMCompilationInterface::getTypeFromDrlVMTypeHandle(Type_Info_Handle typeHandl
         if (!elemType)
             return NULL;
         type = typeManager.getArrayType(elemType);
-    } else if (type_info_is_general_array(typeHandle)) {
-        assert(0);
     } else {
         // should not get here
         assert(0);
@@ -558,7 +473,7 @@ DrlVMCompilationInterface::getTypeFromDrlVMTypeHandle(Type_Info_Handle typeHandl
     return type;
 }
 
-VM_RT_SUPPORT DrlVMCompilationInterface::translateHelperId(RuntimeHelperId runtimeHelperId) {
+VM_RT_SUPPORT CompilationInterface::translateHelperId(RuntimeHelperId runtimeHelperId) {
     VM_RT_SUPPORT vmHelperId = (VM_RT_SUPPORT)-1;
     switch (runtimeHelperId) {
     case Helper_NewObj_UsingVtable:    vmHelperId = VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE; break; 
@@ -616,13 +531,13 @@ VM_RT_SUPPORT DrlVMCompilationInterface::translateHelperId(RuntimeHelperId runti
 }
 
 void*        
-DrlVMCompilationInterface::getRuntimeHelperAddress(RuntimeHelperId runtimeHelperId) {
+CompilationInterface::getRuntimeHelperAddress(RuntimeHelperId runtimeHelperId) {
     VM_RT_SUPPORT drlHelperId = translateHelperId(runtimeHelperId);
     return vm_get_rt_support_addr(drlHelperId);
 }
 
 void*        
-DrlVMCompilationInterface::getRuntimeHelperAddressForType(RuntimeHelperId runtimeHelperId, Type* type) {
+CompilationInterface::getRuntimeHelperAddressForType(RuntimeHelperId runtimeHelperId, Type* type) {
     VM_RT_SUPPORT drlHelperId = translateHelperId(runtimeHelperId);
     Class_Handle handle = NULL;
     if (type != NULL && type->isNamedType())
@@ -632,45 +547,8 @@ DrlVMCompilationInterface::getRuntimeHelperAddressForType(RuntimeHelperId runtim
     return addr;
 }
 
-CompilationInterface::MethodSideEffect  
-DrlVMCompilationInterface::getMethodHasSideEffect(MethodDesc *m) {
-    Method_Side_Effects mse = method_get_side_effects(((DrlVMMethodDesc*)m)->getDrlVMMethod());
-
-    switch (mse) {
-    case MSE_True:            return CompilationInterface::MSE_YES;
-    case MSE_False:           return CompilationInterface::MSE_NO;
-    case MSE_Unknown:         return CompilationInterface::MSE_UNKNOWN;
-    case MSE_True_Null_Param: return CompilationInterface::MSE_NULL_PARAM;
-    default:
-        assert(0);
-        return CompilationInterface::MSE_UNKNOWN;
-    }
-}
-
-void
-DrlVMCompilationInterface::setMethodHasSideEffect(MethodDesc *m, MethodSideEffect mse) {
-    Method_Handle handle = ((DrlVMMethodDesc*)m)->getDrlVMMethod();
-
-    switch (mse) {
-    case CompilationInterface::MSE_YES:
-        method_set_side_effects(handle, MSE_True);
-        break;
-    case CompilationInterface::MSE_NO:
-        method_set_side_effects(handle, MSE_False);
-        break;
-    case CompilationInterface::MSE_UNKNOWN:
-        method_set_side_effects(handle, MSE_Unknown);
-        break;
-    case CompilationInterface::MSE_NULL_PARAM:
-        method_set_side_effects(handle, MSE_True_Null_Param);
-        break;
-    default:
-        assert(0);
-    }
-}
-
 CompilationInterface::VmCallingConvention 
-DrlVMCompilationInterface::getRuntimeHelperCallingConvention(RuntimeHelperId id) {
+CompilationInterface::getRuntimeHelperCallingConvention(RuntimeHelperId id) {
     switch(id) {
     case Helper_NewMultiArray:
     case Helper_WriteBarrier:
@@ -687,63 +565,21 @@ DrlVMCompilationInterface::getRuntimeHelperCallingConvention(RuntimeHelperId id)
 }
 
 bool
-DrlVMCompilationInterface::compileMethod(MethodDesc *method) {
+CompilationInterface::compileMethod(MethodDesc *method) {
     if (Log::isEnabled()) {
         Log::out() << "Jitrino requested compilation of " <<
             method->getParentType()->getName() << "::" <<
             method->getName() << method->getSignatureString() << ::std::endl;
     }
-    JIT_Result res = vm_compile_method(getJitHandle(), ((DrlVMMethodDesc*)method)->getDrlVMMethod());
+    JIT_Result res = vm_compile_method(getJitHandle(), method->getMethodHandle());
     return res == JIT_SUCCESS ? true : false;
 }
 
-void        
-DrlVMCompilationInterface::setNumExceptionHandler(uint32 numHandlers) {
-    method_set_num_target_handlers(methodToCompile->getDrlVMMethod(),getJitHandle(),
-                                   numHandlers);
-}
-
-void
-DrlVMCompilationInterface::setExceptionHandlerInfo(uint32 exceptionHandlerNumber,
-                                                   Byte*  startAddr,
-                                                 Byte*  endAddr,
-                                                 Byte*  handlerAddr,
-                                                 NamedType*  exceptionType,
-                                                 bool   exceptionObjIsDead) {
-    void* exn_handle;
-    assert(exceptionType);
-    if (exceptionType->isSystemObject())
-        exn_handle = NULL;
-    else
-        exn_handle = exceptionType->getRuntimeIdentifier();
-    method_set_target_handler_info(methodToCompile->getDrlVMMethod(),
-                                   getJitHandle(),
-                                   exceptionHandlerNumber,
-                                   startAddr,
-                                   endAddr,
-                                   handlerAddr,
-                                   (Class_Handle) exn_handle,
-                                   exceptionObjIsDead ? TRUE : FALSE);
-}
-
-// token resolution methods
-MethodSignatureDesc*
-DrlVMCompilationInterface::resolveSignature(MethodDesc* enclosingMethodDesc,
-                                          uint32 sigToken) {
-    assert(0);
-    return NULL;
-}
-
-Class_Handle
-DrlVMCompilationInterface::methodGetClass(MethodDesc* method) {
-    return method_get_class(((DrlVMMethodDesc*)method)->getDrlVMMethod());
-}
-
 FieldDesc*  
-DrlVMCompilationInterface::resolveField(MethodDesc* enclosingMethodDesc,
+CompilationInterface::resolveField(MethodDesc* enclosingMethodDesc,
                                         uint32 fieldToken,
                                         bool putfield) {
-    Class_Handle enclosingDrlVMClass = methodGetClass(enclosingMethodDesc);
+    Class_Handle enclosingDrlVMClass = enclosingMethodDesc->getParentHandle();
     
     Field_Handle resolvedField = 
         resolve_nonstatic_field(compileHandle,enclosingDrlVMClass,fieldToken,putfield);
@@ -752,7 +588,7 @@ DrlVMCompilationInterface::resolveField(MethodDesc* enclosingMethodDesc,
 }
 
 FieldDesc*
-DrlVMCompilationInterface::resolveFieldByIndex(NamedType* klass, int index, NamedType **fieldType) {
+CompilationInterface::resolveFieldByIndex(NamedType* klass, int index, NamedType **fieldType) {
 
     Class_Handle ch = (Class_Handle) klass->getVMTypeHandle();
     Field_Handle fh;
@@ -764,9 +600,9 @@ DrlVMCompilationInterface::resolveFieldByIndex(NamedType* klass, int index, Name
 }
 
 FieldDesc*
-DrlVMCompilationInterface::resolveStaticField(MethodDesc* enclosingMethodDesc,
+CompilationInterface::resolveStaticField(MethodDesc* enclosingMethodDesc,
                                                    uint32 fieldToken, bool putfield) {
-    Class_Handle enclosingDrlVMClass = methodGetClass(enclosingMethodDesc);
+    Class_Handle enclosingDrlVMClass = enclosingMethodDesc->getParentHandle();
 
     Field_Handle resolvedField = 
         resolve_static_field(compileHandle,enclosingDrlVMClass,fieldToken,putfield);
@@ -775,15 +611,9 @@ DrlVMCompilationInterface::resolveStaticField(MethodDesc* enclosingMethodDesc,
 }
 
 MethodDesc* 
-DrlVMCompilationInterface::resolveMethod(MethodDesc* enclosingMethodDesc,
-                                              uint32 methodToken) {
-    assert(false); return 0;
-}    
-
-MethodDesc* 
-DrlVMCompilationInterface::resolveVirtualMethod(MethodDesc* enclosingMethodDesc,
+CompilationInterface::resolveVirtualMethod(MethodDesc* enclosingMethodDesc,
                                                      uint32 methodToken) {
-    Class_Handle enclosingDrlVMClass = methodGetClass(enclosingMethodDesc);
+    Class_Handle enclosingDrlVMClass = enclosingMethodDesc->getParentHandle();
     
     Method_Handle resolvedMethod = 
         resolve_virtual_method(compileHandle,enclosingDrlVMClass,methodToken);
@@ -792,9 +622,9 @@ DrlVMCompilationInterface::resolveVirtualMethod(MethodDesc* enclosingMethodDesc,
 }    
 
 MethodDesc* 
-DrlVMCompilationInterface::resolveSpecialMethod(MethodDesc* enclosingMethodDesc,
+CompilationInterface::resolveSpecialMethod(MethodDesc* enclosingMethodDesc,
                                                      uint32 methodToken) {
-    Class_Handle enclosingDrlVMClass = methodGetClass(enclosingMethodDesc);
+    Class_Handle enclosingDrlVMClass = enclosingMethodDesc->getParentHandle();
     
     Method_Handle resolvedMethod = 
         resolve_special_method(compileHandle,enclosingDrlVMClass,methodToken);
@@ -803,9 +633,9 @@ DrlVMCompilationInterface::resolveSpecialMethod(MethodDesc* enclosingMethodDesc,
 }    
 
 MethodDesc* 
-DrlVMCompilationInterface::resolveStaticMethod(MethodDesc* enclosingMethodDesc,
+CompilationInterface::resolveStaticMethod(MethodDesc* enclosingMethodDesc,
                                                     uint32 methodToken) {
-    Class_Handle enclosingDrlVMClass = methodGetClass(enclosingMethodDesc);
+    Class_Handle enclosingDrlVMClass = enclosingMethodDesc->getParentHandle();
     
     Method_Handle resolvedMethod = 
         resolve_static_method(compileHandle,enclosingDrlVMClass,methodToken);
@@ -814,9 +644,9 @@ DrlVMCompilationInterface::resolveStaticMethod(MethodDesc* enclosingMethodDesc,
 }    
 
 MethodDesc* 
-DrlVMCompilationInterface::resolveInterfaceMethod(MethodDesc* enclosingMethodDesc,
+CompilationInterface::resolveInterfaceMethod(MethodDesc* enclosingMethodDesc,
                                                        uint32 methodToken) {
-    Class_Handle enclosingDrlVMClass = methodGetClass(enclosingMethodDesc);
+    Class_Handle enclosingDrlVMClass = enclosingMethodDesc->getParentHandle();
     
     Method_Handle resolvedMethod = 
         resolve_interface_method(compileHandle,enclosingDrlVMClass,methodToken);
@@ -825,9 +655,9 @@ DrlVMCompilationInterface::resolveInterfaceMethod(MethodDesc* enclosingMethodDes
 }    
 
 NamedType*
-DrlVMCompilationInterface::resolveNamedType(MethodDesc* enclosingMethodDesc,
+CompilationInterface::resolveNamedType(MethodDesc* enclosingMethodDesc,
                                                  uint32 typeToken) {
-    Class_Handle enclosingDrlVMClass = methodGetClass(enclosingMethodDesc);
+    Class_Handle enclosingDrlVMClass = enclosingMethodDesc->getParentHandle();
     
     Class_Handle ch = 
         resolve_class(compileHandle,enclosingDrlVMClass,typeToken);
@@ -838,9 +668,9 @@ DrlVMCompilationInterface::resolveNamedType(MethodDesc* enclosingMethodDesc,
 }
 
 NamedType*
-DrlVMCompilationInterface::resolveNamedTypeNew(MethodDesc* enclosingMethodDesc,
+CompilationInterface::resolveNamedTypeNew(MethodDesc* enclosingMethodDesc,
                                                     uint32 typeToken) {
-    Class_Handle enclosingDrlVMClass = methodGetClass(enclosingMethodDesc);
+    Class_Handle enclosingDrlVMClass = enclosingMethodDesc->getParentHandle();
     
     Class_Handle ch = 
         resolve_class_new(compileHandle,enclosingDrlVMClass,typeToken);
@@ -851,9 +681,9 @@ DrlVMCompilationInterface::resolveNamedTypeNew(MethodDesc* enclosingMethodDesc,
 }
 
 Type*
-DrlVMCompilationInterface::getFieldType(MethodDesc* enclosingMethodDesc,
+CompilationInterface::getFieldType(MethodDesc* enclosingMethodDesc,
                                              uint32 entryCPIndex) {
-    Class_Handle enclosingDrlVMClass = methodGetClass(enclosingMethodDesc);
+    Class_Handle enclosingDrlVMClass = enclosingMethodDesc->getParentHandle();
     Java_Type drlType = (Java_Type)class_get_cp_field_type(enclosingDrlVMClass, (unsigned short)entryCPIndex);
     switch (drlType) {
     case JAVA_TYPE_BOOLEAN:  return typeManager.getBooleanType();
@@ -874,32 +704,18 @@ DrlVMCompilationInterface::getFieldType(MethodDesc* enclosingMethodDesc,
     assert(0);
     return NULL;
 }
-const char*
-DrlVMCompilationInterface::methodSignatureString(MethodDesc* enclosingMethodDesc,
-                                                      uint32 methodToken) {
-    Class_Handle enclosingDrlVMClass = methodGetClass(enclosingMethodDesc);
-    return class_get_cp_entry_signature(enclosingDrlVMClass, (unsigned short)methodToken);
-}
 
 void* 
-DrlVMCompilationInterface::loadStringObject(MethodDesc* enclosingMethodDesc,
+CompilationInterface::loadStringObject(MethodDesc* enclosingMethodDesc,
                                                 uint32 stringToken) {
-    Class_Handle enclosingDrlVMClass = methodGetClass(enclosingMethodDesc);
+    Class_Handle enclosingDrlVMClass = enclosingMethodDesc->getParentHandle();
     return class_get_const_string_intern_addr(enclosingDrlVMClass,stringToken);
 }
 
-//
-// Note: This is CLI only but temporarily here for Java also
-//
-void*
-DrlVMCompilationInterface::loadToken(MethodDesc* enclosingMethodDesc,uint32 token) {
-    assert(false); return 0;
-}
-
 Type*
-DrlVMCompilationInterface::getConstantType(MethodDesc* enclosingMethodDesc,
+CompilationInterface::getConstantType(MethodDesc* enclosingMethodDesc,
                                          uint32 constantToken) {
-    Class_Handle enclosingDrlVMClass = methodGetClass(enclosingMethodDesc);
+    Class_Handle enclosingDrlVMClass = enclosingMethodDesc->getParentHandle();
     Java_Type drlType = (Java_Type)class_get_const_type(enclosingDrlVMClass,constantToken);
     switch (drlType) {
     case JAVA_TYPE_STRING:   return typeManager.getSystemStringType(); 
@@ -915,118 +731,63 @@ DrlVMCompilationInterface::getConstantType(MethodDesc* enclosingMethodDesc,
 }
 
 const void*
-DrlVMCompilationInterface::getConstantValue(MethodDesc* enclosingMethodDesc,
+CompilationInterface::getConstantValue(MethodDesc* enclosingMethodDesc,
                                           uint32 constantToken) {
-    Class_Handle enclosingDrlVMClass = methodGetClass(enclosingMethodDesc);
+    Class_Handle enclosingDrlVMClass = enclosingMethodDesc->getParentHandle();
     return class_get_const_addr(enclosingDrlVMClass,constantToken);
 }
 
 MethodDesc*
-DrlVMCompilationInterface::getOverriddenMethod(NamedType* type, MethodDesc *methodDesc) {
+CompilationInterface::getOverriddenMethod(NamedType* type, MethodDesc *methodDesc) {
     Method_Handle m = method_find_overridden_method((Class_Handle) type->getVMTypeHandle(),
-                         ((DrlVMMethodDesc*)methodDesc)->getDrlVMMethod());
+                         methodDesc->getMethodHandle());
     if (!m)
         return NULL;
     return getMethodDesc(m);
 }
 
-ClassHierarchyIterator* 
-DrlVMCompilationInterface::getClassHierarchyIterator(ObjectType* baseType) {
-    DrlVMClassHierarchyIterator* iterator = new (getMemManager()) DrlVMClassHierarchyIterator(getTypeManager(), baseType);
-    return iterator->isValid() ? iterator : NULL;
-}
-
 ClassHierarchyMethodIterator* 
-DrlVMCompilationInterface::getClassHierarchyMethodIterator(ObjectType* baseType, MethodDesc* methodDesc) {
-    DrlVMClassHierarchyMethodIterator* iterator = new (getMemManager()) DrlVMClassHierarchyMethodIterator(*this, baseType, methodDesc);
-    return iterator->isValid() ? iterator : NULL;
+CompilationInterface::getClassHierarchyMethodIterator(ObjectType* baseType, MethodDesc* methodDesc) {
+    return new (getMemManager()) ClassHierarchyMethodIterator(*this, baseType, methodDesc);
 }
 
-// accessors for method info, code and data
-Byte*        DrlVMCompilationInterface::getInfoBlock(MethodDesc* methodDesc) {
-    Method_Handle drlMethod = ((DrlVMMethodDesc*)methodDesc)->getDrlVMMethod();
-    return methodGetStacknGCInfoBlock(drlMethod, getJitHandle());
-}
-
-uint32        DrlVMCompilationInterface::getInfoBlockSize(MethodDesc* methodDesc) {
-    Method_Handle drlMethod = ((DrlVMMethodDesc*)methodDesc)->getDrlVMMethod();
-    return methodGetStacknGCInfoBlockSize(drlMethod,getJitHandle());
-}
-
-Byte*        DrlVMCompilationInterface::getCodeBlockAddress(MethodDesc* methodDesc, int32 id) {
-    Method_Handle drlMethod = ((DrlVMMethodDesc*)methodDesc)->getDrlVMMethod();
-    return method_get_code_block_addr_jit_new(drlMethod,getJitHandle(),id);
-}
-
-uint32        DrlVMCompilationInterface::getCodeBlockSize(MethodDesc* methodDesc, int32 id) {
-    Method_Handle drlMethod = ((DrlVMMethodDesc*)methodDesc)->getDrlVMMethod();
-    return method_get_code_block_size_jit_new(drlMethod,getJitHandle(),id);
-}
-
-void         DrlVMCompilationInterface::setNotifyWhenClassIsExtended(ObjectType * type, 
+void         CompilationInterface::setNotifyWhenClassIsExtended(ObjectType * type, 
                                                                    void * callbackData) {
     void * typeHandle = type->getVMTypeHandle();
     vm_register_jit_extended_class_callback(getJitHandle(), (Class_Handle) typeHandle,callbackData);
 }
 
-void         DrlVMCompilationInterface::setNotifyWhenMethodIsOverridden(MethodDesc * methodDesc, 
+void         CompilationInterface::setNotifyWhenMethodIsOverridden(MethodDesc * methodDesc, 
                                                                       void * callbackData) {
-    Method_Handle drlMethod = ((DrlVMMethodDesc *)methodDesc)->getDrlVMMethod();
+    Method_Handle drlMethod = methodDesc->getMethodHandle();
     vm_register_jit_overridden_method_callback(getJitHandle(), drlMethod, callbackData);
 }
 
-void         DrlVMCompilationInterface::setNotifyWhenMethodIsRecompiled(MethodDesc * methodDesc, 
+void         CompilationInterface::setNotifyWhenMethodIsRecompiled(MethodDesc * methodDesc, 
                                                                       void * callbackData) {
-    Method_Handle drlMethod = ((DrlVMMethodDesc *)methodDesc)->getDrlVMMethod();
+    Method_Handle drlMethod = methodDesc->getMethodHandle();
     vm_register_jit_recompiled_method_callback(getJitHandle(),drlMethod,callbackData);
 }
 
-
-bool DrlVMCompilationInterface::mayInlineObjectSynchronization(ObjectSynchronizationInfo & syncInfo) {
-    unsigned threadIdReg, syncHeaderOffset, syncHeaderWidth, lockOwnerOffset, lockOwnerWidth;
-    Boolean jitClearsCcv;
-    Boolean mayInline = 
-        jit_may_inline_object_synchronization(&threadIdReg, &syncHeaderOffset, &syncHeaderWidth,
-                                              &lockOwnerOffset, &lockOwnerWidth, &jitClearsCcv);
-    if (mayInline == TRUE) {
-        syncInfo.threadIdReg = threadIdReg;
-        syncInfo.syncHeaderOffset = syncHeaderOffset;
-        syncInfo.syncHeaderWidth = syncHeaderWidth;
-        syncInfo.lockOwnerOffset = lockOwnerOffset;
-        syncInfo.lockOwnerWidth = lockOwnerWidth;
-        syncInfo.jitClearsCcv = (jitClearsCcv == TRUE);
-    }
-    return mayInline == TRUE;
-}
-
-void DrlVMCompilationInterface::sendCompiledMethodLoadEvent(MethodDesc* methodDesc, MethodDesc* outerDesc,
+void CompilationInterface::sendCompiledMethodLoadEvent(MethodDesc* methodDesc, MethodDesc* outerDesc,
         uint32 codeSize, void* codeAddr, uint32 mapLength, 
         AddrLocation* addrLocationMap, void* compileInfo) {
 
-    Method_Handle method = (Method_Handle)getRuntimeMethodHandle(methodDesc);
-    Method_Handle outer  = (Method_Handle)getRuntimeMethodHandle(outerDesc);
+    Method_Handle method = methodDesc->getMethodHandle();
+    Method_Handle outer  = outerDesc->getMethodHandle();
 
     compiled_method_load(method, codeSize, codeAddr, mapLength, addrLocationMap, compileInfo, outer); 
 }
 
-bool DrlVMDataInterface::areReferencesCompressed() {
-    return (vm_references_are_compressed() != 0);
-}
-
-void * DrlVMDataInterface::getHeapBase() {
+void * VMInterface::getHeapBase() {
     return vm_heap_base_address();
 }
 
-void * DrlVMDataInterface::getHeapCeiling() {
+void * VMInterface::getHeapCeiling() {
     return vm_heap_ceiling_address();
 }
 
-void DrlVMBinaryRewritingInterface::rewriteCodeBlock(Byte* codeBlock, Byte*  newCode, size_t size) {
-    vm_patch_code_block(codeBlock, newCode, size);
-}
-
-
-ObjectType * DrlVMCompilationInterface::resolveClassUsingBootstrapClassloader( const char * klassName ) {
+ObjectType * CompilationInterface::resolveClassUsingBootstrapClassloader( const char * klassName ) {
     Class_Handle cls = class_load_class_by_name_using_bootstrap_class_loader(klassName);
     if( NULL == cls ) {
         return NULL;
@@ -1035,7 +796,7 @@ ObjectType * DrlVMCompilationInterface::resolveClassUsingBootstrapClassloader( c
 };
 
 
-MethodDesc* DrlVMCompilationInterface::resolveMethod( ObjectType* klass, const char * methodName, const char * methodSig) {
+MethodDesc* CompilationInterface::resolveMethod( ObjectType* klass, const char * methodName, const char * methodSig) {
     Class_Handle cls = (Class_Handle)klass->getVMTypeHandle();
     assert( NULL != cls );  
     Method_Handle mh = class_lookup_method_recursively( cls, methodName, methodSig);
@@ -1046,14 +807,14 @@ MethodDesc* DrlVMCompilationInterface::resolveMethod( ObjectType* klass, const c
 };
 
 JIT_Handle
-DrlVMCompilationInterface::getJitHandle() const {
+CompilationInterface::getJitHandle() const {
     return getCompilationContext()->getCurrentJITContext()->getJitHandle();
 }
 
 
 
 
-NamedType* DrlVMMethodDesc::getThrowType(uint32 i) {
+NamedType* MethodDesc::getThrowType(uint32 i) {
     assert(i<=method_number_throws(drlMethod));
     Class_Handle ch = method_get_throws(drlMethod, i);
     assert(ch);
@@ -1061,8 +822,76 @@ NamedType* DrlVMMethodDesc::getThrowType(uint32 i) {
     return res;
 }
 
-bool DrlVMMethodDesc::hasAnnotation(NamedType* type) {
+bool MethodDesc::hasAnnotation(NamedType* type) const {
     return method_has_annotation(drlMethod, (Class_Handle)type->getVMTypeHandle());
+}
+
+void FieldDesc::printFullName(::std::ostream &os) { 
+    os<<getParentType()->getName()<<"::"<<field_get_name(drlField); 
+}
+void MethodDesc::printFullName(::std::ostream& os) {
+    os<<getParentType()->getName()<<"::"<<getName()<<method_get_descriptor(drlMethod);
+}
+
+FieldDesc*    CompilationInterface::getFieldDesc(Field_Handle field) {
+FieldDesc* fieldDesc = fieldDescs->lookup(field);
+if (fieldDesc == NULL) {
+fieldDesc = new (memManager)
+FieldDesc(field,this,nextMemberId++);
+fieldDescs->insert(field,fieldDesc);
+}
+return fieldDesc;
+}
+
+MethodDesc*   CompilationInterface:: getMethodDesc(Method_Handle method, JIT_Handle jit) {
+assert(method);
+MethodDesc* methodDesc = methodDescs->lookup(method);
+if (methodDesc == NULL) {
+methodDesc = new (memManager)
+MethodDesc(method, jit, this, nextMemberId++);
+methodDescs->insert(method,methodDesc);
+}
+return methodDesc;
+}
+
+CompilationInterface::CompilationInterface(Compile_Handle c, 
+                                           Method_Handle m, JIT_Handle jit, 
+                                           MemoryManager& mm, OpenMethodExecutionParams& comp_params, 
+                                           CompilationContext* cc, TypeManager& tpm) :
+compilationContext(cc), memManager(mm),
+typeManager(tpm), compilation_params(comp_params)
+{
+    fieldDescs = new (mm) PtrHashTable<FieldDesc>(mm,32);
+    methodDescs = new (mm) PtrHashTable<MethodDesc>(mm,32);
+    compileHandle = c;
+    nextMemberId = 0;
+    methodToCompile = NULL;
+    methodToCompile = getMethodDesc(m, jit);
+    flushToZeroAllowed = false;
+}
+
+void    CompilationInterface::lockMethodData(void)    { g_compileLock.lock();     }
+
+void    CompilationInterface::unlockMethodData(void)  { g_compileLock.unlock();   }
+
+Byte*   CompilationInterface::allocateCodeBlock(size_t size, size_t alignment, CodeBlockHeat heat, int32 id, 
+bool simulate) {
+    return method_allocate_code_block(methodToCompile->getMethodHandle(), getJitHandle(), 
+        size, alignment, heat, id, simulate ? CAA_Simulate : CAA_Allocate);
+}
+Byte*        CompilationInterface::allocateDataBlock(size_t size, size_t alignment) {
+    return method_allocate_data_block(methodToCompile->getMethodHandle(),getJitHandle(),size, alignment);
+}
+Byte*        CompilationInterface::allocateInfoBlock(size_t size) {
+    size += sizeof(void *);
+    Byte *addr = method_allocate_info_block(methodToCompile->getMethodHandle(),getJitHandle(),size);
+    return (addr + sizeof(void *));
+}
+Byte*        CompilationInterface::allocateJITDataBlock(size_t size, size_t alignment) {
+    return method_allocate_jit_data_block(methodToCompile->getMethodHandle(),getJitHandle(),size, alignment);
+}
+MethodDesc*     CompilationInterface::getMethodDesc(Method_Handle method) {
+    return getMethodDesc(method, getJitHandle());
 }
 
 } //namespace Jitrino

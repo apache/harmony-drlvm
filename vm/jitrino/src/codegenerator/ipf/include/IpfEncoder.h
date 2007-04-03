@@ -573,8 +573,7 @@ typedef StlVector<Completer>      CompVector;
 
 class Encoder {
   public:
-    static bool patchCallAddr(BinaryRewritingInterface &binaryRewritingInterface
-            , char * callAddr, char * methodAddr);
+    static bool patchCallAddr(char * callAddr, char * methodAddr);
     static void readBundle(uint64 *code, uint64 * tmplt, uint64 * slots);
     
     static char *  getMnemonic(InstCode opcode) { return instDesc[opcode].mnemonic; };

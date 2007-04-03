@@ -1654,8 +1654,7 @@ void Encoder::readBundle(uint64 *code, uint64 * tmplt, uint64 * slots)
 }
 
 //----------------------------------------------------------------------------//
-bool Encoder::patchCallAddr(BinaryRewritingInterface & binaryRewritingInterface
-        , char * callAddr, char * methodAddr)
+bool Encoder::patchCallAddr(char * callAddr, char * methodAddr)
 {
     uint64   p[2];
     uint64   s[3];
@@ -1689,7 +1688,7 @@ bool Encoder::patchCallAddr(BinaryRewritingInterface & binaryRewritingInterface
     p[1] |= s[2] << 23;
 
     // write to callAddr
-    binaryRewritingInterface.rewriteCodeBlock((Byte *)callAddr, 
+    VMInterface::rewriteCodeBlock((Byte *)callAddr, 
                                               (Byte *)p,
                                               IPF_BUNDLE_SIZE);
 

@@ -655,7 +655,7 @@ VMEXPORT Boolean method_iterator_initialize(ChaMethodIterator*, Method_Handle me
  * @return The current method of the iterator. <code>NULL</code> is returned if
  *         therea are no more methods.
  */
-VMEXPORT Method_Handle method_iterator_get_current(ChaMethodIterator*);
+VMEXPORT Method_Handle method_iterator_get_current(const ChaMethodIterator*);
 
 /**
  * Advances the iterator.

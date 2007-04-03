@@ -15,21 +15,11 @@
  *  limitations under the License.
  */
 
-/**
- * @author Intel, Mikhail Y. Fursov
- * @version $Revision: 1.15.12.2.4.4 $
- *
- */
-
 #include <assert.h>
 #include "VMInterface.h"
+#include "PlatformDependant.h"
 
 namespace Jitrino {
-
-//
-//  This file contains definitions of the interface properties that 
-//  do not depend on the interface implementation.
-//
 
 /*
 The following struct and array contains a mapping between RuntimeHelperId 

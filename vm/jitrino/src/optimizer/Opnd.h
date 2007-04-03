@@ -28,7 +28,6 @@
 
 #include "open/types.h"
 #include "Type.h"
-#include "Exceptions.h"
 #include "MemoryManager.h"
 
 namespace Jitrino {

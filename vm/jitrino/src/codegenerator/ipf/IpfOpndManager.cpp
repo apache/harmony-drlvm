@@ -246,8 +246,8 @@ OpndManager::OpndManager(MemoryManager &mm, CompilationInterface &compilationInt
 
     containCall = false;
 
-    refsCompressed       = compilationInterface.areReferencesCompressed();
-    vtablePtrsCompressed = compilationInterface.areVTablePtrsCompressed();
+    refsCompressed       = VMInterface::areReferencesCompressed();
+    vtablePtrsCompressed = VMInterface::areVTablePtrsCompressed();
     heapBase             = NULL;
     heapBaseImm          = NULL;
     vtableBase           = NULL;
@@ -333,7 +333,7 @@ Opnd *OpndManager::getVtableBaseImm() {
 Opnd *OpndManager::getVtableOffset() { 
 
     if (vtableOffset == NULL) {
-        int64 offset = compilationInterface.getVTableOffset();
+        int64 offset = VMInterface::getVTableOffset();
         if (offset != 0) vtableOffset = newImm(offset);
     }
     return vtableOffset;
@@ -349,7 +349,7 @@ void OpndManager::initCompBases(BbNode *enterNode) {
     InstVector &insts    = enterNode->getInsts();
 
     if (heapBase != NULL) {
-        baseValue  = (uint64) compilationInterface.getHeapBase();
+        baseValue  = (uint64) VMInterface::getHeapBase();
         
         baseImm    = newImm(baseValue);
         Inst *inst = new(mm) Inst(mm, INST_MOVL, p0, heapBase, baseImm);
@@ -357,11 +357,11 @@ void OpndManager::initCompBases(BbNode *enterNode) {
         IPF_LOG << "    HeapBase initialization code inserted" << endl;
     }
     if (heapBaseImm != NULL) {
-        heapBaseImm->setValue((uint64)compilationInterface.getHeapBase());
+        heapBaseImm->setValue((uint64)VMInterface::getHeapBase());
     }
         
     if (vtableBase != NULL) {
-        baseValue  = (uint64) compilationInterface.getVTableBase();
+        baseValue  = (uint64) VMInterface::getVTableBase();
 
         baseImm    = newImm(baseValue);
         Inst *inst = new(mm) Inst(mm, INST_MOVL, p0, vtableBase, baseImm);
@@ -369,7 +369,7 @@ void OpndManager::initCompBases(BbNode *enterNode) {
         IPF_LOG << "    VtableBase initialization code inserted" << endl;
     }
     if (vtableBaseImm != NULL) {
-        vtableBaseImm->setValue((uint64)compilationInterface.getVTableBase());
+        vtableBaseImm->setValue((uint64)VMInterface::getVTableBase());
     }
 }
 
@@ -448,9 +448,8 @@ int32 OpndManager::newPreservReg(OpndKind opndKind, RegBitSet &unusedMask) {
 
 int64 OpndManager::getElemBaseOffset() { 
     
-    DrlVMTypeManager typeManager(mm);
-    typeManager.init(compilationInterface);
-    ArrayType *arrayType = typeManager.getArrayType(typeManager.getInt64Type());
+    TypeManager& tm = compilationInterface.getTypeManager();
+    ArrayType *arrayType = tm.getArrayType(tm.getInt64Type());
     return arrayType->getArrayElemOffset();
 }
 

@@ -20,7 +20,7 @@
  */
 
 #include "Ia32IRManager.h"
-#include "DrlVMInterface.h"
+#include "VMInterface.h"
 
 namespace Jitrino
 {
@@ -239,7 +239,7 @@ public:
 static ActionFactory<BBPollingTransformer> _bbp("bbp");
 
 
-const uint32 gcFlagOffsetOffset = flagTLSSuspendRequestOffset();
+const uint32 gcFlagOffsetOffset = VMInterface::flagTLSSuspendRequestOffset();
 
 Opnd*
 BBPolling::getOrCreateTLSBaseReg(Edge* e)
@@ -836,4 +836,5 @@ BBPolling::verifyDeeper(Node* node, Node* unwind, Node* exit)
 #endif // _DEBUG
 
 }}; // namespace Ia32
+
 

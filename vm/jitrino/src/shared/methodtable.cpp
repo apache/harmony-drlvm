@@ -56,7 +56,6 @@
 // FOO=(Ljava/lang/Object;)
 // FOO=(L;)  (jit only methods with a single class ptr in signature)
 
-//#include "defines.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>

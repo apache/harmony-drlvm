@@ -26,7 +26,6 @@
 #include "Dominator.h"
 #include "inliner.h"
 #include "EMInterface.h"
-#include "open/vm.h"
 
 namespace Jitrino {
 
@@ -460,11 +459,13 @@ Devirtualizer::guardCallsInBlock(IRManager& regionIRM, Node* node) {
                         // Do not devirtualize - there were no real calls here
                         return;
                     }
-                    Log::out() << "Valued type: " << class_get_name(vtable_get_class((VTable_Handle)vtHandle)) << std::endl;
 
                     // get desired MethodDesc object
                     assert(vtHandle != 0);
-                    ObjectType* clssObjectType = _typeManager.getObjectType(vtable_get_class((VTable_Handle)vtHandle));
+                    ObjectType* clssObjectType = _typeManager.getObjectType(VMInterface::getTypeHandleFromVTable((void*)vtHandle));
+                    Log::out() << "Valued type: ";
+                    clssObjectType->print(Log::out());
+                    Log::out() << std::endl;
                     candidateMeth = regionIRM.getCompilationInterface().resolveMethod(clssObjectType, origMethodDesc->getName(), origMethodDesc->getSignatureString());
                     Log::out() << "candidateMeth: "<< std::endl;
                     candidateMeth->printFullName(Log::out());
@@ -482,7 +483,7 @@ Devirtualizer::guardCallsInBlock(IRManager& regionIRM, Node* node) {
 
                 } else if (profileSelection) {
                     ClassHierarchyMethodIterator* iterator = regionIRM.getCompilationInterface().getClassHierarchyMethodIterator(baseType, origMethodDesc);
-                    if(iterator) {
+                    if(iterator->isValid()) {
                         ProfilingInterface* pi = cc->getProfilingInterface();
                         while (iterator->hasNext()) {
                             MethodDesc* tmpMeth = iterator->getNext();
@@ -502,7 +503,7 @@ Devirtualizer::guardCallsInBlock(IRManager& regionIRM, Node* node) {
                     }
                 }
                 if (candidateMeth) {
-                    jitrino_assert(regionIRM.getCompilationInterface(), origMethodDesc->getParentType()->isClass());
+                    jitrino_assert(origMethodDesc->getParentType()->isClass());
                     methodInst->setMethodDesc(candidateMeth);
                     //
                     // Try to guard this call

@@ -21,8 +21,6 @@
 
 #include "Ia32Printer.h"
 #include "Log.h"
-#include "../../vm/drl/DrlVMInterface.h"
-#include "../../shared/PlatformDependant.h"
 #include "CGSupport.h"
 #include "PlatformDependant.h"
 
@@ -1398,7 +1396,7 @@ void printDot(
 void printRuntimeArgs(::std::ostream& os, uint32 opndCount, CallingConvention::OpndInfo * infos, JitFrameContext * context)
 {
     MemoryManager mm(0x1000, "printRuntimeOpndInternalHelper");
-    DrlVMTypeManager tm(mm); tm.init();
+    TypeManager tm(mm); tm.init();
     os<<opndCount<<" args: ";
     for (uint32 i=0; i<opndCount; i++){
         CallingConvention::OpndInfo & info=infos[i];
@@ -1494,7 +1492,7 @@ void printRuntimeObjectOpnd(::std::ostream& os, TypeManager & tm, const void * p
         os<<"(INVALID PTR)";
         return;
     }
-    POINTER_SIZE_INT vtableOffset=tm.getVTableOffset();
+    POINTER_SIZE_INT vtableOffset = VMInterface::getVTableOffset();
 
     //  assume that vtable pointer in object head is allocation handle 
     void * allocationHandle=*(void**)(((uint8*)p)+vtableOffset);
@@ -1590,10 +1588,11 @@ void printRuntimeObjectContent(::std::ostream& os, TypeManager & tm, Type * type
 void __stdcall printRuntimeOpndInternalHelper(const void * p)
 {
     MemoryManager mm(0x1000, "printRuntimeOpndInternalHelper");
-    DrlVMTypeManager tm(mm); tm.init();
+    TypeManager tm(mm); tm.init();
     printRuntimeObjectOpnd(::std::cout, tm, p);
 }
 
 
 }}; //namespace Ia32
+
 

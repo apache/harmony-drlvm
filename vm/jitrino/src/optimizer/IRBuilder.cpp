@@ -310,9 +310,9 @@ void IRBuilder::init(IRManager* irm, TranslatorFlags* traFlags, MemoryManager& t
     simplifier  = new (mm) IRBuilderSimplifier(*this);
     
     CompilationInterface* ci = getCompilationContext()->getVMCompilationInterface();
-    irBuilderFlags.insertWriteBarriers    = ci->insertWriteBarriers();
+    irBuilderFlags.insertWriteBarriers    = ci->needWriteBarriers();
     irBuilderFlags.isBCMapinfoRequired = ci->isBCMapInfoRequired();
-    irBuilderFlags.compressedReferences   = irBuilderFlags.compressedReferences || ci->areReferencesCompressed();
+    irBuilderFlags.compressedReferences   = irBuilderFlags.compressedReferences || VMInterface::areReferencesCompressed();
 
     if (irBuilderFlags.isBCMapinfoRequired) {
         MethodDesc* meth = irm->getCompilationInterface().getMethodToCompile();
@@ -2025,10 +2025,7 @@ IRBuilder::genLdStaticAddrNoChecks(Type* type, FieldDesc* fieldDesc) {
     Opnd* dst = lookupHash(Op_LdStaticAddr, fieldDesc->getId());
     if (dst) return dst;
 
-    if (fieldDesc->isUnmanagedStatic()) {
-        // can't mark an unmanaged pointer as non-null
-        dst = createOpnd(typeManager->getIntPtrType());
-    } else if (irBuilderFlags.compressedReferences && type->isObject()) {
+    if (irBuilderFlags.compressedReferences && type->isObject()) {
         // until VM type system is upgraded,
         // fieldDesc type will have uncompressed ref type;
         // compress it

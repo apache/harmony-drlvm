@@ -28,6 +28,7 @@
 
 #include <float.h>
 #include <math.h>
+#include "PlatformDependant.h"
 
 /*
  * The constant folding optimization is described in [S.Muchnick. Advanced Compiler
@@ -39,28 +40,12 @@ namespace Jitrino {
 
 using namespace std;
 
-inline int isFinite(double s) {
-    return finite(s);
-}
-
 inline float _chgsign(float f) {
         return copysignf(f, signbit(f) ? (float)1.0 : (float)-1.0 );
 }
 
 inline double _chgsign(double d) {
         return copysign(d, signbit(d) ? 1.0 : -1.0 );
-}
-
-// isnan(double s) is declared in float.h
-#else
-inline int isFinite(double s) {
-    return _finite(s);
-}
-
-// _chgsign(double d) is declared in float.h
-
-inline int isnan(double s) {
-    return _isnan(s);
 }
 #endif
 
@@ -94,7 +79,7 @@ template <typename tointtype, typename fromfloattype>
 inline tointtype float2int(fromfloattype f)
 {
     if (isnan(f)) return (tointtype) 0;
-    if (isFinite(f) && 
+    if (finite(f) && 
         (((fromfloattype(minint<tointtype>(0))) < f) &&
          (f < fromfloattype(maxint<tointtype>(0)))))
         return (tointtype) f; // both C++ and Java truncate
@@ -106,7 +91,7 @@ template <typename tointtype, typename fromfloattype>
 inline tointtype float2uint(fromfloattype s)
 {
     if (isnan(s) || (s < 0.0)) return (tointtype) 0;
-    if (isFinite(s) && (s < maxuintasfloat<tointtype>(0)))
+    if (finite(s) && (s < maxuintasfloat<tointtype>(0)))
         return (tointtype) s;
     return maxuint<tointtype>(0);
 }

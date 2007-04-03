@@ -446,14 +446,13 @@ JavaByteCodeTranslator::initLocalVars() {
 
 void 
 JavaByteCodeTranslator::initArgs() {
-    MethodSignatureDesc* methodSignatureDesc = methodToCompile.getMethodSig();
     // incoming argument and return value information
-    numArgs = methodSignatureDesc->getNumParams();
-    retType = methodSignatureDesc->getReturnType();
+    numArgs = methodToCompile.getNumParams();
+    retType = methodToCompile.getReturnType();
     argTypes = new (memManager) Type*[numArgs];
     args = new (memManager) Opnd*[numArgs];
     for (uint16 i=0; i<numArgs; i++) {
-        Type* argType = methodSignatureDesc->getParamType(i);
+        Type* argType = methodToCompile.getParamType(i);
         // argType == NULL if it fails to be resolved. Respective exception
         // will be thrown at the point of usage
         argTypes[i] = argType != NULL ? argType : typeManager.getNullObjectType();
@@ -602,14 +601,14 @@ JavaByteCodeTranslator::resolveTypeNew(uint32 cpIndex) {
 
 const char*
 JavaByteCodeTranslator::methodSignatureString(uint32 cpIndex) {
-    return compilationInterface.methodSignatureString(&methodToCompile,cpIndex);
+    return compilationInterface.getSignatureString(&methodToCompile,cpIndex);
 }
 
 uint32 
 JavaByteCodeTranslator::labelId(uint32 offset) {
     uint32 labelId = prepass.getLabelId(offset);
     if (labelId == (uint32) -1)
-        jitrino_assert(compilationInterface, 0);
+        jitrino_assert(0);
     return labelId;
 }
 
@@ -620,13 +619,13 @@ JavaByteCodeTranslator::labelId(uint32 offset) {
 // called when invalid byte code is encountered
 void 
 JavaByteCodeTranslator::invalid() {
-    jitrino_assert(compilationInterface,0);
+    jitrino_assert(0);
 }
 
 // called when an error occurs during the byte code parsing
 void 
 JavaByteCodeTranslator::parseError() {
-    jitrino_assert(compilationInterface,0);
+    jitrino_assert(0);
 }
 
 void 
@@ -727,7 +726,7 @@ JavaByteCodeTranslator::offset(uint32 offset) {
                 Log::out() << "LABEL "; labelInst->print(Log::out()); Log::out() << labelInst->getState();
                 Log::out() << "CATCH "; handler->getLabelInst()->print(Log::out()); Log::out() << ::std::endl;
             }
-        } else {jitrino_assert(compilationInterface,0);}    // only catch blocks should occur in Java
+        } else {jitrino_assert(0);}    // only catch blocks should occur in Java
     }
     // generate the label instruction
     if(translationFlags.newCatchHandling && !catchLabels.empty()) {
@@ -1011,7 +1010,7 @@ JavaByteCodeTranslator::ldc(uint32 constPoolIndex) {
             opnd = irBuilder.genLdConstant((float)value);
         } else {
             // Invalid type!
-            jitrino_assert(compilationInterface,0);
+            jitrino_assert(0);
         }
     }
     pushOpnd(opnd);
@@ -1034,7 +1033,7 @@ JavaByteCodeTranslator::ldc2(uint32 constPoolIndex) {
         opnd = irBuilder.genLdConstant((double)value);
     } else {
         // Invalid type!
-        jitrino_assert(compilationInterface,0);
+        jitrino_assert(0);
     }
     pushOpnd(opnd);
 }
@@ -1736,7 +1735,7 @@ JavaByteCodeTranslator::return_(uint32 off) {
 //-----------------------------------------------------------------------------
 void 
 JavaByteCodeTranslator::linkingException(uint32 constPoolIndex, uint32 operation) {
-    Class_Handle enclosingDrlVMClass = compilationInterface.methodGetClass(&methodToCompile);
+    Class_Handle enclosingDrlVMClass = methodToCompile.getParentHandle();
     irBuilder.genThrowLinkingException(enclosingDrlVMClass, constPoolIndex, operation);
 }
 //-----------------------------------------------------------------------------
@@ -1764,8 +1763,7 @@ void JavaByteCodeTranslator::pseudoInvoke(const char* methodSig)
 // method invocation byte codes
 //-----------------------------------------------------------------------------
 Opnd** 
-JavaByteCodeTranslator::popArgs(MethodSignatureDesc* methodSignatureDesc) {
-    uint32 numArgs = methodSignatureDesc->getNumParams();
+JavaByteCodeTranslator::popArgs(uint32 numArgs) {
     // pop source operands
     Opnd** srcOpnds = new (memManager) Opnd*[numArgs];
     for (int i=numArgs-1; i>=0; i--) 
@@ -1783,12 +1781,10 @@ JavaByteCodeTranslator::invokevirtual(uint32 constPoolIndex) {
         pseudoInvoke(methodSig_string);
         return;
     }
-    jitrino_assert(compilationInterface,methodDesc);
-    MethodSignatureDesc* methodSig = methodDesc->getMethodSig();
-    jitrino_assert(compilationInterface,methodSig);
-    Opnd** srcOpnds = popArgs(methodSig);
-    uint32 numArgs = methodSig->getNumParams();
-    Type* returnType = methodSig->getReturnType();
+    jitrino_assert(methodDesc);
+    uint32 numArgs = methodDesc->getNumParams();
+    Opnd** srcOpnds = popArgs(numArgs);
+    Type* returnType = methodDesc->getReturnType();
 
     if (isMagicClass(methodDesc->getParentType())) {
         genMagic(methodDesc, numArgs, srcOpnds, returnType);
@@ -1928,12 +1924,10 @@ JavaByteCodeTranslator::invokespecial(uint32 constPoolIndex) {
         pseudoInvoke(methodSig_string);
         return;
     }
-    jitrino_assert(compilationInterface,methodDesc);
-    MethodSignatureDesc* methodSig = methodDesc->getMethodSig();
-    jitrino_assert(compilationInterface,methodSig);
-    uint32 numArgs = methodSig->getNumParams();
-    Opnd** srcOpnds = popArgs(methodSig);
-    Type* returnType = methodSig->getReturnType();
+    jitrino_assert(methodDesc);
+    uint32 numArgs = methodDesc->getNumParams();
+    Opnd** srcOpnds = popArgs(numArgs);
+    Type* returnType = methodDesc->getReturnType();
     // invokespecial can throw a null pointer exception
     Opnd *tauNullChecked = irBuilder.genTauCheckNull(srcOpnds[0]);
     Opnd* dst;
@@ -1990,12 +1984,10 @@ JavaByteCodeTranslator::invokestatic(uint32 constPoolIndex) {
         pseudoInvoke(methodSig_string);
         return;
     }
-    jitrino_assert(compilationInterface,methodDesc);
-    MethodSignatureDesc* methodSig = methodDesc->getMethodSig();
-    jitrino_assert(compilationInterface,methodSig);
-    uint32 numArgs = methodSig->getNumParams();
-    Opnd** srcOpnds = popArgs(methodSig);
-    Type *returnType = methodSig->getReturnType();
+    jitrino_assert(methodDesc);
+    uint32 numArgs = methodDesc->getNumParams();
+    Opnd** srcOpnds = popArgs(numArgs);
+    Type *returnType = methodDesc->getReturnType();
     if (returnType == NULL) {
         // This means that it was not resolved successfully but it can be resolved later
         // inside the callee (with some "magic" custom class loader for example)
@@ -2033,12 +2025,10 @@ JavaByteCodeTranslator::invokeinterface(uint32 constPoolIndex,uint32 count) {
         pseudoInvoke(methodSig_string);
         return;
     }
-    jitrino_assert(compilationInterface,methodDesc);
-    MethodSignatureDesc* methodSig = methodDesc->getMethodSig();
-    jitrino_assert(compilationInterface,methodSig);
-    Type* returnType = methodSig->getReturnType();
-    uint32 numArgs = methodSig->getNumParams();
-    Opnd** srcOpnds = popArgs(methodSig);
+    jitrino_assert(methodDesc);
+    uint32 numArgs = methodDesc->getNumParams();
+    Opnd** srcOpnds = popArgs(numArgs);
+    Type* returnType = methodDesc->getReturnType();
     // callintf can throw a null pointer exception
     Opnd *tauNullChecked = irBuilder.genTauCheckNull(srcOpnds[0]);
     Opnd* thisOpnd = srcOpnds[0];
@@ -2105,7 +2095,7 @@ JavaByteCodeTranslator::new_(uint32 constPoolIndex) {
         pushOpnd(irBuilder.genLdNull());
         return;
     }
-    jitrino_assert(compilationInterface,type);
+    jitrino_assert(type);
     pushOpnd(irBuilder.genNewObj(type));
 }
 void 
@@ -2128,7 +2118,7 @@ JavaByteCodeTranslator::newarray(uint8 atype) {
         type = typeManager.getInt32Type(); break;
     case 11: // long
         type = typeManager.getInt64Type(); break;
-    default: jitrino_assert(compilationInterface,0);
+    default: jitrino_assert(0);
     }
     Opnd* arrayOpnd = irBuilder.genNewArray(type,popOpnd());
     pushOpnd(arrayOpnd);
@@ -2150,7 +2140,7 @@ JavaByteCodeTranslator::anewarray(uint32 constPoolIndex) {
         pushOpnd(irBuilder.genLdNull());
         return;
     }
-    jitrino_assert(compilationInterface,type);
+    jitrino_assert(type);
     pushOpnd(irBuilder.genNewArray(type,popOpnd()));
 }
 
@@ -2166,8 +2156,8 @@ JavaByteCodeTranslator::multianewarray(uint32 constPoolIndex,uint8 dimensions) {
         pushOpnd(irBuilder.genLdNull());
         return;
     }
-    jitrino_assert(compilationInterface,arraytype);
-    jitrino_assert(compilationInterface,dimensions > 0);
+    jitrino_assert(arraytype);
+    jitrino_assert(dimensions > 0);
     Opnd** countOpnds = new (memManager) Opnd*[dimensions];
     // pop the sizes
     for (int i=dimensions-1; i>=0; i--) {
@@ -2200,7 +2190,7 @@ JavaByteCodeTranslator::checkcast(uint32 constPoolIndex) {
         linkingException(constPoolIndex, OPCODE_CHECKCAST);
         return; // can be left as is
     }
-    jitrino_assert(compilationInterface,type);
+    jitrino_assert(type);
     pushOpnd(irBuilder.genCast(popOpnd(),type));
 }
 
@@ -2213,7 +2203,7 @@ JavaByteCodeTranslator::instanceof(const uint8* bcp, uint32 constPoolIndex, uint
         pushOpnd(irBuilder.genLdConstant((int32)0));
         return 3;
     }
-    jitrino_assert(compilationInterface,type);
+    jitrino_assert(type);
 
     Opnd* src = popOpnd();
     Type* srcType = src->getType();
@@ -2789,8 +2779,8 @@ JavaByteCodeTranslator::arraycopyOptimizable(MethodDesc * methodDesc,
     bool dstIsArray = dstType->isArray();
     ArrayType* srcAsArrayType = srcType->asArrayType();
     ArrayType* dstAsArrayType = dstType->asArrayType();
-    bool srcIsArrOfPrimitive = srcIsArray && typeManager.isArrayOfPrimitiveElements(srcAsArrayType->getVMTypeHandle());
-    bool dstIsArrOfPrimitive = dstIsArray && typeManager.isArrayOfPrimitiveElements(dstAsArrayType->getVMTypeHandle());
+    bool srcIsArrOfPrimitive = srcIsArray && VMInterface::isArrayOfPrimitiveElements(srcAsArrayType->getVMTypeHandle());
+    bool dstIsArrOfPrimitive = dstIsArray && VMInterface::isArrayOfPrimitiveElements(dstAsArrayType->getVMTypeHandle());
     if ( !(srcIsArray && dstIsArray) ) {
          throwsASE = true;
     } else if ( srcIsArrOfPrimitive ) {
@@ -2804,7 +2794,7 @@ JavaByteCodeTranslator::arraycopyOptimizable(MethodDesc * methodDesc,
         // To avoid this we just reject the inlining of System::arraycopy call in this case.
         NamedType* srcElemType = srcAsArrayType->getElementType();
         NamedType* dstElemType = dstAsArrayType->getElementType();
-        throwsASE = ! typeManager.isSubClassOf(srcElemType->getVMTypeHandle(),dstElemType->getVMTypeHandle());
+        throwsASE = ! VMInterface::isSubClassOf(srcElemType->getVMTypeHandle(),dstElemType->getVMTypeHandle());
     }
     if ( throwsASE )
         return false;

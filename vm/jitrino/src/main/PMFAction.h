@@ -22,7 +22,7 @@
 #ifndef _PMFACTION_H_
 #define _PMFACTION_H_
 
-#include "PMF.h"    // sorry ...
+#include "PMF.h"
 
 #include <string.h>
 

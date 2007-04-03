@@ -27,7 +27,6 @@
 #include "Ia32IRManager.h"
 #include "Ia32StackInfo.h"
 #include "Ia32BCMap.h"
-#include "DrlVMInterface.h"
 
 #ifdef _DEBUG
 #define GCMAP_TRACK_IDS
@@ -55,7 +54,7 @@ namespace Ia32 {
         const GCSafePointsInfo* getGCSafePointsInfo() const {return offsetsInfo;}
         
         static const POINTER_SIZE_INT* findGCSafePointStart(const POINTER_SIZE_INT* image, POINTER_SIZE_INT ip);
-        static void checkObject(DrlVMTypeManager& tm, const void* p);
+        static void checkObject(TypeManager& tm, const void* p);
 
     private:
         void processBasicBlock(IRManager& irm, const Node* block);

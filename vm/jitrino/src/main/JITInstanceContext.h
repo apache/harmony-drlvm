@@ -22,7 +22,7 @@
 #ifndef _JIT_INSTANCE_CONTEXT_H_
 #define _JIT_INSTANCE_CONTEXT_H_
 
-#include "jit_export.h"
+#include "open/em.h"
 #include "MemoryManager.h"
 
 #include <assert.h>

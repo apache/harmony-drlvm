@@ -22,7 +22,6 @@
  */
 
 #include <stdio.h>
-#include "assert.h"
 #include "JavaByteCodeParser.h"
 
 namespace Jitrino {

@@ -23,8 +23,6 @@
 #define _IA32_STACK_INFO_H_
 
 #include "CodeGenIntfc.h"
-#include "open/types.h"
-#include "jit_export.h"
 #include "MemoryManager.h"
 #include "VMInterface.h"
 #include "Type.h"

@@ -15,24 +15,13 @@
  *  limitations under the License.
  */
 
-/**
- * @author Intel, Mikhail Y. Fursov
- * @version $Revision: 1.16.16.4 $
- *
- */
+#include <iostream>
+#include <streambuf>
 
-//
-// interface to print dot files, you should subclass this class and
-// implement the printBody() method
-//
 #include "PrintDotFile.h"
 #include "Inst.h"
 #include "optimizer.h"
 #include "Log.h"
-#include <stdlib.h>
-#include <fstream>
-#include <iostream>
-#include <streambuf>
 
 
 namespace Jitrino {
@@ -49,6 +38,9 @@ class dotbuf : public ::std::streambuf
 public:
     dotbuf(::std::streambuf* sb) :
       inquotes(false), bracedepth(0), m_sb(sb) {}
+private:
+    // copy ctor to make msvc compiler happy
+    dotbuf(dotbuf& sb){}
 
 protected:
     int_type overflow(int_type c) {
@@ -91,6 +83,9 @@ public:
       ::std::ostream(&m_buf), m_buf(out.rdbuf()) {}
 
 private:
+    // copy ctor to make msvc compiler happy
+    dotstream(dotstream& sb) : ::std::ostream(NULL), m_buf(NULL) {}
+
     dotbuf m_buf;
 };
 

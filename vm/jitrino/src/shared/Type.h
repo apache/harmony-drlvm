@@ -32,14 +32,6 @@
 
 namespace Jitrino {
 
-#ifdef PLATFORM_POSIX
-#ifndef __cdecl
-#define __cdecl
-#endif
-#endif
-
-class MethodDesc;
-class FieldDesc;
 class SsaOpnd;
 //
 // forward declarations
@@ -262,7 +254,7 @@ public:
         return (SystemObject <= tag && tag <= ITablePtrObj);
     }
     static bool isCompressedReference(Tag tag, CompilationInterface &compInt) {
-        if (compInt.areReferencesCompressed()) {
+        if (VMInterface::areReferencesCompressed()) {
             // Note: When a reference is converted to a managed pointer, it is converted from a 
             // compressed pointer in the heap to a raw pointer in the heap
             return ((SystemObject <= tag && tag <= BoxedValue)
@@ -407,20 +399,19 @@ public:
 class MethodPtrType : public FunctionPtrType {
 public:
     MethodPtrType(MethodDesc* md, TypeManager& tm, bool isCompressed=false, ValueName obj=NULL) 
-        : FunctionPtrType(isCompressed), methodDesc(md), methodSig(md->getMethodSig()), typeManager(tm), object(obj) {}
+        : FunctionPtrType(isCompressed), methodDesc(md), typeManager(tm), object(obj) {}
     virtual ~MethodPtrType() {}
 
     MethodPtrType* asMethodPtrType() { return this; }
-    uint32 getNumParams() { return methodSig->getNumParams(); }
+    uint32 getNumParams() { return methodDesc->getNumParams(); }
     Type* getParamType(uint32 i);
-    Type* getReturnType() { return methodSig->getReturnType(); }
+    Type* getReturnType() { return methodDesc->getReturnType(); }
     bool isInstance() { return methodDesc->isInstance(); }
     MethodDesc*     getMethodDesc()         {return methodDesc;}
     void print(::std::ostream& os);
     ValueName getThisValueName() { return object; }
 private:
     MethodDesc* methodDesc;
-    MethodSignatureDesc* methodSig;
     TypeManager& typeManager;
     ValueName object;
 };
@@ -455,7 +446,6 @@ public:
     bool isFinalizable();
     bool isBeforeFieldInit();
     bool isLikelyExceptionType();
-    bool isVariableSizeType();
     bool isNamedType() {return true;}
     //
     // Returns the runtime identifier for this type; 
@@ -486,16 +476,8 @@ public:
     //
     // returns size & alignment of the un-boxed value
     //
-    virtual uint32        getUnboxedSize();
-    virtual uint32        getUnboxedAlignment();
-    //
-    // returns the number of fields in the value type
-    //
-    virtual uint32        getUnboxedNumFields();
-    //
-    // returns the field with the given index 
-    //
-    virtual FieldDesc*    getUnboxedFieldDesc(uint32 index);
+    virtual uint32        getUnboxedSize(){assert(0); return 0;}
+    //virtual uint32        getUnboxedAlignment();
     void        print(::std::ostream& os);
 protected:
     UserValueType(Tag t,void* td,TypeManager& tm) : NamedType(t,td,tm) {}
@@ -655,9 +637,8 @@ public:
     TypeManager(MemoryManager& mm);
     virtual ~TypeManager() {}
 
-    void    init(CompilationInterface &compInt);
     void    init();
-    MemoryManager&  getMemManager()        {return memManager;}
+    //MemoryManager&  getMemManager()        {return memManager;}
 
     Type* getPrimitiveType(Type::Tag);
     // Convert type to the type which variable will have
@@ -721,10 +702,6 @@ public:
             unmanagedPtrTypes.insert(pointedToType,type);
         }
         return type;
-    }
-    Type*    getFunPtrType(Type* retType,uint32 numParams,Type** paramTypes) {
-        assert(0);
-        return NULL;
     }
     MethodPtrType*    getMethodPtrType(MethodDesc* methodDesc) {
         MethodPtrType* type = methodPtrTypes.lookup(methodDesc);
@@ -827,7 +804,7 @@ public:
     {
         if (vmAllocationHandle==NULL)
             return NULL;
-        void * vmTypeHandle = getTypeHandleFromAllocationHandle(vmAllocationHandle);
+        void * vmTypeHandle = VMInterface::getTypeHandleFromAllocationHandle(vmAllocationHandle);
         if ( vmTypeHandle==NULL 
                 || vmTypeHandle>(void*)-100
                 || ((POINTER_SIZE_INT)vmTypeHandle&0x3)!=0 ) {
@@ -895,56 +872,11 @@ private:
     bool areReferencesCompressed;
 
     NamedType* initBuiltinType(Type::Tag tag);
-public:
-    //
-    // VM specific methods for types
-    // Move to VM interface class and delegate
-    //
-    virtual void*       getBuiltinValueTypeVMTypeHandle(Type::Tag) = 0;
-    virtual void*       getSystemObjectVMTypeHandle() = 0;
-    virtual void*       getSystemClassVMTypeHandle() = 0;
-    virtual void*       getSystemStringVMTypeHandle() = 0;
-    virtual void*       getArrayVMTypeHandle(void* elemVMTypeHandle,bool isUnboxed) = 0;
-    virtual const char* getTypeName(void* vmTypeHandle) = 0;
-    virtual const char* getTypeNameQualifier(void* vmTypeHandle) = 0;
-    virtual void*       getSuperTypeVMTypeHandle(void* vmTypeHandle) = 0;
-    virtual const char* getMethodName(MethodDesc*) = 0;
-    virtual void*       getArrayElemVMTypeHandle(void* vmTypeHandle) = 0;
-    virtual bool        isArrayType(void* vmTypeHandle) = 0;
-    virtual bool        isArrayOfPrimitiveElements(void* vmTypeHandle) = 0;
-    virtual bool        isEnumType(void* vmTypeHandle) = 0;
-    virtual bool        isValueType(void* vmTypeHandle) = 0;
-    virtual bool        isFinalType(void* vmTypeHandle) = 0;
-    virtual bool        isLikelyExceptionType(void* vmTypeHandle) = 0;
-    virtual bool        isInterfaceType(void* vmTypeHandle) = 0;
-    virtual bool        isAbstractType(void* vmTypeHandle) = 0;
-    virtual bool        isSystemStringType(void* vmTypeHandle) = 0;
-    virtual bool        isSystemObjectType(void* vmTypeHandle) = 0;
-    virtual bool        isSystemClassType(void* vmTypeHandle) = 0;
-    virtual bool        needsInitialization(void* vmTypeHandle) = 0;
-    virtual bool        isFinalizable(void* vmTypeHandle) = 0;
-    virtual bool        isBeforeFieldInit(void* vmTypeHandle) = 0;
-    virtual bool        getClassFastInstanceOfFlag(void* vmTypeHandle) = 0;
-    virtual int         getClassDepth(void* vmTypeHandle) = 0;
-    virtual bool        isInitialized(void* vmTypeHandle) = 0;
-    virtual bool        isVariableSizeType(void* vmTypeHandle) = 0;
-    virtual void*       getVTable(void* vmTypeHandle) = 0;
-    virtual void*       getRuntimeClassHandle(void* vmTypeHandle) = 0;
-    virtual void*       getAllocationHandle(void* vmTypeHandle) = 0;
-    virtual bool        isSubClassOf(void* vmTypeHandle1,void* vmTypeHandle2) = 0;
-    virtual uint32      getUnboxedOffset(void* vmTypeHandle) = 0;
-    virtual uint32      getArrayElemOffset(void* vmElemTypeHandle,bool isUnboxed) = 0;
-    virtual uint32      getBoxedSize(void * vmTypeHandle) = 0;
-    virtual uint32      getUnboxedSize(void* vmTypeHandle) = 0;
-    virtual uint32      getUnboxedAlignment(void* vmTypeHandle) = 0;
-    virtual uint32      getUnboxedNumFields(void* vmTypeHandle) = 0;
-    virtual FieldDesc*  getUnboxedFieldDesc(void* vmTypeHandle,uint32 index) = 0;
-    virtual uint32      getArrayLengthOffset() = 0;
-    virtual Type*       getUnderlyingType(void* enumVMTypeHandle) = 0;
+    void*       getBuiltinValueTypeVMTypeHandle(Type::Tag);
 
-    virtual uint32      getVTableOffset() = 0;
-    virtual void*       getTypeHandleFromAllocationHandle(void* vmAllocationHandle) = 0;
-    
+    void*        systemObjectVMTypeHandle;
+    void*        systemClassVMTypeHandle;
+    void*        systemStringVMTypeHandle;
 };
 
 } //namespace Jitrino 

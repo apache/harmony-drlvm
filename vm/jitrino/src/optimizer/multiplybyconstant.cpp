@@ -23,7 +23,6 @@
 
 #undef STANDALONE_TEST
 
-#include "assert.h"
 #include <iostream>
 #include <fstream>
 #include <float.h>
@@ -56,20 +55,11 @@
 
 #include "Stl.h"
 #include "simplifier.h"
-#include "open/types.h"
 #include "optarithmetic.h"
 
 
 
 namespace Jitrino {
-
-#ifdef PLATFORM_POSIX
-// isnan(double s) is declared in float.h
-#else
-inline bool isnan(double s) {
-    return (_isnan(s) != 0);
-}
-#endif
 
 #ifndef DEBUG_MULTIPLYBYCONSTANT
 #define DEBUGPRINT(x)

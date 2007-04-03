@@ -357,11 +357,11 @@ static inline void m_assert(bool cond)  {
 #endif    
 }
 
-void GCMap::checkObject(DrlVMTypeManager& tm, const void* p)  {
+void GCMap::checkObject(TypeManager& tm, const void* p)  {
     if (p==NULL) return;
     m_assert (!(p<(const void*)0x10000)); //(INVALID PTR)
     m_assert((((POINTER_SIZE_INT)p)&0x3)==0); // check for valid alignment
-    POINTER_SIZE_INT vtableOffset=tm.getVTableOffset();
+    POINTER_SIZE_INT vtableOffset = VMInterface::getVTableOffset();
     void * allocationHandle=*(void**)(((uint8*)p)+vtableOffset);
     m_assert (!(allocationHandle<(void*)0x10000 || (((POINTER_SIZE_INT)allocationHandle)&0x3)!=0)); //INVALID VTABLE PTR
     ObjectType * type=tm.getObjectTypeFromAllocationHandle(allocationHandle);

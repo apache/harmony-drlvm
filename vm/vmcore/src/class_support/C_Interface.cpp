@@ -288,22 +288,28 @@ method_allocate_code_block(Method_Handle m,
                            JIT_Handle j,
                            size_t size,
                            size_t alignment,
-                           unsigned heat,
+                           CodeBlockHeat heat,
                            int id,
                            Code_Allocation_Action action)
 {
     Method *method = (Method *)m;
     assert(method);
 
-    Class_Handle UNUSED clss = method_get_class(method);
-    assert(clss);
-
     JIT *jit = (JIT *)j;
     assert(jit);
 
-    Byte *code_block = NULL;
+    uint32 drlHeat;
+    if (heat == CodeBlockHeatMin)
+        drlHeat = CODE_BLOCK_HEAT_COLD;
+    else if (heat == CodeBlockHeatMax)
+        drlHeat = CODE_BLOCK_HEAT_MAX/2;
+    else {
+        assert (heat == CodeBlockHeatDefault);
+        drlHeat = CODE_BLOCK_HEAT_DEFAULT;
+    }
+
     // the following method is safe to call from multiple threads
-    code_block = (Byte *) method->allocate_code_block_mt(size, alignment, jit, heat, id, action);
+    Byte *code_block = (Byte *) method->allocate_code_block_mt(size, alignment, jit, drlHeat, id, action);
 
     return code_block;
 } // method_allocate_code_block
@@ -2570,7 +2576,7 @@ Boolean method_iterator_initialize(ChaMethodIterator *chaClassIterator, Method_H
 } // method_iterator_initialize
 
 
-Method_Handle method_iterator_get_current(ChaMethodIterator *chaClassIterator)
+Method_Handle method_iterator_get_current(const ChaMethodIterator *chaClassIterator)
 {
     return (chaClassIterator->_class_iter._is_valid ? chaClassIterator->_current : NULL);
 } // method_iterator_get_current

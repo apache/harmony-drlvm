@@ -27,7 +27,6 @@
 #include "Ia32Printer.h"
 #include "Ia32CodeGenerator.h"
 #include "Dominator.h"
-#include "float.h"
 #include <math.h>
 
 namespace Jitrino
@@ -486,7 +485,7 @@ EntryPointPseudoInst * IRManager::newEntryPointPseudoInst(const CallingConventio
     // it's just a self-check, as the currently assumed behaviour is that this method is invoked only once.
     assert(NULL == entryPointInst);
 
-    EntryPointPseudoInst * inst=new(memoryManager, methodDesc.getMethodSig()->getNumParams() * 2) EntryPointPseudoInst(this, instId++, cc);
+    EntryPointPseudoInst * inst=new(memoryManager, methodDesc.getNumParams() * 2) EntryPointPseudoInst(this, instId++, cc);
     fg->getEntryNode()->appendInst(inst);
 
     inst->assignOpcodeGroup(this);
@@ -1503,7 +1502,7 @@ void IRManager::calculateLivenessInfo()
             CGNode* node = (CGNode*)*it;
             if (node == exitNode) {
                 if (!methodDesc.isStatic() 
-                    && (methodDesc.isSynchronized() || methodDesc.isMethodClassIsLikelyExceptionType())) 
+                    && (methodDesc.isSynchronized() || methodDesc.isParentClassIsLikelyExceptionType())) 
                 {
                     BitSet * exitLs  = node->getLiveAtEntry();
                     EntryPointPseudoInst * entryPointInst = getEntryPointInst();
@@ -1659,7 +1658,7 @@ void IRManager::finalizeCallSites()
 #ifdef _EM64T_
     MethodDesc& md = getMethodDesc();
     if (!md.isStatic() 
-            && (md.isSynchronized() || md.isMethodClassIsLikelyExceptionType())) {
+            && (md.isSynchronized() || md.isParentClassIsLikelyExceptionType())) {
         Type* thisType = entryPointInst->getOpnd(0)->getType();
         entryPointInst->thisOpnd = newMemOpnd(thisType, MemOpndKind_StackAutoLayout, getRegOpnd(STACK_REG), 0); 
         entryPointInst->getBasicBlock()->appendInst(newCopyPseudoInst(Mnemonic_MOV, entryPointInst->thisOpnd, entryPointInst->getOpnd(0)));
@@ -1871,7 +1870,7 @@ void IRManager::expandSystemExceptions(uint32 reservedForFlags)
 #ifndef _EM64T_
                         bb->appendInst(newInst(Mnemonic_CMP, opnd, newImmOpnd(opnd->getType(), 0)));
 #else
-                        bb->appendInst(newInst(Mnemonic_CMP, opnd,newImmOpnd(opnd->getType(), (Type::isCompressedReference(opnd->getType()->tag) || !opnd->getType()->isReference())? 0: (POINTER_SIZE_INT)compilationInterface.getHeapBase())));
+                        bb->appendInst(newInst(Mnemonic_CMP, opnd,newImmOpnd(opnd->getType(), (Type::isCompressedReference(opnd->getType()->tag) || !opnd->getType()->isReference())? 0: (POINTER_SIZE_INT)VMInterface::getHeapBase())));
 #endif
                         bb->appendInst(newBranchInst(Mnemonic_JZ, throwBasicBlock, oldTarget));
                         fg->addEdge(bb, throwBasicBlock, 0);
@@ -1962,7 +1961,7 @@ void IRManager::resolveRuntimeInfo(Opnd* opnd) const {
             value=(POINTER_SIZE_INT)((NamedType*)info->getValue(0))->getRuntimeIdentifier();
             break;
         case Opnd::RuntimeInfo::Kind_MethodRuntimeId: 
-            value=(POINTER_SIZE_INT)compilationInterface.getRuntimeMethodHandle((MethodDesc*)info->getValue(0));
+            value=(POINTER_SIZE_INT)((MethodDesc*)info->getValue(0))->getMethodHandle();
             break;
         case Opnd::RuntimeInfo::Kind_AllocationHandle: 
             /* The value of the operand is [0]->ObjectType::getAllocationHandle() */
@@ -1993,7 +1992,7 @@ void IRManager::resolveRuntimeInfo(Opnd* opnd) const {
             break;
         case Opnd::RuntimeInfo::Kind_VTableAddrOffset:
             /** The value of the operand is compilationInterface.getVTableOffset(), zero args */
-            value=(POINTER_SIZE_INT)compilationInterface.getVTableOffset();
+            value = (int64)VMInterface::getVTableOffset();
             break;
         case Opnd::RuntimeInfo::Kind_VTableConstantAddr:
             /** The value of the operand is [0]->ObjectType::getVTable() */
@@ -2358,4 +2357,5 @@ void SessionAction::computeDominators(void)
 
 } //namespace Ia32
 } //namespace Jitrino
+
 

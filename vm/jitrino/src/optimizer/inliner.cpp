@@ -21,6 +21,7 @@
  *
  */
 
+#include "EMInterface.h"
 #include "Log.h"
 #include "methodtable.h"
 #include "inliner.h"
@@ -31,7 +32,6 @@
 #include "Loop.h"
 #include "simplifier.h"
 #include "JavaByteCodeParser.h"
-#include "EdgeProfiler.h"
 #include "StaticProfiler.h"
 #include "optimizer.h"
 
@@ -444,15 +444,12 @@ protected:
 
 bool
 Inliner::isLeafMethod(MethodDesc& methodDesc) {
-    if(methodDesc.isJavaByteCodes()) {
-        uint32 size = methodDesc.getByteCodeSize();
-        const Byte* bytecodes = methodDesc.getByteCodes();
-        ByteCodeParser parser((const uint8*)bytecodes,size);
-        JavaByteCodeLeafSearchCallback leafTester;
-        parser.parse(&leafTester);
-        return leafTester.isLeaf();
-    }
-    return false;
+    uint32 size = methodDesc.getByteCodeSize();
+    const Byte* bytecodes = methodDesc.getByteCodes();
+    ByteCodeParser parser((const uint8*)bytecodes,size);
+    JavaByteCodeLeafSearchCallback leafTester;
+    parser.parse(&leafTester);
+    return leafTester.isLeaf();
 }
 
 void

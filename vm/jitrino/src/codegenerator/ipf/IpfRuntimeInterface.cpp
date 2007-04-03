@@ -198,8 +198,7 @@ void* RuntimeInterface::getAddressOfSecurityObject(MethodDesc              *meth
 
 //----------------------------------------------------------------------------------------//
 
-bool RuntimeInterface::recompiledMethodEvent(BinaryRewritingInterface &binaryRewritingInterface,
-                                             MethodDesc               *methodDesc, 
+bool RuntimeInterface::recompiledMethodEvent(MethodDesc               *methodDesc, 
                                              void                     *data) {
     //std::cout << "IPF::RuntimeInterface::recompiledMethodEvent " << methodDesc->getName() << endl;
 
@@ -207,7 +206,7 @@ bool RuntimeInterface::recompiledMethodEvent(BinaryRewritingInterface &binaryRew
     char **indirectAddr = (char **)methodDesc->getIndirectAddress();
     char *methodAddr    = *indirectAddr;
 
-    return Encoder::patchCallAddr(binaryRewritingInterface, callAddr, methodAddr);
+    return Encoder::patchCallAddr(callAddr, methodAddr);
 }
 
 //----------------------------------------------------------------------------------------//

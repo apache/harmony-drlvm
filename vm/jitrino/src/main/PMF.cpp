@@ -24,7 +24,6 @@
 #include "PMFAction.h"
 #include "FixFileName.h"
 #include "JITInstanceContext.h"
-#include "open/vm.h"
 #include <ctype.h>
 #include <errno.h>
 #include <stdlib.h>

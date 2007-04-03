@@ -59,7 +59,6 @@
 #include "StaticProfiler.h"
 #include "lazyexceptionopt.h"
 #include "CompilationContext.h"
-#include "EdgeProfiler.h"
 #include "PMFAction.h"
 
 namespace Jitrino {

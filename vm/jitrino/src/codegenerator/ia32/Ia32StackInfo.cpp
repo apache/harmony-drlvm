@@ -355,7 +355,7 @@ void StackInfo::registerInsts(IRManager& irm)
     MethodDesc& md = irm.getMethodDesc();
     if (!md.isStatic()) {
 #ifdef _EM64T_
-        if ((md.isSynchronized() || md.isMethodClassIsLikelyExceptionType())) {
+        if ((md.isSynchronized() || md.isParentClassIsLikelyExceptionType())) {
             EntryPointPseudoInst * entryPointInst = irm.getEntryPointInst();
             offsetOfThis = (uint32)entryPointInst->thisOpnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement)->getImmValue();
         } else {

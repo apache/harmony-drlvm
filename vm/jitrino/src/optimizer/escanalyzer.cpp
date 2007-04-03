@@ -33,8 +33,7 @@
 #include "ssa/SSA.h"
 #include "optpass.h"
 #include "devirtualizer.h"
-#include "DrlVMInterface.h"
-//#include "Windows.h"
+#include "VMInterface.h"
 
 namespace Jitrino {
 
@@ -1840,12 +1839,12 @@ EscAnalyzer::saveScannedMethodInfo() {
     mident->name=mname;
     mident->signature=msig;
     minfo->methodIdent=mident;
-    uint32 numpar = mdesc->getMethodSig()->getNumParams();
+    uint32 numpar = mdesc->getNumParams();
     minfo->numberOfArgs=numpar;
     ParamInfos* prminfos = new (globalMM) ParamInfos(globalMM);
     minfo->paramInfos=prminfos;
     minfo->retValueState=0;
-    if (mdesc->getMethodSig()->getReturnType()->isReference()) {
+    if (mdesc->getReturnType()->isReference()) {
         uint32 escstate = 3, bitstate = 0;
         for (it = cngNodes->begin( ); it != cngNodes->end( ); it++) {
             if ((*it)->nodeType==NT_EXITVAL) {
@@ -1961,7 +1960,7 @@ EscAnalyzer::scanCalleeMethod(Inst* call) {
             << "." << methodDesc->getName() << methodDesc->getSignatureString() 
             << "  " << methodDesc << std::endl;
         Log::out() << "    NumParams: " 
-            << methodDesc->getMethodSig()->getNumParams()<< std::endl;
+            << methodDesc->getNumParams()<< std::endl;
         Log::out() << "    isNative: " << methodDesc->isNative() << std::endl;
         Log::out() << "    isStatic: " << methodDesc->isStatic() << std::endl;
         Log::out() << "    isInstance: " << methodDesc->isInstance() << std::endl;
@@ -1971,7 +1970,6 @@ EscAnalyzer::scanCalleeMethod(Inst* call) {
         Log::out() << "    isInstanceInitializer: " 
             << methodDesc->isInstanceInitializer() << std::endl;
         Log::out() << "    isOverridden: " << methodDesc->isOverridden() << std::endl;
-        Log::out() << "    isJavaByteCodes: " << methodDesc->isJavaByteCodes() << std::endl;
    }
 #endif
 
@@ -1983,7 +1981,7 @@ EscAnalyzer::scanCalleeMethod(Inst* call) {
         returnOpnd = _opndManager.createSsaTmpOpnd(call->getDst()->getType());
 
     IRManager* inlinedIRM = new (eaMemManager) IRManager(irManager.getMemoryManager(), irManager, *methodDesc, returnOpnd);
-    DrlVMCompilationInterface& ci= (DrlVMCompilationInterface&)inlinedIRM->getCompilationInterface();
+    CompilationInterface& ci= inlinedIRM->getCompilationInterface();
     bool cibcmap = ci.isBCMapInfoRequired();
     if (cibcmap) {
         ci.setBCMapInfoRequired(false);
@@ -2249,7 +2247,7 @@ EscAnalyzer::setCreatedObjectStates() {
 
                         Log::out() << "---------------" << std::endl;
                         Log::out() << "    NumParams: " 
-                            << mdesc->getMethodSig()->getNumParams()<< std::endl;
+                            << mdesc->getNumParams()<< std::endl;
                         Log::out() << "    isNative: " 
                             << mdesc->isNative() << std::endl;
                         Log::out() << "    isStatic: " 
@@ -2266,8 +2264,6 @@ EscAnalyzer::setCreatedObjectStates() {
                             << mdesc->isInstanceInitializer() << std::endl;
                         Log::out() << "    isOverridden: " 
                             << mdesc->isOverridden() << std::endl;
-                        Log::out() << "    isJavaByteCodes: " 
-                            << mdesc->isJavaByteCodes() << std::endl;
 
                     }
                     if (_setState) {
@@ -3054,7 +3050,6 @@ EscAnalyzer::what_inst(Inst* inst,::std::ostream& os) {
         os << "      isInitOnly        " << fd->isInitOnly() << std::endl;
         os << "      isVolatile        " << fd->isVolatile() << std::endl;
         os << "      isLiteral         " << fd->isLiteral() << std::endl;
-        os << "      isUnmanagedStatic " << fd->isUnmanagedStatic() << std::endl;
         os << "      fldT      " << tt->getName() <<" "<< tt->tag<< std::endl;
         os << "      isObject  " << tt->isObject() << std::endl;
         os << "      isRef     " << tt->isReference()<< std::endl;
@@ -3116,16 +3111,13 @@ EscAnalyzer::what_inst(Inst* inst,::std::ostream& os) {
         os << "          isAbstract " << md->isAbstract() << std::endl;
         os << "          isClassInitializer " << md->isClassInitializer() << std::endl;
         os << "          isInstanceInitializer " << md->isInstanceInitializer() << std::endl;
-        os << "          isInitLocals " << md->isInitLocals() << std::endl;
         os << "          isOverridden " << md->isOverridden() << std::endl;
-        os << "          isJavaByteCodes " << md->isJavaByteCodes() << std::endl;
         os << "          Name " << md->getName() << std::endl;
         os << "          Signature " << md->getSignatureString() << std::endl;
-        MethodSignatureDesc* msd = md->getMethodSig();
-        uint32 n=msd->getNumParams();
+        uint32 n=md->getNumParams();
         os << "          Params " << n << std::endl;
         for (uint32 i = 0; i < n; i++) {
-            Type* tt = msd->getParamType(i);
+            Type* tt = md->getParamType(i);
             os << "          << "<<i<<" >> " << tt->getName() <<" "<< tt->tag<< std::endl;
             os << "              isObject  " << tt->isObject();
             os << "  isRef  " << tt->isReference()<< std::endl;
@@ -3300,7 +3292,7 @@ EscAnalyzer::addCnGNode_op(Inst* inst, Type* type, uint32 ntype) {
 
 EscAnalyzer::CnGNode*
 EscAnalyzer::addCnGNode_mp(Inst* inst, MethodDesc* md, uint32 ntype, uint32 narg) {
-    Type* type = md->getMethodSig()->getParamType(narg);
+    Type* type = md->getParamType(narg);
     CnGNode* cgnode = addCnGNode(inst, type, ntype); // new CG node
 
     cgnode->opndId = 0;
@@ -3384,7 +3376,6 @@ EscAnalyzer::instrExam(cfgNode* cfgnode) {
     CnGNode* cgnode;
     uint32 ntype=0;
     MethodDesc* md;
-    MethodSignatureDesc* msd;
     uint32 n;
     bool addinst;
     Inst* method_inst;
@@ -3590,11 +3581,10 @@ EscAnalyzer::instrExam(cfgNode* cfgnode) {
                     }
                 }
                 md=inst->asMethodInst()->getMethodDesc();
-                msd = md->getMethodSig();
-                n=msd->getNumParams();
+                n=md->getNumParams();
                 addinst=false;
                 for (uint32 i = 0; i < n; i++) {
-                    Type* tt = msd->getParamType(i);
+                    Type* tt = md->getParamType(i);
                     if (!tt->isReference()) {
                         continue;
                     }
@@ -3649,11 +3639,10 @@ EscAnalyzer::instrExam(cfgNode* cfgnode) {
                 } else {
                     md=method_inst->asMethodInst()->getMethodDesc();
                 }
-                msd = md->getMethodSig();
-                n=msd->getNumParams();
+                n=md->getNumParams();
                 addinst=false;
                 for (uint32 i = 0; i < n; i++) {
-                    Type* tt = msd->getParamType(i);
+                    Type* tt = md->getParamType(i);
                     if (!tt->isReference()) {
                         continue;
                     }
@@ -3868,7 +3857,6 @@ EscAnalyzer::instrExam2(cfgNode* node) {
     CnGNode* cgn_src;
     uint32 ntype=0;
     MethodDesc* md;
-    MethodSignatureDesc* msd;
     uint32 n;
     Inst* method_inst;
     bool not_exam = false;
@@ -3984,10 +3972,9 @@ EscAnalyzer::instrExam2(cfgNode* node) {
 
             case Op_DirectCall:      // call
                 md=inst->asMethodInst()->getMethodDesc();
-                msd = md->getMethodSig();
-                n=msd->getNumParams();
+                n=md->getNumParams();
                 for (uint32 i = 0; i < n; i++) {
-                    Type* tt = msd->getParamType(i);
+                    Type* tt = md->getParamType(i);
                     if (!tt->isReference()) 
                         continue;
                     cgnode=findCnGNode_mp(inst->getId(),i);
@@ -4006,10 +3993,9 @@ EscAnalyzer::instrExam2(cfgNode* node) {
                 } else {
                     md=method_inst->asMethodInst()->getMethodDesc();
                 }
-                msd = md->getMethodSig();
-                n=msd->getNumParams();
+                n=md->getNumParams();
                 for (uint32 i = 0; i < n; i++) {
-                    Type* tt = msd->getParamType(i);
+                    Type* tt = md->getParamType(i);
                     if (!tt->isReference()) 
                         continue;
                     cgnode = findCnGNode_mp(inst->getId(),i);
@@ -4203,7 +4189,7 @@ EscAnalyzer::printCnGNodes(char* text,::std::ostream& os) {
             os << ((MethodDesc*)(*it)->refObj)->getParentType()->getName() << "::";
             os << ((MethodDesc*)(*it)->refObj)->getName() << std::endl;
             os << "                                ";
-            os << ((MethodDesc*)(*it)->refObj)->getMethodSig()->getParamType((*it)->opndId)->getName();
+            os << ((MethodDesc*)(*it)->refObj)->getParamType((*it)->opndId)->getName();
         }
         if ((*it)->nodeType & NT_STFLD) {    //field node 
             fd = ((Inst*)(*it)->refObj)->asFieldAccessInst()->getFieldDesc();
@@ -6659,4 +6645,5 @@ EscAnalyzer::remBCMap(Inst* inst) {
 
 
 } //namespace Jitrino 
+
 

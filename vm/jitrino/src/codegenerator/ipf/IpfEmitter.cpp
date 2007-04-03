@@ -302,7 +302,7 @@ void Bundle::print() {
 #include <errno.h>
 #include <ucontext.h>
 
-void __stdcall sighandler(int sn, siginfo_t *si, void *_sc) {
+void sighandler(int sn, siginfo_t *si, void *_sc) {
     struct sigaction signal_action;
     struct ucontext * signal_ucontext;
     int saved_errno = errno;
@@ -1161,7 +1161,7 @@ bool Emitter::emitCode() {
     Inst *inst;
 
     codeoff = (char *)compilationinterface.allocateCodeBlock(
-            codesize, IPF_CODE_ALIGNMENT, CompilationInterface::CodeBlockHeatDefault, 0, false);
+            codesize, IPF_CODE_ALIGNMENT, CodeBlockHeatDefault, 0, false);
     assert(codeoff != NULL);
     IPF_LOG << endl;
     if ( codeoff ) {

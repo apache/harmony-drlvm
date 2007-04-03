@@ -41,6 +41,7 @@
 
 #include <float.h>
 #include <math.h>
+#include "PlatformDependant.h"
 
 namespace Jitrino {
 /*
@@ -49,20 +50,6 @@ namespace Jitrino {
  * Multiplication. PLDI, 1994], [S.Muchnick. Advanced Compiler Design and 
  * Implementation. Morgan Kaufmann, San Francisco, CA, 1997].
  */
-
-#ifdef PLATFORM_POSIX
-inline bool isFinite(double s) {
-    return (finite(s) != 0);
-}
-// isnan(double s) is declared in float.h
-#else
-inline bool isFinite(double s) {
-    return (_finite(s) != 0);
-}
-inline bool isnan(double s) {
-    return (_isnan(s) != 0);
-}
-#endif
 
 
 DEFINE_SESSION_ACTION(SimplificationPass, simplify, "Perform simplification pass");
@@ -3071,7 +3058,7 @@ Simplifier::simplifyTauCheckFinite(Opnd* opnd, bool &alwaysThrows) {
         case Type::Single: // single
             {
                 float s = value.s;
-                if (!isFinite((double)s)) {
+                if (!finite((double)s)) {
                     alwaysThrows = true;
                     return genTauUnsafe()->getDst();
                 }
@@ -3080,7 +3067,7 @@ Simplifier::simplifyTauCheckFinite(Opnd* opnd, bool &alwaysThrows) {
         case Type::Double:
             {
                 double d = value.d;
-                if (!isFinite(d)) {
+                if (!finite(d)) {
                     alwaysThrows = true;
                     return genTauUnsafe()->getDst();
                 }

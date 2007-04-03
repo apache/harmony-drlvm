@@ -142,7 +142,8 @@ void RuntimeSupport::registerExceptionHandlers() {
             dispatchNode = nodes[i]->getDispatchNode();
         }
     }
-    compilationInterface.setNumExceptionHandler(tryRegions.size());
+    MethodDesc* md = compilationInterface.getMethodToCompile();
+    md->setNumExceptionHandler(tryRegions.size());
     
     IPF_LOG << "    region registration:" << endl;
     if(tryRegions.size() == 0) {
@@ -152,7 +153,7 @@ void RuntimeSupport::registerExceptionHandlers() {
 
     IPF_LOG << "      start            end              handler          exception                           objIsDead" << endl;
     for(uint16 i=0; i<tryRegions.size(); i++) {
-        compilationInterface.setExceptionHandlerInfo(i, 
+        md->setExceptionHandlerInfo(i, 
             tryRegions[i]->startAddr, 
             tryRegions[i]->endAddr,
             tryRegions[i]->handlerAddr,

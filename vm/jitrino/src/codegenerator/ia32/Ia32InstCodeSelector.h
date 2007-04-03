@@ -362,7 +362,7 @@ private:
 
     MemoryManager& getCodeSelectorMemoryManager(){ return codeSelector.methodCodeSelector.codeSelectorMemManager; }
     
-    Type * getMethodReturnType() { return getMethodDesc()->getMethodSig()->getReturnType(); }
+    Type * getMethodReturnType() { return getMethodDesc()->getReturnType(); }
 
     Opnd *              sxtInt32(Opnd *opnd);
     Opnd *              zxtInt32(Opnd *opnd);
@@ -406,9 +406,6 @@ private:
     CG_OpndHandle *            genTauSplit(BranchInst * br);
 
     Type *              getRuntimeIdType() {return typeManager.getUnmanagedPtrType(typeManager.getIntPtrType());}
-
-    //  Check if we should inline synchronization
-    bool                inlineSync(CompilationInterface::ObjectSynchronizationInfo& syncInfo);
 
     //  Check if we should generate tau instructions
     bool                suppressTauInsts(){ return true; }; 

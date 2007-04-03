@@ -1,4 +1,3 @@
-
 /*
  *  Licensed to the Apache Software Foundation (ASF) under one or more
  *  contributor license agreements.  See the NOTICE file distributed with
@@ -33,7 +32,7 @@
 #include "jit_intf.h"
 
 
-#include "../shared/mkernel.h"
+#include "mkernel.h"
 //FIXME: needed for NOPs fix only, to be removed
 #include "enc_ia32.h"
 
@@ -48,15 +47,15 @@ using std::stack;
 
 #if !defined(PROJECT_JET)
     #include "Jitrino.h"
-    #include "VMInterface.h"
-    #include "DrlVMInterface.h"
     #include "EMInterface.h"
     #include "JITInstanceContext.h"
-#else
     /**
-     * See DrlVMInterface.h/g_compileLock and 
-     * DrlCompilationInterface::lockMethodData/unlockMethodData for details.
-     */
+    * A lock used to protect method's data in multi-threaded compilation.
+    * See VMInterface.h 
+    * CompilationInterface::lockMethodData/unlockMethodData for details.
+    */
+    extern Jitrino::Mutex g_compileLock;
+#else
     static Jitrino::Mutex g_compileLock;
 #endif
 
@@ -441,7 +440,7 @@ JIT_Result Compiler::compile(Compile_Handle ch, Method_Handle method,
         m_vmCode = (char*)method_allocate_code_block(m_method, m_hjit,
                                                      total_code_size, 
                                                      16/*fixme aligment*/, 
-                                                     CODE_BLOCK_HEAT_DEFAULT,
+                                                     CodeBlockHeatDefault,
                                                      0, CAA_Allocate);
         m_infoBlock.set_code_start(m_vmCode);
     }
@@ -1495,7 +1494,7 @@ void Compiler::initProfilingData(unsigned * pflags)
     ProfilingInterface* pi = jitContext->getProfilingInterface();
     if (pi->isProfilingEnabled(ProfileType_EntryBackedge, JITProfilingRole_GEN)) {
         MemoryManager mm(128, "jet_profiling_mm");
-        DrlVMMethodDesc md(m_method, m_hjit);
+        MethodDesc md(m_method, m_hjit);
 
         g_compileLock.lock();
 
@@ -1523,4 +1522,5 @@ void Compiler::initProfilingData(unsigned * pflags)
 
 
 }}; // ~namespace Jitrino::Jet
+
 

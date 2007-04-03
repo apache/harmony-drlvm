@@ -15,16 +15,6 @@
  *  limitations under the License.
  */
 
-/**
- * @author Intel, Mikhail Y. Fursov
- * @version $Revision: 1.10.24.4 $
- *
- */
-
-//
-// interface to print dot files, you should subclass this class and
-// override the method printDotBody()
-//
 #ifndef _PRINTDOTFILE_
 #define _PRINTDOTFILE_
 //
@@ -32,7 +22,7 @@
 // implement the printBody() method
 //
 
-#include <fstream>
+#include <ostream>
 
 namespace Jitrino {
 

@@ -20,7 +20,6 @@
  */
 
 #include "Ia32IRConstants.h"
-#include "../../shared/PlatformDependant.h"
 
 namespace Jitrino
 {

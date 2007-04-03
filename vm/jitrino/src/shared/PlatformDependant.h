@@ -36,6 +36,10 @@
     #define strdup _strdup
     #define strcmpi _strcmpi
     #define stricmp _stricmp
+
+    #define isnan _isnan
+    #define finite _finite
+
 #endif //_MSC_VER
 
 #undef stdcall__

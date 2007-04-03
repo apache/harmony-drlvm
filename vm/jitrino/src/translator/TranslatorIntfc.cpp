@@ -51,18 +51,14 @@ void TranslatorSession::translate() {
     IRManager* irm = cc->getHIRManager();
     assert(irm);
     MethodDesc& methodDesc = irm->getMethodDesc();
-    if (methodDesc.isJavaByteCodes()) {
-        //create IRBuilder
-        MemoryManager& mm = cc->getCompilationLevelMemoryManager();
-        TranslatorAction* myAction = (TranslatorAction*)getAction();
-        IRBuilder* irb = (IRBuilder*)myAction->getIRBuilderAction()->createSession(mm);
-        irb->setCompilationContext(cc);
-        MemoryManager tmpMM(1024, "IRBuilder::tmpMM");
-        irb->init(irm, &flags, tmpMM);
-        JavaTranslator::translateMethod(*cc->getVMCompilationInterface(), methodDesc, *irb);
-    } else {
-        assert(false);
-    }
+    //create IRBuilder
+    MemoryManager& mm = cc->getCompilationLevelMemoryManager();
+    TranslatorAction* myAction = (TranslatorAction*)getAction();
+    IRBuilder* irb = (IRBuilder*)myAction->getIRBuilderAction()->createSession(mm);
+    irb->setCompilationContext(cc);
+    MemoryManager tmpMM(1024, "IRBuilder::tmpMM");
+    irb->init(irm, &flags, tmpMM);
+    JavaTranslator::translateMethod(*cc->getVMCompilationInterface(), methodDesc, *irb);
 }
 
 

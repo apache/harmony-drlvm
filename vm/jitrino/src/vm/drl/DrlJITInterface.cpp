@@ -25,10 +25,10 @@
 #include <crtdbg.h>
 #endif
 
-
+#include "Type.h"
 #include "Jitrino.h"
-#include "DrlVMInterface.h"
-#include "DrlEMInterface.h"
+#include "VMInterface.h"
+#include "EMInterface.h"
 #include "MemoryEstimates.h"
 #include "Log.h"
 #include "PMF.h"
@@ -38,6 +38,8 @@
 #include "jit_export.h"
 #include "jit_export_jpda.h"
 #include "open/types.h"
+
+#define LOG_DOMAIN "jitrino"
 #include "cxxlog.h"
 
 #include <assert.h>
@@ -131,7 +133,7 @@ JIT_set_profile_access_interface(JIT_Handle jit, EM_Handle em,
 {
     JITInstanceContext* jitContext = Jitrino::getJITInstanceContext(jit);
     MemoryManager& mm = Jitrino::getGlobalMM();
-    DrlProfilingInterface* pi = new (mm) DrlProfilingInterface(em, jit, pc_interface);
+    ProfilingInterface* pi = new (mm) ProfilingInterface(em, jit, pc_interface);
     jitContext->setProfilingInterface(pi);
 }
 
@@ -197,10 +199,8 @@ JIT_recompiled_method_callback(JIT_Handle jit,
                                Method_Handle recompiled_method,
                                void *callback_data)
 {
-    DrlVMBinaryRewritingInterface binaryRewritingInterface;
-    DrlVMMethodDesc methodDesc(recompiled_method);
-    bool res = Jitrino::RecompiledMethodEvent(binaryRewritingInterface,
-                                              &methodDesc,callback_data);
+    MethodDesc methodDesc(recompiled_method, NULL);
+    bool res = Jitrino::RecompiledMethodEvent(&methodDesc,callback_data);
     return (res ? TRUE : FALSE);
 }
 
@@ -241,8 +241,9 @@ JIT_compile_method_with_params(JIT_Handle jit, Compile_Handle compilation,
     JITInstanceContext* jitContext = Jitrino::getJITInstanceContext(jitHandle);
     assert(jitContext!= NULL);
 
-    DrlVMCompilationInterface  compilationInterface(compilation, method_handle, jit,
-            memManager, compilation_params, NULL);
+    TypeManager typeManager(memManager); typeManager.init();
+    CompilationInterface  compilationInterface(compilation, method_handle, jit,
+            memManager, compilation_params, NULL, typeManager);
     CompilationContext cs(memManager, &compilationInterface, jitContext);
     compilationInterface.setCompilationContext(&cs);
 
@@ -348,7 +349,7 @@ JIT_unwind_stack_frame(JIT_Handle jit, Method_Handle method,
         return;
     }
 #endif
-    DrlVMMethodDesc methodDesc(method, jit);
+    MethodDesc methodDesc(method, jit);
     Jitrino::UnwindStack(&methodDesc, context, context->is_ip_past == FALSE);
 }
 
@@ -372,8 +373,8 @@ JIT_get_root_set_from_stack_frame(JIT_Handle jit, Method_Handle method,
     }
 #endif
 
-    DrlVMMethodDesc methodDesc(method, jit);
-    DrlVMGCInterface gcInterface(enum_handle);
+    MethodDesc methodDesc(method, jit);
+    GCInterface gcInterface(enum_handle);
     Jitrino::GetGCRootSet(&methodDesc, &gcInterface, context,
                           context->is_ip_past == FALSE);
 }
@@ -413,7 +414,7 @@ extern "C"
 JITEXPORT Boolean
 JIT_can_enumerate(JIT_Handle jit, Method_Handle method, NativeCodePtr eip)
 {
-    DrlVMMethodDesc methodDesc(method, jit);
+    MethodDesc methodDesc(method, jit);
     bool result = Jitrino::CanEnumerate(&methodDesc, eip);
     return (result ? TRUE : FALSE);
 }
@@ -454,7 +455,7 @@ JIT_fix_handler_context(JIT_Handle jit, Method_Handle method,
     }
 #endif
 
-    DrlVMMethodDesc methodDesc(method, jit);
+    MethodDesc methodDesc(method, jit);
     Jitrino::FixHandlerContext(&methodDesc, context,
                                context->is_ip_past == FALSE);
 }
@@ -469,7 +470,7 @@ JIT_get_address_of_this(JIT_Handle jit, Method_Handle method,
         return Jet::rt_get_address_of_this(jit, method, context);
     }
 #endif
-    DrlVMMethodDesc methodDesc(method, jit);
+    MethodDesc methodDesc(method, jit);
     return Jitrino::GetAddressOfThis(&methodDesc, context,
                                      context->is_ip_past == FALSE);
 }
@@ -522,11 +523,7 @@ JIT_supports_compressed_references(JIT_Handle jit)
 #endif
     }
 #endif
-    DrlVMDataInterface dataIntf;
-    if (dataIntf.areReferencesCompressed())
-        return true;
-    else
-        return false;
+    return (vm_references_are_compressed() != 0);
 }
 
 extern "C"
@@ -540,8 +537,8 @@ JIT_get_root_set_for_thread_dump(JIT_Handle jit, Method_Handle method,
         class_get_name(method_get_class(method)) << "." << 
         method_get_name(method) << ")" << ::std::endl;
     }
-    DrlVMMethodDesc methodDesc(method, jit);
-    DrlVMThreadDumpEnumerator gcInterface;
+    MethodDesc methodDesc(method, jit);
+    ThreadDumpEnumerator gcInterface;
     Jitrino::GetGCRootSet(&methodDesc, &gcInterface, context,
                           context->is_ip_past == FALSE);
 }
@@ -563,7 +560,7 @@ get_native_location_for_bc(JIT_Handle jit, Method_Handle method,
     }
 #endif
 
-    DrlVMMethodDesc methDesc(method, jit);
+    MethodDesc methDesc(method, jit);
     uint64* ncAddr = (uint64*) native_pc;
 
     if (Jitrino::GetNativeLocationForBc(&methDesc, bc_pc, ncAddr)) {
@@ -584,7 +581,7 @@ get_bc_location_for_native(JIT_Handle jit, Method_Handle method,
     }
 #endif
 
-    DrlVMMethodDesc methDesc(method, jit);
+    MethodDesc methDesc(method, jit);
     POINTER_SIZE_INT ncAddr = (POINTER_SIZE_INT) native_pc;
     if (Jitrino::GetBcLocationForNative(&methDesc, (uint64)ncAddr, bc_pc)) {
         return EXE_ERROR_NONE;
@@ -623,4 +620,5 @@ set_local_var(JIT_Handle jit, Method_Handle method,
 }
 
 } //namespace Jitrino
+
 

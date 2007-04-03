@@ -284,7 +284,7 @@ void StateInfo::cleanFinallyInfo(uint32 offset)
     }
 }
 
-class JavaExceptionParser: public ExceptionCallback {
+class JavaExceptionParser {
 public:
     JavaExceptionParser(MemoryManager& mm,JavaLabelPrepass& p,
                     CompilationInterface& ci,MethodDesc* method) 
@@ -292,11 +292,28 @@ public:
           compilationInterface(ci), enclosingMethod(method),
           prevCatch(NULL), nextRegionId(0) {}
 
+    uint32 parseHandlers() {
+        uint32 numHandlers = enclosingMethod->getNumHandlers();
+        for (uint32 i=0; i<numHandlers; i++) {
+            unsigned beginOffset,endOffset,handlerOffset,handlerClassIndex;
+            enclosingMethod->getHandlerInfo(i,&beginOffset,&endOffset,
+                &handlerOffset,&handlerClassIndex);
+            if (!catchBlock(beginOffset,endOffset-beginOffset,
+                handlerOffset,0,handlerClassIndex))
+            {
+                // handlerClass failed to be resolved. LinkingException throwing helper
+                // will be generated instead of method's body
+                return handlerClassIndex;
+            }
+        }
+        return MAX_UINT32; // all catchBlocks were processed successfully
+    }
+
     void addHandlerForCatchBlock(CatchBlock* block, 
                                       uint32 handlerOffset,
                                       uint32 handlerLength,
                                       Type*  exceptionType) {
-        jitrino_assert(compilationInterface, exceptionType);
+        jitrino_assert( exceptionType);
         Log::out() << "Catch Exception Type = " << exceptionType->getName() << ::std::endl;
 
         CatchHandler* handler = new (memManager) 
@@ -342,7 +359,7 @@ public:
         return newBlock;
     }
 
-    virtual bool catchBlock(uint32 tryOffset,
+    bool catchBlock(uint32 tryOffset,
                             uint32 tryLength,
                             uint32 handlerOffset,
                             uint32 handlerLength,
@@ -419,19 +436,6 @@ public:
         }
         return 1; // all exceptionTypes are OK
     }
-    virtual void finallyBlock(uint32 tryOffset,
-                            uint32 tryLength,
-                            uint32 handlerOffset,
-                            uint32 handlerLength)    {jitrino_assert(compilationInterface, 0);}
-    virtual void filterBlock(uint32 tryOffset,
-                            uint32 tryLength,
-                            uint32 handlerOffset,
-                            uint32 handlerLength,
-                            uint32 expressionStart)    {jitrino_assert(compilationInterface, 0);}
-    virtual void faultBlock(uint32 tryOffset,
-                            uint32 tryLength,
-                            uint32 handlerOffset,
-                            uint32 handlerLength)    {jitrino_assert(compilationInterface, 0);}
 
     uint32 numCatch;
     MemoryManager&            memManager;
@@ -490,7 +494,7 @@ JavaLabelPrepass::JavaLabelPrepass(MemoryManager& mm,
     // parse and create exception info
     JavaExceptionParser exceptionTypes(irManager,*this,compilationInterface,&methodDesc);
     // fix exception handlers
-    unsigned problemToken = methodDesc.parseJavaHandlers(exceptionTypes);
+    unsigned problemToken = exceptionTypes.parseHandlers();
     if(problemToken != MAX_UINT32)
     {
         problemTypeToken = problemToken;
@@ -504,8 +508,7 @@ JavaLabelPrepass::JavaLabelPrepass(MemoryManager& mm,
     isFallThruLabel = true;
     numVars = methodDesc.getNumVars();
     methodDesc.getMaxStack();
-    MethodSignatureDesc* methodSig = methodDesc.getMethodSig();
-    uint32 numArgs = methodSig->getNumParams();
+    uint32 numArgs = methodDesc.getNumParams();
     for (uint32 i=0, j=0; i<numArgs; i++,j++) {
         Type *type;
         struct StateInfo::SlotInfo *slot = &stateInfo.stack[j];
@@ -515,7 +518,7 @@ JavaLabelPrepass::JavaLabelPrepass(MemoryManager& mm,
             type = actual->getType();
             if(Log::isEnabled()) {
                 Log::out() << "PARAM " << (int)i << " sig: ";
-                methodSig->getParamType(i)->print(Log::out());
+                methodDesc.getParamType(i)->print(Log::out());
                 Log::out() << " actual: ";
                 type->print(Log::out()); Log::out() << ::std::endl;
             }
@@ -524,7 +527,7 @@ JavaLabelPrepass::JavaLabelPrepass(MemoryManager& mm,
             if (Simplifier::isNonNullParameter(actual))   StateInfo::setNonNull(slot);
             if (Simplifier::isExactType(actual))       StateInfo::setExactType(slot);
         } else {
-            type = methodSig->getParamType(i);
+            type = methodDesc.getParamType(i);
             if (!type) {
                 // linkage error will happen at the usage point of this parameter
                 // here we just keep it as NullObj
@@ -1152,7 +1155,7 @@ void JavaLabelPrepass::new_(uint32 constPoolIndex)         {
         slot.type = typeManager.getNullObjectType();
     }
     slot.vars = NULL;
-    jitrino_assert(compilationInterface, slot.type);
+    jitrino_assert( slot.type);
     pushType(slot);
 }
 
@@ -1168,7 +1171,7 @@ void JavaLabelPrepass::newarray(uint8 etype)                {
     case 9:  elemType = typeManager.getInt16Type();   break;
     case 10: elemType = typeManager.getInt32Type();   break;
     case 11: elemType = typeManager.getInt64Type();   break;
-    default: jitrino_assert(compilationInterface, 0);
+    default: jitrino_assert( 0);
     }
     StateInfo::SlotInfo slot;
     StateInfo::setNonNull(&slot);
@@ -1191,7 +1194,7 @@ void JavaLabelPrepass::anewarray(uint32 constPoolIndex)    {
         slot.type = typeManager.getNullObjectType();
     }
     slot.vars = NULL;
-    jitrino_assert(compilationInterface, slot.type);
+    jitrino_assert( slot.type);
     pushType(slot);
 }
 
@@ -1212,7 +1215,7 @@ void JavaLabelPrepass::checkcast(uint32 constPoolIndex)    {
         return;
     }
     popAndCheck(A);
-    jitrino_assert(compilationInterface, type);
+    jitrino_assert( type);
     pushType(type);
 }
 int JavaLabelPrepass::instanceof(const uint8* bcp, uint32 constPoolIndex, uint32 off)   {
@@ -1287,7 +1290,7 @@ void JavaLabelPrepass::ldc(uint32 constPoolIndex)          {
     } else if (constantType->isSingle()) {
         pushType(singleType);
     } else {
-        jitrino_assert(compilationInterface, 0);
+        jitrino_assert( 0);
     }
 }
 void JavaLabelPrepass::ldc2(uint32 constPoolIndex)         {
@@ -1299,7 +1302,7 @@ void JavaLabelPrepass::ldc2(uint32 constPoolIndex)         {
     } else if (constantType->isDouble()) {
         pushType(doubleType);
     } else {
-        jitrino_assert(compilationInterface, 0);
+        jitrino_assert( 0);
     }
 }
 
@@ -1409,7 +1412,7 @@ void JavaLabelPrepass::multianewarray(uint32 constPoolIndex,uint8 dimensions) {
     if ( !type ) {
         type = typeManager.getNullObjectType();
     }
-    jitrino_assert(compilationInterface, type);
+    jitrino_assert( type);
     pushType(type);
 }
 
@@ -1540,11 +1543,10 @@ Type* JavaLabelPrepass::getRetTypeBySignature(const char* methodSig, TypeManager
 }
 
 void JavaLabelPrepass::invoke(MethodDesc* methodDesc) {
-    MethodSignatureDesc* methodSig = methodDesc->getMethodSig();
     // pop source operands
-    for (int i=methodSig->getNumParams()-1; i>=0; i--)
+    for (int i = methodDesc->getNumParams()-1; i>=0; i--)
         popType();
-    Type* type = methodSig->getReturnType();
+    Type* type = methodDesc->getReturnType();
     // push the return type
     if (type) {
         if ( type->tag != Type::Void ) {
@@ -1847,7 +1849,7 @@ Type*   JavaLabelPrepass::resolveTypeNew(uint32 cpIndex) {
 }
 
 const char*     JavaLabelPrepass::methodSignatureString(uint32 cpIndex) {
-    return compilationInterface.methodSignatureString(&methodDesc,cpIndex);
+    return compilationInterface.getSignatureString(&methodDesc,cpIndex);
 }
 
 void StateTable::copySlotInfo(StateInfo::SlotInfo& to, StateInfo::SlotInfo& from) {

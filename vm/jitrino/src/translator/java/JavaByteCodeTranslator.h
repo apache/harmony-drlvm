@@ -268,7 +268,7 @@ private:
     //
     // helper methods for generating code
     //
-    Opnd**  popArgs(MethodSignatureDesc*);
+    Opnd**  popArgs(uint32 numArgs);
     // for invoke emulation if resolution fails
     void    pseudoInvoke(const char* mdesc);
     void    invalid();    // called when invalid IR is encountered

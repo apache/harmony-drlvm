@@ -42,7 +42,7 @@ public:
     void           fixHandlerContext(MethodDesc*, JitFrameContext*, bool);
     void           *getAddressOfThis(MethodDesc*, const JitFrameContext*, bool);
     void           *getAddressOfSecurityObject(MethodDesc*, const JitFrameContext*);
-    bool           recompiledMethodEvent(BinaryRewritingInterface&, MethodDesc*, void*);
+    bool           recompiledMethodEvent(MethodDesc*, void*);
     bool           getBcLocationForNative(MethodDesc*, uint64, uint16*);
     bool           getNativeLocationForBc(MethodDesc*, uint16, uint64*);
     uint16         getInlinedBc(void *v, unsigned int i1, unsigned int i2) { return 0; } // TODO

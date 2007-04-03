@@ -21,9 +21,7 @@
 
 #include "Ia32InternalTrace.h"
 #include "Log.h"
-#include "jit_export.h"
 #include "Ia32Printer.h"
-#include "../../vm/drl/DrlVMInterface.h"
 #include "Ia32GCMap.h"
 
 namespace Jitrino
@@ -50,7 +48,7 @@ static inline void m_assert(bool cond)  {
     }
 
 static MemoryManager mm(0x100, "printRuntimeOpndInternalHelper");
-static DrlVMTypeManager *tm = NULL;
+static TypeManager *tm = NULL;
 void __stdcall methodEntry(const char * methodName, uint32 argInfoCount, CallingConvention::OpndInfo * argInfos)
 {
 
@@ -67,7 +65,7 @@ void __stdcall methodEntry(const char * methodName, uint32 argInfoCount, Calling
     os<<")"<<::std::endl;
 
     if (tm == NULL) {
-        tm = new (mm) DrlVMTypeManager(mm); tm->init();
+        tm = new (mm) TypeManager(mm); tm->init();
     }
     for (uint32 i=0; i<argInfoCount; i++){
         CallingConvention::OpndInfo & info=argInfos[i];
@@ -104,9 +102,8 @@ void __stdcall fieldWrite(const void * address)
 {   
     ::std::ostream & os=Log::cat_rt()->out();
     os<<"__FIELD_WRITE__:"<<address<<" at "<<*(void**)(&address-1)<<::std::endl;
-    DrlVMDataInterface dataInterface;
-    void * heapBase=dataInterface.getHeapBase();
-    void * heapCeiling=dataInterface.getHeapCeiling();
+    void * heapBase = VMInterface::getHeapBase();
+    void * heapCeiling = VMInterface::getHeapCeiling();
     if (address<heapBase || address>=heapCeiling){
         os<<"PROBABLY STATIC OR INVALID ADDRESS. DYNAMIC ADDRESSES MUST BE IN ["<<heapBase<<","<<heapCeiling<<")"<<::std::endl;
     }
@@ -192,4 +189,5 @@ void InternalTrace::runImpl()
 }
 
 }}; //namespace Ia32
+
 

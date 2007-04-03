@@ -32,7 +32,7 @@
 #include "BitSet.h"
 #include "XTimer.h"
 #include "Log.h"
-#include "../../shared/PlatformDependant.h"
+#include "PlatformDependant.h"
 #include "CGSupport.h"
 #include "CompilationContext.h"
 #include "JITInstanceContext.h"

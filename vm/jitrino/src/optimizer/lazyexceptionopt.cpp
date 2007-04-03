@@ -66,7 +66,7 @@ LazyExceptionOpt::doLazyExceptionOpt() {
     BitSet excOpnds(leMemManager,irManager.getOpndManager().getNumSsaOpnds());
     StlDeque<Inst*> candidateSet(leMemManager);
     optCandidates = new (leMemManager) OptCandidates(leMemManager);
-    CompilationInterface::MethodSideEffect m_sideEff = compInterface.getMethodHasSideEffect(&md); 
+    Method_Side_Effects m_sideEff = md.getSideEffect(); 
 
     const Nodes& nodes = irManager.getFlowGraph().getNodes();
     Nodes::const_iterator niter;
@@ -90,10 +90,10 @@ LazyExceptionOpt::doLazyExceptionOpt() {
     isExceptionInit = md.isInstanceInitializer() && 
             md.getParentType()->isLikelyExceptionType();
 //  core api exception init
-    if (m_sideEff == CompilationInterface::MSE_UNKNOWN && isExceptionInit 
+    if (m_sideEff == MSE_Unknown && isExceptionInit 
             && strncmp(md.getParentType()->getName(),"java/lang/",10) == 0) {
-        m_sideEff = CompilationInterface::MSE_NO;
-        compInterface.setMethodHasSideEffect(&md,m_sideEff);
+        m_sideEff = MSE_False;
+        md.setSideEffect(m_sideEff);
 #ifdef _DEBUG
         if (Log::isEnabled()) {
             Log::out() << "      core api exc "; md.printFullName(Log::out()); 
@@ -137,9 +137,9 @@ LazyExceptionOpt::doLazyExceptionOpt() {
 #endif
                 }
             }
-            if (m_sideEff==CompilationInterface::MSE_UNKNOWN)
+            if (m_sideEff == MSE_Unknown)
                 if (instHasSideEffect(inst)) {
-                    m_sideEff=CompilationInterface::MSE_YES;
+                    m_sideEff = MSE_True;
 #ifdef _DEBUG
                     if (Log::isEnabled()) {
                         Log::out() << "~~~~~~inst sideEff "; 
@@ -149,8 +149,8 @@ LazyExceptionOpt::doLazyExceptionOpt() {
                 }
         }
     }
-    if (compInterface.getMethodHasSideEffect(&md)==CompilationInterface::MSE_UNKNOWN) {
-        if (m_sideEff == CompilationInterface::MSE_UNKNOWN)
+    if (md.getSideEffect() == MSE_Unknown) {
+        if (m_sideEff == MSE_Unknown)
             if (isExceptionInit && isArgCheckNull) {
 #ifdef _DEBUG
                 if (Log::isEnabled()) {
@@ -158,10 +158,10 @@ LazyExceptionOpt::doLazyExceptionOpt() {
                     md.printFullName(Log::out()); Log::out() << std::endl; 
                 }
 #endif
-                m_sideEff = CompilationInterface::MSE_NULL_PARAM;
+                m_sideEff = MSE_True_Null_Param;
             } else
-                m_sideEff = CompilationInterface::MSE_NO;
-        compInterface.setMethodHasSideEffect(&md,m_sideEff);
+                m_sideEff = MSE_False;
+        md.setSideEffect(m_sideEff);
     } 
 
     for(niter = nodes.begin(); niter != nodes.end(); ++niter) {
@@ -633,7 +633,7 @@ bool
 LazyExceptionOpt::methodCallHasSideEffect(Inst* inst) {
     uint32 opcode = inst->getOpcode();
     MethodDesc* cmd;
-    CompilationInterface::MethodSideEffect mse;
+    Method_Side_Effects mse;
 
     if (opcode==Op_DirectCall || opcode==Op_TauVirtualCall) {
         cmd = inst->asMethodCallInst()->getMethodDesc();
@@ -657,25 +657,25 @@ LazyExceptionOpt::methodCallHasSideEffect(Inst* inst) {
     }
 #endif
     
-    mse=compInterface.getMethodHasSideEffect(cmd);
+    mse = cmd->getSideEffect();
 #ifdef _DEBUG
-    if (mse!=CompilationInterface::MSE_UNKNOWN) {
+    if (mse != MSE_Unknown) {
         if (Log::isEnabled()) {
             Log::out() << "    checkMC: prev.set sideEff " << mse << "  "; 
             inst->print(Log::out()); Log::out() << std::endl;
         }
     }
 #endif
-    if (mse==CompilationInterface::MSE_YES) {
+    if (mse == MSE_True) {
         return true;
     }
-    if (mse==CompilationInterface::MSE_NO) {
+    if (mse == MSE_False) {
         return false;
     }
 //  core api exception init
     if (cmd->isInstanceInitializer() && cmd->getParentType()->isLikelyExceptionType()
             && strncmp(cmd->getParentType()->getName(),"java/lang/",10) == 0) {
-        compInterface.setMethodHasSideEffect(cmd,CompilationInterface::MSE_NO);
+        cmd->setSideEffect(MSE_False);
 #ifdef _DEBUG
         if (Log::isEnabled()) {
             Log::out() << "    checkMC: core api exc "; 
@@ -719,7 +719,7 @@ LazyExceptionOpt::methodCallHasSideEffect(Inst* inst) {
         return true;  // cannot compile <init> before <clinit> (to fix vm)
     }
 
-    if (mse==CompilationInterface::MSE_UNKNOWN) {  // try to compile method
+    if (mse == MSE_Unknown) {  // try to compile method
         if (!compInterface.compileMethod(cmd)) {
 #ifdef _DEBUG
             if (Log::isEnabled()) {
@@ -728,22 +728,22 @@ LazyExceptionOpt::methodCallHasSideEffect(Inst* inst) {
 #endif
             return true;
         } else {
-             mse = compInterface.getMethodHasSideEffect(cmd);
+             mse = cmd->getSideEffect();
 #ifdef _DEBUG
             if (Log::isEnabled()) {
                 Log::out() << "    checkMC: method was compiled, sideEff " 
                     << mse << std::endl;
             }
 #endif
-            if (mse==CompilationInterface::MSE_YES)
+            if (mse == MSE_True)
                 return true;
-            if (mse==CompilationInterface::MSE_NO) {
+            if (mse == MSE_False) {
                 return false;
             }
        }
     }
 
-    if (mse==CompilationInterface::MSE_NULL_PARAM) {
+    if (mse == MSE_True_Null_Param) {
         uint32 nsrc=inst->getNumSrcOperands();
         bool mayBeNull;
         if (nsrc>3) {
@@ -1111,4 +1111,5 @@ LazyExceptionOpt::instHasSideEffect(Inst* inst) {
 }
 
 } //namespace Jitrino 
+
 

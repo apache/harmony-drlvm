@@ -22,7 +22,6 @@
  */
 
 #include "CodeSelectors.h"
-#include "../../vm/drl/DrlVMInterface.h"
 
 namespace Jitrino {
 
@@ -132,7 +131,7 @@ InlineInfoMap::write(InlineInfoPtr output)
             MethodDesc* mdesc = (MethodDesc*)(*desc_it)->first;
             uint32 bcOffset = (uint32)(*desc_it)->second;
             //assert(dynamic_cast<DrlVMMethodDesc*>(mdesc)); // <-- some strange warning on Win32 here
-            *ptr++ = ptr_to_uint64(((DrlVMMethodDesc*)mdesc)->getDrlVMMethod());
+            *ptr++ = ptr_to_uint64(mdesc->getMethodHandle());
             *ptr++ = (POINTER_SIZE_INT)bcOffset;
             depth++;
         }

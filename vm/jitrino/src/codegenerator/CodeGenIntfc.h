@@ -589,8 +589,7 @@ public:
     virtual void* getAddressOfSecurityObject(MethodDesc* methodDesc, const ::JitFrameContext* context) = 0;
 #endif
 
-    virtual bool  recompiledMethodEvent(BinaryRewritingInterface & binaryRewritingInterface,
-        MethodDesc * methodDesc, void * data) = 0;
+    virtual bool  recompiledMethodEvent(MethodDesc * methodDesc, void * data) = 0;
 
     virtual uint32          getInlineDepth(InlineInfoPtr ptr, uint32 offset) { return 0; }
     virtual Method_Handle   getInlinedMethod(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth) { return NULL; }
