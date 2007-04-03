@@ -162,6 +162,7 @@ public:
     bool scalarize_final_fields;
     const char* execCountMultiplier_string;
     double ec_mult;
+    bool compressedReferencesArg; // for makeTauLdInd 
 
 private:
     static const int maxMethodExamLevel_default = 0;
