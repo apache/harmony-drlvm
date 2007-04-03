@@ -26,7 +26,9 @@
 #include <apr_pools.h>
 #include <apr_thread_mutex.h>
 #include <apr_time.h>
+#include "port_vmem.h"
 
+#include "open/gc.h"
 #include "open/types.h"
 #include "open/hythread.h"
 #include "open/jthread.h"
@@ -487,7 +489,6 @@ JNIEXPORT jint JNICALL JNI_CreateJavaVM(JavaVM ** p_vm, JNIEnv ** p_jni_env,
     }
 
     vm_env->start_time = apr_time_now()/1000;
-    vm_env->total_compilation_time = 0;
 
     java_vm->functions = &java_vm_vtable;
     java_vm->pool = vm_global_pool;
@@ -541,6 +542,12 @@ JNIEXPORT jint JNICALL JNI_CreateJavaVM(JavaVM ** p_vm, JNIEnv ** p_jni_env,
 
     // Register created VM.
     APR_RING_INSERT_TAIL(&GLOBAL_VMS, java_vm, JavaVM_Internal, link);
+
+    // Store Java heap memory size after initialization
+    vm_env->init_gc_used_memory = (size_t)gc_total_memory();
+
+    // Store native memory size after initialization
+    vm_env->init_used_memory = port_vmem_used_size();
 
     status  = JNI_OK;
 done:

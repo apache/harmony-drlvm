@@ -248,6 +248,31 @@ struct Global_Env {
     apr_time_t total_compilation_time;
 
     /**
+     * Total loaded class count
+     */
+    unsigned total_loaded_class_count;
+
+    /**
+     * Total unloaded class count
+     */
+    unsigned unloaded_class_count;
+
+    /**
+     * Total unloaded class count
+     */
+    jboolean class_loading_verbose;
+
+    /**
+     * The initial amount of Java heap memory (bytes)
+     */
+    size_t init_gc_used_memory;
+
+    /**
+     * The initial amount of used memory (bytes)
+     */
+    size_t init_used_memory;
+
+    /**
      * The VM state. See <code>VM_STATE</code> enum above.
      */
     volatile int vm_state;

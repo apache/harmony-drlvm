@@ -28,8 +28,11 @@
  */
 
 #include "org_apache_harmony_lang_management_MemoryMXBeanImpl.h"
+#include "open/gc.h"
 #include <cxxlog.h>
 #include "environment.h"
+#include "finalize.h"
+#include "port_vmem.h"
 /* Header for class org_apache_harmony_lang_management_MemoryMXBeanImpl */
 
 /*
@@ -41,8 +44,7 @@
 JNIEXPORT void JNICALL Java_org_apache_harmony_lang_management_MemoryMXBeanImpl_createMemoryManagers
 (JNIEnv * jenv_ext, jobject obj)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","createMemoryManagers stub invocation");
+    TRACE2("management","MemoryMXBeanImpl_createMemoryManagers invocation");
 
     JNIEnv_Internal *jenv = (JNIEnv_Internal *)jenv_ext;
 
@@ -72,15 +74,17 @@ JNIEXPORT void JNICALL Java_org_apache_harmony_lang_management_MemoryMXBeanImpl_
 JNIEXPORT jobject JNICALL Java_org_apache_harmony_lang_management_MemoryMXBeanImpl_getHeapMemoryUsageImpl
 (JNIEnv * jenv_ext, jobject)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","getHeapMemoryUsageImpl stub invocation");
+    TRACE2("management","MemoryMXBeanImpl_getHeapMemoryUsageImpl invocation");
 
     JNIEnv_Internal *jenv = (JNIEnv_Internal *)jenv_ext;
 
-    jlong init = 1L<<21;
-    jlong used = 1L<<20;
-    jlong committed = 1L<<20;
-    jlong max = 1L<<22;
+    JavaVM * vm = NULL;
+    jenv_ext->GetJavaVM(&vm);
+
+    jlong init = ((JavaVM_Internal*)vm)->vm_env->init_gc_used_memory;
+    jlong used = gc_total_memory();
+    jlong committed = gc_total_memory();
+    jlong max = gc_max_memory();
 
     jclass memoryUsageClazz =jenv->FindClass("java/lang/management/MemoryUsage");
     if (jenv->ExceptionCheck()) {return NULL;};
@@ -101,16 +105,26 @@ JNIEXPORT jobject JNICALL Java_org_apache_harmony_lang_management_MemoryMXBeanIm
 JNIEXPORT jobject JNICALL Java_org_apache_harmony_lang_management_MemoryMXBeanImpl_getNonHeapMemoryUsageImpl
 (JNIEnv * jenv_ext, jobject)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","getNonHeapMemoryUsageImpl stub invocation");
+    TRACE2("management","MemoryMXBeanImpl_getNonHeapMemoryUsageImpl invocation");
     Global_Env* genv = VM_Global_State::loader_env;
 
     JNIEnv_Internal *jenv = (JNIEnv_Internal *)jenv_ext;
 
-    jlong init = 1L<<21;
-    jlong used = 1L<<20;
-    jlong committed = 1L<<20;
-    jlong max = 1L<<22;
+    JavaVM * vm = NULL;
+    jenv_ext->GetJavaVM(&vm);
+
+    jlong init = ((JavaVM_Internal*)vm)->vm_env->init_used_memory
+        - ((JavaVM_Internal*)vm)->vm_env->init_gc_used_memory;
+    if (init <= 0) {init = -1;}
+
+    jlong used = port_vmem_used_size() - gc_total_memory();
+    if (used < init) {used = init;}
+
+    jlong committed = port_vmem_committed_size() - gc_total_memory();
+    if (committed < used) {committed = used;}
+
+    jlong max = port_vmem_max_size() - gc_total_memory();
+    if (max < committed) {max = committed;}
 
     jclass memoryUsageClazz =jenv->FindClass("java/lang/management/MemoryUsage");
     if (jenv->ExceptionCheck()) {return NULL;};
@@ -131,12 +145,14 @@ JNIEXPORT jobject JNICALL Java_org_apache_harmony_lang_management_MemoryMXBeanIm
 JNIEXPORT jint JNICALL Java_org_apache_harmony_lang_management_MemoryMXBeanImpl_getObjectPendingFinalizationCountImpl
 (JNIEnv *, jobject)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","getObjectPendingFinalizationCountImp stub invocation");
-    return 20;
+    TRACE2("management","MemoryMXBeanImpl_getObjectPendingFinalizationCountImp invocation");
+    return vm_get_finalizable_objects_quantity();;
 }
 
-jboolean memory_bean_verbose = JNI_TRUE;
+/**
+ * Stores current verbose state for the future request
+ */
+jboolean memory_bean_verbose = JNI_FALSE;
 
 /*
  * Class:     org_apache_harmony_lang_management_MemoryMXBeanImpl
@@ -146,8 +162,7 @@ jboolean memory_bean_verbose = JNI_TRUE;
 JNIEXPORT jboolean JNICALL Java_org_apache_harmony_lang_management_MemoryMXBeanImpl_isVerboseImpl
 (JNIEnv *, jobject)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","MemoryMXBeanImpl_isVerboseImpl stub invocation");
+    TRACE2("management","MemoryMXBeanImpl_MemoryMXBeanImpl_isVerboseImpl invocation");
     return memory_bean_verbose;
 };
 
@@ -159,8 +174,8 @@ JNIEXPORT jboolean JNICALL Java_org_apache_harmony_lang_management_MemoryMXBeanI
 JNIEXPORT void JNICALL Java_org_apache_harmony_lang_management_MemoryMXBeanImpl_setVerboseImpl
 (JNIEnv *, jobject, jboolean newValue)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","MemoryMXBeanImpl_setVerboseImpl stub invocation");
+    TRACE2("management","MemoryMXBeanImpl_MemoryMXBeanImpl_setVerboseImpl invocation");
+    // TODO: switch on/off management logging according to newValue
     memory_bean_verbose = newValue;
 };
 

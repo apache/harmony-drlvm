@@ -521,6 +521,37 @@ GCExport Boolean gc_is_object_pinned (Managed_Object_Handle obj);
 GCExport void gc_class_prepared(Class_Handle ch, VTable_Handle vth);
 
 
+/*
+ * *****
+ * *
+ * *  Routines to handle the <code>java.lang.management</code> requests.
+ * * 
+ * *****
+ */
+
+/**
+ * <p>
+ * The number of collections that have been executed by this collector. A
+ * value of <code>-1</code> means that collection counts are undefined for
+ * this collector.
+ * </p>
+ * 
+ * @return The number of collections executed.
+ */
+GCExport int64 gc_get_collection_count();
+
+/**
+ * <p>
+ * The approximate, cumulative time (in microseconds) spent executing
+ * collections for this collector.
+ * </p>
+ * 
+ * @return The time spent collecting garbage.
+ */
+GCExport int64 gc_get_collection_time();
+
+
+
 #else /* #if defined(USE_GC_STATIC) || defined(BUILDING_GC) */
 
 /**
@@ -534,6 +565,8 @@ extern void (*gc_add_root_set_entry_interior_pointer)(void **slot, int offset, B
 extern void (*gc_add_weak_root_set_entry)(Managed_Object_Handle *ref1, Boolean is_pinned,Boolean is_short_weak);
 extern void (*gc_add_root_set_entry_managed_pointer)(void **slot, Boolean is_pinned);
 extern void (*gc_class_prepared)(Class_Handle ch, VTable_Handle vth);
+extern int64 (*gc_get_collection_count)();
+extern int64 (*gc_get_collection_time)();
 VMEXPORT extern void (*gc_force_gc)();
 VMEXPORT extern int64 (*gc_free_memory)();
 extern int (*gc_init)();

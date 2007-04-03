@@ -45,6 +45,10 @@ portLib(NULL),
 dcList(NULL),
 assert_reg(NULL),
 vm_methods(NULL),
+total_loaded_class_count(0),
+unloaded_class_count(0),
+class_loading_verbose(false),
+total_compilation_time(0),
 bootstrapping(false),
 ready_for_exceptions(false)
 {

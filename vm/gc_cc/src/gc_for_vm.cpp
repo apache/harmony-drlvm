@@ -398,6 +398,16 @@ int64 gc_free_memory()
     return (int64) ((heap.allocation_region_end() - heap.pos) + (heap.old_objects.end - heap.old_objects.pos));
 }
 
+int64 gc_get_collection_count()
+{
+    return (int64) gc_num;
+}
+
+int64 gc_get_collection_time()
+{
+    return (int64) total_gc_time;
+}
+
 void gc_pin_object (Managed_Object_Handle* p_object) {
 #if 0
     // FIXME: overflow check and handling

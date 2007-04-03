@@ -20,6 +20,7 @@
  */  
 
 #include <windows.h>
+#include <psapi.h>
 #include "port_vmem.h"
 
 #undef LOG_DOMAIN
@@ -213,6 +214,34 @@ APR_DECLARE(size_t *) port_vmem_page_sizes(){
 		page_sizes[0] = si.dwPageSize;
 	}
 	return page_sizes;
+}
+
+APR_DECLARE(size_t) port_vmem_used_size(){
+    return port_vmem_committed_size();
+}
+
+APR_DECLARE(size_t) port_vmem_committed_size(){
+    // TODO: should return summarized commits instead of usage.
+    PROCESS_MEMORY_COUNTERS pmc;
+    if ( GetProcessMemoryInfo( GetCurrentProcess(), &pmc, sizeof(pmc)) ) {
+        return (pmc.QuotaNonPagedPoolUsage + pmc.QuotaPagedPoolUsage) * 1024;
+    } else {
+        return (size_t)0;
+    }
+}
+
+APR_DECLARE(size_t) port_vmem_reserved_size(){
+    // TODO: should return summarized reservaition instead of peak.
+    return port_vmem_committed_size();
+}
+
+APR_DECLARE(size_t) port_vmem_max_size(){
+    PERFORMANCE_INFORMATION pi;
+    if ( GetPerformanceInfo( &pi, sizeof(pi)) ) {
+        return (pi.CommitLimit - pi.CommitTotal) * pi.PageSize + port_vmem_committed_size();
+    } else {
+        return (size_t)0;
+    }
 }
 
 #ifdef __cplusplus

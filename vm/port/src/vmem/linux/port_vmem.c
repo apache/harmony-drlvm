@@ -19,10 +19,12 @@
  * @version $Revision: 1.1.2.1.4.3 $
  */  
 
+#include <stdio.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <errno.h>
 #include <malloc.h>
+#include <limits.h>
 #include "port_vmem.h"
 
 #ifdef __cplusplus
@@ -129,6 +131,61 @@ APR_DECLARE(size_t *) port_vmem_page_sizes() {
 		}
 	}
 	return page_sizes;
+}
+
+APR_DECLARE(size_t) port_vmem_used_size(){
+    // TODO: Update this method when/if new common memory manager will be created 
+    return port_vmem_committed_size();
+}
+
+APR_DECLARE(size_t) port_vmem_reserved_size(){
+    // TODO: Update this method when/if new common memory manager will be created
+    return port_vmem_committed_size();
+}
+
+APR_DECLARE(size_t) port_vmem_committed_size(){
+    char buf[PATH_MAX];
+
+    pid_t pid = getpid();
+    sprintf(buf, "/proc/%d/statm", pid);
+    FILE* file = fopen(buf, "rt");
+    if (!file) {
+        return port_vmem_page_sizes()[0];
+    }
+    size_t vmem;
+    int res = sscanf(buf, "%lu", &vmem);
+    return vmem * port_vmem_page_sizes()[0];
+}
+
+APR_DECLARE(size_t) port_vmem_max_size(){
+    char buf[PATH_MAX];
+
+    pid_t mypid = getpid();
+    sprintf(buf, "/proc/%d/stat", mypid);
+    FILE* file = fopen(buf, "rt");
+    if (!file) {
+        return UINT_MAX;
+    }
+    int pid, ppid, pgrp, session, tty_nr, tpgid, exit_signal, processor;
+    char comm[PATH_MAX];
+    char state;
+    unsigned long flags, minflt, cminflt, majflt, cmajflt, utime, stime,
+        starttime, vsize, rlim, startcode, endcode, startstack, kstkesp,
+        kstkeip, signal, blocked, sigignore, sigcatch, wchan, nswap, cnswap;
+    long cutime, cstime, priority, nice, unused, itrealvalue, rss;
+
+    int res = sscanf(buf, "%d %s %c %d %d %d %d %d %lu %lu %lu %lu "
+        "%lu %lu %lu %ld %ld %ld %ld %ld %ld %lu %lu %ld %lu %lu %lu "
+        "%lu %lu %lu %lu %lu %lu %lu %lu %lu %lu %d %d",
+        &pid, &comm, &state, &ppid, &pgrp, &session, &tty_nr, &tpgid, &flags,
+        &minflt, &cminflt, &majflt, &cmajflt, &utime, &stime, &cutime, &cstime,
+        &priority, &nice, &unused, &itrealvalue, &starttime, &vsize, &rss, &rlim,
+        &startcode, &endcode, &startstack, &kstkesp, &kstkeip, &signal, &blocked,
+        &sigignore, &sigcatch, &wchan, &nswap, &cnswap, &exit_signal, &processor);
+    if (res < 25) { // rlim position
+        return UINT_MAX;
+    };
+    return rlim;
 }
 
 #ifdef __cplusplus

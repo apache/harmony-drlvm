@@ -106,7 +106,10 @@ ClassLoader::~ClassLoader()
     }
 
     if (GetLoadedClasses())
+    {
+        VM_Global_State::loader_env->unloaded_class_count += GetLoadedClasses()->GetItemCount();
         delete GetLoadedClasses();
+    }
     if (GetLoadingClasses())
         delete GetLoadingClasses();
     if (GetReportedClasses())
@@ -318,6 +321,7 @@ Class* ClassLoader::DefineClass(Global_Env* env, const char* class_name,
     {
         jvmti_send_class_load_event(env, clss);
     }
+    ++(env->total_loaded_class_count);
 
     return clss;
 }

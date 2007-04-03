@@ -166,6 +166,26 @@ int64 gc_max_memory()
   return (int64)((POINTER_SIZE_INT)gc_gen_total_memory_size((GC_Gen*)p_global_gc)); 
 }
 
+int64 gc_get_collection_count()
+{
+  GC* gc =  p_global_gc;
+  if (gc != NULL) {
+    return (int64) gc->num_collections;
+  } else {
+    return -1;
+  }
+}
+
+int64 gc_get_collection_time()
+{
+  GC* gc =  p_global_gc;
+  if (gc != NULL) {
+    return (int64) gc->time_collections;
+  } else {
+    return -1;
+  }
+}
+
 void gc_vm_initialized()
 { return; }
 

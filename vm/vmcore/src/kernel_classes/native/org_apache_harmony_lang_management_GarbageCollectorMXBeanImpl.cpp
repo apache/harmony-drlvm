@@ -28,6 +28,7 @@
  */
 
 #include <cxxlog.h>
+#include <open/gc.h>
 #include "org_apache_harmony_lang_management_GarbageCollectorMXBeanImpl.h"
 
 /*
@@ -36,9 +37,8 @@
 JNIEXPORT jlong JNICALL
 Java_org_apache_harmony_lang_management_GarbageCollectorMXBeanImpl_getCollectionCountImpl(JNIEnv *, jobject)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","getCollectionCountImpl stub invocation");
-    return 7L;
+    TRACE2("management","GarbageCollectorMXBeanImpl_getCollectionCountImpl invocation");
+    return gc_get_collection_count();
 };
 
 /*
@@ -47,9 +47,8 @@ Java_org_apache_harmony_lang_management_GarbageCollectorMXBeanImpl_getCollection
 JNIEXPORT jlong JNICALL
 Java_org_apache_harmony_lang_management_GarbageCollectorMXBeanImpl_getCollectionTimeImpl(JNIEnv *, jobject)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","getCollectionTimeImpl stub invocation");
-    return 2L<<17;
+    TRACE2("management","GarbageCollectorMXBeanImpl_getCollectionTimeImpl invocation");
+    return gc_get_collection_time()/1000;
 };
 
 

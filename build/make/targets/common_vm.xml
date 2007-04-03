@@ -211,7 +211,7 @@ Version: $Revision: 1.6.2.6 $
             </select>
 
             <select os="win">
-                <syslibset libs="advapi32,odbc32,userenv,ws2_32,mswsock" />
+                <syslibset libs="advapi32,odbc32,userenv,ws2_32,mswsock,psapi" />
             </select>
 
             <select os="lnx" arch="ia32">

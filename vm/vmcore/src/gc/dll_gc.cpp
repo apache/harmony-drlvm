@@ -79,6 +79,8 @@ void (*gc_add_compressed_root_set_entry)(uint32 *ref, Boolean is_pinned) = 0;
 void (*gc_add_root_set_entry_interior_pointer)(void **slot, int offset, Boolean is_pinned) = 0;
 void (*gc_add_root_set_entry_managed_pointer)(void **slot, Boolean is_pinned) = 0;
 void (*gc_class_prepared)(Class_Handle ch, VTable_Handle vth) = 0;
+int64 (*gc_get_collection_count)() = 0;
+int64 (*gc_get_collection_time)() = 0;
 void (*gc_force_gc)() = 0;
 int64 (*gc_free_memory)() = 0;
 void (*gc_heap_slot_write_ref)(Managed_Object_Handle p_base_of_object_with_slot,
@@ -197,6 +199,8 @@ void vm_add_gc(const char *dllName)
                             dllName,
                             (apr_dso_handle_sym_t)default_gc_add_root_set_entry_managed_pointer);
     gc_class_prepared = (void (*)(Class_Handle ch, VTable_Handle vth)) getFunction(handle, "gc_class_prepared", dllName);
+    gc_get_collection_count = (int64 (*)()) getFunction(handle, "gc_get_collection_count", dllName);
+    gc_get_collection_time = (int64 (*)()) getFunction(handle, "gc_get_collection_time", dllName);
     gc_force_gc = (void (*)()) getFunction(handle, "gc_force_gc", dllName);
     gc_free_memory = (int64 (*)()) getFunction(handle, "gc_free_memory", dllName);
     gc_heap_slot_write_ref = (void (*)(Managed_Object_Handle p_base_of_object_with_slot,

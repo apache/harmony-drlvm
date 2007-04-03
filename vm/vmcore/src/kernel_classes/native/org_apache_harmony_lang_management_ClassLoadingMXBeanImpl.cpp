@@ -28,6 +28,7 @@
  */
 
 #include <cxxlog.h>
+#include "environment.h"
 #include "org_apache_harmony_lang_management_ClassLoadingMXBeanImpl.h"
 /*
  * Class:     org_apache_harmony_lang_management_ClassLoadingMXBeanImpl
@@ -35,12 +36,13 @@
  * Signature: ()I
  */
 JNIEXPORT jint JNICALL Java_org_apache_harmony_lang_management_ClassLoadingMXBeanImpl_getLoadedClassCountImpl
-(JNIEnv *, jobject)
+(JNIEnv * env, jobject this_bean)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","getLoadedClassCountImpl stub invocation");
-    return 1<<3;
-};
+    TRACE2("management", "ClassLoadingMXBeanImpl_getLoadedClassCountImpl invocation");
+    return (jint)
+        (Java_org_apache_harmony_lang_management_ClassLoadingMXBeanImpl_getTotalLoadedClassCountImpl(env, this_bean)
+        - Java_org_apache_harmony_lang_management_ClassLoadingMXBeanImpl_getUnloadedClassCountImpl(env, this_bean));
+}
 
 /*
  * Class:     org_apache_harmony_lang_management_ClassLoadingMXBeanImpl
@@ -48,12 +50,13 @@ JNIEXPORT jint JNICALL Java_org_apache_harmony_lang_management_ClassLoadingMXBea
  * Signature: ()J
  */
 JNIEXPORT jlong JNICALL Java_org_apache_harmony_lang_management_ClassLoadingMXBeanImpl_getTotalLoadedClassCountImpl
-(JNIEnv *, jobject)
+(JNIEnv * env, jobject)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","getTotalLoadedClassCountImpl stub invocation");
-    return 1<<4;
-};
+    TRACE2("management", "ClassLoadingMXBeanImpl_getTotalLoadedClassCountImpl invocation");
+    JavaVM * vm = NULL;
+    env->GetJavaVM(&vm);
+    return ((JavaVM_Internal*)vm)->vm_env->total_loaded_class_count;
+}
 
 /*
  * Class:     org_apache_harmony_lang_management_ClassLoadingMXBeanImpl
@@ -61,15 +64,13 @@ JNIEXPORT jlong JNICALL Java_org_apache_harmony_lang_management_ClassLoadingMXBe
  * Signature: ()J
  */
 JNIEXPORT jlong JNICALL Java_org_apache_harmony_lang_management_ClassLoadingMXBeanImpl_getUnloadedClassCountImpl
-(JNIEnv *, jobject)
+(JNIEnv * env, jobject)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","getUnloadedClassCountImpl stub invocation");
-    return 1<<2;
-};
-
-jboolean ClassLoadingVerbose = JNI_FALSE;
-
+    TRACE2("management", "ClassLoadingMXBeanImpl_getUnloadedClassCountImpl invocation");
+    JavaVM * vm = NULL;
+    env->GetJavaVM(&vm);
+    return ((JavaVM_Internal*)vm)->vm_env->unloaded_class_count;
+}
 
 /*
  * Class:     org_apache_harmony_lang_management_ClassLoadingMXBeanImpl
@@ -77,12 +78,13 @@ jboolean ClassLoadingVerbose = JNI_FALSE;
  * Signature: ()Z
  */
 JNIEXPORT jboolean JNICALL Java_org_apache_harmony_lang_management_ClassLoadingMXBeanImpl_isVerboseImpl
-(JNIEnv *, jobject)
+(JNIEnv * env, jobject)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","ClassLoadingMXBeanImpl_isVerboseImpl stub invocation");
-    return ClassLoadingVerbose;
-};
+    TRACE2("management", "ClassLoadingMXBeanImpl_isVerboseImpl invocation");
+    JavaVM * vm = NULL;
+    env->GetJavaVM(&vm);
+    return ((JavaVM_Internal*)vm)->vm_env->class_loading_verbose;
+}
 
 /*
  * Class:     org_apache_harmony_lang_management_ClassLoadingMXBeanImpl
@@ -90,10 +92,18 @@ JNIEXPORT jboolean JNICALL Java_org_apache_harmony_lang_management_ClassLoadingM
  * Signature: (Z)V
  */
 JNIEXPORT void JNICALL Java_org_apache_harmony_lang_management_ClassLoadingMXBeanImpl_setVerboseImpl
-(JNIEnv *, jobject, jboolean new_value)
+(JNIEnv * env, jobject, jboolean new_value)
 {
-    // TODO implement this method stub correctly
-    TRACE2("management","ClassLoadingMXBeanImpl_setVerboseImpl stub invocation");
-    ClassLoadingVerbose = new_value;
-};
+    TRACE2("management", "ClassLoadingMXBeanImpl_setVerboseImpl invocation");
+    JavaVM * vm = NULL;
+    env->GetJavaVM(&vm);
+    if (((JavaVM_Internal*)vm)->vm_env->class_loading_verbose != new_value) {
+        if (new_value) {
+            set_threshold(util::CLASS_LOGGER, INFO);
+        } else {
+            set_threshold(util::CLASS_LOGGER, WARN);
+        }
+        ((JavaVM_Internal*)vm)->vm_env->class_loading_verbose = new_value;
+    }
+}
 
