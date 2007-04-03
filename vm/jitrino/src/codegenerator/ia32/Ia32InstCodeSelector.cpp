@@ -2878,7 +2878,7 @@ CG_OpndHandle* InstCodeSelector::callvmhelper(uint32              numArgs,
     {
         assert(numArgs == 0);
         Opnd * tlsBaseReg = irManager.newOpnd(typeManager.getUnmanagedPtrType(typeManager.getInt8Type()));
-#ifdef PLATFORM_POSIX
+#if defined(PLATFORM_POSIX) || defined (_EM64T_)
         TypeManager& tm =irManager.getTypeManager();
         Opnd * callAddrOpnd =irManager.newImmOpnd(tm.getUnmanagedPtrType(tm.getIntPtrType()),
             Opnd::RuntimeInfo::Kind_HelperAddress, (void*)CompilationInterface::Helper_GetTLSBase);

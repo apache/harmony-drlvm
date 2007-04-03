@@ -33,7 +33,8 @@ public class GCHelper {
 
 
     private static final int ARRAY_LEN_OFFSET = 8;
-    private static final int GC_OBJECT_ALIGNMENT = 4; //TODO: EM64 or IPF could have 8!
+    private static final int GC_OBJECT_ALIGNMENT = VMHelper.POINTER_TYPE_SIZE; //4 for 32bit and 8 for 64bit
+    private static final int GC_ARRAY_MIN_FIRST_ELEM_FROM_LEN_OFFSET = VMHelper.POINTER_TYPE_SIZE; //4 for 32bit and 8 for 64bit
 
 
     @Inline
@@ -61,7 +62,7 @@ public class GCHelper {
     @Inline   
     public static Address allocArray(int arrayLen, int elemSize, int allocationHandle) {
         if (arrayLen >= 0) {
-            int firstElementOffset = ARRAY_LEN_OFFSET + (elemSize==8?8:4);
+            int firstElementOffset = ARRAY_LEN_OFFSET + (elemSize==8?8:GC_ARRAY_MIN_FIRST_ELEM_FROM_LEN_OFFSET);
             int size = firstElementOffset + elemSize*arrayLen;
             size = (((size + (GC_OBJECT_ALIGNMENT - 1)) & (~(GC_OBJECT_ALIGNMENT - 1))));
 

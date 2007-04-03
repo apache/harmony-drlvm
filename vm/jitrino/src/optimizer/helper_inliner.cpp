@@ -361,7 +361,7 @@ void HelperInliner::finalizeCall(MethodCallInst* callInst) {
 
 
 void NewObjHelperInliner::doInline() {
-#if defined  (_EM64T_) || defined (_IPF_)
+#if defined (_IPF_)
     return;
 #else
     assert(inst->getOpcode() == Op_NewObj);
@@ -377,8 +377,12 @@ void NewObjHelperInliner::doInline() {
     }
     //replace newObj with call to a method
 
+
+#ifdef _EM64T_
+    assert(VMInterface::areReferencesCompressed());
+#endif
     //the method signature is (int objSize, int allocationHandle)
-    int allocationHandle= (int)objType->getAllocationHandle();
+    int allocationHandle= (int)(POINTER_SIZE_INT)objType->getAllocationHandle();
     int objSize=objType->getObjectSize();
 
     Opnd* tauSafeOpnd = opndManager->createSsaTmpOpnd(typeManager->getTauType());
@@ -412,7 +416,7 @@ void NewObjHelperInliner::doInline() {
 }
 
 void NewArrayHelperInliner::doInline() {
-#if defined  (_EM64T_) || defined (_IPF_)
+#if defined (_IPF_)
     return;
 #else
     assert(inst->getOpcode() == Op_NewArray);
@@ -420,9 +424,12 @@ void NewArrayHelperInliner::doInline() {
     //the method signature is (int objSize, int allocationHandle)
     Opnd* dstOpnd = inst->getDst();
     ArrayType* arrayType = dstOpnd->getType()->asArrayType();
-    int allocationHandle = (int)arrayType->getAllocationHandle();
+#ifdef _EM64T_
+    assert(VMInterface::areReferencesCompressed());
+#endif
+    int allocationHandle = (int)(POINTER_SIZE_INT)arrayType->getAllocationHandle();
     Type* elemType = arrayType->getElementType();
-    int elemSize = 4; //TODO: EM64T references!
+    int elemSize = 4; //TODO: check if references are compressed!
     if (elemType->isDouble() || elemType->isInt8()) {
         elemSize = 8;
     } else if (elemType->isInt2() || elemType->isChar()) {
@@ -461,7 +468,7 @@ void NewArrayHelperInliner::doInline() {
 
 
 void ObjMonitorEnterHelperInliner::doInline() {
-#if defined  (_EM64T_) || defined (_IPF_)
+#if defined (_IPF_)
     return;
 #else
     assert(inst->getOpcode() == Op_TauMonitorEnter);
@@ -484,11 +491,9 @@ void ObjMonitorEnterHelperInliner::doInline() {
     //every call must have exception edge -> add it
     if (call->getNode()->getExceptionEdge() == NULL) {
         Node* node = call->getNode();
-        Node* dispatchNode = node->getUnconditionalEdgeTarget()->getExceptionEdgeTarget();
-        if (dispatchNode == NULL) {
-            dispatchNode = cfg->getUnwindNode();
-            assert(dispatchNode != NULL); //method with monitors must have unwind, so no additional checks is done
-        }
+        //this is fake dispatch edge -> monenter must never throw exceptions
+        Node* dispatchNode = cfg->getUnwindNode(); 
+        assert(dispatchNode != NULL); //method with monitors must have unwind, so no additional checks is done
         cfg->addEdge(node, dispatchNode);
     }
     
@@ -497,7 +502,7 @@ void ObjMonitorEnterHelperInliner::doInline() {
 }
 
 void ObjMonitorExitHelperInliner::doInline() {
-#if defined  (_EM64T_) || defined (_IPF_)
+#if defined (_IPF_)
     return;
 #else
     assert(inst->getOpcode() == Op_TauMonitorExit);

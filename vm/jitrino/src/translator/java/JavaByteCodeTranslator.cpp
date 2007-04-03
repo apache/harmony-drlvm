@@ -90,7 +90,7 @@ Type* convertMagicType2HIR(TypeManager& tm, Type* type) {
 //vm helpers support
 
 bool isVMHelperClass(NamedType* type) {
-#ifdef _EM64T_
+#ifdef _IPF_
     return false;//natives are not tested on EM64T.
 #else
     static const char vmhelperPackage[] = "org/apache/harmony/drlvm/VMHelper";
@@ -2695,7 +2695,7 @@ JavaByteCodeTranslator::genInvokeStatic(MethodDesc * methodDesc,
     if (isMagicMethod(methodDesc)) {
         genMagic(methodDesc, numArgs, srcOpnds, returnType);    
         return;
-    } else if (isVMHelperMethod(methodDesc)) {
+    } else if (isVMHelperMethod(methodDesc) && !methodDesc->isNative()) {
         genVMHelper(methodDesc, numArgs, srcOpnds, returnType);
         return;
     }
