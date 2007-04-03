@@ -15,35 +15,27 @@
  *  limitations under the License.
  */
 
-/**
- * @author Serguei S.Zapreyev
- * @version $Revision$
- **/
-
 package org.apache.harmony.lang.generics;
-import java.io.File;
-import java.io.FileInputStream;
 
-@SuppressWarnings(value={"all"}) public class SpecialClassLoader extends ClassLoader {
+import java.io.File;
+import java.io.InputStream;
+
+public class SpecialClassLoader extends ClassLoader {
     public Class findClass(String name) {
         try {
-            String s="";
-            String s2="";
+            String s;
             if (ClassLoaderTest.flag == 0) {
-				s="org"+File.separator+"apache"+File.separator+"harmony"+File.separator+"lang"+File.separator+"generics"+File.separator+"SpecialD";
-				s2="org.apache.harmony.lang.generics.SpecialD";
+                s = "org.apache.harmony.lang.generics.SpecialD";
             } else {
-				s="org"+File.separator+"apache"+File.separator+"harmony"+File.separator+"lang"+File.separator+"generics"+File.separator+"SpecialC";
-                s2="org.apache.harmony.lang.generics.SpecialC";
+                s = "org.apache.harmony.lang.generics.SpecialC";
             }
-            FileInputStream fis;
-            fis = new FileInputStream(System.getProperty("java.ext.dirs")+File.separator+"classes"+File.separator+s+".class");
-            byte[] classToBytes = new byte[fis.available()];
-            fis.read(classToBytes);
-            return defineClass(s2, classToBytes, 0, classToBytes.length);
+            InputStream is = getResourceAsStream(s.replace('.', File.separatorChar) + ".class");
+            byte[] classToBytes = new byte[is.available()];
+            is.read(classToBytes);
+            is.close();
+            return defineClass(s, classToBytes, 0, classToBytes.length);
         } catch (Exception e) {
-            System.err.println("Unexpected exception during classloading: ");
-            e.printStackTrace();
+            System.err.println("Unexpected exception during classloading: " + e);
             return null;
         }
     }

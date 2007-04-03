@@ -120,7 +120,7 @@ public class ThreadRTest extends TestCase {
         } 
         t.stop(); 
         
-        int count = 10;
+        int count = 300;
         while(!tt.finished && count-- > 0 ){
             Thread.sleep(100);
         }          

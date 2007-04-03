@@ -15,27 +15,16 @@
  *  limitations under the License.
  */
 
-/**
- * @author Serguei S.Zapreyev
- * @version $Revision$
- **/
-
 package org.apache.harmony.lang.generics;
 
-@SuppressWarnings(value={"all"}) public class ClassLoaderTest extends junit.framework.TestCase {
+import junit.framework.TestCase;
+
+public class ClassLoaderTest extends TestCase {
     public static int flag = 0;
-    public void test() {
-        try {
+    public void test() throws Throwable {
             SpecialClassLoader mcl = new SpecialClassLoader();
             Class cls = mcl.loadClass("");
             Object obj = cls.newInstance();
-            cls.getDeclaredMethod("test", (Class[])null).invoke(obj, (Object[])null);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+            cls.getDeclaredMethod("test").invoke(obj);
     }
-    public void main(String[] args) {
-        (new ClassLoaderTest()).test();
-    }
-
 }

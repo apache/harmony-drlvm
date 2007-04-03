@@ -15,11 +15,6 @@
  *  limitations under the License.
  */
 
-/**
- * @author Serguei S.Zapreyev
- * @version $Revision$
- **/
-
 package org.apache.harmony.lang.generics;
 
 public class SpecialC {

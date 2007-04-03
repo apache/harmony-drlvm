@@ -1480,6 +1480,14 @@ public class ThreadTest extends TestCase {
         } catch (InterruptedException e) {
             fail(INTERRUPTED_MESSAGE);
         }
+        waitTime = waitDuration;
+        Thread.State ts = t.getState();
+        while (ts != Thread.State.TIMED_WAITING && !(expired = doSleep(10))) {
+            ts = t.getState();
+        }
+        if (expired) {
+            fail("TIMED_WAITING state has not been reached");
+        }
         t.interrupt();
         waitTime = waitDuration;
         while (!t.exceptionReceived && !(expired = doSleep(10))) {

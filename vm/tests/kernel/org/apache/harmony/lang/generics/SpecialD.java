@@ -15,34 +15,24 @@
  *  limitations under the License.
  */
 
-/**
- * @author Serguei S.Zapreyev
- * @version $Revision$
- **/
-
 package org.apache.harmony.lang.generics;
 
 import junit.framework.TestCase;
 
 public class SpecialD extends TestCase {
-    public void test() {
-        try {
+    public void test() throws Throwable {
             new SpecialC();
             if(((SpecialClassLoader)this.getClass().getClassLoader()).checkFind("org.apache.harmony.lang.generics.SpecialC")==null) {
                 fail("FAILED: " + this.getClass().getClassLoader().getClass() + " wasn't marked as initiating classloader for SpecialC");
-            } else {
-               //System.out.println("PASSED: " + this.getClass().getClassLoader().getClass() + " was marked as initiating classloader for SpecialC");
             }
-            //System.out.println("Trying to define SpecialC for the second time...");
+            
+            // Trying to define SpecialC for the second time...
             ClassLoaderTest.flag++;
             try {
                ((SpecialClassLoader)this.getClass().getClassLoader()).loadClass("");
                 fail("FAILED: LinkageError wasn't thrown");
             } catch (LinkageError err) {
+                // expected
             }
-        } catch (Throwable t) {
-             fail("FAILED: Unexpected error thrown:");
-             t.printStackTrace();
-        }
     }
 }
