@@ -9,7 +9,7 @@ import junit.framework.TestCase;
 public class JavaLibraryPathTest extends TestCase {
 
     public static void main(String args[]) {
-        (new JavaLibraryPath()).test();
+        (new JavaLibraryPathTest()).test();
     }
 
     public void test() {
