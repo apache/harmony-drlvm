@@ -48,6 +48,48 @@ DEFINE_SESSION_ACTION(FastArrayFillPass, fastArrayFill, "Fast Array Filling")
 void
 FastArrayFillPass::_run(IRManager& irManager) 
 {
+    /*
+    This pass tries to find the array filling code pattern and adds 
+    new code under a branch. The new code will be executed in the case of 
+    array filling goes from first to last index of the array.
+
+    Example (C++ like):
+
+    Old code:
+
+        char[] a = new char[100];
+        char c = 1;
+        int num = 100;
+        for (int i = 0; i < num; i++) {
+            a[i] = c;
+        }
+
+    New code:
+
+        char[] a = new char[100];
+        int num = 100;
+        if (num == lengthof(a)) {
+            int * b = (int *)a;
+            int cc = 1 | (1 << 16)
+            for (int i = 0; i < 100; i += 2) {
+                b[i] = cc;
+            }
+        } else {
+            char c = 1;
+            int num = 100;
+            for (int i = 0; i < num; i++) {
+                a[i] = c;
+            }
+        }
+    
+    The pattern depends on loop peeling, de-SSA pass and ABCD pass.
+    Also it needs cg_fastArrayFill pass in code generator.
+    
+    Seems like this pass could be moved into the translator phase with 
+    significant reducing of the pattern and removing of dependencies 
+    from HLO optimizations.
+    */
+
     LoopTree * info = irManager.getLoopTree();
     if (!info->isValid()) {
         info->rebuild(false);
@@ -60,6 +102,7 @@ FastArrayFillPass::_run(IRManager& irManager)
     Edges loopEdges(tmm);
     StlMap<Node *, LoopEdges> loopInfo(tmm);
         
+    //collect necessary information about loops
     const Nodes& nodes = irManager.getFlowGraph().getNodes();
     for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
         Node* node = *it;
@@ -84,6 +127,37 @@ FastArrayFillPass::_run(IRManager& irManager)
     }
 
     //check found loops for pattern
+    /* Code pattern:
+
+    label .node1
+    arraylen  arrayRef ((tau1,tau3)) -) arrayBound:int32
+    chkub 0 .lt. arrayBound -) tau2:tau
+    GOTO .node2
+
+    label .node2
+    ldbase    arrayRef -) arrayBase:ref:char
+    stind.unc:chr constValue ((tau1,tau2,tau3)) -) [arrayBase]
+    stvar     startIndex -) index:int32
+    GOTO .loopNode1
+
+    label .loopNode1
+    ldvar     index -) tmpIndex:int32
+    if cge.i4  tmpIndex, fillBound goto .loopExit
+    GOTO .node2
+
+    label .loopNode2
+    chkub tmpIndex .lt. arrayBound -) tau2:tau
+    GOTO .node3
+
+    label .loopNode3
+    addindex  arrayBase, tmpIndex -) address:ref:char
+    stind.unc:chr constValue ((tau1,tau2,tau3)) -) [address]
+    add   tmpIndex, addOp -) inc:int32
+    stvar     inc -) index:int32
+    GOTO .node1
+    
+    */
+
     for(StlMap<Node *, LoopEdges>::const_iterator it = loopInfo.begin(); it != loopInfo.end(); ++it) {
 
         Edge * backEdge = it->second.backEdge;
@@ -102,6 +176,7 @@ FastArrayFillPass::_run(IRManager& irManager)
         Opnd * fillBound = NULL;
         Inst * inst = ((Inst *)startNode->getLastInst());
         bool found = false;
+
 
         //check StVar
         if (inst->getOpcode() == Op_StVar) {
@@ -210,49 +285,73 @@ FastArrayFillPass::_run(IRManager& irManager)
         inEdge = startNode->getInEdges().front();
 
         //get a new constant
-        int val = ((ConstInst*)constValue->getInst())->getValue().i4;
+#ifdef _EM64T_
+        int64 val = (int64)((ConstInst*)constValue->getInst())->getValue().i8;
+#else
+        int32 val = (int32)((ConstInst*)constValue->getInst())->getValue().i4;
+#endif
         switch (((Type*)arrayRef->getType()->asArrayType()->getElementType())->tag) {
             case Type::Int8:
             case Type::Boolean:
             case Type::UInt8:
                 val |= (val << 8);
                 val |= (val << 16);
+#ifdef _EM64T_
+                val |= (val << 32);
+#endif
                 break;
             case Type::Int16:
             case Type::UInt16:
             case Type::Char:
                 val |= (val << 16);
+#ifdef _EM64T_
+                val |= (val << 32);
+#endif
                 break;
             case Type::Int32:
             case Type::UInt32:
+#ifdef _EM64T_
+                val |= (val << 32);
+                break;
+#endif
             case Type::UIntPtr:
             case Type::IntPtr:
+#ifdef _EM64T_
+            case Type::UInt64:
+            case Type::Int64:
+#endif
                 break;
             default:
                 continue;
         }
 
+        //split node1 (see code pattern) after arraylen instruction 
+        //and insert a check whether fillBound is equal to arrayBound.
+        //if not equal then go to the regular loop
         ControlFlowGraph& fg = irManager.getFlowGraph();
         Node * preheader = fg.splitNodeAtInstruction(inst, true, false, irManager.getInstFactory().makeLabel());
         Inst * cmp = irManager.getInstFactory().makeBranch(Cmp_NE_Un, arrayBound->getType()->tag, arrayBound, fillBound, (LabelInst *)preheader->getFirstInst());
         startNode->appendInst(cmp);
 
+        //create a node with some instructions to prepare variables for loop
         Node * prepNode = fg.createBlockNode(irManager.getInstFactory().makeLabel());
         fg.addEdge(startNode,prepNode);
         
         OpndManager& opndManager = irManager.getOpndManager();
 
-        Opnd * copyOp = opndManager.createArgOpnd(irManager.getTypeManager().getInt32Type());
+        Opnd * copyOp = opndManager.createArgOpnd(irManager.getTypeManager().getIntPtrType());
         Inst * copyInst  = irManager.getInstFactory().makeLdConst(copyOp,val);
         prepNode->appendInst(copyInst);
 
+        //insert ldbase instruction
         Opnd *baseOp = opndManager.createArgOpnd(irManager.getTypeManager().getIntPtrType());
         Inst * ldBaseInst = irManager.getInstFactory().makeLdArrayBaseAddr(arrayRef->getType()->asArrayType()->getElementType(),baseOp, arrayRef);
         prepNode->appendInst(ldBaseInst);
 
         Opnd* args[4] = {copyOp, arrayRef, arrayBound, baseOp};
 
-        // add jit helper
+        // insert the helper.
+        // this helper should be expanded in the code generator phase
         Inst* initInst = irManager.getInstFactory().makeJitHelperCall(
             OpndManager::getNullOpnd(), FillArrayWithConst, 4, args);
         prepNode->appendInst(initInst);

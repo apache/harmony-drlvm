@@ -35,6 +35,11 @@ static ActionFactory<FastArrayFilling> _faf("cg_fastArrayFill");
 void
 FastArrayFilling::runImpl() 
 {
+    /*
+    find and replace particular internal helper (inserted by HLO path) 
+    with a loop providing fast array filling with a constant.
+    */
+
     const Nodes& nodes = irManager->getFlowGraph()->getNodesPostOrder();
     for (Nodes::const_reverse_iterator it = nodes.rbegin(),end = nodes.rend();it!=end; ++it) {
         Node* bb = *it;
@@ -70,8 +75,8 @@ FastArrayFilling::runImpl()
         Node * nextNode = outEdge->getTargetNode();
 
         //extract operands from the internal helper instruction
-        Inst::Opnds opnds(inst, Inst::OpndRole_Use|Inst::OpndRole_Explicit|Inst::OpndRole_Auxilary);
-        Inst::Opnds::iterator ito = opnds.begin()+1; 
+        Inst::Opnds opnds(inst, Inst::OpndRole_Use|Inst::OpndRole_Auxilary);
+        Inst::Opnds::iterator ito = opnds.begin(); 
 
 //      Opnd* args[4] = {valueOp, arrayRef, arrayBound, baseOp};
         Opnd * value = inst->getOpnd(ito++);
@@ -106,16 +111,21 @@ FastArrayFilling::runImpl()
         Opnd * index = irManager->newOpnd(ptrToIntType);
         bb->appendInst(irManager->newCopyPseudoInst(Mnemonic_MOV, index, arrayBase));
 
+        //create increment
+        Opnd * incOp = irManager->newOpnd(intPtrType);
+        bb->appendInst(irManager->newCopyPseudoInst(Mnemonic_MOV, incOp, irManager->newImmOpnd(intPtrType,8)));
+
         Node * loopNode = fg->createNode(Node::Kind_Block);
         
         //insert filling instructions 
         Opnd * memOp1 = irManager->newMemOpndAutoKind(value->getType(), index);
-        Opnd * memOp2 = irManager->newMemOpndAutoKind(value->getType(), index,irManager->newImmOpnd(int32Type,4));
         loopNode->appendInst(irManager->newCopyPseudoInst(Mnemonic_MOV, memOp1, value));
+#ifndef _EM64T_
+        Opnd * memOp2 = irManager->newMemOpndAutoKind(value->getType(), index,irManager->newImmOpnd(int32Type,4));
         loopNode->appendInst(irManager->newCopyPseudoInst(Mnemonic_MOV, memOp2, value));
-        
+#endif
+
         //increment the element address
-        Opnd * incOp = irManager->newImmOpnd(intPtrType,8);
         loopNode->appendInst(irManager->newInst(Mnemonic_ADD, index, incOp));
         
         //compare the element address with the end of the array

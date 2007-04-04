@@ -149,6 +149,7 @@ void __stdcall add_value_profile_value(EM_ProfileAccessInterface* profileAccessI
 }
 
 void __stdcall fill_array_with_const(uint32 copyOp, uint32 arrayRef, uint32 arrayBound, uint32 baseOp) {
+    Jitrino::crash("Illegal internal helper was called.\n Please enable cg_fastArrayFill optimization in the code generator path");
     assert(0);
     return;
 }

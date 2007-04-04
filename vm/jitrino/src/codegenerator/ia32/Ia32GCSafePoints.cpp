@@ -321,18 +321,35 @@ static inline int adjustOffsets(int32 offsetBefore, int32 dOffset) {
     return res;
 }
 
+static bool isHeapBase(Opnd* immOpnd) {
+    assert(immOpnd->isPlacedIn(OpndKind_Imm));
+#ifndef _EM64T_
+    return false;
+#else 
+    int64 heapBase = (int64)VMInterface::getHeapBase();
+    return immOpnd->getImmValue() == heapBase;
+#endif
+}
+
+static Opnd* findImmediateSource(Opnd* opnd) {
+    Opnd* res = opnd;
+    while (!res->isPlacedIn(OpndKind_Imm)) {
+        Inst* defInst = res->getDefiningInst();
+        if (!defInst || defInst->getMnemonic()!=Mnemonic_MOV) {
+            return NULL;
+        }
+        res = defInst->getOpnd(1);
+    }
+    return res;
+}
 
 int32 GCSafePointsInfo::getOffsetFromImmediate(Opnd* offsetOpnd) const {
     if (offsetOpnd->isPlacedIn(OpndKind_Immediate)) {
         if (offsetOpnd->getImmValue() == 0 && offsetOpnd->getRuntimeInfo()!=NULL) {
             irm.resolveRuntimeInfo(offsetOpnd);
         }
-#ifndef _EM64T_
+        assert(!isHeapBase(offsetOpnd));
         return (int32)offsetOpnd->getImmValue();
-#else
-        return offsetOpnd->getImmValue() == (int64)VMInterface::getHeapBase() ?
-            0 : (int32)offsetOpnd->getImmValue();
-#endif
     }
     return MPTR_OFFSET_UNKNOWN;
 }
@@ -486,16 +503,15 @@ void GCSafePointsInfo::updatePairsOnInst(Inst* inst, GCSafePointPairs& res) {
 #endif
                         fromOpnd = opnd;
                         Opnd* offsetOpnd = inst->getOpnd(useIndex1);
-                        if (offsetOpnd->isPlacedIn(OpndKind_Immediate)) {
-                            offset = getOffsetFromImmediate(offsetOpnd);
+                        Opnd* immOffset = findImmediateSource(offsetOpnd);
+                        if (immOffset) {
+                           if (isHeapBase(immOffset)) {
+                               offset = 0;
+                           } else {
+                               offset = getOffsetFromImmediate(immOffset);
+                           }
                         } else {
-                            assert(offsetOpnd->isPlacedIn(OpndKind_Memory) || offsetOpnd->isPlacedIn(OpndKind_Reg));
-#ifdef _EM64T_
-                            if(offsetOpnd->getDefiningInst() && offsetOpnd->getDefiningInst()->getMnemonic() == Mnemonic_MOV && offsetOpnd->getDefiningInst()->getOpnd(1)->isPlacedIn(OpndKind_Immediate)) 
-                                offset = getOffsetFromImmediate(offsetOpnd->getDefiningInst()->getOpnd(1));
-                            else 
-#endif
-                                offset = MPTR_OFFSET_UNKNOWN;
+                           offset = MPTR_OFFSET_UNKNOWN;
                         }
                     }
                     break;
