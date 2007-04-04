@@ -27,6 +27,7 @@
 #include "properties.h"
 #include "vm_properties.h"
 #include "init.h"
+#include "native_modules.h"
 
 inline char* unquote(char *str)
 {
@@ -93,6 +94,27 @@ static char *compose_full_files_path_names_list(const char *path,
     return full_name;
 }
 
+static char* get_module_filename(void* code_ptr)
+{
+    native_module_t* modules;
+    int modules_count;
+
+    if (! get_all_native_modules(&modules, &modules_count))
+        return NULL;
+
+    native_module_t* module = find_native_module(modules, code_ptr);
+
+    char* filename = NULL;
+
+    if (NULL != module) {
+        filename = apr_pstrdup(prop_pool, module->filename);
+    }
+
+    clear_native_modules(&modules);
+
+    return filename;
+}
+
 static void init_java_properties(Properties & properties)
 {
     //java part
@@ -107,90 +129,125 @@ static void init_java_properties(Properties & properties)
     if (APR_SUCCESS != apr_temp_dir_get(&tmp, prop_pool)) {
         tmp = ".";
     }
-    properties.set("java.version", "1.5.0");
-    properties.set("java.vendor", "Apache Software Foundation");
-    properties.set("java.vendor.url", "http://harmony.apache.org");
+    properties.set_new("java.version", "1.5.0");
+    properties.set_new("java.vendor", "Apache Software Foundation");
+    properties.set_new("java.vendor.url", "http://harmony.apache.org");
+
     // java.home initialization, try to find absolute location of the executable and set
     // java.home to the parent directory.
-    char *base_path_buf;
-    if (port_executable_name(&base_path_buf, prop_pool) != APR_SUCCESS) {
+    char *launcher_dir;
+    if (port_executable_name(&launcher_dir, prop_pool) != APR_SUCCESS) {
         LDIE(13, "Failed to find executable location");
     }
     // directory for the executable
-    char *p = strrchr(base_path_buf, PORT_FILE_SEPARATOR);
+    char *p = strrchr(launcher_dir, PORT_FILE_SEPARATOR);
     if (NULL == p)
         LDIE(14, "Failed to determine executable parent directory");
     *p = '\0';
     // home directory
-    char* home_path = apr_pstrdup(prop_pool, base_path_buf);
+    char* home_path = apr_pstrdup(prop_pool, launcher_dir);
     p = strrchr(home_path, PORT_FILE_SEPARATOR);
     if (NULL == p)
         LDIE(15, "Failed to determine java home directory");
     *p = '\0';
 
-    properties.set("java.home", home_path);
-    properties.set("java.vm.specification.version", "1.0");
-    properties.set("java.vm.specification.vendor", "Sun Microsystems Inc.");
-    properties.set("java.vm.specification.name", "Java Virtual Machine Specification");
-    properties.set("java.vm.version", "11.2.0");
-    properties.set("java.vm.vendor", "Apache Software Foundation");
-    properties.set("java.vm.name", "DRLVM");
-    properties.set("java.specification.version", "1.5");
-    properties.set("java.specification.vendor", "Sun Microsystems Inc.");
-    properties.set("java.specification.name", "Java Platform API Specification");
-    properties.set("java.class.version", "49.0");
-    properties.set("java.class.path", ".");
+    properties.set_new("java.home", home_path);
+    properties.set_new("java.vm.specification.version", "1.0");
+    properties.set_new("java.vm.specification.vendor", "Sun Microsystems Inc.");
+    properties.set_new("java.vm.specification.name", "Java Virtual Machine Specification");
+    properties.set_new("java.vm.version", "11.2.0");
+    properties.set_new("java.vm.vendor", "Apache Software Foundation");
+    properties.set_new("java.vm.name", "DRLVM");
+    properties.set_new("java.specification.version", "1.5");
+    properties.set_new("java.specification.vendor", "Sun Microsystems Inc.");
+    properties.set_new("java.specification.name", "Java Platform API Specification");
+    properties.set_new("java.class.version", "49.0");
+    properties.set_new("java.class.path", ".");
 
-    // java.library.path initialization, the value is the location of VM executable,
-    // prepended to OS library search path
+    /*
+    *  it's possible someone forgot to set this property - set to default of location of vm module
+    */
+    if (! properties.is_set(O_A_H_VM_VMDIR)) {
+        char* vm_dir = get_module_filename((void*) &init_java_properties);
+
+        if (NULL == vm_dir)
+            LDIE(43, "ERROR: Can't determine vm module location. Please specify {0} property." << O_A_H_VM_VMDIR);
+
+        char *p = strrchr(vm_dir, PORT_FILE_SEPARATOR);
+        if (NULL == p)
+            LDIE(43, "ERROR: Can't determine vm module location. Please specify {0} property." << O_A_H_VM_VMDIR);
+
+        *p = '\0';
+
+        properties.set(O_A_H_VM_VMDIR, vm_dir);
+    }
+
+    char* vm_dir = properties.get(O_A_H_VM_VMDIR);
+
+    char* lib_path = apr_pstrcat(prop_pool, launcher_dir,
+            PORT_PATH_SEPARATOR_STR, vm_dir, NULL);
+
+    properties.destroy(vm_dir);
+    vm_dir = NULL;
+
+    /*
+     * This property is used by java/lang/Runtime#loadLibrary0 as path to
+     * system native libraries.
+     * The value is the location of launcher executable and vm binary directory
+     */
+    properties.set_new("vm.boot.library.path", lib_path);
+
+    // Added for compatibility with the external java JDWP agent
+    properties.set_new("sun.boot.library.path", lib_path);
+
+    // java.library.path initialization, the value is the same as for
+    // vm.boot.library.path appended with OS library search path
     char *env;
-    char *lib_path = base_path_buf;
     if (APR_SUCCESS == port_dso_search_path(&env, prop_pool))
     {
-        lib_path = apr_pstrcat(prop_pool, base_path_buf, PORT_PATH_SEPARATOR_STR,
-                               base_path_buf, PORT_FILE_SEPARATOR_STR, "default",
-                               PORT_PATH_SEPARATOR_STR, env, NULL);
+        lib_path = apr_pstrcat(prop_pool, lib_path, PORT_PATH_SEPARATOR_STR,
+                env, NULL);
     }
-    properties.set("java.library.path", lib_path);
+    properties.set_new("java.library.path", lib_path);
     //java.ext.dirs initialization.
     char *ext_path = port_filepath_merge(home_path, "lib" PORT_FILE_SEPARATOR_STR "ext", prop_pool);
-    properties.set("java.ext.dirs", ext_path);
-    properties.set("os.name", os_name);
-    properties.set("os.arch", port_CPU_architecture());
-    properties.set("os.version", os_version);
-    properties.set("file.separator", PORT_FILE_SEPARATOR_STR);
-    properties.set("path.separator", PORT_PATH_SEPARATOR_STR);
-    properties.set("line.separator", APR_EOL_STR);
+    properties.set_new("java.ext.dirs", ext_path);
+    properties.set_new("os.name", os_name);
+    properties.set_new("os.arch", port_CPU_architecture());
+    properties.set_new("os.version", os_version);
+    properties.set_new("file.separator", PORT_FILE_SEPARATOR_STR);
+    properties.set_new("path.separator", PORT_PATH_SEPARATOR_STR);
+    properties.set_new("line.separator", APR_EOL_STR);
     // user.name initialization, try to get the name from the system
     char *user_buf;
     apr_status_t status = port_user_name(&user_buf, prop_pool);
     if (APR_SUCCESS != status) {
         LDIE(16, "Failed to get user name from the system. Error code {0}" << status);
     }
-    properties.set("user.name", user_buf);
+    properties.set_new("user.name", user_buf);
     // user.home initialization, try to get home from the system.
     char *user_home;
     status = port_user_home(&user_home, prop_pool);
     if (APR_SUCCESS != status) {
         LDIE(17, "Failed to get user home from the system. Error code {0}" << status);
     }
-    properties.set("user.home", user_home);
+    properties.set_new("user.home", user_home);
     // java.io.tmpdir initialization. 
     const char *tmpdir;
     status = apr_temp_dir_get(&tmpdir, prop_pool);
     if (APR_SUCCESS != status) {
         tmpdir = user_home;
     }
-    properties.set("java.io.tmpdir", tmpdir);
-    properties.set("user.dir", path);
+    properties.set_new("java.io.tmpdir", tmpdir);
+    properties.set_new("user.dir", path);
 
     // FIXME??? other (not required by api specification) properties
     
-    properties.set("java.vm.info", "no info");
-    properties.set("java.tmpdir", tmp);
-    properties.set("user.language", "en");
-    properties.set("user.region", "US");
-    properties.set("file.encoding", "8859_1");
+    properties.set_new("java.vm.info", "no info");
+    properties.set_new("java.tmpdir", tmp);
+    properties.set_new("user.language", "en");
+    properties.set_new("user.region", "US");
+    properties.set_new("file.encoding", "8859_1");
 
     // FIXME user.timezone initialization, required by java.util.TimeZone implementation
     char *user_tz;
@@ -200,57 +257,36 @@ static void init_java_properties(Properties & properties)
         user_tz = "GMT";
     }
     
-    properties.set("user.timezone", user_tz);
+    properties.set_new("user.timezone", user_tz);
 
     // FIXME: This is a workaround code for third party APIs which depend on this property.
-    properties.set("java.util.prefs.PreferencesFactory",
+    properties.set_new("java.util.prefs.PreferencesFactory",
 #ifdef PLATFORM_NT
         "java.util.prefs.RegistryPreferencesFactoryImpl");
 #else
         "java.util.prefs.FilePreferencesFactoryImpl");
 #endif
     // Property for xalan.jar
-    properties.set("javax.xml.transform.TransformerFactory",
+    properties.set_new("javax.xml.transform.TransformerFactory",
                    "org.apache.xalan.xsltc.trax.TransformerFactoryImpl");     
-
-
-    // Added for compatibility with the external java JDWP agent
-    properties.set("sun.boot.library.path", base_path_buf);
-
-    /*
-     * This property is used by java/lang/Runtime#loadLibrary0
-     * as path to system native libraries.
-     */
-    properties.set("vm.boot.library.path", base_path_buf);
 
     /*
     *  it's possible someone forgot to set this property - set to default of .
     */
-    if (!properties.is_set(O_A_H_VM_VMDIR)) {
-        TRACE2("init", "o.a.h.vm.vmdir not set - setting predefined value of as '.'");
-        properties.set(O_A_H_VM_VMDIR, ".");
-    }
-
-    /*
-    *  also, do the same for java.class.path
-    */
-    if (!properties.is_set("java.class.path")) {
-        TRACE2("init", "java.class.path not set - setting predefined value of as '.'");
-        properties.set("java.class.path", ".");
-    }
+    properties.set_new("java.class.path", ".");
 }
 
 //vm part
 static void init_vm_properties(Properties & properties)
 {
-        properties.set("vm.assert_dialog", "true");
-        properties.set("vm.crash_handler", "false");
-        properties.set("vm.finalize", "true");
-        properties.set("vm.jit_may_inline_sync", "true");
-        properties.set("vm.use_verifier", "true");
-        properties.set("vm.jvmti.enabled", "false");
-        properties.set("vm.bootclasspath.appendclasspath", "false");
-        properties.set("vm.dlls", PORT_DSO_NAME(GC_DLL));
+        properties.set_new("vm.assert_dialog", "true");
+        properties.set_new("vm.crash_handler", "false");
+        properties.set_new("vm.finalize", "true");
+        properties.set_new("vm.jit_may_inline_sync", "true");
+        properties.set_new("vm.use_verifier", "true");
+        properties.set_new("vm.jvmti.enabled", "false");
+        properties.set_new("vm.bootclasspath.appendclasspath", "false");
+        properties.set_new("vm.dlls", PORT_DSO_NAME(GC_DLL));
 
         int n_api_dll_files = sizeof(api_dll_files) / sizeof(char *);
         /*
@@ -258,7 +294,7 @@ static void init_vm_properties(Properties & properties)
         *  any path pre-pended
         */
         char* path_buf = compose_full_files_path_names_list(NULL, api_dll_files, n_api_dll_files, true);
-        properties.set("vm.other_natives_dlls", path_buf);
+        properties.set_new("vm.other_natives_dlls", path_buf);
 }
 
 void
@@ -268,13 +304,7 @@ initialize_properties(Global_Env * p_env)
         apr_pool_create(&prop_pool, 0);
     }
 /*
- * 1. Add predefined properties
- */
-    init_java_properties(*p_env->JavaProperties());
-    init_vm_properties(*p_env->VmProperties());
-
-/*
- * 2. Process command line options, possibly overriding the default values. 
+ * 1. Process command line options.
  * Java properties are set as -Dkey[=value];
  * VM properties are set with the following syntax ("fully compatible" with RI):
  * - options are set with -XX:<option>=<string>
@@ -351,5 +381,12 @@ initialize_properties(Global_Env * p_env)
             STD_FREE(src);
         }
     }
+
+/*
+ * 2. Set predefined values to properties not defined via vm options.
+ */
+    init_java_properties(*p_env->JavaProperties());
+    init_vm_properties(*p_env->VmProperties());
+
     apr_pool_clear(prop_pool);
 }

@@ -1,0 +1,16 @@
+<project name="RUN HARMONY-3283 Regression Test">
+    <target name="run-test">
+        <run-junit-test
+            test="org.apache.harmony.drlvm.tests.regression.h3283.JavaLibraryPathTest">
+            <junit-element>
+                <!-- bug was reproduced only in server mode -->
+                <jvmarg value="-Xem:server"/>
+                <!-- specify custom value for java.library.path property -->
+                <jvmarg value="-Djava.library.path=fake_path"/>
+                <!-- test will check expected value for java.library.path property -->
+                <jvmarg value="-Dexpected.value=fake_path"/>
+            </junit-element>
+        </run-junit-test>
+    </target>
+</project>
+

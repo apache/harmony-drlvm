@@ -61,6 +61,26 @@ void Properties::set(const char * key, const char * value)
     }
 }
 
+void Properties::set_new(const char * key, const char * value)
+{
+    TRACE("try to set property " << key << " = " << value);
+
+    if (APR_SUCCESS != apr_thread_rwlock_wrlock(rwlock_array)) {
+        LDIE(11, "Cannot lock properties table");
+    }
+    PropValue* val = (PropValue*) apr_hash_get(hashtables_array, (const void*) key, APR_HASH_KEY_STRING);
+    if (NULL == val) {
+        apr_hash_set(hashtables_array, (const void*) strdup(key), APR_HASH_KEY_STRING, (const void*) new PropValue(value));
+        TRACE("defined property " << key);
+    } else {
+        TRACE("property is already defined: " << key);
+    }
+
+    if (APR_SUCCESS != apr_thread_rwlock_unlock(rwlock_array)) {
+        LDIE(12, "Cannot unlock properties table");
+    }
+}
+
 char* Properties::get(const char * key) {
     char* return_value= NULL;
     if (APR_SUCCESS != apr_thread_rwlock_rdlock(rwlock_array)) {

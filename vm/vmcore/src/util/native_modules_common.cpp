@@ -15,34 +15,21 @@
  *  limitations under the License.
  */
 
-#ifndef _VM_PROPERTIES_H
-#define _VM_PROPERTIES_H
+#include "native_modules.h"
 
-#include <apr_hash.h>
-#include <apr_pools.h>
-#include <apr_thread_rwlock.h>
-
-class Properties
+native_module_t* find_native_module(native_module_t* modules, void* code_ptr)
 {
-public:
-    Properties();
-    ~Properties() {
-        apr_pool_destroy(local_ht_pool);
-    }
-    void set(const char * key, const char * value);
-    /** set property only if it's not set yet */
-    void set_new(const char * key, const char * value);
-    char* get(const char * key);
-    void destroy(char* value);
-    bool is_set(const char * key);
-    void unset(const char * key);
-    char** get_keys();
-    char** get_keys_staring_with(const char* prefix);
-    void destroy(char** keys);
-private:
-    apr_pool_t* local_ht_pool;
-    apr_hash_t* hashtables_array;
-    apr_thread_rwlock_t* rwlock_array;
-};
+    for (native_module_t* module = modules; NULL != module;
+            module = module->next) {
+        for (size_t s = 0; s < module->seg_count; s++) {
+            void* base = module->segments[s].base;
+            size_t size = module->segments[s].size;
 
-#endif // _VM_PROPERTIES_H
+            if (code_ptr >= base && code_ptr < (char*) base + size)
+                return module;
+        }
+    }
+
+    // no matching module
+    return NULL;
+}

@@ -956,6 +956,9 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 				RelativePath="..\..\..\..\vm\vmcore\src\util\mem_alloc.cpp">
 			</File>
 			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\util\native_modules_common.cpp">
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\util\native_stack.cpp">
 			</File>
 			<File

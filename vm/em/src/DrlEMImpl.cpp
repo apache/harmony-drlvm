@@ -179,36 +179,6 @@ void DrlEMImpl::deallocateResources() {
 //_____________________________________________________________________
 // Reading and parsing configuration
 
-/*
- *  deprecated
- */
-std::string buildDefaultLibPath(const std::string& dll_name) {
-    char* c_string_tmp_value = get_property("vm.boot.library.path", JAVA_PROPERTIES);
-    std::string library_path = c_string_tmp_value == NULL ? "" : c_string_tmp_value;
-    destroy_property_value(c_string_tmp_value);
-#ifdef PLATFORM_NT
-    std::string fullPath = dll_name + ".dll";
-    
-    if (!library_path.empty()) { 
-        fullPath = library_path + "\\" + fullPath;
-    }
-    
-#else
-//  $$$ GMJ
-//
-//    std::string fullPath = library_path + "/lib" + dll_name + ".so";
-
-    std::string fullPath = "lib" + dll_name + ".so";
-    
-    if (!library_path.empty()) {
-        fullPath = library_path + "/" + fullPath;
-    }
-    
-#endif
-    return fullPath;
-}
-
-
 static bool endsWith(const std::string& str, const std::string& suffix) {
     if (str.length() < suffix.length()) {
         return false;
