@@ -310,6 +310,7 @@
         <echo message="             arch = ${build.arch}" />
         <echo message="              cxx = ${build.cxx}" />
         <echo message="              cfg = ${build.cfg}" />
+        <echo message="     svn revision = ${svn.revision}" />
         <echo message="       components = ${COMPONENTS}" />
     </target>
 

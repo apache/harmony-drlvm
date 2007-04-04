@@ -139,9 +139,8 @@ ${foo}
             timeout="${test.timeout}"
             jvm="${test.jvm.exe}">
 
-            <jvmarg value="-XX:-vm.assert_dialog" />
+            <jvmarg line="-XX:-vm.assert_dialog ${kernel.mode.switch} ${test.vmargs}" />
             <jvmarg value="-Dtest.resource.path=${test.resource.path}"/>
-            <jvmarg value="${kernel.mode.switch}" />
             <jvmarg value="-Xbootclasspath/a:${junit.jar}${path.separator}${test.class.path}" />
             <formatter type="xml"/>
             <batchtest todir="${report.dir}" unless="test.case">

@@ -185,7 +185,7 @@ ${foo}
                         value="-agentpath:${jvmti.test.native.path}/${testname}/lib${testname}.so"
                         />
                     </select>
-                    <jvmarg line="${mode.switch}" />
+                    <jvmarg line="${mode.switch} ${test.vmargs}" />
                     <formatter type="brief"/>
                     <formatter type="xml" />
                     <classpath path="${jvmti.test.class.path}" />
