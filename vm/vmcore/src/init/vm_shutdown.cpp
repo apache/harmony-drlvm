@@ -206,6 +206,10 @@ jint vm_destroy(JavaVM_Internal * java_vm, jthread java_thread)
     status = jthread_detach(java_thread);
     if (status != TM_ERROR_NONE) return JNI_ERR;
 
+    // Shutdown signals
+    extern void shutdown_signals();
+    shutdown_signals();
+
     // Call Agent_OnUnload() for agents and unload agents.
     java_vm->vm_env->TI->Shutdown(java_vm);
 

@@ -52,6 +52,8 @@ BOOL ctrl_handler(DWORD ctrlType)
     return FALSE; 
 } 
 
+static PVOID veh = NULL;
+
 void initialize_signals(){
     TRACE2("signals", "Setting console control handle...");
     BOOL ok = SetConsoleCtrlHandler( (PHANDLER_ROUTINE) ctrl_handler, TRUE); 
@@ -59,10 +61,16 @@ void initialize_signals(){
 
     // add VEH to catch NPE's from bytecode
     TRACE2("signals", "Adding vectored exception handler...");
-    PVOID res;
-    res = AddVectoredExceptionHandler(0, vectored_exception_handler);
-    assert(res);
+    veh = AddVectoredExceptionHandler(0, vectored_exception_handler);
+    assert(veh);
 }
+
+void shutdown_signals() {
+    TRACE2("signals", "Removing vectored exception handler...");
+    ULONG res;
+    res = RemoveVectoredExceptionHandler(veh);
+    assert(res);
+} //shutdown_signals
 
 //The following is for socket error handling
 const char *sock_errstr[] = { 

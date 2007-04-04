@@ -579,3 +579,7 @@ void initialize_signals()
     get_executable_name(executable, sizeof(executable));
 
 } //initialize_signals
+
+void shutdown_signals() {
+    //FIXME: should be defined in future
+} //shutdown_signals

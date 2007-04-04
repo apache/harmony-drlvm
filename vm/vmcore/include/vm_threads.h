@@ -180,7 +180,7 @@ VMEXPORT extern vm_thread_accessor *get_thread_ptr;
 inline VM_thread *get_vm_thread_fast_self() {
 	register hythread_t thr = hythread_self();
 
-    return (VM_thread *)hythread_tls_get(thr, TM_THREAD_VM_TLS_KEY);
+    return thr ? ((VM_thread *)hythread_tls_get(thr, TM_THREAD_VM_TLS_KEY)) : NULL;
 }
 
 inline VM_thread *get_vm_thread(hythread_t thr) {
