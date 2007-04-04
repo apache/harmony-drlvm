@@ -297,7 +297,7 @@ inline Partial_Reveal_Object* lspace_get_next_object( Space* lspace, POINTER_SIZ
   }
   if((POINTER_SIZE_INT)next_area_start < (POINTER_SIZE_INT)lspace->heap_end){
     ret_obj = next_area_start;
-    unsigned int obj_size = ALIGN_UP_TO_KILO(vm_object_size((Partial_Reveal_Object*)next_area_start));
+	POINTER_SIZE_INT obj_size = ALIGN_UP_TO_KILO(vm_object_size((Partial_Reveal_Object*)next_area_start));
     assert(obj_size);
     next_area_start = (POINTER_SIZE_INT*)((POINTER_SIZE_INT)next_area_start + obj_size);
     return (Partial_Reveal_Object*)ret_obj;
@@ -384,6 +384,7 @@ void verifier_init_object_scanner(Heap_Verifier* heap_verifier)
   heap_verifier->live_obj_scanner = verifier_scan_live_objects;
   heap_verifier->all_obj_scanner   = verifier_scan_all_objects;
 }
+
 
 
 

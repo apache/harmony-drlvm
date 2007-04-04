@@ -130,7 +130,7 @@ inline void wb_unmark_in_slot(REF* p_ref){
 
 inline Boolean wb_is_marked_in_slot(REF* p_ref){
   REF ref = *p_ref;
-  return (POINTER_SIZE_INT)ref & VERIFY_WB_MARK_BIT;
+  return (Boolean)((POINTER_SIZE_INT)ref & VERIFY_WB_MARK_BIT);
 }
 
 inline REF verifier_get_object_slot(REF* p_ref)
@@ -150,7 +150,7 @@ inline void tag_unreachable_obj(Partial_Reveal_Object* p_obj)
 
 inline Boolean is_unreachable_obj(Partial_Reveal_Object* p_obj)
 {
-  return ((POINTER_SIZE_INT)obj_get_vt_raw(p_obj) & UNREACHABLE_OBJ_MARK_IN_VT);
+  return (Boolean)((POINTER_SIZE_INT)obj_get_vt_raw(p_obj) & UNREACHABLE_OBJ_MARK_IN_VT);
 }
 
 #endif 
