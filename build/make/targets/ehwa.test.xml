@@ -77,7 +77,7 @@
         </echo>
 
         <java fork="true" jvm="${test.jvm.exe}" jar="${eclipse.home}/startup.jar" resultproperty="ehwa.result">
-            <jvmarg value="${ehwa.mode.switch}" />
+            <jvmarg line="-XX:-vm.assert_dialog ${ehwa.mode.switch} ${test.vmargs}" />
             <arg line="-application org.eclipse.test.uitestapplication"/>
             <arg line="-dev bin"/>
             <arg line="-data ${ehwa.workspace}"/>
