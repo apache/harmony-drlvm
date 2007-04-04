@@ -130,9 +130,9 @@ Boolean verifier_parse_options(Heap_Verifier* heap_verifier, char* options)
       heap_verifier->need_verify_gc= TRUE;
     }else{
       printf("Parse verify option error.\n");
-      printf("Usage: -XDgc.verify=rooset,writebarrier,allocation,gc \n");
-      printf("Usage: -XDgc.verify=default \n");
-      printf("Usage: -XDgc.verify=all \n");
+      printf("Usage: -XX:gc.verify=rooset,writebarrier,allocation,gc \n");
+      printf("Usage: -XX:gc.verify=default \n");
+      printf("Usage: -XX:gc.verify=all \n");
       return FALSE;
     }
   }

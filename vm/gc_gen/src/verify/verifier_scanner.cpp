@@ -150,7 +150,7 @@ void verifier_trace_objsets(Heap_Verifier* heap_verifier, Pool* obj_set_pool)
   while(obj_set){
     POINTER_SIZE_INT* iter = vector_block_iterator_init(obj_set);
     while(!vector_block_iterator_end(obj_set,iter)){
-      Partial_Reveal_Object* p_obj = (Partial_Reveal_Object* )*iter;
+      Partial_Reveal_Object* p_obj = read_slot((REF*)iter);
       iter = vector_block_iterator_advance(obj_set,iter);
       /*p_obj can be NULL , When GC happened, the obj in Finalize objs list will be clear.*/
       //assert(p_obj != NULL);  
@@ -193,8 +193,12 @@ void verifier_scan_resurrect_objects(Heap_Verifier* heap_verifier)
   if(heap_verifier->is_before_gc){
     verifier_trace_objsets(heap_verifier, gc->finref_metadata->obj_with_fin_pool);
   }else{
-    verify_live_finalizable_obj(heap_verifier, gc->finref_metadata->obj_with_fin_pool);
-    verifier_trace_objsets(heap_verifier, gc->finref_metadata->finalizable_obj_pool);
+	if(!heap_verifier->gc_verifier->is_before_fallback_collection){
+      verify_live_finalizable_obj(heap_verifier, gc->finref_metadata->obj_with_fin_pool);
+      verifier_trace_objsets(heap_verifier, gc->finref_metadata->finalizable_obj_pool);
+    }else{
+      verifier_trace_objsets(heap_verifier, gc->finref_metadata->obj_with_fin_pool);	
+    }
   }
   heap_verifier->gc_verifier->is_tracing_resurrect_obj = FALSE;
   verifier_update_info_after_resurrect(heap_verifier);
@@ -380,5 +384,6 @@ void verifier_init_object_scanner(Heap_Verifier* heap_verifier)
   heap_verifier->live_obj_scanner = verifier_scan_live_objects;
   heap_verifier->all_obj_scanner   = verifier_scan_all_objects;
 }
+
 
 

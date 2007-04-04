@@ -60,7 +60,7 @@ void verify_live_finalizable_obj(Heap_Verifier* heap_verifier, Pool* live_finali
   while(live_fin_objs){
     POINTER_SIZE_INT * iter = vector_block_iterator_init(live_fin_objs);
     while(!vector_block_iterator_end(live_fin_objs, iter)){
-      Partial_Reveal_Object* p_fin_obj = (Partial_Reveal_Object*) *iter;
+      Partial_Reveal_Object* p_fin_obj = read_slot((REF*)iter);
       iter = vector_block_iterator_advance(live_fin_objs, iter);
       if(p_fin_obj==NULL) continue;
       assert(obj_is_marked_in_vt(p_fin_obj));
@@ -307,5 +307,6 @@ void verifier_clear_gc_verification(Heap_Verifier* heap_verifier)
   verify_gc_reset(heap_verifier);  
   verifier_set_fallback_collection(heap_verifier->gc_verifier, FALSE);  
 }
+
 
 

@@ -310,7 +310,7 @@ void collector_add_phanref(Collector *collector, Partial_Reveal_Object *ref)
 void finref_repset_add_entry(GC *gc, REF* p_ref)
 {
   assert(*p_ref);
-  assert(*(unsigned int*)*p_ref);
+  assert(read_slot(p_ref));
   Finref_Metadata *metadata = gc->finref_metadata;
   finref_metadata_add_entry(gc, metadata->repset, metadata->repset_pool, (POINTER_SIZE_INT)p_ref);
 }

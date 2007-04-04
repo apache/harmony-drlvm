@@ -238,7 +238,7 @@ void gc_parse_options(GC* gc)
   }
 
   if (is_property_set("gc.use_large_page", VM_PROPERTIES) == 1){
-    char* value = get_property("gc.large_page", VM_PROPERTIES);
+    char* value = get_property("gc.use_large_page", VM_PROPERTIES);
     large_page_hint = strdup(value);
     destroy_property_value(value);
   }
@@ -318,6 +318,7 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
   vm_resume_threads_after();
   return;
 }
+
 
 
 
