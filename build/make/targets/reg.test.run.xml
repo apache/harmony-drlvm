@@ -85,12 +85,13 @@ DRLVM Regression Testing on platform: ${hy.platform}
                             <!-- Go through unit tests in the directory -->
                             <fileset dir="@{reg.test.2launch.src.dir}">
                                 <include name="*Test.java"/>
+                                <include name="*Test.j"/>
                             </fileset>
                             <sequential>
                                 <propertyregex override="yes"
                                   property="unit.test.class" 
                                   input="@{reg.unit.test.src}"
-                                  regexp=".*H(\d\d*)[/\\](..*)\.java" 
+                                  regexp=".*H(\d\d*)[/\\](..*)\.j.*" 
                                   replace="${reg.test.package}.h\1.\2"/>
                                 <run-junit-test test="${unit.test.class}"/>
                             </sequential>
