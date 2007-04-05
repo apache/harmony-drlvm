@@ -2461,6 +2461,11 @@ stackDump(FILE * file, StackFrame& frame) {
     }
 }
 
+void stack_dump(FILE *f, VM_thread *thread) {
+    StackFrame *frame = getLastStackFrame(thread);
+    stackDump(f, *frame);
+}
+
 void stack_dump(VM_thread *thread) {
     StackFrame *frame = getLastStackFrame(thread);
     stackDump(stderr, *frame);

@@ -91,7 +91,7 @@ extern void interpreter_ti_set_notification_mode(jvmtiEvent event_type, bool ena
 extern jbyte interpreter_ti_set_breakpoint(jmethodID method, jlocation location);
 extern void interpreter_ti_clear_breakpoint(jmethodID method, jlocation location, jbyte saved);
 extern jvmtiError interpreter_ti_pop_frame(jvmtiEnv*, VM_thread *thread);
-extern void stack_dump(VM_thread *thread);
+extern void stack_dump(FILE *f, VM_thread *thread);
 
 extern FrameHandle* interpreter_get_last_frame(class VM_thread *thread);
 extern FrameHandle* interpreter_get_prev_frame(FrameHandle* frame);

@@ -812,7 +812,7 @@ void JNICALL FatalError(JNIEnv * UNREF jni_env, const char *msg)
     st_print(stdout, hythread_self());
 
     // Return 1 to be compatible with RI.
-    exit(1);
+    _exit(1);
 } //FatalError
 
 jobject JNICALL NewGlobalRef(JNIEnv * jni_env, jobject obj)
