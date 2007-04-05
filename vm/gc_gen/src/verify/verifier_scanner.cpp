@@ -233,9 +233,9 @@ static FORCE_INLINE void verifier_scan_object_slots(Partial_Reveal_Object *p_obj
     for (unsigned int i = 0; i < array_length; i++) {
       if(!is_unreachable_obj(p_obj)){ 
         verify_write_barrier(p_ref+i, heap_verifier);
-        if(*(p_ref+i) != COMPRESSED_NULL) verify_live_object_slot(p_ref+i, heap_verifier);
+        if( read_slot(p_ref+i) != NULL) verify_live_object_slot(p_ref+i, heap_verifier);
       }else{
-        if(*(p_ref+i) != COMPRESSED_NULL) verify_all_object_slot(p_ref+i, heap_verifier);
+        if( read_slot(p_ref+i) != NULL) verify_all_object_slot(p_ref+i, heap_verifier);
       }
     }   
   }else{   
@@ -246,9 +246,9 @@ static FORCE_INLINE void verifier_scan_object_slots(Partial_Reveal_Object *p_obj
       p_ref = object_ref_iterator_get(ref_iterator+i, p_obj);  
       if(!is_unreachable_obj(p_obj)){
         verify_write_barrier(p_ref, heap_verifier);
-        if(*p_ref  != COMPRESSED_NULL) verify_live_object_slot(p_ref, heap_verifier);
+        if( read_slot(p_ref) != NULL) verify_live_object_slot(p_ref, heap_verifier);
       }else{
-        if(*p_ref  != COMPRESSED_NULL) verify_all_object_slot(p_ref, heap_verifier);
+        if( read_slot(p_ref) != NULL) verify_all_object_slot(p_ref, heap_verifier);
       }
     }
     
@@ -261,9 +261,9 @@ static FORCE_INLINE void verifier_scan_object_slots(Partial_Reveal_Object *p_obj
       p_ref = obj_get_referent_field(p_obj);
       if(!is_unreachable_obj(p_obj)){ 
         verify_write_barrier(p_ref, heap_verifier);
-        if(*p_ref  != COMPRESSED_NULL)   verify_live_object_slot(p_ref, heap_verifier);
+        if( read_slot(p_ref) != NULL)   verify_live_object_slot(p_ref, heap_verifier);
       }else{
-        if(*p_ref  != COMPRESSED_NULL)   verify_all_object_slot(p_ref, heap_verifier);
+        if( read_slot(p_ref) != NULL)   verify_all_object_slot(p_ref, heap_verifier);
       }
     } 
 #endif
@@ -384,6 +384,7 @@ void verifier_init_object_scanner(Heap_Verifier* heap_verifier)
   heap_verifier->live_obj_scanner = verifier_scan_live_objects;
   heap_verifier->all_obj_scanner   = verifier_scan_all_objects;
 }
+
 
 
 

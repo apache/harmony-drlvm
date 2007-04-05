@@ -318,7 +318,7 @@ void verifier_mark_wb_slots(Heap_Verifier* heap_verifier)
     while(!vector_block_iterator_end(rem_set, iter)){
       REF* p_ref = (REF* )*iter;
       wb_verifier->num_slots_in_remset ++;
-      if(!address_belongs_to_space((void*)p_ref, nspace) && address_belongs_to_space((void*)*p_ref, nspace)){
+      if(!address_belongs_to_space((void*)p_ref, nspace) && address_belongs_to_space(read_slot(p_ref), nspace)){
         if(!wb_is_marked_in_slot(p_ref)){
           wb_mark_in_slot(p_ref);
           wb_verifier->num_ref_wb_in_remset ++;
@@ -341,7 +341,7 @@ void verify_write_barrier(REF* p_ref, Heap_Verifier* heap_verifier)
   WriteBarrier_Verifier* wb_verifier = heap_verifier->writebarrier_verifier;
   assert(wb_verifier);
 
-  if(!address_belongs_to_space((void*)p_ref, nspace) && address_belongs_to_space((void*)*p_ref, nspace)){
+  if(!address_belongs_to_space((void*)p_ref, nspace) && address_belongs_to_space(read_slot(p_ref), nspace)){
     if(!wb_is_marked_in_slot(p_ref)){
       assert(0);
       printf("GC Verify ==> Verify Write Barrier: error!!!\n");
@@ -394,4 +394,5 @@ void verify_mutator_effect(Heap_Verifier* heap_verifier)
   if(heap_verifier->need_verify_allocation)  verify_allocation(heap_verifier);
 }
  
+
 

@@ -33,12 +33,11 @@ static FORCE_INLINE Boolean fspace_object_to_be_forwarded(Partial_Reveal_Object 
 
 static FORCE_INLINE void scan_slot(Collector *collector, REF *p_ref) 
 {
-  REF ref = *p_ref;
-  if(ref == COMPRESSED_NULL) return;
+  Partial_Reveal_Object *p_obj = read_slot(p_ref);
+  if( p_obj == NULL) return;
     
   /* the slot can be in tspace or fspace, we don't care.
      we care only if the reference in the slot is pointing to fspace */
-  Partial_Reveal_Object *p_obj = uncompress_ref(ref);
   if (obj_belongs_to_nos(p_obj))
     collector_tracestack_push(collector, p_ref); 
 

@@ -635,7 +635,7 @@ static void move_compaction_update_ref(GC *gc, REF* p_ref)
   if(address_belongs_to_gc_heap((void *)p_ref, gc) && (space_of_addr(gc, p_ref))->move_object){
     unsigned int offset = get_gc_referent_offset();
     Partial_Reveal_Object *p_old_ref = (Partial_Reveal_Object *)((POINTER_SIZE_INT)p_ref - offset);
-    Partial_Reveal_Object *p_new_ref = uncompress_ref(obj_get_fw_in_table(p_old_ref));
+    Partial_Reveal_Object *p_new_ref = ref_to_obj_ptr(obj_get_fw_in_table(p_old_ref));
     p_ref = (REF*)((POINTER_SIZE_INT)p_new_ref + offset);
   }
   Partial_Reveal_Object* p_obj = read_slot(p_ref);

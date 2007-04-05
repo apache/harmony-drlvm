@@ -163,7 +163,7 @@ void gc_space_tune_before_gc_fixed_size(GC* gc, unsigned int cause)
   else
   {
     POINTER_SIZE_INT los_fail_sz = lspace_get_failure_size((Lspace*)lspace);
-    
+
     if(los_fail_sz > GC_LOS_MIN_VARY_SIZE){
       /*Fixme: we should set the least_tuning_size after finding out the biggest free area in LOS, this number could be zero*/
       tuner->tuning_size = los_fail_sz;
@@ -192,7 +192,7 @@ void gc_space_tune_before_gc_fixed_size(GC* gc, unsigned int cause)
       tuner->tuning_size = 0;
     }
   }
-  
+ 
   /*Fixme: Should MOS heap_start must be 64k aligned?*/
   tuner->tuning_size = round_up_to_size(tuner->tuning_size, SPACE_ALLOC_UNIT);
   if(tuner->tuning_size == 0) tuner->kind = TRANS_NOTHING;
@@ -221,8 +221,8 @@ Boolean retune_los_size(GC *gc)
   POINTER_SIZE_INT tuning_block_num = tuner->tuning_size >> GC_BLOCK_SHIFT_COUNT;
   POINTER_SIZE_INT heap_block_num = gc->committed_heap_size >> GC_BLOCK_SHIFT_COUNT;
   POINTER_SIZE_INT los_block_num = los->committed_heap_size >> GC_BLOCK_SHIFT_COUNT;
-  
   POINTER_SIZE_INT live_block_num = los_block_num + non_los_live_block_num;
+
   while(live_block_num + tuning_block_num > heap_block_num){
     if(tuning_block_num == min_tuning_block_num){  //has not enough space to extend los
       tuner->tuning_size = 0;

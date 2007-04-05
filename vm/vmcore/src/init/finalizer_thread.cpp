@@ -24,6 +24,7 @@
 #include "vm_threads.h"
 #include "init.h"
 #include "open/jthread.h"
+#include "jni_direct.h"
 
 static Boolean native_fin_thread_flag = FALSE;
 static Fin_Thread_Info *fin_thread_info = NULL;
@@ -88,6 +89,7 @@ void finalizer_threads_init(JavaVM *java_vm)
     assert(status == TM_ERROR_NONE);
     
     fin_thread_info->thread_ids = (hythread_t *)STD_MALLOC(sizeof(hythread_t) * fin_thread_info->thread_num);
+    fin_thread_info->thread_attached_num = 0;
     
     for(unsigned int i = 0; i < fin_thread_info->thread_num; i++){
         void **args = (void **)STD_MALLOC(sizeof(void *) * 2);
@@ -97,6 +99,8 @@ void finalizer_threads_init(JavaVM *java_vm)
         status = hythread_create(&fin_thread_info->thread_ids[i], 0, FINALIZER_THREAD_PRIORITY, 0, (hythread_entrypoint_t)finalizer_thread_func, args);
         assert(status == TM_ERROR_NONE);
     }
+    
+    while(fin_thread_info->thread_attached_num < fin_thread_info->thread_num);
 }
 
 void finalizer_shutdown(Boolean start_finalization_on_exit)
@@ -168,15 +172,21 @@ static IDATA finalizer_thread_func(void **args)
 {
     JavaVM *java_vm = (JavaVM *)args[0];
     JNIEnv *jni_env;
-    jthread java_thread;
+    //jthread java_thread;
     char *name = "finalizer";
-    jboolean daemon = JNI_TRUE;
+    //jboolean daemon = JNI_TRUE;
     
-    IDATA status = vm_attach_internal(&jni_env, &java_thread, java_vm, NULL, name, daemon);
+    //IDATA status = vm_attach_internal(&jni_env, &java_thread, java_vm, NULL, name, daemon);
+    //assert(status == JNI_OK);
+    //status = jthread_attach(jni_env, java_thread, daemon);
+    //assert(status == TM_ERROR_NONE);
+    JavaVMAttachArgs *jni_args = (JavaVMAttachArgs*)STD_MALLOC(sizeof(JavaVMAttachArgs));
+    jni_args->version = JNI_VERSION_1_2;
+    jni_args->name = name;
+    jni_args->group = NULL;
+    IDATA status = AttachCurrentThreadAsDaemon(java_vm, (void**)&jni_env, jni_args);
     assert(status == JNI_OK);
-    status = jthread_attach(jni_env, java_thread, daemon);
-    assert(status == TM_ERROR_NONE);
-    
+    atomic_inc32(&fin_thread_info->thread_attached_num);
     /* Choice: use VM_thread or hythread to indicate the finalizer thread ?
      * Now we use hythread
      * p_TLS_vmthread->finalize_thread_flags = thread_id;
@@ -201,7 +211,8 @@ static IDATA finalizer_thread_func(void **args)
     }
     
     vm_heavy_finalizer_resume_mutator();
-    status = jthread_detach(java_thread);
+    status = DetachCurrentThread(java_vm);
+    //status = jthread_detach(java_thread);
     return status;
 }
 
@@ -243,4 +254,5 @@ void vm_heavy_finalizer_resume_mutator(void)
     if(gc_clear_mutator_block_flag())
         hycond_notify_all(&fin_thread_info->mutator_block_cond);
 }
+
 

@@ -34,6 +34,7 @@
 typedef struct Ref_Enqueue_Thread_Info {
     hysem_t pending_sem;
     Boolean shutdown;
+    volatile unsigned int thread_attached;
 }Ref_Enqueue_Thread_Info;
 
 

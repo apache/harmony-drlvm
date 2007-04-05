@@ -108,16 +108,14 @@ inline void obj_set_prefetched_next_pointer(Partial_Reveal_Object* obj, Partial_
     *((REF*)obj + 1) = 0;
     return;
   }
-  REF ref = compress_ref(raw_prefetched_next);
+  REF ref = obj_ptr_to_ref(raw_prefetched_next);
   *((REF*)obj + 1) = ref;
 }
 
 inline  Partial_Reveal_Object* obj_get_prefetched_next_pointer(Partial_Reveal_Object* obj){
   /*Fixme: em64t: This may be not necessary!*/
-  assert(obj);
-  
-  REF ref = *( (REF*)obj + 1);
-  return uncompress_ref(ref);
+  assert(obj);  
+  return read_slot( (REF*)obj + 1);
 }
 
 inline Partial_Reveal_Object *next_marked_obj_in_block(Partial_Reveal_Object *cur_obj, Partial_Reveal_Object *block_end)
@@ -256,7 +254,7 @@ inline REF obj_get_fw_in_table(Partial_Reveal_Object *p_obj)
   unsigned int index    = OBJECT_INDEX_TO_OFFSET_TABLE(p_obj);
   Block_Header *curr_block = GC_BLOCK_HEADER(p_obj);
   Partial_Reveal_Object* new_addr = (Partial_Reveal_Object *)(((POINTER_SIZE_INT)p_obj) - curr_block->table[index]);
-  REF new_ref = compress_ref(new_addr);
+  REF new_ref = obj_ptr_to_ref(new_addr);
   return new_ref;
 }
 
@@ -268,4 +266,5 @@ inline void block_clear_table(Block_Header* block)
 }
 
 #endif //#ifndef _BLOCK_H_
+
 

@@ -115,7 +115,6 @@ enum GC_CAUSE{
   #define COMPRESS_REFERENCE
 #endif
 
-#define COMPRESSED_NULL ((REF)0)
 extern POINTER_SIZE_INT HEAP_NULL;
 
 #ifdef POINTER64
@@ -131,48 +130,48 @@ extern POINTER_SIZE_INT HEAP_NULL;
 /////////////////////////////////////////////
 //Compress reference related!///////////////////
 /////////////////////////////////////////////
-#ifdef COMPRESS_REFERENCE
-FORCE_INLINE REF compress_ref(Partial_Reveal_Object *p_obj)
+FORCE_INLINE REF obj_ptr_to_ref(Partial_Reveal_Object *p_obj)
 {
+#ifdef COMPRESS_REFERENCE
   if(!p_obj){
-  /*Fixme: em64t: vm performs a simple compress/uncompress machenism*/
-  /* i.e. just add or minus HEAP_NULL to p_obj*/
-  /*But in gc we distinguish zero from other p_obj*/
-  /*Now only in prefetch next live object we can hit this point.*/
-    return COMPRESSED_NULL;
+	  /*Fixme: em64t: vm performs a simple compress/uncompress machenism
+	   i.e. just add or minus HEAP_NULL to p_obj
+	   But in gc we distinguish zero from other p_obj
+	   Now only in prefetch next live object we can hit this point. */
+    return (REF)0;
   }
   else
-    return (REF) ( (POINTER_SIZE_INT) p_obj - HEAP_NULL);
+    return (REF) ((POINTER_SIZE_INT) p_obj - HEAP_NULL);
+#else
+
+	return (REF)p_obj;
+
+#endif
+
 }
 
-FORCE_INLINE Partial_Reveal_Object *uncompress_ref(REF ref)
+FORCE_INLINE Partial_Reveal_Object *ref_to_obj_ptr(REF ref)
 {
+#ifdef COMPRESS_REFERENCE
   if(!ref){
     return NULL; 
   }
   return (Partial_Reveal_Object *)(HEAP_NULL + ref);
+
+#else
+
+	return (Partial_Reveal_Object *)ref;
+
+#endif
+
 }
 
 FORCE_INLINE Partial_Reveal_Object *read_slot(REF *p_slot)
-{  return uncompress_ref(*p_slot); }
+{  return ref_to_obj_ptr(*p_slot); }
 
 FORCE_INLINE void write_slot(REF *p_slot, Partial_Reveal_Object *p_obj)
-{  *p_slot = compress_ref(p_obj); }
+{  *p_slot = obj_ptr_to_ref(p_obj); }
 
-#else /* COMPRESS_REFERENCE */
-
-FORCE_INLINE REF compress_ref(Partial_Reveal_Object *p_obj)
-{  return (REF)p_obj; }
-
-FORCE_INLINE Partial_Reveal_Object *uncompress_ref(REF ref)
-{  return (Partial_Reveal_Object *)ref; }
-
-FORCE_INLINE Partial_Reveal_Object *read_slot(REF *p_slot)
-{  return *p_slot; }
-
-FORCE_INLINE void write_slot(REF *p_slot, Partial_Reveal_Object *p_obj)
-{  *p_slot = p_obj; }
-#endif
 
 inline POINTER_SIZE_INT round_up_to_size(POINTER_SIZE_INT size, int block_size) 
 {  return (size + block_size - 1) & ~(block_size - 1); }
@@ -246,7 +245,7 @@ inline void obj_clear_dual_bits_in_oi(Partial_Reveal_Object *obj)
 inline Partial_Reveal_Object *obj_get_fw_in_oi(Partial_Reveal_Object *obj) 
 {
   assert(get_obj_info_raw(obj) & CONST_FORWARD_BIT);
-  return (Partial_Reveal_Object*)(uncompress_ref((REF)(get_obj_info_raw(obj) & ~CONST_FORWARD_BIT)));
+  return (Partial_Reveal_Object*)(ref_to_obj_ptr((REF)(get_obj_info_raw(obj) & ~CONST_FORWARD_BIT)));
 }
 
 inline Boolean obj_is_fw_in_oi(Partial_Reveal_Object *obj) 
@@ -255,7 +254,7 @@ inline Boolean obj_is_fw_in_oi(Partial_Reveal_Object *obj)
 inline void obj_set_fw_in_oi(Partial_Reveal_Object *obj,void *dest)
 {  
   assert(!(get_obj_info_raw(obj) & CONST_FORWARD_BIT));
-  REF dest = compress_ref((Partial_Reveal_Object *) dest);
+  REF dest = obj_ptr_to_ref((Partial_Reveal_Object *) dest);
   set_obj_info(obj,(Obj_Info_Type)dest | CONST_FORWARD_BIT); 
 }
 
@@ -292,7 +291,7 @@ inline void mark_bit_flip()
 inline Partial_Reveal_Object *obj_get_fw_in_oi(Partial_Reveal_Object *obj) 
 {
   assert(get_obj_info_raw(obj) & FLIP_FORWARD_BIT);
-  return (Partial_Reveal_Object*) ( uncompress_ref( (REF)get_obj_info(obj) ) );
+  return (Partial_Reveal_Object*) ( ref_to_obj_ptr( (REF)get_obj_info(obj) ) );
 }
 
 inline Boolean obj_is_fw_in_oi(Partial_Reveal_Object *obj) 
@@ -308,7 +307,7 @@ inline void obj_set_fw_in_oi(Partial_Reveal_Object *obj, void *dest)
   /* It's important to clear the FLIP_FORWARD_BIT before collection ends, since it is the same as
      next minor cycle's FLIP_MARK_BIT. And if next cycle is major, it is also confusing
      as FLIP_FORWARD_BIT. (The bits are flipped only in minor collection). */
-  Obj_Info_Type dst = (Obj_Info_Type)compress_ref((Partial_Reveal_Object *) dest);     
+  Obj_Info_Type dst = (Obj_Info_Type)obj_ptr_to_ref((Partial_Reveal_Object *) dest);     
   set_obj_info(obj, dst | FLIP_FORWARD_BIT); 
 }
 

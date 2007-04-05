@@ -50,7 +50,7 @@ Boolean verifier_copy_rootsets(GC* gc, Heap_Verifier* heap_verifier)
     while(!vector_block_iterator_end(root_set,iter)){
       REF* p_ref = (REF* )*iter;
       iter = vector_block_iterator_advance(root_set,iter);
-      if(*p_ref == COMPRESSED_NULL) continue;
+      if( read_slot(p_ref) == NULL) continue;
       verifier_rootset_push(p_ref,gc_verifier->root_set);
     } 
     root_set = pool_iterator_next(gc_metadata->gc_rootset_pool);
@@ -190,4 +190,5 @@ void verifier_log_after_gc(Heap_Verifier* heap_verifier)
   printf("===============================================\n");
 
 }
+
 

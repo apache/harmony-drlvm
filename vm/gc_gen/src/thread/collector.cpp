@@ -231,7 +231,7 @@ void collector_initialize(GC* gc)
     memset(collector, 0, size);
     
     /* FIXME:: thread_handle is for temporary control */
-    collector->thread_handle = (VmThreadHandle)i;
+    collector->thread_handle = (VmThreadHandle)(POINTER_SIZE_INT)i;
     collector->gc = gc;
     collector_init_thread(collector);
     

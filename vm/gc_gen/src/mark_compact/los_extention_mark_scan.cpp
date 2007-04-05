@@ -21,10 +21,9 @@
 
 static FORCE_INLINE void scan_slot(Collector* collector, REF *p_ref)
 {
-  REF ref = *p_ref;
-  if(ref == COMPRESSED_NULL) return;
+  Partial_Reveal_Object *p_obj = read_slot(p_ref);
+  if(p_obj == NULL) return;
 
-  Partial_Reveal_Object *p_obj = uncompress_ref(ref);
   if(obj_mark_in_vt(p_obj)){
     collector_tracestack_push(collector, p_obj);
     if(!obj_belongs_to_space(p_obj, gc_get_los((GC_Gen*)collector->gc)))
@@ -189,4 +188,5 @@ retry:
   
   return;
 }
+
 

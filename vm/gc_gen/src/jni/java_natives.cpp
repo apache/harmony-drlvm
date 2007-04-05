@@ -34,8 +34,9 @@ JNIEXPORT void JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_helperCall
 {
     java_helper_inlined = TRUE;
 
-    unsigned int obj = *(unsigned int*)c;
-    
+    POINTER_SIZE_INT obj = *(POINTER_SIZE_INT*)c;
+    /* a trick to get the GCHelper_class j.l.c in order to manipulate its 
+       fields in GC native code */ 
     Class_Handle *vm_class_ptr = (Class_Handle *)(obj + VM_Global_State::loader_env->vm_class_offset);
     GCHelper_clss = *vm_class_ptr;
 }

@@ -120,7 +120,7 @@ void gc_add_root_set_entry_interior_pointer (void **slot, int offset, Boolean is
 void gc_add_compressed_root_set_entry(REF* ref, Boolean is_pinned)
 {
   REF *p_ref = (REF *)ref;
-  if(*p_ref == COMPRESSED_NULL) return;
+  if(read_slot(p_ref) == NULL) return;
   Partial_Reveal_Object* p_obj = read_slot(p_ref);
   assert(!obj_is_marked_in_vt(p_obj));
   assert( address_belongs_to_gc_heap(p_obj, p_global_gc));
@@ -213,7 +213,7 @@ int32 gc_get_hashcode(Managed_Object_Handle p_object)
    Obj_Info_Type info = get_obj_info_raw(obj);
    int hash = info & GCGEN_HASH_MASK;
    if (!hash) {
-       hash = (((POINTER_SIZE_INT)obj) >> 3) & GCGEN_HASH_MASK;
+       hash = (int)((((POINTER_SIZE_INT)obj) >> 3) & GCGEN_HASH_MASK);
        if(!hash)  hash = (23 & GCGEN_HASH_MASK);
        unsigned int new_info = (unsigned int)(info | hash);
        while (true) {
@@ -239,6 +239,8 @@ void gc_finalize_on_exit()
  *     Partial_Reveal_Object **p_referent_field = obj_get_referent_field(p_reference);
  *     *p_referent_field = (Partial_Reveal_Object *)((unsigned int)*p_referent_field | PHANTOM_REF_ENQUEUED_MASK | ~PHANTOM_REF_PENDING_MASK);
  *   }
+
+
  * }
  */
 

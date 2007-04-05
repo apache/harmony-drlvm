@@ -170,7 +170,13 @@ static void gc_reset_obj_with_fin(GC *gc)
 {
   Mutator *mutator = gc->mutator_list;
   while(mutator){
-    assert(!mutator->obj_with_fin);
+    //assert(!mutator->obj_with_fin);
+    /* Workaround for the mutator num changing during GC bug */
+    if(mutator->obj_with_fin){
+      assert(vector_block_is_empty(mutator->obj_with_fin));
+      mutator = mutator->next;
+      continue;
+    }
     mutator->obj_with_fin = finref_get_free_block(gc);
     mutator = mutator->next;
   }
@@ -270,41 +276,41 @@ void mutator_add_finalizer(Mutator *mutator, Partial_Reveal_Object *p_obj)
 {
   GC *gc = mutator->gc;
   Finref_Metadata *metadata = gc->finref_metadata;
-  finref_metadata_add_entry(gc, mutator->obj_with_fin, metadata->obj_with_fin_pool, (POINTER_SIZE_INT)compress_ref(p_obj));
+  finref_metadata_add_entry(gc, mutator->obj_with_fin, metadata->obj_with_fin_pool, (POINTER_SIZE_INT)obj_ptr_to_ref(p_obj));
 }
 
 /* This function is only used by resurrection fallback */
 void gc_add_finalizer(GC *gc, Vector_Block* &vector_block_in_use, Partial_Reveal_Object *p_obj)
 {
   Finref_Metadata *metadata = gc->finref_metadata;
-  finref_metadata_add_entry(gc, vector_block_in_use, metadata->obj_with_fin_pool, (POINTER_SIZE_INT)compress_ref(p_obj));
+  finref_metadata_add_entry(gc, vector_block_in_use, metadata->obj_with_fin_pool, (POINTER_SIZE_INT)obj_ptr_to_ref(p_obj));
 }
 
 void gc_add_finalizable_obj(GC *gc, Partial_Reveal_Object *p_obj)
 {
   Finref_Metadata *metadata = gc->finref_metadata;
-  finref_metadata_add_entry(gc, metadata->finalizable_obj_set, metadata->finalizable_obj_pool, (POINTER_SIZE_INT)compress_ref(p_obj));
+  finref_metadata_add_entry(gc, metadata->finalizable_obj_set, metadata->finalizable_obj_pool, (POINTER_SIZE_INT)obj_ptr_to_ref(p_obj));
 }
 
 void collector_add_softref(Collector *collector, Partial_Reveal_Object *ref)
 {
   GC *gc = collector->gc;
   Finref_Metadata *metadata = gc->finref_metadata;
-  finref_metadata_add_entry(gc, collector->softref_set, metadata->softref_pool, (POINTER_SIZE_INT)compress_ref(ref));
+  finref_metadata_add_entry(gc, collector->softref_set, metadata->softref_pool, (POINTER_SIZE_INT)obj_ptr_to_ref(ref));
 }
 
 void collector_add_weakref(Collector *collector, Partial_Reveal_Object *ref)
 {
   GC *gc = collector->gc;
   Finref_Metadata *metadata = gc->finref_metadata;
-  finref_metadata_add_entry(gc, collector->weakref_set, metadata->weakref_pool, (POINTER_SIZE_INT)compress_ref(ref));
+  finref_metadata_add_entry(gc, collector->weakref_set, metadata->weakref_pool, (POINTER_SIZE_INT)obj_ptr_to_ref(ref));
 }
 
 void collector_add_phanref(Collector *collector, Partial_Reveal_Object *ref)
 {
   GC *gc = collector->gc;
   Finref_Metadata *metadata = gc->finref_metadata;
-  finref_metadata_add_entry(gc, collector->phanref_set, metadata->phanref_pool, (POINTER_SIZE_INT)compress_ref(ref));
+  finref_metadata_add_entry(gc, collector->phanref_set, metadata->phanref_pool, (POINTER_SIZE_INT)obj_ptr_to_ref(ref));
 }
 
 void finref_repset_add_entry(GC *gc, REF* p_ref)
@@ -320,7 +326,7 @@ void finref_add_fallback_ref(GC *gc, Vector_Block* &vector_block_in_use, Partial
 {
   assert(p_obj);
   Finref_Metadata *metadata = gc->finref_metadata;
-  finref_metadata_add_entry(gc, vector_block_in_use, metadata->fallback_ref_pool, (POINTER_SIZE_INT)compress_ref(p_obj));
+  finref_metadata_add_entry(gc, vector_block_in_use, metadata->fallback_ref_pool, (POINTER_SIZE_INT)obj_ptr_to_ref(p_obj));
 }
 
 static inline Boolean pool_has_no_ref(Pool *pool)

@@ -171,7 +171,7 @@ inline void gc_rootset_add_entry(GC* gc, Partial_Reveal_Object** p_ref)
   assert(uncompressed_root_set);
   
   Partial_Reveal_Object *p_obj = *p_ref;
-  REF ref = compress_ref(p_obj);
+  REF ref = obj_ptr_to_ref(p_obj);
   
   /* construct an Uncompressed_Root */
   vector_block_add_entry(uncompressed_root_set, (POINTER_SIZE_INT)p_ref);

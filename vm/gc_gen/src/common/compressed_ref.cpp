@@ -63,10 +63,10 @@ void gc_fix_uncompressed_rootset(GC *gc)
       Partial_Reveal_Object **p_ref = (Partial_Reveal_Object **)*iter;
       iter = vector_block_iterator_advance(root_set, iter);
       assert(!vector_block_iterator_end(root_set, iter));
-      REF ref = (REF)*iter;
-      Partial_Reveal_Object *p_obj = uncompress_ref(ref);
+      Partial_Reveal_Object *p_obj = read_slot((REF*)iter);
       *p_ref = p_obj;
     }
   }
 }
+
 

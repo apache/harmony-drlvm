@@ -29,8 +29,7 @@
 
 static FORCE_INLINE void scan_slot(Collector *collector, REF *p_ref)
 {
-  REF ref = *p_ref;
-  if(ref == COMPRESSED_NULL) return;
+  if(read_slot(p_ref) == NULL) return;
   
   collector_tracestack_push(collector, p_ref); 
   return;

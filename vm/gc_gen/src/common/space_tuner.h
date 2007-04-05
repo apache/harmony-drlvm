@@ -24,7 +24,7 @@
 #include "gc_common.h"
 #include "gc_space.h"
 
-#define GC_LOS_MIN_VARY_SIZE ( 2 * MB ) 
+#define GC_LOS_MIN_VARY_SIZE ( 2 * MB )
 #define GC_FIXED_SIZE_TUNER
 
 //For_LOS_extend

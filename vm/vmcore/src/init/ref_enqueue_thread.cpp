@@ -44,7 +44,8 @@ void ref_enqueue_thread_init(JavaVM *java_vm)
         return;
     
     ref_thread_info = (Ref_Enqueue_Thread_Info *)STD_MALLOC(sizeof(Ref_Enqueue_Thread_Info));
-    ref_thread_info->shutdown = FALSE;
+    ref_thread_info->shutdown = false;
+    ref_thread_info->thread_attached = 0;
     
     IDATA status = hysem_create(&ref_thread_info->pending_sem, 0, REF_ENQUEUE_THREAD_NUM);
     assert(status == TM_ERROR_NONE);
@@ -53,6 +54,8 @@ void ref_enqueue_thread_init(JavaVM *java_vm)
     args[0] = (void *)java_vm;
     status = hythread_create(NULL, 0, REF_ENQUEUE_THREAD_PRIORITY, 0, (hythread_entrypoint_t)ref_enqueue_thread_func, args);
     assert(status == TM_ERROR_NONE);
+    
+    while(ref_thread_info->thread_attached == 0);
 }
 
 void ref_enqueue_shutdown(void)
@@ -77,14 +80,21 @@ static IDATA ref_enqueue_thread_func(void **args)
 {
     JavaVM *java_vm = (JavaVM *)args[0];
     JNIEnv *jni_env;
-    jthread java_thread;
+    //jthread java_thread;
     char *name = "ref handler";
-    jboolean daemon = JNI_TRUE;
+    //jboolean daemon = JNI_TRUE;
     
-    IDATA status = vm_attach_internal(&jni_env, &java_thread, java_vm, NULL, name, daemon);
+    //IDATA status = vm_attach_internal(&jni_env, &java_thread, java_vm, NULL, name, daemon);
+    //assert(status == JNI_OK);
+    //status = jthread_attach(jni_env, java_thread, daemon);
+    //assert(status == TM_ERROR_NONE);
+    JavaVMAttachArgs *jni_args = (JavaVMAttachArgs*)STD_MALLOC(sizeof(JavaVMAttachArgs));
+    jni_args->version = JNI_VERSION_1_2;
+    jni_args->name = name;
+    jni_args->group = NULL;
+    IDATA status = AttachCurrentThreadAsDaemon(java_vm, (void**)&jni_env, jni_args);
     assert(status == JNI_OK);
-    status = jthread_attach(jni_env, java_thread, daemon);
-    assert(status == TM_ERROR_NONE);
+    ref_thread_info->thread_attached = 1;
     
     while(true){
         /* Waiting for pending weak references */
@@ -97,6 +107,7 @@ static IDATA ref_enqueue_thread_func(void **args)
             break;
     }
     
-    status = jthread_detach(java_thread);
+    status = DetachCurrentThread(java_vm);
+    //status = jthread_detach(java_thread);
     return status;
 }
