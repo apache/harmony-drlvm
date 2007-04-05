@@ -237,7 +237,14 @@ ${foo}
 
                         <echo message="Running test : ${class.name}" />
 
-                        <java newenvironment="yes" dir="${build.deploy.dir}/jdk/jre/bin" output="${build.dir}/_smoke.tests/reports/${class.name}_${mode.id}.out" classname="${class.name}" fork="true" jvm="${build.deploy.dir}/jdk/jre/bin/java${executable.postfix}" error="${build.dir}/_smoke.tests/reports/${class.name}_${mode.id}.out.err">
+                        <java newenvironment="yes"
+                            dir="${build.deploy.dir}/jdk/jre/bin"
+                            output="${build.dir}/_smoke.tests/reports/${class.name}_${mode.id}.out"
+                            classname="${class.name}"
+                            fork="true"
+                            jvm="${build.deploy.dir}/jdk/jre/bin/java${executable.postfix}"
+                            error="${build.dir}/_smoke.tests/reports/${class.name}_${mode.id}.out.err"
+                            resultproperty="res.code">
                             <jvmarg line="-XX:-vm.assert_dialog ${mode.switch} ${test.vmargs}" />
                             <jvmarg value="-Djava.library.path=${smoke.test.native.path}/${outdir}" />
                             <jvmarg value="-classpath" />
@@ -286,6 +293,26 @@ ${foo}
                                         <not>
                                             <contains string="${@{test}.out}" substring="FAIL" casesensitive="false" />
                                         </not>
+
+                                        <!-- the return code must be checked -->
+                                        <or>
+                                            <!-- it must be '0' in general -->
+                                            <equals arg1="${res.code}" arg2="0" />
+
+                                            <!-- some tests passes w/ non-'0' code -->
+                                            <and>
+                                                <equals arg1="${class.name}" arg2="init.ErrorInInitializer" />
+                                                <equals arg1="${res.code}" arg2="1" />
+                                            </and>
+                                            <and>
+                                                <equals arg1="${class.name}" arg2="shutdown.TestFatalError" />
+                                                <equals arg1="${res.code}" arg2="1" />
+                                            </and>
+                                            <and>
+                                                <equals arg1="${class.name}" arg2="shutdown.TestInterrupt" />
+                                                <equals arg1="${res.code}" arg2="130" />
+                                            </and>
+                                        </or>
                                     </and>
                                 </condition>
                             </else>
@@ -306,7 +333,7 @@ ${foo}
                                 <replace file="${build.dir}/_smoke.tests/reports/TEST-${class.name}_${mode.id}.xml" token="@@@@@" value="${class.name}_${mode.id}" /> 
                             </then>
                             <else>
-                                <echo message="*** FAILED **** : ${class.name}" />
+                                <echo message="*** FAILED **** : ${class.name} (${res.code} res code)" />
                                 <echo message="*** FAILED **** : ${class.name} on ${mode.name}${line.separator}" file="${build.semi.dir}/smoke.test.failed" append="true"/>
 
                                 <!-- create xml-file with test's results -->
@@ -320,6 +347,9 @@ ${foo}
                                 <replace file="${build.dir}/_smoke.tests/reports/TEST-${class.name}_${mode.id}.xml" token="@@@@@" value="${class.name}_${mode.id}" /> 
                             </else>
                         </if>
+
+                        <!-- unset res.code variable to use it for next run-->
+                        <var name="res.code" unset="true"/>
 
                         <!-- grab System.out to xml-file -->
                         <loadfile property="@{test}.tmp.out" srcFile="${build.dir}/_smoke.tests/reports/${class.name}_${mode.id}.out" />
