@@ -1764,8 +1764,8 @@ bool Method::_parse_code(ConstantPool& cp, unsigned code_attr_len,
                 STD_FREE(generic_vars);
             }
             if(j == lv_table->length) {
-                REPORT_FAILED_METHOD("Element: "<< gvi_name <<
-                    " from LocalVariableTypeTable doesn't coincide with element from LocalVariableTable");
+                REPORT_FAILED_METHOD("Element: "<< gvi_name->bytes <<
+                    " in LocalVariableTypeTable has no counterpart or differs from element in LocalVariableTable");
             }
         }
 
