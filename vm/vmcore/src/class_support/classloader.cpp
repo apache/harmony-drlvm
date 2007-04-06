@@ -1677,7 +1677,8 @@ Class* BootstrapClassLoader::LoadFromClassFile(const String* dir_name,
 
     // read file in buf
     size_t buf_len = (size_t)finfo.size;
-    unsigned char* buf = (unsigned char*)STD_ALLOCA(buf_len);
+    unsigned char* buf = (unsigned char*)STD_MALLOC(buf_len);
+    // FIXME: check that memory was allocated
     apr_file_read(file_handle, buf, &buf_len);
 
     // close file
@@ -1685,10 +1686,11 @@ Class* BootstrapClassLoader::LoadFromClassFile(const String* dir_name,
 
     // define class
     Class* clss = DefineClass(m_env, class_name->bytes, buf, 0,
-        (unsigned)buf_len); 
+        (unsigned)buf_len);
     if(clss) {
         clss->set_class_file_name(m_env->string_pool.lookup(full_name));
     }
+    STD_FREE(buf);
     apr_pool_destroy(local_pool);
 
     return clss;
@@ -1710,11 +1712,13 @@ Class* BootstrapClassLoader::LoadFromJarFile( JarFile* jar_file,
 
     // unpack entry
     unsigned size = entry->GetContentSize();
-    unsigned char *buffer = (unsigned char *)STD_ALLOCA(size);
+    unsigned char* buffer = (unsigned char*)STD_MALLOC(size);
+    // FIXME: check that memory was allocated
 
     if(!entry->GetContent(buffer, jar_file)) {
         // cannot unpack entry
         *not_found = true;
+        STD_FREE(buffer);
         return NULL;
     }
 
@@ -1727,6 +1731,8 @@ Class* BootstrapClassLoader::LoadFromJarFile( JarFile* jar_file,
         // set class file name
         clss->set_class_file_name(m_env->string_pool.lookup(jar_file->GetName()));
     }
+
+    STD_FREE(buffer);
 
     return clss;
 } // BootstrapClassLoader::LoadFromJarFile

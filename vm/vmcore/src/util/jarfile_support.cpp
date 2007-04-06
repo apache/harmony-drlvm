@@ -91,9 +91,12 @@ bool JarEntry::GetContent( unsigned char* content, JarFile *jf ) const
         return false;
 #else // _IPF
         {
-            unsigned char* data = (unsigned char *)STD_ALLOCA(m_sizeCompressed + 1);
-            if( read( inFile, data, m_sizeCompressed ) < m_sizeCompressed )
+            unsigned char* data = (unsigned char*)STD_MALLOC(m_sizeCompressed + 1);
+            // FIXME: check that memory was allocated
+            if( read( inFile, data, m_sizeCompressed ) < m_sizeCompressed ) {
+                STD_FREE(data);
                 return false;
+            }
 
             z_stream inf;
             memset( &inf, 0, sizeof(z_stream) );
@@ -103,15 +106,20 @@ bool JarEntry::GetContent( unsigned char* content, JarFile *jf ) const
             // Using -MAX_WBITS (actually any integer less than zero)
             // disables zlib to expect specific header
             infRes = inflateInit2( &inf, -MAX_WBITS );
-            if( infRes != Z_OK )
+            if( infRes != Z_OK ) {
+                STD_FREE(data);
                 return false;
+            }
 
             inf.next_in = data;
             inf.avail_in = m_sizeCompressed;
             //inf.data_type = (m_fileEntry.m_internalAttrs&JAR_FILE_TEXT)?Z_ASCII:Z_BINARY;
             inf.data_type = Z_BINARY;
             infRes = inflate( &inf, Z_FINISH );
-            if( infRes != Z_STREAM_END ) break;
+            STD_FREE(data);
+            if( infRes != Z_STREAM_END ) {
+                break;
+            }
             infRes = inflateEnd( &inf );
         }
 #endif //_IPF
