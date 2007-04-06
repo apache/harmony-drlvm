@@ -7,3 +7,5 @@ io/Integers.java
 # unknown failure
 gc/Mark.java
 
+# HARMONY-3585
+shutdown/TestFatalError.java

@@ -6,3 +6,6 @@ gc/Mark.java
 
 # HARMONY-2977
 io/Integers.java
+
+# HARMONY-3585
+shutdown/TestFatalError.java
