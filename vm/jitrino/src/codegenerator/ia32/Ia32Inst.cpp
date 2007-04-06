@@ -918,8 +918,8 @@ Opnd * EntryPointPseudoInst::getDefArg(uint32 i)const
 // class CallInst
 //=================================================================================================
 //_________________________________________________________________________________________________
-CallInst::CallInst(IRManager * irm, int id, const CallingConvention * cc, InlineInfo* ii)  
-        : ControlTransferInst(Mnemonic_CALL, id), callingConventionClient(irm->getMemoryManager(), cc), inlineInfo(NULL)
+CallInst::CallInst(IRManager * irm, int id, const CallingConvention * cc, InlineInfo* ii, Opnd::RuntimeInfo* rri)  
+        : ControlTransferInst(Mnemonic_CALL, id), callingConventionClient(irm->getMemoryManager(), cc), inlineInfo(NULL), runtimeInfo(rri)
 { 
     if (ii && (!ii->isEmpty()) ) {
         inlineInfo = ii;

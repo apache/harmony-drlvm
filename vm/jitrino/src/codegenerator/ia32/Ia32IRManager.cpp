@@ -508,7 +508,7 @@ EntryPointPseudoInst * IRManager::newEntryPointPseudoInst(const CallingConventio
 CallInst * IRManager::newCallInst(Opnd * targetOpnd, const CallingConvention * cc, 
         uint32 argCount, Opnd ** args, Opnd * retOpnd, InlineInfo* ii)
 {
-    CallInst * callInst=new(memoryManager, (argCount + (retOpnd ? 1 : 0)) * 2 + 1) CallInst(this, instId++, cc, ii);
+    CallInst * callInst=new(memoryManager, (argCount + (retOpnd ? 1 : 0)) * 2 + 1) CallInst(this, instId++, cc, ii, targetOpnd->getRuntimeInfo());
     CallingConventionClient & ccc = callInst->callingConventionClient;
     uint32 i=0;
     if (retOpnd!=NULL){
@@ -1688,12 +1688,24 @@ void IRManager::finalizeCallSites()
                         corr += 16-(sz&15);
                     }
 #ifdef _WIN64
-                    Opnd::RuntimeInfo * rt = callInst->getOpnd(callInst->getTargetOpndIndex())->getRuntimeInfo();
-
-                    if (callInst->isDirect() && rt && rt->getKind() == Opnd::RuntimeInfo::Kind_InternalHelperAddress) {
-                        uint32 nRegOpnds = (uint32)(callInst->getOpndCount(Inst::OpndRole_Auxilary|Inst::OpndRole_Use) - stackOpndInfos.size());
-                        uint32 shadowSize = nRegOpnds * sizeof(POINTER_SIZE_INT);
-                        corr += shadowSize;
+                    Opnd::RuntimeInfo * rt = callInst->getRuntimeInfo();
+                    if (rt) {
+                        //stack size for parameters: "number of entries is equal to 4 or the maximum number ofparameters
+                        //See http://msdn2.microsoft.com/en-gb/library/ms794596.aspx for details
+                        //shadow - is an area on stack reserved to map parameters passed with registers
+                        bool needShadow = rt->getKind() == Opnd::RuntimeInfo::Kind_InternalHelperAddress;
+                        if (!needShadow && rt->getKind() == Opnd::RuntimeInfo::Kind_HelperAddress) {
+                                CompilationInterface::RuntimeHelperId helperId = (CompilationInterface::RuntimeHelperId)(POINTER_SIZE_INT)rt->getValue(0);
+                                //ABOUT: VM does not allocate shadow for most of the helpers
+                                //however some helpers are direct pointers to native funcs
+                                //TODO: create VM interface to get calling conventions for the helper
+                                //today  this knowledge is hardcoded here
+                                needShadow = helperId == CompilationInterface::Helper_GetTLSBase;
+                        }
+                        if (needShadow) {
+                            uint32 shadowSize = 4 * sizeof(POINTER_SIZE_INT);
+                            corr += shadowSize;
+                        }
                     }
 #endif
                     if (corr)
