@@ -1021,9 +1021,6 @@ private:
     // SourceDebugExtension class attribute support
     String* m_sourceDebugExtension;
 
-    // struct Class accessibility for unloading
-    unsigned m_markBit:1;
-
     // verifier private data pointer
     void* m_verify_data;
 
@@ -1749,20 +1746,6 @@ public:
     const char* get_source_debug_extension() const {
         return m_sourceDebugExtension->bytes;
     }
-
-    // Class unloading support
-
-   /** Checks whether the given class is reachable through its loader
-    * or any live object.
-    * @return <code>true</code> if the given class is reachable, 
-    *         otherwise <code>false</code>.*/
-    bool is_reachable() { return m_markBit == 1; }
-
-    /** Clears a reachability mark.*/
-    void reset_reachable() { m_markBit = 0; }
-
-    /** Marks the given class as reachable.*/
-    void mark_reachable() { m_markBit = 1; }
 
     /** Stores a verifier specific pointer into the given class.
      * @param[in] data - a verifier specific data pointer*/

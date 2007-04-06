@@ -488,104 +488,6 @@ void ClassLoader::gc_enumerate()
 }
 
 
-void ClassLoader::ClearMarkBits()
-{
-    TRACE2("classloader.unloading.clear", "Clearing mark bits");
-    LMAutoUnlock aulock( &(ClassLoader::m_tableLock) );
-    ClassTable::iterator cti;
-    unsigned i;
-    for(i = 0; i < m_nextEntry; i++) {
-        if(m_table[i]->m_unloading) {
-            TRACE2("classloader.unloading.debug", "  Skipping \"unloaded\" classloader "
-                << m_table[i] << " (" << m_table[i]->m_loader << " : "
-                << ((VTable*)(*(unsigned**)(m_table[i]->m_loader)))->clss->get_name()->bytes << ")");
-            continue;
-        }
-        TRACE2("classloader.unloading.debug", "  Clearing mark bits in classloader "
-            << m_table[i] << " (" << m_table[i]->m_loader << " : "
-            << ((VTable*)(*(unsigned**)(m_table[i]->m_loader)))->clss->get_name()->bytes << ") and its classes");
-        // clear mark bits in loader and classes
-        m_table[i]->m_markBit = 0;
-        for(cti = m_table[i]->m_loadedClasses->begin();
-            cti != m_table[i]->m_loadedClasses->end(); cti++)
-        {
-            if(cti->second->get_class_loader() == m_table[i]) {
-                cti->second->reset_reachable();
-             }
-         }
-     }
-    TRACE2("classloader.unloading.clear", "Finished clearing mark bits");
-    TRACE2("classloader.unloading.marking", "Starting mark loaders");
-}
-
-
-void ClassLoader::StartUnloading()
-{
-    TRACE2("classloader.unloading.marking", "Finished marking loaders");
-    TRACE2("classloader.unloading.do", "Start checking loaders ready to be unloaded");
-    LMAutoUnlock aulock( &(ClassLoader::m_tableLock) );
-    unsigned i;
-    for(i = 0; i < m_nextEntry; i++) {
-        if(m_table[i]->m_unloading) {
-            TRACE2("classloader.unloading.debug", "  Skipping \"unloaded\" classloader "
-                << m_table[i] << " (" << m_table[i]->m_loader << " : "
-                << ((VTable*)(*(unsigned**)(m_table[i]->m_loader)))->clss->get_name()->bytes << ")");
-            continue;
-        }
-        TRACE2("classloader.unloading.debug", "  Scanning loader "
-            << m_table[i] << " (" << m_table[i]->m_loader << " : "
-            << ((VTable*)(*(unsigned**)(m_table[i]->m_loader)))->clss->get_name()->bytes << ")");
-        if(!m_table[i]->m_markBit) {
-            TRACE2("classloader.unloading.stats", "  (!) Ready to unload classloader "
-                << m_table[i] << " (" << m_table[i]->m_loader << " : "
-                << ((VTable*)(*(unsigned**)(m_table[i]->m_loader)))->clss->get_name()->bytes << ")");
-            TRACE2("classloader.unloading.stats", "  (!) This will free "
-                << m_table[i]->GetFullSize() << " bytes in C heap");
-            m_table[i]->m_unloading = true;
-            m_unloadedBytes += m_table[i]->GetFullSize();
-        }
-    }
-    TRACE2("classloader.unloading.do", "Finished checking loaders");
-}
-
-
-void ClassLoader::PrintUnloadingStats()
-{
-    unsigned i;
-    TRACE2("classloader.unloading.stats", "----------------------------------------------");
-    TRACE2("classloader.unloading.stats", "Class unloading statistics:");
-    hythread_suspend_disable();
-    for(i = 0; i < m_nextEntry; i++) {
-        if(m_table[i]->m_unloading) {
-            TRACE2("classloader.unloading.stats", "  Class loader "
-                << m_table[i] << " (" << m_table[i]->m_loader << " : "
-                << ((VTable*)(*(unsigned**)(m_table[i]->m_loader)))->clss->get_name()->bytes
-                << ") contains " << m_table[i]->GetFullSize() << " bytes in C heap");
-        }
-    }
-    hythread_suspend_enable();
-    TRACE2("classloader.unloading.stats", "A total of "
-        << m_unloadedBytes << " bytes would be freed in C heap for this scenario");
-    TRACE2("classloader.unloading.stats", "----------------------------------------------");
-}
-
-
-void vm_classloader_iterate_objects(void *iterator) {
-
-    // skip the object iteration if it is not needed
-    // (logging is not enabled and 
-    // class unloading is not yet implemented).
-    if (!is_info_enabled("class_unload")) return;
-
-    Managed_Object_Handle obj;
-    int nobjects = 0;
-    while((obj = gc_get_next_live_object(iterator))) {
-        nobjects++;
-    }
-    INFO2("class_unload", "classloader_iterate_objects " << nobjects << " iterated");
-}
-
-
 ClassLoader* ClassLoader::AddClassLoader( ManagedObject* loader )
 {
     SuspendDisabledChecker sdc;
@@ -714,22 +616,6 @@ void ClassLoader::FailedLoadingClass(const String* className)
     if(m_reportedClasses->Lookup(className)) {
         m_reportedClasses->Remove(className);
     }
-}
-
-
-unsigned ClassLoader::GetFullSize() {
-    if(m_fullSize)
-        return m_fullSize;
-    m_fullSize = sizeof(ClassLoader);
-    ClassTable::iterator cti;
-    for(cti = m_loadedClasses->begin();
-        cti != m_loadedClasses->end(); cti++)
-    {
-        if(cti->second->get_class_loader() == this) {
-            m_fullSize += cti->second->calculate_size();
-        }
-    }
-    return m_fullSize;
 }
 
 
@@ -1113,14 +999,6 @@ GenericFunctionPointer ClassLoader::LookupNative(Method* method)
     exn_raise_object(exc_object);
 
     return NULL;
-}
-
-void class_unloading_clear_mark_bits() {
-    ClassLoader::ClearMarkBits();
-}
-
-void class_unloading_start() {
-    ClassLoader::StartUnloading();
 }
 
 inline void

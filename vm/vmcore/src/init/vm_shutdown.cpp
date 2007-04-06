@@ -172,7 +172,6 @@ jint vm_destroy(JavaVM_Internal * java_vm, jthread java_thread)
 
     // Print out gathered data.
 #ifdef VM_STATS
-    ClassLoader::PrintUnloadingStats();
     VM_Statistics::get_vm_stats().print();
 #endif
 

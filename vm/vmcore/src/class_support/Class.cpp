@@ -141,7 +141,6 @@ void Class::init_internals(const Global_Env* env, const String* name, ClassLoade
 
     m_sourceDebugExtension = NULL;
     m_lock = new Lock_Manager();
-    m_markBit = 0;
     m_verify_data = 0;
 }
 
@@ -919,17 +918,6 @@ String* class_name_get_java_name(const String* class_name) {
     }
     String* str = VM_Global_State::loader_env->string_pool.lookup(name);
     return str;
-}
-
-
-static void mark_classloader(ClassLoader* cl)
-{
-    if(cl->GetLoader() && cl->NotMarked()) {
-        TRACE2("classloader.unloading.markloader", "  Marking loader "
-            << cl << " (" << (void*)cl->GetLoader() << " : "
-            << cl->GetLoader()->vt()->clss->get_name()->bytes << ")");
-        cl->Mark();
-    }
 }
 
 
