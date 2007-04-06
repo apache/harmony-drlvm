@@ -394,6 +394,11 @@ void Objects_To_Finalize::run_finalizers()
 
     p_TLS_vmthread->finalize_thread_flags |= FINALIZER_STARTER;
     TRACE2("finalize", "run_finalizers() started");
+
+    // saves curent thread exception risen before running finalizers
+    // if any and clears it to allow java to work
+    jthrowable cte = exn_get();
+    exn_clear();
     
     if (FRAME_COMPILATION ==
             (FRAME_COMPILATION | m2n_get_frame_type(m2n_get_last_frame()))) {
@@ -426,6 +431,11 @@ void Objects_To_Finalize::run_finalizers()
     }
 #endif
     exn_clear();
+
+    // restores curent thread exception risen before if any
+    if (NULL != cte) {
+        exn_raise_object(cte);
+    }
     p_TLS_vmthread->finalize_thread_flags &= ~FINALIZER_STARTER;
 } //Objects_To_Finalize::run_finalizers
 
@@ -537,6 +547,11 @@ void References_To_Enqueue::enqueue_references()
 
     args[0].l = (jobject) handle;
 
+    // saves curent thread exception risen before enqueuing references
+    // if any and clears it to allow java to work
+    jthrowable cte = exn_get();
+    exn_clear();
+
     while(true) {
         tmn_suspend_disable();
         ManagedObject* object = remove_object();
@@ -544,6 +559,10 @@ void References_To_Enqueue::enqueue_references()
         tmn_suspend_enable();
 
         if (object == NULL) {
+            // restores curent thread exception risen before if any
+            if (NULL != cte) {
+                exn_raise_object(cte);
+            }
             return;
         }
         tmn_suspend_disable();
@@ -570,6 +589,10 @@ void References_To_Enqueue::enqueue_references()
         }
 #endif
         exn_clear();
+    }
+    // restores curent thread exception risen before if any
+    if (NULL != cte) {
+        exn_raise_object(cte);
     }
 
     TRACE2("ref", "enqueue_references() completed");
