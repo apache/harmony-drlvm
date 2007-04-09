@@ -6,3 +6,6 @@ stress/Threads.java
 
 # HARMONY-3495 hangs intermittently
 gc/NPE.java
+
+# HARMONY-3519
+thread/ThreadInterrupt.java
