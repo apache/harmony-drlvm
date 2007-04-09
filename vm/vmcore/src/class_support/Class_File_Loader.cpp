@@ -1444,7 +1444,7 @@ bool Method::_parse_local_vars(Local_Var_Table* table, LocalVarOffset *offset_li
                 &&table->table[j].length == table->table[i].length
                 &&table->table[j].index == table->table[i].index)
             {
-                REPORT_FAILED_METHOD("Duplicate local variable "<< table->table[j].name
+                REPORT_FAILED_METHOD("Duplicate local variable "<< table->table[j].name->bytes
                     << " in attribute " << attr_name);
                 return false;
             }
@@ -1735,37 +1735,44 @@ bool Method::_parse_code(ConstantPool& cp, unsigned code_attr_len,
         }
         lv_table->length = num_lvt_entries;
 
+        bool failed = false;
         if (!_parse_local_vars(lv_table, offset_lvt_array, cp, cfs,
                 "LocalVariableTable", ATTR_LocalVariableTable)
             || (generic_vars && !_parse_local_vars(generic_vars, offset_lvtt_array, cp, cfs,
                 "LocalVariableTypeTable", ATTR_LocalVariableTypeTable)))
         {
-            return false;
+            failed = true;
         }
         // JVM spec hints that LocalVariableTypeTable is meant to be a supplement to LocalVariableTable
-        // so we have no reason to cross-check these tables
-        // See specification 4.8.12 second paragraph.
-        if (generic_vars && lv_table) {
+        // See specification 4.8.13 second paragraph.
+        if (!failed && generic_vars) {
             unsigned j = i = 0;
-            for (i = 0; i < generic_vars->length && j != lv_table->length; i++) {
+            for (i = 0; i < generic_vars->length; i++) {
                 for (j = 0; j < lv_table->length; j++) {
                     if (generic_vars->table[i].name == lv_table->table[j].name
                         && generic_vars->table[i].start_pc == lv_table->table[j].start_pc
-                        && generic_vars->table[i].length == lv_table->table[j].length
+                        /* FIXME This is temporary solution. One broken class file
+                        was found in eclipse plugin. RI loads this class successfully, DRLVM doesn't.
+                        Tests show that this depends on classloader, so further evaluation is needed
+                        to fix it permanently. */
+                        //&& generic_vars->table[i].length == lv_table->table[j].length
                         &&  generic_vars->table[i].index == lv_table->table[j].index)
                     {
                         lv_table->table[j].generic_type = generic_vars->table[i].type;
                         break;
                     }
                 }
+                if(j == lv_table->length) {
+                    String* gvi_name = generic_vars->table[i].name;
+                    REPORT_FAILED_METHOD("Element "<< gvi_name->bytes <<
+                        " of LocalVariableTypeTable does not match any of LocalVariableTable entries");
+                    failed = true;
+                    break;
+                }
+                
             }
-            String* gvi_name = generic_vars->table[i].name;
             if( num_lvtt_entries >= LV_ALLOCATION_THRESHOLD ){
                 STD_FREE(generic_vars);
-            }
-            if(j == lv_table->length) {
-                REPORT_FAILED_METHOD("Element: "<< gvi_name->bytes <<
-                    " in LocalVariableTypeTable has no counterpart or differs from element in LocalVariableTable");
             }
         }
 
@@ -1775,6 +1782,9 @@ bool Method::_parse_code(ConstantPool& cp, unsigned code_attr_len,
             if(num_lvt_entries >= LV_ALLOCATION_THRESHOLD) {
                 STD_FREE(lv_table);
             }
+        }
+        if (failed) {
+            return false;
         }
     }
 
@@ -3149,6 +3159,7 @@ bool Class::parse(Global_Env* env,
             //See specification 4.8.5 about InnerClasses Attribute
             if (m_declaring_class_index || m_innerclasses) {
                 REPORT_FAILED_CLASS_FORMAT(this, "more than one InnerClasses attribute");
+                return true;
             }
             bool isinner = false;
             // found_myself == 2: myself is not inner class or has passed myself when iterating inner class attribute arrays
