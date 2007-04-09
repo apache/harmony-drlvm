@@ -2225,8 +2225,8 @@ JavaByteCodeTranslator::instanceof(const uint8* bcp, uint32 constPoolIndex, uint
 
         newFallthroughBlock();
 
-        Opnd * zero = irBuilder.genLdConstant((int32)0);
-        irBuilder.genBranch(Type::IntPtr,Cmp_EQ,ObjIsNullLabel,zero,src);        
+        Opnd * nullObj = irBuilder.genLdNull();
+        irBuilder.genBranch(Type::IntPtr, Cmp_EQ, ObjIsNullLabel, nullObj, src);        
 
         // src is not null here
         newFallthroughBlock();
@@ -2239,6 +2239,7 @@ JavaByteCodeTranslator::instanceof(const uint8* bcp, uint32 constPoolIndex, uint
         // src is null, instanceOf returns 0
         irBuilder.genLabel(ObjIsNullLabel);
         cfgBuilder.genBlockAfterCurrent(ObjIsNullLabel);
+        Opnd * zero = irBuilder.genLdConstant((int32)0);
         irBuilder.genStVar(resVar, zero);
         irBuilder.genJump(Exit);
 
