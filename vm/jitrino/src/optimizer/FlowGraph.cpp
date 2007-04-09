@@ -76,8 +76,9 @@ FlowGraph::foldBranch(ControlFlowGraph& fg, BranchInst* br, bool isTaken)
 }
 
 void         
-FlowGraph::foldSwitch(ControlFlowGraph& fg, Node* block, SwitchInst* sw, uint32 index)
+FlowGraph::foldSwitch(ControlFlowGraph& fg, SwitchInst* sw, uint32 index)
 {
+    Node* block = sw->getNode();
     assert(sw == block->getLastInst());
     LabelInst* target;
     if(index < sw->getNumTargets())

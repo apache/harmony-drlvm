@@ -3840,7 +3840,7 @@ SimplifierWithInstFactory::foldBranch(BranchInst* br, bool isTaken) {
 
 void  
 SimplifierWithInstFactory::foldSwitch(SwitchInst* switchInst, uint32 index) {
-    FlowGraph::foldSwitch(flowGraph, currentCfgNode,switchInst,index);
+    FlowGraph::foldSwitch(flowGraph, switchInst,index);
 }
 
 

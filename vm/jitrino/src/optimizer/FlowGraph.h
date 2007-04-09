@@ -59,7 +59,7 @@ public:
     // from block.
     static void  foldBranch(ControlFlowGraph& fg, BranchInst* br, bool isTaken);
 
-    static void  foldSwitch(ControlFlowGraph& fg, Node* block, SwitchInst* sw, uint32 target);
+    static void  foldSwitch(ControlFlowGraph& fg, SwitchInst* sw, uint32 target);
 
     // Eliminates the check at the end of block and the associated exception
     // edge.  If (alwaysThrows), then eliminates the non-exception edge instead;
