@@ -42,6 +42,7 @@ class Opnd;
 class Inst;
 class BasicBlock;
 class I8Lowerer;
+class ConstantAreaItem;
 
 //=========================================================================================================
 //      class Opnd
@@ -1124,12 +1125,17 @@ public:
     void setTarget(uint32 i, Node* bb);
 
     Opnd * getTableAddress() const;
+    ConstantAreaItem * getConstantAreaItem() const;
     
     virtual void verify() const;
 protected:
     SwitchInst(Mnemonic mnemonic,  int id, Opnd * addr = 0) : 
             ControlTransferInst(mnemonic, id), tableAddr(addr)
-        {kind=Kind_SwitchInst; }
+        {
+            kind=Kind_SwitchInst; 
+            tableAddrRI = addr->getRuntimeInfo();
+            assert(tableAddrRI->getKind()==Opnd::RuntimeInfo::Kind_ConstantAreaItem);
+        }
 
 
     // called by CFG to detect BB->BB block edges
@@ -1140,7 +1146,13 @@ protected:
     virtual void removeRedundantBranch();
 
     void replaceTarget(Node* bbFrom, Node* bbTo);
+
+private:
     Opnd * tableAddr;
+    //keep original opnd runtime info.
+    //if orig opnd is spilled by spillgen and it's replacement has no runtime info
+    Opnd::RuntimeInfo* tableAddrRI;
+    
 };
 
 //=========================================================================================================
@@ -1328,9 +1340,6 @@ private:
 
 };
 
-}}; // namespace Ia32
-
-
 //=========================================================================================================
 //      class ConstantAreaItem
 //=========================================================================================================
@@ -1368,5 +1377,6 @@ protected:
     void *              address;
 };
 
+}}; // namespace Ia32
 
 #endif

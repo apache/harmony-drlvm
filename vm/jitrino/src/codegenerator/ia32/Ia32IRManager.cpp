@@ -189,18 +189,6 @@ Opnd * IRManager::newFPConstantMemOpnd(double d, Opnd * baseOpnd, BasicBlock* bb
 }
 
 //_____________________________________________________________________________________________
-Opnd * IRManager::newSwitchTableConstantMemOpnd(uint32 numTargets, Opnd * index)
-{
-    ConstantAreaItem * item=newSwitchTableConstantAreaItem(numTargets);
-#ifdef _EM64T_
-    Opnd * switchTable=newImmOpnd(typeManager.getInt32Type(), Opnd::RuntimeInfo::Kind_ConstantAreaItem, item);
-#else
-    Opnd * switchTable=newImmOpnd(typeManager.getIntPtrType(), Opnd::RuntimeInfo::Kind_ConstantAreaItem, item);
-#endif
-    return newMemOpnd(typeManager.getIntPtrType(), MemOpndKind_ConstantArea, 0, index, newImmOpnd(typeManager.getInt32Type(), sizeof(POINTER_SIZE_INT)), switchTable);
-}
-
-//_____________________________________________________________________________________________
 Opnd * IRManager::newInternalStringConstantImmOpnd(const char * str)
 {
     ConstantAreaItem * item=newInternalStringConstantAreaItem(str);
@@ -217,30 +205,25 @@ Opnd * IRManager::newBinaryConstantImmOpnd(uint32 size, const void * pv)
 //_____________________________________________________________________________________________
 SwitchInst * IRManager::newSwitchInst(uint32 numTargets, Opnd * index)
 {
-    Inst * instList = NULL;
-#ifndef _EM64T_
     assert(numTargets>0);
     assert(index!=NULL);
-    Opnd* targetOpnd=newSwitchTableConstantMemOpnd(numTargets, index);
-    // Extract the switch table constant address that is stored as 
-    // displacement on IA32. 
+    Inst * instList = NULL;
+    ConstantAreaItem * item=newSwitchTableConstantAreaItem(numTargets);
     // This tableAddress in SwitchInst is kept separately [from getOpnd(0)]
     // so it allows to replace an Opnd (used in SpillGen) and keep the table 
     // itself intact.
-    Opnd* tableAddr = targetOpnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement);
-    SwitchInst * inst=new(memoryManager, 1) SwitchInst(Mnemonic_JMP, instId++, tableAddr);
+    Opnd * tableAddr=newImmOpnd(typeManager.getIntPtrType(), Opnd::RuntimeInfo::Kind_ConstantAreaItem, item);
+#ifndef _EM64T_
+    Opnd * targetOpnd = newMemOpnd(typeManager.getIntPtrType(), 
+        MemOpndKind_ConstantArea, 0, index, newImmOpnd(typeManager.getInt32Type(), sizeof(POINTER_SIZE_INT)), tableAddr);
 #else
-    
-    ConstantAreaItem * item=newSwitchTableConstantAreaItem(numTargets);
-    Opnd * tableAddr = newImmOpnd(typeManager.getInt64Type(), Opnd::RuntimeInfo::Kind_ConstantAreaItem, item);
-
-    SwitchInst * inst=new(memoryManager, 1) SwitchInst(Mnemonic_JMP, instId++, tableAddr);
-    assert(numTargets>0);
-    assert(index!=NULL);
+    // on EM64T immediate displacement cannot be of 64 bit size, so move it to a register first
     Opnd * baseOpnd = newOpnd(typeManager.getInt64Type());
     appendToInstList(instList, newCopyPseudoInst(Mnemonic_MOV, baseOpnd, tableAddr));
-    Opnd * targetOpnd =  newMemOpnd(typeManager.getUnmanagedPtrType(typeManager.getIntPtrType()), MemOpndKind_ConstantArea, baseOpnd, index, newImmOpnd(typeManager.getInt32Type(), sizeof(POINTER_SIZE_INT)), 0);
+    Opnd * targetOpnd = newMemOpnd(typeManager.getUnmanagedPtrType(typeManager.getIntPtrType()), 
+        MemOpndKind_ConstantArea, baseOpnd, index, newImmOpnd(typeManager.getInt32Type(), sizeof(POINTER_SIZE_INT)), 0);
 #endif
+    SwitchInst * inst=new(memoryManager, 1) SwitchInst(Mnemonic_JMP, instId++, tableAddr);
     inst->insertOpnd(0, targetOpnd, Inst::OpndRole_Explicit);
     inst->assignOpcodeGroup(this);
     appendToInstList(instList, inst);

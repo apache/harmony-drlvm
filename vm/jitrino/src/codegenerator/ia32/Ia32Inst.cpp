@@ -682,12 +682,14 @@ void BranchInst::verify() const
 //   class SwitchInst
 //=========================================================================================================
 
+ConstantAreaItem * SwitchInst::getConstantAreaItem() const 
+{
+    return (ConstantAreaItem *)tableAddrRI->getValue(0);
+}
+
 Node* SwitchInst::getTarget(uint32 i)const
 {
-    Opnd * tableAddr=getTableAddress();
-    Opnd::RuntimeInfo * ri=tableAddr->getRuntimeInfo();
-    assert(ri->getKind()==Opnd::RuntimeInfo::Kind_ConstantAreaItem);
-    ConstantAreaItem * cai = (ConstantAreaItem *)ri->getValue(0);
+    ConstantAreaItem * cai = getConstantAreaItem();
     assert(i<cai->getSize()/sizeof(Node*));
     return ((Node**)cai->getValue())[i];
 }
@@ -714,21 +716,15 @@ Edge::Kind SwitchInst::getEdgeKind(const Edge* edge) const
 //_________________________________________________________________________________________________
 uint32 SwitchInst::getNumTargets() const 
 {
-    Opnd * tableAddr=getTableAddress();
-    Opnd::RuntimeInfo * ri= tableAddr->getRuntimeInfo();
-    assert(ri->getKind()==Opnd::RuntimeInfo::Kind_ConstantAreaItem);
-    ConstantAreaItem * cai = (ConstantAreaItem *)ri->getValue(0);
-    return cai->getSize() / sizeof(Node*);
+    return getConstantAreaItem()->getSize() / sizeof(Node*);
 }
 
 //_________________________________________________________________________________________________
 void SwitchInst::setTarget(uint32 i, Node* bb)
 {
     assert(bb->isBlockNode());
-    Opnd * tableAddr=getTableAddress();
-    Opnd::RuntimeInfo * ri=tableAddr->getRuntimeInfo();
-    assert(ri->getKind()==Opnd::RuntimeInfo::Kind_ConstantAreaItem);
-    ConstantAreaItem * cai = (ConstantAreaItem *)ri->getValue(0);
+    
+    ConstantAreaItem * cai = getConstantAreaItem();
     assert(i<cai->getSize()/sizeof(Node*));
     ((Node**)cai->getValue())[i]=bb;
 }
@@ -737,10 +733,7 @@ void SwitchInst::setTarget(uint32 i, Node* bb)
 void SwitchInst::replaceTarget(Node * bbFrom, Node * bbTo)
 {
     assert(bbTo->isBlockNode());
-    Opnd * tableAddr=getTableAddress();
-    Opnd::RuntimeInfo * ri=tableAddr->getRuntimeInfo();
-    assert(ri->getKind()==Opnd::RuntimeInfo::Kind_ConstantAreaItem);
-    ConstantAreaItem * cai = (ConstantAreaItem *)ri->getValue(0);
+    ConstantAreaItem * cai = getConstantAreaItem();
     Node** bbs=(Node**)cai->getValue();
 #ifdef _DEBUG
     bool found = false;
@@ -771,7 +764,7 @@ void SwitchInst::updateControlTransferInst(Node* oldTarget, Node* newTarget)
 // called from CFG when 2 blocks are merging and one of  the branches is redundant.
 void SwitchInst::removeRedundantBranch()
 {
-    assert(0);
+   unlink();
 }
 
 //_________________________________________________________________________________________________
@@ -942,4 +935,5 @@ RetInst::RetInst(IRManager * irm, int id)
 
 
 }};  // namespace Ia32
+
 

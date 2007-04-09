@@ -150,7 +150,6 @@ public:
 
     Opnd * newFPConstantMemOpnd(float f, Opnd * baseOpnd=0, BasicBlock * bb=0);
     Opnd * newFPConstantMemOpnd(double f, Opnd * baseOpnd=0, BasicBlock * bb=0);
-    Opnd * newSwitchTableConstantMemOpnd(uint32 numTargets, Opnd * index);
 
     Opnd * newInternalStringConstantImmOpnd(const char * str);
     Opnd * newBinaryConstantImmOpnd(uint32 size, const void * pv);
