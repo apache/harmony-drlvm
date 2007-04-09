@@ -22,22 +22,23 @@
 
 package java.lang;
 
-import java.io.File;
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.util.Locale;
+import java.util.StringTokenizer;
 
 import junit.framework.TestCase;
 
-/*
- * Created on January 5, 2005
- *
- * This RuntimeTest class is used to test the Core API Runtime class
- * 
- */
-
-
 /**
+ * This RuntimeTest class is used to test the Core API Runtime class
+ * Created on January 5, 2005
+ * 
  * ###############################################################################
  * ###############################################################################
  * REMINDER("XXX") LIST:
@@ -55,20 +56,9 @@ import junit.framework.TestCase;
  *    (Exception: java.lang.UnsatisfiedLinkError: Error compiling method java/lang/Runtime.availableProcessors()I)
  * ###############################################################################
  * ###############################################################################
- **/
-
+ */
 public class RuntimeTest2 extends TestCase {
 
-    protected void setUp() throws Exception {
-    }
-
-    protected void tearDown() throws Exception {
-    }    
-
-    
-    /**
-     *  
-     */
     static class forInternalUseOnly {
         String stmp;
 
@@ -95,56 +85,37 @@ public class RuntimeTest2 extends TestCase {
     }
 
     static boolean runFinalizationFlag = false;
-    public void test_runFinalization() {
-        //System.out.println("test_runFinalization");
+
+    public void test_runFinalization() throws InterruptedException {
         runFinalizationFlag = false;
+
         for (int ind2 = 0; ind2 < 10; ind2++) {
             forInternalUseOnly ins = new forInternalUseOnly();
             ins.stmp += "";
             ins = null;
-            // Runtime.getRuntime().runFinalization();
-            try {
-                Thread.sleep(10);
-            } catch (Exception e) {
-                fail("check001: Unexpected exception: " + e);
-            }
+            Thread.sleep(10);
             Runtime.getRuntime().gc();
-            try {
-                Thread.sleep(10);
-            } catch (Exception e) {
-                fail("check002: Unexpected exception: " + e);
-            }
+            Thread.sleep(10);
             Runtime.getRuntime().runFinalization();
         }
+
         assertTrue("finalization has not been run", runFinalizationFlag);
     }
-    
-    /**
-     *  
-     */
-    public void test_runFinalizersOnExit() {
-        /**/System.out.println("test_runFinalizersOnExit");
+
+    @SuppressWarnings("deprecation")
+    public void test_runFinalizersOnExit() throws InterruptedException {
         runFinalizationFlag = false;
         for (int ind2 = 0; ind2 < 5; ind2++) {
             Runtime.runFinalizersOnExit(false);
             forInternalUseOnly ins = new forInternalUseOnly();
             ins.stmp += "";
             ins = null;
-            // / Runtime.getRuntime().runFinalization();
-            try {
-                Thread.sleep(10);
-            } catch (Exception e) {
-                fail("check001: Unexpected exception: " + e);
-            }
+            Thread.sleep(10);
             Runtime.getRuntime().gc();
-            try {
-                Thread.sleep(10);
-            } catch (Exception e) {
-                fail("check002: Unexpected exception: " + e);
-            }
-            // / Runtime.getRuntime().runFinalization();
+            Thread.sleep(10);
         }
-        assertTrue("check003: finalizers were not run", runFinalizationFlag);
+
+        assertTrue("check001: finalizers were not run", runFinalizationFlag);
 
         runFinalizationFlag = false;
         for (int ind2 = 0; ind2 < 5; ind2++) {
@@ -152,51 +123,36 @@ public class RuntimeTest2 extends TestCase {
             forInternalUseOnly ins = new forInternalUseOnly();
             ins.stmp += "";
             ins = null;
-            // / Runtime.getRuntime().runFinalization();
-            try {
-                Thread.sleep(10);
-            } catch (Exception e) {
-                fail("check004: Unexpected exception: " + e);
-            }
+            Thread.sleep(10);
             Runtime.getRuntime().gc();
-            try {
-                Thread.sleep(10);
-            } catch (Exception e) {
-                fail("check005: Unexpected exception: " + e);
-            }
-            // / Runtime.getRuntime().runFinalization();
+            Thread.sleep(10);
         }
-        assertTrue("check006: finalizers were not run", runFinalizationFlag);
+        assertTrue("check002: finalizers were not run", runFinalizationFlag);
     }
-    
-    /**
-     *  
-     */
+
     class threadForInternalUseOnly1 extends Thread {
         public void run() {
-            // System.out.println("START threadForInternalUseOnly1");
             int I = threadForInternalUseOnly2.getI();
             int counter = 0;
             while ((I < 50 || number < I) && counter < 24000) {
                 try {
                     Thread.sleep(50);
-                } catch (Exception e) {
+                } catch (InterruptedException e) {
+                    // ignore interruption request
+                    // so reset interrupt indicator
+                    this.interrupt();
                 }
                 I = threadForInternalUseOnly2.getI();
                 counter += 1;
             }
-            // System.out.println("FINISH threadForInternalUseOnly1");
         }
 
         protected void finalize() throws Throwable {
-            // System.out.println(">>>>>>>>>>>>>>START
-            // threadForInternalUseOnly1.finalize");
             if (runFinalizationFlag2 == 1 || runFinalizationFlag2 == 11
                     || runFinalizationFlag2 == 21) {
                 // :) // assertTrue( "FAILED: addShutdownHook.check001", false);
             }
             super.finalize();
-            //System.out.println(">>>>>>>>>>>>>>FINISH threadForInternalUseOnly1.finalize");
         }
     }
 
@@ -207,11 +163,11 @@ public class RuntimeTest2 extends TestCase {
 
         synchronized static void incrI() {
             I++;
-        };
+        }
 
         synchronized static int getI() {
             return I;
-        };
+        }
 
         threadForInternalUseOnly2(int ind) {
             super();
@@ -220,7 +176,6 @@ public class RuntimeTest2 extends TestCase {
         }
 
         public void run() {
-            // System.out.println("START threadForInternalUseOnly2: "+ORD);
             if (ORD == 1 || ORD == 11 || ORD == 21) {
                 synchronized (threadForInternalUseOnly2.class) {
                     runFinalizationFlag2 = ORD;
@@ -230,22 +185,19 @@ public class RuntimeTest2 extends TestCase {
             for (int j = 0; j < 30/* 100 */; j++) {
                 try {
                     Thread.sleep(10);
-                } catch (Exception e) {
+                } catch (InterruptedException e) {
+                    // ignore request, set indicator
+                    this.interrupt();
                 }
             }
-            // System.out.println("FINISH threadForInternalUseOnly2: "+ORD);
         }
 
         protected void finalize() throws Throwable {
-            // System.out.println("<<<<<<<<<<<<<<<<<START
-            // threadForInternalUseOnly2.finalize");
             if (runFinalizationFlag2 == 1 || runFinalizationFlag2 == 11
                     || runFinalizationFlag2 == 21) {
                 // :) // assertTrue( "FAILED: addShutdownHook.check002", false);
             }
             super.finalize();
-            // System.out.println("<<<<<<<<<<<<<<<<<FINISH
-            // threadForInternalUseOnly2.finalize");
         }
     }
 
@@ -254,42 +206,32 @@ public class RuntimeTest2 extends TestCase {
 
         synchronized static void incrI() {
             I++;
-        };
+        }
 
         synchronized static int getI() {
             return I;
-        };
+        }
 
         public void run() {
-            // System.out.println("Run threadForInternalUseOnly3: "+getI());
             incrI();
         }
     }
-    
+
     static int runFinalizationFlag2 = -1;
     static int number = 4; //100;
     static int nthr   = 2; //21;
 
-    public void test_addShutdownHook() {
-        /**/System.out.println("test_addShutdownHook");
+    @SuppressWarnings("deprecation")
+    public void test_addShutdownHook() throws InterruptedException {
         Thread[] thr = new Thread[number];
         for (int i = 0; i < number / 2; i++) {
-            Runtime
-                    .getRuntime()
-                    .addShutdownHook(
-                            thr[2 * i + 0] = new threadForInternalUseOnly3());// null);//
-            try {
-                Thread.sleep(5);
-            } catch (Exception e) {
-            }
+            Runtime.getRuntime().addShutdownHook(
+                    thr[2 * i + 0] = new threadForInternalUseOnly3());
+            Thread.sleep(5);
             Runtime.getRuntime().addShutdownHook(
                     thr[2 * i + 1] = new threadForInternalUseOnly2(2 * i + 1));
-            try {
-                Thread.sleep(5);
-            } catch (Exception e) {
-            }
+            Thread.sleep(5);
         }
-        // System.out.println("2test_addShutdownHook");
         Runtime.runFinalizersOnExit(true);
         new threadForInternalUseOnly1().start();
         try {
@@ -297,302 +239,218 @@ public class RuntimeTest2 extends TestCase {
             fail("IllegalArgumentException has not been thrown");
         } catch (IllegalArgumentException e) {
         }
-        //System.out.println("3test_addShutdownHook");
     }
-    
-    /**
-     *  
-     */
-    public void test_removeShutdownHook() {
-        /**/System.out.println("test_removeShutdownHook");
+
+    public void test_removeShutdownHook() throws InterruptedException {
         Thread[] thr = new Thread[number];
         for (int i = 0; i < number / 2; i++) {
             Runtime.getRuntime().addShutdownHook(
                     thr[2 * i + 0] = new threadForInternalUseOnly3());
-            try {
-                Thread.sleep(5);
-            } catch (Exception e) {
-            }
+            Thread.sleep(5);
             Runtime.getRuntime().addShutdownHook(
                     thr[2 * i + 1] = new threadForInternalUseOnly2(2 * i + 1));
-            try {
-                Thread.sleep(5);
-            } catch (Exception e) {
-            }
+            Thread.sleep(5);
         }
         // Runtime.getRuntime().removeShutdownHook(thr[1]);
         // Runtime.getRuntime().removeShutdownHook(thr[11]);
         Runtime.getRuntime().removeShutdownHook(thr[nthr]);
         new threadForInternalUseOnly1().start();
-        try {
-            // Runtime.getRuntime().addShutdownHook(thr[1]);
-            // Runtime.getRuntime().addShutdownHook(thr[11]);
-            Runtime.getRuntime().addShutdownHook(thr[nthr]);
-            // Runtime.getRuntime().removeShutdownHook(thr[1]);
-            // Runtime.getRuntime().removeShutdownHook(thr[11]);
-            Runtime.getRuntime().removeShutdownHook(thr[nthr]);
-            // Runtime.getRuntime().removeShutdownHook(thr[1]);
-            // Runtime.getRuntime().removeShutdownHook(thr[11]);
-            Runtime.getRuntime().removeShutdownHook(thr[nthr]);
-        } catch (Exception e) {
-            fail("Unexpected Exception: " + e);
-        }
+
+        // Runtime.getRuntime().addShutdownHook(thr[1]);
+        // Runtime.getRuntime().addShutdownHook(thr[11]);
+        Runtime.getRuntime().addShutdownHook(thr[nthr]);
+        // Runtime.getRuntime().removeShutdownHook(thr[1]);
+        // Runtime.getRuntime().removeShutdownHook(thr[11]);
+        Runtime.getRuntime().removeShutdownHook(thr[nthr]);
+        // Runtime.getRuntime().removeShutdownHook(thr[1]);
+        // Runtime.getRuntime().removeShutdownHook(thr[11]);
+        Runtime.getRuntime().removeShutdownHook(thr[nthr]);
     }
-    
-    /**
-     *  
-     */
-    public void test_exec_Str() {
-        /**/System.out.println("test_exec_Str");
-        if (System.getProperty("os.name").toLowerCase().indexOf("windows") != -1) {
+
+    private static boolean isOSWindows(){
+        String osName = System.getProperty("os.name");
+        osName = osName.toLowerCase(Locale.US);
+        return osName.contains("windows");
+    }
+
+    private static boolean isOSLinux(){
+        String osName = System.getProperty("os.name");
+        osName = osName.toLowerCase(Locale.US);
+        return osName.contains("linux");
+    }
+
+    private void exec_StrForWindows() throws Exception {
+        String cmnd = "cmd /C date";
+        Process pi3 = Runtime.getRuntime().exec(cmnd);
+        OutputStream os = pi3.getOutputStream();
+        pi3.getErrorStream();
+        InputStream is = pi3.getInputStream();
+        // wait for is.available != 0
+        int count = 100;
+        while (is.available() < 1 && count-- > 0) {
             try {
-                String pathList = System.getProperty("java.library.path");
-                String[] paths = pathList.split(File.pathSeparator);
-                String cmnd = null;
-                int ind1;
-                for (ind1 = 0; ind1 < paths.length; ind1++) {
-                    if (paths[ind1] == null) {
-                        continue;
-                    }
-                    File asf = new java.io.File(paths[ind1] + File.separator
-                            + "cmd.exe");
-                    if (asf.exists()) {
-                        cmnd = paths[ind1] + File.separator + "cmd.exe";
-                        break;
-                    }
-                }
-                if (cmnd == null) {
-                    if (new java.io.File(
-                            // XXX:IA64?
-                            (cmnd = "C:\\WINNT\\system32\\cmd.exe")).exists()) {
-                    } else if (new java.io.File(
-                            // XXX:IA64?
-                            (cmnd = "C:\\WINDOWS\\system32\\cmd.exe")).exists()) {
-                    } else {
-                        fail("cmd.exe hasn't been found! Please, set the path" +
-                                " to cmd.exe via java.library.path property.");
-                    }
-                }
-                cmnd = cmnd + " /C date";
-                Process pi3 = Runtime.getRuntime().exec(cmnd);
-                java.io.OutputStream os = pi3.getOutputStream();
-                pi3.getErrorStream();
-                java.io.InputStream is = pi3.getInputStream();
-                // wait for is.available != 0
-                int count = 100;
-                while (is.available() < 1 && count-- > 0) {
-                    try {
-                        Thread.sleep(200);
-                    } catch (Exception e) {
-                    }
-                }
-                if (count < 0) {
-                    fail("check001: the date's reply has not been received");
-                }
-
-                int ia = is.available();
-                byte[] bb = new byte[ia];
-                is.read(bb);
-                // System.out.println("3test_exec_Str");
-                String r1 = new String(bb);
-                if (r1.indexOf("The current date is") == -1
-                        || r1.indexOf("Enter the new date") == -1) {
-                    fail("exec(String[], String[], File).check002: where is " +
-                            "the date's answer/request?");
-                }
-                // System.out.println("4test_exec_Str");
-                for (int ii = 0; ii < ia; ii++) {
-                    bb[ii] = (byte) 0;
-                }
-
-                os.write('x');
-                os.write('x');
-                os.write('-');
-                os.write('x');
-                os.write('x');
-                os.write('-');
-                os.write('x');
-                os.write('x');
-                os.write('\n');
-                os.flush();
-
-                // wait for is.available > 9 which means that 'is' contains
-                // both the above written value and the consequent 
-                // 'date' command's reply
-                count = 300;
-                while (is.available() < 11 && count-- > 0) {
-                    try {
-                        Thread.sleep(200);
-                    } catch (Exception e) {
-                    }
-                }
-                if (count < 0) {
-                    fail("check003: the date's reply has not been received");
-                }
-                ia = is.available();
-                byte[] bbb = new byte[ia];
-                is.read(bbb);
-                r1 = new String(bbb);
-                if (r1.indexOf("The system cannot accept the date entered") == -1
-                        && r1.indexOf("Enter the new date") == -1) {
-                    fail("check004: unexpected output: " + r1);
-                }
-                os.write('\n');
-                try {
-                    pi3.exitValue();
-                } catch (IllegalThreadStateException e) {
-                    os.flush();
-                    try {
-                        pi3.waitFor();
-                    } catch (InterruptedException ee) {
-                    }
-                }
-                // System.out.println("5test_exec_Str");
-                // os.write('\n');
-                // os.write('\n');
-                // os.flush();
-                pi3.destroy();
-                // pi3.waitFor();
-            } catch (java.io.IOException eeee) {
-                eeee.printStackTrace();
-                System.out.println("test_exec_Str test hasn't finished correctly because of the competent IOException.");
-                return;
-            } catch (Exception eeee) {
-                eeee.printStackTrace();
-                fail("check005: UnexpectedException on " +
-                        "exec(String[], String[], File)");
+                Thread.sleep(10);
+            } catch (InterruptedException e) {
             }
-        } else if (System.getProperty("os.name").toLowerCase()
-                .indexOf("linux") != -1) {
+        }
+        if (count < 0) {
+            fail("check001: the date's reply has not been received");
+        }
+
+        int ia = is.available();
+        byte[] bb = new byte[ia];
+        is.read(bb);
+        String r1 = new String(bb);
+        if (r1.indexOf("The current date is") == -1
+                || r1.indexOf("Enter the new date") == -1) {
+            fail("exec(String[], String[], File).check002: where is " +
+            "the date's answer/request?");
+        }
+        for (int ii = 0; ii < ia; ii++) {
+            bb[ii] = (byte) 0;
+        }
+
+        os.write('x');
+        os.write('x');
+        os.write('-');
+        os.write('x');
+        os.write('x');
+        os.write('-');
+        os.write('x');
+        os.write('x');
+        os.write('\n');
+        os.flush();
+
+        // wait for is.available > 9 which means that 'is' contains
+        // both the above written value and the consequent 
+        // 'date' command's reply
+        count = 300;
+        while (is.available() < 11 && count-- > 0) {
+            try {
+                Thread.sleep(5);
+            } catch (InterruptedException e) {
+            }
+        }
+        if (count < 0) {
+            fail("check003: the date's reply has not been received");
+        }
+        ia = is.available();
+        byte[] bbb = new byte[ia];
+        is.read(bbb);
+        r1 = new String(bbb);
+        if (r1.indexOf("The system cannot accept the date entered") == -1
+                && r1.indexOf("Enter the new date") == -1) {
+            fail("check004: unexpected output: " + r1);
+        }
+        os.write('\n');
+        try {
+            pi3.exitValue();
+        } catch (IllegalThreadStateException e) {
+            os.flush();
+            try {
+                pi3.waitFor();
+            } catch (InterruptedException ee) {
+            }
+        }
+        // System.out.println("5test_exec_Str");
+        // os.write('\n');
+        // os.write('\n');
+        // os.flush();
+        pi3.destroy();
+        // pi3.waitFor();
+    }
+
+    public void test_exec_Str() throws Exception {
+        if (isOSWindows()) {
+            exec_StrForWindows();
+        } else if (isOSLinux()) {
             // TODO
         } else {
             //UNKNOWN
         }
     }
-    
-    /**
-     *  
-     */
-    public void test_exec_StrArr() {
-        /**/System.out.println("test_exec_StrArr");
+
+    public void test_exec_StrArr() throws Exception {
         String[] command = null;
-        if (System.getProperty("os.name").toLowerCase()
-                .indexOf("windows") != -1) {
+        if (isOSWindows()) {
             command = new String[]{"cmd", "/C", "echo S_O_M_E_T_H_I_N_G"};
         } else {
             command = new String[]{"/bin/sh", "-c", "echo S_O_M_E_T_H_I_N_G"};
         }
         String procValue = null;
-        try {
-            Process proc = Runtime.getRuntime().exec(command);
-            BufferedReader br = new BufferedReader(new InputStreamReader(
+        Process proc = Runtime.getRuntime().exec(command);
+        BufferedReader br = new BufferedReader(new InputStreamReader(
                 proc.getInputStream()));
-            procValue = br.readLine();
-        } catch (IOException e) {
-            fail("Unexpected IOException");
-        }
+        procValue = br.readLine();
         assertTrue("echo command has not been run",
                 procValue.indexOf("S_O_M_E_T_H_I_N_G") != -1);
     }
-    
-    /**
-     *  
-     */
-    public void test_exec_StrArr_StrArr() {
-        /**/System.out.println("test_exec_StrArr");
+
+    public void test_exec_StrArr_StrArr() throws Exception {
         String[] command = null;
-        if (System.getProperty("os.name").toLowerCase()
-                .indexOf("windows") != -1) {
+        if (isOSWindows()) {
             command = new String[] {"cmd", "/C", "echo %Z_S_S%"};
         } else {
             command = new String[] {"/bin/sh", "-c", "echo $Z_S_S"};
         }
         String procValue = null;
-        try {
-            Process proc = Runtime.getRuntime().exec(command,
-                    new String[] {"Z_S_S=S_O_M_E_T_H_I_N_G"});
-            BufferedReader br = new BufferedReader(new InputStreamReader(proc
-                    .getInputStream()));
-            procValue = br.readLine();
-        } catch (IOException e) {
-            fail("Unexpected IOException");
-        }
+        Process proc = Runtime.getRuntime().exec(command,
+                new String[] {"Z_S_S=S_O_M_E_T_H_I_N_G"});
+        BufferedReader br = new BufferedReader(new InputStreamReader(proc
+                .getInputStream()));
+        procValue = br.readLine();
         assertTrue("echo command has not been run",
                 procValue.indexOf("S_O_M_E_T_H_I_N_G") != -1);
     }
-    
-    /**
-     * 
-     */
-    public void test_exec_StrArr_StrArr_Fil() {
-        /**/System.out.println("test_exec_StrArr");
+
+    public void test_exec_StrArr_StrArr_Fil() throws Exception {
         String[] command = null;
-        if (System.getProperty("os.name").toLowerCase()
-                .indexOf("windows") != -1) {
-            command = new String[] {"cmd", "/C", "env"};
+        if (isOSWindows()) {
+            command = new String[] {"cmd", "/C", "set"};
         } else {
             command = new String[] {"/bin/sh", "-c", "env"};
         }
         String as[];
         int len = 0;
-        try {
-            Process proc = Runtime.getRuntime().exec(command);
-            BufferedReader br = new BufferedReader(new InputStreamReader(proc
-                    .getInputStream()));
-            while (br.readLine() != null) {
-                len++;
-            }
 
-        } catch (IOException e) {
-            fail("check001: Unexpected IOException");
+        Process proc = Runtime.getRuntime().exec(command);
+        BufferedReader br = new BufferedReader(new InputStreamReader(proc
+                .getInputStream()));
+        while (br.readLine() != null) {
+            len++;
         }
+
         as = new String[len];
-        try {
-            Process proc = Runtime.getRuntime().exec(command);
-            BufferedReader br = new BufferedReader(new InputStreamReader(proc
-                    .getInputStream()));
-            for (int i = 0; i < len; i++) {
-                as[i] = br.readLine();
-            }
-
-        } catch (IOException e) {
-            fail("check002: Unexpected IOException");
+        proc = Runtime.getRuntime().exec(command);
+        br = new BufferedReader(new InputStreamReader(proc
+                .getInputStream()));
+        for (int i = 0; i < len; i++) {
+            as[i] = br.readLine();
         }
-/**/
-                if (System.getProperty("os.name").toLowerCase().indexOf("windows") != -1) {
-                    as = new String[]{"to_avoid=#s1s2f1t1"}; // <<<<<<<<<<< !!! to remember
-                    command = new String[]{"cmd", "/C", "dir"};
-                } else {
-                    command = new String[]{"sh", "-c", "pwd"};
-                }
-                try {
-                    Process proc = Runtime.getRuntime().exec(command, as, new File(System.getProperty("java.io.tmpdir")));
-                    BufferedReader br = new BufferedReader(new InputStreamReader(
-                        proc.getInputStream()));
-                    //for (int i = 0; i < len; i++) {
-                    String ln;
-                    while ( (ln = br.readLine()) != null) {
-                        if(ln.indexOf(System.getProperty("java.io.tmpdir").substring(0,System.getProperty("java.io.tmpdir").length() -1 ))!=-1) {
-                            return;
-                        }
-                   }
-                    fail("Error3");
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    fail("Error4");
-                }
-                fail("Error5");
-/**/
+
+        if (isOSWindows()) {
+            as = new String[]{"to_avoid=#s1s2f1t1"}; // <<<<<<<<<<< !!! to remember
+            command = new String[]{"cmd", "/C", "dir"};
+        } else {
+            command = new String[]{"sh", "-c", "pwd"};
+        }
+
+        proc = Runtime.getRuntime().exec(command, as, new File(System.getProperty("java.io.tmpdir")));
+        br = new BufferedReader(new InputStreamReader(
+                proc.getInputStream()));
+        //for (int i = 0; i < len; i++) {
+        String ln;
+        while ( (ln = br.readLine()) != null) {
+            if(ln.indexOf(System.getProperty("java.io.tmpdir").substring(0,System.getProperty("java.io.tmpdir").length() -1 ))!=-1) {
+                return;
+            }
+        }
+        fail("Error3");
     }
-    
-    /**
-     *  
-     */
-    public void test_exec_Str_StrArr() {
-        /**/System.out.println("test_exec_StrArr");
+
+    public void test_exec_Str_StrArr() throws Exception {
         String command = null;
-        if (System.getProperty("os.name").toLowerCase()
-                .indexOf("windows") != -1) {
+        if (isOSWindows()) {
             command = "cmd /C \"echo %Z_S_S_2%\"";
         } else {
             //command = "/bin/sh -c \"echo $Z_S_S_2\"";
@@ -600,222 +458,128 @@ public class RuntimeTest2 extends TestCase {
             command = "/usr/bin/env";
         }
         String procValue = null;
-        try {
+        block1: {
             Process proc = Runtime.getRuntime().exec(command,
                     new String[] {"Z_S_S_2=S_O_M_E_T_H_I_N_G"});
             BufferedReader br = new BufferedReader(new InputStreamReader(proc
                     .getInputStream()));
             while ((procValue = br.readLine()) != null) {
                 if (procValue.indexOf("S_O_M_E_T_H_I_N_G") != -1) {
-                    return;
+                    break block1;
                 }
                 fail("It should be the only singl environment variable here (" + procValue + ")");
             }
             fail("Z_S_S_2 var should be present and assingned correctly.");
-        } catch (IOException e) {
-            fail("Unexpected IOException");
         }
-        /**/
-        // Commented because the drlvm issue
-                       try {
-                           Process proc = Runtime.getRuntime().exec(command, new String[] {
-                                   "Z_S_S_2=S_O_M_E_T_H_I_N_G_s1s2f1t1", //<<<<<<<<<<< !!! to remember
-                                   "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
-                                   "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
-                                   "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
-                                   "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
-                                   "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
-                                   "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
-                                   "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
-                                   "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
-                                   "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
-                                   "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
-                                   "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
-                                   "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
-                                   "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
-                                   "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
-                                   "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
-                                   "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
-                                  });
-                           BufferedReader br = new BufferedReader(new InputStreamReader(
-                               proc.getInputStream()));
-                           procValue = br.readLine();
-                       } catch (IOException e) {
-                           e.printStackTrace();
-                           fail("Error3");
-                       }
-                       assertTrue("Error4",procValue.indexOf("S_O_M_E_T_H_I_N_G")!=-1);
-       /**/
+        
+        Process proc = Runtime.getRuntime().exec(command, new String[] {
+                "Z_S_S_2=S_O_M_E_T_H_I_N_G_s1s2f1t1", //<<<<<<<<<<< !!! to remember
+                "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
+                "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
+                "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
+                "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
+                "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
+                "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
+                "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
+                "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
+                "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
+                "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
+                "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
+                "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
+                "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
+                "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
+                "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
+                "Z_S_S_3=S_O_M_E_T_H_I_N_G L_O_N_GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG",
+        });
+        BufferedReader br = new BufferedReader(new InputStreamReader(
+                proc.getInputStream()));
+        procValue = br.readLine();
+
+        assertTrue("Error4",procValue.indexOf("S_O_M_E_T_H_I_N_G")!=-1);
     }
-    
-    /**
-     * 
-     */
-    public void test_exec_Str_StrArr_Fil() {
-        /**/System.out.println("test_exec_Str_StrArr_Fil");
+
+    public void test_exec_Str_StrArr_Fil() throws Exception {
         String[] command = null;
-        if (System.getProperty("os.name").toLowerCase()
-                .indexOf("windows") != -1) {
+        if (isOSWindows()) {
             command = new String[] {"cmd", "/C", "env"};
         } else {
             command = new String[] {"/bin/sh", "-c", "env"};
         }
         String as[];
         int len = 0;
-        try {
-            Process proc = Runtime.getRuntime().exec(command);
-            BufferedReader br = new BufferedReader(new InputStreamReader(proc
-                    .getInputStream()));
-            while (br.readLine() != null) {
-                len++;
-            }
-        } catch (IOException e) {
-            fail("check001: Unexpected IOException");
+        Process proc = Runtime.getRuntime().exec(command);
+        BufferedReader br = new BufferedReader(new InputStreamReader(proc
+                .getInputStream()));
+        while (br.readLine() != null) {
+            len++;
         }
+        
         as = new String[len];
-        try {
-            Process proc = Runtime.getRuntime().exec(command);
-            BufferedReader br = new BufferedReader(new InputStreamReader(proc
-                    .getInputStream()));
-            for (int i = 0; i < len; i++) {
-                as[i] = br.readLine();
-            }
-
-        } catch (IOException e) {
-            fail("check002: Unexpected IOException");
+        proc = Runtime.getRuntime().exec(command);
+        br = new BufferedReader(new InputStreamReader(proc
+                .getInputStream()));
+        for (int i = 0; i < len; i++) {
+            as[i] = br.readLine();
         }
-/**/
-                String command2;
-                if (System.getProperty("os.name").toLowerCase().indexOf("windows") != -1) {
-                    as = new String[]{"to_avoid=#s1s2f1t1"};//<<<<<<<<<<< !!! to remember
-                    command2 = "cmd /C dir";
-                } else {
-                    command2 = "sh -c pwd";
-                }
-                try {
-                    Process proc = Runtime.getRuntime().exec(command2, as, new File(System.getProperty("java.io.tmpdir")));
-                    BufferedReader br = new BufferedReader(new InputStreamReader(
-                        proc.getInputStream()));
-                    String ln;
-                    while ( (ln = br.readLine()) != null) {
-                        if(ln.indexOf(System.getProperty("java.io.tmpdir").substring(0,System.getProperty("java.io.tmpdir").length() -1 ))!=-1) {
-                            return;
-                        }
-                   }
-                    fail("Error3");
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    fail("Error4");
-                }
-                fail("Error5");
-/**/
-    }
-    
-    /**
-     *  
-     */
-    public void test_exec_Str_F2T1S2Z() {
-        /**/System.out.println("test_exec_Str_F2T1S2Z");
-        String line;
-        if (System.getProperty("os.name").toLowerCase()
-                .indexOf("windows") != -1) {
-            String strarr[] = {"7", "Hello", "HELL", "Hello", "world",
-                    "World hello", "vasa", "d:?*/\\ World", "hello"};
-            try {
-                String pathList = System.getProperty("java.library.path");
-                String[] paths = pathList.split(File.pathSeparator);
-                String cmnd = null;
-                int ind1;
-                for (ind1 = 0; ind1 < paths.length; ind1++) {
-                    if (paths[ind1] == null) {
-                        continue;
-                    }
-                    File asf = new java.io.File(paths[ind1] + File.separator
-                            + "cmd.exe");
-                    if (asf.exists()) {
-                        cmnd = paths[ind1] + File.separator + "cmd.exe";
-                        break;
-                    }
-                }
-                if (cmnd == null) {
-                    if (new java.io.File(
-                            (cmnd = "C:\\WINNT\\system32\\cmd.exe")).exists()) { // XXX:IA64?
-                    } else if (new java.io.File(
-                            (cmnd = "C:\\WINDOWS\\system32\\cmd.exe")).exists()) { // XXX:IA64?
-                    } else {
-                        fail("check001: cmd.exe hasn't been found! " +
-                                "Please, set the path to cmd.exe via " +
-                                "java.library.path property.");
-                    }
-                }
-                File f = new java.io.File("C:\\CygWin\\bin");
-                Process p;
-                if (f.exists()) {
-                    p = Runtime.getRuntime().exec(new String[] {
-                            cmnd, "/C", "sh", "-c", 
-                            "echo $#; echo $0; echo $1; echo $2; echo $3; " +
-                            "echo $4; echo $5; echo $6; echo $7",
-                            "Hello", "HELL", "\"Hello\" \"world\"",
-                            "World hello", "vas\"a d:?*/\\", "\"World hello\""},
-                            new String[] {}, f);
-                    p.waitFor();
-                } else {
-                    p = Runtime.getRuntime().exec(new String[] {
-                            cmnd, "/C", "sh", "-c",
-                            "echo $#; echo $0; echo $1; echo $2; echo $3; " +
-                            "echo $4; echo $5; echo $6; echo $7",
-                            "Hello", "HELL", "\"Hello\" \"world\"",
-                            "World hello", "vas\"a d:?*/\\", "\"World hello\""});
-                    if (p.waitFor() != 0) {
-                        fail("check002: sh.exe seems to have not been found " +
-                                "by default! Please, set the path to sh.exe" +
-                                " via java.library.path property.");
-                    }
-                }
-                BufferedReader input = new BufferedReader(
-                        new InputStreamReader(p.getErrorStream()));
-                boolean flg = false;
-                while ((line = input.readLine()) != null) {
-                    flg = true;
-                    System.err.println("ErrorStream: " + line);
-                }
-                input.close();
-                if (flg) {
-                    fail("check003: ErrorStream should be empty!");
-                }
-                input = new BufferedReader(new InputStreamReader(p
-                        .getInputStream()));
-                int i = 0;
-                while ((line = input.readLine()) != null) {
-                    if (!line.equals(strarr[i])) {
-                        flg = true;
-                        System.out.println(line + " != " + strarr[i]);
-                    }
-                    i++;
-                }
-                input.close();
-                if (flg) {
-                    fail("An uncoincidence was found (see above)!");
-                }
-            } catch (Exception eeee) {
-                fail("check004: Unexpected exception on " +
-                        "exec(String[], String[], File)");
+
+        String command2;
+        if (isOSWindows()) {
+            as = new String[]{"to_avoid=#s1s2f1t1"};//<<<<<<<<<<< !!! to remember
+            command2 = "cmd /C dir";
+        } else {
+            command2 = "sh -c pwd";
+        }
+
+        proc = Runtime.getRuntime().exec(command2, as, new File(System.getProperty("java.io.tmpdir")));
+        br = new BufferedReader(new InputStreamReader(proc.getInputStream()));
+        String ln;
+        while ( (ln = br.readLine()) != null) {
+            if(ln.indexOf(System.getProperty("java.io.tmpdir").substring(0,System.getProperty("java.io.tmpdir").length() -1 ))!=-1) {
+                return;
             }
-        } else if (System.getProperty("os.name").toLowerCase()
-                .indexOf("linux") != -1) {
+        }
+        fail("Error5");
+    }
+
+    public void test_exec_Str_F2T1S2Z() throws Exception {
+        String line;
+        if (isOSWindows()) {
+            File f = new File(System.getProperty("java.io.tmpdir"));
+            Process p = Runtime.getRuntime().exec(
+                    new String[] { "cmd", "/C", "echo Hello World" }, new String[] {}, f);
+            p.waitFor();
+            BufferedReader input = new BufferedReader(new InputStreamReader(p
+                    .getErrorStream()));
+            while ((line = input.readLine()) != null) {
+                fail("The ErrorStream should be empty!");
+            }
+            input.close();
+            
+            input = new BufferedReader(
+                    new InputStreamReader(p.getInputStream()));
+            
+            StringBuilder builder = new StringBuilder();
+            while ((line = input.readLine()) != null) {
+                builder.append(line);
+                System.out.println(line);
+            }
+            input.close();
+            
+            assertEquals("Hello World", builder.toString().trim());
+        } else if (isOSLinux()) {
             String strarr[] = {"6",System.getProperty("java.io.tmpdir")
                     + File.separator 
                     + "vasja", "Hello", "HELL", "\"Hello\" \"world\"",
                     "World hello", "vas\"a d:?*/\\" };
-            java.io.File fff = null;
-            java.io.PrintStream ps = null;
+            File fff = null;
+            PrintStream ps = null;
             try {
-                fff = new java.io.File(System.getProperty("java.io.tmpdir")
+                fff = new File(System.getProperty("java.io.tmpdir")
                         + File.separator + "vasja");
                 fff.createNewFile();
-                ps = new java.io.PrintStream(new java.io.FileOutputStream(fff));
+                ps = new PrintStream(new FileOutputStream(fff));
                 ps.println("{ echo $#; echo $0; echo $1;  " +
-                        "echo $2; echo $3; echo $4; echo $5; }");
+                "echo $2; echo $3; echo $4; echo $5; }");
             } catch (Throwable e) {
                 System.err.println(e);
                 System.err.println(System.getProperty("user.home")
@@ -832,7 +596,7 @@ public class RuntimeTest2 extends TestCase {
                     if (paths[ind1] == null) {
                         continue;
                     }
-                    File asf = new java.io.File(paths[ind1] + File.separator
+                    File asf = new File(paths[ind1] + File.separator
                             + "sh");
                     if (asf.exists()) {
                         cmnd = paths[ind1] + File.separator + "sh";
@@ -842,7 +606,7 @@ public class RuntimeTest2 extends TestCase {
                 if (cmnd == null) {
                     cmnd = "/bin/sh";
                 }
-                File f = new java.io.File("/bin");
+                File f = new File("/bin");
                 Process p;
                 if (f.exists()) {
                     p = Runtime.getRuntime().exec(new String[] {
@@ -861,7 +625,7 @@ public class RuntimeTest2 extends TestCase {
                     if (p.waitFor() != 0) {
                         fail("check005: sh.exe seems to have not been found" +
                                 " by default! Please, set the path to sh.exe" +
-                                " via java.library.path property.");
+                        " via java.library.path property.");
                     }
                 }
                 BufferedReader input = new BufferedReader(
@@ -891,8 +655,7 @@ public class RuntimeTest2 extends TestCase {
                     fail("check007: An uncoincidence was found (see above)!");
                 }
             } catch (Exception eeee) {
-                fail("check008: Unexpected exception on " +
-                        "exec(String[], String[], File)");
+                fail("check008: Unexpected exception on exec(String[], String[], File)");
             }
             try {
                 fff.delete();
