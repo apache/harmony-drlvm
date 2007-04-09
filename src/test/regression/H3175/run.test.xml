@@ -1,0 +1,10 @@
+<project name="RUN HARMONY-3175 Regression Test">
+    <target name="run-test">
+        <echo message="Running on OPT"/>
+        <run-junit-test 
+             test="org.apache.harmony.drlvm.tests.regression.h3175.Test"
+             vmarg="-Xem:opt">
+        </run-junit-test>
+    </target>
+</project>
+
