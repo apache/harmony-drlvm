@@ -1771,9 +1771,6 @@ bool Method::_parse_code(ConstantPool& cp, unsigned code_attr_len,
                 }
                 
             }
-            if( num_lvtt_entries >= LV_ALLOCATION_THRESHOLD ){
-                STD_FREE(generic_vars);
-            }
         }
 
         if(TI_enabled) {
@@ -1781,6 +1778,9 @@ bool Method::_parse_code(ConstantPool& cp, unsigned code_attr_len,
         } else {
             if(num_lvt_entries >= LV_ALLOCATION_THRESHOLD) {
                 STD_FREE(lv_table);
+            }
+            if( num_lvtt_entries >= LV_ALLOCATION_THRESHOLD ){
+                STD_FREE(generic_vars);
             }
         }
         if (failed) {
@@ -3159,7 +3159,7 @@ bool Class::parse(Global_Env* env,
             //See specification 4.8.5 about InnerClasses Attribute
             if (m_declaring_class_index || m_innerclasses) {
                 REPORT_FAILED_CLASS_FORMAT(this, "more than one InnerClasses attribute");
-                return true;
+                return false;
             }
             bool isinner = false;
             // found_myself == 2: myself is not inner class or has passed myself when iterating inner class attribute arrays
