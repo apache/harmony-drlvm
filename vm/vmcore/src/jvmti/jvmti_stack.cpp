@@ -72,10 +72,12 @@ jint get_thread_stack_depth(VM_thread *thread, jint* pskip)
             Class *clss = method_get_class(method);
             assert(clss);
 
-            if (strcmp(method_get_name(method), "runImpl") == 0 &&
-                strcmp(class_get_name(clss), "java/lang/VMStart$MainThread") == 0)
-            {
-                skip = 3;
+            if (!strcmp(method_get_name(method), "runImpl")) {
+                if(!strcmp(class_get_name(clss), "java/lang/VMStart$MainThread")) {
+                    skip = 3;
+                } else if(!strcmp(class_get_name(clss), "java/lang/Thread")) {
+                    skip = 1;
+                }
             }
         }
 
@@ -583,36 +585,54 @@ jvmtiPopFrame(jvmtiEnv* env,
     CHECK_EVERYTHING();
     CHECK_CAPABILITY(can_pop_frame);
 
-    if (thread == 0) {
+    if (NULL == thread) {
+        return JVMTI_ERROR_INVALID_THREAD;
+    }
+
+    JNIEnv *jni_env = p_TLS_vmthread->jni_env;
+
+    jthread curr_thread = getCurrentThread();
+    if (jni_env->IsSameObject(thread,curr_thread) ) {
+        // cannot pop frame yourself
         return JVMTI_ERROR_THREAD_NOT_SUSPENDED;
     }
 
-    if (NULL == thread)
-        return JVMTI_ERROR_INVALID_THREAD;
-
-    // check error condition: JVMTI_ERROR_INVALID_THREAD
+    // get thread state
     err = env->GetThreadState(thread, &state);
-
     if (err != JVMTI_ERROR_NONE) {
         return err;
     }
 
-    // check error condition: JVMTI_ERROR_THREAD_NOT_ALIVE
+    // check thread state
     if ((state & JVMTI_THREAD_STATE_ALIVE) == 0) {
         return JVMTI_ERROR_THREAD_NOT_ALIVE;
     }
-
-    // check error condition: JVMTI_ERROR_THREAD_NOT_SUSPENDED
-    JNIEnv *jni_env = p_TLS_vmthread->jni_env;
-    jthread curr_thread = getCurrentThread();
-    if (jni_env->IsSameObject(thread,curr_thread)
-            || ((state & JVMTI_THREAD_STATE_SUSPENDED) == 0)) {
+    if( (state & JVMTI_THREAD_STATE_SUSPENDED) == 0) {
         return JVMTI_ERROR_THREAD_NOT_SUSPENDED;
     }
 
+    // check stack depth
+    hythread_t hy_thread = jthread_get_native_thread(thread);
+    VM_thread* vm_thread = get_vm_thread(hy_thread);
+
+    jint depth;
     if (interpreter_enabled()) {
-        return interpreter.interpreter_ti_pop_frame(env,
-            get_vm_thread_ptr_safe(jvmti_test_jenv, thread));
+        err = interpreter.interpreter_ti_get_frame_count(env,
+            vm_thread, &depth);
+    } else {
+        depth = get_thread_stack_depth(vm_thread);
+        err = JVMTI_ERROR_NONE;
+    }
+    if (err != JVMTI_ERROR_NONE) {
+        return err;
+    }
+
+    if(depth <= 1) {
+        return JVMTI_ERROR_NO_MORE_FRAMES;
+    }
+
+    if (interpreter_enabled()) {
+        return interpreter.interpreter_ti_pop_frame(env, vm_thread);
     } else {
         return jvmti_jit_pop_frame(thread);
     }

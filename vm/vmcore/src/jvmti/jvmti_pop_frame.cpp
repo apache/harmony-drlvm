@@ -255,11 +255,7 @@ void jvmti_jit_prepare_pop_frame() {
     // create stack iterator from native
     StackIterator* si = si_create_from_native();
     si_transfer_all_preserved_registers(si);
-    TRACE(("PopFrame prepare for method %s.%s%s, IP: %p",
-        class_get_name(method_get_class(si_get_code_chunk_info(si)->get_method())),
-        method_get_name(si_get_code_chunk_info(si)->get_method()),
-        method_get_descriptor(si_get_code_chunk_info(si)->get_method()),
-        si_get_ip(si) ));
+    TRACE(("PopFrame prepare for method IP: %p", si_get_ip(si) ));
 
     // prepare pop frame - find regs values
     uint32 buf = 0;
