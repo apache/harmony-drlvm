@@ -43,6 +43,13 @@
 #include <unistd.h>
 #endif
 
+#ifdef POINTER64
+#define W_PI_FMT "016"PI_FMT
+#else
+#define W_PI_FMT "08"PI_FMT
+#endif
+
+
 // Symbolic method info: method name, source file name and a line number of an instruction within the method
 struct MethodInfo {
     char* method_name;
@@ -57,12 +64,17 @@ struct MethodInfo {
  * Returns module file name and offset of an IP address from beginnig of the segment (used in addr2line tool)
  */
 static char* get_module(native_module_t* info, jint num_modules, void* ip, POINTER_SIZE_INT* offset) {
+
     for (int i = 0; i < num_modules; i++, info = info->next) {
         for (int j = 0; j < info->seg_count; j++) {
             if (info->segments[j].type != SEGMENT_TYPE_DATA) {
                 if ( (POINTER_SIZE_INT) info->segments[j].base <= (POINTER_SIZE_INT) ip &&
                     (POINTER_SIZE_INT) ip < (POINTER_SIZE_INT) info->segments[j].base + info->segments[j].size) {
-                    *offset = (POINTER_SIZE_INT) ip - (POINTER_SIZE_INT) info->segments[j].base;
+
+                    *offset = (strstr(info->filename, ".so") == NULL) ? // Executable
+                                (POINTER_SIZE_INT)ip :
+                                (POINTER_SIZE_INT)ip - (POINTER_SIZE_INT)info->segments[j].base;
+
                     return info->filename;
                 }
             }
@@ -112,26 +124,21 @@ static void st_get_c_method_info(MethodInfo* info, void* ip) {
     POINTER_SIZE_INT offset;
     char* module = get_module(modules, num_modules, ip, &offset);
     if (module) {
-        int pi[2];
         int po[2];
-        pipe(pi);
         pipe(po);
+
+        char ip_str[20];
+        sprintf(ip_str, "0x%"PI_FMT"x\n", offset);
+
         if (!fork()) {
             close(po[0]);
-            close(pi[1]);
             dup2(po[1], 1);
-            dup2(pi[0], 0);            
-            execlp("addr2line", "addr2line", "-f", "-e", module, "-C", NULL);
+            execlp("addr2line", "addr2line", "-f", "-e", module, "-C", ip_str, NULL);
             fprintf(stderr, "Warning: Cannot run addr2line. No symbolic information will be available\n");
             printf("??\n??:0\n"); // Emulate addr2line output
             exit(-1);
         } else {
             close(po[1]);
-            close(pi[0]);
-            char ip_str[9];
-            sprintf(ip_str, "%08x\n", (uint32) offset); // !!!FIXME: WORKS FOR IA32 ONLY
-            write(pi[1], ip_str, 9);
-            close(pi[1]);
             char buf[256];
             int status;
             wait(&status);
@@ -222,7 +229,8 @@ static void st_get_java_method_info(MethodInfo* info, Method* m, void* ip,
 }
 
 static void st_print_line(int count, MethodInfo* m) {
-    fprintf(stderr, "\t%d: %s (%s:%d)\n",
+
+    fprintf(stderr, "%3d: %s (%s:%d)\n",
         count,
         m->method_name ? m->method_name : "??",
         m->file_name ? m->file_name : "??",
@@ -254,8 +262,8 @@ void st_print_stack_jit(VM_thread* thread,
         {
             if (native_is_ip_stub(frames[frame_num].ip)) // Generated stub
             {
-                fprintf(stderr, "\t%d: <Generated stub> IP is %p\n",
-                    count++, frames[frame_num].ip);
+                fprintf(stderr, "%3d: 0x%"W_PI_FMT"X  <Generated stub>\n",
+                    count++, (POINTER_SIZE_INT)frames[frame_num].ip);
                 ++frame_num;
                 continue;
             }

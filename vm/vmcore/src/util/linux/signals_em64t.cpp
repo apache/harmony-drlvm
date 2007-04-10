@@ -380,10 +380,10 @@ void null_java_reference_handler(int signum, siginfo_t* info, void* context)
     fprintf(stderr, "SIGSEGV in VM code.\n");
     Registers regs;
     linux_ucontext_to_regs(&regs, uc);
+    // setup default handler
+    signal(signum, SIG_DFL);
+    // print stack trace
     st_print_stack(&regs);
-
-    // crash with default handler
-    signal(signum, 0);
 }
 
 
@@ -402,10 +402,10 @@ void null_java_divide_by_zero_handler(int signum, siginfo_t* info, void* context
     fprintf(stderr, "SIGFPE in VM code.\n");
     Registers regs;
     linux_ucontext_to_regs(&regs, uc);
+    // setup default handler
+    signal(signum, SIG_DFL);
+    // print stack trace
     st_print_stack(&regs);
-
-    // crash with default handler
-    signal(signum, 0);
 }
 
 /*
@@ -527,11 +527,14 @@ void locate_sigcontext(int signum)
  * Print out the call stack of the aborted thread.
  * @note call stacks may be used for debugging
  */
-void abort_handler (int signal, siginfo_t* info, void* context) {
+void abort_handler (int signum, siginfo_t* info, void* context) {
     fprintf(stderr, "SIGABRT in VM code.\n");
     ucontext_t *uc = (ucontext_t *)context;
     Registers regs;
     linux_ucontext_to_regs(&regs, uc);
+    // setup default handler
+    signal(signum, SIG_DFL);
+    // print stack trace
     st_print_stack(&regs);
 }
 

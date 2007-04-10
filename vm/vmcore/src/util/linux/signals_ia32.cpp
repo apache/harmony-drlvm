@@ -491,9 +491,10 @@ void null_java_reference_handler(int signum, siginfo_t* UNREF info, void* contex
     fprintf(stderr, "SIGSEGV in VM code.\n");
     Registers regs;
     linux_ucontext_to_regs(&regs, uc);
+    // setup default handler
+    signal(signum, SIG_DFL);
+    // print stack trace
     st_print_stack(&regs);
-
-    signal(signum, 0);
 }
 
 
@@ -515,10 +516,10 @@ void null_java_divide_by_zero_handler(int signum, siginfo_t* UNREF info, void* c
     fprintf(stderr, "SIGFPE in VM code.\n");
     Registers regs;
     linux_ucontext_to_regs(&regs, uc);
+    // setup default handler
+    signal(signum, SIG_DFL);
+    // print stack trace
     st_print_stack(&regs);
-
-    // crash with default handler
-    signal(signum, 0);
 }
 
 void jvmti_jit_breakpoint_handler(int signum, siginfo_t* UNREF info, void* context)
@@ -540,8 +541,10 @@ void jvmti_jit_breakpoint_handler(int signum, siginfo_t* UNREF info, void* conte
 
     fprintf(stderr, "SIGTRAP in VM code.\n");
     linux_ucontext_to_regs(&regs, uc);
+    // setup default handler
+    signal(signum, SIG_DFL);
+    // print stack trace
     st_print_stack(&regs);
-    signal(signum, 0);
 }
 
 /*
@@ -644,9 +647,10 @@ void abort_handler (int signum, siginfo_t* UNREF info, void* context) {
     sa.sa_handler = SIG_DFL;
     sigaction(SIGABRT, &sa, NULL);
 
-    st_print_stack(&regs);
-
+    // setup default handler
     signal(signum, SIG_DFL);
+    // print stack trace
+    st_print_stack(&regs);
 }
 
 /*
