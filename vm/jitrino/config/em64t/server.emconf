@@ -62,7 +62,7 @@ SD2_OPT.useProfile=EDGE_PROF,VALUE_PROF
 
 -XDjit.SD2_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
 
--XDjit.SD2_OPT.path.optimizer=ssa,simplify,dce,uce,devirt_virtual,edge_annotate,unguard,devirt_intf,inline,uce,purge,simplify,dce,uce,so2-,simplify,dce,uce,escape,hvn,dce,uce,dessa,statprof,peel,ssa,hvn,simplify,dce,uce,lower,dce,uce,memopt,reassoc,dce,uce,hvn,dce,uce,abcd,dce,uce,gcm,dessa,fastArrayFill,statprof,markglobals
+-XDjit.SD2_OPT.path.optimizer=ssa,simplify,dce,uce,devirt_virtual,edge_annotate,unguard,devirt_intf,inline,uce,purge,simplify,dce,uce,so2-,simplify,dce,uce,escape,hvn,dce,uce,inline_helpers,purge,simplify,uce,dce,dessa,statprof,peel,ssa,hvn,simplify,dce,uce,lower,dce,uce,memopt,reassoc,dce,uce,hvn,dce,uce,abcd,dce,uce,gcm,dessa,fastArrayFill,statprof,markglobals
 -XDjit.SD2_OPT.path.codegen=lock_method,bbp,gcpoints,cafl,dce1,i8l-,early_prop-,itrace-,native,cg_fastArrayFill,constraints,dce2,regalloc,spillgen,layout,copy,rce-,stack,break-,iprof-,emitter!,si_insts,gcmap,info,unlock_method
 -XDjit.SD2_OPT.path.dce1=cg_dce
 -XDjit.SD2_OPT.path.dce2=cg_dce
@@ -88,6 +88,47 @@ SD2_OPT.useProfile=EDGE_PROF,VALUE_PROF
 -XDjit.SD2_OPT.SD2_OPT_inliner_pipeline.arg.devirt_intf.devirt_virtual_calls=false
 
 
+#helper inliner configuration
+-XDjit.SD2_OPT.SD2_OPT_helper_inliner_pipeline.filter=-
+-XDjit.SD2_OPT.SD2_OPT_helper_inliner_pipeline.path=ssa
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.pipeline=SD2_OPT_helper_inliner_pipeline
+
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.newObj=on
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.newObj_className=org/apache/harmony/drlvm/gc_cc/GCHelper
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.newObj_methodName=alloc
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.newObj_hotnessPercent=1
+
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.newArray=on
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.newArray_className=org/apache/harmony/drlvm/gc_cc/GCHelper
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.newArray_methodName=allocArray
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.newArray_hotnessPercent=1
+
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.objMonEnter=on
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.objMonEnter_className=org/apache/harmony/drlvm/thread/ThreadHelper
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.objMonEnter_methodName=monitorEnterUseReservation
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.objMonEnter_hotnessPercent=1
+
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.objMonExit=on
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.objMonExit_className=org/apache/harmony/drlvm/thread/ThreadHelper
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.objMonExit_methodName=monitorExit
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.objMonExit_hotnessPercent=1
+
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.ldInterface=off
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.ldInterface_className=org/apache/harmony/drlvm/VMHelperFastPath
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.ldInterface_methodName=getInterfaceVTable3
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.ldInterface_hotnessPercent=1
+
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.checkCast=off
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.checkCast_className=org/apache/harmony/drlvm/VMHelperFastPath
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.checkCast_methodName=checkCast
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.checkCast_hotnessPercent=1
+
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.instanceOf=off
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.instanceOf_className=org/apache/harmony/drlvm/VMHelperFastPath
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.instanceOf_methodName=instanceOf
+-XDjit.SD2_OPT.arg.optimizer.inline_helpers.instanceOf_hotnessPercent=1
+
+
 -XDjit.SD2_OPT.arg.codegen.dce1.early=yes
 -XDjit.SD2_OPT.arg.codegen.regalloc.bp_regalloc1.regs=ALL_GP
 -XDjit.SD2_OPT.arg.codegen.regalloc.bp_regalloc2.regs=ALL_XMM
@@ -95,3 +136,16 @@ SD2_OPT.useProfile=EDGE_PROF,VALUE_PROF
 
 #system properties
 -Djava.compiler=server
+
+#GC magics support
+-Dvm.components.gc_cc.startupclass=org.apache.harmony.drlvm.gc_cc.GCHelper
+-XDvm.component.classpath.gc_cc=gc_cc.jar
+
+#TM properties
+-Dvm.components.hythr.startupclass=org.apache.harmony.drlvm.thread.ThreadHelper
+-XDvm.component.classpath.hythr=hythr.jar
+
+#VM helpers
+-Dvm.components.vmcore1.startupclass=org.apache.harmony.drlvm.VMHelper
+-Dvm.components.vmcore2.startupclass=org.apache.harmony.drlvm.VMHelperFastPath
+

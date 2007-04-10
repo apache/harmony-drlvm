@@ -2232,8 +2232,7 @@ Edge* IRManager::createEdge(MemoryManager& mm, Node::Kind srcKind, Node::Kind ds
 bool IRManager::isGCSafePoint(const Inst* inst) {
     if (inst->getMnemonic() == Mnemonic_CALL) {
         const CallInst* callInst =  (const CallInst*)inst;
-        Opnd* callTarget = callInst->getOpnd(callInst->getTargetOpndIndex());
-        Opnd::RuntimeInfo * rt = callTarget->isPlacedIn(OpndKind_Immediate)?callTarget->getRuntimeInfo():NULL;
+        Opnd::RuntimeInfo * rt = callInst->getRuntimeInfo();
         bool isInternalHelper = rt && rt->getKind() == Opnd::RuntimeInfo::Kind_InternalHelperAddress;
         bool isNonGCVMHelper = false;
         if (!isInternalHelper) {

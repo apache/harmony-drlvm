@@ -30,28 +30,29 @@ JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_VMHelperFastPath_getObjectV
 
 JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_VMHelperFastPath_getVtableIntfTypeOffset(JNIEnv *e, jclass c, jint i)
 {
-#if defined  (_EM64T_) || defined (_IPF_)
+#if defined (_IPF_)
     assert(0);
     return 0;
 #else
     assert(i>=0 && i<=2);
-    if (i==0) return (jint)&((VTable*)0)->intfc_class_0;
-    if (i==1) return (jint)&((VTable*)0)->intfc_class_1;
-    return (jint)&((VTable*)0)->intfc_class_2;
+    //NOTE: use (jint)(POINTER_SIZE_INT) double cast here to avoid warnings
+    if (i==0) return (jint)(POINTER_SIZE_INT)&((VTable*)0)->intfc_class_0;
+    if (i==1) return (jint)(POINTER_SIZE_INT)&((VTable*)0)->intfc_class_1;
+    return (jint)(POINTER_SIZE_INT)&((VTable*)0)->intfc_class_2;
 #endif
 }
 
 JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_VMHelperFastPath_getVtableIntfTableOffset(JNIEnv *e, jclass c, jint i)
 {
-#if defined  (_EM64T_) || defined (_IPF_)
+#if defined (_IPF_)
     assert(0);
     return 0;
 #else
 
     assert(i>=0 && i<=2);
-    if (i==0) return (jint)&((VTable*)0)->intfc_table_0;
-    if (i==1) return (jint)&((VTable*)0)->intfc_table_1;
-    return (jint)&((VTable*)0)->intfc_table_2;
+    if (i==0) return (jint)(POINTER_SIZE_INT)&((VTable*)0)->intfc_table_0;
+    if (i==1) return (jint)(POINTER_SIZE_INT)&((VTable*)0)->intfc_table_1;
+    return (jint)(POINTER_SIZE_INT)&((VTable*)0)->intfc_table_2;
     return 0;
 #endif
 }
