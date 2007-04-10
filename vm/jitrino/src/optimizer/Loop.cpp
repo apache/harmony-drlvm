@@ -420,6 +420,9 @@ void LoopBuilder::peelLoops(StlVector<Edge*>& loopEdgesIn) {
 
         // The initial header
         Node* header = backEdge->getTargetNode();
+        if (header->isDispatchNode()) {
+            continue;
+        }
         assert(header->getInDegree() == 2);
         Node* originalInvertedHeader = header;
 
