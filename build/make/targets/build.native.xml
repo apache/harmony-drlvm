@@ -196,7 +196,7 @@ Version: $Revision: 1.5.2.6 $
             </not>
         </condition>
 
-        <condition property="not.static" value="true">
+        <condition property="${component}.not.static">
             <and>
                 <isset property="link.present" />
                 <not>
@@ -215,8 +215,8 @@ Version: $Revision: 1.5.2.6 $
             outfile="${lib.out.dir}/${libname}"
             outtype="${outtype}"  subsystem="console">
             <select os="win">
-                <linkerarg value="/pdb:${build.dir}/_bin/${libname}.pdb" if="${not.static}" />
-                <linkerarg value="/debug" if="${not.static}" />
+                <linkerarg value="/pdb:${build.dir}/_bin/${libname}.pdb" if="${component}.not.static" />
+                <linkerarg value="/debug" if="${component}.not.static" />
             </select>
             <linker refid="linker" />
             <fileset refid="link.fileset" />
@@ -224,7 +224,7 @@ Version: $Revision: 1.5.2.6 $
         <condition property="add.manifest">
             <and>
                 <os family="windows" />
-                <isset property="not.static" />
+                <isset property="${component}.not.static" />
                 <available file="${lib.out.dir}/${libname}${shlib.suffix}${manifest.suffix}" />
             </and>
         </condition>
