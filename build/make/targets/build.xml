@@ -33,6 +33,11 @@ Version: $Revision: 1.3.2.2 $
             <pathelement location="." />
         </path>
 
+        <!-- defines empty BootCP to allow later redefinition if required -->
+        <path id="java.boot.class.path">
+            <pathelement location="" />
+        </path>
+
         <linker id="common.linker" />
 
         <!-- empty common ids, must be defined in component descriptors -->

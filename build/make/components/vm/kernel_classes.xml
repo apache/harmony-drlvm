@@ -38,11 +38,18 @@ Version: $Revision: 1.4.2.5 $
         </path>                 
 
         <path id="java.class.path">
-            <pathelement location="${java.build.dir}"/>
-
             <fileset dir="${external.dep.CLASSLIB.jardir}" includes="*.jar" />
             <fileset dir="${build.ANTLR.home}" includes="antlr-2.7.5.jar" />
             <fileset dir="${build.VMMAGIC.home}" includes="vmmagic-20070207.jar" />
+        </path>
+
+        <!-- 
+        the kernel classes destination directory must be in bootclasspath -
+        otherwise the Reference Java "kernel" classes are referred during
+        compilation of drlvm kernel classes - this produces incompatibility
+        -->
+        <path id="java.boot.class.path">
+            <pathelement location="${java.build.dir}"/>
         </path>
 
         <!-- compile time debug information - true by default for kernel classes -->
