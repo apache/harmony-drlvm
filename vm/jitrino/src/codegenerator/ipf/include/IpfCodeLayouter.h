@@ -67,6 +67,7 @@ protected:
     
     MemoryManager &mm;
     Cfg           &cfg;
+    OpndManager   *opndManager;
     ChainList     chains;
     NodeSet       visitedNodes;
 };

@@ -137,7 +137,7 @@ class Opnd : public CG_OpndHandle {
 public:
                     Opnd(uint32, OpndKind=OPND_INVALID, DataKind=DATA_INVALID, int64=0);
 
-    uint32          getId()                         { return id; }
+    uint16          getId()                         { return id; }
     OpndKind        getOpndKind()                   { return opndKind; }
     DataKind        getDataKind()                   { return dataKind; }
     void            setValue(int64 value_)          { value = value_; }
@@ -147,19 +147,20 @@ public:
     bool            isGReg()                        { return IpfType::isGReg(opndKind); }
     bool            isFReg()                        { return IpfType::isFReg(opndKind); }
     bool            isImm()                         { return IpfType::isImm(opndKind); }
+    bool            isQp()                          { return opndKind == OPND_P_REG; }
     bool            isFloating()                    { return IpfType::isFloating(dataKind); }
     bool            isSigned()                      { return IpfType::isSigned(dataKind); }
     int16           getSize()                       { return IpfType::getSize(dataKind); }
     bool            isWritable();
     bool            isConstant();
     bool            isMem();
-
-    bool            isFoldableImm(int16 size) { return isFoldableImm(value, size); }
     bool            isImm(int);
+
+    bool            isFoldableImm(int16 size)       { return isFoldableImm(value, size); }
     static bool     isFoldableImm(int64 value, int16 size);
     
 protected:
-    uint32          id;
+    uint16          id;
     OpndKind        opndKind;
     DataKind        dataKind;
     int64           value;
@@ -176,13 +177,18 @@ public:
     void        setLocation(int32 value_)             { value = value_; }
     int32       getLocation()                         { return value; }
 
+    QpMask      getQpMask()                           { return qpMask; }
+    void        andQpMask(QpMask mask)                { qpMask &= mask; }
+    void        orQpMask(QpMask mask)                 { qpMask |= mask; }
+    bool        isAlive(QpMask mask)                  { return mask & qpMask; }
+
     void        incSpillCost(uint32 spillCost_)       { spillCost += spillCost_; }
     uint32      getSpillCost()                        { return spillCost; }
     RegOpndSet  &getDepOpnds()                        { return depOpnds; }
     void        insertDepOpnds(RegOpndSet &opnds)     { depOpnds.insert(opnds.begin(), opnds.end()); }
     void        insertDepOpnd(RegOpnd*);
     void        setCrossCallSite(bool crossCallSite_) { crossCallSite = crossCallSite_; }
-    bool        getCrossCallSite()                    { return crossCallSite; }
+    bool        isCrossCallSite()                     { return crossCallSite; }
 
     Int2OpndMap &getCoalesceCands()                   { return coalesceCands; }
     void        addCoalesceCand(uint32 execCnt, RegOpnd *opnd) { coalesceCands.insert(make_pair(execCnt, opnd)); }
@@ -190,6 +196,7 @@ public:
     virtual     ~RegOpnd() {}
 
 protected:
+    QpMask      qpMask;             // mask of predicate spaces opnd alive in
     // These fields are for register allocation algorithm
     uint32      spillCost;          // number of opnd uses
     RegOpndSet  depOpnds;           // opnds which can not be placed in the same reg with the opnd
@@ -358,29 +365,31 @@ public:
     Node        *getDispatchNode();
     void        mergeOutLiveSets(RegOpndSet &resultSet);
 
+    uint16      getId()                             { return id; }
     void        setExecCounter(uint32 execCounter_) { execCounter = execCounter_; }
     uint32      getExecCounter()                    { return execCounter; }
-    EdgeVector  &getInEdges()                       { return inEdges; }
-    EdgeVector  &getOutEdges()                      { return outEdges; }
     void        setNodeKind(NodeKind kind_)         { nodeKind = kind_; }
     NodeKind    getNodeKind()                       { return nodeKind; }
-    void        setId(uint32 id_)                   { id = id_; }
-    uint32      getId()                             { return id; }
+    EdgeVector  &getInEdges()                       { return inEdges; }
+    EdgeVector  &getOutEdges()                      { return outEdges; }
     void        setLiveSet(RegOpndSet& liveSet_)    { liveSet = liveSet_; }
-    RegOpndSet  &getLiveSet()                       { return liveSet; }
-    void        clearLiveSet()                      { liveSet.clear(); }
     void        setLoopHeader(Node *loopHeader_)    { loopHeader = loopHeader_; }
     Node        *getLoopHeader()                    { return loopHeader; }
+    RegOpndSet  &getLiveSet()                       { return liveSet; }
+    void        clearLiveSet()                      { liveSet.clear(); }
+    void        setVisited(bool visited_)           { visited = visited_; }
+    bool        isVisited()                         { return visited; }
     bool        isBb()                              { return nodeKind == NODE_BB; }
     
 protected:
-    uint32      id;               // node unique Id
+    uint16      id;               // node unique Id
     uint32      execCounter;      // profile info (how many times the node executes)
     NodeKind    nodeKind;         // 
     EdgeVector  inEdges;          // in edges list
     EdgeVector  outEdges;         // out edges list
     Node        *loopHeader;      // header of loop containing this node, if NULL - node is not in loop
     RegOpndSet  liveSet;          // set of opnds alive on node enter
+    bool        visited;          // flag used in node iterating algorithms (live analysis)
 };
 
 //========================================================================================//
@@ -393,10 +402,10 @@ public:
     void        addInst(Inst *inst)                 { insts.push_back(inst); }
     void        removeInst(Inst *inst)              { insts.erase(find(insts.begin(),insts.end(),inst)); } 
     InstVector  &getInsts()                         { return insts; }
-    void        setAddress(uint64 address_)         { address = address_; }
-    uint64      getAddress()                        { return address; }
     void        setLayoutSucc(BbNode *layoutSucc_)  { layoutSucc = layoutSucc_; }
     BbNode      *getLayoutSucc()                    { return layoutSucc; }
+    void        setAddress(uint64 address_)         { address = address_; }
+    uint64      getAddress()                        { return address; }
     uint64      getInstAddr(Inst *inst)             { return ((uint64)address + inst->getAddr()); }
 
 protected:
@@ -414,16 +423,14 @@ public:
                          Cfg(MemoryManager &mm, CompilationInterface &compilationInterface);
     NodeVector           &search(SearchKind searchKind);
     
-    MemoryManager        &getMM()                       { return mm; }
-    CompilationInterface &getCompilationInterface()     { return compilationInterface; }
-    uint16               getNextNodeId()                { return maxNodeId++; }
-    uint16               getMaxNodeId()                 { return maxNodeId; }
-    void                 setEnterNode(Node *enterNode_) { enterNode = enterNode_; }
-    void                 setExitNode(Node *exitNode_)   { exitNode = exitNode_; }
-    Node                 *getEnterNode()                { return enterNode; }
-    Node                 *getExitNode()                 { return exitNode; }
-    OpndManager          *getOpndManager()              { return opndManager; }
-    MethodDesc           *getMethodDesc()               { return compilationInterface.getMethodToCompile(); }
+    MemoryManager        &getMM()                   { return mm; }
+    CompilationInterface &getCompilationInterface() { return compilationInterface; }
+    void                 setEnterNode(BbNode *node) { enterNode = node; }
+    void                 setExitNode(BbNode *node)  { exitNode = node; }
+    BbNode               *getEnterNode()            { return enterNode; }
+    BbNode               *getExitNode()             { return exitNode; }
+    OpndManager          *getOpndManager()          { return opndManager; }
+    MethodDesc           *getMethodDesc()           { return compilationInterface.getMethodToCompile(); }
 
 protected:
     void                 makePostOrdered(Node *node, NodeSet &visitedNodes);
@@ -433,10 +440,9 @@ protected:
     MemoryManager        &mm;
     CompilationInterface &compilationInterface;
 
-    uint16               maxNodeId;
     OpndManager          *opndManager;
-    Node                 *enterNode;
-    Node                 *exitNode;
+    BbNode               *enterNode;
+    BbNode               *exitNode;
     NodeVector           searchResult;
     SearchKind           lastSearchKind;
 };

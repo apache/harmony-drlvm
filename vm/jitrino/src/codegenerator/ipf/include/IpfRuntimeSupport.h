@@ -108,7 +108,8 @@ protected:
 
     // Exception registration
     void                 registerExceptionHandlers();
-    void                 makeRegion(Byte* startAddr, Byte* endAddr, Node* dispatchNode);
+    void                 makeRegion(BbNode*, BbNode*, Node*);
+    void                 inserFakeLastNode(NodeVector&);
 
     RegionVector         tryRegions;
 
@@ -116,7 +117,7 @@ protected:
     StackInfo            *makeStackInfo();
     
     // Build root set and extend bases live range
-    void                 newSafePoint(BbNode*, Inst*, RegOpndSet&);
+    void                 newSafePoint(BbNode*, Inst*, RegOpndSet&, QpMask);
     void                 defMptr(BbNode*, Inst*);
     void                 mergeBase(BbNode*, Inst*, RegOpnd*, RegOpnd*);
     void                 replaceBase(Inst*, Opnd*, Opnd*);

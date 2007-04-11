@@ -17,36 +17,42 @@
                                                                                                             
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
+ * @version $Revision: 1.1 $
  *
  */
 
-#ifndef IPFDCE_H_
-#define IPFDCE_H_
+#ifndef IPFINSTRUMENTATOR_H_
+#define IPFINSTRUMENTATOR_H_
 
 #include "IpfCfg.h"
-
-using namespace std;
+#include "IpfOpndManager.h"
+#include "DrlVMInterface.h"
 
 namespace Jitrino {
 namespace IPF {
 
-//========================================================================================//
-// Dce
+//=======================================================================================//
+// Instrumentator
 //========================================================================================//
 
-class Dce {
+class Instrumentator {
 public:
-               Dce(Cfg &cfg) : cfg(cfg), currLiveSet(cfg.getMM()) {}
-    void       eliminate();
+                   Instrumentator(Cfg&);
+    void           instrument();
+    static void    methodStart(Method_Handle);
+    static void    methodEnd(Method_Handle);
 
 protected:
-    bool       isInstDead(Inst*);
+    void           instrumentStart();
+    void           instrumentEnd();
+    void           genNativeCall(uint64, InstVector&);
 
-    Cfg        &cfg;
-    RegOpndSet currLiveSet;
+    MemoryManager  &mm;
+    OpndManager    *opndManager;
+    Cfg            &cfg;
 };
 
 } // IPF
 } // Jitrino
 
-#endif /*IPFDCE_H_*/
+#endif /*IPFINSTRUMENTATOR_H_*/

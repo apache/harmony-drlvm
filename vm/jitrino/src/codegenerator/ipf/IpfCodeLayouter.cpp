@@ -45,6 +45,7 @@ bool greaterEdge(Edge *e1, Edge *e2) {
 CodeLayouter::CodeLayouter(Cfg &cfg) : 
     mm(cfg.getMM()),
     cfg(cfg),
+    opndManager(cfg.getOpndManager()),
     chains(mm),
     visitedNodes(mm) {
 }
@@ -107,7 +108,7 @@ void CodeLayouter::transformPredicatedCall(BbNode *branchNode, Long2Node &addr2n
     IPF_LOG << "    branch inst is " << IrPrinter::toString(branchInst);
     
     if (addr2node.find(addr) == addr2node.end()) {              // this call has not been moved in outstanding node
-        callNode = new(mm) BbNode(mm, cfg.getNextNodeId(), 0);  // create new node
+        callNode = new(mm) BbNode(mm, opndManager->getNextNodeId(), 0);  // create new node
         callInst = new(mm) Inst(mm, INST_BRL13, CMPLT_BTYPE_CALL, cfg.getOpndManager()->getP0());
         for (uint16 i=1; i<opnds.size(); i++) callInst->addOpnd(opnds[i]);
         callNode->addInst(callInst);                            // create and add call instruction 
@@ -399,7 +400,7 @@ uint32 CodeLayouter::calculateChainWeight(Chain *chain) {
 
 void CodeLayouter::setBranchTargets() {
     
-    BbNode *node = (BbNode*) cfg.getEnterNode();
+    BbNode *node = cfg.getEnterNode();
     for(; node != NULL; node = node->getLayoutSucc()) {
 
         IPF_LOG << "    node" << left << setw(3) << node->getId();
@@ -477,7 +478,7 @@ void CodeLayouter::fixConditionalBranch(BbNode *node) {
     
     // create new node for unconditional branch on through edge target node 
     // branch instruction will be inserted in fixUnconditionalBranch method
-    BbNode *branchNode = new(mm) BbNode(mm, cfg.getNextNodeId(), fallThroughNode->getExecCounter());
+    BbNode *branchNode = new(mm) BbNode(mm, opndManager->getNextNodeId(), fallThroughNode->getExecCounter());
     branchNode->setLayoutSucc(layoutSuccNode); // layout successor of current node becomes layoute successor of new node
     node->setLayoutSucc(branchNode);           // the new node becomes layout successor of current node
 
@@ -537,7 +538,7 @@ void CodeLayouter::fixUnconditionalBranch(BbNode *node) {
     // Add branch to through edge target
     Opnd    *p0         = cfg.getOpndManager()->getP0();
     NodeRef *targetNode = cfg.getOpndManager()->newNodeRef(target);
-    node->addInst(new(mm) Inst(mm, INST_BR, CMPLT_WH_SPTK, CMPLT_PH_MANY, p0, targetNode));
+    node->addInst(new(mm) Inst(mm, INST_BR, CMPLT_WH_SPTK, CMPLT_PH_FEW, p0, targetNode));
     
     throughEdge->setEdgeKind(EDGE_BRANCH);
     IPF_LOG << " branch on node" << target->getId() << " added" << endl;

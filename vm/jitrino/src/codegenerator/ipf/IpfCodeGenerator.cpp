@@ -21,11 +21,11 @@
  */
 
 #include "Jitrino.h"
+#include "CodeSelectors.h"
 #include "IpfCodeGenerator.h"
 #include "IpfCodeSelector.h"
 #include "IpfCodeLayouter.h"
 #include "IpfLiveAnalyzer.h"
-#include "IpfDce.h"
 #include "IpfRegisterAllocator.h"
 #include "IpfSpillGen.h"
 #include "IpfIrPrinter.h"
@@ -33,8 +33,7 @@
 #include "IpfPrologEpilogGenerator.h"
 #include "IpfRuntimeSupport.h"
 #include "IpfCfgVerifier.h"
-#include "CodeSelectors.h"
-//#include "IpfInstrumentator.h"
+#include "IpfInstrumentator.h"
 
 namespace Jitrino {
 namespace IPF {
@@ -75,45 +74,30 @@ void CodeGenerator::run() {
     methodDesc           = compilationInterface->getMethodToCompile();
     IrPrinter irPrinter(*cfg);
 
-    if(LOG_ON) {
-        const char *methodName     = methodDesc->getName();
-        const char *methodTypeName = (methodDesc->getParentType()!=NULL
-            ? methodDesc->getParentType()->getName()
-            : "");
-        const char * methodSignature = methodDesc->getSignatureString();
-    
-        IPF_LOG << endl << methodTypeName << "." << methodName << methodSignature << endl;
-    }
-
-    //compilationInterface->lockMethodData();
-
+    IPF_LOG << endl << IrPrinter::toString(methodDesc) << endl;
     IPF_LOG << endl << "=========== Stage: Code Selector =============================" << endl;
     IpfMethodCodeSelector ipfMethodCodeSelector(*cfg, *compilationInterface);
     methodCodeSelector->selectCode(ipfMethodCodeSelector);
 
     methodDesc = ipfMethodCodeSelector.getMethodDesc();
-    cfg->getOpndManager()->initCompBases((BbNode *)cfg->getEnterNode());
+    cfg->getOpndManager()->insertProlog(*cfg);
     cfg->getOpndManager()->saveThisArg();
-    if(LOG_ON) irPrinter.printCfgDot("/cs.dot");
+    if(LOG_ON) irPrinter.printCfgDot("cs.dot");
 
-    IPF_LOG << endl << "=========== Stage: Code Instrumentation ======================" << endl;
+//    IPF_LOG << endl << "=========== Stage: Code Instrumentation ======================" << endl;
 //    Instrumentator instrumentator(*cfg);
 //    instrumentator.instrument();
 
     IPF_LOG << endl << "=========== Stage: Code Layouter =============================" << endl;
     CodeLayouter codeLayouter(*cfg);
     codeLayouter.layout();
-    if(LOG_ON) irPrinter.printCfgDot("/cl.dot");
+    if(LOG_ON) irPrinter.printCfgDot("cl.dot");
     if(LOG_ON) irPrinter.printAsm(LOG_OUT);
 
-    IPF_LOG << endl << "=========== Stage: Liveness analyzis =========================" << endl;
+    IPF_LOG << endl << "=========== Stage: Liveness analysis =========================" << endl;
     LiveAnalyzer liveAnalyzer(*cfg);
-    liveAnalyzer.makeLiveSets(false);
-
-    IPF_LOG << endl << "=========== Stage: Dead Code Eliminator ======================" << endl;
-    Dce dce(*cfg);
-    dce.eliminate();
-    liveAnalyzer.makeLiveSets(false);
+    liveAnalyzer.analyze();
+    liveAnalyzer.dce();
 
     IPF_LOG << endl << "=========== Stage: Build GC Root Set =========================" << endl;
     RuntimeSupport runtimeSupport(*cfg, *compilationInterface);
@@ -139,8 +123,6 @@ void CodeGenerator::run() {
 
     IPF_LOG << endl << "=========== Stage: Make Runtime Info =========================" << endl;
     runtimeSupport.makeRuntimeInfo();
-
-    //compilationInterface->unlockMethodData();
     
     if(ret) IPF_LOG << endl << "=========== Compilation Successful ===========================" << endl;
     else    IPF_LOG << endl << "=========== Compilation Failed ===============================" << endl;

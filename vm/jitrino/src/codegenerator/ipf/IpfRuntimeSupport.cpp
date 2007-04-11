@@ -124,35 +124,34 @@ void RuntimeSupport::makeRuntimeInfo() {
 
 void RuntimeSupport::registerExceptionHandlers() {
     
-    Node       *dispatchNode = cfg.getEnterNode()->getDispatchNode();
     NodeVector &nodes        = cfg.search(SEARCH_LAYOUT_ORDER);
-    Byte       *startAddr    = (Byte *)((BbNode *)cfg.getEnterNode())->getAddress();
+    BbNode     *regionStart  = (BbNode *)nodes[0];
+    Node       *dispatchNode = regionStart->getDispatchNode();
+    
+    inserFakeLastNode(nodes);
+    for (uint16 i=1; i<nodes.size(); i++) {
+        if (nodes[i]->getNodeKind() != NODE_BB) continue; // ignore non BB node
+        BbNode *node = (BbNode *)nodes[i];
 
-    for(uint16 i=1; i<nodes.size(); i++) {
-        if(nodes[i]->getNodeKind() != NODE_BB) continue;    // ignore non BB node
-
-        if(dispatchNode != nodes[i]->getDispatchNode()) {
-            Byte *endAddr  = (Byte *)(((BbNode *)nodes[i])->getAddress());
-            Node *lastNode = nodes[i-1];
-
-            IPF_LOG << "    region detected, last node is BB" << lastNode->getId() << endl;
-            
-            makeRegion(startAddr, endAddr, dispatchNode);
-            startAddr    = (Byte *)((BbNode *)nodes[i])->getAddress();
-            dispatchNode = nodes[i]->getDispatchNode();
+        if (dispatchNode != node->getDispatchNode()) {    // if current node protected by another dispatch 
+            makeRegion(regionStart, node, dispatchNode);  // create new try region
+            regionStart  = node;                          // current node is first node of new region (if any)
+            dispatchNode = node->getDispatchNode();       // current dispatch protects new region
         }
     }
+
+    makeRegion(regionStart, (BbNode *)nodes.back(), dispatchNode);  // create new try region
+
     MethodDesc* md = compilationInterface.getMethodToCompile();
     md->setNumExceptionHandler(tryRegions.size());
-    
-    IPF_LOG << "    region registration:" << endl;
-    if(tryRegions.size() == 0) {
+    IPF_LOG << endl << "    region registration:" << endl;
+    if (tryRegions.size() == 0) {
         IPF_LOG << "      no catch handlers detected" << endl;
         return;
     }
 
     IPF_LOG << "      start            end              handler          exception                           objIsDead" << endl;
-    for(uint16 i=0; i<tryRegions.size(); i++) {
+    for (uint16 i=0; i<tryRegions.size(); i++) {
         md->setExceptionHandlerInfo(i, 
             tryRegions[i]->startAddr, 
             tryRegions[i]->endAddr,
@@ -170,36 +169,62 @@ void RuntimeSupport::registerExceptionHandlers() {
 
 //----------------------------------------------------------------------------------------//
 
-void RuntimeSupport::makeRegion(Byte *startAddr, Byte *endAddr, Node *dispatchNode) {
+void RuntimeSupport::makeRegion(BbNode *regionStart, BbNode *regionEnd, Node *dispatchNode) {
 
-    if(dispatchNode == NULL) {
-        IPF_LOG << "      there is no dispatch node - region is not created" << endl;
-        return;
-    }
+    if (dispatchNode == NULL) return;   // it is not a try region
     
-    if(dispatchNode->getNodeKind() != NODE_DISPATCH) return;
+    IPF_LOG << "    try region detected: node" << regionStart->getId() << " - node" << regionEnd->getId();
 
-    IPF_LOG << "      dispatch node is BB" << dispatchNode->getId() << endl;
-    EdgeVector& outEdges = dispatchNode->getOutEdges();      // get out edges   
+    if (dispatchNode->getNodeKind() != NODE_DISPATCH) { 
+        IPF_LOG << ", there is no catch block" << endl;
+        return; 
+    }
+
+    IPF_LOG << ", dispatch: node" << dispatchNode->getId();
+
+    Byte       *startAddr = (Byte *)regionStart->getAddress();
+    Byte       *endAddr   = (Byte *)regionEnd->getAddress();
+    EdgeVector &outEdges  = dispatchNode->getOutEdges();     // get out edges   
     sort(outEdges.begin(), outEdges.end(), greaterPriority); // sort them by Priority
     
-    for(uint16 i=0; i<outEdges.size(); i++) {
-        if(outEdges[i]->getEdgeKind() == EDGE_EXCEPTION) {
+    for (uint16 i=0; i<outEdges.size(); i++) {
+        Edge *edge = outEdges[i];
+        if (edge->getEdgeKind() == EDGE_EXCEPTION) {
 
-            Byte       *handlerAddr   = (Byte *)((BbNode *)outEdges[i]->getTarget())->getAddress();
-            ObjectType *exceptionType = (ObjectType *)((ExceptionEdge *)outEdges[i])->getExceptionType();
+            BbNode     *handlerNode   = (BbNode *)edge->getTarget();
+            Byte       *handlerAddr   = (Byte *)handlerNode->getAddress();
+            ObjectType *exceptionType = (ObjectType *)((ExceptionEdge *)edge)->getExceptionType();
             TryRegion  *region = new(mm) TryRegion(startAddr, endAddr, handlerAddr, exceptionType, false);
 
             tryRegions.push_back(region);
-            IPF_LOG << "        region created for handler BB" << outEdges[i]->getTarget()->getId();
-            IPF_LOG << " priority: " << ((ExceptionEdge *)outEdges[i])->getPriority();
-            IPF_LOG << " " << exceptionType->getName() << endl;
+            IPF_LOG << ", handler: node" << handlerNode->getId();
+            IPF_LOG << ", priority: " << ((ExceptionEdge *)edge)->getPriority();
+            IPF_LOG << ", " << exceptionType->getName() << endl;
         }
         
-        if(outEdges[i]->getEdgeKind() == EDGE_DISPATCH) { 
-            makeRegion(startAddr, endAddr, outEdges[i]->getTarget());
+        if (edge->getEdgeKind() == EDGE_DISPATCH) { 
+            makeRegion(regionStart, regionEnd, edge->getTarget());
         }
     }
+}
+
+//----------------------------------------------------------------------------------------//
+
+void RuntimeSupport::inserFakeLastNode(NodeVector &nodes) {
+    
+    BbNode     *lastNode = (BbNode *)nodes.back();
+    InstVector &insts    = lastNode->getInsts();
+    uint64     address   = 0;
+    
+    if (insts.size() < 1) address = lastNode->getAddress();
+    else                  address = lastNode->getInstAddr(insts.back());
+
+    uint64 mask = 0xfffffffffffffff0;
+    address = (address & mask) + 0x10;
+
+    BbNode *node = new(mm) BbNode(mm, 0, 0);
+    node->setAddress(address);
+    nodes.push_back(node);
 }
 
 //----------------------------------------------------------------------------------------//
@@ -260,17 +285,17 @@ StackInfo* RuntimeSupport::makeStackInfo() {
 
 void RuntimeSupport::buildRootSet() {
     
-    NodeVector &nodes = cfg.search(SEARCH_POST_ORDER);
-    RegOpndSet liveSet(mm);
+    LiveManager   liveManager(cfg);
+    RegOpndSet    &liveSet = liveManager.getLiveSet();
+    NodeVector    &nodes   = cfg.search(SEARCH_POST_ORDER);
 
     for (uint16 i=0; i<nodes.size(); i++) {              // iterate through CFG nodes
 
         if (nodes[i]->isBb() == false) continue;         // non BB node - ignore
 
-        liveSet.clear();                                 // clear live set
-        nodes[i]->mergeOutLiveSets(liveSet);             // put in the live set merged live sets of successors
+        BbNode *node = (BbNode *)nodes[i];
+        liveManager.init(node);
 
-        BbNode       *node     = (BbNode *)nodes[i];
         InstVector   &insts    = node->getInsts();
         InstIterator currInst  = insts.end()-1;
         InstIterator firstInst = insts.begin()-1;
@@ -278,24 +303,26 @@ void RuntimeSupport::buildRootSet() {
         for (; currInst>firstInst; currInst--) {
 
             Inst *inst = *currInst;
-            LiveAnalyzer::defOpnds(liveSet, inst);       // update liveSet for currInst
-            if (Encoder::isBranchCallInst(inst)) {       // if currInst is "call" (only safe point we have)
-                newSafePoint(node, inst, liveSet);       // insert (safe point->liveSet) pair in sp2LiveSet
-            }
-            LiveAnalyzer::useOpnds(liveSet, inst);       // update liveSet for currInst
+            liveManager.def(inst);                       // update liveSet for currInst
+            if (inst->isCall()) {                        // if inst is "call" (only safe point we have)
+                RegOpnd *qp  = (RegOpnd *)inst->getOpnd(0);
+                QpMask  mask = liveManager.getLiveMask(qp);
+                newSafePoint(node, inst, liveSet, mask); // insert (safe point->liveSet) pair in sp2LiveSet
+            }                                            //
+            liveManager.use(inst);                       // update liveSet for currInst
             defMptr(node, inst);                         // build mptr->base dependency for currInst
         }
     }
     
     if (LOG_ON) {
-        IPF_LOG << endl << "    Build mptr to base map" << endl;
+        IPF_LOG << endl << "  Build mptr to base map" << endl;
         for (MptrDefMapIterator it=mptr2def.begin(); it!=mptr2def.end(); it++) {
             IPF_LOG << "      " << IrPrinter::toString(it->first) << "->";
             IPF_LOG << IrPrinter::toString(it->second.base) << endl;
         }
     }
 
-    IPF_LOG << endl << "    Safe point list" << endl;
+    IPF_LOG << endl << "  Safe point list" << endl;
     // set mptr->base relations (vector SafePoint.alivePtrs will contain base after each mptr)
     // and extend bases live ranges
     for (uint16 i=0; i<safePoints.size(); i++) {
@@ -308,13 +335,14 @@ void RuntimeSupport::buildRootSet() {
 // - Add new record in rootSet map (sp position -> alive mptrs&bases)
 // - extend base live ranges
  
-void RuntimeSupport::newSafePoint(BbNode *node, Inst *spInst, RegOpndSet &liveSet) {
+void RuntimeSupport::newSafePoint(BbNode *node, Inst *spInst, RegOpndSet &liveSet, QpMask mask) {
     
     safePoints.push_back(SafePoint(mm, node, spInst));  // create record for current safe point
     RegOpndVector &ptrs = safePoints.back().alivePtrs;  // get vector for mptrs and bases alive on the safe point
     
     for (RegOpndSetIterator it=liveSet.begin(); it!=liveSet.end(); it++) {
         RegOpnd *opnd = *it;
+        if (opnd->isAlive(mask) == false) continue;
         if (opnd->getDataKind() == DATA_MPTR) {
             ptrs.push_back(opnd);
             ptrs.push_back(NULL);
@@ -418,7 +446,7 @@ void RuntimeSupport::insertMovInst(BbNode *node, Inst *inst, Opnd *oldBase, Opnd
  
 void RuntimeSupport::insertBases(Inst *inst, RegOpndVector &ptrs) {
     
-    IPF_LOG << "      alive pointers:";
+    IPF_LOG << "    alive pointers:";
     for (uint16 i=0; i<ptrs.size(); i++) {
         IPF_LOG << " " << IrPrinter::toString(ptrs[i]);
         if (ptrs[i]->getDataKind() == DATA_MPTR) {
@@ -444,7 +472,7 @@ void RuntimeSupport::insertBases(Inst *inst, RegOpndVector &ptrs) {
 
 void RuntimeSupport::makeRootSetInfo(Uint32Vector &info) {
 
-    IPF_LOG << "    Safe points list:" << endl;
+    IPF_LOG << "  Safe points list:" << endl;
     for (uint16 i=0; i<safePoints.size(); i++) {
 
         BbNode *node   = safePoints[i].node;

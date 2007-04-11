@@ -27,6 +27,7 @@
 #include <iostream>
 #include <fstream>
 #include "IpfCfg.h"
+#include "IpfLiveManager.h"
 
 namespace Jitrino {
 namespace IPF {
@@ -42,8 +43,10 @@ public:
     void           printLayoutDot(char*);
     void           printAsm(ostream&);
 
+    static string  toString(MethodDesc*);
     static string  toString(Inst*);
     static string  toString(Opnd*);
+    static string  toString(QpNode*);
     static string  toString(OpndSet&);
     static string  toString(RegOpndSet&);
     static string  toString(OpndVector&);
@@ -54,6 +57,7 @@ public:
     static string  toString(EdgeKind);
     static string  toString(OpndKind);
     static string  toString(DataKind);
+    static string  boolString(uint64, uint16=16);
     
 protected:
     void           printEdgeDot(Edge*);
@@ -67,6 +71,7 @@ protected:
     Cfg            &cfg;
     ostream        *os;           // output stream
     ofstream       *ofs;          // file output stream
+    char           logDir[500];
 };
 
 } // IPF

@@ -216,7 +216,6 @@ BbNode::BbNode(MemoryManager &mm, uint32 id, uint32 execCounter) :
 Cfg::Cfg(MemoryManager &mm, CompilationInterface &compilationInterface):
     mm(mm),
     compilationInterface(compilationInterface),
-    maxNodeId(0),
     enterNode(NULL),
     exitNode(NULL),
     searchResult(mm),
@@ -229,13 +228,13 @@ Cfg::Cfg(MemoryManager &mm, CompilationInterface &compilationInterface):
 
 NodeVector& Cfg::search(SearchKind searchKind) { 
 
-    if(lastSearchKind == searchKind) return searchResult;
+    if (lastSearchKind == searchKind) return searchResult;
     lastSearchKind = searchKind;
 
     NodeSet visitedNodes(mm);
     searchResult.clear();
 
-    switch(searchKind) {
+    switch (searchKind) {
         case SEARCH_DIRECT_ORDER : makeDirectOrdered(exitNode, visitedNodes); break;
         case SEARCH_POST_ORDER   : makePostOrdered(enterNode, visitedNodes);  break;
         case SEARCH_LAYOUT_ORDER : makeLayoutOrdered();                       break;
@@ -254,12 +253,12 @@ void Cfg::makeDirectOrdered(Node *node, NodeSet &visitedNodes) {
     visitedNodes.insert(node);                       // mark node visited
 
     EdgeVector& inEdges = node->getInEdges();        // get inEdges
-    for(uint32 i=0; i<inEdges.size(); i++) {         // iterate through inEdges
-        Node *pred = inEdges[i]->getSource();     // get pred node
-        if(visitedNodes.count(pred) == 1) continue;  // if it is already visited - ignore
+    for (uint32 i=0; i<inEdges.size(); i++) {        // iterate through inEdges
+        Node *pred = inEdges[i]->getSource();        // get pred node
+        if (visitedNodes.count(pred) == 1) continue; // if it is already visited - ignore
         makeDirectOrdered(pred, visitedNodes);       // we have found unvisited pred - reenter
     }
-    searchResult.push_back(node);                    // all succs have been visited - place node in searchResult vector
+    searchResult.push_back(node);                    // all preds have been visited - place node in searchResult vector
 }
 
 //----------------------------------------------------------------------------------------//
@@ -270,9 +269,9 @@ void Cfg::makePostOrdered(Node *node, NodeSet &visitedNodes) {
     visitedNodes.insert(node);                        // mark node visited
 
     EdgeVector& outEdges = node->getOutEdges();       // get outEdges
-    for(uint32 i=0; i<outEdges.size(); i++) {         // iterate through outEdges
-        Node *succ = outEdges[i]->getTarget();     // get succ node
-        if(visitedNodes.count(succ) == 1) continue;   // if it is already visited - ignore
+    for (uint32 i=0; i<outEdges.size(); i++) {        // iterate through outEdges
+        Node *succ = outEdges[i]->getTarget();        // get succ node
+        if (visitedNodes.count(succ) == 1) continue;  // if it is already visited - ignore
         makePostOrdered(succ, visitedNodes);          // we have found unvisited succ - reenter
     }
     searchResult.push_back(node);                     // all succs have been visited - place node in searchResult vector
@@ -282,8 +281,8 @@ void Cfg::makePostOrdered(Node *node, NodeSet &visitedNodes) {
 
 void Cfg::makeLayoutOrdered() {
 
-    BbNode *node = (BbNode *)getEnterNode();
-    while(node != NULL) {
+    BbNode *node = getEnterNode();
+    while (node != NULL) {
         searchResult.push_back(node);
         node = node->getLayoutSucc();
     }
@@ -291,3 +290,4 @@ void Cfg::makeLayoutOrdered() {
 
 } // IPF
 } // Jitrino
+

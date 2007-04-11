@@ -35,6 +35,7 @@ namespace IPF {
 
 class Opnd;
 class RegOpnd;
+class Cfg;
 
 //========================================================================================//
 // RegStack
@@ -138,10 +139,10 @@ protected:
 class StackInfo {
 public:
            StackInfo();
-    int32  rpBak;           // num of gr or stack offset containing return pointer (e.g. r33)
-    int32  prBak;           // num of gr or stack offset containing predicate registers (e.g. r34)
-    int32  pfsBak;          // num of gr or stack offset containing AR.PFS (e.g. r35)
-    int32  unatBak;         // num of gr or stack offset containing AR.UNAT (e.g. r36)
+    int32  rpBak;           // gr num or stack offset containing return pointer (e.g. r33)
+    int32  prBak;           // gr num or stack offset containing predicate registers (e.g. r34)
+    int32  pfsBak;          // gr num or stack offset containing AR.PFS (e.g. r35)
+    int32  unatBak;         // gr num or stack offset containing AR.UNAT (e.g. r36)
     int32  savedBase;       // mem stack offset of first saved gr (bytes)
     uint32 savedGrMask;     // mask of preserved grs saved on stack
     uint32 savedFrMask;     // mask of preserved frs saved on stack
@@ -155,47 +156,49 @@ public:
 
 class OpndManager : public RegStack, public MemStack, public StackInfo {
 public:
-                 OpndManager(MemoryManager&, CompilationInterface&);
+                   OpndManager(MemoryManager&, CompilationInterface&);
 
     //----------------------------------------------------------------------------//
     // Opnd constructors    
     //----------------------------------------------------------------------------//
 
-    Opnd         *newOpnd(OpndKind = OPND_INVALID);
-    RegOpnd      *newRegOpnd(OpndKind, DataKind, int32 = LOCATION_INVALID);
-    Opnd         *newImm(int64 = 0);
-    ConstantRef  *newConstantRef(Constant*, DataKind = DATA_CONST_REF);
-    NodeRef      *newNodeRef(BbNode* = NULL);
-    MethodRef    *newMethodRef(MethodDesc* = NULL);
+    Opnd           *newOpnd(OpndKind = OPND_INVALID);
+    RegOpnd        *newRegOpnd(OpndKind, DataKind, int32 = LOCATION_INVALID);
+    Opnd           *newImm(int64 = 0);
+    ConstantRef    *newConstantRef(Constant*, DataKind = DATA_CONST_REF);
+    NodeRef        *newNodeRef(BbNode* = NULL);
+    MethodRef      *newMethodRef(MethodDesc* = NULL);
+    Opnd           *newInArg(OpndKind, DataKind, uint32);
+    uint16         getFpArgsNum();
 
     //----------------------------------------------------------------------------//
     // set / get methods
     //----------------------------------------------------------------------------//
                 
-    RegOpnd      *getR0();
-    RegOpnd      *getR0(RegOpnd*);
-    RegOpnd      *getF0();
-    RegOpnd      *getF1();
+    RegOpnd        *getR0();
+    RegOpnd        *getR0(RegOpnd*);
+    RegOpnd        *getF0();
+    RegOpnd        *getF1();
     
-    RegOpnd      *getP0();
-    RegOpnd      *getB0();
-    RegOpnd      *getR12();
-    RegOpnd      *getR8();
-    RegOpnd      *getF8();
-    RegOpnd      *getTau();
+    RegOpnd        *getP0();
+    RegOpnd        *getB0();
+    RegOpnd        *getR12();
+    RegOpnd        *getR8();
+    RegOpnd        *getF8();
+    RegOpnd        *getTau();
 
-    void         setContainCall(bool containCall_)    { containCall = containCall_; }
-    bool         getContainCall()                     { return containCall; }
-    
-    uint         getNumOpnds()                        { return maxOpndId; }
+    void           setContainCall(bool containCall_)    { containCall = containCall_; }
+    bool           getContainCall()                     { return containCall; }
+    uint16         getNextNodeId()                      { return maxNodeId++; }
+    BbNode         *getPrologNode()                     { return prologNode; }
 
     //----------------------------------------------------------------------------//
     // Reg allocation support
     //----------------------------------------------------------------------------//
 
-    int32        newLocation(OpndKind, DataKind, RegBitSet, bool);
-    int32        newScratchReg(OpndKind, RegBitSet&);
-    int32        newPreservReg(OpndKind, RegBitSet&);
+    int32          newLocation(OpndKind, DataKind, RegBitSet, bool);
+    int32          newScratchReg(OpndKind, RegBitSet&);
+    int32          newPreservReg(OpndKind, RegBitSet&);
     
     //----------------------------------------------------------------------------//
     // Compressed references
@@ -214,27 +217,32 @@ public:
     // Misc
     //----------------------------------------------------------------------------//
     
-    int64        getElemBaseOffset();
-    void         printStackInfo();
-    void         saveThisArg();
-    void         initSavedBase();
-    void         initMemStackSize();
+    void           insertProlog(Cfg&);
+    int64          getElemBaseOffset();
+    void           printStackInfo();
+    void           saveThisArg();
+    void           initSavedBase();
+    void           initMemStackSize();
+    RegOpndVector& getInArgs()               { return inArgs; }
 
 protected:
     MemoryManager        &mm;
     CompilationInterface &compilationInterface;
     
-    int32        maxOpndId;            // used for creating new opnds
+    uint16        maxOpndId;            // used for creating new opnds
+    uint16        maxNodeId;            // used for creating new nodes
+    RegOpndVector inArgs;               // input args vector
+    BbNode        *prologNode;
     
-    RegOpnd      *r0;                  // 0 (8 bytes unsigned)
-    RegOpnd      *f0;                  // 0.0
-    RegOpnd      *f1;                  // 1.0
-    RegOpnd      *p0;                  // true
-    RegOpnd      *b0;                  // return address
-    RegOpnd      *r12;                 // stack pointer
-    RegOpnd      *r8;                  // return value (general)
-    RegOpnd      *f8;                  // return value (floating point)
-    RegOpnd      *tau;                 // opnd ignored
+    RegOpnd       *r0;                  // 0 (8 bytes unsigned)
+    RegOpnd       *f0;                  // 0.0
+    RegOpnd       *f1;                  // 1.0
+    RegOpnd       *p0;                  // true
+    RegOpnd       *b0;                  // return address
+    RegOpnd       *r12;                 // stack pointer
+    RegOpnd       *r8;                  // return value (general)
+    RegOpnd       *f8;                  // return value (floating point)
+    RegOpnd       *tau;                 // opnd ignored
     
     RegOpnd      *heapBase;            // Reg opnd containing base for references decompression
     Opnd         *heapBaseImm;         // Imm opnd containing base for references decompression

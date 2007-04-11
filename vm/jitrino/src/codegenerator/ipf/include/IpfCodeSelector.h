@@ -103,6 +103,7 @@ protected:
     NodeVector           &nodes;
     OpndVector           &opnds;
     CompilationInterface &compilationInterface;
+    OpndManager          *opndManager;
 };
 
 //========================================================================================//
@@ -390,7 +391,6 @@ protected:
     OpndVector            &opnds;
     CompilationInterface  &compilationInterface;
     OpndManager           *opndManager;
-    int32                 numFpInArgs;
     
     RegOpnd               *p0;
 };

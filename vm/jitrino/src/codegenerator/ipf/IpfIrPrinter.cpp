@@ -21,6 +21,8 @@
  */
 
 #include "IpfIrPrinter.h"
+#include "CompilationContext.h"
+#include "PMFAction.h"
 
 namespace Jitrino {
 namespace IPF {
@@ -39,12 +41,24 @@ IrPrinter::IrPrinter(Cfg &cfg_) :
     mm(cfg_.getMM()),
     cfg(cfg_),
     ofs(NULL) {
+    
+    if (Log::isEnabled() == false) return;
+
+    CompilationContext *cc        = CompilationContext::getCurrentContext();
+    SessionAction      *session   = cc->getCurrentSessionAction();
+    LogStream          &logStream = session->log(LogStream::CT);
+    strcpy(logDir, logStream.getFileName());
+    int len = strlen(logDir);
+    logDir[len - 6] = 0;
 }
 
 //----------------------------------------------------------------------------------------//
 
-void IrPrinter::printLayoutDot(char *logName) {
+void IrPrinter::printLayoutDot(char *logFile) {
 
+    char logName[500];
+    strcpy(logName, logDir);
+    strcat(logName, logFile);
     ofs = new(mm) ofstream(logName);
     
     BbNode *node = (BbNode *)cfg.getEnterNode();
@@ -66,8 +80,11 @@ void IrPrinter::printLayoutDot(char *logName) {
 
 //----------------------------------------------------------------------------------------//
 
-void IrPrinter::printCfgDot(char *logName) {
+void IrPrinter::printCfgDot(char *logFile) {
 
+    char logName[500];
+    strcpy(logName, logDir);
+    strcat(logName, logFile);
     ofs = new(mm) ofstream(logName);
     
     NodeVector &nodes = cfg.search(SEARCH_POST_ORDER);
@@ -90,7 +107,7 @@ void IrPrinter::printAsm(ostream &os_) {
     
     os = &os_;
     
-    BbNode *node = (BbNode *)cfg.getEnterNode();
+    BbNode *node = cfg.getEnterNode();
     
     *os << endl;
     *os << "----------- Code dump ----------------------------------------" << endl;
@@ -164,7 +181,6 @@ void IrPrinter::printHead() {
     *ofs << "  fontpath=\"c:\\winnt\\fonts\";" << ::std::endl;
     *ofs << "  node [shape=record,fontname=\"Courier\",fontsize=9];" << ::std::endl;
     *ofs << "  edge [fontname=\"Courier\",fontsize=9];" << ::std::endl;
-
 }
 
 //----------------------------------------------------------------------------------------//
@@ -327,6 +343,15 @@ string IrPrinter::toString(Opnd *opnd) {
 
 //----------------------------------------------------------------------------------------//
 
+string IrPrinter::toString(QpNode *qpNode) {
+    ostringstream oss;
+    oss << "mask: " << boolString(qpNode->getNodeMask()) << " comp: " << boolString(qpNode->getCompMask());
+    oss << " dead: " << boolString(qpNode->getLiveMask());
+    return oss.str();
+}
+
+//----------------------------------------------------------------------------------------//
+
 string IrPrinter::toString(OpndSet &opndSet) {
     
     ostringstream oss;
@@ -400,6 +425,21 @@ string IrPrinter::toString(Chain &chain) {
     return oss.str();
 }
     
+//----------------------------------------------------------------------------------------//
+
+string IrPrinter::toString(MethodDesc *methodDesc) {
+
+    ostringstream oss;
+
+    if (methodDesc->getParentType() != NULL) {
+        oss << methodDesc->getParentType()->getName() << ".";
+    }
+    oss << methodDesc->getName();
+    oss << methodDesc->getSignatureString();
+
+    return oss.str();
+}
+
 //----------------------------------------------------------------------------------------//
 
 string IrPrinter::toString(NodeKind nodeKind) {
@@ -485,6 +525,18 @@ string IrPrinter::toString(DataKind dataKind) {
 
     if (s.empty()) IPF_ERR << " unexpected dataKind " << dataKind << endl;
     return s;
+}
+
+//----------------------------------------------------------------------------//
+
+string IrPrinter::boolString(uint64 mask, uint16 size) {
+    uint64 m = 1 << size - 1; 
+    ostringstream oss;
+    for (int i=0; i<size; i++, m >>= 1) {
+        if (mask & m) oss << "1";
+        else          oss << "0";
+    }
+    return oss.str();
 }
 
 } // IPF

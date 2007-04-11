@@ -17,6 +17,7 @@
                                                                                                             
 /**
  * @author Intel, Konstantin M. Anisimov, Igor V. Chebykin
+ * @version $Revision: 1.2 $
  *
  */
 
@@ -31,139 +32,152 @@ namespace IPF {
 // LiveAnalyzer
 //========================================================================================//
 
-LiveAnalyzer::LiveAnalyzer(Cfg &cfg_) : cfg(cfg_) { }
+LiveAnalyzer::LiveAnalyzer(Cfg &cfg) : 
+    cfg(cfg),
+    mm(cfg.getMM()),
+    workSet(mm),
+    liveManager(cfg),
+    liveSet(liveManager.getLiveSet()),
+    dceFlag(false) {
+}
 
 //----------------------------------------------------------------------------------------//
 
-void LiveAnalyzer::makeLiveSets(bool verify_) {
+void LiveAnalyzer::analyze() {
     
-//    IPF_LOG << endl;
-    verify = verify_;
-    NodeVector &nodes = cfg.search(SEARCH_POST_ORDER);   // get postordered node list
+    NodeVector &nodes = cfg.search(SEARCH_POST_ORDER);  // get postordered node list
+    for (int16 i=nodes.size()-1; i>=0; i--) {           // iterate nodes
+        Node *node = nodes[i];                          //
+        node->setVisited(false);                        // mark node unvisited
+        if (dceFlag == false) node->clearLiveSet();     // clear node's live set
+        workSet.push_back(node);                        // put node in workSet (reverse order)
+    }
 
-    // clear live sets for all nodes
-    if (!verify) {
-        for(uint16 i=0; i<nodes.size(); i++) {
-            nodes[i]->clearLiveSet();
+    while (workSet.size() > 0) {                        // while there is node to analyze
+        Node *node = workSet.back();                    // get last workSet node
+        node->setVisited(true);                         // mark the node visited
+        workSet.pop_back();                             // remove the node from workSet
+        if (analyzeNode(node) == false) {               // node's live set has changed - live sets of predecessor need evaluation
+            pushPreds(node);                            // put predecessors in workSet
         }
     }
     
-    // make new live sets for all nodes
-    bool flag = true;
-    while (flag == true) {
-        flag = false;
-        for(uint16 i=0; i<nodes.size(); i++) {
-            if (analyzeNode(nodes[i]) == false) flag = true;
+    if (VERIFY_ON) verify();
+}
+
+//----------------------------------------------------------------------------------------//
+
+void LiveAnalyzer::dce() {
+
+    IPF_LOG << endl << "  Dead code:" << endl;
+    dceFlag = true;
+    analyze();
+    dceFlag = false;
+}
+    
+//----------------------------------------------------------------------------------------//
+// check if node's liveSets coincide with calculated ones
+// check if liveSet of Enter node is empty (except inArgs including implicit arg b0)
+
+void LiveAnalyzer::verify() {
+    
+    NodeVector &nodes = cfg.search(SEARCH_POST_ORDER);              // get nodes postorder
+    
+    for (uint16 i=0; i<nodes.size(); i++) {                         // iterate it
+        if (analyzeNode(nodes[i]) == false) {                       // if node's liveSet does not coincide with calculated one
+            IPF_ERR << " node" << nodes[i]->getId() << endl;        // throw error message
         }
+    }
+    
+    RegOpndSet    enterLiveSet = cfg.getEnterNode()->getLiveSet();  // get liveSet of Enter node
+    RegOpndVector &inArgs      = cfg.getOpndManager()->getInArgs(); // get inArgs
+    for (uint16 i=0; i<inArgs.size(); i++) {                        //
+        enterLiveSet.erase(inArgs[i]);                              // remove inArgs from enterLiveSet
+    }                                                               // 
+    
+    enterLiveSet.erase(cfg.getOpndManager()->getB0());              // remove b0 from enterLiveSet
+    if (enterLiveSet.size() == 0) return;                           // if enterLiveSet is empty - Ok
+
+    IPF_ERR << " size " << enterLiveSet.size() << endl;
+    for (RegOpndSet::iterator it=enterLiveSet.begin(); it!=enterLiveSet.end(); it++) {
+        IPF_ERR << " alive opnd on method enter " << IrPrinter::toString(*it)
+            << " " << IrPrinter::toString(cfg.getMethodDesc()) << endl;
     }
 }
 
 //----------------------------------------------------------------------------------------//
+// recalculate live set for the node
+// if it has not changed - return true, else - return false
 
 bool LiveAnalyzer::analyzeNode(Node *node) {
 
-    // build live set for node
-    RegOpndSet currLiveSet(cfg.getMM());
-    RegOpndSet &oldLiveSet = node->getLiveSet();
-    node->mergeOutLiveSets(currLiveSet);          // put in the live set merged live sets of successors
-
-//    if (LOG_ON) {
-//        IPF_LOG << "    node" << node->getId() << " successors:";
-//        EdgeVector &edges = node->getOutEdges();
-//        for (uint16 i=0; i<edges.size(); i++) {
-//            Node *succ       = edges[i]->getTarget();
-//            Node *loopHeader = succ->getLoopHeader();
-//            IPF_LOG << " " << succ->getId();
-//            if (loopHeader != NULL) IPF_LOG << "(" << loopHeader->getId() << ")";
-//        }
-//        IPF_LOG << " exit live set: " << IrPrinter::toString(currLiveSet) << endl;
-//    }
-
-    // If node is not BB - currLiveSet is not going to change 
-    if(node->getNodeKind() != NODE_BB) {
-//        IPF_LOG << "      node is not BB - live set is not changed" << endl;
-        if (oldLiveSet == currLiveSet) return true;     // if live set has not changed - nothing to do
-
-        node->setLiveSet(currLiveSet);            // Set currLiveSet for the current node
-        return false;                                   // and continue
-    }
-
-    InstVector   &insts    = ((BbNode *)node)->getInsts();
-    InstIterator currInst  = insts.end()-1;
-    InstIterator firstInst = insts.begin()-1;
-    
-    for(; currInst>firstInst; currInst--) {
-        updateLiveSet(currLiveSet, *currInst);
+    liveManager.init(node);                      // init LiveManager with current node
+    if (LOG_ON) {
+        IPF_LOG << endl << "  Qp Tree for node" << node->getId() << endl;
+        liveManager.printQpTree();
     }
     
-    if (oldLiveSet == currLiveSet) return true;     // if live set has not changed - nothing to do
-    if (verify) {
-        IPF_LOG << "ERROR node" << node->getId() << endl;
-        IPF_LOG << " old live set: " << IrPrinter::toString(oldLiveSet) << endl;
-        IPF_LOG << " new live set: " << IrPrinter::toString(currLiveSet) << endl;
+    RegOpndSet &oldLiveSet = node->getLiveSet(); // get current node live set (on node enter)
+    if (node->getNodeKind() != NODE_BB) {        // liveSet is not going to change 
+        if (oldLiveSet == liveSet) return true;  // if live set has not changed - nothing to do
+        node->setLiveSet(liveSet);               // set liveSet for the current node
+        return false;                            // live set of the node has changed
     }
-    node->setLiveSet(currLiveSet);                  // set currLiveSet for the current node
-    return false;
+
+    InstVector &insts = ((BbNode *)node)->getInsts();
+    for(int16 i=insts.size()-1; i>=0; i--) {     // iterate through node insts postorder
+        Inst *inst = insts[i];                   //
+        if (dceFlag && isInstDead(inst)) {       // if dce is activated and inst is dead
+            IPF_LOG << "    node" << setw(3) << left << node->getId();
+            IPF_LOG << IrPrinter::toString(inst) << endl;
+            insts.erase(insts.begin()+i);        // remove inst from InstVector of current node
+            liveManager.def(inst);               // change liveSet according with inst def
+        } else {                                 //
+            liveManager.def(inst);               // change liveSet according with inst def
+            liveManager.use(inst);               // change liveSet according with inst use
+        }
+    }
+    
+    if (oldLiveSet == liveSet) return true;      // if live set has not changed - nothing to do
+    node->setLiveSet(liveSet);                   // set liveSet for the current node
+    return false;                                // live set of the node has changed
 }
 
 //----------------------------------------------------------------------------------------//
-// Remove dst and insert qp and src opnds in live set. 
-// If qp is not "p0" do not remove dst opnd from live set, 
-// because if the inst is not executed dst opnd will stay alive
+// push all predecessors of the node in workSet (ignore preds which are in workSet already)
 
-void LiveAnalyzer::updateLiveSet(RegOpndSet &liveSet, Inst *inst) {
+void LiveAnalyzer::pushPreds(Node *node) {
 
-    OpndVector &opnds = inst->getOpnds();            // get instruction's opnds
-    uint16     numDst = inst->getNumDst();           // number of dst opnds (qp has index 0)
-    bool       isP0   = (opnds[0]->getValue() == 0); // is instruction qp is p0
-
-    // remove dst opnds from live set
-    for(uint16 i=1; isP0 && i<=numDst; i++) {
-        if (opnds[i]->isWritable()) liveSet.erase((RegOpnd *)opnds[i]);
+    EdgeVector &edges = node->getInEdges();       // get in edges
+    for (uint16 i=0; i<edges.size(); i++) {       // iterate
+        Node *pred = edges[i]->getSource();       // get predecessor
+        if (pred->isVisited() == false) continue; // if predecessor is in workSet - ignore
+        workSet.push_back(pred);                  // push predecessor in workSet
+        pred->setVisited(false);                  // mark it unvisited
     }
-    
-    // insert qp opnd in live set
-    if (opnds[0]->isWritable()) liveSet.insert((RegOpnd *)opnds[0]);
-    
-    // insert src opnds in live set
-    for(uint16 i=numDst+1; i<opnds.size(); i++) {
-        if (opnds[i]->isWritable()) liveSet.insert((RegOpnd *)opnds[i]);     
-    } 
-}    
+}
 
 //----------------------------------------------------------------------------------------//
-// Remove dst opnds from live set. 
-// If qp is not "p0" do not remove dst opnd from live set, 
-// because if the inst is not executed dst opnd will stay alive
+// Check if instruction can be removed from inst vector. 
+// Do not remove instruction having "side effects" (like "call")
 
-void LiveAnalyzer::defOpnds(RegOpndSet &liveSet, Inst *inst) {
-
-    OpndVector &opnds = inst->getOpnds();            // get instruction's opnds
-    uint16     numDst = inst->getNumDst();           // number of dst opnds (qp has index 0)
-    bool       isP0   = (opnds[0]->getValue() == 0); // is instruction qp is p0
-
-    // remove dst opnds from live set
-    for(uint16 i=1; isP0 && i<=numDst; i++) {
-        if (opnds[i]->isWritable()) liveSet.erase((RegOpnd *)opnds[i]);
-    }
-}    
-
-//----------------------------------------------------------------------------------------//
-// Insert qp and src opnds in live set. 
-
-void LiveAnalyzer::useOpnds(RegOpndSet &liveSet, Inst *inst) {
-
-    OpndVector &opnds = inst->getOpnds();                          // get instruction's opnds
-    uint16     numDst = inst->getNumDst();                         // number of dst opnds (qp has index 0)
-
-    // insert qp opnd in live set
-    if (opnds[0]->isWritable()) liveSet.insert((RegOpnd *)opnds[0]);
+bool LiveAnalyzer::isInstDead(Inst *inst) {
     
-    // insert src opnds in live set
-    for(uint16 i=numDst+1; i<opnds.size(); i++) {
-        if (opnds[i]->isWritable()) liveSet.insert((RegOpnd *)opnds[i]);     
-    } 
-}    
+    if (inst->isCall())                    return false; // "call" inst is never dead
+    if (inst->getInstCode() == INST_ALLOC) return false; // "alloc" inst is never dead
+
+    uint16 numDst = inst->getNumDst();                   // get num of dst opnds
+    if (numDst == 0) return false;                       // if there is no dst opnds - ignore
+
+    OpndVector &opnds = inst->getOpnds();                // get inst opnds
+    RegOpnd    *qp    = (RegOpnd *)opnds[0];             // get qp of the inst
+    QpMask     mask   = liveManager.getLiveMask(qp);     // get mask for this qp space
+    for (uint16 i=1; i<numDst+1; i++) {                  // iterate dst opnds
+        RegOpnd *dst = (RegOpnd *)opnds[i];              // 
+        if (dst->isAlive(mask)) return false;            // if dst is alive - inst is alive
+    }
+    return true;                                         // there is no alive dst opnd - inst is dead
+}
 
 } // IPF
 } // Jitrino

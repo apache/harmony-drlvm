@@ -43,8 +43,9 @@ public:
 protected:
     CompilationInterface *compilationInterface;
     MethodDesc           *methodDesc;
+
     Cfg                  *cfg;
-};
+}; 
 
 } // IPF
 } // Jitrino

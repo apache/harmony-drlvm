@@ -53,7 +53,6 @@ IpfInstCodeSelector::IpfInstCodeSelector(Cfg                  &cfg_,
     compilationInterface(compilationInterface_) {
 
     opndManager = cfg.getOpndManager();
-    numFpInArgs = 0;
     p0          = opndManager->getP0();
 }
 
@@ -689,7 +688,7 @@ CG_OpndHandle *IpfInstCodeSelector::shladd(IntegerOp::Types opType,
 
 CG_OpndHandle *IpfInstCodeSelector::convToInt(ConvertToIntOp::Types       opType,
                                               bool                        isSigned,
-					      bool                        isZeroExtend,
+                                              bool                        isZeroExtend,
                                               ConvertToIntOp::OverflowMod ovfMod,
                                               Type                        *dstType, 
                                               CG_OpndHandle               *src_) {
@@ -968,25 +967,21 @@ void IpfInstCodeSelector::stVar(CG_OpndHandle *_src, uint32 varId) {
 
 CG_OpndHandle *IpfInstCodeSelector::defArg(uint32 inArgPosition, Type *type) {
 
-    DataKind dataKind = toDataKind(type->tag);
-    OpndKind opndKind = toOpndKind(type->tag);
-    int32    location = LOCATION_INVALID;
-    bool     isFp     = type->isFloatingPoint();
 
-    if (inArgPosition < MAX_REG_ARG) {
-        if (isFp) location = F_INARG_BASE + numFpInArgs++;
-        else      location = opndManager->newInReg(inArgPosition);
-    } else {
-        location = opndManager->newInSlot(inArgPosition); // location is area local offset
-    }
+    OpndKind opndKind = toOpndKind(type->tag);
+    DataKind dataKind = toDataKind(type->tag);
     
-    RegOpnd *arg = opndManager->newRegOpnd(opndKind, dataKind, location);
+    Opnd *arg = opndManager->newInArg(opndKind, dataKind, inArgPosition);    
     IPF_LOG << "      defArg " << IrPrinter::toString(arg) << " " << type->getName() << endl;
 
-    if (isFp) {
-        RegOpnd *newarg = opndManager->newRegOpnd(opndKind, dataKind);
-        addNewInst(INST_MOV, p0, newarg, arg);            // if fp arg crosses call site
+    if (arg->isFloating()) {
+        BbNode  *prologNode = opndManager->getPrologNode();
+        RegOpnd *newarg     = opndManager->newRegOpnd(opndKind, dataKind);
+        Inst    *inst       = new(mm) Inst(mm, INST_MOV, p0, newarg, arg);
+        prologNode->addInst(inst);
         arg = newarg;                                     // it will be moved on preserved reg
+
+        IPF_LOG << "        " << IrPrinter::toString(inst) << endl;
     }
 
     return arg;

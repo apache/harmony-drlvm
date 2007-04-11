@@ -23,7 +23,6 @@
 #include "IpfRegisterAllocator.h"
 #include "IpfIrPrinter.h"
 #include "IpfOpndManager.h"
-#include "IpfLiveAnalyzer.h"
 #include <fstream>
 
 namespace Jitrino {
@@ -38,10 +37,10 @@ bool greaterSpillCost(RegOpnd *op1, RegOpnd *op2) { return op1->getSpillCost() >
 RegisterAllocator::RegisterAllocator(Cfg &cfg) : 
     mm(cfg.getMM()), 
     cfg(cfg),
+    opndManager(cfg.getOpndManager()),
+    liveManager(cfg),
     allocSet(mm),
-    liveSet(mm) {
-
-    opndManager = cfg.getOpndManager();
+    liveSet(liveManager.getLiveSet()) {
 }
 
 //----------------------------------------------------------------------------------------//
@@ -52,7 +51,7 @@ void RegisterAllocator::allocate() {
     buildInterferenceMatrix();
     removeSelfDep();
 
-    IPF_LOG << endl << "  Assign Locations" << endl;
+    IPF_LOG << endl << "  Assign Locations (# - cross call site)" << endl;
     assignLocations();
     
     IPF_LOG << endl << "  Remove Usless \"mov\" Instructions" << endl;
@@ -68,12 +67,11 @@ void RegisterAllocator::buildInterferenceMatrix() {
     NodeVector &nodes = cfg.search(SEARCH_POST_ORDER);
     for(uint16 i=0; i<nodes.size(); i++) {                 // iterate through CFG nodes
 
-        if(nodes[i]->isBb() == false) continue;            // ignore non BB nodes
+        if(nodes[i]->isBb() == false) continue;              // ignore non BB nodes
 
-        liveSet.clear();                                   // clear live set
-        nodes[i]->mergeOutLiveSets(liveSet);               // put in the live set merged live sets of successors
+        BbNode *node = (BbNode *)nodes[i];
+        liveManager.init(node);
 
-        BbNode       *node       = (BbNode *)nodes[i];
         uint32       execCounter = node->getExecCounter();
         InstIterator currInst    = node->getInsts().end()-1;
         InstIterator firstInst   = node->getInsts().begin()-1;
@@ -81,21 +79,23 @@ void RegisterAllocator::buildInterferenceMatrix() {
         for (; currInst>firstInst; currInst--) {
 
             Inst        *inst  = *currInst;
-            uint16      numDst = inst->getNumDst();        // number of dst opnds (qp has index 0)
-            OpndVector& opnds  = inst->getOpnds();         // get inst's opnds
+            uint16      numDst = inst->getNumDst();          // number of dst opnds (qp has index 0)
+            OpndVector& opnds  = inst->getOpnds();           // get inst's opnds
+            RegOpnd     *qp    = (RegOpnd *) opnds[0];
+            QpMask      mask   = liveManager.getLiveMask(qp);
 
             checkCoalescing(execCounter, inst);
 
-            LiveAnalyzer::defOpnds(liveSet, inst);         // remove dst opnds from live set
-            checkCallSite(inst);                           // if currInst is "call" - all alive opnds cross call site
-            for(uint16 i=1; i<=numDst; i++) {              // for each dst opnd
-                updateAllocSet(opnds[i], execCounter);     // insert in allocSet and add live set in dep list
+            liveManager.def(inst);                           // remove dst opnds from live set
+            checkCallSite(inst, mask);                       // if currInst is "call" - all alive opnds cross call site
+            for(uint16 i=1; i<=numDst; i++) {                // for each dst opnd
+                updateAllocSet(opnds[i], execCounter, mask); // insert in allocSet and add live set in dep list
             }
             
-            LiveAnalyzer::useOpnds(liveSet, inst);         // add src opnds in live set
-            updateAllocSet(opnds[0], execCounter);         // insert in allocSet pq opnd and add alive qps in dep list
-            for (uint16 i=numDst+1; i<opnds.size(); i++) { // for each src opnd
-                updateAllocSet(opnds[i], execCounter);     // insert in allocSet and add live set in dep list
+            liveManager.use(inst);                           // add src opnds in live set
+            updateAllocSet(opnds[0], execCounter, mask);     // insert in allocSet pq opnd and add alive qps in dep list
+            for (uint16 i=numDst+1; i<opnds.size(); i++) {   // for each src opnd
+                updateAllocSet(opnds[i], execCounter, mask); // insert in allocSet and add live set in dep list
             }
         }
     }
@@ -127,16 +127,16 @@ void RegisterAllocator::checkCoalescing(uint32 execCounter, Inst *inst) {
 
 void RegisterAllocator::removeSelfDep() {
 
-    for(RegOpndSetIterator it=allocSet.begin(); it!=allocSet.end(); it++) {
+    for (RegOpndSetIterator it=allocSet.begin(); it!=allocSet.end(); it++) {
         (*it)->getDepOpnds().erase(*it);
     }
 
-    if(LOG_ON) { 
-        IPF_LOG << endl << "  Opnd dependensies " << endl; 
-        for(RegOpndSetIterator it=allocSet.begin(); it!=allocSet.end(); it++) {
+    if (LOG_ON) { 
+        IPF_LOG << endl << "  Opnd dependensies" << endl; 
+        for (RegOpndSetIterator it=allocSet.begin(); it!=allocSet.end(); it++) {
             RegOpnd *opnd = *it;
-            IPF_LOG << "      " << setw(4) << left << IrPrinter::toString(opnd) << " depends on: ";
-            IPF_LOG << IrPrinter::toString(opnd->getDepOpnds()) << endl;
+            IPF_LOG << "    " << setw(4) << left << IrPrinter::toString(opnd);
+            IPF_LOG << " depends on: " << IrPrinter::toString(opnd->getDepOpnds()) << endl;
         }
     }
 }
@@ -155,7 +155,8 @@ void RegisterAllocator::assignLocations() {
         RegOpnd *opnd = opndVector[i];
         if (opnd->getLocation() != LOCATION_INVALID) continue;    // opnd has already had location
     
-        IPF_LOG << "      " << left << setw(5) << IrPrinter::toString(opnd); 
+        IPF_LOG << "    " << left << setw(5) << IrPrinter::toString(opnd); 
+        IPF_LOG << (opnd->isCrossCallSite() ? "#" : " ");
         assignLocation(opnd);                 // assign location for current opnd
         IPF_LOG << " after assignment " << left << setw(5) << IrPrinter::toString(opnd);
         IPF_LOG << " spill cost: " << opnd->getSpillCost() << endl; 
@@ -163,8 +164,7 @@ void RegisterAllocator::assignLocations() {
 }
 
 //----------------------------------------------------------------------------------------//
-// remove useless move insts:
-// mov r8 = r8
+// remove useless move insts. Like this "mov r8 = r8"
 
 void RegisterAllocator::removeSameRegMoves() {
 
@@ -183,7 +183,7 @@ void RegisterAllocator::removeSameRegMoves() {
             if (dst->getValue() != src->getValue())       { it++; continue; } // if opnds allocated on different regs - ignore
             
             it = insts.erase(it);
-            IPF_LOG << "      node" << left << setw(4) << node->getId() << IrPrinter::toString(inst) << endl;
+            IPF_LOG << "    node" << left << setw(4) << node->getId() << IrPrinter::toString(inst) << endl;
         }
     }
 }
@@ -195,11 +195,10 @@ void RegisterAllocator::assignLocation(RegOpnd *target) {
     
     OpndKind  opndKind    = target->getOpndKind();
     DataKind  dataKind    = target->getDataKind();
-    bool      isPreserved = target->getCrossCallSite();
+    bool      isPreserved = target->isCrossCallSite();
 
-    // build mask of used regs (already assigned opnds)
-    RegBitSet  usedMask;
-    RegOpndSet &depOpnds = target->getDepOpnds();
+    RegBitSet  usedMask;                                        // mask of regs which already used by dep opnds
+    RegOpndSet &depOpnds = target->getDepOpnds();               // target can not be assigned on reg used by depOpnds
     for (RegOpndSet::iterator it=depOpnds.begin(); it!=depOpnds.end(); it++) {
         RegOpnd *opnd = *it;
         int32 location = opnd->getLocation();                   // get location of dep opnd
@@ -207,25 +206,24 @@ void RegisterAllocator::assignLocation(RegOpnd *target) {
         usedMask[location] = true;                              // mark reg busy
     }
 
-    // try to find opnd to coalesce on
-    Int2OpndMap &coalesceCands = target->getCoalesceCands();
+    Int2OpndMap &coalesceCands = target->getCoalesceCands();    // opnds used in inst like: move target = opnd
     for (Int2OpndMap::iterator it=coalesceCands.begin(); it!=coalesceCands.end(); it++) {
-        RegOpnd *opnd = it->second;
-        int32 location = opnd->getValue();
-        if (location > NUM_G_REG)                             continue;
-        if (isPreserved && (opnd->getCrossCallSite()==false)) continue;
-        if (usedMask[location] == true)                       continue;
-        target->setLocation(location);
+        RegOpnd *cls = it->second;
+        int32 location = cls->getValue();                       // get location of coalesce candidate 
+        if (location > NUM_G_REG)                   continue;   // opnd is not allocated (or allocated on stack)
+        if (isPreserved && !cls->isCrossCallSite()) continue;   // target must be preserved, but cls is scratch
+        if (usedMask[location] == true)             continue;   // target can not be allocated on cls location
+        target->setLocation(location);                          // assign target new location
         return;
     }
     
     int32 location = opndManager->newLocation(opndKind, dataKind, usedMask, isPreserved);
-    target->setLocation(location);                              // set location
+    target->setLocation(location);                              // assign target new location
 }    
 
 //----------------------------------------------------------------------------------------//
 
-void RegisterAllocator::updateAllocSet(Opnd *cand_, uint32 execCounter) {
+void RegisterAllocator::updateAllocSet(Opnd *cand_, uint32 execCounter, QpMask mask) {
 
     if (cand_->isReg()      == false) return;    // imm - it does not need allocation
     if (cand_->isMem()      == true)  return;    // mem stack - it does not need allocation
@@ -238,6 +236,7 @@ void RegisterAllocator::updateAllocSet(Opnd *cand_, uint32 execCounter) {
     // add current live set in opnd dep list (they must be placed on different regs)
     for (RegOpndSetIterator it=liveSet.begin(); it!=liveSet.end(); it++) {
         RegOpnd *opnd = *it;
+        if (opnd->isAlive(mask) == false) continue;
         cand->insertDepOpnd(opnd);               // cand depends on curr opnd from live set
         opnd->insertDepOpnd(cand);               // curr opnd from live set depends on cand
     }
@@ -246,15 +245,13 @@ void RegisterAllocator::updateAllocSet(Opnd *cand_, uint32 execCounter) {
 //----------------------------------------------------------------------------------------//
 // Check if current inst is "call" and mark all opnds in liveSet as crossing call site
 
-void RegisterAllocator::checkCallSite(Inst *inst) {
+void RegisterAllocator::checkCallSite(Inst *inst, QpMask mask) {
 
-    if(Encoder::isBranchCallInst(inst) == false) return; // opnd does not crass call site
-
-    IPF_LOG << "      these opnds cross call site: ";
-    IPF_LOG << IrPrinter::toString(liveSet) << endl;
-
-    for(RegOpndSetIterator it=liveSet.begin(); it!=liveSet.end(); it++) {
-        (*it)->setCrossCallSite(true);
+    if(inst->isCall() == false) return; // it is not call site
+    for(RegOpndSet::iterator it=liveSet.begin(); it!=liveSet.end(); it++) {
+        RegOpnd *opnd = *it;
+        if (opnd->isAlive(mask) == false) continue;
+        opnd->setCrossCallSite(true);
     }
 }
 

@@ -230,10 +230,13 @@ StackInfo::StackInfo() {
 
 OpndManager::OpndManager(MemoryManager &mm, CompilationInterface &compilationInterface) : 
     mm(mm),
-    compilationInterface(compilationInterface) {
+    compilationInterface(compilationInterface),
+    maxOpndId(0),
+    maxNodeId(0),
+    inArgs(mm) {
 
-    maxOpndId = 0;
-
+    prologNode = new(mm) BbNode(mm, getNextNodeId(), 1);
+    
     r0  = NULL;
     f0  = NULL;
     f1  = NULL;
@@ -293,6 +296,37 @@ MethodRef *OpndManager::newMethodRef(MethodDesc *method) {
 
 //----------------------------------------------------------------------------------------//
 
+Opnd *OpndManager::newInArg(OpndKind opndKind, DataKind dataKind, uint32 inArgPosition) {
+
+    int32 location = LOCATION_INVALID;
+    bool  isFp     = IpfType::isFloating(dataKind);
+
+    if (inArgPosition < MAX_REG_ARG) {
+        if (isFp) location = F_INARG_BASE + getFpArgsNum();
+        else      location = newInReg(inArgPosition);
+    } else {
+        location = newInSlot(inArgPosition); // location is area local offset
+    }
+    
+    RegOpnd *arg = newRegOpnd(opndKind, dataKind, location);
+    inArgs.push_back(arg);
+    
+    return arg;
+}
+
+//----------------------------------------------------------------------------------------//
+
+uint16 OpndManager::getFpArgsNum() {
+    
+    uint16 fpArgsNum = 0;
+    for (uint16 i=0; i<inArgs.size(); i++) {
+        if (inArgs[i]->isFloating()) fpArgsNum ++;
+    }
+    return fpArgsNum;
+}
+
+//----------------------------------------------------------------------------------------//
+
 RegOpnd *OpndManager::getR0()  { if(r0 ==NULL) r0 =newRegOpnd(OPND_G_REG, DATA_I64,  0); return r0;  } 
 RegOpnd *OpndManager::getF0()  { if(f0 ==NULL) f0 =newRegOpnd(OPND_F_REG, DATA_F,    0); return f0;  } 
 RegOpnd *OpndManager::getF1()  { if(f1 ==NULL) f1 =newRegOpnd(OPND_F_REG, DATA_F,    1); return f1;  } 
@@ -340,6 +374,40 @@ Opnd *OpndManager::getVtableOffset() {
 }
 
 //----------------------------------------------------------------------------------------//
+//   def       r32, r33, r8, r9
+//   alloc     pfsBak      = 1, 93, 2, 0      # gen alloc (pfsBak can not be preserved gr)
+//   adds      r12         = -stackSize, r12  # save SP
+//   adds      stackAddr   = offset, r12      # if pfsBak is stack opnd - spill pfs
+//   st8       [stackAddr] = pfsBak           #
+//   mov       scratch     = unat             # if we use preserved grs - spill unat
+//   adds      stackAddr   = offset, r12      #
+//   st8       [stackAddr] = scratch          #
+//   adds      stackAddr   = offset, r12      # spill preserved grs
+//   st8.spill [stackAddr] = preservedGr      #
+//   adds      stackAddr   = offset, r12      # spill preserved frs
+//   stf.spill [stackAddr] = preservedFr      #
+//   mov       brBak       = preservedBr      # save preserved brs
+//   mov       prBak       = pr               # save preserved prs
+//   mov       rpBak       = b0               # save return poiner
+//   mov       arg1        = r32
+//   mov       arg2        = r33
+//   mov       arg3        = r8
+//   mov       arg4        = r9
+//   movl      heapBase    = heapBaseImm
+//   movl      vtableBase  = vtableBaseImm
+
+void OpndManager::insertProlog(Cfg &cfg) {
+    
+    BbNode *enterNode = cfg.getEnterNode();
+    Edge   *edge      = new(mm) Edge(prologNode, enterNode, 1.0, EDGE_THROUGH);
+    edge->insert();
+    cfg.setEnterNode(prologNode);
+    cfg.search(SEARCH_UNDEF_ORDER);
+    
+    initCompBases(prologNode);
+}
+
+//----------------------------------------------------------------------------------------//
 
 void OpndManager::initCompBases(BbNode *enterNode) {
     
@@ -350,26 +418,18 @@ void OpndManager::initCompBases(BbNode *enterNode) {
 
     if (heapBase != NULL) {
         baseValue  = (uint64) VMInterface::getHeapBase();
-        
         baseImm    = newImm(baseValue);
         Inst *inst = new(mm) Inst(mm, INST_MOVL, p0, heapBase, baseImm);
-        insts.insert(insts.begin(), inst);
-        IPF_LOG << "    HeapBase initialization code inserted" << endl;
+        insts.insert(insts.end(), inst);
+        IPF_LOG << "    HeapBase saved on opnd " << IrPrinter::toString(heapBase) << endl;
     }
-    if (heapBaseImm != NULL) {
-        heapBaseImm->setValue((uint64)VMInterface::getHeapBase());
-    }
-        
+
     if (vtableBase != NULL) {
         baseValue  = (uint64) VMInterface::getVTableBase();
-
         baseImm    = newImm(baseValue);
         Inst *inst = new(mm) Inst(mm, INST_MOVL, p0, vtableBase, baseImm);
-        insts.insert(insts.begin(), inst);
-        IPF_LOG << "    VtableBase initialization code inserted" << endl;
-    }
-    if (vtableBaseImm != NULL) {
-        vtableBaseImm->setValue((uint64)VMInterface::getVTableBase());
+        insts.insert(insts.end(), inst);
+        IPF_LOG << "    VtableBase saved on opnd " << IrPrinter::toString(vtableBase) << endl;
     }
 }
 

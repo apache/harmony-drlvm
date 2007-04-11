@@ -120,7 +120,8 @@ IpfCfgCodeSelector::IpfCfgCodeSelector(Cfg                  &cfg,
     cfg(cfg),
     nodes(nodes), 
     opnds(opnds),
-    compilationInterface(compilationInterface) {
+    compilationInterface(compilationInterface),
+    opndManager(cfg.getOpndManager()) {
 }
 
 //----------------------------------------------------------------------------------------//
@@ -129,7 +130,7 @@ uint32 IpfCfgCodeSelector::genDispatchNode(uint32 numInEdges,
                                            uint32 numOutEdges, 
                                            double cnt) {
 
-    Node *node = new(mm) Node(mm, cfg.getNextNodeId(), (uint32) cnt, NODE_DISPATCH);
+    Node *node = new(mm) Node(mm, opndManager->getNextNodeId(), (uint32) cnt, NODE_DISPATCH);
     nodes.push_back(node);
 
     IPF_LOG << endl << "    Generate Dispatch node" << node->getId() << endl;
@@ -144,7 +145,7 @@ uint32 IpfCfgCodeSelector::genBlock(uint32            numInEdges,
                                     BlockCodeSelector &codeSelector, 
                                     double            cnt) {
 
-    BbNode *node = new(mm) BbNode(mm, cfg.getNextNodeId(), (uint32)cnt);
+    BbNode *node = new(mm) BbNode(mm, opndManager->getNextNodeId(), (uint32)cnt);
 
     nodes.push_back(node);
     if(blockKind == Prolog) cfg.setEnterNode(node);
@@ -162,7 +163,7 @@ uint32  IpfCfgCodeSelector::genUnwindNode(uint32 numInEdges,
                                           uint32 numOutEdges, 
                                           double cnt) {
 
-    Node *node = new(mm) Node(mm, cfg.getNextNodeId(), (uint32) cnt, NODE_UNWIND);
+    Node *node = new(mm) Node(mm, opndManager->getNextNodeId(), (uint32) cnt, NODE_UNWIND);
     nodes.push_back(node);
 
     IPF_LOG << endl << "    Generate Unwind node" << node->getId() << endl;
@@ -173,7 +174,7 @@ uint32  IpfCfgCodeSelector::genUnwindNode(uint32 numInEdges,
 
 uint32 IpfCfgCodeSelector::genExitNode(uint32 numInEdges, double cnt) {
 
-    BbNode *node = new(mm) BbNode(mm, cfg.getNextNodeId(), (uint32) cnt);
+    BbNode *node = new(mm) BbNode(mm, opndManager->getNextNodeId(), (uint32) cnt);
     nodes.push_back(node);
     cfg.setExitNode(node);
 
@@ -265,6 +266,7 @@ void IpfCfgCodeSelector::genSwitchEdges(uint32  tailNodeId,
 }
 
 //--------------------------------------------------------------------------------//
+// edge from try region to dispatch node 
 
 void IpfCfgCodeSelector::genExceptionEdge(uint32 tailNodeId, 
                                           uint32 headNodeId, 
@@ -273,13 +275,14 @@ void IpfCfgCodeSelector::genExceptionEdge(uint32 tailNodeId,
     Node *tailNode = nodes[tailNodeId];
     Node *headNode = nodes[headNodeId];
 
-    IPF_LOG << "    Generate Exception     edge node" << tailNodeId;
-    IPF_LOG << " -> node" << headNodeId << endl;
+    IPF_LOG << "    Generate Exception     edge node" << tailNode->getId();
+    IPF_LOG << " -> node" << headNode->getId() << endl;
     Edge *edge = new(mm) Edge(tailNode, headNode, prob, EDGE_DISPATCH);
     edge->insert();
 }
 
 //----------------------------------------------------------------------------------------//
+// edge from dispatch node to exception handler 
 
 void IpfCfgCodeSelector::genCatchEdge(uint32  tailNodeId, 
                                       uint32  headNodeId, 

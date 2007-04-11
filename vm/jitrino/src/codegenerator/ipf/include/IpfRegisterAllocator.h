@@ -24,6 +24,7 @@
 #define IPFREGISTERALLOCATOR_H_
 
 #include "IpfCfg.h"
+#include "IpfLiveManager.h"
 
 namespace Jitrino {
 namespace IPF {
@@ -43,8 +44,8 @@ protected:
     void               assignLocations();
     
     void               assignLocation(RegOpnd*);
-    void               updateAllocSet(Opnd*, uint32);
-    void               checkCallSite(Inst*);
+    void               updateAllocSet(Opnd*, uint32, QpMask);
+    void               checkCallSite(Inst*, QpMask);
     
     void               checkCoalescing(uint32, Inst*);
     void               removeSameRegMoves();
@@ -52,8 +53,9 @@ protected:
     MemoryManager      &mm;
     Cfg                &cfg;
     OpndManager        *opndManager;
+    LiveManager        liveManager;
     RegOpndSet         allocSet;       // set of all opnds that need allocation
-    RegOpndSet         liveSet;        // set of opnds alive in current node (buildInterferenceMatrix)
+    RegOpndSet         &liveSet;       // set of opnds alive in current node
 };
 
 } // IPF

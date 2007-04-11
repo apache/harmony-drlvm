@@ -54,6 +54,7 @@ class Node;
 class BbNode;
 class Edge;
 class Cfg;
+class QpNode;
 
 //========================================================================================//
 // Defines
@@ -100,16 +101,18 @@ class Cfg;
 #define ROOT_SET_HEADER_SIZE    4   // header size in root set info block
 #define SAFE_POINT_HEADER_SIZE 12   // header size in safe points info block
 
-#define LOG_ON                1     // Log for Code Generator is on
-#define VERIFY_ON             1     // verification for Code Generator is on
+#define MAX_QP_MASK 0xffffffffffffffff        // max value of predicate mask used in LiveManager
+
+#define LOG_ON                0               // Log for Code Generator is on
+#define VERIFY_ON             0               // verification for Code Generator is on
 #define LOG_OUT               Log::out()
-#define STAT_ON               0     // Log for statistic
+#define STAT_ON               0               // Log for statistic
 
 #define IPF_ERROR "ERROR in file " << __FILE__ << " line " << __LINE__ << " "
 #define IPF_LOG   if (LOG_ON) LOG_OUT
 #define IPF_STAT  if (STAT_ON) LOG_OUT
 #define IPF_ERR   cerr << IPF_ERROR 
-#define IPF_ASSERT(condition) if (VERIFY_ON && !(condition)) { IPF_ERR << (#condition) << endl; }
+#define IPF_ASSERT(condition) if (LOG_ON && !(condition)) { IPF_ERR << (#condition) << endl; }
 
 extern bool ipfLogIsOn;
 extern bool ipfVerifyIsOn;
@@ -191,22 +194,22 @@ enum SearchKind {
 // Typedefs
 //========================================================================================//
 
-typedef StlVector< Opnd* >           OpndVector;
-typedef StlVector< RegOpnd* >        RegOpndVector;
-typedef StlVector< Inst* >           InstVector;
-typedef StlVector< Node* >           NodeVector;
-typedef StlVector< Edge* >           EdgeVector;
-typedef StlVector< uint32 >          Uint32Vector;
-typedef StlList< Inst* >             InstList;
-typedef StlList< Node* >             NodeList;
-typedef StlList< Edge* >             EdgeList;
-typedef StlSet< Opnd* >              OpndSet;
-typedef StlSet< RegOpnd* >           RegOpndSet;
-typedef StlSet< Node* >              NodeSet;
-typedef StlMap< RegOpnd*, RegOpnd* > RegOpnd2RegOpndMap;
-typedef StlMap< Inst*, RegOpndSet >  Inst2RegOpndSetMap;
-typedef StlMap< uint64, RegOpndSet > Uint642RegOpndSetMap;
-typedef bitset< NUM_G_REG >          RegBitSet;
+typedef StlVector< Opnd* >              OpndVector;
+typedef StlVector< RegOpnd* >           RegOpndVector;
+typedef StlVector< Inst* >              InstVector;
+typedef StlVector< Node* >              NodeVector;
+typedef StlVector< Edge* >              EdgeVector;
+typedef StlVector< uint32 >             Uint32Vector;
+typedef StlList< Inst* >                InstList;
+typedef StlList< Node* >                NodeList;
+typedef StlList< Edge* >                EdgeList;
+typedef StlSet< Opnd* >                 OpndSet;
+typedef StlSet< RegOpnd* >              RegOpndSet;
+typedef StlSet< Node* >                 NodeSet;
+typedef StlMap< RegOpnd*, RegOpnd* >    RegOpnd2RegOpndMap;
+typedef StlMap< Inst*, RegOpndSet >     Inst2RegOpndSetMap;
+typedef StlMap< uint64, RegOpndSet >    Uint642RegOpndSetMap;
+typedef bitset< NUM_G_REG >             RegBitSet;
 typedef StlMultiMap <uint32, RegOpnd*, greater <uint32> > Int2OpndMap;
 
 typedef NodeVector::iterator            NodeIterator;
@@ -223,11 +226,14 @@ typedef Inst2RegOpndSetMap::iterator    Inst2RegOpndSetMapIterator;
 typedef Uint642RegOpndSetMap::iterator  Uint642RegOpndSetMapIterator;
 
 typedef NodeList                        Chain;
-typedef StlList< Chain* >                  ChainList;
+typedef StlList< Chain* >               ChainList;
 typedef StlMultiMap< uint32, Chain*, greater < uint32 > > ChainMap;
 typedef Chain::iterator                 ChainIterator;
 typedef ChainList::iterator             ChainListIterator;
 typedef ChainMap::iterator              ChainMapIterator;
+
+typedef StlMultiMap <Opnd*, QpNode*>    QpMap;
+typedef uint64                          QpMask;
 
 //========================================================================================//
 // IpfType

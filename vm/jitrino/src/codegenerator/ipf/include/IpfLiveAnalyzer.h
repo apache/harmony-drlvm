@@ -24,6 +24,7 @@
 #define IPFLIVEANALYZER_H_
 
 #include "IpfCfg.h"
+#include "IpfLiveManager.h"
 
 using namespace std;
 
@@ -36,18 +37,22 @@ namespace IPF {
 
 class LiveAnalyzer {
 public:
-                LiveAnalyzer(Cfg&);
-    void        makeLiveSets(bool);
-
-    static void updateLiveSet(RegOpndSet&, Inst*);
-    static void defOpnds(RegOpndSet&, Inst*);
-    static void useOpnds(RegOpndSet&, Inst*);
+                  LiveAnalyzer(Cfg&);
+    void          analyze();
+    void          dce();
+    void          verify();
 
 protected:
-    bool        analyzeNode(Node*);
+    bool          analyzeNode(Node*);
+    void          pushPreds(Node*);
+    bool          isInstDead(Inst*);
 
-    Cfg         &cfg;
-    bool        verify;
+    Cfg           &cfg;
+    MemoryManager &mm;
+    NodeVector    workSet;      // nodes to be iterated during liveSets calculation or dce
+    LiveManager   liveManager;  // Live Manager evaluates current live set from inst to inst
+    RegOpndSet    &liveSet;     // reference on current live set in liveManager
+    bool          dceFlag;      // make dce if flag is on
 };
 
 } // IPF
