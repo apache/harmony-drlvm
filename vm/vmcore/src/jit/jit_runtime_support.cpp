@@ -2029,7 +2029,7 @@ ManagedObject* class_alloc_new_object(Class* c)
 {
     ASSERT_RAISE_AREA;
     assert(!hythread_is_suspend_enabled());
-    assert(strcmp(c->get_name()->bytes, "java/lang/Class")); 
+    assert(struct_Class_to_java_lang_Class(c)); 
 
     ManagedObject* obj = c->allocate_instance();
     if(!obj) {
@@ -2044,7 +2044,7 @@ ManagedObject *class_alloc_new_object_using_vtable(VTable *vtable)
 {
     ASSERT_RAISE_AREA;
     assert(!hythread_is_suspend_enabled());
-    assert(strcmp(vtable->clss->get_name()->bytes, "java/lang/Class")); 
+    assert(struct_Class_to_java_lang_Class(vtable->clss)); 
 #ifdef VM_STATS
     VM_Statistics::get_vm_stats().num_class_alloc_new_object++;
     vtable->clss->instance_allocated(vtable->allocated_size);
@@ -2073,7 +2073,7 @@ class_alloc_new_object_and_run_constructor(Class* clss,
 {
     ASSERT_RAISE_AREA;
     assert(!hythread_is_suspend_enabled());
-    assert(strcmp(clss->get_name()->bytes, "java/lang/Class"));
+    assert(struct_Class_to_java_lang_Class(clss)); 
 
     ObjectHandle obj = oh_allocate_local_handle();
     obj->object = clss->allocate_instance();
