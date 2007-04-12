@@ -18,6 +18,7 @@
  * @author Li-Gang Wang, 2006/11/15
  */
 
+#include <apr_atomic.h>
 #include "ref_enqueue_thread.h"
 #include "finalize.h"
 #include "vm_threads.h"
@@ -37,6 +38,7 @@ void set_native_ref_enqueue_thread_flag(Boolean flag)
 
 
 static IDATA ref_enqueue_thread_func(void **args);
+static void wait_ref_thread_attached(void);
 
 void ref_enqueue_thread_init(JavaVM *java_vm)
 {
@@ -55,7 +57,7 @@ void ref_enqueue_thread_init(JavaVM *java_vm)
     status = hythread_create(NULL, 0, REF_ENQUEUE_THREAD_PRIORITY, 0, (hythread_entrypoint_t)ref_enqueue_thread_func, args);
     assert(status == TM_ERROR_NONE);
     
-    while(ref_thread_info->thread_attached == 0);
+    wait_ref_thread_attached();
 }
 
 void ref_enqueue_shutdown(void)
@@ -63,6 +65,24 @@ void ref_enqueue_shutdown(void)
     ref_thread_info->shutdown = TRUE;
     activate_ref_enqueue_thread();
 }
+
+static uint32 atomic_inc32(volatile apr_uint32_t *mem)
+{  return (uint32)apr_atomic_inc32(mem); }
+
+static uint32 atomic_dec32(volatile apr_uint32_t *mem)
+{  return (uint32)apr_atomic_dec32(mem); }
+
+static void inc_ref_thread_num(void)
+{ atomic_inc32(&ref_thread_info->thread_attached); }
+
+static void dec_ref_thread_num(void)
+{ atomic_dec32(&ref_thread_info->thread_attached); }
+
+static void wait_ref_thread_attached(void)
+{ while(ref_thread_info->thread_attached == 0); }
+
+void wait_native_ref_thread_detached(void)
+{ while(ref_thread_info->thread_attached); }
 
 void activate_ref_enqueue_thread(void)
 {
@@ -94,7 +114,7 @@ static IDATA ref_enqueue_thread_func(void **args)
     jni_args->group = NULL;
     IDATA status = AttachCurrentThreadAsDaemon(java_vm, (void**)&jni_env, jni_args);
     assert(status == JNI_OK);
-    ref_thread_info->thread_attached = 1;
+    inc_ref_thread_num();
     
     while(true){
         /* Waiting for pending weak references */
@@ -108,6 +128,7 @@ static IDATA ref_enqueue_thread_func(void **args)
     }
     
     status = DetachCurrentThread(java_vm);
+    dec_ref_thread_num();
     //status = jthread_detach(java_thread);
     return status;
 }

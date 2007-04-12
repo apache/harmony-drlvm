@@ -54,5 +54,8 @@ void vm_enqueue_references();
 void vm_ref_enqueue_func(void);   // added for NATIVE REFERENCE ENQUEUE THREAD
 
 Boolean get_native_finalizer_thread_flag(); // added for NATIVE FINALIZER THREAD
+Boolean get_native_ref_enqueue_thread_flag(); // added for NATIVE REF ENQUEUE THREAD
+void wait_native_fin_threads_detached(void); // added for NATIVE FINALIZER THREAD
+void wait_native_ref_thread_detached(void); // added for NATIVE REF ENQUEUE THREAD
 
 #endif

@@ -61,6 +61,7 @@ static unsigned int coarse_log(unsigned int num)
 }
 
 static IDATA finalizer_thread_func(void **args);
+static void wait_fin_threads_attached(void);
 
 void finalizer_threads_init(JavaVM *java_vm)
 {
@@ -100,7 +101,7 @@ void finalizer_threads_init(JavaVM *java_vm)
         assert(status == TM_ERROR_NONE);
     }
     
-    while(fin_thread_info->thread_attached_num < fin_thread_info->thread_num);
+    wait_fin_threads_attached();
 }
 
 void finalizer_shutdown(Boolean start_finalization_on_exit)
@@ -119,6 +120,27 @@ void finalizer_shutdown(Boolean start_finalization_on_exit)
     fin_thread_info->shutdown = TRUE;
     ref_enqueue_shutdown();
     activate_finalizer_threads(TRUE);
+}
+
+static void inc_fin_thread_num(void)
+{ atomic_inc32(&fin_thread_info->thread_attached_num); }
+
+static void dec_fin_thread_num(void)
+{ atomic_dec32(&fin_thread_info->thread_attached_num); }
+
+static void wait_fin_threads_attached(void)
+{ while(fin_thread_info->thread_attached_num < fin_thread_info->thread_num); }
+
+void wait_native_fin_threads_detached(void)
+{
+    hymutex_lock(&fin_thread_info->end_mutex);
+    while(fin_thread_info->thread_attached_num){
+        atomic_inc32(&fin_thread_info->end_waiting_num);
+        IDATA status = hycond_wait_timed(&fin_thread_info->end_cond, &fin_thread_info->end_mutex, (I_64)1000, 0);
+        atomic_dec32(&fin_thread_info->end_waiting_num);
+        if(status != TM_ERROR_NONE) break;
+    }
+    hymutex_unlock(&fin_thread_info->end_mutex);
 }
 
 /* Restrict waiting time; Unit: msec */
@@ -186,7 +208,8 @@ static IDATA finalizer_thread_func(void **args)
     jni_args->group = NULL;
     IDATA status = AttachCurrentThreadAsDaemon(java_vm, (void**)&jni_env, jni_args);
     assert(status == JNI_OK);
-    atomic_inc32(&fin_thread_info->thread_attached_num);
+    inc_fin_thread_num();
+    
     /* Choice: use VM_thread or hythread to indicate the finalizer thread ?
      * Now we use hythread
      * p_TLS_vmthread->finalize_thread_flags = thread_id;
@@ -212,6 +235,7 @@ static IDATA finalizer_thread_func(void **args)
     
     vm_heavy_finalizer_resume_mutator();
     status = DetachCurrentThread(java_vm);
+    dec_fin_thread_num();
     //status = jthread_detach(java_thread);
     return status;
 }
@@ -254,5 +278,7 @@ void vm_heavy_finalizer_resume_mutator(void)
     if(gc_clear_mutator_block_flag())
         hycond_notify_all(&fin_thread_info->mutator_block_cond);
 }
+
+
 
 

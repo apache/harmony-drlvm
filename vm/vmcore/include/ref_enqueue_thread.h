@@ -38,7 +38,6 @@ typedef struct Ref_Enqueue_Thread_Info {
 }Ref_Enqueue_Thread_Info;
 
 
-extern Boolean get_native_ref_enqueue_thread_flag();
 extern void ref_enqueue_thread_init(JavaVM *java_vm);
 extern void ref_enqueue_shutdown(void);
 extern void activate_ref_enqueue_thread(void);

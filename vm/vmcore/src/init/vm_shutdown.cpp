@@ -36,6 +36,7 @@
 #include "vm_stats.h"
 #include "thread_dump.h"
 #include "interpreter.h"
+#include "finalize.h"
 
 #define LOG_DOMAIN "vm.core.shutdown"
 #include "cxxlog.h"
@@ -182,6 +183,11 @@ jint vm_destroy(JavaVM_Internal * java_vm, jthread java_thread)
     // Execute pending shutdown hooks & finalizers
     status = exec_shutdown_sequence(jni_env);
     if (status != JNI_OK) return (jint)status;
+    
+    if(get_native_finalizer_thread_flag())
+        wait_native_fin_threads_detached();
+    if(get_native_ref_enqueue_thread_flag())
+        wait_native_ref_thread_detached();
 
     // Raise uncaught exception to current thread.
     // It will be properly processed in jthread_detach().
