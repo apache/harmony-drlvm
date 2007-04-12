@@ -3,17 +3,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-JNIEXPORT jstring JNICALL Java_org_apache_harmony_drlvm_tests_regression_h0000_DirectByteBufferTest_testValidBuffer0
-  (JNIEnv *, jobject);
+JNIEXPORT jstring JNICALL Java_org_apache_harmony_drlvm_tests_regression_h0000_DirectByteBufferTest_tryDirectBuffer
+  (JNIEnv *, jclass);
+
+JNIEXPORT jstring JNICALL Java_org_apache_harmony_drlvm_tests_regression_h0000_DirectByteBufferTest_checkSameDirectStorage
+(JNIEnv *, jclass, jobject, jobject);
 
 
-/*
- * Class:     DirectByteBufferTest
- * Method:    testValidBuffer0
- * Signature: ()Ljava/lang/String;
- */
-JNIEXPORT jstring JNICALL Java_org_apache_harmony_drlvm_tests_regression_h0000_DirectByteBufferTest_testValidBuffer0
-  (JNIEnv *jenv, jobject unused)
+JNIEXPORT jstring JNICALL Java_org_apache_harmony_drlvm_tests_regression_h0000_DirectByteBufferTest_tryDirectBuffer
+  (JNIEnv *jenv, jclass unused)
 {
     char* error = (char*)calloc(256, 1);
     const jlong BUF_SIZE = 100;
@@ -38,12 +36,35 @@ JNIEXPORT jstring JNICALL Java_org_apache_harmony_drlvm_tests_regression_h0000_D
                 "GetDirectBufferAddress() returned %p\n"
                 "GetDirectBufferCapacity() returned %d\n", addr, size);
         } else {
-            sprintf(error, "no NIO support\n");
+            sprintf(error, "no JNI NIO support\n");
         }
     }
 
     jstr = strlen(error) ? (*jenv)->NewStringUTF(jenv, error) : NULL;
     free(buf);
+    free(error);
+
+    return jstr;
+}
+
+JNIEXPORT jstring JNICALL Java_org_apache_harmony_drlvm_tests_regression_h0000_DirectByteBufferTest_checkSameDirectStorage
+(JNIEnv *jenv, jclass unused, jobject jbuf1, jobject jbuf2)
+{
+    char* error = (char*)calloc(256, 1);
+    void* addr1 = (*jenv)->GetDirectBufferAddress(jenv, jbuf1);
+    void* addr2 = (*jenv)->GetDirectBufferAddress(jenv, jbuf2);
+    jlong size1 = (*jenv)->GetDirectBufferCapacity(jenv, jbuf1);
+    jlong size2 = (*jenv)->GetDirectBufferCapacity(jenv, jbuf2);
+    jstring jstr;
+    if (addr1 != addr2) {
+        sprintf(error, "buffer address is not the same: expected %p but was %p\n", addr1, addr2);
+    }
+    if (size1 != size2) {
+        sprintf(error + strlen(error), 
+            "buffer capacity is not the same: expected %d but was %d\n", size1, size2);
+    }
+
+    jstr = strlen(error) ? (*jenv)->NewStringUTF(jenv, error) : NULL;
     free(error);
 
     return jstr;
