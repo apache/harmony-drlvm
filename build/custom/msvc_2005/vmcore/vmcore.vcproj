@@ -152,7 +152,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="port.lib apr-1.lib aprutil-1.lib zdll.lib log4cxx.lib hythr.lib jthread.lib advapi32.lib odbc32.lib userenv.lib ws2_32.lib mswsock.lib icuuc.lib"
+				AdditionalDependencies="port.lib apr-1.lib aprutil-1.lib zdll.lib log4cxx.lib hythr.lib jthread.lib advapi32.lib odbc32.lib userenv.lib ws2_32.lib mswsock.lib icuuc.lib psapi.lib"
 				OutputFile="$(OutDir)/harmonyvm.dll"
 				LinkIncremental="2"
 				AdditionalLibraryDirectories="&quot;$(ProjectDir)\..\..\..\win_em64t_msvc_$(ConfigurationName)\semis\vm\port\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_em64t_msvc_$(ConfigurationName)\semis\extra\apr\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_em64t_msvc_$(ConfigurationName)\semis\extra\aprutil\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_em64t_msvc_$(ConfigurationName)\semis\extra\zlib\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_em64t_msvc_$(ConfigurationName)\semis\extra\log4cxx\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_em64t_msvc_$(ConfigurationName)\semis\vm\hythr\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_em64t_msvc_$(ConfigurationName)\semis\vm\jthread\_bin&quot;;&quot;$(ProjectDir)\..\..\..\..\..\working_classlib\deploy\lib&quot;"
@@ -321,7 +321,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="port.lib apr-1.lib aprutil-1.lib zdll.lib log4cxx.lib hythr.lib jthread.lib advapi32.lib odbc32.lib userenv.lib ws2_32.lib mswsock.lib icuuc.lib"
+				AdditionalDependencies="port.lib apr-1.lib aprutil-1.lib zdll.lib log4cxx.lib hythr.lib jthread.lib advapi32.lib odbc32.lib userenv.lib ws2_32.lib mswsock.lib icuuc.lib psapi.lib"
 				OutputFile="$(OutDir)/harmonyvm.dll"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;$(ProjectDir)\..\..\..\win_em64t_msvc_$(ConfigurationName)\semis\vm\port\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_em64t_msvc_$(ConfigurationName)\semis\extra\apr\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_em64t_msvc_$(ConfigurationName)\semis\extra\aprutil\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_em64t_msvc_$(ConfigurationName)\semis\extra\zlib\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_em64t_msvc_$(ConfigurationName)\semis\extra\log4cxx\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_em64t_msvc_$(ConfigurationName)\semis\vm\hythr\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_em64t_msvc_$(ConfigurationName)\semis\vm\jthread\_bin&quot;;&quot;$(ProjectDir)\..\..\..\..\..\working_classlib\deploy\lib&quot;"
@@ -1450,6 +1450,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\util\native_modules_common.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\util\native_stack.cpp"
 				>
 			</File>
@@ -1488,7 +1492,7 @@
 							<Tool
 								Name="VCCustomBuildTool"
 								Description="Compiling $(InputFileName)"
-								CommandLine="ml64 /c /Cp /W3 /nologo /Zd /Zi -DWIN32 /Fo$(TargetDir)/$(InputName).obj  $(InputDir)/$(InputFileName)"
+								CommandLine="ml64 /c /Cp /W3 /nologo /Zd /Zi -DWIN32 /Fo$(TargetDir)/$(InputName).obj  $(InputDir)/$(InputFileName)&#x0D;&#x0A;"
 								Outputs="$(OutDir)/$(InputName).obj"
 							/>
 						</FileConfiguration>
@@ -1498,7 +1502,7 @@
 							<Tool
 								Name="VCCustomBuildTool"
 								Description="Compiling $(InputFileName)"
-								CommandLine="ml64 /c /Cp /W3 /nologo /Zd /Zi -DWIN32 /Fo$(TargetDir)/$(InputName).obj  $(InputDir)/$(InputFileName)"
+								CommandLine="ml64 /c /Cp /W3 /nologo /Zd /Zi -DWIN32 /Fo$(TargetDir)/$(InputName).obj  $(InputDir)/$(InputFileName)&#x0D;&#x0A;"
 								Outputs="$(OutDir)/$(InputName).obj"
 							/>
 						</FileConfiguration>

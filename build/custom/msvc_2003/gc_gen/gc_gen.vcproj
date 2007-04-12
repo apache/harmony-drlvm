@@ -235,6 +235,9 @@ copy $(OutDir)\gc_gen.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationNa
 				RelativePath="..\..\..\..\vm\gc_gen\src\mark_compact\fallback_mark_scan.cpp">
 			</File>
 			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\mark_compact\los_extention_mark_scan.cpp">
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\gc_gen\src\mark_compact\mspace.cpp">
 			</File>
 			<File
@@ -381,10 +384,37 @@ copy $(OutDir)\gc_gen.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationNa
 			Name="verify"
 			Filter="">
 			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\verify\verifier_common.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\verify\verifier_common.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\verify\verifier_metadata.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\verify\verifier_metadata.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\verify\verifier_scanner.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\verify\verify_gc_effect.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\verify\verify_gc_effect.h">
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\gc_gen\src\verify\verify_live_heap.cpp">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\gc_gen\src\verify\verify_live_heap.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\verify\verify_mutator_effect.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\verify\verify_mutator_effect.h">
 			</File>
 		</Filter>
 		<Filter
