@@ -66,7 +66,7 @@ protected:
     void registerExceptionRegion(void * regionStart, void * regionEnd, Node * regionDispatchNode);
     void packCode();
     void postPass();
-    void registerDirectCall(Inst * inst);
+    void registerDirectCall(MethodDesc * md, void * instStartAddr);
     void registerInlineInfoOffsets( void );
 
     void orderNodesAndMarkInlinees(StlList<MethodMarkerPseudoInst*>& container, 
@@ -394,37 +394,37 @@ void CodeEmitter::emitCode( void ) {
                 continue;
             }
 
-#ifdef _EM64T_
-            bool patchCall = false;
             if (inst->hasKind(Inst::Kind_ControlTransferInst) && 
                    ((ControlTransferInst*)inst)->isDirect() && 
                    inst->getMnemonic() == Mnemonic_CALL) 
             {
                 ControlTransferInst* callInst =  (ControlTransferInst*)inst;
                 Opnd::RuntimeInfo * rt = callInst->getOpnd(callInst->getTargetOpndIndex())->getRuntimeInfo();
-                bool helperCall = rt && (rt->getKind() == Opnd::RuntimeInfo::Kind_InternalHelperAddress || rt->getKind() == Opnd::RuntimeInfo::Kind_HelperAddress);
-                patchCall = !helperCall;
-            }
-            if (patchCall) {
-                 if ((POINTER_SIZE_INT)ip & 0xF) 
-                 {
-                     unsigned align = 0x10 - (unsigned)((POINTER_SIZE_INT)ip & 0xF);
-                     ip = (uint8*)EncoderBase::nops((char*)ip, align);
-                 }
-                 uint8 * instStartIp = ip;
-                 assert(fit32(instStartIp-blockStartIp));
-                 inst->setCodeOffset( (uint32)(instStartIp-blockStartIp) );
-                 ip = inst->emit(ip);
-                 ip = (uint8*)EncoderBase::nops((char*)ip, 0x10 - inst->getCodeSize());
-            } else {
+                bool callIsNotForPatching = rt && (rt->getKind() == Opnd::RuntimeInfo::Kind_InternalHelperAddress ||
+                                                   rt->getKind() == Opnd::RuntimeInfo::Kind_HelperAddress);
+
+                if (!callIsNotForPatching) { // the call may be patched at runtime
+                    // nops for self-jump <opcode + 8 bit displacement(-3)> for atomic write at aligned ip
+                    // there are 3 bytes reserved to allow self-jump to be aligned for sure
+                    // the first (must be the real inst in CFG to cheat code compactor that removes these nops
+                    // if the inst is the only in the bb)
+                    Inst* nopInst = irManager->newInst(Mnemonic_NOP);
+                    bb->prependInst(nopInst,inst);
+                    ip = nopInst->emit(ip);
+                    // the last two
+                    ip = (uint8*)EncoderBase::nops((char*)ip,2);
+#ifdef _EM64T_
+                    // these nops are required for call transformation from immediate into register form
+                    // nops for MOV r11, callTarget (when !fit32(call_offset) ) <opcode + 8 byte address>
+                    ip = (uint8*)EncoderBase::nops((char*)ip, 10);
 #endif
+                }
+            }
+            
             uint8 * instStartIp = ip;
             assert(fit32(instStartIp-blockStartIp));
             inst->setCodeOffset( (uint32)(instStartIp-blockStartIp) );
             ip = inst->emit(ip);
-#ifdef _EM64T_
-            }
-#endif
         }
         bb->setCodeSize( (uint32)(ip-blockStartIp) );
     }
@@ -509,6 +509,7 @@ void CodeEmitter::postPass()
                 uint8 * instCodeEndAddr=(uint8*)instCodeStartAddr+inst->getCodeSize();
                 uint8 * targetCodeStartAddr=0;
                 uint32 targetOpndIndex = ((ControlTransferInst*)inst)->getTargetOpndIndex();
+                MethodDesc * md = NULL;
                 if (inst->hasKind(Inst::Kind_BranchInst)){
                     BasicBlock * bbTarget=(BasicBlock*)((BranchInst*)inst)->getTrueTarget();
                     targetCodeStartAddr=(uint8*)bbTarget->getCodeStartAddr();
@@ -516,14 +517,21 @@ void CodeEmitter::postPass()
                     BasicBlock* bbTarget = (BasicBlock*)bb->getUnconditionalEdgeTarget();
                     targetCodeStartAddr=(uint8*)bbTarget->getCodeStartAddr();
                 } else if (inst->hasKind(Inst::Kind_CallInst)){
-                    targetCodeStartAddr=(uint8*)(POINTER_SIZE_INT)inst->getOpnd(targetOpndIndex)->getImmValue();
-                }else 
+                    Opnd * targetOpnd=inst->getOpnd(targetOpndIndex);
+                    targetCodeStartAddr=(uint8*)(POINTER_SIZE_INT)targetOpnd->getImmValue();
+                    Opnd::RuntimeInfo * ri=targetOpnd->getRuntimeInfo();
+                    if ( ri && ri->getKind() == Opnd::RuntimeInfo::Kind_MethodDirectAddr ) {
+                        md = (MethodDesc*)ri->getValue(0);
+                    }
+                } else 
                     continue;
                 int64 offset=targetCodeStartAddr-instCodeEndAddr;
 
                 uint64 bcOffset = isBcRequired ? bc2LIRMapHandler->getVectorEntry(inst->getId()) : ILLEGAL_VALUE;
 #ifdef _EM64T_
                 if ( !fit32(offset) ) { // offset is not a signed value that fits into 32 bits
+                    // this is for direct calls only
+                    assert(inst->hasKind(Inst::Kind_CallInst));
                     Type* targetType = irManager->getTypeManager().getInt64Type();
 
                     Opnd* targetVal = irManager->newImmOpnd(targetType,(int64)targetCodeStartAddr);
@@ -536,14 +544,30 @@ void CodeEmitter::postPass()
                     bb->prependInst(movInst,inst);
 
                     uint8* blockStartIp = (uint8*)bb->getCodeStartAddr();
-                    uint8* ip = movInst->emit(instCodeStartAddr);
-                    movInst->setCodeOffset((uint32)(instCodeStartAddr - blockStartIp));
-                    inst->emit(ip);
-                    inst->setCodeOffset((uint32)(ip - blockStartIp));
+                    // 10 bytes are dumped with 'nops' ahead of the call especially for this MOV
+                    uint8* movAddr = instCodeStartAddr-10;
+                    movInst->setCodeOffset((uint32)(movAddr - blockStartIp));
+                    uint8* callAddr = movInst->emit(movAddr);
+                    assert(callAddr == instCodeStartAddr);
+                    // then dump 2 bytes with nops to keep return ip the same for both
+                    // immediate and register calls
+                    EncoderBase::nops((char*)(callAddr), 2);
+                    // reemit the call as a register-based at the address 'callAddr+2'
+                    inst->emit(callAddr+2);
+                    inst->setCodeOffset( (uint32)(callAddr + 2 - blockStartIp) );
+                    // the register call is being registered for patching in the same way as immediate calls
+                    // code patcher takes care of the correct patching
+                    if(md) {
+                        // the call was generated at callAddr+2 but it is being reported as it is at callAddr
+                        // code patcher knows about this collision
+                        registerDirectCall(md,callAddr);
+                    }
 
                     if (bcOffset != ILLEGAL_VALUE) {
-                        bcMap->setEntry((uint64)(POINTER_SIZE_INT)instCodeStartAddr, bcOffset); // MOV
-                        bcMap->setEntry((uint64)(POINTER_SIZE_INT)ip, bcOffset); // CALL
+                        bcMap->setEntry((uint64)(POINTER_SIZE_INT)movAddr, bcOffset); // MOV
+                        // add both possible calls into bcMap
+                        bcMap->setEntry((uint64)(POINTER_SIZE_INT)callAddr, bcOffset); // CALL (immediate)
+                        bcMap->setEntry((uint64)(POINTER_SIZE_INT)callAddr+2, bcOffset); // CALL (register)
                     }
 
                     newOpndsCreated = true;
@@ -555,12 +579,17 @@ void CodeEmitter::postPass()
                     // re-emit the instruction: 
                     inst->emit(instCodeStartAddr);
 
-                    if (inst->hasKind(Inst::Kind_CallInst)){
-                        registerDirectCall(inst);
+                    if (inst->hasKind(Inst::Kind_CallInst) && md){
+                        registerDirectCall(md,instCodeStartAddr);
                     }
 
                     if (bcOffset != ILLEGAL_VALUE) {
                         bcMap->setEntry((uint64)(POINTER_SIZE_INT)instCodeStartAddr, bcOffset);
+                        if (inst->hasKind(Inst::Kind_CallInst)){
+                            // the call can be moved two bytes further after transformation
+                            // into register form during code patching 
+                            bcMap->setEntry((uint64)(POINTER_SIZE_INT)instCodeStartAddr+2, bcOffset);
+                        }
                     }
                 }
             }   
@@ -571,21 +600,12 @@ void CodeEmitter::postPass()
 }
 
 //________________________________________________________________________________________
-void CodeEmitter::registerDirectCall(Inst * inst)
+void CodeEmitter::registerDirectCall(MethodDesc * md, void * instStartAddr)
 {
-    assert(inst->hasKind(Inst::Kind_CallInst) && ((CallInst*)inst)->isDirect());
-    CallInst * callInst=(CallInst*)inst;
-    Opnd * targetOpnd=callInst->getOpnd(callInst->getTargetOpndIndex());
-    assert(targetOpnd->isPlacedIn(OpndKind_Imm));
-    Opnd::RuntimeInfo * ri=targetOpnd->getRuntimeInfo();
-
-    if( !ri || ri->getKind() != Opnd::RuntimeInfo::Kind_MethodDirectAddr) { return; };
-
-    MethodDesc * md = (MethodDesc*)ri->getValue(0);
-    irManager->getCompilationInterface().setNotifyWhenMethodIsRecompiled(md,inst->getCodeStartAddr());
+    irManager->getCompilationInterface().setNotifyWhenMethodIsRecompiled(md,instStartAddr);
     if (Log::isEnabled()) {
         Log::out() << "Registered call to " << md->getParentType()->getName() << "." << md->getName() << " at ";
-        Log::out() << inst->getCodeStartAddr() << " for recompiled method event" << ::std::endl;
+        Log::out() << instStartAddr << " for recompiled method event" << ::std::endl;
     }
 }
 
@@ -597,33 +617,79 @@ bool RuntimeInterface::recompiledMethodEvent(MethodDesc *recompiledMethodDesc,
     Byte * targetAddr = *indirectAddr;
     Byte * callAddr = (Byte*)data;
 
-    uint64 offset = targetAddr - callAddr-5;
-  
+    uint64 offset = targetAddr - callAddr - 5;
+
+    // we can not guarantee the (callAddr+1) aligned
+    // self-jump is a kind of lock for the time of call patching
+    uint32 movSize =
 #ifdef _EM64T_
+                     10;
+#else
+                     0; // no additional MOV on ia32
+#endif
+    Byte * movAddr = callAddr - movSize;
+
+    // there is a reserved region for this self-jump dumped with nops
+    // it is from 'callAddr - movSize' (movAddr)
+    //                   [- 10 (reserved for 'MOV r11, callTarget' if !fit32(offset))] (EM64T only)
+    //                   - 3  (to provide self-jump aligned)
+    // to 'callAddr - movSize' (movAddr)
+    Byte* jmpAddr = movAddr - 3;
+    if( 0 != (POINTER_SIZE_INT(jmpAddr) & 0x1) ) {
+        jmpAddr++;
+    }
+    assert(POINTER_SIZE_INT(movAddr-jmpAddr) >= 2);
+
+    // as jmpAddr is aligned emit it
+
+    //                   JMP opcode  | jmp disp (-2)
+    uint16 jmpWithNop = (0xeb)       | (0xfe << 8);
+    *(uint16*)(jmpAddr) = jmpWithNop;
+    
+    // do we need 'lfence' here?
+    // no. it is not necessary.
+
+    // The patching itself
+
+#ifdef _EM64T_
+    bool registerCallIsBeingPatched = ( 0xB8 == (0xF8 &(*(movAddr+1))) ); // test opcode (&0xF8 - to skip rd bits)
+
+    EncoderBase::Operands args;
     if ( !fit32(offset) ) { // offset is not a signed value that fits into 32 bits
-        return true;
-        // this place should be rewritten to perform code patching safely:
-        // - there should be nops before call inst (sufficient for self jump and regiscter call encodeing)
-        // - encode self jump before call inst
-        // - encode mov reg, newTarget (before)
-        // - replace old call by nops
-        // - replace self-jump by nops
-/*
-        EncoderBase::Operands args;
+        // - encode mov reg, newTarget
         args.clear();
         args.add(RegName_R11);
         // direct call <imm> is relative, but call <reg> use an absolute address to jump
         args.add(EncoderBase::Operand(OpndSize_64, (int64)targetAddr));
-        char * ip = EncoderBase::encode((char*)callAddr, Mnemonic_MOV, args);
+        EncoderBase::encode((char*)movAddr, Mnemonic_MOV, args);
+        if (!registerCallIsBeingPatched) {
+            // dump the first 2 bytes with nops
+            // to keep return ip the same
+            EncoderBase::nops((char*)(callAddr), 2);
+            // - replace old (immediate) call by the register-formed
+            args.clear();
+            args.add(RegName_R11);
+            EncoderBase::encode((char*)(callAddr+2), Mnemonic_CALL, args); // 3 bytes
+        }
+
+    } else if (registerCallIsBeingPatched) { // but offset fits into 32 bits
+        // replace old mov with nops
+        EncoderBase::nops((char*)(movAddr), 10);
+        // emit the call in immediate form
         args.clear();
-        args.add(RegName_R11);
-        EncoderBase::encode(ip, Mnemonic_CALL, args);
-*/
+        args.add(EncoderBase::Operand(OpndSize_32, (int32)offset));
+        EncoderBase::encode((char*)callAddr, Mnemonic_CALL, args); // 5 bytes
     } else
 #endif
     { // offset fits into 32 bits
         *(uint32*)(callAddr+1) = (uint32)offset;
     }
+
+    // removing self-jump
+    *(uint16*)(jmpAddr) = 0x9090; // 2 nops
+    
+    // do we need 'lfence' here?
+    // no. it has some sense but it is not necessary.
 
     return true;
 }

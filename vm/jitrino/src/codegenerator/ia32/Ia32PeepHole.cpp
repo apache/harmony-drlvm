@@ -199,10 +199,10 @@ PeepHoleOpt::Changed PeepHoleOpt::handleInst(Inst* inst)
         return handleInst_MUL(inst);
     case Mnemonic_MOVSS:
     case Mnemonic_MOVSD:
-        return handleInst_SSEMov(inst);
+        //return handleInst_SSEMov(inst);
     case Mnemonic_XORPS:
     case Mnemonic_XORPD:
-        return handleInst_SSEXor(inst);
+        //return handleInst_SSEXor(inst);
     default:
         break;
     }
