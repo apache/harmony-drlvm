@@ -1056,12 +1056,14 @@ void FlowGraph::printLabel(std::ostream& cout, Node* node) {
     Inst *first = (Inst*)node->getFirstInst();
     assert(first->isLabel());
     if (node->isBlockNode()) {
-        if(node->getInDegree() == 0)
-            cout << "ENTRY";
-        else if(node->getOutDegree() == 1 && node->getOutEdges().front()->getTargetNode()->isExitNode())
-            cout << "RETURN";
-        else
+        if(node->getInDegree() == 0) {
+            cout << "ENTRY_";
             ((LabelInst*)first)->printId(cout);
+        } else if(node->getOutDegree() == 1 && node->getOutEdges().front()->getTargetNode()->isExitNode()) {
+            cout << "RETURN";
+        } else {
+            ((LabelInst*)first)->printId(cout);
+        }
     } else if (node->isDispatchNode()) {
         if(node->getOutDegree() == 1 && node->getOutEdges().front()->getTargetNode()->isExitNode())
             cout << "UNWIND";
