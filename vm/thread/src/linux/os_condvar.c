@@ -37,15 +37,52 @@
 int os_cond_timedwait(hycond_t *cond, hymutex_t *mutex, I_64 ms, IDATA nano)
 {
     int r = 0;
+
     if (!ms && !nano) {
         r = pthread_cond_wait(cond, mutex);
     } else {
-        struct timespec abstime;
-        apr_time_t then = apr_time_now() + ms*1000 + nano/1000;
-        abstime.tv_sec = apr_time_sec(then);
-        abstime.tv_nsec = apr_time_usec(then)*1000 + nano%1000;
-        r = pthread_cond_timedwait(cond, mutex, &abstime);
+        // the main point here is to translate time from ms:nano
+        // format into sec:nano format (acceptable by pthread)
+
+        apr_time_t now = apr_time_now();
+
+        // translate 'now' into: seconds + nanos
+        I_64 Nsec = apr_time_sec(now);
+        I_64 Nnsec = (apr_time_usec(now) % APR_USEC_PER_SEC) * ((1000*1000*1000) / APR_USEC_PER_SEC);
+
+        // translate delay method parameters ('ms' and 'nano') into:
+        // seconds + nanos (taking care about overflow)
+        I_64 Dsec = (ms / 1000) + (nano / (1000 * 1000 * 1000));
+        I_64 Dnsec = (ms % 1000) * (1000 * 1000) + (nano % (1000 * 1000 * 1000));
+        Dsec = Dsec + (Dnsec / (1000 * 1000 * 1000));
+        Dnsec = Dnsec % (1000 * 1000 * 1000);
+        
+        // calculating result sec:nanos values
+        // (taking care about overflow as well)
+        I_64 Rsec = Dsec + Nsec + (Dnsec + Nnsec) / (1000 * 1000 * 1000);
+        I_64 Rnsec = (Dnsec + Nnsec) % (1000 * 1000 * 1000);
+
+        // wrap the resulting wake up time (absolute time) into struct
+        // acceptable by pthread_cond_timedwait()
+        struct timespec wakeup_time;
+
+        // final boundary checks: pthread struct sec is 32 bit
+        if (Rsec <= 0x7FFFFFFF) {
+           wakeup_time.tv_sec = Rsec;
+        } else {
+           wakeup_time.tv_sec = 0x7FFFFFFF;
+        }
+
+        // final boundary checks: pthread struct nanos is 32 bit as well
+        if (Rnsec <= 0x7FFFFFFF) {
+           wakeup_time.tv_nsec = Rnsec;
+        } else {
+           wakeup_time.tv_nsec = 0x7FFFFFFF;
+        }
+
+        r = pthread_cond_timedwait(cond, mutex, &wakeup_time);
     }
+
     if (r == ETIMEDOUT)
         r = TM_ERROR_TIMEOUT;
     else if (r == EINTR)
