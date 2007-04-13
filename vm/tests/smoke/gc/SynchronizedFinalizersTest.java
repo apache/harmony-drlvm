@@ -18,17 +18,18 @@
  * @author Pavel Afremov
  * @version $Revision: 1.8.8.3.4.3 $
  */
+
 package gc;
 
 /**
  * Tests synchronized finalizers in multiple threads.
  */
-public class SynchronizedFinilazersTest implements Runnable {
+public class SynchronizedFinalizersTest implements Runnable {
     int n;
     byte[] array;
-    
+
     static final int N_THREADS = 100;
-    static final int N_OBJECTS = 100;
+    static final int N_OBJECTS = 300;
     static final int OBJECT_SIZE = 20000;
 
     static int started = 0;
@@ -38,9 +39,9 @@ public class SynchronizedFinilazersTest implements Runnable {
 
     static boolean stop = false;
 
-    public SynchronizedFinilazersTest(int nn) {
+    public SynchronizedFinalizersTest(int nn) {
         n=nn;
-        synchronized(SynchronizedFinilazersTest.class) {
+        synchronized(SynchronizedFinalizersTest.class) {
             created++;
             array = new byte[OBJECT_SIZE];
             checkPass();
@@ -51,19 +52,21 @@ public class SynchronizedFinilazersTest implements Runnable {
 	updateInfo();  	
 
         for (int i=0;i<N_THREADS ;i++) {
-            new Thread(new SynchronizedFinilazersTest(i)).start();
+            new Thread(new SynchronizedFinalizersTest(i)).start();
         }
     }
  
     public void run() {
         try {
-       	    synchronized(SynchronizedFinilazersTest.class) {
+            synchronized(SynchronizedFinalizersTest.class) {
                 started++;
                 updateInfo();
             }
 
             for (int i=0;i<N_OBJECTS;i++) {
-                new SynchronizedFinilazersTest(n*N_OBJECTS+i);
+                synchronized(SynchronizedFinalizersTest.class) {
+					new SynchronizedFinalizersTest(n*N_OBJECTS+i);
+				}
 
                 if (stop) {
                     break;
@@ -80,7 +83,7 @@ public class SynchronizedFinilazersTest implements Runnable {
                 System.out.flush();
             }
         } finally {
-       	    synchronized(SynchronizedFinilazersTest.class) {
+            synchronized(SynchronizedFinalizersTest.class) {
                 finished++;
                 updateInfo();
                 checkPass();
@@ -89,8 +92,8 @@ public class SynchronizedFinilazersTest implements Runnable {
     }
  
     protected void finalize() {            
-        synchronized(SynchronizedFinilazersTest.class) {
-	    finalized ++;
+        synchronized(SynchronizedFinalizersTest.class) {
+            finalized ++;
             updateInfo();
             checkPass();
         }

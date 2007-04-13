@@ -76,7 +76,6 @@ class FinalizerThread extends Thread {
             trace("FinalizerThread: static initialization started");
         }
 
-        String p = System.getProperty("vm.finalize");
         processorsQuantity = getProcessorsQuantity();
 
         // -XDvm.finalize=0 disables the finalizer thread
@@ -254,7 +253,7 @@ class FinalizerThread extends Thread {
 
         FinalizerThread newThread = null;
         if (waitFinishCounter >= MAX_THREADS) {
-            // do nothing
+			Thread.yield();
         } else {
             try {
                 for (int i = 0; i < processorsQuantity; i++) {

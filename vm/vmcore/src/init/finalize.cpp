@@ -384,12 +384,12 @@ void Objects_To_Finalize::run_finalizers()
     int num_objects = getLength() + vm_get_references_quantity();
 
     if (num_objects == 0) {
-        //return;
+        return;
     }
 
     if ((p_TLS_vmthread->finalize_thread_flags & (FINALIZER_STARTER | FINALIZER_THREAD)) != 0) {
         TRACE2("finalize", "recursive finalization prevented");
-        //return;
+        return;
     }
 
     p_TLS_vmthread->finalize_thread_flags |= FINALIZER_STARTER;
@@ -401,7 +401,7 @@ void Objects_To_Finalize::run_finalizers()
     exn_clear();
     
     if (FRAME_COMPILATION ==
-            (FRAME_COMPILATION | m2n_get_frame_type(m2n_get_last_frame()))) {
+            (FRAME_COMPILATION & m2n_get_frame_type(m2n_get_last_frame()))) {
         assert(work_lock);
 
         IDATA r = jthread_monitor_try_enter(work_lock);
@@ -615,10 +615,12 @@ void vm_run_pending_finalizers()
     NativeObjectHandles nhs;
     assert(hythread_is_suspend_enabled());
     /* BEGIN: modified for NATIVE FINALIZER THREAD */
-    if(get_native_finalizer_thread_flag())
+    if(get_native_finalizer_thread_flag()) {
         activate_finalizer_threads(FALSE);
-    else
+    }
+    else {
         objects_to_finalize.run_finalizers();
+    }
     /* END: modified for NATIVE FINALIZER THREAD */
 } //vm_run_pending_finalizers
 
@@ -626,7 +628,7 @@ int vm_do_finalization(int quantity)
 {
     assert(hythread_is_suspend_enabled());
     return objects_to_finalize.do_finalization(quantity);
-} //vm_run_pending_finalizers
+} //vm_do_finalization
 
 bool is_it_finalize_thread() {
     return ((p_TLS_vmthread->finalize_thread_flags & FINALIZER_THREAD) != 0);

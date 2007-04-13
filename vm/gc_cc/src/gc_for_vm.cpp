@@ -37,6 +37,8 @@ static hythread_tls_key_t tls_key_current=MAX_UINT32, tls_key_clean=MAX_UINT32, 
 
 fast_list<Partial_Reveal_Object*, 1024> finalizible_objects;
 
+static unsigned int pending_finalizers_hint_counter = 0;
+
 #ifdef POINTER64
 GCExport Boolean gc_supports_compressed_references() {
     vtable_base = (Ptr) vm_get_vtable_base();
@@ -233,9 +235,16 @@ Managed_Object_Handle gc_alloc(unsigned in_size,
     unsigned size = get_instance_data_size(in_size);
 
     if (gcvt->is_finalizible()) {
+        pending_finalizers_hint_counter++;
         unsigned char *obj;
         unsigned char *endpos;
         bool allocated = place_into_old_objects(obj, endpos, size);
+
+        if (pending_finalizers_hint_counter > 100) {
+            pending_finalizers_hint_counter = 0;
+            pending_finalizers = true;
+        }
+
         if (allocated) {
             memset(obj, 0, size);
             finalizible_objects.push_back((Partial_Reveal_Object*) obj);
