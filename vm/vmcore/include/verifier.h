@@ -32,16 +32,22 @@ enum Verifier_Result
     VER_ErrorLocals,                // incorrect usage of local variables
     VER_ErrorBranch,                // incorrect local branch offset
     VER_ErrorStackOverflow,         // stack overflow
-    VER_ErrorStackDeep,             // inconstant stack deep to basic block
+    VER_ErrorStackUnderflow,        // stack underflow
+    VER_ErrorStackDepth,            // inconstant stack deep to basic block
     VER_ErrorCodeEnd,               // falling off the end of the code
     VER_ErrorHandler,               // error in method handler
     VER_ErrorDataFlow,              // data flow error
     VER_ErrorIncompatibleArgument,  // incompatible argument to function
     VER_ErrorLoadClass,             // error load class
     VER_ErrorResolve,               // error resolve field/method
-    VER_NoSupportJSR,               // don't support jsr instruction
+    VER_ErrorJsrRecursive,          // found a recursive subroutine call sequence
+    VER_ErrorJsrMultipleRet,        // subroutine splits execution into several
+                                    // <code>ret</code> instructions
+    VER_ErrorJsrLoadRetAddr,        // loaded return address from local variable
+    VER_ErrorJsrOther,              // invalid subroutine
     VER_ClassNotLoaded,             // verified class not loaded yet
-    VER_ErrorInternal               // error in verification process
+    VER_ErrorInternal,              // error in verification process
+    VER_Continue                    // intermediate status, continue analysis
 };
 
 /**

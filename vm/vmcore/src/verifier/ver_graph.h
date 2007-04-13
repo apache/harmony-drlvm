@@ -17,7 +17,7 @@
 /** 
  * @author Pavel Rebriy, Alexei Fedotov
  * @version $Revision: 1.1.2.3.4.4 $
- */  
+ */
 
 
 #ifndef _VERIFIER_GRAPH_H_
@@ -30,70 +30,77 @@
 #include "ver_real.h"
 
 /**
- * Initial node mark in verifier graph.
- */
-#define VERIFY_START_MARK       1
-
-
-/**
  * Each node has a descriptive bitmap.
  */
-enum vf_NodeType {
-    VF_TYPE_NODE_CODE_RANGE  = 0,
-    VF_TYPE_NODE_START_ENTRY = 1,
-    VF_TYPE_NODE_END_ENTRY   = 2,
-    VF_TYPE_NODE_HANDLER     = 3
+enum vf_NodeType
+{
+    VF_NODE_CODE_RANGE = 0,
+    VF_NODE_START_ENTRY = 1,
+    VF_NODE_END_ENTRY = 2,
+    VF_NODE_HANDLER = 3
 };
+
+const unsigned ALL_BITS_SET = ~0U;
 
 /**
  * @ingroup Handles
- * The stack map handle vector handle.
+ * A handle of a stack map vector.
  */
-typedef const struct vf_MapVector* vf_MapVectorHandle;
+typedef const struct vf_MapVector *vf_MapVectorHandle;
 /**
  * @ingroup Handles
- * The handle of the graph node.
+ * A handle of a graph edge.
  */
-typedef const struct vf_Node* vf_NodeHandle;
+typedef const struct vf_Edge *vf_EdgeHandle;
 /**
  * @ingroup Handles
- * The handle of the graph edge.
+ * A handle of a container.
  */
-typedef const struct vf_Edge* vf_EdgeHandle;
-/// Declaration of enum with a descriptive bitmap.
-typedef enum vf_NodeType vf_NodeType_t;
+typedef const struct vf_Container *vf_ContainerHandle;
+/**
+ * @ingroup Handles
+ * A subroutine handle.
+ */
+typedef const struct vf_Sub *vf_SubHandle;
 
 /**
  * Structure of stack map vector.
  */
-struct vf_MapVector {
-    vf_MapEntry_t *m_stack;         ///< stack map vector
-    vf_MapEntry_t *m_local;         ///< locals map vector
-    unsigned short m_number;        ///< number of locals
-    unsigned short m_depth;         ///< stack depth
-    unsigned short m_maxstack;      ///< max stack length
-    unsigned short m_maxlocal;      ///< max local number
+struct vf_MapVector
+{
+    vf_MapEntry *m_stack;       ///< stack map vector
+    vf_MapEntry *m_local;       ///< locals map vector
+    unsigned short m_number;    ///< number of locals
+    unsigned short m_depth;     ///< stack depth
 };
+
+/**
+ * Node marks are greater or equal to this, zero mark means
+ * unmarked node.
+ */
+const unsigned VF_START_MARK = 1;
 
 /**
  * Graph node structure.
  */
 struct vf_Node
 {
-    vf_MapVector m_inMapVector;     ///< stack map IN node vector
-    vf_MapVector m_outMapVector;    ///< stack map OUT node vector
-    unsigned m_start;               ///< index of the first instruction at vf_Context.m_code
-    unsigned m_end;                 ///< index of the last instruction at vf_Context.m_code
-    unsigned m_inedge;              ///< the first incoming edge
-    unsigned m_outedge;             ///< the first outcoming edge
-    unsigned m_innum;               ///< number of incoming edges
-    unsigned m_outnum;              ///< number of outcoming edges
-    unsigned m_nodecount;           ///< node count in enumeration
-    int m_stack;                    ///< stack depth
-    int m_mark;                     ///< node mark
-    vf_NodeType_t m_type;           ///< node type
-    bool m_initialized : 1;         ///< reference in a local variable 
-                                    ///< should be initialized
+    vf_MapVector m_inmap;       ///< stack map IN node vector
+    vf_MapVector m_outmap;      ///< stack map OUT node vector
+    vf_InstrHandle m_start;     ///< the first instruction
+    vf_InstrHandle m_end;       ///< the last instruction
+    vf_EdgeHandle m_inedge;     ///< the first incoming edge
+    vf_EdgeHandle m_outedge;    ///< the first outcoming edge
+    unsigned m_outnum;          ///< a number of outcoming edges
+    unsigned m_nodecount;       ///< node count in enumeration
+    ///< 0 for unreachable and start nodes
+    int m_stack;                ///< stack depth modifier
+    int m_mark;                 ///< node mark
+    vf_SubHandle m_sub;         ///< if this is a subroutine node, this refers
+    ///< to the corresponding subroutine descriptor
+    vf_NodeType m_type;         ///< node type
+    bool m_initialized:1;       ///< reference in a local variable 
+    ///< should be initialized
 };
 
 /**
@@ -101,214 +108,515 @@ struct vf_Node
  */
 struct vf_Edge
 {
-    unsigned m_start;       ///< start edge node
-    unsigned m_end;         ///< end edge node
-    unsigned m_innext;      ///< next incoming edge
-    unsigned m_outnext;     ///< next outcoming edge
+    vf_NodeHandle m_start;      ///< start edge node
+    vf_NodeHandle m_end;        ///< end edge node
+    vf_EdgeHandle m_innext;     ///< next incoming edge
+    vf_EdgeHandle m_outnext;    ///< next outcoming edge
 };
 
 /**
- * Graph node container structure.
+ * A generic container.
+ */
+struct vf_Container
+{
+    vf_ContainerHandle m_next;  ///< next container
+    unsigned m_max;             ///< max number of nodes in container
+    unsigned m_used;            ///< number of nodes in container
+};
+
+/**
+ * Locates a container for an object by its number.
+ * @param[in] container a container to start a search from
+ * @param[in]  n an object number
+ * @param[out] n an object index in a returned container
+ * @return a container
+ */
+static inline vf_ContainerHandle vf_get_container(vf_ContainerHandle
+    container, unsigned &n)
+{
+    while (n >= container->m_max) {
+        n -= container->m_max;
+        container = container->m_next;
+        assert(container);
+        assert(container->m_max);
+    }
+    return container;
+}
+
+/**
+ * Adds a new container to the container list.
+ * @param[in, out] head the first list element
+ * @param[in]  new_container a new container to be placed at the end of the list
+ */
+static inline void vf_add_container(vf_ContainerHandle head,
+    vf_ContainerHandle new_container)
+{
+    while (head->m_next) {
+        head = head->m_next;
+    }
+    ((vf_Container *) head)->m_next = new_container;
+}
+
+
+/**
+ * Checks amount of used space for given containers.
+ */
+static inline unsigned vf_used_space(vf_ContainerHandle container)
+{
+    unsigned used = 0;
+
+    for (; container; container = container->m_next) {
+        used += container->m_used;
+    }
+    return used;
+}                               // vf_used_space
+
+/**
+ * Checks amount of pre-allocated space for given containers.
+ */
+static inline unsigned vf_total_space(vf_ContainerHandle container)
+{
+    unsigned total_space = 0;
+
+    for (; container; container = container->m_next) {
+        total_space += container->m_max;
+    }
+    return total_space;
+}                               // vf_total_space
+
+
+
+/**
+ * A linked list of containers containing arrays of nodes.
  */
 struct vf_NodeContainer
 {
-    vf_NodeContainer* m_next;           ///< next container
-    unsigned m_max;                     ///< max number of nodes in container
-    unsigned m_used;                    ///< number of nodes in container
-    vf_Node m_node[1];                  ///< array of contained nodes
+    vf_Container container;     ///< a container
+    vf_Node m_node[1];          ///< an array of nodes
 };
 
 /**
- * Graph edge container structure.
+ * A linked list of containers containing arrays of edges.
  */
 struct vf_EdgeContainer
 {
-    vf_EdgeContainer* m_next;           ///< next container
-    unsigned m_max;                     ///< max number of edges in container
-    unsigned m_used;                    ///< number of edges in container
-    vf_Edge m_edge[1];                  ///< array of contained edges
+    vf_Container container;     ///< a container
+    vf_Edge m_edge[1];          ///< an array of edges
 };
+
+/**
+ * An iterator over nodes.
+ */
+class vf_Iterator
+{
+    vf_ContainerHandle m_container;     ///< a container
+    unsigned m_index;           ///< an index in this container
+
+    /**
+     * Go to the next container.
+     */
+    void SkipContainer()
+    {
+        m_container = m_container->m_next;
+        m_index = 0;
+    }
+
+    /**
+     * Advances iterator to the next object.
+     */
+    void Advance()
+    {
+        m_index++;
+        if (m_index < m_container->m_max) {
+            return;
+        }
+        SkipContainer();
+    }
+public:
+    /**
+     * Empty constructor.
+     */
+    vf_Iterator ()
+    {
+    }
+
+    /**
+     * Creates an iterator for given containers.
+     * @param[in] container the first container
+     */
+    vf_Iterator (vf_ContainerHandle container)
+    {
+        Reset(container);
+    }
+
+    /**
+     * Resets an iterator for given containers.
+     * @param[in] container the first container
+     */
+    void Reset(vf_ContainerHandle container)
+    {
+        m_container = container;
+        m_index = 0;
+    }
+
+    /**
+     * Gets a current node.
+     */
+    vf_NodeHandle GetNextNode()
+    {
+        vf_NodeHandle node =
+            ((vf_NodeContainer *) m_container)->m_node + m_index;
+        Advance();
+        return node;
+    }
+
+    /**
+     * @return <code>true</code> if the iterator can be advanced further.
+     */
+    bool HasMoreElements() const
+    {
+        return m_container;
+    }
+};                              // vf_Iterator
 
 /**
  * Verifier control flow graph structure.
  */
 class vf_Graph
 {
+    vf_NodeContainer *m_nodes;  ///< array of nodes
+    vf_EdgeContainer *m_edges;  ///< array of edges
+    vf_Pool *m_pool;            ///< graph memory pool
+    vf_NodeHandle *m_enum;      ///< graph node enumeration
+    unsigned m_nodenum;         ///< number of nodes
+    unsigned m_edgenum;         ///< number of edges
+    unsigned m_enumcount;       ///< number of enumerated elements
+    vf_NodeHandle m_endnode;    ///< control flow end
+    vf_ContextHandle m_ctx;     ///< a verification context
+    vf_Iterator iterator;       ///< an embedded graph iterator
+    bool m_free;                ///< need to free pool
+
+    /**
+     * Prints a graph node in <code>stderr</code>.
+     * @param node a graph node
+     */
+    void DumpNode(vf_NodeHandle node);
+
+    /**
+     * Prints graph node instructions in <code>stderr</code>.
+     * @param node_num   a graph node
+     * @note Empty in release mode.
+     */
+    void DumpNodeInternal(vf_NodeHandle node);
+
+#ifdef _VF_DEBUG
+    /**
+     * Prints subroutine information in <code>stderr</code>.
+     * @param sub a subroutine handle
+     */
+    void DumpSub(vf_SubHandle sub);
+
+    /**
+     * Checks if node maps are allocated.
+     * @param[in] vector to check
+     */
+    bool AreMapsAllocated(vf_MapVectorHandle vector) const
+    {
+        return (!m_ctx->m_maxlocal || vector->m_local)
+            && (!m_ctx->m_maxstack || vector->m_stack);
+    }
+#endif                          // _VF_DEBUG
+
+    /**
+     * Dumps a graph header in a file in a DOT format.
+     * @param graph_name    a graph name
+     * @param fout          a file stream
+     * @note Empty in release mode.
+     */
+    void DumpDotHeader(const char *graph_name, ofstream &fout);
+
+    /**
+     * Dumps a graph node in a file in DOT format.
+     * @param node     a graph node
+     * @param fout     a file stream
+     * @note Empty in release mode.
+     */
+    void DumpDotNode(vf_NodeHandle node, ofstream &fout);
+
+    /**
+     * Dumps graph node instructions in a file stream in DOT format.
+     * @param node       a graph node
+     * @param next_node  a separator between nodes in stream
+     * @param next_instr a separator between instructions in stream
+     * @param fout       an output file stream
+     * @note Empty in release mode.
+     */
+    void DumpDotNodeInternal(vf_NodeHandle node,
+        char *next_node, char *next_instr, ofstream &fout);
+
+    /**
+     * Dumps graph end in file in DOT format.
+     * @param fout - output file stream
+     * @note Empty in release mode.
+     */
+    void DumpDotEnd(ofstream &fout);
+
 public:
     /**
-     * Control flow graph constructor.
-     * @param node - number of graph nodes
-     * @param edge - number of graph edges
-     * @param pool - external memory pool
-     * @note Function allocates memory for graph structure, nodes and edges.
+     * Constructs a control flow graph and allocates memory for
+     * graph structure, nodes and edges.
+     * @param nodenum a number of graph nodes
+     * @param edgenum a number of graph edges
+     * @param ctx     a verification context
      */
-    vf_Graph( unsigned node, unsigned edge, vf_VerifyPool_t *pool )
-            : m_nodes(NULL), m_edges(NULL), m_pool(pool), m_enum(NULL),
-            m_nodenum(0), m_edgenum(1), m_enummax(0), m_enumcount(0),
-            m_free(false)
+    vf_Graph(unsigned nodenum, unsigned edgenum,
+        vf_ContextHandle ctx):m_nodes(NULL), m_edges(NULL),
+        m_pool(ctx->m_pool), m_enum(NULL), m_nodenum(0), m_edgenum(0),
+        m_enumcount(0), m_ctx(ctx), m_free(false)
     {
-        CreateNodes( node );
-        CreateEdges( edge );
-        return;
-    } // vf_Graph
+        CreateNodes(nodenum);
+        CreateEdges(edgenum);
+    }                           // vf_Graph
 
     /**
      * Control flow graph destructor.
      * @note Function release memory for graph structure, nodes and edges.
      */
-    ~vf_Graph()
-    {
-        if( m_free ) {
-            vf_delete_pool( m_pool ); 
+    ~vf_Graph() {
+        if (m_free) {
+            vf_delete_pool(m_pool);
         }
-        return;
-    } // ~vf_Graph
+    }                           // ~vf_Graph
 
     /**
-     * Function create graph nodes.
-     * @param count - number of graph nodes
-     * @note Function allocates memory for graph nodes.
+     * Allocates memory for graph nodes.
+     * @param count a number of nodes
      */
-    void CreateNodes( unsigned count );
+    void CreateNodes(unsigned count)
+    {
+        assert(count > 0);
+        vf_NodeContainer *nodes =
+            (vf_NodeContainer *) AllocMemory(sizeof(vf_NodeContainer)
+            + (count - 1) * sizeof(vf_Node));
+
+        nodes->container.m_max = count;
+        if (m_nodes == NULL) {
+            m_nodes = nodes;
+        } else {
+            vf_add_container(&m_nodes->container, &nodes->container);
+        }
+    }
+
+    /**
+     * Allocates a container for graph edges.
+     * @param count a number of edges 
+     */
+    void CreateEdges(unsigned count)
+    {
+        assert(count > 0);
+        vf_EdgeContainer *edges =
+            (vf_EdgeContainer *) AllocMemory(sizeof(vf_EdgeContainer)
+            + (count - 1) * sizeof(vf_Edge));
+        edges->container.m_max = count;
+        if (m_edges == NULL) {
+            m_edges = edges;
+        } else {
+            vf_add_container(&m_edges->container, &edges->container);
+        }
+    }
 
     /**
      * Gets a graph node.
-     *
      * @param[in] node_num  a node number, should be in range
      * @return a handle of the node
      */
-    vf_NodeHandle GetNode( unsigned node_num );
+    vf_NodeHandle GetNode(unsigned node_num) const
+    {
+        // get node
+        assert(m_nodes);
+        assert(node_num < m_nodenum);
+
+        vf_NodeContainer *nodes =
+            (vf_NodeContainer *) vf_get_container(&m_nodes->container,
+            node_num);
+        return nodes->m_node + node_num;
+    }                           // GetNode
+
 
     /**
-     * Gets the first node.
+     * Gets a graph node from a program counter.
      *
-     * @return a handle of the node
+     * @param[in] pc   a bytecode index at a node start
+     * @return a handle of a node
      */
-    vf_NodeHandle GetFirstNode()
+    vf_NodeHandle GetNodeFromBytecodeIndex(unsigned pc) const
     {
-        return GetNode( 0 );
-    } // GetFirstNode
+        vf_InstrHandle instr = m_ctx->m_bc[pc].m_instr;
+        assert(instr);
+        assert(m_ctx->m_bc[pc].m_instr->m_addr - m_ctx->m_bytes == pc);
+        vf_NodeHandle node = instr->m_node;
+        assert(GetNodeNum(node) > m_ctx->m_handlers);
+        return node;
+    }
+
+    /**
+     * Gets the start node.
+     * @return the handle of the start node
+     */
+    vf_NodeHandle GetStartNode()
+    {
+        return m_nodes->m_node;
+    }                           // GetStartNode
+
+    /**
+     * Adds the end node.
+     * @return the handle of the end node
+     */
+    vf_NodeHandle AddEndNode()
+    {
+        m_endnode = NewNode(VF_NODE_END_ENTRY);
+        return m_endnode;
+    }                           // GetEndNode
+
+    /**
+     * Gets the end node.
+     * @return the handle of the end node
+     */
+    vf_NodeHandle GetEndNode()
+    {
+        return m_endnode;
+    }                           // GetEndNode
 
     /**
      * Creates a new node of a specific type.
-     * Node array must have enough free space for a new element.
-     *
-     * @param[in] m_type node type
-     * @param[in] stack  a stack modifier (signed value)
+     * A node array must have enough free space for a new element.
+     * @param[in] type node type
      * @return a handle of the created node
      */
-    vf_NodeHandle NewNode( vf_NodeType_t m_type, int stack );
+    vf_NodeHandle NewNode(vf_NodeType type)
+    {
+        // get node
+        assert(m_nodes);
+        unsigned count = m_nodenum;
+        vf_NodeContainer *nodes =
+            (vf_NodeContainer *) vf_get_container(&m_nodes->container, count);
+
+        // increment nodes count
+        m_nodenum++;
+        nodes->container.m_used++;
+        assert(nodes->container.m_used <= nodes->container.m_max);
+
+        // set node
+        vf_Node *node = nodes->m_node + count;
+        node->m_type = type;
+        return node;
+    }                           // NewNode
+
 
     /**
      * Creates a new node for a bytecode range.
-     * Node array must have enough free space for a new element.
-     *
-     * @param[in] start   an instruction start index
-     * @param[in] end     an instruction end index
-     * @param[in] stack   a stack modifier (signed value)
+     * A node array must have enough free space for a new element.
+     * @param[in] start   the first instruction
+     * @param[in] end     the last instruction
      * @return a handle of the created node
      */
-    vf_NodeHandle NewNode( unsigned start,
-                           unsigned end,
-                           int stack)
+    vf_NodeHandle NewNode(vf_InstrHandle start, vf_InstrHandle end)
     {
         // get node
-        vf_Node* node = (vf_Node*) NewNode( VF_TYPE_NODE_CODE_RANGE, stack );
+        vf_Node *node = (vf_Node *) NewNode(VF_NODE_CODE_RANGE);
         node->m_start = start;
         node->m_end = end;
         return node;
-    } // NewNode( start, end, len )
+    }                           // NewNode(start, end)
 
     /**
-     * Gets graph edge.
-     * Parameter <i>edge_num</i> must be in range.
+     * A quick interface for adding nodes to the container. Reserves a
+     * given number of nodes by increasing <code>m_used</code> count
+     * of the current container.
+     * A node array must have enough free space for a new element.
+     * @param[in] count a handle of an existing node
+     * @return a reference to the first reserved node
+     */
+    vf_Node *AddNodes(unsigned count)
+    {
+        // get node
+        assert(m_nodes);
+
+        // find a container
+        unsigned c = m_nodenum;
+        vf_NodeContainer *nodes =
+            (vf_NodeContainer *) vf_get_container(&m_nodes->container, c);
+
+        // increment nodes count
+        m_nodenum += count;
+        nodes->container.m_used += count;
+        assert(nodes->container.m_used <= nodes->container.m_max);
+
+        // return a reference
+        return nodes->m_node + c;
+    }                           // AddNodes
+
+    /**
+     * Creates a new edge between graph nodes.
      *
-     * @param[in] edge_num  - edge number
-     *
-     * @return The pointer to edge structure.
+     * @param start_node    an edge start
+     * @param end_node      an edge end
+     * @return a handle of a created edge
      */
-    vf_EdgeHandle GetEdge( unsigned edge_num );
-
-    /**
-     * Creates a new edge for graph nodes.
-     *
-     * @param start_node    - start edge node
-     * @param end_node      - end edge node
-     * @note Edge is set as out edge for start_node and as in edge for end_node.
-     */
-    void NewEdge( unsigned start_node,
-                  unsigned end_node);
-
-    /**
-     * Gets the first code instruction of a node.
-     * @param node_num the node number
-     * @return a number of the first code instruction of graph node
-     * @note Assertion is raised if <i>node_num</i> is not a
-     * code range node.
-     */
-    unsigned GetNodeFirstInstr( unsigned node_num )
+    vf_EdgeHandle NewEdge(vf_Node *start_node, vf_Node *end_node)
     {
-        vf_NodeHandle node = GetNode( node_num );
-        assert( VF_TYPE_NODE_CODE_RANGE == node->m_type );
-        return node->m_start;
-    } // GetNodeFirstInstr
+        // get edge
+        assert(m_edges);
+
+        VF_TRACE("graph",
+            "Creating a new edge from " << GetNodeNum(start_node)
+            << " to " << GetNodeNum(end_node));
+        unsigned count = m_edgenum;
+        vf_EdgeContainer *edges =
+            (vf_EdgeContainer *) vf_get_container(&m_edges->container, count);
+
+        // get a new edge and edge's nodes
+        vf_Edge *edge = edges->m_edge + count;
+
+        // set a new edge
+        edge->m_start = start_node;
+        edge->m_end = end_node;
+        edge->m_outnext = start_node->m_outedge;
+        start_node->m_outedge = edge;
+        start_node->m_outnum++;
+        edge->m_innext = end_node->m_inedge;
+        end_node->m_inedge = edge;
+
+        // increment edge count
+        m_edgenum++;
+        edges->container.m_used++;
+        assert(edges->container.m_used <= edges->container.m_max);
+        return edge;
+    }                           // NewEdge
 
     /**
-     * Gets the last code instruction of a node.
-     * @param node_num the node number
-     * @return a number of the last code instruction of graph node
-     * @note Assertion is raised if <i>node_num</i> is not a
-     * code range node.
+     * Resets an internal graph node iterator.
      */
-    unsigned GetNodeLastInstr( unsigned node_num )
+    void ResetNodeIterator()
     {
-        vf_NodeHandle node = GetNode( node_num );
-        assert( VF_TYPE_NODE_CODE_RANGE == node->m_type );
-        return node->m_end;
-    } // GetNodeLastInstr
+        iterator.Reset(&m_nodes->container);
+    }
 
     /**
-     * Gets a bytecode length of a graph node instructions.
-     * @param context a verifier context handle
-     * @param node a node handle
-     * @return a number of the last code instruction of graph node
-     * @note Assertion is raised if <i>node_num</i> is not a
-     * code range node.
+     * Gets a next node.
      */
-    unsigned GetNodeBytecodeLen( vf_ContextHandle context,
-                                 vf_NodeHandle node)
+    vf_NodeHandle GetNextNode()
     {
-        assert( VF_TYPE_NODE_CODE_RANGE == node->m_type );
-        unsigned char* code_end = (node->m_end + 1 == context->m_codeNum)
-            ? method_get_bytecode( context->m_method )
-                + method_get_code_length( context->m_method )
-            : context->m_code[node->m_end + 1].m_addr;
-
-        unsigned len = (unsigned)(code_end -
-            context->m_code[node->m_start].m_addr);
-        return len;
-    } // GetNodeBytecodeLen
+        return iterator.GetNextNode();
+    }
 
     /**
-     * Gets a stack modifier of a graph node.
-     * @param node_num a node number
-     * @return a stack modifier of graph node
+     * Checks if there are still elements to iterate.
      */
-    int GetNodeStackModifier( unsigned node_num )
+    bool HasMoreElements() const
     {
-        return GetNode( node_num )->m_stack;
-    } // GetNodeStackModifier
-
-    /**
-     * Sets graph node stack modifier.
-     * @param node_num a graph node number
-     * @param stack    a stack modifier (signed value)
-     */
-    void SetNodeStackModifier( unsigned node_num, int stack )
-    {
-        vf_Node* node = (vf_Node*) GetNode( node_num );
-        node->m_stack = stack;
-    } // SetNodeStackModifier
+        return iterator.HasMoreElements();
+    }
 
     /**
      * Counts graph nodes.
@@ -317,236 +625,31 @@ public:
     unsigned GetNodeCount()
     {
         return m_nodenum;
-    } // GetNodeCount
+    }                           // GetNodeCount
 
     /**
      * Counts graph edges excluding
      * the reserved edge.
      * @return a number of graph edges
      */
-    unsigned GetEdgeCount()
+    unsigned GetEdgeCount() const
     {
-        return m_edgenum - 1;
-    } // GetEdgeCount
+        return m_edgenum;
+    }                           // GetEdgeCount
 
     /**
-     * Marks a graph node with a given number.
-     * @param node_num a graph node number
-     * @param mark     a mark
+     * Removes marks for all nodes.
      */
-    void SetNodeMark( unsigned node_num, int mark )
+    void CleanNodeMarks()
     {
-        vf_Node* node = (vf_Node*) GetNode( node_num );
-        node->m_mark = mark;
-    } // SetNodeMark
+        assert(m_nodes);
+        ResetNodeIterator();
 
-    /**
-     * Gets a graph node mark.
-     * @param  node_num a node number
-     * @return a graph node mark
-     */
-    int GetNodeMark( unsigned node_num )
-    {
-        return GetNode( node_num )->m_mark;
-    } // GetNodeMark
-
-    /**
-     * Checks if a node is marked.
-     * @param  node_num a graph node number
-     * @return <code>true</code> if node is marked, <code>false</code> otherwise
-     */
-    bool IsNodeMarked( unsigned node_num )
-    {
-        return 0 != GetNode( node_num )->m_mark;
-    } // IsNodeMarked
-
-    /**
-     * Function removes node mark.
-     */
-    void CleanNodesMark()
-    {
-        // clean node's mark
-        assert( m_nodes );
-        vf_NodeContainer* nodes = m_nodes;
-        while( nodes != NULL ) {
-            for( unsigned index = 0; index < nodes->m_used; index++ ) {
-                nodes->m_node[index].m_mark = 0;
-            }
-            nodes = nodes->m_next;
+        // clean node marks
+        while (HasMoreElements()) {
+            ((vf_Node *) GetNextNode())->m_mark = 0;
         }
-        return;
-    } // CleanNodesMark
-
-    /**
-     * Sets local variable reference initialization flag for a anode.
-     * @param node_num a graph node number
-     * @param flag     a node flag
-     */
-    void SetNodeInitFlag( unsigned node_num, bool flag )
-    {
-        vf_Node* node = (vf_Node*) GetNode( node_num );
-        node->m_initialized = flag;
-    } // SetNodeInitFlag
-
-    /**
-     * Gets an initialization flag for local variable reference for a given node.
-     * @param node_num a graph node number
-     * @return <code>true</code> if the local variable reference has
-     * to be initialized, <code>false</code> otherwise.
-     */
-    bool GetNodeInitFlag( unsigned node_num )
-    {
-        return GetNode( node_num )->m_initialized;
-    } // GetNodeInitFlag
-
-    /**
-     * Function creates <i>IN</i> data flow vector of a node.
-     * @param node_num  a graph node number
-     * @param example   a handle of copied data flow vector
-     * @param need_copy a copy flag
-     * @note If copy flag <code>true</code>, incoming vector is copied to <i>IN</i>,
-     *       else if copy flag <code>false</code>, <i>IN</i> vector is created
-     *       with parameters of current vector.
-     */
-    void SetNodeInVector( unsigned node_num,
-                          vf_MapVectorHandle example,
-                          bool need_copy)
-    {
-        SetVector( GetNodeInVector( node_num ), example, need_copy );
-    } // SetNodeInVector
-
-    /**
-     * Creates <i>OUT</i> data flow vector of a node.
-     * @param node_num  a graph node number
-     * @param example   a handle of copied data flow vector
-     * @param need_copy a copy flag
-     * @note If copy flag <code>true</code>, incoming vector is copied to <i>OUT</i>,
-     *       else if copy flag <code>false</code>, <i>OUT</i> vector is created
-     *       with parameters of current vector.
-     */
-    void SetNodeOutVector( unsigned node_num,
-                           vf_MapVectorHandle example,
-                           bool need_copy )
-    {
-        SetVector( GetNodeOutVector( node_num ), example, need_copy );
-    } // SetNodeOutVector
-
-    /**
-     * Gets <i>IN</i> data flow vector for the node.
-     * @param node_num graph node number
-     * @return a reference to <i>IN</i> data flow stack map vector
-     * @note Assertion is raised if <i>node_num</i> is out of range.
-     * @see vf_MapVector_t
-     */
-    vf_MapVectorHandle GetNodeInVector( unsigned node_num )
-    {
-        return &( GetNode( node_num )->m_inMapVector );
-    } // GetNodeInVector
-
-    /**
-     * Gets <i>OUT</i> data flow vector for the node.
-     * @param node_num graph node number
-     * @return a reference to <i>OUT</i> data flow stack map vector
-     * @see vf_MapVector_t
-     */
-    vf_MapVectorHandle GetNodeOutVector( unsigned node_num )
-    {
-        return &( GetNode( node_num )->m_outMapVector );
-    } // GetNodeOutVector
-
-    /**
-     * Function creates graph edges.
-     * @param number - number of edges 
-     */
-    void CreateEdges( unsigned number );
-
-    /**
-     * Function receives next <i>IN</i> edge of graph node.
-     * @param edge_num - number of graph edge
-     * @return Number of next <i>IN</i> edge of node.
-     * @note Assertion is raised if <i>edge_num</i> is out of range.
-     */
-    unsigned GetEdgeNextInEdge( unsigned edge_num )
-    {
-        return GetEdge( edge_num )->m_innext;
-    } // GetEdgeNextInEdge
-
-    /**
-     * Function receives next <i>OUT</i> edge of graph node.
-     * @param edge_num - number of graph edge
-     * @return Number of next <i>OUT</i> edge of node.
-     * @note Assertion is raised if <i>edge_num</i> is out of range.
-     */
-    unsigned GetEdgeNextOutEdge( unsigned edge_num )
-    {
-        return GetEdge( edge_num )->m_outnext;
-    } // GetEdgeNextOutEdge
-
-    /**
-     * Function receives start graph node of edge.
-     * @param edge_num - number of graph edge
-     * @return Number start graph node of edge.
-     * @note Assertion is raised if <i>edge_num</i> is out of range.
-     */
-    unsigned GetEdgeStartNode( unsigned edge_num )
-    {
-        return GetEdge( edge_num )->m_start;
-    } // GetEdgeStartNode
-
-    /**
-     * Function receives end graph node of edge.
-     * @param edge_num - number of graph edge
-     * @return Number end graph node of edge.
-     * @note Assertion is raised if <i>edge_num</i> is out of range.
-     */
-    unsigned GetEdgeEndNode( unsigned edge_num )
-    {
-        return GetEdge( edge_num )->m_end;
-    } // GetEdgeStartNode
-
-    /**
-     * Function receives number of <i>IN</i> edges of graph node.
-     * @param node_num - number of graph node
-     * @return Number of <i>IN</i> edges of graph node.
-     * @note Assertion is raised if <i>node_num</i> is out of range.
-     */
-    unsigned GetNodeInEdgeNumber( unsigned node_num )
-    {
-        return GetNode( node_num )->m_innum;
-    } // GetNodeInEdgeNumber
-
-    /**
-     * Function receives number of <i>OUT</i> edges of graph node.
-     * @param node_num - number of graph node
-     * @return Number of <i>OUT</i> edges of graph node.
-     * @note Assertion is raised if <i>node_num</i> is out of range.
-     */
-    unsigned GetNodeOutEdgeNumber( unsigned node_num )
-    {
-        return GetNode( node_num )->m_outnum;
-    } // GetNodeOutEdgeNumber
-
-    /**
-     * Function receives first <i>IN</i> edge of graph node.
-     * @param node_num - number of graph node
-     * @return First <i>IN</i> edges of node.
-     * @note Assertion is raised if <i>node_num</i> is out of range.
-     */
-    unsigned GetNodeFirstInEdge( unsigned node_num )
-    {
-        return GetNode( node_num )->m_inedge;
-    } // GetNodeFirstInEdge
-
-    /**
-     * Function receives first <i>OUT</i> edge of graph node.
-     * @param node_num - number of graph node
-     * @return First <i>OUT</i> edges of node.
-     * @note Assertion is raised if <i>node_num</i> is out of range.
-     */
-    unsigned GetNodeFirstOutEdge( unsigned node_num )
-    {
-        return GetNode( node_num )->m_outedge;
-    } // GetNodeFirstOutEdge
+    }                           // CleanNodeMarks
 
     /**
      * Allocates memory from the graph memory pool.
@@ -554,205 +657,275 @@ public:
      * @return a pointer to allocated memory,
      *         or <code>NULL</code> if memory allocation failed.
      */
-    void* AllocMemory( unsigned size ) {
-        assert( size );
-        return vf_alloc_pool_memory( m_pool, size );
-    } // AllocMemory
+    void *AllocMemory(unsigned size)
+    {
+        assert(size);
+        return vf_palloc(m_pool, size);
+    }                           // AllocMemory
 
     /**
-     * Function cleans graph node enumeration, creates new graph
-     * enumeration structure and sets first enumeration element.
-     * @param node_num - first enumeration node
-     * @note Assertion is raised if <i>node_num</i> is out of range.
+     * Allocates a graph node enumeration sequence and
+     * sets first enumeration element.
+     * @param node a first enumeration node
      */
-    void SetStartCountNode( unsigned node_num );
+    void SetStartCountNode(vf_Node *node)
+    {
+        // check node number is in range
+        assert(m_nodes);
+        assert(node);
+
+        // allocate memory
+        m_enum = (vf_NodeHandle *) vf_palloc(m_pool, sizeof(vf_NodeHandle)
+            * m_nodenum);
+
+        // clean node enumeration
+        ResetNodeIterator();
+        while (HasMoreElements()) {
+            ((vf_Node *) GetNextNode())->m_nodecount = ALL_BITS_SET;
+        }
+
+        // set node enumeration number
+        node->m_nodecount = 0;
+
+        // set enumeration first element;
+        m_enum[0] = node;
+        m_enumcount = 1;
+    }
 
     /**
-     * Function receives number of enumerated nodes.
+     * Receives number of enumerated nodes.
      * @return Function returns number of enumerated nodes.
      */
-    unsigned GetEnumCount()
+    unsigned GetReachableNodeCount()
     {
         return m_enumcount;
-    } // SetStartCountNode
+    }                           // SetStartCountNode
 
     /**
-     * Function sets next enumeration element in graph enumeration structure.
-     * @param node_num - next enumeration node
-     * @note Assertion is raised if <i>node_num</i> is out of range.
+     * Sets a next enumeration element in a graph enumeration
+     * and stores the index in the node.
+     * @param node  a node handle
      */
-    void SetNextCountNode( unsigned node_num )
+    void AddReachableNode(vf_Node *node)
     {
         // check enumeration count is in range
-        assert( m_enumcount < m_nodenum );
+        assert(m_enumcount < m_nodenum);
 
         // set enumeration element for node
-        m_enum[m_enumcount] = node_num;
+        m_enum[m_enumcount] = node;
 
         // set node enumeration number and increase number of enumerated nodes
-        vf_Node* node = (vf_Node*) GetNode( node_num );
         node->m_nodecount = m_enumcount++;
-        return;
-    } // SetNextCountNode
+    }                           // SetNextCountNode
 
     /**
-     * Function receives first enumerated graph node.
-     * @return First enumerated graph node in graph enumeration structure.
+     * Suits for counting reachable nodes.
+     * @param node  a node handle
      */
-    unsigned GetStartCountNode()
+    void IncrementReachableCount()
     {
-        return m_enum[0];
-    } // GetStartCountNode
-    
+        m_enumcount++;
+    }                           // IncreaseReachableCount
+
     /**
-     * Function receives graph node relevant to enumeration element.
-     * @param count - given enumeration element
-     * @return Graph node relevant to enumeration element.
-     * @note Assertion is raised if <i>count</i> is out of range.
+     * Gets a graph node by enumeration index.
+     * @param count given enumeration index
+     * @return      a graph node handle
      */
-    unsigned GetCountElementNode( unsigned count )
+    vf_NodeHandle GetReachableNode(unsigned count)
     {
-        // check element is in range.
-        assert( count < m_nodenum );
         return m_enum[count];
-    } // GetCountElementNode
+    }                           // GetCountElementNode
 
     /**
-     * Function receives graph node enumeration count.
-     * @param node_num - given node
-     * @return Graph node enumeration count.
-     * @note Assertion is raised if <i>node_num</i> is out of range.
+     * Copies a data flow vector from a given source.
+     * @param source   a handle of a source vector
+     * @param dest     a pointer to a vector to set
      */
-    unsigned GetNodeCountElement( unsigned node_num )
+    void CopyVector(vf_MapVectorHandle source, vf_MapVector *dest)
     {
-        return GetNode( node_num )->m_nodecount;
-    } // GetNodeCountElement
+        assert(AreMapsAllocated(source));
+        assert(AreMapsAllocated(dest));
+
+        dest->m_number = source->m_number;
+        dest->m_depth = source->m_depth;
+
+        unsigned index;
+        for (index = 0; index < source->m_number; index++) {
+            dest->m_local[index] = source->m_local[index];
+        }
+        for (index = 0; index < source->m_depth; index++) {
+            dest->m_stack[index] = source->m_stack[index];
+        }
+    }
 
     /**
-     * Function prints graph structure in <code>stderr</code>.
-     * @param context - current verifier context
-     * @note Function is valid in debug mode.
-     * @see vf_Context_t
+     * Copies a data flow vector from a given source,
+     * nullifies the rest of the destination.
+     * @param source   a handle of a source vector
+     * @param dest     a pointer to a vector to set
      */
-    void DumpGraph( vf_Context_t *context );
+    void CopyFullVector(vf_MapVectorHandle source, vf_MapVector *dest)
+    {
+        assert(AreMapsAllocated(source));
+        assert(AreMapsAllocated(dest));
+
+        unsigned index;
+        vf_MapEntry zero = { 0 };
+
+        dest->m_number = source->m_number;
+        dest->m_depth = source->m_depth;
+
+        // copy locals
+        for (index = 0; index < source->m_number; index++) {
+            dest->m_local[index] = source->m_local[index];
+        }
+        for (; index < m_ctx->m_maxlocal; index++) {
+            dest->m_local[index] = zero;
+        }
+        // copy stack
+        for (index = 0; index < source->m_depth; index++) {
+            dest->m_stack[index] = source->m_stack[index];
+        }
+        for (; index < m_ctx->m_maxstack; index++) {
+            dest->m_stack[index] = zero;
+        }
+    }
 
     /**
-     * Function dumps verifier graph in file in DOT format.
-     * @param context - current verifier context
-     * @note Function is valid in debug mode.
+     * Allocates a vector with maximum storage capacity.
+     * @param[out] vector map to allocate
+     */
+    void AllocVector(vf_MapVector *vector)
+    {
+        // create and set local vector
+        if (m_ctx->m_maxlocal && !vector->m_local) {
+            vector->m_local =
+                (vf_MapEntry *) vf_palloc(m_pool,
+                m_ctx->m_maxlocal * sizeof(vf_MapEntry));
+        }
+        // create and set stack vector
+        if (m_ctx->m_maxstack && !vector->m_stack) {
+            vector->m_stack =
+                (vf_MapEntry *) vf_palloc(m_pool,
+                m_ctx->m_maxstack * sizeof(vf_MapEntry));
+        }
+    }
+
+    /**
+     * Prints a graph structure in <code>stderr</code>.
+     * @note Empty in release mode.
+     */
+    void DumpGraph();
+
+    /**
+     * Dumps a graph in a file in DOT format.
+     * @note Empty in release mode.
      * @note File name is created from class and method names with .dot extension.
-     * @see vf_Context_t
      */
-    void DumpDotGraph( vf_Context_t *context );
+    void DumpDotGraph();
 
-private:
-    vf_NodeContainer* m_nodes;          ///< array of nodes
-    vf_EdgeContainer* m_edges;          ///< array of edges
-    vf_VerifyPool_t *m_pool;            ///< graph memory pool
-    unsigned *m_enum;                   ///< graph node enumeration structure
-    unsigned m_nodenum;                 ///< number of nodes
-    unsigned m_edgenum;                 ///< number of edges
-    unsigned m_enummax;                 ///< max number of enumerated elements
-    unsigned m_enumcount;               ///< number of enumerated elements
-    bool m_free;                        ///< need to free pool
+#if _VF_DEBUG
+    /**
+     * Gets a graph node number for debugging purposes.
+     *
+     * @param[in] node a node handle
+     * @return a subsequent node number
+     */
+    unsigned GetNodeNum(vf_NodeHandle node) const
+    {
+        assert(node);
+        unsigned node_num = 0;
+        vf_NodeContainer *nodes = m_nodes;
+        while (nodes) {
+            unsigned index = node - nodes->m_node;
+            if (index < nodes->container.m_max) {
+                node_num += index;
+                assert(node_num < m_nodenum);
+                return node_num;
+            }
+            node_num += nodes->container.m_max;
+            nodes = (vf_NodeContainer *) nodes->container.m_next;
+        }
+        VF_DIE("vf_Graph::GetNodeNum: cannot find a node " << node);
+        return 0;
+    }
 
     /**
-     * Creates a data flow vector from a given example.
-     * @param vector_handle a vector to set
-     * @param example   a handle of an example vector
-     * @param need_copy a copy flag
-     * @note If copy flag <code>true</code>, incoming vector is copied to,
-     *       otherwise <i>IN</i> vector is created
-     *       with parameters of current vector.
+     * Checks amount of pre-allocated space for nodes in the graph.
      */
-    void SetVector( vf_MapVectorHandle vector_handle,
-                    vf_MapVectorHandle example,
-                    bool need_copy);
+    unsigned HasMoreNodeSpace() const
+    {
+        unsigned used = vf_used_space(&m_nodes->container);
+        assert(used == m_nodenum);
+        return vf_total_space(&m_nodes->container) - used;
+    }                           // HasMoreNodeSpace
 
     /**
-     * Function prints graph node in <code>stderr</code>.
-     * @param node_num  - number of graph node
-     * @param context      - current verifier context
-     * @note Function is valid in debug mode.
-     * @note Assertion is raised if <i>node_num</i> is out of range.
-     * @see vf_Context_t
+     * Checks amount of pre-allocated space for edges in the graph.
      */
-    void DumpNode( unsigned node_num, vf_Context_t *context );
+    unsigned HasMoreEdgeSpace() const
+    {
+        unsigned used = vf_used_space(&m_edges->container);
+        assert(used == m_edgenum);
+        return vf_total_space(&m_edges->container) - used;
+    }                           // HasMoreEdgeSpace
 
-    /**
-     * Function prints graph node instruction in stream.
-     * @param node_num   - number of graph node
-     * @param context    - current verifier context
-     * @note Function is valid in debug mode.
-     * @note Assertion is raised if <i>node_num</i> is out of range.
-     * @see vf_Context_t
-     */
-    void DumpNodeInternal( unsigned node_num,
-                           vf_Context_t *context);
+#endif // _VF_DEBUG
 
-
-    /**
-     * Function dumps graph header in file in DOT format.
-     * @param graph_name    - graph name
-     * @param fout          - file stream
-     * @note Function is valid in debug mode.
-     * @note Graph name is created from class and method names.
-     */
-    void DumpDotHeader( char *graph_name, ofstream &fout );
-
-    /**
-     * Function dumps graph node in file in DOT format.
-     * @param node_num - number of graph node
-     * @param fout     - file stream
-     * @param context  - current verifier context
-     * @note Function is valid in debug mode.
-     * @note Assertion is raised if <i>node_num</i> is out of range.
-     * @see vf_Context_t
-     */
-    void DumpDotNode( unsigned node_num, ofstream &fout, vf_Context_t *context );
-
-    /**
-     * Function dumps graph node instruction in file stream in DOT format.
-     * @param node_num   - number of graph node
-     * @param next_node  - separator between nodes in stream
-     * @param next_instr - separator between instructions in stream
-     * @param fout       - output file stream
-     * @param context    - current verifier context
-     * @note Function is valid in debug mode.
-     * @note Assertion is raised if <i>node_num</i> is out of range.
-     * @see vf_Context_t
-     */
-    void DumpDotNodeInternal( unsigned node_num,
-                              char *next_node,
-                              char *next_instr,
-                              ofstream &fout,
-                              vf_Context_t *context);
-
-    /**
-     * Function dumps graph end in file in DOT format.
-     * @param fout - output file stream
-     * @note Function is valid in debug mode.
-     */
-    void DumpDotEnd( ofstream &fout );
-
-}; // vf_Graph
+};                              // vf_Graph
 
 /**
- * Checks if a code range node ends with a specific
- * instruction type.
- *
- * @param[in] context a verifier context
- * @param[in] node_index the node identifier
- *
- * @return a type of the last instruction of code range node
+ * Checks if a given edge is a subroutine call branch.
+ * @param[in] edge    an edge handle
+ * @param[in] ctx     a verification context
+ * @return <code>true</code> if this branch is a jsr call branch
  */
-static inline vf_CodeType
-vf_get_last_instruction_type( vf_ContextHandle context,
-                              unsigned node_index)
+static inline bool vf_is_jsr_branch(vf_EdgeHandle edge, vf_ContextHandle ctx)
 {
-    vf_NodeHandle node = context->m_graph->GetNode( node_index );
-    assert( VF_TYPE_NODE_CODE_RANGE == node->m_type );
-    return context->m_code[node->m_end].m_type;
+    vf_NodeHandle node = edge->m_start;
+    return (VF_NODE_CODE_RANGE == node->m_type)
+        && (VF_INSTR_JSR == node->m_end->m_type)
+        && (VF_NODE_CODE_RANGE == edge->m_end->m_type);
 }
+
+/**
+ * Gets a subroutine number for a node. The function is slow and should be used for
+ * debugging purposes only.
+ * @param[in] sub  a given subroutine handle
+ * @param[in] ctx  a verification context
+ * @return a sequential subroutine number in a list
+ */
+unsigned vf_get_sub_num(vf_SubHandle sub, vf_ContextHandle ctx);
+
+/**
+ * Checks that a stack depth is the same as during last visit, calculates
+ * a stack modifier, counts a number of visited nodes, for each instruction checks
+ * that stack doesn't overflow.
+ * @param[in, out] node a pointer to a node structure, <code>m_mark</code> is
+ * modified during the call
+ * @param[in, out] depth starts as node depth before the first node instruction and ends
+ * as a node depth after the last node instruction
+ * @param[in] ctx a verifier context
+ * @return <code>VER_Continue</code> if this node wasn't visited before, and analysis of
+ * subsequent nodes is needed, <code>VER_OK</code> if the stack depth is consistent, an
+ * error code otherwise
+ */
+vf_Result vf_check_node_stack_depth(vf_Node *node,      // a graph node
+    unsigned &depth,            // stack depth
+    vf_Context *ctx);           // verification context
+
+/**
+ * Creates and sets graph node OUT vector.
+ * @param[in] node     a graph node handle
+ * @param[in, out] invector an IN vector, then OUT vector
+ * @param[in] ctx     a verifier context
+ * @return <code>VER_OK</code> if OUT vector wasn't changed,
+ * <code>VER_Continue</code>
+ * if the vector was changed successfully, an error code otherwise
+ */
+vf_Result
+vf_set_node_out_vector(vf_NodeHandle node,
+    vf_MapVector *invector, vf_Context *ctx);
 
 #endif // _VERIFIER_GRAPH_H_

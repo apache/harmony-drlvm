@@ -17,438 +17,181 @@
 /** 
  * @author Pavel Rebriy
  * @version $Revision: 1.1.2.1.4.4 $
- */  
+ */
 
 #include "ver_real.h"
 #include "ver_graph.h"
-
-/**
- * Function evaluates stack depth of graph node.
- */
-static int
-vf_get_node_stack_depth( vf_Code_t *start,  // from start instruction
-                         vf_Code_t *end );  // to end instruction
-
-/**
- * Function checks graph nodes stack depth consistency. It's recursive function.
- * Function returns result of check.
- */
-static Verifier_Result
-vf_check_stack_depth( unsigned nodenum,       // graph node number
-                      int stack_depth,        // initial stack depth of node
-                      unsigned maxstack,      // maximal stack
-                      unsigned *count,        // pointer to checked node count
-                      vf_Context_t *ctex);    // verifier context
-
-/************************************************************
- ******************* Graph Implementation *******************
- ************************************************************/
-
-/**
- * Function create graph nodes.
- */
-void
-vf_Graph::CreateNodes( unsigned number )    // number of nodes
-{
-    assert( number > 0 );
-    vf_NodeContainer* nodes =
-        (vf_NodeContainer*) AllocMemory( sizeof(vf_NodeContainer)
-            + (number - 1) * sizeof(vf_Node) );
-    nodes->m_max = number;
-    nodes->m_next = m_nodes;
-    nodes->m_max = number;
-    if( m_nodes == NULL ) {
-        m_nodes = nodes;
-    } else {
-        vf_NodeContainer* index = m_nodes->m_next;
-        while( index->m_next ) {
-            index = index->m_next;
-        }
-        index->m_next = nodes;
-    }
-} // vf_Graph::CreateNodes
-
-/**
- * Gets graph node.
- */
-vf_NodeHandle
-vf_Graph::GetNode( unsigned node_num )  // graph node number
-{
-    // get node
-    assert( m_nodes );
-    assert( node_num < m_nodenum );
-    unsigned count = node_num;
-    vf_NodeContainer* nodes = m_nodes;
-    while( count > nodes->m_max ) {
-        count -= nodes->m_max;
-        nodes = nodes->m_next;
-        assert( nodes );
-    }
-    return &nodes->m_node[count];
-} // vf_Graph::GetNode
-
-/**
- * Creates a new node of a specific type.
- */
-vf_NodeHandle
-vf_Graph::NewNode( vf_NodeType_t type,  // node type
-                   int stack)           // a stack modifier
-{
-    // get node
-    assert( m_nodes );
-    unsigned count = m_nodenum;
-    vf_NodeContainer* nodes = m_nodes;
-    while( count > nodes->m_max ) {
-        count -= nodes->m_max;
-        nodes = nodes->m_next;
-        assert( nodes );
-    }
-
-    // increment nodes count
-    m_nodenum++;
-    nodes->m_used++;
-    assert( nodes->m_used <= nodes->m_max );
-
-    // set node
-    vf_Node* node = &nodes->m_node[count];
-    node->m_type = type;
-    node->m_stack = stack;
-    return node;
-} // vf_Graph::NewNode
-
-/**
- * Gets graph edge.
- */
-vf_EdgeHandle
-vf_Graph::GetEdge( unsigned edge_num )  // graph edge number
-{
-    // get edge
-    assert( m_edges );
-    assert( edge_num < m_edgenum );
-    assert( edge_num );             // zero edge is reserved
-    unsigned count = edge_num;
-    vf_EdgeContainer* edges = m_edges;
-    while( count > edges->m_max ) {
-        count -= edges->m_max;
-        edges = edges->m_next;
-        assert( edges );
-    }
-    return &edges->m_edge[count];
-} // vf_Graph::GetEdge
-
-/**
- * Creates a new edge for graph nodes.
- */
-void
-vf_Graph::NewEdge( unsigned start,   // start graph node of edge
-                   unsigned end)     // end graph node of edge
-{
-    // check node numbers are in range
-    assert( start < m_nodenum );
-    assert( end < m_nodenum );
-
-    // get edge
-    assert( m_edges );
-    unsigned count = m_edgenum;
-    vf_EdgeContainer* edges = m_edges;
-    while( count > edges->m_max ) {
-        count -= edges->m_max;
-        edges = edges->m_next;
-        assert( edges );
-    }
-
-    // get a new edge and edge's nodes
-    vf_Edge* edge = &edges->m_edge[count];
-    vf_Node* node_start = (vf_Node*) GetNode( start );
-    vf_Node* node_end = (vf_Node*) GetNode( end );
-
-    // set a new edge
-    edge->m_start = start;
-    edge->m_end = end;
-    edge->m_outnext = node_start->m_outedge;
-    node_start->m_outedge = m_edgenum;
-    node_start->m_outnum++;
-    edge->m_innext = node_end->m_inedge;
-    node_end->m_inedge = m_edgenum;
-    node_end->m_innum++;
-
-    // increment edge count
-    m_edgenum++;
-    edges->m_used++;
-    assert( edges->m_used <= edges->m_max );
-
-    return;
-} // vf_Graph::NewEdge
-
-/**
- * Creates a data flow vector from the given example.
- */
-void
-vf_Graph::SetVector( vf_MapVectorHandle vector_handle,  // vector to set
-                     vf_MapVectorHandle example,        // current data flow vector
-                     bool need_copy)                    // copy flag
-{
-    assert( example );
-    vf_MapVector* vector = (vf_MapVector*) vector_handle;
-
-    // create and set local vector
-    if( example->m_maxlocal ) {
-        vector->m_local = (vf_MapEntry_t*) AllocMemory( example->m_maxlocal
-            * sizeof( vf_MapEntry_t ) );
-        assert( vector->m_local );
-        vector->m_number = example->m_number;
-        vector->m_maxlocal = example->m_maxlocal;
-    }
-    // create and set stack vector
-    if( example->m_maxstack ) {
-        vector->m_stack = (vf_MapEntry_t*) AllocMemory( example->m_maxstack
-            * sizeof( vf_MapEntry_t ) );
-        vector->m_depth = example->m_depth;
-        vector->m_maxstack = example->m_maxstack;
-    }
-    if( need_copy ) {
-        unsigned index;
-        for( index = 0; index < example->m_number; index++ ) {
-            vector->m_local[index] = example->m_local[index];
-        }
-        for( index = 0; index < example->m_depth; index++ ) {
-            vector->m_stack[index] = example->m_stack[index];
-        }
-    }
-} // vf_Graph::SetVector
-
-/**
- * Function creates graph edges.
- */
-void
-vf_Graph::CreateEdges( unsigned number )        // number of edges
-{
-    assert( number > 0 );
-    vf_EdgeContainer* edges = 
-        (vf_EdgeContainer*) AllocMemory( sizeof(vf_EdgeContainer)
-                    + number * sizeof(vf_Edge) );
-    edges->m_max = number + 1;  // zero edge is reserved
-    if( m_edges == NULL ) {
-        m_edges = edges;
-    } else {
-        vf_EdgeContainer* index = m_edges->m_next;
-        while( index->m_next ) {
-            index = index->m_next;
-        }
-        index->m_next = edges;
-    }
-    return;
-} // vf_Graph::CreateEdges
-
-/**
- * Function cleans graph node enumeration, creates new graph
- * enumeration structure and sets first enumeration node.
- */
-void
-vf_Graph::SetStartCountNode( unsigned node_num )     // graph node number
-{
-    // check node number is in range
-    assert( m_nodes );
-    assert( node_num < m_nodenum );
-
-    // create memory
-    if( m_enummax < m_nodenum ) {
-        m_enum = (unsigned*)AllocMemory( sizeof(unsigned) * m_nodenum );
-    }
-
-    // clean node enumeration
-    vf_NodeContainer* nodes = m_nodes;
-    unsigned count = 0;
-    while( nodes != NULL ) {
-        for( unsigned index = 0; index < nodes->m_used; index++, count++ ) {
-            nodes->m_node[index].m_nodecount = ~0U;
-            m_enum[count] = ~0U;
-        }
-        nodes = nodes->m_next;
-    }
-    assert( count == m_nodenum );
-
-    // set enumeration first element;
-    m_enum[0] = node_num;
-    m_enumcount = 1;
-
-    // set node enumeration number
-    vf_Node* node = (vf_Node*) GetNode( node_num );
-    node->m_nodecount = 0;
-    return;
-} // vf_Graph::SetStartCountNode
 
 /************************************************************
  **************** Debug Graph Implementation ****************
  ************************************************************/
 
 /**
- * Function prints graph structure in stderr.
+ * Prints graph structure in stderr.
  */
 void
-vf_Graph::DumpGraph( vf_Context_t *ctex )   // verifier context
+vf_Graph::DumpGraph()
 {
-#if _VERIFY_DEBUG
-    VERIFY_DEBUG( "Method: " << class_get_name( ctex->m_class ) << "::"
-        << method_get_name( ctex->m_method )
-        << method_get_descriptor( ctex->m_method ) << endl );
-    VERIFY_DEBUG( "-- start --" );
-    for( unsigned index = 0; index < GetNodeCount(); index++ ) {
-        DumpNode( index, ctex );
+#if _VF_DEBUG
+    VF_DEBUG( "Method: " << class_get_name( m_ctx->m_class ) << "::"
+              << method_get_name( m_ctx->m_method )
+              << method_get_descriptor( m_ctx->m_method ) << endl );
+    VF_DEBUG( "-- start --" );
+    ResetNodeIterator();
+    while( HasMoreElements() ) {
+        DumpNode( GetNextNode() );
     }
-#endif // _VERIFY_DEBUG
-    return;
-} // vf_Graph::DumpGraph
+#endif // _VF_DEBUG
+}                               // vf_Graph::DumpGraph
 
 /**
- * Function prints graph node in stderr.
+ * Prints graph node in stderr.
  */
 void
-vf_Graph::DumpNode( unsigned num,           // graph node number
-                    vf_Context_t *ctex)     // verifier context
+vf_Graph::DumpNode( vf_NodeHandle node )        // a graph node
 {
-#if _VERIFY_DEBUG
+#if _VF_DEBUG
     // print node incoming edges
-    unsigned index;
-    unsigned edge_num;
-    for( index = 0, edge_num = GetNode( num )->m_inedge;
-         index < GetNode( num )->m_innum;
-         index++ )
-    {
-        vf_EdgeHandle edge = GetEdge( edge_num );
-        VERIFY_DEBUG( " [" << edge->m_start << "] -->" );
-        edge_num = edge->m_innext;
+    vf_EdgeHandle edge;
+    for( edge = node->m_inedge; edge; edge = edge->m_innext ) {
+        VF_DEBUG( " [" << GetNodeNum( edge->m_start ) << "] -->" );
     }
 
-    vf_NodeHandle node = GetNode( num );
-    // print node
-    if( VF_TYPE_NODE_START_ENTRY == node->m_type)
-    { // start node
-        VERIFY_DEBUG( "node[" << num << "]: " << node->m_start << "[-] start" );
-    } else if( VF_TYPE_NODE_END_ENTRY == node->m_type)
-    { // end node
-        VERIFY_DEBUG( "node[" << num << "]: " << node->m_start << "[-] end" );
-        VERIFY_DEBUG( "-- end --" );
-    } else if( VF_TYPE_NODE_HANDLER == node->m_type )
-    { // handler node
-        VERIFY_DEBUG( "node[" << num << "]: " << num << "handler entry" );
-    } else { // another nodes
-        DumpNodeInternal( num, ctex );
+    switch ( node->m_type ) {
+    case VF_NODE_START_ENTRY:
+        VF_DEBUG( "node[" << GetNodeNum( node ) << "]: start node" );
+        break;
+    case VF_NODE_END_ENTRY:
+        VF_DEBUG( "node[" << GetNodeNum( node ) << "]: end node" );
+        break;
+    case VF_NODE_HANDLER:
+        VF_DEBUG( "node[" << GetNodeNum( node ) << "]: exception handler" );
+        break;
+    default:
+        DumpNodeInternal( node );
     }
 
     // print node outcoming edges
-    for( index = 0, edge_num = GetNode( num )->m_outedge;
-         index < GetNode( num )->m_outnum;
-         index++ )
-    {
-        vf_EdgeHandle edge = GetEdge( edge_num );
-        VERIFY_DEBUG( " --> [" << edge->m_end << "]" );
-        edge_num = edge->m_outnext;
+    for( edge = node->m_outedge; edge; edge = edge->m_outnext ) {
+        VF_DEBUG( " --> [" << GetNodeNum( edge->m_end ) << "]" );
     }
-    VERIFY_DEBUG( "" );
-#endif // _VERIFY_DEBUG
-    return;
-} // vf_Graph::DumpNode
+    VF_DEBUG( "" );
+#endif // _VF_DEBUG
+}                               // vf_Graph::DumpNode
 
 /**
- * Function prints graph node instruction in stream.
+ * Prints graph node instruction in stream.
  */
 void
-vf_Graph::DumpNodeInternal( unsigned num,           // graph node number
-                            vf_Context_t *ctex)     // verifier context
+vf_Graph::DumpNodeInternal( vf_NodeHandle node )        // graph node number
 {
-#if _VERIFY_DEBUG
+#if _VF_DEBUG
     // print node header
-    VERIFY_DEBUG( "Node #" << num );
-    VERIFY_DEBUG( "Stack mod: " << GetNode( num )->m_stack );
+    VF_DEBUG( "Node #" << GetNodeNum( node ) );
+    VF_DEBUG( "Stack mod: " << node->m_stack );
+    DumpSub( node->m_sub );
 
     // get code instructions
-    unsigned count = GetNode( num )->m_end - GetNode( num )->m_start + 1;
-    vf_Code_t *instr = &( ctex->m_code[ GetNode( num )->m_start ] );
+    unsigned count = node->m_end - node->m_start + 1;
+    vf_InstrHandle instr = node->m_start;
 
     // print node instructions
     for( unsigned index = 0; index < count; index++, instr++ ) {
-        VERIFY_DEBUG( index << ": " << ((instr->m_stack < 0) ? "[" : "[ ")
-            << instr->m_stack << "| " << instr->m_minstack << "] "
-            << vf_opcode_names[*(instr->m_addr)] );
+        VF_DEBUG( index << ": " << ( ( instr->m_stack < 0 ) ? "[" : "[ " )
+                  << instr->m_stack << "| " << instr->m_minstack << "] "
+                  << vf_opcode_names[*( instr->m_addr )] );
     }
-#endif // _VERIFY_DEBUG
-    return;
-} // vf_Graph::DumpNodeInternal
+#endif // _VF_DEBUG
+}                               // vf_Graph::DumpNodeInternal
+
 
 /**
- * Function dumps graph node in file in DOT format.
+ * Dumps graph node in file in DOT format.
  */
 void
-vf_Graph::DumpDotGraph( vf_Context_t *ctex )        // verifier context
+vf_Graph::DumpDotGraph()
 {
-#if _VERIFY_DEBUG
-    unsigned index;
+#if _VF_DEBUG
+    /**
+     * Graphviz has a hardcoded label length limit. Windows has a file
+     * name length limit as well.
+     */
+    const int MAX_LABEL_LENGTH = 80;
 
     // get class and method name
-    const char *class_name = class_get_name( ctex->m_class );
-    const char *method_name = method_get_name( ctex->m_method );
-    const char *method_desc = method_get_descriptor( ctex->m_method );
+    const char *class_name = class_get_name( m_ctx->m_class );
+    const char *method_name = method_get_name( m_ctx->m_method );
+    const char *method_desc = method_get_descriptor( m_ctx->m_method );
 
     // create file name
     size_t len = strlen( class_name ) + strlen( method_name )
-                        + strlen( method_desc ) + 6;
+        + strlen( method_desc ) + 6;
     char *fname = (char*)STD_ALLOCA( len );
-    sprintf( fname, "%s_%s%s.dot", class_name, method_name, method_desc );
-    char* pointer = fname;
-    while( pointer != NULL ) {
-        switch( *pointer )
-        {
-        case '/': 
-        case '*':
-        case '<':
-        case '>':
-        case '(':
-        case ')': 
-        case '{':
-        case '}':
-        case ';':
-            *pointer++ = '_';
-            break;        
-        case 0:
-            pointer = NULL;
+    sprintf( fname, "%s_%s%s", class_name, method_name, method_desc );
+
+    char *f_start;
+    char *pointer;
+    if( len > MAX_LABEL_LENGTH ) {
+        f_start = fname + len - MAX_LABEL_LENGTH;
+        // shift to the start of the nearest lexem
+        for( pointer = f_start;; pointer++ ) {
+            if( isalnum( *pointer ) ) {
+                continue;
+            } else if( !*pointer ) {    // end of the string
+                break;
+            } else {
+                // record the first matching position
+                f_start = pointer;
+                break;
+            }
+        }
+    } else {
+        f_start = fname;
+    }
+
+    for( pointer = f_start;; pointer++ ) {
+        if( isalnum( *pointer ) ) {
+            continue;
+        } else if( !*pointer ) {        // end of the string
             break;
-        default:    
-            pointer++;
+        } else {
+            *pointer = '_';
         }
     }
+    // pointer currently points to the end of the string
+    sprintf( pointer, ".dot" );
 
     // create .dot file
-    ofstream fout( fname );
+    ofstream fout( f_start );
     if( fout.fail() ) {
-        VERIFY_DEBUG( "vf_Graph::DumpDotGraph: error opening file: " << fname );
-        vf_error();
+        VF_DEBUG( "vf_Graph::DumpDotGraph: error opening file: " << f_start );
+        return;
     }
     // create name of graph
-    sprintf( fname, "%s::%s%s", class_name, method_name, method_desc );
+    sprintf( fname, "%s.%s%s", class_name, method_name, method_desc );
 
     // print graph to file
-    DumpDotHeader( fname, fout );
-    for( index = 0; index < m_nodenum; index++ ) {
-        DumpDotNode( index, fout, ctex );
+    DumpDotHeader( f_start, fout );
+    ResetNodeIterator();
+    while( HasMoreElements() ) {
+        DumpDotNode( GetNextNode(), fout );
     }
     DumpDotEnd( fout );
 
     // close file
     fout.flush();
     fout.close();
-#endif // _VERIFY_DEBUG
-    return;
-} // vf_Graph::DumpDotGraph
+#endif // _VF_DEBUG
+}                               // vf_Graph::DumpDotGraph
 
 /**
- * Function dumps graph header in file in DOT format.
+ * Dumps graph header in file in DOT format.
  */
-void 
-vf_Graph::DumpDotHeader( char *graph_name,      // graph name
-                         ofstream &out)         // output file stream
+void
+vf_Graph::DumpDotHeader( const char *graph_name,        // graph name
+                         ofstream &out )        // output file stream
 {
-#if _VERIFY_DEBUG
+#if _VF_DEBUG
     out << "digraph dotgraph {" << endl
         << "center=TRUE;" << endl
         << "margin=\".2,.2\";" << endl
@@ -457,107 +200,101 @@ vf_Graph::DumpDotHeader( char *graph_name,      // graph name
         << "page=\"8.5,11\";" << endl
         << "ratio=auto;" << endl
         << "node [color=lightblue2, style=filled, shape=record, "
-                  << "fontname=\"Courier\", fontsize=9];" << endl
+        << "fontname=\"Courier\", fontsize=9];" << endl
         << "label=\"" << graph_name << "\";" << endl;
-#endif // _VERIFY_DEBUG
-    return;
-} // vf_Graph::DumpDotHeader
+
+#endif // _VF_DEBUG
+}                               // vf_Graph::DumpDotHeader
 
 /**
- * Function dumps graph node in file in DOT format.
+ * Dumps graph node in file in DOT format.
  */
 void
-vf_Graph::DumpDotNode( unsigned num,            // graph node number
-                       ofstream &out,           // output file stream
-                       vf_Context_t *ctex)      // verifier contex
+vf_Graph::DumpDotNode( vf_NodeHandle node,      // graph node number
+                       ofstream &out )  // output file stream
 {
-#if _VERIFY_DEBUG
-    vf_NodeHandle node = GetNode( num );
-
+#if _VF_DEBUG
     // print node to dot file
-    if( VF_TYPE_NODE_START_ENTRY == node->m_type )
-    { // start node
-        out << "node" << num << " [label=\"START\", color=limegreen]" << endl;
-    } else if( VF_TYPE_NODE_END_ENTRY == node->m_type )
-    { // end node
-        out << "node" << num << " [label=\"END\", color=orangered]" << endl;
-    } else if( VF_TYPE_NODE_HANDLER == node->m_type )
-    { // handler node
-        out << "node" << num << " [label=\"Handler #"
-            << num << "\", shape=ellipse, color=aquamarine]" << endl;
-    } else { // other nodes
-        out << "node" << num 
-            << " [label=\"";
-        DumpDotNodeInternal( num, "\\n---------\\n", "\\l", out, ctex );
-        out << "\"]" << endl;
+    out << "node" << GetNodeNum( node );
+    if( VF_NODE_START_ENTRY == node->m_type ) { // start node
+        out << " [label=\"START\", color=limegreen]" << endl;
+    } else if( VF_NODE_END_ENTRY == node->m_type ) {    // end node
+        out << " [label=\"END\", color=orangered]" << endl;
+    } else if( VF_NODE_HANDLER == node->m_type ) {      // handler node
+        out << " [label=\"Handler #"
+            << GetNodeNum( node ) << "\", shape=ellipse, color=";
+        if( node->m_sub ) {
+            out << "\"#B7FFE" << hex
+                << ( vf_get_sub_num( node->m_sub, m_ctx ) %
+                     16 ) << dec << "\"";
+        } else {
+            out << "aquamarine";
+        }
+        out << "]" << endl;
+    } else {                    // other nodes
+        DumpDotNodeInternal( node, "\\n---------\\n", "\\l", out );
     }
 
     // print node outcoming edges to dot file
-    unsigned index;
-    unsigned edge_num;
-    for( index = 0, edge_num = node->m_outedge;
-         index < node->m_outnum;
-         index++ )
-    {
-        vf_EdgeHandle edge = GetEdge( edge_num );
-
-        out << "node" << num << " -> " << "node" << edge->m_end;
-        if( VF_TYPE_NODE_HANDLER == GetNode( edge->m_end )->m_type )
-        {
+    for( vf_EdgeHandle edge = node->m_outedge; edge; edge = edge->m_outnext ) {
+        out << "node" << GetNodeNum( node ) << " -> "
+            << "node" << GetNodeNum( edge->m_end );
+        if( VF_NODE_HANDLER == edge->m_end->m_type ) {
             out << "[color=red]" << endl;
-        } else if( ( VF_TYPE_NODE_CODE_RANGE == node->m_type )
-            && ( VF_TYPE_INSTR_SUBROUTINE ==
-                vf_get_last_instruction_type( ctex, edge->m_start ) ) )
-        {
+        } else if( vf_is_jsr_branch( edge, m_ctx ) ) {
             out << "[color=blue]" << endl;
         }
         out << ";" << endl;
-        edge_num = edge->m_outnext;
     }
-#endif // _VERIFY_DEBUG
-    return;
-} // vf_Graph::DumpDotNode
+#endif // _VF_DEBUG
+}                               // vf_Graph::DumpDotNode
 
 /**
- * Function dumps graph node instruction in file stream in DOT format.
+ * Dumps graph node instruction in file stream in DOT format.
  */
 void
-vf_Graph::DumpDotNodeInternal( unsigned num,            // graph node number
-                               char *next_node,         // separator between nodes in stream
+vf_Graph::DumpDotNodeInternal( vf_NodeHandle node,      // graph node number
+                               char *next_node, // separator between nodes in stream
                                char *next_instr,        // separator between instructions in stream
-                               ofstream &out,           // output file stream
-                               vf_Context_t *ctex)      // verifier contex
+                               ofstream &out )  // output file stream
 {
-#if _VERIFY_DEBUG
+#if _VF_DEBUG
     // print node header
-    out << "Node " << num << next_node
-        << "Stack mod: " << GetNode( num )->m_stack << next_node;
+    out << " [label=\"";
+    out << "Node " << GetNodeNum( node ) << next_node
+        << "Stack mod: " << node->m_stack << next_node;
 
     // get code instructions
-    unsigned count = GetNode( num )->m_end - GetNode( num )->m_start + 1;
-    vf_Code_t *instr = &( ctex->m_code[ GetNode( num )->m_start ] );
+    unsigned count = node->m_end - node->m_start + 1;
+    vf_InstrHandle instr = node->m_start;
 
     // print node instructions
     for( unsigned index = 0; index < count; index++, instr++ ) {
-        out << index << ": " << ((instr->m_stack < 0) ? "[" : "[ ")
+        out << index << ": " << ( ( instr->m_stack < 0 ) ? "[" : "[ " )
             << instr->m_stack << "\\| " << instr->m_minstack << "] "
-            << vf_opcode_names[*(instr->m_addr)] << next_instr;
+            << vf_opcode_names[*( instr->m_addr )] << next_instr;
     }
-#endif // _VERIFY_DEBUG
-    return;
-} // vf_Graph::DumpDotNodeInternal
+    out << "\"" << endl;
+
+    if( node->m_sub ) {
+        out << ", color=\"#B2F" << hex
+            << ( vf_get_sub_num( node->m_sub, m_ctx ) % 16 ) << dec << "EE\"";
+    }
+    out << "]" << endl;
+#endif // _VF_DEBUG
+}                               // vf_Graph::DumpDotNodeInternal
 
 /**
- * Function dumps graph end in file in DOT format.
+ * Dumps graph end in file in DOT format.
  */
 void
 vf_Graph::DumpDotEnd( ofstream &out )   // output file stream
 {
-#if _VERIFY_DEBUG
+#if _VF_DEBUG
     out << "}" << endl;
-#endif // _VERIFY_DEBUG
-    return;
-} // vf_Graph::DumpDotEnd
+#endif // _VF_DEBUG
+}                               // vf_Graph::DumpDotEnd
+
 
 /************************************************************
  ********************** Graph Creation **********************
@@ -565,124 +302,175 @@ vf_Graph::DumpDotEnd( ofstream &out )   // output file stream
 /**
  * Creates bytecode control flow graph.
  */
-Verifier_Result
-vf_create_graph( vf_Context_t* ctex )   // verifier context
+vf_Result
+vf_create_graph( vf_Context *ctx )      // verification context
 {
-    // allocate memory for graph structure
-    void *mem_graph = vf_alloc_pool_memory(ctex->m_pool, sizeof(vf_Graph));
+    vf_BCode *bc = ctx->m_bc;
 
-    // for creation of graph use numbers pre-calculated at vf_parse_bytecode
-    ctex->m_graph = new(mem_graph) vf_Graph( ctex->m_nodeNum,
-                        ctex->m_edgeNum, ctex->m_pool );
-    vf_Graph* graph = ctex->m_graph;
+    /** 
+     * Count edges from basic blocks from exception range to the
+     * corresponding exception handlers.
+     */
+    unsigned edges = 0;
+    unsigned short handler_count = ctx->m_handlers;
+    for( unsigned short handler_index = 0; handler_index < handler_count;
+         handler_index++ ) {
+        unsigned short start_pc, end_pc, handler_pc, handler_cp_index, count;
+        method_get_exc_handler_info( ctx->m_method, handler_index,
+                                     &start_pc, &end_pc, &handler_pc,
+                                     &handler_cp_index );
 
-    // the array contains a corresponding node for each instruction
-    unsigned* code2node = (unsigned*)vf_alloc_pool_memory( ctex->m_pool,
-                            ctex->m_codeNum * sizeof( unsigned ) );
+        // number of basic blocks in the exception range
+        unsigned handler_edges = 0;
+        for( count = start_pc; count < end_pc; count++ ) {
+            if( bc[count].m_is_bb_start ) {
+                handler_edges++;
+            }
+        }
 
-    // create start-entry node
-    graph->NewNode( VF_TYPE_NODE_START_ENTRY, 0 );
+        edges += handler_edges;
+    }
 
-    // create handler nodes
-    unsigned node_index;
-    unsigned short handler_count = method_get_exc_handler_number( ctex->m_method );
-    for (node_index = 1; node_index <= (unsigned) handler_count; node_index++) {
-        graph->NewNode( VF_TYPE_NODE_HANDLER, 1 );
+    /** 
+     * Initialize a node counter with handler nodes
+     * and 2 terminator nodes.
+     */
+    unsigned nodes = handler_count + 2;
+
+    /**
+     * Check instruction offsets, count basic blocks and edges.
+     */
+    for( unsigned index = 0; index < ctx->m_len; index++ ) {
+        vf_InstrHandle instr = bc[index].m_instr;
+        if( NULL == instr ) {
+            if( bc[index].m_is_bb_start ) {
+                VF_REPORT( ctx, "Illegal target of jump or branch" );
+                return VER_ErrorBranch;
+            } else {
+                continue;
+            }
+        }
+
+        if( bc[index].m_is_bb_start ) {
+            ( (vf_Instr*)instr )->m_is_bb_start = true;
+            nodes++;
+        }
+
+        if( instr->m_offcount ) {
+            // basic block should start next, so we will
+            // count one branch anyway
+            edges += instr->m_offcount - 1;
+        }
     }
 
     /**
-     * Create code range nodes. New node correspond to the subsequent
-     * basic blocks of instructions.
-     * Note: code range nodes follow after the last handler node.
+     * Each node except the end node and <code>ret</code> nodes emits at least one
+     * branch.
      */
-    // adding a basic block which starts
-    for( unsigned bb_start = 0;
-         bb_start < ctex->m_codeNum;
-         node_index++ )
-    {
+    edges += nodes - 1 - ctx->m_retnum;
+
+    // allocate memory for graph structure
+    void *mem_graph = vf_palloc( ctx->m_pool, sizeof( vf_Graph ) );
+    // for graph creation use pre-calculated numbers
+    vf_Graph *graph = new( mem_graph ) vf_Graph( nodes, edges, ctx );
+    ctx->m_graph = graph;
+
+    /**
+     * Create nodes.
+     */
+    graph->NewNode( VF_NODE_START_ENTRY );
+
+    // create handler nodes
+    unsigned node_index;
+    for( node_index = 1; node_index <= ( unsigned )handler_count;
+         node_index++ ) {
+        graph->NewNode( VF_NODE_HANDLER );
+    }
+
+    // create code range nodes right after the last handler node
+    // a new node correspond to a subsequent basic block of instructions
+    for( vf_InstrHandle bb_start = ctx->m_instr;
+         bb_start < ctx->m_last_instr; node_index++ ) {
         // find a basic block end
-        unsigned next_bb_start = bb_start + 1;
-        while ((next_bb_start < ctex->m_codeNum)
-            && (!ctex->m_code[next_bb_start].m_basic_block_start))
-        {
+        vf_InstrHandle next_bb_start = bb_start + 1;
+        while( ( next_bb_start < ctx->m_last_instr )
+               && ( !next_bb_start->m_is_bb_start ) ) {
             next_bb_start++;
         }
 
-        int stack = vf_get_node_stack_depth( &ctex->m_code[bb_start],
-            &ctex->m_code[next_bb_start - 1] );
-        graph->NewNode( bb_start, next_bb_start - 1, stack );
-        code2node[bb_start] = node_index;
+        ( (vf_Instr*)bb_start )->m_node =
+            graph->NewNode( bb_start, next_bb_start - 1 );
         bb_start = next_bb_start;
     }
 
     // create exit-entry node
-    graph->NewNode( VF_TYPE_NODE_END_ENTRY, 0 );
+    graph->AddEndNode();
     unsigned node_num = node_index + 1;
-    assert( ctex->m_nodeNum == node_num );
+    assert( 0 == graph->HasMoreNodeSpace() );
 
     /**
-     * Create edges
+     * Create edges.
      */
-    
-    // from start-entry node to the first code node
-    node_index = handler_count + 1;
-    graph->NewEdge( 0, node_index );
+    vf_Node *node = (vf_Node*)graph->GetNode( handler_count + 1 );
+
+    // from start-entry node to the first code range node
+    graph->NewEdge( (vf_Node*)graph->GetStartNode(), node );
 
     // create code range edges
-    for (; node_index < node_num - 1; node_index++) {
-        vf_Code_t* code = &ctex->m_code[graph->GetNodeLastInstr( node_index )];
-         
+    for( ; VF_NODE_CODE_RANGE == node->m_type; node++ ) {
+        vf_InstrHandle instr = node->m_end;
+
         // set control flow edges
-        if( code->m_offcount ) {
-            for( unsigned count = 0; count < code->m_offcount; count++ ) {
-                int offset = vf_get_code_branch( code, count );
-                unsigned node = code2node[ctex->m_bc[offset].m_instr - 1];
+        if( instr->m_offcount ) {
+            for( unsigned count = 0; count < instr->m_offcount; count++ ) {
+                int offset = vf_get_instr_branch( instr, count );
+                vf_Node *next_node =
+                    (vf_Node*)graph->GetNodeFromBytecodeIndex( offset );
                 assert( node );
-                
-                graph->NewEdge( node_index, node );
-                if( node < node_index ) {
+
+                graph->NewEdge( node, next_node );
+                if( next_node < node ) {
                     // node has a backward branch, thus any
                     // object on the stack should be initialized
-                    graph->SetNodeInitFlag( node, true );
+                    node->m_initialized = true;
                 }
             }
-        } else if (code->m_type) {
-            // FIXME compatibility issue - no need to
-            // have these branches for VF_TYPE_INSTR_SUBROUTINE
-            graph->NewEdge( node_index, node_num - 1 );
-        } else if (node_index + 1 < node_num) {
-            graph->NewEdge( node_index, node_index + 1 );
+        } else if( VF_INSTR_RETURN == instr->m_type
+                   || VF_INSTR_THROW == instr->m_type ) {
+            graph->NewEdge( node, (vf_Node*)graph->GetEndNode() );
+        } else if( VF_INSTR_RET == instr->m_type ) {
+            // no edges from ret
+        } else if( VF_NODE_CODE_RANGE == ( node + 1 )->m_type ) {
+            graph->NewEdge( node, node + 1 );
         } else {
-            VERIFY_REPORT_METHOD( ctex, "Falling off the end of the code" );
+            VF_REPORT( ctx, "Falling off the end of the code" );
             return VER_ErrorBranch;
         }
 
     }
+    assert( VF_NODE_END_ENTRY == node->m_type );
 
     // create OUT map vectors for handler nodes
-    unsigned char* start_bc = method_get_bytecode( ctex->m_method );
-    unsigned bytecode_len = method_get_code_length( ctex->m_method );
-    for (unsigned short handler_index = 0;
-        handler_index < handler_count;
-        handler_index++)
-    {
+    unsigned char *start_bc = method_get_bytecode( ctx->m_method );
+    for( unsigned short handler_index = 0;
+         handler_index < handler_count; handler_index++ ) {
         unsigned short start_pc, end_pc, handler_pc, handler_cp_index;
-        method_get_exc_handler_info( ctex->m_method,
-            handler_index, &start_pc, &end_pc,
-            &handler_pc, &handler_cp_index );
+        method_get_exc_handler_info( ctx->m_method,
+                                     handler_index, &start_pc, &end_pc,
+                                     &handler_pc, &handler_cp_index );
 
-        vf_ValidType_t *type = NULL;
-        if (handler_cp_index) {
-            const char* name = vf_get_cp_class_name( ctex->m_class,
-                handler_cp_index );
+        vf_ValidType *type = NULL;
+        if( handler_cp_index ) {
+            const char *name = vf_get_cp_class_name( ctx->m_class,
+                                                     handler_cp_index );
             assert( name );
-            type = vf_create_class_valid_type( name, ctex );
+            type = vf_create_class_valid_type( name, ctx );
 
             // set restriction for handler class
-            if( ctex->m_vtype.m_throwable->string[0] != type->string[0] ) {
-                ctex->m_type->SetRestriction(
-                    ctex->m_vtype.m_throwable->string[0],
-                    type->string[0], 0, VF_CHECK_SUPER);
+            if( ctx->m_vtype.m_throwable->string[0] != type->string[0] ) {
+                ctx->m_type->SetRestriction( ctx->m_vtype.m_throwable->
+                                             string[0], type->string[0], 0,
+                                             VF_CHECK_SUPER );
             }
         }
 
@@ -693,309 +481,277 @@ vf_create_graph( vf_Context_t* ctex )   // verifier context
          *    incoming map vector, local variables map vector will be
          *    created with during the process of merge.
          */
-        vf_MapVector* p_outvector = (vf_MapVector*)
-            graph->GetNodeOutVector( handler_index + 1 );
-        p_outvector->m_stack = 
-            (vf_MapEntry_t*) graph->AllocMemory(sizeof(vf_MapEntry_t));
+        vf_MapVector *p_outvector = (vf_MapVector*)
+            &graph->GetNode( handler_index + 1 )->m_outmap;
+        p_outvector->m_stack =
+            (vf_MapEntry*)graph->AllocMemory( sizeof( vf_MapEntry ) *
+                                                 ctx->m_maxstack );
         p_outvector->m_depth = 1;
         vf_set_vector_stack_entry_ref( p_outvector->m_stack, 0, type );
 
         // outcoming handler edge
-        graph->NewEdge( handler_index + 1,
-            code2node[ctex->m_bc[handler_pc].m_instr - 1] );
-        
-        // node range start
-        node_index = code2node[ctex->m_bc[start_pc].m_instr - 1];
-        
-        unsigned last_node = (end_pc == bytecode_len)
-            ? node_num - 1
-            : code2node[ctex->m_bc[end_pc].m_instr - 1];
+        vf_Node *handler_node =
+            (vf_Node*)graph->GetNode( handler_index + 1 );
+        graph->NewEdge( handler_node,
+                        (vf_Node*)graph->
+                        GetNodeFromBytecodeIndex( handler_pc ) );
 
-        for (; node_index < last_node; node_index++) {
+        // node range start
+        node = (vf_Node*)graph->GetNodeFromBytecodeIndex( start_pc );
+
+        vf_NodeHandle last_node = ( end_pc == ctx->m_len )
+            ? graph->GetEndNode()
+            : graph->GetNodeFromBytecodeIndex( end_pc );
+
+        for( ; node < last_node; node++ ) {
             // node is protected by exception handler, thus the 
             // reference in local variables have to be initialized
-            graph->SetNodeInitFlag( node_index, true );
-            graph->NewEdge( node_index, handler_index + 1 );
+            node->m_initialized = true;
+            graph->NewEdge( node, handler_node );
         }
     }
     // one edge is reserved
-    assert( graph->GetEdgeCount() == ctex->m_edgeNum ); 
+    assert( 0 == graph->HasMoreEdgeSpace() );
 
-#if _VERIFY_DEBUG
-    if( ctex->m_dump.m_graph ) {
-        graph->DumpGraph( ctex );
-    }
-    if( ctex->m_dump.m_dot_graph ) {
-        graph->DumpDotGraph( ctex );
-    }
-#endif // _VERIFY_DEBUG
+    VF_DUMP( DUMP_GRAPH, graph->DumpGraph() );
+    VF_DUMP( DUMP_DOT, graph->DumpDotGraph() );
 
     return VER_OK;
-} // vf_create_graph
+}                               // vf_create_graph
 
 /************************************************************
- *************** Graph Stack Deep Analysis ******************
+ *************** Graph Stack Depth Analysis *****************
  ************************************************************/
-
 /**
- * Function evaluates stack depth of graph code range node.
+ * Checks stack depth of a node.
  */
-static int
-vf_get_node_stack_depth( vf_Code_t *start,  // beginning instruction
-                         vf_Code_t *end)    // ending instruction
+vf_Result
+vf_check_node_stack_depth( vf_Node *node,       // a graph node
+                           unsigned &depth,     // initial stack depth
+                           vf_Context *ctx )    // verification context
 {
-    assert( start <= end );
-    
-    /**
-     * Evaluate stack depth
-     */
-    int result = 0;
-    for( vf_Code_t* pointer = start; pointer <= end; pointer++ ) {
-        result += pointer->m_stack;
+    if( node->m_mark ) {
+        if( ( depth == node->m_inmap.m_depth )
+            || ( VF_NODE_CODE_RANGE != node->m_type ) ) {
+            // consistent stack depth in the node
+            return VER_OK;
+        } else {
+            // inconsistent stack depth
+            VF_REPORT( ctx, "Inconsistent stack depth: "
+                       << node->m_inmap.m_depth << " != " << depth );
+            return VER_ErrorStackDepth;
+        }
     }
-    return result;
-} // vf_get_node_stack_depth
+    // mark the node
+    node->m_mark = VF_START_MARK;
 
+    // count the node
+    vf_Graph *graph = ctx->m_graph;
+    graph->IncrementReachableCount();
+    node->m_inmap.m_depth = depth;
 
-/**
- * Function provides some checks of control flow and data flow structures of graph.
- */
-Verifier_Result
-vf_check_graph( vf_Context_t *ctex )   // verifier context
-{
-    unsigned count,
-             inedge,
-             innode;
-
-    /**
-     * Gem method max stack
-     */
-    vf_Graph* vGraph = ctex->m_graph;
-    unsigned maxstack = method_get_max_stack( ctex->m_method );
-    unsigned short handlcount = method_get_exc_handler_number( ctex->m_method );
-    vf_Code_t *code = ctex->m_code;
-
-    /**
-     * Check stack depth correspondence
-     */
-    unsigned index = 1;
-    Verifier_Result result = vf_check_stack_depth( 0, VERIFY_START_MARK,
-        maxstack + VERIFY_START_MARK, &index, ctex );
-    if( result != VER_OK ) {
-        goto labelEnd_bypassGraphStructure;
+    if( VF_NODE_CODE_RANGE != node->m_type ) {
+        if( VF_NODE_HANDLER == node->m_type ) {
+            depth = 1;
+            node->m_stack = 1;
+            node->m_outmap.m_depth = 1;
+        } else if( VF_NODE_END_ENTRY == node->m_type ) {
+            return VER_OK;
+        }
+        return VER_Continue;
     }
-    assert( index <= vGraph->GetNodeCount() );
-
-    /**
-     * Determine dead code nodes
-     */
-    index = vGraph->GetNodeCount() - index; // number of dead code nodes
-
-    /**
-     * Override all dead nodes
-     */
-    if( index )
-    {
-        /** 
-         * Identify dead code nodes and fill by nop instruction.
-         */
-        for( index = handlcount + 1; index < vGraph->GetNodeCount() - 1; index++ ) {
-            if( !vGraph->IsNodeMarked( index ) ) {
-                unsigned char *instr = code[ vGraph->GetNodeFirstInstr( index ) ].m_addr;
-                unsigned len = vGraph->GetNodeBytecodeLen( ctex, vGraph->GetNode( index ) );
-                for( count = 0; count < len; count++ ) {
-                    instr[count] = OPCODE_NOP;
-                }
-                vGraph->SetNodeStackModifier( index, 0 );
-            }
+    // calculate a stack depth after the last node instruction
+    int stack_depth = 0;
+    for( vf_InstrHandle instr = node->m_start; instr <= node->m_end; instr++ ) {
+        if( instr->m_minstack > depth ) {
+            VF_REPORT( ctx,
+                       "Unable to pop operands needed for an instruction" );
+            return VER_ErrorStackUnderflow;
+        }
+        stack_depth += instr->m_stack;
+        depth += instr->m_stack;
+        assert( depth >= 0 );
+        if( depth > ctx->m_maxstack ) {
+            VF_REPORT( ctx, "Instruction stack overflow" );
+            return VER_ErrorStackOverflow;
         }
     }
 
-#if _VERIFY_DEBUG
-    if( ctex->m_dump.m_mod_graph ) {
-        vGraph->DumpGraph( ctex );
+    node->m_stack = stack_depth;
+    node->m_outmap.m_depth = depth;
+    return VER_Continue;
+}                               // vf_check_node_stack_depth
+
+/**
+ * Checks graph nodes stack depth consistency recursively.
+ * Returns result of a check.
+ */
+static vf_Result
+vf_check_stack_depth( vf_Node *node,    // a graph node
+                      unsigned stack_depth,     // initial stack depth of node
+                      vf_Context *ctx ) // verification context
+{
+    // check for node stack overflow
+    vf_Result result = vf_check_node_stack_depth( node, stack_depth, ctx );
+    if( result != VER_Continue ) {
+        return result;
     }
-    if( ctex->m_dump.m_dot_mod_graph ) {
-        vGraph->DumpDotGraph( ctex );
+    // iterate over out edges and set stack depth for out nodes
+    for( vf_EdgeHandle outedge = node->m_outedge;
+         outedge; outedge = outedge->m_outnext ) {
+        // get out node
+        vf_Node *outnode = (vf_Node*)outedge->m_end;
+        // mark out node with its out nodes
+        result = vf_check_stack_depth( outnode, stack_depth, ctx );
+        if( VER_OK != result ) {
+            return result;
+        }
     }
-#endif // _VERIFY_DEBUG
+    return VER_OK;
+}                               // vf_check_stack_depth
+
+/**
+ * Removes <i>in</i> edge from the list of the corresponding end node.
+ */
+static void
+vf_remove_inedge( vf_EdgeHandle edge )  // verification context
+{
+    vf_EdgeHandle *p_next_edge = (vf_EdgeHandle*) & edge->m_end->m_inedge;
+    vf_Edge *inedge = (vf_Edge*) edge->m_end->m_inedge;
+    while( inedge ) {
+        if( inedge == edge ) {
+            // remove the edge from the list
+            *p_next_edge = inedge->m_innext;
+            return;
+        }
+        p_next_edge = &inedge->m_innext;
+        inedge = (vf_Edge*) inedge->m_innext;
+    }
+    VF_DIE( "vf_remove_inedge: Cannot find an IN edge " << edge
+            << " from the list of the node " << edge->m_end );
+}
+
+/**
+ * Scans dead nodes, removes obsolete edges and fills corresponding bytecode by nop
+ * instruction.
+ */
+static void
+vf_nullify_unreachable_bytecode( vf_ContextHandle ctx ) // verification context
+{
+    vf_Node *node =
+        (vf_Node*)ctx->m_graph->GetStartNode()->m_outedge->m_end;
+    for( ; node->m_type != VF_NODE_END_ENTRY; node++ ) {
+        assert( VF_NODE_CODE_RANGE == node->m_type );
+        if( !node->m_mark ) {
+            unsigned char *instr = node->m_start->m_addr;
+            const unsigned char *end = vf_get_instr_end( node->m_end, ctx );
+            while( instr < end ) {
+                *( instr++ ) = OPCODE_NOP;
+            }
+            node->m_stack = 0;
+            // we assume that java compiler generally doesn't generate a dead code,
+            // so we rarely remove edges here is rare
+            for( vf_EdgeHandle edge = node->m_outedge; edge;
+                 edge = edge->m_outnext ) {
+                vf_remove_inedge( edge );
+            }
+            node->m_inedge = node->m_outedge = NULL;
+            node->m_outnum = 0;
+        }
+    }
+}
+
+/**
+ * Provides checks of control flow and data flow structures of graph.
+ */
+vf_Result
+vf_check_graph( vf_Context *ctx )       // verification context
+{
+    vf_Graph *graph = ctx->m_graph;
+    vf_InstrHandle instr = ctx->m_instr;
+
+    vf_Result result;
+
+    // allocate a current stack map vector
+    ctx->m_map =    (vf_MapVector*)vf_palloc( ctx->m_pool,
+                                              sizeof( vf_MapVector ) );
+    ctx->m_graph->AllocVector( ctx->m_map );
+
+    // create a buf stack map vector (max 4 entries)
+    ctx->m_buf =    (vf_MapEntry*)vf_palloc( ctx->m_pool,
+                                             sizeof( vf_MapEntry )
+                                             * ctx->m_maxstack );
+
+    if( ctx->m_retnum ) {
+        result = vf_mark_subroutines( ctx );
+    } else {
+        result =
+            vf_check_stack_depth( (vf_Node*)graph->GetStartNode(), 0,
+                                  ctx );
+    }
+    if( VER_OK != result ) {
+        return result;
+    }
+    // there could be only <code>nop</code> opcodes in the bytecode, in this case 
+    // the code is already checked during previous step
+    if( ctx->m_maxstack == 0 ) {
+        return VER_OK;
+    }
+    // override all dead nodes
+    assert( graph->GetReachableNodeCount() <= graph->GetNodeCount() );
+    if( graph->GetReachableNodeCount() < graph->GetNodeCount() ) {
+        vf_nullify_unreachable_bytecode( ctx );
+    }
+
+    if( ctx->m_retnum ) {
+        result = vf_inline_subroutines( ctx );
+        if( VER_OK != result ) {
+            return result;
+        }
+    }
+
+    VF_DUMP( DUMP_MOD, graph->DumpGraph() );
+    VF_DUMP( DUMP_DOT_MOD, graph->DumpDotGraph() );
 
     /** 
      * Check that execution flow terminates with
      * return or athrow bytecodes.
      * Override all incoming edges to the end-entry node.
      */
-    for( inedge = vGraph->GetNodeFirstInEdge( vGraph->GetNodeCount() - 1 );
-         inedge;
-         inedge = vGraph->GetEdgeNextInEdge( inedge ) )
-    {
+    for( vf_EdgeHandle inedge =
+         graph->GetEndNode()->m_inedge; inedge;
+         inedge = inedge->m_innext ) {
         // get incoming node
-        innode = vGraph->GetEdgeStartNode( inedge );
-        // check last node instruction, skip dead code nodes
-        if( vGraph->IsNodeMarked( innode ) ) {
-            // get node last instruction
-            unsigned char *instr = code[ vGraph->GetNodeLastInstr( innode ) ].m_addr;
-            if( !instr
-               || !((*instr) >= OPCODE_IRETURN && (*instr) <= OPCODE_RETURN 
-                            || (*instr) == OPCODE_ATHROW) )
-            { // illegal instruction
-                VERIFY_REPORT_METHOD( ctex, "Falling off the end of the code" );
-                result = VER_ErrorCodeEnd;
-                goto labelEnd_bypassGraphStructure;
-            }
+        vf_NodeHandle innode = inedge->m_start;
+        // get node last instruction
+        vf_InstrType type = innode->m_end->m_type;
+
+        if( ( VF_INSTR_RETURN != type ) && ( VF_INSTR_THROW != type ) ) {
+            // illegal instruction
+            VF_REPORT( ctx, "Falling off the end of the code" );
+            return VER_ErrorCodeEnd;
         }
     }
 
     /**
      * Make data flow analysis
      */
-    result = vf_check_graph_data_flow( ctex );
+    result = vf_check_graph_data_flow( ctx );
 
-labelEnd_bypassGraphStructure:
     return result;
-} // vf_check_graph
+}                               // vf_check_graph
 
 /**
  * Frees memory allocated for graph, if any.
  */
 void
-vf_free_graph( vf_Context_t *context )   // verifier context
+vf_free_graph( vf_Context *ctx )        // verification context
 {
-    if( context->m_graph ) {
-        context->m_graph->~vf_Graph();
-        context->m_graph = NULL;
+    if( ctx->m_graph ) {
+        VF_TRACE( "method", VF_REPORT_CTX( ctx ) << "method graph: "
+                  << " nodes: " << ctx->m_graph->GetNodeCount()
+                  << ", edges: " << ctx->m_graph->GetEdgeCount() );
+        ctx->m_graph->~vf_Graph();
+        ctx->m_graph = NULL;
     }
-} // vf_free_graph
-
-/**
- * Function checks stack overflow of graph node instruction.
- */
-static inline Verifier_Result
-vf_check_node_stack_depth( unsigned nodenum,       // graph node number
-                           int depth,              // initial stack depth
-                           unsigned max_stack,     // maximal stack
-                           vf_Context_t *ctex)     // verifier context
-{
-    // get checked node
-    vf_NodeHandle node = ctex->m_graph->GetNode( nodenum );
-
-    /** 
-     * For start, end and handler nodes
-     */
-    if( node->m_type != VF_TYPE_NODE_CODE_RANGE ) {
-        return VER_OK;
-    }
-    
-    /**
-     * Get begin and end code instruction of graph node
-     */
-    unsigned start = node->m_start;
-    unsigned end = node->m_end;
-    assert( start <= end );
-    
-    /**
-     * Evaluate stack depth
-     */
-    unsigned index;
-    vf_Code_t *pointer;
-    int stack_depth = 0;
-    for( index = start, pointer = &ctex->m_code[index]; index <= end; index++, pointer++ ) {
-        if( pointer->m_minstack + VERIFY_START_MARK > stack_depth + depth ) {
-            VERIFY_REPORT_METHOD( ctex, "Unable to pop operand off an empty stack" );
-            return VER_ErrorStackOverflow;
-        }
-        stack_depth += pointer->m_stack;
-        if( stack_depth + depth > (int)max_stack || stack_depth + depth < VERIFY_START_MARK ) {
-            VERIFY_REPORT_METHOD( ctex, "Instruction stack overflow" );
-            return VER_ErrorStackOverflow;
-        }
-    }
-#if _VERIFY_DEBUG
-    if( stack_depth != ctex->m_graph->GetNodeStackModifier( nodenum ) ) {
-        VERIFY_DEBUG( "vf_check_node_stack_depth: error stack modifier calculate" );
-        vf_error();
-    }
-#endif // _VERIFY_DEBUG
-
-    return VER_OK;
-} // vf_check_node_stack_depth
-
-/**
- * Function checks graph nodes stack depth consistency. It's recursive function.
- * Function returns result of check.
- */
-static Verifier_Result
-vf_check_stack_depth( unsigned nodenum,       // graph node number
-                     int stack_depth,         // initial stack depth of node
-                     unsigned maxstack,      // maximal stack
-                     unsigned *count,        // pointer to checked node count
-                     vf_Context_t *ctex)     // verifier context
-{
-    // get checked node
-    vf_NodeHandle node = ctex->m_graph->GetNode( nodenum );
-
-    /**
-     * Skip end-entry node
-     */
-    if( VF_TYPE_NODE_END_ENTRY == node->m_type ) {
-        return VER_OK;
-    }
-
-    /**
-     * Check handler node
-     */
-    if( VF_TYPE_NODE_HANDLER == node->m_type ) {
-        // Reset stack for handler nodes
-        stack_depth = VERIFY_START_MARK;
-    }
-
-    /**
-     * Check node stack depth
-     */
-    int depth = ctex->m_graph->GetNodeMark( nodenum );
-    if( !depth ) {
-        // stack depth don't set, mark node by his stack depth
-        ctex->m_graph->SetNodeMark( nodenum, stack_depth );
-        (*count)++;
-    } else {
-        if( stack_depth == depth ) {
-            // consistent stack depth in graph
-            return VER_OK;
-        } else {
-            // inconsistent stack depth in graph
-            VERIFY_REPORT_METHOD( ctex, "Inconsistent stack depth: "
-                << stack_depth - VERIFY_START_MARK << " != "
-                << depth - VERIFY_START_MARK );
-            return VER_ErrorStackDeep;
-        }
-    }
-
-    /**
-     * Check node stack overflow
-     */
-    Verifier_Result result = 
-        vf_check_node_stack_depth( nodenum, stack_depth, maxstack, ctex );
-    if( result != VER_OK ) {
-        return result;
-    }
-
-    /** 
-     * Override all out edges and set stack depth for out nodes
-     */
-    depth = stack_depth + ctex->m_graph->GetNodeStackModifier( nodenum );
-    for( unsigned outedge = ctex->m_graph->GetNodeFirstOutEdge( nodenum );
-         outedge;
-         outedge = ctex->m_graph->GetEdgeNextOutEdge( outedge ) )
-    {
-        // get out node
-        unsigned outnode = ctex->m_graph->GetEdgeEndNode( outedge );
-        // mark out node with its out nodes
-        result = vf_check_stack_depth( outnode, depth, maxstack, count, ctex );
-        if( result != VER_OK ) {
-            return result;
-        }
-    }
-    return result;
-} // vf_check_stack_depth
-
-
+}                               // vf_free_graph
