@@ -41,6 +41,12 @@
 
 #include "LoopTree.h"
 
+
+#define STACK_INFO_KEY "stackInfo"
+#define INLINE_INFO_KEY "inlineInfo"
+#define BCMAP_INFO_KEY "bcMap"
+#define GCMAP_INFO_KEY "gcMap"
+
 namespace Jitrino
 {
 namespace Ia32
@@ -117,7 +123,7 @@ public:
     void setInfo(const char * key, void * info)
     { infoMap[newInternalString(key)]=info; }
 
-    const void * getInfo(const char * key)
+    const void * getInfo(const char * key) const
     { ConstCharStringToVoidPtrMap::const_iterator it=infoMap.find(key); return it!=infoMap.end()?it->second:NULL; }
 
     //-------------------------------------------------------------------------------------

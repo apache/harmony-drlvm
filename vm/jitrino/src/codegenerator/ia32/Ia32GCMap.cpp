@@ -469,7 +469,7 @@ void GCMapCreator::runImpl() {
     GCMap * gcMap=new(mm) GCMap(mm);
     irManager->calculateOpndStatistics();
     gcMap->registerInsts(*irManager);
-    irManager->setInfo("gcMap", gcMap);
+    irManager->setInfo(GCMAP_INFO_KEY, gcMap);
 
     if (Log::isEnabled()) {
         gcMap->getGCSafePointsInfo()->dump(getTagName());
@@ -532,13 +532,13 @@ bool RuntimeInterface::canEnumerate(MethodDesc* methodDesc, NativeCodePtr eip) {
 
 
 void InfoBlockWriter::runImpl() {
-    StackInfo * stackInfo = (StackInfo*)irManager->getInfo("stackInfo");
+    StackInfo * stackInfo = (StackInfo*)irManager->getInfo(STACK_INFO_KEY);
     assert(stackInfo != NULL);
-    GCMap * gcMap = (GCMap*)irManager->getInfo("gcMap");
+    GCMap * gcMap = (GCMap*)irManager->getInfo(GCMAP_INFO_KEY);
     assert(gcMap != NULL);
-    BcMap *bcMap = (BcMap*)irManager->getInfo("bcMap");
+    BcMap *bcMap = (BcMap*)irManager->getInfo(BCMAP_INFO_KEY);
     assert(bcMap != NULL);
-    InlineInfoMap * inlineInfo = (InlineInfoMap*)irManager->getInfo("inlineInfo");
+    InlineInfoMap * inlineInfo = (InlineInfoMap*)irManager->getInfo(INLINE_INFO_KEY);
     assert(inlineInfo !=NULL);
 
     CompilationInterface& compIntf = irManager->getCompilationInterface();

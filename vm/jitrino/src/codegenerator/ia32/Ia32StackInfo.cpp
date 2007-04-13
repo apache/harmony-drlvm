@@ -47,7 +47,7 @@ namespace Ia32 {
 class StackInfoInstRegistrar : public SessionAction {
     void runImpl()
     { 
-        StackInfo * stackInfo = (StackInfo*)irManager->getInfo("stackInfo");
+        StackInfo * stackInfo = (StackInfo*)irManager->getInfo(STACK_INFO_KEY);
         assert(stackInfo!=NULL);
         stackInfo->registerInsts(*irManager);
         stackInfo->setMethodExitString(*irManager);

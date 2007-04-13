@@ -171,7 +171,7 @@ void StackLayouter::runImpl()
     IRManager & irm=getIRManager();
 
     stackInfo = new(irm.getMemoryManager()) StackInfo(irm.getMemoryManager());
-    irm.setInfo("stackInfo", stackInfo);
+    irm.setInfo(STACK_INFO_KEY, stackInfo);
 
     irm.calculateOpndStatistics();
 #ifdef _DEBUG

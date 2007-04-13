@@ -294,7 +294,7 @@ void CodeEmitter::runImpl()
         bc2LIRMapHandler = new(memoryManager) VectorHandler(bcOffset2LIRHandlerName, meth);
     }
 
-    irManager->setInfo("inlineInfo", new(irManager->getMemoryManager()) InlineInfoMap(irManager->getMemoryManager()));
+    irManager->setInfo(INLINE_INFO_KEY, new(irManager->getMemoryManager()) InlineInfoMap(irManager->getMemoryManager()));
     constantAreaLayout.doLayout(irManager);
     irManager->resolveRuntimeInfo();
     emitCode();
@@ -310,7 +310,7 @@ void CodeEmitter::runImpl()
 //________________________________________________________________________________________
 void CodeEmitter::registerInlineInfoOffsets() 
 {
-    InlineInfoMap * inlineMap = (InlineInfoMap *)irManager->getInfo("inlineInfo");
+    InlineInfoMap * inlineMap = (InlineInfoMap *)irManager->getInfo(INLINE_INFO_KEY);
     const Nodes& nodes = irManager->getFlowGraph()->getNodes();
     for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
         Node* node = *it;
@@ -498,7 +498,7 @@ void CodeEmitter::postPass()
     MemoryManager& irmm = irManager->getMemoryManager();
     bool isBcRequired = irManager->getCompilationInterface().isBCMapInfoRequired();
     BcMap* bcMap = new(irmm) BcMap(irmm);
-    irManager->setInfo("bcMap", bcMap);
+    irManager->setInfo(BCMAP_INFO_KEY, bcMap);
     bool newOpndsCreated = false;
     for( BasicBlock * bb = (BasicBlock*)irManager->getFlowGraph()->getEntryNode(); bb != NULL; bb=bb->getLayoutSucc()) {
         for (Inst* inst = (Inst*)bb->getFirstInst(); inst!=NULL; inst = inst->getNextInst()) {

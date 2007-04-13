@@ -1185,7 +1185,17 @@ void IRLivenessDotPrinter::printNode(const Node * node)
 
 #ifdef _DEBUG
             BitSet* entrySet = irManager->getLiveAtEntry(node);
-            assert(entrySet->isEqual(*lsCurrent));
+            if (!entrySet->isEqual(*lsCurrent)) {
+                if (node == irManager->getFlowGraph()->getEntryNode() 
+                    && ((POINTER_SIZE_INT*)irManager->getInfo(STACK_INFO_KEY))!=NULL) 
+                {
+                    //DETAILS: callee save regs has no defs. See IRManager.verifyLiveness for details.
+                    //This is why we skip liveness verification for entry node here after stacklayouter pass.
+                    //TODO: we can add pseudo-defs for callee save regs to EntryPointPseudoInst
+                } else {
+                    assert(false);
+                }
+            }
 #endif
 
             StlVector<Opnd *> opndsAll(mm);
