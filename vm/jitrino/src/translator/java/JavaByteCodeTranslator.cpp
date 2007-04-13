@@ -2795,7 +2795,7 @@ JavaByteCodeTranslator::arraycopyOptimizable(MethodDesc * methodDesc,
         // To avoid this we just reject the inlining of System::arraycopy call in this case.
         NamedType* srcElemType = srcAsArrayType->getElementType();
         NamedType* dstElemType = dstAsArrayType->getElementType();
-        throwsASE = ! VMInterface::isSubClassOf(srcElemType->getVMTypeHandle(),dstElemType->getVMTypeHandle());
+        throwsASE = srcElemType->getVMTypeHandle() != dstElemType->getVMTypeHandle();
     }
     if ( throwsASE )
         return false;

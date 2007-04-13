@@ -1,0 +1,9 @@
+<project name="RUN HARMONY-3216 Regression Test">
+    <target name="run-test">
+        <run-junit-test 
+            test="org.apache.harmony.drlvm.tests.regression.h3216.ASETest"
+            vmarg="-Xem:opt">
+        </run-junit-test>
+    </target>
+</project>
+
