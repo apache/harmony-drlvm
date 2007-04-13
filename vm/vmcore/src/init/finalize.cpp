@@ -674,14 +674,14 @@ void vm_enqueue_reference(Managed_Object_Handle obj)
 void vm_activate_ref_enqueue_thread()
 {
     if(get_native_ref_enqueue_thread_flag())
-        activate_ref_enqueue_thread();
+        activate_ref_enqueue_thread(FALSE);
 }
 
 void vm_enqueue_references()
 {
     /* BEGIN: modified for NATIVE REFERENCE ENQUEUE THREAD */
     if(get_native_ref_enqueue_thread_flag())
-        activate_ref_enqueue_thread();
+        activate_ref_enqueue_thread(FALSE);
     else
         references_to_enqueue.enqueue_references();
     /* END: modified for NATIVE REFERENCE ENQUEUE THREAD */

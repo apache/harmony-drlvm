@@ -66,7 +66,9 @@ extern Boolean get_finalizer_on_exit_flag();
 extern void finalizer_threads_init(JavaVM *java_vm);
 extern void finalizer_shutdown(Boolean start_finalization_on_exit);
 extern void activate_finalizer_threads(Boolean wait);
-extern void vmmemory_manager_runfinalization(void);
+
+inline void native_sync_run_finalization(void)
+{ activate_finalizer_threads(TRUE); };
 
 
 extern void vm_heavy_finalizer_resume_mutator(void);

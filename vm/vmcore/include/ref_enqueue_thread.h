@@ -33,13 +33,19 @@
 
 typedef struct Ref_Enqueue_Thread_Info {
     hysem_t pending_sem;
+    hycond_t end_cond;      // ref enqueue end condition variable
+    hymutex_t end_mutex;    // ref enqueue end mutex
     Boolean shutdown;
     volatile unsigned int thread_attached;
+    volatile unsigned int end_waiting_num;  // thread num waiting for finalization end
 }Ref_Enqueue_Thread_Info;
 
 
 extern void ref_enqueue_thread_init(JavaVM *java_vm);
 extern void ref_enqueue_shutdown(void);
-extern void activate_ref_enqueue_thread(void);
+extern void activate_ref_enqueue_thread(Boolean wait);
+
+inline void native_sync_enqueue_references(void)
+{ activate_ref_enqueue_thread(TRUE); };
 
 #endif // _REF_ENQUEUE_THREAD_H_

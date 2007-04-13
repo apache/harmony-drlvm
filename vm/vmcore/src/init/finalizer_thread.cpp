@@ -179,11 +179,6 @@ static void notify_finalization_end(void)
         hycond_notify_all(&fin_thread_info->end_cond);
 }
 
-void vmmemory_manager_runfinalization(void)
-{
-    activate_finalizer_threads(TRUE);
-}
-
 static void wait_pending_finalizer(void)
 {
     IDATA stat = hysem_wait(fin_thread_info->pending_sem);
@@ -278,6 +273,7 @@ void vm_heavy_finalizer_resume_mutator(void)
     if(gc_clear_mutator_block_flag())
         hycond_notify_all(&fin_thread_info->mutator_block_cond);
 }
+
 
 
 

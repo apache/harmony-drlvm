@@ -36,6 +36,7 @@
 
 /* added for NATIVE FINALIZER THREAD */
 #include "finalizer_thread.h"
+#include "ref_enqueue_thread.h"
 
 /**
  * Implements getObject(..) method.
@@ -116,10 +117,10 @@ JNIEXPORT jboolean JNICALL Java_java_lang_FinalizerThread_getNativeFinalizerThre
 JNIEXPORT void JNICALL Java_java_lang_FinalizerThread_runFinalizationInNativeFinalizerThreads
   (JNIEnv *, jclass)
 {
-    vm_enqueue_references();
+    native_sync_enqueue_references();
     
     // Do finalization in dedicated native finalizer threads.
-    vmmemory_manager_runfinalization();
+    native_sync_run_finalization();
 }
 
 /*

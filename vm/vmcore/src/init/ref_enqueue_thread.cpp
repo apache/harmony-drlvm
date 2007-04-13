@@ -52,6 +52,11 @@ void ref_enqueue_thread_init(JavaVM *java_vm)
     IDATA status = hysem_create(&ref_thread_info->pending_sem, 0, REF_ENQUEUE_THREAD_NUM);
     assert(status == TM_ERROR_NONE);
     
+    status = hycond_create(&ref_thread_info->end_cond);
+    assert(status == TM_ERROR_NONE);
+    status = hymutex_create(&ref_thread_info->end_mutex, TM_MUTEX_DEFAULT);
+    assert(status == TM_ERROR_NONE);
+    
     void **args = (void **)STD_MALLOC(sizeof(void *));
     args[0] = (void *)java_vm;
     status = hythread_create(NULL, 0, REF_ENQUEUE_THREAD_PRIORITY, 0, (hythread_entrypoint_t)ref_enqueue_thread_func, args);
@@ -63,7 +68,7 @@ void ref_enqueue_thread_init(JavaVM *java_vm)
 void ref_enqueue_shutdown(void)
 {
     ref_thread_info->shutdown = TRUE;
-    activate_ref_enqueue_thread();
+    activate_ref_enqueue_thread(FALSE);
 }
 
 static uint32 atomic_inc32(volatile apr_uint32_t *mem)
@@ -79,15 +84,39 @@ static void dec_ref_thread_num(void)
 { atomic_dec32(&ref_thread_info->thread_attached); }
 
 static void wait_ref_thread_attached(void)
-{ while(ref_thread_info->thread_attached == 0); }
+{ while(ref_thread_info->thread_attached < REF_ENQUEUE_THREAD_NUM); }
 
 void wait_native_ref_thread_detached(void)
 { while(ref_thread_info->thread_attached); }
 
-void activate_ref_enqueue_thread(void)
+static void wait_ref_enqueue_end(void)
+{
+    hymutex_lock(&ref_thread_info->end_mutex);
+    unsigned int ref_num = vm_get_references_quantity();
+    do {
+        unsigned int wait_time = ref_num + 100;
+        atomic_inc32(&ref_thread_info->end_waiting_num);
+        IDATA status = hycond_wait_timed(&ref_thread_info->end_cond, &ref_thread_info->end_mutex, (I_64)wait_time, 0);
+        atomic_dec32(&ref_thread_info->end_waiting_num);
+        if(status != TM_ERROR_NONE) break;
+        ref_num = vm_get_references_quantity();
+    } while(ref_num);
+    hymutex_unlock(&ref_thread_info->end_mutex);
+}
+
+void activate_ref_enqueue_thread(Boolean wait)
 {
     IDATA stat = hysem_set(ref_thread_info->pending_sem, REF_ENQUEUE_THREAD_NUM);
     assert(stat == TM_ERROR_NONE);
+    
+    if(wait)
+        wait_ref_enqueue_end();
+}
+
+static void notify_ref_enqueue_end(void)
+{
+    if(vm_get_references_quantity()==0)
+        hycond_notify_all(&ref_thread_info->end_cond);
 }
 
 static void wait_pending_reference(void)
@@ -122,6 +151,9 @@ static IDATA ref_enqueue_thread_func(void **args)
         
         /* do the real reference enqueue work */
         vm_ref_enqueue_func();
+        
+        if(ref_thread_info->end_waiting_num)
+            notify_ref_enqueue_end();
         
         if(ref_thread_info->shutdown)
             break;
