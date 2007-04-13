@@ -633,11 +633,13 @@ PeepHoleOpt::Changed PeepHoleOpt::handleInst_SSEXor(Inst* inst)
           why: XORPS/PD used for zero-ing register, but PXOR is faster 
                (2 ticks on PXOR vs 4 ticks for XORPS/XORPD)
         */
-        dst = convertToXmmReg64(dst);
-        src = convertToXmmReg64(src);
-        Inst* ii = irManager->newInst(Mnemonic_PXOR, dst, src);
-        replaceInst(inst, ii);
-        return Changed_Inst;
+        // FIXME: replacing operands on 1 instruction only 
+        // will fail liveness verification if their refcount > 1
+        //dst = convertToXmmReg64(dst);
+        //src = convertToXmmReg64(src);
+        //Inst* ii = irManager->newInst(Mnemonic_PXOR, dst, src);
+        //replaceInst(inst, ii);
+        //return Changed_Inst;
     }
     return Changed_Nothing;
 }
