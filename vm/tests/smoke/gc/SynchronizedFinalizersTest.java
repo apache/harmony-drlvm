@@ -29,7 +29,7 @@ public class SynchronizedFinalizersTest implements Runnable {
     byte[] array;
 
     static final int N_THREADS = 100;
-    static final int N_OBJECTS = 300;
+    static final int N_OBJECTS = 100;
     static final int OBJECT_SIZE = 20000;
 
     static int started = 0;
