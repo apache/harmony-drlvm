@@ -78,6 +78,8 @@ void gc_space_tune_prepare(GC* gc, unsigned int cause)
 /*Check the tuning size, if too small, cancle the tuning.*/
 void check_space_tuner(GC* gc)
 {
+	POINTER_SIZE_INT los_fail_sz_uped = 0;
+	
   Space_Tuner* tuner = gc->tuner;
   if((!tuner->need_tune) && (!tuner->force_tune)){
     assert(tuner->kind == TRANS_NOTHING);
@@ -91,7 +93,7 @@ void check_space_tuner(GC* gc)
   }
   if((tuner->need_tune) && (!tuner->force_tune)) goto check_size;
   /*tuner->force_tune must be true here!*/
-  POINTER_SIZE_INT los_fail_sz_uped = lspace_get_failure_size((Lspace*)lspace);
+  los_fail_sz_uped = lspace_get_failure_size((Lspace*)lspace);
   assert(!(los_fail_sz_uped % GC_BLOCK_SIZE_BYTES));
 
   if(tuner->kind == TRANS_FROM_LOS_TO_MOS){
