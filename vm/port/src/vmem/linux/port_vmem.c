@@ -144,27 +144,43 @@ APR_DECLARE(size_t) port_vmem_reserved_size(){
 }
 
 APR_DECLARE(size_t) port_vmem_committed_size(){
-    char buf[PATH_MAX];
+    char* buf = (char*) malloc(PATH_MAX + 1);
 
-    pid_t pid = getpid();
-    sprintf(buf, "/proc/%d/statm", pid);
-    FILE* file = fopen(buf, "rt");
+    pid_t my_pid = getpid();
+    sprintf(buf, "/proc/%d/statm", my_pid);
+    FILE* file = fopen(buf, "r");
     if (!file) {
-        return port_vmem_page_sizes()[0];
+        return 0;
+    }
+    size_t size = 0;
+    ssize_t len = getline(&buf, &size, file);
+    if (len == -1) {
+        return 0;
     }
     size_t vmem;
     int res = sscanf(buf, "%lu", &vmem);
+    if (res < 1) {
+        return 0;
+    }
+    if (buf) {
+        free(buf);
+    }
     return vmem * port_vmem_page_sizes()[0];
 }
 
 APR_DECLARE(size_t) port_vmem_max_size(){
-    char buf[PATH_MAX];
+    char* buf = (char*) malloc(PATH_MAX + 1);
 
-    pid_t mypid = getpid();
-    sprintf(buf, "/proc/%d/stat", mypid);
-    FILE* file = fopen(buf, "rt");
+    pid_t my_pid = getpid();
+    sprintf(buf, "/proc/%d/stat", my_pid);
+    FILE* file = fopen(buf, "r");
     if (!file) {
-        return UINT_MAX;
+        return 0;
+    }
+    size_t size = 0;
+    ssize_t len = getline(&buf, &size, file);
+    if (len == -1) {
+        return 0;
     }
     int pid, ppid, pgrp, session, tty_nr, tpgid, exit_signal, processor;
     char comm[PATH_MAX];
@@ -183,7 +199,7 @@ APR_DECLARE(size_t) port_vmem_max_size(){
         &startcode, &endcode, &startstack, &kstkesp, &kstkeip, &signal, &blocked,
         &sigignore, &sigcatch, &wchan, &nswap, &cnswap, &exit_signal, &processor);
     if (res < 25) { // rlim position
-        return UINT_MAX;
+        return 0;
     };
     return rlim;
 }

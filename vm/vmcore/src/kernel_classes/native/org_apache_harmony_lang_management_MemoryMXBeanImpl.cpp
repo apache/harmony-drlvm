@@ -117,19 +117,21 @@ JNIEXPORT jobject JNICALL Java_org_apache_harmony_lang_management_MemoryMXBeanIm
         - ((JavaVM_Internal*)vm)->vm_env->init_gc_used_memory;
     if (init <= 0) {init = -1;}
 
-    jlong used = port_vmem_used_size() - gc_total_memory();
+    jlong used = port_vmem_used_size();
     if (used < init) {used = init;}
+    if (used == -1) {used = 0;}
 
-    jlong committed = port_vmem_committed_size() - gc_total_memory();
+    jlong committed = port_vmem_committed_size();
     if (committed < used) {committed = used;}
+    if (committed == -1) {committed = 0;}
 
-    jlong max = port_vmem_max_size() - gc_total_memory();
-    if (max < committed) {max = committed;}
+    jlong max = port_vmem_max_size();
+    if ((max < committed) && (max != -1)) {max = committed;}
 
     jclass memoryUsageClazz =jenv->FindClass("java/lang/management/MemoryUsage");
-    if (jenv->ExceptionCheck()) {return NULL;};
+    if (jenv->ExceptionCheck()) {return NULL;}
     jmethodID memoryUsageClazzConstructor = jenv->GetMethodID(memoryUsageClazz, "<init>", "(JJJJ)V");
-    if (jenv->ExceptionCheck()) {return NULL;};
+    if (jenv->ExceptionCheck()) {return NULL;}
 
     jobject memoryUsage = jenv->NewObject(memoryUsageClazz, memoryUsageClazzConstructor, init, used,
         committed, max);

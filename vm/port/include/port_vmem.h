@@ -136,22 +136,26 @@ APR_DECLARE(apr_status_t) port_vmem_release(port_vmem_t *block);
 APR_DECLARE(size_t *) port_vmem_page_sizes();
 
 /**
- * Returns the amount of currently used memory in bytes.
+ * Returns the amount of currently used memory in bytes
+ * or 0 if this value could not be calculated.
  */
 APR_DECLARE(size_t) port_vmem_used_size();
 
 /**
- * Returns the amount of committed memory in bytes.
+ * Returns the amount of committed memory in bytes
+ * or 0 if this value could not be calculated.
  */
 APR_DECLARE(size_t) port_vmem_committed_size();
 
 /**
- * Returns the amount of reserved memory in bytes.
+ * Returns the amount of reserved memory in bytes
+ * or 0 if this value could not be calculated.
  */
 APR_DECLARE(size_t) port_vmem_reserved_size();
 
 /**
- * Returns the maximum amount of memory which could be reserved in bytes.
+ * Returns the maximum amount of memory which could be reserved in bytes
+ * or 0 if this value could not be calculated
  */
 APR_DECLARE(size_t) port_vmem_max_size();
 
