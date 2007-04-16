@@ -35,7 +35,7 @@ extern char* GC_VERIFY;
 
 extern POINTER_SIZE_INT NOS_SIZE;
 extern POINTER_SIZE_INT MIN_NOS_SIZE;
-extern POINTER_SIZE_INT MIN_LOS_SIZE;
+extern POINTER_SIZE_INT INIT_LOS_SIZE;
 
 extern Boolean FORCE_FULL_COMPACT;
 extern Boolean MINOR_ALGORITHM;
@@ -161,8 +161,8 @@ void gc_parse_options(GC* gc)
     MIN_NOS_SIZE = get_size_property("gc.min_nos_size");
   }
 
-  if (is_property_set("gc.min_los_size", VM_PROPERTIES) == 1) {
-    MIN_LOS_SIZE = get_size_property("gc.min_los_size");
+  if (is_property_set("gc.init_los_size", VM_PROPERTIES) == 1) {
+    INIT_LOS_SIZE = get_size_property("gc.init_los_size");
   }  
 
   if (is_property_set("gc.num_collectors", VM_PROPERTIES) == 1) {
@@ -318,6 +318,7 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
   vm_resume_threads_after();
   return;
 }
+
 
 
 

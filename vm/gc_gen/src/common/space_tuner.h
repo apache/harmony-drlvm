@@ -25,7 +25,7 @@
 #include "gc_space.h"
 
 #define GC_LOS_MIN_VARY_SIZE ( 2 * MB )
-#define GC_FIXED_SIZE_TUNER
+//#define GC_FIXED_SIZE_TUNER
 
 //For_LOS_extend
 enum Transform_Kind {
@@ -40,13 +40,18 @@ typedef struct Space_Tuner{
     POINTER_SIZE_INT tuning_size;
     POINTER_SIZE_INT conservative_tuning_size;
     POINTER_SIZE_INT least_tuning_size;
-    unsigned int force_tune;
+    /*Used for LOS_Shrink*/
+    Block_Header* interim_blocks;
+    Boolean need_tune;
+    Boolean force_tune;
     
     /*LOS alloc speed sciecne last los variation*/    
     POINTER_SIZE_INT speed_los;
+    POINTER_SIZE_INT old_speed_los;
     /*MOS alloc speed sciecne last los variation*/    
     POINTER_SIZE_INT speed_mos;
-
+    POINTER_SIZE_INT old_speed_mos;
+    
     /*Total wasted memory of los science last los variation*/
     POINTER_SIZE_INT wast_los;
     /*Total wasted memory of mos science last los variation*/
@@ -70,7 +75,7 @@ typedef struct Space_Tuner{
 void gc_space_tune_prepare(GC* gc, unsigned int cause);
 void gc_space_tune_before_gc(GC* gc, unsigned int cause);
 void gc_space_tune_before_gc_fixed_size(GC* gc, unsigned int cause);
-Boolean retune_los_size(GC *gc);
+Boolean gc_space_retune(GC *gc);
 void gc_space_tuner_reset(GC* gc);
 void gc_space_tuner_initialize(GC* gc);
 

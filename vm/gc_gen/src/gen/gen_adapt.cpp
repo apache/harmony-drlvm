@@ -217,7 +217,8 @@ static void gc_decide_next_collect(GC_Gen* gc, int64 pause_time)
         survive_ratio = (float)major_survive_size/(float)space_committed_size((Space*)mspace);
         mspace->survive_ratio = survive_ratio;
       }
-      if(gc->tuner->kind == TRANS_FROM_MOS_TO_LOS){
+      /*For LOS_Shrink:*/
+      if(gc->tuner->kind != TRANS_NOTHING){
         POINTER_SIZE_INT mspace_size_threshold = (space_committed_size((Space*)mspace) + space_committed_size((Space*)fspace)) >> 1;
         mspace_set_expected_threshold((Mspace *)mspace, mspace_size_threshold );
       }
@@ -251,9 +252,14 @@ static void gc_decide_next_collect(GC_Gen* gc, int64 pause_time)
   
       survive_ratio = (float)minor_survive_size/(float)space_committed_size((Space*)fspace);
       fspace->survive_ratio = survive_ratio;
-      /*For_LOS adaptive*/
-      POINTER_SIZE_INT mspace_size_threshold = space_committed_size((Space*)mspace) + space_committed_size((Space*)fspace) - free_size_threshold;
-      mspace_set_expected_threshold((Mspace *)mspace, mspace_size_threshold );
+      /*For LOS_Adaptive*/
+      POINTER_SIZE_INT mspace_committed_size = space_committed_size((Space*)mspace);
+      POINTER_SIZE_INT fspace_committed_size = space_committed_size((Space*)fspace);
+      if(mspace_committed_size  + fspace_committed_size > free_size_threshold){
+        POINTER_SIZE_INT mspace_size_threshold;
+        mspace_size_threshold = mspace_committed_size  + fspace_committed_size - free_size_threshold;
+        mspace_set_expected_threshold((Mspace *)mspace, mspace_size_threshold );
+      }
     }
     
     gc->survive_ratio =  (gc->survive_ratio + survive_ratio)/2.0f;
@@ -262,7 +268,11 @@ static void gc_decide_next_collect(GC_Gen* gc, int64 pause_time)
   }
 
   gc_gen_mode_adapt(gc,pause_time);
-    
+  /* a heuristic: when no free block at all after this collection, we can't  
+     do any allocation at all. The first allocation will trigger a major collection */
+  if( fspace->num_managed_blocks == 0 )
+     gc->force_major_collect = TRUE;
+
   return;
 }
 
@@ -338,7 +348,7 @@ void gc_gen_adapt(GC_Gen* gc, int64 pause_time)
 
   POINTER_SIZE_INT curr_nos_size = space_committed_size((Space*)fspace);
 
-  if( abs((int)(new_nos_size - curr_nos_size)) < NOS_COPY_RESERVE_DELTA )
+  if( ABS_DIFF(new_nos_size, curr_nos_size) < NOS_COPY_RESERVE_DELTA )
     return;
   
   /* below are ajustment */  

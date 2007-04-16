@@ -25,6 +25,13 @@
 #include "../thread/gc_thread.h"
 #include "free_area_pool.h"
 
+/*Fixme: This macro is for handling HEAP_NULL issues caused by JIT OPT*/
+#ifdef COMPRESS_REFERENCE
+  #define LOS_HEAD_RESERVE_FOR_HEAP_NULL (GC_BLOCK_SIZE_BYTES )
+#else
+  #define LOS_HEAD_RESERVE_FOR_HEAP_NULL (0*KB)
+#endif
+
 typedef struct Lspace{
   /* <-- first couple of fields are overloadded as Space */
   void* heap_start;
@@ -36,6 +43,7 @@ typedef struct Lspace{
   float survive_ratio;
   unsigned int collect_algorithm;  
   GC* gc;
+  /*LOS_Shrink:This field stands for sliding compact to lspace */
   Boolean move_object;
   /*For_statistic: size allocated science last time collect los, ie. last major*/
   POINTER_SIZE_INT alloced_size;
@@ -46,11 +54,15 @@ typedef struct Lspace{
   Free_Area_Pool* free_pool;
   /*Size of allocation which caused lspace alloc failure.*/
   POINTER_SIZE_INT failure_size;
+  void* scompact_fa_start;
+  void* scompact_fa_end;
 }Lspace;
 
 void lspace_initialize(GC* gc, void* reserved_base, POINTER_SIZE_INT lspace_size);
 void lspace_destruct(Lspace* lspace);
 Managed_Object_Handle lspace_alloc(POINTER_SIZE_INT size, Allocator* allocator);
+void lspace_sliding_compact(Collector* collector, Lspace* lspace);
+void lspace_compute_object_target(Collector* collector, Lspace* lspace);
 void lspace_sweep(Lspace* lspace);
 void lspace_reset_after_collection(Lspace* lspace);
 void lspace_collection(Lspace* lspace);
@@ -65,8 +77,8 @@ inline Partial_Reveal_Object* lspace_get_next_marked_object( Lspace* lspace, uns
 
     while(!reach_heap_end){
         //FIXME: This while shoudl be if, try it!
-        while(!*((unsigned int *)next_area_start)){
-                next_area_start += ((Free_Area*)next_area_start)->size;
+        while(!*((POINTER_SIZE_INT*)next_area_start)){
+            next_area_start += ((Free_Area*)next_area_start)->size;
         }
         if(next_area_start < (POINTER_SIZE_INT)lspace->heap_end){
             //If there is a living object at this addr, return it, and update iterate_index

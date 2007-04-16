@@ -79,7 +79,8 @@ Managed_Object_Handle gc_alloc(unsigned size, Allocation_Handle ah, void *unused
     p_obj = (Managed_Object_Handle)nos_alloc(size, allocator);
   }
   
-  if( p_obj == NULL ) return NULL;
+  if( p_obj == NULL )
+    return NULL;
     
   obj_set_vt((Partial_Reveal_Object*)p_obj, (VT)ah);
   

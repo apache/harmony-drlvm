@@ -30,8 +30,9 @@
 POINTER_SIZE_INT min_nos_size_bytes = 16 * MB;
 POINTER_SIZE_INT max_nos_size_bytes = 256 * MB;
 POINTER_SIZE_INT min_los_size_bytes = 4*MB;
+POINTER_SIZE_INT min_none_los_size_bytes = 4*MB;
 POINTER_SIZE_INT NOS_SIZE = 0;
-POINTER_SIZE_INT MIN_LOS_SIZE = 0;
+POINTER_SIZE_INT INIT_LOS_SIZE = 0;
 POINTER_SIZE_INT MIN_NOS_SIZE = 0;
 POINTER_SIZE_INT MAX_NOS_SIZE = 0;
 
@@ -78,7 +79,7 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
   if( MIN_NOS_SIZE )  min_nos_size_bytes = MIN_NOS_SIZE;
 
   POINTER_SIZE_INT los_size = max_heap_size >> 7;
-  if(MIN_LOS_SIZE) min_los_size_bytes = MIN_LOS_SIZE;
+  if(INIT_LOS_SIZE) los_size = INIT_LOS_SIZE;
   if(los_size < min_los_size_bytes ) 
     los_size = min_los_size_bytes ;
   
@@ -352,7 +353,6 @@ void gc_gen_reclaim_heap(GC_Gen* gc)
   }
 
   if(gc->collect_result == FALSE && gc_match_kind((GC*)gc, MINOR_COLLECTION)){
-    
     if(gc_is_gen_mode())
       gc_clear_remset((GC*)gc);  
     
@@ -387,6 +387,8 @@ void gc_gen_reclaim_heap(GC_Gen* gc)
 #ifdef COMPRESS_REFERENCE
   gc_set_pool_clear(gc->metadata->gc_uncompressed_rootset_pool);
 #endif
+
+  assert(!gc->los->move_object);
 
   return;
 }

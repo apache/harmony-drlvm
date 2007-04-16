@@ -28,6 +28,7 @@
 #include "../gen/gen.h"
 
 Boolean IGNORE_FINREF = FALSE;
+Boolean DURING_RESURRECTION = FALSE;
 
 
 static inline Boolean obj_is_dead_in_gen_minor_gc(Partial_Reveal_Object *p_obj)
@@ -224,6 +225,8 @@ static void resurrect_finalizable_objects(Collector *collector)
   if(finalizable_obj_pool_is_empty(gc))
     return;
   
+  DURING_RESURRECTION = TRUE;
+  
   if(!gc_match_kind(gc, MINOR_COLLECTION))
     finref_reset_repset(gc);
   pool_iterator_init(finalizable_obj_pool);
@@ -259,6 +262,8 @@ static void resurrect_finalizable_objects(Collector *collector)
   if(!gc_match_kind(gc, MINOR_COLLECTION))
     finref_put_repset(gc);
   metadata->pending_finalizers = TRUE;
+  
+  DURING_RESURRECTION = FALSE;
   
   /* fianlizable objs have been added to finref repset pool or updated by tracing */
 }

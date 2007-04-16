@@ -32,6 +32,7 @@ static void mspace_move_objects(Collector* collector, Mspace* mspace)
 {
   Block_Header* curr_block = collector->cur_compact_block;
   Block_Header* dest_block = collector->cur_target_block;
+  Block_Header *local_last_dest = dest_block;
   
   void* dest_sector_addr = dest_block->base;
   Boolean is_fallback = gc_match_kind(collector->gc, FALLBACK_COLLECTION);
@@ -65,6 +66,8 @@ static void mspace_move_objects(Collector* collector, Mspace* mspace)
           collector->result = FALSE; 
           return; 
         }
+        if(dest_block > local_last_dest)
+          local_last_dest = dest_block;
         block_end = (POINTER_SIZE_INT)GC_BLOCK_END(dest_block);
         dest_sector_addr = dest_block->base;
       }
@@ -89,6 +92,7 @@ static void mspace_move_objects(Collector* collector, Mspace* mspace)
     curr_block = mspace_get_next_compact_block(collector, mspace);
   }
   dest_block->new_free = dest_sector_addr;
+  collector->cur_target_block = local_last_dest;
  
   return;
 }
@@ -148,7 +152,6 @@ void move_compact_mspace(Collector* collector)
     }
 #endif
 
-    
     /* let other collectors go */
     num_marking_collectors++; 
   }
@@ -187,7 +190,7 @@ void move_compact_mspace(Collector* collector)
     /* last collector's world here */
     lspace_fix_repointed_refs(collector, lspace);   
     gc_fix_rootset(collector);
-    update_mspace_info_for_los_extension(mspace);
+    mspace_update_info_for_los_extension(mspace);
     num_fixing_collectors++; 
   }
   while(num_fixing_collectors != num_active_collectors + 1);

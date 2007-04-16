@@ -23,6 +23,7 @@
 #include "collector.h"
 #include "../mark_compact/mspace.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
+#include "../common/space_tuner.h"
 
 unsigned int MINOR_COLLECTORS = 0;
 unsigned int MAJOR_COLLECTORS = 0;
@@ -76,9 +77,11 @@ static void collector_reset_thread(Collector *collector)
   collector_reset_weakref_sets(collector);
 #endif
 
-  if(collector->gc->cause == GC_CAUSE_LOS_IS_FULL)
+  /*For LOS_Shrink and LOS_Extend*/
+  if(collector->gc->tuner->kind != TRANS_NOTHING){
     collector->non_los_live_obj_size = 0;
-  
+    collector->los_live_obj_size = 0;
+  }
   collector->result = TRUE;
   return;
 }

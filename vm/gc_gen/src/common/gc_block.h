@@ -74,7 +74,10 @@ typedef union Block{
 #define GC_BLOCK_HEADER_SIZE_BYTES (OFFSET_TABLE_SIZE_BYTES + GC_BLOCK_HEADER_VARS_SIZE_BYTES)
 #define GC_BLOCK_BODY_SIZE_BYTES (GC_BLOCK_SIZE_BYTES - GC_BLOCK_HEADER_SIZE_BYTES)
 #define GC_BLOCK_BODY(block) ((void*)((POINTER_SIZE_INT)(block) + GC_BLOCK_HEADER_SIZE_BYTES))
-#define GC_BLOCK_END(block) ((void*)((POINTER_SIZE_INT)(block) + GC_BLOCK_SIZE_BYTES))
+/*LOS_Shrink: We have some fake block headers when trying to compute mos object target, 
+so we must have some other methods to compute block end.*/
+//#define GC_BLOCK_END(block) ((void*)((POINTER_SIZE_INT)(block) + GC_BLOCK_SIZE_BYTES))
+#define GC_BLOCK_END(block) (((Block_Header*)(block))->ceiling)
 
 #define GC_BLOCK_LOW_MASK ((POINTER_SIZE_INT)(GC_BLOCK_SIZE_BYTES - 1))
 #define GC_BLOCK_HIGH_MASK (~GC_BLOCK_LOW_MASK)

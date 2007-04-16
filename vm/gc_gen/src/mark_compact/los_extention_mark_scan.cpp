@@ -28,6 +28,8 @@ static FORCE_INLINE void scan_slot(Collector* collector, REF *p_ref)
     collector_tracestack_push(collector, p_obj);
     if(!obj_belongs_to_space(p_obj, gc_get_los((GC_Gen*)collector->gc)))
       collector->non_los_live_obj_size += vm_object_size(p_obj);
+    else
+      collector->los_live_obj_size += round_up_to_size(vm_object_size(p_obj), KB);
   }
   
   return;
@@ -102,7 +104,7 @@ static volatile unsigned int num_finished_collectors = 0;
    So we abondoned this design. We no longer use the repset to remember repointed slots 
 */
   
-void los_extention_mark_scan_heap(Collector *collector)
+void los_adaptation_mark_scan_heap(Collector *collector)
 {
   GC* gc = collector->gc;
   GC_Metadata* metadata = gc->metadata;
@@ -137,6 +139,8 @@ void los_extention_mark_scan_heap(Collector *collector)
         collector_tracestack_push(collector, p_obj);
         if(!obj_belongs_to_space(p_obj, gc_get_los((GC_Gen*)gc)))
           collector->non_los_live_obj_size += vm_object_size(p_obj);
+        else
+          collector->los_live_obj_size += round_up_to_size(vm_object_size(p_obj), KB);
       }
 
     } 

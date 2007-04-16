@@ -29,12 +29,11 @@ Space* gc_get_nos(GC_Gen* gc);
 static volatile Block_Header* next_block_for_compact;
 static volatile Block_Header* next_block_for_target;
 
-void update_mspace_info_for_los_extension(Mspace *mspace)
+void mspace_update_info_for_los_extension(Mspace *mspace)
 { 
   Space_Tuner *tuner = mspace->gc->tuner;
   
-  if(tuner->kind != TRANS_FROM_MOS_TO_LOS)
-    return;
+  if(tuner->kind != TRANS_FROM_MOS_TO_LOS) return;
   
   POINTER_SIZE_INT tune_size = tuner->tuning_size;
   unsigned int tune_blocks = (unsigned int)(tune_size >> GC_BLOCK_SHIFT_COUNT);
@@ -52,6 +51,44 @@ void update_mspace_info_for_los_extension(Mspace *mspace)
     mspace->num_used_blocks = 0;
 }
 
+void mspace_update_info_for_los_shrink(Mspace* mspace)
+{
+  Space_Tuner *tuner = mspace->gc->tuner;
+  if(tuner->kind != TRANS_FROM_LOS_TO_MOS) return;
+
+  POINTER_SIZE_INT tune_size = tuner->tuning_size;
+  unsigned int tune_blocks = (unsigned int)(tune_size >> GC_BLOCK_SHIFT_COUNT);
+
+  /*Update mspace infomation.*/
+  mspace->blocks = (Block*)((POINTER_SIZE_INT)mspace->blocks - tune_size);
+  mspace->heap_start = (void*)(mspace->blocks);
+  mspace->committed_heap_size += tune_size;
+  mspace->first_block_idx -= tune_blocks;
+  mspace->num_managed_blocks += tune_blocks;
+  mspace->num_total_blocks += tune_blocks;
+}
+
+/*Copy the fake blocks into real blocks, reconnect these new block into main list of mspace.*/
+void mspace_settle_fake_blocks_for_los_shrink(Mspace* mspace)
+{
+  Space_Tuner *tuner = mspace->gc->tuner;  
+  if(tuner->kind != TRANS_FROM_LOS_TO_MOS) return;  
+
+  POINTER_SIZE_INT tune_size = tuner->tuning_size;
+  unsigned int tune_blocks = (unsigned int)(tune_size >> GC_BLOCK_SHIFT_COUNT);
+
+  Block* blocks = (Block*)((POINTER_SIZE_INT)mspace->blocks - tune_size);
+  unsigned int i;
+  for(i=0; i < tune_blocks; i++){
+    Block_Header* real_block = (Block_Header*)&(blocks[i]);
+    Block_Header* fake_block = &tuner->interim_blocks[i];
+    memcpy((void*)real_block, (void*)fake_block, sizeof(Block_Header));
+    real_block->next = (Block_Header*)((POINTER_SIZE_INT)real_block + GC_BLOCK_SIZE_BYTES);
+  }
+
+  return;
+}
+
 void mspace_reset_after_compaction(Mspace* mspace)
 {
   unsigned int old_num_used = mspace->num_used_blocks;
@@ -62,6 +99,7 @@ void mspace_reset_after_compaction(Mspace* mspace)
   unsigned int i;
   for(i=0; i < num_used; i++){
     Block_Header* block = (Block_Header*)&(blocks[i]);
+    assert(!((POINTER_SIZE_INT)block % GC_BLOCK_SIZE_BYTES));
     block->status = BLOCK_USED;
     block->free = block->new_free;
     block->new_free = block->base;
@@ -148,6 +186,45 @@ void gc_init_block_for_collectors(GC* gc, Mspace* mspace)
     next_block_for_target = block;
     next_block_for_compact = block;
     return;
+  }else
+  {
+    Block_Header* mos_first_block = (Block_Header*)&mspace->blocks[0];
+    unsigned int trans_blocks = (unsigned int)(tuner->tuning_size >> GC_BLOCK_SHIFT_COUNT);
+    gc->tuner->interim_blocks = (Block_Header*)STD_MALLOC(trans_blocks * sizeof(Block_Header));
+    Block_Header* los_trans_fake_blocks = gc->tuner->interim_blocks;
+    memset(los_trans_fake_blocks, 0, trans_blocks * sizeof(Block_Header));
+    void* trans_base = (void*)((POINTER_SIZE_INT)mos_first_block - tuner->tuning_size);
+    unsigned int start_idx = GC_BLOCK_INDEX_FROM(gc->heap_start, trans_base);
+    Block_Header* last_block = los_trans_fake_blocks;
+
+    for(i = 0; i < trans_blocks; i ++){
+        Block_Header* curr_block = &los_trans_fake_blocks[i];
+        curr_block->block_idx = start_idx + i;
+        curr_block->base = (void*)((POINTER_SIZE_INT)trans_base + i * GC_BLOCK_SIZE_BYTES + GC_BLOCK_HEADER_SIZE_BYTES);
+        curr_block->free = curr_block->base ;
+        curr_block->new_free = curr_block->free;
+        curr_block->ceiling = (void*)((POINTER_SIZE_INT)curr_block->base + GC_BLOCK_BODY_SIZE_BYTES);
+        curr_block->status = BLOCK_COMPACTED;
+        last_block->next = curr_block;
+        last_block = curr_block;
+    }
+    last_block->next = mos_first_block;
+
+    Collector* collector = gc->collectors[0];
+    collector->cur_target_block = los_trans_fake_blocks;
+    collector->cur_target_block->status = BLOCK_TARGET;
+    collector->cur_compact_block = mos_first_block;
+    collector->cur_compact_block->status = BLOCK_IN_COMPACT;
+    
+    for(i=1; i< gc->num_active_collectors; i++){
+      collector = gc->collectors[i];
+      collector->cur_target_block = gc->collectors[i - 1]->cur_target_block->next;
+      collector->cur_target_block->status = BLOCK_TARGET;
+      collector->cur_compact_block = gc->collectors[i - 1]->cur_compact_block->next;
+      collector->cur_compact_block->status = BLOCK_IN_COMPACT;
+    }
+    next_block_for_target = collector->cur_target_block->next;    
+    next_block_for_compact = collector->cur_compact_block->next;
   }
 }
 
@@ -187,9 +264,6 @@ Block_Header* mspace_get_next_compact_block(Collector* collector, Mspace* mspace
   return NULL;
 }
 
-#include "../trace_forward/fspace.h"
-#include "../gen/gen.h"
-
 Block_Header* mspace_get_next_target_block(Collector* collector, Mspace* mspace)
 {    
   Block_Header* cur_target_block = (Block_Header*)next_block_for_target;
@@ -216,8 +290,14 @@ Block_Header* mspace_get_next_target_block(Collector* collector, Mspace* mspace)
    * but we can't use the blocks which are given to los when los extension happens.
    * in this case, an out-of-mem should be given to user.
    */
-  Fspace *nos = ((GC_Gen*)collector->gc)->nos;
-  Block_Header *nos_end = ((Block_Header *)&nos->blocks[nos->num_managed_blocks-1])->next;
+  GC* gc = collector->gc;
+  Blocked_Space* nos = (Blocked_Space*)gc_get_nos((GC_Gen*)gc);
+  Block_Header *nos_end; 
+  if( nos->num_managed_blocks != 0)
+    nos_end = ((Block_Header *)&nos->blocks[nos->num_managed_blocks-1])->next;
+  else 
+    nos_end = ((Block_Header *)&mspace->blocks[mspace->num_managed_blocks-1])->next;
+
   while( cur_target_block != nos_end){
     //For_LOS_extend
     //assert( cur_target_block <= collector->cur_compact_block);
@@ -298,6 +378,7 @@ void mspace_collection(Mspace* mspace)
 
   return;  
 } 
+
 
 
 

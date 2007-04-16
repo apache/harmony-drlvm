@@ -199,7 +199,7 @@ void* lspace_alloc(POINTER_SIZE_INT size, Allocator *allocator)
         /*Failled, no adequate area found in all lists, so GC at first, then get another try.*/   
         if(try_count == 0){
             vm_gc_lock_enum();
-            lspace->failure_size = alloc_size;
+            lspace->failure_size = round_up_to_size(alloc_size, GC_BLOCK_SIZE_BYTES);
             gc_reclaim_heap(allocator->gc, GC_CAUSE_LOS_IS_FULL);
             vm_gc_unlock_enum();
             try_count ++;
@@ -210,41 +210,137 @@ void* lspace_alloc(POINTER_SIZE_INT size, Allocator *allocator)
     return NULL;
 }
 
+void lspace_compute_object_target(Collector* collector, Lspace* lspace)
+{
+  void* dest_addr = lspace->heap_start;
+  unsigned int iterate_index = 0;
+  Partial_Reveal_Object* p_obj = lspace_get_first_marked_object(lspace, &iterate_index);
+
+  assert(!collector->rem_set);
+  collector->rem_set = free_set_pool_get_entry(collector->gc->metadata);
+  
+  while( p_obj ){
+    assert( obj_is_marked_in_vt(p_obj));
+    unsigned int obj_size = vm_object_size(p_obj);
+    assert(((POINTER_SIZE_INT)dest_addr + obj_size) <= (POINTER_SIZE_INT)lspace->heap_end);
+    Obj_Info_Type obj_info = get_obj_info_raw(p_obj);
+    if( obj_info != 0 ) {
+      collector_remset_add_entry(collector, (Partial_Reveal_Object **)dest_addr);
+      collector_remset_add_entry(collector, (Partial_Reveal_Object **)obj_info);
+    }
+      
+    obj_set_fw_in_oi(p_obj, dest_addr);
+    dest_addr = (void *)ALIGN_UP_TO_KILO(((POINTER_SIZE_INT) dest_addr + obj_size));
+    p_obj = lspace_get_next_marked_object(lspace, &iterate_index);
+  }
+
+  pool_put_entry(collector->gc->metadata->collector_remset_pool, collector->rem_set);
+  collector->rem_set = NULL;
+  
+  lspace->scompact_fa_start = dest_addr;
+  lspace->scompact_fa_end= lspace->heap_end;
+  return;
+}
+
+void lspace_sliding_compact(Collector* collector, Lspace* lspace)
+{
+  unsigned int iterate_index = 0;
+  Partial_Reveal_Object* p_obj = lspace_get_first_marked_object(lspace, &iterate_index);
+
+  while( p_obj ){
+    assert( obj_is_marked_in_vt(p_obj));
+    obj_unmark_in_vt(p_obj);
+    
+    unsigned int obj_size = vm_object_size(p_obj);
+    Partial_Reveal_Object *p_target_obj = obj_get_fw_in_oi(p_obj);
+    POINTER_SIZE_INT target_obj_end = (POINTER_SIZE_INT)p_target_obj + obj_size;
+    if( p_obj != p_target_obj){
+      memmove(p_target_obj, p_obj, obj_size);
+      /*Fixme: For LOS_Shrink debug*/
+//      unsigned int padding_lenth = ALIGN_UP_TO_KILO(target_obj_end) - target_obj_end;
+//      memset(p_target_obj, 0, padding_lenth);
+    }
+    set_obj_info(p_target_obj, 0);
+    p_obj = lspace_get_next_marked_object(lspace, &iterate_index);  
+  }
+
+  return;
+}
+
 void lspace_reset_after_collection(Lspace* lspace)
 {
     GC* gc = lspace->gc;
     Space_Tuner* tuner = gc->tuner;
     POINTER_SIZE_INT trans_size = tuner->tuning_size;
+    POINTER_SIZE_INT new_fa_size = 0;
     assert(!(trans_size%GC_BLOCK_SIZE_BYTES));
-    //For_LOS_extend
-    if(tuner->kind == TRANS_FROM_MOS_TO_LOS){
+    
+    /* Reset the pool first because its info is useless now. */
+    free_area_pool_reset(lspace->free_pool);
+
+    switch(tuner->kind){
+      case TRANS_FROM_MOS_TO_LOS:{
+        assert(!lspace->move_object);
         void* origin_end = lspace->heap_end;
         lspace->heap_end = (void*)(((GC_Gen*)gc)->mos->blocks);
-        
+        /*The assumption that the first word of one KB must be zero when iterating lspace in 
+        that function lspace_get_next_marked_object is not true*/
         Free_Area* trans_fa = free_area_new(origin_end, trans_size);
         free_pool_add_area(lspace->free_pool, trans_fa);
         lspace->committed_heap_size += trans_size;
         lspace->reserved_heap_size += trans_size;
+        if(lspace->move_object){
+            Block* mos_first_block = ((GC_Gen*)gc)->mos->blocks;
+            lspace->heap_end = (void*)mos_first_block;
+            new_fa_size = (POINTER_SIZE_INT)lspace->scompact_fa_end - (POINTER_SIZE_INT)lspace->scompact_fa_start;
+            Free_Area* fa = free_area_new(lspace->scompact_fa_start,  new_fa_size);
+            if(new_fa_size >= GC_OBJ_SIZE_THRESHOLD) free_pool_add_area(lspace->free_pool, fa);
+        }
+        break;
+      }
+      case TRANS_FROM_LOS_TO_MOS:{
+        assert(lspace->move_object);
+        assert(tuner->tuning_size);
+        Block* mos_first_block = ((GC_Gen*)gc)->mos->blocks;
+        assert( (POINTER_SIZE_INT)lspace->heap_end - trans_size == (POINTER_SIZE_INT)mos_first_block );
+        lspace->heap_end = (void*)mos_first_block;
+        lspace->committed_heap_size -= trans_size;
+        lspace->reserved_heap_size -= trans_size;
+        /*LOS_Shrink: We don't have to scan lspace to build free pool when slide compact LOS*/
+        assert((POINTER_SIZE_INT)lspace->scompact_fa_end > (POINTER_SIZE_INT)lspace->scompact_fa_start + tuner->tuning_size);
+        new_fa_size = (POINTER_SIZE_INT)lspace->scompact_fa_end - (POINTER_SIZE_INT)lspace->scompact_fa_start - tuner->tuning_size;
+        Free_Area* fa = free_area_new(lspace->scompact_fa_start,  new_fa_size);
+        free_pool_add_area(lspace->free_pool, fa);
+        break;
+      }
+      default:{
+        if(lspace->move_object){
+          assert(tuner->kind == TRANS_NOTHING);
+          assert(!tuner->tuning_size);
+          new_fa_size = (POINTER_SIZE_INT)lspace->scompact_fa_end - (POINTER_SIZE_INT)lspace->scompact_fa_start;
+          Free_Area* fa = free_area_new(lspace->scompact_fa_start,  new_fa_size);
+          free_pool_add_area(lspace->free_pool, fa);
+        }
+        break;
+      }
     }
+
     /*For_statistic los information.*/
     lspace->alloced_size = 0;    
-
     lspace->failure_size = 0;
+    lspace->surviving_size = 0;
 
     los_boundary = lspace->heap_end;
 }
 
 void lspace_sweep(Lspace* lspace)
 {
-
-  lspace->surviving_size = 0;
-  
-  /* reset the pool first because its info is useless now. */
-  free_area_pool_reset(lspace->free_pool);
-
   unsigned int mark_bit_idx = 0;
   POINTER_SIZE_INT cur_size = 0;
   void *cur_area_start, *cur_area_end;
+
+  /*If it is TRANS_FROM_MOS_TO_LOS now, we must clear the fa alread added in lspace_reset_after_collection*/
+  free_area_pool_reset(lspace->free_pool);
 
   Partial_Reveal_Object* p_prev_obj = (Partial_Reveal_Object *)lspace->heap_start;
   Partial_Reveal_Object* p_next_obj = lspace_get_first_marked_object(lspace, &mark_bit_idx);

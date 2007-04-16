@@ -57,6 +57,7 @@ extern char* large_page_hint;
 
 #endif
 
+#define ABS_DIFF(x, y) (((x)>(y))?((x)-(y)):((y)-(x)))
 #define USEC_PER_SEC INT64_C(1000000)
 
 #define VmThreadHandle  void*

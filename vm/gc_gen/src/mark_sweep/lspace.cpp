@@ -21,16 +21,12 @@
 #include "lspace.h"
 
 void* los_boundary = NULL;
+Boolean* p_global_lspace_move_obj;
+
 struct GC_Gen;
 void gc_set_los(GC_Gen* gc, Space* lspace);
 
-/*Fixme: This macro is for handling HEAP_NULL issues caused by JIT OPT*/
-#ifdef COMPRESS_REFERENCE
-  #define LOS_HEAD_RESERVE_FOR_HEAP_NULL (4*KB)
-#else
-  #define LOS_HEAD_RESERVE_FOR_HEAP_NULL (0*KB)
-#endif
-
+extern POINTER_SIZE_INT min_los_size_bytes;
 void lspace_initialize(GC* gc, void* start, POINTER_SIZE_INT lspace_size)
 {
   Lspace* lspace = (Lspace*)STD_MALLOC( sizeof(Lspace));
@@ -44,13 +40,15 @@ void lspace_initialize(GC* gc, void* start, POINTER_SIZE_INT lspace_size)
     vm_commit_mem(reserved_base, lspace_size);
   memset(reserved_base, 0, lspace_size);
 
+  min_los_size_bytes -= LOS_HEAD_RESERVE_FOR_HEAP_NULL;
   lspace->committed_heap_size = committed_size - LOS_HEAD_RESERVE_FOR_HEAP_NULL;
   lspace->reserved_heap_size = committed_size - LOS_HEAD_RESERVE_FOR_HEAP_NULL;
   lspace->heap_start = (void*)((POINTER_SIZE_INT)reserved_base + LOS_HEAD_RESERVE_FOR_HEAP_NULL);
   lspace->heap_end = (void *)((POINTER_SIZE_INT)reserved_base + committed_size);
 
-  lspace->move_object = FALSE;
   lspace->gc = gc;
+  /*LOS_Shrink:*/
+  lspace->move_object = FALSE;
 
   /*Treat with free area buddies*/
   lspace->free_pool = (Free_Area_Pool*)STD_MALLOC(sizeof(Free_Area_Pool));
@@ -64,6 +62,7 @@ void lspace_initialize(GC* gc, void* start, POINTER_SIZE_INT lspace_size)
   lspace->survive_ratio = 0.5f;
 
   gc_set_los((GC_Gen*)gc, (Space*)lspace);
+  p_global_lspace_move_obj = &(lspace->move_object);
   los_boundary = lspace->heap_end;
 
   return;
@@ -106,8 +105,13 @@ void lspace_collection(Lspace* lspace)
 {
   /* heap is marked already, we need only sweep here. */
   lspace->num_collections ++;
-  lspace_reset_after_collection(lspace);  
-  lspace_sweep(lspace);
+  lspace_reset_after_collection(lspace); 
+  /*When sliding compacting lspace, we don't need to sweep it anymore.
+  What's more, the assumption that the first word of one KB must be zero when iterating 
+  lspace in that function lspace_get_next_marked_object is not true*/  
+  if(!lspace->move_object) lspace_sweep(lspace);
+  lspace->move_object = FALSE;
+//  printf("lspace: %d MB \n", lspace->committed_heap_size / MB);
   return;
 }
 

@@ -204,7 +204,7 @@ Managed_Object_Handle gc_get_next_live_object(void *iterator)
 unsigned int gc_time_since_last_gc()
 {  assert(0); return 0; }
 
-#define GCGEN_HASH_MASK 0x7c
+#define GCGEN_HASH_MASK 0x1fc
 int32 gc_get_hashcode(Managed_Object_Handle p_object) 
 {  
    Partial_Reveal_Object *obj = (Partial_Reveal_Object *)p_object;
@@ -214,7 +214,7 @@ int32 gc_get_hashcode(Managed_Object_Handle p_object)
    int hash = info & GCGEN_HASH_MASK;
    if (!hash) {
        hash = (int)((((POINTER_SIZE_INT)obj) >> 3) & GCGEN_HASH_MASK);
-       if(!hash)  hash = (23 & GCGEN_HASH_MASK);
+       if(!hash)  hash = (0x173 & GCGEN_HASH_MASK);
        unsigned int new_info = (unsigned int)(info | hash);
        while (true) {
          unsigned int temp = atomic_cas32(&obj->obj_info, new_info, info);
@@ -239,8 +239,6 @@ void gc_finalize_on_exit()
  *     Partial_Reveal_Object **p_referent_field = obj_get_referent_field(p_reference);
  *     *p_referent_field = (Partial_Reveal_Object *)((unsigned int)*p_referent_field | PHANTOM_REF_ENQUEUED_MASK | ~PHANTOM_REF_PENDING_MASK);
  *   }
-
-
  * }
  */
 
