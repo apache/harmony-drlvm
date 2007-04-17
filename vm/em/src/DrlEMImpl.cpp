@@ -296,8 +296,8 @@ static std::string readFile(const std::string& fileName) {
                 std::string name;
                 std::string value;
                 if (idx != std::string::npos) {
-                    std::string name = line.substr(4, idx-4);                   
-                    std::string value = line.substr(idx+1);
+                    name = line.substr(4, idx-4);                   
+                    value = line.substr(idx+1);
                 } else {
                     if (line[4] == '-' ) {
                         value = "off";

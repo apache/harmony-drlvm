@@ -21,10 +21,10 @@ CS_OPT.file=jitrino
 
 # Options to be passed to JIT
 
--XDjit.CS_OPT.path=opt_init,translator,hir2lir,lock_method,ipf_codegen,unlock_method
-#-XDjit.arg.ipf_codegen.log=ct,dot
--XDjit.arg.genArrayCopyRepMove=false
--XDjit.arg.genArrayCopy=true
+-XX:jit.CS_OPT.path=opt_init,translator,hir2lir,lock_method,ipf_codegen,unlock_method
+#-XX:jit.arg.ipf_codegen.log=ct,dot
+-XX:jit.arg.genArrayCopyRepMove=false
+-XX:jit.arg.genArrayCopy=true
 
 #system properties
 -Djava.compiler=client static

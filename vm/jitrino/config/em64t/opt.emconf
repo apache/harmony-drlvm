@@ -22,26 +22,26 @@ CS_OPT.file=jitrino
 
 # Options to be passed to JIT
 
--XDjit.CS_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
+-XX:jit.CS_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
 
--XDjit.CS_OPT.path.optimizer=ssa,devirt,inline,uce,purge,simplify,dce,uce,memopt,simplify,dce,uce,lower,dessa,statprof,markglobals
--XDjit.CS_OPT.path.codegen=lock_method,bbp,gcpoints,cafl,dce1,i8l-,early_prop-,itrace-,native,constraints,dce2,regalloc,spillgen,layout,copy,rce-,stack,break-,iprof-,emitter!,si_insts,gcmap,info,unlock_method
--XDjit.CS_OPT.path.dce1=cg_dce
--XDjit.CS_OPT.path.dce2=cg_dce
--XDjit.CS_OPT.path.regalloc=bp_regalloc1,bp_regalloc2
--XDjit.CS_OPT.path.bp_regalloc1=bp_regalloc
--XDjit.CS_OPT.path.bp_regalloc2=bp_regalloc
+-XX:jit.CS_OPT.path.optimizer=ssa,devirt,inline,uce,purge,simplify,dce,uce,memopt,simplify,dce,uce,lower,dessa,statprof,markglobals
+-XX:jit.CS_OPT.path.codegen=lock_method,bbp,gcpoints,cafl,dce1,i8l-,early_prop-,itrace-,native,constraints,dce2,regalloc,spillgen,layout,copy,rce-,stack,break-,iprof-,emitter!,si_insts,gcmap,info,unlock_method
+-XX:jit.CS_OPT.path.dce1=cg_dce
+-XX:jit.CS_OPT.path.dce2=cg_dce
+-XX:jit.CS_OPT.path.regalloc=bp_regalloc1,bp_regalloc2
+-XX:jit.CS_OPT.path.bp_regalloc1=bp_regalloc
+-XX:jit.CS_OPT.path.bp_regalloc2=bp_regalloc
 
 #inliner configuration
--XDjit.CS_OPT.CS_OPT_inliner_pipeline.filter=-
--XDjit.CS_OPT.CS_OPT_inliner_pipeline.path=ssa,devirt
--XDjit.CS_OPT.arg.optimizer.inline.pipeline=CS_OPT_inliner_pipeline
+-XX:jit.CS_OPT.CS_OPT_inliner_pipeline.filter=-
+-XX:jit.CS_OPT.CS_OPT_inliner_pipeline.path=ssa,devirt
+-XX:jit.CS_OPT.arg.optimizer.inline.pipeline=CS_OPT_inliner_pipeline
 
 
--XDjit.CS_OPT.arg.codegen.dce1.early=yes
--XDjit.CS_OPT.arg.codegen.regalloc.bp_regalloc1.regs=ALL_GP
--XDjit.CS_OPT.arg.codegen.regalloc.bp_regalloc2.regs=ALL_XMM
--XDjit.arg.codegen.emitter.align=0
+-XX:jit.CS_OPT.arg.codegen.dce1.early=yes
+-XX:jit.CS_OPT.arg.codegen.regalloc.bp_regalloc1.regs=ALL_GP
+-XX:jit.CS_OPT.arg.codegen.regalloc.bp_regalloc2.regs=ALL_XMM
+-XX:jit.arg.codegen.emitter.align=0
 
 #system properties
 -Djava.compiler=client static

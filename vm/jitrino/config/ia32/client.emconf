@@ -48,30 +48,30 @@ EB_PROF.backedgeThreshold=100000
 
 # Options to be passed to JIT
 
--XDjit.JET_CLINIT.path=
--XDjit.JET_DPGO.path=
+-XX:jit.JET_CLINIT.path=
+-XX:jit.JET_DPGO.path=
 
--XDjit.CD_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
+-XX:jit.CD_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
 
--XDjit.CD_OPT.path.optimizer=ssa,devirt,inline,uce,purge,simplify,dce,uce,lazyexc,memopt,simplify,dce,uce,lower,dessa,statprof,markglobals
--XDjit.CD_OPT.path.codegen=lock_method,bbp,btr,gcpoints,cafl,dce1,i8l,api_magic,early_prop,peephole,itrace-,native,constraints,dce2,regalloc,spillgen,layout,copy,rce+,stack,break-,iprof-,peephole,emitter!,si_insts,gcmap,info,unlock_method
--XDjit.CD_OPT.path.dce1=cg_dce
--XDjit.CD_OPT.path.dce2=cg_dce
--XDjit.CD_OPT.path.regalloc=bp_regalloc1,bp_regalloc2
--XDjit.CD_OPT.path.bp_regalloc1=bp_regalloc
--XDjit.CD_OPT.path.bp_regalloc2=bp_regalloc
+-XX:jit.CD_OPT.path.optimizer=ssa,devirt,inline,uce,purge,simplify,dce,uce,lazyexc,memopt,simplify,dce,uce,lower,dessa,statprof,markglobals
+-XX:jit.CD_OPT.path.codegen=lock_method,bbp,btr,gcpoints,cafl,dce1,i8l,api_magic,early_prop,peephole,itrace-,native,constraints,dce2,regalloc,spillgen,layout,copy,rce+,stack,break-,iprof-,peephole,emitter!,si_insts,gcmap,info,unlock_method
+-XX:jit.CD_OPT.path.dce1=cg_dce
+-XX:jit.CD_OPT.path.dce2=cg_dce
+-XX:jit.CD_OPT.path.regalloc=bp_regalloc1,bp_regalloc2
+-XX:jit.CD_OPT.path.bp_regalloc1=bp_regalloc
+-XX:jit.CD_OPT.path.bp_regalloc2=bp_regalloc
 
 #inliner configuration
--XDjit.CD_OPT.CD_OPT_inliner_pipeline.filter=-
--XDjit.CD_OPT.CD_OPT_inliner_pipeline.path=ssa,devirt
--XDjit.CD_OPT.arg.optimizer.inline.pipeline=CD_OPT_inliner_pipeline
+-XX:jit.CD_OPT.CD_OPT_inliner_pipeline.filter=-
+-XX:jit.CD_OPT.CD_OPT_inliner_pipeline.path=ssa,devirt
+-XX:jit.CD_OPT.arg.optimizer.inline.pipeline=CD_OPT_inliner_pipeline
 
--XDjit.CD_OPT.arg.codegen.dce1.early=yes
--XDjit.CD_OPT.arg.codegen.regalloc.bp_regalloc1.regs=ALL_GP
--XDjit.CD_OPT.arg.codegen.regalloc.bp_regalloc2.regs=ALL_XMM
--XDjit.CD_OPT.arg.codegen.btr.insertCMOVs=no
--XDjit.CD_OPT.arg.codegen.btr.removeConstCompare=yes
--XDjit.arg.codegen.emitter.align=4
+-XX:jit.CD_OPT.arg.codegen.dce1.early=yes
+-XX:jit.CD_OPT.arg.codegen.regalloc.bp_regalloc1.regs=ALL_GP
+-XX:jit.CD_OPT.arg.codegen.regalloc.bp_regalloc2.regs=ALL_XMM
+-XX:jit.CD_OPT.arg.codegen.btr.insertCMOVs=no
+-XX:jit.CD_OPT.arg.codegen.btr.removeConstCompare=yes
+-XX:jit.arg.codegen.emitter.align=4
 
 #system properties
 -Djava.compiler=client

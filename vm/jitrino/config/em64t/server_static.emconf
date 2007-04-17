@@ -22,25 +22,25 @@ SS_OPT.file=jitrino
 
 # Options to be passed to JIT
 
--XDjit.SS_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
+-XX:jit.SS_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
 
--XDjit.SS_OPT.path.optimizer=ssa,simplify,dce,uce,statprof,devirt,inline,uce,purge,simplify,dce,uce,hvn,dce,uce,dessa,statprof,peel,ssa,hvn,simplify,dce,uce,lower,dce,uce,memopt,reassoc,dce,uce,hvn,dce,uce,abcd,dce,uce,gcm,dessa,statprof,markglobals
--XDjit.SS_OPT.path.codegen=lock_method,bbp,gcpoints,cafl,dce1,i8l-,early_prop-,itrace-,native,constraints,dce2,regalloc,spillgen,layout,copy,rce-,stack,break-,iprof-,emitter!,si_insts,gcmap,info,unlock_method
--XDjit.SS_OPT.path.dce1=cg_dce
--XDjit.SS_OPT.path.dce2=cg_dce
--XDjit.SS_OPT.path.regalloc=bp_regalloc1,bp_regalloc2
--XDjit.SS_OPT.path.bp_regalloc1=bp_regalloc
--XDjit.SS_OPT.path.bp_regalloc2=bp_regalloc
+-XX:jit.SS_OPT.path.optimizer=ssa,simplify,dce,uce,statprof,devirt,inline,uce,purge,simplify,dce,uce,hvn,dce,uce,dessa,statprof,peel,ssa,hvn,simplify,dce,uce,lower,dce,uce,memopt,reassoc,dce,uce,hvn,dce,uce,abcd,dce,uce,gcm,dessa,statprof,markglobals
+-XX:jit.SS_OPT.path.codegen=lock_method,bbp,gcpoints,cafl,dce1,i8l-,early_prop-,itrace-,native,constraints,dce2,regalloc,spillgen,layout,copy,rce-,stack,break-,iprof-,emitter!,si_insts,gcmap,info,unlock_method
+-XX:jit.SS_OPT.path.dce1=cg_dce
+-XX:jit.SS_OPT.path.dce2=cg_dce
+-XX:jit.SS_OPT.path.regalloc=bp_regalloc1,bp_regalloc2
+-XX:jit.SS_OPT.path.bp_regalloc1=bp_regalloc
+-XX:jit.SS_OPT.path.bp_regalloc2=bp_regalloc
 
 #inliner configuration
--XDjit.SS_OPT.SS_OPT_inliner_pipeline.filter=-
--XDjit.SS_OPT.SS_OPT_inliner_pipeline.path=ssa,simplify,dce,uce,statprof,devirt
--XDjit.SS_OPT.arg.optimizer.inline.pipeline=SS_OPT_inliner_pipeline
+-XX:jit.SS_OPT.SS_OPT_inliner_pipeline.filter=-
+-XX:jit.SS_OPT.SS_OPT_inliner_pipeline.path=ssa,simplify,dce,uce,statprof,devirt
+-XX:jit.SS_OPT.arg.optimizer.inline.pipeline=SS_OPT_inliner_pipeline
 
--XDjit.SS_OPT.arg.codegen.dce1.early=yes
--XDjit.SS_OPT.arg.codegen.regalloc.bp_regalloc1.regs=ALL_GP
--XDjit.SS_OPT.arg.codegen.regalloc.bp_regalloc2.regs=ALL_XMM
--XDjit.arg.codegen.emitter.align=0
+-XX:jit.SS_OPT.arg.codegen.dce1.early=yes
+-XX:jit.SS_OPT.arg.codegen.regalloc.bp_regalloc1.regs=ALL_GP
+-XX:jit.SS_OPT.arg.codegen.regalloc.bp_regalloc2.regs=ALL_XMM
+-XX:jit.arg.codegen.emitter.align=0
 
 #system properties
 -Djava.compiler=server static

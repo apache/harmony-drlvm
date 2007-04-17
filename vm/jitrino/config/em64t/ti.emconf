@@ -20,7 +20,7 @@ chain1.jits=JET_TI
 JET_TI.file=jitrino
 
 #JIT options
--XDjit.JET_TI.path=
+-XX:jit.JET_TI.path=
 
 #system properties
 -Djava.compiler=jet ti
