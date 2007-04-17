@@ -120,6 +120,7 @@ Version: $Revision: 1.5.2.3 $
 
             <fileset dir="${build.vm.home}/vmcore/src">
                 <select os="win">
+                    <include name="thread/win/*.cpp" />
                     <include name="util/win/*.cpp" />
                 </select>
 
@@ -154,6 +155,7 @@ Version: $Revision: 1.5.2.3 $
                 </select>
 
                 <select os="lnx">
+                    <include name="thread/linux/*.cpp" />
                     <include name="util/linux/os_wrapper.cpp" />
                     <include name="util/linux/stubs.cpp" />
                     <include name="util/linux/crash_handler.cpp" />
