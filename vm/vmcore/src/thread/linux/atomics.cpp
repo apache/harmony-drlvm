@@ -18,6 +18,11 @@
 
 
 void MemoryReadWriteBarrier() {
+#if defined(_EM64T_)
+    asm volatile ("mfence");
+#elif defined(_IPF_)
+    asm volatile ("mf" ::: "memory");
+#else // General x86 case
     /*
      * This code must use a lock-prefixed assembly instruction, so that 
      * we can support P3 processors (SSE2 only). With P4 and SSE3, we 
@@ -30,15 +35,20 @@ void MemoryReadWriteBarrier() {
      * This is a GCC inline assembly command. The final bit, "memory", will
      * clobber all of the memory registers.
      */
-    asm volatile("lock; addl $0,0(%%esp)" : : : "memory");
+    asm volatile ("lock; addl $0,0(%%esp)" : : : "memory");
+#endif
 }
 
 void MemoryWriteBarrier() {
+#if defined(_IPF_)
+    asm volatile ("mf" ::: "memory");
+#else // General x86 and x86_64 case
     /*
      * We could use the same lock-prefixed assembly instruction above,
      * but since we have support for P3 processors (SSE2) we'll just 
      * use 'sfence'.
      */
      asm volatile ("sfence" : : : "memory");
+#endif
 }
 
