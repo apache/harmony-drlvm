@@ -24,19 +24,28 @@
 
 /**
  * \file
- * Provides definition needed to install crash handler (from crash_handler.cpp)
+ * Provides definition needed to install gdb crash handler.
  */
 
 /**
- * Initializes the static state needed for crash handler.
- */
-void init_crash_handler();
-
-/**
- * Installs specified signal handler to call gdb.
+ * Checks if gdb crash handler is enabled and prepared.
  *
- * @param signum A signal number constant, e.g. SIGABRT or SIGSEGV
+ * @return true if gdb crash handler is enabled and ready for use.
  */
-void install_crash_handler(int signum);
+bool is_gdb_crash_handler_enabled();
+
+/**
+ * Initializes the static state needed for gdb crash handler.
+ *
+ * @return 0 on success or negative value on failure
+ */
+int init_gdb_crash_handler();
+
+/**
+ * Invokes gdb.
+ *
+ * @return true on success or false on failure
+ */
+bool gdb_crash_handler();
 
 #endif // _CRASH_HANDLER_H

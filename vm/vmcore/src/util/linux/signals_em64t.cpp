@@ -67,6 +67,7 @@
 
 #include "exception_filter.h"
 #include "interpreter.h"
+#include "crash_handler.h"
 #include "stack_dump.h"
 
 // Variables used to locate the context from the signal handler
@@ -380,10 +381,16 @@ void null_java_reference_handler(int signum, siginfo_t* info, void* context)
     fprintf(stderr, "SIGSEGV in VM code.\n");
     Registers regs;
     linux_ucontext_to_regs(&regs, uc);
+
     // setup default handler
     signal(signum, SIG_DFL);
-    // print stack trace
-    st_print_stack(&regs);
+
+    if (!is_gdb_crash_handler_enabled() ||
+        !gdb_crash_handler())
+    {
+        // print stack trace
+        st_print_stack(&regs);
+    }
 }
 
 
@@ -402,10 +409,16 @@ void null_java_divide_by_zero_handler(int signum, siginfo_t* info, void* context
     fprintf(stderr, "SIGFPE in VM code.\n");
     Registers regs;
     linux_ucontext_to_regs(&regs, uc);
+
     // setup default handler
     signal(signum, SIG_DFL);
-    // print stack trace
-    st_print_stack(&regs);
+
+    if (!is_gdb_crash_handler_enabled() ||
+        !gdb_crash_handler())
+    {
+        // print stack trace
+        st_print_stack(&regs);
+    }
 }
 
 /*
@@ -532,10 +545,16 @@ void abort_handler (int signum, siginfo_t* info, void* context) {
     ucontext_t *uc = (ucontext_t *)context;
     Registers regs;
     linux_ucontext_to_regs(&regs, uc);
+
     // setup default handler
     signal(signum, SIG_DFL);
-    // print stack trace
-    st_print_stack(&regs);
+
+    if (!is_gdb_crash_handler_enabled() ||
+        !gdb_crash_handler())
+    {
+        // print stack trace
+        st_print_stack(&regs);
+    }
 }
 
 void initialize_signals()
@@ -577,9 +596,8 @@ void initialize_signals()
     sigaction( SIGABRT, &sa, NULL);
     /* abort_handler installed */
 
-    extern int get_executable_name(char*, int);
-    /* initialize the name of the executable (to be used by addr2line) */
-    get_executable_name(executable, sizeof(executable));
+    // Prepare gdb crash handler
+    init_gdb_crash_handler();
 
 } //initialize_signals
 

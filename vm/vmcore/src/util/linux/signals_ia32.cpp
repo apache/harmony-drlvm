@@ -491,10 +491,16 @@ void null_java_reference_handler(int signum, siginfo_t* UNREF info, void* contex
     fprintf(stderr, "SIGSEGV in VM code.\n");
     Registers regs;
     linux_ucontext_to_regs(&regs, uc);
+
     // setup default handler
     signal(signum, SIG_DFL);
-    // print stack trace
-    st_print_stack(&regs);
+
+    if (!is_gdb_crash_handler_enabled() ||
+        !gdb_crash_handler())
+    {
+        // print stack trace
+        st_print_stack(&regs);
+    }
 }
 
 
@@ -516,10 +522,16 @@ void null_java_divide_by_zero_handler(int signum, siginfo_t* UNREF info, void* c
     fprintf(stderr, "SIGFPE in VM code.\n");
     Registers regs;
     linux_ucontext_to_regs(&regs, uc);
+
     // setup default handler
     signal(signum, SIG_DFL);
-    // print stack trace
-    st_print_stack(&regs);
+
+    if (!is_gdb_crash_handler_enabled() ||
+        !gdb_crash_handler())
+    {
+        // print stack trace
+        st_print_stack(&regs);
+    }
 }
 
 void jvmti_jit_breakpoint_handler(int signum, siginfo_t* UNREF info, void* context)
@@ -541,10 +553,16 @@ void jvmti_jit_breakpoint_handler(int signum, siginfo_t* UNREF info, void* conte
 
     fprintf(stderr, "SIGTRAP in VM code.\n");
     linux_ucontext_to_regs(&regs, uc);
+
     // setup default handler
     signal(signum, SIG_DFL);
-    // print stack trace
-    st_print_stack(&regs);
+
+    if (!is_gdb_crash_handler_enabled() ||
+        !gdb_crash_handler())
+    {
+        // print stack trace
+        st_print_stack(&regs);
+    }
 }
 
 /*
@@ -640,17 +658,15 @@ void abort_handler (int signum, siginfo_t* UNREF info, void* context) {
     ucontext_t *uc = (ucontext_t *)context;
     linux_ucontext_to_regs(&regs, uc);
     
-    // reset handler to avoid loop in case st_print_stack fails
-    struct sigaction sa;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = 0;
-    sa.sa_handler = SIG_DFL;
-    sigaction(SIGABRT, &sa, NULL);
-
     // setup default handler
     signal(signum, SIG_DFL);
-    // print stack trace
-    st_print_stack(&regs);
+
+    if (!is_gdb_crash_handler_enabled() ||
+        !gdb_crash_handler())
+    {
+        // print stack trace
+        st_print_stack(&regs);
+    }
 }
 
 /*
@@ -779,15 +795,8 @@ void initialize_signals()
     sigaction( SIGABRT, &sa, NULL);
     /* abort_handler installed */
 
-    extern int get_executable_name(char*, int);
-    /* initialize the name of the executable (to be used by addr2line) */
-    get_executable_name(executable, sizeof(executable));
-
-    if (get_boolean_property("vm.crash_handler", FALSE, VM_PROPERTIES)) {
-        init_crash_handler();
-        // can't install crash handler immediately,
-        // as we have already SIGABRT and SIGSEGV handlers
-    }
+    // Prepare gdb crash handler
+    init_gdb_crash_handler();
 
 } //initialize_signals
 

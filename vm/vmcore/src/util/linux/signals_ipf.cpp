@@ -75,10 +75,34 @@
 
 #include <semaphore.h>
 
-/**
- * the saved copy of the executable name.
- */
-static char executable[1024];
+
+
+void linux_ucontext_to_regs(Registers* regs, ucontext_t* uc)
+{
+    memcpy(regs->gr, uc->uc_mcontext.sc_gr, sizeof(regs->gr));
+    memcpy(regs->fp, uc->uc_mcontext.sc_fr, sizeof(regs->fp));
+    memcpy(regs->br, uc->uc_mcontext.sc_br, sizeof(regs->br));
+
+    regs->preds = uc->uc_mcontext.sc_pr;
+    regs->nats  = uc->uc_mcontext.sc_ar_rnat;
+    regs->pfs   = uc->uc_mcontext.sc_ar_pfs;
+    regs->bsp   = (uint64*)uc->uc_mcontext.sc_ar_bsp;
+    regs->ip    = uc->uc_mcontext.sc_ip;
+}
+
+void linux_regs_to_ucontext(ucontext_t* uc, Registers* regs)
+{
+    memcpy(uc->uc_mcontext.sc_gr, regs->gr, sizeof(regs->gr));
+    memcpy(uc->uc_mcontext.sc_fr, regs->fp, sizeof(regs->fp));
+    memcpy(uc->uc_mcontext.sc_br, regs->br, sizeof(regs->br));
+
+    uc->uc_mcontext.sc_pr      = regs->preds;
+    uc->uc_mcontext.sc_ar_rnat = regs->nats;
+    uc->uc_mcontext.sc_ar_pfs  = regs->pfs;
+    uc->uc_mcontext.sc_ar_bsp  = (uint64)regs->bsp;
+    uc->uc_mcontext.sc_ip      = regs->ip;
+}
+
 
 void asm_jvmti_exception_catch_callback() {
     // FIXME: not implemented
@@ -97,9 +121,20 @@ static bool java_throw_from_sigcontext(ucontext_t *uc, Class* exc_clss)
 }
 
 void abort_handler (int signum, siginfo_t* info, void* context) {
-    fprintf(stderr, "FIXME: abort_handler\n");
+    fprintf(stderr, "SIGABRT in VM code.\n");
+    Registers regs;
+    ucontext_t *uc = (ucontext_t *)context;
+    linux_ucontext_to_regs(&regs, uc);
+    
+    // setup default handler
     signal(signum, SIG_DFL);
-    kill(getpid(), signum);
+
+    if (!is_gdb_crash_handler_enabled() ||
+        !gdb_crash_handler())
+    {
+        // print stack trace
+        st_print_stack(&regs);
+    }
 }
 
 
@@ -107,12 +142,6 @@ static void throw_from_sigcontext(ucontext_t *uc, Class* exc_clss) {
     // FIXME: not implemented
     fprintf(stderr, "FIXME: throw_from_sigcontext: not implemented\n");
     assert(0);
-    abort();
-}
-
-void linux_ucontext_to_regs(Registers* regs, ucontext_t* uc)
-{
-    //TODO: ADD Copying of IPF registers here like it was done on ia32!!
     abort();
 }
 
@@ -136,10 +165,16 @@ void null_java_divide_by_zero_handler(int signum, siginfo_t* UNREF info, void* c
     fprintf(stderr, "SIGFPE in VM code.\n");
     Registers regs;
     linux_ucontext_to_regs(&regs, uc);
-    st_print_stack(&regs);
 
-    // crash with default handler
-    signal(signum, 0);
+    // setup default handler
+    signal(signum, SIG_DFL);
+
+    if (!is_gdb_crash_handler_enabled() ||
+        !gdb_crash_handler())
+    {
+        // print stack trace
+        st_print_stack(&regs);
+    }
 }
 
 
@@ -373,9 +408,16 @@ void null_java_reference_handler(int signum, siginfo_t* UNREF info, void* contex
     fprintf(stderr, "SIGSEGV in VM code.\n");
     Registers regs;
     linux_ucontext_to_regs(&regs, uc);
-    st_print_stack(&regs);
 
-    signal(signum, 0);
+    // setup default handler
+    signal(signum, SIG_DFL);
+
+    if (!is_gdb_crash_handler_enabled() ||
+        !gdb_crash_handler())
+    {
+        // print stack trace
+        st_print_stack(&regs);
+    }
 }
 
 void initialize_signals() {
@@ -416,15 +458,9 @@ void initialize_signals() {
     sigaction( SIGABRT, &sa, NULL);
     /* abort_handler installed */
 
-    extern int get_executable_name(char*, int);
-    /* initialize the name of the executable (to be used by addr2line) */
-    get_executable_name(executable, sizeof(executable));
+    // Prepare gdb crash handler
+    init_gdb_crash_handler();
 
-    if (get_boolean_property("vm.crash_handler", FALSE, VM_PROPERTIES)) {
-        init_crash_handler();
-        // can't install crash handler immediately,
-        // as we have already SIGABRT and SIGSEGV handlers
-    }
 } //initialize_signals
 
 void shutdown_signals() {
@@ -445,21 +481,6 @@ static uint32 exam_point;
 
 bool SuspendThread(unsigned xx){ return 0; }
 bool ResumeThread(unsigned xx){ return 1; }
-
-void linux_regs_to_ucontext(ucontext_t* uc, Registers* regs)
-{
-//TODO: ADD Copying of IPF registers here like it was done on ia32!!
-}
-
-static void linux_sigcontext_to_regs(Registers* regs, sigcontext* sc)
-{
-//TODO: ADD Copying of IPF registers here like it was done on ia32!!
-}
-
-static void linux_regs_to_sigcontext(sigcontext* sc, Registers* regs)
-{
-//TODO: ADD Copying of IPF registers here like it was done on ia32!!
-}
 
 static bool linux_throw_from_sigcontext(ucontext_t *uc, Class* exc_clss)
 {
