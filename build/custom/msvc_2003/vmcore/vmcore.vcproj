@@ -919,7 +919,7 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 			Name="thread"
 			Filter="">
 			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\thread\atomics.cpp">
+				RelativePath="..\..\..\..\vm\vmcore\src\thread\atomics_common.cpp">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\thread\lock_manager.cpp">
@@ -942,6 +942,13 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\thread\verify_stack_enumeration.cpp">
 			</File>
+			<Filter
+				Name="win"
+				Filter="">
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\thread\win\atomics.cpp">
+				</File>
+			</Filter>
 		</Filter>
 		<Filter
 			Name="util"
