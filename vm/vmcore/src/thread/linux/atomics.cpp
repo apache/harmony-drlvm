@@ -19,9 +19,9 @@
 
 void MemoryReadWriteBarrier() {
 #if defined(_EM64T_)
-    asm volatile ("mfence");
+    asm volatile ("mfence" : : : "memory");
 #elif defined(_IPF_)
-    asm volatile ("mf" ::: "memory");
+    asm volatile ("mf" : : : "memory");
 #else // General x86 case
     /*
      * This code must use a lock-prefixed assembly instruction, so that 
@@ -41,7 +41,7 @@ void MemoryReadWriteBarrier() {
 
 void MemoryWriteBarrier() {
 #if defined(_IPF_)
-    asm volatile ("mf" ::: "memory");
+    asm volatile ("mf" : : : "memory");
 #else // General x86 and x86_64 case
     /*
      * We could use the same lock-prefixed assembly instruction above,
