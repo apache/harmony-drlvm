@@ -125,6 +125,8 @@ static void wait_pending_reference(void)
     assert(stat == TM_ERROR_NONE);
 }
 
+extern void assign_classloader_to_native_threads(JNIEnv *jni_env);
+
 static IDATA ref_enqueue_thread_func(void **args)
 {
     JavaVM *java_vm = (JavaVM *)args[0];
@@ -143,6 +145,7 @@ static IDATA ref_enqueue_thread_func(void **args)
     jni_args->group = NULL;
     IDATA status = AttachCurrentThreadAsDaemon(java_vm, (void**)&jni_env, jni_args);
     assert(status == JNI_OK);
+    assign_classloader_to_native_threads(jni_env);
     inc_ref_thread_num();
     
     while(true){

@@ -25,6 +25,8 @@
 #include "init.h"
 #include "open/jthread.h"
 #include "jni_direct.h"
+#include "jni_utils.h"
+#include "slot.h"
 
 static Boolean native_fin_thread_flag = FALSE;
 static Fin_Thread_Info *fin_thread_info = NULL;
@@ -154,12 +156,14 @@ static unsigned int restrict_wait_time(unsigned int wait_time, unsigned int max_
 static void wait_finalization_end(void)
 {
     hymutex_lock(&fin_thread_info->end_mutex);
-    while(unsigned int fin_obj_num = vm_get_finalizable_objects_quantity()){
+    unsigned int fin_obj_num = vm_get_finalizable_objects_quantity();
+    while(fin_thread_info->working_thread_num || fin_obj_num){
         unsigned int wait_time = restrict_wait_time(fin_obj_num + 1000, FIN_MAX_WAIT_TIME << 7);
         atomic_inc32(&fin_thread_info->end_waiting_num);
         IDATA status = hycond_wait_timed(&fin_thread_info->end_cond, &fin_thread_info->end_mutex, (I_64)wait_time, 0);
         atomic_dec32(&fin_thread_info->end_waiting_num);
         if(status != TM_ERROR_NONE) break;
+        fin_obj_num = vm_get_finalizable_objects_quantity();
     }
     hymutex_unlock(&fin_thread_info->end_mutex);
 }
@@ -185,6 +189,36 @@ static void wait_pending_finalizer(void)
     assert(stat == TM_ERROR_NONE);
 }
 
+void assign_classloader_to_native_threads(JNIEnv *jni_env)
+{
+    jthread self_jthread = jthread_self();
+    ManagedObject *self_obj = (*self_jthread).object;
+    char *thread_jclass_name = "java/lang/Thread";
+    jclass thread_jclass = FindClass(jni_env, thread_jclass_name);
+    Class *thread_class = jclass_to_struct_Class(thread_jclass);
+    Field *loader_field = LookupField(thread_class, "contextClassLoader");
+    unsigned int offset = loader_field->get_offset();
+    
+    char *loader_jclass_name = "java/lang/ClassLoader";
+    jclass loader_jclass = FindClass(jni_env, loader_jclass_name);
+    Class *loader_class = jclass_to_struct_Class(loader_jclass);
+    
+    tmn_suspend_disable();
+    
+    Method *get_loader_method = LookupMethod(loader_class, "getSystemClassLoader", "()Ljava/lang/ClassLoader;");
+    assert(get_loader_method);
+    jvalue result;
+    vm_execute_java_method_array((jmethodID)get_loader_method, &result, NULL);
+    ManagedObject *sys_class_loader = (*(result.l)).object;
+    
+    uint32 *the_field = (uint32*)((POINTER_SIZE_INT)self_obj + offset);
+    void *heap_null = Slot::managed_null();
+    assert(sys_class_loader > heap_null);
+    *the_field = (uint32)((POINTER_SIZE_INT)sys_class_loader - (POINTER_SIZE_INT)heap_null);
+    
+    tmn_suspend_enable();
+}
+
 static IDATA finalizer_thread_func(void **args)
 {
     JavaVM *java_vm = (JavaVM *)args[0];
@@ -203,6 +237,7 @@ static IDATA finalizer_thread_func(void **args)
     jni_args->group = NULL;
     IDATA status = AttachCurrentThreadAsDaemon(java_vm, (void**)&jni_env, jni_args);
     assert(status == JNI_OK);
+    assign_classloader_to_native_threads(jni_env);
     inc_fin_thread_num();
     
     /* Choice: use VM_thread or hythread to indicate the finalizer thread ?
@@ -273,6 +308,7 @@ void vm_heavy_finalizer_resume_mutator(void)
     if(gc_clear_mutator_block_flag())
         hycond_notify_all(&fin_thread_info->mutator_block_cond);
 }
+
 
 
 
