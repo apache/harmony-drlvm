@@ -379,13 +379,15 @@ typedef struct HyThread_public {
 
 
 
-/* 
- * FS14_TLS_USE 
- *
- *  FS14_TLS_USE declaration turns on windows specific TLS access optimization
- *  We use free TIB slot with 14 offset, see following article for details
- *  http://www.microsoft.com/msj/archive/S2CE.aspx (currently it's used on
- *  Windows 32-bit)
+/** 
+ * HYTHREAD_FAST_TLS
+ * Enables platform-specific TLS access optimization, such as:
+ *  - On Win32, free TIB slot is used via direct reference FS:[0x14]
+ * (see http://www.microsoft.com/msj/archive/S2CE.aspx);
+ *  - On Linuxes, initial-exec TLS model allows to address static TLS directly, 
+ * via GS:[0] on IA32 and FS:[0] on x86_64
+ * (see http://people.redhat.com/drepper/tls.pdf)
+ * 
  *
  * APR_TLS_USE
  *
@@ -400,25 +402,37 @@ typedef struct HyThread_public {
    
 
 
-#if (defined (WIN32) && !defined (_WIN64))
-
+#if (defined (_WIN32) && !defined (_WIN64))
 //use optimized asm monitor enter and exit helpers
 #define ASM_MONITOR_HELPER
+#endif
 
-// FS14_TLS_USE define turns on windows specific TLS access optimization
-// We use free TIB slot with 14 offset, see following article for details
-// http://www.microsoft.com/msj/archive/S2CE.aspx
-#define FS14_TLS_USE
+#if defined (_WIN32)
+#   define HYTHREAD_FAST_TLS_ATTRIBUTE
+#   if defined(_IA32_)
+#       define HYTHREAD_FAST_TLS (1)
+        // FIXME suggested to drop FS14_TLS_USE in favor of common HYTHREAD_FAST_TLS
+#       define FS14_TLS_USE
+#   else 
+#       define APR_TLS_USE
+#   endif
+#elif defined(__linux__)
+    // some kind of nix - the threads internals are known for IA32/Intel64
+    // kernels, will use slow way on other HWs (TODO: add IPF support)
+#   if defined(_IA32_) || defined(_EM64T_)
+#       define HYTHREAD_FAST_TLS (1)
+#       define HYTHREAD_FAST_TLS_ATTRIBUTE __attribute__((tls_model("initial-exec")))
+#   endif
+#else
+#   undef HYTHREAD_FAST_TLS
+#endif
 
-#elif defined _WIN64
-#define APR_TLS_USE
+#if !defined(HYTHREAD_FAST_TLS)
+#   define HYTHREAD_FAST_TLS_ATTRIBUTE   
 #endif
 
 
- 
-
 #ifdef APR_TLS_USE
-
 
 #ifdef __cplusplus
 extern "C" {

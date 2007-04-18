@@ -206,6 +206,8 @@ IDATA VMCALL hythread_set_private_data(hythread_t  t, void* data);
 UDATA VMCALL hythread_tls_get_offset(hythread_tls_key_t key);
 UDATA VMCALL hythread_tls_get_request_offset();
 UDATA VMCALL hythread_get_thread_times(hythread_t thread, int64* pkernel, int64* puser);
+UDATA VMCALL hythread_uses_fast_tls(void);
+IDATA VMCALL hythread_get_hythread_offset_in_tls(void);
 
 //@}
 /** @name Conditional variable

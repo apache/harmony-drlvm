@@ -16,7 +16,6 @@
  */
 /**
  * @author Intel, Vyacheslav P. Shakin, Nikolay A. Sidelnikov
- * @version $Revision: 1.23.8.2.4.4 $
  */
 
 #include "Log.h"
@@ -26,6 +25,7 @@
 #include "EMInterface.h"
 #include "VMInterface.h"
 #include "Opcode.h"
+#include "Ia32Tls.h"
 
 #include <float.h>
 #include <math.h>
@@ -196,9 +196,6 @@ InstCodeSelector(CompilationInterface&          compIntfc,
   switchNumTargets(0), currPersistentId(),
   currPredOpnd(NULL) 
 {
-#ifdef _DEBUG
-    nextInArg = 0;
-#endif
 }
 
 //_______________________________________________________________________________________________________________
@@ -1693,20 +1690,6 @@ CG_OpndHandle* InstCodeSelector::compressRef(CG_OpndHandle *ref)
 }
 
 //_______________________________________________________________________________________________________________
-Opnd* InstCodeSelector::buildOffset(uint32 offset, MemoryAttribute::Context context)
-{
-    ICS_ASSERT(0);
-    return 0;
-}
-
-//_______________________________________________________________________________________________________________
-Opnd* InstCodeSelector::buildOffsetPlusHeapbase(uint32 offset, MemoryAttribute::Context context)
-{
-    ICS_ASSERT(0);
-    return 0;
-}
-
-//_______________________________________________________________________________________________________________
 CG_OpndHandle * InstCodeSelector::ldFieldOffset(FieldDesc *fieldDesc)
 {
     return irManager.newImmOpnd(typeManager.getIntPtrType(), Opnd::RuntimeInfo::Kind_FieldOffset, fieldDesc);
@@ -1991,17 +1974,6 @@ void InstCodeSelector::simpleStInd(Opnd * addr,
 #endif
 } 
 
-
-//_______________________________________________________________________________________________________________
-//  Get type of the field reference
-
-Type * InstCodeSelector::getFieldRefType(Type *dstType, 
-                                              Type::Tag fieldTypeTag) 
-{
-    ICS_ASSERT(0);
-    return 0;
-}
-
 //_______________________________________________________________________________________________________________
 //  Load static field
 
@@ -2081,43 +2053,6 @@ void InstCodeSelector::tau_stElem(CG_OpndHandle* src,
                                  CG_OpndHandle* tauBaseNonNull,
                                  CG_OpndHandle* tauAddressInRange, 
                                  CG_OpndHandle* tauElemTypeChecked) 
-{
-    ICS_ASSERT(0);
-}
-    
-
-
-//_______________________________________________________________________________________________________________
-//    Compress a reference operand
-
-void InstCodeSelector::compressOpnd(Opnd *dst, Opnd *src) 
-{
-    ICS_ASSERT(0);
-}
-
-//_______________________________________________________________________________________________________________
-//    Decompress a reference operand
-
-void InstCodeSelector::decompressOpnd(Opnd *dst, Opnd *src) 
-{
-    ICS_ASSERT(0);
-}
-
-//_______________________________________________________________________________________________________________
-// If one operand is a raw reference and the other is a compressed reference 
-// change them both to either compressed or raw references so that they can be 
-// compared for equality/inequality etc..
-
-void InstCodeSelector::makeComparable(Opnd*& srcOpnd1, Opnd*& srcOpnd2) 
-{
-    ICS_ASSERT(0);
-}
-
-//_______________________________________________________________________________________________________________
-//  If pointer points to the enumerated type change type tag to
-//  the type tag of the underlying type of the enumerated type.
-
-void InstCodeSelector::simplifyTypeTag(Type::Tag& tag,Type *ptr) 
 {
     ICS_ASSERT(0);
 }
@@ -2466,18 +2401,6 @@ CG_OpndHandle* InstCodeSelector::tau_ldVTableAddr(Type* dstType,
 }
 
 //_______________________________________________________________________________________________________________
-//  Add the base of all VTables and an immediate offset to a CG_OpndHandle
-//  This gets an absolute address into a field in the VTable
-
-Opnd* InstCodeSelector::addVtableBaseAndOffset(Opnd *       addr, 
-                                                     CG_OpndHandle * compPtr,
-                                                     uint32          offset) 
-{
-    ICS_ASSERT(0);
-    return 0;
-}
-
-//_______________________________________________________________________________________________________________
 //  Load interface table address
 //    The tau parameter is irrelevant because VM helper does not expect JIT
 //    to verify that the object type has given interface
@@ -2741,54 +2664,26 @@ CG_OpndHandle* InstCodeSelector::callhelper(uint32              numArgs,
     case SaveThisState:
     {
         assert(numArgs == 1);
-#ifdef PLATFORM_POSIX
-        // Not supported
-        assert(0);
-#else // PLATFORM_POSIX
-        // TLS base can be obtained from [fs:0x14]
-        Opnd * tlsBaseReg = irManager.newOpnd(typeManager.getUnmanagedPtrType(typeManager.getInt32Type()));
-        appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, tlsBaseReg, 
-                                irManager.newMemOpnd(typeManager.getInt32Type(), 
-                                                     MemOpndKind_Any, 
-                                                     NULL, 
-                                                     0x14, RegName_FS)));
-        appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, 
-                                                irManager.newMemOpnd(typeManager.getUnmanagedPtrType(typeManager.getInt32Type()),
-                                                                     MemOpndKind_Any, 
-                                                                     tlsBaseReg, 
-                                                                     VMInterface::flagTLSThreadStateOffset()),
-                                                (Opnd*)args[0]));
-#endif // PLATFORM_POSIX
-        
+        Type* int32type = typeManager.getInt32Type();
+        Type* unmanPtr = typeManager.getUnmanagedPtrType(int32type);
+        Opnd * tlsBase = createTlsBaseLoadSequence(irManager, currentBasicBlock, unmanPtr);
+        uint32 offsetInTLS = VMInterface::flagTLSThreadStateOffset();
+        Opnd* pStateFlag = irManager.newMemOpnd(int32type, MemOpndKind_Any, tlsBase, offsetInTLS);
+        Inst* ii = irManager.newCopyPseudoInst(Mnemonic_MOV, pStateFlag, (Opnd*)args[0]);
+        appendInsts(ii);
         break;
     }
     case ReadThisState:
     {
         assert(numArgs == 0);
-#ifdef PLATFORM_POSIX
-        // Not supported
-        assert(0);
-#else // PLATFORM_POSIX
-        // TLS base can be obtained from [fs:0x14]
-        Opnd * tlsBaseReg = irManager.newOpnd(typeManager.getUnmanagedPtrType(typeManager.getInt32Type()));
-        appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, 
-                                                tlsBaseReg, 
-                                                irManager.newMemOpnd(typeManager.getInt32Type(), 
-                                                                     MemOpndKind_Any, 
-                                                                     NULL, 0x14, RegName_FS)));
-        appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, dstOpnd, 
-                                                irManager.newMemOpnd(typeManager.getInt32Type(),
-                                                                     MemOpndKind_Any, 
-                                                                     tlsBaseReg, 
-                                                                     VMInterface::flagTLSThreadStateOffset())));
-        appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, 
-                                                irManager.newMemOpnd(typeManager.getInt32Type(),
-                                                                     MemOpndKind_Any, 
-                                                                     tlsBaseReg, 
-                                                                     VMInterface::flagTLSThreadStateOffset()),
-                                                irManager.newImmOpnd(typeManager.getInt32Type(),1)));
-#endif
+        Type* int32type = typeManager.getInt32Type();
+        Type* unmanPtr = typeManager.getUnmanagedPtrType(int32type);
 
+        Opnd * tlsBase = createTlsBaseLoadSequence(irManager, currentBasicBlock, unmanPtr);
+        uint32 offsetInTLS = VMInterface::flagTLSThreadStateOffset();
+        Opnd* pStateFlag = irManager.newMemOpnd(int32type, MemOpndKind_Any, tlsBase, offsetInTLS);
+        Inst* ii = irManager.newCopyPseudoInst(Mnemonic_MOV, dstOpnd, pStateFlag);
+        appendInsts(ii);
         break;
     }
     case LockedCompareAndExchange:
@@ -2880,18 +2775,9 @@ CG_OpndHandle* InstCodeSelector::callvmhelper(uint32              numArgs,
     case CompilationInterface::Helper_GetTLSBase:
     {
         assert(numArgs == 0);
-        Opnd * tlsBaseReg = irManager.newOpnd(typeManager.getUnmanagedPtrType(typeManager.getInt8Type()));
-#if defined(PLATFORM_POSIX) || defined (_EM64T_)
-        TypeManager& tm =irManager.getTypeManager();
-        Opnd * callAddrOpnd =irManager.newImmOpnd(tm.getUnmanagedPtrType(tm.getIntPtrType()),
-            Opnd::RuntimeInfo::Kind_HelperAddress, (void*)CompilationInterface::Helper_GetTLSBase);
-        appendInsts(irManager.newCallInst(callAddrOpnd, &CallingConvention_STDCALL, 0, NULL, tlsBaseReg));
-#else 
-        appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, tlsBaseReg,  
-            irManager.newMemOpnd(typeManager.getInt32Type(),  MemOpndKind_Any, NULL, 0x14, RegName_FS)));
-#endif
-        dstOpnd  = tlsBaseReg;        
-
+        Type* tlsBaseType = typeManager.getUnmanagedPtrType(typeManager.getInt8Type());
+        Opnd * tlsBase = createTlsBaseLoadSequence(irManager, currentBasicBlock, tlsBaseType);
+        dstOpnd  = tlsBase;
         break;
     }
     case CompilationInterface::Helper_NewObj_UsingVtable:
@@ -2967,12 +2853,6 @@ void  InstCodeSelector::copyValueObj(Type* objType, CG_OpndHandle *dstAddr, CG_O
 }
 
 //_______________________________________________________________________________________________________________
-//  Static estimate of fast path success probabilities
-
-#define FAST_PATH_MONITOR_ENTER_SUCCESS_PROB  0.99
-#define FAST_PATH_MONITOR_EXIT_SUCCESS_PROB   0.99
-
-//_______________________________________________________________________________________________________________
 //  Acquire monitor for an object
 
 void InstCodeSelector::tau_monitorEnter(CG_OpndHandle* obj, CG_OpndHandle* tauIsNonNull) 
@@ -3033,15 +2913,6 @@ void           InstCodeSelector::optimisticBalancedMonitorExit(CG_OpndHandle* ob
                                                  CG_OpndHandle* oldLock)
 {
     ICS_ASSERT(0);
-}
-
-//_______________________________________________________________________________________________________________
-//  Read synchronization fence flag
-
-uint32 InstCodeSelector::getSyncFenceFlag() 
-{
-    ICS_ASSERT(0);
-    return 0;
 }
 
 //_______________________________________________________________________________________________________________
@@ -3224,14 +3095,6 @@ void InstCodeSelector::prefetch(CG_OpndHandle* base, uint32 offset, int hints)
 //    Create a tau point definition indicating that control flow reached the current point
 
 CG_OpndHandle*  InstCodeSelector::tauPoint() 
-{
-    return getTauUnsafe();
-}
-
-//_______________________________________________________________________________________________________________
-//    Generate a tau split instruction
-
-CG_OpndHandle * InstCodeSelector::genTauSplit(BranchInst *br) 
 {
     return getTauUnsafe();
 }

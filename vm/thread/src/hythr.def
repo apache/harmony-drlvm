@@ -3,6 +3,7 @@ LIBRARY	HYTHR
 EXPORTS
  
 hythread_detach
+hythread_uses_fast_tls
 hythread_tls_alloc
 hythread_sleep_interruptable
 hythread_cancel

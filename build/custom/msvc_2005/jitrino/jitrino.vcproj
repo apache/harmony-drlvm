@@ -1191,6 +1191,14 @@
 					>
 				</File>
 				<File
+					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32Tls.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32Tls.h"
+					>
+				</File>
+				<File
 					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32WebMaker.cpp"
 					>
 				</File>

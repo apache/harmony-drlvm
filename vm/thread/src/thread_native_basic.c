@@ -17,8 +17,7 @@
 
 /** 
  * @author Nikolay Kuznetsov
- * @version $Revision: 1.1.2.13 $
- */  
+ */
 
 /**
  * @file thread_native_basic.c
@@ -50,16 +49,15 @@ static int VMAPICALL thread_start_proc(void *arg);
 static hythread_t allocate_thread();
 static void reset_thread(hythread_t thread);
 static IDATA register_to_group(hythread_t thread, hythread_group_t group);
-//#define APR_TLS_USE 1
 
 #define NAKED __declspec(naked)
 
-#if !defined (APR_TLS_USE) && !defined (FS14_TLS_USE)
-#ifdef PLATFORM_POSIX
-__thread hythread_t tm_self_tls = NULL;
-#else
-__declspec(thread) hythread_t tm_self_tls = NULL;
-#endif
+#if !defined (APR_TLS_USE)
+    #if !defined(_WIN32)
+        __thread hythread_t tm_self_tls HYTHREAD_FAST_TLS_ATTRIBUTE;
+    #elif !defined(HYTHREAD_FAST_TLS)
+        __declspec(thread) hythread_t tm_self_tls = NULL;
+    #endif
 #endif
 
 #define MAX_ID 1000000
@@ -320,7 +318,7 @@ IDATA VMCALL hythread_join_interruptable(hythread_t t, I_64 millis, IDATA nanos)
     return hylatch_wait_interruptable(t->join_event, millis, nanos);
 }
 
-/** 
+/**
  * Yield the processor.
  * 
  * @return none
@@ -353,11 +351,11 @@ void VMCALL hythread_yield() {
 hythread_t hythread_self_slow() {
     hythread_t  thread;
     apr_status_t UNUSED apr_status;
-    
+
     // Extract hythread_t from TLS
-    apr_status = apr_threadkey_private_get((void **)(&thread), TM_THREAD_KEY);            
+    apr_status = apr_threadkey_private_get((void **)(&thread), TM_THREAD_KEY);
     assert(apr_status == APR_SUCCESS);
-    
+
     return thread;
 }
 
@@ -365,7 +363,7 @@ static void thread_set_self(hythread_t  thread) {
     apr_threadkey_private_set(thread, TM_THREAD_KEY);
 }
 #else 
-#ifdef FS14_TLS_USE
+#if defined(_WIN32) && defined(HYTHREAD_FAST_TLS)
 /**
  * Return the hythread_t for the current thread.
  *

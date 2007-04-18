@@ -16,16 +16,16 @@
  */
 /**
  * @author George A. Timoshenko
- * @version $Revision: 1.1.12.3.4.3 $
  */
 
 #include "Ia32IRManager.h"
 #include "VMInterface.h"
+#include "Ia32Tls.h"
+#include <open/hythread_ext.h>
 
 namespace Jitrino
 {
 namespace Ia32{
-
 
 const uint32 BBPollingMaxVersion = 6;
 
@@ -61,8 +61,8 @@ public:
 #endif
         loopHeaderOfEdge(irManager.getMemoryManager())
     {
+        gcFlagOffsetOffset = VMInterface::flagTLSSuspendRequestOffset();
         calculateInitialInterruptability(version == 5 || version == 6);
-
         if (version == 2 || version == 3)
             calculateInterruptablePathes();
         // no more calculations here, just collect the edges!
@@ -136,7 +136,7 @@ private:
     //  2 - path analysis based on searching of pairs [isOnThreadInterruptablePath]->[!isOnThreadInterruptablePath]
     //  3 - recursive version of "2"
     //  4 - "1" + suspension flag addr [TLS base + offset] is calculated before the loop header
-    //  5 - like "1" but some backedges are not patched (if all paths through it are interuuptable)
+    //  5 - like "1" but some backedges are not patched (if all paths through it are uninterpretable)
     //  6 - "4" + "5"
     //  7.. illegal
     uint32  version;
@@ -158,15 +158,18 @@ private:
     BBPControllersMap   bbpCFGControllerForNode;
     //     to get the toppest loop header of the given without calling getLoopHeader
     StlVector<Node*>    toppestLoopHeader;
-    //     start index in otheredges collection for the toppest loop headers
+    //     start index in otheredges collection for the topmost loop headers
     StlVector<uint32> otherStartNdx;
 
     // just a collection of loop headers of the method (Basic blocks only!)
     StlVector<Node*> loopHeaders;
-    // edgse which are not a back edge
+    // edges which are not a back edge
     StlVector<Edge*> otherEdges;
     // edges for inserting BBPolling subCFG
     StlVector<Edge*> eligibleEdges;
+
+    /// Offset of the suspension flag in the VM's structure stored in TLS.
+    uint32 gcFlagOffsetOffset;
 
 #ifdef _DEBUG
     uint32  interruptablePoints;
@@ -189,7 +192,6 @@ public:
         if(!lt->hasLoops()) {
             return;
         }
-
         version = getIntArg("version", 6);
         if(version == 0) {
             return;
@@ -238,9 +240,6 @@ public:
 
 static ActionFactory<BBPollingTransformer> _bbp("bbp");
 
-
-const uint32 gcFlagOffsetOffset = VMInterface::flagTLSSuspendRequestOffset();
-
 Opnd*
 BBPolling::getOrCreateTLSBaseReg(Edge* e)
 {
@@ -253,64 +252,50 @@ BBPolling::getOrCreateTLSBaseReg(Edge* e)
     Opnd* tlsBaseReg = tlsBaseRegForLoopHeader[id];
     if ( tlsBaseReg ) { // it is already created for this loop
         return tlsBaseReg;
-    } else {
-
-        Type* tlsBaseType;
-#ifdef _EM64T_              
-        tlsBaseType = irManager.getTypeManager().getUnmanagedPtrType(irManager.getTypeManager().getIntPtrType());
-        tlsBaseReg = irManager.newOpnd(tlsBaseType, Constraint(OpndKind_GPReg));
-#else
-        tlsBaseType = irManager.getTypeManager().getPrimitiveType(Type::Int32);
-        tlsBaseReg = irManager.newOpnd(tlsBaseType, Constraint(RegName_EAX)|
-                                                             RegName_EBX |
-                                                             RegName_ECX |
-                                                             RegName_EDX |
-                                                             RegName_EBP |
-                                                             RegName_ESI |
-                                                             RegName_EDI);
-#endif
-        // Basic Block for flag address calculating. (To be inserted before the loopHeaders)
-        Node * bbpFlagAddrBlock = irManager.getFlowGraph()->createBlockNode();
-#if defined (PLATFORM_POSIX) || defined (_EM64T_)
-         // TLS base can be obtained by calling get_thread_ptr()  (from vm_threads.h)
-         Opnd * target=irManager.newImmOpnd( irManager.getTypeManager().getUnmanagedPtrType(irManager.getTypeManager().getIntPtrType()),
-                                             Opnd::RuntimeInfo::Kind_HelperAddress,
-                                            (void*)CompilationInterface::Helper_GetTLSBase
-                                           );
-         Opnd* tlsBase  = irManager.newOpnd(tlsBaseType);
-         bbpFlagAddrBlock->appendInst(irManager.newCallInst(target, &CallingConvention_STDCALL, 0, NULL, tlsBase));
-#else // PLATFORM_POSIX
-        // TLS base can be obtained from [fs:0x14]
-        Opnd* tlsBase = irManager.newMemOpnd(tlsBaseType, MemOpndKind_Any, NULL, 0x14, RegName_FS);
-#endif // PLATFORM_POSIX
-
-        if (version == 4 || version == 6) {
-            Opnd * offset = irManager.newImmOpnd(tlsBaseType, gcFlagOffsetOffset);
-            bbpFlagAddrBlock->appendInst(irManager.newInstEx(Mnemonic_ADD, 1, tlsBaseReg, tlsBase, offset));
-        } else {
-            bbpFlagAddrBlock->appendInst(irManager.newInst(Mnemonic_MOV, tlsBaseReg, tlsBase));
-        }
-
-        // inserting bbpFlagAddrBlock before the given loopHeader
-        uint32 startIndex = otherStartNdx[id];
-
-        ControlFlowGraph* fg = irManager.getFlowGraph();
-        for (uint32 otherIdx = startIndex; ; otherIdx++) {
-            if (otherIdx == otherEdges.size())
-                break;
-            Edge* other = otherEdges[otherIdx];
-            if (other->getTargetNode() != loopHeader)
-                break;
-            
-            fg->replaceEdgeTarget(other, bbpFlagAddrBlock);
-        }
-        
-        assert(loopHeader->isBlockNode());
-        fg->addEdge(bbpFlagAddrBlock, loopHeader, 1);
-
-        tlsBaseRegForLoopHeader[id] = tlsBaseReg;
-        return tlsBaseReg;
     }
+
+    Type* tlsBaseType = irManager.getTypeManager().getUnmanagedPtrType(irManager.getTypeManager().getIntPtrType());
+
+#ifdef _EM64T_
+    tlsBaseReg = irManager.newOpnd(tlsBaseType, Constraint(OpndKind_GPReg));
+#else
+    tlsBaseReg = irManager.newOpnd(tlsBaseType, Constraint(RegName_EAX)|
+                                                            RegName_EBX |
+                                                            RegName_ECX |
+                                                            RegName_EDX |
+                                                            RegName_EBP |
+                                                            RegName_ESI |
+                                                            RegName_EDI);
+#endif
+    // Basic Block for flag address calculating. (To be inserted before the loopHeaders)
+    Node * bbpFlagAddrBlock = irManager.getFlowGraph()->createBlockNode();
+    Opnd* tlsBase = createTlsBaseLoadSequence(irManager, bbpFlagAddrBlock);
+
+    if (version == 4 || version == 6) {
+        Opnd * offset = irManager.newImmOpnd(tlsBaseType, gcFlagOffsetOffset);
+        bbpFlagAddrBlock->appendInst(irManager.newInstEx(Mnemonic_ADD, 1, tlsBaseReg, tlsBase, offset));
+    } else {
+        bbpFlagAddrBlock->appendInst(irManager.newInst(Mnemonic_MOV, tlsBaseReg, tlsBase));
+    }
+
+    // inserting bbpFlagAddrBlock before the given loopHeader
+    uint32 startIndex = otherStartNdx[id];
+
+    ControlFlowGraph* fg = irManager.getFlowGraph();
+    for (uint32 otherIdx = startIndex; ; otherIdx++) {
+        if (otherIdx == otherEdges.size())
+            break;
+        Edge* other = otherEdges[otherIdx];
+        if (other->getTargetNode() != loopHeader)
+            break;
+        fg->replaceEdgeTarget(other, bbpFlagAddrBlock);
+    }
+
+    assert(loopHeader->isBlockNode());
+    fg->addEdge(bbpFlagAddrBlock, loopHeader, 1);
+
+    tlsBaseRegForLoopHeader[id] = tlsBaseReg;
+    return tlsBaseReg;
 }
 
 Node*

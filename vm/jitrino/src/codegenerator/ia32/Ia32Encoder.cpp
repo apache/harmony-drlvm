@@ -28,9 +28,10 @@
 namespace Jitrino {
 namespace Ia32 {
 
-//fixme64: for adapter needs
-bool is_ptr_type(const Type* typ) {
-    switch(typ->tag) {
+#ifdef _EM64T_
+    //FIXME64: for adapter needs
+    static bool is_ptr_type(const Type* typ) {
+        switch(typ->tag) {
         case Type::TypedReference:
         case Type::SystemObject:
         case Type::SystemString:
@@ -45,10 +46,34 @@ bool is_ptr_type(const Type* typ) {
         case Type::VTablePtrObj:
         case Type::ITablePtrObj:
             return true;
-    default:
-        break;
+        default:
+            break;
+        }
+        return false;
     }
-    return false;
+#endif  // _EM64T_
+
+static InstPrefix getInstPrefixFromSReg(RegName reg) {
+    if (reg == RegName_Null) {
+        return InstPrefix_Null;
+    }
+    if (reg == RegName_FS) {
+        return InstPrefix_FS;
+    }
+    if (reg == RegName_GS) {
+        return InstPrefix_GS;
+    }
+    if (reg == RegName_DS) {
+        return InstPrefix_DS;
+    }
+    if (reg == RegName_ES) {
+        return InstPrefix_ES;
+    }
+    if (reg == RegName_CS) {
+        return InstPrefix_CS;
+    }
+    assert(false);
+    return InstPrefix_Null;
 }
 
 
@@ -188,11 +213,6 @@ uint8* Encoder::emit(uint8* stream, const Inst * inst)
     Opnd * const * opnds = inst->getOpnds();
     const uint32 * roles = inst->getOpndRoles();
 
-    //emit inst prefix
-    if (inst->getPrefix()!=InstPrefix_Null) {
-        stream = (uint8*)EncoderBase::prefix((char*)stream, inst->getPrefix());
-    }
-
     for( int idx=0, n=inst->getOpndCount(); idx<n; idx++ ) { 
         if (!(roles[idx] & Inst::OpndRole_Explicit)) continue;
         const Opnd * p = opnds[idx];
@@ -232,7 +252,8 @@ uint8* Encoder::emit(uint8* stream, const Inst * inst)
                 RegName baseReg = pbase == NULL ? RegName_Null : pbase->getRegName();
                 RegName indexReg = pindex == NULL ? RegName_Null : pindex->getRegName();
 #ifdef _EM64T_
-                // adapter: all PTR types go as 64 bits
+                // FIXME64 adapter: all PTR types go as 64 bits
+                // this is a porting quick workaround, should be fixed
                 assert(pindex != NULL || pbase != NULL);
                 sz = is_ptr_type(p->getType()) ? OpndSize_64 : sz;
 #endif
@@ -240,10 +261,14 @@ uint8* Encoder::emit(uint8* stream, const Inst * inst)
                     baseReg,
                     indexReg,
                     NULL == pscale ? 0 : (unsigned char)pscale->getImmValue(),
-                    disp
-                    );
+                    disp);
                 args.add( o );
-
+                // Emit prefix here - so it relates to the real instruction
+                // emitted alter, rather that to the hidden MOV inserted above
+                InstPrefix instPrefix = getInstPrefixFromSReg(p->getSegReg());
+                if (instPrefix != InstPrefix_Null) {
+                    stream = (uint8*)EncoderBase::prefix((char*)stream, instPrefix);
+                }
             }
             break;
         default:
@@ -260,6 +285,10 @@ uint8* Encoder::emit(uint8* stream, const Inst * inst)
         }
     }
 
+    //emit inst prefix
+    if (inst->getPrefix()!=InstPrefix_Null) {
+        stream = (uint8*)EncoderBase::prefix((char*)stream, inst->getPrefix());
+    }
     return (uint8*)EncoderBase::encode((char*)stream, mnemonic, args);
 }
 

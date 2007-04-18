@@ -18,7 +18,6 @@
 #define THREAD_PRIVATE_H
 
 #include <assert.h>
-//#include <open/thread_types.h>
 #include <stdlib.h>
 #include <open/types.h>
 #include <open/hythread_ext.h>
@@ -56,19 +55,14 @@
 
 #endif // !defined (_IPF_)
 
-#if defined(WIN32) && !defined (_EM64T_)
+#if defined(_WIN32) && !defined (_EM64T_)
 //use optimized asm monitor enter and exit helpers 
 #define ASM_MONITOR_HELPER
-// FS14_TLS_USE define turns on windows specific TLS access optimization 
-// We use free TIB slot with 14 offset, see following article for details 
-// http://www.microsoft.com/msj/archive/S2CE.aspx
-//#define FS14_TLS_USE
 #endif
 
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
-
 
 
 #ifdef __linux__
