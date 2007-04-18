@@ -285,7 +285,7 @@ public class RuntimeTest2 extends TestCase {
         InputStream is = pi3.getInputStream();
         // wait for is.available != 0
         int count = 100;
-        while (is.available() < 1 && count-- > 0) {
+        while (is.available() < 60 && count-- > 0) {
             try {
                 Thread.sleep(10);
             } catch (InterruptedException e) {
@@ -301,8 +301,7 @@ public class RuntimeTest2 extends TestCase {
         String r1 = new String(bb);
         if (r1.indexOf("The current date is") == -1
                 || r1.indexOf("Enter the new date") == -1) {
-            fail("exec(String[], String[], File).check002: where is " +
-            "the date's answer/request?");
+            fail("check002: " + r1);
         }
         for (int ii = 0; ii < ia; ii++) {
             bb[ii] = (byte) 0;
