@@ -35,7 +35,7 @@ Version: $Revision$
             <defineset define="APR_DECLARE_STATIC, _DEBUG, VM_STATS" />
             <defineset define="BUILDING_VM" />
             <select os="win">
-                <defineset define="PLATFORM_NT, WIN32, _WINDOWS, _IA32_" />
+                <defineset define="PLATFORM_NT, WIN32, _WINDOWS" />
                 <defineset define="_WIN32_WINNT=0x0501" />
             </select>
             <select os="lnx">
@@ -49,11 +49,14 @@ Version: $Revision$
                 <compilerarg value="-g" />
                 <compilerarg value="-O0" />
             </select>
-	    <select arch="em64t">
-		<defineset define="_EM64T_" />
-		<defineset define="POINTER64" />
-		<defineset define="LAZY_LOCK" />
-	    </select>
+        <select arch="ia32">
+            <defineset define="_IA32_" />
+        </select>
+        <select arch="em64t">
+            <defineset define="_EM64T_" />
+            <defineset define="POINTER64" />
+            <defineset define="LAZY_LOCK" />
+        </select>
         </compiler>
         <!-- Compiling framework -->
         <echo message="## Compiling framework..." />
@@ -145,21 +148,21 @@ Version: $Revision$
                         <select os="lnx">
                             <syslibset type="shared" libs="stdc++, gcc_s, pthread, rt" />
                             <select arch="ia32">
-			        <libset type="shared" libs="icuuc"
+                                <libset type="shared" libs="icuuc"
                                     dir="${external.dep.CLASSLIB}/depends/libs/linux.x86" />
-			        <libset type="shared" libs="icudata"
+                                <libset type="shared" libs="icudata"
                                     dir="${external.dep.CLASSLIB}/depends/libs/linux.x86" />
-                                </select>				
+                                </select>               
                             <select arch="em64t">
                                 <libset type="shared" libs="icuuc"
                                     dir="${external.dep.CLASSLIB}/depends/libs/linux.x86_64" />
-			        <libset type="shared" libs="icudata"
+                                <libset type="shared" libs="icudata"
                                     dir="${external.dep.CLASSLIB}/depends/libs/linux.x86_64" />
                             </select>
                             <select arch="ipf">
                                 <libset type="shared" libs="icuuc"
                                     dir="${external.dep.CLASSLIB}/depends/libs/linux.ia64" />
-			        <libset type="shared" libs="icudata"
+                                <libset type="shared" libs="icudata"
                                     dir="${external.dep.CLASSLIB}/depends/libs/linux.ia64" />
                             </select>
                         </select>
