@@ -1976,6 +1976,7 @@ NativeCodePtr rth_get_lil_helper(VM_RT_SUPPORT f)
         return rth_get_lil_ddiv(dyn_count);
     case VM_RT_RESOLVE:
         return rth_get_lil_resolve(dyn_count);
+
     default:
         return NULL;
     }
@@ -1984,6 +1985,135 @@ NativeCodePtr rth_get_lil_helper(VM_RT_SUPPORT f)
 //**********************************************************************//
 // End new LIL runtime support
 //**********************************************************************//
+
+
+/**
+ *  Checks if helper is a suspension point
+ */
+
+VMEXPORT Boolean vm_helper_is_gc_interruptible(VM_RT_SUPPORT f)
+{
+switch(f) {
+    case VM_RT_MULTIANEWARRAY_RESOLVED:
+        return TRUE;
+    case VM_RT_LDC_STRING:
+		return TRUE;
+    // Exceptions
+    case VM_RT_THROW:
+    case VM_RT_THROW_SET_STACK_TRACE:
+		return TRUE;
+    case VM_RT_THROW_LAZY:
+		return TRUE;
+    case VM_RT_IDX_OUT_OF_BOUNDS:
+		return TRUE;
+    case VM_RT_NULL_PTR_EXCEPTION:
+		return TRUE;
+    case VM_RT_DIVIDE_BY_ZERO_EXCEPTION:
+		return TRUE;
+    case VM_RT_ARRAY_STORE_EXCEPTION:
+		return TRUE;
+    case VM_RT_THROW_LINKING_EXCEPTION:
+		return TRUE;
+    // Type tests
+    case VM_RT_CHECKCAST:
+		return TRUE;
+    case VM_RT_INSTANCEOF:
+		return TRUE;
+    case VM_RT_AASTORE:
+		return TRUE;	
+    case VM_RT_AASTORE_TEST:
+		return TRUE;
+    // Misc
+    case VM_RT_GET_INTERFACE_VTABLE_VER0:
+		return TRUE;
+    case VM_RT_INITIALIZE_CLASS:
+		return TRUE;
+    case VM_RT_GC_SAFE_POINT:
+		return TRUE;
+    case VM_RT_GC_GET_TLS_BASE:
+		return FALSE;
+    // JVMTI
+    case VM_RT_JVMTI_METHOD_ENTER_CALLBACK:
+		return TRUE;
+    case VM_RT_JVMTI_METHOD_EXIT_CALLBACK:
+		return TRUE;
+    case VM_RT_JVMTI_FIELD_ACCESS_CALLBACK:
+		return TRUE;
+    case VM_RT_JVMTI_FIELD_MODIFICATION_CALLBACK:
+		return TRUE;
+    // Non-VM
+    case VM_RT_F2I:
+		return FALSE;
+    case VM_RT_F2L:
+		return FALSE;
+    case VM_RT_D2I:
+		return FALSE;
+    case VM_RT_D2L:
+		return FALSE;
+    case VM_RT_LSHL:
+		return FALSE;
+    case VM_RT_LSHR:
+		return FALSE;
+    case VM_RT_LUSHR:
+		return FALSE;
+    case VM_RT_LMUL:
+#ifdef VM_LONG_OPT
+    case VM_RT_LMUL_CONST_MULTIPLIER:  
+#endif
+		return FALSE;
+    case VM_RT_LREM:
+		return FALSE;
+    case VM_RT_LDIV:
+		return FALSE;
+    case VM_RT_ULDIV:
+		return FALSE;
+    case VM_RT_CONST_LDIV:             
+		return FALSE;
+    case VM_RT_CONST_LREM:             
+		return FALSE;
+    case VM_RT_IMUL:
+		return FALSE;
+    case VM_RT_IREM:
+		return FALSE;
+    case VM_RT_IDIV:
+		return FALSE;
+    case VM_RT_FREM:
+		return FALSE;
+    case VM_RT_FDIV:
+		return FALSE;
+    case VM_RT_DREM:
+		return FALSE;
+    case VM_RT_DDIV:
+		return FALSE;
+    case VM_RT_RESOLVE:
+		return TRUE;
+	case VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE:
+        return TRUE; 
+	case VM_RT_NEW_VECTOR_USING_VTABLE:
+        return TRUE;
+	case VM_RT_WRITE_BARRIER_FASTCALL:
+        return TRUE;
+	case VM_RT_MONITOR_ENTER:
+    case VM_RT_MONITOR_ENTER_NON_NULL:
+        return TRUE;
+
+    case VM_RT_MONITOR_ENTER_STATIC:
+        return TRUE;
+    case VM_RT_MONITOR_EXIT:
+    case VM_RT_MONITOR_EXIT_NON_NULL:
+        return TRUE;
+
+    case VM_RT_MONITOR_EXIT_STATIC:
+        return TRUE;
+	case VM_RT_CHAR_ARRAYCOPY_NO_EXC:
+        return TRUE;
+	case VM_RT_GC_HEAP_WRITE_REF:
+        return FALSE;
+    default:
+		ASSERT(false, "Unexpected helper id" << f);
+        return TRUE;
+	}
+}
 
 
 /////////////////////////////////////////////////////////////

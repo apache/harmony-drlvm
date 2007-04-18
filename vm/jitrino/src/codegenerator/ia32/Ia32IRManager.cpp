@@ -2236,8 +2236,9 @@ bool IRManager::isGCSafePoint(const Inst* inst) {
         bool isInternalHelper = rt && rt->getKind() == Opnd::RuntimeInfo::Kind_InternalHelperAddress;
         bool isNonGCVMHelper = false;
         if (!isInternalHelper) {
+            CompilationInterface* ci = CompilationContext::getCurrentContext()->getVMCompilationInterface();
             isNonGCVMHelper = rt && rt->getKind() == Opnd::RuntimeInfo::Kind_HelperAddress 
-                && (CompilationInterface::RuntimeHelperId)(POINTER_SIZE_INT)rt->getValue(0) == CompilationInterface::Helper_GetTLSBase;
+                && !ci->isGCInterruptible((CompilationInterface::RuntimeHelperId)(POINTER_SIZE_INT)rt->getValue(0));
         }
         bool isGCPoint = !isInternalHelper && !isNonGCVMHelper;
         return isGCPoint;
@@ -2351,5 +2352,6 @@ void SessionAction::computeDominators(void)
 
 } //namespace Ia32
 } //namespace Jitrino
+
 
 

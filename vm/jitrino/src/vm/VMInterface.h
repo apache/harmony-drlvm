@@ -370,6 +370,7 @@ public:
     static RuntimeHelperId str2rid( const char * helperName );
 
     VmCallingConvention getRuntimeHelperCallingConvention(RuntimeHelperId id);
+    bool        isGCInterruptible(RuntimeHelperId id);
     void*       getRuntimeHelperAddress(RuntimeHelperId);
     void*       getRuntimeHelperAddressForType(RuntimeHelperId, Type*);
 

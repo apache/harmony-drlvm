@@ -618,6 +618,13 @@ VMEXPORT void *vm_get_rt_support_addr_optimized(VM_RT_SUPPORT f, Class_Handle c)
 VMEXPORT LilCodeStub *vm_get_rt_support_stub(VM_RT_SUPPORT f, Class_Handle c);
 
 
+/**
+ *  Checks if helper is a suspension point
+ */
+
+VMEXPORT Boolean vm_helper_is_gc_interruptible(VM_RT_SUPPORT f);
+
+
 #ifdef __cplusplus
 }
 #endif // __cplusplus

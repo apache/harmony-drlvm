@@ -75,7 +75,7 @@ VMInterface::getTypeHandleFromVTable(void* vtHandle){
 // TODO: free TLS key on JIT deinitilization
 uint32
 VMInterface::flagTLSSuspendRequestOffset(){
-    return hythread_tls_get_request_offset();
+    return (uint32)hythread_tls_get_request_offset();
 }
 
 uint32
@@ -563,6 +563,13 @@ CompilationInterface::getRuntimeHelperCallingConvention(RuntimeHelperId id) {
         return CallingConvention_Stdcall;
     }
 }
+
+bool
+CompilationInterface::isGCInterruptible(RuntimeHelperId runtimeHelperId)  {
+    VM_RT_SUPPORT drlHelperId = translateHelperId(runtimeHelperId);
+    return vm_helper_is_gc_interruptible(drlHelperId);
+}
+
 
 bool
 CompilationInterface::compileMethod(MethodDesc *method) {
