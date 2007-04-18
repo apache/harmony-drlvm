@@ -24,10 +24,15 @@
 #include "apr_thread_ext.h"
 #include <apr_atomic.h>
 
-#if defined(_EM64T_) && defined(_WIN64)
-#include <intrin.h>
-#pragma intrinsic (_ReadWriteBarrier)
+// MSVC barrier intrinsics setup
+#if _MSC_VER < 1400
+    // VC++ 2003
+    extern void _ReadWriteBarrier();
+#else
+    // VC++ 2005
+    #include <intrin.h>
 #endif
+#pragma intrinsic (_ReadWriteBarrier)
 
 APR_DECLARE(apr_status_t) apr_thread_set_priority(apr_thread_t *thread, 
                 apr_int32_t priority) 
@@ -85,11 +90,7 @@ APR_DECLARE(apr_status_t) apr_thread_yield_other(apr_thread_t* thread) {
 }
 
 APR_DECLARE(void) apr_memory_rw_barrier() {
-#if defined(_EM64T_) && defined(_WIN64)
-    _ReadWriteBarrier();
-#else
-    __asm mfence;
-#endif
+	_ReadWriteBarrier();
 }
 
 APR_DECLARE(apr_status_t) apr_thread_times(apr_thread_t *thread, 

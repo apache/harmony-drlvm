@@ -105,11 +105,25 @@ APR_DECLARE(apr_status_t) apr_thread_yield_other(apr_thread_t* thread) {
 }
 
 APR_DECLARE(void) apr_memory_rw_barrier() {
-    #ifdef _IPF_ 
-        asm volatile ("mf" ::: "memory");
-    #else
-        __asm__("mfence");
-    #endif    
+#if defined(_EM64T_)
+    asm volatile ("mfence" : : : "memory");
+#elif defined(_IPF_)
+    asm volatile ("mf" : : : "memory");
+#else // General x86 case
+    /*
+     * This code must use a lock-prefixed assembly instruction, so that 
+     * we can support P3 processors (SSE2 only). With P4 and SSE3, we 
+     * could use 'mfence'. 
+     * References:
+     * Java Memory Model cookbook 
+     *      - http://gee.cs.oswego.edu/dl/jmm/cookbook.html
+     * Linux Kernel, mb() function 
+     *      - http://lxr.linux.no/source/include/asm-i386/system.h
+     * This is a GCC inline assembly command. The final bit, "memory", will
+     * clobber all of the memory registers.
+     */
+    asm volatile ("lock; addl $0,0(%%esp)" : : : "memory");
+#endif
 }
 
 APR_DECLARE(apr_status_t) apr_thread_times(apr_thread_t *thread, 
