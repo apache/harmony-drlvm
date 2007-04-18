@@ -1560,7 +1560,10 @@ Class* UserDefinedClassLoader::DoLoadClass(Global_Env* env, const String* classN
         // if loading of this class was delegated to some other CL
         //      signal successful loading for our CL
         SuccessLoadingClass(className);
-    }
+    } else
+    	INFO2("class", "[Loaded " << (NULL != className ? className->bytes : "NULL") <<
+              " by " << (NULL != clss->get_class_loader()->GetName() ? clss->get_class_loader()->GetName()->bytes : "NULL")
+               << "]");
     return clss;
 } // UserDefinedClassLoader::DoLoadClass
 
@@ -1692,7 +1695,7 @@ Class* BootstrapClassLoader::LoadFromClassFile(const String* dir_name,
     }
     STD_FREE(buf);
     apr_pool_destroy(local_pool);
-
+    INFO2("class", "[Loaded " << (NULL != class_name ? class_name->bytes : "NULL") << " from " << dir_name->bytes << "]");
     return clss;
 } // BootstrapClassLoader::LoadFromClassFile
 
@@ -1734,6 +1737,7 @@ Class* BootstrapClassLoader::LoadFromJarFile( JarFile* jar_file,
 
     STD_FREE(buffer);
 
+    INFO2("class", "[Loaded " << (NULL != class_name ? class_name->bytes : "NULL") << " from " << jar_file->GetName()  << "]");
     return clss;
 } // BootstrapClassLoader::LoadFromJarFile
 
