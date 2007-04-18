@@ -149,6 +149,7 @@ void gc_init_block_for_collectors(GC* gc, Mspace* mspace)
   unsigned int i;
   Block_Header* block;
   Space_Tuner* tuner = gc->tuner;
+  Block_Header* nos_last_block;
   /*Needn't change LOS size.*/
   if(tuner->kind == TRANS_NOTHING){
     for(i=0; i<gc->num_active_collectors; i++){
@@ -168,7 +169,11 @@ void gc_init_block_for_collectors(GC* gc, Mspace* mspace)
   else if(tuner->kind == TRANS_FROM_MOS_TO_LOS)
   {
     Blocked_Space* nos = (Blocked_Space*)gc_get_nos((GC_Gen*)gc);
-    Block_Header* nos_last_block = (Block_Header*)&nos->blocks[nos->num_managed_blocks-1];
+    if(nos->num_managed_blocks)
+      nos_last_block = (Block_Header*)&nos->blocks[nos->num_managed_blocks-1];
+    else
+      /*If nos->num_managed_blocks is zero, we take mos_last_block as nos_last_block instead.*/
+      nos_last_block = (Block_Header*)&mspace->blocks[mspace->num_managed_blocks - 1];
     Block_Header* mos_first_block = (Block_Header*)&mspace->blocks[0];
     unsigned int trans_blocks = (unsigned int)(tuner->tuning_size >> GC_BLOCK_SHIFT_COUNT);
     nos_last_block->next = mos_first_block;

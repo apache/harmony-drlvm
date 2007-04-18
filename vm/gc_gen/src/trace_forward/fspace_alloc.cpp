@@ -82,9 +82,9 @@ void* fspace_alloc(unsigned size, Allocator *allocator)
     vm_gc_lock_enum();
     /* after holding lock, try if other thread collected already */
     if ( !space_has_free_block((Blocked_Space*)fspace) ) {  
-        if(attempts == 0) {
+        if(attempts < 2) {
           gc_reclaim_heap(allocator->gc, GC_CAUSE_NOS_IS_FULL); 
-          attempts = 1;
+          attempts++;
         }else{
           vm_gc_unlock_enum();  
           return NULL;

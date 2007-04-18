@@ -225,7 +225,11 @@ static void gc_decide_next_collect(GC_Gen* gc, int64 pause_time)
   #ifdef NOS_SURVIVE_RATIO_SENSITIVE
       /*If this major is caused by fall back compaction, 
          we must give fspace->survive_ratio a conservative and reasonable number to avoid next fall back.*/
-      fspace->survive_ratio = mspace->survive_ratio;
+      //fspace->survive_ratio = mspace->survive_ratio;
+      /*In fallback compaction, the survive_ratio of mspace must be 1.*/
+      if(gc_match_kind((GC*)gc, FALLBACK_COLLECTION))
+      	fspace->survive_ratio = 1;
+      	
   #endif
     }else{
       /*Give a hint to mini_free_ratio. */
@@ -305,14 +309,27 @@ Boolean gc_compute_new_space_size(GC_Gen* gc, POINTER_SIZE_INT* mos_size, POINTE
   /* predict NOS + NOS*ratio = total_free_size */
   POINTER_SIZE_INT nos_reserve_size;
   nos_reserve_size = (POINTER_SIZE_INT)(((float)total_free)/(1.0f + fspace->survive_ratio));
-  /*Nos should not be too small*/
+  /*NOS should not be zero, if there is only one block in non-los, i.e. in the former if sentence,
+    if total_free = GC_BLOCK_SIZE_BYTES, then the computed nos_reserve_size is between zero
+    and GC_BLOCK_SIZE_BYTES. In this case, we assign this block to NOS*/
   if(nos_reserve_size <= GC_BLOCK_SIZE_BYTES)  nos_reserve_size = GC_BLOCK_SIZE_BYTES;
-  new_nos_size = round_down_to_size((POINTER_SIZE_INT)nos_reserve_size, GC_BLOCK_SIZE_BYTES);
 
 #ifdef STATIC_NOS_MAPPING
-  if(new_nos_size > fspace->reserved_heap_size) new_nos_size = fspace->reserved_heap_size;
+  if(nos_reserve_size > fspace->reserved_heap_size) nos_reserve_size = fspace->reserved_heap_size;
 #endif  
-  if(new_nos_size > GC_MOS_MIN_EXTRA_REMAIN_SIZE) new_nos_size -= GC_MOS_MIN_EXTRA_REMAIN_SIZE ;
+  //To reserve some MOS space to avoid fallback situation. 
+  //But we need ensure nos has at least one block 
+  //if(new_nos_size > GC_MOS_MIN_EXTRA_REMAIN_SIZE) new_nos_size -= GC_MOS_MIN_EXTRA_REMAIN_SIZE ;
+  POINTER_SIZE_INT reserve_in_mos = GC_MOS_MIN_EXTRA_REMAIN_SIZE;
+  while (reserve_in_mos >= GC_BLOCK_SIZE_BYTES){
+    if(nos_reserve_size >= reserve_in_mos + GC_BLOCK_SIZE_BYTES){
+      nos_reserve_size -= reserve_in_mos;    
+      break;
+    }
+    reserve_in_mos >>= 1;
+  }
+
+  new_nos_size = round_down_to_size((POINTER_SIZE_INT)nos_reserve_size, GC_BLOCK_SIZE_BYTES); 
 
   if(gc->force_gen_mode){
     new_nos_size = min_nos_size_bytes;//round_down_to_size((unsigned int)(gc->gen_minor_adaptor->adapt_nos_size), SPACE_ALLOC_UNIT);
@@ -400,7 +417,7 @@ void gc_gen_adapt(GC_Gen* gc, int64 pause_time)
   
   POINTER_SIZE_INT curr_nos_size = space_committed_size((Space*)fspace);
 
-  if( abs((POINTER_SIZE_SINT)new_nos_size - (POINTER_SIZE_SINT)curr_nos_size) < NOS_COPY_RESERVE_DELTA )
+  if( ABS_DIFF(new_nos_size, curr_nos_size) < NOS_COPY_RESERVE_DELTA )
     return;
       
   POINTER_SIZE_INT used_mos_size = space_used_memory_size((Blocked_Space*)mspace);  

@@ -173,7 +173,7 @@ void gc_space_tune_before_gc(GC* gc, unsigned int cause)
     if(tuning_size > max_tuning_size) tuning_size = max_tuning_size;
     tuner->tuning_size = round_down_to_size(tuning_size, GC_BLOCK_SIZE_BYTES);
   }
-  if(tuner->tuning_size == 0){
+  if( (tuner->tuning_size == 0) && (!tuner->force_tune) ){
     tuner->kind = TRANS_NOTHING;
     lspace->move_object = 0;
     return;
