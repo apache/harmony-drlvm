@@ -98,6 +98,8 @@ stop_the_world_root_set_enumeration()
 
     jvmti_send_gc_start_event();
 
+    class_unloading_clear_mark_bits();
+
     current_vm_thread = p_TLS_vmthread;
     // Run through list of active threads and enumerate each one of them.
     hythread_t tm_thread = hythread_iterator_next(&iterator);    

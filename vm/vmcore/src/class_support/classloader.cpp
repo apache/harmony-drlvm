@@ -488,6 +488,21 @@ void ClassLoader::gc_enumerate()
 }
 
 
+void ClassLoader::ClearMarkBits()
+{
+    TRACE2("classloader.unloading.clear", "Clearing mark bits");
+    LMAutoUnlock aulock( &(ClassLoader::m_tableLock) );
+    ClassTable::iterator cti;
+    for(unsigned i = 0; i < m_nextEntry; i++) {
+        TRACE2("classloader.unloading.debug", "  Clearing mark bits in classloader "
+            << m_table[i] << " (" << m_table[i]->m_loader << " : "
+            << m_table[i]->m_loader->vt_unsafe()->clss->get_name()->bytes << ") and its classes");
+        m_table[i]->m_markBit = 0;
+     }
+    TRACE2("classloader.unloading.clear", "Finished clearing mark bits");
+}
+
+
 ClassLoader* ClassLoader::AddClassLoader( ManagedObject* loader )
 {
     SuspendDisabledChecker sdc;
@@ -1001,6 +1016,9 @@ GenericFunctionPointer ClassLoader::LookupNative(Method* method)
     return NULL;
 }
 
+void class_unloading_clear_mark_bits() {
+    ClassLoader::ClearMarkBits();
+}
 inline void
 BootstrapClassLoader::SetClasspathFromString(char* bcp,
                                                apr_pool_t* tmp_pool)

@@ -155,7 +155,7 @@ private:
 public:
     ClassLoader() : m_loader(NULL), m_parent(NULL), m_name(NULL), m_package_table(NULL), 
         m_loadedClasses(NULL), m_loadingClasses(NULL), m_reportedClasses(NULL),
-        m_javaTypes(NULL), m_nativeLibraries(NULL), m_verifyData(NULL)
+        m_javaTypes(NULL), m_nativeLibraries(NULL), m_verifyData(NULL), m_markBit(false)
     {
         apr_pool_create(&pool, 0);
     }
@@ -208,6 +208,8 @@ protected:
 
 public:
     bool IsBootstrap() { return m_loader == NULL; }
+    void Mark() { m_markBit = true; }
+    bool isMarked() { return m_markBit; }
     ManagedObject* GetLoader() { return m_loader; }
     const String* GetName() { return m_name; }
     ClassLoader* GetParent() { return m_parent; }
@@ -225,6 +227,7 @@ public:
     VMEXPORT static ClassLoader* LookupLoader( ManagedObject* loader );
     static void UnloadClassLoader( ManagedObject* loader );
     static void gc_enumerate();
+    static void ClearMarkBits();
     static unsigned GetClassLoaderNumber() { return m_nextEntry; }
     static ClassLoader** GetClassLoaderTable() { return m_table; }
     static void DeleteClassLoaderTable(){
@@ -273,6 +276,7 @@ protected:
     NativeLibraryList m_nativeLibraries;
     Lock_Manager m_lock;
     Lock_Manager m_types_cache_lock;
+    bool m_markBit;
     void* m_verifyData;
     apr_pool_t* pool;
     PoolManager *CodeMemoryManager;

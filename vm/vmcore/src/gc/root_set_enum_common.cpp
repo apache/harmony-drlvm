@@ -255,6 +255,24 @@ void vm_enumerate_root_set_single_thread_on_stack(StackIterator* si)
                 << "." << method_get_name(cci->get_method())
                 << method_get_descriptor(cci->get_method()));
             cci->get_jit()->get_root_set_from_stack_frame(cci->get_method(), 0, si_get_jit_context(si));
+            ClassLoader* cl = cci->get_method()->get_class()->get_class_loader();
+            assert (cl);
+            // force cl classloader to be enumerated as strong reference
+            cl->Mark();
+            if (cci->has_inline_info()) {
+                JIT *jit = cci->get_jit();
+                NativeCodePtr ip = si_get_ip(si);
+                uint32 inlined_depth = si_get_inline_depth(si);
+                uint32 offset = (POINTER_SIZE_INT)ip - (POINTER_SIZE_INT)cci->get_code_block_addr();
+                for (uint32 i = 0; i < inlined_depth; i++) {
+                    Method* m = jit->get_inlined_method(cci->get_inline_info(), offset, i);
+                    assert (m);
+                    cl = m->get_class()->get_class_loader();
+                    assert (cl);
+                    // force cl classloader to be enumerated as strong reference
+                    cl->Mark();
+                }
+            }
             TRACE2("enumeration", "enumerated eip=" << (void *) si_get_ip(si)
                 << " is_first=" << !si_get_jit_context(si)->is_ip_past
                 << " " << class_get_name(method_get_class(cci->get_method()))
@@ -268,6 +286,13 @@ void vm_enumerate_root_set_single_thread_on_stack(StackIterator* si)
                 << (m2n_get_method(si_get_m2n(si)) ? method_get_name(m2n_get_method(si_get_m2n(si))) : "")
                 << (m2n_get_method(si_get_m2n(si)) ? method_get_descriptor(m2n_get_method(si_get_m2n(si))) : ""));
             oh_enumerate_handles(m2n_get_local_handles(si_get_m2n(si)));
+            Method* m = m2n_get_method(si_get_m2n(si));
+            if (m) {
+                ClassLoader* cl = m->get_class()->get_class_loader();
+                assert (cl);
+                // force cl classloader to be enumerated as strong reference
+                cl->Mark();
+            }
         }
         si_goto_previous(si, false);
     }
