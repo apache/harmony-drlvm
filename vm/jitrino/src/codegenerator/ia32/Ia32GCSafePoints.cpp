@@ -456,10 +456,16 @@ void GCSafePointsInfo::updatePairsOnInst(Inst* inst, GCSafePointPairs& res) {
                 pair->base = opnd;
             }
         } else { //def of mptr
+            // detect which operand is base
             Opnd* fromOpnd = inst->getOpnd(useIndex1);
-            int32 offset = MPTR_OFFSET_UNKNOWN;
-            assert(fromOpnd->getType()->isObject() || fromOpnd->getType()->isManagedPtr());
             uint32 useIndex2 = opnds.next(useIndex1);
+            Opnd* fromOpnd2 = useIndex2!=opnds.end() ? inst->getOpnd(useIndex2) : NULL;
+            if (!(fromOpnd->getType()->isObject() || fromOpnd->getType()->isManagedPtr())) {
+                assert(fromOpnd2!=NULL);
+                Opnd* tmp = fromOpnd; fromOpnd = fromOpnd2; fromOpnd2 = tmp;
+            }
+            assert(fromOpnd->getType()->isObject() || fromOpnd->getType()->isManagedPtr());
+            int32 offset = MPTR_OFFSET_UNKNOWN;
             if (inst->getMnemonic() == Mnemonic_LEA) {
                 assert(fromOpnd->isPlacedIn(OpndKind_Memory));
                 Opnd* scaleOpnd = fromOpnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Scale);
@@ -469,8 +475,8 @@ void GCSafePointsInfo::updatePairsOnInst(Inst* inst, GCSafePointPairs& res) {
                     offset = (int32)displOpnd->getImmValue();
                 }
                 fromOpnd = fromOpnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Base);
-            } else if (useIndex2 < opnds.end()) {
-                Opnd* offsetOpnd = inst->getOpnd(useIndex2); 
+            } else if (fromOpnd2!=NULL) {
+                Opnd* offsetOpnd = fromOpnd2; 
                 offset = getOffsetFromImmediate(offsetOpnd);
             }
             updateMptrInfoInPairs(res, opnd, fromOpnd, offset, fromOpnd->getType()->isObject());
