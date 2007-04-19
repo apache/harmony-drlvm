@@ -662,7 +662,6 @@ MemoryOptInitWalker::applyToInst(Inst *i)
             JitHelperCallId callId = jitcalli->getJitHelperId();
             switch (callId) {
             case InitializeArray:
-            case PseudoCanThrow:
             case SaveThisState:
             case ReadThisState:
             case LockedCompareAndExchange:
@@ -673,6 +672,8 @@ MemoryOptInitWalker::applyToInst(Inst *i)
                 break;
             }
         }
+        break;
+    case Op_PseudoThrow:
         break;
     case Op_Return:
     case Op_Throw:

@@ -62,6 +62,15 @@ UnreachableCodeEliminationPass::_run(IRManager& irm) {
     }
 }
 
+DEFINE_SESSION_ACTION(ExtraPseudoThrowRemovalPass, rept, "Removal of Extra PseudoThrow Instructions");
+
+void 
+ExtraPseudoThrowRemovalPass::_run(IRManager& irm) {
+    DeadCodeEliminator dce(irm);
+    dce.removeExtraPseudoThrow();
+}
+
+
 //Empty Node Removal
 class PurgeEmptyNodesPass: public SessionAction {
 public:
@@ -1051,6 +1060,111 @@ DeadCodeEliminator::eliminateDeadCode(bool keepEmptyNodes) {
         }
     }
 
+}
+
+//
+// Leave one PseudoThrow instruction only for those loops which
+// do not contain other dispatch edges exiting the loop.
+//
+void
+DeadCodeEliminator::removeExtraPseudoThrow() {
+    MemoryManager memManager(flowGraph.getMaxNodeId(),"DeadCodeEliminator::removeExtraPseudoThrow");
+
+    OptPass::computeLoops(irManager);
+    LoopTree* loopTree = irManager.getLoopTree();
+    assert(loopTree && loopTree->isValid());
+
+    if (Log::isLogEnabled(LogStream::DOTDUMP)) {
+        OptPass::printDotFile(irManager, Log::getStageId(), "rept", "after_loop_tree");
+    }
+
+    // Nodes containing essential PseudoThrow instructions
+    BitSet essentialNodes(memManager, flowGraph.getMaxNodeId());
+    
+    if (loopTree->hasLoops()) {
+        LoopNode* loopNode = ((LoopNode*)loopTree->getRoot())->getChild();
+        markEssentialPseudoThrows(loopNode, essentialNodes);
+    }
+
+    const Nodes& cfgNodes = flowGraph.getNodes();
+    if (Log::isEnabled()) {
+        Log::out() << "Removing useless PseudoThrow instructions:" << std::endl;
+    }
+    for (Nodes::const_iterator it = cfgNodes.begin(), end = cfgNodes.end(); it!=end; ++it) {
+        Node* node = *it;
+        Inst* lastInst = (Inst*)node->getLastInst();
+        if (!essentialNodes.getBit(node->getId()) && (lastInst->getOpcode() == Op_PseudoThrow)) {
+            if (Log::isEnabled()) {
+                Log::out() << "  Removing instruction: ";
+                lastInst->print(Log::out());
+                Log::out() << std::endl;
+            }
+            lastInst->unlink();
+            Edge* dispatchEdge = node->getExceptionEdge();
+            assert(dispatchEdge != NULL);
+            flowGraph.removeEdge(dispatchEdge);
+        }
+    }
+    if (Log::isEnabled()) {
+        Log::out() << "Done." << std::endl;
+    }
+    eliminateUnreachableCode();
+}
+
+void
+DeadCodeEliminator::markEssentialPseudoThrows(LoopNode* loopNode, BitSet& essentialNodes) {
+    LoopNode* childNode = loopNode->getChild();
+    if (childNode != NULL)
+        markEssentialPseudoThrows(childNode, essentialNodes);
+    LoopNode* siblingNode = loopNode->getSiblings();
+    if (siblingNode != NULL)
+        markEssentialPseudoThrows(siblingNode, essentialNodes);
+    if (Log::isEnabled()) {
+        Log::out() << "Analyzing loop nodes with the loop header ID: "
+            << loopNode->getHeader()->getId() << std::endl;
+    }
+    Node* mbEssentialNode = NULL;
+    const Nodes& loopNodes = loopNode->getNodesInLoop();
+    for (Nodes::const_iterator it = loopNodes.begin(), end = loopNodes.end(); it!=end; ++it) {
+        Node* node = *it;
+        if (Log::isEnabled()) {
+            Log::out() << "Analyzing Node ID: " << node->getId() << std::endl;
+        }
+        Edge* exceptionEdge = node->getExceptionEdge();
+        if ((exceptionEdge != NULL) && !loopNode->inLoop(exceptionEdge->getTargetNode())) {
+            if (Log::isEnabled()) {
+                Log::out() << " Loop ID exit exception edge detected: ";
+            }
+            if (((Inst*)node->getLastInst())->getOpcode() == Op_PseudoThrow) {
+                if (essentialNodes.getBit(node->getId())) {
+                    // There is an essential PseudoThrow instruction in this loop
+                    if (Log::isEnabled()) {
+                        Log::out() << " essential PseudoThrow inst" << std::endl;
+                    }
+                    return;
+                } else {
+                    // A candidate to essential nodes
+                    if (Log::isEnabled()) {
+                        Log::out() << " essential candidate" << std::endl;
+                    }
+                    mbEssentialNode = node;
+                }
+            } else {
+                // No essential PseudoThrow insts in this loop
+                if (Log::isEnabled()) {
+                    Log::out() << " PseudoThrow killer inst" << std::endl;
+                }
+                return;
+            }
+        }
+    }
+    assert(mbEssentialNode != NULL);
+    essentialNodes.setBit(mbEssentialNode->getId());
+    if (Log::isEnabled()) {
+        Log::out() << "Found essential PseudoThrow in node ID: "
+            << mbEssentialNode->getId() << std::endl;
+    }
+    return;
 }
 
 } //namespace Jitrino 

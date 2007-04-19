@@ -210,6 +210,8 @@ public:
     
     Inst* caseThrow(Inst* inst) { return caseDefault(inst); }
 
+    Inst* casePseudoThrow(Inst* inst) { return caseDefault(inst); }
+
     Inst* caseThrowSystemException(Inst* inst) { return caseDefault(inst); }
     
     Inst* caseThrowLinkingException(Inst* inst) { return caseDefault(inst); }

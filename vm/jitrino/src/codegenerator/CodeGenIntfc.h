@@ -167,7 +167,6 @@ public:
     enum Id {
         InitializeArray,
         FillArrayWithConst,
-        PseudoCanThrow,
         SaveThisState,
         ReadThisState,
         LockedCompareAndExchange,

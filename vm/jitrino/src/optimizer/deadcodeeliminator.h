@@ -26,6 +26,7 @@
 
 #include "Stl.h"
 #include "optpass.h"
+#include "LoopTree.h"
 
 namespace Jitrino {
 
@@ -43,12 +44,13 @@ public:
     static void copyPropagate(Inst*);
     static Opnd* copyPropagate(Opnd*);
     bool eliminateUnreachableCode(); // returns true if any node is eliminated
+    void removeExtraPseudoThrow();
 private:
     void sweepInst(Node* node, Inst* inst, BitSet& usefulInstSet, BitSet& usefulVarSet, uint8 *usedInstWidth, uint32 minInstId, uint32 maxInstId, bool canRemoveStvars);
     void sweepInst1(Node* node, Inst* inst, BitSet& usefulInstSet, BitSet& usefulVarSet,
                     uint32 minInstId, uint32 maxInstId, bool canRemoveStvars); // if we're skipping instWidth
     static Opnd* findDefiningTemp(Opnd* var);
-
+    void markEssentialPseudoThrows(LoopNode* loopNode, BitSet& essentialNodes);
 
     IRManager& irManager;
     ControlFlowGraph& flowGraph;

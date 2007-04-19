@@ -404,7 +404,6 @@ IntrinsicCallOp::Id _BlockCodeSelector::convertIntrinsicId(IntrinsicCallId callI
 JitHelperCallOp::Id _BlockCodeSelector::convertJitHelperId(JitHelperCallId callId) {
     switch(callId) {
     case InitializeArray: return JitHelperCallOp::InitializeArray;
-    case PseudoCanThrow: return JitHelperCallOp::PseudoCanThrow;
     case SaveThisState: return JitHelperCallOp::SaveThisState;
     case ReadThisState: return JitHelperCallOp::ReadThisState;
     case LockedCompareAndExchange: return JitHelperCallOp::LockedCompareAndExchange;
@@ -897,17 +896,11 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback,
             {
                 JitHelperCallInst* call = inst->asJitHelperCallInst();
                 JitHelperCallId callId = call->getJitHelperId();
-
-                if( callId == PseudoCanThrow ){
-                    instructionCallback.pseudoInst();
-
-                } else {
-                    cgInst = 
-                        instructionCallback.callhelper(inst->getNumSrcOperands(),
-                        genCallArgs(call,0),
-                        inst->getDst()->getType(),
-                        convertJitHelperId(callId));
-                }
+                cgInst = 
+                    instructionCallback.callhelper(inst->getNumSrcOperands(),
+                    genCallArgs(call,0),
+                    inst->getDst()->getType(),
+                    convertJitHelperId(callId));
             }
             break;
         case Op_VMHelperCall:
@@ -940,6 +933,9 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback,
             {
                 instructionCallback.throwException(getCGInst(inst->getSrc(0)), inst->getThrowModifier() == Throw_CreateStackTrace);
             }
+            break;
+        case Op_PseudoThrow:
+            instructionCallback.pseudoInst();
             break;
         case Op_ThrowSystemException:
             {

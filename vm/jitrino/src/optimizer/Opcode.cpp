@@ -112,8 +112,9 @@ static OpcodeInfo opcodeTable[] = {
     { Op_Return,                true,  MB::ControlFlow,   MK::None,                                  "return",        "return    %s",                 },
     { Op_Catch,                 true,  MB::ControlFlow,   MK::None,                                  "catch",         "catch        -) %l",           },
     { Op_Throw,                 true,  MB::Exception,     MK::Throw,                                 "throw ",        "throw     %0",                 },               
-    { Op_ThrowSystemException,  true,  MB::Exception,     MK::None,                                  "throwsys ",        "throwsys %d",               },
-    { Op_ThrowLinkingException, true,  MB::Exception,     MK::None,                                  "throwLink ",        "throwLink",                },
+    { Op_PseudoThrow,           true,  MB::Exception,     MK::Exception,                             "pseudoThrow ",  "pseudoThrow",                  },               
+    { Op_ThrowSystemException,  true,  MB::Exception,     MK::None,                                  "throwsys ",     "throwsys %d",                  },
+    { Op_ThrowLinkingException, true,  MB::Exception,     MK::None,                                  "throwLink ",    "throwLink",                    },
     { Op_Leave,                 true,  MB::ControlFlow,   MK::None,                                  "leave ",        "leave %l",                     }, // CLI only -- DELETE
     { Op_EndFinally,            true,  MB::ControlFlow,   MK::None,                                  "endfinally",    "endfinally",                   }, // CLI only -- DELETE
     { Op_EndFilter,             true,  MB::ControlFlow,   MK::None,                                  "endfilter",     "endfilter",                    }, // CLI only -- DELETE

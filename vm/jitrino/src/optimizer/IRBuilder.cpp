@@ -1264,6 +1264,11 @@ IRBuilder::genThrow(ThrowModifier mod, Opnd* exceptionObj) {
 }
 
 void
+IRBuilder::genPseudoThrow() {
+    appendInst(instFactory->makePseudoThrow());
+}
+
+void
 IRBuilder::genThrowSystemException(CompilationInterface::SystemExceptionId id) {
     appendInst(instFactory->makeThrowSystemException(id));
 }

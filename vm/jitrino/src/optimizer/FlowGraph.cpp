@@ -32,6 +32,7 @@
 #include "XTimer.h"
 #include "StaticProfiler.h"
 #include "escapeanalyzer.h"
+#include "deadcodeeliminator.h"
 #include "TranslatorIntfc.h"
 #include "CGSupport.h"
 #include "LoopTree.h"
@@ -996,6 +997,10 @@ void FlowGraph::doTranslatorCleanupPhase(IRManager& irm) {
             }
         }
     }
+    // Remove extra PseudoThrow insts
+    DeadCodeEliminator dce(irm);
+    dce.removeExtraPseudoThrow();
+
     //
     // a quick cleanup of unreachable and empty basic blocks
     //
@@ -1164,7 +1169,7 @@ void HIRDotPrinter::printDotNode(Node* node) {
     out << "tn: " << (int) node->getTraversalNum() << " pre:" << (int)node->getPreNum() << " post:" << (int)node->getPostNum() << " ";
     out << "id: " << (int) node->getId() << " ";
     if(fg.hasEdgeProfile()) {
-        out << " execCount:" << (int)node->getExecCount()<< " ";
+        out << " execCount:" << node->getExecCount() << " ";
     }
     Node* idom = dom==NULL ? NULL: dom->getIdom(node);
     if (idom!=NULL) {

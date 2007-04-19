@@ -168,6 +168,7 @@ public:
     void       genReturn();//TR
     Opnd*      genCatch(Type* exceptionType); // TR
     void       genThrow(ThrowModifier mod, Opnd* exceptionObj);//TR
+    void       genPseudoThrow();//TR
     void       genThrowSystemException(CompilationInterface::SystemExceptionId);//SI
     void       genThrowLinkingException(Class_Handle encClass, uint32 CPIndex, uint32 operation);//SI
     void       genLeave(LabelInst* label);//TR

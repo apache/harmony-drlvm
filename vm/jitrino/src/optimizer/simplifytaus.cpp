@@ -496,6 +496,7 @@ Opnd *TauWalkerState::findReplacement(Opnd *src, Type *type, bool exactType)
         }
         
     case Op_Throw:
+    case Op_PseudoThrow:
     case Op_Leave:
     case Op_EndFinally:
     case Op_EndFilter:

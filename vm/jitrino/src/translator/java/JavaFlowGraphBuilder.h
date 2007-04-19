@@ -48,9 +48,6 @@ private:
     void         edgeForFallthrough(Node* block);
     void         eliminateUnnestedLoopsOnDispatch();
     bool         lastInstIsMonitorExit(Node* node);
-    void         resolveWhileTrue();
-    void         reverseDFS( StlVector<int8>& state, Node* targetNode, uint32* NodesCounter );
-    void         forwardDFS( StlVector<int8>& state, Node* srcNode, Edges& edges);
 
     Node* createBlockNodeOrdered(LabelInst* label = NULL);
     Node* createBlockNodeAfter(Node* node, LabelInst* label = NULL);

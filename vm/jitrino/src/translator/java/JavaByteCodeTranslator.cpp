@@ -1605,6 +1605,9 @@ void JavaByteCodeTranslator::if_acmpeq(uint32 targetOffset,uint32 nextOffset) {
     Opnd*    src1 = popOpnd();
     if (targetOffset == nextOffset)
         return;
+    if (targetOffset < nextOffset) {
+        irBuilder.genPseudoThrow();
+    }
     lastInstructionWasABranch = true;
     checkStack();
     LabelInst *target = getLabel(labelId(targetOffset));
@@ -1617,6 +1620,9 @@ JavaByteCodeTranslator::if_acmpne(uint32 targetOffset,uint32 nextOffset) {
     Opnd*    src1 = popOpnd();
     if (targetOffset == nextOffset)
         return;
+    if (targetOffset < nextOffset) {
+        irBuilder.genPseudoThrow();
+    }
     lastInstructionWasABranch = true;
     checkStack();
     LabelInst *target = getLabel(labelId(targetOffset));
@@ -1627,6 +1633,9 @@ void
 JavaByteCodeTranslator::goto_(uint32 targetOffset,uint32 nextOffset) {
     if (targetOffset == nextOffset)
         return;
+    if (targetOffset < nextOffset) {
+        irBuilder.genPseudoThrow();
+    }
     lastInstructionWasABranch = true;
     checkStack();
     uint32 lid = labelId(targetOffset);
@@ -1638,6 +1647,9 @@ JavaByteCodeTranslator::goto_(uint32 targetOffset,uint32 nextOffset) {
 //-----------------------------------------------------------------------------
 void 
 JavaByteCodeTranslator::jsr(uint32 targetOffset, uint32 nextOffset) {
+    if (targetOffset < nextOffset) {
+        irBuilder.genPseudoThrow();
+    }
     lastInstructionWasABranch = true;
     checkStack();
     irBuilder.genJSR(getLabel(labelId(targetOffset)));
@@ -2605,6 +2617,9 @@ JavaByteCodeTranslator::genIf1(ComparisonModifier mod,
     Opnd*    src1 = popOpnd();
     if (targetOffset == nextOffset)
         return;
+    if (targetOffset < nextOffset) {
+        irBuilder.genPseudoThrow();
+    }
     lastInstructionWasABranch = true;
     checkStack();
     LabelInst *target = getLabel(labelId(targetOffset));
@@ -2619,6 +2634,9 @@ JavaByteCodeTranslator::genIf1Commute(ComparisonModifier mod,
     Opnd*    src1 = popOpnd();
     if (targetOffset == nextOffset)
         return;
+    if (targetOffset < nextOffset) {
+        irBuilder.genPseudoThrow();
+    }
     lastInstructionWasABranch = true;
     checkStack();
     LabelInst *target = getLabel(labelId(targetOffset));
@@ -2634,6 +2652,9 @@ JavaByteCodeTranslator::genIf2(ComparisonModifier mod,
     Opnd*    src1 = popOpnd();
     if (targetOffset == nextOffset)
         return;
+    if (targetOffset < nextOffset) {
+        irBuilder.genPseudoThrow();
+    }
     lastInstructionWasABranch = true;
     checkStack();
     LabelInst *target = getLabel(labelId(targetOffset));
@@ -2648,6 +2669,9 @@ JavaByteCodeTranslator::genIf2Commute(ComparisonModifier mod,
     Opnd*    src1 = popOpnd();
     if (targetOffset == nextOffset)
         return;
+    if (targetOffset < nextOffset) {
+        irBuilder.genPseudoThrow();
+    }
     lastInstructionWasABranch = true;
     checkStack();
     LabelInst *target = getLabel(labelId(targetOffset));
@@ -2661,6 +2685,9 @@ JavaByteCodeTranslator::genIfNull(ComparisonModifier mod,
     Opnd*    src1 = popOpnd();
     if (targetOffset == nextOffset)
         return;
+    if (targetOffset < nextOffset) {
+        irBuilder.genPseudoThrow();
+    }
     lastInstructionWasABranch = true;
     checkStack();
     LabelInst *target = getLabel(labelId(targetOffset));

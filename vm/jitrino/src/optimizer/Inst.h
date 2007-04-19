@@ -1156,6 +1156,7 @@ public:
     Inst*    makeCatchLabel(uint32 labelId, uint32 exceptionOrder, Type* exceptionType);
     CatchLabelInst*    makeCatchLabel(uint32 exceptionOrder, Type* exceptionType);
     Inst*    makeThrow(ThrowModifier mod, Opnd* exceptionObj);
+    Inst*    makePseudoThrow();
     Inst*    makeThrowSystemException(CompilationInterface::SystemExceptionId exceptionId);
     Inst*    makeThrowLinkingException(Class_Handle encClass, uint32 CPIndex, uint32 operation);
     Inst*    makeLeave(LabelInst* labelInst);
@@ -1681,6 +1682,9 @@ public:
 
     virtual Inst*
     caseThrow(Inst* inst)=0;//              {return caseDefault(inst);}
+
+    virtual Inst*
+    casePseudoThrow(Inst* inst)=0;//        {return caseDefault(inst);}
 
     virtual Inst*
     caseThrowSystemException(Inst* inst)=0;// {return caseDefault(inst);}

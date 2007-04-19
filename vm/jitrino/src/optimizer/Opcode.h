@@ -272,7 +272,6 @@ enum IntrinsicCallId {
 enum JitHelperCallId {
     InitializeArray,
     FillArrayWithConst,
-    PseudoCanThrow,
     SaveThisState, //todo: replace with GetTLS + offset sequence
     ReadThisState, //todo: replace with GetTLS + offset sequence
     LockedCompareAndExchange,
@@ -318,7 +317,8 @@ enum Opcode {
     Op_Return,
     // Exception processing
     Op_Catch,
-    Op_Throw,               
+    Op_Throw, 
+    Op_PseudoThrow,                 // pseudo instruction to break infinte loops
     Op_ThrowSystemException,        // takes a CompilationInterface::SystemExceptionId parameter
     Op_ThrowLinkingException,       // generate a call to Helper_Throw_LinkingException
     Op_Leave,                       

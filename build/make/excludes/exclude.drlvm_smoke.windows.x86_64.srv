@@ -17,6 +17,3 @@ stress/Stack.java
 
 # Server mode failures specific to Windows x86_64
 stress/Mix.java
-
-# HARMONY-3519
-thread/ThreadInterrupt.java

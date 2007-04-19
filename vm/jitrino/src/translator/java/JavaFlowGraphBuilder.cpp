@@ -226,126 +226,6 @@ void JavaFlowGraphBuilder::createCFGEdges() {
     }
 }
 
-#define WHITE 0  // node has not been touched yet
-#define BLACK 1  // node can reach exit node
-
-//
-// Traverse all the nodes in a reverse DFS manner, and mark all the ndoes
-// that are reachable from exit node with BLACK.
-//
-void JavaFlowGraphBuilder::reverseDFS( StlVector<int8>& state,
-                                       Node* targetNode,
-                                       uint32* nodesCounter )
-{
-    const Edges& in_edges = targetNode->getInEdges();
-
-    assert( state[targetNode->getId()] == WHITE );
-    state[targetNode->getId()] = BLACK;
-
-    *nodesCounter += 1;
-
-    for( Edges::const_iterator in_iter = in_edges.begin(); in_iter != in_edges.end(); in_iter++ ){
-        Node* srcNode = (*in_iter)->getSourceNode();
-
-        if( state[srcNode->getId()] != BLACK ){
-            reverseDFS( state, srcNode, nodesCounter );
-        }
-    }
-
-    return;
-}
-
-//
-// Traverse all the nodes in a forward DFS manner, and add dispatches
-// for while(true){;} loops, if they exist.
-//
-void JavaFlowGraphBuilder::forwardDFS( StlVector<int8>& state,
-                                       Node* srcNode,
-                                       Edges& edgesForSplicing)
-{
-    // Flip the state, so the same node will not be visited more than twice.
-    state[srcNode->getId()] = ~state[srcNode->getId()];
-
-    const Edges& out_edges = srcNode->getOutEdges();
-
-    for( Edges::const_iterator out_iter = out_edges.begin(); out_iter != out_edges.end(); out_iter++ ){
-
-        Node* targetNode = (*out_iter)->getTargetNode();
-        const int32 targetState = state[targetNode->getId()];
-
-        if( targetState == BLACK ||
-            targetState == WHITE ){
-            // Keep searching ...
-            forwardDFS( state, targetNode, edgesForSplicing );
-        } else if( targetState == ~WHITE){
-            state[targetNode->getId()] = ~BLACK;  // Now it can reach exit node.
-            edgesForSplicing.push_back((*out_iter));
-        }
-    }
-
-    // Don't visit ~WHITE node again.
-    state[srcNode->getId()] = ~BLACK;
-
-    return;
-}
-
-//
-// Introduce a dispatch edge from an infinite loop, if exists, to the
-// unwind node, so that the graph is connected from entry to exit.
-//
-void JavaFlowGraphBuilder::resolveWhileTrue()
-{
-    MemoryManager mm( fg->getMaxNodeId(), "ControlFlowGraph::resolveWhileTrue" );
-
-    StlVector<int8> state( mm, fg->getMaxNodeId() );
-
-    //
-    // Pass 1: Identify all the nodes that are reachable from exit node.
-    //
-    uint32 nodesAffected = 0;
-    reverseDFS( state, fg->getExitNode(), &nodesAffected );
-
-    //
-    // Pass 2: Add dispatches for while(true){;} loops, if they exist.
-    //
-    if( nodesAffected < fg->getNodes().size() ){
-        Edges edgesForSplicing(mm);
-        forwardDFS( state, fg->getEntryNode(), edgesForSplicing );
-        for (uint32 i=0; i < edgesForSplicing.size(); i++) {
-            Edge* e= edgesForSplicing[i];
-            Node* targetNode = e->getTargetNode();
-            LabelInst* newLabel = irBuilder.createLabel();
-            Node* node = fg->spliceBlockOnEdge(e, newLabel);
-            irBuilder.genLabel(newLabel);
-
-            Opnd* args[] = { irBuilder.genTauSafe(), irBuilder.genTauSafe() };
-            Type* returnType = irBuilder.getTypeManager()->getVoidType();
-            irBuilder.genJitHelperCall( PseudoCanThrow,
-                                        returnType,
-                                        sizeof(args) / sizeof(args[0]),
-                                        args );
-
-            ExceptionInfo* exceptionInfo =
-                (CatchBlock*)((LabelInst*)targetNode->getFirstInst())->getState();
-            Node* dispatch = NULL;
-
-            if( exceptionInfo != NULL) {
-                dispatch = exceptionInfo->getLabelInst()->getNode();
-            } else {
-                dispatch = fg->getUnwindNode();
-    }
-
-            fg->addEdge(node, dispatch);
-        }
-        if( Log::isEnabled() ){
-            MethodDesc &methodDesc = irBuilder.getIRManager()->getMethodDesc();
-            Log::out() << "PRINTING LOG: After resolveWhileTrue" << ::std::endl;
-            FlowGraph::printHIR(Log::out(), *fg, methodDesc );
-        }
-
-    }
-}
-
 Node* JavaFlowGraphBuilder::createBlockNodeOrdered(LabelInst* label) {
     if (label == NULL) {
         label = irBuilder.getInstFactory()->makeLabel();
@@ -396,10 +276,6 @@ void JavaFlowGraphBuilder::build() {
     // second phase: construct edges
     //
     createCFGEdges();
-    //
-    // third phase: add dispatches for infinite loop(s)
-    //
-    resolveWhileTrue();
 
     eliminateUnnestedLoopsOnDispatch();
 }

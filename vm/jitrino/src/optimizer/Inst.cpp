@@ -458,8 +458,6 @@ void JitHelperCallInst::handlePrintEscape(::std::ostream& os, char code) const {
         switch(jitHelperId) {
     case InitializeArray:
         os << "InitializeArray"; break;
-    case PseudoCanThrow:
-        os << "PseudoCanThrow"; break;
     case SaveThisState:
         os << "SaveThisState"; break;
     case ReadThisState:
@@ -1893,6 +1891,10 @@ Inst* InstFactory::makeThrow(ThrowModifier mod, Opnd* exceptionObj) {
     return makeInst(Op_Throw, Modifier(mod), Type::Void, OpndManager::getNullOpnd(), exceptionObj);
 }
 
+Inst* InstFactory::makePseudoThrow() {
+    return makeInst(Op_PseudoThrow, Modifier(Exception_Sometimes), Type::Void, OpndManager::getNullOpnd());
+}
+
 Inst* InstFactory::makeThrowSystemException(CompilationInterface::SystemExceptionId exceptionId) {
     MethodDesc* enclosingMethod = 0;
     return makeTokenInst(Op_ThrowSystemException, Modifier(), Type::Void, 
@@ -2688,6 +2690,7 @@ InstOptimizer::dispatch(Inst* inst) {
     case Op_Return:             return caseReturn(inst);
     case Op_Catch:              return caseCatch(inst);
     case Op_Throw:              return caseThrow(inst);
+    case Op_PseudoThrow:        return casePseudoThrow(inst);
     case Op_ThrowSystemException: return caseThrowSystemException(inst);
     case Op_ThrowLinkingException: return caseThrowLinkingException(inst);
     case Op_Leave:              return caseLeave(inst);

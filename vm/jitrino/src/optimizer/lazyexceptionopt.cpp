@@ -904,6 +904,8 @@ LazyExceptionOpt::instHasSideEffect(Inst* inst) {
         case Op_Return:
         case Op_Catch:
             return false;
+        case Op_PseudoThrow:
+            return false;
         case Op_Throw:
         case Op_ThrowSystemException:
         case Op_ThrowLinkingException:
