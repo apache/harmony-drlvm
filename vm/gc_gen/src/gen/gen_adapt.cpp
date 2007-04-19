@@ -365,7 +365,8 @@ void gc_gen_adapt(GC_Gen* gc, int64 pause_time)
 
   POINTER_SIZE_INT curr_nos_size = space_committed_size((Space*)fspace);
 
-  if( ABS_DIFF(new_nos_size, curr_nos_size) < NOS_COPY_RESERVE_DELTA )
+  //if( ABS_DIFF(new_nos_size, curr_nos_size) < NOS_COPY_RESERVE_DELTA )
+  if( new_nos_size == curr_nos_size )
     return;
   
   /* below are ajustment */  
@@ -417,7 +418,8 @@ void gc_gen_adapt(GC_Gen* gc, int64 pause_time)
   
   POINTER_SIZE_INT curr_nos_size = space_committed_size((Space*)fspace);
 
-  if( ABS_DIFF(new_nos_size, curr_nos_size) < NOS_COPY_RESERVE_DELTA )
+  //if( ABS_DIFF(new_nos_size, curr_nos_size) < NOS_COPY_RESERVE_DELTA )
+  if( new_nos_size == curr_nos_size) 
     return;
       
   POINTER_SIZE_INT used_mos_size = space_used_memory_size((Blocked_Space*)mspace);  
