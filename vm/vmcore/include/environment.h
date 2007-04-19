@@ -72,6 +72,7 @@ struct Global_Env {
     bool retain_invisible_annotations; // retain InvisibleAnnotation and InvisibleParameterAnnotation
     bool verify_all;                // Verify all classes including loaded by bootstrap class loader
     bool verify_strict;             // Do strict verification
+    bool verify;                    // Verify if -Xverify:none or -noverify flags aren't set      
     size_t system_page_size;        // system page size according to use_large_pages value
     
     Lock_Manager *p_jit_a_method_lock;

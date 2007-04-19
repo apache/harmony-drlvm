@@ -53,7 +53,7 @@ Class::verify(const Global_Env* env)
     Boolean is_forced = env->verify_all;
     Boolean is_strict = env->verify_strict;
     Boolean is_bootstrap = m_class_loader->IsBootstrap();
-    Boolean is_enabled = get_boolean_property("vm.use_verifier", TRUE, VM_PROPERTIES);
+    Boolean is_enabled = env->verify;
 
     /**
      * Verify class

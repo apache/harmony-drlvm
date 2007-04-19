@@ -23,6 +23,7 @@
 #include "cxxlog.h"
 
 
+
 #include "port_filepath.h"
 #include <assert.h>
 
@@ -1333,7 +1334,7 @@ bool Method::_parse_line_numbers(unsigned attr_len, ByteReader &cfs) {
 
 
 bool Method::_parse_local_vars(Local_Var_Table* table, LocalVarOffset *offset_list,
-            ConstantPool& cp, ByteReader &cfs, const char *attr_name, Attributes attribute)
+            Global_Env& env, ConstantPool& cp, ByteReader &cfs, const char *attr_name, Attributes attribute)
 {
 
     for (unsigned j = 0; j < table->length; j++) {
@@ -1424,38 +1425,48 @@ bool Method::_parse_local_vars(Local_Var_Table* table, LocalVarOffset *offset_li
             return false;
         }
 
-        table->table[j].start_pc = start_pc;
-        table->table[j].length = length;
-        table->table[j].index = index;
-        table->table[j].name = name;
-        table->table[j].type = descriptor;
-        table->table[j].generic_type = NULL;
-
-        offset_list = offset_list->next;
-    }
-
-    //checks that there are no same LocalVariableTable or LovalVariableTypeTable attribute in Code
-    //Can't check this in simulated mode
-    for (unsigned j = 0; j < table->length; j++)
-    {
-        for(unsigned i = j + 1; i < table->length; i++)
+        //ensure that table has no duplicates
+        unsigned i;
+        for(i = 0; i < j; i++)
         {
-            if(table->table[j].start_pc == table->table[i].start_pc
-                &&table->table[j].length == table->table[i].length
-                &&table->table[j].index == table->table[i].index)
+            //RI does not check descriptors
+            if(index == table->table[i].index
+                && name == table->table[i].name
+                && start_pc == table->table[i].start_pc
+                && length == table->table[i].length)
             {
-                REPORT_FAILED_METHOD("Duplicate local variable "<< table->table[j].name->bytes
+                break;
+            }
+        }
+
+        if (j != 0 && i != j) {
+            // duplicate entry found
+            if (!env.verify || _class->get_version() < JAVA5_CLASS_FILE_VERSION) {
+                //just ignore the entry
+                --j;
+                --table->length;
+            } else {
+                REPORT_FAILED_METHOD("Duplicate local variable "<< name->bytes
                     << " in attribute " << attr_name);
                 return false;
             }
+        } else {
+            table->table[j].start_pc = start_pc;
+            table->table[j].length = length;
+            table->table[j].index = index;
+            table->table[j].name = name;
+            table->table[j].type = descriptor;
+            table->table[j].generic_type = NULL;
         }
+
+        offset_list = offset_list->next;
     }
 
     return true;
 } //Method::_parse_local_vars
 
 
-bool Method::_parse_code(ConstantPool& cp, unsigned code_attr_len,
+bool Method::_parse_code(Global_Env& env, ConstantPool& cp, unsigned code_attr_len,
                          ByteReader& cfs)
 {
     unsigned real_code_attr_len = 0;
@@ -1625,45 +1636,54 @@ bool Method::_parse_code(ConstantPool& cp, unsigned code_attr_len,
             }
         case ATTR_LocalVariableTypeTable:
             {
-                uint16 n_local_vars;
-                if(!cfs.parse_u2_be(&n_local_vars)) {
-                    REPORT_FAILED_METHOD("could not parse local variables number "
-                            "of LocalVariableTypeTable attribute");
-                    return false;
-                }
-                unsigned lnt_attr_len = 2 + n_local_vars * 10;
-                if(lnt_attr_len != attr_len) {
-                    REPORT_FAILED_METHOD("real LocalVariableTypeTable attribute length differ "
-                        "from declared length ("
-                        << attr_len << " vs. " << lnt_attr_len << ")" );
-                    return false;
-                }
-                if(n_local_vars == 0) break;
+                if(_class->get_version() < JAVA5_CLASS_FILE_VERSION) {
+                    //skip this attribute for class files of version less than 49
+                    if (!cfs.skip(attr_len))
+                    {
+                        REPORT_FAILED_METHOD("error skipping");
+                        return false;
+                    }
+                } else {
+                    uint16 n_local_vars;
+                    if(!cfs.parse_u2_be(&n_local_vars)) {
+                        REPORT_FAILED_METHOD("could not parse local variables number "
+                                "of LocalVariableTypeTable attribute");
+                        return false;
+                    }
+                    unsigned lnt_attr_len = 2 + n_local_vars * 10;
+                    if(lnt_attr_len != attr_len) {
+                        REPORT_FAILED_METHOD("real LocalVariableTypeTable attribute length differ "
+                                "from declared length ("
+                                << attr_len << " vs. " << lnt_attr_len << ")" );
+                        return false;
+                    }
+                    if(n_local_vars == 0) break;
 
-                if(offset_lvtt_array == NULL){
-                    offset_lvtt_array = lvtt_iter =
-                        (LocalVarOffset*)STD_ALLOCA(sizeof(LocalVarOffset) * n_local_vars);
-                }
-                else
-                {
-                    lvtt_iter->next = (LocalVarOffset*)STD_ALLOCA(sizeof(LocalVarOffset) * n_local_vars);
-                    lvtt_iter = lvtt_iter->next;
-                }
-                int off = cfs.get_offset();
-                int j = 0;
-                for(j = 0; j < n_local_vars - 1; j++, lvtt_iter++)
-                {
+                    if(offset_lvtt_array == NULL){
+                        offset_lvtt_array = lvtt_iter =
+                            (LocalVarOffset*)STD_ALLOCA(sizeof(LocalVarOffset) * n_local_vars);
+                    }
+                    else
+                    {
+                        lvtt_iter->next = (LocalVarOffset*)STD_ALLOCA(sizeof(LocalVarOffset) * n_local_vars);
+                        lvtt_iter = lvtt_iter->next;
+                    }
+                    int off = cfs.get_offset();
+                    int j = 0;
+                    for(j = 0; j < n_local_vars - 1; j++, lvtt_iter++)
+                    {
+                        lvtt_iter->value = off + 10*j;
+                        lvtt_iter->next = lvtt_iter + 1;
+                    }
                     lvtt_iter->value = off + 10*j;
-                    lvtt_iter->next = lvtt_iter + 1;
-                }
-                lvtt_iter->value = off + 10*j;
-                lvtt_iter->next = NULL;
-                num_lvtt_entries += n_local_vars;
+                    lvtt_iter->next = NULL;
+                    num_lvtt_entries += n_local_vars;
 
-                if (!cfs.skip(10*n_local_vars))
-                {
-                    REPORT_FAILED_METHOD("error skipping");
-                    return false;
+                    if (!cfs.skip(10*n_local_vars))
+                    {
+                        REPORT_FAILED_METHOD("error skipping");
+                        return false;
+                    }
                 }
                 break;
             }
@@ -1695,11 +1715,13 @@ bool Method::_parse_code(ConstantPool& cp, unsigned code_attr_len,
     // we should remember this point to return here
     // after complete LVT and LVTT parsing.
     int return_point = cfs.get_offset();
-    
-    if(num_lvt_entries == 0 && num_lvtt_entries != 0) {
+
+    if(_class->get_version() >= JAVA5_CLASS_FILE_VERSION) {
+        if(num_lvt_entries == 0 && num_lvtt_entries != 0) {
             REPORT_FAILED_METHOD("if LocalVariableTable is empty "
-                "LocalVariableTypeTable must be empty too");
-        return false;
+                    "LocalVariableTypeTable must be empty too");
+            return false;
+        }
     }
 
     if(num_lvt_entries != 0) {
@@ -1710,12 +1732,11 @@ bool Method::_parse_code(ConstantPool& cp, unsigned code_attr_len,
 
         if(num_lvtt_entries != 0) {
             if( num_lvtt_entries < LV_ALLOCATION_THRESHOLD ){
-                generic_vars =
-                    (Local_Var_Table *)STD_ALLOCA(sizeof(Local_Var_Table) +
-                    sizeof(Local_Var_Entry) * (num_lvtt_entries - 1));
+                generic_vars = (Local_Var_Table *)STD_ALLOCA(sizeof(Local_Var_Table) +
+                        sizeof(Local_Var_Entry) * (num_lvtt_entries - 1));
             } else {
                 generic_vars = (Local_Var_Table *)STD_MALLOC(sizeof(Local_Var_Table) +
-                    sizeof(Local_Var_Entry) * (num_lvtt_entries - 1));
+                        sizeof(Local_Var_Entry) * (num_lvtt_entries - 1));
             }
             generic_vars->length = num_lvtt_entries;
         }
@@ -1736,9 +1757,9 @@ bool Method::_parse_code(ConstantPool& cp, unsigned code_attr_len,
         lv_table->length = num_lvt_entries;
 
         bool failed = false;
-        if (!_parse_local_vars(lv_table, offset_lvt_array, cp, cfs,
+        if (!_parse_local_vars(lv_table, offset_lvt_array, env, cp, cfs,
                 "LocalVariableTable", ATTR_LocalVariableTable)
-            || (generic_vars && !_parse_local_vars(generic_vars, offset_lvtt_array, cp, cfs,
+            || (generic_vars && !_parse_local_vars(generic_vars, offset_lvtt_array, env, cp, cfs,
                 "LocalVariableTypeTable", ATTR_LocalVariableTypeTable)))
         {
             failed = true;
@@ -1751,25 +1772,20 @@ bool Method::_parse_code(ConstantPool& cp, unsigned code_attr_len,
                 for (j = 0; j < lv_table->length; j++) {
                     if (generic_vars->table[i].name == lv_table->table[j].name
                         && generic_vars->table[i].start_pc == lv_table->table[j].start_pc
-                        /* FIXME This is temporary solution. One broken class file
-                        was found in eclipse plugin. RI loads this class successfully, DRLVM doesn't.
-                        Tests show that this depends on classloader, so further evaluation is needed
-                        to fix it permanently. */
-                        //&& generic_vars->table[i].length == lv_table->table[j].length
-                        &&  generic_vars->table[i].index == lv_table->table[j].index)
+                        && generic_vars->table[i].length == lv_table->table[j].length
+                        && generic_vars->table[i].index == lv_table->table[j].index)
                     {
                         lv_table->table[j].generic_type = generic_vars->table[i].type;
                         break;
                     }
                 }
-                if(j == lv_table->length) {
+                if(j == lv_table->length && env.verify) {
                     String* gvi_name = generic_vars->table[i].name;
                     REPORT_FAILED_METHOD("Element "<< gvi_name->bytes <<
                         " of LocalVariableTypeTable does not match any of LocalVariableTable entries");
                     failed = true;
                     break;
                 }
-                
             }
         }
 
@@ -1996,7 +2012,7 @@ bool Method::parse(Global_Env& env, Class* clss,
                     << " method should not have Code attribute present");
                 return false;
             }
-            if(!_parse_code(cp, attr_len, cfs))
+            if(!_parse_code(env, cp, attr_len, cfs))
                 return false;
             break;
 

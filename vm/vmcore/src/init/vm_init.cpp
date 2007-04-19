@@ -653,6 +653,8 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
 
     parse_vm_arguments(vm_env);
 
+    vm_env->verify = get_boolean_property("vm.use_verifier", TRUE, VM_PROPERTIES);
+
     // "Tool Interface" enabling.
     vm_env->TI->setExecutionMode(vm_env);
 

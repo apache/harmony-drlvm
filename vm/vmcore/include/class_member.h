@@ -697,7 +697,7 @@ private:
     //
     // private methods for parsing methods
     //
-    bool _parse_code(ConstantPool& cp, unsigned code_attr_len, ByteReader &cfs);
+    bool _parse_code(Global_Env& env, ConstantPool& cp, unsigned code_attr_len, ByteReader &cfs);
 
     bool _parse_line_numbers(unsigned attr_len, ByteReader &cfs);
 
@@ -712,7 +712,7 @@ private:
     Local_Var_Table *_local_vars_table;
 
     bool _parse_local_vars(Local_Var_Table* table, LocalVarOffset* offset_list,
-        ConstantPool& cp, ByteReader &cfs, const char* attr_name, Attributes attr);
+        Global_Env& env, ConstantPool& cp, ByteReader &cfs, const char* attr_name, Attributes attr);
 
     // This is the number of breakpoints which should be set in the
     // method when it is compiled. This number does not reflect
