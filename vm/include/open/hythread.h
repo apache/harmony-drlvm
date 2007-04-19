@@ -419,7 +419,7 @@ typedef struct HyThread_public {
 #elif defined(__linux__)
     // some kind of nix - the threads internals are known for IA32/Intel64
     // kernels, will use slow way on other HWs (TODO: add IPF support)
-#   if defined(_IA32_)
+#   if defined(_IA32_) || defined(_EM64T_)
 #       define HYTHREAD_FAST_TLS (1)
 #       define HYTHREAD_FAST_TLS_ATTRIBUTE __attribute__((tls_model("initial-exec")))
 #   endif

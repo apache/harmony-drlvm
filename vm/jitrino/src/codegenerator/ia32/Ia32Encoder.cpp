@@ -24,6 +24,7 @@
 #include <signal.h>
 #include "mkernel.h"
 #include "enc_prvt.h"
+#include "PlatformDependant.h"
 
 namespace Jitrino {
 namespace Ia32 {
@@ -254,7 +255,7 @@ uint8* Encoder::emit(uint8* stream, const Inst * inst)
 #ifdef _EM64T_
                 // FIXME64 adapter: all PTR types go as 64 bits
                 // this is a porting quick workaround, should be fixed
-                assert(pindex != NULL || pbase != NULL);
+                assert(pdisp == NULL || fit32(disp));
                 sz = is_ptr_type(p->getType()) ? OpndSize_64 : sz;
 #endif
                 EncoderBase::Operand o(sz, 
