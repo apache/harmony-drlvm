@@ -153,17 +153,22 @@ static unsigned int restrict_wait_time(unsigned int wait_time, unsigned int max_
     return wait_time;
 }
 
-static void wait_finalization_end(void)
+static void wait_finalization_end(Boolean must_wait)
 {
     hymutex_lock(&fin_thread_info->end_mutex);
     unsigned int fin_obj_num = vm_get_finalizable_objects_quantity();
     while(fin_thread_info->working_thread_num || fin_obj_num){
-        unsigned int wait_time = restrict_wait_time(fin_obj_num + 1000, FIN_MAX_WAIT_TIME << 7);
+        unsigned int wait_time = restrict_wait_time(fin_obj_num, FIN_MAX_WAIT_TIME << 7);
         atomic_inc32(&fin_thread_info->end_waiting_num);
         IDATA status = hycond_wait_timed(&fin_thread_info->end_cond, &fin_thread_info->end_mutex, (I_64)wait_time, 0);
         atomic_dec32(&fin_thread_info->end_waiting_num);
-        if(status != TM_ERROR_NONE) break;
-        fin_obj_num = vm_get_finalizable_objects_quantity();
+        unsigned int temp = vm_get_finalizable_objects_quantity();
+        if(must_wait){
+            if((status != TM_ERROR_NONE) && (fin_obj_num == temp)) break;
+        }else{
+            if(status != TM_ERROR_NONE) break; 
+        }
+        fin_obj_num = temp;     
     }
     hymutex_unlock(&fin_thread_info->end_mutex);
 }
@@ -174,7 +179,7 @@ void activate_finalizer_threads(Boolean wait)
     assert(stat == TM_ERROR_NONE);
     
     if(wait)
-        wait_finalization_end();
+        wait_finalization_end(true);
 }
 
 static void notify_finalization_end(void)
