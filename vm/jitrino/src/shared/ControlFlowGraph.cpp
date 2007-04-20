@@ -237,11 +237,13 @@ void ControlFlowGraph::removeNode(Nodes::iterator pos, bool erase) {
     // Remove incident edges
     while (!node->inEdges.empty()) {
         Edge* edge = node->inEdges.front();
+        assert(edge->getTargetNode() == node);
         removeEdge(edge);
     }
     
     while (!node->outEdges.empty()) {
         Edge* edge = node->outEdges.front();
+        assert(edge->getSourceNode() == node);
         removeEdge(edge);
     }
 
@@ -310,7 +312,12 @@ Edge* ControlFlowGraph::replaceEdgeTarget(Edge* edge, Node* newTarget, bool keep
     Edge* newEdge = NULL;
     if (keepOldBody) {
         edge->target = newTarget;
+        newTarget->inEdges.push_back(edge);
+        Edges& oldInEdges = oldTarget->inEdges;
+        oldInEdges.erase(std::remove(oldInEdges.begin(), oldInEdges.end(), edge));
         newEdge = edge;
+        // Mark the graph modified.
+        lastModifiedTraversalNumber = traversalNumber;
     } else {
         removeEdge(edge);
         newEdge = addEdge(source, newTarget);
@@ -441,13 +448,13 @@ Node* ControlFlowGraph::splitNodeAtInstruction(CFGInst *inst, bool splitAfter, b
 }
 
 // Splice a new empty block on the CFG edge.
-Node* ControlFlowGraph::spliceBlockOnEdge(Edge* edge, CFGInst* inst) {
+Node* ControlFlowGraph::spliceBlockOnEdge(Edge* edge, CFGInst* inst, bool keepOldEdge) {
     Node*    source = edge->getSourceNode();
     double edgeProb = edge->getEdgeProb();
     double edgeFreq = source->getExecCount()*edgeProb;
 
     // Split the edge
-    Node* split =  splitEdge(edge, inst);
+    Node* split =  splitEdge(edge, inst, keepOldEdge);
     split->setExecCount(edgeFreq);
 
     // Set the incoming edge probability
@@ -479,7 +486,7 @@ restart:
                     Node* source = thisEdge->getSourceNode();
                     if ((source->getOutDegree() > 1) && (includeExceptionEdges || !source->isDispatchNode())) {
                         // it's a critical edge, split it
-                        Node* newNode = splitEdge(thisEdge, NULL);
+                        Node* newNode = splitEdge(thisEdge, NULL, false); //TODO: keep old edge?
                         if (newNodes) {
                             newNodes->push_back(newNode);
                         }
@@ -811,11 +818,11 @@ Node* ControlFlowGraph::splitNode(Node* node, bool newBlockAtEnd, CFGInst* inst)
     return newNode;
 }
 
-Node* ControlFlowGraph::splitEdge(Edge *edge, CFGInst* inst) {
+Node* ControlFlowGraph::splitEdge(Edge *edge, CFGInst* inst, bool keepOldEdge) {
     Node* target = edge->getTargetNode();
     Node* newNode = createBlockNode(inst);
 
-    replaceEdgeTarget(edge, newNode);
+    replaceEdgeTarget(edge, newNode, keepOldEdge);
     addEdge(newNode, target);
 
     return newNode;

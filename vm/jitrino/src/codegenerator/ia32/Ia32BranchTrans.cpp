@@ -264,9 +264,9 @@ BranchTranslator::runImpl()
                                             continue; //can't retarget this edge -> var is not a const
                                         }
                                         if (branchDirection(opnd->getImmValue(), cmpOp2->getImmValue(),cmpOp1->getSize(),condMnem)) {
-                                            irManager->getFlowGraph()->replaceEdgeTarget(edge, trueBB);
+                                            irManager->getFlowGraph()->replaceEdgeTarget(edge, trueBB, true);
                                         } else {
-                                            irManager->getFlowGraph()->replaceEdgeTarget(edge, falseBB);
+                                            irManager->getFlowGraph()->replaceEdgeTarget(edge, falseBB, true);
                                         }
                                         for(Inst * copy = (Inst *)bb->getFirstInst();copy!=NULL; copy=copy->getNextInst()) {
                                             if (copy != inst && copy !=cmpInst) {
@@ -275,10 +275,15 @@ BranchTranslator::runImpl()
                                                 Inst * newInst = copy->getKind() == Inst::Kind_I8PseudoInst?
                                                     irManager->newI8PseudoInst(Mnemonic_MOV,1,copy->getOpnd(0),copy->getOpnd(1)):
                                                     irManager->newCopyPseudoInst(Mnemonic_MOV,copy->getOpnd(0),copy->getOpnd(1));
-                                                if (lastInst->getKind()== Inst::Kind_BranchInst) 
-                                                    sourceBB->prependInst(newInst, lastInst);
-                                                else
+                                                if (lastInst->getKind()== Inst::Kind_BranchInst) {
+                                                    //WAS: sourceBB->prependInst(newInst, lastInst);
+                                                    //create new block instead of prepending to branchInst
+                                                    //some algorithms like I8Lowerer are very sensitive to CMP/JCC pattern
+                                                    //and fails if any inst is inserted between CMP and JCC
+                                                    irManager->getFlowGraph()->spliceBlockOnEdge(edge, newInst, true);
+                                                } else {
                                                     sourceBB->appendInst(newInst);
+                                                }
                                             }
                                         }
                                     }
@@ -401,7 +406,7 @@ BranchTranslator::runImpl()
                             bb->prependInst(irManager->newInstEx(Mnemonic(Mnemonic_CMOVcc+condMnem), 1, tfOp,tfOp,tsOp),inst);
                         }
                             //link bb with successor of trueBB and falseBB
-                            irManager->getFlowGraph()->replaceEdgeTarget(bb->getFalseEdge(), nextBB);
+                            irManager->getFlowGraph()->replaceEdgeTarget(bb->getFalseEdge(), nextBB, true);
                             irManager->getFlowGraph()->removeEdge(bb->getTrueEdge());
                             inst->unlink();
                             irManager->getFlowGraph()->removeNode(falseBB);

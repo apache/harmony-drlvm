@@ -1438,10 +1438,11 @@ public:
    *
    * @param[in] edge - the edge to splice
    * @param[in] inst - the instruction to add to a new node
+   * @param[in] keepOldEdge  - keep old edge and use it to connect source and new nodes
    *
    * @return The newly created node.
    */
-    Node* spliceBlockOnEdge(Edge* edge, CFGInst* inst = NULL);
+    Node* spliceBlockOnEdge(Edge* edge, CFGInst* inst = NULL, bool keepOldEdge=false);
 
   /** 
    * Inlines <code>inlineFG</code> into this CFG after <code>instAfter</code>, 
@@ -1653,7 +1654,7 @@ protected:
 
   /// Splits the edge and adds <code>newBlockInst</code> to a new node.
    
-    Node* splitEdge(Edge* edge, CFGInst* newBlockInst);
+    Node* splitEdge(Edge* edge, CFGInst* newBlockInst, bool keepOldEdge);
     
   /// Checks whether the <code>Source</code> node can be merged with the <code>Target</code> node.
    
