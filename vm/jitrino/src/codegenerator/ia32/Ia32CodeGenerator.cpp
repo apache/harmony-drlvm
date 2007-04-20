@@ -95,6 +95,15 @@ static ActionFactory<UserRequestedBreakPoint> _break("break");
 //___________________________________________________________________________________________________
 
 void CodeGenerator::genCode(::Jitrino::SessionAction* sa, ::Jitrino::MethodCodeSelector& inputProvider) {
+    LogStream& irdump  = Log::log(LogStream::IRDUMP);
+    LogStream& dotdump = Log::log(LogStream::DOTDUMP);
+    uint32 stageId = Log::getStageId();
+    const char* stageName = sa->getName();
+    if (irdump.isEnabled()) {
+        Log::printStageBegin(irdump.out(), stageId, "IA32", stageName, stageName);
+    }
+
+
     CompilationContext* cc = sa->getCompilationContext();
     CompilationInterface* ci = cc->getVMCompilationInterface();
     MemoryManager& mm = cc->getCompilationLevelMemoryManager();
@@ -119,7 +128,26 @@ void CodeGenerator::genCode(::Jitrino::SessionAction* sa, ::Jitrino::MethodCodeS
     MethodCodeSelector    codeSelector(*ci, mm, codeSelectorMemManager, *irManager, slowLdString);
 
     inputProvider.selectCode(codeSelector);
+
+    
+    const char* logKind = "after";
+
+    if (irdump.isEnabled()) {
+        irManager->updateLoopInfo();
+        irManager->updateLivenessInfo();
+        Ia32::dumpIR(irManager, stageId, "IA32 LIR CFG after ", stageName, stageName, logKind, "opnds");
+        Ia32::dumpIR(irManager, stageId, "IA32 LIR CFG after ", stageName, stageName, logKind);
+        Log::printStageEnd(irdump.out(), stageId, "IA32", stageName, stageName);
+    }
+
+    if (dotdump.isEnabled()) {
+        irManager->updateLoopInfo();
+        irManager->updateLivenessInfo();
+        Ia32::printDot(irManager, stageId, "IA32 LIR CFG after ", stageName, stageName,  logKind);
+        Ia32::printDot(irManager, stageId, "IA32 LIR CFG after ", stageName, stageName, logKind, "liveness");
+    }
 }
 
 }}; // namespace Ia32
+
 
