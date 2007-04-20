@@ -148,59 +148,82 @@ static void* free_pool_last_list_atomic_take_area_piece(Free_Area_Pool* pool, PO
     return NULL;
 }
 
+void* lspace_try_alloc(Lspace* lspace, POINTER_SIZE_INT alloc_size){
+  void* p_result = NULL;
+  Free_Area_Pool* pool = lspace->free_pool;  
+  unsigned int list_hint = pool_list_index_with_size(alloc_size);  
+  list_hint = pool_list_get_next_flag(pool, list_hint);  
+
+  while((!p_result) && (list_hint <= MAX_LIST_INDEX)){
+      /*List hint is not the last list, so look for it in former lists.*/
+      if(list_hint < MAX_LIST_INDEX){
+          p_result = free_pool_former_lists_atomic_take_area_piece(pool, list_hint, alloc_size);
+          if(p_result){
+              memset(p_result, 0, alloc_size);
+              POINTER_SIZE_INT vold = lspace->alloced_size;
+              POINTER_SIZE_INT vnew = vold + alloc_size;
+              while( vold != atomic_casptrsz(&lspace->alloced_size, vnew, vold) ){                      
+                  vold = lspace->alloced_size;
+                  vnew = vold + alloc_size;
+              }
+              return p_result;
+          }else{
+              list_hint ++;
+              list_hint = pool_list_get_next_flag(pool, list_hint);
+              continue;
+          }
+      }
+      /*List hint is the last list, so look for it in the last list.*/
+      else
+      {
+          p_result = free_pool_last_list_atomic_take_area_piece(pool, alloc_size);
+          if(p_result){
+              memset(p_result, 0, alloc_size);
+              POINTER_SIZE_INT vold = lspace->alloced_size;
+              POINTER_SIZE_INT vnew = vold + alloc_size;
+              while( vold != atomic_casptrsz(&lspace->alloced_size, vnew, vold) ){                      
+                  vold = lspace->alloced_size;
+                  vnew = vold + alloc_size;
+              }
+              return p_result;
+          }
+          else break;
+      }
+  }
+  return p_result;
+}
+
 void* lspace_alloc(POINTER_SIZE_INT size, Allocator *allocator)
 {
     unsigned int try_count = 0;
     void* p_result = NULL;
-    unsigned int  list_hint = 0;
     POINTER_SIZE_INT alloc_size = ALIGN_UP_TO_KILO(size);
     Lspace* lspace = (Lspace*)gc_get_los((GC_Gen*)allocator->gc);
     Free_Area_Pool* pool = lspace->free_pool;
-
+    
     while( try_count < 2 ){
-        list_hint = pool_list_index_with_size(alloc_size);
-        list_hint = pool_list_get_next_flag(pool, list_hint);
-        while((!p_result) && (list_hint <= MAX_LIST_INDEX)){
-            /*List hint is not the last list, so look for it in former lists.*/
-            if(list_hint < MAX_LIST_INDEX){
-                p_result = free_pool_former_lists_atomic_take_area_piece(pool, list_hint, alloc_size);
-                if(p_result){
-                    memset(p_result, 0, size);
-                    POINTER_SIZE_INT vold = lspace->alloced_size;
-                    POINTER_SIZE_INT vnew = vold + alloc_size;
-                    while( vold != atomic_casptrsz(&lspace->alloced_size, vnew, vold) ){                      
-                        vold = lspace->alloced_size;
-                        vnew = vold + alloc_size;
-                    }
-                    return p_result;
-                }else{
-                    list_hint ++;
-                    list_hint = pool_list_get_next_flag(pool, list_hint);
-                    continue;
-                }
-            }
-            /*List hint is the last list, so look for it in the last list.*/
-            else
-            {
-                p_result = free_pool_last_list_atomic_take_area_piece(pool, alloc_size);
-                if(p_result){
-                    memset(p_result, 0, size);
-                    POINTER_SIZE_INT vold = lspace->alloced_size;
-                    POINTER_SIZE_INT vnew = vold + alloc_size;
-                    while( vold != atomic_casptrsz(&lspace->alloced_size, vnew, vold) ){                      
-                        vold = lspace->alloced_size;
-                        vnew = vold + alloc_size;
-                    }
-                    return p_result;
-                }
-                else break;
-            }
-        }
+        if(p_result = lspace_try_alloc(lspace, alloc_size))
+          return p_result;
+
         /*Failled, no adequate area found in all lists, so GC at first, then get another try.*/   
         if(try_count == 0){
             vm_gc_lock_enum();
-            lspace->failure_size = round_up_to_size(alloc_size, GC_BLOCK_SIZE_BYTES);
+            /*Check again if there is space for the obj, for maybe other mutator 
+            threads issus a GC in the time gap of waiting the gc lock*/
+            if(p_result = lspace_try_alloc(lspace, alloc_size)){
+              vm_gc_unlock_enum();
+              return p_result;            
+            }
+            lspace->failure_size = round_up_to_size(alloc_size, KB);
+
             gc_reclaim_heap(allocator->gc, GC_CAUSE_LOS_IS_FULL);
+
+            if(lspace->success_ptr){
+              p_result = lspace->success_ptr;
+              lspace->success_ptr = NULL;
+              vm_gc_unlock_enum();
+              return p_result;
+            }
             vm_gc_unlock_enum();
             try_count ++;
         }else{
@@ -327,7 +350,6 @@ void lspace_reset_after_collection(Lspace* lspace)
 
     /*For_statistic los information.*/
     lspace->alloced_size = 0;    
-    lspace->failure_size = 0;
     lspace->surviving_size = 0;
 
     los_boundary = lspace->heap_end;

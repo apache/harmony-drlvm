@@ -21,7 +21,7 @@
 #include "fspace.h"
 
 static Boolean fspace_alloc_block(Fspace* fspace, Allocator* allocator)
-{
+{    
   alloc_context_reset(allocator);
 
   /* now try to get a new block */
@@ -36,29 +36,9 @@ static Boolean fspace_alloc_block(Fspace* fspace, Allocator* allocator)
     }
     /* ok, got one */
     Block_Header* alloc_block = (Block_Header*)&(fspace->blocks[allocated_idx - fspace->first_block_idx]);
-    assert(alloc_block->status == BLOCK_FREE);
-    alloc_block->status = BLOCK_IN_USE;
     
-    /* set allocation context */
-    void* new_free = alloc_block->free;
-    allocator->free = new_free;
-
-#ifndef ALLOC_ZEROING
-
-    allocator->ceiling = alloc_block->ceiling;
-    memset(new_free, 0, GC_BLOCK_BODY_SIZE_BYTES);
-
-#else
-    /* the first-time zeroing area includes block header, to make subsequent allocs page aligned */
-    unsigned int zeroing_size = ZEROING_SIZE - GC_BLOCK_HEADER_SIZE_BYTES;
-    allocator->ceiling = (void*)((POINTER_SIZE_INT)new_free + zeroing_size);
-    memset(new_free, 0, zeroing_size);
-
-#endif /* #ifndef ALLOC_ZEROING */
-
-    allocator->end = alloc_block->ceiling;
-    allocator->alloc_block = (Block*)alloc_block; 
-        
+    allocator_init_free_block(allocator, alloc_block);
+            
     return TRUE;
   }
 
@@ -84,12 +64,18 @@ void* fspace_alloc(unsigned size, Allocator *allocator)
     if ( !space_has_free_block((Blocked_Space*)fspace) ) {  
         if(attempts < 2) {
           gc_reclaim_heap(allocator->gc, GC_CAUSE_NOS_IS_FULL); 
+          if(allocator->alloc_block){
+            vm_gc_unlock_enum();  
+            break;
+          }
+          
           attempts++;
+          
         }else{
           vm_gc_unlock_enum();  
           return NULL;
         }
-    }    
+    }
     vm_gc_unlock_enum();  
   }
   

@@ -150,12 +150,15 @@ inline Space* space_of_addr(GC* gc, void* addr)
 void* mos_alloc(unsigned size, Allocator *allocator);
 void* nos_alloc(unsigned size, Allocator *allocator);
 void* los_alloc(unsigned size, Allocator *allocator);
+void* los_try_alloc(POINTER_SIZE_INT size, GC* gc);
+
 Space* gc_get_nos(GC_Gen* gc);
 Space* gc_get_mos(GC_Gen* gc);
 Space* gc_get_los(GC_Gen* gc);
 void gc_set_nos(GC_Gen* gc, Space* nos);
 void gc_set_mos(GC_Gen* gc, Space* mos);
 void gc_set_los(GC_Gen* gc, Space* los);
+
 unsigned int gc_get_processor_num(GC_Gen* gc);
 
 void gc_decide_collection_algorithm(GC_Gen* gc, char* minor_algo, char* major_algo);
@@ -165,6 +168,8 @@ void gc_gen_adapt(GC_Gen* gc, int64 pause_time);
 
 void gc_gen_reclaim_heap(GC_Gen* gc);
 
+void gc_gen_assign_free_area_to_mutators(GC_Gen* gc);
+  
 void gc_gen_mode_adapt_init(GC_Gen *gc);
 
 void gc_gen_iterate_heap(GC_Gen *gc);

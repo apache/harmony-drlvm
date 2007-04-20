@@ -52,8 +52,13 @@ typedef struct Lspace{
   /* END of Space --> */
 
   Free_Area_Pool* free_pool;
-  /*Size of allocation which caused lspace alloc failure.*/
+  /*Size of allocation which caused lspace alloc failure.
+   *This one is used to assign area to failed collection inside gc.
+   *Resetted in every gc_assign_free_area_to_mutators
+   */
   POINTER_SIZE_INT failure_size;
+  void* success_ptr;
+  
   void* scompact_fa_start;
   void* scompact_fa_end;
 }Lspace;
@@ -61,6 +66,7 @@ typedef struct Lspace{
 void lspace_initialize(GC* gc, void* reserved_base, POINTER_SIZE_INT lspace_size);
 void lspace_destruct(Lspace* lspace);
 Managed_Object_Handle lspace_alloc(POINTER_SIZE_INT size, Allocator* allocator);
+void* lspace_try_alloc(Lspace* lspace, POINTER_SIZE_INT alloc_size);
 void lspace_sliding_compact(Collector* collector, Lspace* lspace);
 void lspace_compute_object_target(Collector* collector, Lspace* lspace);
 void lspace_sweep(Lspace* lspace);
@@ -78,6 +84,7 @@ inline Partial_Reveal_Object* lspace_get_next_marked_object( Lspace* lspace, uns
     while(!reach_heap_end){
         //FIXME: This while shoudl be if, try it!
         while(!*((POINTER_SIZE_INT*)next_area_start)){
+            assert(((Free_Area*)next_area_start)->size);
             next_area_start += ((Free_Area*)next_area_start)->size;
         }
         if(next_area_start < (POINTER_SIZE_INT)lspace->heap_end){

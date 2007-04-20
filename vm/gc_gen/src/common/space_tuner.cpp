@@ -94,7 +94,7 @@ void check_space_tuner(GC* gc)
   if((tuner->need_tune) && (!tuner->force_tune)) goto check_size;
   /*tuner->force_tune must be true here!*/
   los_fail_sz_uped = lspace_get_failure_size((Lspace*)lspace);
-  assert(!(los_fail_sz_uped % GC_BLOCK_SIZE_BYTES));
+  assert(!(los_fail_sz_uped % KB));
 
   if(tuner->kind == TRANS_FROM_LOS_TO_MOS){
     tuner->kind = TRANS_FROM_MOS_TO_LOS;
@@ -269,7 +269,7 @@ Boolean gc_space_retune(GC *gc)
       return TRUE;
     }
     /*force tune here!*/
-    POINTER_SIZE_INT min_tuning_uped = los->failure_size;
+    POINTER_SIZE_INT min_tuning_uped = round_up_to_size(los->failure_size, GC_BLOCK_SIZE_BYTES);
     if(min_tuning_uped > max_free_for_tuning){
       tuner->tuning_size = 0;
       tuner->kind = TRANS_NOTHING;

@@ -141,8 +141,10 @@ static inline Block_Header *set_next_block_for_dest(Mspace *mspace)
   if(block->status != BLOCK_DEST)
     return block;
   
-  while(block->status == BLOCK_DEST)
+  while(block->status == BLOCK_DEST) {
     block = block->next;
+    if(!block) break;
+  }
   next_block_for_dest = block;
   return block;
 }

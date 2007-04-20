@@ -110,6 +110,34 @@ inline Partial_Reveal_Object* thread_local_alloc(unsigned int size, Allocator* a
 
 }
 
+inline void allocator_init_free_block(Allocator* allocator, Block_Header* alloc_block)
+{
+    assert(alloc_block->status == BLOCK_FREE);
+    alloc_block->status = BLOCK_IN_USE;
+    
+    /* set allocation context */
+    void* new_free = alloc_block->free;
+    allocator->free = new_free;
+
+#ifndef ALLOC_ZEROING
+
+    allocator->ceiling = alloc_block->ceiling;
+    memset(new_free, 0, GC_BLOCK_BODY_SIZE_BYTES);
+
+#else
+    /* the first-time zeroing area includes block header, to make subsequent allocs page aligned */
+    unsigned int zeroing_size = ZEROING_SIZE - GC_BLOCK_HEADER_SIZE_BYTES;
+    allocator->ceiling = (void*)((POINTER_SIZE_INT)new_free + zeroing_size);
+    memset(new_free, 0, zeroing_size);
+
+#endif /* #ifndef ALLOC_ZEROING */
+
+    allocator->end = alloc_block->ceiling;
+    allocator->alloc_block = (Block*)alloc_block; 
+    
+    return;
+}
+
 inline void alloc_context_reset(Allocator* allocator)
 {
   Block_Header* block = (Block_Header*)allocator->alloc_block;

@@ -245,15 +245,19 @@ void gc_gen_destruct(GC_Gen *gc_gen)
   return;  
 }
 
-void* mos_alloc(unsigned size, Allocator *allocator){return mspace_alloc(size, allocator);}
-void* nos_alloc(unsigned size, Allocator *allocator){return fspace_alloc(size, allocator);}
-void* los_alloc(unsigned size, Allocator *allocator){return lspace_alloc(size, allocator);}
 Space* gc_get_nos(GC_Gen* gc){ return (Space*)gc->nos;}
 Space* gc_get_mos(GC_Gen* gc){ return (Space*)gc->mos;}
 Space* gc_get_los(GC_Gen* gc){ return (Space*)gc->los;}
 void gc_set_nos(GC_Gen* gc, Space* nos){ gc->nos = (Fspace*)nos;}
 void gc_set_mos(GC_Gen* gc, Space* mos){ gc->mos = (Mspace*)mos;}
 void gc_set_los(GC_Gen* gc, Space* los){ gc->los = (Lspace*)los;}
+
+void* mos_alloc(unsigned size, Allocator *allocator){return mspace_alloc(size, allocator);}
+void* nos_alloc(unsigned size, Allocator *allocator){return fspace_alloc(size, allocator);}
+void* los_alloc(unsigned size, Allocator *allocator){return lspace_alloc(size, allocator);}
+void* los_try_alloc(POINTER_SIZE_INT size, GC* gc){  return lspace_try_alloc((Lspace*)((GC_Gen*)gc)->los, size); }
+
+
 unsigned int gc_get_processor_num(GC_Gen* gc){ return gc->_num_processors;}
 
 
@@ -320,6 +324,25 @@ void gc_decide_collection_algorithm(GC_Gen* gc, char* minor_algo, char* major_al
   
   return;
   
+}
+
+void gc_gen_assign_free_area_to_mutators(GC_Gen* gc)
+{
+  if(gc->cause == GC_CAUSE_LOS_IS_FULL){
+    Lspace* los = gc->los;
+    los->success_ptr = los_try_alloc(los->failure_size, (GC*)gc);      
+    los->failure_size = 0;
+     
+  }else{ 
+    Blocked_Space* nos = (Blocked_Space*)gc->nos;
+    if(nos->num_managed_blocks == 0) return;
+
+    Mutator *mutator = (Mutator *)gc_get_tls();   
+    allocator_init_free_block((Allocator*)mutator, (Block_Header*)nos->blocks);
+    nos->free_block_idx++;
+  }
+    
+  return;     
 }
 
 Boolean IS_FALLBACK_COMPACTION = FALSE; /* only for debugging, don't use it. */

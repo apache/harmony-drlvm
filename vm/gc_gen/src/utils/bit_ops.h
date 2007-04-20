@@ -95,9 +95,12 @@ inline void words_set_bit(POINTER_SIZE_INT* words, unsigned int count, unsigned 
   POINTER_SIZE_INT old_value = *p_word;
   POINTER_SIZE_INT mask = (POINTER_SIZE_INT)1 << bit_offset;
   POINTER_SIZE_INT new_value = old_value|mask;
-  
-  *p_word = new_value;
-  
+  while (true) {
+    POINTER_SIZE_INT temp = atomic_casptrsz(p_word, new_value, old_value);
+    if (temp == old_value) break;
+    old_value = *p_word;
+    new_value = old_value|mask;
+  }
   return;
 }
 
@@ -114,9 +117,12 @@ inline void words_clear_bit(POINTER_SIZE_INT* words, unsigned int count, unsigne
   POINTER_SIZE_INT old_value = *p_word;
   POINTER_SIZE_INT mask = ~((POINTER_SIZE_INT)1 << bit_offset);
   POINTER_SIZE_INT new_value = old_value & mask;
-  
-  *p_word = new_value;
-  
+  while (true) {
+    POINTER_SIZE_INT temp = atomic_casptrsz(p_word, new_value, old_value);
+    if (temp == old_value) break;
+    old_value = *p_word;
+    new_value = old_value & mask;
+  }
   return;
 }
 #endif

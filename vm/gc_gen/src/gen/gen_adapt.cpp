@@ -272,10 +272,6 @@ static void gc_decide_next_collect(GC_Gen* gc, int64 pause_time)
   }
 
   gc_gen_mode_adapt(gc,pause_time);
-  /* a heuristic: when no free block at all after this collection, we can't  
-     do any allocation at all. The first allocation will trigger a major collection */
-  if( fspace->num_managed_blocks == 0 )
-     gc->force_major_collect = TRUE;
 
   return;
 }

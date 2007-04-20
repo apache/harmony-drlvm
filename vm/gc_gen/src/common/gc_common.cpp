@@ -246,6 +246,11 @@ void gc_parse_options(GC* gc)
   return;
 }
 
+void gc_assign_free_area_to_mutators(GC* gc)
+{
+  gc_gen_assign_free_area_to_mutators((GC_Gen*)gc);
+}
+
 void gc_copy_interior_pointer_table_to_rootset();
 
 void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
@@ -314,6 +319,8 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
 
   //For_LOS_extend!
   gc_space_tuner_reset(gc);
+  
+  gc_assign_free_area_to_mutators(gc);
   
   vm_resume_threads_after();
   return;
