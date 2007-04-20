@@ -52,7 +52,7 @@ typedef struct Fin_Thread_Info {
     
     hythread_t *thread_ids;
     unsigned int thread_num;
-    volatile unsigned int thread_attached_num;
+    volatile unsigned int thread_attached;
     
     volatile Boolean shutdown;
     volatile Boolean on_exit;
