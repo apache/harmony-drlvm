@@ -193,16 +193,10 @@ void Opnd::setDefiningInst(Inst * inst)
                 defScope=DefScope_SemiTemporary;
             else{
                 defScope=DefScope_Variable;
-                definingInst=NULL;
             }
-        }
-    }else if (defScope==DefScope_SemiTemporary){
-        assert(definingInst!=NULL);     
-        if (inst->getNode()!=definingInst->getNode()){
-            defScope=DefScope_Variable;
             definingInst=NULL;
         }
-    }
+    } 
 }
 
 //=================================================================================================
@@ -935,5 +929,6 @@ RetInst::RetInst(IRManager * irm, int id)
 
 
 }};  // namespace Ia32
+
 
 

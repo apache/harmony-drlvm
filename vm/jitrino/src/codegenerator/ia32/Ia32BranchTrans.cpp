@@ -55,25 +55,45 @@ class BranchTranslator : public SessionAction {
 
 static ActionFactory<BranchTranslator> _btr("btr");
 
-Opnd * getMOVsChainSource(Opnd * opnd) {
-    
-    if (opnd->getDefScope() == Opnd::DefScope_SemiTemporary)
-        return opnd;
-
-    Inst * instUp = opnd->getDefiningInst();
-    Inst * movInst = NULL;
-
-    for(;instUp!=NULL && instUp->getMnemonic() == Mnemonic_MOV;instUp = instUp->getOpnd(1)->getDefiningInst())
-    {
-        movInst = instUp;
+static Inst* findDefInstWithMove(Inst* currentInst, Opnd* opnd) {
+    bool var = opnd->getDefScope() != Opnd::DefScope_Temporary;
+    if (var) {
+        //process only moves in current block
+        for (Inst* inst= currentInst->getPrevInst(); inst!=NULL; inst = inst->getPrevInst()) {
+            Inst::Opnds defs(inst,Inst::OpndRole_Def|Inst::OpndRole_Explicit|Inst::OpndRole_Auxilary);
+            if (defs.begin()!= defs.end()) {
+                Opnd* tmpOpnd =  inst->getOpnd(defs.begin()); 
+                if (tmpOpnd == opnd) {
+                    if (inst->getMnemonic()!=Mnemonic_MOV) {
+                        //op is not supporter by BTR 
+                        return NULL;
+                    }
+                    return inst;
+                }
+            }
+            
+        }
+        return NULL; //no more defs for this var/semitemporal in the block
     }
-    if (movInst) 
-        return movInst->getOpnd(1);
-    else
-        return opnd;
+    Inst* inst = opnd->getDefiningInst();
+    if (!inst || inst->getMnemonic()!=Mnemonic_MOV) {
+        return NULL;
+    }
+    return inst;
 }
 
-bool branchDirection (int64 v1, int64 v2, OpndSize sz,ConditionMnemonic mn) {
+static Opnd * getMOVsChainSource(Inst* inst, Opnd * opnd) {
+    Inst * instUp = findDefInstWithMove(inst, opnd);
+    Opnd * resOpnd = opnd;
+    while(instUp!=NULL) {
+        assert(instUp->getMnemonic() == Mnemonic_MOV);
+        resOpnd = instUp->getOpnd(1);
+        instUp = findDefInstWithMove(instUp, resOpnd);
+    }
+    return resOpnd;
+}
+
+static bool branchDirection (int64 v1, int64 v2, OpndSize sz,ConditionMnemonic mn) {
     switch (sz) {
         case OpndSize_8:
             v1 = int64(int8(v1));
@@ -130,6 +150,22 @@ bool branchDirection (int64 v1, int64 v2, OpndSize sz,ConditionMnemonic mn) {
     return branchDirection;
 }
 
+static void mapDefsPerEdge(StlMap<Edge *, Opnd *>& defsPerEdge, Node* node, Opnd* opnd) {
+    assert(opnd->getDefScope() == Opnd::DefScope_Variable);
+    const Edges& inEdges = node->getInEdges();
+    for (Edges::const_iterator ite = inEdges.begin(), ende = inEdges.end(); ite!=ende; ++ite) {
+        Edge* edge = *ite;
+        Node* prevNode = edge->getSourceNode();
+        Inst* lastInst = (Inst*)prevNode->getLastInst();
+        if (lastInst == NULL) {
+            defsPerEdge[edge] = NULL;
+            continue;
+        }
+        Opnd* opndDef = getMOVsChainSource(lastInst, opnd);
+        defsPerEdge[edge] = opndDef;    
+    }
+}
+
 void
 BranchTranslator::runImpl() 
 {
@@ -177,7 +213,7 @@ BranchTranslator::runImpl()
                         Opnd * cmpOp2 = cmpInst->getOpnd(uses.begin()+1);
 
                         if (cmpOp1->getDefScope() == Opnd::DefScope_Temporary) {
-                            cmpOp1 = getMOVsChainSource(cmpOp1);
+                            cmpOp1 = getMOVsChainSource(cmpInst, cmpOp1);
                             if (!cmpOp1->isPlacedIn(OpndKind_Imm)) {
                                 for(Inst * copy = (Inst *)bb->getLastInst();copy!=NULL; copy=copy->getPrevInst()) {
                                     Inst::Opnds opnds(copy, Inst::OpndRole_Def|Inst::OpndRole_ForIterator);
@@ -192,7 +228,7 @@ BranchTranslator::runImpl()
                                 }
                             }
                             if (cmpOp1->isPlacedIn(OpndKind_Imm)) {
-                                cmpOp2 = getMOVsChainSource(cmpOp2);
+                                cmpOp2 = getMOVsChainSource(cmpInst, cmpOp2);
                                 if (cmpOp2->isPlacedIn(OpndKind_Imm)) { 
                                     //Two constants are operands of CMP inst
                                     irManager->resolveRuntimeInfo(cmpOp1);
@@ -212,63 +248,21 @@ BranchTranslator::runImpl()
                                 }
                             }
                         } 
-                        cmpOp1 = getMOVsChainSource(cmpOp1);
+                        cmpOp1 = getMOVsChainSource(cmpInst, cmpOp1);
                         if (cmpOp1->getDefScope() == Opnd::DefScope_Variable) {
                             if(loopHeaders[bb])
                                 continue;
-                            cmpOp2 = getMOVsChainSource(cmpOp2);
-                            if (cmpOp2->isPlacedIn(OpndKind_Imm) && bb->getInEdges().size()>1) {
-                            
-                                const Edges& inEdges = bb->getInEdges();
-                                StlMap<Edge *, Opnd *> defInsts(irManager->getMemoryManager());
-                                Inst * nextInst = inst->getPrevInst();
-                                int i = -1; 
-                                bool stopSearch = false;
-                                Node * node = bb;
-                                                            
-                                while (!stopSearch && i != (int)inEdges.size()) {
-                                    bool found = false;
-                                    for (Inst * prevInst=NULL; nextInst!=NULL && !found; nextInst=prevInst){
-                                        Inst::Opnds opnds(nextInst, Inst::OpndRole_Def|Inst::OpndRole_ForIterator);
-
-                                        if (i==-1 && nextInst != cmpInst && (nextInst->getMnemonic() != Mnemonic_MOV || nextInst->getOpnd(0)->isPlacedIn(OpndKind_Mem) || nextInst->getOpnd(1)->isPlacedIn(OpndKind_Mem))) {
-                                            stopSearch = true;
-                                            break;
-                                        }
-                                        for (Inst::Opnds::iterator ito = opnds.begin(); ito != opnds.end(); ito = opnds.next(ito)){
-                                            Opnd * opnd = nextInst->getOpnd(ito);
-                                            if (opnd == cmpOp1) {
-                                                opnd = getMOVsChainSource(nextInst->getOpnd(1));
-                                                if(!opnd->isPlacedIn(OpndKind_Imm)) {
-                                                    found=true;
-                                                    break;
-                                                }
-                                                if (i==-1) {
-                                                    stopSearch=true;
-                                                    break;
-                                                }
-                                                defInsts[inEdges[i]] = opnd;
-                                                found = true;
-                                            }
-                                        }
-                                        prevInst=nextInst->getPrevInst();
-                                    }
-                                    const Edges& edges = node->getInEdges();
-                                    if (found || i == -1 || edges.size() > 1) {
-                                        i++;
-                                        if (i < (int)inEdges.size()) {
-                                            node = inEdges[i]->getSourceNode();
-                                            nextInst = (Inst *)node->getLastInst();
-                                        }
-                                    } else {
-                                        node = edges.front()->getSourceNode();
-                                        nextInst = (Inst*)node->getLastInst();
-                                    } 
-                                }
-                                if (!stopSearch) {
+                            cmpOp2 = getMOVsChainSource(cmpInst, cmpOp2);
+                            if (cmpOp2->isPlacedIn(OpndKind_Imm)) {
+                                if (cmpInst->getPrevInst()== NULL) { //no other side effects in node except branching
+                                    StlMap<Edge *, Opnd *> defInsts(irManager->getMemoryManager());
+                                    mapDefsPerEdge(defInsts, bb, cmpOp1);
                                     for (StlMap<Edge *, Opnd *>::iterator eit = defInsts.begin(); eit != defInsts.end(); eit++) {
                                         Edge * edge = eit->first;
                                         Opnd * opnd = eit->second;
+                                        if (opnd == NULL || !opnd->isPlacedIn(OpndKind_Imm)) {
+                                            continue; //can't retarget this edge -> var is not a const
+                                        }
                                         if (branchDirection(opnd->getImmValue(), cmpOp2->getImmValue(),cmpOp1->getSize(),condMnem)) {
                                             irManager->getFlowGraph()->replaceEdgeTarget(edge, trueBB);
                                         } else {
@@ -291,19 +285,16 @@ BranchTranslator::runImpl()
                                 }
                             }
                         } else if (cmpOp1->getDefScope() == Opnd::DefScope_SemiTemporary) {
+                            //TODO: merge DefScope_SemiTemporary & DefScope_Variable if-branches
+
                             //try to reduce ObjMonitorEnter pattern
-                            const Edges& inEdges = bb->getInEdges();
-                            if (inEdges.size() != 1)
-                                continue;
-                            Inst * defInst = cmpInst->getPrevInst();
+                            Inst * defInst = cmpInst;
                             bool stopSearch = false;
+                            //look for Mnemonic_SETcc def for cmpOp1 in the current block (it has SemiTemporary kind)
                             while (1) {
-                                if (!defInst || (defInst->getPrevInst() == NULL && defInst->getNode() == bb)) {
-                                    defInst = (Inst*)inEdges.front()->getSourceNode()->getLastInst();
-                                } else {
-                                    defInst = defInst->getPrevInst();
-                                    if (defInst == NULL)
-                                        break;
+                                defInst = defInst->getPrevInst();
+                                if (defInst == NULL) {
+                                    break;
                                 }
                                 Inst::Opnds defs(defInst,Inst::OpndRole_Def|Inst::OpndRole_Explicit|Inst::OpndRole_Auxilary);
                                 for (Inst::Opnds::iterator ito = defs.begin(); ito != defs.end(); ito = defs.next(ito)){
