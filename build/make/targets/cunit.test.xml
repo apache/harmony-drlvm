@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="UTF-8" ?>
 <!--
     Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
   
@@ -13,10 +13,6 @@
     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
     See the License for the specific language governing permissions and
     limitations under the License.
--->
-<!--
-Author:  Sergey V. Dmitriev, Marina V. Goldburt
-Version: $Revision$
 -->
 <project name="C UNIT TESTS">
     <target name="cunit.test" depends="init_component">
@@ -49,14 +45,14 @@ Version: $Revision$
                 <compilerarg value="-g" />
                 <compilerarg value="-O0" />
             </select>
-        <select arch="ia32">
-            <defineset define="_IA32_" />
-        </select>
-        <select arch="em64t">
-            <defineset define="_EM64T_" />
-            <defineset define="POINTER64" />
-            <defineset define="LAZY_LOCK" />
-        </select>
+            <select arch="ia32">
+                <defineset define="_IA32_" />
+            </select>
+            <select arch="em64t">
+                <defineset define="_EM64T_" />
+                <defineset define="POINTER64" />
+                <defineset define="LAZY_LOCK" />
+            </select>
         </compiler>
         <!-- Compiling framework -->
         <echo message="## Compiling framework..." />
@@ -148,21 +144,37 @@ Version: $Revision$
                         <select os="lnx">
                             <syslibset type="shared" libs="stdc++, gcc_s, pthread, rt" />
                             <select arch="ia32">
+<<<<<<< .mine
+                    <libset type="shared" libs="icuuc"
+=======
                                 <libset type="shared" libs="icuuc"
+>>>>>>> .r530955
                                     dir="${external.dep.CLASSLIB}/depends/libs/linux.x86" />
+<<<<<<< .mine
+                    <libset type="shared" libs="icudata"
+=======
                                 <libset type="shared" libs="icudata"
+>>>>>>> .r530955
                                     dir="${external.dep.CLASSLIB}/depends/libs/linux.x86" />
                                 </select>               
                             <select arch="em64t">
                                 <libset type="shared" libs="icuuc"
                                     dir="${external.dep.CLASSLIB}/depends/libs/linux.x86_64" />
+<<<<<<< .mine
+                    <libset type="shared" libs="icudata"
+=======
                                 <libset type="shared" libs="icudata"
+>>>>>>> .r530955
                                     dir="${external.dep.CLASSLIB}/depends/libs/linux.x86_64" />
                             </select>
                             <select arch="ipf">
                                 <libset type="shared" libs="icuuc"
                                     dir="${external.dep.CLASSLIB}/depends/libs/linux.ia64" />
+<<<<<<< .mine
+                    <libset type="shared" libs="icudata"
+=======
                                 <libset type="shared" libs="icudata"
+>>>>>>> .r530955
                                     dir="${external.dep.CLASSLIB}/depends/libs/linux.ia64" />
                             </select>
                         </select>

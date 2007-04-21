@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="UTF-8" ?>
 <!--
     Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
   
@@ -13,11 +14,6 @@
     See the License for the specific language governing permissions and
     limitations under the License.
 -->
-<!--
-Author:  Marina V. Goldburt
-Version: $Revision: 1.4.2.4 $
--->
-
 <project name="UNIT TESTS">
     <target name="unit.test" depends="java_test_unit" />
     <target name="java_test_unit" depends="init_component">

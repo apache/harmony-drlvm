@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="UTF-8" ?>
 <!--
     Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
   
@@ -140,10 +140,10 @@
         <propertycopy property="mode.name" from="${jvmti.tests.mode}.name" override="on"/>       
         <propertycopy property="mode.switch" from="${jvmti.tests.mode}.switch" override="on"/>
         <echo>
-		==================================
-		Run JVMTI tests using ${mode.name}
-		==================================
-		</echo>
+        ==================================
+        Run JVMTI tests using ${mode.name}
+        ==================================
+        </echo>
         <property name="exclude.file" location="./excludes/exclude.drlvm_jvmti.${hy.platform}.${jvmti.tests.mode}" />
         <if>
             <available file="${exclude.file}" />
