@@ -348,7 +348,7 @@ PeepHoleOpt::Changed PeepHoleOpt::handleInst_Convert_F2I_D2I(Inst* inst)
     // test SRC against zero
     //
     setCurrentNode(testAgainstZeroNode);
-    Mnemonic mn_cmp = is_dbl ? Mnemonic_COMISD : Mnemonic_COMISS;
+    Mnemonic mn_cmp = is_dbl ? Mnemonic_UCOMISD : Mnemonic_UCOMISS;
     /*comiss src, 0.  */ newInst(mn_cmp, src, fpZeroOpnd);
     /*jp _nan:result=0*/ newBranch(Mnemonic_JP, loadZeroNode, testIfBelowNode);
     setCurrentNode(NULL);

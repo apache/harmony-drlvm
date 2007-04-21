@@ -511,7 +511,7 @@ OpenMethodExecutionParams get_exe_capabilities()
 JIT_Result compile(JIT_Handle jitHandle, Compile_Handle ch, 
                    Method_Handle method, JIT_Flags flags)
 {
-    // this function is obsolet
+    // this function is obsolete
     assert(false);
     return JIT_FAILURE;
 }
@@ -521,6 +521,10 @@ JIT_Result compile_with_params(JIT_Handle jit_handle, Compile_Handle ch,
                                OpenMethodExecutionParams params)
 {
     ::Jitrino::Jet::Compiler jit(jit_handle);
+    if (!CPUID::isSSE2Supported()) {
+        //TODO: return FAILURE only of method contains double ops!
+        return JIT_FAILURE;
+    }
     return jit.compile(ch, method, params);
 }
 

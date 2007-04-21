@@ -524,31 +524,31 @@ JIT_Result DrlEMImpl::compileMethod(Method_Handle mh) {
         RChain* chain = *it;
         if (chain->acceptMethod(mh, nMethodsCompiled)) {
             assert(!chain->steps.empty());
-            RStep* step = chain->steps[0];
+            for (size_t i=0;i<chain->steps.size(); i++) {
+                RStep* step = chain->steps[i];
+                if (step->loggingEnabled) {
+                    methodName = method_get_name(mh);
+                    Class_Handle ch = method_get_class(mh);
+                    className = class_get_name(ch);
+                    signature = method_get_descriptor(mh);
+                    std::ostringstream msg;
+                    msg <<"EM: compile start:["<<step->jitName.c_str()<<" n="<<n<<"] "
+                        <<className<<"::"<<methodName<<signature;
+                    INFO2(step->catName.c_str(), msg.str().c_str());
+                }
 
-            if (step->loggingEnabled) {
-                methodName = method_get_name(mh);
-                Class_Handle ch = method_get_class(mh);
-                className = class_get_name(ch);
-                signature = method_get_descriptor(mh);
-                std::ostringstream msg;
-                msg <<"EM: compile start:["<<step->jitName.c_str()<<" n="<<n<<"] "
-                    <<className<<"::"<<methodName<<signature;
-                INFO2(step->catName.c_str(), msg.str().c_str());
-            }
+                JIT_Result res = vm_compile_method(step->jit, mh);
 
-            JIT_Result res = vm_compile_method(step->jit, mh);
+                if (step->loggingEnabled) {
+                    std::ostringstream msg;
+                    msg << "EM: compile done:["<<step->jitName.c_str()<<" n="<<n<<": "
+                        <<(res ==JIT_SUCCESS ? "OK" : "FAILED")<<"] "<<className<<"::"<<methodName<<signature;
+                    INFO2(step->catName.c_str(), msg.str().c_str());
+                }
 
-            if (step->loggingEnabled) {
-                std::ostringstream msg;
-                msg << "EM: compile done:["<<step->jitName.c_str()<<" n="<<n<<": "
-                    <<(res ==JIT_SUCCESS ? "OK" : "FAILED")<<"] "<<className<<"::"<<methodName<<signature;
-                INFO2(step->catName.c_str(), msg.str().c_str());
-            }
-
-
-            if (res == JIT_SUCCESS) {
-                return JIT_SUCCESS;
+                if (res == JIT_SUCCESS) {
+                    return JIT_SUCCESS;
+                }
             }
         }
     }

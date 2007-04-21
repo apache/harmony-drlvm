@@ -204,6 +204,8 @@ enum OpcodeByteKind {
 
 #define FP0S        {OpndKind_FPReg, OpndSize_32, RegName_FP0S}
 #define FP0D        {OpndKind_FPReg, OpndSize_64, RegName_FP0D}
+#define FP1S        {OpndKind_FPReg, OpndSize_32, RegName_FP1S}
+#define FP1D        {OpndKind_FPReg, OpndSize_64, RegName_FP1D}
 #define fp32        {OpndKind_FPReg, OpndSize_32, RegName_Null}
 #define fp64        {OpndKind_FPReg, OpndSize_64, RegName_Null}
 

@@ -469,8 +469,20 @@ Mnemonic_EMMS,                          // Empty MMX Technology State
 #endif
 
 Mnemonic_FLDCW,                         // Load FPU control word
+Mnemonic_FADDP,                        
+Mnemonic_FLDZ,                        
+Mnemonic_FADD,                        
+Mnemonic_FSUBP,                        
+Mnemonic_FSUB,                        
+Mnemonic_FMUL,                        
+Mnemonic_FMULP,                        
+Mnemonic_FDIVP,                        
+Mnemonic_FDIV,                        
+Mnemonic_FUCOMPP,                        
+Mnemonic_FRNDINT,
 Mnemonic_FNSTCW,                        // Store FPU control word
 Mnemonic_FSTSW,                         // Store FPU status word
+Mnemonic_FNSTSW,                         // Store FPU status word
 //Mnemonic_FDECSTP,                     // Decrement Stack-Top Pointer
 Mnemonic_FILD,                          // Load Integer
 Mnemonic_FLD,                           // Load Floating Point Value

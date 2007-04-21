@@ -567,6 +567,16 @@ private:
     TlsKey m_key;
 };
 
+/**
+    Set of utility methods to get features the current CPU supports.
+    The functionality of this class is rather scarce, but it covers all needs we have in JIT today
+*/
+class CPUID {
+    CPUID(){}
+public:
+    static bool isSSE2Supported();
+};
+
 }; // ~namespace Jitrino
 
 #endif  // ~ifndef __MKERNEL_H_INCLUDED__

@@ -190,4 +190,28 @@ unsigned Runtime::init_num_cpus(void)
 #endif    
 }
 
+
+bool CPUID::isSSE2Supported() {
+//uncomment to test on SSE2 PC:
+//  if (true) return false;
+#if defined (_EM64T_) || defined(_IA64_)
+    return true;
+#else
+
+    unsigned int fflags =0;
+#ifdef _WIN32
+    __asm {
+        mov    eax, 0x1  //returns standard features flags in edx, bit 26 is SSE2 flag
+        cpuid
+        mov    fflags, edx
+    };
+#elif PLAFTFORM_POSIX
+    __asm__ __volatile__ ("cpuid":"=d" (fflags) : "a" (0x1));
+#endif
+    bool res = ((fflags & (1<<26))!=0);
+    return res;
+
+#endif
+}
+
 }; // ~namespace Jitrino
