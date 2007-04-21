@@ -144,37 +144,20 @@
                         <select os="lnx">
                             <syslibset type="shared" libs="stdc++, gcc_s, pthread, rt" />
                             <select arch="ia32">
-<<<<<<< .mine
-                    <libset type="shared" libs="icuuc"
-=======
-                                <libset type="shared" libs="icuuc"
->>>>>>> .r530955
-                                    dir="${external.dep.CLASSLIB}/depends/libs/linux.x86" />
-<<<<<<< .mine
-                    <libset type="shared" libs="icudata"
-=======
+                                <libset type="shared" libs="icuuc" />
                                 <libset type="shared" libs="icudata"
->>>>>>> .r530955
                                     dir="${external.dep.CLASSLIB}/depends/libs/linux.x86" />
                                 </select>               
                             <select arch="em64t">
                                 <libset type="shared" libs="icuuc"
                                     dir="${external.dep.CLASSLIB}/depends/libs/linux.x86_64" />
-<<<<<<< .mine
-                    <libset type="shared" libs="icudata"
-=======
                                 <libset type="shared" libs="icudata"
->>>>>>> .r530955
                                     dir="${external.dep.CLASSLIB}/depends/libs/linux.x86_64" />
                             </select>
                             <select arch="ipf">
                                 <libset type="shared" libs="icuuc"
                                     dir="${external.dep.CLASSLIB}/depends/libs/linux.ia64" />
-<<<<<<< .mine
-                    <libset type="shared" libs="icudata"
-=======
                                 <libset type="shared" libs="icudata"
->>>>>>> .r530955
                                     dir="${external.dep.CLASSLIB}/depends/libs/linux.ia64" />
                             </select>
                         </select>
