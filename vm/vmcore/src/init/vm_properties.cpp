@@ -57,7 +57,7 @@ static const char *api_dll_files[] =
     "hyarchive"
 };
 
-#define GC_DLL "gc_cc"
+#define GC_DLL "gc_gen"
 
 /**
  *  Compose a string of file names each of them beginning with path,
