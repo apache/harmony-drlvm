@@ -423,13 +423,14 @@ void slide_compact_mspace(Collector* collector)
     lspace_fix_repointed_refs(collector, lspace);
     gc_fix_rootset(collector);
     gc_init_block_for_sliding_compact(gc, mspace);
-    num_fixing_collectors++;
     /*LOS_Shrink: Fixme: This operation moves objects in LOS, and should be part of Pass 4*/
     if(lspace->move_object)  lspace_sliding_compact(collector, lspace);
     mspace_settle_fake_blocks_for_los_shrink(mspace);
     /*Fixme: LOS_Shrink: set dest block for sliding compact*/
     if(gc->tuner->kind == TRANS_FROM_LOS_TO_MOS)
       mspace->block_iterator = (Block_Header*)((POINTER_SIZE_INT)mspace->blocks - (mspace->gc)->tuner->tuning_size);
+
+    num_fixing_collectors++;
   }
   while(num_fixing_collectors != num_active_collectors + 1);
 
