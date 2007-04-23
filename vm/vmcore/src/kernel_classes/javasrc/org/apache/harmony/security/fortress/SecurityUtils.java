@@ -19,22 +19,15 @@
 * @version $Revision: 1.1.6.3 $
 */
 
-package org.apache.harmony.fortress.security;
+package org.apache.harmony.security.fortress;
 
 import java.security.AccessControlContext;
 import java.util.WeakHashMap;
 
-//FIXME: move this class under umbrella of protected packages -
-// see lib/java.security: property 'package.access',
-// so only trusted classes like Thread and AccessController will
-// have an access to this class. 
-// This is to remove dependency on VMStack, to reduce number 
-// of VM2API-dependent classes.
-
 /**
  * The class is used to perform an exchange of information between 
  * java.lang.Thread and java.security.AccessController.<br>
- * The data to excnahge is inherited contexts for the Thread-s.  
+ * The data to excnahge is inherited contexts for the Thread-s.
  * 
  */
 public final class SecurityUtils {
@@ -42,7 +35,7 @@ public final class SecurityUtils {
     // A map used to store inherited contexts.<br>
     // A thread is used as a key for the map and AccessControlContext 
     // passed to the putContext is used as a value.
-    private static WeakHashMap<Thread, AccessControlContext> map = 
+    private static final WeakHashMap<Thread, AccessControlContext> ACC_CACHE = 
         new WeakHashMap<Thread, AccessControlContext>();
 
     /**
@@ -73,17 +66,17 @@ public final class SecurityUtils {
         if (thread == null) {
             throw new NullPointerException("thread can not be null");
         }
-        synchronized (map) {
-            if (map.containsKey(thread)) {
+        synchronized (ACC_CACHE) {
+            if (ACC_CACHE.containsKey(thread)) {
                 throw new SecurityException("You can not modify this map.");
             }
             if (context == null) {
                 // this only allowed once - for the very first thread.
-                if (map.containsValue(null)) {
+                if (ACC_CACHE.containsValue(null)) {
                     throw new Error("null context may be stored only once.");
                 }
             }
-            map.put(thread, context);
+            ACC_CACHE.put(thread, context);
         }
     }
 
@@ -105,8 +98,8 @@ public final class SecurityUtils {
          }
          */
 
-        synchronized (map) {
-            return map.get(thread);
+        synchronized (ACC_CACHE) {
+            return ACC_CACHE.get(thread);
         }
     }
 }

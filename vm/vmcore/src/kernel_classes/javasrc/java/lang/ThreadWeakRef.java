@@ -22,13 +22,13 @@ package java.lang;
 import java.lang.ref.WeakReference;
 import java.lang.ref.ReferenceQueue;
 
-class ThreadWeakRef extends WeakReference {
+class ThreadWeakRef extends WeakReference<Thread> {
     
-    private static ReferenceQueue refQueue = new ReferenceQueue();
+    private static ReferenceQueue<Thread> refQueue = new ReferenceQueue<Thread>();
     private long nativeAddr = 0;
     
     public ThreadWeakRef(Thread thread) {
-        super (thread, ThreadWeakRef.refQueue);
+        super(thread, ThreadWeakRef.refQueue);
     }
 
     public void setNativeAddr(long newAddr) {

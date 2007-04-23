@@ -35,7 +35,6 @@ public class VMHelperFastPath {
     private static final int CLASS_INF_TABLE_1_OFFSET = getVtableIntfTableOffset(1);
     private static final int CLASS_INF_TYPE_2_OFFSET  = getVtableIntfTypeOffset(2);
     private static final int CLASS_INF_TABLE_2_OFFSET = getVtableIntfTableOffset(2);
-    private static final int CLASS_DEPTH_OFFSET = getClassDepthOffset();
 
     private VMHelperFastPath() {}
 
@@ -178,5 +177,4 @@ public class VMHelperFastPath {
     private static native int getVtableIntfTableOffset(int n);
     private static native int getVtableClassOffset();
     private static native int getVtableSuperclassesOffset();
-    private static native int getClassDepthOffset();
 }

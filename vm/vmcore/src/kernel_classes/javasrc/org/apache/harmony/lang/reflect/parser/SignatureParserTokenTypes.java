@@ -19,12 +19,6 @@
 
 package org.apache.harmony.lang.reflect.parser;
 
-import java.util.ArrayList;
-import java.io.StringBufferInputStream;
-import java.io.IOException;
-import java.lang.reflect.GenericSignatureFormatError;
-import org.apache.harmony.lang.reflect.parser.*;
-
 /**
  * @author Serguei S. Zapreyev
  * @version $Revision: 1.1.2.1 $

@@ -645,6 +645,7 @@ public abstract class ClassLoader {
     /**
      * Initializes the system class loader.
      */
+    @SuppressWarnings("unchecked")
     private static void initSystemClassLoader() {
         if (systemClassLoader != null) {
             throw new IllegalStateException(
@@ -665,7 +666,7 @@ public abstract class ClassLoader {
                             + " must inherit java.lang.SecurityManager");
                     }
                 }   
-                AccessController.doPrivileged(new PrivilegedExceptionAction() {
+                AccessController.doPrivileged(new PrivilegedExceptionAction<Object>() {
                     public Object run() throws Exception {
                         System.setSecurityManager(smClass.newInstance());
                         return null;

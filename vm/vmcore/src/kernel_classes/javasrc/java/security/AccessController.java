@@ -20,7 +20,7 @@ package java.security;
 import java.util.ArrayList;
 import java.util.WeakHashMap;
 
-import org.apache.harmony.fortress.security.SecurityUtils;
+import org.apache.harmony.security.fortress.SecurityUtils;
 
 /**
  * @com.intel.drl.spec_ref

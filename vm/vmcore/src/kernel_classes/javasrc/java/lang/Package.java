@@ -70,6 +70,7 @@ public class Package implements AnnotatedElement {
 	 *  @com.intel.drl.spec_ref
 	 * 
 	 **/
+    @SuppressWarnings("unchecked")
     public <A extends Annotation> A getAnnotation(Class<A> annotationClass) {
 		if(annotationClass == null) {
 			throw new NullPointerException();

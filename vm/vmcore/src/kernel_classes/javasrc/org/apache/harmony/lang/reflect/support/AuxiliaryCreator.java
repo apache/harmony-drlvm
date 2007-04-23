@@ -17,7 +17,6 @@
 package org.apache.harmony.lang.reflect.support;
 
 import java.lang.reflect.Type;
-import java.lang.reflect.GenericDeclaration;
 import java.lang.TypeNotPresentException;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.WildcardType;
@@ -57,7 +56,7 @@ public final class AuxiliaryCreator {
             ParameterizedType pType = ParameterizedTypeRepository.findParameterizedType((InterimParameterizedType) nextLayer, startPoint);
             if (pType == null) {
                 try {
-                Class genClassDecl = AuxiliaryFinder.findGenericClassDeclarationForParameterizedType((InterimParameterizedType) nextLayer, startPoint);
+                AuxiliaryFinder.findGenericClassDeclarationForParameterizedType((InterimParameterizedType) nextLayer, startPoint);
                 } catch(Throwable e) {
                     throw new TypeNotPresentException(((InterimParameterizedType) nextLayer).rawType.classTypeName.substring(1).replace('/', '.'), e);
                 }
@@ -113,7 +112,7 @@ public final class AuxiliaryCreator {
             ParameterizedType pType = ParameterizedTypeRepository.findParameterizedType((InterimParameterizedType) nextppType, startPoint);
             if (pType == null) {
                 try {
-                    Class genClassDecl = AuxiliaryFinder.findGenericClassDeclarationForParameterizedType((InterimParameterizedType) nextppType, startPoint);
+                    AuxiliaryFinder.findGenericClassDeclarationForParameterizedType((InterimParameterizedType) nextppType, startPoint);
                 } catch(Throwable e) {
                     throw new TypeNotPresentException(((InterimParameterizedType) nextppType).rawType.classTypeName.substring(1).replace('/', '.'), e);
                 }
@@ -158,7 +157,7 @@ public final class AuxiliaryCreator {
                 ParameterizedType cType = ParameterizedTypeRepository.findParameterizedType((InterimParameterizedType) pType, startPoint);
                 if (cType == null) {
                     try {
-                        Class genClassDecl = AuxiliaryFinder.findGenericClassDeclarationForParameterizedType((InterimParameterizedType) pType, startPoint);
+                        AuxiliaryFinder.findGenericClassDeclarationForParameterizedType((InterimParameterizedType) pType, startPoint);
                     } catch(Throwable e) {
                         throw new TypeNotPresentException(((InterimParameterizedType) pType).rawType.classTypeName.substring(1).replace('/', '.'), e);
                     }

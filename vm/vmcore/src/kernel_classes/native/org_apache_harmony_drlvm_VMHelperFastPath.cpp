@@ -66,9 +66,3 @@ JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_VMHelperFastPath_getVtableS
 {
     return static_cast<jint>(reinterpret_cast<jlong>(&((VTable*)0)->superclasses));
 }
-
-
-JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_VMHelperFastPath_getClassDepthOffset(JNIEnv *, jclass)
-{
-    return (jint)Class::get_offset_of_depth();
-}

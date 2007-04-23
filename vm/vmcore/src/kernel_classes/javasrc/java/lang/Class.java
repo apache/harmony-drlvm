@@ -50,7 +50,6 @@ import java.security.PrivilegedAction;
 import java.security.ProtectionDomain;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Map;
 
@@ -906,6 +905,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
      *  @com.intel.drl.spec_ref
      * 
      **/
+    @SuppressWarnings("unchecked")
     public <A extends Annotation> A getAnnotation(Class<A> annotationClass) {
         if(annotationClass == null) {
             throw new NullPointerException();
@@ -1220,6 +1220,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
             }
         }
 
+        @SuppressWarnings("unchecked")
         public synchronized Constructor<T>[] getPublicConstructors() {
             if (publicConstructors != null) {
                 return publicConstructors;
@@ -1343,7 +1344,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
         private Annotation[] declaredAnnotations;
         private Type[] genericInterfaces;
         private Type genericSuperclass;
-        private TypeVariable[] typeParameters;
+        private TypeVariable<Class<T>>[] typeParameters;
         
         public synchronized Annotation[] getAllAnnotations() {
             if (allAnnotations != null) {
@@ -1497,49 +1498,14 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
             return genericSuperclass;
         }
 
-        /**
-         *  Checks if two methods match by name and parameter types.
-         *  Ignored return type
-         *
-         * @param m1 one method to check
-         * @param m2 the other method to check
-         * @return true if they match, false otherwise
-         */
-        private boolean isMethodMatches(Method m1, Method m2) {
-            return m1.getName().equals(m2.getName())
-                && isTypeMatches(m1.getParameterTypes(), m2.getParameterTypes());
-        }
-
-        private void mergeMethods(HashSet names, ArrayList thisMethods,
-                                  Method[] superMethods) {
-            for (int i = 0; i < superMethods.length; i++) {
-                Method superMethod = superMethods[i];
-                if (names.contains(superMethod.getName())) {
-                    int j;
-                    for (j = 0; j < thisMethods.size(); j++) {
-                        Method thisMethod = (Method)thisMethods.get(j);
-                        if (isMethodMatches(thisMethod, superMethod)) {
-                            break;
-                        }
-                    }
-                    if (j >= thisMethods.size()) {
-                        thisMethods.add(superMethod);
-                        names.add(superMethod.getName());
-                    }
-                } else {
-                    thisMethods.add(superMethod);
-                    names.add(superMethod.getName());
-                }
-            }
-        }
-        
-        public synchronized TypeVariable[] getTypeParameters() {
+        @SuppressWarnings("unchecked")
+        public synchronized TypeVariable<Class<T>>[] getTypeParameters() {
             //So, here it can be only TypeVariable elements.
             if (typeParameters == null) {
                 Object startPoint = (Object) Class.this;
                 String signature = AuxiliaryUtil.toUTF8(VMGenericsAndAnnotations.getSignature(Class.this)); // getting this class signature
                 if (signature == null) {
-                    return typeParameters =  new TypeVariable[0];
+                    return typeParameters = new TypeVariable[0];
                 }
                 InterimClassGenericDecl decl = (InterimClassGenericDecl) Parser.parseSignature(signature, SignatureKind.CLASS_SIGNATURE, (GenericDeclaration)startPoint); // GenericSignatureFormatError can be thrown here
                 InterimTypeParameter[] pTypeParameters = decl.typeParameters;

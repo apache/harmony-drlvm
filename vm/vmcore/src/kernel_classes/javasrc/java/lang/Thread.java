@@ -28,7 +28,7 @@ import java.util.Iterator;
 import java.util.Map;
 
 import org.apache.harmony.lang.RuntimePermissionCollection;
-import org.apache.harmony.fortress.security.SecurityUtils;
+import org.apache.harmony.security.fortress.SecurityUtils;
 import org.apache.harmony.vm.VMStack;
 
 /**
@@ -966,14 +966,6 @@ public class Thread implements Runnable {
         }
     }
 
-    /**
-     * Associate current thread object with native thread structure.
-     */
-    private void initNativeThread() {
-        
-    }
-
-    
     /**
      * Initializes local values represented by
      * <code>InheritableThreadLocal</code> objects having local values for the

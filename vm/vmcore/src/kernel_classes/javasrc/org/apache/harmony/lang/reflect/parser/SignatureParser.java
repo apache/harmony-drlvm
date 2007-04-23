@@ -20,22 +20,14 @@
 package org.apache.harmony.lang.reflect.parser;
 
 import java.util.ArrayList;
-import java.io.StringBufferInputStream;
-import java.io.IOException;
 import java.lang.reflect.GenericSignatureFormatError;
-import org.apache.harmony.lang.reflect.parser.*;
 
 import antlr.TokenBuffer;
 import antlr.TokenStreamException;
-import antlr.TokenStreamIOException;
-import antlr.ANTLRException;
-import antlr.LLkParser;
 import antlr.Token;
 import antlr.TokenStream;
 import antlr.RecognitionException;
 import antlr.NoViableAltException;
-import antlr.MismatchedTokenException;
-import antlr.SemanticException;
 import antlr.ParserSharedInputState;
 import antlr.collections.impl.BitSet;
 
@@ -111,7 +103,6 @@ private PTStack currentStackElem; // points to the current processed level eleme
 
 private String CTPTsignature; // accumulated signature of the current parsered parameterized type, it's used for parameterized types repository
 private int  sigInd;
-private int  sigLen;
 
 private InterimType/*InterimGenericType*/ highLevelType; // the rolled up reference (InterimParameterizedType or InterimClassType)
 
@@ -120,7 +111,6 @@ private InterimType prsrT;
 private int len;
 private PTStack p1, p2, currentStackElemCopy;
 private InterimClassType upper;
-private char t;
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 private void throwGenericSignatureFormatError() throws GenericSignatureFormatError {
     
@@ -199,7 +189,7 @@ private void addElemToTypeArgsList(InterimType ref) {
      
     // add the value to the args list of the found stack's element:
      if(p2.args == null) {
-        p2.args = new ArrayList();
+        p2.args = new ArrayList<InterimType>();
     }
     p2.args.add(ref);
                                                                                         
@@ -457,7 +447,6 @@ public SignatureParser(ParserSharedInputState state) {
 		// to be reenterable:
 		CTPTsignature = null;
 		sigInd = 0;
-		sigLen = 0;
 		currentStackElem = stack;
 		genParamList = null;
 		boundList = null;
@@ -1031,7 +1020,6 @@ public SignatureParser(ParserSharedInputState state) {
 				if (CTPTsignature != null) {
 				CTPTsignature = null;
 				sigInd = 0;
-				sigLen = 0;
 				}
 				
 				// clean the current stack's element to be ready for new reference parsering:
@@ -2032,14 +2020,12 @@ public SignatureParser(ParserSharedInputState state) {
 	
 	public final void pr__C_P_AND_R_T() throws RecognitionException, TokenStreamException {
 		
-		Token  m557 = null;
-		
 		try {      // for error handling
 			pr__METHOD_PARAMETERS();
 			if ( inputState.guessing==0 ) {
 				prntSS("   ### 241:", "m556.getText()");
 			}
-			m557 = LT(1);
+			LT(1);
 			match(VOIDTYPE);
 			if ( inputState.guessing==0 ) {
 				
@@ -2091,14 +2077,12 @@ public SignatureParser(ParserSharedInputState state) {
 	
 	public final void pr__F_T_P_AND_C_P_AND_R_T() throws RecognitionException, TokenStreamException {
 		
-		Token  m559 = null;
-		
 		try {      // for error handling
 			pr__F_T_P_AND_M_P();
 			if ( inputState.guessing==0 ) {
 				prntSS("   ### 29:", "m558.getText()");
 			}
-			m559 = LT(1);
+			LT(1);
 			match(VOIDTYPE);
 			if ( inputState.guessing==0 ) {
 				
@@ -2716,5 +2700,5 @@ public SignatureParser(ParserSharedInputState state) {
 		return data;
 	}
 	public static final BitSet _tokenSet_17 = new BitSet(mk_tokenSet_17());
-	
+
 	}

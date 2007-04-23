@@ -32,7 +32,7 @@ import java.security.AccessController;
 public final class AuxiliaryLoader extends ClassLoader {
     public static final AuxiliaryLoader ersatzLoader = new AuxiliaryLoader();
 
-    public Class findClass(final String classTypeName)
+    public Class<?> findClass(final String classTypeName)
             throws ClassNotFoundException {
         if (classTypeName.equals("byte")) {
             return byte.class;
@@ -55,17 +55,16 @@ public final class AuxiliaryLoader extends ClassLoader {
         }
         ClassLoader cl = this.getClass().getClassLoader();
         if (cl == null) {
-            cl = AuxiliaryLoader.this.getSystemClassLoader();
+            cl = ClassLoader.getSystemClassLoader();
         }
         try {
             return cl.loadClass(classTypeName);
         } catch (Throwable _) {
             Class c = (Class) AccessController
-                    .doPrivileged(new java.security.PrivilegedAction() {
+                    .doPrivileged(new java.security.PrivilegedAction<Object>() {
                         public Object run() {
                             // based on an empiric knowledge
-                            ClassLoader cl = AuxiliaryLoader.this
-                                    .getSystemClassLoader();
+                            ClassLoader cl = ClassLoader.getSystemClassLoader();
                             try {
                                 java.lang.reflect.Method[] ms = cl.getClass()
                                         .getDeclaredMethods();
@@ -123,11 +122,11 @@ public final class AuxiliaryLoader extends ClassLoader {
     }
 
     public void resolve(final Class c) {
-        AccessController.doPrivileged(new java.security.PrivilegedAction() {
+        AccessController.doPrivileged(new java.security.PrivilegedAction<Object>() {
             public Object run() {
                 ClassLoader cl = AuxiliaryLoader.this.getClass().getClassLoader();
                 if (cl == null) {
-                    cl = AuxiliaryLoader.this.getSystemClassLoader();
+                    cl = ClassLoader.getSystemClassLoader();
                 }
                 try {
                     java.lang.reflect.Method[] ms = cl.getClass()

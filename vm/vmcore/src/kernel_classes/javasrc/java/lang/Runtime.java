@@ -380,7 +380,7 @@ public class Runtime
      */
     private static Runtime thisApplicationRuntime = new Runtime(); 
 
-    private static ArrayList hooksList = new ArrayList();
+    private static ArrayList<Thread> hooksList = new ArrayList<Thread>();
     
     /**
      * 0 - normal work
@@ -412,14 +412,14 @@ public class Runtime
             try {
                 // Phase1: Execute all registered hooks.
                 VMState = 1;
-                for (int i = 0; i < hooksList.size(); i++) {
-                    ((Thread)hooksList.get(i)).start();
+                for (Thread hook : hooksList) {
+                    hook.start();
                 }
-                
-                for (int i = 0; i < hooksList.size(); i++) {
+               
+                for (Thread hook : hooksList) {
                     while (true){
                         try {
-                            ((Thread)hooksList.get(i)).join();
+                            hook.join();
                             break;
                         } catch (InterruptedException e) {
                             continue;
@@ -483,10 +483,10 @@ public class Runtime
             throw new IllegalStateException();
         }
         synchronized (hooksList) {
-            if (hooksList.contains((Object) hook)) {
+            if (hooksList.contains(hook)) {
                 throw new IllegalArgumentException();
             }
-            hooksList.add((Object) hook);
+            hooksList.add(hook);
         }
     }
 
@@ -506,7 +506,7 @@ public class Runtime
             throw new IllegalStateException();
         }
         synchronized (hooksList) {
-            return hooksList.remove((Object) hook);
+            return hooksList.remove(hook);
         }
     }
 
@@ -765,7 +765,7 @@ public class Runtime
             //String[] paths = allPaths.split(pathSeparator);
             String[] paths;
             {
-                java.util.ArrayList res = new java.util.ArrayList();
+                ArrayList<String> res = new ArrayList<String>();
                 int curPos = 0;
                 int l = pathSeparator.length();
                 int i = allPaths.indexOf(pathSeparator);
@@ -822,5 +822,4 @@ public class Runtime
         //XXX: return new BufferedOutputStream( (OutputStream) (Object) new OutputStreamWriter( out ) );
         return out;
     }
-
 }

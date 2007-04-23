@@ -36,6 +36,7 @@ public class Reflection {
         return reflectAccessor.copyConstructor(c);
     }
 
+    @SuppressWarnings("unchecked")
     public static <T> Constructor<T>[] copyConstructors(Constructor<T>[] cs) {
         Constructor<T>[] ret = new Constructor[cs.length];
         for (int i = 0; i < cs.length; i++) {
@@ -81,5 +82,4 @@ public class Reflection {
             Method[] superPublic, Method[][] intf, int estimate) {
         return reflectAccessor.mergePublicMethods(declared, superPublic, intf, estimate);
     }
-
 }

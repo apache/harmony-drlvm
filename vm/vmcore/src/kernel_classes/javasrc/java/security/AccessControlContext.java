@@ -22,7 +22,7 @@
 package java.security;
 
 import java.util.ArrayList;
-import org.apache.harmony.fortress.security.PolicyUtils;
+import org.apache.harmony.security.fortress.PolicyUtils;
 
 /**
  * @com.intel.drl.spec_ref 

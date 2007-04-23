@@ -65,14 +65,14 @@ public final class Field extends AccessibleObject implements Member {
     /**
     *  @com.intel.drl.spec_ref
     */
+    @SuppressWarnings("unchecked")
     public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
         if(annotationClass == null) {
             throw new NullPointerException();
         }
-        Annotation aa[] = data.getAnnotations();
-        for (int i = 0; i < aa.length; i++) {
-            if(aa[i].annotationType() == annotationClass) {
-                return (T) aa[i];
+        for (Annotation aa : data.getAnnotations()) {
+            if(aa.annotationType() == annotationClass) {
+                return (T) aa;
             }
         }
         return null;

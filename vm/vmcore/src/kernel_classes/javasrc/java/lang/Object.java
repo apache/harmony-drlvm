@@ -27,10 +27,6 @@
  */
 public class Object {
 
-    private static final int TM_ERROR_NONE = 0;
-    private static final int TM_ERROR_INTERRUPT = 52;
-    private static final int TM_ERROR_ILLEGAL_STATE = 118;
-    
 	public final Class<? extends Object> getClass() {
 		return VMClassRegistry.getClass(this);
 	}
@@ -108,4 +104,5 @@ public class Object {
 
 	protected void finalize() throws Throwable {
 	}
+
 }

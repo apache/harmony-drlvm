@@ -23,7 +23,6 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.TypeVariable;
 import org.apache.harmony.lang.reflect.parser.InterimParameterizedType;
-import org.apache.harmony.lang.reflect.parser.InterimGenericType;
 import org.apache.harmony.lang.reflect.repository.TypeVariableRepository;
 
 import org.apache.harmony.lang.reflect.parser.*;
@@ -376,7 +375,6 @@ public final class AuxiliaryFinder {
                 return res + transform(ini.substring(ind+12));
             } else { // range 0x10000 - 0x10FFFF (high-surrogates range = 0xd800-0xdbff; low-surrogates range = 0xdc00-0xdfff; ) , for example: \0ed\0a0\0b5\0ed\0be\0af
                 di3 = ini.substring(ind+10, ind+10+2); // to ommit the following \0
-                String di4 = ini.substring(ind+14, ind+14+2); // to ommit the following \0
                 String di5 = ini.substring(ind+18, ind+18+2); // to ommit the following \0
                 String di6 = ini.substring(ind+22, ind+22+2); // to ommit the following \0
                 res = res + new String(new char[]{(char)((((Integer.parseInt(di2, 16)&0xf) + ((Integer.parseInt(di2, 16)&0xf)!=0?1:0))<<16)+((Integer.parseInt(di3, 16)&0x3f)<<10)+((Integer.parseInt(di5, 16)&0xf)<<6)+(Integer.parseInt(di6, 16)&0x3f))});

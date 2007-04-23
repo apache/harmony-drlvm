@@ -90,14 +90,14 @@ public final class Constructor<T> extends AccessibleObject implements Member, Ge
     /**
     *  @com.intel.drl.spec_ref
     */
+    @SuppressWarnings("unchecked")
     public <A extends Annotation> A getAnnotation(Class<A> annotationClass) {
         if(annotationClass == null) {
             throw new NullPointerException();
         }
-        Annotation aa[] = data.getDeclaredAnnotations();
-        for (int i = 0; i < aa.length; i++) {
-            if(aa[i].annotationType() == annotationClass) {
-                return (A) aa[i];
+        for (Annotation a : data.getDeclaredAnnotations()) {
+            if (a.annotationType() == annotationClass) {
+                return (A) a; // warning here, but it's known its type is A
             }
         }
         return null;
@@ -278,6 +278,7 @@ public final class Constructor<T> extends AccessibleObject implements Member, Ge
     /**
      * @com.intel.drl.spec_ref 
      */
+    @SuppressWarnings("unchecked")
     public T newInstance(Object... args) throws InstantiationException,
         IllegalAccessException, IllegalArgumentException,
         InvocationTargetException {
@@ -576,6 +577,7 @@ public final class Constructor<T> extends AccessibleObject implements Member, Ge
         /**
          * initializes type parameters
          */
+        @SuppressWarnings("unchecked")
 		public synchronized void initTypeParameters() {
 			//So, here it can be only TypeVariable elements.
             if (typeParameters == null) {

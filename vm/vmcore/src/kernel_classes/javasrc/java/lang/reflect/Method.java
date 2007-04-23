@@ -98,14 +98,15 @@ public final class Method extends AccessibleObject implements Member, GenericDec
     /**
     *  @com.intel.drl.spec_ref
     */
+    @SuppressWarnings("unchecked")
     public <A extends Annotation> A getAnnotation(Class<A> annotationClass) {
         if(annotationClass == null) {
             throw new NullPointerException();
         }
-        Annotation aa[] = data.getDeclaredAnnotations();
-        for (int i = 0; i < aa.length; i++) {
-            if(aa[i].annotationType() == annotationClass) {
-                return (A) aa[i];
+        for (Annotation aa : data.getDeclaredAnnotations()) {
+            if(aa.annotationType() == annotationClass) {
+
+                return (A) aa;
             }
         }
         return null;
@@ -679,6 +680,7 @@ public final class Method extends AccessibleObject implements Member, GenericDec
         /**
          * initializes type parameters
          */
+        @SuppressWarnings("unchecked")
         public synchronized void initTypeParameters() {
             // So, here it can be only TypeVariable elements.
             if (typeParameters == null) {
@@ -709,5 +711,4 @@ public final class Method extends AccessibleObject implements Member, GenericDec
             }
         }
     }
-
 }
