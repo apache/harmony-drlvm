@@ -21,18 +21,33 @@
     // VC++ 2003
     extern "C" void _ReadWriteBarrier();
     extern "C" void _WriteBarrier();
+    extern "C" void _mm_mfence(void);
+    extern "C" void _mm_sfence(void);
 #else
     // VC++ 2005
     #include <intrin.h>
+    #include <emmintrin.h>
 #endif
 #pragma intrinsic (_ReadWriteBarrier)
 #pragma intrinsic (_WriteBarrier)
 
 void MemoryReadWriteBarrier() {
+#ifdef _EM64T_
+    // if x86_64/x64/EM64T, then use an mfence to flush memory caches
+    _mm_mfence();
+#else
+    /* otherwise, we assume this is an x86, so insert an inline assembly 
+     * macro to insert a lock instruction
+     *
+     * the lock is what's needed, so the 'add' is setup, essentially, as a no-op
+     */
+    __asm {lock add [esp], 0 }
+#endif
     _ReadWriteBarrier();
 }
 
 void MemoryWriteBarrier() {
+    _mm_sfence();
     _WriteBarrier();
 }
 

@@ -28,9 +28,11 @@
 #if _MSC_VER < 1400
     // VC++ 2003
     extern void _ReadWriteBarrier();
+    extern void _mm_mfence(void);
 #else
     // VC++ 2005
     #include <intrin.h>
+    #include <emmintrin.h>
 #endif
 #pragma intrinsic (_ReadWriteBarrier)
 
@@ -90,7 +92,18 @@ APR_DECLARE(apr_status_t) apr_thread_yield_other(apr_thread_t* thread) {
 }
 
 APR_DECLARE(void) apr_memory_rw_barrier() {
-	_ReadWriteBarrier();
+#ifdef _EM64T_
+    // if x86_64/x64/EM64T, then use an mfence to flush memory caches
+    _mm_mfence();
+#else
+    /* otherwise, we assume this is an x86, so insert an inline assembly 
+     * macro to insert a lock instruction
+     *
+     * the lock is what's needed, so the 'add' is setup, essentially, as a no-op
+     */
+    __asm {lock add [esp], 0 }
+#endif
+    _ReadWriteBarrier();
 }
 
 APR_DECLARE(apr_status_t) apr_thread_times(apr_thread_t *thread, 
