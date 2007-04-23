@@ -205,8 +205,17 @@ bool CPUID::isSSE2Supported() {
         cpuid
         mov    fflags, edx
     };
-#elif PLAFTFORM_POSIX
-    __asm__ __volatile__ ("cpuid":"=d" (fflags) : "a" (0x1));
+#elif PLATFORM_POSIX
+    unsigned int stub;
+
+     __asm__ __volatile__ (
+            "push %%ebx; cpuid; mov %%ebx, %%edi; pop %%ebx" :
+                "=a" (stub),
+                "=D" (stub),
+                "=c" (stub),
+                "=d" (fflags) : "a" (0x1));
+#else
+#error 0  
 #endif
     bool res = ((fflags & (1<<26))!=0);
     return res;
