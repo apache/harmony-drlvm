@@ -111,10 +111,10 @@ void finalizer_threads_init(JavaVM *java_vm)
         args[0] = (void *)java_vm;
         args[1] = (void *)(UDATA)(i + 1);
         fin_thread_info->thread_ids[i] = NULL;
-		clear_fin_thread_attached();
+        clear_fin_thread_attached();
         status = hythread_create(&fin_thread_info->thread_ids[i], 0, FINALIZER_THREAD_PRIORITY, 0, (hythread_entrypoint_t)finalizer_thread_func, args);
         assert(status == TM_ERROR_NONE);
-		wait_fin_thread_attached();
+       wait_fin_thread_attached();
     }    
 }
 
@@ -161,7 +161,7 @@ static void wait_finalization_end(Boolean must_wait)
     hymutex_lock(&fin_thread_info->end_mutex);
     unsigned int fin_obj_num = vm_get_finalizable_objects_quantity();
     while(fin_thread_info->working_thread_num || fin_obj_num){
-        unsigned int wait_time = restrict_wait_time(fin_obj_num, FIN_MAX_WAIT_TIME << 7);
+        unsigned int wait_time = restrict_wait_time(fin_obj_num + 100, FIN_MAX_WAIT_TIME << 7);
         atomic_inc32(&fin_thread_info->end_waiting_num);
         IDATA status = hycond_wait_timed(&fin_thread_info->end_cond, &fin_thread_info->end_mutex, (I_64)wait_time, 0);
         atomic_dec32(&fin_thread_info->end_waiting_num);
@@ -246,7 +246,7 @@ static IDATA finalizer_thread_func(void **args)
     IDATA status = AttachCurrentThreadAsDaemon(java_vm, (void**)&jni_env, jni_args);
     assert(status == JNI_OK);
     assign_classloader_to_native_threads(jni_env);
-	assert(!get_fin_thread_attached());
+    assert(!get_fin_thread_attached());
     set_fin_thread_attached();
     
     /* Choice: use VM_thread or hythread to indicate the finalizer thread ?
@@ -274,6 +274,7 @@ static IDATA finalizer_thread_func(void **args)
     
     vm_heavy_finalizer_resume_mutator();
     status = DetachCurrentThread(java_vm);
+    assert(status == JNI_OK);
     dec_fin_thread_num();
     //status = jthread_detach(java_thread);
     return status;

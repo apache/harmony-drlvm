@@ -87,7 +87,7 @@ static void wait_ref_thread_attached(void)
 { while(ref_thread_info->thread_attached < REF_ENQUEUE_THREAD_NUM); }
 
 void wait_native_ref_thread_detached(void)
-{ while(ref_thread_info->thread_attached); }
+{ while(ref_thread_info->thread_attached){hythread_yield();} }
 
 static void wait_ref_enqueue_end(void)
 {

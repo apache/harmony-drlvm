@@ -51,7 +51,7 @@ typedef struct Fin_Thread_Info {
     hymutex_t mutator_block_mutex;              // mutator block mutex for heavy finalizable obj load
     
     hythread_t *thread_ids;
-    unsigned int thread_num;
+    volatile unsigned int thread_num;
     volatile unsigned int thread_attached;
     
     volatile Boolean shutdown;
