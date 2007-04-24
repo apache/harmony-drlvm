@@ -1,8 +1,8 @@
 package org.apache.harmony.drlvm.tests.regression.h3225;
 
 /**
- * The class launches methods which contain invalid <code>jsr</code>
- * usage and should be rejected by a verifier.
+ * The class launches methods which contain invalid <code>jsr</code> usage and
+ * should be rejected by a verifier.
  */
 public class NegativeJsrTest extends junit.framework.TestCase {
     public static void main(String args[]) {
@@ -49,4 +49,3 @@ public class NegativeJsrTest extends junit.framework.TestCase {
         fail("The test should throw java.lang.VerifyError");
     }
 }
-

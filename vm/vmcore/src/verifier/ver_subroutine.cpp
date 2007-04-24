@@ -142,7 +142,7 @@ static inline vf_Result ResolveSubroutineEntryPoint(vf_Node *node,
         }
         map->m_stack[index].m_type = SM_RETURN_ADDR;
         map->m_stack[index].m_pc =
-            p_element->m_node->m_start->m_addr - ctx->m_bytes;
+            (unsigned) (p_element->m_node->m_start->m_addr - ctx->m_bytes);
     }
 
     VF_DUMP(DUMP_NODESTACK, DumpNodeStack(ctx));

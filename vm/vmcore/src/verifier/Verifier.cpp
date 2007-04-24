@@ -2399,11 +2399,7 @@ vf_opcode_aastore( vf_Instr *instr,     // code instruction
     vf_set_in_vector_stack_entry_ref( instr, 0, NULL );
     vf_set_in_vector_check( instr, 0, VF_CHECK_REF_ARRAY );
     vf_set_in_vector_stack_entry_int( instr, 1 );
-    if( vf_is_class_version_14( ctx ) ) {
-        vf_set_in_vector_type( instr, 2, SM_UP_ARRAY );
-    } else {
-        vf_set_in_vector_stack_entry_ref( instr, 2, NULL );
-    }
+    vf_set_in_vector_stack_entry_ref( instr, 2, NULL );
 }                               // vf_opcode_aastore
 
 /**
@@ -4709,8 +4705,8 @@ vf_parse_bytecode( vf_Context *ctx )
             index += 2;
             // zero number of opcode new is reserved for "uninitialized this"
             result =
-                vf_opcode_new( instr, const_index, instr - ctx->m_instr + 1,
-                               ctx );
+                vf_opcode_new( instr, const_index,
+                               vf_get_instr_index( instr, ctx ) + 1, ctx );
 
             if( VER_OK != result ) {
                 return result;

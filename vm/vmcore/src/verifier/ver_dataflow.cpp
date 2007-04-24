@@ -1018,28 +1018,23 @@ vf_set_node_out_vector( vf_NodeHandle node,     // a graph node
         // set OUT vector for a handler node
         return vf_get_handler_out_vector( invector, &node->m_outmap );
     }
-    // get first instruction
-    vf_InstrHandle instr = node->m_start;
-    unsigned instruction = node->m_end - node->m_start + 1;
-
     // set out vector for each instruction
-    for( unsigned index = 0; index < instruction; index++ ) {
-        if( ( 0 == instr[index].m_inlen + instr[index].m_outlen )
-            && ( VF_INSTR_NONE == instr[index].m_type ) ) {
+    for( vf_InstrHandle instr = node->m_start; instr <= node->m_end; instr++ ) {
+        if( ( 0 == instr->m_inlen + instr->m_outlen )
+            && ( VF_INSTR_NONE == instr->m_type ) ) {
             continue;
-        } else {
-            result = vf_get_instruction_out_vector( node, &instr[index],
-                                                    invector, ctx );
         }
+        result = vf_get_instruction_out_vector( node, instr, invector, ctx );
         if( VER_OK != result ) {
             return result;
         }
         VF_DUMP( DUMP_INSTR_MAP, {
                  // dump instruction OUT vector
-                 cerr << "-------------- instruction #" << index << ", node #"
-                 << node->m_nodecount << " out: " << endl;
-                 vf_dump_vector( invector, &instr[index], &cerr );
-                 }
+                 cerr << "-------------- instruction #" << ( instr -
+                                                             node->
+                                                             m_start ) <<
+                 ", node #" << node->m_nodecount << " out: " << endl;
+                 vf_dump_vector( invector, instr, &cerr );}
          );
     }
     return VER_OK;
@@ -1077,8 +1072,7 @@ vf_create_node_vectors( vf_NodeHandle node,     // a graph node
              m_nodecount << endl;
              // dump in vector
              cerr << "IN vector :" << endl;
-             vf_dump_vector( incoming, NULL, &cerr );
-             } );
+             vf_dump_vector( incoming, NULL, &cerr );} );
 
     // calculate OUT node vector
     vf_Result result = vf_set_node_out_vector( node, incoming, ctx );
@@ -1103,8 +1097,7 @@ vf_create_node_vectors( vf_NodeHandle node,     // a graph node
              // dump out vector
              cerr << "-------------- Node #" << node->m_nodecount
              << endl << "OUT vector:" << endl;
-             vf_dump_vector( outcoming, NULL, &cerr );
-             }
+             vf_dump_vector( outcoming, NULL, &cerr );}
      );
 
     // check stack modifier

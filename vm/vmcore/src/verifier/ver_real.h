@@ -1155,6 +1155,18 @@ vf_set_vector_stack_entry_ref( vf_MapEntry *vector,
 }                               // vf_set_vector_stack_entry_ref
 
 /**
+ * Gets an instruction index.
+ * @param[in] instr an instruction handle
+ * @param[in] ctx a verification context
+ * @return    an instruction index
+ */
+static inline unsigned
+vf_get_instr_index( vf_InstrHandle instr, vf_ContextHandle ctx )
+{
+    return ( unsigned )( instr - ctx->m_instr );
+}
+
+/**
  * Calculates an index of instruction.
  * @param[in] pc  a bytecode index at instruction start
  * @param[in] ctx a verification context
@@ -1165,7 +1177,7 @@ vf_bc_to_instr_index( unsigned short pc, vf_ContextHandle ctx )
 {
     vf_InstrHandle instr = ctx->m_bc[pc].m_instr;
     assert( instr );
-    return instr - ctx->m_instr;
+    return vf_get_instr_index( instr, ctx );
 }
 
 /**

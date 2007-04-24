@@ -656,6 +656,7 @@ vf_nullify_unreachable_bytecode( vf_ContextHandle ctx ) // verification context
                 vf_remove_inedge( edge );
             }
             node->m_inedge = node->m_outedge = NULL;
+            node->m_sub = NULL;
             node->m_outnum = 0;
         }
     }
