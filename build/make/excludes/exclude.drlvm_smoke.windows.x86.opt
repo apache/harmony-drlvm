@@ -7,3 +7,6 @@ gc/RunFinalizersOnExitTest.java
 
 # HARMONY-2977
 io/Integers.java
+
+# HARMONY-3731
+exception/FinalizeStackTest.java
