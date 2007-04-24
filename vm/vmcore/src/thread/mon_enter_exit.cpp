@@ -129,7 +129,10 @@ static void vm_monitor_exit_default(ManagedObject *p_obj)
     assert(p_obj);
     jobject jobj = oh_allocate_local_handle();
     jobj->object = p_obj;
+    hythread_suspend_enable();
+    // the function crashes during exception throwing if called in hythread_disabled state
     jthread_monitor_exit(jobj);
+    hythread_suspend_disable();
 }
 
 static uint32 vm_monitor_try_enter_default(ManagedObject *p_obj) {

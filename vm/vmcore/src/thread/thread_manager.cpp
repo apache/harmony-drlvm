@@ -158,7 +158,9 @@ IDATA jthread_throw_exception_object(jobject object) {
     if (interpreter_enabled()) {
         // FIXME - Function set_current_thread_exception does the same
         // actions as exn_raise_object, and it should be replaced.
+        hythread_suspend_disable();
         set_current_thread_exception(object->object);
+        hythread_suspend_enable();
     } else {
         if (is_unwindable()) {
             exn_throw_object(object);
