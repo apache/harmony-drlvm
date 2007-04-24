@@ -1038,7 +1038,8 @@ vf_set_node_out_vector( vf_NodeHandle node,     // a graph node
                  // dump instruction OUT vector
                  cerr << "-------------- instruction #" << index << ", node #"
                  << node->m_nodecount << " out: " << endl;
-                 vf_dump_vector( invector, &instr[index], &cerr );}
+                 vf_dump_vector( invector, &instr[index], &cerr );
+                 }
          );
     }
     return VER_OK;
@@ -1076,7 +1077,8 @@ vf_create_node_vectors( vf_NodeHandle node,     // a graph node
              m_nodecount << endl;
              // dump in vector
              cerr << "IN vector :" << endl;
-             vf_dump_vector( incoming, NULL, &cerr );} );
+             vf_dump_vector( incoming, NULL, &cerr );
+             } );
 
     // calculate OUT node vector
     vf_Result result = vf_set_node_out_vector( node, incoming, ctx );
@@ -1101,7 +1103,8 @@ vf_create_node_vectors( vf_NodeHandle node,     // a graph node
              // dump out vector
              cerr << "-------------- Node #" << node->m_nodecount
              << endl << "OUT vector:" << endl;
-             vf_dump_vector( outcoming, NULL, &cerr );}
+             vf_dump_vector( outcoming, NULL, &cerr );
+             }
      );
 
     // check stack modifier
@@ -1219,7 +1222,7 @@ vf_check_node_data_flow( vf_NodeHandle node,    // a graph node
  * Creates a map for a start node.
  */
 static void
-vf_create_start_map( vf_Context *ctx )      // verification context
+vf_create_start_map( vf_Context *ctx )  // verification context
 {
     vf_Graph *graph = ctx->m_graph;
 

@@ -105,20 +105,20 @@ static vf_Sub *AddNewSub(vf_NodeHandle ret_node, vf_SubContext * sub_ctx)
     return sub;
 }                               // AddNewSub
 
+
 /**
  * Adds a node to the subroutine.
- * @param[in] sub a subroutine
  * @param[in] node a node which is a part of this subroutine
  */
-static void AddSubNode(vf_Sub *sub, vf_Node *node)
+static inline void AddSubNode(vf_Node *node)
 {
-    assert(!node->m_sub);       // node is added once
-    node->m_sub = sub;
+    assert(node->m_mark);       // node is reachable
+    vf_Sub *sub = (vf_Sub *) node->m_sub;
     sub->m_nodenum++;
     // a number of out edges for reachable node won't
     // change while removing a dead code
     sub->m_out_edgenum += node->m_outnum;
-}                               // AddNewSub
+}                               // AddSubNode
 
 static inline vf_Result ResolveSubroutineEntryPoint(vf_Node *node,
     vf_Context *ctx)
@@ -168,49 +168,55 @@ static inline vf_Result ResolveSubroutineEntryPoint(vf_Node *node,
 static vf_Result MarkNode(vf_NodeStack &stack, vf_Context *ctx);
 
 /**
- * Fills <code>m_sub</code> field of the node using <code>m_sub</code> field of
- * the next node using the following rules:
- * <ul>
- * <li>If the mark of the next node is empty, it doesn't count.</li>
- * <li>If the mark of this node is empty, it is set to the following node
- * mark.</li>
- * <li>Otherwise node marks should be equal, or an error should be reported.</li>
- * </ul>
+ * Set a subroutine mark for the node and its predecessors. Stop recursive
+ * processing if the node subroutine mark is already set.
+ * @param[in] sub  the subroutine handle
+ * @param[in] node a node which is a part of a subroutine
+ * @param[in,out] ctx a verification context
+ * @return if the mark of this node is already set and is not equal to 
+ * <code>sub</code>, <code>VER_ErrorJsrMultipleRet</code> is reported
  */
 static inline vf_Result
-MergeSubMarks(vf_Node *node, vf_NodeHandle next_node, vf_Context *ctx)
+SetSubMarks(vf_SubHandle sub, vf_Node *node, vf_Context *ctx)
 {
-    if (next_node->m_sub) {
-        VF_TRACE("sub.mark", "sub[" << ctx->m_graph->GetNodeNum(node)
-            << "] := sub[" << ctx->m_graph->GetNodeNum(next_node->
-                m_sub->m_ret)
-            << "] (" << vf_get_sub_num(next_node->m_sub, ctx) << ")");
-        if (node->m_sub == NULL) {
-            AddSubNode((vf_Sub *) next_node->m_sub, node);
-        } else if (node->m_sub != next_node->m_sub) {
-            VF_REPORT(ctx,
-                "A subroutine splits execution into "
-                "several ret instructions");
-            return VER_ErrorJsrMultipleRet;
+    assert(sub);
+    VF_TRACE("sub.mark", "sub[" << ctx->m_graph->GetNodeNum(node)
+        << "] := sub[" << ctx->m_graph->GetNodeNum(sub->m_ret)
+        << "] (" << vf_get_sub_num(sub, ctx) << ")");
+    if (node->m_sub == sub) {
+        return VER_OK;          // already marked
+    }
+
+    if (NULL == node->m_sub) {
+        if (node == ctx->m_graph->GetStartNode()) {
+            VF_REPORT(ctx, "Reached ret not using jsr branches");
+            return VER_ErrorJsrOther;
         }
+
+        node->m_sub = sub;
+        if (node->m_mark) {
+            // add marked nodes now, others later
+            AddSubNode(node);
+        }
+        for (vf_EdgeHandle inedge = node->m_inedge;
+            inedge; inedge = inedge->m_innext) {
+            if (vf_is_jsr_branch(inedge, ctx)) {
+                continue;
+            }
+            vf_Result result =
+                SetSubMarks(sub, (vf_Node *) inedge->m_start, ctx);
+            if (result != VER_OK) {
+                return result;
+            }
+        }
+        return VER_OK;
     }
-    return VER_OK;
-}                               // MergeSubMarks
 
-
-/**
- * Marks an edge end node.
- */
-static inline vf_Result
-FollowEdge(vf_Node *node, vf_NodeStack &stack, vf_Context *ctx)
-{
-    vf_Result r = MarkNode(stack, ctx);
-    if (VER_OK != r) {
-        return r;
-    }
-
-    return MergeSubMarks(node, stack.m_node, ctx);
-}                               // FollowEdge
+    assert(node->m_sub != sub);
+    VF_REPORT(ctx,
+        "A subroutine splits execution into several ret instructions");
+    return VER_ErrorJsrMultipleRet;
+}                               // SetSubMarks
 
 /**
  * Marks a <code>jsr</code> edge end node. If the subroutine returns, marks a node, which
@@ -219,25 +225,20 @@ FollowEdge(vf_Node *node, vf_NodeStack &stack, vf_Context *ctx)
 static inline vf_Result
 FollowJsrEdge(vf_Node *node, vf_NodeStack &stack, vf_Context *ctx)
 {
-    bool set_start = !ctx->m_sub_ctx->m_path_start;
-    if (set_start) {
+    vf_NodeStackHandle path_start = ctx->m_sub_ctx->m_path_start;
+    if (!path_start) {
         ctx->m_sub_ctx->m_path_start = &stack;
     }
+
     vf_Result r = MarkNode(stack, ctx);
     if (VER_OK != r) {
         return r;
     }
 
-    if (stack.m_node->m_sub) {
-        // if this jsr returns we need to process a node which
+    if (stack.m_node->m_sub->m_entry == stack.m_node) {
+        // this jsr returns, and we need to process a node which
         // follows after edge start node
-        if (stack.m_node->m_sub->m_entry != stack.m_node) {
-            VF_REPORT(ctx, "Subroutines merge their execution");
-            return VER_ErrorDataFlow;
-        }
-
         ctx->m_sub_ctx->m_path_fork = &stack;
-
         // select and check the following node
         stack.Set(node + 1, stack.m_node->m_sub->m_ret->m_outmap.m_depth);
         if (VF_NODE_END_ENTRY == stack.m_node->m_type) {
@@ -245,18 +246,22 @@ FollowJsrEdge(vf_Node *node, vf_NodeStack &stack, vf_Context *ctx)
             return VER_ErrorBranch;
         }
         assert(VF_NODE_CODE_RANGE == stack.m_node->m_type);
-
         r = MarkNode(stack, ctx);
+        if (VER_OK != r) {
+            return r;
+        }
         ctx->m_sub_ctx->m_path_fork = NULL;
+    }
+
+    if (stack.m_node->m_sub) {
+        r = SetSubMarks(stack.m_node->m_sub, node, ctx);
         if (VER_OK != r) {
             return r;
         }
     }
 
-    if (set_start) {
-        ctx->m_sub_ctx->m_path_start = NULL;
-    }
-    return MergeSubMarks(node, stack.m_node, ctx);
+    ctx->m_sub_ctx->m_path_start = path_start;
+    return r;
 }                               // FollowJsrEdge
 
 /**
@@ -269,7 +274,6 @@ static vf_Result MarkNode(vf_NodeStack &stack, vf_Context *ctx)
 {
     vf_Graph *graph = ctx->m_graph;
     vf_Result r;
-
     vf_Result result =
         vf_check_node_stack_depth(stack.m_node, stack.m_depth, ctx);
     if (result != VER_Continue) {
@@ -277,21 +281,20 @@ static vf_Result MarkNode(vf_NodeStack &stack, vf_Context *ctx)
     }
     VF_TRACE("sub.mark",
         "Processing node " << graph->GetNodeNum(stack.m_node));
+    if (stack.m_node->m_sub) {
+        AddSubNode(stack.m_node);
+    }
 
-    if (VF_NODE_CODE_RANGE == stack.m_node->m_type) {
-        vf_InstrType last_instr_type = stack.m_node->m_end->m_type;
-
-        if (VF_INSTR_RET == last_instr_type) {
-            if (!ctx->m_sub_ctx->m_path_start) {
-                VF_REPORT(ctx, "Reached ret not using jsr branches");
-                return VER_ErrorJsrOther;
-            }
-            vf_Sub *sub = AddNewSub(stack.m_node, ctx->m_sub_ctx);
-            AddSubNode(sub, stack.m_node);
-            r = ResolveSubroutineEntryPoint(stack.m_node, ctx);
-            if (VER_OK != r) {
-                return r;
-            }
+    if ((VF_NODE_CODE_RANGE == stack.m_node->m_type)
+        && (VF_INSTR_RET == stack.m_node->m_end->m_type)) {
+        vf_Sub *sub = AddNewSub(stack.m_node, ctx->m_sub_ctx);
+        r = SetSubMarks(sub, stack.m_node, ctx);
+        if (VER_OK != r) {
+            return r;
+        }
+        r = ResolveSubroutineEntryPoint(stack.m_node, ctx);
+        if (VER_OK != r) {
+            return r;
         }
     }
 
@@ -301,7 +304,7 @@ static vf_Result MarkNode(vf_NodeStack &stack, vf_Context *ctx)
         outedge; outedge = outedge->m_outnext) {
         next_stack.Set(outedge->m_end, stack.m_depth);
         if (!vf_is_jsr_branch(outedge, ctx)) {
-            r = FollowEdge(stack.m_node, next_stack, ctx);
+            r = MarkNode(next_stack, ctx);
         } else {
             assert(VF_NODE_CODE_RANGE == outedge->m_end->m_type);
             assert(!outedge->m_outnext);
@@ -311,7 +314,6 @@ static vf_Result MarkNode(vf_NodeStack &stack, vf_Context *ctx)
             return r;
         }
     }
-
     return VER_OK;
 }                               // MarkNode
 
@@ -320,17 +322,18 @@ vf_Result vf_mark_subroutines(vf_Context *ctx)
 {
     vf_Graph *graph = ctx->m_graph;
     AllocateSubContext(ctx);
-
-    vf_NodeStack bottom =
-        { (vf_Node *) ctx->m_graph->GetStartNode(), 0, NULL };
+    vf_NodeStack bottom = {
+        (vf_Node *) ctx->m_graph->GetStartNode(), 0, NULL
+    };
     vf_Result r = MarkNode(bottom, ctx);
     return r;
 }                               // vf_mark_subroutines
 
 static vf_Result AddDupCount(vf_Sub *sub, unsigned &count, vf_Context *ctx)
 {
-    VF_TRACE("dupcount", "Calculating a duplication count for a subroutine #"
-        << vf_get_sub_num(sub, ctx));
+    VF_TRACE("dupcount",
+        "Calculating a duplication count for a subroutine #" <<
+        vf_get_sub_num(sub, ctx));
     if (ALL_BITS_SET == sub->m_dupcount) {
         VF_REPORT(ctx, "Found a recursive subroutine call sequence");
         return VER_ErrorJsrRecursive;
@@ -338,12 +341,10 @@ static vf_Result AddDupCount(vf_Sub *sub, unsigned &count, vf_Context *ctx)
 
     if (!sub->m_dupcount) {
         sub->m_dupcount = ALL_BITS_SET;
-
         unsigned sum = 0;
         for (vf_EdgeHandle inedge = sub->m_entry->m_inedge;
             inedge; inedge = inedge->m_innext) {
             vf_NodeHandle node = inedge->m_start;
-
             if (vf_is_jsr_branch(inedge, ctx)) {
                 assert(!inedge->m_outnext);
                 if (node->m_sub == NULL) {
@@ -361,8 +362,9 @@ static vf_Result AddDupCount(vf_Sub *sub, unsigned &count, vf_Context *ctx)
         sub->m_dupcount = sum;
     }
 
-    VF_TRACE("dupcount", "A duplication count for a subroutine #"
-        << vf_get_sub_num(sub, ctx) << " is " << sub->m_dupcount);
+    VF_TRACE("dupcount",
+        "A duplication count for a subroutine #" << vf_get_sub_num(sub,
+            ctx) << " is " << sub->m_dupcount);
     count += sub->m_dupcount;
     return VER_OK;
 }                               // AddSubDupCount
@@ -371,7 +373,6 @@ static void InlineSubNodes(vf_ContextHandle ctx)
 {
     vf_Graph *graph = ctx->m_graph;
     vf_Sub *sub;
-
     for (sub = ctx->m_sub_ctx->m_sub; sub; sub = sub->m_next) {
         sub->m_nodes =
             (vf_NodeHandle *) vf_palloc(ctx->m_sub_ctx->m_pool,
@@ -415,7 +416,6 @@ static void InlineSubNodes(vf_ContextHandle ctx)
         }
     }
     assert(0 == ctx->m_graph->HasMoreNodeSpace());
-
 }                               // InlineSubNodes
 
 /**
@@ -424,7 +424,6 @@ static void InlineSubNodes(vf_ContextHandle ctx)
 static void InlineInEdges(vf_ContextHandle ctx)
 {
     vf_Graph *graph = ctx->m_graph;
-
     for (vf_SubHandle sub = ctx->m_sub_ctx->m_sub; sub; sub = sub->m_next) {
         ((vf_Sub *) sub)->m_following_nodes =
             (vf_Node **) vf_palloc(ctx->m_sub_ctx->m_pool,
@@ -465,7 +464,6 @@ static void InlineInEdges(vf_ContextHandle ctx)
 static void InlineOutEdges(vf_ContextHandle ctx)
 {
     vf_Graph *graph = ctx->m_graph;
-
     for (vf_SubHandle sub = ctx->m_sub_ctx->m_sub; sub; sub = sub->m_next) {
         if (!sub->m_copies) {
             continue;
@@ -474,12 +472,10 @@ static void InlineOutEdges(vf_ContextHandle ctx)
         for (unsigned node_index = 0; node_index < sub->m_nodenum;
             node_index++, copy += sub->m_dupcount - 1) {
             vf_NodeHandle node = sub->m_nodes[node_index];
-
             for (vf_EdgeHandle outedge = node->m_outedge; outedge;
                 outedge = outedge->m_outnext) {
                 vf_NodeHandle end_node = outedge->m_end;
                 vf_SubHandle end_sub = end_node->m_sub;
-
                 vf_Node *c = copy;
                 if (NULL == end_sub) {
                     for (unsigned index = 1; index < sub->m_dupcount; index++) {
@@ -527,7 +523,6 @@ static void InlineRetEdges(vf_ContextHandle ctx)
         vf_Node *ret_node = (vf_Node *) sub->m_ret;
         vf_Node **next_node = sub->m_following_nodes;
         graph->NewEdge(ret_node, *(next_node++));
-
         vf_Node *ret_node_copy =
             sub->m_copies + ret_node->m_nodecount * (sub->m_dupcount - 1);
         for (unsigned index = 1; index < sub->m_dupcount; index++) {
@@ -576,13 +571,11 @@ vf_Result vf_inline_subroutines(vf_Context *ctx)
         edges += sub->m_dupcount;
     }
     ctx->m_graph->CreateEdges(edges);
-
     if (nodes) {
         ctx->m_graph->CreateNodes(nodes);
         InlineSubNodes(ctx);
     }
     InlineInEdges(ctx);
-
     if (nodes) {
         InlineOutEdges(ctx);
     }

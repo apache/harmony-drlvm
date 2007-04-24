@@ -230,7 +230,8 @@ inline vf_HashEntry *vf_Hash::NewHashEntry( const char *key,    // hash key
 /**
  * Type constraint collection constructor.
  */
-vf_TypePool::vf_TypePool():m_method( NULL ), m_restriction( NULL )
+vf_TypePool::vf_TypePool ():m_method( NULL ),
+m_restriction( NULL )
 {
     m_pool = vf_create_pool();
     m_Hash = new vf_Hash ( m_pool );
@@ -239,7 +240,7 @@ vf_TypePool::vf_TypePool():m_method( NULL ), m_restriction( NULL )
 /**
  * Type constraint collection destructor.
  */
-vf_TypePool::~vf_TypePool()
+vf_TypePool::~vf_TypePool ()
 {
     delete m_Hash;
     vf_delete_pool( m_pool );
@@ -248,9 +249,8 @@ vf_TypePool::~vf_TypePool()
 /**
  * Function creates valid type which is identical to current class.
  */
-vf_ValidType *
-vf_TypePool::NewType( const char *type, // class name
-                      size_t len )      // name length
+vf_ValidType *vf_TypePool::NewType( const char *type,   // class name
+                                    size_t len )        // name length
 {
     vf_ValidType *result;
     vf_HashEntry *hash;
@@ -287,8 +287,7 @@ vf_type_string_compare( const void *type_string1, const void *type_string2 )
 /**
  * Function creates valid type which is identical to an element of a given array type.
  */
-vf_ValidType *
-vf_TypePool::NewArrayElemType( vf_ValidType *array )    // array type
+vf_ValidType *vf_TypePool::NewArrayElemType( vf_ValidType *array )      // array type
 {
     vf_ValidType *result;
     vf_HashEntry *hash;
@@ -327,8 +326,7 @@ vf_TypePool::NewArrayElemType( vf_ValidType *array )    // array type
 /**
  * Dumps constraint collection in stream.
  */
-void
-vf_TypePool::DumpTypeConstraints( ostream *out )        // output stream
+void vf_TypePool::DumpTypeConstraints( ostream *out )   // output stream
 {
     if( out == NULL ) {
         out = &cerr;
@@ -347,8 +345,7 @@ vf_TypePool::DumpTypeConstraints( ostream *out )        // output stream
 /**
  * Function returns the methods constraints array.
  */
-inline vf_TypeConstraint *
-vf_TypePool::GetClassConstraint()
+inline vf_TypeConstraint *vf_TypePool::GetClassConstraint()
 {
     return m_restriction;
 }                               // vf_TypePool::GetClassConstraint
@@ -356,8 +353,7 @@ vf_TypePool::GetClassConstraint()
 /**
  * Sets current context method.
  */
-void
-vf_TypePool::SetMethod( method_handler method )
+void vf_TypePool::SetMethod( method_handler method )
 {
     // set method
     m_method = method;
@@ -366,11 +362,10 @@ vf_TypePool::SetMethod( method_handler method )
 /**
  * Sets restriction from target class to source class.
  */
-void
-vf_TypePool::SetRestriction( const char *target,        // target class name
-                             const char *source,        // source class name
-                             unsigned short index,      // constant pool index
-                             vf_CheckConstraint check_type )    // constraint check type
+void vf_TypePool::SetRestriction( const char *target,   // target class name
+                                  const char *source,   // source class name
+                                  unsigned short index, // constant pool index
+                                  vf_CheckConstraint check_type )       // constraint check type
 {
     vf_TypeConstraint *restriction;
 
@@ -419,11 +414,10 @@ vf_TypePool::SetRestriction( const char *target,        // target class name
 /**
  * Checks types and create constraints if it's necessarily.
  */
-bool
-vf_TypePool::CheckTypes( vf_ValidType *required,        // required type
-                         vf_ValidType *available,       // available type
-                         unsigned short index,  // constant pool index
-                         vf_CheckConstraint check_type )        // constraint check type
+bool vf_TypePool::CheckTypes( vf_ValidType *required,   // required type
+                              vf_ValidType *available,  // available type
+                              unsigned short index,     // constant pool index
+                              vf_CheckConstraint check_type )   // constraint check type
 {
     unsigned index1, index2;
 
@@ -530,9 +524,8 @@ vf_TypePool::CheckTypes( vf_ValidType *required,        // required type
  * Function merges two valid types.
  * Function returns NULL if vector wasn't merged.
  */
-vf_ValidType *
-vf_TypePool::MergeTypes( vf_ValidType *first,   // first merged type
-                         vf_ValidType *second ) // second merged type
+vf_ValidType *vf_TypePool::MergeTypes( vf_ValidType *first,     // first merged type
+                                       vf_ValidType *second )   // second merged type
 {
     // check null reference
     if( first == NULL ) {

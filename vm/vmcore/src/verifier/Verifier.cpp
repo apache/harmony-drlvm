@@ -3290,7 +3290,8 @@ vf_opcode_areturn( vf_Instr *instr,     // a return instruction
     // create in vector
     vf_new_in_vector( instr, 1, ctx->m_pool );
     vf_set_in_vector_stack_entry_ref( instr, 0,
-                                      ctx->m_method_outvector->m_vtype );
+                                      ( ctx->m_method_outlen ) ? ctx->
+                                      m_method_outvector->m_vtype : 0 );
 
     // set flag and make checks
     vf_opcode_return( instr, next_pc, ctx );
@@ -4979,7 +4980,7 @@ vf_verify_class( class_handler klass,   // verified class
     /**
      * Create type pool
      */
-    ctx.m_type = new vf_TypePool();
+    ctx.m_type = new vf_TypePool ();
 
     /**
      * Create memory pool

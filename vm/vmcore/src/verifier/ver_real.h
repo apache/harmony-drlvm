@@ -574,7 +574,7 @@ struct vf_HashEntry
  */
 struct vf_Hash
 {
-public:
+  public:
     /**
      * Hash table constructor.
      * @note Function allocates memory for hash pool and hash table.
@@ -695,18 +695,18 @@ struct vf_TypeConstraint
  */
 struct vf_TypePool
 {
-public:
+  public:
     /**
      * Type constraint collection constructor.
      * @note Function allocates memory for collection memory pool and hash table.
      */
-    vf_TypePool();
+    vf_TypePool ();
 
     /**
      * Type constraint collection destructor.
      * @note Function release memory for collection memory pool and hash table.
      */
-    ~vf_TypePool();
+               ~vf_TypePool ();
 
     /**
      * Function creates valid type which is identical to given class.
@@ -802,7 +802,7 @@ void vf_clean_pool_func( vf_Pool *pool, VF_SOURCE_PARAMS );
  */
 struct vf_Context
 {
-public:
+  public:
     /**
      * Verifier context constructor
      */
@@ -860,7 +860,7 @@ public:
         vf_clean_pool( m_pool );
     }                           // vf_ClearContext
 
-public:
+  public:
     vf_TypePool *m_type;        ///< context type constraint collection
     char *m_error;              ///< context error message
     vf_Graph *m_graph;          ///< control flow graph

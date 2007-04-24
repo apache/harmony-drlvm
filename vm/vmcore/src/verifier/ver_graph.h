@@ -232,7 +232,7 @@ class vf_Iterator
         }
         SkipContainer();
     }
-public:
+  public:
     /**
      * Empty constructor.
      */
@@ -361,7 +361,7 @@ class vf_Graph
      */
     void DumpDotEnd(ofstream &fout);
 
-public:
+  public:
     /**
      * Constructs a control flow graph and allocates memory for
      * graph structure, nodes and edges.
@@ -369,6 +369,8 @@ public:
      * @param edgenum a number of graph edges
      * @param ctx     a verification context
      */
+
+
     vf_Graph(unsigned nodenum, unsigned edgenum,
         vf_ContextHandle ctx):m_nodes(NULL), m_edges(NULL),
         m_pool(ctx->m_pool), m_enum(NULL), m_nodenum(0), m_edgenum(0),
@@ -453,6 +455,10 @@ public:
     {
         vf_InstrHandle instr = m_ctx->m_bc[pc].m_instr;
         assert(instr);
+
+
+
+
         assert(m_ctx->m_bc[pc].m_instr->m_addr - m_ctx->m_bytes == pc);
         vf_NodeHandle node = instr->m_node;
         assert(GetNodeNum(node) > m_ctx->m_handlers);

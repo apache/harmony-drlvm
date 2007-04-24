@@ -36,6 +36,9 @@
     aload_0
     invokevirtual org/apache/harmony/drlvm/tests/regression/h3225/PositiveJsrTest/testCallFromHandler()V
 
+    aload_0
+    invokevirtual org/apache/harmony/drlvm/tests/regression/h3225/PositiveJsrTest/testBranches()V
+
     return
 .end method
 
@@ -114,7 +117,7 @@ LabelSub:
 .end method
 
 ;
-; Subroutine is called from another subroutine twice.
+; A subroutine is called from another subroutine twice.
 ;
 .method public testNestedSubs()V
     .limit stack 1
@@ -136,7 +139,7 @@ LabelSubSub:
 .end method
 
 ;
-; Subroutine is called from the exception handler of
+; A subroutine is called from the exception handler of
 ; the other subroutine.
 ;
 .method public testCallFromHandler()V
@@ -165,5 +168,37 @@ LabelHandler:
     return
 
 .catch all from LabelStartHandler to LabelEndHandler using LabelHandler
+.end method
+
+
+;
+; Subroutine contains different branches.
+;
+.method public testBranches()V
+    .limit stack 1
+    .limit locals 2
+
+    aconst_null
+    astore_0
+    jsr LabelSub
+    aload_0
+    pop
+    iconst_0
+    istore_0
+    jsr LabelSub
+    iload_0
+    return
+
+LabelSub:
+    astore 1
+LabelBranch:
+    aconst_null
+    ifnonnull LabelBranch
+    aconst_null
+    ifnull LabelRet
+    goto LabelBranch
+LabelRet:
+    ret 1
+
 .end method
 
