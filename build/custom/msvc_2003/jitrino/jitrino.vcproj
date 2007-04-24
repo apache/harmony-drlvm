@@ -668,6 +668,9 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32GCSafePoints.h">
 				</File>
 				<File
+					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32i586InstsExpansion.cpp">
+				</File>
+				<File
 					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32I8Lowerer.cpp">
 				</File>
 				<File

@@ -422,19 +422,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\gc_gen\src\common\mark_scan.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\gc_gen\src\common\mark_scan_par.cpp"
-				>
-			</File>
-			<File
 				RelativePath="..\..\..\..\vm\gc_gen\src\common\mark_scan_pool.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\gc_gen\src\common\mark_scan_seq.cpp"
 				>
 			</File>
 			<File
@@ -474,10 +462,6 @@
 			Name="jni"
 			>
 			<File
-				RelativePath="..\..\..\..\vm\gc_gen\src\jni\helper.cpp"
-				>
-			</File>
-			<File
 				RelativePath="..\..\..\..\vm\gc_gen\src\jni\java_natives.cpp"
 				>
 			</File>
@@ -511,14 +495,6 @@
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\gc_gen\src\mark_compact\mspace_alloc.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\gc_gen\src\mark_compact\mspace_collect.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\gc_gen\src\mark_compact\mspace_collect.h"
 				>
 			</File>
 			<File
@@ -578,10 +554,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\gc_gen\src\thread\collector_alloc.cpp"
-				>
-			</File>
-			<File
 				RelativePath="..\..\..\..\vm\gc_gen\src\thread\collector_alloc.h"
 				>
 			</File>
@@ -623,30 +595,6 @@
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\gc_gen\src\trace_forward\fspace_alloc.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\gc_gen\src\trace_forward\fspace_collect_copy.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\gc_gen\src\trace_forward\fspace_collect_forward.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\gc_gen\src\trace_forward\fspace_collect_forward_par.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\gc_gen\src\trace_forward\fspace_collect_forward_seq.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\gc_gen\src\trace_forward\fspace_copy.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\gc_gen\src\trace_forward\fspace_forward.cpp"
 				>
 			</File>
 			<File

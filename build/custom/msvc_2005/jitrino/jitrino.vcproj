@@ -1083,10 +1083,6 @@
 					>
 				</File>
 				<File
-					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32I8Lowerer.cpp"
-					>
-				</File>
-				<File
 					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32Inst.cpp"
 					>
 				</File>
