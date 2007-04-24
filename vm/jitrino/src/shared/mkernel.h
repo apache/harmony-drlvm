@@ -574,7 +574,10 @@ private:
 class CPUID {
     CPUID(){}
 public:
+#if defined(_IA32_) || defined(_EM64T_)
+    /** SSE2 is an extension of the IA-32 architecture, since 2000. */
     static bool isSSE2Supported();
+#endif
 };
 
 }; // ~namespace Jitrino

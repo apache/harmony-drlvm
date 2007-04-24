@@ -190,24 +190,28 @@ unsigned Runtime::init_num_cpus(void)
 #endif    
 }
 
-
+#if defined(_EM64T_)
 bool CPUID::isSSE2Supported() {
-//uncomment to test on SSE2 PC:
-//  if (true) return false;
-#if defined (_EM64T_) || defined(_IA64_)
     return true;
-#else
-
+}
+#elif defined(_IA32_) //older IA-32
+bool CPUID::isSSE2Supported() {
+    /*
+     * cpuid instruction: 
+     * - takes 0x1 on eax,
+     * - returns standard features flags in edx, bit 26 is SSE2 flag
+     * - clobbers ebx, ecx
+     */
     unsigned int fflags =0;
 #ifdef _WIN32
     __asm {
-        mov    eax, 0x1  //returns standard features flags in edx, bit 26 is SSE2 flag
+        mov    eax, 0x1
         cpuid
         mov    fflags, edx
     };
-#elif PLATFORM_POSIX
+#elif defined (__linux__)
     unsigned int stub;
-
+    //ebx must be restored for -fPIC
      __asm__ __volatile__ (
             "push %%ebx; cpuid; mov %%ebx, %%edi; pop %%ebx" :
                 "=a" (stub),
@@ -215,12 +219,11 @@ bool CPUID::isSSE2Supported() {
                 "=c" (stub),
                 "=d" (fflags) : "a" (0x1));
 #else
-#error 0  
+#error "Need assembly code to query CPUID on this platform"
 #endif
     bool res = ((fflags & (1<<26))!=0);
     return res;
-
-#endif
 }
+#endif //older IA-32
 
 }; // ~namespace Jitrino
