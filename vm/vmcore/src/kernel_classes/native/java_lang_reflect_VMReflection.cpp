@@ -294,7 +294,6 @@ JNIEXPORT jobject JNICALL Java_java_lang_reflect_VMReflection_newArrayInstance
             assert(exn_raised());
             break;
         }
-        WARN(arrClss->get_name()->bytes);
     }
 
     jobject jarray = arrClss ? createArray(jenv, arrClss, dims, depth) : NULL;
