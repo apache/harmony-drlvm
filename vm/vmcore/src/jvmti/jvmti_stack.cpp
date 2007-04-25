@@ -41,16 +41,10 @@
 #define jvmti_test_jenv (p_TLS_vmthread->jni_env)
 
 jthread getCurrentThread() {
-    tmn_suspend_disable();
-    ObjectHandle hThread = oh_allocate_local_handle();
-    jthread thread = jthread_self();
-    if(thread) {
-        hThread->object = (Java_java_lang_Thread *)thread->object;
-    } else {
-        hThread->object = NULL;
-    }
-    tmn_suspend_enable();
-    return (jthread) hThread;
+    jthread current_thread = jthread_self();
+    assert(current_thread);
+
+    return oh_copy_to_local_handle(current_thread);
 }
 
 jint get_thread_stack_depth(VM_thread *thread, jint* pskip)

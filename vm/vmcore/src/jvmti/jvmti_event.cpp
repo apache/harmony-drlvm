@@ -1785,10 +1785,14 @@ void jvmti_send_class_file_load_hook_event(const Global_Env* env,
         return;
 
     JNIEnv *jni_env = p_TLS_vmthread->jni_env;
-    tmn_suspend_disable();
-    ObjectHandle hLoader = oh_convert_to_local_handle((ManagedObject*)loader->GetLoader());
-    if( !(hLoader->object) ) hLoader = NULL;
-    tmn_suspend_enable();
+
+    ObjectHandle hLoader = NULL;
+    if (! loader->IsBootstrap()) {
+        tmn_suspend_disable();
+        hLoader = oh_convert_to_local_handle((ManagedObject*)loader->GetLoader());
+        tmn_suspend_enable();
+    }
+
     jint input_len = classlen;
     jint output_len = 0;
     unsigned char* input_class = classbytes;

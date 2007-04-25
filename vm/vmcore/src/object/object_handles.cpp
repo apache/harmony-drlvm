@@ -392,6 +392,7 @@ ObjectHandle oh_allocate_local_handle()
 
 ObjectHandle oh_convert_to_local_handle(ManagedObject* pointer) {
     assert(!hythread_is_suspend_enabled());
+    assert(pointer);
     ObjectHandle jobj = oh_allocate_local_handle();
     TRACE2("oh", "oh_convert_to_local_handle() pointer = " << pointer << ", handle = " << jobj);
     jobj->object = pointer;
@@ -401,6 +402,8 @@ ObjectHandle oh_convert_to_local_handle(ManagedObject* pointer) {
 
 ObjectHandle oh_copy_to_local_handle(ObjectHandle oh) {
     tmn_suspend_disable();
+    assert(oh);
+    assert(oh->object);
     ObjectHandle jobj = oh_allocate_local_handle();
     TRACE2("oh", "oh_copy_to_local_handle() oh = " << oh << ", handle = " << jobj);
     jobj->object = oh->object;
