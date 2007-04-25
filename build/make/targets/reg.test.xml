@@ -87,10 +87,12 @@
                      property="reg.test.src.jasmin.list"
                      refid="reg.test.src.jasmin.set"/>
        
-        <java jar="${jasmin.jar}" fork="true">
+        <java jar="${jasmin.jar}" fork="true" outputproperty="jasmin-reg-out" errorproperty="jasmin-reg-err">
             <arg line="-d ${reg.test.class.path}"/>
             <arg line="${reg.test.src.jasmin.list}"/>
         </java>
+        <echo level="error" message="${jasmin-reg-err}"/>
+        <echo level="verbose" message="${jasmin-reg-out}"/>
     </target>
 
     <target name="compile-reg-tests-java"
@@ -98,9 +100,9 @@
         <javac srcdir="${reg.test.src}"
                includes="**/*.java"
                destdir="${reg.test.class.path}"
-               source="1.5" target="1.5" listfiles="true"
+               source="1.5" target="1.5" 
                debug="true"
-               verbose="yes">
+               verbose="no" listfiles="no">
             <depend targetdir="${reg.test.class.path}">
                 <mapper>
                     <chainedmapper>
@@ -153,7 +155,7 @@
                 <property name="objdir" value="${outdir}/_obj"/>
                 <mkdir dir="${objdir}"/>
 
-                <echo message="## Compiling reg native ${outname}" />
+                <!--echo message="## Compiling reg native ${outname}" /-->
                 <cc name="${build.cxx}"
                     debug="true"
                     runtime="dynamic"
