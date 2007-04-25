@@ -123,6 +123,9 @@ void gc_space_tune_before_gc(GC* gc, unsigned int cause)
 {
   if(gc_match_kind(gc, MINOR_COLLECTION)) return;
   Space_Tuner* tuner = gc->tuner;
+  if((tuner->speed_los == 0) && ( tuner->speed_mos == 0)) return;
+  if(tuner->speed_los == 0) tuner->speed_los = 16;
+  if(tuner->speed_mos == 0) tuner->speed_mos = 16;
 
   /*Needn't tune if dw does not reach threshold.*/  
   if(tuner->current_dw > tuner->threshold)  tuner->need_tune = 1;
@@ -135,12 +138,17 @@ void gc_space_tune_before_gc(GC* gc, unsigned int cause)
   Space* lspace = (Space*)gc_get_los((GC_Gen*)gc);
 
   POINTER_SIZE_INT los_expect_survive_sz = (POINTER_SIZE_INT)((float)(lspace->surviving_size + lspace->alloced_size) * lspace->survive_ratio);
-  POINTER_SIZE_INT los_expect_free_sz = lspace->committed_heap_size - los_expect_survive_sz;
+  POINTER_SIZE_INT los_expect_free_sz = ((lspace->committed_heap_size > los_expect_survive_sz) ? 
+                                                            (lspace->committed_heap_size - los_expect_survive_sz) : 0);
   POINTER_SIZE_INT mos_expect_survive_sz = (POINTER_SIZE_INT)((float)(mspace->surviving_size + mspace->alloced_size) * mspace->survive_ratio);
-  POINTER_SIZE_INT mos_expect_free_sz = mspace_get_expected_threshold((Mspace*)mspace) - mos_expect_survive_sz;
+  POINTER_SIZE_INT mos_expect_threshold = mspace_get_expected_threshold((Mspace*)mspace);
+  POINTER_SIZE_INT mos_expect_free_sz = ((mos_expect_threshold > mos_expect_survive_sz)?
+                                                            (mos_expect_threshold - mos_expect_survive_sz) : 0);
   POINTER_SIZE_INT total_free = los_expect_free_sz + mos_expect_free_sz;
+  assert(total_free <= gc->committed_heap_size);
   float new_los_ratio = (float)tuner->speed_los / (float)(tuner->speed_los  + tuner->speed_mos);
   POINTER_SIZE_INT new_free_los_sz = (POINTER_SIZE_INT)((float)total_free * new_los_ratio);
+  assert(new_free_los_sz <= gc->committed_heap_size);  
   POINTER_SIZE_INT max_tuning_size = 0;
   /*LOS_Extend:*/
   if((new_free_los_sz > los_expect_free_sz) )
