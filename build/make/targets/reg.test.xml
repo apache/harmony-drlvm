@@ -116,6 +116,10 @@
                     </chainedmapper>
                 </mapper>
             </depend>
+            <classpath>
+                <pathelement path="${java.class.path}/"/>
+                <fileset dir="${build.VMMAGIC.home}" includes="vmmagic-20070207.jar" />
+            </classpath>
         </javac>
     </target>
 
