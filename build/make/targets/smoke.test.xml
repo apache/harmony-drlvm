@@ -240,7 +240,8 @@ ${foo}
                             fork="true"
                             jvm="${build.deploy.dir}/jdk/jre/bin/java${executable.postfix}"
                             error="${build.dir}/_smoke.tests/reports/${class.name}_${mode.id}.out.err"
-                            resultproperty="res.code">
+                            resultproperty="res.code"
+                            timeout="${test.timeout}" >
                             <jvmarg line="-XX:-vm.assert_dialog ${mode.switch} ${test.vmargs}" />
                             <jvmarg value="-Djava.library.path=${smoke.test.native.path}/${outdir}" />
                             <jvmarg value="-classpath" />
