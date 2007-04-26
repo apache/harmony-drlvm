@@ -537,17 +537,18 @@ static bool inlineJSR(IRManager* irManager, Node *block, DefUseBuilder& defUses,
             ++eiter;
             Node *node = edge->getSourceNode();
             Inst* last = (Inst*)node->getLastInst();
-            assert(last->isJSR());
-            last->unlink();
-            assert(node->getOutDegree() == 2);
-            Node* t1 = node->getOutEdges().front()->getTargetNode();
-            Node* t2 = node->getOutEdges().back()->getTargetNode();
-            if(t1 == entryJSR) {
-                fg.removeEdge(node, t2);
+            if (last->isJSR()) {
+	           last->unlink();
             }
-            else {
-                assert(t2 == entryJSR);
-                fg.removeEdge(node, t1);
+            if (node->getOutDegree() == 2) {
+	            Node* t1 = node->getOutEdges().front()->getTargetNode();
+	            Node* t2 = node->getOutEdges().back()->getTargetNode();
+	            if(t1 == entryJSR) {
+	                fg.removeEdge(node, t2);
+	            } else {
+	                assert(t2 == entryJSR);
+	                fg.removeEdge(node, t1);
+	            }
             }
         }
     } else if (entryJSR->hasOnlyOnePredEdge()) {

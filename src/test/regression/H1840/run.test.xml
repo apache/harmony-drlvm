@@ -4,6 +4,10 @@
             test="org.apache.harmony.drlvm.tests.regression.h1840.SimplestTest"
             vmarg="-Xem:jet -XX:-vm.assert_dialog">
         </run-junit-test>
+        <run-junit-test
+            test="org.apache.harmony.drlvm.tests.regression.h1840.SimplestTest"
+            vmarg="-Xem:opt -XX:-vm.assert_dialog">
+        </run-junit-test>
     </target>
 </project>
 
