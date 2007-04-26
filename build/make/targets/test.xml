@@ -16,8 +16,8 @@
 -->
 <project name="ALL TESTS">
     <select arch="ipf">
-        <propertyregex property="test.mode" input="int" regexp="" replace="" override="on" />
-        <target name="test" depends="smoke.test, check-result"/>
+        <propertyregex property="test.mode" input="${test.mode}" regexp="(jet|opt|srv)" replace="" override="on" />
+        <target name="test" depends="smoke.test, kernel.test, check-result"/>
     </select>
     <select arch="ia32,em64t">
         <target name="test" depends="jvmti.test, cunit.test, smoke.test, kernel.test, check-result"/>
