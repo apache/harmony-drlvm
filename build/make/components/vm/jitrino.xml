@@ -43,10 +43,6 @@ Version: $Revision: 1.6.2.8 $
         <fileset id="cpp.fileset" dir="." includes="empty_fileset"/>
         <fileset id="asm.fileset" dir="." includes="empty_fileset"/>        
 
-        <path id="java.source">
-            <pathelement location="." />
-        </path>
-
         <patternset id="java.classes.pattern" includes="empty_pattern"/>
 
         <compiler id="cpp.compiler" extends="common.cpp.compiler">

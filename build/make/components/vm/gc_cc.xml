@@ -97,9 +97,8 @@ Version: $Revision: 1.4.2.3 $
          <!-- Java helpers -->
         <property name="build.java.depends" value=""/>
 
-        <path id="java.source">
-            <pathelement location="${build.vm.home}/gc_cc/javasrc" />
-        </path>                 
+        <property name="java.source.dir"
+                  location="${build.vm.home}/gc_cc/javasrc"/>
 
         <path id="java.class.path">
             <pathelement location="${java.build.dir}"/>
@@ -110,6 +109,7 @@ Version: $Revision: 1.4.2.3 $
         </path>
 
         <property name="jarname" value="gc_cc.jar"/>
+        <property name="srcjarname" value="gc_cc-src.jar"/>
 
     </target>
 </project>

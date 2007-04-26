@@ -38,9 +38,9 @@
         <linker id="common.linker" />
 
         <!-- empty common ids, must be defined in component descriptors -->
-        <path id="java.source">
+        <!--path id="java.source">
             <pathelement location="." />
-        </path>
+        </path-->
 
         <patternset id="java.classes.pattern" includes="empty_pattern" />
     </target>

@@ -172,7 +172,7 @@
         <property name="build.executable.pattern" value="\1" />
         <property name="build.shared.pattern" value="lib\1.so lib\1.so.*" />
         <property name="build.static.pattern" value="lib\1.a" />
-        <property name="build.jar.pattern" value="\1.jar" />
+        <property name="build.jar.pattern" value="\1.jar \1-src.jar" />
         <property name="build.other.pattern" value="\1" />
     </target>
 
@@ -183,7 +183,7 @@
         <property name="build.executable.pattern" value="\1.exe \1.pdb" />
         <property name="build.shared.pattern" value="\1.dll \1.pdb" />
         <property name="build.static.pattern" value="\1.lib" />
-        <property name="build.jar.pattern" value="\1.jar" />
+        <property name="build.jar.pattern" value="\1.jar \1-src.jar" />
         <property name="build.other.pattern" value="\1" />
     </target>
 
@@ -705,11 +705,11 @@ right after the executable name.
                             <!-- 'lib:luni': select 'luni' from it -->
                             <propertyregex property="component.deploy.filenames" input="${deploy.@{component}.@{deploy.property.tail}}" regexp=".+:(.+)" select="\1" defaultValue="${deploy.@{component}.@{deploy.property.tail}}" override="true" />
 
-                            <!-- filenames: 'luni,luni2' -->
+                            <!-- filenames: 'luni' -->
                             <!-- pattern:   'lib\1.so,lib\1.so.34' -->
-                            <!-- output:    'libluni.so,libluni.so.34,libluni2.so,libluni.so.34' -->
+                            <!-- output:    'libluni.so,libluni.so.34' -->
                             <!-- note the last comma in input and output -->
-                            <propertyregex property="component.deploy.filenames" input="${component.deploy.filenames}," regexp="(.+),\s*" replace="${build.@{deploy.property.tail}.pattern}," global="true" defaultValue="${component.deploy.filenames}" override="true" />
+                            <propertyregex property="component.deploy.filenames" input="${component.deploy.filenames}" regexp="(.+)\s*" replace="${build.@{deploy.property.tail}.pattern}" global="true" defaultValue="${component.deploy.filenames}" override="true" />
 
                             <mkdir dir="${build.deploy.dir}/jdk/jre/${component.deploy.filedir}" />
                             <switch value="@{deploy.property.tail}">

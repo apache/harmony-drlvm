@@ -70,6 +70,13 @@ Version: $Revision: 1.2.2.3 $
         </xsl:call-template>
     </xsl:template>
 
+    <xsl:template match="property[@name='srcjarname']">
+        <xsl:copy-of select="." />
+        <xsl:call-template name="insert-property">
+            <xsl:with-param name="suffix">srcjarname</xsl:with-param>
+        </xsl:call-template>
+    </xsl:template>
+
     <xsl:template name="insert-property">
         <xsl:param name="suffix"/>
         <xsl:element name="property">

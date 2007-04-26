@@ -15,7 +15,7 @@
     limitations under the License.
 -->
 <project name="BUILD_JAVA_TARGET">
-    <target name="build.java" depends="init_component" if="java.build.dir">
+    <target name="build.java" depends="init_component" if="java.source.dir">
         <echo message="## Building Java classes of '${component}'" />
 
         <mkdir dir="${java.build.dir}" />
@@ -23,13 +23,18 @@
         <patternset id="java.classes.pattern"  includes="**/*.class"/>
         <patternset id="java.source.pattern"  includes="**/*.java"/>
 
-        <javac destdir="${java.build.dir}" source="${javac.source}"
-                target="${javac.target}" debug="${java.debug.option}" compiler="${hy.javac.compiler}">
-            <src refid="java.source" />
+        <javac srcdir="${java.source.dir}" destdir="${java.build.dir}"
+               source="${javac.source}" target="${javac.target}"
+               debug="${java.debug.option}"
+               compiler="${hy.javac.compiler}">
+            <!--src refid="java.source" /-->
             <patternset refid="java.source.pattern" />
             <classpath refid="java.class.path"/>
             <bootclasspath refid="java.boot.class.path"/>
         </javac>
+        <fileset id="java.sources.fileset" dir="${java.source.dir}">
+            <patternset refid="java.source.pattern" />
+        </fileset>
         <fileset id="java.classes.fileset" dir="${java.build.dir}">
             <patternset refid="java.classes.pattern" />
         </fileset>

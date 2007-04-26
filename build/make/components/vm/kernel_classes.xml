@@ -33,9 +33,8 @@ Version: $Revision: 1.4.2.5 $
         <property name="src"
                   location="${build.vm.home}/vmcore/src/kernel_classes/native" />
 
-        <path id="java.source">
-            <pathelement location="${build.vm.home}/vmcore/src/kernel_classes/javasrc" />
-        </path>                 
+        <property name="java.source.dir"
+                  location="${build.vm.home}/vmcore/src/kernel_classes/javasrc"/>
 
         <path id="java.class.path">
             <fileset dir="${external.dep.CLASSLIB.jardir}" includes="*.jar" />
@@ -56,7 +55,8 @@ Version: $Revision: 1.4.2.5 $
         <property name="java.debug.option" value="true"/>
 
         <property name="jarname" value="kernel.jar"/>
-        
+        <property name="srcjarname" value="kernel-src.jar"/>
+
         <property name="manifest.file" 
             location="${build.vm.home}/vmcore/src/kernel_classes/resource/MANIFEST.MF" />   
         

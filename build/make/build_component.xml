@@ -313,11 +313,11 @@ Version: $Revision: 1.9.2.5 $
                               inheritRefs="true"
                               return="${component.name}.libdir,
                                       ${component.name}.libname,
-                                      ${component.name}.jarname,
                                       ${component.name}.src,
                                       ${component.name}.includes,
                                       ${component.name}.jardir,
-                                      ${component.name}.jarname" >
+                                      ${component.name}.jarname,
+                                      ${component.name}.srcjarname" >
                         <property name="component"
                                   value="${component.name}" />
                         <property name="build.dir"

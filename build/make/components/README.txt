@@ -164,12 +164,17 @@ II. HOW TO DEVELOP A COMPONENT DESCRIPTOR
 
               <property name="jarname" value="kernel.jar" />
 
-            - Java* source file set description. 
+            - The property "srcjarname" represents the output .jar file name
+              with Java* source files. 
               Example: 
 
-              <path id="java.source">
-                  <pathelement location="${build.vm.home}/vmcore/src/kernel_classes/javasrc" />
-              </path>                 
+              <property name="srcjarname" value="kernel-src.jar" />
+
+            - Java* source files location. 
+              Example: 
+
+              <property name="java.source.dir"
+                  location="${build.vm.home}/vmcore/src/kernel_classes/javasrc"/>
 
             - Java* source files pattern: files to pass to javac
               Example: 

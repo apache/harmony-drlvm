@@ -32,11 +32,17 @@
             <jar jarfile="${jardir}/${jarname}" manifest="${manifest.file}">
                 <fileset refid="java.classes.fileset" />
             </jar>
-
+            <jar jarfile="${jardir}/${srcjarname}"
+                 manifest="${manifest.file}">
+                <fileset refid="java.sources.fileset" />
+            </jar>
         </then>
         <else>
             <jar jarfile="${jardir}/${jarname}">
                  <fileset refid="java.classes.fileset" />
+            </jar>
+            <jar jarfile="${jardir}/${srcjarname}">
+                <fileset refid="java.sources.fileset" />
             </jar>
         </else>
         </if>

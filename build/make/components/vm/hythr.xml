@@ -117,9 +117,8 @@ Version: $Revision: 1.4.2.4 $
          <!-- Java helpers -->
         <property name="build.java.depends" value=""/>
 
-        <path id="java.source">
-            <pathelement location="${build.vm.home}/thread/javasrc" />
-        </path>                 
+        <property name="java.source.dir"
+                  location="${build.vm.home}/thread/javasrc"/>
 
         <path id="java.class.path">
             <pathelement location="${java.build.dir}"/>
@@ -130,6 +129,7 @@ Version: $Revision: 1.4.2.4 $
         </path>
 
         <property name="jarname" value="hythr.jar"/>
+        <property name="srcjarname" value="hythr-src.jar"/>
 
     </target>
 </project>
