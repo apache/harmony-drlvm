@@ -134,7 +134,10 @@ static void checkManaged2UnmanagedConv(IRManager& irm, Opnd* opnd, Inst* skipIns
                 bool res = isUnmanagedFieldPtr(managedOpnd);
                 if (!res) {
                     Log::out()<<"GCMap::checkManaged2UnmanagedConv failure, managedOpnd="<<managedOpnd->getFirstId()<<std::endl;
+#ifdef _IA32_
+                    // FIXME em64t
                     assert(0);
+#endif
                 }
             }
         }
