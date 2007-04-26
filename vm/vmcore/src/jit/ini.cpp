@@ -28,7 +28,16 @@
 #include "exceptions.h"
 #include "open/em_vm.h"
 #include "jvmti_break_intf.h"
+#include "stack_iterator.h"
 
+static bool is_in_jni_method()
+{
+    StackIterator *si = si_create_from_native();
+    bool in_jni = si_is_native(si) && NULL != si_get_method(si);
+
+    si_free(si);
+    return in_jni;
+}
 
 void
 vm_execute_java_method_array(jmethodID method, jvalue *result, jvalue *args) {
@@ -65,7 +74,7 @@ vm_execute_java_method_array(jmethodID method, jvalue *result, jvalue *args) {
             jvmti_StepLocation *method_return;
             unsigned locations_number;
             jvmtiError errorCode = jvmti_get_next_bytecodes_from_native(
-                vm_thread, &method_return, &locations_number, false);
+            vm_thread, &method_return, &locations_number, is_in_jni_method());
             assert (JVMTI_ERROR_NONE == errorCode);
 
             jvmti_set_single_step_breakpoints(ti , vm_thread, method_return, locations_number);
