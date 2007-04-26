@@ -199,6 +199,8 @@ int64 __stdcall irem64(const int64 src1, const int64 src2)
 {   return src1%src2;   }
 
 
+static void checkIR(IRManager* irm);
+
 void I8Lowerer::runImpl() 
 {
     // I8 operation internal helpers
@@ -310,6 +312,8 @@ void I8Lowerer::runImpl()
             }
         }
     }
+    
+    checkIR(irManager);
 }
 
 void I8Lowerer::processOpnds(Inst * inst)
@@ -415,8 +419,13 @@ void I8Lowerer::processOpnds(Inst * inst)
                     //setns 	hi		; if lo is positive, then load 1 into hi
                     //sub		hi, 1	; if lo is positive, then hi is now '0'. otherwise, it's -1
                     irManager->newInstEx(Mnemonic_CDQ, 1, dst_2, dst_1)->insertBefore(inst);
-                    inst->unlink();
+                } else {
+                    //fill upper word with 0
+                    assert(mn == Mnemonic_MOVZX);
+                    Opnd* imm0=irManager->newImmOpnd(irManager->getTypeManager().getInt32Type(), 0);
+                    irManager->newInstEx(Mnemonic_MOV, 1, dst_2, imm0)->insertBefore(inst);
                 }
+                inst->unlink();
                 break;
             case Mnemonic_PUSH  :
                 assert(src1_1);
@@ -1359,5 +1368,20 @@ void I8Lowerer::propagateDivRemResults(
     }
 }
 
+//IR verification routine.
+//checks that there are no I8Pseudo insts left in CFG after the pass
+static void checkIR(IRManager* irm) {
+#ifdef _DEBUG
+    const Nodes& nodes = irm->getFlowGraph()->getNodes();
+    for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
+       Node* node = *it;
+        for (Inst* inst = (Inst*)node->getFirstInst(); inst!=NULL; inst = inst->getNextInst()) {
+            assert(!inst->hasKind(Inst::Kind_I8PseudoInst));
+        }
+    }
+#endif
+}
+
 }}
+
 
