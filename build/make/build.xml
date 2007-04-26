@@ -305,6 +305,7 @@
  <!--       <property name="build.compiler" value="org.eclipse.jdt.core.JDTCompilerAdapter" /> -->
 
         <echo message="Configuration:" />
+        <echo message="     Hosting Java = ${java.version} (${java.vendor})" />
         <echo message="    classlib root = ${external.dep.CLASSLIB}" />
         <echo message="               os = ${build.os}" />
         <echo message="             arch = ${build.arch}" />
