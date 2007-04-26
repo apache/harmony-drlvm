@@ -749,16 +749,18 @@ check_field_descriptor( const char *descriptor,
 
 static bool is_magic_type_name(const String* name) {
     static String* MAGIC_TYPE_NAMES[]={
-        VM_Global_State::loader_env->string_pool.lookup("org/vmmagic/unboxed/Address"),
-        VM_Global_State::loader_env->string_pool.lookup("org/vmmagic/unboxed/Offset"), 
-        VM_Global_State::loader_env->string_pool.lookup("org/vmmagic/unboxed/Word"),
-        VM_Global_State::loader_env->string_pool.lookup("org/vmmagic/unboxed/Extent"),
+        VM_Global_State::loader_env->string_pool.lookup("Lorg/vmmagic/unboxed/Address;"),
+        VM_Global_State::loader_env->string_pool.lookup("Lorg/vmmagic/unboxed/Offset;"), 
+        VM_Global_State::loader_env->string_pool.lookup("Lorg/vmmagic/unboxed/Word;"),
+        VM_Global_State::loader_env->string_pool.lookup("Lorg/vmmagic/unboxed/Extent;"),
         NULL
     };
     for (int i=0;;i++)    {
         String* magicClassName = MAGIC_TYPE_NAMES[i];
         if (magicClassName == NULL) break;
-        if (magicClassName == name) return true;
+        if (magicClassName == name) {
+            return true;
+        }
     }
     return false;
 }
@@ -843,7 +845,7 @@ bool Field::parse(Global_Env& env, Class *clss, ByteReader &cfs, bool is_trusted
     }
 
     //check if field is magic type
-     if (is_magic_type_name(clss->get_name())) {
+     if (is_magic_type_name(_descriptor)) {
          _is_magic_type = 1;
      }
 

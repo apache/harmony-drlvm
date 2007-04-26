@@ -86,13 +86,40 @@ void GCMap::processBasicBlock(IRManager& irm, const Node* block) {
 
 static bool isManaged(Opnd* op) { return op->getType()->isObject() || op->getType()->isManagedPtr();}
 
-static void checkManaged2UnmanagedConv(IRManager& irm, Opnd* opnd) {
+static bool isUnmanagedFieldPtr(Opnd* opnd) {
+    if (opnd->getMemOpndKind()!=MemOpndKind_Heap) {
+        Log::out()<<"GCMap::isUnmanagedFieldPtr: not a heap opnd"<<std::endl;
+        return false;
+    }
+    Opnd* fieldOpnd = opnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement);
+    if (fieldOpnd==NULL) {
+        fieldOpnd = opnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Base);
+        if (fieldOpnd == NULL) {
+            Log::out()<<"GCMap::isUnmanagedFieldPtr: memopnd base/displacement not found"<<std::endl;
+            return false;
+        }
+    }
+    Opnd::RuntimeInfo* info = fieldOpnd->getRuntimeInfo();
+    if (info==NULL) {
+        Log::out()<<"GCMap::isUnmanagedFieldPtr: runtime info not found"<<std::endl;
+        return false;
+    }
+    FieldDesc* field = NULL;
+    if (info->getKind() != Opnd::RuntimeInfo::Kind_FieldOffset && info->getKind()!=Opnd::RuntimeInfo::Kind_StaticFieldAddress) {
+        Log::out()<<"GCMap::isUnmanagedFieldPtr: not a field kind"<<std::endl;
+        return false;
+    }
+    field = (FieldDesc*)info->getValue(0);
+    return field_is_magic(field->getFieldHandle());
+}
+
+static void checkManaged2UnmanagedConv(IRManager& irm, Opnd* opnd, Inst* skipInst) {
     const Nodes& nodes = irm.getFlowGraph()->getNodes();
     for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
         Node* node = *it;
         if (node->isBlockNode()) {
             for (Inst* inst = (Inst*)node->getLastInst(); inst!=NULL; inst = inst->getPrevInst()) {
-                if (inst->getMnemonic() != Mnemonic_MOV) {
+                if (inst->getMnemonic() != Mnemonic_MOV || inst == skipInst) {
                     continue;
                 }
                 Opnd* op0 = inst->getOpnd(0);
@@ -104,8 +131,11 @@ static void checkManaged2UnmanagedConv(IRManager& irm, Opnd* opnd) {
                     continue;
                 }
                 Opnd* managedOpnd = isManaged(op0)?op0:op1;
-                //the only managed->unmanaged conversion type is allowed is for static (non-gc) fields
-                assert(managedOpnd->isPlacedIn(OpndKind_Immediate)); 
+                bool res = isUnmanagedFieldPtr(managedOpnd);
+                if (!res) {
+                    Log::out()<<"GCMap::checkManaged2UnmanagedConv failure, managedOpnd="<<managedOpnd->getFirstId()<<std::endl;
+                    assert(0);
+                }
             }
         }
     }
@@ -135,7 +165,10 @@ void  GCMap::registerGCSafePoint(IRManager& irm, const BitSet& ls, Inst* inst) {
     for (int i = liveOpnds.getNext(); i != -1; i = liveOpnds.getNext()) {
         Opnd* opnd = irm.getOpnd(i);
 #ifdef _DEBUG
-        if (opnd->getType()->isUnmanagedPtr()) checkManaged2UnmanagedConv(irm, opnd);
+        if (opnd->getType()->isUnmanagedPtr()) {
+            Inst* skipInst= opnd == callRes ? inst : NULL; // skip this call from the check if opnd is the result of the call
+            checkManaged2UnmanagedConv(irm, opnd, skipInst);
+        }
 #endif
         
         if (callRes == opnd) {

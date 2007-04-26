@@ -200,11 +200,12 @@ public:
         _const_value_index = fd._const_value_index;
         _field_type_desc = fd._field_type_desc;
         _is_injected = fd._is_injected;
+        _is_magic_type = fd._is_magic_type;
         _offset_computed = fd._offset_computed;
         const_value = fd.const_value;
         track_access = fd.track_access;
         track_modification = fd.track_modification;
-
+        
         return *this;
     }
     //
