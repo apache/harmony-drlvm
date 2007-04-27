@@ -225,7 +225,7 @@ SingleStep(jvmtiEnv *jvmti,
             jmethodID method,
             jlocation location)
 {
-    static hit_count = 0;
+    static int hit_count = 0;
     hit_count ++;
 
     cerr << endl << "==> Single Step callback" << endl;
