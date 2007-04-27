@@ -66,7 +66,7 @@ static void mspace_move_objects(Collector* collector, Mspace* mspace)
           collector->result = FALSE; 
           return; 
         }
-        if(dest_block > local_last_dest)
+        if((!local_last_dest) || (dest_block->block_idx > local_last_dest->block_idx))
           local_last_dest = dest_block;
         block_end = (POINTER_SIZE_INT)GC_BLOCK_END(dest_block);
         dest_sector_addr = dest_block->base;

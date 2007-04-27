@@ -67,7 +67,7 @@ static void mspace_compute_object_target(Collector* collector, Mspace* mspace)
           collector->result = FALSE; 
           return; 
         }
-        if(dest_block > local_last_dest)
+        if((!local_last_dest) || (dest_block->block_idx > local_last_dest->block_idx))
           local_last_dest = dest_block;
         dest_addr = dest_block->base;
         dest_block->src = p_obj;
@@ -101,7 +101,7 @@ static void mspace_compute_object_target(Collector* collector, Mspace* mspace)
   
   Block_Header *cur_last_dest = (Block_Header *)last_block_for_dest;
   collector->cur_target_block = local_last_dest;
-  while(local_last_dest > cur_last_dest){
+  while((local_last_dest)&&((!cur_last_dest) || (local_last_dest->block_idx > cur_last_dest->block_idx))){
     atomic_casptr((volatile void **)&last_block_for_dest, local_last_dest, cur_last_dest);
     cur_last_dest = (Block_Header *)last_block_for_dest;
   }
