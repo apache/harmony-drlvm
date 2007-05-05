@@ -26,27 +26,28 @@
 inline unsigned int word_get_first_set_lsb(POINTER_SIZE_INT target_word)
 {
   assert(target_word != 0);
-  POINTER_SIZE_INT bit_offset;
+  POINTER_SIZE_INT bit_offset = 0;
 
-#ifdef PLATFORM_POSIX  /* POSIX Platform*/
+#if defined(_IPF_) || defined(_WIN64)
+    while( ! (target_word & ((POINTER_SIZE_INT)1 << bit_offset)) ){
+    	bit_offset++;
+    }
+#else /* !_IPF_ && !_WIN64 */
+#ifdef PLATFORM_POSIX  /* linux X86 32/64 */
     __asm__ __volatile__(
       "bsf %1,%0\n"
       :"=r"(bit_offset)
       :"m"(target_word)
     );
-#else /* Windows Platform*/
-#if defined(WIN32) && !defined(_WIN64)
+#else /* !PLATFORM_POSIX */
+#ifdef WIN32 
     __asm{
       bsf eax, target_word
       mov bit_offset, eax
     }
-#else /* _WIN64 */
-    bit_offset = 0;
-    while( ! (target_word & ((POINTER_SIZE_INT)1 << bit_offset)) ){
-    	bit_offset++;
-    }
-#endif /* _WIN64 */
-#endif /* ifdef PLATFORM_POSIX else*/
+#endif /* WIN32 */
+#endif /* !PLATFORM_POSIX */
+#endif /* !_IPF_ && !_WIN64 */
 
   assert(bit_offset < BITS_PER_WORD);
   return (unsigned int)bit_offset;
