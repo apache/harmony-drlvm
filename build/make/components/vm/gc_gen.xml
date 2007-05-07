@@ -120,6 +120,7 @@ Version: $Revision: 1.2 $
         </path>
 
         <property name="jarname" value="gc_gen.jar"/>
+        <property name="srcjarname" value="gc_gen-src.jar"/>
 
     </target>
 </project>
