@@ -91,6 +91,7 @@ private:
     Changed handleInst_MUL(Inst* inst);
     Changed handleInst_SSEMov(Inst* inst);
     Changed handleInst_SSEXor(Inst* inst);
+    Changed handleInst_CMP(Inst* inst);
     //
     // Helpers
     //
@@ -177,6 +178,8 @@ PeepHoleOpt::Changed PeepHoleOpt::handleBasicBlock(Node* node)
 
 PeepHoleOpt::Changed PeepHoleOpt::handleInst(Inst* inst)
 {
+    PeepHoleOpt::Changed temp;
+
     if (isPseudoInst(inst)) {
         return Changed_Nothing;
     }
@@ -191,9 +194,15 @@ PeepHoleOpt::Changed PeepHoleOpt::handleInst(Inst* inst)
     case Mnemonic_AND:
     case Mnemonic_OR:
     case Mnemonic_XOR:
-    case Mnemonic_CMP:
     case Mnemonic_TEST:
         return handleInst_ALU(inst);
+    case Mnemonic_CMP:
+    temp = handleInst_CMP(inst);
+    if ( temp == Changed_Nothing ) {
+        return handleInst_ALU(inst); 
+    } else {
+        return temp;
+    }
     case Mnemonic_IMUL:
     case Mnemonic_MUL:
         return handleInst_MUL(inst);
@@ -404,6 +413,29 @@ static int getMaxBit(uint32 val) {
     } while (--i>=0);
     return i;
 }
+
+PeepHoleOpt::Changed PeepHoleOpt::handleInst_CMP(Inst* inst) {
+    assert(inst->getMnemonic()==Mnemonic_CMP);
+    
+    Inst::Opnds uses(inst, Inst::OpndRole_Explicit | Inst::OpndRole_Use);
+    Opnd* src1 = inst->getOpnd(uses.begin());
+    Opnd* src2 = inst->getOpnd(uses.next(uses.begin()));
+    assert(src1!=NULL && src2!=NULL);
+
+    if (isImm(src1)) {
+        Opnd* tmp = src1; src1 = src2; src2 = tmp;
+    }
+
+    if (isImm(src2) && isReg(src1) && (int)src2->getImmValue() == 0) {
+            if (Log::isEnabled()) Log::out()<<"I"<<inst->getId()<<" -> CMP with 0"<<std::endl;
+            irManager->newInst(Mnemonic_TEST, src1, src1)->insertAfter(inst);
+            inst->unlink();
+            return Changed_Inst;
+    }
+    return Changed_Nothing;
+}
+
+
 
 PeepHoleOpt::Changed PeepHoleOpt::handleInst_MUL(Inst* inst) {
     assert(inst->getMnemonic()==Mnemonic_IMUL || inst->getMnemonic()==Mnemonic_MUL);

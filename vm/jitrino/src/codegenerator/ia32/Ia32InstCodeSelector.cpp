@@ -2704,7 +2704,7 @@ CG_OpndHandle* InstCodeSelector::callhelper(uint32              numArgs,
         Opnd* ecxOpnd = irManager.newOpnd(opnds[2]->getType(), cecx);
 #else
         Opnd* eaxOpnd = irManager.getRegOpnd(RegName_EAX);
-        Opnd* ecxOpnd = irManager.getRegOpnd(RegName_ECX);
+        Opnd* ecxOpnd = irManager.newOpnd(typeManager.getUInt32Type(), Constraint(OpndKind_GPReg));
 #endif
         Opnd* memOpnd = irManager.newMemOpnd(opnds[1]->getType(), opnds[0]);//use opnd1 type for memopnd
         appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, eaxOpnd, opnds[1]));
