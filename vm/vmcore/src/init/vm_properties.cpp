@@ -245,9 +245,6 @@ static void init_java_properties(Properties & properties)
     
     properties.set_new("java.vm.info", "no info");
     properties.set_new("java.tmpdir", tmp);
-    properties.set_new("user.language", "en");
-    properties.set_new("user.region", "US");
-    properties.set_new("file.encoding", "8859_1");
 
     // FIXME user.timezone initialization, required by java.util.TimeZone implementation
     char *user_tz;
@@ -256,19 +253,7 @@ static void init_java_properties(Properties & properties)
         INFO("Failed to get user timezone from the system. Error code " << status);
         user_tz = "GMT";
     }
-    
     properties.set_new("user.timezone", user_tz);
-
-    // FIXME: This is a workaround code for third party APIs which depend on this property.
-    properties.set_new("java.util.prefs.PreferencesFactory",
-#ifdef PLATFORM_NT
-        "java.util.prefs.RegistryPreferencesFactoryImpl");
-#else
-        "java.util.prefs.FilePreferencesFactoryImpl");
-#endif
-    // Property for xalan.jar
-    properties.set_new("javax.xml.transform.TransformerFactory",
-                   "org.apache.xalan.xsltc.trax.TransformerFactoryImpl");     
 
     /*
     *  it's possible someone forgot to set this property - set to default of .
