@@ -1,0 +1,20 @@
+<project name="RUN HARMONY-3784 Regression Test">
+    <target name="run-test">
+        <run-junit-test 
+            test="org.apache.harmony.drlvm.tests.regression.h3784.Test"
+            vmarg="-Xem:jet">
+            <junit-element>
+              <sysproperty key="java.library.path" value="${reg.test.native.path}/H3784"/>
+            </junit-element>
+        </run-junit-test>
+
+        <!--run-junit-test 
+            test="org.apache.harmony.drlvm.tests.regression.h3784.Test"
+            vmarg="-Xem:opt">
+            <junit-element>
+              <sysproperty key="java.library.path" value="${reg.test.native.path}/H3784"/>
+            </junit-element>
+        </run-junit-test-->
+    </target>
+</project>
+

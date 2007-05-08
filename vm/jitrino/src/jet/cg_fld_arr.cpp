@@ -234,12 +234,17 @@ void CodeGen::do_field_op(JavaByteCodes opcode, jtype jt, Field_Handle fld)
         gen_call_throw(ci_helper_linkerr, rt_helper_throw_linking_exc, 0,
                        m_klass, jinst.op0, jinst.opcode);
     }
+    
+    bool fieldIsMagic = field_is_magic(fld);
+    if (fieldIsMagic) {
+        jt = iplatf;
+    }
 
-    if (!get && compilation_params.exe_notify_field_modification)  {
+    if (!get && compilation_params.exe_notify_field_modification && !fieldIsMagic)  {
         gen_modification_watchpoint(opcode, jt, fld);
     }
 
-    if (!get) {
+    if (!get && ! fieldIsMagic) {
         gen_write_barrier(opcode, fld);
     }
 
@@ -265,7 +270,7 @@ void CodeGen::do_field_op(JavaByteCodes opcode, jtype jt, Field_Handle fld)
     assert(is_ia32() || g_refs_squeeze);
     
 
-    if (get && compilation_params.exe_notify_field_access) {
+    if (get && compilation_params.exe_notify_field_access && !fieldIsMagic) {
         gen_access_watchpoint(opcode, jt, fld);
     }
     
@@ -275,23 +280,32 @@ void CodeGen::do_field_op(JavaByteCodes opcode, jtype jt, Field_Handle fld)
             // pop out ref
             vpop();
         }
-        if (!is_ia32() && g_refs_squeeze && jt == jobj) {
-            AR gr_base = valloc(jobj);
-            rlock(gr_base);
-            AR gr_ref = valloc(jobj);
-            rlock(gr_ref);
-            
-            Opnd where32(i32, where.base(), where.disp(), 
+        if (!is_ia32() && g_refs_squeeze && (jt == jobj || fieldIsMagic)) {
+            if (fieldIsMagic) {
+                AR gr_ref = valloc(jobj);
+                rlock(gr_ref);
+                Opnd obj(jobj, gr_ref);
+                mov(Opnd(jobj, gr_ref), where);
+                runlock(gr_ref);
+                vpush(obj);
+            } else {
+                AR gr_base = valloc(jobj);
+                rlock(gr_base);
+                AR gr_ref = valloc(jobj);
+                rlock(gr_ref);
+
+                Opnd where32(i32, where.base(), where.disp(), 
                               where.index(), where.scale());
-            mov(Opnd(i32, gr_ref), where32);
-            movp(gr_base, OBJ_BASE);
-            Opnd obj(jobj, gr_ref);
-            alu(alu_add, obj, Opnd(jobj, gr_base));
-            //
-            runlock(gr_ref);
-            runlock(gr_base);
-            //
-            vpush(obj);
+                mov(Opnd(i32, gr_ref), where32);
+                movp(gr_base, OBJ_BASE);
+                Opnd obj(jobj, gr_ref);
+                alu(alu_add, obj, Opnd(jobj, gr_base));
+                //
+                runlock(gr_ref);
+                runlock(gr_base);
+                //
+                vpush(obj);
+            }
         }
         else if (jt<i32) {
             AR gr = valloc(i32);
@@ -326,19 +340,23 @@ void CodeGen::do_field_op(JavaByteCodes opcode, jtype jt, Field_Handle fld)
                           where.index(), where.scale());
         mov(where32, Opnd(ref));
     }
-    else if (!is_ia32() && g_refs_squeeze && jt == jobj) {
+    else if (!is_ia32() && g_refs_squeeze && (jt == jobj || fieldIsMagic)) {
         // have the reference on a register
         Val& s0 = vstack(0, true);
         rlock(s0);
-        // compress the reference
-        AR tmp = valloc(jobj);
-        void * inv_base = (void*)-(int_ptr)OBJ_BASE;
-        movp(tmp, inv_base);
-        alu(alu_add, Opnd(jobj, tmp), s0.as_opnd());
-        // store the resulting int32
-        Opnd where32(i32, where.base(), where.disp(), 
+        if (fieldIsMagic) {
+            mov(where, s0.as_opnd());
+        } else {
+            // compress the reference
+            AR tmp = valloc(jobj);
+            void * inv_base = (void*)-(int_ptr)OBJ_BASE;
+            movp(tmp, inv_base);
+            alu(alu_add, Opnd(jobj, tmp), s0.as_opnd());
+            // store the resulting int32
+            Opnd where32(i32, where.base(), where.disp(), 
                           where.index(), where.scale());
-        mov(where32, Opnd(jobj, tmp)); //s0.as_opnd(i32));
+            mov(where32, Opnd(jobj, tmp)); //s0.as_opnd(i32));
+        }
         runlock(s0);
     }
     else if (jt<i32) {

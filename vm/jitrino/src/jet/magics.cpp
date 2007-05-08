@@ -54,21 +54,18 @@ bool is_magic(Method_Handle m)
     return is_magic(klass);
 }
 
-#ifdef _EM64T_ 
-// sizeof_jt & vstack_replace_top_opnd aren't used on EM64T
-#else
 static size_t sizeof_jt(jtype jt) {
     static size_t sizes[] =  { 
         1, //i8,
         2, //i16, 
         2, //u16,
-        8, //i64,
         4, //i32,
+        8, //i64,
         4, //flt32,
         8, //dbl64,
-        4, //jobj,
-        4, //jvoid,
-        4, //jretAddr,
+        sizeof(POINTER_SIZE_INT), //jobj,
+        sizeof(POINTER_SIZE_INT), //jvoid,
+        sizeof(POINTER_SIZE_INT), //jretAddr,
         0, //jtypes_count, 
     };
     size_t res= sizes[jt];
@@ -78,83 +75,86 @@ static size_t sizeof_jt(jtype jt) {
 
 /** creates new opnd with the specified type and generates move from old one to new one */
 static void vstack_replace_top_opnd(Compiler* c, jtype jt) {
-    Opnd before = c->vstack(0).as_opnd();
-    assert(sizeof_jt(jt) >= sizeof_jt(before.jt()) && sizeof(jt)<=32);
-    Opnd after(jt, c->valloc(jt));
-    c->mov(after, before);
-    c->vpop(); 
-    c->vpush(after);
+    Opnd src = c->vstack(0).as_opnd();
+    Opnd dst(jt, c->valloc(jt));
+
+    size_t dstSize = sizeof_jt(dst.jt());
+    size_t srcSize = sizeof_jt(src.jt());
+    assert((srcSize==4 || srcSize ==  8) && (dstSize == 4 || dstSize == 8));
+    if (srcSize == dstSize) { //simple mov
+        c->mov(dst, src);
+        c->vpop();  //pop src
+        c->vpush(dst);
+    } else if (srcSize > dstSize) { //truncation
+        c->do_mov(dst, src);
+        c->vpop(); //lo&hi parts are popped with a single pop operation for i64 type
+        c->vpush(dst); //push result
+    } else { // expansion
+        assert(srcSize<dstSize);
+        c->do_mov(dst, src); //fill lower part -> dst
+        Opnd hi(jt, c->g_iconst_0); //fill hi part with 0
+        c->vpop(); //pop old value
+        c->vpush2(dst, hi); //push new value
+    }
 }
-#endif //not em64t
 
 bool Compiler::gen_magic(void)
 {
-#ifdef _EM64T_ 
-    return false; //not tested
-#else
     const JInst& jinst = m_insts[m_pc];
-    if (jinst.opcode != OPCODE_INVOKEVIRTUAL && 
-        jinst.opcode != OPCODE_INVOKESTATIC &&
-        jinst.opcode != OPCODE_INVOKESPECIAL &&
-        jinst.opcode != OPCODE_NEW) {
+    JavaByteCodes opkod = jinst.opcode;
+
+    if (opkod != OPCODE_INVOKEVIRTUAL && 
+        opkod != OPCODE_INVOKESTATIC &&
+        opkod != OPCODE_INVOKESPECIAL)
+    {
         return false;
     }
     
-    if (jinst.opcode == OPCODE_NEW) {
-        // trying to create a magic instance ?
-        Class_Handle klass = NULL;
-        klass = vm_resolve_class_new(m_compileHandle, m_klass, jinst.op0);
-        if (klass == NULL || !is_magic(klass)) {
-            // not a magic - proceed as usual
-            return false;
-        }
-        // Create fake instance on the stack:
-        vpush(jobj);
-        vstack(0).set(VA_NZ);
-        return true;
-    }
-    //
-    //
-    //
-    JavaByteCodes opkod = jinst.opcode;
     vector<jtype> args;
     jtype retType;
     bool is_static = opkod == OPCODE_INVOKESTATIC;
     get_args_info(is_static, jinst.op0, args, &retType);
+
     Method_Handle meth = NULL;
     if (opkod == OPCODE_INVOKESTATIC) {
         meth = resolve_static_method(m_compileHandle, m_klass, jinst.op0);
-    } 
-    else if (opkod == OPCODE_INVOKEVIRTUAL) {
+    } else if (opkod == OPCODE_INVOKEVIRTUAL) {
         meth = resolve_virtual_method(m_compileHandle, m_klass, jinst.op0);
-    }
-    else {
+    } else {
         assert(opkod == OPCODE_INVOKESPECIAL);
         meth = resolve_special_method(m_compileHandle, m_klass, jinst.op0);
     }
     if (meth == NULL || !is_magic(meth)) {
         return false;
     }
-    //
-    // 
-    //
+
+    // This is a magic -> transform it
+
     const char* mname = method_get_name(meth);
-    //
-    // Construction
-    //
-    if (!strcmp(mname, "<init>")) {
-        // Currently only 'new <Magic>()' expected and handled
-        assert(args.size() == 1);
-        vpop();
+    jtype magicType = iplatf;
+
+    if (!strcmp(mname, "fromLong")) {
+        vstack_replace_top_opnd(this, magicType);
         return true;
     }
-    
-    //
+
+    if (!strcmp(mname, "toLong")) {
+        vstack_replace_top_opnd(this, i64);
+        return true;
+    }
+    return false;
+
+
+/**     Old IA32 implementation. This implementation is not GC safe, 
+        it keeps all magic classes as objects and magics becomes a part of GC enumeration
+        This code must be refactored or removed
+
+
     // ADD, SUB, DIFF, etc - 2 args arithmetics
     ALU oper = alu_count;
     
     if (!strcmp(mname, "add"))          { oper = alu_add; }
-    else if (!strcmp(mname, "plus"))          { oper = alu_add; }
+    else if (!strcmp(mname, "plus"))    { oper = alu_add; }
     else if (!strcmp(mname, "sub"))     { oper = alu_sub; }
     else if (!strcmp(mname, "minus"))     { oper = alu_sub; }
     else if (!strcmp(mname, "diff"))    { oper = alu_sub; }
@@ -267,10 +267,9 @@ bool Compiler::gen_magic(void)
     //
     // fromXXX - static creation from something
     //
-    if (!strcmp(mname, "fromInt")) {
-        vstack_replace_top_opnd(this, jobj);
-        return true;
-    }
+    if (strcmp(mname, "fromLong")) {
+        assert(0);
+    } 
     else if (!strcmp(mname, "fromIntSignExtend")) {
         vstack_replace_top_opnd(this, jobj);
         return true;
@@ -528,7 +527,7 @@ bool Compiler::gen_magic(void)
     //assert(false);
     return false;
 
-#endif //not em64t
+*/
 }
 
 }};             // ~namespace Jitrino::Jet
