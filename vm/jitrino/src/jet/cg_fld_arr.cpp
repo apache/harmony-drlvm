@@ -235,7 +235,7 @@ void CodeGen::do_field_op(JavaByteCodes opcode, jtype jt, Field_Handle fld)
                        m_klass, jinst.op0, jinst.opcode);
     }
     
-    bool fieldIsMagic = field_is_magic(fld);
+    bool fieldIsMagic = fld && field_is_magic(fld);
     if (fieldIsMagic) {
         jt = iplatf;
     }
