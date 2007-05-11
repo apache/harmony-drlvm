@@ -26,6 +26,7 @@
                           been stored locally before
         unit.test       - builds and runs unit tests for the
                           designated components
+        cunit.test      - builds and runs cunit tests
         smoke.test      - builds and runs smoke tests for the
                           designated components
         jvmti.test      - builds and runs JVMTI tests
@@ -406,6 +407,14 @@
     <target name="unit.test" depends="init, set.target.to.unit.test, process.components" />
     <target name="set.target.to.unit.test">
         <property name="target" value="unit.test" />
+    </target>
+
+    <!-- Run cunit tests only -->
+    <target name="cunit.test" depends="setup, init">
+        <subant buildpath="." antfile="build_component.xml" target="build" inheritall="true" failonerror="true">
+            <property name="_component" value="vm" />
+            <property name="_target" value="cunit.test" />
+        </subant>
     </target>
 
     <!-- Main target to run smoke tests -->
