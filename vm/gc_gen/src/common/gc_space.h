@@ -137,9 +137,9 @@ inline void blocked_space_shrink(Blocked_Space* space, unsigned int changed_size
   new_last_block->next = NULL;
 }
 
-inline void blocked_space_extend(Blocked_Space* space, unsigned int changed_size)
+inline void blocked_space_extend(Blocked_Space* space, POINTER_SIZE_INT changed_size)
 {
-  unsigned int block_inc_count = changed_size >> GC_BLOCK_SHIFT_COUNT;
+  POINTER_SIZE_INT block_inc_count = changed_size >> GC_BLOCK_SHIFT_COUNT;
   
   void* old_base = (void*)&space->blocks[space->num_managed_blocks];
   void* commit_base = (void*)round_down_to_size((POINTER_SIZE_INT)old_base, SPACE_ALLOC_UNIT);
@@ -152,7 +152,8 @@ inline void blocked_space_extend(Blocked_Space* space, unsigned int changed_size
 
   void* new_end = (void*)((POINTER_SIZE_INT)commit_base + commit_size);
   space->committed_heap_size = (POINTER_SIZE_INT)new_end - (POINTER_SIZE_INT)space->heap_start;
-  
+  /*Fixme: For_Heap_Adjust, but need fix if static mapping.*/
+  space->heap_end = new_end;
   /* init the grown blocks */
   Block_Header* block = (Block_Header*)commit_base;
   Block_Header* last_block = (Block_Header*)((Block*)block -1);

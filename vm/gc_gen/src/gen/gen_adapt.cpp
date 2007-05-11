@@ -25,8 +25,6 @@
 #define NOS_COPY_RESERVE_DELTA (GC_BLOCK_SIZE_BYTES<<1)
 /*Tune this number in case that MOS could be too small, so as to avoid or put off fall back.*/
 #define GC_MOS_MIN_EXTRA_REMAIN_SIZE (36*MB)
-/*Switch on this MACRO when we want lspace->survive_ratio to be sensitive.*/
-//#define NOS_SURVIVE_RATIO_SENSITIVE
 
 struct Mspace;
 void mspace_set_expected_threshold(Mspace* mspace, POINTER_SIZE_INT threshold);
@@ -213,8 +211,8 @@ static void gc_decide_next_collect(GC_Gen* gc, int64 pause_time)
       
       /*If major is caused by LOS, or collection kind is EXTEND_COLLECTION, all survive ratio is not updated.*/
       if((gc->cause != GC_CAUSE_LOS_IS_FULL) && (!gc_match_kind((GC*)gc, EXTEND_COLLECTION))){
-        POINTER_SIZE_INT major_survive_size = space_committed_size((Space*)mspace) - mos_free_size;
-        survive_ratio = (float)major_survive_size/(float)space_committed_size((Space*)mspace);
+        POINTER_SIZE_INT major_surviving_size = space_committed_size((Space*)mspace) - mos_free_size;
+        survive_ratio = (float)major_surviving_size/(float)space_committed_size((Space*)mspace);
         mspace->survive_ratio = survive_ratio;
       }
       /*For LOS_Shrink:*/
@@ -222,15 +220,10 @@ static void gc_decide_next_collect(GC_Gen* gc, int64 pause_time)
         POINTER_SIZE_INT mspace_size_threshold = (space_committed_size((Space*)mspace) + space_committed_size((Space*)fspace)) >> 1;
         mspace_set_expected_threshold((Mspace *)mspace, mspace_size_threshold );
       }
-  #ifdef NOS_SURVIVE_RATIO_SENSITIVE
-      /*If this major is caused by fall back compaction, 
-         we must give fspace->survive_ratio a conservative and reasonable number to avoid next fall back.*/
-      //fspace->survive_ratio = mspace->survive_ratio;
-      /*In fallback compaction, the survive_ratio of mspace must be 1.*/
-      if(gc_match_kind((GC*)gc, FALLBACK_COLLECTION))
-      	fspace->survive_ratio = 1;
-      	
-  #endif
+      /*If this major is caused by fall back compaction, we must give fspace->survive_ratio 
+        *a conservative and reasonable number to avoid next fall back.
+        *In fallback compaction, the survive_ratio of mspace must be 1.*/
+      if(gc_match_kind((GC*)gc, FALLBACK_COLLECTION)) fspace->survive_ratio = 1;
     }else{
       /*Give a hint to mini_free_ratio. */
       if(fspace->num_collections == 1){
@@ -242,19 +235,17 @@ static void gc_decide_next_collect(GC_Gen* gc, int64 pause_time)
   
       fspace->time_collections += pause_time;  
       POINTER_SIZE_INT free_size_threshold;
-        
-      POINTER_SIZE_INT minor_survive_size = last_total_free_size - total_free_size;
+
+      POINTER_SIZE_INT minor_surviving_size = last_total_free_size - total_free_size;
   
       float k = Tslow * fspace->num_collections/fspace->time_collections;
-      float m = ((float)minor_survive_size)*1.0f/((float)(SMax - GC_MOS_MIN_EXTRA_REMAIN_SIZE ));
+      float m = ((float)minor_surviving_size)*1.0f/((float)(SMax - GC_MOS_MIN_EXTRA_REMAIN_SIZE ));
       float free_ratio_threshold = mini_free_ratio(k, m);
       free_size_threshold = (POINTER_SIZE_INT)(free_ratio_threshold * (SMax - GC_MOS_MIN_EXTRA_REMAIN_SIZE ) + GC_MOS_MIN_EXTRA_REMAIN_SIZE );
   
-      if ((mos_free_size + nos_free_size)< free_size_threshold)  {
-        gc->force_major_collect = TRUE;
-      }
+      if ((mos_free_size + nos_free_size)< free_size_threshold) gc->force_major_collect = TRUE;
   
-      survive_ratio = (float)minor_survive_size/(float)space_committed_size((Space*)fspace);
+      survive_ratio = (float)minor_surviving_size/(float)space_committed_size((Space*)fspace);
       fspace->survive_ratio = survive_ratio;
       /*For LOS_Adaptive*/
       POINTER_SIZE_INT mspace_committed_size = space_committed_size((Space*)mspace);
@@ -265,9 +256,8 @@ static void gc_decide_next_collect(GC_Gen* gc, int64 pause_time)
         mspace_set_expected_threshold((Mspace *)mspace, mspace_size_threshold );
       }
     }
-    
-    gc->survive_ratio =  (gc->survive_ratio + survive_ratio)/2.0f;
   
+    gc->survive_ratio =  (gc->survive_ratio + survive_ratio)/2.0f;
     last_total_free_size = total_free_size;
   }
 
@@ -295,7 +285,9 @@ Boolean gc_compute_new_space_size(GC_Gen* gc, POINTER_SIZE_INT* mos_size, POINTE
 #ifdef STATIC_NOS_MAPPING
     total_size = max_heap_size_bytes - lspace->committed_heap_size;
 #else
-    total_size = (POINTER_SIZE_INT)gc->heap_end - (POINTER_SIZE_INT)mspace->heap_start;
+    POINTER_SIZE_INT curr_heap_commit_end = 
+                              (POINTER_SIZE_INT)gc->heap_start + LOS_HEAD_RESERVE_FOR_HEAP_NULL + gc->committed_heap_size;
+    total_size = curr_heap_commit_end - (POINTER_SIZE_INT)mspace->heap_start;
 #endif
 
   POINTER_SIZE_INT total_free = total_size - used_mos_size;
@@ -306,16 +298,15 @@ Boolean gc_compute_new_space_size(GC_Gen* gc, POINTER_SIZE_INT* mos_size, POINTE
   POINTER_SIZE_INT nos_reserve_size;
   nos_reserve_size = (POINTER_SIZE_INT)(((float)total_free)/(1.0f + fspace->survive_ratio));
   /*NOS should not be zero, if there is only one block in non-los, i.e. in the former if sentence,
-    if total_free = GC_BLOCK_SIZE_BYTES, then the computed nos_reserve_size is between zero
-    and GC_BLOCK_SIZE_BYTES. In this case, we assign this block to NOS*/
+    *if total_free = GC_BLOCK_SIZE_BYTES, then the computed nos_reserve_size is between zero
+    *and GC_BLOCK_SIZE_BYTES. In this case, we assign this block to NOS*/
   if(nos_reserve_size <= GC_BLOCK_SIZE_BYTES)  nos_reserve_size = GC_BLOCK_SIZE_BYTES;
 
 #ifdef STATIC_NOS_MAPPING
   if(nos_reserve_size > fspace->reserved_heap_size) nos_reserve_size = fspace->reserved_heap_size;
 #endif  
-  //To reserve some MOS space to avoid fallback situation. 
-  //But we need ensure nos has at least one block 
-  //if(new_nos_size > GC_MOS_MIN_EXTRA_REMAIN_SIZE) new_nos_size -= GC_MOS_MIN_EXTRA_REMAIN_SIZE ;
+  /*To reserve some MOS space to avoid fallback situation. 
+   *But we need ensure nos has at least one block */
   POINTER_SIZE_INT reserve_in_mos = GC_MOS_MIN_EXTRA_REMAIN_SIZE;
   while (reserve_in_mos >= GC_BLOCK_SIZE_BYTES){
     if(nos_reserve_size >= reserve_in_mos + GC_BLOCK_SIZE_BYTES){
@@ -342,7 +333,6 @@ Boolean gc_compute_new_space_size(GC_Gen* gc, POINTER_SIZE_INT* mos_size, POINTE
 }
 
 #ifndef STATIC_NOS_MAPPING
-
 void gc_gen_adapt(GC_Gen* gc, int64 pause_time)
 {
   gc_decide_next_collect(gc, pause_time);
@@ -366,8 +356,9 @@ void gc_gen_adapt(GC_Gen* gc, int64 pause_time)
     return;
   
   /* below are ajustment */  
-
-  nos_boundary = (void*)((POINTER_SIZE_INT)gc->heap_end - new_nos_size);
+  POINTER_SIZE_INT curr_heap_commit_end = 
+                             (POINTER_SIZE_INT)gc->heap_start + LOS_HEAD_RESERVE_FOR_HEAP_NULL + gc->committed_heap_size;
+  nos_boundary = (void*)(curr_heap_commit_end - new_nos_size);
 
   fspace->heap_start = nos_boundary;
   fspace->blocks = (Block*)nos_boundary;
@@ -394,8 +385,8 @@ void gc_gen_adapt(GC_Gen* gc, int64 pause_time)
   return;
 }
 
-#else /* ifndef STATIC_NOS_MAPPING */
-
+/* ifdef STATIC_NOS_MAPPING */
+#else
 void gc_gen_adapt(GC_Gen* gc, int64 pause_time)
 {
   gc_decide_next_collect(gc, pause_time);

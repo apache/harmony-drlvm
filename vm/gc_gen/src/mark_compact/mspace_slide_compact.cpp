@@ -357,16 +357,7 @@ void slide_compact_mspace(Collector* collector)
   if( ++old_num == num_active_collectors ){
     /* last collector's world here */
     /*Retune space tuner to insure the tuning size is not to great*/
-//    Boolean retune_result;
     if(gc->tuner->kind != TRANS_NOTHING) gc_space_retune(gc);
-//    if(gc->tuner->kind == TRANS_FROM_LOS_TO_MOS) printf("los shrink...\n");
-//    if(gc->tuner->kind == TRANS_FROM_MOS_TO_LOS) printf("los extend...\n");
-    
-/*    if(!retune_result){
-      gc->collect_result = FALSE;
-      num_marking_collectors++; 
-      return;
-    }*/
     
     assert(!(gc->tuner->tuning_size % GC_BLOCK_SIZE_BYTES));
     /* prepare for next phase */

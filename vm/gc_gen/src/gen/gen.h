@@ -169,6 +169,8 @@ void gc_gen_adapt(GC_Gen* gc, int64 pause_time);
 void gc_gen_reclaim_heap(GC_Gen* gc);
 
 void gc_gen_assign_free_area_to_mutators(GC_Gen* gc);
+
+void gc_gen_adjust_heap_size(GC_Gen* gc);
   
 void gc_gen_mode_adapt_init(GC_Gen *gc);
 
@@ -177,5 +179,6 @@ void gc_gen_iterate_heap(GC_Gen *gc);
 extern Boolean GEN_NONGEN_SWITCH ;
 
 #endif /* ifndef _GC_GEN_H_ */
+
 
 
