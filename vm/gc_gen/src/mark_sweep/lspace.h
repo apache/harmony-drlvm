@@ -27,9 +27,9 @@
 
 /*Fixme: This macro is for handling HEAP_NULL issues caused by JIT OPT*/
 #ifdef COMPRESS_REFERENCE
-  #define LOS_HEAD_RESERVE_FOR_HEAP_NULL ( SPACE_ALLOC_UNIT )
+  #define LOS_HEAD_RESERVE_FOR_HEAP_NULL (GC_BLOCK_SIZE_BYTES )
 #else
-  #define LOS_HEAD_RESERVE_FOR_HEAP_NULL ( 0*KB )
+  #define LOS_HEAD_RESERVE_FOR_HEAP_NULL (0*KB)
 #endif
 
 typedef struct Lspace{

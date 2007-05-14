@@ -71,14 +71,14 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
 
   min_nos_size_bytes *=  gc_gen->_num_processors;
 
-  POINTER_SIZE_INT min_nos_size_threshold = min_heap_size>>5;
+  POINTER_SIZE_INT min_nos_size_threshold = max_heap_size>>5;
   if(min_nos_size_bytes  > min_nos_size_threshold){
     min_nos_size_bytes = round_down_to_size(min_nos_size_threshold,SPACE_ALLOC_UNIT);
   }
   
   if( MIN_NOS_SIZE )  min_nos_size_bytes = MIN_NOS_SIZE;
 
-  POINTER_SIZE_INT los_size = min_heap_size >> 7;
+  POINTER_SIZE_INT los_size = max_heap_size >> 7;
   if(INIT_LOS_SIZE) los_size = INIT_LOS_SIZE;
   if(los_size < min_los_size_bytes ) 
     los_size = min_los_size_bytes ;
@@ -96,21 +96,21 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
   gc_gen->survive_ratio = 0.2f;
 
   if(NOS_SIZE){
-    los_mos_size = min_heap_size - NOS_SIZE;
+    los_mos_size = max_heap_size - NOS_SIZE;
     mos_reserve_size = los_mos_size - los_size;  
 
     nos_commit_size = NOS_SIZE;
     nos_reserve_size = NOS_SIZE;
   
   }else{  
-    los_mos_size = min_heap_size;
+    los_mos_size = max_heap_size;
     mos_reserve_size = los_mos_size - los_size;
-    nos_commit_size = (POINTER_SIZE_INT)(((float)(min_heap_size - los_size))/(1.0f + gc_gen->survive_ratio));
+    nos_commit_size = (POINTER_SIZE_INT)(((float)(max_heap_size - los_size))/(1.0f + gc_gen->survive_ratio));
     nos_reserve_size = mos_reserve_size;
   }
     
   nos_commit_size = round_down_to_size(nos_commit_size, SPACE_ALLOC_UNIT);  
-  mos_commit_size = min_heap_size - los_size - nos_commit_size;
+  mos_commit_size = max_heap_size - los_size - nos_commit_size;
 
   /* allocate memory for gc_gen */
   void* reserved_base;
@@ -142,8 +142,8 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
     }
     reserved_base = vm_reserve_mem(los_mos_base, los_mos_size);
   }
-/* NON_STATIC_NOS_MAPPING */  
-#else 
+  
+#else /* STATIC_NOS_MAPPING */
 
   reserved_base = NULL;
   if(large_page_hint){
@@ -157,24 +157,15 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
     }
   }
   
-  if(reserved_base == NULL){
-    Boolean max_size_reduced = 0;
+  if(reserved_base==NULL){
     reserved_base = vm_reserve_mem((void*)0, max_heap_size + SPACE_ALLOC_UNIT);
-    
-    while( !reserved_base ){
-      max_size_reduced = 1;
-      max_heap_size -= SPACE_ALLOC_UNIT;
-      reserved_base = vm_reserve_mem((void*)0, max_heap_size + SPACE_ALLOC_UNIT);
-    }
-    if(max_heap_size < min_heap_size){
-      printf("Non-static NOS mapping: Max heap size could not be gauranteed greater than min heap size according to memory limitation.\n");  
-      exit(0);
-    }else if(max_size_reduced){
-      printf("Non-static NOS mapping: Max heap size is reduced to %x according to memory limitation.\n", max_heap_size);
-    }//else printf("Max size: %x, heap_start: %lx\n", max_heap_size, reserved_base);
-
     reserved_base = (void*)round_up_to_size((POINTER_SIZE_INT)reserved_base, SPACE_ALLOC_UNIT);
     assert((POINTER_SIZE_INT)reserved_base%SPACE_ALLOC_UNIT == 0);
+
+    while( !reserved_base ){
+      printf("Non-static NOS mapping: Can't allocate memory at address %x for specified size %x", reserved_base, max_heap_size);  
+      exit(0);      
+    }
   }
 
   reserved_end = (void*)((POINTER_SIZE_INT)reserved_base + max_heap_size);
@@ -214,6 +205,9 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
   nos->collect_algorithm = MINOR_ALGO;
   mos->collect_algorithm = MAJOR_ALGO;
 
+  /*Give GC a hint of space survive ratio.*/
+//  nos->survive_ratio = gc_gen->survive_ratio;
+//  mos->survive_ratio = gc_gen->survive_ratio;
   gc_space_tuner_initialize((GC*)gc_gen);
 
   gc_gen_mode_adapt_init(gc_gen);
@@ -222,6 +216,7 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
                                 space_committed_size((Space*)gc_gen->mos) +
                                 space_committed_size((Space*)gc_gen->los);
   
+
   set_native_finalizer_thread_flag(!IGNORE_FINREF);
   set_native_ref_enqueue_thread_flag(!IGNORE_FINREF);
   
@@ -264,6 +259,12 @@ void* los_try_alloc(POINTER_SIZE_INT size, GC* gc){  return lspace_try_alloc((Ls
 
 
 unsigned int gc_get_processor_num(GC_Gen* gc){ return gc->_num_processors;}
+
+
+static Boolean major_collection_needed(GC_Gen* gc)
+{
+  return space_used_memory_size((Blocked_Space*)gc->nos)*gc->survive_ratio > (space_free_memory_size((Blocked_Space*)gc->mos));
+}
 
 Boolean FORCE_FULL_COMPACT = FALSE;
 
@@ -344,64 +345,6 @@ void gc_gen_assign_free_area_to_mutators(GC_Gen* gc)
   return;     
 }
 
-void gc_gen_adjust_heap_size(GC_Gen* gc)
-{
-  if(gc_match_kind((GC*)gc, MINOR_COLLECTION)) return;
-  if(gc->committed_heap_size == max_heap_size_bytes - LOS_HEAD_RESERVE_FOR_HEAP_NULL) return;
-  
-  Mspace* mos = gc->mos;
-  Fspace* nos = gc->nos;
-  Lspace* los = gc->los;
-  /*We can not tolerate gc->survive_ratio be greater than threshold twice continuously.
-   *Or, we must adjust heap size
-   */
-  static unsigned int tolerate = 0;
-
-  POINTER_SIZE_INT heap_total_size = los->committed_heap_size + mos->committed_heap_size + nos->committed_heap_size;
-  assert(heap_total_size == gc->committed_heap_size);
-
-  assert(nos->surviving_size == 0);  
-  POINTER_SIZE_INT heap_surviving_size = mos->surviving_size + los->surviving_size; 
-  assert(heap_total_size > heap_surviving_size);
-
-  float heap_survive_ratio = (float)heap_surviving_size / (float)heap_total_size;
-  float threshold_survive_ratio = 0.3f;
-  float regular_survive_ratio = 0.125f;
-
-  POINTER_SIZE_INT new_heap_total_size = 0;
-  POINTER_SIZE_INT adjust_size = 0;
-
-  if(heap_survive_ratio < threshold_survive_ratio) return;
-
-  if(++tolerate < 2) return;
-  tolerate = 0;
-  
-  new_heap_total_size = (POINTER_SIZE_INT)((float)heap_surviving_size / regular_survive_ratio);
-  new_heap_total_size = round_down_to_size(new_heap_total_size, SPACE_ALLOC_UNIT);
-
-
-  if(new_heap_total_size <= heap_total_size) return;
-  if(new_heap_total_size > max_heap_size_bytes) 
-    new_heap_total_size = max_heap_size_bytes - LOS_HEAD_RESERVE_FOR_HEAP_NULL;
-
-  adjust_size = new_heap_total_size - heap_total_size;
-  assert( !(adjust_size % SPACE_ALLOC_UNIT) );
-  
-#ifdef STATIC_NOS_MAPPING
-  /*Fixme: Static mapping have other bugs to be fixed first.*/
-  assert(!large_page_hint);
-  return;
-#else
-  assert(!large_page_hint);
-  POINTER_SIZE_INT old_nos_size = nos->committed_heap_size;
-  blocked_space_extend(nos, adjust_size);
-  nos->survive_ratio = (float)old_nos_size * nos->survive_ratio / (float)nos->committed_heap_size;
-  /*Fixme: gc should be modified according to nos extend*/
-  gc->committed_heap_size += adjust_size;
-  assert(gc->committed_heap_size == los->committed_heap_size + mos->committed_heap_size + nos->committed_heap_size);
-#endif
-}
-
 Boolean IS_FALLBACK_COMPACTION = FALSE; /* only for debugging, don't use it. */
 
 void gc_gen_reclaim_heap(GC_Gen* gc)
@@ -418,31 +361,41 @@ void gc_gen_reclaim_heap(GC_Gen* gc)
   if(gc_match_kind((GC*)gc, MINOR_COLLECTION)){
     /* FIXME:: move_object is only useful for nongen_slide_copy */
     gc->mos->move_object = FALSE;
+    
     fspace_collection(gc->nos);
+    
     gc->mos->move_object = TRUE;      
+
+      
   }else{
+
     /* process mos and nos together in one compaction */
     mspace_collection(gc->mos); /* fspace collection is included */
     lspace_collection(gc->los);
+
   }
 
   if(gc->collect_result == FALSE && gc_match_kind((GC*)gc, MINOR_COLLECTION)){
-    if(gc_is_gen_mode()) gc_clear_remset((GC*)gc);  
+    if(gc_is_gen_mode())
+      gc_clear_remset((GC*)gc);  
     
     /* runout mspace in minor collection */
     assert(mspace->free_block_idx == mspace->ceiling_block_idx + 1);
     mspace->num_used_blocks = mspace->num_managed_blocks;
 
     IS_FALLBACK_COMPACTION = TRUE;
+
     gc_reset_collect_result((GC*)gc);
     gc->collect_kind = FALLBACK_COLLECTION;    
 
-    if(verify_live_heap) event_gc_collect_kind_changed((GC*)gc);
+    if(verify_live_heap)
+      event_gc_collect_kind_changed((GC*)gc);
 
     mspace_collection(gc->mos); /* fspace collection is included */
     lspace_collection(gc->los);
     
     IS_FALLBACK_COMPACTION = FALSE;
+    
   }
   
   if( gc->collect_result == FALSE){
@@ -459,6 +412,7 @@ void gc_gen_reclaim_heap(GC_Gen* gc)
 #endif
 
   assert(!gc->los->move_object);
+
   return;
 }
 

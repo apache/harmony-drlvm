@@ -106,7 +106,7 @@ void check_space_tuner(GC* gc)
   }
   
 check_size:
-  tuner->tuning_size = round_up_to_size(tuner->tuning_size, GC_BLOCK_SIZE_BYTES);
+  tuner->tuning_size = round_down_to_size(tuner->tuning_size, GC_BLOCK_SIZE_BYTES);
   if(tuner->tuning_size == 0){
     tuner->kind = TRANS_NOTHING;
     lspace->move_object = 0;
@@ -137,9 +137,9 @@ void gc_space_tune_before_gc(GC* gc, unsigned int cause)
   Blocked_Space* fspace = (Blocked_Space*)gc_get_nos((GC_Gen*)gc);
   Space* lspace = (Space*)gc_get_los((GC_Gen*)gc);
 
-  POINTER_SIZE_INT los_expect_surviving_sz = (POINTER_SIZE_INT)((float)(lspace->surviving_size + lspace->alloced_size) * lspace->survive_ratio);
-  POINTER_SIZE_INT los_expect_free_sz = ((lspace->committed_heap_size > los_expect_surviving_sz) ? 
-                                                            (lspace->committed_heap_size - los_expect_surviving_sz) : 0);
+  POINTER_SIZE_INT los_expect_survive_sz = (POINTER_SIZE_INT)((float)(lspace->surviving_size + lspace->alloced_size) * lspace->survive_ratio);
+  POINTER_SIZE_INT los_expect_free_sz = ((lspace->committed_heap_size > los_expect_survive_sz) ? 
+                                                            (lspace->committed_heap_size - los_expect_survive_sz) : 0);
   POINTER_SIZE_INT mos_expect_survive_sz = (POINTER_SIZE_INT)((float)(mspace->surviving_size + mspace->alloced_size) * mspace->survive_ratio);
   POINTER_SIZE_INT mos_expect_threshold = mspace_get_expected_threshold((Mspace*)mspace);
   POINTER_SIZE_INT mos_expect_free_sz = ((mos_expect_threshold > mos_expect_survive_sz)?
@@ -304,7 +304,7 @@ Boolean gc_space_retune(GC *gc)
     }
     los_live_obj_size = round_up_to_size(los_live_obj_size, GC_BLOCK_SIZE_BYTES);
     los_live_obj_size += (collector_num << 2 << GC_BLOCK_SHIFT_COUNT);
-
+    
     Lspace *los = (Lspace*)gc_get_los((GC_Gen*)gc);
     Space_Tuner *tuner = gc->tuner;
     POINTER_SIZE_INT los_max_shrink_size = 0;
