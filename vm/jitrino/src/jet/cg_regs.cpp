@@ -149,7 +149,7 @@ AR CodeGen::valloc(jtype jt)
         s.to_mem(m_base, vstack_off(i));
         rref(s);
     }
-    
+    // Next, free out the locals, which are the register
     for (unsigned i=0; i<m_jframe->num_vars(); i++) {
         Val& s = m_jframe->var(i);
         if (!s.is_reg() || s.reg() != ar) { continue; };
@@ -161,15 +161,26 @@ AR CodeGen::valloc(jtype jt)
     }
     //
     // Now, free up the stack items that are the memory
+    // addressed via register (e.g. an instance field value)
     //
     for (unsigned i=0; is_gr(ar) && i<m_jframe->size(); i++) {
         Val& s = m_jframe->dip(i);
         if (!s.is_mem() || !s.uses(ar)) { continue; };
-        push(s.as_opnd(jobj));
+        bool need_double_slot = is_ia32() && is_wide(s.jt());
+        push(s.as_opnd(iplatf));
+        if (need_double_slot) {
+            Opnd hi_mem(iplatf, s.base(), s.disp() + STACK_SLOT_SIZE, s.index(), s.scale());
+            push(hi_mem);
+        }
         rfree(s);
-        s.to_mem(m_base, vstack_off(i));
+        int stack_off = vstack_off(i);
+        s.to_mem(m_base, stack_off);
         rref(s);
-        Opnd stk(jobj, m_base, vstack_off(i));
+        if (need_double_slot) {
+            Opnd hi_stk(iplatf, m_base, stack_off + STACK_SLOT_SIZE);
+            pop(hi_stk);
+        }
+        Opnd stk(iplatf, m_base, stack_off);
         pop(stk);
     }
     if (is_set(DBG_TRACE_CG)) { dbg(";;>~spill\n"); }
