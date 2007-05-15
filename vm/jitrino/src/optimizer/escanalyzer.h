@@ -399,15 +399,6 @@ private:
     void checkSubobjectStates(CnGNode* node);
 
 /**
- * Scans connection graph nodes specified NT_EXITVAL node refers to. 
- * @param node - NT_EXITVAL connection graph node.
- * @return GLOBAL_ESCAPE, if any of nodes node reference to is GLOBAL_ESCAPE, otherwise 
- *         ARG_ESCAPE, if any of nodes node reference to is ARG_ESCAPE, otherwise
- *         NO_ESCAPE.
- */
-    uint32 getSubobjectStates(CnGNode* node);
-
-/**
  * Finds specified method escape analysis information in the common repository and compiles 
  * the method if it is required and possible. 
  * @param md - method description,
@@ -537,23 +528,13 @@ private:
     void createdObjectInfo();
 
 /**
- * Prints origin operands of specified instruction operands.
- * @param inst - instruction,
+ * Prints origin operands of specified instruction.
+ * @param inst - specified instruction,
+ * @param all - if <code>true</code> for all source operands of the instruction,
+ *              if <code>false</code> for main source operand of some instructions,
  * @param text - text to print before the instruction.
  */
-    void printOriginObject(Inst* inst,std::string text="  ");
-
-/**
- * Prints origin operands of specified instruction main operand.
- * @param inst - instruction,
- * @param text - text to print before the instruction.
- */
-    void printOriginObject1(Inst* inst,std::string text="  ");
-
-/**
- * Prints escape analysis method information stored in common repository.
- */
-    void printMethodInfos();
+    void printOriginObjects(Inst* inst, bool all, std::string text="  ");
 
 /**
  * Prints escape analysis method information for specified parameter.
@@ -745,19 +726,6 @@ private:
     void collectSuccessors(Node* node);
 
 /**
- * Collects global node successors to scannedSucNodes list. 
- * @param node - CnG node.
- */
-    void collectGlobalNodeSuccessors(CnGNode* node);
-
-/**
- * Returns state of object containing address for Op_TauStInd instruction.
- * @param linst - Op_TauStInd instruction.
- * @return object state.
- */
-    uint32 getContainingObjState(Inst* linst);
-
-/**
  * Inserts flag for specified monitor unit. Flag is set to 0 after operand creation instruction.
  * Flag is set to 1 before call instruction from vcInsts list.
  * Inserts flag check before monitor instruction from monInsts list.
@@ -922,7 +890,7 @@ private:
  * Performs checks for CnGNode operand using connection graph.
  * @param scnode - CnG node of optimized operand
  * @param check_loc - if <code>true</code> checks for local objects,
- *                    if <code>false</code> checks for virtual call escaped objects.
+ *                    if <code>false</code> checks for method call escaped objects.
  * @return CnGNode* for operand that may be optimized; 
  *         <code>NULL<code> otherwise.
  */
@@ -953,12 +921,11 @@ private:
  * @param vc_insts    - list of call instructions optimized object is escaped to,
  * @param objs        - list of optimized object fields,
  * @param ob_var_opnd -  varOpnd replacing optimized object,
- * @param ob_flag_var_opnd - sign if optimized object was created,
  * @param tnode       - target CFG node for newobj instruction exception edge,
  * @param oid         - escaped optimized object Id.
  */
     void restoreEOCreation(Insts* vc_insts, ScObjFlds* objs, VarOpnd* ob_var_opnd, 
-        VarOpnd* ob_flag_var_opnd, Node* tnode, uint32 oid);
+        Node* tnode, uint32 oid);
 
 /**
  * Removes specified instruction from ControlFlowGraph.
@@ -1025,8 +992,7 @@ private:
     void fixCheckInsts(uint32 opId);
 
 /**
- * Checks (using connection graph) if CnGNode operand has final fields and adds it to
- * the list of possible optimized final fields operands.
+ * Checks (using connection graph) if CnGNode operand has final fields and scalarizes them.
  * @param onode - CnG node of optimized operand,
  * @param scObjFlds - list to collect onode operand field usage.
  */
