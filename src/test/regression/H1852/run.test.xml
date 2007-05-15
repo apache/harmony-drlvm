@@ -1,0 +1,9 @@
+<project name="RUN HARMONY-1852 Regression Test">
+    <target name="run-test">
+        <run-junit-test 
+             test="org.apache.harmony.drlvm.tests.regression.h1852.DivIntTest"
+             vmarg="-Xem:jet">
+        </run-junit-test>
+    </target>
+</project>
+

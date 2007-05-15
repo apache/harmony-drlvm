@@ -37,6 +37,10 @@
 namespace Jitrino {
 namespace Jet {
 
+/**
+ * Provides fine-tuned implementation for IDIV/IREM operations on IA32-compatible platforms, 
+ * in replacement of common arithmetic helper (see arith_rt.h).
+ */
 bool CodeGen::gen_a_platf(JavaByteCodes op, jtype jt)
 {
     if (jt != i32) return false;
@@ -58,18 +62,16 @@ bool CodeGen::gen_a_platf(JavaByteCodes op, jtype jt)
     alu(alu_cmp, v2.as_opnd(), Opnd(-1));
     unsigned br_normal = br(ne, 0, 0);
     alu(alu_cmp, v1.as_opnd(), Opnd(INT_MIN));
-    unsigned br_cont = NOTHING, br_exit = NOTHING;
+    unsigned br_exit = NOTHING;
     if (op == OPCODE_IREM) {
-        br_cont = br(ne, 0, 0);
-        br_exit = br(cond_none, 0, 0);
+        do_mov(edx, Opnd(0)); // prepare exit value for the corner case
+        br_exit = br(eq, 0, 0);
     }
     else {
+        do_mov(eax, v1);
         br_exit = br(eq, 0, 0);
     }
     patch(br_normal, ip());
-    if (br_cont != NOTHING) {
-        patch(br_cont, ip());
-    }
     do_mov(eax, v1);
     //
     // The method is supposed to be platform-depended, and may not have 
@@ -84,9 +86,8 @@ bool CodeGen::gen_a_platf(JavaByteCodes op, jtype jt)
     EncoderBase::Operands args(RegName_EDX, RegName_EAX, 
                                devirt(v2.reg(), i32));
     ip(EncoderBase::encode(ip(), Mnemonic_IDIV, args));
-    if (br_exit != NOTHING) {
-        patch(br_exit, ip());
-    }
+    patch(br_exit, ip());
+
     vpop();
     vpop();
     vpush(op == OPCODE_IREM ? edx : eax);
