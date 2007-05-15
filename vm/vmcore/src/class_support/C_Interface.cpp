@@ -2262,6 +2262,11 @@ Method_Handle method_find_overridden_method(Class_Handle ch, Method_Handle mh)
     for(; ch;  ch = ch->get_super_class()) {
         m = ch->lookup_method(name, desc);
         if (m != NULL) {
+            // IllegalAccessError will be thrown if implementation of
+            // interface method is not public
+            if (method->get_class()->is_interface() && !m->is_public()) {
+                return NULL;
+            }
             // The method m can only override mh/method
             // if m's class can access mh/method (JLS 6.6.5).
             if(m->get_class()->can_access_member(method)) {
