@@ -332,7 +332,7 @@ private:
 
     char& at (int i, int j) const
     {
-        assert(0 <= i && i < dim && 0 <= j && j < dim && i != j);
+        assert(0 <= i && i < (int)dim && 0 <= j && j < (int)dim && i != j);
 
         return (i < j) ? *(i*dim + j + ptr)
                        : *(j*dim + i + ptr);
