@@ -658,7 +658,7 @@ public:
      * @param size - if this parameter is not OpndSize_Null the resulted constraint 
      * is adjusted to the requested size.
     */
-    Constraint getConstraint(uint32 idx, uint32 memOpndMask, OpndSize size = OpndSize_Null);
+    Constraint getConstraint(uint32 idx, uint32 memOpndMask, OpndSize size = OpndSize_Null) const;
 
     /** 
      * Returns true if the position at idx starts or extends the operand live range 

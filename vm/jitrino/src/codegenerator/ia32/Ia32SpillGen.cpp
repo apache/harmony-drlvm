@@ -193,7 +193,6 @@ struct SpillGen : public SessionAction
 
     bool   evicts_known;
 
-
 //  Methods
 //  -------
 
@@ -579,6 +578,13 @@ void SpillGen::runImpl()
     onConstruct(*this);
 #endif
 
+    const bool* spill_flag = static_cast<const bool*>(getIRManager().getInfo("SpillGen"));
+    if (spill_flag != 0 && !*spill_flag)
+    {
+        DBGOUT("SpillGen skipped" << endl;);
+        return;
+    }
+
     registers.parse(getArg("regs"));
     DBGOUT("parameters: " << registers << endl;)
     irManager->resetOpndConstraints();
@@ -652,6 +658,7 @@ void SpillGen::runImpl()
 
     static Counter<size_t> count_emits("ia32:spillgen:emits", 0);
     count_emits += emitted;
+
 #ifdef _DEBUG_SPILLGEN
     log(LogStream::DBG) << endl << "Emitted movs :" << emitted << endl;
 
@@ -869,7 +876,6 @@ size_t SpillGen::pass0 ()
 
     assert(instxp == instxs.begin());
     return actives.size();
-
 }
 
 
@@ -896,11 +902,9 @@ size_t SpillGen::pass1 ()
 
     lives_catch = 0;
     Node* node = bblock->getExceptionEdgeTarget();
-    if (node!=NULL) {
-        if ((lives_catch = irManager->getLiveAtEntry(node))->isEmpty()) {
+    if (node != NULL) 
+        if ((lives_catch = irManager->getLiveAtEntry(node))->isEmpty()) 
             lives_catch = 0;
-        }
-    }
 
     for (Oplines::reverse_iterator it = actives.rbegin(); it != actives.rend(); ++it)
     {
@@ -935,12 +939,13 @@ size_t SpillGen::pass1 ()
 
     //  Process instructions that are using the operand
 
-        while (opline.go()) {
+        while (opline.go()) 
             if (opline.isProc())
             {
                 Constraint c(opline.opnd->getConstraint(Opnd::ConstraintKind_Initial));
                 update(opline.instx->inst, opline.opnd, c);
                 opline.idx = registers.getIndex(c);
+
                 if (!tryRegister(opline, c, prefreg))
                     if (!tryMemory(opline, c))
                         if (!tryEvict(opline, c))
@@ -950,7 +955,10 @@ size_t SpillGen::pass1 ()
                                 ++fails;
 
                                 if (simplify(opline.instx->inst, opline.opnd))
+                                {
+                                    loadOpndMem(opline);
                                     break;
+                                }
 
                                 loadOpnd(opline, opline.instx, opline.opnd);
 
@@ -966,11 +974,10 @@ size_t SpillGen::pass1 ()
             {
                 opline.forw();
             }
-        }
 
     //  End-block processing
 
-        assert(opline.instx == opline.ops->front().instx);
+        //assert(opline.instx == opline.ops->front().instx);
         if (opline.at_exit)
             loadOpndMem(opline);
     }
@@ -1012,6 +1019,7 @@ bool SpillGen::tryRegister (Opline& opline, Constraint c, RegMask prefreg)
     Constraint cr((OpndKind)cx.getKind(), c.getSize(), cx.getMask());
 
 //  handle first instruction of the interval
+
     RegMask mk = cr.getMask() & ~usedRegs(opline.instx, opline.idx, opline.isUse());
     if (mk == 0)
     {
@@ -1024,7 +1032,6 @@ bool SpillGen::tryRegister (Opline& opline, Constraint c, RegMask prefreg)
         mkpost = callRegs(opline.instx, opline.idx);
 
 //  handle second and all others instructions
-
 
     Instx* begx = opline.instx;
     Instx* endx = begx;
@@ -1059,7 +1066,8 @@ bool SpillGen::tryRegister (Opline& opline, Constraint c, RegMask prefreg)
         mkpost = callRegs(opline.instx, opline.idx);
         count += cnt;
     }
-    DBGOUT("   -reg [" << (const Inst*)begx->inst << " - " << (const Inst*)endx->inst 
+
+    DBGOUT("   -reg [" << *begx->inst << " - " << *endx->inst 
         << "] avail:" << RegMasks(cx, mk) << " count:" << count << endl;)
 
     if (count == 0)
@@ -1073,6 +1081,7 @@ bool SpillGen::tryRegister (Opline& opline, Constraint c, RegMask prefreg)
             return true;
         }
     }
+
     if ((mk & prefreg) != 0)
     {
         mk &= prefreg;
@@ -1241,14 +1250,34 @@ bool SpillGen::tryRepair (Opline& opline, Constraint c)
 
 bool SpillGen::simplify (Inst* inst, Opnd* opnd)
 {
+    Opnd* opndm;
     if (inst->hasKind(Inst::Kind_LocalControlTransferInst) && inst->getOpndCount() == 1)
     {
-        Opnd* opndm = inst->getOpnd(0);
+        opndm = inst->getOpnd(0);
         Opnd* opndx = irManager->newMemOpnd(opndm->getType(), 
                                            MemOpndKind_StackAutoLayout, 
-                                           irManager->getRegOpnd(RegName_ESP), 
+                                           irManager->getRegOpnd(STACK_REG), 
                                            0);
-        DBGOUT("simplify " << *opndm << " -> mem " << *opndx << endl;);
+        DBGOUT("simplify jump " << *opndm << " -> mem " << *opndx << endl;);
+        emitMove(true, inst,opndx, opndm);
+        inst->replaceOpnd(opndm, opndx);
+
+        for (int so = 0; so != MemOpndSubOpndKind_Count; ++so)
+        {
+            Opnd* sub = opndm->getMemOpndSubOpnd(static_cast<MemOpndSubOpndKind>(so));
+            if (sub != 0)
+                actsmap[sub->getId()] = 0;
+        }
+        return true;
+    }
+
+    else if (inst->hasKind(Inst::Kind_CallInst) && (opndm = inst->getOpnd(0)) == opnd)
+    {
+        Opnd* opndx = irManager->newMemOpnd(opndm->getType(), 
+                                           MemOpndKind_StackAutoLayout, 
+                                           irManager->getRegOpnd(STACK_REG), 
+                                           0);
+        DBGOUT("simplify call " << *opndm << " -> mem " << *opndx << endl;);
         emitMove(true, inst,opndx, opndm);
         inst->replaceOpnd(opndm, opndx);
 
@@ -1384,6 +1413,7 @@ void  SpillGen::assignMem (Opline& opline, Instx* begx, Instx* endx)
            << " - " << *endx->inst << "] to " << *opline.opnd_mem << endl;)
 
     loadOpnd(opline, begx, opline.opnd_mem);
+
     if (opline.opnd != opline.opnd_mem)
         for (; begx <= endx; ++begx)
         {
@@ -1842,6 +1872,7 @@ SpillGen::RegMask SpillGen::getRegMaskConstr (const Opnd* opnd, Constraint c) co
 } //namespace Ia32
 
 } //namespace Jitrino
+
 
 
 

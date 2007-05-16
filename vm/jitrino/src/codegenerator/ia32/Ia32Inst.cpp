@@ -270,7 +270,7 @@ uint32 Inst::countOpnds(uint32 roles)const
 }
 
 //_________________________________________________________________________________________________
-Constraint Inst::getConstraint(uint32 idx, uint32 memOpndMask, OpndSize size)
+Constraint Inst::getConstraint(uint32 idx, uint32 memOpndMask, OpndSize size) const
 { 
     Constraint c(OpndKind_Any); 
     if (idx < opndCount){
@@ -336,22 +336,22 @@ bool Inst::replaceOpnd(Opnd * oldOpnd, Opnd * newOpnd, uint32 opndRoleMask)
     assert(newOpnd != NULL);
     for (uint32 i=0, n=getOpndCount(); i<n; i++){
         uint32 opndRole=getOpndRoles(i);
+        Opnd * opnd=getOpnd(i);
         if (
             (opndRole&opndRoleMask&OpndRole_FromEncoder)!=0 && 
-            (opndRole&opndRoleMask&OpndRole_ForIterator)!=0
+            (opndRole&opndRoleMask&OpndRole_InstLevel)!=0
             ){
-            Opnd * opnd=getOpnd(i);
             if (opnd==oldOpnd){
                 assert((opndRole&OpndRole_Changeable)!=0);
                 setOpnd(i, newOpnd);
                 opnd=newOpnd;
                 replaced = true;
             }
-            if ((opndRoleMask&OpndRole_OpndLevel)!=0)
-                replaced |= opnd->replaceMemOpndSubOpnd(oldOpnd, newOpnd);
         }
+        if ((opndRoleMask&OpndRole_OpndLevel)!=0 &&
+            (opndRoleMask&OpndRole_Use)!=0)
+            replaced |= opnd->replaceMemOpndSubOpnd(oldOpnd, newOpnd);
     }
-
     return replaced;
 }
 

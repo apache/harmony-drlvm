@@ -1,3 +1,19 @@
+/*
+ *  Licensed to the Apache Software Foundation (ASF) under one or more
+ *  contributor license agreements.  See the NOTICE file distributed with
+ *  this work for additional information regarding copyright ownership.
+ *  The ASF licenses this file to You under the Apache License, Version 2.0
+ *  (the "License"); you may not use this file except in compliance with
+ *  the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
 /**
  * @author Sergey L. Ivashin
  * @version $Revision$
@@ -14,24 +30,18 @@
 #include <sstream>
 #include <stdio.h>
 
-#ifdef _DEBUG__REGALLOC3
-#include "Ia32RegAllocWrite.h"
+#ifdef _DEBUG_REGALLOC3
 #ifdef _MSC_VER
 #pragma warning(disable : 4505)   //unreferenced local function has been removed
 #endif //#ifdef _MSC_VER
-#endif //#ifdef _DEBUG__REGALLOC3
-
-
-//
-//  Flags to tune 
-//
-#define _VAR2_
-#define _REGALLOC3_NEIGBH
-//#define _REGALLOC3_COALESCE
-
+#endif //#ifdef _DEBUG_REGALLOC3
 
 
 using namespace std;
+
+#ifdef _EM64T_
+#define _SKIP_CATCHED
+#endif
 
 namespace Jitrino
 {
@@ -64,7 +74,11 @@ struct RegAlloc3 : public SessionAction
 {
     MemoryManager mm;           // this is private MemoryManager, not irm.getMemoryManager()
 
-    int coalesceCount;
+    unsigned flag_SORT;
+    bool flag_NEIGBH;
+    bool flag_COALESCE;
+
+    unsigned coalesceCount;
 
     class BoolMatrix;
     typedef uint32 RegMask;     // used to represent set of registers
@@ -99,9 +113,10 @@ struct RegAlloc3 : public SessionAction
     };
     typedef StlVector<Oprole> Oproles;
 
+    typedef StlList<int> Indexes;
+
     struct Opndx
     {
-        typedef StlList<int> Indexes;
         Indexes* adjacents,
                * hiddens;
 
@@ -112,27 +127,27 @@ struct RegAlloc3 : public SessionAction
 
         int ridx;       // index in Registers of register assigned/will be assigned
         RegMask alloc,  // 0 or mask of the register assigned
-                avail;  // if not assigned, then mask of the registers available    
-        int nbavails;   // number of the registers available for this operand
-        int spillcost;
-        bool spilled;
+                avail;  // if not assigned, then mask of the registers available (defined by calculated constraint)
+        unsigned nbavails;  // number of the registers available for this operand ( =bitCount(avail) )
+        double  spillcost;
+        bool    spill;  // operand selected for spilling
+        bool    ignore; // this operand was coalesced so its entry in the graph is invalid
     };
 
     //  Operand's graph to be colored
     struct Graph : public StlVector<Opndx>
     {
-        Graph (MemoryManager& m)            : StlVector<Opndx>(m), mm(m) {}
+        Graph (MemoryManager& m)            : StlVector<Opndx>(m) {}
 
         void connect (int x1, int x2) const;
         int  disconnect (int x) const;
         void reconnect  (int x) const;
-        void moveNodes (Opndx::Indexes& from, Opndx::Indexes& to, int x) const;
-
-        MemoryManager& mm;
+        void moveNodes (Indexes& from, Indexes& to, int x) const;
     };
     Graph graph;
 
-    int graphsize;
+    size_t graphsize,  // total size of graph (operands + registers)
+             xregbase;   // index of first register in graph
 
     StlVector<int> nstack;
 
@@ -143,14 +158,24 @@ struct RegAlloc3 : public SessionAction
     uint32 getSideEffects () const  {return coalesceCount == 0 ? 0 : SideEffect_InvalidatesLivenessInfo;}
 
     void runImpl();
-    bool verify(bool force=false);
+    void SpillGen ();
+    bool verify (bool force=false);
 
     bool buildGraph ();
+    void processInst (Inst*, BitSet&, int* opandmap, BoolMatrix&, double excount);
+    void showGraph ();
+    void lookLives (Opnd*, BitSet&, int* opandmap, BoolMatrix&);
+    int  findNode  (Opnd*) const;
     bool coalescing (int* opandmap, BoolMatrix& matrix);
-    void coalesce   (int* opandmap, BoolMatrix& matrix, int, int);
+    void coalesce   (int* opandmap, BoolMatrix& matrix, int x0, int x1);
+    int  duplicates (Indexes* list, BoolMatrix& matrix, int x0, int x1);
     void pruneGraph ();
-    void assignRegs ();
-    bool assignReg (int);
+    bool shouldPrune (const Opndx&) const;
+    bool assignRegs ();
+    bool assignReg  (Opndx&);
+    void spillRegs  ();
+    int  spillReg   (Opndx&);
+    int update (const Inst*, const Opnd*, Constraint&) const;
 };
 
 
@@ -170,12 +195,7 @@ static Counter<size_t> count_spilled("ia32:regalloc3:spilled", 0),
 using std::endl;
 using std::ostream;
 
-#ifdef _DEBUG__REGALLOC3
-
-#include "Ia32RegAllocWrite.h"
-
-static void onConstruct (const IRManager&);
-static void onDestruct  ();
+#ifdef _DEBUG_REGALLOC3
 
 struct Sep
 {
@@ -209,15 +229,7 @@ static ostream& operator << (ostream&, const RegAlloc3::Opndx&);
 
 static ostream& operator << (ostream&, const RegAlloc3::Graph&);
 
-struct Dbgout : public  ::std::ofstream
-{
-    Dbgout (const char* s)          {open(s);}
-    ~Dbgout ()                      {close();}
-};
-
-static Dbgout dbgout("RegAlloc3.txt");
-
-#define DBGOUT(s) dbgout << s
+#define DBGOUT(s) log(LogStream::DBG).out() << s
 
 #else
 
@@ -231,9 +243,9 @@ static Dbgout dbgout("RegAlloc3.txt");
 //========================================================================================
 
 
-static size_t bitCount (RegAlloc3::RegMask mk)
+static int bitCount (RegAlloc3::RegMask mk)
 {
-    size_t count = 0;
+    int count = 0;
     while (mk != 0)
     {
         if ((mk & 1) != 0)
@@ -244,11 +256,11 @@ static size_t bitCount (RegAlloc3::RegMask mk)
 }
 
 
-static size_t bitNumber (RegAlloc3::RegMask mk)
+static int bitNumber (RegAlloc3::RegMask mk)
 {
     assert(mk != 0);
 
-    size_t number = 0;
+    int number = 0;
     while (mk != 1)
     {
         ++number;
@@ -299,6 +311,7 @@ protected:
     bool  isw;
 };
 
+
 //========================================================================================
 //  BoolMatrix - Symmetric boolean matrix
 //========================================================================================
@@ -308,7 +321,7 @@ class RegAlloc3::BoolMatrix
 {
 public:
 
-    BoolMatrix (MemoryManager&, int);
+    BoolMatrix (MemoryManager&, size_t);
 
     void clear ();
     void clear (int i, int j)           {at(i,j) = 0;}
@@ -325,12 +338,12 @@ private:
                        : *(j*dim + i + ptr);
     }
 
-    int   dim, dims;
+    size_t dim, dims;
     char* ptr;
 };
 
 
-RegAlloc3::BoolMatrix::BoolMatrix (MemoryManager& mm, int d)
+RegAlloc3::BoolMatrix::BoolMatrix (MemoryManager& mm, size_t d)
 {
     assert(d > 0);
     dim = d;
@@ -357,6 +370,20 @@ void RegAlloc3::Registers::parse (const char* params)
 {
     if (params == 0 || strcmp(params, "ALL") == 0)
     {
+#ifdef _EM64T_
+        push_back(Constraint(RegName_RAX)
+                 |Constraint(RegName_RCX)
+                 |Constraint(RegName_RDX)
+                 |Constraint(RegName_RBX)
+                 |Constraint(RegName_RSI)
+                 |Constraint(RegName_RDI)
+                 |Constraint(RegName_RBP)
+                 |Constraint(RegName_R8)
+                 |Constraint(RegName_R9)
+                 |Constraint(RegName_R10)
+                 |Constraint(RegName_R11)
+                 |Constraint(RegName_R12));
+#else
         push_back(Constraint(RegName_EAX)
                  |Constraint(RegName_ECX)
                  |Constraint(RegName_EDX)
@@ -364,16 +391,15 @@ void RegAlloc3::Registers::parse (const char* params)
                  |Constraint(RegName_ESI)
                  |Constraint(RegName_EDI)
                  |Constraint(RegName_EBP));
-
-        push_back(Constraint(RegName_XMM1)
+#endif
+        push_back(Constraint(RegName_XMM0)
+                 |Constraint(RegName_XMM1)
                  |Constraint(RegName_XMM2)
                  |Constraint(RegName_XMM3)
                  |Constraint(RegName_XMM4)
                  |Constraint(RegName_XMM5)
                  |Constraint(RegName_XMM6)
                  |Constraint(RegName_XMM7));
-
-        push_back(Constraint(RegName_FP0));
     }
     else
     {
@@ -391,10 +417,10 @@ void RegAlloc3::Registers::parse (const char* params)
 
     assert(!empty());
 
-    for (size_t i = 0; i != IRMaxRegKinds; ++i)
+    for (unsigned i = 0; i != IRMaxRegKinds; ++i)
         indexes[i] = -1;
 
-    for (size_t i = 0; i != size(); ++i)
+    for (unsigned i = 0; i != size(); ++i)
         indexes[operator[](i).getKind()] = (int)i;
 }
 
@@ -403,7 +429,7 @@ int RegAlloc3::Registers::merge (const Constraint& c, bool add)
 {
     if (c.getMask() != 0)
     {
-        for (size_t i = 0; i != size(); ++i)
+        for (unsigned i = 0; i != size(); ++i)
         {
             Constraint& r = operator[](i);
             if (r.getKind() == c.getKind())
@@ -448,7 +474,7 @@ int RegAlloc3::Graph::disconnect (int x) const
 
     int disc = 0;
 
-    for (Opndx::Indexes::iterator k = opndx.adjacents->begin(); k != opndx.adjacents->end(); ++k)
+    for (Indexes::iterator k = opndx.adjacents->begin(); k != opndx.adjacents->end(); ++k)
     {
     //  this node is adjacent to the node to be disconnected
         const Opndx& adjopndx = at(*k);
@@ -471,7 +497,7 @@ void RegAlloc3::Graph::reconnect (int x) const
 //  Node to be reconnected
     const Opndx& opndx = at(x);
 
-    for (Opndx::Indexes::iterator k = opndx.hiddens->begin(); k != opndx.hiddens->end(); ++k)
+    for (Indexes::iterator k = opndx.hiddens->begin(); k != opndx.hiddens->end(); ++k)
     {
     //  this node was adjacent to the node to be reconnected
         const Opndx& adjopndx = at(*k);
@@ -482,9 +508,9 @@ void RegAlloc3::Graph::reconnect (int x) const
 }
 
 
-void RegAlloc3::Graph::moveNodes (Opndx::Indexes& from, Opndx::Indexes& to, int x) const
+void RegAlloc3::Graph::moveNodes (Indexes& from, Indexes& to, int x) const
 {
-    Opndx::Indexes::iterator i;
+    Indexes::iterator i;
     while ((i = find(from.begin(), from.end(), x)) != from.end())
         to.splice(to.begin(), from, i);
 }
@@ -497,65 +523,41 @@ void RegAlloc3::Graph::moveNodes (Opndx::Indexes& from, Opndx::Indexes& to, int 
 
 void RegAlloc3::runImpl ()
 {
-#ifdef _DEBUG__REGALLOC3
-    onConstruct(*irManager);
-#endif
-
-    irManager->fixEdgeProfile();
+    getIRManager().fixEdgeProfile();
 
     registers.parse(getArg("regs"));
     DBGOUT("parameters: " << registers << endl;)
 
+    getArg("SORT", flag_SORT = 2);
+    getArg("NEIGBH", flag_NEIGBH = false);
+    getArg("COALESCE", flag_COALESCE = true);
+
     coalesceCount = 0;
 
+    DBGOUT(endl << "passnb 1" << endl;)
     if (buildGraph())
     {
-
-#ifdef _DEBUG__REGALLOC3
-        dbgout << "--- graph" << endl;
-        for (int x = 0; x != graphsize; ++x)
-        {
-            const Opndx& opndx = graph.at(x);
-            dbgout << "(" << x << ") " << opndx.opnd->getId()
-                   << " " << *opndx.opnd << " ridx:" << opndx.ridx 
-                   << " avail:" << hex << opndx.avail << dec << " nbavails:" << opndx.nbavails
-                   << " spillcost:" << opndx.spillcost;
-
-            if (!opndx.adjacents->empty())
-            {
-                Sep s;
-                dbgout << " adjacents{";
-                for (RegAlloc3::Opndx::Indexes::const_iterator i = opndx.adjacents->begin(); i != opndx.adjacents->end(); ++i)
-                    dbgout << s << *i;
-                dbgout << "}";
-            }
-
-            if (opndx.neighbs != 0)
-            {
-                Sep s;
-                dbgout << " neighbs{";
-                for (RegAlloc3::Opndx::Indexes::const_iterator i = opndx.neighbs->begin(); i != opndx.neighbs->end(); ++i)
-                    dbgout << s << *i;
-                dbgout << "}";
-            }
-
-            dbgout << endl;
-        }
-        dbgout << "---------" << endl;
-#endif
-
         pruneGraph();
-        assignRegs();
+        if (!assignRegs())
+        {
+            bool flag_SPILL;
+            getArg("SPILL", flag_SPILL = false);
+            if (flag_SPILL)
+            {
+                spillRegs();
+                getIRManager().calculateLivenessInfo();
+
+                DBGOUT(endl << "passnb 2" << endl;)
+                buildGraph();
+                pruneGraph();
+                assignRegs();
+            }
+        }
     }
 
     count_coalesced += coalesceCount;
-
-#ifdef _DEBUG__REGALLOC3
-    RegAllocWrite raw(*irManager, "regalloc3.xml");
-    raw.write();
-
-    onDestruct();
-#endif
+    
+    SpillGen();
 }
 
 
@@ -575,48 +577,69 @@ bool RegAlloc3::verify (bool force)
 }   
 
 
+void RegAlloc3::SpillGen ()   
+{
+/***
+    bool runSpillGen = false;    
+
+    for (unsigned i = 0, opandcount = getIRManager().getOpndCount(); i != opandcount; ++i)
+    {
+        Opnd* opnd  = getIRManager().getOpnd(i);
+        if (opnd->getConstraint(Opnd::ConstraintKind_Location, OpndSize_Default).isNull())
+            if (opnd->getConstraint(Opnd::ConstraintKind_Calculated, OpndSize_Default).getKind() == OpndKind_Memory)
+            {
+                opnd->assignMemLocation(MemOpndKind_StackAutoLayout, getIRManager().getRegOpnd(STACK_REG), 0);
+                DBGOUT("assigned to mem " << *opnd << endl;)
+            }
+            else
+                runSpillGen = true;
+    }
+
+    bool* spill_flag = new (getIRManager().getMemoryManager()) bool(runSpillGen);
+    getIRManager().setInfo("SpillGen", spill_flag);
+    DBGOUT("runSpillGen:" << runSpillGen << endl;)
+***/
+}
+
+
 bool RegAlloc3::buildGraph ()   
 {
-    size_t opandcount = getIRManager().getOpndCount();
+    static CountTime buildGraphTimer("ia32::RegAlloc3::buildGraph");
+    AutoTimer tm(buildGraphTimer);
+
+    const unsigned opandcount = getIRManager().getOpndCount();
+    graph.resize(0);
     graph.reserve(opandcount);
 
-//  First, scan all the operands available and see if operand is already assigned
+    Opndx opndx;
+
+//  Scan all the operands available and see if operand is already assigned
 //  or need to be assigned
 
-    Opndx opndx;
     int* opandmap = new (mm) int[opandcount];
 
-    for (size_t i = 0; i != opandcount; ++i)
+    for (unsigned i = 0; i != opandcount; ++i)
     {
-        Opnd* opnd  = getIRManager().getOpnd((uint32)i);
         int mapto = -1;
+
+        Opnd* opnd  = getIRManager().getOpnd(i);
+        opndx.opnd   = opnd;
+        opndx.spill  = false;
+        opndx.ignore = false;
 
         int ridx;
         Constraint loc = opnd->getConstraint(Opnd::ConstraintKind_Location, OpndSize_Default);
-        if (!loc.isNull())
-        {// this operand is already assigned to some location/register
-            if ((ridx = registers.index(loc)) != -1)
-            {
-                opndx.opnd  = opnd;
-                opndx.ridx  = ridx;
-                opndx.alloc = loc.getMask();
-                mapto = (int)graph.size();
-                graph.push_back(opndx);
-            }
-        }
-        else
+        if (loc.isNull())
         {// this operand is not allocated yet
             loc = opnd->getConstraint(Opnd::ConstraintKind_Calculated, OpndSize_Default);
             if ((ridx = registers.index(loc)) != -1)
             {// operand should be assigned to register
-                opndx.opnd  = opnd;
                 opndx.ridx  = ridx;
                 opndx.alloc = 0;
                 opndx.avail = loc.getMask() & registers[ridx].getMask();
-                opndx.nbavails = (int)bitCount(opndx.avail);
+                opndx.nbavails = bitCount(opndx.avail);
                 assert(opndx.nbavails != 0);
                 opndx.spillcost = 1;
-                opndx.spilled = false;
                 mapto = (int)graph.size();
                 graph.push_back(opndx);
             }
@@ -625,26 +648,50 @@ bool RegAlloc3::buildGraph ()
         opandmap[i] = mapto;
     }
 
-    if ((graphsize = (int)graph.size()) == 0)
+    if ((graphsize = graph.size()) == 0)
         return false;
+
+//  Create graph node for each register available
+
+    xregbase = graph.size();    // graph index of the first register available
+    graph.reserve(graph.size() + registers.size());
+
+    opndx.opnd = 0;
+    opndx.spill  = false;
+    opndx.ignore = false;
+    opndx.ridx  = 0;
+    for (Registers::iterator it = registers.begin(), end = registers.end(); it != end; ++it)
+    {
+        for (RegMask msk = it->getMask(), mk = 1; msk != 0; mk <<= 1)
+            if ((msk & mk) != 0)
+            {
+                msk ^= mk;
+                opndx.alloc = mk;
+                graph.push_back(opndx);
+            }
+
+        ++opndx.ridx;
+    }
+
+    graphsize = graph.size();
+    BoolMatrix matrix(mm, graphsize);
 
     for (Graph::iterator i = graph.begin(); i != graph.end(); ++i)
     {
-        i->adjacents = new (mm) Opndx::Indexes(mm);
-        i->hiddens   = new (mm) Opndx::Indexes(mm);
+        i->adjacents = new (mm) Indexes(mm);
+        i->hiddens   = new (mm) Indexes(mm);
         i->oproles   = new (mm) Oproles(mm);
         i->neighbs   = 0;
     }
 
-//  Second, iterate over all instructions in CFG and calculate which operands
+//  Iterate over all instructions in CFG and calculate which operands
 //  are live simultaneouesly (result stored in matrix)
 
-    BoolMatrix matrix(mm, graphsize);
-
-    BitSet lives(mm, (uint32)opandcount);
+    BitSet lives(mm, opandcount);
 
     const Nodes& nodes = irManager->getFlowGraph()->getNodesPostOrder();
-    for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
+    for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) 
+    {
         Node* node = *it;
         if (node->isBlockNode())
         {
@@ -652,11 +699,8 @@ bool RegAlloc3::buildGraph ()
             if (inst == 0)
                 continue;
 
-            int excount = static_cast<int>(node->getExecCount());
-            if (excount < 1)
-                excount = 1;
-            excount *= 100;
-            //int excount = 1;
+            double excount = node->getExecCount() / irManager->getFlowGraph()->getEntryNode()->getExecCount();
+            assert(excount > 0);
 
         //  start with the operands at the block bottom
             getIRManager().getLiveAtExit(node, lives);
@@ -664,58 +708,7 @@ bool RegAlloc3::buildGraph ()
         //  iterate over instructions towards the top of the block
             for (;;)
             {
-                int i, x;
-#ifdef _OLD_
-                Inst::Opnds defs(inst, Inst::OpndRole_AllDefs);
-                for (Inst::Opnds::iterator it = defs.begin(); it != defs.end(); it = defs.next(it))
-                    if ((x = opandmap[i = inst->getOpnd(it)->getId()]) != -1)
-                    {
-                        BitSet::IterB bsk(lives);
-                        int k, y;
-                        for (k = bsk.getNext(); k != -1; k = bsk.getNext())
-                            if (k != i && (y = opandmap[k]) != -1)
-                                matrix.set(x, y);
-                    }
-#else
-                int defx = -1;
-                Oprole oprole;
-                const uint32* oproles = const_cast<const Inst*>(inst)->getOpndRoles();
-                Inst::Opnds opnds(inst, Inst::OpndRole_All);
-                for (Inst::Opnds::iterator it = opnds.begin(); it != opnds.end(); it = opnds.next(it))
-                    if ((x = opandmap[i = inst->getOpnd(it)->getId()]) != -1)
-                    {
-                        Opndx& opndx = graph.at(x);
-
-                        oprole.inst = inst;
-                        oprole.role = oproles[it];
-                        opndx.oproles->push_back(oprole);
-
-                        if (oprole.role & Inst::OpndRole_Def)
-                        {
-                            defx = x;
-                            BitSet::IterB bsk(lives);
-                            int k, y;
-                            for (k = bsk.getNext(); k != -1; k = bsk.getNext())
-                                if (k != i && (y = opandmap[k]) != -1)
-                                    matrix.set(x, y);
-                        }
-#ifdef _REGALLOC3_NEIGBH
-                        else if (defx != -1 && !lives.getBit(opndx.opnd->getId()))
-                        {
-                            Opndx& defopndx = graph.at(defx);
-                            if (defopndx.neighbs == 0)
-                                defopndx.neighbs = new (mm) Opndx::Indexes(mm);
-                            defopndx.neighbs->push_back(x);
-
-                            if (opndx.neighbs ==0)
-                                opndx.neighbs = new (mm) Opndx::Indexes(mm);
-                            opndx.neighbs->push_back(defx);
-                        }
-#endif
-
-                        opndx.spillcost += excount;
-                    }
-#endif
+                processInst(inst, lives, opandmap, matrix, excount);
 
                 if (inst->getPrevInst() == 0)
                     break;
@@ -724,35 +717,198 @@ bool RegAlloc3::buildGraph ()
                 inst = inst->getPrevInst();
             }
         }
+#ifdef _SKIP_CATCHED
+        else if (node->isDispatchNode())
+        {
+            BitSet* tmp = irManager->getLiveAtEntry(node);
+            BitSet::IterB ib(*tmp);
+            int i;
+            for (int x = ib.getNext(); x != -1; x = ib.getNext())
+                if ((i = opandmap[x]) != -1)
+                {
+                    Opndx& opndx = graph.at(i);
+                    opndx.ignore = true;
+                    DBGOUT("catched " << opndx << endl;)
+                }
+        }
+#endif
     }
+
+//  Detect and ignore not-used operands (e.g. child of coalesced operands)
+
+    for (unsigned x = 0; x < xregbase; ++x)
+        if (graph[x].oproles->empty())
+            graph[x].ignore = true;
+
+//  Connect nodes that represent simultaneouesly live operands
+
+    for (unsigned x1 = 1; x1 < graphsize; ++x1)
+        for (unsigned x2 = 0; x2 < x1; ++x2)
+            if (matrix.test(x1, x2))
+                graph.connect(x1, x2);
+
+    showGraph();
 
 //  Do iterative coalescing
 
-#ifdef _REGALLOC3_COALESCE
+    if (flag_COALESCE)
         while (coalescing(opandmap, matrix))
-        /*nothing*/;
-#endif
+            /*nothing*/;
 
-//  Third, connect nodes that represent simultaneouesly live operands
-
-    for (int x1 = 1; x1 < graphsize; ++x1)
-        for (int x2 = 0; x2 < x1; ++x2)
-            if (matrix.test(x1, x2) && graph.at(x1).ridx == graph.at(x2).ridx)
-                graph.connect(x1, x2);
-
+    showGraph();
     return true;
+}
+
+
+void RegAlloc3::processInst (Inst* inst, BitSet& lives, int* opandmap, BoolMatrix& matrix, double excount)
+{
+    int defx = -1;
+    Oprole oprole;
+    Inst::Opnds opnds(inst, Inst::OpndRole_All);
+    for (Inst::Opnds::iterator it = opnds.begin(); it != opnds.end(); it = opnds.next(it))
+    {
+        uint32 role = inst->getOpndRoles(it);
+        Opnd*  opnd = inst->getOpnd(it);
+
+    //  For each operand def, look at the all live operand
+        if (role & Inst::OpndRole_Def)
+            lookLives(opnd, lives, opandmap, matrix);
+
+        int i = opnd->getId();
+        int x = opandmap[i];
+        if (x != -1)
+        {
+            Opndx& opndx = graph.at(x);
+
+            if (opndx.oproles->empty() || opndx.oproles->back().inst != inst)
+            {
+                oprole.inst = inst;
+                oprole.role = role;
+                opndx.oproles->push_back(oprole);
+            }
+            else
+                opndx.oproles->back().role |= role;
+
+            if (role & Inst::OpndRole_Def)
+            {
+                defx = x;
+            }
+            else if (flag_NEIGBH && defx != -1 && !lives.getBit(i))
+            {
+                Opndx& defopndx = graph.at(defx);
+                if (defopndx.neighbs == 0)
+                    defopndx.neighbs = new (mm) Indexes(mm);
+                defopndx.neighbs->push_back(x);
+
+                if (opndx.neighbs == 0)
+                    opndx.neighbs = new (mm) Indexes(mm);
+                opndx.neighbs->push_back(defx);
+            }
+
+            opndx.spillcost += excount;
+        }
+    }
+}
+
+
+//  Look for operands live at defining point 
+//
+void RegAlloc3::lookLives (Opnd* opnd, BitSet& lives, int* opandmap, BoolMatrix& matrix)
+{
+    int i = opnd->getId();
+    int x;
+    if ((x = opandmap[i]) == -1 && (x = findNode(opnd)) == -1)
+        return;
+
+    BitSet::IterB bsk(lives);
+    int k, y;
+    for (k = bsk.getNext(); k != -1; k = bsk.getNext())
+        if (k != i)
+            if ((y = opandmap[k]) != -1 || (y = findNode(irManager->getOpnd(k))) != -1)
+                matrix.set(x, y);
+}
+
+
+int RegAlloc3::findNode (Opnd* opnd) const
+{
+    Constraint loc = opnd->getConstraint(Opnd::ConstraintKind_Location);
+    if (!loc.isNull())
+    {
+        int ridx = registers.index(loc);
+        RegMask msk = loc.getMask();
+
+        for (size_t x = xregbase; x != graph.size(); ++x)
+        {
+            const Opndx& opndx = graph[x];
+            assert(opndx.alloc != 0);
+            if (opndx.ridx == ridx && opndx.alloc == msk)
+                return (int)x;
+        }
+    }
+
+    return -1;
+}
+
+
+void RegAlloc3::showGraph ()
+{
+#ifdef _DEBUG_REGALLOC3
+    log(LogStream::DBG) << "--- graph" << endl;
+    for (unsigned x = 0; x != graphsize; ++x)
+    {
+        const Opndx& opndx = graph.at(x);
+        log(LogStream::DBG).out()
+            << "(" << x << ") "
+            << (opndx.ignore ? "IGNORE " : "");
+
+            if (opndx.opnd != 0)
+                log(LogStream::DBG).out() << *opndx.opnd;
+            else
+                log(LogStream::DBG).out() << "REG";
+
+        log(LogStream::DBG).out()
+            << " ridx:" << opndx.ridx 
+            << " avail:" << hex << opndx.avail << " alloc:" << opndx.alloc << dec 
+            //<< " nbavails:" << opndx.nbavails
+            << " spillcost:" << opndx.spillcost;
+
+        if (!opndx.adjacents->empty())
+        {
+            Sep s;
+            log(LogStream::DBG) << " adjacents{";
+            for (RegAlloc3::Indexes::const_iterator i = opndx.adjacents->begin(); i != opndx.adjacents->end(); ++i)
+                log(LogStream::DBG).out() << s << *i;
+            log(LogStream::DBG) << "}";
+        }
+
+        if (opndx.neighbs != 0)
+        {
+            Sep s;
+            log(LogStream::DBG) << " neighbs{";
+            for (RegAlloc3::Indexes::const_iterator i = opndx.neighbs->begin(); i != opndx.neighbs->end(); ++i)
+                log(LogStream::DBG).out() << s << *i;
+            log(LogStream::DBG) << "}";
+        }
+
+        log(LogStream::DBG) << endl;
+    }
+    log(LogStream::DBG) << "---------" << endl;
+#endif
 }
 
 
 bool RegAlloc3::coalescing (int* opandmap, BoolMatrix& matrix)
 {
+    //static CountTime coalescingTimer("ia32::RegAlloc3::coalescing");
+    //AutoTimer tm(coalescingTimer);
+
     int x0, x1;
 
     const Nodes& nodes = irManager->getFlowGraph()->getNodesPostOrder();
-    for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
+    for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) 
+    {
         Node* node = *it;
         if (node->isBlockNode())
-        {
             for (const Inst*  inst = (Inst*)node->getLastInst(); inst != 0; inst = inst->getPrevInst())
                 if (inst->getMnemonic() == Mnemonic_MOV)
                     if ((x0 = opandmap[inst->getOpnd(0)->getId()]) != -1 &&
@@ -762,13 +918,58 @@ bool RegAlloc3::coalescing (int* opandmap, BoolMatrix& matrix)
                         Opndx& opndx0 = graph.at(x0),
                              & opndx1 = graph.at(x1);
 
-                        if (opndx0.ridx  == opndx1.ridx && opndx0.avail == opndx1.avail)
+                        RegMask  avail = opndx0.avail & opndx1.avail;
+                        unsigned nbavails = bitCount(avail);
+
+                        if (opndx0.ridx != opndx1.ridx || nbavails == 0)
+                            continue;
+
+                        //if (opndx0.opnd->getSize() != opndx1.opnd->getSize())
+                        //    continue;
+
+                        Type* t0 = opndx0.opnd->getType(),
+                            * t1 = opndx1.opnd->getType();
+
+                        //if ((t0->isManagedPtr() || t0->isObject()) != (t1->isManagedPtr() || t1->isObject()))
+                        //    continue;
+
+                        if (!Type::mayAlias(&irManager->getTypeManager(), t0, t1))
+                            continue;
+
+                        DBGOUT("coalesce candidates (" << x0 << ") & (" << x1 << ") " << *inst << endl;)
+
+                        size_t   xdegree = 0, // estimated degree of the coalesced node
+                                 xcount  = 0; // number of neighbours with degree >= k
+
+                        xdegree = opndx0.adjacents->size() + opndx1.adjacents->size() 
+                                  - duplicates(opndx1.adjacents, matrix, x0, x1);
+
+                        for (Indexes::iterator ptr = opndx0.adjacents->begin(), end = opndx0.adjacents->end(); ptr != end; ++ptr)
                         {
-                            coalesce (opandmap, matrix, x0, x1);
-                            return true;
+                            Indexes* ixs = graph.at(*ptr).adjacents;
+                            size_t ndegree = ixs->size() - duplicates(ixs, matrix, x0, x1);
+                            if (ndegree >= nbavails)
+                                if (++xcount >= nbavails)
+                                    break;
                         }
+                        for (Indexes::iterator ptr = opndx1.adjacents->begin(), end = opndx1.adjacents->end(); ptr != end; ++ptr)
+                            if (!matrix.test(*ptr, x0))
+                            {
+                                Indexes* ixs = graph.at(*ptr).adjacents;
+                                size_t ndegree = ixs->size();
+                                if (ndegree >= nbavails)
+                                    if (++xcount >= nbavails)
+                                        break;
+                            }
+
+                        DBGOUT("xdegree:" << xdegree << " xcount:" << xcount << endl;)
+
+                        if (xcount >= nbavails || xdegree >= nbavails)
+                            continue;
+
+                        coalesce (opandmap, matrix, x0, x1);
+                        return true;
                     }
-        }
     }
 
     return false;
@@ -777,7 +978,7 @@ bool RegAlloc3::coalescing (int* opandmap, BoolMatrix& matrix)
 
 //  Colalesce graph nodes (x0) and (x1) and the corresponding operands.
 //  Node (x1) not to be used anymore, (x0) must be used unstead.
-//  Note that (x1) remains in the graph
+//  Note that (x1) remains in the graph (must be ignored)
 //
 void RegAlloc3::coalesce (int* opandmap, BoolMatrix& matrix, int x0, int x1)
 {
@@ -786,7 +987,10 @@ void RegAlloc3::coalesce (int* opandmap, BoolMatrix& matrix, int x0, int x1)
     Opndx& opndx0 = graph.at(x0),
          & opndx1 = graph.at(x1);
 
-    opndx1.spilled = true;
+    opndx0.avail &= opndx1.avail;
+    opndx0.nbavails = bitCount(opndx0.avail);
+
+    opndx1.ignore = true;
 
     Opnd* opnd0 = opndx0.opnd,
         * opnd1 = opndx1.opnd;
@@ -802,137 +1006,168 @@ void RegAlloc3::coalesce (int* opandmap, BoolMatrix& matrix, int x0, int x1)
     opndx0.oproles->insert(opndx0.oproles->end(), opndx1.oproles->begin(), opndx1.oproles->end());
     opndx1.oproles->clear();
 
-    for (int x = 0; x < graphsize; ++x)
-        if (x != x1 && matrix.test(x, x1))
-        {
-            matrix.set(x, x0);
-            matrix.clear(x, x1);
+    Indexes tmp(mm);    // list of trash indexes
+
+    for (Indexes::iterator ptr = opndx1.adjacents->begin(), end = opndx1.adjacents->end(); ptr != end;)
+    {
+        Indexes::iterator ptr_next = ptr;
+        ++ptr_next;
+
+        int x = *ptr;
+        assert(matrix.test(x, x1));
+        matrix.clear(x, x1);
+
+        Opndx& opndx = graph.at(x);
+        Indexes::iterator ptrx = find(opndx.adjacents->begin(), opndx.adjacents->end(), x1);
+        assert(ptrx != opndx.adjacents->end());
+
+        if (matrix.test(x, x0))
+        {// disconnect (x1 - x)
+            tmp.splice(tmp.end(), *opndx1.adjacents, ptr);
+            tmp.splice(tmp.end(), *opndx.adjacents, ptrx);
         }
+        else
+        {// connect (x0 - x)
+            matrix.set(x, x0);
+            opndx0.adjacents->splice(opndx0.adjacents->end(), *opndx1.adjacents, ptr);  // x0 -> x
+            *ptrx = x0;                                                                 // x  -> x0
+        }
+
+        ptr = ptr_next;
+    }
+
+    assert(opndx1.adjacents->empty());
 
     ++coalesceCount;
 }
 
 
-#ifndef _VAR0
+int RegAlloc3::duplicates (RegAlloc3::Indexes* list, RegAlloc3::BoolMatrix& matrix, int x0, int x1)
+{
+    int count = 0;
+
+    for (RegAlloc3::Indexes::iterator ptr = list->begin(), end = list->end(); ptr != end; ++ptr)
+        if (*ptr != x0 && *ptr != x1)
+            if (matrix.test(*ptr, x0) && matrix.test(*ptr, x1))
+                ++count;
+
+    return count;
+}
+
 
 struct sortRule1
 {
     const RegAlloc3::Graph& graph;
+    const unsigned int rule;
 
-
-    sortRule1 (const RegAlloc3::Graph& g)   :graph(g) {}
-
+    sortRule1 (const RegAlloc3::Graph& g, unsigned int r)   :graph(g), rule(r) {}
 
     bool operator () (int x1, int x2)
     {
         const RegAlloc3::Opndx& opndx1 = graph.at(x1),
                               & opndx2 = graph.at(x2);
 
-#ifdef _VAR1_
-        return opndx1.spillcost > opndx2.spillcost;
-#endif
-#ifdef _VAR2_
-        return opndx1.spillcost < opndx2.spillcost;
-#endif
-
+        return rule == 1 ? opndx1.spillcost > opndx2.spillcost
+                         : opndx1.spillcost < opndx2.spillcost;
     }
 };
-
-#endif
 
 
 void RegAlloc3::pruneGraph ()
 {
-    DBGOUT(endl << "pruneGraph - start"<< endl;)
+    static CountTime pruneGraphTimer("ia32::RegAlloc3::pruneGraph");
+    AutoTimer tm(pruneGraphTimer);
 
-    size_t nbnodes = 0;
-    for (int i = 0; i != graphsize; ++i)
-        if (!graph.at(i).adjacents->empty())
+    DBGOUT(endl << "pruneGraph"<< endl;)
+
+//  Calculate number of nodes that should be pruned off the graph
+    int nbnodes = 0;
+    for (unsigned i = 0; i != graphsize; ++i)
+        if (shouldPrune(graph.at(i)))
             nbnodes++;
 
     StlVector<int> tmp(mm);
 
     nstack.reserve(nbnodes);
-    while (nbnodes != 0)
+    while (nbnodes > 0)
     {
     //  Apply degree < R rule
 
-#ifdef _VAR0_
+        if (flag_SORT == 0)
 
-        for (bool succ = false; !succ;)
-        {
-            succ = true;
-            for (int i = 0; i != graphsize; ++i)
+            for (bool succ = false; !succ;)
             {
-                Opndx& opndx = graph.at(i);
-                const int n = (int)opndx.adjacents->size();
-                if (n != 0 && n < opndx.nbavails)
+                succ = true;
+                for (unsigned i = 0; i != graphsize; ++i)
                 {
-                    nbnodes -= graph.disconnect(i);
-                    nstack.push_back(i);
+                    Opndx& opndx = graph.at(i);
+                    if (shouldPrune(opndx))
+                    {
+                        const size_t n = opndx.adjacents->size();
+                        if (n != 0 && n < opndx.nbavails)
+                        {
+                            nbnodes -= graph.disconnect(i);
+                            nstack.push_back(i);
+                            succ = false;
+                            //DBGOUT(" rule#1 (" << i << ")" << endl;)
+                        }
+                    }
+                }
+            }
+
+        else
+
+            for (bool succ = false; !succ;)
+            {
+                succ = true;
+
+                tmp.resize(0);
+
+                for (unsigned i = 0; i != graphsize; ++i)
+                {
+                    Opndx& opndx = graph.at(i);
+                    if (shouldPrune(opndx))
+                    {
+                        const size_t n = opndx.adjacents->size();
+                        if (n != 0 && n < opndx.nbavails)
+                            tmp.push_back(i);
+                    }
+                }
+
+                if (tmp.size() != 0)
+                {
+                    if (tmp.size() > 1)
+                        sort(tmp.begin(), tmp.end(), sortRule1(graph, flag_SORT));
+
+                    for (StlVector<int>::iterator it = tmp.begin(); it != tmp.end(); ++it)
+                    {
+                        nbnodes -= graph.disconnect(*it);
+                        nstack.push_back(*it);
+                    }
+
                     succ = false;
-
-                    DBGOUT(" rule#1 (" << i << ")" << endl;)
                 }
             }
-
-        }
-
-#else
-
-        for (bool succ = false; !succ;)
-        {
-            succ = true;
-
-            tmp.resize(0);
-
-            for (int i = 0; i != graphsize; ++i)
-            {
-                Opndx& opndx = graph.at(i);
-                const int n = (int)opndx.adjacents->size();
-                if (n != 0 && n < opndx.nbavails)
-                    tmp.push_back(i);
-            }
-
-            if (tmp.size() != 0)
-            {
-                DBGOUT("buck size:" << tmp.size() << endl;)
-                if (tmp.size() > 1)
-                    sort(tmp.begin(), tmp.end(), sortRule1(graph));
-
-                for (StlVector<int>::iterator it = tmp.begin(); it != tmp.end(); ++it)
-                {
-                    nbnodes -= graph.disconnect(*it);
-                    nstack.push_back(*it);
-
-                    DBGOUT(" rule#1 (" << *it << ")  cost:" << graph.at(*it).spillcost << endl;)
-                }
-
-                succ = false;
-            }
-        }
-
-#endif
 
     //  Apply degree >= R rule
 
-        if (nbnodes != 0)
+        if (nbnodes > 0)
         {
             int x = -1, n;
             double cost = 0, w;
 
         //  Find some node to disconnect 
-            for (int i = 0; i != graphsize; ++i)
+            for (unsigned i = 0; i != graphsize; ++i)
             {
                 Opndx& opndx = graph.at(i);
-                if ((n = (int)opndx.adjacents->size()) != 0)
-                {
-                    w = (double)opndx.spillcost/(double)n;
-                    DBGOUT("    (" << i << ") cost:" << w << endl;)
-                    if (x == -1 || w < cost)
-                        cost = w,
-                        x    = i;
-                }
+                if (shouldPrune(opndx))
+                    if ((n = (int)opndx.adjacents->size()) != 0)
+                    {
+                        w = opndx.spillcost/(double)n;
+                        if (x == -1 || w < cost)
+                            cost = w,
+                            x    = i;
+                    }
             }
 
             assert(x != -1);
@@ -940,18 +1175,27 @@ void RegAlloc3::pruneGraph ()
             {
                 nbnodes -= graph.disconnect(x);
                 nstack.push_back(x);
-
-                DBGOUT(" rule#2 (" << x << ") cost:" << cost << endl;)
             }
         }
     }
-
-    DBGOUT("pruneGraph - stop"<< endl << graph;)
 }
 
 
-void RegAlloc3::assignRegs ()
+bool RegAlloc3::shouldPrune (const Opndx& opndx) const
 {
+    return !opndx.ignore && opndx.alloc == 0 && !opndx.adjacents->empty();
+}
+
+
+bool RegAlloc3::assignRegs ()
+{
+    static CountTime assignRegsTimer("ia32::RegAlloc3::assignRegs");
+    AutoTimer tm(assignRegsTimer);
+
+    DBGOUT("assignRegs" << endl;)
+
+    int spilled = 0;
+
     while (!nstack.empty())
     {
         int x = nstack.back();
@@ -959,30 +1203,47 @@ void RegAlloc3::assignRegs ()
 
         Opndx& opndx = graph.at(x);
         graph.reconnect(x);
-        opndx.spilled = !assignReg(x);
+        if (opndx.alloc == 0)
+        {
+            DBGOUT("(" << x << ")" << endl;)
+            opndx.spill = !assignReg(opndx);
+        }
     }
 
-    for (int x = 0; x != graphsize; ++x)
+    for (unsigned x = 0; x != graphsize; ++x)
     {
         Opndx& opndx = graph.at(x);
-        if (opndx.alloc == 0 && !opndx.spilled )
-            assignReg(x);
+        if (opndx.alloc == 0 && !opndx.spill && !opndx.ignore)
+        {
+            DBGOUT("(" << x << ")" << endl;)
+            opndx.spill = !assignReg(opndx);
+        }
+
+        if (opndx.spill)
+            ++spilled;
     }
+
+    DBGOUT("spilled " << spilled << " operands" << endl;)
+
+    return spilled == 0;
 }
 
 
-bool RegAlloc3::assignReg (int x)
+bool RegAlloc3::assignReg (Opndx& opndx)
 {
-    Opndx& opndx = graph.at(x);
     RegMask alloc = 0;
 
-    for (Opndx::Indexes::iterator i = opndx.adjacents->begin(); i != opndx.adjacents->end(); ++i)
-        alloc |= graph.at(*i).alloc;
+    assert(!opndx.ignore);
+    for (Indexes::iterator i = opndx.adjacents->begin(); i != opndx.adjacents->end(); ++i)
+    {
+        Opndx& opndz = graph.at(*i);
+        if (opndz.ridx == opndx.ridx)
+            alloc |= opndz.alloc;
+    }
 
     if ((alloc = opndx.avail & ~alloc) == 0)
     {
-        ++count_spilled;
-        DBGOUT("spilled (" << x << ")" << endl;)
+        DBGOUT("  assign " << *opndx.opnd << " failed" << endl;)
         return false;
     }
     else
@@ -990,7 +1251,7 @@ bool RegAlloc3::assignReg (int x)
         if (opndx.neighbs != 0)
         {
             RegMask neighbs = 0;
-            for (Opndx::Indexes::iterator i = opndx.neighbs->begin(); i != opndx.neighbs->end(); ++i)
+            for (Indexes::iterator i = opndx.neighbs->begin(); i != opndx.neighbs->end(); ++i)
             {
                 Opndx& neigbx = graph.at(*i);
                 if (neigbx.ridx == opndx.ridx)
@@ -999,7 +1260,7 @@ bool RegAlloc3::assignReg (int x)
 
             if ((neighbs & alloc) != 0 && neighbs != alloc)
             {
-                DBGOUT("! alloc:" << std::hex << alloc << " * neighbs:"  << neighbs << " =" << (alloc & neighbs) << std::dec << endl);
+                DBGOUT("  !alloc:" << std::hex << alloc << " * neighbs:"  << neighbs << " =" << (alloc & neighbs) << std::dec << endl);
                 alloc &= neighbs;
             }
         }
@@ -1007,41 +1268,109 @@ bool RegAlloc3::assignReg (int x)
         opndx.alloc = findHighest(alloc);
         opndx.opnd->assignRegName(getRegName((OpndKind)registers[opndx.ridx].getKind(), 
                                              opndx.opnd->getSize(), 
-                                             (int)bitNumber(opndx.alloc)));
+                                             bitNumber(opndx.alloc)));
 
         ++count_assigned;
-        DBGOUT("assigned (" << x << ") = <" << getRegNameString(opndx.opnd->getRegName()) << ">" << endl;)
+        DBGOUT("  assigned " << *opndx.opnd << endl;)
         return true;
     }
 }
 
 
-//========================================================================================
-// Internal debug helpers
-//========================================================================================
-
-
-#ifdef _DEBUG__REGALLOC3
-
-static void onConstruct (const IRManager& irm)
+void RegAlloc3::spillRegs ()
 {
-    MethodDesc& md = irm.getMethodDesc();
-    const char * methodName = md.getName();
-    const char * methodTypeName = md.getParentType()->getName();
-    dbgout << endl << "Constructed " << methodTypeName  << "." << methodName 
-           << "(" << md.getSignatureString() << ")" << endl;
+    DBGOUT("spillRegs" << endl;)
 
-//  sos = strcmp(methodTypeName, "spec/benchmarks/_213_javac/BatchEnvironment") == 0 &&
-//        strcmp(methodName,     "flushErrors") == 0;
+    int inserted = 0;
+
+    for (unsigned x = 0; x != graphsize; ++x)
+    {
+        Opndx& opndx = graph.at(x);
+        if (opndx.spill)
+            inserted += spillReg(opndx);
+    }
+
+    DBGOUT("inserted " << inserted << " operands" << endl;)
 }
 
 
-static void onDestruct ()
+int RegAlloc3::spillReg (Opndx& opndx)
 {
-    dbgout << endl << "Destructed" << endl;
+    Opnd* opnd = opndx.opnd;
+    const Constraint initial = opnd->getConstraint(Opnd::ConstraintKind_Initial);
+
+    if ((initial.getKind() & OpndKind_Memory) == 0)
+    {
+        DBGOUT("  spilling " << *opndx.opnd << " failed" << endl;)
+        return 0;
+    }
+
+    DBGOUT("  spilling " << *opndx.opnd << endl;)
+    opnd->setCalculatedConstraint(initial);
+    opnd->assignMemLocation(MemOpndKind_StackAutoLayout, irManager->getRegOpnd(STACK_REG), 0);
+
+    int inserted = 0;
+
+    for (Oproles::iterator ptr = opndx.oproles->begin(), end = opndx.oproles->end(); ptr != end; ++ptr)
+    {
+        Opnd* opndnew = getIRManager().newOpnd(opnd->getType(), initial);
+        Inst* inst = ptr->inst;
+        Inst* instnew = 0;
+        bool replaced = false;
+        if (ptr->role & Inst::OpndRole_Use)
+        {
+            instnew = getIRManager().newCopyPseudoInst(Mnemonic_MOV, opndnew, opnd);
+            instnew->insertBefore(inst);
+            replaced = inst->replaceOpnd(opnd, opndnew);
+            assert(replaced);
+            DBGOUT("    before " << *inst << " inserted " << *instnew << " MOV " << *opndnew << ", " << *opnd << endl;)
+        }
+
+        if (ptr->role & Inst::OpndRole_Def)
+        {
+            assert(!inst->hasKind(Inst::Kind_LocalControlTransferInst));  
+            if (!replaced)
+                replaced = inst->replaceOpnd(opnd, opndnew);
+            assert(replaced);
+            instnew = getIRManager().newCopyPseudoInst(Mnemonic_MOV, opnd, opndnew);
+            instnew->insertAfter(inst);
+            DBGOUT("    after  " << *inst << " inserted " << *instnew << " MOV " << *opnd << ", " << *opndnew << endl;)
+        }
+
+        Constraint c = initial;
+        update(instnew, opndnew, c);
+        update(inst,    opndnew, c);
+        opndnew->setCalculatedConstraint(c);
+
+        ++inserted;
+    }
+
+    ++count_spilled;
+    return inserted;
 }
 
-#endif //#ifdef _DEBUG__REGALLOC3
+
+//  If currently handled operand is referenced by current instruction, then evaluate
+//  constraint of the operand imposed by this instruction and return 'true'.
+//  Otherwise, do nothing and return false.
+//
+int RegAlloc3::update (const Inst* inst, const Opnd* opnd, Constraint& constr) const
+{
+    int count = 0;
+    Inst::Opnds opnds(inst, Inst::OpndRole_All);
+    for (Inst::Opnds::iterator it = opnds.begin(); it != opnds.end(); it = opnds.next(it))
+        if ( inst->getOpnd(it) == opnd)
+        {
+            Constraint c = inst->getConstraint(it, 0, constr.getSize());
+            if (constr.isNull())
+                constr = c;
+            else
+                constr.intersectWith(c);
+
+            count++;    
+        }
+    return count;
+}
 
 
 //========================================================================================
@@ -1049,7 +1378,7 @@ static void onDestruct ()
 //========================================================================================
 
 
-#ifdef _DEBUG__REGALLOC3
+#ifdef _DEBUG_REGALLOC3
 
 static ostream& operator << (ostream& os, Sep& x)
 {
@@ -1105,11 +1434,11 @@ static ostream& outRegMasks (ostream& os, RegAlloc3::RegMask* x, const RegAlloc3
 {
     Sep s;;
     os << "{";
-    for (size_t rk = 0; rk != registers.size(); ++rk)
+    for (unsigned rk = 0; rk != registers.size(); ++rk)
     {
         RegAlloc3::RegMask msk = x[rk];
 
-        for (size_t rx = 0; msk != 0; ++rx, msk >>= 1)
+        for (unsigned rx = 0; msk != 0; ++rx, msk >>= 1)
             if ((msk & 1) != 0)
             {
                 RegName reg = getRegName((OpndKind)registers[rk].getKind(), registers[rk].getSize(), rx);
@@ -1130,7 +1459,7 @@ static ostream& operator << (ostream& os, const RegAlloc3::Opndx& opndx)
     {
         Sep s;
         os << " adjacents{";
-        for (RegAlloc3::Opndx::Indexes::const_iterator i = opndx.adjacents->begin(); i != opndx.adjacents->end(); ++i)
+        for (RegAlloc3::Indexes::const_iterator i = opndx.adjacents->begin(); i != opndx.adjacents->end(); ++i)
             os << s << *i;
         os << "}";
     }
@@ -1139,7 +1468,7 @@ static ostream& operator << (ostream& os, const RegAlloc3::Opndx& opndx)
     {
         Sep s;
         os << " hiddens{";
-        for (RegAlloc3::Opndx::Indexes::const_iterator i = opndx.hiddens->begin(); i != opndx.hiddens->end(); ++i)
+        for (RegAlloc3::Indexes::const_iterator i = opndx.hiddens->begin(); i != opndx.hiddens->end(); ++i)
             os << s << *i;
         os << "}";
     }
@@ -1158,7 +1487,7 @@ static ostream& operator << (ostream& os, const RegAlloc3::Graph& graph)
 }
 
 
-#endif //#ifdef _DEBUG__REGALLOC3
+#endif //#ifdef _DEBUG_REGALLOC3
 
 } //namespace Ia32
 } //namespace Jitrino

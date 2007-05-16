@@ -19,7 +19,7 @@
  * @version $Revision: 1.11.14.2.4.3 $
  */
 
-#include "Ia32IRManager.h"
+#include "Ia32ConstraintsResolver.h"
 #include "Ia32Printer.h"
 
 namespace Jitrino
@@ -207,108 +207,6 @@ static ActionFactory<ConstraintsResolver> _constraints("constraints", help);
  *      For more details please refer to ConstraintsResolverImpl source code
  */
 
-class ConstraintsResolverImpl
-{
-public:
-    ConstraintsResolverImpl(IRManager &irm)
-        :irManager(irm), 
-        memoryManager(irManager.getOpndCount()*16, "ConstraintsResolverImpl"),
-        basicBlocks(memoryManager, 0), originalOpndCount(0),
-        liveOpnds(memoryManager,0),
-        liveAtDispatchBlockEntry(memoryManager,0),
-        needsOriginalOpnd(memoryManager,0),
-        hoveringOpnds(memoryManager,0),
-        opndReplaceWorkset(memoryManager,0),
-        opndUsage(memoryManager,0)
-    {
-    }
-    
-    void run();
-
-private:
-    /** Get the priority of a the node for sorting in createBasicBlockArray */
-    double getBasicBlockPriority(Node * node);
-    /** Fills the basicBlocks array and orders it according to block exec count (hottest first) */ 
-    void createBasicBlockArray();
-    /** Fills the liveAtDispatchBlockEntry bit set with operands live at dispatch node entries */ 
-    void calculateLiveAtDispatchBlockEntries();
-    /** Pre-sets calculated constraints for each operand */ 
-    void calculateStartupOpndConstraints();
-    /** Scans basicBlocks array and calls resolveConstraints(BasicBlock * bb) for each entry */
-    void resolveConstraints();
-    /** Traverses instructions of bb and calls resolveConstraints(Inst *) 
-     * for each inst 
-     */
-    void resolveConstraints(Node* bb);
-    /**
-     Main logic of constraint resolution for each instrution
-     */
-    void resolveConstraintsWithOG(Inst * inst);
-
-    /** returns constraint describing call-safe locations for opnd in CallInst inst */
-    Constraint getCalleeSaveConstraint(Inst * inst, Opnd * opnd);
-    /** returns constraint describing safe locations for operands live at dispatch node entries */
-    Constraint getDispatchEntryConstraint(Opnd * opnd);
-
-    static bool constraintIsWorse(Constraint cnew, Constraint cold, unsigned normedBBExecCount, 
-        unsigned splitThresholdForNoRegs, unsigned splitThresholdFor1Reg, unsigned splitThresholdFor4Regs
-        );
-   
-
-
-    /** Reference to IRManager */ 
-    IRManager&                  irManager;
-
-    /** Private memory manager for this algorithm */ 
-    MemoryManager               memoryManager;
-
-    /** Array of basic blocks to be handled */ 
-    Nodes                       basicBlocks;
-
-    /** result of irManager.getOpndCount before the pass */ 
-    uint32                      originalOpndCount;
-
-    /** Current live set, updated as usual for each instruction in resolveConstraints(Inst*) */ 
-    BitSet                      liveOpnds;
-
-    /** Bit set of operands live at dispatch node entries */ 
-    BitSet                      liveAtDispatchBlockEntry;
-
-    /** Bit set of operands for which original operand should be used wherever possible.
-     *  Currently this is only for operands which are live at dispatch block entries.
-     */ 
-    BitSet                      needsOriginalOpnd;
-
-    /** Temporary bit set of hovering operands (live across call sites)
-     *  Is initialized and used only during resolveConstraints(Inst*)
-     */ 
-    BitSet                      hoveringOpnds;
-
-    /** An array of current substitutions for operands
-     *  Is filled as a result of operand splitting.
-     *  Reset for each basic blocks (all replacements are local within basic blocks)
-     */
-    StlVector<Opnd*>            opndReplaceWorkset;
-
-
-    StlVector<uint32>           opndUsage;
-
-    unsigned callSplitThresholdForNoRegs;
-    unsigned callSplitThresholdFor1Reg;
-    unsigned callSplitThresholdFor4Regs;
-
-    unsigned defSplitThresholdForNoRegs;
-    unsigned defSplitThresholdFor1Reg;
-    unsigned defSplitThresholdFor4Regs;
-
-    unsigned useSplitThresholdForNoRegs;
-    unsigned useSplitThresholdFor1Reg;
-    unsigned useSplitThresholdFor4Regs;
-
-    friend class ConstraintsResolver;
-};
-
-
 //_________________________________________________________________________________________________
 Constraint ConstraintsResolverImpl::getCalleeSaveConstraint(Inst * inst, Opnd * opnd)
 {
@@ -331,7 +229,8 @@ Constraint ConstraintsResolverImpl::getDispatchEntryConstraint(Opnd * opnd)
 void ConstraintsResolverImpl::run()
 {
 //  Set all instruction constraints for EntryPoints, CALLs and RETs
-    irManager.applyCallingConventions();
+    if (!second)
+        irManager.applyCallingConventions();
 // Initialization 
     originalOpndCount=irManager.getOpndCount();
     liveOpnds.resizeClear(originalOpndCount);
@@ -682,25 +581,16 @@ void ConstraintsResolver::runImpl()
     // call the private implementation of the algorithm
     ConstraintsResolverImpl impl(*irManager);
     
-    impl.callSplitThresholdForNoRegs = (unsigned)-1; // always
     getArg("callSplitThresholdForNoRegs", impl.callSplitThresholdForNoRegs);
-    impl.callSplitThresholdFor1Reg = 1; // for very cold code
     getArg("callSplitThresholdFor1Reg", impl.callSplitThresholdFor1Reg);
-    impl.callSplitThresholdFor4Regs = 1; // for very cold code
     getArg("callSplitThresholdFor4Regs", impl.callSplitThresholdFor4Regs);
 
-    impl.defSplitThresholdForNoRegs = 0; // never
     getArg("defSplitThresholdForNoRegs", impl.defSplitThresholdForNoRegs);
-    impl.defSplitThresholdFor1Reg = 0; // never
     getArg("defSplitThresholdFor1Reg", impl.defSplitThresholdFor1Reg);
-    impl.defSplitThresholdFor4Regs = 0; // never
     getArg("defSplitThresholdFor4Regs", impl.defSplitThresholdFor4Regs);
 
-    impl.useSplitThresholdForNoRegs = 0; // never
     getArg("useSplitThresholdForNoRegs", impl.useSplitThresholdForNoRegs);
-    impl.useSplitThresholdFor1Reg = 0; // never
     getArg("useSplitThresholdFor1Reg", impl.useSplitThresholdFor1Reg);
-    impl.useSplitThresholdFor4Regs = 0; // never
     getArg("useSplitThresholdFor4Regs", impl.useSplitThresholdFor4Regs);
 
     impl.run();
@@ -710,4 +600,5 @@ void ConstraintsResolver::runImpl()
 //_________________________________________________________________________________________________
 
 }}; //namespace Ia32
+
 

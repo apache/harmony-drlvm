@@ -20,18 +20,18 @@
  */
 
 #include "Ia32IRManager.h"
+#include "Ia32ConstraintsResolver.h"
 #include "XTimer.h"
 #include "Counter.h"
 #include "Stl.h"
 
-#ifdef _DEBUG__WEBMAKER
+#ifdef _DEBUG_WEBMAKER
 #include <iostream>
 #include <iomanip>
-#include "Ia32IRXMLDump.h"
 #ifdef _MSC_VER
 #pragma warning(disable : 4505)   //unreferenced local function has been removed
 #endif //#ifdef _MSC_VER
-#endif //#ifdef _DEBUG__WEBMAKER
+#endif //#ifdef _DEBUG_WEBMAKER
 
 
 using namespace std;
@@ -51,7 +51,7 @@ struct WebMaker : public SessionAction
     {
         int globid;         // -1 for local definition or uniquue id (starting from 0)
         Inst* defp;         // defining instruction
-        size_t linkx;
+        unsigned linkx;
         bool visited;
 
         typedef StlVector<Inst*> Instps;
@@ -79,10 +79,10 @@ struct WebMaker : public SessionAction
 
     struct Nodex
     {
-        Nodex (MemoryManager& mm, size_t s) :globentrys(mm,(uint32)s), 
-                                             globdefsp (0), 
-                                             globkillsp(0),
-                                             globexitsp(0) {}
+        Nodex (MemoryManager& mm, unsigned s) :globentrys(mm, s), 
+                                               globdefsp (0), 
+                                               globkillsp(0),
+                                               globexitsp(0) {}
 
         BitSet globentrys;  // all global definitions available at the block entry
         BitSet* globdefsp,  // can be 0
@@ -93,10 +93,10 @@ struct WebMaker : public SessionAction
     typedef StlVector <Nodex*> Nodexs;
     Nodexs nodexs;
 
-    /*const*/ size_t opandcount;
-    /*const*/ size_t nodecount;
-    size_t splitcount;
-    size_t globcount;
+    /*const*/ unsigned opandcount;
+    /*const*/ unsigned nodecount;
+    unsigned splitcount;
+    unsigned globcount;
 
 
     WebMaker ()                     :mm(1000, "WebMaker"), opndxs(mm), nodexs(mm) {}
@@ -105,6 +105,7 @@ struct WebMaker : public SessionAction
     uint32 getSideEffects () const  {return splitcount == 0 ? 0 : SideEffect_InvalidatesLivenessInfo;}
 
     void runImpl();
+    void calculateConstraints();
 
     void phase1();
     void phase2();
@@ -118,7 +119,7 @@ struct WebMaker : public SessionAction
 
 static ActionFactory<WebMaker> _webmaker("webmaker");
 
-static Counter<size_t> count_splitted("ia32:webmaker:splitted", 0);
+static Counter<int> count_splitted("ia32:webmaker:splitted", 0);
 
 
 //========================================================================================
@@ -126,13 +127,10 @@ static Counter<size_t> count_splitted("ia32:webmaker:splitted", 0);
 //========================================================================================
 
 
-#ifdef _DEBUG__WEBMAKER
-
 using std::endl;
 using std::ostream;
 
-static void onConstruct (const IRManager&);
-static void onDestruct  ();
+#ifdef _DEBUG_WEBMAKER
 
 struct Sep
 {
@@ -149,16 +147,7 @@ static ostream& operator << (ostream&, const Opnd&);
 
 static ostream& operator << (ostream&, /*const*/ BitSet*);
 
-struct Dbgout : public  ::std::ofstream
-{
-    Dbgout (const char* s)          {open(s);}
-    ~Dbgout ()                      {close();}
-};
-
-static Dbgout dbgout("WebMaker.txt");
-
-#define DBGOUT(s) dbgout << s
-//#define DBGOUT(s) std::cerr << s
+#define DBGOUT(s) log(LogStream::DBG).out() << s
 
 #else
 
@@ -168,16 +157,159 @@ static Dbgout dbgout("WebMaker.txt");
 
 
 //========================================================================================
+//  Inst::Opnds
+//========================================================================================
+
+class InstOpnds
+{
+public:
+
+    InstOpnds (const Inst* inst, uint32 roles = Inst::OpndRole_All, bool forw = true);
+
+    bool hasMore () const           {return opnd != 0;}
+    void next ()                    {move();}
+    Opnd*  getOpnd () const         {return opnd;}
+    uint32 getRole () const         {return role;}
+
+protected:
+
+    bool move ();
+
+    const Inst*  inst;
+    const uint32 roles;
+    const unsigned main_count;
+
+    unsigned state,
+             main_idx,
+              sub_idx;
+
+    uint32 role;
+    Opnd* opnd;
+    Opnd* main_opnd;
+};
+
+
+InstOpnds::InstOpnds (const Inst* i, uint32 r, bool forw)
+:inst(i), roles(r), main_count(i->getOpndCount())
+{
+    if (main_count == 0)
+    {
+        state = 6;
+        opnd = 0;
+    }
+    else if (forw)
+    {
+        main_idx = 0;
+        state = 0;
+        move();
+    }
+    else
+    {
+        main_idx = main_count;
+        state = 3;
+        move();
+    }
+}
+
+
+bool InstOpnds::move ()
+{
+    opnd = 0;
+
+    do
+        switch (state)
+        {
+        //  forward iteration
+
+            case 0:     // main operands
+                opnd = inst->getOpnd(main_idx);
+                role = inst->getOpndRoles(main_idx);
+                if (++main_idx == main_count)
+                {
+                    main_idx = 0;
+                    state = 1;
+                }
+                return true;
+
+            case 1:     // find next memory operand
+                for (;; ++main_idx)
+                {
+                    if (main_idx == main_count)
+                    {
+                        state = 6;
+                        return false;
+                    }
+
+                    main_opnd = inst->getOpnd(main_idx);
+                    if (main_opnd->getMemOpndKind() != MemOpndKind_Null)
+                        break;
+                }
+
+                sub_idx = 0;
+                state = 2;
+                // fall to case 2
+
+            case 2:     // sub operands
+                opnd = main_opnd->getMemOpndSubOpnd((MemOpndSubOpndKind)sub_idx);
+                role = Inst::OpndRole_OpndLevel | Inst::OpndRole_Use;
+                if (++sub_idx == 4)
+                {
+                    ++main_idx;
+                    state = 1;
+                }
+                break;
+
+        //  backward iteration
+
+            case 3:     // find prev memory operand
+                for (;;)
+                {
+                    if (main_idx == 0)
+                    {
+                        main_idx = main_count;
+                        state = 5;
+                        goto S5;
+                    }
+
+                    main_opnd = inst->getOpnd(--main_idx);
+                    if (main_opnd->getMemOpndKind() != MemOpndKind_Null)
+                        break;
+                }
+
+                sub_idx = 4;
+                state = 4;
+                // fall to case 4
+
+            case 4:     // sub operands
+                opnd = main_opnd->getMemOpndSubOpnd((MemOpndSubOpndKind)--sub_idx);
+                role = Inst::OpndRole_OpndLevel | Inst::OpndRole_Use;
+                if (sub_idx == 0)
+                    state = 3;
+                break;
+
+            case 5:     // main operands
+S5:             opnd = inst->getOpnd(--main_idx);
+                role = inst->getOpndRoles(main_idx);
+                if (main_idx == 0)
+                    state = 6;
+                return true;
+
+            case 6:
+                return false;
+        }
+    while (opnd == 0 /*TBD: check roles here */);
+
+    return true;
+}
+
+
+//========================================================================================
 //  WebMaker implementation
 //========================================================================================
 
 
 void WebMaker::runImpl()
 {
-#ifdef _DEBUG__WEBMAKER
-    onConstruct(irm);
-#endif
-
     opandcount = irManager->getOpndCount();
     nodecount = irManager->getFlowGraph()->getMaxNodeId();
 
@@ -192,36 +324,43 @@ void WebMaker::runImpl()
         phase2();
         phase3();
         phase4();
+
+        if (splitcount != 0 && getBoolArg("calc", false))
+            calculateConstraints();
     }
 
     count_splitted += splitcount;
-    DBGOUT("***splitcount=" << splitcount << "/" << count_splitted << endl;)
+    DBGOUT("splitcount=" << splitcount << "/" << count_splitted << endl;)
+}
 
-#ifdef _DEBUG__WEBMAKER
-    onDestruct();
-#endif
+
+void WebMaker::calculateConstraints ()
+{
+    DBGOUT("Calculating constraints" << endl;)
+
+    irManager->calculateLivenessInfo();
+    ConstraintsResolverImpl impl(*irManager, true);
+    impl.run();
 }
 
 
 void WebMaker::phase1()
 {
-    static CountTime phase1Timer("timer:ia32::webmaker:phase1");
-    AutoTimer tm(phase1Timer);
-
     opndxs.resize(opandcount);
-    for (size_t i = 0; i != opandcount; ++i)
+    for (unsigned i = 0; i != opandcount; ++i)
     {
         Opndx* opndxp = 0;
-        if (!irManager->getOpnd((uint32)i)->hasAssignedPhysicalLocation())
+        if (!irManager->getOpnd(i)->hasAssignedPhysicalLocation())
             opndxp = new Opndx(mm);
         opndxs[i] = opndxp;
     }
 
-    BitSet lives(mm, (uint32)opandcount);
+    BitSet lives(mm, opandcount);
     globcount = 0;
 
     const Nodes& postOrder = irManager->getFlowGraph()->getNodesPostOrder();
-    for (Nodes::const_iterator it = postOrder.begin(), end = postOrder.end(); it!=end; ++it) {
+    for (Nodes::const_iterator it = postOrder.begin(), end = postOrder.end(); it!=end; ++it) 
+    {
         Node* nodep = *it;
         
         if (nodep->isBlockNode())
@@ -229,14 +368,17 @@ void WebMaker::phase1()
             for (Inst* instp = (Inst*)nodep->getFirstInst(); instp!=NULL; instp = instp->getNextInst()) {
                 const uint32 iprops = instp->getProperties();
                 Inst::Opnds defs(instp, Inst::OpndRole_AllDefs);
-                size_t itx = 0;
+                unsigned itx = 0;
                 for (Inst::Opnds::iterator it = defs.begin(); it != defs.end(); it = defs.next(it), ++itx)
+                //for (InstOpnds inops(instp, Inst::OpndRole_All, true); inops.hasMore(); inops.next())
                 {
                     Opnd* opndp = instp->getOpnd(it);
+                    //Opnd* opndp = inops.getOpnd();
                     Opndx* opndxp = opndxs.at(opndp->getId());
                     if (opndxp != 0)
                     {
-                        const uint32 oprole = const_cast<const Inst*>(instp)->getOpndRoles((uint32)itx);
+                        const uint32 oprole = const_cast<const Inst*>(instp)->getOpndRoles(itx);
+                        //const uint32 oprole = inops.getRole();
                         const bool isdef = ((oprole & Inst::OpndRole_UseDef) == Inst::OpndRole_Def)
                                         && ((iprops & Inst::Properties_Conditional) == 0 );
                         if (isdef)
@@ -252,6 +394,8 @@ void WebMaker::phase1()
                     }
                 }
             }
+
+        //  Mark all global definitions
 
             irManager->getLiveAtExit(nodep, lives);
             BitSet::IterB bsk(lives);
@@ -272,7 +416,7 @@ void WebMaker::phase1()
         }
     }
 
-#ifdef _DEBUG__WEBMAKER
+#ifdef _DEBUG_WEBMAKER
 /*
     dbgout << "--- phase1 ---" << endl;
     for (size_t i = 0; i != opandcount; ++i)
@@ -295,9 +439,6 @@ void WebMaker::phase1()
 
 void WebMaker::phase2()
 {
-    static CountTime phase2Timer("timer:ia32::webmaker:phase2");
-    AutoTimer tm(phase2Timer);
-
     nodexs.resize(nodecount);
     for (size_t n = 0; n != nodecount; ++n)
         nodexs[n] = new Nodex(mm, globcount);
@@ -324,8 +465,6 @@ void WebMaker::phase2()
             opndxp->cbbp = 0;
             opndxp->copdefp = 0;
         }
-
-    
     
     BitSet wrkbs(mm, (uint32)globcount);
     bool   wrkbsvalid;
@@ -391,7 +530,7 @@ void WebMaker::phase2()
         }
     }
 
-#ifdef _DEBUG__WEBMAKER
+#ifdef _DEBUG_WEBMAKER
 /*
     dbgout << "--- total passes:" << passnb << endl;
     for (size_t n = 0; n != nodecount; ++n)
@@ -409,50 +548,42 @@ void WebMaker::phase2()
 
 void WebMaker::phase3()
 {
-    static CountTime phase3Timer("timer:ia32::webmaker:phase3");
-    AutoTimer tm(phase3Timer);
-
-    DBGOUT("--- phase3 ---" << endl;)
-
     const Nodes& postOrder  = irManager->getFlowGraph()->getNodesPostOrder();
-    for (Nodes::const_iterator it = postOrder.begin(), end = postOrder.end(); it!=end; ++it) {
+    for (Nodes::const_iterator it = postOrder.begin(), end = postOrder.end(); it!=end; ++it) 
+    {
         Node* nodep = *it;
         if (nodep->isBlockNode())
         {
             const BitSet*  globentryp = &nodexs.at(nodep->getId())->globentrys;
             
-            for (Inst* instp = (Inst*)nodep->getFirstInst(); instp!=NULL; instp = instp->getNextInst()) {
+            for (Inst* instp = (Inst*)nodep->getFirstInst(); instp != 0; instp = instp->getNextInst()) 
             {
                 const uint32 iprops = instp->getProperties();
-                Inst::Opnds all(instp, Inst::OpndRole_All);
-                size_t itx = 0;
-                for (Inst::Opnds::iterator it = all.begin(); it != all.end(); it = all.next(it), ++itx)
+
+                for (InstOpnds inops(instp, Inst::OpndRole_All, false); inops.hasMore(); inops.next())
                 {
-                    Opnd* opndp = instp->getOpnd(it);
+                    Opnd* opndp = inops.getOpnd();
                     Opndx* opndxp = opndxs.at(opndp->getId());
                     if (opndxp != 0)
                     {
                         OpDef* opdefp = 0;
-                        const uint32 oprole = const_cast<const Inst*>(instp)->getOpndRoles((uint32)itx);
+                        const uint32 oprole = inops.getRole();
                         const bool isdef = ((oprole & Inst::OpndRole_UseDef) == Inst::OpndRole_Def)
                                         && ((iprops & Inst::Properties_Conditional) == 0 );
-                        DBGOUT(" O#" << opndp->getFirstId() << "(#" << opndp->getId() << ") def:" << isdef;)
                         DBGOUT(" B#" << instp->getBasicBlock()->getId() << " " << *instp;)
+                        DBGOUT(" " << *opndp << (isdef ? " DEF" : "") << endl;)
 
                         if (isdef) 
                         {// opand definition here
                             Opndx::OpDefs::iterator it = opndxp->opdefs.begin(),
                                                     end = opndxp->opdefs.end();
-                            //if (opndxp->copdefp != 0)
-                            //  it = opndxp->copdefp;
                             for (; it != end && it->defp != instp; ++it)
                                 ;
 
                             assert(it != end);
                             opdefp = &*it;
-                            opndxp->copdefp = opdefp;
+                            opndxp->copdefp = opdefp;   
                             opndxp->cbbp = nodep;
-                            DBGOUT(" found1 globid#" << opdefp->globid << " def B#" << opdefp->defp->getBasicBlock()->getId() << " " << *opdefp->defp << endl;)
                         }
                         else
                         {// opand usage here
@@ -473,44 +604,42 @@ void WebMaker::phase3()
                                         lastdefp = opdefp;
                                     }
                                 assert(lastdefp != 0);
-                                DBGOUT(" found2 globid#" << opdefp->globid << " def B#" << opdefp->defp->getBasicBlock()->getId() << " " << *opdefp->defp << endl;)
                             }
                             else
                             {// it can be usage of global or local definition
                                 opdefp = opndxp->copdefp;
-                                DBGOUT(" found3 globid#" << opdefp->globid << " def B#" << opdefp->defp->getBasicBlock()->getId() << " " << *opdefp->defp << endl;)
                             }
                         }
                         assert(opdefp != 0);
 
                         if (opdefp->globid == -1)
-                        {
+                        {// local operand
                             if (isdef)
                             {
                                 ++opndxp->webscount;
                                 if (opndxp->webscount > 1)
                                 {
                                     opndxp->newopndp = splitOpnd(opndp);
-                                    DBGOUT("**new local web found O#" << opndxp->newopndp->getFirstId() << "(#" << opndxp->newopndp->getId() << ")" << endl;)
+                                    DBGOUT("**new local web found " << *opndp << " -> " << *opndxp->newopndp << endl;)
                                 }
                             }
 
                             if (opndxp->webscount > 1 && opdefp->defp->getNode() == nodep)
                             {
-                                instp->replaceOpnd(opndp, opndxp->newopndp);
-                                DBGOUT("  opand replaced by O#" << opndxp->newopndp->getFirstId() << "(#" << opndxp->newopndp->getId() << ")" << endl;)
+                                instp->replaceOpnd(opndp, opndxp->newopndp, isdef ? Inst::OpndRole_AllDefs : Inst::OpndRole_AllUses);
+                                DBGOUT(" replace B#" << instp->getBasicBlock()->getId() << " " << *instp << endl;)
                             }
                         }
                         else
-                        {
+                        {// global oprand
                             if (opdefp->useps == 0)
                                 opdefp->useps = new OpDef::Instps(mm);
-                            opdefp->useps->push_back(instp);
+                            if (!isdef)
+                                opdefp->useps->push_back(instp);
                         }
                     }
                 }
             }
-        }
         }
     }
 }
@@ -518,23 +647,16 @@ void WebMaker::phase3()
 
 void WebMaker::phase4()
 {
-    static CountTime phase4Timer("timer:ia32::webmaker:phase4");
-    AutoTimer tm(phase4Timer);
-
-    DBGOUT("--- phase4 ---" << endl;)
-
     Opndx* opndxp;
-    for (size_t i = 0; i != opandcount; ++i)
+    for (unsigned i = 0; i != opandcount; ++i)
         if ((opndxp = opndxs[i]) != 0  && !opndxp->opdefs.empty())
         {
-            Opnd* opndp = irManager->getOpnd((uint32)i);
+            Opnd* opndp = irManager->getOpnd(i);
             Opndx::OpDefs& opdefs = opndxp->opdefs;
-            DBGOUT(" O#" << opndp->getFirstId() << "(#" << i << ")" << endl;)
 
-            for (size_t itx = 0; itx != opdefs.size(); ++itx)
+            for (unsigned itx = 0; itx != opdefs.size(); ++itx)
             {
                 OpDef* opdefp = &opdefs[itx];
-                DBGOUT("  " <<  itx << "->" << opdefp->linkx << " globid#" << opdefp->globid << endl;)
                 if (opdefp->globid != -1 && !opdefp->visited)
                 {
                     Opnd* newopndp = 0;
@@ -542,22 +664,23 @@ void WebMaker::phase4()
                     if (opndxp->webscount > 1)
                     {
                         newopndp = splitOpnd(opndp);
-                        DBGOUT("**new global web found O#" << newopndp->getFirstId() << "(#" << newopndp->getId() << ")" << endl;)
+                        DBGOUT("**new global web found " << *opndp << " -> " << *newopndp<< endl;)
                     }
 
                     while (!opdefp->visited)
                     {
-                        DBGOUT("   -visited globid#" << opdefp->globid << endl;)
-
-                        if (newopndp != 0 && opdefp->useps != 0)
+                        if (newopndp != 0)
                         {
+                            DBGOUT(" defp " << *opdefp->defp << endl;)
+                            opdefp->defp->replaceOpnd(opndp, newopndp, Inst::OpndRole_AllDefs);
+                            DBGOUT(" replace B#" << opdefp->defp->getBasicBlock()->getId() << " " << *opdefp->defp << endl;)
+
                             OpDef::Instps::iterator it = opdefp->useps->begin(),
-                                                   end = opdefp->useps->end();
+                                                    end = opdefp->useps->end();
                             for (; it != end; ++it)
                             {
-                                (*it)->replaceOpnd(opndp, newopndp);
-                                DBGOUT(" replace B#" << (*it)->getBasicBlock()->getId() << " " << *(*it);)
-                                DBGOUT(" O#" << opndp->getFirstId() << "(#" << opndp->getId() << ")" << endl;)
+                                (*it)->replaceOpnd(opndp, newopndp, Inst::OpndRole_AllUses);
+                                DBGOUT(" replace B#" << (*it)->getBasicBlock()->getId() << " " << **it << endl;)
                             }
                         }
 
@@ -581,19 +704,18 @@ void WebMaker::linkDef(Opndx::OpDefs& opdefs, OpDef* lastdefp, OpDef* opdefp)
             break;
     }
 
-    size_t wx = lastdefp->linkx;
+    unsigned wx = lastdefp->linkx;
     lastdefp->linkx = opdefp->linkx;
     opdefp->linkx = wx;
-    DBGOUT("** glob def linked " << opdefp->globid << " + " << lastdefp->globid << endl;)
 }
 
 
 BitSet* WebMaker::bitsetp (BitSet*& bsp)
 {
     if (bsp == 0)
-        bsp = new BitSet(mm, (uint32)globcount);
+        bsp = new BitSet(mm, globcount);
     else
-        bsp->resize((uint32)globcount);
+        bsp->resize(globcount);
     return bsp;
 }
 
@@ -601,38 +723,9 @@ BitSet* WebMaker::bitsetp (BitSet*& bsp)
 Opnd* WebMaker::splitOpnd (const Opnd* op)
 {
     Opnd* np = irManager->newOpnd(op->getType(), op->getConstraint(Opnd::ConstraintKind_Initial));
-    np->setCalculatedConstraint( op->getConstraint(Opnd::ConstraintKind_Calculated)); 
     ++splitcount;
     return np;
 }
-
-
-//========================================================================================
-// Internal debug helpers
-//========================================================================================
-
-
-#ifdef _DEBUG__WEBMAKER
-
-static void onConstruct (const IRManager& irm)
-{
-    MethodDesc& md = irm.getMethodDesc();
-    const char * methodName = md.getName();
-    const char * methodTypeName = md.getParentType()->getName();
-    DBGOUT(endl << "Constructed " << methodTypeName  << "." << methodName 
-           << "(" << md.getSignatureString() << ")" << endl;)
-
-//  sos = strcmp(methodTypeName, "spec/benchmarks/_213_javac/BatchEnvironment") == 0 &&
-//        strcmp(methodName,     "flushErrors") == 0;
-}
-
-
-static void onDestruct ()
-{
-    DBGOUT(endl << "Destructed" << endl;)
-}
-
-#endif //#ifdef _DEBUG__WEBMAKER
 
 
 //========================================================================================
@@ -640,7 +733,7 @@ static void onDestruct ()
 //========================================================================================
 
 
-#ifdef _DEBUG__WEBMAKER
+#ifdef _DEBUG_WEBMAKER
 
 static ostream& operator << (ostream& os, Sep& x)
 {
@@ -686,7 +779,7 @@ static ostream& operator << (ostream& os, /*const*/ BitSet* bs)
     return os;
 }
 
-#endif //#ifdef _DEBUG__WEBMAKER
+#endif //#ifdef _DEBUG_WEBMAKER
 
 } //namespace Ia32
 } //namespace Jitrino
