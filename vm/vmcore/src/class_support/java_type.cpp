@@ -101,7 +101,7 @@ TypeDesc* type_desc_create_from_java_class(Class* c)
         c->get_class_loader()->UnlockTypesCache();
         return *tdres;
     }
-    TypeDesc* td = new TypeDesc(K_Object, NULL, NULL, cname, c->get_class_loader(), NULL);
+    TypeDesc* td = new TypeDesc(K_Object, NULL, NULL, cname, c->get_class_loader(), c);
     assert(td);
     c->get_class_loader()->GetJavaTypes()->Insert(cname, td);
     c->get_class_loader()->UnlockTypesCache();
@@ -115,7 +115,6 @@ Class* TypeDesc::load_type_desc()
     if (clss) return clss; // class already loaded
     Global_Env* env = VM_Global_State::loader_env;
     Class* element_clss;
-    Class* c;
 
     switch (get_kind()) {
     case K_S1: return env->Byte_Class;
@@ -132,13 +131,14 @@ Class* TypeDesc::load_type_desc()
         assert (name);
         // FIXME: better to use LoadVerifyAndPrepareClass here - but this results in Recursive resolution collision in StartLoadingClass
         //c = loader->LoadVerifyAndPrepareClass(env, name);
-        c = loader->LoadClass(env, name);
-        return c;
+        clss = loader->LoadClass(env, name);
+        return clss;
     case K_Vector:
         assert (component_type);
         element_clss = component_type->load_type_desc();
         if (!element_clss) return NULL;
-        return resolve_class_array_of_class1(env, element_clss);
+        clss = resolve_class_array_of_class1(env, element_clss);
+        return clss;
     default:
         // All other types are not Java types, so fail
         ABORT("Unexpected kind");
@@ -167,4 +167,5 @@ TypeDesc* TypeDesc::type_desc_create_vector()
         return td;
     }
 }
+
 
