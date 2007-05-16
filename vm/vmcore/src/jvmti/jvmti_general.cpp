@@ -203,7 +203,7 @@ jvmtiGetVersionNumber(jvmtiEnv* env,
     if (NULL == version_ptr)
         return JVMTI_ERROR_NULL_POINTER;
 
-    *version_ptr = JVMTI_VERSION_1_0;
+    *version_ptr = JVMTI_VERSION;
 
     return JVMTI_ERROR_NONE;
 }
