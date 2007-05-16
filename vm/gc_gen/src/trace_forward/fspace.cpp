@@ -27,6 +27,9 @@ void* object_forwarding_boundary=NULL;
 
 static void fspace_destruct_blocks(Fspace* fspace)
 {   
+#ifdef USE_32BITS_HASHCODE
+  space_desturct_blocks((Blocked_Space*)fspace);
+#endif
   return;
 }
 
@@ -145,6 +148,31 @@ void fspace_reset_for_allocation(Fspace* fspace)
 
   return;
 }
+
+#ifdef USE_32BITS_HASHCODE
+Block_Header* fspace_next_block;
+
+void fspace_block_iterate_init(Fspace* fspace)
+{
+  fspace_next_block = (Block_Header*) fspace->blocks;
+}
+
+Block_Header* fspace_get_next_block()
+{
+  Block_Header* curr_block = (Block_Header*) fspace_next_block;
+  while(fspace_next_block != NULL){
+    Block_Header* next_block = curr_block->next;
+
+    Block_Header* temp = (Block_Header*)atomic_casptr((volatile void**)&fspace_next_block, next_block, curr_block);
+    if(temp != curr_block){
+      curr_block = (Block_Header*) fspace_next_block;
+      continue;
+    }
+    return curr_block;
+  }
+  return NULL;
+}
+#endif
 
 void collector_execute_task(GC* gc, TaskType task_func, Space* space);
 

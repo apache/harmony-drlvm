@@ -35,6 +35,9 @@ typedef struct Vector_Block{
 
 #define VECTOR_BLOCK_HEADER_SIZE_BYTES ((POINTER_SIZE_INT)((Vector_Block*)0)->entries)
 #define VECTOR_BLOCK_ENTRY_NUM ((VECTOR_BLOCK_DATA_SIZE_BYTES - VECTOR_BLOCK_HEADER_SIZE_BYTES) >> BIT_SHIFT_TO_BYTES_OF_POINTER_SIZE_INT )
+#define VECTOR_BLOCK_LOW_MASK ((POINTER_SIZE_INT)(VECTOR_BLOCK_DATA_SIZE_BYTES - 1))
+#define VECTOR_BLOCK_HIGH_MASK (~VECTOR_BLOCK_LOW_MASK)
+#define VECTOR_BLOCK_HEADER(addr) ((Vector_Block *)((POINTER_SIZE_INT)(addr) & VECTOR_BLOCK_HIGH_MASK))
 
 inline void vector_block_init(Vector_Block* block, unsigned int size)
 {
@@ -90,6 +93,8 @@ inline POINTER_SIZE_INT* vector_block_iterator_advance(Vector_Block* block, POIN
 inline Boolean vector_block_iterator_end(Vector_Block* block, POINTER_SIZE_INT* iter)
 {  return iter == block->tail; }
 
+inline POINTER_SIZE_INT* vector_block_get_last_entry(Vector_Block* block)
+{ return block->tail; }
 
 /* Below is to use Vector_Block as stack (for trace-forwarding DFS order ) */
 inline void vector_stack_init(Vector_Block* block)

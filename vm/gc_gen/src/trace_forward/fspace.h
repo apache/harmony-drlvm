@@ -58,4 +58,8 @@ void nongen_forward_pool(Collector* collector);
 
 void fspace_collection(Fspace* fspace);
 
+#ifdef USE_32BITS_HASHCODE
+void fspace_block_iterate_init(Fspace* fspace);
+Block_Header* fspace_get_next_block();
+#endif
 #endif // _FROM_SPACE_H_

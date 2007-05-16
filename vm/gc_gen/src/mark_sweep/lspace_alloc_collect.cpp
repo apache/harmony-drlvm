@@ -238,15 +238,24 @@ void lspace_compute_object_target(Collector* collector, Lspace* lspace)
   void* dest_addr = lspace->heap_start;
   unsigned int iterate_index = 0;
   Partial_Reveal_Object* p_obj = lspace_get_first_marked_object(lspace, &iterate_index);
-
+  
   assert(!collector->rem_set);
   collector->rem_set = free_set_pool_get_entry(collector->gc->metadata);
+#ifdef USE_32BITS_HASHCODE  
+  collector->hashcode_set = free_set_pool_get_entry(collector->gc->metadata);
+#endif
   
   while( p_obj ){
     assert( obj_is_marked_in_vt(p_obj));
     unsigned int obj_size = vm_object_size(p_obj);
     assert(((POINTER_SIZE_INT)dest_addr + obj_size) <= (POINTER_SIZE_INT)lspace->heap_end);
+#ifdef USE_32BITS_HASHCODE 
+    obj_size += hashcode_is_attached(p_obj)? GC_OBJECT_ALIGNMENT : 0 ;
+    Obj_Info_Type obj_info = slide_compact_process_hashcode(p_obj, dest_addr, &obj_size, collector, null, null);
+#else
     Obj_Info_Type obj_info = get_obj_info_raw(p_obj);
+#endif
+
     if( obj_info != 0 ) {
       collector_remset_add_entry(collector, (Partial_Reveal_Object **)dest_addr);
       collector_remset_add_entry(collector, (Partial_Reveal_Object **)obj_info);
@@ -259,6 +268,10 @@ void lspace_compute_object_target(Collector* collector, Lspace* lspace)
 
   pool_put_entry(collector->gc->metadata->collector_remset_pool, collector->rem_set);
   collector->rem_set = NULL;
+#ifdef USE_32BITS_HASHCODE 
+  pool_put_entry(collector->gc->metadata->collector_hashcode_pool, collector->hashcode_set);
+  collector->hashcode_set = NULL;
+#endif
   
   lspace->scompact_fa_start = dest_addr;
   lspace->scompact_fa_end= lspace->heap_end;
@@ -269,12 +282,20 @@ void lspace_sliding_compact(Collector* collector, Lspace* lspace)
 {
   unsigned int iterate_index = 0;
   Partial_Reveal_Object* p_obj = lspace_get_first_marked_object(lspace, &iterate_index);
+  Partial_Reveal_Object *p_target_obj = obj_get_fw_in_oi(p_obj); 
 
   while( p_obj ){
     assert( obj_is_marked_in_vt(p_obj));
+#ifdef USE_32BITS_HASHCODE
+    obj_clear_dual_bits_in_vt(p_obj); 
+#else
     obj_unmark_in_vt(p_obj);
+#endif
     
     unsigned int obj_size = vm_object_size(p_obj);
+#ifdef USE_32BITS_HASHCODE 
+    obj_size += (obj_is_sethash_in_vt(p_obj))?GC_OBJECT_ALIGNMENT:0;    
+#endif
     Partial_Reveal_Object *p_target_obj = obj_get_fw_in_oi(p_obj);
     POINTER_SIZE_INT target_obj_end = (POINTER_SIZE_INT)p_target_obj + obj_size;
     if( p_obj != p_target_obj){
@@ -373,12 +394,16 @@ void lspace_sweep(Lspace* lspace)
        the last time marked object is thought to be already marked and not scanned for this cycle. */
     obj_clear_dual_bits_in_oi(p_next_obj);
     /*For_statistic: sum up the size of suvived large objects, useful to deciede los extention.*/
-    lspace->surviving_size += ALIGN_UP_TO_KILO(vm_object_size(p_next_obj));    
+unsigned int obj_size = vm_object_size(p_next_obj);
+#ifdef USE_32BITS_HASHCODE
+    obj_size += (hashcode_is_attached(p_next_obj))?GC_OBJECT_ALIGNMENT:0;
+#endif
+    lspace->surviving_size += ALIGN_UP_TO_KILO(obj_size);    
   }
 
   cur_area_start = (void*)ALIGN_UP_TO_KILO(p_prev_obj);
   cur_area_end = (void*)ALIGN_DOWN_TO_KILO(p_next_obj);
-
+  unsigned int hash_extend_size = 0;
 
   while(cur_area_end){
     cur_size = (POINTER_SIZE_INT)cur_area_end - (POINTER_SIZE_INT)cur_area_start;
@@ -394,10 +419,17 @@ void lspace_sweep(Lspace* lspace)
       obj_unmark_in_vt(p_next_obj);
       obj_clear_dual_bits_in_oi(p_next_obj);
       /*For_statistic: sum up the size of suvived large objects, useful to deciede los extention.*/
-      lspace->surviving_size += ALIGN_UP_TO_KILO(vm_object_size(p_next_obj));
+      unsigned int obj_size = vm_object_size(p_next_obj);
+#ifdef USE_32BITS_HASHCODE
+      obj_size += (hashcode_is_attached(p_next_obj))?GC_OBJECT_ALIGNMENT:0;
+#endif
+      lspace->surviving_size += ALIGN_UP_TO_KILO(obj_size);
     }
 
-    cur_area_start = (void*)ALIGN_UP_TO_KILO((POINTER_SIZE_INT)p_prev_obj + vm_object_size(p_prev_obj));
+#ifdef USE_32BITS_HASHCODE
+    hash_extend_size  = (hashcode_is_attached((Partial_Reveal_Object*)p_prev_obj))?GC_OBJECT_ALIGNMENT:0;
+#endif
+    cur_area_start = (void*)ALIGN_UP_TO_KILO((POINTER_SIZE_INT)p_prev_obj + vm_object_size(p_prev_obj) + hash_extend_size);
     cur_area_end = (void*)ALIGN_DOWN_TO_KILO(p_next_obj);
     
   }

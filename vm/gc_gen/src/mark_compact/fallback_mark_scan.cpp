@@ -178,3 +178,34 @@ void trace_obj_in_fallback_marking(Collector *collector, void *p_ref)
 {
   trace_object(collector, (REF *)p_ref);
 }
+
+#ifdef USE_32BITS_HASHCODE
+void fallback_clear_fwd_obj_oi(Collector* collector)
+{
+  GC* gc = collector->gc;
+  assert(gc_match_kind(gc, FALLBACK_COLLECTION));
+
+  unsigned int num_active_collectors = gc->num_active_collectors;
+  atomic_cas32( &num_finished_collectors, 0, num_active_collectors);
+  
+  Block_Header* curr_block = fspace_get_next_block();
+  while(curr_block){
+    Partial_Reveal_Object* curr_obj = (Partial_Reveal_Object*) curr_block->base;
+    while(curr_obj < curr_block->free){
+      if(obj_is_fw_in_oi(curr_obj)){
+        set_obj_info(curr_obj, (Obj_Info_Type)0);
+      }
+      curr_obj = (Partial_Reveal_Object*)((POINTER_SIZE_INT)curr_obj + vm_object_size(curr_obj));
+    }
+    curr_block = fspace_get_next_block();
+  }
+  atomic_inc32(&num_finished_collectors);
+  while(num_finished_collectors < num_active_collectors) ;
+}
+
+void fallback_clear_fwd_obj_oi_init(Collector* collector)
+{
+  fspace_block_iterate_init((Fspace*)((GC_Gen*)collector->gc)->nos);
+}
+#endif
+

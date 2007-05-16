@@ -121,7 +121,7 @@ void event_gc_collect_kind_changed(GC* gc)
   verifier_reset_gc_verification(heap_verifier);
 
   (*heap_verifier->live_obj_scanner)(heap_verifier);
-  
+  verifier_set_fallback_collection(heap_verifier->gc_verifier, FALSE);  
 }
 
 void event_mutator_allocate_newobj(Partial_Reveal_Object* p_newobj, POINTER_SIZE_INT size, VT vt_raw)
@@ -131,6 +131,7 @@ void event_mutator_allocate_newobj(Partial_Reveal_Object* p_newobj, POINTER_SIZE
 
 Heap_Verifier* get_heap_verifier()
 { return heap_verifier; }
+
 
 
 

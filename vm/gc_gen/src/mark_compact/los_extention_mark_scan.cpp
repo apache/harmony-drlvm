@@ -26,10 +26,14 @@ static FORCE_INLINE void scan_slot(Collector* collector, REF *p_ref)
 
   if(obj_mark_in_vt(p_obj)){
     collector_tracestack_push(collector, p_obj);
+    unsigned int obj_size = vm_object_size(p_obj);
+#ifdef USE_32BITS_HASHCODE
+    obj_size += (hashcode_is_set(p_obj))?GC_OBJECT_ALIGNMENT:0;
+#endif
     if(!obj_belongs_to_space(p_obj, gc_get_los((GC_Gen*)collector->gc)))
-      collector->non_los_live_obj_size += vm_object_size(p_obj);
+      collector->non_los_live_obj_size += obj_size;
     else
-      collector->los_live_obj_size += round_up_to_size(vm_object_size(p_obj), KB);
+      collector->los_live_obj_size += round_up_to_size(obj_size, KB);
   }
   
   return;
@@ -137,10 +141,14 @@ void los_adaptation_mark_scan_heap(Collector *collector)
       */
       if(obj_mark_in_vt(p_obj)){
         collector_tracestack_push(collector, p_obj);
+        unsigned int obj_size = vm_object_size(p_obj);
+#ifdef USE_32BITS_HASHCODE
+        obj_size += (hashcode_is_set(p_obj))?GC_OBJECT_ALIGNMENT:0;
+#endif
         if(!obj_belongs_to_space(p_obj, gc_get_los((GC_Gen*)gc)))
-          collector->non_los_live_obj_size += vm_object_size(p_obj);
+          collector->non_los_live_obj_size += obj_size;
         else
-          collector->los_live_obj_size += round_up_to_size(vm_object_size(p_obj), KB);
+          collector->los_live_obj_size += round_up_to_size(obj_size, KB);
       }
 
     } 
@@ -192,5 +200,6 @@ retry:
   
   return;
 }
+
 
 

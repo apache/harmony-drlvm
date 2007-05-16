@@ -112,6 +112,15 @@ inline void space_init_blocks(Blocked_Space* space)
   return;
 }
 
+inline void space_desturct_blocks(Blocked_Space* space)
+{
+  Block* blocks = (Block*)space->heap_start; 
+  unsigned int i=0;
+  for(; i < space->num_managed_blocks; i++){
+    Block_Header* block = (Block_Header*)&(blocks[i]);
+    block_destruct(block);
+  }
+}
 
 inline void blocked_space_shrink(Blocked_Space* space, unsigned int changed_size)
 {

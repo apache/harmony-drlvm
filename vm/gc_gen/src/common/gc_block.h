@@ -22,6 +22,9 @@
 #define _BLOCK_H_
 
 #include "gc_common.h"
+#ifdef USE_32BITS_HASHCODE
+#include "hashcode.h"
+#endif
 
 #define GC_BLOCK_SHIFT_COUNT 15
 #define GC_BLOCK_SIZE_BYTES (1 << GC_BLOCK_SHIFT_COUNT)
@@ -45,6 +48,9 @@ typedef struct Block_Header {
   unsigned int block_idx;           
   volatile unsigned int status;
   volatile unsigned int dest_counter;
+#ifdef USE_32BITS_HASHCODE
+  Hashcode_Buf* hashcode_buf; /*hash code entry list*/
+#endif
   Partial_Reveal_Object* src;
   Partial_Reveal_Object* next_src;
   Block_Header* next;
@@ -98,12 +104,39 @@ inline void block_init(Block_Header* block)
   block->dest_counter = 0;
   block->src = NULL;
   block->next_src = NULL;
+#ifdef USE_32BITS_HASHCODE
+  block->hashcode_buf = hashcode_buf_create(); 
+#endif
+}
+
+inline void block_destruct(Block_Header* block)
+{
+#ifdef USE_32BITS_HASHCODE
+  hashcode_buf_destory(block->hashcode_buf);
+#endif
 }
 
 inline Partial_Reveal_Object *obj_end(Partial_Reveal_Object *obj)
 {
+#ifdef USE_32BITS_HASHCODE
+  assert(vm_object_size(obj) != 0);
+  unsigned int hash_extend_size 
+    = (hashcode_is_attached(obj))?GC_OBJECT_ALIGNMENT:0;
+  return (Partial_Reveal_Object *)((POINTER_SIZE_INT)obj + vm_object_size(obj) + hash_extend_size);
+#else
   return (Partial_Reveal_Object *)((POINTER_SIZE_INT)obj + vm_object_size(obj));
+#endif
 }
+
+#ifdef USE_32BITS_HASHCODE
+inline Partial_Reveal_Object *obj_end_extend(Partial_Reveal_Object *obj) 
+{
+  assert(vm_object_size(obj) != 0);
+  unsigned int hash_extend_size 
+    = (obj_is_sethash_in_vt(obj))?GC_OBJECT_ALIGNMENT:0;
+  return (Partial_Reveal_Object *)((POINTER_SIZE_INT)obj + vm_object_size(obj) + hash_extend_size);
+}
+#endif
 
 inline void obj_set_prefetched_next_pointer(Partial_Reveal_Object* obj, Partial_Reveal_Object* raw_prefetched_next){
   /*Fixme: em64t: This may be not necessary!*/
@@ -131,6 +164,22 @@ inline Partial_Reveal_Object *next_marked_obj_in_block(Partial_Reveal_Object *cu
   
   return NULL;
 }
+
+#ifdef USE_32BITS_HASHCODE
+inline Partial_Reveal_Object* block_get_first_marked_object_extend(Block_Header* block, void** start_pos)
+{
+  Partial_Reveal_Object* cur_obj = (Partial_Reveal_Object*)block->base;
+  Partial_Reveal_Object* block_end = (Partial_Reveal_Object*)block->free;
+
+  Partial_Reveal_Object* first_marked_obj = next_marked_obj_in_block(cur_obj, block_end);
+  if(!first_marked_obj)
+    return NULL;
+
+  *start_pos = obj_end_extend(first_marked_obj);
+  
+  return first_marked_obj;
+}
+#endif
 
 inline Partial_Reveal_Object* block_get_first_marked_object(Block_Header* block, void** start_pos)
 {
@@ -188,7 +237,11 @@ inline Partial_Reveal_Object *block_get_first_marked_obj_prefetch_next(Block_Hea
 
 inline Partial_Reveal_Object *block_get_first_marked_obj_after_prefetch(Block_Header *block, void **start_pos)
 {
+#ifdef USE_32BITS_HASHCODE
+  return block_get_first_marked_object_extend(block, start_pos);
+#else
   return block_get_first_marked_object(block, start_pos);
+#endif
 }
 
 inline Partial_Reveal_Object *block_get_next_marked_obj_prefetch_next(Block_Header *block, void **start_pos)
@@ -245,7 +298,12 @@ inline Partial_Reveal_Object *block_get_next_marked_obj_after_prefetch(Block_Hea
   if(!cur_marked_obj)
     return NULL;
   
+#ifdef USE_32BITS_HASHCODE  
+  Partial_Reveal_Object *next_obj = obj_end_extend(cur_marked_obj);  
+#else
   Partial_Reveal_Object *next_obj = obj_end(cur_marked_obj);
+#endif
+
   *start_pos = next_obj;
   
   return cur_marked_obj;
@@ -268,6 +326,33 @@ inline void block_clear_table(Block_Header* block)
   return;
 }
 
+#ifdef USE_32BITS_HASHCODE
+inline Hashcode_Buf* block_set_hashcode_buf(Block_Header *block, Hashcode_Buf* new_hashcode_buf)
+{
+  Hashcode_Buf* old_hashcode_buf = block->hashcode_buf;
+  block->hashcode_buf = new_hashcode_buf;
+  return old_hashcode_buf;
+}
+
+inline void block_swap_hashcode_buf(Block_Header *block, Hashcode_Buf** new_ptr, Hashcode_Buf** old_ptr)
+{
+  Hashcode_Buf*  temp = block_set_hashcode_buf(block, *new_ptr);
+  *old_ptr = *new_ptr;
+  *new_ptr = temp;
+  hashcode_buf_init(*new_ptr);
+}
+
+inline Hashcode_Buf* block_get_hashcode_buf(Block_Header *block)
+{ return block->hashcode_buf; }
+
+inline int obj_lookup_hashcode_in_buf(Partial_Reveal_Object *p_obj)
+{
+  Hashcode_Buf* hashcode_buf = block_get_hashcode_buf(GC_BLOCK_HEADER(p_obj));
+  return hashcode_buf_lookup(p_obj,hashcode_buf);
+}
+#endif
+
 #endif //#ifndef _BLOCK_H_
+
 
 

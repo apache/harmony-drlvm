@@ -25,6 +25,9 @@
 #include "../verify/verify_live_heap.h"
 #include "../common/space_tuner.h"
 #include "../common/compressed_ref.h"
+#ifdef USE_32BITS_HASHCODE
+#include "../common/hashcode.h"
+#endif
 
 /* fspace size limit is not interesting. only for manual tuning purpose */
 POINTER_SIZE_INT min_nos_size_bytes = 16 * MB;
@@ -229,10 +232,14 @@ void gc_gen_destruct(GC_Gen *gc_gen)
   Space* mos = (Space*)gc_gen->mos;
   Space* los = (Space*)gc_gen->los;
 
-  vm_unmap_mem(nos->heap_start, space_committed_size(nos));
-  vm_unmap_mem(mos->heap_start, space_committed_size(mos));
-  vm_unmap_mem(los->heap_start, space_committed_size(los));
+  POINTER_SIZE_INT nos_size = space_committed_size(nos);
+  POINTER_SIZE_INT mos_size = space_committed_size(nos);
+  POINTER_SIZE_INT los_size = space_committed_size(nos);
 
+  void* nos_start = nos->heap_start;
+  void* mos_start = mos->heap_start;
+  void* los_start = los->heap_start;
+  
   gc_nos_destruct(gc_gen);
   gc_gen->nos = NULL;
   
@@ -241,6 +248,10 @@ void gc_gen_destruct(GC_Gen *gc_gen)
 
   gc_los_destruct(gc_gen);  
   gc_gen->los = NULL;
+  
+  vm_unmap_mem(nos_start, nos_size);
+  vm_unmap_mem(mos_start, mos_size);
+  vm_unmap_mem(los_start, los_size);
 
   return;  
 }
@@ -433,10 +444,14 @@ void gc_gen_iterate_heap(GC_Gen *gc)
   while(curr_block < space_end) {
     POINTER_SIZE_INT p_obj = (POINTER_SIZE_INT)curr_block->base;
     POINTER_SIZE_INT block_end = (POINTER_SIZE_INT)curr_block->free;
+    unsigned int hash_extend_size = 0;
     while(p_obj < block_end){
       cont = vm_iterate_object((Managed_Object_Handle)p_obj);
       if (!cont) return;
-      p_obj = p_obj + vm_object_size((Partial_Reveal_Object *)p_obj);
+#ifdef USE_32BITS_HASHCODE
+      hash_extend_size  = (hashcode_is_attached((Partial_Reveal_Object*)p_obj))?GC_OBJECT_ALIGNMENT:0;
+#endif
+      p_obj = p_obj + vm_object_size((Partial_Reveal_Object *)p_obj) + hash_extend_size;
     }
     curr_block = curr_block->next;
     if(curr_block == NULL) break;
@@ -460,13 +475,17 @@ void gc_gen_iterate_heap(GC_Gen *gc)
   Lspace* lspace = gc->los;
   POINTER_SIZE_INT lspace_obj = (POINTER_SIZE_INT)lspace->heap_start;
   POINTER_SIZE_INT lspace_end = (POINTER_SIZE_INT)lspace->heap_end;
+  unsigned int hash_extend_size = 0;
   while (lspace_obj < lspace_end) {
     if(!*((unsigned int *)lspace_obj)){
       lspace_obj = lspace_obj + ((Free_Area*)lspace_obj)->size;
     }else{
       cont = vm_iterate_object((Managed_Object_Handle)lspace_obj);
       if (!cont) return;
-      unsigned int obj_size = (unsigned int)ALIGN_UP_TO_KILO(vm_object_size((Partial_Reveal_Object *)lspace_obj));
+#ifdef USE_32BITS_HASHCODE
+      hash_extend_size  = (hashcode_is_attached((Partial_Reveal_Object *)lspace_obj))?GC_OBJECT_ALIGNMENT:0;
+#endif
+      unsigned int obj_size = (unsigned int)ALIGN_UP_TO_KILO(vm_object_size((Partial_Reveal_Object *)lspace_obj)+hash_extend_size);
       lspace_obj = lspace_obj + obj_size;
     }
   }

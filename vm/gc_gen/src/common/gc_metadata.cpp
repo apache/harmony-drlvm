@@ -75,6 +75,9 @@ void gc_metadata_initialize(GC* gc)
   gc_metadata.mutator_remset_pool = sync_pool_create();
   gc_metadata.collector_remset_pool = sync_pool_create();
   gc_metadata.collector_repset_pool = sync_pool_create();
+#ifdef USE_32BITS_HASHCODE  
+  gc_metadata.collector_hashcode_pool = sync_pool_create();
+#endif
  
   gc->metadata = &gc_metadata; 
   return;  
@@ -92,6 +95,9 @@ void gc_metadata_destruct(GC* gc)
   sync_pool_destruct(metadata->mutator_remset_pool);
   sync_pool_destruct(metadata->collector_remset_pool);
   sync_pool_destruct(metadata->collector_repset_pool);
+#ifdef USE_32BITS_HASHCODE  
+  sync_pool_destruct(metadata->collector_hashcode_pool);
+#endif
 
   for(unsigned int i=0; i<metadata->num_alloc_segs; i++){
     assert(metadata->segments[i]);
@@ -360,5 +366,6 @@ void gc_metadata_verify(GC* gc, Boolean is_before_gc)
   
   return;  
 }
+
 
 

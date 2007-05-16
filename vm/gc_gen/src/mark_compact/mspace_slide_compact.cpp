@@ -38,9 +38,18 @@ static void mspace_compute_object_target(Collector* collector, Mspace* mspace)
   Block_Header *local_last_dest = dest_block;
   void *dest_addr = dest_block->base;
   Block_Header *last_src;
+
+#ifdef USE_32BITS_HASHCODE
+  Hashcode_Buf* old_hashcode_buf = NULL;
+  Hashcode_Buf* new_hashcode_buf = hashcode_buf_create();
+  hashcode_buf_init(new_hashcode_buf);
+#endif
   
   assert(!collector->rem_set);
   collector->rem_set = free_set_pool_get_entry(collector->gc->metadata);
+#ifdef USE_32BITS_HASHCODE  
+  collector->hashcode_set = free_set_pool_get_entry(collector->gc->metadata);
+#endif
   
   while( curr_block ){
     void* start_pos;
@@ -60,7 +69,17 @@ static void mspace_compute_object_target(Collector* collector, Mspace* mspace)
 
       unsigned int obj_size = (unsigned int)((POINTER_SIZE_INT)start_pos - (POINTER_SIZE_INT)p_obj);
       
-      if( ((POINTER_SIZE_INT)dest_addr + obj_size) > (POINTER_SIZE_INT)GC_BLOCK_END(dest_block)){
+      Obj_Info_Type obj_info = get_obj_info(p_obj);
+      
+      unsigned int obj_size_precompute = obj_size;
+      
+#ifdef USE_32BITS_HASHCODE
+      precompute_hashcode_extend_size(p_obj, dest_addr, &obj_size_precompute);
+#endif
+      if( ((POINTER_SIZE_INT)dest_addr + obj_size_precompute) > (POINTER_SIZE_INT)GC_BLOCK_END(dest_block)){
+#ifdef USE_32BITS_HASHCODE      
+        block_swap_hashcode_buf(dest_block, &new_hashcode_buf, &old_hashcode_buf);
+#endif        
         dest_block->new_free = dest_addr;
         dest_block = mspace_get_next_target_block(collector, mspace);
         if(dest_block == NULL){ 
@@ -77,7 +96,9 @@ static void mspace_compute_object_target(Collector* collector, Mspace* mspace)
       }
       assert(((POINTER_SIZE_INT)dest_addr + obj_size) <= (POINTER_SIZE_INT)GC_BLOCK_END(dest_block));
       
-      Obj_Info_Type obj_info = get_obj_info(p_obj);
+#ifdef USE_32BITS_HASHCODE      
+       obj_info = slide_compact_process_hashcode(p_obj, dest_addr, &obj_size, collector,curr_block->hashcode_buf, new_hashcode_buf);
+#endif      
 
       if( obj_info != 0 ) {
         collector_remset_add_entry(collector, (Partial_Reveal_Object **)dest_addr);
@@ -90,11 +111,17 @@ static void mspace_compute_object_target(Collector* collector, Mspace* mspace)
       dest_addr = (void *)((POINTER_SIZE_INT) dest_addr + obj_size);
       p_obj = block_get_next_marked_obj_prefetch_next(curr_block, &start_pos);
     }
-    
+ #ifdef USE_32BITS_HASHCODE      
+    hashcode_buf_clear(curr_block->hashcode_buf);
+ #endif    
     curr_block = mspace_get_next_compact_block(collector, mspace);
   
   }
   
+#ifdef USE_32BITS_HASHCODE 
+  pool_put_entry(collector->gc->metadata->collector_hashcode_pool, collector->hashcode_set);
+  collector->hashcode_set = NULL;
+#endif
   pool_put_entry(collector->gc->metadata->collector_remset_pool, collector->rem_set);
   collector->rem_set = NULL;
   dest_block->new_free = dest_addr;
@@ -106,6 +133,10 @@ static void mspace_compute_object_target(Collector* collector, Mspace* mspace)
     cur_last_dest = (Block_Header *)last_block_for_dest;
   }
   
+#ifdef USE_32BITS_HASHCODE
+  old_hashcode_buf = block_set_hashcode_buf(dest_block, new_hashcode_buf);
+  hashcode_buf_destory(old_hashcode_buf);
+#endif
   return;
 }   
 
@@ -203,7 +234,7 @@ static Block_Header *check_dest_block(Mspace *mspace)
       cur_dest_block = cur_dest_block->next;
     }
   } else {
-    cur_dest_block = set_next_block_for_dest(mspace);
+    cur_dest_block = mspace_block_iterator_get(mspace);
   }
 
   unsigned int total_dest_counter = 0;
@@ -290,13 +321,21 @@ static void mspace_sliding_compact(Collector* collector, Mspace* mspace)
     /* We don't set start_pos as p_obj in case that memmove of this obj may overlap itself.
      * In that case we can't get the correct vt and obj_info.
      */
+#ifdef USE_32BITS_HASHCODE
+    start_pos = obj_end_extend(p_obj);
+#else
     start_pos = obj_end(p_obj);
+#endif
     
     do {
       assert(obj_is_marked_in_vt(p_obj));
+#ifdef USE_32BITS_HASHCODE
+      obj_clear_dual_bits_in_vt(p_obj);
+ #else
       obj_unmark_in_vt(p_obj);
-      
-      unsigned int obj_size = (unsigned int)((POINTER_SIZE_INT)start_pos - (POINTER_SIZE_INT)p_obj);
+#endif
+
+       unsigned int obj_size = (unsigned int)((POINTER_SIZE_INT)start_pos - (POINTER_SIZE_INT)p_obj);
       if(p_obj != p_target_obj){
         memmove(p_target_obj, p_obj, obj_size);
       }
@@ -380,7 +419,12 @@ void slide_compact_mspace(Collector* collector)
       gc_update_weakref_ignore_finref(gc);
     }
 #endif
-    
+
+#ifdef USE_32BITS_HASHCODE
+    if(gc_match_kind(gc, FALLBACK_COLLECTION))
+      fallback_clear_fwd_obj_oi_init(collector);
+#endif
+
     last_block_for_dest = NULL;
     
     /* let other collectors go */
@@ -392,6 +436,11 @@ void slide_compact_mspace(Collector* collector)
   /* Pass 2: **************************************************
      assign target addresses for all to-be-moved objects */
   atomic_cas32( &num_repointing_collectors, 0, num_active_collectors+1);
+
+#ifdef USE_32BITS_HASHCODE
+  if(gc_match_kind(gc, FALLBACK_COLLECTION))
+    fallback_clear_fwd_obj_oi(collector);
+#endif
 
   mspace_compute_object_target(collector, mspace);
   
@@ -448,6 +497,9 @@ void slide_compact_mspace(Collector* collector)
   atomic_cas32( &num_restoring_collectors, 0, num_active_collectors+1);
   
   collector_restore_obj_info(collector);
+#ifdef USE_32BITS_HASHCODE
+  collector_attach_hashcode(collector);
+#endif
   
   old_num = atomic_inc32(&num_restoring_collectors);
   if( ++old_num == num_active_collectors ){

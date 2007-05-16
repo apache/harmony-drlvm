@@ -70,6 +70,8 @@
 
 #define GC_OBJ_SIZE_THRESHOLD (4*KB)
 
+#define USE_32BITS_HASHCODE
+
 typedef void (*TaskType)(void*);
 
 enum Collection_Algorithm{
@@ -227,6 +229,11 @@ inline void obj_unmark_in_vt(Partial_Reveal_Object *obj)
 { 
   VT vt = obj_get_vt_raw(obj);
   obj_set_vt(obj, (VT)((POINTER_SIZE_INT)vt & ~CONST_MARK_BIT));
+}
+
+inline void obj_clear_dual_bits_in_vt(Partial_Reveal_Object* p_obj){
+  VT vt = obj_get_vt_raw(p_obj);
+  obj_set_vt(p_obj,(VT)((POINTER_SIZE_INT)vt & DUAL_MARKBITS_MASK));
 }
 
 inline Boolean obj_is_marked_or_fw_in_oi(Partial_Reveal_Object *obj)

@@ -43,6 +43,9 @@ typedef struct Collector{
   
   Vector_Block* rep_set; /* repointed set */
   Vector_Block* rem_set;
+#ifdef USE_32BITS_HASHCODE
+  Vector_Block* hashcode_set;
+#endif
   
   Vector_Block *softref_set;
   Vector_Block *weakref_set;
@@ -69,6 +72,9 @@ void collector_reset(GC* gc);
 void collector_execute_task(GC* gc, TaskType task_func, Space* space);
 
 void collector_restore_obj_info(Collector* collector);
+#ifdef USE_32BITS_HASHCODE
+void collector_attach_hashcode(Collector *collector);
+#endif
 
 inline Boolean gc_collection_result(GC* gc)
 {

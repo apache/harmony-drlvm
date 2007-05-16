@@ -27,6 +27,9 @@
 #include "../thread/collector.h"
 #include "../verify/verify_live_heap.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
+#ifdef USE_32BITS_HASHCODE
+#include "hashcode.h"
+#endif
 
 static GC* p_global_gc = NULL;
 Boolean mutator_need_block;
@@ -47,10 +50,11 @@ int gc_init()
   gc_parse_options(gc);
   
   gc_tls_init();
+
+  gc_metadata_initialize(gc); /* root set and mark stack */
   
   gc_gen_initialize((GC_Gen*)gc, min_heap_size_bytes, max_heap_size_bytes);
 
-  gc_metadata_initialize(gc); /* root set and mark stack */
 #ifndef BUILD_IN_REFERENT
   gc_finref_metadata_initialize(gc);
 #endif
@@ -204,6 +208,7 @@ Managed_Object_Handle gc_get_next_live_object(void *iterator)
 unsigned int gc_time_since_last_gc()
 {  assert(0); return 0; }
 
+#ifndef USE_32BITS_HASHCODE
 #define GCGEN_HASH_MASK 0x1fc
 int32 gc_get_hashcode(Managed_Object_Handle p_object) 
 {  
@@ -225,6 +230,35 @@ int32 gc_get_hashcode(Managed_Object_Handle p_object)
    }
    return hash;
 }
+#else //USE_32BITS_HASHCODE
+int32 gc_get_hashcode(Managed_Object_Handle p_object)
+{
+  Partial_Reveal_Object* p_obj = (Partial_Reveal_Object*)p_object;
+  if(!p_obj) return 0;
+  assert(address_belongs_to_gc_heap(p_obj, p_global_gc));
+  Obj_Info_Type info = get_obj_info_raw(p_obj);
+  int hash;
+  
+  switch(info & HASHCODE_MASK){
+    case HASHCODE_SET_UNALLOCATED:
+      hash = hashcode_gen((void*)p_obj);
+      break;
+    case HASHCODE_SET_ATTACHED:
+      hash = hashcode_lookup(p_obj,info);
+      break;
+    case HASHCODE_SET_BUFFERED:
+      hash = hashcode_lookup(p_obj,info);
+      break;
+    case HASHCODE_UNSET:
+      set_obj_info(p_obj, info | HASHCODE_SET_BIT);
+      hash = hashcode_gen((void*)p_obj);
+      break;
+    default:
+      assert(0);
+  }
+  return hash;
+}
+#endif //USE_32BITS_HASHCODE
 
 void gc_finalize_on_exit()
 {

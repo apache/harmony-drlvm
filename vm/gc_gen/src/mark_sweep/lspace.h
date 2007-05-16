@@ -24,12 +24,15 @@
 #include "../common/gc_common.h"
 #include "../thread/gc_thread.h"
 #include "free_area_pool.h"
+#ifdef USE_32BITS_HASHCODE
+#include "../common/hashcode.h"
+#endif
 
 /*Fixme: This macro is for handling HEAP_NULL issues caused by JIT OPT*/
 #ifdef COMPRESS_REFERENCE
-  #define LOS_HEAD_RESERVE_FOR_HEAP_NULL (GC_BLOCK_SIZE_BYTES )
+  #define LOS_HEAD_RESERVE_FOR_HEAP_NULL ( SPACE_ALLOC_UNIT )
 #else
-  #define LOS_HEAD_RESERVE_FOR_HEAP_NULL (0*KB)
+  #define LOS_HEAD_RESERVE_FOR_HEAP_NULL ( 0*KB )
 #endif
 
 typedef struct Lspace{
@@ -80,6 +83,7 @@ inline Partial_Reveal_Object* lspace_get_next_marked_object( Lspace* lspace, uns
 {
     POINTER_SIZE_INT next_area_start = (POINTER_SIZE_INT)lspace->heap_start + (*iterate_index) * KB;
     BOOLEAN reach_heap_end = 0;
+    unsigned int hash_extend_size = 0;
 
     while(!reach_heap_end){
         //FIXME: This while shoudl be if, try it!
@@ -89,13 +93,18 @@ inline Partial_Reveal_Object* lspace_get_next_marked_object( Lspace* lspace, uns
         }
         if(next_area_start < (POINTER_SIZE_INT)lspace->heap_end){
             //If there is a living object at this addr, return it, and update iterate_index
+
+#ifdef USE_32BITS_HASHCODE
+            hash_extend_size  = (hashcode_is_attached((Partial_Reveal_Object*)next_area_start))?GC_OBJECT_ALIGNMENT:0;
+#endif
+
             if(obj_is_marked_in_vt((Partial_Reveal_Object*)next_area_start)){
-                POINTER_SIZE_INT obj_size = ALIGN_UP_TO_KILO(vm_object_size((Partial_Reveal_Object*)next_area_start));
+                POINTER_SIZE_INT obj_size = ALIGN_UP_TO_KILO(vm_object_size((Partial_Reveal_Object*)next_area_start) + hash_extend_size);
                 *iterate_index = (unsigned int)((next_area_start + obj_size - (POINTER_SIZE_INT)lspace->heap_start) >> BIT_SHIFT_TO_KILO);
                 return (Partial_Reveal_Object*)next_area_start;
             //If this is a dead object, go on to find  a living one.
             }else{
-                POINTER_SIZE_INT obj_size = ALIGN_UP_TO_KILO(vm_object_size((Partial_Reveal_Object*)next_area_start));
+                POINTER_SIZE_INT obj_size = ALIGN_UP_TO_KILO(vm_object_size((Partial_Reveal_Object*)next_area_start)+ hash_extend_size);
                 next_area_start += obj_size;
             }
         }else{

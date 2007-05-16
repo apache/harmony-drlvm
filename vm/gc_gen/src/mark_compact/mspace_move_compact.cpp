@@ -22,6 +22,9 @@
 #include "../trace_forward/fspace.h"
 #include "../mark_sweep/lspace.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
+#ifdef USE_32BITS_HASHCODE
+#include "../common/hashcode.h"
+#endif
 
 struct GC_Gen;
 Space* gc_get_nos(GC_Gen* gc);
@@ -37,12 +40,20 @@ static void mspace_move_objects(Collector* collector, Mspace* mspace)
   void* dest_sector_addr = dest_block->base;
   Boolean is_fallback = gc_match_kind(collector->gc, FALLBACK_COLLECTION);
   
+#ifdef USE_32BITS_HASHCODE
+  Hashcode_Buf* old_hashcode_buf = NULL;
+  Hashcode_Buf* new_hashcode_buf = hashcode_buf_create();
+  hashcode_buf_init(new_hashcode_buf);
+#endif  
  
   while( curr_block ){
     void* start_pos;
     Partial_Reveal_Object* p_obj = block_get_first_marked_object(curr_block, &start_pos);
 
     if( !p_obj ){
+ #ifdef USE_32BITS_HASHCODE      
+      hashcode_buf_clear(curr_block->hashcode_buf);
+ #endif
       curr_block = mspace_get_next_compact_block(collector, mspace);
       continue;    
     }
@@ -55,17 +66,30 @@ static void mspace_move_objects(Collector* collector, Mspace* mspace)
       /* we don't check if it's set, since only remaining objs from last NOS partial collection need it. */
       obj_unmark_in_oi(p_obj); 
       
+#ifdef USE_32BITS_HASHCODE
+      move_compact_process_hashcode(p_obj, curr_block->hashcode_buf, new_hashcode_buf);
+#endif 
+      
       POINTER_SIZE_INT curr_sector_size = (POINTER_SIZE_INT)start_pos - (POINTER_SIZE_INT)src_sector_addr;
 
       /* check if dest block is not enough to hold this sector. If yes, grab next one */      
       POINTER_SIZE_INT block_end = (POINTER_SIZE_INT)GC_BLOCK_END(dest_block);
       if( ((POINTER_SIZE_INT)dest_sector_addr + curr_sector_size) > block_end ){
         dest_block->new_free = dest_sector_addr; 
+#ifdef USE_32BITS_HASHCODE
+        block_swap_hashcode_buf(dest_block, &new_hashcode_buf, &old_hashcode_buf);
+#endif        
         dest_block = mspace_get_next_target_block(collector, mspace);
         if(dest_block == NULL){ 
+#ifdef USE_32BITS_HASHCODE
+          hashcode_buf_rollback_new_entry(old_hashcode_buf);
+#endif
           collector->result = FALSE; 
           return; 
         }
+#ifdef USE_32BITS_HASHCODE
+        hashcode_buf_transfer_new_entry(old_hashcode_buf, new_hashcode_buf);
+#endif 
         if((!local_last_dest) || (dest_block->block_idx > local_last_dest->block_idx))
           local_last_dest = dest_block;
         block_end = (POINTER_SIZE_INT)GC_BLOCK_END(dest_block);
@@ -85,15 +109,26 @@ static void mspace_move_objects(Collector* collector, Mspace* mspace)
 
       memmove(dest_sector_addr, src_sector_addr, curr_sector_size);
 
+#ifdef USE_32BITS_HASHCODE
+      hashcode_buf_refresh_new_entry(new_hashcode_buf, sector_distance);
+#endif
+
       dest_sector_addr = (void*)((POINTER_SIZE_INT)dest_sector_addr + curr_sector_size);
       src_sector_addr = p_obj;
       curr_sector  = OBJECT_INDEX_TO_OFFSET_TABLE(p_obj);
     }
+#ifdef USE_32BITS_HASHCODE      
+    hashcode_buf_clear(curr_block->hashcode_buf);
+ #endif    
     curr_block = mspace_get_next_compact_block(collector, mspace);
   }
   dest_block->new_free = dest_sector_addr;
   collector->cur_target_block = local_last_dest;
  
+#ifdef USE_32BITS_HASHCODE
+  old_hashcode_buf = block_set_hashcode_buf(dest_block, new_hashcode_buf);
+  hashcode_buf_destory(old_hashcode_buf);
+#endif
   return;
 }
 

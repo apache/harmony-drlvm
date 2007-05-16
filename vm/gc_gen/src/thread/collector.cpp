@@ -49,6 +49,28 @@ void collector_restore_obj_info(Collector* collector)
   }
 }
 
+#ifdef USE_32BITS_HASHCODE
+void collector_attach_hashcode(Collector *collector)
+{
+  Pool* hashcode_pool = collector->gc->metadata->collector_hashcode_pool;
+  Pool *free_pool = collector->gc->metadata->free_set_pool;
+  assert(!collector->hashcode_set);
+
+  while(Vector_Block* hashcode_block = pool_get_entry(hashcode_pool)){
+    POINTER_SIZE_INT *iter = vector_block_iterator_init(hashcode_block);
+    while(!vector_block_iterator_end(hashcode_block, iter)){
+      POINTER_SIZE_INT* obj_end_pos = (POINTER_SIZE_INT*)*iter;
+      iter = vector_block_iterator_advance(hashcode_block, iter);
+      POINTER_SIZE_INT hashcode = *iter;
+      iter = vector_block_iterator_advance(hashcode_block, iter);
+      *obj_end_pos = hashcode;
+    }
+    vector_block_clear(hashcode_block);
+    pool_put_entry(free_pool, hashcode_block);
+  }
+}
+#endif
+
 static void collector_reset_thread(Collector *collector) 
 {
   collector->task_func = NULL;

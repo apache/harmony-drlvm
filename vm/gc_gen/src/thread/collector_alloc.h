@@ -22,6 +22,9 @@
 #define _COLLECTOR_ALLOC_H_
 
 #include "gc_thread.h"
+#ifdef USE_32BITS_HASHCODE
+#include "../common/hashcode.h"
+#endif
 
 void* mos_alloc(unsigned size, Allocator *allocator);
 
@@ -37,6 +40,11 @@ FORCE_INLINE Partial_Reveal_Object* collector_forward_object(Collector* collecto
   
   /* otherwise, try to alloc it. mos should always has enough space to hold nos during collection */
   unsigned int size = vm_object_size(p_obj);
+  
+#ifdef USE_32BITS_HASHCODE
+  Boolean obj_is_set_hashcode = hashcode_is_set(p_obj);
+  if(obj_is_set_hashcode) size += GC_OBJECT_ALIGNMENT;
+#endif
 
   Partial_Reveal_Object* p_targ_obj = thread_local_alloc(size, (Allocator*)collector);
   if(!p_targ_obj)
@@ -60,8 +68,16 @@ FORCE_INLINE Partial_Reveal_Object* collector_forward_object(Collector* collecto
     return NULL;
   }
 
-  /* we forwarded the object */
+#ifdef USE_32BITS_HASHCODE
+  if(obj_is_set_hashcode){
+    memcpy(p_targ_obj, p_obj, size-GC_OBJECT_ALIGNMENT);
+    oi = trace_forward_process_hashcode(p_targ_obj, p_obj ,oi, size);
+  }else{
+    memcpy(p_targ_obj, p_obj, size);    
+  }
+#else
   memcpy(p_targ_obj, p_obj, size);
+#endif //USE_32BITS_HASHCODE
 
   /* we need clear the bit to give major collection a clean status. */
   if(gc_is_gen_mode())
@@ -72,6 +88,11 @@ FORCE_INLINE Partial_Reveal_Object* collector_forward_object(Collector* collecto
   else
     set_obj_info(p_targ_obj, oi|FLIP_MARK_BIT);
 
+#else
+#ifdef USE_32BITS_HASHCODE
+  else if(obj_is_set_hashcode) 
+    set_obj_info(p_targ_obj, oi);
+#endif
 #endif
 
   return p_targ_obj;  

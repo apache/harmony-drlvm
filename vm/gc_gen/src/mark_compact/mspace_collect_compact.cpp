@@ -38,6 +38,14 @@ void mspace_update_info_for_los_extension(Mspace *mspace)
   POINTER_SIZE_INT tune_size = tuner->tuning_size;
   unsigned int tune_blocks = (unsigned int)(tune_size >> GC_BLOCK_SHIFT_COUNT);
 
+#ifdef USE_32BITS_HASHCODE
+  unsigned int index = 0;
+  for(; index < tune_blocks; index++){
+    Block* curr_block = &mspace->blocks[index];
+    hashcode_buf_destory(((Block_Header*)curr_block)->hashcode_buf);
+  }
+#endif
+
   mspace->blocks = &mspace->blocks[tune_blocks];
   mspace->heap_start = mspace->blocks;
   mspace->committed_heap_size -= tune_size;
@@ -210,6 +218,9 @@ void gc_init_block_for_collectors(GC* gc, Mspace* mspace)
         curr_block->new_free = curr_block->free;
         curr_block->ceiling = (void*)((POINTER_SIZE_INT)curr_block->base + GC_BLOCK_BODY_SIZE_BYTES);
         curr_block->status = BLOCK_COMPACTED;
+#ifdef USE_32BITS_HASHCODE
+        curr_block->hashcode_buf = hashcode_buf_create();
+#endif
         last_block->next = curr_block;
         last_block = curr_block;
     }
@@ -218,7 +229,11 @@ void gc_init_block_for_collectors(GC* gc, Mspace* mspace)
     Collector* collector = gc->collectors[0];
     collector->cur_target_block = los_trans_fake_blocks;
     collector->cur_target_block->status = BLOCK_TARGET;
-    collector->cur_compact_block = mos_first_block;
+    if(trans_blocks >= gc->num_active_collectors)
+      collector->cur_compact_block = mos_first_block;
+    else
+      collector->cur_compact_block = los_trans_fake_blocks;
+            
     collector->cur_compact_block->status = BLOCK_IN_COMPACT;
     
     for(i=1; i< gc->num_active_collectors; i++){
@@ -383,6 +398,7 @@ void mspace_collection(Mspace* mspace)
 
   return;  
 } 
+
 
 
 

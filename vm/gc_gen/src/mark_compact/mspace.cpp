@@ -24,6 +24,9 @@
 
 static void mspace_destruct_blocks(Mspace* mspace)
 {   
+#ifdef USE_32BITS_HASHCODE
+  space_desturct_blocks((Blocked_Space*)mspace);
+#endif
   return;
 }
 
@@ -172,5 +175,6 @@ POINTER_SIZE_INT mspace_get_expected_threshold(Mspace* mspace)
 {
     return mspace->expected_threshold;
 }
+
 
 
