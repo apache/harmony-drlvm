@@ -154,20 +154,23 @@ POINTER_SIZE_INT String_Pool::hash_it(const char * s, size_t len) {
 
 POINTER_SIZE_INT String_Pool::hash_it_unaligned(const char * s, size_t len) {
     POINTER_SIZE_INT h1 = 0, h2 = 0;
+    POINTER_SIZE_INT val, val0, val1, val2, val3, val4, val5, val6, val7;
     const size_t parts = len / sizeof(POINTER_SIZE_INT);
 
     // ATTENTION! we got here with unaligned s!
 
     for (size_t i = 0; i < parts; i++) {
 #ifdef _IPF_ /* 64 bit and little endian */
-        h1 +=  (POINTER_SIZE_INT) s[i * 8  + 0]
-            + ((POINTER_SIZE_INT)s[i * 8 + 1] << 8)
-            + ((POINTER_SIZE_INT)s[i * 8 + 2] << 16)
-            + ((POINTER_SIZE_INT)s[i * 8 + 3] << 24)
-            + ((POINTER_SIZE_INT)s[i * 8 + 4] << 32)
-            + ((POINTER_SIZE_INT)s[i * 8 + 5] << 40)
-            + ((POINTER_SIZE_INT)s[i * 8 + 6] << 48)
-            + ((POINTER_SIZE_INT)s[i * 8 + 7] << 56);
+        val0 = (POINTER_SIZE_INT)(unsigned char)(s[i * 8 + 0]);
+        val1 = ((POINTER_SIZE_INT)(unsigned char)(s[i * 8 + 1])) << 8;
+        val2 = ((POINTER_SIZE_INT)(unsigned char)(s[i * 8 + 2])) << 16;
+        val3 = ((POINTER_SIZE_INT)(unsigned char)(s[i * 8 + 3])) << 24;
+        val4 = ((POINTER_SIZE_INT)(unsigned char)(s[i * 8 + 4])) << 32;
+        val5 = ((POINTER_SIZE_INT)(unsigned char)(s[i * 8 + 5])) << 40;
+        val6 = ((POINTER_SIZE_INT)(unsigned char)(s[i * 8 + 6])) << 48;
+        val7 = ((POINTER_SIZE_INT)(unsigned char)(s[i * 8 + 7])) << 56;
+        val = val0 + val1 + val2 + val3 + val4 + val5 + val6 + val7;
+        h1 += val;
 #else /* also unaligned load */
         h1 += *((POINTER_SIZE_INT *)s + i);
 #endif
