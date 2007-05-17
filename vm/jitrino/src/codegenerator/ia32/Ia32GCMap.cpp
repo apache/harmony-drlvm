@@ -113,13 +113,13 @@ static bool isUnmanagedFieldPtr(Opnd* opnd) {
     return field_is_magic(field->getFieldHandle());
 }
 
-static void checkManaged2UnmanagedConv(IRManager& irm, Opnd* opnd, Inst* skipInst) {
+static void checkManaged2UnmanagedConv(IRManager& irm, Opnd* opnd) {
     const Nodes& nodes = irm.getFlowGraph()->getNodes();
     for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
         Node* node = *it;
         if (node->isBlockNode()) {
             for (Inst* inst = (Inst*)node->getLastInst(); inst!=NULL; inst = inst->getPrevInst()) {
-                if (inst->getMnemonic() != Mnemonic_MOV || inst == skipInst) {
+                if (inst->getMnemonic() != Mnemonic_MOV) {
                     continue;
                 }
                 Opnd* op0 = inst->getOpnd(0);
@@ -168,9 +168,8 @@ void  GCMap::registerGCSafePoint(IRManager& irm, const BitSet& ls, Inst* inst) {
     for (int i = liveOpnds.getNext(); i != -1; i = liveOpnds.getNext()) {
         Opnd* opnd = irm.getOpnd(i);
 #ifdef _DEBUG
-        if (opnd->getType()->isUnmanagedPtr()) {
-            Inst* skipInst= opnd == callRes ? inst : NULL; // skip this call from the check if opnd is the result of the call
-            checkManaged2UnmanagedConv(irm, opnd, skipInst);
+        if (opnd->getType()->isUnmanagedPtr() && opnd != callRes ) {
+            checkManaged2UnmanagedConv(irm, opnd);
         }
 #endif
         
