@@ -58,9 +58,10 @@ public final class VMStack {
      * Collects and returns the stack of the current thread as an array of
      * classes. Resulting array should contain maxSize elements at the maximum.
      * Note that reflection stack frames should not be taken into account. The
-     * caller of the caller of this method is stored as a first element of the
-     * array. If considerPrivileged is true then the last element of the array
-     * should be the caller of the most recent privileged method.  
+     * caller of the caller of the caller of this method is stored as a first
+     * element of the array. If considerPrivileged is true then the last
+     * element of the array should be the caller of the most recent privileged
+     * method.  
      * <p>
      * This method may be used by security checks implementation. It is not
      * supposed to be used by Throwable class.

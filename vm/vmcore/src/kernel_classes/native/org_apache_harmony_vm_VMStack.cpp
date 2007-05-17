@@ -117,9 +117,9 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getClasses
     StackTraceFrame* frames;
     st_get_trace(get_thread_ptr(), &size, &frames);
 
-    // The caller of the caller of this method is stored as a first element of the array.
-    // For details look at the org/apache/harmony/vm/VMStack.java file. Thus skipping 2 frames.
-    unsigned skip = 2;
+    // The caller of the caller of the caller of this method is stored as a first element of the array.
+    // For details look at the org/apache/harmony/vm/VMStack.java file. Thus skipping 3 frames.
+    unsigned skip = 3;
 
     Global_Env* genv = jni_get_vm_env(jenv);
 
