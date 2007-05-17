@@ -22,5 +22,5 @@ java/lang/ThreadTest.java
 java/lang/RuntimeTest.java
 java/lang/RuntimeTest2.java
 
-# IpfCodeSelector.h line 317 pseudoInst INSTRUCTION NOT IMPLEMENTED
 java/lang/ThreadRTest.java
+java/lang/SystemExtensionTest.java
