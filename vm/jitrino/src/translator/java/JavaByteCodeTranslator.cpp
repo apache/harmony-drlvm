@@ -3161,6 +3161,7 @@ JavaByteCodeTranslator::genArrayCopy(MethodDesc * methodDesc,
     irBuilder.genStVar(dstPosVar, dstPosOpnd);
 
     // back edge
+    irBuilder.genPseudoThrow();
     irBuilder.genJump(loopHead);
     
     }   // End of Direct Copying
@@ -3221,6 +3222,7 @@ JavaByteCodeTranslator::genArrayCopy(MethodDesc * methodDesc,
     irBuilder.genStVar(dstPosVar, dstPosOpnd);
 
     // back edge
+    irBuilder.genPseudoThrow();
     irBuilder.genJump(loopHead);
 
     }   // End of Reverse Copying

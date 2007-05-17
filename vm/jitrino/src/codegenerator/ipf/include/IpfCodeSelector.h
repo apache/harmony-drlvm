@@ -314,7 +314,7 @@ public:
     CG_OpndHandle* arraycopy(unsigned int, CG_OpndHandle**);
     CG_OpndHandle* addElemIndexWithLEA(Type*, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("addElemIndexWithLEA") }
     CG_OpndHandle* ldRef(Type*, MethodDesc*, unsigned int, bool); 
-    void           pseudoInst()                                               { NOT_IMPLEMENTED_V("pseudoInst") }
+    void           pseudoInst()                                               {}
     void           methodEntry(MethodDesc*);
     void           methodEnd(MethodDesc*, CG_OpndHandle*);
     void           tau_stRef(CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*, Type::Tag, bool, CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_V("tau_stRef") }
