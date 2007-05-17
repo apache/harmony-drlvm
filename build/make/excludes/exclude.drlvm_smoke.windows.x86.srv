@@ -6,3 +6,4 @@ io/Integers.java
 
 # HARMONY-3731
 exception/FinalizeStackTest.java
+StackTest.java
