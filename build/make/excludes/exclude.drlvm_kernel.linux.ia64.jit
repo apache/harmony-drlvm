@@ -9,6 +9,8 @@ java/lang/RuntimeAdditionalTest40.java
 java/lang/RuntimeAdditionalTest41.java
 java/lang/RuntimeAdditionalTest42.java
 
+# HARMONY-3905
+java/lang/ClassAnnotationsTest.java
 
 #################################
 ######## to be analyzed #########
