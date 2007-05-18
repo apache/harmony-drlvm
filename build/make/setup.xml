@@ -185,10 +185,18 @@
         <property name="common.resources" value="LOG4CXX,CPPTASKS,XALAN,VM,ANTLR,PATCHES,JASMIN,VMMAGIC" />
         <property name="build.resources" value="CPPTASKS" />
         <if>
-            <isset property="if.lnx" />
+            <isset property="if.unix" />
             <then>
-                <property name="build.os.short" value="lnx" />
                 <property name="os.resources" value="APR,APRUTIL,APRICONV" />
+                <if>
+                    <isset property="if.lnx" />
+                    <then>
+                        <property name="build.os.short" value="lnx" />
+                    </then>
+                    <else>
+                        <property name="build.os.short" value="macosx" />
+                    </else>
+                </if>
             </then>
             <else>
                 <property name="build.os.short" value="win" />

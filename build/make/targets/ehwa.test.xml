@@ -27,6 +27,9 @@
     <condition property="os" value="linux">
         <os name="linux" />
     </condition>
+    <condition property="os" value="macosx">
+        <os name="mac os x" />
+    </condition>
     <condition property="arch" value="x86_64">
         <or>
             <equals arg1="x86_64" arg2="${os.arch}"/>
@@ -41,6 +44,12 @@
     </condition>
     <condition property="arch" value="ia64">
         <equals arg1="ia64" arg2="${os.arch}"/>
+    </condition>
+    <condition property="arch" value="ppc32">
+        <or>
+            <equals arg1="${os.arch}" arg2="ppc32" />
+            <equals arg1="${os.arch}" arg2="ppc" />
+        </or>
     </condition>
 
     <propertycopy name="eclipse.url" from="eclipse.${os}.${arch}.url"/>
