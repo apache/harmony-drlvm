@@ -427,9 +427,10 @@ void ClassLoader::SuccessLoadingClass(const String* className)
 {
     LMAutoUnlock aulock( &m_lock );
     LoadingClass* lc = m_loadingClasses->Lookup(className);
-    assert(lc);
-    lc->SignalLoading();
-    RemoveLoadingClass(className, lc);
+    if (lc) {
+        lc->SignalLoading();
+        RemoveLoadingClass(className, lc);
+    }
 }
 
 ClassLoader* ClassLoader::FindByObject(ManagedObject* loader)
