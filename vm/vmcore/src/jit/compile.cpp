@@ -44,6 +44,7 @@
 
 #include "vm_stats.h"
 #include "dump.h"
+#include "port_threadunsafe.h"
 
 extern bool parallel_jit;
 
@@ -658,8 +659,11 @@ JIT_Result compile_do_compilation_jit(Method* method, JIT* jit)
 
     TRACE("compile_do_compilation_jit(): returned from jit->compile_method_with_params() for method " << method );
 
-    // Convertion from microseconds to milliseconds
+    UNSAFE_REGION_START
+    // Non-atomic increment of statistic counter
+    // Conversion from microseconds to milliseconds
     vm_env->total_compilation_time += ((apr_time_now() - start)/1000);
+    UNSAFE_REGION_END
 
     if (JIT_SUCCESS != res) {
         if (!parallel_jit) {

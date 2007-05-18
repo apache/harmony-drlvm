@@ -41,6 +41,7 @@
 #include "compiler.h"
 #include "trace.h"
 #include "stats.h"
+#include "port_threadunsafe.h"
 
 #include <stack>
 using std::stack;
@@ -110,8 +111,14 @@ JIT_Result Compiler::compile(Compile_Handle ch, Method_Handle method,
     assert(!method_is_native(method) && 
            "VM must not try to compile native method!");
     
+    UNSAFE_REGION_START
+    // Non-atomic increment of compiled method counter.
+    // May affect accuracy of JIT logging or a special debug mode 
+    // when a user specifies which range of methods accept/reject from compilation.
+    // Can't affect default JET execution mode.
     STATS_SET_NAME_FILER(NULL);
     m_methID = ++methodsSeen;
+    UNSAFE_REGION_END
     
     unsigned compile_flags = defaultFlags;
     initProfilingData(&compile_flags);

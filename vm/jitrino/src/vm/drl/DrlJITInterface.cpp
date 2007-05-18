@@ -45,6 +45,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "port_threadunsafe.h"
 
 #if !defined(_IPF_) // No .JET on IPF yet
     #define USE_FAST_PATH
@@ -248,7 +249,11 @@ JIT_compile_method_with_params(JIT_Handle jit, Compile_Handle compilation,
     compilationInterface.setCompilationContext(&cs);
 
     static int method_seqnb = 0;
+    UNSAFE_REGION_START
+    // Non-atomic increment of compiled method counter,
+    // may affect accuracy of JIT logging but don't affect JIT functionality
     int current_nb = method_seqnb++;
+    UNSAFE_REGION_END
     MethodDesc* md = compilationInterface.getMethodToCompile();
     const char* methodTypeName = md->getParentType()->getName();
     const char* methodName = md->getName();
