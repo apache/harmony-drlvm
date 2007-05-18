@@ -154,8 +154,11 @@ POINTER_SIZE_INT String_Pool::hash_it(const char * s, size_t len) {
 
 POINTER_SIZE_INT String_Pool::hash_it_unaligned(const char * s, size_t len) {
     POINTER_SIZE_INT h1 = 0, h2 = 0;
-    POINTER_SIZE_INT val, val0, val1, val2, val3, val4, val5, val6, val7;
     const size_t parts = len / sizeof(POINTER_SIZE_INT);
+
+#ifdef _IPF_ /* 64 bit and little endian */
+    POINTER_SIZE_INT val, val0, val1, val2, val3, val4, val5, val6, val7;
+#endif
 
     // ATTENTION! we got here with unaligned s!
 
