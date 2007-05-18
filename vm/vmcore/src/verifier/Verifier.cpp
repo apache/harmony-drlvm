@@ -90,27 +90,20 @@ const char *vf_opcode_names[256] = {
 static vf_Result
 vf_verify_method_bytecode( vf_Context *ctx )    // verification context
 {
-    vf_Result result = VER_OK;
-
     VF_TRACE( "method", VF_REPORT_CTX( ctx ) << "verifying method" );
 
-    /**
-     * Set method for type pool
-     */
-    ctx->m_type->SetMethod( ctx->m_method );
+    // set method for type pool
+    ctx->m_type->SetMethod( ctx );
 
-    // get method signature
-    const char *descr = method_get_descriptor( ctx->m_method );
-
-    // parse method signature
-    vf_parse_description( descr, &ctx->m_method_inlen,
+    // parse method descriptor
+    vf_parse_description( ctx->m_descriptor, &ctx->m_method_inlen,
                           &ctx->m_method_outlen );
-    vf_set_description_vector( descr, ctx->m_method_inlen, 0,
+    vf_set_description_vector( ctx->m_descriptor, ctx->m_method_inlen, 0,
                                ctx->m_method_outlen, &ctx->m_method_invector,
                                &ctx->m_method_outvector, ctx );
 
     // parse bytecode, fill instruction instr
-    result = vf_parse_bytecode( ctx );
+    vf_Result result = vf_parse_bytecode( ctx );
     if( VER_OK != result ) {
         goto labelEnd_verifyClassBytecode;
     }
@@ -4893,8 +4886,7 @@ vf_dump_bytecode( vf_ContextHandle ctx )        // verification context
     VF_DEBUG
         ( "======================== VERIFIER METHOD DUMP ========================" );
     VF_DEBUG( "Method: " << class_get_name( ctx->m_class )
-              << "." << method_get_name( ctx->m_method )
-              << method_get_descriptor( ctx->m_method ) << endl );
+              << "." << ctx->m_name << ctx->m_descriptor << endl );
     VF_DEBUG( "0 [-]: -> START-ENTRY" );
 
     unsigned short handler_count = ctx->m_handlers;

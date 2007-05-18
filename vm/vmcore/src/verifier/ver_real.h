@@ -109,9 +109,10 @@ using namespace std;
 }
 
 /** Dump a current class and method. */
-#define VF_REPORT_CTX( ctx ) "(class: " << class_get_name( (ctx)->m_class ) \
-    << ", method: " << method_get_name( (ctx)->m_method ) \
-    << method_get_descriptor( (ctx)->m_method ) << ") "
+#define VF_REPORT_CTX( ctx ) \
+    "(class: " << class_get_name( (ctx)->m_class )              \
+    << ", method: " << (ctx)->m_name << (ctx)->m_descriptor     \
+    << ") "
 
 /** Report a verification error. */
 #define VF_REPORT( ctx, error_message ) \
@@ -682,12 +683,14 @@ struct vf_Hash
  */
 struct vf_TypeConstraint
 {
-    const char *m_source;       ///< constraint source class name
-    const char *m_target;       ///< constraint target class name
-    method_handler m_method;    ///< constraint for method
-    vf_TypeConstraint *m_next;  ///< next constraint
-    unsigned short m_index;     ///< constant pool index
-    unsigned short m_check_type;        ///< constraint check type @see vf_CheckConstraint
+    const char *m_source;           ///< constraint source class name
+    const char *m_target;           ///< constraint target class name
+    method_handler m_method;        ///< constraint for method
+    const char *m_name;             ///< constraint method name
+    const char *m_descriptor;       ///< constraint method descriptor
+    vf_TypeConstraint *m_next;      ///< next constraint
+    unsigned short m_index;         ///< constant pool index
+    unsigned short m_check_type;    ///< constraint check type @see vf_CheckConstraint
 };
 
 /**
@@ -706,7 +709,7 @@ struct vf_TypePool
      * Type constraint collection destructor.
      * @note Function release memory for collection memory pool and hash table.
      */
-               ~vf_TypePool ();
+    ~vf_TypePool ();
 
     /**
      * Function creates valid type which is identical to given class.
@@ -767,9 +770,9 @@ struct vf_TypePool
 
     /**
      * Sets current context method.
-     * @param method - current context method
+     * @param ctx - current verifier context
      */
-    void SetMethod( method_handler method );
+    void SetMethod( vf_ContextHandle ctx );
 
     /**
      * Sets restriction from target class to source class.
@@ -788,6 +791,8 @@ struct vf_TypePool
     vf_Pool *m_pool;            ///< collection memory pool
     vf_Hash *m_Hash;            ///< hash table
     method_handler m_method;    ///< current context method
+    const char *m_name;         ///< current context method name
+    const char *m_descriptor;   ///< current context method descriptor
     vf_TypeConstraint *m_restriction;   ///< array of the class constraints
 };                              // vf_TypePool
 
@@ -807,8 +812,9 @@ struct vf_Context
      * Verifier context constructor
      */
     vf_Context ():m_class( NULL ), m_type( NULL ), m_error( NULL ),
-        m_method( NULL ), m_graph( NULL ), m_pool( NULL ), m_instr( NULL ),
-        m_last_instr( NULL ), m_retnum( 0 ), m_verify_all( false )
+        m_method( NULL ), m_name(NULL), m_descriptor(NULL), m_graph( NULL ),
+        m_pool( NULL ), m_instr( NULL ), m_last_instr( NULL ), m_retnum( 0 ),
+        m_verify_all( false )
     {
         vf_ContextVType zero2 = { 0 };
         m_vtype = zero2;
@@ -816,7 +822,10 @@ struct vf_Context
 
     void SetMethod( method_handler method )
     {
+        assert(method);
         m_method = method;
+        m_name = method_get_name(method);
+        m_descriptor = method_get_descriptor(method);
 
         // get method parameters
         m_len = method_get_code_length( method );
@@ -828,8 +837,7 @@ struct vf_Context
         m_maxstack = method_get_max_stack( method );
 
         // cache in the context if the method is a constructor
-        m_is_constructor =
-            memcmp( method_get_name( method ), "<init>", 7 ) == 0;
+        m_is_constructor = (memcmp( m_name, "<init>", 7 ) == 0);
     }
 
     /**
@@ -851,6 +859,8 @@ struct vf_Context
     void ClearContext()
     {
         m_method = NULL;
+        m_name = NULL;
+        m_descriptor = NULL;
         m_is_constructor = false;
         m_graph = NULL;
         m_instr = NULL;
@@ -871,29 +881,32 @@ struct vf_Context
     vf_BCode *m_bc;             ///< bytecode to instruction mapping
     unsigned m_retnum;          ///< a number of <code>ret</code>s
 
-    /**
-     * Cached method info.
-     */
+    // Cached method info.
     class_handler m_class;      ///< a context class
     method_handler m_method;    ///< a context method
+    const char *m_name;         ///< a context method name
+    const char *m_descriptor;   ///< a context method descriptor
     unsigned m_len;             ///< bytecode length
     unsigned char *m_bytes;     ///< bytecode location
     unsigned short m_handlers;  ///< a number of exception handlers
     unsigned short m_maxstack;  ///< max stack length
     unsigned short m_maxlocal;  ///< max local number
     bool m_is_constructor;      ///< <code>true</code> if the
-    ///< method is a constructor
+                                ///< method is a constructor
 
-    vf_SubContext *m_sub_ctx;   ///< aggregate subroutine info
-    vf_MapVector *m_map;        ///< a stack map for control flow analysis,
-    ///< vectors themselves are allocated from the graph pool
+    // Subrotine info
+    vf_SubContext *m_sub_ctx;           ///< aggregate subroutine info
+    vf_MapVector *m_map;                ///< a stack map for control flow
+                                        ///< analysis, vectors themselves are
+                                        ///< allocated from the graph pool
     vf_MapEntry *m_method_invector;     ///< method parameters
     unsigned short m_method_inlen;      ///< a length of <code>m_method_invector</code>
     vf_MapEntry *m_method_outvector;    ///< method return value
     unsigned short m_method_outlen;     ///< a length of <code>m_method_outvector</code>
 
+    // Data flow analisys info
     vf_MapEntry *m_buf;         ///< used to store intermediate stack states
-    ///< during data flow analysis
+                                ///< during data flow analysis
 
     bool m_verify_all;          ///< if <code>true</code> need to verify more checks
 
@@ -902,11 +915,11 @@ struct vf_Context
      */
     struct vf_ContextVType
     {
-        vf_ValidType *m_class;  ///< a given class
+        vf_ValidType *m_class;          ///< a given class
         vf_ValidType *m_throwable;      ///< java/lang/Throwable
-        vf_ValidType *m_object; ///< java/lang/Object
-        vf_ValidType *m_array;  ///< [Ljava/lang/Object;
-        vf_ValidType *m_clone;  ///< java/lang/Cloneable
+        vf_ValidType *m_object;         ///< java/lang/Object
+        vf_ValidType *m_array;          ///< [Ljava/lang/Object;
+        vf_ValidType *m_clone;          ///< java/lang/Cloneable
         vf_ValidType *m_serialize;      ///< java/io/Serializable
     } m_vtype;
 

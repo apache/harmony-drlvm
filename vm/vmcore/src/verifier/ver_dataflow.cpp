@@ -78,6 +78,9 @@ vf_dump_vector_entry( vf_MapEntry *entry,       // stack map entry
             *stream << " [THIS]";
         }
         break;
+    case SM_RETURN_ADDR:
+        *stream << " [RT " << entry->m_pc % 10 << "]";
+        break;
     case SM_ANY:
         *stream << " [ANY ]";
         break;
@@ -834,6 +837,7 @@ vf_check_instruction_in_vector( vf_MapEntry *stack,     // stack map vector
                                << entry->m_local );
                 }
                 if( !ctx->m_error ) {
+            result = vf_check_entry_refs( entry, vector, local_init, ctx );
                     VF_REPORT( ctx, "Data flow analysis error" );
                 }
                 return result;
@@ -1030,10 +1034,10 @@ vf_set_node_out_vector( vf_NodeHandle node,     // a graph node
         }
         VF_DUMP( DUMP_INSTR_MAP, {
                  // dump instruction OUT vector
-                 cerr << "-------------- instruction #" << ( instr -
-                                                             node->
-                                                             m_start ) <<
-                 ", node #" << node->m_nodecount << " out: " << endl;
+                 cerr << "-------------- instruction #"
+                     << ( instr - node->m_start )
+                     << ", node #" << ctx->m_graph->GetNodeNum(node)
+                     << " out: " << endl;
                  vf_dump_vector( invector, instr, &cerr );}
          );
     }
@@ -1068,8 +1072,8 @@ vf_create_node_vectors( vf_NodeHandle node,     // a graph node
 
     VF_DUMP( DUMP_NODE_MAP, {
              // dump node number
-             cerr << endl << "-------------- Node #" << node->
-             m_nodecount << endl;
+             cerr << endl << "-------------- Node #"
+                 << ctx->m_graph->GetNodeNum(node) << endl;
              // dump in vector
              cerr << "IN vector :" << endl;
              vf_dump_vector( incoming, NULL, &cerr );} );
@@ -1095,8 +1099,9 @@ vf_create_node_vectors( vf_NodeHandle node,     // a graph node
     }
     VF_DUMP( DUMP_NODE_MAP, {
              // dump out vector
-             cerr << "-------------- Node #" << node->m_nodecount
-             << endl << "OUT vector:" << endl;
+             cerr << "-------------- Node #"
+                 << ctx->m_graph->GetNodeNum(node)
+                 << endl << "OUT vector:" << endl;
              vf_dump_vector( outcoming, NULL, &cerr );}
      );
 
@@ -1193,7 +1198,7 @@ vf_check_node_data_flow( vf_NodeHandle node,    // a graph node
             VF_DUMP( DUMP_MERGE_MAP, if( is_changed ) {
                      // dump out vectors
                      cerr << "============== merge IN vector for Node #"
-                     << outnode->m_nodecount << endl;
+                     << ctx->m_graph->GetNodeNum(outnode) << endl;
                      cerr << "IN vectors:" << endl;
                      cerr << "1: --------------" << endl;
                      vf_dump_vector( incoming, NULL, &cerr );
@@ -1203,7 +1208,8 @@ vf_check_node_data_flow( vf_NodeHandle node,    // a graph node
                      cerr << "result: --------------" << endl;
                      vf_dump_vector( outnode_vector, NULL, &cerr );
                      cerr << "### Recount from " << *node_count
-                     << " (now " << node->m_nodecount << ")" << endl;}
+                     << " (now " << ctx->m_graph->GetNodeNum(node)
+                     << ")" << endl;}
              );
         }
     }

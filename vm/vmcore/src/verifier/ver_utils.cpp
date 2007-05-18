@@ -230,8 +230,8 @@ inline vf_HashEntry *vf_Hash::NewHashEntry( const char *key,    // hash key
 /**
  * Type constraint collection constructor.
  */
-vf_TypePool::vf_TypePool ():m_method( NULL ),
-m_restriction( NULL )
+vf_TypePool::vf_TypePool ()
+    : m_method( NULL ), m_name(NULL), m_descriptor(NULL), m_restriction(NULL)
 {
     m_pool = vf_create_pool();
     m_Hash = new vf_Hash ( m_pool );
@@ -334,11 +334,10 @@ void vf_TypePool::DumpTypeConstraints( ostream *out )   // output stream
     for( vf_TypeConstraint *constraint = m_restriction;
          constraint; constraint = constraint->m_next ) {
         *out << "CONSTRAINT: have \""
-            << constraint->m_source << "\" need \"" << constraint->
-            m_target << "\" for method " <<
-            class_get_name( method_get_class( m_method ) ) << "." <<
-            method_get_name( m_method ) << method_get_descriptor( m_method )
-            << endl;
+            << constraint->m_source << "\" need \""
+            << constraint->m_target << "\" for method "
+            << class_get_name( method_get_class( m_method ) ) << "."
+            << m_name << m_descriptor << endl;
     }
 }                               // vf_TypePool::DumpTypeConstraints
 
@@ -353,10 +352,12 @@ inline vf_TypeConstraint *vf_TypePool::GetClassConstraint()
 /**
  * Sets current context method.
  */
-void vf_TypePool::SetMethod( method_handler method )
+void vf_TypePool::SetMethod( vf_ContextHandle ctx )
 {
-    // set method
-    m_method = method;
+    // set method context
+    m_method = ctx->m_method;
+    m_name = ctx->m_name;
+    m_descriptor = ctx->m_descriptor;
 }                               // vf_TypePool::SetMethod
 
 /**
@@ -390,24 +391,24 @@ void vf_TypePool::SetRestriction( const char *target,   // target class name
     restriction->m_index = index;
     restriction->m_check_type = check_type;
     restriction->m_method = m_method;
+    restriction->m_name = m_name;
+    restriction->m_descriptor = m_descriptor;
     restriction->m_next = m_restriction;
     m_restriction = restriction;
 
     // trace restriction
     if( index ) {
         VF_TRACE( "constraint", "CONSTRAINT: for class \""
-                  << class_get_name( method_get_class( m_method ) ) <<
-                  "\" CP index #" << index << " check access: have \"" <<
-                  source << "\" need \"" << target << "\" for method " <<
-                  class_get_name( method_get_class( m_method ) ) << "." <<
-                  method_get_name( m_method ) <<
-                  method_get_descriptor( m_method ) );
+                  << class_get_name( method_get_class( m_method ) )
+                  << "\" CP index #" << index << " check access: have \""
+                  << source << "\" need \"" << target << "\" for method "
+                  << class_get_name( method_get_class( m_method ) ) << "."
+                  << m_name << m_descriptor );
     } else {
         VF_TRACE( "constraint", "CONSTRAINT: have \""
                   << source << "\" need \"" << target << "\" for method "
                   << class_get_name( method_get_class( m_method ) ) << "."
-                  << method_get_name( m_method ) <<
-                  method_get_descriptor( m_method ) );
+                  << m_name << m_descriptor );
     }
 }                               // vf_TypePool::SetRestriction
 
@@ -631,7 +632,10 @@ vf_set_class_constraint( vf_TypeConstraint *collection, // constraint for the cl
         // create entry in string pool for checked class
         hash_entry = hash->NewHashEntry( restriction->m_source );
         constraint->m_source = hash_entry->key;
-        constraint->m_method = restriction->m_method;
+        // set only method name and descriptor due to
+        // method handle could be changed during class preparation phase
+        constraint->m_name = restriction->m_name;
+        constraint->m_descriptor = restriction->m_descriptor;
         constraint->m_check_type = restriction->m_check_type;
         constraint->m_next = save_collection;
         save_collection = constraint;
@@ -1227,10 +1231,8 @@ vf_check_access_constraint( const char *super_name,     // name of super class
         if( !field ) {
             // NoSuchFieldError or IllegalAccessError - nothing to check
             VF_DEBUG( "verifying class " << class_get_name( ctx->m_class )
-                      << " (method " << method_get_name( ctx->m_method )
-                      << method_get_descriptor( ctx->m_method )
-                      <<
-                      ") couldn't resolve field with constant pool index #"
+                      << " (method " << ctx->m_name << ctx->m_descriptor
+                      << ") couldn't resolve field with constant pool index #"
                       << index );
             return VER_OK;
         }
@@ -1242,10 +1244,8 @@ vf_check_access_constraint( const char *super_name,     // name of super class
         if( !method || method_is_static( method ) ) {
             // NoSuchMethodError or IllegalAccessError - nothing to check
             VF_DEBUG( "verifying class " << class_get_name( ctx->m_class )
-                      << " (method " << method_get_name( ctx->m_method )
-                      << method_get_descriptor( ctx->m_method )
-                      <<
-                      ") couldn't resolve method with constant pool index #"
+                      << " (method " << ctx->m_name << ctx->m_descriptor
+                      << ") couldn't resolve method with constant pool index #"
                       << index );
             return VER_OK;
         }
@@ -1292,7 +1292,8 @@ vf_check_class_constraints( vf_Context *ctx )   // verification context
     for( vf_TypeConstraint *constraint = collection;
          constraint; constraint = constraint->m_next ) {
         // set context method
-        ctx->SetMethod( constraint->m_method );
+        // FIXME - need set method to context?
+        //ctx->SetMethod( constraint->m_method );
 
         // check constraint
         vf_Result result = vf_check_constraint( constraint, ctx );
@@ -1307,6 +1308,10 @@ vf_check_class_constraints( vf_Context *ctx )   // verification context
             // return error
             return result;
         } else {
+            // these constraints should be checked at the first time
+            assert(constraint->m_check_type != VF_CHECK_ACCESS_FIELD);
+            assert(constraint->m_check_type != VF_CHECK_ACCESS_METHOD);
+
             // set the last constraint
             last = constraint;
         }
@@ -1340,9 +1345,8 @@ vf_force_check_constraint( vf_TypeConstraint *constraint,       // class constra
         vf_resolve_class( constraint->m_target, true, ctx );
     if( !target ) {
         VF_DEBUG( "verifying class " << class_get_name( ctx->m_class )
-                  << " (method " << method_get_name( constraint->m_method )
-                  << method_get_descriptor( constraint->m_method )
-                  << ") couldn't load class \""
+                  << " (method " << constraint->m_name
+                  << constraint->m_descriptor << ") couldn't load class \""
                   << ( ( constraint->m_target[0] == 'L' )
                        ? &( constraint->m_target[1] ) : constraint->m_target )
                   << "\"" );
@@ -1391,9 +1395,8 @@ vf_force_check_constraint( vf_TypeConstraint *constraint,       // class constra
         vf_resolve_class( constraint->m_source, true, ctx );
     if( !source ) {
         VF_DEBUG( "verifying class " << class_get_name( ctx->m_class )
-                  << " (method " << method_get_name( constraint->m_method )
-                  << method_get_descriptor( constraint->m_method )
-                  << ") couldn't load class \""
+                  << " (method " << constraint->m_name
+                  << constraint->m_descriptor << ") couldn't load class \""
                   << ( ( constraint->m_source[0] == 'L' )
                        ? &( constraint->m_source[1] ) : constraint->m_source )
                   << "\"" );
@@ -1422,6 +1425,8 @@ vf_force_check_constraint( vf_TypeConstraint *constraint,       // class constra
     if( !vf_is_valid( source, target, ctx->m_class, check ) ) {
         // return error
         ctx->m_method = constraint->m_method;
+        ctx->m_name = constraint->m_name;
+        ctx->m_descriptor = constraint->m_descriptor;
         vf_set_error( check, ctx );
         return VER_ErrorIncompatibleArgument;
     }

@@ -134,15 +134,24 @@ static inline vf_Result ResolveSubroutineEntryPoint(vf_Node *node,
         unsigned index;
         for (index = 0; index < map->m_number; index++) {
             map->m_local[index].m_type = SM_ANY;
+            map->m_local[index].m_is_local = true;
+            map->m_local[index].m_local = index;
         }
 
         map->m_depth = p_element->m_node->m_inmap.m_depth;
+        // FIXME - stack depth should be greater then 0
+        // assert(map->m_depth);
         for (index = 0; index + 1 < map->m_depth; index++) {
             map->m_stack[index].m_type = SM_ANY;
         }
         map->m_stack[index].m_type = SM_RETURN_ADDR;
-        map->m_stack[index].m_pc =
+        map->m_stack[index++].m_pc =
             (unsigned) (p_element->m_node->m_start->m_addr - ctx->m_bytes);
+        // FIXME - index should be equal to stack depth
+        // assert(index == map->m_depth);
+        for (; index < ctx->m_maxstack; index++) {
+            map->m_stack[index].m_type = SM_TOP;
+        }
     }
 
     VF_DUMP(DUMP_NODESTACK, DumpNodeStack(ctx));

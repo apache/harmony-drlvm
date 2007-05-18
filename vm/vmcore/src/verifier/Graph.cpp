@@ -34,8 +34,7 @@ vf_Graph::DumpGraph()
 {
 #if _VF_DEBUG
     VF_DEBUG( "Method: " << class_get_name( m_ctx->m_class ) << "::"
-              << method_get_name( m_ctx->m_method )
-              << method_get_descriptor( m_ctx->m_method ) << endl );
+              << m_ctx->m_name << m_ctx->m_descriptor << endl );
     VF_DEBUG( "-- start --" );
     ResetNodeIterator();
     while( HasMoreElements() ) {
@@ -120,14 +119,12 @@ vf_Graph::DumpDotGraph()
 
     // get class and method name
     const char *class_name = class_get_name( m_ctx->m_class );
-    const char *method_name = method_get_name( m_ctx->m_method );
-    const char *method_desc = method_get_descriptor( m_ctx->m_method );
 
     // create file name
-    size_t len = strlen( class_name ) + strlen( method_name )
-        + strlen( method_desc ) + 6;
+    size_t len = strlen( class_name ) + strlen( m_ctx->m_name )
+        + strlen( m_ctx->m_descriptor ) + 6;
     char *fname = (char*)STD_ALLOCA( len );
-    sprintf( fname, "%s_%s%s", class_name, method_name, method_desc );
+    sprintf( fname, "%s_%s%s", class_name, m_ctx->m_name, m_ctx->m_descriptor );
 
     char *f_start;
     char *pointer;
@@ -168,7 +165,7 @@ vf_Graph::DumpDotGraph()
         return;
     }
     // create name of graph
-    sprintf( fname, "%s.%s%s", class_name, method_name, method_desc );
+    sprintf( fname, "%s.%s%s", class_name, m_ctx->m_name, m_ctx->m_descriptor );
 
     // print graph to file
     DumpDotHeader( f_start, fout );
