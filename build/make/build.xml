@@ -87,10 +87,16 @@
         <condition property="if.win" value="true">
             <contains string="${os.name}" substring="Windows" />
         </condition>
-        <condition property="if.lnx" value="true">
+        <condition property="if.unix" value="true">
             <not>
                 <isset property="if.win" />
             </not>
+        </condition>
+        <condition property="if.lnx" value="true">
+            <os name="linux" />
+        </condition>
+        <condition property="if.macosx" value="true">
+            <os name="mac os x" />
         </condition>
 
         <!-- assigned only only under linux (see build.sh)-->
@@ -116,6 +122,12 @@
                 <equals arg1="${os.arch}" arg2="amd64" />
                 <equals arg1="${machine.arch}" arg2="x86_64" />
                 <equals arg1="${machine.arch}" arg2="amd64" />
+            </or>
+        </condition>
+	<condition property="build.arch" value="ppc32">
+            <or>
+                <equals arg1="${os.arch}" arg2="ppc32" />
+                <equals arg1="${os.arch}" arg2="ppc" />
             </or>
         </condition>
         
@@ -166,11 +178,21 @@
         <property name="build.is.debug" value="false" />
     </target>
 
-    <!-- initialization target specific for linux -->
-    <target name="init.lnx" if="if.lnx">
+    <!-- initialization target specific for unix -->
+    <target name="init.unix" if="if.unix">
+        <property name="build.os.family" value="unix" />
+	<condition property="build.os" value="macosx">
+            <isset property="if.macosx" />
+        </condition>
         <property name="build.os" value="Linux" />
+	<condition property="build.os.short" value="macosx">
+            <isset property="if.macosx" />
+        </condition>
         <property name="build.os.short" value="lnx" />
         <property name="build.executable.pattern" value="\1" />
+	<condition property="build.shared.pattern" value="lib\1.dylib">
+            <isset property="if.macosx" />
+        </condition>
         <property name="build.shared.pattern" value="lib\1.so lib\1.so.*" />
         <property name="build.static.pattern" value="lib\1.a" />
         <property name="build.jar.pattern" value="\1.jar \1-src.jar" />
@@ -180,6 +202,7 @@
     <!-- initialization target specific for windows -->
     <target name="init.win" if="if.win">
         <property name="build.os" value="Windows" />
+        <property name="build.os.family" value="win" />
         <property name="build.os.short" value="win" />
         <property name="build.executable.pattern" value="\1.exe \1.pdb" />
         <property name="build.shared.pattern" value="\1.dll \1.pdb" />
@@ -208,7 +231,7 @@
         </taskdef>
     </target>
 
-    <target name="set.semis.dirs" depends="detect.os.arch.cxx.cfg,init.win,init.lnx">
+    <target name="set.semis.dirs" depends="detect.os.arch.cxx.cfg,init.win,init.unix">
         <property environment="env" />
 
         <!-- precopied folder location -->
@@ -252,7 +275,7 @@
 
     <!-- initialization target: loading and setting build properties -->
     <target name="init" depends="detect.os.arch.cxx.cfg,
-                                 init.lnx,
+                                 init.unix,
                                  init.win,
                                  set.semis.dirs,
                                  plugin.antcontrib,
@@ -262,6 +285,7 @@
         <xslt in="deploy.xml" out="${build.semi.dir}/deploy.xml" style="./selector.xsl">
             <param name="cfg" expression="${build.cfg}" />
             <param name="os" expression="${build.os.short}" />
+            <param name="osfamily" expression="${build.os.family}" />
             <param name="arch" expression="${build.arch}" />
             <param name="cxx" expression="${build.cxx}" />
         </xslt>
@@ -483,7 +507,7 @@
     <!-- delete component binaries in semis and deploy -->
     <!-- do not touch pre-copied stuff (see clean.update target) -->
     <target name="clean" depends="detect.os.arch.cxx.cfg,
-                                  init.lnx,
+                                  init.unix,
                                   init.win">
         <delete dir="../${build.os.short}_${build.arch}_${build.cxx}_${build.cfg}/harmony" failonerror="false" />
         <delete dir="../${build.os.short}_${build.arch}_${build.cxx}_${build.cfg}/deploy" failonerror="false" />
@@ -514,7 +538,7 @@
 
         <if>
             <and>
-                <isset property="if.lnx" />
+                <isset property="if.unix" />
                 <available type="dir" file="${build.deploy.dir}/jdk/jre/bin" />
             </and>
             <then>
@@ -522,6 +546,7 @@
                     <fileset dir="${build.deploy.dir}/jdk/jre/bin">
                         <include name="java" />
                         <include name="*.so" />
+                        <include name="*.dylib" />
                         <include name="*.so.*" />
                     </fileset>
                 </chmod>
