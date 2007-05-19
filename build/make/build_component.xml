@@ -42,14 +42,15 @@ Version: $Revision: 1.9.2.5 $
     Some  build properties  must  be predefined  before the  component
     builder is called:
         
-    ${build.semi.dir} - property that points to directory, the builder
-                        stores results of executed targets
-    ${build.cfg}      - configuration, supported values: debug/release
-    ${build.os.short} - operation system, supported values:  lnx/win
-    ${build.arch}     - supported values: ia32/em64t/ipf
-    ${build.cxx}      - c/cpp source code compiler, supported values:
-                        msvc/icl for Windows, gcc/icc for Linux
-    ${build.is.debug} - true/false - used in build target    
+    ${build.semi.dir}  - property that points to directory, the builder
+                         stores results of executed targets
+    ${build.cfg}       - configuration, supported values: debug/release
+    ${build.os.short}  - operation system, supported values:  lnx/win
+    ${build.os.family} - OS, supported values:  unix/win
+    ${build.arch}      - supported values: ia32/em64t/ipf
+    ${build.cxx}       - c/cpp source code compiler, supported values:
+                         msvc/icl for Windows, gcc/icc for Linux
+    ${build.is.debug}  - true/false - used in build target    
     
     ${build.CLASSLIB.home} - directory with classlib src
     ${build.VM.home}       - directory with vm src
@@ -135,6 +136,7 @@ Version: $Revision: 1.9.2.5 $
                 <xslt in="@{target}" out="${build.semi.dir}/build/targets/${targetname}" style="./selector.xsl">
                     <param name="cfg" expression="${build.cfg}" />
                     <param name="os" expression="${build.os.short}" />
+                    <param name="osfamily" expression="${build.os.family}" />
                     <param name="arch" expression="${build.arch}" />
                     <param name="cxx" expression="${build.cxx}" />
                 </xslt>
@@ -259,6 +261,7 @@ Version: $Revision: 1.9.2.5 $
         <xslt in="${file}" out="${init.component.file}" style="./build_component.xsl">
             <param name="cfg" expression="${cfg}" />
             <param name="os" expression="${build.os.short}" />
+            <param name="osfamily" expression="${build.os.family}" />
             <param name="arch" expression="${build.arch}" />
             <param name="cxx" expression="${build.cxx}" />
         </xslt>
