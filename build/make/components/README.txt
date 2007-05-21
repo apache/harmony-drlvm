@@ -233,12 +233,13 @@ III. ATTRIBUTE-BASED FILTERING
     The following attributes are supported
     for <select> tags:
             
-         Attr  |  Meaning           |  Supported values
-         ------+--------------------+-----------------         
-         os    |  operating system  |  win, lnx
-         arch  |  architecture      |  ia32, ipf, em64t
-         cxx   |  native compiler   |  msvc, icl 
-         cfg   |  building mode     |  release, debug
+         Attr     |  Meaning           |  Supported values
+         ---------+--------------------+-----------------         
+         os       |  operating system  |  win, lnx
+         osfamily |  operating system  |  win, unix
+         arch     |  architecture      |  ia32, ipf, em64t
+         cxx      |  native compiler   |  msvc, icl 
+         cfg      |  building mode     |  release, debug
             
     The example below illustrates using different source files
     for different operating systems and platform architectures. 
@@ -404,7 +405,7 @@ IV. A COMPONENT DESCRIPTOR EXAMPLE
                 <linkerarg value="/NODEFAULTLIB:libcmt.lib" />
             </select>
 
-            <select os="lnx">
+            <select osfamily="unix">
                 <linkerarg value="--export-dynamic" />
                 <linkerarg value="-lz" />
                 <linkerarg value="-lxml2" />
