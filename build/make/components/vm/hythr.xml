@@ -49,7 +49,7 @@ Version: $Revision: 1.4.2.4 $
                 <select os="win">
                   <include name="thread/src/win/*.c" />
                 </select>
-                <select os="lnx">
+                <select osfamily="unix">
                   <include name="thread/src/linux/*.c" />
                 </select>
             </fileset>
@@ -62,6 +62,9 @@ Version: $Revision: 1.4.2.4 $
                 <defineset define="_USRDLL" />
             </select>
 
+            <select os="macosx">
+                <defineset define="MACOSX" />
+            </select>
             <select os="lnx">
                 <defineset define="LINUX" />
             </select>
@@ -73,7 +76,7 @@ Version: $Revision: 1.4.2.4 $
                 <defineset define="_EM64T_" />
             </select>
             <!--
-            <select os="lnx">
+            <select osfamily="unix">
                 <compilerarg value="-Wno-deprecated" />
                 <compilerarg value="-fno-exceptions" />
             </select>

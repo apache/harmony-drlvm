@@ -42,7 +42,7 @@
             <select os="win">
                 <syslibset libs="advapi32,odbc32,userenv,ws2_32,mswsock" />
             </select>
-            <select os="lnx">
+            <select osfamily="unix">
                 <syslibset type="static" libs="z,pthread,xml2" />
                 <syslibset type="shared" libs="m,dl,stdc++" />
             </select>

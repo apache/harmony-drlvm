@@ -61,6 +61,12 @@
                 <defineset define="HYX86_64" />
             </select>
 
+            <select arch="ppc32">
+                <defineset define="_PPC32_" />
+                <defineset define="_PPC_" />
+                <defineset define="HYPPC32" />
+            </select>
+
             <select os="win">
                 <defineset>
                     <define name="PLATFORM_NT" />
@@ -85,9 +91,14 @@
                 </select>
             </select>
 
-            <select os="lnx">
+            <select osfamily="unix">
                 <defineset define="PLATFORM_POSIX" />
-                <defineset define="LINUX" />
+                <select os="macosx">
+                    <defineset define="MACOSX" />
+                </select>
+                <select os="lnx">
+                    <defineset define="LINUX" />
+                </select>
                 <defineset define="__SMP__" />
                 <defineset define="_REENTRANT" />
                 <defineset define="LINUX_TLS_OPT" />
@@ -168,7 +179,7 @@
                 </select>
             </select>
 
-            <select os="lnx">
+            <select osfamily="unix">
                 <compilerarg value="-Wno-deprecated" />
                 <compilerarg value="-x" />
                 <compilerarg value="c++" />

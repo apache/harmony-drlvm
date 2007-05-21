@@ -62,7 +62,7 @@ Version: $Revision: 1.3.2.5 $
     </target>
 
     <target name="configure" unless="aprutil-config-available">
-        <select os="lnx">
+        <select osfamily="unix">
             <exec executable="sh" dir="${src}">
                 <arg value="./buildconf" />
                 <arg value="--with-apr=${extra.apr.src}" />
@@ -106,7 +106,7 @@ Version: $Revision: 1.3.2.5 $
             <replacefilter token="VERSION" value='"expat_1.95.1"' />
         </replace>
 
-    	<select os="lnx">
+    	<select osfamily="unix">
 
             <compiler id="c.compiler" extends="common.c.compiler">
                 <fileset dir="${src}" includes="**/*.c" excludes="test/*.c ldap/*.c xml/expat/lib/*" />
@@ -127,7 +127,7 @@ Version: $Revision: 1.3.2.5 $
                 <defineset>
                     <define name="APU_HAVE_APR_ICONV" value="0" />
                 </defineset>
-                <select os="lnx" arch="em64t">
+                <select osfamily="unix" arch="em64t">
                     <compilerarg value="-fPIC" />
                 </select>
             </compiler>

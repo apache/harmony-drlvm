@@ -28,7 +28,7 @@ Version: $Revision: 1.1.2.6 $
 <project name="extra.java_script">
     <target name="init" >
         <mkdir dir="${build.dir}/_other" />
-        <select os="lnx">
+        <select osfamily="unix">
             <echo file="${build.dir}/_other/java.sh">
 #!/bin/sh
 

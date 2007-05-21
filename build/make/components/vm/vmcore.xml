@@ -89,7 +89,7 @@ Version: $Revision: 1.5.2.3 $
             <fileset dir="${build.vm.home}/vmcore/src/kernel_classes/native">
                 <include name="*.cpp" />
 
-                <select os="lnx">
+                <select osfamily="unix">
                     <exclude name="Runtime_win.cpp" />
                     <exclude name="System_win.cpp" />
                 </select>
@@ -154,7 +154,7 @@ Version: $Revision: 1.5.2.3 $
                     <include name="util/em64t/base_natives/*.cpp" />
                 </select>
 
-                <select os="lnx">
+                <select osfamily="unix">
                     <include name="thread/linux/*.cpp" />
                     <include name="util/linux/os_wrapper.cpp" />
                     <include name="util/linux/stubs.cpp" />
@@ -207,7 +207,7 @@ Version: $Revision: 1.5.2.3 $
                     <pathelement path="${extra.zlib.includes}" />
                 </select>
 
-                <select os="lnx">
+                <select osfamily="unix">
                     <dirset dir="${build.vm.home}">
                         <include name="vm/common/base" />
                         <include name="vmcore/src/util/linux/include" />

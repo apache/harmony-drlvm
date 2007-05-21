@@ -119,7 +119,7 @@ Version: $Revision: 1.6.2.8 $
                     <pathelement location="${build.vm.home}/vmcore/src/util/win/include" />
                 </select>
 
-                <select os="lnx">
+                <select osfamily="unix">
                     <pathelement location="${build.vm.home}/vmcore/src/util/linux/include" />
                 </select>
             </includepath>
@@ -225,7 +225,7 @@ Version: $Revision: 1.6.2.8 $
             </select>
 
             <!-- linux specific -->
-            <select os="lnx">
+            <select osfamily="unix">
                 <defineset define="PLATFORM_POSIX,LINUX" />
 
                 <select cxx="gcc" arch="ia32,em64t">
@@ -328,7 +328,7 @@ Version: $Revision: 1.6.2.8 $
 
             </select>
 
-            <select os="lnx">
+            <select osfamily="unix">
                 <linkerarg value="-shared" />
                 <linkerarg value="-ldl" />
                 <linkerarg value="-lm" />

@@ -45,7 +45,7 @@ Version: $Revision: 1.4.2.3 $
                     <select os="win">
                         <include name="vmcore/src/util/win/include" />
                     </select>
-                    <select os="lnx">
+                    <select osfamily="unix">
                         <include name="vmcore/src/util/linux/include" />
                     </select>
                 </dirset>

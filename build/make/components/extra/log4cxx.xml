@@ -51,7 +51,7 @@ Version: $Revision: 1.4.2.6 $
             <copy tofile="${includes}/log4cxx/log4cxx.h" file="${includes}/log4cxx/log4cxx.hw" />
             <copy tofile="${includes}/log4cxx/private/log4cxx_private.h" file="${includes}/log4cxx/private/log4cxx_private.hw" />
         </select>
-        <select os="lnx">
+        <select osfamily="unix">
             <copy tofile="${includes}/log4cxx/log4cxx.h" file="${includes}/log4cxx/log4cxx.h.in" />
             <copy tofile="${includes}/log4cxx/private/log4cxx_private.h" file="${includes}/log4cxx/private/log4cxx_private.h.in" />
         </select>
@@ -96,7 +96,7 @@ Version: $Revision: 1.4.2.6 $
                 <compilerarg value="/EHsc" />
                 <defineset define="_USRDLL,DLL_EXPORTS,APR_DECLARE_EXPORT,APU_DECLARE_EXPORT,LOG4CXX_STATIC,LOG4CXX" />
             </select>
-            <select os="lnx">
+            <select osfamily="unix">
                 <includepath path="/usr/include/libxml2" />
                 <select arch="em64t,ipf">
                     <compilerarg value="-fPIC" />

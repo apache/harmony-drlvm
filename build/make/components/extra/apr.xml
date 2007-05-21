@@ -58,7 +58,7 @@ Version: $Revision: 1.4.2.5 $
     </target>
 
     <target name="apr-configure" unless="apr-config-available">
-        <select os="lnx">
+        <select osfamily="unix">
         	
 <!--            <exec executable="sh" dir="${src}">
                 <arg value="./buildconf" />
@@ -84,7 +84,7 @@ Version: $Revision: 1.4.2.5 $
         <property name="libname" value="apr-1" />
         <property name="outtype" value="static" />
 
-        <select os="lnx">
+        <select osfamily="unix">
 
         	<!-- simply invoke make to let it build as the APR people suggest  -->
             <!-- we'll need to tune this wrt flags and such                    -->

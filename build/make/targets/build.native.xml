@@ -98,7 +98,7 @@
             <select os="win">
                 <compilerarg value="/Zi" />
             </select>
-            <select os="lnx">
+            <select osfamily="unix">
                 <linkerarg value="-g" />
             </select>
             <fileset refid="c.fileset" />
@@ -113,7 +113,7 @@
             <select os="win">
                 <compilerarg value="/Zi" />
             </select>
-            <select os="lnx">
+            <select osfamily="unix">
                 <compilerarg value="-fpic" />
                 <linkerarg value="-g" />
             </select>
@@ -167,7 +167,7 @@
                         <exec executable="${asm.executable}" failonerror="true">
                             <arg line="${asm.args}" />
                             <arg line="${asm.add.arg}" />
-                            <select os="lnx">
+                            <select osfamily="unix">
                                 <arg line=" -o${build.dir}/_obj/${object}.${object.suffix} @{file} " />
                             </select>
                             <select os="win">

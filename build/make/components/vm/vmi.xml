@@ -54,7 +54,7 @@ Version: $Revision: 1.4.2.4 $
                         <include name="vmcore/src/util/win/include" />
                     </select>
 
-                    <select os="lnx">
+                    <select osfamily="unix">
                         <include name="vmcore/src/util/linux/include" />
                     </select>
                 </dirset>
@@ -76,7 +76,7 @@ Version: $Revision: 1.4.2.4 $
                 <libset libs="${vm.vmcore.lib}" dir="${vm.vmcore.libdir}" />
             </select>
 
-            <select os="lnx">
+            <select osfamily="unix">
                 <linkerarg value="--version-script,${src}/vmi.exp" />
             </select>
 

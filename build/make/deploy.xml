@@ -81,7 +81,7 @@ Description of the product deploy folder.
                 <other>bin/default:eclipse.bat</other>
             </select>
 
-            <select os="lnx">
+            <select osfamily="unix">
                 <other>bin/default:eclipse.sh</other>
             </select>
         </eclipse_script>
