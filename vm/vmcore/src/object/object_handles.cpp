@@ -38,6 +38,7 @@
 #include "open/types.h"
 #include "open/vm_util.h"
 #include "vtable.h"
+#include "port_threadunsafe.h"
 
 #ifndef NDEBUG
 // this is for managed object sanity checks
@@ -440,16 +441,20 @@ void free_local_object_handles3(ObjectHandles* head)
 {
     ObjectHandlesNew* h = (ObjectHandlesNew*)head;
 #ifdef VM_STATS
+    UNSAFE_REGION_START
     VM_Statistics::get_vm_stats().num_free_local_called++;
     if(h != NULL)
         VM_Statistics::get_vm_stats().num_free_local_called_free++;
+        UNSAFE_REGION_END
 #endif //VM_STATS
     while(h) {
 #ifdef VM_STATS
         unsigned size = h->size;
+        UNSAFE_REGION_START
         VM_Statistics::get_vm_stats().num_local_jni_handles += size;
         VM_Statistics::get_vm_stats().num_jni_handles_freed++;
         VM_Statistics::get_vm_stats().num_jni_handles_wasted_refs += (h->capacity - size);
+        UNSAFE_REGION_END
 #endif //VM_STATS
         ObjectHandlesNew* next = h->next;
         STD_FREE(h);
@@ -463,23 +468,29 @@ void free_local_object_handles2(ObjectHandles* head)
     ObjectHandlesNew* h = (ObjectHandlesNew*)head;
     assert(h);
 #ifdef VM_STATS
+    UNSAFE_REGION_START
     VM_Statistics::get_vm_stats().num_free_local_called++;
     if(h->next != NULL)
         VM_Statistics::get_vm_stats().num_free_local_called_free++;
+        UNSAFE_REGION_END
 #endif //VM_STATS
     while(h->next) {
 #ifdef VM_STATS
         unsigned size = h->size;
+        UNSAFE_REGION_START
         VM_Statistics::get_vm_stats().num_local_jni_handles += size;
         VM_Statistics::get_vm_stats().num_jni_handles_freed++;
         VM_Statistics::get_vm_stats().num_jni_handles_wasted_refs += (h->capacity - size);
+        UNSAFE_REGION_END
 #endif //VM_STATS
         ObjectHandlesNew* next = h->next;
         STD_FREE(h);
         h = next;
     }
 #ifdef VM_STATS
+    UNSAFE_REGION_START
     VM_Statistics::get_vm_stats().num_jni_handles_wasted_refs += (h->capacity - h->size);
+    UNSAFE_REGION_END
 #endif //VM_STATS
 }
 
