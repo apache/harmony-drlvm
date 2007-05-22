@@ -1160,6 +1160,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
         return VMClassRegistry.getSimpleName(this);
     }
 
+    protected ClassLoader definingLoader;
 
     private final class ReflectionData {
         

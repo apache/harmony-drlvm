@@ -106,6 +106,12 @@ public abstract class ClassLoader {
      */
     private final HashMap<String, Package> definedPackages;
 
+    /*
+    * The following mapping is used <String binaryClassName, Class clazz>, where binaryClassName - class name,
+    * clazz - corresponding class.
+    */
+    Hashtable<String, Class> loadedClasses = new Hashtable<String, Class>(); 
+
     /**
      * package private to access from the java.lang.Class class. The following
      * mapping is used <String name, Certificate[] certificates>, where name -
@@ -373,6 +379,15 @@ public abstract class ClassLoader {
     /**
      * @com.intel.drl.spec_ref
      */
+    public void addToLoadedClasses(String name, Class clazz) {
+        synchronized (loadedClasses){
+            loadedClasses.put(name, clazz); 
+    	}
+    }
+
+    /**
+     * @com.intel.drl.spec_ref
+     */
     protected final Class<?> defineClass(String name, ByteBuffer b, ProtectionDomain protectionDomain)
         throws ClassFormatError {
 		byte[] data = b.array();
@@ -415,6 +430,7 @@ public abstract class ClassLoader {
             certs = getCertificates(packageName, domain.getCodeSource());
         }
         Class<?> clazz = defineClass0(name, data, offset, len);
+        clazz.definingLoader = this;
         clazz.setProtectionDomain(domain);
         if (certs != null) {
             packageCertificates.put(packageName, certs);

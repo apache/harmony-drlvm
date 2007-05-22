@@ -66,79 +66,121 @@ void vm_enumerate_interned_strings()
 
 // Enumerate all globally visible classes and their static fields.
 
+static void vm_enumerate_jlc(Class* c, bool b_weak = false)
+{
+    assert (*c->get_class_handle());
+    if (!b_weak) {
+        vm_enumerate_root_reference((void**)c->get_class_handle(), FALSE);
+    }
+    else {
+        vm_enumerate_weak_root_reference((void**)c->get_class_handle(), FALSE);
+    }
+}
+
+static void vm_enumerate_class_static(Class* c)
+{
+    Global_Env *global_env = VM_Global_State::loader_env;
+    assert (c);
+    ConstPoolEntry* cp = c->get_constant_pool().get_error_chain();
+    while(cp) {
+        vm_enumerate_root_reference((void**)(&(cp->error.cause)), FALSE);
+        cp = cp->error.next;
+    }
+    // Finally enumerate the static fields of the class
+    unsigned n_fields = c->get_number_of_fields();
+    if(c->is_at_least_prepared()) {
+        // Class has been prepared, so we can iterate over all its fields.
+        for(unsigned i = 0; i < n_fields; i++) {
+            Field* f = c->get_field(i);
+            if(f->is_static()) {
+		if(field_is_enumerable_reference(f)){
+                    // The field is static and it is a reference.
+                    if (global_env->compress_references) {
+                        vm_enumerate_compressed_root_reference((uint32 *)f->get_address(), FALSE);
+                    } else {
+                        vm_enumerate_root_reference((void **)f->get_address(), FALSE);
+                    }
+                }
+            }
+        }
+    }
+}
+
 void vm_enumerate_static_fields()
 {
     TRACE2("enumeration", "vm_enumerate_static_fields()");
-    Global_Env *global_env = VM_Global_State::loader_env;
-    ManagedObject** ppc;
     GlobalClassLoaderIterator ClIterator;
     ClassLoader *cl = ClIterator.first();
     while(cl) {
         GlobalClassLoaderIterator::ClassIterator itc;
         GlobalClassLoaderIterator::ReportedClasses RepClasses = cl->GetReportedClasses();
+        Class* c;
         for (itc = RepClasses->begin(); itc != RepClasses->end(); itc++)
         {
-            ppc = &itc->second;
-            assert(*ppc);
-            Class* c = jclass_to_struct_Class((jclass)ppc);
-
-            vm_enumerate_root_reference((void**)ppc, FALSE);
-            ConstPoolEntry* cp = c->get_constant_pool().get_error_chain();
-            while(cp) {
-                vm_enumerate_root_reference((void**)(&(cp->error.cause)), FALSE);
-                cp = cp->error.next;
-            }
-            // Finally enumerate the static fields of the class
-            unsigned n_fields = c->get_number_of_fields();
-            if(c->is_at_least_prepared()) {
-                // Class has been prepared, so we can iterate over all its fields.
-                for(unsigned i = 0; i < n_fields; i++) {
-                    Field* f = c->get_field(i);
-                    if(f->is_static()) {
-						if(field_is_enumerable_reference(f)){
-                            // The field is static and it is a reference.
-                            if (global_env->compress_references) {
-                                vm_enumerate_compressed_root_reference((uint32 *)f->get_address(), FALSE);
-                            } else {
-                                vm_enumerate_root_reference((void **)f->get_address(), FALSE);
-                            }
-                        }
-                    }
-                }
+          c = itc->second;
+          assert(c);
+          vm_enumerate_jlc(c);
+          vm_enumerate_class_static(c);
+        }
+        ClassTable::iterator itl;
+        ClassTable* p_loadedClasses = cl->GetLoadedClasses();
+        for (itl = p_loadedClasses->begin(); itl != p_loadedClasses->end(); itl++)
+        {
+            c = itl->second;
+            assert(c);
+            if (!cl->IsBootstrap())
+            {
+                vm_enumerate_jlc(c, true/*enum as weak root*/);
+                vm_enumerate_class_static(c);
             }
         }
         cl = ClIterator.next();
-    }
-} //vm_enumerate_static_fields
-
-
+   }
+ } //vm_enumerate_static_fields
 
 
 // This is the main function used to enumerate Java references by the VM and the JITs.  
 // It is part of the JIT-VM interface.
 // 20030405 Note: When compressing references, vm_enumerate_root_reference() expects to be called with slots
 // containing *managed* refs (represented by heap_base if null, not 0/NULL), so those refs must not be NULL. 
+static void check_ref(void** ref)
+{
+    if (VM_Global_State::loader_env->compress_references) {
+        // 20030324 DEBUG: verify the slot whose reference is being passed.
+        ManagedObject **p_obj = (ManagedObject **)ref;  
+        ManagedObject* obj = *p_obj;
+        assert(obj != NULL);    // See the comment at the top of the procedure.
+        if ((void *)obj != VM_Global_State::loader_env->heap_base) {
+            assert(((POINTER_SIZE_INT)VM_Global_State::loader_env->heap_base <= (POINTER_SIZE_INT)obj)
+                && ((POINTER_SIZE_INT)obj <= (POINTER_SIZE_INT)VM_Global_State::loader_env->heap_end));
+        } 
+    }
+}
+
 void 
 vm_enumerate_root_reference(void **ref, Boolean is_pinned)
 {
     TRACE2("vm.enum", "vm_enumerate_root_reference(" 
             << ref << " -> " << *ref << ")");
 #if _DEBUG
-        if (VM_Global_State::loader_env->compress_references) {
-            // 20030324 DEBUG: verify the slot whose reference is being passed.
-            ManagedObject **p_obj = (ManagedObject **)ref;  
-            ManagedObject* obj = *p_obj;
-            assert(obj != NULL);    // See the comment at the top of the procedure.
-            if ((void *)obj != VM_Global_State::loader_env->heap_base) {
-                assert(((POINTER_SIZE_INT)VM_Global_State::loader_env->heap_base <= (POINTER_SIZE_INT)obj)
-                    && ((POINTER_SIZE_INT)obj <= (POINTER_SIZE_INT)VM_Global_State::loader_env->heap_end));
-            } 
-        }
+    check_ref(ref);
 #endif // _DEBUG
 
     gc_add_root_set_entry((Managed_Object_Handle *)ref, is_pinned);
 } //vm_enumerate_root_reference
 
+
+void 
+vm_enumerate_weak_root_reference(void **ref, Boolean is_pinned)
+{
+    TRACE2("vm.enum", "vm_enumerate_weak_root_reference(" 
+            << ref << " -> " << *ref << ")");
+#if _DEBUG
+    check_ref(ref);
+#endif // _DEBUG
+
+    gc_add_weak_root_set_entry((Managed_Object_Handle *)ref, is_pinned, FALSE);
+} //vm_enumerate_weak_root_reference
 
 
 // Resembles vm_enumerate_root_reference() but is passed the address of a uint32 slot containing a compressed reference.

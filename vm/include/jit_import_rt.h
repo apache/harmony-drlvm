@@ -40,6 +40,12 @@ extern "C" {
  */
 VMEXPORT void vm_enumerate_root_reference(Managed_Object_Handle *ref, Boolean is_pinned);
 
+// Enumerate a weak root entry.  The argument is a pointer to the memory
+// location that contains a managed reference.  The GC may update
+// this location if the object pointed to has been moved during
+// collection.
+VMEXPORT void vm_enumerate_weak_root_reference(Managed_Object_Handle *ref, Boolean is_pinned);
+
 /**
  * Resembles vm_enumerate_root_reference(), but is passed the 
  * address of a slot containing a compressed reference.

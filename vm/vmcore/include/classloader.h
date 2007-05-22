@@ -147,7 +147,7 @@ public:
 
 private:
     class LoadingClasses : public MapEx<const String*, LoadingClass > {};
-    class ReportedClasses : public MapEx<const String*, ManagedObject* > {};
+    class ReportedClasses : public MapEx<const String*, Class* > {};
 
     class JavaTypes : public MapEx<const String*, TypeDesc* > {};
 
@@ -173,11 +173,12 @@ public:
             klass = m_initiatedClasses->Lookup(name);
         return klass?*klass:NULL;
     }
-    void InsertClass(Class* clss) {
-        LMAutoUnlock aulock(&m_lock);
-        m_loadedClasses->Insert(clss->get_name(), clss);
-        m_initiatedClasses->Insert(clss->get_name(), clss);
+    void RemoveFromReported(const String* name){
+        if(m_reportedClasses->Lookup(name)) {
+            m_reportedClasses->Remove(name);
+        }
     }
+    bool InsertClass(Class* clss);
     Class* AllocateAndReportInstance(const Global_Env* env, Class* klass);
     Class* NewClass(const Global_Env* env, const String* name);
     Package* ProvidePackage(Global_Env* env, const String *class_name, const char *jar);
