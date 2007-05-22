@@ -35,6 +35,7 @@
 #include "mem_alloc.h"
 #include "vm_stats.h"
 #include "port_malloc.h"
+#include "port_threadunsafe.h"
 
 ////////////////////////////////////////////////////////////
 // allocation memory for code for stubs
@@ -228,7 +229,9 @@ void* PoolManager::alloc(size_t size, size_t alignment, Code_Allocation_Action a
     _unlock();
  
  #ifdef VM_STATS
+    UNSAFE_REGION_START
     VM_Statistics::get_vm_stats().total_memory_used += size;
+    UNSAFE_REGION_END
 #endif
  
     return p;
