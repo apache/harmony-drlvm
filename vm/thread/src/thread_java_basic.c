@@ -31,7 +31,7 @@
 #define LOG_DOMAIN "tm.java"
 
 void stop_callback(void);
-jmethodID getRunMethod(JNIEnv *env);
+jmethodID getRunMethod(JNIEnv *env, jthread java_thread);
 IDATA increase_nondaemon_threads_count(hythread_t self);
 IDATA countdown_nondaemon_threads(hythread_t self);
 
@@ -99,7 +99,7 @@ int wrapper_proc(void *arg) {
         data->tiProc(data->tiEnv, jni_env, data->tiProcArgs);
     } else {
         // for jthread_create();
-        (*jni_env) -> CallVoidMethodA(jni_env, java_thread, getRunMethod(jni_env), NULL);
+        (*jni_env) -> CallVoidMethodA(jni_env, java_thread, getRunMethod(jni_env, java_thread), NULL);
     }
     
     status = jthread_detach(java_thread);
@@ -705,7 +705,7 @@ void throw_interrupted_exception(void) {
     (*env) -> ThrowNew(env, clazz, "Park() is interrupted");
 }
 
-jmethodID getRunMethod(JNIEnv *env) {
+jmethodID getRunMethod(JNIEnv *env, jthread java_thread) {
     jclass clazz;
     static jmethodID run_method = NULL;
     IDATA status;
@@ -714,7 +714,7 @@ jmethodID getRunMethod(JNIEnv *env) {
     assert(status == TM_ERROR_NONE);
     //printf("run method find enter\n");
     if (!run_method) {
-        clazz = (*env) -> FindClass(env, "java/lang/Thread");
+        clazz = (*env) -> GetObjectClass(env, java_thread);
         run_method = (*env) -> GetMethodID(env, clazz, "runImpl", "()V");
     }
     status=release_start_lock();
