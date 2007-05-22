@@ -225,8 +225,6 @@ public class Thread implements Runnable {
                 systemThreadGroup = new ThreadGroup();
                 mainThreadGroup = new ThreadGroup(systemThreadGroup, "main");
                 group = mainThreadGroup;
-                // Initialize system class loader.
-                contextLoader = ClassLoader.getSystemClassLoader();
             } else {
                 group = mainThreadGroup;
             }

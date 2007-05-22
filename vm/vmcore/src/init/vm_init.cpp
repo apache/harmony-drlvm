@@ -25,6 +25,7 @@
 #include "port_dso.h"
 
 #include "open/gc.h"
+#include "open/jthread.h"   // this is for jthread_self()
 #include "open/thread_externals.h"
 
 #include "init.h"
@@ -450,6 +451,19 @@ static jint initialize_system_class_loader(JNIEnv * jni_env) {
     return JNI_OK;
 }
 
+static jint set_main_thread_context_loader(JNIEnv* jni_env) {
+    Global_Env* vm_env = jni_get_vm_env(jni_env);
+    jthread main_thread = jthread_self();
+    jfieldID scl_field = jni_env->GetFieldID(jni_env->GetObjectClass(main_thread),
+        "contextClassLoader", "Ljava/lang/ClassLoader;");
+    assert(scl_field);
+    jobject loader = jni_env->NewLocalRef((jobject)(vm_env->system_class_loader->GetLoaderHandle()));
+    jni_env->SetObjectField(main_thread, scl_field, loader);
+    jni_env->DeleteLocalRef(loader);
+
+    return JNI_OK;
+}
+
 #define PROCESS_EXCEPTION(messageId, message) \
 { \
     LECHO(messageId, message << "Internal error: "); \
@@ -856,6 +870,8 @@ jint vm_init2(JNIEnv * jni_env) {
     }
 
     TRACE("system class loader initialized");
+
+    set_main_thread_context_loader(jni_env);
 
     status = run_java_init(jni_env);
     if (status != JNI_OK) return status;

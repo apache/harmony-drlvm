@@ -519,17 +519,17 @@ JNIEXPORT jint JNICALL JNI_CreateJavaVM(JavaVM ** p_vm, JNIEnv ** p_jni_env,
     finalizer_threads_init(java_vm);   /* added for NATIVE FINALIZER THREAD */
     ref_enqueue_thread_init(java_vm);  /* added for NATIVE REFERENCE ENQUEUE THREAD */
     
-    // Now JVMTIThread keeps global reference. Discared temporary global reference.
+    // Now JVMTIThread keeps global reference. Discard temporary global reference.
     jni_env->DeleteGlobalRef(java_thread);
-
-    // Send VM start event. JNI services are available now.
-    // JVMTI services permited in the start phase are available as well.
-    jvmti_send_vm_start_event(vm_env, jni_env);
 
     status = vm_init2(jni_env);
     if (status != JNI_OK) {
         goto done;
     }
+
+    // Send VM start event. JNI services are available now.
+    // JVMTI services permited in the start phase are available as well.
+    jvmti_send_vm_start_event(vm_env, jni_env);
 
     // The VM is fully initialized now.
     vm_env->vm_state = Global_Env::VM_RUNNING;

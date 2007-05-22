@@ -212,6 +212,7 @@ public:
     void Mark() { m_markBit = true; }
     bool isMarked() { return m_markBit; }
     ManagedObject* GetLoader() { return m_loader; }
+    ManagedObject** GetLoaderHandle() { return &m_loader; }
     const String* GetName() { return m_name; }
     ClassLoader* GetParent() { return m_parent; }
     Package_Table* getPackageTable() { return m_package_table; }
