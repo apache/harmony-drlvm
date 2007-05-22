@@ -873,8 +873,7 @@ jvmti_process_method_exit_event_internal(jmethodID method,
 
     // processing PopFrame event
     VM_thread *curr_thread = p_TLS_vmthread;
-    jint UNREF skip;
-    jint depth = get_thread_stack_depth(curr_thread, &skip);
+    jint depth = get_thread_stack_depth(curr_thread);
 
 #ifndef NDEBUG
     if( curr_thread->frame_pop_listener ) {

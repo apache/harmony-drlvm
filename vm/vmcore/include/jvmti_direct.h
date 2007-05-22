@@ -91,7 +91,7 @@ struct TIEnv
 };
 
 jint JNICALL create_jvmti_environment(JavaVM *vm, void **env, jint version);
-jint get_thread_stack_depth(VM_thread *thread, jint* pskip = NULL);
+jint get_thread_stack_depth(VM_thread *thread);
 void jvmti_get_compilation_flags(OpenMethodExecutionParams *flags);
 
 // Marks topmost frame of the specified thead to be popped
