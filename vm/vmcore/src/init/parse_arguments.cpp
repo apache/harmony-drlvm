@@ -238,6 +238,8 @@ void print_vm_standard_properties()
         "            Use verifier.\n"
         "    vm.jvmti.enabled (default FALSE):\n"
         "            Whether JVMTI mode is enabled.\n"
+        "    vm.jvmti.compiled_method_load.inlined (default FALSE):\n"
+        "            Report inlined methods with JVMTI_EVENT_COMPILED_METHOD_LOAD. Makes sense for optimizing jit.\n"
         "    vm.bootclasspath.appendclasspath (default FALSE):\n"
         "            Append classpath to the bootclasspath.\n"
         "\nOther properties:\n\n"

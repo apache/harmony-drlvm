@@ -328,6 +328,16 @@ class DebugUtilsTI {
         jvmtiError jvmti_single_step_start(void);
         jvmtiError jvmti_single_step_stop(void);
 
+        bool is_cml_report_inlined()
+        {
+            return cml_report_inlined;
+        }
+
+        void set_cml_report_inlined(bool value)
+        {
+            cml_report_inlined = value;
+        }
+
     private:
 
     protected:
@@ -346,6 +356,7 @@ class DebugUtilsTI {
         unsigned prepareListNumber;
         unsigned global_capabilities;
         bool single_step_enabled;
+        bool cml_report_inlined;
 }; /* end of class DebugUtilsTI */
 
 jvmtiError add_event_to_thread(jvmtiEnv *env, jvmtiEvent event_type, jthread event_thread);

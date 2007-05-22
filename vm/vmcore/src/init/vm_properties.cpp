@@ -270,6 +270,7 @@ static void init_vm_properties(Properties & properties)
         properties.set_new("vm.jit_may_inline_sync", "true");
         properties.set_new("vm.use_verifier", "true");
         properties.set_new("vm.jvmti.enabled", "false");
+        properties.set_new("vm.jvmti.compiled_method_load.inlined", "false");
         properties.set_new("vm.bootclasspath.appendclasspath", "false");
         properties.set_new("vm.dlls", PORT_DSO_NAME(GC_DLL));
 

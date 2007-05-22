@@ -321,7 +321,8 @@ DebugUtilsTI::DebugUtilsTI() :
     loadListNumber(0),
     prepareListNumber(0),
     global_capabilities(0),
-    single_step_enabled(false)
+    single_step_enabled(false),
+    cml_report_inlined(false)
 {
     jvmtiError UNUSED res = _allocate( MAX_NOTIFY_LIST * sizeof(Class**),
         (unsigned char**)&notifyLoadList );
@@ -634,6 +635,11 @@ jint DebugUtilsTI::Init(JavaVM *vm)
     else
     {
         status = true;
+
+        cml_report_inlined = (bool) get_boolean_property(
+                "vm.jvmti.compiled_method_load.inlined",
+                FALSE, VM_PROPERTIES);
+
         // FIXME: workaround to let get_vm_thread_ptr_safe function and other JNI code
         // to work in OnLoad phase
         NativeObjectHandles noh;
@@ -780,7 +786,8 @@ void jvmti_get_compilation_flags(OpenMethodExecutionParams *flags)
     if (!ti->isEnabled())
         return;
 
-    flags->exe_notify_compiled_method_load = 1;
+    if (ti->is_cml_report_inlined())
+        flags->exe_notify_compiled_method_load = 1;
 
     flags->exe_do_code_mapping = flags->exe_do_local_var_mapping = 1;
 
