@@ -3094,7 +3094,15 @@ bool Class::parse(Global_Env* env,
             return false;
         if(!valid_cpi(this, m_const_pool.get_class_name_index(super_class), CONSTANT_Utf8, "for super class name"))
             return false;
-        m_super_class.name = m_const_pool.get_utf8_string(m_const_pool.get_class_name_index(super_class));
+
+        String* super_name = m_const_pool.get_utf8_string(m_const_pool.get_class_name_index(super_class));
+        if(!check_class_name(super_name->bytes, super_name->len, m_version < JAVA5_CLASS_FILE_VERSION)) {
+            REPORT_FAILED_CLASS_FORMAT(this, " Illegal super class name "
+                    << super_name->bytes);
+            return false;
+        }
+        m_super_class.name = super_name;
+
         if(is_interface() && m_super_class.name != env->JavaLangObject_String){
             REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/ClassFormatError",
                 m_name->bytes << ": the super class of interface is "
