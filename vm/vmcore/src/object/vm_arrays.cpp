@@ -34,7 +34,7 @@
 #include "open/vm_util.h"
 
 #include "vm_stats.h"
-
+#include "port_threadunsafe.h"
 
 /////////////////////////////////////////////////////////////
 // begin vector access functions
@@ -411,8 +411,11 @@ ASSERT_THROW_AREA;
 #ifdef VM_STATS
 static void increment_array_copy_counter(uint64 &counter)
 {
+    UNSAFE_REGION_START
     counter ++;
+    UNSAFE_REGION_END
 }
+
 #endif // VM_STATS
 
 // This implementation may be Java specific
