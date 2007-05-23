@@ -33,7 +33,7 @@
 #include "class_member.h"
 
 #include "method_lookup.h"
-
+#include "port_threadunsafe.h"
 
 #define EIP_CACHE_SIZE 1024
 #define EIP_ALIGNMENT     4
@@ -231,7 +231,9 @@ CodeChunkInfo *Method_Lookup_Table::find(void *addr, bool is_ip_past)
         void *guess_end   = ((char *)guess->get_code_block_addr()) + guess->get_code_block_size();
         if ((addr >= guess_start) && (addr < guess_end)) {
 #ifdef VM_STATS
+            UNSAFE_REGION_START
             VM_Statistics::get_vm_stats().num_method_lookup_cache_hit++;
+            UNSAFE_REGION_END
 #endif //VM_STATS
             return guess;
         }
