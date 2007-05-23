@@ -30,6 +30,7 @@
 #include "vm_stats.h"
 #include "exceptions.h"
 #include "vm_arrays.h"
+#include "port_threadunsafe.h"
 
 /////////////////////////////////////////////////////////////
 // begin utf8 support
@@ -601,7 +602,9 @@ vm_instantiate_cp_string_slow(Class* c, unsigned cp_index)
 {
     ASSERT_THROW_AREA;
 #ifdef VM_STATS
+    UNSAFE_REGION_START
     VM_Statistics::get_vm_stats().num_instantiate_cp_string_slow++;
+    UNSAFE_REGION_END
 #endif
 
     Java_java_lang_String* result;
