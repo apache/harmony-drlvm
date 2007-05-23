@@ -106,11 +106,13 @@ public abstract class ClassLoader {
      */
     private final HashMap<String, Package> definedPackages;
 
-    /*
-    * The following mapping is used <String binaryClassName, Class clazz>, where binaryClassName - class name,
-    * clazz - corresponding class.
-    */
-    Hashtable<String, Class> loadedClasses = new Hashtable<String, Class>(); 
+    /**
+     * The class registry, provides strong referencing between the classloader 
+     * and it's defined classes. Intended for class unloading implementation.
+     * Maps binary class name to the class.
+     * @see java.lang.Class#definingLoader
+     */
+    private HashMap<String, Class> loadedClasses = new HashMap<String, Class>(); 
 
     /**
      * package private to access from the java.lang.Class class. The following
@@ -377,12 +379,14 @@ public abstract class ClassLoader {
     }
 
     /**
-     * @com.intel.drl.spec_ref
+     * Registers the defined class, invoked by VM.
+     * Intended for class unloading implementation.
      */
-    public void addToLoadedClasses(String name, Class clazz) {
+    @SuppressWarnings("unused") 
+    private void addToLoadedClasses(String name, Class clazz) {
         synchronized (loadedClasses){
             loadedClasses.put(name, clazz); 
-    	}
+        }
     }
 
     /**
@@ -390,7 +394,7 @@ public abstract class ClassLoader {
      */
     protected final Class<?> defineClass(String name, ByteBuffer b, ProtectionDomain protectionDomain)
         throws ClassFormatError {
-		byte[] data = b.array();
+        byte[] data = b.array();
         return defineClass(name, data, 0, data.length, protectionDomain);
     }
 

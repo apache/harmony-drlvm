@@ -1160,7 +1160,12 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
         return VMClassRegistry.getSimpleName(this);
     }
 
-    protected ClassLoader definingLoader;
+    /**
+     * Provides strong referencing between the classloader 
+     * and it's defined classes. Intended for class unloading implementation.
+     * @see java.lang.ClassLoader#loadedClasses
+     */
+    ClassLoader definingLoader;
 
     private final class ReflectionData {
         
