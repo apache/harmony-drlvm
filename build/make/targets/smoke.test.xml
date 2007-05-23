@@ -45,7 +45,8 @@
     </target>
 
     <target name="clean">
-        <delete file="${build.semi.dir}/smoke.test.failed"/>
+        <delete quiet="true" file="${build.semi.dir}/smoke.test.failed"/>
+        <delete quiet="true" dir="${build.dir}/_smoke.tests/reports" />
     </target>
 
     <target name="compile.smoke.test" depends="compile.smoke.test.java, compile.smoke.test.native" />

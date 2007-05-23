@@ -404,6 +404,7 @@
     </target>
     
     <target name="test2" depends="init">
+        <property file="test.properties"/>
         <parallel threadsPerProcessor="1" failonany="no">
         <ant antfile="${external.dep.CLASSLIB}/build.xml" inheritAll="no" output="${build.semi.dir}/hut.log">
             <target name="properties"/>
