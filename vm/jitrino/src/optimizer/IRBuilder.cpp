@@ -1347,7 +1347,7 @@ Opnd* IRBuilder::genIndirectCallWithResolve(Type* returnType,
         Opnd* clsOpnd = createTypeOpnd(ch);
         Opnd* idxOpnd = genLdConstant((int)cpIndex);
         uint32 numHelperArgs = 0;
-        Opnd** helperArgs = helperArgs = new(mm)Opnd*[3];
+        Opnd** helperArgs = new(mm)Opnd*[3];
         helperArgs[0] = clsOpnd;
         helperArgs[1] = idxOpnd;
         helperArgs[2] = NULL;
