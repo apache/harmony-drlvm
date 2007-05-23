@@ -39,6 +39,7 @@
 #include "type.h"
 #include "cci.h"
 #include "interpreter.h"
+#include "port_threadunsafe.h"
 
 #include "inline_info.h"
 
@@ -192,6 +193,7 @@ bool Class::is_instanceof(Class* clss)
     assert(!is_interface());
 
 #ifdef VM_STATS
+    UNSAFE_REGION_START
     VM_Statistics::get_vm_stats().num_type_checks++;
     if(this == clss)
         VM_Statistics::get_vm_stats().num_type_checks_equal_type++;
@@ -203,6 +205,7 @@ bool Class::is_instanceof(Class* clss)
         VM_Statistics::get_vm_stats().num_type_checks_super_is_interface ++;
     else if(clss->m_depth >= vm_max_fast_instanceof_depth())
         VM_Statistics::get_vm_stats().num_type_checks_super_is_too_deep++;
+    UNSAFE_REGION_END
 #endif // VM_STATS
 
     if(this == clss) return true;
