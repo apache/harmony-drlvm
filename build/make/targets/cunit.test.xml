@@ -182,7 +182,7 @@
                               resultproperty="resultproperty"
                               outputproperty="outputproperty">
                     <arg value="-Dorg.apache.harmony.vm.vmdir=${build.deploy.dir}/jdk/jre/bin/default"/>
-                    <arg value="-Djava.home=${build.deploy.dir}/jdk/jre"/>
+                    <arg line="-Djava.home=${build.deploy.dir}/jdk/jre ${test.vmargs}"/>
                     <env key="JAVA_HOME" value="${build.deploy.dir}/jdk/jre" />
                     <select os="win">
                         <env key="Path" path="${build.deploy.dir}/jdk/jre/bin/:${build.deploy.dir}/jdk/jre/bin/default:${env.Path}" />
