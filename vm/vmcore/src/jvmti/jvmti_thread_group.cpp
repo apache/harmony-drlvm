@@ -14,10 +14,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
+/**
  * @author Gregory Shimansky
  * @version $Revision: 1.1.2.1.4.4 $
- */  
+ */
 /*
  * JVMTI thread group APIO
  */
@@ -29,6 +29,7 @@
 #include "cxxlog.h"
 #include "suspend_checker.h"
 #include "environment.h"
+#include "exceptions.h"
 #include "Class.h"
 
 #define jvmti_test_jenv (p_TLS_vmthread->jni_env)
@@ -148,6 +149,45 @@ jvmtiGetThreadGroupInfo(jvmtiEnv* env,
     return JVMTI_ERROR_NONE;
 }
 
+/**
+ * This function extracts element specified by 'index' from 'pair' array.
+ * Extracted element assumed to be an jobjectArray and is converted to native
+ * array of jobject that is returned via 'array_ptr' ant 'count_ptr' args.
+ */
+static jvmtiError read_array(jvmtiEnv* env,
+                                  jobjectArray pair,
+                                  jint index,
+                                  jint* count_ptr,
+                                  jobject** array_ptr)
+{
+    jint count = 0;
+    jobjectArray object_array = NULL;
+
+    if (NULL != pair) {
+        object_array = jvmti_test_jenv->GetObjectArrayElement(pair, index);
+
+        if (NULL != object_array)
+            count = jvmti_test_jenv->GetArrayLength(object_array);
+    }
+
+    jvmtiError err;
+
+    jobject* native_array = NULL;
+    err = _allocate(sizeof(jobject) * count, (unsigned char**) &native_array);
+
+    if (JVMTI_ERROR_NONE != err)
+        return err;
+
+    for (int i = 0; i < count; i++)
+        native_array[i] = jvmti_test_jenv->
+                GetObjectArrayElement(object_array, i);
+
+    *count_ptr = count;
+    *array_ptr = native_array;
+
+    return JVMTI_ERROR_NONE;
+}
+
 /*
  * Get Thread Group Children
  *
@@ -183,57 +223,38 @@ jvmtiGetThreadGroupChildren(jvmtiEnv* env,
         return JVMTI_ERROR_NULL_POINTER;
     }
 
+    jclass thread_group_class = GetObjectClass(jvmti_test_jenv, group);
+    jmethodID method = jvmti_test_jenv -> GetMethodID(thread_group_class,
+            "getActiveChildren","()[Ljava/lang/Object;");
+    assert(method);
+
     ti->setLocallyDisabled();//-----------------------------------V
 
-    jclass cl = GetObjectClass(jvmti_test_jenv, group);
-    jobjectArray jg = jvmti_test_jenv -> NewObjectArray(10, cl, 0);
-    jmethodID id = jvmti_test_jenv -> GetMethodID(cl, "enumerate","([Ljava/lang/ThreadGroup;)I");
-    int cc = jvmti_test_jenv -> CallIntMethod (group, id, jg);
-    jthreadGroup* groups = NULL;
-    jvmtiError jvmti_error = _allocate(sizeof(jthreadGroup) * cc,
-            (unsigned char **)&groups);
-
-    if (JVMTI_ERROR_NONE != jvmti_error)
-    {
-        
-        ti->setLocallyEnabled();//-----------------------------------^
-        return jvmti_error;
-    }
-
-    int i; // Visual C++ 6.0 does not treat "for" as C++ scope
-
-    for (i = 0; i < cc; i++)
-    {
-        groups[i] = jvmti_test_jenv -> GetObjectArrayElement(jg, i);
-    }
-
-    *group_count_ptr = cc;
-    *groups_ptr = groups;
-
-    jclass cll = struct_Class_to_java_lang_Class_Handle(VM_Global_State::loader_env->java_lang_Thread_Class);
-    jobjectArray jt = jvmti_test_jenv -> NewObjectArray(10, cll, 0);
-    id = jvmti_test_jenv -> GetMethodID(cl, "enumerate","([Ljava/lang/Thread;Z)I");
-    cc = jvmti_test_jenv -> CallIntMethod (group, id, jt, JNI_FALSE);
+    // by contract this method returns Object[2] array.
+    // First element is Object[] array of child Thread objects.
+    // Second element is Object[] array of child ThreadGroup objects.
+    jobjectArray result = jvmti_test_jenv->CallObjectMethod(group, method);
 
     ti->setLocallyEnabled();//-----------------------------------^
 
-    jthread * threads = NULL;
-    jvmti_error = _allocate(sizeof(jthread) * cc, (unsigned char **)&threads);
+    if (exn_raised())
+        return JVMTI_ERROR_INTERNAL;
 
-    if (JVMTI_ERROR_NONE != jvmti_error)
-    {
-        return jvmti_error;
+    jvmtiError err;
+
+    // extract child threads array
+    err = read_array(env, result, 0, thread_count_ptr, threads_ptr);
+
+    if (JVMTI_ERROR_NONE != err)
+        return err;
+
+    // extract child groups array
+    err = read_array(env, result, 1, group_count_ptr, groups_ptr);
+
+    if (JVMTI_ERROR_NONE != err) {
+        _deallocate((unsigned char*) *threads_ptr);
+        return err;
     }
-
-    for (i = 0; i < cc; i++)
-    {
-        threads[i] = jvmti_test_jenv -> GetObjectArrayElement(jt, i);
-    }
-
-    *thread_count_ptr = cc;
-    *threads_ptr = threads;
 
     return JVMTI_ERROR_NONE;
-}
-
-
+} // jvmtiGetThreadGroupChildren

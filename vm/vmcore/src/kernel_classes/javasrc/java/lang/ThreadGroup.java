@@ -22,13 +22,14 @@
 package java.lang;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.Iterator;
 import java.util.WeakHashMap;
 import java.util.ConcurrentModificationException;
 
 /**
- * @com.intel.drl.spec_ref 
+ * @com.intel.drl.spec_ref
  */
 
 public class ThreadGroup implements Thread.UncaughtExceptionHandler{
@@ -66,7 +67,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
     /**
      * Parent thread group of this thread group.
      *
-     * FIXME: this field must be private. It is changed to package-private 
+     * FIXME: this field must be private. It is changed to package-private
      * to be accessible from FT SecurityManager class. Both SecurityManager
      * and ThreadGroup are considered as non-Kernel by FT, but ThreadGroup
      * is Kernel now in DRL.
@@ -125,13 +126,13 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
             threadsCopy = copyThreads();
             groupsListCopy = (List)groups.clone();
         }
-        
+
         for (int i = 0; i < threadsCopy.length; i++) {
             if (((Thread) threadsCopy[i]).isAlive()) {
                 count++;
             }
         }
-        
+
         for (Iterator it = groupsListCopy.iterator(); it.hasNext();) {
             count += ((ThreadGroup)it.next()).activeCount();
         }
@@ -185,7 +186,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
 					"The thread group " + name + " is already destroyed!");
 		}
         if (!nonsecureDestroy()) {
-            throw new IllegalThreadStateException("The thread group " + name + 
+            throw new IllegalThreadStateException("The thread group " + name +
                     " is not empty");
         } else {
             if (parent != null) {
@@ -314,7 +315,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
      */
     public synchronized final void setMaxPriority(int priority) {
         checkAccess();
-        
+
         /*
          *  GMJ : note that this is to match a known bug in the RI
          *  http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=4708197
@@ -364,7 +365,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
         if(parent != null){
            parent.uncaughtException(thread, throwable);
            return;
-        } 
+        }
         Thread.UncaughtExceptionHandler defaultHandler = Thread.getDefaultUncaughtExceptionHandler();
         if(defaultHandler != null){
             defaultHandler.uncaughtException(thread, throwable);
@@ -416,7 +417,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
         }
         groups.add(group);
     }
-    
+
     /**
      * Copies this ThreadGroup's threads to an array which is used in iteration
      * over threads because iteration over a WeakHashMap object can lead to
@@ -433,11 +434,46 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
     }
 
     /**
+     * Used by GetThreadGroupChildren() jvmti function.
+     * @return Object[] array of 2 elements: first - Object[] array of active
+     * child threads; second - Object[] array of child groups.
+     */
+    private Object[] getActiveChildren() {
+        ArrayList<Thread> threadsCopy = new ArrayList<Thread>(threads.size());
+        ArrayList<ThreadGroup> groupsCopy = new ArrayList<ThreadGroup>(groups.size());
+
+        synchronized (this) {
+            if (destroyed) {
+                return new Object[] {null, null};
+            }
+
+            for (Thread thread : threads.keySet()) {
+                threadsCopy.add(thread);
+            }
+
+            for (ThreadGroup group : groups) {
+                groupsCopy.add(group);
+            }
+        }
+
+        ArrayList<Thread> activeThreads = new ArrayList<Thread>(threadsCopy.size());
+
+        // filter out alive threads
+        for (Thread thread : threadsCopy) {
+            if (thread.isAlive()) {
+                activeThreads.add(thread);
+            }
+        }
+
+        return new Object[] {activeThreads.toArray(), groupsCopy.toArray()};
+    }
+
+    /**
      * Copies all the threads contained in the snapshot of this thread group to
      * the array specified starting from the specified position. <br>
      * If the specified array is not long enough to take all the threads of this
      * thread group, the exta threads are silently ignored. <br>
-     * 
+     *
      * @param list an array to copy threads to
      * @param offset position in this array to start copying from
      * @param recurse indicates if the threads contained in the subgroups of
@@ -480,7 +516,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
      * to the array specified starting from the specified position. <br>
      * If the specified array is not long enough to take all the subgroups of
      * this thread group, the exta subgroups are silently ignored. <br>
-     * 
+     *
      * @param list an array to copy subgroups to
      * @param offset position in this array to start copying from
      * @param recurse indicates if the subgroups contained in the subgroups of
@@ -537,7 +573,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
      * Destroys this thread group without any security checks. We add this
      * method to avoid calls to the checkAccess() method on subgroups.
      * All non-empty subgroups are removed recursievely.
-     * If at least one subgroup is not empty, IllegalThreadStateException 
+     * If at least one subgroup is not empty, IllegalThreadStateException
      * will be thrown.
      * @return false if this ThreadGroup is not empty
      */
@@ -628,7 +664,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
 
     /**
      * Removes the specified thread group from this group.
-     * 
+     *
      * @param group group to be removed from this one
      */
     private synchronized void remove(ThreadGroup group) {
