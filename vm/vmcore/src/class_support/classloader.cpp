@@ -1595,15 +1595,6 @@ Class* UserDefinedClassLoader::DoLoadClass(Global_Env* env, const String* classN
     return clss;
 } // UserDefinedClassLoader::DoLoadClass
 
-static jmethodID getClassRegistryMethod(Global_Env* env) {
-    String* acr_func_name = env->string_pool.lookup("addToLoadedClasses");
-    String* acr_func_desc = env->string_pool.lookup("(Ljava/lang/String;Ljava/lang/Class;)V");
-    Class* clss = env->LoadCoreClass("java/lang/ClassLoader");
-    Method* m = clss->lookup_method(acr_func_name, acr_func_desc);
-    assert(m);
-    return (jmethodID)m;
-}
-
 bool ClassLoader::InsertClass(Class* clss) {
     tmn_suspend_disable();
     if (!IsBootstrap()) // skip BS classes
@@ -1642,10 +1633,14 @@ bool ClassLoader::InsertClass(Class* clss) {
         chl->object = *clss->get_class_handle();
         args[2].l = chl;
 
-        static jmethodID registryMethod = getClassRegistryMethod(env);
+        static String* acr_func_name = env->string_pool.lookup("addToLoadedClasses");
+        static String* acr_func_desc = env->string_pool.lookup("(Ljava/lang/String;Ljava/lang/Class;)V");
+
+        Method* method = class_lookup_method_recursive(m_loader->vt()->clss, acr_func_name, acr_func_desc);
+        assert(method);
 
         jvalue res;
-        vm_execute_java_method_array(registryMethod, &res, args);
+        vm_execute_java_method_array((jmethodID) method, &res, args);
 
         if(exn_raised()) {
             tmn_suspend_enable();
