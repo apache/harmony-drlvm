@@ -305,7 +305,7 @@ void vm_enumerate_root_set_single_thread_on_stack(StackIterator* si)
                 JIT *jit = cci->get_jit();
                 NativeCodePtr ip = si_get_ip(si);
                 uint32 inlined_depth = si_get_inline_depth(si);
-                uint32 offset = (POINTER_SIZE_INT)ip - (POINTER_SIZE_INT)cci->get_code_block_addr();
+                uint32 offset = (uint32)((POINTER_SIZE_INT)ip - (POINTER_SIZE_INT)cci->get_code_block_addr());
                 for (uint32 i = 0; i < inlined_depth; i++) {
                     Method* m = jit->get_inlined_method(cci->get_inline_info(), offset, i);
                     assert (m);

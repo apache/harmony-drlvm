@@ -111,7 +111,7 @@ FastArrayFillPass::_run(IRManager& irManager)
         }
         //compute number of nodes of the loop
         Nodes loopNodes = info->getLoopNode(node,false)->getNodesInLoop();
-        unsigned sz = loopNodes.size();
+        size_t sz = loopNodes.size();
         if (sz!=3) {
             continue;
         }
