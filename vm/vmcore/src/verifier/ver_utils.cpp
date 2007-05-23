@@ -1105,7 +1105,8 @@ vf_check_without_loading( vf_TypeConstraint *restriction,       // checked const
         if( ( restriction->m_target[0] != '['
               && restriction->m_source[0] == '[' )
             || ( restriction->m_target[0] != '['
-                 && restriction->m_source[0] == '[' ) ) {
+                 && restriction->m_source[0] == '[' ) )
+        {
             vf_set_error( VF_CHECK_PARAM, ctx );
             return VER_ErrorIncompatibleArgument;
         }
@@ -1290,10 +1291,13 @@ vf_check_class_constraints( vf_Context *ctx )   // verification context
 
     // check constraints
     for( vf_TypeConstraint *constraint = collection;
-         constraint; constraint = constraint->m_next ) {
+         constraint;
+         constraint = constraint->m_next )
+    {
         // set context method
-        // FIXME - need set method to context?
-        //ctx->SetMethod( constraint->m_method );
+        ctx->m_method = constraint->m_method;
+        ctx->m_name = constraint->m_name;
+        ctx->m_descriptor = constraint->m_descriptor;
 
         // check constraint
         vf_Result result = vf_check_constraint( constraint, ctx );
