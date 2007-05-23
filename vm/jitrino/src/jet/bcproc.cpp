@@ -386,7 +386,14 @@ void Compiler::handle_ik_meth(const JInst& jinst) {
         get_args_info(is_static, jinst.op0, args, &retType);
         
         Method_Handle meth = NULL;
-
+        unsigned short cpIndex = (unsigned short)jinst.op0;
+        bool lazy = m_lazy_resolution;
+        bool resolve = !lazy || class_is_cp_entry_resolved(m_compileHandle, m_klass, cpIndex);
+        if (!resolve) {
+            assert(lazy);
+            gen_invoke(opkod, NULL, cpIndex, args, retType);
+            return;
+        }
         if (opkod == OPCODE_INVOKESTATIC) {
             meth = resolve_static_method(m_compileHandle, m_klass,
                                             jinst.op0);
@@ -422,7 +429,7 @@ void Compiler::handle_ik_meth(const JInst& jinst) {
         else {
             meth = resolve_virtual_method(m_compileHandle, m_klass, jinst.op0);
         }
-        gen_invoke(opkod, meth, args, retType);
+        gen_invoke(opkod, meth, 0, args, retType);
         return;
     }
     switch(jinst.opcode) {
@@ -483,64 +490,19 @@ void Compiler::handle_ik_obj(const JInst& jinst) {
 
     switch(jinst.opcode) {
     case OPCODE_NEW:
-        {
-        Class_Handle klass;
-        klass = vm_resolve_class_new(m_compileHandle, m_klass, jinst.op0);
-        gen_new(klass);
-        }
+        gen_new(m_klass, (unsigned short)jinst.op0);
         break;
     case OPCODE_PUTSTATIC:
     case OPCODE_GETSTATIC:
-        {
-        jtype jt = to_jtype(class_get_cp_field_type(
-                                    m_klass, (unsigned short)jinst.op0));
-        const bool is_put = jinst.opcode == OPCODE_PUTSTATIC;
-        Field_Handle fld;
-        fld = resolve_static_field(m_compileHandle, m_klass, 
-                                    jinst.op0, is_put);
-        if (fld && !field_is_static(fld)) {
-            fld = NULL;
-        }
-        if (fld != NULL) {
-            Class_Handle klass = field_get_class(fld);
-            assert(klass);
-            if (klass != m_klass && class_needs_initialization(klass)) {
-                gen_call_vm(ci_helper_o, rt_helper_init_class, 0, klass);
-            }
-        }
-        gen_static_op(jinst.opcode, jt, fld);
-        }
-        break;
     case OPCODE_PUTFIELD:
     case OPCODE_GETFIELD:
-        // stack: [objref, value] ; op0 -
-        {
-        jtype jt = to_jtype(class_get_cp_field_type(
-                                    m_klass, (unsigned short)jinst.op0));
-        bool is_put = jinst.opcode == OPCODE_PUTFIELD;
-        
-        Field_Handle fld = NULL;
-        fld = resolve_nonstatic_field(m_compileHandle, m_klass, 
-                                    jinst.op0, is_put);
-        gen_field_op(jinst.opcode, jt, fld);
-        }
+        gen_field_op(jinst.opcode, m_klass, (unsigned short)jinst.op0);
         break;
     case OPCODE_ARRAYLENGTH:
         gen_array_length();
         break;
     case OPCODE_ANEWARRAY:
-        {
-        Allocation_Handle ah = 0;
-        Class_Handle klass = resolve_class(m_compileHandle, m_klass, 
-                                           jinst.op0);
-        if (klass != NULL) {
-            klass = class_get_array_of_class(klass);
-        }
-        if (klass != NULL) {
-            ah = class_get_allocation_handle(klass);
-        }
-        gen_new_array(ah);
-        }
+        gen_new_array(m_klass, (unsigned short)jinst.op0);
         break;
     case OPCODE_NEWARRAY:
         {
@@ -563,11 +525,7 @@ void Compiler::handle_ik_obj(const JInst& jinst) {
         }
         break;
     case OPCODE_MULTIANEWARRAY:
-        {
-        Class_Handle klass = NULL;
-        klass = resolve_class(m_compileHandle, m_klass, jinst.op0);
-        gen_multianewarray(klass, jinst.op1);
-        }
+        gen_multianewarray(m_klass, (unsigned short)jinst.op0, jinst.op1);
         break;
     case OPCODE_MONITORENTER:
     case OPCODE_MONITOREXIT:
@@ -575,12 +533,7 @@ void Compiler::handle_ik_obj(const JInst& jinst) {
         break;
     case OPCODE_CHECKCAST:
     case OPCODE_INSTANCEOF:
-        {
-        const bool chk = jinst.opcode == OPCODE_CHECKCAST;
-        Class_Handle klazz = NULL;
-        klazz = resolve_class(m_compileHandle, m_klass, jinst.op0);
-        gen_instanceof_cast(chk, klazz);
-        }
+        gen_instanceof_cast(jinst.opcode, m_klass, (unsigned short)jinst.op0);
         break;
     default: assert(false); break;
     }

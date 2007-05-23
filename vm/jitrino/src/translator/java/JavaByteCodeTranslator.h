@@ -49,25 +49,8 @@ public:
                     MethodDesc& methodToCompile,
                     TypeManager& typeManager,
                     JavaFlowGraphBuilder& cfg);
-
-    // version for inlined methods 
-    JavaByteCodeTranslator(CompilationInterface& compilationInterface,
-                    MemoryManager&,
-                    IRBuilder&,
-                    ByteCodeParser&,
-                    MethodDesc& methodToCompile,
-                    TypeManager& typeManager,
-                    JavaFlowGraphBuilder& cfg,
-                    uint32 numActualArgs,Opnd **actualArgs,
-                    Opnd **returnOpnd, Node **returnNode,
-                    ExceptionInfo *exceptionInfo, // propagated exception info
-                    uint32 inlineDepth, bool startNewBlock,
-                    InlineInfoBuilder* parent,
-                    JsrEntryInstToRetInstMap* parentJsrEntryMap);
-
-    // should be called for IR-inlining
-    void setNoInlineInfoBuilder() { inlineBuilder = NULL; }
-
+    
+    
 
     void offset(uint32 offset);
     void offset_done(uint32 offset);
@@ -260,17 +243,13 @@ private:
         uint32 bcOffset;
     };
 
-    static uint32 MaxSelfSizeForInlining; // in bytes
-    static uint32 MaxInlineSize; // in bytes
-    static uint32 MaxInlineDepth;
-    //the hotness threshold to inline method => (inline entry counts)/(this entry count)
-    static float MaxRelativeInlineHotness; 
     //
     // helper methods for generating code
     //
     Opnd**  popArgs(uint32 numArgs);
     // for invoke emulation if resolution fails
     void    pseudoInvoke(const char* mdesc);
+    void    genCallWithResolve(JavaByteCodes bc, unsigned cpIndex);
     void    invalid();    // called when invalid IR is encountered
     void    genLdVar(uint32 varIndex,JavaLabelPrepass::JavaVarType javaType);
     void    genStVar(uint32 varIndex,JavaLabelPrepass::JavaVarType javaType);
@@ -310,13 +289,10 @@ private:
     //
     // helper methods for inlining, call and return sequences
     //
-    bool    isProfileAllowsInlining(MethodDesc* inlinee);
-    bool    inlineMethod(MethodDesc* methodDesc);
-    bool    guardedInlineMethod(MethodDesc* methodDesc);
     bool    needsReturnLabel(uint32 off);
     void    genInvokeStatic(MethodDesc * methodDesc,uint32 numArgs,Opnd ** srcOpnds,Type * returnType);
-    void    genMagic(MethodDesc * methodDesc,uint32 numArgs,Opnd ** srcOpnds,Type * returnType);
-    void    genVMHelper(MethodDesc * methodDesc,uint32 numArgs,Opnd ** srcOpnds,Type * returnType);
+    bool    genVMMagic(const char* mname, uint32 numArgs,Opnd ** srcOpnds,Type * returnType);
+    bool    genVMHelper(const char* mname, uint32 numArgs,Opnd ** srcOpnds,Type * returnType);
     
     bool    methodIsArraycopy(MethodDesc * methodDesc);
     bool    arraycopyOptimizable(MethodDesc * methodDesc, uint32 numArgs, Opnd ** srcOpnds);
@@ -364,15 +340,7 @@ private:
     //
     // field, method, and type resolution
     //
-    FieldDesc*       resolveField(uint32 cpIndex,bool putfield);
-    FieldDesc*       resolveStaticField(uint32 cpIndex, bool putfield);
-    MethodDesc*      resolveVirtualMethod(uint32 cpIndex);
-    MethodDesc*      resolveSpecialMethod(uint32 cpIndex);
-    MethodDesc*      resolveStaticMethod(uint32 cpIndex);
-    MethodDesc*      resolveInterfaceMethod(uint32 cpIndex);
-    NamedType*       resolveType(uint32 cpIndex);
-    NamedType*       resolveTypeNew(uint32 cpIndex);
-    Type*            getFieldType(FieldDesc* fieldDesc,uint32 cpIndex);
+    Type*            getFieldType(FieldDesc*, uint32 constPoolIndex);
     const char*      methodSignatureString(uint32 cpIndex);
     //
     //
@@ -429,14 +397,12 @@ private:
     //
     // method state
     //
-    bool                isInlinedMethod;    // is this method being inlined?
     ExceptionInfo*      inliningExceptionInfo; // instruction where inlining begins
     Node*            inliningNodeBegin;  // used by inlining of synchronized methods
     uint32              numLabels;          // number of labels in this method
     uint32              numVars;            // number of variables in this method
     uint32              numStackVars;       // number of non-empty stack locations in this method
     uint32              numArgs;            // number of arguments in this method
-    uint32              inlineDepth;
     Type**              argTypes;           // types for each argument
     Opnd**              args;               // argument opnds
     Opnd*               resultOpnd;         // used for inlining only
@@ -452,8 +418,7 @@ private:
     Opnd*               lockAddr;
     Opnd*               oldLockValue;
     JavaInlineInfoBuilder  thisLevelBuilder;
-    InlineInfoBuilder*  inlineBuilder;
-
+    
     //
     // mapping: 
     //   [ subroutine entry stvar inst ] -> [ ret inst ]

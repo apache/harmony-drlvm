@@ -116,7 +116,7 @@ public:
     Val(jtype jt, const void* p)
     {
         clear();
-        m_kind = opnd_imm; assert(jt==jobj); m_jt = jt; m_pval = p;
+        m_kind = opnd_imm; assert(jt==jobj || jt==iplatf); m_jt = jt; m_pval = p;
     }
     Val(AR base, int disp, AR index = ar_x, unsigned scale=0)
     {

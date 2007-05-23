@@ -757,6 +757,10 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     // Precompile InternalError.
     class_alloc_new_object_and_run_default_constructor(vm_env->java_lang_InternalError_Class);
 
+    //String must be initialized before strings from intern pool are used
+    class_initialize(vm_env->JavaLangString_Class);
+
+
     hythread_suspend_enable();
 
     // Mark j.l.Throwable() constructor as a side effects free.

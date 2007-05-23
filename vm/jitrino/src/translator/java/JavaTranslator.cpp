@@ -59,48 +59,4 @@ void JavaTranslator::translateMethod(CompilationInterface& ci, MethodDesc& metho
     cfgBuilder.build();
 }
 
-
-//
-// version for translation-level inlining
-//
-Opnd*
-JavaCompileMethodInline(CompilationInterface& compilationInterface,
-                        MemoryManager& translatorMemManager,
-                        MethodDesc& methodDesc,
-                        IRBuilder&        irBuilder,
-                        uint32            numActualArgs,
-                        Opnd**            actualArgs,
-                        JavaFlowGraphBuilder&  cfgBuilder, 
-                        uint32 inlineDepth,
-                        InlineInfoBuilder* parentInlineInfoBuilder,
-                        JsrEntryInstToRetInstMap* parentJsrEntryMap)
-{
-    uint32 byteCodeSize = methodDesc.getByteCodeSize();
-    const unsigned char* byteCodes = methodDesc.getByteCodes();
-
-
-    ByteCodeParser parser((const uint8*)byteCodes,byteCodeSize);
-    // generate code
-    JavaByteCodeTranslator translator(compilationInterface,
-                              translatorMemManager,
-                              irBuilder,
-                              parser,
-                              methodDesc,
-                              *irBuilder.getTypeManager(),
-                              cfgBuilder,
-                              numActualArgs,actualArgs,NULL,NULL,
-                              (ExceptionInfo*)irBuilder.getCurrentLabel()->getState(),
-                              inlineDepth,false /* startNewBlock */,
-                              parentInlineInfoBuilder,
-                              parentJsrEntryMap);  // isInlined=true for this c-tor
-    if ( compilationInterface.isBCMapInfoRequired()) {
-        size_t incSize = byteCodeSize * ESTIMATED_HIR_SIZE_PER_BYTECODE;
-        MethodDesc* parentMethod = compilationInterface.getMethodToCompile();
-        incVectorHandlerSize(bcOffset2HIRHandlerName, parentMethod, incSize);
-    }
-    parser.parse(&translator);
-    return translator.getResultOpnd();
-}
-
-
 } //namespace Jitrino 

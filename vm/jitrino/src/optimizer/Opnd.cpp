@@ -160,6 +160,7 @@ OpndManager::getOpndTypeFromLdType(Type* ldType) {
     case Type::CompressedNullObject:
     case Type::SystemObject:    case Type::SystemClass:    case Type::SystemString:
     case Type::Array:           case Type::Object:
+    case Type::UnresolvedObject:
     case Type::NullObject:
     case Type::Offset:  case Type::OffsetPlusHeapbase:
     case Type::VTablePtr:

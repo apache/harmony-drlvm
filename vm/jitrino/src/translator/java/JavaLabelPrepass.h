@@ -266,14 +266,6 @@ public:
     // cut and paste from Java_Translator.cpp
     // field, method, and type resolution
     //
-    FieldDesc*              resolveField(uint32 cpIndex, bool putfield);
-    FieldDesc*              resolveStaticField(uint32 cpIndex, bool putfield);
-    MethodDesc*             resolveVirtualMethod(uint32 cpIndex);
-    MethodDesc*             resolveSpecialMethod(uint32 cpIndex);
-    MethodDesc*             resolveStaticMethod(uint32 cpIndex);
-    MethodDesc*             resolveInterfaceMethod(uint32 cpIndex);
-    Type*                   resolveType(uint32 cpIndex);
-    Type*                   resolveTypeNew(uint32 cpIndex);
     const char*             methodSignatureString(uint32 cpIndex);
     StateInfo*              getStateInfo()  { return &stateInfo; }
     StateTable*             getStateTable() { return stateTable; }
@@ -293,6 +285,7 @@ public:
         case Type::Array:           
         case Type::Object:
         case Type::NullObject:
+        case Type::UnresolvedObject:
         case Type::SystemString:
         case Type::SystemObject:
         case Type::SystemClass:
@@ -331,7 +324,7 @@ public:
     void invoke       (MethodDesc *mdesc);
     void pseudoInvoke (const char* mdesc);
     static  uint32  getNumArgsBySignature(const char*& methodSig);
-    static  Type*   getRetTypeBySignature(const char* methodSig, TypeManager& tm);
+    static  Type*   getRetTypeBySignature(CompilationInterface& ci, Class_Handle enclClass, const char* methodSig);
 
     // remaining instructions
 

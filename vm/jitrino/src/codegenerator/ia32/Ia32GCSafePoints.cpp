@@ -421,6 +421,19 @@ void GCSafePointsInfo::updateMptrInfoInPairs(GCSafePointPairs& res, Opnd* newMpt
     }
 }
 
+static bool isStaticFieldPtrDefWithCall(Inst* inst) {
+    if (inst->hasKind(Inst::Kind_CallInst)) {
+        CallInst* callInst = (CallInst*)inst;
+        Opnd::RuntimeInfo * rt = callInst->getRuntimeInfo();
+        if (rt && rt->getKind() == Opnd::RuntimeInfo::Kind_HelperAddress
+            && ((CompilationInterface::RuntimeHelperId)(POINTER_SIZE_INT)rt->getValue(0)
+                    == CompilationInterface::Helper_GetStaticFieldAddrWithResolve))
+        {
+            return true;
+        }
+    }
+    return false;
+}
 
 void GCSafePointsInfo::updatePairsOnInst(Inst* inst, GCSafePointPairs& res) {
     runLivenessFilter(inst, res);//filter pairs with dead mptrs from list
@@ -438,6 +451,11 @@ void GCSafePointsInfo::updatePairsOnInst(Inst* inst, GCSafePointPairs& res) {
     Opnd* opnd = inst->getOpnd(defIndex);
     Type* opndType = opnd->getType();
     if (!opndType->isObject() && !opndType->isManagedPtr()) {
+        return;
+    }
+    if (isStaticFieldPtrDefWithCall(inst)) {
+        removePairByMPtrOpnd(res, opnd);
+        staticMptrs.insert(opnd);
         return;
     }
     if (mode == MODE_1_FIX_BASES) { //3 addr form

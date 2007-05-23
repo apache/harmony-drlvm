@@ -632,14 +632,18 @@ LazyExceptionOpt::printInst1(::std::ostream& os, Inst* inst, std::string txt) {
 bool 
 LazyExceptionOpt::methodCallHasSideEffect(Inst* inst) {
     uint32 opcode = inst->getOpcode();
-    MethodDesc* cmd;
-    Method_Side_Effects mse;
+    MethodDesc* cmd = NULL;
+    Method_Side_Effects mse = MSE_Unknown;
 
     if (opcode==Op_DirectCall || opcode==Op_TauVirtualCall) {
         cmd = inst->asMethodCallInst()->getMethodDesc();
     } else {
         if (opcode==Op_IndirectCall || opcode==Op_IndirectMemoryCall) {
-            cmd = inst->asCallInst()->getFunPtr()->getType()->asMethodPtrType()->getMethodDesc();
+            Type* type = inst->asCallInst()->getFunPtr()->getType();
+            if (type->isUnresolvedType()) {
+                return true;
+            }
+            cmd = type->asMethodPtrType()->getMethodDesc();
         } else {
 #ifdef _DEBUG
             if (Log::isEnabled()) {
@@ -720,6 +724,11 @@ LazyExceptionOpt::methodCallHasSideEffect(Inst* inst) {
     }
 
     if (mse == MSE_Unknown) {  // try to compile method
+        //TODO: avoid compilation here. Use translator to perform analysis needed
+        bool allowRecursion = !compInterface.getTypeManager().isLazyResolutionMode();
+        if (!allowRecursion) {
+            return MSE_True;
+        }
         if (!compInterface.compileMethod(cmd)) {
 #ifdef _DEBUG
             if (Log::isEnabled()) {

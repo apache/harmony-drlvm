@@ -76,6 +76,19 @@ public:
     static char*        rt_helper_ti_field_modification;
 
     static char*        rt_helper_gc_safepoint;
+
+    static char*        rt_helper_new_withresolve;
+    static char*        rt_helper_new_array_withresolve;
+    static char*        rt_helper_get_class_withresolve;
+    static char*        rt_helper_checkcast_withresolve;
+    static char*        rt_helper_instanceof_withresolve;
+    static char*        rt_helper_field_get_offset_withresolve;
+    static char*        rt_helper_field_get_address_withresolve;
+    static char*        rt_helper_get_invokevirtual_addr_withresolve;
+    static char*        rt_helper_get_invokespecial_addr_withresolve;
+    static char*        rt_helper_get_invokestatic_addr_withresolve;
+    static char*        rt_helper_get_invokeinterface_addr_withresolve;
+
     /**
      * @brief An offset of 'thread suspend requiest' flag in TIB.
      * @see rt_helper_get_tls_base_ptr

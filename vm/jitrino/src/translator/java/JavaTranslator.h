@@ -37,20 +37,6 @@ typedef StlMultiMap<Inst*, Inst*> JsrEntryInstToRetInstMap;
 typedef std::pair<JsrEntryInstToRetInstMap::const_iterator, 
         JsrEntryInstToRetInstMap::const_iterator> JsrEntryCIterRange;
 
-//
-// version for translation-level inlining
-//
-extern Opnd* JavaCompileMethodInline(
-                                CompilationInterface& compilationInterface,
-                                MemoryManager& translatorMemManager,
-                                MethodDesc& methodDesc,
-                                IRBuilder& irBuilder,
-                                uint32 numActualArgs,
-                                Opnd** actualArgs,
-                                JavaFlowGraphBuilder& cfgBuilder, uint32 inlineDepth,
-                                InlineInfoBuilder* parentInlineInfoBuilder,
-                                JsrEntryInstToRetInstMap* parentJsrEntryMap);
-
 
 class JavaTranslator {
 public:

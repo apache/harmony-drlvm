@@ -440,53 +440,158 @@ enum VM_RT_SUPPORT {
  */
 
  /////
- /// Runtime resolution routine
+ /// Runtime resolution routines
  /////
 
-    VM_RT_RESOLVE = 801,
-  
-/**
- * @param The parameters are the following:
- *        arg\ Class handle
- *        arg\ Constant pool index of an item to be resolved
- *        arg\ A java byte code instruction (<code>JavaByteCodes</code>) 
- *             the resolution is performed for
- *
- * The helper performs resolution of symbolic references during runtime.
- * If resolution failed, the helper throws appropriate <code>LinkageError</code>.
- * Otherwise, the value depends on byte code passed:
- *
- *  === JavaByteCodes ===          === result of call ===
- *
- *  OPCODE_INVOKESTATIC:        resolve_static_method
- *
- *  OPCODE_INVOKEINTERFACE:     resolve_interface_method
- *
- *  OPCODE_INVOKEVIRTUAL,
- *
- *  OPCODE_INVOKESPECIAL:       resolve_virtual_method
- *
- *  OPCODE_INSTANCEOF,
- *
- *  OPCODE_CHECKCAST,
- *
- *  OPCODE_MULTIANEWARRAY       resolve_class
- *
- *  OPCODE_ANEWARRAY:           class_get_array_of_class(resolve_class())
- *
- *  OPCODE_NEW:                 resolve_class_new
- *
- *  OPCODE_GETFIELD,
- *
- *  OPCODE_PUTFIELD:            resolve_nonstatic_field
- *
- *  OPCODE_PUTSTATIC,
- *
- *  OPCODE_GETSTATIC:           resolve_static_field
- *
- * The helper initializes class if the class hasn't been initialized yet
- * for <code>PUTSTATIC</code> and <code>GETSTATIC</code>.
- */
+ 
+    /**
+    * @param The parameters are the following:
+    *        arg\ Class_Handle - enclosing class handle
+    *        arg\ Constant pool index
+    *
+    * @return new object
+    *
+    * Creates and returns new object for the given (class, cp_index)
+    * Loads and initialize class if needed
+    */
+    VM_RT_NEWOBJ_WITHRESOLVE,
+
+    /**
+    * @param The parameters are the following:
+    *        arg\ Class_Handle - enclosing class handle
+    *        arg\ Constant pool index
+    *        arg\ Array size
+    *
+    * @return new array
+    *
+    * Creates and returns new array of the given size
+    * with type referenced by (class, cp_index)
+    * Loads and initialize array class if needed
+    */
+    VM_RT_NEWARRAY_WITHRESOLVE,
+
+    /**
+    * @param The parameters are the following:
+    *        arg\ Class_Handle - enclosing class handle
+    *        arg\ Constant pool index
+    *
+    * @return field offset
+    *
+    * Returns an offset of the field referenced
+    * by the given (class, cp_index) pair
+    * Field's class must be loaded and  initialized
+    * before this helper call.
+    */
+    VM_RT_GET_NONSTATIC_FIELD_OFFSET_WITHRESOLVE,
+
+    /**
+    * @param The parameters are the following:
+    *        arg\ Class_Handle - enclosing class handle
+    *        arg\ Constant pool index
+    *
+    * @return field address
+    *
+    * Returns an address of the field referenced
+    * by the given (class, cp_index) pair
+    * Loads and initializes field's class if needed
+    */
+    VM_RT_GET_STATIC_FIELD_ADDR_WITHRESOLVE,
+
+    /**
+    * @param The parameters are the following:
+    *        arg\ Class_Handle - enclosing class handle
+    *        arg\ Constant pool index
+    *        arg\ Object to check cast
+    *
+    * @return third parameter
+    *
+    * Check if the given object can be casted to 
+    * the type referenced by (class, cp_index) pair
+    * Throws class cast exception if object can't be casted
+    * Returns the object instance (3rd parameter) if cast is allowed
+    * Loads and intialize cast type if needed.
+    */
+    VM_RT_CHECKCAST_WITHRESOLVE,
+    
+    /**
+    * @param The parameters are the following:
+    *        arg\ Class_Handle - enclosing class handle
+    *        arg\ Constant pool index
+    *        arg\ Object to check cast
+    *
+    * @return TRUE or FALSE
+    *
+    * Check if the given object is instance of 
+    * the type referenced by (class, cp_index) pair
+    * Return TRUE if object is instance of the given type
+    * or FALSE otherwise
+    * Loads and intialize 'instanceof' type if needed.
+    */
+    VM_RT_INSTANCEOF_WITHRESOLVE,
+
+    /**
+    * @param The parameters are the following:
+    *        arg\ Class_Handle - enclosing class handle
+    *        arg\ Constant pool index
+    *
+    * @return indirect address of the static method
+    *
+    * Returns the indirect address of the static method referenced
+    * by (class, cp_index) pair
+    * Loads and intialize method's class type if needed.
+    */
+    VM_RT_GET_INVOKESTATIC_ADDR_WITHRESOLVE,
+
+    /**
+    * @param The parameters are the following:
+    *        arg\ Class_Handle - enclosing class handle
+    *        arg\ Constant pool index
+    *        arg\ Object
+    *
+    * @return indirect address of the interface method
+    *
+    * Returns the indirect address of the interface method referenced
+    * by (class, cp_index) pair for the given object
+    */
+    VM_RT_GET_INVOKEINTERFACE_ADDR_WITHRESOLVE,
+
+    /**
+    * @param The parameters are the following:
+    *        arg\ Class_Handle - enclosing class handle
+    *        arg\ Constant pool index
+    *        arg\ Object
+    *
+    * @return indirect address of the virtual method
+    *
+    * Returns the indirect address of the virtual method referenced
+    * by (class, cp_index) pair for the given object
+    */
+    VM_RT_GET_INVOKEVIRTUAL_ADDR_WITHRESOLVE,
+    /**
+    * @param The parameters are the following:
+    *        arg\ Class_Handle - enclosing class handle
+    *        arg\ Constant pool index
+    *
+    * @return indirect address of the special method
+    *
+    * Returns the indirect address of the special method referenced
+    * by (class, cp_index) pair 
+    */
+    VM_RT_GET_INVOKE_SPECIAL_ADDR_WITHRESOLVE,
+
+    /**
+    * @param The parameters are the following:
+    *        arg\ Class_Handle - enclosing class handle
+    *        arg\ Constant pool index
+    *
+    * @return Class_Handle
+    *
+    * Returns the class handle referenced
+    * by (class, cp_index) pair 
+    * Loads and initialize class if needed
+    */
+    VM_RT_INITIALIZE_CLASS_WITHRESOLVE,
+
 
  /////
  // Non-VM specific helpers for the JIT

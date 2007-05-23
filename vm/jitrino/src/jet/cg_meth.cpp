@@ -694,8 +694,7 @@ void Compiler::gen_return(jtype retType)
     }
 }
 
-
-void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth,
+void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth, unsigned short cpIndex,
                          const ::std::vector<jtype> &args, jtype retType)
 {
     const unsigned slots = count_slots(args);
@@ -716,7 +715,7 @@ void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth,
     
     const bool is_static = opcod == OPCODE_INVOKESTATIC;
     Val thiz = is_static ? Val() : vstack(thiz_depth, true);
-    if (meth == NULL) {
+    if (meth == NULL && !m_lazy_resolution) {
         runlock(cs); // was just locked above - unlock
         gen_call_throw(ci_helper_linkerr, rt_helper_throw_linking_exc, 0,
                        m_klass, jinst.op0, jinst.opcode);
@@ -736,31 +735,64 @@ void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth,
         rlock(thiz);
     }
     
-    // INVOKEINTERFACE must have VM helper call first, so will place 
+    // INVOKEINTERFACE and lazy resolution must have VM helper call first, so will place 
     // its args later, after the call, to avoid destruction of args 
     // on registers.
-    if (opcod != OPCODE_INVOKEINTERFACE) {
+    if (opcod != OPCODE_INVOKEINTERFACE && meth != NULL) {
         stackFix = gen_stack_to_args(true, cs, 0);
         gen_gc_stack(-1, true);
         vpark();
     }
     //
-        // Check for null here - we just spilled all the args and 
-        // parked all the registers, so we have a chance to use HW NPE 
+    // Check for null here - we just spilled all the args and 
+    // parked all the registers, so we have a chance to use HW NPE 
     // For INVOKEINTERFACE we did not spill args, but we'll call VM first,
     // which is pretty expensive by itself, so the HW check does not give 
     // much.
     //
-        if (!is_static) {
-            // For invokeSPECIAL, we're using indirect address provided by 
-            // the VM. This means we do not read vtable, which means no 
-            // memory access, so we can't use HW checks - have to use 
+    if (!is_static) {
+        // For invokeSPECIAL, we're using indirect address provided by 
+        // the VM. This means we do not read vtable, which means no 
+        // memory access, so we can't use HW checks - have to use 
         // explicit one. Not a big loss, as the INVOKESPECIAL mostly
-            // comes right after NEW which guarantees non-null.
-            gen_check_null(thiz, opcod != OPCODE_INVOKESPECIAL);
-        }
-    
-    if (opcod == OPCODE_INVOKEINTERFACE) {
+        // comes right after NEW which guarantees non-null.
+        gen_check_null(thiz, opcod != OPCODE_INVOKESPECIAL);
+    }
+    if (meth == NULL) {
+        //lazy resolution mode: get method addr and call it.
+        assert(m_lazy_resolution);
+        //1. get method address
+        if (opcod == OPCODE_INVOKESTATIC || opcod == OPCODE_INVOKESPECIAL) {
+            static const CallSig cs_get_is_addr(CCONV_STDCALL, iplatf, i32);
+            char* helper = opcod == OPCODE_INVOKESTATIC ?  rt_helper_get_invokestatic_addr_withresolve :
+                                                           rt_helper_get_invokespecial_addr_withresolve;
+            gen_call_vm(cs_get_is_addr, helper, 0, m_klass, cpIndex);
+            runlock(cs_get_is_addr);
+        } else {
+            assert(opcod == OPCODE_INVOKEVIRTUAL || opcod == OPCODE_INVOKEINTERFACE);
+            static const CallSig cs_get_iv_addr(CCONV_STDCALL, iplatf, i32, jobj);
+            char * helper = opcod == OPCODE_INVOKEVIRTUAL ? rt_helper_get_invokevirtual_addr_withresolve : 
+                                                            rt_helper_get_invokeinterface_addr_withresolve;
+            // setup constant parameters first,
+            Val vclass(iplatf, m_klass);
+            Val vcpIdx(cpIndex);
+            gen_args(cs_get_iv_addr, 0, &vclass, &vcpIdx, &thiz);
+            gen_call_vm(cs_get_iv_addr, helper, 3);
+            runlock(cs_get_iv_addr);
+        } 
+        rlock(gr_ret); //WARN: call addr is in gr_ret -> lock it
+
+        //2.  call java method
+        stackFix = gen_stack_to_args(true, cs, 0);
+        gen_gc_stack(-1, true);
+        vpark();
+        
+        AR gr = valloc(iplatf);
+        ld(jobj, gr, gr_ret); //load indirect addr
+        call(gr, cs, is_set(DBG_CHECK_STACK));
+        runlock(gr_ret);
+    } 
+    else if (opcod == OPCODE_INVOKEINTERFACE) {
         // if it's INVOKEINTERFACE, then first resolve it
         Class_Handle klass = method_get_class(meth);
         const CallSig cs_vtbl(CCONV_STDCALL, jobj, jobj);

@@ -221,8 +221,8 @@ static bool class_can_instantiate(Class* clss, bool _throw)
 }
 
 
-Class* _resolve_class_new(Global_Env* env, Class* clss,
-                          unsigned cp_index)
+Class* resolve_class_new_env(Global_Env* env, Class* clss,
+                          unsigned cp_index, bool raise_exn)
 {
     ASSERT_RAISE_AREA;
 
@@ -504,36 +504,52 @@ static bool CAN_LINK_FROM_FIELD = false; // can link from putfield/getfield
 static bool LINK_WRITE_ACCESS   = true;  // link from putfield/putstatic
 static bool LINK_READ_ACCESS = false;    // link from getfield/getstatic
 static bool LINK_THROW_ERRORS = true;    // should throw linking exception on error
-static bool LINK_NO_THROW = false;       // must not throw linking exception on error
 
-static Field* _resolve_static_field(Global_Env *env,
-                                  Class *clss,
-                                  unsigned cp_index,
-                                  bool putfield)
-{
+Field* resolve_static_field_env(Global_Env *env,
+                                Class *clss,
+                                unsigned cp_index,
+                                bool putfield, 
+                                bool is_runtume)
+ {
     ASSERT_RAISE_AREA;
-
+ 
     Field *field = clss->_resolve_field(env, cp_index);
-    if(field && !field_can_link(clss, field, CAN_LINK_FROM_STATIC, putfield, LINK_NO_THROW)) {
+    if(!field) {
+        assert(clss->get_constant_pool().is_entry_in_error(cp_index));
+        if (is_runtume) {
+            exn_raise_object(clss->get_constant_pool().get_error_cause(cp_index));
+        }
+        return NULL;
+     }
+    if(!field_can_link(clss, field, CAN_LINK_FROM_STATIC, putfield, is_runtume)) {
+        return NULL;
+    }
+     return field;
+ }
+
+
+Field* resolve_nonstatic_field_env(Global_Env* env,
+                                    Class* clss,
+                                    unsigned cp_index,
+                                    unsigned putfield, 
+                                    bool raise_exn)
+ {
+     ASSERT_RAISE_AREA;
+ 
+    Field *field = clss->_resolve_field(env, cp_index);
+    if(!field) {
+        assert(clss->get_constant_pool().is_entry_in_error(cp_index));
+        if (raise_exn) {
+            exn_raise_object(clss->get_constant_pool().get_error_cause(cp_index));
+        }
+        return NULL;
+    }
+    if(!field_can_link(clss, field, CAN_LINK_FROM_FIELD, putfield, raise_exn)) {
         return NULL;
     }
     return field;
-} // _resolve_static_field
+ } 
 
-
-static Field* _resolve_nonstatic_field(Global_Env* env,
-                                       Class* clss,
-                                       unsigned cp_index,
-                                       unsigned putfield)
-{
-    ASSERT_RAISE_AREA;
-
-    Field *field = clss->_resolve_field(env, cp_index);
-    if(field && !field_can_link(clss, field, CAN_LINK_FROM_FIELD, putfield, LINK_NO_THROW)) {
-        return NULL;
-    }
-    return field;
-} // _resolve_nonstatic_field
 
 
 Method* Class::_resolve_method(Global_Env* env, unsigned cp_index)
@@ -645,17 +661,27 @@ static bool method_can_link_static(Class* clss, unsigned index, Method* method, 
     return true;
 }
 
-static Method* _resolve_static_method(Global_Env *env,
-                                      Class *clss,
-                                      unsigned cp_index)
+Method* resolve_static_method_env(Global_Env *env,
+                                Class *clss,
+                                unsigned cp_index, 
+                                bool raise_exn)
 {
     ASSERT_RAISE_AREA;
-
+ 
     Method* method = clss->_resolve_method(env, cp_index);
-    if(method && !method_can_link_static(clss, cp_index, method, LINK_NO_THROW))
+    if(!method) {
+        assert(clss->get_constant_pool().is_entry_in_error(cp_index));
+        if (raise_exn) {
+            exn_raise_object(clss->get_constant_pool().get_error_cause(cp_index));
+        }
         return NULL;
+    }
+
+    if (!method_can_link_static(clss, cp_index, method, raise_exn)) {
+        return NULL;
+    }
     return method;
-} //_resolve_static_method
+}
 
 
 static bool method_can_link_virtual(Class* clss, unsigned cp_index, Method* method, bool _throw)
@@ -684,15 +710,25 @@ static bool method_can_link_virtual(Class* clss, unsigned cp_index, Method* meth
 }
 
 
-static Method* _resolve_virtual_method(Global_Env *env,
-                                       Class *clss,
-                                       unsigned cp_index)
+Method* resolve_virtual_method_env(Global_Env *env,
+                                    Class *clss,
+                                    unsigned cp_index,
+                                    bool raise_exn)
 {
     Method* method = clss->_resolve_method(env, cp_index);
-    if(method && !method_can_link_virtual(clss, cp_index, method, LINK_NO_THROW))
+    if(!method) {
+        assert(clss->get_constant_pool().is_entry_in_error(cp_index));
+        if (raise_exn) {
+            exn_raise_object(clss->get_constant_pool().get_error_cause(cp_index));
+        }
         return NULL;
+    }
+
+    if (!method_can_link_virtual(clss, cp_index, method, raise_exn)) {
+        return NULL;
+    }
     return method;
-} //_resolve_virtual_method
+}
 
 
 static bool method_can_link_interface(Class* clss, unsigned cp_index, Method* method, bool _throw) {
@@ -700,16 +736,24 @@ static bool method_can_link_interface(Class* clss, unsigned cp_index, Method* me
 }
 
 
-static Method* _resolve_interface_method(Global_Env *env,
-                                         Class *clss,
-                                         unsigned cp_index)
-{
+Method* resolve_interface_method_env(Global_Env *env,
+                                    Class *clss,
+                                    unsigned cp_index, 
+                                    bool raise_exn)
+ {
     Method* method = clss->_resolve_method(env, cp_index);
-    if(method && !method_can_link_interface(clss, cp_index, method, LINK_NO_THROW)) {
+    if (!method) {
+        assert(clss->get_constant_pool().is_entry_in_error(cp_index));
+        if (raise_exn) {
+            exn_raise_object(clss->get_constant_pool().get_error_cause(cp_index));
+        }
+        return NULL;
+     }
+    if (!method_can_link_interface(clss, cp_index, method, raise_exn)) {
         return NULL;
     }
     return method;
-} //_resolve_interface_method
+}
 
 
 Field_Handle resolve_field(Compile_Handle h,
@@ -729,7 +773,7 @@ Field_Handle resolve_nonstatic_field(Compile_Handle h,
                                      unsigned index,
                                      unsigned putfield)
 {
-    return _resolve_nonstatic_field(compile_handle_to_environment(h), c, index, putfield);
+    return resolve_nonstatic_field_env(compile_handle_to_environment(h), c, index, putfield, false);
 } //resolve_nonstatic_field
 
 
@@ -742,7 +786,7 @@ Field_Handle resolve_static_field(Compile_Handle h,
                                   unsigned index,
                                   unsigned putfield)
 {
-    return _resolve_static_field(compile_handle_to_environment(h), c, index, putfield);
+    return resolve_static_field_env(compile_handle_to_environment(h), c, index, putfield, false);
 } //resolve_static_field
 
 
@@ -760,7 +804,7 @@ Method_Handle resolve_virtual_method(Compile_Handle h,
                                      Class_Handle c,
                                      unsigned index)
 {
-    return _resolve_virtual_method(compile_handle_to_environment(h), c, index);
+    return resolve_virtual_method_env(compile_handle_to_environment(h), c, index, false);
 } //resolve_virtual_method
 
 
@@ -813,14 +857,19 @@ static bool method_can_link_special(Class* clss, unsigned index, Method* method,
 // resolve constant pool reference to a method
 // used for invokespecial
 //
-Method_Handle resolve_special_method_env(Global_Env *env,
-                                         Class_Handle curr_clss,
-                                         unsigned index)
+Method* resolve_special_method_env(Global_Env *env,
+                                    Class_Handle curr_clss,
+                                    unsigned index,
+                                    bool raise_exn)
 {
     ASSERT_RAISE_AREA;
 
     Method* method = curr_clss->_resolve_method(env, index);
     if(!method) {
+        assert(curr_clss->get_constant_pool().is_entry_in_error(index));
+        if (raise_exn) {
+            exn_raise_object(curr_clss->get_constant_pool().get_error_cause(index));
+        }
         return NULL;
     }
     if(curr_clss->is_super()
@@ -851,7 +900,7 @@ Method_Handle resolve_special_method(Compile_Handle h,
                                      Class_Handle c,
                                      unsigned index)
 {
-    return resolve_special_method_env(compile_handle_to_environment(h), c, index);
+    return resolve_special_method_env(compile_handle_to_environment(h), c, index, false);
 } //resolve_special_method
 
 
@@ -864,7 +913,7 @@ Method_Handle resolve_static_method(Compile_Handle h,
                                     Class_Handle c,
                                     unsigned index) 
 {
-    return _resolve_static_method(compile_handle_to_environment(h), c, index);
+    return resolve_static_method_env(compile_handle_to_environment(h), c, index, false);
 } //resolve_static_method
 
 
@@ -877,7 +926,7 @@ Method_Handle resolve_interface_method(Compile_Handle h,
                                        Class_Handle c,
                                        unsigned index) 
 {
-    return _resolve_interface_method(compile_handle_to_environment(h), c, index);
+    return resolve_interface_method_env(compile_handle_to_environment(h), c, index, false);
 } //resolve_interface_method
 
 
@@ -898,7 +947,7 @@ Class_Handle resolve_class_new(Compile_Handle h,
                                Class_Handle c,
                                unsigned index) 
 {
-    return _resolve_class_new(compile_handle_to_environment(h), c, index);
+    return resolve_class_new_env(compile_handle_to_environment(h), c, index, false);
 } //resolve_class_new
 
 
@@ -912,6 +961,38 @@ Class_Handle resolve_class(Compile_Handle h,
 {
     return c->_resolve_class(compile_handle_to_environment(h), index);
 } //resolve_class
+
+Boolean class_is_cp_entry_resolved(Compile_Handle ch, Class_Handle clazz, unsigned cp_index) {
+    ConstantPool& cp = clazz->get_constant_pool();
+    Boolean res = cp.is_entry_resolved(cp_index);
+    if (!res) {
+        unsigned char tag = cp.get_tag(cp_index);
+        //during the loading of a class not all items in it's constant pool are updated
+        if (tag == CONSTANT_Fieldref || tag == CONSTANT_Methodref  
+            || tag == CONSTANT_InterfaceMethodref || tag == CONSTANT_Class)
+        {
+            uint16 typeIndex = tag == CONSTANT_Class ? cp_index : cp.get_ref_class_index(cp_index);
+            res = cp.is_entry_resolved(typeIndex);
+            if (!res) {
+                // the type is not marked as loaded in local constant pool
+                // ask classloader directly
+                uint16 nameIdx = cp.get_class_name_index(typeIndex);
+                String* typeName = cp.get_utf8_string(nameIdx);
+                assert(typeName!=NULL);
+                Class* type = clazz->get_class_loader()->LookupClass(typeName);
+                if (type) {
+                    /*TODO: uncommenting this code lead to a crash in StressLoader test
+                    clazz->lock();
+                    cp.resolve_entry(typeIndex, type);
+                    clazz->unlock();*/
+                    res = true;
+                }
+            }
+
+        } 
+    }
+    return res;
+}
 
 
 void class_throw_linking_error(Class_Handle ch, unsigned index, unsigned opcode)

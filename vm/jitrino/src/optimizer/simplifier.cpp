@@ -4426,6 +4426,8 @@ Simplifier::simplifyTauCheckCast(Opnd* src, Opnd* tauCheckedNull, Type* castType
     Type *opndType = src->getType();
     if (isNullObject(src)) {
         return genTauSafe()->getDst();
+    } else if (opndType->isUnresolvedType()) {
+        return NULL;
     } else if (irManager.getTypeManager().isSubClassOf(opndType, castType)) {
         return genTauHasType(src, castType)->getDst();
     } else if (!irManager.getTypeManager().isSubClassOf(castType, opndType)) {

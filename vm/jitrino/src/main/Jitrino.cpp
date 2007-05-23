@@ -68,6 +68,7 @@ JITInstances* Jitrino::jitInstances = NULL;
 
 struct Jitrino::Flags Jitrino::flags;
 
+static TlsKey recursionKey = 0;
 
 
 // some demo parameters
@@ -144,6 +145,8 @@ bool Jitrino::Init(JIT_Handle jh, const char* name)
         jitInstances = new (*global_mm) JITInstances(*global_mm);
 
         flags.time=false;
+
+        recursionKey = Tls::allocKey();
     }
 
     jitInstance = new (*global_mm) JITInstanceContext(*global_mm, jh, name);
@@ -383,6 +386,21 @@ void Jitrino::killJITInstanceContext(JITInstanceContext* jit) {
     }
 }
 
+
+
+int Jitrino::getCompilationRecursionLevel() {
+    return (int)(POINTER_SIZE_INT)Tls::get(recursionKey);
+}
+
+void Jitrino::incCompilationRecursionLevel() {
+    int recursion = (int)(POINTER_SIZE_INT)Tls::get(recursionKey);
+    Tls::put(recursionKey, (void*)(POINTER_SIZE_INT)(recursion+1));
+}
+
+void Jitrino::decCompilationRecursionLevel() {
+    int recursion = (int)(POINTER_SIZE_INT)Tls::get(recursionKey);
+    Tls::put(recursionKey, (void*)(POINTER_SIZE_INT)(recursion-1));
+}
 
 
 } //namespace Jitrino 

@@ -271,6 +271,9 @@ JIT_compile_method_with_params(JIT_Handle jit, Compile_Handle compilation,
              << "\tbyte code size=" <<  method_get_byte_code_size(method_handle)
              << std::endl;
     }
+#ifdef _DEBUG
+    Jitrino::incCompilationRecursionLevel();
+#endif
 
     JIT_Result result;
  
@@ -282,6 +285,10 @@ JIT_compile_method_with_params(JIT_Handle jit, Compile_Handle compilation,
 #endif  // USE_FAST_PATH
 
         result = Jitrino::CompileMethod(&cs) ? JIT_SUCCESS : JIT_FAILURE;
+
+#ifdef _DEBUG
+    Jitrino::decCompilationRecursionLevel();
+#endif
 
     if (info.isEnabled()) {
         info << current_nb << ">\t"

@@ -136,6 +136,7 @@ protected:
 
 };
 
+///Field representation for resolved fields
 class FieldDesc : public TypeMemberDesc {
 public:
     FieldDesc(Field_Handle field, CompilationInterface* ci, uint32 id) 
@@ -155,10 +156,6 @@ public:
         bool          isInitOnly() const     {return field_is_final(drlField)?true:false;}    
         // accesses to field cannot be reordered or CSEed
         bool          isVolatile() const    {return field_is_volatile(drlField)?true:false;}
-        //
-        // this is a compile-time constant field -- static fields only
-        //
-        bool          isLiteral() const;
         Type*         getFieldType();
         uint32        getOffset() const; // for non-static fields
         void*         getAddress() const    {return field_get_address(drlField);} // for static fields
@@ -168,6 +165,7 @@ private:
     Field_Handle drlField;
 };
 
+///Method representation for resolved methods
 class MethodDesc : public TypeMemberDesc {
 public:
     MethodDesc(Method_Handle m, JIT_Handle jit, CompilationInterface* ci = NULL, uint32 id = 0)
@@ -275,6 +273,7 @@ private:
     ChaMethodIterator iterator;
 };
 
+enum ResolveNewCheck{ResolveNewCheck_NoCheck, ResolveNewCheck_DoCheck};
 
 class CompilationInterface {
 public:
@@ -350,6 +349,17 @@ public:
         Helper_MethodEntry, // f(MethodHandle)
         Helper_MethodExit,   // f(MethodHandle, void* ret_value)
         Helper_WriteBarrier,
+        Helper_NewObjWithResolve,       //f(class_handle, cp_index)
+        Helper_NewArrayWithResolve,     //f(class_handle, cp_index, length)
+        Helper_GetNonStaticFieldOffsetWithResolve, //f(class_handle, cp_index)
+        Helper_GetStaticFieldAddrWithResolve,       //f(class_handle, cp_index)
+        Helper_CheckCastWithResolve,                //f(class_handle, cp_index, obj)
+        Helper_InstanceOfWithResolve,               //f(class_handle, cp_index, obj)
+        Helper_GetInvokeStaticAddrWithResolve,      //f(class_handle, cp_index)
+        Helper_GetInvokeInterfaceAddrWithResolve,   //f(class_handle, cp_index, obj)
+        Helper_GetInvokeVirtualAddrWithResolve,     //f(class_handle, cp_index, obj)
+        Helper_GetInvokeSpecialAddrWithResolve,     //f(class_handle, cp_index)
+        Helper_InitializeClassWithResolve,          //f(class_handle, cp_index)
         Num_Helpers
     };
 
@@ -375,29 +385,25 @@ public:
     void*       getRuntimeHelperAddressForType(RuntimeHelperId, Type*);
 
 
-    FieldDesc*  resolveField(MethodDesc* enclosingMethod,
-        uint32 fieldToken,
-        bool putfield);
-    FieldDesc*  resolveFieldByIndex(NamedType *klass, int index, NamedType **fieldType);
-    FieldDesc*  resolveStaticField(MethodDesc* enclosingMethod,
-        uint32 fieldToken,
-        bool putfield);
-    MethodDesc* resolveVirtualMethod(MethodDesc* enclosingMethod,
-        uint32 methodToken);
-    MethodDesc* resolveSpecialMethod(MethodDesc* enclosingMethod,
-        uint32 methodToken);
-    //FIXME
-    //MethodDesc* resolveMethod(MethodDesc* enclosingMethod,uint32 methodToken){assert(false); return 0;}
-    MethodDesc* resolveStaticMethod(MethodDesc* enclosingMethod,
-        uint32 methodToken);
-    MethodDesc* resolveInterfaceMethod(MethodDesc* enclosingMethod,
-        uint32 methodToken);
-    NamedType*  resolveNamedType(MethodDesc* enclosingMethod,
-        uint32 typeToken);
-    NamedType*  resolveNamedTypeNew(MethodDesc* enclosingMethod,
-        uint32 typeToken);
-    Type*       getFieldType(MethodDesc* enclosingMethodDesc, uint32 entryCPIndex);
+    Type*      getFieldType(Class_Handle enclClass, uint32 cpIndex);
 
+    NamedType* getNamedType(Class_Handle enclClass, uint32 cpIndex, ResolveNewCheck check = ResolveNewCheck_NoCheck);
+    Type*      getTypeFromDescriptor(Class_Handle enclClass, const char* descriptor);
+
+    //this method is obsolete and will be removed. Use getNamedType if unsure.
+    NamedType* resolveNamedType(Class_Handle enclClass, uint32 cpIndex);
+
+
+
+    MethodDesc* getStaticMethod(Class_Handle enclClass, uint32 cpIndex);
+    MethodDesc* getVirtualMethod(Class_Handle enclClass, uint32 cpIndex);
+    MethodDesc* getSpecialMethod(Class_Handle enclClass, uint32 cpIndex);
+    MethodDesc* getInterfaceMethod(Class_Handle enclClass, uint32 cpIndex);
+
+    FieldDesc*  getNonStaticField(Class_Handle enclClass, uint32 cpIndex, bool putfield);
+    FieldDesc*  getStaticField(Class_Handle enclClass, uint32 cpIndex, bool putfield);
+
+    
 
     // resolve-by-name methods
     /**

@@ -94,6 +94,17 @@ runtime_helpers_names[] = {
     DECL_HELPER_ITEM(MethodEntry),
     DECL_HELPER_ITEM(MethodExit),
     DECL_HELPER_ITEM(WriteBarrier),
+    DECL_HELPER_ITEM(NewObjWithResolve),
+    DECL_HELPER_ITEM(NewArrayWithResolve),
+    DECL_HELPER_ITEM(GetNonStaticFieldOffsetWithResolve),
+    DECL_HELPER_ITEM(GetStaticFieldAddrWithResolve),
+    DECL_HELPER_ITEM(CheckCastWithResolve),
+    DECL_HELPER_ITEM(InstanceOfWithResolve),
+    DECL_HELPER_ITEM(GetInvokeStaticAddrWithResolve),
+    DECL_HELPER_ITEM(GetInvokeInterfaceAddrWithResolve),
+    DECL_HELPER_ITEM(GetInvokeVirtualAddrWithResolve),
+    DECL_HELPER_ITEM(GetInvokeSpecialAddrWithResolve),
+    DECL_HELPER_ITEM(InitializeClassWithResolve)
 #undef DECL_HELPER_ITEM
 };
 static const unsigned runtime_helpers_names_count = sizeof(runtime_helpers_names)/sizeof(runtime_helpers_names[0]);

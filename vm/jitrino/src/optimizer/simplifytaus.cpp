@@ -581,7 +581,7 @@ Opnd *TauWalkerState::findReplacement(Opnd *src, Type *type, bool exactType)
         {
             return genTauSafe();
         }
-        
+
     case Op_TauMonitorEnter:
     case Op_TauMonitorExit:
     case Op_TypeMonitorEnter:

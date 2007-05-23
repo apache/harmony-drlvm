@@ -219,7 +219,7 @@ VMEXPORT const char  *class_get_source_file_name(Class_Handle cl);
 // is replaced with class_property_is_interface2.
 VMEXPORT Boolean class_property_is_interface(Class_Handle ch);
 
-VMEXPORT Boolean        class_get_array_num_dimensions(Class_Handle cl);
+VMEXPORT uint32 class_get_num_array_dimensions(Class_Handle cl, unsigned short cpIndex);
 
 VMEXPORT ClassLoaderHandle class_get_class_loader(Class_Handle c);
 
@@ -233,7 +233,6 @@ VMEXPORT Class_Handle
 class_load_class_by_name(const char *name,
                          Class_Handle c);
 
-
 VMEXPORT Class_Handle
 class_load_class_by_descriptor(const char *descr,
                                Class_Handle c);
@@ -242,6 +241,9 @@ VMEXPORT Method_Handle
 class_lookup_method_recursively(Class_Handle clss,
                                 const char *name,
                                 const char *descr);
+
+/// Returns 'TRUE' if the entry by the given cp_index is resolved.
+VMEXPORT Boolean  class_is_cp_entry_resolved(Compile_Handle ch, Class_Handle clazz, unsigned cp_index);
 
 // This function is for native library support
 // It takes a class name with .s not /s.
@@ -255,8 +257,7 @@ VMEXPORT Class_Handle class_find_class_from_loader(ClassLoaderHandle, const char
 // The following do not cause constant pools to be resolve, if they are not
 // resolved already
 //
-VMEXPORT Class_Handle resolve_class_from_constant_pool(Class_Handle c_handle,
-                                                        unsigned index);
+
 VMEXPORT const char  *const_pool_get_field_name(Class_Handle cl,
                                                  unsigned index);
 VMEXPORT const char  *const_pool_get_field_class_name(Class_Handle cl,

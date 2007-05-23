@@ -710,12 +710,6 @@ void Method::do_jit_recompiled_method_callbacks()
 //////////////////////////////////////////////////////
 // begin nop analysis
 
-
-Method_Handle resolve_special_method_env(Global_Env *env,
-                                         Class_Handle c,
-                                         unsigned index);
-
-
 enum Nop_Stack_State {
     NS_StackEmpty,
     NS_ThisPushed,
@@ -779,7 +773,7 @@ void Method::_set_nop()
                     }
                     Method_Handle mh = resolve_special_method_env(VM_Global_State::loader_env,
                                                                   get_class(),
-                                                                  index);
+                                                                  index, false);
                     Method *callee = (Method *)mh;
                     if(!callee) {
                         if(verbose) {

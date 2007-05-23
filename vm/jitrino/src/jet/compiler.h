@@ -355,6 +355,7 @@ private:
      * @return  - true if current inst is magic call, false otherwise.
      */
     bool gen_magic(void);
+
     
     //
     // Method being compiled info
@@ -410,11 +411,6 @@ private:
      * @brief Code buffer allocated by VM.
      */
     char *  m_vmCode;
-    
-    /**
-     * @brief Compilation handle.
-     */    
-    Compile_Handle  m_compileHandle;
     
     /**
      * @brief Parses method's signature at the given constant pool entry.

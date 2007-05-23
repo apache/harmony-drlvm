@@ -3027,7 +3027,6 @@ EscAnalyzer::what_inst(Inst* inst,::std::ostream& os) {
         Type* tt=fd->getFieldType();
         os << "      isInitOnly        " << fd->isInitOnly() << std::endl;
         os << "      isVolatile        " << fd->isVolatile() << std::endl;
-        os << "      isLiteral         " << fd->isLiteral() << std::endl;
         os << "      fldT      " << tt->getName() <<" "<< tt->tag<< std::endl;
         os << "      isObject  " << tt->isObject() << std::endl;
         os << "      isRef     " << tt->isReference()<< std::endl;

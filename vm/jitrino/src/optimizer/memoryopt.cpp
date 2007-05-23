@@ -1085,9 +1085,11 @@ void AliasRep::dump(::std::ostream &os) const
     case UnknownKind: os << "Unknown"; break;
         
     case ObjectFieldKind: os << "ObjectField"; break;
+    case UnresolvedObjectFieldKind: os << "UnresolvedObjectField"; break;
     case ArrayElementKind: os << "ArrayElement"; break;
         
     case StaticFieldKind: os << "StaticField"; break;
+    case UnresolvedStaticFieldKind: os << "UnresolvedStaticField"; break;
 
     case ObjectVtableKind: os << "ObjectVtable"; break;
     case MethodPtrKind: os << "MethodPtr"; break;
@@ -1107,6 +1109,7 @@ void AliasRep::dump(::std::ostream &os) const
     if (type || desc || opnd) {
         os << "[";
         if (opnd) { opnd->print(os); if (type || desc) os << ","; };
+        if (enclClass) {enclClass->print(os); os<<","; idx->print(os);}
         if (type) { type->print(os); if (desc) os << ","; };
         if (desc) desc->printFullName(os);
         os << "]";
@@ -1380,6 +1383,14 @@ AliasRep AliasManager::getReference(Opnd *addr)
                     assert(offsetRep.opnd == 0);
                     return findOrInsertAlias(getObjectField(baseOpnd, desc));
                 }
+            case AliasRep::UnresolvedObjectFieldKind:
+                {
+                    assert(offsetRep.opnd == 0);
+                    Opnd* enclClass = offsetRep.enclClass;
+                    Opnd* cpIdx = offsetRep.idx;
+                    assert(enclClass!=NULL &&  cpIdx!=NULL);
+                    return findOrInsertAlias(getUnresolvedObjectField(baseOpnd, enclClass, cpIdx));
+                }
             case AliasRep::LockKind:
                 assert(offsetRep.opnd == 0);
                 return findOrInsertAlias(getLock(baseOpnd));
@@ -1397,6 +1408,16 @@ AliasRep AliasManager::getReference(Opnd *addr)
     case Op_ConvZE:
     case Op_ConvUnmanaged:
     case Op_TauLdInd: // the result of static field load
+        break;
+    case Op_VMHelperCall:
+        {
+            VMHelperCallInst* callInst = addri->asVMHelperCallInst();
+            assert(callInst->getVMHelperId() == CompilationInterface::Helper_GetNonStaticFieldOffsetWithResolve
+                || callInst->getVMHelperId() == CompilationInterface::Helper_GetStaticFieldAddrWithResolve);
+            Opnd* enclClass = callInst->getSrc(0);
+            Opnd* cpIdx = callInst->getSrc(1);
+            return findOrInsertAlias(getUnresolvedObjectField(0, enclClass, cpIdx));
+        }
         break;
     default:
         assert(0);
@@ -1525,6 +1546,18 @@ AliasRep AliasManager::getObjectField(Opnd *obj, TypeMemberDesc *field)
     return findOrInsertAlias(theAlias);
 }
 
+AliasRep AliasManager::getUnresolvedObjectField(Opnd *obj, Opnd* enclClass, Opnd* cpIdx)
+{
+    AliasRep theAlias(AliasRep::UnresolvedObjectFieldKind, obj, enclClass, cpIdx);
+    return findOrInsertAlias(theAlias);
+}
+
+AliasRep AliasManager::getUnresolvedStaticField(Opnd* enclClass, Opnd* cpIdx)
+{
+    AliasRep theAlias(AliasRep::UnresolvedStaticFieldKind, 0, enclClass, cpIdx);
+    return findOrInsertAlias(theAlias);
+}
+
 void
 AliasManager::dumpAliasReps(::std::ostream &os) const
 {
@@ -1588,6 +1621,7 @@ AliasManager::computeAncestors(const AliasRep &a,
     case AliasRep::LocalKind: result->push_back(getAny()); return;
     case AliasRep::AnyKind: return;
     case AliasRep::UnknownKind:
+    case AliasRep::UnresolvedStaticFieldKind:
         result->push_back(getAnyGlobal());
         result->push_back(getAnyLocal());
         result->push_back(getAny());
@@ -1595,10 +1629,10 @@ AliasManager::computeAncestors(const AliasRep &a,
     case AliasRep::ObjectFieldKind:
         {
             FieldDesc *field = (FieldDesc *) a.desc;
-        if (a.opnd) {
-        result->push_back(getObjectField(0, field));
-        }
-        if (field->isInitOnly()) {
+            if (a.opnd) {
+                result->push_back(getObjectField(0, field));
+            }
+            if (field->isInitOnly()) {
                 result->push_back(getFinishObject(a.opnd));
             } else {
                 if ((a.opnd == 0) || analyzer->mayEscape(a.opnd)) {
@@ -1607,6 +1641,16 @@ AliasManager::computeAncestors(const AliasRep &a,
                 if ((a.opnd == 0) || !analyzer->mayEscape(a.opnd)) {
                     result->push_back(getAnyLocal());
                 }
+            }
+            result->push_back(getAny()); return;
+        }
+    case AliasRep::UnresolvedObjectFieldKind:
+        {
+            if ((a.opnd == 0) || analyzer->mayEscape(a.opnd)) {
+                result->push_back(getAnyGlobal());
+            }
+            if ((a.opnd == 0) || !analyzer->mayEscape(a.opnd)) {
+                result->push_back(getAnyLocal());
             }
             result->push_back(getAny()); return;
         }

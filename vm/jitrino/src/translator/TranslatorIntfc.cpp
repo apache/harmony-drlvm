@@ -33,6 +33,7 @@
 #include "methodtable.h"
 #include "CompilationContext.h"
 #include "FlowGraph.h"
+#include "Jitrino.h"
 
 namespace Jitrino {
 
@@ -40,7 +41,12 @@ namespace Jitrino {
 void TranslatorSession::run () {
     TranslatorAction* action = (TranslatorAction*)getAction();
     flags = action->getFlags();
-
+#ifdef _DEBUG
+    if (flags.assertOnRecursion) {
+        int rec = Jitrino::getCompilationRecursionLevel();
+        assert( rec == 1);
+    }
+#endif
     translate();
     postTranslatorCleanup();
 }
@@ -50,6 +56,7 @@ void TranslatorSession::translate() {
     CompilationContext* cc = getCompilationContext();
     IRManager* irm = cc->getHIRManager();
     assert(irm);
+    irm->getTypeManager().setLazyResolutionMode(flags.lazyResolution);
     MethodDesc& methodDesc = irm->getMethodDesc();
     //create IRBuilder
     MemoryManager& mm = cc->getCompilationLevelMemoryManager();
@@ -79,9 +86,7 @@ void TranslatorSession::postTranslatorCleanup() {
 
 
 static const char* help = \
-    "  inlineMethods[={ON|off}] - bytecode inlining\n"\
     "  propValues[={ON|off}]    -  propagate values during translation\n"\
-    "  guardedInlining[={on|OFF}]  - do guarded inlining during translation\n"\
     "  genCharArrayCopy[={on|off}] - generate intrinsic calls to char array copy\n"\
     "  genArrayCopy[={ON|off}] - inline java/lang/System::arraycopy call as a copying loop\n"\
     "  genArrayCopyRepMove[={ON|off}] - inline java/lang/System::arraycopy call as 'rep move' instruction\n"\
@@ -120,20 +125,12 @@ void TranslatorAction::readFlags() {
     flags.syncAsEnterFence = getBoolArg("syncAsEnterFence",false);
     flags.newCatchHandling = getBoolArg("newCatchHandling",true);
 
-    flags.inlineMethods  = getBoolArg("inlineMethods", false);
-    flags.guardedInlining = getBoolArg("guardedInlining", false);
-
+    
     flags.genMinMaxAbs = getBoolArg("genMinMaxAbs", false);
     flags.genFMinMaxAbs = getBoolArg("genFMinMaxAbs", false);
  
-    const char* skipMethods = getStringArg("skipMethods", NULL);
-    if(skipMethods == NULL) {
-        flags.inlineSkipTable = NULL;
-    } else {
-        MemoryManager& mm = Jitrino::getGlobalMM();
-        flags.inlineSkipTable = new (mm) Method_Table(mm, strdup(skipMethods), "SKIP_METHODS", true);
-    }
-
+    flags.lazyResolution = getBoolArg("lazyResolution", false);
+    flags.assertOnRecursion = getBoolArg("assertOnRecursion", flags.lazyResolution);
 }
 
 

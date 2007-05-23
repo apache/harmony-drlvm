@@ -92,6 +92,7 @@ public:
     virtual void accept(DispatchLabelInst*) = 0;
     virtual void accept(IntrinsicCallInst*) = 0;
     virtual void accept(JitHelperCallInst*) = 0;
+    virtual void accept(VMHelperCallInst*) = 0;
     virtual void accept(FieldAccessInst*) = 0;
     virtual void accept(LabelInst*) = 0;
     virtual void accept(MethodCallInst*) = 0;
@@ -1361,6 +1362,7 @@ private:
     CallInst*           makeClone(CallInst*, OpndManager&, OpndRenameTable&);
     IntrinsicCallInst*  makeClone(IntrinsicCallInst*, OpndManager&, OpndRenameTable&);
     JitHelperCallInst*  makeClone(JitHelperCallInst*, OpndManager&, OpndRenameTable&);
+    VMHelperCallInst*   makeClone(VMHelperCallInst*, OpndManager&, OpndRenameTable&);
     PhiInst*            makeClone(PhiInst*, OpndManager&, OpndRenameTable&);
     MultiSrcInst*       makeClone(MultiSrcInst*, OpndManager&, OpndRenameTable&);
 public:

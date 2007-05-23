@@ -59,9 +59,32 @@ Boolean class_is_array(Class_Handle cl) {
 } //class_is_array
 
 
-Boolean     class_get_array_num_dimensions(Class_Handle cl) {
-    assert(cl);
-    return cl->get_number_of_dimensions();
+static uint32 countLeadingChars(const char* str, char c) {
+    uint32 n=0;
+    while (str[n]==c) {
+        n++;                
+    }
+    return n;
+}
+ 
+VMEXPORT uint32 class_get_num_array_dimensions(Class_Handle cl, unsigned short cpIndex) {
+    ConstantPool& cp  = cl->get_constant_pool();
+    unsigned char tag = cp.get_tag(cpIndex);
+    char c = '[';
+    switch (tag) {
+        case CONSTANT_Class: {
+            uint16 nameIdx = cp.get_class_name_index(cpIndex);
+            const char* str = cp.get_utf8_string(nameIdx)->bytes;
+            return countLeadingChars(str, c);
+        }
+        case CONSTANT_Fieldref: {
+            const char* str = class_get_cp_entry_signature(cl, cpIndex);
+            return countLeadingChars(str, c);
+        }
+        default:
+            assert(0);
+    }
+    return 0;
 }
 
 const char* class_get_package_name(Class_Handle cl) {
@@ -2083,6 +2106,54 @@ Type_Info_Handle type_info_get_type_info(Type_Info_Handle tih)
     }
 } //type_info_get_type_info
 
+uint32 type_info_get_num_array_dimensions(Type_Info_Handle tih) {
+    TypeDesc* td = (TypeDesc*)tih;
+    if (td->get_kind() == K_Vector) {
+        const String* name = td->get_type_name();
+        uint32 res = 0;
+        if (name == NULL) {
+            res = 1 + type_info_get_num_array_dimensions(td->get_element_type());
+        } else {
+            res = countLeadingChars(name->bytes, '[');
+        }
+        assert(res<=255);
+        return res;
+    }
+    return 0;
+}
+
+Boolean type_info_is_resolved(Type_Info_Handle tih) {
+    TypeDesc* td = (TypeDesc*)tih;
+    switch (td->get_kind()) {
+        case K_Vector:
+            if (td->get_element_type()->is_primitive()) {
+                return true;
+            }
+            return type_info_is_resolved(td->get_element_type());
+        case K_Object:
+            {
+                bool res = td->is_loaded();
+                if (!res) {
+                    const String* typeName = td->get_type_name();
+                    assert(typeName);
+                    res =  td->get_classloader()->LookupClass(typeName) != NULL;
+                    if (res) {
+                        // type descs for some bootstrap classes (e.g. java/lang/Throwable) 
+                        // are not initialized by default. Do it here to avoid extra lookups next time
+                        td->load_type_desc();
+                        assert(td->is_loaded());
+                    }
+                }
+                
+                return res;
+            }
+        default:
+            ABORT("Unexpected kind");
+            return 0;
+    }
+}
+
+
 void free_string_buffer(char *buffer)
 {
     STD_FREE(buffer);
@@ -2108,6 +2179,10 @@ Type_Info_Handle class_get_element_type_info(Class_Handle ch)
     return td;
 } //class_get_element_type_info
 
+
+Type_Info_Handle type_info_create_from_java_descriptor(ClassLoaderHandle cl, const char* typeName) {
+    return type_desc_create_from_java_descriptor(typeName, cl);
+}
 
 
 /////////////////////////////////////////////////////
@@ -2168,7 +2243,7 @@ int class_get_referent_offset(Class_Handle ch)
 void* class_alloc_via_classloader(Class_Handle ch, int32 size)
 {
     assert(ch);
-	assert(size >= 0);
+    assert(size >= 0);
     Class *clss = (Class *)ch;
     assert (clss->get_class_loader());
     return clss->get_class_loader()->Alloc(size);
@@ -2630,7 +2705,7 @@ void set_property(const char* key, const char* value, PropertyTable table_number
     switch(table_number) {
     case JAVA_PROPERTIES: 
         VM_Global_State::loader_env->JavaProperties()->set(key, value);
-    	break;
+        break;
     case VM_PROPERTIES: 
         VM_Global_State::loader_env->VmProperties()->set(key, value);
         break;

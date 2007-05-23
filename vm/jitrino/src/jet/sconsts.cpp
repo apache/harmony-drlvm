@@ -62,6 +62,20 @@ char *  StaticConsts::rt_helper_ti_field_modification= NULL;
 char *  StaticConsts::rt_helper_gc_safepoint = NULL;
 char *  StaticConsts::rt_helper_get_tls_base_ptr= NULL;
 
+char*   StaticConsts::rt_helper_new_withresolve= NULL;
+char*   StaticConsts::rt_helper_new_array_withresolve= NULL;
+char*   StaticConsts::rt_helper_get_class_withresolve= NULL;
+char*   StaticConsts::rt_helper_checkcast_withresolve= NULL;
+char*   StaticConsts::rt_helper_instanceof_withresolve= NULL;
+char*   StaticConsts::rt_helper_field_get_offset_withresolve = NULL;
+char*   StaticConsts::rt_helper_field_get_address_withresolve = NULL;
+char*   StaticConsts::rt_helper_get_invokevirtual_addr_withresolve = NULL;
+char*   StaticConsts::rt_helper_get_invokespecial_addr_withresolve = NULL;
+char*   StaticConsts::rt_helper_get_invokestatic_addr_withresolve = NULL;
+char*   StaticConsts::rt_helper_get_invokeinterface_addr_withresolve = NULL;
+
+
+
 unsigned StaticConsts::rt_array_length_offset = NOTHING;
 unsigned StaticConsts::rt_suspend_req_flag_offset = NOTHING;
 int StaticConsts::rt_vtable_offset = 0;

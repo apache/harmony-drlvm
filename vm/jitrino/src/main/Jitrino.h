@@ -80,6 +80,10 @@ public:
     static struct Flags flags;
     static JITInstanceContext* getJITInstanceContext(JIT_Handle jitHandle);
     static void killJITInstanceContext(JITInstanceContext* jit);
+    
+    static int  getCompilationRecursionLevel();
+    static void incCompilationRecursionLevel();
+    static void decCompilationRecursionLevel();
 
 private:
     static MemoryManager *global_mm; 

@@ -1734,8 +1734,18 @@ CG_OpndHandle * InstCodeSelector::ldArrayLenOffsetPlusHeapbase(Type *elemType)
 CG_OpndHandle * InstCodeSelector::addOffset(Type *pointerType, CG_OpndHandle* refHandle,
                                CG_OpndHandle* offsetHandle)
 { 
-    ICS_ASSERT(0);
-    return 0;
+    Opnd* base = (Opnd*)refHandle;
+    Opnd* offsetOpnd = (Opnd*)offsetHandle;
+    Type* fieldRefType = pointerType;
+    assert(base->getType()->isObject());
+    assert(offsetOpnd->getType()->isInteger());
+    assert(fieldRefType->isManagedPtr());
+
+#ifdef _EM64T_
+    return simpleOp_I8(Mnemonic_ADD, fieldRefType, (Opnd*)base, offsetOpnd);
+#else
+    return simpleOp_I4(Mnemonic_ADD, fieldRefType, (Opnd*)base, offsetOpnd);
+#endif
 }
 
 //_______________________________________________________________________________________________________________
@@ -2780,6 +2790,7 @@ CG_OpndHandle* InstCodeSelector::callvmhelper(uint32              numArgs,
         dstOpnd  = tlsBase;
         break;
     }
+    //vmhelper slow paths
     case CompilationInterface::Helper_NewObj_UsingVtable:
     case CompilationInterface::Helper_NewVector_UsingVtable:
     case CompilationInterface::Helper_ObjMonitorEnter:
@@ -2788,7 +2799,21 @@ CG_OpndHandle* InstCodeSelector::callvmhelper(uint32              numArgs,
     case CompilationInterface::Helper_LdInterface:
     case CompilationInterface::Helper_Cast:
     case CompilationInterface::Helper_IsInstanceOf:
-    {
+    
+    //helpers used by JIT in lazy resolution mode
+    case CompilationInterface::Helper_NewObjWithResolve:
+    case CompilationInterface::Helper_NewArrayWithResolve:
+    case CompilationInterface::Helper_GetNonStaticFieldOffsetWithResolve:
+    case CompilationInterface::Helper_GetStaticFieldAddrWithResolve:
+    case CompilationInterface::Helper_CheckCastWithResolve:
+    case CompilationInterface::Helper_InstanceOfWithResolve:
+    case CompilationInterface::Helper_GetInvokeStaticAddrWithResolve:
+    case CompilationInterface::Helper_GetInvokeInterfaceAddrWithResolve:
+    case CompilationInterface::Helper_GetInvokeVirtualAddrWithResolve:
+    case CompilationInterface::Helper_GetInvokeSpecialAddrWithResolve:
+    case CompilationInterface::Helper_InitializeClassWithResolve:
+    case CompilationInterface::Helper_NewMultiArray:
+{
         dstOpnd = retType==NULL ? NULL: irManager.newOpnd(retType);
         CallInst * callInst=irManager.newRuntimeHelperCallInst(callId, numArgs, (Opnd**)args, dstOpnd);
         appendInsts(callInst);

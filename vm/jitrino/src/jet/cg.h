@@ -102,6 +102,23 @@ inline unsigned count_slots(unsigned num, const jtype * args)
     return slots;
 }
 
+/** the class is used by codegen internally to keep field information */
+class FieldOpInfo {
+public:
+    FieldOpInfo(Field_Handle f, Class_Handle h, unsigned short i, JavaByteCodes oc) 
+        : fld(f), enclClass(h), cpIndex(i), opcode(oc){}
+
+    bool isGet() const {return opcode == OPCODE_GETFIELD || opcode == OPCODE_GETSTATIC;}
+    bool isPut() const {return !isGet();}
+    bool isStatic() const {return opcode == OPCODE_GETSTATIC || opcode == OPCODE_PUTSTATIC;}
+
+
+    Field_Handle    fld;
+    Class_Handle    enclClass;
+    unsigned short  cpIndex;
+    JavaByteCodes   opcode;
+};
+
 /**
  * Code generation routines for most of byte code instructions.
  *
@@ -116,6 +133,8 @@ protected:
     {
         m_pmfPipeline = NULL;
         m_pmf = NULL;
+        m_lazy_resolution = false;
+        m_compileHandle = NULL;
     }
 
     /**
@@ -163,24 +182,12 @@ public:
      */
     void gen_ldc(void);
     /**
-     * @brief Generates PUTFIELD and GETFIELD operations.
+     * @brief Generates PUTFIELD/GETFIELD/PUTSTATIC/GETSTATIC operations.
      *
-     * Simply invokes do_field_op().
      */
-    void gen_field_op(JavaByteCodes op, jtype jt, Field_Handle fld);
-    /**
-     * @brief Generates PUTSTATIC and GETSTATIC operations.
-     *
-     * Simply invokes do_field_op().
-     */
-    void gen_static_op(JavaByteCodes op, jtype jt, Field_Handle fld);
-    /**
-     * @brief Do all the job for gen_static_op() and gen_field_op().
-     *
-     * Invokes gen_check_null() for GETFIELD and PUTFIELD.
-     */
-    void do_field_op(JavaByteCodes op, jtype jt, Field_Handle fld);
-
+    void gen_field_op(JavaByteCodes opcode,  Class_Handle enclClass, unsigned short cpIndex);
+    
+    
     /**
     * @brief Generates modification watchpoints if VM need it.
     *
@@ -213,7 +220,7 @@ public:
     /**
      * @brief Generates code for INVOKE instructions.
      */
-    void gen_invoke(JavaByteCodes opcod, Method_Handle meth, 
+    void gen_invoke(JavaByteCodes opcod, Method_Handle meth, unsigned short cpIndex,
                     const ::std::vector<jtype>& args, jtype retType);
 
     /**
@@ -265,21 +272,22 @@ public:
     /**
      * @brief Generates code for NEW instruction.
      */
-    void gen_new(Class_Handle klass);
+    void gen_new(Class_Handle enclClass, unsigned short cpIndex);
     /**
      * @brief Generates ANEWARRAY, NEWARRAY.
      */
     void gen_new_array(Allocation_Handle ah);
+    void gen_new_array(Class_Handle enclClass, unsigned cpIndex);
     /**
      * @brief Generates MULTIANEWARRAY.
      */
-    void gen_multianewarray(Class_Handle klass, unsigned num_dims);
+    void gen_multianewarray(Class_Handle enclClass, unsigned short cpIndex, unsigned num_dims);
     /**
      * @brief Generates code for INSTANCEOF or CHECKCAST operations.
      * @param chk - if \b true, generates CHECKCAST, INSTANCEOF otherwise.
      * @param klass - Class_Handle of the class to cast to.
      */
-    void gen_instanceof_cast(bool chk, Class_Handle klass);
+    void gen_instanceof_cast(JavaByteCodes opcode, Class_Handle enclClass, unsigned short cpIndex);
     /**
      * @brief Generates code for MONITOREXTERN and MONITOREXIT.
      */
@@ -463,8 +471,9 @@ public:
      * The opcode may be one of AASTORE, PUTFIELD or PUTSTATIC.
      *
      * For AASTORE \c fieldHandle must be \b NULL.
+     * For AASTORE \c fieldSlotAddress is not used
      */
-    void gen_write_barrier(JavaByteCodes opcode, Field_Handle fieldHandle);
+    void gen_write_barrier(JavaByteCodes opcode, Field_Handle fieldHandle, Opnd fieldSlotAddress);
 
 
     /**
@@ -1016,6 +1025,13 @@ public:
             m_bbstate->m_last_gr = ar;
         }
     }
+
+    /**
+    * @brief Checks if the class name is vmmagic class
+    * @return  - true if the class name is vmmagic class
+    */
+    static bool is_magic_class(const char* kname);
+
 protected:
     /**
      * @brief Tests whether the specified flag is set in method's compilation
@@ -1082,6 +1098,15 @@ protected:
         }
         return to_bool(val);
     }
+
+
+    /**
+    * @brief Do all the job for gen_field_op()
+    *
+    * Invokes gen_check_null() for GETFIELD and PUTFIELD.
+    */
+    void do_field_op(const FieldOpInfo& fieldOp);
+
     /**
      * PMF instance to get arguments from.
      */
@@ -1251,7 +1276,17 @@ protected:
      * as some methods may be rejected (seen, but not compiled).
      */
     unsigned     m_methID;
-    
+
+    /**
+    * @brief If 'TRUE' JIT will not ask VM to resolve any unresolved types during compilation
+    */    
+    bool m_lazy_resolution;
+
+    /**
+    * @brief Compilation handle.
+    */    
+    Compile_Handle  m_compileHandle;
+
 };
 
 

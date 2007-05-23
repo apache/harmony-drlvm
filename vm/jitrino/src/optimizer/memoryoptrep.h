@@ -45,9 +45,11 @@ public:
         UnknownKind, // other opnd, should not be vtable, methodptr, arraylen, field
 
         ObjectFieldKind, // parameterized by object and field desc
+        UnresolvedObjectFieldKind, // field of unresolved type
         ArrayElementKind, // offset into array, parameterized by array object and offset opnd
 
         StaticFieldKind, // just field, type is pulled out too
+        UnresolvedStaticFieldKind, // just field, type is pulled out too
 
         ObjectVtableKind, // opnd
         MethodPtrKind, // opnd, desc
@@ -64,23 +66,27 @@ public:
     } kind;
     Opnd *opnd;
     Opnd *idx;
+    Opnd *enclClass;
     Type *type;
     TypeMemberDesc *desc;
     int id;
 
-    AliasRep(int) : kind(NullKind), opnd(0), idx(0), type(0), desc(0), id(0) {};
-    AliasRep(Kind k=NullKind) : kind(k), opnd(0), idx(0), type(0), desc(0), id(0) {};
-    AliasRep(Kind k, Opnd *op) : kind(k), opnd(op), idx(0), type(0), desc(0), id(0) {
+    AliasRep(int) : kind(NullKind), opnd(0), idx(0), enclClass(0), type(0), desc(0), id(0) {};
+    AliasRep(Kind k=NullKind) : kind(k), opnd(0), idx(0), enclClass(0),type(0), desc(0), id(0) {};
+    AliasRep(Kind k, Opnd *op) : kind(k), opnd(op), idx(0), enclClass(0),type(0), desc(0), id(0) {
     };
-    AliasRep(Kind k, Opnd *op, Opnd *idx0) : kind(k), opnd(op), idx(idx0), type(0), desc(0), id(0) {
+    AliasRep(Kind k, Opnd *op, Opnd *idx0) : kind(k), opnd(op), idx(idx0), enclClass(0), type(0), desc(0), id(0) {
     };
-    AliasRep(Kind k, Opnd *op, TypeMemberDesc *md) : kind(k), opnd(op), idx(0), type(0), desc(md), id(0) {
+    AliasRep(Kind k, Opnd *op, TypeMemberDesc *md) : kind(k), opnd(op), idx(0), enclClass(0), type(0), desc(md), id(0) {
     };
-    AliasRep(Kind k, Type *t) : kind(k), opnd(0), idx(0), type(t), desc(0), id(0) {
+    AliasRep(Kind k, Type *t) : kind(k), opnd(0), idx(0), enclClass(0), type(t), desc(0), id(0) {
     };
-    AliasRep(Kind k, TypeMemberDesc *md) : kind(k), opnd(0), idx(0), type(0), desc(md), id(0) {
+    AliasRep(Kind k, TypeMemberDesc *md) : kind(k), opnd(0), idx(0), enclClass(0), type(0), desc(md), id(0) {
     };
     
+    AliasRep(Kind k, Opnd* op, Opnd* enc, Opnd* idx0) : kind(k), opnd(op), idx(idx0), enclClass(enc), type(0), desc(0), id(0) {
+    };
+
     void dump(::std::ostream &os) const;
     void print(::std::ostream &os) const;
 
@@ -95,15 +101,18 @@ public:
                 ((kind == other.kind) && 
                  ((opnd < other.opnd) ||
                   ((opnd == other.opnd) &&
-                   ((type < other.type) ||
-                    ((type == other.type) &&
-                     ((desc < other.desc) ||
-                      ((desc == other.desc) &&
-                       (idx < other.idx)))))))));
+                   ((enclClass < other.enclClass) ||
+                    ((enclClass== other.enclClass) &&
+                     ((type < other.type) ||
+                      ((type == other.type) &&
+                       ((desc < other.desc) ||
+                        ((desc == other.desc) &&
+                         (idx < other.idx)))))))))));
     }
     bool operator == (const AliasRep &other) const {
         return ((kind == other.kind) &&
                 (opnd == other.opnd) &&
+                (enclClass == other.enclClass) &&
                 (type == other.type) &&
                 (desc == other.desc) &&
                 (idx == other.idx));
@@ -112,7 +121,8 @@ public:
         return (((size_t) kind) ^
                 ((size_t) opnd) ^
                 ((size_t) type) ^
-                ((size_t) desc));
+                ((size_t) desc) ^
+                ((size_t) enclClass));
     }
 };
 
@@ -139,7 +149,9 @@ public:
     AliasRep getReference(Opnd *addr); // examine for an indirect addr
 
     AliasRep getObjectField(Opnd *obj, TypeMemberDesc *field);
+    AliasRep getUnresolvedObjectField(Opnd *obj, Opnd* enclClass, Opnd* cpIdx);
     AliasRep getStaticField(TypeMemberDesc *field);
+    AliasRep getUnresolvedStaticField(Opnd* enclClass, Opnd* cpIdx);
     AliasRep getArrayElementByType(Type *elementType);
     AliasRep getLock(Opnd *obj);
     AliasRep getLock(Type *type);

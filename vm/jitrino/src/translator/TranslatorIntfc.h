@@ -50,8 +50,6 @@ class SessionAction;
     // to select which byte code translator optimizations are done
 struct TranslatorFlags {
     bool propValues         : 1;    // do value propagation
-    bool inlineMethods      : 1;    // do method inlining
-    bool guardedInlining    : 1;    // a step further for inlining
     bool genCharArrayCopy   : 1;    // generate intrinsic calls to CharArrayCopy
     bool genArrayCopy       : 1;    // inline java/lang/System::arraycopy call as a copying loop
     bool genArrayCopyRepMove: 1;    // inline java/lang/System::arraycopy call as 'rep move' instruction
@@ -62,7 +60,8 @@ struct TranslatorFlags {
     bool genMinMaxAbs       : 1;    // gen min/max/abs opcodes instead of using select
     bool genFMinMaxAbs      : 1;    // gen min/max/abs opcodes for floats
     bool optArrayInit       : 1;    // skip array initializers from optimizations
-    Method_Table* inlineSkipTable; // do not inline these methods
+    bool lazyResolution     : 1;    //do not ask VM to resolve any classes during a compilation
+    bool assertOnRecursion  : 1;    //assert of translator work in recursove compilation. Used to check lazy resolution mode.
 };
 
 class IRBuilderAction;
@@ -168,12 +167,6 @@ setStackOpndAliveOpnd(Opnd* opnd,bool val);
 
 extern void
 setStackOpndSavedOpnd(Opnd* opnd,bool val);
-
-extern void 
-IRinline(CompilationInterface&      compilationInterface,
-         IRBuilder&                 irBuilder,
-         InstFactory&               instFactory,
-         ControlFlowGraph*                 fg);
 
 } //namespace Jitrino 
 

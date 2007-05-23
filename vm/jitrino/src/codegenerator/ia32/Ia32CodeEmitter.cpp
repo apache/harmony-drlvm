@@ -799,6 +799,7 @@ void CodeEmitter::registerExceptionRegion(void * regionStart, void * regionEnd, 
 
         void * handlerAddr=handler->getCodeStartAddr();
         ObjectType * exceptionType = (ObjectType*)((CatchEdge*)edge)->getType();
+        assert(!exceptionType->isUnresolvedType());
         exceptionHandlerInfos.push_back(
             ExceptionHandlerInfo(regionStart, regionEnd, handlerAddr, exceptionType, isExceptObjDead)
             );

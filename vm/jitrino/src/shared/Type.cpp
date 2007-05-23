@@ -37,6 +37,9 @@ bool Type::mayAlias(TypeManager* typeManager, Type* t1, Type* t2)
     t1 = t1->getNonValueSupertype();
     t2 = t2->getNonValueSupertype();
     if (t1==t2) return true;
+    if (t1->isUnresolvedType() || t2->isUnresolvedType()) {
+        return false;
+    }
     return typeManager->isSubTypeOf(t1, t2) || typeManager->isSubClassOf(t2, t1);
 }
 
@@ -48,7 +51,7 @@ bool Type::mayAliasPtr(Type* t1, Type* t2)
     // References off of null objects are invalid, so should not interfere 
     // with other accesses or each other.  (Although invalid, these seems
     // to show up, at least briefly, due to constant folding).
-    if (t1->isNullObject() || t2->isNullObject()) {
+    if (t1->isNullObject() || t2->isNullObject() || t1->isUnresolvedType() || t2->isUnresolvedType()) {
         return false;
     }
 
@@ -135,6 +138,7 @@ Type* TypeManager::toInternalType(Type* t)
     case Type::NullObject:
     case Type::Array:
     case Type::Object:
+    case Type::UnresolvedObject:
     case Type::UnmanagedPtr:
     case Type::ManagedPtr:
     case Type::CompressedSystemObject:
@@ -243,13 +247,19 @@ bool TypeManager::isSubTypeOf(Type *type1, Type *type2) {
 
 ObjectType * TypeManager::getCommonObjectType(ObjectType *o1, ObjectType *o2) {
     ObjectType *common = NULL;
-    for ( ; o2 != NULL; o2 = o2->getSuperType()) {
-        if (o1->isSubClassOf(o2)) {
-            common = o2;
-            break;
-        } else if (o2->isSubClassOf(o1)) {
-            common = o1;
-            break;
+    if (o1->isUnresolvedType()){
+        common = o2;
+    } else if (o2->isUnresolvedType()) {
+        common = o1;
+    } else {
+        for ( ; o2 != NULL; o2 = o2->getSuperType()) {
+            if (o1->isSubClassOf(o2)) {
+                common = o2;
+                break;
+            } else if (o2->isSubClassOf(o1)) {
+                common = o1;
+                break;
+            }
         }
     }
     return common;
@@ -262,6 +272,11 @@ Type*   TypeManager::getCommonType(Type *type1, Type* type2) {
     Type *common = NULL;
     bool oneIsCompressed = type1->isCompressedReference();
     assert(type1->isCompressedReference() == type2->isCompressedReference());
+    if (type1->isUnresolvedType() || type2->isUnresolvedType()) {
+        if (type1->isNullObject()) return type2;
+        if (type2->isNullObject()) return type1;
+        return type1->isUnresolvedType() ? type2 : type1;
+    }
     if ( type2->isObject() && (oneIsCompressed 
         ? (type1 == getCompressedNullObjectType()) 
         : (type1 == getNullObjectType())) ) {
@@ -303,6 +318,7 @@ TypeManager::TypeManager(MemoryManager& mm) :
     typedReference(Type::TypedReference),
     theSystemStringType(NULL), 
     theSystemObjectType(NULL),
+    theUnresolvedObjectType(NULL),
     theSystemClassType(NULL),
     nullObjectType(Type::NullObject), 
     offsetType(Type::Offset),
@@ -335,6 +351,7 @@ TypeManager::TypeManager(MemoryManager& mm) :
     arrayElementTypes(mm, 32),
     arrayIndexTypes(mm, 32),
     methodPtrObjTypes(mm,32),
+    unresMethodPtrTypes(mm, 32),
     itableObjTypes(mm, 32),
 
     areReferencesCompressed(false)
@@ -343,6 +360,7 @@ TypeManager::TypeManager(MemoryManager& mm) :
     int32Type=int64Type=uintPtrType=uint8Type=uint16Type=NULL;
        uint32Type=uint64Type=singleType=doubleType=floatType=NULL;
        systemObjectVMTypeHandle = systemClassVMTypeHandle = systemStringVMTypeHandle = NULL;
+       lazyResolutionMode = false;
 }
 
 NamedType* 
@@ -365,6 +383,8 @@ TypeManager::init() {
         ObjectType(Type::SystemString,systemStringVMTypeHandle,*this);
     theSystemObjectType = new (memManager) 
         ObjectType(Type::SystemObject,systemObjectVMTypeHandle,*this);
+    theUnresolvedObjectType= new (memManager) 
+        ObjectType(Type::UnresolvedObject,systemObjectVMTypeHandle,*this);
     theSystemClassType = new (memManager) 
         ObjectType(Type::SystemClass,systemClassVMTypeHandle,*this);
     userObjectTypes.insert(systemStringVMTypeHandle,theSystemStringType);
@@ -419,11 +439,16 @@ TypeManager::getArrayType(Type* elemType, bool isCompressed, void* arrayVMTypeHa
                 isUnboxed = false;
             }
             if (arrayVMTypeHandle == NULL) {
-                arrayVMTypeHandle = VMInterface::getArrayVMTypeHandle(elemNamedType->getVMTypeHandle(),isUnboxed);
+                if (elemNamedType->isUnresolvedType()) {
+                    arrayVMTypeHandle = NULL;
+                } else {
+                    arrayVMTypeHandle = VMInterface::getArrayVMTypeHandle(elemNamedType->getVMTypeHandle(),isUnboxed);
+                }
             }
-            type = new (memManager) 
-                ArrayType(elemNamedType,arrayVMTypeHandle,*this, isCompressed);
-            if (arrayVMTypeHandle != (void*)(POINTER_SIZE_INT)0xdeadbeef && type->getAllocationHandle()!=0) { // type is resolved
+            type = new (memManager)  ArrayType(elemNamedType,arrayVMTypeHandle,*this, isCompressed);
+            if (arrayVMTypeHandle != (void*)(POINTER_SIZE_INT)0xdeadbeef 
+                &&  (type->isUnresolvedType() || type->getAllocationHandle()!=0)) 
+            { // type can be cached
                 lookupTable.insert(elemNamedType,type);
             }
         }
@@ -468,28 +493,176 @@ TypeManager::getValueType(void* vmTypeHandle) {
     return type;
 }
 
+
+PtrType*  
+TypeManager::getManagedPtrType(Type* pointedToType) {
+    PtrType* type = managedPtrTypes.lookup(pointedToType);
+    if (type == NULL) {
+        type = new (memManager) PtrType(pointedToType,true);
+        managedPtrTypes.insert(pointedToType,type);
+    }
+    return type;
+}
+PtrType*
+TypeManager::getUnmanagedPtrType(Type* pointedToType) {
+    PtrType* type = unmanagedPtrTypes.lookup(pointedToType);
+    if (type == NULL) {
+        type = new (memManager) PtrType(pointedToType,false);
+        unmanagedPtrTypes.insert(pointedToType,type);
+    }
+    return type;
+}
+MethodPtrType*    
+TypeManager::getMethodPtrType(MethodDesc* methodDesc) {
+    MethodPtrType* type = methodPtrTypes.lookup(methodDesc);
+    if (type == NULL) {
+        type = new (memManager) MethodPtrType(methodDesc,*this);
+        methodPtrTypes.insert(methodDesc,type);
+    }
+    return type;
+}
+
+UnresolvedMethodPtrType*    
+TypeManager::getUnresolvedMethodPtrType(ObjectType* enclosingClass, uint32 cpIndex) {
+    PtrHashTable<UnresolvedMethodPtrType>* methodsPerClass = unresMethodPtrTypes.lookup(enclosingClass);
+    if (!methodsPerClass) {
+        methodsPerClass = new (memManager) PtrHashTable<UnresolvedMethodPtrType>(memManager, 32);
+        unresMethodPtrTypes.insert(enclosingClass, methodsPerClass);
+    }
+    UnresolvedMethodPtrType* methType = methodsPerClass->lookup((void*)(POINTER_SIZE_INT)cpIndex);
+    if (!methType) {
+        methType = new (memManager) UnresolvedMethodPtrType(enclosingClass, cpIndex, *this);
+        methodsPerClass->insert((void*)(POINTER_SIZE_INT)cpIndex, methType);
+    }
+    return methType;
+}
+
+MethodPtrType* 
+TypeManager::getMethodPtrObjType(ValueName obj, MethodDesc* methodDesc) {
+    PtrHashTable<MethodPtrType>* ptrTypes = methodPtrObjTypes.lookup(methodDesc);
+    if (!ptrTypes) {
+        ptrTypes = new (memManager) PtrHashTable<MethodPtrType>(memManager, 32);
+        methodPtrObjTypes.insert(methodDesc, ptrTypes);
+    }
+    MethodPtrType* ptrType = ptrTypes->lookup(obj);
+    if (!ptrType) {
+        ptrType = new (memManager) MethodPtrType(methodDesc, *this, false, obj);
+        ptrTypes->insert(obj, ptrType);
+    }
+    return ptrType;
+}
+
+VTablePtrType*    
+TypeManager::getVTablePtrType(Type* type) {
+    VTablePtrType* vtableType = vtablePtrTypes.lookup(type);
+    if (vtableType == NULL) {
+        vtableType = new (memManager) VTablePtrType(type);
+        vtablePtrTypes.insert(type,vtableType);
+    }
+    return vtableType;
+}
+
+OrNullType* 
+TypeManager::getOrNullType(Type* t) {
+    OrNullType* orNullType = orNullTypes.lookup(t);
+    if (!orNullType) {
+        orNullType = new (memManager) OrNullType(t);
+        orNullTypes.insert(t, orNullType);
+    }
+    return orNullType;
+}
+
+ValueNameType* 
+TypeManager::getVTablePtrObjType(ValueName val) {
+    ValueNameType* vtablePtrType = vtableObjTypes.lookup(val);
+    if (!vtablePtrType) {
+        vtablePtrType = new (memManager) ValueNameType(Type::VTablePtrObj, val, getIntPtrType());
+        vtableObjTypes.insert(val, vtablePtrType);
+    }
+    return vtablePtrType;
+}
+
+ValueNameType* 
+TypeManager::getITablePtrObjType(ValueName val, NamedType* itype) {
+    PtrHashTable<ITablePtrObjType>* itableTypes = itableObjTypes.lookup(val);
+    if (!itableTypes) {
+        itableTypes = new (memManager) PtrHashTable<ITablePtrObjType>(memManager, 32);
+        itableObjTypes.insert(val, itableTypes);
+    }
+    ITablePtrObjType* itablePtrType = itableTypes->lookup(itype);
+    if (!itablePtrType) {
+        itablePtrType = new (memManager) ITablePtrObjType(val, itype, getIntPtrType());
+        itableTypes->insert(itype, itablePtrType);
+    }
+    return itablePtrType;
+}
+
+ValueNameType* 
+TypeManager::getArrayLengthType(ValueName val) {
+    ValueNameType* arrayLengthType = arrayLengthTypes.lookup(val);
+    if (!arrayLengthType) {
+        arrayLengthType = new (memManager) ValueNameType(Type::ArrayLength, val, getInt32Type());
+        arrayLengthTypes.insert(val, arrayLengthType);
+    }
+    return arrayLengthType;
+}
+
+PtrType* 
+TypeManager::getArrayBaseType(ValueName val) {
+    PtrType* arrayBaseType = arrayBaseTypes.lookup(val);
+    if (!arrayBaseType) {
+        Type* elementType = getArrayElementType(val);
+        arrayBaseType = new (memManager) PtrType(elementType, true, val);
+        arrayBaseTypes.insert(val, arrayBaseType);
+    }
+    return arrayBaseType;
+}
+
+PtrType* 
+TypeManager::getArrayIndexType(ValueName array, ValueName index)
+{
+    PtrHashTable<PtrType>* indexTypes = arrayIndexTypes.lookup(array);
+    if (!indexTypes) {
+        indexTypes = new (memManager) PtrHashTable<PtrType>(memManager, 32);
+        arrayIndexTypes.insert(array, indexTypes);
+    }
+    PtrType* indexType = indexTypes->lookup(index);
+    if (!indexType) {
+        Type* elementType = getArrayElementType(array);
+        indexType = new (memManager) PtrType(elementType, true, array, index);
+        indexTypes->insert(index, indexType);
+    }
+    return indexType;
+}
+
 bool    
-ObjectType::_isFinalClass()    {
+ObjectType::_isFinalClass() {
+    if (isUnresolvedType()) {
+        return false;
+    }
     return VMInterface::isFinalType(vmTypeHandle);
 }
 
 bool    
 ObjectType::isInterface() {
+    assert(!isUnresolvedType());
     return VMInterface::isInterfaceType(vmTypeHandle);
 }
 
 bool    
 ObjectType::isAbstract() {
+    assert(!isUnresolvedType());
     return VMInterface::isAbstractType(vmTypeHandle);
 }
 
 bool    
-NamedType::needsInitialization(){
+NamedType::needsInitialization() {
     return VMInterface::needsInitialization(vmTypeHandle);
 }
 
 bool    
-NamedType::isFinalizable(){
+NamedType::isFinalizable() {
+    assert(!isUnresolvedType());
     return VMInterface::isFinalizable(vmTypeHandle);
 }
 
@@ -500,16 +673,19 @@ NamedType::isBeforeFieldInit() {
 
 bool    
 NamedType::isLikelyExceptionType() {
+    assert(!isUnresolvedType());
     return VMInterface::isLikelyExceptionType(vmTypeHandle);
 }
 
 void*
 NamedType::getRuntimeIdentifier() {
+    assert(!isUnresolvedType());
     return vmTypeHandle;
 }
 
 ObjectType*
 ObjectType::getSuperType() {
+    assert(!isUnresolvedObject());
     void* superTypeVMTypeHandle = VMInterface::getSuperTypeVMTypeHandle(vmTypeHandle);
     if (superTypeVMTypeHandle)
         return typeManager.getObjectType(superTypeVMTypeHandle,
@@ -524,6 +700,7 @@ ObjectType::getSuperType() {
 //
 void*    
 ObjectType::getVTable() {
+    assert(!isUnresolvedType());
     return VMInterface::getVTable(vmTypeHandle);
 }
 
@@ -532,6 +709,7 @@ ObjectType::getVTable() {
 //
 void*    
 ObjectType::getAllocationHandle() {
+    assert(!isUnresolvedType());
     return VMInterface::getAllocationHandle(vmTypeHandle);
 }
 //
@@ -539,6 +717,7 @@ ObjectType::getAllocationHandle() {
 //
 bool
 ObjectType::isSubClassOf(NamedType *other) {
+    assert(!isUnresolvedType());
     return VMInterface::isSubClassOf(vmTypeHandle,other->getRuntimeIdentifier());
 }
 
@@ -609,26 +788,40 @@ TypeManager::compressType(Type *uncompRefType)
 //
 uint32
 ObjectType::getObjectSize() {
+    assert(!isUnresolvedObject());
     return VMInterface::getObjectSize(vmTypeHandle);
 }
 
 const char* 
 ObjectType::getName() {
+    if (isUnresolvedObject()) {
+        return ".Unresolved";
+    } else if (isUnresolvedArray()) {
+        return ".Unresolved[]";
+    }
+    assert(vmTypeHandle);
     return VMInterface::getTypeName(vmTypeHandle);
 }
 
 const char* 
 ObjectType::getNameQualifier() {
+    if (isUnresolvedObject()) {
+        return ""; //package name
+    }
     return VMInterface::getTypeNameQualifier(vmTypeHandle);
 }
 
 bool 
 ObjectType::getFastInstanceOfFlag() {
+    if (isUnresolvedType()) {
+        return false;
+    }
     return VMInterface::getClassFastInstanceOfFlag(vmTypeHandle);
 }
 
 int 
 ObjectType::getClassDepth() {
+    assert(!isUnresolvedType());
     return VMInterface::getClassDepth(vmTypeHandle);
 }
 
@@ -638,6 +831,11 @@ ObjectType::getClassDepth() {
 uint32    
 ArrayType::getArrayElemOffset()    {
     bool isUnboxed = elemType->isValueType();
+    if (elemType->isUnresolvedType()) {
+        //workaround to keep assertion in public getVMTypeHandle() method for unresolved types
+        //actually any suitable object is OK here to get an offset
+        return VMInterface::getArrayElemOffset(typeManager.getSystemObjectType()->getVMTypeHandle(),isUnboxed);
+    }
     return VMInterface::getArrayElemOffset(elemType->getVMTypeHandle(),isUnboxed);
 }
 
@@ -647,6 +845,12 @@ ArrayType::getArrayElemOffset()    {
 uint32    
 ArrayType::getArrayLengthOffset() {
     return VMInterface::getArrayLengthOffset();
+}
+
+bool    ArrayType::isUnresolvedArray() const {
+    bool res = elemType->isUnresolvedObject();
+    res = res || (elemType->isArrayType() && elemType->asArrayType()->isUnresolvedArray());
+    return res;
 }
 
 // predefined value types
@@ -718,6 +922,7 @@ void    Type::print(::std::ostream& os) {
     case Array:            s = "[]"; break;
     case Object:           s = "object"; break;
     case NullObject:       s = "null_object"; break;
+    case UnresolvedObject: s = "unres_object"; break;
     case Offset:           s = "offset"; break;
     case OffsetPlusHeapbase: s = "offsetplushb"; break;
     case UnmanagedPtr:     s = "ptr"; break;
@@ -743,7 +948,8 @@ void    EnumType::print(::std::ostream& os) {
     os << "enum:" << getName();
 }
 
-extern char *massageStr(const char *);
+extern char *messageStr(const char *);
+
 void    ObjectType::print(::std::ostream& os) {
     if (isCompressedReference()) {
         os << "clsc:" << getName();
@@ -790,8 +996,17 @@ void    MethodPtrType::print(::std::ostream& os) {
     } else {
         os << "method:";
     }
-    os << massageStr(methodDesc->getName());
+    os << messageStr(methodDesc->getName());
 }
+
+void UnresolvedMethodPtrType::print(::std::ostream& os) {
+    Class_Handle ch = (Class_Handle)enclosingClass->getVMTypeHandle();
+    const char* method_class = const_pool_get_method_class_name(ch, (unsigned short)cpIndex);
+    const char* method_name = const_pool_get_method_name(ch, (unsigned short)cpIndex);
+    const char* signature = const_pool_get_method_descriptor(ch, (unsigned short)cpIndex);
+    os << method_class << "::" << messageStr(method_name) << signature;
+}
+
 
 void    VTablePtrType::print(::std::ostream& os) {
     os << "vtb:";
@@ -853,6 +1068,7 @@ Type::getPrintString(Tag t) {
     case OffsetPlusHeapbase: s = "ohb"; break;
     case Array:           s = "[] "; break;
     case Object:          s = "o  "; break;
+    case UnresolvedObject:s = "uno  "; break;
     case UnmanagedPtr:    s = "*  "; break;
     case ManagedPtr:      s = "&  "; break;
     case MethodPtr:       s = "fun"; break;

@@ -165,14 +165,14 @@ static ManagedObject * rth_ldc_ref_helper(Class *c, unsigned cp_index)
     else if (cp.is_class(cp_index))
     {
         assert(!hythread_is_suspend_enabled());
-        hythread_suspend_enable();
-
+ 
         Class *objClass = NULL;
         BEGIN_RAISE_AREA;
+        hythread_suspend_enable();
         objClass = c->_resolve_class(VM_Global_State::loader_env, cp_index);
-        END_RAISE_AREA;
-
         hythread_suspend_disable();
+        END_RAISE_AREA;
+ 
         if (objClass) {
             return struct_Class_to_java_lang_Class(objClass);
         }
@@ -1614,112 +1614,6 @@ static NativeCodePtr rth_get_lil_tls_base(int * dyn_count) {
     return (NativeCodePtr)hythread_self;
 }
 
-static void * rth_resolve(Class_Handle klass, unsigned cp_idx,
-                          JavaByteCodes opcode)
-{
-    ASSERT_THROW_AREA;
-
-    Compilation_Handle comp_handle;
-    comp_handle.env = VM_Global_State::loader_env;
-    comp_handle.jit = NULL;
-    Compile_Handle ch = (Compile_Handle)&comp_handle;
-    
-    void * ret = NULL;
-    hythread_suspend_enable();
-    switch(opcode) {
-    case OPCODE_INVOKEINTERFACE:
-        ret = resolve_interface_method(ch, klass, cp_idx);
-        break;
-    case OPCODE_INVOKEVIRTUAL:
-    case OPCODE_INVOKESPECIAL:
-        ret = resolve_virtual_method(ch, klass, cp_idx);
-        break;
-    case OPCODE_INSTANCEOF:
-    case OPCODE_CHECKCAST:
-    case OPCODE_MULTIANEWARRAY:
-        ret = resolve_class(ch, klass, cp_idx);
-        break;
-    case OPCODE_ANEWARRAY:
-        ret = resolve_class(ch, klass, cp_idx);
-        if (ret != NULL) {
-            ret = class_get_array_of_class((Class_Handle)ret);
-        }
-        break;
-    case OPCODE_NEW:
-        ret = resolve_class_new(ch, klass, cp_idx);
-        break;
-    case OPCODE_GETFIELD:
-    case OPCODE_PUTFIELD:
-        ret = resolve_nonstatic_field(ch, klass, cp_idx, 
-                                      opcode == OPCODE_PUTFIELD);
-        break;
-    case OPCODE_PUTSTATIC:
-    case OPCODE_GETSTATIC:
-        ret = resolve_static_field(ch, klass, cp_idx, 
-                                   opcode == OPCODE_PUTSTATIC);
-        if (ret != NULL) {
-            Class_Handle that_class = method_get_class((Method_Handle)ret);
-            hythread_suspend_disable();
-            if (class_needs_initialization(that_class)) {
-                assert(!exn_raised());
-                vm_rt_class_initialize(that_class);
-            }
-            return ret;
-        }
-        break;
-    case OPCODE_INVOKESTATIC:
-        ret = resolve_static_method(ch, klass, cp_idx);
-        if (ret != NULL) {
-            Class_Handle that_class = method_get_class((Method_Handle)ret);
-            hythread_suspend_disable();
-            if (class_needs_initialization(that_class)) {
-                assert(!exn_raised());
-                vm_rt_class_initialize(that_class);
-            }
-            return ret;
-        }
-        break;
-    default:    assert(false);
-    } // ~switch(opcode)
-    
-    hythread_suspend_disable();
-    if (ret == NULL) {
-        vm_rt_class_throw_linking_error(klass, cp_idx, opcode);
-        assert(false); // must be unreachable
-    }
-    return ret;
-}
-
-static NativeCodePtr rth_get_lil_resolve(int * dyn_count)
-{
-    static NativeCodePtr addr = NULL;
-    if (addr) {
-        return addr;
-    }
-    LilCodeStub* cs = lil_parse_code_stub("entry 0:rth:pint,pint,pint:void;");
-    assert(cs);
-    if (dyn_count) {
-        cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
-        assert(cs);
-    }
-    
-    cs = lil_parse_onto_end(cs,
-        "push_m2n 0, %0i;"
-        "in2out platform:pint;"
-        "call %1i;"
-        "pop_m2n;"
-        "ret;",
-        (POINTER_SIZE_INT)FRAME_POPABLE,
-        (void*)&rth_resolve);
-    assert(cs && lil_is_valid(cs));
-    addr = LilCodeGenerator::get_platform()->compile(cs);
-
-    DUMP_STUB(addr, "rth_resolve", lil_cs_get_code_size(cs));
-
-    lil_free_code_stub(cs);
-    return addr;
-}
-
 static NativeCodePtr rth_get_lil_jvmti_method_enter_callback(int * dyn_count) {
     static NativeCodePtr addr = NULL;
     if (addr) {
@@ -1875,6 +1769,504 @@ static NativeCodePtr rth_get_lil_jvmti_field_modification_callback(int * dyn_cou
     //return addr;
 }
 
+
+//////////////////////////////////////////////////////////////////////////
+//lazy resolution helpers
+
+typedef void* f_resolve(Class_Handle, unsigned);
+typedef void* f_resolve_int(Class_Handle, unsigned, unsigned);
+typedef void* f_resolve_managed(Class_Handle, unsigned, ManagedObject*);
+
+enum ResolveResType {
+    ResolveResType_Managed, 
+    ResolveResType_Unmanaged
+};
+
+///generates stub for 2 params helpers: ClassHandle, cpIndex
+static NativeCodePtr rth_get_lil_stub_withresolve(int * dyn_count, f_resolve foo, const char* stub_name, ResolveResType type)
+{
+    LilCodeStub* cs = NULL;
+    const char* in2out = NULL;
+    if (type == ResolveResType_Unmanaged) {
+        cs = lil_parse_code_stub("entry 0:rth:pint,pint:pint;");
+        in2out = "in2out platform:pint;";
+    } else {
+        assert(type == ResolveResType_Managed);
+        cs = lil_parse_code_stub("entry 0:rth:pint,pint:ref;");
+        in2out = "in2out platform:ref;";
+    }
+    assert(cs);
+    if (dyn_count) {
+        cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
+        assert(cs);
+    }
+
+    cs = lil_parse_onto_end(cs, "push_m2n 0, %0i;", (POINTER_SIZE_INT)FRAME_POPABLE);
+    assert(cs);
+    cs = lil_parse_onto_end(cs, in2out);
+    assert(cs);
+    cs = lil_parse_onto_end(cs, 
+        "call %0i;"
+        "pop_m2n;"
+        "ret;",
+        (void*)foo);
+
+    assert(cs && lil_is_valid(cs));
+    NativeCodePtr addr = LilCodeGenerator::get_platform()->compile(cs);
+
+    DUMP_STUB(addr, stub_name, lil_cs_get_code_size(cs));
+    lil_free_code_stub(cs);
+
+    return addr;
+}
+ 
+
+///generates stub for 3 params helpers: ClassHandle, cpIndex, ManagedObject* ref
+static NativeCodePtr rth_get_lil_stub_withresolve(int * dyn_count, f_resolve_managed foo, const char* stub_name, ResolveResType type)
+{
+    LilCodeStub* cs = NULL;
+    const char* in2out = NULL;
+    if (type == ResolveResType_Unmanaged) {
+        cs = lil_parse_code_stub("entry 0:rth:pint,pint,ref:pint;");
+        in2out = "in2out platform:pint;";
+    } else {
+        assert(type == ResolveResType_Managed);
+        cs = lil_parse_code_stub("entry 0:rth:pint,pint,ref:ref;");
+        in2out = "in2out platform:ref;";
+    }
+
+    assert(cs);
+    if (dyn_count) {
+        cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
+        assert(cs);
+    }
+
+    cs = lil_parse_onto_end(cs, "push_m2n 0, %0i;", (POINTER_SIZE_INT)FRAME_POPABLE);
+    assert(cs);
+    cs = lil_parse_onto_end(cs, in2out);
+    assert(cs);
+    cs = lil_parse_onto_end(cs, 
+        "call %0i;"
+        "pop_m2n;"
+        "ret;",
+        (void*)foo);
+
+    assert(cs && lil_is_valid(cs));
+    NativeCodePtr addr = LilCodeGenerator::get_platform()->compile(cs);
+
+    DUMP_STUB(addr, stub_name, lil_cs_get_code_size(cs));
+    lil_free_code_stub(cs);
+
+    return addr;
+}
+
+///generates stub for 3 params helpers: ClassHandle, cpIndex, + some unsigned param
+static NativeCodePtr rth_get_lil_stub_withresolve(int * dyn_count, f_resolve_int foo, const char* stub_name, ResolveResType type)
+{
+    LilCodeStub* cs = NULL;
+    const char* in2out = NULL;
+    if (type == ResolveResType_Unmanaged) {
+        cs = lil_parse_code_stub("entry 0:rth:pint,pint,pint:pint;");
+        in2out = "in2out platform:pint;";
+    } else {
+        assert(type == ResolveResType_Managed);
+        cs = lil_parse_code_stub("entry 0:rth:pint,pint,pint:ref;");
+        in2out = "in2out platform:ref;";
+    }
+
+    assert(cs);
+    if (dyn_count) {
+        cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
+        assert(cs);
+    }
+
+    cs = lil_parse_onto_end(cs, "push_m2n 0, %0i;", (POINTER_SIZE_INT)FRAME_POPABLE);
+    assert(cs);
+    cs = lil_parse_onto_end(cs, in2out);
+    assert(cs);
+    cs = lil_parse_onto_end(cs, 
+        "call %0i;"
+        "pop_m2n;"
+        "ret;",
+        (void*)foo);
+
+
+    assert(cs && lil_is_valid(cs));
+    NativeCodePtr addr = LilCodeGenerator::get_platform()->compile(cs);
+
+    DUMP_STUB(addr, stub_name, lil_cs_get_code_size(cs));
+    lil_free_code_stub(cs);
+
+    return addr;
+}
+
+
+static inline Class* resolveClass(Class_Handle klass, unsigned cp_idx, bool checkNew) {
+    Global_Env* env = VM_Global_State::loader_env;
+    Class* objClass = NULL;
+    BEGIN_RAISE_AREA;
+    assert(!hythread_is_suspend_enabled());
+    hythread_suspend_enable();
+    if (checkNew) {
+        objClass = resolve_class_new_env(env, klass, cp_idx, true);    
+    } else {
+        objClass = klass->_resolve_class(env, cp_idx);
+    }
+    hythread_suspend_disable();
+    if (objClass==NULL) {
+        class_throw_linking_error(klass, cp_idx, OPCODE_NEW);
+    }
+    END_RAISE_AREA;
+    return objClass;
+}
+
+
+static inline void initializeClass(Class* cls) {
+    if (cls->is_initialized() || cls->is_initializing()) {
+        return;
+    }
+
+    assert(!hythread_is_suspend_enabled());
+    BEGIN_RAISE_AREA;
+    hythread_suspend_enable();
+    Global_Env* env = VM_Global_State::loader_env;
+    cls->verify_constraints(env);
+    hythread_suspend_disable();
+    END_RAISE_AREA;
+
+    BEGIN_RAISE_AREA;
+    cls->initialize();
+    END_RAISE_AREA;
+}
+
+//resolving a class: used for multianewarray helper by JIT in lazyresolution mode
+static void * rth_initialize_class_withresolve(Class_Handle klass, unsigned cp_idx)
+{
+    ASSERT_THROW_AREA;
+
+    //resolve and init object class
+    Class* objClass = resolveClass(klass, cp_idx, false);
+    initializeClass(objClass);    
+    return objClass;
+}
+
+static NativeCodePtr rth_get_lil_initialize_class_withresolve(int * dyn_count) {
+    static NativeCodePtr addr = NULL;
+    if (!addr) {
+        addr = rth_get_lil_stub_withresolve(dyn_count, rth_initialize_class_withresolve, 
+            "rth_initialize_class_withresolve", ResolveResType_Unmanaged);    
+    }
+    return addr;
+}
+
+
+///OPCODE_NEW
+static void * rth_newobj_withresolve(Class_Handle klass, unsigned cp_idx)
+{
+    ASSERT_THROW_AREA;
+
+    //resolve and init object class
+    Class* objClass = resolveClass(klass, cp_idx, true);
+    initializeClass(objClass);
+
+    //create new object and return;    
+    void* tls=vm_get_gc_thread_local();
+    unsigned size = objClass->get_allocated_size();
+    Allocation_Handle ah = objClass->get_allocation_handle();
+    void* res=vm_malloc_with_thread_pointer(size, ah, tls);
+    assert(res!=NULL);
+    return res;
+}
+
+static NativeCodePtr rth_get_lil_newobj_withresolve(int * dyn_count) {
+    static NativeCodePtr addr = NULL;
+    if (!addr) {
+        addr = rth_get_lil_stub_withresolve(dyn_count, rth_newobj_withresolve, 
+            "rth_new_obj_withresolve", ResolveResType_Managed);    
+    }
+    return addr;
+}
+
+
+//OPCODE_ANEWARRAY
+static void *rth_newarray_withresolve(Class_Handle klass, unsigned cp_idx, unsigned arraySize) {
+    ASSERT_THROW_AREA;
+    
+    //resolve and init object class
+    Class* objClass = resolveClass(klass, cp_idx, false);
+    initializeClass(objClass);
+    assert(!objClass->is_primitive());
+
+    void* res = NULL;
+
+    Class* arrayClass = NULL;
+    BEGIN_RAISE_AREA;
+    hythread_suspend_enable();
+    arrayClass = class_get_array_of_class(objClass);
+    hythread_suspend_disable();
+    END_RAISE_AREA
+    
+    BEGIN_RAISE_AREA;
+    //create new array and return;    
+    res = vm_new_vector(arrayClass, (int)arraySize);
+    END_RAISE_AREA
+
+    assert(res!=NULL);
+    return res;
+}
+
+static NativeCodePtr rth_get_lil_newarray_withresolve(int * dyn_count) {
+    static NativeCodePtr addr = NULL;
+    if (!addr) {
+        addr = rth_get_lil_stub_withresolve(dyn_count, rth_newarray_withresolve,
+            "rth_newarray_withresolve", ResolveResType_Managed);    
+    }
+    return addr;
+}
+
+
+///OPCODE_INVOKESPECIAL
+
+static void *rth_invokespecial_addr_withresolve(Class_Handle klass, unsigned cp_idx) {
+    ASSERT_THROW_AREA;
+    
+    Method* m = NULL;
+    
+    BEGIN_RAISE_AREA;
+    hythread_suspend_enable();
+    Global_Env* env = VM_Global_State::loader_env;
+    m = resolve_special_method_env(env, klass, cp_idx, true);
+    hythread_suspend_disable();
+    END_RAISE_AREA;
+
+    initializeClass(m->get_class());
+    return m->get_indirect_address();
+}
+
+
+static NativeCodePtr rth_get_lil_invokespecial_addr_withresolve(int * dyn_count) {
+    static NativeCodePtr addr = NULL;
+    if (!addr) {
+        addr = rth_get_lil_stub_withresolve(dyn_count, rth_invokespecial_addr_withresolve,
+            "rth_invokespecial_addr_withresolve", ResolveResType_Unmanaged);    
+    }
+    return addr;
+}
+
+
+
+///OPCODE_INVOKESTATIC
+
+static void *rth_invokestatic_addr_withresolve(Class_Handle klass, unsigned cp_idx) {
+    ASSERT_THROW_AREA;
+
+    Method* m = NULL;
+
+    BEGIN_RAISE_AREA;
+    hythread_suspend_enable();
+    Global_Env* env = VM_Global_State::loader_env;
+    m = resolve_static_method_env(env, klass, cp_idx, true);
+    hythread_suspend_disable();
+    END_RAISE_AREA;
+
+    initializeClass(m->get_class());
+    return m->get_indirect_address();
+}
+
+static NativeCodePtr rth_get_lil_invokestatic_addr_withresolve(int * dyn_count) {
+    static NativeCodePtr addr = NULL;
+    if (!addr) {
+        addr = rth_get_lil_stub_withresolve(dyn_count, rth_invokestatic_addr_withresolve,
+            "rth_invokestatic_addr_withresolve", ResolveResType_Unmanaged);    
+    }
+    return addr;
+}
+
+///OPCODE_INVOKEVIRTUAL
+
+static void *rth_invokevirtual_addr_withresolve(Class_Handle klass, unsigned cp_idx, ManagedObject* obj) {
+    ASSERT_THROW_AREA;
+
+    Method* m = NULL;
+
+    BEGIN_RAISE_AREA;
+    hythread_suspend_enable();
+    Global_Env* env = VM_Global_State::loader_env;
+    m = resolve_virtual_method_env(env, klass, cp_idx, true);
+    hythread_suspend_disable();
+    END_RAISE_AREA;
+    assert(m!=NULL);
+
+    assert(obj!=NULL);
+    assert(obj->vt()!=NULL);
+    Class* objClass = obj->vt()->clss;
+    assert(objClass!=NULL);
+    assert(objClass->is_initialized() || objClass->is_initializing());
+    assert(m->get_class()->is_initialized() || m->get_class()->is_initializing());
+
+    unsigned method_index = m->get_index();
+    assert(method_index<objClass->get_number_of_virtual_method_entries());
+    Method* method_to_call = objClass->get_method_from_vtable(method_index);
+    
+    assert(method_to_call->get_class()->is_initialized() || method_to_call->get_class()->is_initializing());
+    return method_to_call->get_indirect_address();
+
+}
+
+static NativeCodePtr rth_get_lil_invokevirtual_addr_withresolve(int * dyn_count) {
+    static NativeCodePtr addr = NULL;
+    if (!addr) {
+        addr = rth_get_lil_stub_withresolve(dyn_count, rth_invokevirtual_addr_withresolve,
+            "rth_invokevirtual_addr_withresolve", ResolveResType_Unmanaged);    
+    }
+    return addr;
+}
+
+
+///OPCODE_INVOKEINTERFACE
+static void *rth_invokeinterface_addr_withresolve(Class_Handle klass, unsigned cp_idx, ManagedObject* obj) {
+    ASSERT_THROW_AREA;
+
+    Method* m = NULL;
+    
+    BEGIN_RAISE_AREA;
+    hythread_suspend_enable();
+    Global_Env* env = VM_Global_State::loader_env;
+    m = resolve_interface_method_env(env, klass, cp_idx, true);
+    hythread_suspend_disable();
+    END_RAISE_AREA;
+    assert(m!=NULL);
+
+    assert(obj!=NULL);
+    assert(obj->vt()!=NULL);
+    Class* objClass = obj->vt()->clss;
+    assert(objClass!=NULL);
+    assert(objClass->is_initialized() || objClass->is_initializing());
+
+    char* infc_vtable = (char*)Class::helper_get_interface_vtable(obj, m->get_class());
+    assert(infc_vtable);
+    unsigned base_index = (unsigned)(infc_vtable - (char*)objClass->get_vtable()->methods)/sizeof(char*);
+    Method* infc_method = objClass->get_method_from_vtable(base_index + m->get_index());
+    assert(infc_method);
+    assert(infc_method->get_class()->is_initialized() || objClass->is_initializing());
+    return infc_method->get_indirect_address();
+}
+
+static NativeCodePtr rth_get_lil_invokeinterface_addr_withresolve(int * dyn_count) {
+    static NativeCodePtr addr = NULL;
+    if (!addr) {
+        addr = rth_get_lil_stub_withresolve(dyn_count, rth_invokeinterface_addr_withresolve,
+            "rth_invokeinterface_addr_withresolve", ResolveResType_Unmanaged);    
+    }
+    return addr;
+}
+
+
+///OPCODE_GETFIELD
+///OPCODE_PUTFIELD
+
+static void *rth_get_nonstatic_field_offset_withresolve(Class_Handle klass, unsigned cp_idx, unsigned putfield) {
+    ASSERT_THROW_AREA;
+
+    Field* f = NULL;
+
+    BEGIN_RAISE_AREA;
+    hythread_suspend_enable();
+    Global_Env* env = VM_Global_State::loader_env;
+    f = resolve_nonstatic_field_env(env, klass, cp_idx, putfield, true);
+    hythread_suspend_disable();
+    END_RAISE_AREA;
+
+    assert(f->get_class()->is_initialized() || f->get_class()->is_initializing());
+    return (void*)(POINTER_SIZE_INT)f->get_offset();
+}
+
+static NativeCodePtr rth_get_lil_nonstatic_field_offset_withresolve(int * dyn_count) {
+    static NativeCodePtr addr = NULL;
+    if (!addr) {
+        addr = rth_get_lil_stub_withresolve(dyn_count, rth_get_nonstatic_field_offset_withresolve,
+            "rth_get_nonstatic_field_offset_withresolve", ResolveResType_Unmanaged);    
+    }
+    return addr;
+}
+
+
+///OPCODE_GETSTATIC
+///OPCODE_PUTSTATIC
+
+static void *rth_get_static_field_addr_withresolve(Class_Handle klass, unsigned cp_idx, unsigned putfield) {
+    ASSERT_THROW_AREA;
+
+    Field* f = NULL;
+
+    BEGIN_RAISE_AREA;
+    hythread_suspend_enable();
+    Global_Env* env = VM_Global_State::loader_env;
+    f = resolve_static_field_env(env, klass, cp_idx, putfield, true);
+    hythread_suspend_disable();
+    END_RAISE_AREA;
+
+    initializeClass(f->get_class());
+    return f->get_address();
+}
+
+static NativeCodePtr rth_get_lil_static_field_addr_withresolve(int * dyn_count) {
+    static NativeCodePtr addr = NULL;
+    if (!addr) {
+        addr = rth_get_lil_stub_withresolve(dyn_count, rth_get_static_field_addr_withresolve,
+            "rth_get_static_field_addr_withresolve", ResolveResType_Unmanaged);    
+    }
+    return addr;
+}
+
+
+///OPCODE_CHECKCAST
+
+static void *rth_checkcast_withresolve(Class_Handle klass, unsigned cp_idx, ManagedObject* obj) {
+    if (obj==NULL) {
+        return obj;
+    }
+    Class* castClass = resolveClass(klass, cp_idx, false);
+    Class* objClass = obj->vt()->clss;
+    Boolean res = class_is_subtype(objClass, castClass);
+    if (!res) {
+        exn_throw_by_name("java/lang/ClassCastException");
+    }
+    return obj;
+}
+
+static NativeCodePtr rth_get_lil_checkcast_withresolve(int * dyn_count) {
+    static NativeCodePtr addr = NULL;
+    if (!addr) {
+        addr = rth_get_lil_stub_withresolve(dyn_count, rth_checkcast_withresolve,
+            "rth_checkcast_withresolve", ResolveResType_Managed);    
+    }
+    return addr;
+}
+
+//OPCODE_INSTANCEOF
+static void *rth_instanceof_withresolve(Class_Handle klass, unsigned cp_idx, ManagedObject* obj) {
+    ASSERT_THROW_AREA;
+    Class* castClass = resolveClass(klass, cp_idx, false);
+    int res = vm_instanceof(obj, castClass);
+    return (void*)(POINTER_SIZE_INT)res;
+}
+
+static NativeCodePtr rth_get_lil_instanceof_withresolve(int * dyn_count) {
+    static NativeCodePtr addr = NULL;
+    if (!addr) {
+        addr = rth_get_lil_stub_withresolve(dyn_count, rth_instanceof_withresolve,
+            "rth_instanceof_withresolve", ResolveResType_Unmanaged);    
+    }
+    return addr;
+}
+
+//end of lazy resolution helpers
+//////////////////////////////////////////////////////////////////////////
+
+
+
+
 NativeCodePtr rth_get_lil_helper(VM_RT_SUPPORT f)
 {
     int* dyn_count = NULL;
@@ -1974,8 +2366,28 @@ NativeCodePtr rth_get_lil_helper(VM_RT_SUPPORT f)
         return rth_get_lil_drem(dyn_count);
     case VM_RT_DDIV:
         return rth_get_lil_ddiv(dyn_count);
-    case VM_RT_RESOLVE:
-        return rth_get_lil_resolve(dyn_count);
+    case VM_RT_NEWOBJ_WITHRESOLVE:
+        return rth_get_lil_newobj_withresolve(dyn_count);
+    case VM_RT_NEWARRAY_WITHRESOLVE:
+        return rth_get_lil_newarray_withresolve(dyn_count);
+    case VM_RT_INITIALIZE_CLASS_WITHRESOLVE:
+        return rth_get_lil_initialize_class_withresolve(dyn_count);
+    case VM_RT_GET_NONSTATIC_FIELD_OFFSET_WITHRESOLVE:
+        return rth_get_lil_nonstatic_field_offset_withresolve(dyn_count);
+    case VM_RT_GET_STATIC_FIELD_ADDR_WITHRESOLVE:
+        return rth_get_lil_static_field_addr_withresolve(dyn_count);
+    case VM_RT_CHECKCAST_WITHRESOLVE:
+        return rth_get_lil_checkcast_withresolve(dyn_count);
+    case VM_RT_INSTANCEOF_WITHRESOLVE:
+        return rth_get_lil_instanceof_withresolve(dyn_count);
+    case VM_RT_GET_INVOKESTATIC_ADDR_WITHRESOLVE:
+        return rth_get_lil_invokestatic_addr_withresolve(dyn_count);
+    case VM_RT_GET_INVOKEINTERFACE_ADDR_WITHRESOLVE:
+        return rth_get_lil_invokeinterface_addr_withresolve(dyn_count);
+    case VM_RT_GET_INVOKEVIRTUAL_ADDR_WITHRESOLVE:
+        return rth_get_lil_invokevirtual_addr_withresolve(dyn_count);
+    case VM_RT_GET_INVOKE_SPECIAL_ADDR_WITHRESOLVE:
+        return rth_get_lil_invokespecial_addr_withresolve(dyn_count);
 
     default:
         return NULL;
@@ -1997,103 +2409,113 @@ switch(f) {
     case VM_RT_MULTIANEWARRAY_RESOLVED:
         return TRUE;
     case VM_RT_LDC_STRING:
-		return TRUE;
+        return TRUE;
     // Exceptions
     case VM_RT_THROW:
     case VM_RT_THROW_SET_STACK_TRACE:
-		return TRUE;
+        return TRUE;
     case VM_RT_THROW_LAZY:
-		return TRUE;
+        return TRUE;
     case VM_RT_IDX_OUT_OF_BOUNDS:
-		return TRUE;
+        return TRUE;
     case VM_RT_NULL_PTR_EXCEPTION:
-		return TRUE;
+        return TRUE;
     case VM_RT_DIVIDE_BY_ZERO_EXCEPTION:
-		return TRUE;
+        return TRUE;
     case VM_RT_ARRAY_STORE_EXCEPTION:
-		return TRUE;
+        return TRUE;
     case VM_RT_THROW_LINKING_EXCEPTION:
-		return TRUE;
+        return TRUE;
     // Type tests
     case VM_RT_CHECKCAST:
-		return TRUE;
+        return TRUE;
     case VM_RT_INSTANCEOF:
-		return TRUE;
+        return TRUE;
     case VM_RT_AASTORE:
-		return TRUE;	
+        return TRUE;    
     case VM_RT_AASTORE_TEST:
-		return TRUE;
+        return TRUE;
     // Misc
     case VM_RT_GET_INTERFACE_VTABLE_VER0:
-		return TRUE;
+        return TRUE;
     case VM_RT_INITIALIZE_CLASS:
-		return TRUE;
+        return TRUE;
     case VM_RT_GC_SAFE_POINT:
-		return TRUE;
+        return TRUE;
     case VM_RT_GC_GET_TLS_BASE:
-		return FALSE;
+        return FALSE;
     // JVMTI
     case VM_RT_JVMTI_METHOD_ENTER_CALLBACK:
-		return TRUE;
+        return TRUE;
     case VM_RT_JVMTI_METHOD_EXIT_CALLBACK:
-		return TRUE;
+        return TRUE;
     case VM_RT_JVMTI_FIELD_ACCESS_CALLBACK:
-		return TRUE;
+        return TRUE;
     case VM_RT_JVMTI_FIELD_MODIFICATION_CALLBACK:
-		return TRUE;
+        return TRUE;
     // Non-VM
     case VM_RT_F2I:
-		return FALSE;
+        return FALSE;
     case VM_RT_F2L:
-		return FALSE;
+        return FALSE;
     case VM_RT_D2I:
-		return FALSE;
+        return FALSE;
     case VM_RT_D2L:
-		return FALSE;
+        return FALSE;
     case VM_RT_LSHL:
-		return FALSE;
+        return FALSE;
     case VM_RT_LSHR:
-		return FALSE;
+        return FALSE;
     case VM_RT_LUSHR:
-		return FALSE;
+        return FALSE;
     case VM_RT_LMUL:
 #ifdef VM_LONG_OPT
     case VM_RT_LMUL_CONST_MULTIPLIER:  
 #endif
-		return FALSE;
+        return FALSE;
     case VM_RT_LREM:
-		return FALSE;
+        return FALSE;
     case VM_RT_LDIV:
-		return FALSE;
+        return FALSE;
     case VM_RT_ULDIV:
-		return FALSE;
+        return FALSE;
     case VM_RT_CONST_LDIV:             
-		return FALSE;
+        return FALSE;
     case VM_RT_CONST_LREM:             
-		return FALSE;
+        return FALSE;
     case VM_RT_IMUL:
-		return FALSE;
+        return FALSE;
     case VM_RT_IREM:
-		return FALSE;
+        return FALSE;
     case VM_RT_IDIV:
-		return FALSE;
+        return FALSE;
     case VM_RT_FREM:
-		return FALSE;
+        return FALSE;
     case VM_RT_FDIV:
-		return FALSE;
+        return FALSE;
     case VM_RT_DREM:
-		return FALSE;
+        return FALSE;
     case VM_RT_DDIV:
-		return FALSE;
-    case VM_RT_RESOLVE:
-		return TRUE;
-	case VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE:
+        return FALSE;
+    case VM_RT_NEWOBJ_WITHRESOLVE:
+    case VM_RT_NEWARRAY_WITHRESOLVE:
+    case VM_RT_INITIALIZE_CLASS_WITHRESOLVE:
+    case VM_RT_GET_NONSTATIC_FIELD_OFFSET_WITHRESOLVE:
+    case VM_RT_GET_STATIC_FIELD_ADDR_WITHRESOLVE:
+    case VM_RT_CHECKCAST_WITHRESOLVE:
+    case VM_RT_INSTANCEOF_WITHRESOLVE:
+    case VM_RT_GET_INVOKESTATIC_ADDR_WITHRESOLVE:
+    case VM_RT_GET_INVOKEINTERFACE_ADDR_WITHRESOLVE:
+    case VM_RT_GET_INVOKEVIRTUAL_ADDR_WITHRESOLVE:
+    case VM_RT_GET_INVOKE_SPECIAL_ADDR_WITHRESOLVE:
+        return TRUE;
+    case VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE:
         return TRUE; 
-	case VM_RT_NEW_VECTOR_USING_VTABLE:
+    case VM_RT_NEW_VECTOR_USING_VTABLE:
         return TRUE;
-	case VM_RT_WRITE_BARRIER_FASTCALL:
+    case VM_RT_WRITE_BARRIER_FASTCALL:
         return TRUE;
-	case VM_RT_MONITOR_ENTER:
+    case VM_RT_MONITOR_ENTER:
     case VM_RT_MONITOR_ENTER_NON_NULL:
         return TRUE;
 
@@ -2105,14 +2527,14 @@ switch(f) {
 
     case VM_RT_MONITOR_EXIT_STATIC:
         return TRUE;
-	case VM_RT_CHAR_ARRAYCOPY_NO_EXC:
+    case VM_RT_CHAR_ARRAYCOPY_NO_EXC:
         return TRUE;
-	case VM_RT_GC_HEAP_WRITE_REF:
+    case VM_RT_GC_HEAP_WRITE_REF:
         return FALSE;
     default:
-		ASSERT(false, "Unexpected helper id" << f);
+        ASSERT(false, "Unexpected helper id" << f);
         return TRUE;
-	}
+    }
 }
 
 

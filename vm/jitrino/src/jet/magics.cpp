@@ -37,21 +37,13 @@ using std::vector;
 namespace Jitrino {
 namespace Jet {
 
-bool is_magic(Class_Handle k)
+bool CodeGen::is_magic_class(const char* kname)
 {
     static const char unboxedName[] = "org/vmmagic/unboxed/";
     static const unsigned nameLen = sizeof(unboxedName)-1;
 
-    assert(k!=NULL);
-    const char * kname = class_get_name(k);
+    assert(kname!=NULL);
     return !strncmp(kname, unboxedName, nameLen);
-}
-
-bool is_magic(Method_Handle m)
-{
-    assert(m != NULL);
-    Class_Handle klass = method_get_class(m);
-    return is_magic(klass);
 }
 
 static size_t sizeof_jt(jtype jt) {
@@ -110,27 +102,15 @@ bool Compiler::gen_magic(void)
         return false;
     }
     
-    vector<jtype> args;
-    jtype retType;
-    bool is_static = opkod == OPCODE_INVOKESTATIC;
-    get_args_info(is_static, jinst.op0, args, &retType);
+    const char* kname = const_pool_get_method_class_name(m_klass, (unsigned short)jinst.op0);
 
-    Method_Handle meth = NULL;
-    if (opkod == OPCODE_INVOKESTATIC) {
-        meth = resolve_static_method(m_compileHandle, m_klass, jinst.op0);
-    } else if (opkod == OPCODE_INVOKEVIRTUAL) {
-        meth = resolve_virtual_method(m_compileHandle, m_klass, jinst.op0);
-    } else {
-        assert(opkod == OPCODE_INVOKESPECIAL);
-        meth = resolve_special_method(m_compileHandle, m_klass, jinst.op0);
-    }
-    if (meth == NULL || !is_magic(meth)) {
+    if (!is_magic_class(kname)) {
         return false;
     }
-
     // This is a magic -> transform it
 
-    const char* mname = method_get_name(meth);
+    const char* mname = const_pool_get_method_name(m_klass, (unsigned short)jinst.op0);
+
     jtype magicType = iplatf;
 
     if (!strcmp(mname, "fromLong")) {
@@ -149,6 +129,11 @@ bool Compiler::gen_magic(void)
         it keeps all magic classes as objects and magics becomes a part of GC enumeration
         This code must be refactored or removed
 
+
+    vector<jtype> args;
+    jtype retType;
+    bool is_static = opkod == OPCODE_INVOKESTATIC;
+    get_args_info(is_static, jinst.op0, args, &retType);
 
     // ADD, SUB, DIFF, etc - 2 args arithmetics
     ALU oper = alu_count;

@@ -91,7 +91,6 @@ Devirtualizer::isGuardableVirtualCall(Inst* inst, MethodInst*& methodInst, Opnd*
         assert(tauNullChecked->getType()->tag == Type::Tau);
         assert(tauTypesChecked->getType()->tag == Type::Tau);
     } else if(opcode == Op_IndirectMemoryCall) {
-        assert(inst->getNumSrcOperands() >= 4);
         // Indirect call - attempt to determine original virtual call
         CallInst* call = inst->asCallInst();
         assert(call != NULL);
@@ -100,6 +99,8 @@ Devirtualizer::isGuardableVirtualCall(Inst* inst, MethodInst*& methodInst, Opnd*
         if(methodInst == NULL)
             // Cannot resolve methodDesc.
             return false;
+
+        assert(inst->getNumSrcOperands() >= 4);
 
         // LdFunAddr should have already converted to a direct call (Op_DirectCall)
         // by the simplifier.
@@ -413,14 +414,20 @@ Devirtualizer::guardCallsInBlock(IRManager& regionIRM, Node* node) {
         bool isIntfCall = false;
         if(isGuardableVirtualCall(last, methodInst, base, tauNullChecked, tauTypesChecked, argOffset, isIntfCall)) {
             assert(methodInst && base && tauNullChecked && tauTypesChecked && argOffset);
+            Type* type = base->getType();
+            if (type->isNullObject()) { //NullObject type is not ObjectType instance, but Type instance
+                return;
+            }
+            ObjectType* baseType = type->asObjectType();
+            assert(baseType!=NULL);
+            
+            assert(!baseType->isUnresolvedType());
 
-            assert(base->getType()->isObject());
-            ObjectType* baseType = (ObjectType*) base->getType();
             if (! ((_devirtInterfaceCalls && isIntfCall) || (_devirtVirtualCalls && !isIntfCall))) {
                 return;
             }
             // If base type is concrete, consider an explicit guarded test against it
-            if(!baseType->isNullObject() && ((_devirtInterfaceCalls && isIntfCall) || !baseType->isAbstract() || baseType->isArray())) {
+            if((_devirtInterfaceCalls && isIntfCall) || !baseType->isAbstract() || baseType->isArray()) {
                 MethodDesc* origMethodDesc = methodInst->getMethodDesc();
                 MethodDesc* candidateMeth = NULL;
                 int candidateExecCount = 0;

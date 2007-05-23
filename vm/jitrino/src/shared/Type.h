@@ -41,6 +41,7 @@ class FunctionPtrType;
 class NamedType;
 class ArrayType;
 class MethodPtrType;
+class UnresolvedMethodPtrType;
 class ValueNameType;
 class ITablePtrObjType;
 class OrNullType;
@@ -93,6 +94,7 @@ public:
 
         // special null object reference
         NullObject,
+        UnresolvedObject,
 
         //     (2.1.2) Array type
         Array,
@@ -177,6 +179,9 @@ public:
     bool    isFloatingPoint()  {return isFloatingPoint(tag);}
     bool    isNullObject()     {return isNullObject(tag);}
     bool    isObject()         {return isObject(tag);}
+    bool    isUnresolvedObject() {return isUnresolvedObject(tag);}
+    bool    isUnresolvedMethodPtrType() {return asUnresolvedMethodPtrType()!=NULL;}
+    virtual bool    isUnresolvedType() {return false;}
     bool    isArray()          {return isArray(tag);}
     bool    isValue()          {return isValue(tag);}
     bool    isPtr()            {return isPtr(tag);}
@@ -207,6 +212,7 @@ public:
     virtual NamedType*        asNamedType()          {return NULL;}
     virtual ArrayType*        asArrayType()          {return NULL;}
     virtual MethodPtrType*    asMethodPtrType()      {return NULL;}
+    virtual UnresolvedMethodPtrType* asUnresolvedMethodPtrType() { return NULL; }
     virtual ValueNameType*    asValueNameType()      {return NULL;}
     virtual ITablePtrObjType* asITablePtrObjType()   {return NULL;}
     virtual OrNullType*       asOrNullType()         {return NULL;}
@@ -297,6 +303,9 @@ public:
     static bool isObject(Tag tag) {
         return (((SystemObject <= tag) && (tag <= Object)) ||
                 ((CompressedSystemObject <= tag) && (tag <= CompressedObject)));
+    }
+    static bool isUnresolvedObject(Tag tag) {
+        return tag == UnresolvedObject;
     }
     static bool isNullObject(Tag tag) {
         return ((tag == NullObject) || (tag == CompressedNullObject));
@@ -396,6 +405,27 @@ public:
     virtual bool isInstance() = 0;
 };
 
+class UnresolvedMethodPtrType : public FunctionPtrType {
+public:
+    UnresolvedMethodPtrType(ObjectType* _enclosingClass, uint32 _cpIndex, TypeManager& tm, bool isCompressed=false, ValueName obj=NULL) 
+        : FunctionPtrType(isCompressed), enclosingClass(_enclosingClass), cpIndex(_cpIndex), typeManager(tm), object(obj) {}
+        virtual ~UnresolvedMethodPtrType() {}
+
+        UnresolvedMethodPtrType* asUnresolvedMethodPtrType() { return this; }
+        uint32 getNumParams() {assert(0); return 0;}
+        Type* getParamType(uint32 n){assert(0); return NULL;}
+        Type* getReturnType() {assert(0); return NULL;}
+        bool isInstance() { assert(0); return false;}
+        void print(::std::ostream& os);
+        virtual bool    isUnresolvedType() {return true;}
+private:
+    ObjectType* enclosingClass;
+    uint32      cpIndex;
+    TypeManager& typeManager;
+    ValueName object;
+
+};
+
 class MethodPtrType : public FunctionPtrType {
 public:
     MethodPtrType(MethodDesc* md, TypeManager& tm, bool isCompressed=false, ValueName obj=NULL) 
@@ -454,7 +484,7 @@ public:
     // dynamic type checking, and look up interface vtables.
     //
     void*    getRuntimeIdentifier();   
-    void*    getVMTypeHandle()        {return vmTypeHandle;}
+    void*    getVMTypeHandle()        {assert(!isUnresolvedType()); return vmTypeHandle;}
 protected:
     void*            vmTypeHandle;
     TypeManager&    typeManager;
@@ -513,6 +543,7 @@ public:
     const    char*    getNameQualifier();
     bool getFastInstanceOfFlag();
     int getClassDepth();
+    virtual bool    isUnresolvedType() {return isUnresolvedObject() || isUnresolvedArray();}
 
     //
     // returns the vtable address of this boxed type
@@ -534,6 +565,8 @@ public:
     //
     // for boxed value types, returns byte offset of the un-boxed value
     //
+
+    virtual bool    isUnresolvedArray() const {return false;}
     uint32          getUnboxedOffset();
     bool            isInterface();
     bool            isAbstract();
@@ -543,31 +576,13 @@ protected:
 };
 class ArrayType : public ObjectType {
 public:
-    ArrayType(NamedType*   elemType_,
-              uint32  rank_,
-              uint32  numSizes_,
-              uint32* sizes_,
-              uint32  numLoBounds_,
-              uint32* loBounds_,
-              void*      td,
-              TypeManager& tm,
-              bool isCompressed) 
-        : ObjectType(isCompressed ? CompressedArray : Array,td,tm), elemType(elemType_) {
-        rank = rank_;
-        numSizes = numSizes_;
-        numLoBounds = numLoBounds_;
-        sizes = sizes_;
-        loBounds = loBounds_;
-    }
     ArrayType(NamedType* elemType_,void* td,TypeManager& tm, bool isCompressed) 
-        : ObjectType(isCompressed ? CompressedArray : Array, td, tm), elemType(elemType_) {
-        rank = 1;
-        numSizes = numLoBounds = 0;
-        sizes = loBounds = NULL;
+        : ObjectType(isCompressed ? CompressedArray : Array, td, tm), elemType(elemType_) 
+    {
     }
     ArrayType* asArrayType() { return this; }
     NamedType*    getElementType()        {return elemType;}
-    uint32    getNumArrayDimensions()    {return rank;}
+    virtual bool    isUnresolvedArray() const;
     //
     // for array types, returns byte offset of the first element of the array
     //
@@ -586,11 +601,6 @@ protected:
     }
 private:
     NamedType*    elemType;
-    uint32        rank;
-    uint32        numSizes;
-    uint32        numLoBounds;
-    uint32*       sizes;
-    uint32*       loBounds;
 };
 
 class ValueNameType : public Type {
@@ -668,6 +678,7 @@ public:
     Type*         getOffsetPlusHeapbaseType()   {return &offsetPlusHeapbaseType;}
     ObjectType*   getSystemStringType()    {return theSystemStringType;}
     ObjectType*   getSystemObjectType()    {return theSystemObjectType;}
+    ObjectType*   getUnresolvedObjectType(){return theUnresolvedObjectType;}
     ObjectType*   getSystemClassType()     {return theSystemClassType;}
 
     Type*         getCompressedNullObjectType()  {return &compressedNullObjectType;}
@@ -687,113 +698,30 @@ public:
     Type*         uncompressType(Type *compRefType);
     Type*         compressType(Type *uncompRefType);
 
-    PtrType*        getManagedPtrType(Type* pointedToType) {
-        PtrType* type = managedPtrTypes.lookup(pointedToType);
-        if (type == NULL) {
-            type = new (memManager) PtrType(pointedToType,true);
-            managedPtrTypes.insert(pointedToType,type);
-        }
-        return type;
-    }
-    PtrType*        getUnmanagedPtrType(Type* pointedToType) {
-        PtrType* type = unmanagedPtrTypes.lookup(pointedToType);
-        if (type == NULL) {
-            type = new (memManager) PtrType(pointedToType,false);
-            unmanagedPtrTypes.insert(pointedToType,type);
-        }
-        return type;
-    }
-    MethodPtrType*    getMethodPtrType(MethodDesc* methodDesc) {
-        MethodPtrType* type = methodPtrTypes.lookup(methodDesc);
-        if (type == NULL) {
-            type = new (memManager) MethodPtrType(methodDesc,*this);
-            methodPtrTypes.insert(methodDesc,type);
-        }
-        return type;
-    }
-    MethodPtrType* getMethodPtrObjType(ValueName obj, MethodDesc* methodDesc) {
-        PtrHashTable<MethodPtrType>* ptrTypes = methodPtrObjTypes.lookup(methodDesc);
-        if (!ptrTypes) {
-            ptrTypes = new (memManager) PtrHashTable<MethodPtrType>(memManager, 32);
-            methodPtrObjTypes.insert(methodDesc, ptrTypes);
-        }
-        MethodPtrType* ptrType = ptrTypes->lookup(obj);
-        if (!ptrType) {
-            ptrType = new (memManager) MethodPtrType(methodDesc, *this, false, obj);
-            ptrTypes->insert(obj, ptrType);
-        }
-        return ptrType;
-    }
-    VTablePtrType*    getVTablePtrType(Type* type) {
-        VTablePtrType* vtableType = vtablePtrTypes.lookup(type);
-        if (vtableType == NULL) {
-            vtableType = new (memManager) VTablePtrType(type);
-            vtablePtrTypes.insert(type,vtableType);
-        }
-        return vtableType;
-    }
+    PtrType*        getManagedPtrType(Type* pointedToType);
+       
+    PtrType*        getUnmanagedPtrType(Type* pointedToType);
 
-    OrNullType* getOrNullType(Type* t) {
-        OrNullType* orNullType = orNullTypes.lookup(t);
-        if (!orNullType) {
-            orNullType = new (memManager) OrNullType(t);
-            orNullTypes.insert(t, orNullType);
-        }
-        return orNullType;
-    }
-    ValueNameType* getVTablePtrObjType(ValueName val) {
-        ValueNameType* vtablePtrType = vtableObjTypes.lookup(val);
-        if (!vtablePtrType) {
-            vtablePtrType = new (memManager) ValueNameType(Type::VTablePtrObj, val, getIntPtrType());
-            vtableObjTypes.insert(val, vtablePtrType);
-        }
-        return vtablePtrType;
-    }
-    ValueNameType* getITablePtrObjType(ValueName val, NamedType* itype) {
-        PtrHashTable<ITablePtrObjType>* itableTypes = itableObjTypes.lookup(val);
-        if (!itableTypes) {
-            itableTypes = new (memManager) PtrHashTable<ITablePtrObjType>(memManager, 32);
-            itableObjTypes.insert(val, itableTypes);
-        }
-        ITablePtrObjType* itablePtrType = itableTypes->lookup(itype);
-        if (!itablePtrType) {
-            itablePtrType = new (memManager) ITablePtrObjType(val, itype, getIntPtrType());
-            itableTypes->insert(itype, itablePtrType);
-        }
-        return itablePtrType;
-    }
-    ValueNameType* getArrayLengthType(ValueName val) {
-        ValueNameType* arrayLengthType = arrayLengthTypes.lookup(val);
-        if (!arrayLengthType) {
-            arrayLengthType = new (memManager) ValueNameType(Type::ArrayLength, val, getInt32Type());
-            arrayLengthTypes.insert(val, arrayLengthType);
-        }
-        return arrayLengthType;
-    }
-    PtrType* getArrayBaseType(ValueName val) {
-        PtrType* arrayBaseType = arrayBaseTypes.lookup(val);
-        if (!arrayBaseType) {
-            Type* elementType = getArrayElementType(val);
-            arrayBaseType = new (memManager) PtrType(elementType, true, val);
-            arrayBaseTypes.insert(val, arrayBaseType);
-        }
-        return arrayBaseType;
-    }
-    PtrType* getArrayIndexType(ValueName array, ValueName index)
-    {
-        PtrHashTable<PtrType>* indexTypes = arrayIndexTypes.lookup(array);
-        if (!indexTypes) {
-            indexTypes = new (memManager) PtrHashTable<PtrType>(memManager, 32);
-            arrayIndexTypes.insert(array, indexTypes);
-        }
-        PtrType* indexType = indexTypes->lookup(index);
-        if (!indexType) {
-            Type* elementType = getArrayElementType(array);
-            indexType = new (memManager) PtrType(elementType, true, array, index);
-            indexTypes->insert(index, indexType);
-        }
-        return indexType;
-    }
+    MethodPtrType*    getMethodPtrType(MethodDesc* methodDesc);
+
+    UnresolvedMethodPtrType*    getUnresolvedMethodPtrType(ObjectType* enclosingClass, uint32 cpIndex);
+        
+    MethodPtrType* getMethodPtrObjType(ValueName obj, MethodDesc* methodDesc);
+        
+    VTablePtrType*    getVTablePtrType(Type* type);
+
+    OrNullType* getOrNullType(Type* t);
+
+    ValueNameType* getVTablePtrObjType(ValueName val);
+
+    ValueNameType* getITablePtrObjType(ValueName val, NamedType* itype);
+        
+    ValueNameType* getArrayLengthType(ValueName val);
+        
+    PtrType* getArrayBaseType(ValueName val);
+        
+    PtrType* getArrayIndexType(ValueName array, ValueName index);
+
     ValueNameType* getArrayElementType(ValueName val);
     ValueNameType* getSingletonType(ValueName val);
 
@@ -812,6 +740,9 @@ public:
         }
         return getObjectType(vmTypeHandle, isCompressed);
     }
+
+    void setLazyResolutionMode(bool flag) {lazyResolutionMode = flag;}
+    bool isLazyResolutionMode() const {return lazyResolutionMode;}
 
 private:
     MemoryManager& memManager;
@@ -836,6 +767,7 @@ private:
     ValueType     typedReference;
     ObjectType*   theSystemStringType;
     ObjectType*   theSystemObjectType;
+    ObjectType*   theUnresolvedObjectType;
     ObjectType*   theSystemClassType;
     Type          nullObjectType;
     Type          offsetType;
@@ -867,6 +799,7 @@ private:
 
     PtrHashTable< PtrHashTable<PtrType> >          arrayIndexTypes;
     PtrHashTable< PtrHashTable<MethodPtrType> >    methodPtrObjTypes;
+    PtrHashTable< PtrHashTable<UnresolvedMethodPtrType> > unresMethodPtrTypes;
     PtrHashTable< PtrHashTable<ITablePtrObjType> > itableObjTypes;
 
     bool areReferencesCompressed;
@@ -877,6 +810,7 @@ private:
     void*        systemObjectVMTypeHandle;
     void*        systemClassVMTypeHandle;
     void*        systemStringVMTypeHandle;
+    bool         lazyResolutionMode;
 };
 
 } //namespace Jitrino 

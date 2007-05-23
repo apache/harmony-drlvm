@@ -299,7 +299,7 @@ void CodeGen::pop_all_state(BBState* saveBB) {
 //
 }
 
-void CodeGen::gen_write_barrier(JavaByteCodes opcode, Field_Handle fieldHandle)
+void CodeGen::gen_write_barrier(JavaByteCodes opcode, Field_Handle fieldHandle, Opnd fieldSlotAddress)
 {
     //
     // TODO: the WB implementation is expected to perform the write
@@ -328,12 +328,7 @@ void CodeGen::gen_write_barrier(JavaByteCodes opcode, Field_Handle fieldHandle)
     if (!doGenWB4J && !doGenWB4C) {
         return;
     }
-    if ((opcode == OPCODE_PUTFIELD || opcode == OPCODE_PUTSTATIC) && 
-         fieldHandle == NULL) {
-        // Resolution error ? - nothing to report
-        return;
-    }
-
+    
     const bool wb4c_skip_statics = get_bool_arg("wb4c.skip_statics", true);
     if (doGenWB4C && (opcode == OPCODE_PUTSTATIC) && wb4c_skip_statics) {
         // Currently, in DRLVM, statics are allocated outside of GC heap, 
@@ -428,22 +423,19 @@ void CodeGen::gen_write_barrier(JavaByteCodes opcode, Field_Handle fieldHandle)
         //
         mode = 0;
         //
-        unsigned f_offset = field_get_offset(fieldHandle);
+        assert(fieldSlotAddress.is_reg());
         baseObject = vstack(1, true);
         rlock(baseObject);
-        slotAddress = Val(jobj, valloc(jobj));
-        Opnd address(jobj, baseObject.reg(), f_offset);
-        lea(slotAddress.as_opnd(), address);
+        slotAddress = fieldSlotAddress;
         rlock(slotAddress);
     }
     else if (opcode == OPCODE_PUTSTATIC) {
         //
         mode = 1;
         //
+        assert(fieldSlotAddress.is_reg());
         baseObject = Val(jobj, NULL_REF);
-        rlock(baseObject);
-        void* fieldAddress = field_get_address(fieldHandle);
-        slotAddress = Opnd(jobj, (int_ptr)fieldAddress);
+        slotAddress = fieldSlotAddress;
         rlock(slotAddress);
     }
     else if (opcode == OPCODE_AASTORE) {

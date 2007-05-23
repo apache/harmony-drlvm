@@ -140,6 +140,16 @@ JIT_Result Compiler::compile(Compile_Handle ch, Method_Handle method,
     if (!get_bool_arg("bbp", true)) {
         compile_flags &= JMF_BBPOLLING;
     }
+    
+    m_lazy_resolution  = get_bool_arg("lazyResolution", false);
+#ifdef _DEBUG
+    bool assertOnRecursion = get_bool_arg("assertOnRecursion", false);
+    if (assertOnRecursion) {
+        assert(Jitrino::getCompilationRecursionLevel() == 1);
+    }
+#endif
+
+
     //
     // Debugging support
     //
@@ -1446,6 +1456,30 @@ void Compiler::initStatics(void)
                 (char*)vm_get_rt_support_addr(VM_RT_GC_SAFE_POINT);
     rt_helper_get_tls_base_ptr= 
                 (char*)vm_get_rt_support_addr(VM_RT_GC_GET_TLS_BASE);
+
+    rt_helper_new_withresolve =
+                    (char*)vm_get_rt_support_addr(VM_RT_NEWOBJ_WITHRESOLVE);
+    rt_helper_new_array_withresolve =
+        (char*)vm_get_rt_support_addr(VM_RT_NEWARRAY_WITHRESOLVE);
+    rt_helper_get_class_withresolve =
+        (char*)vm_get_rt_support_addr(VM_RT_INITIALIZE_CLASS_WITHRESOLVE);
+    rt_helper_checkcast_withresolve =
+                    (char*)vm_get_rt_support_addr(VM_RT_CHECKCAST_WITHRESOLVE);
+    rt_helper_instanceof_withresolve =
+                    (char*)vm_get_rt_support_addr(VM_RT_INSTANCEOF_WITHRESOLVE);
+    rt_helper_field_get_offset_withresolve =
+                    (char*)vm_get_rt_support_addr(VM_RT_GET_NONSTATIC_FIELD_OFFSET_WITHRESOLVE);
+    rt_helper_field_get_address_withresolve = 
+                    (char*)vm_get_rt_support_addr(VM_RT_GET_STATIC_FIELD_ADDR_WITHRESOLVE);
+    rt_helper_get_invokevirtual_addr_withresolve = 
+                (char*)vm_get_rt_support_addr(VM_RT_GET_INVOKEVIRTUAL_ADDR_WITHRESOLVE);
+    rt_helper_get_invokespecial_addr_withresolve = 
+                    (char*)vm_get_rt_support_addr(VM_RT_GET_INVOKE_SPECIAL_ADDR_WITHRESOLVE);
+    rt_helper_get_invokestatic_addr_withresolve = 
+                    (char*)vm_get_rt_support_addr(VM_RT_GET_INVOKESTATIC_ADDR_WITHRESOLVE);
+    rt_helper_get_invokeinterface_addr_withresolve = 
+                    (char*)vm_get_rt_support_addr(VM_RT_GET_INVOKEINTERFACE_ADDR_WITHRESOLVE);
+
     //
     rt_helper_ti_method_enter = 
             (char*)vm_get_rt_support_addr(VM_RT_JVMTI_METHOD_ENTER_CALLBACK);

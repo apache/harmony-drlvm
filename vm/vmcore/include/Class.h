@@ -1155,6 +1155,11 @@ public:
         return m_vtable_descriptors[method_idx];
     }
 
+    /// Returns the number of virtual methods in vtable
+    unsigned get_number_of_virtual_method_entries() const {
+        return m_num_virtual_method_entries;
+    }
+
     /** Gets the first subclass for Class Hierarchy Analysis.
      * @return The first subclass.*/
     Class* get_first_child() const { return m_cha_first_child; }
@@ -2024,5 +2029,17 @@ class_register_methods(Class_Handle klass, const JNINativeMethod* methods, int n
  *         otherwise <code>true</code>.*/
 bool
 class_unregister_methods(Class_Handle klass);
+
+//method is defined in Resolve.cpp
+Class* resolve_class_new_env(Global_Env* env, Class* clss, unsigned cp_index, bool raise_exn);
+Method* resolve_special_method_env(Global_Env *env, Class_Handle curr_clss, unsigned index, bool raise_exn);
+Method* resolve_static_method_env(Global_Env *env, Class *clss, unsigned cp_index, bool raise_exn);
+Method* resolve_virtual_method_env(Global_Env *env, Class *clss, unsigned cp_index, bool raise_exn);
+Method* resolve_interface_method_env(Global_Env *env, Class *clss, unsigned cp_index, bool raise_exn);
+Field* resolve_static_field_env(Global_Env *env, Class *clss, unsigned cp_index, bool putfield, bool is_runtume);
+Field* resolve_nonstatic_field_env(Global_Env* env, Class* clss, unsigned cp_index, unsigned putfield, bool raise_exn);
+
+
+
 
 #endif // _CLASS_H_

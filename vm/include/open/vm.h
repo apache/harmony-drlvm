@@ -826,6 +826,14 @@ VMEXPORT Boolean type_info_is_general_array(Type_Info_Handle tih);
  */
 VMEXPORT Class_Handle type_info_get_class(Type_Info_Handle tih);
 
+
+/**
+* Gets Type_Info_Handle from the given type name.
+* Does'n resolve type if not resolved
+*/
+
+VMEXPORT Type_Info_Handle type_info_create_from_java_descriptor(ClassLoaderHandle cl, const char* typeName);
+
 /**
  * Get the class if <code>type_info_is_reference</code> or 
  * <code>type_info_is_unboxed</code> returned <code>TRUE</code>. 
@@ -854,6 +862,18 @@ VMEXPORT Type_Info_Handle type_info_get_type_info(Type_Info_Handle tih);
  * of other functions provided in this interface.
  */
 VMEXPORT VM_Data_Type type_info_get_type(Type_Info_Handle tih);
+
+
+/**
+* Checks if a type referenced by the given type info handle is resolved
+*/
+VMEXPORT Boolean type_info_is_resolved(Type_Info_Handle tih);
+
+/**
+* Returns number of array dimension of a type referenced by the 
+* given type info handle.
+*/
+VMEXPORT uint32 type_info_get_num_array_dimensions(Type_Info_Handle tih);
 
 ////
 // end type info-related functions.

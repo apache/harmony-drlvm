@@ -24,6 +24,8 @@
 #ifndef _IRBUILDER_H_
 #define _IRBUILDER_H_
 
+#include "open/bytecodes.h"
+
 #include "MemoryManager.h"
 #include "Opcode.h"
 #include "Inst.h"
@@ -118,9 +120,21 @@ public:
     void  genBranch(Type::Tag instType, ComparisonModifier mod, LabelInst* label, Opnd* src); // TR //SI
     void  genJump(LabelInst* label); //TR
     void  genSwitch(uint32 numLabels, LabelInst* label[], LabelInst* defaultLabel, Opnd* src);//TR
+
+        
     // Calls
     // If the call does not return a value, then the returned Opnd* is the
     // null Opnd*.
+    Opnd* genIndirectCallWithResolve(Type* returnType,
+                                    Opnd* tauNullCheckedFirstArg,
+                                    Opnd* tauTypesChecked,
+                                    uint32 numArgs,
+                                    Opnd* args[],
+                                    ObjectType* ch,
+                                    JavaByteCodes bc,
+                                    uint32 cpIndex
+                                    );
+    
     Opnd* genDirectCall(MethodDesc* methodDesc, // TR //SI
                         Type* returnType,
                         Opnd* tauNullCheckedFirstArg, // 0 for unsafe
@@ -198,11 +212,17 @@ public:
     Opnd*      genLdElem(Type* elemType, Opnd* array, Opnd* index,
                          Opnd* tauNullCheck, Opnd* tauAddressInRange);
     Opnd*      genLdFieldAddr(Type* fieldType, Opnd* base, FieldDesc* fieldDesc); //TR
+    Opnd*      genLdFieldAddrWithResolve(Type* fieldType, Opnd* base, ObjectType* enclClass, uint32 cpIndex, bool putfield); //TR
     Opnd*      genLdStaticAddr(Type* fieldType, FieldDesc* fieldDesc);//TR
+    Opnd*      genLdStaticAddrWithResolve(Type* fieldType, ObjectType* enclClass, uint32 cpIndex, bool putfield);//TR
     Opnd*      genLdElemAddr(Type* elemType, Opnd* array, Opnd* index);//TR
     Opnd*      genLdVirtFunAddr(Opnd* base, MethodDesc* methodDesc);//TR
     Opnd*      genLdFunAddr(MethodDesc* methodDesc);//TR
     Opnd*      genArrayLen(Type* dstType, Type::Tag type, Opnd* array); // TR
+
+    Opnd*      genLdFieldWithResolve(Type*, Opnd* base, ObjectType* enclClass, uint32 cpIdx); //TR
+    Opnd*      genLdStaticWithResolve(Type*, ObjectType* enclClass, uint32 cpIdx);//TR
+
     // store instructions
     void       genStVar(VarOpnd* var, Opnd* src);//TR
     void       genStField(Type*, Opnd* base, FieldDesc* fieldDesc, Opnd* src);//TR
@@ -211,14 +231,22 @@ public:
     void       genStElem(Type*, Opnd* array, Opnd* index, Opnd* src,
                          Opnd* tauNullCheck, Opnd* tauBaseTypeCheck, Opnd* tauAddressInRange);
     void       genStInd(Type*, Opnd* ptr, Opnd* src);//TR
+
+    void       genStFieldWithResolve(Type*, Opnd* base, ObjectType* enclClass, uint32 cpIdx, Opnd* src);//TR
+    void       genStStaticWithResolve(Type*, ObjectType* enclClass, uint32 cpIdx, Opnd* src);//TR
+
     // checks
     Opnd*      genTauCheckNull(Opnd* base);
     Opnd*      genTauCheckBounds(Opnd* array, Opnd* index, Opnd *tauNullChecked);
     Opnd*      genCheckFinite(Type* dstType, Opnd* src); // TR
     // allocation
     Opnd*      genNewObj(Type* type);//TR
+    Opnd*      genNewObjWithResolve(ObjectType* enclClass, uint32 cpIndex);//TR
     Opnd*      genNewArray(NamedType* elemType, Opnd* numElems);//TR
+    Opnd*      genNewArrayWithResolve(NamedType* elemType, Opnd* numElems, ObjectType* enclClass, uint32 cpIndex);//TR
     Opnd*      genMultianewarray(NamedType* arrayType, uint32 dimensions, Opnd** numElems);//TR
+    Opnd*      genMultianewarrayWithResolve(NamedType* arrayType, ObjectType* enclClass, uint32 cpIndex, uint32 dimensions, Opnd** numElems);//TR
+    //Opnd*      genMultianewarrayWithResolve(NamedType* arrayType, uint32 dimensions, Opnd** numElems);//TR
     // sync
     void       genMonitorEnter(Opnd* src); // also inserts nullcheck of src//TR
     void       genMonitorExit(Opnd* src);  // also inserts nullcheck of src//TR
@@ -233,10 +261,12 @@ public:
     // type checking
     // CastException (succeeds if argument is null, returns casted object)
     Opnd*      genCast(Opnd* src, Type* type); // TR
+    Opnd*      genCastWithResolve(Opnd* src, Type* type, ObjectType* enclClass, uint32 cpIndex); // TR
     // returns trueResult if src is an instance of type, 0 otherwise
     Opnd*      genAsType(Opnd* src, Type* type); // TR
     // returns 1 if src is not null and an instance of type, 0 otherwise
     Opnd*      genInstanceOf(Opnd* src, Type* type); //TR
+    Opnd*      genInstanceOfWithResolve(Opnd* src, ObjectType* enclClass, uint32 cpIndex); //TR
     void       genInitType(NamedType* type); //TR
     // labels
     void       genLabel(LabelInst* labelInst); //TR
@@ -313,9 +343,7 @@ public:
                                      Opnd* args[],
                                      InlineInfoBuilder* inlineInfoBuilder);     // NULL if this call is not inlined
 
-    Opnd*      genLdFieldAddrNoChecks(Type* fieldType, Opnd* base, FieldDesc* fieldDesc);
     Opnd*      genLdElemAddrNoChecks(Type *elemType, Opnd* array, Opnd* index);
-    Opnd*      genLdStaticAddrNoChecks(Type *fieldType, FieldDesc* fieldDesc);
     Opnd*      genTauLdVirtFunAddrSlot(Opnd* base, Opnd* tauOk, MethodDesc* methodDesc);
     Opnd*      genLdVTable(Opnd* base, Type* type);
     Opnd*      genTauLdVTable(Opnd* base, Opnd *tauNullChecked, Type* type);
@@ -345,6 +373,9 @@ public:
     Opnd*      genTauCheckCast(Opnd* src, Opnd *tauNullChecked, Type* type);
     Opnd*      genTauStaticCast(Opnd *src, Opnd *tauCheckedCast, Type *castType);
     Opnd*      genTauHasType(Opnd *src, Type *hasType);
+    //generates tauhastype + copy conversion of src has unresolved type
+    //stores result of conversion in *src
+    Opnd*      genTauHasTypeWithConv(Opnd **src, Type *hasType);
     Opnd*      genTauHasExactType(Opnd *src, Type *hasType);
     Opnd*      genTauIsNonNull(Opnd *src);
     Opnd*      genTauAnd(Opnd *src1, Opnd *src2);
@@ -392,6 +423,7 @@ private:
     Type*    getOpndTypeFromLdType(Type* ldType);
     Opnd*    createOpnd(Type*);
     PiOpnd*  createPiOpnd(Opnd *org);
+    Opnd*    createTypeOpnd(ObjectType* type);
     Opnd*    lookupHash(uint32 opc);
     Opnd*    lookupHash(uint32 opc, uint32 op);
     Opnd*    lookupHash(uint32 opc, uint32 op1, uint32 op2);

@@ -314,6 +314,7 @@ public:
                                       uint32 handlerLength,
                                       Type*  exceptionType) {
         jitrino_assert( exceptionType);
+        assert(!exceptionType->isUnresolvedType());//must be resolved by verifier
         Log::out() << "Catch Exception Type = " << exceptionType->getName() << ::std::endl;
 
         CatchHandler* handler = new (memManager) 
@@ -381,9 +382,18 @@ public:
 
         Type* exceptionType = NULL;
         if (exceptionTypeToken != 0) {
-            exceptionType = compilationInterface.resolveNamedType(enclosingMethod,exceptionTypeToken);
+            exceptionType = compilationInterface.getNamedType(enclosingMethod->getParentHandle(),exceptionTypeToken, ResolveNewCheck_NoCheck);
             if(!exceptionType) { // the type can not be resolved. LinkingException must be thrown
                 return 0;
+            }
+            if (exceptionType->isUnresolvedObject()) {
+                //WORKAROUND! resolving exception type during a compilation session!!!
+                //Details: using singleton UnresolvedObjectType we unable to 
+                //distinct exception types if there are several unresolved exceptions in a single try block
+                //usually verifier loads all exception types caught for in method
+                //but verifier is turned off for bootstrap classes
+                Log::out()<<"WARNING: resolving type from inside of compilation session!!"<<std::endl;
+                exceptionType = compilationInterface.resolveNamedType(enclosingMethod->getParentHandle(),exceptionTypeToken);
             }
         } else {
             exceptionType = prepass.typeManager.getSystemObjectType();
@@ -503,7 +513,6 @@ JavaLabelPrepass::JavaLabelPrepass(MemoryManager& mm,
     } else {
         numCatchHandlers = exceptionTypes.numCatch;
     }
-
     hasJsrLabels = false;
     isFallThruLabel = true;
     numVars = methodDesc.getNumVars();
@@ -1148,10 +1157,13 @@ void JavaLabelPrepass::new_(uint32 constPoolIndex)         {
     StateInfo::SlotInfo slot;
     StateInfo::setNonNull(&slot);
     StateInfo::setExactType(&slot);
-    Type* nType = resolveTypeNew(constPoolIndex);
+    
+    Type* nType = compilationInterface.getNamedType(methodDesc.getParentHandle(), constPoolIndex, ResolveNewCheck_DoCheck);
+    
     if (nType) {
         slot.type = nType;
     } else {
+        assert(!typeManager.isLazyResolutionMode());
         slot.type = typeManager.getNullObjectType();
     }
     slot.vars = NULL;
@@ -1187,10 +1199,13 @@ void JavaLabelPrepass::anewarray(uint32 constPoolIndex)    {
     StateInfo::SlotInfo slot;
     StateInfo::setNonNull(&slot);
     StateInfo::setExactType(&slot);
-    Type* type = resolveType(constPoolIndex);
+
+    Type* type = compilationInterface.getNamedType(methodDesc.getParentHandle(), constPoolIndex);
+    
     if (type) {
         slot.type = typeManager.getArrayType(type);
     } else {
+        assert(!typeManager.isLazyResolutionMode());
         slot.type = typeManager.getNullObjectType();
     }
     slot.vars = NULL;
@@ -1198,8 +1213,15 @@ void JavaLabelPrepass::anewarray(uint32 constPoolIndex)    {
     pushType(slot);
 }
 
-void JavaLabelPrepass::arraylength()                       { popAndCheck(A); pushType(int32Type); }
-void JavaLabelPrepass::athrow()                            { popAndCheck(A); }
+void JavaLabelPrepass::arraylength() {
+    popAndCheck(A); 
+    pushType(int32Type); 
+}
+
+void JavaLabelPrepass::athrow() { 
+    popAndCheck(A); 
+}
+
 void JavaLabelPrepass::checkcast(uint32 constPoolIndex)    { 
     StateInfo::SlotInfo slot = stateInfo.stack[stateInfo.stackDepth - 1];
     if ( (slot.type) &&
@@ -1207,68 +1229,20 @@ void JavaLabelPrepass::checkcast(uint32 constPoolIndex)    {
          (slot.vars == NULL) ) {
         return;
     }
-    Type *type = resolveType(constPoolIndex);
+    Type* type = compilationInterface.getNamedType(methodDesc.getParentHandle(), constPoolIndex);
     if (!type) {
+        assert(!typeManager.isLazyResolutionMode());
         // leave stack as is as in case of success because
         // resolution of item by constPoolIndex fails and
         // respective exception will be thrown
         return;
     }
     popAndCheck(A);
-    jitrino_assert( type);
     pushType(type);
 }
+
 int JavaLabelPrepass::instanceof(const uint8* bcp, uint32 constPoolIndex, uint32 off)   {
-    struct StateInfo::SlotInfo exitInfo = popType();
-    if ( !StateInfo::isVarNumberSet(exitInfo)) {
-        pushType(int32Type);
-        return 3;
-    }
-    Type *restype = resolveType(constPoolIndex);
-    if (!restype) {
-        // skip other activity because
-        // resolution of item by constPoolIndex fails and
-        // respective exception will be thrown
-        pushType(int32Type);
-        return 3;  // length of instanceof
-    }
-    // check the next byte code following the instanceof
-    bcp += 3;
-    off += 3;
-    const uint8* byteCodes = bcp-off;
-    StateInfo::SlotInfo *slot = &stateInfo.stack[exitInfo.varNumber];
-    bool isSubClassOf = false;
-    Type *runtype = exitInfo.type;
-    Type *chktype = restype;
-    if (runtype->isArrayType() && chktype->isArrayType()) {
-        runtype = ((ArrayType*)runtype)->getElementType();
-        chktype = ((ArrayType*)chktype)->getElementType();
-    }
-    if (!runtype->isNullObject() && runtype->isObject() && chktype->isObject()) {
-        isSubClassOf = ((ObjectType*)runtype)->isSubClassOf((ObjectType*)chktype);
-    }
-    if (false && !isSubClassOf)
-        switch(*bcp) {
-        case 0x9a: // ifne
-            {uint32 targetOffset = off+si16(bcp+1);
-             uint32 nextOffset   = off+3;
-            setStackVars();
-            // propagate state info on both ways
-            Type * oldtype    = slot->type;
-            uint16 oldflags   = slot->slotFlags;
-            slot->type        = restype;
-            StateInfo::setNonNull(slot);
-            StateInfo::setChangeState(slot);
-            propagateStateInfo(targetOffset,false);
-            slot->type        = oldtype;
-            slot->slotFlags   = oldflags;
-            setLabel(nextOffset);
-            isFallThruLabel = targetOffset > nextOffset;
-            if (labelStack != NULL)
-                labelStack->push((uint8*)byteCodes + off+si16(bcp+1));
-            }
-            return 3+3;
-         }
+    popType();
     pushType(int32Type);
     return 3;  // length of instanceof
 }
@@ -1307,66 +1281,59 @@ void JavaLabelPrepass::ldc2(uint32 constPoolIndex)         {
 }
 
 void JavaLabelPrepass::getstatic(uint32 constPoolIndex)    {
-    FieldDesc *fdesc = resolveStaticField(constPoolIndex, false);
+    FieldDesc *fdesc = compilationInterface.getStaticField(methodDesc.getParentHandle(), constPoolIndex, false);
     Type* fieldType = 0;
     if (fdesc && fdesc->isStatic()) {
         fieldType = fdesc->getFieldType();
-        if (!fieldType){
-            fieldType = compilationInterface.getFieldType(&methodDesc,constPoolIndex);
-        }
-    } else {
-        fieldType = compilationInterface.getFieldType(&methodDesc,constPoolIndex);
     }
+    if (!fieldType){
+        fieldType = compilationInterface.getFieldType(methodDesc.getParentHandle(), constPoolIndex);
+     }
     assert(fieldType);
     pushType(typeManager.toInternalType(fieldType));
 }
+
 void JavaLabelPrepass::putstatic(uint32 constPoolIndex)    {
-    FieldDesc *fdesc = resolveStaticField(constPoolIndex, true);
-    if (fdesc) {
-        Type* fieldType = fdesc->getFieldType();
-        if (!fieldType){
-            popType();
-        }else {
-            popAndCheck(getJavaType(fieldType));
-        }
+    FieldDesc *fdesc = compilationInterface.getStaticField(methodDesc.getParentHandle(), constPoolIndex, true);
+    Type* fieldType = fdesc ? fdesc->getFieldType() : NULL;
+    if (fieldType){
+        popAndCheck(getJavaType(fieldType));
     } else {
+        // lazy resolution mode or
         // throwing respective exception helper will be inserted at the Translator
-        popType();
-    }
+       popType();
+    } 
 }
+
 void JavaLabelPrepass::getfield(uint32 constPoolIndex)     {
-    popAndCheck(A);
-    FieldDesc *fdesc = resolveField(constPoolIndex, false);
-    Type* fieldType = 0;
+    popAndCheck(A);//obj
+    FieldDesc *fdesc = compilationInterface.getNonStaticField(methodDesc.getParentHandle(), constPoolIndex, false);
+    Type* fieldType = NULL;
     if (fdesc) {
         fieldType = fdesc->getFieldType();
-        if (!fieldType){
-            fieldType = compilationInterface.getFieldType(&methodDesc,constPoolIndex);
-        }
-    } else {
-        fieldType = compilationInterface.getFieldType(&methodDesc,constPoolIndex);
+    }
+    if (!fieldType){
+        fieldType = compilationInterface.getFieldType(methodDesc.getParentHandle(), constPoolIndex);
     }
     assert(fieldType);
     pushType(typeManager.toInternalType(fieldType));
 }
+
 void JavaLabelPrepass::putfield(uint32 constPoolIndex)     {
-    FieldDesc *fdesc = resolveField(constPoolIndex, true);
-    if (fdesc) {
-        Type* fieldType = fdesc->getFieldType();
-        if (!fieldType){
-            popType();
-        }else {
-            popAndCheck(getJavaType(fieldType));
-        }
+    FieldDesc *fdesc = compilationInterface.getNonStaticField(methodDesc.getParentHandle(), constPoolIndex, true);
+    Type* fieldType = fdesc ? fdesc->getFieldType() : NULL;
+    if (fieldType){
+        popAndCheck(getJavaType(fieldType));
     } else {
         // throwing respective exception helper will be inserted at the Translator
+        // TODO: why not check types for lazy-resolve mode?
         popType();
     }
     popAndCheck(A);
 }
 
 void JavaLabelPrepass::invokevirtual(uint32 constPoolIndex){
-    MethodDesc *mdesc = resolveVirtualMethod(constPoolIndex);
+    MethodDesc *mdesc = compilationInterface.getVirtualMethod(methodDesc.getParentHandle(), constPoolIndex);
     if (mdesc) {// resolution was successful
         invoke(mdesc);
     } else {    // exception happens during resolving/linking
@@ -1377,17 +1344,18 @@ void JavaLabelPrepass::invokevirtual(uint32 constPoolIndex){
 }
 
 void JavaLabelPrepass::invokespecial(uint32 constPoolIndex){
-    MethodDesc *mdesc = resolveSpecialMethod(constPoolIndex);
+    MethodDesc* mdesc = compilationInterface.getSpecialMethod(methodDesc.getParentHandle(),constPoolIndex);
     if (mdesc) {// resolution was successful
         invoke(mdesc);
-    } else {    // exception happens during resolving/linking
+    } else {    
+        // exception happens during resolving/linking or lazy resolution mode
         const char* methodSig_string = methodSignatureString(constPoolIndex);
         popType(); // is not static
         pseudoInvoke(methodSig_string);
     }
 }
 void JavaLabelPrepass::invokestatic(uint32 constPoolIndex) {
-    MethodDesc *mdesc = resolveStaticMethod(constPoolIndex);
+    MethodDesc *mdesc = compilationInterface.getStaticMethod(methodDesc.getParentHandle(), constPoolIndex);
     if (mdesc) {// resolution was successful
         invoke(mdesc);
     } else {    // exception happens during resolving/linking
@@ -1396,7 +1364,7 @@ void JavaLabelPrepass::invokestatic(uint32 constPoolIndex) {
     }
 }
 void JavaLabelPrepass::invokeinterface(uint32 constPoolIndex,uint32 count) {
-    MethodDesc *mdesc = resolveInterfaceMethod(constPoolIndex);
+    MethodDesc *mdesc = compilationInterface.getInterfaceMethod(methodDesc.getParentHandle(), constPoolIndex);
     if (mdesc) {// resolution was successful
         invoke(mdesc);
     } else {    // exception happens during resolving/linking
@@ -1406,10 +1374,12 @@ void JavaLabelPrepass::invokeinterface(uint32 constPoolIndex,uint32 count) {
     }
 }
 void JavaLabelPrepass::multianewarray(uint32 constPoolIndex,uint8 dimensions) {
-    for (int i =0; i < dimensions; i++)
+    for (int i =0; i < dimensions; i++) {
         popAndCheck(int32Type);
-    Type *type = resolveType(constPoolIndex);
+    }
+    Type *type = compilationInterface.getNamedType(methodDesc.getParentHandle(), constPoolIndex);
     if ( !type ) {
+        assert(!typeManager.isLazyResolutionMode());
         type = typeManager.getNullObjectType();
     }
     jitrino_assert( type);
@@ -1426,7 +1396,7 @@ void JavaLabelPrepass::pseudoInvoke(const char* methodSig) {
         popType();
 
     // recognize and push respective returnType
-    Type* retType = getRetTypeBySignature(methodSig, typeManager);
+    Type* retType = getRetTypeBySignature(compilationInterface, methodDesc.getParentHandle(), methodSig);
     assert(retType);
 
     // push the return type
@@ -1474,13 +1444,15 @@ uint32 JavaLabelPrepass::getNumArgsBySignature(const char*& methodSig)
     return numArgs;
 }
 
-Type* JavaLabelPrepass::getRetTypeBySignature(const char* methodSig, TypeManager& typeManager) 
+Type* JavaLabelPrepass::getRetTypeBySignature(CompilationInterface& ci, Class_Handle enclClass, const char* origSig) 
 {
-    assert(*methodSig == '(' || *methodSig == ')');
-    while( *(methodSig++) != ')' ); // in case getNumArgsBySignature was not run earlier
+    assert(*origSig== '(' || *origSig == ')');
+    while( *(origSig++) != ')' ); // in case getNumArgsBySignature was not run earlier
 
     Type* retType = NULL;
     uint32 arrayDim = 0;
+    const char* methodSig = origSig;
+
 
     // collect array dimension if any
     while( *(methodSig) == '[' ) {
@@ -1488,10 +1460,18 @@ Type* JavaLabelPrepass::getRetTypeBySignature(const char* methodSig, TypeManager
         methodSig++;
     }
 
+    bool arrayIsWrapped = false;
+    TypeManager& typeManager = ci.getTypeManager();
     switch( *methodSig ) 
     {
-    case 'L':
-        retType = typeManager.getNullObjectType();
+    case 'L': {
+            if (!typeManager.isLazyResolutionMode()) {
+                typeManager.getNullObjectType();
+            }
+            retType = ci.getTypeFromDescriptor(enclClass, origSig);
+            //in lazy resolution mode retType is already valid array type
+            arrayIsWrapped = true;
+        }
         break;
     case 'B':
         retType = typeManager.getInt8Type();
@@ -1503,7 +1483,7 @@ Type* JavaLabelPrepass::getRetTypeBySignature(const char* methodSig, TypeManager
         retType = typeManager.getDoubleType();
         break;
     case 'F':
-        retType = typeManager.getFloatType();
+        retType = typeManager.getSingleType();
         break;
     case 'I':
         retType = typeManager.getInt32Type();
@@ -1532,12 +1512,15 @@ Type* JavaLabelPrepass::getRetTypeBySignature(const char* methodSig, TypeManager
 
     void* arrVMTypeHandle = NULL;
     if(retType == typeManager.getNullObjectType()) {
+        assert(!typeManager.isLazyResolutionMode());
         // VM can not operate with an array of NullObjects
         // Let's cheat here
         arrVMTypeHandle = (void*)(POINTER_SIZE_INT)0xdeadbeef;
     }
-    for (;arrayDim > 0; arrayDim--) {
-        retType = typeManager.getArrayType(retType, false, arrVMTypeHandle);
+    if (!arrayIsWrapped && arrayDim > 0) {
+        for (;arrayDim > 0; arrayDim--) {
+            retType = typeManager.getArrayType(retType, false, arrVMTypeHandle);
+        }
     }
     return retType;
 }
@@ -1751,7 +1734,7 @@ void JavaLabelPrepass::genArrayLoad (Type *type) {
 void JavaLabelPrepass::genTypeArrayLoad() {
     popAndCheck(int32Type);
     Type* type = popType().type;
-    assert(type->isArrayType() || type->isNullObject());
+    assert(type->isArrayType() || type->isNullObject() || type->isUnresolvedObject());
     if(type->isArrayType()) {
         type = ((ArrayType*)type)->getElementType();
     }
@@ -1775,7 +1758,7 @@ void JavaLabelPrepass::genTypeArrayStore() {
     type = 
 #endif
         popType().type;
-    assert(type->isArrayType() || type->isNullObject());
+    assert(type->isArrayType() || type->isNullObject() || type->isUnresolvedObject());
 }
 
 void JavaLabelPrepass::genBinary    (Type *type) {
@@ -1806,47 +1789,7 @@ void JavaLabelPrepass::genCompare   (Type *type) {
     pushType(int32Type);
 }
 
-// cut and paste from JavaLabelPrepass.cpp
 
-FieldDesc*      JavaLabelPrepass::resolveField(uint32 cpIndex, bool putfield) {
-    FieldDesc* res = compilationInterface.resolveField(&methodDesc, cpIndex, putfield);
-    return res;
-}
-
-FieldDesc*      JavaLabelPrepass::resolveStaticField(uint32 cpIndex, bool putfield) {
-    FieldDesc* res = compilationInterface.resolveStaticField(&methodDesc, cpIndex, putfield);
-    return res;
-}
-
-MethodDesc*     JavaLabelPrepass::resolveVirtualMethod(uint32 cpIndex) {
-    MethodDesc* res = compilationInterface.resolveVirtualMethod(&methodDesc,cpIndex);
-    return res;
-}
-
-MethodDesc*     JavaLabelPrepass::resolveSpecialMethod(uint32 cpIndex) {
-    MethodDesc* res = compilationInterface.resolveSpecialMethod(&methodDesc,cpIndex);
-    return res;
-}
-
-MethodDesc*     JavaLabelPrepass::resolveStaticMethod(uint32 cpIndex) {
-    MethodDesc* res = compilationInterface.resolveStaticMethod(&methodDesc,cpIndex);
-    return res;
-}
-
-MethodDesc*     JavaLabelPrepass::resolveInterfaceMethod(uint32 cpIndex) {
-    MethodDesc* res = compilationInterface.resolveInterfaceMethod(&methodDesc,cpIndex);
-    return res;
-}
-
-Type*   JavaLabelPrepass::resolveType(uint32 cpIndex) {
-    Type* res = compilationInterface.resolveNamedType(&methodDesc,cpIndex);
-    return res;
-}
-
-Type*   JavaLabelPrepass::resolveTypeNew(uint32 cpIndex) {
-    Type* res = compilationInterface.resolveNamedTypeNew(&methodDesc,cpIndex);
-    return res;
-}
 
 const char*     JavaLabelPrepass::methodSignatureString(uint32 cpIndex) {
     return compilationInterface.getSignatureString(&methodDesc,cpIndex);

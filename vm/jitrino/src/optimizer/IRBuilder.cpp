@@ -31,9 +31,6 @@
 
 namespace Jitrino {
 
-static void UNIMPLEMENTED(char* fun) {
-    Log::out() << "   !!!!  IRBuilder: unimplemented: " << fun << "   !!!\n";
-}
 
 #if defined(_MSC_VER) && !defined (__ICL) && !defined (__GNUC__)
 #pragma warning(disable : 4355)
@@ -1320,7 +1317,69 @@ IRBuilder::genPrefetch(Opnd *base, Opnd *offset, Opnd *hints) {
     return dst;
 }
 
+Opnd* IRBuilder::createTypeOpnd(ObjectType* type) {
+    Opnd* res = NULL;
+    POINTER_SIZE_SINT val = (POINTER_SIZE_SINT)type->getRuntimeIdentifier();
+    res = genLdConstant(val);
+    return res;
+}
 // Calls
+
+Opnd* IRBuilder::genIndirectCallWithResolve(Type* returnType,
+                                Opnd* tauNullCheckedFirstArg,
+                                Opnd* tauTypesChecked,
+                                uint32 numArgs,
+                                Opnd* args[],
+                                ObjectType* ch,
+                                JavaByteCodes bc,
+                                uint32 cpIndex
+                                )
+{
+    assert(!returnType->isNullObject());
+    Opnd* callAddrOpnd = lookupHash(Op_VMHelperCall, bc, cpIndex, numArgs>0?args[0]->getId() : 0);
+    if (tauTypesChecked == NULL) {
+        tauTypesChecked = genTauUnsafe(); 
+    }
+
+    if (callAddrOpnd == NULL) {
+        CompilationInterface::RuntimeHelperId vmHelperId = CompilationInterface::Helper_Null;
+        MemoryManager& mm = irManager->getMemoryManager();
+        Opnd* clsOpnd = createTypeOpnd(ch);
+        Opnd* idxOpnd = genLdConstant((int)cpIndex);
+        uint32 numHelperArgs = 0;
+        Opnd** helperArgs = helperArgs = new(mm)Opnd*[3];
+        helperArgs[0] = clsOpnd;
+        helperArgs[1] = idxOpnd;
+        helperArgs[2] = NULL;
+        switch(bc) {
+        case OPCODE_INVOKESTATIC:
+            vmHelperId = CompilationInterface::Helper_GetInvokeStaticAddrWithResolve;
+            numHelperArgs = 2;
+            break;
+        case OPCODE_INVOKEVIRTUAL:
+            vmHelperId = CompilationInterface::Helper_GetInvokeVirtualAddrWithResolve;
+            helperArgs[2] = args[0];
+            numHelperArgs = 3;
+            break;
+        case OPCODE_INVOKESPECIAL:
+            vmHelperId = CompilationInterface::Helper_GetInvokeSpecialAddrWithResolve;
+            numHelperArgs = 2;
+            break;
+        case OPCODE_INVOKEINTERFACE:
+            vmHelperId = CompilationInterface::Helper_GetInvokeInterfaceAddrWithResolve;
+            helperArgs[2] = args[0];
+            numHelperArgs = 3;
+            break;
+        default: assert(0);
+        }
+        callAddrOpnd = genVMHelperCall(vmHelperId, typeManager->getUnresolvedMethodPtrType(ch, cpIndex), numHelperArgs, helperArgs);
+        insertHash(Op_VMHelperCall, bc, cpIndex, numArgs>0?args[0]->getId() : 0, callAddrOpnd->getInst());
+    }
+
+    return genIndirectMemoryCall(returnType, callAddrOpnd,  tauNullCheckedFirstArg, tauTypesChecked, numArgs, args, NULL); 
+}
+
+
 Opnd*
 IRBuilder::genDirectCall(MethodDesc* methodDesc,
                          Type* returnType,
@@ -1387,10 +1446,9 @@ IRBuilder::genTauVirtualCall(MethodDesc* methodDesc,
     } else {
         tauNullCheckedFirstArg = propagateCopy(tauNullCheckedFirstArg);
     }
-    if (!tauTypesChecked || 
-        (tauTypesChecked->getInst()->getOpcode() == Op_TauUnsafe)) {
+    if (!tauTypesChecked || (tauTypesChecked->getInst()->getOpcode() == Op_TauUnsafe)) {
         // if no type check available yet
-        tauTypesChecked = genTauHasType(args[0], methodDesc->getParentType());
+        tauTypesChecked = genTauHasTypeWithConv(&args[0], methodDesc->getParentType());
     } else {
         tauTypesChecked = propagateCopy(tauTypesChecked);
     }
@@ -1566,8 +1624,12 @@ void
 IRBuilder::genReturn(Opnd* src, Type* retType) {
     src = propagateCopy(src);
     if(Log::isEnabled()) {
-        if (retType != src->getType()) {
-            UNIMPLEMENTED("ret type check");
+        Type* srcType = src->getType();
+        bool convOk = retType == srcType;
+        convOk = convOk || (retType->isObject() && srcType->isObject());
+        if (!convOk){
+            assert(!typeManager->isLazyResolutionMode());
+            Log::out() << "ERROR   !!!!  IRBuilder: unimplemented: ret typecheck !!!\n";
         }
     }
     appendInst(instFactory->makeReturn(src));
@@ -1848,8 +1910,7 @@ IRBuilder::genLdRef(Modifier mod, Type* type,
 
 Opnd*
 IRBuilder::genLdField(Type* type, Opnd* base, FieldDesc* fieldDesc) {
-    if (fieldDesc->isStatic())
-        return genLdStatic(type, fieldDesc);
+    assert(!fieldDesc->isStatic());
     base = propagateCopy(base);
     Opnd *tauNullCheck = genTauCheckNull(base);
     Opnd *tauAddressInRange = 
@@ -1863,7 +1924,7 @@ IRBuilder::genLdField(Type* type, Opnd* base, FieldDesc* fieldDesc) {
     Modifier mod = uncompress ? AutoCompress_Yes : AutoCompress_No;
     if (irBuilderFlags.expandMemAddrs) {
         return genTauLdInd(mod, type, type->tag, 
-                           genLdFieldAddrNoChecks(type, base, fieldDesc), 
+                           genLdFieldAddr(type, base, fieldDesc), 
                            tauNullCheck, tauAddressInRange);
     }
 
@@ -1872,6 +1933,24 @@ IRBuilder::genLdField(Type* type, Opnd* base, FieldDesc* fieldDesc) {
                                           tauNullCheck, tauAddressInRange, 
                                           fieldDesc));
     return dst;
+}
+
+Opnd*
+IRBuilder::genLdFieldWithResolve(Type* type, Opnd* base, ObjectType* enclClass, uint32 cpIndex) {
+    base = propagateCopy(base);
+    Opnd *tauNullCheck = genTauCheckNull(base);
+    Opnd *tauAddressInRange = genTauSafe();
+
+    bool uncompress = false;
+    if (irBuilderFlags.compressedReferences && type->isObject()) {
+        assert(!type->isCompressedReference());
+        uncompress = true;
+    }
+    Modifier mod = uncompress ? AutoCompress_Yes : AutoCompress_No;
+    assert(irBuilderFlags.expandMemAddrs);
+
+    Opnd* addr = genLdFieldAddrWithResolve(type, base, enclClass, cpIndex, false);
+    return genTauLdInd(mod, type, type->tag, addr,  tauNullCheck, tauAddressInRange);
 }
 
 void
@@ -1883,6 +1962,20 @@ IRBuilder::genInitType(NamedType* type) {
 
     insertHash(Op_InitType, type->getId(), 
                appendInst(instFactory->makeInitType(type)));
+}
+
+Opnd*
+IRBuilder::genLdStaticWithResolve(Type* type, ObjectType* enclClass, uint32 cpIdx) {
+    bool uncompress = false;
+    if (irBuilderFlags.compressedReferences && type->isObject()) {
+        assert(!type->isCompressedReference());
+        uncompress = true;
+    }
+    Modifier mod = uncompress ? AutoCompress_Yes : AutoCompress_No;
+
+    Opnd *tauOk = genTauSafe(); // static field, always safe
+    Opnd* addrOpnd = genLdStaticAddrWithResolve(type, enclClass, cpIdx, false);
+    return genTauLdInd(mod, type, type->tag, addrOpnd, tauOk, tauOk);
 }
 
 Opnd*
@@ -1948,21 +2041,13 @@ IRBuilder::genLdElem(Type* type, Opnd* array, Opnd* index) {
     return genLdElem(type,array,index,tauNullChecked,tauAddressInRange);
 }
 
-// this is now used just for CLI; the tauNonNull operand is ignored, but the
-// check should remain even after optimization. 
 Opnd*
 IRBuilder::genLdFieldAddr(Type* type, Opnd* base, FieldDesc* fieldDesc) {
-    if (fieldDesc->isStatic()) {
-        assert(0);
-        return genLdStaticAddr(type, fieldDesc);
-    }
+    assert(!fieldDesc->isStatic());
 
     base = propagateCopy(base);
 
-    // generate a null check if the field is not static
-        ((base->getType()->isObject())
-         ? genTauCheckNull(base)
-         : genTauUnsafe());
+    genTauCheckNull(base);
     
     Opnd* dst = lookupHash(Op_LdFieldAddr, base->getId(), fieldDesc->getId());
     if (dst) return dst;
@@ -1981,28 +2066,21 @@ IRBuilder::genLdFieldAddr(Type* type, Opnd* base, FieldDesc* fieldDesc) {
         dst = createOpnd(typeManager->getManagedPtrType(type));
     }
     appendInst(instFactory->makeLdFieldAddr(dst, base, fieldDesc));
-    insertHash(Op_LdFieldAddr, base->getId(), fieldDesc->getId(), 
-               dst->getInst());
+    insertHash(Op_LdFieldAddr, base->getId(), fieldDesc->getId(), dst->getInst());
     return dst;
 }
 
-// null check isn't needed for this address calculation
 Opnd*
-IRBuilder::genLdFieldAddrNoChecks(Type* type, Opnd* base, FieldDesc* fieldDesc) {
-    if (fieldDesc->isStatic()) {
-        assert(0);
-        return genLdStaticAddrNoChecks(type, fieldDesc);
-    }
-
+IRBuilder::genLdFieldAddrWithResolve(Type* type, Opnd* base, ObjectType* enclClass, uint32 cpIndex, bool putfield) {
     base = propagateCopy(base);
+    genTauCheckNull(base);
 
-    Opnd* dst = lookupHash(Op_LdFieldAddr, base->getId(), fieldDesc->getId());
+    //1. loading field offset
+    JavaByteCodes opcode = putfield? OPCODE_PUTFIELD : OPCODE_GETFIELD;
+    Opnd* dst = lookupHash(Op_VMHelperCall, opcode, base->getId(), cpIndex);
     if (dst) return dst;
 
-    if (base->getType()->isIntPtr()) {
-        // unmanaged pointer
-        dst = createOpnd(typeManager->getIntPtrType());
-    } else if (irBuilderFlags.compressedReferences && type->isObject()) {
+    if (irBuilderFlags.compressedReferences && type->isObject()) {
         // until VM type system is upgraded,
         // fieldDesc type will have uncompressed ref type;
         // compress it
@@ -2012,21 +2090,23 @@ IRBuilder::genLdFieldAddrNoChecks(Type* type, Opnd* base, FieldDesc* fieldDesc) 
     } else {
         dst = createOpnd(typeManager->getManagedPtrType(type));
     }
-    appendInst(instFactory->makeLdFieldAddr(dst, base, fieldDesc));
-    insertHash(Op_LdFieldAddr, base->getId(), fieldDesc->getId(), 
-               dst->getInst());
+    Opnd** args = new (irManager->getMemoryManager()) Opnd*[3];
+    args[0] = createTypeOpnd(enclClass);
+    args[1] = genLdConstant((int)cpIndex);
+    args[2] = genLdConstant((int)putfield?1:0);
+    Opnd* offsetOpnd = genVMHelperCall(CompilationInterface::Helper_GetNonStaticFieldOffsetWithResolve, 
+                                    typeManager->getInt32Type(), 3, args);
+    insertHash(Op_VMHelperCall, opcode, base->getId(), cpIndex, dst->getInst());
+
+    //2. adding the offset to object opnd -> getting the address of the field
+    appendInst(instFactory->makeAddOffset(dst, base, offsetOpnd));
     return dst;
 }
-
 
 Opnd*
 IRBuilder::genLdStaticAddr(Type* type, FieldDesc* fieldDesc) {
     genInitType(fieldDesc->getParentType());
-    return genLdStaticAddrNoChecks(type, fieldDesc);
-}
 
-Opnd*
-IRBuilder::genLdStaticAddrNoChecks(Type* type, FieldDesc* fieldDesc) {
     Opnd* dst = lookupHash(Op_LdStaticAddr, fieldDesc->getId());
     if (dst) return dst;
 
@@ -2042,6 +2122,31 @@ IRBuilder::genLdStaticAddrNoChecks(Type* type, FieldDesc* fieldDesc) {
     }
     appendInst(instFactory->makeLdStaticAddr(dst, fieldDesc));
     insertHash(Op_LdStaticAddr, fieldDesc->getId(), dst->getInst());
+    return dst;
+}
+
+Opnd*
+IRBuilder::genLdStaticAddrWithResolve(Type* type, ObjectType* enclClass, uint32 cpIndex, bool putfield) {
+    JavaByteCodes opcode = putfield ? OPCODE_PUTSTATIC : OPCODE_GETSTATIC;
+    Opnd* dst = lookupHash(Op_VMHelperCall, opcode, cpIndex);
+    if (dst) return dst;
+
+    if (irBuilderFlags.compressedReferences && type->isObject()) {
+        // until VM type system is upgraded,
+        // fieldDesc type will have uncompressed ref type;
+        // compress it
+        assert(!type->isCompressedReference());
+        Type *compressedType = typeManager->compressType(type);
+        dst = createOpnd(typeManager->getManagedPtrType(compressedType));
+    } else {
+        dst = createOpnd(typeManager->getManagedPtrType(type));
+    }
+    Opnd** args = new (irManager->getMemoryManager()) Opnd*[3];
+    args[0] = createTypeOpnd(enclClass);
+    args[1] = genLdConstant((int)cpIndex);
+    args[2] = genLdConstant((int)putfield?1:0);
+    appendInst(instFactory->makeVMHelperCall(dst, CompilationInterface::Helper_GetStaticFieldAddrWithResolve, 3, args));
+    insertHash(Op_VMHelperCall, OPCODE_GETSTATIC, cpIndex, dst->getInst());
     return dst;
 }
 
@@ -2580,15 +2685,9 @@ IRBuilder::genTauStRef(Type* type, Opnd *objectbase, Opnd* ptr, Opnd* src,
 }
 
 void
-IRBuilder::genStField(Type* type,
-                      Opnd* base,
-                      FieldDesc* fieldDesc,
-                      Opnd* src) {
-    if (fieldDesc->isStatic()) {
-        assert(0); 
-        genStStatic(type, fieldDesc, src);
-        return;
-    }
+IRBuilder::genStField(Type* type, Opnd* base, FieldDesc* fieldDesc,Opnd* src) {
+    assert (!fieldDesc->isStatic());
+
     base = propagateCopy(base);
     src = propagateCopy(src);
     Opnd *tauBaseNonNull = genTauCheckNull(base);
@@ -2630,6 +2729,41 @@ IRBuilder::genStField(Type* type,
                                                   fieldDesc));
         }
     }
+}
+
+
+void       
+IRBuilder::genStFieldWithResolve(Type* type, Opnd* base, ObjectType* enclClass, uint32 cpIdx, Opnd* src) {
+    base = propagateCopy(base);
+    src = propagateCopy(src);
+    Opnd *tauBaseNonNull = genTauCheckNull(base);
+    Opnd *tauBaseTypeIsOk = genTauSafe();
+    Opnd *tauStoredTypeIsOk = (type->isObject() ? genTauHasType(src, type) : genTauSafe()); 
+    assert(irBuilderFlags.expandMemAddrs);
+    Opnd *ptr = genLdFieldAddrWithResolve(type, base, enclClass, cpIdx, true);
+    if (irBuilderFlags.insertWriteBarriers && src->getType()->isObject()) {
+        genTauStRef(type, base, ptr, src, 
+            tauBaseNonNull, 
+            tauBaseTypeIsOk,
+            tauStoredTypeIsOk); 
+    } else {
+        genTauStInd(type, ptr, src, 
+            tauBaseNonNull, 
+            tauBaseTypeIsOk,
+            tauStoredTypeIsOk);
+    }
+}
+
+
+void       
+IRBuilder::genStStaticWithResolve(Type* type, ObjectType* enclClass, uint32 cpIdx, Opnd* src) {
+    src = propagateCopy(src);
+    Opnd *tauOk = genTauSafe(); // address is always ok
+    Opnd *tauTypeIsOk = type->isObject() ? genTauHasType(src, type) : genTauSafe();
+    assert(irBuilderFlags.expandMemAddrs);
+    Opnd* addr = genLdStaticAddrWithResolve(type, enclClass, cpIdx, true);
+    genTauStInd(type, addr, src, tauOk,  tauOk, tauTypeIsOk);
+    return;
 }
 
 void
@@ -2739,11 +2873,37 @@ IRBuilder::genStElem(Type* elemType,
     genStElem(elemType,array,index,src,tauNullChecked,tauBaseTypeChecked,tauAddressInRange);
 }
 
+
 Opnd*
 IRBuilder::genNewObj(Type* type) {
     Opnd* dst = createOpnd(type);
     appendInst(instFactory->makeNewObj(dst, type));
     return dst;
+}
+
+Opnd*
+IRBuilder::genNewObjWithResolve(ObjectType* enclClass, uint32 cpIndex) {
+    Opnd* clsOpnd = createTypeOpnd(enclClass);
+    Opnd* idxOpnd = genLdConstant((int)cpIndex);
+    Opnd** args = new (irManager->getMemoryManager()) Opnd*[2];
+    args[0]=clsOpnd;
+    args[1]=idxOpnd;
+    Opnd* res = genVMHelperCall(CompilationInterface::Helper_NewObjWithResolve, typeManager->getUnresolvedObjectType(), 2, args);
+    return res;
+}
+
+Opnd*
+IRBuilder::genNewArrayWithResolve(NamedType* elemType, Opnd* numElems, ObjectType* enclClass, uint32 cpIndex) {
+    numElems = propagateCopy(numElems);
+    Opnd* clsOpnd = createTypeOpnd(enclClass);
+    Opnd* idxOpnd = genLdConstant((int)cpIndex);
+    Opnd** args = new (irManager->getMemoryManager()) Opnd*[3];
+    args[0]=clsOpnd;
+    args[1]=idxOpnd;
+    args[2]=numElems;
+    Type* resType = typeManager->getArrayType(elemType);
+    Opnd* res = genVMHelperCall(CompilationInterface::Helper_NewArrayWithResolve, resType, 3, args);
+    return res;
 }
 
 Opnd*
@@ -2767,6 +2927,35 @@ IRBuilder::genMultianewarray(NamedType* arrayType,
     appendInst(instFactory->makeNewMultiArray(dst, dimensions, numElems, elemType));
     return dst;
 }
+
+Opnd*
+IRBuilder::genMultianewarrayWithResolve(NamedType* arrayType,
+                                        ObjectType* enclClass, 
+                                        uint32 cpIndex,
+                                        uint32 dimensions,
+                                        Opnd** numElems) 
+{
+    Opnd* enclClsOpnd = createTypeOpnd(enclClass);
+    Opnd* idxOpnd = genLdConstant((int)cpIndex);
+    Opnd** args = new (irManager->getMemoryManager()) Opnd*[2];
+    args[0] = enclClsOpnd;
+    args[1] = idxOpnd;
+    Opnd* clsOpnd = genVMHelperCall(CompilationInterface::Helper_InitializeClassWithResolve, 
+                                    typeManager->getUnmanagedPtrType(typeManager->getInt8Type()),
+                                    2, args);
+    
+    size_t nArgs2 = 2+dimensions;
+    Opnd** args2  = new (irManager->getMemoryManager()) Opnd*[nArgs2];
+    args2[0]=clsOpnd;
+    args2[1]=genLdConstant((int)dimensions);
+    // create an array of arrays type
+    for (uint32 i=0; i<dimensions; i++) {
+        args2[i+2]=numElems[dimensions-1-i];
+    }
+    Opnd* dst = genVMHelperCall(CompilationInterface::Helper_NewMultiArray, arrayType, (uint32)nArgs2, args2);
+    return dst;
+}
+
 
 void
 IRBuilder::genMonitorEnter(Opnd* src) {
@@ -2890,6 +3079,24 @@ IRBuilder::genCast(Opnd* src, Type* castType) {
     return dst;
 }
 
+// type checking
+// CastException (succeeds if argument is null, returns casted object)
+Opnd*
+IRBuilder::genCastWithResolve(Opnd* src, Type* type, ObjectType* enclClass, uint32 cpIndex) {
+    src = propagateCopy(src);
+    Opnd* dst = lookupHash(Op_VMHelperCall, OPCODE_CHECKCAST, src->getId(), cpIndex);
+    if (dst) return dst;
+
+    Opnd** args = new (irManager->getMemoryManager()) Opnd*[3];
+    args[0] = createTypeOpnd(enclClass);
+    args[1] = genLdConstant((int)cpIndex);
+    args[2] = src;
+    dst = genVMHelperCall(CompilationInterface::Helper_CheckCastWithResolve, type, 3, args);
+    insertHash(Op_VMHelperCall, OPCODE_CHECKCAST, src->getId(), cpIndex, dst->getInst());
+    return dst;
+}
+
+
 Opnd*
 IRBuilder::genTauCheckCast(Opnd* src, Opnd *tauNullChecked, Type* castType) {
     src = propagateCopy(src);
@@ -2955,6 +3162,25 @@ IRBuilder::genInstanceOf(Opnd* src, Type* type) {
                tauNullChecked->getId(), dst->getInst());
     return dst;
 }
+
+Opnd*
+IRBuilder::genInstanceOfWithResolve(Opnd* src, ObjectType* enclClass, uint32 cpIndex) {
+    src = propagateCopy(src);
+
+    Opnd* dst = lookupHash(Op_VMHelperCall, OPCODE_INSTANCEOF, src->getId(), cpIndex);
+    if (dst) {
+        return dst;
+    }
+
+    Opnd** args = new (irManager->getMemoryManager()) Opnd*[3];
+    args[0] = createTypeOpnd(enclClass);
+    args[1] = genLdConstant((int)cpIndex);
+    args[2] = src;
+    dst = genVMHelperCall(CompilationInterface::Helper_InstanceOfWithResolve, typeManager->getInt32Type(), 3, args);
+    insertHash(Op_VMHelperCall, OPCODE_INSTANCEOF, src->getId(), cpIndex,  dst->getInst());
+    return dst;
+}
+
 
 Opnd*
 IRBuilder::genSizeOf(Type* type) {
@@ -3371,6 +3597,19 @@ IRBuilder::genTauHasType(Opnd *src, Type *castType) {
     
     insertHash(hashcode, src->getId(), castType->getId(), dst->getInst());
     return dst;
+}
+
+Opnd* IRBuilder::genTauHasTypeWithConv(Opnd **srcPtr, Type *hasType) {
+    Opnd* src = srcPtr[0];
+    Opnd* res = genTauHasType(src, hasType);
+    Type* srcType = src->getType();
+    if (srcType->isUnresolvedType()) {
+        //change opnd type in case if unresolved
+        Modifier mod = Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No);
+        Opnd* newSrc = genConv(hasType, hasType->tag, mod,  src);
+        srcPtr[0] = newSrc;
+    }
+    return res;
 }
 
 Opnd*

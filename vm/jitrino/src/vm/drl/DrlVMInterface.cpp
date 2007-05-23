@@ -360,32 +360,30 @@ MethodDesc::setExceptionHandlerInfo(uint32 exceptionHandlerNumber,
                                     Byte*  endAddr,
                                     Byte*  handlerAddr,
                                     NamedType*  exceptionType,
-                                    bool   exceptionObjIsDead) {
-                                        void* exn_handle;
-                                        assert(exceptionType);
-                                        if (exceptionType->isSystemObject())
-                                            exn_handle = NULL;
-                                        else
-                                            exn_handle = exceptionType->getRuntimeIdentifier();
-                                        method_set_target_handler_info(drlMethod,
-                                            getJitHandle(),
-                                            exceptionHandlerNumber,
-                                            startAddr,
-                                            endAddr,
-                                            handlerAddr,
-                                            (Class_Handle) exn_handle,
-                                            exceptionObjIsDead ? TRUE : FALSE);
-                                    }
+                                    bool   exceptionObjIsDead) 
+{
+    void* exn_handle;
+    assert(exceptionType);
+    if (exceptionType->isSystemObject() || exceptionType->isUnresolvedObject()) {
+        exn_handle = NULL;
+    } else {
+        exn_handle = exceptionType->getRuntimeIdentifier();
+    }
+    method_set_target_handler_info(drlMethod,
+        getJitHandle(),
+        exceptionHandlerNumber,
+        startAddr,
+        endAddr,
+        handlerAddr,
+        (Class_Handle) exn_handle,
+        exceptionObjIsDead ? TRUE : FALSE);
+}
 
 
 //////////////////////////////////////////////////////////////////////////////
 ///////////////////////// FieldDesc ///////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
-bool
-FieldDesc::isLiteral() const {
-    return field_is_literal(drlField)?true:false;
-}
 
 Class_Handle FieldDesc::getParentHandle() const {
     return field_get_class(drlField);
@@ -449,9 +447,15 @@ CompilationInterface::getTypeFromDrlVMTypeHandle(Type_Info_Handle typeHandle) {
         // void return type
         type = typeManager.getVoidType();
     } else if (type_info_is_reference(typeHandle)) {
+        bool lazy = typeManager.isLazyResolutionMode();
+        if (lazy && !type_info_is_resolved(typeHandle)) {
+            return typeManager.getUnresolvedObjectType();
+        }
         Class_Handle classHandle = type_info_get_class_no_exn(typeHandle);
-        if (!classHandle)
+        if (!classHandle) {
+            assert(!lazy);
             return NULL;
+        }
         type = typeManager.getObjectType(classHandle);
     } else if (type_info_is_primitive(typeHandle)) {
         // value type
@@ -461,10 +465,24 @@ CompilationInterface::getTypeFromDrlVMTypeHandle(Type_Info_Handle typeHandle) {
         type = typeManager.getValueType(valueTypeHandle);
     } else if (type_info_is_vector(typeHandle)) {
         // vector
+        bool lazy = typeManager.isLazyResolutionMode();
+        if (lazy && !type_info_is_resolved(typeHandle)) {
+            Type* elemType = typeManager.getUnresolvedObjectType();
+            uint32 dims =  type_info_get_num_array_dimensions(typeHandle);
+            Type* arrayType = NULL;
+            while (dims!=0) {
+                arrayType = typeManager.getArrayType(arrayType==NULL ? elemType : arrayType);
+                dims--;
+            }
+            assert(arrayType!=NULL && arrayType->isArrayType());
+            return arrayType;
+        }
         Type_Info_Handle elemTypeInfo = type_info_get_type_info(typeHandle);
         Type* elemType = getTypeFromDrlVMTypeHandle(elemTypeInfo);
-        if (!elemType)
+        if (!elemType) {
+            assert(!lazy);
             return NULL;
+        }
         type = typeManager.getArrayType(elemType);
     } else {
         // should not get here
@@ -521,8 +539,20 @@ VM_RT_SUPPORT CompilationInterface::translateHelperId(RuntimeHelperId runtimeHel
     case Helper_ConvDtoI32:            vmHelperId = VM_RT_D2I; break;
     case Helper_ConvDtoI64:            vmHelperId = VM_RT_D2L; break;
     case Helper_MethodEntry:           vmHelperId = VM_RT_JVMTI_METHOD_ENTER_CALLBACK; break;
-    case Helper_MethodExit:             vmHelperId = VM_RT_JVMTI_METHOD_EXIT_CALLBACK; break;
+    case Helper_MethodExit:            vmHelperId = VM_RT_JVMTI_METHOD_EXIT_CALLBACK; break;
     case Helper_WriteBarrier:          vmHelperId = VM_RT_GC_HEAP_WRITE_REF; break;
+    case Helper_NewObjWithResolve:                  vmHelperId=VM_RT_NEWOBJ_WITHRESOLVE; break;
+    case Helper_NewArrayWithResolve:                vmHelperId=VM_RT_NEWARRAY_WITHRESOLVE; break;
+    case Helper_GetNonStaticFieldOffsetWithResolve: vmHelperId=VM_RT_GET_NONSTATIC_FIELD_OFFSET_WITHRESOLVE; break;
+    case Helper_GetStaticFieldAddrWithResolve:      vmHelperId=VM_RT_GET_STATIC_FIELD_ADDR_WITHRESOLVE; break;
+    case Helper_CheckCastWithResolve:               vmHelperId=VM_RT_CHECKCAST_WITHRESOLVE; break;
+    case Helper_InstanceOfWithResolve:              vmHelperId=VM_RT_INSTANCEOF_WITHRESOLVE; break;
+    case Helper_GetInvokeStaticAddrWithResolve:     vmHelperId=VM_RT_GET_INVOKESTATIC_ADDR_WITHRESOLVE; break;
+    case Helper_GetInvokeInterfaceAddrWithResolve:  vmHelperId=VM_RT_GET_INVOKEINTERFACE_ADDR_WITHRESOLVE; break;
+    case Helper_GetInvokeVirtualAddrWithResolve:    vmHelperId=VM_RT_GET_INVOKEVIRTUAL_ADDR_WITHRESOLVE; break;
+    case Helper_GetInvokeSpecialAddrWithResolve:    vmHelperId=VM_RT_GET_INVOKE_SPECIAL_ADDR_WITHRESOLVE; break;
+    case Helper_InitializeClassWithResolve:         vmHelperId=VM_RT_INITIALIZE_CLASS_WITHRESOLVE; break;
+
 
     default:
         assert(0);
@@ -582,135 +612,7 @@ CompilationInterface::compileMethod(MethodDesc *method) {
     return res == JIT_SUCCESS ? true : false;
 }
 
-FieldDesc*  
-CompilationInterface::resolveField(MethodDesc* enclosingMethodDesc,
-                                        uint32 fieldToken,
-                                        bool putfield) {
-    Class_Handle enclosingDrlVMClass = enclosingMethodDesc->getParentHandle();
-    
-    Field_Handle resolvedField = 
-        resolve_nonstatic_field(compileHandle,enclosingDrlVMClass,fieldToken,putfield);
-    if (!resolvedField) return NULL;
-    return getFieldDesc(resolvedField);
-}
 
-FieldDesc*
-CompilationInterface::resolveFieldByIndex(NamedType* klass, int index, NamedType **fieldType) {
-
-    Class_Handle ch = (Class_Handle) klass->getVMTypeHandle();
-    Field_Handle fh;
-    fh = class_get_instance_field_recursive(ch,index);
-    ::std::cerr << "load field "<< class_get_name((Class_Handle) klass->getVMTypeHandle()) << ".";
-    ::std::cerr << field_get_name(fh) << " as ";
-    (*fieldType)->print(::std::cerr); ::std::cerr << ::std::endl;
-    return getFieldDesc(fh);
-}
-
-FieldDesc*
-CompilationInterface::resolveStaticField(MethodDesc* enclosingMethodDesc,
-                                                   uint32 fieldToken, bool putfield) {
-    Class_Handle enclosingDrlVMClass = enclosingMethodDesc->getParentHandle();
-
-    Field_Handle resolvedField = 
-        resolve_static_field(compileHandle,enclosingDrlVMClass,fieldToken,putfield);
-    if (!resolvedField) return NULL;
-    return getFieldDesc(resolvedField);
-}
-
-MethodDesc* 
-CompilationInterface::resolveVirtualMethod(MethodDesc* enclosingMethodDesc,
-                                                     uint32 methodToken) {
-    Class_Handle enclosingDrlVMClass = enclosingMethodDesc->getParentHandle();
-    
-    Method_Handle resolvedMethod = 
-        resolve_virtual_method(compileHandle,enclosingDrlVMClass,methodToken);
-    if (!resolvedMethod) return NULL;
-    return getMethodDesc(resolvedMethod);
-}    
-
-MethodDesc* 
-CompilationInterface::resolveSpecialMethod(MethodDesc* enclosingMethodDesc,
-                                                     uint32 methodToken) {
-    Class_Handle enclosingDrlVMClass = enclosingMethodDesc->getParentHandle();
-    
-    Method_Handle resolvedMethod = 
-        resolve_special_method(compileHandle,enclosingDrlVMClass,methodToken);
-    if (!resolvedMethod) return NULL;
-    return getMethodDesc(resolvedMethod);
-}    
-
-MethodDesc* 
-CompilationInterface::resolveStaticMethod(MethodDesc* enclosingMethodDesc,
-                                                    uint32 methodToken) {
-    Class_Handle enclosingDrlVMClass = enclosingMethodDesc->getParentHandle();
-    
-    Method_Handle resolvedMethod = 
-        resolve_static_method(compileHandle,enclosingDrlVMClass,methodToken);
-    if (!resolvedMethod) return NULL;
-    return getMethodDesc(resolvedMethod);
-}    
-
-MethodDesc* 
-CompilationInterface::resolveInterfaceMethod(MethodDesc* enclosingMethodDesc,
-                                                       uint32 methodToken) {
-    Class_Handle enclosingDrlVMClass = enclosingMethodDesc->getParentHandle();
-    
-    Method_Handle resolvedMethod = 
-        resolve_interface_method(compileHandle,enclosingDrlVMClass,methodToken);
-    if (!resolvedMethod) return NULL;
-    return getMethodDesc(resolvedMethod);
-}    
-
-NamedType*
-CompilationInterface::resolveNamedType(MethodDesc* enclosingMethodDesc,
-                                                 uint32 typeToken) {
-    Class_Handle enclosingDrlVMClass = enclosingMethodDesc->getParentHandle();
-    
-    Class_Handle ch = 
-        resolve_class(compileHandle,enclosingDrlVMClass,typeToken);
-    if (!ch) return NULL;
-    if (class_is_primitive(ch))
-        return typeManager.getValueType(ch);
-    return typeManager.getObjectType(ch);
-}
-
-NamedType*
-CompilationInterface::resolveNamedTypeNew(MethodDesc* enclosingMethodDesc,
-                                                    uint32 typeToken) {
-    Class_Handle enclosingDrlVMClass = enclosingMethodDesc->getParentHandle();
-    
-    Class_Handle ch = 
-        resolve_class_new(compileHandle,enclosingDrlVMClass,typeToken);
-    if (!ch) return NULL;
-    if (class_is_primitive(ch))
-        return typeManager.getValueType(ch);
-    return typeManager.getObjectType(ch);
-}
-
-Type*
-CompilationInterface::getFieldType(MethodDesc* enclosingMethodDesc,
-                                             uint32 entryCPIndex) {
-    Class_Handle enclosingDrlVMClass = enclosingMethodDesc->getParentHandle();
-    Java_Type drlType = (Java_Type)class_get_cp_field_type(enclosingDrlVMClass, (unsigned short)entryCPIndex);
-    switch (drlType) {
-    case JAVA_TYPE_BOOLEAN:  return typeManager.getBooleanType();
-    case JAVA_TYPE_CHAR:     return typeManager.getCharType();
-    case JAVA_TYPE_BYTE:     return typeManager.getInt8Type();
-    case JAVA_TYPE_SHORT:    return typeManager.getInt16Type();
-    case JAVA_TYPE_INT:      return typeManager.getInt32Type();
-    case JAVA_TYPE_LONG:     return typeManager.getInt64Type();
-    case JAVA_TYPE_DOUBLE:   return typeManager.getDoubleType();
-    case JAVA_TYPE_FLOAT:    return typeManager.getSingleType();
-    case JAVA_TYPE_ARRAY:
-    case JAVA_TYPE_CLASS:    return typeManager.getNullObjectType();
-
-    case JAVA_TYPE_VOID:     // class_get_cp_field_type can't return VOID
-    case JAVA_TYPE_STRING:   // class_get_cp_field_type can't return STRING
-    default: assert(0);
-    }
-    assert(0);
-    return NULL;
-}
 
 void* 
 CompilationInterface::loadStringObject(MethodDesc* enclosingMethodDesc,
@@ -746,6 +648,9 @@ CompilationInterface::getConstantValue(MethodDesc* enclosingMethodDesc,
 
 MethodDesc*
 CompilationInterface::getOverriddenMethod(NamedType* type, MethodDesc *methodDesc) {
+    if (type->isUnresolvedType()) {
+        return NULL;
+    }
     Method_Handle m = method_find_overridden_method((Class_Handle) type->getVMTypeHandle(),
                          methodDesc->getMethodHandle());
     if (!m)
@@ -841,24 +746,24 @@ void MethodDesc::printFullName(::std::ostream& os) {
 }
 
 FieldDesc*    CompilationInterface::getFieldDesc(Field_Handle field) {
-FieldDesc* fieldDesc = fieldDescs->lookup(field);
-if (fieldDesc == NULL) {
-fieldDesc = new (memManager)
-FieldDesc(field,this,nextMemberId++);
-fieldDescs->insert(field,fieldDesc);
-}
-return fieldDesc;
+    FieldDesc* fieldDesc = fieldDescs->lookup(field);
+    if (fieldDesc == NULL) {
+        fieldDesc = new (memManager)
+            FieldDesc(field,this,nextMemberId++);
+        fieldDescs->insert(field,fieldDesc);
+    }
+    return fieldDesc;
 }
 
 MethodDesc*   CompilationInterface:: getMethodDesc(Method_Handle method, JIT_Handle jit) {
-assert(method);
-MethodDesc* methodDesc = methodDescs->lookup(method);
-if (methodDesc == NULL) {
-methodDesc = new (memManager)
-MethodDesc(method, jit, this, nextMemberId++);
-methodDescs->insert(method,methodDesc);
-}
-return methodDesc;
+    assert(method);
+    MethodDesc* methodDesc = methodDescs->lookup(method);
+    if (methodDesc == NULL) {
+        methodDesc = new (memManager)
+            MethodDesc(method, jit, this, nextMemberId++);
+        methodDescs->insert(method,methodDesc);
+    }
+    return methodDesc;
 }
 
 CompilationInterface::CompilationInterface(Compile_Handle c, 
@@ -900,5 +805,166 @@ Byte*        CompilationInterface::allocateJITDataBlock(size_t size, size_t alig
 MethodDesc*     CompilationInterface::getMethodDesc(Method_Handle method) {
     return getMethodDesc(method, getJitHandle());
 }
+
+
+static uint32 getArrayDims(Class_Handle cl, uint32 cpIndex) {
+    return class_get_num_array_dimensions(cl, (unsigned short)cpIndex);
+}
+
+static NamedType* getUnresolvedType(TypeManager& typeManager, Class_Handle enclClass, uint32 cpIndex) {
+    uint32 arrayDims = getArrayDims(enclClass, cpIndex);
+    NamedType * res = typeManager.getUnresolvedObjectType();
+    while (arrayDims > 0) {
+        res = typeManager.getArrayType(res);
+        arrayDims --;
+    }
+    return res;
+}
+
+NamedType* CompilationInterface::resolveNamedType(Class_Handle enclClass, uint32 cpIndex) {
+    //this method is allowed to use only for unresolved exception types
+    Class_Handle ch = resolve_class(compileHandle,enclClass,cpIndex);
+    assert(!class_is_primitive(ch));
+    ObjectType* res = typeManager.getObjectType(ch);    
+    assert(res->isLikelyExceptionType());
+    return res;
+}
+
+NamedType* CompilationInterface::getNamedType(Class_Handle enclClass, uint32 cpIndex, ResolveNewCheck checkNew) {
+    Class_Handle ch = NULL;
+    bool lazy = typeManager.isLazyResolutionMode();
+    if (lazy && !class_is_cp_entry_resolved(compileHandle, enclClass, cpIndex)) {
+        NamedType * res = getUnresolvedType(typeManager, enclClass, cpIndex);
+        return res; 
+    } else {
+        if (checkNew == ResolveNewCheck_DoCheck) {
+            ch = resolve_class_new(compileHandle,enclClass,cpIndex);
+        } else {
+            ch = resolve_class(compileHandle,enclClass,cpIndex);
+        }
+        if (ch == NULL) {
+            if (lazy) {//instantiation of abstract/private class -> do it lazily
+                assert(checkNew == ResolveNewCheck_DoCheck);
+                return typeManager.getUnresolvedObjectType();
+            } else {
+                return NULL;
+            }
+        }
+    }
+    if (class_is_primitive(ch)) {
+        return typeManager.getValueType(ch);
+    }
+    return typeManager.getObjectType(ch);    
+}
+
+Type* CompilationInterface::getTypeFromDescriptor(Class_Handle enclClass, const char* descriptor) {
+    ClassLoaderHandle loader = class_get_class_loader(enclClass);
+    Type_Info_Handle tih = type_info_create_from_java_descriptor(loader, descriptor);
+    return getTypeFromDrlVMTypeHandle(tih);
+}
+
+MethodDesc* 
+CompilationInterface::getSpecialMethod(Class_Handle enclClass, uint32 cpIndex) {
+    Method_Handle res = NULL;
+    bool lazy = typeManager.isLazyResolutionMode();
+    if (!lazy || class_is_cp_entry_resolved(compileHandle, enclClass, cpIndex)) {
+        res =  resolve_special_method(compileHandle,enclClass, cpIndex);
+    }
+    if (!res) return NULL;
+    return getMethodDesc(res);
+}    
+
+MethodDesc* 
+CompilationInterface::getInterfaceMethod(Class_Handle enclClass, uint32 cpIndex) {
+    Method_Handle res = NULL;
+    bool lazy = typeManager.isLazyResolutionMode();
+    if (!lazy || class_is_cp_entry_resolved(compileHandle, enclClass, cpIndex)) {
+        res =  resolve_interface_method(compileHandle,enclClass, cpIndex);
+    }
+    if (!res) return NULL;
+    return getMethodDesc(res);
+}    
+
+MethodDesc* 
+CompilationInterface::getStaticMethod(Class_Handle enclClass, uint32 cpIndex) {
+    Method_Handle res = NULL;
+    bool lazy = typeManager.isLazyResolutionMode();
+    if (!lazy || class_is_cp_entry_resolved(compileHandle, enclClass, cpIndex)) {
+        res =  resolve_static_method(compileHandle,enclClass, cpIndex);
+    }
+    if (!res) return NULL;
+    return getMethodDesc(res);
+}    
+
+MethodDesc* 
+CompilationInterface::getVirtualMethod(Class_Handle enclClass, uint32 cpIndex) {
+    Method_Handle res = NULL;
+    bool lazy = typeManager.isLazyResolutionMode();
+    if (!lazy || class_is_cp_entry_resolved(compileHandle, enclClass, cpIndex)) {
+        res =  resolve_virtual_method(compileHandle,enclClass, cpIndex);
+    }
+    if (!res) return NULL;
+    return getMethodDesc(res);
+}    
+
+
+FieldDesc*  
+CompilationInterface::getNonStaticField(Class_Handle enclClass, uint32 cpIndex, bool putfield) {
+    Field_Handle res = NULL;
+    bool lazy = typeManager.isLazyResolutionMode();
+    if (!lazy || class_is_cp_entry_resolved(compileHandle, enclClass, cpIndex)) {
+        res = resolve_nonstatic_field(compileHandle, enclClass, cpIndex, putfield);
+    }
+    if (!res) {
+        return NULL;
+    }
+    return getFieldDesc(res);
+}
+
+
+FieldDesc*  
+CompilationInterface::getStaticField(Class_Handle enclClass, uint32 cpIndex, bool putfield) {
+    Field_Handle res = NULL;
+    bool lazy = typeManager.isLazyResolutionMode();
+    if (!lazy || class_is_cp_entry_resolved(compileHandle, enclClass, cpIndex)) {
+        res = resolve_static_field(compileHandle, enclClass, cpIndex, putfield);
+    }
+    if (!res) {
+        return NULL;
+    }
+    return getFieldDesc(res);
+}
+
+Type*
+CompilationInterface::getFieldType(Class_Handle enclClass, uint32 cpIndex) {
+    Java_Type drlType = (Java_Type)class_get_cp_field_type(enclClass, (unsigned short)cpIndex);
+    bool lazy = typeManager.isLazyResolutionMode();
+    switch (drlType) {
+        case JAVA_TYPE_BOOLEAN:  return typeManager.getBooleanType();
+        case JAVA_TYPE_CHAR:     return typeManager.getCharType();
+        case JAVA_TYPE_BYTE:     return typeManager.getInt8Type();
+        case JAVA_TYPE_SHORT:    return typeManager.getInt16Type();
+        case JAVA_TYPE_INT:      return typeManager.getInt32Type();
+        case JAVA_TYPE_LONG:     return typeManager.getInt64Type();
+        case JAVA_TYPE_DOUBLE:   return typeManager.getDoubleType();
+        case JAVA_TYPE_FLOAT:    return typeManager.getSingleType();
+        case JAVA_TYPE_ARRAY:
+        
+        case JAVA_TYPE_CLASS:    
+                if (lazy) {
+                    const char* fieldTypeName = const_pool_get_field_descriptor(enclClass, cpIndex);
+                    assert(fieldTypeName);
+                    return getTypeFromDescriptor(enclClass, fieldTypeName);
+                } 
+                return typeManager.getNullObjectType();
+
+        case JAVA_TYPE_VOID:     // class_get_cp_field_type can't return VOID
+        case JAVA_TYPE_STRING:   // class_get_cp_field_type can't return STRING
+        default: assert(0);
+    }
+    assert(0);
+    return NULL;
+}
+
 
 } //namespace Jitrino

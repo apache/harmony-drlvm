@@ -270,7 +270,7 @@ void Inst::handlePrintEscape(::std::ostream& os, char code) const {
     }
 }
 
-char *massageStr(const char *string) {
+char *messageStr(const char *string) {
     if (strcmp(string, "<init>")==0)
         return "_init_";
     if (strcmp(string, "<clinit>")==0)
@@ -282,7 +282,7 @@ void MethodEntryInst::handlePrintEscape(::std::ostream& os, char code) const {
     switch (code) {
     case 'd':
         os  << methodDesc->getParentType()->getName()
-            << "::" << massageStr(methodDesc->getName());
+            << "::" << messageStr(methodDesc->getName());
         break;
     default:
         Inst::handlePrintEscape(os, code);
@@ -294,7 +294,7 @@ void MethodMarkerInst::handlePrintEscape(::std::ostream& os, char code) const {
     switch (code) {
     case 'd':
         os  << methodDesc->getParentType()->getName()
-            << "::" << massageStr(methodDesc->getName());
+            << "::" << messageStr(methodDesc->getName());
         break;
     default:
         Inst::handlePrintEscape(os, code);
@@ -424,7 +424,7 @@ void MethodInst::handlePrintEscape(::std::ostream& os, char code) const {
     switch (code) {
     case 'd':
         os  << methodDesc->getParentType()->getName()
-            << "::" << massageStr(methodDesc->getName());
+            << "::" << messageStr(methodDesc->getName());
         break;
     default:
         Inst::handlePrintEscape(os, code);
@@ -614,6 +614,9 @@ public:
         clone = instFactory.makeClone(inst, opndManager, renameTable);
     }
     void accept(JitHelperCallInst* inst) {
+        clone = instFactory.makeClone(inst, opndManager, renameTable);
+    }
+    void accept(VMHelperCallInst* inst) {
         clone = instFactory.makeClone(inst, opndManager, renameTable);
     }
     void accept(MethodEntryInst* inst) {
@@ -1065,6 +1068,27 @@ InstFactory::makeClone(JitHelperCallInst* inst,
                                  nsrcs,
                                  newArgs,
                                  inst->getJitHelperId());
+    newInst->setPersistentInstructionId(inst->getPersistentInstructionId());
+    return newInst;
+}
+
+VMHelperCallInst*
+InstFactory::makeClone(VMHelperCallInst* inst,
+                       OpndManager& opndManager,
+                       OpndRenameTable& table)
+{
+    uint32 nsrcs = inst->getNumSrcOperands();
+    Opnd** newArgs = new (memManager) Opnd*[nsrcs];
+    for (uint32 i=0; i<nsrcs; i++){
+        newArgs[i] = table.rename(inst->getSrc(i));
+    }
+    VMHelperCallInst *newInst = makeVMHelperCallInst(inst->getOpcode(),
+        inst->getModifier(),
+        inst->getType(),
+        table.duplicate(opndManager, inst->getDst()),
+        nsrcs,
+        newArgs,
+        inst->getVMHelperId());
     newInst->setPersistentInstructionId(inst->getPersistentInstructionId());
     return newInst;
 }

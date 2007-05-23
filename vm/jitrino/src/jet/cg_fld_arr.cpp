@@ -129,7 +129,7 @@ void CodeGen::gen_arr_store(jtype jt, bool helperOk)
     vunref(jt);
     // stack: [.., aref, idx, val]
     if (jt == jobj && helperOk) {
-        gen_write_barrier(m_curr_inst->opcode, NULL);
+        gen_write_barrier(m_curr_inst->opcode, NULL, Opnd(0));
         static const CallSig cs_aastore(CCONV_HELPERS, jobj, i32, jobj);
         unsigned stackFix = gen_stack_to_args(true, cs_aastore, 0);
 #ifdef _EM64T_
@@ -201,82 +201,105 @@ void CodeGen::gen_arr_store(jtype jt, bool helperOk)
     vpop();
 }
 
-void CodeGen::gen_static_op(JavaByteCodes op, jtype jt, Field_Handle fld) {
-    do_field_op(op, jt, fld);
+
+void CodeGen::gen_field_op(JavaByteCodes opcode,  Class_Handle enclClass, unsigned short cpIndex) {
+    FieldOpInfo fieldOp(NULL, enclClass, cpIndex, opcode); 
+
+    bool needJVMTI = compilation_params.exe_notify_field_modification 
+                    || compilation_params.exe_notify_field_access;
+    bool lazy = m_lazy_resolution && !needJVMTI; // JVMTI field access helpers are not ready for lazy resolution mode
+    bool resolve = !lazy || class_is_cp_entry_resolved(m_compileHandle, enclClass, cpIndex);
+    if (resolve) {
+        if (!fieldOp.isStatic()) {
+            fieldOp.fld = resolve_nonstatic_field(m_compileHandle, enclClass, cpIndex, fieldOp.isPut());
+        } else {
+            Field_Handle fld = resolve_static_field(m_compileHandle, enclClass,  cpIndex, fieldOp.isPut());
+            if (fld && !field_is_static(fld)) {
+                fld = NULL;
+            }
+            if (fld != NULL) {
+                Class_Handle klass = field_get_class(fld);
+                assert(klass);
+                if (klass != m_klass && class_needs_initialization(klass)) {
+                    gen_call_vm(ci_helper_o, rt_helper_init_class, 0, klass);
+                }
+                fieldOp.fld = fld;
+            }
+        }
+        if(fieldOp.fld == NULL) { 
+            //TODO: we can avoid this check and use lazy resolution code path in this case!
+            assert(!lazy);
+            gen_call_throw(ci_helper_linkerr, rt_helper_throw_linking_exc, 0, enclClass, cpIndex, opcode);
+        }
+    }
+    do_field_op(fieldOp);
 }
 
-void CodeGen::gen_field_op(JavaByteCodes op, jtype jt, Field_Handle fld)
+
+void CodeGen::do_field_op(const FieldOpInfo& fieldOp)
 {
-    do_field_op(op, jt, fld);
-}
-
-void CodeGen::do_field_op(JavaByteCodes opcode, jtype jt, Field_Handle fld)
-{
-    bool field_op = false, get = false; // PUTSTATIC is default
-    unsigned ref_depth = 0;
-    if (opcode == OPCODE_PUTFIELD) {
-        field_op = true;
-        ref_depth = is_wide(jt) ? 2 : 1;
-    }
-    else if (opcode == OPCODE_GETFIELD) {
-        field_op = true;
-        get = true;
-    }
-    else if (opcode == OPCODE_GETSTATIC) {
-        get = true;
-    }
-    else {
-        assert(opcode == OPCODE_PUTSTATIC);
-    }
-    
-    if(fld == NULL) {
-        const JInst& jinst = *m_curr_inst;
-        gen_call_throw(ci_helper_linkerr, rt_helper_throw_linking_exc, 0,
-                       m_klass, jinst.op0, jinst.opcode);
-    }
-    
-    bool fieldIsMagic = fld && field_is_magic(fld);
-    if (fieldIsMagic) {
-        jt = iplatf;
-    }
-
-    if (!get && compilation_params.exe_notify_field_modification && !fieldIsMagic)  {
-        gen_modification_watchpoint(opcode, jt, fld);
-    }
-
-    if (!get && ! fieldIsMagic) {
-        gen_write_barrier(opcode, fld);
-    }
-
-    
-    Opnd where;
-    if (field_op) {
-        Val& ref = vstack(ref_depth, true);
-        gen_check_null(ref_depth);
-        unsigned fld_offset = fld ? field_get_offset(fld) : 0;
-        where = Opnd(jt, ref.reg(), fld_offset);
-    }
-    else {
-        // static s
-        char * fld_addr = fld ? (char*)field_get_address(fld) : NULL;
-        where = vaddr(jt, fld_addr);
-    }
-    rlock(where);
-    
     // Presumption: we dont have compressed refs on IA32 and all other 
     // (64bits) platforms have compressed refs. 
     // is_ia32() check added below so on IA32 it becomes 'false' during the 
     // compilation, without access to g_refs_squeeze in runtime.
     assert(is_ia32() || g_refs_squeeze);
-    
 
-    if (get && compilation_params.exe_notify_field_access && !fieldIsMagic) {
-        gen_access_watchpoint(opcode, jt, fld);
+
+    jtype jt = to_jtype(class_get_cp_field_type(fieldOp.enclClass, fieldOp.cpIndex));
+    
+    const char* fieldClassName = const_pool_get_field_class_name(fieldOp.enclClass, fieldOp.cpIndex);
+    bool fieldIsMagic = is_magic_class(fieldClassName);
+    if (fieldIsMagic) {
+        jt = iplatf;
     }
-    
-    if (get) {
 
-        if (field_op) {
+    Opnd where;
+    if (!fieldOp.isStatic()) { //generate check null
+        unsigned ref_depth = fieldOp.isPut() ? (is_wide(jt) ? 2 : 1) : 0;
+        Val& ref = vstack(ref_depth, true);
+        gen_check_null(ref_depth);
+        if (fieldOp.fld) { //field is resolved -> offset is available
+            unsigned fld_offset = field_get_offset(fieldOp.fld);
+            where = Opnd(jt, ref.reg(), fld_offset);
+        }  else { //field is not resolved -> generate code to request offset
+            static const CallSig cs_get_offset(CCONV_STDCALL, iplatf, i32, i32);
+            gen_call_vm(cs_get_offset, rt_helper_field_get_offset_withresolve, 0, fieldOp.enclClass, fieldOp.cpIndex, fieldOp.isPut());
+            runlock(cs_get_offset);
+            alu(alu_add, gr_ret, ref.as_opnd());
+            where = Opnd(jt, gr_ret, 0);
+        }
+    } else {
+        if (fieldOp.fld) { //field is resolved -> address is available
+            char * fld_addr = (char*)field_get_address(fieldOp.fld);
+            where = vaddr(jt, fld_addr);
+        }  else { //field is not resolved -> generate code to request address
+            static const CallSig cs_get_addr(CCONV_STDCALL, iplatf, i32, i32);
+            gen_call_vm(cs_get_addr, rt_helper_field_get_address_withresolve, 0, fieldOp.enclClass, fieldOp.cpIndex, fieldOp.isPut());
+            runlock(cs_get_addr);
+            where = Opnd(jt, gr_ret, 0);
+        }
+    }
+    rlock(where);
+
+    // notify all listeners
+
+    if (fieldOp.isPut() && compilation_params.exe_notify_field_modification && !fieldIsMagic)  {
+        gen_modification_watchpoint(fieldOp.opcode, jt, fieldOp.fld);
+    }
+    if (fieldOp.isGet() && compilation_params.exe_notify_field_access && !fieldIsMagic) {
+        gen_access_watchpoint(fieldOp.opcode, jt, fieldOp.fld);
+    }
+    if (fieldOp.isPut() && ! fieldIsMagic) {
+        gen_write_barrier(fieldOp.opcode, fieldOp.fld, where);
+    }
+
+    
+
+    //generate get/put op
+
+    if (fieldOp.isGet()) {
+
+        if (!fieldOp.isStatic()) {
             // pop out ref
             vpop();
         }
@@ -382,7 +405,7 @@ void CodeGen::do_field_op(JavaByteCodes opcode, jtype jt, Field_Handle fld)
 
     
     vpop(); // pop out value
-    if (field_op) {
+    if (!fieldOp.isStatic()) {
         vpop(); // pop out ref
     }
 }

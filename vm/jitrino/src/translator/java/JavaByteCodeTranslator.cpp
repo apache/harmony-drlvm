@@ -40,27 +40,23 @@
 namespace Jitrino {
 
 // magics support    
-static bool isMagicClass(Type* type) {
+static bool isVMMagicClass(const char* name) {
     static const char magicPackage[] = "org/vmmagic/unboxed/";
     static const unsigned magicPackageLen = sizeof(magicPackage)-1;
 
-    const char* name = type->getName();
     bool res =  !strncmp(name, magicPackage, magicPackageLen);
     return res;
 }
 
-static bool isMagicMethod(MethodDesc* md) {
-    return isMagicClass(md->getParentType());
-}
-
-Type* convertMagicType2HIR(TypeManager& tm, Type* type) {
+Type* convertVMMagicType2HIR(TypeManager& tm, Type* type) {
     if (!type->isObject() || !type->isNamedType() || type->isSystemObject()) {
         return type;
     }
 
-    assert(isMagicClass(type));
-
     const char* name = type->getName();    
+
+    assert(isVMMagicClass(name));
+
     if (!strcmp(name, "org/vmmagic/unboxed/Address") 
         //TODO: ObjectReference must have a ManagedPointer/Object type
         || !strcmp(name, "org/vmmagic/unboxed/ObjectReference")) 
@@ -89,100 +85,17 @@ Type* convertMagicType2HIR(TypeManager& tm, Type* type) {
 
 //vm helpers support
 
-bool isVMHelperClass(NamedType* type) {
+bool isVMHelperClass(const char* name) {
 #ifdef _IPF_
-    return false;//natives are not tested on EM64T.
+    return false;//natives are not tested on IPF.
 #else
     static const char vmhelperPackage[] = "org/apache/harmony/drlvm/VMHelper";
     
-    const char* name = type->getName();
     bool res =  !strcmp(name, vmhelperPackage);
     return res;
 #endif
 }
 
-bool isVMHelperMethod(MethodDesc* md) {
-    return isVMHelperClass(md->getParentType());
-} 
-
-
-//-----------------------------------------------------------------------------
-// inlining policy management
-//-----------------------------------------------------------------------------
-
-uint32 JavaByteCodeTranslator::MaxSelfSizeForInlining = 10000; // in bytes
-uint32 JavaByteCodeTranslator::MaxInlineSize = 33; // in bytes
-uint32 JavaByteCodeTranslator::MaxInlineDepth = 4;
-float JavaByteCodeTranslator::MaxRelativeInlineHotness = 0.5;
-
-
-bool JavaByteCodeTranslator::isProfileAllowsInlining(MethodDesc* inlinee) {
-    //do not inline methods with not initialized classes -> these paths are cold!
-    CompilationContext* ctx = compilationInterface.getCompilationContext();
-    ProfilingInterface* pi = ctx->getProfilingInterface();
-    if (pi==NULL || !pi->isProfilingEnabled(ProfileType_EntryBackedge, JITProfilingRole_USE)) {
-        return true;
-    }
-    uint32 inlineeHotness = pi->getProfileMethodCount(*inlinee);
-    uint32 myHotness = pi->getProfileMethodCount(methodToCompile);
-    if (inlineeHotness >= myHotness * MaxRelativeInlineHotness) {
-        return true;
-    }
-    return false;
-}
-
-bool 
-JavaByteCodeTranslator::inlineMethod(MethodDesc* methodDesc) {
-    if (translationFlags.inlineMethods == false)
-        return false;
-    bool doSkip = (translationFlags.inlineSkipTable == NULL) ? false : translationFlags.inlineSkipTable->accept_this_method(*methodDesc);
-    if(doSkip) {
-       Log::out() << "Skipping inlining of " << methodDesc->getParentType()->getName() << "." << methodDesc->getName() << ::std::endl;    
-        return false;
-    }
-    ObjectType * methodClass = (ObjectType*)methodDesc->getParentType();
-
-    bool doInline =
-        !doSkip &&
-        !methodDesc->isNative() &&
-        !methodDesc->isNoInlining() &&
-        !methodDesc->isSynchronized() &&
-        methodDesc->getNumHandlers()==0 &&
-        !methodDesc->isRequireSecObject() &&
-        !methodClass->isLikelyExceptionType() &&
-        isProfileAllowsInlining(methodDesc) &&
-        (methodDesc->isInstanceInitializer() || methodDesc->isFinal() || methodDesc->isStatic() 
-        || methodDesc->isPrivate() || methodClass->isFinalClass());
-
-    if(!doInline) {
-       Log::out() << "Cannot inline " << methodDesc->getParentType()->getName() << "." << methodDesc->getName() << ::std::endl;
-        return false;
-    }
-    uint32 numByteCodes = methodDesc->getByteCodeSize();
-    bool result = (numByteCodes > 0 && numByteCodes < MaxInlineSize) && 
-        (inlineDepth < MaxInlineDepth);
-    if(result)
-       Log::out() << "Translator inline " << methodDesc->getParentType()->getName() << "." << methodDesc->getName() << ::std::endl;    
-    return result;
-}
-
-bool 
-JavaByteCodeTranslator::guardedInlineMethod(MethodDesc* methodDesc) {
-    if (translationFlags.guardedInlining == false)
-        return false;
-    if (compilationInterface.getMethodToCompile()->getByteCodeSize() > MaxSelfSizeForInlining)
-        return false;
-
-    if (!isProfileAllowsInlining(methodDesc)) {
-        return false;
-    }
-    
-
-    uint32 numByteCodes = methodDesc->getByteCodeSize();
-    bool result = (numByteCodes > 0 && numByteCodes < MaxInlineSize) && 
-        (inlineDepth < MaxInlineDepth);
-    return result;
-}
 
 //-----------------------------------------------------------------------------
 // JavaByteCodeTranslator constructors
@@ -209,9 +122,7 @@ JavaByteCodeTranslator::JavaByteCodeTranslator(CompilationInterface& ci,
       opndStack(mm,methodDesc.getMaxStack()+1),
       returnOpnd(NULL),
       returnNode(NULL),
-      isInlinedMethod(false),
       inliningExceptionInfo(NULL),
-      inlineDepth(0),
       prepass(memManager,
               typeManager,
               irBuilder.getInstFactory()->getMemManager(),
@@ -221,14 +132,11 @@ JavaByteCodeTranslator::JavaByteCodeTranslator(CompilationInterface& ci,
       lockAddr(NULL), 
       oldLockValue(NULL),
       thisLevelBuilder(NULL, methodDesc,irb.getBcOffset()),
-      inlineBuilder(NULL),
       jsrEntryMap(NULL),
       retOffsets(mm),
       jsrEntryOffsets(mm)
 {
     initJsrEntryMap();
-    if (methodToCompile.isClassInitializer())
-        translationFlags.inlineMethods = false;
     // create a prolog block 
     cfgBuilder.genBlock(irBuilder.genMethodEntryLabel(&methodDesc));
     initLocalVars();
@@ -254,14 +162,16 @@ JavaByteCodeTranslator::JavaByteCodeTranslator(CompilationInterface& ci,
                 assert(ic->getNumArgs() == numArgs);
                 Type* newType = ic->getArgTypes()[i];
                 if (newType->isObject()) {
-                    assert(newType->isNullObject() || newType->asObjectType()->isSubClassOf(type->asObjectType()) || newType->isSystemObject());
+                    assert(newType->isObject() == type->isObject());
+                    assert(newType->isNullObject() || newType->isUnresolvedType()  || type->isUnresolvedType()
+                        || newType->asObjectType()->isSubClassOf(type->asObjectType()) || newType->isSystemObject());
                     type = newType;
                 } else {
-                    //do nothing, numX->numY auto convertion not tested
+                    //TODO: numX->numY auto conversion not tested
                 }
             } 
-            if (isMagicClass(type)) {
-                type = convertMagicType2HIR(typeManager, type);
+            if (isVMMagicClass(type->getName())) {
+                type = convertVMMagicType2HIR(typeManager, type);
             }
             arg = irBuilder.genArgDef(DefArgNoModifier,type);
         }
@@ -295,102 +205,6 @@ JavaByteCodeTranslator::JavaByteCodeTranslator(CompilationInterface& ci,
 }
 
 
-// version for inlined methods
-
-JavaByteCodeTranslator::JavaByteCodeTranslator(CompilationInterface& ci,
-                                 MemoryManager& mm,
-                                 IRBuilder& irb,
-                                 ByteCodeParser& bcp,
-                                 MethodDesc& methodDesc,
-                                 TypeManager& typeManager,
-                                 JavaFlowGraphBuilder& cfg,
-                                 uint32 numActualArgs, 
-                                 Opnd** actualArgs,
-                                 Opnd** returnopnd, // non-null for IR inlining
-                                 Node** returnnode, // returns the block where is a return
-                                                       // (only one for inlined methods)
-                                 ExceptionInfo *inliningexceptinfo,
-                                 uint32 inlDepth, bool startNewBlock,
-                                 InlineInfoBuilder* parent,
-                                 JsrEntryInstToRetInstMap* parentJsrEntryMap)
-    : memManager(mm),
-      compilationInterface(ci),
-      methodToCompile(methodDesc),
-      parser(bcp),
-      typeManager(*irb.getTypeManager()),
-      irBuilder(irb),
-      translationFlags(*irb.getTranslatorFlags()),
-      cfgBuilder(cfg),
-      // CHECK ? for static sync methods must ensure at least one slot on stack for monitor enter/exit code
-      opndStack(mm,methodDesc.getMaxStack()+1),
-      returnOpnd(returnopnd),
-      returnNode(returnnode),
-      isInlinedMethod(true),
-      inliningExceptionInfo(inliningexceptinfo),
-      inlineDepth(inlDepth),
-      prepass(memManager,
-              typeManager,
-              irBuilder.getInstFactory()->getMemManager(),
-              methodDesc,
-              ci,
-              actualArgs),
-      lockAddr(NULL), 
-      oldLockValue(NULL),
-      thisLevelBuilder(parent, methodDesc, irb.getBcOffset()),
-      inlineBuilder(&thisLevelBuilder),
-      jsrEntryMap(parentJsrEntryMap),
-      retOffsets(mm),
-      jsrEntryOffsets(mm)
-{
-    if ( !jsrEntryMap ) {
-        // the case for IR inlining
-        initJsrEntryMap();
-    }
-    if (methodToCompile.isSynchronized() || startNewBlock) {
-        // create a new basic block
-        LabelInst *label = irBuilder.createLabel();
-        cfgBuilder.genBlock(label);
-        inliningNodeBegin = label->getNode();
-    } else {
-        inliningNodeBegin = irBuilder.getCurrentLabel()->getNode();
-    }
-    // create a prolog instruction
-    irBuilder.genMethodEntryMarker(&methodDesc);
-
-    if(!prepass.allExceptionTypesResolved()) {
-        unsigned problemToken = prepass.getProblemTypeToken();
-        assert(problemToken != MAX_UINT32);
-        linkingException(problemToken,OPCODE_CHECKCAST); // CHECKCAST is suitable here
-        noNeedToParse = true;
-        return;
-    }
-
-    initLocalVars();
-    initArgs();
-    assert(numActualArgs == numArgs);
-    // load actual parameters into formal parameters
-    for (uint32 i=0,j=0; i<numArgs; i++,j++) {
-        // generate argument coercion
-        Opnd *arg = irBuilder.genArgCoercion(argTypes[i],actualArgs[i]);
-        args[i] = arg;
-        JavaLabelPrepass::JavaVarType javaType= JavaLabelPrepass::getJavaType(argTypes[i]);
-        VarOpnd *var = getVarOpndStVar(javaType,j,arg);
-        if (javaType==JavaLabelPrepass::L || javaType==JavaLabelPrepass::D) 
-            j++;
-        if (var != NULL)
-            irBuilder.genStVar(var,arg);
-    }
-    // check for synchronized methods
-    if (methodToCompile.isSynchronized()) {
-        if (methodToCompile.isStatic()) {
-            irBuilder.genTypeMonitorEnter(methodToCompile.getParentType());
-        } else {
-            genLdVar(0,JavaLabelPrepass::A);
-            genMethodMonitorEnter();
-        }
-    }
-}
-
 //-----------------------------------------------------------------------------
 // initialization helpers
 //-----------------------------------------------------------------------------
@@ -416,10 +230,6 @@ JavaByteCodeTranslator::initLocalVars() {
     // compute number of labels
     numLabels = prepass.getNumLabels();
     labels = new (memManager) LabelInst*[numLabels+1];
-    if (isInlinedMethod && methodToCompile.isSynchronized()) {
-        jumpToTheEnd = true;
-        numLabels++;
-    }
     irBuilder.createLabels(numLabels,labels);
     nextLabel = 0;
     resultOpnd = NULL;
@@ -453,6 +263,7 @@ JavaByteCodeTranslator::initArgs() {
     args = new (memManager) Opnd*[numArgs];
     for (uint16 i=0; i<numArgs; i++) {
         Type* argType = methodToCompile.getParamType(i);
+        assert(!(typeManager.isLazyResolutionMode() && argType==NULL));
         // argType == NULL if it fails to be resolved. Respective exception
         // will be thrown at the point of usage
         argTypes[i] = argType != NULL ? argType : typeManager.getNullObjectType();
@@ -559,45 +370,6 @@ JavaByteCodeTranslator::checkStack() {
 //-----------------------------------------------------------------------------
 // constant pool resolution helpers
 //-----------------------------------------------------------------------------
-FieldDesc*    
-JavaByteCodeTranslator::resolveField(uint32 cpIndex, bool putfield) {
-    return compilationInterface.resolveField(&methodToCompile, cpIndex, putfield);
-}
-
-FieldDesc*    
-JavaByteCodeTranslator::resolveStaticField(uint32 cpIndex, bool putfield) {
-    return compilationInterface.resolveStaticField(&methodToCompile, cpIndex, putfield);
-}
-
-MethodDesc*    
-JavaByteCodeTranslator::resolveVirtualMethod(uint32 cpIndex) {
-    return compilationInterface.resolveVirtualMethod(&methodToCompile,cpIndex);
-}
-
-MethodDesc*    
-JavaByteCodeTranslator::resolveSpecialMethod(uint32 cpIndex) {
-    return compilationInterface.resolveSpecialMethod(&methodToCompile,cpIndex);
-}
-
-MethodDesc*    
-JavaByteCodeTranslator::resolveStaticMethod(uint32 cpIndex) {
-    return compilationInterface.resolveStaticMethod(&methodToCompile,cpIndex);
-}
-
-MethodDesc*    
-JavaByteCodeTranslator::resolveInterfaceMethod(uint32 cpIndex) {
-    return compilationInterface.resolveInterfaceMethod(&methodToCompile,cpIndex);
-}
-
-NamedType*    
-JavaByteCodeTranslator::resolveType(uint32 cpIndex) {
-    return compilationInterface.resolveNamedType(&methodToCompile,cpIndex);
-}
-
-NamedType*    
-JavaByteCodeTranslator::resolveTypeNew(uint32 cpIndex) {
-    return compilationInterface.resolveNamedTypeNew(&methodToCompile,cpIndex);
-}
 
 const char*
 JavaByteCodeTranslator::methodSignatureString(uint32 cpIndex) {
@@ -798,151 +570,6 @@ JavaByteCodeTranslator::parseDone()
         jsrEntryMap->insert(std::make_pair(entry_inst, ret_inst));
     }
     irBuilder.getIRManager()->setJsrEntryMap(jsrEntryMap);
-
-    if (isInlinedMethod) {
-        CatchBlock *catchSyncBlock = NULL;
-        if (methodToCompile.isSynchronized()) {
-            // generate fake exception info to catch any exception in the code
-            catchSyncBlock = new (memManager) CatchBlock(0,0,methodToCompile.getByteCodeSize(), MAX_UINT32);
-            const Nodes& nodes = cfgBuilder.getCFG()->getNodes();
-            Nodes::const_iterator niter = ::std::find(nodes.begin(), nodes.end(), inliningNodeBegin);
-            for(; niter != nodes.end(); ++niter) {
-                Node* node = *niter;
-                LabelInst *first = (LabelInst*)node->getFirstInst();
-                if (node->isDispatchNode()) continue;
-                ExceptionInfo *existingInfo = (ExceptionInfo*)first->getState();
-                if (existingInfo == NULL) {
-                    first->setState(catchSyncBlock);
-                } else {
-                    while (true) {
-                        ExceptionInfo *next = existingInfo->getNextExceptionInfoAtOffset();
-                        if (next == NULL) {
-                            existingInfo->setNextExceptionInfoAtOffset(catchSyncBlock);
-                            break;
-                        } else if (next == catchSyncBlock) {
-                            break;
-                        }
-                        existingInfo = next;
-                    }
-                }
-            }
-        }
-
-        ExceptionInfo *exceptionInfo = inliningExceptionInfo;
-
-        // propagate exception info to the inlined basic blocks
-        if (exceptionInfo != NULL) {
-            const Nodes& nodes = cfgBuilder.getCFG()->getNodes();
-            Nodes::const_iterator niter = ::std::find(nodes.begin(), nodes.end(), inliningNodeBegin);
-            for(++niter; niter != nodes.end(); ++niter) {
-                Node* node = *niter;
-                LabelInst *first = (LabelInst*)(node)->getFirstInst();
-                ExceptionInfo *existingInfo = (ExceptionInfo*)first->getState();
-                if (existingInfo == NULL) {
-                    first->setState(exceptionInfo);   
-                } else if (existingInfo != exceptionInfo) {
-                    while (true) {
-                        ExceptionInfo *next = existingInfo->getNextExceptionInfoAtOffset();
-                        if (next == NULL) {
-                            existingInfo->setNextExceptionInfoAtOffset(exceptionInfo); 
-                            break;
-                        } else if (next == exceptionInfo) {
-                            break;
-                        }
-                        existingInfo = next;
-                    }
-                }
-            }
-        }
-
-        // fix synchronized methods
-        if (methodToCompile.isSynchronized()) {
-            // generate fake exception dispatch node
-            Node *dispatchNode = cfgBuilder.createDispatchNode();
-            // propagate exception info (if any)
-            exceptionInfo = inliningExceptionInfo;
-            catchSyncBlock->setLabelInst((LabelInst*)dispatchNode->getFirstInst());
-            ((LabelInst*)dispatchNode->getFirstInst())->setState(catchSyncBlock);
-
-            // generate basic block to contain the monitor exit
-            LabelInst *label = irBuilder.createLabel();
-            Type *exceptionType = typeManager.getSystemObjectType();
-            CatchLabelInst *
-
-
-            labelInst =  (CatchLabelInst*)
-            irBuilder.getInstFactory()->makeCatchLabel(
-                                                      label->getLabelId(),
-                                                      0/*order*/,
-                                                      exceptionType);
-
-            // generate a catch handler to handle any exception
-            CatchHandler* 
-                handler = new (irBuilder.getInstFactory()->getMemManager())
-                               CatchHandler(0,0,0,catchSyncBlock,exceptionType);
-            catchSyncBlock->addHandler(handler);
-            // propagate exception info (if any)
-            handler->setNextExceptionInfoAtOffset(exceptionInfo);
-            labelInst->setState(exceptionInfo);
-            handler->setLabelInst(labelInst);
-
-            // generate a basic block to contain the monitor exit and re-throw the exception
-            irBuilder.genLabel(labelInst);
-            cfgBuilder.genBlock(labelInst);
-            Opnd *exception = irBuilder.genCatch(exceptionType);
-            if (methodToCompile.isStatic()) {
-                irBuilder.genTypeMonitorExit(methodToCompile.getParentType());
-            } else {
-                genLdVar(0,JavaLabelPrepass::A);
-                genMethodMonitorExit();
-            }
-            irBuilder.genThrow(Throw_NoModifier, exception);
-        }
-
-        if ( (resultOpnd == NULL) && (retType != typeManager.getVoidType()) ) {
-            //
-            // Result-operand is required to insert inlined CFG into parent CFG.
-            // So be it, creating result-operand to contain a default value.
-            //
-            assert(retType); // we should NOT start inlining if return-type has not been resolved
-
-            VarOpnd* retVar = irBuilder.genVarDef(retType, false);
-            resultOpnd = irBuilder.genLdVar(retType, retVar);
-        }
-
-        if (jumpToTheEnd) {
-            //
-            // generate a return block
-            //
-            LabelInst* labelInst = getLabel(getNextLabelId());
-            labelInst->setState(exceptionInfo);
-            irBuilder.genLabel(labelInst);
-            cfgBuilder.genBlock(labelInst);
-            if (returnNode != NULL) {
-                *returnNode = labelInst->getNode();
-            }
-            //
-            // load the return type
-            //
-            if (resultOpnd != NULL && resultOpnd->isVarOpnd()) {
-                resultOpnd = irBuilder.genLdVar(resultOpnd->getType(),(VarOpnd*)resultOpnd);
-                if (returnOpnd != NULL) {
-                    resultOpnd->getInst()->setDst(*returnOpnd);
-                    resultOpnd = *returnOpnd; // voids an extra copy
-                }
-            }
-        }
-        // end the method scope
-        if ((numArgs > 0) && (!methodToCompile.isStatic())) {
-            Opnd *thisOpnd = args[0];
-            // resultOpnd is needed to produce method exit event
-            irBuilder.genMethodEndMarker(&methodToCompile, thisOpnd, 
-                    returnOpnd != NULL ? *returnOpnd : NULL);
-        } else {
-            irBuilder.genMethodEndMarker(&methodToCompile, 
-                    returnOpnd != NULL ? *returnOpnd : NULL);
-        }
-    }
 }
 
 //-----------------------------------------------------------------------------
@@ -991,7 +618,7 @@ JavaByteCodeTranslator::ldc(uint32 constPoolIndex) {
     if (constantType->isSystemString()) {
         opnd = irBuilder.genLdRef(&methodToCompile,constPoolIndex,constantType);
     } else if (constantType->isSystemClass()) {
-        NamedType *literalType = resolveType(constPoolIndex);
+        NamedType *literalType = compilationInterface.getNamedType(methodToCompile.getParentHandle(), constPoolIndex);
         if (!literalType) {
             linkingException(constPoolIndex, OPCODE_LDC);
             pushOpnd(irBuilder.genLdNull());
@@ -1091,14 +718,15 @@ JavaByteCodeTranslator::getFieldType(FieldDesc* field, uint32 constPoolIndex) {
         // some problem with fieldType class handle. Let's try the constant_pool.
         // (For example if the field type class is deleted, the field is beeing resolved successfully
         // but field->getFieldType() returns NULL in this case)
-        fieldType = compilationInterface.getFieldType(&methodToCompile,constPoolIndex);
+        fieldType = compilationInterface.getFieldType(methodToCompile.getParentHandle(),constPoolIndex);
     }
     return fieldType;
 }
 
+
 void 
 JavaByteCodeTranslator::getstatic(uint32 constPoolIndex) {
-    FieldDesc* field = resolveStaticField(constPoolIndex, false);
+    FieldDesc *field = compilationInterface.getStaticField(methodToCompile.getParentHandle(), constPoolIndex, false);
     if (field && field->isStatic()) {
         bool fieldValueInlined = false;
         if (field->isInitOnly() && !field->getParentType()->needsInitialization()) {
@@ -1113,7 +741,7 @@ JavaByteCodeTranslator::getstatic(uint32 constPoolIndex) {
                     case Type::Char :   constVal=irBuilder.genLdConstant(*(uint16*)fieldAddr);break;
                     case Type::Int32:   constVal=irBuilder.genLdConstant(*(int32*)fieldAddr);break;
                     case Type::Int64:   constVal=irBuilder.genLdConstant(*(int64*)fieldAddr);break;
-                    case Type::Float:   constVal=irBuilder.genLdConstant(*(float*)fieldAddr);break;
+                    case Type::Single:  constVal=irBuilder.genLdConstant(*(float*)fieldAddr);break;
                     case Type::Double:  constVal=irBuilder.genLdConstant(*(double*)fieldAddr);break;
                     case Type::Boolean: constVal=irBuilder.genLdConstant(*(bool*)fieldAddr);break;
                     default: assert(0); //??
@@ -1127,67 +755,87 @@ JavaByteCodeTranslator::getstatic(uint32 constPoolIndex) {
         if (!fieldValueInlined){
             Type* fieldType = getFieldType(field,constPoolIndex);
             assert(fieldType);
-            if (isMagicClass(fieldType)) {
-                fieldType = convertMagicType2HIR(typeManager, fieldType);
+            if (isVMMagicClass(fieldType->getName())) {
+                fieldType = convertVMMagicType2HIR(typeManager, fieldType);
             }
             pushOpnd(irBuilder.genLdStatic(fieldType,field));
         }
-        return;
+    } else if (typeManager.isLazyResolutionMode()) {
+        Type* type = compilationInterface.getFieldType(methodToCompile.getParentHandle(), constPoolIndex);
+        Opnd* res = irBuilder.genLdStaticWithResolve(type, methodToCompile.getParentType()->asObjectType(), constPoolIndex);
+        pushOpnd(res);
+    } else {
+        // generate helper call for throwing respective exception
+        linkingException(constPoolIndex, OPCODE_GETSTATIC);
+        Type* type = compilationInterface.getFieldType(methodToCompile.getParentHandle(), constPoolIndex);
+        ConstInst::ConstValue nullValue;
+        pushOpnd(irBuilder.genLdConstant(type,nullValue));
     }
-    // generate helper call for throwing respective exception
-    linkingException(constPoolIndex, OPCODE_GETSTATIC);
-    Type* type = compilationInterface.getFieldType(&methodToCompile, constPoolIndex);
-    ConstInst::ConstValue nullValue;
-    pushOpnd(irBuilder.genLdConstant(type,nullValue));
 }
 
 void 
 JavaByteCodeTranslator::putstatic(uint32 constPoolIndex) {
-    FieldDesc* field = resolveStaticField(constPoolIndex, true);
+    FieldDesc *field = compilationInterface.getStaticField(methodToCompile.getParentHandle(), constPoolIndex, true);
     if (field && field->isStatic()) {
         Type* fieldType = getFieldType(field,constPoolIndex);
         assert(fieldType);
         irBuilder.genStStatic(fieldType,field,popOpnd());
-        return;
+    } else  if (typeManager.isLazyResolutionMode()) {
+        Type* type = compilationInterface.getFieldType(methodToCompile.getParentHandle(), constPoolIndex);
+        Opnd* value = popOpnd();
+        irBuilder.genStStaticWithResolve(type, methodToCompile.getParentType()->asObjectType(), constPoolIndex, value);
+    } else {
+        // generate helper call for throwing respective exception
+        linkingException(constPoolIndex, OPCODE_PUTSTATIC);
+        popOpnd();
     }
-    // generate helper call for throwing respective exception
-    linkingException(constPoolIndex, OPCODE_PUTSTATIC);
-    popOpnd();
 }
 
 void 
 JavaByteCodeTranslator::getfield(uint32 constPoolIndex) {
-    FieldDesc* field = resolveField(constPoolIndex, false);
+    FieldDesc *field = compilationInterface.getNonStaticField(methodToCompile.getParentHandle(), constPoolIndex, false);
     if (field && !field->isStatic()) {
-        Type* fieldType = getFieldType(field,constPoolIndex);
-        assert(fieldType);
-        if (isMagicClass(fieldType)) {
-            fieldType = convertMagicType2HIR(typeManager, fieldType);
+        Type* fieldType = getFieldType(field, constPoolIndex);
+        if (isVMMagicClass(fieldType->getName())) {
+            fieldType = convertVMMagicType2HIR(typeManager, fieldType);
         }
         pushOpnd(irBuilder.genLdField(fieldType,popOpnd(),field));
-        return;
+    } else  if (typeManager.isLazyResolutionMode()) {
+        Type* fieldType = compilationInterface.getFieldType(methodToCompile.getParentHandle(), constPoolIndex);
+        if (isVMMagicClass(fieldType->getName())) {
+            fieldType = convertVMMagicType2HIR(typeManager, fieldType);
+        }
+        Opnd* base = popOpnd();
+        Opnd* res = irBuilder.genLdFieldWithResolve(fieldType, base, methodToCompile.getParentType()->asObjectType(), constPoolIndex);
+        pushOpnd(res);
+    } else {
+        // generate helper call for throwing respective exception
+        linkingException(constPoolIndex, OPCODE_GETFIELD);
+        popOpnd();
+        pushOpnd(irBuilder.genLdNull());
     }
-    // generate helper call for throwing respective exception
-    linkingException(constPoolIndex, OPCODE_GETFIELD);
-    popOpnd();
-    pushOpnd(irBuilder.genLdNull());
 }
 
 void 
 JavaByteCodeTranslator::putfield(uint32 constPoolIndex) {
-    FieldDesc* field = resolveField(constPoolIndex, true);
+    FieldDesc *field = compilationInterface.getNonStaticField(methodToCompile.getParentHandle(), constPoolIndex, true);
     if (field && !field->isStatic()) {
         Type* fieldType = getFieldType(field,constPoolIndex);
         assert(fieldType);
         Opnd* value = popOpnd();
         Opnd* ref = popOpnd();
         irBuilder.genStField(fieldType,ref,field,value);
-        return;
+    } else if (typeManager.isLazyResolutionMode()) {
+        Type* type = compilationInterface.getFieldType(methodToCompile.getParentHandle(), constPoolIndex);
+        Opnd* value = popOpnd();
+        Opnd* base = popOpnd();
+        irBuilder.genStFieldWithResolve(type, base, methodToCompile.getParentType()->asObjectType(), constPoolIndex, value);
+    } else {
+        // generate helper call for throwing respective exception
+        linkingException(constPoolIndex, OPCODE_PUTFIELD);
+        popOpnd();
+        popOpnd();
     }
-    // generate helper call for throwing respective exception
-    linkingException(constPoolIndex, OPCODE_PUTFIELD);
-    popOpnd();
-    popOpnd();
 }
 //-----------------------------------------------------------------------------
 // array access byte codes
@@ -1762,7 +1410,7 @@ void JavaByteCodeTranslator::pseudoInvoke(const char* methodSig)
         popOpnd();
     }
     // recognize and push respective returnType
-    Type* retType = JavaLabelPrepass::getRetTypeBySignature(methodSig, typeManager);
+    Type* retType = JavaLabelPrepass::getRetTypeBySignature(compilationInterface, methodToCompile.getParentHandle(), methodSig);
     assert(retType);
 
     // push NULL as a returned object
@@ -1783,14 +1431,62 @@ JavaByteCodeTranslator::popArgs(uint32 numArgs) {
     return srcOpnds;
 }
 
+
+void JavaByteCodeTranslator::genCallWithResolve(JavaByteCodes bc, unsigned cpIndex) {
+    assert(bc == OPCODE_INVOKESPECIAL || bc == OPCODE_INVOKESTATIC || bc == OPCODE_INVOKEVIRTUAL || bc == OPCODE_INVOKEINTERFACE);
+    bool isStatic = bc == OPCODE_INVOKESTATIC;
+    
+
+    ObjectType* enclosingClass = methodToCompile.getParentType()->asObjectType();
+    assert(enclosingClass!=NULL);
+    const char* methodSig = methodSignatureString(cpIndex);
+    assert(methodSig);
+    uint32 numArgs = JavaLabelPrepass::getNumArgsBySignature(methodSig) + (isStatic ? 0 : 1); 
+    assert(numArgs > 0 || isStatic);
+
+    Opnd** args = popArgs(numArgs);
+    Type* returnType = JavaLabelPrepass::getRetTypeBySignature(compilationInterface, methodToCompile.getParentHandle(), methodSig);
+    
+
+    if (bc != OPCODE_INVOKEINTERFACE) {
+        const char* kname = const_pool_get_method_class_name(methodToCompile.getParentHandle(), cpIndex);
+        const char* mname = const_pool_get_method_name(methodToCompile.getParentHandle(), cpIndex);
+        if (isVMMagicClass(kname)) {
+            assert(bc == OPCODE_INVOKESTATIC || bc == OPCODE_INVOKEVIRTUAL);
+            UNUSED bool res = genVMMagic(mname, numArgs, args, returnType);    
+            assert(res);
+            return;
+        } else if (isVMHelperClass(kname)) {
+            assert(bc == OPCODE_INVOKESTATIC);
+            bool res = genVMHelper(mname, numArgs, args, returnType);
+            if (res) { //method is not a registered vmhelper name
+                return;
+            }
+        }
+    }
+
+    Opnd* tauNullCheckedFirstArg = bc == OPCODE_INVOKESTATIC ? irBuilder.genTauSafe() :irBuilder.genTauCheckNull(args[0]);
+    Opnd* tauTypesChecked = NULL;// let IRBuilder handle types
+
+    Opnd* dst = irBuilder.genIndirectCallWithResolve(returnType, tauNullCheckedFirstArg, tauTypesChecked, 
+                                numArgs, args, enclosingClass, bc, cpIndex);
+    if (returnType->tag != Type::Void) {
+        pushOpnd(dst);
+    }
+}
+
 void 
 JavaByteCodeTranslator::invokevirtual(uint32 constPoolIndex) {
-    MethodDesc* methodDesc = resolveVirtualMethod(constPoolIndex);
+    MethodDesc* methodDesc = compilationInterface.getVirtualMethod(methodToCompile.getParentHandle(), constPoolIndex);
     if (!methodDesc) {
-        linkingException(constPoolIndex, OPCODE_INVOKEVIRTUAL);
-        const char* methodSig_string = methodSignatureString(constPoolIndex);
-        popOpnd(); // is not static
-        pseudoInvoke(methodSig_string);
+        if (typeManager.isLazyResolutionMode()) {
+            genCallWithResolve(OPCODE_INVOKEVIRTUAL, constPoolIndex);
+        } else {
+            linkingException(constPoolIndex, OPCODE_INVOKEVIRTUAL);
+            const char* methodSig_string = methodSignatureString(constPoolIndex);
+            popOpnd(); // is not static
+            pseudoInvoke(methodSig_string);
+        }
         return;
     }
     jitrino_assert(methodDesc);
@@ -1798,8 +1494,8 @@ JavaByteCodeTranslator::invokevirtual(uint32 constPoolIndex) {
     Opnd** srcOpnds = popArgs(numArgs);
     Type* returnType = methodDesc->getReturnType();
 
-    if (isMagicClass(methodDesc->getParentType())) {
-        genMagic(methodDesc, numArgs, srcOpnds, returnType);
+    if (isVMMagicClass(methodDesc->getParentType()->getName())) {
+        genVMMagic(methodDesc->getName(), numArgs, srcOpnds, returnType);
         return;
     }
     // callvirt can throw a null pointer exception
@@ -1813,7 +1509,7 @@ JavaByteCodeTranslator::invokevirtual(uint32 constPoolIndex) {
         }
 
         Type* type = thisOpnd->getType();
-        if (!type->isNullObject() && !type->isInterface()) {
+        if (!type->isNullObject() && !type->isUnresolvedType() && !type->isInterface()) {
             // needs to refine the method descriptor before doing any optimization
             MethodDesc *overridden = compilationInterface.getOverriddenMethod(
                                      (NamedType*)type,methodDesc);
@@ -1823,104 +1519,21 @@ JavaByteCodeTranslator::invokevirtual(uint32 constPoolIndex) {
         }
     }
 
-    if (returnType) {
-        if ((isExactTypeOpnd(thisOpnd) || methodDesc->isFinal()) 
-            && inlineMethod(methodDesc)) {
-            if (Log::isEnabled()) {
-                Log::out() << "XXX inline virtual:"; methodDesc->printFullName(Log::out()); Log::out() << ::std::endl;
-            }
-            if(methodDesc->isInstanceInitializer()) {
-                irBuilder.genInitType(methodDesc->getParentType());
-            }
-            Opnd* dst =  
-                JavaCompileMethodInline(compilationInterface,
-                                        memManager,
-                                        *methodDesc,
-                                        irBuilder,
-                                        numArgs,
-                                        srcOpnds,
-                                        cfgBuilder,
-                                        inlineDepth+1,
-                                        inlineBuilder,
-                                        jsrEntryMap);
-            // push the return type
-            if (returnType->tag != Type::Void)
-                pushOpnd(dst);
-
-            if ( tauNullChecked->getInst()->getOpcode() == Op_TauCheckNull ) {
-                tauNullChecked->getInst()->setDefArgModifier(NonNullThisArg);
-            }
-            return;
-        } else if (guardedInlineMethod(methodDesc)) { 
-            if (Log::isEnabled()) {
-                Log::out() << "XXX guarded inline:"; methodDesc->printFullName(Log::out()); Log::out() << ::std::endl;
-            }
-            VarOpnd *retVar = NULL;
-            if (returnType->tag != Type::Void)
-                retVar =irBuilder.genVarDef(returnType,false); 
-
-            LabelInst *inlined = (LabelInst*)irBuilder.getInstFactory()->makeLabel();
-            LabelInst *target  = (LabelInst*)irBuilder.getInstFactory()->makeLabel();
-            LabelInst *merge   = (LabelInst*)irBuilder.getInstFactory()->makeLabel();
-
-            irBuilder.genTauTypeCompare(thisOpnd,methodDesc,target,
-                                        tauNullChecked);
-            /********** non- inlined path */
-            irBuilder.genFallThroughLabel(inlined);
-            cfgBuilder.genBlockAfterCurrent(inlined);
-            Opnd *dst = irBuilder.genTauVirtualCall(methodDesc,returnType,
-                                                    tauNullChecked, 0,
-                                                    numArgs,srcOpnds,
-                                                    inlineBuilder);
-            if (retVar != NULL)
-                irBuilder.genStVar(retVar,dst);
-            irBuilder.genJump(merge);
-          
-            /********** inlined path */  
-            irBuilder.genLabel(target);
-            cfgBuilder.genBlockAfterCurrent(target);
-            dst = JavaCompileMethodInline(compilationInterface,
-                                          memManager,
-                                          *methodDesc,
-                                          irBuilder,
-                                          numArgs,
-                                          srcOpnds,
-                                          cfgBuilder, 
-                                          inlineDepth+1,
-                                          inlineBuilder,
-                                          jsrEntryMap);
-            
-            if (retVar != NULL && dst != NULL)
-                irBuilder.genStVar(retVar,dst); 
-
-            /*if ( tauNullChecked->getInst()->getOpcode() == Op_TauCheckNull ) {
-                tauNullChecked->getInst()->setDefArgModifier(NonNullThisArg);
-            }*/
-
-            /*********** merge point */
-            irBuilder.genLabel(merge);
-            cfgBuilder.genBlockAfterCurrent(merge);
-            if (retVar != NULL) {
-                dst = irBuilder.genLdVar(returnType,retVar);
-                pushOpnd(dst);
-            }
-            return;
-        }
-    } else { // i.e. returnType == NULL
+    if (returnType==NULL) {
         // This means that it was not resolved successfully but it can be resolved later
         // inside the callee (with some "magic" custom class loader for example)
         // Or respective exception will be thrown there (in the callee) at the attempt to create (new)
         // an object of unresolved type
         const char* methodSig_string = methodSignatureString(constPoolIndex);
-        returnType = JavaLabelPrepass::getRetTypeBySignature(methodSig_string, typeManager);
+        returnType = JavaLabelPrepass::getRetTypeBySignature(compilationInterface, methodToCompile.getParentHandle(), methodSig_string);
     }
 
     Opnd* dst = irBuilder.genTauVirtualCall(methodDesc,returnType,
                                             tauNullChecked, 
                                             0, // let IRBuilder handle types
                                             numArgs,
-                                            srcOpnds,
-                                            inlineBuilder);
+                                            srcOpnds, 
+                                            NULL);
     // push the return type
     if (returnType->tag != Type::Void)
         pushOpnd(dst);
@@ -1928,12 +1541,16 @@ JavaByteCodeTranslator::invokevirtual(uint32 constPoolIndex) {
 
 void 
 JavaByteCodeTranslator::invokespecial(uint32 constPoolIndex) {
-    MethodDesc* methodDesc = resolveSpecialMethod(constPoolIndex);
+    MethodDesc* methodDesc = compilationInterface.getSpecialMethod(methodToCompile.getParentHandle(), constPoolIndex);
     if (!methodDesc) {
-        linkingException(constPoolIndex, OPCODE_INVOKESPECIAL);
-        const char* methodSig_string = methodSignatureString(constPoolIndex);
-        popOpnd(); // is not static
-        pseudoInvoke(methodSig_string);
+        if (typeManager.isLazyResolutionMode()) {
+            genCallWithResolve(OPCODE_INVOKESPECIAL, constPoolIndex);
+        } else {
+            linkingException(constPoolIndex, OPCODE_INVOKESPECIAL);
+            const char* methodSig_string = methodSignatureString(constPoolIndex);
+            popOpnd(); // is not static
+            pseudoInvoke(methodSig_string);
+        }
         return;
     }
     jitrino_assert(methodDesc);
@@ -1944,58 +1561,42 @@ JavaByteCodeTranslator::invokespecial(uint32 constPoolIndex) {
     Opnd *tauNullChecked = irBuilder.genTauCheckNull(srcOpnds[0]);
     Opnd* dst;
     
-    if (returnType && inlineMethod(methodDesc)) {
-        if(Log::isEnabled()) {
-            Log::out() << "XXX inline special:";methodDesc->printFullName(Log::out()); Log::out() << ::std::endl;
-        }
-        if(methodDesc->isInstanceInitializer() || methodDesc->isClassInitializer())
-            irBuilder.genInitType(methodDesc->getParentType());
-
-        dst = JavaCompileMethodInline(compilationInterface,
-                                      memManager,
-                                      *methodDesc,
-                                      irBuilder,
-                                      numArgs,
-                                      srcOpnds,
-                                      cfgBuilder,
-                                      inlineDepth+1,
-                                      inlineBuilder,
-                                      jsrEntryMap);
-
-        if ( tauNullChecked->getInst()->getOpcode() == Op_TauCheckNull ) {
-            tauNullChecked->getInst()->setDefArgModifier(NonNullThisArg);
-        }
-    } else {
-        if (returnType == NULL) {
-            // This means that it was not resolved successfully but it can be resolved later
-            // inside the callee (with some "magic" custom class loader for example)
-            // Or respective exception will be thrown there (in the callee) at the attempt to create (new)
-            // an object of unresolved type
-            returnType = typeManager.getNullObjectType();
-        }
-        dst = irBuilder.genDirectCall(methodDesc,
-                                      returnType,
-                                      tauNullChecked, 
-                                      0, // let IRBuilder check types
-                                      numArgs,
-                                      srcOpnds,
-                                      inlineBuilder);
+    if (returnType == NULL) {
+        // This means that it was not resolved successfully but it can be resolved later
+        // inside the callee (with some "magic" custom class loader for example)
+        // Or respective exception will be thrown there (in the callee) at the attempt to create (new)
+        // an object of unresolved type
+        returnType = typeManager.getNullObjectType();
     }
+    dst = irBuilder.genDirectCall(methodDesc,
+        returnType,
+        tauNullChecked, 
+        0, // let IRBuilder check types
+        numArgs,
+        srcOpnds,
+        NULL);
+
     // push the return type
-    if (returnType->tag != Type::Void)
+    if (returnType->tag != Type::Void) {
         pushOpnd(dst);
+    }
 
 }
 
 void 
 JavaByteCodeTranslator::invokestatic(uint32 constPoolIndex) {
-    MethodDesc* methodDesc = resolveStaticMethod(constPoolIndex);
+    MethodDesc* methodDesc = compilationInterface.getStaticMethod(methodToCompile.getParentHandle(), constPoolIndex);
     if (!methodDesc) {
-        linkingException(constPoolIndex, OPCODE_INVOKESTATIC);
-        const char* methodSig_string = methodSignatureString(constPoolIndex);
-        pseudoInvoke(methodSig_string);
+        if (typeManager.isLazyResolutionMode()) {
+            genCallWithResolve(OPCODE_INVOKESTATIC, constPoolIndex);
+        } else {
+            linkingException(constPoolIndex, OPCODE_INVOKESTATIC);
+            const char* methodSig_string = methodSignatureString(constPoolIndex);
+            pseudoInvoke(methodSig_string);
+        }
         return;
     }
+
     jitrino_assert(methodDesc);
     uint32 numArgs = methodDesc->getNumParams();
     Opnd** srcOpnds = popArgs(numArgs);
@@ -2020,7 +1621,7 @@ JavaByteCodeTranslator::invokestatic(uint32 constPoolIndex) {
         genCharArrayCopy(methodDesc,numArgs,srcOpnds,returnType)) {
         return;
     } else if (translationFlags.genMinMaxAbs == true &&
-               genMinMax(methodDesc,numArgs,srcOpnds,returnType)) {
+        genMinMax(methodDesc,numArgs,srcOpnds,returnType)) {
         return;
     } else {
         genInvokeStatic(methodDesc,numArgs,srcOpnds,returnType);
@@ -2029,12 +1630,16 @@ JavaByteCodeTranslator::invokestatic(uint32 constPoolIndex) {
 
 void 
 JavaByteCodeTranslator::invokeinterface(uint32 constPoolIndex,uint32 count) {
-    MethodDesc* methodDesc = resolveInterfaceMethod(constPoolIndex);
+    MethodDesc* methodDesc = compilationInterface.getInterfaceMethod(methodToCompile.getParentHandle(), constPoolIndex);
     if (!methodDesc) {
-        linkingException(constPoolIndex, OPCODE_INVOKEINTERFACE);
-        const char* methodSig_string = methodSignatureString(constPoolIndex);
-        popOpnd(); // is not static
-        pseudoInvoke(methodSig_string);
+        if (typeManager.isLazyResolutionMode()) {
+            genCallWithResolve(OPCODE_INVOKEINTERFACE, constPoolIndex);
+        } else {
+            linkingException(constPoolIndex, OPCODE_INVOKEINTERFACE);
+            const char* methodSig_string = methodSignatureString(constPoolIndex);
+            popOpnd(); // is not static
+            pseudoInvoke(methodSig_string);
+        }
         return;
     }
     jitrino_assert(methodDesc);
@@ -2047,7 +1652,7 @@ JavaByteCodeTranslator::invokeinterface(uint32 constPoolIndex,uint32 count) {
     Opnd* dst;
     if (methodDesc->getParentType() != thisOpnd->getType()) {
         Type * type = thisOpnd->getType();
-        if (!type->isNullObject() && !type->isInterface()) {
+        if (!type->isNullObject() && !type->isUnresolvedObject() && !type->isInterface()) {
             // need to refine the method descriptor before doing any optimization
             MethodDesc *overridden = compilationInterface.getOverriddenMethod(
                                   (NamedType*)type,methodDesc);
@@ -2056,42 +1661,22 @@ JavaByteCodeTranslator::invokeinterface(uint32 constPoolIndex,uint32 count) {
             }
         }
     }
-    if (returnType && (isExactTypeOpnd(thisOpnd) || methodDesc->isFinal())
-        && inlineMethod(methodDesc))  {
-        if(Log::isEnabled()) {
-            Log::out() << "XXX inline interface:"; methodDesc->printFullName(Log::out()); Log::out() << ::std::endl;
-        }
-        dst =  JavaCompileMethodInline(compilationInterface,
-                                       memManager,
-                                       *methodDesc,
-                                       irBuilder,
-                                       numArgs,
-                                       srcOpnds,
-                                       cfgBuilder,
-                                       inlineDepth+1,
-                                       inlineBuilder,
-                                       jsrEntryMap);
 
-        if ( tauNullChecked->getInst()->getOpcode() == Op_TauCheckNull ) {
-            tauNullChecked->getInst()->setDefArgModifier(NonNullThisArg);
-        }
-    } else {
-        if (returnType == NULL) {
-            // This means that it was not resolved successfully but it can be resolved later
-            // inside the callee (with some "magic" custom class loader for example)
-            // Or respective exception will be thrown there (in the callee) at the attempt to create (new)
-            // an object of unresolved type
-            const char* methodSig_string = methodSignatureString(constPoolIndex);
-            returnType = JavaLabelPrepass::getRetTypeBySignature(methodSig_string, typeManager);
-        }
-        dst = irBuilder.genTauVirtualCall(methodDesc,
-                                          returnType,
-                                          tauNullChecked, 
-                                          0, // let IRBuilder handle types
-                                          numArgs,
-                                          srcOpnds,
-                                          inlineBuilder);
+    if (returnType == NULL) {
+        // This means that it was not resolved successfully but it can be resolved later
+        // inside the callee (with some "magic" custom class loader for example)
+        // Or respective exception will be thrown there (in the callee) at the attempt to create (new)
+        // an object of unresolved type
+        const char* methodSig_string = methodSignatureString(constPoolIndex);
+        returnType = JavaLabelPrepass::getRetTypeBySignature(compilationInterface, methodToCompile.getParentHandle(), methodSig_string);
     }
+    dst = irBuilder.genTauVirtualCall(methodDesc,
+        returnType,
+        tauNullChecked, 
+        0, // let IRBuilder handle types
+        numArgs,
+        srcOpnds,
+        NULL);
     // push the return type
     if (returnType->tag != Type::Void)
         pushOpnd(dst);
@@ -2101,14 +1686,20 @@ JavaByteCodeTranslator::invokeinterface(uint32 constPoolIndex,uint32 count) {
 //-----------------------------------------------------------------------------
 void 
 JavaByteCodeTranslator::new_(uint32 constPoolIndex) {
-    NamedType *type = resolveTypeNew(constPoolIndex);
+    NamedType* type = compilationInterface.getNamedType(methodToCompile.getParentHandle(), constPoolIndex, ResolveNewCheck_DoCheck);
+
     if (!type) {
+        assert(!typeManager.isLazyResolutionMode());
         linkingException(constPoolIndex, OPCODE_NEW);
         pushOpnd(irBuilder.genLdNull());
         return;
     }
     jitrino_assert(type);
-    pushOpnd(irBuilder.genNewObj(type));
+    if (type->isUnresolvedObject()) {
+        pushOpnd(irBuilder.genNewObjWithResolve(methodToCompile.getParentType()->asObjectType(), constPoolIndex));
+    } else {
+        pushOpnd(irBuilder.genNewObj(type));
+    }
 }
 void 
 JavaByteCodeTranslator::newarray(uint8 atype) {
@@ -2145,20 +1736,27 @@ JavaByteCodeTranslator::newarray(uint8 atype) {
 
 void 
 JavaByteCodeTranslator::anewarray(uint32 constPoolIndex) {
-    NamedType* type = resolveType(constPoolIndex);
+    NamedType* type = compilationInterface.getNamedType(methodToCompile.getParentHandle(), constPoolIndex);
     if (!type) {
+        assert(!typeManager.isLazyResolutionMode());
         linkingException(constPoolIndex, OPCODE_ANEWARRAY);
         popOpnd();
         pushOpnd(irBuilder.genLdNull());
         return;
     }
-    jitrino_assert(type);
-    pushOpnd(irBuilder.genNewArray(type,popOpnd()));
+    Opnd* sizeOpnd = popOpnd();
+    if (type->isUnresolvedType()) {
+        assert(typeManager.isLazyResolutionMode());
+        //res type can be an array of multi array with uninitialized dimensions.
+        pushOpnd(irBuilder.genNewArrayWithResolve(type, sizeOpnd, methodToCompile.getParentType()->asObjectType(), constPoolIndex));
+    } else {
+        pushOpnd(irBuilder.genNewArray(type,sizeOpnd));
+    }
 }
 
 void 
 JavaByteCodeTranslator::multianewarray(uint32 constPoolIndex,uint8 dimensions) {
-    NamedType* arraytype = resolveType(constPoolIndex);
+    NamedType* arraytype = compilationInterface.getNamedType(methodToCompile.getParentHandle(), constPoolIndex);
     if (!arraytype) {
         linkingException(constPoolIndex, OPCODE_MULTIANEWARRAY);
         // pop the sizes
@@ -2168,14 +1766,20 @@ JavaByteCodeTranslator::multianewarray(uint32 constPoolIndex,uint8 dimensions) {
         pushOpnd(irBuilder.genLdNull());
         return;
     }
-    jitrino_assert(arraytype);
+    assert(arraytype->isArray());
     jitrino_assert(dimensions > 0);
     Opnd** countOpnds = new (memManager) Opnd*[dimensions];
     // pop the sizes
     for (int i=dimensions-1; i>=0; i--) {
         countOpnds[i] = popOpnd();
     }
-    pushOpnd(irBuilder.genMultianewarray(arraytype,dimensions,countOpnds));
+    if (arraytype->isUnresolvedType()) {
+        pushOpnd(irBuilder.genMultianewarrayWithResolve(
+            arraytype, methodToCompile.getParentType()->asObjectType(),constPoolIndex, dimensions,countOpnds
+            ));
+    } else {
+        pushOpnd(irBuilder.genMultianewarray(arraytype,dimensions,countOpnds));
+    }
 }
 
 void 
@@ -2197,38 +1801,46 @@ JavaByteCodeTranslator::athrow() {
 //-----------------------------------------------------------------------------
 void 
 JavaByteCodeTranslator::checkcast(uint32 constPoolIndex) {
-    NamedType *type = resolveType(constPoolIndex);
+    NamedType *type = compilationInterface.getNamedType(methodToCompile.getParentHandle(), constPoolIndex);
     if (!type) {
+        assert(!typeManager.isLazyResolutionMode());
         linkingException(constPoolIndex, OPCODE_CHECKCAST);
         return; // can be left as is
     }
-    jitrino_assert(type);
-    pushOpnd(irBuilder.genCast(popOpnd(),type));
+    Opnd* objOpnd = popOpnd();
+    if (type->isUnresolvedType()) {
+        assert(typeManager.isLazyResolutionMode());
+        pushOpnd(irBuilder.genCastWithResolve(objOpnd, type, methodToCompile.getParentType()->asObjectType(), constPoolIndex));
+    } else {
+        pushOpnd(irBuilder.genCast(objOpnd, type));
+    }
 }
 
 int  
 JavaByteCodeTranslator::instanceof(const uint8* bcp, uint32 constPoolIndex, uint32 off)   {
-    NamedType *type = resolveType(constPoolIndex);
+    NamedType *type = compilationInterface.getNamedType(methodToCompile.getParentHandle(), constPoolIndex);
     if (!type) {
         linkingException(constPoolIndex, OPCODE_INSTANCEOF);
         popOpnd(); // emulation of unsuccessful 'instanceof'
         pushOpnd(irBuilder.genLdConstant((int32)0));
         return 3;
     }
-    jitrino_assert(type);
-
     Opnd* src = popOpnd();
     Type* srcType = src->getType();
     Opnd* res = NULL;
 
-
-    // if target type is final just compare VTables
-    // This can not be done by Simplifier as it can not generate branches
-    // (srcType->isExactType() case will be simplified by Simplifier)
-    if( !srcType->isInterface() &&
-        !Simplifier::isExactType(src) &&
-        ((ObjectType*)type)->isFinalClass() )
+    if (type->isUnresolvedType()) {
+        assert(typeManager.isLazyResolutionMode());
+        res = irBuilder.genInstanceOfWithResolve(src, methodToCompile.getParentType()->asObjectType(), constPoolIndex);
+    } else if( !srcType->isUnresolvedType() 
+        && !srcType->isInterface() 
+        && !Simplifier::isExactType(src) 
+        && ((ObjectType*)type)->isFinalClass() )
     {
+        // if target type is final just compare VTables
+        // This can not be done by Simplifier as it can not generate branches
+        // (srcType->isExactType() case will be simplified by Simplifier)
+
         Type* intPtrType = typeManager.getIntPtrType();
 
         LabelInst* ObjIsNullLabel = irBuilder.createLabel();
@@ -2294,8 +1906,8 @@ JavaByteCodeTranslator::monitorexit() {
 void 
 JavaByteCodeTranslator::genLdVar(uint32 varIndex,JavaLabelPrepass::JavaVarType javaType) {
     Opnd *var = getVarOpndLdVar(javaType,varIndex);
-    if (isMagicClass(var->getType())) {
-        var->setType(convertMagicType2HIR(typeManager, var->getType()));
+    if (isVMMagicClass(var->getType()->getName())) {
+        var->setType(convertVMMagicType2HIR(typeManager, var->getType()));
     }
     Opnd *opnd;
     if (var->isVarOpnd()) {
@@ -2359,30 +1971,7 @@ JavaByteCodeTranslator::genReturn(JavaLabelPrepass::JavaVarType javaType, uint32
             genMethodMonitorExit();
         }
     }
-    if (isInlinedMethod) {
-        if (needsReturnLabel(off)) {
-            if (resultOpnd == NULL)  { // create a variable to hold the return value
-                resultOpnd = irBuilder.genVarDef(ret->getType(),false);
-            } else {
-                Type *retType = typeManager.getCommonType(resultOpnd->getType(),ret->getType());
-                if (retType != NULL)
-                    resultOpnd->setType(retType);
-            }
-            // generate a StVar
-            irBuilder.genStVar((VarOpnd*)resultOpnd,ret);
-        } else {
-            if (returnNode != NULL)
-                *returnNode = irBuilder.getCurrentLabel()->getNode(); 
-            resultOpnd = ret;
-            if (returnOpnd != NULL) {
-                    *returnOpnd = resultOpnd;
-            }
-        }
-        if (jumpToTheEnd)  // insert jump to the end of method
-            irBuilder.genJump(getLabel(numLabels-1));
-    } else {
-        irBuilder.genReturn(ret,javaTypeMap[javaType]);
-    }
+    irBuilder.genReturn(ret,javaTypeMap[javaType]);
     opndStack.makeEmpty();
 }
 
@@ -2400,12 +1989,7 @@ JavaByteCodeTranslator::genReturn(uint32 off) {
             genMethodMonitorExit();
         }
     }
-    if (isInlinedMethod) {
-        needsReturnLabel(off);
-        if (jumpToTheEnd)
-            irBuilder.genJump(getLabel(numLabels-1));
-    } else
-        irBuilder.genReturn();
+    irBuilder.genReturn();
 }
 
 //-----------------------------------------------------------------------------
@@ -2720,43 +2304,29 @@ JavaByteCodeTranslator::genInvokeStatic(MethodDesc * methodDesc,
                                         Type *       returnType) {
     Opnd *dst;
 
-    if (isMagicMethod(methodDesc)) {
-        genMagic(methodDesc, numArgs, srcOpnds, returnType);    
+    const char* kname = methodDesc->getParentType()->getName(); 
+    const char* mname = methodDesc->getName(); 
+    if (isVMMagicClass(kname)) {
+        UNUSED bool res = genVMMagic(mname, numArgs, srcOpnds, returnType);    
+        assert(res);
         return;
-    } else if (isVMHelperMethod(methodDesc) && !methodDesc->isNative()) {
-        genVMHelper(methodDesc, numArgs, srcOpnds, returnType);
+    } else if (isVMHelperClass(kname) && !methodDesc->isNative()) {
+        UNUSED bool res = genVMHelper(mname, numArgs, srcOpnds, returnType);
+        assert(res);
         return;
     }
-    if (inlineMethod(methodDesc)) {
-        if(Log::isEnabled()) {
-            Log::out() << "XXX inline static:"; methodDesc->printFullName(Log::out()); Log::out() << ::std::endl;
-        }
-        irBuilder.genTauSafe(); // always safe, is a static method call
-        irBuilder.genInitType(methodDesc->getParentType());
-        dst = JavaCompileMethodInline(compilationInterface,
-                                      memManager,
-                                      *methodDesc,
-                                      irBuilder,
-                                      numArgs,
-                                      srcOpnds,
-                                      cfgBuilder,
-                                      inlineDepth+1,
-                                      inlineBuilder,
-                                      jsrEntryMap);
-    } else {
-        Opnd *tauNullChecked = irBuilder.genTauSafe(); // always safe, is a static method call
-        Type* resType = returnType;
-        if (isMagicClass(resType)) {
-            resType = convertMagicType2HIR(typeManager, resType);
-        }
-        dst = irBuilder.genDirectCall(methodDesc, 
-                                      resType,
-                                      tauNullChecked,
-                                      0, // let IRBuilder check types
-                                      numArgs,
-                                      srcOpnds,
-                                      inlineBuilder);
+    Opnd *tauNullChecked = irBuilder.genTauSafe(); // always safe, is a static method call
+    Type* resType = returnType;
+    if (isVMMagicClass(resType->getName())) {
+        resType = convertVMMagicType2HIR(typeManager, resType);
     }
+    dst = irBuilder.genDirectCall(methodDesc, 
+                        resType,
+                        tauNullChecked,
+                        0, // let IRBuilder check types
+                        numArgs,
+                        srcOpnds,
+                        NULL);
     if (returnType->tag != Type::Void)
         pushOpnd(dst);
 }
@@ -2803,8 +2373,8 @@ JavaByteCodeTranslator::arraycopyOptimizable(MethodDesc * methodDesc,
            srcOpnds[4]->getType()->isInt4());  // 4 - length
 
     bool throwsASE = false;
-    bool srcIsArray = srcType->isArray();
-    bool dstIsArray = dstType->isArray();
+    bool srcIsArray = srcType->isArray() && !srcType->isUnresolvedType();
+    bool dstIsArray = dstType->isArray() && !dstType->isUnresolvedType();
     ArrayType* srcAsArrayType = srcType->asArrayType();
     ArrayType* dstAsArrayType = dstType->asArrayType();
     bool srcIsArrOfPrimitive = srcIsArray && VMInterface::isArrayOfPrimitiveElements(srcAsArrayType->getVMTypeHandle());
@@ -3725,9 +3295,8 @@ uint32 JavaByteCodeTranslator::getNumericValue(const uint8* byteCodes, uint32 of
     return off - offset;
 }
 
-void JavaByteCodeTranslator::genMagic(MethodDesc *md, uint32 numArgs, Opnd **srcOpnds, Type *magicRetType) {
-    const char* mname = md->getName();
-    Type* resType = convertMagicType2HIR(typeManager, magicRetType);
+bool JavaByteCodeTranslator::genVMMagic(const char* mname, uint32 numArgs, Opnd **srcOpnds, Type *magicRetType) {
+    Type* resType = convertVMMagicType2HIR(typeManager, magicRetType);
     Type* cmpResType = typeManager.getInt32Type();
     Opnd* tauSafe = irBuilder.genTauSafe();
     Opnd* arg0 = numArgs > 0 ? srcOpnds[0]: NULL;
@@ -3755,7 +3324,7 @@ void JavaByteCodeTranslator::genMagic(MethodDesc *md, uint32 numArgs, Opnd **src
             res = irBuilder.genConv(resType, resType->tag, mod, res);
         }
         pushOpnd(res);
-        return;
+        return true;
     }
 
     //
@@ -3780,7 +3349,7 @@ void JavaByteCodeTranslator::genMagic(MethodDesc *md, uint32 numArgs, Opnd **src
         Type* srcType = arg0->getType();
         if (resType == srcType) {
             pushOpnd(irBuilder.genCopy(arg0));
-            return;
+            return true;
         }
         Opnd* res = NULL;
         
@@ -3794,7 +3363,7 @@ void JavaByteCodeTranslator::genMagic(MethodDesc *md, uint32 numArgs, Opnd **src
             res = irBuilder.genConv(resType, resType->tag, mod, arg0);
         }
         pushOpnd(res);
-        return;
+        return true;
     }
 
     //
@@ -3808,7 +3377,7 @@ void JavaByteCodeTranslator::genMagic(MethodDesc *md, uint32 numArgs, Opnd **src
         assert(numArgs == 1);
         Opnd* res = irBuilder.genCmp(cmpResType, arg0->getType()->tag, Cmp_EQ, arg0, irBuilder.genLdConstant((POINTER_SIZE_SINT)theConst));
         pushOpnd(res);
-        return;
+        return true;
     }
 
 
@@ -3836,7 +3405,7 @@ void JavaByteCodeTranslator::genMagic(MethodDesc *md, uint32 numArgs, Opnd **src
         Opnd* op1 = commuteOpnds ? arg0 : arg1;
         Opnd* res = irBuilder.genCmp(cmpResType, arg0->getType()->tag, cm, op0, op1);
         pushOpnd(res);
-        return;
+        return true;
     }
 
    
@@ -3850,7 +3419,7 @@ void JavaByteCodeTranslator::genMagic(MethodDesc *md, uint32 numArgs, Opnd **src
         } else {
             pushOpnd(irBuilder.genAdd(resType, mod, arg0, arg1)); 
         }
-        return;
+        return true;
     }
     if (!strcmp(mname, "minus")){ 
         assert(numArgs==2); 
@@ -3861,22 +3430,22 @@ void JavaByteCodeTranslator::genMagic(MethodDesc *md, uint32 numArgs, Opnd **src
         } else {
             pushOpnd(irBuilder.genSub(resType, mod, arg0, arg1)); 
         }
-        return;
+        return true;
     }
-    if (!strcmp(mname, "or"))   { assert(numArgs==2); pushOpnd(irBuilder.genOr (resType, arg0, arg1)); return;}
-    if (!strcmp(mname, "xor"))  { assert(numArgs==2); pushOpnd(irBuilder.genXor(resType, arg0, arg1)); return;}
-    if (!strcmp(mname, "and"))  { assert(numArgs==2); pushOpnd(irBuilder.genAnd(resType, arg0, arg1)); return;}
-    if (!strcmp(mname, "not"))  { assert(numArgs==1); pushOpnd(irBuilder.genNot(resType, arg0)); return;}
-    if (!strcmp(mname, "diff")) { assert(numArgs==2); pushOpnd(irBuilder.genSub(resType, mod, arg0, arg1)); return;}
+    if (!strcmp(mname, "or"))   { assert(numArgs==2); pushOpnd(irBuilder.genOr (resType, arg0, arg1)); return true;}
+    if (!strcmp(mname, "xor"))  { assert(numArgs==2); pushOpnd(irBuilder.genXor(resType, arg0, arg1)); return true;}
+    if (!strcmp(mname, "and"))  { assert(numArgs==2); pushOpnd(irBuilder.genAnd(resType, arg0, arg1)); return true;}
+    if (!strcmp(mname, "not"))  { assert(numArgs==1); pushOpnd(irBuilder.genNot(resType, arg0)); return true;}
+    if (!strcmp(mname, "diff")) { assert(numArgs==2); pushOpnd(irBuilder.genSub(resType, mod, arg0, arg1)); return true;}
 
     
     //
     // shifts
     //
     Modifier shMod(ShiftMask_Masked);
-    if (!strcmp(mname, "lsh"))      {assert(numArgs==2); pushOpnd(irBuilder.genShl(resType, shMod|SignedOp, arg0, arg1));  return;}
-    else if (!strcmp(mname, "rsha")){assert(numArgs==2); pushOpnd(irBuilder.genShr(resType, shMod|SignedOp, arg0, arg1)); return;}
-    else if (!strcmp(mname, "rshl")){assert(numArgs==2); pushOpnd(irBuilder.genShr(resType, shMod |UnsignedOp, arg0, arg1)); return;}
+    if (!strcmp(mname, "lsh"))      {assert(numArgs==2); pushOpnd(irBuilder.genShl(resType, shMod|SignedOp, arg0, arg1));  return true;}
+    else if (!strcmp(mname, "rsha")){assert(numArgs==2); pushOpnd(irBuilder.genShr(resType, shMod|SignedOp, arg0, arg1)); return true;}
+    else if (!strcmp(mname, "rshl")){assert(numArgs==2); pushOpnd(irBuilder.genShr(resType, shMod |UnsignedOp, arg0, arg1)); return true;}
 
     
     //
@@ -3904,7 +3473,7 @@ void JavaByteCodeTranslator::genMagic(MethodDesc *md, uint32 numArgs, Opnd **src
         }
         Opnd* res = irBuilder.genTauLdInd(AutoCompress_No, resType, resType->tag, effectiveAddress, tauSafe, tauSafe);
         pushOpnd(res);
-        return;
+        return true;
     }
 
     //
@@ -3917,7 +3486,7 @@ void JavaByteCodeTranslator::genMagic(MethodDesc *md, uint32 numArgs, Opnd **src
             effectiveAddress = irBuilder.genAddScaledIndex(arg0, srcOpnds[2]);
         }
         irBuilder.genTauStInd(arg1->getType(), effectiveAddress, arg1, tauSafe, tauSafe, tauSafe);
-        return;
+        return true;
     }
 
     if (!strcmp(mname, "attempt")) {
@@ -3929,101 +3498,99 @@ void JavaByteCodeTranslator::genMagic(MethodDesc *md, uint32 numArgs, Opnd **src
         Opnd* opnds[3] = {effectiveAddress, arg1, srcOpnds[2]};
         Opnd* res = irBuilder.genJitHelperCall(LockedCompareAndExchange, resType, 3, opnds);
         pushOpnd(res);
-        return;
+        return true;
     }
 
     //
     //Arrays
     //
-    if (!strcmp(mname, "create")) { assert(numArgs==1); pushOpnd(irBuilder.genNewArray(resType->asNamedType(),arg0)); return;} 
+    if (!strcmp(mname, "create")) { assert(numArgs==1); pushOpnd(irBuilder.genNewArray(resType->asNamedType(),arg0)); return true;} 
     if (!strcmp(mname, "set")) {
         assert(numArgs == 3);
         Opnd* arg2 = srcOpnds[2];
-        Type* opType = convertMagicType2HIR(typeManager, arg2->getType());
+        Type* opType = convertVMMagicType2HIR(typeManager, arg2->getType());
         irBuilder.genStElem(opType, arg0, arg1, arg2, tauSafe, tauSafe, tauSafe); 
-        return;
+        return true;
     }
     if (!strcmp(mname, "get")) {
         assert(numArgs == 2);
         Opnd* res = irBuilder.genLdElem(resType, arg0, arg1, tauSafe, tauSafe);
         pushOpnd(res);
-        return;
+        return true;
     }
     if (!strcmp(mname, "length")) {    
         pushOpnd(irBuilder.genArrayLen(typeManager.getInt32Type(), Type::Int32, arg0));
-        return;
+        return true;
     }
 
-    assert(0);
-    return;
+    return false;
 }
 
 
-void JavaByteCodeTranslator::genVMHelper(MethodDesc *md, uint32 numArgs, Opnd **srcOpnds, Type *returnType) {
-    Type* resType = isMagicClass(returnType) ? convertMagicType2HIR(typeManager, returnType) : returnType;
-    const char* mname = md->getName();
+bool JavaByteCodeTranslator::genVMHelper(const char* mname, uint32 numArgs, Opnd **srcOpnds, Type *returnType) {
+    Type* resType = isVMMagicClass(returnType->getName()) ? convertVMMagicType2HIR(typeManager, returnType) : returnType;
 
     if (!strcmp(mname,"getTlsBaseAddress")) {
         assert(numArgs == 0);
         Opnd* res = irBuilder.genVMHelperCall(CompilationInterface::Helper_GetTLSBase, resType, numArgs, srcOpnds);
         pushOpnd(res);
-        return;
+        return true;
     }
 
     if (!strcmp(mname,"newResolvedUsingAllocHandleAndSize")) {
         assert(numArgs == 2);
         Opnd* res = irBuilder.genVMHelperCall(CompilationInterface::Helper_NewObj_UsingVtable, resType, numArgs, srcOpnds);
         pushOpnd(res);
-        return;
+        return true;
     }
 
     if (!strcmp(mname,"newVectorUsingAllocHandle")) {
         assert(numArgs == 2);
         Opnd* res = irBuilder.genVMHelperCall(CompilationInterface::Helper_NewVector_UsingVtable, resType, numArgs, srcOpnds);
         pushOpnd(res);
-        return;
+        return true;
     }
 
     if (!strcmp(mname,"monitorEnter")) {
         assert(numArgs == 1);
         irBuilder.genVMHelperCall(CompilationInterface::Helper_ObjMonitorEnter, resType, numArgs, srcOpnds);
-        return;
+        return true;
     }
 
     if (!strcmp(mname,"monitorExit")) {
         assert(numArgs == 1);
         irBuilder.genVMHelperCall(CompilationInterface::Helper_ObjMonitorExit, resType, numArgs, srcOpnds);
-        return;
+        return true;
     }
 
     if (!strcmp(mname,"writeBarrier")) {
         assert(numArgs == 3);
         irBuilder.genVMHelperCall(CompilationInterface::Helper_WriteBarrier, resType, numArgs, srcOpnds);
-        return;
+        return true;
     }
 
     if (!strcmp(mname,"getInterfaceVTable")) {
         assert(numArgs == 2);
         Opnd* res = irBuilder.genVMHelperCall(CompilationInterface::Helper_LdInterface, resType, numArgs, srcOpnds);
         pushOpnd(res);
-        return;
+        return true;
     }
 
     if (!strcmp(mname,"checkCast")) {
         assert(numArgs == 2);
         Opnd* res = irBuilder.genVMHelperCall(CompilationInterface::Helper_Cast, resType, numArgs, srcOpnds);
         pushOpnd(res);
-        return;
+        return true;
     }
 
     if (!strcmp(mname,"instanceOf")) {
         assert(numArgs == 2);
         Opnd* res = irBuilder.genVMHelperCall(CompilationInterface::Helper_IsInstanceOf, resType, numArgs, srcOpnds);
         pushOpnd(res);
-        return;
+        return true;
     }
 
-    assert(0);
+    return false;
 }
 
 } //namespace Jitrino 
