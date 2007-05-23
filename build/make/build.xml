@@ -411,15 +411,16 @@
             <property name="hy.test.vm.name" value="drl"/>
             <property name="test.jre.home" value="${build.deploy.dir}/jdk/jre"/>
             <property name="short.report" value="true"/>
+            <property name="hy.test.vmargs" value="-XX:-vm.assert_dialog ${test.vmargs}"/>
         </ant>
-        <!--ant antfile="targets/kernel.test.xml" target="kernel.test" output="${build.semi.dir}/kernel.log"/-->
+        <ant antfile="targets/kernel.test.xml" target="kernel.test" output="${build.semi.dir}/kernel.log"/>
         <ant antfile="targets/ehwa.test.xml" target="ehwa" output="${build.semi.dir}/ehwa.log"/>
-        <ant target="test" output="${build.semi.dir}/test.log"/>
-        <!--sequential>
+        <!--ant target="test" output="${build.semi.dir}/test.log"/-->
+        <sequential>
             <ant target="cunit.test" output="${build.semi.dir}/cunit.log"/>
             <ant target="smoke.test" output="${build.semi.dir}/smoke.log"/>
             <ant target="jvmti.test" output="${build.semi.dir}/jvmti.log"/>
-        </sequential-->
+        </sequential>
         </parallel>
     </target>
 
