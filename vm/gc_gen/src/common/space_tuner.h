@@ -27,6 +27,8 @@
 #define GC_LOS_MIN_VARY_SIZE ( 2 * MB )
 //#define GC_FIXED_SIZE_TUNER
 
+extern POINTER_SIZE_INT max_heap_size_bytes;
+
 //For_LOS_extend
 enum Transform_Kind {
   TRANS_NOTHING = 0,
@@ -36,19 +38,22 @@ enum Transform_Kind {
 
 typedef struct Space_Tuner{
     Transform_Kind kind;
-
+    /*This flag is set if the los tuning status changes in the process of tuning*/
+    Boolean reverse;
     POINTER_SIZE_INT tuning_size;
-    POINTER_SIZE_INT conservative_tuning_size;
-    POINTER_SIZE_INT least_tuning_size;
     /*Used for LOS_Shrink*/
     Block_Header* interim_blocks;
+    /*This flag is set when tuning strategy decide to tune los size.
+      *i.e. wasted memory is greater than wast_threshold.
+      */
     Boolean need_tune;
+    /*This flag is set if gc is caused by los alloc failure.*/
     Boolean force_tune;
     
-    /*LOS alloc speed sciecne last los variation*/    
+    /*LOS alloc speed since last major*/
     POINTER_SIZE_INT speed_los;
     POINTER_SIZE_INT old_speed_los;
-    /*MOS alloc speed sciecne last los variation*/    
+    /*MOS alloc speed since last major*/
     POINTER_SIZE_INT speed_mos;
     POINTER_SIZE_INT old_speed_mos;
     
@@ -61,22 +66,17 @@ typedef struct Space_Tuner{
     /*NOS survive size of last minor, this could be the least meaningful space unit when talking about tuning.*/
     POINTER_SIZE_INT current_ds;
 
-    /*Threshold for deta wast*/
-    POINTER_SIZE_INT threshold;
+    /*Threshold for deta waste*/
+    POINTER_SIZE_INT threshold_waste;
     /*Minimun tuning size for los variation*/
     POINTER_SIZE_INT min_tuning_size;
-
-    /*Cost of normal major compaction*/
-    unsigned int fast_cost;
-    /*Cost of major compaction when changing LOS size*/    
-    unsigned int slow_cost;    
 }Space_Tuner;
 
-void gc_space_tune_prepare(GC* gc, unsigned int cause);
-void gc_space_tune_before_gc(GC* gc, unsigned int cause);
-void gc_space_tune_before_gc_fixed_size(GC* gc, unsigned int cause);
-Boolean gc_space_retune(GC *gc);
+void gc_compute_space_tune_size_before_marking(GC* gc, unsigned int cause);
+void gc_compute_space_tune_size_after_marking(GC *gc);
 void gc_space_tuner_reset(GC* gc);
 void gc_space_tuner_initialize(GC* gc);
+void gc_space_tuner_init_fake_blocks_for_los_shrink(GC* gc);
+void gc_space_tuner_release_fake_blocks_for_los_shrink(GC* gc);
 
 #endif /* _SPACE_TUNER_H_ */

@@ -300,9 +300,6 @@ void lspace_sliding_compact(Collector* collector, Lspace* lspace)
     POINTER_SIZE_INT target_obj_end = (POINTER_SIZE_INT)p_target_obj + obj_size;
     if( p_obj != p_target_obj){
       memmove(p_target_obj, p_obj, obj_size);
-      /*Fixme: For LOS_Shrink debug*/
-//      unsigned int padding_lenth = ALIGN_UP_TO_KILO(target_obj_end) - target_obj_end;
-//      memset(p_target_obj, 0, padding_lenth);
     }
     set_obj_info(p_target_obj, 0);
     p_obj = lspace_get_next_marked_object(lspace, &iterate_index);  

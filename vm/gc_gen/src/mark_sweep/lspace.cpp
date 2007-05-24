@@ -111,7 +111,6 @@ void lspace_collection(Lspace* lspace)
   lspace in that function lspace_get_next_marked_object is not true*/  
   if(!lspace->move_object) lspace_sweep(lspace);
   lspace->move_object = FALSE;
-//  printf("lspace: %d MB \n", lspace->committed_heap_size / MB);
   return;
 }
 

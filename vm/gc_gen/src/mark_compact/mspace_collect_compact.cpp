@@ -29,72 +29,30 @@ Space* gc_get_nos(GC_Gen* gc);
 static volatile Block_Header* next_block_for_compact;
 static volatile Block_Header* next_block_for_target;
 
-void mspace_update_info_for_los_extension(Mspace *mspace)
-{ 
-  Space_Tuner *tuner = mspace->gc->tuner;
-  
-  if(tuner->kind != TRANS_FROM_MOS_TO_LOS) return;
-  
-  POINTER_SIZE_INT tune_size = tuner->tuning_size;
-  unsigned int tune_blocks = (unsigned int)(tune_size >> GC_BLOCK_SHIFT_COUNT);
-
-#ifdef USE_32BITS_HASHCODE
-  unsigned int index = 0;
-  for(; index < tune_blocks; index++){
-    Block* curr_block = &mspace->blocks[index];
-    hashcode_buf_destory(((Block_Header*)curr_block)->hashcode_buf);
-  }
-#endif
-
-  mspace->blocks = &mspace->blocks[tune_blocks];
-  mspace->heap_start = mspace->blocks;
-  mspace->committed_heap_size -= tune_size;
-  mspace->reserved_heap_size -= tune_size;
-  mspace->first_block_idx += tune_blocks;
-  mspace->num_managed_blocks -= tune_blocks;
-  mspace->num_total_blocks -= tune_blocks;
-  if(mspace->num_used_blocks > tune_blocks)
-    mspace->num_used_blocks -= tune_blocks;
-  else
-    mspace->num_used_blocks = 0;
-}
-
-void mspace_update_info_for_los_shrink(Mspace* mspace)
+void mspace_update_info_after_space_tuning(Mspace* mspace)
 {
   Space_Tuner *tuner = mspace->gc->tuner;
-  if(tuner->kind != TRANS_FROM_LOS_TO_MOS) return;
-
   POINTER_SIZE_INT tune_size = tuner->tuning_size;
   unsigned int tune_blocks = (unsigned int)(tune_size >> GC_BLOCK_SHIFT_COUNT);
-
-  /*Update mspace infomation.*/
-  mspace->blocks = (Block*)((POINTER_SIZE_INT)mspace->blocks - tune_size);
-  mspace->heap_start = (void*)(mspace->blocks);
-  mspace->committed_heap_size += tune_size;
-  mspace->first_block_idx -= tune_blocks;
-  mspace->num_managed_blocks += tune_blocks;
-  mspace->num_total_blocks += tune_blocks;
-}
-
-/*Copy the fake blocks into real blocks, reconnect these new block into main list of mspace.*/
-void mspace_settle_fake_blocks_for_los_shrink(Mspace* mspace)
-{
-  Space_Tuner *tuner = mspace->gc->tuner;  
-  if(tuner->kind != TRANS_FROM_LOS_TO_MOS) return;  
-
-  POINTER_SIZE_INT tune_size = tuner->tuning_size;
-  unsigned int tune_blocks = (unsigned int)(tune_size >> GC_BLOCK_SHIFT_COUNT);
-
-  Block* blocks = (Block*)((POINTER_SIZE_INT)mspace->blocks - tune_size);
-  unsigned int i;
-  for(i=0; i < tune_blocks; i++){
-    Block_Header* real_block = (Block_Header*)&(blocks[i]);
-    Block_Header* fake_block = &tuner->interim_blocks[i];
-    memcpy((void*)real_block, (void*)fake_block, sizeof(Block_Header));
-    real_block->next = (Block_Header*)((POINTER_SIZE_INT)real_block + GC_BLOCK_SIZE_BYTES);
+  
+  if(tuner->kind == TRANS_FROM_MOS_TO_LOS){
+    mspace->blocks = &mspace->blocks[tune_blocks];
+    mspace->heap_start = mspace->blocks;
+    mspace->committed_heap_size -= tune_size;
+    mspace->reserved_heap_size -= tune_size;
+    mspace->first_block_idx += tune_blocks;
+    mspace->num_managed_blocks -= tune_blocks;
+    mspace->num_total_blocks -= tune_blocks;
+    if(mspace->num_used_blocks > tune_blocks) mspace->num_used_blocks -= tune_blocks;
+    else mspace->num_used_blocks = 0;
+  }else if(tuner->kind == TRANS_FROM_LOS_TO_MOS){
+    mspace->blocks = (Block*)((POINTER_SIZE_INT)mspace->blocks - tune_size);
+    mspace->heap_start = (void*)(mspace->blocks);
+    mspace->committed_heap_size += tune_size;
+    mspace->first_block_idx -= tune_blocks;
+    mspace->num_managed_blocks += tune_blocks;
+    mspace->num_total_blocks += tune_blocks;
   }
-
-  return;
 }
 
 void mspace_reset_after_compaction(Mspace* mspace)
@@ -158,6 +116,9 @@ void gc_init_block_for_collectors(GC* gc, Mspace* mspace)
   Block_Header* block;
   Space_Tuner* tuner = gc->tuner;
   Block_Header* nos_last_block;
+  Block_Header* mos_first_block = (Block_Header*)&mspace->blocks[0];  
+  unsigned int trans_blocks = (unsigned int)(tuner->tuning_size >> GC_BLOCK_SHIFT_COUNT);  
+  
   /*Needn't change LOS size.*/
   if(tuner->kind == TRANS_NOTHING){
     for(i=0; i<gc->num_active_collectors; i++){
@@ -182,8 +143,7 @@ void gc_init_block_for_collectors(GC* gc, Mspace* mspace)
     else
       /*If nos->num_managed_blocks is zero, we take mos_last_block as nos_last_block instead.*/
       nos_last_block = (Block_Header*)&mspace->blocks[mspace->num_managed_blocks - 1];
-    Block_Header* mos_first_block = (Block_Header*)&mspace->blocks[0];
-    unsigned int trans_blocks = (unsigned int)(tuner->tuning_size >> GC_BLOCK_SHIFT_COUNT);
+
     nos_last_block->next = mos_first_block;
     ((Block_Header*)&(mspace->blocks[trans_blocks - 1]))->next = NULL;
     
@@ -201,39 +161,17 @@ void gc_init_block_for_collectors(GC* gc, Mspace* mspace)
     return;
   }else
   {
-    Block_Header* mos_first_block = (Block_Header*)&mspace->blocks[0];
-    unsigned int trans_blocks = (unsigned int)(tuner->tuning_size >> GC_BLOCK_SHIFT_COUNT);
-    gc->tuner->interim_blocks = (Block_Header*)STD_MALLOC(trans_blocks * sizeof(Block_Header));
-    Block_Header* los_trans_fake_blocks = gc->tuner->interim_blocks;
-    memset(los_trans_fake_blocks, 0, trans_blocks * sizeof(Block_Header));
-    void* trans_base = (void*)((POINTER_SIZE_INT)mos_first_block - tuner->tuning_size);
-    unsigned int start_idx = GC_BLOCK_INDEX_FROM(gc->heap_start, trans_base);
-    Block_Header* last_block = los_trans_fake_blocks;
-
-    for(i = 0; i < trans_blocks; i ++){
-        Block_Header* curr_block = &los_trans_fake_blocks[i];
-        curr_block->block_idx = start_idx + i;
-        curr_block->base = (void*)((POINTER_SIZE_INT)trans_base + i * GC_BLOCK_SIZE_BYTES + GC_BLOCK_HEADER_SIZE_BYTES);
-        curr_block->free = curr_block->base ;
-        curr_block->new_free = curr_block->free;
-        curr_block->ceiling = (void*)((POINTER_SIZE_INT)curr_block->base + GC_BLOCK_BODY_SIZE_BYTES);
-        curr_block->status = BLOCK_COMPACTED;
-#ifdef USE_32BITS_HASHCODE
-        curr_block->hashcode_buf = hashcode_buf_create();
-#endif
-        last_block->next = curr_block;
-        last_block = curr_block;
-    }
-    last_block->next = mos_first_block;
+    gc_space_tuner_init_fake_blocks_for_los_shrink(gc);
 
     Collector* collector = gc->collectors[0];
-    collector->cur_target_block = los_trans_fake_blocks;
+    collector->cur_target_block = tuner->interim_blocks;
     collector->cur_target_block->status = BLOCK_TARGET;
+
     if(trans_blocks >= gc->num_active_collectors)
       collector->cur_compact_block = mos_first_block;
     else
-      collector->cur_compact_block = los_trans_fake_blocks;
-            
+      collector->cur_compact_block = gc->tuner->interim_blocks;
+
     collector->cur_compact_block->status = BLOCK_IN_COMPACT;
     
     for(i=1; i< gc->num_active_collectors; i++){

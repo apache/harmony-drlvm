@@ -132,23 +132,34 @@ void gc_parse_options(GC* gc)
   if (is_property_set("gc.mx", VM_PROPERTIES) == 1) {
     max_heap_size = get_size_property("gc.mx");
 
-    if (max_heap_size < min_heap_size)
+    if (max_heap_size < min_heap_size){
       max_heap_size = min_heap_size;
-    if (0 == max_heap_size) 
+      printf("Max heap size: too small, reset to %d MB!\n", max_heap_size/MB);
+    }
+    if (0 == max_heap_size){
       max_heap_size = HEAP_SIZE_DEFAULT;
+      printf("Max heap size: zero, reset to %d MB! \n", max_heap_size/MB);
+    }
  
     min_heap_size = max_heap_size / 10;
-    if (min_heap_size < min_heap_size_bytes) min_heap_size = min_heap_size_bytes;
+    if (min_heap_size < min_heap_size_bytes){
+      min_heap_size = min_heap_size_bytes;
+//      printf("Min heap size: too small, reset to %d MB! \n", min_heap_size/MB);
+    }
   }
 
   if (is_property_set("gc.ms", VM_PROPERTIES) == 1) {
     min_heap_size = get_size_property("gc.ms");
-    if (min_heap_size < min_heap_size_bytes) 
+    if (min_heap_size < min_heap_size_bytes){
       min_heap_size = min_heap_size_bytes;
+      printf("Min heap size: too small, reset to %d MB! \n", min_heap_size/MB);    
+    } 
   }
 
-  if (min_heap_size > max_heap_size)
+  if (min_heap_size > max_heap_size){
     max_heap_size = min_heap_size;
+    printf("Max heap size: too small, reset to %d MB\n", max_heap_size / MB);
+  }
 
   min_heap_size_bytes = min_heap_size;
   max_heap_size_bytes = max_heap_size;
@@ -251,6 +262,11 @@ void gc_assign_free_area_to_mutators(GC* gc)
   gc_gen_assign_free_area_to_mutators((GC_Gen*)gc);
 }
 
+void gc_adjust_heap_size(GC* gc, int64 pause_time)
+{
+  gc_gen_adjust_heap_size((GC_Gen*)gc, pause_time);
+}
+
 void gc_copy_interior_pointer_table_to_rootset();
 
 void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
@@ -263,18 +279,10 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
   gc->cause = gc_cause;
   gc_decide_collection_kind((GC_Gen*)gc, gc_cause);
 
-
-  //For_LOS_extend!
-#ifdef GC_FIXED_SIZE_TUNER
-  gc_space_tune_before_gc_fixed_size(gc, gc_cause);
-#else
-  gc_space_tune_prepare(gc, gc_cause);
-  gc_space_tune_before_gc(gc, gc_cause);
-#endif
+  gc_compute_space_tune_size_before_marking(gc, gc_cause);
 
 #ifdef MARK_BIT_FLIPPING
-  if(gc_match_kind(gc, MINOR_COLLECTION))
-    mark_bit_flip();
+  if(gc_match_kind(gc, MINOR_COLLECTION)) mark_bit_flip();
 #endif
   
   gc_metadata_verify(gc, TRUE);
@@ -291,21 +299,22 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
   /* this has to be done after all mutators are suspended */
   gc_reset_mutator_context(gc);
 
-  if(!IGNORE_FINREF )
-    gc_set_obj_with_fin(gc);
+  if(!IGNORE_FINREF ) gc_set_obj_with_fin(gc);
 
   gc_gen_reclaim_heap((GC_Gen*)gc);
   
   gc_reset_interior_pointer_table();
-    
+
   gc_metadata_verify(gc, FALSE);
 
   int64 pause_time = time_now() - start_time;  
   gc->time_collections += pause_time;
+
+  gc_adjust_heap_size(gc, pause_time);
+
   gc_gen_adapt((GC_Gen*)gc, pause_time);
 
-  if(gc_is_gen_mode())
-    gc_prepare_mutator_remset(gc);
+  if(gc_is_gen_mode()) gc_prepare_mutator_remset(gc);
   
   if(!IGNORE_FINREF ){
     gc_put_finref_to_vm(gc);
@@ -317,16 +326,12 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
 #endif
   }
 
-  //For_LOS_extend!
   gc_space_tuner_reset(gc);
-  
+
   gc_assign_free_area_to_mutators(gc);
-  
+
   vm_resume_threads_after();
   return;
 }
-
-
-
 
 

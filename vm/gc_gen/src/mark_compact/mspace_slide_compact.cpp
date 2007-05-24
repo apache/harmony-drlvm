@@ -292,13 +292,44 @@ static inline Partial_Reveal_Object *get_next_first_src_obj(Mspace *mspace)
   }
 }
 
+static inline void gc_init_block_for_fix_repointed_refs(GC* gc, Mspace* mspace)
+{
+  Space_Tuner* tuner = gc->tuner;
+  POINTER_SIZE_INT tuning_size = tuner->tuning_size;
+  /*If LOS_Shrink, we just fix the repointed refs from the start of old mspace.*/
+  if((tuner->kind == TRANS_NOTHING) || (tuner->kind == TRANS_FROM_LOS_TO_MOS)){
+    mspace_block_iterator_init(mspace);
+    return;
+  }else{
+    /*If LOS_Extend, we fix from the new start of mspace, because the block list is start from there.*/
+    mspace->block_iterator = (Block_Header*)((POINTER_SIZE_INT)mspace->blocks + tuning_size);
+  }  
+  return;
+}
+
 static inline void gc_init_block_for_sliding_compact(GC *gc, Mspace *mspace)
 {
   /* initialize related static variables */
   next_block_for_dest = NULL;
   current_dest_block.block = NULL;
   current_dest_block.lock = FREE_LOCK;
-  mspace_block_iterator_init(mspace);
+
+  Space_Tuner* tuner = gc->tuner;
+  POINTER_SIZE_INT tuning_size = tuner->tuning_size;
+
+  if( tuner->kind == TRANS_NOTHING ){
+    /*If space is not tuned, we just start from mspace->heap_start.*/
+    mspace_block_iterator_init(mspace);
+    return;
+  }else if (tuner->kind == TRANS_FROM_MOS_TO_LOS){
+    /*If LOS_Extend, we compact from the new start of mspace, because the block list is start from there.*/
+    mspace->block_iterator = (Block_Header*)((POINTER_SIZE_INT)mspace->blocks + tuning_size);
+  }else{
+    /*If LOS_Shrink, we compact from the new start of mspace too. 
+      *This is different from the operations in function gc_init_block_for_fix_repointed_refs, 
+      *because we want to compact mspace to the new start.*/
+    mspace->block_iterator = (Block_Header*)((POINTER_SIZE_INT)mspace->blocks - tuning_size);
+  }
 
   return;
 }
@@ -353,8 +384,8 @@ static void mspace_sliding_compact(Collector* collector, Mspace* mspace)
 
 }
 
-//For_LOS_extend
-void mspace_restore_block_chain(Mspace* mspace)
+/*For LOS_Extend*/
+static void mspace_restore_block_chain(Mspace* mspace)
 {
   GC* gc = mspace->gc;
   Fspace* fspace = (Fspace*)gc_get_nos((GC_Gen*)gc);
@@ -381,32 +412,22 @@ void slide_compact_mspace(Collector* collector)
   unsigned int num_active_collectors = gc->num_active_collectors;
 
   /* Pass 1: **************************************************
-     mark all live objects in heap, and save all the slots that 
-            have references  that are going to be repointed */
+    *mark all live objects in heap, and save all the slots that 
+    *have references  that are going to be repointed.
+    */
   unsigned int old_num = atomic_cas32( &num_marking_collectors, 0, num_active_collectors+1);
 
   if(gc_match_kind(gc, FALLBACK_COLLECTION))
-    fallback_mark_scan_heap(collector);
+    mark_scan_heap_for_fallback(collector);
   else if(gc->tuner->kind != TRANS_NOTHING)
-    los_adaptation_mark_scan_heap(collector);
+    mark_scan_heap_for_space_tune(collector);
   else
     mark_scan_heap(collector);
-  
   old_num = atomic_inc32(&num_marking_collectors);
+
+   /* last collector's world here */
   if( ++old_num == num_active_collectors ){
-    /* last collector's world here */
-    /*Retune space tuner to insure the tuning size is not to great*/
-//    Boolean retune_result;
-    if(gc->tuner->kind != TRANS_NOTHING) gc_space_retune(gc);
-//    if(gc->tuner->kind == TRANS_FROM_LOS_TO_MOS) printf("los shrink...\n");
-//    if(gc->tuner->kind == TRANS_FROM_MOS_TO_LOS) printf("los extend...\n");
-    
-/*    if(!retune_result){
-      gc->collect_result = FALSE;
-      num_marking_collectors++; 
-      return;
-    }*/
-    
+    if( gc->tuner->kind != TRANS_NOTHING ) gc_compute_space_tune_size_after_marking(gc);
     assert(!(gc->tuner->tuning_size % GC_BLOCK_SIZE_BYTES));
     /* prepare for next phase */
     gc_init_block_for_collectors(gc, mspace);
@@ -426,12 +447,10 @@ void slide_compact_mspace(Collector* collector)
 #endif
 
     last_block_for_dest = NULL;
-    
     /* let other collectors go */
     num_marking_collectors++; 
   }
   while(num_marking_collectors != num_active_collectors + 1);
-//  if(!gc->collect_result) return;
 
   /* Pass 2: **************************************************
      assign target addresses for all to-be-moved objects */
@@ -445,40 +464,43 @@ void slide_compact_mspace(Collector* collector)
   mspace_compute_object_target(collector, mspace);
   
   old_num = atomic_inc32(&num_repointing_collectors);
+  /*last collector's world here*/
   if( ++old_num == num_active_collectors ){
-    /* single thread world */
-    /*LOS_Shrink: */
+    /*LOS_Shrink: but lspace->move_object could be set individually without shrinking LOS.*/
     if(lspace->move_object) lspace_compute_object_target(collector, lspace);
     gc->collect_result = gc_collection_result(gc);
     if(!gc->collect_result){
       num_repointing_collectors++;
       return;
     }
-    
     gc_reset_block_for_collectors(gc, mspace);
-    mspace_block_iterator_init(mspace);
+    gc_init_block_for_fix_repointed_refs(gc, mspace);
     num_repointing_collectors++; 
   }
   while(num_repointing_collectors != num_active_collectors + 1);
   if(!gc->collect_result) return;
 
   /* Pass 3: **************************************************
-     update all references whose objects are to be moved */  
+    *update all references whose objects are to be moved
+    */
   old_num = atomic_cas32( &num_fixing_collectors, 0, num_active_collectors+1);
   mspace_fix_repointed_refs(collector, mspace);
   old_num = atomic_inc32(&num_fixing_collectors);
+  /*last collector's world here */
   if( ++old_num == num_active_collectors ){
-    /* last collector's world here */
     lspace_fix_repointed_refs(collector, lspace);
     gc_fix_rootset(collector);
     gc_init_block_for_sliding_compact(gc, mspace);
-    /*LOS_Shrink: Fixme: This operation moves objects in LOS, and should be part of Pass 4*/
+    /*LOS_Shrink: This operation moves objects in LOS, and should be part of Pass 4
+      *lspace_sliding_compact is not binded with los shrink, we could slide compact los individually.
+      *So we use a flag lspace->move_object here, not tuner->kind == TRANS_FROM_LOS_TO_MOS.
+      */
     if(lspace->move_object)  lspace_sliding_compact(collector, lspace);
-    mspace_settle_fake_blocks_for_los_shrink(mspace);
-    /*Fixme: LOS_Shrink: set dest block for sliding compact*/
-    if(gc->tuner->kind == TRANS_FROM_LOS_TO_MOS)
-      mspace->block_iterator = (Block_Header*)((POINTER_SIZE_INT)mspace->blocks - (mspace->gc)->tuner->tuning_size);
-
+    /*The temp blocks for storing interim infomation is copied to the real place they should be.
+      *And the space of the blocks are freed, which is alloced in gc_space_tuner_init_fake_blocks_for_los_shrink.
+      */
+    last_block_for_dest = (Block_Header *)round_down_to_size((POINTER_SIZE_INT)last_block_for_dest->base, GC_BLOCK_SIZE_BYTES);
+    if(gc->tuner->kind == TRANS_FROM_LOS_TO_MOS) gc_space_tuner_release_fake_blocks_for_los_shrink(gc);
     num_fixing_collectors++;
   }
   while(num_fixing_collectors != num_active_collectors + 1);
@@ -502,11 +524,9 @@ void slide_compact_mspace(Collector* collector)
 #endif
   
   old_num = atomic_inc32(&num_restoring_collectors);
-  if( ++old_num == num_active_collectors ){
 
-    mspace_update_info_for_los_extension(mspace);
-    mspace_update_info_for_los_shrink(mspace);
-    
+  if( ++old_num == num_active_collectors ){
+    if(gc->tuner->kind != TRANS_NOTHING) mspace_update_info_after_space_tuning(mspace);
     num_restoring_collectors++;
   }
   while(num_restoring_collectors != num_active_collectors + 1);
@@ -529,7 +549,7 @@ void slide_compact_mspace(Collector* collector)
   mspace_reset_after_compaction(mspace);
   fspace_reset_for_allocation(fspace);
 
-  //For_LOS_extend
+  /*For LOS_Extend*/
   mspace_restore_block_chain(mspace);
 
   gc_set_pool_clear(gc->metadata->gc_rootset_pool);

@@ -388,7 +388,6 @@ typedef struct GC{
   Vector_Block* root_set;
   Vector_Block* uncompressed_root_set;
 
-  //For_LOS_extend
   Space_Tuner* tuner;
 
 }GC;
@@ -443,6 +442,9 @@ inline Boolean obj_belongs_to_nos(Partial_Reveal_Object* p_obj)
 
 extern void* los_boundary;
 
+/*This flag indicate whether lspace is using a sliding compaction
+ *Fixme: check if the performance is a problem with this global flag.
+ */
 extern Boolean* p_global_lspace_move_obj;
 inline Boolean obj_is_moved(Partial_Reveal_Object* p_obj)
 {  return ((p_obj >= los_boundary) || (*p_global_lspace_move_obj)); }

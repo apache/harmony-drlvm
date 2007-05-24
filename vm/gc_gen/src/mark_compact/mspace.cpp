@@ -75,8 +75,7 @@ void mspace_initialize(GC* gc, void* start, POINTER_SIZE_INT mspace_size, POINTE
   mspace->move_object = TRUE;
   mspace->gc = gc;
 
-  /*For_LOS adaptive: The threshold is initiated by half of MOS + NOS commit size.*/
-  mspace->expected_threshold = (unsigned int)( ( (float)mspace->committed_heap_size * (1.f + 1.f / gc->survive_ratio) ) * 0.5f );
+  mspace->expected_threshold_ratio = 0.5f;
 
   gc_set_mos((GC_Gen*)gc, (Space*)mspace);
 
@@ -96,21 +95,12 @@ void mspace_block_iterator_init_free(Mspace* mspace)
   mspace->block_iterator = (Block_Header*)&mspace->blocks[mspace->free_block_idx - mspace->first_block_idx];
 }
 
-//For_LOS_extend
 #include "../common/space_tuner.h"
 void mspace_block_iterator_init(Mspace* mspace)
 {
-  GC* gc = mspace->gc;
-  if(gc->tuner->kind == TRANS_FROM_MOS_TO_LOS){
-    unsigned int tuning_blocks = (unsigned int)((mspace->gc)->tuner->tuning_size >> GC_BLOCK_SHIFT_COUNT);
-    mspace->block_iterator = (Block_Header*)&(mspace->blocks[tuning_blocks]);
-    return;
-  }
-  
   mspace->block_iterator = (Block_Header*)mspace->blocks;
   return;
 }
-
 
 Block_Header* mspace_block_iterator_get(Mspace* mspace)
 {
@@ -165,15 +155,15 @@ void mspace_fix_after_copy_nursery(Collector* collector, Mspace* mspace)
 }
 
 /*For_LOS adaptive.*/
-void mspace_set_expected_threshold(Mspace* mspace, POINTER_SIZE_INT threshold)
+void mspace_set_expected_threshold_ratio(Mspace* mspace, float threshold_ratio)
 {
-    mspace->expected_threshold = threshold;
+    mspace->expected_threshold_ratio = threshold_ratio;
     return;
 }
 
-POINTER_SIZE_INT mspace_get_expected_threshold(Mspace* mspace)
+float mspace_get_expected_threshold_ratio(Mspace* mspace)
 {
-    return mspace->expected_threshold;
+    return mspace->expected_threshold_ratio;
 }
 
 

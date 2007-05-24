@@ -56,7 +56,7 @@ typedef struct Mspace{
   
   volatile Block_Header* block_iterator;    
   /*Threshold computed by NOS adaptive*/
-  POINTER_SIZE_INT expected_threshold;
+  float expected_threshold_ratio;
 }Mspace;
 
 void mspace_initialize(GC* gc, void* reserved_base, POINTER_SIZE_INT mspace_size, POINTER_SIZE_INT commit_size);
@@ -72,6 +72,6 @@ Block_Header* mspace_block_iterator_get(Mspace* mspace);
 
 void mspace_fix_after_copy_nursery(Collector* collector, Mspace* mspace);
 
-void mspace_set_expected_threshold(Mspace* mspace, unsigned int threshold);
+void mspace_set_expected_threshold_ratio(Mspace* mspace, float threshold_ratio);
 
 #endif //#ifdef _MSC_SPACE_H_

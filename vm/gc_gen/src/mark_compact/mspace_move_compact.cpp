@@ -170,7 +170,7 @@ void move_compact_mspace(Collector* collector)
   if(!gc_match_kind(gc, FALLBACK_COLLECTION))
        mark_scan_heap(collector);  
   else
-       fallback_mark_scan_heap(collector);
+       mark_scan_heap_for_fallback(collector);
 
   old_num = atomic_inc32(&num_marking_collectors);
   if( ++old_num == num_active_collectors ){
@@ -225,7 +225,6 @@ void move_compact_mspace(Collector* collector)
     /* last collector's world here */
     lspace_fix_repointed_refs(collector, lspace);   
     gc_fix_rootset(collector);
-    mspace_update_info_for_los_extension(mspace);
     num_fixing_collectors++; 
   }
   while(num_fixing_collectors != num_active_collectors + 1);

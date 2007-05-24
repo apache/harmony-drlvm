@@ -237,6 +237,7 @@ int32 gc_get_hashcode(Managed_Object_Handle p_object)
   if(!p_obj) return 0;
   assert(address_belongs_to_gc_heap(p_obj, p_global_gc));
   Obj_Info_Type info = get_obj_info_raw(p_obj);
+  unsigned int new_info = 0;
   int hash;
   
   switch(info & HASHCODE_MASK){
@@ -250,7 +251,13 @@ int32 gc_get_hashcode(Managed_Object_Handle p_object)
       hash = hashcode_lookup(p_obj,info);
       break;
     case HASHCODE_UNSET:
-      set_obj_info(p_obj, info | HASHCODE_SET_BIT);
+      new_info = (unsigned int)(info | HASHCODE_SET_BIT);
+      while (true) {
+        unsigned int temp = atomic_cas32(&p_obj->obj_info, new_info, info);
+        if (temp == info) break;
+        info = get_obj_info_raw(p_obj);
+        new_info =  (unsigned int)(info | HASHCODE_SET_BIT);
+      }
       hash = hashcode_gen((void*)p_obj);
       break;
     default:

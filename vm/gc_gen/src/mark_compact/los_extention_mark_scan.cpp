@@ -108,7 +108,7 @@ static volatile unsigned int num_finished_collectors = 0;
    So we abondoned this design. We no longer use the repset to remember repointed slots 
 */
   
-void los_adaptation_mark_scan_heap(Collector *collector)
+void mark_scan_heap_for_space_tune(Collector *collector)
 {
   GC* gc = collector->gc;
   GC_Metadata* metadata = gc->metadata;

@@ -125,7 +125,7 @@ static void identify_finalizable_objects(Collector *collector)
     for(; !vector_block_iterator_end(block, iter); iter = vector_block_iterator_advance(block, iter)){
       REF* p_ref = (REF *)iter;
       if(IS_FALLBACK_COMPACTION)
-      fallback_update_fw_ref(p_ref);  // in case that this collection is FALLBACK_COLLECTION
+        fallback_update_fw_ref(p_ref);  // in case that this collection is FALLBACK_COLLECTION
       Partial_Reveal_Object *p_obj = read_slot(p_ref);
       if(!p_obj)
         continue;
@@ -281,7 +281,7 @@ static void identify_dead_refs(GC *gc, Pool *pool)
       assert(p_obj);
       REF* p_referent_field = obj_get_referent_field(p_obj);
       if(IS_FALLBACK_COMPACTION)
-      fallback_update_fw_ref(p_referent_field);
+        fallback_update_fw_ref(p_referent_field);
       Partial_Reveal_Object *p_referent = read_slot(p_referent_field);
       
       if(!p_referent){  // referent field has been cleared
@@ -598,7 +598,7 @@ static void update_referent_field_ignore_finref(GC *gc, Pool *pool)
       assert(p_obj);
       REF* p_referent_field = obj_get_referent_field(p_obj);
       if(IS_FALLBACK_COMPACTION)
-      fallback_update_fw_ref(p_referent_field);
+        fallback_update_fw_ref(p_referent_field);
       Partial_Reveal_Object* p_referent = read_slot(p_referent_field);
       
       if(!p_referent){  // referent field has been cleared

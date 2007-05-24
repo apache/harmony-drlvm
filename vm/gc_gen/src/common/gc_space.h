@@ -161,7 +161,8 @@ inline void blocked_space_extend(Blocked_Space* space, unsigned int changed_size
 
   void* new_end = (void*)((POINTER_SIZE_INT)commit_base + commit_size);
   space->committed_heap_size = (POINTER_SIZE_INT)new_end - (POINTER_SIZE_INT)space->heap_start;
-  
+  /*Fixme: For_Heap_Adjust, but need fix if static mapping.*/
+  space->heap_end = new_end;
   /* init the grown blocks */
   Block_Header* block = (Block_Header*)commit_base;
   Block_Header* last_block = (Block_Header*)((Block*)block -1);

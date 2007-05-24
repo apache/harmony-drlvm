@@ -96,7 +96,7 @@ static void trace_object(Collector* collector, REF *p_ref)
 /* for marking phase termination detection */
 static volatile unsigned int num_finished_collectors = 0;
 
-void fallback_mark_scan_heap(Collector* collector)
+void mark_scan_heap_for_fallback(Collector* collector)
 { 
   GC* gc = collector->gc;
   GC_Metadata* metadata = gc->metadata;
@@ -208,4 +208,5 @@ void fallback_clear_fwd_obj_oi_init(Collector* collector)
   fspace_block_iterate_init((Fspace*)((GC_Gen*)collector->gc)->nos);
 }
 #endif
+
 

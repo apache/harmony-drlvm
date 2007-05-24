@@ -28,9 +28,7 @@
 void gc_reset_block_for_collectors(GC* gc, Mspace* mspace);
 void gc_init_block_for_collectors(GC* gc, Mspace* mspace);
 
-void mspace_update_info_for_los_extension(Mspace* mspace);
-void mspace_update_info_for_los_shrink(Mspace* mspace);
-void mspace_settle_fake_blocks_for_los_shrink(Mspace* mspace);
+void mspace_update_info_after_space_tuning(Mspace* mspace);
 void mspace_reset_after_compaction(Mspace* mspace);
 
 Block_Header* mspace_get_first_compact_block(Mspace* mspace);
@@ -41,8 +39,8 @@ Block_Header* mspace_get_next_target_block(Collector* collector, Mspace* mspace)
 void slide_compact_mspace(Collector* collector);
 void move_compact_mspace(Collector* collector);
 
-void fallback_mark_scan_heap(Collector* collector);
-void los_adaptation_mark_scan_heap(Collector *collector);
+void mark_scan_heap_for_fallback(Collector* collector);
+void mark_scan_heap_for_space_tune(Collector *collector);
 
 void mspace_extend_compact(Collector *collector);
 
