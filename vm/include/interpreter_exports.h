@@ -306,7 +306,7 @@ typedef struct {
  *
  * @param file - File to dump stack to
  * @param thread - the pointer to the thread*/
-   void (*stack_dump) (FILE *, VM_thread*);
+   void (*stack_dump) (int, VM_thread*);
 
 } Interpreter;
 

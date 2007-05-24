@@ -7,9 +7,6 @@ gc/Mark.java
 # HARMONY-2977
 io/Integers.java
 
-# HARMONY-3585
-shutdown/TestFatalError.java
-
 # HARMONY-3917
 gc/PhantomReferenceTest.java
 gc/WeakReferenceTest.java

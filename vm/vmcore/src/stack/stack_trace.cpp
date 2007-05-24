@@ -265,7 +265,13 @@ void st_print(FILE* f, hythread_t thread)
     fprintf(f, "The stack trace of the %p java thread:\n", vm_thread);
 
     if (interpreter_enabled()) {
-        interpreter.stack_dump(f, vm_thread);
+        int fd;
+#ifdef PLATFORM_NT
+        fd = _fileno(f);
+#else
+        fd = fileno(f);
+#endif
+        interpreter.stack_dump(fd, vm_thread);
         fflush(f);
         return;
     }

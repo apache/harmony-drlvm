@@ -2466,6 +2466,23 @@ void stack_dump(FILE *f, VM_thread *thread) {
     stackDump(f, *frame);
 }
 
+void stack_dump(int fd, VM_thread *thread) {
+    FILE *f;
+#ifdef PLATFORM_NT
+    fd = _dup(fd);
+    assert(fd != -1);
+    f = _fdopen(fd, "w");
+#else
+    fd = dup(fd);
+    assert(fd != -1);
+    f = fdopen(fd, "w");
+#endif
+    assert(f);
+    StackFrame *frame = getLastStackFrame(thread);
+    stackDump(f, *frame);
+    fclose(f);
+}
+
 void stack_dump(VM_thread *thread) {
     StackFrame *frame = getLastStackFrame(thread);
     stackDump(stderr, *frame);
