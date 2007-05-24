@@ -429,13 +429,17 @@ void NewArrayHelperInliner::doInline() {
 #endif
     int allocationHandle = (int)(POINTER_SIZE_INT)arrayType->getAllocationHandle();
     Type* elemType = arrayType->getElementType();
-    int elemSize = 4; //TODO: check if references are compressed!
-    if (elemType->isDouble() || elemType->isInt8()) {
-        elemSize = 8;
+    int elemSize = 0; //TODO: check if references are compressed!
+    if (elemType->isBoolean() || elemType->isInt1()) {
+        elemSize = 1;
     } else if (elemType->isInt2() || elemType->isChar()) {
         elemSize = 2;
-    } else  if (elemType->isInt1()) {
-        elemSize = 1;
+    } else if (elemType->isInt4() || elemType->isSingle()) {
+        elemSize = 4;
+    } else if (elemType->isInt8() || elemType->isDouble()) {
+        elemSize = 8;
+    } else {
+        elemSize = 4;
     }
 
     Opnd* tauSafeOpnd = opndManager->createSsaTmpOpnd(typeManager->getTauType());
