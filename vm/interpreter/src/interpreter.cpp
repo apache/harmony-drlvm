@@ -2466,6 +2466,10 @@ void stack_dump(FILE *f, VM_thread *thread) {
     stackDump(f, *frame);
 }
 
+#ifdef PLATFORM_NT
+#include <io.h>
+#endif
+
 void stack_dump(int fd, VM_thread *thread) {
     FILE *f;
 #ifdef PLATFORM_NT
