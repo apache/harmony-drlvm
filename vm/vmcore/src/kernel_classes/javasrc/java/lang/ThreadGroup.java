@@ -438,6 +438,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
      * @return Object[] array of 2 elements: first - Object[] array of active
      * child threads; second - Object[] array of child groups.
      */
+    @SuppressWarnings("unused")
     private Object[] getActiveChildren() {
         ArrayList<Thread> threadsCopy = new ArrayList<Thread>(threads.size());
         ArrayList<ThreadGroup> groupsCopy = new ArrayList<ThreadGroup>(groups.size());
