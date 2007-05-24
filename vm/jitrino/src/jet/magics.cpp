@@ -43,6 +43,9 @@ bool CodeGen::is_magic_class(const char* kname)
     static const unsigned nameLen = sizeof(unboxedName)-1;
 
     assert(kname!=NULL);
+    if (*kname=='L') {
+        return !strncmp(kname+1, unboxedName, nameLen);
+    }
     return !strncmp(kname, unboxedName, nameLen);
 }
 

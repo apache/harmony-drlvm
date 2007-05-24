@@ -49,12 +49,12 @@ const CallSig ci_helper_v(CCONV_HELPERS);
 const CallSig ci_helper_io(CCONV_HELPERS, i32, jobj);
 const CallSig ci_helper_linkerr(CCONV_HELPERS, jobj, i32, i32);
 
-void CodeGen::do_mov(const Val& dst_s, const Val& src_s)
+void CodeGen::do_mov(const Val& dst_s, const Val& src_s, bool skipTypeCheck)
 {
     assert(!dst_s.is_imm());
     jtype sjt = jtmov(src_s.jt());
     jtype djt = jtmov(dst_s.jt());
-    assert(sjt == djt);
+    assert(skipTypeCheck || sjt == djt);
     
     if (dst_s.is_mem() && src_s.is_mem()) {
         // Need to allocate a reg

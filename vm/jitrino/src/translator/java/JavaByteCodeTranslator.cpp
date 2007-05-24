@@ -39,39 +39,47 @@
 
 namespace Jitrino {
 
-// magics support    
-static bool isVMMagicClass(const char* name) {
+// magics support: both typenames and descriptor names are supported
+static bool isVMMagicClass(const char* kname) {
     static const char magicPackage[] = "org/vmmagic/unboxed/";
     static const unsigned magicPackageLen = sizeof(magicPackage)-1;
-
-    bool res =  !strncmp(name, magicPackage, magicPackageLen);
+    bool res = false;
+    if (*kname=='L') {
+        res = !strncmp(kname+1, magicPackage, magicPackageLen);
+    } else {
+        res = !strncmp(kname, magicPackage, magicPackageLen);
+    }
     return res;
 }
 
-Type* convertVMMagicType2HIR(TypeManager& tm, Type* type) {
-    if (!type->isObject() || !type->isNamedType() || type->isSystemObject()) {
-        return type;
+static bool matchType(const char* candidate, const char* typeName) {
+    if (candidate[0]=='L') {
+        size_t typeLen = strlen(typeName);
+        size_t candLen = strlen(candidate);
+        bool res = typeLen+2 == candLen && !strncmp(typeName, candidate+1, typeLen);
+        return res;
     }
+    return !strcmp(typeName, candidate);
+}
 
-    const char* name = type->getName();    
-
+static Type* convertVMMagicType2HIR(TypeManager& tm, const char* name) {
     assert(isVMMagicClass(name));
 
-    if (!strcmp(name, "org/vmmagic/unboxed/Address") 
+    if (matchType(name, "org/vmmagic/unboxed/Address")
         //TODO: ObjectReference must have a ManagedPointer/Object type
-        || !strcmp(name, "org/vmmagic/unboxed/ObjectReference")) 
+        || matchType(name, "org/vmmagic/unboxed/ObjectReference"))
     {
         return tm.getUnmanagedPtrType(tm.getInt8Type());
-    } else if (!strcmp(name, "org/vmmagic/unboxed/Word") 
-        || !strcmp(name, "org/vmmagic/unboxed/Offset")
-        || !strcmp(name, "org/vmmagic/unboxed/Extent")) 
+    } else if (matchType(name, "org/vmmagic/unboxed/Word")
+        || matchType(name, "org/vmmagic/unboxed/Offset")
+        || matchType(name, "org/vmmagic/unboxed/Extent"))
     {
         return tm.getUIntPtrType();
-    } else if (!strcmp(name, "org/vmmagic/unboxed/WordArray")
-        || !strcmp(name, "org/vmmagic/unboxed/OffsetArray")
-        || !strcmp(name, "org/vmmagic/unboxed/ExtentArray") 
-        || !strcmp(name, "org/vmmagic/unboxed/AddressArray") 
-        || !strcmp(name, "org/vmmagic/unboxed/ObjectReferenceArray")) 
+    } else if (matchType(name, "org/vmmagic/unboxed/WordArray")
+        || matchType(name, "org/vmmagic/unboxed/OffsetArray")
+        || matchType(name, "org/vmmagic/unboxed/ExtentArray") 
+        || matchType(name, "org/vmmagic/unboxed/AddressArray") 
+        || matchType(name, "org/vmmagic/unboxed/ObjectReferenceArray")) 
     {
 #ifdef _EM64T_
         return tm.getArrayType(tm.getInt64Type(), false);
@@ -83,9 +91,17 @@ Type* convertVMMagicType2HIR(TypeManager& tm, Type* type) {
     return NULL;
 }
 
+static Type* convertVMMagicType2HIR(TypeManager& tm, Type* type) {
+    if (!type->isObject() || !type->isNamedType() || type->isSystemObject()) {
+        return type;
+    }
+    const char* name = type->getName();    
+    return convertVMMagicType2HIR(tm, name);
+}
+
 //vm helpers support
 
-bool isVMHelperClass(const char* name) {
+static bool isVMHelperClass(const char* name) {
 #ifdef _IPF_
     return false;//natives are not tested on IPF.
 #else
@@ -729,10 +745,15 @@ JavaByteCodeTranslator::getstatic(uint32 constPoolIndex) {
     FieldDesc *field = compilationInterface.getStaticField(methodToCompile.getParentHandle(), constPoolIndex, false);
     if (field && field->isStatic()) {
         bool fieldValueInlined = false;
+        Type* fieldType = field->getFieldType();
+        assert(fieldType);
+        bool fieldIsMagic = isVMMagicClass(fieldType->getName());
+        if (fieldIsMagic) {
+            fieldType = convertVMMagicType2HIR(typeManager, fieldType);
+        }
         if (field->isInitOnly() && !field->getParentType()->needsInitialization()) {
             //the final static field of the initialized class
-            Type* fieldType = field->getFieldType();
-            if (field->getFieldType()->isNumeric() || field->getFieldType()->isBoolean()) {
+            if (field->getFieldType()->isNumeric() || field->getFieldType()->isBoolean() || fieldIsMagic) {
                 Opnd* constVal = NULL;
                 void* fieldAddr = field->getAddress();
                 switch(fieldType->tag) {
@@ -744,6 +765,14 @@ JavaByteCodeTranslator::getstatic(uint32 constPoolIndex) {
                     case Type::Single:  constVal=irBuilder.genLdConstant(*(float*)fieldAddr);break;
                     case Type::Double:  constVal=irBuilder.genLdConstant(*(double*)fieldAddr);break;
                     case Type::Boolean: constVal=irBuilder.genLdConstant(*(bool*)fieldAddr);break;
+                    case Type::UnmanagedPtr:  assert(fieldIsMagic); 
+#ifdef _IA32_
+                            constVal=irBuilder.genLdConstant(*(int32*)fieldAddr);break;
+#else
+                            assert(sizeof(void*)==8);
+                            constVal=irBuilder.genLdConstant(*(int64*)fieldAddr);break;
+#endif
+                            break;
                     default: assert(0); //??
                 }
                 if (constVal != NULL) {
@@ -753,16 +782,14 @@ JavaByteCodeTranslator::getstatic(uint32 constPoolIndex) {
             }
         } 
         if (!fieldValueInlined){
-            Type* fieldType = getFieldType(field,constPoolIndex);
-            assert(fieldType);
-            if (isVMMagicClass(fieldType->getName())) {
-                fieldType = convertVMMagicType2HIR(typeManager, fieldType);
-            }
-            pushOpnd(irBuilder.genLdStatic(fieldType,field));
+            pushOpnd(irBuilder.genLdStatic(fieldType, field));
         }
     } else if (typeManager.isLazyResolutionMode()) {
-        Type* type = compilationInterface.getFieldType(methodToCompile.getParentHandle(), constPoolIndex);
-        Opnd* res = irBuilder.genLdStaticWithResolve(type, methodToCompile.getParentType()->asObjectType(), constPoolIndex);
+        const char* fieldTypeName = const_pool_get_field_descriptor(methodToCompile.getParentHandle(), constPoolIndex);
+        bool fieldIsMagic = isVMMagicClass(fieldTypeName);
+        Type* fieldType = fieldIsMagic ? convertVMMagicType2HIR(typeManager, fieldTypeName) 
+                                       : compilationInterface.getFieldType(methodToCompile.getParentHandle(), constPoolIndex);
+        Opnd* res = irBuilder.genLdStaticWithResolve(fieldType, methodToCompile.getParentType()->asObjectType(), constPoolIndex);
         pushOpnd(res);
     } else {
         // generate helper call for throwing respective exception
@@ -779,11 +806,18 @@ JavaByteCodeTranslator::putstatic(uint32 constPoolIndex) {
     if (field && field->isStatic()) {
         Type* fieldType = getFieldType(field,constPoolIndex);
         assert(fieldType);
+        bool fieldIsMagic = isVMMagicClass(fieldType->getName());
+        if (fieldIsMagic) {
+            fieldType = convertVMMagicType2HIR(typeManager, fieldType);
+        }
         irBuilder.genStStatic(fieldType,field,popOpnd());
     } else  if (typeManager.isLazyResolutionMode()) {
-        Type* type = compilationInterface.getFieldType(methodToCompile.getParentHandle(), constPoolIndex);
+        const char* fieldTypeName = const_pool_get_field_descriptor(methodToCompile.getParentHandle(), constPoolIndex);
+        bool fieldIsMagic = isVMMagicClass(fieldTypeName);
+        Type* fieldType = fieldIsMagic ? convertVMMagicType2HIR(typeManager, fieldTypeName) 
+                                       : compilationInterface.getFieldType(methodToCompile.getParentHandle(), constPoolIndex);
         Opnd* value = popOpnd();
-        irBuilder.genStStaticWithResolve(type, methodToCompile.getParentType()->asObjectType(), constPoolIndex, value);
+        irBuilder.genStStaticWithResolve(fieldType, methodToCompile.getParentType()->asObjectType(), constPoolIndex, value);
     } else {
         // generate helper call for throwing respective exception
         linkingException(constPoolIndex, OPCODE_PUTSTATIC);

@@ -528,7 +528,7 @@ public:
      * @param src - source operand.
      * @param dst - destination operand.
      */
-    void    do_mov(const Val& dst, const Val& src);
+    void    do_mov(const Val& dst, const Val& src, bool skipTypeCheck=false);
     /**
      * @brief Returns a stack item at the given depth.
      * 
