@@ -17,3 +17,7 @@ stress/Stack.java
 
 # Server mode failures specific to Windows x86_64
 stress/Mix.java
+
+# HARMONY-3917
+gc/PhantomReferenceTest.java
+gc/WeakReferenceTest.java

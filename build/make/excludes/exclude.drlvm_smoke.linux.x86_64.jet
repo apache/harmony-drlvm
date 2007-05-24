@@ -19,3 +19,7 @@ stress/Mix.java
 
 # HARMONY-3495 hangs intermittently
 gc/NPE.java
+
+# HARMONY-3917
+gc/PhantomReferenceTest.java
+gc/WeakReferenceTest.java

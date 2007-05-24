@@ -13,3 +13,7 @@ stress/Mix.java
 # HARMONY-3581 crashes quite often
 stress/Sync.java
 
+# HARMONY-3917
+gc/PhantomReferenceTest.java
+gc/WeakReferenceTest.java
+

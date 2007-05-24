@@ -15,3 +15,7 @@ StackTest.java
 exception/FinalizeStackTest.java
 stress/Stack.java
 
+# HARMONY-3917
+gc/PhantomReferenceTest.java
+gc/WeakReferenceTest.java
+
