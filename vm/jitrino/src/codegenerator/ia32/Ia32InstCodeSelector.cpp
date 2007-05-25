@@ -2540,11 +2540,20 @@ CG_OpndHandle* InstCodeSelector::arraycopy(uint32          numArgs,
         case OpndSize_8:   mn = Mnemonic_MOVS8; break;
         case OpndSize_16:  mn = Mnemonic_MOVS16; break;
         case OpndSize_32:  mn = Mnemonic_MOVS32; break;
-        case OpndSize_64: {
-                            appendInsts(irManager.newInst(Mnemonic_SHL, counter, irManager.newImmOpnd(counterType, (int32)1)));
-                            mn = Mnemonic_MOVS32;
-                          }
-                          break;
+        case OpndSize_64: 
+            {
+                /**
+                 * FIXME 
+                 * Currently JIT erroneously supposes that compressed mode is always on.
+                 * So if type is object, it is actually compressed (32-bit sized).
+                 * But IRManager::getTypeSize() "correctly" returns OpndSize_64.
+                 */
+                if (!srcAddrType->getPointedToType()->isObject()) {
+                    appendInsts(irManager.newInst(Mnemonic_SHL, counter, irManager.newImmOpnd(counterType, (int32)1)));
+                }
+                mn = Mnemonic_MOVS32;
+            }
+            break;
         default: assert(0); mn = Mnemonic_MOVS32; break;
     }
     Inst* copyInst = irManager.newInst(mn,dstAddrReg,srcAddrReg,counter);
