@@ -2535,44 +2535,18 @@ CG_OpndHandle* InstCodeSelector::arraycopy(uint32          numArgs,
     assert(srcAddrType);
     Type::Tag tag = srcAddrType->getPointedToType()->tag;
     Mnemonic mn = Mnemonic_NULL;
-    switch(tag) {
-        case Type::Int8   :
-        case Type::UInt8  :
-        case Type::Boolean:
-        {
-            mn = Mnemonic_MOVS8; break;
-        }
-        case Type::Char   :
-        case Type::Int16  :
-        case Type::UInt16 :
-        {
-            mn = Mnemonic_MOVS16; break;
-        }
-        case Type::IntPtr :
-        case Type::Int32  :
-        case Type::UIntPtr:
-        case Type::UInt32 :
-        case Type::Single :
-        case Type::Float  : 
-        case Type::Object  : 
-        case Type::SystemObject  : 
-        case Type::SystemString  : 
-        case Type::Array  : 
-        {
-            mn = Mnemonic_MOVS32; break;
-        }
-        case Type::Int64  :
-        case Type::UInt64 :
-        case Type::Double :
-        {
-            appendInsts(irManager.newInst(Mnemonic_SHL, counter, irManager.newImmOpnd(counterType, (int32)1)));
-            mn = Mnemonic_MOVS32; break;
-        }
-    default:
-        assert(0);
-        mn = Mnemonic_MOVS32; break;
+    OpndSize typeSize = IRManager::getTypeSize(tag);
+    switch(typeSize) {
+        case OpndSize_8:   mn = Mnemonic_MOVS8; break;
+        case OpndSize_16:  mn = Mnemonic_MOVS16; break;
+        case OpndSize_32:  mn = Mnemonic_MOVS32; break;
+        case OpndSize_64: {
+                            appendInsts(irManager.newInst(Mnemonic_SHL, counter, irManager.newImmOpnd(counterType, (int32)1)));
+                            mn = Mnemonic_MOVS32;
+                          }
+                          break;
+        default: assert(0); mn = Mnemonic_MOVS32; break;
     }
-
     Inst* copyInst = irManager.newInst(mn,dstAddrReg,srcAddrReg,counter);
     copyInst->setPrefix(InstPrefix_REP);
     appendInsts(copyInst);
