@@ -360,7 +360,7 @@ void gc_gen_assign_free_area_to_mutators(GC_Gen* gc)
 void gc_gen_adjust_heap_size(GC_Gen* gc, int64 pause_time)
 {
   if(gc_match_kind((GC*)gc, MINOR_COLLECTION)) return;
-  if(gc->committed_heap_size == max_heap_size_bytes) return;
+  if(gc->committed_heap_size == max_heap_size_bytes - LOS_HEAD_RESERVE_FOR_HEAP_NULL) return;
   
   Mspace* mos = gc->mos;
   Fspace* nos = gc->nos;

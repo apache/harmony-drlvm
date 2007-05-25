@@ -233,6 +233,7 @@ void gc_compute_space_tune_size_after_marking(GC *gc)
       assert(max_heap_size_bytes >= gc->committed_heap_size);
       POINTER_SIZE_INT extend_heap_size = 0;
       POINTER_SIZE_INT potential_max_heap_size = max_tuning_size + max_heap_size_bytes - gc->committed_heap_size;
+      potential_max_heap_size -= LOS_HEAD_RESERVE_FOR_HEAP_NULL;
 
       //debug_adjust
       assert(!(potential_max_heap_size % SPACE_ALLOC_UNIT));
