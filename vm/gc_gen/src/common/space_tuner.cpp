@@ -148,7 +148,7 @@ void gc_compute_space_tune_size_before_marking(GC* gc, unsigned int cause)
   }
   
   if(tuner->force_tune){
-    if(tuner->kind == TRANS_FROM_LOS_TO_MOS){
+    if(tuner->kind != TRANS_FROM_MOS_TO_LOS){
       tuner->kind = TRANS_FROM_MOS_TO_LOS;
       tuner->reverse = 1;
     }
