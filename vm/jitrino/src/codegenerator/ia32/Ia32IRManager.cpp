@@ -2238,7 +2238,7 @@ bool IRManager::isGCSafePoint(const Inst* inst) {
         if (!isInternalHelper) {
             CompilationInterface* ci = CompilationContext::getCurrentContext()->getVMCompilationInterface();
             isNonGCVMHelper = rt && rt->getKind() == Opnd::RuntimeInfo::Kind_HelperAddress 
-                && !ci->isGCInterruptible((CompilationInterface::RuntimeHelperId)(POINTER_SIZE_INT)rt->getValue(0));
+                && !ci->mayBeInterruptible((CompilationInterface::RuntimeHelperId)(POINTER_SIZE_INT)rt->getValue(0));
         }
         bool isGCPoint = !isInternalHelper && !isNonGCVMHelper;
         return isGCPoint;

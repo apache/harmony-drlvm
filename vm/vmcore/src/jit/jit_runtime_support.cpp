@@ -2403,100 +2403,100 @@ NativeCodePtr rth_get_lil_helper(VM_RT_SUPPORT f)
  *  Checks if helper is a suspension point
  */
 
-VMEXPORT Boolean vm_helper_is_gc_interruptible(VM_RT_SUPPORT f)
+VMEXPORT HELPER_INTERRUPTIBILITY_KIND vm_helper_get_interruptibility_kind(VM_RT_SUPPORT f)
 {
 switch(f) {
     case VM_RT_MULTIANEWARRAY_RESOLVED:
-        return TRUE;
+        return INTERRUPTIBLE_ALWAYS;
     case VM_RT_LDC_STRING:
-        return TRUE;
+        return INTERRUPTIBLE_ALWAYS;
     // Exceptions
     case VM_RT_THROW:
     case VM_RT_THROW_SET_STACK_TRACE:
-        return TRUE;
+        return INTERRUPTIBLE_ALWAYS;
     case VM_RT_THROW_LAZY:
-        return TRUE;
+        return INTERRUPTIBLE_ALWAYS;
     case VM_RT_IDX_OUT_OF_BOUNDS:
-        return TRUE;
+        return INTERRUPTIBLE_ALWAYS;
     case VM_RT_NULL_PTR_EXCEPTION:
-        return TRUE;
+        return INTERRUPTIBLE_ALWAYS;
     case VM_RT_DIVIDE_BY_ZERO_EXCEPTION:
-        return TRUE;
+        return INTERRUPTIBLE_ALWAYS;
     case VM_RT_ARRAY_STORE_EXCEPTION:
-        return TRUE;
+        return INTERRUPTIBLE_ALWAYS;
     case VM_RT_THROW_LINKING_EXCEPTION:
-        return TRUE;
+        return INTERRUPTIBLE_ALWAYS;
     // Type tests
     case VM_RT_CHECKCAST:
-        return TRUE;
+        return INTERRUPTIBLE_ALWAYS;
     case VM_RT_INSTANCEOF:
-        return TRUE;
+        return INTERRUPTIBLE_ALWAYS;
     case VM_RT_AASTORE:
-        return TRUE;    
+        return INTERRUPTIBLE_ALWAYS;    
     case VM_RT_AASTORE_TEST:
-        return TRUE;
+        return INTERRUPTIBLE_ALWAYS;
     // Misc
     case VM_RT_GET_INTERFACE_VTABLE_VER0:
-        return TRUE;
+        return INTERRUPTIBLE_ALWAYS;
     case VM_RT_INITIALIZE_CLASS:
-        return TRUE;
+        return INTERRUPTIBLE_ALWAYS;
     case VM_RT_GC_SAFE_POINT:
-        return TRUE;
+        return INTERRUPTIBLE_ALWAYS;
     case VM_RT_GC_GET_TLS_BASE:
-        return FALSE;
+        return INTERRUPTIBLE_NEVER;
     // JVMTI
     case VM_RT_JVMTI_METHOD_ENTER_CALLBACK:
-        return TRUE;
+        return INTERRUPTIBLE_ALWAYS;
     case VM_RT_JVMTI_METHOD_EXIT_CALLBACK:
-        return TRUE;
+        return INTERRUPTIBLE_ALWAYS;
     case VM_RT_JVMTI_FIELD_ACCESS_CALLBACK:
-        return TRUE;
+        return INTERRUPTIBLE_ALWAYS;
     case VM_RT_JVMTI_FIELD_MODIFICATION_CALLBACK:
-        return TRUE;
+        return INTERRUPTIBLE_ALWAYS;
     // Non-VM
     case VM_RT_F2I:
-        return FALSE;
+        return INTERRUPTIBLE_NEVER;
     case VM_RT_F2L:
-        return FALSE;
+        return INTERRUPTIBLE_NEVER;
     case VM_RT_D2I:
-        return FALSE;
+        return INTERRUPTIBLE_NEVER;
     case VM_RT_D2L:
-        return FALSE;
+        return INTERRUPTIBLE_NEVER;
     case VM_RT_LSHL:
-        return FALSE;
+        return INTERRUPTIBLE_NEVER;
     case VM_RT_LSHR:
-        return FALSE;
+        return INTERRUPTIBLE_NEVER;
     case VM_RT_LUSHR:
-        return FALSE;
+        return INTERRUPTIBLE_NEVER;
     case VM_RT_LMUL:
 #ifdef VM_LONG_OPT
     case VM_RT_LMUL_CONST_MULTIPLIER:  
 #endif
-        return FALSE;
+        return INTERRUPTIBLE_NEVER;
     case VM_RT_LREM:
-        return FALSE;
+        return INTERRUPTIBLE_NEVER;
     case VM_RT_LDIV:
-        return FALSE;
+        return INTERRUPTIBLE_NEVER;
     case VM_RT_ULDIV:
-        return FALSE;
+        return INTERRUPTIBLE_NEVER;
     case VM_RT_CONST_LDIV:             
-        return FALSE;
+        return INTERRUPTIBLE_NEVER;
     case VM_RT_CONST_LREM:             
-        return FALSE;
+        return INTERRUPTIBLE_NEVER;
     case VM_RT_IMUL:
-        return FALSE;
+        return INTERRUPTIBLE_NEVER;
     case VM_RT_IREM:
-        return FALSE;
+        return INTERRUPTIBLE_NEVER;
     case VM_RT_IDIV:
-        return FALSE;
+        return INTERRUPTIBLE_NEVER;
     case VM_RT_FREM:
-        return FALSE;
+        return INTERRUPTIBLE_NEVER;
     case VM_RT_FDIV:
-        return FALSE;
+        return INTERRUPTIBLE_NEVER;
     case VM_RT_DREM:
-        return FALSE;
+        return INTERRUPTIBLE_NEVER;
     case VM_RT_DDIV:
-        return FALSE;
+        return INTERRUPTIBLE_NEVER;
     case VM_RT_NEWOBJ_WITHRESOLVE:
     case VM_RT_NEWARRAY_WITHRESOLVE:
     case VM_RT_INITIALIZE_CLASS_WITHRESOLVE:
@@ -2508,32 +2508,32 @@ switch(f) {
     case VM_RT_GET_INVOKEINTERFACE_ADDR_WITHRESOLVE:
     case VM_RT_GET_INVOKEVIRTUAL_ADDR_WITHRESOLVE:
     case VM_RT_GET_INVOKE_SPECIAL_ADDR_WITHRESOLVE:
-        return TRUE;
+        return INTERRUPTIBLE_ALWAYS;
     case VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE:
-        return TRUE; 
+        return INTERRUPTIBLE_ALWAYS; 
     case VM_RT_NEW_VECTOR_USING_VTABLE:
-        return TRUE;
+        return INTERRUPTIBLE_ALWAYS;
     case VM_RT_WRITE_BARRIER_FASTCALL:
-        return TRUE;
+        return INTERRUPTIBLE_ALWAYS;
     case VM_RT_MONITOR_ENTER:
     case VM_RT_MONITOR_ENTER_NON_NULL:
-        return TRUE;
+        return INTERRUPTIBLE_SOMETIMES;
 
     case VM_RT_MONITOR_ENTER_STATIC:
-        return TRUE;
+        return INTERRUPTIBLE_SOMETIMES;
     case VM_RT_MONITOR_EXIT:
     case VM_RT_MONITOR_EXIT_NON_NULL:
-        return TRUE;
+        return INTERRUPTIBLE_SOMETIMES;
 
     case VM_RT_MONITOR_EXIT_STATIC:
-        return TRUE;
+        return INTERRUPTIBLE_SOMETIMES;
     case VM_RT_CHAR_ARRAYCOPY_NO_EXC:
-        return TRUE;
+        return INTERRUPTIBLE_ALWAYS;
     case VM_RT_GC_HEAP_WRITE_REF:
-        return FALSE;
+        return INTERRUPTIBLE_NEVER;
     default:
         ASSERT(false, "Unexpected helper id" << f);
-        return TRUE;
+        return INTERRUPTIBLE_SOMETIMES;
     }
 }
 

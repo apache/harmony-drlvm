@@ -393,11 +393,14 @@ BBPolling::isThreadInterruptablePoint(const Inst* inst) {
         if (!ri) {
             return false;
         } else {
-            if ( ri->getKind() == Opnd::RuntimeInfo::Kind_HelperAddress ) {
-                return true;
-            }
             if ( ri->getKind() == Opnd::RuntimeInfo::Kind_MethodDirectAddr &&
                  ((MethodDesc*)ri->getValue(0))->isNative() )
+            {
+                return true;
+            }
+            CompilationInterface* ci = CompilationContext::getCurrentContext()->getVMCompilationInterface();
+            if ( ri->getKind() == Opnd::RuntimeInfo::Kind_HelperAddress &&
+                 ci->isInterruptible((CompilationInterface::RuntimeHelperId)(POINTER_SIZE_INT)ri->getValue(0)) )
             {
                 return true;
             }

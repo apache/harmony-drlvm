@@ -595,11 +595,16 @@ CompilationInterface::getRuntimeHelperCallingConvention(RuntimeHelperId id) {
 }
 
 bool
-CompilationInterface::isGCInterruptible(RuntimeHelperId runtimeHelperId)  {
+CompilationInterface::isInterruptible(RuntimeHelperId runtimeHelperId)  {
     VM_RT_SUPPORT drlHelperId = translateHelperId(runtimeHelperId);
-    return vm_helper_is_gc_interruptible(drlHelperId);
+    return INTERRUPTIBLE_ALWAYS == vm_helper_get_interruptibility_kind(drlHelperId);
 }
 
+bool
+CompilationInterface::mayBeInterruptible(RuntimeHelperId runtimeHelperId)  {
+    VM_RT_SUPPORT drlHelperId = translateHelperId(runtimeHelperId);
+    return INTERRUPTIBLE_NEVER != vm_helper_get_interruptibility_kind(drlHelperId);
+}
 
 bool
 CompilationInterface::compileMethod(MethodDesc *method) {

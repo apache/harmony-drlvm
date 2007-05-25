@@ -699,9 +699,29 @@ enum VM_RT_SUPPORT {
  * Write barrier for GC.
  */
 
-} VM_RT_SUPPORT; //VM_RT_SUPPORT
+} VM_RT_SUPPORT;
 
 
+/** 
+ * VM RT helpers can be interrupted differently.
+ */
+typedef
+enum HELPER_INTERRUPTIBILITY_KIND {
+/** 
+ * Disallowed to interrupt a thread inside the helper. 
+ */
+    INTERRUPTIBLE_NEVER,
+/** 
+ * Some helpers can be run in fast path mode, 
+ * when they are not interruptible, or in slow path, when they are.
+ */
+    INTERRUPTIBLE_SOMETIMES,
+/**
+ * Helper call can always be interrupted.
+ */
+    INTERRUPTIBLE_ALWAYS
+
+} HELPER_INTERRUPTIBILITY_KIND;
 
 NativeCodePtr rth_get_lil_helper(VM_RT_SUPPORT f);
 
@@ -727,7 +747,7 @@ VMEXPORT LilCodeStub *vm_get_rt_support_stub(VM_RT_SUPPORT f, Class_Handle c);
  *  Checks if helper is a suspension point
  */
 
-VMEXPORT Boolean vm_helper_is_gc_interruptible(VM_RT_SUPPORT f);
+VMEXPORT HELPER_INTERRUPTIBILITY_KIND vm_helper_get_interruptibility_kind(VM_RT_SUPPORT f);
 
 
 #ifdef __cplusplus
