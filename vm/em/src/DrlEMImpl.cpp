@@ -37,7 +37,7 @@
 #include <algorithm>
 #include <sstream>
 #include <fstream>
-
+#include "port_threadunsafe.h"
 
 #define LOG_DOMAIN "em"
 
@@ -512,8 +512,13 @@ void DrlEMImpl::executeMethod(jmethodID meth, jvalue  *return_value, jvalue *arg
 JIT_Result DrlEMImpl::compileMethod(Method_Handle mh) {
     //initial method compilation. Select chain to use.
 
+    UNSAFE_REGION_START
+    // May affect logging statistics, also used in debug-intended method filter
+    // Does not affect normal execution
     nMethodsCompiled++;
-    //these vars used for logging
+    UNSAFE_REGION_END
+
+    //these vars are used for logging
     const char* methodName = NULL;
     const char* className = NULL;
     const char* signature = NULL;
