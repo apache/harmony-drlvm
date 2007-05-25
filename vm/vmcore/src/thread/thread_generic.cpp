@@ -91,6 +91,8 @@ using namespace std;
 #include "../m2n_ia32_internal.h"
 #endif
 
+#define IS_FAT_LOCK(lockword) (lockword >> 31)
+
 extern struct JNINativeInterface_ jni_vtable;
 
 struct vmthread_dummies {
@@ -309,3 +311,17 @@ jint vm_detach(jthread java_thread) {
     vm_jthread_set_tm_data(jthread java_thread, NULL);
 */
 }
+
+void vm_notify_obj_alive(void *p_obj)
+{
+    if (IS_FAT_LOCK(((ManagedObject *)p_obj)->get_obj_info())) {
+      uint32 xx = ((ManagedObject *)p_obj)->get_obj_info();
+      hythread_native_resource_is_live(xx);
+    }
+}
+
+void vm_reclaim_native_objs()
+{
+	hythread_reclaim_resources();
+}
+

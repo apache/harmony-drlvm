@@ -57,6 +57,13 @@
 #define RECURSION_DEC(lockword_ptr, lockword) (*lockword_ptr=lockword - (1<<11))
 #define MAX_RECURSION 31
 
+
+/*
+ * Lock table which holds the omapping between LockID and fat lock (OS fat_monitor) pointer.
+ */
+
+HyFatLockTable *lock_table = NULL;
+
 IDATA owns_thin_lock(hythread_t thread, I_32 lockword) {
     IDATA this_id = thread->thread_id;
     assert(!IS_FAT_LOCK(lockword));
@@ -69,18 +76,31 @@ IDATA owns_thin_lock(hythread_t thread, I_32 lockword) {
 }
 
 void set_fat_lock_id(hythread_thin_monitor_t *lockword_ptr, IDATA monitor_id) {
-    I_32 lockword = *lockword_ptr;
+    U_32 lockword = *lockword_ptr;
 #ifdef LOCK_RESERVATION
     assert(!IS_RESERVED(lockword));
 #endif
+    assert((U_32)monitor_id < lock_table->size);
     lockword&=0x7FF;
     lockword|=(monitor_id << 11) | 0x80000000;
     *lockword_ptr=lockword;
     apr_memory_rw_barrier();
 }
 
+IDATA get_fat_lock_id(hythread_thin_monitor_t *lockword_ptr) {
+    // this method steals the bit mask from set_fat_lock_id above
+    // get_fat_lock() and set_fat_lock need cleaning up
+    // the bit masks should be replaced with "#define ..."
+    U_32 lockword = *lockword_ptr;
+    assert(lockword & 0x80000000);  //fat lock bit better be set
+    lockword &= 0x7fFFffFF;  // throw away the fat lock bit
+    lockword = lockword >> 11;
+    assert(lockword < lock_table->size);
+    return lockword;
+}
+
 IDATA is_fat_lock(hythread_thin_monitor_t lockword) {
-        return IS_FAT_LOCK(lockword);
+    return IS_FAT_LOCK(lockword);
 }
 
 //forward declaration
@@ -108,8 +128,8 @@ extern hymutex_t TM_LOCK;
  * Unreserves the lock already owned by this thread
  */
 void unreserve_self_lock(hythread_thin_monitor_t *lockword_ptr) {
-    I_32 lockword = *lockword_ptr;
-    I_32 lockword_new;
+    U_32 lockword = *lockword_ptr;
+    U_32 lockword_new;
     TRACE(("unreserve self_id %d lock owner %d", hythread_get_id(hythread_self()), THREAD_ID(lockword)));
     assert(hythread_get_id(hythread_self()) == THREAD_ID(lockword));
     assert (!IS_FAT_LOCK(*lockword_ptr));
@@ -132,17 +152,17 @@ void unreserve_self_lock(hythread_thin_monitor_t *lockword_ptr) {
  * Used lockword
  */
 IDATA unreserve_lock(hythread_thin_monitor_t *lockword_ptr) {
-    I_32 lockword = *lockword_ptr;
-    I_32 lockword_new;
+    U_32 lockword = *lockword_ptr;
+    U_32 lockword_new;
     uint16 lock_id;
     hythread_t owner;
     IDATA status;
     // trylock used to prevent cyclic suspend deadlock
     // the java_monitor_enter calls safe_point between attempts.
     /*status = hymutex_trylock(&TM_LOCK);
-    if (status !=TM_ERROR_NONE) {
-        return status;
-    }*/
+      if (status !=TM_ERROR_NONE) {
+      return status;
+      }*/
     
     if (IS_FAT_LOCK(lockword)) {
         return TM_ERROR_NONE;
@@ -161,7 +181,7 @@ IDATA unreserve_lock(hythread_thin_monitor_t *lockword_ptr) {
         assert(owner != hythread_self());
         status=hythread_suspend_other(owner);
         if (status !=TM_ERROR_NONE) {
-             return status;
+	    return status;
         }
     }
     // prepare new unreserved lockword and try to CAS it with old one.
@@ -177,7 +197,7 @@ IDATA unreserve_lock(hythread_thin_monitor_t *lockword_ptr) {
             lockword_new =  lockword_new & 0x0000ffff; 
         }
         if (lockword == apr_atomic_cas32 (((volatile apr_uint32_t*) lockword_ptr), 
-                (apr_uint32_t) lockword_new, lockword)) {
+					  (apr_uint32_t) lockword_new, lockword)) {
             TRACE(("unreserved lock"));
             break;
         }
@@ -231,12 +251,12 @@ IDATA hythread_thin_monitor_create(hythread_thin_monitor_t *lockword_ptr) {
  * @param[in] lockword_ptr monitor addr 
  */
 IDATA hythread_thin_monitor_try_enter(hythread_thin_monitor_t *lockword_ptr) {
-    I_32 lockword;
+    U_32 lockword;
     // warkaround strange intel compiler bug 
-    #if defined (__INTEL_COMPILER) && defined (LINUX)
+#if defined (__INTEL_COMPILER) && defined (LINUX)
     volatile
-    #endif
-    IDATA this_id = tm_self_tls->thread_id;
+#endif
+	IDATA this_id = tm_self_tls->thread_id;
     IDATA lock_id;
     IDATA status;
     hythread_monitor_t fat_monitor;
@@ -283,7 +303,7 @@ IDATA hythread_thin_monitor_try_enter(hythread_thin_monitor_t *lockword_ptr) {
             assert(this_id > 0 && this_id < 0x8000); 
             // Acquire monitor
             if (0 != port_atomic_cas16 (((volatile apr_uint16_t*) lockword_ptr)+1, 
-                    (apr_uint16_t) this_id, 0)) {
+					(apr_uint16_t) this_id, 0)) {
 
 #ifdef SPIN_COUNT
                 continue; 
@@ -295,43 +315,43 @@ IDATA hythread_thin_monitor_try_enter(hythread_thin_monitor_t *lockword_ptr) {
 #ifdef LOCK_RESERVATION
             //lockword = *lockword_ptr; // this reloading of lockword may be odd, need to investigate;
             if (IS_RESERVED(lockword)) {
-                    TRACE(("initially reserve lock %x count: %d ", *lockword_ptr, init_reserve_cout++));
-                    RECURSION_INC(lockword_ptr, *lockword_ptr);
+		TRACE(("initially reserve lock %x count: %d ", *lockword_ptr, init_reserve_cout++));
+		RECURSION_INC(lockword_ptr, *lockword_ptr);
             }
 #endif
             TRACE(("CAS lock %x count: %d ", *lockword_ptr, cas_cout++));
             return TM_ERROR_NONE;
         } else 
 
-        // Fat monitor
-        if (IS_FAT_LOCK(lockword)) {
-            TRACE(("FAT MONITOR %d \n", ++fat_lock2_count/*, vm_get_object_class_name(lockword_ptr-1)*/));  
-            fat_monitor = locktable_get_fat_monitor(FAT_LOCK_ID(lockword)); //  find fat_monitor in lock table
-
-            status = hythread_monitor_try_enter(fat_monitor);
+	    // Fat monitor
+	    if (IS_FAT_LOCK(lockword)) {
+		TRACE(("FAT MONITOR %d \n", ++fat_lock2_count/*, vm_get_object_class_name(lockword_ptr-1)*/));  
+		fat_monitor = locktable_get_fat_monitor(FAT_LOCK_ID(lockword)); //  find fat_monitor in lock table
+	    
+		status = hythread_monitor_try_enter(fat_monitor);
 #ifdef SPIN_COUNT
-            if (status == TM_ERROR_EBUSY) {
-                continue; 
-            }
+		if (status == TM_ERROR_EBUSY) {
+		    continue; 
+		}
 #endif
-            return status;
-        }
+		return status;
+	    }
 
 #ifdef LOCK_RESERVATION
         // unreserved busy lock
-        else if (IS_RESERVED(lockword)) {
-            status = unreserve_lock(lockword_ptr);
-            if (status != TM_ERROR_NONE) {
+	    else if (IS_RESERVED(lockword)) {
+		status = unreserve_lock(lockword_ptr);
+		if (status != TM_ERROR_NONE) {
 #ifdef SPIN_COUNT
-                if (status == TM_ERROR_EBUSY) {
-                    continue;
-                }
+		    if (status == TM_ERROR_EBUSY) {
+			continue;
+		    }
 #endif //SPIN_COUNT
-                return status;
-            }
-            assert(!IS_RESERVED(*lockword_ptr));
-            return hythread_thin_monitor_try_enter(lockword_ptr);
-        }
+		    return status;
+		}
+		assert(!IS_RESERVED(*lockword_ptr));
+		return hythread_thin_monitor_try_enter(lockword_ptr);
+	    }
 #endif 
 #ifdef SPIN_COUNT
         hythread_yield();
@@ -384,7 +404,7 @@ IDATA hythread_thin_monitor_enter(hythread_thin_monitor_t *lockword_ptr) {
  * @param[in] lockword_ptr monitor addr 
  */
 IDATA VMCALL hythread_thin_monitor_exit(hythread_thin_monitor_t *lockword_ptr) {
-    I_32 lockword = *lockword_ptr;
+    U_32 lockword = *lockword_ptr;
     hythread_monitor_t fat_monitor;
     IDATA this_id = tm_self_tls->thread_id; // obtain current thread id   
     assert(this_id > 0 && this_id < 0xffff);
@@ -404,7 +424,7 @@ IDATA VMCALL hythread_thin_monitor_exit(hythread_thin_monitor_t *lockword_ptr) {
             //TRACE(("recursion_dec: 0x%x", *lockword_ptr)); 
         }
         //TRACE(("unlocked: 0x%x id: %d\n", *lockword_ptr, THREAD_ID(*lockword_ptr)));
-                //hythread_safe_point();
+	//hythread_safe_point();
         return TM_ERROR_NONE;     
     }  else if (IS_FAT_LOCK(lockword)) {
         TRACE(("exit fat monitor %d thread: %d\n", FAT_LOCK_ID(lockword), tm_self_tls->thread_id));
@@ -419,7 +439,7 @@ IDATA VMCALL hythread_thin_monitor_exit(hythread_thin_monitor_t *lockword_ptr) {
 IDATA thin_monitor_wait_impl(hythread_thin_monitor_t *lockword_ptr, I_64 ms, IDATA nano, IDATA interruptable) {
     // get this thread
     hythread_t this_thread = tm_self_tls;    
-    I_32 lockword = *lockword_ptr;
+    U_32 lockword = *lockword_ptr;
     hythread_monitor_t fat_monitor;
   
     if (!IS_FAT_LOCK(lockword)) {
@@ -501,9 +521,9 @@ IDATA hythread_thin_monitor_notify(hythread_thin_monitor_t *lockword_ptr) {
     hythread_monitor_t fat_monitor;
     hythread_thin_monitor_t lockword = *lockword_ptr;
     if (IS_FAT_LOCK(lockword)) {
-         fat_monitor = locktable_get_fat_monitor(FAT_LOCK_ID(lockword));
-         assert(fat_monitor);
-         return hythread_monitor_notify(fat_monitor); 
+	fat_monitor = locktable_get_fat_monitor(FAT_LOCK_ID(lockword));
+	assert(fat_monitor);
+	return hythread_monitor_notify(fat_monitor); 
     }
     // check if the current thread owns lock
     if (!owns_thin_lock(tm_self_tls, lockword)) {
@@ -522,9 +542,9 @@ IDATA hythread_thin_monitor_notify_all(hythread_thin_monitor_t *lockword_ptr) {
     hythread_monitor_t fat_monitor;
     hythread_thin_monitor_t lockword = *lockword_ptr;
     if (IS_FAT_LOCK(lockword)) {
-         fat_monitor = locktable_get_fat_monitor(FAT_LOCK_ID(lockword));
-         assert(fat_monitor);
-         return hythread_monitor_notify_all(fat_monitor); 
+	fat_monitor = locktable_get_fat_monitor(FAT_LOCK_ID(lockword));
+	assert(fat_monitor);
+	return hythread_monitor_notify_all(fat_monitor); 
     }
     // check if the current thread owns lock
     if (!owns_thin_lock(tm_self_tls, lockword)) {
@@ -543,14 +563,12 @@ IDATA hythread_thin_monitor_destroy(hythread_thin_monitor_t *lockword_ptr) {
     hythread_thin_monitor_t lockword = *lockword_ptr;
     
     if (IS_FAT_LOCK(lockword)) {
-         fat_monitor = locktable_delete_entry(FAT_LOCK_ID(lockword));
-         assert(fat_monitor);
-         return hythread_monitor_destroy(fat_monitor); 
+	fat_monitor = locktable_delete_entry(FAT_LOCK_ID(lockword));
+	assert(fat_monitor);
+	return hythread_monitor_destroy(fat_monitor); 
     }
     return TM_ERROR_NONE;
 }
-
-extern hymutex_t FAT_MONITOR_TABLE_LOCK;
 
 /*
  * Inflates the compressed lockword into fat fat_monitor
@@ -559,14 +577,14 @@ hythread_monitor_t VMCALL inflate_lock(hythread_thin_monitor_t *lockword_ptr) {
     hythread_monitor_t fat_monitor;
     IDATA status;
     IDATA fat_monitor_id;
-    I_32 lockword;
+    U_32 lockword;
     int i;
-    status=hymutex_lock(&FAT_MONITOR_TABLE_LOCK);
+    status=hymutex_lock(&lock_table->mutex);
     assert(status == TM_ERROR_NONE);
     TRACE(("inflate tmj%d\n", ++inflate_count));
     lockword = *lockword_ptr;
     if (IS_FAT_LOCK (lockword)) {
-        status = hymutex_unlock(&FAT_MONITOR_TABLE_LOCK);
+        status = hymutex_unlock(&lock_table->mutex);
         assert(status == TM_ERROR_NONE);
         return locktable_get_fat_monitor(FAT_LOCK_ID(lockword));
     }
@@ -587,7 +605,7 @@ hythread_monitor_t VMCALL inflate_lock(hythread_thin_monitor_t *lockword_ptr) {
     assert(status == TM_ERROR_NONE);  
     status = hythread_monitor_enter(fat_monitor);
     if (status != TM_ERROR_NONE) {
-        hymutex_unlock(&FAT_MONITOR_TABLE_LOCK);
+        hymutex_unlock(&lock_table->mutex);
         return NULL;
     } 
     
@@ -603,7 +621,7 @@ hythread_monitor_t VMCALL inflate_lock(hythread_thin_monitor_t *lockword_ptr) {
     TRACE(("FAT ID : 0x%x", *lockword_ptr));
     fat_monitor->inflate_count++;
     fat_monitor->inflate_owner=tm_self_tls;
-    status=hymutex_unlock(&FAT_MONITOR_TABLE_LOCK);
+    status=hymutex_unlock(&lock_table->mutex);
     assert(status == TM_ERROR_NONE);
 #ifdef LOCK_RESERVATION
     assert(!IS_RESERVED(*lockword_ptr));
@@ -617,28 +635,19 @@ hythread_monitor_t VMCALL inflate_lock(hythread_thin_monitor_t *lockword_ptr) {
  * Not yet implemented.
  */
 void deflate_lock(hythread_monitor_t fat_monitor, hythread_thin_monitor_t *lockword) {
-/*
-    ;;// put thread_id into lockword
-    //... TODO
-    RECURSION_COUNT(lockword) = fat_monitor->recursion_count; // Transfer recursion count from fat lock back to thin lock
-    IS_FAT_LOCK(lockword) = 0; // Set contention bit indicating that the lock is now thin
-    hythread_monitor_destroy(fat_monitor); // Deallocate fat_monitor
-    locktable_delete_entry(lock_id); // delete entry in lock able
+    /*
+      ;;// put thread_id into lockword
+      //... TODO
+      RECURSION_COUNT(lockword) = fat_monitor->recursion_count; // Transfer recursion count from fat lock back to thin lock
+      IS_FAT_LOCK(lockword) = 0; // Set contention bit indicating that the lock is now thin
+      hythread_monitor_destroy(fat_monitor); // Deallocate fat_monitor
+      locktable_delete_entry(lock_id); // delete entry in lock able
 
-*/
+    */
 }
 
 
 
-/*
- * Lock table which holds the mapping between LockID and fat lock (OS fat_monitor) pointer.
- */
-
-//FIXME: make table resizable, implement delete
- 
-extern int table_size;
-extern hythread_monitor_t *lock_table;
-int fat_monitor_count = 1;
 // Lock table implementation
 
 
@@ -649,42 +658,137 @@ int fat_monitor_count = 1;
 hythread_monitor_t locktable_get_fat_monitor(IDATA lock_id) {
     hythread_monitor_t fat_monitor;
     TRACE(("LOCK ID in table %x\n", lock_id));
-    assert(lock_id >=0 && lock_id < table_size);
-    //hythread_global_lock();
-    fat_monitor = lock_table[lock_id];
-    //hythread_global_unlock();
+
+    assert(lock_id >=0 && (U_32)lock_id < lock_table->size);
+    hymutex_lock(&lock_table->mutex);
+    fat_monitor = lock_table->table[lock_id];
+    hymutex_unlock(&lock_table->mutex);
     return fat_monitor;
 }
 
 /*
  * Sets the value of the specific entry in the lock table
  */
+
 IDATA locktable_put_fat_monitor(hythread_monitor_t fat_monitor) {
-    int id;
-    //hythread_global_lock();
-    id = fat_monitor_count++;
-    if (id >= table_size) {
-        hythread_suspend_all(NULL, NULL); 
-        table_size = table_size*2;
-        lock_table = (hythread_monitor_t *)realloc(lock_table, sizeof(hythread_monitor_t)*table_size);
-        assert(lock_table);
-        apr_memory_rw_barrier();
-        hythread_resume_all(NULL);
+    U_32 i = 0;
+    int mon_index;
+    short free_slot_found = 0;
+
+    if (lock_table == 0) { 
+        DIE (("Lock table not initialized!"));
     }
 
-    lock_table[id] = fat_monitor;
-    //hythread_global_unlock();
-    return id;
-} 
+
+    hymutex_lock(&lock_table->mutex);
+    for(i =0; i < lock_table->size; i++) {
+      if (lock_table->table[lock_table->array_cursor] == 0) {
+            assert(lock_table->live_objs[lock_table->array_cursor] == 0);
+            lock_table->table[lock_table->array_cursor] = fat_monitor;
+	    free_slot_found = 1;
+            break;
+        }
+        lock_table->array_cursor++;
+        if (lock_table->array_cursor == lock_table->size) 
+	    lock_table->array_cursor = 0;
+    }   
+
+    if(!free_slot_found) {
+	int old_size;
+	
+	old_size = lock_table->size;
+	lock_table->size += INITIAL_FAT_TABLE_ENTRIES;
+	lock_table->table = realloc(lock_table->table, 
+			 lock_table->size * sizeof(hythread_monitor_t));
+	assert(lock_table->table);
+	
+	lock_table->live_objs = realloc(lock_table->live_objs, 
+			 lock_table->size * sizeof(unsigned char));
+	assert(lock_table->live_objs);
+
+	memset(lock_table->table + old_size, 0, 
+	       INITIAL_FAT_TABLE_ENTRIES * sizeof(hythread_monitor_t));
+	memset(lock_table->live_objs + old_size, 0, 
+	       INITIAL_FAT_TABLE_ENTRIES * sizeof(unsigned char));
+      
+	lock_table->array_cursor = old_size;
+	lock_table->table[lock_table->array_cursor] = fat_monitor;
+
+    }      
+    mon_index = lock_table->array_cursor;
+    hymutex_unlock(&lock_table->mutex);
+    return mon_index;
+}
+
+// flag that is set when major collection happens
+static unsigned char live_objs_were_reported = 0; 
+
+
+void VMCALL hythread_native_resource_is_live(U_32 lockword)
+{
+    IDATA index = 0;
+    index = get_fat_lock_id( (hythread_thin_monitor_t *) &lockword);
+    hymutex_lock(&lock_table->mutex);
+    lock_table->live_objs[index] = 1; // mark the fat lock entry as still alive
+    live_objs_were_reported = 1;
+    hymutex_unlock(&lock_table->mutex);
+}
+
+void VMCALL hythread_reclaim_resources()
+{
+    U_32 i = 0;
+
+#ifdef DEBUG_NATIVE_RESOURCE_COLLECTION
+    int old_slots_occupied = 0;
+    int new_slots_occupied = 0;
+    
+    for (i < lock_table->size)
+      if (lock_table->table[i]) 
+	old_slots_occupied++;
+#endif
+
+    hymutex_lock(&lock_table->mutex);
+    // If major collection didn't happen, do nothing
+    if (!live_objs_were_reported) {
+	hymutex_unlock(&lock_table->mutex);
+	return; 
+    }    
+    // reset the flag (major collection happened)
+    live_objs_were_reported = 0;  
+
+    for(i = 0; i < lock_table->size; i++) {
+        if (lock_table->live_objs[i]) {
+            assert(lock_table->table[i]);
+#ifdef DEBUG_NATIVE_RESOURCE_COLLECTION
+            new_slots_occupied++;
+#endif
+
+	    // reset the live array for the next major GC cycle
+            lock_table->live_objs[i] = 0;  
+        } else {
+            if (lock_table->table[i]) {
+                hythread_monitor_destroy(lock_table->table[i]);
+                lock_table->table[i] = 0;
+            }
+        }
+    }
+    hymutex_unlock(&lock_table->mutex);
+#ifdef DEBUG_NATIVE_RESOURCE_COLLECTION
+    TRACE(("hythread_reclaim_resources(): old = %d, new = %d\n", 
+	   old_slots_occupied,
+	   new_slots_occupied));
+#endif
+}
 
 /*
  * Deletes the entry in the lock table with the given lock_id
  */
-hythread_monitor_t  locktable_delete_entry(int lock_id) {  
+hythread_monitor_t  locktable_delete_entry(int lock_id) {
     hythread_monitor_t  m;
-    assert(lock_id >=0 && lock_id < table_size);
-    m = lock_table[lock_id];
-    lock_table[lock_id] = NULL;
+    DIE(("shouldn't get here"));
+    assert(lock_id >=0 && (U_32)lock_id < lock_table->size);
+    m = lock_table->table[lock_id];
+    lock_table->table[lock_id] = NULL;
     return m;
 }
 
@@ -694,23 +798,24 @@ hythread_monitor_t  locktable_delete_entry(int lock_id) {
  * @param[in] lockword_ptr monitor addr 
  */
 hythread_t VMCALL hythread_thin_monitor_get_owner(hythread_thin_monitor_t *lockword_ptr) {
-    I_32 lockword;
+    U_32 lockword;
     hythread_monitor_t fat_monitor;
     
     assert(lockword_ptr);    
     lockword = *lockword_ptr;       
     if (IS_FAT_LOCK(lockword)) {
-        fat_monitor = locktable_get_fat_monitor(FAT_LOCK_ID(lockword)); //  find fat_monitor in lock table
+	// find fat_monitor in lock table
+        fat_monitor = locktable_get_fat_monitor(FAT_LOCK_ID(lockword)); 
         return fat_monitor->owner;
     }
 
     if (THREAD_ID(lockword)== 0) {
-         return NULL;
+	return NULL;
     }
 
 #ifdef LOCK_RESERVATION
     if (RECURSION(lockword)==0 && IS_RESERVED(lockword)) {
-         return NULL;
+	return NULL;
     }
 #endif
     return hythread_get_thread(THREAD_ID(lockword));
@@ -722,13 +827,14 @@ hythread_t VMCALL hythread_thin_monitor_get_owner(hythread_thin_monitor_t *lockw
  * @param[in] lockword_ptr monitor addr 
  */
 IDATA VMCALL hythread_thin_monitor_get_recursion(hythread_thin_monitor_t *lockword_ptr) {
-    I_32 lockword;
+    U_32 lockword;
     hythread_monitor_t fat_monitor;
     
     assert(lockword_ptr);    
     lockword = *lockword_ptr;       
     if (IS_FAT_LOCK(lockword)) {
-        fat_monitor = locktable_get_fat_monitor(FAT_LOCK_ID(lockword)); //  find fat_monitor in lock table
+	//  find fat_monitor in lock table
+        fat_monitor = locktable_get_fat_monitor(FAT_LOCK_ID(lockword)); 
         return fat_monitor->recursion_count+1;
     }
     if (THREAD_ID(lockword) == 0) {
@@ -736,7 +842,7 @@ IDATA VMCALL hythread_thin_monitor_get_recursion(hythread_thin_monitor_t *lockwo
     }
 #ifdef LOCK_RESERVATION
     if (IS_RESERVED(lockword)) {
-         return RECURSION(lockword);
+	return RECURSION(lockword);
     }
 #endif
     return RECURSION(lockword)+1;

@@ -24,11 +24,13 @@
 #include <open/hythread_ext.h>
 #include <apr_atomic.h>
 #include "open/thread_externals.h"
-#include "thread_private.h"
-#include "jni.h"
 
 #undef LOG_DOMAIN
 #define LOG_DOMAIN "tm.java"
+
+#include "thread_private.h"
+#include "jni.h"
+
 
 void stop_callback(void);
 jmethodID getRunMethod(JNIEnv *env, jthread java_thread);
@@ -83,7 +85,7 @@ int wrapper_proc(void *arg) {
     jvmti_thread->jenv = jni_env;
     jvmti_thread->daemon = data->daemon;
 
-    TRACE(("TM: Java thread started: id=%d OS_handle=%p", native_thread->thread_id, apr_os_thread_current()));
+    TRACE( ("TM: Java thread started: id=%d OS_handle=%p", native_thread->thread_id, apr_os_thread_current()) );
 
     if (!jvmti_thread->daemon) {
         increase_nondaemon_threads_count(native_thread);

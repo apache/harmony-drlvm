@@ -159,6 +159,14 @@ VMEXPORT enum safepoint_state get_global_safepoint_status();
  */
 VMEXPORT Boolean verify_object_header(void *ptr);
 
+/**
+ *  Routines to support lifecycle management of resources associated
+ *  with a java object
+ */
+
+VMEXPORT void vm_notify_obj_alive(void *);
+VMEXPORT void vm_reclaim_native_objs();
+
 
 /*
  * *****

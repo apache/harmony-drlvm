@@ -41,16 +41,12 @@ apr_threadkey_t *TM_THREAD_KEY;
 //Thread manager global lock
 hymutex_t TM_START_LOCK;
 static int TM_INITIALIZED = 0;
-hymutex_t FAT_MONITOR_TABLE_LOCK;
 #define GLOBAL_MONITOR_NAME "global_monitor"
 hythread_monitor_t p_global_monitor;
 
 //group for the threads created/attached to the NULL group
 hythread_group_t TM_DEFAULT_GROUP;
 hythread_group_t group_list;
-
-hythread_monitor_t *lock_table = NULL;
-int table_size = 8024;
 
 IDATA groups_count;
 
@@ -157,9 +153,7 @@ void VMCALL hythread_init(hythread_library_t lib) {
     assert(status == TM_ERROR_NONE);
     status = hymutex_create(&TM_START_LOCK, TM_MUTEX_NESTED);
     assert(status == TM_ERROR_NONE);
-    status = hymutex_create(&FAT_MONITOR_TABLE_LOCK, TM_MUTEX_NESTED);
-    assert(status == TM_ERROR_NONE);
-    
+     
     status = init_group_list();
     assert(status == TM_ERROR_NONE);
 
@@ -172,10 +166,7 @@ void VMCALL hythread_init(hythread_library_t lib) {
     lib->nondaemon_thread_count = 0;
     status = hycond_create(&lib->nondaemon_thread_cond);
     assert(status == TM_ERROR_NONE);
-    
-    lock_table = (hythread_monitor_t *)malloc(sizeof(hythread_monitor_t)*table_size);
-    assert(lock_table);
-    
+ 
     // init global monitor
     status=hythread_monitor_init_with_name(&p_global_monitor, 0, "Thread Global Monitor");
     assert(status == TM_ERROR_NONE);
@@ -278,6 +269,7 @@ static IDATA init_group_list() {
     // Initial group, does not contain any actual group, but serves 
     //as a head and a tail of this list;
     hythread_group_t dummy;
+
     
     //this group will exist as long as TM lives, so it's ok to have 
     //the same pool for them
@@ -288,7 +280,23 @@ static IDATA init_group_list() {
     dummy->next = dummy->prev = dummy;
     group_list = dummy;
     groups_count = 0;
-    
+
+    lock_table = (HyFatLockTable *) malloc (sizeof(HyFatLockTable));
+    lock_table->table = (hythread_monitor_t *)calloc(INITIAL_FAT_TABLE_ENTRIES,
+					      sizeof(hythread_monitor_t));
+    lock_table->live_objs = (unsigned char *)calloc(INITIAL_FAT_TABLE_ENTRIES,
+					 sizeof(unsigned char));
+    lock_table->size = INITIAL_FAT_TABLE_ENTRIES;
+    lock_table->array_cursor = 0;
+
+    assert (lock_table);
+    assert (lock_table->table);
+    assert (lock_table->live_objs);
+
+    if (hymutex_create(&lock_table->mutex, APR_THREAD_MUTEX_NESTED)) {
+      return TM_ERROR_OUT_OF_MEMORY;
+    }
+
     return TM_ERROR_NONE;
 }
 
@@ -312,8 +320,17 @@ static IDATA destroy_group_list() {
             cur = cur->next;
         }
     }
+
+    free(lock_table->live_objs);
+    free(lock_table->table);
+
+    status = hymutex_destroy(&lock_table->mutex);
+    
+    free(lock_table);
+
     status2=hythread_global_unlock();
     if (status2 != TM_ERROR_NONE) return status2;
+
     return status;
 }
 

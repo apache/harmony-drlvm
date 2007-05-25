@@ -37,8 +37,14 @@
 #endif // __linux__
 
 // temporary remove logging
+//#define TRACE(a) //printf a; printf("\n")
+
+#ifdef __linux__
+#include "clog.h"
+#else
 #define TRACE(a) //printf a; printf("\n")
-//#include "clog.h"
+#define DIE(A) //exit(55);
+#endif
 
 // FIXME move to the global header, add error converter 
 #define RET_ON_ERROR(stat) if (stat) { return -1; }
@@ -46,6 +52,8 @@
 
 #define MAX_OWNED_MONITOR_NUMBER 200 //FIXME: switch to dynamic resize
 #define FAST_LOCAL_STORAGE_SIZE 10
+
+#define INITIAL_FAT_TABLE_ENTRIES 16*1024   //make this table exapandible if workloads show it is necessary
 
 #if !defined (_IPF_)
 //use lock reservation
@@ -530,6 +538,31 @@ typedef struct HySemaphore {
     hymutex_t mutex;         
 } HySemaphore;
 
+  
+/*
+ * Lock table which holds the mapping between LockID and fat lock 
+ * (OS fat_monitor) pointer.
+ */
+
+typedef struct HyFatLockTable {
+  // locktable itself
+  hythread_monitor_t *table;
+
+  // mutex guarding locktable
+  hymutex_t mutex;
+
+  // table of live objects (updated during each major GC)
+  unsigned char *live_objs;
+
+  // size of locktable
+  U_32 size;
+
+  // used to scan the lock table for the next available entry
+  U_32 array_cursor;
+  
+} HyFatLockTable;
+
+
 // Global variables 
 
 extern hythread_group_t group_list; // list of thread groups
@@ -542,6 +575,8 @@ extern apr_threadkey_t *TM_THREAD_KEY; // Key used to store tm_thread_t structur
 extern int max_group_index;     // max number of groups
 
 extern int total_started_thread_count; // Total started thread counter.
+
+extern HyFatLockTable *lock_table;
 
 #define THREAD_ID_SIZE 16  //size of thread ID in bits. Also defines max number of threads
 

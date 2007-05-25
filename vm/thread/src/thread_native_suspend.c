@@ -275,6 +275,7 @@ IDATA VMCALL hythread_suspend_other(hythread_t thread)
 void VMCALL hythread_resume(hythread_t thread)
 {
     int count;
+    hythread_t self = tm_self_tls;
 
     TRACE(("start resume, self: %p, thread: %p, "
            "suspend_count: %d, request: %d", self, thread,

@@ -326,12 +326,18 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
 #endif
   }
 
+  //For_LOS_extend!
   gc_space_tuner_reset(gc);
-
+  
   gc_assign_free_area_to_mutators(gc);
+
+  vm_reclaim_native_objs();  
 
   vm_resume_threads_after();
   return;
 }
+
+
+
 
 

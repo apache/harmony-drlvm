@@ -306,6 +306,9 @@ IDATA VMCALL hythread_thin_monitor_destroy(hythread_thin_monitor_t *lockword);
 hythread_t VMCALL hythread_thin_monitor_get_owner(hythread_thin_monitor_t *lockword);
 IDATA VMCALL hythread_thin_monitor_get_recursion(hythread_thin_monitor_t *lockword);
 
+void VMCALL hythread_native_resource_is_live(U_32);
+void VMCALL hythread_reclaim_resources();
+
 //@}
 /** @name State query
  */

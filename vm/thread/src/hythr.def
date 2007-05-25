@@ -86,6 +86,8 @@ hythread_thin_monitor_notify
 hythread_thin_monitor_notify_all
 hythread_thin_monitor_destroy
 hythread_thin_monitor_get_owner
+hythread_native_resource_is_live
+hythread_reclaim_resources
 
 hysem_post
 hysem_wait

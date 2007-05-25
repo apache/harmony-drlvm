@@ -87,6 +87,9 @@ hythread_thin_monitor_notify;
 hythread_thin_monitor_notify_all;
 hythread_thin_monitor_destroy;
 hythread_thin_monitor_get_owner;
+hythread_native_resource_is_live;
+hythread_reclaim_resources;
+
 hythread_add_task;
 hythread_get_function_pointer;
 hythread_get_data_pointer;

@@ -33,6 +33,7 @@ void remove_owned_monitor(jobject monitor);
 void set_contended_monitor(jobject monitor);
 void set_wait_monitor(jobject monitor);
 
+
 /**
  *  Initializes Java monitor.
  *
@@ -286,6 +287,7 @@ IDATA VMCALL jthread_monitor_wait(jobject monitor) {
  * @param[in] nanos time to wait (in nanoseconds)
  * @sa java.lang.Object.wait()
  */
+
 IDATA VMCALL jthread_monitor_timed_wait(jobject monitor, jlong millis, jint nanos) {
     hythread_thin_monitor_t *lockword;
     IDATA status;
@@ -293,7 +295,6 @@ IDATA VMCALL jthread_monitor_timed_wait(jobject monitor, jlong millis, jint nano
     apr_time_t wait_begin;
     jvmti_thread_t tm_java_thread;
     int disable_count;
-    ///////
 
     assert(monitor);
 
@@ -412,7 +413,6 @@ void remove_owned_monitor(jobject monitor) {
             return;
         }
     }
-    //assert(0); monitor - it is no valid monitor
 }
 
 void set_contended_monitor(jobject monitor){
