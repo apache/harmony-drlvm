@@ -39,8 +39,9 @@ void set_native_ref_enqueue_thread_flag(Boolean flag)
 
 static IDATA ref_enqueue_thread_func(void **args);
 static void wait_ref_thread_attached(void);
+extern jobject get_system_thread_group(JNIEnv* jni_env);
 
-void ref_enqueue_thread_init(JavaVM *java_vm)
+void ref_enqueue_thread_init(JavaVM *java_vm, JNIEnv* jni_env)
 {
     if(!native_ref_thread_flag)
         return;
@@ -57,8 +58,9 @@ void ref_enqueue_thread_init(JavaVM *java_vm)
     status = hymutex_create(&ref_thread_info->end_mutex, TM_MUTEX_DEFAULT);
     assert(status == TM_ERROR_NONE);
     
-    void **args = (void **)STD_MALLOC(sizeof(void *));
+    void **args = (void **)STD_MALLOC(sizeof(void *)*2);
     args[0] = (void *)java_vm;
+    args[1] = (void*)get_system_thread_group(jni_env);
     status = hythread_create(NULL, 0, REF_ENQUEUE_THREAD_PRIORITY, 0, (hythread_entrypoint_t)ref_enqueue_thread_func, args);
     assert(status == TM_ERROR_NONE);
     
@@ -125,27 +127,21 @@ static void wait_pending_reference(void)
     assert(stat == TM_ERROR_NONE);
 }
 
-extern void assign_classloader_to_native_threads(JNIEnv *jni_env);
+extern jint set_current_thread_context_loader(JNIEnv* jni_env);
 
 static IDATA ref_enqueue_thread_func(void **args)
 {
     JavaVM *java_vm = (JavaVM *)args[0];
     JNIEnv *jni_env;
-    //jthread java_thread;
     char *name = "ref handler";
-    //jboolean daemon = JNI_TRUE;
-    
-    //IDATA status = vm_attach_internal(&jni_env, &java_thread, java_vm, NULL, name, daemon);
-    //assert(status == JNI_OK);
-    //status = jthread_attach(jni_env, java_thread, daemon);
-    //assert(status == TM_ERROR_NONE);
+
     JavaVMAttachArgs *jni_args = (JavaVMAttachArgs*)STD_MALLOC(sizeof(JavaVMAttachArgs));
     jni_args->version = JNI_VERSION_1_2;
     jni_args->name = name;
-    jni_args->group = NULL;
+    jni_args->group = (jobject)args[1];
     IDATA status = AttachCurrentThreadAsDaemon(java_vm, (void**)&jni_env, jni_args);
     assert(status == JNI_OK);
-    assign_classloader_to_native_threads(jni_env);
+    set_current_thread_context_loader(jni_env);
     inc_ref_thread_num();
     
     while(true){

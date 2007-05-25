@@ -79,7 +79,17 @@ static void clear_fin_thread_attached(void)
 static void wait_fin_thread_attached(void)
 { while(!fin_thread_info->thread_attached){hythread_yield();}}
 
-void finalizer_threads_init(JavaVM *java_vm)
+
+jobject get_system_thread_group(JNIEnv* jni_env)
+{
+    jclass thread_class = GetObjectClass(jni_env, jthread_self());
+    jfieldID sysTG_field = GetStaticFieldID(jni_env, thread_class,
+        "systemThreadGroup", "Ljava/lang/ThreadGroup;");
+    assert(sysTG_field);
+    return GetStaticObjectField(jni_env, thread_class, sysTG_field);
+}
+
+void finalizer_threads_init(JavaVM *java_vm, JNIEnv* jni_env)
 {   if(!native_fin_thread_flag)
         return;
     
@@ -107,14 +117,15 @@ void finalizer_threads_init(JavaVM *java_vm)
     fin_thread_info->thread_ids = (hythread_t *)STD_MALLOC(sizeof(hythread_t) * fin_thread_info->thread_num);
     
     for(unsigned int i = 0; i < fin_thread_info->thread_num; i++){
-        void **args = (void **)STD_MALLOC(sizeof(void *) * 2);
+        void **args = (void **)STD_MALLOC(sizeof(void *) * 3);
         args[0] = (void *)java_vm;
         args[1] = (void *)(UDATA)(i + 1);
+        args[2] = (void*)get_system_thread_group(jni_env);
         fin_thread_info->thread_ids[i] = NULL;
         clear_fin_thread_attached();
         status = hythread_create(&fin_thread_info->thread_ids[i], 0, FINALIZER_THREAD_PRIORITY, 0, (hythread_entrypoint_t)finalizer_thread_func, args);
         assert(status == TM_ERROR_NONE);
-       wait_fin_thread_attached();
+        wait_fin_thread_attached();
     }    
 }
 
@@ -197,55 +208,22 @@ static void wait_pending_finalizer(void)
     assert(stat == TM_ERROR_NONE);
 }
 
-void assign_classloader_to_native_threads(JNIEnv *jni_env)
-{
-    jthread self_jthread = jthread_self();
-    ManagedObject *self_obj = (*self_jthread).object;
-    char *thread_jclass_name = "java/lang/Thread";
-    jclass thread_jclass = FindClass(jni_env, thread_jclass_name);
-    Class *thread_class = jclass_to_struct_Class(thread_jclass);
-    Field *loader_field = LookupField(thread_class, "contextClassLoader");
-    unsigned int offset = loader_field->get_offset();
-    
-    char *loader_jclass_name = "java/lang/ClassLoader";
-    jclass loader_jclass = FindClass(jni_env, loader_jclass_name);
-    Class *loader_class = jclass_to_struct_Class(loader_jclass);
-    
-    tmn_suspend_disable();
-    
-    Method *get_loader_method = LookupMethod(loader_class, "getSystemClassLoader", "()Ljava/lang/ClassLoader;");
-    assert(get_loader_method);
-    jvalue result;
-    vm_execute_java_method_array((jmethodID)get_loader_method, &result, NULL);
-    ManagedObject *sys_class_loader = (*(result.l)).object;
-    
-    uint32 *the_field = (uint32*)((POINTER_SIZE_INT)self_obj + offset);
-    void *heap_null = Slot::managed_null();
-    assert(sys_class_loader > heap_null);
-    *the_field = (uint32)((POINTER_SIZE_INT)sys_class_loader - (POINTER_SIZE_INT)heap_null);
-    
-    tmn_suspend_enable();
-}
+extern jint set_current_thread_context_loader(JNIEnv* jni_env);
 
 static IDATA finalizer_thread_func(void **args)
 {
     JavaVM *java_vm = (JavaVM *)args[0];
     JNIEnv *jni_env;
-    //jthread java_thread;
     char *name = "finalizer";
-    //jboolean daemon = JNI_TRUE;
-    
-    //IDATA status = vm_attach_internal(&jni_env, &java_thread, java_vm, NULL, name, daemon);
-    //assert(status == JNI_OK);
-    //status = jthread_attach(jni_env, java_thread, daemon);
-    //assert(status == TM_ERROR_NONE);
+    // FIXME: use args[1] (thread number) to distinguish finalization threads by name
+
     JavaVMAttachArgs *jni_args = (JavaVMAttachArgs*)STD_MALLOC(sizeof(JavaVMAttachArgs));
     jni_args->version = JNI_VERSION_1_2;
     jni_args->name = name;
-    jni_args->group = NULL;
+    jni_args->group = (jobject)args[2];
     IDATA status = AttachCurrentThreadAsDaemon(java_vm, (void**)&jni_env, jni_args);
     assert(status == JNI_OK);
-    assign_classloader_to_native_threads(jni_env);
+    set_current_thread_context_loader(jni_env);
     assert(!get_fin_thread_attached());
     set_fin_thread_attached();
     

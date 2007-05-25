@@ -63,7 +63,7 @@ typedef struct Fin_Thread_Info {
 
 extern Boolean get_finalizer_shutdown_flag();
 extern Boolean get_finalizer_on_exit_flag();
-extern void finalizer_threads_init(JavaVM *java_vm);
+extern void finalizer_threads_init(JavaVM *java_vm, JNIEnv* jni_env);
 extern void finalizer_shutdown(Boolean start_finalization_on_exit);
 extern void activate_finalizer_threads(Boolean wait);
 

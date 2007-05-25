@@ -1,0 +1,9 @@
+<project name="RUN HARMONY-3909 Regression Test">
+    <target name="run-test">
+        <!-- use special launcher for JVMTI tests -->
+        <run-jvmti-test
+            test="org.apache.harmony.drlvm.tests.regression.h3909.FinalizerThreadGroup"
+            agent="FinalizerThreadGroup"/>
+    </target>
+</project>
+
