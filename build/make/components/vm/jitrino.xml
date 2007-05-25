@@ -131,7 +131,7 @@ Version: $Revision: 1.6.2.8 $
                 <compilerarg value="/Fo${build.semi.dir}/vm/jitrino/_obj/" />
 
                 <!-- _CRT_SECURE_NO_DEPRECATE added to suppress a huge amount of complaints from msvc em64t compiler -->
-                <defineset define="PLATFORM_NT,_WINDLL,_MBCS,_REENTRANT,__SMP__,WIN32,_WIN32,_CRT_SECURE_NO_DEPRECATE" />
+                <defineset define="PLATFORM_NT,_WINDLL,_MBCS,_REENTRANT,__SMP__,WIN32,_WIN32,_CRT_SECURE_NO_DEPRECATE,_HAS_ITERATOR_DEBUGGING=0,_SECURE_SCL=0" />
 
                 <compilerarg value="/nologo" />
                 <compilerarg value="/EHsc" />
