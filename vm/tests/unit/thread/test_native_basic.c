@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include "thread_private.h"
 #include <apr_pools.h>
+#include <apr_time.h>
 #include "testframe.h"
 #include "jthread.h"
 #include <open/hythread_ext.h>
@@ -61,6 +62,37 @@ int test_hythread_create(void){
     return TEST_PASSED;
 }
 
+// Waits until count of running threads in specified group reaches 'count' or less
+static void wait_for_all_treads_are_terminated(hythread_group_t group, int count)
+{
+    int max_tries = 1000; // Maximum count of iterations
+
+    while (max_tries--)
+    {
+        int n = 0;
+        hythread_t thread;
+
+        hythread_iterator_t iterator = hythread_iterator_create(group);
+
+        while(hythread_iterator_has_next(iterator))
+        {
+            thread = hythread_iterator_next(&iterator);
+
+            if (!hythread_is_terminated(thread))
+                ++n;
+        }
+
+        hythread_iterator_release(&iterator);
+
+        if (n <= count)
+            break;
+
+        apr_sleep(1000); // 1ms
+    }
+
+    apr_sleep(100000);// 0.1s to let system threads finish their work
+}
+
 hylatch_t start;
 hylatch_t end;
 
@@ -96,9 +128,11 @@ int test_hythread_iterator(void) {
     }
 
     tf_assert(i == n);
-    
+
     hythread_iterator_release(&iterator);
-    
+
+    wait_for_all_treads_are_terminated(group, i - n);
+
     return 0;
 }
 
@@ -131,9 +165,11 @@ int test_hythread_iterator_default(void) {
     }
 
     tf_assert(i >= n);
-    
+
     hythread_iterator_release(&iterator);
-    
+
+    wait_for_all_treads_are_terminated(NULL, i - n);
+
     return 0;
 }
 
