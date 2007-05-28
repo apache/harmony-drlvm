@@ -43,6 +43,8 @@
 #include "vm_stats.h"
 #include "jvmti_break_intf.h"
 #include "cci.h"
+#include "port_threadunsafe.h"
+
 
 #ifdef _IPF_
 #include "../m2n_ipf_internal.h"
@@ -238,7 +240,9 @@ static void exn_propagate_exception(
 
 #ifdef VM_STATS
     exn_class->class_thrown();
+    UNSAFE_REGION_START
     VM_Statistics::get_vm_stats().num_exceptions++;
+    UNSAFE_REGION_END
 #endif // VM_STATS
 
     // Remove single step breakpoints which could have been set on the
