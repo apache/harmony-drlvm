@@ -36,6 +36,7 @@
 #include "clog.h"
 
 #include "dump.h"
+#include "port_threadunsafe.h"
 
 // Invariants:
 //   Native frames:
@@ -64,7 +65,9 @@ struct StackIterator {
 static void si_unwind_from_m2n(StackIterator* si, bool over_popped = true)
 {
 #ifdef VM_STATS
+    UNSAFE_REGION_START
     VM_Statistics::get_vm_stats().num_unwind_native_frames_all++;
+    UNSAFE_REGION_END
 #endif
 
     M2nFrame* m2nfl = si->m2nfl;
