@@ -209,6 +209,14 @@ static jvmtiError get_stack_trace_jit(
 
     JavaStackIterator jsi(vm_thread);
 
+    // to be complient with RI we must break the spec.
+    // if stack is empty and start_depth is 0 RI doesn't return
+    // JVMTI_ERROR_ILLEGAL_ARGUMENT as it is required by spec.
+    if (start == 0 && ! jsi) {
+        *count_ptr = 0;
+        return JVMTI_ERROR_NONE;
+    }
+
     jsi += start;
 
     if (! jsi)

@@ -1,0 +1,9 @@
+<project name="RUN HARMONY-3982 Regression Test">
+    <target name="run-test">
+        <!-- use special launcher for JVMTI tests -->
+        <run-jvmti-test
+            test="org.apache.harmony.drlvm.tests.regression.h3982.EmptyStackTrace"
+            agent="EmptyStackTrace"/>
+    </target>
+</project>
+
