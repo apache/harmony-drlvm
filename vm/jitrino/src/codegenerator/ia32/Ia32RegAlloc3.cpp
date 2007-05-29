@@ -15,8 +15,7 @@
  *  limitations under the License.
  */
 /**
- * @author Sergey L. Ivashin
- * @version $Revision$
+ * @author Intel, Sergey L. Ivashin
  */
 
 #include "Ia32IRManager.h"
@@ -324,21 +323,27 @@ public:
     BoolMatrix (MemoryManager&, size_t);
 
     void clear ();
-    void clear (int i, int j)           {at(i,j) = 0;}
-    void set   (int i, int j)           {at(i,j) = 1;}
-    bool test  (int i, int j) const     {return at(i,j) != 0;}
+    void clear (int i, int j)           {at((unsigned)i, (unsigned)j); *ptr &= ~msk;}
+    void set   (int i, int j)           {at((unsigned)i, (unsigned)j); *ptr |= msk;}
+    bool test  (int i, int j)           {at((unsigned)i, (unsigned)j); return (*ptr & msk) != 0;}
 
 private:
 
-    char& at (int i, int j) const
+    void at (unsigned i, unsigned j)
     {
-        assert(0 <= i && i < (int)dim && 0 <= j && j < (int)dim && i != j);
+        assert((size_t)i < dim && (size_t)j < dim);
 
-        return (i < j) ? *(i*dim + j + ptr)
-                       : *(j*dim + i + ptr);
+        const unsigned bitn = (i < j) ? j*(j-1)/2 + i
+                                      : i*(i-1)/2 + j;
+
+        msk = (char)(1 << (bitn & 7));
+        ptr = base + (bitn >> 3);
     }
 
     size_t dim, dims;
+    char* base;
+
+    char  msk;
     char* ptr;
 };
 
@@ -347,14 +352,15 @@ RegAlloc3::BoolMatrix::BoolMatrix (MemoryManager& mm, size_t d)
 {
     assert(d > 0);
     dim = d;
-    ptr = new (mm) char[dims = dim*dim];
+    dims = (dim*(dim - 1)) >> 4; // /16
+    base = new (mm) char[dims];
     clear();
 }
 
 
 void RegAlloc3::BoolMatrix::clear ()                        
 {
-    memset(ptr, 0, dims);
+    memset(base, 0, dims);
 }
 
 

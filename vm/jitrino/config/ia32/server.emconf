@@ -42,6 +42,16 @@ SD2_OPT.useProfile=EDGE_PROF,VALUE_PROF
 
 -XX:jit.JET_CLINIT.path=
 
+#register allocator configuration
+-XDjit.RA2.filter=-
+-XDjit.RA2.path=bp_regalloc1,bp_regalloc2
+-XDjit.RA2.path.bp_regalloc1=bp_regalloc
+-XDjit.RA2.path.bp_regalloc2=bp_regalloc
+-XDjit.RA2.arg.bp_regalloc1.regs=ALL_GP
+-XDjit.RA2.arg.bp_regalloc2.regs=ALL_XMM
+-XDjit.RA3.filter=-
+-XDjit.RA3.path=webmaker,cg_regalloc
+-XDjit.RA3.arg.webmaker.calc=true
 
 -XX:jit.SD1_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
 
@@ -54,9 +64,6 @@ SD2_OPT.useProfile=EDGE_PROF,VALUE_PROF
 -XX:jit.SD1_OPT.arg.codegen.dce1.early=yes
 -XX:jit.SD1_OPT.arg.codegen.btr.insertCMOVs=no
 -XX:jit.SD1_OPT.arg.codegen.btr.removeConstCompare=yes
-
--XX:jit.SD1_OPT.path.regalloc=webmaker,cg_regalloc,spillgen
--XX:jit.SD1_OPT.arg.codegen.regalloc.webmaker.calc=true
 
 #enable profiling of all virtual calls
 -XX:jit.SD1_OPT.arg.optimizer.vp_instrument.profile_abstract=true
@@ -132,9 +139,6 @@ SD2_OPT.useProfile=EDGE_PROF,VALUE_PROF
 -XX:jit.SD2_OPT.arg.codegen.btr.insertCMOVs=no
 -XX:jit.SD2_OPT.arg.codegen.btr.removeConstCompare=yes
 -XX:jit.arg.codegen.emitter.align=4
-
--XX:jit.SD2_OPT.path.regalloc=webmaker,cg_regalloc,spillgen
--XX:jit.SD2_OPT.arg.codegen.regalloc.webmaker.calc=true
 
 #system properties
 -Djava.compiler=server
