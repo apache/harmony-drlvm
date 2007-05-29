@@ -591,6 +591,29 @@ static bool inlineJSR(IRManager* irManager, Node *block, DefUseBuilder& defUses,
 
         Node* newEntry = _duplicateRegion(*irManager, entryJSR, nodesInJSR, defUses, *nodeRenameTable, *opndRenameTable, 0);
 
+        // update the BCMap
+        if(irManager->getCompilationInterface().isBCMapInfoRequired()) {
+            MethodDesc* meth = irManager->getCompilationInterface().getMethodToCompile();
+            VectorHandler *bc2HIRmapHandler = new(inlineManager) VectorHandler(bcOffset2HIRHandlerName, meth);
+
+            // update the BCMap for each copied node
+            NodeRenameTable::Iter nodeIter(nodeRenameTable);
+            Node* oldNode = NULL;
+            Node* newNode = NULL;
+            StlBitVector regionNodes(inlineManager);
+            while(nodeIter.getNextElem(oldNode, newNode)) {
+                Inst* oldLast = (Inst*)oldNode->getLastInst();
+                Inst* newLast = (Inst*)newNode->getLastInst();
+                if (oldLast->asMethodCallInst() || oldLast->asCallInst()) {
+                    assert(newLast->asMethodCallInst() || newLast->asCallInst());
+                    uint32 bcOffset = bc2HIRmapHandler->getVectorEntry(oldLast->getId());
+                    assert((bcOffset != 0) && (bcOffset != ILLEGAL_VALUE));
+                    bc2HIRmapHandler->setVectorEntry(newLast->getId(), bcOffset);
+                }
+
+            }
+        }
+
         fg.removeEdge(block,retTarget);
         fg.removeEdge(block,entryJSR);
         jsrInst->unlink();

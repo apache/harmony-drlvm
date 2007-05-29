@@ -158,8 +158,6 @@ void OptInitAction::readFlags()
 
     //devirtualizer flags
     optimizerFlags.devirt_do_aggressive_guarded_devirtualization = getBoolArg("devirt_aggressive", false);
-    optimizerFlags.devirt_use_cha_with_profile = getBoolArg("devirt_use_cha_with_profile", false);
-    optimizerFlags.devirt_use_cha_with_profile_threshold = getIntArg("devirt_use_cha_with_profile_threshold", -1);
     optimizerFlags.devirt_skip_exception_path = getBoolArg("devirt_skip_exception_path", true);
     optimizerFlags.devirt_block_hotness_multiplier= (float)getIntArg("devirt_block_hotness_multiplier", 10);
     optimizerFlags.devirt_skip_object_methods = getBoolArg("devirt_skip_object_methods", false);

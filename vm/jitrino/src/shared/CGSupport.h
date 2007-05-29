@@ -15,12 +15,6 @@
  *  limitations under the License.
  */
 
-/**
-* @author Intel, Vitaly N. Chaiko
-* @version $Revision: 1.6.22.4 $
-*
-*/
-
 #ifndef _CG_SUPPORT_H_
 #define _CG_SUPPORT_H_
 
@@ -28,11 +22,8 @@
 #include "MemoryManager.h"
 #include "VMInterface.h"
 
-#if defined(_IPF_)
-    #define ILLEGAL_VALUE 0xFFFFFFFFFFFFFFFF
-#else
-    #define ILLEGAL_VALUE 0xFFFFFFFF
-#endif
+//FIXME 64-bit usage
+#define ILLEGAL_VALUE 0xFFFFFFFF
 
 #define ESTIMATED_LIR_SIZE_PER_HIR 0x3
 #define ESTIMATED_HIR_SIZE_PER_BYTECODE 0x8

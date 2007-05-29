@@ -46,6 +46,9 @@ void ValueProfilerInstrumentationPass::_run(IRManager& irm)
     TypeManager& typeManager = irm.getTypeManager();
     StlVector<uint32> counterKeys(mm);
     bool debug = Log::isEnabled();
+    bool profileAbstractCalls =  getBoolArg("profile_abstract", false);
+    bool profileAllVirtualCalls =  getBoolArg("profile_all_virtual", false);
+
     uint32 key = 0;
 
     StlVector<Node*> nodes(mm);
@@ -88,18 +91,16 @@ void ValueProfilerInstrumentationPass::_run(IRManager& irm)
                         Log::out() << std::endl;
                     }
                 } else {
-                    // That is what we are looking for
-                    if (debug) {
-                        Log::out() << "\tFound ldVTable instruction to instrument: ";
-                        vtableInst->print(Log::out());
-                        Log::out() << std::endl;
+                    // Profile abstract calls, or all virtual calls
+                    ObjectType* baseType = (ObjectType*) base->getType();
+                    if(!((baseType->isAbstract() && profileAbstractCalls) || profileAllVirtualCalls)) {
+                        continue;
                     }
-                    // Don't profile virtual calls so far
-                    continue;
                 }
-                VectorHandler* bc2HIRMapHandler = new VectorHandler(bcOffset2HIRHandlerName, &md);
+                VectorHandler* bc2HIRMapHandler = new (mm) VectorHandler(bcOffset2HIRHandlerName, &md);
                 uint64 callInstId = (uint64)lastInst->getId();
                 key = (uint32)bc2HIRMapHandler->getVectorEntry(callInstId);
+                assert(key != ILLEGAL_VALUE);
                 assert(key != 0);
                 if (debug) {
                     Log::out() << "Use call instruction bcOffset = " << (int32)key << std::endl;

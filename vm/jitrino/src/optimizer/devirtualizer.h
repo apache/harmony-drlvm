@@ -45,18 +45,18 @@ private:
     void guardCallsInBlock(IRManager& irm, Node* node);
     void genGuardedDirectCall(IRManager& irm, Node* node, Inst* call, MethodDesc* methodDesc, ObjectType* valuedType, Opnd *tauNullChecked, Opnd *tauTypesChecked, uint32 argOffset);
     bool doGuard(IRManager& irm, Node* node, MethodDesc& methodDesc);
+    ObjectType *getTopProfiledCalleeType(IRManager& irm, MethodDesc *origMethodDesc, Inst *call);
 
     bool _hasProfileInfo;
     bool _doProfileOnlyGuardedDevirtualization;
     bool _doAggressiveGuardedDevirtualization;
-    bool _devirtUseCHAWithProfile;
-    bool _devirtUseCHAWithProfileThreshold;
     bool _devirtSkipExceptionPath;
     float _devirtBlockHotnessMultiplier;
     bool _devirtSkipJLObjectMethods;
     bool _devirtInterfaceCalls;
     bool _devirtVirtualCalls;
-
+    bool _devirtAbstractCalls;
+    bool _devirtUsingProfile;
 
     //unguard pass params
     int _directCallPercent;

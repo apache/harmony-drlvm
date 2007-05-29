@@ -58,6 +58,10 @@ SD2_OPT.useProfile=EDGE_PROF,VALUE_PROF
 -XX:jit.SD1_OPT.path.regalloc=webmaker,cg_regalloc,spillgen
 -XX:jit.SD1_OPT.arg.codegen.regalloc.webmaker.calc=true
 
+#enable profiling of all virtual calls
+-XX:jit.SD1_OPT.arg.optimizer.vp_instrument.profile_abstract=true
+
+
 -XX:jit.SD2_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
 
 -XX:jit.SD2_OPT.path.optimizer=ssa,simplify,dce,uce,devirt_virtual,edge_annotate,unguard,devirt_intf,inline,uce,purge,simplify,dce,uce,lazyexc,so2-,simplify,dce,uce,escape,inline_helpers,purge,simplify,uce,dce,dessa,statprof,peel,ssa,hvn,simplify,dce,uce,lower,dce,uce,memopt,reassoc,dce,uce,hvn,dce,uce,abcd,dce,uce,gcm,dessa,fastArrayFill,statprof,markglobals
@@ -69,6 +73,7 @@ SD2_OPT.useProfile=EDGE_PROF,VALUE_PROF
 -XX:jit.SD2_OPT.path.devirt_virtual=devirt
 -XX:jit.SD2_OPT.path.devirt_intf=devirt
 -XX:jit.SD2_OPT.arg.optimizer.devirt_intf.devirt_intf_calls=true
+-XX:jit.SD2_OPT.arg.optimizer.devirt_intf.devirt_abstract_calls=true
 -XX:jit.SD2_OPT.arg.optimizer.devirt_intf.devirt_virtual_calls=false
 
 #inliner configuration
@@ -80,6 +85,7 @@ SD2_OPT.useProfile=EDGE_PROF,VALUE_PROF
 -XX:jit.SD2_OPT.SD2_OPT_inliner_pipeline.path.devirt_virtual=devirt
 -XX:jit.SD2_OPT.SD2_OPT_inliner_pipeline.path.devirt_intf=devirt
 -XX:jit.SD2_OPT.SD2_OPT_inliner_pipeline.arg.devirt_intf.devirt_intf_calls=true
+-XX:jit.SD2_OPT.SD2_OPT_inliner_pipeline.arg.devirt_intf.devirt_abstract_calls=true
 -XX:jit.SD2_OPT.SD2_OPT_inliner_pipeline.arg.devirt_intf.devirt_virtual_calls=false
 
 #helper inliner configuration
