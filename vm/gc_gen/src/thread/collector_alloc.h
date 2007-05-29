@@ -22,6 +22,8 @@
 #define _COLLECTOR_ALLOC_H_
 
 #include "gc_thread.h"
+#include "port_threadunsafe.h"
+
 #ifdef USE_32BITS_HASHCODE
 #include "../common/hashcode.h"
 #endif
@@ -70,10 +72,14 @@ FORCE_INLINE Partial_Reveal_Object* collector_forward_object(Collector* collecto
 
 #ifdef USE_32BITS_HASHCODE
   if(obj_is_set_hashcode){
+    UNSAFE_REGION_START
     memcpy(p_targ_obj, p_obj, size-GC_OBJECT_ALIGNMENT);
+    UNSAFE_REGION_END
     oi = trace_forward_process_hashcode(p_targ_obj, p_obj ,oi, size);
   }else{
+    UNSAFE_REGION_START
     memcpy(p_targ_obj, p_obj, size);    
+    UNSAFE_REGION_END
   }
 #else
   memcpy(p_targ_obj, p_obj, size);

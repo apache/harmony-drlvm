@@ -203,9 +203,11 @@ void collector_reset_weakref_sets(Collector *collector)
   assert(collector->softref_set == NULL);
   assert(collector->weakref_set == NULL);
   assert(collector->phanref_set == NULL);
+  UNSAFE_REGION_START
   collector->softref_set = finref_get_free_block(gc);
   collector->weakref_set = finref_get_free_block(gc);
   collector->phanref_set= finref_get_free_block(gc);
+  UNSAFE_REGION_END
 }
 
 /* put back last weak references block of each collector */
@@ -217,12 +219,14 @@ void gc_set_weakref_sets(GC *gc)
   for(unsigned int i = 0; i < num_active_collectors; i++)
   {
     Collector* collector = gc->collectors[i];
+    UNSAFE_REGION_START
     pool_put_entry(metadata->softref_pool, collector->softref_set);
     pool_put_entry(metadata->weakref_pool, collector->weakref_set);
     pool_put_entry(metadata->phanref_pool, collector->phanref_set);
     collector->softref_set = NULL;
     collector->weakref_set= NULL;
     collector->phanref_set= NULL;
+    UNSAFE_REGION_END
   }
   return;
 }

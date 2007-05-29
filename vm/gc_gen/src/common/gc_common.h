@@ -22,6 +22,7 @@
 #define _GC_COMMON_H_
 
 #include "port_vmem.h"
+#include "port_threadunsafe.h" /* to mark unsafe region (race but correct) */
 
 #include "platform_lowlevel.h"
 
@@ -172,7 +173,11 @@ FORCE_INLINE Partial_Reveal_Object *read_slot(REF *p_slot)
 {  return ref_to_obj_ptr(*p_slot); }
 
 FORCE_INLINE void write_slot(REF *p_slot, Partial_Reveal_Object *p_obj)
-{  *p_slot = obj_ptr_to_ref(p_obj); }
+{ 
+  UNSAFE_REGION_START
+  *p_slot = obj_ptr_to_ref(p_obj); 
+  UNSAFE_REGION_END
+}
 
 
 inline POINTER_SIZE_INT round_up_to_size(POINTER_SIZE_INT size, int block_size) 

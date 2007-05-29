@@ -18,6 +18,7 @@
  * @author Xiao-Feng Li, 2006/10/25
  */
  
+#include "port_threadunsafe.h"
 #ifndef _SYNC_STACK_H_
 #define _SYNC_STACK_H_
 
@@ -108,7 +109,9 @@ inline Node* sync_stack_pop(Sync_Stack* stack)
     POINTER_SIZE_INT temp = stack_top_contruct(top_entry->next, version);
     temp = (POINTER_SIZE_INT)atomic_casptr((volatile void**)&stack->top, (void*)temp, (void*)cur_top);
     if(temp == *(POINTER_SIZE_INT*)&cur_top){ // got it  
+      UNSAFE_REGION_START
       top_entry->next = NULL;
+      UNSAFE_REGION_END
       return top_entry;
     }
     cur_top = stack->top;
@@ -121,7 +124,9 @@ inline Node* sync_stack_pop(Sync_Stack* stack)
 inline Boolean sync_stack_push(Sync_Stack* stack, Node* node)
 {
   Stack_Top cur_top = stack->top;
+  UNSAFE_REGION_START
   node->next = stack_top_get_entry(cur_top);
+  UNSAFE_REGION_END
   POINTER_SIZE_INT new_version = stack_top_get_next_version(cur_top);
   POINTER_SIZE_INT temp = stack_top_contruct(node, new_version);
  
