@@ -524,12 +524,12 @@ JNIEXPORT jint JNICALL JNI_CreateJavaVM(JavaVM ** p_vm, JNIEnv ** p_jni_env,
         goto done;
     }
 
-    finalizer_threads_init(java_vm, jni_env);   /* added for NATIVE FINALIZER THREAD */
-    ref_enqueue_thread_init(java_vm, jni_env);  /* added for NATIVE REFERENCE ENQUEUE THREAD */
-
     // Send VM start event. JNI services are available now.
     // JVMTI services permited in the start phase are available as well.
     jvmti_send_vm_start_event(vm_env, jni_env);
+
+    finalizer_threads_init(java_vm, jni_env);   /* added for NATIVE FINALIZER THREAD */
+    ref_enqueue_thread_init(java_vm, jni_env);  /* added for NATIVE REFERENCE ENQUEUE THREAD */
 
     // The VM is fully initialized now.
     vm_env->vm_state = Global_Env::VM_RUNNING;
