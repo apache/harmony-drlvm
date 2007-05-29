@@ -1466,11 +1466,12 @@ Type* JavaLabelPrepass::getRetTypeBySignature(CompilationInterface& ci, Class_Ha
     {
     case 'L': {
             if (!typeManager.isLazyResolutionMode()) {
-                typeManager.getNullObjectType();
+                retType = typeManager.getNullObjectType();
+            } else {
+                retType = ci.getTypeFromDescriptor(enclClass, origSig);
+                //in lazy resolution mode retType is already valid array type
+                arrayIsWrapped = true;
             }
-            retType = ci.getTypeFromDescriptor(enclClass, origSig);
-            //in lazy resolution mode retType is already valid array type
-            arrayIsWrapped = true;
         }
         break;
     case 'B':
