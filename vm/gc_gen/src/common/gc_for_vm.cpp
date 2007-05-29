@@ -222,7 +222,7 @@ int32 gc_get_hashcode(Managed_Object_Handle p_object)
        if(!hash)  hash = (0x173 & GCGEN_HASH_MASK);
        unsigned int new_info = (unsigned int)(info | hash);
        while (true) {
-         unsigned int temp = atomic_cas32(&obj->obj_info, new_info, info);
+         unsigned int temp = atomic_cas32((volatile unsigned int*)(&obj->obj_info), new_info, info);
          if (temp == info) break;
          info = get_obj_info_raw(obj);
          new_info = (unsigned int)(info | hash);
@@ -253,7 +253,7 @@ int32 gc_get_hashcode(Managed_Object_Handle p_object)
     case HASHCODE_UNSET:
       new_info = (unsigned int)(info | HASHCODE_SET_BIT);
       while (true) {
-        unsigned int temp = atomic_cas32(&p_obj->obj_info, new_info, info);
+        unsigned int temp = atomic_cas32((volatile unsigned int*)(&p_obj->obj_info), new_info, info);
         if (temp == info) break;
         info = get_obj_info_raw(p_obj);
         new_info =  (unsigned int)(info | HASHCODE_SET_BIT);

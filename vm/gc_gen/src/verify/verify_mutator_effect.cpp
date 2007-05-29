@@ -14,7 +14,7 @@ void verifier_init_allocation_verifier( Heap_Verifier* heap_verifier)
   allocation_verifier->last_size_los_objs = allocation_verifier->last_num_los_objs = 0;
   allocation_verifier->new_objects_set = NULL;
   allocation_verifier->new_objects_set 
-      = verifier_free_set_pool_get_entry(heap_verifier->heap_verifier_metadata->free_objects_pool);
+      = verifier_free_set_pool_get_entry(heap_verifier->heap_verifier_metadata->free_set_pool);
   heap_verifier->allocation_verifier = allocation_verifier;
 }
 
@@ -44,7 +44,7 @@ void verify_allocation_reset(Heap_Verifier* heap_verifier)
   alloc_verifier->size_los_objs = alloc_verifier->num_los_objs = 0;
   
   assert(alloc_verifier->new_objects_set == NULL);
-  alloc_verifier->new_objects_set = verifier_free_set_pool_get_entry(verifier_metadata->free_objects_pool);
+  alloc_verifier->new_objects_set = verifier_free_set_pool_get_entry(verifier_metadata->free_set_pool);
   assert(alloc_verifier->new_objects_set);
 
 }
@@ -135,7 +135,7 @@ void verify_allocation(Heap_Verifier* heap_verifier)
       STD_FREE(p_newobj);
     }
     vector_block_clear(new_objects);
-    pool_put_entry(verifier_metadata->free_objects_pool, new_objects);
+    pool_put_entry(verifier_metadata->free_set_pool, new_objects);
     new_objects = pool_get_entry(verifier_metadata->new_objects_pool);
   }
 }
@@ -216,7 +216,7 @@ void verifier_event_mutator_allocate_newobj(Partial_Reveal_Object* p_newobj, POI
 /*The rootset set verifier is placed here, so the rootset verifier
     verifys the rootset that vm enumerated before GC. The rootset 
     verifying processes before and after gc will be integrated in  gc verifying pass,
-    the rootset verifying is considered as slot verifying while verifying gc. */
+    the rootset verifying is considered as slot verifying while verifying heap. */
 void verifier_init_rootset_verifier( Heap_Verifier* heap_verifier)
 {
   RootSet_Verifier* rs_verifier = (RootSet_Verifier*)STD_MALLOC(sizeof(RootSet_Verifier));
@@ -237,6 +237,12 @@ void verifier_destruct_rootset_verifier( Heap_Verifier* heap_verifier)
   heap_verifier->rootset_verifier = NULL;
 }
 
+void verifier_reset_rootset_verifier( Heap_Verifier* heap_verifier)
+{
+  RootSet_Verifier* rootset_verifier = heap_verifier->rootset_verifier;
+  rootset_verifier->num_slots_in_rootset = 0;
+  rootset_verifier->num_error_slots = 0;
+}
 
 void verify_root_set(Heap_Verifier* heap_verifier)
 {
@@ -296,6 +302,13 @@ void verifier_destruct_wb_verifier( Heap_Verifier* heap_verifier)
   heap_verifier->writebarrier_verifier = NULL;
 }
 
+void verifier_reset_wb_verifier(Heap_Verifier* heap_verifier)
+{
+  WriteBarrier_Verifier* wb_verifier = heap_verifier->writebarrier_verifier;
+  wb_verifier->num_ref_wb_after_scanning = 0;
+  wb_verifier->num_ref_wb_in_remset = 0;
+  wb_verifier->num_slots_in_remset = 0;
+}
 
 void verifier_mark_wb_slots(Heap_Verifier* heap_verifier)
 {
@@ -344,12 +357,19 @@ void verify_write_barrier(REF* p_ref, Heap_Verifier* heap_verifier)
   if(!address_belongs_to_space((void*)p_ref, nspace) && address_belongs_to_space(read_slot(p_ref), nspace)){
     if(!wb_is_marked_in_slot(p_ref)){
       assert(0);
-      printf("GC Verify ==> Verify Write Barrier: error!!!\n");
+      printf("GC Verify ==> Verify Write Barrier: unbuffered error!!!\n");
       wb_verifier->is_verification_passed = FALSE;
     }else{
       wb_unmark_in_slot(p_ref);
       wb_verifier->num_ref_wb_after_scanning ++;
     }
+    return;
+  }else{
+    if(wb_is_marked_in_slot(p_ref)){
+      assert(0);
+      printf("GC Verify ==>Verify Write Barrier: buffered error!!!\n");
+    }
+    return;
   }
 }
 
@@ -375,7 +395,8 @@ void verifier_reset_mutator_verification(Heap_Verifier* heap_verifier)
   heap_verifier->allocation_verifier->is_verification_passed = TRUE;
   heap_verifier->writebarrier_verifier->is_verification_passed = TRUE;
   heap_verifier->rootset_verifier->is_verification_passed = TRUE;
-  
+  verifier_reset_wb_verifier(heap_verifier);
+  verifier_reset_rootset_verifier(heap_verifier);
   if(heap_verifier->need_verify_writebarrier && heap_verifier->gc_is_gen_mode)
     verifier_mark_wb_slots(heap_verifier);
 
@@ -394,5 +415,6 @@ void verify_mutator_effect(Heap_Verifier* heap_verifier)
   if(heap_verifier->need_verify_allocation)  verify_allocation(heap_verifier);
 }
  
+
 
 

@@ -46,7 +46,7 @@ extern unsigned int MINOR_COLLECTORS;
 extern unsigned int MAJOR_COLLECTORS;
 
 POINTER_SIZE_INT HEAP_SIZE_DEFAULT = 256 * MB;
-POINTER_SIZE_INT min_heap_size_bytes = 32 * MB;
+POINTER_SIZE_INT min_heap_size_bytes = 16 * MB;
 POINTER_SIZE_INT max_heap_size_bytes = 0;
 
 extern Boolean JVMTI_HEAP_ITERATION ;
@@ -326,18 +326,13 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
 #endif
   }
 
-  //For_LOS_extend!
   gc_space_tuner_reset(gc);
-  
+
   gc_assign_free_area_to_mutators(gc);
 
   vm_reclaim_native_objs();  
-
   vm_resume_threads_after();
   return;
 }
-
-
-
 
 

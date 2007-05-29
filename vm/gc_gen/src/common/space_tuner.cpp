@@ -138,7 +138,9 @@ void gc_compute_space_tune_size_before_marking(GC* gc, unsigned int cause)
     lspace->move_object = 0;
   }
 
-  /*If los or non-los is already the smallest size, there is no need to tune anymore.*/
+  /*If los or non-los is already the smallest size, there is no need to tune anymore.
+   *But we give "force tune" a chance to extend the whole heap size down there.
+   */
   if(((lspace->committed_heap_size <= min_los_size_bytes) && (tuner->kind == TRANS_FROM_LOS_TO_MOS)) ||
       ((fspace->committed_heap_size + mspace->committed_heap_size <= min_none_los_size_bytes) && (tuner->kind == TRANS_FROM_MOS_TO_LOS))){
     assert((lspace->committed_heap_size == min_los_size_bytes) || (fspace->committed_heap_size + mspace->committed_heap_size == min_none_los_size_bytes));
@@ -173,9 +175,9 @@ static void gc_compute_live_object_size_after_marking(GC* gc)
     non_los_live_obj_size += collector->non_los_live_obj_size;
     los_live_obj_size += collector->los_live_obj_size;
   }
-
-  non_los_live_obj_size += ((collector_num << 2) << GC_BLOCK_SHIFT_COUNT);
-  non_los_live_obj_size = round_up_to_size(non_los_live_obj_size, GC_BLOCK_SIZE_BYTES);
+  
+  POINTER_SIZE_INT additional_non_los_size = ((collector_num * 2) << GC_BLOCK_SHIFT_COUNT) + (non_los_live_obj_size >> GC_BLOCK_SHIFT_COUNT) * (GC_OBJ_SIZE_THRESHOLD/4);
+  non_los_live_obj_size = round_up_to_size(non_los_live_obj_size + additional_non_los_size, GC_BLOCK_SIZE_BYTES);
 
   los_live_obj_size += ((collector_num << 2) << GC_BLOCK_SHIFT_COUNT);
   los_live_obj_size = round_up_to_size(los_live_obj_size, GC_BLOCK_SIZE_BYTES);
@@ -210,49 +212,62 @@ void gc_compute_space_tune_size_after_marking(GC *gc)
 
   /*If force tune*/
   if( (tuner->force_tune) && (doforce) ){
+    POINTER_SIZE_INT lspace_free_size = 
+        ( (lspace->committed_heap_size > los_live_obj_size) ? (lspace->committed_heap_size - los_live_obj_size) : (0) );
+    //debug_adjust
+    assert(!(lspace_free_size % KB));
+    assert(!(failure_size % KB));
     
-    tuner->tuning_size = failure_size;
-    
-    /*We should assure that the tuning size is no more than the free space of non_los area*/
-    if( gc->committed_heap_size > lspace->committed_heap_size + non_los_live_obj_size )
-      max_tuning_size = gc->committed_heap_size - lspace->committed_heap_size - non_los_live_obj_size;
+    if(lspace_free_size >= failure_size){
+      tuner->tuning_size = 0;
+      tuner->kind = TRANS_NOTHING;
+      lspace->move_object = 1;
+      return;
+    }else{
+      tuner->tuning_size = failure_size -lspace_free_size;
+      
+      /*We should assure that the tuning size is no more than the free space of non_los area*/
+      if( gc->committed_heap_size > lspace->committed_heap_size + non_los_live_obj_size )
+        max_tuning_size = gc->committed_heap_size - lspace->committed_heap_size - non_los_live_obj_size;
 
-    if(max_tuning_size > max_tune_for_min_non_los)
-      max_tuning_size = max_tune_for_min_non_los;
+      if(max_tuning_size > max_tune_for_min_non_los)
+        max_tuning_size = max_tune_for_min_non_los;
 
-    /*Round up to satisfy LOS alloc demand.*/
-    tuner->tuning_size = round_up_to_size(tuner->tuning_size, GC_BLOCK_SIZE_BYTES);
-    max_tuning_size = round_down_to_size(max_tuning_size, GC_BLOCK_SIZE_BYTES);
+      /*Round up to satisfy LOS alloc demand.*/
+      tuner->tuning_size = round_up_to_size(tuner->tuning_size, GC_BLOCK_SIZE_BYTES);
+      max_tuning_size = round_down_to_size(max_tuning_size, GC_BLOCK_SIZE_BYTES);
 
-    /*If the tuning size is too large, we did nothing and wait for the OOM of JVM*/
-    /*Fixme: if the heap size is not mx, we can extend the whole heap size*/
-    if(tuner->tuning_size > max_tuning_size){
-      tuner->tuning_size = round_up_to_size(tuner->tuning_size, SPACE_ALLOC_UNIT);
-      max_tuning_size = round_down_to_size(max_tuning_size, SPACE_ALLOC_UNIT);
+      /*If the tuning size is too large, we did nothing and wait for the OOM of JVM*/
+      /*Fixme: if the heap size is not mx, we can extend the whole heap size*/
+      if(tuner->tuning_size > max_tuning_size){
+        tuner->tuning_size = round_up_to_size(tuner->tuning_size, SPACE_ALLOC_UNIT);
+        max_tuning_size = round_down_to_size(max_tuning_size, SPACE_ALLOC_UNIT);
+          //debug_adjust
+        assert(max_heap_size_bytes >= gc->committed_heap_size);
+        POINTER_SIZE_INT extend_heap_size = 0;
+        POINTER_SIZE_INT potential_max_tuning_size = max_tuning_size + max_heap_size_bytes - gc->committed_heap_size;
+        potential_max_tuning_size -= LOS_HEAD_RESERVE_FOR_HEAP_NULL;
+
         //debug_adjust
-      assert(max_heap_size_bytes >= gc->committed_heap_size);
-      POINTER_SIZE_INT extend_heap_size = 0;
-      POINTER_SIZE_INT potential_max_heap_size = max_tuning_size + max_heap_size_bytes - gc->committed_heap_size;
-      potential_max_heap_size -= LOS_HEAD_RESERVE_FOR_HEAP_NULL;
-
-      //debug_adjust
-      assert(!(potential_max_heap_size % SPACE_ALLOC_UNIT));
-      if(tuner->tuning_size > potential_max_heap_size){
-        tuner->tuning_size = 0;
-        tuner->kind = TRANS_NOTHING;
-        lspace->move_object = 0;      
-      }else{
-        extend_heap_size = tuner->tuning_size - max_tuning_size;
-        blocked_space_extend(fspace, (unsigned int)extend_heap_size);
-        gc->committed_heap_size += extend_heap_size;
-        tuner->kind = TRANS_FROM_MOS_TO_LOS;
-        lspace->move_object = 0;        
+        assert(!(potential_max_tuning_size % SPACE_ALLOC_UNIT));
+        if(tuner->tuning_size > potential_max_tuning_size){
+          tuner->tuning_size = 0;
+          tuner->kind = TRANS_NOTHING;
+          lspace->move_object = 0;      
+        }else{
+          //We have tuner->tuning_size > max_tuning_size up there.
+          extend_heap_size = tuner->tuning_size - max_tuning_size;
+          blocked_space_extend(fspace, (unsigned int)extend_heap_size);
+          gc->committed_heap_size += extend_heap_size;
+          tuner->kind = TRANS_FROM_MOS_TO_LOS;
+          lspace->move_object = 1;        
+        }
       }
-    }
-    else
-    {
-      tuner->kind = TRANS_FROM_MOS_TO_LOS;
-      lspace->move_object = 0;
+      else
+      {
+        tuner->kind = TRANS_FROM_MOS_TO_LOS;
+        lspace->move_object = 1;
+      }
     }
   }
   /*No force tune, LOS_Extend:*/
@@ -392,4 +407,5 @@ void gc_space_tuner_release_fake_blocks_for_los_shrink(GC* gc)
   STD_FREE(tuner->interim_blocks);
   return;
 }
+
 

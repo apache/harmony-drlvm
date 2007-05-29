@@ -49,7 +49,7 @@ typedef struct Lspace{
   /*LOS_Shrink:This field stands for sliding compact to lspace */
   Boolean move_object;
   /*For_statistic: size allocated science last time collect los, ie. last major*/
-  POINTER_SIZE_INT alloced_size;
+  volatile POINTER_SIZE_INT alloced_size;
   /*For_statistic: size survived after lspace_sweep*/  
   POINTER_SIZE_INT surviving_size;
   /* END of Space --> */

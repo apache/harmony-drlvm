@@ -1,6 +1,7 @@
 #include "verifier_common.h"
 #include "verify_gc_effect.h"
 #include "verify_mutator_effect.h"
+
 Boolean verifier_compare_objs_pools(Pool* objs_pool_before_gc, Pool* objs_pool_after_gc, Pool* free_pool ,Object_Comparator object_comparator)
 {
   Vector_Block* objs_set_before_gc = pool_get_entry(objs_pool_before_gc);
@@ -12,7 +13,7 @@ Boolean verifier_compare_objs_pools(Pool* objs_pool_before_gc, Pool* objs_pool_a
                 && !vector_block_iterator_end(objs_set_after_gc, iter_2) ){
       if(!(*object_comparator)(iter_1, iter_2)){
         assert(0);
-        printf("ERROR\n");
+        printf("\nERROR:    objs pools compare error!!!\n");
         return FALSE;
       }
       iter_1 = vector_block_iterator_advance(objs_set_before_gc, iter_1);
@@ -29,10 +30,12 @@ Boolean verifier_compare_objs_pools(Pool* objs_pool_before_gc, Pool* objs_pool_a
     objs_set_before_gc = pool_get_entry(objs_pool_before_gc);
     objs_set_after_gc = pool_get_entry(objs_pool_after_gc);
   }
-  if(pool_is_empty(objs_pool_before_gc)&&pool_is_empty(objs_pool_before_gc))
+  if(pool_is_empty(objs_pool_before_gc)&&pool_is_empty(objs_pool_before_gc)){
     return TRUE;
-  else 
+  }else{ 
+    assert(0);
     return FALSE;
+  }
 }
 
 Boolean verifier_copy_rootsets(GC* gc, Heap_Verifier* heap_verifier)
@@ -51,7 +54,7 @@ Boolean verifier_copy_rootsets(GC* gc, Heap_Verifier* heap_verifier)
       REF* p_ref = (REF* )*iter;
       iter = vector_block_iterator_advance(root_set,iter);
       if( read_slot(p_ref) == NULL) continue;
-      verifier_rootset_push(p_ref,gc_verifier->root_set);
+      verifier_set_push(p_ref,gc_verifier->root_set,verifier_metadata->root_set_pool);
     } 
     root_set = pool_iterator_next(gc_metadata->gc_rootset_pool);
   }  
@@ -79,7 +82,8 @@ Boolean verify_rootset_slot(REF* p_ref, Heap_Verifier* heap_verifier)
   if(!heap_verifier->gc_is_gen_mode){
     assert(!address_belongs_to_gc_heap(p_ref, heap_verifier->gc));
     if(address_belongs_to_gc_heap(p_ref, heap_verifier->gc)){
-      printf("ERROR\n");
+      printf("\nERROR: rootset address is inside gc heap\n");
+      assert(0);
       return FALSE;
     }
   }
@@ -87,21 +91,23 @@ Boolean verify_rootset_slot(REF* p_ref, Heap_Verifier* heap_verifier)
   if(heap_verifier->is_before_gc){
     //if(!address_belongs_to_gc_heap(p_ref) && address_belongs_to_gc_heap(p_obj)){
     if(!address_belongs_to_gc_heap(p_obj, heap_verifier->gc)){
-      printf("error!\n");
+      printf("\nERROR: obj referenced by rootset is outside the heap error!\n");
+      assert(0);
       return FALSE;
     }
   }else{
     if(heap_verifier->gc_verifier->is_before_fallback_collection){
       if(!address_belongs_to_gc_heap(p_obj, heap_verifier->gc)){
-        printf("error!\n");
+        printf("\nERROR: obj referenced by rootset is outside the heap error!\n");
         assert(0);
         return FALSE;
       }
       return TRUE;
     }
-    assert(address_belongs_to_space(p_obj, mspace) || address_belongs_to_space(p_obj, lspace));
-    if(!address_belongs_to_space(p_obj, mspace) && !address_belongs_to_space(p_obj, lspace)){
-      printf("Error\n");
+
+    if(!address_belongs_to_space(p_obj, mspace) && !address_belongs_to_space(p_obj, lspace) && !NOS_PARTIAL_FORWARD){
+      assert(0);
+      printf("\nERROR: obj referenced by rootset is in nos after GC!\n");
       return FALSE;
    }
   }
@@ -145,50 +151,90 @@ void verifier_log_before_gc(Heap_Verifier* heap_verifier)
   Allocation_Verifier* alloc_verifier = heap_verifier->allocation_verifier;
   WriteBarrier_Verifier* wb_verifier = heap_verifier->writebarrier_verifier;
   RootSet_Verifier* rootset_verifier = heap_verifier->rootset_verifier;
-
-  printf("before gc:\n");
-
+  printf("\n\n");
+  verifier_log_start("   Begin of GC ");
+  printf(" collection number: %4d \n", heap_verifier->gc->num_collections);
+  
   if(heap_verifier->need_verify_allocation){
-    printf(" Allocation Verify: %s , ", alloc_verifier->is_verification_passed?"passed":"failed");
-    printf(" new nos: %d : %d , ", alloc_verifier->num_nos_newobjs, alloc_verifier->num_nos_objs);
-    printf(" new los: %d : %d \n", alloc_verifier->num_los_newobjs, 
+    printf(" .......................................................................... \n");
+    printf(" Allocation  Verify: %s , ", alloc_verifier->is_verification_passed?"passed":"failed");
+    printf("new nos: %d : %d , ", alloc_verifier->num_nos_newobjs, alloc_verifier->num_nos_objs);
+    printf("new los: %d : %d \n", alloc_verifier->num_los_newobjs, 
           alloc_verifier->num_los_objs-alloc_verifier->last_num_los_objs);
   }
 
   if(heap_verifier->need_verify_rootset){
-    printf(" RootSet Verify: %s , ", rootset_verifier->is_verification_passed?"passed":"failed");
-    printf(" num: %d  , ", rootset_verifier->num_slots_in_rootset);
-    printf(" error num: %d \n", rootset_verifier->num_error_slots);
+    printf(" .......................................................................... \n");
+    printf(" RootSet      Verify: %s, ", rootset_verifier->is_verification_passed?"passed":"failed");
+    printf("num: %d, ", rootset_verifier->num_slots_in_rootset);
+    printf("error num: %d \n", rootset_verifier->num_error_slots);
 
   }
 
   if(heap_verifier->need_verify_writebarrier){
-    printf(" WriteBarrier Verify: %s , ", wb_verifier->is_verification_passed?"passed":"failed");
-    printf(" num cached: %d  , ", wb_verifier->num_ref_wb_in_remset);
-    printf(" num real : %d \n", wb_verifier->num_ref_wb_after_scanning);
+    printf(" .......................................................................... \n");
+    printf(" WriteBarrier Verify: %s, ", wb_verifier->is_verification_passed?"passed":"failed");
+    printf("cached: %d, ", wb_verifier->num_ref_wb_in_remset);
+    printf("real : %d \n", wb_verifier->num_ref_wb_after_scanning);
   }
-  printf("===============================================\n");
-
 }
 
-void verifier_log_start()
+void verifier_log_start(char* message)
 {
-  printf("\n===============================================\n");
+  printf("------------------------------%-16s------------------------------\n", message);
 }
 
+void verifier_collect_kind_log(Heap_Verifier* heap_verifier)
+{
+  GC* gc = heap_verifier->gc;
+  char* gc_kind;
+  if(gc_match_kind(gc, MINOR_COLLECTION)){ 
+    gc_kind = " minor collection.";
+  }else if(gc_match_kind(gc, FALLBACK_COLLECTION)){ 
+    gc_kind = " fallback collection.";
+  }else if(gc_match_kind(gc, EXTEND_COLLECTION)){ 
+    gc_kind = " extend collection.";
+  }else if(gc_match_kind(gc, MAJOR_COLLECTION)){ 
+    if(gc->tuner->kind == TRANS_NOTHING)  gc_kind = "major collection (normal)";
+    else if(gc->tuner->kind == TRANS_FROM_LOS_TO_MOS) gc_kind = "major collection (LOS shrink)";
+    else if(gc->tuner->kind == TRANS_FROM_MOS_TO_LOS) gc_kind = "major collection (LOS extend)";
+  }
+  printf(" GC_kind: %s\n", gc_kind);
+}
+
+void verifier_hashcode_log(GC_Verifier* gc_verifier);
 void verifier_log_after_gc(Heap_Verifier* heap_verifier)
 {
   GC_Verifier* gc_verifier = heap_verifier->gc_verifier;
-  printf("after gc:\n");
   if(heap_verifier->need_verify_gc){
-    printf(" GC Verify: %s \n", gc_verifier->is_verification_passed?"passed":"failed");
-    printf(" live obj  :   NUM   before %d ,  after %d \n", gc_verifier->num_live_objects_before_gc, gc_verifier->num_live_objects_after_gc);
-    printf(" live obj  :   SIZE   before %d MB,  after %d MB \n", gc_verifier->size_live_objects_before_gc>>20, gc_verifier->size_live_objects_after_gc>>20);
-    printf(" resurrect obj:  NUM   before %d      , after %d \n", gc_verifier->num_resurrect_objects_before_gc, gc_verifier->num_resurrect_objects_after_gc);
-    printf(" resurrect obj : SIZE   before %d MB,  after %d MB\n", gc_verifier->size_resurrect_objects_before_gc>>20, gc_verifier->size_resurrect_objects_after_gc>>20);
+    printf(" .......................................................................... \n");
+    verifier_collect_kind_log(heap_verifier);
+    printf(" GC Verify Result: %s  \n", gc_verifier->is_verification_passed?"Passed":"Failed*");
+    printf(" .......................................................................... \n");
+    printf(" %-14s:    %-7s |   Before %10d   |   After %10d   |\n", "live obj", "NUM" ,gc_verifier->num_live_objects_before_gc, gc_verifier->num_live_objects_after_gc);
+    printf(" %-14s:    %-7s |   Before %7d MB   |   After %7d MB   |\n","live obj", "SIZE", gc_verifier->size_live_objects_before_gc>>20, gc_verifier->size_live_objects_after_gc>>20);
+    printf(" %-14s:    %-7s |   Before %10d   |   After %10d   |\n", "resurrect obj", "NUM",gc_verifier->num_resurrect_objects_before_gc, gc_verifier->num_resurrect_objects_after_gc);
+    if(gc_verifier->size_resurrect_objects_before_gc>>20 == 0 &&  gc_verifier->size_resurrect_objects_before_gc != 0){
+      if(gc_verifier->size_resurrect_objects_before_gc>>10 == 0 ){
+        printf(" %-14s:    %-7s |   Before %7d  B   |   After %7d  B   |\n", "resurrect obj", "SIZE", gc_verifier->size_resurrect_objects_before_gc, gc_verifier->size_resurrect_objects_after_gc);
+      }else{  
+        printf(" %-14s:    %-7s |   Before %7d KB   |   After %7d KB   |\n", "resurrect obj", "SIZE", gc_verifier->size_resurrect_objects_before_gc>>10, gc_verifier->size_resurrect_objects_after_gc>>10);
+      }
+    }else{
+      printf(" %-14s:    %-7s |   Before %7d MB   |   After %7d MB   |\n", "resurrect obj", "SIZE", gc_verifier->size_resurrect_objects_before_gc>>20, gc_verifier->size_resurrect_objects_after_gc>>20);
+    }
+    verifier_hashcode_log(gc_verifier);
   }
-  printf("===============================================\n");
+  if(!heap_verifier->gc_verifier->is_before_fallback_collection)
+    verifier_log_start("    End of GC   ");
+  else
+    verifier_log_start(" failed GC end ");
 
+}
+
+void verifier_hashcode_log(GC_Verifier* gc_verifier)
+{
+    printf(" %-14s:    %-7s |   Before %10d   |   After %10d   |\n", "hashcode", "NUM", gc_verifier->num_hash_before_gc, gc_verifier->num_hash_after_gc);
 }
 
 

@@ -92,7 +92,7 @@ inline void words_set_bit(POINTER_SIZE_INT* words, unsigned int count, unsigned 
   
   if(word_index >= count) return;
   
-  POINTER_SIZE_INT* p_word = words + word_index;
+  volatile POINTER_SIZE_INT* p_word = words + word_index;
   POINTER_SIZE_INT old_value = *p_word;
   POINTER_SIZE_INT mask = (POINTER_SIZE_INT)1 << bit_offset;
   POINTER_SIZE_INT new_value = old_value|mask;
@@ -114,7 +114,7 @@ inline void words_clear_bit(POINTER_SIZE_INT* words, unsigned int count, unsigne
   
   if(word_index >= count) return;
   
-  POINTER_SIZE_INT* p_word = words + word_index;
+  volatile POINTER_SIZE_INT* p_word = words + word_index;
   POINTER_SIZE_INT old_value = *p_word;
   POINTER_SIZE_INT mask = ~((POINTER_SIZE_INT)1 << bit_offset);
   POINTER_SIZE_INT new_value = old_value & mask;

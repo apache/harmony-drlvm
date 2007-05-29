@@ -5,6 +5,10 @@
 #include "../common/gc_common.h"
 #include "../common/gc_space.h"
 #include "../gen/gen.h"
+#include "../common/space_tuner.h"
+#ifdef USE_32BITS_HASHCODE
+#include "../common/hashcode.h"
+#endif
 
 struct Heap_Verifier;
 struct Allocation_Verifier;
@@ -50,7 +54,7 @@ Boolean verifier_compare_objs_pools(Pool* objs_pool_before_gc, Pool* objs_pool_a
 Boolean verifier_parse_options(Heap_Verifier* heap_verifier, char* options);
 void verifier_log_before_gc(Heap_Verifier* heap_verifier);
 void verifier_log_after_gc(Heap_Verifier* heap_verifier);
-void verifier_log_start();
+void verifier_log_start(char* message);
 Boolean verify_rootset_slot(REF* p_ref, Heap_Verifier*  heap_verifier);
 
 
@@ -90,7 +94,7 @@ inline void verify_live_object_slot(REF* p_ref, Heap_Verifier* heap_verifier)
   assert(address_belongs_to_gc_heap(read_slot(p_ref), (GC*)heap_verifier->gc));
   Partial_Reveal_Object* UNUSED p_obj = read_slot(p_ref);
   assert(p_obj);
-  assert(obj_get_vt(p_obj));
+  assert(uncompress_vt(obj_get_vt(p_obj)));
   assert(!address_belongs_to_gc_heap(uncompress_vt(obj_get_vt(p_obj)), (GC*)heap_verifier->gc));
 }
 
@@ -138,19 +142,17 @@ inline REF verifier_get_object_slot(REF* p_ref)
   REF ref = *p_ref;   
   return (REF)((POINTER_SIZE_INT)ref | VERIFY_WB_MARK_BIT);
 }
-
-
+/*
 #define UNREACHABLE_OBJ_MARK_IN_VT 0x02
 
 inline void tag_unreachable_obj(Partial_Reveal_Object* p_obj)
 {
-  Partial_Reveal_VTable* vt = uncompress_vt(obj_get_vt_raw(p_obj));
-  obj_set_vt(p_obj, compress_vt((Partial_Reveal_VTable*)((POINTER_SIZE_INT)vt | UNREACHABLE_OBJ_MARK_IN_VT)));
+  VT vt = obj_get_vt_raw(p_obj);
+  obj_set_vt(p_obj, (VT)((POINTER_SIZE_INT)vt | UNREACHABLE_OBJ_MARK_IN_VT));
 }
 
 inline Boolean is_unreachable_obj(Partial_Reveal_Object* p_obj)
 {
   return (Boolean)((POINTER_SIZE_INT)obj_get_vt_raw(p_obj) & UNREACHABLE_OBJ_MARK_IN_VT);
-}
-
+}*/
 #endif 

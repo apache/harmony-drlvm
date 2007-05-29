@@ -29,33 +29,29 @@ void verifier_metadata_initialize(Heap_Verifier* heap_verifier)
     vector_block_init(block, GC_VERIFIER_METADATA_BLOCK_SIZE_BYTES);
   }
   
-  unsigned num_tasks = num_blocks>>2;
+  unsigned num_tasks = num_blocks>>1;
   heap_verifier_metadata->free_task_pool = sync_pool_create();
   for(i=0; i<num_tasks; i++){
     Vector_Block *block = (Vector_Block*)((POINTER_SIZE_INT)metadata + i*GC_VERIFIER_METADATA_BLOCK_SIZE_BYTES);
     vector_stack_init((Vector_Block*)block);
     pool_put_entry(heap_verifier_metadata->free_task_pool, (void*)block); 
   }
-  heap_verifier_metadata->mark_task_pool = sync_pool_create();
   
-  unsigned num_sets = num_blocks>>2;
   heap_verifier_metadata->free_set_pool = sync_pool_create();
-  for(; i<(num_sets + num_tasks); i++){
+  for(; i<num_blocks; i++){
     POINTER_SIZE_INT block = (POINTER_SIZE_INT)metadata + i*GC_VERIFIER_METADATA_BLOCK_SIZE_BYTES;    
     pool_put_entry(heap_verifier_metadata->free_set_pool, (void*)block); 
   }
+
+  heap_verifier_metadata->mark_task_pool = sync_pool_create();
   heap_verifier_metadata->root_set_pool = sync_pool_create();
-  
-  heap_verifier_metadata->free_objects_pool = sync_pool_create();
-  for(; i<num_blocks; i++){
-    POINTER_SIZE_INT block = (POINTER_SIZE_INT)metadata + i*GC_VERIFIER_METADATA_BLOCK_SIZE_BYTES;    
-    pool_put_entry(heap_verifier_metadata->free_objects_pool, (void*)block); 
-  }
   heap_verifier_metadata->objects_pool_before_gc  = sync_pool_create();
   heap_verifier_metadata->objects_pool_after_gc     = sync_pool_create();
   heap_verifier_metadata->resurrect_objects_pool_before_gc  = sync_pool_create();
   heap_verifier_metadata->resurrect_objects_pool_after_gc      = sync_pool_create();
   heap_verifier_metadata->new_objects_pool  = sync_pool_create();  
+  heap_verifier_metadata->hashcode_pool_before_gc = sync_pool_create();
+  heap_verifier_metadata->hashcode_pool_after_gc = sync_pool_create();
   
   verifier_metadata = heap_verifier_metadata;
   heap_verifier->heap_verifier_metadata = heap_verifier_metadata;
@@ -67,17 +63,17 @@ void gc_verifier_metadata_destruct(Heap_Verifier* heap_verifier)
   Heap_Verifier_Metadata* metadata = heap_verifier->heap_verifier_metadata;
   
   sync_pool_destruct(metadata->free_task_pool);
-  sync_pool_destruct(metadata->mark_task_pool);
-  
   sync_pool_destruct(metadata->free_set_pool);
+
+  sync_pool_destruct(metadata->mark_task_pool);
   sync_pool_destruct(metadata->root_set_pool); 
-  
-  sync_pool_destruct(metadata->free_objects_pool);  
   sync_pool_destruct(metadata->objects_pool_before_gc);
   sync_pool_destruct(metadata->objects_pool_after_gc);
   sync_pool_destruct(metadata->resurrect_objects_pool_before_gc);
   sync_pool_destruct(metadata->resurrect_objects_pool_after_gc);
   sync_pool_destruct(metadata->new_objects_pool);  
+  sync_pool_destruct(metadata->hashcode_pool_before_gc);
+  sync_pool_destruct(metadata->hashcode_pool_after_gc);
 
   for(unsigned int i=0; i<metadata->num_alloc_segs; i++){
     assert(metadata->segments[i]);
@@ -134,7 +130,6 @@ Vector_Block* gc_verifier_metadata_extend(Pool* pool, Boolean is_set_pool)
 
   block = pool_get_entry(pool);
   unlock(verifier_metadata->alloc_lock);
-  printf("extend metadata\n");
   return block;
 }
 
@@ -147,4 +142,23 @@ void verifier_clear_pool(Pool* working_pool, Pool* free_pool, Boolean is_vector_
     pool_put_entry(free_pool, working_block);
     working_block = pool_get_entry(working_pool);
   }
+}
+
+Pool* verifier_copy_pool_reverse_order(Pool* source_pool)
+{
+  Pool* dest_pool = sync_pool_create();
+  pool_iterator_init(source_pool);
+  Vector_Block* dest_set = verifier_free_set_pool_get_entry(verifier_metadata->free_set_pool);
+  
+  while(Vector_Block *source_set = pool_iterator_next(source_pool)){
+    POINTER_SIZE_INT *iter = vector_block_iterator_init(source_set);
+    while( !vector_block_iterator_end(source_set, iter)){
+      assert(!vector_block_is_full(dest_set));
+      vector_block_add_entry(dest_set, *iter);
+      iter = vector_block_iterator_advance(source_set, iter);
+    }
+    pool_put_entry(dest_pool, dest_set);
+    dest_set = verifier_free_set_pool_get_entry(verifier_metadata->free_set_pool);
+  }
+  return dest_pool;
 }

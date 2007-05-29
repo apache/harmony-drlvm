@@ -85,8 +85,9 @@ void verifier_trace_rootsets(Heap_Verifier* heap_verifier, Pool* root_set_pool)
 {
   Heap_Verifier_Metadata* verifier_metadata = heap_verifier->heap_verifier_metadata;
   GC_Verifier* gc_verifier = heap_verifier->gc_verifier;
-  gc_verifier->objects_set = verifier_free_task_pool_get_entry(verifier_metadata->free_objects_pool);
+  gc_verifier->objects_set = verifier_free_set_pool_get_entry(verifier_metadata->free_set_pool);
   gc_verifier->trace_stack = verifier_free_task_pool_get_entry(verifier_metadata->free_task_pool);
+  gc_verifier->hashcode_set = verifier_free_set_pool_get_entry(verifier_metadata->free_set_pool);
   pool_iterator_init(root_set_pool);
   Vector_Block* root_set = pool_iterator_next(root_set_pool);
   
@@ -145,7 +146,6 @@ void verifier_trace_objsets(Heap_Verifier* heap_verifier, Pool* obj_set_pool)
   gc_verifier->trace_stack = verifier_free_task_pool_get_entry(verifier_metadata->free_task_pool);
   pool_iterator_init(obj_set_pool);
   Vector_Block* obj_set = pool_iterator_next(obj_set_pool);
-  
   /* first step: copy all root objects to trace tasks. */ 
   while(obj_set){
     POINTER_SIZE_INT* iter = vector_block_iterator_init(obj_set);
@@ -193,9 +193,12 @@ void verifier_scan_resurrect_objects(Heap_Verifier* heap_verifier)
   if(heap_verifier->is_before_gc){
     verifier_trace_objsets(heap_verifier, gc->finref_metadata->obj_with_fin_pool);
   }else{
-	if(!heap_verifier->gc_verifier->is_before_fallback_collection){
+	  if(!heap_verifier->gc_verifier->is_before_fallback_collection){
       verify_live_finalizable_obj(heap_verifier, gc->finref_metadata->obj_with_fin_pool);
-      verifier_trace_objsets(heap_verifier, gc->finref_metadata->finalizable_obj_pool);
+      Pool* finalizable_obj_pool = verifier_copy_pool_reverse_order(gc->finref_metadata->finalizable_obj_pool);
+      verifier_trace_objsets(heap_verifier, finalizable_obj_pool);
+      verifier_clear_pool(finalizable_obj_pool, heap_verifier->heap_verifier_metadata->free_set_pool, FALSE);
+      sync_pool_destruct(finalizable_obj_pool);
     }else{
       verifier_trace_objsets(heap_verifier, gc->finref_metadata->obj_with_fin_pool);	
     }
@@ -231,12 +234,14 @@ static FORCE_INLINE void verifier_scan_object_slots(Partial_Reveal_Object *p_obj
     p_ref = (REF*)((POINTER_SIZE_INT)array + (int)array_first_element_offset(array));
 
     for (unsigned int i = 0; i < array_length; i++) {
-      if(!is_unreachable_obj(p_obj)){ 
-        verify_write_barrier(p_ref+i, heap_verifier);
-        if( read_slot(p_ref+i) != NULL) verify_live_object_slot(p_ref+i, heap_verifier);
-      }else{
-        if( read_slot(p_ref+i) != NULL) verify_all_object_slot(p_ref+i, heap_verifier);
-      }
+     verify_write_barrier(p_ref+i, heap_verifier); 
+     if( read_slot(p_ref+i) != NULL) verify_all_object_slot(p_ref+i, heap_verifier);
+     // if(!is_unreachable_obj(p_obj)){ 
+     //   verify_write_barrier(p_ref+i, heap_verifier);
+     //   if( read_slot(p_ref+i) != NULL) verify_live_object_slot(p_ref+i, heap_verifier);
+     // }else{
+     //   if( read_slot(p_ref+i) != NULL) verify_all_object_slot(p_ref+i, heap_verifier);
+     // }
     }   
   }else{   
     unsigned int num_refs = object_ref_field_num(p_obj);
@@ -244,12 +249,14 @@ static FORCE_INLINE void verifier_scan_object_slots(Partial_Reveal_Object *p_obj
  
     for(unsigned int i=0; i<num_refs; i++){
       p_ref = object_ref_iterator_get(ref_iterator+i, p_obj);  
-      if(!is_unreachable_obj(p_obj)){
-        verify_write_barrier(p_ref, heap_verifier);
-        if( read_slot(p_ref) != NULL) verify_live_object_slot(p_ref, heap_verifier);
-      }else{
-        if( read_slot(p_ref) != NULL) verify_all_object_slot(p_ref, heap_verifier);
-      }
+      verify_write_barrier(p_ref, heap_verifier);
+      if( read_slot(p_ref) != NULL) verify_all_object_slot(p_ref, heap_verifier);
+      //if(!is_unreachable_obj(p_obj)){
+      //  verify_write_barrier(p_ref, heap_verifier);
+      //  if( read_slot(p_ref) != NULL) verify_live_object_slot(p_ref, heap_verifier);
+      //}else{
+      //  if( read_slot(p_ref) != NULL) verify_all_object_slot(p_ref, heap_verifier);
+      //}
     }
     
 #ifndef BUILD_IN_REFERENT
@@ -259,12 +266,14 @@ static FORCE_INLINE void verifier_scan_object_slots(Partial_Reveal_Object *p_obj
     //if(type != SOFT_REFERENCE && verifier_get_gc_collect_kind(heap_verifier) == MINOR_COLLECTION){
     {
       p_ref = obj_get_referent_field(p_obj);
-      if(!is_unreachable_obj(p_obj)){ 
-        verify_write_barrier(p_ref, heap_verifier);
-        if( read_slot(p_ref) != NULL)   verify_live_object_slot(p_ref, heap_verifier);
-      }else{
-        if( read_slot(p_ref) != NULL)   verify_all_object_slot(p_ref, heap_verifier);
-      }
+      verify_write_barrier(p_ref, heap_verifier);
+      if( read_slot(p_ref) != NULL)   verify_all_object_slot(p_ref, heap_verifier);
+      //if(!is_unreachable_obj(p_obj)){ 
+      //  verify_write_barrier(p_ref, heap_verifier);
+      //  if( read_slot(p_ref) != NULL)   verify_live_object_slot(p_ref, heap_verifier);
+      //}else{
+      //  if( read_slot(p_ref) != NULL)   verify_all_object_slot(p_ref, heap_verifier);
+      //}
     } 
 #endif
   
@@ -352,7 +361,7 @@ void verifier_scan_mos_unreachable_objects(Space* space, Heap_Verifier* heap_ver
     Partial_Reveal_Object* cur_obj = (Partial_Reveal_Object*) block->base;
     while( cur_obj < block->free ){
       verify_object_header(cur_obj, heap_verifier);
-      if(!obj_is_marked_in_vt(cur_obj)) tag_unreachable_obj(cur_obj);
+     // if(!obj_is_marked_in_vt(cur_obj)) tag_unreachable_obj(cur_obj);
       cur_obj = obj_end(cur_obj);
     }
   }
@@ -365,7 +374,7 @@ void verifier_scan_los_unreachable_objects(Space* lspace, Heap_Verifier* heap_ve
 
   while(p_los_obj){
     verify_object_header(p_los_obj, heap_verifier);
-    if(!obj_is_marked_in_vt(p_los_obj)) tag_unreachable_obj(p_los_obj);
+    //if(!obj_is_marked_in_vt(p_los_obj)) tag_unreachable_obj(p_los_obj);
     p_los_obj = lspace_get_next_object(lspace, interator);
   }
 }

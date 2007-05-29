@@ -31,7 +31,7 @@ void gc_init_heap_verification(GC* gc)
     = heap_verifier->need_verify_allocation =  heap_verifier->need_verify_writebarrier = FALSE;
   
   if(!verifier_parse_options(heap_verifier, GC_VERIFY)){
-    printf("GC Verify options error, verifier will not start.\n");
+    printf("GC Verify options error, verifier will not be started.\n");
     gc_terminate_heap_verification(gc);
     return;
   }
@@ -52,7 +52,6 @@ void gc_terminate_heap_verification(GC* gc)
 
 void verify_heap_before_gc(GC* gc)
 {
-  verifier_log_start();
   verifier_set_gc_collect_kind(heap_verifier->gc_verifier, gc->collect_kind);  
   verifier_set_gen_mode(heap_verifier);
   verifier_reset_mutator_verification(heap_verifier);
@@ -74,7 +73,6 @@ void verify_heap_before_gc(GC* gc)
 
 void verify_heap_after_gc(GC* gc)
 {
-  verifier_log_start();
   if(need_scan_live_objs(heap_verifier))
     (*heap_verifier->live_obj_scanner)(heap_verifier);
   if(need_verify_gc_effect(heap_verifier))
@@ -103,16 +101,15 @@ void event_gc_collect_kind_changed(GC* gc)
   assert(gc->collect_kind == FALLBACK_COLLECTION);
   if(!heap_verifier->need_verify_gc) return;
   
-  verifier_log_start();
   /*finish the fallbacked gc verify*/
   heap_verifier->is_before_gc = FALSE;
   verifier_set_fallback_collection(heap_verifier->gc_verifier, TRUE);  
   (*heap_verifier->live_obj_scanner)(heap_verifier);  
   verify_gc_effect(heap_verifier);
-  printf("GC Fall Back, GC end.\n");
   verifier_log_after_gc(heap_verifier);
   verifier_clear_gc_verification(heap_verifier);
 
+  verifier_log_start("GC start");
   /*start fallback major gc verify */
   heap_verifier->is_before_gc = TRUE;
   verifier_set_fallback_collection(heap_verifier->gc_verifier, TRUE);  

@@ -394,7 +394,8 @@ void gc_gen_adjust_heap_size(GC_Gen* gc, int64 pause_time)
 
 
   if(new_heap_total_size <= heap_total_size) return;
-  if(new_heap_total_size > max_heap_size_bytes - LOS_HEAD_RESERVE_FOR_HEAP_NULL) 
+  /*If there is only small piece of area left not committed, we just merge it into the heap at once*/
+  if(new_heap_total_size + (max_heap_size_bytes >> 5) > max_heap_size_bytes - LOS_HEAD_RESERVE_FOR_HEAP_NULL) 
     new_heap_total_size = max_heap_size_bytes - LOS_HEAD_RESERVE_FOR_HEAP_NULL;
 
   adjust_size = new_heap_total_size - heap_total_size;

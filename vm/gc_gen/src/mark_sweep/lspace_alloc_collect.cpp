@@ -321,22 +321,24 @@ void lspace_reset_after_collection(Lspace* lspace)
 
     switch(tuner->kind){
       case TRANS_FROM_MOS_TO_LOS:{
-        assert(!lspace->move_object);
-        void* origin_end = lspace->heap_end;
-        lspace->heap_end = (void*)(((GC_Gen*)gc)->mos->blocks);
-        /*The assumption that the first word of one KB must be zero when iterating lspace in 
-        that function lspace_get_next_marked_object is not true*/
-        Free_Area* trans_fa = free_area_new(origin_end, trans_size);
-        free_pool_add_area(lspace->free_pool, trans_fa);
+        if(lspace->move_object){
+          assert(tuner->force_tune);
+          Block* mos_first_block = ((GC_Gen*)gc)->mos->blocks;
+          lspace->heap_end = (void*)mos_first_block;
+          assert(!(tuner->tuning_size % GC_BLOCK_SIZE_BYTES));
+          new_fa_size = (POINTER_SIZE_INT)lspace->scompact_fa_end - (POINTER_SIZE_INT)lspace->scompact_fa_start + tuner->tuning_size;
+          Free_Area* fa = free_area_new(lspace->scompact_fa_start,  new_fa_size);
+          if(new_fa_size >= GC_OBJ_SIZE_THRESHOLD) free_pool_add_area(lspace->free_pool, fa);
+        }else{
+          void* origin_end = lspace->heap_end;
+          lspace->heap_end = (void*)(((GC_Gen*)gc)->mos->blocks);
+          /*The assumption that the first word of one KB must be zero when iterating lspace in 
+          that function lspace_get_next_marked_object is not true*/
+          Free_Area* trans_fa = free_area_new(origin_end, trans_size);
+          if(trans_size >= GC_OBJ_SIZE_THRESHOLD) free_pool_add_area(lspace->free_pool, trans_fa);
+        }
         lspace->committed_heap_size += trans_size;
         lspace->reserved_heap_size += trans_size;
-        if(lspace->move_object){
-            Block* mos_first_block = ((GC_Gen*)gc)->mos->blocks;
-            lspace->heap_end = (void*)mos_first_block;
-            new_fa_size = (POINTER_SIZE_INT)lspace->scompact_fa_end - (POINTER_SIZE_INT)lspace->scompact_fa_start;
-            Free_Area* fa = free_area_new(lspace->scompact_fa_start,  new_fa_size);
-            if(new_fa_size >= GC_OBJ_SIZE_THRESHOLD) free_pool_add_area(lspace->free_pool, fa);
-        }
         break;
       }
       case TRANS_FROM_LOS_TO_MOS:{
@@ -351,7 +353,7 @@ void lspace_reset_after_collection(Lspace* lspace)
         assert((POINTER_SIZE_INT)lspace->scompact_fa_end > (POINTER_SIZE_INT)lspace->scompact_fa_start + tuner->tuning_size);
         new_fa_size = (POINTER_SIZE_INT)lspace->scompact_fa_end - (POINTER_SIZE_INT)lspace->scompact_fa_start - tuner->tuning_size;
         Free_Area* fa = free_area_new(lspace->scompact_fa_start,  new_fa_size);
-        free_pool_add_area(lspace->free_pool, fa);
+        if(new_fa_size >= GC_OBJ_SIZE_THRESHOLD) free_pool_add_area(lspace->free_pool, fa);
         break;
       }
       default:{
@@ -360,7 +362,7 @@ void lspace_reset_after_collection(Lspace* lspace)
           assert(!tuner->tuning_size);
           new_fa_size = (POINTER_SIZE_INT)lspace->scompact_fa_end - (POINTER_SIZE_INT)lspace->scompact_fa_start;
           Free_Area* fa = free_area_new(lspace->scompact_fa_start,  new_fa_size);
-          free_pool_add_area(lspace->free_pool, fa);
+          if(new_fa_size >= GC_OBJ_SIZE_THRESHOLD) free_pool_add_area(lspace->free_pool, fa);
         }
         break;
       }

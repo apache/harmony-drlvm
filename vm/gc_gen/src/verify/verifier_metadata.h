@@ -20,14 +20,15 @@ typedef struct Heap_Verifier_Metadata{
   Pool* root_set_pool;
   Pool* mark_task_pool;
   
-  Pool* free_objects_pool;
-  
   Pool* objects_pool_before_gc;
   Pool* objects_pool_after_gc; 
   
   Pool* resurrect_objects_pool_before_gc;
   Pool* resurrect_objects_pool_after_gc;
-  
+
+  Pool* hashcode_pool_before_gc;
+  Pool* hashcode_pool_after_gc;
+
   Pool* new_objects_pool;
 } Heap_Verifier_Metadata;
 
@@ -39,6 +40,7 @@ void gc_verifier_metadata_destruct(Heap_Verifier* heap_verifier);
 Vector_Block* gc_verifier_metadata_extend(Pool* pool, Boolean is_set_pool);
 
 void verifier_clear_pool(Pool* working_pool, Pool* free_pool, Boolean is_vector_stack);
+Pool* verifier_copy_pool_reverse_order(Pool* source_pool);
 
 inline Vector_Block* verifier_free_set_pool_get_entry(Pool* free_pool)
 {
@@ -64,8 +66,6 @@ inline Vector_Block* verifier_free_task_pool_get_entry(Pool* free_pool)
   return block; 
 }
 
-
-
 inline void verifier_tracestack_push(void* p_task, Vector_Block_Ptr& trace_task)
 {
   vector_stack_push(trace_task, (POINTER_SIZE_INT)p_task);
@@ -77,17 +77,6 @@ inline void verifier_tracestack_push(void* p_task, Vector_Block_Ptr& trace_task)
   assert(trace_task);
 }
 
-inline void verifier_rootset_push(void* p_task, Vector_Block_Ptr& root_set)
-{
-  vector_block_add_entry(root_set, (POINTER_SIZE_INT)p_task);
-  
-  if( !vector_block_is_full(root_set)) return;
-    
-  pool_put_entry(verifier_metadata->root_set_pool, root_set);
-  root_set = verifier_free_set_pool_get_entry(verifier_metadata->free_set_pool);  
-  assert(root_set);
-}
-
 inline void verifier_set_push(void* p_data, Vector_Block_Ptr& set_block, Pool* pool)
 {
   vector_block_add_entry(set_block, (POINTER_SIZE_INT)p_data);
@@ -95,7 +84,7 @@ inline void verifier_set_push(void* p_data, Vector_Block_Ptr& set_block, Pool* p
   if( !vector_block_is_full(set_block) ) return;
   
   pool_put_entry(pool, set_block);
-  set_block = verifier_free_set_pool_get_entry(verifier_metadata->free_objects_pool);
+  set_block = verifier_free_set_pool_get_entry(verifier_metadata->free_set_pool);
   assert(set_block);
 }
 
