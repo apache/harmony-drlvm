@@ -309,14 +309,14 @@ public:
     //
     // Set current HIR instruction in order to allow Code Generator propagate bc offset info
     //
-    virtual void setCurrentHIRInstrID(uint64 HIRInstrID) {
+    virtual void setCurrentHIRInstrID(uint32 HIRInstrID) {
         currentHIRInstrID =  HIRInstrID;
     }
 private: 
     //
     // pointer to HIR instruction with bytecode offset 
     //
-    uint64 currentHIRInstrID;
+    uint32 currentHIRInstrID;
 
     Opnd *  convertIntToInt(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd=NULL, bool isZeroExtend=false);
     Opnd *  convertIntToFp(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd=NULL);

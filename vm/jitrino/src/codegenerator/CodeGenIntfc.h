@@ -479,7 +479,7 @@ public:
     // Any subsequently generated instructions have no associated ID.
     virtual void            clearCurrentPersistentId() = 0;
     // Set current HIR instruction in order to allow Code Generator propagate bc offset info
-    virtual void setCurrentHIRInstrID(uint64 HIRInstrID) = 0; 
+    virtual void setCurrentHIRInstrID(uint32 HIRInstrID) = 0; 
 private:
 };
 
@@ -581,8 +581,8 @@ public:
 
     virtual void* getAddressOfThis(MethodDesc* methodDesc, const ::JitFrameContext* context, bool isFirst) = 0;
 
-    virtual bool getBcLocationForNative(MethodDesc* method, uint64 native_pc, uint16 *bc_pc) = 0;
-    virtual bool getNativeLocationForBc(MethodDesc* method,  uint16 bc_pc, uint64 *native_pc) = 0;
+    virtual bool getBcLocationForNative(MethodDesc* method, POINTER_SIZE_INT native_pc, uint16 *bc_pc) = 0;
+    virtual bool getNativeLocationForBc(MethodDesc* method,  uint16 bc_pc, POINTER_SIZE_INT *native_pc) = 0;
 
 #ifdef USE_SECURITY_OBJECT
     virtual void* getAddressOfSecurityObject(MethodDesc* methodDesc, const ::JitFrameContext* context) = 0;

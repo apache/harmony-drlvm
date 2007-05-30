@@ -203,9 +203,11 @@ Inst * InstCodeSelector::appendInsts(Inst *inst)
 {
     assert(currentBasicBlock);
     if (compilationInterface.isBCMapInfoRequired()) {
-        uint64 bcOffset = codeSelector.bc2HIRmapHandler->getVectorEntry(currentHIRInstrID);
-        uint64 insID = inst->getId();
-        if (bcOffset != ILLEGAL_VALUE) codeSelector.bc2LIRmapHandler->setVectorEntry(insID, bcOffset);
+        uint16 bcOffset = getBCMappingEntry(codeSelector.bc2HIRmapHandler, currentHIRInstrID);
+        uint32 insID = inst->getId();
+        if (bcOffset != ILLEGAL_BC_MAPPING_VALUE) {
+            setBCMappingEntry(codeSelector.bc2LIRmapHandler, insID, bcOffset);
+        }
     }
     if (Log::isEnabled()){
         Inst * i=inst; 

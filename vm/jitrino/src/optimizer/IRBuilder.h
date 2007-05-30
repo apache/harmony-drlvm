@@ -472,8 +472,7 @@ private:
 
     // current bc offset
     uint32 offset;
-    VectorHandler* bc2HIRmapHandler;
-    MapHandler* lostBCMapOffsetHandler;
+    void* bc2HIRmapHandler;
 };
 
 } //namespace Jitrino 

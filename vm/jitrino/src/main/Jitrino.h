@@ -59,8 +59,8 @@ public:
     static bool  RecompiledMethodEvent(MethodDesc * recompiledMethodDesc, void * data);
     static MemoryManager& getGlobalMM() { return *global_mm; }
 
-    static bool GetBcLocationForNative(MethodDesc* method, uint64 native_pc, uint16 *bc_pc);
-    static bool GetNativeLocationForBc(MethodDesc* method, uint16 bc_pc, uint64 *native_pc);
+    static bool GetBcLocationForNative(MethodDesc* method, POINTER_SIZE_INT native_pc, uint16 *bc_pc);
+    static bool GetNativeLocationForBc(MethodDesc* method, uint16 bc_pc, POINTER_SIZE_INT *native_pc);
 
     static uint32 GetInlineDepth(InlineInfoPtr ptr, uint32 offset);
     static Method_Handle GetInlinedMethod(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth);

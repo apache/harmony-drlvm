@@ -285,8 +285,7 @@ cseHashTable(NULL),
 simplifier(NULL),
 tauMethodSafeOpnd(NULL),
 offset(0),
-bc2HIRmapHandler(NULL),
-lostBCMapOffsetHandler(NULL)
+bc2HIRmapHandler(NULL)
 {
     
 }
@@ -313,7 +312,7 @@ void IRBuilder::init(IRManager* irm, TranslatorFlags* traFlags, MemoryManager& t
 
     if (irBuilderFlags.isBCMapinfoRequired) {
         MethodDesc* meth = irm->getCompilationInterface().getMethodToCompile();
-        bc2HIRmapHandler = new(irm->getMemoryManager()) VectorHandler(bcOffset2HIRHandlerName, meth);
+        bc2HIRmapHandler = getContainerHandler(bcOffset2HIRHandlerName, meth);
     }
 }
 
@@ -326,16 +325,12 @@ void IRBuilder::invalid() {
 Inst* IRBuilder::appendInst(Inst* inst) {
     assert(currentLabel);
     if (irBuilderFlags.isBCMapinfoRequired) {
-        //POINTER_SIZE_INT instAddr = (POINTER_SIZE_INT) inst;
-        uint64 instID = inst->getId();
+        uint32 instID = inst->getId();
         if (irBuilderFlags.fullBcMap) {
-            bc2HIRmapHandler->setVectorEntry(instID, offset);
+            setBCMappingEntry(bc2HIRmapHandler, instID, (uint16)offset);
         } else if (inst->asMethodCallInst() || inst->asCallInst()) {
-            bc2HIRmapHandler->setVectorEntry(instID, offset);
+            setBCMappingEntry(bc2HIRmapHandler, instID, (uint16)offset);
         }
-//#ifdef _DEBUG
-//        lostBCMapOffsetHandler->setMapEntry((uint64) offset, 0x01);
-//#endif
     }
     currentLabel->getNode()->appendInst(inst);
     if(Log::isEnabled()) {

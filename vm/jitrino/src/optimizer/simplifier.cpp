@@ -4204,7 +4204,7 @@ SimplifierWithInstFactory::genDirectCall(
                                             numArgs, args, 
                                             methodDesc);
     if ( inlineBuilder ) {
-        uint32 callOffset = ILLEGAL_VALUE;
+        uint32 callOffset = ILLEGAL_BC_MAPPING_VALUE;
         inlineBuilder->buildInlineInfoForInst(inst, callOffset, methodDesc);
     }
 

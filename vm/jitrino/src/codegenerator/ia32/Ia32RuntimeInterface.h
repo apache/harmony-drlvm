@@ -58,8 +58,8 @@ public:
 
     virtual bool  recompiledMethodEvent(MethodDesc * methodDesc, void * data);
 
-    virtual bool getBcLocationForNative(MethodDesc* method, uint64 native_pc, uint16 *bc_pc);
-    virtual bool getNativeLocationForBc(MethodDesc* method,  uint16 bc_pc, uint64 *native_pc);
+    virtual bool getBcLocationForNative(MethodDesc* method, POINTER_SIZE_INT native_pc, uint16 *bc_pc);
+    virtual bool getNativeLocationForBc(MethodDesc* method,  uint16 bc_pc, POINTER_SIZE_INT *native_pc);
 
     virtual uint32          getInlineDepth(InlineInfoPtr ptr, uint32 offset);
     virtual Method_Handle   getInlinedMethod(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth);

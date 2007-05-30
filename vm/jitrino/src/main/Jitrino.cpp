@@ -239,35 +239,15 @@ void runPipeline(CompilationContext* c) {
 }
 
 bool compileMethod(CompilationContext* cc) {
-    
     if(Jitrino::flags.skip) {
         return false;
     }
 
-    //
-    // IRManager contains the method's IR for the global optimizer.
-    // It contains a memory manager that is live during optimization
-    //
-    
     MethodDesc* methDesc = cc->getVMCompilationInterface()->getMethodToCompile();
     MemoryManager& ir_mmgr = cc->getCompilationLevelMemoryManager();
-    
     initHandleMap(ir_mmgr, methDesc);
 
-    // add bc <-> HIR code map handler
-    StlVector<uint64> *bc2HIRMap;
-    if (cc->getVMCompilationInterface()->isBCMapInfoRequired()) {
-        bc2HIRMap = new(ir_mmgr) StlVector<uint64>(ir_mmgr, methDesc->getByteCodeSize() 
-                * (ESTIMATED_HIR_SIZE_PER_BYTECODE) + 5, ILLEGAL_VALUE);
-        addContainerHandler(bc2HIRMap, bcOffset2HIRHandlerName, methDesc);
-    }
-
     runPipeline(cc);
-    
-    // remove bc <-> HIR code map handler
-    if (cc->getVMCompilationInterface()->isBCMapInfoRequired()) {
-        removeContainerHandler(bcOffset2HIRHandlerName, methDesc);
-    }
     
     bool success = !cc->isCompilationFailed();
     return success;
@@ -357,12 +337,12 @@ Jitrino::RecompiledMethodEvent(MethodDesc *               recompiledMethodDesc,
 }
 
 bool 
-Jitrino::GetBcLocationForNative(MethodDesc* method, uint64 native_pc, uint16 *bc_pc) { 
+Jitrino::GetBcLocationForNative(MethodDesc* method, POINTER_SIZE_INT native_pc, uint16 *bc_pc) { 
     return runtimeInterface->getBcLocationForNative(method, native_pc, bc_pc);
 }
 
 bool
-Jitrino::GetNativeLocationForBc(MethodDesc* method, uint16 bc_pc, uint64 *native_pc) { 
+Jitrino::GetNativeLocationForBc(MethodDesc* method, uint16 bc_pc, POINTER_SIZE_INT *native_pc) { 
     return runtimeInterface->getNativeLocationForBc(method, bc_pc, native_pc);
 }
 

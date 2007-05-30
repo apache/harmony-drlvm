@@ -114,7 +114,7 @@ EscAnalyzer::EscAnalyzer(MemoryManager& mm, SessionAction* argSource, IRManager&
     if (compInterface.isBCMapInfoRequired()) {
         isBCmapRequired = true;
         MethodDesc* meth = compInterface.getMethodToCompile();
-        bc2HIRMapHandler = new VectorHandler(bcOffset2HIRHandlerName, meth);
+        bc2HIRMapHandler = getContainerHandler(bcOffset2HIRHandlerName, meth);
     } else {
         isBCmapRequired = false;
         bc2HIRMapHandler = NULL;
@@ -6328,11 +6328,11 @@ EscAnalyzer::checkToScalarizeFinalFiels(CnGNode* onode, ScObjFlds* scObjFlds) {
 void
 EscAnalyzer::setNewBCMap(Inst* new_i, Inst* old_i) {
     if (isBCmapRequired) {
-        uint64 bcOffset = ILLEGAL_VALUE;
-        uint64 instID = old_i->getId();
-        bcOffset = bc2HIRMapHandler->getVectorEntry(instID);
-        if (bcOffset != ILLEGAL_VALUE) {
-            bc2HIRMapHandler->setVectorEntry(new_i->getId(), bcOffset);
+        uint16 bcOffset = ILLEGAL_BC_MAPPING_VALUE;
+        uint32 instID = old_i->getId();
+        bcOffset = getBCMappingEntry(bc2HIRMapHandler, instID);
+        if (bcOffset != ILLEGAL_BC_MAPPING_VALUE) {
+            setBCMappingEntry(bc2HIRMapHandler, new_i->getId(), bcOffset);
         }
     }
 }  // setNewBCMap(Inst* new_i, Inst* old_i)
@@ -6345,11 +6345,11 @@ EscAnalyzer::setNewBCMap(Inst* new_i, Inst* old_i) {
 void
 EscAnalyzer::remBCMap(Inst* inst) {
     if (isBCmapRequired) {
-        uint64 bcOffset = ILLEGAL_VALUE;
-        uint64 instID = inst->getId();
-        bcOffset = bc2HIRMapHandler->getVectorEntry(instID);
-        if (bcOffset != ILLEGAL_VALUE) {
-            bc2HIRMapHandler->setVectorEntry(instID, ILLEGAL_VALUE);
+        uint16 bcOffset = ILLEGAL_BC_MAPPING_VALUE;
+        uint32 instID = inst->getId();
+        bcOffset = getBCMappingEntry(bc2HIRMapHandler, instID);
+        if (bcOffset != ILLEGAL_BC_MAPPING_VALUE) {
+            setBCMappingEntry(bc2HIRMapHandler, instID, ILLEGAL_BC_MAPPING_VALUE);
         }
     }
 }  // remBCMap(Inst* inst)

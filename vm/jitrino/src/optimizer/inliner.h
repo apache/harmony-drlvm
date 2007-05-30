@@ -189,7 +189,7 @@ private:
 
     bool _usesOptimisticBalancedSync;
     bool isBCmapRequired;
-    VectorHandler* bc2HIRMapHandler;
+    void* bc2HIRMapHandler;
     TranslatorAction* translatorAction;
 };
 

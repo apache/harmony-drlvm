@@ -340,11 +340,10 @@ static ActionFactory<CopyExpansion> _copy("copy");
 void CopyExpansion::runImpl()
 {
     CompilationInterface& compIntfc = irManager->getCompilationInterface();
-    VectorHandler* bc2LIRmapHandler = NULL;
-    MemoryManager& mm = irManager->getMemoryManager();
+    void* bc2LIRmapHandler = NULL;
 
     if (compIntfc.isBCMapInfoRequired()) {
-        bc2LIRmapHandler = new(mm) VectorHandler(bcOffset2LIRHandlerName, compIntfc.getMethodToCompile());
+        bc2LIRmapHandler = getContainerHandler(bcOffset2LIRHandlerName, compIntfc.getMethodToCompile());
     }
 
     // call SimpleStackOpndCoalescer before all other things including finalizeCallSites
@@ -402,20 +401,19 @@ void CopyExpansion::runImpl()
                         }
                         copySequence = irManager->newCopySequence(mn, inst->getOpnd(0), NULL, gpRegUsageMask, flagsRegUsageMask);
                     }
-                    // CopyPseudoInst map entries should be changed by new copy sequence instrutions in byte code map
+                    // CopyPseudoInst map entries should be changed by new copy sequence instructions in byte code map
                     if (compIntfc.isBCMapInfoRequired() && copySequence != NULL) {
-                        uint64 instID = inst->getId();
-                        uint64 bcOffs = bc2LIRmapHandler->getVectorEntry(instID);
-                        if (bcOffs != ILLEGAL_VALUE) {
+                        uint32 instID = inst->getId();
+                        uint16 bcOffs = getBCMappingEntry(bc2LIRmapHandler, instID);
+                        if (bcOffs != ILLEGAL_BC_MAPPING_VALUE) {
                             Inst * cpInst=NULL, * nextCpInst=copySequence, * lastCpInst=copySequence->getPrev(); 
                             do { 
                                 cpInst=nextCpInst;
                                 nextCpInst=cpInst->getNext();
-                                uint64 cpInstID = cpInst->getId();
-                                bc2LIRmapHandler->setVectorEntry(cpInstID, bcOffs);
+                                uint32 cpInstID = cpInst->getId();
+                                setBCMappingEntry(bc2LIRmapHandler, cpInstID, bcOffs);
                             } while ((cpInst != lastCpInst) && (cpInst != NULL));
                         }
-                        bc2LIRmapHandler->removeVectorEntry(instID);
                     }
                     // End of code map change
 

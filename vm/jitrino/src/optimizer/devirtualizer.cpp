@@ -415,11 +415,11 @@ Devirtualizer::getTopProfiledCalleeType(IRManager& regionIRM, MethodDesc *origMe
     MethodDesc* rootMethodDesc = regionIRM.getCompilationInterface().getMethodToCompile();
 
     // Get bytecode offset of the call
-    VectorHandler* bc2HIRMapHandler = new VectorHandler(bcOffset2HIRHandlerName, rootMethodDesc);
-    uint64 callInstId = (uint64)call->getId();
-    uint32 bcOffset = (uint32)bc2HIRMapHandler->getVectorEntry(callInstId);
+    void* bc2HIRMapHandler = getContainerHandler(bcOffset2HIRHandlerName, rootMethodDesc);
+    uint32 callInstId = call->getId();
+    uint16 bcOffset = getBCMappingEntry(bc2HIRMapHandler, callInstId);
     assert(bcOffset != 0);
-    assert(bcOffset != ILLEGAL_VALUE);
+    assert(bcOffset != ILLEGAL_BC_MAPPING_VALUE);
     Log::out() << "Call instruction bcOffset = " << (int32)bcOffset << std::endl;
 
     // Get profiled vtable value

@@ -50,7 +50,7 @@ LazyExceptionOpt::LazyExceptionOpt(IRManager &ir_manager) :
     if (compInterface.isBCMapInfoRequired()) {
         isBCmapRequired = true;
         MethodDesc* meth = compInterface.getMethodToCompile();
-        bc2HIRMapHandler = new VectorHandler(bcOffset2HIRHandlerName, meth);
+        bc2HIRMapHandler = getContainerHandler(bcOffset2HIRHandlerName, meth);
     } else {
         isBCmapRequired = false;
         bc2HIRMapHandler = NULL;
@@ -540,12 +540,12 @@ LazyExceptionOpt::fixOptCandidates(BitSet* bs) {
                 tinst->unlink();
 
                 if (isBCmapRequired) {
-                    uint64 bcOffset = ILLEGAL_VALUE;
-                    uint64 instID = iinst->getId();
-                    bcOffset = bc2HIRMapHandler->getVectorEntry(instID);
-                    if (bcOffset != ILLEGAL_VALUE) {
-                        bc2HIRMapHandler->setVectorEntry(mptinst->getId(), bcOffset);
-                        bc2HIRMapHandler->setVectorEntry(tlinst->getId(), bcOffset);
+                    uint16 bcOffset = ILLEGAL_BC_MAPPING_VALUE;
+                    uint32 instID = iinst->getId();
+                    bcOffset = getBCMappingEntry(bc2HIRMapHandler, instID);
+                    if (bcOffset != ILLEGAL_BC_MAPPING_VALUE) {
+                        setBCMappingEntry(bc2HIRMapHandler, mptinst->getId(), bcOffset);
+                        setBCMappingEntry(bc2HIRMapHandler, tlinst->getId(), bcOffset);
                     }
                 }
             }

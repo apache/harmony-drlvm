@@ -124,7 +124,7 @@ protected:
     };
     
     // bc to native map stuff
-    VectorHandler* bc2LIRMapHandler;
+    void* bc2LIRMapHandler;
 
     MemoryManager                   memoryManager;
     StlVector<ExceptionHandlerInfo> exceptionHandlerInfos;
@@ -291,7 +291,7 @@ void CodeEmitter::runImpl()
 {
     if (irManager->getCompilationInterface().isBCMapInfoRequired()) {
         MethodDesc* meth = irManager->getCompilationInterface().getMethodToCompile();
-        bc2LIRMapHandler = new(memoryManager) VectorHandler(bcOffset2LIRHandlerName, meth);
+        bc2LIRMapHandler = getContainerHandler(bcOffset2LIRHandlerName, meth);
     }
 
     irManager->setInfo(INLINE_INFO_KEY, new(irManager->getMemoryManager()) InlineInfoMap(irManager->getMemoryManager()));
@@ -527,7 +527,7 @@ void CodeEmitter::postPass()
                     continue;
                 int64 offset=targetCodeStartAddr-instCodeEndAddr;
 
-                uint64 bcOffset = isBcRequired ? bc2LIRMapHandler->getVectorEntry(inst->getId()) : ILLEGAL_VALUE;
+                uint16 bcOffset = isBcRequired ? getBCMappingEntry(bc2LIRMapHandler, inst->getId()) : ILLEGAL_BC_MAPPING_VALUE;
 #ifdef _EM64T_
                 if ( !fit32(offset) ) { // offset is not a signed value that fits into 32 bits
                     // this is for direct calls only
@@ -563,11 +563,11 @@ void CodeEmitter::postPass()
                         registerDirectCall(md,callAddr);
                     }
 
-                    if (bcOffset != ILLEGAL_VALUE) {
-                        bcMap->setEntry((uint64)(POINTER_SIZE_INT)movAddr, bcOffset); // MOV
+                    if (bcOffset != ILLEGAL_BC_MAPPING_VALUE) {
+                        bcMap->setEntry((POINTER_SIZE_INT)movAddr, bcOffset); // MOV
                         // add both possible calls into bcMap
-                        bcMap->setEntry((uint64)(POINTER_SIZE_INT)callAddr, bcOffset); // CALL (immediate)
-                        bcMap->setEntry((uint64)(POINTER_SIZE_INT)callAddr+2, bcOffset); // CALL (register)
+                        bcMap->setEntry((POINTER_SIZE_INT)callAddr, bcOffset); // CALL (immediate)
+                        bcMap->setEntry((POINTER_SIZE_INT)callAddr+2, bcOffset); // CALL (register)
                     }
 
                     newOpndsCreated = true;
@@ -583,12 +583,12 @@ void CodeEmitter::postPass()
                         registerDirectCall(md,instCodeStartAddr);
                     }
 
-                    if (bcOffset != ILLEGAL_VALUE) {
-                        bcMap->setEntry((uint64)(POINTER_SIZE_INT)instCodeStartAddr, bcOffset);
+                    if (bcOffset != ILLEGAL_BC_MAPPING_VALUE) {
+                        bcMap->setEntry((POINTER_SIZE_INT)instCodeStartAddr, bcOffset);
                         if (inst->hasKind(Inst::Kind_CallInst)){
                             // the call can be moved two bytes further after transformation
                             // into register form during code patching 
-                            bcMap->setEntry((uint64)(POINTER_SIZE_INT)instCodeStartAddr+2, bcOffset);
+                            bcMap->setEntry((POINTER_SIZE_INT)instCodeStartAddr+2, bcOffset);
                         }
                     }
                 }
@@ -854,14 +854,14 @@ void CodeEmitter::orderNodesAndMarkInlinees(StlList<MethodMarkerPseudoInst*>& in
                     if( ! inst->hasKind(Inst::Kind_PseudoInst)) {
                         instSizeMap[(POINTER_SIZE_INT) inst->getCodeStartAddr()] = inst->getCodeSize();
                     }
-                    uint64 instID = inst->getId();
-                    uint64 bcOffset = bc2LIRMapHandler->getVectorEntry(instID);
+                    uint32 instID = inst->getId();
+                    uint16 bcOffset = getBCMappingEntry(bc2LIRMapHandler, instID);
                     methInfo->includeInst(inst,bcOffset);
                     // addLocation with ILLEGAL_VALUE for all outers
                     MethodMarkerPseudoInst* outerEntry = methInfo->getOuterMethodEntry();
                     while (outerEntry) {
                         CompiledMethodInfo* outerInfo = methodLocationMap[outerEntry];
-                        outerInfo->includeInst(inst, ILLEGAL_VALUE);
+                        outerInfo->includeInst(inst, ILLEGAL_BC_MAPPING_VALUE);
                         outerEntry = outerInfo->getOuterMethodEntry();
                     }
                 }

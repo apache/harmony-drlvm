@@ -176,7 +176,7 @@ private:
     static int level;
     // Byte code map info
     bool isBCmapRequired;
-    VectorHandler* bc2HIRMapHandler;
+    void* bc2HIRMapHandler;
 };
 
 } // namespace Jitrino

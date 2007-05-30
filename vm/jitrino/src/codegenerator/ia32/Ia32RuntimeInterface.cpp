@@ -70,7 +70,7 @@ void  RuntimeInterface::fixHandlerContext(MethodDesc* methodDesc, JitFrameContex
     stackInfo.fixHandlerContext(context);
 }
 
-bool RuntimeInterface::getBcLocationForNative(MethodDesc* method, uint64 native_pc, uint16 *bc_pc)
+bool RuntimeInterface::getBcLocationForNative(MethodDesc* method, POINTER_SIZE_INT native_pc, uint16 *bc_pc)
 {
     StackInfo stackInfo;
 
@@ -84,9 +84,9 @@ bool RuntimeInterface::getBcLocationForNative(MethodDesc* method, uint64 native_
 
     const char* methName;
 
-    uint64 bcOffset = BcMap::get_bc_location_for_native(native_pc, infoBlock + stackInfoSize + gcMapSize);
-    if (bcOffset != ILLEGAL_VALUE) {
-        *bc_pc = (uint16)bcOffset;
+    uint16 bcOffset = BcMap::get_bc_location_for_native(native_pc, infoBlock + stackInfoSize + gcMapSize);
+    if (bcOffset != ILLEGAL_BC_MAPPING_VALUE) {
+        *bc_pc = bcOffset;
         return true;
     } else if (Log::isLogEnabled(LogStream::RT)) {
         methName = method->getName();
@@ -95,7 +95,7 @@ bool RuntimeInterface::getBcLocationForNative(MethodDesc* method, uint64 native_
     }
     return false;
 }
-bool RuntimeInterface::getNativeLocationForBc(MethodDesc* method, uint16 bc_pc, uint64 *native_pc) {
+bool RuntimeInterface::getNativeLocationForBc(MethodDesc* method, uint16 bc_pc, POINTER_SIZE_INT *native_pc) {
     StackInfo stackInfo;
 
     Byte* infoBlock = method->getInfoBlock();
@@ -104,8 +104,8 @@ bool RuntimeInterface::getNativeLocationForBc(MethodDesc* method, uint16 bc_pc, 
 
     const char* methName;
 
-    uint64 ncAddr = BcMap::get_native_location_for_bc(bc_pc, infoBlock + stackInfoSize + gcMapSize);
-    if (ncAddr != ILLEGAL_VALUE) {
+    POINTER_SIZE_INT ncAddr = BcMap::get_native_location_for_bc(bc_pc, infoBlock + stackInfoSize + gcMapSize);
+    if (ncAddr != ILLEGAL_BC_MAPPING_VALUE) {
         *native_pc =  ncAddr;
         return true;
     } else if (Log::isLogEnabled(LogStream::RT)) {

@@ -26,7 +26,6 @@
 
 namespace Jitrino {
 
-#define ESTIMATED_MEMORY_PER_BYTECODE 128
 #define ESTIMATED_TRANSLATOR_MEMORY_PER_BYTECODE 128
 
 } //namespace Jitrino 

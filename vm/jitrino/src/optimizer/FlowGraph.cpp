@@ -594,7 +594,7 @@ static bool inlineJSR(IRManager* irManager, Node *block, DefUseBuilder& defUses,
         // update the BCMap
         if(irManager->getCompilationInterface().isBCMapInfoRequired()) {
             MethodDesc* meth = irManager->getCompilationInterface().getMethodToCompile();
-            VectorHandler *bc2HIRmapHandler = new(inlineManager) VectorHandler(bcOffset2HIRHandlerName, meth);
+            void *bc2HIRmapHandler = getContainerHandler(bcOffset2HIRHandlerName, meth);
 
             // update the BCMap for each copied node
             NodeRenameTable::Iter nodeIter(nodeRenameTable);
@@ -606,9 +606,9 @@ static bool inlineJSR(IRManager* irManager, Node *block, DefUseBuilder& defUses,
                 Inst* newLast = (Inst*)newNode->getLastInst();
                 if (oldLast->asMethodCallInst() || oldLast->asCallInst()) {
                     assert(newLast->asMethodCallInst() || newLast->asCallInst());
-                    uint32 bcOffset = bc2HIRmapHandler->getVectorEntry(oldLast->getId());
-                    assert((bcOffset != 0) && (bcOffset != ILLEGAL_VALUE));
-                    bc2HIRmapHandler->setVectorEntry(newLast->getId(), bcOffset);
+                    uint16 bcOffset = getBCMappingEntry(bc2HIRmapHandler, oldLast->getId());
+                    assert((bcOffset != 0) && (bcOffset != ILLEGAL_BC_MAPPING_VALUE));
+                    setBCMappingEntry(bc2HIRmapHandler, newLast->getId(), bcOffset);
                 }
 
             }
@@ -1216,16 +1216,8 @@ void HIRDotPrinter::printDotNode(Node* node) {
     if (!node->isEmpty()) {
         out << "\\l|\\" << std::endl;
         Inst* first = (Inst*)node->getFirstInst();
-        VectorHandler* bc2HIRMapHandler = NULL;
         for (Inst* i = first->getNextInst(); i != NULL; i=i->getNextInst()) { // skip label inst
             i->print(out); 
-            if (bc2HIRMapHandler != NULL) {
-                uint64 bcOffset = 0;
-                //POINTER_SIZE_INT instAddr = (POINTER_SIZE_INT) i;
-                uint64 instID = i->getId();
-                bcOffset = bc2HIRMapHandler->getVectorEntry(instID);
-                if (bcOffset != ILLEGAL_VALUE) out<<" "<<"bcOff:"<< (uint16)bcOffset<<" ";
-            }
             out << "\\l\\" << std::endl;
         }
         out << "}";

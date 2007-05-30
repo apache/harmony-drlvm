@@ -211,7 +211,7 @@ bool RuntimeInterface::recompiledMethodEvent(MethodDesc               *methodDes
 
 //----------------------------------------------------------------------------------------//
 
-bool RuntimeInterface::getBcLocationForNative(MethodDesc *methodDesc, uint64 native_pc, uint16 *bc_pc) {
+bool RuntimeInterface::getBcLocationForNative(MethodDesc *methodDesc, POINTER_SIZE_INT native_pc, uint16 *bc_pc) {
 
     std::cout << "FIXME: IPF::RuntimeInterface::getBcLocationForNative " << methodDesc->getName() << endl;
 //    assert(0);
@@ -221,7 +221,7 @@ bool RuntimeInterface::getBcLocationForNative(MethodDesc *methodDesc, uint64 nat
 
 //----------------------------------------------------------------------------------------//
 
-bool RuntimeInterface::getNativeLocationForBc(MethodDesc *methodDesc,  uint16 bc_pc, uint64 *native_pc) {
+bool RuntimeInterface::getNativeLocationForBc(MethodDesc *methodDesc,  uint16 bc_pc, POINTER_SIZE_INT *native_pc) {
 
     std::cout << "FIXME: IPF::RuntimeInterface::getNativeLocationForBc " << methodDesc->getName() << endl;
     assert(0);

@@ -351,7 +351,7 @@ void WebMaker::phase1()
     {
         Opndx* opndxp = 0;
         if (!irManager->getOpnd(i)->hasAssignedPhysicalLocation())
-            opndxp = new Opndx(mm);
+            opndxp = new (mm) Opndx(mm);
         opndxs[i] = opndxp;
     }
 
@@ -441,7 +441,7 @@ void WebMaker::phase2()
 {
     nodexs.resize(nodecount);
     for (size_t n = 0; n != nodecount; ++n)
-        nodexs[n] = new Nodex(mm, globcount);
+        nodexs[n] = new (mm) Nodex(mm, globcount);
 
     Opndx* opndxp;
     for (size_t i = 0; i != opandcount; ++i)
@@ -633,7 +633,7 @@ void WebMaker::phase3()
                         else
                         {// global oprand
                             if (opdefp->useps == 0)
-                                opdefp->useps = new OpDef::Instps(mm);
+                                opdefp->useps = new (mm) OpDef::Instps(mm);
                             if (!isdef)
                                 opdefp->useps->push_back(instp);
                         }
@@ -713,7 +713,7 @@ void WebMaker::linkDef(Opndx::OpDefs& opdefs, OpDef* lastdefp, OpDef* opdefp)
 BitSet* WebMaker::bitsetp (BitSet*& bsp)
 {
     if (bsp == 0)
-        bsp = new BitSet(mm, globcount);
+        bsp = new (mm) BitSet(mm, globcount);
     else
         bsp->resize(globcount);
     return bsp;

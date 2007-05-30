@@ -362,12 +362,14 @@ public:
     // The two types are pointer types, could their values be the same (i.e. point to the same locations)?
     static bool mayAliasPtr(Type*, Type*);
 
-    const uint32 id;
     uint32 getId() { return id; }
+
 protected:
     virtual bool    _isFinalClass()    {return false;}
     static uint32 nextTypeId;
- 
+
+private:
+    const uint32 id;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -82,7 +82,7 @@ Inliner::Inliner(SessionAction* argSource, MemoryManager& mm, IRManager& irm, bo
     if (irm.getCompilationInterface().isBCMapInfoRequired()) {
         isBCmapRequired = true;
         MethodDesc* meth = irm.getCompilationInterface().getMethodToCompile();
-        bc2HIRMapHandler = new VectorHandler(bcOffset2HIRHandlerName, meth);
+        bc2HIRMapHandler = getContainerHandler(bcOffset2HIRHandlerName, meth);
     } else {
         isBCmapRequired = false;
         bc2HIRMapHandler = NULL;
@@ -842,16 +842,16 @@ Inliner::inlineRegion(InlineNode* inlineNode, bool updatePriorityQueue) {
                 // InlineInfo order is parent-first 
                 //     (ii might be non-empty when translation-level inlining is on)
                 //
-                uint32 bcOff = ILLEGAL_VALUE;
+                uint16 bcOff = ILLEGAL_BC_MAPPING_VALUE;
 
                 if (isBCmapRequired) {
-                    uint64 callIinstID = (uint64) callInst->getId();
-                    uint64 iinstID = (uint64) i->getId();
-                    bcOff = (uint32)bc2HIRMapHandler->getVectorEntry(iinstID);
+                    uint32 callIinstID = callInst->getId();
+                    uint32 iinstID = i->getId();
+                    bcOff = getBCMappingEntry(bc2HIRMapHandler, iinstID);
                     if (iinstID != callIinstID) {
-                        uint32 inlinedBcOff = ILLEGAL_VALUE;
-                        inlinedBcOff = (uint32)bc2HIRMapHandler->getVectorEntry(callIinstID);
-                        bc2HIRMapHandler->setVectorEntry(iinstID, inlinedBcOff);
+                        uint16 inlinedBcOff = ILLEGAL_BC_MAPPING_VALUE;
+                        inlinedBcOff = getBCMappingEntry(bc2HIRMapHandler, callIinstID);
+                        setBCMappingEntry(bc2HIRMapHandler, iinstID, inlinedBcOff);
                     }
                 }
 
@@ -966,14 +966,6 @@ InlineNode* Inliner::createInlineNode(CompilationContext& inlineCC, MethodCallIn
     // Augment inline tree
     InlineNode *inlineNode = new (_tmpMM) InlineNode(*inlinedIRM, call, call->getNode());
     
-    // Call a translator 
-    if (isBCmapRequired) {
-        uint32 methodByteSize = methodDesc->getByteCodeSize();
-        size_t incSize = methodByteSize * ESTIMATED_HIR_SIZE_PER_BYTECODE;
-        MethodDesc* parentMethod = _toplevelIRM.getCompilationInterface().getMethodToCompile();
-        incVectorHandlerSize(bcOffset2HIRHandlerName, parentMethod, incSize);
-    }
-
     inlineCC.setHIRManager(inlinedIRM);
     
     //prepare type info

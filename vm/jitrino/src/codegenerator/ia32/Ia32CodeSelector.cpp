@@ -65,8 +65,8 @@ CfgCodeSelector::CfgCodeSelector(CompilationInterface&      compIntfc,
 
     if (compIntfc.isBCMapInfoRequired()) {
         MethodDesc* meth = compIntfc.getMethodToCompile();
-        bc2HIRmapHandler = new(irMemManager) VectorHandler(bcOffset2HIRHandlerName, meth);
-        bc2LIRmapHandler = new(irMemManager) VectorHandler(bcOffset2LIRHandlerName, meth);
+        bc2HIRmapHandler = getContainerHandler(bcOffset2HIRHandlerName, meth);
+        bc2LIRmapHandler = getContainerHandler(bcOffset2LIRHandlerName, meth);
    }
     InstCodeSelector::onCFGInit(irManager);
 }

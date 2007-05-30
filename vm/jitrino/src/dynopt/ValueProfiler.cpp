@@ -97,10 +97,10 @@ void ValueProfilerInstrumentationPass::_run(IRManager& irm)
                         continue;
                     }
                 }
-                VectorHandler* bc2HIRMapHandler = new (mm) VectorHandler(bcOffset2HIRHandlerName, &md);
-                uint64 callInstId = (uint64)lastInst->getId();
-                key = (uint32)bc2HIRMapHandler->getVectorEntry(callInstId);
-                assert(key != ILLEGAL_VALUE);
+                void* bc2HIRMapHandler = getContainerHandler(bcOffset2HIRHandlerName, &md);
+                uint32 callInstId = lastInst->getId();
+                key = (uint32)getBCMappingEntry(bc2HIRMapHandler, callInstId);
+                assert(key != ILLEGAL_BC_MAPPING_VALUE);
                 assert(key != 0);
                 if (debug) {
                     Log::out() << "Use call instruction bcOffset = " << (int32)key << std::endl;

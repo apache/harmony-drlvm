@@ -1,4 +1,4 @@
-/*
+    /*
  *  Licensed to the Apache Software Foundation (ASF) under one or more
  *  contributor license agreements.  See the NOTICE file distributed with
  *  this work for additional information regarding copyright ownership.
@@ -235,9 +235,7 @@ JIT_compile_method_with_params(JIT_Handle jit, Compile_Handle compilation,
                                Method_Handle method_handle,
                                OpenMethodExecutionParams compilation_params)
 {
-    MemoryManager memManager(method_get_byte_code_size(method_handle)*
-                             ESTIMATED_MEMORY_PER_BYTECODE,
-                             "JIT_compile_method.memManager");
+    MemoryManager memManager(method_get_byte_code_size(method_handle), "JIT_compile_method.memManager");
     JIT_Handle jitHandle = method_get_JIT_id(compilation);
     JITInstanceContext* jitContext = Jitrino::getJITInstanceContext(jitHandle);
     assert(jitContext!= NULL);
@@ -573,7 +571,7 @@ get_native_location_for_bc(JIT_Handle jit, Method_Handle method,
 #endif
 
     MethodDesc methDesc(method, jit);
-    uint64* ncAddr = (uint64*) native_pc;
+    POINTER_SIZE_INT* ncAddr = (POINTER_SIZE_INT*) native_pc;
 
     if (Jitrino::GetNativeLocationForBc(&methDesc, bc_pc, ncAddr)) {
         return EXE_ERROR_NONE;
@@ -595,7 +593,7 @@ get_bc_location_for_native(JIT_Handle jit, Method_Handle method,
 
     MethodDesc methDesc(method, jit);
     POINTER_SIZE_INT ncAddr = (POINTER_SIZE_INT) native_pc;
-    if (Jitrino::GetBcLocationForNative(&methDesc, (uint64)ncAddr, bc_pc)) {
+    if (Jitrino::GetBcLocationForNative(&methDesc, ncAddr, bc_pc)) {
         return EXE_ERROR_NONE;
     }
     return EXE_ERROR_INVALID_LOCATION;

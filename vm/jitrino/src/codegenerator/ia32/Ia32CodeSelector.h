@@ -136,8 +136,8 @@ private:
     //
     // bc map info
     //
-    VectorHandler* bc2HIRmapHandler;
-    VectorHandler* bc2LIRmapHandler;
+    void* bc2HIRmapHandler;
+    void* bc2LIRmapHandler;
 
     friend class InstCodeSelector;
 };

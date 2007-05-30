@@ -2102,8 +2102,7 @@ void _BlockCodeSelector::genCode(InstructionCallback& instructionCallback) {
             Log::out() << ::std::endl;
         }
         if (irmanager.getCompilationInterface().isBCMapInfoRequired()) {
-            //POINTER_SIZE_INT instAddr = (POINTER_SIZE_INT) inst;
-            uint64 instID = inst->getId();
+            uint32 instID = inst->getId();
             instructionCallback.setCurrentHIRInstrID(instID);
         }
         genInstCode(instructionCallback, inst, !sinkConstants);

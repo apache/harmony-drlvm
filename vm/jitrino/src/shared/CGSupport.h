@@ -22,8 +22,7 @@
 #include "MemoryManager.h"
 #include "VMInterface.h"
 
-//FIXME 64-bit usage
-#define ILLEGAL_VALUE 0xFFFFFFFF
+#define ILLEGAL_BC_MAPPING_VALUE 0xFFFF
 
 #define ESTIMATED_LIR_SIZE_PER_HIR 0x3
 #define ESTIMATED_HIR_SIZE_PER_BYTECODE 0x8
@@ -32,38 +31,15 @@ namespace Jitrino {
 
 extern const char* bcOffset2LIRHandlerName;
 extern const char* bcOffset2HIRHandlerName;
-extern const char* lostBCOffsetHandlerName;
 
 void initHandleMap(MemoryManager& mm, MethodDesc* meth);
-void enumerateHandlMap(MethodDesc* meth);
-
-//  Old interface to work with MapHandlers is deprecated since
-//  it inefficient due to problems with reenterability on resolution
-
-//void addMapHandler(void *mapHandler, const char* name);
-//void removeMapHandler(const char* name);
-//void* getMapHandler(const char* name);
-//uint64 getHandlerSize(const char* name);
-//bool isHandlerExist(const char* name);
 
 void addContainerHandler(void* contHandler, const char* name, MethodDesc* meth);
-void removeContainerHandler(const char* name, MethodDesc* meth);
 void* getContainerHandler(const char* name, MethodDesc* meth);
-bool isContainerHandlerExist(const char* name, MethodDesc* meth);
 
-void incVectorHandlerSize(const char* name, MethodDesc* meth, size_t incSize);
-uint64 getVectorSize(const char* name, MethodDesc* meth);
-
-uint64 getMapHandlerSize(const char* name, MethodDesc* meth);
-
-uint64 getMapEntry(void* mapHandler, uint64 key);
-void setMapEntry(void* mapHandler, uint64 key, uint64 value);
-void removeMapEntry(void* mapHandler, uint64 key);
-
-uint64 getVectorEntry(void* vectorHandler, uint64 key);
-void setVectorEntry(void* vectorHandler, uint64 key, uint64 value);
-void removeVectorEntry(void* vectorHandler, uint64 key);
-
+size_t getNumBCMapEntries(void* vectorHandler);
+uint16 getBCMappingEntry(void* mappingHandler, uint32 key);
+void setBCMappingEntry(void* mappingHandler, uint32 key, uint16 bcOffset);
 }
 
 #endif

@@ -819,10 +819,10 @@ void IRDotPrinter::printNode(const Node * node)
 
     if (bb) {
         out << "\\l|\\" << std::endl;
-        VectorHandler* lirMapHandler = NULL;
+        void* lirMapHandler = NULL;
         if (irManager->getCompilationInterface().isBCMapInfoRequired()) {
             MethodDesc* meth = irManager->getCompilationInterface().getMethodToCompile();
-            lirMapHandler = new(irManager->getMemoryManager()) VectorHandler(bcOffset2LIRHandlerName, meth);
+            lirMapHandler = getContainerHandler(bcOffset2LIRHandlerName, meth);
             assert(lirMapHandler);
         }
         for (Inst * inst = (Inst*)bb->getFirstInst(); inst != NULL; inst = inst->getNextInst()) {
@@ -830,10 +830,10 @@ void IRDotPrinter::printNode(const Node * node)
             if ((kind & instFilter)==(uint32)kind){
                 printInst(inst);
                 if (lirMapHandler != NULL) {
-                    uint64 bcOffset = 0;
-                    uint64 instID = inst->getId();
-                    bcOffset = lirMapHandler->getVectorEntry(instID);
-                    if (bcOffset != ILLEGAL_VALUE) out<<" bcOff: "<< (uint16)bcOffset << " ";
+                    uint16 bcOffset = 0;
+                    uint32 instID = inst->getId();
+                    bcOffset = getBCMappingEntry(lirMapHandler, instID);
+                    if (bcOffset != ILLEGAL_BC_MAPPING_VALUE) out<<" bcOff: "<< (uint16)bcOffset << " ";
                 }
                 out << "\\l\\" << ::std::endl;
             }

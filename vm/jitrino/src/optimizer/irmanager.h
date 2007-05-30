@@ -208,38 +208,6 @@ private:
     OptimizerFlags&          _optFlags;
 };
 
-/** MapHandler is auxilary class to eliminate direct usage of map hanlers between HLO and codegenerator */
-
-class MapHandler {
-public:
-    MapHandler(const char* handlerName, MethodDesc* meth) {
-        handler = getContainerHandler(handlerName, meth);
-        }
-    uint64 getMapEntry(uint64 key) {
-        return ::Jitrino::getMapEntry(handler, key);
-    }
-    void setMapEntry(uint64 key, uint64 value) {
-        ::Jitrino::setMapEntry(handler, key, value);
-    }
-private:
-    void* handler;
-};
-
-class VectorHandler {
-public:
-    VectorHandler(const char* handlerName, MethodDesc* meth) {
-        handler = getContainerHandler(handlerName, meth);
-    }
-    uint64 getVectorEntry(uint64 key) {
-        return ::Jitrino::getVectorEntry(handler, key);
-    }
-    void setVectorEntry(uint64 key, uint64 value) {
-        ::Jitrino::setVectorEntry(handler, key, value);
-    }
-private:
-    void* handler;
-};
-
 } //namespace Jitrino 
 
 #endif

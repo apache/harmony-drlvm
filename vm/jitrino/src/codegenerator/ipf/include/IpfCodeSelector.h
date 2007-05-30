@@ -243,8 +243,7 @@ public:
     void          opndMaybeGlobal(CG_OpndHandle* opnd)            {}
     void          setCurrentPersistentId(PersistentInstructionId) {}
     void          clearCurrentPersistentId()                      {}
-    void          setCurrentHIRHandler(uint64)                    {} 
-    void          setCurrentHIRInstrID(uint64)                    {}
+    void          setCurrentHIRInstrID(uint32)                    {}
 
     //---------------------------------------------------------------------------//
     // Methods that are not going to be implemented

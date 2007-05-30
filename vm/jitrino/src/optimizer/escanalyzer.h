@@ -1002,7 +1002,7 @@ private:
 // BCMap support
     // Byte code map info
     bool isBCmapRequired;
-    VectorHandler* bc2HIRMapHandler;
+    void* bc2HIRMapHandler;
 /**
  * Sets bcmap offset in bc2HIRMapHandler.
  * @param new_i - instruction to set offset,

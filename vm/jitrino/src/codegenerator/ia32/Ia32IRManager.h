@@ -527,45 +527,6 @@ protected:
 
 #define VERIFY_OUT(s) { if (Log::isEnabled()) Log::out() << s; std::cerr << s; }
 
-/** MapHandler is auxilary class to eliminate direct usage of map handlers between HLO and codegenerator */
-
-class MapHandler {
-public:
-    MapHandler(const char* handlerName, MethodDesc* meth) {
-        handler = getContainerHandler(handlerName, meth);
-    }
-    uint64 getMapEntry(uint64 key) {
-        return ::Jitrino::getMapEntry(handler, key);
-    }
-    void setMapEntry(uint64 key, uint64 value) {
-        ::Jitrino::setMapEntry(handler, key, value);
-    }
-    void removeMapEntry(uint64 key) {
-        ::Jitrino::removeMapEntry(handler, key);
-    }
-private:
-    void* handler;
-};
-
-class VectorHandler {
-public:
-    VectorHandler(const char* handlerName, MethodDesc* meth) {
-        handler = getContainerHandler(handlerName, meth);
-    }
-    uint64 getVectorEntry(uint64 key) {
-        return ::Jitrino::getVectorEntry(handler, key);
-    }
-    void setVectorEntry(uint64 key, uint64 value) {
-        ::Jitrino::setVectorEntry(handler, key, value);
-    }
-    void removeVectorEntry(uint64 key) {
-        ::Jitrino::removeVectorEntry(handler, key);
-    }
-private:
-    void* handler;
-};
-
-
 
 //========================================================================================
 // class Ia32::SessionAction
