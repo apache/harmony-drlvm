@@ -133,7 +133,7 @@ protected:
     {
         m_pmfPipeline = NULL;
         m_pmf = NULL;
-        m_lazy_resolution = false;
+        m_lazy_resolution = true;
         m_compileHandle = NULL;
     }
 
