@@ -404,13 +404,18 @@ unsigned int obj_size = vm_object_size(p_next_obj);
   cur_area_end = (void*)ALIGN_DOWN_TO_KILO(p_next_obj);
   unsigned int hash_extend_size = 0;
 
+  Free_Area* cur_area = NULL;
   while(cur_area_end){
+    cur_area = NULL;
     cur_size = (POINTER_SIZE_INT)cur_area_end - (POINTER_SIZE_INT)cur_area_start;
       
-    Free_Area* cur_area = free_area_new(cur_area_start, cur_size);
+    if(cur_size){
+      //debug
+      assert(cur_size >= KB);
+      cur_area = free_area_new(cur_area_start, cur_size);
+      if( cur_area ) free_pool_add_area(lspace->free_pool, cur_area);
+    }
     /* successfully create an area */
-    if( cur_area )
-      free_pool_add_area(lspace->free_pool, cur_area);
 
     p_prev_obj = p_next_obj;
     p_next_obj = lspace_get_next_marked_object(lspace, &mark_bit_idx);
@@ -436,10 +441,12 @@ unsigned int obj_size = vm_object_size(p_next_obj);
    /* cur_area_end == NULL */
   cur_area_end = (void*)ALIGN_DOWN_TO_KILO(lspace->heap_end);
   cur_size = (POINTER_SIZE_INT)cur_area_end - (POINTER_SIZE_INT)cur_area_start;
-  Free_Area* cur_area = free_area_new(cur_area_start, cur_size);
-  /* successfully create an area */
-  if( cur_area )
-    free_pool_add_area(lspace->free_pool, cur_area);
+  if(cur_size){
+    //debug
+    assert(cur_size >= KB);
+    cur_area = free_area_new(cur_area_start, cur_size);
+    if( cur_area ) free_pool_add_area(lspace->free_pool, cur_area);
+  }  
 
    mark_bit_idx = 0;
    assert(!lspace_get_first_marked_object(lspace, &mark_bit_idx));

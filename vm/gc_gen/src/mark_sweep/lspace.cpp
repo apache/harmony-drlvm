@@ -110,6 +110,7 @@ void lspace_collection(Lspace* lspace)
   What's more, the assumption that the first word of one KB must be zero when iterating 
   lspace in that function lspace_get_next_marked_object is not true*/  
   if(!lspace->move_object) lspace_sweep(lspace);
+  else lspace->surviving_size = (POINTER_SIZE_INT)lspace->scompact_fa_start - (POINTER_SIZE_INT)lspace->heap_start;
   lspace->move_object = FALSE;
   return;
 }

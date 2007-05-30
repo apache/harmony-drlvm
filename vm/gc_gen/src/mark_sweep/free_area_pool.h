@@ -49,20 +49,19 @@ typedef struct Free_Area{
   POINTER_SIZE_INT size;
 }Free_Area;
 
-/* this is the only interface for new area creation */
+/* this is the only interface for new area creation. If the new area size is smaller than threshold, return NULL*/
 inline Free_Area* free_area_new(void* start, POINTER_SIZE_INT size)
 {
   assert(ADDRESS_IS_KB_ALIGNED(start));
   assert(ADDRESS_IS_KB_ALIGNED(size));
 
-  //memset(start, 0, size);
- 
-  if( size < GC_OBJ_SIZE_THRESHOLD) return NULL;
   Free_Area* area = (Free_Area*)start;
   area->zero = 0;
   area->next = area->prev = (Bidir_List*)area;
   area->size = size;
-  return area;
+  
+  if( size < GC_OBJ_SIZE_THRESHOLD) return NULL;
+  else return area;
 }
 
 #define NUM_FLAG_WORDS (NUM_FREE_LIST >> BIT_SHIFT_TO_BITS_PER_WORD)

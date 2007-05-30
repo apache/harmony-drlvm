@@ -335,6 +335,7 @@ void  gc_space_tuner_reset(GC* gc)
       tuner->wast_mos = 0;
     }
     tuner->kind = TRANS_NOTHING;    
+    tuner->reverse = 0;
   }
   
   return;  
@@ -407,5 +408,6 @@ void gc_space_tuner_release_fake_blocks_for_los_shrink(GC* gc)
   STD_FREE(tuner->interim_blocks);
   return;
 }
+
 
 
