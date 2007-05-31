@@ -326,8 +326,7 @@ public final class AuxiliaryFinder {
                     }
                 }
             }
-                while (klass != null) {
-                    klass = klass.getDeclaringClass();
+                while ((klass = klass.getDeclaringClass()) != null) {
                     /**/java.lang.reflect.TypeVariable variable = TypeVariableRepository.findTypeVariable(typeVariableName, klass);
                     /**/if (variable != null) {
                     /**/    return variable;
