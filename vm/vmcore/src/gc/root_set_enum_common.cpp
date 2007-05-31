@@ -93,7 +93,7 @@ static void vm_enumerate_class_static(Class* c)
         for(unsigned i = 0; i < n_fields; i++) {
             Field* f = c->get_field(i);
             if(f->is_static()) {
-		if(field_is_enumerable_reference(f)){
+                if(field_is_enumerable_reference(f)){
                     // The field is static and it is a reference.
                     if (global_env->compress_references) {
                         vm_enumerate_compressed_root_reference((uint32 *)f->get_address(), FALSE);
@@ -139,10 +139,9 @@ void vm_enumerate_static_fields()
  } //vm_enumerate_static_fields
 
 
-// This is the main function used to enumerate Java references by the VM and the JITs.  
-// It is part of the JIT-VM interface.
 // 20030405 Note: When compressing references, vm_enumerate_root_reference() expects to be called with slots
 // containing *managed* refs (represented by heap_base if null, not 0/NULL), so those refs must not be NULL. 
+#ifdef _DEBUG
 static void check_ref(void** ref)
 {
     if (VM_Global_State::loader_env->compress_references) {
@@ -156,6 +155,7 @@ static void check_ref(void** ref)
         } 
     }
 }
+#endif // _DEBUG
 
 void 
 vm_enumerate_root_reference(void **ref, Boolean is_pinned)

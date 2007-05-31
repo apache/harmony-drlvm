@@ -109,30 +109,5 @@ public final class VMStack {
      */
     public static native StackTraceElement[] getStackTrace(Object state);
     
-    /**
-     * This method does exactly the same things as the
-     * {@link VMClassRegistry#getClassLoader(Class)
-     * VMClassRegistry.getClassLoader(Class clazz)} method. It has package
-     * visibility only. So it can be used by other classes in this package to
-     * to get class loader with out security checks.
-     * 
-     * @param clazz class to get class loader for.
-     * @return class loader for the specified class.
-     * @api2vm
-     */
-    static ClassLoader getClassLoader(Class<?> clazz) {
-        return clazz != null ? getClassLoader0(clazz)
-           : Thread.currentThread().getContextClassLoader();
-    }
-
-
-    /**
-     * This method satisfies the requirements of the specification for the
-     * {@link Class#getClassLoader() Class.getClassLoader()} method.
-     * 
-     * @api2vm
-     */
-    static native ClassLoader getClassLoader0(Class<?> clazz);
-
     public static native StackTraceElement[] getThreadStackTrace(Thread t);
 }

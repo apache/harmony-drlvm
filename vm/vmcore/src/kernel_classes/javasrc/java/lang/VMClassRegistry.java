@@ -114,8 +114,11 @@ final class VMClassRegistry
      * @api2vm
      */
     static ClassLoader getClassLoader(Class<?> clazz) {
-        return clazz != null ? getClassLoader0(clazz)
-            : Thread.currentThread().getContextClassLoader();
+        if (clazz != null) {
+            assert(getClassLoader0(clazz) == clazz.definingLoader);
+            return clazz.definingLoader;
+        }
+        return Thread.currentThread().getContextClassLoader();
     }
 
     /**

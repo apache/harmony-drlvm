@@ -195,7 +195,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
             return false;
         }
         
-        ClassLoader loader = VMClassRegistry.getClassLoader(this);
+        ClassLoader loader = getClassLoaderImpl();
         if (loader == null) {
             // system class, status is controlled via cmdline only
             return VMExecutionEngine.getAssertionStatus(this, true, 0) > 0;
@@ -285,7 +285,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
      * @com.intel.drl.spec_ref
      */
     public ClassLoader getClassLoader() {
-        ClassLoader loader = VMClassRegistry.getClassLoader(this);
+        ClassLoader loader = getClassLoaderImpl();
         SecurityManager sc = System.getSecurityManager();
         if (sc != null) {
             ClassLoader callerLoader = VMClassRegistry.getClassLoader(VMStack
@@ -537,7 +537,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
      * @com.intel.drl.spec_ref
      */
     public Package getPackage() {
-        ClassLoader classLoader = VMClassRegistry.getClassLoader(this);
+        ClassLoader classLoader = getClassLoaderImpl();
         return classLoader == null
             ? ClassLoader.BootstrapLoader.getPackage(getPackageName())
             : classLoader.getPackage(getPackageName());
@@ -567,7 +567,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
      */
     public URL getResource(String resource) {
         resource = getAbsoluteResource(resource);
-        ClassLoader classLoader = VMClassRegistry.getClassLoader(this);
+        ClassLoader classLoader = getClassLoaderImpl();
         return classLoader == null
             ? ClassLoader.getSystemResource(resource)
             : classLoader.getResource(resource);
@@ -578,7 +578,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
      */
     public InputStream getResourceAsStream(String resource) {
         resource = getAbsoluteResource(resource);
-        ClassLoader classLoader = VMClassRegistry.getClassLoader(this);
+        ClassLoader classLoader = getClassLoaderImpl();
         return classLoader == null
             ? ClassLoader.getSystemResourceAsStream(resource)
             : classLoader.getResourceAsStream(resource);
@@ -589,7 +589,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
      */
     public Object[] getSigners() {
         try {
-            Object[] signers = (Object[])VMClassRegistry.getClassLoader(this).classSigners.get(getName());
+            Object[] signers = (Object[])getClassLoaderImpl().classSigners.get(getName());
             return (Object[])signers.clone();
        } catch (NullPointerException e) {
         }
@@ -866,7 +866,8 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
     /* VMI SPECIFIC PART*/
 
     final ClassLoader getClassLoaderImpl() {
-        return VMClassRegistry.getClassLoader(this);
+        assert(VMClassRegistry.getClassLoader0(this) == definingLoader);
+        return definingLoader;
     }
 
     static final Class[] getStackClasses(int maxDepth, 
@@ -1160,7 +1161,12 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
         return VMClassRegistry.getSimpleName(this);
     }
 
-    protected ClassLoader definingLoader;
+    /**
+     * Provides strong referencing between the classloader 
+     * and it's defined classes. Intended for class unloading implementation.
+     * @see java.lang.ClassLoader#loadedClasses
+     */
+    ClassLoader definingLoader;
 
     private final class ReflectionData {
         

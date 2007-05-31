@@ -106,11 +106,13 @@ public abstract class ClassLoader {
      */
     private final HashMap<String, Package> definedPackages;
 
-    /*
-    * The following mapping is used <String binaryClassName, Class clazz>, where binaryClassName - class name,
-    * clazz - corresponding class.
-    */
-    Hashtable<String, Class> loadedClasses = new Hashtable<String, Class>(); 
+    /**
+     * The class registry, provides strong referencing between the classloader 
+     * and it's defined classes. Intended for class unloading implementation.
+     * @see java.lang.Class#definingLoader
+     * @see #registerLoadedClass()
+     */
+    private ArrayList<Class> loadedClasses = new ArrayList<Class>(); 
 
     /**
      * package private to access from the java.lang.Class class. The following
@@ -377,12 +379,15 @@ public abstract class ClassLoader {
     }
 
     /**
-     * @com.intel.drl.spec_ref
+     * Registers the defined class, invoked by VM.
+     * Intended for class unloading implementation.
      */
-    public void addToLoadedClasses(String name, Class clazz) {
+    @SuppressWarnings("unused") 
+    private void registerLoadedClass(Class<?> clazz) {
         synchronized (loadedClasses){
-            loadedClasses.put(name, clazz); 
+            loadedClasses.add(clazz); 
     	}
+        clazz.definingLoader = this;
     }
 
     /**
@@ -430,7 +435,6 @@ public abstract class ClassLoader {
             certs = getCertificates(packageName, domain.getCodeSource());
         }
         Class<?> clazz = defineClass0(name, data, offset, len);
-        clazz.definingLoader = this;
         clazz.setProtectionDomain(domain);
         if (certs != null) {
             packageCertificates.put(packageName, certs);
@@ -595,7 +599,7 @@ public abstract class ClassLoader {
     protected final void setSigners(Class<?> clazz, Object[] signers) {
         checkInitialized();
         String name = clazz.getName();
-        ClassLoader classLoader = VMClassRegistry.getClassLoader(clazz);
+        ClassLoader classLoader = clazz.getClassLoaderImpl();
         if (classLoader != null) {
             if (classLoader.classSigners == null) {
                 classLoader.classSigners = new Hashtable<String, Object[]>();
@@ -794,7 +798,7 @@ public abstract class ClassLoader {
     
     static final ClassLoader getStackClassLoader(int depth) {
         Class<?> clazz = VMStack.getCallerClass(depth);
-        return clazz != null ? VMClassRegistry.getClassLoader(clazz) : null;
+        return clazz != null ? clazz.getClassLoaderImpl() : null;
     }
     
     final boolean  isSystemClassLoader () {

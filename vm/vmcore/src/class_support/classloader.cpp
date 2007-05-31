@@ -1595,33 +1595,23 @@ Class* UserDefinedClassLoader::DoLoadClass(Global_Env* env, const String* classN
     return clss;
 } // UserDefinedClassLoader::DoLoadClass
 
-bool ClassLoader::InsertClass(Class* clss) {
-    tmn_suspend_disable();
+static jmethodID getClassRegistryMethod() {
+    Global_Env* env = VM_Global_State::loader_env;
+    String* acr_func_name = env->string_pool.lookup("registerLoadedClass");
+    String* acr_func_desc = env->string_pool.lookup("(Ljava/lang/Class;)V");
+    Class* clss = env->LoadCoreClass("java/lang/ClassLoader");
+    Method* m = clss->lookup_method(acr_func_name, acr_func_desc);
+    assert(m);
+    return (jmethodID)m;
+}
+
+bool ClassLoader::InsertClass(Class* clss) 
+{
     if (!IsBootstrap()) // skip BS classes
     {
-        Global_Env* env = VM_Global_State::loader_env;
-        jvalue args[3];
-        ManagedObject* jstr;
-
-        if (env->compress_references) {
-            jstr = uncompress_compressed_reference(clss->get_name()->intern.compressed_ref);
-        } else {
-            jstr = clss->get_name()->intern.raw_ref;
-        }
-        ObjectHandle h = oh_allocate_local_handle();
-        if (jstr != NULL) {
-            h->object = jstr;
-        } else {
-            h->object = vm_instantiate_cp_string_resolved((String*)clss->get_name());
-        }
-        args[1].l = h;
-
-        if (exn_raised()) {
-            TRACE2("classloader", "OutOfMemoryError on class registering " << clss->get_name()->bytes);
-            assert (false);
-            tmn_suspend_enable();
-            return false;
-        }
+        static jmethodID registryMethod = getClassRegistryMethod();
+        tmn_suspend_disable();
+        jvalue args[2], res;
 
         // this parameter
         ObjectHandle hl = oh_allocate_local_handle();
@@ -1631,19 +1621,12 @@ bool ClassLoader::InsertClass(Class* clss) {
         // jlc parameter
         ObjectHandle chl = oh_allocate_local_handle();
         chl->object = *clss->get_class_handle();
-        args[2].l = chl;
+        args[1].l = chl;
 
-        static String* acr_func_name = env->string_pool.lookup("addToLoadedClasses");
-        static String* acr_func_desc = env->string_pool.lookup("(Ljava/lang/String;Ljava/lang/Class;)V");
-
-        Method* method = class_lookup_method_recursive(m_loader->vt()->clss, acr_func_name, acr_func_desc);
-        assert(method);
-
-        jvalue res;
-        vm_execute_java_method_array((jmethodID) method, &res, args);
+        vm_execute_java_method_array(registryMethod, &res, args);
+        tmn_suspend_enable();
 
         if(exn_raised()) {
-            tmn_suspend_enable();
             return false;
         }
     }
@@ -1653,7 +1636,7 @@ bool ClassLoader::InsertClass(Class* clss) {
     if (!IsBootstrap()){
         RemoveFromReported(clss->get_name());
     }
-    tmn_suspend_enable();
+    
     m_initiatedClasses->Insert(clss->get_name(), clss);
     return true;
 }
