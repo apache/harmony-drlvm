@@ -73,7 +73,7 @@
 #define VERSION "java version \"1.5.0\" \n" "pre-alpha : not complete or compatible\n" \
     "svn = r" VERSION_SVN_TAG ", (" __DATE__ "), " \
     VERSION_OS "/" VERSION_ARCH "/" VERSION_COMPILER ", " VERSION_DEBUG_STRING " build\n" \
-    "http://incubator.apache.org/harmony"
+    "http://harmony.apache.org"
 
 #endif // _VERSION_H
 

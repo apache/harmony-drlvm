@@ -27,8 +27,8 @@ The supported configurations are Windows* IA-32 and Linux* IA-32.
 --------------
 
 For prerequisites and instructions on how to build DRLVM, refer to 
-Getting Started for Users 
-[http://incubator.apache.org/harmony/quickhelp_users.html]. 
+Getting Started for Contributors 
+[http://harmony.apache.org/quickhelp_contributors.html]. 
 
   
 1. DRLVM SOURCE TREE CONTENTS
@@ -95,7 +95,7 @@ The structure is as follows:
 
 For detailed information on tools and environment variabled required for the build, refer to  
 to Getting Started for Contributors
-[http://incubator.apache.org/harmony/quickhelp_contributors.html].
+[http://harmony.apache.org/quickhelp_contributors.html].
 
 
 3. BUILDING VM
@@ -107,7 +107,7 @@ tasks related to the build.
 
 For detailed instructions on how to build DRLVM, 
 refer to Getting Started for Contributors
-[http://incubator.apache.org/harmony/quickhelp_contributors.html].
+[http://harmony.apache.org/quickhelp_contributors.html].
 
 The build produces a set of .jar files, native libraries, and
 support files that constitute the executable JRE. These files 
@@ -185,7 +185,7 @@ are placed in the following directory tree structure:
               
 You can now run DRLVM on the command line or under Eclipse*. For details on 
 how to run the VM under Eclipse*, see Getting Started with DRLVM, 
-[http://incubator.apache.org/harmony/subcomponents/drlvm/getting_started.html].  
+[http://harmony.apache.org/subcomponents/drlvm/getting_started.html].  
 
  3.1 Build the selected components. 
      
