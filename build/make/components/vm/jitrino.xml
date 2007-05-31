@@ -141,7 +141,6 @@ Version: $Revision: 1.6.2.8 $
                 <compilerarg value="/WL" />
                 <compilerarg value="/W4" />
 <!--                <compilerarg value="/WX" /> -->
-                <compilerarg value="/arch:SSE2" />
 
                 <select cfg="debug">
                     <compilerarg value="/Od" />
@@ -227,10 +226,6 @@ Version: $Revision: 1.6.2.8 $
             <!-- linux specific -->
             <select osfamily="unix">
                 <defineset define="PLATFORM_POSIX,LINUX" />
-
-                <select cxx="gcc" arch="ia32,em64t">
-                    <compilerarg value="-msse2" />
-                </select>
 
                 <select cxx="gcc">
                     <compilerarg value="-fmessage-length=0" />
