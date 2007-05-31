@@ -40,14 +40,17 @@ jobjectArray get_annotations(JNIEnv* jenv, AnnotationTable* table, AnnotationTab
 {
     unsigned table_num = table ? table->length : 0;
     TRACE("annotations table size = " << table_num);
-    
+
     unsigned inv_table_num = inv_table ? inv_table->length : 0;
     TRACE("invisible annotations table size = " << inv_table_num);
-    
+
     unsigned num = table_num + inv_table_num;
 
-    static Class* antn_class = jni_get_vm_env(jenv)->LoadCoreClass(
-        "java/lang/annotation/Annotation");
+    static Class* antn_class;
+    if(antn_class == NULL) {
+        antn_class = jni_get_vm_env(jenv)->LoadCoreClass(
+            "java/lang/annotation/Annotation");
+    }
 
     jobjectArray array = NewObjectArray(jenv, num, 
         struct_Class_to_java_lang_Class_Handle(antn_class), NULL);
