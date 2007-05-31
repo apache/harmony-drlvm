@@ -107,7 +107,7 @@ private:
     static const uint32 ESC_MASK = 3;
     static const uint32 BIT_MASK = 56;
     static const uint32 LOOP_CREATED = 8;
-    static const uint32 CALLEE_ESCAPED = 16;
+    static const uint32 OUT_ESCAPED = 16;
     static const uint32 VIRTUAL_CALL = 32;
 
 
@@ -198,8 +198,8 @@ private:
     bool do_sync_removal_sm;
     bool do_scalar_repl;
     bool do_esc_scalar_repl;
-    bool do_scalar_repl_only_final_fields;
-    bool scalarize_final_fields;
+    bool do_scalar_repl_only_final_fields_in_use;
+    bool do_scalar_repl_final_fields;
     const char* execCountMultiplier_string;
     double ec_mult;
     bool print_scinfo;
@@ -609,14 +609,14 @@ private:
     void remLoopCreated(CnGNode* n) {
         n->state = (n->state|LOOP_CREATED)^LOOP_CREATED;
     }
-    uint32 getCalleeEscaped(CnGNode* n) {
-        return (n->state)&CALLEE_ESCAPED;
+    uint32 getOutEscaped(CnGNode* n) {
+        return (n->state)&OUT_ESCAPED;
     }
-    void setCalleeEscaped(CnGNode* n) {
-        n->state = n->state|CALLEE_ESCAPED;
+    void setOutEscaped(CnGNode* n) {
+        n->state = n->state|OUT_ESCAPED;
     }
-    void remCalleeEscaped(CnGNode* n) {
-        n->state = (n->state|CALLEE_ESCAPED)^CALLEE_ESCAPED;
+    void remOutEscaped(CnGNode* n) {
+        n->state = (n->state|OUT_ESCAPED)^OUT_ESCAPED;
     }
     uint32 getVirtualCall(CnGNode* n) {
         return (n->state)&VIRTUAL_CALL;

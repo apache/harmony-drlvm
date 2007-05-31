@@ -40,7 +40,7 @@ namespace Jitrino {
 const  char* help =
     "  escape flags:\n"
     "    escape.max_level[=0]                     - max level callee method analysis\n"
-    "    escape.do_sync_removal[={on,OFF}]        - do synchronization removal optimization\n"
+    "    escape.do_sync_removal[={ON,off}]        - do synchronization removal optimization\n"
     "    escape.do_sync_removal_vc[={ON,off}]     - do synchronization removal optimization\n"
     "                                               for virtual call escaped operands\n"
     "    escape.do_sync_removal_sm[={ON,off}]     - do synchronization removal optimization\n"
@@ -48,8 +48,9 @@ const  char* help =
     "    escape.do_scalar_repl[={ON,off}]         - do scalar replacement optimization for\n"
     "                                               local and escaped objects\n"
     "    escape.do_esc_scalar_repl[={ON,off}]     - scalar replacement for escaped objects\n"
-    "    escape.do_scalar_repl_only_final_fields[={on,OFF}] \n"
-    "    escape.scalarize_final_fields[={on,OFF}] - scalarize final field usage when\n"
+    "    escape.do_scalar_repl_only_final_fields_in_use[={on,OFF}] \n"
+    "    escape.do_scalar_repl_final_fields[={on,OFF}] \n"
+    "                                             - scalarize final field usage when\n"
     "                                               escaped object wasn't optimized\n"
     "    escape.exec_count_mult[=0]               - entry node execCount multiplier\n";
 
@@ -101,8 +102,8 @@ EscAnalyzer::EscAnalyzer(MemoryManager& mm, SessionAction* argSource, IRManager&
     print_scinfo = argSource->getBoolArg("sc_info",false);
     execCountMultiplier_string = argSource->getStringArg("exec_count_mult", NULL);
     ec_mult = ( execCountMultiplier_string==NULL ? 0 : atof(execCountMultiplier_string) );
-    do_scalar_repl_only_final_fields = argSource->getBoolArg("do_scalar_repl_only_final_fields",false);
-    scalarize_final_fields = argSource->getBoolArg("scalarize_final_fields",false);
+    do_scalar_repl_only_final_fields_in_use = argSource->getBoolArg("do_scalar_repl_only_final_fields_in_use",false);
+    do_scalar_repl_final_fields = argSource->getBoolArg("do_scalar_repl_final_fields",false);
     compressedReferencesArg = argSource->getBoolArg("compressedReferences", false);
 
     const char* translatorName = argSource->getStringArg("translatorActionName", "translator");
@@ -198,7 +199,7 @@ void
 EscAnalyzer::showFlags(std::ostream& os) {
     os << "  escape flags:"<<std::endl;
     os << "    escape.max_level[=0]                     - max level callee method analysis" << std::endl;
-    os << "    escape.do_sync_removal[={On,off}]        - do synchronization removal optimization" << std::endl;
+    os << "    escape.do_sync_removal[={ON,off}]        - do synchronization removal optimization" << std::endl;
     os << "    escape.do_sync_removal_vc[={ON,off}]     - do synchronization removal optimization" << std::endl;
     os << "                                               for virtual call escaped operands" << std::endl;
     os << "    escape.do_sync_removal_sm[={ON,off}]     - do synchronization removal optimization" << std::endl;
@@ -206,8 +207,9 @@ EscAnalyzer::showFlags(std::ostream& os) {
     os << "    escape.do_scalar_repl[={ON,off}]         - do scalar replacement optimization for" << std::endl;
     os << "                                               local and escaped objects" << std::endl;
     os << "    escape.do_esc_scalar_repl[={ON,off}]     - scalar replacement for escaped objects" << std::endl;
-    os << "    escape.do_scalar_repl_only_final_fields[={on,OFF}] " << std::endl;
-    os << "    escape.scalarize_final_fields[={on,OFF}] - scalarize final field usage when" << std::endl;
+    os << "    escape.do_scalar_repl_only_final_fields_in_use[={on,OFF}] " << std::endl;
+    os << "    escape.do_scalar_repl_final_fields[={on,OFF}]  " << std::endl;
+    os << "                                             - scalarize final field usage when" << std::endl;
     os << "                                               escaped object wasn't optimized" << std::endl;
     os << "    escape.exec_count_mult[=0]               - entry node execCount multiplier" << std::endl;
 }
@@ -1184,7 +1186,7 @@ EscAnalyzer::addCnGNode(Inst* inst, Type* type, uint32 ntype) {
             setFullState(cgnode,NO_ESCAPE);
     }
     if (ntype==NT_EXITVAL)
-        setCalleeEscaped(cgnode);
+        setOutEscaped(cgnode);
     cgnode->nodeMDs = NULL;
     if (type->isReference()) {
         if (type->isArray()) {
@@ -1199,6 +1201,12 @@ EscAnalyzer::addCnGNode(Inst* inst, Type* type, uint32 ntype) {
         }
     } else {
         cgnode->nodeRefType = NR_PRIM;
+    }
+    if (cgnode->nodeType==NT_OBJECT && cgnode->nodeRefType == NR_REF) {
+        NamedType* nt = (NamedType*)(inst->getDst())->getType();
+        if (nt->isFinalizable()) {  // finalized objects cannot be removed
+            setOutEscaped(cgnode);
+        }
     }
     cngNodes->push_back(cgnode);
     return cgnode;
@@ -1915,7 +1923,7 @@ EscAnalyzer::scanCnGNodeRefsGE(CnGNode* cgn, bool check_var_src) {
             }
         } 
         if (initNodeType==NT_EXITVAL) {
-            if (getCalleeEscaped(cgn) == 0) {
+            if (getOutEscaped(cgn) == 0) {
 #ifdef _DEBUG
                 if (_setState) {
                     Log::out() <<"--scanGE 3:  nodeId "
@@ -1926,12 +1934,12 @@ EscAnalyzer::scanCnGNodeRefsGE(CnGNode* cgn, bool check_var_src) {
                         << cgn->nodeType <<" initNode "<<initNodeType<< std::endl;
                 }
 #endif
-                setCalleeEscaped(cgn);
+                setOutEscaped(cgn);
             }
             // The objects created in the method are not global escaped through return
         }
         if (initNodeType==NT_DEFARG) {
-            if (getCalleeEscaped(cgn) == 0) {
+            if (getOutEscaped(cgn) == 0) {
 #ifdef _DEBUG
                 if (_setState) {
                     Log::out() <<"--scanGE 4:  nodeId "
@@ -1949,7 +1957,7 @@ EscAnalyzer::scanCnGNodeRefsGE(CnGNode* cgn, bool check_var_src) {
                 if (cgn->nodeType == NT_OBJECT ) {
                     setEscState(cgn,GLOBAL_ESCAPE); //objects escaped through defarg - global escape
                 } else {
-                    setCalleeEscaped(cgn);
+                    setOutEscaped(cgn);
                 }
             }
         }
@@ -2185,7 +2193,7 @@ EscAnalyzer::checkSubobjectStates(CnGNode* node) {
                 continue;
             }
         }
-        if (getCalleeEscaped(node) == 0 && getCalleeEscaped(cgn) != 0) {
+        if (getOutEscaped(node) == 0 && getOutEscaped(cgn) != 0) {
             calle = true;
             continue;
         }
@@ -2445,7 +2453,7 @@ EscAnalyzer::saveScannedMethodInfo() {
         uint32 escstate = 3, bitstate = 0;
         for (it = cngNodes->begin( ); it != cngNodes->end( ); it++) {
             if ((*it)->nodeType==NT_EXITVAL) {
-                bitstate = bitstate|getCalleeEscaped(*it);
+                bitstate = bitstate|getOutEscaped(*it);
                 if (escstate > getEscState(*it))
                     escstate=getEscState(*it);
             }
@@ -2507,7 +2515,8 @@ EscAnalyzer::markNotEscInsts() {
     typedef ::std::pair <uint32,uint32> intPair;
 
     for (it = cngNodes->begin( ); it != cngNodes->end( ); it++ ) {
-        if ((*it)->nodeType == NT_OBJECT && getEscState(*it) > GLOBAL_ESCAPE) {
+        if ((*it)->nodeType == NT_OBJECT && getEscState(*it) > GLOBAL_ESCAPE && getVirtualCall(*it) == 0 
+            && getOutEscaped(*it) == 0) {
             nonEscInsts.insert(intPair((*it)->instrId,getFullState(*it))); 
         }
     }
@@ -4156,7 +4165,7 @@ EscAnalyzer::scanLocalObjects() {
 
     for (it = cngNodes->begin( ); it != cngNodes->end( ); it++ ) {
         if ((*it)->nodeType == NT_OBJECT && getEscState(*it)==NO_ESCAPE 
-            && getCalleeEscaped(*it) == 0 && !((*it)->nInst->getOpcode()==Op_LdRef)) {
+            && getOutEscaped(*it) == 0 && !((*it)->nInst->getOpcode()==Op_LdRef)) {
             if (prTitle) {
                 if (_scinfo) {
                     os_sc << "================ Local Object States   < "; 
@@ -4284,7 +4293,7 @@ EscAnalyzer::scanEscapedObjects() {
     for (it = cngNodes->begin( ); it != cngNodes->end( ); it++ ) {
 //        if ((*it)->nodeType == NT_OBJECT && getEscState(*it)!=NO_ESCAPE
         if ((*it)->nodeType == NT_OBJECT 
-            && getCalleeEscaped(*it) == 0 && !((*it)->nInst->getOpcode()==Op_LdRef)) {
+            && getOutEscaped(*it) == 0 && !((*it)->nInst->getOpcode()==Op_LdRef)) {
             if ((*it)->nInst->getNode() == NULL && getEscState(*it)==NO_ESCAPE) {
 				continue;   // already scalarized
             }
@@ -4604,7 +4613,7 @@ EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
             os_sc<<"*       " << (path_prob < entryNode_execCount*ec_mult || path_prob==0)<<std::endl;
         }
         if (path_prob < entryNode_execCount*ec_mult || path_prob==0) {
-            if (scalarize_final_fields) {
+            if (do_scalar_repl_final_fields) {
                 checkToScalarizeFinalFiels(onode, scObjFlds);
             }
             continue;
@@ -5320,6 +5329,10 @@ EscAnalyzer::checkCnGtoScalarize(CnGNode* scnode, bool check_loc) {
     if (_scinfo) {
         os_sc << "=="; printCnGNode(scnode,os_sc);
         ((Opnd*)scnode->refObj)->printWithType(os_sc);
+        NamedType* nt = (NamedType*)((Opnd*)scnode->refObj)->getType();
+        if (nt->isFinalizable()) {
+            os_sc << " - finalizable ";
+        }
         os_sc << std::endl;
         os_sc << "  =="; ((Opnd*)scnode->refObj)->getInst()->print(os_sc); 
         os_sc << std::endl;
@@ -5503,7 +5516,7 @@ EscAnalyzer::checkCnGtoScalarize(CnGNode* scnode, bool check_loc) {
                 goto MM;
             }
             // to optimize escaped object
-            if (do_scalar_repl_only_final_fields) {
+            if (do_scalar_repl_only_final_fields_in_use) {
                 if (ob_fin_fld_count==ob_fld_usage_count) {
                     storeId = true;
                 } else {
