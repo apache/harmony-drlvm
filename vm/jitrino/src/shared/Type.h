@@ -30,6 +30,8 @@
 #include "MemoryManager.h"
 #include "HashTable.h"
 
+#include "port_threadunsafe.h"
+
 namespace Jitrino {
 
 class SsaOpnd;
@@ -143,7 +145,7 @@ public:
         NumTypeTags,
         InavlidTag = NumTypeTags
     };
-    Type(Tag t) : tag(t), id(++nextTypeId) {}
+    Type(Tag t) : tag(t), id(genNextTypeId()) {}
     virtual ~Type() {}
 
     const Tag tag;
@@ -366,10 +368,19 @@ public:
 
 protected:
     virtual bool    _isFinalClass()    {return false;}
-    static uint32 nextTypeId;
+    
+    static uint32 genNextTypeId() {
+        // this operation can be unsafe until types are cached only per compilation session
+        // and every compilation session is performed in a single thread
+        UNSAFE_REGION_START
+        nextTypeId++;
+        UNSAFE_REGION_END
+        return nextTypeId;
+    }
 
 private:
     const uint32 id;
+    static uint32 nextTypeId;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

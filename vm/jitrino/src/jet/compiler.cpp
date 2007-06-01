@@ -367,12 +367,14 @@ JIT_Result Compiler::compile(Compile_Handle ch, Method_Handle method,
     //
     // Initialization done, collect statistics
     //
+    UNSAFE_REGION_START
     STATS_INC(Stats::methodsCompiled, 1);
     STATS_INC(Stats::methodsWOCatchHandlers, m_handlers.size() ? 0 : 1);
     //
     STATS_MEASURE_MIN_MAX_VALUE(bc_size, m_infoBlock.get_bc_size(), meth_fname());
     STATS_MEASURE_MIN_MAX_VALUE(jstack, max_stack, meth_fname());
     STATS_MEASURE_MIN_MAX_VALUE(locals, num_locals, meth_fname());
+    UNSAFE_REGION_END
     //
     // ~Stats
     //
@@ -1534,7 +1536,7 @@ void Compiler::initProfilingData(unsigned * pflags)
     JITInstanceContext* jitContext = JITInstanceContext::getContextForJIT(m_hjit);
     ProfilingInterface* pi = jitContext->getProfilingInterface();
     if (pi->isProfilingEnabled(ProfileType_EntryBackedge, JITProfilingRole_GEN)) {
-        MemoryManager mm(128, "jet_profiling_mm");
+        MemoryManager mm("jet_profiling_mm");
         MethodDesc md(m_method, m_hjit);
 
         g_compileLock.lock();

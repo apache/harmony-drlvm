@@ -63,6 +63,7 @@ using namespace std;
 
 #include "dump.h"
 #include "vm_stats.h"
+#include "port_threadunsafe.h"
 
 // macro that gets the offset of a certain field within a struct or class type
 #define OFFSET(Struct, Field) \
@@ -364,6 +365,7 @@ static void rth_type_test_update_stats(VTable* sub, Class* super)
 // Checkcast stats update
 static void rth_update_checkcast_stats(ManagedObject* o, Class* super)
 {
+    UNSAFE_REGION_START
     VM_Statistics::get_vm_stats().num_checkcast ++;
     if (o == (ManagedObject*)VM_Global_State::loader_env->managed_null) {
         VM_Statistics::get_vm_stats().num_checkcast_null++;
@@ -374,6 +376,7 @@ static void rth_update_checkcast_stats(ManagedObject* o, Class* super)
             VM_Statistics::get_vm_stats().num_checkcast_fast_decision ++;
         rth_type_test_update_stats(o->vt(), super);
     }
+    UNSAFE_REGION_END
 }
 
 // Instanceof stats update
