@@ -76,7 +76,7 @@ GlobalOpndAnalyzer::markGlobals() {
     // visited as global.
     //
     uint32 numInsts = irManager.getInstFactory().getNumInsts();
-    MemoryManager memManager(numInsts/8+4,"GlobalOpndAnalyzer::doAnalysis()");
+    MemoryManager memManager("GlobalOpndAnalyzer::doAnalysis()");
     BitSet markedInstSet(memManager,numInsts);
     Nodes::iterator niter;
     for (niter = nodes.begin(); niter != nodes.end(); ++niter) {
@@ -241,8 +241,7 @@ AdvancedGlobalOpndAnalyzer::markManagedPointerBases() {
     
 void
 AdvancedGlobalOpndAnalyzer::unmarkFalseGlobals() {
-    MemoryManager localMemManager(1024,
-       "RefinedGlobalOpndAnalyzer::doAnalysis.localMemManager");
+    MemoryManager localMemManager("RefinedGlobalOpndAnalyzer::doAnalysis.localMemManager");
     opndTable = new (localMemManager) OpndTable(localMemManager, 16);
     uint32 timeStamp = 0;
     //

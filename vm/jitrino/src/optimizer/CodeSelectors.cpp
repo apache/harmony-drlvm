@@ -2303,8 +2303,7 @@ void _CFGCodeSelector::genCode(Callback& callback) {
 }
 
 void _MethodCodeSelector::selectCode(Callback& callback) {
-    MemoryManager localMemManager(1024,
-        "_MethodCodeSelector::genCode.localMemManager"); 
+    MemoryManager localMemManager("_MethodCodeSelector::genCode.localMemManager"); 
 
     callback.setMethodDesc(methodDesc);
 

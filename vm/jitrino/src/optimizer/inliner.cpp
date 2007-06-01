@@ -1152,7 +1152,7 @@ void InlinePass::_run(IRManager& irm) {
     bool connectEarly = getBoolArg("connect_early", true);
     const char* pipeName = getStringArg("pipeline", "inliner_pipeline");
 
-    MemoryManager tmpMM(1024, "Inliner::tmp_mm");
+    MemoryManager tmpMM("Inliner::tmp_mm");
     Inliner inliner(this, tmpMM, irm, irm.getFlowGraph().hasEdgeProfile());
     InlineNode* rootRegionNode = (InlineNode*) inliner.getInlineTree().getRoot();
     inliner.inlineRegion(rootRegionNode);

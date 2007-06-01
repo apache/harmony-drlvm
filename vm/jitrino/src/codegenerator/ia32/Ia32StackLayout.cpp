@@ -162,7 +162,7 @@ StackLayouter::StackLayouter ()
 #ifdef _EM64T_
     stackCorrection(0),
 #endif
-    memoryManager(0x100, "StackLayouter")
+    memoryManager("StackLayouter")
 {
 };
 

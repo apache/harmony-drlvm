@@ -73,7 +73,7 @@ GCManagedPointerAnalyzer::computeBaseMaps()
 {
     assert(_mapsComputed == false);
     ControlFlowGraph& fg = _irManager.getFlowGraph();
-    MemoryManager mm(fg.getNodes().size()*sizeof(Node*), "GCManagedPointerAnalyzer::computeBaseMaps.mm");
+    MemoryManager mm("GCManagedPointerAnalyzer::computeBaseMaps.mm");
     
     // List of nodes in RPO
     StlVector<Node*> nodes(mm);
@@ -290,7 +290,7 @@ GCManagedPointerAnalyzer::analyzeManagedPointers()
         addBaseVarDefs();
     } else {
         ControlFlowGraph& fg = _irManager.getFlowGraph();
-        MemoryManager mm(fg.getNodes().size()*sizeof(Node*), "GCManagedPointerAnalyzer::analyzeManagedPointers.mm");
+        MemoryManager mm("GCManagedPointerAnalyzer::analyzeManagedPointers.mm");
         
         StlVector<Node*> nodes(mm);
         fg.getNodesPostOrder(nodes);

@@ -122,7 +122,7 @@ TailDuplicator::tailDuplicate(DefUseBuilder& defUses, Node* idom, Node* tail)
 
 void
 TailDuplicator::doTailDuplication() {
-    MemoryManager mm(0, "TailDuplicator::doTailDuplication.mm");
+    MemoryManager mm("TailDuplicator::doTailDuplication.mm");
     ControlFlowGraph& fg = _irm.getFlowGraph();
 
     DefUseBuilder defUses(mm);
@@ -232,7 +232,7 @@ TailDuplicator::profileGuidedTailDuplicate(LoopTree* ltree, DefUseBuilder& defUs
 
 void 
 TailDuplicator::doProfileGuidedTailDuplication(LoopTree* ltree) {
-    MemoryManager mm(0, "TailDuplicator::doProfileGuidedTailDuplication.mm");
+    MemoryManager mm("TailDuplicator::doProfileGuidedTailDuplication.mm");
     ControlFlowGraph& fg = _irm.getFlowGraph();
     if(!fg.hasEdgeProfile())
         return;

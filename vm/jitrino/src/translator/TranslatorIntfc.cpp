@@ -63,7 +63,7 @@ void TranslatorSession::translate() {
     TranslatorAction* myAction = (TranslatorAction*)getAction();
     IRBuilder* irb = (IRBuilder*)myAction->getIRBuilderAction()->createSession(mm);
     irb->setCompilationContext(cc);
-    MemoryManager tmpMM(1024, "IRBuilder::tmpMM");
+    MemoryManager tmpMM("IRBuilder::tmpMM");
     irb->init(irm, &flags, tmpMM);
     JavaTranslator::translateMethod(*cc->getVMCompilationInterface(), methodDesc, *irb);
 }

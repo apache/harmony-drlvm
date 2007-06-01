@@ -863,7 +863,7 @@ void GCSafePointsInfo::dump(const char* stage) const {
 void GCPointsBaseLiveRangeFixer::runImpl() {
     bool disableStaticOffsets = false;
     getArg("disable_static_offsets", disableStaticOffsets);
-    MemoryManager mm(MAX(512, irManager->getOpndCount()), "GCSafePointsMarker");
+    MemoryManager mm("GCSafePointsMarker");
     GCSafePointsInfo info(mm, *irManager, GCSafePointsInfo::MODE_1_FIX_BASES);
     
     if (Log::isEnabled()) {

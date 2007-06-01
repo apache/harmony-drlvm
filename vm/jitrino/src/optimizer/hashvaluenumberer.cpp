@@ -2668,8 +2668,7 @@ public:
 
 void 
 HashValueNumberer::doGlobalValueNumbering(MemoryOpt *mopt) {
-    MemoryManager localMM(sizeof(InstValueNumberer)+10000, 
-                          "HashValueNumberer::doGlobalValueNumbering");
+    MemoryManager localMM("HashValueNumberer::doGlobalValueNumbering");
 
     if (Log::isEnabled()) {
         Log::out() << "Starting unscoped value numbering pass" << ::std::endl;
@@ -2714,8 +2713,7 @@ HashValueNumberer::doGlobalValueNumbering(MemoryOpt *mopt) {
 
 void 
 HashValueNumberer::doValueNumbering(MemoryOpt *mopt) {
-    MemoryManager localMM(sizeof(InstValueNumberer)+10000, 
-                          "HashValueNumberer::doValueNumbering");
+    MemoryManager localMM("HashValueNumberer::doValueNumbering");
 
     if (Log::isEnabled()) {
         Log::out() << "Starting scoped value numbering pass" << ::std::endl;

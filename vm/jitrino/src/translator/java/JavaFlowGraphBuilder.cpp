@@ -322,7 +322,7 @@ void JavaFlowGraphBuilder::build() {
 //
 void JavaFlowGraphBuilder::eliminateUnnestedLoopsOnDispatch()
 {
-    MemoryManager matched_nodes_mm(3*sizeof(Node*), "unnested_loops_mm");
+    MemoryManager matched_nodes_mm("unnested_loops_mm");
     Nodes matched_dispatches(matched_nodes_mm);
     bool found_goto_into_loop_warning = false;
     const Nodes& nodes = fg->getNodes();

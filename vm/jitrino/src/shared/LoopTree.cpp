@@ -63,7 +63,7 @@ void LoopTree::findLoopHeaders(Nodes& headers) { // out
 void LoopTree::findAndCoalesceLoopEdges(const Nodes& headers) { 
     DominatorTree* dom = fg->getDominatorTree();
     assert(dom->isValid());
-    MemoryManager mm(1024, "LoopTree::findAndCoalesceEdges");
+    MemoryManager mm("LoopTree::findAndCoalesceEdges");
     Edges entryEdges(mm);
     Edges loopEdges(mm);
     for (Nodes::const_iterator it = headers.begin(), end = headers.end(); it!=end; ++it) {

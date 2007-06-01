@@ -47,7 +47,7 @@ static inline void m_assert(bool cond)  {
 #endif    
     }
 
-static MemoryManager mm(0x100, "printRuntimeOpndInternalHelper");
+static MemoryManager mm("printRuntimeOpndInternalHelper");
 static TypeManager *tm = NULL;
 void __stdcall methodEntry(const char * methodName, uint32 argInfoCount, CallingConvention::OpndInfo * argInfos)
 {
@@ -112,7 +112,7 @@ void __stdcall fieldWrite(const void * address)
 //_________________________________________________________________________________________________
 void InternalTrace::runImpl()
 {
-    MemoryManager mm(0x400, "InternalTrace");
+    MemoryManager mm("InternalTrace");
 
     irManager->registerInternalHelperInfo("itrace_method_entry", IRManager::InternalHelperInfo((void*)&methodEntry, &CallingConvention_STDCALL));
     irManager->registerInternalHelperInfo("itrace_method_exit", IRManager::InternalHelperInfo((void*)&methodExit, &CallingConvention_STDCALL));

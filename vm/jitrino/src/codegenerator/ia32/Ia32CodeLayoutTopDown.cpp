@@ -34,7 +34,7 @@ namespace Ia32 {
 
 TopDownLayout::TopDownLayout(IRManager* irm) 
 : Linearizer(irm), 
-memManager(40*irm->getFlowGraph()->getMaxNodeId(), "ia32::topdown_layout"),
+memManager("ia32::topdown_layout"),
 lastBlk(NULL), 
 neighboursBlocks(memManager),
 blockInfos(memManager, irm->getFlowGraph()->getMaxNodeId(), NULL)

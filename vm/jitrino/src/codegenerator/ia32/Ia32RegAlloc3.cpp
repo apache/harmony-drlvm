@@ -151,7 +151,7 @@ struct RegAlloc3 : public SessionAction
     StlVector<int> nstack;
 
 
-    RegAlloc3 ()                    : mm(1000, "RegAlloc3"), registers(mm), graph(mm), nstack(mm) {}
+    RegAlloc3 ()                    : mm("RegAlloc3"), registers(mm), graph(mm), nstack(mm) {}
 
     uint32 getNeedInfo () const     {return NeedInfo_LivenessInfo;}
     uint32 getSideEffects () const  {return coalesceCount == 0 ? 0 : SideEffect_InvalidatesLivenessInfo;}

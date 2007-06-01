@@ -213,17 +213,7 @@ void I8Lowerer::runImpl()
 
     ControlFlowGraph* fg = irManager->getFlowGraph();
 
-    const unsigned totalI8InstCountEstimate = fg->getNodeCount()*5;
-    unsigned memSizeEstimate = 
-            // for i8Insts
-            sizeof(Inst*)*totalI8InstCountEstimate +
-            // for loopInfo
-            sizeof(unsigned)*totalI8InstCountEstimate + 
-            // for pairs
-            (sizeof(Opnd*)+sizeof(Opnd**)*2)*totalI8InstCountEstimate;
-
-    memSizeEstimate = (unsigned)(memSizeEstimate*0.1);
-    MemoryManager memMgr(memSizeEstimate, "i8lowerer");
+    MemoryManager memMgr("i8lowerer");
 
     StlMap<Opnd *,Opnd **> pairs(memMgr);
     m_pairs = &pairs;

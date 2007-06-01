@@ -29,7 +29,6 @@
 #include "JavaTranslator.h"
 #include "ByteCodeParser.h"
 #include "JavaByteCodeTranslator.h"
-#include "MemoryEstimates.h"
 #include "Log.h"
 #include "CGSupport.h"
 #include "FlowGraph.h"
@@ -40,8 +39,7 @@ void JavaTranslator::translateMethod(CompilationInterface& ci, MethodDesc& metho
     
     uint32 byteCodeSize = methodDesc.getByteCodeSize();
     const unsigned char* byteCodes = methodDesc.getByteCodes();
-    MemoryManager  translatorMemManager(byteCodeSize*ESTIMATED_TRANSLATOR_MEMORY_PER_BYTECODE,
-                             "JavaTranslator::translateMethod.translatorMemManager");
+    MemoryManager  translatorMemManager("JavaTranslator::translateMethod.translatorMemManager");
 
     JavaFlowGraphBuilder cfgBuilder(irBuilder.getInstFactory()->getMemManager(),irBuilder);
 

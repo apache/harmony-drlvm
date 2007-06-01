@@ -33,7 +33,7 @@ namespace Ia32 {
 
 BottomUpLayout::BottomUpLayout(IRManager* irm) : 
 Linearizer(irm), 
-mm(40*irm->getFlowGraph()->getNodeCount(), "Ia32::bottomUpLayout"), 
+mm("Ia32::bottomUpLayout"), 
 firstInChain(mm, irm->getFlowGraph()->getNodeCount(), false),
 lastInChain(mm, irm->getFlowGraph()->getNodeCount(), false),
 prevInLayoutBySuccessorId(mm, irm->getFlowGraph()->getNodeCount(), NULL)

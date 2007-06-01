@@ -3856,7 +3856,7 @@ SimplifierWithInstFactory::simplifyControlFlowGraph() {
     }
 
     uint32 numInstOptimized = 0;
-    MemoryManager memManager(1024,"SimplifierWithInstFactory::simplifyControlFlowGraph");
+    MemoryManager memManager("SimplifierWithInstFactory::simplifyControlFlowGraph");
     BitSet* reachableNodes = new (memManager) BitSet(memManager,flowGraph.getMaxNodeId());
     BitSet* unreachableInsts = 
         new (memManager) BitSet(memManager,irManager.getInstFactory().getNumInsts());

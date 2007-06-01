@@ -189,7 +189,7 @@ InstCodeSelector(CompilationInterface&          compIntfc,
                     ) 
 : compilationInterface(compIntfc), codeSelector(codeSel),   
   irManager(irM), typeManager(irM.getTypeManager()), 
-  memManager(0x2000, "InstCodeSelector"),
+  memManager("InstCodeSelector"),
   currentBasicBlock(currBasicBlock),
   inArgPos(0),
   seenReturn(false),               switchSrcOpnd(NULL), 

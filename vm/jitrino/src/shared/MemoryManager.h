@@ -34,7 +34,7 @@ namespace Jitrino {
 
 class MemoryManager {
 public:
-    MemoryManager(size_t initial_estimate, const char* name);
+    MemoryManager(const char* name);
     virtual ~MemoryManager();
     void *alloc(size_t size);
     size_t bytes_allocated() { return _bytes_allocated; }
@@ -59,7 +59,6 @@ protected:
     //
     size_t _bytes_allocated;
     size_t _bytes_arena;
-    size_t _next_arena_size;
     //
     // fields for tracing
     //

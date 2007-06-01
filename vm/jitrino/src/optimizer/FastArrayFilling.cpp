@@ -98,7 +98,7 @@ FastArrayFillPass::_run(IRManager& irManager)
         return;
     }
 
-    MemoryManager tmm(1024,"FastArrayInitPass::insertFastArrayInit");
+    MemoryManager tmm("FastArrayInitPass::insertFastArrayInit");
     Edges loopEdges(tmm);
     StlMap<Node *, LoopEdges> loopInfo(tmm);
         

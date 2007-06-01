@@ -74,7 +74,7 @@ Mutex EscAnalyzer::calleeMethodInfosLock;
 void
 EscapeAnalysisPass::_run(IRManager& irm) {
 
-    MemoryManager escMemManager(1024, "EscapeAnalyzer:tmp_mm");
+    MemoryManager escMemManager("EscapeAnalyzer:tmp_mm");
     EscAnalyzer ea(escMemManager, this, irm);
 
     if (Log::isEnabled() && (ea.allProps!=0)) {

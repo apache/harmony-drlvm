@@ -44,7 +44,7 @@ int LazyExceptionOpt::level=0;
 
 LazyExceptionOpt::LazyExceptionOpt(IRManager &ir_manager) :
     irManager(ir_manager), 
-    leMemManager(1024,"LazyExceptionOpt::doLazyExceptionOpt"),
+    leMemManager("LazyExceptionOpt::doLazyExceptionOpt"),
     compInterface(ir_manager.getCompilationInterface())
 {
     if (compInterface.isBCMapInfoRequired()) {

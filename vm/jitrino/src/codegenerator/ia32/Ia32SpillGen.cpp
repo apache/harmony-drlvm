@@ -197,7 +197,7 @@ struct SpillGen : public SessionAction
 //  -------
 
 
-    SpillGen ()                     : mm(1000, "SpillGen")
+    SpillGen ()                     : mm("SpillGen")
                                     , registers(mm), memopnds(mm)
                                     , instxs(mm), actives(mm), actsmap(mm)
                                     , lives_start(0), lives_exit(0)

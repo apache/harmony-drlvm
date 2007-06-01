@@ -169,7 +169,7 @@ class ConstraintsResolverImpl
 public:
     ConstraintsResolverImpl(IRManager &irm, bool _second = false)
         :irManager(irm), 
-        memoryManager(irManager.getOpndCount()*16, "ConstraintsResolverImpl"),
+        memoryManager("ConstraintsResolverImpl"),
         basicBlocks(memoryManager, 0), originalOpndCount(0),
         liveOpnds(memoryManager,0),
         liveAtDispatchBlockEntry(memoryManager,0),

@@ -46,7 +46,7 @@ CodeLowerer::doLower() {
     GlobalOpndAnalyzer globalOpndAnalyzer(_irm);
     globalOpndAnalyzer.doAnalysis();
 
-    MemoryManager mm(1000, "CodeLowerer.doLower");
+    MemoryManager mm("CodeLowerer.doLower");
 
     Nodes nodes(mm);
     _irm.getFlowGraph().getNodesPostOrder(nodes);

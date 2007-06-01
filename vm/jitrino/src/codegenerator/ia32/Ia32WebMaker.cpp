@@ -99,7 +99,7 @@ struct WebMaker : public SessionAction
     unsigned globcount;
 
 
-    WebMaker ()                     :mm(1000, "WebMaker"), opndxs(mm), nodexs(mm) {}
+    WebMaker ()                     :mm("WebMaker"), opndxs(mm), nodexs(mm) {}
 
     uint32 getNeedInfo () const     {return NeedInfo_LivenessInfo;}
     uint32 getSideEffects () const  {return splitcount == 0 ? 0 : SideEffect_InvalidatesLivenessInfo;}

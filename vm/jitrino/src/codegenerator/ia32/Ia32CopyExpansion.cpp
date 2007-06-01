@@ -60,7 +60,7 @@ public:
     void run();
 
     SimpleStackOpndCoalescer(IRManager& irm)
-        :irManager(irm), memoryManager(0x1000, "SimpleStackOpndCoalescer"), 
+        :irManager(irm), memoryManager("SimpleStackOpndCoalescer"), 
         candidateInsts(memoryManager), intervals(memoryManager), opndReplacements(memoryManager), 
         replacementsAdded(0), emptyBlocks(false)
     {}

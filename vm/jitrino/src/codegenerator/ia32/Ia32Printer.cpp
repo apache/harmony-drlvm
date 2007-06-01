@@ -605,7 +605,7 @@ void IRLivenessPrinter::printNode(const Node * node, uint32 indent)
     BitSet * ls=irManager->getLiveAtEntry(node);
     os<<"Live at entry: "; printLiveSet(ls); os<<::std::endl;
 
-    MemoryManager mm(0x100, "IRLivenessPrinter::printNode");
+    MemoryManager mm("IRLivenessPrinter::printNode");
     ls=new(mm) BitSet(mm, irManager->getOpndCount());
     irManager->getLiveAtExit(node, *ls);
     os<<"Live at exit: "; printLiveSet(ls); os<<::std::endl;
@@ -1125,7 +1125,7 @@ char * IRLivenessDotPrinter::getRegString(char * str, Constraint c, StlVector<Op
 void IRLivenessDotPrinter::printNode(const Node * node)
 {
     ::std::ostream& out=getStream();
-    MemoryManager mm(0x2000, "IRLivenessDotPrinter::printNode");
+    MemoryManager mm("IRLivenessDotPrinter::printNode");
     printNodeName(node); 
     out << " [label=\"";
 
@@ -1405,7 +1405,7 @@ void printDot(
 //_________________________________________________________________________________________________
 void printRuntimeArgs(::std::ostream& os, uint32 opndCount, CallingConvention::OpndInfo * infos, JitFrameContext * context)
 {
-    MemoryManager mm(0x1000, "printRuntimeOpndInternalHelper");
+    MemoryManager mm("printRuntimeOpndInternalHelper");
     TypeManager tm(mm); tm.init();
     os<<opndCount<<" args: ";
     for (uint32 i=0; i<opndCount; i++){
@@ -1597,7 +1597,7 @@ void printRuntimeObjectContent(::std::ostream& os, TypeManager & tm, Type * type
 //_________________________________________________________________________________________________
 void __stdcall printRuntimeOpndInternalHelper(const void * p)
 {
-    MemoryManager mm(0x1000, "printRuntimeOpndInternalHelper");
+    MemoryManager mm("printRuntimeOpndInternalHelper");
     TypeManager tm(mm); tm.init();
     printRuntimeObjectOpnd(::std::cout, tm, p);
 }

@@ -39,7 +39,7 @@ void ValueProfilerInstrumentationPass::_run(IRManager& irm)
     // Currently value profile is used by interface devirtualization only
 
     ControlFlowGraph& flowGraph = irm.getFlowGraph();
-    MemoryManager mm( 1024, "Value Profiler Instrumentation Pass");
+    MemoryManager mm("Value Profiler Instrumentation Pass");
     MethodDesc& md = irm.getMethodDesc();
     InstFactory& instFactory = irm.getInstFactory();
     OpndManager& opndManager = irm.getOpndManager();

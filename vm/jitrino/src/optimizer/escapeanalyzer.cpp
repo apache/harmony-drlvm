@@ -209,7 +209,7 @@ markEscapingInst(Inst* inst,BitSet& escapingInsts) {
 
 uint32
 EscapeAnalyzer::doAnalysis() {
-    MemoryManager memManager(1000,"EscapeAnalyzer::doAnalysis");
+    MemoryManager memManager("EscapeAnalyzer::doAnalysis");
     StlDeque<Inst*> candidateSet(memManager);
     BitSet escapingInsts(memManager,irManager.getInstFactory().getNumInsts());
 
@@ -409,7 +409,7 @@ EscapeAnalyzer::doAggressiveAnalysis() {
     // (6) Refs that are stored through free ptrs or refs are free
     // (7) Refs loaded through free ptrs or refs are free
     //
-    MemoryManager memManager(1000,"EscapeAnalyzer::doAggressiveAnalysis");
+    MemoryManager memManager("EscapeAnalyzer::doAggressiveAnalysis");
     //
     // work list of instructions that define free refs & ptrs
     //

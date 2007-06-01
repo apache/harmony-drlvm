@@ -120,7 +120,7 @@ struct RegAlloc2 : public SessionAction
     Register* findReg (RegMask) const;
 
 
-    RegAlloc2 ()                    :mm(1000, "RegAlloc2"), registers(mm), opandmap(mm) {}
+    RegAlloc2 ()                    :mm("RegAlloc2"), registers(mm), opandmap(mm) {}
 
     uint32 getNeedInfo () const     {return NeedInfo_LivenessInfo;}
     uint32 getSideEffects () const  {return 0;}

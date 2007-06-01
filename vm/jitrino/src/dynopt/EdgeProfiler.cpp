@@ -52,7 +52,7 @@ DEFINE_SESSION_ACTION(EdgeProfilerInstrumentationPass, edge_instrument, "Perform
 void EdgeProfilerInstrumentationPass::_run(IRManager& irm)
 {
     ControlFlowGraph& flowGraph = irm.getFlowGraph();
-    MemoryManager mm( 1024, "Edge InstrumentationPass");
+    MemoryManager mm("Edge InstrumentationPass");
     MethodDesc& md = irm.getMethodDesc();
     InstFactory& instFactory = irm.getInstFactory();
     OptPass::computeDominatorsAndLoops(irm);
@@ -125,7 +125,7 @@ DEFINE_SESSION_ACTION(EdgeProfilerAnnotationPass, edge_annotate, "Perform edge a
 void EdgeProfilerAnnotationPass::_run(IRManager& irm) {
     ControlFlowGraph& flowGraph = irm.getFlowGraph();
     MethodDesc& md = irm.getMethodDesc();
-    MemoryManager mm( 1024, "Edge AnnotationPass");
+    MemoryManager mm("Edge AnnotationPass");
     bool debug = Log::isEnabled();
     // Create the edge profile structure for the compiled method in 'irm'.
     ProfilingInterface* pi = irm.getProfilingInterface();

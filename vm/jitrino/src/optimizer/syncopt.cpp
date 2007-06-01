@@ -2152,7 +2152,7 @@ void SO2::_run(IRManager& irm) {
 }
 
 void SyncOpt2::runPass() {
-    MemoryManager tmpMM(1024, "SO2MM");
+    MemoryManager tmpMM("SO2MM");
     ControlFlowGraph& flowGraph = irManager.getFlowGraph();
     OptPass::computeDominators(irManager);
     DominatorTree* domTree = flowGraph.getDominatorTree();

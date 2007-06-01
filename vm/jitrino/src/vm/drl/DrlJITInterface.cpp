@@ -29,7 +29,6 @@
 #include "Jitrino.h"
 #include "VMInterface.h"
 #include "EMInterface.h"
-#include "MemoryEstimates.h"
 #include "Log.h"
 #include "PMF.h"
 #include "CompilationContext.h"
@@ -235,7 +234,7 @@ JIT_compile_method_with_params(JIT_Handle jit, Compile_Handle compilation,
                                Method_Handle method_handle,
                                OpenMethodExecutionParams compilation_params)
 {
-    MemoryManager memManager(method_get_byte_code_size(method_handle), "JIT_compile_method.memManager");
+    MemoryManager memManager("JIT_compile_method.memManager");
     JIT_Handle jitHandle = method_get_JIT_id(compilation);
     JITInstanceContext* jitContext = Jitrino::getJITInstanceContext(jitHandle);
     assert(jitContext!= NULL);

@@ -35,7 +35,7 @@ namespace Jitrino {
 DominatorTree*
 DominatorBuilder::computeDominators(MemoryManager& mm, ControlFlowGraph* flowgraph, bool isPost, bool ignoreUnreach) {
     // Temp memory manager
-    MemoryManager tmm(flowgraph->getMaxNodeId()*(sizeof(Node*)*2), "DominatorBuilder::computeDominators");
+    MemoryManager tmm("DominatorBuilder::computeDominators");
     Nodes nodes(tmm);
 
     // Get the nodes of the flowgraph in postorder.

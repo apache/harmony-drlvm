@@ -396,7 +396,7 @@ void MethodCodeSelector::updateRegUsage()
 
 void CfgCodeSelector::fixNodeInfo() 
 {
-    MemoryManager tmpMM(1024, "Ia32CS:fixNodeInfoMM");
+    MemoryManager tmpMM("Ia32CS:fixNodeInfoMM");
     ControlFlowGraph* fg = irManager.getFlowGraph();
     Nodes nodes(tmpMM);
     fg->getNodes(nodes); //copy nodes -> loop creates new ones, so we can't use reference to cfg->getNodes()

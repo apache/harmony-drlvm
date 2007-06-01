@@ -398,8 +398,7 @@ void SSABuilder::createPhiInst(VarOpnd* var, Node* insertedLoc) {
 // this is the main function which returns true if a PHI node has been inserted
 bool SSABuilder::convertSSA(MethodDesc&    methodDesc) {
     // create structure recording the blocks that define var opnds
-    MemoryManager ssaMemManager(sizeof(VarDefSites)*frontier.getNumNodes(),
-                              "SSABuilder::convertSSA.ssaMemManager");
+    MemoryManager ssaMemManager("SSABuilder::convertSSA.ssaMemManager");
     DefSites allDefSites(ssaMemManager,frontier.getNumNodes());
 
     // find out where vars are defined
@@ -754,9 +753,7 @@ void SSABuilder::checkForTrivialPhis2(Node *node,
 
 bool SSABuilder::fixupSSA(MethodDesc& methodDesc, bool useBetter) {
     // clear out all Phi args
-    int sizeEstimate = opndManager.getNumVarOpnds()+opndManager.getNumSsaOpnds();
-    MemoryManager localMM(64*sizeEstimate,
-                          "SSABuilder::fixupSSA::memManager");
+    MemoryManager localMM("SSABuilder::fixupSSA::memManager");
 
 #ifdef DEBUG_SSA
     if (Log::isEnabled()) {
@@ -1032,9 +1029,7 @@ public:
 // that var, put into SSA form.
 bool SSABuilder::fixupVars(ControlFlowGraph*fg, MethodDesc& methodDesc) {
     // clear out all Phi args
-    int sizeEstimate = opndManager.getNumVarOpnds()+opndManager.getNumSsaOpnds();
-    MemoryManager localMM(64*sizeEstimate,
-                          "SSABuilder::fixupVars::memManager");
+    MemoryManager localMM("SSABuilder::fixupVars::memManager");
 
 #ifdef DEBUG_SSA
     if (Log::isEnabled()) {
@@ -1144,8 +1139,7 @@ struct SsaVarClique : private UnionFind {
 // different variables.
 void SSABuilder::splitSsaWebs(ControlFlowGraph* fg,OpndManager& opndManager) {
     uint32 numSsaOpnds = opndManager.getNumSsaOpnds();
-    MemoryManager localMM(16*numSsaOpnds,
-                          "SSABuilder::splitSsaWebs::memManager");
+    MemoryManager localMM("SSABuilder::splitSsaWebs::memManager");
     SsaVarClique *cliques = new (localMM) SsaVarClique[numSsaOpnds];
     
     const Nodes& nodes = fg->getNodes();

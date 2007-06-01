@@ -117,7 +117,7 @@ FlowGraph::eliminateCheck(ControlFlowGraph& fg, Node* block, Inst* check, bool a
 
 Node* 
 FlowGraph::tailDuplicate(IRManager& irm, Node* pred, Node* tail, DefUseBuilder& defUses) {
-    MemoryManager mm(1024,"FlowGraph::tailDuplicate.mm");
+    MemoryManager mm("FlowGraph::tailDuplicate.mm");
     ControlFlowGraph& fg = irm.getFlowGraph();
 
     // Set region containing only node.
@@ -244,7 +244,7 @@ static Node* duplicateNode(IRManager& irm, Node *node, StlBitVector* nodesInRegi
                     }
                     Inst* patchdef = NULL;
                     if(ci != NULL) {
-                        MemoryManager mm(0,"FlowGraph::duplicateNode.mm");
+                        MemoryManager mm("FlowGraph::duplicateNode.mm");
                         OpndRenameTable table(mm,1);
                         patchdef = instFactory.clone(ci, opndManager, &table)->asConstInst();
                         assert(patchdef != NULL);
@@ -350,7 +350,7 @@ static Node* _duplicateRegion(IRManager& irm, Node* entry, StlBitVector& nodesIn
 
 
 Node* FlowGraph::duplicateRegion(IRManager& irm, Node* entry, StlBitVector& nodesInRegion, DefUseBuilder& defUses, double newEntryFreq) {
-    MemoryManager dupMemManager(1024, "FlowGraph::duplicateRegion.dupMemManager");
+    MemoryManager dupMemManager("FlowGraph::duplicateRegion.dupMemManager");
     // prepare the hashtable for the operand rename translation
     OpndRenameTable    *opndRenameTable = new (dupMemManager) OpndRenameTable(dupMemManager,10);
     NodeRenameTable *nodeRenameTable = new (dupMemManager) NodeRenameTable(dupMemManager,10);
@@ -573,7 +573,7 @@ static bool inlineJSR(IRManager* irManager, Node *block, DefUseBuilder& defUses,
         //
         // Duplicate and inline the JSR.
         //
-        MemoryManager inlineManager(0,"FlowGraph::inlineJSR.inlineManager"); 
+        MemoryManager inlineManager("FlowGraph::inlineJSR.inlineManager"); 
 
         // Find the nodes in the JSR.
         StlBitVector nodesInJSR(inlineManager, fg.getMaxNodeId());
@@ -652,7 +652,7 @@ static bool inlineJSR(IRManager* irManager, Node *block, DefUseBuilder& defUses,
 
 
 static void inlineJSRs(IRManager* irManager) {
-    MemoryManager jsrMemoryManager(0, "FlowGraph::inlineJSRs.jsrMemoryManager");
+    MemoryManager jsrMemoryManager("FlowGraph::inlineJSRs.jsrMemoryManager");
     static CountTime inlineJSRTimer("ptra::fg::inlineJSRs");
     AutoTimer tm(inlineJSRTimer);
 
@@ -821,7 +821,7 @@ static bool inlineFinally(IRManager& irm, Node *block) {
         fg.removeEdge(block,retTarget);
         _fixFinally(fg, entryFinally,retTarget);
     } else {
-        MemoryManager inlineManager(0,"FlowGraph::inlineFinally.inlineManager");
+        MemoryManager inlineManager("FlowGraph::inlineFinally.inlineManager");
         // prepare the hashtable for the operand rename translation
         OpndRenameTable    *opndRenameTable =
             new (inlineManager) OpndRenameTable(inlineManager,10);
@@ -834,28 +834,6 @@ static bool inlineFinally(IRManager& irm, Node *block) {
     return true;
 }
 
-/*
-static void renumberLabels(ControlFlowGraph& fg) {
-    uint32 minLabelId = 0x7fffffff;
-    for(Nodes::const_iterator i = fg.getNodes().begin(), end = fg.getNodes().end(); i != end; ++i) {
-        Node* node = *i;
-        assert(node->getFirstInst()->isLabel());
-        LabelInst *label = (LabelInst*)node->getFirstInst();
-        uint32 n = label->getLabelId();
-        if (n < minLabelId) {
-            minLabelId = n;
-        }
-    }
-    if (!fg.hasValidOrdering()) {
-        fg.orderNodes();
-    }
-    for(Nodes::const_iterator i = fg.getNodes().begin(), end = fg.getNodes().end(); i != end; ++i) {
-        Node* node = *i;
-        LabelInst *label = (LabelInst*)node->getFirstInst();
-        label->setLabelId(node->getPreNum() + minLabelId);
-    }
-}
-*/
 
 void FlowGraph::doTranslatorCleanupPhase(IRManager& irm) {
     ControlFlowGraph& fg = irm.getFlowGraph();
@@ -1030,7 +1008,6 @@ void FlowGraph::doTranslatorCleanupPhase(IRManager& irm) {
     //
     fg.purgeUnreachableNodes();
     fg.purgeEmptyNodes(false);
-//    renumberLabels(fg);
 }
 
 
@@ -1039,7 +1016,7 @@ void FlowGraph::printHIR(std::ostream& os, ControlFlowGraph& fg, MethodDesc& met
     const char* methodName = methodDesc.getName();
     os << std::endl << "--------  irDump: " << methodDesc.getParentType()->getName() << "::" << methodName << "  --------" << std::endl;
 
-    MemoryManager mm(fg.getMaxNodeId(), "ControlFlowGraph::print.mm");
+    MemoryManager mm("ControlFlowGraph::print.mm");
     Nodes nodes(mm);
     fg.getNodesPostOrder(nodes);
     Nodes::reverse_iterator iter = nodes.rbegin(), end = nodes.rend();

@@ -125,7 +125,7 @@ void CodeGenerator::genCode(::Jitrino::SessionAction* sa, ::Jitrino::MethodCodeS
     }
 
     bool slowLdString = sa->getBoolArg("SlowLdString", false); 
-    MemoryManager  codeSelectorMemManager(1024, "CodeGenerator::selectCode.codeSelectorMemManager");
+    MemoryManager  codeSelectorMemManager("CodeGenerator::selectCode.codeSelectorMemManager");
     MethodCodeSelector    codeSelector(*ci, mm, codeSelectorMemManager, *irManager, slowLdString);
 
     inputProvider.selectCode(codeSelector);

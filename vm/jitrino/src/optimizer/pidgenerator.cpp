@@ -36,7 +36,7 @@ PersistentInstIdGenerationPass::_run(IRManager& irm) {
 
 void
 PersistentInstructionIdGenerator::runPass(IRManager& irm) {
-    MemoryManager mm(0, "PersistentInstructionIdGenerator::runPass");
+    MemoryManager mm("PersistentInstructionIdGenerator::runPass");
     
     MethodDesc& methodDesc = irm.getMethodDesc();
 

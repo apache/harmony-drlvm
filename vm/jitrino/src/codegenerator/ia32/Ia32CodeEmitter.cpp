@@ -43,7 +43,7 @@ class CompiledMethodInfo;
 class CodeEmitter : public SessionAction {
 public:
     CodeEmitter()
-        :memoryManager(0x1000, "CodeEmitter"),
+        :memoryManager("CodeEmitter"),
         exceptionHandlerInfos(memoryManager), constantAreaLayout(memoryManager),
         traversalInfo(memoryManager), methodLocationMap(memoryManager), 
         entryExitMap(memoryManager), instSizeMap(memoryManager)
@@ -789,7 +789,7 @@ void CodeEmitter::registerExceptionRegion(void * regionStart, void * regionEnd, 
         BasicBlock* handler = (BasicBlock*)edge->getTargetNode();
         Inst * catchInst = (Inst*)handler->getFirstInst();
         assert(catchInst && catchInst->getKind() == Inst::Kind_CatchPseudoInst);
-        MemoryManager mm(0x400, "CatchOpnds");
+        MemoryManager mm("CatchOpnds");
         BitSet * ls=new(mm) BitSet(mm, irManager->getOpndCount());
         irManager->getLiveAtExit(handler, *ls);
         for (Inst* inst = (Inst*)handler->getLastInst(); inst!=catchInst; inst = inst->getPrevInst()) {

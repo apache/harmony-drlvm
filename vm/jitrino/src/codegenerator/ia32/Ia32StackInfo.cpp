@@ -117,7 +117,7 @@ void StackInfo::write(Byte* bytes) {
     *serializedInfo = *this;
     serializedInfo->byteSize = getByteSize();
     data+=sizeof(StackInfo);
-    MemoryManager mm(0x100, "DepthInfo");
+    MemoryManager mm("DepthInfo");
     EntryPtr * entries = new(mm) EntryPtr[hashTableSize];
     for(uint32 i = 0; i< hashTableSize; i++)
         entries[i] = NULL;

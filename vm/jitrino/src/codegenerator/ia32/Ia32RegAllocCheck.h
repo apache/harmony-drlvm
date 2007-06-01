@@ -52,7 +52,7 @@ class RegAllocCheck
 
 public:
     
-    RegAllocCheck (const IRManager& x)      :irm(x), mm(1000, "RegAllocCheck") {}
+    RegAllocCheck (const IRManager& x)      :irm(x), mm("RegAllocCheck") {}
 
     bool run (bool checkloc);
 

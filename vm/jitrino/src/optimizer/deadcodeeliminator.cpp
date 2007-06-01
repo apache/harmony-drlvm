@@ -761,7 +761,7 @@ DeadCodeEliminator::sweepInst(Node* node,
 //
 bool
 DeadCodeEliminator::eliminateUnreachableCode() {
-    MemoryManager memManager(1000,"DeadCodeEliminator::eliminateUnreachableCode");
+    MemoryManager memManager("DeadCodeEliminator::eliminateUnreachableCode");
 
     // Purge unreachable nodes from CFG.
     Nodes unreachableNodes(memManager);
@@ -852,8 +852,7 @@ DeadCodeEliminator::eliminateDeadCode(bool keepEmptyNodes) {
     uint32 maxInstId = irManager.getInstFactory().getNumInsts();
     uint32 numInsts = maxInstId - minInstId;
     uint32 numOpnds = irManager.getOpndManager().getNumVarOpnds();
-    MemoryManager memManager(numInsts*20,
-                             "DeadCodeEliminator::eliminateDeadCode");
+    MemoryManager memManager("DeadCodeEliminator::eliminateDeadCode");
     InstDeque workSet(memManager);
     Nodes nodes(memManager);
     flowGraph.getNodesPostOrder(nodes);
@@ -1068,7 +1067,7 @@ DeadCodeEliminator::eliminateDeadCode(bool keepEmptyNodes) {
 //
 void
 DeadCodeEliminator::removeExtraPseudoThrow() {
-    MemoryManager memManager(flowGraph.getMaxNodeId(),"DeadCodeEliminator::removeExtraPseudoThrow");
+    MemoryManager memManager("DeadCodeEliminator::removeExtraPseudoThrow");
 
     OptPass::computeLoops(irManager);
     LoopTree* loopTree = irManager.getLoopTree();

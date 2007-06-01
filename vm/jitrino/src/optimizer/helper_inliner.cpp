@@ -185,7 +185,7 @@ DECLARE_HELPER_INLINER(InstanceOfHelperInliner, instanceOf)
 
 void HelperInlinerSession::_run(IRManager& irm) {
     CompilationContext* cc = getCompilationContext();
-    MemoryManager tmpMM(1024, "Inline VM helpers");
+    MemoryManager tmpMM("Inline VM helpers");
     HelperInlinerAction* action = (HelperInlinerAction*)getAction();
     HelperInlinerFlags& flags = action->getFlags();
 

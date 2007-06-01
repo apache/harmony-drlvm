@@ -139,7 +139,7 @@ uint32 LoopMarker<IDFun>::markNodesOfLoop(StlBitVector& nodesInLoop,
                                Node* tail) {
     static IDFun getId;
     uint32 maxSize = ::std::max(getId(header), getId(tail));
-    MemoryManager tmm(maxSize >> 3, "LoopBuilder::markNodesOfLoop.tmm");
+    MemoryManager tmm("LoopBuilder::markNodesOfLoop.tmm");
     StlBitVector visited(tmm, maxSize);
 
     // mark header is visited
@@ -389,7 +389,7 @@ void LoopBuilder::peelLoops(StlVector<Edge*>& loopEdgesIn) {
     globalOpndAnalyzer.doAnalysis();
 
     // Set def-use chains
-    MemoryManager peelmem(1000, "LoopBuilder::peelLoops.peelmem");
+    MemoryManager peelmem("LoopBuilder::peelLoops.peelmem");
     DefUseBuilder defUses(peelmem);
     defUses.initialize(irManager.getFlowGraph());
 
@@ -436,7 +436,7 @@ void LoopBuilder::peelLoops(StlVector<Edge*>& loopEdgesIn) {
 
         // Temporary memory for peeling
         uint32 maxSize = fg.getMaxNodeId();
-        MemoryManager tmm(maxSize, "LoopBuilder::peelLoops.tmm");
+        MemoryManager tmm("LoopBuilder::peelLoops.tmm");
         
         // Compute nodes in loop
         StlBitVector nodesInLoop(tmm, maxSize);
@@ -898,7 +898,7 @@ void LoopBuilder::peelLoops() {
         return;
     }
 
-    MemoryManager tmm(1024,"LoopBuilder::peelLoops");
+    MemoryManager tmm("LoopBuilder::peelLoops");
     Edges loopEdges(tmm);
     const Nodes& nodes = irManager.getFlowGraph().getNodes();
     for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {

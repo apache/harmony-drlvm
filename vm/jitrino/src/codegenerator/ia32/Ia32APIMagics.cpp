@@ -82,7 +82,7 @@ DECLARE_HELPER_INLINER(Long_numberOfTrailingZeros_Handler_x_J_x_I);
 
 void APIMagicsHandlerSession::runImpl() {
     CompilationContext* cc = getCompilationContext();
-    MemoryManager tmpMM(1024, "Inline API methods");
+    MemoryManager tmpMM("Inline API methods");
     //finding all api magic calls
     IRManager* irm = cc->getLIRManager();
     ControlFlowGraph* fg = irm->getFlowGraph();

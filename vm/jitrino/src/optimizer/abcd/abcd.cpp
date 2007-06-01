@@ -209,8 +209,7 @@ void Abcd::renamePiVariables()
 {
     MethodDesc &methodDesc= irManager.getMethodDesc();
     uint32 byteCodeSize = methodDesc.getByteCodeSize();
-    MemoryManager localMemManager(byteCodeSize*16,
-                                  "Abcd::renamePiNodes");
+    MemoryManager localMemManager("Abcd::renamePiNodes");
 
     RenamePiWalker theWalker(this, localMemManager, piMap, byteCodeSize);
     DomTreeWalk<true, RenamePiWalker>(dominators, theWalker,

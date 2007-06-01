@@ -27,7 +27,6 @@
 #include "JavaTranslator.h"
 #include "CompilationContext.h"
 #include "MemoryManager.h"
-#include "MemoryEstimates.h"
 #include "Opnd.h"
 #include "Inst.h"
 #include "VMInterface.h"

@@ -2391,7 +2391,7 @@ void PMF::Pipeline::Step::setup (MemoryManager& mm)
 
 
 PMF::PipelineIterator::PipelineIterator (PMF& p, const char* cn, const char* mn, const char* sig)
-:pmf(p), mm(0, "PMF::PipelineIterator"), smm(0), session(0), first(true)
+:pmf(p), mm("PMF::PipelineIterator"), smm(0), session(0), first(true)
 {
     if (pmf.pipelines.empty())
         crash("PMF: No pipelines defined\n");
@@ -2402,7 +2402,7 @@ PMF::PipelineIterator::PipelineIterator (PMF& p, const char* cn, const char* mn,
 
 
 PMF::PipelineIterator::PipelineIterator (HPipeline hpipe)
-:pmf(hpipe->pmf), pipeline(hpipe), mm(0, "PMF::PipelineIterator"), smm(0), session(0), first(true)
+:pmf(hpipe->pmf), pipeline(hpipe), mm("PMF::PipelineIterator"), smm(0), session(0), first(true)
 {
     pipeline->init();
 }
@@ -2438,7 +2438,7 @@ bool PMF::PipelineIterator::next ()
 
     if (it != end)
     {// open new session
-        smm = new MemoryManager(0, it->factory->getName());
+        smm = new MemoryManager(it->factory->getName());
         session = it->factory->createSessionAction(*smm);
         assert(session != 0);
         session->step = &*it;

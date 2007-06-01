@@ -100,7 +100,7 @@ struct TlsLogStreams {
     Jit2Logs jit2logs;
 
     TlsLogStreams ()   
-        :threadnb(thread_nb), mm(0, "TlsLogStreams"), jit2logs(mm) {}
+        :threadnb(thread_nb), mm("TlsLogStreams"), jit2logs(mm) {}
 
     ~TlsLogStreams ();
 };

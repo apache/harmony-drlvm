@@ -536,7 +536,7 @@ Devirtualizer::unguardCallsInRegion(IRManager& regionIRM) {
     //
     // Search for previously guarded virtual calls
     //
-    MemoryManager mm(regionFG.getMaxNodeId()*sizeof(Node*), "Devirtualizer::unguardCallsInRegion.mm");
+    MemoryManager mm("Devirtualizer::unguardCallsInRegion.mm");
     Nodes nodes(mm);
     regionFG.getNodesPostOrder(nodes);
     StlVector<Node*>::reverse_iterator i;

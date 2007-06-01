@@ -67,12 +67,11 @@ static ::std::ostream& traceStream = ::std::cerr;
 
 static const uint32 mm_default_next_arena_size = 4096-ARENA_HEADER_SIZE;
 
-MemoryManager::MemoryManager(size_t initial_estimate, const char* name)
+MemoryManager::MemoryManager(const char* name)
 {
     _arena = NULL;
     _bytes_allocated = 0;
     _bytes_arena = 0;
-    _next_arena_size = initial_estimate < mm_default_next_arena_size  ? mm_default_next_arena_size : initial_estimate;
     _name = name;
     _numArenas = 0;
 
@@ -80,14 +79,10 @@ MemoryManager::MemoryManager(size_t initial_estimate, const char* name)
     // get start time for this MemoryManager
     _startTraceId = traceId++;
 #ifdef DEBUG_MEMORY_MANAGER
-    traceStream << "### MemoryManager," << _name 
-                << ", START"
-                << ::std::endl;
+    traceStream << "### MemoryManager," << _name  << ", START" << ::std::endl;
 #endif //DEBUG_MEMORY_MANAGER
 
 #endif //USE_TRACE_MEM_MANANGER
-
-//    _alloc_arena(initial_estimate);
 }
 
 #ifdef DEBUG_MEMORY_MANAGER
@@ -214,8 +209,8 @@ void *MemoryManager::alloc(size_t size)
         // allocate another arena
         //
         size_t arena_size;
-        if (size < _next_arena_size) {
-            arena_size = _next_arena_size;
+        if (size < mm_default_next_arena_size) {
+            arena_size = mm_default_next_arena_size;
         } else {
             arena_size = size;
         }

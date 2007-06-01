@@ -847,7 +847,7 @@ void IRManager::getAliasRelations(AliasRelation * relations)
 //_________________________________________________________________________________________________
 void IRManager::layoutAliasOpnds() 
 {
-    MemoryManager mm(0x1000, "layoutAliasOpnds");
+    MemoryManager mm("layoutAliasOpnds");
     uint32 opndCount=getOpndCount();
     AliasRelation * relations=new  (memoryManager) AliasRelation[opndCount];
     getAliasRelations(relations);
@@ -1729,7 +1729,7 @@ void IRManager::finalizeCallSites()
 //_____________________________________________________________________________________________
 void IRManager::calculateStackDepth()
 {
-    MemoryManager mm(0x100, "calculateStackDepth");
+    MemoryManager mm("calculateStackDepth");
     StlVector<int32> stackDepths(mm, fg->getNodeCount(), -1);
     
     

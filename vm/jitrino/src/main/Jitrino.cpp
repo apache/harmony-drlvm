@@ -25,7 +25,6 @@
 #include "IRBuilder.h"
 #include "irmanager.h"
 #include "FlowGraph.h"
-#include "MemoryEstimates.h"
 #include "TranslatorIntfc.h"
 #include "CodeGenIntfc.h"
 #include "Log.h"
@@ -134,7 +133,7 @@ bool Jitrino::Init(JIT_Handle jh, const char* name)
             }
         }
     }else {
-        global_mm = new MemoryManager(0,"Jitrino::Init.global_mm"); 
+        global_mm = new MemoryManager("Jitrino::Init.global_mm"); 
 #if defined(_IPF_)
         runtimeInterface = new IPF::RuntimeInterface;
         flags.codegen = CG_IPF;

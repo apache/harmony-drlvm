@@ -539,7 +539,7 @@ void RuntimeInterface::getGCRootSet(MethodDesc* methodDesc, GCInterface* gcInter
     const POINTER_SIZE_INT* gcPointImage = GCMap::findGCSafePointStart((POINTER_SIZE_INT*)gcBlock, *context->p_eip);
 #endif  
     if (gcPointImage != NULL) {
-        MemoryManager mm(128,"RuntimeInterface::getGCRootSet");
+        MemoryManager mm("RuntimeInterface::getGCRootSet");
         GCSafePoint gcSite(mm, gcPointImage);
         if (gcSite.getNumOpnds() > 0) { 
             //this is a performance filter for empty points 

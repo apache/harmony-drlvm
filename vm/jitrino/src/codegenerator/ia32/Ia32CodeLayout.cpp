@@ -65,7 +65,7 @@ static Edge* findEdgeToAddJump(BasicBlock* block) {
 
 /**  Fix branches to work with the code layout */
 void Linearizer::fixBranches() {
-    MemoryManager tmpMM(1024, "Linearizer::fixBranches");
+    MemoryManager tmpMM("Linearizer::fixBranches");
     Nodes nodes(tmpMM);
     irManager->getFlowGraph()->getNodes(nodes);
     for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it)  {

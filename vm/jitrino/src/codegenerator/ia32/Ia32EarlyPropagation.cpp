@@ -73,7 +73,7 @@ void EarlyPropagation::runImpl()
         irManager->updateLoopInfo();
         uint32 opndCount=irManager->getOpndCount();
 
-        MemoryManager mm(0x100 + sizeof(OpndInfo) * opndCount + sizeof(Opnd*) * opndCount, "early_prop");
+        MemoryManager mm("early_prop");
         OpndInfo * opndInfos = new(mm) OpndInfo[opndCount];
         Node * currentLoopHeader = NULL;
 
