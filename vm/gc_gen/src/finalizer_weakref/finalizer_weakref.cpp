@@ -26,6 +26,7 @@
 #include "../trace_forward/fspace.h"
 #include "../mark_sweep/lspace.h"
 #include "../gen/gen.h"
+#include "../common/space_tuner.h"
 
 Boolean IGNORE_FINREF = FALSE;
 Boolean DURING_RESURRECTION = FALSE;
@@ -151,8 +152,10 @@ static void identify_finalizable_objects(Collector *collector)
 
 extern void trace_obj_in_gen_fw(Collector *collector, void *p_ref);
 extern void trace_obj_in_nongen_fw(Collector *collector, void *p_ref);
-extern void trace_obj_in_marking(Collector *collector, void *p_obj);
+extern void trace_obj_in_normal_marking(Collector *collector, void *p_obj);
 extern void trace_obj_in_fallback_marking(Collector *collector, void *p_ref);
+extern void trace_obj_in_space_tune_marking(Collector *collector, void *p_obj);
+
 
 typedef void (* Trace_Object_Func)(Collector *collector, void *p_ref_or_obj);
 // clear the two least significant bits of p_obj first
@@ -175,7 +178,19 @@ static inline void resurrect_obj_tree(Collector *collector, REF* p_ref)
       trace_object = trace_obj_in_nongen_fw;
   } else if(gc_match_kind(gc, MAJOR_COLLECTION)){
     p_ref_or_obj = p_obj;
-    trace_object = trace_obj_in_marking;
+    if(gc->tuner->kind != TRANS_NOTHING){
+      trace_object = trace_obj_in_space_tune_marking;
+      unsigned int obj_size = vm_object_size(p_obj);
+#ifdef USE_32BITS_HASHCODE
+      obj_size += (hashcode_is_set(p_obj))?GC_OBJECT_ALIGNMENT:0;
+#endif
+      if(!obj_belongs_to_space(p_obj, gc_get_los((GC_Gen*)gc)))
+        collector->non_los_live_obj_size += obj_size;
+      else
+        collector->los_live_obj_size += round_up_to_size(obj_size, KB); 
+    }else{  
+      trace_object = trace_obj_in_normal_marking;
+    }
     obj_mark_in_vt(p_obj);
   } else {
     assert(gc_match_kind(gc, FALLBACK_COLLECTION));

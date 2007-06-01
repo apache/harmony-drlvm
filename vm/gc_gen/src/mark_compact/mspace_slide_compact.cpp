@@ -427,11 +427,6 @@ void slide_compact_mspace(Collector* collector)
 
    /* last collector's world here */
   if( ++old_num == num_active_collectors ){
-    if( gc->tuner->kind != TRANS_NOTHING ) gc_compute_space_tune_size_after_marking(gc);
-    assert(!(gc->tuner->tuning_size % GC_BLOCK_SIZE_BYTES));
-    /* prepare for next phase */
-    gc_init_block_for_collectors(gc, mspace);
-    
     if(!IGNORE_FINREF )
       collector_identify_finref(collector);
 #ifndef BUILD_IN_REFERENT
@@ -441,6 +436,11 @@ void slide_compact_mspace(Collector* collector)
     }
 #endif
 
+    if( gc->tuner->kind != TRANS_NOTHING ) gc_compute_space_tune_size_after_marking(gc);
+    assert(!(gc->tuner->tuning_size % GC_BLOCK_SIZE_BYTES));
+    /* prepare for next phase */
+    gc_init_block_for_collectors(gc, mspace);
+    
 #ifdef USE_32BITS_HASHCODE
     if(gc_match_kind(gc, FALLBACK_COLLECTION))
       fallback_clear_fwd_obj_oi_init(collector);

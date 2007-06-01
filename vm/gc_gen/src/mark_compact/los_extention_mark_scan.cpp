@@ -202,5 +202,7 @@ retry:
   return;
 }
 
-
-
+void trace_obj_in_space_tune_marking(Collector *collector, void *p_obj)
+{
+  trace_object(collector, (Partial_Reveal_Object *)p_obj);
+}

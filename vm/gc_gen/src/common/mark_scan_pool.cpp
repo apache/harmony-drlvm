@@ -37,7 +37,6 @@ static FORCE_INLINE void scan_slot(Collector* collector, REF *p_ref)
 static FORCE_INLINE void scan_object(Collector* collector, Partial_Reveal_Object *p_obj)
 {
   vm_notify_obj_alive( (void *)p_obj);
-
   if( !object_has_ref_field(p_obj) ) return;
   
   REF *p_ref;
@@ -189,7 +188,7 @@ retry:
   return;
 }
 
-void trace_obj_in_marking(Collector *collector, void *p_obj)
+void trace_obj_in_normal_marking(Collector *collector, void *p_obj)
 {
   trace_object(collector, (Partial_Reveal_Object *)p_obj);
 }
