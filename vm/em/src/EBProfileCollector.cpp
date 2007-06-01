@@ -116,11 +116,14 @@ EBProfileCollector::~EBProfileCollector() {
 }
 
 MethodProfile* EBProfileCollector::getMethodProfile(Method_Handle mh) const {
-     EBProfilesMap::const_iterator it = profilesByMethod.find(mh);
-     if (it == profilesByMethod.end()) {
-        return NULL;
-     }
-     return it->second;
+    hymutex_lock(&profilesLock);
+    MethodProfile* res = NULL;
+    EBProfilesMap::const_iterator it = profilesByMethod.find(mh);
+    if (it != profilesByMethod.end()) {
+        res = it->second;
+    }
+    hymutex_unlock(&profilesLock);
+    return res;
 }
 
 EBMethodProfile* EBProfileCollector::createProfile(Method_Handle mh) {

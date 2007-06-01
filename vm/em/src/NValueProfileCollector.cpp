@@ -127,7 +127,6 @@ ValueMethodProfile* ValueProfileCollector::createProfile(Method_Handle mh, uint3
 {
     hymutex_lock(&profilesLock);
     ValueMethodProfile* profile = new ValueMethodProfile(this, mh);
-    VPInstructionProfileData* vpmap = new VPInstructionProfileData[numkeys];
     // Allocate space for value maps
     for (uint32 index = 0; index < numkeys; index++){
         VPInstructionProfileData* profileData = new VPInstructionProfileData();
@@ -143,7 +142,8 @@ ValueMethodProfile* ValueProfileCollector::createProfile(Method_Handle mh, uint3
                 (profileData->TNV_clear_part[i]).value = 0;
             }
         }
-        (profile->ValueMap)[keys[index]] = profileData;
+        uint32 key = keys[index];
+        (profile->ValueMap)[key] = profileData;
     }
     assert(profilesByMethod.find(mh) == profilesByMethod.end());
     profilesByMethod[mh] = profile;
@@ -209,7 +209,9 @@ void ValueMethodProfile::addNewValue(uint32 instructionKey, POINTER_SIZE_INT val
 {
     POINTER_SIZE_INT curr_value = valueToAdd;
     lockProfile();
-    VPInstructionProfileData* _temp_vp = ValueMap[instructionKey];
+    VPDataMap::const_iterator it =  ValueMap.find(instructionKey);
+    assert(it != ValueMap.end());
+    VPInstructionProfileData* _temp_vp = it->second;
     POINTER_SIZE_INT* last_value = &(_temp_vp->last_value);
     uint32* profile_tick = &(_temp_vp->profile_tick);
     uint32* num_times_profiled = &(_temp_vp->num_times_profiled);
@@ -238,9 +240,14 @@ void ValueMethodProfile::addNewValue(uint32 instructionKey, POINTER_SIZE_INT val
 POINTER_SIZE_INT ValueMethodProfile::getResult(uint32 instructionKey)
 {
     lockProfile();
-    VPInstructionProfileData* _temp_vp = ValueMap[instructionKey];
+    VPDataMap::const_iterator it =  ValueMap.find(instructionKey);
+    if (it == ValueMap.end()) {
+        unlockProfile();
+        return 0;
+    }
+    VPInstructionProfileData* _temp_vp = it->second;
+    assert(_temp_vp);
     if (_temp_vp == NULL) {
-        assert(0);
         unlockProfile();
         return 0;
     }
@@ -262,7 +269,7 @@ void ValueMethodProfile::flushInstProfile(VPInstructionProfileData* instProfile)
 
 void ValueMethodProfile::dumpValues(std::ostream& os)
 {
-    std::map<uint32, VPInstructionProfileData*>::const_iterator mapIter;
+    VPDataMap::const_iterator mapIter;
     assert(pc->type == EM_PCTYPE_VALUE);
     lockProfile();
     os << "===== Value profile dump, " << ValueMap.size() << " element(s) ===" << std::endl;
@@ -314,11 +321,14 @@ ValueProfileCollector* ValueMethodProfile::getVPC() const {
 
 MethodProfile* ValueProfileCollector::getMethodProfile(Method_Handle mh) const
 {
+    MethodProfile* res = NULL;
+    hymutex_lock(&profilesLock);
     ValueProfilesMap::const_iterator it = profilesByMethod.find(mh);
-    if (it == profilesByMethod.end()) {
-        return NULL;
+    if (it != profilesByMethod.end()) {
+        res =  it->second;
     }
-    return it->second;
+    hymutex_unlock(&profilesLock);
+    return res;
 }
 
 

@@ -64,7 +64,7 @@ private:
     std::vector<EdgeMethodProfile*> greenProfiles;
     std::vector<EdgeMethodProfile*> newProfiles;
     std::vector<EdgeMethodProfile*> tmpProfiles;
-    hymutex_t profilesLock;
+    mutable hymutex_t profilesLock;
 };
 
 class EdgeMethodProfile : public MethodProfile {

@@ -69,7 +69,7 @@ private:
     bool   loggingEnabled;
     typedef std::map<Method_Handle, ValueMethodProfile*> ValueProfilesMap;
     ValueProfilesMap profilesByMethod;
-    hymutex_t profilesLock;
+    mutable hymutex_t profilesLock;
 };
 
 class VPInstructionProfileData
@@ -85,9 +85,10 @@ public:
     uint32 profile_tick;
 };
 
+typedef std::map<uint32, VPInstructionProfileData*> VPDataMap;
 class ValueMethodProfile : public MethodProfile {
 public:
-    std::map<uint32, VPInstructionProfileData*> ValueMap;
+    VPDataMap ValueMap;
 public:
     ValueMethodProfile(ValueProfileCollector* pc, Method_Handle mh);
     ~ValueMethodProfile();

@@ -119,11 +119,14 @@ EdgeProfileCollector::~EdgeProfileCollector()
 
 MethodProfile* EdgeProfileCollector::getMethodProfile(Method_Handle mh) const
 {
+    hymutex_lock(&profilesLock);
+    MethodProfile* res = NULL;
     EdgeProfilesMap::const_iterator it = profilesByMethod.find(mh);
-    if (it == profilesByMethod.end()) {
-        return NULL;
+    if (it != profilesByMethod.end()) {
+        res = it->second;    
     }
-    return it->second;
+    hymutex_unlock(&profilesLock);
+    return res;
 }
 
 
