@@ -29,6 +29,8 @@
 #include "Opcode.h"
 #include "FlowGraph.h"
 #include "optpass.h"
+#include "insertpi.h"
+#include "abcd/AbcdFlags.h"
 
 namespace Jitrino {
 
@@ -46,92 +48,38 @@ class AbcdSolver;
 class AbcdAliases;
 class AbcdReasons;
 
-
 typedef ::std::pair<Inst *, AbcdReasons *> InstReasonPair;
 
 inline bool operator <(const InstReasonPair &pair1, const InstReasonPair &pair2) {
     return (pair1.first < pair2.first);
 }
 
-struct AbcdFlags {
-    bool partial;
-    bool dryRun;
-    bool useAliases;
-    bool useConv;
-    bool remConv;
-    bool useShr;
-    bool unmaskShifts;
-    bool remBr;
-    bool remCmp;
-    bool remOneBound;
-    bool remOverflow;
-    bool checkOverflow;
-    bool useReasons;
-};
-
 class Abcd {
-    IRManager& irManager;
-    MemoryManager &mm;
-    InequalityGraph *ineqGraph;
-    DominatorTree& dominators;
-    SparseOpndMap *piMap;
-    uint32 nextPiOpndId;
-    AbcdSolver *solver;
-    StlVector<InstReasonPair> canEliminate; // sorted by Inst
-    StlVector<InstReasonPair> canEliminateUB; // keep sorted
-    StlVector<InstReasonPair> canEliminateLB; // keep sorted
-
-    SsaTmpOpnd *tauUnsafe;
-    SsaTmpOpnd *tauSafe;
-    SsaTmpOpnd *blockTauPoint;
-    Node *lastTauPointBlock;
-    SsaTmpOpnd *blockTauEdge;
-    Node *lastTauEdgeBlock;
-    
-    AbcdFlags& flags;
 public:    
     static void readFlags(Action* argSource, AbcdFlags* flags);
     static void showFlags(std::ostream& os);
     
     Abcd(IRManager &irManager0, MemoryManager& memManager, DominatorTree& dom0);
     
-    ~Abcd() {
-    };
+    ~Abcd() {}
 
     void runPass();
+
+    bool getAliases(Opnd *theOpnd, AbcdAliases *,
+                    int64 addend);  // adds them to aliases list, adding addend
+
+    static bool isConvOpnd(const Opnd *opnd);
+    static bool convPassesSource(const Opnd *opnd);
+    static Opnd *getConvSource(const Opnd *opnd);
+    static bool typeIncludes(Type::Tag type1, Type::Tag type2);
+    static bool hasTypeBounds(Type::Tag srcTag, int64 &lb, int64 &ub);
+    static bool isCheckableType(Type::Tag type1);
+    static bool hasCheckableType(const Opnd *opnd);
 private:
-    void insertPiNodes(); // insert and rename over whole tree;
-    void insertPiNodes(DominatorNode *domBlock); // for each dominator
-    void insertPiNodes(Node *block); // for each dominator
-    void insertPiNodesForUnexceptionalPEI(Node *block, Inst *pei);
-    void insertPiNodesForBranch(Node *block, BranchInst *branchi, 
-                                Edge::Kind kind);
-    void insertPiNodesForComparison(Node *block,
-                                    ComparisonModifier mod,
-                                    const PiCondition &bounds,
-                                    Opnd *op,
-                                    bool swap_operands,
-                                    bool negate_comparison);
-    void insertPiNodeForOpnd(Node *block, Opnd *org, 
-                             const PiCondition &cond,
-                             Opnd *tauOpnd = 0);
-    // checks for aliases of opnd, inserts them.
-    void insertPiNodeForOpndAndAliases(Node *block, Opnd *org, 
-                                       const PiCondition &cond,
-                                       Opnd *tauOpnd = 0);
-    PiOpnd *getNewDestOpnd(Node *block, Opnd *org);
-
     Opnd *getConstantOpnd(Opnd *opnd); // dereferencing through Pis, 0 if not constant.
-    void renamePiVariables();
-    void renamePiVariables(Node *block);
-    void renamePiVariables(DominatorNode *block);
 
-    void removePiNodes();
-    void removePiNodes(Node *block, Inst *i);
-
-    void updateSsaForm();
-    void buildInequalityGraph();
     void removeRedundantBoundsChecks();
+    void removePiEliminateChecksOnInst(Node *block, Inst *inst);
 
     void markCheckToEliminate(Inst *); // used by solver to mark eliminable branches
     void markInstToEliminate(Inst *); // used by solver to mark other eliminable instructions
@@ -152,31 +100,33 @@ private:
     bool isMarkedToEliminateUB(Inst *, AbcdReasons *&why);
 
     SsaTmpOpnd *getBlockTauPoint(Node *block);
-    SsaTmpOpnd *getBlockTauEdge(Node *block);
     SsaTmpOpnd *getTauUnsafe();
     SsaTmpOpnd *getTauSafe();
-    SsaTmpOpnd *getReasonTau(AbcdReasons *reason,
-                             Inst *useSite);
     SsaTmpOpnd *makeReasonPhi(Opnd *derefVar, StlVector<AbcdReasons *> &reasons,
                               StlVector<Opnd *> &derefVarVersions);
+    SsaTmpOpnd* getReasonTau(AbcdReasons *reason, Inst *useSite);
+
+    void removePiEliminateChecks();
+
+    IRManager& irManager;
+    MemoryManager &mm;
+    DominatorTree& dominators;
+    AbcdSolver *solver;
+    StlVector<InstReasonPair> canEliminate; // sorted by Inst
+    StlVector<InstReasonPair> canEliminateUB; // keep sorted
+    StlVector<InstReasonPair> canEliminateLB; // keep sorted
+
+    SsaTmpOpnd *tauUnsafe;
+    SsaTmpOpnd *tauSafe;
+    
+    AbcdFlags& flags;
+    InsertPi insertPi;
+
+    SsaTmpOpnd* blockTauPoint;
+    Node* lastTauPointBlock;
 
     friend class AbcdSolver;
-    friend class InsertPiWalker;
-    friend class RenamePiWalker;
-    friend class RemovePiWalker;
-    friend struct AliasCheckingFun;
-    void checkForAliases();
-public:
-    bool getAliases(Opnd *theOpnd, AbcdAliases *,
-                    int64 addend);  // adds them to aliases list, adding addend
-
-    static bool isConvOpnd(const Opnd *opnd);
-    static bool convPassesSource(const Opnd *opnd);
-    static Opnd *getConvSource(const Opnd *opnd);
-    static bool typeIncludes(Type::Tag type1, Type::Tag type2);
-    static bool hasTypeBounds(Type::Tag srcTag, int64 &lb, int64 &ub);
-    static bool isCheckableType(Type::Tag type1);
-    static bool hasCheckableType(const Opnd *opnd);
+    friend class RemovePiEliminateChecksWalker;
 };
 
 } //namespace Jitrino 

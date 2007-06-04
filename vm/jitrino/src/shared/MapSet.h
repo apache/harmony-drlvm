@@ -120,7 +120,7 @@ public:
         // Find elements that are in this set bat are not in 'set' and
         // write them into 'removeList'.
         //
-        MemoryManager memManager(1024,"MapSet::intersect.memManager");
+        MemoryManager memManager("MapSet::intersect.memManager");
         KEY * removeList = (KEY *)memManager.alloc(sizeof(KEY) * size());
         uint32 removeListSize = 0;
         const_iterator iter = begin(),

@@ -1081,7 +1081,7 @@ protected:
     virtual void handlePrintEscape(::std::ostream&, char code) const;
 private:
     friend class InstFactory;
-    friend class Abcd; // needs to update the cond below;
+    friend class InsertPi; // needs to update the cond below;
     TauPiInst(Type::Tag type, Opnd* dst, Opnd* src, Opnd *tau, PiCondition *cond0)
         : Inst(Op_TauPi, Modifier(), type, dst, src, tau),
           cond(cond0)

@@ -220,8 +220,11 @@ FastArrayFillPass::_run(IRManager& irManager)
         inst = ((Inst *)startNode->getLastInst());
 
         //check CheckUpperBound
-        if (inst->getOpcode() == Op_TauCheckUpperBound && inst->getSrc(0) == tmpIndex && inst->getPrevInst()->getOpcode() == Op_Label) {
+        Opcode cbOpcode = inst->getOpcode();
+        if (cbOpcode == Op_TauCheckUpperBound && inst->getSrc(0) == tmpIndex && inst->getPrevInst()->getOpcode() == Op_Label) {
             arrayBound = inst->getSrc(1);
+        } else if (cbOpcode == Op_TauCheckBounds && inst->getSrc(1) == tmpIndex && inst->getPrevInst()->getOpcode() == Op_Label) {
+            arrayBound = inst->getSrc(0);
         } else {
             continue;
         }
@@ -268,8 +271,14 @@ FastArrayFillPass::_run(IRManager& irManager)
         found = false;
 
         //check CheckUpperBound
-        ConstInst * cInst = (ConstInst *)inst->getSrc(0)->getInst();
-        if (inst->getOpcode() == Op_TauCheckUpperBound && cInst && cInst->getValue().i4 == 0 ) {
+        ConstInst* cInst = 0;
+        cbOpcode = inst->getOpcode();
+        if (cbOpcode == Op_TauCheckUpperBound) {
+            cInst = (ConstInst *)inst->getSrc(0)->getInst();
+        } else if (cbOpcode == Op_TauCheckBounds) {
+            cInst = (ConstInst *)inst->getSrc(1)->getInst();
+        }
+        if (cInst && cInst->getValue().i4 == 0) {
             inst = inst->getPrevInst();
             //check ArrayLength and Label
             if (inst->getOpcode() == Op_TauArrayLen && inst->getSrc(0) == arrayRef && inst->getDst() == arrayBound && inst->getPrevInst()->getOpcode() == Op_Label) {

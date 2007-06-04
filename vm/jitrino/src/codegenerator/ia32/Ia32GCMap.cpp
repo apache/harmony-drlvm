@@ -405,7 +405,7 @@ void GCMap::checkObject(TypeManager& tm, const void* p)  {
 
 void GCSafePoint::enumerate(GCInterface* gcInterface, const JitFrameContext* context, const StackInfo& stackInfo) const {
 #ifdef ENABLE_GC_RT_CHECKS
-    MemoryManager mm(256, "tmp");
+    MemoryManager mm("tmp");
     DrlVMTypeManager tm(mm);
 #endif
     //The algorithm of enumeration is

@@ -112,7 +112,7 @@ public:
         // Find elements that are in this set but are not in 'set' and
         // write them into 'removeList'.
         //
-        MemoryManager memManager(1024,"HashSet::intersect.memManager");
+        MemoryManager memManager("HashSet::intersect.memManager");
         KEY * removeList = (KEY *)memManager.alloc(sizeof(KEY) * map.size());
         uint32 removeListSize = 0;
         const_iterator iter = map.begin(),

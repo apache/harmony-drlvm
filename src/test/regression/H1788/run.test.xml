@@ -1,0 +1,10 @@
+<project name="RUN HARMONY-1788 Regression Test">
+    <!-- The test incorporates test cases from the issues HARMONY-2141, HARMONY-2144, HAARMONY-2147 -->
+    <target name="run-test">
+        <run-junit-test 
+            test="org.apache.harmony.drlvm.tests.regression.h1788.abcdTest"
+            vmarg="-Xem:server_static">
+        </run-junit-test>
+    </target>
+</project>
+

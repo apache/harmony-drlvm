@@ -24,7 +24,7 @@ SS_OPT.file=jitrino
 
 -XX:jit.SS_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
 
--XX:jit.SS_OPT.path.optimizer=ssa,simplify,dce,uce,statprof,devirt,inline,uce,purge,simplify,dce,uce,hvn,dce,uce,dessa,statprof,peel,ssa,hvn,simplify,dce,uce,lower,dce,uce,memopt,reassoc,dce,uce,hvn,dce,uce,abcd,dce,uce,gcm,dessa,statprof,markglobals
+-XX:jit.SS_OPT.path.optimizer=ssa,simplify,dce,uce,statprof,devirt,inline,uce,purge,simplify,dce,uce,hvn,dce,uce,dessa,statprof,peel,ssa,hvn,simplify,dce,uce,lower,dce,uce,memopt,reassoc,dce,uce,hvn,dce,uce,classic_abcd,dce,uce,gcm,dessa,statprof,markglobals
 -XX:jit.SS_OPT.path.codegen=lock_method,bbp,gcpoints,cafl,dce1,i8l-,early_prop-,itrace-,native,constraints,dce2,regalloc,spillgen,layout,copy,rce-,stack,break-,iprof-,emitter!,si_insts,gcmap,info,unlock_method
 -XX:jit.SS_OPT.path.dce1=cg_dce
 -XX:jit.SS_OPT.path.dce2=cg_dce
