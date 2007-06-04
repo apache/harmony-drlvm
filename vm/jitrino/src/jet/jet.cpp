@@ -563,7 +563,7 @@ using std::map;
 namespace Jitrino {
 typedef map<JIT_Handle, JITInstanceContext*> JITCTXLIST;
 static JITCTXLIST jitContextList;
-static MemoryManager g_mm(4026, "global MM");
+static MemoryManager g_mm("global MM");
 
 //
 // CompilationContext stub
