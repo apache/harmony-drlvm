@@ -355,7 +355,7 @@ string IrPrinter::toString(QpNode *qpNode) {
 string IrPrinter::toString(OpndSet &opndSet) {
     
     ostringstream oss;
-    MemoryManager mml(1024, "");
+    MemoryManager mml("IpfIrPrinter.OpndSet.toString");
     OpndVector opndVector(mml);
     opndVector.insert(opndVector.begin(), opndSet.begin(), opndSet.end());
     sort(opndVector.begin(), opndVector.end(), ptr_fun(greaterOpnd));
@@ -368,7 +368,7 @@ string IrPrinter::toString(OpndSet &opndSet) {
 string IrPrinter::toString(RegOpndSet &opndSet) {
     
     ostringstream oss;
-    MemoryManager mml(1024, "");
+    MemoryManager mml("IpfIrPrinter.RegOpndSet.toString");
     OpndVector opndVector(mml);
     opndVector.insert(opndVector.begin(), opndSet.begin(), opndSet.end());
     sort(opndVector.begin(), opndVector.end(), ptr_fun(greaterOpnd));

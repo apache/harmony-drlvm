@@ -56,7 +56,7 @@ CodeGenerator::CodeGenerator() {
 
 void CodeGenerator::run() {
     
-    MemoryManager mm(0x1000, "IpfCodeGenerator");
+    MemoryManager mm("IpfCodeGenerator");
 
     CompilationContext   *cc          = CompilationContext::getCurrentContext();
     IRManager            &irManager   = *cc->getHIRManager();
