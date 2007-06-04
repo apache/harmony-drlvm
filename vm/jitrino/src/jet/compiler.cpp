@@ -660,7 +660,7 @@ void Compiler::comp_parse_bytecode(void)
             ++ji.ref_count;
             comp_create_bb(jinst.get_def_target());
         }
-    }
+    } // ~for
     //
     // mark exception handlers as leads of basic blocks 
     for (unsigned i=0; i<m_handlers.size(); i++) {
@@ -673,6 +673,11 @@ void Compiler::comp_parse_bytecode(void)
             ji.id = id++;
         }
     }
+	// Sometimes, Eclipse's javac generates NOPs at the end of method AND in a basic 
+	// block which is [unreachable] exception handler. In this case we have an inst which 
+	// is last in the method, has fall-through, but no following block. Always set up 'OPF_DEAD_END':
+	JInst& lastInst = m_insts[bc_size-1];
+	lastInst.flags = lastInst.flags | OPF_DEAD_END;
 }
 
 void Compiler::comp_alloc_regs(void)

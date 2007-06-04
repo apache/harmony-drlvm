@@ -603,9 +603,9 @@ void Compiler::gen_bb_leave(unsigned to)
         to_eh = false;
     }
     else {
-        const BBInfo& bbto = m_bbs[to];
         // Must be BB
         assert(m_bbs.find(to) != m_bbs.end());
+        const BBInfo& bbto = m_bbs[to];
         // Jumps to ehandler ?
         to_eh = bbto.ehandler;
          // Now, check where the control flow may be transferred from the 

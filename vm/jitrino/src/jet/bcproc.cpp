@@ -40,7 +40,7 @@ void Compiler::handle_inst(void)
     //const bool last = m_bbinfo->last_pc == jinst.pc;
     const JInst& jinst = m_insts[m_pc];
     unsigned bc_size = m_infoBlock.get_bc_size();
-    bool last = jinst.next>=bc_size || (m_insts[jinst.next].flags & OPF_STARTS_BB);
+    bool lastInBB = jinst.next>=bc_size || (m_insts[jinst.next].flags & OPF_STARTS_BB);
     
     if (is_set(DBG_CHECK_STACK)) {
         gen_dbg_check_stack(true);
@@ -93,8 +93,8 @@ void Compiler::handle_inst(void)
         vpark();
     }
 
-    const bool has_fall_through = !(jinst.flags & OPF_DEAD_END);
-    if (last && has_fall_through && jinst.get_num_targets() == 0) {
+    const bool has_fall_through = !jinst.is_set(OPF_DEAD_END);
+    if (lastInBB && has_fall_through && jinst.get_num_targets() == 0) {
         gen_bb_leave(jinst.next);
     }
 }
