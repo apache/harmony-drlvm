@@ -240,7 +240,9 @@ CodeChunkInfo *Method_Lookup_Table::find(void *addr, bool is_ip_past)
     }
 #endif //USE_METHOD_LOOKUP_CACHE
 #ifdef VM_STATS
+    UNSAFE_REGION_START
     VM_Statistics::get_vm_stats().num_method_lookup_cache_miss++;
+    UNSAFE_REGION_END
 #endif //VM_STATS
 
     vm_env->p_meth_addr_table_lock->_lock();
