@@ -39,6 +39,7 @@ using namespace std;
 #include "atomics.h"
 #include "vm_strings.h"
 #include "vm_stats.h"
+#include "port_threadunsafe.h"
 
 #define LOG_DOMIAN "vm.strings"
 #include "cxxlog.h"
@@ -316,7 +317,9 @@ void String_Pool::register_interned_string(String * str) {
         MemoryWriteBarrier();
         local_current_interned->free_slot++;
     } else {
+        UNSAFE_REGION_START
         current_interned->free_slot++;
+        UNSAFE_REGION_END
     }
 }
 
