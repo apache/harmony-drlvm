@@ -496,6 +496,7 @@ void* Class::helper_get_interface_vtable(ManagedObject* obj, Class* iid)
     Intfc_Table* intfTable  = vt->intfc_table;
     unsigned num_intfc = intfTable->n_entries;
 #ifdef VM_STATS
+    UNSAFE_REGION_START
     VM_Statistics::get_vm_stats().num_invokeinterface_calls++;
     switch(num_intfc) {
     case 1:  VM_Statistics::get_vm_stats().num_invokeinterface_calls_size_1++;    break;
@@ -504,12 +505,14 @@ void* Class::helper_get_interface_vtable(ManagedObject* obj, Class* iid)
     }
     if(num_intfc > VM_Statistics::get_vm_stats().invokeinterface_calls_size_max)
         VM_Statistics::get_vm_stats().invokeinterface_calls_size_max = num_intfc;
+    UNSAFE_REGION_END
 #endif
     for(unsigned i = 0; i < num_intfc; i++) {
         const Intfc_Table_Entry& intfEntry = intfTable->entry[i];
         Class* intfc = intfEntry.intfc_class;
         if(intfc == iid) {
 #ifdef VM_STATS
+            UNSAFE_REGION_START
             switch(i) {
             case 0:  VM_Statistics::get_vm_stats().num_invokeinterface_calls_searched_1++;    break;
             case 1:  VM_Statistics::get_vm_stats().num_invokeinterface_calls_searched_2++;    break;
@@ -517,6 +520,7 @@ void* Class::helper_get_interface_vtable(ManagedObject* obj, Class* iid)
             }
             if(i > VM_Statistics::get_vm_stats().invokeinterface_calls_searched_max)
                 VM_Statistics::get_vm_stats().invokeinterface_calls_searched_max = i;
+            UNSAFE_REGION_END
 #endif
             unsigned char** table = intfEntry.table;
             return (void*)table;
