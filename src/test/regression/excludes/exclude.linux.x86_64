@@ -1,5 +1,6 @@
 H2086
 H2151
+# Exclude this test because JVMTI is not implemented for x86_64 in JIT mode yet
 H2926
 H3027
 H3228
