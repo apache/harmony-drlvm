@@ -64,7 +64,9 @@ int vector_length_offset()
 static Vector_Handle vm_anewarray_resolved_array_type(Class *arr_clss, int length)
 {
 #ifdef VM_STATS
+    UNSAFE_REGION_START
     VM_Statistics::get_vm_stats().num_anewarray++;  
+    UNSAFE_REGION_END
 #endif
     ASSERT_RAISE_AREA;
     assert(!hythread_is_suspend_enabled());
