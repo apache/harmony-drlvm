@@ -54,7 +54,7 @@ void VMCALL hythread_interrupt(hythread_t thread) {
 	}
     } else if (thread->state & TM_THREAD_STATE_IN_MONITOR_WAIT) {
         if (thread->current_condition && (hythread_monitor_try_enter(thread->waited_monitor) == TM_ERROR_NONE)) {
-            hythread_monitor_notify_all(thread->waited_monitor);
+            hythread_monitor_interrupt_wait(thread->waited_monitor, thread);
             hythread_monitor_exit(thread->waited_monitor);
         } else {
             status = hythread_create(&thr, 0, 0, 0, interrupter_thread_function, (void *)thread);

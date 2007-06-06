@@ -309,6 +309,9 @@ IDATA VMCALL hythread_thin_monitor_get_recursion(hythread_thin_monitor_t *lockwo
 void VMCALL hythread_native_resource_is_live(U_32);
 void VMCALL hythread_reclaim_resources();
 
+IDATA VMCALL hythread_monitor_interrupt_wait(hythread_monitor_t mon_ptr,
+					     hythread_t thread);
+
 //@}
 /** @name State query
  */
