@@ -33,20 +33,6 @@
  * Exported functons.
  */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/**
- * Interns a string.
- */
-VMEXPORT jstring
-string_intern(JNIEnv*, jobject string);
-
-#ifdef __cplusplus
-}
-#endif
-
 VMEXPORT // temporary solution for interpreter unplug
 Java_java_lang_String *vm_instantiate_cp_string_resolved(String*);
 

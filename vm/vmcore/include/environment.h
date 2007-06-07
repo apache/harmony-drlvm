@@ -157,6 +157,11 @@ struct Global_Env {
     String* InitCauseDescriptor_String;
 
     /**
+     * Preloaded methods
+     */
+    Method* VM_intern;
+
+    /**
      * Preloaded classes
      */
     Class* Boolean_Class;

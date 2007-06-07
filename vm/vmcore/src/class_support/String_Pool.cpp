@@ -19,26 +19,24 @@
  * @version $Revision: 1.1.2.1.4.4 $
  */  
 
-#include "platform_lowlevel.h"
-
-//MVM
-#include <iostream>
-using namespace std;
-
 #include <assert.h>
 #include <apr_atomic.h>
 #include <apr_pools.h>
 #include <apr_hash.h>
 #include <apr_time.h>
 
-#include "String_Pool.h"
-#include "environment.h"
 #include "open/hythread.h"
 #include "open/vm_util.h"
 #include "open/gc.h"
+
+#include "platform_lowlevel.h"
+#include "String_Pool.h"
+#include "environment.h"
 #include "atomics.h"
 #include "vm_strings.h"
 #include "vm_stats.h"
+#include "ini.h"
+#include "exceptions.h"
 #include "port_threadunsafe.h"
 
 #define LOG_DOMIAN "vm.strings"
@@ -326,19 +324,30 @@ void String_Pool::register_interned_string(String * str) {
 // NOTE: it is safe to call this function in multiple threads BUT
 // don't iterate through interned strings while other threads do interning
 ManagedObject * String_Pool::intern(String * str) {
+    jobject string = oh_allocate_local_handle();
     ManagedObject* lang_string = string_create_from_utf8(str->bytes, str->len);
     
     if (!lang_string) { // if OutOfMemory
         return NULL;
     }
+    string->object = lang_string;
     assert(!hythread_is_suspend_enabled());
+
+    Global_Env* env = VM_Global_State::loader_env;
+    jvalue args[1];
+    args[0].l = string;
+    assert(env->VM_intern);
+    vm_execute_java_method_array((jmethodID)env->VM_intern,
+        (jvalue*)&string, args);
+    assert(!exn_raised());
+    assert(string);
+    assert(string->object);
 
     // Atomically update the string structure since some other thread might be trying to make the same update.
     // The GC won't be able to enumerate here since GC is disabled, so there are no race conditions with GC.
     if (VM_Global_State::loader_env->compress_references) {
         COMPRESSED_REFERENCE compressed_lang_string =
-            (COMPRESSED_REFERENCE)((POINTER_SIZE_INT)lang_string
-            - (POINTER_SIZE_INT)VM_Global_State::loader_env->heap_base);
+            compress_reference(string->object);
         assert(is_compressed_reference(compressed_lang_string));     
         uint32 result = apr_atomic_cas32(
             /*destination*/ (volatile uint32 *)&str->intern.compressed_ref, 
@@ -348,7 +357,7 @@ ManagedObject * String_Pool::intern(String * str) {
             // Note the successful write of the object. 
             gc_heap_write_global_slot_compressed(
                 (COMPRESSED_REFERENCE *)&str->intern.compressed_ref,
-                (Managed_Object_Handle)lang_string);
+                (Managed_Object_Handle)string->object);
             // add this string to interned strings
             register_interned_string(str);
         }
@@ -358,18 +367,19 @@ ManagedObject * String_Pool::intern(String * str) {
         void *result =
             (void *)apr_atomic_casptr(
             /*destination*/ (volatile void **)&str->intern.raw_ref, 
-            /*exchange*/    (void *)lang_string, 
+            /*exchange*/    (void *)string->object, 
             /*comparand*/   (void *)NULL);    
         if (result == NULL) {
             // Note the successful write of the object. 
             gc_heap_write_global_slot(
                 (Managed_Object_Handle *)&str->intern.raw_ref,
-                (Managed_Object_Handle)lang_string);
+                (Managed_Object_Handle)string->object);
             // add this string to interned strings
             register_interned_string(str);
         }
         // Some other thread may have beaten us to the slot.
         lang_string = str->intern.raw_ref;
     }
+    oh_discard_local_handle(string);
     return lang_string;
 }

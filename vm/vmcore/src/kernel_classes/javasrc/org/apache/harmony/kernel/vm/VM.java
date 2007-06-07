@@ -22,6 +22,8 @@
 package org.apache.harmony.kernel.vm;
 
 import org.apache.harmony.vm.VMStack;
+import java.lang.ref.WeakReference;
+import java.util.WeakHashMap;
 
 public final class VM {
 
@@ -105,12 +107,20 @@ public final class VM {
      *  @return String that has the same contents as 
      *    argument, but from internal pool
      */
-    public static String intern(String s) {
-        return intern0(s);
+    public static synchronized String intern(String s)
+    {
+        return internedStrings.intern(s);
     }
     
     /**
      * Invokes native string interning service.
      */
     private static native String intern0(String s);
+
+    private static InternMap internedStrings;
+
+    static {
+        // initialize the storage for interned strings
+        internedStrings = new InternMap(32768);
+    }
 }

@@ -369,6 +369,10 @@ static jint preload_classes(Global_Env * vm_env) {
         (class_lookup_field_recursive(vm_env->JavaLangString_Class, "bvalue", "[B") != NULL);
     vm_env->JavaLangString_VTable = vm_env->JavaLangString_Class->get_vtable();
 
+    Class* VM_class = preload_class(vm_env, "org/apache/harmony/kernel/vm/VM");
+    vm_env->VM_intern = class_lookup_method_recursive(VM_class, "intern",
+            "(Ljava/lang/String;)Ljava/lang/String;");
+
     TRACE2("init", "preloading exceptions");
     vm_env->java_lang_Throwable_Class =
         preload_class(vm_env, vm_env->JavaLangThrowable_String);

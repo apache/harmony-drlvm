@@ -38,10 +38,3 @@ JNIEXPORT jobject JNICALL Java_org_apache_harmony_kernel_vm_VM_getClassLoader
     // reuse similar method in VMClassRegistry
     return Java_java_lang_VMClassRegistry_getClassLoader0(jenv, NULL, clazz);
 }
-
-JNIEXPORT jstring JNICALL
-Java_org_apache_harmony_kernel_vm_VM_intern0(JNIEnv *jenv, jclass, jstring str)
-{
-    // call corresponding VM internal function
-    return string_intern(jenv, str);
-}

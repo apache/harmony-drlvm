@@ -565,19 +565,6 @@ Java_java_lang_String *vm_instantiate_cp_string_resolved(String *str)
 
 // Interning of strings
 
-VMEXPORT jstring string_intern(JNIEnv *jenv, jobject jstr_obj)
-{
-    ASSERT_RAISE_AREA;
-    jboolean is_copy;
-    const char* val = jenv->GetStringUTFChars(jstr_obj, &is_copy);
-    String* str = VM_Global_State::loader_env->string_pool.lookup(val);
-    if (is_copy == JNI_TRUE) {
-        jenv->ReleaseStringUTFChars(jstr_obj, val);
-    }
-
-    return String_to_interned_jstring(str);
-}
-
 jstring String_to_interned_jstring(String* str)
 {
     ASSERT_RAISE_AREA;
