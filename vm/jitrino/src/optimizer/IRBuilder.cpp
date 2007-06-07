@@ -1950,8 +1950,14 @@ IRBuilder::genLdFieldWithResolve(Type* type, Opnd* base, ObjectType* enclClass, 
 
 void
 IRBuilder::genInitType(NamedType* type) {
-    if (!type->needsInitialization())
+    if (!type->needsInitialization()) {
         return;
+    }
+    MethodDesc * m = irManager->getCompilationInterface().getMethodToCompile();
+    NamedType* classType = m->getParentType();
+    if (type == classType) {
+        return;
+    }
     Opnd* opnd = lookupHash(Op_InitType, type->getId());
     if (opnd) return; // no need to re-initialize
 
@@ -2871,8 +2877,11 @@ IRBuilder::genStElem(Type* elemType,
 
 Opnd*
 IRBuilder::genNewObj(Type* type) {
+    assert(type->isNamedType());
     Opnd* dst = createOpnd(type);
+    //FIXME class initialization must be done before allocating new object
     appendInst(instFactory->makeNewObj(dst, type));
+    genInitType(type->asNamedType());
     return dst;
 }
 

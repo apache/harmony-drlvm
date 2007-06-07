@@ -172,6 +172,9 @@ void CodeGen::gen_new(Class_Handle enclClass, unsigned short cpIndex)
         if (klass == NULL) {
             gen_call_throw(ci_helper_linkerr, rt_helper_throw_linking_exc, 0, enclClass, cpIndex, OPCODE_NEW);
         } else {
+            if ( klass!=enclClass && class_needs_initialization(klass)) {
+                gen_call_vm(ci_helper_o, rt_helper_init_class, 0, klass);
+            }
             unsigned size = class_get_boxed_data_size(klass);
             Allocation_Handle ah = class_get_allocation_handle(klass);
             static CallSig ci_new(CCONV_STDCALL, i32, jobj);
@@ -183,11 +186,9 @@ void CodeGen::gen_new(Class_Handle enclClass, unsigned short cpIndex)
         gen_call_vm(ci_new_with_resolve, rt_helper_new_withresolve, 0, enclClass, cpIndex);
     }
     gen_save_ret(jobj);
-    // the returned can not be null, marking as such.
-    vstack(0).set(VA_NZ);
-    // allocation assumes GC invocation
-    
-    m_bbstate->seen_gcpt = true;
+    vstack(0).set(VA_NZ);// the returned can not be null, marking as such.
+    m_bbstate->seen_gcpt = true;// allocation assumes GC invocation
+
 }
 
 void CodeGen::gen_instanceof_cast(JavaByteCodes opcode, Class_Handle enclClass, unsigned short cpIdx)
