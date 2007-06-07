@@ -17,3 +17,7 @@ perf/MultiThreadsSimple.java
 
 # fails intermittently
 gc/Fragment.java
+
+# HARMONY-3639
+thread/ManyThreadTest.java
+
