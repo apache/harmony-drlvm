@@ -1497,14 +1497,16 @@ EscAnalyzer::setCreatedObjectStates() {
     NodeMDs::iterator it1;
 
     for (it = cngNodes->begin( ); it != cngNodes->end( ); it++ ) {
-        if ((*it)->nodeType==NT_STFLD) {
+        uint32 nt = (*it)->nodeType;
+        if (nt==NT_STFLD || nt==NT_CATCHVAL
+            || (nt==NT_RETVAL && (*it)->nInst->getOpcode()==Op_IndirectMemoryCall)
+            || (nt==NT_RETVAL && (*it)->nInst->asMethodInst()->getMethodDesc()->isNative())) {
             initNodeType = NT_STFLD;
 #ifdef _DEBUG
             if (_setState) {
                 Log::out() <<"-- before scanGE:  nodeId "
                     <<(*it)->cngNodeId<<"  opId "<<(*it)->opndId<<" state ";
-                printState(*it); 
-                Log::out() << std::endl;
+                printState(*it); Log::out() << std::endl;
             }
 #endif
             scanCnGNodeRefsGE(*it,false);
@@ -1513,19 +1515,18 @@ EscAnalyzer::setCreatedObjectStates() {
     scannedObjs->clear();
     scannedObjsRev->clear();
     for (it = cngNodes->begin( ); it != cngNodes->end( ); it++ ) {
-        if ((*it)->nodeType&NT_EXITVAL || (*it)->nodeType==NT_DEFARG) {  // returned, thrown || defarg
+        if ((*it)->nodeType&NT_EXITVAL || (*it)->nodeType==NT_DEFARG) {  // returned, thrown , defarg
 #ifdef _DEBUG
             if (_setState) {
                 Log::out() <<"-- before scanEVDA:  nodeId "
                     <<(*it)->cngNodeId<<"  opId "<<(*it)->opndId<<" state ";
-                printState(*it); 
-                Log::out() << std::endl;
+                printState(*it); Log::out() << std::endl;
             }
 #endif
             initNodeType = (*it)->nodeType;
             scanCnGNodeRefsGE(*it,false);
-            scannedObjs->clear();    //
-            scannedObjsRev->clear(); //
+            scannedObjs->clear();
+            scannedObjsRev->clear();
         }
     }
     scannedObjs->clear();
@@ -1537,8 +1538,7 @@ EscAnalyzer::setCreatedObjectStates() {
             if (_setState) {
                 Log::out() <<"-- before scanAE:  nodeId "
                     <<(*it)->cngNodeId<<"  opId "<<(*it)->opndId<<" state ";
-                printState(*it); 
-                Log::out() << std::endl;
+                printState(*it);  Log::out() << std::endl;
             }
 #endif
             initNodeType = NT_ACTARG;
@@ -1569,8 +1569,7 @@ EscAnalyzer::setCreatedObjectStates() {
                                     <<(*it)->cngNodeId<<"  opId "
                                     <<(*it)->opndId<<" state ";
                                 printState(*it);
-                                Log::out() 
-                                    <<" to set loop" << std::endl;
+                                Log::out() <<" to set loop" << std::endl;
                             }
 #endif
                             setLoopCreated(*it);
@@ -1599,13 +1598,11 @@ EscAnalyzer::setCreatedObjectStates() {
                     Log::out()<<"--setSt chk arg_esc:  nodeId " <<(*it)->cngNodeId
                         <<"  opId " <<(*it)->opndId<<" state "; 
                     printState(*it); Log::out() << std::endl; 
-                    Log::out() << "       ";
-                    callInst->print(Log::out());
+                    Log::out() << "       "; callInst->print(Log::out());
                     Log::out() << std::endl;
                 }
 #endif
                 if (mdesc->isNative()) {  // not scanned native methods 
-
                     setEscState(*it,GLOBAL_ESCAPE);
 #ifdef _DEBUG
                     if (_scanMtds==1) {
@@ -1661,18 +1658,11 @@ EscAnalyzer::setCreatedObjectStates() {
                             << mdesc->isStatic() << std::endl;
                         Log::out() << "    isFinal: " 
                             << mdesc->isFinal() << std::endl;
-
                         Log::out() << "---------------" << std::endl;
                         Log::out() << "    NumParams: " 
                             << mdesc->getNumParams()<< std::endl;
-                        Log::out() << "    isNative: " 
-                            << mdesc->isNative() << std::endl;
-                        Log::out() << "    isStatic: " 
-                            << mdesc->isStatic() << std::endl;
                         Log::out() << "    isInstance: " 
                             << mdesc->isInstance() << std::endl;
-                        Log::out() << "    isFinal: " 
-                            << mdesc->isFinal() << std::endl;
                         Log::out() << "    isVirtual: " 
                             << mdesc->isVirtual() << std::endl;
                         Log::out() << "    isAbstract: " 
@@ -1681,15 +1671,13 @@ EscAnalyzer::setCreatedObjectStates() {
                             << mdesc->isInstanceInitializer() << std::endl;
                         Log::out() << "    isOverridden: " 
                             << mdesc->isOverridden() << std::endl;
-
                     }
                     if (_setState) {
                         Log::out() <<"--setSt 2:  nodeId "
                             <<(*it)->cngNodeId<<"  opId "<<(*it)->opndId
                             <<" state ";
                         printState(*it);
-                        Log::out() <<" to v.call."
-                            << std::endl;
+                        Log::out() <<" to v.call." << std::endl;
                     }
 #endif
                     continue; //break;
@@ -1703,8 +1691,7 @@ EscAnalyzer::setCreatedObjectStates() {
                             <<(*it)->cngNodeId<<"  opId "<<(*it)->opndId
                             <<" state ";
                         printState(*it);
-                        Log::out() <<" to gl.esc." 
-                            << std::endl;
+                        Log::out() <<" to gl.esc." << std::endl;
                     }
 #endif
                     break;
@@ -1727,8 +1714,7 @@ EscAnalyzer::setCreatedObjectStates() {
                             Log::out() 
                                 <<(*it2)->paramNumber<<" == "<<narg<<" state "
                                 <<(*it2)->state <<" < "<< getEscState(*it)<<"  ";
-                            printState(*it);
-                            Log::out() << std::endl;
+                            printState(*it);  Log::out() << std::endl;
                         }
 #endif
                         if ((*it2)->paramNumber == narg) { //???to add scanning of contained obj
@@ -1739,8 +1725,7 @@ EscAnalyzer::setCreatedObjectStates() {
                                         <<(*it)->cngNodeId<<"  opId "<<(*it)->opndId
                                         <<" state "; 
                                     printState(*it);
-                                    Log::out() <<" to state "
-                                        <<state<< std::endl;
+                                    Log::out() <<" to state " <<state<< std::endl;
                                 }
 #endif
                                 setEscState(*it,state);
@@ -1750,7 +1735,23 @@ EscAnalyzer::setCreatedObjectStates() {
                 }
             }
             if (getEscState(*it)==GLOBAL_ESCAPE) { // to set gl.escape for contained objects
-                scanCnGNodeRefsGE(*it,false);    
+                initNodeType = NT_STFLD;
+                CnGNode* cn = *it;
+                CnGNode* nn = NULL;
+                CnGRefs::iterator it2;
+                if (cn->nodeType == NT_LDOBJ) {
+                    scanCnGNodeRefsGE(cn,true);
+                } else {
+                    if (cn->outEdges != NULL) {
+                        for (it2 = cn->outEdges->begin( ); it2 != cn->outEdges->end( ); it2++ ) {
+                            nn = (*it2)->cngNodeTo;
+                            if (getEscState(nn)==GLOBAL_ESCAPE) {
+                                continue;
+                            }
+                            scanCnGNodeRefsGE(nn,false);
+                        }
+                    }
+                }
                 scannedObjs->clear();
                 scannedObjsRev->clear();
             }
@@ -1758,42 +1759,10 @@ EscAnalyzer::setCreatedObjectStates() {
     }
     for (it = cngNodes->begin( ); it != cngNodes->end( ); it++ ) {
         uint32 nt = (*it)->nodeType;
-        if ((nt&NT_RETVAL) && getEscState(*it)>GLOBAL_ESCAPE) {
-            if (nt==NT_CATCHVAL || ((*it)->nInst->getOpcode())==Op_IndirectMemoryCall) {
-#ifdef _DEBUG
-                if (_setState) {
-                    Log::out() <<"--setCOS 1:  nodeId "
-                        <<(*it)->cngNodeId<<"  opId "<<(*it)->opndId <<" state ";
-                    printState(*it);
-                    Log::out() <<" to gl.esc."<< std::endl;
-                }
-#endif
-                setEscState(*it,GLOBAL_ESCAPE);
-                continue;
-            }
+        if ((nt==NT_RETVAL) && getEscState(*it)>GLOBAL_ESCAPE) {
             MethodDesc* mdesc = (*it)->nInst->asMethodInst()->getMethodDesc();
-            if (mdesc->isNative()) {  // not scanned native methods
-#ifdef _DEBUG
-                if (_setState) {
-                    Log::out() <<"--setCOS 2:  nodeId "
-                        <<(*it)->cngNodeId<<"  opId "<<(*it)->opndId <<" state ";
-                    printState(*it);
-                    Log::out() <<" to gl.esc."<< std::endl;
-                }
-#endif
-                setEscState(*it,GLOBAL_ESCAPE);
-                continue;
-            }
-            if (((*it)->nInst->getOpcode())!=Op_DirectCall) {
-#ifdef _DEBUG
-                if (_setState) {
-                    Log::out() <<"--setCOS 3:  nodeId "
-                        <<(*it)->cngNodeId<<"  opId "<<(*it)->opndId <<" state ";
-                    printState(*it);
-                    Log::out() <<" to gl.esc."<< std::endl;
-                }
-#endif
-                setEscState(*it,GLOBAL_ESCAPE);
+            if (((*it)->nInst->getOpcode())!=Op_DirectCall) { // only direct call may be here
+                assert(0);
                 continue;
             }
             CalleeMethodInfo* mthInfo = findMethodInfo(mdesc,(*it)->nInst);
@@ -1802,13 +1771,13 @@ EscAnalyzer::setCreatedObjectStates() {
                 if (_setState) {
                     Log::out() <<"--setCOS 4:  nodeId "
                         <<(*it)->cngNodeId<<"  opId "<<(*it)->opndId <<" state ";
-                    printState(*it);
-                    Log::out() <<" to gl.esc."<< std::endl;
+                    printState(*it); Log::out() <<" to gl.esc."<< std::endl;
                 }
 #endif
-                setEscState(*it,GLOBAL_ESCAPE);
+                initNodeType = NT_STFLD;
+                scanCnGNodeRefsGE(*it,false);
             } else {
-                if (getEscState(*it)>((mthInfo->retValueState)&ESC_MASK)) {
+                if (getEscState(*it)>((mthInfo->retValueState)&ESC_MASK) || getOutEscaped(*it)==0) {
 #ifdef _DEBUG
                     if (_setState) {
                         Log::out() <<"--setCOS 5:  nodeId "
@@ -1817,7 +1786,12 @@ EscAnalyzer::setCreatedObjectStates() {
                         Log::out() <<" to "<< mthInfo->retValueState<< std::endl;
                     }
 #endif
-                    setEscState(*it,(mthInfo->retValueState)&ESC_MASK);
+                    if (((mthInfo->retValueState)&ESC_MASK) == GLOBAL_ESCAPE) {
+                        initNodeType = NT_STFLD;   // global_escape propagate
+                    } else {
+                        initNodeType = NT_EXITVAL;  // out_escaped propagate
+                    }
+                    scanCnGNodeRefsGE(*it,false);
                 }
             }
         }
@@ -1825,7 +1799,7 @@ EscAnalyzer::setCreatedObjectStates() {
     scannedObjs->clear();
     scannedObjsRev->clear();
     scannedSucNodes->clear();
-    // check states of array elements and fields values
+    // check states of array elements' and fields' values
     for (it = cngNodes->begin( ); it != cngNodes->end( ); it++ ) {
         uint32 nt = (*it)->nodeType;
         if ((nt&(NT_OBJECT|NT_RETVAL) || nt==NT_LDOBJ) && (getEscState(*it)!=GLOBAL_ESCAPE)) {
@@ -1843,30 +1817,7 @@ EscAnalyzer::setCreatedObjectStates() {
         scannedObjsRev->clear();
         scannedSucNodes->clear();
     }
-    uint32 rs = NO_ESCAPE;  
-    CnGRefs::iterator it2;
-    CnGNode* cgn;
-    // set escape state for NT_EXITVAL nodes
-    for (it = cngNodes->begin( ); it != cngNodes->end( ); it++) {
-        if ((*it)->nodeType==NT_EXITVAL) {
-            if ((*it)->outEdges ==NULL)
-                continue;
-            for (it2 = (*it)->outEdges->begin( ); it2 != (*it)->outEdges->end( ); it2++ ) {
-                cgn = (*it2)->cngNodeTo;
-                if (getEscState(cgn)<=(rs&ESC_MASK)) 
-                    rs = getFullState(cgn);
-            } 
-#ifdef _DEBUG
-            if (_setState) {
-                Log::out() <<"--setCOS 7:  nodeId "
-                    <<(*it)->cngNodeId<<"  opId "<<(*it)->opndId <<" state ";
-                printState(*it);
-                Log::out() <<" to "<< rs << std::endl;
-            }
-#endif
-            setFullState(*it,rs);
-        }
-    }
+
 }  // setCreatedObjectStates() 
 
 
@@ -1876,9 +1827,12 @@ EscAnalyzer::scanCnGNodeRefsGE(CnGNode* cgn, bool check_var_src) {
     CnGRefs::iterator it1;
     CnGNode* next_node;
     ObjIds* scObjs = check_var_src ? scannedObjsRev : scannedObjs;
-    uint32 nscan=0;
     uint32 ni_opcode = cgn->nInst->getOpcode();
+    bool needFix = isStateNeedGEFix(getFullState(cgn),cgn->nodeType);
 
+    if (cgn->nodeType != NT_STFLD && cgn->nodeType != NT_THRVAL && cgn->nodeType != NT_EXITVAL 
+        && cgn->nodeType != NT_DEFARG && cgn->nodeType != NT_RETVAL && cgn->nodeType != NT_LDOBJ)
+        assert(needFix);
 #ifdef _DEBUG
     if (_setState) {
         Log::out() <<"--scanGE 1:  nodeId "<<cgn->cngNodeId
@@ -1906,77 +1860,87 @@ EscAnalyzer::scanCnGNodeRefsGE(CnGNode* cgn, bool check_var_src) {
             return;
         }
     }
-    if (cgn->nodeType&NT_OBJS) {
-        if (initNodeType!=NT_EXITVAL && initNodeType!=NT_DEFARG) { // 
-            if (getEscState(cgn) > GLOBAL_ESCAPE) {
+
+    if (initNodeType!=NT_EXITVAL && initNodeType!=NT_DEFARG) { // 
+        if (getEscState(cgn) > GLOBAL_ESCAPE) {
 #ifdef _DEBUG
-                if (_setState) {
-                    Log::out() <<"--scanGE 2:  nodeId "
-                        <<cgn->cngNodeId<<"  opId "<<cgn->opndId <<" state ";
-                    printState(cgn);
-                    Log::out() <<" to gl.esc."<< std::endl;
-                    Log::out() <<"--scanGE 2: "<< nodeTypeToString(cgn) 
-                        << cgn->nodeType <<" initNode "<<initNodeType<< std::endl;
-                }
-#endif
-                setEscState(cgn,GLOBAL_ESCAPE);
+            if (_setState) {
+                Log::out() <<"--scanGE 2:  nodeId "
+                    <<cgn->cngNodeId<<"  opId "<<cgn->opndId <<" state ";
+                printState(cgn);
+                Log::out() <<" to gl.esc."<< std::endl;
+                Log::out() <<"--scanGE 2: "<< nodeTypeToString(cgn) 
+                    << cgn->nodeType <<" initNode "<<initNodeType<< std::endl;
             }
-        } 
-        if (initNodeType==NT_EXITVAL) {
-            if (getOutEscaped(cgn) == 0) {
-#ifdef _DEBUG
-                if (_setState) {
-                    Log::out() <<"--scanGE 3:  nodeId "
-                        <<cgn->cngNodeId<<"  opId "<<cgn->opndId <<" state ";
-                    printState(cgn);
-                    Log::out() <<" to callee.esc."<< std::endl;
-                    Log::out() <<"--scanGE 3: "<< nodeTypeToString(cgn) 
-                        << cgn->nodeType <<" initNode "<<initNodeType<< std::endl;
-                }
 #endif
-                setOutEscaped(cgn);
-            }
-            // The objects created in the method are not global escaped through return
+            setEscState(cgn,GLOBAL_ESCAPE);
         }
-        if (initNodeType==NT_DEFARG) {
-            if (getOutEscaped(cgn) == 0) {
+    } 
+    if (initNodeType==NT_EXITVAL) {
+        if (getOutEscaped(cgn) == 0) {
 #ifdef _DEBUG
-                if (_setState) {
-                    Log::out() <<"--scanGE 4:  nodeId "
-                        <<cgn->cngNodeId<<"  opId "<<cgn->opndId <<" state ";
-                    printState(cgn);
-                    if (cgn->nodeType == NT_OBJECT ) {
-                        Log::out() <<" to gl.esc."<< std::endl;
-                    } else {
-                        Log::out() <<" to callee.esc."<< std::endl;
-                    } 
-                    Log::out() <<"--scanGE 4: "<< nodeTypeToString(cgn) 
-                        << cgn->nodeType <<" initNode "<<initNodeType<< std::endl;
-                }
+            if (_setState) {
+                Log::out() <<"--scanGE 3:  nodeId "
+                    <<cgn->cngNodeId<<"  opId "<<cgn->opndId <<" state ";
+                printState(cgn);
+                Log::out() <<" to out.esc."<< std::endl;
+                Log::out() <<"--scanGE 3: "<< nodeTypeToString(cgn) 
+                    << cgn->nodeType <<" initNode "<<initNodeType<< std::endl;
+            }
 #endif
-                if (cgn->nodeType == NT_OBJECT ) {
-                    setEscState(cgn,GLOBAL_ESCAPE); //objects escaped through defarg - global escape
+            setOutEscaped(cgn);
+        }
+        // The objects created in the method are not global escaped through return
+    }
+    if (initNodeType==NT_DEFARG) {
+        if (needFix) {
+#ifdef _DEBUG
+            if (_setState) {
+                Log::out() <<"--scanGE 4:  nodeId "
+                    <<cgn->cngNodeId<<"  opId "<<cgn->opndId <<" state ";
+                printState(cgn);
+                if (cgn->nodeType == NT_OBJECT || cgn->nodeType == NT_LDOBJ || cgn->nodeType == NT_RETVAL) {
+                    Log::out() <<" to gl.esc."<< std::endl;
                 } else {
-                    setOutEscaped(cgn);
-                }
+                    Log::out() <<" to out.esc."<< std::endl;
+                } 
+                Log::out() <<"--scanGE 4: "<< nodeTypeToString(cgn) 
+                    << cgn->nodeType <<" initNode "<<initNodeType<< std::endl;
+            }
+#endif
+            if (cgn->nodeType == NT_OBJECT || cgn->nodeType == NT_LDOBJ || cgn->nodeType == NT_RETVAL) {
+                setEscState(cgn,GLOBAL_ESCAPE); //objects escaped through defarg - global escape
+            } else {
+                setOutEscaped(cgn);
             }
         }
     }
 
     scObjs->push_back(cgn->cngNodeId);
     if (cgn->outEdges != NULL) {
-        bool to_check_var_src = check_var_src;
+        bool to_check_var_src = false;
         for (it1 = cgn->outEdges->begin( ); it1 != cgn->outEdges->end( ); it1++ ) {
             next_node = (*it1)->cngNodeTo;
-            if (next_node->nodeType == NT_LDOBJ)
-                if (next_node->nInst->getOpcode()==Op_LdVar && cgn->nodeType!=NT_VARVAL)
-                    to_check_var_src = true;
+            needFix = isStateNeedGEFix(getFullState(next_node),next_node->nodeType);
+            if (!needFix) {
 #ifdef _DEBUG
-                    if (_setState) {
-                        Log::out() <<"--scanGE 5 next:  nodeId "
-                            <<next_node->cngNodeId<<"  opId "<<next_node->opndId <<" state ";
-                        printState(next_node); Log::out() << std::endl;
+                if (_setState) {
+                    Log::out() <<"--scanGE 5.0 next:  already set  ";
+                    printState(next_node); Log::out() << std::endl;
                 }
+#endif
+                continue;
+            }
+            if (next_node->nodeType == NT_LDOBJ && next_node->nInst->getOpcode()==Op_LdVar 
+                && cgn->nodeType!=NT_VARVAL) {
+                to_check_var_src = true;
+            }
+#ifdef _DEBUG
+            if (_setState) {
+                Log::out() <<"--scanGE 5 next:  nodeId "
+                    <<next_node->cngNodeId<<"  opId "<<next_node->opndId <<" state ";
+                printState(next_node); Log::out() << std::endl;
+            }
 #endif
             scanCnGNodeRefsGE(next_node,to_check_var_src);
 #ifdef _DEBUG
@@ -1985,8 +1949,6 @@ EscAnalyzer::scanCnGNodeRefsGE(CnGNode* cgn, bool check_var_src) {
                     <<"  opId " << next_node->opndId << std::endl;
             }
 #endif
-            if ((*it1)->edgeType!=ET_POINT)
-                nscan++;
         }
     }
     if (check_var_src) {
@@ -1994,6 +1956,16 @@ EscAnalyzer::scanCnGNodeRefsGE(CnGNode* cgn, bool check_var_src) {
             uint32 nsrc=cgn->nInst->getNumSrcOperands();
             for (uint32 i=0; i<nsrc; i++) {
                 next_node = findCnGNode_op(cgn->nInst->getSrc(i)->getId());
+                needFix = isStateNeedGEFix(getFullState(next_node),next_node->nodeType);
+                if (!needFix) {
+#ifdef _DEBUG
+                    if (_setState) {
+                        Log::out() <<"--scanGE 6.0 next:  already set  ";
+                        printState(next_node); Log::out() << std::endl;
+                    }
+#endif
+                    continue;
+                }
 #ifdef _DEBUG
                 if (_setState) {
                     Log::out() <<"--scanGE 6 next:  nodeId "
@@ -2011,11 +1983,6 @@ EscAnalyzer::scanCnGNodeRefsGE(CnGNode* cgn, bool check_var_src) {
             }
         }
     }
-#ifdef _DEBUG
-    if (_setState) {
-        Log::out()<<"--scanGE: nscan "<<nscan<<"  opId "<<cgn->opndId<<std::endl;
-    }
-#endif
 
 }  // scanCnGNodeRefsGE(CnGNode* cgn, bool check_var_src)
 
@@ -2026,9 +1993,13 @@ EscAnalyzer::scanCnGNodeRefsAE(CnGNode* cgn, bool check_var_src) {
     CnGRefs::iterator it1;
     CnGNode* next_node;
     ObjIds* scObjs = check_var_src ? scannedObjsRev : scannedObjs;
-    uint32 nscan=0;
     uint32 ni_opcode = cgn->nInst->getOpcode();
+    uint32 curMDNode_saved = 0;
 
+    if (curMDNode == 0) {
+        assert(getEscState(cgn)!=ARG_ESCAPE);
+    }
+    assert(getEscState(cgn)!=GLOBAL_ESCAPE);
 #ifdef _DEBUG
     if (_setState) {
         Log::out() <<"--scanAE < 1:  nodeId "<<cgn->cngNodeId
@@ -2056,41 +2027,41 @@ EscAnalyzer::scanCnGNodeRefsAE(CnGNode* cgn, bool check_var_src) {
             return;
         }
     }
-    if (getEscState(cgn) < ARG_ESCAPE) {   // not scan global escaped
+
+    if (cgn->nodeType == NT_ACTARG) {
+        curMDNode_saved = curMDNode;
+    }
+
+    if (cgn->nodeMDs!=NULL && curMDNode!=0) {
+         cgn->nodeMDs->push_back(curMDNode);
 #ifdef _DEBUG
         if (_setState) {
-            Log::out() <<"--scanAE > 3: global escaped " << std::endl;
+            Log::out() <<"--scanAE 1_1:  nodeId "<<cgn->cngNodeId
+                <<"  opId "<<cgn->opndId <<" curMDNode "<<curMDNode<< std::endl;
         }
 #endif
-        return;
     }
-    if (cgn->nodeType&NT_OBJS) {
-        if (cgn->nodeMDs!=NULL && curMDNode!=0) {
-             cgn->nodeMDs->push_back(curMDNode);
+    if (getEscState(cgn) > ARG_ESCAPE) {
 #ifdef _DEBUG
-            if (_setState) {
-                Log::out() <<"--scanAE 1_1:  nodeId "<<cgn->cngNodeId
-                    <<"  opId "<<cgn->opndId <<" curMDNode "<<curMDNode<< std::endl;
-            }
-#endif
+        if (_setState) {
+            Log::out() <<"--scanAE 2:  nodeId "<<cgn->cngNodeId
+                <<"  opId "<<cgn->opndId<<" state ";
+            printState(cgn);
+            Log::out() <<" to arg.esc."<< std::endl;
         }
-        if (getEscState(cgn) > ARG_ESCAPE) {
-#ifdef _DEBUG
-            if (_setState) {
-                Log::out() <<"--scanAE 2:  nodeId "<<cgn->cngNodeId
-                    <<"  opId "<<cgn->opndId<<" state ";
-                printState(cgn);
-                Log::out() <<" to arg.esc."<< std::endl;
-            }
 #endif
-            setEscState(cgn,ARG_ESCAPE);
-        }
+        setEscState(cgn,ARG_ESCAPE);
     }
+
     scObjs->push_back(cgn->cngNodeId);
     if (cgn->outEdges != NULL) {
         bool to_check_var_src = check_var_src;
         for (it1 = cgn->outEdges->begin( ); it1 != cgn->outEdges->end( ); it1++ ) {
             next_node = (*it1)->cngNodeTo;
+            if (getEscState(next_node) < ARG_ESCAPE)
+                continue;
+            if (getEscState(next_node) == ARG_ESCAPE && cgn->nodeType != NT_ACTARG)
+                continue;
 #ifdef _DEBUG
             if (_setState) {
                 Log::out() <<"--scanAE 3 next:  nodeId "
@@ -2106,8 +2077,7 @@ EscAnalyzer::scanCnGNodeRefsAE(CnGNode* cgn, bool check_var_src) {
                 if (next_node->nInst->getOpcode()==Op_LdVar && cgn->nodeType!=NT_VARVAL)
                     to_check_var_src = true;
             scanCnGNodeRefsAE(next_node,to_check_var_src);
-            if ((*it1)->edgeType!=ET_POINT)
-                nscan++;
+            curMDNode = curMDNode_saved;
         }
     }
     if (check_var_src) {
@@ -2115,6 +2085,8 @@ EscAnalyzer::scanCnGNodeRefsAE(CnGNode* cgn, bool check_var_src) {
             uint32 nsrc=cgn->nInst->getNumSrcOperands();
             for (uint32 i=0; i<nsrc; i++) {
                 next_node = findCnGNode_op(cgn->nInst->getSrc(i)->getId());
+                if (getEscState(next_node) <= ARG_ESCAPE)
+                    continue;
 #ifdef _DEBUG
                 if (_setState) {
                     Log::out() <<"--scanAE 4 next:  nodeId "
@@ -2123,6 +2095,7 @@ EscAnalyzer::scanCnGNodeRefsAE(CnGNode* cgn, bool check_var_src) {
                 }
 #endif
                 scanCnGNodeRefsAE(next_node,check_var_src);
+                curMDNode = curMDNode_saved;
             }
         }
     }
@@ -2141,14 +2114,16 @@ EscAnalyzer::scanCnGNodeRefsAE(CnGNode* cgn, bool check_var_src) {
 void 
 EscAnalyzer::checkSubobjectStates(CnGNode* node) {
     CnGRefs::iterator it;
+    CnGRefs::iterator it1;
     CnGNode* cgn;
     CnGNode* cgn1;
+    CnGNode* node_fld;
     bool arge = false;
     bool calle = false;
     bool gle = false;
     bool no_mod = false;
-    Inst* n_inst = node->nInst;;
-    CnGNode* nt = node;
+    Inst* n_inst = node->nInst;
+    CnGNode* nt = NULL;
 
 #ifdef _DEBUG
     if (_setState) {
@@ -2156,16 +2131,6 @@ EscAnalyzer::checkSubobjectStates(CnGNode* node) {
         printCnGNode(node,Log::out());Log::out() << std::endl;
     }
 #endif
-    if (scannedSucNodes->size()!=0) {
-        if (checkScannedSucNodes(node->cngNodeId)) {
-#ifdef _DEBUG
-            if (_setState) {
-                Log::out() <<"--checkSOS ... : return "  << std::endl;
-            }
-#endif
-            return;
-        }
-    }
     if (node->outEdges==NULL) {
 #ifdef _DEBUG
         if (_setState) {
@@ -2175,93 +2140,103 @@ EscAnalyzer::checkSubobjectStates(CnGNode* node) {
         return;
     }
 
-    for (it = node->outEdges->begin( ); it != node->outEdges->end( ); it++ ) {
-        cgn = (*it)->cngNodeTo;
-#ifdef _DEBUG
-        if (_setState) {
-            Log::out() <<"--checkSOS 2: ";
-            printCnGNode(cgn,Log::out());Log::out() << std::endl;
-        }
-#endif
-        if (getEscState(cgn) < getEscState(node)) {
-            if (getEscState(cgn)==GLOBAL_ESCAPE) {
-                gle = true;
-                break;
-            }
-            if (getEscState(cgn)==ARG_ESCAPE) {
-                arge = true;
-                continue;
-            }
-        }
-        if (getOutEscaped(node) == 0 && getOutEscaped(cgn) != 0) {
-            calle = true;
+    for (it1 = node->outEdges->begin( ); it1 != node->outEdges->end( ); it1++ ) {
+        node_fld = (*it1)->cngNodeTo;
+        if ((*it1)->edgeType != ET_FIELD) {
             continue;
         }
-        no_mod = true;
-    }
+        if (node_fld->outEdges==NULL) {
+            continue;
+        }
+        arge = false;
+        calle = false;
+        gle = false;
+        no_mod = false;
+        nt = node_fld;
+        n_inst = node_fld->nInst;
+        for (it = node_fld->outEdges->begin( ); it != node_fld->outEdges->end( ); it++ ) {
+            cgn = (*it)->cngNodeTo;
 #ifdef _DEBUG
-    if (_setState) {
-        Log::out() <<"--checkSOS 2:  " << no_mod << " " << gle  << " " << calle << " " << arge
-            << std::endl;
-    }
+            if (_setState) {
+                Log::out() <<"--checkSOS 2: ";
+                printCnGNode(cgn,Log::out());Log::out() << std::endl;
+            }
 #endif
-
-    if (gle || calle || arge) {
-        if (node->nodeType==NT_ARRELEM) {
-            if (n_inst->getOpcode() == Op_AddScaledIndex) {
-                n_inst = n_inst->getSrc(0)->getInst();
-                nt = findCnGNode_op(n_inst->getSrc(0)->getId());
-#ifdef _DEBUG
-                if (_setState) {
-                    Log::out() <<"--checkSOS 3:  "; printCnGNode(nt,Log::out()); Log::out() << std::endl;
+            if (getEscState(cgn) < getEscState(node_fld)) {
+                if (getEscState(cgn)==GLOBAL_ESCAPE) {
+                    gle = true;
+                    break;
                 }
-#endif
-                if (nt->lNode != NULL) {
-                    nt = nt->lNode;
+                if (getEscState(cgn)==ARG_ESCAPE) {
+                    arge = true;
+                    continue;
                 }
             }
+            if (getOutEscaped(node_fld) == 0 && getOutEscaped(cgn) != 0) {
+                calle = true;
+                continue;
+            }
+            no_mod = true;
         }
 #ifdef _DEBUG
         if (_setState) {
-            Log::out() <<"--checkSOS 4: found  ";
-            printCnGNode(nt,Log::out());Log::out() << std::endl;
+            Log::out() <<"--checkSOS 2:  " << no_mod << " " << gle  << " " << calle << " " << arge
+                << std::endl;
         }
 #endif
-        if (gle) {
-            initNodeType = NT_STFLD; 
-        } else {
-            if (calle) {
-                initNodeType = NT_DEFARG; 
-            } else {
-                initNodeType = NT_ACTARG;
-            }
-        }
-        for (it = nt->outEdges->begin( ); it != nt->outEdges->end( ); it++ ) {
-            cgn1 = (*it)->cngNodeTo;
-            if (gle || calle) {
-                scanCnGNodeRefsGE((*it)->cngNodeTo,false);
-            } else {
-                curMDNode = 0;
-                scanCnGNodeRefsAE((*it)->cngNodeTo,false);
-            }
-        }
-    }
-    if (!no_mod && gle && !calle && !arge) {
+        if (gle || calle || arge) {
+            if (node_fld->nodeType==NT_ARRELEM) {
+                if (n_inst->getOpcode() == Op_AddScaledIndex) {
+                    n_inst = n_inst->getSrc(0)->getInst();
+                    nt = findCnGNode_op(n_inst->getSrc(0)->getId());
 #ifdef _DEBUG
-        if (_setState) {
-            Log::out() <<"--checkSOS 5: return "  << std::endl;
-        }
+                    if (_setState) {
+                        Log::out() <<"--checkSOS 3:  "; printCnGNode(nt,Log::out()); Log::out() << std::endl;
+                    }
 #endif
-        return;
-    }
-    scannedSucNodes->push_back(node->cngNodeId);
-    if (_setState) {
-        Log::out() <<"--checkSOS 6: added " << node->cngNodeId << std::endl;
-    }
-    for (it = node->outEdges->begin( ); it != node->outEdges->end( ); it++ ) {
-        cgn = (*it)->cngNodeTo;
-
-        checkSubobjectStates(cgn);
+                    if (nt->lNode != NULL) {
+                        nt = nt->lNode;
+                    }
+                }
+            }
+#ifdef _DEBUG
+            if (_setState) {
+                Log::out() <<"--checkSOS 4: found  ";
+                printCnGNode(nt,Log::out());Log::out() << std::endl;
+            }
+#endif
+            if (gle) {
+                initNodeType = NT_STFLD; 
+            } else {
+                if (calle) {
+                    initNodeType = NT_DEFARG; 
+                } else {
+                    initNodeType = NT_ACTARG;
+                }
+            }
+            if (node_fld->nodeType==NT_INSTFLD) { // set new state beginning with instance field
+                if (gle || calle) {
+                    scanCnGNodeRefsGE(node_fld,false);
+                } else {
+                    curMDNode = 0;
+                    scanCnGNodeRefsAE(node_fld,false);
+                }
+            } else { // set new state beginning with array elements
+                for (it = nt->outEdges->begin( ); it != nt->outEdges->end( ); it++ ) {
+                    cgn1 = (*it)->cngNodeTo;
+                    if (cgn1->nodeType != NT_ARRELEM)
+                        continue;
+                    if (gle || calle) {
+                        if (isStateNeedGEFix(getFullState(cgn1),cgn1->nodeType))
+                            scanCnGNodeRefsGE(cgn1,false);
+                    } else {
+                        curMDNode = 0;
+                        if (getEscState(cgn1) > ARG_ESCAPE)
+                            scanCnGNodeRefsAE((*it)->cngNodeTo,false);
+                    }
+                }
+            }
+        }
     }
 }  // checkSubobjectStates(CnGNode* node)
 
@@ -2450,15 +2425,19 @@ EscAnalyzer::saveScannedMethodInfo() {
     minfo->paramInfos=prminfos;
     minfo->retValueState=0;
     if (mdesc->getReturnType()->isReference()) {
-        uint32 escstate = 3, bitstate = 0;
+        uint32 escstate = 0;
         for (it = cngNodes->begin( ); it != cngNodes->end( ); it++) {
             if ((*it)->nodeType==NT_EXITVAL) {
-                bitstate = bitstate|getOutEscaped(*it);
-                if (escstate > getEscState(*it))
-                    escstate=getEscState(*it);
+                if (isGlobalState(getFullState((*it)->outEdges->front()->cngNodeTo))) {
+                    escstate = GLOBAL_ESCAPE;
+                    break;
+                }
             }
-        } 
-        minfo->retValueState=escstate|bitstate;
+        }
+        if (escstate == 0) {
+            escstate = OUT_ESCAPED|NO_ESCAPE;
+        }
+        minfo->retValueState=escstate;
     }
     bool pmt = checkMonitorsOnThis();
     minfo->mon_on_this = pmt;

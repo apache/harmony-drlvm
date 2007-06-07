@@ -638,7 +638,15 @@ private:
             return true;
         return false;
     }
-
+    bool isStateNeedGEFix(uint32 state, uint32 nType) {
+        if ((state&ESC_MASK)==GLOBAL_ESCAPE)
+            return false;
+        if ((state&OUT_ESCAPED)!=0 && initNodeType != NT_STFLD)
+            return false;
+        if ((state&OUT_ESCAPED)!=0 && initNodeType == NT_DEFARG && nType != NT_DEFARG)
+            return false;
+        return true;
+    }
 
 // Monitors elimination optimization
 
