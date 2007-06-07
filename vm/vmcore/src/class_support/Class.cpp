@@ -482,8 +482,10 @@ ManagedObject* Class::allocate_instance()
     }
 
 #ifdef VM_STATS
+    UNSAFE_REGION_START
     VM_Statistics::get_vm_stats().num_class_alloc_new_object++;
     instance_allocated(m_instance_data_size);
+    UNSAFE_REGION_END
 #endif //VM_STATS
 
     return new_instance;
