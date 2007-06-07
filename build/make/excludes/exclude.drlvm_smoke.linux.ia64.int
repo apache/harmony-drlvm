@@ -19,5 +19,5 @@ perf/MultiThreadsSimple.java
 gc/Fragment.java
 
 # HARMONY-3639
-thread/ManyThreadTest.java
+thread/ManyThreadsTest.java
 

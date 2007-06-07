@@ -32,5 +32,5 @@ gc/PhantomReferenceTest.java
 gc/WeakReferenceTest.java
 
 # HARMONY-3639
-thread/ManyThreadTest.java
+thread/ManyThreadsTest.java
 
