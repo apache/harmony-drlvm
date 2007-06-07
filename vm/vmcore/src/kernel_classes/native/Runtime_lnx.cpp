@@ -69,6 +69,57 @@ static void ThrowError(JNIEnv *env, char *message = 0) {
 
 void JNICALL Java_java_lang_Runtime_00024SubProcess_createProcess0 (JNIEnv *env, jobject obj, jobjectArray cmdarray, jobjectArray envp, jstring dir, jlongArray la){
     jobject jo; 
+
+     const char *strChain;
+     int i;
+
+     char *cmdDir = NULL;
+     char *strCmd = NULL; 
+
+     // Get the working directory of the subprocess:
+     if ( dir != NULL ) {
+         char* str = (char *)env->GetStringUTFChars(dir, 0);
+         cmdDir = (char *)malloc(1+strlen(str)); // + NUL symbol
+         *cmdDir = '\0';
+         strcat(cmdDir, str);
+         env->ReleaseStringUTFChars(dir, str);
+     }  
+
+     // Get the the command to call and its arguments (it must be non-null):
+     int lenargv = 0;
+     lenargv = env->GetArrayLength(cmdarray);
+     char *argv[lenargv+1];
+     for ( i = 0; i < lenargv; i++ ) {
+         jo = env->GetObjectArrayElement((jobjectArray)((jobject)cmdarray), (jsize) i);
+         strChain = env->GetStringUTFChars((jstring) jo, 0);
+         strCmd = (char *)malloc(1+strlen(strChain)); // + NUL symbol
+         *strCmd = '\0';
+         strcat(strCmd, strChain);
+         argv[i] = strCmd;
+         env->ReleaseStringUTFChars((jstring) jo, strChain);
+     }
+     argv[lenargv] = (char *) 0; // NULL pointer
+
+     // Get the array, each element of which has environment variable settings:
+     int lenEnvp = 0;
+     if (envp != NULL) {
+         lenEnvp += env->GetArrayLength(envp);
+     }
+     char *strEnvpBeginAA[lenEnvp + 1];
+     if (envp != NULL) {
+         for ( i = 0; i < lenEnvp; i++ ) {
+             jo = env->GetObjectArrayElement((jobjectArray)((jobject)envp), (jsize) i);
+             strChain = env->GetStringUTFChars((jstring) jo, 0);
+             strCmd = (char *)malloc(1+strlen(strChain)); // + NUL symbol
+             *strCmd = '\0';
+             strcat(strCmd, strChain);
+             strEnvpBeginAA[i] = strCmd;
+             env->ReleaseStringUTFChars((jstring) jo, strChain);
+         }
+     }
+
+     strEnvpBeginAA[lenEnvp] = (char *) 0; // NULL pointer
+
      //define stdI/O/E for future process:
      int fildesO[2] = {-1,-1};
      int fildesE[2] = {-1,-1};
@@ -124,59 +175,17 @@ void JNICALL Java_java_lang_Runtime_00024SubProcess_createProcess0 (JNIEnv *env,
          long close_on_exec = FD_CLOEXEC; // set close on exec bit
          fcntl(fildesInfo[1], F_SETFD, close_on_exec);
 
-         const char *strChain;
-         int i;
-
-         char *cmdDir = NULL;
-         char *strCmd = NULL; 
-
          // Get the working directory of the subprocess:
-         if ( dir != NULL ) {
-             cmdDir = (char *)env->GetStringUTFChars(dir, 0);
+         if ( cmdDir != NULL ) {
              int res = chdir(cmdDir);
              if (res == -1) {
                  write(fildesInfo[1], &errno, sizeof(int));
                  INFO("chdir failed: " << strerror(errno));
                  kill(getpid(), 9);
              }
-             env->ReleaseStringUTFChars(dir, cmdDir);
-         }  
-
-         // Get the the command to call and its arguments (it must be non-null):
-         int lenargv = 0;
-         lenargv = env->GetArrayLength(cmdarray);
-         char *argv[lenargv+1];
-         for ( i = 0; i < lenargv; i++ ) {
-             jo = env->GetObjectArrayElement((jobjectArray)((jobject)cmdarray), (jsize) i);
-             strChain = env->GetStringUTFChars((jstring) jo, 0);
-             strCmd = (char *)malloc(1+strlen(strChain)); // + NUL symbol
-             *strCmd = '\0';
-             strcat(strCmd, strChain);
-             argv[i] = strCmd;
-             env->ReleaseStringUTFChars((jstring) jo, strChain);
+             free(cmdDir);
          }
-         argv[lenargv] = (char *) 0; // NULL pointer
-
-         // Get the array, each element of which has environment variable settings:
-         int lenEnvp = 0;
-         if (envp != NULL) {
-             lenEnvp += env->GetArrayLength(envp);
-         }
-         char *strEnvpBeginAA[lenEnvp + 1];
-         if (envp != NULL) {
-             for ( i = 0; i < lenEnvp; i++ ) {
-                 jo = env->GetObjectArrayElement((jobjectArray)((jobject)envp), (jsize) i);
-                 strChain = env->GetStringUTFChars((jstring) jo, 0);
-                 strCmd = (char *)malloc(1+strlen(strChain)); // + NUL symbol
-                 *strCmd = '\0';
-                 strcat(strCmd, strChain);
-                 strEnvpBeginAA[i] = strCmd;
-                 env->ReleaseStringUTFChars((jstring) jo, strChain);
-             }
-         }
-
-         strEnvpBeginAA[lenEnvp] = (char *) 0; // NULL pointer
-
+         
          if (lenEnvp == 0) {
              execvp(argv[0], argv);
          } else {
@@ -215,6 +224,8 @@ void JNICALL Java_java_lang_Runtime_00024SubProcess_createProcess0 (JNIEnv *env,
      close(fildesI[0]);
      close(fildesE[1]);
      close(fildesInfo[1]);
+     free(cmdDir);
+     free(strCmd);
 
      // get execution status from child
      int errno_child;
