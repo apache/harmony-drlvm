@@ -523,7 +523,30 @@ static bool inlineJSR(IRManager* irManager, Node *block, DefUseBuilder& defUses,
     //
     // entryMap is a mapping [stVar -> ret inst]
     //
-    if(retVar == NULL || (entryMap.find(stVar) == entryMap.end())) {
+    // In some cases retNode exists, but is unreachable
+    // Let's check this
+    // if retNodeIsUnrichable==true
+    // then JSR never returns.  Convert to jmp
+    bool retNodeIsUnreachable = true;
+    if (entryMap.find(stVar) != entryMap.end()) {
+        JsrEntryCIterRange jsr_range = entryMap.equal_range(stVar);
+        JsrEntryInstToRetInstMap::const_iterator i;
+        for(i = jsr_range.first; i != jsr_range.second; ++i) {
+            assert(i->first->getNode() == entryJSR);
+            Node* retNode = i->second->getNode();
+            UNUSED Inst* ret = (Inst*)retNode->getLastInst();
+            assert(ret->isRet());
+            assert(ret->getSrc(0) == retVar);
+
+            const Edges& inEdges = retNode->getInEdges();
+            if (!inEdges.empty()) {
+                retNodeIsUnreachable = false;
+                break;
+            }
+        }
+    }
+
+    if(retNodeIsUnreachable == true || retVar == NULL || (entryMap.find(stVar) == entryMap.end())) {
         //
         // JSR never returns.  Convert to jmp.
         //
@@ -845,6 +868,7 @@ void FlowGraph::doTranslatorCleanupPhase(IRManager& irm) {
     fg.purgeUnreachableNodes();
 
     inlineJSRs(&irm);
+    fg.purgeUnreachableNodes();
     
     {
         static CountTime cleanupPhaseInternalTimer("ptra::fg::cleanupPhase::in");
