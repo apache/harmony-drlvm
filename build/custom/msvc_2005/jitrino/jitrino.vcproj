@@ -679,11 +679,39 @@
 					>
 				</File>
 				<File
+					RelativePath="..\..\..\..\vm\jitrino\src\optimizer\abcd\AbcdFlags.h"
+					>
+				</File>
+				<File
 					RelativePath="..\..\..\..\vm\jitrino\src\optimizer\abcd\abcdsolver.cpp"
 					>
 				</File>
 				<File
 					RelativePath="..\..\..\..\vm\jitrino\src\optimizer\abcd\abcdsolver.h"
+					>
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\jitrino\src\optimizer\abcd\classic_abcd.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\jitrino\src\optimizer\abcd\classic_abcd.h"
+					>
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\jitrino\src\optimizer\abcd\classic_abcd_solver.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\jitrino\src\optimizer\abcd\classic_abcd_solver.h"
+					>
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\jitrino\src\optimizer\abcd\insertpi.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\jitrino\src\optimizer\abcd\insertpi.h"
 					>
 				</File>
 			</Filter>
@@ -1043,6 +1071,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32ConstraintsResolver.h"
+					>
+				</File>
+				<File
 					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32CopyExpansion.cpp"
 					>
 				</File>
@@ -1080,6 +1112,14 @@
 				</File>
 				<File
 					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32GCSafePoints.h"
+					>
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32i586InstsExpansion.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32I8Lowerer.cpp"
 					>
 				</File>
 				<File
@@ -1144,6 +1184,10 @@
 				</File>
 				<File
 					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32RCE.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32RegAlloc0.cpp"
 					>
 				</File>
 				<File
@@ -1369,10 +1413,6 @@
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\shared\MemoryAttribute.h"
-				>
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\jitrino\src\shared\MemoryEstimates.h"
 				>
 			</File>
 			<File

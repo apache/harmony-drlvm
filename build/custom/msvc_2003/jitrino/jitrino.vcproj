@@ -368,10 +368,31 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 					RelativePath="..\..\..\..\vm\jitrino\src\optimizer\abcd\abcdbounds.h">
 				</File>
 				<File
+					RelativePath="..\..\..\..\vm\jitrino\src\optimizer\abcd\AbcdFlags.h">
+				</File>
+				<File
 					RelativePath="..\..\..\..\vm\jitrino\src\optimizer\abcd\abcdsolver.cpp">
 				</File>
 				<File
 					RelativePath="..\..\..\..\vm\jitrino\src\optimizer\abcd\abcdsolver.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\jitrino\src\optimizer\abcd\classic_abcd.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\jitrino\src\optimizer\abcd\classic_abcd.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\jitrino\src\optimizer\abcd\classic_abcd_solver.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\jitrino\src\optimizer\abcd\classic_abcd_solver.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\jitrino\src\optimizer\abcd\insertpi.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\jitrino\src\optimizer\abcd\insertpi.h">
 				</File>
 			</Filter>
 			<Filter
@@ -638,6 +659,9 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32ConstraintsResolver.cpp">
 				</File>
 				<File
+					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32ConstraintsResolver.h">
+				</File>
+				<File
 					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32CopyExpansion.cpp">
 				</File>
 				<File
@@ -720,6 +744,9 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 				</File>
 				<File
 					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32RCE.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32RegAlloc0.cpp">
 				</File>
 				<File
 					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32RegAlloc2.cpp">
@@ -888,9 +915,6 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\shared\MemoryAttribute.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\jitrino\src\shared\MemoryEstimates.h">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\shared\MemoryManager.cpp">

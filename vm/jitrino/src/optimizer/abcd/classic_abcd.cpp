@@ -301,7 +301,7 @@ bool BuildInequalityGraphWalker::addDistance
         if ( negate ) {
             constant = (-1) * constant;
         }
-        _igraph->addEdge(src->getID(), dst->getID(), constant);
+        _igraph->addEdge(src->getID(), dst->getID(), (int32)constant);
         return true;
     }
     return false;
@@ -364,7 +364,7 @@ void BuildInequalityGraphWalker::addPiEdgesWithOneBoundInf
     } else if ( non_inf_bound.isConst() ) {
         MemoryManager& mm = _igraph->getMemoryManager();
         IOpndProxy* c_opnd = new (mm) 
-            IOpndProxy(non_inf_bound.getConst(), _const_id_counter++);
+            IOpndProxy((int32)non_inf_bound.getConst(), _const_id_counter++);
         _igraph->addOpnd(c_opnd);
         addDistanceSwapNegate(c_opnd /* to */, dst, 0, false /* negate */);
     }

@@ -2466,13 +2466,13 @@ void stack_dump(FILE *f, VM_thread *thread) {
     stackDump(f, *frame);
 }
 
-#ifdef PLATFORM_NT
+#ifdef _WIN32
 #include <io.h>
 #endif
 
 void stack_dump(int fd, VM_thread *thread) {
     FILE *f;
-#ifdef PLATFORM_NT
+#ifdef _WIN32
     fd = _dup(fd);
     assert(fd != -1);
     f = _fdopen(fd, "w");
