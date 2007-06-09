@@ -975,8 +975,9 @@ bool Compiler::comp_gen_insts(unsigned pc, unsigned parentPC,
         gen_dbg_check_bb_stack();
     }
 
-    if (bbinfo.ehandler) {
-        //
+    if (bbinfo.ehandler && pc == parentPC) {
+        // This is a 'normal' handler, unreached via fall-through so far
+        // (otherwise parent bb must leave stack in consistent state).
         // Here, we invoke gen_save_ret() because this is how the idea of
         // exception handlers works in DRL VM: 
         // Loosely speaking, calling 'throw_<whatever>' is like a regular 

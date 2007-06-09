@@ -625,19 +625,7 @@ void Compiler::gen_bb_leave(unsigned to)
              targetIsMultiRef = targetIsMultiRef || (m_insts[targetPC].ref_count > 1);
          }
     }
-    
-    if (to_eh) {
-        // we're generating a 'goto/fall through/if_' to a basic block
-        // if the BB is also the catch handler, then it can't have a 
-        // ref_count less than 2.
-        assert(m_insts[to].ref_count > 1);
-        // Must have only Exception on the top of stack
-        assert(m_jframe->size() == 1 && m_jframe->top(0) == jobj);
-        // if top of the stack is currently not on the gr_ret, then 
-        // force it to be there
-        assert(m_jframe->dip(0).is_reg() && m_jframe->dip(0).reg() == gr_ret);
-    }
-    
+
     if (!targetIsMultiRef && !to_eh) {
         // nothing to do anymore
         if (is_set(DBG_TRACE_CG)) { dbg(";;>~bb_leave\n"); }
@@ -699,6 +687,29 @@ void Compiler::gen_bb_leave(unsigned to)
         v = Val(jt, m_base, vlocal_off(i));
         rref(v);
     }
+
+    if (to_eh) {
+        // we're generating a 'goto/fall through/if_' to a basic block
+        // if the BB is also the catch handler, then it can't have a 
+        // ref_count less than 2.
+        assert(m_insts[to].ref_count > 1);
+        // Must have only Exception on the top of stack
+        assert(m_jframe->size() == 1 && m_jframe->top(0) == jobj);
+        // if top of the stack is currently not on the gr_ret, then 
+        // force it to be there
+        Val& ev = m_jframe->dip(0);
+        if (!ev.is_reg() || ev.reg() != gr_ret) {
+            // locals were just spilled and no other stack items left
+            // therefore gr_ret must be unused, simply load the Exception
+            assert(rrefs(gr_ret) == 0);
+            Opnd reg(ev.jt(), gr_ret);
+            do_mov(reg, ev.as_opnd());
+            rfree(ev);
+            ev.to_reg(gr_ret);
+            rref(ev);
+        }
+    }
+
     if (is_set(DBG_TRACE_CG)) { dbg(";;>~bb_leave\n"); }
 }
 
