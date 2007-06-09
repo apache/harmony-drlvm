@@ -73,7 +73,7 @@ protected:
     void buildShiftSubGraph(Inst * inst, Opnd * src1_1, Opnd * src1_2, Opnd * src2, Opnd * dst_1, Opnd * dst_2, Mnemonic mnem, Mnemonic opMnem);
     void buildComplexSubGraph(Inst * inst, Opnd * src1_1,Opnd * src1_2,Opnd * src2_1,Opnd * src2_2, Inst * condInst = NULL);
     void buildSetSubGraph(Inst * inst, Opnd * src1_1,Opnd * src1_2,Opnd * src2_1,Opnd * src2_2, Inst * condInst = NULL);
-    void buildJumpSubGraph(Inst * inst, Opnd * src1_1,Opnd * src1_2,Opnd * src2_1,Opnd * src2_2, Inst * condInst = NULL);
+    void compareAndBranch(Inst * inst, Opnd * src1_1,Opnd * src1_2,Opnd * src2_1,Opnd * src2_2, Inst * condInst = NULL);
     /**
      * Processes I8 IMUL instruction.
      *
@@ -456,7 +456,7 @@ void I8Lowerer::processOpnds(Inst * inst)
                 Mnemonic mnem = condInst ? getBaseConditionMnemonic(condInst->getMnemonic()) : Mnemonic_NULL;
                 if (mnem != Mnemonic_NULL) {
                             if(condInst->hasKind(Inst::Kind_BranchInst)) {
-                                buildJumpSubGraph(inst,src1_1,src1_2,src2_1,src2_2,condInst);
+                                compareAndBranch(inst,src1_1,src1_2,src2_1,src2_2,condInst);
                             } else {
                                 buildSetSubGraph(inst,src1_1,src1_2,src2_1,src2_2,condInst);
                             }
@@ -559,47 +559,77 @@ void I8Lowerer::buildShiftSubGraph(Inst * inst, Opnd * src1_1, Opnd * src1_2, Op
     }
 }
 
-void I8Lowerer::buildJumpSubGraph(Inst * inst, Opnd * src1_1,Opnd * src1_2,Opnd * src2_1,Opnd * src2_2, Inst * condInst) {
-    Node * bb=inst->getNode();
+void I8Lowerer::compareAndBranch(Inst * inst, Opnd * src1_1,Opnd * src1_2,Opnd * src2_1,Opnd * src2_2, Inst * condInst) {
+    ControlFlowGraph* cfg = irManager->getFlowGraph();
+
+    Node * bb = inst->getNode();
+    Edge* dbEdge = bb->getTrueEdge();
+    Edge* ftEdge = bb->getFalseEdge();
+    Node* bbDB = dbEdge->getTargetNode();
+    Node* bbFT = ftEdge->getTargetNode();
+    Mnemonic mn = condInst->getMnemonic();
     
-    ControlFlowGraph* subCFG = irManager->createSubCFG(true, false);
-    Node* bbHMain = subCFG->getEntryNode();
-    Node* bbLMain = subCFG->createBlockNode();
-    Node* sinkNode =  subCFG->getReturnNode();
-    
-    bbHMain->appendInst(irManager->newInst(Mnemonic_CMP, src1_2, src2_2));
-    
-    bbLMain->appendInst(irManager->newInst(Mnemonic_CMP, src1_1, src2_1));
-    
-    
-    Node* bbFT = bb->getFalseEdgeTarget();
-    Node* bbDB = bb->getTrueEdgeTarget();
-    
-    Mnemonic mnem = Mnemonic_NULL;
-    switch(condInst->getMnemonic()) {
-        case Mnemonic_JL : mnem = Mnemonic_JB; break;
-        case Mnemonic_JLE : mnem = Mnemonic_JBE; break;
-        case Mnemonic_JG : mnem = Mnemonic_JA; break;
-        case Mnemonic_JGE : mnem = Mnemonic_JAE; break;
-        default: mnem = condInst->getMnemonic(); break;
-    }
-    bbLMain->appendInst(irManager->newBranchInst(mnem, bbDB, bbFT));
-    
-    if (condInst->getMnemonic() == Mnemonic_JZ) {
-        bbHMain->appendInst(irManager->newBranchInst(Mnemonic_JNZ, bbFT, bbLMain));
-        subCFG->addEdge(bbHMain, bbFT, 0.1);
-    } else if (condInst->getMnemonic() == Mnemonic_JNZ) {
-        bbHMain->appendInst(irManager->newBranchInst(Mnemonic_JNZ, bbDB, bbLMain));
-        subCFG->addEdge(bbHMain, bbDB, 0.1);
-    } else {
-        bbHMain->appendInst(irManager->newBranchInst(Mnemonic_JNZ, sinkNode, bbLMain));
-        subCFG->addEdge(bbHMain, sinkNode, 0.1);
-    }
-    subCFG->addEdge(bbHMain, bbLMain, 0.9);
-    subCFG->addEdge(bbLMain, bbFT, 0.1);
-    subCFG->addEdge(bbLMain, bbDB, 0.9);
+    //for == and != algorithms checks low parts first
+    if (mn == Mnemonic_JNZ) { // !=
+        Node* cmpHiNode = cfg->createBlockNode();
+        cfg->replaceEdgeTarget(ftEdge, cmpHiNode, true);
         
-    irManager->getFlowGraph()->spliceFlowGraphInline(inst, *subCFG);
+        //if (lo1!=lo2) return true;
+        bb->appendInst(irManager->newInst(Mnemonic_CMP, src1_1, src2_1));        
+        bb->appendInst(irManager->newBranchInst(Mnemonic_JNZ, bbDB, cmpHiNode));
+
+        //if (hi1!=hi2) return true;
+        cmpHiNode->appendInst(irManager->newInst(Mnemonic_CMP, src1_2, src2_2));
+        cmpHiNode->appendInst(irManager->newBranchInst(Mnemonic_JNZ, bbDB, bbFT));
+        
+        cfg->addEdge(cmpHiNode, bbDB, dbEdge->getEdgeProb());
+        cfg->addEdge(cmpHiNode, bbFT, ftEdge->getEdgeProb());
+    } else if (mn == Mnemonic_JZ) { // ==
+        Node* cmpHiNode = cfg->createBlockNode();
+        cfg->replaceEdgeTarget(dbEdge, cmpHiNode, true);
+       
+        //if lo1==lo2 check hi parts
+        bb->appendInst(irManager->newInst(Mnemonic_CMP, src1_1, src2_1));        
+        bb->appendInst(irManager->newBranchInst(Mnemonic_JZ, cmpHiNode, bbFT));
+
+        //if hi1==hi2 -> return true
+        cmpHiNode->appendInst(irManager->newInst(Mnemonic_CMP, src1_2, src2_2));
+        cmpHiNode->appendInst(irManager->newBranchInst(Mnemonic_JZ, bbDB, bbFT));
+
+        cfg->addEdge(cmpHiNode, bbDB, dbEdge->getEdgeProb());
+        cfg->addEdge(cmpHiNode, bbFT, ftEdge->getEdgeProb());
+    } else { // >=, >, <=, <
+        //if hi parts equals -> compare low parts
+        //else compare hi parts
+        Node* cmpHiNode = cfg->createBlockNode();
+        Node* cmpLoNode = cfg->createBlockNode();
+
+        //check if hi parts are equal
+        cfg->replaceEdgeTarget(dbEdge, cmpHiNode, true);
+        cfg->replaceEdgeTarget(ftEdge, cmpLoNode, true);
+        bb->appendInst(irManager->newInst(Mnemonic_CMP, src1_2, src2_2));        
+        bb->appendInst(irManager->newBranchInst(Mnemonic_JNE, cmpHiNode, cmpLoNode));
+
+        //check hi parts: reuse old CMP result here
+        cmpHiNode->appendInst(irManager->newBranchInst(mn, bbDB, bbFT));
+        cfg->addEdge(cmpHiNode, bbDB, dbEdge->getEdgeProb());
+        cfg->addEdge(cmpHiNode, bbFT, ftEdge->getEdgeProb());
+        
+        //check lo parts, use unsigned comparison
+        Mnemonic unsignedMn = Mnemonic_NULL;
+        switch(mn) {
+            case Mnemonic_JL  : unsignedMn = Mnemonic_JB; break;
+            case Mnemonic_JLE : unsignedMn = Mnemonic_JBE; break;
+            case Mnemonic_JG  : unsignedMn = Mnemonic_JA; break;
+            case Mnemonic_JGE : unsignedMn = Mnemonic_JAE; break;
+            default: unsignedMn = mn; break;
+        }
+        cmpLoNode->appendInst(irManager->newInst(Mnemonic_CMP, src1_1, src2_1));        
+        cmpLoNode->appendInst(irManager->newBranchInst(unsignedMn, bbDB, bbFT));
+        cfg->addEdge(cmpLoNode, bbDB, dbEdge->getEdgeProb());
+        cfg->addEdge(cmpLoNode, bbFT, ftEdge->getEdgeProb());
+    }
+    condInst->unlink();
 }
 
 
