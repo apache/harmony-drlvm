@@ -17,16 +17,19 @@ package stress;
 
 /**
  * Tests the correctness of string interning.
- *
- * @keyword XXX_stress
  */
 public class Intern {
     public static void main(String[] args) {
         String s = "abc";
-        for (int i = 0; i < 100000; i++) {
-            s = (s + i + s).intern();
-            if (s.length() > 65536) s = "abc" + i;
-            if (i % 1000 == 0) trace(".");
+        try {
+            for (int i = 0; i < 100000; i++) {
+                s = (s + i + s).intern();
+                if (s.length() > 65536) s = "abc" + i;
+                if (i % 1000 == 0) trace(".");
+            }
+            System.out.println("\nPASSED");
+        } catch (OutOfMemoryError oome) {
+            System.out.println("\nFAILED");
         }
     }
 

@@ -22,8 +22,6 @@
 package org.apache.harmony.kernel.vm;
 
 import org.apache.harmony.vm.VMStack;
-import java.lang.ref.WeakReference;
-import java.util.WeakHashMap;
 
 public final class VM {
 
@@ -115,8 +113,6 @@ public final class VM {
     /**
      * Invokes native string interning service.
      */
-    private static native String intern0(String s);
-
     private static InternMap internedStrings;
 
     static {

@@ -10,3 +10,7 @@ gc/Mark.java
 # HARMONY-3917
 gc/PhantomReferenceTest.java
 gc/WeakReferenceTest.java
+
+# This stress test is very slow on interpreter
+stress/Intern.java
+

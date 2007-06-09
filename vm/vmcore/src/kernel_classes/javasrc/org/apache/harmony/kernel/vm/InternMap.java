@@ -25,7 +25,7 @@ import java.lang.ref.WeakReference;
  */
 public class InternMap {
 
-    private final ReferenceQueue referenceQueue;
+    private final ReferenceQueue<String> referenceQueue;
 
     int elementCount;
 
@@ -40,13 +40,11 @@ public class InternMap {
         return new Entry[size];
     }
 
-    private static final class Entry/* extends WeakReference*/ {
+    private static final class Entry extends WeakReference<String> {
         int hash;
         Entry next;
-        String key;
-        Entry(String key, ReferenceQueue queue) {
-            //super(key, queue);
-            this.key = key;
+        Entry(String key, ReferenceQueue<String> queue) {
+            super(key, queue);
             hash = key.hashCode();
         }
     }
@@ -57,7 +55,7 @@ public class InternMap {
             elementData = newEntryArray(capacity == 0 ? 1 : capacity);
             loadFactor = 7500; // Default load factor of 0.75
             computeMaxSize();
-            referenceQueue = new ReferenceQueue();
+            referenceQueue = new ReferenceQueue<String>();
         } else {
             throw new IllegalArgumentException();
         }
@@ -69,12 +67,10 @@ public class InternMap {
 
     void poll()
     {
-        /*
         Entry toRemove;
         while ((toRemove = (Entry)referenceQueue.poll()) != null) {
                 removeEntry(toRemove);
         }
-        */
     }
 
     void removeEntry(Entry toRemove)
@@ -110,7 +106,7 @@ public class InternMap {
         int length = elementData.length;
         index = (hash & 0x7FFFFFFF) % length;
         entry = elementData[index];
-        while (entry != null && !key.equals(interned = (String)entry.key/*get()*/)) {
+        while (entry != null && !key.equals(interned = (String)entry.get())) {
             entry = entry.next;
         }
 

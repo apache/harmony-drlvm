@@ -21,3 +21,6 @@ gc/Fragment.java
 # HARMONY-3639
 thread/ManyThreadsTest.java
 
+# This stress test is very slow on interpreter
+stress/Intern.java
+
