@@ -24,24 +24,21 @@ import static org.apache.harmony.vm.ClassFormat.ACC_SYNTHETIC;
 
 import java.io.InputStream;
 import java.io.Serializable;
+import java.lang.annotation.Annotation;
+import java.lang.annotation.Inherited;
 import java.lang.ref.SoftReference;
+import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.GenericDeclaration;
+import java.lang.reflect.GenericSignatureFormatError;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.MalformedParameterizedTypeException;
 import java.lang.reflect.Member;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-
-import java.lang.reflect.AnnotatedElement;
-import java.lang.reflect.GenericDeclaration;
-import java.lang.reflect.GenericSignatureFormatError;
-import java.lang.reflect.MalformedParameterizedTypeException;
-import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
-import java.lang.annotation.Annotation;
-import java.lang.annotation.Inherited;
-
 import java.net.URL;
 import java.security.AccessController;
 import java.security.AllPermission;
@@ -53,32 +50,11 @@ import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.Map;
 
-
-import org.apache.harmony.lang.reflect.parser.InterimClassGenericDecl;
-import org.apache.harmony.lang.reflect.parser.Parser;
-import org.apache.harmony.lang.reflect.parser.Parser.SignatureKind;
-import org.apache.harmony.lang.reflect.parser.InterimParameterizedType;
-import org.apache.harmony.lang.reflect.parser.InterimType;
-import org.apache.harmony.lang.reflect.parser.InterimClassType;
-import org.apache.harmony.lang.reflect.parser.InterimTypeParameter;
-
-import org.apache.harmony.lang.reflect.repository.TypeVariableRepository;
-import org.apache.harmony.lang.reflect.repository.ParameterizedTypeRepository;
- 
-import org.apache.harmony.lang.reflect.support.AuxiliaryChecker;
-import org.apache.harmony.lang.reflect.support.AuxiliaryLoader;
-import org.apache.harmony.lang.reflect.support.AuxiliaryFinder;
-import org.apache.harmony.lang.reflect.support.AuxiliaryCreator;
-import org.apache.harmony.lang.reflect.support.AuxiliaryUtil;
- 
-import org.apache.harmony.lang.reflect.implementation.TypeVariableImpl;
-import org.apache.harmony.lang.reflect.implementation.ParameterizedTypeImpl;
-
-
 import org.apache.harmony.lang.RuntimePermissionCollection;
 import org.apache.harmony.lang.reflect.Reflection;
-import org.apache.harmony.vm.VMStack;
+import org.apache.harmony.lang.reflect.parser.Parser;
 import org.apache.harmony.vm.VMGenericsAndAnnotations;
+import org.apache.harmony.vm.VMStack;
 
 /**
  * @com.intel.drl.spec_ref
@@ -1399,62 +1375,8 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
         }
         
         public synchronized Type[] getGenericInterfaces() {
-            if (genericInterfaces != null) {
-                return genericInterfaces;
-            }
-                
-            //So, here it can be only ParameterizedType or ordinary reference class type elements.
-            if (Class.this.isArray()) {
-                return genericInterfaces = new Type[]{Cloneable.class, Serializable.class};
-            }
             if (genericInterfaces == null) {
-                Object startPoint = (Object) Class.this;  // It should be this class itself because, for example, an interface may be a parameterized type with parameters which are the generic parameters of this class
-                String signature = AuxiliaryUtil.toUTF8(VMGenericsAndAnnotations.getSignature(Class.this)); // getting this class signature
-                if (signature == null) {
-                    return genericInterfaces = Class.this.getInterfaces();
-                }
-                InterimClassGenericDecl decl = (InterimClassGenericDecl) Parser.parseSignature(signature, SignatureKind.CLASS_SIGNATURE, (GenericDeclaration)startPoint); //GenericSignatureFormatError can be thrown here
-                InterimType[] superInterfaces = decl.superInterfaces;
-                if (superInterfaces == null) {
-                    return genericInterfaces =  Class.this.getInterfaces();
-                }
-                int l = superInterfaces.length;
-                genericInterfaces = new Type[l];
-                for (int i = 0; i < l; i++) { 
-                    if (superInterfaces[i] instanceof InterimParameterizedType) {
-                        ParameterizedType pType = ParameterizedTypeRepository.findParameterizedType((InterimParameterizedType) superInterfaces[i], ((InterimParameterizedType) superInterfaces[i]).signature, startPoint);
-                        if (pType == null) {
-                            try {
-                                AuxiliaryFinder.findGenericClassDeclarationForParameterizedType((InterimParameterizedType) superInterfaces[i], startPoint);
-                            } catch(Throwable e) {
-                                throw new TypeNotPresentException(((InterimParameterizedType) superInterfaces[i]).rawType.classTypeName.substring(1).replace('/', '.'), e);
-                            }
-                            //check the correspondence of the formal parameter number and the actual argument number:
-                            AuxiliaryChecker.checkArgsNumber((InterimParameterizedType) superInterfaces[i], startPoint); // the MalformedParameterizedTypeException may raise here
-                            try {
-                                pType = new ParameterizedTypeImpl(AuxiliaryCreator.createTypeArgs((InterimParameterizedType) superInterfaces[i], startPoint), AuxiliaryCreator.createRawType((InterimParameterizedType) superInterfaces[i], startPoint), AuxiliaryCreator.createOwnerType((InterimParameterizedType) superInterfaces[i], startPoint));
-                            } catch(ClassNotFoundException e) {
-                                throw new TypeNotPresentException(e.getMessage(), e);
-                            }
-                            ParameterizedTypeRepository.registerParameterizedType(pType, (InterimParameterizedType) superInterfaces[i], signature, startPoint);
-                        }
-                        genericInterfaces[i] = (Type) pType; 
-                    } else if (superInterfaces[i] instanceof InterimClassType) {
-                        try {
-                            if(Class.this.getClass().getClassLoader() != null){
-                                genericInterfaces[i] = (Type) Class.this.getClass().getClassLoader().findClass(AuxiliaryFinder.transform(((InterimClassType)superInterfaces[i]).classTypeName.substring(1).replace('/', '.'))); // XXX: should we propagate the class loader of initial user's request (Field.getGenericType()) or use this one?
-                            } else {
-                                genericInterfaces[i] = (Type) AuxiliaryLoader.ersatzLoader.findClass(AuxiliaryFinder.transform(((InterimClassType)superInterfaces[i]).classTypeName.substring(1).replace('/', '.'))); // XXX: should we propagate the class loader of initial user's request (Field.getGenericType()) or use this one?
-                            }
-                        } catch (ClassNotFoundException e) {
-                            throw new TypeNotPresentException(((InterimClassType)superInterfaces[i]).classTypeName.substring(1).replace('/', '.'), e);
-                        } catch (ExceptionInInitializerError e) {
-                        } catch (LinkageError e) {
-                        }
-                    } else {
-                        // Internal Error
-                    }
-                }
+                genericInterfaces = Parser.getGenericInterfaces(Class.this, VMGenericsAndAnnotations.getSignature(Class.this));
             }
             return genericInterfaces;
         }
@@ -1462,71 +1384,16 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
         public Type getGenericSuperclass() {
             //So, here it can be only ParameterizedType or ordinary reference class type
             if (genericSuperclass == null) {
-                Object startPoint = (Object) Class.this;  // It should be this class itself because, for example, superclass may be a parameterized type with parameters which are the generic parameters of this class
-                String signature = AuxiliaryUtil.toUTF8(VMGenericsAndAnnotations.getSignature(Class.this)); // getting this class signature
-                if (signature == null) {
-                    return genericSuperclass = Class.this.getSuperclass();
-                }
-                InterimClassGenericDecl decl = (InterimClassGenericDecl) Parser.parseSignature(signature, SignatureKind.CLASS_SIGNATURE, (GenericDeclaration)startPoint); // GenericSignatureFormatError can be thrown here
-                InterimType superClassType = decl.superClass;
-                if (superClassType == null) {
-                    return genericSuperclass = Class.this.getSuperclass();
-                }
-                if (superClassType instanceof InterimParameterizedType) {
-                    ParameterizedType pType = ParameterizedTypeRepository.findParameterizedType((InterimParameterizedType) superClassType, ((InterimParameterizedType) superClassType).signature, startPoint);
-                    if (pType == null) {
-                        try {
-                            AuxiliaryFinder.findGenericClassDeclarationForParameterizedType((InterimParameterizedType) superClassType, startPoint);
-                        } catch(Throwable e) {
-                            throw new TypeNotPresentException(((InterimParameterizedType) superClassType).rawType.classTypeName.substring(1).replace('/', '.'), e);
-                        }
-                        //check the correspondence of the formal parameter number and the actual argument number:
-                        AuxiliaryChecker.checkArgsNumber((InterimParameterizedType) superClassType, startPoint); // the MalformedParameterizedTypeException may raise here
-                        try {
-                            pType = new ParameterizedTypeImpl(AuxiliaryCreator.createTypeArgs((InterimParameterizedType) superClassType, startPoint), AuxiliaryCreator.createRawType((InterimParameterizedType) superClassType, startPoint), AuxiliaryCreator.createOwnerType((InterimParameterizedType) superClassType, startPoint));
-                        } catch(ClassNotFoundException e) {
-                            throw new TypeNotPresentException(e.getMessage(), e);
-                        }
-                        ParameterizedTypeRepository.registerParameterizedType(pType, (InterimParameterizedType) superClassType, signature, startPoint);
-                    }
-                    genericSuperclass = (Type) pType; 
-                } else if (superClassType instanceof InterimClassType) {
-                    try {
-                        genericSuperclass = (Type) Class.this.getClass().getClassLoader().findClass(AuxiliaryFinder.transform(((InterimClassType)superClassType).classTypeName.substring(1).replace('/', '.'))); // XXX: should we propagate the class loader of initial user's request (Field.getGenericType()) or use this one?
-                    } catch (ClassNotFoundException e) {
-                        throw new TypeNotPresentException(((InterimClassType)superClassType).classTypeName.substring(1).replace('/', '.'), e);
-                    } catch (ExceptionInInitializerError e) {
-                    } catch (LinkageError e) {
-                    }
-                } else {
-                    // Internal Error
-                }
+                genericSuperclass = Parser.getGenericSuperClass(Class.this, VMGenericsAndAnnotations.getSignature(Class.this));
             }
             return genericSuperclass;
         }
 
         @SuppressWarnings("unchecked")
         public synchronized TypeVariable<Class<T>>[] getTypeParameters() {
-            //So, here it can be only TypeVariable elements.
-            if (typeParameters == null) {
-                Object startPoint = (Object) Class.this;
-                String signature = AuxiliaryUtil.toUTF8(VMGenericsAndAnnotations.getSignature(Class.this)); // getting this class signature
-                if (signature == null) {
-                    return typeParameters = new TypeVariable[0];
-                }
-                InterimClassGenericDecl decl = (InterimClassGenericDecl) Parser.parseSignature(signature, SignatureKind.CLASS_SIGNATURE, (GenericDeclaration)startPoint); // GenericSignatureFormatError can be thrown here
-                InterimTypeParameter[] pTypeParameters = decl.typeParameters;
-                if (pTypeParameters == null) {
-                    return typeParameters =  new TypeVariable[0];
-                }
-                int l = pTypeParameters.length;
-                typeParameters = new TypeVariable[l];
-                for (int i = 0; i < l; i++) {
-                    String tvName = pTypeParameters[i].typeParameterName;
-                    TypeVariable variable = new TypeVariableImpl((GenericDeclaration)Class.this, tvName, decl.typeParameters[i]);
-                    TypeVariableRepository.registerTypeVariable(variable, tvName, startPoint);
-                    typeParameters[i] = variable;               
-                }
+            if(typeParameters == null){
+                typeParameters = Parser.getTypeParameters(Class.this,
+                        VMGenericsAndAnnotations.getSignature(Class.this));
             }
             return typeParameters;
         }

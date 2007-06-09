@@ -26,26 +26,9 @@ import static org.apache.harmony.vm.ClassFormat.ACC_SYNTHETIC;
 
 import java.lang.annotation.Annotation;
 
-import org.apache.harmony.lang.reflect.parser.InterimFieldGenericDecl;
 import org.apache.harmony.lang.reflect.parser.Parser;
-import org.apache.harmony.lang.reflect.parser.Parser.SignatureKind;
-import org.apache.harmony.lang.reflect.parser.InterimParameterizedType;
-import org.apache.harmony.lang.reflect.parser.InterimTypeVariable;
-import org.apache.harmony.lang.reflect.parser.InterimGenericArrayType;
-import org.apache.harmony.lang.reflect.parser.InterimGenericType;
-
-import org.apache.harmony.lang.reflect.repository.TypeVariableRepository;
-import org.apache.harmony.lang.reflect.repository.ParameterizedTypeRepository;
-
-import org.apache.harmony.lang.reflect.support.AuxiliaryFinder;
-import org.apache.harmony.lang.reflect.support.AuxiliaryCreator;
-import org.apache.harmony.lang.reflect.support.AuxiliaryChecker;
-import org.apache.harmony.lang.reflect.support.AuxiliaryUtil;
-
-import org.apache.harmony.lang.reflect.implementation.ParameterizedTypeImpl;
-
-import org.apache.harmony.vm.VMStack;
 import org.apache.harmony.vm.VMGenericsAndAnnotations;
+import org.apache.harmony.vm.VMStack;
 
 /**
 * @com.intel.drl.spec_ref 
@@ -81,50 +64,11 @@ public final class Field extends AccessibleObject implements Member {
     /**
     *  @com.intel.drl.spec_ref
     */
-    public Type getGenericType() throws GenericSignatureFormatError, TypeNotPresentException, MalformedParameterizedTypeException {
+    public Type getGenericType() throws GenericSignatureFormatError,
+            TypeNotPresentException, MalformedParameterizedTypeException {
         if (data.genericType == null) {
-            Object startPoint = data.declaringClass;
-            String signature = AuxiliaryUtil.toUTF8(VMGenericsAndAnnotations.getSignature(data.vm_member_id));
-            if (signature == null) {
-                return data.genericType = (Type)data.getType();
-            }
-            InterimFieldGenericDecl decl =  (InterimFieldGenericDecl) Parser.parseSignature(signature, SignatureKind.FIELD_SIGNATURE, (GenericDeclaration)startPoint);
-            InterimGenericType fldType = decl.fieldType;
-            if (fldType instanceof InterimTypeVariable) {
-                String tvName = ((InterimTypeVariable) fldType).typeVariableName;
-                TypeVariable variable = TypeVariableRepository.findTypeVariable(tvName, startPoint);
-                if (variable == null) {
-                    variable =  AuxiliaryFinder.findTypeVariable(tvName, startPoint);
-                    if (variable == null) {
-                        return (Type) null;
-                    }
-                }
-                data.genericType = (Type) variable;
-                return (Type) variable;
-            } else if (fldType instanceof InterimParameterizedType) {
-                ParameterizedType pType = ParameterizedTypeRepository.findParameterizedType((InterimParameterizedType) fldType, ((InterimParameterizedType) fldType).signature, startPoint);
-                if (pType == null) {
-                    try {
-                        AuxiliaryFinder.findGenericClassDeclarationForParameterizedType((InterimParameterizedType) fldType, startPoint);
-                    } catch(Throwable e) {
-                        throw new TypeNotPresentException(((InterimParameterizedType) fldType).rawType.classTypeName.substring(1).replace('/', '.'), e);
-                    }
-                    // check the correspondence of the formal parameter number and the actual argument number:
-                    AuxiliaryChecker.checkArgsNumber((InterimParameterizedType) fldType, startPoint); // the MalformedParameterizedTypeException may raise here
-                    try {
-                        pType = new ParameterizedTypeImpl(AuxiliaryCreator.createTypeArgs((InterimParameterizedType) fldType, startPoint), AuxiliaryCreator.createRawType((InterimParameterizedType) fldType, startPoint), AuxiliaryCreator.createOwnerType((InterimParameterizedType) fldType, startPoint));
-                    } catch(ClassNotFoundException e) {
-                        throw new TypeNotPresentException(e.getMessage(), e);
-                    }
-                    ParameterizedTypeRepository.registerParameterizedType(pType, (InterimParameterizedType) fldType, ((InterimParameterizedType) fldType).signature, startPoint);
-                }
-                data.genericType = (Type) pType;
-                return pType; 
-            } else if (fldType instanceof InterimGenericArrayType) {
-                return AuxiliaryCreator.createGenericArrayType((InterimGenericArrayType) fldType, startPoint); 
-            } else {
-                return data.genericType = (Type)data.getType();
-            }
+            data.genericType = Parser.parseFieldGenericType(this, VMGenericsAndAnnotations
+                    .getSignature(data.vm_member_id));
         }
         return data.genericType;
     }

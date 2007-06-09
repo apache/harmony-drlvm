@@ -29,29 +29,8 @@ import java.lang.annotation.Annotation;
 import java.util.Arrays;
 
 import org.apache.harmony.lang.reflect.parser.Parser;
-import org.apache.harmony.lang.reflect.parser.Parser.SignatureKind;
-import org.apache.harmony.lang.reflect.parser.InterimParameterizedType;
-import org.apache.harmony.lang.reflect.parser.InterimTypeVariable;
-import org.apache.harmony.lang.reflect.parser.InterimType;
-import org.apache.harmony.lang.reflect.parser.InterimClassType;
-import org.apache.harmony.lang.reflect.parser.InterimTypeParameter;
-import org.apache.harmony.lang.reflect.parser.InterimGenericArrayType;
-import org.apache.harmony.lang.reflect.parser.InterimMethodGenericDecl;
-
-import org.apache.harmony.lang.reflect.repository.TypeVariableRepository;
-import org.apache.harmony.lang.reflect.repository.ParameterizedTypeRepository;
-
-import org.apache.harmony.lang.reflect.support.AuxiliaryFinder;
-import org.apache.harmony.lang.reflect.support.AuxiliaryCreator;
-import org.apache.harmony.lang.reflect.support.AuxiliaryChecker;
-import org.apache.harmony.lang.reflect.support.AuxiliaryLoader;
-import org.apache.harmony.lang.reflect.support.AuxiliaryUtil;
-
-import org.apache.harmony.lang.reflect.implementation.TypeVariableImpl;
-import org.apache.harmony.lang.reflect.implementation.ParameterizedTypeImpl;
-
-import org.apache.harmony.vm.VMStack;
 import org.apache.harmony.vm.VMGenericsAndAnnotations;
+import org.apache.harmony.vm.VMStack;
 
 /**
 * @com.intel.drl.spec_ref 
@@ -117,9 +96,8 @@ public final class Method extends AccessibleObject implements Member, GenericDec
     */
     public Type[] getGenericExceptionTypes() throws GenericSignatureFormatError, TypeNotPresentException, MalformedParameterizedTypeException {
         if (data.genericExceptionTypes == null) {
-            data.initGenericExceptionTypes();
+            data.genericExceptionTypes = Parser.getGenericExceptionTypes(this, VMGenericsAndAnnotations.getSignature(data.vm_member_id));
         }
-
         return (Type[])data.genericExceptionTypes.clone();
     }
 
@@ -128,7 +106,7 @@ public final class Method extends AccessibleObject implements Member, GenericDec
     */
     public Type[] getGenericParameterTypes() throws GenericSignatureFormatError, TypeNotPresentException, MalformedParameterizedTypeException {
         if (data.genericParameterTypes == null) {
-            data.initGenericParameterTypes();
+            data.genericParameterTypes = Parser.getGenericParameterTypes(this, VMGenericsAndAnnotations.getSignature(data.vm_member_id));
         }
 
         return (Type[])data.genericParameterTypes.clone();
@@ -139,53 +117,8 @@ public final class Method extends AccessibleObject implements Member, GenericDec
     */
     public Type getGenericReturnType() throws GenericSignatureFormatError, TypeNotPresentException, MalformedParameterizedTypeException {
         if (data.genericReturnType == null) {
-            Object startPoint = this; 
-            if (data.methSignature == null) {
-                data.methSignature = AuxiliaryUtil.toUTF8(VMGenericsAndAnnotations.getSignature(data.vm_member_id));
-                if (data.methSignature == null) {
-                    data.genericReturnType = (Type)getReturnType();
-                    return data.genericReturnType;
-                }
-            }
-            if (data.methGenDecl == null) {
-                data.methGenDecl =  (InterimMethodGenericDecl) Parser.parseSignature(data.methSignature, SignatureKind.METHOD_SIGNATURE, (GenericDeclaration)startPoint);
-            }
-            InterimType mthdType = data.methGenDecl.returnValue;
-            if (mthdType instanceof InterimTypeVariable) {
-                String tvName = ((InterimTypeVariable) mthdType).typeVariableName;
-                TypeVariable variable = TypeVariableRepository.findTypeVariable(tvName, startPoint);
-                if (variable == null) {
-                    variable =  AuxiliaryFinder.findTypeVariable(tvName, startPoint);
-                    if (variable == null) {
-                        return (Type) null; // compatible behaviour
-                    }
-                }
-                data.genericReturnType = (Type) variable;
-                return (Type) variable;
-            } else if (mthdType instanceof InterimParameterizedType) {
-                ParameterizedType pType = ParameterizedTypeRepository.findParameterizedType((InterimParameterizedType) mthdType, ((InterimParameterizedType) mthdType).signature, startPoint);
-                if (pType == null) {
-                    try {
-                        AuxiliaryFinder.findGenericClassDeclarationForParameterizedType((InterimParameterizedType) mthdType, startPoint);
-                    } catch(Throwable e) {
-                        throw new TypeNotPresentException(((InterimParameterizedType) mthdType).rawType.classTypeName.substring(1).replace('/', '.'), e);
-                    }
-                    // check the correspondence of the formal parameter number and the actual argument number:
-                    AuxiliaryChecker.checkArgsNumber((InterimParameterizedType) mthdType, startPoint); // the MalformedParameterizedTypeException may raise here
-                    try {
-                        pType = new ParameterizedTypeImpl(AuxiliaryCreator.createTypeArgs((InterimParameterizedType) mthdType, startPoint), AuxiliaryCreator.createRawType((InterimParameterizedType) mthdType, startPoint), AuxiliaryCreator.createOwnerType((InterimParameterizedType) mthdType, startPoint));
-                    } catch(ClassNotFoundException e) {
-                        throw new TypeNotPresentException(e.getMessage(), e);
-                    }
-                    ParameterizedTypeRepository.registerParameterizedType(pType, (InterimParameterizedType) mthdType, ((InterimParameterizedType) mthdType).signature, startPoint);
-                }
-                data.genericReturnType = (Type) pType;
-                return (Type) pType; 
-            } else if (mthdType instanceof InterimGenericArrayType) {
-                return AuxiliaryCreator.createGenericArrayType((InterimGenericArrayType) mthdType, startPoint); 
-            } else {
-                return getReturnType();
-            }            
+            data.genericReturnType = Parser.getGenericReturnTypeImpl(this, VMGenericsAndAnnotations
+                    .getSignature(data.vm_member_id));            
         }
         return data.genericReturnType;
     }
@@ -193,11 +126,13 @@ public final class Method extends AccessibleObject implements Member, GenericDec
     /**
     *  @com.intel.drl.spec_ref
     */
+    @SuppressWarnings("unchecked")
     public TypeVariable<Method>[] getTypeParameters() throws GenericSignatureFormatError {
         if (data.typeParameters == null) {
-            data.initTypeParameters();
+            data.typeParameters = Parser.getTypeParameters(this,
+                    VMGenericsAndAnnotations.getSignature(data.vm_member_id));
         }
-        return (TypeVariable<Method>[])data.typeParameters.clone();
+        return (TypeVariable<Method>[]) data.typeParameters.clone();
     }
 
     /**
@@ -207,10 +142,10 @@ public final class Method extends AccessibleObject implements Member, GenericDec
         StringBuilder sb = new StringBuilder(80);
         // data initialization
         if (data.genericParameterTypes == null) {
-            data.initGenericParameterTypes();
+            data.genericParameterTypes = Parser.getGenericParameterTypes(this, VMGenericsAndAnnotations.getSignature(data.vm_member_id));
         }
         if (data.genericExceptionTypes == null) {
-            data.initGenericExceptionTypes();
+            data.genericExceptionTypes = Parser.getGenericExceptionTypes(this, VMGenericsAndAnnotations.getSignature(data.vm_member_id));
         }
         // append modifiers if any
         int modifier = getModifiers();
@@ -448,11 +383,6 @@ public final class Method extends AccessibleObject implements Member, GenericDec
 
         String methSignature;
 
-        /**
-         * method generic declaration
-         */
-        InterimMethodGenericDecl methGenDecl;
-
         final int modifiers;
 
         final String name;
@@ -508,147 +438,6 @@ public final class Method extends AccessibleObject implements Member, GenericDec
             return exceptionTypes;
         }
 
-        /**
-         * initializes generalized exeptions
-         */
-        public synchronized void initGenericExceptionTypes() {
-            // So, here it can be ParameterizedType or TypeVariable or ordinary reference class type elements.
-            if (genericExceptionTypes == null) {
-                Object startPoint = Method.this;
-                if (methSignature == null) {
-                    methSignature = AuxiliaryUtil.toUTF8(VMGenericsAndAnnotations.getSignature(vm_member_id)); // getting this method signature
-                    if (methSignature == null) {
-                        genericExceptionTypes = getExceptionTypes();
-                        return;
-                    }
-                }
-                if (methGenDecl == null) {
-                    methGenDecl =  (InterimMethodGenericDecl) Parser.parseSignature(methSignature, SignatureKind.METHOD_SIGNATURE, (GenericDeclaration)startPoint); // GenericSignatureFormatError can be thrown here
-                }
-                InterimType[] throwns = methGenDecl.throwns;
-                if (throwns == null) {
-                    genericExceptionTypes = getExceptionTypes();
-                    return;
-                }
-                int l = throwns.length;
-                genericExceptionTypes = new Type[l];
-                for (int i = 0; i < l; i++) {
-                    if (throwns[i] instanceof InterimParameterizedType) {
-                        ParameterizedType pType = ParameterizedTypeRepository.findParameterizedType((InterimParameterizedType) throwns[i], ((InterimParameterizedType) throwns[i]).signature, startPoint);
-                        if (pType == null) {
-                            try {
-                                AuxiliaryFinder.findGenericClassDeclarationForParameterizedType((InterimParameterizedType) throwns[i], startPoint);
-                            } catch(Throwable e) {
-                                throw new TypeNotPresentException(((InterimParameterizedType) throwns[i]).rawType.classTypeName.substring(1).replace('/', '.'), e);
-                            }
-                            // check the correspondence of the formal parameter number and the actual argument number:
-                            AuxiliaryChecker.checkArgsNumber((InterimParameterizedType) throwns[i], startPoint); // the MalformedParameterizedTypeException may raise here
-                            try {
-                                pType = new ParameterizedTypeImpl(AuxiliaryCreator.createTypeArgs((InterimParameterizedType) throwns[i], startPoint), AuxiliaryCreator.createRawType((InterimParameterizedType) throwns[i], startPoint), AuxiliaryCreator.createOwnerType((InterimParameterizedType) throwns[i], startPoint));
-                            } catch(ClassNotFoundException e) {
-                                throw new TypeNotPresentException(e.getMessage(), e);
-                            }
-                            ParameterizedTypeRepository.registerParameterizedType(pType, (InterimParameterizedType) throwns[i], ((InterimParameterizedType) throwns[i]).signature, startPoint);
-                        }
-                        genericExceptionTypes[i] = (Type) pType; 
-                    } else if (throwns[i] instanceof InterimClassType) {
-                        try {
-                            genericExceptionTypes[i] = (Type) AuxiliaryLoader.ersatzLoader.findClass(((InterimClassType)throwns[i]).classTypeName.substring((((InterimClassType)throwns[i]).classTypeName.charAt(0)=='L'? 1 : 0)).replace('/', '.')); // XXX: should we propagate the class loader of initial user's request (Field.getGenericType()) or use this one?
-                        } catch (ClassNotFoundException e) {
-                            throw new TypeNotPresentException(((InterimClassType)throwns[i]).classTypeName.substring((((InterimClassType)throwns[i]).classTypeName.charAt(0)=='L'? 1 : 0)).replace('/', '.'), e);
-                        } catch (ExceptionInInitializerError e) {
-                        } catch (LinkageError e) {
-                        }
-                    } else if (throwns[i] instanceof InterimTypeVariable) {
-                        String tvName = ((InterimTypeVariable) throwns[i]).typeVariableName;
-                        TypeVariable variable = TypeVariableRepository.findTypeVariable(tvName, startPoint);
-                        if (variable == null) {
-                            variable =  AuxiliaryFinder.findTypeVariable(tvName, startPoint);
-                            if (variable == null) {
-                                genericExceptionTypes[i] = (Type) null;
-                                break;
-                            }
-                        }
-                        genericExceptionTypes[i] = (Type) variable;
-                    } else {
-                        // Internal Error
-                    }
-                }
-            }
-        }
-
-        /**
-         * initializes generalized parameters
-         */
-        public synchronized void initGenericParameterTypes() {
-            // So, here it can be ParameterizedType or TypeVariable or ordinary reference class type elements.
-            if (genericParameterTypes == null) {
-                Object startPoint = Method.this;
-                if (methSignature == null) {
-                    methSignature = AuxiliaryUtil.toUTF8(VMGenericsAndAnnotations.getSignature(vm_member_id)); // getting this method signature
-                    if (methSignature == null) {
-                        genericParameterTypes = getParameterTypes();
-                        return;
-                    }
-                }
-                if (methGenDecl == null) {
-                    methGenDecl =  (InterimMethodGenericDecl) Parser.parseSignature(methSignature, SignatureKind.METHOD_SIGNATURE, (GenericDeclaration)startPoint); // GenericSignatureFormatError can be thrown here
-                }
-                InterimType[] methodParameters = methGenDecl.methodParameters;
-                if (methodParameters == null) {
-                    genericParameterTypes = new Type[0];
-                    return;
-                }
-                int l = methodParameters.length;
-                genericParameterTypes = new Type[l];
-                for (int i = 0; i < l; i++) {
-                    if (methodParameters[i] instanceof InterimParameterizedType) {
-                        ParameterizedType pType = ParameterizedTypeRepository.findParameterizedType((InterimParameterizedType) methodParameters[i], ((InterimParameterizedType) methodParameters[i]).signature, startPoint);
-                        if (pType == null) {
-                            try {
-                                AuxiliaryFinder.findGenericClassDeclarationForParameterizedType((InterimParameterizedType) methodParameters[i], startPoint);
-                            } catch(Throwable e) {
-                                throw new TypeNotPresentException(((InterimParameterizedType) methodParameters[i]).rawType.classTypeName.substring(1).replace('/', '.'), e);
-                            }
-                            // check the correspondence of the formal parameter number and the actual argument number:
-                            AuxiliaryChecker.checkArgsNumber((InterimParameterizedType) methodParameters[i], startPoint); // the MalformedParameterizedTypeException may raise here
-                            try {
-                                pType = new ParameterizedTypeImpl(AuxiliaryCreator.createTypeArgs((InterimParameterizedType) methodParameters[i], startPoint), AuxiliaryCreator.createRawType((InterimParameterizedType) methodParameters[i], startPoint), AuxiliaryCreator.createOwnerType((InterimParameterizedType) methodParameters[i], startPoint));
-                            } catch(ClassNotFoundException e) {
-                                throw new TypeNotPresentException(e.getMessage(), e);
-                            }
-                            ParameterizedTypeRepository.registerParameterizedType(pType, (InterimParameterizedType) methodParameters[i], ((InterimParameterizedType) methodParameters[i]).signature, startPoint);
-                        }
-                        genericParameterTypes[i] = (Type) pType; 
-                    } else if (methodParameters[i] instanceof InterimClassType) {
-                        try {
-                            genericParameterTypes[i] = (Type) AuxiliaryLoader.ersatzLoader.findClass(((InterimClassType)methodParameters[i]).classTypeName.substring((((InterimClassType)methodParameters[i]).classTypeName.charAt(0)=='L'? 1 : 0)).replace('/', '.')); // XXX: should we propagate the class loader of initial user's request (Field.getGenericType()) or use this one?
-                        } catch (ClassNotFoundException e) {
-                            throw new TypeNotPresentException(((InterimClassType)methodParameters[i]).classTypeName.substring((((InterimClassType)methodParameters[i]).classTypeName.charAt(0)=='L'? 1 : 0)).replace('/', '.'), e);
-                        } catch (ExceptionInInitializerError e) {
-                        } catch (LinkageError e) {
-                        }
-                    } else if (methodParameters[i] instanceof InterimTypeVariable) {
-                        String tvName = ((InterimTypeVariable) methodParameters[i]).typeVariableName;
-                        TypeVariable variable = TypeVariableRepository.findTypeVariable(tvName, startPoint);
-                        if (variable == null) {
-                            variable =  AuxiliaryFinder.findTypeVariable(tvName, startPoint);
-                            if (variable == null) {
-                                genericParameterTypes[i] = (Type) null;
-                                continue;
-                            }
-                        }
-                        genericParameterTypes[i] = (Type) variable;
-                    } else if (methodParameters[i] instanceof InterimGenericArrayType) {
-                        genericParameterTypes[i] = AuxiliaryCreator.createGenericArrayType((InterimGenericArrayType) methodParameters[i], startPoint); 
-                    } else {
-                        // Internal Error
-                    }
-                }
-            }
-        }
-
-
         public Annotation[][] getParameterAnnotations() {
             if (parameterAnnotations == null) {
                 parameterAnnotations = VMGenericsAndAnnotations
@@ -675,40 +464,6 @@ public final class Method extends AccessibleObject implements Member, GenericDec
                 returnType = VMReflection.getMethodReturnType(vm_member_id);
             }
             return returnType;
-        }
-        
-        /**
-         * initializes type parameters
-         */
-        @SuppressWarnings("unchecked")
-        public synchronized void initTypeParameters() {
-            // So, here it can be only TypeVariable elements.
-            if (typeParameters == null) {
-                Object startPoint = Method.this;
-                if (methSignature == null) {
-                    methSignature = AuxiliaryUtil.toUTF8(VMGenericsAndAnnotations.getSignature(vm_member_id)); // getting this method signature
-                    if (methSignature == null) {
-                        typeParameters =  new TypeVariable[0];
-                        return;
-                    }
-                }
-                if (methGenDecl == null) {
-                    methGenDecl =  (InterimMethodGenericDecl) Parser.parseSignature(methSignature, SignatureKind.METHOD_SIGNATURE, (GenericDeclaration)startPoint); // GenericSignatureFormatError can be thrown here
-                }
-                InterimTypeParameter[] pTypeParameters = methGenDecl.typeParameters;
-                if (pTypeParameters == null) {
-                    typeParameters =  new TypeVariable[0];
-                    return;
-                }
-                int l = pTypeParameters.length;
-                typeParameters = new TypeVariable[l];
-                for (int i = 0; i < l; i++) {
-                    String tvName = pTypeParameters[i].typeParameterName;
-                    TypeVariable variable = new TypeVariableImpl((GenericDeclaration)Method.this, tvName, methGenDecl.typeParameters[i]);
-                    TypeVariableRepository.registerTypeVariable(variable, tvName, startPoint);
-                    typeParameters[i] = variable;                
-                }
-            }
         }
     }
 }
