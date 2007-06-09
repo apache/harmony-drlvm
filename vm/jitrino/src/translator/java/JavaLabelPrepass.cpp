@@ -14,11 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
-/**
- * @author Intel, George A. Timoshenko
- * @version $Revision: 1.40.12.2.4.4 $
- */
  
 #include <stdio.h>
 #include <iostream>
@@ -32,8 +27,8 @@
 
 namespace Jitrino {
 
-VariableIncarnation::VariableIncarnation(uint32 offset, uint32 block, Type* t)
-: definingOffset(offset), definingBlock(block), declaredType(t), opnd(NULL)
+VariableIncarnation::VariableIncarnation(uint32 offset, Type* t)
+: definingOffset(offset), declaredType(t), opnd(NULL)
 {
     _prev = _next = NULL;
 }
@@ -41,12 +36,6 @@ VariableIncarnation::VariableIncarnation(uint32 offset, uint32 block, Type* t)
 void VariableIncarnation::setMultipleDefs()
 {
     definingOffset = -1;
-    definingBlock = -1;
-}
-
-void VariableIncarnation::ldBlock(int32 blockNumber)
-{
-    if (definingBlock!=blockNumber) definingBlock = -1;
 }
 
 Type* VariableIncarnation::getDeclaredType()
@@ -147,7 +136,7 @@ void VariableIncarnation::print(::std::ostream& out) {
         out << " (" << tmp << ",DO=" << tmp->definingOffset << ") <-i->";
         tmp = (VariableIncarnation*)tmp->_next;
     } while (tmp);
-    out << ::std::endl;
+    //out << ::std::endl;
 }
 
 
@@ -159,7 +148,7 @@ void SlotVar::print(::std::ostream& out) {
         out << " (" << cur_var_inc << ",DO=" << cur_var_inc->definingOffset << ",LO=" << linkOffset << ") <->";
         tmp = (SlotVar*)tmp->_next;
     } while (tmp);
-    out << ::std::endl;
+    //out << ::std::endl;
 }
 
 
@@ -246,34 +235,49 @@ void VariableIncarnation::createMultipleDefVarOpnd(IRBuilder* irBuilder)
     if (definingOffset==-1) createVarOpnd(irBuilder);
 }
 
-void  StateInfo::addExceptionInfo(ExceptionInfo *info)
+StateInfo::SlotInfo& StateInfo::top() {
+    assert(stack && stackDepth != 0);
+    return stack[stackDepth - 1];
+}
+
+StateInfo::SlotInfo& StateInfo::push(Type *type) {
+    StateInfo::SlotInfo& slot = stack[stackDepth++];
+    slot.type = type;
+    slot.slotFlags = 0;
+    slot.vars = NULL;
+    slot.jsrLabelOffset = 0;
+    return slot;
+}
+
+void  StateInfo::addCatchHandler(CatchHandler *info)
 {
-    if ( !info->isCatchBlock() ) {
+    setCatchLabel();
+    info->setNextExceptionInfoAtOffset(exceptionInfo);
+    exceptionInfo = info;
+}
+
+void  StateInfo::addExceptionInfo(CatchBlock *info) {
+    ExceptionInfo *exc;
+    ExceptionInfo *prev = NULL;
+    for (exc = exceptionInfo; exc != NULL; exc = exc->getNextExceptionInfoAtOffset()) {
+        if (exc->isCatchBlock() &&
+            ((CatchBlock *)exc)->getExcTableIndex() > ((CatchBlock *)info)->getExcTableIndex()) {
+            break;
+        }
+        prev = exc;
+    }
+    if (prev == NULL) {
         info->setNextExceptionInfoAtOffset(exceptionInfo);
         exceptionInfo = info;
-    }else{
-        ExceptionInfo *exc;
-        ExceptionInfo *prev = NULL;
-        for (exc = exceptionInfo; exc != NULL; exc = exc->getNextExceptionInfoAtOffset()) {
-            if (exc->isCatchBlock() &&
-                ((CatchBlock *)exc)->getExcTableIndex() > ((CatchBlock *)info)->getExcTableIndex()) {
-                break;
-            }
-            prev = exc;
-        }
-        if (prev == NULL) {
-            info->setNextExceptionInfoAtOffset(exceptionInfo);
-            exceptionInfo = info;
-        } else {
-            info->setNextExceptionInfoAtOffset(prev->getNextExceptionInfoAtOffset());
-            prev->setNextExceptionInfoAtOffset(info);
-        }
+    } else {
+        info->setNextExceptionInfoAtOffset(prev->getNextExceptionInfoAtOffset());
+        prev->setNextExceptionInfoAtOffset(info);
     }
 }
 
 void StateInfo::cleanFinallyInfo(uint32 offset)
 {
-    for (int32 k=0; k < stackDepth; k++) {
+    for (unsigned k=0; k < stackDepth; k++) {
         if (stack[k].jsrLabelOffset == offset) {
             stack[k].jsrLabelOffset = 0;
             stack[k].type = 0;
@@ -299,7 +303,7 @@ public:
             enclosingMethod->getHandlerInfo(i,&beginOffset,&endOffset,
                 &handlerOffset,&handlerClassIndex);
             if (!catchBlock(beginOffset,endOffset-beginOffset,
-                handlerOffset,0,handlerClassIndex))
+                handlerOffset,handlerClassIndex))
             {
                 // handlerClass failed to be resolved. LinkingException throwing helper
                 // will be generated instead of method's body
@@ -311,22 +315,37 @@ public:
 
     void addHandlerForCatchBlock(CatchBlock* block, 
                                       uint32 handlerOffset,
-                                      uint32 handlerLength,
                                       Type*  exceptionType) {
         jitrino_assert( exceptionType);
         assert(!exceptionType->isUnresolvedType());//must be resolved by verifier
-        Log::out() << "Catch Exception Type = " << exceptionType->getName() << ::std::endl;
+        if (Log::isEnabled()) Log::out() << "Catch Exception Type = " << exceptionType->getName() << ::std::endl;
 
+        // FIXME can we operate with just sole handler per offset, just merging exceptionTypes?
+        // need to check about handler for finally.
         CatchHandler* handler = new (memManager) 
             CatchHandler(nextRegionId++,
                          handlerOffset,
-                         handlerOffset+handlerLength,
-                         block,
+                         handlerOffset,
                          exceptionType);
         block->addHandler(handler);
-        StateInfo *catchInfo = prepass.stateTable->createStateInfo(handlerOffset);
-        catchInfo->setCatchLabel();
-        catchInfo->addExceptionInfo(handler);
+        StateInfo *hi = prepass.stateTable->createStateInfo(handlerOffset, true);
+        hi->addCatchHandler(handler);
+        StateInfo::SlotInfo* slot;
+        if (hi->stackDepth != prepass.getNumVars()) {
+            slot = &hi->top();
+            if (slot->type != exceptionType) {
+                slot->type = prepass.typeManager.getCommonType(exceptionType, slot->type);
+                StateInfo::clearExactType(slot);
+            }
+        } else {
+            slot = &hi->push(exceptionType);
+            StateInfo::setNonNull(slot);
+            StateInfo::setExactType(slot);
+        }
+        assert(prepass.getNumVars() + 1 == (unsigned)hi->stackDepth);
+        slot->vars = new (memManager) SlotVar(
+            prepass.getOrCreateVarInc(handlerOffset, hi->stackDepth - 1, slot->type));
+        
     }
 
     CatchBlock* splitBlockWithOffset(CatchBlock* block, uint32 offset)
@@ -346,16 +365,9 @@ public:
 
         for (CatchHandler* handler = block->getHandlers(); 
                            handler != NULL; 
-                           handler = handler->getNextHandler() ) {
-            CatchHandler* newHandler = 
-                new (memManager) CatchHandler(nextRegionId++,
-                                              handler->getBeginOffset(),
-                                              handler->getEndOffset(),
-                                              newBlock,
-                                              handler->getExceptionType());
-            newBlock->addHandler(newHandler);
-            assert(prepass.stateTable->getStateInfo(handler->getBeginOffset()));
-            prepass.stateTable->getStateInfo(handler->getBeginOffset())->addExceptionInfo(newHandler);
+                           handler = handler->getNextHandler() ) 
+        {
+            addHandlerForCatchBlock(newBlock, handler->getBeginOffset(), handler->getExceptionType());
         }
         return newBlock;
     }
@@ -363,17 +375,16 @@ public:
     bool catchBlock(uint32 tryOffset,
                             uint32 tryLength,
                             uint32 handlerOffset,
-                            uint32 handlerLength,
                             uint32 exceptionTypeToken)  {
  
-        Log::out() << "CatchBlock @ " << (int)tryOffset << "," << (int)tryOffset+(int)tryLength
-             << " handler @ " << (int)handlerOffset << "," << (int)handlerOffset+(int)handlerLength
+        if (Log::isEnabled()) Log::out() << "CatchBlock @ " << (int)tryOffset << "," 
+            << (int)tryOffset+(int)tryLength
+             << " handler @ " << (int)handlerOffset << ","
              << " exception type " << (int)exceptionTypeToken << ","
              << " numCatch " << numCatch << ::std::endl;
 
         uint32 endOffset = tryOffset + tryLength;
         prepass.setLabel(handlerOffset);
-        prepass.setLabel(handlerOffset+handlerLength);
         prepass.setLabel(tryOffset);
         prepass.setLabel(endOffset);
   
@@ -392,16 +403,17 @@ public:
                 //distinct exception types if there are several unresolved exceptions in a single try block
                 //usually verifier loads all exception types caught for in method
                 //but verifier is turned off for bootstrap classes
-                Log::out()<<"WARNING: resolving type from inside of compilation session!!"<<std::endl;
+                if (Log::isEnabled()) Log::out()<<"WARNING: resolving type from inside of compilation session!!"<<std::endl;
                 exceptionType = compilationInterface.resolveNamedType(enclosingMethod->getParentHandle(),exceptionTypeToken);
             }
         } else {
+            //FIXME should use j.l.Throwable for correct type propagation ??
             exceptionType = prepass.typeManager.getSystemObjectType();
         }
 
         if (prevCatch != NULL && prevCatch->equals(tryOffset, endOffset) == true) {
             catchBlock = prevCatch;
-            addHandlerForCatchBlock(catchBlock, handlerOffset, handlerLength, exceptionType);
+            addHandlerForCatchBlock(catchBlock, handlerOffset, exceptionType);
         } else {
             prepass.stateTable->createStateInfo(tryOffset);
             // 
@@ -419,7 +431,7 @@ public:
                 if ( block->offsetSplits(tryOffset) || block->offsetSplits(endOffset) ) {
                     if ( !unnested_try_regions_found ) {
                         unnested_try_regions_found = true;
-                        Log::out() << "unnested try-regions encountered" << std::endl;
+                        if (Log::isEnabled()) Log::out() << "unnested try-regions encountered" << std::endl;
                     }
                 }
                 assert(tryOffset < endOffset);
@@ -442,7 +454,7 @@ public:
                 new (memManager) CatchBlock(nextRegionId++, tryOffset, endOffset, numCatch++);
             prepass.stateTable->getStateInfo(tryOffset)->addExceptionInfo(catchBlock);
             prepass.exceptionTable.push_back(catchBlock);
-            addHandlerForCatchBlock(catchBlock, handlerOffset, handlerLength, exceptionType);
+            addHandlerForCatchBlock(catchBlock, handlerOffset, exceptionType);
         }
         return 1; // all exceptionTypes are OK
     }
@@ -482,11 +494,11 @@ JavaLabelPrepass::JavaLabelPrepass(MemoryManager& mm,
     doubleType= typeManager.getDoubleType();
 
     numLabels = 0;
-    numVars = methodDesc.getNumVars();
     labels = new (memManager) BitSet(memManager,numByteCodes);
     subroutines = new (memManager) BitSet(memManager,numByteCodes);
-    int numStack = md.getMaxStack()+1;
-    stateInfo.stack  = new (memManager) struct StateInfo::SlotInfo[numVars+numStack];
+    numVars = methodDesc.getNumVars();
+    int numStack = methodDesc.getMaxStack()+1;
+    stateInfo.stack  = new (memManager) StateInfo::SlotInfo[numVars+numStack];
     stateInfo.stackDepth = numVars;
     for (uint32 k=0; k < numVars+numStack; k++) {
         struct StateInfo::SlotInfo *slot = &stateInfo.stack[k];
@@ -498,7 +510,7 @@ JavaLabelPrepass::JavaLabelPrepass(MemoryManager& mm,
     blockNumber  = 0;
     labelOffsets = NULL;
     // exceptions
-    stateTable = new (memManager)  StateTable(memManager,typeManager,*this,20,numVars);
+    stateTable = new (memManager)  StateTable(memManager,typeManager,*this,numStack,numVars);
 
     // 1st count number of catch and finally blocks
     // parse and create exception info
@@ -515,8 +527,6 @@ JavaLabelPrepass::JavaLabelPrepass(MemoryManager& mm,
     }
     hasJsrLabels = false;
     isFallThruLabel = true;
-    numVars = methodDesc.getNumVars();
-    methodDesc.getMaxStack();
     uint32 numArgs = methodDesc.getNumParams();
     for (uint32 i=0, j=0; i<numArgs; i++,j++) {
         Type *type;
@@ -544,7 +554,7 @@ JavaLabelPrepass::JavaLabelPrepass(MemoryManager& mm,
             }
             slot->type = typeManager.toInternalType(type);
         }
-        slot->vars  = new (memManager) SlotVar(getOrCreateVarInc(0, j, slot->type, NULL));
+        slot->vars  = new (memManager) SlotVar(getOrCreateVarInc(0, j, slot->type));
         JavaVarType javaType = getJavaType(type);
         if (javaType == L || javaType == D) j++;
     }
@@ -552,11 +562,11 @@ JavaLabelPrepass::JavaLabelPrepass(MemoryManager& mm,
 }
 
 void JavaLabelPrepass::offset(uint32 offset) {
-    Log::out() << std::endl << "PREPASS OFFSET " << (int32)offset << ", blockNo=" << blockNumber << std::endl;
+    if (Log::isEnabled()) Log::out() << std::endl << "PREPASS OFFSET " << (int32)offset << ", blockNo=" << blockNumber << std::endl;
     bytecodevisited->setBit(offset,true);
     if (offset==0)
         stateTable->restoreStateInfo(&stateInfo, offset);
-    if (labels->getBit(offset) == true/* && !visited->getBit(offset)*/) {
+    if (labels->getBit(offset) == true) {
         if (linearPassDone)
             stateTable->restoreStateInfo(&stateInfo, offset);
         setStackVars();
@@ -565,32 +575,13 @@ void JavaLabelPrepass::offset(uint32 offset) {
             propagateStateInfo(offset,isFallThruLabel);
             isFallThruLabel = true;
         }
-        Log::out() << "BASICBLOCK " << (int32)offset << " " << blockNumber << std::endl;
+        if (Log::isEnabled()) Log::out() << "BASICBLOCK " << (int32)offset << " #" << blockNumber << std::endl;
         ++blockNumber;
         visited->setBit(offset,true);
         stateTable->restoreStateInfo(&stateInfo,offset);
-        if (stateInfo.isCatchLabel()) {
-            Type *handlerExceptionType = NULL;
-            for (ExceptionInfo* exceptionInfo = stateInfo.exceptionInfo;
-                 exceptionInfo != NULL;
-                 exceptionInfo = exceptionInfo->getNextExceptionInfoAtOffset()) {
-                if (exceptionInfo->isCatchHandler()) {
-                    // catch handler block
-                    CatchHandler* handler = (CatchHandler*)exceptionInfo;
-                    handlerExceptionType = handler->getExceptionType();
-                    break;
-                }
-            }
-            if(Log::isEnabled()) { 
-                Log::out() << "CATCH " << (int32) offset << " "; 
-                handlerExceptionType->print(Log::out()); 
-                Log::out() << ::std::endl;
-            }
-            pushType(handlerExceptionType);
-        }
-        else if (stateInfo.isSubroutineEntry()) {
-            pushType(typeManager.getSystemObjectType());
-            stateInfo.stack[stateInfo.stackDepth-1].jsrLabelOffset = offset;
+        if (stateInfo.isSubroutineEntry()) {
+            stateInfo.push(typeManager.getSystemObjectType());
+            stateInfo.top().jsrLabelOffset = offset;
         }
     }
 }
@@ -600,7 +591,7 @@ void JavaLabelPrepass::offset(uint32 offset) {
 void JavaLabelPrepass::setLabel(uint32 offset) {
     if (labels->getBit(offset)) // this label is already seen
         return;
-    Log::out() << "SET LABEL " << (int) offset << " " << (int) numLabels << ::std::endl;
+    if (Log::isEnabled()) Log::out() << "SET LABEL " << (int) offset << " #" << (int) numLabels << ::std::endl;
     labels->setBit(offset,true);
     numLabels++;
 }
@@ -652,14 +643,14 @@ VariableIncarnation* JavaLabelPrepass::getVarInc(uint32 offset, uint32 index)
     return (*iter).second;
 }
 
-VariableIncarnation* JavaLabelPrepass::getOrCreateVarInc(uint32 offset, uint32 index, Type* type, VariableIncarnation* prev)
+VariableIncarnation* JavaLabelPrepass::getOrCreateVarInc(uint32 offset, uint32 index, Type* type)
 {
     int numStack = methodDesc.getMaxStack()+1;
     uint32 key = offset*(numVars+numStack)+index;
     StlHashMap<uint32,VariableIncarnation*>::iterator iter = localVars.find(key);
     VariableIncarnation* var;
     if (iter==localVars.end()) {
-        var = new(memManager) VariableIncarnation(offset, blockNumber, type);
+        var = new(memManager) VariableIncarnation(offset, type);
         localVars[key] = var;
     } else {
         var = (*iter).second;
@@ -680,49 +671,39 @@ void JavaLabelPrepass::createMultipleDefVarOpnds(IRBuilder* irBuilder)
 // stack operations
 //
 
-struct StateInfo::SlotInfo   JavaLabelPrepass::topType() {
+StateInfo::SlotInfo&   JavaLabelPrepass::topType() {
     return stateInfo.stack[stateInfo.stackDepth-1];
 }
 
-struct StateInfo::SlotInfo JavaLabelPrepass::popType() {
-    struct StateInfo::SlotInfo top = stateInfo.stack[--stateInfo.stackDepth];
-    assert (stateInfo.stackDepth >= (int)numVars);
+StateInfo::SlotInfo& JavaLabelPrepass::popType() {
+    StateInfo::SlotInfo& top = stateInfo.stack[--stateInfo.stackDepth];
+    assert (stateInfo.stackDepth >= numVars);
     return top;
 }
 
 void    JavaLabelPrepass::popAndCheck(Type *type) {
-    struct StateInfo::SlotInfo top = popType();
+    StateInfo::SlotInfo& top = popType();
     if( !(top.type == type) )
         assert(0);
 }
 
 void    JavaLabelPrepass::popAndCheck(JavaVarType type) {
-    struct StateInfo::SlotInfo top = popType();
+    StateInfo::SlotInfo& top = popType();
     if(!(top.type && getJavaType(top.type) == type))
         assert(0);
 }
 
 void    JavaLabelPrepass::pushType(Type *type) {
-    struct StateInfo::SlotInfo* slot = &stateInfo.stack[stateInfo.stackDepth++];
-    slot->type = type;
-    slot->slotFlags = 0;
-    slot->vars = NULL;
-    slot->jsrLabelOffset = 0;
+    stateInfo.push(type);
 }
 
 
 void    JavaLabelPrepass::pushType(Type *type, uint32 varNumber) {
-    struct StateInfo::SlotInfo* slot = &stateInfo.stack[stateInfo.stackDepth++];
-    slot->type           = type;
-    slot->slotFlags      = 0;
-    slot->varNumber      = varNumber;
-    slot->vars            = NULL;
-    slot->jsrLabelOffset  = 0;
-    StateInfo::setVarNumber(slot);
+    stateInfo.push(type).setVarNumber(varNumber);
 }
 
 
-void    JavaLabelPrepass::pushType(struct StateInfo::SlotInfo slot) {
+void    JavaLabelPrepass::pushType(StateInfo::SlotInfo& slot) {
     stateInfo.stack[stateInfo.stackDepth++] = slot;
     stateInfo.stack[stateInfo.stackDepth-1].jsrLabelOffset = 0;
 }
@@ -733,29 +714,19 @@ void JavaLabelPrepass::setStackVars() {
         Log::out() << "SET STACK VARS:" << ::std::endl;
     }
 
-    for (int i=numVars; i < stateInfo.stackDepth; i++) {
+    for (unsigned i=numVars; i < stateInfo.stackDepth; i++) {
         struct StateInfo::SlotInfo* slot = &stateInfo.stack[i];
 
         if(Log::isEnabled()) {
             Log::out() << "SLOT " << i << ":" << ::std::endl;
-            Log::out() << "       type = ";
-            if (slot->type)
-                slot->type->print(Log::out());
-            else
-                Log::out() << "NULL";
-            Log::out() << ::std::endl;
-            Log::out() << "       vars = ";
-            if (slot->vars)
-                slot->vars->getVarIncarnation()->print(Log::out());
-            else
-                Log::out() << "NULL";
+            StateInfo::print(*slot, Log::out());
             Log::out() << ::std::endl;
         }
 
         Type* type = slot->type;
         assert(type);
         SlotVar* sv = slot->vars;
-        VariableIncarnation* var = getOrCreateVarInc(currentOffset, i, type, NULL);
+        VariableIncarnation* var = getOrCreateVarInc(currentOffset, i, type);
 
         // Do not merge stack vars of incompatible types
         if (sv && (sv->getVarIncarnation()->getDeclaredType() == var->getDeclaredType())) {
@@ -767,17 +738,7 @@ void JavaLabelPrepass::setStackVars() {
 
         if(Log::isEnabled()) {
             Log::out() << "AFTER" << ::std::endl;
-            Log::out() << "       type = ";
-            if (slot->type)
-                slot->type->print(Log::out());
-            else
-                Log::out() << "NULL";
-            Log::out() << ::std::endl;
-            Log::out() << "       vars = ";
-            if (slot->vars)
-                slot->vars->getVarIncarnation()->print(Log::out());
-            else
-                Log::out() << "NULL";
+            StateInfo::print(*slot, Log::out());
             Log::out() << ::std::endl;
         }
     }
@@ -1549,7 +1510,7 @@ void JavaLabelPrepass::invoke(MethodDesc* methodDesc) {
 void JavaLabelPrepass::pop()                               { popType(); }
 
 void JavaLabelPrepass::pop2() {
-    struct StateInfo::SlotInfo type = popType();
+    StateInfo::SlotInfo& type = popType();
     if (isCategory2(type))
         return;
     popType();
@@ -1560,23 +1521,23 @@ void JavaLabelPrepass::dup() {
 }
 
 void JavaLabelPrepass::dup_x1() {
-    struct StateInfo::SlotInfo opnd1 = popType();
-    struct StateInfo::SlotInfo opnd2 = popType();
+    StateInfo::SlotInfo& opnd1 = popType();
+    StateInfo::SlotInfo& opnd2 = popType();
     pushType(opnd1);
     pushType(opnd2);
     pushType(opnd1);
 }
 
 void JavaLabelPrepass::dup_x2() {
-    struct StateInfo::SlotInfo opnd1 = popType();
-    struct StateInfo::SlotInfo opnd2 = popType();
+    StateInfo::SlotInfo& opnd1 = popType();
+    StateInfo::SlotInfo& opnd2 = popType();
     if (isCategory2(opnd2)) {
         pushType(opnd1);
         pushType(opnd2);
         pushType(opnd1);
         return;
     }
-    struct StateInfo::SlotInfo opnd3 = popType();
+    StateInfo::SlotInfo& opnd3 = popType();
     pushType(opnd1);
     pushType(opnd3);
     pushType(opnd2);
@@ -1584,13 +1545,13 @@ void JavaLabelPrepass::dup_x2() {
 }
 
 void JavaLabelPrepass::dup2() {
-    struct StateInfo::SlotInfo opnd1 = popType();
+    StateInfo::SlotInfo& opnd1 = popType();
     if (isCategory2(opnd1)) {
         pushType(opnd1);
         pushType(opnd1);
         return;
     }
-    struct StateInfo::SlotInfo opnd2 = popType();
+    StateInfo::SlotInfo& opnd2 = popType();
     pushType(opnd2);
     pushType(opnd1);
     pushType(opnd2);
@@ -1598,8 +1559,8 @@ void JavaLabelPrepass::dup2() {
 }
 
 void JavaLabelPrepass::dup2_x1() {
-    struct StateInfo::SlotInfo opnd1 = popType();
-    struct StateInfo::SlotInfo opnd2 = popType();
+    StateInfo::SlotInfo& opnd1 = popType();
+    StateInfo::SlotInfo& opnd2 = popType();
     if (isCategory2(opnd1)) {
         // opnd1 is a category 2 instruction
         pushType(opnd1);
@@ -1607,7 +1568,7 @@ void JavaLabelPrepass::dup2_x1() {
         pushType(opnd1);
     } else {
         // opnd1 is a category 1 instruction
-        struct StateInfo::SlotInfo opnd3 = popType();
+        StateInfo::SlotInfo& opnd3 = popType();
         pushType(opnd2);
         pushType(opnd1);
         pushType(opnd3);
@@ -1618,8 +1579,8 @@ void JavaLabelPrepass::dup2_x1() {
 
 
 void JavaLabelPrepass::dup2_x2() {
-    struct StateInfo::SlotInfo opnd1 = popType();
-    struct StateInfo::SlotInfo opnd2 = popType();
+    StateInfo::SlotInfo& opnd1 = popType();
+    StateInfo::SlotInfo& opnd2 = popType();
     if (isCategory2(opnd1)) {
         // opnd1 is category 2
         if (isCategory2(opnd2)) {
@@ -1628,7 +1589,7 @@ void JavaLabelPrepass::dup2_x2() {
             pushType(opnd1);
         } else {
             // opnd2 is category 1
-            struct StateInfo::SlotInfo opnd3 = popType();
+            StateInfo::SlotInfo& opnd3 = popType();
             assert(isCategory2(opnd3) == false);
             pushType(opnd1);
             pushType(opnd3);
@@ -1638,7 +1599,7 @@ void JavaLabelPrepass::dup2_x2() {
     } else {
         assert(isCategory2(opnd2) == false);
         // both opnd1 & opnd2 are category 1
-        struct StateInfo::SlotInfo opnd3 = popType();
+        StateInfo::SlotInfo& opnd3 = popType();
         if (isCategory2(opnd3)) {
             pushType(opnd2);
             pushType(opnd1);
@@ -1647,7 +1608,7 @@ void JavaLabelPrepass::dup2_x2() {
             pushType(opnd1);
         } else {
             // opnd1, opnd2, opnd3 all are category 1
-            struct StateInfo::SlotInfo opnd4 = popType();
+            StateInfo::SlotInfo& opnd4 = popType();
             assert(isCategory2(opnd4) == false);
             pushType(opnd2);
             pushType(opnd1);
@@ -1660,8 +1621,8 @@ void JavaLabelPrepass::dup2_x2() {
 }
 
 void JavaLabelPrepass::swap() {
-    struct StateInfo::SlotInfo opnd1 = popType();
-    struct StateInfo::SlotInfo opnd2 = popType();
+    StateInfo::SlotInfo& opnd1 = popType();
+    StateInfo::SlotInfo& opnd2 = popType();
     pushType(opnd1);
     pushType(opnd2);
 }
@@ -1679,16 +1640,16 @@ void JavaLabelPrepass::genStore(Type *type, uint32 index, uint32 offset) {
     popAndCheck(type);
     stateInfo.stack[index].type     = type;
     stateInfo.stack[index].slotFlags= 0;
-    stateInfo.stack[index].vars = new (memManager) SlotVar(getOrCreateVarInc(offset, index, type, NULL/*prevVar*/));
+    stateInfo.stack[index].vars = new (memManager) SlotVar(getOrCreateVarInc(offset, index, type));
     propagateLocalVarToHandlers(index);
 }
 
 void JavaLabelPrepass::genTypeStore(uint32 index, uint32 offset) {
-    struct StateInfo::SlotInfo slot = popType();
+    StateInfo::SlotInfo& slot = popType();
     Type *type = slot.type;
     stateInfo.stack[index].type     = type;
     stateInfo.stack[index].slotFlags= slot.slotFlags;
-    VariableIncarnation* offset_varinc = getOrCreateVarInc(offset, index, type, NULL/*prevVar*/);
+    VariableIncarnation* offset_varinc = getOrCreateVarInc(offset, index, type);
     offset_varinc->setDeclaredType(typeManager.getCommonType(type, offset_varinc->getDeclaredType()));
     stateInfo.stack[index].vars = new (memManager) SlotVar(offset_varinc);
     if(Log::isEnabled()) {
@@ -1708,7 +1669,6 @@ void JavaLabelPrepass::genLoad(Type *type, uint32 index) {
     stateInfo.stack[stateInfo.stackDepth-1].jsrLabelOffset = stateInfo.stack[index].jsrLabelOffset;
     SlotVar* vars = stateInfo.stack[index].vars;
     if (vars) {
-        vars->getVarIncarnation()->ldBlock(blockNumber);
         vars->mergeVarIncarnations(&typeManager);
     }
 }
@@ -1717,7 +1677,6 @@ void JavaLabelPrepass::genTypeLoad(uint32 index) {
     Type *type = stateInfo.stack[index].type;
     SlotVar* vars = stateInfo.stack[index].vars;
     if (vars) {
-        vars->getVarIncarnation()->ldBlock(blockNumber);
         vars->mergeVarIncarnations(&typeManager);
         type = vars->getVarIncarnation()->getDeclaredType();
     }
@@ -1750,15 +1709,9 @@ void JavaLabelPrepass::genArrayStore(Type *type) {
 }
 
 void JavaLabelPrepass::genTypeArrayStore() {
-#ifndef NDEBUG
-    Type *type = 
-#endif
-        popType().type;
+    UNUSED Type *type = popType().type;
     popAndCheck(int32Type);
-#ifndef NDEBUG
-    type = 
-#endif
-        popType().type;
+    type = popType().type;
     assert(type->isArrayType() || type->isNullObject() || type->isUnresolvedObject());
 }
 
@@ -1804,7 +1757,7 @@ void StateTable::copySlotInfo(StateInfo::SlotInfo& to, StateInfo::SlotInfo& from
     to.vars = from.vars ? new (memManager) SlotVar(from.vars, memManager) : NULL;
 }
 
-void  StateTable::setStateInfo(StateInfo *inState, uint32 offset, bool isFallThru) {
+void  StateTable::setStateInfo(StateInfo *inState, uint32 offset, bool isFallThru, bool varsOnly) {
     if(Log::isEnabled()) {
         Log::out() << "SETSTATE offset=" <<(int)offset << " depth=" << inState->stackDepth << ::std::endl;
         printState(inState);
@@ -1820,6 +1773,7 @@ void  StateTable::setStateInfo(StateInfo *inState, uint32 offset, bool isFallThr
         state->clearFallThroughLabel();
     assert(getStateInfo(offset) != NULL);
 
+    setStackInfo(inState, offset, true, !varsOnly);
     if (!state->isVisited() ) {
         state->setVisited();
     
@@ -1828,7 +1782,7 @@ void  StateTable::setStateInfo(StateInfo *inState, uint32 offset, bool isFallThr
 
             CatchBlock* except = *it;
             if ( except->hasOffset(offset) ) {
-                Log::out() << "try-region begin=" << (int)except->getBeginOffset() 
+                if (Log::isEnabled()) Log::out() << "try-region begin=" << (int)except->getBeginOffset() 
                                      << " end=" << (int)except->getEndOffset() << ::std::endl;
                 ExceptionInfo *prev = state->exceptionInfo;
                 bool found  = false;
@@ -1858,51 +1812,43 @@ void  StateTable::setStateInfo(StateInfo *inState, uint32 offset, bool isFallThr
             }
         }
     }
-    int stackDepth = inState->stackDepth;
+}
+
+void  StateTable::setStackInfo(StateInfo *inState, uint32 offset, bool includeVars, bool includeStack)
+{
+    if (Log::isEnabled()) Log::out() << "SETSTACK " << includeVars << ", " << includeStack << ::std::endl;
+    unsigned stackDepth = inState->stackDepth;
     if (stackDepth > 0) {
+        StateInfo *state = hashtable[offset];
+        assert(state);
+        unsigned from = includeVars ? 0 : numVars;
+        unsigned to = includeStack ? stackDepth : numVars;
         if (maxDepth < stackDepth) maxDepth = stackDepth;
-        Log::out() << "MAXDEPTH " << maxDepth << ::std::endl;
-        struct StateInfo::SlotInfo *stack = state->stack;
+        if (Log::isEnabled()) Log::out() << "MAXDEPTH " << maxDepth << ::std::endl;
+        StateInfo::SlotInfo *stack = state->stack;
         if (stack == NULL) {
+            if (Log::isEnabled()) Log::out() << "NEWSTACK" << ::std::endl;
             stack = new (memManager) StateInfo::SlotInfo[stackDepth+1];
             state->stack = stack;
-            for (int i=0; i < stackDepth; i++) {
+            for (unsigned i = from; i < to; i++) {
                 copySlotInfo(stack[i], inState->stack[i]);
             }
-            state->stackDepth = stackDepth;
+            state->stackDepth = to;
         } else { // needs to merge the states
-            assert(state->stackDepth == stackDepth);
+            assert(!includeStack || state->stackDepth == stackDepth);
             if(Log::isEnabled()) {
                 Log::out() << " before\n";
                 printState(state);
             }
-            for (int i=0; i < stackDepth; i++) {
+            for (unsigned i = from; i < to; i++) {
                 struct StateInfo::SlotInfo *inSlot = &inState->stack[i];
                 struct StateInfo::SlotInfo *slot   = &stack[i];
                 if(Log::isEnabled()) {
                     Log::out() << " i = " << i << ::std::endl;
-                    Log::out() << "inSlot->type: ";
-                    if (inSlot->type) {
-                        inSlot->type->print(Log::out());
-                    } else {
-                        Log::out() << "null";
-                    }
-                    Log::out() << ::std::endl;
-                    Log::out() << "slot->type: ";
-                    if (slot->type) {
-                        slot->type->print(Log::out());
-                    } else {
-                        Log::out() << "null";
-                    }
-                    Log::out() << ::std::endl;
-                    if (inSlot->vars) {
-                        Log::out() << "inSlot->vars: "; inSlot->vars->print(Log::out());
-                    }
-                    if (slot->vars) {
-                        Log::out() << "slot->vars: "; slot->vars->print(Log::out());
-                    }
+                    Log::out() << "inSlot: ";StateInfo::print(*inSlot, Log::out());Log::out() << ::std::endl;
+                    Log::out() << "slot:   ";StateInfo::print(*slot, Log::out());Log::out() << ::std::endl;
                 }
-                mergeSlots(inSlot, slot, offset, i < numVars);
+                mergeSlots(inSlot, slot, offset, i < (unsigned)numVars);
             }
         }
         if(Log::isEnabled()) {
@@ -1913,6 +1859,14 @@ void  StateTable::setStateInfo(StateInfo *inState, uint32 offset, bool isFallThr
 }
 
 void StateTable::mergeSlots(StateInfo::SlotInfo* inSlot, StateInfo::SlotInfo* slot, uint32 offset, bool isVar) {
+
+    if (!getStateInfo(offset)->isVisited()) {
+        assert(NULL == slot->type);
+        assert(NULL == slot->vars);
+        copySlotInfo(*slot, *inSlot);
+        return;
+    }
+
     slot->jsrLabelOffset = inSlot->jsrLabelOffset;
     slot->slotFlags = slot->slotFlags & inSlot->slotFlags;
 
@@ -1973,28 +1927,26 @@ void  StateTable::setStateInfoFromFinally(StateInfo *inState, uint32 offset) {
         Log::out() << "SETSTATE FROM FINALLY offset=" <<(int)offset << " depth=" << inState->stackDepth << ::std::endl;
         printState(inState);
     }
-    StateInfo *state = hashtable[offset];
-    assert(getStateInfo(offset) != NULL);
-    int stackDepth = inState->stackDepth;
+    StateInfo *state = getStateInfo(offset);
+    assert(state);
+    unsigned stackDepth = inState->stackDepth;
     if (stackDepth > 0) {
         if (maxDepth < stackDepth) maxDepth = stackDepth;
-        Log::out() << "MAXDEPTH " << maxDepth << ::std::endl;
+        if (Log::isEnabled()) Log::out() << "MAXDEPTH " << maxDepth << ::std::endl;
         struct StateInfo::SlotInfo *stack = state->stack;
-        if (stack == NULL) {
-            // stack must be propagated from JSR to jsrNext earlier
-            assert(0);
-        }
+        // stack must be propagated from JSR to jsrNext earlier
+        assert(stack);
         assert(state->stackDepth == stackDepth);
         if(Log::isEnabled()) {
             Log::out() << " before\n";
             printState(state);
         }
-        for (int i=0; i < stackDepth; i++) {
+        for (unsigned i=0; i < stackDepth; i++) {
             struct StateInfo::SlotInfo *inSlot = &inState->stack[i];
             struct StateInfo::SlotInfo *slot   = &stack[i];
             Type *intype = inSlot->type;
             Type *type  = slot->type;
-            Log::out() << "STACK " << i << ": "<< type << ::std::endl;
+            if (Log::isEnabled()) Log::out() << "STACK " << i << ": "<< type << ::std::endl;
             if (!type && intype) {  // don't merge, just rewrite!
                 slot->type      = intype;
                 // Consider copying not pointers but SlotVat structures.
@@ -2047,7 +1999,8 @@ void JavaLabelPrepass::propagateLocalVarToHandlers(uint32 varIndex)
 
                         uint32 handler_offset = handler->getBeginOffset();
                         struct StateInfo::SlotInfo *slot = &stateTable->getStateInfo(handler_offset)->stack[varIndex];
-                        Log::out() << "HANDLER SLOT " << varIndex << " merged to offset " << handler_offset << ::std::endl;
+                        if (Log::isEnabled()) Log::out() << "HANDLER SLOT " << varIndex 
+                            << " merged to offset " << handler_offset << ::std::endl;
                         stateTable->mergeSlots(inSlot, slot, handler_offset, true);
                     }
             }

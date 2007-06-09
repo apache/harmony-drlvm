@@ -430,7 +430,7 @@ JavaByteCodeTranslator::offset(uint32 offset) {
     }
 
     // start a new basic block
-    Log::out() << "TRANSLATOR BASICBLOCK " << (int32)offset << " " << ::std::endl;
+    if (Log::isEnabled()) Log::out() << "TRANSLATOR BASICBLOCK " << (int32)offset << " " << ::std::endl;
 
     // finish the previous basic block, if any work was required
     if (!lastInstructionWasABranch) {
@@ -443,13 +443,12 @@ JavaByteCodeTranslator::offset(uint32 offset) {
     stateInfo->flags = state->flags;
     stateInfo->stackDepth = state->stackDepth;
     stateInfo->exceptionInfo = state->exceptionInfo;
-    for(int i=0; i<state->stackDepth; ++i)
+    for(unsigned i=0; i<state->stackDepth; ++i)
         stateInfo->stack[i] = state->stack[i];
     assert(stateInfo != NULL);
     Type* handlerExceptionType = NULL;
     uint32 lblId = getNextLabelId();
     LabelInst* labelInst = getLabel(lblId);
-    ::std::vector<LabelInst*> oldLabels;
 
     ::std::vector<LabelInst*> catchLabels;
 
@@ -459,10 +458,10 @@ JavaByteCodeTranslator::offset(uint32 offset) {
          exceptionInfo = exceptionInfo->getNextExceptionInfoAtOffset()) {
         if (exceptionInfo->isCatchBlock()) {
             CatchBlock* catchBlock = (CatchBlock*)exceptionInfo;
-            Log::out() << "TRY REGION " << (int)exceptionInfo->getBeginOffset() 
-                << " " << (int)exceptionInfo->getEndOffset() << ::std::endl;
             CatchHandler *first = ((CatchBlock*)exceptionInfo)->getHandlers();
             if (Log::isEnabled()) {
+                Log::out() << "TRY REGION " << (int)exceptionInfo->getBeginOffset() 
+                    << " " << (int)exceptionInfo->getEndOffset() << ::std::endl;
                 for (; first != NULL; first = first->getNextHandler()) {
                     Log::out() << " handler " << (int)first->getBeginOffset() << ::std::endl;
                 }
@@ -482,32 +481,16 @@ JavaByteCodeTranslator::offset(uint32 offset) {
             // catch handler block
             isCatchHandler = true;
             CatchHandler* handler = (CatchHandler*)exceptionInfo;
-            Log::out() << "CATCH REGION " << (int)exceptionInfo->getBeginOffset() 
+            if (Log::isEnabled()) Log::out() << "CATCH REGION " << (int)exceptionInfo->getBeginOffset() 
                 << " " << (int)exceptionInfo->getEndOffset() << ::std::endl;
-            if (translationFlags.newCatchHandling) {
-                handlerExceptionType = (handlerExceptionType == NULL) ?
-                    handler->getExceptionType() :
-                    typeManager.getCommonObjectType((ObjectType*) handlerExceptionType, (ObjectType*) handler->getExceptionType());
-            } else {
-                handlerExceptionType = handler->getExceptionType();
-            }
+            handlerExceptionType = (handlerExceptionType == NULL) ?
+                handler->getExceptionType() :
+                typeManager.getCommonObjectType((ObjectType*) handlerExceptionType, (ObjectType*) handler->getExceptionType());
             LabelInst *oldLabel = labelInst;
-            oldLabels.push_back(oldLabel);
-
-            if (translationFlags.newCatchHandling) {
-                labelInst = (LabelInst*)
-                    irBuilder.getInstFactory()->makeCatchLabel(
-                                             handler->getExceptionOrder(),
-                                             handler->getExceptionType());
-                catchLabels.push_back(labelInst);
-            } else {
-                labelInst = (LabelInst*)
-                    irBuilder.getInstFactory()->makeCatchLabel(
-                                             labelInst->getLabelId(),
-                                             handler->getExceptionOrder(),
-                                             handlerExceptionType);
-                setLabel(lblId,labelInst);
-            }
+            labelInst = irBuilder.getInstFactory()->makeCatchLabel(
+                                            handler->getExceptionOrder(),
+                                            handler->getExceptionType());
+            catchLabels.push_back(labelInst);
             labelInst->setState(oldLabel->getState());
             exceptionInfo->setLabelInst(labelInst);
             if(Log::isEnabled()) {
@@ -517,7 +500,7 @@ JavaByteCodeTranslator::offset(uint32 offset) {
         } else {jitrino_assert(0);}    // only catch blocks should occur in Java
     }
     // generate the label instruction
-    if(translationFlags.newCatchHandling && !catchLabels.empty()) {
+    if(!catchLabels.empty()) {
         for(::std::vector<LabelInst*>::iterator iter = catchLabels.begin(); iter != catchLabels.end(); ++iter) {
             LabelInst* catchLabel = *iter;
             irBuilder.genLabel(catchLabel);
@@ -538,20 +521,25 @@ JavaByteCodeTranslator::offset(uint32 offset) {
         }
         cfgBuilder.genBlock(labelInst);
     }
-    //
-    // Load var operands where current basic block begins
-    //
-    for (uint32 k=numVars; k < (uint32)stateInfo->stackDepth; k++) {
-        if(Log::isEnabled()) {
-            Log::out() << "STACK ";stateInfo->stack[k].type->print(Log::out()); Log::out() << ::std::endl;
-        }
 
-        genLdVar(k,prepass.getJavaType(stateInfo->stack[k].type));
-    }
     if (isCatchHandler) {
         // for catch handler blocks, generate the catch instruction
-        pushOpnd(irBuilder.genCatch(handlerExceptionType));
-    } else  if (stateInfo->isSubroutineEntry()) {
+        assert(stateInfo->isCatchLabel());
+        assert(1 == stateInfo->stackDepth - numVars);
+        assert(stateInfo->stack[numVars].type == handlerExceptionType);
+        pushOpnd(irBuilder.genCatch(stateInfo->stack[numVars].type));
+    } else {
+        //
+        // Load var operands where current basic block begins
+        //
+        for (uint32 k=numVars; k < (uint32)stateInfo->stackDepth; k++) {
+            if(Log::isEnabled()) {
+                Log::out() << "STACK ";StateInfo::print(stateInfo->stack[k], Log::out());Log::out() << ::std::endl;
+            }
+            genLdVar(k,prepass.getJavaType(stateInfo->stack[k].type));
+        }
+    }
+    if (stateInfo->isSubroutineEntry()) {
         pushOpnd(irBuilder.genSaveRet());
     }
 }

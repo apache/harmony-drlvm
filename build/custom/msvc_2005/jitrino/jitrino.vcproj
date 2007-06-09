@@ -1524,10 +1524,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\jitrino\src\translator\ExceptionInfo.cpp"
-				>
-			</File>
-			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\translator\ExceptionInfo.h"
 				>
 			</File>

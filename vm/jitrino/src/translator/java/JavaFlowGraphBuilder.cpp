@@ -65,15 +65,10 @@ void JavaFlowGraphBuilder::edgeForFallthrough(Node* block) {
     //
     NodeList::const_iterator niter = std::find(fallThruNodes.begin(), fallThruNodes.end(), block);
     assert(niter != fallThruNodes.end());
-    TranslatorFlags* translatorFlags = irBuilder.getTranslatorFlags();
     for(++niter; niter != fallThruNodes.end(); ++niter) {
         Node* node = *niter;
-        if (translatorFlags->newCatchHandling) {
-            if (node->isBlockNode() && !((LabelInst*)node->getFirstInst())->isCatchLabel()) {
-                break;
-            }
-        } else if (node->isBlockNode()) {
-                break;
+        if (node->isBlockNode() && !((LabelInst*)node->getFirstInst())->isCatchLabel()) {
+            break;
         }
     }
     assert(niter != fallThruNodes.end());

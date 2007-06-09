@@ -997,9 +997,6 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 				RelativePath="..\..\..\..\vm\jitrino\src\translator\ByteCodeParser.h">
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\jitrino\src\translator\ExceptionInfo.cpp">
-			</File>
-			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\translator\ExceptionInfo.h">
 			</File>
 			<File

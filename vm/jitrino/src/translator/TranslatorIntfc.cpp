@@ -123,8 +123,6 @@ void TranslatorAction::readFlags() {
 
     flags.ignoreSync       = getBoolArg("ignoreSync",false);
     flags.syncAsEnterFence = getBoolArg("syncAsEnterFence",false);
-    flags.newCatchHandling = getBoolArg("newCatchHandling",true);
-
     
     flags.genMinMaxAbs = getBoolArg("genMinMaxAbs", false);
     flags.genFMinMaxAbs = getBoolArg("genFMinMaxAbs", false);

@@ -47,10 +47,9 @@ class JavaLookupSwitchTargetsIter;
 
 class JavaByteCodeParserCallback : public ByteCodeParserCallback {
 public:
-    JavaByteCodeParserCallback() {
+    JavaByteCodeParserCallback() : isLinearPass(true)  {
         currentOffset = 0;
         nextOffset = 0; 
-        isLinearPass = true;
         linearPassDone = false;
         visited = NULL;
         bytecodevisited = NULL;
@@ -58,10 +57,11 @@ public:
         labelStack = NULL;
         noNeedToParse = false;
     }
-    JavaByteCodeParserCallback(MemoryManager& memManager,uint32 byteCodeLength) {
+    JavaByteCodeParserCallback(MemoryManager& memManager,uint32 byteCodeLength) 
+        : isLinearPass(false) 
+    {
         currentOffset = 0;
         nextOffset = 0; 
-        isLinearPass = false;
         linearPassDone = false;
         visited = new (memManager) BitSet(memManager,byteCodeLength);
         bytecodevisited = new (memManager) BitSet(memManager,byteCodeLength);
@@ -74,7 +74,7 @@ public:
 protected:
     // the current byte codes offset
     uint32           currentOffset;
-    bool             isLinearPass;
+    const bool       isLinearPass;
     bool             linearPassDone;
     BitSet*          visited;
     BitSet*          bytecodevisited;

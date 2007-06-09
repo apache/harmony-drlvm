@@ -15,12 +15,6 @@
  *  limitations under the License.
  */
 
-/**
- * @author Intel, George A. Timoshenko
- * @version $Revision: 1.24.12.1.4.4 $
- *
- */
-
 #ifndef _JAVALABELPREPASS_H_
 #define _JAVALABELPREPASS_H_
 
@@ -40,9 +34,8 @@ class StateTable;
 
 class VariableIncarnation : private Dlink {
 public:
-    VariableIncarnation(uint32 offset, uint32 block, Type*);
+    VariableIncarnation(uint32 offset, Type*);
     void setMultipleDefs();
-    void ldBlock(int32 blockNumber);
     Type* getDeclaredType();
     void setDeclaredType(Type*);
 
@@ -69,7 +62,6 @@ protected:
 private:
     friend class SlotVar;
     int32   definingOffset;  // offset where the def was found, -1 if multiple defs
-    int32   definingBlock;   // block  where the def was found, -1 if spans basic block
     Type*   declaredType;
     Opnd*   opnd;
 };
@@ -116,12 +108,10 @@ public:
     bool           isFallThroughLabel()     { return (flags & 4) != 0;     }
     bool           isVisited()              { return (flags & 8) != 0;     }
 
-    //
-    // addExceptionInfo() adds both catch-blocks and handlers. 
     //     Catch-blocks should be listed in the same order as the 
     //     corresponding exception table entries were listed in byte-code. (according to VM spec)
-    //
-    void  addExceptionInfo(ExceptionInfo *info); 
+    void  addExceptionInfo(CatchBlock* info); 
+    void  addCatchHandler(CatchHandler* info); 
 
     struct SlotInfo {
         Type *type;
@@ -130,7 +120,14 @@ public:
         SlotVar *vars;
         uint32 jsrLabelOffset;
         SlotInfo() : type(NULL), varNumber(0), slotFlags(0), vars(NULL), jsrLabelOffset(0){}
+        void setVarNumber(uint32 n) { varNumber = n;slotFlags |= VarNumberIsSet; }
     };
+
+    // Push type to modelled operand stack
+    SlotInfo& push(Type *type);
+
+    // Obtain top slot of modelled operand stack
+    SlotInfo& top();
 
     // remove all slots containing returnAddress for RET instruction with jsrNexOffset == offset
     void cleanFinallyInfo(uint32 offset);
@@ -144,47 +141,38 @@ public:
         StackOpndAlive = 0x10,  // the following to get rid of phi nodes in the translator
         StackOpndSaved = 0x20   // the following to get rid of phi nodes in the translator
     };
-    static bool isNonNull(uint32 flags)           { return (flags & IsNonNull)            != 0; }
-    static bool isExactType(uint32 flags)         { return (flags & IsExactType)          != 0; }
-    static uint32 setNonNull(uint32 flags,bool val) { 
-        return (val ? (flags | IsNonNull) : (flags & ~IsNonNull));
-    }
-    static uint32 setExactType(uint32 flags,bool val){ 
-        return (val ? (flags | IsExactType) : (flags & ~IsExactType));
-    }
-    static bool isStackOpndAlive(uint32 flags) {return (flags & StackOpndAlive) != 0;}
-    static bool isStackOpndSaved(uint32 flags) {return (flags & StackOpndSaved) != 0;}
-    static uint32 setStackOpndAlive(uint32 flags,bool val) {
-        return (val ? (flags | StackOpndAlive) : (flags & ~StackOpndAlive));
-    }
-
-    static uint32 setStackOpndSaved(uint32 flags,bool val) {
-        return (val ? (flags | StackOpndSaved) : (flags & ~StackOpndSaved));
-    }
 
     static bool isVarNumberSet(struct SlotInfo s) { return (s.slotFlags & VarNumberIsSet) != 0; }
     static bool isNonNull(struct SlotInfo s)      { return (s.slotFlags & IsNonNull)      != 0; }
     static bool isExactType(struct SlotInfo s)    { return (s.slotFlags & IsExactType)    != 0; }
     static bool changeState(struct SlotInfo s)    { return (s.slotFlags & ChangeState)    != 0; }
-    static void setVarNumber(struct SlotInfo *s)   { s->slotFlags |= VarNumberIsSet; }
     static void setNonNull(struct SlotInfo *s)     { s->slotFlags |= IsNonNull;      }
     static void setExactType(struct SlotInfo *s)   { s->slotFlags |= IsExactType;    }
+    static void clearExactType(struct SlotInfo *s) { s->slotFlags &= ~IsExactType;   }
     static void setChangeState(struct SlotInfo *s) { s->slotFlags |= ChangeState;    }
-    static void print(struct SlotInfo s, ::std::ostream& os) {
+    static void print(SlotInfo& s, ::std::ostream& os) {
+        Log::out() << "\ttype: ";
         if (s.type == NULL)
-            os << "null";
+            os << "NULL";
         else
             s.type->print(os);
-        if (isVarNumberSet(s)) os << (int)s.varNumber<< ",";
+        if (isVarNumberSet(s)) os << " ->[" <<(int)s.varNumber<< "],";
         if (isNonNull(s))      os << ",nn";
         if (isExactType(s))    os << ",ex";
         if (changeState(s))    os << ",cs";
+        //Log::out() << ::std::endl;
+        Log::out() << "\tvar: ";
+        if (s.vars) {
+            s.vars->print(Log::out());
+        } else {
+            Log::out() << "NULL";
+        }
     }
     // add flags as needed
     friend class JavaLabelPrepass;
     friend class JavaByteCodeTranslator;
-    int        flags;
-    int        stackDepth;
+    unsigned        flags;
+    unsigned        stackDepth;
     struct SlotInfo*  stack;
     ExceptionInfo *exceptionInfo;
 };
@@ -244,20 +232,20 @@ public:
 
     // Variable information
     VariableIncarnation* getVarInc(uint32 offset, uint32 index);
-    VariableIncarnation* getOrCreateVarInc(uint32 offset, uint32 index, Type* type, VariableIncarnation* prev);
+    VariableIncarnation* getOrCreateVarInc(uint32 offset, uint32 index, Type* type);
     void                 createMultipleDefVarOpnds(IRBuilder*);
 
     //
     // operand stack manipulation (to keep track of state only !)
     //
-    struct StateInfo::SlotInfo topType();
-    struct StateInfo::SlotInfo popType();
+    StateInfo::SlotInfo& topType();
+    StateInfo::SlotInfo& popType();
     void                    popAndCheck(Type *type);
     void                    popAndCheck(JavaVarType type);
-    void                    pushType(struct StateInfo::SlotInfo slot);
+    void                    pushType(StateInfo::SlotInfo& slot);
     void                    pushType(Type *type, uint32 varNumber);
     void                    pushType(Type *type);
-    bool isCategory2(struct StateInfo::SlotInfo slot) { return slot.type == int64Type || slot.type == doubleType; }
+    bool isCategory2(StateInfo::SlotInfo& slot) { return slot.type == int64Type || slot.type == doubleType; }
 
     //
     bool        allExceptionTypesResolved() {return problemTypeToken == MAX_UINT32;}
@@ -549,9 +537,9 @@ public:
     virtual ~StateTable() {
     }
 
-    StateTable(MemoryManager& mm,TypeManager& tm, JavaLabelPrepass& jlp, uint32 size, uint32 numvars) :
+    StateTable(MemoryManager& mm,TypeManager& tm, JavaLabelPrepass& jlp, uint32 numstack, uint32 numvars) :
                memManager(mm), typeManager(tm), prepass(jlp),
-               hashtable(mm), maxDepth(numvars), numVars(numvars)
+               hashtable(mm), maxDepth(numvars + numstack), numVars(numvars)
                {
                     assert(sizeof(POINTER_SIZE_INT)>=sizeof(uint32));
                     assert(sizeof(uint32*)>=sizeof(uint32));
@@ -559,23 +547,28 @@ public:
     StateInfo *getStateInfo(uint32 offset) {
         return hashtable[offset];
     }
-    StateInfo *createStateInfo(uint32 offset) {
-        StateInfo *state = hashtable[offset]; //lookup((uint32*)(POINTER_SIZE_INT)offset);
+    StateInfo *createStateInfo(uint32 offset, bool createStack = false) {
+        StateInfo *state = hashtable[offset];
         if (state == NULL) {
             state = new (memManager) StateInfo();
             hashtable[offset] = state;
         }
+        if (createStack && state->stack == NULL) {
+            state->stack = new (memManager) StateInfo::SlotInfo[maxDepth];
+            state->stackDepth = numVars;
+        }
         if(Log::isEnabled()) {
             Log::out() << "CREATESTATE " <<(int)offset << " depth " << state->stackDepth << ::std::endl;
-            printState(state);
+            //printState(state);
         }
         return state;
     }
 
     void copySlotInfo(StateInfo::SlotInfo& to, StateInfo::SlotInfo& from);
-    void  mergeSlots(StateInfo::SlotInfo* inSlot, StateInfo::SlotInfo* slot, uint32 offset, bool isVar);
-    void  setStateInfo(StateInfo *inState, uint32 offset, bool isFallThru);
-    void  setStateInfoFromFinally(StateInfo *inState, uint32 offset);
+    void mergeSlots(StateInfo::SlotInfo* inSlot, StateInfo::SlotInfo* slot, uint32 offset, bool isVar);
+    void setStackInfo(StateInfo *inState, uint32 offset, bool includeVars, bool includeStack);
+    void setStateInfo(StateInfo *inState, uint32 offset, bool isFallThru, bool varsOnly = false);
+    void setStateInfoFromFinally(StateInfo *inState, uint32 offset);
 
     void restoreStateInfo(StateInfo *stateInfo, uint32 offset) {
         if(Log::isEnabled()) {
@@ -586,7 +579,7 @@ public:
         assert(state != NULL && (state->stack || state->stackDepth==0));
         stateInfo->flags      = state->flags;
         stateInfo->stackDepth = state->stackDepth;
-        for (int i=0; i < stateInfo->stackDepth; i++)
+        for (unsigned i=0; i < stateInfo->stackDepth; i++)
             stateInfo->stack[i] = state->stack[i];
         stateInfo->exceptionInfo = state->exceptionInfo;
         for (ExceptionInfo *except = stateInfo->exceptionInfo; except != NULL;
@@ -597,12 +590,9 @@ public:
                 for (CatchHandler *handler = block->getHandlers(); handler != NULL;
                      handler = handler->getNextHandler()) {
                     int cstart = handler->getBeginOffset();
-                    Log::out() << "SETCATCHINFO "<<(int)cstart<<" "<<(int)prepass.getNumVars()<< ::std::endl;
+                    if (Log::isEnabled()) Log::out() << "SETCATCHINFO "<<(int)cstart<<" "<<(int)numVars<< ::std::endl;
                     prepass.pushCatchLabel(cstart);
-                    int stackDepth = stateInfo->stackDepth;
-                    stateInfo->stackDepth = prepass.getNumVars();
-                    setStateInfo(stateInfo,cstart,false);
-                    stateInfo->stackDepth = stackDepth;
+                    setStateInfo(stateInfo,cstart,false,true);
                 }
             }
         }
@@ -612,16 +602,9 @@ public:
     void printState(StateInfo *state) {
         if (state == NULL) return;
         struct StateInfo::SlotInfo *stack = state->stack;
-        for (int i=0; i < state->stackDepth; i++) {
+        for (unsigned i=0; i < state->stackDepth; i++) {
             Log::out() << "STACK " << i << ":";
             StateInfo::print(stack[i],Log::out());
-            Log::out() << ::std::endl;
-            Log::out() << "        var: ";
-            if (stack[i].vars) {
-                stack[i].vars->print(Log::out());
-            } else {
-                Log::out() << "null";
-            }
             Log::out() << ::std::endl;
         }
     }
@@ -638,8 +621,8 @@ private:
     TypeManager& typeManager;
     JavaLabelPrepass& prepass;
     StlHashMap<uint32, StateInfo*> hashtable;
-    int maxDepth;
-    int numVars;
+    unsigned maxDepth;
+    unsigned numVars;
 };
 
 #endif // _JAVALABELPREPASS_H_

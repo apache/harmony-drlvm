@@ -15,18 +15,14 @@
  *  limitations under the License.
  */
 
-/**
- * @author Intel, George A. Timoshenko
- * @version $Revision: 1.10.24.4 $
- *
- */
-
 #ifndef _EXCEPTIONINFO_H_
 #define _EXCEPTIONINFO_H_
 
 namespace Jitrino {
 
 class LabelInst;
+class CatchBlock;
+class Type;
 
 class ExceptionInfo {
 public:
@@ -61,31 +57,14 @@ private:
     LabelInst* label;
 };
 
-class Handler : public ExceptionInfo {
-public:
-    Handler(uint32 id,
-            uint32 beginOffset,
-            uint32 endOffset,
-            ExceptionInfo* _tryBlock) 
-    : ExceptionInfo(id,beginOffset,endOffset), tryBlock(_tryBlock) {}
-    virtual ~Handler() {}
-
-    uint32 getTryRegionId()            {return tryBlock->getId();}
-    ExceptionInfo* getTryBlock()    {return tryBlock;}
-private:
-    ExceptionInfo* tryBlock;
-};
-
-class CatchBlock;
-class Type;
-
-class CatchHandler : public Handler {
+class CatchHandler : public ExceptionInfo {
 public:
     CatchHandler(uint32 id,
                  uint32 beginOffset,
                  uint32 endOffset,
-                 CatchBlock* tryBlock,
-                 Type* excType);
+                 Type* excType) 
+                 : ExceptionInfo(id, beginOffset, endOffset), 
+                 exceptionType(excType), nextHandler(NULL), order(0) {}
     virtual ~CatchHandler() {}
 
     Type*          getExceptionType()              {return exceptionType;}

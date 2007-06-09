@@ -691,7 +691,6 @@ JavaByteCodeParserCallback::parseByteCode(const uint8* byteCodes,uint32 off) {
         nextOffset = currentOffset + len;
         return true;
     } 
-    linearPassDone = true;
     // get next label by popping label stack
     while (!labelStack->isEmpty()) {
         nextOffset = (uint32) (labelStack->pop() - byteCodes);
