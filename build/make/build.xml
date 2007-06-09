@@ -445,10 +445,9 @@
 
     <!-- Main target to run smoke tests -->
     <target name="smoke.test" depends="setup, init">
-        <property name="target" value="smoke.test" />
         <subant buildpath="." antfile="build_component.xml" target="build" inheritall="true" failonerror="true">
             <property name="_component" value="vm" />
-            <property name="_target" value="${target}" />
+            <property name="_target" value="smoke.test" />
         </subant>
     </target>
 
@@ -464,16 +463,10 @@
 
     <!-- Main target to run jvmti tests /-->
     <target name="jvmti.test" depends="setup, init">
-        <!-- <if>
-            <equals arg1="${build.arch}" arg2="ia32" />
-            <then> -->
-                <property name="target" value="jvmti.test" />
-                <subant buildpath="." antfile="build_component.xml" target="build" inheritall="true" failonerror="true">
-                    <property name="_component" value="vm" />
-                    <property name="_target" value="${target}" />
-                </subant>
-            <!-- </then>
-        </if> -->
+        <subant buildpath="." antfile="build_component.xml" target="build" inheritall="true" failonerror="true">
+            <property name="_component" value="vm" />
+            <property name="_target" value="jvmti.test" />
+        </subant>
     </target>
 
     <!-- Main target to run regression test /-->

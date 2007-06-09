@@ -177,6 +177,7 @@ DRLVM Regression Testing on platform: ${hy.platform}
                    dir="${basedir}"
                    failureproperty="reg.test.errors"
                    timeout="${reg.test.timeout}">
+                <jvmarg value="-XX:-vm.assert_dialog" />
                 <jvmarg line="@{vmarg}"/>
                 <test name="@{test}" todir="${reg.test.dir}/reports"/>
                 <classpath>
@@ -209,7 +210,6 @@ DRLVM Regression Testing on platform: ${hy.platform}
             <run-junit-test test="@{test}" vmarg="@{vmarg}">
                 <junit-element>
                     <jvmti-junit-element/>
-                    <jvmarg value="-Dvm.assert_dialog=0" />
                     <jvmarg
                         value="-agentpath:${reg.test.2launch.native.path}/${lib.prefix}@{agent}${lib.suffix}"
                         />
@@ -235,6 +235,7 @@ DRLVM Regression Testing on platform: ${hy.platform}
                   fork="yes"
                   timeout="${reg.test.timeout}">
                 <java-element/>
+                <jvmarg value="-XX:-vm.assert_dialog" />
                 <jvmarg line="@{vmarg}" />
                 <arg line="@{args}" />
                 <classpath>
