@@ -26,6 +26,7 @@
 #include "stack_dump.h"
 #include "jvmti_break_intf.h"
 #include "m2n.h"
+#include "open/hythread_ext.h"
 
 // Windows specific
 #include <string>
@@ -109,20 +110,6 @@ inline void* find_stack_addr() {
     return stack_addr;
 }
 
-inline size_t find_stack_size() {
-   void* stack_addr;
-    size_t stack_size;
-    size_t reg_size;
-    MEMORY_BASIC_INFORMATION memory_information;
-
-    VirtualQuery(&memory_information, &memory_information, sizeof(memory_information));
-    reg_size = memory_information.RegionSize;
-    stack_addr = ((char*) memory_information.BaseAddress) + reg_size;
-    stack_size = ((char*) stack_addr) - ((char*) memory_information.AllocationBase);
-
-    return stack_size;
-}
-
 inline size_t find_guard_page_size() {
     size_t  guard_size;
     SYSTEM_INFO system_info;
@@ -138,7 +125,6 @@ inline size_t find_guard_stack_size() {
     return find_guard_page_size();
 }
 
-static size_t common_stack_size;
 static size_t common_guard_stack_size;
 static size_t common_guard_page_size;
 
@@ -147,7 +133,7 @@ inline void* get_stack_addr() {
 }
 
 inline size_t get_stack_size() {
-    return common_stack_size;
+  return p_TLS_vmthread->stack_size;
 }
 
 inline size_t get_guard_stack_size() {
@@ -161,9 +147,9 @@ inline size_t get_guard_page_size() {
 
 void init_stack_info() {
     p_TLS_vmthread->stack_addr = find_stack_addr();
-    common_stack_size = find_stack_size();
+    p_TLS_vmthread->stack_size = hythread_get_thread_stacksize(hythread_self());
     common_guard_stack_size = find_guard_stack_size();
-    common_guard_page_size =find_guard_page_size();
+    common_guard_page_size = find_guard_page_size();
 }
 
 void set_guard_stack() {

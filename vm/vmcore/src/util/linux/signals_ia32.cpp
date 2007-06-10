@@ -252,9 +252,11 @@ inline void* find_stack_addr() {
     err = pthread_attr_getstack(&pthread_attr, &stack_addr, &stack_size);
     assert(!err);
     pthread_attr_destroy(&pthread_attr);
+    
     return (void *)((unsigned char *)stack_addr + stack_size);
 }
 
+#if 0
 inline size_t find_stack_size() {
     int err;
     size_t stack_size;
@@ -265,6 +267,7 @@ inline size_t find_stack_size() {
     pthread_attr_destroy(&pthread_attr);
     return stack_size;
 }
+#endif
 
 inline size_t find_guard_stack_size() {
     return 64*1024;
@@ -283,7 +286,6 @@ inline size_t find_guard_page_size() {
     return guard_size;
 }
 
-static size_t common_stack_size;
 static size_t common_guard_stack_size;
 static size_t common_guard_page_size;
 
@@ -292,7 +294,7 @@ inline void* get_stack_addr() {
 }
 
 inline size_t get_stack_size() {
-    return common_stack_size;
+    return p_TLS_vmthread->stack_size;
 }
 
 inline size_t get_guard_stack_size() {
@@ -316,12 +318,19 @@ void init_stack_info() {
     // fins stack parametrs
     char* stack_addr = (char *)find_stack_addr();
     p_TLS_vmthread->stack_addr = stack_addr;
-    common_stack_size = find_stack_size();
+    unsigned int stack_size = hythread_get_thread_stacksize(hythread_self());
+    
+    assert(stack_size > 0);
+    
+    p_TLS_vmthread->stack_size = stack_size;
+
+    
     common_guard_stack_size = find_guard_stack_size();
     common_guard_page_size =find_guard_page_size();
 
     // stack should be mapped so it's result of future mapping
     char* res;
+
 
     // begin of the stack can be protected by OS, but this part already mapped
     // found address of current stack page
@@ -336,18 +345,17 @@ void init_stack_info() {
 
     // found size of the stack area which should be maped
     size_t stack_mapping_size = (size_t)mapping_page_addr
-            - (size_t)stack_addr + common_stack_size;
+            - (size_t)stack_addr + stack_size;
 
     // maps unmapped part of the stack
-    res = (char*) mmap(stack_addr - common_stack_size,
+    res = (char*) mmap(stack_addr - stack_size,
             stack_mapping_size,
             PROT_READ | PROT_WRITE,
             MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS | MAP_GROWSDOWN,
             -1,
             0);
-
     // stack should be mapped, checks result
-    assert(res == (stack_addr - common_stack_size));
+    assert(res == (stack_addr - stack_size));
 
     // set guard page
     set_guard_stack();

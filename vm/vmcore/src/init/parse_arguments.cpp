@@ -441,7 +441,14 @@ void parse_vm_arguments(Global_Env *p_env)
                 LECHO(34, "Negative or invalid heap size. Default value will be used!");
             }
             p_env->VmProperties()->set("gc.mx", arg);
-        }
+        } else if (begins_with(option, "-Xss")) {
+            const char* arg = option + 4;
+            TRACE2("init", "thread.stacksize = " << arg);
+            if (atoi(arg) == 0) {
+                LECHO(34, "Negative or invalid stack size. Default value will be used!");
+            }
+            p_env->VmProperties()->set("thread.stacksize", arg);
+	}	  
         else if (begins_with(option, "-agentlib:")) {
             p_env->TI->addAgent(option);
         }

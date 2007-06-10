@@ -45,4 +45,6 @@ private:
     apr_thread_rwlock_t* rwlock_array;
 };
 
+
 #endif // _VM_PROPERTIES_H
+

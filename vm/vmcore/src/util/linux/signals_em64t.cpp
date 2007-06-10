@@ -197,9 +197,11 @@ inline void* find_stack_addr() {
     err = pthread_attr_getstack(&pthread_attr, &stack_addr, &stack_size);
     assert(!err);
     pthread_attr_destroy(&pthread_attr);
+
     return (void *)((unsigned char *)stack_addr + stack_size);
 }
 
+#if 0
 inline size_t find_stack_size() {
     int err;
     size_t stack_size;
@@ -210,6 +212,7 @@ inline size_t find_stack_size() {
     pthread_attr_destroy(&pthread_attr);
     return stack_size;
 }
+#endif
 
 inline size_t find_guard_stack_size() {
     return 64*1024;
@@ -226,7 +229,6 @@ inline size_t find_guard_page_size() {
     return guard_size;
 }
 
-static size_t common_stack_size;
 static size_t common_guard_stack_size;
 static size_t common_guard_page_size;
 
@@ -235,7 +237,7 @@ inline void* get_stack_addr() {
 }
 
 inline size_t get_stack_size() {
-    return common_stack_size;
+  return p_TLS_vmthread->stack_size;
 }
 
 inline size_t get_guard_stack_size() {
@@ -250,7 +252,7 @@ void set_guard_stack();
 
 void init_stack_info() {
     p_TLS_vmthread->stack_addr = find_stack_addr();
-    common_stack_size = find_stack_size();
+    p_TLS_vmthread->stack_size = hythread_get_thread_stacksize(hythread_self());
     common_guard_stack_size = find_guard_stack_size();
     common_guard_page_size =find_guard_page_size();
 

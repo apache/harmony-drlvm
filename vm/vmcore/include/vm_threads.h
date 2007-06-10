@@ -112,6 +112,9 @@ public:
     // thread stack address
     void* stack_addr;
 
+    // thread stack size
+    unsigned int stack_size;
+
     // Should JVMTI code be notified about exception in p_exception_object
     bool                              ti_exception_callback_pending;
 

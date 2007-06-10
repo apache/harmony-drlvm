@@ -24,12 +24,14 @@
 #include <open/hythread_ext.h>
 #include <apr_atomic.h>
 #include "open/thread_externals.h"
+#include "open/vm.h"
 
 #undef LOG_DOMAIN
 #define LOG_DOMAIN "tm.java"
 
 #include "thread_private.h"
 #include "jni.h"
+
 
 
 void stop_callback(void);
@@ -132,6 +134,7 @@ IDATA jthread_create_with_function(JNIEnv * jni_env, jthread java_thread, jthrea
     hythread_t tm_native_thread = NULL;
     jvmti_thread_t tm_java_thread;
     void *vm_thread_dummies;
+    static int default_stacksize = -1;
     
     wrapper_proc_data * data;
     IDATA status;
@@ -170,6 +173,13 @@ IDATA jthread_create_with_function(JNIEnv * jni_env, jthread java_thread, jthrea
 	return TM_ERROR_OUT_OF_MEMORY;
     }
 
+    if (default_stacksize == -1) {
+      int ss = get_size_property("thread.stacksize", 0, VM_PROPERTIES);
+      default_stacksize = ss ? ss : HY_DEFAULT_STACKSIZE;
+    }
+
+
+
     // prepare args for wrapper_proc
     data->daemon = attrs->daemon;
     data->tiEnv  = attrs->jvmti_env;
@@ -177,7 +187,7 @@ IDATA jthread_create_with_function(JNIEnv * jni_env, jthread java_thread, jthrea
     data->tiProcArgs = (void *)arg;
     data->vm_thread_dummies = vm_thread_dummies;
 
-    status = hythread_create(&tm_native_thread, (attrs->stacksize)?attrs->stacksize:1024000,
+    status = hythread_create(&tm_native_thread, (attrs->stacksize)?attrs->stacksize:default_stacksize,
                                attrs->priority, 0, wrapper_proc, data);
 
     TRACE(("TM: Created thread: id=%d", tm_native_thread->thread_id));

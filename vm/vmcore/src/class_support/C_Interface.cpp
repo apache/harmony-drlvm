@@ -2884,6 +2884,37 @@ Boolean get_boolean_property(const char *property_name, Boolean default_value, P
     return return_value;
 }
 
+size_t get_size_property(const char *property_name, size_t default_value, PropertyTable table_number) 
+{
+  char* size_string; 
+  size_t size; 
+  int sizeModifier;
+  size_t unit = 1;
+
+  size_string = get_property(property_name, table_number);
+
+  if (size_string == NULL) {
+    return default_value;
+  }
+
+  size = atol(size_string);
+  sizeModifier = tolower(size_string[strlen(size_string) - 1]);
+  destroy_property_value(size_string);
+
+  switch (sizeModifier) {
+  case 'k': unit = 1024; break;
+  case 'm': unit = 1024 * 1024; break;
+  case 'g': unit = 1024 * 1024 * 1024;break;
+  }
+
+  size_t res = size * unit;
+  if (res / unit != size) {
+    /* overflow happened */
+    return 0;
+  }
+  return res;
+}
+
 
 static Annotation* lookup_annotation(AnnotationTable* table, Class* owner, Class* antn_type) {
     for (int i = table->length - 1; i >= 0; --i) {

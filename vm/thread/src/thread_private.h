@@ -55,6 +55,9 @@
 
 #define INITIAL_FAT_TABLE_ENTRIES 16*1024   //make this table exapandible if workloads show it is necessary
 
+#define HY_DEFAULT_STACKSIZE 512 * 1024 // if default stack size is not through -Xss parameter, it is 256kb
+
+
 #if !defined (_IPF_)
 //use lock reservation
 #define LOCK_RESERVATION
@@ -284,6 +287,12 @@ typedef struct HyThread {
     * Hint for scheduler about thread priority
     */
     IDATA priority;    
+
+    /**
+     * Size of thread's stack, set on creation
+     */
+
+    UDATA stacksize;
 
 // Monitors
     
@@ -671,6 +680,7 @@ void os_thread_yield_other(osthread_t);
 int os_get_thread_times(osthread_t os_thread, int64* pkernel, int64* puser);
 
 int os_cond_timedwait(hycond_t *cond, hymutex_t *mutex, I_64 ms, IDATA nano);
+UDATA os_get_foreign_thread_stack_size();
 
 #ifdef __cplusplus
 }

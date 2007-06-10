@@ -16,7 +16,7 @@
  */
 
 #include <apr_atomic.h>
-
+#
 #include "thread_private.h"
 
 /**
@@ -34,7 +34,8 @@
 int os_thread_create(/* out */osthread_t* phandle, UDATA stacksize, UDATA priority,
         int (VMAPICALL *func)(void*), void *data)
 {
-    HANDLE handle = (HANDLE)_beginthreadex(NULL, stacksize, (unsigned(__stdcall *)(void*))func, data, 0, NULL);
+    HANDLE handle = (HANDLE)_beginthreadex(NULL, stacksize, (unsigned(__stdcall *)(void*))func, data, STACK_SIZE_PARAM_IS_A_RESERVATION, NULL);
+
     if (handle) {
         *phandle = handle;
         if (priority)
@@ -186,4 +187,18 @@ int os_get_thread_times(osthread_t os_thread, int64* pkernel, int64* puser)
         return 0;
     } else
         return GetLastError();
+}
+
+UDATA os_get_foreign_thread_stack_size() {
+    void* stack_addr;
+    size_t stack_size;
+    size_t reg_size;
+    MEMORY_BASIC_INFORMATION memory_information;
+
+    VirtualQuery(&memory_information, &memory_information, sizeof(memory_information));
+    reg_size = memory_information.RegionSize;
+    stack_addr = ((char*) memory_information.BaseAddress) + reg_size;
+    stack_size = ((char*) stack_addr) - ((char*) memory_information.AllocationBase);
+
+    return (UDATA)stack_size;
 }

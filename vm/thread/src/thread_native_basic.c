@@ -114,6 +114,7 @@ IDATA VMCALL hythread_create_with_group(hythread_t *ret_thread, hythread_group_t
 
     new_thread->library = hythread_self()->library;
     new_thread->priority = priority ? priority : HYTHREAD_PRIORITY_NORMAL;
+    new_thread->stacksize = stacksize ? stacksize : HY_DEFAULT_STACKSIZE;
     //new_thread->suspend_request = suspend ? 1 : 0;
     
     start_proc_data =
@@ -132,7 +133,7 @@ IDATA VMCALL hythread_create_with_group(hythread_t *ret_thread, hythread_group_t
     // we need to make sure thread will not register itself with a thread group
     // until os_thread_create returned and initialized thread->os_handle properly
     hythread_global_lock();
-    r = os_thread_create(&new_thread->os_handle, stacksize,
+    r = os_thread_create(&new_thread->os_handle, new_thread->stacksize,
             priority, thread_start_proc, (void *)start_proc_data);
     assert(/* error */ r || new_thread->os_handle /* or thread created ok */);
     hythread_global_unlock();
@@ -625,6 +626,8 @@ static hythread_t allocate_thread() {
 
     ptr->os_handle  = (osthread_t)NULL;
     ptr->priority   = HYTHREAD_PRIORITY_NORMAL;
+    ptr->stacksize  = os_get_foreign_thread_stack_size();
+    ptr->name       = strdup("NONAME");
     // not implemented
     //ptr->big_thread_local_storage = (void **)calloc(1, sizeof(void*)*tm_tls_capacity);
     
@@ -751,4 +754,9 @@ extern HY_CFUNC void VMCALL
  */
 UDATA hythread_get_thread_times(hythread_t thread, int64* pkernel, int64* puser) {
     return os_get_thread_times(thread->os_handle, pkernel, puser);
+}
+
+
+UDATA hythread_get_thread_stacksize(hythread_t thread) {
+    return thread->stacksize;
 }

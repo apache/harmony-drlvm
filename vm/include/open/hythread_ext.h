@@ -206,6 +206,7 @@ IDATA VMCALL hythread_set_private_data(hythread_t  t, void* data);
 UDATA VMCALL hythread_tls_get_offset(hythread_tls_key_t key);
 UDATA VMCALL hythread_tls_get_request_offset();
 UDATA VMCALL hythread_get_thread_times(hythread_t thread, int64* pkernel, int64* puser);
+UDATA hythread_get_thread_stacksize(hythread_t thread);
 UDATA VMCALL hythread_uses_fast_tls(void);
 IDATA VMCALL hythread_get_hythread_offset_in_tls(void);
 
@@ -308,6 +309,9 @@ IDATA VMCALL hythread_thin_monitor_get_recursion(hythread_thin_monitor_t *lockwo
 
 void VMCALL hythread_native_resource_is_live(U_32);
 void VMCALL hythread_reclaim_resources();
+
+IDATA VMCALL hythread_monitor_interrupt_wait(hythread_monitor_t mon_ptr,
+					     hythread_t thread);
 
 IDATA VMCALL hythread_monitor_interrupt_wait(hythread_monitor_t mon_ptr,
 					     hythread_t thread);

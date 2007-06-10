@@ -52,6 +52,7 @@ hythread_get_self_id
 hythread_get_id
 hythread_get_thread
 hythread_get_thread_times
+hythread_get_thread_stacksize
 hythread_struct_init
 hythread_cancel_all
 hythread_group_create
@@ -88,6 +89,9 @@ hythread_thin_monitor_destroy
 hythread_thin_monitor_get_owner
 hythread_native_resource_is_live
 hythread_reclaim_resources
+
+
+
 
 hysem_post
 hysem_wait

@@ -273,6 +273,9 @@ void exn_rethrow_if_pending();
 void set_guard_stack();
 #endif
 void init_stack_info();
+#ifndef WIN32
+void remove_guard_stack();
+#endif
 VMEXPORT size_t get_available_stack_size();
 #ifndef _EM64T_
 VMEXPORT bool check_available_stack_size(size_t required_size);

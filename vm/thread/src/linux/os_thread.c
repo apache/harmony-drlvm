@@ -223,3 +223,21 @@ int os_get_thread_times(osthread_t os_thread, int64* pkernel, int64* puser)
     *puser = tp.tv_sec * 1000000000ULL + tp.tv_nsec;
     return 0;
 }
+
+UDATA os_get_foreign_thread_stack_size() {
+    int err;
+    void* stack_addr;
+    pthread_attr_t pthread_attr;
+    size_t stack_size;
+
+    static UDATA common_stack_size = -1;
+
+    if (common_stack_size == -1) {
+	    pthread_attr_init(&pthread_attr);
+	    err = pthread_attr_getstacksize(&pthread_attr, &common_stack_size);
+	    pthread_attr_destroy(&pthread_attr);
+    }
+
+    return common_stack_size;
+
+}

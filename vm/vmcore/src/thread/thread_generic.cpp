@@ -291,6 +291,12 @@ jint vm_detach(jthread java_thread) {
     // Notify GC about thread detaching.
     gc_thread_kill(&p_vm_thread->_gc_private_information);
     assert(p_vm_thread->gc_frames == 0);
+
+#ifdef PLATFORM_POSIX
+    // Remove guard page on the stack on linux
+    remove_guard_stack();
+#endif
+
     // Remove current VM_thread from TLS.
     set_TLS_data(NULL);
     // Destroy current VM_thread structure.
