@@ -364,6 +364,7 @@ public abstract class ClassLoader {
 
     /**
      * @com.intel.drl.spec_ref
+     * @deprecated
      */
     protected final Class<?> defineClass(byte[] data, int offset, int len)
         throws ClassFormatError {

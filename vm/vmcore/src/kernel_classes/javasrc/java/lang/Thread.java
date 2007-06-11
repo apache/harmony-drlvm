@@ -409,6 +409,7 @@ public class Thread implements Runnable {
 
     /**
      * @com.intel.drl.spec_ref
+     * @deprecated
      */
     public int countStackFrames() {
         return 0; //deprecated
@@ -416,6 +417,7 @@ public class Thread implements Runnable {
 
     /**
      * @com.intel.drl.spec_ref
+     * @deprecated
      */
     public void destroy() {
         // this method is not implemented
@@ -641,6 +643,7 @@ public class Thread implements Runnable {
      *  hythread does the synchronization for us
      *  
      * @com.intel.drl.spec_ref
+     * @deprecated
      */
     public final void resume() {
             checkAccess();
@@ -817,6 +820,7 @@ public class Thread implements Runnable {
 
     /**
      * @com.intel.drl.spec_ref
+     * @deprecated
      */
     public final void stop() {
         synchronized (lock) {
@@ -828,6 +832,7 @@ public class Thread implements Runnable {
 
     /**
      * @com.intel.drl.spec_ref
+     * @deprecated
      */
     public final void stop(Throwable throwable) {
         SecurityManager securityManager = System.getSecurityManager();
@@ -857,6 +862,7 @@ public class Thread implements Runnable {
      *  hythread does the synchronization for us
      *  
      * @com.intel.drl.spec_ref
+     * @deprecated
      */
     public final void suspend() {
             checkAccess();

@@ -524,6 +524,7 @@ public class Runtime
 
     /**
      * @com.intel.drl.spec_ref  
+     * @deprecated
      */
     public static void runFinalizersOnExit(boolean value) {
         SecurityManager sm = System.getSecurityManager();
@@ -809,6 +810,7 @@ public class Runtime
 
     /**
      * @com.intel.drl.spec_ref  
+     * @deprecated
      */
     public InputStream getLocalizedInputStream(InputStream in) {
         //XXX: return new BufferedInputStream( (InputStream) (Object) new InputStreamReader( in ) );
@@ -817,6 +819,7 @@ public class Runtime
 
     /**
      * @com.intel.drl.spec_ref  
+     * @deprecated
      */
     public OutputStream getLocalizedOutputStream(OutputStream out) {
         //XXX: return new BufferedOutputStream( (OutputStream) (Object) new OutputStreamWriter( out ) );

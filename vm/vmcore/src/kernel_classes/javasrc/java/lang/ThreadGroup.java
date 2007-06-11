@@ -161,6 +161,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
     /**
      * @com.intel.drl.spec_ref Note: This implementation always returns
      *                         <code>false</code>.
+     * @deprecated
      */
     public boolean allowThreadSuspension(boolean b) {
         return false;
@@ -296,6 +297,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
 
     /**
      * @com.intel.drl.spec_ref
+     * @deprecated
      */
     public final void resume() {
         checkAccess();
@@ -336,6 +338,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
 
     /**
      * @com.intel.drl.spec_ref
+     * @deprecated
      */
     public final void stop() {
         checkAccess();
@@ -344,6 +347,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
 
     /**
      * @com.intel.drl.spec_ref
+     * @deprecated
      */
     public final void suspend() {
         checkAccess();

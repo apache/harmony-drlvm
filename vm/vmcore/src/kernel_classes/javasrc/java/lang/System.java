@@ -249,6 +249,7 @@ public final class System {
 
     /**
      * @com.intel.drl.spec_ref
+     * @deprecated
      */
     public static void runFinalizersOnExit(boolean value) {
         Runtime.runFinalizersOnExit(value);
