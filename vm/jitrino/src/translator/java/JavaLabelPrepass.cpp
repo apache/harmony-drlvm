@@ -1521,23 +1521,23 @@ void JavaLabelPrepass::dup() {
 }
 
 void JavaLabelPrepass::dup_x1() {
-    StateInfo::SlotInfo& opnd1 = popType();
-    StateInfo::SlotInfo& opnd2 = popType();
+    StateInfo::SlotInfo opnd1 = popType();
+    StateInfo::SlotInfo opnd2 = popType();
     pushType(opnd1);
     pushType(opnd2);
     pushType(opnd1);
 }
 
 void JavaLabelPrepass::dup_x2() {
-    StateInfo::SlotInfo& opnd1 = popType();
-    StateInfo::SlotInfo& opnd2 = popType();
+    StateInfo::SlotInfo opnd1 = popType();
+    StateInfo::SlotInfo opnd2 = popType();
     if (isCategory2(opnd2)) {
         pushType(opnd1);
         pushType(opnd2);
         pushType(opnd1);
         return;
     }
-    StateInfo::SlotInfo& opnd3 = popType();
+    StateInfo::SlotInfo opnd3 = popType();
     pushType(opnd1);
     pushType(opnd3);
     pushType(opnd2);
@@ -1545,13 +1545,13 @@ void JavaLabelPrepass::dup_x2() {
 }
 
 void JavaLabelPrepass::dup2() {
-    StateInfo::SlotInfo& opnd1 = popType();
+    StateInfo::SlotInfo opnd1 = popType();
     if (isCategory2(opnd1)) {
         pushType(opnd1);
         pushType(opnd1);
         return;
     }
-    StateInfo::SlotInfo& opnd2 = popType();
+    StateInfo::SlotInfo opnd2 = popType();
     pushType(opnd2);
     pushType(opnd1);
     pushType(opnd2);
@@ -1559,8 +1559,8 @@ void JavaLabelPrepass::dup2() {
 }
 
 void JavaLabelPrepass::dup2_x1() {
-    StateInfo::SlotInfo& opnd1 = popType();
-    StateInfo::SlotInfo& opnd2 = popType();
+    StateInfo::SlotInfo opnd1 = popType();
+    StateInfo::SlotInfo opnd2 = popType();
     if (isCategory2(opnd1)) {
         // opnd1 is a category 2 instruction
         pushType(opnd1);
@@ -1568,7 +1568,7 @@ void JavaLabelPrepass::dup2_x1() {
         pushType(opnd1);
     } else {
         // opnd1 is a category 1 instruction
-        StateInfo::SlotInfo& opnd3 = popType();
+        StateInfo::SlotInfo opnd3 = popType();
         pushType(opnd2);
         pushType(opnd1);
         pushType(opnd3);
@@ -1579,8 +1579,8 @@ void JavaLabelPrepass::dup2_x1() {
 
 
 void JavaLabelPrepass::dup2_x2() {
-    StateInfo::SlotInfo& opnd1 = popType();
-    StateInfo::SlotInfo& opnd2 = popType();
+    StateInfo::SlotInfo opnd1 = popType();
+    StateInfo::SlotInfo opnd2 = popType();
     if (isCategory2(opnd1)) {
         // opnd1 is category 2
         if (isCategory2(opnd2)) {
@@ -1589,7 +1589,7 @@ void JavaLabelPrepass::dup2_x2() {
             pushType(opnd1);
         } else {
             // opnd2 is category 1
-            StateInfo::SlotInfo& opnd3 = popType();
+            StateInfo::SlotInfo opnd3 = popType();
             assert(isCategory2(opnd3) == false);
             pushType(opnd1);
             pushType(opnd3);
@@ -1599,7 +1599,7 @@ void JavaLabelPrepass::dup2_x2() {
     } else {
         assert(isCategory2(opnd2) == false);
         // both opnd1 & opnd2 are category 1
-        StateInfo::SlotInfo& opnd3 = popType();
+        StateInfo::SlotInfo opnd3 = popType();
         if (isCategory2(opnd3)) {
             pushType(opnd2);
             pushType(opnd1);
@@ -1608,7 +1608,7 @@ void JavaLabelPrepass::dup2_x2() {
             pushType(opnd1);
         } else {
             // opnd1, opnd2, opnd3 all are category 1
-            StateInfo::SlotInfo& opnd4 = popType();
+            StateInfo::SlotInfo opnd4 = popType();
             assert(isCategory2(opnd4) == false);
             pushType(opnd2);
             pushType(opnd1);
@@ -1621,8 +1621,8 @@ void JavaLabelPrepass::dup2_x2() {
 }
 
 void JavaLabelPrepass::swap() {
-    StateInfo::SlotInfo& opnd1 = popType();
-    StateInfo::SlotInfo& opnd2 = popType();
+    StateInfo::SlotInfo opnd1 = popType();
+    StateInfo::SlotInfo opnd2 = popType();
     pushType(opnd1);
     pushType(opnd2);
 }
@@ -1895,10 +1895,8 @@ void StateTable::mergeSlots(StateInfo::SlotInfo* inSlot, StateInfo::SlotInfo* sl
         if (vars) {
             if(Log::isEnabled()) {
                 Log::out() << "addVarIncarnations to SlotVar:" << ::std::endl;
-                Log::out() << "   vars: ";
-                vars->print(Log::out());
-                Log::out() << "in_vars: ";
-                in_vars->print(Log::out());
+                Log::out() << "   vars:\t";vars->print(Log::out());Log::out() << ::std::endl;
+                Log::out() << "in_vars:\t";in_vars->print(Log::out());Log::out() << ::std::endl;
             }
             if (vars->addVarIncarnations(in_vars, memManager, offset)) {
                 prepass.getVisited()->setBit(offset,false);
@@ -1907,8 +1905,7 @@ void StateTable::mergeSlots(StateInfo::SlotInfo* inSlot, StateInfo::SlotInfo* sl
                  vars->mergeVarIncarnations(&typeManager);
             }
             if(Log::isEnabled()) {
-                Log::out() << "result_vars: ";
-                vars->print(Log::out());
+                Log::out() << "result_vars:\t";vars->print(Log::out());Log::out() << ::std::endl;
             }
         }
     } else {
