@@ -650,9 +650,9 @@ is_identifier(const char *name, unsigned len)
 }
 
 // JVM spec:
-// Unqualified names must not contain the characters ’.’, ’;’, ’[’ or ’/’. Method names are
-// further constrained so that, with the exception of the special method names (§3.9)
-// <init> and <clinit>, they must not contain the characters ’<’ or ’>’.
+// Unqualified names must not contain the characters ".", ";", "[" or "/". Method names are
+// further constrained so that, with the exception of the special method names (�3.9)
+// <init> and <clinit>, they must not contain the characters "<" or ">".
 static inline bool
 check_member_name(const char *name, unsigned len, bool old_version, bool is_method)
 {
@@ -660,17 +660,30 @@ check_member_name(const char *name, unsigned len, bool old_version, bool is_meth
         return is_identifier(name, len);
     }else {
         for (unsigned i = 0; i < len; i++) {
-            switch(name[i]){
-            case '.':
-            case ';':
-            case '[':
-            case '/':
-                return false;
-            case '<':
-            case '>':
-                if(is_method)
+            //check if symbol has byte size
+            if(!(name[i] & 0x80)) {
+                switch(name[i]) {
+                case '.':
+                case ';':
+                case '[':
+                case '/':
                     return false;
-                break;    
+                case '<':
+                case '>':
+                    if(is_method)
+                        return false;
+                }
+	    } else { //skip other symbols, they are not in exception list
+                assert(name[i] & 0x40);
+                if(name[i] & 0x20) {
+                    if(len - i - 3 < 0) //check array bound
+                        return false;
+                    i += 2;
+                    } else {
+                    if(len - i - 2 < 0)
+                        return false;
+                    i++;
+                }    
             }
         }
     }
@@ -1801,6 +1814,7 @@ bool Method::_parse_code(Global_Env& env, ConstantPool& cp, unsigned code_attr_l
                 STD_FREE(generic_vars);
             }
         }
+
         if (failed) {
             return false;
         }
@@ -1829,7 +1843,7 @@ check_method_descriptor(const char *descriptor, bool old_version)
     {
         result = check_field_descriptor(descriptor, &next, false, old_version);
         if( !result || *next == '\0' ) {
-            return result;
+            return false;
         }
         descriptor = next;
     }
