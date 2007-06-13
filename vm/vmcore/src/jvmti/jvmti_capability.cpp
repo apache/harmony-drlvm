@@ -300,7 +300,8 @@ jvmtiAddCapabilities(jvmtiEnv* env,
     if (capabilities_ptr->can_pop_frame)
         ti->set_global_capability(DebugUtilsTI::TI_GC_ENABLE_POP_FRAME);
 
-    if (capabilities_ptr->can_generate_monitor_events)
+    if (capabilities_ptr->can_generate_monitor_events ||
+        capabilities_ptr->can_get_owned_monitor_info)
         ti->set_global_capability(DebugUtilsTI::TI_GC_ENABLE_MONITOR_EVENTS);
 
     if (capabilities_ptr->can_tag_objects) {
