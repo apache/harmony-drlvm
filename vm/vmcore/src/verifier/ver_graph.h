@@ -20,8 +20,8 @@
  */
 
 
-#ifndef _VERIFIER_GRAPH_H_
-#define _VERIFIER_GRAPH_H_
+#ifndef _VF_GRAPH_H_
+#define _VF_GRAPH_H_
 /**
  * @file
  * Control flow graph structures.
@@ -132,7 +132,7 @@ struct vf_Container
  * @return a container
  */
 static inline vf_ContainerHandle vf_get_container(vf_ContainerHandle
-    container, unsigned &n)
+                                                  container, unsigned &n)
 {
     while (n >= container->m_max) {
         n -= container->m_max;
@@ -149,7 +149,7 @@ static inline vf_ContainerHandle vf_get_container(vf_ContainerHandle
  * @param[in]  new_container a new container to be placed at the end of the list
  */
 static inline void vf_add_container(vf_ContainerHandle head,
-    vf_ContainerHandle new_container)
+                                    vf_ContainerHandle new_container)
 {
     while (head->m_next) {
         head = head->m_next;
@@ -352,7 +352,8 @@ class vf_Graph
      * @note Empty in release mode.
      */
     void DumpDotNodeInternal(vf_NodeHandle node,
-        char *next_node, char *next_instr, ofstream &fout);
+                             char *next_node, char *next_instr,
+                             ofstream &fout);
 
     /**
      * Dumps graph end in file in DOT format.
@@ -369,10 +370,8 @@ class vf_Graph
      * @param edgenum a number of graph edges
      * @param ctx     a verification context
      */
-
-
     vf_Graph(unsigned nodenum, unsigned edgenum,
-        vf_ContextHandle ctx):m_nodes(NULL), m_edges(NULL),
+             vf_ContextHandle ctx):m_nodes(NULL), m_edges(NULL),
         m_pool(ctx->m_pool), m_enum(NULL), m_nodenum(0), m_edgenum(0),
         m_enumcount(0), m_ctx(ctx), m_free(false)
     {
@@ -399,7 +398,7 @@ class vf_Graph
         assert(count > 0);
         vf_NodeContainer *nodes =
             (vf_NodeContainer *) AllocMemory(sizeof(vf_NodeContainer)
-            + (count - 1) * sizeof(vf_Node));
+                                             + (count - 1) * sizeof(vf_Node));
 
         nodes->container.m_max = count;
         if (m_nodes == NULL) {
@@ -418,7 +417,7 @@ class vf_Graph
         assert(count > 0);
         vf_EdgeContainer *edges =
             (vf_EdgeContainer *) AllocMemory(sizeof(vf_EdgeContainer)
-            + (count - 1) * sizeof(vf_Edge));
+                                             + (count - 1) * sizeof(vf_Edge));
         edges->container.m_max = count;
         if (m_edges == NULL) {
             m_edges = edges;
@@ -440,10 +439,9 @@ class vf_Graph
 
         vf_NodeContainer *nodes =
             (vf_NodeContainer *) vf_get_container(&m_nodes->container,
-            node_num);
+                                                  node_num);
         return nodes->m_node + node_num;
     }                           // GetNode
-
 
     /**
      * Gets a graph node from a program counter.
@@ -455,10 +453,6 @@ class vf_Graph
     {
         vf_InstrHandle instr = m_ctx->m_bc[pc].m_instr;
         assert(instr);
-
-
-
-
         assert(m_ctx->m_bc[pc].m_instr->m_addr - m_ctx->m_bytes == pc);
         vf_NodeHandle node = instr->m_node;
         assert(GetNodeNum(node) > m_ctx->m_handlers);
@@ -575,8 +569,8 @@ class vf_Graph
         assert(m_edges);
 
         VF_TRACE("graph",
-            "Creating a new edge from " << GetNodeNum(start_node)
-            << " to " << GetNodeNum(end_node));
+                 "Creating a new edge from " << GetNodeNum(start_node)
+                 << " to " << GetNodeNum(end_node));
         unsigned count = m_edgenum;
         vf_EdgeContainer *edges =
             (vf_EdgeContainer *) vf_get_container(&m_edges->container, count);
@@ -682,7 +676,7 @@ class vf_Graph
 
         // allocate memory
         m_enum = (vf_NodeHandle *) vf_palloc(m_pool, sizeof(vf_NodeHandle)
-            * m_nodenum);
+                                             * m_nodenum);
 
         // clean node enumeration
         ResetNodeIterator();
@@ -808,13 +802,15 @@ class vf_Graph
         if (m_ctx->m_maxlocal && !vector->m_local) {
             vector->m_local =
                 (vf_MapEntry *) vf_palloc(m_pool,
-                m_ctx->m_maxlocal * sizeof(vf_MapEntry));
+                                          m_ctx->m_maxlocal *
+                                          sizeof(vf_MapEntry));
         }
         // create and set stack vector
         if (m_ctx->m_maxstack && !vector->m_stack) {
             vector->m_stack =
                 (vf_MapEntry *) vf_palloc(m_pool,
-                m_ctx->m_maxstack * sizeof(vf_MapEntry));
+                                          m_ctx->m_maxstack *
+                                          sizeof(vf_MapEntry));
         }
     }
 
@@ -918,8 +914,8 @@ unsigned vf_get_sub_num(vf_SubHandle sub, vf_ContextHandle ctx);
  * error code otherwise
  */
 vf_Result vf_check_node_stack_depth(vf_Node *node,      // a graph node
-    unsigned &depth,            // stack depth
-    vf_Context *ctx);           // verification context
+                                    unsigned &depth,    // stack depth
+                                    vf_Context *ctx);   // verification context
 
 /**
  * Creates and sets graph node OUT vector.
@@ -932,6 +928,16 @@ vf_Result vf_check_node_stack_depth(vf_Node *node,      // a graph node
  */
 vf_Result
 vf_set_node_out_vector(vf_NodeHandle node,
-    vf_MapVector *invector, vf_Context *ctx);
+                       vf_MapVector *invector, vf_Context *ctx);
 
-#endif // _VERIFIER_GRAPH_H_
+/**
+ * Prints data flow vector into output stream.
+ * @param vector a data flow vector
+ * @param instr  a code instruction
+ * @param stream an output stream (can be NULL)
+ */
+void vf_dump_vector(vf_MapVectorHandle vector,  // data flow vector
+                    vf_InstrHandle instr,       // code instruction
+                    ostream *stream);   // output stream (can be NULL)
+
+#endif // _VF_GRAPH_H_

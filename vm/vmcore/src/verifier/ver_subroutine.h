@@ -14,6 +14,9 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+#ifndef _VF_SUBROUTINE_H_
+#define _VF_SUBROUTINE_H_
+
 #include "ver_graph.h"
 
 /**
@@ -77,6 +80,10 @@ struct vf_Sub
      * A current duplication index.
      */
     unsigned m_index;
+    /**
+     * An OUT stack map of the <code>ret</code> node.
+     */
+    vf_MapVector *m_outmap;
 };
 
 /**
@@ -125,10 +132,12 @@ struct vf_SubContext
      */
     vf_NodeStackHandle m_path_start;
     /**
-     * After the <code>ret</code> is resolved a <code>ctx->m_map</code> contains a
-     * correct input map for a node which follows <code>jsr</code> call. This is
-     * a pointer to the corresponding node stack. If this pointer is
-     * <code>NULL</code> we start from <code>m_path_start</code> stack entry.
+     * Equals to <code>true</code> when the map gets initialized.
      */
-    vf_NodeStackHandle m_path_fork;
+    bool m_path_map_initialized;
+    /**
+     * A temporary map for subroutine data flow analysis.
+     */
+    vf_MapVector *m_tmpmap;
 };
+#endif // _VF_SUBROUTINE_H_

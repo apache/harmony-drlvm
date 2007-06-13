@@ -20,8 +20,8 @@
  */
 
 
-#ifndef _VERIFIER_REAL_H_
-#define _VERIFIER_REAL_H_
+#ifndef _VF_REAL_H_
+#define _VF_REAL_H_
 
 /**
  * @file
@@ -149,71 +149,66 @@ using namespace std;
 #define CHECK_HANDLER_CONST_POOL_ID( id, len, ctx ) \
     if( (id) >= (len) ) { \
         VF_REPORT( ctx, "Illegal constant pool index in handler" ); \
-        return VER_ErrorHandler; \
+        return VF_ErrorHandler; \
     }
 // for handler id = 0 is legal value
 #define CHECK_HANDLER_CONST_POOL_CLASS( ctx, id ) \
     if( (id) && class_get_cp_tag( (ctx)->m_class, (id) ) != _CONSTANT_Class ) { \
         VF_REPORT( ctx, "Illegal type in constant pool for handler, " \
             << id << ": CONSTANT_Class is expected" ); \
-        return VER_ErrorHandler; \
+        return VF_ErrorHandler; \
     }
 #define CHECK_CONST_POOL_ID( id, len, ctx ) \
     if( !(id) || (id) >= (len) ) { \
         VF_REPORT( ctx, "Illegal constant pool index" ); \
-        return VER_ErrorConstantPool; \
+        return VF_ErrorConstantPool; \
     }
 #define CHECK_CONST_POOL_CLASS( ctx, id ) \
     if( class_get_cp_tag( (ctx)->m_class, (id) ) != _CONSTANT_Class ) { \
         VF_REPORT( ctx, "Illegal type in constant pool, " \
             << id << ": CONSTANT_Class is expected" ); \
-        return VER_ErrorConstantPool; \
+        return VF_ErrorConstantPool; \
     }
 #define CHECK_CONST_POOL_METHOD( ctx, id ) \
     if( class_get_cp_tag( (ctx)->m_class, (id) ) != _CONSTANT_Methodref ) { \
         VF_REPORT( ctx, "Illegal type in constant pool, " \
             << id << ": CONSTANT_Methodref is expected" ); \
-        return VER_ErrorConstantPool; \
+        return VF_ErrorConstantPool; \
     }
 #define CHECK_CONST_POOL_INTERFACE( ctx, id ) \
     if( class_get_cp_tag( (ctx)->m_class, (id) ) != _CONSTANT_InterfaceMethodref ) { \
         VF_REPORT( ctx, "Illegal type in constant pool, " \
             << id << ": CONSTANT_InterfaceMethodref is expected" ); \
-        return VER_ErrorConstantPool; \
+        return VF_ErrorConstantPool; \
     }
 #define CHECK_CONST_POOL_FIELD( ctx, id ) \
     if( class_get_cp_tag( (ctx)->m_class, (id) ) != _CONSTANT_Fieldref ) { \
         VF_REPORT( ctx, "Illegal type in constant pool, " \
             << id << ": CONSTANT_Fieldref is expected" ); \
-        return VER_ErrorConstantPool; \
+        return VF_ErrorConstantPool; \
     }
 #define CHECK_CONST_POOL_TYPE( ctx, id ) \
     if( class_get_cp_tag( (ctx)->m_class, (id) ) != _CONSTANT_NameAndType ) { \
         VF_REPORT( ctx, "Illegal type in constant pool, " \
             << id << ": CONSTANT_NameAndType is expected" ); \
-        return VER_ErrorConstantPool; \
+        return VF_ErrorConstantPool; \
     }
 #define CHECK_CONST_POOL_STRING( ctx, id ) \
     if( class_get_cp_tag( (ctx)->m_class, (id) ) != _CONSTANT_String ) { \
         VF_REPORT( ctx, "Illegal type in constant pool, " \
             << id << ": CONSTANT_String is expected" ); \
-        return VER_ErrorConstantPool; \
+        return VF_ErrorConstantPool; \
     }
 #define CHECK_CONST_POOL_UTF8( ctx, id ) \
     if( class_get_cp_tag( (ctx)->m_class, (id) ) != _CONSTANT_Utf8) { \
         VF_REPORT( ctx, "Illegal type in constant pool, " \
             << id << ": CONSTANT_Utf8 is expected" ); \
-        return VER_ErrorConstantPool; \
+        return VF_ErrorConstantPool; \
     }
 
 //===========================================================
 // Verifier enums
 //===========================================================
-
-/**
- * Verifier error codes.
- */
-typedef Verifier_Result vf_Result;
 
 /**
  * Constraint check types enum.
@@ -337,6 +332,8 @@ struct vf_MapEntry
     {
         unsigned m_new;         ///< program count of opcode new for uninitialized
         unsigned m_pc;          ///< program count of return address for subroutine
+        unsigned m_mappos;      ///< for SM_ANY a position in the initial stack map,
+        ///< positions in the stack start from ctx->m_maxlocal
     };
     union
     {
@@ -468,8 +465,7 @@ struct vf_Pool
  *       are equal to zero or if out of memory error is arisen.
  * @note Trace is available with argument <b>verifier:memory</b>.
  */
-void *vf_calloc_func( unsigned number, size_t element_size,
-                      VF_SOURCE_PARAMS );
+void *vf_calloc_func(unsigned number, size_t element_size, VF_SOURCE_PARAMS);
 
 /**
  * Function allocates memory blocks.
@@ -482,7 +478,7 @@ void *vf_calloc_func( unsigned number, size_t element_size,
  *       or if out of memory error is arisen.
  * @note Trace is available with argument <b>verifier:memory</b>.
  */
-void *vf_malloc_func( size_t size, VF_SOURCE_PARAMS );
+void *vf_malloc_func(size_t size, VF_SOURCE_PARAMS);
 
 /**
  * Function releases allocated memory blocks.
@@ -493,7 +489,7 @@ void *vf_malloc_func( size_t size, VF_SOURCE_PARAMS );
  * @note Assertion is raised if <i>pointer</i> is equal to null.
  * @note Trace is available with argument <b>verifier:memory</b>.
  */
-void vf_free_func( void *pointer, VF_SOURCE_PARAMS );
+void vf_free_func(void *pointer, VF_SOURCE_PARAMS);
 
 /**
  * Function reallocates memory blocks.
@@ -508,7 +504,7 @@ void vf_free_func( void *pointer, VF_SOURCE_PARAMS );
  * @note If <i>pointer</i> is equal to null function works like vf_malloc_func.
  * @note Trace is available with argument <b>verifier:memory</b>.
  */
-void *vf_realloc_func( void *pointer, size_t resize, VF_SOURCE_PARAMS );
+void *vf_realloc_func(void *pointer, size_t resize, VF_SOURCE_PARAMS);
 
 /**
  * Function creates memory pool structure.
@@ -519,7 +515,7 @@ void *vf_realloc_func( void *pointer, size_t resize, VF_SOURCE_PARAMS );
  * @see vf_Pool
  * @note Trace is available with argument <b>verifier:memory:pool</b>.
  */
-vf_Pool *vf_create_pool_func( VF_SOURCE_PARAMS );
+vf_Pool *vf_create_pool_func(VF_SOURCE_PARAMS);
 
 /**
  * Function allocates memory blocks in current pool.
@@ -532,7 +528,7 @@ vf_Pool *vf_create_pool_func( VF_SOURCE_PARAMS );
  * @see vf_Pool
  * @note Trace is available with argument <b>verifier:memory:pool</b>.
  */
-void *vf_palloc_func( vf_Pool *pool, size_t size, VF_SOURCE_PARAMS );
+void *vf_palloc_func(vf_Pool *pool, size_t size, VF_SOURCE_PARAMS);
 
 /**
  * Function cleans given pool.
@@ -543,7 +539,7 @@ void *vf_palloc_func( vf_Pool *pool, size_t size, VF_SOURCE_PARAMS );
  * @see vf_Pool
  * @note Trace is available with argument <b>verifier:memory:pool</b>.
  */
-void vf_clean_pool_func( vf_Pool *pool, VF_SOURCE_PARAMS );
+void vf_clean_pool_func(vf_Pool *pool, VF_SOURCE_PARAMS);
 
 /**
  * Function releases memory from given pool.
@@ -554,7 +550,7 @@ void vf_clean_pool_func( vf_Pool *pool, VF_SOURCE_PARAMS );
  * @see vf_Pool
  * @note Trace is available with argument <b>verifier:memory:pool</b>.
  */
-void vf_delete_pool_func( vf_Pool *pool, VF_SOURCE_PARAMS );
+void vf_delete_pool_func(vf_Pool *pool, VF_SOURCE_PARAMS);
 
 //===========================================================
 // Verifier hash table structures.
@@ -587,13 +583,13 @@ struct vf_Hash
      * @param pool - external memory pool
      * @note Function allocates memory for hash pool and hash table.
      */
-    vf_Hash ( vf_Pool *pool );
+    vf_Hash (vf_Pool *pool);
 
     /**
      * Hash table destructor.
      * @note Function release memory for hash pool and hash table.
      */
-           ~vf_Hash ();
+    ~vf_Hash();
 
     /**
      * Function looks up hash entry which is identical to given hash key.
@@ -601,7 +597,7 @@ struct vf_Hash
      * @return Hash entry which is identical to given hash key.
      * @see vf_HashEntry
      */
-    vf_HashEntry *Lookup( const char *key );
+    vf_HashEntry *Lookup(const char *key);
 
     /**
      * Function looks up hash entry which is identical to given hash key.
@@ -610,7 +606,7 @@ struct vf_Hash
      * @return Hash entry which is identical to given hash key.
      * @see vf_HashEntry
      */
-    vf_HashEntry *Lookup( const char *key, size_t len );
+    vf_HashEntry *Lookup(const char *key, size_t len);
 
     /**
      * Function creates hash entry which is identical to given hash key.
@@ -619,7 +615,7 @@ struct vf_Hash
      * @see vf_HashEntry
      * @note Created hash key and hash entry is allocated into hash memory pool.
      */
-    vf_HashEntry *NewHashEntry( const char *key );
+    vf_HashEntry *NewHashEntry(const char *key);
 
     /**
      * Function creates hash entry which is identical to given hash key.
@@ -629,7 +625,7 @@ struct vf_Hash
      * @see vf_HashEntry
      * @note Created hash key and hash entry is allocated into hash memory pool.
      */
-    vf_HashEntry *NewHashEntry( const char *key, size_t len );
+    vf_HashEntry *NewHashEntry(const char *key, size_t len);
 
   private:
     vf_Pool *m_pool;            ///< hash memory pool
@@ -645,7 +641,7 @@ struct vf_Hash
      *         else returns <code>false</code>.
      * @see vf_HashEntry
      */
-    bool CheckKey( vf_HashEntry *hash_entry, const char *key );
+    bool CheckKey(vf_HashEntry *hash_entry, const char *key);
 
     /**
      * Checks key identity.
@@ -656,14 +652,14 @@ struct vf_Hash
      *         else returns <code>false</code>.
      * @see vf_HashEntry
      */
-    bool CheckKey( vf_HashEntry *hash_entry, const char *key, size_t len );
+    bool CheckKey(vf_HashEntry *hash_entry, const char *key, size_t len);
 
     /**
      * Hash function.
      * @param key - key for hash function
      * @return Hash index relevant to key.
      */
-    unsigned HashFunc( const char *key );
+    unsigned HashFunc(const char *key);
 
     /**
      * Hash function.
@@ -671,7 +667,7 @@ struct vf_Hash
      * @param len - key length
      * @return Hash index relevant to key.
      */
-    unsigned HashFunc( const char *key, size_t len );
+    unsigned HashFunc(const char *key, size_t len);
 };                              // struct vf_Hash
 
 //===========================================================
@@ -683,14 +679,14 @@ struct vf_Hash
  */
 struct vf_TypeConstraint
 {
-    const char *m_source;           ///< constraint source class name
-    const char *m_target;           ///< constraint target class name
-    method_handler m_method;        ///< constraint for method
-    const char *m_name;             ///< constraint method name
-    const char *m_descriptor;       ///< constraint method descriptor
-    vf_TypeConstraint *m_next;      ///< next constraint
-    unsigned short m_index;         ///< constant pool index
-    unsigned short m_check_type;    ///< constraint check type @see vf_CheckConstraint
+    const char *m_source;       ///< constraint source class name
+    const char *m_target;       ///< constraint target class name
+    method_handler m_method;    ///< constraint for method
+    const char *m_name;         ///< constraint method name
+    const char *m_descriptor;   ///< constraint method descriptor
+    vf_TypeConstraint *m_next;  ///< next constraint
+    unsigned short m_index;     ///< constant pool index
+    unsigned short m_check_type;        ///< constraint check type @see vf_CheckConstraint
 };
 
 /**
@@ -709,7 +705,7 @@ struct vf_TypePool
      * Type constraint collection destructor.
      * @note Function release memory for collection memory pool and hash table.
      */
-    ~vf_TypePool ();
+    ~vf_TypePool();
 
     /**
      * Function creates valid type which is identical to given class.
@@ -718,7 +714,7 @@ struct vf_TypePool
      * @return Created valid type structure.
      * @see vf_ValidType
      */
-    vf_ValidType *NewType( const char *type, size_t len );
+    vf_ValidType *NewType(const char *type, size_t len);
 
     /**
      * Function creates valid type which is identical to an element of a given array type.
@@ -726,7 +722,7 @@ struct vf_TypePool
      * @return Created valid type of a given array element.
      * @see vf_ValidType
      */
-    vf_ValidType *NewArrayElemType( vf_ValidType *array );
+    vf_ValidType *NewArrayElemType(vf_ValidType *array);
 
     /**
      * Checks types and create constraints if it's necessarily.
@@ -740,9 +736,9 @@ struct vf_TypePool
      * @see vf_ValidType
      * @see vf_CheckConstraint
      */
-    bool CheckTypes( vf_ValidType *required,
-                     vf_ValidType *available,
-                     unsigned short index, vf_CheckConstraint check_type );
+    bool CheckTypes(vf_ValidType *required,
+                    vf_ValidType *available,
+                    unsigned short index, vf_CheckConstraint check_type);
 
     /**
      * Function merges two valid types.
@@ -752,14 +748,14 @@ struct vf_TypePool
      * @return Function returns <code>NULL</code> if vector wasn't merged.
      * @see vf_ValidType
      */
-    vf_ValidType *MergeTypes( vf_ValidType *first, vf_ValidType *second );
+    vf_ValidType *MergeTypes(vf_ValidType *first, vf_ValidType *second);
 
     /**
      * Dumps constraint collection in stream.
      * @param out - pointer to output stream
      * @note If <i>out</i> is equal to null, output stream is <i>cerr</i>.
      */
-    void DumpTypeConstraints( ostream *out );
+    void DumpTypeConstraints(ostream *out);
 
     /**
      * Function returns the methods constraints array.
@@ -772,7 +768,7 @@ struct vf_TypePool
      * Sets current context method.
      * @param ctx - current verifier context
      */
-    void SetMethod( vf_ContextHandle ctx );
+    void SetMethod(vf_ContextHandle ctx);
 
     /**
      * Sets restriction from target class to source class.
@@ -782,10 +778,9 @@ struct vf_TypePool
      * @param check_type    - constraint check type
      * @see vf_CheckConstraint
      */
-    void SetRestriction( const char *target,
-                         const char *source,
-                         unsigned short index,
-                         vf_CheckConstraint check_type );
+    void SetRestriction(const char *target,
+                        const char *source,
+                        unsigned short index, vf_CheckConstraint check_type);
 
   private:
     vf_Pool *m_pool;            ///< collection memory pool
@@ -800,7 +795,7 @@ struct vf_TypePool
 // Verifier type constraint structures.
 //===========================================================
 
-void vf_clean_pool_func( vf_Pool *pool, VF_SOURCE_PARAMS );
+void vf_clean_pool_func(vf_Pool *pool, VF_SOURCE_PARAMS);
 
 /**
  * Verification context.
@@ -811,16 +806,16 @@ struct vf_Context
     /**
      * Verifier context constructor
      */
-    vf_Context ():m_class( NULL ), m_type( NULL ), m_error( NULL ),
-        m_method( NULL ), m_name(NULL), m_descriptor(NULL), m_graph( NULL ),
-        m_pool( NULL ), m_instr( NULL ), m_last_instr( NULL ), m_retnum( 0 ),
-        m_verify_all( false )
+    vf_Context ():m_class(NULL), m_type(NULL), m_error(NULL),
+        m_method(NULL), m_name(NULL), m_descriptor(NULL), m_graph(NULL),
+        m_pool(NULL), m_instr(NULL), m_last_instr(NULL), m_retnum(0),
+        m_verify_all(false)
     {
         vf_ContextVType zero2 = { 0 };
         m_vtype = zero2;
     }
 
-    void SetMethod( method_handler method )
+    void SetMethod(method_handler method)
     {
         assert(method);
         m_method = method;
@@ -828,27 +823,27 @@ struct vf_Context
         m_descriptor = method_get_descriptor(method);
 
         // get method parameters
-        m_len = method_get_code_length( method );
-        m_bytes = method_get_bytecode( method );
-        m_handlers = method_get_exc_handler_number( method );
+        m_len = method_get_code_length(method);
+        m_bytes = method_get_bytecode(method);
+        m_handlers = method_get_exc_handler_number(method);
 
         // get method limitations
-        m_maxlocal = method_get_max_local( method );
-        m_maxstack = method_get_max_stack( method );
+        m_maxlocal = method_get_max_local(method);
+        m_maxstack = method_get_max_stack(method);
 
         // cache in the context if the method is a constructor
-        m_is_constructor = (memcmp( m_name, "<init>", 7 ) == 0);
+        m_is_constructor = (memcmp(m_name, "<init>", 7) == 0);
     }
 
     /**
      * Verifier context destructor
      */
-    ~vf_Context ()
+    ~vf_Context()
     {
-        if( m_pool ) {
-            vf_delete_pool( m_pool );
+        if (m_pool) {
+            vf_delete_pool(m_pool);
         }
-        if( m_type ) {
+        if (m_type) {
             delete m_type;
         }
     }
@@ -867,7 +862,7 @@ struct vf_Context
         m_bc = NULL;
         m_last_instr = NULL;
         m_retnum = 0;
-        vf_clean_pool( m_pool );
+        vf_clean_pool(m_pool);
     }                           // vf_ClearContext
 
   public:
@@ -892,13 +887,13 @@ struct vf_Context
     unsigned short m_maxstack;  ///< max stack length
     unsigned short m_maxlocal;  ///< max local number
     bool m_is_constructor;      ///< <code>true</code> if the
-                                ///< method is a constructor
+    ///< method is a constructor
 
     // Subrotine info
-    vf_SubContext *m_sub_ctx;           ///< aggregate subroutine info
-    vf_MapVector *m_map;                ///< a stack map for control flow
-                                        ///< analysis, vectors themselves are
-                                        ///< allocated from the graph pool
+    vf_SubContext *m_sub_ctx;   ///< aggregate subroutine info
+    vf_MapVector *m_map;        ///< a stack map for control flow
+    ///< analysis, vectors themselves are
+    ///< allocated from the graph pool
     vf_MapEntry *m_method_invector;     ///< method parameters
     unsigned short m_method_inlen;      ///< a length of <code>m_method_invector</code>
     vf_MapEntry *m_method_outvector;    ///< method return value
@@ -906,7 +901,7 @@ struct vf_Context
 
     // Data flow analisys info
     vf_MapEntry *m_buf;         ///< used to store intermediate stack states
-                                ///< during data flow analysis
+    ///< during data flow analysis
 
     bool m_verify_all;          ///< if <code>true</code> need to verify more checks
 
@@ -915,11 +910,11 @@ struct vf_Context
      */
     struct vf_ContextVType
     {
-        vf_ValidType *m_class;          ///< a given class
+        vf_ValidType *m_class;  ///< a given class
         vf_ValidType *m_throwable;      ///< java/lang/Throwable
-        vf_ValidType *m_object;         ///< java/lang/Object
-        vf_ValidType *m_array;          ///< [Ljava/lang/Object;
-        vf_ValidType *m_clone;          ///< java/lang/Cloneable
+        vf_ValidType *m_object; ///< java/lang/Object
+        vf_ValidType *m_array;  ///< [Ljava/lang/Object;
+        vf_ValidType *m_clone;  ///< java/lang/Cloneable
         vf_ValidType *m_serialize;      ///< java/io/Serializable
     } m_vtype;
 
@@ -961,7 +956,7 @@ extern const char *vf_opcode_names[];
  * @see vf_Context
  * @see vf_Result
  */
-vf_Result vf_create_graph( vf_Context *ctx );
+vf_Result vf_create_graph(vf_Context *ctx);
 
 /**
  * Checks control flow and data flow of graph.
@@ -970,7 +965,7 @@ vf_Result vf_create_graph( vf_Context *ctx );
  *
  * @return a result of graph checks
  */
-vf_Result vf_check_graph( vf_Context *ctx );
+vf_Result vf_check_graph(vf_Context *ctx);
 
 /**
  * Provides data flow checks of verifier graph structure.
@@ -979,7 +974,7 @@ vf_Result vf_check_graph( vf_Context *ctx );
  * @see vf_Context
  * @see vf_Result
  */
-vf_Result vf_check_graph_data_flow( vf_Context *ctx );
+vf_Result vf_check_graph_data_flow(vf_Context *ctx);
 
 /**
  * Parses method, class or field descriptors.
@@ -989,8 +984,8 @@ vf_Result vf_check_graph_data_flow( vf_Context *ctx );
  * @note Assertion is raised if <i>descr</i> or <i>inlen</i> are equal to <code>NULL</code>.
  * @note Parameter <i>outlen</i> may be equal to null (for class or field descriptor).
  */
-void vf_parse_description( const char *descr, unsigned short *inlen,
-                           unsigned short *outlen );
+void vf_parse_description(const char *descr, unsigned short *inlen,
+                          unsigned short *outlen);
 
 /**
  * Parses a descriptor and sets input and output data flow vectors.
@@ -1008,12 +1003,12 @@ void vf_parse_description( const char *descr, unsigned short *inlen,
  *       if parameter <i>outlen</i> is equal to zero.
  */
 void
-vf_set_description_vector( const char *descr,
-                           unsigned short inlen,
-                           unsigned short add,
-                           unsigned short outlen,
-                           vf_MapEntry **invector,
-                           vf_MapEntry **outvector, vf_ContextHandle ctx );
+vf_set_description_vector(const char *descr,
+                          unsigned short inlen,
+                          unsigned short add,
+                          unsigned short outlen,
+                          vf_MapEntry **invector,
+                          vf_MapEntry **outvector, vf_ContextHandle ctx);
 
 /**
  * Gets a class name from a constant pool.
@@ -1023,12 +1018,12 @@ vf_set_description_vector( const char *descr,
  *
  * @return a pointer to UTF8 constant pool entry
  */
-static inline const char *
-vf_get_cp_class_name( class_handler klass, unsigned short index )
+static inline const char *vf_get_cp_class_name(class_handler klass,
+                                               unsigned short index)
 {
     unsigned short class_name_index =
-        class_get_cp_class_name_index( klass, index );
-    const char *name = class_get_cp_utf8_bytes( klass, class_name_index );
+        class_get_cp_class_name_index(klass, index);
+    const char *name = class_get_cp_utf8_bytes(klass, class_name_index);
     return name;
 }                               // vf_get_cp_class_name
 
@@ -1038,8 +1033,8 @@ vf_get_cp_class_name( class_handler klass, unsigned short index )
  * @param ctx    a verifier context
  * @return a valid type structure corresponding to the given class name
  */
-vf_ValidType *vf_create_class_valid_type( const char *class_name,
-                                          vf_ContextHandle ctx );
+vf_ValidType *vf_create_class_valid_type(const char *class_name,
+                                         vf_ContextHandle ctx);
 
 /**
  * Provides constraint checks for current class.
@@ -1050,7 +1045,7 @@ vf_ValidType *vf_create_class_valid_type( const char *class_name,
  * @see vf_Context
  * @see vf_Result
  */
-vf_Result vf_check_class_constraints( vf_Context *ctx );
+vf_Result vf_check_class_constraints(vf_Context *ctx);
 
 /**
  * Function compares two valid types.
@@ -1059,7 +1054,7 @@ vf_Result vf_check_class_constraints( vf_Context *ctx );
  * @return If types are equal returns <code>true</code>, else returns <code>false</code>.
  * @see vf_ValidType
  */
-bool vf_is_types_equal( vf_ValidType *type1, vf_ValidType *type2 );
+bool vf_is_types_equal(vf_ValidType *type1, vf_ValidType *type2);
 
 /**
  * Checks access to protected field/method.
@@ -1077,11 +1072,11 @@ bool vf_is_types_equal( vf_ValidType *type1, vf_ValidType *type2 );
  * @see vf_Context
  * @see vf_Result
  */
-vf_Result vf_check_access_constraint( const char *super_name,   // name of super class
-                                      const char *instance_name,        // name of instance class
-                                      unsigned short index,     // constant pool index
-                                      vf_CheckConstraint check_type,    // access check type
-                                      vf_Context *ctx );        // verification context
+vf_Result vf_check_access_constraint(const char *super_name,    // name of super class
+                                     const char *instance_name, // name of instance class
+                                     unsigned short index,      // constant pool index
+                                     vf_CheckConstraint check_type,     // access check type
+                                     vf_Context *ctx);  // verification context
 
 /**
  * Sets error message of a verifier.
@@ -1090,17 +1085,17 @@ vf_Result vf_check_access_constraint( const char *super_name,   // name of super
  * @param[in] ctx   a verifier context
  */
 static inline void
-vf_set_error_message( stringstream & stream, vf_Context *ctx )
+vf_set_error_message(stringstream & stream, vf_Context *ctx)
 {
-    if( ctx->m_error ) {
+    if (ctx->m_error) {
         // free old message
-        vf_free( ctx->m_error );
+        vf_free(ctx->m_error);
     }
     // create message
     size_t len = stream.str().length();
-    if( len ) {
-        ctx->m_error = (char*)vf_malloc( len + 1 );
-        memcpy( ctx->m_error, stream.str().c_str(), len );
+    if (len) {
+        ctx->m_error = (char *) vf_malloc(len + 1);
+        memcpy(ctx->m_error, stream.str().c_str(), len);
         ctx->m_error[len] = '\0';
     } else {
         ctx->m_error = NULL;
@@ -1114,10 +1109,9 @@ vf_set_error_message( stringstream & stream, vf_Context *ctx )
  *
  * @return <code>true</code> if a class version is less than 1.4
  */
-static inline bool
-vf_is_class_version_14( vf_ContextHandle ctx )
+static inline bool vf_is_class_version_14(vf_ContextHandle ctx)
 {
-    return ( class_get_version( ctx->m_class ) < 49 ) ? true : false;
+    return (class_get_version(ctx->m_class) < 49) ? true : false;
 }                               // vf_is_class_version_14
 
 /**
@@ -1130,9 +1124,9 @@ vf_is_class_version_14( vf_ContextHandle ctx )
  * branches
  */
 static inline int
-vf_get_instr_branch( vf_InstrHandle instr, unsigned branch_num )
+vf_get_instr_branch(vf_InstrHandle instr, unsigned branch_num)
 {
-    assert( branch_num < instr->m_offcount );
+    assert(branch_num < instr->m_offcount);
     return instr->m_off[branch_num];
 }                               // vf_get_instruction_branch
 
@@ -1144,11 +1138,10 @@ vf_get_instr_branch( vf_InstrHandle instr, unsigned branch_num )
  * @param[in]  pool   memory pool
  */
 static inline void
-vf_new_vector( vf_MapEntry **vector, unsigned len, vf_Pool *pool )
+vf_new_vector(vf_MapEntry **vector, unsigned len, vf_Pool *pool)
 {
     // create new vector
-    ( *vector ) =    (vf_MapEntry*)vf_palloc( pool,
-                                              len * sizeof( vf_MapEntry ) );
+    (*vector) = (vf_MapEntry *) vf_palloc(pool, len * sizeof(vf_MapEntry));
 }                               // vf_new_vector
 
 /**
@@ -1159,8 +1152,8 @@ vf_new_vector( vf_MapEntry **vector, unsigned len, vf_Pool *pool )
  * @param[in]      type   reference type
  */
 static inline void
-vf_set_vector_stack_entry_ref( vf_MapEntry *vector,
-                               unsigned num, vf_ValidType *type )
+vf_set_vector_stack_entry_ref(vf_MapEntry *vector,
+                              unsigned num, vf_ValidType *type)
 {
     // set a stack map vector entry by ref
     vector[num].m_type = SM_REF;
@@ -1174,9 +1167,9 @@ vf_set_vector_stack_entry_ref( vf_MapEntry *vector,
  * @return    an instruction index
  */
 static inline unsigned
-vf_get_instr_index( vf_InstrHandle instr, vf_ContextHandle ctx )
+vf_get_instr_index(vf_InstrHandle instr, vf_ContextHandle ctx)
 {
-    return ( unsigned )( instr - ctx->m_instr );
+    return (unsigned) (instr - ctx->m_instr);
 }
 
 /**
@@ -1186,11 +1179,11 @@ vf_get_instr_index( vf_InstrHandle instr, vf_ContextHandle ctx )
  * @return    an instruction index
  */
 static inline unsigned
-vf_bc_to_instr_index( unsigned short pc, vf_ContextHandle ctx )
+vf_bc_to_instr_index(unsigned short pc, vf_ContextHandle ctx)
 {
     vf_InstrHandle instr = ctx->m_bc[pc].m_instr;
-    assert( instr );
-    return vf_get_instr_index( instr, ctx );
+    assert(instr);
+    return vf_get_instr_index(instr, ctx);
 }
 
 /**
@@ -1200,13 +1193,13 @@ vf_bc_to_instr_index( unsigned short pc, vf_ContextHandle ctx )
  * @param[in] ctx   a verification context
  * @return a pointer which follows a given instruction
  */
-static inline const unsigned char *
-vf_get_instr_end( vf_InstrHandle instr, vf_ContextHandle ctx )
+static inline const unsigned char *vf_get_instr_end(vf_InstrHandle instr,
+                                                    vf_ContextHandle ctx)
 {
-    if( instr + 1 == ctx->m_last_instr ) {
+    if (instr + 1 == ctx->m_last_instr) {
         return ctx->m_bytes + ctx->m_len;
     }
-    return ( instr + 1 )->m_addr;
+    return (instr + 1)->m_addr;
 }
 
 /**
@@ -1214,7 +1207,7 @@ vf_get_instr_end( vf_InstrHandle instr, vf_ContextHandle ctx )
  *
  * @param[in] context a context of verifier
  */
-void vf_free_graph( vf_Context *context );
+void vf_free_graph(vf_Context *context);
 
 /**
  * Mark subroutine code.
@@ -1226,18 +1219,18 @@ void vf_free_graph( vf_Context *context );
  * page</a>.</p>
  *
  * @param ctx a verifier context
- * @return VER_OK if no graph structure inconsistencies were detected during marking,
+ * @return VF_OK if no graph structure inconsistencies were detected during marking,
  * an error code otherwise
  */
-vf_Result vf_mark_subroutines( vf_Context *ctx );
+vf_Result vf_mark_subroutines(vf_Context *ctx);
 
 /**
  * Inline subroutines in the call graph.
  *
  * @param ctx a verifier context
- * @return VER_OK if subroutines were inlined successfully,
+ * @return VF_OK if subroutines were inlined successfully,
  * an error code otherwise
  */
-vf_Result vf_inline_subroutines( vf_Context *ctx );
+vf_Result vf_inline_subroutines(vf_Context *ctx);
 
-#endif // _VERIFIER_REAL_H_
+#endif // _VF_REAL_H_

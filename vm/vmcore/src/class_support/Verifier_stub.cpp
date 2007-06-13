@@ -17,7 +17,7 @@
 /** 
  * @author Pavel Pervov
  * @version $Revision: 1.1.2.2.4.4 $
- */  
+ */
 
 
 #define LOG_DOMAIN "verifier"
@@ -30,18 +30,17 @@
 #include "open/vm.h"
 #include "lock_manager.h"
 
-bool
-Class::verify(const Global_Env* env)
+bool Class::verify(const Global_Env * env)
 {
     // fast path
-    if(m_state >= ST_BytecodesVerified)
+    if (m_state >= ST_BytecodesVerified)
         return true;
 
     LMAutoUnlock aulock(m_lock);
-    if(m_state >= ST_BytecodesVerified)
+    if (m_state >= ST_BytecodesVerified)
         return true;
 
-    if(is_array()) {
+    if (is_array()) {
         // no need do bytecode verification for arrays
         m_state = ST_BytecodesVerified;
         return true;
@@ -58,31 +57,28 @@ Class::verify(const Global_Env* env)
     /**
      * Verify class
      */
-    if(is_enabled == TRUE
-        && !is_interface()
-        && (is_bootstrap == FALSE || is_forced == TRUE))
-    {
+    if (is_enabled == TRUE && !is_interface()
+        && (is_bootstrap == FALSE || is_forced == TRUE)) {
         char *error;
-        Verifier_Result result = vf_verify_class((class_handler)this, is_strict, &error);
-        if( result != VER_OK ) {
+        vf_Result result =
+            vf_verify_class((class_handler) this, is_strict, &error);
+        if (VF_OK != result) {
             aulock.ForceUnlock();
             REPORT_FAILED_CLASS_CLASS(m_class_loader, this,
-                "java/lang/VerifyError", error);
+                                      "java/lang/VerifyError", error);
             return false;
         }
     }
     m_state = ST_BytecodesVerified;
 
     return true;
-} // Class::verify
+}                               // Class::verify
 
 
-bool
-Class::verify_constraints(const Global_Env* env)
+bool Class::verify_constraints(const Global_Env * env)
 {
     // fast path
-    switch(m_state)
-    {
+    switch (m_state) {
     case ST_ConstraintsVerified:
     case ST_Initializing:
     case ST_Initialized:
@@ -94,8 +90,7 @@ Class::verify_constraints(const Global_Env* env)
     lock();
 
     // check verification stage again
-    switch(m_state)
-    {
+    switch (m_state) {
     case ST_ConstraintsVerified:
     case ST_Initializing:
     case ST_Initialized:
@@ -105,13 +100,12 @@ Class::verify_constraints(const Global_Env* env)
     }
     assert(m_state == ST_Prepared);
 
-    if(is_array()) {
+    if (is_array()) {
         // no need do constraint verification for arrays
         m_state = ST_ConstraintsVerified;
         unlock();
         return true;
     }
-
     // get verifier enable status
     Boolean is_strict = env->verify_strict;
 
@@ -120,13 +114,12 @@ Class::verify_constraints(const Global_Env* env)
 
     // check method constraints
     char *error;
-    Verifier_Result result =
-        vf_verify_class_constraints((class_handler)this, is_strict, &error);
+    vf_Result result =
+        vf_verify_class_constraints((class_handler) this, is_strict, &error);
 
     // lock class and check result
     lock();
-    switch(m_state)
-    {
+    switch (m_state) {
     case ST_ConstraintsVerified:
     case ST_Initializing:
     case ST_Initialized:
@@ -134,15 +127,15 @@ Class::verify_constraints(const Global_Env* env)
         unlock();
         return true;
     }
-    if( result != VER_OK ) {
+    if (VF_OK != result) {
         unlock();
-        if( result == VER_ErrorLoadClass ) {
+        if (result == VF_ErrorLoadClass) {
             // Exception is raised by class loading
             // and passed through verifier unchanged
             assert(exn_raised());
         } else {
             REPORT_FAILED_CLASS_CLASS(m_class_loader, this,
-                "java/lang/VerifyError", error);
+                                      "java/lang/VerifyError", error);
         }
         return false;
     }
@@ -152,4 +145,4 @@ Class::verify_constraints(const Global_Env* env)
     unlock();
 
     return true;
-} // class_verify_method_constraints
+}                               // class_verify_method_constraints

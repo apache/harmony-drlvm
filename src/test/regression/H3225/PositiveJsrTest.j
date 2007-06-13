@@ -10,34 +10,12 @@
 ; Launches testcases which check subroutine verification.
 ;
 .method public static main([Ljava/lang/String;)V
-    .limit stack 2
+    .limit stack 1
     .limit locals 1
 
-    new org/apache/harmony/drlvm/tests/regression/h3225/PositiveJsrTest
-    dup
-    invokespecial org/apache/harmony/drlvm/tests/regression/h3225/PositiveJsrTest/<init>()V
-    astore_0
-
-    aload_0
-    invokevirtual org/apache/harmony/drlvm/tests/regression/h3225/PositiveJsrTest/testMinimalLimits()V
-
-    aload_0
-    invokevirtual org/apache/harmony/drlvm/tests/regression/h3225/PositiveJsrTest/testLastJsr()V
-
-    aload_0
-    invokevirtual org/apache/harmony/drlvm/tests/regression/h3225/PositiveJsrTest/testCommonReturn()V
-
-    aload_0
-    invokevirtual org/apache/harmony/drlvm/tests/regression/h3225/PositiveJsrTest/testMultipleCalls()V
-
-    aload_0
-    invokevirtual org/apache/harmony/drlvm/tests/regression/h3225/PositiveJsrTest/testNestedSubs()V
-
-    aload_0
-    invokevirtual org/apache/harmony/drlvm/tests/regression/h3225/PositiveJsrTest/testCallFromHandler()V
-
-    aload_0
-    invokevirtual org/apache/harmony/drlvm/tests/regression/h3225/PositiveJsrTest/testBranches()V
+    ldc "org.apache.harmony.drlvm.tests.regression.h3225.PositiveJsrTest"
+    invokestatic java/lang/Class/forName(Ljava/lang/String;)Ljava/lang.Class;
+    invokestatic junit/textui/TestRunner/run(Ljava/lang/Class;)V
 
     return
 .end method
@@ -201,4 +179,98 @@ LabelRet:
     ret 1
 
 .end method
+
+
+;
+; A subroutine graph contains several unreachable nodes.
+;
+.method public testUnreachableNodes()V
+    .limit stack 1
+    .limit locals 1
+
+    return
+LabelBackward:
+    aconst_null
+    ifnull LabelForward
+    aconst_null
+    ifnull LabelBackward
+LabelForward:
+    aconst_null
+    ifnull LabelBackward
+    jsr LabelBackward
+.end method
+
+;
+; A subroutine is called from another subroutine nine times.
+;
+.method public testNineNestedSubs()V
+    .limit stack 3
+    .limit locals 1
+
+    iconst_0
+    jsr LabelSub
+    jsr LabelSub
+    jsr LabelSub
+    jsr LabelSub
+    jsr LabelSub
+    jsr LabelSub
+    jsr LabelSub
+    jsr LabelSub
+    jsr LabelSub
+    bipush 81
+    swap
+    invokestatic org/apache/harmony/drlvm/tests/regression/h3225/PositiveJsrTest/assertEquals(II)V
+    return
+
+LabelSub:
+    swap
+    jsr LabelSubSub
+    jsr LabelSubSub
+    jsr LabelSubSub
+    jsr LabelSubSub
+    jsr LabelSubSub
+    jsr LabelSubSub
+    jsr LabelSubSub
+    jsr LabelSubSub
+    jsr LabelSubSub
+    swap
+    astore 0
+    ret 0
+
+LabelSubSub:
+    astore 0
+    iconst_1
+    iadd
+    ret 0
+
+.end method
+
+;
+; Calls one subroutine after another in the subroutine context.
+;
+.method public testSubAfterSub()V
+    .limit stack 1
+    .limit locals 2
+
+    jsr LabelSub1
+    return
+
+LabelSub1:
+    astore 0
+    jsr LabelSub2
+    jsr LabelSub2
+    jsr LabelSub3
+    jsr LabelSub3
+    ret 0
+
+LabelSub2:
+    astore 1
+    ret 1
+
+LabelSub3:
+    astore 1
+    ret 1
+
+.end method
+
 

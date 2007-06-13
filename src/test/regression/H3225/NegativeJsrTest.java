@@ -6,11 +6,7 @@ package org.apache.harmony.drlvm.tests.regression.h3225;
  */
 public class NegativeJsrTest extends junit.framework.TestCase {
     public static void main(String args[]) {
-        NegativeJsrTest t = new NegativeJsrTest();
-        t.testMergeExecution();
-        t.testMergeEmptyStack();
-        t.testMergeIntFloat();
-        t.testMergeStack();
+        junit.textui.TestRunner.run(org.apache.harmony.drlvm.tests.regression.h3225.NegativeJsrTest.class);
     }
 
     public void testMergeExecution() {

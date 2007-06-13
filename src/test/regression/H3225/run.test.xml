@@ -6,6 +6,9 @@
         <run-junit-test 
              test="org.apache.harmony.drlvm.tests.regression.h3225.NegativeJsrTest"
              vmarg="-Xint" />
+        <run-junit-test 
+             test="org.apache.harmony.drlvm.tests.regression.h3225.J9CompatibleJsrTest"
+             vmarg="-Xint" />
     </target>
 </project>
 
