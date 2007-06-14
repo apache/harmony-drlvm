@@ -4633,9 +4633,7 @@ static vf_Result vf_parse_bytecode(vf_Context *ctx)
                                     handler_index, &start_pc, &end_pc,
                                     &handler_pc, &handler_cp_index);
         // check instruction range
-        if ((start_pc >= len)
-            || (end_pc > len)
-            || (handler_pc >= len)) {
+        if ((end_pc > len) || (handler_pc >= len)) {
             VF_REPORT(ctx, "Exception handler pc is out of range");
             return VF_ErrorHandler;
         }
@@ -4647,7 +4645,8 @@ static vf_Result vf_parse_bytecode(vf_Context *ctx)
         // check that handlers point to instruction
         // boundaries
         if (NULL == bc[start_pc].m_instr
-            || NULL == bc[end_pc].m_instr || NULL == bc[handler_pc].m_instr) {
+            || ((end_pc < len) && (NULL == bc[end_pc].m_instr))
+            || NULL == bc[handler_pc].m_instr) {
             VF_REPORT(ctx,
                       "At least one of exception handler parameters ["
                       << start_pc << ", " << end_pc << ", " <<
