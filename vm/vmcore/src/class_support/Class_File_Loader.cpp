@@ -1241,7 +1241,7 @@ bool Method::get_local_var_entry(unsigned index, jlong* pc,
                          jint* length, jint* slot, String** name,
                          String** type, String** generic_type) {
 
-    if (_line_number_table && index < _local_vars_table->length) {
+    if (_local_vars_table && index < _local_vars_table->length) {
         *pc = _local_vars_table->table[index].start_pc;
         *length = _local_vars_table->table[index].length;
         *slot = _local_vars_table->table[index].index;
