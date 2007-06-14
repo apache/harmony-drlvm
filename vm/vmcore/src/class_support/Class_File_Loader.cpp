@@ -2652,9 +2652,8 @@ bool ConstantPool::check(Global_Env* env, Class* clss, bool is_trusted_cl)
                 // illegal name index
                 return false;
             }
-            if(env->verify_all
-                && !check_class_name(get_utf8_string(name_index)->bytes, get_utf8_string(name_index)->len,
-                        clss->get_version() < JAVA5_CLASS_FILE_VERSION))
+            if(!check_class_name(get_utf8_string(name_index)->bytes, get_utf8_string(name_index)->len,
+                    clss->get_version() < JAVA5_CLASS_FILE_VERSION))
             {
                 REPORT_FAILED_CLASS_CLASS(clss->get_class_loader(), clss, "java/lang/ClassFormatError",
                     clss->get_name()->bytes << ": illegal CONSTANT_Class name "
