@@ -309,9 +309,13 @@ bool jobjectarray_to_jvaluearray(JNIEnv *jenv, jvalue **output, Method *method, 
             char arg_sig = is_wrapper_class(arg_clss->get_name()->bytes);
             char param_sig = (char)type;
 
-            ASSERT(arg_sig, "Reflection arguments mismatch: expected " 
-                << param_sig << " but was " << arg_clss->get_name()->bytes);
-            
+            // actual parameter is not a wrapper
+            if (0 == arg_sig) {
+                ThrowNew_Quick(jenv, "java/lang/IllegalArgumentException",
+                    "actual parameter for the primitive argument is not a wrapper object");
+                return false;
+            }
+
             array[arg_number] = unwrap_primitive(jenv, arg, arg_sig);
 
             if (!widen_primitive_jvalue(array + arg_number, arg_sig, param_sig)) {
