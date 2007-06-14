@@ -180,7 +180,6 @@ LabelRet:
 
 .end method
 
-
 ;
 ; A subroutine graph contains several unreachable nodes.
 ;
@@ -273,4 +272,23 @@ LabelSub3:
 
 .end method
 
+;
+; An exception range ends at the end of the method.
+;
+.method public testWideExceptionRange()V
+    .limit stack 1
+    .limit locals 1
+
+    jsr LabelSub
+    ldc "Constant"
+LabelStart:
+    return
+
+LabelSub:
+    astore 0
+    ret 0
+LabelEnd:
+.catch all from LabelSub to LabelEnd using LabelStart
+
+.end method
 
