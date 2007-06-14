@@ -370,7 +370,8 @@ bool vm_iterate_object(Managed_Object_Handle obj)
     TIEnv* ti_env = global_ti_env;  // FIXME: use TLS to store ti_env
 
     TRACE2("vm.iterate", "vm_iterate_object " << (ManagedObject*)obj);
-    assert(ti_env->tags);
+
+    // Note: It is ok for ti_env->tags to be NULL at this point.
 
     jlong class_tag = ti_get_object_class_tag(ti_env, obj);
     tag_pair** tp = ti_get_object_tptr(obj);
