@@ -234,30 +234,28 @@ import junit.framework.TestCase;
     /**
      *  
      */
-//Commented because of the drlvm issue
-/*
     public void test_newInstance_Obj() {
-        class X {
-            public X() {
+        class X1 {
+            public X1() {
                 return;
             }
 
-            public X(X a9) {
+            public X1(X1 a9) {
                 return;
             }
         }
-        X x = new X(new X());
+        X1 x = new X1(new X1());
         try {
-            Constructor m = X.class.getDeclaredConstructor(new Class[] {
-                    java.lang.reflect.ConstructorTest.class, X.class });
+            Constructor m = X1.class.getDeclaredConstructor(new Class[] {
+                    java.lang.reflect.ConstructorTest.class, X1.class });
             Object o = m.newInstance(new Object[] {
-                    new java.lang.reflect.ConstructorTest(), new X() });
-            assertTrue("Error1", o instanceof X);
+                    new java.lang.reflect.ConstructorTest(), new X1() });
+            assertTrue("Error1", o instanceof X1);
         } catch (Exception e) {
             fail("Error2: " + e.toString());
         }
     }
-*/
+
     /**
      *  
      */

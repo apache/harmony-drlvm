@@ -67,10 +67,6 @@ public class ClassTestGetResource extends TestCase {
      * in java.ext.dirs.
      */
     public void test3() {
-        //System.out.println(System.getProperties());
-        if (vendor.equals("Intel DRL")) {// to test for others
-            // -Djava.ext.dirs=<some non-empty path list> argument should be
-            // passed for ij.exe for real check
             String as[] = System.getProperty("java.ext.dirs").split(
                     System.getProperty("path.separator"));
             for (int i = 0; i < as.length; i++) {
@@ -79,31 +75,32 @@ public class ClassTestGetResource extends TestCase {
                     String afn[] = dir.list();
                     File aff[] = dir.listFiles();
                     for (int j = 0; j < aff.length; j++) {
-                        if (aff[j].isFile()) {
-                            /**/System.out.println("test3 "+afn[j]);
+                        if (aff[j].isFile() && aff[j].getName().endsWith(".jar")) {
+                            aff[j].getName();
                             try {
-                                assertTrue("Error1",
-                                    Void.class.getResource("/" + afn[j])
-                                            .toString().indexOf(afn[j]) != -1);
-							    return;
-                            }catch(Throwable e){
-								 System.out.println(e.toString());
-    			    }
+                                java.util.jar.JarFile jf = new java.util.jar.JarFile(aff[j]);
+                                for (java.util.Enumeration e = jf.entries(); e
+                                        .hasMoreElements();) {
+                                    String s = e.nextElement().toString();
+                                    if (s.endsWith(".class")) {
+                                    	String resource = Void.class.getResource("/" + s).toString();
+                                        assertTrue("Error1", (resource.indexOf(s) != -1) && (resource.indexOf("jar:file:") != -1));
+                                        return;
+                                    }
+                                }
+                            } catch (java.io.IOException e) {
+                            	fail("Unexpected Exception " + e);
+                            }
                         }
                     }
                 }
             }
-        }
     }
 
     /**
      * in java.class.path.
      */
     public void test4() {
-        if (vendor.equals("Intel DRL")) {// to test for others
-            // -cp <some non-empty path list> or -Djava.class.path=<some
-            // non-empty path list> arguments should be passed for ij.exe for
-            // real check
             String as[] = System.getProperty("java.class.path").split(
                     System.getProperty("path.separator"));
             for (int i = 0; i < as.length; i++) {
@@ -113,10 +110,8 @@ public class ClassTestGetResource extends TestCase {
                     File aff[] = f.listFiles();
                     for (int j = 0; j < aff.length; j++) {
                         if (aff[j].isFile()) {
-                            //System.out.println("test4 "+afn[j]);
-                            assertTrue("Error1",
-                                    Void.class.getResource("/" + afn[j])
-                                            .toString().indexOf(afn[j]) != -1);
+                        	String resource = Void.class.getResource("/" + afn[j]).toString();
+                            assertTrue("Error1", (resource.toString().indexOf(afn[j]) != -1) && (resource.toString().indexOf("file:") != -1));
                             return;
                         }
                     }
@@ -128,31 +123,24 @@ public class ClassTestGetResource extends TestCase {
                                 .hasMoreElements();) {
                             String s = e.nextElement().toString();
                             if (s.endsWith(".class")) {
-                                //System.out.println("test4 "+s);
-                                assertTrue("Error1", Void.class.getResource(
-                                        "/" + s).toString().indexOf(s) != -1);
+                            	String resource = Void.class.getResource("/" + s).toString();
+                                assertTrue("Error2", (resource.indexOf(s) != -1) && (resource.indexOf("jar:file:") != -1));
                                 return;
                             }
                         }
-                    } catch (java.io.IOException _) {
+                    } catch (java.io.IOException e) {
+                    	fail("Unexpected Exception " + e);
                     }
                 }
             }
-        }
     }
 
     /**
      * via -Xbootclasspath (vm.boot.class.path).
      */
     public void test5() {
-        //System.out.println("|"+System.getProperty("sun.boot.class.path")+"|");
-        //System.out.println("|"+System.getProperty("vm.boot.class.path")+"|");
-        if (vendor.equals("Intel DRL")) {// to test for others
-            // -Xbootclasspath[/a /p]:<some non-empty path list> or
-            // -D{vm/sun}.boot.class.path=<some non-empty path list> arguments
-            // should be passed for ij.exe for real check
             String as[] = System.getProperty(
-                    (vendor.equals("Intel DRL") ? "vm" : "sun")
+                    (vendor.equals("Apache Software Foundation") ? "vm" : "sun")
                             + ".boot.class.path").split(
                     System.getProperty("path.separator"));
             for (int i = 0; i < as.length; i++) {
@@ -164,39 +152,35 @@ public class ClassTestGetResource extends TestCase {
                                 .hasMoreElements();) {
                             String s = e.nextElement().toString();
                             if (s.endsWith(".class")) {
-                                //System.out.println("test5 "+s);
-                                assertTrue("Error1", Void.class.getResource(
-                                        "/" + s).toString().indexOf(s) != -1);
+                            	String resource = Void.class.getResource("/" + s).toString();
+                                assertTrue("Error1", (resource.indexOf(s) != -1) && (resource.indexOf("jar:file:") != -1));
                                 return;
                             }
                         }
-                    } catch (java.io.IOException _) {
+                    } catch (java.io.IOException e) {
+                    	fail("Unexpected Exception " + e);
                     }
-                } else if (f.exists() && f.isDirectory() && false) {
+                } else if (f.exists() && f.isDirectory()) {
                     String afn[] = f.list();
                     File aff[] = f.listFiles();
                     for (int j = 0; j < aff.length; j++) {
                         if (aff[j].isFile()) {
-                            //System.out.println("test5 "+afn[j]);
-                            assertTrue("Error1",
-                                    Void.class.getResource("/" + afn[j])
-                                            .toString().indexOf(afn[j]) != -1);
+                        	String resource = Void.class.getResource("/" + afn[j]).toString();
+                            assertTrue("Error2", (resource.indexOf(afn[j]) != -1) && (resource.indexOf("file") != -1));
                             return;
                         }
                     }
                 }
             }
-        }
     }
 
     /**
      * The method throws NullPointerException if argument is null
      */
-//Commented because 6793 bug isn't fixed
-    public void te_st6() {
+    public void test6() {
         try {
             Void.class.getResource(null);
-        	fail("Error1: NullPointerException is not thrown for null argument"); // #6793
+        	fail("Error1: NullPointerException is not thrown for null argument");
         } catch (NullPointerException _) {           
         }
     }

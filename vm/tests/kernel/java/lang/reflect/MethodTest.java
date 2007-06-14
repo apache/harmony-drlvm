@@ -260,8 +260,6 @@ import junit.framework.TestCase;
     /**
      *  
      */
-//Commented because of the drlvm issue
-/*
     public void test_invoke_Obj_Obj() {
 
         class X {
@@ -279,7 +277,39 @@ import junit.framework.TestCase;
             fail("Error2: " + e.toString());
         }
     }
-*/
+
+    /**
+     *  
+     */
+    public void test_invoke_Obj_Obj_2() {
+        int sz = 500;
+        Object obj = null;
+        Class cls = null;
+        Method m;
+        try {         
+            cls = Class.forName("java.lang.reflect.AuxiliaryClass");
+            obj = cls.newInstance();
+        } catch (Throwable e) {
+            e.printStackTrace();
+            fail("Test failed during class creation: Unexpected error: " + e);
+        }       
+        int pp = 0;
+        for (int j = 0; j < sz; j++) {
+            try {
+                m = cls.getMethod("get", (Class[])null);
+                int ans = ((Integer) (m.invoke(obj, (Object[])null))).intValue();
+                fail("Expected InvocationTargetException was not thrown: ans = "
+                	+ ans + " step: " + j + " method name: "
+                    + m.getDeclaringClass().getName() + "." + m.getName());
+            } catch (InvocationTargetException e) {
+                // expected
+            } catch (Throwable e) {
+                e.printStackTrace();
+                fail("Test failed: Unexpected error: " + e);
+            }
+        }
+    }
+
     /**
      *  
      */
@@ -294,9 +324,9 @@ import junit.framework.TestCase;
             Method m = X.class.getDeclaredMethod("first",
                     new Class[] { X.class });
             assertEquals("Error1 ",
-                    "public java.lang.reflect.MethodTest$9X " +
-                        "java.lang.reflect.MethodTest$9X.first(" +
-                        "java.lang.reflect.MethodTest$9X)",
+                    "public java.lang.reflect.MethodTest$10X " +
+                        "java.lang.reflect.MethodTest$10X.first(" +
+                        "java.lang.reflect.MethodTest$10X)",
                     m.toString());
         } catch (Exception e) {
             fail("Error2: " + e.toString());

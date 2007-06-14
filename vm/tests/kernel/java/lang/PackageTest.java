@@ -52,7 +52,7 @@ public class PackageTest extends TestCase {
                          "Java Runtime Environment", s);
         } else if (vendor.equals("BEA Systems, Inc.")) {
             assertEquals("Error2: unexpected title:", "...", s);
-        } else if (vendor.equals("Intel DRL")) {
+        } else if (vendor.equals("Apache Software Foundation")) {
             assertEquals("Error3: unexpected title:", "Apache Harmony", s);
         }
     }
@@ -64,7 +64,7 @@ public class PackageTest extends TestCase {
         //System.out.println("test_getImplementationVendor_V");
         Package p = java.lang.Character.class.getPackage();
         if (p == null)
-            return;
+        	return;
         String s = p.getImplementationVendor();
         if (s == null)
             return; // XXX:It's not explained by spec
@@ -73,7 +73,7 @@ public class PackageTest extends TestCase {
                          "Sun Microsystems, Inc.", s);
         } else if (vendor.equals("BEA Systems, Inc.")) {
             assertEquals("Error2: unexpected vendor:", "...", s);
-        } else if (vendor.equals("Intel DRL")) {
+        } else if (vendor.equals("Apache Software Foundation")) {
             assertEquals("Error3: unexpected vendor:", "The Apache Software Foundation", s);
         }
     }
@@ -191,6 +191,7 @@ public class PackageTest extends TestCase {
         if (p == null)
             return;
         String s = p.getSpecificationVersion();
+        assertNotNull("spec version is null", s);
         if (s == null)
             return;
         assertTrue("unexpected specification version: " + s,
@@ -212,8 +213,7 @@ public class PackageTest extends TestCase {
     /**
      *  
      */
-// Commented because of the drvm issue.
-    public void te_st_isCompatibleWith_Str_1() {
+    public void test_isCompatibleWith_Str_1() {
         //System.out.println("test_isCompatibleWith_Str_1");
         Package p = Package.getPackage("java.lang");
         if (p == null)
@@ -278,8 +278,7 @@ public class PackageTest extends TestCase {
     /**
      *  
      */
-// Commented because of the drvm issue.
-    public void te_st_isSealed_URL_2() {
+    public void test_isSealed_URL_2() {
         //System.out.println("test_isSealed_URL_2");
         try {
             Package p = Package.getPackage("java.lang");

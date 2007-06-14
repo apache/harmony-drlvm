@@ -85,16 +85,14 @@ import junit.framework.TestCase;
     /**
      *  
      */
-//Commented because of the drlvm issue
-/*
     public void test_get_Obj() {
-        class X {
+        class X1 {
             public int Xfld = 777;
         }
-        X x = new X();
+        X1 x = new X1();
         x.Xfld = 333;
         try {
-            Field f1 = X.class.getField("Xfld");
+            Field f1 = X1.class.getField("Xfld");
             assertTrue("Error1: x.Xfld should be equal 333", ((Integer) (f1
                     .get(x))).intValue() == 333);
         } catch (Exception e) {
@@ -102,7 +100,7 @@ import junit.framework.TestCase;
             fail("Error2: " + e.toString());
         }
         try {
-            Field f1 = X.class.getField("Xfld");
+            Field f1 = X1.class.getField("Xfld");
             f1.get(null);
             fail("Error3: NullPointerException should be risen just above");
         } catch (NullPointerException _) {
@@ -111,7 +109,7 @@ import junit.framework.TestCase;
             fail("Error4: " + e.toString());
         }
     }
-*/
+
     /**
      *  
      */
@@ -379,11 +377,9 @@ import junit.framework.TestCase;
     /**
      *  
      */
-//Commented because of the drlvm issue
-/*
     public void test_set_Obj_Obj() {
-        class X {
-            X xx;
+        class X2 {
+            X2 xx;
 
             int Yfld = 777;
 
@@ -391,13 +387,13 @@ import junit.framework.TestCase;
                 return Yfld;
             };
         }
-        X x = new X();
+        X2 x = new X2();
         try {
-            Field f1 = X.class.getDeclaredField("Yfld");
+            Field f1 = X2.class.getDeclaredField("Yfld");
             f1.set(x, new Integer(345));
             assertTrue("Error1", x.m() == 345);
 
-            f1 = X.class.getDeclaredField("xx");
+            f1 = X2.class.getDeclaredField("xx");
             f1.set(x, x);
             assertTrue("Error2", x.xx.Yfld == 345);
             assertTrue("Error3", x.xx.m() == 345);
@@ -411,7 +407,6 @@ import junit.framework.TestCase;
             fail("Error6: " + e.toString());
         }
     }
-*/
     /**
      *  
      */

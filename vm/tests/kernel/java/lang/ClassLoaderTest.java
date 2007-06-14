@@ -1,10 +1,9 @@
 /*
- *  Licensed to the Apache Software Foundation (ASF) under one or more
- *  contributor license agreements.  See the NOTICE file distributed with
- *  this work for additional information regarding copyright ownership.
- *  The ASF licenses this file to You under the Apache License, Version 2.0
- *  (the "License"); you may not use this file except in compliance with
- *  the License.  You may obtain a copy of the License at
+ *  Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -609,6 +608,9 @@ import junit.framework.TestCase;
                 if (nm.endsWith("IIOImage")) {
                     return defineClass(b, 0, b.length); // ALL RIGHT
                 }
+                if (nm.endsWith("TemplateSet")) {
+                    return defineClass(b, 0, b.length); // ALL RIGHT
+                }
                 return null;
             }
 
@@ -641,31 +643,25 @@ import junit.framework.TestCase;
             tcl.loadClass("#org.apache.harmony.lang.generics.TemplateSet");
             assertTrue("Error1", tcl.findLoadedClass("org.apache.harmony.lang.generics.TemplateSet")
                     .getName().equals("org.apache.harmony.lang.generics.TemplateSet"));
-            //tcl.loadClass("#javax.imageio.IIOImage");
-            //assertTrue("Error1", tcl.findLoadedClass("javax.imageio.IIOImage")
-            //        .getName().equals("javax.imageio.IIOImage"));
-        } catch (ClassNotFoundException _) {
         } catch (Throwable e) {
             fail("Error2: " + e.toString());
         }
 
         // TEST CASE #2:
         try {
-            assertTrue("Error1", cl.findLoadedClass(null) == null);
-        } catch (NullPointerException _) {
+            assertTrue("Error3", cl.findLoadedClass(null) == null);
         } catch (Throwable e) {
             fail("Error4: " + e.toString());
         }
         try {
-            assertTrue("Error1", tcl.findLoadedClass(null) == null);
-        } catch (NullPointerException _) {
+            assertTrue("Error33", tcl.findLoadedClass(null) == null);
         } catch (Throwable e) {
-            fail("Error4: " + e.toString());
+            fail("Error44: " + e.toString());
         }
 
         // TEST CASE #3:
         try {
-            if (cl.findLoadedClass("java.lang.Object") != null) // XXX: Here we
+        	if (cl.findLoadedClass("java.lang.Object") != null) // XXX: Here we
                                                                 // differ of others. Is it
                                                                 // absolutely
                                                                 // acceptible
@@ -736,7 +732,7 @@ import junit.framework.TestCase;
             ClassLoader ld = TestResources.getLoader();
             Class c = Class.forName("[Lorg.apache.harmony.lang.generics.TemplateSet;", true, ld);
             assertTrue("Error7_1", ld
-                    .findLoadedClass("[Lorg.apache.harmony.test.TestResources;") == null); // according the deligate loading model
+                    .findLoadedClass("[Lorg.apache.harmony.test.TestResources;") == null); // according the delegate loading model
         } catch (Throwable e) {
             fail("Error12_1: " + e.toString());
         }
@@ -920,7 +916,6 @@ import junit.framework.TestCase;
         //new a3().main(new String[] { "" });
     }
 
-    
     /**
      *  
      */
@@ -989,6 +984,13 @@ import junit.framework.TestCase;
             ClassLoader.getSystemClassLoader().findResource("java.lang.Class");
         } catch (Exception _) {
             fail("Error3");
+        }
+        
+        try {
+            tcl.findResources(null);
+        } catch (NullPointerException _) {
+            fail("Error5");
+        } catch (java.io.IOException _) {
         }
     }
 
@@ -1277,12 +1279,11 @@ import junit.framework.TestCase;
         ClassLoader cl = ClassLoader.getSystemClassLoader();
 
         // TEST CASE #1:
-// Commented because of the drlvm issue.
-//        try {
-//            cl.getResource(null);
-//            fail("Error1: NullPointerException is not thrown for null argument");
-//        } catch (NullPointerException _) {
-//        }
+        try {
+            cl.getResource(null);
+            fail("Error1: NullPointerException is not thrown for null argument");
+        } catch (NullPointerException _) {
+        }
 
         // TEST CASE #2:
         assertTrue("Error1: unexpected:"
@@ -1337,12 +1338,11 @@ import junit.framework.TestCase;
         ClassLoader cl = ClassLoader.getSystemClassLoader();
 
         // TEST CASE #1:
-// Commented because of the drlvm issue.
-//        try {
-//            cl.getResourceAsStream(null);
-//            fail("Error1: NullPointerException is not thrown for null argument");
-//        } catch (NullPointerException _) {
-//        }
+        try {
+            cl.getResourceAsStream(null);
+            fail("Error1: NullPointerException is not thrown for null argument");
+        } catch (NullPointerException _) {
+        }
 
         // TEST CASE #2:
         byte magic[] = new byte[4];
@@ -1522,12 +1522,11 @@ import junit.framework.TestCase;
         ClassLoader.getSystemClassLoader();
 
         // TEST CASE #1:
-// Commented because of the drlvm issue.
-//        try {
-//            ClassLoader.getSystemResource(null);
-//            fail("Error1: NullPointerException is not thrown for null argument");
-//        } catch (NullPointerException _) {
-//        }
+        try {
+            ClassLoader.getSystemResource(null);
+            fail("Error1: NullPointerException is not thrown for null argument");
+        } catch (NullPointerException _) {
+        }
 
         // TEST CASE #2:
         assertTrue("Error1: unexpected:"
@@ -1584,12 +1583,11 @@ import junit.framework.TestCase;
         ClassLoader.getSystemClassLoader();
 
         // TEST CASE #1:
-// Commented because of the drlvm issue.
-//        try {
-//            ClassLoader.getSystemResourceAsStream(null);
-//            fail("Error1: NullPointerException is not thrown for null argument");
-//        } catch (NullPointerException _) {
-//        }
+        try {
+            ClassLoader.getSystemResourceAsStream(null);
+            fail("Error1: NullPointerException is not thrown for null argument");
+        } catch (NullPointerException _) {
+        }
 
         // TEST CASE #2:
         byte magic[] = new byte[4];
@@ -2242,10 +2240,10 @@ import junit.framework.TestCase;
             //expected 
         } 
     }
+    
     private class CL extends ClassLoader { 
         public Class defineKlass(byte[] a, int i1, int i2) throws ClassFormatError { 
             return super.defineClass(a, i1, i2); 
         } 
     } 
-
 }
