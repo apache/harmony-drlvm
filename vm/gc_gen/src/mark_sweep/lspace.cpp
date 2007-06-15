@@ -27,6 +27,7 @@ struct GC_Gen;
 void gc_set_los(GC_Gen* gc, Space* lspace);
 
 extern POINTER_SIZE_INT min_los_size_bytes;
+extern POINTER_SIZE_INT min_none_los_size_bytes;
 void lspace_initialize(GC* gc, void* start, POINTER_SIZE_INT lspace_size)
 {
   Lspace* lspace = (Lspace*)STD_MALLOC( sizeof(Lspace));
@@ -42,7 +43,7 @@ void lspace_initialize(GC* gc, void* start, POINTER_SIZE_INT lspace_size)
 
   min_los_size_bytes -= LOS_HEAD_RESERVE_FOR_HEAP_NULL;
   lspace->committed_heap_size = committed_size - LOS_HEAD_RESERVE_FOR_HEAP_NULL;
-  lspace->reserved_heap_size = committed_size - LOS_HEAD_RESERVE_FOR_HEAP_NULL;
+  lspace->reserved_heap_size = gc->reserved_heap_size - min_none_los_size_bytes - LOS_HEAD_RESERVE_FOR_HEAP_NULL;
   lspace->heap_start = (void*)((POINTER_SIZE_INT)reserved_base + LOS_HEAD_RESERVE_FOR_HEAP_NULL);
   lspace->heap_end = (void *)((POINTER_SIZE_INT)reserved_base + committed_size);
 

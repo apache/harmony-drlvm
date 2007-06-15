@@ -39,7 +39,6 @@ void mspace_update_info_after_space_tuning(Mspace* mspace)
     mspace->blocks = &mspace->blocks[tune_blocks];
     mspace->heap_start = mspace->blocks;
     mspace->committed_heap_size -= tune_size;
-    mspace->reserved_heap_size -= tune_size;
     mspace->first_block_idx += tune_blocks;
     mspace->num_managed_blocks -= tune_blocks;
     mspace->num_total_blocks -= tune_blocks;

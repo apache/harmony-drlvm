@@ -246,7 +246,11 @@ static void gc_decide_next_collect(GC_Gen* gc, int64 pause_time)
         free_size_threshold = (POINTER_SIZE_INT)(free_ratio_threshold * (SMax - GC_MOS_MIN_EXTRA_REMAIN_SIZE ) + GC_MOS_MIN_EXTRA_REMAIN_SIZE );
       else
         free_size_threshold = (POINTER_SIZE_INT)(free_ratio_threshold * SMax);
-  
+
+/*Fixme: if the total free size is lesser than threshold, the time point might be too late!
+ *Have a try to test whether the backup solution is better for specjbb.
+ */
+//   if ((mos_free_size + nos_free_size + minor_surviving_size) < free_size_threshold) gc->force_major_collect = TRUE;  
       if ((mos_free_size + nos_free_size)< free_size_threshold) gc->force_major_collect = TRUE;
   
       survive_ratio = (float)minor_surviving_size/(float)space_committed_size((Space*)fspace);
@@ -292,9 +296,10 @@ Boolean gc_compute_new_space_size(GC_Gen* gc, POINTER_SIZE_INT* mos_size, POINTE
 #else
     POINTER_SIZE_INT curr_heap_commit_end = 
                               (POINTER_SIZE_INT)gc->heap_start + LOS_HEAD_RESERVE_FOR_HEAP_NULL + gc->committed_heap_size;
+    assert(curr_heap_commit_end > (POINTER_SIZE_INT)mspace->heap_start);
     total_size = curr_heap_commit_end - (POINTER_SIZE_INT)mspace->heap_start;
 #endif
-
+  assert(total_size >= used_mos_size);
   POINTER_SIZE_INT total_free = total_size - used_mos_size;
   /*If total free is smaller than one block, there is no room for us to adjust*/
   if(total_free < GC_BLOCK_SIZE_BYTES)  return FALSE;

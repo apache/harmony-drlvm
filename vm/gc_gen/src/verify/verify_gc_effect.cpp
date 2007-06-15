@@ -77,11 +77,48 @@ void verify_live_finalizable_obj(Heap_Verifier* heap_verifier, Pool* live_finali
 
 void* verifier_copy_obj_information(Partial_Reveal_Object* p_obj)
 {
-  Live_Object_Inform* p_obj_information = (Live_Object_Inform* )STD_MALLOC(sizeof(Live_Object_Inform));
-  assert(p_obj_information);
-  p_obj_information->vt_raw = obj_get_vt_raw(p_obj);
-  p_obj_information->address = p_obj;
-  return (void*) p_obj_information;
+  if(!object_has_ref_field(p_obj)){
+    Live_Object_Inform* p_obj_information = (Live_Object_Inform* )STD_MALLOC(sizeof(Live_Object_Inform));
+    assert(p_obj_information);
+    p_obj_information->vt_raw = obj_get_vt_raw(p_obj);
+    p_obj_information->address = p_obj;
+    return (void*) p_obj_information;
+  }else{
+    REF *p_ref;
+    if (object_is_array(p_obj)) {  
+      Partial_Reveal_Array* array = (Partial_Reveal_Array*)p_obj;
+      unsigned int array_length = array->array_len;
+      Live_Object_Ref_Slot_Inform* p_obj_information = (Live_Object_Ref_Slot_Inform* )STD_MALLOC(sizeof(Live_Object_Inform) + sizeof(VT)*array_length);
+
+      p_obj_information->vt_raw = obj_get_vt_raw(p_obj);
+      p_obj_information->address = p_obj;
+
+      p_ref = (REF *)((POINTER_SIZE_INT)array + (int)array_first_element_offset(array));
+
+      unsigned int i = 0;
+      for(; i<array_length;i++){
+        Partial_Reveal_Object* p_obj = read_slot(p_ref+i);
+        p_obj_information->ref_slot[i] = p_obj==NULL? (VT)NULL: obj_get_vt_raw(p_obj);
+      }
+      return p_obj_information;
+    }else{
+      unsigned int num_refs = object_ref_field_num(p_obj);
+      Live_Object_Ref_Slot_Inform* p_obj_information = (Live_Object_Ref_Slot_Inform* )STD_MALLOC(sizeof(Live_Object_Inform) + sizeof(VT)*num_refs);
+      
+      p_obj_information->vt_raw = obj_get_vt_raw(p_obj);
+      p_obj_information->address = p_obj;
+
+      int* ref_iterator = object_ref_iterator_init(p_obj);
+      
+      unsigned int i = 0;
+      for(; i<num_refs; i++){  
+        p_ref = object_ref_iterator_get(ref_iterator+i, p_obj);
+        Partial_Reveal_Object* p_obj = read_slot(p_ref);
+        p_obj_information->ref_slot[i] = p_obj == NULL? (VT)NULL: obj_get_vt_raw(p_obj);
+      }
+      return p_obj_information;
+    }
+  }
 }
 
 static Boolean fspace_object_was_forwarded(Partial_Reveal_Object *p_obj, Fspace *fspace, Heap_Verifier* heap_verifier)
@@ -304,8 +341,45 @@ Boolean compare_live_obj_inform(POINTER_SIZE_INT* obj_container1,POINTER_SIZE_IN
   Live_Object_Inform* obj_inform_2 = (Live_Object_Inform*)*obj_container2;
   if(((POINTER_SIZE_INT)obj_inform_1->vt_raw) == ((POINTER_SIZE_INT)obj_inform_2->vt_raw)){
     /*FIXME: erase live object information in compare_function. */
-    STD_FREE(obj_inform_1);
-    STD_FREE(obj_inform_2);
+    if( object_has_ref_field((Partial_Reveal_Object*)obj_inform_1) ){
+      Live_Object_Ref_Slot_Inform* obj_ref_inform_1 = (Live_Object_Ref_Slot_Inform*)obj_inform_1;
+      Live_Object_Ref_Slot_Inform* obj_ref_inform_2 = (Live_Object_Ref_Slot_Inform*)obj_inform_2;
+      
+      if (object_is_array((Partial_Reveal_Object*)obj_ref_inform_1)){
+        Partial_Reveal_Array* array = (Partial_Reveal_Array*)obj_ref_inform_2->address;
+        unsigned int array_length = array->array_len;
+
+        unsigned int i = 0;
+        for(; i<array_length;i++){
+          if((POINTER_SIZE_INT)obj_ref_inform_1->ref_slot[i] != (POINTER_SIZE_INT)obj_ref_inform_2->ref_slot[i]){
+            assert(0);
+            STD_FREE(obj_ref_inform_1);
+            STD_FREE(obj_ref_inform_1);
+            return FALSE;
+          }
+        }
+      }else{
+
+        unsigned int num_refs = object_ref_field_num((Partial_Reveal_Object*)(obj_ref_inform_2->address));
+        
+        unsigned int i = 0;
+        for(; i<num_refs; i++){  
+          if((POINTER_SIZE_INT)obj_ref_inform_1->ref_slot[i] != (POINTER_SIZE_INT)obj_ref_inform_2->ref_slot[i]){
+            assert(0);
+            STD_FREE(obj_ref_inform_1);
+            STD_FREE(obj_ref_inform_1);
+            return FALSE;
+          }
+        }
+
+      }
+      
+      STD_FREE(obj_ref_inform_1);
+      STD_FREE(obj_ref_inform_2);
+    }else{
+      STD_FREE(obj_inform_1);
+      STD_FREE(obj_inform_2);
+    }  
     return TRUE;
   }else{ 
     assert(0);

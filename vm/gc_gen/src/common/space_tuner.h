@@ -38,8 +38,10 @@ enum Transform_Kind {
 
 typedef struct Space_Tuner{
     Transform_Kind kind;
-    /*This flag is set if the los tuning status changes in the process of tuning*/
-    Boolean reverse;
+    /*Fixme: These flags is set if the los tuning status changes in the process of tuning, remove one of them*/
+    Boolean reverse_1;
+    Boolean reverse_2;
+    
     POINTER_SIZE_INT tuning_size;
     /*Used for LOS_Shrink*/
     Block_Header* interim_blocks;

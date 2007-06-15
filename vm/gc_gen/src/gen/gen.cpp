@@ -107,7 +107,7 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
   
   }else{  
     los_mos_size = min_heap_size;
-    mos_reserve_size = los_mos_size - los_size;
+    mos_reserve_size = max_heap_size_bytes - min_los_size_bytes;
     nos_commit_size = (POINTER_SIZE_INT)(((float)(min_heap_size - los_size))/(1.0f + gc_gen->survive_ratio));
     nos_reserve_size = mos_reserve_size;
   }
@@ -192,8 +192,12 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
 #endif  /* STATIC_NOS_MAPPING else */
 
   HEAP_NULL = (POINTER_SIZE_INT)reserved_base;
-  
+
+#ifdef STATIC_NOS_MAPPING  
   gc_gen->reserved_heap_size = los_size + nos_reserve_size + mos_reserve_size;
+#else
+  gc_gen->reserved_heap_size = max_heap_size_bytes;
+#endif
   gc_gen->heap_start = reserved_base;
   gc_gen->heap_end = reserved_end;
   gc_gen->blocks = (Block*)reserved_base;

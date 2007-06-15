@@ -184,10 +184,12 @@ static inline void resurrect_obj_tree(Collector *collector, REF* p_ref)
 #ifdef USE_32BITS_HASHCODE
       obj_size += (hashcode_is_set(p_obj))?GC_OBJECT_ALIGNMENT:0;
 #endif
-      if(!obj_belongs_to_space(p_obj, gc_get_los((GC_Gen*)gc)))
+      if(!obj_belongs_to_space(p_obj, gc_get_los((GC_Gen*)gc))){
         collector->non_los_live_obj_size += obj_size;
-      else
+        collector->segment_live_size[SIZE_TO_SEGMENT_INDEX(obj_size)] += obj_size;
+      } else {
         collector->los_live_obj_size += round_up_to_size(obj_size, KB); 
+      }
     }else{  
       trace_object = trace_obj_in_normal_marking;
     }

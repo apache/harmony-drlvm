@@ -42,6 +42,12 @@ typedef struct Live_Object_Inform_struct{
   Partial_Reveal_Object* address;
 } Live_Object_Inform;
 
+typedef struct Live_Object_Ref_Slot_Inform_Struct{
+  VT vt_raw;
+  Partial_Reveal_Object* address;
+  VT ref_slot[1];
+} Live_Object_Ref_Slot_Inform;
+
 typedef struct Object_Hashcode_Inform_struct{
   int hashcode;
   Partial_Reveal_Object* address;

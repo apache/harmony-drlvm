@@ -338,7 +338,6 @@ void lspace_reset_after_collection(Lspace* lspace)
           if(trans_size >= GC_OBJ_SIZE_THRESHOLD) free_pool_add_area(lspace->free_pool, trans_fa);
         }
         lspace->committed_heap_size += trans_size;
-        lspace->reserved_heap_size += trans_size;
         break;
       }
       case TRANS_FROM_LOS_TO_MOS:{
@@ -348,7 +347,6 @@ void lspace_reset_after_collection(Lspace* lspace)
         assert( (POINTER_SIZE_INT)lspace->heap_end - trans_size == (POINTER_SIZE_INT)mos_first_block );
         lspace->heap_end = (void*)mos_first_block;
         lspace->committed_heap_size -= trans_size;
-        lspace->reserved_heap_size -= trans_size;
         /*LOS_Shrink: We don't have to scan lspace to build free pool when slide compact LOS*/
         assert((POINTER_SIZE_INT)lspace->scompact_fa_end > (POINTER_SIZE_INT)lspace->scompact_fa_start + tuner->tuning_size);
         new_fa_size = (POINTER_SIZE_INT)lspace->scompact_fa_end - (POINTER_SIZE_INT)lspace->scompact_fa_start - tuner->tuning_size;

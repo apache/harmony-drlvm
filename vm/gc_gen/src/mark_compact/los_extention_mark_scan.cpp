@@ -30,10 +30,12 @@ static FORCE_INLINE void scan_slot(Collector* collector, REF *p_ref)
 #ifdef USE_32BITS_HASHCODE
     obj_size += (hashcode_is_set(p_obj))?GC_OBJECT_ALIGNMENT:0;
 #endif
-    if(!obj_belongs_to_space(p_obj, gc_get_los((GC_Gen*)collector->gc)))
+    if(!obj_belongs_to_space(p_obj, gc_get_los((GC_Gen*)collector->gc))){
       collector->non_los_live_obj_size += obj_size;
-    else
+      collector->segment_live_size[SIZE_TO_SEGMENT_INDEX(obj_size)] += obj_size;
+    } else {
       collector->los_live_obj_size += round_up_to_size(obj_size, KB);
+    }
   }
   
   return;
@@ -146,10 +148,12 @@ void mark_scan_heap_for_space_tune(Collector *collector)
 #ifdef USE_32BITS_HASHCODE
         obj_size += (hashcode_is_set(p_obj))?GC_OBJECT_ALIGNMENT:0;
 #endif
-        if(!obj_belongs_to_space(p_obj, gc_get_los((GC_Gen*)gc)))
+        if(!obj_belongs_to_space(p_obj, gc_get_los((GC_Gen*)gc))){
           collector->non_los_live_obj_size += obj_size;
-        else
+          collector->segment_live_size[SIZE_TO_SEGMENT_INDEX(obj_size)] += obj_size;
+        } else {
           collector->los_live_obj_size += round_up_to_size(obj_size, KB);
+        }
       }
 
     } 

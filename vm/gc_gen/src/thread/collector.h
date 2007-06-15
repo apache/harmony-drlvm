@@ -25,6 +25,12 @@
 struct Block_Header;
 struct Stealable_Stack;
 
+#define NORMAL_SIZE_SEGMENT_GRANULARITY_BITS  8
+#define NORMAL_SIZE_SEGMENT_GRANULARITY (1 << NORMAL_SIZE_SEGMENT_GRANULARITY_BITS)
+#define NORMAL_SIZE_SEGMENT_NUM (GC_OBJ_SIZE_THRESHOLD / NORMAL_SIZE_SEGMENT_GRANULARITY)
+#define SIZE_TO_SEGMENT_INDEX(size) ((((size) + NORMAL_SIZE_SEGMENT_GRANULARITY-1) >> NORMAL_SIZE_SEGMENT_GRANULARITY_BITS) - 1)
+#define SEGMENT_INDEX_TO_SIZE(index)  (((index)+1) << NORMAL_SIZE_SEGMENT_GRANULARITY_BITS)
+
 typedef struct Collector{
   /* <-- first couple of fields are overloaded as Allocator */
   void *free;
@@ -61,6 +67,7 @@ typedef struct Collector{
   
   POINTER_SIZE_INT non_los_live_obj_size;
   POINTER_SIZE_INT los_live_obj_size;
+  POINTER_SIZE_INT segment_live_size[NORMAL_SIZE_SEGMENT_NUM];
   unsigned int result;
  
 }Collector;
