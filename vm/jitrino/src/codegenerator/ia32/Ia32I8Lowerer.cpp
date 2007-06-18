@@ -158,7 +158,7 @@ private:
     /**
      * check if the opnd is a volatile field of long type
      */
-    bool I8Lowerer::isLongVolatileMemoryOpnd(Opnd* opnd);
+    bool isLongVolatileMemoryOpnd(Opnd* opnd);
 
     /**
      * Points to the list of instructions to process.
