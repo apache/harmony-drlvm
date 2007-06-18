@@ -1904,10 +1904,9 @@ static NativeCodePtr rth_get_lil_stub_withresolve(int * dyn_count, f_resolve_int
 }
 
 
-static inline Class* resolveClass(Class_Handle klass, unsigned cp_idx, bool checkNew) {
+static inline Class* resolveClassNoExnCheck(Class_Handle klass, unsigned cp_idx, bool checkNew) {
     Global_Env* env = VM_Global_State::loader_env;
     Class* objClass = NULL;
-    BEGIN_RAISE_AREA;
     assert(!hythread_is_suspend_enabled());
     hythread_suspend_enable();
     if (checkNew) {
@@ -1919,13 +1918,19 @@ static inline Class* resolveClass(Class_Handle klass, unsigned cp_idx, bool chec
     if (objClass==NULL) {
         class_throw_linking_error(klass, cp_idx, OPCODE_NEW);
     }
-    END_RAISE_AREA;
     return objClass;
 }
 
+static inline Class* resolveClass(Class_Handle klass, unsigned cp_idx, bool checkNew) {
+    Class* res = NULL;
+    BEGIN_RAISE_AREA;
+    res = resolveClassNoExnCheck(klass, cp_idx, checkNew);
+    END_RAISE_AREA;
+    return res;
+}
 
 static inline void initializeClass(Class* cls) {
-    if (cls->is_initialized() || cls->is_initializing()) {
+    if (cls->is_initialized()) {
         return;
     }
 
@@ -2090,15 +2095,24 @@ static NativeCodePtr rth_get_lil_invokestatic_addr_withresolve(int * dyn_count) 
 static void *rth_invokevirtual_addr_withresolve(Class_Handle klass, unsigned cp_idx, ManagedObject* obj) {
     ASSERT_THROW_AREA;
 
+    assert(obj!=NULL);
+
     Method* m = NULL;
 
     BEGIN_RAISE_AREA;
+    jobject obj_h = oh_allocate_local_handle(); //make object reference visible to GC
+    obj_h->object = obj;
+
     hythread_suspend_enable();
     Global_Env* env = VM_Global_State::loader_env;
     m = resolve_virtual_method_env(env, klass, cp_idx, true);
     hythread_suspend_disable();
+
+    obj = obj_h->object;
+    oh_discard_local_handle(obj_h);
     END_RAISE_AREA;
     assert(m!=NULL);
+
 
     assert(obj!=NULL);
     assert(obj->vt()!=NULL);
@@ -2130,15 +2144,24 @@ static NativeCodePtr rth_get_lil_invokevirtual_addr_withresolve(int * dyn_count)
 static void *rth_invokeinterface_addr_withresolve(Class_Handle klass, unsigned cp_idx, ManagedObject* obj) {
     ASSERT_THROW_AREA;
 
+    assert(obj!=NULL);
+
     Method* m = NULL;
-    
+
     BEGIN_RAISE_AREA;
+    jobject obj_h = oh_allocate_local_handle(); //make object reference visible to GC
+    obj_h->object = obj;
+
     hythread_suspend_enable();
     Global_Env* env = VM_Global_State::loader_env;
     m = resolve_interface_method_env(env, klass, cp_idx, true);
     hythread_suspend_disable();
+
+    obj = obj_h->object;
+    oh_discard_local_handle(obj_h);
     END_RAISE_AREA;
     assert(m!=NULL);
+
 
     assert(obj!=NULL);
     assert(obj->vt()!=NULL);
@@ -2229,8 +2252,20 @@ static void *rth_checkcast_withresolve(Class_Handle klass, unsigned cp_idx, Mana
     if (obj==NULL) {
         return obj;
     }
-    Class* castClass = resolveClass(klass, cp_idx, false);
+
     Class* objClass = obj->vt()->clss;
+    Class* castClass = NULL;
+
+    BEGIN_RAISE_AREA
+    jobject obj_h = oh_allocate_local_handle(); //make object reference visible to GC
+    obj_h->object = obj;
+
+    castClass = resolveClassNoExnCheck(klass, cp_idx, false);
+
+    obj = obj_h->object;
+    oh_discard_local_handle(obj_h);
+    END_RAISE_AREA
+    
     Boolean res = class_is_subtype(objClass, castClass);
     if (!res) {
         exn_throw_by_name("java/lang/ClassCastException");
@@ -2250,7 +2285,19 @@ static NativeCodePtr rth_get_lil_checkcast_withresolve(int * dyn_count) {
 //OPCODE_INSTANCEOF
 static void *rth_instanceof_withresolve(Class_Handle klass, unsigned cp_idx, ManagedObject* obj) {
     ASSERT_THROW_AREA;
-    Class* castClass = resolveClass(klass, cp_idx, false);
+
+    Class* castClass = NULL;
+
+    BEGIN_RAISE_AREA
+    jobject obj_h = oh_allocate_local_handle(); //make object reference visible to GC
+    obj_h->object = obj;
+   
+    castClass = resolveClassNoExnCheck(klass, cp_idx, false);
+
+    obj = obj_h->object;
+    oh_discard_local_handle(obj_h);
+    END_RAISE_AREA
+
     int res = vm_instanceof(obj, castClass);
     return (void*)(POINTER_SIZE_INT)res;
 }

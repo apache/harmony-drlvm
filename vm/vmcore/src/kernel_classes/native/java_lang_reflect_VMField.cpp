@@ -46,6 +46,7 @@ static jvalue read_primitive(JNIEnv* jenv, jfieldID field_id, jobject obj, char 
     jclass declaring_class = NULL; //unused
     bool is_static = ((Field*) field_id)->is_static();
     jvalue primitive_value;
+    primitive_value.j = 0;
 
     switch (field_sig) {
     case 'B':
@@ -102,6 +103,7 @@ static jvalue get_primitive_field(JNIEnv *jenv, jobject obj, jlong jmember, char
     TRACE("read field value : " << field);
 
     jvalue result;
+    result.j = 0;
     if (field->get_field_type_desc()->is_primitive()) {
         char field_sig = field->get_descriptor()->bytes[0];
         result = read_primitive(jenv, (jfieldID)field, obj, field_sig);

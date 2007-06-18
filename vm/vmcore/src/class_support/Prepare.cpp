@@ -1454,6 +1454,9 @@ bool Class::prepare(Global_Env* env)
     gc_class_prepared(this, m_vtable);
     assert(m_state == ST_InstanceSizeComputed);
     m_state = ST_Prepared;
+    if (is_array()) {
+        m_state = ST_Initialized;
+    }
     TRACE2("classloader.prepare","class " << m_name->bytes << " prepared");
 
     //

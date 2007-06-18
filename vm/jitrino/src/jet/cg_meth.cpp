@@ -756,7 +756,9 @@ void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth, unsigned short
         // memory access, so we can't use HW checks - have to use 
         // explicit one. Not a big loss, as the INVOKESPECIAL mostly
         // comes right after NEW which guarantees non-null.
-        gen_check_null(thiz, opcod != OPCODE_INVOKESPECIAL);
+        // in lazy resolution mode we must do manual check and provide helper with
+        // non-null results.
+        gen_check_null(thiz, opcod != OPCODE_INVOKESPECIAL && meth!=NULL);
     }
     if (meth == NULL) {
         //lazy resolution mode: get method addr and call it.
