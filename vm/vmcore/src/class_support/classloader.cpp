@@ -1313,8 +1313,10 @@ bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
         
         strcpy(vmboot, kernel_path);
         strcat(vmboot, PORT_PATH_SEPARATOR_STR);
-        strcat(vmboot, luni_path);
-        m_env->JavaProperties()->destroy(luni_path);
+        if(luni_path != NULL) {
+            strcat(vmboot, luni_path);
+            m_env->JavaProperties()->destroy(luni_path);
+        }
 
         free(kernel_path);
         bcp_value = vmboot;
