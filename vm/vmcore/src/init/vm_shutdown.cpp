@@ -64,6 +64,7 @@ static jint exec_shutdown_sequence(JNIEnv * jni_env) {
     jmethodID shutdown_method;
 
     assert(hythread_is_suspend_enabled());
+    BEGIN_RAISE_AREA;
 
     system_class = jni_env->FindClass("java/lang/System");
     if (jni_env->ExceptionCheck() == JNI_TRUE || system_class == NULL) {
@@ -81,6 +82,8 @@ static jint exec_shutdown_sequence(JNIEnv * jni_env) {
     if (jni_env->ExceptionCheck() == JNI_TRUE) {
         PROCESS_EXCEPTION(40, "{0}java.lang.System.execShutdownSequence() method completed with an exception.");
     }
+
+    END_RAISE_AREA;
     return JNI_OK;
 }
 
