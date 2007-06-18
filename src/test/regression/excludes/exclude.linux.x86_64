@@ -1,3 +1,5 @@
+# Exclude this test because of problems with hardware exceptions handling in VM for this platform
+H1859
 H2086
 H2151
 # Exclude this test because JVMTI is not implemented for x86_64 in JIT mode yet

@@ -1761,11 +1761,11 @@ void IRManager::finalizeCallSites()
 }
 
 //_____________________________________________________________________________________________
-void IRManager::calculateStackDepth()
+uint32 IRManager::calculateStackDepth()
 {
     MemoryManager mm("calculateStackDepth");
     StlVector<int32> stackDepths(mm, fg->getNodeCount(), -1);
-    
+    int32 maxMethodStackDepth = -1;    
     
     const Nodes& nodes = fg->getNodesPostOrder();
     //iterating in topological (reverse postorder) order
@@ -1813,12 +1813,15 @@ void IRManager::calculateStackDepth()
                             stackDepth -= ((CallInst *)inst)->getArgStackDepth();
                         }
                     }
+                    maxMethodStackDepth = std::max(maxMethodStackDepth, stackDepth);
                 }
                 assert(stackDepth>=0);
             }
             stackDepths[node->getDfNum()]=stackDepth;
         }
     }
+    assert(maxMethodStackDepth>=0);
+    return (uint32)maxMethodStackDepth;
 }
 
 //_____________________________________________________________________________________________

@@ -427,10 +427,10 @@ public:
     uint32 getLayoutOpndAlignment(Opnd * opnd);
     void finalizeCallSites();
 
-    /** Calculates dislacement from stack entry point
-        for every instruction.
+    /** Calculates displacement from stack entry point
+        for every instruction and returns maximum stack depth needed for a method
     */
-    void calculateStackDepth();
+    uint32 calculateStackDepth();
     //-----------------------------------------------------------------------------------------------
     bool verify();
     bool verifyOpnds() const;

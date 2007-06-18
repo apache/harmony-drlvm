@@ -166,6 +166,23 @@ StackLayouter::StackLayouter ()
 {
 };
 
+static void insertSOEHandler(IRManager& irm, uint32 maxStackSize) {
+    if (maxStackSize == 0) {
+        return;
+    }
+#ifdef _EM64T_
+    RegName eaxReg = RegName_RAX;
+    RegName espReg = RegName_RSP;
+#else
+    RegName eaxReg = RegName_EAX;
+    RegName espReg = RegName_ESP;
+#endif
+    Opnd* guardedMemOpnd = irm.newMemOpnd(irm.getTypeFromTag(Type::IntPtr), MemOpndKind_Heap, irm.getRegOpnd(espReg), -(int)maxStackSize);
+    Inst* guardInst = irm.newInst(Mnemonic_MOV, irm.getRegOpnd(eaxReg), guardedMemOpnd);
+    Inst* entryInst = irm.getEntryPointInst();
+    guardInst->insertAfter(entryInst);
+}
+
 void StackLayouter::runImpl()
 {
     IRManager & irm=getIRManager();
@@ -180,7 +197,8 @@ void StackLayouter::runImpl()
     irm.calculateTotalRegUsage(OpndKind_GPReg);
     createProlog();
     createEpilog();
-    irm.calculateStackDepth();
+    uint32 maxStackDepth = irm.calculateStackDepth();
+    insertSOEHandler(irm, maxStackDepth);
     irm.layoutAliasOpnds();
 
     //fill StackInfo object

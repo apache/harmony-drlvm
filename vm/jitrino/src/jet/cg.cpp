@@ -535,7 +535,7 @@ unsigned CodeGen::gen_stack_to_args(bool pop, const CallSig& cs,
         (cs.cc() == CCONV_MANAGED_IA32)) {
         int fix = 0;
         if (cnt != 0) {
-            // find the differenece between last used slot and the end of 
+            // find the difference between last used slot and the end of 
             // stack frame
             int s = m_stack.stack_slot(m_jframe->depth2slot(0));
             fix = m_stack.size() + s; // s is < 0
@@ -556,6 +556,11 @@ unsigned CodeGen::gen_stack_to_args(bool pop, const CallSig& cs,
 
     if (idx == 0 && cs.size() != 0) {
         alu(alu_sub, sp, cs.size());
+        
+        //SOE handler -> read by maximum stack offset
+        Opnd maxStackAddr(iplatf, sp, -(int)cs.size(), ar_x, 0);
+        Opnd unusedRes(iplatf, valloc(iplatf));
+        do_mov(unusedRes, maxStackAddr);
     }
     int depth = 0;
     // 1st pass - free all register that are used for args passing

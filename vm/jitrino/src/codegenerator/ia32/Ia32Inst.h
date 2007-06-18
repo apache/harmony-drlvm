@@ -795,8 +795,12 @@ protected:
 
     Inst(Mnemonic m, uint32 _id, Form f)
         :kind(Kind_Inst), id(_id), mnemonic(m), prefix(InstPrefix_Null),
-        form(f), reservedFlags(0), 
-        opcodeGroup(0), index(0), defOpndCount(0), opndCount(0)
+        form(f), reservedFlags(0), codeSize(0), properties(0), reservedFlags2(0),
+        opcodeGroup(0), index(0), codeOffset(0), 
+        /*allocatedOpndCount(0), */defOpndCount(0), opndCount(0), stackDepth(0)/*, opnds(0)*/ 
+        
+        // WARN! commented opnds are assigned in overloaded 'new' operator before the constructor
+        // : void* Inst::operator new(size_t sz, MemoryManager& mm, uint32 opndCount)
     {}
     virtual ~Inst(){};
 
