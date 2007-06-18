@@ -14,10 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/**
- * @author Pavel Pervov, Alexey V. Varlamov
- * @version $Revision: 1.1.2.6.4.6 $
- */
 
 #define LOG_DOMAIN util::CLASS_LOGGER
 #include "cxxlog.h"
@@ -40,19 +36,10 @@
 
 #include "unicode/uchar.h"
 
-#ifdef _IPF_
-#include "vm_ipf.h"
-#endif //_IPF_
-
 /*
- *  References to th JVM spec below are the references to Java Virtual Machine
+ *  References to the JVM spec below are the references to Java Virtual Machine
  *  Specification, Second Edition
  */
-
-//
-// TODO list:
-//  (1) Implement field and method name check for 45 and lower versions of class file.
-//    
 
 #define REPORT_FAILED_CLASS_FORMAT(klass, msg)   \
     {                                                               \
@@ -61,61 +48,50 @@
     klass->get_class_loader()->ReportFailedClass(klass, "java/lang/ClassFormatError", ss);              \
     }
 
-
-static const char* get_tag_name(ConstPoolTags type) {
-    const char* name = "(Unknown tag)";
-    switch(type) {
+//returns constant pool tag symbolic name
+static const char* get_tag_name(ConstPoolTags tag) {
+    switch(tag) {
         case CONSTANT_Utf8:
-            name = "CONSTANT_Utf8";
-        break;
+            return "CONSTANT_Utf8";
         case CONSTANT_Integer:
-            name = "CONSTANT_Integer";
-            break;
+            return "CONSTANT_Integer";
         case CONSTANT_Float:
-            name = "CONSTANT_Float";
-            break;
+            return "CONSTANT_Float";
         case CONSTANT_Long:
-            name = "CONSTANT_Long";
-            break;
+            return "CONSTANT_Long";
         case CONSTANT_Double:
-            name = "CONSTANT_Double";
-            break;
+            return "CONSTANT_Double";
         case CONSTANT_Class:
-            name = "CONSTANT_Class";
-            break;
+            return "CONSTANT_Class";
         case CONSTANT_String:
-            name = "CONSTANT_String";
-            break;
+            return "CONSTANT_String";
         case CONSTANT_Fieldref:
-            name = "CONSTANT_Fieldref";
-            break;
+            return "CONSTANT_Fieldref";
         case CONSTANT_Methodref:
-            name = "CONSTANT_Methodref";
-            break;
+            return "CONSTANT_Methodref";
         case CONSTANT_InterfaceMethodref:
-            name = "CONSTANT_InterfaceMethodref";
-            break;
+            return "CONSTANT_InterfaceMethodref";
         case CONSTANT_NameAndType:
-            name = "CONSTANT_NameAndType";
-            break;
+            return "CONSTANT_NameAndType";
         case CONSTANT_UnusedEntry:
-            name = "CONSTANT_UnusedEntry";
-            break;
+            return "CONSTANT_UnusedEntry";
     }
-    return name;
+    return "(Unknown tag)";
 }
 
-static bool valid_cpi(Class* clss, uint16 idx, ConstPoolTags type, const char* msg) {
+//checks if constant pool index and tag are valid
+inline static bool
+valid_cpi(Class* clss, uint16 idx, ConstPoolTags tag, const char* msg) {
     if(!clss->get_constant_pool().is_valid_index(idx)) {
         //report error message about wrong index
         REPORT_FAILED_CLASS_FORMAT(clss, "invalid constant pool index: "
             << idx << " " << msg);
         return false;
     }
-    if(clss->get_constant_pool().get_tag(idx) != type) {
+    if(clss->get_constant_pool().get_tag(idx) != tag) {
         //report error message about wrong tag
         REPORT_FAILED_CLASS_FORMAT(clss, "invalid constant pool tag "
-            "(expected " << get_tag_name(type) << " got " 
+            "(expected " << get_tag_name(tag) << " got " 
             << get_tag_name((ConstPoolTags)clss->get_constant_pool().get_tag(idx)) << ") "
             << msg);
         return false;
@@ -123,125 +99,78 @@ static bool valid_cpi(Class* clss, uint16 idx, ConstPoolTags type, const char* m
     return true;
 }
 
-#define N_FIELD_ATTR    6
-#define N_METHOD_ATTR   10
-#define N_CODE_ATTR     3
-#define N_CLASS_ATTR    9
+struct AttributeID {
+    const char* name;
+    String* interned_name;
+    Attributes attr_id;
+};
 
-static String *field_attr_strings[N_FIELD_ATTR+1]; //attributes required to be recognized for fields
-static Attributes field_attrs[N_FIELD_ATTR];
+AttributeID field_attrs[] = {
+    {"ConstantValue", NULL, ATTR_ConstantValue},
+    {"Synthetic", NULL, ATTR_Synthetic},
+    {"Deprecated", NULL, ATTR_Deprecated},
+    {"Signature", NULL, ATTR_Signature},
+    {"RuntimeVisibleAnnotations", NULL, ATTR_RuntimeVisibleAnnotations},
+    {"RuntimeInvisibleAnnotations", NULL, ATTR_RuntimeInvisibleAnnotations},
+    {NULL, NULL, ATTR_UNDEF} 
+};
 
-static String *method_attr_strings[N_METHOD_ATTR+1]; //attributes required to be recognized for methods
-static Attributes method_attrs[N_METHOD_ATTR];
+AttributeID method_attrs[] = {
+    {"Code", NULL, ATTR_Code},
+    {"Exceptions", NULL, ATTR_Exceptions},
+    {"RuntimeVisibleParameterAnnotations", NULL, ATTR_RuntimeVisibleParameterAnnotations},
+    {"RuntimeInvisibleParameterAnnotations", NULL, ATTR_RuntimeInvisibleParameterAnnotations},
+    {"AnnotationDefault", NULL, ATTR_AnnotationDefault},
+    {"Synthetic", NULL, ATTR_Synthetic},
+    {"Deprecated", NULL, ATTR_Deprecated},
+    {"Signature", NULL, ATTR_Signature},
+    {"RuntimeVisibleAnnotations", NULL, ATTR_RuntimeVisibleAnnotations},
+    {"RuntimeInvisibleAnnotations", NULL, ATTR_RuntimeInvisibleAnnotations},
+    {NULL, NULL, ATTR_UNDEF}
+};
 
-static String *class_attr_strings[N_CLASS_ATTR+1]; //attributes required to be recognized for class
-static Attributes class_attrs[N_CLASS_ATTR];
+AttributeID class_attrs[] = {
+    {"SourceFile", NULL, ATTR_SourceFile},
+    {"InnerClasses", NULL, ATTR_InnerClasses},
+    {"SourceDebugExtension", NULL, ATTR_SourceDebugExtension},
+    {"EnclosingMethod", NULL, ATTR_EnclosingMethod},
+    {"Synthetic", NULL, ATTR_Synthetic},
+    {"Deprecated", NULL, ATTR_Deprecated},
+    {"Signature", NULL, ATTR_Signature},
+    {"RuntimeVisibleAnnotations", NULL, ATTR_RuntimeVisibleAnnotations},
+    {"RuntimeInvisibleAnnotations", NULL, ATTR_RuntimeInvisibleAnnotations},
+    {NULL, NULL, ATTR_UNDEF} 
+};
 
-static String *code_attr_strings[N_CODE_ATTR+1]; //attributes required to be recognized for code attribute
-static Attributes code_attrs[N_CODE_ATTR];
+AttributeID code_attrs[] = {
+    {"LineNumberTable", NULL, ATTR_LineNumberTable},
+    {"LocalVariableTable", NULL, ATTR_LocalVariableTable},
+    {"LocalVariableTypeTable", NULL, ATTR_LocalVariableTypeTable},
+    {NULL, NULL, ATTR_UNDEF}
+};
+ 
+static void preload(String_Pool& string_pool, AttributeID* attrs) {
+    for(int i = 0; attrs[i].name != NULL; i++)
+    {
+        attrs[i].interned_name = string_pool.lookup(attrs[i].name);
+    }
+}
+
 
 //
-// initialize string pool by preloading it with commonly used strings
+// initializes string pool by preloading it with commonly used strings
 //
 static bool preload_attrs(String_Pool& string_pool)
 {
-    method_attr_strings[0] = string_pool.lookup("Code");
-    method_attrs[0] = ATTR_Code;
-
-    method_attr_strings[1] = string_pool.lookup("Exceptions");
-    method_attrs[1] = ATTR_Exceptions;
-
-    method_attr_strings[2] = string_pool.lookup("RuntimeVisibleParameterAnnotations");
-    method_attrs[2] = ATTR_RuntimeVisibleParameterAnnotations;
-
-    method_attr_strings[3] = string_pool.lookup("RuntimeInvisibleParameterAnnotations");
-    method_attrs[3] = ATTR_RuntimeInvisibleParameterAnnotations;
-
-    method_attr_strings[4] = string_pool.lookup("AnnotationDefault");
-    method_attrs[4] = ATTR_AnnotationDefault;
-
-    method_attr_strings[5] = string_pool.lookup("Synthetic");
-    method_attrs[5] = ATTR_Synthetic;
-
-    method_attr_strings[6] = string_pool.lookup("Deprecated");
-    method_attrs[6] = ATTR_Deprecated;
-
-    method_attr_strings[7] = string_pool.lookup("Signature");
-    method_attrs[7] = ATTR_Signature;
-
-    method_attr_strings[8] = string_pool.lookup("RuntimeVisibleAnnotations");
-    method_attrs[8] = ATTR_RuntimeVisibleAnnotations;
-
-    method_attr_strings[9] = string_pool.lookup("RuntimeInvisibleAnnotations");
-    method_attrs[9] = ATTR_RuntimeInvisibleAnnotations;
-
-    method_attr_strings[10] = NULL;
-
-    field_attr_strings[0] = string_pool.lookup("ConstantValue");
-    field_attrs[0] = ATTR_ConstantValue;
-
-    field_attr_strings[1] = string_pool.lookup("Synthetic");
-    field_attrs[1] = ATTR_Synthetic;
-
-    field_attr_strings[2] = string_pool.lookup("Deprecated");
-    field_attrs[2] = ATTR_Deprecated;
-
-    field_attr_strings[3] = string_pool.lookup("Signature");
-    field_attrs[3] = ATTR_Signature;
-
-    field_attr_strings[4] = string_pool.lookup("RuntimeVisibleAnnotations");
-    field_attrs[4] = ATTR_RuntimeVisibleAnnotations;
-
-    field_attr_strings[5] = string_pool.lookup("RuntimeInvisibleAnnotations");
-    field_attrs[5] = ATTR_RuntimeInvisibleAnnotations;
-
-    field_attr_strings[6] = NULL;
-
-    class_attr_strings[0] = string_pool.lookup("SourceFile");
-    class_attrs[0] = ATTR_SourceFile;
-
-    class_attr_strings[1] = string_pool.lookup("InnerClasses");
-    class_attrs[1] = ATTR_InnerClasses;
-
-    class_attr_strings[2] = string_pool.lookup("SourceDebugExtension");
-    class_attrs[2] = ATTR_SourceDebugExtension;
-
-    class_attr_strings[3] = string_pool.lookup("EnclosingMethod");
-    class_attrs[3] = ATTR_EnclosingMethod;
-
-    class_attr_strings[4] = string_pool.lookup("Synthetic");
-    class_attrs[4] = ATTR_Synthetic;
-
-    class_attr_strings[5] = string_pool.lookup("Deprecated");
-    class_attrs[5] = ATTR_Deprecated;
-
-    class_attr_strings[6] = string_pool.lookup("Signature");
-    class_attrs[6] = ATTR_Signature;
-
-    class_attr_strings[7] = string_pool.lookup("RuntimeVisibleAnnotations");
-    class_attrs[7] = ATTR_RuntimeVisibleAnnotations;
-
-    class_attr_strings[8] = string_pool.lookup("RuntimeInvisibleAnnotations");
-    class_attrs[8] = ATTR_RuntimeInvisibleAnnotations;
-
-    class_attr_strings[9] = NULL;
-
-    code_attr_strings[0] = string_pool.lookup("LineNumberTable");
-    code_attrs[0] = ATTR_LineNumberTable;
-
-    code_attr_strings[1] = string_pool.lookup("LocalVariableTable");
-    code_attrs[1] = ATTR_LocalVariableTable;
-
-    code_attr_strings[2] = string_pool.lookup("LocalVariableTypeTable");
-    code_attrs[2] = ATTR_LocalVariableTypeTable;
-
-    code_attr_strings[3] = NULL;
+    preload(string_pool, method_attrs);
+    preload(string_pool, field_attrs);
+    preload(string_pool, class_attrs);
+    preload(string_pool, code_attrs);
 
     return true;
-} //init_loader
+}
 
-
-String* parse_signature_attr(ByteReader &cfs,
+static String* parse_signature_attr(ByteReader &cfs,
                              uint32 attr_len,
                              Class* clss)
 {
@@ -254,47 +183,42 @@ String* parse_signature_attr(ByteReader &cfs,
     uint16 idx;
     if (!cfs.parse_u2_be(&idx)) {
         REPORT_FAILED_CLASS_FORMAT(clss,
-            "cannot parse Signature index");
+            "truncated class file: failed to parse Signature index");
         return NULL;
     }
     if(!valid_cpi(clss, idx, CONSTANT_Utf8, "for signature at Signature attribute"))
         return NULL;
-    String* sig = clss->get_constant_pool().get_utf8_string(idx);
 
-    return sig;
+    return clss->get_constant_pool().get_utf8_string(idx);
 }
 
-
+static
 Attributes parse_attribute(Class *clss,
                            ByteReader &cfs,
-                           ConstantPool& cp,
-                           String *attr_strings[],
-                           Attributes attrs[],
+			   AttributeID* attrs,
                            uint32 *attr_len)
 {
     static bool UNUSED init = preload_attrs(VM_Global_State::loader_env->string_pool);
     //See specification 4.8 about Attributes
     uint16 attr_name_index;
-    bool result = cfs.parse_u2_be(&attr_name_index);
-    if (!result)
+    if (!cfs.parse_u2_be(&attr_name_index))
     {
         REPORT_FAILED_CLASS_FORMAT(clss,
-            "cannot parse attr_name_index");
+            "truncated class file: failed to parse attr_name_index");
         return ATTR_ERROR;
     }
-    result = cfs.parse_u4_be(attr_len);
-    if (!result)
+    if (!cfs.parse_u4_be(attr_len))
     {
         REPORT_FAILED_CLASS_FORMAT(clss,
-            "parse attribute:cannot parse attribute length");
+            "truncated class file: failed to parse attribute length");
         return ATTR_ERROR;
     }
     if(!valid_cpi(clss, attr_name_index, CONSTANT_Utf8, "for attribute name"))
         return ATTR_ERROR;
-    String* attr_name = cp.get_utf8_string(attr_name_index);
-    for (unsigned i=0; attr_strings[i] != NULL; i++) {
-        if (attr_strings[i] == attr_name)
-            return attrs[i];
+    String* attr_name = clss->get_constant_pool().get_utf8_string(attr_name_index);
+    for (unsigned i=0; attrs[i].interned_name != NULL ; i++) {
+        if (attrs[i].interned_name == attr_name)
+            return attrs[i].attr_id;
     }
     //
     // unrecognized attribute; skip
@@ -302,22 +226,26 @@ Attributes parse_attribute(Class *clss,
     if(!cfs.skip(*attr_len))
     {
             REPORT_FAILED_CLASS_FORMAT(clss,
-                "Couldn't skip unrecognized attribute: " << attr_name->bytes);
+                "Truncated class file");
             return ATTR_ERROR;
     }
     return ATTR_UNDEF;
 } //parse_attribute
 
 // forward declaration
-uint32 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* clss);
+static uint32
+parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* clss);
 
 // returns number of read bytes, 0 if error occurred
-uint32 parse_annotation(Annotation** value, ByteReader& cfs, Class* clss)
+static uint32
+parse_annotation(Annotation** value, ByteReader& cfs, Class* clss)
 {
+    unsigned initial_offset = cfs.get_offset();
+
     uint16 type_idx;
     if (!cfs.parse_u2_be(&type_idx)) {
         REPORT_FAILED_CLASS_FORMAT(clss,
-            "cannot parse type index of annotation");
+            "truncated class file: failed to parse type index of annotation");
         return 0;
     }
     if(!valid_cpi(clss, type_idx, CONSTANT_Utf8, "for annotation type"))
@@ -327,7 +255,7 @@ uint32 parse_annotation(Annotation** value, ByteReader& cfs, Class* clss)
     uint16 num_elements;
     if (!cfs.parse_u2_be(&num_elements)) {
         REPORT_FAILED_CLASS_FORMAT(clss,
-            "cannot parse number of annotation elements");
+            "truncated class file: failed to parse number of annotation elements");
         return 0;
     }
     Annotation* antn = (Annotation*) clss->get_class_loader()->Alloc(
@@ -338,41 +266,39 @@ uint32 parse_annotation(Annotation** value, ByteReader& cfs, Class* clss)
     antn->elements = (AnnotationElement*)((POINTER_SIZE_INT)antn + sizeof(Annotation));
     *value = antn;
 
-    uint32 read_len = 4;
-
     for (unsigned j = 0; j < num_elements; j++)
     {
         uint16 name_idx;
         if (!cfs.parse_u2_be(&name_idx)) {
             REPORT_FAILED_CLASS_FORMAT(clss,
-                "cannot parse element_name_index of annotation element");
+                "truncated class file: failed to parse element_name_index of annotation element");
             return 0;
         }
         if(!valid_cpi(clss, name_idx, CONSTANT_Utf8, "for annotation element name"))
             return 0;
         antn->elements[j].name = clss->get_constant_pool().get_utf8_string(name_idx);
 
-        uint32 size = parse_annotation_value(antn->elements[j].value, cfs, clss);
-        if (size == 0) {
+        if (parse_annotation_value(antn->elements[j].value, cfs, clss) == 0) {
             return 0;
         }
-        read_len += size + 2;
     }
 
-    return read_len;
+    return cfs.get_offset() - initial_offset;
 }
 
 // returns number of read bytes, 0 if error occurred
-uint32 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* clss)
+static uint32
+parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* clss)
 {
+    unsigned initial_offset = cfs.get_offset();
+
     uint8 tag;
     if (!cfs.parse_u1(&tag)) {
         REPORT_FAILED_CLASS_FORMAT(clss,
-            "cannot parse annotation value tag");
+            "truncated class file: failed to parse annotation value tag");
         return 0;
     }
     value.tag = (AnnotationValueType)tag;
-    uint32 read_len = 1;
 
     ConstantPool& cp = clss->get_constant_pool();
     unsigned cp_size = cp.get_size();
@@ -391,10 +317,9 @@ uint32 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* cl
             uint16 const_idx;
             if (!cfs.parse_u2_be(&const_idx)) {
                 REPORT_FAILED_CLASS_FORMAT(clss,
-                    "cannot parse const index of annotation value");
+                    "truncated class file: failed to parse const index of annotation value");
                 return 0;
             }
-            read_len += 2;
 
             switch (tag) {
             case AVT_BOOLEAN:
@@ -439,13 +364,12 @@ uint32 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* cl
             uint16 class_idx;
             if (!cfs.parse_u2_be(&class_idx)) {
                 REPORT_FAILED_CLASS_FORMAT(clss,
-                    "cannot parse class_info_index of annotation value");
+                    "truncated class file: failed to parse class_info_index of annotation value");
                 return 0;
             }
             if(!valid_cpi(clss, class_idx, CONSTANT_Utf8, " of class for annotation element value"))
                 return 0;
             value.class_name = cp.get_utf8_string(class_idx);
-            read_len += 2;
         }
         break;
 
@@ -454,7 +378,7 @@ uint32 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* cl
             uint16 type_idx;
             if (!cfs.parse_u2_be(&type_idx)) {
                 REPORT_FAILED_CLASS_FORMAT(clss,
-                    "cannot parse type_name_index of annotation enum value");
+                    "truncated class file: failed to parse type_name_index of annotation enum value");
                 return 0;
             }
             if(!valid_cpi(clss, type_idx, CONSTANT_Utf8, "of type_name for annotation enum element value"))
@@ -463,23 +387,20 @@ uint32 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* cl
             uint16 name_idx;
             if (!cfs.parse_u2_be(&name_idx)) {
                 REPORT_FAILED_CLASS_FORMAT(clss,
-                    "cannot parse const_name_index of annotation enum value");
+                    "truncated class file: failed to parse const_name_index of annotation enum value");
                 return 0;
             }
             if(!valid_cpi(clss, name_idx, CONSTANT_Utf8, "of const_name for annotation enum element value"))
                 return 0;
             value.enum_const.name = cp.get_utf8_string(name_idx);
-            read_len += 4;
         }
         break;
 
     case AVT_ANNOTN:
         {
-            uint32 size = parse_annotation(&value.nested, cfs, clss);
-            if (size == 0) {
+            if (parse_annotation(&value.nested, cfs, clss) == 0) {
                 return 0;
             }
-            read_len += size;
         }
         break;
 
@@ -488,21 +409,18 @@ uint32 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* cl
             uint16 num;
             if (!cfs.parse_u2_be(&num)) {
                 REPORT_FAILED_CLASS_FORMAT(clss,
-                    "cannot parse num_values of annotation array value");
+                    "truncated class file: failed to parse num_values of annotation array value");
                 return 0;
             }
-            read_len += 2;
             value.array.length = num;
             if (num) {
                 value.array.items = (AnnotationValue*) clss->get_class_loader()->Alloc(
                     num * sizeof(AnnotationValue));
                     //FIXME: verav should throw OOM
                 for (int i = 0; i < num; i++) {
-                    uint32 size = parse_annotation_value(value.array.items[i], cfs, clss);
-                    if (size == 0) {
+                    if (parse_annotation_value(value.array.items[i], cfs, clss) == 0) {
                         return 0;
                     }
-                    read_len += size;
                 }
             }
         }
@@ -510,23 +428,25 @@ uint32 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* cl
 
     default:
         REPORT_FAILED_CLASS_FORMAT(clss,
-            "unrecognized annotation value tag : " << (tag < 128) ? tag : (int)tag);
+            "unrecognized annotation value tag : " << (int)tag);
         return 0;
     }
 
-    return read_len;
+    return cfs.get_offset() - initial_offset;
 }
 
 // returns number of read bytes, 0 if error occurred
-uint32 parse_annotation_table(AnnotationTable ** table, ByteReader& cfs, Class* clss)
+static uint32
+parse_annotation_table(AnnotationTable ** table, ByteReader& cfs, Class* clss)
 {
+    unsigned initial_offset = cfs.get_offset();
+
     uint16 num_annotations;
     if (!cfs.parse_u2_be(&num_annotations)) {
         REPORT_FAILED_CLASS_FORMAT(clss,
-            "cannot parse number of Annotations");
+            "truncated class file: failed to parse number of Annotations");
         return 0;
     }
-    uint32 read_len = 2;
 
     if (num_annotations) {
         *table = (AnnotationTable*) clss->get_class_loader()->Alloc(
@@ -536,35 +456,33 @@ uint32 parse_annotation_table(AnnotationTable ** table, ByteReader& cfs, Class* 
 
         for (unsigned i = 0; i < num_annotations; i++)
         {
-            uint32 size = parse_annotation((*table)->table + i, cfs, clss);
-            if (size == 0) {
+            if (parse_annotation((*table)->table + i, cfs, clss) == 0) {
                 return 0;
             }
-            read_len += size;
         }
     } else {
         *table = NULL;
     }
 
-    return read_len;
+    return cfs.get_offset() - initial_offset;
 }
 
-static uint32 parse_parameter_annotations(AnnotationTable *** table,
+static uint32
+parse_parameter_annotations(AnnotationTable *** table,
                                         uint8 num_annotations,
                                         ByteReader& cfs, Class* clss)
 {
+    unsigned initial_offset = cfs.get_offset();
+
     *table = (AnnotationTable**)clss->get_class_loader()->Alloc(
         num_annotations * sizeof (AnnotationTable*));
     //FIXME: verav should throw OOM
-    uint32 len = 0;
     for (unsigned i = 0; i < num_annotations; i++)
     {
-        uint32 next_len = parse_annotation_table(*table + i, cfs, clss);
-        if(next_len == 0)
+        if(parse_annotation_table(*table + i, cfs, clss) == 0)
             return 0;
-        len += next_len;
     }
-    return len;
+    return cfs.get_offset() - initial_offset;
 }
 
 void* Class_Member::Alloc(size_t size) {
@@ -576,7 +494,8 @@ void* Class_Member::Alloc(size_t size) {
 bool Class_Member::parse(Class* clss, ByteReader &cfs)
 {
     if (!cfs.parse_u2_be(&_access_flags)) {
-        REPORT_FAILED_CLASS_FORMAT(clss, "cannot parse member access flags");
+        REPORT_FAILED_CLASS_FORMAT(clss, "truncated class file: "
+            << "failed to parse member access flags");
         return false;
     }
 
@@ -585,14 +504,16 @@ bool Class_Member::parse(Class* clss, ByteReader &cfs)
     //See specification 4.6 about name_index
     uint16 name_index;
     if (!cfs.parse_u2_be(&name_index)) {
-        REPORT_FAILED_CLASS_FORMAT(clss, "cannot parse member name index");
+        REPORT_FAILED_CLASS_FORMAT(clss, "truncated class file: "
+            << "failed to parse member name index");
         return false;
     }
 
     //See specification 4.6 about descriptor_index
     uint16 descriptor_index;
     if (!cfs.parse_u2_be(&descriptor_index)) {
-        REPORT_FAILED_CLASS_FORMAT(clss, "cannot parse member descriptor index");
+        REPORT_FAILED_CLASS_FORMAT(clss, "truncated class file: "
+            << "failed to parse member descriptor index");
         return false;
     }
 
@@ -882,7 +803,7 @@ bool Field::parse(Global_Env& env, Class *clss, ByteReader &cfs, bool is_trusted
     for (unsigned j=0; j<attr_count; j++)
     {
         // See specification 4.6 about attributes[]
-        Attributes cur_attr = parse_attribute(clss, cfs, cp, field_attr_strings, field_attrs, &attr_len);
+        Attributes cur_attr = parse_attribute(clss, cfs, field_attrs, &attr_len);
         switch (cur_attr) {
         case ATTR_ConstantValue:
             {   // constant value attribute
@@ -907,8 +828,7 @@ bool Field::parse(Global_Env& env, Class *clss, ByteReader &cfs, bool is_trusted
                     if(!cfs.skip(attr_len))
                     {
                         REPORT_FAILED_CLASS_FORMAT(clss,
-                            "couldn't skip ConstantValue attribute for field "
-                            << _name->bytes);
+                            "Truncated class file");
                         return false;
                     }
                 }
@@ -1099,8 +1019,8 @@ bool Field::parse(Global_Env& env, Class *clss, ByteReader &cfs, bool is_trusted
                     }
                 } else {
                     if(!cfs.skip(attr_len)) {
-                        REPORT_FAILED_CLASS_FORMAT(clss,
-                            "failed to skip RuntimeInvisibleAnnotations attribute");
+                        REPORT_FAILED_CLASS_FORMAT(_class,
+                            "Truncated class file");
                         return false;
                     }
                 }
@@ -1594,7 +1514,7 @@ bool Method::_parse_code(Global_Env& env, ConstantPool& cp, unsigned code_attr_l
     unsigned num_lvtt_entries = 0;
 
     for (i=0; i<n_attrs; i++) {
-        Attributes cur_attr = parse_attribute(_class, cfs, cp, code_attr_strings, code_attrs, &attr_len);
+        Attributes cur_attr = parse_attribute(_class, cfs, code_attrs, &attr_len);
         switch(cur_attr) {
         case ATTR_LineNumberTable:
             {
@@ -1644,8 +1564,9 @@ bool Method::_parse_code(Global_Env& env, ConstantPool& cp, unsigned code_attr_l
                 num_lvt_entries += n_local_vars;
                 if (!cfs.skip(10*n_local_vars))
                 {
-                    REPORT_FAILED_METHOD("error skipping");
-                    return false;
+                    REPORT_FAILED_CLASS_FORMAT(_class,
+                            "Truncated class file");
+                        return false;
                 }
                 break;
             }
@@ -1655,7 +1576,8 @@ bool Method::_parse_code(Global_Env& env, ConstantPool& cp, unsigned code_attr_l
                     //skip this attribute for class files of version less than 49
                     if (!cfs.skip(attr_len))
                     {
-                        REPORT_FAILED_METHOD("error skipping");
+                        REPORT_FAILED_CLASS_FORMAT(_class,
+                            "Truncated class file");
                         return false;
                     }
                 } else {
@@ -1696,7 +1618,8 @@ bool Method::_parse_code(Global_Env& env, ConstantPool& cp, unsigned code_attr_l
 
                     if (!cfs.skip(10*n_local_vars))
                     {
-                        REPORT_FAILED_METHOD("error skipping");
+                        REPORT_FAILED_CLASS_FORMAT(_class,
+                            "Truncated class file");
                         return false;
                     }
                 }
@@ -2011,7 +1934,7 @@ bool Method::parse(Global_Env& env, Class* clss,
         //
         // only code and exception attributes are defined for Method
         //
-        Attributes cur_attr = parse_attribute(clss, cfs, cp, method_attr_strings, method_attrs, &attr_len);
+        Attributes cur_attr = parse_attribute(clss, cfs, method_attrs, &attr_len);
         switch(cur_attr) {
         case ATTR_Code:
             numCode++;
@@ -2077,7 +2000,8 @@ bool Method::parse(Global_Env& env, Class* clss,
                 } else {
                     if (!cfs.skip(attr_len))
                     {
-                        REPORT_FAILED_METHOD("error skipping RuntimeInvisibleParameterAnnotations");
+                        REPORT_FAILED_CLASS_FORMAT(_class,
+                            "Truncated class file");
                         return false;
                     }
                 }
@@ -2222,7 +2146,7 @@ bool Method::parse(Global_Env& env, Class* clss,
                 }else {
                     if(!cfs.skip(attr_len)) {
                         REPORT_FAILED_CLASS_FORMAT(clss,
-                            "failed to skip RuntimeInvisibleAnnotations attribute");
+                            "Truncated class file");
                         return false;
                     }
                 }
@@ -3158,7 +3082,7 @@ bool Class::parse(Global_Env* env,
     uint32 attr_len = 0;
 
     for (unsigned i=0; i<n_attrs; i++) {
-        Attributes cur_attr = parse_attribute(this, cfs, m_const_pool, class_attr_strings, class_attrs, &attr_len);
+        Attributes cur_attr = parse_attribute(this, cfs, class_attrs, &attr_len);
         switch(cur_attr){
         case ATTR_SourceFile:
         {
@@ -3453,7 +3377,7 @@ bool Class::parse(Global_Env* env,
                 }else {
                     if(!cfs.skip(attr_len)) {
                         REPORT_FAILED_CLASS_FORMAT(this,
-                            "failed to skip RuntimeInvisibleAnnotations attribute");
+                            "Truncated class file");
                         return false;
                     }
                 }
