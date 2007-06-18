@@ -449,9 +449,17 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getThreadStack
         if (p_thread == get_thread_ptr()) {
             st_get_trace(p_thread, &size, &frames);
         } else {
+            // to avoid suspension of each other due to race condition
+            // get global thread lock as it's done in hythread_suspend_all().
+            IDATA UNREF status = hythread_global_lock();
+            assert(0 == status);
+
             jthread_suspend(thread);
             st_get_trace(p_thread, &size, &frames);
             jthread_resume(thread);
+
+            status = hythread_global_unlock();
+            assert(0 == status);
         }
     }
 

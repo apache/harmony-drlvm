@@ -300,8 +300,16 @@ jvmtiGetStackTrace(jvmtiEnv* env,
         // Check that this thread is not current
         if (vm_thread != p_TLS_vmthread)
         {
+            // to avoid suspension of each other due to race condition
+            // get global thread lock as it's done in hythread_suspend_all().
+            IDATA UNREF status = hythread_global_lock();
+            assert(0 == status);
+
             jthread_suspend(thread);
             thread_suspended = true;
+
+            status = hythread_global_unlock();
+            assert(0 == status);
         }
     }
     else
