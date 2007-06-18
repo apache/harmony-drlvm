@@ -102,8 +102,6 @@ AR CodeGen::valloc(jtype jt)
     assert(min_idx != NOTHING);
     
     AR ar = _ar(min_idx);
-    if (is_set(DBG_TRACE_CG)) { dbg(";;>spill %s\n", to_str(ar).c_str()); }
-    // Where to spill:
      
 #if 0 // TODO: checkit
     // How about scratch registers of other kind ?
@@ -136,9 +134,16 @@ AR CodeGen::valloc(jtype jt)
 #endif // if 0
 
     // Ugh... No way out, have to spill to the memory...
+
+    freeReg(ar);
     
-    // Now, update the things
-    
+    return ar;
+}
+
+void CodeGen::freeReg(AR ar)
+{
+    if (is_set(DBG_TRACE_CG)) { dbg(";;>spill %s\n", to_str(ar).c_str()); }
+     
     // First, free out the stack items, which are the register
     for (unsigned i=0; i<m_jframe->size(); i++) {
         Val& s = m_jframe->dip(i);
@@ -184,7 +189,6 @@ AR CodeGen::valloc(jtype jt)
         pop(stk);
     }
     if (is_set(DBG_TRACE_CG)) { dbg(";;>~spill\n"); }
-    return ar;
 }
 
 Val& CodeGen::vstack(unsigned depth, bool toReg)

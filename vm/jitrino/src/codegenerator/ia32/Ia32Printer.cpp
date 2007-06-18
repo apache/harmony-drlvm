@@ -275,6 +275,7 @@ const char * IRPrinter::getPseudoInstPrintName(Inst::Kind k)
         case Inst::Kind_MethodEntryPseudoInst: return "MethodEntryPseudoInst";
         case Inst::Kind_MethodEndPseudoInst: return "MethodEndPseudoInst";
         case Inst::Kind_EmptyPseudoInst: return "EmptyPseudoInst";
+        case Inst::Kind_CMPXCHG8BPseudoInst: return "CMPXCHG8BPseudoInst";
         default: return "";
     }
 }

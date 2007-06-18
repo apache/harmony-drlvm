@@ -409,26 +409,27 @@ public:
     */
     enum Kind
     {
-        Kind_Inst=0x7fffffff,
-        Kind_PseudoInst=0x7ff00000,
-            Kind_EntryPointPseudoInst=0x40000000,
-            Kind_AliasPseudoInst=0x20000000,
-            Kind_CatchPseudoInst=0x10000000,
-            Kind_CopyPseudoInst=0x01000000,
-            Kind_I8PseudoInst=0x02000000,
-            Kind_GCInfoPseudoInst=0x04000000,
-            Kind_SystemExceptionCheckPseudoInst=0x08000000,
-            Kind_MethodEntryPseudoInst=0x00100000,
-            Kind_MethodEndPseudoInst=0x00200000,
-            Kind_EmptyPseudoInst=0x00400000,
-        Kind_ControlTransferInst=0x0000fff0,
-            Kind_LocalControlTransferInst=0x000003F0,
-            Kind_JmpInst=0x00000200,
-            Kind_BranchInst=0x000001C0,
-            Kind_SwitchInst=0x00000030,
-            Kind_InterProceduralControlTransferInst=0x0000fc00,
-                Kind_CallInst=0x00000f000,
-                Kind_RetInst=0x000000c00,
+        Kind_Inst = 0x7fffffff,
+        Kind_PseudoInst                         = 0x7ff00000,
+            Kind_MethodEntryPseudoInst          = 0x00100000,
+            Kind_MethodEndPseudoInst            = 0x00200000,
+            Kind_EmptyPseudoInst                = 0x00400000,
+            Kind_CMPXCHG8BPseudoInst            = 0x00800000,
+            Kind_CopyPseudoInst                 = 0x01000000,
+            Kind_I8PseudoInst                   = 0x02000000,
+            Kind_GCInfoPseudoInst               = 0x04000000,
+            Kind_SystemExceptionCheckPseudoInst = 0x08000000,
+            Kind_CatchPseudoInst                = 0x10000000,
+            Kind_AliasPseudoInst                = 0x20000000,
+            Kind_EntryPointPseudoInst           = 0x40000000,
+        Kind_ControlTransferInst                    = 0x0000fff0,
+            Kind_LocalControlTransferInst           = 0x000003F0,
+            Kind_JmpInst                            = 0x00000200,
+            Kind_BranchInst                         = 0x000001C0,
+            Kind_SwitchInst                         = 0x00000030,
+            Kind_InterProceduralControlTransferInst = 0x0000fc00,
+                Kind_CallInst                       = 0x0000f000,
+                Kind_RetInst                        = 0x00000c00,
     };
 
     /** Misc properties of an instruction */
@@ -945,6 +946,22 @@ public:
 
 };
 
+
+//=========================================================================================================
+//   class CMPXCHG8BPseudoInst
+//=========================================================================================================
+/**
+    Class CMPXCHG8BPseudoInst represents ...
+*/
+class CMPXCHG8BPseudoInst: public Inst
+{
+protected:
+    CMPXCHG8BPseudoInst(int id)  
+        : Inst(Mnemonic_NULL, id, Inst::Form_Extended)
+    {kind=Kind_CMPXCHG8BPseudoInst;}
+
+    friend class    IRManager;
+};
 
 //=========================================================================================================
 //   class AliasPseudoInst

@@ -640,6 +640,40 @@ GCInfoPseudoInst* IRManager::newGCInfoPseudoInst(const StlVector<Opnd*>& basesAn
 }
 
 //_________________________________________________________________________________________________
+CMPXCHG8BPseudoInst * IRManager::newCMPXCHG8BPseudoInst(Opnd* mem, Opnd* edx, Opnd* eax, Opnd* ecx, Opnd* ebx)
+{ 
+    CMPXCHG8BPseudoInst* inst = new  (memoryManager, 8) CMPXCHG8BPseudoInst(instId++);
+
+    Opnd** opnds = inst->getOpnds();
+    Constraint* opndConstraints = inst->getConstraints();
+
+    // we do not set mem as a use in the inst
+    // just to cheat cg::verifier (see IRManager::verifyOpnds() function)
+    opnds[0] = mem;
+    opnds[1] = edx;
+    opnds[2] = eax;
+    opnds[3] = getRegOpnd(RegName_EFLAGS);
+    opnds[4] = edx;
+    opnds[5] = eax;
+    opnds[6] = ecx;
+    opnds[7] = ebx;
+    opndConstraints[0] = Constraint(OpndKind_Memory, OpndSize_64);
+    opndConstraints[1] = Constraint(RegName_EDX);
+    opndConstraints[2] = Constraint(RegName_EAX);
+    opndConstraints[3] = Constraint(RegName_EFLAGS);
+    opndConstraints[4] = Constraint(RegName_EDX);
+    opndConstraints[5] = Constraint(RegName_EAX);
+    opndConstraints[6] = Constraint(RegName_ECX);
+    opndConstraints[7] = Constraint(RegName_EBX);
+
+    inst->opndCount = 8;
+    inst->defOpndCount = 4;
+
+    inst->assignOpcodeGroup(this);
+    return inst;
+}
+
+//_________________________________________________________________________________________________
 Inst * IRManager::newCopyPseudoInst(Mnemonic mn, Opnd * opnd0, Opnd * opnd1)
 { 
     assert(mn==Mnemonic_MOV||mn==Mnemonic_PUSH||mn==Mnemonic_POP);

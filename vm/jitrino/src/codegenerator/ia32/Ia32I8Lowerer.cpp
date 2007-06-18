@@ -150,6 +150,17 @@ private:
         return true;
     }
     /**
+     * performs original mnemonic action on the new operands
+     */
+    void applyMnemonic(Inst* inst, Opnd* dst,  Opnd* dst_1,   Opnd* dst_2,
+                                   Opnd* src1, Opnd* src1_1, Opnd* src1_2,
+                                   Opnd* src2, Opnd* src2_1, Opnd* src2_2);
+    /**
+     * check if the opnd is a volatile field of long type
+     */
+    bool I8Lowerer::isLongVolatileMemoryOpnd(Opnd* opnd);
+
+    /**
      * Points to the list of instructions to process.
      *
      * The pointer points to the local variable in runImpl();
@@ -344,144 +355,249 @@ void I8Lowerer::processOpnds(Inst * inst)
         Opnd * src1 = useCount> 0 ? inst->getOpnd(defCount): NULL;
         Opnd * src2 = useCount> 1 ? inst->getOpnd(defCount+1): NULL;
 
+        bool dstIsLongVolatile = false;
+
         if (mn!=Mnemonic_IDIV && mn!=Mnemonic_IMUL) {
-            if (dst)
-                prepareNewOpnds(dst, dst_1,dst_2);
-            if (src1)
-                prepareNewOpnds(src1, src1_1,src1_2);
-            if (src2)
-                prepareNewOpnds(src2, src2_1,src2_2);
+            if (dst) {
+                if(isLongVolatileMemoryOpnd(dst)) {
+                    // temporary dst placed on stack will be used in the original instruction
+                    dstIsLongVolatile = true;
+                    Type* typeInt32 = irManager->getTypeManager().getInt32Type();
+                    Type* typeUInt32 = irManager->getTypeManager().getUInt32Type();
+                    dst_2 = irManager->newOpnd(typeInt32, Constraint(RegName_EDX));
+                    dst_1 = irManager->newOpnd(typeUInt32, Constraint(RegName_EAX));
+                } else {
+                    prepareNewOpnds(dst,dst_1,dst_2);
+                }
+            }
+            if (src1) {
+                if(isLongVolatileMemoryOpnd(src1)) {
+                    // prepare gp regs for CMPXCHG8B
+                    Type* typeInt32 = irManager->getTypeManager().getInt32Type();
+                    Type* typeUInt32 = irManager->getTypeManager().getUInt32Type();
+                    Opnd* edx = irManager->newOpnd(typeInt32, Constraint(RegName_EDX));
+                    Opnd* eax = irManager->newOpnd(typeUInt32, Constraint(RegName_EAX));
+                    Opnd* ecx = irManager->newOpnd(typeInt32, Constraint(RegName_ECX));
+                    Opnd* ebx = irManager->newOpnd(typeUInt32, Constraint(RegName_EBX));
+                    Opnd* zero = irManager->newImmOpnd(typeInt32, 0);
+
+                    irManager->newCopyPseudoInst(Mnemonic_MOV, edx, zero)->insertBefore(inst);
+                    irManager->newCopyPseudoInst(Mnemonic_MOV, eax, zero)->insertBefore(inst);
+                    irManager->newCopyPseudoInst(Mnemonic_MOV, ecx, edx)->insertBefore(inst);
+                    irManager->newCopyPseudoInst(Mnemonic_MOV, ebx, eax)->insertBefore(inst);
+
+                    // read src1 -> EDX:EAX regs using CMPXCHG8B inst
+                    Inst* cmpxchg = irManager->newCMPXCHG8BPseudoInst(src1,edx,eax,ecx,ebx);
+                    cmpxchg->setPrefix(InstPrefix_LOCK);
+                    cmpxchg->insertBefore(inst);
+
+                    // let src1_1:src1_2 be EAX:EDX 
+                    src1_1 = eax;
+                    src1_2 = edx;
+                } else {
+                    prepareNewOpnds(src1,src1_1,src1_2);
+                }
+            }
+            if (src2) {
+                if(isLongVolatileMemoryOpnd(src2)) {
+                    // prepare gp regs for CMPXCHG8B
+                    Type* typeInt32 = irManager->getTypeManager().getInt32Type();
+                    Type* typeUInt32 = irManager->getTypeManager().getUInt32Type();
+                    Opnd* edx = irManager->newOpnd(typeInt32, Constraint(RegName_EDX));
+                    Opnd* eax = irManager->newOpnd(typeUInt32, Constraint(RegName_EAX));
+                    Opnd* ecx = irManager->newOpnd(typeInt32, Constraint(RegName_ECX));
+                    Opnd* ebx = irManager->newOpnd(typeUInt32, Constraint(RegName_EBX));
+                    Opnd* zero = irManager->newImmOpnd(typeInt32, 0);
+
+                    irManager->newCopyPseudoInst(Mnemonic_MOV, edx, zero)->insertBefore(inst);
+                    irManager->newCopyPseudoInst(Mnemonic_MOV, eax, zero)->insertBefore(inst);
+                    irManager->newCopyPseudoInst(Mnemonic_MOV, ecx, edx)->insertBefore(inst);
+                    irManager->newCopyPseudoInst(Mnemonic_MOV, ebx, eax)->insertBefore(inst);
+
+                    // read src2 -> EDX:EAX regs using CMPXCHG8B inst
+                    Inst* cmpxchg = irManager->newCMPXCHG8BPseudoInst(src2,edx,eax,ecx,ebx);
+                    cmpxchg->setPrefix(InstPrefix_LOCK);
+                    cmpxchg->insertBefore(inst);
+                    // let src2_1:src2_2 be EAX:EDX 
+                    src2_1 = eax;
+                    src2_2 = edx;
+                } else {
+                    prepareNewOpnds(src2,src2_1,src2_2);
+                }
+            }
         }
 
-        switch(mn) {
-            case Mnemonic_ADD   :
-                assert(dst_1 && src1_1 && src2_1);
-                assert(dst_2 && src1_2 && src2_2);
-                irManager->newInstEx(Mnemonic_ADD, 1, dst_1, src1_1, src2_1)->insertBefore(inst);
-                irManager->newInstEx(Mnemonic_ADC, 1, dst_2, src1_2, src2_2)->insertBefore(inst);
-                inst->unlink();
-                break;
-            case Mnemonic_SUB   :
-                assert(dst_1 && src1_1 && src2_1);
-                assert(dst_2 && src1_2 && src2_2);
-                irManager->newInstEx(Mnemonic_SUB, 1, dst_1, src1_1, src2_1)->insertBefore(inst);
-                irManager->newInstEx(Mnemonic_SBB, 1, dst_2, src1_2, src2_2)->insertBefore(inst);
-                inst->unlink();
-                break;
-            case Mnemonic_AND   :
-            case Mnemonic_OR    :
-            case Mnemonic_XOR   :
-                assert(dst_1 && src1_1 && src2_1);
-                assert(dst_2 && src1_2 && src2_2);
-            case Mnemonic_NOT   :
-                assert(dst_1 && src1_1);
-                assert(dst_2 && src1_2);
-                irManager->newInstEx(mn, 1, dst_1, src1_1, src2_1)->insertBefore(inst);
-                irManager->newInstEx(mn, 1, dst_2, src1_2, src2_2)->insertBefore(inst);
-                inst->unlink();
-                break;
-            case Mnemonic_MOV   :
-                assert(dst_1 && src1_1);
-                irManager->newCopyPseudoInst(Mnemonic_MOV, dst_1, src1_1)->insertBefore(inst);
-                if (dst_2 && src1_2) {
-                    irManager->newCopyPseudoInst(Mnemonic_MOV, dst_2, src1_2)->insertBefore(inst);
-                }
-                inst->unlink();
-                break;
-            case Mnemonic_MOVSX :
-            case Mnemonic_MOVZX :
-                assert(dst_1 && dst_2 && src1_1);
-                assert(!src1_2);
-                if (src1_1->getSize()<OpndSize_32){
-                    irManager->newInstEx(mn, 1, dst_1, src1_1)->insertBefore(inst);
-                }else{
-                    assert(src1_1->getSize()==OpndSize_32);
-                    irManager->newInstEx(Mnemonic_MOV, 1, dst_1, src1_1)->insertBefore(inst);
-                }
-                if (mn==Mnemonic_MOVSX){
-                    // It's possible to substitute complex CDQ with a tight
-                    // constraints to the set of simpler instructions
-                    // with a wider constraints to let more freedom 
-                    // to regalloc and constraint resolver.
-                    // However, this seems does not change anything currently,
-                    // so leaving as-is.
-                    //test 	    low, low
-                    //setns 	hi		; if lo is positive, then load 1 into hi
-                    //sub		hi, 1	; if lo is positive, then hi is now '0'. otherwise, it's -1
-                    irManager->newInstEx(Mnemonic_CDQ, 1, dst_2, dst_1)->insertBefore(inst);
-                } else {
-                    //fill upper word with 0
-                    assert(mn == Mnemonic_MOVZX);
-                    Opnd* imm0=irManager->newImmOpnd(irManager->getTypeManager().getInt32Type(), 0);
-                    irManager->newInstEx(Mnemonic_MOV, 1, dst_2, imm0)->insertBefore(inst);
-                }
-                inst->unlink();
-                break;
-            case Mnemonic_PUSH  :
-                assert(src1_1);
-                assert(src1_2);
-                irManager->newInstEx(Mnemonic_PUSH, 0, src1_2)->insertBefore(inst);
-                irManager->newInstEx(Mnemonic_PUSH, 0, src1_1)->insertBefore(inst);
-                inst->unlink();
-                break;
-            case Mnemonic_POP   :
-                assert(dst_1);
-                assert(dst_2);
-                irManager->newInstEx(Mnemonic_POP, 1, dst_1)->insertBefore(inst);
-                irManager->newInstEx(Mnemonic_POP, 1, dst_2)->insertBefore(inst);
-                inst->unlink();
-                break;
-            case Mnemonic_SHL   :
-            {
-                assert(dst && src1 && src2);
-                buildShiftSubGraph(inst, src1_2, src1_1, src2, dst_2, dst_1, mn, Mnemonic_SHR);
-                inst->unlink();
-                break;
-            }
-            case Mnemonic_SHR   :
-            case Mnemonic_SAR   :
-            {
-                assert(dst && src1 && src2);
-                buildShiftSubGraph(inst, src1_1, src1_2, src2, dst_1, dst_2, mn, Mnemonic_SHL);
-                inst->unlink();
-                break;
-            }
-            case Mnemonic_CMP   :
-            {
-                assert(src1 && src2);
-                Inst * condInst = inst->getNextInst();
-                while (condInst && condInst->getMnemonic() == Mnemonic_MOV) {
-                    condInst = condInst->getNextInst();
-                }
-                Mnemonic mnem = condInst ? getBaseConditionMnemonic(condInst->getMnemonic()) : Mnemonic_NULL;
-                if (mnem != Mnemonic_NULL) {
-                            if(condInst->hasKind(Inst::Kind_BranchInst)) {
-                                compareAndBranch(inst,src1_1,src1_2,src2_1,src2_2,condInst);
-                            } else {
-                                buildSetSubGraph(inst,src1_1,src1_2,src2_1,src2_2,condInst);
-                            }
-                } else {
-                    buildComplexSubGraph(inst,src1_1,src1_2,src2_1,src2_2);
-                }
-                inst->unlink();
-                break;
-            }
-            case Mnemonic_IMUL:
-                lowerMul64(inst);
-                break;
-            case Mnemonic_IDIV:
-                if (isI8RemInst(inst)) {
-                    lowerRem64(inst);
-                }
-                else {
-                    lowerDiv64(inst);
-                }
-                break;
-            default :   
-                assert(0);
-        }//end switch by mnemonics
+        applyMnemonic(inst,dst,dst_1,dst_2,src1,src1_1,src1_2,src2,src2_1,src2_2);
+
+        if(dstIsLongVolatile) {
+            // prepare gp regs for CMPXCHG8B
+            Type* typeInt32 = irManager->getTypeManager().getInt32Type();
+            Type* typeUInt32 = irManager->getTypeManager().getUInt32Type();
+            Opnd* ecx = irManager->newOpnd(typeInt32, Constraint(RegName_ECX));
+            Opnd* ebx = irManager->newOpnd(typeUInt32, Constraint(RegName_EBX));
+
+            irManager->newCopyPseudoInst(Mnemonic_MOV, ecx, dst_2)->insertBefore(inst);
+            irManager->newCopyPseudoInst(Mnemonic_MOV, ebx, dst_1)->insertBefore(inst);
+
+            ControlFlowGraph * fg = irManager->getFlowGraph();
+            Node* prevNode = inst->getNode();
+            Node* nextNode = fg->splitNodeAtInstruction(inst, true, true, NULL);
+            Node* loopNode = fg->createNode(Node::Kind_Block);
+            Edge* prevOut = prevNode->getOutEdges().front();
+            fg->replaceEdgeTarget(prevOut, loopNode);
+
+            // write ECX:EBX -> dst using CMPXCHG8B inst
+            Inst* cmpxchg = irManager->newCMPXCHG8BPseudoInst(dst,dst_2,dst_1,ecx,ebx);
+            cmpxchg->setPrefix(InstPrefix_LOCK);
+            loopNode->appendInst(cmpxchg);
+            loopNode->appendInst(irManager->newBranchInst(Mnemonic_JNZ, loopNode, nextNode));
+
+            fg->addEdge(loopNode, loopNode, 0.5);
+            fg->addEdge(loopNode, nextNode, 0.5);
+        }
+
+        inst->unlink();
     }
 }
+
+bool I8Lowerer::isLongVolatileMemoryOpnd(Opnd* opnd) {
+
+    if ( isI8Type(opnd->getType()) ) {
+        Opnd* disp = opnd->isPlacedIn(OpndKind_Memory) ? opnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement) : NULL;
+        Opnd::RuntimeInfo* ri = (disp == NULL) ? NULL : disp->getRuntimeInfo();
+        Opnd::RuntimeInfo::Kind riKind = (ri == NULL) ? Opnd::RuntimeInfo::Kind_Null : ri->getKind();
+        return (riKind == Opnd::RuntimeInfo::Kind_FieldOffset ||
+                riKind == Opnd::RuntimeInfo::Kind_StaticFieldAddress) &&
+               ((FieldDesc*)disp->getRuntimeInfo()->getValue(0))->isVolatile();
+    } else {
+        return false;
+    }
+}
+
+
+void I8Lowerer::applyMnemonic(Inst* inst, Opnd* dst,  Opnd* dst_1,  Opnd* dst_2,
+                                          Opnd* src1, Opnd* src1_1, Opnd* src1_2,
+                                          Opnd* src2, Opnd* src2_1, Opnd* src2_2)
+{
+    Mnemonic mn = inst->getMnemonic();
+    switch(mn) {
+        case Mnemonic_ADD   :
+            assert(dst_1 && src1_1 && src2_1);
+            assert(dst_2 && src1_2 && src2_2);
+            irManager->newInstEx(Mnemonic_ADD, 1, dst_1, src1_1, src2_1)->insertBefore(inst);
+            irManager->newInstEx(Mnemonic_ADC, 1, dst_2, src1_2, src2_2)->insertBefore(inst);
+            break;
+        case Mnemonic_SUB   :
+            assert(dst_1 && src1_1 && src2_1);
+            assert(dst_2 && src1_2 && src2_2);
+            irManager->newInstEx(Mnemonic_SUB, 1, dst_1, src1_1, src2_1)->insertBefore(inst);
+            irManager->newInstEx(Mnemonic_SBB, 1, dst_2, src1_2, src2_2)->insertBefore(inst);
+            break;
+        case Mnemonic_AND   :
+        case Mnemonic_OR    :
+        case Mnemonic_XOR   :
+            assert(dst_1 && src1_1 && src2_1);
+            assert(dst_2 && src1_2 && src2_2);
+        case Mnemonic_NOT   :
+            assert(dst_1 && src1_1);
+            assert(dst_2 && src1_2);
+            irManager->newInstEx(mn, 1, dst_1, src1_1, src2_1)->insertBefore(inst);
+            irManager->newInstEx(mn, 1, dst_2, src1_2, src2_2)->insertBefore(inst);
+            break;
+        case Mnemonic_MOV   :
+            assert(dst_1 && src1_1);
+            irManager->newCopyPseudoInst(Mnemonic_MOV, dst_1, src1_1)->insertBefore(inst);
+            if (dst_2 && src1_2) {
+                irManager->newCopyPseudoInst(Mnemonic_MOV, dst_2, src1_2)->insertBefore(inst);
+            }
+            break;
+        case Mnemonic_MOVSX :
+        case Mnemonic_MOVZX :
+            assert(dst_1 && dst_2 && src1_1);
+            assert(!src1_2);
+            if (src1_1->getSize()<OpndSize_32){
+                irManager->newInstEx(mn, 1, dst_1, src1_1)->insertBefore(inst);
+            }else{
+                assert(src1_1->getSize()==OpndSize_32);
+                irManager->newInstEx(Mnemonic_MOV, 1, dst_1, src1_1)->insertBefore(inst);
+            }
+            if (mn==Mnemonic_MOVSX){
+                // It's possible to substitute complex CDQ with a tight
+                // constraints to the set of simpler instructions
+                // with a wider constraints to let more freedom 
+                // to regalloc and constraint resolver.
+                // However, this seems does not change anything currently,
+                // so leaving as-is.
+                //test 	    low, low
+                //setns 	hi		; if lo is positive, then load 1 into hi
+                //sub		hi, 1	; if lo is positive, then hi is now '0'. otherwise, it's -1
+                irManager->newInstEx(Mnemonic_CDQ, 1, dst_2, dst_1)->insertBefore(inst);
+            } else {
+                //fill upper word with 0
+                assert(mn == Mnemonic_MOVZX);
+                Opnd* imm0=irManager->newImmOpnd(irManager->getTypeManager().getInt32Type(), 0);
+                irManager->newInstEx(Mnemonic_MOV, 1, dst_2, imm0)->insertBefore(inst);
+            }
+            break;
+        case Mnemonic_PUSH  :
+            assert(src1_1);
+            assert(src1_2);
+            irManager->newInstEx(Mnemonic_PUSH, 0, src1_2)->insertBefore(inst);
+            irManager->newInstEx(Mnemonic_PUSH, 0, src1_1)->insertBefore(inst);
+            break;
+        case Mnemonic_POP   :
+            assert(dst_1);
+            assert(dst_2);
+            irManager->newInstEx(Mnemonic_POP, 1, dst_1)->insertBefore(inst);
+            irManager->newInstEx(Mnemonic_POP, 1, dst_2)->insertBefore(inst);
+            break;
+        case Mnemonic_SHL   :
+        {
+            assert(dst && src1 && src2);
+            buildShiftSubGraph(inst, src1_2, src1_1, src2, dst_2, dst_1, mn, Mnemonic_SHR);
+            break;
+        }
+        case Mnemonic_SHR   :
+        case Mnemonic_SAR   :
+        {
+            assert(dst && src1 && src2);
+            buildShiftSubGraph(inst, src1_1, src1_2, src2, dst_1, dst_2, mn, Mnemonic_SHL);
+            break;
+        }
+        case Mnemonic_CMP   :
+        {
+            assert(src1 && src2);
+            Inst * condInst = inst->getNextInst();
+            while (condInst && condInst->getMnemonic() == Mnemonic_MOV) {
+                condInst = condInst->getNextInst();
+            }
+            Mnemonic mnem = condInst ? getBaseConditionMnemonic(condInst->getMnemonic()) : Mnemonic_NULL;
+            if (mnem != Mnemonic_NULL) {
+                        if(condInst->hasKind(Inst::Kind_BranchInst)) {
+                            compareAndBranch(inst,src1_1,src1_2,src2_1,src2_2,condInst);
+                        } else {
+                            buildSetSubGraph(inst,src1_1,src1_2,src2_1,src2_2,condInst);
+                        }
+            } else {
+                buildComplexSubGraph(inst,src1_1,src1_2,src2_1,src2_2);
+            }
+            break;
+        }
+        case Mnemonic_IMUL:
+            lowerMul64(inst);
+            break;
+        case Mnemonic_IDIV:
+            if (isI8RemInst(inst)) {
+                lowerRem64(inst);
+            }
+            else {
+                lowerDiv64(inst);
+            }
+            break;
+        default :   
+            assert(0);
+    }
+} // applyMnemonic
 
 void I8Lowerer::buildShiftSubGraph(Inst * inst, Opnd * src1_1, Opnd * src1_2, Opnd * src2, Opnd * dst_1, Opnd * dst_2, Mnemonic mnem, Mnemonic opMnem) {
     Opnd * dst1_1 = irManager->newOpnd(dst_2->getType()), 

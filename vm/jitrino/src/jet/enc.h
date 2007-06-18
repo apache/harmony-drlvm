@@ -1031,6 +1031,17 @@ public:
     }
 
     /**
+    * Generates CMPXCHG8B operation.
+    */
+    void cmpxchg8b(bool lockPrefix, AR addrBaseReg)
+    {
+        if (is_trace_on()) {
+            trace(string("cmpxchg8b:"), string(lockPrefix ? "(locked) ":""),  to_str(addrBaseReg));
+        }
+        cmpxchg8b_impl(lockPrefix,addrBaseReg);
+    }
+
+    /**
      * Generates ALU operation between two registers.
      *
      * The registers are used as \c jt type.
@@ -1459,6 +1470,8 @@ private:
     void cmovcc_impl(COND c, const Opnd& op0, const Opnd& op1);
     /// Implementation of cmpxchg().
     void cmpxchg_impl(bool lockPrefix, AR addrReg, AR newReg, AR oldReg);
+    /// Implementation of cmpxchg8b().
+    void cmpxchg8b_impl(bool lockPrefix, AR addrReg);
     /// Implementation of lea().
     void lea_impl(const Opnd& reg, const Opnd& mem);
     /// Implementation of movp().

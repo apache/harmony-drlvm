@@ -223,6 +223,8 @@ public:
     AliasPseudoInst * newAliasPseudoInst(Opnd * targetOpnd, Opnd * sourceOpnd, uint32 offset);
     AliasPseudoInst * newAliasPseudoInst(Opnd * targetOpnd, uint32 sourceOpndCount, Opnd ** sourceOpnds);
 
+    CMPXCHG8BPseudoInst * newCMPXCHG8BPseudoInst(Opnd* mem, Opnd* edx, Opnd* eax, Opnd* ecx, Opnd* ebx);
+
     CatchPseudoInst * newCatchPseudoInst(Opnd * exception);
 
     Inst * newI8PseudoInst(Mnemonic mnemonic, uint32 defCount,

@@ -434,6 +434,7 @@ Mnemonic_CMOVcc,                        // Conditional Move
 
 Mnemonic_CMP,                           // Compare Two Operands
 Mnemonic_CMPXCHG,                       // Compare and exchange
+Mnemonic_CMPXCHG8B,                     // Compare and Exchange 8 Bytes
 //
 // double -> float
 Mnemonic_CVTSD2SS,                      // Convert Scalar Double-Precision Floating-Point Value to Scalar Single-Precision Floating-Point Value
@@ -454,8 +455,6 @@ Mnemonic_CVTSI2SD,                      // Convert Doubleword Integer to Scalar 
 // int32 -> float
 Mnemonic_CVTSI2SS,                      // Convert Doubleword Integer to Scalar Single-Precision Floating-Point Value
 
-//Mnemonic_CMPXCHG,                     // Compare and Exchange
-//Mnemonic_CMPXCHG8B,                   // Compare and Exchange 8 Bytes
 Mnemonic_COMISD,                        // Compare Scalar Ordered Double-Precision Floating-Point Values and Set EFLAGS
 Mnemonic_COMISS,                        // Compare Scalar Ordered Single-Precision Floating-Point Values and Set EFLAGS
 Mnemonic_DEC,                           // Decrement by 1

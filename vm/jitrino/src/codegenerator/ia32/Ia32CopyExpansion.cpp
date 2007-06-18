@@ -367,7 +367,21 @@ void CopyExpansion::runImpl()
             bool calculatingRegUsage = false;
             for (Inst * inst=(Inst*)node->getLastInst(), * nextInst=NULL; inst!=NULL; inst=nextInst){
                 nextInst=inst->getPrevInst();
-                if (inst->hasKind(Inst::Kind_CopyPseudoInst)){
+                if (inst->hasKind(Inst::Kind_CMPXCHG8BPseudoInst)){
+                    Opnd* mem = inst->getOpnd(0);
+                    Opnd* base = mem->getMemOpndSubOpnd(MemOpndSubOpndKind_Base);
+                    Opnd* index = mem->getMemOpndSubOpnd(MemOpndSubOpndKind_Index);
+                    Opnd* scale = mem->getMemOpndSubOpnd(MemOpndSubOpndKind_Scale);
+                    Opnd* disp = mem->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement);
+
+                    Opnd* memCopy = irManager->newMemOpnd(mem->getType(), mem->getMemOpndKind(), base, index, scale, disp);
+
+                    Inst* cmpxchg = irManager->newInst(Mnemonic_CMPXCHG8B, memCopy);
+                    if(inst->getPrefix() != InstPrefix_Null) {
+                        cmpxchg->setPrefix(inst->getPrefix());
+                    }
+                    cmpxchg->insertAfter(inst);
+                } else if (inst->hasKind(Inst::Kind_CopyPseudoInst)){
                     Mnemonic mn=inst->getMnemonic();
                     Inst *copySequence = NULL;
                     if (mn==Mnemonic_MOV){

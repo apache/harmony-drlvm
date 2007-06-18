@@ -728,6 +728,19 @@ void Encoder::cmpxchg_impl(bool lockPrefix, AR addrReg, AR newReg, AR oldReg) {
 
 }
 
+void Encoder::cmpxchg8b_impl(bool lockPrefix, AR addrReg) {
+
+    if (lockPrefix) {
+        ip(EncoderBase::prefix(ip(), InstPrefix_LOCK));
+    }
+
+    RegName dAddrReg = devirt(addrReg);
+    EncoderBase::Operands args;
+    args.add(EncoderBase::Operand(OpndSize_64, dAddrReg, 0));
+    ip(EncoderBase::encode(ip(), Mnemonic_CMPXCHG8B, args));
+
+}
+
 void Encoder::lea_impl(const Opnd& reg, const Opnd& mem)
 {
     EncoderBase::Operands args;

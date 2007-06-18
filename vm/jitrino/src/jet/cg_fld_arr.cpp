@@ -342,9 +342,31 @@ void CodeGen::do_field_op(const FieldOpInfo& fieldOp)
         }
         else {
             if (is_big(jt)){
-                Opnd where_hi(jt, where.base(), where.disp()+4, 
-                                  where.index(), where.scale());
-                vpush2(where, where_hi);
+                // if in lazy resolution mode the field may be not resolved
+                // it is pessimistically considered as a volatile one.
+                if ( (!fieldOp.fld) || field_is_volatile(fieldOp.fld) ) {
+                    // prepare address
+                    freeReg(gr4); // ESI
+                    lea(gr4,where);
+
+                    // release gp regs used by cmpxchg8b
+                    freeReg(gr0); // EAX
+                    freeReg(gr1); // EBX
+                    freeReg(gr2); // ECX
+                    freeReg(gr3); // EDX
+
+                    // place for loading value (EDX:EAX)
+                    Opnd eax = Opnd(jt, gr0);
+                    Opnd edx = Opnd(jt, gr3);
+
+                    // read the field
+                    cmpxchg8b(true, gr4);
+                    vpush2(eax, edx);
+                } else {
+                    Opnd where_hi(jt, where.base(), where.disp()+4, 
+                                      where.index(), where.scale());
+                    vpush2(where, where_hi);
+                }
             }
             else {
                 vpush(where);
@@ -390,14 +412,44 @@ void CodeGen::do_field_op(const FieldOpInfo& fieldOp)
     }
     else {
         vunref(jt, where);
-        Val& val = vstack(0, vis_mem(0));
-        do_mov(where, val, fieldIsMagic);
-        if (is_big(jt)) {
-            Opnd where_hi(jt, where.base(), where.disp()+4, 
-                              where.index(), where.scale());
-            vunref(jt, where_hi);
-            Opnd val_hi = vstack(1, vis_mem(1)).as_opnd();
-            do_mov(where_hi, val_hi);
+        // if in lazy resolution mode the field may be not resolved
+        // it is pessimistically considered as a volatile one.
+        if (is_big(jt) &&
+           ((!fieldOp.fld) || field_is_volatile(fieldOp.fld))) {
+            Val& val = vstack(0);
+            Val& val_hi = vstack(1);
+
+            // prepare address
+            freeReg(gr4); // ESI
+            lea(gr4,where);
+
+            // prepare the value being stored
+            Opnd ecx = Opnd(i32, gr2);
+            Opnd ebx = Opnd(i32, gr1);
+            freeReg(gr1); // EBX
+            freeReg(gr2); // ECX
+            mov(ecx, val_hi.as_opnd());
+            mov(ebx, val.as_opnd());
+
+            // release EDX:EAX (they are rewritten by cmpxchg8b)
+            freeReg(gr0); // EAX
+            freeReg(gr3); // EDX
+
+            // the loop to write value to the field
+            unsigned _loop = ipoff();
+            cmpxchg8b(true, gr4);
+            unsigned br_off = br(nz, 0, 0);
+            patch(br_off, ip(_loop));
+        } else {
+            Val& val = vstack(0, vis_mem(0));
+            do_mov(where, val);
+            if (is_big(jt)) {
+                Opnd where_hi(jt, where.base(), where.disp()+4, 
+                                  where.index(), where.scale());
+                vunref(jt, where_hi);
+                Opnd val_hi = vstack(1, vis_mem(1)).as_opnd();
+                do_mov(where_hi, val_hi);
+            }
         }
     }
     
