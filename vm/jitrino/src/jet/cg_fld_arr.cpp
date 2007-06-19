@@ -442,7 +442,7 @@ void CodeGen::do_field_op(const FieldOpInfo& fieldOp)
             patch(br_off, ip(_loop));
         } else {
             Val& val = vstack(0, vis_mem(0));
-            do_mov(where, val);
+            do_mov(where, val, fieldIsMagic);
             if (is_big(jt)) {
                 Opnd where_hi(jt, where.base(), where.disp()+4, 
                                   where.index(), where.scale());

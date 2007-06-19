@@ -2209,7 +2209,13 @@ bool IRManager::verifyHeapAddressTypes()
                 Opnd * subOpnd=opnd->getMemOpndSubOpnd((MemOpndSubOpndKind)j);
                 if (subOpnd!=NULL){
                     Type * type=subOpnd->getType();
-                    if (type->isManagedPtr()||type->isObject()||type->isMethodPtr()||type->isVTablePtr()||type->isUnmanagedPtr()){
+                    if (type->isManagedPtr() || type->isObject() || type->isMethodPtr() || type->isVTablePtr() || type->isUnmanagedPtr()
+#ifdef _EM64T_
+                        || subOpnd->getRegName() == RegName_RSP/*SOE handler*/
+#else
+                        || subOpnd->getRegName() == RegName_ESP/*SOE handler*/
+#endif
+                        ){
                         if (properTypeSubOpnd!=NULL){
                             VERIFY_OUT("Heap operand " << opnd << " contains more than 1 sub-operands of type Object or ManagedPointer "<<::std::endl);
                             VERIFY_OUT("Opnd 1: " << properTypeSubOpnd << ::std::endl);
