@@ -129,6 +129,21 @@ VMEXPORT int ti_is_enabled();
 
 VMEXPORT void *vm_allocate_thread_dummies(JavaVM *java_vm);
 
+/**
+ * A structure for thread manager properties
+ * There is the only yet. Others to be added here.
+ */
+struct tm_props {
+    int use_soft_unreservation;
+};
+
+#if !defined(_TM_PROP_EXPORT)
+extern VMIMPORT struct tm_props *tm_properties;
+#else 
+struct tm_props *tm_properties = NULL;
+#endif
+
+
 #ifdef __cplusplus
 }
 #endif

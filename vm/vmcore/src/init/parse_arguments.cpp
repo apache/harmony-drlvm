@@ -242,6 +242,8 @@ void print_vm_standard_properties()
         "            Report inlined methods with JVMTI_EVENT_COMPILED_METHOD_LOAD. Makes sense for optimizing jit.\n"
         "    vm.bootclasspath.appendclasspath (default FALSE):\n"
         "            Append classpath to the bootclasspath.\n"
+	"    thread.soft_unreservation (default FALSE):\n"
+        "            Use soft unreservation scheme.\n"
         "\nOther properties:\n\n"
         "    vm.boot.library.path:\n"
         "            List of directories which contain additional dynamic libraries to load into VM.\n"

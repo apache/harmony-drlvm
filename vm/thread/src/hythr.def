@@ -159,5 +159,5 @@ array_delete
 array_get
 get_java_thread_group
 
-
+tm_properties;
 Java_org_apache_harmony_drlvm_thread_ThreadHelper_getThreadIdOffset

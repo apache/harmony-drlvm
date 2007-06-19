@@ -273,6 +273,7 @@ static void init_vm_properties(Properties & properties)
         properties.set_new("vm.jvmti.compiled_method_load.inlined", "false");
         properties.set_new("vm.bootclasspath.appendclasspath", "false");
         properties.set_new("vm.dlls", PORT_DSO_NAME(GC_DLL));
+        properties.set_new("thread.soft_unreservation", "false");
 
         int n_api_dll_files = sizeof(api_dll_files) / sizeof(char *);
         /*

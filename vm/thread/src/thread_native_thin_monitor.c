@@ -22,6 +22,7 @@
 
 #undef LOG_DOMAIN
 #define LOG_DOMAIN "tm.locks"
+#define _TM_PROP_EXPORT
 
 #include <open/hythread_ext.h>
 #include <open/thread_externals.h>
@@ -147,6 +148,7 @@ void unreserve_self_lock(hythread_thin_monitor_t *lockword_ptr) {
     assert(!IS_RESERVED(*lockword_ptr));
     TRACE(("unreserved self"));
 }
+          
 
 /*
  * Used lockword
@@ -157,6 +159,8 @@ IDATA unreserve_lock(hythread_thin_monitor_t *lockword_ptr) {
     uint16 lock_id;
     hythread_t owner;
     IDATA status;
+    I_32 append;
+
     // trylock used to prevent cyclic suspend deadlock
     // the java_monitor_enter calls safe_point between attempts.
     /*status = hymutex_trylock(&TM_LOCK);
@@ -179,21 +183,43 @@ IDATA unreserve_lock(hythread_thin_monitor_t *lockword_ptr) {
         assert(owner);
         assert(hythread_get_id(owner) == lock_id);
         assert(owner != hythread_self());
+        if(owner->state& 
+                          ( TM_THREAD_STATE_TERMINATED|
+                            TM_THREAD_STATE_WAITING|
+        		    TM_THREAD_STATE_WAITING_INDEFINITELY|
+        		    TM_THREAD_STATE_WAITING_WITH_TIMEOUT|
+        		    TM_THREAD_STATE_SLEEPING|
+        		    TM_THREAD_STATE_SUSPENDED|
+        		    TM_THREAD_STATE_IN_MONITOR_WAIT )
+        ) {
+            append = 0;
+        } else {
+           append = RESERVED_BITMASK;
+        }
+
         status=hythread_suspend_other(owner);
         if (status !=TM_ERROR_NONE) {
 	    return status;
         }
+    } else {
+        append = 0;
     }
+
+    if(!tm_properties || !tm_properties->use_soft_unreservation) {
+	    append = RESERVED_BITMASK;
+    }
+
     // prepare new unreserved lockword and try to CAS it with old one.
     while (IS_RESERVED(lockword)) {
         assert(!IS_FAT_LOCK(lockword));
         TRACE(("unreserving lock"));
-        lockword_new = (lockword | RESERVED_BITMASK);
         if (RECURSION(lockword) != 0) {
+            lockword_new = (lockword | RESERVED_BITMASK);
             assert(RECURSION(lockword) > 0);
             assert(RECURSION(lockword_new) > 0);
             RECURSION_DEC(&lockword_new, lockword_new);
         } else {
+            lockword_new = (lockword | append);
             lockword_new =  lockword_new & 0x0000ffff; 
         }
         if (lockword == apr_atomic_cas32 (((volatile apr_uint32_t*) lockword_ptr), 
@@ -220,8 +246,8 @@ IDATA unreserve_lock(hythread_thin_monitor_t *lockword_ptr) {
     // To avoid race condition between checking two different
     // conditions inside of assert, the lockword contents has to be
     // loaded before checking.
-    lockword = *lockword_ptr;
-    assert(IS_FAT_LOCK(lockword) || !IS_RESERVED(lockword));
+//    lockword = *lockword_ptr;
+//    assert(IS_FAT_LOCK(lockword) || !IS_RESERVED(lockword));
     return TM_ERROR_NONE;
 }
 #else

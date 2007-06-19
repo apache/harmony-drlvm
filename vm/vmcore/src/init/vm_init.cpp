@@ -669,6 +669,15 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
 
     initialize_properties(vm_env);
 
+    tm_properties = (struct tm_props*) STD_MALLOC(sizeof(struct tm_props));
+
+    if (!tm_properties) {
+        LWARN(30, "failed to allocate mem for tp properties");
+        return JNI_ERR;
+    }
+
+    tm_properties->use_soft_unreservation = get_boolean_property("thread.soft_unreservation", FALSE, VM_PROPERTIES);
+
     parse_vm_arguments(vm_env);
 
     vm_env->verify = get_boolean_property("vm.use_verifier", TRUE, VM_PROPERTIES);
