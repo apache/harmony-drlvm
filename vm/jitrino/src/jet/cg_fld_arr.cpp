@@ -362,6 +362,13 @@ void CodeGen::do_field_op(const FieldOpInfo& fieldOp)
                     // read the field
                     cmpxchg8b(true, gr4);
                     vpush2(eax, edx);
+                    
+                    //TODO: do not mark registers as global, restore old value here!
+                    if (is_callee_save(gr0)) m_global_rusage.set(ar_idx(gr0));
+                    if (is_callee_save(gr1)) m_global_rusage.set(ar_idx(gr1));
+                    if (is_callee_save(gr2)) m_global_rusage.set(ar_idx(gr2));
+                    if (is_callee_save(gr3)) m_global_rusage.set(ar_idx(gr3));
+                    if (is_callee_save(gr4)) m_global_rusage.set(ar_idx(gr4));
                 } else {
                     Opnd where_hi(jt, where.base(), where.disp()+4, 
                                       where.index(), where.scale());
@@ -418,7 +425,6 @@ void CodeGen::do_field_op(const FieldOpInfo& fieldOp)
            ((!fieldOp.fld) || field_is_volatile(fieldOp.fld))) {
             Val& val = vstack(0);
             Val& val_hi = vstack(1);
-
             // prepare address
             freeReg(gr4); // ESI
             lea(gr4,where);
@@ -440,6 +446,14 @@ void CodeGen::do_field_op(const FieldOpInfo& fieldOp)
             cmpxchg8b(true, gr4);
             unsigned br_off = br(nz, 0, 0);
             patch(br_off, ip(_loop));
+
+            //TODO: do not mark registers as global, restore old value here!
+            if (is_callee_save(gr0)) m_global_rusage.set(ar_idx(gr0));
+            if (is_callee_save(gr1)) m_global_rusage.set(ar_idx(gr1));
+            if (is_callee_save(gr2)) m_global_rusage.set(ar_idx(gr2));
+            if (is_callee_save(gr3)) m_global_rusage.set(ar_idx(gr3));
+            if (is_callee_save(gr4)) m_global_rusage.set(ar_idx(gr4));
+
         } else {
             Val& val = vstack(0, vis_mem(0));
             do_mov(where, val, fieldIsMagic);
