@@ -840,7 +840,7 @@ class vf_Graph
         unsigned node_num = 0;
         vf_NodeContainer *nodes = m_nodes;
         while (nodes) {
-            unsigned index = node - nodes->m_node;
+            unsigned index = (unsigned) (node - nodes->m_node);
             if (index < nodes->container.m_max) {
                 node_num += index;
                 assert(node_num < m_nodenum);

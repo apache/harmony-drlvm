@@ -9,39 +9,40 @@ public class NegativeJsrTest extends junit.framework.TestCase {
         junit.textui.TestRunner.run(org.apache.harmony.drlvm.tests.regression.h3225.NegativeJsrTest.class);
     }
 
-    public void testMergeExecution() {
+    private void checkVerifyError() {
+        final String testMethodName = Thread.currentThread().getStackTrace()[3].getMethodName();
+        assertEquals("test", testMethodName.substring(0, 4));
+
+        final String testClassName = "org.apache.harmony.drlvm.tests.regression.h3225."
+           + testMethodName.substring(4) + "NegativeTest";
         try {
-            MergeExecutionNegativeTest.test();
+            Class.forName(testClassName).getConstructors();
         } catch (VerifyError ve) {
             return;
+        } catch (ClassNotFoundException cnfe) {
+            fail("Failed to load " + testClassName);
         }
-        fail("The test should throw java.lang.VerifyError");
+        fail(testClassName + " should throw java.lang.VerifyError");
+    }
+
+    public void testMergeExecution() {
+        checkVerifyError();
     }
 
     public void testMergeEmptyStack() {
-        try {
-            MergeEmptyStackNegativeTest.test();
-        } catch (VerifyError ve) {
-            return;
-        }
-        fail("The test should throw java.lang.VerifyError");
+        checkVerifyError();
     }
 
     public void testMergeIntFloat() {
-        try {
-            MergeIntFloatNegativeTest.test();
-        } catch (VerifyError ve) {
-            return;
-        }
-        fail("The test should throw java.lang.VerifyError");
+        checkVerifyError();
     }
 
     public void testMergeStack() {
-        try {
-            MergeStackNegativeTest.test();
-        } catch (VerifyError ve) {
-            return;
-        }
-        fail("The test should throw java.lang.VerifyError");
+        checkVerifyError();
+    }
+
+    public void testRetOrder() {
+        checkVerifyError();
     }
 }
+

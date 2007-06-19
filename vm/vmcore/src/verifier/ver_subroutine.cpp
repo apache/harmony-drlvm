@@ -318,11 +318,8 @@ SetSubMarks(vf_SubHandle sub, vf_Node *node, vf_Context *ctx)
         return VF_OK;           // already marked
     }
 
+    assert(node != ctx->m_graph->GetStartNode());
     if (NULL == node->m_sub) {
-        if (node == ctx->m_graph->GetStartNode()) {
-            VF_REPORT(ctx, "Reached ret not using jsr branches");
-            return VF_ErrorJsrOther;
-        }
 
         node->m_sub = sub;
         if (node->m_mark) {
@@ -372,24 +369,26 @@ FollowJsrEdge(vf_Node *node, vf_NodeStack &stack, vf_Context *ctx)
              << ctx->m_graph->GetNodeNum(node) << " -> #"
              << ctx->m_graph->GetNodeNum(stack.m_node));
 
+    if (stack.m_node->m_sub && (stack.m_node->m_sub->m_entry != stack.m_node)) {
+        // a subroutine entry is already resolved and
+        // jsr doesn't branch to the entry node
+        VF_REPORT(ctx,
+                  "A subroutine splits execution into "
+                  "several ret instructions");
+        return VF_ErrorJsrMultipleRet;
+    }
+
     if (stack.m_node->m_mark) {
+        if (!stack.m_node->m_sub) {
+            // we assume that the branch is to the top
+            // level code, or the same subroutine, so there
+            // is no return
+            return VF_OK;
+        }
+
         // FIXME subroutine node copies might have different stack maps, though
         // this is not a security threat, just incompatibility with RI.
         if (path_start) {
-            if (!stack.m_node->m_sub) {
-                // we assume that the branch is to the top
-                // level code, or the same subroutine, so there
-                // is no return
-                return VF_OK;
-            }
-
-            if (stack.m_node->m_sub->m_entry != stack.m_node) {
-                VF_REPORT(ctx,
-                          "A subroutine splits execution into "
-                          "several ret instructions");
-                return VF_ErrorJsrMultipleRet;
-            }
-
             EnsureStackMapInitialized(ctx);
             vf_NodeStackHandle &p_element = ctx->m_sub_ctx->m_path_start;
             for (; p_element != &stack; p_element = p_element->m_next) {
@@ -503,8 +502,11 @@ static vf_Result MarkNode(vf_NodeStack &stack, vf_Context *ctx)
     if ((VF_NODE_CODE_RANGE == stack.m_node->m_type)
         && (VF_INSTR_RET == stack.m_node->m_end->m_type)) {
         vf_Sub *sub = AddNewSub(stack.m_node, ctx->m_sub_ctx);
+        if (!ctx->m_sub_ctx->m_path_start) {
+            VF_REPORT(ctx, "Reached ret on the top level");
+            return VF_ErrorJsrOther;
+        }
         result = SetSubMarks(sub, stack.m_node, ctx);
-        assert(ctx->m_sub_ctx->m_path_start);
         if (VF_OK != result) {
             return result;
         }
