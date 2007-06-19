@@ -1,3 +1,19 @@
+/*
+ *  Copyright 2005-2006 The Apache Software Foundation or its licensors, as applicable.
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
 #include "verifier_common.h"
 #include "verify_gc_effect.h"
 
@@ -98,7 +114,7 @@ void* verifier_copy_obj_information(Partial_Reveal_Object* p_obj)
       unsigned int i = 0;
       for(; i<array_length;i++){
         Partial_Reveal_Object* p_obj = read_slot(p_ref+i);
-        p_obj_information->ref_slot[i] = p_obj==NULL? (VT)NULL: obj_get_vt_raw(p_obj);
+        p_obj_information->ref_slot[i] = p_obj==NULL? (VT)NULL: obj_get_vt(p_obj);
       }
       return p_obj_information;
     }else{
@@ -114,7 +130,7 @@ void* verifier_copy_obj_information(Partial_Reveal_Object* p_obj)
       for(; i<num_refs; i++){  
         p_ref = object_ref_iterator_get(ref_iterator+i, p_obj);
         Partial_Reveal_Object* p_obj = read_slot(p_ref);
-        p_obj_information->ref_slot[i] = p_obj == NULL? (VT)NULL: obj_get_vt_raw(p_obj);
+        p_obj_information->ref_slot[i] = p_obj == NULL? (VT)NULL: obj_get_vt(p_obj);
       }
       return p_obj_information;
     }

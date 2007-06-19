@@ -36,9 +36,7 @@ static Boolean mspace_alloc_block(Mspace* mspace, Allocator* allocator)
     }
     /* ok, got one */
     Block_Header* alloc_block = (Block_Header*)&(mspace->blocks[allocated_idx - mspace->first_block_idx]);
-    UNSAFE_REGION_START
     mspace->alloced_size += GC_BLOCK_SIZE_BYTES;
-    UNSAFE_REGION_END
 
     allocator_init_free_block(allocator, alloc_block);
     

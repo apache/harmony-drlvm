@@ -20,7 +20,6 @@
  
 #ifndef _VECTOR_BLOCK_H_
 #define _VECTOR_BLOCK_H_
-#include "port_threadunsafe.h"
 
 typedef struct Vector_Block{
   void* next; /* point to next block */
@@ -100,20 +99,16 @@ inline POINTER_SIZE_INT* vector_block_get_last_entry(Vector_Block* block)
 /* Below is to use Vector_Block as stack (for trace-forwarding DFS order ) */
 inline void vector_stack_init(Vector_Block* block)
 { 
-  UNSAFE_REGION_START
   block->tail = block->heap_end;
-  block->head = block->heap_end;
-  UNSAFE_REGION_END
+  block->head = block->heap_end;  
 }
 
 inline void vector_stack_clear(Vector_Block* block)
 {
-  UNSAFE_REGION_START
   vector_stack_init(block);
 #ifdef _DEBUG
   memset(block->entries, 0, (POINTER_SIZE_INT)block->heap_end - (POINTER_SIZE_INT)block->entries);
 #endif
-  UNSAFE_REGION_END
 }
 
 inline Boolean vector_stack_is_empty(Vector_Block* block)
@@ -129,13 +124,11 @@ inline Boolean vector_stack_is_full(Vector_Block* block)
 
 inline void vector_stack_push(Vector_Block* block, POINTER_SIZE_INT value)
 { 
-  UNSAFE_REGION_START
   block->head--;
 #ifdef _DEBUG
   assert(value && !*(block->head));
 #endif
   *(block->head) = value;
-  UNSAFE_REGION_END
 }
 
 inline POINTER_SIZE_INT vector_stack_pop(Vector_Block* block)

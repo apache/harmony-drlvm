@@ -296,9 +296,7 @@ void gc_set_mutator_block_flag()
 
 Boolean gc_clear_mutator_block_flag()
 {
-  UNSAFE_REGION_START
   Boolean old_flag = mutator_need_block;
   mutator_need_block = FALSE;
-  UNSAFE_REGION_END
   return old_flag;
 }
