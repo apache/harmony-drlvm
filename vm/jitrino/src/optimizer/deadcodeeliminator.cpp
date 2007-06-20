@@ -96,9 +96,15 @@ isNonEssential(Inst* inst) {
     if (operation.isNonEssential()) {
         return true;
     } else {
-        if (inst->getOpcode() == Op_StVar) {
+        Opcode opCode = inst->getOpcode();
+        if (opCode == Op_StVar) {
             // StVar is non-essential if the variable to which it stores is in SSA form
             return inst->getDst()->isSsaVarOpnd();
+        } else if (opCode == Op_NewObj) {
+            Type* dstType = inst->getDst()->getType();
+            assert(!dstType->isUnresolvedObject());
+            // Objects that have finalizers must not be swept
+            return !dstType->asNamedType()->isFinalizable();
         }
         return false;
     }

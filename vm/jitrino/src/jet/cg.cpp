@@ -556,11 +556,6 @@ unsigned CodeGen::gen_stack_to_args(bool pop, const CallSig& cs,
 
     if (idx == 0 && cs.size() != 0) {
         alu(alu_sub, sp, cs.size());
-        
-        //SOE handler -> read by maximum stack offset
-        Opnd maxStackAddr(iplatf, sp, -(int)cs.size(), ar_x, 0);
-        Opnd unusedRes(iplatf, valloc(iplatf));
-        do_mov(unusedRes, maxStackAddr);
     }
     int depth = 0;
     // 1st pass - free all register that are used for args passing

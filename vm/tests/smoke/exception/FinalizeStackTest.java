@@ -38,7 +38,6 @@ class FinalizeStackTest {
     public static void main(String[] args) {
         try {
             new FinalizeStackTest(MAX_DEPTH);
-            System.out.println("FAIL");
         } catch (StackOverflowError soe) {
             System.out.println("PASS : " + soe);
         } catch (Throwable th) {

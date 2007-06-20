@@ -162,7 +162,7 @@ static OpcodeInfo opcodeTable[] = {
     { Op_TauCheckDivOpnds,      false, MB::Check,         MK::Exception,                             "chkdivopnds",   "chkdivopnds %0,%1 -) %l",            }, // for signed divide overflow in CLI (div/rem of MAXNEGINT, -1): generates an ArithmeticException
     { Op_TauCheckElemType,      false, MB::Check,         MK::Exception,                             "chkelemtype",   "chkelemtype %0,%1 ((%2,%3)) -) %l",            }, // Array element type check for aastore
     { Op_TauCheckFinite,        false, MB::Check,         MK::Exception,                             "ckfinite",      "ckfinite  %s -) %l",           }, // throws ArithmeticException if value is NaN or +- inifinity
-    { Op_NewObj,                false, MB::Exception,     MK::None,                                  "newobj",        "newobj    %d -) %l",           }, // OutOfMemoryException
+    { Op_NewObj,                false, MB::Exception,     MK::Exception,                             "newobj",        "newobj    %d -) %l",           }, // OutOfMemoryException
     { Op_NewArray,              false, MB::Exception,     MK::Exception,                             "newarray",      "newarray  %d[%0] -) %l",       }, // OutOfMemoryException, NegativeArraySizeException
     { Op_NewMultiArray,         false, MB::Exception,     MK::Exception,                             "newmultiarray", "newmultiarray %d[%s] -) %l",   }, // OutOfMemoryException, NegativeArraySizeException
     { Op_TauMonitorEnter,       true,  MB::StoreOrSync,   MK::None,                                  "monenter",      "monenter  %0 ((%1))",                 }, // (opnd must be non-null)

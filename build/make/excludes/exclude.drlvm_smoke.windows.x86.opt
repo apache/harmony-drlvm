@@ -1,10 +1,6 @@
 Check.java
 PerfCheck.java
 
-# HARMONY-3349
-gc/Finalizer.java
-gc/RunFinalizersOnExitTest.java
-
 # HARMONY-2977
 io/Integers.java
 

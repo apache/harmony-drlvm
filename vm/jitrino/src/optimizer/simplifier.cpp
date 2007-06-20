@@ -2721,18 +2721,30 @@ Simplifier::canFoldBranch(Type::Tag instType,
             // We can't assume x == x.  E.g., Nan != Nan
             return false;
         switch (mod) {
-        case Cmp_EQ:    
-        case Cmp_GTE:   
-        case Cmp_GTE_Un:
-            isTaken = true;
-            return true;
-        case Cmp_NE_Un: 
-        case Cmp_GT:    
-        case Cmp_GT_Un: 
-            isTaken = false;
-            return true;
-    default:
-        break;
+            case Cmp_EQ:    
+            case Cmp_GTE:   
+            case Cmp_GTE_Un:
+                isTaken = true;
+                return true;
+            case Cmp_NE_Un: 
+            case Cmp_GT:    
+            case Cmp_GT_Un: 
+                isTaken = false;
+                return true;
+            default:
+                break;
+        }
+    } else if (Type::isVTablePtr(instType)) {
+        Inst* src1DefInst = propagateCopy(src1)->getInst();
+        Inst* src2DefInst = propagateCopy(src2)->getInst();
+        if (src1DefInst->getOpcode() == Op_GetVTableAddr && src2DefInst->getOpcode() == Op_GetVTableAddr) {
+            Type* src1ObjType = src1DefInst->asTypeInst()->getTypeInfo();
+            Type* src2ObjType = src2DefInst->asTypeInst()->getTypeInfo();
+            if (!src1ObjType->isUnresolvedType() && !src2ObjType->isUnresolvedType()) {
+                isTaken = (src1ObjType == src2ObjType && mod == Cmp_EQ) 
+                        || (src1ObjType != src2ObjType && mod == Cmp_NE_Un);
+                return true;
+            }
         }
     }
     return false;

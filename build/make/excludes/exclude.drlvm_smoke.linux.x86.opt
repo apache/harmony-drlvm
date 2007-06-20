@@ -1,10 +1,6 @@
 Check.java
 PerfCheck.java
 
-# HARMONY-3349
-gc/Finalizer.java
-gc/RunFinalizersOnExitTest.java
-
 # breaks on ubuntu 6 w/ OOME
 stress/Threads.java
 

@@ -297,7 +297,7 @@ EscAnalyzer::doAnalysis() {
 
     cngEdges=new (eaMemManager) CnGEdges(eaMemManager);   // Common part of connection graph (edges)
     instrExam2();
-
+    
     if (_cngedges) {
         Log::out() <<"printCnGEdges: "; 
         mh.printFullName(Log::out()); 
@@ -952,6 +952,26 @@ EscAnalyzer::instrExam2() {
                             FieldDesc* fd=inst->asFieldAccessInst()->getFieldDesc();
                             if (fd->getParentType()->isSystemString()&&strcmp(fd->getName(),"value")==0) {
                                 addEdge(cgnode,cgn_src,ET_DEFER,inst);
+                            }
+                            if (method_ea_level == 0 && cgn_src->nInst->getOpcode()==Op_NewObj) {
+                                //fail if instance type is not compatible with 
+                                //store/load type. Incompatibility can be the result of not cleaned dead code.
+                                //see HARMONY-4115 for details.
+                                Inst* instantceInst = cgn_src->nInst;
+                                ObjectType* instanceType = instantceInst->asTypeInst()->getTypeInfo()->asObjectType();
+                                assert(instanceType!=NULL);
+                                ObjectType* fieldObjectType = fd->getParentType()->asObjectType();
+                                assert(fieldObjectType!=NULL);
+                                if (!instanceType->isSubClassOf(fieldObjectType)) {
+                                    if (Log::isEnabled()) {
+                                        Log::out()<<"FAILURE: instance type: "<<instanceType->getName();
+                                        Log::out()<<" is not compatible with field object type: "<<fieldObjectType->getName()<<std::endl;
+                                        Log::out()<<"Instance inst: ";instantceInst->print(Log::out());
+                                        Log::out()<<" field inst: ";inst->print(Log::out()); Log::out()<<std::endl;
+                                    }
+                                    assert(0);
+                                    Jitrino::crash("Jitrino failure:escape: illegal HIR sequence");
+                                }
                             }
                         }
                     }
