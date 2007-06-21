@@ -83,8 +83,11 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMGenericsAndAnnotatio
     Method* method = (Method*) ((POINTER_SIZE_INT) jmethod);
     Class* declaring_class = method->get_class();
 
-    static Class* array_class = genv->LoadCoreClass(
-        "[Ljava/lang/annotation/Annotation;");
+    static Class* array_class;
+    if(array_class == NULL) {
+        array_class = genv->LoadCoreClass(
+            "[Ljava/lang/annotation/Annotation;");
+    }
 
     unsigned param_num = method->get_num_param_annotations();
     unsigned num = param_num + method->get_num_invisible_param_annotations();
@@ -95,8 +98,12 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMGenericsAndAnnotatio
     if (num == 0) {
         unsigned nparams = (method->get_num_args() - (method->is_static() ? 0 : 1));
         if (nparams > 0) {
-            static Class* antn_class = jni_get_vm_env(jenv)->LoadCoreClass(
-                "java/lang/annotation/Annotation");
+            static Class* antn_class;
+            if(antn_class == NULL) {
+                antn_class = jni_get_vm_env(jenv)->LoadCoreClass(
+                    "java/lang/annotation/Annotation");
+            }
+
             array = NewObjectArray(jenv, nparams, 
                 struct_Class_to_java_lang_Class_Handle(array_class), NewObjectArray(jenv, 0, 
                     struct_Class_to_java_lang_Class_Handle(antn_class), NULL));
