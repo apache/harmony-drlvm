@@ -269,17 +269,15 @@ void print_uncaught_exception_message(FILE *f, char* context_message, jthrowable
 void exn_rethrow();
 void exn_rethrow_if_pending();
 
-#ifndef _EM64T_
 void set_guard_stack();
-#endif
 void init_stack_info();
 #ifndef WIN32
 void remove_guard_stack();
 #endif
 VMEXPORT size_t get_available_stack_size();
-#ifndef _EM64T_
 VMEXPORT bool check_available_stack_size(size_t required_size);
-#endif
 VMEXPORT size_t get_default_stack_size();
+VMEXPORT size_t get_restore_stack_size();
+bool check_stack_size_enough_for_exception_catch(void* sp);
 
 #endif // _EXCEPTIONS_H_

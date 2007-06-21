@@ -330,6 +330,11 @@ ManagedObject * String_Pool::intern(String * str) {
     if (!lang_string) { // if OutOfMemory
         return NULL;
     }
+
+    if (exn_raised()) { //if RuntimeException or Error
+        return NULL;
+    }
+
     string->object = lang_string;
     assert(!hythread_is_suspend_enabled());
 
@@ -339,7 +344,10 @@ ManagedObject * String_Pool::intern(String * str) {
     assert(env->VM_intern);
     vm_execute_java_method_array((jmethodID)env->VM_intern,
         (jvalue*)&string, args);
-    assert(!exn_raised());
+
+    if (exn_raised()) { //if RuntimeException or Error
+        return NULL;
+    }
     assert(string);
     assert(string->object);
 

@@ -188,7 +188,11 @@ void StackInfo::read(MethodDesc* pMethodDesc, POINTER_SIZE_INT eip, bool isFirst
         if (entry && (entry->info.callSize == i)) {
             stackDepth = entry->info.stackDepth;
         } else {
-            stackDepth = frameSize;
+            if (((POINTER_SIZE_INT)pMethodDesc->getCodeBlockAddress(0)) == eip) {
+                stackDepth = 0;
+            } else {
+                stackDepth = frameSize;
+            }
         }
 
         if (Log::cat_rt()->isEnabled())

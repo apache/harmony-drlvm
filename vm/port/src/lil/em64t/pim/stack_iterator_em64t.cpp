@@ -403,6 +403,10 @@ void si_free(StackIterator * si) {
     STD_FREE(si);
 }
 
+void* si_get_sp(StackIterator* si) {
+    return (void*)si->jit_frame_context.rsp;
+}
+
 NativeCodePtr si_get_ip(StackIterator * si) {
     ASSERT_NO_INTERPRETER
     return (NativeCodePtr)(*si->jit_frame_context.p_rip);

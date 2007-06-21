@@ -166,6 +166,7 @@ static ManagedObject *create_lazy_exception(
     return result;
 }   //create_object_lazily
 
+
 //////////////////////////////////////////////////////////////////////////
 // Main Exception Propogation Function
 
@@ -206,6 +207,7 @@ static void exn_propagate_exception(
     Method *interrupted_method;
     NativeCodePtr interrupted_method_location;
     JIT *interrupted_method_jit;
+    bool restore_guard_page = p_TLS_vmthread->restore_guard_page;
 
     if (!si_is_native(si))
     {
@@ -302,6 +304,13 @@ static void exn_propagate_exception(
                         }
                     }
 #endif // VM_STATS
+
+                    if (restore_guard_page) {
+                        if (!check_stack_size_enough_for_exception_catch(si_get_sp(si))) {
+                            break;
+                        }
+                    }
+
                     // Setup handler context
                     jit->fix_handler_context(method, si_get_jit_context(si));
                     si_set_ip(si, handler->get_handler_ip(), false);
@@ -472,6 +481,10 @@ void exn_throw_for_JIT(ManagedObject* exn_obj, Class_Handle exn_class,
         NativeCodePtr callback = (NativeCodePtr)
                 asm_jvmti_exception_catch_callback;
         si_set_callback(si, &callback);
+    } else if (p_TLS_vmthread->restore_guard_page) {
+        NativeCodePtr callback = (NativeCodePtr)
+                asm_exception_catch_callback;
+        si_set_callback(si, &callback);
     }
 
     // don't put any call here
@@ -530,18 +543,14 @@ void exn_athrow_regs(Registers * regs, Class_Handle exn_class, bool java_code)
 // exception catch callback to restore stack after Stack Overflow Error
 void exception_catch_callback() {
     if (p_TLS_vmthread->restore_guard_page) {
-#ifndef _EM64T_
         set_guard_stack();
-#endif
     }
 }
 
 // exception catch support for JVMTI, also restore stack after Stack Overflow Error
 void jvmti_exception_catch_callback(Registers* regs) {
     if (p_TLS_vmthread->restore_guard_page) {
-#ifndef _EM64T_
         set_guard_stack();
-#endif
     }
 
     M2nFrame *m2nf = m2n_push_suspended_frame(regs);

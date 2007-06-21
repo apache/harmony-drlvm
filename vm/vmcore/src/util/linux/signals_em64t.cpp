@@ -104,8 +104,48 @@ void linux_regs_to_ucontext(ucontext_t *uc, Registers* regs)
     uc->uc_mcontext.gregs[REG_RSP] = regs->rsp;
 }
 
+// exception catch support for stack restore
+extern "C" {
+    static void __attribute__ ((used)) exception_catch_callback_wrapper(){
+        exception_catch_callback();
+    }
+}
+
+void asm_exception_catch_callback() {
+    asm (
+        "pushq %%rax;\n"
+        "pushq %%rbx;\n"
+        "pushq %%rcx;\n"
+        "pushq %%rdx;\n"
+        "pushq %%rsi;\n"
+        "pushq %%rdi;\n"
+        "pushq %%r8;\n"
+        "pushq %%r9;\n"
+        "pushq %%r10;\n"
+        "pushq %%r11;\n"
+        "call exception_catch_callback_wrapper;\n"
+        "popq %%r11;\n"
+        "popq %%r10;\n"
+        "popq %%r9;\n"
+        "popq %%r8;\n"
+        "popq %%rdi;\n"
+        "popq %%rsi;\n"
+        "popq %%rdx;\n"
+        "popq %%rcx;\n"
+        "popq %%rbx;\n"
+        "popq %%rax;\n"
+        : /* no output operands */
+        : /* no input operands */
+    );
+}
+
+// exception catch support for JVMTI
 void asm_jvmti_exception_catch_callback() {
+    // FIXME: not implemented
+    fprintf(stderr, "FIXME: asm_jvmti_exception_catch_callback: not implemented\n");
     assert(0);
+    abort();
+
 }
 static void throw_from_sigcontext(ucontext_t *uc, Class* exc_clss)
 {
@@ -284,7 +324,7 @@ size_t get_available_stack_size() {
     size_t used_stack_size = stack_adrr - ((char*)&stack_adrr);
     size_t available_stack_size =
             get_stack_size() - used_stack_size
-            - get_guard_page_size() - get_guard_stack_size();
+            - 2 * get_guard_page_size() - get_guard_stack_size();
     return available_stack_size;
 }
 
@@ -296,6 +336,19 @@ bool check_available_stack_size(size_t required_size) {
     } else {
         return true;
     }
+}
+
+size_t get_restore_stack_size() {
+    return 0x8000;
+}
+
+bool check_stack_size_enough_for_exception_catch(void* sp) {
+    char* stack_adrr = (char*) get_stack_addr();
+    size_t used_stack_size = ((size_t)stack_adrr) - ((size_t)sp);
+    size_t available_stack_size =
+            get_stack_size() - used_stack_size
+            - 2 * get_guard_page_size() - get_guard_stack_size();
+    return get_restore_stack_size() < available_stack_size;
 }
 
 void remove_guard_stack() {

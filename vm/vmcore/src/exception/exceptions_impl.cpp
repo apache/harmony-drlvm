@@ -246,6 +246,10 @@ jthrowable create_exception(Class* exc_class, Method* exc_init, jvalue* args) {
     exc_object->object = man_obj;
     args[0].l = exc_object;
 
+    if (exn_raised()) { //if RuntimeException or Error
+        return NULL;
+    }
+
     vm_execute_java_method_array((jmethodID) exc_init, 0, args);
 
     if (suspended_enabled) {

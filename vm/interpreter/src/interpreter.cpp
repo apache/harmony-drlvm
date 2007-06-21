@@ -2595,7 +2595,6 @@ interpreter(StackFrame &frame) {
         if (!(state & INTERP_STATE_STACK_OVERFLOW)) {
             state |= INTERP_STATE_STACK_OVERFLOW;
             interp_throw_exception("java/lang/StackOverflowError");
-            state &= ~INTERP_STATE_STACK_OVERFLOW;
 
             if (frame.framePopListener)
                 frame_pop_callback(frame.framePopListener, frame.method, true);
@@ -3090,6 +3089,12 @@ got_exception:
             frame.stack.pick().cr = COMPRESS_REF(frame.exc);
             frame.stack.ref() = FLAG_OBJECT;
             frame.exc = NULL;
+            
+            int &state = get_thread_ptr()->interpreter_state;
+
+            if (state & INTERP_STATE_STACK_OVERFLOW) {
+                state &= ~INTERP_STATE_STACK_OVERFLOW;
+            }
             continue;
         }
 

@@ -45,7 +45,7 @@ void __cdecl exception_catch_callback_wrapper();
 // exception catch support for JVMTI
  void __cdecl jvmti_exception_catch_callback_wrapper();
 // Assembler wrappers; are used to restore registers
-void asm_exception_catch_callback();
+//void asm_exception_catch_callback(); // Declared in exceptions_jit.h
 //void asm_jvmti_exception_catch_callback(); // Declared in exceptions_jit.h
 
 #ifdef __cplusplus

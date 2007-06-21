@@ -104,6 +104,13 @@ void linux_regs_to_ucontext(ucontext_t* uc, Registers* regs)
 }
 
 
+void asm_exception_catch_callback() {
+    // FIXME: not implemented
+    fprintf(stderr, "FIXME: asm_jvmti_exception_catch_callback: not implemented\n");
+    assert(0);
+    abort();
+}
+
 void asm_jvmti_exception_catch_callback() {
     // FIXME: not implemented
     fprintf(stderr, "FIXME: asm_jvmti_exception_catch_callback: not implemented\n");
@@ -301,7 +308,7 @@ size_t get_available_stack_size() {
     size_t used_stack_size = stack_adrr - ((char*)&stack_adrr);
     size_t available_stack_size =
             get_stack_size() - used_stack_size
-            - get_guard_page_size() - get_guard_stack_size();
+            - 2 * get_guard_page_size() - get_guard_stack_size();
     return available_stack_size;
 }
 
@@ -318,6 +325,20 @@ bool check_available_stack_size(size_t required_size) {
         return true;
     }
 }
+
+size_t get_restore_stack_size() {
+    return 0x8000;
+}
+
+bool check_stack_size_enough_for_exception_catch(void* sp) {
+    char* stack_adrr = (char*) get_stack_addr();
+    size_t used_stack_size = ((size_t)stack_adrr) - ((size_t)sp);
+    size_t available_stack_size =
+            get_stack_size() - used_stack_size
+            - 2 * get_guard_page_size() - get_guard_stack_size();
+    return get_restore_stack_size() < available_stack_size;
+}
+
 
 void remove_guard_stack() {
     int err;

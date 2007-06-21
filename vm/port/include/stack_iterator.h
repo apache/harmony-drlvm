@@ -144,6 +144,15 @@ bool si_is_past_end(StackIterator* si );
 void si_goto_previous(StackIterator* si, bool over_popped = true);
 
 /**
+ * Gets the pointer to the top of the stack.
+ *
+ * @param[in] si -  the pointer to the stack iterator indicating stack
+ *
+ * @return The pointer to the top of the stack.
+ */
+void* si_get_sp(StackIterator* si);
+
+/**
  * Gets the instruction pointer for the current frame.
  *
  * @param[in] si -  the pointer to the stack iterator indicating the current frame

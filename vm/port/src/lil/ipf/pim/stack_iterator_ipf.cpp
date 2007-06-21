@@ -560,6 +560,10 @@ void si_free(StackIterator* si)
     STD_FREE(si);
 }
 
+void* si_get_sp(StackIterator* si) {
+    return (void*)si->c.sp;
+}
+
 NativeCodePtr si_get_ip(StackIterator* si)
 {
     return (NativeCodePtr)*si->c.p_eip;
