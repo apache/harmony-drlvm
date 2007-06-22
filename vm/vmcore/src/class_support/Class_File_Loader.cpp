@@ -597,12 +597,14 @@ check_member_name(const char *name, unsigned len, bool old_version, bool is_meth
 	    } else { //skip other symbols, they are not in exception list
                 assert(name[i] & 0x40);
                 if(name[i] & 0x20) {
-                    if(len - i - 3 < 0) //check array bound
+                    if(len < i + 3) { //check array bound
                         return false;
+                    }
                     i += 2;
-                    } else {
-                    if(len - i - 2 < 0)
+                } else {
+                    if(len < i + 2) {
                         return false;
+                    }
                     i++;
                 }    
             }

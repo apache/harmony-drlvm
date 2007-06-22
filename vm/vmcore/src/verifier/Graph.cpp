@@ -556,7 +556,7 @@ vf_Result vf_check_node_stack_depth(vf_Node *node,      // a graph node
         }
         stack_depth += instr->m_stack;
         depth += instr->m_stack;
-        assert(depth >= 0);
+        // assert(depth >= 0); always true since depth is unsigned
         if (depth > ctx->m_maxstack) {
             VF_REPORT(ctx, "Instruction stack overflow");
             return VF_ErrorStackOverflow;

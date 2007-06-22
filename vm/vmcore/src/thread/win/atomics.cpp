@@ -43,11 +43,19 @@ void MemoryReadWriteBarrier() {
      */
     __asm {lock add [esp], 0 }
 #endif
+#ifdef __INTEL_COMPILER
+    __memory_barrier();
+#else
     _ReadWriteBarrier();
+#endif
 }
 
 void MemoryWriteBarrier() {
     _mm_sfence();
+#ifdef __INTEL_COMPILER
+    __memory_barrier();
+#else
     _WriteBarrier();
+#endif
 }
 

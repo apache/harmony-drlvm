@@ -755,10 +755,10 @@ JavaByteCodeTranslator::getstatic(uint32 constPoolIndex) {
                     case Type::Boolean: constVal=irBuilder.genLdConstant(*(bool*)fieldAddr);break;
                     case Type::UnmanagedPtr:  assert(fieldIsMagic); 
 #ifdef _IA32_
-                            constVal=irBuilder.genLdConstant(*(int32*)fieldAddr);break;
+                            constVal=irBuilder.genLdConstant(*(int32*)fieldAddr);
 #else
                             assert(sizeof(void*)==8);
-                            constVal=irBuilder.genLdConstant(*(int64*)fieldAddr);break;
+                            constVal=irBuilder.genLdConstant(*(int64*)fieldAddr);
 #endif
                             break;
                     default: assert(0); //??

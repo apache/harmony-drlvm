@@ -120,7 +120,7 @@ IOpndProxy::IOpndProxy(int32 c, uint32 id) :
     IOpnd(0, false /* is_phi */, true /* is_constant */),
     _opnd(NULL)
 {
-    setID(min_const_opnd + id);
+    setID((uint32)min_const_opnd + id);
     setConstant(c);
 }
 

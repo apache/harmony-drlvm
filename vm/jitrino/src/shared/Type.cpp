@@ -1316,8 +1316,8 @@ Type::Tag Type::str2tag(const char * tagname) {
 const char * Type::tag2str(Tag t) {
     checkArray();
 
-    assert( t >= 0 && t<NumTypeTags );
-    return t >= 0 && t<NumTypeTags ? type_tag_names[t].name : type_tag_names[NumTypeTags].name;
+    assert( t >= 0 && t < NumTypeTags );
+    return type_tag_names[t].name;
 }
 
 

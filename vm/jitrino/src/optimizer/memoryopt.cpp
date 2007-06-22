@@ -1418,7 +1418,7 @@ AliasRep AliasManager::getReference(Opnd *addr)
             Opnd* cpIdx = callInst->getSrc(1);
             return findOrInsertAlias(getUnresolvedObjectField(0, enclClass, cpIdx));
         }
-        break;
+        // break; unreachable because of the return above
     default:
         assert(0);
         break;
