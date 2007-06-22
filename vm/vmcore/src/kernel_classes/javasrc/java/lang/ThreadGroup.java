@@ -32,12 +32,18 @@ import java.util.ConcurrentModificationException;
  * @com.intel.drl.spec_ref
  */
 
-public class ThreadGroup implements Thread.UncaughtExceptionHandler{
+public class ThreadGroup implements Thread.UncaughtExceptionHandler {
 
     /**
      * Indent used to print information about thread group
      */
     private final static String LISTING_INDENT = "    ";
+
+    /**
+     * ThreadGroup lock object
+     */
+    private static class ThreadGroupLock {};
+    private final static ThreadGroupLock lock = new ThreadGroupLock();
 
     /**
      * This group's max priority
@@ -119,7 +125,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
         int count = 0;
         List groupsListCopy = null;  // a copy of subgroups list
         Object[] threadsCopy = null; // a copy of threads list
-        synchronized (this) {
+        synchronized (lock) {
             if (destroyed) {
                 return 0;
             }
@@ -145,7 +151,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
     public int activeGroupCount() {
         int count;
         List groupsListCopy = null; // a copy of subgroups list
-        synchronized (this) {
+        synchronized (lock) {
             if (destroyed) {
                 return 0;
             }
@@ -180,18 +186,20 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
     /**
      * @com.intel.drl.spec_ref
      */
-    public synchronized final void destroy() {
+    public final void destroy() {
         checkAccess();
-        if (destroyed) {
-			throw new IllegalThreadStateException(
-					"The thread group " + name + " is already destroyed!");
-		}
-        if (!nonsecureDestroy()) {
-            throw new IllegalThreadStateException("The thread group " + name +
-                    " is not empty");
-        } else {
-            if (parent != null) {
-                parent.remove(this);
+        synchronized (lock) {
+            if (destroyed) {
+                throw new IllegalThreadStateException(
+                        "The thread group " + name + " is already destroyed!");
+            }
+            if (!nonsecureDestroy()) {
+                throw new IllegalThreadStateException("The thread group " + name +
+                        " is not empty");
+            } else {
+                if (parent != null) {
+                    parent.remove(this);
+                }
             }
         }
     }
@@ -315,7 +323,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
     /**
      * @com.intel.drl.spec_ref
      */
-    public synchronized final void setMaxPriority(int priority) {
+    public final void setMaxPriority(int priority) {
         checkAccess();
 
         /*
@@ -330,10 +338,11 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
             this.maxPriority = Thread.MIN_PRIORITY;
             return;
         }
-        this.maxPriority = (parent != null && parent.maxPriority < priority)
+        int new_priority = (parent != null && parent.maxPriority < priority)
                             ? parent.maxPriority
                             : priority;
-        nonsecureSetMaxPriority(this.maxPriority);
+
+        nonsecureSetMaxPriority(new_priority);
     }
 
     /**
@@ -385,28 +394,32 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
     /**
      * Adds a thread to this thread group
      */
-    synchronized void add(Thread thread) {
-        if (destroyed) {
-            throw new IllegalThreadStateException(
-                "The thread group is already destroyed!");
+    void add(Thread thread) {
+        synchronized (lock) {
+            if (destroyed) {
+                throw new IllegalThreadStateException(
+                        "The thread group is already destroyed!");
+            }
+            threads.put(thread, this);
         }
-        threads.put(thread, this);
     }
 
     /**
      * Removes a thread from this thread group
      */
-    synchronized void remove(Thread thread) {
-        if (destroyed) {
-            return;
-        }
-        threads.remove(thread);
-        thread.group = null;
-        if (daemon && threads.isEmpty() && groups.isEmpty()) {
-            // destroy this group
-            if (parent != null) {
-                parent.remove(this);
-                destroyed = true;
+    void remove(Thread thread) {
+        synchronized (lock) {
+            if (destroyed) {
+                return;
+            }
+            threads.remove(thread);
+            thread.group = null;
+            if (daemon && threads.isEmpty() && groups.isEmpty()) {
+                // destroy this group
+                if (parent != null) {
+                    parent.remove(this);
+                    destroyed = true;
+                }
             }
         }
     }
@@ -414,12 +427,14 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
     /**
      * Adds a subgroup to this thread group
      */
-    private synchronized void add(ThreadGroup group) {
-        if (destroyed) {
-            throw new IllegalThreadStateException(
-                "The thread group is already destroyed!");
+    private void add(ThreadGroup group) {
+        synchronized (lock) {
+            if (destroyed) {
+                throw new IllegalThreadStateException(
+                        "The thread group is already destroyed!");
+            }
+            groups.add(group);
         }
-        groups.add(group);
     }
 
     /**
@@ -447,7 +462,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
         ArrayList<Thread> threadsCopy = new ArrayList<Thread>(threads.size());
         ArrayList<ThreadGroup> groupsCopy = new ArrayList<ThreadGroup>(groups.size());
 
-        synchronized (this) {
+        synchronized (lock) {
             if (destroyed) {
                 return new Object[] {null, null};
             }
@@ -490,7 +505,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
     private int enumerate(Thread[] list, int offset, boolean recurse) {
         List groupsListCopy = null;  // a copy of subgroups list
         Object[] threadsCopy = null; // a copy of threads list
-        synchronized (this) {
+        synchronized (lock) {
             if (destroyed) {
                 return offset;
             }
@@ -535,7 +550,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
             return offset;
         }
         int firstGroupIdx = offset;
-        synchronized (this) {
+        synchronized (lock) {
             for (Iterator it = groups.iterator(); it.hasNext();) {
                 list[offset++] = (ThreadGroup)it.next();
                 if (offset == list.length) {
@@ -562,7 +577,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
         prefix += LISTING_INDENT;
         List groupsListCopy = null;   // a copy of subgroups list
         Object[] threadsCopy = null;  // a copy of threads list
-        synchronized (this) {
+        synchronized (lock) {
             threadsCopy = copyThreads();
             groupsListCopy = (List)groups.clone();
         }
@@ -582,20 +597,22 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
      * will be thrown.
      * @return false if this ThreadGroup is not empty
      */
-    private synchronized boolean nonsecureDestroy() {
+    private boolean nonsecureDestroy() {
         boolean thisGroupIsEmpty = true;
-        if (!threads.isEmpty()) {
-            return false;
-        }
-        for (Iterator<ThreadGroup> it = groups.iterator(); it.hasNext();) {
-            if (it.next().nonsecureDestroy()) {
-                it.remove();
-            } else {
-                thisGroupIsEmpty = false;
+        synchronized (lock) {
+            if (!threads.isEmpty()) {
+                return false;
             }
-        }
-        if (groups.isEmpty()) {
-            destroyed = true;
+            for (Iterator<ThreadGroup> it = groups.iterator(); it.hasNext();) {
+                if (it.next().nonsecureDestroy()) {
+                    it.remove();
+                } else {
+                    thisGroupIsEmpty = false;
+                }
+            }
+            if (groups.isEmpty()) {
+                destroyed = true;
+            }
         }
         return thisGroupIsEmpty;
     }
@@ -604,13 +621,15 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
      * Interrupts this thread group without any security checks. We add this
      * method to avoid calls to the checkAccess() method on subgroups
      */
-    private synchronized void nonsecureInterrupt() {
-        Object[] threadsCopy = copyThreads(); // a copy of threads list
-        for (int i = 0; i < threadsCopy.length; i++) {
-            ((Thread) threadsCopy[i]).interrupt();
-        }
-        for (Iterator it = groups.iterator(); it.hasNext();) {
-            ((ThreadGroup)it.next()).nonsecureInterrupt();
+    private void nonsecureInterrupt() {
+        synchronized (lock) {
+            Object[] threadsCopy = copyThreads(); // a copy of threads list
+            for (int i = 0; i < threadsCopy.length; i++) {
+                ((Thread) threadsCopy[i]).interrupt();
+            }
+            for (Iterator it = groups.iterator(); it.hasNext();) {
+                ((ThreadGroup)it.next()).nonsecureInterrupt();
+            }
         }
     }
 
@@ -618,13 +637,15 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
      * Resumes this thread group without any security checks. We add this method
      * to avoid calls to the checkAccess() method on subgroups
      */
-    private synchronized void nonsecureResume() {
-        Object[] threadsCopy = copyThreads();
-        for (int i = 0; i < threadsCopy.length; i++) {
-            ((Thread) threadsCopy[i]).resume();
-        }
-        for (Iterator it = groups.iterator(); it.hasNext();) {
-            ((ThreadGroup)it.next()).nonsecureResume();
+    private void nonsecureResume() {
+        synchronized (lock) {
+            Object[] threadsCopy = copyThreads();
+            for (int i = 0; i < threadsCopy.length; i++) {
+                ((Thread) threadsCopy[i]).resume();
+            }
+            for (Iterator it = groups.iterator(); it.hasNext();) {
+                ((ThreadGroup)it.next()).nonsecureResume();
+            }
         }
     }
 
@@ -632,24 +653,29 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
      * Sets the maximum priority allowed for this thread group and its subgroups.
      * We add this method to avoid calls to the checkAccess() method on subgroups
      */
-    private synchronized void nonsecureSetMaxPriority(int priority) {
-        for (Iterator it = ((List)groups.clone()).iterator(); it.hasNext();) {
-            ((ThreadGroup)it.next()).nonsecureSetMaxPriority(priority);
+    private void nonsecureSetMaxPriority(int priority) {
+        synchronized (lock) {
+            this.maxPriority = priority;
+
+            for (Iterator it = groups.iterator(); it.hasNext();) {
+                ((ThreadGroup)it.next()).nonsecureSetMaxPriority(priority);
+            }
         }
-        this.maxPriority = priority;
     }
 
     /**
      * Stops this thread group without any security checks.
      * We add this method to avoid calls to the checkAccess() method on subgroups
      */
-    private synchronized void nonsecureStop() {
-        Object[] threadsCopy = copyThreads();
-        for (int i = 0; i < threadsCopy.length; i++) {
-            ((Thread) threadsCopy[i]).stop();
-        }
-        for (Iterator it = groups.iterator(); it.hasNext();) {
-            ((ThreadGroup)it.next()).nonsecureStop();
+    private void nonsecureStop() {
+        synchronized (lock) {
+            Object[] threadsCopy = copyThreads();
+            for (int i = 0; i < threadsCopy.length; i++) {
+                ((Thread) threadsCopy[i]).stop();
+            }
+            for (Iterator it = groups.iterator(); it.hasNext();) {
+                ((ThreadGroup)it.next()).nonsecureStop();
+            }
         }
     }
 
@@ -657,13 +683,15 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
      * Suspends this thread group without any security checks.
      * We add this method to avoid calls to the checkAccess() method on subgroups
      */
-    private synchronized void nonsecureSuspend() {
-        Object[] threadsCopy = copyThreads(); // a copy of threads list
-        for (int i = 0; i < threadsCopy.length; i++) {
-            ((Thread) threadsCopy[i]).suspend();
-        }
-        for (Iterator it = groups.iterator(); it.hasNext();) {
-            ((ThreadGroup)it.next()).nonsecureSuspend();
+    private void nonsecureSuspend() {
+        synchronized (lock) {
+            Object[] threadsCopy = copyThreads(); // a copy of threads list
+            for (int i = 0; i < threadsCopy.length; i++) {
+                ((Thread) threadsCopy[i]).suspend();
+            }
+            for (Iterator it = groups.iterator(); it.hasNext();) {
+                ((ThreadGroup)it.next()).nonsecureSuspend();
+            }
         }
     }
 
@@ -672,13 +700,15 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler{
      *
      * @param group group to be removed from this one
      */
-    private synchronized void remove(ThreadGroup group) {
-    	groups.remove(group);
-        if (daemon && threads.isEmpty() && groups.isEmpty()) {
-        	// destroy this group
-            if (parent != null) {
-                parent.remove(this);
-                destroyed = true;
+    private void remove(ThreadGroup group) {
+        synchronized (lock) {
+            groups.remove(group);
+            if (daemon && threads.isEmpty() && groups.isEmpty()) {
+                // destroy this group
+                if (parent != null) {
+                    parent.remove(this);
+                    destroyed = true;
+                }
             }
         }
     }
