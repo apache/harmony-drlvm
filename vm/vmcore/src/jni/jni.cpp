@@ -414,7 +414,6 @@ JNIEXPORT jint JNICALL JNI_GetCreatedJavaVMs(JavaVM ** vmBuf,
                                                jsize bufLen,
                                                jsize * nVMs)
 {
-
     jint status = jni_init();
     if (status != JNI_OK) {
         return status;
@@ -443,7 +442,7 @@ JNIEXPORT jint JNICALL JNI_CreateJavaVM(JavaVM ** p_vm, JNIEnv ** p_jni_env,
     JavaVMInitArgs * vm_args;
     JavaVM_Internal * java_vm;
     Global_Env * vm_env;
-    apr_pool_t * vm_global_pool;
+    apr_pool_t * vm_global_pool = NULL;
     jthread java_thread;
     jint status;
 
@@ -552,6 +551,11 @@ JNIEXPORT jint JNICALL JNI_CreateJavaVM(JavaVM ** p_vm, JNIEnv ** p_jni_env,
     status  = JNI_OK;
 done:
     apr_thread_mutex_unlock(GLOBAL_LOCK);
+
+    if (status != JNI_OK && NULL != vm_global_pool) {
+        apr_pool_destroy(vm_global_pool);
+    }
+
     return status;
 }
 
@@ -1469,12 +1473,14 @@ VMEXPORT jint JNICALL DestroyJavaVM(JavaVM * vm)
     assert(java_thread != NULL);
 
     apr_thread_mutex_lock(GLOBAL_LOCK);
-    
-    status = vm_destroy(java_vm, java_thread);
 
     // Remove current VM from the list of all VMs running in the current adress space.
     APR_RING_REMOVE(java_vm, link);
     
+    apr_thread_mutex_unlock(GLOBAL_LOCK);
+
+    status = vm_destroy(java_vm, java_thread);
+
     // Destroy VM environment.
     delete java_vm->vm_env;
     java_vm->vm_env = NULL;
@@ -1482,8 +1488,6 @@ VMEXPORT jint JNICALL DestroyJavaVM(JavaVM * vm)
     // Destroy VM pool.
     apr_pool_destroy(java_vm->pool);
 
-    apr_thread_mutex_unlock(GLOBAL_LOCK);
-    
     return status;
 }
 
