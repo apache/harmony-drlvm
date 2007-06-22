@@ -88,179 +88,29 @@ static inline bool begins_with(const char* str, const char* beginning)
 
 void print_generic_help()
 {
-    LECHO(21, 
-        "Usage: {0} [-options] class [args...]\n"
-        "        (to execute a method main() of the class)\n"
-        "    or {0} [-options] -jar jarfile [args...]\n"
-        "        (to execute the jar file)\n"
-        "\n"
-        "where options include:\n"
-        "    -classpath <class search path of directories and zip/jar files>\n"
-        "    -cp        <class search path of directories and zip/jar files>\n"
-        "                  A {1} separated list of directories, jar archives,\n"
-        "                  and zip archives to search for class file\n"
-        "    -client       select the 'client' VM (same as -Xem:client)\n"
-        "    -server       select the 'server' VM (same as -Xem:server)\n"
-        "    -D<name>=<value>\n"
-        "                  set a system property\n"
-        "    -showversion  print product version and continue\n"
-        "    -version      print product version and exit\n"
-        "    -verbose[:class|:gc|:jni]\n"
-        "                  enable verbose output\n"
-        "    -agentlib:<library name>[=<agent options>]\n"
-        "                  load JVMTI agent library, library name is platform independent\n"
-        "    -agentpath:<library name>[=<agent options]\n"
-        "                  load JVMTI agent library, library name is platform dependent\n"
-        "    -verify\n"
-        "                  do full bytecode verification\n"
-        "    -noverify\n"
-        "                  do no bytecode verification\n"
-        "    -enableassertions[:<package>...|:<class>]\n"
-        "    -ea[:<package>...|:<class>]\n"
-        "                  enable assertions\n"
-        "    -disableassertions[:<package>...|:<class>]\n"
-        "    -da[:<package>...|:<class>]\n"
-        "                  disable assertions\n"
-        "    -esa | -enablesystemassertions\n"
-        "                  enable system assertions\n"
-        "    -dsa | -disablesystemassertions\n"
-        "                  disable system assertions\n"
-        "    -? -help      print this help message\n"
-        "    -help properties\n"
-        "                  help on system properties\n"
-        "    -X            print help on non-standard options" 
+    // the '-help' output is defined in resource file 'harmony.properties'
+    LECHO(21, "{0} {1} \n" 
+        "Internal error: string resource is undefined in harmony.properties\n"
         <<  EXECUTABLE_NAME << PORT_PATH_SEPARATOR_STR);
 }
 
 static void print_help_on_nonstandard_options()
 {
-    LECHO(22, 
-        "    -Xbootclasspath:<PATH>\n"
-        "              Set bootclasspath to the specified value\n"
-        "    -Xbootclasspath/a:<PATH>\n"
-        "              Append specified directories and files to bootclasspath\n"
-        "    -Xbootclasspath/p:<PATH>\n"
-        "              Prepend specified directories and files to bootclasspath\n"
-        "    -Xjit <JIT options>\n"
-        "              Specify JIT specific options\n"
-        "    -Xms<size>\n"
-        "              Set Java heap size\n"
-        "    -Xmx<size>\n"
-        "              Set maximum Java heap size\n"
-        "    -Xdebug\n"
-        "              Does nothing, this is a compatibility option\n"
-        "    -Xnoagent\n"
-        "              Does nothing, this is a compatibility option\n"
-        "    -Xrun\n"
-        "              Specify debugger agent library\n"
-        "    -Xverbose[:<category>[:<file>]\n"
-        "              Switch logging on [for specified category only\n"
-        "              [and log that category to a file]]\n"
-        "    -Xwarn[:<category>[:<file>]\n"
-        "              Switch verbose logging off [for specified category only\n"
-        "              [and log that category to a file]]\n"
-        "    -Xverboseconf:<file>\n"
-        "              Set up logging via log4cxx configuration file\n"
-        "    -Xverboselog:<file>\n"
-        "              Log verbose output to a file\n"
-        "    -Xverify[:none|all]\n"
-        "              Do full bytecode verification\n"
-        "    -Xinvisible\n"
-        "              Retain invisible annotations at runtime\n"
-        "    -Xfileline\n"
-        "              Add source information to logging messages\n"
-        "    -Xthread\n"
-        "              Add thread id to logging messages\n"
-        "    -Xcategory\n"
-        "              Add category name to logging messages\n"
-        "    -Xtimestamp\n"
-        "              Add timestamp to logging messages\n"
-        "    -Xfunction\n"
-        "              Add function signature to logging messages");
+    // the '-X' output is defined in resource file 'harmony.properties'
+    LECHO(22, // base -X help output (like -Xbootclasspath, -Xmx)
+        "Internal error: string resource is undefined in harmony.properties\n");
 #ifdef _DEBUG
-    LECHO(23, 
-        "    -Xlog[:<category>[:<file>]\n"
-        "              Switch debug logging on [for specified category only\n"
-        "              [and log that category to a file]]\n"
-        "    -Xtrace[:<category>[:<file>]\n"
-        "              Switch trace logging on [for specified category only\n"
-        "              [and log that category to a file]]");
+    LECHO(23, // -Xlog & -Xtrace help output
+        "Internal error: string resource is undefined in harmony.properties\n");
 #endif //_DEBUG
 
 #ifdef VM_STATS
-    LECHO(24, 
-        "    -Xstats:<mask>\n"
-        "              Generates different statistics");
+    LECHO(24, // -Xstats help output 
+        "Internal error: string resource is undefined in harmony.properties\n");
 #endif // VM_STATS
-    LECHO(25, 
-        "    -Xint\n"
-        "              Use interpreter to execute the program\n"
-        "    -Xgc:<gc options>\n"
-        "              Specify gc specific options\n"
-        "    -Xem:<em options>\n"
-        "              Specify em specific options\n"
-        "    -Xdumpstubs\n"
-        "              Writes stubs generated by LIL to disk\n"
-        "    -Xparallel_jit\n"
-        "              Launch compilation in parallel (default)\n"
-        "    -Xno_parallel_jit\n"
-        "              Do not launch compilation in parallel\n"
-        "    -Xdumpfile:<file>\n"
-        "              Specifies a file name for the dump\n"
-        "    -XX:<name>=<value>\n"
-        "              set an internal system property.\n"
-        "              Boolean options may be turned on with -XX:+<option>\n"
-        "              and turned off with -XX:-<option>\n"
-        "              Numeric options are set with -XX:<option>=<number>.\n"
-        "              Numbers can include suffix 'm' or 'M' for megabytes,\n"
-        "              'k' or 'K' for kilobytes, and 'g' or 'G' for gigabytes\n" 
-        "              (for example, 32k is the same as 32768).\n"
-    );
+    LECHO(25, // -Xint, -Xgc, -Xem, -XX help with URL to properties description
+        "Internal error: string resource is undefined in harmony.properties\n");
 } //print_help_on_nonstandard_options
-
-void print_vm_standard_properties()
-{
-    LECHO(26, 
-        "Boolean-valued properties (set to one of {on,true,1,off,false,0} through -XD<name>=<value>):\n\n"
-        "    vm.assert_dialog (default TRUE):\n"
-        "            If false, prevent assertion failures from popping up a dialog box.");
-#ifdef PLATFORM_POSIX
-    LECHO(27, "    vm.crash_handler (default FALSE):\n"
-        "            Invoke gdb on crashes.");
-#endif // PLATFORM_POSIX
-    LECHO(28, "    vm.finalize (default TRUE):\n"
-        "            Run finalizers.\n"
-        "    vm.jit_may_inline_sync (default TRUE):\n"
-        "            The JIT is allowed to inline part of the synchronization sequence.\n"
-        "    vm.use_interpreter (default FALSE):\n"
-        "            Use interpreter not jit.\n"
-        "    vm.use_verifier (default TRUE):\n"
-        "            Use verifier.\n"
-        "    vm.jvmti.enabled (default FALSE):\n"
-        "            Whether JVMTI mode is enabled.\n"
-        "    vm.jvmti.compiled_method_load.inlined (default FALSE):\n"
-        "            Report inlined methods with JVMTI_EVENT_COMPILED_METHOD_LOAD. Makes sense for optimizing jit.\n"
-        "    vm.bootclasspath.appendclasspath (default FALSE):\n"
-        "            Append classpath to the bootclasspath.\n"
-	"    thread.soft_unreservation (default FALSE):\n"
-        "            Use soft unreservation scheme.\n"
-        "\nOther properties:\n\n"
-        "    vm.boot.library.path:\n"
-        "            List of directories which contain additional dynamic libraries to load into VM.\n"
-        "    vm.boot.class.path:\n"
-        "            Virtual machine bootclasspath.\n"
-        "    vm.dlls:\n"
-        "            A '{0}'-delimited list of modular dlls (GC/etc.) to load at startup.\n"
-        "    vm.em_dll:\n"
-        "            A '{0}'-execution manager (EM) dll to load at startup.\n"
-        "    vm.other_natives_dlls:\n"
-        "            A '{0}'-delimited list of dlls contained native methods implementations to load at startup.\n"
-        "    vm.components.<component>.classpath:\n" 
-        "            Part of a <component>'s classpath to append to the JDK bootclasspath\n"
-        "    vm.components.<component>.startupclass:\n"
-        "            A <component> class to be initialized during startup" << PORT_PATH_SEPARATOR_STR);
-
-}
 
 static inline Assertion_Registry* get_assert_reg(Global_Env *p_env) {
     if (!p_env->assert_reg) {
@@ -374,18 +224,6 @@ void parse_vm_arguments(Global_Env *p_env)
             p_env->VmProperties()->set(XBOOTCLASSPATH_P, bcp_old ? bcp_new : value);
             p_env->VmProperties()->destroy(bcp_old);
             STD_FREE((void*)bcp_new);
-        } 
-        else if (begins_with(option, "-Xhelp:")) {
-            const char* arg = option + strlen("-Xhelp:");
-
-            if (begins_with(arg, "prop")) {
-                print_vm_standard_properties();
-
-            } else {
-                LECHO(31, "Unknown argument {0} of -Xhelp: option" << arg);
-            }
-
-            LOGGER_EXIT(0);
         } else if (begins_with(option, "-Xjit:")) {
             // Do nothing here, just skip this option for later parsing
         } else if (strcmp(option, "-Xint") == 0) {
