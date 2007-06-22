@@ -865,12 +865,23 @@ public class Thread implements Runnable {
      * @deprecated
      */
     public final void suspend() {
-            checkAccess();
-            int status = VMThreadManager.suspend(this);
-            if (status != VMThreadManager.TM_ERROR_NONE) {
-                throw new InternalError(
-                    "Thread Manager internal error " + status);
-            }
+	int status;
+	
+	checkAccess();
+	
+	// We can receive EBUSY from VMThreadManager.suspend() if we are 
+	// requested to suspend ourselves. If we are requested to suspend we
+	// cannot to suspend other threads, so we need to try to suspend
+	// again.
+	
+	do {
+	    status = VMThreadManager.suspend(this);
+	} while (status == VMThreadManager.TM_ERROR_EBUSY);
+	
+	if (status != VMThreadManager.TM_ERROR_NONE) {
+	    throw new InternalError(
+				    "Thread Manager internal error " + status);
+	}
     }
 
     /**

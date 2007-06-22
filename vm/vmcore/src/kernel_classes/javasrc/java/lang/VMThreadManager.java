@@ -43,7 +43,7 @@ final class VMThreadManager {
     public static final int TM_ERROR_NONE = 0;
     public static final int TM_ERROR_INTERRUPT = 52;
     public static final int TM_ERROR_ILLEGAL_STATE = 51;
-
+    public static final int TM_ERROR_EBUSY = 70025;
 
     /**
      * JVMTI constants
