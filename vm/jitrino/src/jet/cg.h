@@ -636,10 +636,7 @@ public:
      * to memory.
      */
     AR      valloc(jtype jt);
-    /**
-     * @brief spills ar register. after the call ar is free for use. 
-     */
-    void    freeReg(AR ar);
+
     /**
      * @brief Ensures operand stack item at the given \c depth resides in 
      * the memory.

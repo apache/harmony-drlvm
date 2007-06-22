@@ -1031,14 +1031,25 @@ public:
     }
 
     /**
-    * Generates CMPXCHG8B operation.
+    * Generates write for 64-bit volatile value
     */
-    void cmpxchg8b(bool lockPrefix, AR addrBaseReg)
+    void volatile64_set(Opnd& where, AR hi_part, AR lo_part)
     {
         if (is_trace_on()) {
-            trace(string("cmpxchg8b:"), string(lockPrefix ? "(locked) ":""),  to_str(addrBaseReg));
+            trace(string("volatile64_set:") + to_str(where), to_str(hi_part), to_str(lo_part));
         }
-        cmpxchg8b_impl(lockPrefix,addrBaseReg);
+        volatile64_op_impl(where, hi_part, lo_part, true);
+    }
+
+    /**
+    * Generates read for 64-bit volatile value
+    */
+    void volatile64_get(Opnd& where, AR hi_part, AR lo_part)
+    {
+        if (is_trace_on()) {
+            trace(string("volatile64_get:") + to_str(where), to_str(hi_part), to_str(lo_part));
+        }
+        volatile64_op_impl(where, hi_part, lo_part, false);
     }
 
     /**
@@ -1470,8 +1481,8 @@ private:
     void cmovcc_impl(COND c, const Opnd& op0, const Opnd& op1);
     /// Implementation of cmpxchg().
     void cmpxchg_impl(bool lockPrefix, AR addrReg, AR newReg, AR oldReg);
-    /// Implementation of cmpxchg8b().
-    void cmpxchg8b_impl(bool lockPrefix, AR addrReg);
+    /// Implementation of volatile64 get and set ops().
+    void volatile64_op_impl(Opnd& where, AR hi_part, AR lo_part, bool is_put);
     /// Implementation of lea().
     void lea_impl(const Opnd& reg, const Opnd& mem);
     /// Implementation of movp().

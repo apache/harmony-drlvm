@@ -728,17 +728,97 @@ void Encoder::cmpxchg_impl(bool lockPrefix, AR addrReg, AR newReg, AR oldReg) {
 
 }
 
-void Encoder::cmpxchg8b_impl(bool lockPrefix, AR addrReg) {
+static void mov_regs(Encoder* enc, RegName r_dst, RegName r_src) {
+    EncoderBase::Operands args;
+    args.add(r_dst);
+    args.add(r_src);
+    enc->ip(EncoderBase::encode(enc->ip(), Mnemonic_MOV, args));
+}
 
-    if (lockPrefix) {
-        ip(EncoderBase::prefix(ip(), InstPrefix_LOCK));
+void Encoder::volatile64_op_impl(Opnd& where, AR hi_part, AR lo_part, bool is_put) {
+    int regSize=sizeof(void*);
+    RegName regs[] = {RegName_EAX, RegName_EBX, RegName_ECX, RegName_EDX, RegName_ESI};
+    {//free EAX,EBX,ECX,EDX and ESI registers to use cmpxchg8b
+        { //SUB ESP 20 -> protect spill area from OS
+            EncoderBase::Operands args;
+            args.add(RegName_ESP);
+            args.add(EncoderBase::Operand(OpndSize_32, (long long)5*regSize));
+            ip(EncoderBase::encode(ip(), Mnemonic_SUB, args));
+        }
+        for (int i=0;i<5;i++) {
+            EncoderBase::Operands args;
+            args.add(EncoderBase::Operand(OpndSize_32, RegName_ESP, i*regSize));
+            args.add(regs[i]);
+            ip(EncoderBase::encode(ip(), Mnemonic_MOV, args));
+        }
     }
 
-    RegName dAddrReg = devirt(addrReg);
-    EncoderBase::Operands args;
-    args.add(EncoderBase::Operand(OpndSize_64, dAddrReg, 0));
-    ip(EncoderBase::encode(ip(), Mnemonic_CMPXCHG8B, args));
+    //load address to ESI
+    lea_impl(virt(RegName_ESI), where);
+    
+    
 
+    RegName r_hi = devirt(hi_part);
+    RegName r_lo = devirt(lo_part);
+
+    if (is_put) {
+        //load value to ECX/EBX.
+        RegName r_lo2=r_lo;
+        if (r_lo2 == RegName_ECX) {
+            RegName r_free = r_lo2!=RegName_EAX ? RegName_EAX : RegName_EDX;
+            mov_regs(this, r_free, r_lo2);
+            r_lo2 = r_free;
+        }
+        mov_regs(this, RegName_ECX, r_hi);
+        mov_regs(this, RegName_EBX, r_lo2);
+    }
+
+    //3. set lock prefix
+    unsigned loop_ip = ipoff();
+    ip(EncoderBase::prefix(ip(), InstPrefix_LOCK));
+     
+    //do cmpxchg8b
+    {
+        EncoderBase::Operands args;
+        args.add(EncoderBase::Operand(OpndSize_64, RegName_ESI, 0));
+        ip(EncoderBase::encode(ip(), Mnemonic_CMPXCHG8B, args));
+    }
+
+    if (is_put) {
+        //loop until not successful
+        unsigned br_off = br(nz, 0, 0);
+        patch(br_off, ip(loop_ip));
+    } else {
+        //store result of get to lo_part and hi_part
+        RegName lo_res = RegName_EAX;
+        if (r_hi == lo_res) {
+            mov_regs(this, RegName_EBX, lo_res);
+            lo_res = RegName_EBX;
+        }
+        mov_regs(this, r_hi, RegName_EDX);
+        mov_regs(this, r_lo, lo_res);
+    }
+
+    //restore initial regs values
+    {
+        for (int i=0;i<5;i++) {
+            RegName r = regs[i];
+            if (!is_put && (r == r_hi || r == r_lo)) { 
+                continue;
+            }
+            EncoderBase::Operands args;
+            args.add(regs[i]);
+            args.add(EncoderBase::Operand(OpndSize_32, RegName_ESP, i*regSize));
+            ip(EncoderBase::encode(ip(), Mnemonic_MOV, args));
+        }
+        { //ADD ESP 20 -> restore ESP
+            EncoderBase::Operands args;
+            args.add(RegName_ESP);
+            args.add(EncoderBase::Operand(OpndSize_32, (long long)5*regSize));
+            ip(EncoderBase::encode(ip(), Mnemonic_ADD, args));
+        }
+
+    }
 }
 
 void Encoder::lea_impl(const Opnd& reg, const Opnd& mem)

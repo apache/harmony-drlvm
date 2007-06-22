@@ -135,13 +135,6 @@ AR CodeGen::valloc(jtype jt)
 
     // Ugh... No way out, have to spill to the memory...
 
-    freeReg(ar);
-    
-    return ar;
-}
-
-void CodeGen::freeReg(AR ar)
-{
     if (is_set(DBG_TRACE_CG)) { dbg(";;>spill %s\n", to_str(ar).c_str()); }
      
     // First, free out the stack items, which are the register
@@ -189,6 +182,8 @@ void CodeGen::freeReg(AR ar)
         pop(stk);
     }
     if (is_set(DBG_TRACE_CG)) { dbg(";;>~spill\n"); }
+
+    return ar;
 }
 
 Val& CodeGen::vstack(unsigned depth, bool toReg)
