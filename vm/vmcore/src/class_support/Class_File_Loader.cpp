@@ -2798,8 +2798,8 @@ bool Class::parse(Global_Env* env,
     if (!(m_version >= CLASSFILE_MAJOR
         && m_version <= CLASSFILE_MAJOR_MAX))
     {
-        REPORT_FAILED_CLASS_FORMAT(this, "class has version number " << m_version);
-        return false;
+        REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/UnsupportedClassVersionError",
+            "class has version number " << m_version);
     }
 
     if(m_version == JAVA5_CLASS_FILE_VERSION && minor_version > 0)
