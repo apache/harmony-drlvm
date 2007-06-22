@@ -274,12 +274,12 @@ jint vm_attach(JavaVM * java_vm, JNIEnv ** p_jni_env,
  */
 jint vm_detach(jthread java_thread) {
     VM_thread * p_vm_thread;
-    jint status;
     
     assert(hythread_is_suspend_enabled());
 
-    status = run_java_detach(java_thread);
-    if (status != JNI_OK) return status;
+    // could return error if detach throws an exception,
+    // keep exception and ignore an error
+    run_java_detach(java_thread);
 
     // Send Thread End event
     jvmti_send_thread_start_end_event(0);

@@ -60,8 +60,9 @@ static IDATA register_to_group(hythread_t thread, hythread_group_t group);
     #endif
 #endif
 
-#define MAX_ID 1000000
+#define MAX_ID 0x8000
 hythread_t fast_thread_array[MAX_ID];
+short next_free_thread_id[MAX_ID];
 int next_id = 1;
 
 /*
@@ -575,6 +576,7 @@ IDATA VMCALL hythread_struct_init(hythread_t *ret_thread) {
  */
 static IDATA register_to_group(hythread_t thread, hythread_group_t group) {
     IDATA status;
+    int free_slot_found = 0;
     hythread_t cur, prev;
 
     assert(thread);
@@ -592,14 +594,27 @@ static IDATA register_to_group(hythread_t thread, hythread_group_t group) {
     thread->state |= TM_THREAD_STATE_ALIVE | TM_THREAD_STATE_RUNNABLE;
     
     if (!thread->thread_id) {
-        ++next_id;
-        thread->thread_id = next_id;
-        if (next_id >= MAX_ID) {
+        U_32 i;
+        for(i = 0; i < MAX_ID; i++) {
+            // increase next_id to allow thread_id change 
+            next_id++;
+            if (next_id == MAX_ID) {
+	            next_id = 1;
+            }
+            if (fast_thread_array[next_id] == NULL) {
+                thread->thread_id = next_id;
+	            free_slot_found = 1;
+                break;
+            }
+        }
+
+        if (!free_slot_found) {
             hythread_global_unlock(NULL);
             return TM_ERROR_OUT_OF_MEMORY;
         }
     }
-    
+
+    assert(thread->thread_id);
     fast_thread_array[thread->thread_id] = thread;
 
     thread->group = group;
