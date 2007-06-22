@@ -283,19 +283,32 @@ static IDATA init_group_list() {
 
     lock_table = (HyFatLockTable *) malloc (sizeof(HyFatLockTable));
     lock_table->table = (hythread_monitor_t *)calloc(INITIAL_FAT_TABLE_ENTRIES,
-					      sizeof(hythread_monitor_t));
+                                              sizeof(hythread_monitor_t));
     lock_table->live_objs = (unsigned char *)calloc(INITIAL_FAT_TABLE_ENTRIES,
-					 sizeof(unsigned char));
+                                         sizeof(unsigned char));
     lock_table->size = INITIAL_FAT_TABLE_ENTRIES;
     lock_table->array_cursor = 0;
 
     assert (lock_table);
     assert (lock_table->table);
     assert (lock_table->live_objs);
-
+    
     if (hymutex_create(&lock_table->mutex, APR_THREAD_MUTEX_NESTED)) {
-      return TM_ERROR_OUT_OF_MEMORY;
+        return TM_ERROR_OUT_OF_MEMORY;
     }
+
+    if (hycond_create(&lock_table->write)) {
+        return TM_ERROR_OUT_OF_MEMORY;
+    }
+
+    if (hycond_create(&lock_table->read)) {
+        return TM_ERROR_OUT_OF_MEMORY;
+    }
+    
+    lock_table->readers_reading = 0;
+    lock_table->readers_waiting = 0;
+    lock_table->writers_waiting = 0;
+    lock_table->state = HYTHREAD_LOCKTABLE_IDLE;
 
     return TM_ERROR_NONE;
 }
@@ -324,7 +337,9 @@ static IDATA destroy_group_list() {
     free(lock_table->live_objs);
     free(lock_table->table);
 
-    status = hymutex_destroy(&lock_table->mutex);
+    hymutex_destroy(&lock_table->mutex);
+    hycond_destroy(&lock_table->write);
+    hycond_destroy(&lock_table->read);
     
     free(lock_table);
 

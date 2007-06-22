@@ -48,7 +48,7 @@
 
 // FIXME move to the global header, add error converter 
 #define RET_ON_ERROR(stat) if (stat) { return -1; }
-#define CONVERT_ERROR(stat)	(stat)
+#define CONVERT_ERROR(stat)     (stat)
 
 #define MAX_OWNED_MONITOR_NUMBER 200 //FIXME: switch to dynamic resize
 #define FAST_LOCAL_STORAGE_SIZE 10
@@ -553,22 +553,38 @@ typedef struct HySemaphore {
  * (OS fat_monitor) pointer.
  */
 
+typedef enum hythread_locktable_state { 
+    HYTHREAD_LOCKTABLE_IDLE, 
+    HYTHREAD_LOCKTABLE_READING, 
+    HYTHREAD_LOCKTABLE_WRITING 
+} hythread_locktable_state_t;
+    
 typedef struct HyFatLockTable {
-  // locktable itself
-  hythread_monitor_t *table;
-
-  // mutex guarding locktable
-  hymutex_t mutex;
-
-  // table of live objects (updated during each major GC)
-  unsigned char *live_objs;
-
-  // size of locktable
-  U_32 size;
-
-  // used to scan the lock table for the next available entry
-  U_32 array_cursor;
+    // locktable itself
+    hythread_monitor_t *table;
+    
+    // mutex guarding locktable
+    hymutex_t mutex;
+    hycond_t read;
+    hycond_t write;
+    
+    int readers_reading;
+    int readers_waiting;
+    int writers_waiting;
+    
+    hythread_locktable_state_t state;
   
+    U_32 read_count;
+    
+    // table of live objects (updated during each major GC)
+    unsigned char *live_objs;
+    
+    // size of locktable
+    U_32 size;
+
+    // used to scan the lock table for the next available entry
+    U_32 array_cursor;
+    
 } HyFatLockTable;
 
 
