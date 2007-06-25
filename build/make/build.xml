@@ -246,8 +246,6 @@
         <!-- product binary deploy location -->
         <property name="build.deploy.dir" location="../${build.os.short}_${build.arch}_${build.cxx}_${build.cfg}/deploy" />
 
-        <!-- product doc deploy location -->
-        <property name="build.deploy.doc.dir" location="../${build.os.short}_${build.arch}_${build.cxx}_${build.cfg}/docs" />
     </target>
 
     <target name="clean.update" depends="">
@@ -513,7 +511,6 @@
     <!-- put the rest of product (everything but components' output) to the deploy directory -->
     <target name="fill.up.deploy" depends="deploy.jni.n.jvmti.includes,
                                            deploy.readme,
-                                           deploy.getting_started,
                                            deploy.copy_classlib,
                                            deploy.antlr,
                                            deploy.vmmagic,
@@ -694,22 +691,6 @@ right after the executable name.
 
 </echo>
         <fixcrlf srcDir="${build.deploy.dir}/jdk/jre/" includes="readme.txt" />
-    </target>
-
-
-    <!-- Deploy the Getting Started document -->
-    <target name="deploy.getting_started" depends="plugin.antcontrib, set.semis.dirs">
-        <mkdir dir="${build.deploy.dir}/jdk/jre/doc" />
-
-        <copy todir="${build.deploy.dir}/jdk/jre/doc">
-            <fileset dir="${build.VM.home}/doc">
-                <include name="images/**" />
-                <include name="drl.css" />
-                <include name="GettingStarted.htm" />
-            </fileset>
-        </copy>
-
-        <fixcrlf srcDir="${build.deploy.dir}/jdk/jre/doc" includes="*.htm *.css" />
     </target>
 
 
