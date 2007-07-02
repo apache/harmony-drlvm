@@ -394,11 +394,13 @@ public:
         Type* exceptionType = NULL;
         if (exceptionTypeToken != 0) {
             exceptionType = compilationInterface.getNamedType(enclosingMethod->getParentHandle(),exceptionTypeToken, ResolveNewCheck_NoCheck);
-            if(!exceptionType) { // the type can not be resolved. LinkingException must be thrown
-                return 0;
-            }
+            assert(exceptionType);
             if (exceptionType->isUnresolvedObject()) {
-                //WORKAROUND! resolving exception type during a compilation session!!!
+                if(!compilationInterface.getTypeManager().isLazyResolutionMode()) {
+                    // the type can not be resolved. LinkingException must be thrown
+                    return 0;
+                }
+               //WORKAROUND! resolving exception type during a compilation session!!!
                 //Details: using singleton UnresolvedObjectType we unable to 
                 //distinct exception types if there are several unresolved exceptions in a single try block
                 //usually verifier loads all exception types caught for in method
@@ -1121,12 +1123,8 @@ void JavaLabelPrepass::new_(uint32 constPoolIndex)         {
     
     Type* nType = compilationInterface.getNamedType(methodDesc.getParentHandle(), constPoolIndex, ResolveNewCheck_DoCheck);
     
-    if (nType) {
-        slot.type = nType;
-    } else {
-        assert(!typeManager.isLazyResolutionMode());
-        slot.type = typeManager.getNullObjectType();
-    }
+    assert(nType);
+    slot.type = nType;
     slot.vars = NULL;
     jitrino_assert( slot.type);
     pushType(slot);
@@ -1162,13 +1160,8 @@ void JavaLabelPrepass::anewarray(uint32 constPoolIndex)    {
     StateInfo::setExactType(&slot);
 
     Type* type = compilationInterface.getNamedType(methodDesc.getParentHandle(), constPoolIndex);
-    
-    if (type) {
-        slot.type = typeManager.getArrayType(type);
-    } else {
-        assert(!typeManager.isLazyResolutionMode());
-        slot.type = typeManager.getNullObjectType();
-    }
+    assert(type);
+    slot.type = typeManager.getArrayType(type);
     slot.vars = NULL;
     jitrino_assert( slot.type);
     pushType(slot);
@@ -1191,13 +1184,7 @@ void JavaLabelPrepass::checkcast(uint32 constPoolIndex)    {
         return;
     }
     Type* type = compilationInterface.getNamedType(methodDesc.getParentHandle(), constPoolIndex);
-    if (!type) {
-        assert(!typeManager.isLazyResolutionMode());
-        // leave stack as is as in case of success because
-        // resolution of item by constPoolIndex fails and
-        // respective exception will be thrown
-        return;
-    }
+    assert(type);
     popAndCheck(A);
     pushType(type);
 }
@@ -1339,11 +1326,7 @@ void JavaLabelPrepass::multianewarray(uint32 constPoolIndex,uint8 dimensions) {
         popAndCheck(int32Type);
     }
     Type *type = compilationInterface.getNamedType(methodDesc.getParentHandle(), constPoolIndex);
-    if ( !type ) {
-        assert(!typeManager.isLazyResolutionMode());
-        type = typeManager.getNullObjectType();
-    }
-    jitrino_assert( type);
+    jitrino_assert(type);
     pushType(type);
 }
 
@@ -1427,7 +1410,7 @@ Type* JavaLabelPrepass::getRetTypeBySignature(CompilationInterface& ci, Class_Ha
     {
     case 'L': {
             if (!typeManager.isLazyResolutionMode()) {
-                retType = typeManager.getNullObjectType();
+                retType = typeManager.getUnresolvedObjectType();
             } else {
                 retType = ci.getTypeFromDescriptor(enclClass, origSig);
                 //in lazy resolution mode retType is already valid array type
@@ -1467,21 +1450,14 @@ Type* JavaLabelPrepass::getRetTypeBySignature(CompilationInterface& ci, Class_Ha
     case ')': // we have just leave it back
     default: // impossible! Verifier must check and catch this
         assert(0);
-        retType = typeManager.getNullObjectType();
+        retType = typeManager.getUnresolvedObjectType();
         break;
     }
     assert(retType);
 
-    void* arrVMTypeHandle = NULL;
-    if(retType == typeManager.getNullObjectType()) {
-        assert(!typeManager.isLazyResolutionMode());
-        // VM can not operate with an array of NullObjects
-        // Let's cheat here
-        arrVMTypeHandle = (void*)(POINTER_SIZE_INT)0xdeadbeef;
-    }
     if (!arrayIsWrapped && arrayDim > 0) {
         for (;arrayDim > 0; arrayDim--) {
-            retType = typeManager.getArrayType(retType, false, arrVMTypeHandle);
+            retType = typeManager.getArrayType(retType, false);
         }
     }
     return retType;

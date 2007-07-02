@@ -623,13 +623,10 @@ JavaByteCodeTranslator::ldc(uint32 constPoolIndex) {
         opnd = irBuilder.genLdRef(&methodToCompile,constPoolIndex,constantType);
     } else if (constantType->isSystemClass()) {
         NamedType *literalType = compilationInterface.getNamedType(methodToCompile.getParentHandle(), constPoolIndex);
-        if (!literalType) {
+        if (!typeManager.isLazyResolutionMode() && literalType->isUnresolvedType()) {
             linkingException(constPoolIndex, OPCODE_LDC);
-            pushOpnd(irBuilder.genLdNull());
-            return;
-        } else {
-            opnd = irBuilder.genLdRef(&methodToCompile,constPoolIndex,constantType);
         }
+        opnd = irBuilder.genLdRef(&methodToCompile,constPoolIndex,constantType);
     } else {
         const void* constantAddress =
            compilationInterface.getConstantValue(&methodToCompile,constPoolIndex);
@@ -772,19 +769,17 @@ JavaByteCodeTranslator::getstatic(uint32 constPoolIndex) {
         if (!fieldValueInlined){
             pushOpnd(irBuilder.genLdStatic(fieldType, field));
         }
-    } else if (typeManager.isLazyResolutionMode()) {
+    } else {
+        if (!typeManager.isLazyResolutionMode()) {
+            // generate helper call for throwing respective exception
+            linkingException(constPoolIndex, OPCODE_GETSTATIC);
+        }
         const char* fieldTypeName = const_pool_get_field_descriptor(methodToCompile.getParentHandle(), constPoolIndex);
         bool fieldIsMagic = isVMMagicClass(fieldTypeName);
         Type* fieldType = fieldIsMagic ? convertVMMagicType2HIR(typeManager, fieldTypeName) 
                                        : compilationInterface.getFieldType(methodToCompile.getParentHandle(), constPoolIndex);
         Opnd* res = irBuilder.genLdStaticWithResolve(fieldType, methodToCompile.getParentType()->asObjectType(), constPoolIndex);
         pushOpnd(res);
-    } else {
-        // generate helper call for throwing respective exception
-        linkingException(constPoolIndex, OPCODE_GETSTATIC);
-        Type* type = compilationInterface.getFieldType(methodToCompile.getParentHandle(), constPoolIndex);
-        ConstInst::ConstValue nullValue;
-        pushOpnd(irBuilder.genLdConstant(type,nullValue));
     }
 }
 
@@ -799,17 +794,17 @@ JavaByteCodeTranslator::putstatic(uint32 constPoolIndex) {
             fieldType = convertVMMagicType2HIR(typeManager, fieldType);
         }
         irBuilder.genStStatic(fieldType,field,popOpnd());
-    } else  if (typeManager.isLazyResolutionMode()) {
+    } else {
+        if (!typeManager.isLazyResolutionMode()) {
+            // generate helper call for throwing respective exception
+            linkingException(constPoolIndex, OPCODE_PUTSTATIC);
+        }
         const char* fieldTypeName = const_pool_get_field_descriptor(methodToCompile.getParentHandle(), constPoolIndex);
         bool fieldIsMagic = isVMMagicClass(fieldTypeName);
         Type* fieldType = fieldIsMagic ? convertVMMagicType2HIR(typeManager, fieldTypeName) 
                                        : compilationInterface.getFieldType(methodToCompile.getParentHandle(), constPoolIndex);
         Opnd* value = popOpnd();
         irBuilder.genStStaticWithResolve(fieldType, methodToCompile.getParentType()->asObjectType(), constPoolIndex, value);
-    } else {
-        // generate helper call for throwing respective exception
-        linkingException(constPoolIndex, OPCODE_PUTSTATIC);
-        popOpnd();
     }
 }
 
@@ -822,7 +817,11 @@ JavaByteCodeTranslator::getfield(uint32 constPoolIndex) {
             fieldType = convertVMMagicType2HIR(typeManager, fieldType);
         }
         pushOpnd(irBuilder.genLdField(fieldType,popOpnd(),field));
-    } else  if (typeManager.isLazyResolutionMode()) {
+    } else {
+        if (!typeManager.isLazyResolutionMode()) {
+            // generate helper call for throwing respective exception
+            linkingException(constPoolIndex, OPCODE_GETFIELD);
+        }
         Type* fieldType = compilationInterface.getFieldType(methodToCompile.getParentHandle(), constPoolIndex);
         if (isVMMagicClass(fieldType->getName())) {
             fieldType = convertVMMagicType2HIR(typeManager, fieldType);
@@ -830,11 +829,6 @@ JavaByteCodeTranslator::getfield(uint32 constPoolIndex) {
         Opnd* base = popOpnd();
         Opnd* res = irBuilder.genLdFieldWithResolve(fieldType, base, methodToCompile.getParentType()->asObjectType(), constPoolIndex);
         pushOpnd(res);
-    } else {
-        // generate helper call for throwing respective exception
-        linkingException(constPoolIndex, OPCODE_GETFIELD);
-        popOpnd();
-        pushOpnd(irBuilder.genLdNull());
     }
 }
 
@@ -847,16 +841,15 @@ JavaByteCodeTranslator::putfield(uint32 constPoolIndex) {
         Opnd* value = popOpnd();
         Opnd* ref = popOpnd();
         irBuilder.genStField(fieldType,ref,field,value);
-    } else if (typeManager.isLazyResolutionMode()) {
+    } else {
+        if (!typeManager.isLazyResolutionMode()) {
+            // generate helper call for throwing respective exception
+            linkingException(constPoolIndex, OPCODE_PUTFIELD);
+        }
         Type* type = compilationInterface.getFieldType(methodToCompile.getParentHandle(), constPoolIndex);
         Opnd* value = popOpnd();
         Opnd* base = popOpnd();
         irBuilder.genStFieldWithResolve(type, base, methodToCompile.getParentType()->asObjectType(), constPoolIndex, value);
-    } else {
-        // generate helper call for throwing respective exception
-        linkingException(constPoolIndex, OPCODE_PUTFIELD);
-        popOpnd();
-        popOpnd();
     }
 }
 //-----------------------------------------------------------------------------
@@ -1501,14 +1494,10 @@ void
 JavaByteCodeTranslator::invokevirtual(uint32 constPoolIndex) {
     MethodDesc* methodDesc = compilationInterface.getVirtualMethod(methodToCompile.getParentHandle(), constPoolIndex);
     if (!methodDesc) {
-        if (typeManager.isLazyResolutionMode()) {
-            genCallWithResolve(OPCODE_INVOKEVIRTUAL, constPoolIndex);
-        } else {
+        if (!typeManager.isLazyResolutionMode()) {
             linkingException(constPoolIndex, OPCODE_INVOKEVIRTUAL);
-            const char* methodSig_string = methodSignatureString(constPoolIndex);
-            popOpnd(); // is not static
-            pseudoInvoke(methodSig_string);
         }
+        genCallWithResolve(OPCODE_INVOKEVIRTUAL, constPoolIndex);
         return;
     }
     jitrino_assert(methodDesc);
@@ -1565,14 +1554,10 @@ void
 JavaByteCodeTranslator::invokespecial(uint32 constPoolIndex) {
     MethodDesc* methodDesc = compilationInterface.getSpecialMethod(methodToCompile.getParentHandle(), constPoolIndex);
     if (!methodDesc) {
-        if (typeManager.isLazyResolutionMode()) {
-            genCallWithResolve(OPCODE_INVOKESPECIAL, constPoolIndex);
-        } else {
+        if (!typeManager.isLazyResolutionMode()) {
             linkingException(constPoolIndex, OPCODE_INVOKESPECIAL);
-            const char* methodSig_string = methodSignatureString(constPoolIndex);
-            popOpnd(); // is not static
-            pseudoInvoke(methodSig_string);
         }
+        genCallWithResolve(OPCODE_INVOKESPECIAL, constPoolIndex);
         return;
     }
     jitrino_assert(methodDesc);
@@ -1609,13 +1594,10 @@ void
 JavaByteCodeTranslator::invokestatic(uint32 constPoolIndex) {
     MethodDesc* methodDesc = compilationInterface.getStaticMethod(methodToCompile.getParentHandle(), constPoolIndex);
     if (!methodDesc) {
-        if (typeManager.isLazyResolutionMode()) {
-            genCallWithResolve(OPCODE_INVOKESTATIC, constPoolIndex);
-        } else {
+        if (!typeManager.isLazyResolutionMode()) {
             linkingException(constPoolIndex, OPCODE_INVOKESTATIC);
-            const char* methodSig_string = methodSignatureString(constPoolIndex);
-            pseudoInvoke(methodSig_string);
         }
+        genCallWithResolve(OPCODE_INVOKESTATIC, constPoolIndex);
         return;
     }
 
@@ -1654,14 +1636,10 @@ void
 JavaByteCodeTranslator::invokeinterface(uint32 constPoolIndex,uint32 count) {
     MethodDesc* methodDesc = compilationInterface.getInterfaceMethod(methodToCompile.getParentHandle(), constPoolIndex);
     if (!methodDesc) {
-        if (typeManager.isLazyResolutionMode()) {
-            genCallWithResolve(OPCODE_INVOKEINTERFACE, constPoolIndex);
-        } else {
+        if (!typeManager.isLazyResolutionMode()) {
             linkingException(constPoolIndex, OPCODE_INVOKEINTERFACE);
-            const char* methodSig_string = methodSignatureString(constPoolIndex);
-            popOpnd(); // is not static
-            pseudoInvoke(methodSig_string);
         }
+        genCallWithResolve(OPCODE_INVOKEINTERFACE, constPoolIndex);
         return;
     }
     jitrino_assert(methodDesc);
@@ -1709,15 +1687,11 @@ JavaByteCodeTranslator::invokeinterface(uint32 constPoolIndex,uint32 count) {
 void 
 JavaByteCodeTranslator::new_(uint32 constPoolIndex) {
     NamedType* type = compilationInterface.getNamedType(methodToCompile.getParentHandle(), constPoolIndex, ResolveNewCheck_DoCheck);
-
-    if (!type) {
-        assert(!typeManager.isLazyResolutionMode());
-        linkingException(constPoolIndex, OPCODE_NEW);
-        pushOpnd(irBuilder.genLdNull());
-        return;
-    }
     jitrino_assert(type);
     if (type->isUnresolvedObject()) {
+        if (!typeManager.isLazyResolutionMode()) {
+            linkingException(constPoolIndex, OPCODE_NEW);
+        }
         pushOpnd(irBuilder.genNewObjWithResolve(methodToCompile.getParentType()->asObjectType(), constPoolIndex));
     } else {
         pushOpnd(irBuilder.genNewObj(type));
@@ -1759,16 +1733,11 @@ JavaByteCodeTranslator::newarray(uint8 atype) {
 void 
 JavaByteCodeTranslator::anewarray(uint32 constPoolIndex) {
     NamedType* type = compilationInterface.getNamedType(methodToCompile.getParentHandle(), constPoolIndex);
-    if (!type) {
-        assert(!typeManager.isLazyResolutionMode());
-        linkingException(constPoolIndex, OPCODE_ANEWARRAY);
-        popOpnd();
-        pushOpnd(irBuilder.genLdNull());
-        return;
-    }
     Opnd* sizeOpnd = popOpnd();
     if (type->isUnresolvedType()) {
-        assert(typeManager.isLazyResolutionMode());
+        if (!typeManager.isLazyResolutionMode()) {
+            linkingException(constPoolIndex, OPCODE_ANEWARRAY);
+        }
         //res type can be an array of multi array with uninitialized dimensions.
         pushOpnd(irBuilder.genNewArrayWithResolve(type, sizeOpnd, methodToCompile.getParentType()->asObjectType(), constPoolIndex));
     } else {
@@ -1779,23 +1748,17 @@ JavaByteCodeTranslator::anewarray(uint32 constPoolIndex) {
 void 
 JavaByteCodeTranslator::multianewarray(uint32 constPoolIndex,uint8 dimensions) {
     NamedType* arraytype = compilationInterface.getNamedType(methodToCompile.getParentHandle(), constPoolIndex);
-    if (!arraytype) {
-        linkingException(constPoolIndex, OPCODE_MULTIANEWARRAY);
-        // pop the sizes
-        for (int i=dimensions-1; i>=0; i--) {
-            popOpnd();
-        }
-        pushOpnd(irBuilder.genLdNull());
-        return;
-    }
     assert(arraytype->isArray());
     jitrino_assert(dimensions > 0);
     Opnd** countOpnds = new (memManager) Opnd*[dimensions];
     // pop the sizes
-    for (int i=dimensions-1; i>=0; i--) {
+    for (int i = dimensions - 1; i >= 0; i--) {
         countOpnds[i] = popOpnd();
     }
     if (arraytype->isUnresolvedType()) {
+        if (!typeManager.isLazyResolutionMode()) {
+            linkingException(constPoolIndex, OPCODE_MULTIANEWARRAY);
+        }
         pushOpnd(irBuilder.genMultianewarrayWithResolve(
             arraytype, methodToCompile.getParentType()->asObjectType(),constPoolIndex, dimensions,countOpnds
             ));
@@ -1824,14 +1787,11 @@ JavaByteCodeTranslator::athrow() {
 void 
 JavaByteCodeTranslator::checkcast(uint32 constPoolIndex) {
     NamedType *type = compilationInterface.getNamedType(methodToCompile.getParentHandle(), constPoolIndex);
-    if (!type) {
-        assert(!typeManager.isLazyResolutionMode());
-        linkingException(constPoolIndex, OPCODE_CHECKCAST);
-        return; // can be left as is
-    }
     Opnd* objOpnd = popOpnd();
     if (type->isUnresolvedType()) {
-        assert(typeManager.isLazyResolutionMode());
+        if (!typeManager.isLazyResolutionMode()) {
+            linkingException(constPoolIndex, OPCODE_CHECKCAST);
+        }
         pushOpnd(irBuilder.genCastWithResolve(objOpnd, type, methodToCompile.getParentType()->asObjectType(), constPoolIndex));
     } else {
         pushOpnd(irBuilder.genCast(objOpnd, type));
@@ -1841,18 +1801,14 @@ JavaByteCodeTranslator::checkcast(uint32 constPoolIndex) {
 int  
 JavaByteCodeTranslator::instanceof(const uint8* bcp, uint32 constPoolIndex, uint32 off)   {
     NamedType *type = compilationInterface.getNamedType(methodToCompile.getParentHandle(), constPoolIndex);
-    if (!type) {
-        linkingException(constPoolIndex, OPCODE_INSTANCEOF);
-        popOpnd(); // emulation of unsuccessful 'instanceof'
-        pushOpnd(irBuilder.genLdConstant((int32)0));
-        return 3;
-    }
     Opnd* src = popOpnd();
     Type* srcType = src->getType();
     Opnd* res = NULL;
 
     if (type->isUnresolvedType()) {
-        assert(typeManager.isLazyResolutionMode());
+        if (!typeManager.isLazyResolutionMode()) {
+            linkingException(constPoolIndex, OPCODE_INSTANCEOF);
+        }
         res = irBuilder.genInstanceOfWithResolve(src, methodToCompile.getParentType()->asObjectType(), constPoolIndex);
     } else if( !srcType->isUnresolvedType() 
         && !srcType->isInterface() 

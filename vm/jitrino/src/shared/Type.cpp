@@ -275,7 +275,7 @@ Type*   TypeManager::getCommonType(Type *type1, Type* type2) {
     if (type1->isUnresolvedType() || type2->isUnresolvedType()) {
         if (type1->isNullObject()) return type2;
         if (type2->isNullObject()) return type1;
-        return type1->isUnresolvedType() ? type2 : type1;
+        return type1->isUnresolvedType() ? type1 : type2;
     }
     if ( type2->isObject() && (oneIsCompressed 
         ? (type1 == getCompressedNullObjectType()) 
@@ -446,8 +446,7 @@ TypeManager::getArrayType(Type* elemType, bool isCompressed, void* arrayVMTypeHa
                 }
             }
             type = new (memManager)  ArrayType(elemNamedType,arrayVMTypeHandle,*this, isCompressed);
-            if (arrayVMTypeHandle != (void*)(POINTER_SIZE_INT)0xdeadbeef 
-                &&  (type->isUnresolvedType() || type->getAllocationHandle()!=0)) 
+            if (type->isUnresolvedType() || type->getAllocationHandle()!=0) 
             { // type can be cached
                 lookupTable.insert(elemNamedType,type);
             }

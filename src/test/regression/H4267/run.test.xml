@@ -1,0 +1,12 @@
+<project name="RUN HARMONY-4267 Regression Test">
+    <target name="run-test">
+        <delete
+             file="${reg.test.class.path}/org/apache/harmony/drlvm/tests/regression/h4267/RemoveMe.class"
+             verbose="true"/>
+        <run-junit-test 
+             test="org.apache.harmony.drlvm.tests.regression.h4267.UnresolvedArrayElem"
+             vmarg="-Xem:opt">
+        </run-junit-test>
+    </target>
+</project>
+

@@ -837,8 +837,7 @@ NamedType* CompilationInterface::resolveNamedType(Class_Handle enclClass, uint32
 
 NamedType* CompilationInterface::getNamedType(Class_Handle enclClass, uint32 cpIndex, ResolveNewCheck checkNew) {
     Class_Handle ch = NULL;
-    bool lazy = typeManager.isLazyResolutionMode();
-    if (lazy && !class_is_cp_entry_resolved(compileHandle, enclClass, cpIndex)) {
+    if (typeManager.isLazyResolutionMode() && !class_is_cp_entry_resolved(compileHandle, enclClass, cpIndex)) {
         NamedType * res = getUnresolvedType(typeManager, enclClass, cpIndex);
         return res; 
     } else {
@@ -848,12 +847,7 @@ NamedType* CompilationInterface::getNamedType(Class_Handle enclClass, uint32 cpI
             ch = resolve_class(compileHandle,enclClass,cpIndex);
         }
         if (ch == NULL) {
-            if (lazy) {//instantiation of abstract/private class -> do it lazily
-                assert(checkNew == ResolveNewCheck_DoCheck);
-                return typeManager.getUnresolvedObjectType();
-            } else {
-                return NULL;
-            }
+            return typeManager.getUnresolvedObjectType();
         }
     }
     if (class_is_primitive(ch)) {
@@ -961,7 +955,7 @@ CompilationInterface::getFieldType(Class_Handle enclClass, uint32 cpIndex) {
                     assert(fieldTypeName);
                     return getTypeFromDescriptor(enclClass, fieldTypeName);
                 } 
-                return typeManager.getNullObjectType();
+                return typeManager.getUnresolvedObjectType();
 
         case JAVA_TYPE_VOID:     // class_get_cp_field_type can't return VOID
         case JAVA_TYPE_STRING:   // class_get_cp_field_type can't return STRING
