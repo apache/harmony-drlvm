@@ -272,7 +272,7 @@ static void init_vm_properties(Properties & properties)
         properties.set_new("vm.jvmti.enabled", "false");
         properties.set_new("vm.jvmti.compiled_method_load.inlined", "false");
         properties.set_new("vm.bootclasspath.appendclasspath", "false");
-        properties.set_new("vm.dlls", PORT_DSO_NAME(GC_DLL));
+        properties.set_new("gc.dll", PORT_DSO_NAME(GC_DLL));
         properties.set_new("thread.soft_unreservation", "false");
 
         int n_api_dll_files = sizeof(api_dll_files) / sizeof(char *);
@@ -284,9 +284,10 @@ static void init_vm_properties(Properties & properties)
         properties.set_new("vm.other_natives_dlls", path_buf);
 }
 
-void
-initialize_properties(Global_Env * p_env)
+jint initialize_properties(Global_Env * p_env)
 {
+    jint status = JNI_OK;
+
     if (!prop_pool) {
         apr_pool_create(&prop_pool, 0);
     }
@@ -359,6 +360,8 @@ initialize_properties(Global_Env * p_env)
                     ++name;
                 } else {
                     value = "";
+                    LECHO(28, "Wrong option format {0}" << option);
+                    status = JNI_ERR;
                 }
             }
 
@@ -366,14 +369,19 @@ initialize_properties(Global_Env * p_env)
             p_env->VmProperties()->set(name, value);
 
             STD_FREE(src);
+
+            if (status != JNI_OK) break;
         }
     }
 
 /*
  * 2. Set predefined values to properties not defined via vm options.
  */
-    init_java_properties(*p_env->JavaProperties());
-    init_vm_properties(*p_env->VmProperties());
-
+    if (status == JNI_OK)
+    {
+        init_java_properties(*p_env->JavaProperties());
+        init_vm_properties(*p_env->VmProperties());
+    }
     apr_pool_clear(prop_pool);
+    return status;
 }

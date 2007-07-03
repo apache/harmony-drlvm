@@ -35,6 +35,6 @@ void parse_vm_arguments(Global_Env *p_env);
 void* get_portlib_for_logger(Global_Env *p_env);
 void parse_jit_arguments(JavaVMInitArgs* vm_arguments);
 void print_generic_help();
-void initialize_properties(Global_Env *p_env);
+jint initialize_properties(Global_Env *p_env);
 
 #endif //_INIT_H

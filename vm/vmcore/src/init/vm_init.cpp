@@ -144,35 +144,30 @@ static jint process_properties_dlls(Global_Env * vm_env) {
         return status;
     }
 
-    const char delimiters[] = {PORT_PATH_SEPARATOR, 0};
-
-    char* dlls = vm_env->VmProperties()->get("vm.dlls");
-    if (!dlls) return JNI_OK;
-    
-    char* tok = strtok((char *)dlls, delimiters);
-    while (tok) {
-        TRACE("analyzing dll " << tok);
+    /*
+     * Preload <GC>.dll which is specified by 'gc.dll' property.
+     *
+     * According to current design (r552465) 'gc.dll' property
+     * is always set: in configuration file (by default), or it can
+     * be reset from command line...
+     */
 #ifndef USE_GC_STATIC
-        if (vm_is_a_gc_dll(tok)) {
-            vm_add_gc(tok);
-            goto next_dll;
-        }
-#endif
+    char* gc_dll = vm_env->VmProperties()->get("gc.dll");
 
-#ifdef USE_DISEM
-        if (vm_is_a_disem_dll(tok)) {
-            vm_add_disem(tok);
-            goto next_dll;
-        }
-#endif
-        LWARN(16, "Mandatory library cannot be loaded: {0}" << tok);
-        status = JNI_ERR;
-        break;
-next_dll:
-        tok = strtok(NULL, delimiters);
+    if (!gc_dll) {
+        LWARN(44, "{0} internal property is undefined" << "gc.dll");
+        return JNI_ERR;
     }
+    TRACE("analyzing gc.dll " << gc_dll);
 
-    vm_env->VmProperties()->destroy(dlls);
+    if (vm_is_a_gc_dll(gc_dll)) {
+        vm_add_gc(gc_dll);
+    } else {
+        LWARN(16, "GC library cannot be loaded: {0}" << gc_dll);
+        status = JNI_ERR;
+    }
+    vm_env->VmProperties()->destroy(gc_dll);
+#endif
     return status;
 }
 
@@ -667,7 +662,8 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     // 20030407 Note: property initialization must follow initialization of the default JITs to allow 
     // the command line to override those default JITs.
 
-    initialize_properties(vm_env);
+    status = initialize_properties(vm_env);
+    if (status != JNI_OK) return status;
 
     tm_properties = (struct tm_props*) STD_MALLOC(sizeof(struct tm_props));
 
