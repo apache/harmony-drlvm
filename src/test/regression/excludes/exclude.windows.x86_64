@@ -19,3 +19,6 @@ H3982
 #HARMONY-4093
 H2113
 
+# Exclude this test because unresolved types support is not ready for x86_64 in JIT mode yet.
+H4267
+
