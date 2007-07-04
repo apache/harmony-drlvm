@@ -28,7 +28,7 @@ POINTER_SIZE_INT cur_mark_color = OBJ_COLOR_BLACK;
 
 static void ops_color_flip(void)
 {
-  uint32 temp = cur_alloc_color;
+  POINTER_SIZE_INT temp = cur_alloc_color;
   cur_alloc_color = cur_mark_color;
   cur_mark_color = temp;
   alloc_mask_in_table = ~alloc_mask_in_table;

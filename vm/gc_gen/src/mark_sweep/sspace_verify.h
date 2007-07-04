@@ -19,9 +19,9 @@
 
 #include "../common/gc_common.h"
 
-#define SSPACE_VERIFY
-#define SSPACE_CHUNK_INFO
-#define SSPACE_ALLOC_INFO
+//#define SSPACE_VERIFY
+//#define SSPACE_CHUNK_INFO
+//#define SSPACE_ALLOC_INFO
 //#define SSPACE_TIME
 
 struct Sspace;

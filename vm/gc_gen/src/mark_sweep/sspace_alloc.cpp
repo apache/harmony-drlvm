@@ -25,7 +25,7 @@ static Boolean slot_is_alloc_in_table(POINTER_SIZE_INT *table, unsigned int slot
   unsigned int word_index = color_bits_index / BITS_PER_WORD;
   unsigned int index_in_word = color_bits_index % BITS_PER_WORD;
   
-  return table[word_index] & (cur_alloc_color << index_in_word);
+  return (Boolean)(table[word_index] & (cur_alloc_color << index_in_word));
 }
 
 static void alloc_slot_in_table(POINTER_SIZE_INT *table, unsigned int slot_index)
