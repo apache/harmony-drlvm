@@ -163,7 +163,7 @@ void gc_compute_space_tune_size_before_marking(GC* gc, unsigned int cause)
 }
 
 #include "../thread/collector.h"
-#include "../mark_sweep/lspace.h"
+#include "../los/lspace.h"
 
 static POINTER_SIZE_INT non_los_live_obj_size;
 static  POINTER_SIZE_INT los_live_obj_size;
@@ -518,6 +518,5 @@ void gc_space_tuner_release_fake_blocks_for_los_shrink(GC* gc)
   STD_FREE(tuner->interim_blocks);
   return;
 }
-
 
 

@@ -23,6 +23,8 @@
 
 #include "../common/gc_space.h"
 
+struct Chunk_Header;
+
 /* Mutator thread local information for GC */
 typedef struct Mutator {
   /* <-- first couple of fields are overloaded as Allocator */
@@ -37,6 +39,8 @@ typedef struct Mutator {
   
   Vector_Block* rem_set;
   Vector_Block* obj_with_fin;
+  Chunk_Header **small_chunks;
+  Chunk_Header **medium_chunks;
   Mutator* next;  /* The gc info area associated with the next active thread. */
 } Mutator;
 

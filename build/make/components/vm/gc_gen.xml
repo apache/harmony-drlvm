@@ -53,15 +53,16 @@ Version: $Revision: 1.2 $
 
             <fileset dir="${src}/gc_gen/src">
                 <select arch="ia32,em64t,ipf">
-                <include name="common/*.cpp" />            
-                <include name="gen/*.cpp" />            
-                <include name="mark_compact/*.cpp" />            
-                <include name="mark_sweep/*.cpp" />            
-                <include name="thread/*.cpp" />            
-                <include name="trace_forward/*.cpp" />            
-                <include name="utils/*.cpp" /> 
-                <include name="jni/*.cpp" /> 
-                <include name="verify/*.cpp" />             
+                <include name="common/*.cpp" />
+                <include name="gen/*.cpp" />
+                <include name="mark_compact/*.cpp" />
+                <include name="mark_sweep/*.cpp" />
+                <include name="los/*.cpp" />
+                <include name="thread/*.cpp" />
+                <include name="trace_forward/*.cpp" />
+                <include name="utils/*.cpp" />
+                <include name="jni/*.cpp" />
+                <include name="verify/*.cpp" />
                 <include name="finalizer_weakref/*.cpp" />
                 </select>
             </fileset>

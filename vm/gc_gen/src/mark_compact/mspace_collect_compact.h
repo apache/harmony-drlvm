@@ -54,4 +54,3 @@ extern Boolean IS_MOVE_COMPACT;
 #endif /* _MSPACE_COLLECT_COMPACT_H_ */
 
 
-

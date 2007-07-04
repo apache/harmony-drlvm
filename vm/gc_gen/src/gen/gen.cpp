@@ -270,9 +270,11 @@ void gc_gen_destruct(GC_Gen *gc_gen)
 Space* gc_get_nos(GC_Gen* gc){ return (Space*)gc->nos;}
 Space* gc_get_mos(GC_Gen* gc){ return (Space*)gc->mos;}
 Space* gc_get_los(GC_Gen* gc){ return (Space*)gc->los;}
+Space* gc_get_pos(GC_Gen* gc) { return NULL; }
 void gc_set_nos(GC_Gen* gc, Space* nos){ gc->nos = (Fspace*)nos;}
 void gc_set_mos(GC_Gen* gc, Space* mos){ gc->mos = (Mspace*)mos;}
 void gc_set_los(GC_Gen* gc, Space* los){ gc->los = (Lspace*)los;}
+void gc_set_pos(GC_Gen* gc, Space* pos) {}
 
 void* mos_alloc(unsigned size, Allocator *allocator){return mspace_alloc(size, allocator);}
 void* nos_alloc(unsigned size, Allocator *allocator){return fspace_alloc(size, allocator);}

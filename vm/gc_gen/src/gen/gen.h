@@ -26,7 +26,7 @@
 #include "../thread/gc_thread.h"
 #include "../trace_forward/fspace.h"
 #include "../mark_compact/mspace.h"
-#include "../mark_sweep/lspace.h"
+#include "../los/lspace.h"
 #include "../finalizer_weakref/finalizer_weakref_metadata.h"
 
 enum Write_Barrier_Kind{
@@ -155,9 +155,11 @@ void* los_try_alloc(POINTER_SIZE_INT size, GC* gc);
 Space* gc_get_nos(GC_Gen* gc);
 Space* gc_get_mos(GC_Gen* gc);
 Space* gc_get_los(GC_Gen* gc);
+Space* gc_get_pos(GC_Gen* gc);
 void gc_set_nos(GC_Gen* gc, Space* nos);
 void gc_set_mos(GC_Gen* gc, Space* mos);
 void gc_set_los(GC_Gen* gc, Space* los);
+void gc_set_pos(GC_Gen* gc, Space* pos);
 
 unsigned int gc_get_processor_num(GC_Gen* gc);
 
@@ -179,6 +181,5 @@ void gc_gen_iterate_heap(GC_Gen *gc);
 extern Boolean GEN_NONGEN_SWITCH ;
 
 #endif /* ifndef _GC_GEN_H_ */
-
 
 

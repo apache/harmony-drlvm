@@ -368,4 +368,3 @@ void gc_metadata_verify(GC* gc, Boolean is_before_gc)
 }
 
 
-

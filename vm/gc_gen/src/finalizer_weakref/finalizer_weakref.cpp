@@ -24,7 +24,7 @@
 #include "../thread/mutator.h"
 #include "../common/gc_metadata.h"
 #include "../trace_forward/fspace.h"
-#include "../mark_sweep/lspace.h"
+#include "../los/lspace.h"
 #include "../gen/gen.h"
 #include "../common/space_tuner.h"
 

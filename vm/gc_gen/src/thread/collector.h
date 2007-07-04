@@ -22,8 +22,11 @@
 #define _COLLECTOR_H_
 
 #include "../common/gc_space.h"
+#include "../mark_sweep/sspace_verify.h"
+
 struct Block_Header;
 struct Stealable_Stack;
+struct Free_Chunk_List;
 
 #define NORMAL_SIZE_SEGMENT_GRANULARITY_BITS  8
 #define NORMAL_SIZE_SEGMENT_GRANULARITY (1 << NORMAL_SIZE_SEGMENT_GRANULARITY_BITS)
@@ -62,6 +65,11 @@ typedef struct Collector{
   
   Block_Header* cur_compact_block;
   Block_Header* cur_target_block;
+  
+  Free_Chunk_List *free_chunk_list;
+#ifdef SSPACE_VERIFY
+  POINTER_SIZE_INT live_obj_num;
+#endif
   
   void(*task_func)(void*) ;   /* current task */
   

@@ -20,7 +20,7 @@
 
 #include "mspace_collect_compact.h"
 #include "../trace_forward/fspace.h"
-#include "../mark_sweep/lspace.h"
+#include "../los/lspace.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 #ifdef USE_32BITS_HASHCODE
 #include "../common/hashcode.h"

@@ -253,4 +253,3 @@ void verifier_hashcode_log(GC_Verifier* gc_verifier)
     printf(" %-14s:    %-7s |   Before %10d   |   After %10d   |\n", "hashcode", "NUM", gc_verifier->num_hash_before_gc, gc_verifier->num_hash_after_gc);
 }
 
-

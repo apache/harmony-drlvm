@@ -97,4 +97,3 @@ inline void verifier_set_fallback_collection(GC_Verifier* gc_verifier, Boolean i
 
 #endif
 
-
