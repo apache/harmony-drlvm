@@ -311,6 +311,11 @@ void Layouter::runImpl() {
             Log::out() << "Layout: not edge profile found: '"<<params<<"' using topological layout\n";;
         }
     }
+    
+    fg->purgeEmptyNodes();
+    fg->getLoopTree()->rebuild(false);
+    irManager->fixEdgeProfile();
+
     Linearizer::doLayout(type, &getIRManager());
 }
 

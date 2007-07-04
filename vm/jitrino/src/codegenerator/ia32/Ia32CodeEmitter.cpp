@@ -377,7 +377,7 @@ void CodeEmitter::emitCode( void ) {
     uint8 * ip = codeStreamStart;
     for( BasicBlock * bb = (BasicBlock*)irManager->getFlowGraph()->getEntryNode(); bb != NULL; bb=bb->getLayoutSucc()) {
 
-        
+        assert(bb->getFirstInst()!=NULL);
         if (alignment && lt->isLoopHeader(bb) && ((POINTER_SIZE_INT)ip & (alignment-1))) {
             unsigned align = alignment - (unsigned)((POINTER_SIZE_INT)ip & (alignment-1));
             ip = (uint8*)EncoderBase::nops((char*)ip, align);

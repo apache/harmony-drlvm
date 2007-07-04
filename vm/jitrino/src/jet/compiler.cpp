@@ -140,8 +140,12 @@ JIT_Result Compiler::compile(Compile_Handle ch, Method_Handle method,
     if (!get_bool_arg("bbp", true)) {
         compile_flags &= JMF_BBPOLLING;
     }
-    
+#ifndef _EM64T_    
+    m_lazy_resolution  = get_bool_arg("lazyResolution", true);
+#else
     m_lazy_resolution  = get_bool_arg("lazyResolution", false);
+#endif
+
 #ifdef _DEBUG
     bool assertOnRecursion = get_bool_arg("assertOnRecursion", false);
     if (assertOnRecursion) {
@@ -673,11 +677,11 @@ void Compiler::comp_parse_bytecode(void)
             ji.id = id++;
         }
     }
-	// Sometimes, Eclipse's javac generates NOPs at the end of method AND in a basic 
-	// block which is [unreachable] exception handler. In this case we have an inst which 
-	// is last in the method, has fall-through, but no following block. Always set up 'OPF_DEAD_END':
-	JInst& lastInst = m_insts[bc_size-1];
-	lastInst.flags = lastInst.flags | OPF_DEAD_END;
+    // Sometimes, Eclipse's javac generates NOPs at the end of method AND in a basic 
+    // block which is [unreachable] exception handler. In this case we have an inst which 
+    // is last in the method, has fall-through, but no following block. Always set up 'OPF_DEAD_END':
+    JInst& lastInst = m_insts[bc_size-1];
+    lastInst.flags = lastInst.flags | OPF_DEAD_END;
 }
 
 void Compiler::comp_alloc_regs(void)
