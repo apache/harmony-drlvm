@@ -154,6 +154,7 @@ OpndManager::getOpndTypeFromLdType(Type* ldType) {
         return typeManager.getFloatType();
         // object types
     case Type::CompressedSystemObject:
+    case Type::CompressedUnresolvedObject:
     case Type::CompressedSystemClass:
     case Type::CompressedSystemString:
     case Type::CompressedArray:           case Type::CompressedObject:

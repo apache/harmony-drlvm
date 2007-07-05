@@ -1404,8 +1404,14 @@ void Compiler::initStatics(void)
         if (gr == bp) continue;
         g_global_grs.push_back(gr);
     }
-    // ... for fr registers, leave 3 registers available for scratch
-    for (unsigned i=3; i<fr_num; i++) {
+	// On a platform with float-point args passed on registers, we need at 
+	// least one scratch register in addition to the regs occupied by the args.
+	// For example: when all arg regs are occupied and we need to perform mem-mem 
+	// move e.g. field from operand stack into a memory stack.
+	// When no float-point args are passed on regs, we need at least 3 scratch 
+	// to perform computations and mem-mem moves in codegen.
+	const unsigned num_of_scratch = MAX_FR_ARGS<3 ? 3 : (MAX_FR_ARGS+1);
+    for (unsigned i=num_of_scratch; i<fr_num; i++) {
         AR fr = _fr(i);
         g_global_frs.push_back(fr);
     }

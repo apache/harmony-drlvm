@@ -89,9 +89,16 @@ namespace Jet {
      * @brief On IA-32 it's CCONV_CDECL_IA32, on EM64T it's CCONV_EM64T.
      */
     #define CCONV_CDECL     CCONV_EM64T
+	#ifdef _WIN32
+		/// A nubmer of FR registers dedicated to pass float-point arguments.
+		#define MAX_FR_ARGS (4)
+	#else
+		#define MAX_FR_ARGS (8)
+	#endif
 #else
     #define CCONV_STDCALL   CCONV_STDCALL_IA32
     #define CCONV_CDECL     CCONV_CDECL_IA32
+	#define MAX_FR_ARGS (0)
 #endif
 
 /**

@@ -124,6 +124,8 @@ public:
 
         // special null object reference
         CompressedNullObject,
+        // Unresolved Object
+        CompressedUnresolvedObject,
 
         //     (2.1.2) Array type
         CompressedArray,
@@ -276,28 +278,30 @@ public:
     }
     static Tag compressReference(Tag tag) {
         switch (tag) {
-        case SystemObject: return CompressedSystemObject;
-        case SystemClass:  return CompressedSystemClass;
-        case SystemString: return CompressedSystemString;
-        case NullObject:   return CompressedNullObject;
-        case Array:        return CompressedArray;
-        case Object:       return CompressedObject;
-        case MethodPtr:    return CompressedMethodPtr;
-        case VTablePtr:    return CompressedVTablePtr;
+        case SystemObject:     return CompressedSystemObject;
+        case SystemClass:      return CompressedSystemClass;
+        case SystemString:     return CompressedSystemString;
+        case NullObject:       return CompressedNullObject;
+        case UnresolvedObject: return CompressedUnresolvedObject;
+        case Array:            return CompressedArray;
+        case Object:           return CompressedObject;
+        case MethodPtr:        return CompressedMethodPtr;
+        case VTablePtr:        return CompressedVTablePtr;
         default:
             assert(0); return Void;
         }
     }
     static Tag unCompressReference(Tag tag) {
         switch (tag) {
-        case CompressedSystemObject: return SystemObject;
-        case CompressedSystemClass:  return SystemClass;
-        case CompressedSystemString: return SystemString;
-        case CompressedNullObject:   return NullObject;
-        case CompressedArray:        return Array;
-        case CompressedObject:       return Object;
-        case CompressedMethodPtr:    return MethodPtr;
-        case CompressedVTablePtr:    return VTablePtr;
+        case CompressedSystemObject:     return SystemObject;
+        case CompressedSystemClass:      return SystemClass;
+        case CompressedSystemString:     return SystemString;
+        case CompressedNullObject:       return NullObject;
+        case CompressedUnresolvedObject: return UnresolvedObject;
+        case CompressedArray:            return Array;
+        case CompressedObject:           return Object;
+        case CompressedMethodPtr:        return MethodPtr;
+        case CompressedVTablePtr:        return VTablePtr;
         default:
             assert(0); return Void;
         }
@@ -307,7 +311,7 @@ public:
                 ((CompressedSystemObject <= tag) && (tag <= CompressedObject)));
     }
     static bool isUnresolvedObject(Tag tag) {
-        return tag == UnresolvedObject;
+        return ((tag == UnresolvedObject) || (tag == CompressedUnresolvedObject));
     }
     static bool isNullObject(Tag tag) {
         return ((tag == NullObject) || (tag == CompressedNullObject));
@@ -697,6 +701,7 @@ public:
     Type*         getCompressedNullObjectType()  {return &compressedNullObjectType;}
     ObjectType*   getCompressedSystemStringType(){return compressedSystemStringType;}
     ObjectType*   getCompressedSystemObjectType(){return compressedSystemObjectType;}
+    ObjectType*   getCompressedUnresolvedObjectType(){return compressedUnresolvedObjectType;}
     ObjectType*   getCompressedSystemClassType() {return compressedSystemClassType;}
 
     NamedType*    getValueType(void* vmTypeHandle);
@@ -787,6 +792,7 @@ private:
     Type          offsetPlusHeapbaseType;
     ObjectType*   compressedSystemStringType;
     ObjectType*   compressedSystemObjectType;
+    ObjectType*   compressedUnresolvedObjectType;
     ObjectType*   compressedSystemClassType;
     Type          compressedNullObjectType;
     // hashtable for user-defined object and value types

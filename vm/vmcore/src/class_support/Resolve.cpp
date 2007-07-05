@@ -886,7 +886,7 @@ Method* resolve_special_method_env(Global_Env *env,
             }
         }
     }
-    if(method && !method_can_link_special(curr_clss, index, method, false))
+    if(method && !method_can_link_special(curr_clss, index, method, raise_exn))
         return NULL;
     return method;
 } //resolve_special_method_env

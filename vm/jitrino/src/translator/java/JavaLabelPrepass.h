@@ -280,6 +280,7 @@ public:
         case Type::CompressedArray:           
         case Type::CompressedObject:
         case Type::CompressedNullObject:
+        case Type::CompressedUnresolvedObject:
         case Type::CompressedSystemString:
         case Type::CompressedSystemObject:
             return A;

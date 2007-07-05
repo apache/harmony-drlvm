@@ -145,6 +145,7 @@ Type* TypeManager::toInternalType(Type* t)
     case Type::CompressedSystemClass:
     case Type::CompressedSystemString:
     case Type::CompressedNullObject:
+    case Type::CompressedUnresolvedObject:
     case Type::CompressedArray:
     case Type::CompressedObject:
     case Type::CompressedMethodPtr:
@@ -326,6 +327,7 @@ TypeManager::TypeManager(MemoryManager& mm) :
 
     compressedSystemStringType(NULL), 
     compressedSystemObjectType(NULL),
+    compressedUnresolvedObjectType(NULL),
     compressedSystemClassType(NULL),
     compressedNullObjectType(Type::CompressedNullObject), 
 
@@ -395,6 +397,8 @@ TypeManager::init() {
         ObjectType(Type::CompressedSystemString,systemStringVMTypeHandle,*this);
     compressedSystemObjectType = new (memManager) 
         ObjectType(Type::CompressedSystemObject,systemObjectVMTypeHandle,*this);
+    compressedUnresolvedObjectType = new (memManager) 
+        ObjectType(Type::CompressedUnresolvedObject,systemObjectVMTypeHandle,*this);
     compressedSystemClassType = new (memManager) 
         ObjectType(Type::CompressedSystemClass,systemClassVMTypeHandle,*this);
     compressedUserObjectTypes.insert(systemStringVMTypeHandle,compressedSystemStringType);
@@ -736,6 +740,8 @@ TypeManager::uncompressType(Type *compRefType)
         }
     case Type::CompressedSystemObject:
         return getSystemObjectType();
+    case Type::CompressedUnresolvedObject:
+        return getUnresolvedObjectType();
     case Type::CompressedSystemClass:
         return getSystemClassType();
     case Type::CompressedSystemString:
@@ -767,6 +773,8 @@ TypeManager::compressType(Type *uncompRefType)
         }
     case Type::SystemObject:
         return getCompressedSystemObjectType();
+    case Type::UnresolvedObject:
+        return getCompressedUnresolvedObjectType();
     case Type::SystemClass:
         return getCompressedSystemClassType();
     case Type::SystemString:
@@ -934,6 +942,7 @@ void    Type::print(::std::ostream& os) {
     case CompressedArray:            s = "cmp[]"; break;
     case CompressedObject:           s = "cmpo"; break;
     case CompressedNullObject:       s = "cmpnull"; break;
+    case CompressedUnresolvedObject: s = "cmpunreso"; break;
     default:               s = "???"; break;
     }
     os << s;
@@ -1076,6 +1085,7 @@ Type::getPrintString(Tag t) {
     case CompressedSystemClass:     s = "ccl"; break;
     case CompressedSystemString:    s = "cst"; break;
     case CompressedNullObject:      s = "cnl"; break;
+    case CompressedUnresolvedObject:s = "cun"; break;
     case CompressedArray:           s = "c[]"; break;
     case CompressedObject:          s = "co "; break;
     case VTablePtrObj:    s = "vtb"; break;
@@ -1146,6 +1156,7 @@ Type* TypeManager::convertToOldType(Type* t)
     case Type::CompressedSystemClass:
     case Type::CompressedSystemString:
     case Type::CompressedNullObject:
+    case Type::CompressedUnresolvedObject:
     case Type::CompressedArray:
     case Type::CompressedObject:
     case Type::CompressedVTablePtr:
@@ -1271,6 +1282,7 @@ type_tag_names[] = {
     DECL_TAG_ITEM(CompressedSystemClass,  "ccl "),
     DECL_TAG_ITEM(CompressedSystemString, "cst "),
     DECL_TAG_ITEM(CompressedNullObject, "cnl "),
+    DECL_TAG_ITEM(CompressedUnresolvedObject, "cun "),
     DECL_TAG_ITEM(CompressedArray, "c[] "),
     DECL_TAG_ITEM(CompressedObject, "co  "),
 
