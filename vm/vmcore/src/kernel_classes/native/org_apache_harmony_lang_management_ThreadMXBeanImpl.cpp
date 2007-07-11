@@ -50,6 +50,8 @@ Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_findMonitorDeadlockedTh
     jthread* dead_threads;
     jint count;
     jint dead_count;
+    jmethodID mid;
+    jlongArray array;
 
     IDATA UNUSED status = jthread_get_all_threads(&threads, &count);
     assert(!status);
@@ -57,7 +59,6 @@ Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_findMonitorDeadlockedTh
     status = jthread_get_deadlocked_threads(threads, count, &dead_threads, &dead_count);
     assert(!status);
 
-    free(threads);
     if (dead_count == 0){
         return NULL;
     }
@@ -66,24 +67,26 @@ Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_findMonitorDeadlockedTh
     assert(ids);
 
     jclass cl = jenv->FindClass("java/lang/Thread");
-    if (jenv->ExceptionCheck()) return NULL;
+    if (jenv->ExceptionCheck()) goto cleanup;
 
-    jmethodID mid = jenv->GetMethodID(cl, "getId","()J");
-    if (jenv->ExceptionCheck()) return NULL;
+    mid = jenv->GetMethodID(cl, "getId","()J");
+    if (jenv->ExceptionCheck()) goto cleanup;
 
     for (int i = 0; i < dead_count; i++){
         ids[i] = jenv->CallLongMethod(dead_threads[i], mid);
-        if (jenv->ExceptionCheck()) return NULL;
+        if (jenv->ExceptionCheck()) goto cleanup;
     }
     
-    free(dead_threads);
 
-    jlongArray array = jenv->NewLongArray(dead_count);
-    if (jenv->ExceptionCheck()) return NULL;
+    array = jenv->NewLongArray(dead_count);
+    if (jenv->ExceptionCheck()) goto cleanup;
 
     jenv->SetLongArrayRegion(array, 0, dead_count, ids);
-    if (jenv->ExceptionCheck()) return NULL;
+    if (jenv->ExceptionCheck()) goto cleanup;
 
+cleanup:
+    free(threads);
+    free(dead_threads);
     free(ids);
 
     return array;
@@ -100,31 +103,62 @@ Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getAllThreadIdsImpl
     JNIEnv_Internal *jenv = (JNIEnv_Internal *)jenv_ext;
     jthread* threads;
     jint count;
+    jlongArray array;
+    jclass cl;
+    jmethodID mid;
+    jmethodID m_get_state;
+    jclass cls;
+    jfieldID field_terminated;
+    jobject state_terminated;
+    int ids_count = 0;
 
     IDATA UNUSED status = jthread_get_all_threads(&threads, &count);
     assert(!status);
+
     jlong* ids = (jlong*)malloc(sizeof(jlong)* count);
     assert(ids);
 
-    jclass cl =jenv->FindClass("java/lang/Thread");
-    if (jenv->ExceptionCheck()) return NULL;
+    cl =jenv->FindClass("java/lang/Thread");
+    if (jenv->ExceptionCheck()) goto cleanup;
 
-    jmethodID mid = jenv->GetMethodID(cl, "getId","()J");
-    if (jenv->ExceptionCheck()) return NULL;
+    mid = jenv->GetMethodID(cl, "getId","()J");
+    if (jenv->ExceptionCheck()) goto cleanup;
+
+    m_get_state = jenv->GetMethodID(cl, "getState","()Ljava/lang/Thread$State;");
+    if (jenv->ExceptionCheck()) goto cleanup;
+
+    cls =jenv->FindClass("java/lang/Thread$State");
+    if (jenv->ExceptionCheck()) goto cleanup;
+
+    field_terminated = jenv->GetStaticFieldID(cls, "TERMINATED", "Ljava/lang/Thread$State;");
+    if (jenv->ExceptionCheck()) goto cleanup;
+
+    state_terminated = jenv->GetStaticObjectField(cls, field_terminated);
+    if (jenv->ExceptionCheck()) goto cleanup;
 
     for (int i = 0; i < count; i++){
-        ids[i] = jenv->CallLongMethod(threads[i], mid);
-        if (jenv->ExceptionCheck()) return NULL;
+        jthread thread_i = threads[i];
+
+        jobject state = jenv->CallObjectMethod(thread_i, m_get_state);
+        if (jenv->ExceptionCheck()) goto cleanup;
+
+        jboolean is_terminated = jenv->IsSameObject(state, state_terminated);
+        if (jenv->ExceptionCheck()) goto cleanup;
+
+        if (!is_terminated){
+            ids[ids_count++] = jenv->CallLongMethod(thread_i, mid);
+            if (jenv->ExceptionCheck()) goto cleanup;
+        }
     }
 
+    array = jenv->NewLongArray(ids_count);
+    if (jenv->ExceptionCheck()) goto cleanup;
+
+    jenv->SetLongArrayRegion(array, 0, ids_count, ids);
+    if (jenv->ExceptionCheck()) goto cleanup;
+
+cleanup:
     free(threads);
-
-    jlongArray array = jenv->NewLongArray(count);
-    if (jenv->ExceptionCheck()) return NULL;
-
-    jenv->SetLongArrayRegion(array, 0, count, ids);
-    if (jenv->ExceptionCheck()) return NULL;
-
     free(ids);
 
     return array;
@@ -139,24 +173,28 @@ Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getDaemonThreadCountImp
     jthread* threads;
     jint count;
     jint daemon_count = 0;
+    jclass cl;
+    jmethodID id;
 
     TRACE2("management", "getDaemonThreadCountImpl invocation");
     IDATA UNUSED status = jthread_get_all_threads(&threads, &count);
     assert(!status);
 
-    jclass cl = jenv->FindClass("java/lang/Thread");
-    if (jenv->ExceptionCheck()) return 0;
-    jmethodID id = jenv->GetMethodID(cl, "isDaemon","()Z");
-    if (jenv->ExceptionCheck()) return 0;
+    cl = jenv->FindClass("java/lang/Thread");
+    if (jenv->ExceptionCheck()) goto cleanup;
+    id = jenv->GetMethodID(cl, "isDaemon","()Z");
+    if (jenv->ExceptionCheck()) goto cleanup;
 
     for (int i = 0; i < count; i++){
         int is_daemon = jenv->CallBooleanMethod(threads[i], id);
-        if (jenv->ExceptionCheck()) return 0;
+        if (jenv->ExceptionCheck()) goto cleanup;
         if (is_daemon){
             daemon_count++;
         }
     }
+cleanup:
     free(threads);
+
     return daemon_count;
 };
 
@@ -222,26 +260,55 @@ Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_getThreadByIdImpl(
     jint count;
     jlong id;
     jobject res = NULL;
+    jclass cl;
+    jmethodID jmid;
+    jclass cls;
+    jmethodID m_get_state;
+    jfieldID field_terminated;
+    jobject state_terminated;
 
     IDATA UNUSED status = jthread_get_all_threads(&threads, &count);
     assert(!status);
 
-    jclass cl =jenv->FindClass("java/lang/Thread");
-    if (jenv->ExceptionCheck()) return NULL;
+    cl =jenv->FindClass("java/lang/Thread");
+    if (jenv->ExceptionCheck()) goto cleanup;
 
-    jmethodID jmid = jenv->GetMethodID(cl, "getId","()J");
-    if (jenv->ExceptionCheck()) return NULL;
+    jmid = jenv->GetMethodID(cl, "getId","()J");
+    if (jenv->ExceptionCheck()) goto cleanup;
+
+    cls =jenv->FindClass("java/lang/Thread$State");
+    if (jenv->ExceptionCheck()) goto cleanup;
+
+    m_get_state = jenv->GetMethodID(cl, "getState", "()Ljava/lang/Thread$State;");
+    if (jenv->ExceptionCheck()) goto cleanup;
+
+    field_terminated = jenv->GetStaticFieldID(cls, "TERMINATED", "Ljava/lang/Thread$State;");
+    if (jenv->ExceptionCheck()) goto cleanup;
+
+    state_terminated = jenv->GetStaticObjectField(cls, field_terminated);
+    if (jenv->ExceptionCheck()) goto cleanup;
 
     for (int i = 0; i < count; i++){
-        id = jenv->CallLongMethod(threads[i], jmid);
-        if (jenv->ExceptionCheck()) return NULL;
+        jthread thread_i = threads[i];
+
+        id = jenv->CallLongMethod(thread_i, jmid);
+        if (jenv->ExceptionCheck()) goto cleanup;
         
         if (id == thread_id){
-            res = jenv->NewGlobalRef(threads[i]);
+            jobject state = jenv->CallObjectMethod(thread_i, m_get_state);
+            if (jenv->ExceptionCheck()) goto cleanup;
+
+            jboolean is_terminated = jenv->IsSameObject(state, state_terminated);
+            if (jenv->ExceptionCheck()) goto cleanup;
+
+            if (!is_terminated){
+                res = jenv->NewGlobalRef(thread_i);
+            }
             break;
         }
     }
 
+cleanup:
     free(threads);
 
     return res;
@@ -290,7 +357,7 @@ Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_isSuspendedImpl(JNIEnv 
     jint thread_state;
     TRACE2("management", "ThreadMXBeanImpl_isSuspendedImpl invocation");
     IDATA UNUSED status = jthread_get_state(thread, &thread_state);
-    assert(!status);
+    assert(status == TM_ERROR_NONE);
     return thread_state & TM_THREAD_STATE_SUSPENDED;
 };
 
