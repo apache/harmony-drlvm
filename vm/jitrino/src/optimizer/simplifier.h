@@ -90,24 +90,21 @@ public:
                                  Opnd* tauNullCheckedFirstArg,
                                  Opnd* tauTypesChecked,
                                  uint32 numArgs,
-                                 Opnd* args[],
-                            InlineInfoBuilder* inlineBuilder);
+                                 Opnd* args[]);
 
     Inst* simplifyIndirectCallInst(Opnd* funPtr,
                                    Type* returnType,
                                    Opnd* tauNullCheckedFirstArg,
                                    Opnd* tauTypesChecked,
                                    uint32 numArgs,
-                                   Opnd** args,
-                                   InlineInfoBuilder* inlineBuilder);
+                                   Opnd** args);
 
     Inst* simplifyIndirectMemoryCallInst(Opnd* funPtr,
                                          Type* returnType,
                                          Opnd* tauNullCheckedFirstArg,
                                          Opnd* tauTypesChecked,
                                          uint32 numArgs,
-                                         Opnd** args,
-                                         InlineInfoBuilder* inlineBuilder);
+                                         Opnd** args);
     // loads
     Opnd* simplifyLdRef(Modifier mod, Type *dstType, 
                         uint32 token,
@@ -233,8 +230,7 @@ protected:
                                 Opnd* tauNullCheckedFirstArg,
                                 Opnd* tauTypesChecked,
                                 uint32 numArgs,
-                                Opnd* args[],
-                                InlineInfoBuilder* inlineBuilder) = 0;
+                                Opnd* args[]) = 0;
     // load, store & move
     virtual Inst* genLdConstant(int32 val) = 0;
     virtual Inst* genLdConstant(int64 val) = 0;
@@ -1151,8 +1147,7 @@ protected:
                                 Opnd* tauNullCheckedFirstArg,
                                 Opnd* typesChecked,
                                 uint32 numArgs,
-                                Opnd* args[],
-                                InlineInfoBuilder* inlineBuilder);
+                                Opnd* args[]);
 
     virtual Inst* genLdConstant(int32 val);
     virtual Inst* genLdConstant(int64 val);

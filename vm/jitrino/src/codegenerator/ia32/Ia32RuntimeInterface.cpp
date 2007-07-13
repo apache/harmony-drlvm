@@ -24,7 +24,6 @@
 #include "Ia32StackInfo.h"
 #include "Ia32GCMap.h"
 #include "Ia32BCMap.h"
-#include "CGSupport.h"
 
 namespace Jitrino
 {
@@ -117,15 +116,18 @@ bool RuntimeInterface::getNativeLocationForBc(MethodDesc* method, uint16 bc_pc, 
 }
 
 uint32  RuntimeInterface::getInlineDepth(InlineInfoPtr ptr, uint32 offset) {
-    return InlineInfoMap::get_inline_depth(ptr, offset);
+    const InlineInfoMap::Entry* e = InlineInfoMap::getEntryWithMaxDepth(ptr, offset);
+    return e == NULL ? 0 : e->getInlineDepth();
 }
 
 Method_Handle   RuntimeInterface::getInlinedMethod(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth) {
-    return InlineInfoMap::get_inlined_method(ptr, offset, inline_depth);
+    const InlineInfoMap::Entry* e = InlineInfoMap::getEntry(ptr, offset, inline_depth);
+    return e == NULL  ? 0 : e->method;
 }
 
 uint16 RuntimeInterface::getInlinedBc(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth) {
-    return InlineInfoMap::get_inlined_bc(ptr, offset, inline_depth);
+    const InlineInfoMap::Entry* e = InlineInfoMap::getEntry(ptr, offset, inline_depth);
+    return e == NULL  ? 0 : e->bcOffset;
 }
 
 

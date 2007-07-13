@@ -34,7 +34,6 @@
 
 namespace Jitrino
 {
-class InlineInfo;
 
     // struct ::JitFrameContext;    
     class CG_OpndHandle {
@@ -262,21 +261,21 @@ public:
     virtual CG_OpndHandle*  tau_ldIntfTableAddr(Type *dstType, CG_OpndHandle* base, 
                                                 NamedType* vtableType) = 0;
     virtual CG_OpndHandle*  call(uint32 numArgs, CG_OpndHandle** args, Type* retType,
-                                 MethodDesc *desc, InlineInfo* ii = NULL) = 0;
+                                 MethodDesc *desc) = 0;
     virtual CG_OpndHandle*  arraycopyReverse(uint32 numArgs, CG_OpndHandle** args) = 0;
     virtual CG_OpndHandle*  arraycopy(uint32 numArgs, CG_OpndHandle** args) = 0;
     virtual CG_OpndHandle*  tau_call(uint32 numArgs, CG_OpndHandle** args, Type* retType,
                                      MethodDesc *desc,
                                      CG_OpndHandle *tauNullChecked,
-                                     CG_OpndHandle *tauTypesChecked, InlineInfo* ii = NULL) = 0;
+                                     CG_OpndHandle *tauTypesChecked) = 0;
     // for callvirt this reference is in args[0]
     virtual CG_OpndHandle*  tau_callvirt(uint32 numArgs, CG_OpndHandle** args, Type* retType,
                                          MethodDesc *desc, CG_OpndHandle* tauNullChecked,
-                                         CG_OpndHandle* tauTypesChecked, InlineInfo* ii = NULL) = 0;
+                                         CG_OpndHandle* tauTypesChecked) = 0;
     virtual CG_OpndHandle*  tau_calli(uint32 numArgs,CG_OpndHandle** args, Type* retType,
                                       CG_OpndHandle* methodPtr, 
                                       CG_OpndHandle* tauNullChecked,
-                                      CG_OpndHandle* tauTypesChecked, InlineInfo* ii = NULL) = 0;
+                                      CG_OpndHandle* tauTypesChecked) = 0;
     virtual CG_OpndHandle*  tau_callintr(uint32 numArgs, CG_OpndHandle** args, Type* retType,
                                          IntrinsicCallOp::Id callId,
                                          CG_OpndHandle* tauNullChecked,
@@ -284,7 +283,7 @@ public:
     virtual CG_OpndHandle*  callhelper(uint32 numArgs, CG_OpndHandle** args, Type* retType,
                                        JitHelperCallOp::Id callId) = 0;
     virtual CG_OpndHandle*  callvmhelper(uint32 numArgs, CG_OpndHandle** args, Type* retType,
-                                       CompilationInterface::RuntimeHelperId callId, InlineInfo* ii = NULL) = 0;
+                                       CompilationInterface::RuntimeHelperId callId) = 0;
 
     virtual CG_OpndHandle*  ldc_i4(int32 val) = 0;
     virtual CG_OpndHandle*  ldc_i8(int64 val) = 0;
@@ -478,8 +477,9 @@ public:
     // Clear the current persistent instruction id.  
     // Any subsequently generated instructions have no associated ID.
     virtual void            clearCurrentPersistentId() = 0;
-    // Set current HIR instruction in order to allow Code Generator propagate bc offset info
-    virtual void setCurrentHIRInstrID(uint32 HIRInstrID) = 0; 
+    // Set current HIR instruction bytecode offset
+    virtual void   setCurrentHIRInstBCOffset(uint16 val) = 0; 
+    virtual uint16 getCurrentHIRInstBCOffset() const = 0; 
 private:
 };
 
@@ -517,7 +517,7 @@ public:
     public:
         enum BlockKind {Prolog, InnerBlock, Epilog};
         virtual ~Callback() {}
-        virtual uint32  genDispatchNode(uint32 numInEdges,uint32 numOutEdges,double cnt) = 0;
+        virtual uint32  genDispatchNode(uint32 numInEdges,uint32 numOutEdges, const StlVector<MethodDesc*>& inlineEndMarkers, double cnt) = 0;
         virtual uint32  genBlock(uint32 numInEdges,uint32 numOutEdges, BlockKind blockKind,
                                  BlockCodeSelector&, double cnt) = 0;
         virtual uint32  genUnwindNode(uint32 numInEdges, uint32 numOutEdges,double cnt) = 0;
@@ -596,38 +596,47 @@ public:
 
 };
 
+/* serialized inline_info layout
+    nativeOffset1 -> offset to InlineInfoMap::Entry in the image with max inline depth   (32bit + 32bit)
+    nativeOffset2 -> offset to InlineInfoMap::Entry in the image with max inline depth
+    nativeOffset3 -> offset to InlineInfoMap::Entry in the image with max inline depth
+    ...
+    0 -> 0
+    InlineInfoMap::Entry1
+    InlineInfoMap::Entry2
+    ...
+*/
+
 class InlineInfoMap {
-    class OffsetPair {
-    public:
-        OffsetPair() : offset(0), inline_info(NULL) {}
-        OffsetPair(uint32 off, InlineInfo* ii) : offset(off), inline_info(ii) {}
-        uint32 offset;
-        InlineInfo* inline_info;
-    };
-    typedef StlList<OffsetPair> InlineInfoList;
 public:
-    InlineInfoMap(MemoryManager& mm) 
-        : list(mm), memManager(mm)
-    {}
-    void registerOffset(uint32 offset, InlineInfo* ii);
-    bool isEmpty() const;
-    uint32 computeSize() const;
+    //Inline info for a single call site
+    class Entry {
+    public:
+        Entry(Entry* parent, uint16 _bcOffset, Method_Handle _method) 
+            : parentEntry(parent), bcOffset(_bcOffset), method(_method){}
+        
+        Entry* parentEntry;
+        uint16  bcOffset;
+        Method_Handle method;
+
+        uint32 getInlineDepth() const { 
+            return (parentEntry == 0) ? 0 : 1 + parentEntry->getInlineDepth(); 
+        }
+    };
+
+    InlineInfoMap(MemoryManager& mm) : memManager(mm), entries(mm), entryByOffset(mm){}
+    Entry* newEntry(Entry* parent, Method_Handle mh, uint16 bcOffset);
+    void registerEntry(Entry* entry, uint32 nativeOff);
+    bool isEmpty() const { return entries.empty();}
+    uint32 getImageSize() const;
     void write(InlineInfoPtr output);
-    static uint32 get_inline_depth(InlineInfoPtr ptr, uint32 offset);
-    static Method_Handle get_inlined_method(InlineInfoPtr ptr, uint32 offset, 
-            uint32 inline_depth);
-    static uint16 get_inlined_bc(InlineInfoPtr ptr, uint32 offset, 
-            uint32 inline_depth);
+
+    static const Entry* getEntryWithMaxDepth(InlineInfoPtr ptr, uint32 nativeOffs);
+    static const Entry* getEntry(InlineInfoPtr ptr, uint32 nativeOffs, uint32 inlineDepth);
 private:
-    static POINTER_SIZE_INT ptr_to_uint64(void *ptr);
-    static Method_Handle uint64_to_mh(POINTER_SIZE_INT value);
-    // 
-    // returns pointer to serialized data corresponding to offset:
-    //   depth mh[depth]
-    //
-    static POINTER_SIZE_INT* find_offset(InlineInfoPtr ptr, uint32 offset);
-    InlineInfoList list;
     MemoryManager& memManager;
+    StlVector<Entry*> entries;
+    StlMap<uint32, Entry*> entryByOffset;
 };
 
 }

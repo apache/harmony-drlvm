@@ -36,7 +36,7 @@ namespace Ia32{
 
 
 //========================================================================================================
-//  Forward delcarations
+//  Forward declarations
 //========================================================================================================
 
 class Inst;
@@ -69,10 +69,9 @@ public:
                          MemoryManager& codeSelectorMM, uint32 nNodes, 
                          IRManager& irM);
 
-    uint32  genDispatchNode(uint32 numInEdges, uint32 numOutEdges, double cnt);
+    uint32  genDispatchNode(uint32 numInEdges, uint32 numOutEdges, const StlVector<MethodDesc*>& inlineEndMarkers, double cnt);
     uint32  genBlock(uint32 numInEdges, uint32 numOutEdges, BlockKind blockKind,
-                     BlockCodeSelector& codeSelector,
-                     double cnt);
+                     BlockCodeSelector& codeSelector, double cnt);
     uint32  genUnwindNode(uint32 numInEdges, uint32 numOutEdges,double cnt);
     uint32  genExitNode(uint32 numInEdges, double cnt);
     void    genUnconditionalEdge(uint32 tailNodeId,uint32 headNodeId, double prob);
@@ -133,11 +132,6 @@ private:
 
     Opnd *                  returnOperand;
 
-    //
-    // bc map info
-    //
-    void* bc2HIRmapHandler;
-    void* bc2LIRmapHandler;
 
     friend class InstCodeSelector;
 };

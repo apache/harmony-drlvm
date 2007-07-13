@@ -189,11 +189,6 @@ Edge* BranchInst::getTakenEdge(uint32 result) {
 void Inst::print(::std::ostream& os) const {
     os << "I" << (int)id << ":";
     printFormatString(os, getOperation().getOpcodeFormatString());
-    InlineInfo* ii = getCallInstInlineInfoPtr();
-    if ( ii && !ii->isEmpty() ) {
-        os << " has II: ";
-        ii->printLevels(Log::out());
-    }
 }
 
 void Inst::handlePrintEscape(::std::ostream& os, char code) const {
@@ -217,6 +212,19 @@ void Inst::handlePrintEscape(::std::ostream& os, char code) const {
                     os << ", ";
                 getSrc(i)->print(os);
                 comma = true;
+            }
+        }
+        break;
+    case 'b': // bytecode mapping info
+        {
+            if (getBCOffset() == ILLEGAL_BC_MAPPING_VALUE) {
+                Node* node = getNode();
+                if (node!=NULL && node->isBlockNode()) { // write 'unknown' only for block nodes
+                    os<<"bcmap:unknown ";
+                }
+            } else {
+                int32 bcOffset = (int32)getBCOffset();
+                os<<"bcmap:"<<bcOffset<<" ";
             }
         }
         break;
@@ -673,7 +681,9 @@ Inst*
 InstFactory::clone(Inst* inst, OpndManager& opndManager, OpndRenameTable *table) {
     CloneVisitor cloneVisitor(*this, opndManager, *table);
     inst->visit(cloneVisitor);
-    return cloneVisitor.getClone();
+    Inst* newInst = cloneVisitor.getClone();
+    newInst->setBCOffset(inst->getBCOffset());
+    return newInst;
 }
 
 Inst*
@@ -1005,8 +1015,6 @@ InstFactory::makeClone(MethodCallInst* inst,
                              newArgs,
                              inst->getMethodDesc());
     newInst->setPersistentInstructionId(inst->getPersistentInstructionId());
-    InlineInfo* ii = newInst->getInlineInfoPtr();
-    ii->getInlineChainFrom(*inst->getInlineInfoPtr());
     return newInst;
 }
 
@@ -1027,8 +1035,6 @@ InstFactory::makeClone(CallInst* inst,
                         inst->getNumArgs(),
                         newArgs);
     newInst->setPersistentInstructionId(inst->getPersistentInstructionId());
-    InlineInfo* ii = newInst->getInlineInfoPtr();
-    ii->getInlineChainFrom(*inst->getInlineInfoPtr());
     return newInst;
 }
 
@@ -1600,12 +1606,10 @@ InstFactory::makeVMHelperCallInst(Opcode op,
                                     Opnd* dst,
                                     uint32 nArgs,
                                     Opnd** args_,
-                                    CompilationInterface::RuntimeHelperId id,
-                                    InlineInfo* inlInfo) {
+                                    CompilationInterface::RuntimeHelperId id) {
     VMHelperCallInst * inst = 
         new (memManager) VMHelperCallInst(op, mod, type, dst, nArgs, args_, id);
     inst->id       = numInsts++;
-    inst->inlInfo = inlInfo;
     return inst;
 }
 
@@ -2039,12 +2043,10 @@ InstFactory::makeJitHelperCall(Opnd* dst, JitHelperCallId id, uint32 numArgs, Op
 }
 
 Inst*
-InstFactory::makeVMHelperCall(Opnd* dst, CompilationInterface::RuntimeHelperId id, uint32 numArgs,
-                              Opnd** args, InlineInfo* inlInfo) {
+InstFactory::makeVMHelperCall(Opnd* dst, CompilationInterface::RuntimeHelperId id, uint32 numArgs, Opnd** args) {
     Type::Tag returnType = dst->isNull()? Type::Void : dst->getType()->tag;
     args = copyOpnds(args, numArgs);
-    return makeVMHelperCallInst(Op_VMHelperCall, Modifier(Exception_Sometimes), 
-                                returnType, dst, numArgs, args, id, inlInfo);
+    return makeVMHelperCallInst(Op_VMHelperCall, Modifier(Exception_Sometimes), returnType, dst, numArgs, args, id);
 }
 
 
@@ -2833,56 +2835,6 @@ InstOptimizer::dispatch(Inst* inst) {
         assert(0);
     }
     return NULL;
-}
-
-InlineInfo* 
-Inst::getCallInstInlineInfoPtr() const
-{
-    InlineInfo *ii = NULL;
-    if ( isMethodCall() ) {
-        ii = asMethodCallInst()->getInlineInfoPtr();
-    }else if ( isCall() ) {
-        ii = asCallInst()->getInlineInfoPtr();
-    }
-    return ii;
-}
-
-uint32
-InlineInfoBuilder::buildInlineInfoForInst(Inst* inst, uint32 currOffset, MethodDesc* target_md)
-{
-    InlineInfo* ii = inst->getCallInstInlineInfoPtr();
-    if ( ii ) {
-        //buildInlineInfo(ii, currOffset);
-        InlineInfoBuilder* parBuilder = parent;
-        uint32 parOffset = getCurrentBcOffset();
-        ii->prependLevel(getCurrentMd(), currOffset);
-        while (parBuilder) {
-            ii->prependLevel(parBuilder->getCurrentMd(), parOffset);
-            parOffset = parBuilder->getCurrentBcOffset();
-            parBuilder = parBuilder->parent;
-        }
-        if ( Log::isEnabled() ) {
-            Log::out() << "InlineInfoBuiler: inlined call to ";
-            if ( target_md ) {
-                Log::out() << target_md->getName();
-            }else{
-                Log::out() << "[some method]";
-            }
-            Log::out() << ", chain: "; 
-            ii->printLevels(Log::out());
-        }
-        return parOffset;
-    }
-    return currOffset;
-}
-void
-InlineInfoBuilder::buildInlineInfo(InlineInfo* ii, uint32 offset) // ii must be non-NULL
-{
-    if ( parent ) {
-        parent->buildInlineInfo(ii, offset);
-    } else {
-        addCurrentLevel(ii, getCurrentBcOffset());
-    }
 }
 
 } //namespace Jitrino 

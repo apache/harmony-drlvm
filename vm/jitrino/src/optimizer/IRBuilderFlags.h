@@ -40,7 +40,6 @@ struct IRBuilderFlags {
         genMinMaxAbs = false;
         genFMinMaxAbs = false;
         useNewTypeSystem = false;
-        isBCMapinfoRequired = false;
     }
     /* expansion flags */
     bool expandMemAddrs      : 1;    // expand field/array element accesses
@@ -61,8 +60,6 @@ struct IRBuilderFlags {
     bool genFMinMaxAbs       : 1;
     // LBS Project flags
     bool useNewTypeSystem    : 1;    // Use the new LBS type system rather than the old one
-    bool isBCMapinfoRequired : 1;     // Produce HIR bc map info
-    bool fullBcMap : 1;                    // Produce HIR bc map info for all intructions
 };
 
 } //namespace

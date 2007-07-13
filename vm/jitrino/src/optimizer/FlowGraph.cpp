@@ -34,7 +34,6 @@
 #include "escapeanalyzer.h"
 #include "deadcodeeliminator.h"
 #include "TranslatorIntfc.h"
-#include "CGSupport.h"
 #include "LoopTree.h"
 
 #include <stdlib.h>
@@ -253,7 +252,10 @@ static Node* duplicateNode(IRManager& irm, Node *node, StlBitVector* nodesInRegi
                             var = opndManager.createVarOpnd(dst->getType(), false);
                             Inst* stVar = instFactory.makeStVar(var, dst);
                             if(inst->getOperation().canThrow()) {
-                                stBlock = fg.createBlockNode(instFactory.makeLabel());
+                                LabelInst* lblInst = instFactory.makeLabel();
+                                assert(inst->getBCOffset()!=ILLEGAL_BC_MAPPING_VALUE);
+                                lblInst->setBCOffset(inst->getBCOffset());
+                                stBlock = fg.createBlockNode(lblInst);
                                 stBlock->appendInst(stVar);
                                 Node* succ =  node->getUnconditionalEdge()->getTargetNode();
                                 Edge* succEdge = node->findTargetEdge(succ);
@@ -614,29 +616,6 @@ static bool inlineJSR(IRManager* irManager, Node *block, DefUseBuilder& defUses,
 
         Node* newEntry = _duplicateRegion(*irManager, entryJSR, nodesInJSR, defUses, *nodeRenameTable, *opndRenameTable, 0);
 
-        // update the BCMap
-        if(irManager->getCompilationInterface().isBCMapInfoRequired()) {
-            MethodDesc* meth = irManager->getCompilationInterface().getMethodToCompile();
-            void *bc2HIRmapHandler = getContainerHandler(bcOffset2HIRHandlerName, meth);
-
-            // update the BCMap for each copied node
-            NodeRenameTable::Iter nodeIter(nodeRenameTable);
-            Node* oldNode = NULL;
-            Node* newNode = NULL;
-            StlBitVector regionNodes(inlineManager);
-            while(nodeIter.getNextElem(oldNode, newNode)) {
-                Inst* oldLast = (Inst*)oldNode->getLastInst();
-                Inst* newLast = (Inst*)newNode->getLastInst();
-                if (oldLast->asMethodCallInst() || oldLast->asCallInst()) {
-                    assert(newLast->asMethodCallInst() || newLast->asCallInst());
-                    uint16 bcOffset = getBCMappingEntry(bc2HIRmapHandler, oldLast->getId());
-                    assert((bcOffset != 0) && (bcOffset != ILLEGAL_BC_MAPPING_VALUE));
-                    setBCMappingEntry(bc2HIRmapHandler, newLast->getId(), bcOffset);
-                }
-
-            }
-        }
-
         fg.removeEdge(block,retTarget);
         fg.removeEdge(block,entryJSR);
         jsrInst->unlink();
@@ -858,7 +837,35 @@ static bool inlineFinally(IRManager& irm, Node *block) {
 }
 
 
+static void checkBCMapping(IRManager& irm) {
+#ifdef _DEBUG
+    ControlFlowGraph& fg = irm.getFlowGraph();
+    const Nodes& nodes=  fg.getNodes();
+    for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
+    	Node* node = *it;
+        if (!node->isEmpty()) { //allow empty nodes (like dispatches, exit, return nodes) do not have bc-mapping
+            for (Inst* inst = (Inst*)node->getFirstInst(); inst!=NULL; inst = inst->getNextInst()) {
+                if (inst->getOperation().canThrow() || inst->isLabel()) {
+                    assert(inst->getBCOffset()!=ILLEGAL_BC_MAPPING_VALUE);
+                }
+            }
+        }
+    }
+#endif
+}
+
 void FlowGraph::doTranslatorCleanupPhase(IRManager& irm) {
+    uint32 id = irm.getCompilationContext()->getCurrentSessionNum();
+    const char* stage = "trans_cleanup";
+    if (Log::isLogEnabled(LogStream::IRDUMP)) {
+        LogStream& irdump = Log::log(LogStream::IRDUMP);
+        Log::printStageBegin(irdump.out(), id, "TRANS", stage, stage);
+        irdump << OptPass::indent(irm) << "Trans:   Running " << "cleanup" << ::std::endl;
+        Log::printIRDumpBegin(irdump.out(), id, stage, "before");
+        printHIR(irdump.out(), irm.getFlowGraph(), irm.getMethodDesc());
+        Log::printIRDumpEnd(irdump.out(), id, stage, "before");
+    }
+
     ControlFlowGraph& fg = irm.getFlowGraph();
     InstFactory& instFactory = irm.getInstFactory();
     OpndManager& opndManager = irm.getOpndManager();
@@ -869,7 +876,9 @@ void FlowGraph::doTranslatorCleanupPhase(IRManager& irm) {
 
     inlineJSRs(&irm);
     fg.purgeUnreachableNodes();
-    
+
+    checkBCMapping(irm);
+
     {
         static CountTime cleanupPhaseInternalTimer("ptra::fg::cleanupPhase::in");
         AutoTimer tm(cleanupPhaseInternalTimer);
@@ -1032,6 +1041,11 @@ void FlowGraph::doTranslatorCleanupPhase(IRManager& irm) {
     //
     fg.purgeUnreachableNodes();
     fg.purgeEmptyNodes(false);
+
+    if (Log::isLogEnabled(LogStream::IRDUMP)) {
+        LogStream& irdump = Log::log(LogStream::IRDUMP);
+        Log::printStageEnd(irdump.out(), id, "TRANS", stage, stage);
+    }
 }
 
 

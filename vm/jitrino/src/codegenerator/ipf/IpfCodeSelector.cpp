@@ -128,6 +128,7 @@ IpfCfgCodeSelector::IpfCfgCodeSelector(Cfg                  &cfg,
 
 uint32 IpfCfgCodeSelector::genDispatchNode(uint32 numInEdges, 
                                            uint32 numOutEdges, 
+                                           const StlVector<MethodDesc*>& inlineInfo,
                                            double cnt) {
 
     Node *node = new(mm) Node(mm, opndManager->getNextNodeId(), (uint32) cnt, NODE_DISPATCH);

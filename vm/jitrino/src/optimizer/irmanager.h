@@ -30,7 +30,6 @@
 #include "Opnd.h"
 #include "Inst.h"
 #include "VMInterface.h"
-#include "CGSupport.h"
 #include "JITInstanceContext.h"
 #include "ControlFlowGraph.h"
 #include "optimizer.h"

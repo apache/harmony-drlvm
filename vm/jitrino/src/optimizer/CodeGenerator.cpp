@@ -56,145 +56,111 @@ void HIR2LIRSelectorSessionAction::run() {
 #endif
 }
 
-POINTER_SIZE_INT
-InlineInfoMap::ptr_to_uint64(void *ptr)
-{
-#ifdef POINTER64
-    return (POINTER_SIZE_INT)ptr;
-#else
-    return (POINTER_SIZE_INT)ptr;
-#endif
+
+
+InlineInfoMap::Entry* InlineInfoMap::newEntry(Entry* parent, Method_Handle mh, uint16 bcOffset) {
+    Entry* e = new (memManager) Entry(parent, bcOffset, mh);
+    return e;
 }
 
-Method_Handle
-InlineInfoMap::uint64_to_mh(POINTER_SIZE_INT value)
-{
-#ifdef POINTER64
-    return (Method_Handle)value;
-#else
-    return (Method_Handle)((uint32)value);
-#endif
-}
-
-void
-InlineInfoMap::registerOffset(uint32 offset, InlineInfo* ii)
-{
-    assert(ii->countLevels() > 0);
-    OffsetPair pair(offset, ii);
-    list.push_back(pair);
-}
-
-bool
-InlineInfoMap::isEmpty() const
-{
-    return list.size() == 0;
-}
-
-//
-// offset_cnt ( offset depth mh[depth] )[offset_cnt]
-//
-// sizeof(offset_cnt|offset|depth|mh) = 8 
-// size increased for better portability,
-// everybody is welcome to optimize this storage
-// 
-// size = sizeof(POINTER_SIZE_INT) * (2 * offset_cnt + 1 + total_mh_cnt * 2)
-//
-uint32
-InlineInfoMap::computeSize() const
-{
-    uint32 total_mh_cnt = 0;
-    uint32 offset_cnt = 0;
-    InlineInfoList::const_iterator it = list.begin();
-    for (; it != list.end(); it++) {
-        total_mh_cnt += it->inline_info->countLevels();
-        offset_cnt++;
-    }
-    return sizeof(POINTER_SIZE_INT) * (2 * offset_cnt + 1 + total_mh_cnt * 2);
-}
-
-void
-InlineInfoMap::write(InlineInfoPtr output)
-{
-//    assert(((uint64)ptr_to_uint64(output) & 0x7) == 0);
-
-    POINTER_SIZE_INT* ptr = (POINTER_SIZE_INT *)output;
-    *ptr++ = (POINTER_SIZE_INT)list.size(); // offset_cnt
-
-    InlineInfoList::iterator it = list.begin();
-    for (; it != list.end(); it++) {
-        *ptr++ = (POINTER_SIZE_INT) it->offset;
-        POINTER_SIZE_INT depth = 0;
-        POINTER_SIZE_INT* depth_ptr = ptr++;
-        assert(it->inline_info->countLevels() > 0);
-        InlineInfo::InlinePairList::iterator desc_it = it->inline_info->inlineChain->begin();
-        for (; desc_it != it->inline_info->inlineChain->end(); desc_it++) {
-            MethodDesc* mdesc = (MethodDesc*)(*desc_it)->first;
-            uint32 bcOffset = (uint32)(*desc_it)->second;
-            //assert(dynamic_cast<DrlVMMethodDesc*>(mdesc)); // <-- some strange warning on Win32 here
-            *ptr++ = ptr_to_uint64(mdesc->getMethodHandle());
-            *ptr++ = (POINTER_SIZE_INT)bcOffset;
-            depth++;
+void InlineInfoMap::registerEntry(Entry* e, uint32 nativeOffs) {
+    entryByOffset[nativeOffs] = e;
+    for (Entry* current = e; current!=NULL; current = current->parentEntry) {
+        if (std::find(entries.begin(), entries.end(), current)!=entries.end()) {
+            assert(current!=e); //possible if inlined method has multiple entries, skip this method marker.
+        } else {
+            entries.push_back(current);
         }
-        assert(depth == it->inline_info->countLevels());
-        *depth_ptr = depth;
     }
-    assert((POINTER_SIZE_INT)ptr == (POINTER_SIZE_INT)output + computeSize());
 }
 
-POINTER_SIZE_INT*
-InlineInfoMap::find_offset(InlineInfoPtr ptr, uint32 offset)
-{
-    assert(((POINTER_SIZE_INT)ptr_to_uint64(ptr) & 0x7) == 0);
 
-    POINTER_SIZE_INT* tmp_ptr = (POINTER_SIZE_INT *)ptr;
-    POINTER_SIZE_INT offset_cnt = *tmp_ptr++;
-
-    for (uint32 i = 0; i < offset_cnt; i++) {
-        POINTER_SIZE_INT curr_offs = *tmp_ptr++ ;
-        if ( offset == curr_offs ) {
-            return tmp_ptr;
-        }
-        POINTER_SIZE_INT curr_depth  = (*tmp_ptr++)*2 ;
-        tmp_ptr += curr_depth;
-    }
-
-    return NULL;
+static uint32 getIndexSize(size_t nEntriesInIndex) {
+    return (uint32)(2 * nEntriesInIndex * sizeof(uint32) + sizeof(uint32)); //zero ending list of [nativeOffset, entryOffsetInImage] pairs
 }
 
 uint32
-InlineInfoMap::get_inline_depth(InlineInfoPtr ptr, uint32 offset)
-{
-    POINTER_SIZE_INT* tmp_ptr = find_offset(ptr, offset);
-    if ( tmp_ptr != NULL ) {
-        return (uint32)*tmp_ptr;
+InlineInfoMap::getImageSize() const {
+    if (isEmpty()) {
+        return sizeof(uint32);
     }
-    return 0;
+    return getIndexSize(entryByOffset.size())   //index size
+          + entries.size() * sizeof(Entry); //all entries size;
 }
 
-Method_Handle
-InlineInfoMap::get_inlined_method(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth)
+void
+InlineInfoMap::write(InlineInfoPtr image)
 {
-    POINTER_SIZE_INT* tmp_ptr = find_offset(ptr, offset);
-    if ( tmp_ptr != NULL ) {
-        POINTER_SIZE_INT depth = *tmp_ptr++;
-        assert(inline_depth < depth);
-        tmp_ptr += ((depth - 1) - inline_depth ) * 2;
-        return uint64_to_mh(*tmp_ptr);
+    if (isEmpty()) {
+        *(uint32*)image=0;
+        return;
+    }
+
+    //write all entries first;
+    Entry*  entriesInImage = (Entry*)((char*)image + getIndexSize(entryByOffset.size()));
+    Entry*  entriesPtr = entriesInImage; 
+    for (StlVector<Entry*>::iterator it = entries.begin(), end = entries.end(); it != end; it++) {
+        Entry* e = *it;
+        *entriesPtr = *e;
+        entriesPtr++;
+    }
+    assert(((char*)entriesPtr) == ((char*)image) + getImageSize());
+
+    //now update parentEntry reference to written entries
+    for (uint32 i=0; i < entries.size(); i++) {
+        Entry* imageChild = entriesInImage + i;
+        Entry* compileTimeParent = imageChild->parentEntry;
+        if (compileTimeParent!=NULL) {
+            size_t parentIdx = std::find(entries.begin(), entries.end(), compileTimeParent) - entries.begin();
+            assert(parentIdx<entries.size());
+            Entry* imageParent = entriesInImage + parentIdx;
+            imageChild->parentEntry = imageParent;
+        }
+    }
+
+    //now write index header
+    uint32* header = (uint32*)image;
+    for (StlMap<uint32, Entry*>::iterator it = entryByOffset.begin(), end = entryByOffset.end(); it!=end; it++) {
+        uint32 nativeOffset = it->first;
+        Entry* compileTimeEntry = it->second;
+        size_t entryIdx = std::find(entries.begin(), entries.end(), compileTimeEntry) - entries.begin();
+        assert(entryIdx<entries.size());
+        Entry* imageEntry = entriesInImage + entryIdx;
+        *header = nativeOffset;
+        header++;
+        *header = (char*)imageEntry - (char*)image;
+        header++;
+    }
+    *header = 0;
+    header++;
+    assert((char*)header == (char*)entriesInImage);
+}
+
+
+const InlineInfoMap::Entry* InlineInfoMap::getEntryWithMaxDepth(InlineInfoPtr ptr, uint32 nativeOffs) {
+    uint32* header = (uint32*)ptr;
+    while (*header!=0) {
+        uint32 nativeOffset = *header;
+        header++;
+        uint32 entryOffset = *header;
+        header++;
+        if (nativeOffset == nativeOffs) {
+            Entry* e = (Entry*)((char*)ptr + entryOffset);
+            return e;
+        }
     }
     return NULL;
 }
 
-uint16
-InlineInfoMap::get_inlined_bc(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth)
-{
-    POINTER_SIZE_INT* tmp_ptr = find_offset(ptr, offset);
-    if ( tmp_ptr != NULL ) {
-        POINTER_SIZE_INT depth = *tmp_ptr++;
-        assert(inline_depth < depth);
-        tmp_ptr += ((depth - 1) - inline_depth) * 2 + 1;
-        return (uint16)(*tmp_ptr);
+const InlineInfoMap::Entry* InlineInfoMap::getEntry(InlineInfoPtr ptr, uint32 nativeOffs, uint32 inlineDepth) {
+    const Entry* e = getEntryWithMaxDepth(ptr, nativeOffs);
+    while (e!=NULL) {
+        if (e->getInlineDepth() == inlineDepth) {
+            return e;
+        }
+        e = e->parentEntry;
     }
-    return 0;
+    return NULL;
 }
 
 

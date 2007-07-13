@@ -229,23 +229,37 @@ Opnd* OpndUtils::getFloatZeroConst(void)
     return m_opndFloatZero;
 }
 
-
-
-bool InstUtils::isPseudoInst(const Inst* inst)
-{
-    return inst->hasKind(Inst::Kind_PseudoInst);
+//All CALL insts except some special helpers that never cause stacktrace printing
+bool InstUtils::instMustHaveBCMapping(Inst* inst) {
+    if (!inst->hasKind(Inst::Kind_CallInst)) {
+        return false;
+    }
+    CallInst* callInst = (CallInst*)inst;
+    Opnd * targetOpnd=callInst->getOpnd(callInst->getTargetOpndIndex());
+    Opnd::RuntimeInfo * ri=targetOpnd->getRuntimeInfo();
+    if(!ri) {
+        return true;
+    } else if (ri->getKind() == Opnd::RuntimeInfo::Kind_InternalHelperAddress) { 
+        return false;
+    } else if (ri->getKind() == Opnd::RuntimeInfo::Kind_HelperAddress) { 
+        CompilationInterface::RuntimeHelperId helperId = (CompilationInterface::RuntimeHelperId)(POINTER_SIZE_INT)ri->getValue(0);
+        switch (helperId) {
+            case CompilationInterface::Helper_GetTLSBase:
+            case CompilationInterface::Helper_EnableThreadSuspension:
+                return false;
+            default:
+                break;
+        }
+    }
+    return true;
 }
 
-void InstUtils::removeInst(Inst* toBeRemoved)
-{
-    toBeRemoved->unlink();
-}
 
 void InstUtils::replaceInst(Inst* toBeReplaced, Inst* brandNewInst)
 {
     BasicBlock* bb = toBeReplaced->getBasicBlock();
     bb->appendInst(brandNewInst, toBeReplaced);
-    removeInst(toBeReplaced);
+    toBeReplaced->unlink();
 }
 
 void InstUtils::replaceOpnd(Inst* inst, unsigned index, Opnd* newOpnd)
@@ -365,7 +379,7 @@ void SubCfgBuilderUtils::propagateSubCFG(Inst* inst, bool purgeEmptyNodes)
 {
     ControlFlowGraph* mainCFG = m_irManager->getFlowGraph();
     mainCFG->spliceFlowGraphInline(inst, *m_subCFG);
-    InstUtils::removeInst(inst);
+    inst->unlink();
     if (purgeEmptyNodes) {
         mainCFG->purgeEmptyNodes(true, false);
     }

@@ -82,15 +82,6 @@ public:
         OptimizerFlags& flags = myAction->optimizerFlags;
         IRManager* irm = new (mm) IRManager(mm, *cc->getVMCompilationInterface(), flags);
         cc->setHIRManager(irm);
-
-        MethodDesc* methDesc = cc->getVMCompilationInterface()->getMethodToCompile();
-
-        // add bc <-> HIR code map handler
-        if (cc->getVMCompilationInterface()->isBCMapInfoRequired()) {
-            StlVector<uint16> *bc2HIRMap = new(mm) StlVector<uint16>(mm, methDesc->getByteCodeSize() 
-                * (ESTIMATED_HIR_SIZE_PER_BYTECODE) + 5, ILLEGAL_BC_MAPPING_VALUE);
-            addContainerHandler(bc2HIRMap, bcOffset2HIRHandlerName, methDesc);
-        }
     }
 
 };

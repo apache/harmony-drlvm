@@ -1288,17 +1288,15 @@ public:
         return callingConventionClient.getCallingConvention()->getCalleeSavedRegs(regKind);
     }
 
-    InlineInfo * getInlineInfo() const { return inlineInfo; }
     Opnd::RuntimeInfo*  getRuntimeInfo() const {return runtimeInfo;}
 
 protected:
     CallingConventionClient callingConventionClient;
-    CallInst(IRManager * irm, int id, const CallingConvention * cc, InlineInfo* ii, Opnd::RuntimeInfo* targetInfo);
+    CallInst(IRManager * irm, int id, const CallingConvention * cc, Opnd::RuntimeInfo* targetInfo);
 
     //--------------------------------------------------------------------
     friend class    IRManager;
 private:
-    InlineInfo * inlineInfo;
     Opnd::RuntimeInfo* runtimeInfo;
 };
 

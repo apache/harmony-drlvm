@@ -79,15 +79,6 @@ Inliner::Inliner(SessionAction* argSource, MemoryManager& mm, IRManager& irm, bo
       translatorAction(NULL)
 {
     
-    if (irm.getCompilationInterface().isBCMapInfoRequired()) {
-        isBCmapRequired = true;
-        MethodDesc* meth = irm.getCompilationInterface().getMethodToCompile();
-        bc2HIRMapHandler = getContainerHandler(bcOffset2HIRHandlerName, meth);
-    } else {
-        isBCmapRequired = false;
-        bc2HIRMapHandler = NULL;
-    }
-
     const char* translatorName = argSource->getStringArg("translatorActionName", "translator");
     translatorAction = (TranslatorAction*)PMF::getAction(argSource->getPipeline(), translatorName);
     assert(translatorAction);
@@ -503,21 +494,40 @@ Inliner::connectRegion(InlineNode* inlineNode) {
         Opnd *obj = callInst->getSrc(2); // this parameter for DirectCall
         if (obj && !obj->isNull()) obj = 0;
     }
-    Inst* entryMarker = 
-        obj ? _instFactory.makeMethodMarker(MethodMarkerInst::Entry, 
-        &methodDesc, obj)
-        : _instFactory.makeMethodMarker(MethodMarkerInst::Entry, &methodDesc);
-    Inst* exitMarker = 
-        obj ? _instFactory.makeMethodMarker(MethodMarkerInst::Exit, 
-        &methodDesc, obj)
-        : _instFactory.makeMethodMarker(MethodMarkerInst::Exit, 
-        &methodDesc);
-    Node* entry = inlinedFlowGraph.getEntryNode();
-    entry->prependInst(entryMarker);
-    Node* retNode = inlinedFlowGraph.getReturnNode();
-    if(retNode != NULL)
-        retNode->appendInst(exitMarker);
     
+    
+    //set up inlinee border markers
+    {
+        Node* entry = inlinedFlowGraph.getEntryNode();
+        //replace MethodEntryInst with simple label -> MethodMarkerInsts will be used to mark inlinee borders
+        entry->getFirstInst()->unlink(); 
+        entry->prependInst(_instFactory.makeLabel());
+
+        uint16 bcOffset = inlineNode->getCallInst()->getBCOffset();
+        assert(bcOffset!=ILLEGAL_BC_MAPPING_VALUE);
+        Inst* entryMarker =  obj ? _instFactory.makeMethodMarker(MethodMarkerInst::Entry, &methodDesc, obj)
+            : _instFactory.makeMethodMarker(MethodMarkerInst::Entry, &methodDesc);
+        entryMarker->setBCOffset(bcOffset);
+        entry->prependInst(entryMarker);
+
+        Node* retNode = inlinedFlowGraph.getReturnNode();
+        if (retNode) {
+            Inst* exitMarker =  obj ? _instFactory.makeMethodMarker(MethodMarkerInst::Exit, &methodDesc, obj)
+                : _instFactory.makeMethodMarker(MethodMarkerInst::Exit,  &methodDesc);
+            exitMarker->setBCOffset(entryMarker->getBCOffset());
+            retNode->appendInst(exitMarker);
+        }
+
+        Node* unwindNode = inlinedFlowGraph.getUnwindNode();
+        if (unwindNode) {
+            Inst* exitMarker =  obj ? _instFactory.makeMethodMarker(MethodMarkerInst::Exit, &methodDesc, obj)
+                : _instFactory.makeMethodMarker(MethodMarkerInst::Exit,  &methodDesc);
+            exitMarker->setBCOffset(entryMarker->getBCOffset());
+            unwindNode->appendInst(exitMarker);
+        }
+    }
+
+
     // Fuse callsite arguments with incoming parameters
     uint32 numArgs = callInst->getNumSrcOperands() - 2; // omit taus
     Opnd *tauNullChecked = callInst->getSrc(0);
@@ -532,6 +542,8 @@ Inliner::connectRegion(InlineNode* inlineNode) {
         tauNullCheckInst->setDefArgModifier(NonNullThisArg);
     }
 
+    Node* entry = inlinedFlowGraph.getEntryNode();
+    Node* retNode = inlinedFlowGraph.getReturnNode();
     Inst* first = (Inst*)entry->getFirstInst();
     Inst* inst;
     Opnd* thisPtr = 0;
@@ -658,17 +670,22 @@ Inliner::connectRegion(InlineNode* inlineNode) {
     if(methodDesc.isSynchronized() && inlinedIRM.getFlowGraph().getUnwindNode()) {
         // Add monitor exit to unwind.
         Node* unwind = inlinedFlowGraph.getUnwindNode();
+        uint16 monExitBCMap = 0; //this monexit is not present in bytecode. Need some artificial but valid value.
         // Test if an exception exit exists
         if(unwind->getInDegree() > 0) {
             Node* dispatch = inlinedFlowGraph.createDispatchNode(_instFactory.makeLabel());
             
             // Insert catch all
             Opnd* ex = _opndManager.createSsaTmpOpnd(_typeManager.getSystemObjectType());
-            Node* handler = inlinedFlowGraph.createBlockNode(inlinedIRM.getInstFactory().makeCatchLabel(0, ex->getType()));
+            Inst* catchInst = inlinedIRM.getInstFactory().makeCatchLabel(0, ex->getType());
+            catchInst->setBCOffset(0);
+            Node* handler = inlinedFlowGraph.createBlockNode(catchInst);
             handler->appendInst(_instFactory.makeCatch(ex));
             if(methodDesc.isStatic()) {
                 // Release class monitor
-                handler->appendInst(_instFactory.makeTypeMonitorExit(methodDesc.getParentType()));
+                Inst* monExit = _instFactory.makeTypeMonitorExit(methodDesc.getParentType());
+                monExit->setBCOffset(monExitBCMap);
+                handler->appendInst(monExit);
             } else {
                 // Release object monitor
                 assert(callInst->getNumSrcOperands() > 2);
@@ -699,9 +716,9 @@ Inliner::connectRegion(InlineNode* inlineNode) {
                                         Opnd *lockAddr = lastInst->getSrc(1);
                                         Opnd *enterDst = lastInst->getSrc(2);
                                         
-                                        handler->appendInst(_instFactory.makeOptimisticBalancedMonitorExit(srcObj,
-                                                                                                       lockAddr,
-                                                                                                       enterDst));
+                                        Inst* monExit = _instFactory.makeOptimisticBalancedMonitorExit(srcObj,lockAddr,enterDst);
+                                        monExit->setBCOffset(monExitBCMap);
+                                        handler->appendInst(monExit);
                                         done = true;
                                         break;
                                     }
@@ -724,14 +741,18 @@ Inliner::connectRegion(InlineNode* inlineNode) {
                     } else {
                         Opnd* tauSafe = _opndManager.createSsaTmpOpnd(_typeManager.getTauType());
                         handler->appendInst(_instFactory.makeTauSafe(tauSafe)); // monenter success guarantees non-null
-                        handler->appendInst(_instFactory.makeTauMonitorExit(obj, tauSafe));
+                        Inst* monExit = _instFactory.makeTauMonitorExit(obj, tauSafe);
+                        monExit->setBCOffset(monExitBCMap);
+                        handler->appendInst(monExit);
                     }
                 }
             }
             
             // Insert rethrow
             Node* rethrow = inlinedFlowGraph.createBlockNode(_instFactory.makeLabel());
-            rethrow->appendInst(_instFactory.makeThrow(Throw_NoModifier, ex));
+            Inst* rethrowInst = _instFactory.makeThrow(Throw_NoModifier, ex);
+            rethrowInst->setBCOffset(monExitBCMap);
+            rethrow->appendInst(rethrowInst);
             
             // Redirect exception exits to monitor_exit
             while (!unwind->getInEdges().empty()) {
@@ -752,15 +773,20 @@ Inliner::connectRegion(InlineNode* inlineNode) {
         methodDesc.getParentType()->needsInitialization()) {
             // initialize type for static methods
             Inst* initType = _instFactory.makeInitType(methodDesc.getParentType());
-            entry->prependInst(initType);
+            initType->setBCOffset(callInst->getBCOffset());
+            entry->prependInst(initType); //inittype is placed before methodEntryMarker -> it's a part of caller method in stacktrace
             inlinedFlowGraph.splitNodeAtInstruction(initType, true, false, _instFactory.makeLabel());
-            Node* unwind = inlinedFlowGraph.getUnwindNode();
-            if (unwind == NULL) {
-                unwind = inlinedFlowGraph.createDispatchNode(_instFactory.makeLabel());
-                inlinedFlowGraph.setUnwindNode(unwind);
-                inlinedFlowGraph.addEdge(unwind, inlinedFlowGraph.getExitNode());
+            //here we need to create new unwind node, because old one contains method-exit-marker instruction.
+            //Init-type is a part of caller method -> it must be out of the range of method marker insts.
+            Node* oldUnwind = inlinedFlowGraph.getUnwindNode();
+            Node* newUnwind = inlinedFlowGraph.createDispatchNode(_instFactory.makeLabel());
+            inlinedFlowGraph.addEdge(entry, newUnwind);
+            inlinedFlowGraph.addEdge(newUnwind, inlinedFlowGraph.getExitNode());
+            inlinedFlowGraph.setUnwindNode(newUnwind);
+            if (oldUnwind!=NULL) {
+                assert(oldUnwind->getOutDegree() == 1);
+                inlinedFlowGraph.replaceEdgeTarget(oldUnwind->getExceptionEdge(), newUnwind, true);
             }
-            inlinedFlowGraph.addEdge(entry, unwind);
         }
 }
 
@@ -815,57 +841,6 @@ Inliner::inlineRegion(InlineNode* inlineNode, bool updatePriorityQueue) {
         << inlinedIRM.getParent()->getMethodDesc().getName()
         << ::std::endl;
 
-    //
-    // update inlining-related information in all 'call' instructions of the inlined method
-    //
-    
-    const Nodes& nodes = inlinedFlowGraph.getNodes();
-    Nodes::const_iterator niter;
-    uint16 count = 0;
-
-    assert(callInst->isMethodCall());
-    InlineInfo& call_ii = *callInst->asMethodCallInst()->getInlineInfoPtr();
-
-    call_ii.printLevels(Log::out());
-    Log::out() << ::std::endl;
-
-    for(niter = nodes.begin(); niter != nodes.end(); ++niter) {
-        Node* node = *niter;
-
-        Inst* first = (Inst*)node->getFirstInst();
-        Inst* i;
-        for(i=first->getNextInst(); i != NULL; i=i->getNextInst()) {
-            InlineInfo *ii = i->getCallInstInlineInfoPtr();
-            // ii should be non-null for each call instruction
-            if ( ii ) {
-                //
-                // InlineInfo order is parent-first 
-                //     (ii might be non-empty when translation-level inlining is on)
-                //
-                uint16 bcOff = ILLEGAL_BC_MAPPING_VALUE;
-
-                if (isBCmapRequired) {
-                    uint32 callIinstID = callInst->getId();
-                    uint32 iinstID = i->getId();
-                    bcOff = getBCMappingEntry(bc2HIRMapHandler, iinstID);
-                    if (iinstID != callIinstID) {
-                        uint16 inlinedBcOff = ILLEGAL_BC_MAPPING_VALUE;
-                        inlinedBcOff = getBCMappingEntry(bc2HIRMapHandler, callIinstID);
-                        setBCMappingEntry(bc2HIRMapHandler, iinstID, inlinedBcOff);
-                    }
-                }
-
-                ii->prependLevel(&methodDesc, bcOff);
-                // appropriate byte code offset instead of 0 should be propogated here
-                // to enable correct inline info
-                ii->prependInlineChain(call_ii);
-                // ii->inlineChain remains at the end
-                
-                Log::out() << "      call No." << count++ << " ";
-                ii->printLevels(Log::out());
-            }
-        }
-    }
 
     //
     // Splice the inlined region into the top-level flowgraph

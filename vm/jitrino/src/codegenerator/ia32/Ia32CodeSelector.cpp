@@ -63,18 +63,13 @@ CfgCodeSelector::CfgCodeSelector(CompilationInterface&      compIntfc,
     for (i = 0; i < numNodes; i++) 
         nodes[i] = NULL;
 
-    if (compIntfc.isBCMapInfoRequired()) {
-        MethodDesc* meth = compIntfc.getMethodToCompile();
-        bc2HIRmapHandler = getContainerHandler(bcOffset2HIRHandlerName, meth);
-        bc2LIRmapHandler = getContainerHandler(bcOffset2LIRHandlerName, meth);
-   }
     InstCodeSelector::onCFGInit(irManager);
 }
 
 //_______________________________________________________________________________________________
 /**  Create an exception handling (dispatching) node */
 
-uint32 CfgCodeSelector::genDispatchNode(uint32 numInEdges,uint32 numOutEdges, double cnt) 
+uint32 CfgCodeSelector::genDispatchNode(uint32 numInEdges,uint32 numOutEdges, const StlVector<MethodDesc*>& inlineEndMarkers, double cnt) 
 {
     assert(nextNodeId < numNodes);
     uint32 nodeId = nextNodeId++;
@@ -82,6 +77,10 @@ uint32 CfgCodeSelector::genDispatchNode(uint32 numInEdges,uint32 numOutEdges, do
     node->setExecCount(cnt);
     nodes[nodeId] = node;
     hasDispatchNodes = true;
+    for (StlVector<MethodDesc*>::const_iterator it = inlineEndMarkers.begin(), end = inlineEndMarkers.end(); it!=end; ++it) {
+        MethodDesc*  desc = *it;
+        node->appendInst(irManager.newMethodEndPseudoInst(desc));
+    }
     return nodeId;
 }
 
@@ -106,7 +105,7 @@ uint32 CfgCodeSelector::genBlock(uint32              numInEdges,
     }
 
     currBlock = NULL;
-    //  Set prolog or epilog node
+    //  Set prolog or epilogue node
     switch (blockKind) {
     case Prolog:
         {

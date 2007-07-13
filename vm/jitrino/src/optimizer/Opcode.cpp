@@ -102,18 +102,18 @@ static OpcodeInfo opcodeTable[] = {
     { Op_Branch,                true,  MB::ControlFlow,   MK::Comparison,                            "br    ",        "if c%m.%t %s goto %l",         }, 
     { Op_Jump,                  true,  MB::ControlFlow,   MK::None,                                  "jmp   ",        "goto %l",                      }, // (different from the CLI jmp opcode) 
     { Op_Switch,                true,  MB::ControlFlow,   MK::None,                                  "switch",        "switch (%l)[%0]",              },
-    { Op_DirectCall,            true,  MB::Call,          MK::Exception,                             "call  ",        "call      %d(%p) ((%0,%1)) -) %l",       },
-    { Op_TauVirtualCall,        true,  MB::Call,          MK::Exception,                             "callvirt",      "callvrt   [%2.%d](%a) ((%0,%1)) -) %l",  },
+    { Op_DirectCall,            true,  MB::Call,          MK::Exception,                             "call  ",        "call      %d(%p) ((%0,%1)) -) %l  %b",       },
+    { Op_TauVirtualCall,        true,  MB::Call,          MK::Exception,                             "callvirt",      "callvrt   [%2.%d](%a) ((%0,%1)) -) %l  %b",  },
     { Op_IndirectCall,          true,  MB::Call,          MK::Exception,                             "calli",         "calli     [%0](%a) ((%1,%2)) -) %l",     },
     { Op_IndirectMemoryCall,    true,  MB::Call,          MK::Exception,                             "callimem",      "callimem  [%0](%a) ((%1,%2)) -) %l",     },
     { Op_IntrinsicCall,         true,  MB::Call,          MK::Exception,                             "callintr",      "callintr  %d(%p) ((%0,%1)) -) %l",       },
     { Op_JitHelperCall,         true,  MB::Call,          MK::Exception,                             "callhelper",    "callhelper %d(%s) -) %l",       },
-    { Op_VMHelperCall,          true,  MB::Call,          MK::Exception,                             "callvmhelper",  "callvmhelper %d(%s) -) %l",    },
+    { Op_VMHelperCall,          true,  MB::Call,          MK::Exception,                             "callvmhelper",  "callvmhelper %d(%s) -) %l  %b",    },
     { Op_Return,                true,  MB::ControlFlow,   MK::None,                                  "return",        "return    %s",                 },
     { Op_Catch,                 true,  MB::ControlFlow,   MK::None,                                  "catch",         "catch        -) %l",           },
-    { Op_Throw,                 true,  MB::Exception,     MK::Throw,                                 "throw ",        "throw     %0",                 },               
-    { Op_PseudoThrow,           true,  MB::Exception,     MK::Exception,                             "pseudoThrow ",  "pseudoThrow",                  },               
-    { Op_ThrowSystemException,  true,  MB::Exception,     MK::None,                                  "throwsys ",     "throwsys %d",                  },
+    { Op_Throw,                 true,  MB::Exception,     MK::Throw,                                 "throw ",        "throw     %0 %b",                 },               
+    { Op_PseudoThrow,           true,  MB::Exception,     MK::Exception,                             "pseudoThrow ",  "pseudoThrow %b",                  },               
+    { Op_ThrowSystemException,  true,  MB::Exception,     MK::None,                                  "throwsys ",     "throwsys %d %b",                  },
     { Op_ThrowLinkingException, true,  MB::Exception,     MK::None,                                  "throwLink ",    "throwLink",                    },
     { Op_Leave,                 true,  MB::ControlFlow,   MK::None,                                  "leave ",        "leave %l",                     }, // CLI only -- DELETE
     { Op_EndFinally,            true,  MB::ControlFlow,   MK::None,                                  "endfinally",    "endfinally",                   }, // CLI only -- DELETE
@@ -127,7 +127,7 @@ static OpcodeInfo opcodeTable[] = {
     { Op_DefArg,                true,  MB::None,          MK::DefArg,                                "defarg",        "defarg%m -) %l",               },
     // Load instructions                                                                                               
     { Op_LdConstant,            false, MB::Movable,       MK::None,                                  "ldc   ",        "ldc%t    #%c -) %l",           },
-    { Op_LdRef,                 false, MB::Movable,       MK::AutoCompress,                          "ldref ",        "ldref%m (%d) -) %l",           },
+    { Op_LdRef,                 false, MB::Movable,       MK::AutoCompress,                          "ldref ",        "ldref%m (%d) -) %l  %b",       },
     { Op_LdVar,                 false, MB::None,          MK::None,                                  "ldvar ",        "ldvar     %0 -) %l",           },
     { Op_LdVarAddr,             false, MB::Movable,       MK::None,                                  "ldvara",        "ldvara    %0 -) %l",           },
     { Op_TauLdInd,              false, MB::Load,          MK::AutoCompress_Speculative,              "ldind",         "ldind%m:%t [%0] ((%1,%2)) -) %l",          },
@@ -154,16 +154,16 @@ static OpcodeInfo opcodeTable[] = {
     { Op_TauStElem,             true,  MB::StoreOrSync,   MK::Store_AutoCompress,                    "stelem",        "stelem%m:%t %0 ((%3,%4,%5)) -) [%1[%2]]",   },
     { Op_TauStStatic,           true,  MB::StoreOrSync,   MK::Store_AutoCompress,                    "stsfld",        "stsfld:%t %0 ((%1)) -) [%d]",         },                    
     { Op_TauStRef,              true,  MB::StoreOrSync,   MK::Store_AutoCompress,                    "stref ",        "stref%m   %0 ((%3,%4,%5)) -) [%1 %2] ",      }, // high-level version that will make a call to the VM
-    { Op_TauCheckBounds,        false, MB::Check,         MK::Overflow_and_Exception,                "chkbounds",     "chkbounds %1 .lt. %0 -) %l",         }, // takes index and array length arguments,               },
+    { Op_TauCheckBounds,        false, MB::Check,         MK::Overflow_and_Exception,                "chkbounds",     "chkbounds %1 .lt. %0 -) %l  %b",         }, // takes index and array length arguments,               },
     { Op_TauCheckLowerBound,    false, MB::Check,         MK::Overflow_and_Exception,                "chklb",         "chklb %0 .le. %1 -) %l",             }, // throws unless src0 <= src1
     { Op_TauCheckUpperBound,    false, MB::Check,         MK::Overflow_and_Exception,                "chkub",         "chkub %0 .lt. %1 -) %l",             }, // throws unless src0 < src1
-    { Op_TauCheckNull,          false, MB::Check,         MK::Exception_and_DefArg,                  "chknull",       "chknull   %0 -) %l",           }, // throws NullPointerException if src is null
-    { Op_TauCheckZero,          false, MB::Check,         MK::Exception,                             "chkzero",       "chkzero   %0 -) %l",           }, // for divide by zero exceptions (div and rem)
+    { Op_TauCheckNull,          false, MB::Check,         MK::Exception_and_DefArg,                  "chknull",       "chknull   %0 -) %l  %b",           }, // throws NullPointerException if src is null
+    { Op_TauCheckZero,          false, MB::Check,         MK::Exception,                             "chkzero",       "chkzero   %0 -) %l  %b",           }, // for divide by zero exceptions (div and rem)
     { Op_TauCheckDivOpnds,      false, MB::Check,         MK::Exception,                             "chkdivopnds",   "chkdivopnds %0,%1 -) %l",            }, // for signed divide overflow in CLI (div/rem of MAXNEGINT, -1): generates an ArithmeticException
     { Op_TauCheckElemType,      false, MB::Check,         MK::Exception,                             "chkelemtype",   "chkelemtype %0,%1 ((%2,%3)) -) %l",            }, // Array element type check for aastore
     { Op_TauCheckFinite,        false, MB::Check,         MK::Exception,                             "ckfinite",      "ckfinite  %s -) %l",           }, // throws ArithmeticException if value is NaN or +- inifinity
-    { Op_NewObj,                false, MB::Exception,     MK::Exception,                             "newobj",        "newobj    %d -) %l",           }, // OutOfMemoryException
-    { Op_NewArray,              false, MB::Exception,     MK::Exception,                             "newarray",      "newarray  %d[%0] -) %l",       }, // OutOfMemoryException, NegativeArraySizeException
+    { Op_NewObj,                false, MB::Exception,     MK::Exception,                             "newobj",        "newobj    %d -) %l  %b",       }, // OutOfMemoryException
+    { Op_NewArray,              false, MB::Exception,     MK::Exception,                             "newarray",      "newarray  %d[%0] -) %l  %b",   }, // OutOfMemoryException, NegativeArraySizeException
     { Op_NewMultiArray,         false, MB::Exception,     MK::Exception,                             "newmultiarray", "newmultiarray %d[%s] -) %l",   }, // OutOfMemoryException, NegativeArraySizeException
     { Op_TauMonitorEnter,       true,  MB::StoreOrSync,   MK::None,                                  "monenter",      "monenter  %0 ((%1))",                 }, // (opnd must be non-null)
     { Op_TauMonitorExit,        true,  MB::StoreOrSync,   MK::Exception,                             "monexit",       "monexit   %0 ((%1))",                 }, // (opnd must be non-null), IllegalMonitorStateException
@@ -178,12 +178,12 @@ static OpcodeInfo opcodeTable[] = {
     { Op_MonitorEnterFence,     true,  MB::StoreOrSync,   MK::None,                                  "monenterfence", "monenterfence %0",             }, // (opnd must be non-null)
     { Op_MonitorExitFence,      true,  MB::StoreOrSync,   MK::None,                                  "monexitfence",  "monexitfence  %0",             }, // (opnd must be non-null)
     { Op_TauStaticCast,         false, MB::Movable,       MK::None,                                  "staticcast",    "staticcast %0,%d ((%1)) -) %l",       }, // Compile-time assertion.  Asserts that cast is legal.
-    { Op_TauCast,               false, MB::Check,         MK::Exception,                             "cast  ",        "cast      %0,%d ((%1)) -) %l",        }, // CastException (suceeds if argument is null, returns casted object)
+    { Op_TauCast,               false, MB::Check,         MK::Exception,                             "cast  ",        "cast      %0,%d ((%1)) -) %l  %b",        }, // CastException (suceeds if argument is null, returns casted object)
     { Op_TauAsType,             false, MB::Movable,       MK::None,                                  "astype",        "astype    %0,%d -) %l",        }, // returns casted object if argument is an instance of, null otherwise
-    { Op_TauInstanceOf,         false, MB::Movable,       MK::None,                                  "instanceof",    "instanceof %0,%d ((%1)) -) %l",       }, // returns true if argument is an instance of type T, tau opnd isNonNull
-    { Op_InitType,              true,  MB::CSEable,       MK::Exception,                             "inittype",      "inittype  %d",                 }, // can throw a linking exception during class initialization
-    { Op_Label,                 true,  MB::None,          MK::None,                                  "label ",        "%l:",                          }, // special label instructions for branch labels, finally, catch
-    { Op_MethodEntry,           true,  MB::None,          MK::None,                                  "methodentry",   "--- MethodEntry(%d): (%s)",                 }, // method entry label
+    { Op_TauInstanceOf,         false, MB::Movable,       MK::None,                                  "instanceof",    "instanceof %0,%d ((%1)) -) %l",}, // returns true if argument is an instance of type T, tau opnd isNonNull
+    { Op_InitType,              true,  MB::CSEable,       MK::Exception,                             "inittype",      "inittype  %d  %b",             }, // can throw a linking exception during class initialization
+    { Op_Label,                 true,  MB::None,          MK::None,                                  "label ",        "%l: %b",                       }, // special label instructions for branch labels, finally, catch
+    { Op_MethodEntry,           true,  MB::None,          MK::None,                                  "methodentry",   "--- MethodEntry(%d): (%s)  %b",}, // method entry label
     { Op_MethodEnd,             true,  MB::None,          MK::None,                                  "methodend",     "+++ MethodEnd(%d) (%s)",       }, // end of a method
     { Op_SourceLineNumber,      true,  MB::None,          MK::None,                                  "lineno",        "???",                          }, // change to source position
     { Op_LdObj,                 false, MB::Load,          MK::None,                                  "ldobj ",        "ldobj     [%0] -) %l",         }, // load a value type to the stack

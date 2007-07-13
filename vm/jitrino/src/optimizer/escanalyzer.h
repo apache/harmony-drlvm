@@ -929,11 +929,9 @@ private:
  * @param vc_insts    - list of call instructions optimized object is escaped to,
  * @param objs        - list of optimized object fields,
  * @param ob_var_opnd -  varOpnd replacing optimized object,
- * @param tnode       - target CFG node for newobj instruction exception edge,
  * @param oid         - escaped optimized object Id.
  */
-    void restoreEOCreation(Insts* vc_insts, ScObjFlds* objs, VarOpnd* ob_var_opnd, 
-        Node* tnode, uint32 oid);
+    void restoreEOCreation(Insts* vc_insts, ScObjFlds* objs, VarOpnd* ob_var_opnd, uint32 oid);
 
 /**
  * Removes specified instruction from ControlFlowGraph.
@@ -1005,26 +1003,6 @@ private:
  * @param scObjFlds - list to collect onode operand field usage.
  */
     void checkToScalarizeFinalFiels(CnGNode* onode, ScObjFlds* scObjFlds);
-
-
-// BCMap support
-    // Byte code map info
-    bool isBCmapRequired;
-    void* bc2HIRMapHandler;
-/**
- * Sets bcmap offset in bc2HIRMapHandler.
- * @param new_i - instruction to set offset,
- * @param old_i - offset of old_i instruction is set to new_i instruction.
- */
-    void setNewBCMap(Inst* new_i, Inst* old_i);
-
-/**
- * Removes bcmap offset in bc2HIRMapHandler.
- * @param inst - instruction to remove offset.
- */
-    void remBCMap(Inst* inst);
-
-
 };
 
 } //namespace Jitrino 

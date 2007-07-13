@@ -82,7 +82,7 @@ protected:
 class IpfCfgCodeSelector : public CFGCodeSelector::Callback {
 public:
                          IpfCfgCodeSelector(Cfg&, NodeVector&, OpndVector&, CompilationInterface&);
-    uint32               genDispatchNode(uint32, uint32, double);
+    uint32               genDispatchNode(uint32, uint32, const StlVector<MethodDesc*>&, double);
     uint32               genBlock(uint32, uint32, BlockKind, BlockCodeSelector&, double);
     uint32               genUnwindNode(uint32, uint32, double);
     uint32               genExitNode(uint32, double);
@@ -173,9 +173,9 @@ public:
     void          bnzero(CompareZeroOp::Types, CG_OpndHandle*);
     void          tableSwitch(CG_OpndHandle*, uint32);       
 
-    CG_OpndHandle *call(uint32, CG_OpndHandle**, Type*, MethodDesc*, InlineInfo* ii = NULL);
-    CG_OpndHandle *tau_call(uint32, CG_OpndHandle**, Type*, MethodDesc*, CG_OpndHandle*, CG_OpndHandle*, InlineInfo* ii = NULL);
-    CG_OpndHandle *tau_calli(uint32,CG_OpndHandle**, Type*, CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*, InlineInfo* ii = NULL);
+    CG_OpndHandle *call(uint32, CG_OpndHandle**, Type*, MethodDesc*);
+    CG_OpndHandle *tau_call(uint32, CG_OpndHandle**, Type*, MethodDesc*, CG_OpndHandle*, CG_OpndHandle*);
+    CG_OpndHandle *tau_calli(uint32,CG_OpndHandle**, Type*, CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*);
     CG_OpndHandle *tau_callintr(uint32, CG_OpndHandle**, Type*, IntrinsicCallOp::Id, CG_OpndHandle*, CG_OpndHandle*);
     void          ret();
     void          ret(CG_OpndHandle*);
@@ -243,7 +243,8 @@ public:
     void          opndMaybeGlobal(CG_OpndHandle* opnd)            {}
     void          setCurrentPersistentId(PersistentInstructionId) {}
     void          clearCurrentPersistentId()                      {}
-    void          setCurrentHIRInstrID(uint32)                    {}
+    void          setCurrentHIRInstBCOffset(uint16)               {}
+    uint16        getCurrentHIRInstBCOffset() const         {return 0xFFFF;}
 
     //---------------------------------------------------------------------------//
     // Methods that are not going to be implemented
@@ -274,7 +275,7 @@ public:
     CG_OpndHandle *ldValueObj(Type*, CG_OpndHandle*)                       { NOT_IMPLEMENTED_C("ldValueObj") }
     CG_OpndHandle *tau_ckfinite(CG_OpndHandle*)                            { NOT_IMPLEMENTED_C("tau_ckfinite") }
     CG_OpndHandle *callhelper(uint32, CG_OpndHandle**, Type*, JitHelperCallOp::Id) { NOT_IMPLEMENTED_C("callhelper") }
-    CG_OpndHandle *tau_callvirt(uint32, CG_OpndHandle**, Type*, MethodDesc*, CG_OpndHandle*, CG_OpndHandle*, InlineInfo* ii = NULL)  { NOT_IMPLEMENTED_C("tau_callvirt") }
+    CG_OpndHandle *tau_callvirt(uint32, CG_OpndHandle**, Type*, MethodDesc*, CG_OpndHandle*, CG_OpndHandle*)  { NOT_IMPLEMENTED_C("tau_callvirt") }
     CG_OpndHandle *select(CompareOp::Types, CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("select") }
     CG_OpndHandle *cmp3(CompareOp::Operators,CompareOp::Types, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("cmp3") }
     CG_OpndHandle *pred_cmp(CompareOp::Operators,CompareOp::Types, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("pred_cmp") }
@@ -303,7 +304,7 @@ public:
     //---------------------------------------------------------------------------//
 
     CG_OpndHandle* callvmhelper(uint32, CG_OpndHandle**, Type*
-                        , CompilationInterface::RuntimeHelperId, InlineInfo*) { NOT_IMPLEMENTED_C("unbox") }
+                        , CompilationInterface::RuntimeHelperId) { NOT_IMPLEMENTED_C("unbox") }
 
     CG_OpndHandle* convUPtrToObject(ObjectType*, CG_OpndHandle*)              { NOT_IMPLEMENTED_C("convUPtrToObject") }
     CG_OpndHandle* convToUPtr(PtrType*, CG_OpndHandle*)                       { NOT_IMPLEMENTED_C("convToUPtr") }

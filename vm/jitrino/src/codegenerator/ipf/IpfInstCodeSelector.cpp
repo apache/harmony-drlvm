@@ -1285,10 +1285,9 @@ void IpfInstCodeSelector::tableSwitch(CG_OpndHandle *src, uint32 nTargets) {
 CG_OpndHandle *IpfInstCodeSelector::call(uint32        numArgs, 
                                          CG_OpndHandle **args, 
                                          Type          *retType,
-                                         MethodDesc    *desc,
-                                         InlineInfo    *ii) {
+                                         MethodDesc    *desc) {
 
-    return tau_call(numArgs, args, retType, desc, NULL, NULL, ii);
+    return tau_call(numArgs, args, retType, desc, NULL, NULL);
 }
 
 //----------------------------------------------------------------------------//
@@ -1299,8 +1298,7 @@ CG_OpndHandle *IpfInstCodeSelector::tau_call(uint32        numArgs,
                                              Type          *retType,
                                              MethodDesc    *desc,
                                              CG_OpndHandle *tauNullCheckedFirstArg,
-                                             CG_OpndHandle *tauTypesChecked,
-                                             InlineInfo    *ii) {
+                                             CG_OpndHandle *tauTypesChecked) {
 
     IPF_LOG << "      tau_call; method=" << desc->getName() 
         << ", desc=" << desc << ", addr=0x" << hex << *((uint64 *)desc->getIndirectAddress()) 
@@ -1326,8 +1324,7 @@ CG_OpndHandle *IpfInstCodeSelector::tau_calli(uint32        numArgs,
                                               Type          *retType, 
                                               CG_OpndHandle *methodPtr,
                                               CG_OpndHandle *nonNullFirstArgTau,
-                                              CG_OpndHandle *tauTypesChecked,
-                                              InlineInfo    *ii) {
+                                              CG_OpndHandle *tauTypesChecked) {
 
     IPF_LOG << "      tau_calli; numArgs=" << numArgs 
         << ", retType=" << (retType ? Type::tag2str(retType->tag) : "NULL") << endl;

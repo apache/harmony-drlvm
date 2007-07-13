@@ -25,7 +25,6 @@
 #include "Inst.h"
 #include "CSEHash.h"
 #include "Log.h"
-#include "CGSupport.h"
 #include "irmanager.h"
 #include "CompilationContext.h"
 
@@ -140,10 +139,9 @@ protected:
         irBuilder.genBranch(instType, mod, label, src1);
     }
     virtual Inst* genDirectCall(MethodDesc* methodDesc,Type* returnType,Opnd* tauNullCheckedFirstArg,
-        Opnd* tauTypesChecked,uint32 numArgs,Opnd* args[],InlineInfoBuilder* inlineBuilder)
+        Opnd* tauTypesChecked,uint32 numArgs,Opnd* args[])
     {
-        irBuilder.genDirectCall(methodDesc, returnType, tauNullCheckedFirstArg, tauTypesChecked, 
-            numArgs, args, inlineBuilder);
+        irBuilder.genDirectCall(methodDesc, returnType, tauNullCheckedFirstArg, tauTypesChecked, numArgs, args);
         return (Inst*)irBuilder.getCurrentLabel()->getNode()->getLastInst();
     }
     // load, store & mov
@@ -251,8 +249,7 @@ void IRBuilderAction::readFlags() {
     irBuilderFlags.expandVirtualCallAddrs = getBoolArg("expandVirtualCallAddrs", true);
     irBuilderFlags.expandNullChecks       = getBoolArg("expandNullChecks", true);
     irBuilderFlags.expandElemTypeChecks   = getBoolArg("expandElemTypeChecks", true);
-    irBuilderFlags.fullBcMap              = getBoolArg("fullBcMap", false);
-
+    
     //
     // IRBuilder translation-time optimizations
     //
@@ -284,8 +281,7 @@ currentLabel(NULL),
 cseHashTable(NULL),
 simplifier(NULL),
 tauMethodSafeOpnd(NULL),
-offset(0),
-bc2HIRmapHandler(NULL)
+offset(0)
 {
     
 }
@@ -307,13 +303,7 @@ void IRBuilder::init(IRManager* irm, TranslatorFlags* traFlags, MemoryManager& t
     
     CompilationInterface* ci = getCompilationContext()->getVMCompilationInterface();
     irBuilderFlags.insertWriteBarriers    = ci->needWriteBarriers();
-    irBuilderFlags.isBCMapinfoRequired = ci->isBCMapInfoRequired();
     irBuilderFlags.compressedReferences   = irBuilderFlags.compressedReferences || VMInterface::areReferencesCompressed();
-
-    if (irBuilderFlags.isBCMapinfoRequired) {
-        MethodDesc* meth = irm->getCompilationInterface().getMethodToCompile();
-        bc2HIRmapHandler = getContainerHandler(bcOffset2HIRHandlerName, meth);
-    }
 }
 
 
@@ -324,15 +314,16 @@ void IRBuilder::invalid() {
 
 Inst* IRBuilder::appendInst(Inst* inst) {
     assert(currentLabel);
-    if (irBuilderFlags.isBCMapinfoRequired) {
-        uint32 instID = inst->getId();
-        if (irBuilderFlags.fullBcMap) {
-            setBCMappingEntry(bc2HIRmapHandler, instID, (uint16)offset);
-        } else if (inst->asMethodCallInst() || inst->asCallInst()) {
-            setBCMappingEntry(bc2HIRmapHandler, instID, (uint16)offset);
-        }
+    inst->setBCOffset((uint16)offset);
+    Node* node = currentLabel->getNode();
+
+    assert(currentLabel->getBCOffset()!=ILLEGAL_BC_MAPPING_VALUE || node->isEmpty());
+    if (node->isEmpty() && currentLabel->getBCOffset()==ILLEGAL_BC_MAPPING_VALUE) {
+        currentLabel->setBCOffset((uint16)offset);
     }
-    currentLabel->getNode()->appendInst(inst);
+    assert(currentLabel->getBCOffset()!=ILLEGAL_BC_MAPPING_VALUE);
+
+    node->appendInst(inst);
     if(Log::isEnabled()) {
         inst->print(Log::out());
         Log::out() << ::std::endl;
@@ -378,6 +369,7 @@ void IRBuilder::createLabels(uint32 numLabels, LabelInst** labels) {
 LabelInst* IRBuilder::genMethodEntryLabel(MethodDesc* methodDesc) {
     LabelInst* labelInst = instFactory->makeMethodEntryLabel(methodDesc);
     currentLabel = labelInst;
+    labelInst->setBCOffset(0);
 
     if(Log::isEnabled()) {
         currentLabel->print(Log::out());
@@ -385,25 +377,6 @@ LabelInst* IRBuilder::genMethodEntryLabel(MethodDesc* methodDesc) {
         Log::out().flush();
     }
     return labelInst;
-}
-
-void IRBuilder::genMethodEntryMarker(MethodDesc* methodDesc) {
-    if (! irBuilderFlags.insertMethodLabels)
-        return;
-    appendInst(instFactory->makeMethodMarker(MethodMarkerInst::Entry, methodDesc));
-}
-
-void IRBuilder::genMethodEndMarker(MethodDesc* methodDesc, Opnd *obj, Opnd *retOpnd) {
-    if (! irBuilderFlags.insertMethodLabels)
-        return;
-    assert(obj && !obj->isNull());
-    appendInst(instFactory->makeMethodMarker(MethodMarkerInst::Exit, methodDesc, obj, retOpnd));
-}
-
-void IRBuilder::genMethodEndMarker(MethodDesc* methodDesc, Opnd *retOpnd) {
-    if (! irBuilderFlags.insertMethodLabels)
-        return;
-    appendInst(instFactory->makeMethodMarker(MethodMarkerInst::Exit, methodDesc, retOpnd));
 }
 
 // compute instructions
@@ -1371,7 +1344,7 @@ Opnd* IRBuilder::genIndirectCallWithResolve(Type* returnType,
         insertHash(Op_VMHelperCall, bc, cpIndex, numArgs>0?args[0]->getId() : 0, callAddrOpnd->getInst());
     }
 
-    return genIndirectMemoryCall(returnType, callAddrOpnd,  tauNullCheckedFirstArg, tauTypesChecked, numArgs, args, NULL); 
+    return genIndirectMemoryCall(returnType, callAddrOpnd,  tauNullCheckedFirstArg, tauTypesChecked, numArgs, args); 
 }
 
 
@@ -1381,8 +1354,7 @@ IRBuilder::genDirectCall(MethodDesc* methodDesc,
                          Opnd* tauNullCheckedFirstArg,
                          Opnd* tauTypesChecked,
                          uint32 numArgs,
-                         Opnd* args[],
-                         InlineInfoBuilder* inlineInfoBuilder)      // NULL if this call is not inlined
+                         Opnd* args[])
 {
     if (!tauNullCheckedFirstArg)
         tauNullCheckedFirstArg = genTauUnsafe();
@@ -1396,19 +1368,14 @@ IRBuilder::genDirectCall(MethodDesc* methodDesc,
     if (irBuilderFlags.expandCallAddrs) {
         return genIndirectMemoryCall(returnType, genLdFunAddrSlot(methodDesc), 
                                      tauNullCheckedFirstArg, tauTypesChecked,
-                                     numArgs, args,
-                                     inlineInfoBuilder); 
+                                     numArgs, args); 
     }
     for (uint32 i=0; i<numArgs; i++) {
         args[i] = propagateCopy(args[i]);
     }
     Opnd* dst = createOpnd(returnType);
-    appendInstUpdateInlineInfo(instFactory->makeDirectCall(dst,
-                                          tauNullCheckedFirstArg, tauTypesChecked,
-                                          numArgs, args,
-                                          methodDesc),
-                               inlineInfoBuilder,
-                               methodDesc);
+    appendInst(instFactory->makeDirectCall(dst, tauNullCheckedFirstArg, tauTypesChecked,
+                                          numArgs, args, methodDesc));
 
     // Note that type initialization should be made available for this type
     // and all its ancestor types.
@@ -1421,15 +1388,13 @@ IRBuilder::genTauVirtualCall(MethodDesc* methodDesc,
                              Opnd* tauNullCheckedFirstArg,
                              Opnd* tauTypesChecked,
                              uint32 numArgs,
-                             Opnd* args[],
-                             InlineInfoBuilder* inlineInfoBuilder)      // NULL if this call is not inlined
+                             Opnd* args[])
 {
     if(!methodDesc->isVirtual())
         // Must de-virtualize - no vtable
         return genDirectCall(methodDesc, returnType,
                              tauNullCheckedFirstArg, tauTypesChecked, 
-                             numArgs, args,
-                             inlineInfoBuilder);
+                             numArgs, args);
     for (uint32 i=0; i<numArgs; i++) {
         args[i] = propagateCopy(args[i]);
     }
@@ -1453,8 +1418,7 @@ IRBuilder::genTauVirtualCall(MethodDesc* methodDesc,
                                                             tauNullCheckedFirstArg,
                                                             tauTypesChecked,
                                                             numArgs,
-                                                            args,
-                                                            inlineInfoBuilder);
+                                                            args);
         if (dst) return dst;
     }
     
@@ -1465,17 +1429,11 @@ IRBuilder::genTauVirtualCall(MethodDesc* methodDesc,
                                                              methodDesc), 
                                      tauNullCheckedFirstArg,
                                      tauTypesChecked,
-                                     numArgs, args,
-                                     inlineInfoBuilder);
+                                     numArgs, args);
     }
     Opnd *dst = createOpnd(returnType);
-    appendInstUpdateInlineInfo(instFactory->makeTauVirtualCall(dst, 
-                                              tauNullCheckedFirstArg,
-                                              tauTypesChecked,
-                                              numArgs, args, 
-                                              methodDesc),
-                                              inlineInfoBuilder,
-                               methodDesc);
+    appendInst(instFactory->makeTauVirtualCall(dst, tauNullCheckedFirstArg,
+                                              tauTypesChecked, numArgs, args, methodDesc));
     return dst;
 }
 
@@ -1556,8 +1514,7 @@ IRBuilder::genIndirectCall(Type* returnType,
                            Opnd* tauNullCheckedFirstArg,
                            Opnd* tauTypesChecked,
                            uint32 numArgs,
-                           Opnd* args[],
-                           InlineInfoBuilder* inlineInfoBuilder)      // NULL if this call is not inlined
+                           Opnd* args[])
 {
     for (uint32 i=0; i<numArgs; i++) {
         args[i] = propagateCopy(args[i]);
@@ -1573,12 +1530,8 @@ IRBuilder::genIndirectCall(Type* returnType,
     else
         tauTypesChecked = propagateCopy(tauTypesChecked);
 
-    appendInstUpdateInlineInfo(instFactory->makeIndirectCall(dst, funAddr, 
-                                            tauNullCheckedFirstArg, tauTypesChecked,
-                                            numArgs, 
-                                            args),
-                                            inlineInfoBuilder,
-                                            NULL); // indirect call -- no method desc
+    appendInst(instFactory->makeIndirectCall(dst, funAddr, tauNullCheckedFirstArg, tauTypesChecked,
+                                            numArgs, args));
     return dst;
 }
 
@@ -1588,8 +1541,7 @@ IRBuilder::genIndirectMemoryCall(Type* returnType,
                                  Opnd* tauNullCheckedFirstArg,
                                  Opnd* tauTypesChecked,
                                  uint32 numArgs,
-                                 Opnd* args[],
-                                 InlineInfoBuilder* inlineInfoBuilder)      // NULL if this call is not inlined
+                                 Opnd* args[])
 {
     for (uint32 i=0; i<numArgs; i++) {
         args[i] = propagateCopy(args[i]);
@@ -1605,13 +1557,8 @@ IRBuilder::genIndirectMemoryCall(Type* returnType,
         tauTypesChecked = propagateCopy(tauTypesChecked);
 
     Opnd* dst = createOpnd(returnType);
-    appendInstUpdateInlineInfo(instFactory->makeIndirectMemoryCall(dst, funAddr, 
-                                                  tauNullCheckedFirstArg, 
-                                                  tauTypesChecked,
-                                                  numArgs, 
-                                                  args),
-                                                  inlineInfoBuilder,
-                                                  NULL); // indirect call -- no method desc
+    appendInst(instFactory->makeIndirectMemoryCall(dst, funAddr, tauNullCheckedFirstArg, 
+                                                  tauTypesChecked, numArgs, args));
     return dst;
 }
 
@@ -1961,8 +1908,7 @@ IRBuilder::genInitType(NamedType* type) {
     Opnd* opnd = lookupHash(Op_InitType, type->getId());
     if (opnd) return; // no need to re-initialize
 
-    insertHash(Op_InitType, type->getId(), 
-               appendInst(instFactory->makeInitType(type)));
+    insertHash(Op_InitType, type->getId(),  appendInst(instFactory->makeInitType(type)));
 }
 
 Opnd*
@@ -3667,17 +3613,6 @@ IRBuilder::genTauAnd(Opnd *src1, Opnd *src2) {
     return dst;
 }
 
-void
-IRBuilder::appendInstUpdateInlineInfo(Inst* inst, InlineInfoBuilder* builder, MethodDesc* target_md)
-{
-    assert(inst->getCallInstInlineInfoPtr());
-
-    if ( builder ) {
-        offset = builder->buildInlineInfoForInst(inst, offset, target_md);
-    }
-    
-    appendInst(inst);
-}
 
 Inst* IRBuilder::getLastGeneratedInst() {
     return (Inst*)currentLabel->getNode()->getLastInst();

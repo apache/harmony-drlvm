@@ -225,6 +225,11 @@ public:
                 ControlFlowGraph* bbpCFG = bbp.createBBPSubCFG(*irManager, tlsBaseReg);
             
                 // Inlining bbpCFG at edge
+                if (fg->getUnwindNode()==NULL) {//inlined cfg has dispatch flow -> add unwind to parent if needed
+                    Node* unwind = fg->createDispatchNode();
+                    fg->addEdge(unwind, fg->getExitNode());
+                    fg->setUnwindNode(unwind);
+                }
                 fg->spliceFlowGraphInline(edge, *bbpCFG);
                 bbp.setBBPSubCFGController(originalTargetId,sourceDispatchId,edge->getTargetNode());
             }

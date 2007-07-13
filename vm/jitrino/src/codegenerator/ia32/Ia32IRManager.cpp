@@ -489,9 +489,9 @@ EntryPointPseudoInst * IRManager::newEntryPointPseudoInst(const CallingConventio
 
 //_________________________________________________________________________________________________
 CallInst * IRManager::newCallInst(Opnd * targetOpnd, const CallingConvention * cc, 
-        uint32 argCount, Opnd ** args, Opnd * retOpnd, InlineInfo* ii)
+        uint32 argCount, Opnd ** args, Opnd * retOpnd)
 {
-    CallInst * callInst=new(memoryManager, (argCount + (retOpnd ? 1 : 0)) * 2 + 1) CallInst(this, instId++, cc, ii, targetOpnd->getRuntimeInfo());
+    CallInst * callInst=new(memoryManager, (argCount + (retOpnd ? 1 : 0)) * 2 + 1) CallInst(this, instId++, cc, targetOpnd->getRuntimeInfo());
     CallingConventionClient & ccc = callInst->callingConventionClient;
     uint32 i=0;
     if (retOpnd!=NULL){
@@ -514,7 +514,7 @@ CallInst * IRManager::newCallInst(Opnd * targetOpnd, const CallingConvention * c
 
 //_________________________________________________________________________________________________
 CallInst * IRManager::newRuntimeHelperCallInst(CompilationInterface::RuntimeHelperId helperId, 
-    uint32 numArgs, Opnd ** args, Opnd * retOpnd, InlineInfo* ii)
+    uint32 numArgs, Opnd ** args, Opnd * retOpnd)
 {
     Inst * instList = NULL;
     Opnd * target=newImmOpnd(typeManager.getInt32Type(), Opnd::RuntimeInfo::Kind_HelperAddress, (void*)helperId);
@@ -1898,12 +1898,18 @@ void IRManager::expandSystemExceptions(uint32 reservedForFlags)
 #endif
                        )){
                         Node* throwBasicBlock = fg->createBlockNode();
-                        throwBasicBlock->appendInst(newRuntimeHelperCallInst(CompilationInterface::Helper_NullPtrException, 0, NULL, NULL));
+                        Inst* throwInst = newRuntimeHelperCallInst(CompilationInterface::Helper_NullPtrException, 0, NULL, NULL);
+                        throwInst->setBCOffset(lastInst->getBCOffset());
+                        throwBasicBlock->appendInst(throwInst);
 #ifndef _EM64T_
-                        bb->appendInst(newInst(Mnemonic_CMP, opnd, newImmOpnd(opnd->getType(), 0)));
+                        Inst* cmpInst = newInst(Mnemonic_CMP, opnd, newImmOpnd(opnd->getType(), 0));
+                        bb->appendInst(cmpInst);
 #else
-                        bb->appendInst(newInst(Mnemonic_CMP, opnd,newImmOpnd(opnd->getType(), (Type::isCompressedReference(opnd->getType()->tag) || !opnd->getType()->isReference())? 0: (POINTER_SIZE_INT)VMInterface::getHeapBase())));
+                        Inst* cmpInst = newInst(Mnemonic_CMP, opnd,newImmOpnd(opnd->getType(), (Type::isCompressedReference(opnd->getType()->tag) || !opnd->getType()->isReference())? 0: (POINTER_SIZE_INT)VMInterface::getHeapBase()));
+                        bb->appendInst(cmpInst);
 #endif
+                        cmpInst->setBCOffset(lastInst->getBCOffset());
+
                         bb->appendInst(newBranchInst(Mnemonic_JZ, throwBasicBlock, oldTarget));
                         fg->addEdge(bb, throwBasicBlock, 0);
 
@@ -2364,8 +2370,10 @@ void SessionAction::debugOutput(const char * subKind)
     if (isLogEnabled(LogStream::IRDUMP)) {
         irManager->updateLoopInfo();
         irManager->updateLivenessInfo();
-        dumpIR(subKind, "opnds");
-        dumpIR(subKind, "liveness");
+        if (isLogEnabled("irdump_verbose")) {
+            dumpIR(subKind, "opnds");
+            dumpIR(subKind, "liveness");
+        }
         dumpIR(subKind);
     }
 

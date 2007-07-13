@@ -21,7 +21,6 @@
 
 #include "Ia32Printer.h"
 #include "Log.h"
-#include "CGSupport.h"
 #include "PlatformDependant.h"
 
 namespace Jitrino
@@ -228,7 +227,7 @@ void IRPrinter::printNodeHeader(const Node * node, uint32 indent)
 }
 
 //_____________________________________________________________________________________________
-void IRPrinter::printNodeInstList(const BasicBlock * bb, uint32 indent)
+void IRPrinter::printNodeInstList(const Node* bb, uint32 indent)
 {
     ::std::ostream& os = getStream();
     for (Inst * inst = (Inst*)bb->getFirstInst(); inst != NULL; inst = inst->getNextInst()) {
@@ -249,7 +248,7 @@ void IRPrinter::printNode(const Node * node, uint32 indent)
 {
     std::ostream& os = getStream();
     printNodeHeader(node, indent);
-    if (node->isBlockNode()) {
+    if (!node->isEmpty()) {
         os << std::endl;
         printNodeInstList((BasicBlock*)node, indent);
     }
@@ -356,6 +355,16 @@ void IRPrinter::printInst(const Inst * inst)
     if (printedOpnds){ os<<" "; printedOpndsTotal+=printedOpnds; }
     printedOpnds=printInstOpnds(inst, (Inst::OpndRole_Use|Inst::OpndRole_Implicit)&opndRolesFilter);
     if (printedOpnds){ os<<" "; printedOpndsTotal+=printedOpnds; }
+
+    if (inst->hasKind(Inst::Kind_CallInst) || inst->hasKind(Inst::Kind_MethodEntryPseudoInst)) {
+        os<<"[bcmap:";
+        if (inst->getBCOffset()==ILLEGAL_BC_MAPPING_VALUE) {
+            os<<"unknown";
+        } else {
+            os<<inst->getBCOffset();
+        }
+        os<<"] ";
+    }
 
     if (inst->hasKind(Inst::Kind_GCInfoPseudoInst)) {
         const GCInfoPseudoInst* gcInst = (GCInfoPseudoInst*)inst;
@@ -818,24 +827,14 @@ void IRDotPrinter::printNode(const Node * node)
         out<<", code="<<(void*)bb->getCodeStartAddr();
     }
 
-    if (bb) {
+    if (!node->isEmpty()) {
         out << "\\l|\\" << std::endl;
-        void* lirMapHandler = NULL;
-        if (irManager->getCompilationInterface().isBCMapInfoRequired()) {
-            MethodDesc* meth = irManager->getCompilationInterface().getMethodToCompile();
-            lirMapHandler = getContainerHandler(bcOffset2LIRHandlerName, meth);
-            assert(lirMapHandler);
-        }
-        for (Inst * inst = (Inst*)bb->getFirstInst(); inst != NULL; inst = inst->getNextInst()) {
+        for (Inst * inst = (Inst*)node->getFirstInst(); inst != NULL; inst = inst->getNextInst()) {
             Inst::Kind kind=inst->getKind();
             if ((kind & instFilter)==(uint32)kind){
                 printInst(inst);
-                if (lirMapHandler != NULL) {
-                    uint16 bcOffset = 0;
-                    uint32 instID = inst->getId();
-                    bcOffset = getBCMappingEntry(lirMapHandler, instID);
-                    if (bcOffset != ILLEGAL_BC_MAPPING_VALUE) out<<" bcOff: "<< (uint16)bcOffset << " ";
-                }
+                uint16 bcOffset = inst->getBCOffset();
+                if (bcOffset != ILLEGAL_BC_MAPPING_VALUE) out<<" bcOff: "<< bcOffset << " ";
                 out << "\\l\\" << ::std::endl;
             }
         }

@@ -3609,8 +3609,7 @@ Simplifier::simplifyTauVirtualCall(MethodDesc* methodDesc,
                                    Opnd* tauNullCheckedFirstArg,
                                    Opnd* tauTypesChecked,
                                    uint32 numArgs,
-                                   Opnd* args[],
-                                   InlineInfoBuilder* inlineBuilder)
+                                   Opnd* args[])
 {
     //
     // change to a direct call if the type of the this pointer is exactly known
@@ -3626,7 +3625,7 @@ Simplifier::simplifyTauVirtualCall(MethodDesc* methodDesc,
         }
         return genDirectCall(methodDesc, returnType,
                              tauNullCheckedFirstArg, tauTypesChecked,
-                             numArgs, args, inlineBuilder)->getDst();
+                             numArgs, args)->getDst();
     }
     return NULL;
 }
@@ -3636,12 +3635,11 @@ Simplifier::simplifyIndirectCallInst(    Opnd* funPtr,
                                          Opnd* tauNullCheckedFirstArg,
                                          Opnd* tauTypesChecked,
                                         uint32 numArgs,
-                                        Opnd** args,
-                            InlineInfoBuilder* inlineBuilder)
+                                        Opnd** args)
 {
     return simplifyIndirectMemoryCallInst(funPtr, returnType, 
                                           tauNullCheckedFirstArg, tauTypesChecked,
-                                          numArgs, args, inlineBuilder);
+                                          numArgs, args);
 }
 
 Inst*
@@ -3650,8 +3648,7 @@ Simplifier::simplifyIndirectMemoryCallInst(Opnd* funPtr,
                                            Opnd* tauNullCheckedFirstArg,
                                            Opnd* tauTypesChecked,
                                           uint32 numArgs,
-                                          Opnd** args,
-                              InlineInfoBuilder* inlineBuilder)
+                                          Opnd** args)
 {
     // if funptr is a load of a fun slot that does not go through a vtable, then
     // simplify this to a direct call if direct calls are enabled
@@ -3662,7 +3659,7 @@ Simplifier::simplifyIndirectMemoryCallInst(Opnd* funPtr,
     if (ldFunInst->getOpcode() == Op_LdFunAddrSlot) {
        return genDirectCall(ldFunInst->getMethodDesc(), returnType,
                              tauNullCheckedFirstArg, tauTypesChecked,
-                             numArgs, args, inlineBuilder);
+                             numArgs, args);
     }
     return NULL;    
 }
@@ -3783,11 +3780,8 @@ Simplifier::caseIndirectCall(CallInst* inst) {
                                              tauNullCheckedFirstArg,
                                              tauTypesChecked,
                                              numArgs-2, // skip taus
-                                             args+2, 
-                                             NULL); // not creating InlineInfo with InlineInfoBuilder
+                                             args+2);
     if (newInst != NULL) {
-        assert(inst->getCallInstInlineInfoPtr() && inst->getCallInstInlineInfoPtr());
-        newInst->getCallInstInlineInfoPtr()->getInlineChainFrom(*inst->getCallInstInlineInfoPtr());
         return newInst;
     }
     return inst;
@@ -3807,11 +3801,8 @@ Simplifier::caseIndirectMemoryCall(CallInst* inst) {
                                                    tauNullCheckedFirstArg,
                                                    tauTypesChecked,
                                                    numArgs-2,
-                                                   args+2,
-                                                   NULL); // not creating InlineInfo with InlineInfoBuilder
+                                                   args+2);
     if (newInst != NULL) {
-        assert(inst->getCallInstInlineInfoPtr() && inst->getCallInstInlineInfoPtr());
-        newInst->getCallInstInlineInfoPtr()->getInlineChainFrom(*inst->getCallInstInlineInfoPtr());
         return newInst;
     }
     return inst;
@@ -3972,6 +3963,7 @@ SimplifierWithInstFactory::optimizeInst(Inst* inst) {
 void
 SimplifierWithInstFactory::insertInst(Inst* inst) {
     inst->insertBefore(nextInst);
+    inst->setBCOffset(nextInst->getBCOffset());
 }
 
 void
@@ -4202,8 +4194,7 @@ SimplifierWithInstFactory::genDirectCall(
                                       Opnd* tauNullCheckedFirstArg,
                                       Opnd* tauTypesChecked,
                                      uint32 numArgs,
-                                      Opnd* args[],
-                         InlineInfoBuilder* inlineBuilder)
+                                      Opnd* args[])
 {
     Opnd* dst;
     if (returnType->tag == Type::Void) {
@@ -4215,11 +4206,6 @@ SimplifierWithInstFactory::genDirectCall(
                                             tauNullCheckedFirstArg, tauTypesChecked,
                                             numArgs, args, 
                                             methodDesc);
-    if ( inlineBuilder ) {
-        uint32 callOffset = ILLEGAL_BC_MAPPING_VALUE;
-        inlineBuilder->buildInlineInfoForInst(inst, callOffset, methodDesc);
-    }
-
     insertInst(inst);
     return inst;
 }

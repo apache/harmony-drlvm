@@ -97,9 +97,7 @@ void ValueProfilerInstrumentationPass::_run(IRManager& irm)
                         continue;
                     }
                 }
-                void* bc2HIRMapHandler = getContainerHandler(bcOffset2HIRHandlerName, &md);
-                uint32 callInstId = lastInst->getId();
-                key = (uint32)getBCMappingEntry(bc2HIRMapHandler, callInstId);
+                key = (uint32)lastInst->getBCOffset();
                 assert(key != ILLEGAL_BC_MAPPING_VALUE);
                 assert(key != 0);
                 if (debug) {
@@ -113,6 +111,7 @@ void ValueProfilerInstrumentationPass::_run(IRManager& irm)
                 const uint32 numArgs = 2;
                 Opnd* args[numArgs] = {indexOpnd, valueOpnd};
                 Inst* addValueInst = instFactory.makeJitHelperCall(opndManager.getNullOpnd(), AddValueProfileValue, numArgs, args);
+                addValueInst->setBCOffset(call->getBCOffset());
                 ((CFGInst *)addValueInst)->insertBefore(call);
                 ((CFGInst *)loadIndexInst)->insertBefore(addValueInst);
             }

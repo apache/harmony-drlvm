@@ -220,29 +220,6 @@ private:
 
     typedef StlMap<uint32, Inst*> OffsetToInstMap;
 
-    class JavaInlineInfoBuilder : public InlineInfoBuilder {
-    public:
-        JavaInlineInfoBuilder(InlineInfoBuilder* parent, 
-                MethodDesc& thisMethodDesc, uint32 byteCodeOffset) :
-            InlineInfoBuilder(parent), methodDesc(thisMethodDesc), 
-                bcOffset(byteCodeOffset)
-        {}
-
-    virtual uint32 getCurrentBcOffset() { return bcOffset; }; 
-    virtual MethodDesc* getCurrentMd() { return &methodDesc; }; 
-
-    private:
-        virtual void addCurrentLevel(InlineInfo* ii, uint32 currOffset)
-        {
-            ii->addLevel(&methodDesc, currOffset);
-        }
-        virtual void setCurrentBcOffset(uint32 offSet) { bcOffset = offSet; };
-
-
-        MethodDesc& methodDesc;
-        uint32 bcOffset;
-    };
-
     //
     // helper methods for generating code
     //
@@ -417,7 +394,6 @@ private:
     // Synchronization
     Opnd*               lockAddr;
     Opnd*               oldLockValue;
-    JavaInlineInfoBuilder  thisLevelBuilder;
     
     //
     // mapping: 

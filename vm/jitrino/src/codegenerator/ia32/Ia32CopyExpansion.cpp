@@ -340,11 +340,6 @@ static ActionFactory<CopyExpansion> _copy("copy");
 void CopyExpansion::runImpl()
 {
     CompilationInterface& compIntfc = irManager->getCompilationInterface();
-    void* bc2LIRmapHandler = NULL;
-
-    if (compIntfc.isBCMapInfoRequired()) {
-        bc2LIRmapHandler = getContainerHandler(bcOffset2LIRHandlerName, compIntfc.getMethodToCompile());
-    }
 
     // call SimpleStackOpndCoalescer before all other things including finalizeCallSites
     // as they add new local operands and fixLivenessInfo would be necessary 
@@ -417,15 +412,13 @@ void CopyExpansion::runImpl()
                     }
                     // CopyPseudoInst map entries should be changed by new copy sequence instructions in byte code map
                     if (compIntfc.isBCMapInfoRequired() && copySequence != NULL) {
-                        uint32 instID = inst->getId();
-                        uint16 bcOffs = getBCMappingEntry(bc2LIRmapHandler, instID);
+                        uint16 bcOffs = inst->getBCOffset();
                         if (bcOffs != ILLEGAL_BC_MAPPING_VALUE) {
                             Inst * cpInst=NULL, * nextCpInst=copySequence, * lastCpInst=copySequence->getPrev(); 
                             do { 
                                 cpInst=nextCpInst;
                                 nextCpInst=cpInst->getNext();
-                                uint32 cpInstID = cpInst->getId();
-                                setBCMappingEntry(bc2LIRmapHandler, cpInstID, bcOffs);
+                                cpInst->setBCOffset(bcOffs);
                             } while ((cpInst != lastCpInst) && (cpInst != NULL));
                         }
                     }

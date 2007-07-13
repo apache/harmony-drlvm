@@ -164,7 +164,7 @@ public:
     { IRPrinter p; p.setStream(os); p.printNodeName(node); }
 
     virtual void printNodeHeader(const Node * node, uint32 indent=0);
-    virtual void printNodeInstList(const BasicBlock * bb, uint32 indent=0);
+    virtual void printNodeInstList(const Node* bb, uint32 indent=0);
 
     virtual void printNode(const Node * node, uint32 indent=0);
     static void printNode(::std::ostream& os, const Node * node, uint32 indent=0)

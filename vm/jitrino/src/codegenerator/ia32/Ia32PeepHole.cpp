@@ -180,7 +180,7 @@ PeepHoleOpt::Changed PeepHoleOpt::handleInst(Inst* inst)
 {
     PeepHoleOpt::Changed temp;
 
-    if (isPseudoInst(inst)) {
+    if (inst->hasKind(Inst::Kind_PseudoInst)) {
         return Changed_Nothing;
     }
 
@@ -584,7 +584,7 @@ PeepHoleOpt::Changed PeepHoleOpt::handleInst_SSEMov(Inst* inst)
     if (isReg(dst) && equals(src, dst)) {
         // what: same register moved around
         // why:  useless thing
-        removeInst(inst);
+        inst->unlink();
         return Changed_Inst;
     }
     

@@ -579,7 +579,7 @@ void InfoBlockWriter::runImpl() {
     CompilationInterface& compIntf = irManager->getCompilationInterface();
 
     if ( !inlineInfo->isEmpty() ) {
-        inlineInfo->write(compIntf.allocateJITDataBlock(inlineInfo->computeSize(), 8));
+        inlineInfo->write(compIntf.allocateJITDataBlock(inlineInfo->getImageSize(), 8));
     }
 
     uint32 stackInfoSize = (uint32)stackInfo->getByteSize();

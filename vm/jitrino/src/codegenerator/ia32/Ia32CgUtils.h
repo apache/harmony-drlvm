@@ -196,10 +196,9 @@ private:
 
 class InstUtils : virtual protected IRManagerHolder {
 public:
-    static bool isPseudoInst(const Inst*);
-    static void removeInst(Inst* toBeRemoved);
     static void replaceInst(Inst* old, Inst* brandNewInst);
     static void replaceOpnd(Inst* inst, unsigned index, Opnd* newOpnd);
+    static bool instMustHaveBCMapping(Inst* inst);
 };
 
 class SubCfgBuilderUtils : virtual protected IRManagerHolder {

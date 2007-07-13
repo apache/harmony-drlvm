@@ -33,7 +33,6 @@
 #include "XTimer.h"
 #include "Log.h"
 #include "PlatformDependant.h"
-#include "CGSupport.h"
 #include "CompilationContext.h"
 #include "JITInstanceContext.h"
 #include "PMFAction.h"
@@ -205,11 +204,11 @@ public:
 
     /** Creates a CallInst instance. */
     CallInst *  newCallInst(Opnd * targetOpnd, const CallingConvention * cc, 
-        uint32 numArgs, Opnd ** args, Opnd * retOpnd, InlineInfo* ii = NULL);
+        uint32 numArgs, Opnd ** args, Opnd * retOpnd);
 
     /** A specialization of the newCallInst to create a VM Helper CallInst. */
     CallInst *  newRuntimeHelperCallInst(CompilationInterface::RuntimeHelperId helperId, 
-        uint32 numArgs, Opnd ** args, Opnd * retOpnd, InlineInfo* ii = NULL);
+        uint32 numArgs, Opnd ** args, Opnd * retOpnd);
     /** A specialization of the newCallInst to create an internal helper CallInst. */
     CallInst *  newInternalRuntimeHelperCallInst(const char * internalHelperID, uint32 numArgs, Opnd ** args, Opnd * retOpnd);
 

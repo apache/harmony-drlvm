@@ -49,8 +49,8 @@ private:
     void         eliminateUnnestedLoopsOnDispatch();
     bool         lastInstIsMonitorExit(Node* node);
 
-    Node* createBlockNodeOrdered(LabelInst* label = NULL);
-    Node* createBlockNodeAfter(Node* node, LabelInst* label = NULL);
+    Node* createBlockNodeOrdered(LabelInst* label);
+    Node* createBlockNodeAfter(Node* node, LabelInst* label);
     void addEdge(Node* source, Node* target);
 
     //
@@ -62,6 +62,7 @@ private:
     IRBuilder&      irBuilder;
 typedef StlList<Node*> NodeList;
     NodeList fallThruNodes;
+    void*    methodHandle;
 };
 
 

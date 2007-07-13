@@ -31,7 +31,6 @@
 #include "Inst.h"
 #include "CSEHash.h"
 #include "simplifier.h"
-#include "InlineInfo.h"
 #include "IRBuilderFlags.h"
 #include "PMFAction.h"
 
@@ -140,24 +139,21 @@ public:
                         Opnd* tauNullCheckedFirstArg, // 0 for unsafe
                         Opnd* tauTypesChecked,        // 0 to let IRBuilder find taus
                         uint32 numArgs,
-                        Opnd* args[],
-                        InlineInfoBuilder* inlineInfoBuilder);     // NULL if this call is not inlined
+                        Opnd* args[]);
    
    Opnd* genTauVirtualCall(MethodDesc* methodDesc,//TR
                                   Type* returnType,
                                   Opnd* tauNullCheckedFirstArg, // 0 to let IRBuilder add check
                                   Opnd* tauTypesChecked,        // 0 to let IRBuilder find it
                                   uint32 numArgs,
-                                  Opnd* args[],
-                                  InlineInfoBuilder* inlineInfoBuilder);     // NULL if this call is not inlined
+                                  Opnd* args[]);
 
     Opnd* genIndirectCall(      Type* returnType, //TR
                                   Opnd* funAddr,
                                   Opnd* tauNullCheckedFirstArg, // 0 for unsafe
                                   Opnd* tauTypesChecked,        // 0 to let IRBuilder find it
                                  uint32 numArgs,
-                                  Opnd* args[],
-                     InlineInfoBuilder* inlineInfoBuilder);     // NULL if this call is not inlined
+                                  Opnd* args[]);
 
     Opnd*  genIntrinsicCall(
                         IntrinsicCallId intrinsicId, //TR
@@ -273,9 +269,6 @@ public:
     void       genFallThroughLabel(LabelInst* labelInst); //TR
     // method entry/exit
     LabelInst* genMethodEntryLabel(MethodDesc* methodDesc);//TR
-    void       genMethodEntryMarker(MethodDesc* methodDesc);//TR
-    void       genMethodEndMarker(MethodDesc* methodDesc, Opnd *obj, Opnd *retOpnd);//TR
-    void       genMethodEndMarker(MethodDesc* methodDesc, Opnd *retOpnd);//TR
     // value object instructions
     Opnd*      genLdObj(Type* type, Opnd* addrOfValObj);//TR
     void       genStObj(Opnd* addrOfDstVal, Opnd* srcVal, Type* type);//TR
@@ -340,8 +333,7 @@ public:
                                      Opnd* tauNullCheckedFirstArg, // 0 to let IRBuilder add check
                                      Opnd* tauTypesChecked,        // 0 to let IRBuilder find it
                                      uint32 numArgs,
-                                     Opnd* args[],
-                                     InlineInfoBuilder* inlineInfoBuilder);     // NULL if this call is not inlined
+                                     Opnd* args[]);
 
     Opnd*      genLdElemAddrNoChecks(Type *elemType, Opnd* array, Opnd* index);
     Opnd*      genTauLdVirtFunAddrSlot(Opnd* base, Opnd* tauOk, MethodDesc* methodDesc);
@@ -401,9 +393,6 @@ public:
     // checks
     void       genSourceLineNumber(uint32 fileId, uint32 lineNumber);
 
-protected:
-    void appendInstUpdateInlineInfo(Inst* inst, InlineInfoBuilder* builder, MethodDesc* target_md);
-
 private:
 
     void readFlagsFromCommandLine(SessionAction* argSource, const char* argPrefix);
@@ -439,8 +428,8 @@ private:
     void     insertHash(uint32 opc, Opnd* op1, Opnd* op2, Inst*i) { insertHash(opc, op1->getId(), op2->getId(), i); };
     void     insertHash(uint32 opc, Opnd* op1, Opnd* op2, Opnd* op3, Inst*i) { insertHash(opc, op1->getId(), op2->getId(), op3->getId(), i); };
     void     invalid();    // called when the builder detects invalid IR
-    void setBcOffset(uint32 bcOffset) {  offset =  bcOffset; };
-    uint32 getBcOffset() {  return offset; };
+    void     setBcOffset(uint32 bcOffset) {  offset =  bcOffset;}
+    uint32   getBcOffset() const {  return offset; };
 
     friend class    JavaByteCodeTranslator;
     
@@ -472,7 +461,6 @@ private:
 
     // current bc offset
     uint32 offset;
-    void* bc2HIRmapHandler;
 };
 
 } //namespace Jitrino 

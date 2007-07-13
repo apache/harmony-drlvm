@@ -431,9 +431,11 @@ CG_OpndHandle ** _BlockCodeSelector::genCallArgs(Opnd *extraArg, Inst * call, ui
     return args;
 }
 
-void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback,
-                                     Inst *inst, bool genConsts)
+void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback, Inst *inst, bool genConsts) 
 {
+    uint16 bcOffset = inst->getBCOffset();
+    instructionCallback.setCurrentHIRInstBCOffset(bcOffset);
+
     if(Log::isEnabled()) {
         Log::out() << "genInstCode ";
         inst->print(Log::out());
@@ -792,8 +794,7 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback,
                     inst->getDst()->getType(),
                     methodDesc,
                     getCGInst(tauNullChecked),
-                    getCGInst(tauTypesChecked),
-                    call->getInlineInfoPtr());
+                    getCGInst(tauTypesChecked));
             }
             break;
         case Op_TauVirtualCall:
@@ -812,8 +813,7 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback,
                     inst->getDst()->getType(),
                     methodDesc,
                     getCGInst(tauNullChecked),
-                    getCGInst(tauTypesChecked),
-                    call->getInlineInfoPtr());
+                    getCGInst(tauTypesChecked));
             }
             break;
         case Op_IndirectCall:
@@ -825,15 +825,13 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback,
                 assert(tauNullChecked->getType()->tag == Type::Tau);
                 assert(tauTypesChecked->getType()->tag == Type::Tau);
                 assert(inst->isCall());
-                CallInst * call = inst->asCallInst();
                 cgInst = 
                     instructionCallback.tau_calli(inst->getNumSrcOperands() - 3, // omit taus and fnAddr
                     genCallArgs(inst, 3), // omit taus and fnAddr
                     inst->getDst()->getType(),
                     getCGInst(fnAddr),
                     getCGInst(tauNullChecked),
-                    getCGInst(tauTypesChecked),
-                    call->getInlineInfoPtr());
+                    getCGInst(tauTypesChecked));
             }
             break;
         case Op_IndirectMemoryCall:
@@ -845,15 +843,13 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback,
                 assert(tauNullChecked->getType()->tag == Type::Tau);
                 assert(tauTypesChecked->getType()->tag == Type::Tau);
                 assert(inst->isCall());
-                CallInst * call = inst->asCallInst();
                 cgInst = 
                     instructionCallback.tau_calli(inst->getNumSrcOperands() - 3, // omit taus andfnAddr
                     genCallArgs(inst, 3), // omit taus and fnAddr
                     inst->getDst()->getType(),
                     getCGInst(fnAddr),
                     getCGInst(tauNullChecked),
-                    getCGInst(tauTypesChecked),
-                    call->getInlineInfoPtr());
+                    getCGInst(tauTypesChecked));
             }
             break;
         case Op_IntrinsicCall:
@@ -2101,10 +2097,6 @@ void _BlockCodeSelector::genCode(InstructionCallback& instructionCallback) {
             inst->print(Log::out());
             Log::out() << ::std::endl;
         }
-        if (irmanager.getCompilationInterface().isBCMapInfoRequired()) {
-            uint32 instID = inst->getId();
-            instructionCallback.setCurrentHIRInstrID(instID);
-        }
         genInstCode(instructionCallback, inst, !sinkConstants);
         inst = inst->getNextInst();
     }
@@ -2116,9 +2108,11 @@ CG_OpndHandle* _BlockCodeSelector::getCGInst(Opnd* opnd) {
         assert(sinkConstants);
         res = localOpndToCGInstMap[opnd->getId()];
         if (!res) {
+            uint16 savedBCOffset = callback->getCurrentHIRInstBCOffset();
             genInstCode(*callback, opnd->getInst(), true); // generate code for the constant
             res = localOpndToCGInstMap[opnd->getId()];
             assert(res);
+            callback->setCurrentHIRInstBCOffset(savedBCOffset);
         }
     }
     return res;
@@ -2157,18 +2151,17 @@ void _CFGCodeSelector::genCode(Callback& callback) {
     // this table maps from a node's depth-first number to the 
     // node id returned by the code selector
     //
+    StlVector<MethodDesc*> inlineEndMarkers(memManager);
     uint32*    nodeMapTable = new (memManager) uint32[numNodes];
-    ::std::vector<Node*> nodes;
-    nodes.reserve(numNodes);
-
+    
     // Compute postorder list to get only reachable nodes.
-    flowGraph->getNodesPostOrder(nodes);
+    const Nodes& nodes = flowGraph->getNodesPostOrder();
 
     assert(flowGraph->getExitNode()->getTraversalNum() == flowGraph->getTraversalNum());
     Node* unwind = flowGraph->getUnwindNode();
     Node* exit = flowGraph->getExitNode();
     // Use reverse iterator to generate nodes in reverse postorder.
-    ::std::vector<Node*>::reverse_iterator niter;
+    Nodes::const_reverse_iterator niter;
     for(niter = nodes.rbegin(); niter != nodes.rend(); ++niter) {
         Node* node = *niter;
         //
@@ -2212,7 +2205,16 @@ void _CFGCodeSelector::genCode(Callback& callback) {
                 cnt);
 
         } else if (node->isDispatchNode()) {
-            nodeId = callback.genDispatchNode(numInEdges,numOutEdges,cnt);
+            if(node->getSecondInst()!=NULL) {
+                for (Inst* inst = (Inst*)node->getSecondInst(); inst!=NULL; inst = inst->getNextInst()) {
+                    assert(inst->isMethodMarker());
+                    MethodMarkerInst* marker = inst->asMethodMarkerInst();
+                    assert(marker->getOpcode() == Op_MethodEnd);
+                    inlineEndMarkers.push_back(marker->getMethodDesc());
+                }
+            }
+            nodeId = callback.genDispatchNode(numInEdges,numOutEdges,inlineEndMarkers, cnt);
+            inlineEndMarkers.clear();
         }
         assert(nodeId < numNodes);
         callback.setPersistentId(nodeId, node->getId());

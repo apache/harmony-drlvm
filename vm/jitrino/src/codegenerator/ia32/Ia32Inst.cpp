@@ -20,7 +20,6 @@
 
 #include "Ia32Inst.h"
 #include "Ia32IRManager.h"
-#include "InlineInfo.h"
 #include "Ia32CFG.h"
 
 namespace Jitrino
@@ -584,6 +583,9 @@ void Inst::makeNative(IRManager * irManager)
 //_________________________________________________________________________________________________
 void * Inst::getCodeStartAddr() const 
 {
+    if (hasKind(Inst::Kind_PseudoInst)) {
+        return (void*)0xDEADBEEF;
+    }
     BasicBlock* bb = getBasicBlock();
     return bb!=NULL?(uint8*)bb->getCodeStartAddr()+codeOffset:0;
 }
@@ -905,12 +907,9 @@ Opnd * EntryPointPseudoInst::getDefArg(uint32 i)const
 // class CallInst
 //=================================================================================================
 //_________________________________________________________________________________________________
-CallInst::CallInst(IRManager * irm, int id, const CallingConvention * cc, InlineInfo* ii, Opnd::RuntimeInfo* rri)  
-        : ControlTransferInst(Mnemonic_CALL, id), callingConventionClient(irm->getMemoryManager(), cc), inlineInfo(NULL), runtimeInfo(rri)
+CallInst::CallInst(IRManager * irm, int id, const CallingConvention * cc, Opnd::RuntimeInfo* rri)  
+        : ControlTransferInst(Mnemonic_CALL, id), callingConventionClient(irm->getMemoryManager(), cc), runtimeInfo(rri)
 { 
-    if (ii && (!ii->isEmpty()) ) {
-        inlineInfo = ii;
-    }
     kind=Kind_CallInst; 
     callingConventionClient.setOwnerInst(this); 
 }

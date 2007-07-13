@@ -99,12 +99,18 @@ Node * JavaFlowGraphBuilder::edgesForBlock(Node* block) {
     for (Inst* inst = first->getNextInst(); inst != NULL; inst = inst->getNextInst()) {
         if (lastExceptionalInstSeen != NULL) {
             // start a new basic block
-            Node *newblock = createBlockNodeAfter(block); 
+            LabelInst* label = irBuilder.getInstFactory()->makeLabel();
+            Node *newblock = createBlockNodeAfter(block, label); 
+            uint16 bcOffset = ILLEGAL_BC_MAPPING_VALUE;
             for (Inst *ins = lastExceptionalInstSeen->getNextInst(), *nextIns = NULL; ins!=NULL; ins = nextIns) {
                 nextIns = ins->getNextInst();
                 ins->unlink();
                 newblock->appendInst(ins);
+                if (bcOffset == ILLEGAL_BC_MAPPING_VALUE) {
+                    bcOffset = ins->getBCOffset();
+                }
             }
+            label->setBCOffset(bcOffset);
 
             // now fix up the CFG, duplicating edges
             if (!lastExceptionalInstSeen->isThrow())
@@ -222,9 +228,7 @@ void JavaFlowGraphBuilder::createCFGEdges() {
 }
 
 Node* JavaFlowGraphBuilder::createBlockNodeOrdered(LabelInst* label) {
-    if (label == NULL) {
-        label = irBuilder.getInstFactory()->makeLabel();
-    }
+    assert(label != NULL);
     Node* node = fg->createBlockNode(label);
     fallThruNodes.push_back(node);
     return node;
@@ -233,9 +237,7 @@ Node* JavaFlowGraphBuilder::createBlockNodeOrdered(LabelInst* label) {
 Node* JavaFlowGraphBuilder::createBlockNodeAfter(Node* node, LabelInst* label) {
     NodeList::iterator it = std::find(fallThruNodes.begin(), fallThruNodes.end(), node);
     assert(it!=fallThruNodes.end());
-    if (label == NULL) {
-        label = irBuilder.getInstFactory()->makeLabel();
-    }
+    assert(label != NULL);
     label->setState(((LabelInst*)node->getFirstInst())->getState());
     Node* newNode = fg->createBlockNode(label);
     fallThruNodes.insert(++it, newNode);
@@ -262,7 +264,7 @@ void JavaFlowGraphBuilder::build() {
     // create epilog, unwind, and exit
     //
     InstFactory* instFactory = irBuilder.getInstFactory();
-    fg->setReturnNode(createBlockNodeOrdered());
+    fg->setReturnNode(createBlockNodeOrdered(instFactory->makeLabel()));
     fg->setUnwindNode(createDispatchNode());
     fg->setExitNode(fg->createNode(Node::Kind_Exit, instFactory->makeLabel()));
     fg->addEdge(fg->getReturnNode(), fg->getExitNode());
@@ -427,11 +429,11 @@ void JavaFlowGraphBuilder::eliminateUnnestedLoopsOnDispatch()
                if ( !dispatch_target->isCatchBlock() ) {
                    fg->addEdge(dup_dispatch, dispatch_target);
                }else{
-                   CatchLabelInst* catch_label = 
-                       (CatchLabelInst*)dispatch_target->getFirstInst();
+                   CatchLabelInst* catch_label = (CatchLabelInst*)dispatch_target->getFirstInst();
                    assert(dispatch_target->getInstCount() == 0);
-                   Node* dup_catch = createBlockNodeOrdered(
-                           instFactory->makeCatchLabel( catch_label->getOrder(), catch_label->getExceptionType()));
+                   LabelInst* dupCatchInst = instFactory->makeCatchLabel( catch_label->getOrder(), catch_label->getExceptionType());
+                   dupCatchInst->setBCOffset(catch_label->getBCOffset());
+                   Node* dup_catch = createBlockNodeOrdered(dupCatchInst);
                    fg->addEdge(dup_dispatch, dup_catch);
                    assert(dispatch_target->getOutDegree() == 1);
                    fg->addEdge(dup_catch, (*dispatch_target->getOutEdges().begin())->getTargetNode());
@@ -456,6 +458,7 @@ JavaFlowGraphBuilder::JavaFlowGraphBuilder(MemoryManager& mm, IRBuilder &irB) :
     memManager(mm), currentBlock(NULL), irBuilder(irB), fallThruNodes(mm)
 {
     fg = irBuilder.getFlowGraph();
+    methodHandle = irBuilder.getIRManager()->getMethodDesc().getMethodHandle();
 }
 
 } //namespace Jitrino 

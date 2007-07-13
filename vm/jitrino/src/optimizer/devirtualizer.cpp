@@ -239,14 +239,7 @@ Devirtualizer::genGuardedDirectCall(IRManager &regionIRM, Node* node, Inst* call
                                                    tauNullChecked,
                                                    tauTypesChecked,
                                                    numArgs, args, methodDesc);
-    //
-    // copy InlineInfo
-    //
-    InlineInfo* call_ii = call->getCallInstInlineInfoPtr();
-    InlineInfo* new_ii = directCall->getCallInstInlineInfoPtr();
-    assert(call_ii && new_ii);
-    new_ii->getInlineChainFrom(*call_ii);
-    
+    directCall->setBCOffset(call->getBCOffset());
     directCallBlock->appendInst(directCall);
 
     //
@@ -277,6 +270,7 @@ Devirtualizer::genGuardedDirectCall(IRManager &regionIRM, Node* node, Inst* call
             Type* type = ldVTable->asTypeInst()->getTypeInfo();
             Opnd* vtable2 = _opndManager.createSsaTmpOpnd(vtable->getType());
             Inst* ldVTable2 = _instFactory.makeTauLdIntfcVTableAddr(vtable2, slot, type);
+            ldVTable2->setBCOffset(ldVTable->getBCOffset());
             ldSlot2->setSrc(0, vtable2);
             ldVTable2->insertBefore(ldSlot2);
         }
@@ -412,12 +406,9 @@ Devirtualizer::getTopProfiledCalleeType(IRManager& regionIRM, MethodDesc *origMe
     if (Log::isLogEnabled(LogStream::DBG)) {
         mp->dumpValues(Log::out());
     }
-    MethodDesc* rootMethodDesc = regionIRM.getCompilationInterface().getMethodToCompile();
 
     // Get bytecode offset of the call
-    void* bc2HIRMapHandler = getContainerHandler(bcOffset2HIRHandlerName, rootMethodDesc);
-    uint32 callInstId = call->getId();
-    uint16 bcOffset = getBCMappingEntry(bc2HIRMapHandler, callInstId);
+    uint16 bcOffset = call->getBCOffset();
     assert(bcOffset != 0);
     assert(bcOffset != ILLEGAL_BC_MAPPING_VALUE);
     Log::out() << "Call instruction bcOffset = " << (int32)bcOffset << std::endl;

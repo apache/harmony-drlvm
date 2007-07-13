@@ -24,7 +24,6 @@
 
 #include "CodeGenIntfc.h"
 #include "Ia32CodeSelector.h"
-#include "CGSupport.h"
 namespace Jitrino
 {
 namespace Ia32{
@@ -210,23 +209,22 @@ public:
     CG_OpndHandle* getVTableAddr(Type *dstType, ObjectType *base);
     CG_OpndHandle* tau_ldIntfTableAddr(Type *dstType, CG_OpndHandle* base,NamedType* vtableTypeDesc);
     CG_OpndHandle* calli(uint32 numArgs,CG_OpndHandle** args, Type* retType,
-                         CG_OpndHandle* methodPtr, InlineInfo* ii = NULL);
+                         CG_OpndHandle* methodPtr);
     CG_OpndHandle* tau_calli(uint32 numArgs,CG_OpndHandle** args, Type* retType,
                              CG_OpndHandle* methodPtr, CG_OpndHandle* nonNullFirstArgTau,
-                             CG_OpndHandle* tauTypesChecked, InlineInfo* ii = NULL);
-    CG_OpndHandle* call(uint32 numArgs, CG_OpndHandle** args, Type* retType,
-                        MethodDesc *desc, InlineInfo* ii = NULL);
+                             CG_OpndHandle* tauTypesChecked);
+    CG_OpndHandle* call(uint32 numArgs, CG_OpndHandle** args, Type* retType, MethodDesc *desc);
     CG_OpndHandle* arraycopyReverse(uint32 numArgs, CG_OpndHandle** args);
     CG_OpndHandle* arraycopy(uint32 numArgs, CG_OpndHandle** args);
     CG_OpndHandle* tau_call(uint32 numArgs, CG_OpndHandle** args, Type* retType,
                             MethodDesc *desc, CG_OpndHandle *nonNullFirstArgTau,
-                            CG_OpndHandle *tauTypesChecked, InlineInfo* ii = NULL);
-    CG_OpndHandle* tau_callvirt(uint32 numArgs,CG_OpndHandle** args, Type* retType, MethodDesc *desc,             CG_OpndHandle* tauNullChecked, CG_OpndHandle* tauTypesChecked, InlineInfo* ii = NULL);
+                            CG_OpndHandle *tauTypesChecked);
+    CG_OpndHandle* tau_callvirt(uint32 numArgs,CG_OpndHandle** args, Type* retType, MethodDesc *desc,             CG_OpndHandle* tauNullChecked, CG_OpndHandle* tauTypesChecked);
     CG_OpndHandle* callintr(uint32 numArgs, CG_OpndHandle** args, Type* retType,IntrinsicCallOp::Id callId);
     CG_OpndHandle* tau_callintr(uint32 numArgs, CG_OpndHandle** args, Type* retType,IntrinsicCallOp::Id callId,      CG_OpndHandle *tauNullsChecked, CG_OpndHandle *tauTypesChecked);
     CG_OpndHandle* callhelper(uint32 numArgs, CG_OpndHandle** args, Type* retType,JitHelperCallOp::Id callId);
     CG_OpndHandle* callvmhelper(uint32 numArgs, CG_OpndHandle** args, Type* retType,
-                                CompilationInterface::RuntimeHelperId callId, InlineInfo* ii = NULL);
+                                CompilationInterface::RuntimeHelperId callId);
     
     CG_OpndHandle* box(ObjectType * boxedType, CG_OpndHandle* val);
     CG_OpndHandle* unbox(Type * dstType, CG_OpndHandle* objHandle);
@@ -309,14 +307,13 @@ public:
     //
     // Set current HIR instruction in order to allow Code Generator propagate bc offset info
     //
-    virtual void setCurrentHIRInstrID(uint32 HIRInstrID) {
-        currentHIRInstrID =  HIRInstrID;
-    }
+    virtual void   setCurrentHIRInstBCOffset(uint16 val) { currentHIRInstBCOffset =  val; }
+    virtual uint16 getCurrentHIRInstBCOffset() const { return currentHIRInstBCOffset; }
 private: 
     //
-    // pointer to HIR instruction with bytecode offset 
+    // info about current HIR instruction bytecode offset 
     //
-    uint32 currentHIRInstrID;
+    uint16 currentHIRInstBCOffset;
 
     Opnd *  convertIntToInt(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd=NULL, bool isZeroExtend=false);
     Opnd *  convertIntToFp(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd=NULL);

@@ -231,6 +231,8 @@ protected:
     double prob;
 };
 
+
+#define ILLEGAL_BC_MAPPING_VALUE 0xFFFF
   /** 
    * The base abstract class for all CFG instructions.
    * The given class keeps information about the node this instruction belongs
@@ -352,6 +354,12 @@ public:
    */
     virtual bool isLabel() const {return false;}
 
+    /// Returns byte-code offset the inst
+    uint16 getBCOffset() const { return bcOffset;}
+
+    /// Sets byte-code offset the inst
+    void setBCOffset(uint16 newVal) {bcOffset = newVal;}
+
 protected:
     /// Called from CFG to detect edge kinds for BN to BN edges.
     virtual Edge::Kind getEdgeKind(const Edge* edge) const = 0;
@@ -366,10 +374,13 @@ protected:
    * Initializes the Node instance field with the <code>NULL</code> 
    * value.
    */
-    CFGInst() : node(NULL) {}
+    CFGInst() : node(NULL), bcOffset(ILLEGAL_BC_MAPPING_VALUE) {}
 
     /// The owner node of the instruction.
     Node* node;
+
+    ///offset in byte-code
+    uint16 bcOffset;
 };
 
   /** 
@@ -1097,7 +1108,7 @@ public:
    *
    * @return The <code>Unwind</code> node of the graph.
    */
-    void setUnwindNode(Node* node) {assert(unwindNode==NULL); assert(node->isDispatchNode()); unwindNode = node;}
+    void setUnwindNode(Node* node) {assert(node->isDispatchNode()); unwindNode = node;}
 
   /** 
    * Gets the maximum node ID. 

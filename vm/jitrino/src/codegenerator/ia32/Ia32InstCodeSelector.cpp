@@ -26,6 +26,7 @@
 #include "VMInterface.h"
 #include "Opcode.h"
 #include "Ia32Tls.h"
+#include "Ia32CgUtils.h"
 
 #include <float.h>
 #include <math.h>
@@ -202,13 +203,8 @@ InstCodeSelector(CompilationInterface&          compIntfc,
 Inst * InstCodeSelector::appendInsts(Inst *inst)
 {
     assert(currentBasicBlock);
-    if (compilationInterface.isBCMapInfoRequired()) {
-        uint16 bcOffset = getBCMappingEntry(codeSelector.bc2HIRmapHandler, currentHIRInstrID);
-        uint32 insID = inst->getId();
-        if (bcOffset != ILLEGAL_BC_MAPPING_VALUE) {
-            setBCMappingEntry(codeSelector.bc2LIRmapHandler, insID, bcOffset);
-        }
-    }
+    inst->setBCOffset(currentHIRInstBCOffset);
+    assert(!InstUtils::instMustHaveBCMapping(inst) || currentHIRInstBCOffset!=ILLEGAL_BC_MAPPING_VALUE);
     if (Log::isEnabled()){
         Inst * i=inst; 
         do {
@@ -1553,8 +1549,10 @@ CG_OpndHandle* InstCodeSelector::tau_checkBounds(CG_OpndHandle* arrayLen,
         cmpType = CompareOp::I;
 
     Node* throwBasicBlock = irManager.getFlowGraph()->createBlockNode();
-    throwBasicBlock->appendInst(irManager.newRuntimeHelperCallInst(
-                CompilationInterface::Helper_ArrayBoundsException, 0, NULL, NULL));
+    Inst* throwInst = irManager.newRuntimeHelperCallInst(CompilationInterface::Helper_ArrayBoundsException, 0, NULL, NULL);
+    throwInst->setBCOffset(currentHIRInstBCOffset);
+    throwBasicBlock->appendInst(throwInst);
+                
 
     branch(CompareOp::Geu, cmpType, (Opnd*)index, (Opnd*)arrayLen);
     codeSelector.genTrueEdge(currentBasicBlock, throwBasicBlock, 0);
@@ -1585,8 +1583,10 @@ CG_OpndHandle* InstCodeSelector::tau_checkLowerBound(CG_OpndHandle* a,
         cmpOp = CompareOp::Gtu;
     }
     Node* throwBasicBlock = irManager.getFlowGraph()->createBlockNode();
-    throwBasicBlock->appendInst(irManager.newRuntimeHelperCallInst(
-                CompilationInterface::Helper_ArrayBoundsException, 0, NULL, NULL));
+    Inst* throwInst = irManager.newRuntimeHelperCallInst(CompilationInterface::Helper_ArrayBoundsException, 0, NULL, NULL);
+    throwInst->setBCOffset(currentHIRInstBCOffset);
+    throwBasicBlock->appendInst(throwInst);
+    
 
     branch(cmpOp, cmpType, (Opnd*)a, (Opnd*)b);
     codeSelector.genTrueEdge(currentBasicBlock, throwBasicBlock, 0);
@@ -1613,8 +1613,10 @@ CG_OpndHandle* InstCodeSelector::tau_checkElemType(CG_OpndHandle* array,
                                                       CG_OpndHandle* tauIsArray) 
 {
     Node* throwBasicBlock = irManager.getFlowGraph()->createBlockNode();
-    throwBasicBlock->appendInst(irManager.newRuntimeHelperCallInst(
-                CompilationInterface::Helper_ElemTypeException, 0, NULL, NULL));
+    Inst* throwInst = irManager.newRuntimeHelperCallInst(CompilationInterface::Helper_ElemTypeException, 0, NULL, NULL);
+    assert(currentHIRInstBCOffset!=ILLEGAL_BC_MAPPING_VALUE);
+    throwInst->setBCOffset(currentHIRInstBCOffset);
+    throwBasicBlock->appendInst(throwInst);
 
     Opnd * args[] = { (Opnd*)src, (Opnd*)array };
     Opnd * flag = irManager.newOpnd(typeManager.getInt32Type());
@@ -1634,8 +1636,10 @@ CG_OpndHandle* InstCodeSelector::tau_checkElemType(CG_OpndHandle* array,
 CG_OpndHandle*  InstCodeSelector::tau_checkZero(CG_OpndHandle* src) 
 {
     Node* throwBasicBlock = irManager.getFlowGraph()->createBlockNode();
-    throwBasicBlock->appendInst(irManager.newRuntimeHelperCallInst(
-                CompilationInterface::Helper_DivideByZeroException, 0, NULL, NULL));
+    Inst* throwInst = irManager.newRuntimeHelperCallInst(CompilationInterface::Helper_DivideByZeroException, 0, NULL, NULL);
+    assert(currentHIRInstBCOffset!=ILLEGAL_BC_MAPPING_VALUE);
+    throwInst->setBCOffset(currentHIRInstBCOffset);
+    throwBasicBlock->appendInst(throwInst);
     Opnd * srcOpnd = (Opnd*)src;
     Type * type = srcOpnd->getType();
     CompareZeroOp::Types opType = CompareZeroOp::I;
@@ -2441,8 +2445,7 @@ CG_OpndHandle*  InstCodeSelector::tau_ldIntfTableAddr(Type *         dstType,
 CG_OpndHandle* InstCodeSelector::calli(uint32            numArgs, 
                                           CG_OpndHandle**   args, 
                                           Type*             retType, 
-                                          CG_OpndHandle*    methodPtr,
-                                          InlineInfo*       ii)
+                                          CG_OpndHandle*    methodPtr)
 {
     return tau_calli(numArgs, args, retType, methodPtr, getTauUnsafe(), getTauUnsafe());
 }
@@ -2455,13 +2458,11 @@ CG_OpndHandle* InstCodeSelector::tau_calli(uint32        numArgs,
                                               Type*             retType, 
                                               CG_OpndHandle*    methodPtr,
                                               CG_OpndHandle*    nonNullFirstArgTau,
-                                              CG_OpndHandle*    tauTypesChecked,
-                                              InlineInfo*       ii)
+                                              CG_OpndHandle*    tauTypesChecked)
 {
     Opnd * target=irManager.newMemOpnd(typeManager.getUnmanagedPtrType(typeManager.getUIntPtrType()), (Opnd*)methodPtr);
     Opnd * retOpnd=createResultOpnd(retType);
-    CallInst * callInst=irManager.newCallInst(target, irManager.getDefaultManagedCallingConvention(), 
-        numArgs, (Opnd **)args, retOpnd, ii);
+    CallInst * callInst=irManager.newCallInst(target, irManager.getDefaultManagedCallingConvention(), numArgs, (Opnd **)args, retOpnd);
     appendInsts(callInst);
     return retOpnd;
 }
@@ -2474,8 +2475,7 @@ CG_OpndHandle* InstCodeSelector::tau_calli(uint32        numArgs,
 CG_OpndHandle* InstCodeSelector::call(uint32          numArgs, 
                                          CG_OpndHandle** args, 
                                          Type*           retType,
-                                         MethodDesc *    desc,
-                                         InlineInfo*       ii)
+                                         MethodDesc *    desc)
 {
     return tau_call(numArgs, args, retType, desc, getTauUnsafe(), getTauUnsafe());
 }
@@ -2574,8 +2574,7 @@ CG_OpndHandle* InstCodeSelector::tau_call(uint32          numArgs,
                                              Type*           retType,
                                              MethodDesc *    desc,
                                              CG_OpndHandle* tauNullCheckedFirstArg,
-                                             CG_OpndHandle* tauTypesChecked,
-                                             InlineInfo*       ii)
+                                             CG_OpndHandle* tauTypesChecked)
 {
     // target address here has Int32 type. On EM64T platform it can be larger, but this situations are managed
     // in Ia32CodeEmitter::postPass method (transforming direct calls into register form if target offset
@@ -2585,7 +2584,7 @@ CG_OpndHandle* InstCodeSelector::tau_call(uint32          numArgs,
     Opnd * target=irManager.newImmOpnd(typeManager.getInt32Type(), Opnd::RuntimeInfo::Kind_MethodDirectAddr, desc);
     Opnd * retOpnd=createResultOpnd(retType);
     CallInst * callInst=irManager.newCallInst(target, irManager.getDefaultManagedCallingConvention(), 
-        numArgs, (Opnd **)args, retOpnd, ii);
+        numArgs, (Opnd **)args, retOpnd);
     appendInsts(callInst);
     return retOpnd;
 }
@@ -2599,8 +2598,7 @@ CG_OpndHandle* InstCodeSelector::tau_callvirt(uint32          numArgs,
                                                  Type*           retType,
                                                  MethodDesc *    desc,
                                                  CG_OpndHandle * tauNullChecked,
-                                                 CG_OpndHandle * tauTypesChecked,
-                                                 InlineInfo*       ii)
+                                                 CG_OpndHandle * tauTypesChecked)
 {
     CG_OpndHandle * vtableAddr = NULL;
     NamedType* vtableType = desc->getParentType();
@@ -2746,8 +2744,7 @@ CG_OpndHandle* InstCodeSelector::callhelper(uint32              numArgs,
 CG_OpndHandle* InstCodeSelector::callvmhelper(uint32              numArgs, 
                                               CG_OpndHandle**     args, 
                                               Type*               retType,
-                                              CompilationInterface::RuntimeHelperId  callId,
-                                              InlineInfo* ii) 
+                                              CompilationInterface::RuntimeHelperId  callId) 
 {
     Opnd* dstOpnd=NULL;
     switch(callId) {
@@ -2764,7 +2761,7 @@ CG_OpndHandle* InstCodeSelector::callvmhelper(uint32              numArgs,
         hlpArgs[numArgs] = irManager.newImmOpnd(getRuntimeIdType(), 
                                                Opnd::RuntimeInfo::Kind_MethodRuntimeId, md);
         appendInsts(irManager.newRuntimeHelperCallInst(CompilationInterface::Helper_Throw_Lazy,
-                                                       numArgs+1, (Opnd**)hlpArgs, dstOpnd, ii));
+                                                       numArgs+1, (Opnd**)hlpArgs, dstOpnd));
         break;
     }
     case CompilationInterface::Helper_GetTLSBase:

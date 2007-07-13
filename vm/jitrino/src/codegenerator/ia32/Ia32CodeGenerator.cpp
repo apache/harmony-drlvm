@@ -115,15 +115,6 @@ void CodeGenerator::genCode(::Jitrino::SessionAction* sa, ::Jitrino::MethodCodeS
 #endif     
     cc->setLIRManager(irManager);
     
-    MethodDesc* meth = ci->getMethodToCompile();
-    if (ci->isBCMapInfoRequired()) {
-        void* hirMapping = getContainerHandler(bcOffset2HIRHandlerName, meth);
-        StlVector<uint16>* lirMap = new(mm) StlVector<uint16> (mm, 
-            getNumBCMapEntries(hirMapping) * ESTIMATED_LIR_SIZE_PER_HIR + 5, 
-            ILLEGAL_BC_MAPPING_VALUE);
-        addContainerHandler(lirMap, bcOffset2LIRHandlerName, meth);
-    }
-
     bool slowLdString = sa->getBoolArg("SlowLdString", false); 
     MemoryManager  codeSelectorMemManager("CodeGenerator::selectCode.codeSelectorMemManager");
     MethodCodeSelector    codeSelector(*ci, mm, codeSelectorMemManager, *irManager, slowLdString);

@@ -9,7 +9,7 @@
 struct Method;
 
 /**
- * Iformation about methods inlined to a given method.
+ * Information about methods inlined to a given method.
  * Instance of this class holds a collection of Entry objects.
  */
 class InlineInfo

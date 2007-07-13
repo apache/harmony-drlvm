@@ -33,7 +33,6 @@
 #include "Opcode.h"
 #include "Opnd.h"
 #include "Log.h"
-#include "InlineInfo.h"
 #include "ControlFlowGraph.h"
 
 #include "open/types.h"
@@ -364,8 +363,6 @@ public:
         operation.setNewModifier2(mod);
     }
 
-
-    InlineInfo* getCallInstInlineInfoPtr() const;
 
 protected:
     //
@@ -888,7 +885,6 @@ class MethodCallInst : public MethodInst {
 public:
     void visit(InstFormatVisitor& visitor)  {visitor.accept(this);}
     bool isMethodCall() const {return true;}
-    InlineInfo* getInlineInfoPtr() { return &inlineInfo; }
 
 private:
     friend class InstFactory;
@@ -899,10 +895,7 @@ private:
                    Opnd** args_,
                    MethodDesc* md,
                    MemoryManager& mem_mgr)
-        : MethodInst(op, mod, type, dst, nArgs, args_, md),
-          inlineInfo(mem_mgr)
-    {}
-    InlineInfo inlineInfo;
+        : MethodInst(op, mod, type, dst, nArgs, args_, md){}
 };
 
 // for call instructions
@@ -914,7 +907,6 @@ public:
     uint32  getNumArgs() const      {return getNumSrcOperands()-1;}
     Opnd*   getArg(uint32 argIndex) {return getSrc(argIndex+1);}
     Opnd**  getArgs()               {args[0] = srcs[1]; return args;}
-    InlineInfo* getInlineInfoPtr() { return &inlineInfo; }
 private:
     friend class InstFactory;
 
@@ -925,8 +917,7 @@ private:
              uint32 nArgs,
              Opnd** args_,
              MemoryManager& mem_mgr)
-        : Inst(op, mod, type, dst, nArgs+1),
-          inlineInfo(mem_mgr)
+        : Inst(op, mod, type, dst, nArgs+1)
     {
         args = args_;
         switch (nArgs) {
@@ -944,7 +935,6 @@ private:
         args[srcIndex - 1] = src;
     }
     Opnd**    args;
-    InlineInfo inlineInfo;
 };
 
 // intrinsic calls
@@ -1023,7 +1013,6 @@ public:
     bool isVMHelperCallInst() const { return true; }
     CompilationInterface::RuntimeHelperId getVMHelperId() const {return vmHelperId;}
     bool isThrowLazy() const {return vmHelperId == CompilationInterface::Helper_Throw_Lazy;}
-InlineInfo* getInlineInfoPtr() { return inlInfo; }
 private:
     virtual void handlePrintEscape(::std::ostream&, char code) const;
     friend class InstFactory;
@@ -1034,7 +1023,7 @@ private:
                      uint32 nArgs,
                      Opnd** args_,
                      CompilationInterface::RuntimeHelperId id) 
-                     : Inst(op, mod, type, dst, nArgs), vmHelperId(id), inlInfo(NULL) 
+                     : Inst(op, mod, type, dst, nArgs), vmHelperId(id)
     {
         args = args_;
         switch (nArgs) {
@@ -1052,7 +1041,6 @@ private:
     }
     Opnd**    args;
     CompilationInterface::RuntimeHelperId vmHelperId;
-    InlineInfo* inlInfo;
 };
 
 
@@ -1148,7 +1136,7 @@ public:
                                uint32 numArgs, Opnd** args);
     Inst*    makeJitHelperCall(Opnd* dst, JitHelperCallId id, uint32 numArgs, Opnd** args);
     Inst*    makeVMHelperCall(Opnd* dst, CompilationInterface::RuntimeHelperId id, uint32 numArgs,
-                               Opnd** args, InlineInfo* inlInfo = NULL);
+                               Opnd** args);
     
 
     Inst*    makeReturn(Opnd* src);
@@ -1532,8 +1520,7 @@ private:
                                            Opnd* dst,
                                            uint32 nArgs,
                                            Opnd** args_,
-                                           CompilationInterface::RuntimeHelperId id,
-                                           InlineInfo* inlInfo = NULL);
+                                           CompilationInterface::RuntimeHelperId id);
 
 
     PhiInst* makePhiInst(Type::Tag type, Opnd* dst, uint32 nArgs, Opnd** args_);

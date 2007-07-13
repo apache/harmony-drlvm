@@ -30,7 +30,6 @@
 #include "ByteCodeParser.h"
 #include "JavaByteCodeTranslator.h"
 #include "Log.h"
-#include "CGSupport.h"
 #include "FlowGraph.h"
 
 namespace Jitrino {

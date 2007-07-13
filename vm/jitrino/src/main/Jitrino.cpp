@@ -43,7 +43,6 @@
     #include <sys/types.h>
 #endif 
 
-#include "CGSupport.h"
 #include "PlatformDependant.h"
 #include "JITInstanceContext.h"
 #include "PMF.h"
@@ -242,9 +241,6 @@ bool compileMethod(CompilationContext* cc) {
         return false;
     }
 
-    MethodDesc* methDesc = cc->getVMCompilationInterface()->getMethodToCompile();
-    MemoryManager& ir_mmgr = cc->getCompilationLevelMemoryManager();
-    initHandleMap(ir_mmgr, methDesc);
 
     runPipeline(cc);
     

@@ -572,7 +572,7 @@ void ControlFlowGraph::mergeAdjacentNodes(bool skipEntry, bool mergeByDispatch) 
                 }
             }
         } else if (node->isDispatchNode()) {
-            if (node->getOutDegree() == 1) {
+            if (node->getOutDegree() == 1 && node->isEmpty()) {
                 Node* succ = node->getOutEdges().front()->getTargetNode();
                 if (succ->isDispatchNode())  {
                     // This dispatch has no handlers.
@@ -691,12 +691,8 @@ void ControlFlowGraph::spliceFlowGraphInline(Edge* edge, ControlFlowGraph& inlin
         if (dispatchNode == NULL) {
             dispatchNode = getUnwindNode();
         }
-        if (dispatchNode != NULL) {
-            addEdge(inlineUnwindNode, dispatchNode, 1);
-        } else {
-            setUnwindNode(inlineUnwindNode);
-            addEdge(inlineUnwindNode, getExitNode());
-        }
+        assert(dispatchNode != NULL);
+        addEdge(inlineUnwindNode, dispatchNode, 1);
     }
 }
 

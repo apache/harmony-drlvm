@@ -394,6 +394,7 @@ void NewObjHelperInliner::doInline() {
     instFactory->makeLdConst(allocationHandleOpnd, allocationHandle)->insertBefore(inst);
     Opnd* args[2] = {objSizeOpnd, allocationHandleOpnd};
     MethodCallInst* call = instFactory->makeDirectCall(callResOpnd, tauSafeOpnd, tauSafeOpnd, 2, args, method)->asMethodCallInst();
+    call->setBCOffset(inst->getBCOffset());
     call->insertBefore(inst);
     inst->unlink();
 
@@ -452,6 +453,7 @@ void NewArrayHelperInliner::doInline() {
     Opnd* args[3] = {numElements, elemSizeOpnd, allocationHandleOpnd};
     Opnd* callResOpnd = opndManager->createSsaTmpOpnd(typeManager->getUnmanagedPtrType(typeManager->getInt8Type()));
     MethodCallInst* call = instFactory->makeDirectCall(callResOpnd, tauSafeOpnd, tauSafeOpnd, 3, args, method)->asMethodCallInst();
+    call->setBCOffset(inst->getBCOffset());
     call->insertBefore(inst);
     inst->unlink();
     assert(call == call->getNode()->getLastInst());
@@ -483,6 +485,7 @@ void ObjMonitorEnterHelperInliner::doInline() {
     instFactory->makeTauSafe(tauSafeOpnd)->insertBefore(inst);
     Opnd* args[1] = {objOpnd};
     MethodCallInst* call = instFactory->makeDirectCall(opndManager->getNullOpnd(), tauSafeOpnd, tauSafeOpnd, 1, args, method)->asMethodCallInst();
+    call->setBCOffset(inst->getBCOffset());
     call->insertBefore(inst);
     inst->unlink();
     
@@ -517,6 +520,7 @@ void ObjMonitorExitHelperInliner::doInline() {
     instFactory->makeTauSafe(tauSafeOpnd)->insertBefore(inst);
     Opnd* args[1] = {objOpnd};
     MethodCallInst* call = instFactory->makeDirectCall(opndManager->getNullOpnd(), tauSafeOpnd, tauSafeOpnd, 1, args, method)->asMethodCallInst();
+    call->setBCOffset(inst->getBCOffset());
     call->insertBefore(inst);
     inst->unlink();
 
@@ -543,6 +547,7 @@ void WriteBarrierHelperInliner::doInline() {
     instFactory->makeTauSafe(tauSafeOpnd)->insertBefore(inst);
     Opnd* args[3] = {objBaseOpnd, ptrOpnd, srcOpnd};
     MethodCallInst* call = instFactory->makeDirectCall(opndManager->getNullOpnd(), tauSafeOpnd, tauSafeOpnd, 3, args, method)->asMethodCallInst();
+    call->setBCOffset(inst->getBCOffset());
     call->insertBefore(inst);
     inst->unlink();
     
@@ -591,6 +596,7 @@ void LdInterfaceHelperInliner::doInline() {
     instFactory->makeTauSafe(tauSafeOpnd)->insertBefore(inst);
     Opnd* args[2] = {baseOpnd, typeOpnd};
     MethodCallInst* call = instFactory->makeDirectCall(resOpnd, tauSafeOpnd, tauSafeOpnd, 2, args, method)->asMethodCallInst();
+    call->setBCOffset(inst->getBCOffset());
     call->insertBefore(inst);
     inst->unlink();
 
@@ -649,6 +655,7 @@ void CheckCastHelperInliner::doInline() {
 
     Opnd* args[6] = {objOpnd, typeOpnd, isArrayOpnd, isInterfaceOpnd, isFinalOpnd, fastCheckDepthOpnd};
     MethodCallInst* call = instFactory->makeDirectCall(opndManager->getNullOpnd(), tauSafeOpnd, tauSafeOpnd, 6, args, method)->asMethodCallInst();
+    call->setBCOffset(inst->getBCOffset());
     
     call->insertBefore(inst);
 
@@ -709,6 +716,7 @@ void InstanceOfHelperInliner::doInline() {
 
     Opnd* args[6] = {objOpnd, typeOpnd, isArrayOpnd, isInterfaceOpnd, isFinalOpnd, fastCheckDepthOpnd};
     MethodCallInst* call = instFactory->makeDirectCall(inst->getDst(), tauSafeOpnd, tauSafeOpnd, 6, args, method)->asMethodCallInst();
+    call->setBCOffset(inst->getBCOffset());
 
     call->insertBefore(inst);
     inst->unlink();

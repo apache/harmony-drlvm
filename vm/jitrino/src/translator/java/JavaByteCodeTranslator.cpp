@@ -27,7 +27,6 @@
 #include "ExceptionInfo.h"
 #include "simplifier.h"
 #include "methodtable.h"
-#include "InlineInfo.h"
 #include "open/bytecodes.h"
 #include "irmanager.h"
 #include "Jitrino.h"
@@ -147,7 +146,6 @@ JavaByteCodeTranslator::JavaByteCodeTranslator(CompilationInterface& ci,
               NULL),
       lockAddr(NULL), 
       oldLockValue(NULL),
-      thisLevelBuilder(NULL, methodDesc,irb.getBcOffset()),
       jsrEntryMap(NULL),
       retOffsets(mm),
       jsrEntryOffsets(mm)
@@ -247,6 +245,7 @@ JavaByteCodeTranslator::initLocalVars() {
     numLabels = prepass.getNumLabels();
     labels = new (memManager) LabelInst*[numLabels+1];
     irBuilder.createLabels(numLabels,labels);
+
     nextLabel = 0;
     resultOpnd = NULL;
 
@@ -420,8 +419,7 @@ void
 JavaByteCodeTranslator::offset(uint32 offset) {
 
     // set bc offset in ir builder
-    if (compilationInterface.isBCMapInfoRequired()) irBuilder.setBcOffset(offset);
-
+    irBuilder.setBcOffset(offset);
     if (prepass.isLabel(offset) == false)
         return;
     if (prepassVisited && prepassVisited->getBit(offset) == false) {
@@ -490,6 +488,7 @@ JavaByteCodeTranslator::offset(uint32 offset) {
             labelInst = irBuilder.getInstFactory()->makeCatchLabel(
                                             handler->getExceptionOrder(),
                                             handler->getExceptionType());
+            labelInst->setBCOffset((uint16)exceptionInfo->getBeginOffset());
             catchLabels.push_back(labelInst);
             labelInst->setState(oldLabel->getState());
             exceptionInfo->setLabelInst(labelInst);
@@ -1543,8 +1542,7 @@ JavaByteCodeTranslator::invokevirtual(uint32 constPoolIndex) {
                                             tauNullChecked, 
                                             0, // let IRBuilder handle types
                                             numArgs,
-                                            srcOpnds, 
-                                            NULL);
+                                            srcOpnds);
     // push the return type
     if (returnType->tag != Type::Void)
         pushOpnd(dst);
@@ -1580,8 +1578,7 @@ JavaByteCodeTranslator::invokespecial(uint32 constPoolIndex) {
         tauNullChecked, 
         0, // let IRBuilder check types
         numArgs,
-        srcOpnds,
-        NULL);
+        srcOpnds);
 
     // push the return type
     if (returnType->tag != Type::Void) {
@@ -1675,8 +1672,7 @@ JavaByteCodeTranslator::invokeinterface(uint32 constPoolIndex,uint32 count) {
         tauNullChecked, 
         0, // let IRBuilder handle types
         numArgs,
-        srcOpnds,
-        NULL);
+        srcOpnds);
     // push the return type
     if (returnType->tag != Type::Void)
         pushOpnd(dst);
@@ -2303,8 +2299,7 @@ JavaByteCodeTranslator::genInvokeStatic(MethodDesc * methodDesc,
                         tauNullChecked,
                         0, // let IRBuilder check types
                         numArgs,
-                        srcOpnds,
-                        NULL);
+                        srcOpnds);
     if (returnType->tag != Type::Void)
         pushOpnd(dst);
 }

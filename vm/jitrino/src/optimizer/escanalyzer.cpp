@@ -82,6 +82,8 @@ EscapeAnalysisPass::_run(IRManager& irm) {
     }
 
     ea.doAnalysis();
+    
+    irm.getFlowGraph().purgeUnreachableNodes(); //needed to get valid log after this pass
 
 }  // run(IRManager& irm) 
 
@@ -111,15 +113,6 @@ EscAnalyzer::EscAnalyzer(MemoryManager& mm, SessionAction* argSource, IRManager&
     assert(translatorAction);
 
     init();
-
-    if (compInterface.isBCMapInfoRequired()) {
-        isBCmapRequired = true;
-        MethodDesc* meth = compInterface.getMethodToCompile();
-        bc2HIRMapHandler = getContainerHandler(bcOffset2HIRHandlerName, meth);
-    } else {
-        isBCmapRequired = false;
-        bc2HIRMapHandler = NULL;
-    }
 }
 
 EscAnalyzer::EscAnalyzer(EscAnalyzer* parent, IRManager& irm) 
@@ -4526,19 +4519,9 @@ EscAnalyzer::doLOScalarReplacement(ObjIds* loids) {
                         st_inst = *it3;
                         removeInst(st_inst);
                         removeInst(inst=st_inst->getSrc(1)->getInst());
-                        if (isBCmapRequired) {
-                            remBCMap(st_inst);
-                            remBCMap(inst);
-                        }
                         removeInst(inst=inst->getSrc(0)->getInst());
-                        if (isBCmapRequired) {
-                            remBCMap(inst);
-                        }
                         if (inst->getOpcode() == Op_LdArrayBaseAddr) {
                             removeInst(inst->getSrc(0)->getInst()); 
-                            if (isBCmapRequired) {
-                                remBCMap(inst->getSrc(0)->getInst());
-                            }
                         }
                     }
                 }
@@ -4557,9 +4540,6 @@ EscAnalyzer::doLOScalarReplacement(ObjIds* loids) {
                 FlowGraph::print(os_sc,no_node);
                 os_sc << "++++ old newobj: after end"  << std::endl;
             }        
-            if (isBCmapRequired) {
-                remBCMap(onode->nInst);
-            }
         }
     }
 } // doLOScalarReplacement(ObjIds* loids)
@@ -4763,21 +4743,14 @@ EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
         TypeManager& _typeManager  = irManager.getTypeManager();
         Inst* nobj_inst = nonode->nInst;  // optimized newobj inst for ldvar opnd
         Inst* lobj_inst = NULL;           // load opnd inst for ldvar opnd
-        Edge* excedge = NULL;
         VarOpnd* ob_var_opnd = _opndManager.createVarOpnd(nobj_inst->getDst()->getType(), false);
         SsaTmpOpnd* ob_init_opnd = _opndManager.createSsaTmpOpnd(ob_var_opnd->getType());
         uint32 ob_id = onode->opndId;
-        Node* ob_exc_tnode = NULL;
         Insts::iterator itvc;
         ScObjFlds::iterator ito;
         Node* node_no = nobj_inst->getNode();
         ScObjFld* sco = NULL;
 
-        if (nobj_inst->getOperation().canThrow()==true) {
-            excedge = (Edge*)nobj_inst->getNode()->getExceptionEdge();
-            assert(excedge != NULL);
-            ob_exc_tnode = excedge->getTargetNode();
-        }
         if (lobj_opt) {
             lobj_inst = lonode->nInst;
         }
@@ -4865,7 +4838,7 @@ EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
                 scalarizeOFldUsage(sco);
             }
         }
-        restoreEOCreation(vc_insts, scObjFlds, ob_var_opnd, ob_exc_tnode, ob_id);
+        restoreEOCreation(vc_insts, scObjFlds, ob_var_opnd, ob_id);
         if (_scinfo) {
             os_sc << "++++ old newobj: before"  << std::endl;
             FlowGraph::print(os_sc,node_no);
@@ -4884,9 +4857,6 @@ EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
         if (methodEndInsts->size()!=0)
             fixMethodEndInsts(ob_id);
         removeInst(nobj_inst);
-        if (isBCmapRequired) {
-            remBCMap(nobj_inst);
-        }
         if (_scinfo) {
             os_sc << "++++ old newobj: after"  << std::endl;
             FlowGraph::print(os_sc,node_no);
@@ -5052,18 +5022,9 @@ EscAnalyzer::scalarizeOFldUsage(ScObjFld* scfld) {
         }
         st_ld_var_inst->insertAfter(st_ld_inst);
         removeInst(st_ld_inst);
-        if (isBCmapRequired) {
-            setNewBCMap(st_ld_var_inst,st_ld_inst);
-        }
         removeInst(inst_ad);
-        if (isBCmapRequired) {
-            remBCMap(inst_ad);
-        }
         if (inst_ad->getOpcode()==Op_AddScaledIndex) {
             removeInst(inst_ad->getSrc(0)->getInst());
-            if (isBCmapRequired) {
-                remBCMap(inst_ad->getSrc(0)->getInst());
-            }
         }
         if (_scinfo) {
             os_sc << "++++ scalarizeOFldUsage: after"  << std::endl;
@@ -5702,8 +5663,7 @@ EscAnalyzer::checkNextNodes(Node* n, uint32 obId, double cprob) {
 
 
 void 
-EscAnalyzer::restoreEOCreation(Insts* vc_insts, ScObjFlds* scObjFlds, VarOpnd* ob_var_opnd, 
-                                Node* tnode, uint32 oid) {
+EscAnalyzer::restoreEOCreation(Insts* vc_insts, ScObjFlds* scObjFlds, VarOpnd* ob_var_opnd, uint32 oid) {
     Insts::iterator itvc;
     InstFactory& _instFactory = irManager.getInstFactory();
     ControlFlowGraph& fg = irManager.getFlowGraph();
@@ -5735,6 +5695,8 @@ EscAnalyzer::restoreEOCreation(Insts* vc_insts, ScObjFlds* scObjFlds, VarOpnd* o
         }
 
         node_before=vc->getNode();
+        Node* dispatchNode = node_before->getExceptionEdgeTarget(); //now object allocation inst will be connected to this dispatch
+        assert(dispatchNode);
         node_obj1 = NULL;
         node_after1 = NULL;
         node_var1 = NULL;
@@ -5748,7 +5710,6 @@ EscAnalyzer::restoreEOCreation(Insts* vc_insts, ScObjFlds* scObjFlds, VarOpnd* o
         Inst* ldobj=_instFactory.makeLdVar(ob_opnd,ob_var_opnd);
         ldobj->insertBefore(vc);
         // reset call inst parameters
-        Inst* old_newobj = vc->getSrc(i)->getInst();
         for (uint32 i1=0; i1<nsrc; i1++) {
             if (vc->getSrc(i1)->getId()==oid) {
                 vc->setSrc(i1,ob_opnd );
@@ -5806,9 +5767,7 @@ EscAnalyzer::restoreEOCreation(Insts* vc_insts, ScObjFlds* scObjFlds, VarOpnd* o
         SsaTmpOpnd* nob_opnd = _opndManager.createSsaTmpOpnd(ob_var_opnd->getType());
         Inst* newobj=_instFactory.makeNewObj(nob_opnd,ob_var_opnd->getType());
         newobj->insertBefore(ldobj);
-        if (isBCmapRequired) {
-            setNewBCMap(newobj,old_newobj);
-        }
+        newobj->setBCOffset(0);
         // storing created newobj result in object var opnd
         Inst* stvobj=_instFactory.makeStVar(ob_var_opnd,nob_opnd);
         stvobj->insertBefore(ldobj);
@@ -5823,7 +5782,7 @@ EscAnalyzer::restoreEOCreation(Insts* vc_insts, ScObjFlds* scObjFlds, VarOpnd* o
         // node with newobj instruction after opt
         node_obj=fg.splitNodeAtInstruction(branch_inst,splitAfter,false,_instFactory.makeLabel());
         fg.addEdge(node_before, node_var);
-        // created oject field initialization
+        // created object field initialization
         ScObjFld* sco = NULL;
         if (scObjFlds->size() > 0) {
             Opnd* tau_op = _opndManager.createSsaTmpOpnd(_typeManager.getTauType());
@@ -5912,11 +5871,10 @@ EscAnalyzer::restoreEOCreation(Insts* vc_insts, ScObjFlds* scObjFlds, VarOpnd* o
                 fg.addEdge(node_after1,node_after);
             }
         }
-        if (tnode!=NULL) {
-            node_obj1=fg.splitNodeAtInstruction(newobj,splitAfter,false,
-                _instFactory.makeLabel());
-            fg.addEdge(node_obj,tnode);
-        }
+        
+        node_obj1=fg.splitNodeAtInstruction(newobj,splitAfter,false, _instFactory.makeLabel());
+        fg.addEdge(node_obj,dispatchNode);
+
         if (_scinfo) {
             os_sc << "++++ objectCreate: after"  << std::endl;
             FlowGraph::print(os_sc,node_before);
@@ -6330,43 +6288,6 @@ EscAnalyzer::checkToScalarizeFinalFiels(CnGNode* onode, ScObjFlds* scObjFlds) {
         }
     }
 } // checkToScalarizeFinalFiels(CnGNode* onode, ScObjFlds* scObjFlds)
-
-
-/**
- * Sets bcmap offset in bc2HIRMapHandler.
- * @param new_i - instruction to set offset
- * @param old_i - offset of old_i instruction is set to new_i instruction
- */
-void
-EscAnalyzer::setNewBCMap(Inst* new_i, Inst* old_i) {
-    if (isBCmapRequired) {
-        uint16 bcOffset = ILLEGAL_BC_MAPPING_VALUE;
-        uint32 instID = old_i->getId();
-        bcOffset = getBCMappingEntry(bc2HIRMapHandler, instID);
-        if (bcOffset != ILLEGAL_BC_MAPPING_VALUE) {
-            setBCMappingEntry(bc2HIRMapHandler, new_i->getId(), bcOffset);
-        }
-    }
-}  // setNewBCMap(Inst* new_i, Inst* old_i)
-
-
-/**
- * Removes bcmap offset in bc2HIRMapHandler.
- * @param inst - instruction to remove offset
- */
-void
-EscAnalyzer::remBCMap(Inst* inst) {
-    if (isBCmapRequired) {
-        uint16 bcOffset = ILLEGAL_BC_MAPPING_VALUE;
-        uint32 instID = inst->getId();
-        bcOffset = getBCMappingEntry(bc2HIRMapHandler, instID);
-        if (bcOffset != ILLEGAL_BC_MAPPING_VALUE) {
-            setBCMappingEntry(bc2HIRMapHandler, instID, ILLEGAL_BC_MAPPING_VALUE);
-        }
-    }
-}  // remBCMap(Inst* inst)
-
-
 
 } //namespace Jitrino 
 

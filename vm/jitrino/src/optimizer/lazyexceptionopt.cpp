@@ -47,14 +47,6 @@ LazyExceptionOpt::LazyExceptionOpt(IRManager &ir_manager) :
     leMemManager("LazyExceptionOpt::doLazyExceptionOpt"),
     compInterface(ir_manager.getCompilationInterface())
 {
-    if (compInterface.isBCMapInfoRequired()) {
-        isBCmapRequired = true;
-        MethodDesc* meth = compInterface.getMethodToCompile();
-        bc2HIRMapHandler = getContainerHandler(bcOffset2HIRHandlerName, meth);
-    } else {
-        isBCmapRequired = false;
-        bc2HIRMapHandler = NULL;
-    }
 }
 
 /**
@@ -484,9 +476,8 @@ LazyExceptionOpt::fixOptCandidates(BitSet* bs) {
                 continue;
             }
             iinst = (*it)->initInst->asMethodCallInst(); 
-            // inline info from constructor should be propogated to lazy
+            // inline info from constructor should be propagated to lazy
             // exception if any
-            InlineInfo* constrInlineInfo = iinst->getInlineInfoPtr();
 #ifdef _DEBUG
             if (Log::isEnabled()) {
                 Log::out() << "  to remove ";
@@ -521,8 +512,7 @@ LazyExceptionOpt::fixOptCandidates(BitSet* bs) {
                 tinst = *it1;
                 assert(tinst != NULL);
                 tlinst=irManager.getInstFactory().makeVMHelperCall(  
-                        OpndManager::getNullOpnd(), CompilationInterface::Helper_Throw_Lazy, opcount, 
-                        opnds, constrInlineInfo);
+                        OpndManager::getNullOpnd(), CompilationInterface::Helper_Throw_Lazy, opcount, opnds);
 #ifdef _DEBUG
                 if (Log::isEnabled()) {
                     Log::out() << "  2nd      ";
@@ -539,15 +529,9 @@ LazyExceptionOpt::fixOptCandidates(BitSet* bs) {
                 tlinst->insertBefore(tinst);
                 tinst->unlink();
 
-                if (isBCmapRequired) {
-                    uint16 bcOffset = ILLEGAL_BC_MAPPING_VALUE;
-                    uint32 instID = iinst->getId();
-                    bcOffset = getBCMappingEntry(bc2HIRMapHandler, instID);
-                    if (bcOffset != ILLEGAL_BC_MAPPING_VALUE) {
-                        setBCMappingEntry(bc2HIRMapHandler, mptinst->getId(), bcOffset);
-                        setBCMappingEntry(bc2HIRMapHandler, tlinst->getId(), bcOffset);
-                    }
-                }
+                uint16 bcOffset = iinst->getBCOffset();
+                mptinst->setBCOffset(bcOffset);
+                tlinst->setBCOffset(bcOffset);
             }
         }
     }

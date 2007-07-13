@@ -174,9 +174,6 @@ private:
     /// List of throwable objects that may be optimized.
     OptCandidates* optCandidates;
     static int level;
-    // Byte code map info
-    bool isBCmapRequired;
-    void* bc2HIRMapHandler;
 };
 
 } // namespace Jitrino
