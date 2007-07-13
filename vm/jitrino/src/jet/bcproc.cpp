@@ -429,7 +429,10 @@ void Compiler::handle_ik_meth(const JInst& jinst) {
         else {
             meth = resolve_virtual_method(m_compileHandle, m_klass, jinst.op0);
         }
-        gen_invoke(opkod, meth, 0, args, retType);
+        // if class to call to is available, but method is not found in the class
+        // meth here will be equal to NULL and lazy resolution call will be
+        // generated in gen_invoke
+        gen_invoke(opkod, meth, cpIndex, args, retType);
         return;
     }
     switch(jinst.opcode) {
