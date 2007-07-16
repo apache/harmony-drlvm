@@ -351,7 +351,7 @@ void CodeEmitter::registerInlineInfoOffsets(Node* node, InlineInfoMap::Entry* pa
                 IRPrinter::printInst(Log::out(), inst); Log::out()<<std::endl;
             }
             if (parentEntry!=NULL) { //check to avoid crash in release mode
-                MethodMarkerPseudoInst* endMarker = (MethodMarkerPseudoInst*)inst;
+                UNUSED MethodMarkerPseudoInst* endMarker = (MethodMarkerPseudoInst*)inst;
                 assert(parentEntry->method == endMarker->getMethodDesc()->getMethodHandle());
                 parentEntry = parentEntry->parentEntry;
             }
