@@ -17,7 +17,7 @@
 /** 
  * @author Andrey Chernyshev
  * @version $Revision: 1.1.2.5.4.5 $
- */  
+ */
 
 
 #define LOG_DOMAIN "thread"
@@ -95,70 +95,18 @@ using namespace std;
 
 extern struct JNINativeInterface_ jni_vtable;
 
-struct vmthread_dummies {
-    VM_thread *p_vm_thread;
-    ObjectHandles *p_object_handles;
-    M2nFrame *p_m2n_frame;
-};
-
-
-void *vm_allocate_thread_dummies(JavaVM *java_vm) {
-    struct vmthread_dummies *p_vmt_dummies;
-    VM_thread *vmt = allocate_thread_block((JavaVM_Internal *)java_vm);
-    
-    if (vmt == NULL) 
-	goto err;
-    
-    p_vmt_dummies = 
-	(struct vmthread_dummies *)apr_palloc(vmt->pool, sizeof(vmthread_dummies));
-    
-    if (p_vmt_dummies == NULL)
-	goto err;
-    
-    // Create top level M2N frame.
-    p_vmt_dummies->p_m2n_frame = 
-	(M2nFrame*) apr_palloc(vmt->pool, sizeof(M2nFrame));
-    // Create local handles.
-    p_vmt_dummies->p_object_handles = 
-	(ObjectHandles*) apr_palloc(vmt->pool, sizeof(ObjectHandlesNew));
-    // allocate jni env internal structures
-    vmt->jni_env = (JNIEnv_Internal *) apr_palloc(vmt->pool, 
-						  sizeof(JNIEnv_Internal));
-
-    if (vmt->jni_env == NULL || p_vmt_dummies->p_object_handles == NULL ||
-	p_vmt_dummies->p_m2n_frame == NULL)
-	goto err;
-    
-    p_vmt_dummies->p_vm_thread = vmt;
-
-    return (void*)p_vmt_dummies;
-
- err:
-    if (p_vmt_dummies->p_m2n_frame)
-      free (p_vmt_dummies->p_m2n_frame);
-    if (p_vmt_dummies->p_object_handles)
-      free(p_vmt_dummies->p_object_handles);
-    if (vmt->jni_env)
-      free(vmt->jni_env);
-    if (p_vmt_dummies) 
-      free(p_vmt_dummies);
-    if (vmt) 
-      free(vmt);
-
-    return NULL;
-}
-    
 /**
  * Runs java.lang.Thread.detach() method.
  */
-static jint run_java_detach(jthread java_thread) {
-    static Method * detach = NULL;
-    const char * method_name = "detach";
-    const char * descriptor = "(Ljava/lang/Throwable;)V";
+static jint run_java_detach(jthread java_thread)
+{
+    static Method *detach = NULL;
+    const char *method_name = "detach";
+    const char *descriptor = "(Ljava/lang/Throwable;)V";
     jvalue args[2];
-    JNIEnv * jni_env;
-    Global_Env * vm_env;
-    Class * thread_class;
+    JNIEnv *jni_env;
+    Global_Env *vm_env;
+    Class *thread_class;
 
     assert(hythread_is_suspend_enabled());
 
@@ -169,18 +117,18 @@ static jint run_java_detach(jthread java_thread) {
     if (detach == NULL) {
         detach = class_lookup_method(thread_class, method_name, descriptor);
         if (detach == NULL) {
-            TRACE("Failed to find thread's detach method " << descriptor << " , exception = " << exn_get());
+            TRACE("Failed to find thread's detach method " << descriptor <<
+                  " , exception = " << exn_get());
             return TM_ERROR_INTERNAL;
         }
     }
-
     // Initialize arguments.
     args[0].l = java_thread;
     if (vm_env->IsVmShutdowning()) {
         args[1].l = NULL;
     } else {
         args[1].l = exn_get();
-    }    
+    }
     exn_clear();
 
     hythread_suspend_disable();
@@ -188,7 +136,9 @@ static jint run_java_detach(jthread java_thread) {
     hythread_suspend_enable();
 
     if (exn_raised()) {
-        TRACE("java.lang.Thread.detach(Throwable) method completed with an exception: " << exn_get_name());
+        TRACE
+            ("java.lang.Thread.detach(Throwable) method completed with an exception: "
+             << exn_get_name());
         return TM_ERROR_INTERNAL;
     }
     return TM_ERROR_NONE;
@@ -197,63 +147,53 @@ static jint run_java_detach(jthread java_thread) {
 /**
  * Attaches thread current thread to VM.
  */
-jint vm_attach(JavaVM * java_vm, JNIEnv ** p_jni_env,
-	       void *pv_vmt_dummies) {
-    M2nFrame * p_m2n;
-    VM_thread * p_vm_thread;
-    ObjectHandles * p_handles;
-    struct vmthread_dummies *p_vmt_dummies = 
-	(struct vmthread_dummies *)pv_vmt_dummies;
-
-    if (p_vmt_dummies != NULL) {
-	p_m2n = p_vmt_dummies->p_m2n_frame;
-	p_vm_thread = p_vmt_dummies->p_vm_thread;
-	p_handles = p_vmt_dummies->p_object_handles;
-    }
-
+jint vm_attach(JavaVM * java_vm, JNIEnv ** p_jni_env)
+{
     // It seems to be reasonable to have suspend enabled state here.
     // It is unsafe to perform operations which require suspend disabled
     // mode until current thread is not attaced to VM.
     assert(hythread_is_suspend_enabled());
 
-    if (p_vmt_dummies != NULL) {
-	// VMThread structure is already allocated, we only need to set
-	// TLS
-	set_TLS_data (p_vm_thread);
-    } else {
-	p_vm_thread = get_vm_thread(hythread_self());
-	
-	if (p_vm_thread != NULL) {
-	    assert (java_vm == p_vm_thread->jni_env->vm); 
-	    *p_jni_env = p_vm_thread->jni_env;
-	    return JNI_OK;
-	}
-	
-	p_vm_thread = get_a_thread_block((JavaVM_Internal *)java_vm);
+    vm_thread_t vm_thread = p_TLS_vmthread;
+    if (!vm_thread) {
+        vm_thread = jthread_allocate_vm_thread(hythread_self());
     }
 
     // if the assertion is false we cannot notify the parent thread
     // that we started and it would hang in waitloop
-    assert (p_vm_thread != NULL);
-    
-    if (p_vmt_dummies == NULL) {
-	// Create top level M2N frame.
-	p_m2n = (M2nFrame*) apr_palloc(p_vm_thread->pool, sizeof(M2nFrame));
-	// Create local handles.
-	p_handles = (ObjectHandles*) apr_palloc(p_vm_thread->pool, sizeof(ObjectHandlesNew));
-	p_vm_thread->jni_env = (JNIEnv_Internal *) apr_palloc(p_vm_thread->pool, sizeof(JNIEnv_Internal));
+    assert(vm_thread);
+
+    jint status = jthread_allocate_vm_thread_pool(java_vm, vm_thread);
+    if (status != JNI_OK) {
+        return status;
     }
 
-    assert (p_m2n != NULL && p_handles != NULL && p_vm_thread->jni_env != NULL);
+    // Create top level M2N frame.
+    M2nFrame *p_m2n = (M2nFrame *) apr_palloc(vm_thread->pool, sizeof(M2nFrame));
+    if (!p_m2n) {
+        return JNI_ENOMEM;
+    }
+
+    // Create local handles.
+    ObjectHandles *p_handles = (ObjectHandles *) apr_palloc(vm_thread->pool,
+                        sizeof(ObjectHandlesNew));
+    if (!p_handles) {
+        return JNI_ENOMEM;
+    }
+
+    vm_thread->jni_env =
+        (JNIEnv *) apr_palloc(vm_thread->pool, sizeof(JNIEnv_Internal));
+    if (!vm_thread->jni_env) {
+        return JNI_ENOMEM;
+    }
 
     // Initialize JNI environment.
-    p_vm_thread->jni_env->functions = &jni_vtable;
-    p_vm_thread->jni_env->vm = (JavaVM_Internal *)java_vm;
-    p_vm_thread->jni_env->reserved0 = (void *)0x1234abcd;
-    *p_jni_env = p_vm_thread->jni_env;
+    JNIEnv_Internal *jni_env = (JNIEnv_Internal *) vm_thread->jni_env;
+    jni_env->functions = &jni_vtable;
+    jni_env->vm = (JavaVM_Internal *) java_vm;
+    jni_env->reserved0 = (void *) 0x1234abcd;
+    *p_jni_env = jni_env;
 
-
-    
     init_stack_info();
 
     m2n_null_init(p_m2n);
@@ -263,7 +203,16 @@ jint vm_attach(JavaVM * java_vm, JNIEnv ** p_jni_env,
 
     m2n_set_local_handles(p_m2n, p_handles);
     m2n_set_frame_type(p_m2n, FRAME_NON_UNWINDABLE);
-    gc_thread_init(&p_vm_thread->_gc_private_information);
+    gc_thread_init(&vm_thread->_gc_private_information);
+
+    if (ti_is_enabled()) {
+        vm_thread->jvmti_thread.owned_monitors =
+            (jobject*)apr_palloc(vm_thread->pool,
+                sizeof(jobject) * TM_MAX_OWNED_MONITOR_NUMBER);
+        vm_thread->jvmti_thread.jvmti_jit_breakpoints_handling_buffer =
+            (jbyte*)apr_palloc(vm_thread->pool,
+                sizeof(jbyte) * TM_JVMTI_MAX_BUFFER_SIZE);
+    }
 
     assert(hythread_is_suspend_enabled());
     return JNI_OK;
@@ -272,9 +221,10 @@ jint vm_attach(JavaVM * java_vm, JNIEnv ** p_jni_env,
 /**
  * Detaches current thread from VM.
  */
-jint vm_detach(jthread java_thread) {
-    VM_thread * p_vm_thread;
-    
+jint vm_detach(jthread java_thread)
+{
+    VM_thread *p_vm_thread;
+
     assert(hythread_is_suspend_enabled());
 
     // could return error if detach throws an exception,
@@ -297,11 +247,9 @@ jint vm_detach(jthread java_thread) {
     remove_guard_stack();
 #endif
 
-    // Remove current VM_thread from TLS.
-    set_TLS_data(NULL);
-    // Destroy current VM_thread structure.
-    apr_pool_destroy(p_vm_thread->pool);
-    
+    // Destroy current VM_thread pool.
+    jthread_deallocate_vm_thread_pool(p_vm_thread);
+
     hythread_suspend_enable();
 
     return JNI_OK;
@@ -320,14 +268,13 @@ jint vm_detach(jthread java_thread) {
 
 void vm_notify_obj_alive(void *p_obj)
 {
-    if (IS_FAT_LOCK(((ManagedObject *)p_obj)->get_obj_info())) {
-      uint32 xx = ((ManagedObject *)p_obj)->get_obj_info();
-      hythread_native_resource_is_live(xx);
+    uint32 obj_info = ((ManagedObject*)p_obj)->get_obj_info();
+    if (hythread_is_fat_lock(obj_info)) {
+        hythread_native_resource_is_live(obj_info);
     }
 }
 
 void vm_reclaim_native_objs()
 {
-	hythread_reclaim_resources();
+    hythread_reclaim_resources();
 }
-

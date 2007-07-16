@@ -305,6 +305,9 @@ void DebugUtilsTI::setExecutionMode(Global_Env *p_env)
             break;
         }
     }
+    if (TRUE == get_boolean_property("vm.jvmti.enabled", FALSE, VM_PROPERTIES)) {
+        p_env->TI->setEnabled();
+    }
 }
 
 DebugUtilsTI::DebugUtilsTI() :

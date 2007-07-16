@@ -2579,7 +2579,7 @@ interpreter(StackFrame &frame) {
     assert(frame.method->is_static() || frame.This);
     
     M2N_ALLOC_MACRO;
-    if (get_thread_ptr()->p_exception_object_ti || exn_raised()) {
+    if (get_thread_ptr()->jvmti_thread.p_exception_object_ti || exn_raised()) {
          frame.exc = get_current_thread_exception();
          goto got_exception;
     }
@@ -2664,7 +2664,7 @@ restart:
             }
             breakpoint_processed = false;
 
-            if (get_thread_ptr()->p_exception_object_ti || exn_raised()) {
+            if (get_thread_ptr()->jvmti_thread.p_exception_object_ti || exn_raised()) {
                 frame.exc = get_current_thread_exception();
                 goto got_exception;
             }
@@ -3046,8 +3046,9 @@ got_exception:
         clear_current_thread_exception();
 
         if (interpreter_ti_notification_mode) {
-            frame.exc_catch = (ManagedObject*) get_thread_ptr()->p_exception_object_ti;
-            p_TLS_vmthread->p_exception_object_ti = NULL;
+            frame.exc_catch =
+                (ManagedObject*) get_thread_ptr()->jvmti_thread.p_exception_object_ti;
+            p_TLS_vmthread->jvmti_thread.p_exception_object_ti = NULL;
 
             if (frame.exc != frame.exc_catch) {
 
@@ -3079,7 +3080,8 @@ got_exception:
                 M2N_FREE_MACRO;
                 assert(!exn_raised());
                 if (interpreter_ti_notification_mode)
-                    p_TLS_vmthread->p_exception_object_ti = (volatile ManagedObject*) frame.exc;
+                    p_TLS_vmthread->jvmti_thread.p_exception_object_ti =
+                        (volatile ManagedObject*) frame.exc;
             }
         }
 

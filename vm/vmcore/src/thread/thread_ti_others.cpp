@@ -18,114 +18,129 @@
 /**
  * @file thread_ti_others.c
  * @brief JVMTI peak related functions
- */  
+ */
 
 #include <open/jthread.h>
 #include <open/hythread_ext.h>
 #include <open/ti_thread.h>
-#include "thread_private.h"
+#include <open/thread_externals.h>
+#include "vm_threads.h"
 
 #define THREAD_CONTENTION_MONITORING_SUPPORTED 1
 
 /*
  *  Monitors contentions requests enabled flag.
  */
-int thread_contention_monitoring_enabled = 0;
+static int thread_contention_monitoring_enabled = 0;
 
 /*
  *  Total started thread counter.
  */
-int total_started_thread_count = 0;
+static int total_started_thread_count = 0;
 
 /*
  *  Alive thread counter.
  */
-int alive_thread_count = 0;
+static int alive_thread_count = 0;
 
 /*
  *  Peak count
  */
-int peak_thread_count = 0;
- 
+static int peak_thread_count = 0;
+
 /**
  * Resets the thread peak counter to current value.
  */
-IDATA  jthread_reset_peak_thread_count () {
-
+IDATA jthread_reset_peak_thread_count()
+{
     peak_thread_count = alive_thread_count;
     return TM_ERROR_NONE;
-} 
+} // jthread_reset_peak_thread_count
 
 /**
  * Returns the peak thread count since the last peak reset. 
  */
-IDATA  jthread_get_peak_thread_count (jint *threads_count_ptr) {
+IDATA jthread_get_peak_thread_count(jint * threads_count_ptr)
+{
     *threads_count_ptr = peak_thread_count;
     return TM_ERROR_NONE;
-}
- 
+} // jthread_get_peak_thread_count
+
 /**
  * Returns true if VM supports monitors contention requests and 
  * this feature is enabled 
  *
  * @return true if monitors contention requests are enabled, false otherwise;
  */
-jboolean jthread_is_thread_contention_monitoring_enabled(){
+jboolean jthread_is_thread_contention_monitoring_enabled()
+{
     return thread_contention_monitoring_enabled;
-}
+} // jthread_is_thread_contention_monitoring_enabled
 
 /**
  * Returns true if VM supports monitors contention requests
  *
  * @return true if monitors contention requests are supported, false otherwise;
  */
-jboolean jthread_is_thread_contention_monitoring_supported(){
-
+jboolean jthread_is_thread_contention_monitoring_supported()
+{
     return THREAD_CONTENTION_MONITORING_SUPPORTED;
-}
+} // jthread_is_thread_contention_monitoring_supported
 
 /**
  * Enabled or diabled thread monitors contention requests
  *
  * @param[in] true or false to enable or disable the feature
  */
-void jthread_set_thread_contention_monitoring_enabled(jboolean flag){
-
-    thread_contention_monitoring_enabled = THREAD_CONTENTION_MONITORING_SUPPORTED ? flag : 0;
-}
+void jthread_set_thread_contention_monitoring_enabled(jboolean flag)
+{
+    thread_contention_monitoring_enabled =
+        THREAD_CONTENTION_MONITORING_SUPPORTED ? flag : 0;
+} // jthread_set_thread_contention_monitoring_enabled
 
 /**
  * Returns JVMTILocalStorage pointer.
  *
  * @param[in] java_thread
  */
-JVMTILocalStorage* jthread_get_jvmti_local_storage(jthread java_thread) {
+JVMTILocalStorage *jthread_get_jvmti_local_storage(jthread java_thread)
+{
+    assert(java_thread);
+    hythread_t native_thread = vm_jthread_get_tm_data(java_thread);
+    assert(native_thread);
+    jvmti_thread_t jvmti_thread = jthread_get_jvmti_thread(native_thread);
+    assert(jvmti_thread);
+    return &jvmti_thread->jvmti_local_storage;
+} // jthread_get_jvmti_local_storage
 
-    jvmti_thread_t tm_java_thread;
-    hythread_t tm_native_thread;
-
-    tm_native_thread = vm_jthread_get_tm_data(java_thread);
-    tm_java_thread = hythread_get_private_data(tm_native_thread);
-
-    return &tm_java_thread->jvmti_local_storage;
-
-}
+/**
+ * Returns the number of total started Java threads.
+ *
+ * @param[out] count_ptr number of started threads.
+ */
+IDATA VMCALL jthread_get_total_started_thread_count(jint * count_ptr)
+{
+    assert(count_ptr);
+    *count_ptr = total_started_thread_count;
+    return TM_ERROR_NONE;
+} // jthread_get_total_started_thread_count
 
 /**
  * Increase thread counters.
  */
-void thread_start_count(){
+void jthread_start_count()
+{
     alive_thread_count++;
     total_started_thread_count++;
     if (peak_thread_count < alive_thread_count) {
         peak_thread_count = alive_thread_count;
     }
-}
+} // jthread_start_count
 
 /**
  * Decrease alive thread counter.
  */
-void thread_end_count(){
+void jthread_end_count()
+{
     alive_thread_count--;
-}
-
+} // jthread_end_count

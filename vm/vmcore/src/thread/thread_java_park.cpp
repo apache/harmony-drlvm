@@ -23,7 +23,7 @@
 #include <apr_time.h>
 #include <open/jthread.h>
 #include <open/hythread_ext.h>
-#include "thread_private.h"
+#include "vm_threads.h"
 
 /**
  * Parks the current thread.
@@ -33,9 +33,10 @@
  *
  * @sa java.util.concurrent.locks.LockSupport.park() 
  */
-IDATA VMCALL jthread_park() {
+IDATA VMCALL jthread_park()
+{
     return hythread_park(0, 0);
-}
+} // jthread_park
 
 /**
  * Parks the current thread with the specified timeout.
@@ -48,9 +49,10 @@ IDATA VMCALL jthread_park() {
  * @param[in] nanos timeout in nanoseconds
  * @sa java.util.concurrent.locks.LockSupport.park() 
  */
-IDATA VMCALL jthread_timed_park(jlong millis, jint nanos) {
-    return hythread_park((I_64)millis, (IDATA)nanos);
-}
+IDATA VMCALL jthread_timed_park(jlong millis, jint nanos)
+{
+    return hythread_park((I_64) millis, (IDATA) nanos);
+} // jthread_timed_park
 
 /**
  * Unparks the given thread.
@@ -65,15 +67,13 @@ IDATA VMCALL jthread_timed_park(jlong millis, jint nanos) {
  * @param[in] java_thread thread that needs to be unparked
  * @sa java.util.concurrent.locks.LockSupport.unpark() 
  */
-IDATA VMCALL jthread_unpark(jthread java_thread) {
-    hythread_t tm_native_thread;
-
+IDATA VMCALL jthread_unpark(jthread java_thread)
+{
     assert(java_thread);
-    tm_native_thread = jthread_get_native_thread(java_thread);
-    hythread_unpark(tm_native_thread);
-    
+    hythread_t native_thread = jthread_get_native_thread(java_thread);
+    hythread_unpark(native_thread);
     return TM_ERROR_NONE;
-}
+} // jthread_unpark
 
 /**
  * Parks the current thread until the specified deadline
@@ -85,8 +85,10 @@ IDATA VMCALL jthread_unpark(jthread java_thread) {
  * @param[in] millis absolute time in milliseconds to wait until
  * @sa java.util.concurrent.locks.LockSupport.parkUntil() 
  */
-IDATA VMCALL jthread_park_until(jlong millis) {
-    jlong delta = millis - apr_time_now()/1000;
-    if (delta <= 0) return TM_ERROR_NONE;
-    return hythread_park((I_64)delta, 0);
-}
+IDATA VMCALL jthread_park_until(jlong millis)
+{
+    jlong delta = millis - apr_time_now() / 1000;
+    if (delta <= 0)
+        return TM_ERROR_NONE;
+    return hythread_park((I_64) delta, 0);
+} // jthread_park_until

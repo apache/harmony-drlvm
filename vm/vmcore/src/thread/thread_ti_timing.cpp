@@ -23,7 +23,8 @@
 #include <open/ti_thread.h>
 #include <open/hythread_ext.h>
 #include <open/jthread.h>
-#include "thread_private.h"
+#include <open/thread_externals.h>
+#include "vm_threads.h"
 #include "apr_thread_ext.h"
 
 #define THREAD_CPU_TIME_SUPPORTED 1
@@ -39,19 +40,18 @@ int thread_cpu_time_enabled = 0;
  * @param[in] java_thread
  * @param[out] nanos_ptr CPU time in nanoseconds
  */
-IDATA VMCALL jthread_get_thread_blocked_time(jthread java_thread, jlong *nanos_ptr) {
-
-    jvmti_thread_t tm_java_thread;
-    hythread_t tm_native_thread;
-
+IDATA VMCALL
+jthread_get_thread_blocked_time(jthread java_thread, jlong * nanos_ptr)
+{
     assert(java_thread);
     assert(nanos_ptr);
-    tm_native_thread = vm_jthread_get_tm_data(java_thread);
-    tm_java_thread = hythread_get_private_data(tm_native_thread);
-    *nanos_ptr = tm_java_thread->blocked_time;
-
+    hythread_t native_thread = vm_jthread_get_tm_data(java_thread);
+    assert(native_thread);
+    jvmti_thread_t jvmti_thread = jthread_get_jvmti_thread(native_thread);
+    assert(jvmti_thread);
+    *nanos_ptr = jvmti_thread->blocked_time;
     return TM_ERROR_NONE;
-}
+} // jthread_get_thread_blocked_time
 
 /**
  * Returns time utilized by given thread.
@@ -59,29 +59,28 @@ IDATA VMCALL jthread_get_thread_blocked_time(jthread java_thread, jlong *nanos_p
  * @param[in] java_thread
  * @param[out] nanos_ptr CPU time in nanoseconds
  */
-IDATA VMCALL jthread_get_thread_cpu_time(jthread java_thread, jlong *nanos_ptr) {
-
-    hythread_t tm_native_thread;
+IDATA VMCALL
+jthread_get_thread_cpu_time(jthread java_thread, jlong * nanos_ptr)
+{
     int64 kernel_time;
+
     assert(nanos_ptr);
-
-    if (NULL == java_thread) {
-        tm_native_thread = hythread_self();
-    } else {
-        tm_native_thread = vm_jthread_get_tm_data(java_thread);
-    }
-
-    return hythread_get_thread_times(tm_native_thread, &kernel_time, nanos_ptr);
-}
+    hythread_t native_thread = java_thread
+        ? hythread_self() : vm_jthread_get_tm_data(java_thread);
+    assert(native_thread);
+    return hythread_get_thread_times(native_thread, &kernel_time,
+                                     nanos_ptr);
+} // jthread_get_thread_cpu_time
 
 /**
  * Returns information about the system timer.
  *
  * @param[out] info_ptr timer info
  */
-IDATA VMCALL jthread_get_thread_cpu_timer_info(jvmtiTimerInfo* info_ptr) {
+IDATA VMCALL jthread_get_thread_cpu_timer_info(jvmtiTimerInfo * info_ptr)
+{
     return TM_ERROR_NONE;
-}
+} // jthread_get_thread_cpu_timer_info
 
 /**
  * Returns time utilized by the given thread in user mode.
@@ -89,20 +88,22 @@ IDATA VMCALL jthread_get_thread_cpu_timer_info(jvmtiTimerInfo* info_ptr) {
  * @param[in] java_thread 
  * @param[out] nanos_ptr CPU time in nanoseconds
  */
-IDATA VMCALL jthread_get_thread_user_cpu_time(jthread java_thread, jlong *nanos_ptr) {
+IDATA VMCALL
+jthread_get_thread_user_cpu_time(jthread java_thread, jlong * nanos_ptr)
+{
+    assert(nanos_ptr);
+    assert(java_thread);
+    hythread_t native_thread = vm_jthread_get_tm_data(java_thread);
+    assert(native_thread);
 
-    hythread_t tm_native_thread;
     int64 kernel_time;
     int64 user_time;
-
-    assert(java_thread);
-    assert(nanos_ptr);
-    tm_native_thread = vm_jthread_get_tm_data(java_thread);
-    hythread_get_thread_times(tm_native_thread, &kernel_time, &user_time);
+    IDATA status = hythread_get_thread_times(native_thread,
+                        &kernel_time, &user_time);
+    assert(status != TM_ERROR_NONE);
     *nanos_ptr = user_time;
-
     return TM_ERROR_NONE;
-}
+} // jthread_get_thread_user_cpu_time
 
 /**
  * Returns time spent by the specific thread while waiting for monitors.
@@ -110,19 +111,19 @@ IDATA VMCALL jthread_get_thread_user_cpu_time(jthread java_thread, jlong *nanos_
  * @param[in] java_thread 
  * @param[out] nanos_ptr CPU time in nanoseconds
  */
-IDATA VMCALL jthread_get_thread_waited_time(jthread java_thread, jlong *nanos_ptr) {
-
-    jvmti_thread_t tm_java_thread;
-    hythread_t tm_native_thread;
-
+IDATA VMCALL
+jthread_get_thread_waited_time(jthread java_thread, jlong * nanos_ptr)
+{
     assert(java_thread);
     assert(nanos_ptr);
-    tm_native_thread = vm_jthread_get_tm_data(java_thread);
-    tm_java_thread = hythread_get_private_data(tm_native_thread);
-    *nanos_ptr = tm_java_thread->waited_time;
+    hythread_t native_thread = vm_jthread_get_tm_data(java_thread);
+    assert(native_thread);
+    jvmti_thread_t jvmti_thread = jthread_get_jvmti_thread(native_thread);
+    assert(jvmti_thread);
+    *nanos_ptr = jvmti_thread->waited_time;
 
     return TM_ERROR_NONE;
-}
+} // jthread_get_thread_waited_time
 
 /**
  * Returns number of times the specific thread contending for monitors.
@@ -130,13 +131,15 @@ IDATA VMCALL jthread_get_thread_waited_time(jthread java_thread, jlong *nanos_pt
  * @param[in] java_thread
  * @return number of times the specific thread contending for monitors
  */
-jlong VMCALL jthread_get_thread_blocked_times_count(jthread java_thread) {
-    
-    hythread_t tm_native_thread = jthread_get_native_thread(java_thread); 
-    jvmti_thread_t tm_java_thread = hythread_get_private_data(tm_native_thread);
-
-    return tm_java_thread->blocked_count;
-}
+jlong VMCALL jthread_get_thread_blocked_times_count(jthread java_thread)
+{
+    assert(java_thread);
+    hythread_t native_thread = jthread_get_native_thread(java_thread);
+    assert(native_thread);
+    jvmti_thread_t jvmti_thread = jthread_get_jvmti_thread(native_thread);
+    assert(jvmti_thread);
+    return jvmti_thread->blocked_count;
+} // jthread_get_thread_blocked_times_count
 
 /**
  * Returns number of times the specific thread waiting on monitors for notification.
@@ -144,31 +147,35 @@ jlong VMCALL jthread_get_thread_blocked_times_count(jthread java_thread) {
  * @param[in] java_thread
  * @return number of times the specific thread waiting on monitors for notification
  */
-jlong VMCALL jthread_get_thread_waited_times_count(jthread java_thread) {
-    
-    hythread_t tm_native_thread = jthread_get_native_thread(java_thread); 
-    jvmti_thread_t tm_java_thread = hythread_get_private_data(tm_native_thread);
+jlong VMCALL jthread_get_thread_waited_times_count(jthread java_thread)
+{
 
-    return tm_java_thread->waited_count;
-}
+    hythread_t native_thread = jthread_get_native_thread(java_thread);
+    assert(native_thread);
+    jvmti_thread_t jvmti_thread = jthread_get_jvmti_thread(native_thread);
+    assert(jvmti_thread);
+    return jvmti_thread->waited_count;
+} // jthread_get_thread_waited_times_count
 
 /**
  * Returns true if VM supports current thread CPU and USER time requests
  *
  * @return true if current thread CPU and USER time requests are supported, false otherwise;
  */
-jboolean jthread_is_current_thread_cpu_time_supported(){
+jboolean jthread_is_current_thread_cpu_time_supported()
+{
     return THREAD_CPU_TIME_SUPPORTED;
-}
+} // jthread_is_current_thread_cpu_time_supported
 
 /**
  * Returns true if VM supports thread CPU and USER time requests
  *
  * @return true if thread CPU and USER time requests are supported, false otherwise;
  */
-jboolean jthread_is_thread_cpu_time_supported(){
+jboolean jthread_is_thread_cpu_time_supported()
+{
     return THREAD_CPU_TIME_SUPPORTED;
-}
+} // jthread_is_thread_cpu_time_supported
 
 /**
  * Returns true if VM supports (current) thread CPU and USER time requests and 
@@ -176,15 +183,17 @@ jboolean jthread_is_thread_cpu_time_supported(){
  *
  * @return true if thread CPU and USER time requests are enabled, false otherwise;
  */
-jboolean jthread_is_thread_cpu_time_enabled(){
+jboolean jthread_is_thread_cpu_time_enabled()
+{
     return thread_cpu_time_enabled;
-}
+} // jthread_is_thread_cpu_time_enabled
 
 /**
  * Enabled or diabled thread CPU and USER time requests
  *
  * @param[in] true or false to enable or disable the feature
  */
-void jthread_set_thread_cpu_time_enabled(jboolean flag){
-     thread_cpu_time_enabled = THREAD_CPU_TIME_SUPPORTED ? flag : 0;
-}
+void jthread_set_thread_cpu_time_enabled(jboolean flag)
+{
+    thread_cpu_time_enabled = THREAD_CPU_TIME_SUPPORTED ? flag : 0;
+} // jthread_set_thread_cpu_time_enabled

@@ -252,11 +252,11 @@ static void exn_propagate_exception(
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     if (ti->isEnabled() && ti->is_single_step_enabled())
     {
-        VM_thread *vm_thread = p_TLS_vmthread;
+        jvmti_thread_t jvmti_thread = jthread_self_jvmti();
         ti->vm_brpt->lock();
-        if (NULL != vm_thread->ss_state)
+        if (NULL != jvmti_thread->ss_state)
         {
-            jvmti_remove_single_step_breakpoints(ti, vm_thread);
+            jvmti_remove_single_step_breakpoints(ti, jvmti_thread);
         }
         ti->vm_brpt->unlock();
     }
@@ -318,9 +318,9 @@ static void exn_propagate_exception(
                     // Start single step in exception handler
                     if (ti->isEnabled() && ti->is_single_step_enabled())
                     {
-                        VM_thread *vm_thread = p_TLS_vmthread;
+                        jvmti_thread_t jvmti_thread = jthread_self_jvmti();
                         ti->vm_brpt->lock();
-                        if (NULL != vm_thread->ss_state)
+                        if (NULL != jvmti_thread->ss_state)
                         {
                             uint16 bc;
                             NativeCodePtr ip = handler->get_handler_ip();
@@ -330,7 +330,7 @@ static void exn_propagate_exception(
 
                             jvmti_StepLocation method_start = {(Method *)method, ip, bc, false};
 
-                            jvmti_set_single_step_breakpoints(ti, vm_thread,
+                            jvmti_set_single_step_breakpoints(ti, jvmti_thread,
                                 &method_start, 1);
                         }
                         ti->vm_brpt->unlock();

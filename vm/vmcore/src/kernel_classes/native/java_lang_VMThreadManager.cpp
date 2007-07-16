@@ -29,6 +29,7 @@
 #include "open/ti_thread.h"
 #include "open/thread_externals.h"
 #include "jni_utils.h"
+#include "thread_manager.h"
 
 /*
  * Class:     java_lang_VMThreadManager
@@ -148,7 +149,7 @@ JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_sleep
 JNIEXPORT jlong JNICALL Java_java_lang_VMThreadManager_init
   (JNIEnv *jenv, jclass clazz, jobject thread, jobject ref, jlong oldThread)
 {
-    return jthread_thread_init(NULL, jenv, thread, ref, oldThread);
+    return jthread_thread_init(jenv, thread, ref, (hythread_t)oldThread);
 }
 
 /*
@@ -159,11 +160,13 @@ JNIEXPORT jlong JNICALL Java_java_lang_VMThreadManager_init
 JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_start
   (JNIEnv *jenv, jclass clazz, jobject thread, jlong stackSize, jboolean daemon, jint priority)
 {
-    jthread_threadattr_t attrs;
+    jthread_threadattr_t attrs = {0};
 
     attrs.daemon = daemon;
     attrs.priority = priority;
-    attrs.stacksize = stackSize > 40000000? 0:(jint)stackSize;
+    // FIXME - may be define value 40000000
+    attrs.stacksize = stackSize > 40000000 ? 0:(jint)stackSize;
+
     return (jint)jthread_create(jenv, thread, &attrs);
 }
 
@@ -225,13 +228,7 @@ JNIEXPORT jboolean JNICALL Java_java_lang_VMThreadManager_isAlive
 
     tm_native_thread = (hythread_t )vm_jthread_get_tm_data((jthread)thread);
     assert(tm_native_thread);
-    if (hythread_is_alive(tm_native_thread))
-    { 
-        printf("isAlive\n");
-        return true;
-    }
-        printf ("isnot\n");
-    return false;
+    return hythread_is_alive(tm_native_thread) ? 1 : 0;
 }
 
 /*
@@ -256,7 +253,7 @@ JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_getState
     jint state;	
     IDATA stat;
     
-    stat = jthread_get_state(jthread, &state);
+    stat = jthread_get_jvmti_state(jthread, &state);
     assert(stat == TM_ERROR_NONE);
     return state;
 }

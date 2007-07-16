@@ -604,7 +604,7 @@ jint vm_attach_internal(JNIEnv ** p_jni_env, jthread * java_thread, JavaVM * jav
     }
     assert(native_thread);
 
-    status = vm_attach(java_vm, &jni_env, NULL);
+    status = vm_attach(java_vm, &jni_env);
     if (status != JNI_OK) return status;
 
     *p_jni_env = jni_env;
@@ -723,7 +723,7 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     extern void initialize_signals();
     initialize_signals(); 
 
-    status = vm_attach(java_vm, &jni_env, NULL);
+    status = vm_attach(java_vm, &jni_env);
     if (status != JNI_OK) return status;
     
     // "Tool Interface" initialization

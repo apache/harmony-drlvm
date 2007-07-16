@@ -593,7 +593,8 @@ VMBreakPoints::process_native_breakpoint()
     // JVMTI handles it, and registers context is saved for us in TLS
     VM_thread *vm_thread = p_TLS_vmthread;
     lock();
-    Registers regs = vm_thread->jvmti_saved_exception_registers;
+    Registers regs = 
+        *(Registers*)vm_thread->jvmti_thread.jvmti_saved_exception_registers;
     NativeCodePtr addr = (NativeCodePtr)regs.get_ip();
 
     TRACE2("jvmti.break", "Native breakpoint occured: " << addr);
@@ -703,7 +704,7 @@ VMBreakPoints::process_native_breakpoint()
     // Registers in TLS can be changed in user callbacks
     // It should be restored to keep original address of instrumented instruction
     // Exception/signal handlers use it when HWE occurs in instruction buffer
-    vm_thread->jvmti_saved_exception_registers = regs;
+    vm_set_jvmti_saved_exception_registers(vm_thread, regs);
     unlock();
 
     // Now we need to return back to normal code execution, it is
@@ -714,7 +715,8 @@ VMBreakPoints::process_native_breakpoint()
     // special handling.
     InstructionDisassembler::Type type = idisasm.get_type();
 
-    instruction_buffer = vm_thread->jvmti_jit_breakpoints_handling_buffer;
+    instruction_buffer =
+        vm_thread->jvmti_thread.jvmti_jit_breakpoints_handling_buffer;
     jbyte *interrupted_instruction = (jbyte *)addr;
     jint instruction_length = idisasm.get_length_with_prefix();
 
@@ -1367,7 +1369,7 @@ bool jvmti_jit_breakpoint_handler(Registers *regs)
     // Store possibly corrected location
     regs->set_ip((void*)native_location);
     // Copy original registers to TLS
-    vm_thread->jvmti_saved_exception_registers = *regs;
+    vm_set_jvmti_saved_exception_registers(vm_thread, *regs);
     // Set return address for exception handler
 #if defined (PLATFORM_POSIX) || defined(_EM64T_)
     regs->set_ip((void*)process_native_breakpoint_event);

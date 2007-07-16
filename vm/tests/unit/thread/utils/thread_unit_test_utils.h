@@ -19,6 +19,7 @@
 #include "apr_thread_proc.h"
 #include "open/hycomp.h"
 #include "open/jthread.h"
+#include "thread_manager.h"
 
 // Tested Thread Phases
 #define TT_PHASE_NONE 0

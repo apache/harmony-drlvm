@@ -66,21 +66,21 @@ struct StackTraceFrame;
 
 extern bool interpreter_st_get_frame(unsigned target_depth, StackTraceFrame* stf);
 extern jvmtiError interpreter_ti_getFrameLocation(
-        struct jvmtiEnv_struct *,class VM_thread *,int, struct _jmethodID * *,int64 *);
-extern jvmtiError interpreter_ti_getLocal32( struct jvmtiEnv_struct *,class VM_thread *,int,int,int *);
-extern jvmtiError interpreter_ti_getLocal64( struct jvmtiEnv_struct *,class VM_thread *,int,int,int64 *);
-extern jvmtiError interpreter_ti_getObject( struct jvmtiEnv_struct *,class VM_thread *,int,int,struct _jobject * *);
-extern jvmtiError interpreter_ti_getStackTrace(struct jvmtiEnv_struct *,class VM_thread *,int,int,jvmtiFrameInfo *,int *);
+        struct jvmtiEnv_struct *,struct VM_thread *,int, struct _jmethodID * *,int64 *);
+extern jvmtiError interpreter_ti_getLocal32( struct jvmtiEnv_struct *,struct VM_thread *,int,int,int *);
+extern jvmtiError interpreter_ti_getLocal64( struct jvmtiEnv_struct *,struct VM_thread *,int,int,int64 *);
+extern jvmtiError interpreter_ti_getObject( struct jvmtiEnv_struct *,struct VM_thread *,int,int,struct _jobject * *);
+extern jvmtiError interpreter_ti_getStackTrace(struct jvmtiEnv_struct *,struct VM_thread *,int,int,jvmtiFrameInfo *,int *);
 
-extern jvmtiError interpreter_ti_get_frame_count( struct jvmtiEnv_struct *,class VM_thread *,int *);
+extern jvmtiError interpreter_ti_get_frame_count( struct jvmtiEnv_struct *,struct VM_thread *,int *);
 extern jvmtiError interpreter_ti_notify_frame_pop (jvmtiEnv*, VM_thread *thread, int depth);
-extern jvmtiError interpreter_ti_setLocal32( struct jvmtiEnv_struct *,class VM_thread *,int,int,int);
-extern jvmtiError interpreter_ti_setLocal64( struct jvmtiEnv_struct *,class VM_thread *,int,int,int64);
-extern jvmtiError interpreter_ti_setObject( struct jvmtiEnv_struct *,class VM_thread *,int,int,struct _jobject *);
+extern jvmtiError interpreter_ti_setLocal32( struct jvmtiEnv_struct *,struct VM_thread *,int,int,int);
+extern jvmtiError interpreter_ti_setLocal64( struct jvmtiEnv_struct *,struct VM_thread *,int,int,int64);
+extern jvmtiError interpreter_ti_setObject( struct jvmtiEnv_struct *,struct VM_thread *,int,int,struct _jobject *);
 
-extern unsigned int interpreter_st_get_interrupted_method_native_bit(class VM_thread *);
-extern void interpreter_enumerate_thread(class VM_thread *);
-extern void interpreter_ti_enumerate_thread(jvmtiEnv*, class VM_thread*);
+extern unsigned int interpreter_st_get_interrupted_method_native_bit(struct VM_thread *);
+extern void interpreter_enumerate_thread(struct VM_thread *);
+extern void interpreter_ti_enumerate_thread(jvmtiEnv*, struct VM_thread*);
 extern void interpreter_st_get_interrupted_method(struct Method * *,int64 *);
 extern void interpreter_st_get_catch_method(struct Method * *,int64 *,struct _jobject *);
 extern void interpreter_st_get_trace(VM_thread *thread, unsigned int *,struct StackTraceFrame * *);
@@ -93,7 +93,7 @@ extern void interpreter_ti_clear_breakpoint(jmethodID method, jlocation location
 extern jvmtiError interpreter_ti_pop_frame(jvmtiEnv*, VM_thread *thread);
 extern void stack_dump(int fd, VM_thread *thread);
 
-extern FrameHandle* interpreter_get_last_frame(class VM_thread *thread);
+extern FrameHandle* interpreter_get_last_frame(struct VM_thread *thread);
 extern FrameHandle* interpreter_get_prev_frame(FrameHandle* frame);
 extern Method_Handle interpreter_get_frame_method(FrameHandle* frame);
 extern uint8* interpreter_get_frame_bytecode_ptr(FrameHandle* frame);

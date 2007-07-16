@@ -38,7 +38,8 @@
 static void jvmti_pop_frame_callback()
 {
     TRACE(("JVMTI PopFrame callback is called"));
-    frame_type type = m2n_get_frame_type(p_TLS_vmthread->last_m2n_frame);
+    frame_type type =
+		m2n_get_frame_type((M2nFrame*)(p_TLS_vmthread->last_m2n_frame));
 
     // frame wasn't requested to be popped
     if (FRAME_POP_NOW != (FRAME_POP_NOW & type)) {
@@ -307,11 +308,11 @@ jvmti_relocate_single_step_breakpoints( StackIterator *si)
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     if (ti->isEnabled() && ti->is_single_step_enabled())
     {
-        VM_thread *vm_thread = p_TLS_vmthread;
+        jvmti_thread_t jvmti_thread = jthread_self_jvmti();
         LMAutoUnlock lock(ti->vm_brpt->get_lock());
-        if (NULL != vm_thread->ss_state) {
+        if (NULL != jvmti_thread->ss_state) {
             // remove old single step breakpoints
-            jvmti_remove_single_step_breakpoints(ti, vm_thread);
+            jvmti_remove_single_step_breakpoints(ti, jvmti_thread);
 
             // set new single step breakpoints
             CodeChunkInfo *cci = si_get_code_chunk_info(si);
@@ -324,7 +325,7 @@ jvmti_relocate_single_step_breakpoints( StackIterator *si)
             assert(EXE_ERROR_NONE == result);
 
             jvmti_StepLocation locations = {method, ip, bc, false};
-            jvmti_set_single_step_breakpoints(ti, vm_thread, &locations, 1);
+            jvmti_set_single_step_breakpoints(ti, jvmti_thread, &locations, 1);
         }
     }
     return;

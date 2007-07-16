@@ -81,7 +81,7 @@ jvmtiGetThreadState(jvmtiEnv* env,
     if (thread_state_ptr == NULL){
         return JVMTI_ERROR_NULL_POINTER;
     }
-    IDATA UNUSED status = jthread_get_state(thread, thread_state_ptr);
+    IDATA UNUSED status = jthread_get_jvmti_state(thread, thread_state_ptr);
     assert(status == TM_ERROR_NONE);
 
     return JVMTI_ERROR_NONE;
@@ -469,7 +469,7 @@ jvmtiInterruptThread(jvmtiEnv* env,
     }
 
     jint thread_state;
-    IDATA UNUSED status = jthread_get_state(thread, &thread_state);
+    IDATA UNUSED status = jthread_get_jvmti_state(thread, &thread_state);
     assert(status == TM_ERROR_NONE);
 
     if (! (JVMTI_THREAD_STATE_ALIVE & thread_state))
@@ -697,15 +697,16 @@ jvmtiRunAgentThread(jvmtiEnv* env,
     CallVoidMethod(jvmti_test_jenv, thread, set_daemon, JNI_TRUE);
 
     jni_env = jthread_get_JNI_env(jthread_self());
+
     // Run new thread
-    // FIXME TM integration, pass arguments correctly
-    //Java_java_lang_Thread_start_generic(jvmti_test_jenv, thread, env, proc, arg, priority);
-    jthread_threadattr_t attrs;
+    jthread_threadattr_t attrs = {0};
     attrs.priority = priority; 
-    attrs.stacksize = 0;
     attrs.daemon = JNI_TRUE;
     attrs.jvmti_env = env;
-    jthread_create_with_function(jni_env, thread, &attrs, proc, arg);
+    attrs.proc = proc;
+    attrs.arg = arg;
+
+    jthread_create_with_function(jni_env, thread, &attrs);
 
     ti->setLocallyEnabled();//-----------------------------------^
 

@@ -54,7 +54,9 @@ vm_execute_java_method_array(jmethodID method, jvalue *result, jvalue *args) {
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     if(ti->isEnabled() && ti->is_single_step_enabled()) {
         // Start single stepping a new Java method
-        jvmti_set_single_step_breakpoints_for_method(ti, p_TLS_vmthread, (Method*)method);
+        jvmti_thread_t jvmti_thread = jthread_self_jvmti();
+        assert(jvmti_thread);
+        jvmti_set_single_step_breakpoints_for_method(ti, jvmti_thread, (Method*)method);
     }
 
     VM_Global_State::loader_env->em_interface->ExecuteMethod(method, result, args);
@@ -65,19 +67,20 @@ vm_execute_java_method_array(jmethodID method, jvalue *result, jvalue *args) {
     if (ti->isEnabled() && ti->is_single_step_enabled())
     {
         VM_thread *vm_thread = p_TLS_vmthread;
+        jvmti_thread_t jvmti_thread = &vm_thread->jvmti_thread;
         LMAutoUnlock lock(ti->vm_brpt->get_lock());
-        if (NULL != vm_thread->ss_state)
+        if (NULL != jvmti_thread->ss_state)
         {
             // Start single stepping a new Java method
-            jvmti_remove_single_step_breakpoints(ti, vm_thread);
+            jvmti_remove_single_step_breakpoints(ti, jvmti_thread);
 
             jvmti_StepLocation *method_return;
             unsigned locations_number;
             jvmtiError errorCode = jvmti_get_next_bytecodes_from_native(
-            vm_thread, &method_return, &locations_number, is_in_jni_method());
+                vm_thread, &method_return, &locations_number, is_in_jni_method());
             assert (JVMTI_ERROR_NONE == errorCode);
 
-            jvmti_set_single_step_breakpoints(ti , vm_thread, method_return, locations_number);
+            jvmti_set_single_step_breakpoints(ti, jvmti_thread, method_return, locations_number);
         }
     }
 }

@@ -42,35 +42,28 @@
 #include "cxxlog.h"
 
 
-static std::set<void *> unique_references;
+static std::set < void *>unique_references;
 
-enum reference_types {
+enum reference_types
+{
     root_reference = 1,
     compresses_root_reference,
     managed_reference,
     managed_reference_with_base
 };
 
- void td_print_thread_dumps(FILE* f);
-#ifdef _DEBUG
- void td_print_native_dumps(FILE* f);
-    #endif
- void td_attach_thread(void( *printer)(FILE *), FILE *out);
+void td_attach_thread(void (*printer) (FILE *), FILE * out);
 
-VMEXPORT void vm_check_if_monitor(void  **reference,
-                                       void  **base_reference,
-                                           uint32 *compressed_reference, 
-                                           int     slotOffset, 
-                                           Boolean pinned,
-                                           int     type) {
+VMEXPORT void vm_check_if_monitor(void **reference,
+                                  void **base_reference,
+                                  uint32 * compressed_reference,
+                                  int slotOffset, Boolean pinned, int type)
+{
 }
 
 /**
  * The thread dump entry poin, this function being called from the signal handler
  */
-void td_dump_all_threads(FILE *out) {
-#ifdef _DEBUG
-//    td_print_native_dumps(out);    
-#endif
-   // td_attach_thread(td_print_thread_dumps, out);
+void td_dump_all_threads(FILE * out)
+{
 }

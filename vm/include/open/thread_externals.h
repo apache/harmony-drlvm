@@ -20,8 +20,9 @@
 
 #include "open/types.h"
 #include "open/hycomp.h"
-#include <jni.h>
+#include "jni.h"
 #include "jvmti_types.h"
+#include "open/hythread_ext.h"
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
@@ -33,7 +34,7 @@ extern "C" {
  * @return The address of the memory chunk in the object which can be used by the 
  *         Thread Manager for synchronization purposes.
  */
-VMEXPORT void *vm_object_get_lockword_addr(jobject obj);
+VMEXPORT hythread_thin_monitor_t * vm_object_get_lockword_addr(jobject obj);
 
 /**
  * @return The size of the memory chunk in the object that can be used by
@@ -65,17 +66,15 @@ VMEXPORT void vm_jthread_set_tm_data(jthread thread, void *data_ptr);
  * @return TM-specific data previously stored, or <code>NULL</code>,
  *         if there are none.
  */
-VMEXPORT void *vm_jthread_get_tm_data(jthread thread);
+VMEXPORT hythread_t vm_jthread_get_tm_data(jthread thread);
 
 /** 
  * Registrates current thread in VM, so it could execute Java.
  *
  * @param[in] java_vm    - current thread will be attached to the specified VM
  * @param[out] p_jni_env - will point to JNI environment assocciated with the thread
- * @param[in] vm_thread_dummies - memory preallocated for Java thread structures (if NULL, memory will be allocated automatically)
  */
-VMEXPORT jint vm_attach(JavaVM * java_vm, JNIEnv ** p_jni_env, 
-			void *vm_thread_dummies);
+VMEXPORT jint vm_attach(JavaVM * java_vm, JNIEnv ** p_jni_env);
 
 /**
  * Frees java related resources before thread exit.

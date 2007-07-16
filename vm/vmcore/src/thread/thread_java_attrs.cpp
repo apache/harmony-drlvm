@@ -18,11 +18,11 @@
 /**
  * @file thread_java_attrs.c
  * @brief Java thread priority related functions
- */  
+ */
 
 #include <open/jthread.h>
 #include <open/hythread_ext.h>
-#include "thread_private.h"
+#include "vm_threads.h"
 
 /**
  * Returns the priority for the <code>thread</code>.
@@ -30,9 +30,10 @@
  * @param[in] java_thread thread those attribute is read
  * @sa java.lang.Thread.getPriority()
  */
-int jthread_get_priority(jthread java_thread) {
+jint jthread_get_priority(jthread java_thread)
+{
     hythread_t tm_native_thread = jthread_get_native_thread(java_thread);
-    return hythread_get_priority(tm_native_thread);
+    return (jint)hythread_get_priority(tm_native_thread);
 }
 
 /**
@@ -42,7 +43,8 @@ int jthread_get_priority(jthread java_thread) {
  * @param[in] priority thread priority
  * @sa java.lang.Thread.setPriority()
  */
-IDATA VMCALL jthread_set_priority(jthread java_thread, int priority) {
+IDATA VMCALL jthread_set_priority(jthread java_thread, jint priority)
+{
     hythread_t tm_native_thread = jthread_get_native_thread(java_thread);
     return hythread_set_priority(tm_native_thread, priority);
 }
@@ -52,9 +54,8 @@ IDATA VMCALL jthread_set_priority(jthread java_thread, int priority) {
  *
  * @param[in] thread thread those attribute is read
  */
-jboolean jthread_is_daemon(jthread thread) {
-    jvmti_thread_t jvmti_thread;
-    
-    jvmti_thread = hythread_get_private_data(hythread_self());
-    return jvmti_thread->daemon;
+jboolean jthread_is_daemon(jthread thread)
+{
+    vm_thread_t vm_thread = (vm_thread_t)thread;
+    return (jboolean)vm_thread->daemon;
 }

@@ -254,7 +254,7 @@ JIT_execute_method_default(JIT_Handle jh,
         void *thread_pointer, uint64 tid) = (uint64 (__cdecl * )(void *entry_point, int nargs, uint64 args[],
         double *double_result_addr, int double_nargs, double double_args[], 
         void *thread_pointer, uint64 tid))&fptr;
-    IDATA id = hythread_get_id(hythread_self());
+    IDATA id = hythread_get_self_id();
     uint64 int_result = (uint64)fpp_exec(entry_point, nargs, arg_words, &double_result,
         double_nargs, double_args, p_TLS_vmthread, id);
 

@@ -16,12 +16,11 @@
  */
 
 #include <stdio.h>
-#include "thread_private.h"
 #include <apr_pools.h>
 #include <apr_atomic.h>
-#include "testframe.h"
 #include <open/hythread_ext.h>
-#include "open/jthread.h"
+#include "testframe.h"
+#include "thread_manager.h"
 
 int start_proc(void *);
 
@@ -91,7 +90,7 @@ int test_hythread_thread_suspend_all(void){
         hythread_create(&thread, 0, 0, 0, start_proc, args);
     } 
     hythread_sleep(500); 
-    hythread_suspend_all(NULL, hythread_self()->group);
+    hythread_suspend_all(NULL, ((HyThread_public*)hythread_self())->group);
     hythread_suspend_disable();
     status = hythread_thin_monitor_enter(lockword_ptr);
     tf_assert_same(status, TM_ERROR_NONE);
@@ -107,7 +106,7 @@ int test_hythread_thread_suspend_all(void){
         tf_assert_same(args[1], 0);
     }
     
-    hythread_resume_all(hythread_self()->group);
+    hythread_resume_all(((HyThread_public*)hythread_self())->group);
     
     hythread_join(thread);
     

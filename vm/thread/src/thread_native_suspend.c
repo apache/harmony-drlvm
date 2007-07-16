@@ -429,9 +429,9 @@ IDATA VMCALL hythread_resume_all(hythread_group_t group)
 /**
  * Reset disable_count for currect thread.
  * The method begins suspension safe region.
- * Field disable_count is restored in set_suspend_disable() function.
+ * Field disable_count is restored in hythread_set_suspend_disable() function.
  */
-int reset_suspend_disable()
+int VMCALL hythread_reset_suspend_disable()
 {
     hythread_t self = tm_self_tls;
     int disable_count = self->disable_count;
@@ -442,12 +442,12 @@ int reset_suspend_disable()
 
 /**
  * Restores disable_count for current thread,
- * which was reset in reset_suspend_disable() function
+ * which was reset in hythread_reset_suspend_disable() function
  * If restored value ends suspension safe region
  * and there was a suspension request set for this thread,
  * the method invokes hythread_safe_point() function.
  */
-void set_suspend_disable(int count)
+void VMCALL hythread_set_suspend_disable(int count)
 {
     hythread_t self = tm_self_tls;
 

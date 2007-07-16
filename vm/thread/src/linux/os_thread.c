@@ -141,7 +141,7 @@ int os_thread_join(osthread_t os_thread)
  *
  * @param status        returns status of a thread
  */
-void os_thread_exit(int status)
+void os_thread_exit(IDATA status)
 {
     pthread_exit((void*)status);
 }

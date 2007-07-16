@@ -372,11 +372,11 @@ jint load_agentpath(Agent *agent, const char *str, JavaVM_Internal *vm);
 jvmtiError jvmti_get_next_bytecodes_from_native(VM_thread *thread,
     jvmti_StepLocation **next_step, unsigned *count, bool invoked_frame);
 void jvmti_set_single_step_breakpoints(DebugUtilsTI *ti,
-    VM_thread *vm_thread, jvmti_StepLocation *locations,
+    jvmti_thread_t jvmti_thread, jvmti_StepLocation *locations,
     unsigned locations_number);
 void jvmti_set_single_step_breakpoints_for_method(DebugUtilsTI *ti,
-    VM_thread *vm_thread, Method* method);
-void jvmti_remove_single_step_breakpoints(DebugUtilsTI *ti, VM_thread *vm_thread);
+    jvmti_thread_t jvmti_thread, Method* method);
+void jvmti_remove_single_step_breakpoints(DebugUtilsTI *ti, jvmti_thread_t jvmti_thread);
 
 // Object check functions
 Boolean is_valid_thread_object(jthread thread);

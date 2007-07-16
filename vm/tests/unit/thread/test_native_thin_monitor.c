@@ -16,11 +16,9 @@
  */
 
 #include <stdio.h>
-#include "thread_private.h"
 #include <apr_pools.h>
 #include <apr_atomic.h>
 #include "testframe.h"
-#include "jthread.h"
 #include <open/hythread_ext.h>
 
 int start_proc(void *);

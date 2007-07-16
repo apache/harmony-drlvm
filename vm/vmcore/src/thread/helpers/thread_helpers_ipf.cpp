@@ -18,7 +18,7 @@
 /** 
  * @file thread_helpers_ipf.c
  * Missing definition to ipf compile
- */  
+ */
 
 #include <open/hythread_ext.h>
 #include <open/thread_helpers.h>
@@ -28,13 +28,14 @@
 
 #include <assert.h>
 
-void *dummy_tls_func() {
+void *dummy_tls_func()
+{
     assert(0);
     abort();
 }
 
 
-fast_tls_func* get_tls_helper(hythread_tls_key_t key) {
+fast_tls_func *get_tls_helper(hythread_tls_key_t key)
+{
     return dummy_tls_func;
 }
-

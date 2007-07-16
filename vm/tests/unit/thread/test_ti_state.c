@@ -24,7 +24,7 @@
 #include <open/ti_thread.h>
 
 /*
- * Test jthread_get_state(...)
+ * Test jthread_get_jvmti_state(...)
  *
  *  called function          tested state
  *
@@ -34,7 +34,7 @@
  *  jthread_clear_interrupted()  ALIVE | RUNNABLE
  *                           DEAD
  */
-void JNICALL run_for_test_jthread_get_state_1(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
+void JNICALL run_for_test_jthread_get_jvmti_state_1(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
 
     tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
 
@@ -48,7 +48,7 @@ void JNICALL run_for_test_jthread_get_state_1(jvmtiEnv * jvmti_env, JNIEnv * jni
     tested_thread_ended(tts);
 }
 
-int test_jthread_get_state_1(void) {
+int test_jthread_get_jvmti_state_1(void) {
 
     tested_thread_sturct_t *tts;
     int state;
@@ -59,7 +59,7 @@ int test_jthread_get_state_1(void) {
 
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
-        tf_assert_same(jthread_get_state(tts->java_thread, &state), TM_ERROR_NONE);
+        tf_assert_same(jthread_get_jvmti_state(tts->java_thread, &state), TM_ERROR_NONE);
         ref_state = 0;
         if(tts->my_index == 0){
             printf("state = %08x (%08x)\n", state, ref_state);
@@ -68,12 +68,12 @@ int test_jthread_get_state_1(void) {
     }
 
     // Run all tested threads
-    tested_threads_run_common(run_for_test_jthread_get_state_1);
+    tested_threads_run_common(run_for_test_jthread_get_jvmti_state_1);
 
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
         tested_thread_wait_running(tts);
-        tf_assert_same(jthread_get_state(tts->java_thread, &state), TM_ERROR_NONE);
+        tf_assert_same(jthread_get_jvmti_state(tts->java_thread, &state), TM_ERROR_NONE);
         ref_state = 0x5;
         if(tts->my_index == 0){
             printf("state = %08x (%08x)\n", state, ref_state);
@@ -81,7 +81,7 @@ int test_jthread_get_state_1(void) {
         //tf_assert_same(state, ref_state);
 
         tf_assert_same(jthread_interrupt(tts->java_thread), TM_ERROR_NONE);
-        tf_assert_same(jthread_get_state(tts->java_thread, &state), TM_ERROR_NONE);
+        tf_assert_same(jthread_get_jvmti_state(tts->java_thread, &state), TM_ERROR_NONE);
         ref_state = 0x200005;
         if(tts->my_index == 0){
             printf("state = %08x (%08x)\n", state, ref_state);
@@ -89,7 +89,7 @@ int test_jthread_get_state_1(void) {
         //tf_assert_same(state, ref_state);
 
         tf_assert_same(jthread_clear_interrupted(tts->java_thread), TM_ERROR_INTERRUPT);
-        tf_assert_same(jthread_get_state(tts->java_thread, &state), TM_ERROR_NONE);
+        tf_assert_same(jthread_get_jvmti_state(tts->java_thread, &state), TM_ERROR_NONE);
         ref_state = 0x5;
         if(tts->my_index == 0){
             printf("state = %08x (%08x)\n", state, ref_state);
@@ -99,7 +99,7 @@ int test_jthread_get_state_1(void) {
         tested_thread_send_stop_request(tts);
         tested_thread_wait_ended(tts);
         check_tested_thread_phase(tts, TT_PHASE_DEAD);
-        tf_assert_same(jthread_get_state(tts->java_thread, &state), TM_ERROR_NONE);
+        tf_assert_same(jthread_get_jvmti_state(tts->java_thread, &state), TM_ERROR_NONE);
         ref_state = 0x2;
         if(tts->my_index == 0){
             printf("state = %08x (%08x)\n", state, ref_state);
@@ -113,9 +113,9 @@ int test_jthread_get_state_1(void) {
     return TEST_PASSED;
 }
 /*
- * Test jthread_get_state(...)
+ * Test jthread_get_jvmti_state(...)
  */
-void JNICALL run_for_test_jthread_get_state_2(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
+void JNICALL run_for_test_jthread_get_jvmti_state_2(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
 
     tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
     jobject monitor = tts->monitor;
@@ -147,7 +147,7 @@ void JNICALL run_for_test_jthread_get_state_2(jvmtiEnv * jvmti_env, JNIEnv * jni
     tested_thread_ended(tts);
 }
 
-int test_jthread_get_state_2(void) {
+int test_jthread_get_jvmti_state_2(void) {
 
     tested_thread_sturct_t *tts;
     jobject monitor;
@@ -165,12 +165,12 @@ int test_jthread_get_state_2(void) {
     status = jthread_monitor_enter(monitor);
 
     // Run all tested threads
-    tested_threads_run_common(run_for_test_jthread_get_state_2);
+    tested_threads_run_common(run_for_test_jthread_get_jvmti_state_2);
 
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
         check_tested_thread_phase(tts, TT_PHASE_WAITING_ON_MONITOR);
-        tf_assert_same(jthread_get_state(tts->java_thread, &state), TM_ERROR_NONE);
+        tf_assert_same(jthread_get_jvmti_state(tts->java_thread, &state), TM_ERROR_NONE);
         ref_state = 0x401;
         if(tts->my_index == 0){
             printf("state = %08x (%08x)\n", state, ref_state);
@@ -183,7 +183,7 @@ int test_jthread_get_state_2(void) {
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
         check_tested_thread_phase(tts, TT_PHASE_WAITING_ON_WAIT);
-        tf_assert_same(jthread_get_state(tts->java_thread, &state), TM_ERROR_NONE);
+        tf_assert_same(jthread_get_jvmti_state(tts->java_thread, &state), TM_ERROR_NONE);
         ref_state = 0x191;
         if(tts->my_index == 0){
             printf("state = %08x (%08x)\n", state, ref_state);
@@ -198,7 +198,7 @@ int test_jthread_get_state_2(void) {
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
         check_tested_thread_phase(tts, TT_PHASE_WAITING_ON_WAIT);
-        tf_assert_same(jthread_get_state(tts->java_thread, &state), TM_ERROR_NONE);
+        tf_assert_same(jthread_get_jvmti_state(tts->java_thread, &state), TM_ERROR_NONE);
         ref_state = 0x401;
         if(tts->my_index == 0){
             printf("state = %08x (%08x)\n", state, ref_state);
@@ -212,7 +212,7 @@ int test_jthread_get_state_2(void) {
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
         check_tested_thread_phase(tts, TT_PHASE_RUNNING);
-        tf_assert_same(jthread_get_state(tts->java_thread, &state), TM_ERROR_NONE);
+        tf_assert_same(jthread_get_jvmti_state(tts->java_thread, &state), TM_ERROR_NONE);
         ref_state = 0x5;
         if(tts->my_index == 0){
             printf("state = %08x (%08x)\n", state, ref_state);
@@ -227,9 +227,9 @@ int test_jthread_get_state_2(void) {
 }
 
 /*
- * Test jthread_get_state(...)
+ * Test jthread_get_jvmti_state(...)
  */
-void JNICALL run_for_test_jthread_get_state_3(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
+void JNICALL run_for_test_jthread_get_jvmti_state_3(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
 
     tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
     jobject monitor = tts->monitor;
@@ -257,25 +257,25 @@ void JNICALL run_for_test_jthread_get_state_3(jvmtiEnv * jvmti_env, JNIEnv * jni
     tested_thread_ended(tts);
 }
 
-int test_jthread_get_state_3(void) {
+int test_jthread_get_jvmti_state_3(void) {
 
     tested_thread_sturct_t *tts;
     int state;
     int ref_state;
 
     // Initialize tts structures and run all tested threads
-    tested_threads_run(run_for_test_jthread_get_state_3);
+    tested_threads_run(run_for_test_jthread_get_jvmti_state_3);
 
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
         check_tested_thread_phase(tts, TT_PHASE_WAITING_ON_WAIT);
-        tf_assert_same(jthread_get_state(tts->java_thread, &state), TM_ERROR_NONE);
+        tf_assert_same(jthread_get_jvmti_state(tts->java_thread, &state), TM_ERROR_NONE);
         ref_state = 0x1a1;
         printf("state = %08x (%08x)\n", state, ref_state);
         //tf_assert_same(state, ref_state);
         tf_assert_same(jthread_interrupt(tts->java_thread), TM_ERROR_NONE);
         check_tested_thread_phase(tts, TT_PHASE_DEAD);
-        tf_assert_same(jthread_get_state(tts->java_thread, &state), TM_ERROR_NONE);
+        tf_assert_same(jthread_get_jvmti_state(tts->java_thread, &state), TM_ERROR_NONE);
         ref_state = 0x2;
         printf("state = %08x (%08x)\n", state, ref_state);
         //tf_assert_same(state, ref_state);
@@ -288,9 +288,9 @@ int test_jthread_get_state_3(void) {
 }
 
 /*
- * Test jthread_get_state(...)
+ * Test jthread_get_jvmti_state(...)
  */
-void JNICALL run_for_test_jthread_get_state_4(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
+void JNICALL run_for_test_jthread_get_jvmti_state_4(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
 
     tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
     jobject monitor = tts->monitor;
@@ -318,14 +318,14 @@ void JNICALL run_for_test_jthread_get_state_4(jvmtiEnv * jvmti_env, JNIEnv * jni
     tested_thread_ended(tts);
 }
 
-int test_jthread_get_state_4(void) {
+int test_jthread_get_jvmti_state_4(void) {
 
     tested_thread_sturct_t *tts;
     int state;
     int ref_state;
 
     // Initialize tts structures and run all tested threads
-    tested_threads_run(run_for_test_jthread_get_state_4);
+    tested_threads_run(run_for_test_jthread_get_jvmti_state_4);
 
     // Wait for all threads wait timeout
     jthread_sleep(20 * CLICK_TIME_MSEC * MAX_TESTED_THREAD_NUMBER, 0);
@@ -333,7 +333,7 @@ int test_jthread_get_state_4(void) {
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
         check_tested_thread_phase(tts, TT_PHASE_DEAD);
-        tf_assert_same(jthread_get_state(tts->java_thread, &state), TM_ERROR_NONE);
+        tf_assert_same(jthread_get_jvmti_state(tts->java_thread, &state), TM_ERROR_NONE);
         ref_state = 0x2;
         printf("state = %08x (%08x)\n", state, ref_state);
         //tf_assert_same(state, ref_state);
@@ -346,9 +346,9 @@ int test_jthread_get_state_4(void) {
 }
 
 /*
- * Test jthread_get_state(...)
+ * Test jthread_get_jvmti_state(...)
  */
-void JNICALL run_for_test_jthread_get_state_5(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
+void JNICALL run_for_test_jthread_get_jvmti_state_5(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
 
     tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
     IDATA status;
@@ -360,25 +360,25 @@ void JNICALL run_for_test_jthread_get_state_5(jvmtiEnv * jvmti_env, JNIEnv * jni
     tested_thread_ended(tts);
 }
 
-int test_jthread_get_state_5(void) {
+int test_jthread_get_jvmti_state_5(void) {
 
     tested_thread_sturct_t *tts;
     int state;
     int ref_state;
 
     // Initialize tts structures and run all tested threads
-    tested_threads_run(run_for_test_jthread_get_state_5);
+    tested_threads_run(run_for_test_jthread_get_jvmti_state_5);
 
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
         check_tested_thread_phase(tts, TT_PHASE_SLEEPING);
-        tf_assert_same(jthread_get_state(tts->java_thread, &state), TM_ERROR_NONE);
+        tf_assert_same(jthread_get_jvmti_state(tts->java_thread, &state), TM_ERROR_NONE);
         ref_state = 0;
         printf("state = %08x (%08x)\n", state, ref_state);
         //tf_assert_same(state, ref_state);
         tf_assert_same(jthread_interrupt(tts->java_thread), TM_ERROR_NONE);
         check_tested_thread_phase(tts, TT_PHASE_DEAD);
-        tf_assert_same(jthread_get_state(tts->java_thread, &state), TM_ERROR_NONE);
+        tf_assert_same(jthread_get_jvmti_state(tts->java_thread, &state), TM_ERROR_NONE);
         ref_state = 0;
         printf("state = %08x (%08x)\n", state, ref_state);
         //tf_assert_same(state, ref_state);
@@ -391,9 +391,9 @@ int test_jthread_get_state_5(void) {
 }
 
 /*
- * Test jthread_get_state(...)
+ * Test jthread_get_jvmti_state(...)
  */
-void JNICALL run_for_test_jthread_get_state_6(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
+void JNICALL run_for_test_jthread_get_jvmti_state_6(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
 
     tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
     IDATA status;
@@ -405,14 +405,14 @@ void JNICALL run_for_test_jthread_get_state_6(jvmtiEnv * jvmti_env, JNIEnv * jni
     tested_thread_ended(tts);
 }
 
-int test_jthread_get_state_6(void) {
+int test_jthread_get_jvmti_state_6(void) {
 
     tested_thread_sturct_t *tts;
     int state;
     int ref_state;
 
     // Initialize tts structures and run all tested threads
-    tested_threads_run(run_for_test_jthread_get_state_6);
+    tested_threads_run(run_for_test_jthread_get_jvmti_state_6);
 
     // Wait for all threads wait timeout
     jthread_sleep(20 * CLICK_TIME_MSEC * MAX_TESTED_THREAD_NUMBER, 0);
@@ -420,7 +420,7 @@ int test_jthread_get_state_6(void) {
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
         check_tested_thread_phase(tts, TT_PHASE_DEAD);
-        tf_assert_same(jthread_get_state(tts->java_thread, &state), TM_ERROR_NONE);
+        tf_assert_same(jthread_get_jvmti_state(tts->java_thread, &state), TM_ERROR_NONE);
         ref_state = 0x2;
         printf("state = %08x (%08x)\n", state, ref_state);
         //tf_assert_same(state, ref_state);
@@ -433,10 +433,10 @@ int test_jthread_get_state_6(void) {
 }
 
 TEST_LIST_START
-    //TEST(test_jthread_get_state_1)
-    //TEST(test_jthread_get_state_2)
-    //TEST(test_jthread_get_state_3)
-    //TEST(test_jthread_get_state_4)
-    //TEST(test_jthread_get_state_5)
-    TEST(test_jthread_get_state_6)
+    //TEST(test_jthread_get_jvmti_state_1)
+    //TEST(test_jthread_get_jvmti_state_2)
+    //TEST(test_jthread_get_jvmti_state_3)
+    //TEST(test_jthread_get_jvmti_state_4)
+    //TEST(test_jthread_get_jvmti_state_5)
+    TEST(test_jthread_get_jvmti_state_6)
 TEST_LIST_END;

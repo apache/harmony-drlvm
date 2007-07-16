@@ -154,7 +154,6 @@ void tested_threads_init(int mode){
         tts->my_index = i;
         tts->java_thread = new_jobject_thread(jni_env);
         tts->native_thread = NULL;
-        //tts->attrs.priority = 5;
         tts->jvmti_start_proc_arg = &tts->jvmti_start_proc_arg;
         hysem_create(&tts->started, 0, 1);
         hysem_create(&tts->running, 0, 1);
@@ -237,13 +236,13 @@ void reset_tested_thread_iterator(tested_thread_sturct_t **tts){
 
 void tested_threads_run_common(jvmtiStartFunction run_method_param){
     tested_thread_sturct_t *tts;
-    JNIEnv * jni_env;
-
-    jni_env = jthread_get_JNI_env(jthread_self());
+    JNIEnv * jni_env = jthread_get_JNI_env(jthread_self());
 
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
-        tf_assert_same_v(jthread_create_with_function(jni_env, tts->java_thread, &tts->attrs, run_method_param, tts), TM_ERROR_NONE);
+        tts->attrs.proc = run_method_param;
+        tts->attrs.arg = tts;
+        tf_assert_same_v(jthread_create_with_function(jni_env, tts->java_thread, &tts->attrs), TM_ERROR_NONE);
         tested_thread_wait_started(tts);
         tts->native_thread = (hythread_t) vm_jthread_get_tm_data(tts->java_thread);
     }
@@ -338,22 +337,16 @@ int tested_threads_destroy() {
 int check_structure(tested_thread_sturct_t *tts){
 
     jthread java_thread = tts->java_thread;
+    vm_thread_t vm_thread;
     jvmti_thread_t jvmti_thread;
     hythread_t hythread;
 
     hythread = (hythread_t) vm_jthread_get_tm_data(java_thread);
     tf_assert_same(hythread, tts->native_thread);
-    jvmti_thread = hythread_get_private_data(hythread);
+    vm_thread = (vm_thread_t)hythread_tls_get(hythread, TM_THREAD_VM_TLS_KEY);
+    tf_assert(vm_thread);
+    jvmti_thread = &(vm_thread->jvmti_thread);
     tf_assert(jvmti_thread);
-    /*
-      tf_assert_same(jvmti_thread->thread_object->object->data, 
-      java_thread->object->data);
-      tf_assert_same(jvmti_thread->jenv, tts->jni_env);
-    */
-
-    //if(jvmti_thread->stop_exception != stop_exception){
-    //      return TEST_FAILED; ????????????????????????????????????????????
-    //}
     return TEST_PASSED;
 }
 

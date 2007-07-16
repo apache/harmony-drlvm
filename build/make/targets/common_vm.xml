@@ -240,7 +240,7 @@
             <pathelement location="${build.VM.home}/tests/unit/framework" />
             <pathelement location="${build.VM.home}/include" />
             <pathelement location="${build.VM.home}/include/open" />
-            <pathelement location="${build.VM.home}/thread/src" />
+            <pathelement location="${build.VM.home}/vmcore/src/thread" />
             <pathelement location="${build.VM.home}/port/include" />
         </path>
     </target>

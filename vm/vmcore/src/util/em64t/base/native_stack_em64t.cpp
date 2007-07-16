@@ -182,9 +182,12 @@ bool native_unwind_special(native_module_t* modules,
     return true;
 }
 
-void native_unwind_interrupted_frame(VM_thread* pthread, void** p_ip, void** p_bp, void** p_sp)
+void native_unwind_interrupted_frame(jvmti_thread_t thread, void** p_ip, void** p_bp, void** p_sp)
 {
-    Registers* pregs = &pthread->jvmti_saved_exception_registers;
+    if (!thread) {
+        return;
+    }
+    Registers* pregs = (Registers*)(thread->jvmti_saved_exception_registers);
     *p_ip = (void*)pregs->rip;
     *p_bp = (void*)pregs->rbp;
     *p_sp = (void*)pregs->rsp;

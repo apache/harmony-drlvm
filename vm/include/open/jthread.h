@@ -35,15 +35,15 @@
  * <code>vm/thread/doc/ThreadManager.htm</code>
  */
 
-#include "open/types.h"
-#include "open/hythread_ext.h"
 #include <jni.h>
 #include <jvmti.h>
+#include "open/types.h"
+#include "open/hythread_ext.h"
+#include "open/ti_thread.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
-
 
 /** 
  * @name Basic manipulation
@@ -51,48 +51,22 @@ extern "C" {
 //@{
 
 typedef struct JVMTIThread *jvmti_thread_t;
+typedef struct jthread_thread_attr jthread_threadattr_t;
+typedef struct VM_thread * vm_thread_t;
 
-/**
- * Java thread creation attributes.
- */
-typedef struct {
-  
-   /**
-    * Thread scheduling priority.
-    */  
-    jint priority;
-
-   /**
-    * Thread stack size.
-    */  
-    jint stacksize;
-
-   /**
-    * Denotes whether Java thread is daemon.  
-    * JVM exits when the only threads running are daemon threads.
-    */  
-    jboolean daemon;
-
-   /**
-    * JVM TI Environment.
-    */  
-    jvmtiEnv * jvmti_env;
-
-} jthread_threadattr_t;
-
-jlong jthread_thread_init(jvmti_thread_t *ret_thread, JNIEnv* env, jthread java_thread, jobject weak_ref, jlong old_thread);
-IDATA jthread_create(JNIEnv * jni_env, jthread thread, jthread_threadattr_t *attrs);
-IDATA jthread_create_with_function(JNIEnv * jni_env, jthread thread, jthread_threadattr_t *attrs, jvmtiStartFunction proc, const void* arg);
-IDATA jthread_attach(JNIEnv * jni_env, jthread thread, jboolean daemon);
- IDATA jthread_detach(jthread thread);
-IDATA jthread_join(jthread thread);
-IDATA jthread_timed_join(jthread thread, jlong millis, jint nanos);
-IDATA jthread_yield();
-IDATA jthread_stop(jthread thread);
-IDATA jthread_exception_stop(jthread thread, jobject throwable);
-IDATA jthread_sleep(jlong millis, jint nanos);
-JNIEnv *jthread_get_JNI_env(jthread thread);
-IDATA jthread_wait_for_all_nondaemon_threads();
+VMEXPORT jlong jthread_thread_init(JNIEnv* env, jthread java_thread, jobject weak_ref, hythread_t old_thread);
+VMEXPORT IDATA jthread_create(JNIEnv * jni_env, jthread thread, jthread_threadattr_t *attrs);
+VMEXPORT IDATA jthread_create_with_function(JNIEnv * jni_env, jthread thread, jthread_threadattr_t *attrs);
+VMEXPORT IDATA jthread_attach(JNIEnv * jni_env, jthread thread, jboolean daemon);
+VMEXPORT IDATA jthread_detach(jthread thread);
+VMEXPORT IDATA jthread_join(jthread thread);
+VMEXPORT IDATA jthread_timed_join(jthread thread, jlong millis, jint nanos);
+VMEXPORT IDATA jthread_yield();
+VMEXPORT IDATA jthread_stop(jthread thread);
+VMEXPORT IDATA jthread_exception_stop(jthread thread, jobject throwable);
+VMEXPORT IDATA jthread_sleep(jlong millis, jint nanos);
+VMEXPORT JNIEnv *jthread_get_JNI_env(jthread thread);
+VMEXPORT IDATA jthread_wait_for_all_nondaemon_threads();
 
 
 
@@ -101,9 +75,9 @@ IDATA jthread_wait_for_all_nondaemon_threads();
  */
 //@{
 
-jthread jthread_self(void);
-jlong jthread_get_id(jthread thread);
-jthread jthread_get_thread(jlong thread_id);
+VMEXPORT jthread jthread_self(void);
+VMEXPORT jlong jthread_get_id(jthread thread);
+VMEXPORT jthread jthread_get_thread(jlong thread_id);
 
 
 
@@ -113,8 +87,8 @@ jthread jthread_get_thread(jlong thread_id);
 //@{
 
 
-hythread_t  jthread_get_native_thread(jthread thread);
-jthread jthread_get_java_thread(hythread_t thread);
+VMEXPORT hythread_t  jthread_get_native_thread(jthread thread);
+VMEXPORT jthread jthread_get_java_thread(hythread_t thread);
 
 
 //@}
@@ -123,9 +97,9 @@ jthread jthread_get_java_thread(hythread_t thread);
 //@{
 
 
-IDATA jthread_set_priority(jthread thread, int priority);
-int jthread_get_priority(jthread thread);
-jboolean jthread_is_daemon(jthread thread);
+VMEXPORT IDATA jthread_set_priority(jthread thread, jint priority);
+VMEXPORT jint jthread_get_priority(jthread thread);
+VMEXPORT jboolean jthread_is_daemon(jthread thread);
 
 /**
  * Sets the name for the <code>thread</code>.
@@ -135,7 +109,7 @@ jboolean jthread_is_daemon(jthread thread);
  *
  * @sa <code>java.lang.Thread.setName()</code>
  */
-IDATA jthread_set_name(jthread thread, jstring name);
+VMEXPORT IDATA jthread_set_name(jthread thread, jstring name);
 
 /**
  * Returns the name for the <code>thread</code>.
@@ -144,7 +118,7 @@ IDATA jthread_set_name(jthread thread, jstring name);
  *
  * @sa <code>java.lang.Thread.getName()</code>
  */
-jstring jthread_get_name(jthread thread);
+VMEXPORT jstring jthread_get_name(jthread thread);
 
 
 //@}
@@ -152,9 +126,9 @@ jstring jthread_get_name(jthread thread);
  */
 //@{
 
-IDATA jthread_interrupt(jthread thread);
-jboolean jthread_is_interrupted(jthread thread);
-IDATA jthread_clear_interrupted(jthread thread);
+VMEXPORT IDATA jthread_interrupt(jthread thread);
+VMEXPORT jboolean jthread_is_interrupted(jthread thread);
+VMEXPORT IDATA jthread_clear_interrupted(jthread thread);
 
 
 //@}
@@ -162,36 +136,35 @@ IDATA jthread_clear_interrupted(jthread thread);
  */
 //@{
 
- IDATA jthread_monitor_init(jobject mon);
+VMEXPORT IDATA jthread_monitor_init(jobject mon);
 VMEXPORT IDATA jthread_monitor_enter(jobject mon);
- IDATA jthread_monitor_try_enter(jobject mon);
+VMEXPORT IDATA jthread_monitor_try_enter(jobject mon);
 VMEXPORT IDATA jthread_monitor_exit(jobject mon);
- IDATA jthread_monitor_notify(jobject mon);
- IDATA jthread_monitor_notify_all(jobject mon);
- IDATA jthread_monitor_wait(jobject mon);
- IDATA jthread_monitor_timed_wait(jobject mon, jlong millis, jint nanos);
+VMEXPORT IDATA jthread_monitor_notify(jobject mon);
+VMEXPORT IDATA jthread_monitor_notify_all(jobject mon);
+VMEXPORT IDATA jthread_monitor_wait(jobject mon);
+VMEXPORT IDATA jthread_monitor_timed_wait(jobject mon, jlong millis, jint nanos);
 
 //@}
 /** @name Parking
  */
 //@{
 
- IDATA jthread_park();
- IDATA jthread_timed_park(jlong millis, jint nanos);
- IDATA jthread_unpark(jthread thread);
- IDATA jthread_park_until(jlong milis);
+VMEXPORT IDATA jthread_park();
+VMEXPORT IDATA jthread_timed_park(jlong millis, jint nanos);
+VMEXPORT IDATA jthread_unpark(jthread thread);
+VMEXPORT IDATA jthread_park_until(jlong milis);
 
 //@}
 /** @name Suspension
  */
 //@{
 
- IDATA jthread_suspend(jthread thread);
- IDATA jthread_suspend_all(jvmtiError* results, jint count, const jthread* thread_list);
- IDATA jthread_resume(jthread thread);
- IDATA jthread_resume_all(jvmtiError* results, jint count, const jthread* thread_list);
- IDATA jthread_cancel_all();
-
+VMEXPORT IDATA jthread_suspend(jthread thread);
+VMEXPORT IDATA jthread_suspend_all(jvmtiError* results, jint count, const jthread* thread_list);
+VMEXPORT IDATA jthread_resume(jthread thread);
+VMEXPORT IDATA jthread_resume_all(jvmtiError* results, jint count, const jthread* thread_list);
+VMEXPORT IDATA jthread_cancel_all();
 
 #ifdef __cplusplus
 }

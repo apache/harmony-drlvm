@@ -356,7 +356,7 @@ Java_org_apache_harmony_lang_management_ThreadMXBeanImpl_isSuspendedImpl(JNIEnv 
 {
     jint thread_state;
     TRACE2("management", "ThreadMXBeanImpl_isSuspendedImpl invocation");
-    IDATA UNUSED status = jthread_get_state(thread, &thread_state);
+    IDATA UNUSED status = jthread_get_jvmti_state(thread, &thread_state);
     assert(status == TM_ERROR_NONE);
     return thread_state & TM_THREAD_STATE_SUSPENDED;
 };

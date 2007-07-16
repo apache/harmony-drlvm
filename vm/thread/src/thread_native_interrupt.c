@@ -23,7 +23,7 @@
 #include "thread_private.h"
 #include <open/hythread_ext.h>
 
-static int interrupter_thread_function(void *args);
+static IDATA HYTHREAD_PROC interrupter_thread_function(void *args);
 
 /** 
  * Interrupt a thread.
@@ -65,7 +65,7 @@ void VMCALL hythread_interrupt(hythread_t thread) {
     hymutex_unlock(&thread->mutex);
 }
 
-static int interrupter_thread_function(void *args) {
+static IDATA HYTHREAD_PROC interrupter_thread_function(void *args) {
     hythread_t thread = (hythread_t)args; 
     hythread_monitor_t monitor = NULL;
     hymutex_lock(&thread->mutex);

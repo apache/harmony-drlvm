@@ -42,11 +42,11 @@ void m2n_null_init(M2nFrame * m2n){
 }
 
 M2nFrame* m2n_get_last_frame() {
-    return p_TLS_vmthread->last_m2n_frame;
+    return (M2nFrame*)p_TLS_vmthread->last_m2n_frame;
 }
 
 M2nFrame* m2n_get_last_frame(VM_thread * thread) {
-    return thread->last_m2n_frame;
+    return (M2nFrame*)thread->last_m2n_frame;
 }
 
 void m2n_set_last_frame(VM_thread* thread, M2nFrame * lm2nf) {

@@ -61,20 +61,20 @@ typedef struct {
  * @param[out] stfs      - the pointer to the array of stack trace frames
  *                         created by this function and returned via this pointer
  * @note The caller is responsible for freeing the memory.*/
-    void (*interpreter_st_get_trace) (class VM_thread *thread, unsigned* res_depth, struct StackTraceFrame** stfs);
+    void (*interpreter_st_get_trace) (struct VM_thread *thread, unsigned* res_depth, struct StackTraceFrame** stfs);
 
 /**
  * Enumerates references associated with the thread.
  *
  * @param thread - the pointer to the thread*/
-    void (*interpreter_enumerate_thread) (class VM_thread *thread);
+    void (*interpreter_enumerate_thread) (struct VM_thread *thread);
 
 /**
  * Returns the last frame.
  *
  * @param thread - the pointer to the thread
  * @return The pointer to the last frame.*/
-    FrameHandle* (*interpreter_get_last_frame) (class VM_thread *thread);
+    FrameHandle* (*interpreter_get_last_frame) (struct VM_thread *thread);
 
 /** Returns the previous frame.
  *
@@ -111,7 +111,7 @@ typedef struct {
  *
  * @param thread   - the pointer to the thread
  * @param jvmtiEnv - the pointer to the jvmti environment*/
-    void (*interpreter_ti_enumerate_thread) (jvmtiEnv*, class VM_thread *thread);
+    void (*interpreter_ti_enumerate_thread) (jvmtiEnv*, struct VM_thread *thread);
 
 #ifdef _IPF_
 /**
@@ -133,7 +133,7 @@ typedef struct {
  * @param jlocation  - the pointer to the location
  * @return <code>JVMTI_ERROR_NONE</code> - a successfully added notification<br>
  *         <code>JVMTI_ERROR_NO_MORE_FRAMES</code> - depth is too large*/
-    jvmtiError (*interpreter_ti_getFrameLocation) ( jvmtiEnv*, class VM_thread*,
+    jvmtiError (*interpreter_ti_getFrameLocation) ( jvmtiEnv*, struct VM_thread*,
             int, struct _jmethodID * *, int64 *);
 
 /**
@@ -149,7 +149,7 @@ typedef struct {
  *         <code>JVMTI_ERROR_OPAQUE_FRAME</code>   - no frame<br>
  *         <code>JVMTI_ERROR_INVALID_SLOT</code>   - a bad slot<br>
  *         <code>JVMTI_ERROR_TYPE_MISMATCH</code>  - an invalid variable type*/
-    jvmtiError (*interpreter_ti_getLocal32) ( jvmtiEnv*, class VM_thread*, int, int, int *);
+    jvmtiError (*interpreter_ti_getLocal32) ( jvmtiEnv*, struct VM_thread*, int, int, int *);
 
 /**
  * Returns the value of 64 bit local variable.
@@ -164,7 +164,7 @@ typedef struct {
  *         <code>JVMTI_ERROR_OPAQUE_FRAME</code>   - no frame<br>
  *         <code>JVMTI_ERROR_INVALID_SLOT</code>   - a bad slot<br>
  *         <code>JVMTI_ERROR_TYPE_MISMATCH</code>  - an invalid variable type*/
-    jvmtiError (*interpreter_ti_getLocal64) ( jvmtiEnv*, class VM_thread*, int, int, int64 *);
+    jvmtiError (*interpreter_ti_getLocal64) ( jvmtiEnv*, struct VM_thread*, int, int, int64 *);
 
 /**
  * Returns the value of the <code>Object</code> type local variable.
@@ -179,7 +179,7 @@ typedef struct {
  *         <code>JVMTI_ERROR_OPAQUE_FRAME</code>   - no frame<br>
  *         <code>JVMTI_ERROR_INVALID_SLOT</code>   - a bad slot<br>
  *         <code>JVMTI_ERROR_TYPE_MISMATCH</code>  - an invalid variable type*/
-    jvmtiError (*interpreter_ti_getObject) ( jvmtiEnv*, class VM_thread*, int, int, struct _jobject * *);
+    jvmtiError (*interpreter_ti_getObject) ( jvmtiEnv*, struct VM_thread*, int, int, struct _jobject * *);
 
 /**
  * Returns stack trace data.
@@ -192,7 +192,7 @@ typedef struct {
  * @param count_ptr       - the pointer to the count
  * @return <code>JVMTI_ERROR_NONE</code>             - a successfully added notification<br>
  *         <code>JVMTI_ERROR_ILLEGAL_ARGUMENT</code> - bad arguments*/
-    jvmtiError (*interpreter_ti_getStackTrace) (jvmtiEnv*, class VM_thread*, int, int, jvmtiFrameInfo*, int *);
+    jvmtiError (*interpreter_ti_getStackTrace) (jvmtiEnv*, struct VM_thread*, int, int, jvmtiFrameInfo*, int *);
 
 /**
  * Returns frame count.
@@ -201,7 +201,7 @@ typedef struct {
  * @param thread         - the pointer to the thread
  * @param count_ptr[out] - the pointer to the count
  * @return <code>JVMTI_ERROR_NONE</code> - a successfully added notification*/
-    jvmtiError (*interpreter_ti_get_frame_count) ( jvmtiEnv*, class VM_thread*, int *);
+    jvmtiError (*interpreter_ti_get_frame_count) ( jvmtiEnv*, struct VM_thread*, int *);
 
 /**
  * Sets the value of 32 bit local variable.
@@ -216,7 +216,7 @@ typedef struct {
  *         <code>JVMTI_ERROR_OPAQUE_FRAME</code>   - no frame<br>
  *         <code>JVMTI_ERROR_INVALID_SLOT</code>   - a bad slot<br>
  *         <code>JVMTI_ERROR_TYPE_MISMATCH</code>  - an invalid variable type*/
-    jvmtiError (*interpreter_ti_setLocal32) ( jvmtiEnv*, class VM_thread*, int, int, int);
+    jvmtiError (*interpreter_ti_setLocal32) ( jvmtiEnv*, struct VM_thread*, int, int, int);
 
 /**
  * Sets the value of 64 bit local variable.
@@ -231,7 +231,7 @@ typedef struct {
  *         <code>JVMTI_ERROR_OPAQUE_FRAME</code>   - no frame<br>
  *         <code>JVMTI_ERROR_INVALID_SLOT</code>   - a bad slot<br>
  *         <code>JVMTI_ERROR_TYPE_MISMATCH</code>  - an invalid variable type<br>*/
-    jvmtiError (*interpreter_ti_setLocal64) ( jvmtiEnv*, class VM_thread*, int, int, int64);
+    jvmtiError (*interpreter_ti_setLocal64) ( jvmtiEnv*, struct VM_thread*, int, int, int64);
 
 /**
  * Sets the value of the <code>Object</code> type local variable.
@@ -246,14 +246,14 @@ typedef struct {
  *         <code>JVMTI_ERROR_OPAQUE_FRAME</code>   - no frame<br>
  *         <code>JVMTI_ERROR_INVALID_SLOT</code>   - a bad slot<br>
  *         <code>JVMTI_ERROR_TYPE_MISMATCH</code>  - an invalid variable type*/
-    jvmtiError (*interpreter_ti_setObject) ( jvmtiEnv*, class VM_thread*, int, int, struct _jobject *);
+    jvmtiError (*interpreter_ti_setObject) ( jvmtiEnv*, struct VM_thread*, int, int, struct _jobject *);
 
 /**
  * Returns the interrupted method native bit.
  *
  * @param thread - the pointer to the thread
  * @return The interrupted method native bit.*/
-    unsigned int (*interpreter_st_get_interrupted_method_native_bit) (class VM_thread *);
+    unsigned int (*interpreter_st_get_interrupted_method_native_bit) (struct VM_thread *);
 
 /** @defgroup open_interfaces Open Interfaces
  * Open interfaces.*/

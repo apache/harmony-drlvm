@@ -443,25 +443,25 @@ jvmti_SingleStepLocation( VM_thread* thread,
 static void
 jvmti_setup_jit_single_step(DebugUtilsTI *ti, Method* m, jlocation location)
 {
-    VM_thread* vm_thread = p_TLS_vmthread;
+    jvmti_thread_t jvmti_thread = jthread_self_jvmti();
     jvmti_StepLocation *locations;
     unsigned locations_count;
 
-    jvmti_SingleStepLocation(vm_thread, m, (unsigned)location,
+    jvmti_SingleStepLocation(p_TLS_vmthread, m, (unsigned)location,
                             &locations, &locations_count);
 
     // lock breakpoints
     VMBreakPoints* vm_brpt = VM_Global_State::loader_env->TI->vm_brpt;
     LMAutoUnlock lock(vm_brpt->get_lock());
 
-    jvmti_remove_single_step_breakpoints(ti, vm_thread);
+    jvmti_remove_single_step_breakpoints(ti, jvmti_thread);
 
-    jvmti_set_single_step_breakpoints(ti, vm_thread, locations, locations_count);
+    jvmti_set_single_step_breakpoints(ti, jvmti_thread, locations, locations_count);
 }
 
 void
 jvmti_set_single_step_breakpoints_for_method(DebugUtilsTI *ti,
-                                             VM_thread *vm_thread,
+                                             jvmti_thread_t jvmti_thread,
                                              Method *method)
 {
     if (ti->isEnabled() && ti->is_single_step_enabled())
@@ -470,12 +470,12 @@ jvmti_set_single_step_breakpoints_for_method(DebugUtilsTI *ti,
             return;
 
         LMAutoUnlock lock(ti->vm_brpt->get_lock());
-        if (NULL != vm_thread->ss_state)
+        if (NULL != jvmti_thread->ss_state)
         {
-            jvmti_remove_single_step_breakpoints(ti, vm_thread);
+            jvmti_remove_single_step_breakpoints(ti, jvmti_thread);
 
             jvmti_StepLocation method_start = {method, NULL, 0, false};
-            jvmti_set_single_step_breakpoints(ti, vm_thread, &method_start, 1);
+            jvmti_set_single_step_breakpoints(ti, jvmti_thread, &method_start, 1);
         }
     }
 }
@@ -485,7 +485,10 @@ static void jvmti_start_single_step_in_virtual_method(DebugUtilsTI *ti, VMBreakP
 {
 #if (defined _IA32_) || (defined _EM64T_)
     VM_thread *vm_thread = p_TLS_vmthread;
-    Registers *regs = &vm_thread->jvmti_saved_exception_registers;
+    assert(vm_thread);
+    jvmti_thread_t jvmti_thread = &vm_thread->jvmti_thread;
+    assert(jvmti_thread);
+    Registers regs = *(Registers*)(jvmti_thread->jvmti_saved_exception_registers);
     // This is a virtual breakpoint set exactly on the call
     // instruction for the virtual method. In this place it is
     // possible to determine the target method in runtime
@@ -500,11 +503,11 @@ static void jvmti_start_single_step_in_virtual_method(DebugUtilsTI *ti, VMBreakP
         // Invokevirtual uses indirect call from VTable. The base
         // address is in the register, offset is in displacement *
         // scale. This method is much faster than 
-        VTable* vtable = (VTable*)disasm->get_reg_value(op.base, regs);
+        VTable* vtable = (VTable*)disasm->get_reg_value(op.base, &regs);
         assert(vtable);
         // For x86 based architectures offset cannot be longer than 32
         // bits, so unsigned is ok here
-        unsigned offset = (unsigned)((POINTER_SIZE_INT)disasm->get_reg_value(op.index, regs) *
+        unsigned offset = (unsigned)((POINTER_SIZE_INT)disasm->get_reg_value(op.index, &regs) *
             op.scale + op.disp);
         method = class_get_method_from_vt_offset(vtable, offset);
     }
@@ -513,7 +516,7 @@ static void jvmti_start_single_step_in_virtual_method(DebugUtilsTI *ti, VMBreakP
         // This is invokeinterface bytecode which uses register
         // call so we need to search through all methods for this
         // one to find it, no way to get vtable and offset in it
-        NativeCodePtr ip = disasm->get_target_address_from_context(regs);
+        NativeCodePtr ip = disasm->get_target_address_from_context(&regs);
         Global_Env * vm_env = jni_get_vm_env(vm_thread->jni_env);
         CodeChunkInfo *cci = vm_env->vm_methods->find(ip);
         if (cci)
@@ -547,7 +550,7 @@ static void jvmti_start_single_step_in_virtual_method(DebugUtilsTI *ti, VMBreakP
     // The determined method is the one which is called by
     // invokevirtual or invokeinterface bytecodes. It should be
     // started to be single stepped from the beginning
-    jvmti_set_single_step_breakpoints_for_method(ti, vm_thread, method);
+    jvmti_set_single_step_breakpoints_for_method(ti, jvmti_thread, method);
 #else
     NOT_IMPLEMENTED;
 #endif
@@ -570,7 +573,9 @@ static bool jvmti_process_jit_single_step_event(TIEnv* UNREF unused_env,
         return false;
 
     ti->vm_brpt->lock();
-    JVMTISingleStepState* sss = p_TLS_vmthread->ss_state;
+    jvmti_thread_t jvmti_thread = jthread_self_jvmti();
+    assert(jvmti_thread);
+    JVMTISingleStepState* sss = jvmti_thread->ss_state;
 
     if (!sss || !ti->is_single_step_enabled()) {
         ti->vm_brpt->unlock();
@@ -677,13 +682,13 @@ static bool jvmti_process_jit_single_step_event(TIEnv* UNREF unused_env,
     return true;
 }
 
-void jvmti_set_single_step_breakpoints(DebugUtilsTI *ti, VM_thread *vm_thread,
+void jvmti_set_single_step_breakpoints(DebugUtilsTI *ti, jvmti_thread_t jvmti_thread,
     jvmti_StepLocation *locations, unsigned locations_number)
 {
     // Function is always executed under global TI breakpoints lock
     ASSERT_NO_INTERPRETER;
 
-    JVMTISingleStepState *ss_state = vm_thread->ss_state;
+    JVMTISingleStepState *ss_state = jvmti_thread->ss_state;
     if( NULL == ss_state ) {
         // no need predict next step due to single step is off
         return;
@@ -730,10 +735,10 @@ void jvmti_set_single_step_breakpoints(DebugUtilsTI *ti, VM_thread *vm_thread,
     }
 }
 
-void jvmti_remove_single_step_breakpoints(DebugUtilsTI *ti, VM_thread *vm_thread)
+void jvmti_remove_single_step_breakpoints(DebugUtilsTI *ti, jvmti_thread_t jvmti_thread)
 {
     // Function is always executed under global TI breakpoints lock
-    JVMTISingleStepState *ss_state = vm_thread->ss_state;
+    JVMTISingleStepState *ss_state = jvmti_thread->ss_state;
 
     TRACE2("jvmti.break.ss", "Remove single step breakpoints, intf: "
         << (ss_state ? ss_state->predicted_breakpoints : NULL) );
@@ -937,17 +942,25 @@ jvmtiError DebugUtilsTI::jvmti_single_step_start(void)
     // Set single step in all threads
     while ((ht = hythread_iterator_next(&threads_iterator)) != NULL)
     {
-        VM_thread *vm_thread = get_vm_thread(ht);
+        vm_thread_t vm_thread =
+            (vm_thread_t)hythread_tls_get(ht, TM_THREAD_VM_TLS_KEY);
         if( !vm_thread ) {
-            // Skip thread that isn't started yet. SingleStep state
-            // will be enabled for it in
+            // Skip thread that isn't started yet.
+            // SingleStep state will be enabled for it in
+            // jvmti_send_thread_start_end_event()
+            continue;
+        }
+        jvmti_thread_t jvmti_thread = &vm_thread->jvmti_thread;
+        if( !jvmti_thread ) {
+            // Skip thread that isn't started yet.
+            // SingleStep state will be enabled for it in
             // jvmti_send_thread_start_end_event
             continue;
         }
 
         // Init single step state for the thread
         jvmtiError errorCode = _allocate(sizeof(JVMTISingleStepState),
-            (unsigned char **)&vm_thread->ss_state);
+            (unsigned char **)&jvmti_thread->ss_state);
 
         if (JVMTI_ERROR_NONE != errorCode)
         {
@@ -955,7 +968,7 @@ jvmtiError DebugUtilsTI::jvmti_single_step_start(void)
             return errorCode;
         }
 
-        vm_thread->ss_state->predicted_breakpoints = NULL;
+        jvmti_thread->ss_state->predicted_breakpoints = NULL;
 
         jvmti_StepLocation *locations;
         unsigned locations_number;
@@ -969,7 +982,7 @@ jvmtiError DebugUtilsTI::jvmti_single_step_start(void)
             return errorCode;
         }
 
-        jvmti_set_single_step_breakpoints(this, vm_thread, locations, locations_number);
+        jvmti_set_single_step_breakpoints(this, jvmti_thread, locations, locations_number);
     }
     
     single_step_enabled = true;
@@ -1014,20 +1027,20 @@ jvmtiError DebugUtilsTI::jvmti_single_step_stop(void)
     // Clear single step in all threads
     while ((ht = hythread_iterator_next(&threads_iterator)) != NULL)
     {
-        VM_thread *vm_thread = get_vm_thread(ht);
-        if( !vm_thread ) {
+        jvmti_thread_t jvmti_thread = jthread_get_jvmti_thread(ht);
+        if( !jvmti_thread ) {
             // Skip thread that isn't started yet. No need to disable
             // SingleStep state for it
             continue;
         }
 
-        if( vm_thread->ss_state ) {
-            jvmti_remove_single_step_breakpoints(this, vm_thread);
-            if( vm_thread->ss_state->predicted_breakpoints ) {
-                vm_brpt->release_intf(vm_thread->ss_state->predicted_breakpoints);
+        if( jvmti_thread->ss_state ) {
+            jvmti_remove_single_step_breakpoints(this, jvmti_thread);
+            if( jvmti_thread->ss_state->predicted_breakpoints ) {
+                vm_brpt->release_intf(jvmti_thread->ss_state->predicted_breakpoints);
             }
-            _deallocate((unsigned char *)vm_thread->ss_state);
-            vm_thread->ss_state = NULL;
+            _deallocate((unsigned char *)jvmti_thread->ss_state);
+            jvmti_thread->ss_state = NULL;
         }
     }
 

@@ -58,8 +58,6 @@ hythread_cancel_all
 hythread_group_create
 hythread_group_release
 hythread_group_get_list
-hythread_get_private_data
-hythread_set_private_data
 hythread_is_suspend_enabled
 hythread_suspend_enable
 hythread_suspend_disable
@@ -133,14 +131,12 @@ hythread_lib_destroy
 hythread_lib_lock
 hythread_lib_unlock
 
-release_start_lock
-acquire_start_lock
-inflate_lock
-is_fat_lock
-owns_thin_lock
-unreserve_lock
-set_suspend_disable
-reset_suspend_disable
+hythread_inflate_lock
+hythread_is_fat_lock
+hythread_owns_thin_lock
+hythread_unreserve_lock
+hythread_set_suspend_disable
+hythread_reset_suspend_disable
 hythread_is_blocked_on_monitor_enter
 hythread_is_waiting
 hythread_is_in_native
@@ -153,11 +149,15 @@ hythread_is_waiting_indefinitely
 hythread_is_runnable
 hythread_thin_monitor_get_recursion
 hythread_exit
-array_add
-array_create
-array_delete
-array_get
 get_java_thread_group
+tm_properties
 
-tm_properties;
-Java_org_apache_harmony_drlvm_thread_ThreadHelper_getThreadIdOffset
+hythread_thread_lock
+hythread_thread_unlock
+hythread_get_state
+hythread_set_state
+hythread_get_thread_id_offset
+hythread_set_thread_stop_callback
+hythread_wait_for_nondaemon_threads
+hythread_increase_nondaemon_threads_count
+hythread_decrease_nondaemon_threads_count

@@ -394,7 +394,7 @@ void interpreter_ti_set_notification_mode(jvmtiEvent event_type, bool UNREF enab
     else interpreter_ti_notification_mode &= ~new_mask;
 
     if (!interpreter_ti_notification_mode)
-        get_thread_ptr()->p_exception_object_ti = NULL;
+        get_thread_ptr()->jvmti_thread.p_exception_object_ti = NULL;
 }
 
 void method_entry_callback(Method *method) {
@@ -506,7 +506,7 @@ void single_step_callback(StackFrame &frame) {
 
 ////////////////////////////////////////
 //  Interpreter frames iteration
-FrameHandle* interpreter_get_last_frame(class VM_thread *thread)
+FrameHandle* interpreter_get_last_frame(struct VM_thread *thread)
 {
     return (FrameHandle*)getLastStackFrame(thread);
 }

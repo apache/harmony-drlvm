@@ -17,7 +17,7 @@
 /** 
  * @author Andrey Chernyshev
  * @version $Revision: 1.1.2.1.4.5 $
- */  
+ */
 
 
 #include "open/thread_externals.h"
@@ -73,88 +73,107 @@ using namespace std;
 #define LOG_DOMAIN "vmcore.thread"
 #include "cxxlog.h"
 
-hythread_tls_key_t TLS_key_pvmthread;
-
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
-volatile VM_thread *p_the_safepoint_control_thread = 0;  // only set when a gc is happening
+volatile VM_thread *p_the_safepoint_control_thread = 0;     // only set when a gc is happening
 volatile safepoint_state global_safepoint_status = nill;
 
 #ifdef __cplusplus
 }
 #endif
 
-
-void init_TLS_data();
-
-VM_thread * allocate_thread_block(JavaVM_Internal * java_vm) {
-    VM_thread * p_vmthread;
-    apr_pool_t * thread_pool;
-  
-    if (apr_pool_create(&thread_pool, java_vm->vm_env->mem_pool) != APR_SUCCESS) {
-	return NULL;
-    }
-    p_vmthread = (VM_thread *) apr_pcalloc(thread_pool, sizeof(VM_thread));
-
-    if (!p_vmthread) return NULL;
-    
-    p_vmthread->pool = thread_pool;
-
-    return p_vmthread;
-}
-  
-
-
-VM_thread * get_a_thread_block(JavaVM_Internal * java_vm) {
-    VM_thread * p_vmthread;
-
-    p_vmthread = p_TLS_vmthread;
-    if (!p_vmthread) {
-      p_vmthread = allocate_thread_block(java_vm);
-      
-      if (!p_vmthread) return NULL;
-      set_TLS_data(p_vmthread);
-
-    } else {
-        memset(p_vmthread, 0, sizeof(VM_thread));
-    }
-    return p_vmthread;
-} 
-
-VM_thread *get_vm_thread_ptr_safe(JNIEnv *jenv, jobject jThreadObj)
+jint jthread_allocate_vm_thread_pool(JavaVM *java_vm,
+                                     vm_thread_t vm_thread)
 {
-   hythread_t t=jthread_get_native_thread(jThreadObj);
-   if(t == NULL) {
-      return NULL;
-   }
-   return (VM_thread *)hythread_tls_get(t, TLS_key_pvmthread);
+    assert(java_vm);
+    assert(vm_thread);
+
+    apr_pool_t *thread_pool;
+    if (apr_pool_create(&thread_pool,
+            ((JavaVM_Internal*)java_vm)->vm_env->mem_pool) != APR_SUCCESS)
+    {
+        return JNI_ENOMEM;
+    }
+    vm_thread->pool = thread_pool;
+
+    return JNI_OK;
+}
+
+void jthread_deallocate_vm_thread_pool(vm_thread_t vm_thread)
+{
+    assert(vm_thread);
+    
+    // Destroy current VM_thread pool.
+    apr_pool_destroy(vm_thread->pool);
+
+    // mark VM_thread structure
+    jobject weak_ref = vm_thread->weak_ref;
+    memset(vm_thread, 0, sizeof(VM_thread));
+    vm_thread->weak_ref = weak_ref;
+}
+
+vm_thread_t jthread_allocate_vm_thread(hythread_t native_thread)
+{
+    assert(native_thread);
+    vm_thread_t vm_thread;
+
+    // check current VM thread
+#ifdef _DEBUG
+    vm_thread =
+        (vm_thread_t)hythread_tls_get(native_thread, TM_THREAD_VM_TLS_KEY);
+    assert(NULL == vm_thread);
+#endif // _DEBUG
+
+    // allocate VM thread
+    vm_thread = (vm_thread_t)STD_MALLOC(sizeof(VM_thread));
+    if (!vm_thread) {
+        return NULL;
+    }
+    memset(vm_thread, 0, sizeof(VM_thread));
+
+    // set VM thread to thread local storage
+    IDATA status =
+        hythread_tls_set(native_thread, TM_THREAD_VM_TLS_KEY, vm_thread);
+    if (status != TM_ERROR_NONE) {
+        return NULL;
+    }
+    return vm_thread;
+}
+
+VM_thread *get_vm_thread_ptr_safe(JNIEnv * jenv, jobject jThreadObj)
+{
+    hythread_t t = jthread_get_native_thread(jThreadObj);
+    if (t == NULL) {
+        return NULL;
+    }
+    return (VM_thread *) hythread_tls_get(t, TM_THREAD_VM_TLS_KEY);
 }
 
 VM_thread *get_thread_ptr_stub()
-{   
- return get_vm_thread(hythread_self());
+{
+    return get_vm_thread(hythread_self());
 }
-  
-vm_thread_accessor* get_thread_ptr = get_thread_ptr_stub;
-void init_TLS_data() {
-    //printf ("init TLS data, TLS key = %x \n", TLS_key_pvmthread);
-    TLS_key_pvmthread = TM_THREAD_VM_TLS_KEY;
-}
-  
-void set_TLS_data(VM_thread *thread) {
-    hythread_tls_set(hythread_self(), TLS_key_pvmthread, thread);
+
+vm_thread_accessor *get_thread_ptr = get_thread_ptr_stub;
+
+void set_TLS_data(VM_thread * thread)
+{
+    hythread_tls_set(hythread_self(), TM_THREAD_VM_TLS_KEY, thread);
     //printf ("sett ls call %p %p\n", get_thread_ptr(), get_vm_thread(hythread_self()));
 }
 
-IDATA jthread_throw_exception(char* name, char* message) {
+IDATA jthread_throw_exception(char *name, char *message)
+{
     assert(hythread_is_suspend_enabled());
     jobject jthe = exn_create(name);
     return jthread_throw_exception_object(jthe);
 }
 
-IDATA jthread_throw_exception_object(jobject object) {
+IDATA jthread_throw_exception_object(jobject object)
+{
     if (interpreter_enabled()) {
         // FIXME - Function set_current_thread_exception does the same
         // actions as exn_raise_object, and it should be replaced.
@@ -178,73 +197,97 @@ IDATA jthread_throw_exception_object(jobject object) {
  * This localizes the dependencies of Thread Manager on vmcore component.
  */
 
-void *vm_object_get_lockword_addr(jobject monitor){
-    return (*(ManagedObject**)monitor)->get_obj_info_addr();
+hythread_thin_monitor_t *vm_object_get_lockword_addr(jobject monitor)
+{
+    assert(monitor);
+    return (hythread_thin_monitor_t *) (*(ManagedObject **) monitor)->
+        get_obj_info_addr();
 }
 
-extern "C" char *vm_get_object_class_name(void* ptr) {
-        return (char*)(((ManagedObject*)ptr)->vt()->clss->get_name()->bytes);
+extern "C" char *vm_get_object_class_name(void *ptr)
+{
+    return (char *) (((ManagedObject *) ptr)->vt()->clss->get_name()->bytes);
 }
 
-void* vm_jthread_get_tm_data(jthread thread)
+hythread_t vm_jthread_get_tm_data(jthread thread)
 {
     static int offset = -1;
-    Class * clazz;
-    Field * field;
-    ManagedObject * thread_obj;
-    Byte * java_ref;
+    Class *clazz;
+    Field *field;
+    ManagedObject *thread_obj;
+    Byte *java_ref;
     POINTER_SIZE_INT val;
 
     hythread_suspend_disable();
 
-    thread_obj = ((ObjectHandle)thread)->object;
+    thread_obj = ((ObjectHandle) thread)->object;
     if (offset == -1) {
         clazz = thread_obj->vt()->clss;
         field = class_lookup_field_recursive(clazz, "vm_thread", "J");
         offset = field->get_offset();
     }
-    java_ref = (Byte *)thread_obj;
-    val = *(POINTER_SIZE_INT *)(java_ref + offset);
+    java_ref = (Byte *) thread_obj;
+    val = *(POINTER_SIZE_INT *) (java_ref + offset);
 
     hythread_suspend_enable();
 
-    return (void *)val;
+    return (hythread_t) val;
 }
 
-void vm_jthread_set_tm_data(jthread thread, void* val) {
-    static int offset = -1;
-    Class * clazz;
-    Field * field;
-    ManagedObject * thread_obj;
-    Byte * java_ref;
-
+void vm_jthread_set_tm_data(jthread thread, void *val)
+{
     hythread_suspend_disable();
 
-    thread_obj = ((ObjectHandle)thread)->object;
-    if (offset == -1) {
-        clazz = thread_obj->vt()->clss;
-        field = class_lookup_field_recursive(clazz, "vm_thread", "J");
+    ManagedObject *thread_obj = ((ObjectHandle) thread)->object;
+
+    // offset 0 has an virtual table of object,
+    // thus field "vm_thread" cannot have such offset value
+    static unsigned offset = 0;
+    if (!offset) {
+        Class *clazz = thread_obj->vt()->clss;
+        Field *field = class_lookup_field_recursive(clazz, "vm_thread", "J");
         offset = field->get_offset();
     }
 
-    java_ref = (Byte *)thread_obj;
-    *(jlong *)(java_ref + offset) = (jlong)(POINTER_SIZE_INT)val;
+    Byte *java_ref = (Byte *) thread_obj;
+    *(jlong *) (java_ref + offset) = (jlong) (POINTER_SIZE_INT) val;
 
     hythread_suspend_enable();
 }
 
-int vm_objects_are_equal(jobject obj1, jobject obj2){
+int vm_objects_are_equal(jobject obj1, jobject obj2)
+{
     //ObjectHandle h1 = (ObjectHandle)obj1;
     //ObjectHandle h2 = (ObjectHandle)obj2;
-    if (obj1 == NULL && obj2 == NULL){
+    if (obj1 == NULL && obj2 == NULL) {
         return 1;
-}
-    if (obj1 == NULL || obj2 == NULL){
-    return 0;
-}
-    return obj1->object == obj2->object;
     }
+    if (obj1 == NULL || obj2 == NULL) {
+        return 0;
+    }
+    return obj1->object == obj2->object;
+}
 
-int ti_is_enabled(){
+int ti_is_enabled()
+{
     return VM_Global_State::loader_env->TI->isEnabled();
 }
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
+/*
+ * Class:     org_apache_harmony_drlvm_thread_ThreadHelper
+ * Method:    getThreadIdOffset
+ * Signature: ()I
+ */
+VMEXPORT jint JNICALL
+Java_org_apache_harmony_drlvm_thread_ThreadHelper_getThreadIdOffset(JNIEnv *env, jclass klass)
+{
+    return (jint)hythread_get_thread_id_offset();
+}
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */

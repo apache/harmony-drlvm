@@ -35,10 +35,8 @@ int test_jthread_get_all_threads(void) {
     jint initial_thread_count;
     jint initial_all_threads_count;
     jthread *threads = NULL;
-    JNIEnv * jni_env;
     int i;
-
-    jni_env = jthread_get_JNI_env(jthread_self());
+    JNIEnv * jni_env = jthread_get_JNI_env(jthread_self());
 
     // TODO: unsafe .... need to find another way of synchronization
     hythread_sleep(1000);
@@ -57,7 +55,9 @@ int test_jthread_get_all_threads(void) {
     i = 0;
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
-        tf_assert_same(jthread_create_with_function(jni_env, tts->java_thread, &tts->attrs, default_run_for_test, tts), TM_ERROR_NONE);
+        tts->attrs.proc = default_run_for_test;
+        tts->attrs.arg = tts;
+        tf_assert_same(jthread_create_with_function(jni_env, tts->java_thread, &tts->attrs), TM_ERROR_NONE);
         tested_thread_wait_started(tts);
         tts->native_thread = (hythread_t) vm_jthread_get_tm_data(tts->java_thread);
         check_tested_thread_phase(tts, TT_PHASE_RUNNING);

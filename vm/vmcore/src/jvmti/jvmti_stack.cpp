@@ -872,8 +872,8 @@ jvmtiNotifyFramePop(jvmtiEnv* env,
 
         new_listener->depth = jsi.get_depth() - depth;
         new_listener->env = reinterpret_cast<TIEnv *>(env);
-        new_listener->next = vm_thread->frame_pop_listener;
-        vm_thread->frame_pop_listener = new_listener;
+        new_listener->next = vm_thread->jvmti_thread.frame_pop_listener;
+        vm_thread->jvmti_thread.frame_pop_listener = new_listener;
 
         TRACE("Pop listener is created: thread: "
             << vm_thread << ", listener: " << new_listener

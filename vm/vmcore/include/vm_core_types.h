@@ -44,7 +44,7 @@ struct LilCodeStub;
 struct M2nFrame;
 struct ManagedObject;
 class  NativeObjectHandles;
-class  VM_thread;
+struct VM_thread;
 class  Package;
 class  Package_Table;
 class  Properties;

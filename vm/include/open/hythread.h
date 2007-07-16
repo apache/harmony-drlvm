@@ -348,7 +348,7 @@ typedef struct HyThread_public {
      * for current thread only.
      *
      * Also disable_count could be reset to value 0 and restored in
-     * reset_suspend_disable()/set_suspend_disable() function
+     * hythread_reset_suspend_disable()/hythread_set_suspend_disable() function
      * for current thread only.
      *
      * Function hythread_exception_safe_point() sets disable_count to

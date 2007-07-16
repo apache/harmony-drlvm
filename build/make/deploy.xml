@@ -70,7 +70,6 @@ Description of the product deploy folder.
 
         <hythr>
             <shared>bin/default:hythr</shared>
-            <jar>bin/default:hythr</jar>
         </hythr>
      </vm>
 

@@ -48,7 +48,7 @@ Version: $Revision: 1.5.2.3 $
                                               extra.log4cxx,
                                               extra.zlib,
                                               vm.encoder,
-                                              vm.port, vm.hythr, vm.jthread" />
+                                              vm.port, vm.hythr" />
 
         <property name="libname" value="harmonyvm" />
         <property name="outtype" value="shared" />
@@ -82,6 +82,10 @@ Version: $Revision: 1.5.2.3 $
                 <include name="reflection/*.cpp" />
                 <include name="stack/*.cpp" />
                 <include name="thread/*.cpp" />
+                <select arch="ia32">
+                    <include name="thread/helpers/thread_helpers.cpp" />
+                    <include name="thread/helpers/thread_helpers_${build.arch}.cpp" />
+                </select>
                 <include name="util/*.cpp" />
                 <include name="verifier/*.cpp" unless="use_verifier_3363"/>
                 <include name="verifier-3363/*.cpp" if="use_verifier_3363"/>
@@ -318,9 +322,6 @@ Version: $Revision: 1.5.2.3 $
 
             <libset libs="${vm.hythr.lib}"
                     dir="${vm.hythr.libdir}" />
-
-            <libset libs="${vm.jthread.lib}"
-                    dir="${vm.jthread.libdir}" />
 
             <libset libs="${vm.port.lib}"
                     dir="${vm.port.libdir}" />

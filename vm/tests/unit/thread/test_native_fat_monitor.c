@@ -15,7 +15,7 @@
  *  limitations under the License.
  */
 
-#include "thread_private.h"
+#include "thread_manager.h"
 #include "testframe.h"
 #include "open/jthread.h"
 #include <open/hythread_ext.h>

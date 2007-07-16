@@ -51,12 +51,12 @@ VMEXPORT void vm_ti_enumerate_heap_root(jvmtiEnv* env,
 /**
  * Requests interpreter to enumerate one thread for TI.
  */
-void interpreter_ti_enumerate_thread(jvmtiEnv *env, class VM_thread *thread);
+void interpreter_ti_enumerate_thread(jvmtiEnv *env, struct VM_thread *thread);
 
 /**
  * Requests JIT support to enumerate one thread for TI.
  */
-void jitted_ti_enumerate_thread(jvmtiEnv *env, class VM_thread *thread);
+void jitted_ti_enumerate_thread(jvmtiEnv *env, struct VM_thread *thread);
 
 
 #endif // _JVMTI_SUPPORT_H_

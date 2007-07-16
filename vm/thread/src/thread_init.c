@@ -231,7 +231,7 @@ IDATA VMCALL hythread_global_lock() {
     // suspend_disable_count must be 0 on potentially
     // blocking operation to prevent suspension deadlocks,
     // meaning that the thread is safe for suspension
-    saved_count = reset_suspend_disable();
+    saved_count = hythread_reset_suspend_disable();
     r = hymutex_lock(&TM_LIBRARY->TM_LOCK);
     if (r) return r;
 
@@ -247,7 +247,7 @@ IDATA VMCALL hythread_global_lock() {
         if (r) return r;
     }
 
-    // do not use set_suspend_disable() as we do not
+    // do not use hythread_set_suspend_disable() as we do not
     // want safe points happening under global lock
     self->disable_count = saved_count;
     return 0;
@@ -423,74 +423,4 @@ UDATA* VMCALL hythread_global (char* name) {
     //hythread_monitor_exit(*p_global_monitor);
     return data+index;
 }
-
-
-/*
- * Resizable array implementation
- */
-
-IDATA array_create(array_t *array) {
-    array_t ptr;
-    ptr = (array_t)malloc(sizeof(ResizableArrayType));
-    if (!ptr) return -1;
-    ptr->capacity = 1024;
-    ptr->size     =0;
-    ptr->next_index = 0; 
-    ptr->entries = (array_entry_t)malloc(sizeof(ResizableArrayEntry)*ptr->capacity);
-    if (!ptr->entries) return -1;
-
-    *array = ptr;
-    return 0;
-}
-
-IDATA array_destroy(array_t array) {
-    if (!array) return -1;
-        free(array->entries);
-    free(array);
-
-    return 0;
-}
-
-UDATA array_add(array_t array, void *value) {
-    UDATA index;
-    if (!array) return 0;   
-    if (array->next_index) {
-        index = array->next_index;
-    } else {
-        index = array->size + 1;
-        if (index >= array->capacity) {
-            array->entries = realloc(array->entries, sizeof(void*)*array->capacity*2);
-            if (!array->entries) return 0;
-            array->capacity*=2;
-        }
-
-        array->entries[index].next_free=0;
-    }
-    
-    array->next_index = array->entries[index].next_free;
-    array->entries[index].entry = value;
-    array->size++;
-
-    return index;
-}
-
-void *array_delete(array_t array, UDATA index) {
-    void *return_value;
-    if (!array || index > array->size || index==0) return NULL;
-    return_value =  array->entries[index].entry;
-    
-    array->entries[index].entry = NULL;
-    array->entries[index].next_free = array->next_index;
-    array->next_index = index;
-
-    return return_value;
-}
-
-void *array_get(array_t array, UDATA index) {
-    if (!array || index > array->size || index==0) return NULL;
-    return array->entries[index].entry;
-}
-
-
-
 

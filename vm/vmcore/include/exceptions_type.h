@@ -30,11 +30,12 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
 struct Exception {
-    ManagedObject* exc_object;
-    Class* exc_class;
+    struct ManagedObject* exc_object;
+    struct Class* exc_class;
     const char* exc_message;
-    ManagedObject* exc_cause;
+    struct ManagedObject* exc_cause;
 };
 
 #ifdef __cplusplus

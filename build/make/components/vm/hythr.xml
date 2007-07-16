@@ -43,9 +43,7 @@ Version: $Revision: 1.4.2.4 $
             </includepath>
 
             <fileset dir="${src}">
-                <include name="thread/src/*native*.c" />
-                <!-- include name="thread/src/*task*.c" / -->
-                <include name="thread/src/thread_init.c" />
+                <include name="thread/src/*.c" />
                 <select os="win">
                   <include name="thread/src/win/*.c" />
                 </select>
@@ -114,23 +112,6 @@ Version: $Revision: 1.4.2.4 $
                 <syslibset libs="advapi32,ws2_32" />
             </select>
         </linker>
-
-         <!-- Java helpers -->
-        <property name="build.java.depends" value=""/>
-
-        <property name="java.source.dir"
-                  location="${build.vm.home}/thread/javasrc"/>
-
-        <path id="java.class.path">
-            <pathelement location="${java.build.dir}"/>
-
-            <fileset dir="${external.dep.CLASSLIB.jardir}" includes="*.jar" />
-            <pathelement location="${vm.kernel_classes.jardir}/kernel.jar"/>
-            <fileset dir="${build.VMMAGIC.home}" includes="vmmagic-20070207.jar" />
-        </path>
-
-        <property name="jarname" value="hythr.jar"/>
-        <property name="srcjarname" value="hythr-src.jar"/>
 
     </target>
 </project>

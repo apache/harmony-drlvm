@@ -20,7 +20,7 @@
 #include "thread_unit_test_utils.h"
 #include <open/jthread.h>
 #include <open/hythread_ext.h>
-#include "thread_private.h"
+#include "thread_manager.h"
 
 
 /*

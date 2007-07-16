@@ -24,10 +24,6 @@
 #include "vm_threads.h"
 #include "exceptions.h"
 
-//void vm_thread_enumerate_from_native(VM_thread *thread); // unused anywhere
- 
-extern hythread_library_t hythread_lib;
-
 Lock_Manager::Lock_Manager()
 {
     UNREF IDATA stat = hymutex_create (&lock, TM_MUTEX_NESTED);

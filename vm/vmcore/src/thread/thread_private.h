@@ -50,9 +50,26 @@
 #define RET_ON_ERROR(stat) if (stat) { return -1; }
 #define CONVERT_ERROR(stat)     (stat)
 
+#define MAX_OWNED_MONITOR_NUMBER 200 //FIXME: switch to dynamic resize
 #define FAST_LOCAL_STORAGE_SIZE 10
 
 #define INITIAL_FAT_TABLE_ENTRIES 16*1024   //make this table exapandible if workloads show it is necessary
+
+#define HY_DEFAULT_STACKSIZE 512 * 1024 // if default stack size is not through -Xss parameter, it is 256kb
+
+
+#if !defined (_IPF_)
+//use lock reservation
+#define LOCK_RESERVATION
+// spin with try_lock SPIN_COUNT times
+#define SPIN_COUNT 5
+
+#endif // !defined (_IPF_)
+
+#if defined(_WIN32) && !defined (_EM64T_)
+//use optimized asm monitor enter and exit helpers 
+#define ASM_MONITOR_HELPER
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -119,7 +136,7 @@ typedef struct HyThread {
      *    2. hythread_exception_safe_point()
      *          - removes safe point callback request for current thread
      */
-    uint32 request;
+    int32 request;
 
     /**
      * Field indicating that thread can safely be suspended.
@@ -130,7 +147,7 @@ typedef struct HyThread {
      * for current thread only.
      *
      * Also disable_count could be reset to value 0 and restored in
-     * hythread_set_suspend_disable()/hythread_set_suspend_disable() function
+     * reset_suspend_disable()/set_suspend_disable() function
      * for current thread only.
      *
      * Function hythread_exception_safe_point() sets disable_count to
@@ -142,6 +159,7 @@ typedef struct HyThread {
      * after exitting.
      */
     int16 disable_count;
+
 
     /**
      * Group for this thread. Different groups are needed in order 
@@ -173,7 +191,8 @@ typedef struct HyThread {
      * After increment/decrement of suspend_count, request field
      * should be incremented/decremented too.
      */
-    uint32 suspend_count;
+    int32 suspend_count;
+    
         
     /**
      * Function to be executed at safepoint upon thread resume.
@@ -207,7 +226,23 @@ typedef struct HyThread {
      * Handle to OS thread.
      */
     osthread_t os_handle;
+        
+    /**
+     * Placeholder for any data to be associated with this thread.
+     * Java layer is using it to keep java-specific context.
+     */
+    void *private_data;
+
+    /**
+     * Flag indicating there was request to exit
+     */
+    Boolean exit_request; 
     
+    /**
+     * Exit value of this thread
+     */
+    IDATA exit_value; 
+
 
 // Synchronization stuff
 
@@ -243,6 +278,11 @@ typedef struct HyThread {
 
 // Attributes
 
+    /**
+     * name of the thread (useful for debugging purposes)
+     */
+    char* name;
+
    /**
     * Hint for scheduler about thread priority
     */
@@ -258,7 +298,7 @@ typedef struct HyThread {
     
     /**
      *  Monitor this thread is waiting on now.
-     */
+     **/
     hythread_monitor_t waited_monitor;
 
     /**
@@ -266,7 +306,107 @@ typedef struct HyThread {
      */
     IDATA thread_id;
 
+    /**
+     * APR thread attributes
+     */
+    apr_threadattr_t *apr_attrs;
+
+    /**
+     * Extension to the standard local storage slot.
+     */
+    void **big_local_storage;
+       
 } HyThread;
+
+
+/**
+ * Java-specific context that is attached to tm_thread control structure by Java layer
+ */
+typedef struct JVMTIThread {
+    
+    /**
+     * JNI env associated with this Java thread
+     */
+    JNIEnv *jenv;
+       
+    /**
+     * jthread object which is associated with tm_thread
+     */
+    jthread thread_object;
+       
+    /**
+     * Conditional variable which is used to wait/notify on java monitors.
+     */
+    hycond_t monitor_condition;
+
+    /**
+     * Exception that has to be thrown in stopped thread
+     */
+    jthrowable stop_exception;
+
+    /**
+     * Blocked on monitor times count
+     */
+     jlong blocked_count;
+       
+    /**
+     * Blocked on monitor time in nanoseconds
+     */
+     jlong blocked_time;
+       
+    /**
+     * Waited on monitor times count
+     */
+     jlong waited_count;
+       
+    /**
+     * Waited on monitor time in nanoseconds
+     */
+     jlong waited_time;
+       
+    /**
+     * JVM TI local storage
+     */
+     JVMTILocalStorage jvmti_local_storage;
+
+    /**
+     * Monitor this thread is blocked on.
+     */
+     jobject contended_monitor;
+
+    /**
+     * Monitor this thread waits on.
+     */
+     jobject wait_monitor;
+
+    /**
+     * Monitors for which this thread is owner.
+     */
+     jobject *owned_monitors;
+
+    /**
+     * owned monitors count.
+     */
+     int owned_monitors_nmb;
+
+    /**
+     * APR pool for this structure
+     */
+     apr_pool_t *pool;
+
+     /**
+      * weak reference to corresponding java.lang.Thread instance
+      */
+     jobject thread_ref;
+
+     /**
+      * Is this thread daemon?
+      */
+     IDATA daemon;
+
+} JVMTIThread;
+
+
 
 /** 
   * hythread_group_t pointer to the first element in the thread group
@@ -459,6 +599,8 @@ extern apr_threadkey_t *TM_THREAD_KEY; // Key used to store tm_thread_t structur
 
 extern int max_group_index;     // max number of groups
 
+extern int total_started_thread_count; // Total started thread counter.
+
 extern HyFatLockTable *lock_table;
 
 #define THREAD_ID_SIZE 16  //size of thread ID in bits. Also defines max number of threads
@@ -468,6 +610,23 @@ extern HyFatLockTable *lock_table;
 /**
 * Internal TM functions
 */
+
+/**
+* tm_reset_suspend_disable() reset <code>suspend_disable</code> to 0, and return old value. 
+* It should be used with tm_set_suspend_disable() to implement safe points
+* Will be used in tm_safe_point(), tm_mutex_lock(), tm_cond_wait().
+*/
+
+int reset_suspend_disable();
+void set_suspend_disable(int count);
+
+/* thin monitor functions used java monitor
+ */
+IDATA is_fat_lock(hythread_thin_monitor_t lockword);
+IDATA owns_thin_lock(hythread_t thread, I_32 lockword);
+hythread_monitor_t inflate_lock(hythread_thin_monitor_t *lockword_ptr);
+IDATA unreserve_lock(hythread_thin_monitor_t *lockword_ptr);
+
 IDATA VMCALL hythread_get_group(hythread_group_t *group, hythread_t thread);
 /**
  *  Auxiliary function to throw java.lang.InterruptedException
@@ -495,6 +654,34 @@ IDATA monitor_wait_impl(hythread_monitor_t mon_ptr, I_64 ms, IDATA nano, IDATA i
 IDATA thin_monitor_wait_impl(hythread_thin_monitor_t *lockword_ptr, I_64 ms, IDATA nano, IDATA interruptable);
 IDATA sem_wait_impl(hysem_t sem, I_64 ms, IDATA nano, IDATA interruptable);
 
+typedef struct ResizableArrayEntry {
+    void *entry;
+    UDATA next_free;
+} ResizableArrayEntry;
+
+typedef struct ResizableArrayEntry *array_entry_t; 
+
+typedef struct ResizableArrayType {
+    UDATA size;
+    UDATA capacity;
+    UDATA next_index;
+    array_entry_t entries;
+} ResizableArrayType;
+typedef struct ResizableArrayType *array_t;
+
+
+IDATA array_create(array_t *array);
+IDATA array_destroy(array_t array);
+UDATA array_add(array_t array, void *value);
+void *array_delete(array_t array, UDATA index);
+void *array_get(array_t array, UDATA index);
+
+/**
+ *  Auxiliary function to update thread count
+ */
+void thread_start_count();
+void thread_end_count();
+
 /*
  * portability functions, private for thread module
  */
@@ -504,7 +691,7 @@ int os_thread_set_priority(osthread_t thread, int priority);
 osthread_t os_thread_current();
 int os_thread_cancel(osthread_t);
 int os_thread_join(osthread_t);
-void os_thread_exit(IDATA status);
+void os_thread_exit(int status);
 void os_thread_yield_other(osthread_t);
 int os_get_thread_times(osthread_t os_thread, int64* pkernel, int64* puser);
 

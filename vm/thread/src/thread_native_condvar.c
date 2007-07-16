@@ -50,11 +50,11 @@ IDATA condvar_wait_impl(hycond_t *cond, hymutex_t *mutex, I_64 ms, IDATA nano, I
         return TM_ERROR_INTERRUPT;
     }
 
-    disable_count = reset_suspend_disable(); 
+    disable_count = hythread_reset_suspend_disable();
 
     r = os_cond_timedwait(cond, mutex, ms, nano);
 
-    set_suspend_disable(disable_count);
+    hythread_set_suspend_disable(disable_count);
     self->current_condition = NULL;
    
     // check interrupted flag

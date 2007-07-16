@@ -265,7 +265,7 @@ static int walk_native_stack_jit(Registers* pregs, VM_thread* pthread,
 
                 if (native_is_ip_in_breakpoint_handler(tmp_ip))
                 {
-                    native_unwind_interrupted_frame(pthread, &ip, &bp, &sp);
+                    native_unwind_interrupted_frame(&pthread->jvmti_thread, &ip, &bp, &sp);
                     flag_breakpoint = true;
                 }
                 else

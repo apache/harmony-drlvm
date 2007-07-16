@@ -81,7 +81,7 @@ GcFrame::GcFrame(unsigned size_hint)
         nodes = gc_frame_node_new(size_hint);
     else
         nodes = NULL;
-    next = p_TLS_vmthread->gc_frames;
+    next = (GcFrame*)p_TLS_vmthread->gc_frames;
     p_TLS_vmthread->gc_frames = this;
 }
 
@@ -89,7 +89,7 @@ GcFrame::~GcFrame()
 {
     assert(!hythread_is_suspend_enabled());
 
-    assert(p_TLS_vmthread->gc_frames==this);
+    assert(((GcFrame*)p_TLS_vmthread->gc_frames) == this);
     p_TLS_vmthread->gc_frames = next;
     next = NULL;
     GcFrameNode* c;
@@ -331,14 +331,14 @@ VMEXPORT // temporary solution for interpreter unplug
 NativeObjectHandles::NativeObjectHandles()
 : handles(NULL)
 {
-    next = p_TLS_vmthread->native_handles;
+    next = (NativeObjectHandles*)p_TLS_vmthread->native_handles;
     p_TLS_vmthread->native_handles = this;
 }
 
 VMEXPORT // temporary solution for interpreter unplug
 NativeObjectHandles::~NativeObjectHandles()
 {
-    assert(p_TLS_vmthread->native_handles==this);
+    assert(((NativeObjectHandles*)p_TLS_vmthread->native_handles) == this);
     p_TLS_vmthread->native_handles = next;
     next = NULL;
     oh_free_handles(handles);
@@ -386,7 +386,7 @@ ObjectHandle oh_allocate_local_handle()
         m2n_set_local_handles(lm2nf, hs);
     } else {
         assert(p_TLS_vmthread->native_handles);
-        res = p_TLS_vmthread->native_handles->allocate();
+        res = ((NativeObjectHandles*)p_TLS_vmthread->native_handles)->allocate();
     }
     return res;
 }

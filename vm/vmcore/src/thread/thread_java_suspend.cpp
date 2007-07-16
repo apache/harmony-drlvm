@@ -22,7 +22,8 @@
 
 #include <open/jthread.h>
 #include <open/hythread_ext.h>
-#include "thread_private.h"
+#include <open/thread_externals.h>
+#include "vm_threads.h"
 
 /**
  * Resumes the suspended thread <code>thread</code> execution.
@@ -34,11 +35,12 @@
  * @param[in] java_thread thread to be resumed
  * @sa java.lang.Thread.resume(), JVMTI::ResumeThread()
  */
-IDATA VMCALL jthread_resume(jthread java_thread) {
-    hythread_t tm_native_thread = vm_jthread_get_tm_data(java_thread);
-    hythread_resume(tm_native_thread);
+IDATA VMCALL jthread_resume(jthread java_thread)
+{
+    hythread_t native_thread = vm_jthread_get_tm_data(java_thread);
+    hythread_resume(native_thread);
     return TM_ERROR_NONE;
-}
+} // jthread_resume
 
 /**
  * Resumes the suspended threads from the list.
@@ -48,14 +50,16 @@ IDATA VMCALL jthread_resume(jthread java_thread) {
  * @param[in] thread_list list of threads to be resumed
  * @sa JVMTI::ResumeThreadList()
  */
-IDATA VMCALL jthread_resume_all(jvmtiError* results, jint count, const jthread* thread_list) {
-    int i;
-
-    for (i = 0; i < count; i++) {
+IDATA VMCALL
+jthread_resume_all(jvmtiError *results,
+                   jint count,
+                   const jthread *thread_list)
+{
+    for (jint i = 0; i < count; i++) {
         results[i] = (jvmtiError)jthread_resume(thread_list[i]);
     }
     return TM_ERROR_NONE;
-}
+} // jthread_resume_all
 
 /**
  * Suspends the <code>thread</code> execution.
@@ -75,10 +79,11 @@ IDATA VMCALL jthread_resume_all(jvmtiError* results, jint count, const jthread* 
  * @param[in] java_thread thread to be suspended
  * @sa java.lang.Thread.suspend(), JVMTI::SuspendThread()
  */
-IDATA VMCALL jthread_suspend(jthread java_thread) {
-    hythread_t tm_native_thread = vm_jthread_get_tm_data(java_thread);
-    return hythread_suspend_other(tm_native_thread);
-}
+IDATA VMCALL jthread_suspend(jthread java_thread)
+{
+    hythread_t native_thread = vm_jthread_get_tm_data(java_thread);
+    return hythread_suspend_other(native_thread);
+} // jthread_suspend
 
 /**
  * Suspends the threads from the list.
@@ -100,11 +105,13 @@ IDATA VMCALL jthread_suspend(jthread java_thread) {
  * @param[in] thread_list list of threads to be suspended
  * @sa JVMTI::SuspendThreadList()
  */
-IDATA VMCALL jthread_suspend_all(jvmtiError* results, jint count, const jthread* thread_list) {
-    int i;
-    for (i = 0; i < count; i++) {
+IDATA VMCALL
+jthread_suspend_all(jvmtiError *results,
+                    jint count,
+                    const jthread *thread_list)
+{
+    for (jint i = 0; i < count; i++) {
         results[i] = (jvmtiError)jthread_suspend(thread_list[i]);
     }
     return TM_ERROR_NONE;
-}
-
+} // jthread_suspend_all

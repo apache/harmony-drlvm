@@ -812,7 +812,9 @@ NativeCodePtr compile_me(Method* method)
     if(ti->isEnabled() && ti->is_single_step_enabled()
         && !method->is_native())
     {
-        jvmti_set_single_step_breakpoints_for_method(ti, p_TLS_vmthread, method);
+        jvmti_thread_t jvmti_thread = jthread_self_jvmti();
+        assert(jvmti_thread);
+        jvmti_set_single_step_breakpoints_for_method(ti, jvmti_thread, method);
     }
 
     return entry_point;

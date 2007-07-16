@@ -22,7 +22,7 @@
 
 #include <open/jthread.h>
 #include <open/hythread_ext.h>
-#include "thread_private.h"
+#include "vm_threads.h"
 
 /**
  * Interrupt a <code>thread</code>.
@@ -34,11 +34,12 @@
  * @param[in] java_thread a thread to be interrupted
  * @sa java.lang.Thread.interrupt()
  */
-IDATA VMCALL jthread_interrupt(jthread java_thread) {
-    hythread_t tm_native_thread = jthread_get_native_thread(java_thread); 
+IDATA VMCALL jthread_interrupt(jthread java_thread)
+{
+    hythread_t tm_native_thread = jthread_get_native_thread(java_thread);
     hythread_interrupt(tm_native_thread);
     return TM_ERROR_NONE;
-}
+} // jthread_interrupt
 
 /**
  * Returns <code>true</code> if the thread <code>thread</code> is interrupted.
@@ -50,11 +51,11 @@ IDATA VMCALL jthread_interrupt(jthread java_thread) {
  * is interrupted; <code>false</code> otherwise.
  * @sa java.lang.Thread.isInterrupted()
  */
-jboolean jthread_is_interrupted(jthread java_thread) {   
+jboolean jthread_is_interrupted(jthread java_thread)
+{
     hythread_t tm_native_thread = jthread_get_native_thread(java_thread);
     return hythread_interrupted(tm_native_thread) > 0;
-   
-}
+} // jthread_is_interrupted
 
 /**
  * Clears the interruption flag for the specific <code>thread</code>.
@@ -62,7 +63,8 @@ jboolean jthread_is_interrupted(jthread java_thread) {
  * @param[in] java_thread where to clear interrupt flag
  * @sa java.lang.Thread.interrupted()
  */
-IDATA VMCALL jthread_clear_interrupted(jthread java_thread) {
+IDATA VMCALL jthread_clear_interrupted(jthread java_thread)
+{
     hythread_t tm_native_thread = jthread_get_native_thread(java_thread);
     return hythread_clear_interrupted_other(tm_native_thread);
-}
+} // jthread_clear_interrupted

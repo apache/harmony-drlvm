@@ -153,13 +153,17 @@ extern "C" {
 #include "hycond_win.h"
 #endif // _WIN32
 
+#if !defined (_IPF_)
+//use lock reservation
+#define LOCK_RESERVATION
+#endif // !defined (_IPF_)
 
 typedef struct HyLatch *hylatch_t;
 
 typedef struct HyThread *hythread_iterator_t;
 typedef struct HyThreadLibrary *hythread_library_t;
 
-typedef I_32  hythread_thin_monitor_t;
+typedef U_32  hythread_thin_monitor_t;
 
 typedef void (*hythread_event_callback_proc)(void);
 
@@ -200,8 +204,6 @@ IDATA VMCALL hythread_cancel_all(hythread_group_t group);
 IDATA hythread_group_create(hythread_group_t *group);
 IDATA VMCALL hythread_group_release(hythread_group_t group);
 IDATA VMCALL hythread_group_get_list(hythread_group_t **list, int* size);
-void* VMCALL hythread_get_private_data(hythread_t  t);
-IDATA VMCALL hythread_set_private_data(hythread_t  t, void* data);
 
 UDATA VMCALL hythread_tls_get_offset(hythread_tls_key_t key);
 UDATA VMCALL hythread_tls_get_request_offset();
@@ -209,6 +211,22 @@ UDATA VMCALL hythread_get_thread_times(hythread_t thread, int64* pkernel, int64*
 UDATA hythread_get_thread_stacksize(hythread_t thread);
 UDATA VMCALL hythread_uses_fast_tls(void);
 IDATA VMCALL hythread_get_hythread_offset_in_tls(void);
+
+IDATA VMCALL hythread_thread_lock(hythread_t thread);
+IDATA VMCALL hythread_thread_unlock(hythread_t thread);
+IDATA VMCALL hythread_get_state(hythread_t thread);
+IDATA VMCALL hythread_set_state(hythread_t thread, IDATA state);
+int VMCALL hythread_reset_suspend_disable();
+void VMCALL hythread_set_suspend_disable(int count);
+int VMCALL hythread_is_fat_lock(hythread_thin_monitor_t lockword);
+hythread_monitor_t VMCALL hythread_inflate_lock(hythread_thin_monitor_t *lockword_ptr);
+IDATA VMCALL hythread_owns_thin_lock(hythread_t thread, hythread_thin_monitor_t lockword);
+IDATA VMCALL hythread_unreserve_lock(hythread_thin_monitor_t *lockword_ptr);
+IDATA VMCALL hythread_get_thread_id_offset();
+IDATA VMCALL hythread_set_thread_stop_callback(hythread_t thread, hythread_event_callback_proc stop_callback);
+IDATA VMCALL hythread_wait_for_nondaemon_threads(hythread_t thread, IDATA threads_to_keep);
+IDATA VMCALL hythread_increase_nondaemon_threads_count(hythread_t thread);
+IDATA VMCALL hythread_decrease_nondaemon_threads_count(hythread_t thread, IDATA threads_to_keep);
 
 //@}
 /** @name Conditional variable
@@ -489,7 +507,11 @@ hy_inline void VMCALL hythread_suspend_disable()
 
 // possible values for tm_status_t
 #define TM_OS_ERROR (TM_ERROR_START+1)
-    
+
+#define TM_MAX_OWNED_MONITOR_NUMBER 200 //FIXME: switch to dynamic resize
+// if default stack size is not through -Xss parameter, it is 256kb
+#define TM_DEFAULT_STACKSIZE (512 * 1024)
+
 #if defined(__cplusplus)
 }
 #endif

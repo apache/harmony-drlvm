@@ -191,15 +191,4 @@ UDATA VMCALL hythread_tls_get_offset(hythread_tls_key_t key) {
     return ((UDATA)&((hythread_t)0)->thread_local_storage) + (key * sizeof(void*));
 }
 
-
-/*
- * Class:     org_apache_harmony_drlvm_thread_ThreadHelper
- * Method:    getThreadIdOffset
- * Signature: ()I
- */
-jint JNICALL Java_org_apache_harmony_drlvm_thread_ThreadHelper_getThreadIdOffset(JNIEnv *e, jclass c) {
-    return (uint32)&((HyThread *)0)->thread_id;
-}
-
-
 //@}

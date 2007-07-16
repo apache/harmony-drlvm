@@ -217,7 +217,10 @@ void __cdecl exception_catch_callback_wrapper(){
 
 // exception catch support for JVMTI
 void __cdecl jvmti_exception_catch_callback_wrapper(){
-    Registers regs = p_TLS_vmthread->regs;
+	Registers regs = {0};
+	if (p_TLS_vmthread->regs) {
+		regs = *(Registers*)p_TLS_vmthread->regs;
+	}
     jvmti_exception_catch_callback(&regs);
 }
 
@@ -235,19 +238,19 @@ LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception
 
     bool in_java = false;
 
-    if (vmthread)
+    if (vmthread && (&vmthread->jvmti_thread))
     {
         // If exception is occured in processor instruction previously
         // instrumented by breakpoint, the actual exception address will reside
         // in jvmti_jit_breakpoints_handling_buffer
         // We should replace exception address with saved address of instruction
         POINTER_SIZE_INT break_buf =
-            (POINTER_SIZE_INT)vmthread->jvmti_jit_breakpoints_handling_buffer;
+            (POINTER_SIZE_INT)vmthread->jvmti_thread.jvmti_jit_breakpoints_handling_buffer;
         if (saved_eip >= break_buf &&
-            saved_eip < break_buf + 50)
+            saved_eip < break_buf + TM_JVMTI_MAX_BUFFER_SIZE)
         {
             flag_replaced = true;
-            regs.set_ip(vmthread->jvmti_saved_exception_registers.get_ip());
+            regs.set_ip(vm_get_ip_from_regs(vmthread));
             vm_to_nt_context(&regs, context);
         }
 
@@ -370,7 +373,7 @@ LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception
 
     // save register context of hardware exception site
     // into thread-local registers snapshot
-    vmthread->regs = regs;
+    vm_set_exception_registers(vmthread, regs);
 
     // __cdecl <=> push parameters in the reversed order
     // push in_java argument onto stack
@@ -396,7 +399,12 @@ void __cdecl c_exception_handler(Class* exn_class, bool in_java)
     // this exception handler is executed *after* NT exception handler returned
     DebugUtilsTI* ti = VM_Global_State::loader_env->TI;
     // Create local copy for registers because registers in TLS can be changed
-    Registers regs = p_TLS_vmthread->regs;
+    Registers regs = {0};
+    VM_thread *thread = p_TLS_vmthread;
+    assert(thread);
+    if (thread->regs) {
+        regs = *(Registers*)thread->regs;
+    }
 
     M2nFrame* prev_m2n = m2n_get_last_frame();
     M2nFrame* m2n = NULL;
@@ -412,7 +420,7 @@ void __cdecl c_exception_handler(Class* exn_class, bool in_java)
         regs_push_return_address(&regs, regs.get_ip());
         // Set IP to callback address
         regs.set_ip(asm_jvmti_exception_catch_callback);
-    } else if (p_TLS_vmthread->restore_guard_page) {
+    } else if (thread->restore_guard_page) {
         // Set return address to current IP
         regs_push_return_address(&regs, regs.get_ip());
         // Set IP to callback address
@@ -425,7 +433,7 @@ void __cdecl c_exception_handler(Class* exn_class, bool in_java)
     if (m2n)
         STD_FREE(m2n);
 
-    p_TLS_vmthread->regs = regs;
+    vm_set_exception_registers(thread, regs);
     si_transfer_control(si);
     assert(!"si_transfer_control should not return");
 }

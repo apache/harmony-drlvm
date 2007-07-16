@@ -268,14 +268,14 @@ static void ti_enumerate_thread_not_on_stack(TIEnv* ti_env, VM_thread* thread)
     if (thread->thread_exception.exc_cause != NULL) {
         vm_enumerate_root_reference((void **)&(thread->thread_exception.exc_cause), FALSE);
     }
-    if (thread->p_exception_object_ti != NULL) {
-        vm_enumerate_root_reference((void **)&(thread->p_exception_object_ti), FALSE);
+    if (thread->jvmti_thread.p_exception_object_ti != NULL) {
+        vm_enumerate_root_reference((void **)&(thread->jvmti_thread.p_exception_object_ti), FALSE);
     }
 
     if (thread->native_handles)
-        thread->native_handles->enumerate();
+        ((NativeObjectHandles*)(thread->native_handles))->enumerate();
     if (thread->gc_frames) {
-        thread->gc_frames->enumerate();
+        ((GcFrame*)(thread->gc_frames))->enumerate();
     }
 }
 

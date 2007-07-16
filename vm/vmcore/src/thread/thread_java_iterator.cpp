@@ -23,75 +23,75 @@
 #include <open/ti_thread.h>
 #include <open/hythread_ext.h>
 #include <open/jthread.h>
-#include "thread_private.h"
-
+#include "vm_threads.h"
 
 /**
  * Creates the iterator that can be used to walk over java threads.
  */
-jthread_iterator_t VMCALL jthread_iterator_create(void) {
+jthread_iterator_t VMCALL jthread_iterator_create(void)
+{
     hythread_group_t java_thread_group = get_java_thread_group();
-    return (jthread_iterator_t)hythread_iterator_create(java_thread_group);
-}
+    return (jthread_iterator_t)
+        hythread_iterator_create(java_thread_group);
+} // jthread_iterator_create
 
 /**
  * Releases the iterator.
  * 
  * @param[in] it iterator
  */
-IDATA VMCALL jthread_iterator_release(jthread_iterator_t *it) {
-    return hythread_iterator_release((hythread_iterator_t *)it);
-}
+IDATA VMCALL jthread_iterator_release(jthread_iterator_t * it)
+{
+    return hythread_iterator_release((hythread_iterator_t *) it);
+} // jthread_iterator_release
 
 /**
  * Resets the iterator such that it will start from the beginning.
  * 
  * @param[in] it iterator
  */
-IDATA VMCALL jthread_iterator_reset(jthread_iterator_t *it) {
-    return hythread_iterator_reset((hythread_iterator_t *)it);   
-}
+IDATA VMCALL jthread_iterator_reset(jthread_iterator_t * it)
+{
+    return hythread_iterator_reset((hythread_iterator_t *) it);
+} // jthread_iterator_reset
 
 /**
  * Returns the next jthread using the given iterator.
  * 
  * @param[in] it iterator
  */
-jthread VMCALL jthread_iterator_next(jthread_iterator_t *it) {
-    hythread_t tm_native_thread;
-    jvmti_thread_t tm_java_thread;
-    tm_native_thread = hythread_iterator_next((hythread_iterator_t *)it);
-    while (tm_native_thread!=NULL)
-    {
-        if (hythread_is_alive(tm_native_thread)) {
-            tm_java_thread = hythread_get_private_data(tm_native_thread);
-            if (tm_java_thread) {
-                return (jthread)tm_java_thread->thread_object;
+jobject VMCALL jthread_iterator_next(jthread_iterator_t * it)
+{
+    hythread_t native_thread = hythread_iterator_next((hythread_iterator_t *) it);
+    while (native_thread != NULL) {
+        if (hythread_is_alive(native_thread)) {
+            vm_thread_t vm_thread = (vm_thread_t)hythread_tls_get(native_thread,
+                                        TM_THREAD_VM_TLS_KEY);
+            if (vm_thread) {
+                return vm_thread->java_thread;
             }
         }
-        tm_native_thread = hythread_iterator_next((hythread_iterator_t *)it);
+        native_thread = hythread_iterator_next((hythread_iterator_t *) it);
     }
-
     return NULL;
-} 
+} // jthread_iterator_next
 
 /**
  * Returns the the number of Java threads.
  * 
  * @param[in] iterator
  */
-IDATA VMCALL jthread_iterator_size(jthread_iterator_t iterator) {
-    jthread res;
-    IDATA status;
-    int count=0;
-    status=jthread_iterator_reset(&iterator);
+IDATA VMCALL jthread_iterator_size(jthread_iterator_t iterator)
+{
+    IDATA status = jthread_iterator_reset(&iterator);
     assert(status == TM_ERROR_NONE);
-    res = jthread_iterator_next(&iterator);
-    while (res!=NULL) {
-        count++;        
-        res = jthread_iterator_next(&iterator);
+    jthread thread = jthread_iterator_next(&iterator);
+    int count = 0;
+    while (thread != NULL) {
+        count++;
+        thread = jthread_iterator_next(&iterator);
     }
-    status=jthread_iterator_reset(&iterator);
+    status = jthread_iterator_reset(&iterator);
     assert(status == TM_ERROR_NONE);
     return count;
-}
+} // jthread_iterator_size

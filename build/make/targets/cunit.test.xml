@@ -134,7 +134,6 @@
                         <libset libs="port" dir="${build.semi.dir}/vm/port/_bin" />
                         <libset libs="log4cxx" dir="${build.semi.dir}/extra/log4cxx/_bin" />
                         <libset libs="hyzlib" dir="${external.dep.CLASSLIB}/deploy/jdk/jre/bin" />
-                        <libset libs="jthread" dir="${build.semi.dir}/vm/jthread/_bin" />
                         <libset libs="harmonyvm" dir="${build.semi.dir}/vm/vmcore/_bin" />
                         <libset libs="icuuc" dir="${external.dep.CLASSLIB.libdir}" />
                         <select os="win">
@@ -182,7 +181,8 @@
                               resultproperty="resultproperty"
                               outputproperty="outputproperty">
                     <arg value="-Dorg.apache.harmony.vm.vmdir=${build.deploy.dir}/jdk/jre/bin/default"/>
-                    <arg line="-Djava.home=${build.deploy.dir}/jdk/jre ${test.vmargs}"/>
+                    <arg value="-Djava.home=${build.deploy.dir}/jdk/jre ${test.vmargs}"/>
+                    <arg value="-XX:vm.jvmti.enabled=true"/>
                     <env key="JAVA_HOME" value="${build.deploy.dir}/jdk/jre" />
                     <select os="win">
                         <env key="Path" path="${build.deploy.dir}/jdk/jre/bin/:${build.deploy.dir}/jdk/jre/bin/default:${env.Path}" />

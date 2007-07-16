@@ -247,7 +247,7 @@ jvmtiSetEventNotificationMode(jvmtiEnv* env,
             return JVMTI_ERROR_INVALID_THREAD;
 
         jint thread_state;
-        IDATA UNUSED status = jthread_get_state(event_thread, &thread_state);
+        IDATA UNUSED status = jthread_get_jvmti_state(event_thread, &thread_state);
         assert(status == TM_ERROR_NONE);
 
         if (!(thread_state & JVMTI_THREAD_STATE_ALIVE))
@@ -876,7 +876,7 @@ jvmti_process_method_exit_event_internal(jmethodID method,
     jint depth = get_thread_stack_depth(curr_thread);
 
 #ifndef NDEBUG
-    if( curr_thread->frame_pop_listener ) {
+    if( curr_thread->jvmti_thread.frame_pop_listener ) {
         TRACE2("jvmti.stack", "Prepare to PopFrame callback for thread: "
             << curr_thread << ", method: " << class_get_name(method_get_class((Method*)method))
             << "." << method_get_name((Method*)method)
@@ -887,9 +887,9 @@ jvmti_process_method_exit_event_internal(jmethodID method,
 #endif // NDEBUG
 
     jvmti_frame_pop_listener *last = NULL;
-    for( jvmti_frame_pop_listener *fpl = curr_thread->frame_pop_listener;
+    for( jvmti_frame_pop_listener *fpl = curr_thread->jvmti_thread.frame_pop_listener;
          fpl;
-         last = fpl, (fpl = fpl ? fpl->next : curr_thread->frame_pop_listener) )
+         last = fpl, (fpl = fpl ? fpl->next : curr_thread->jvmti_thread.frame_pop_listener) )
     {
         TRACE2("jvmti.stack", "-> Look through listener: "
             << fpl << ", env: " << fpl->env << ", depth: " << fpl->depth);
@@ -900,7 +900,7 @@ jvmti_process_method_exit_event_internal(jmethodID method,
             if(last) {
                 last->next = fpl->next;
             } else {
-                curr_thread->frame_pop_listener = fpl->next;
+                curr_thread->jvmti_thread.frame_pop_listener = fpl->next;
             }
             fpl = last;
 
@@ -1376,7 +1376,6 @@ void jvmti_send_exception_event(jthrowable exn_object,
 
     VM_thread *curr_thread = p_TLS_vmthread;
     hythread_t curr_native_thread=hythread_self();
-    curr_thread->ti_exception_callback_pending = false;
 
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     assert(ti->isEnabled());
@@ -2025,17 +2024,17 @@ void jvmti_send_thread_start_end_event(int is_start)
     if (!ti->is_single_step_enabled())
         return;
 
+    jvmti_thread_t jvmti_thread = jthread_self_jvmti();
     if (is_start)
     {
         // Init single step state for the thread
-        VM_thread *vm_thread = p_TLS_vmthread;
         LMAutoUnlock lock(ti->vm_brpt->get_lock());
 
         jvmtiError UNREF errorCode = _allocate(sizeof(JVMTISingleStepState),
-            (unsigned char **)&vm_thread->ss_state);
+            (unsigned char **)&jvmti_thread->ss_state);
         assert(JVMTI_ERROR_NONE == errorCode);
 
-        vm_thread->ss_state->predicted_breakpoints = NULL;
+        jvmti_thread->ss_state->predicted_breakpoints = NULL;
 
         // There is no need to set a breakpoint in a thread which
         // is started inside of jvmti_send_thread_start_end_event() function.
@@ -2047,16 +2046,15 @@ void jvmti_send_thread_start_end_event(int is_start)
     else
     {
         // Shut down single step state for the thread
-        VM_thread *vm_thread = p_TLS_vmthread;
         LMAutoUnlock lock(ti->vm_brpt->get_lock());
 
-        jvmti_remove_single_step_breakpoints(ti, vm_thread);
-        if( vm_thread->ss_state ) {
-            if( vm_thread->ss_state->predicted_breakpoints ) {
-                ti->vm_brpt->release_intf(vm_thread->ss_state->predicted_breakpoints);
+        jvmti_remove_single_step_breakpoints(ti, jvmti_thread);
+        if( jvmti_thread->ss_state ) {
+            if( jvmti_thread->ss_state->predicted_breakpoints ) {
+                ti->vm_brpt->release_intf(jvmti_thread->ss_state->predicted_breakpoints);
             }
-            _deallocate((unsigned char *)vm_thread->ss_state);
-            vm_thread->ss_state = NULL;
+            _deallocate((unsigned char *)jvmti_thread->ss_state);
+            jvmti_thread->ss_state = NULL;
         }
     }
 }

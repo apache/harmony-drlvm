@@ -50,7 +50,7 @@ struct ClassLoader;
 class JIT;
 struct Global_Env;
 class Package;
-class VM_thread;
+struct VM_thread;
 struct AnnotationTable;
 
 

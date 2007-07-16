@@ -25,10 +25,6 @@
 
 hysem_t mon_enter;
 
-int ti_is_enabled() {
-    return 1;
-}
-
 /*
  * Test jthread_get_contended_monitor(...)
  */

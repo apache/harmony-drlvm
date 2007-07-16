@@ -223,9 +223,9 @@ IDATA monitor_wait_impl(hythread_monitor_t mon_ptr, I_64 ms, IDATA nano, IDATA i
         hymutex_unlock(&mon_ptr->mutex);
         hythread_safe_point();
         hythread_exception_safe_point();
-        save_count = reset_suspend_disable();
+        save_count = hythread_reset_suspend_disable();
         hymutex_lock(&mon_ptr->mutex);
-        set_suspend_disable(save_count);
+        hythread_set_suspend_disable(save_count);
     }
 
     mon_ptr->recursion_count = saved_recursion;

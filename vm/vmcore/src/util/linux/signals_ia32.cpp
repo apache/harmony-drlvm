@@ -754,15 +754,16 @@ void general_signal_handler(int signum, siginfo_t* info, void* context)
     // instrumented by breakpoint, the actual exception address will reside
     // in jvmti_jit_breakpoints_handling_buffer
     // We should replace exception address with saved address of instruction
-    uint32 break_buf = (uint32)p_TLS_vmthread->jvmti_jit_breakpoints_handling_buffer;
+    uint32 break_buf =
+        (uint32)p_TLS_vmthread->jvmti_thread.jvmti_jit_breakpoints_handling_buffer;
     if (saved_eip >= break_buf &&
-        saved_eip < break_buf + 50)
+        saved_eip < break_buf + TM_JVMTI_MAX_BUFFER_SIZE)
     {
         // Breakpoints should not occur in breakpoint buffer
         assert(signum != SIGTRAP);
 
         replaced = true;
-        new_eip = p_TLS_vmthread->jvmti_saved_exception_registers.eip;
+        new_eip = (uint32)vm_get_ip_from_regs(p_TLS_vmthread);
         uc->uc_mcontext.gregs[REG_EIP] = (greg_t)new_eip;
     }
 

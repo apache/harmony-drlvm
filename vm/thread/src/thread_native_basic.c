@@ -33,6 +33,7 @@
 #   define hy_inline
 #endif //PLATFORM_POSIX
 
+#include <apr_atomic.h>
 #include <open/hythread_ext.h>
 #include "thread_private.h"
 
@@ -115,7 +116,7 @@ IDATA VMCALL hythread_create_with_group(hythread_t *ret_thread, hythread_group_t
 
     new_thread->library = hythread_self()->library;
     new_thread->priority = priority ? priority : HYTHREAD_PRIORITY_NORMAL;
-    new_thread->stacksize = stacksize ? stacksize : HY_DEFAULT_STACKSIZE;
+    new_thread->stacksize = stacksize ? stacksize : TM_DEFAULT_STACKSIZE;
     //new_thread->suspend_request = suspend ? 1 : 0;
     
     start_proc_data =
@@ -483,28 +484,6 @@ hythread_t VMCALL hythread_get_thread(IDATA id) {
 }
 
 /**
- * Returns thread private data.
- * 
- * @param[in] t thread those private data to get
- * @return pointer to thread private data
- */
-void* VMCALL hythread_get_private_data(hythread_t t) {
-    assert(t);
-    return t->private_data;
-}
-/**
- * Sets the thread private data. 
- *
- * @param t thread
- * @param data pointer to private data
- */
-IDATA VMCALL hythread_set_private_data(hythread_t t, void* data) {
-    assert(t);
-    t->private_data = data;
-    return TM_ERROR_NONE;
-}
-
-/**
  * Get thread group. 
  *
  * @param[out] group hythread_group_t* pointer to group
@@ -562,6 +541,7 @@ IDATA VMCALL hythread_cancel_all(hythread_group_t group) {
  *
  */
 IDATA VMCALL hythread_struct_init(hythread_t *ret_thread) {
+    assert(ret_thread);
     if (*ret_thread) {
         reset_thread(*ret_thread);
         return TM_ERROR_NONE;
@@ -642,9 +622,6 @@ static hythread_t allocate_thread() {
     ptr->os_handle  = (osthread_t)NULL;
     ptr->priority   = HYTHREAD_PRIORITY_NORMAL;
     ptr->stacksize  = os_get_foreign_thread_stack_size();
-    ptr->name       = strdup("NONAME");
-    // not implemented
-    //ptr->big_thread_local_storage = (void **)calloc(1, sizeof(void*)*tm_tls_capacity);
     
     // Suspension
     ptr->request = 0;
@@ -664,19 +641,16 @@ static hythread_t allocate_thread() {
 }
 
 static void reset_thread(hythread_t thread) {
-    int r;
-    IDATA status;
+    IDATA UNREF status;
     if (thread->os_handle) {
-        r = os_thread_join(thread->os_handle);
-        assert(!r);
+        int UNREF res = os_thread_join(thread->os_handle);
+        assert(!res);
     }
 
     hymutex_lock(&thread->mutex);
 
     thread->os_handle  = (osthread_t)NULL;
     thread->priority   = HYTHREAD_PRIORITY_NORMAL;
-    // not implemented
-    //ptr->big_thread_local_storage = (void **)calloc(1, sizeof(void*)*tm_tls_capacity);
 
     // Suspension
     thread->request = 0;
@@ -716,8 +690,7 @@ static int VMAPICALL thread_start_proc(void *arg) {
 
     status = register_to_group(thread, group);
     if (status != TM_ERROR_NONE) {
-        thread->exit_value = status;
-        return thread->exit_value;
+        return status;
     }
 
     // Also, should it be executed under TM global lock?
@@ -733,7 +706,6 @@ static int VMAPICALL thread_start_proc(void *arg) {
     assert(status == TM_ERROR_NONE);
     assert(hythread_is_suspend_enabled()); 
     thread->state = TM_THREAD_STATE_TERMINATED | (TM_THREAD_STATE_INTERRUPTED  & thread->state);
-    thread->exit_value = 0;
 
     hythread_detach(thread);
     // Send join event to those threads who called join on this thread.
@@ -775,3 +747,139 @@ UDATA hythread_get_thread_times(hythread_t thread, int64* pkernel, int64* puser)
 UDATA hythread_get_thread_stacksize(hythread_t thread) {
     return thread->stacksize;
 }
+
+IDATA VMCALL hythread_thread_lock(hythread_t thread) {
+    assert(thread);
+    return hymutex_lock(&thread->mutex);
+} // hythread_thread_lock
+
+IDATA VMCALL hythread_thread_unlock(hythread_t thread) {
+    assert(thread);
+    return hymutex_unlock(&thread->mutex);
+} // hythread_thread_unlock
+
+IDATA VMCALL hythread_get_state(hythread_t thread) {
+    IDATA state;
+    assert(thread);
+    hymutex_lock(&thread->mutex);
+    state = thread->state;
+    hymutex_unlock(&thread->mutex);
+    return state;
+} // hythread_get_state
+
+IDATA VMCALL hythread_set_state(hythread_t thread, IDATA state) {
+    assert(thread);
+    hymutex_lock(&thread->mutex);
+    thread->state = state;
+    hymutex_unlock(&thread->mutex);
+    return TM_ERROR_NONE;
+} // hythread_set_state
+
+IDATA VMCALL hythread_get_thread_id_offset() {
+    return (uint32)&((HyThread *)0)->thread_id;
+} // hythread_get_thread_id_offset
+
+IDATA VMCALL hythread_set_thread_stop_callback(hythread_t thread,
+    tm_thread_event_callback_proc stop_callback)
+{
+    IDATA status = hythread_set_safepoint_callback(thread, stop_callback);
+
+    while (thread->suspend_count > 0) {
+        apr_atomic_dec32((volatile apr_uint32_t *)
+            &thread->suspend_count);
+        apr_atomic_dec32((volatile apr_uint32_t *)
+            &thread->request);
+    }
+
+    // if there is no competition, it would be 1, but if someone else is
+    // suspending the same thread simultaneously, it could be greater than 1
+    // if safepoint callback isn't set it could be equal to 0.
+    //
+    // The following assertion may be false because at each time
+    // one of the conditions is true, and the other is false, but
+    // when checking the whole condition it may be failse in the result.
+    // assert(thread->request > 0 || thread->safepoint_callback == NULL);
+
+    // notify the thread that it may wake up now,
+    // so that it would eventually reach exception safepoint
+    // and execute callback
+    hysem_post(thread->resume_event);
+    return status;
+} // hythread_set_thread_stop_callback
+
+IDATA VMCALL hythread_wait_for_nondaemon_threads(hythread_t thread, IDATA threads_to_keep)
+{
+    IDATA status;
+    hythread_library_t lib;
+
+    assert(thread);
+    lib = thread->library;
+
+    status = hymutex_lock(&lib->TM_LOCK);
+    if (status != TM_ERROR_NONE) {
+        return status;
+    }
+
+    while (lib->nondaemon_thread_count - threads_to_keep > 0)
+    {
+        // check interruption and other problems
+        status = hycond_wait(&lib->nondaemon_thread_cond, &lib->TM_LOCK);
+
+        TRACE(("TM wait for nondaemons notified, count: %d",
+               lib->nondaemon_thread_count));
+
+        if (status != TM_ERROR_NONE) {
+            hymutex_unlock(&lib->TM_LOCK);
+            return status;
+        }
+    }
+
+    status = hymutex_unlock(&lib->TM_LOCK);
+    return status;
+} // hythread_wait_for_nondaemon_threads
+
+IDATA VMCALL hythread_increase_nondaemon_threads_count(hythread_t thread)
+{
+    hythread_library_t lib = thread->library;
+    IDATA status = hymutex_lock(&lib->TM_LOCK);
+    if (status != TM_ERROR_NONE) {
+        return status;
+    }
+    lib->nondaemon_thread_count++;
+    status = hymutex_unlock(&lib->TM_LOCK);
+    return status;
+} // hythread_increase_nondaemon_threads_count_in_library
+
+IDATA VMCALL hythread_decrease_nondaemon_threads_count(hythread_t thread, IDATA threads_to_keep)
+{
+    hythread_library_t lib = thread->library;
+    IDATA status = hymutex_lock(&lib->TM_LOCK);
+    if (status != TM_ERROR_NONE) {
+        return status;
+    }
+
+    if (lib->nondaemon_thread_count <= 0) {
+        status = hymutex_unlock(&lib->TM_LOCK);
+        if (status != TM_ERROR_NONE) {
+            return status;
+        }
+        return TM_ERROR_ILLEGAL_STATE;
+    }
+
+    TRACE(("TM: nondaemons decreased, thread: %p count: %d\n", thread,
+           lib->nondaemon_thread_count));
+
+    lib->nondaemon_thread_count--;
+    if (lib->nondaemon_thread_count - threads_to_keep <= 0) {
+        status = hycond_notify_all(&lib->nondaemon_thread_cond);
+        TRACE(("TM: nondaemons all dead, thread: %p count: %d\n", thread,
+               lib->nondaemon_thread_count));
+        if (status != TM_ERROR_NONE) {
+            hymutex_unlock(&lib->TM_LOCK);
+            return status;
+        }
+    }
+
+    status = hymutex_unlock(&lib->TM_LOCK);
+    return status;
+} // hythread_countdown_nondaemon_threads

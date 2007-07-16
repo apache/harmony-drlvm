@@ -15,29 +15,36 @@
  *  limitations under the License.
  */
 
+#include "open/ti_thread.h"
 #include "testframe.h"
 #include "thread_unit_test_utils.h"
-#include <open/ti_thread.h>
+
+#define TEST_TLS_KEY (TM_THREAD_VM_TLS_KEY + 1)
 
 /*
- * Test jthread_set_local_storage(...)
+ * Test test_jthread_set_and_get_local_storage
  */
-int test_jthread_set_local_storage(void) {
-
-
-    tested_thread_sturct_t *tts;
+int test_jthread_set_and_get_local_storage(void)
+{
     void * data;
+    hythread_t hythread;
+    tested_thread_sturct_t *tts;
 
     // Initialize tts structures and run all tested threads
     tested_threads_run(default_run_for_test);
     
     reset_tested_thread_iterator(&tts);
-    while(next_tested_thread(&tts)){
-        tf_assert_same(jthread_set_local_storage(tts->java_thread, (const void*)tts), TM_ERROR_NONE);
+    while (next_tested_thread(&tts)) {
+        hythread = vm_jthread_get_tm_data(tts->java_thread);
+        tf_assert(hythread);
+        tf_assert_same(hythread_tls_set(hythread, TEST_TLS_KEY, tts),
+                       TM_ERROR_NONE);
     }
     reset_tested_thread_iterator(&tts);
-    while(next_tested_thread(&tts)){
-        tf_assert_same(jthread_get_local_storage(tts->java_thread, &data), TM_ERROR_NONE);
+    while (next_tested_thread(&tts)) {
+        hythread = vm_jthread_get_tm_data(tts->java_thread);
+        tf_assert(hythread);
+        data = hythread_tls_get(hythread, TEST_TLS_KEY);
         tf_assert_same(data, tts);
     }
 
@@ -47,15 +54,6 @@ int test_jthread_set_local_storage(void) {
     return TEST_PASSED;
 }
 
-/*
- * Test jthread_get_local_storage(...)
- */
-int test_jthread_get_local_storage(void) {
-
-    return test_jthread_set_local_storage();
-}
-
 TEST_LIST_START
-    //TEST(test_jthread_set_local_storage)
-    //TEST(test_jthread_get_local_storage)
+    TEST(test_jthread_set_and_get_local_storage)
 TEST_LIST_END;

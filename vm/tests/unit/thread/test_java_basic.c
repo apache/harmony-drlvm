@@ -20,7 +20,7 @@
 #include "thread_unit_test_utils.h"
 #include <open/jthread.h>
 #include <open/hythread_ext.h>
-#include "thread_private.h"
+#include "thread_manager.h"
 
 /*
  * Time for jthread_timed_join() to wait
@@ -47,7 +47,7 @@ int HYTHREAD_PROC run_for_test_jthread_attach(void *args){
         }
     }
 
-    status = vm_attach(GLOBAL_VM, &jni_env, NULL);
+    status = vm_attach(GLOBAL_VM, &jni_env);
     if (status != JNI_OK) {
         tts->phase = TT_PHASE_ERROR;
         return 0;
@@ -303,7 +303,7 @@ int test_jthread_exception_stop (void){
     tested_thread_sturct_t * tts;
     jobject excn;
     hythread_t hythread;
-    jvmti_thread_t jvmti_thread;
+    vm_thread_t vm_thread;
     JNIEnv * jni_env;
 
     jni_env = jthread_get_JNI_env(jthread_self());
@@ -317,8 +317,10 @@ int test_jthread_exception_stop (void){
         tf_assert_same(jthread_exception_stop(tts->java_thread, excn), TM_ERROR_NONE);
         check_tested_thread_phase(tts, TT_PHASE_ANY);
         hythread = vm_jthread_get_tm_data(tts->java_thread);
-        jvmti_thread = hythread_get_private_data(hythread);
-        tf_assert(vm_objects_are_equal(excn, jvmti_thread->stop_exception));
+        tf_assert(hythread);
+        vm_thread = (vm_thread_t)hythread_tls_get(hythread, TM_THREAD_VM_TLS_KEY);
+        tf_assert(vm_thread);
+        tf_assert(vm_objects_are_equal(excn, vm_thread->stop_exception));
     }
 
     // Terminate all threads (not needed here) and clear tts structures
@@ -335,12 +337,19 @@ int test_jthread_stop (void){
 
     tested_thread_sturct_t * tts;
     JNIEnv * env;
-    jclass excn;
+    jclass excn_stop_class;
+    jclass stop_excn_class;
     hythread_t hythread;
-    jvmti_thread_t jvmti_thread;
+    vm_thread_t vm_thread;
+    jmethodID getClassId;
 
     env = jthread_get_JNI_env(jthread_self());
-    excn = (*env) -> FindClass(env, "java/lang/ThreadDeath");
+    excn_stop_class = (*env) -> FindClass(env, "java/lang/ThreadDeath");
+    tf_assert(excn_stop_class);
+
+    getClassId = (*env)->GetMethodID(env, excn_stop_class,
+        "getClass", "()Ljava/lang/Class;");
+    tf_assert(getClassId);
 
     // Initialize tts structures and run all tested threads
     tested_threads_run(run_for_test_jthread_exception_stop);
@@ -349,14 +358,17 @@ int test_jthread_stop (void){
     while(next_tested_thread(&tts)){
         tf_assert_same(tts->excn, NULL);
         tf_assert_same(jthread_stop(tts->java_thread), TM_ERROR_NONE);
-        //check_tested_thread_phase(tts, TT_PHASE_ANY);
-        //tf_assert_same(tts->excn, excn);
-        hythread = vm_jthread_get_tm_data(tts->java_thread);
-        jvmti_thread = hythread_get_private_data(hythread);
-        //tf_assert_same(excn, jvmti_thread->stop_exception);
 
-        //tf_assert_same(jthread_stop(tts->java_thread), TM_ERROR_NONE);
-        //tf_assert_same(thread_deaf_excn, thread->stop_exception);
+        hythread = vm_jthread_get_tm_data(tts->java_thread);
+        tf_assert(hythread);
+        vm_thread =
+            (vm_thread_t)hythread_tls_get(hythread, TM_THREAD_VM_TLS_KEY);
+        tf_assert(vm_thread);
+        stop_excn_class = (*env)->CallObjectMethod(env,
+            vm_thread->stop_exception, getClassId);
+        tf_assert(stop_excn_class);
+
+        tf_assert(vm_objects_are_equal(excn_stop_class, stop_excn_class));
     }
 
     // Terminate all threads (not needed here) and clear tts structures
@@ -476,7 +488,7 @@ TEST_LIST_START
     TEST(test_jthread_join)
     TEST(test_jthread_timed_join)
     TEST(test_jthread_exception_stop)
-    //TEST(test_jthread_stop)
+    TEST(test_jthread_stop)
     TEST(test_jthread_sleep)
     TEST(test_hythread_yield)
 TEST_LIST_END;
