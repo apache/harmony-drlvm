@@ -845,12 +845,6 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 				RelativePath="..\..\..\..\vm\jitrino\src\shared\BitSet.h">
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\jitrino\src\shared\CGSupport.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\jitrino\src\shared\CGSupport.h">
-			</File>
-			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\shared\ControlFlowGraph.cpp">
 			</File>
 			<File
@@ -888,9 +882,6 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\shared\HashTable.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\jitrino\src\shared\InlineInfo.h">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\shared\Interval.cpp">
