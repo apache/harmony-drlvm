@@ -83,7 +83,8 @@ Version: $Revision: 1.5.2.3 $
                 <include name="stack/*.cpp" />
                 <include name="thread/*.cpp" />
                 <include name="util/*.cpp" />
-                <include name="verifier/*.cpp" />
+                <include name="verifier/*.cpp" unless="use_verifier_3363"/>
+                <include name="verifier-3363/*.cpp" if="use_verifier_3363"/>
             </fileset>
 
             <fileset dir="${build.vm.home}/vmcore/src/kernel_classes/native">
