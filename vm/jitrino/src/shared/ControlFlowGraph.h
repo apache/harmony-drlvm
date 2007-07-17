@@ -1467,12 +1467,8 @@ public:
    *                           inlined after this instruction
    * @param[in] inlineFG     - the flow graph to inline. Must have valid unwind 
    *                           and return nodes
-   * @param[in] keepDispatch - indicates if both nodes after the splitting must  
-   *                           have the same dispatch as the initial node had.
-   *                           If <code>FALSE</code> the <code>Dispatch</code> node 
-   *                           is moved to the node with a higher post-num.
    */
-    void spliceFlowGraphInline(CFGInst* instAfter, ControlFlowGraph& inlineFG, bool keepDispatch=true);
+    void spliceFlowGraphInline(CFGInst* instAfter, ControlFlowGraph& inlineFG);
     
   /** 
    * Inlines <code>inlineFG</code> info given CFG retargeting the edge to the 

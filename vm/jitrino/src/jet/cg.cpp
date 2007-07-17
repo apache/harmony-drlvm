@@ -34,7 +34,7 @@ using std::min;
 #include <jit_runtime_support.h>
 #include <jit_intf.h>
 #include <jni_types.h>
-
+#include "port_threadunsafe.h"
 
 /**
  * @file
@@ -122,7 +122,9 @@ void CodeGen::gen_check_null(Val& obj, bool hw_ok)
 {
     assert(obj.jt() == jobj);
     if (obj.has(VA_NZ)) {
+        UNSAFE_REGION_START
         STATS_INC(Stats::npesEliminated,1);
+        UNSAFE_REGION_END
         if (is_set(DBG_TRACE_CG)) {
             dbg(";;>check.npe for %s - skipped\n", 
                                             to_str(obj.as_opnd()).c_str());

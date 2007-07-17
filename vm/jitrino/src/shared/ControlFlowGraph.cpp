@@ -697,13 +697,13 @@ void ControlFlowGraph::spliceFlowGraphInline(Edge* edge, ControlFlowGraph& inlin
 }
 
 
-void ControlFlowGraph::spliceFlowGraphInline(CFGInst* instAfter, ControlFlowGraph& inlineFG, bool keepDispatch) {
+void ControlFlowGraph::spliceFlowGraphInline(CFGInst* instAfter, ControlFlowGraph& inlineFG) {
     Node* node = instAfter->getNode();
     Edge* edgeToInlined = NULL;
     if (node->getLastInst() == instAfter) {
         edgeToInlined =  node->getUnconditionalEdge();
     } else {//WARN: no label inst created -> possible problems if method is used in HLO
-        Node* newBlock = splitNodeAtInstruction(instAfter, true, keepDispatch, NULL);
+        Node* newBlock = splitNodeAtInstruction(instAfter, true, false, NULL);
         assert(newBlock->getInDegree() == 1);
         edgeToInlined = newBlock->getInEdges().front();
     }

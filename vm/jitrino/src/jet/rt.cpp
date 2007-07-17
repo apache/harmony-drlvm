@@ -31,6 +31,8 @@
 #include "jit_import.h"
 #include "jit_intf.h"
 
+#include "port_threadunsafe.h"
+
 #if !defined(_IPF_)
 #include "enc_ia32.h"
 #endif
@@ -164,6 +166,7 @@ void rt_unwind(JIT_Handle jit, Method_Handle method,
     // restore callee-save regs
     //
 #ifdef _DEBUG
+    UNSAFE_REGION_START
     // presumption: only GP registers can be callee-save
     static bool do_check = true;
     for (unsigned i=0; do_check && i<ar_num; i++) {
@@ -171,6 +174,7 @@ void rt_unwind(JIT_Handle jit, Method_Handle method,
         assert(!is_callee_save(ar) || is_gr(ar));
     }
     do_check = false;
+    UNSAFE_REGION_END
 #endif
 
 #if defined(_EM64T_) || defined(_IPF_)

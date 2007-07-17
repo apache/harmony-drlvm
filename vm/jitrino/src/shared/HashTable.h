@@ -27,6 +27,7 @@
 #include <assert.h>
 #include "Dlink.h"
 #include "MemoryManager.h"
+#include "port_threadunsafe.h"
 
 namespace Jitrino {
 
@@ -110,15 +111,21 @@ public:
 protected:
     virtual HashTableLink* lookupEntry(void* key) const {
 #ifdef _DEBUG
+        UNSAFE_REGION_START
         ((HashTableImpl *)this)->numLookup++;
+        UNSAFE_REGION_END
 #endif
         for (HashTableLink* e = table[getTableIndex(key)]; e != NULL; e = e->next) {
 #ifdef _DEBUG
+            UNSAFE_REGION_START
             ((HashTableImpl *)this)->numLookupEntry++;
+            UNSAFE_REGION_END
 #endif
             if (equals(e->keyPtr,key)) {
 #ifdef _DEBUG
+                UNSAFE_REGION_START
                 ((HashTableImpl *)this)->numFound++;
+                UNSAFE_REGION_END
 #endif
                 return e;
             }

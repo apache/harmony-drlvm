@@ -630,14 +630,14 @@ TlsLogStreams::~TlsLogStreams ()
 
 
 static TlsStore<TlsLogStreams> tlslogstreams;
-
+static Mutex logInfoLock;
 
 /*
     Because CompilationContext is a transient object (it created on start of compilation
     and destroyed on end of compilation for every method), LogStreams table cannot reside
     in it. Thread-local storage (TLS) is used to keep LogStreams.
     On the other hand, different Jits can run on the same thread, so several LogStreams
-    have to be keept for single thread.
+    have to be kept for single thread.
     To optimize access, pointer to LogStreams is cached in CompilationContext.
 
  */
@@ -654,7 +654,9 @@ LogStreams& LogStreams::current(JITInstanceContext* jitContext) {
     TlsLogStreams* sp = tlslogstreams.get();
     if (sp == 0)
     {   // new thread
+        logInfoLock.lock();
         ++thread_nb;
+        logInfoLock.unlock();
         sp = new TlsLogStreams();
         tlslogstreams.put(sp);
     }
