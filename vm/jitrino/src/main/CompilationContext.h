@@ -47,7 +47,6 @@ public:
     // Exists only during a compilation of method
     // This class uses destructor and must not be created on MemoryManager
     CompilationContext(MemoryManager& mm, CompilationInterface* ci, JITInstanceContext* jit);
-    CompilationContext(MemoryManager& mm, CompilationInterface* ci, const CompilationContext* cc);
     ~CompilationContext();
     
     CompilationInterface* getVMCompilationInterface() const  {return compilationInterface;}

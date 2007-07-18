@@ -27,8 +27,6 @@
 
 namespace Jitrino {
 
-#define PRAGMA_INLINE "org/vmmagic/pragma/Inline"
-
 struct HelperInlinerFlags {
     const char* inlinerPipelineName;
 
@@ -118,7 +116,7 @@ class HelperInliner {
 public:
     HelperInliner(HelperInlinerSession* _sessionAction, MemoryManager& tmpMM, CompilationContext* _cc, Inst* _inst)  
         : flags(((HelperInlinerAction*)_sessionAction->getAction())->getFlags()), localMM(tmpMM), 
-        cc(_cc), inst(_inst), session(_sessionAction), method(NULL), inlinePragma(NULL)
+        cc(_cc), inst(_inst), session(_sessionAction), method(NULL)
     {
         irm = cc->getHIRManager();
         instFactory = &irm->getInstFactory();
@@ -142,8 +140,7 @@ protected:
     Inst* inst;
     HelperInlinerSession* session;
     MethodDesc*  method;
-    NamedType* inlinePragma;
-
+    
 //these fields used by almost every subclass -> cache them
     IRManager* irm;
     InstFactory* instFactory;
@@ -164,11 +161,6 @@ public:\
         }\
         method = ensureClassIsResolvedAndInitialized(flags.flagPrefix##_className, flags.flagPrefix##_methodName, flags.flagPrefix##_signature);\
         if (!method) return;\
-        if (!inlinePragma) { \
-            inlinePragma = cc->getVMCompilationInterface()->resolveClassUsingBootstrapClassloader(PRAGMA_INLINE);\
-        } \
-        if (!inlinePragma) return;\
-        \
         doInline();\
     }\
     virtual void doInline();\
@@ -189,6 +181,10 @@ void HelperInlinerSession::_run(IRManager& irm) {
     HelperInlinerAction* action = (HelperInlinerAction*)getAction();
     HelperInlinerFlags& flags = action->getFlags();
 
+    if (cc->getVMCompilationInterface()->resolveClassUsingBootstrapClassloader(PRAGMA_INLINE) == NULL) {
+        Log::out()<<"Helpers inline pass failed! class not found: "<<PRAGMA_INLINE<<std::endl;
+        return;
+    }
     //finding all helper calls
     ControlFlowGraph& fg = irm.getFlowGraph();
     double entryExecCount = fg.hasEdgeProfile() ? fg.getEntryNode()->getExecCount(): 1;
@@ -285,55 +281,13 @@ MethodDesc* HelperInliner::ensureClassIsResolvedAndInitialized(const char* class
 typedef StlVector<MethodCallInst*> InlineVector;
 
 
-void HelperInliner::inlineVMHelper(MethodCallInst* origCall) {
-    assert(inlinePragma!=0);
-
-    InlineVector  methodsToInline(localMM);
-    methodsToInline.push_back(origCall);
-    while (!methodsToInline.empty()) {
-        MethodCallInst* call = *methodsToInline.rbegin();
-        methodsToInline.pop_back();
-        if (Log::isEnabled()) {
-            Log::out()<<"Inlining VMHelper:";call->print(Log::out());Log::out()<<std::endl;
-        }
-
-        CompilationInterface* ci = cc->getVMCompilationInterface();
-        
-        //now inline the call
-        CompilationContext inlineCC(cc->getCompilationLevelMemoryManager(), ci, cc->getCurrentJITContext());
-        inlineCC.setPipeline(cc->getPipeline());
-
-        Inliner inliner(session, localMM, *irm, false);
-        InlineNode* regionToInline = inliner.createInlineNode(inlineCC, call);
-
-        inliner.connectRegion(regionToInline);
-
-        // Optimize inlined region before splicing
-        inlineCC.stageId = cc->stageId;
-        Inliner::runInlinerPipeline(inlineCC, flags.inlinerPipelineName);
-        cc->stageId = inlineCC.stageId;
-
-        //add all methods with pragma inline into the list.
-        const Nodes& nodesInRegion = regionToInline->getIRManager().getFlowGraph().getNodes();
-        for (Nodes::const_iterator it = nodesInRegion.begin(), end = nodesInRegion.end(); it!=end; ++it) {
-            Node* node = *it;
-            for (Inst* inst = (Inst*)node->getFirstInst(); inst!=NULL; inst = inst->getNextInst()) {
-                if (inst->isMethodCall()) {
-                    MethodCallInst* methodCall = inst->asMethodCallInst();
-                    MethodDesc* md = methodCall->getMethodDesc();
-                    if (md->hasAnnotation(inlinePragma)) {
-                        methodsToInline.push_back(methodCall);
-                        if (Log::isEnabled()) {
-                            Log::out()<<"Found Inline pragma, adding to the queue:";methodCall->print(Log::out());Log::out()<<std::endl;
-                        }
-                    }
-                }
-            }
-        }
-
-        //inline the region
-        inliner.inlineRegion(regionToInline, false);
+void HelperInliner::inlineVMHelper(MethodCallInst* call) {
+    if (Log::isEnabled()) {
+        Log::out()<<"Inlining VMHelper:";call->print(Log::out());Log::out()<<std::endl;
     }
+
+    Inliner inliner(session, localMM, *irm, false, false, flags.inlinerPipelineName);
+    inliner.doInline(localMM, call);
 }
 
 void HelperInliner::finalizeCall(MethodCallInst* callInst) {

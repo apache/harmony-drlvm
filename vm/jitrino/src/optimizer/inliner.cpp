@@ -68,7 +68,8 @@ namespace Jitrino {
 
 DEFINE_SESSION_ACTION(InlinePass, inline, "Method Inlining");
 
-Inliner::Inliner(SessionAction* argSource, MemoryManager& mm, IRManager& irm, bool doProfileOnly) 
+Inliner::Inliner(SessionAction* argSource, MemoryManager& mm, IRManager& irm, 
+                 bool doProfileOnly, bool _usePriorityQueue, const char* inlinePipeline) 
     : _tmpMM(mm), _toplevelIRM(irm), 
       _typeManager(irm.getTypeManager()), _instFactory(irm.getInstFactory()),
       _opndManager(irm.getOpndManager()),
@@ -76,7 +77,8 @@ Inliner::Inliner(SessionAction* argSource, MemoryManager& mm, IRManager& irm, bo
       _inlineCandidates(mm), _initByteSize(irm.getMethodDesc().getByteCodeSize()), 
       _currentByteSize(irm.getMethodDesc().getByteCodeSize()), 
       _inlineTree(new (mm) InlineNode(irm, 0, 0)),
-      translatorAction(NULL)
+      translatorAction(NULL), inlinePragma(NULL), 
+      usePriorityQueue(_usePriorityQueue), inlinerPipelineName(inlinePipeline), connectEarly(true)
 {
     
     const char* translatorName = argSource->getStringArg("translatorActionName", "translator");
@@ -138,6 +140,8 @@ Inliner::Inliner(SessionAction* argSource, MemoryManager& mm, IRManager& irm, bo
     }
 
     _usesOptimisticBalancedSync = argSource->getBoolArg("sync_optimistic", false) ? argSource->getBoolArg("sync_optcatch", true) : false;
+    
+    inlinePragma = irm.getCompilationInterface().resolveClassUsingBootstrapClassloader(PRAGMA_INLINE);
 }
 
 int32 
@@ -149,6 +153,11 @@ Inliner::computeInlineBenefit(Node* node, MethodDesc& methodDesc, InlineNode* pa
         Log::out() << "Computing Inline benefit for "
                                << methodDesc.getParentType()->getName()
                                << "." << methodDesc.getName() << ::std::endl;
+    }
+    if (inlinePragma!=NULL && methodDesc.hasAnnotation(inlinePragma)) {
+        //methods marked with inline pragma processed separately and are always inlined
+        //regardless of it benefits and size limitations.
+        return -1;
     }
     if (_inlineBonusMethodTable!=NULL && _inlineBonusMethodTable->accept_this_method(methodDesc)) {
         benefit+=1000;
@@ -791,7 +800,7 @@ Inliner::connectRegion(InlineNode* inlineNode) {
 }
 
 void
-Inliner::inlineRegion(InlineNode* inlineNode, bool updatePriorityQueue) {
+Inliner::inlineRegion(InlineNode* inlineNode) {
     IRManager &inlinedIRM = inlineNode->getIRManager();
     DominatorTree* dtree = inlinedIRM.getDominatorTree();
     LoopTree* ltree = inlinedIRM.getLoopTree();
@@ -815,7 +824,7 @@ Inliner::inlineRegion(InlineNode* inlineNode, bool updatePriorityQueue) {
     //
     // Update priority queue with calls in this region
     //
-    if (updatePriorityQueue) {
+    if (usePriorityQueue) {
         processRegion(inlineNode, dtree, ltree);
     }
     
@@ -865,8 +874,8 @@ void Inliner::runTranslatorSession(CompilationContext& inlineCC) {
     inlineCC.setCurrentSessionAction(NULL);
 }
 
-InlineNode*
-Inliner::getNextRegionToInline(CompilationContext& inlineCC) {
+MethodCallInst*
+Inliner::getNextRegionToInline() {
     // If in DPGO profiling mode, don't inline if profile information is not available.
     if(_doProfileOnlyInlining && !_toplevelIRM.getFlowGraph().hasEdgeProfile()) {
         return NULL;
@@ -924,15 +933,8 @@ Inliner::getNextRegionToInline(CompilationContext& inlineCC) {
     Log::out() << "Opt:   Inline " << methodDesc->getParentType()->getName() << "." << methodDesc->getName() << 
         methodDesc->getSignatureString() << ::std::endl;
     
-    // Generate flowgraph for new region
-   
-    InlineNode* inlineNode = createInlineNode(inlineCC, call);
-    assert(inlineNode!=NULL);
-
-    inlineParentNode->addChild(inlineNode);
-
     _currentByteSize = newByteSize;
-    return inlineNode;
+    return call;
 }
 
 InlineNode* Inliner::createInlineNode(CompilationContext& inlineCC, MethodCallInst* call) {
@@ -1114,51 +1116,97 @@ void Inliner::runInlinerPipeline(CompilationContext& inlineCC, const char* pipeN
     }
 }
 
+typedef StlVector<MethodCallInst*> InlineVector;
+
+void Inliner::doInline(MemoryManager& tmpMM, MethodCallInst* origCall) {
+    CompilationContext* topCC = _toplevelIRM.getCompilationContext();
+    CompilationInterface* ci = topCC->getVMCompilationInterface();
+
+    InlineVector pragmaInlineCalls(tmpMM);
+    bool firstIteration = true;
+    do {
+        MethodCallInst* call = NULL;
+        bool rootMethodAnalysis = firstIteration && origCall == NULL;
+        if (firstIteration) {
+            call = origCall;
+            firstIteration = false;
+        } else {
+            call = *pragmaInlineCalls.rbegin();
+            pragmaInlineCalls.pop_back();
+            assert(call!=NULL);
+        }
+        
+        InlineNode* ir = NULL;
+        if (!rootMethodAnalysis) { // processing custom call in a method
+            assert(call!=NULL);
+            CompilationContext inlineCC(topCC->getCompilationLevelMemoryManager(), ci, topCC->getCurrentJITContext());
+            inlineCC.setPipeline(topCC->getPipeline());//workaround for logging issue. Pipeline must not be NULL
+            ir = createInlineNode(inlineCC, call);
+            IRManager &regionManager = ir->getIRManager();
+            assert(inlineCC.getHIRManager() == &regionManager);
+
+            // Connect region arguments to top-level flowgraph
+            if(connectEarly) {
+                connectRegion(ir);
+            }
+
+            // Optimize inlined region before splicing
+            inlineCC.stageId = topCC->stageId;
+            Inliner::runInlinerPipeline(inlineCC, inlinerPipelineName);
+            topCC->stageId = inlineCC.stageId;
+
+            // Splice into flow graph and find next region.
+            if(!connectEarly) {
+                connectRegion(ir);
+            }
+            OptPass::computeDominatorsAndLoops(regionManager);
+        } else {// processing whole method
+            ir = (InlineNode*)getInlineTree().getRoot();
+        }
+
+        //check all methods with @Inline pragmas
+        const Nodes& nodesInRegion = ir->getIRManager().getFlowGraph().getNodes();
+        for (Nodes::const_iterator it = nodesInRegion.begin(), end = nodesInRegion.end(); it!=end; ++it) {
+            Node* node = *it;
+            for (Inst* inst = (Inst*)node->getFirstInst(); inst!=NULL; inst = inst->getNextInst()) {
+                if (inst->isMethodCall()) {
+                    MethodCallInst* methodCall = inst->asMethodCallInst();
+                    MethodDesc* md = methodCall->getMethodDesc();
+                    if (md->hasAnnotation(inlinePragma)) {
+                        assert(!md->isSynchronized()); //not tested!
+                        pragmaInlineCalls.push_back(methodCall);
+                        if (Log::isEnabled()) {
+                            Log::out()<<"Found Inline pragma, adding to the queue:";methodCall->print(Log::out());Log::out()<<std::endl;
+                        }
+                    }
+                }
+            }
+        }
+        //inline current region
+        inlineRegion(ir);
+    } while (!pragmaInlineCalls.empty());
+}
+
 void InlinePass::_run(IRManager& irm) {
 
     computeDominatorsAndLoops(irm);
-
-   
-    CompilationContext* cc = getCompilationContext();
-    MemoryManager& mm = cc->getCompilationLevelMemoryManager() ;
-    CompilationInterface* ci = cc->getVMCompilationInterface();
 
     // Set up Inliner
     bool connectEarly = getBoolArg("connect_early", true);
     const char* pipeName = getStringArg("pipeline", "inliner_pipeline");
 
     MemoryManager tmpMM("Inliner::tmp_mm");
-    Inliner inliner(this, tmpMM, irm, irm.getFlowGraph().hasEdgeProfile());
-    InlineNode* rootRegionNode = (InlineNode*) inliner.getInlineTree().getRoot();
-    inliner.inlineRegion(rootRegionNode);
+    Inliner inliner(this, tmpMM, irm, irm.getFlowGraph().hasEdgeProfile(), true, pipeName);
+    inliner.setConnectEarly(connectEarly);
+    inliner.doInline(tmpMM, NULL);
 
     // Inline calls
     do {
-        CompilationContext inlineCC(mm, ci, cc);
-        InlineNode* regionNode = inliner.getNextRegionToInline(inlineCC);
-        if (regionNode == NULL) {
+        MethodCallInst* call = inliner.getNextRegionToInline();
+        if (call == NULL) {
             break;
         }
-        assert(regionNode != rootRegionNode);
-        IRManager &regionManager = regionNode->getIRManager();
-        assert(inlineCC.getHIRManager() == &regionManager);
-
-        // Connect region arguments to top-level flowgraph
-        if(connectEarly) {
-            inliner.connectRegion(regionNode);
-        }
-
-        // Optimize inlined region before splicing
-        inlineCC.stageId = cc->stageId;
-        Inliner::runInlinerPipeline(inlineCC, pipeName);
-        cc->stageId = inlineCC.stageId;
-        
-        // Splice into flow graph and find next region.
-        if(!connectEarly) {
-            inliner.connectRegion(regionNode);
-        }
-        OptPass::computeDominatorsAndLoops(regionManager);
-        inliner.inlineRegion(regionNode);
+        inliner.doInline(tmpMM, call);
     } while (true);
     const OptimizerFlags& optimizerFlags = irm.getOptimizerFlags();
     // Print the results to logging / dot file

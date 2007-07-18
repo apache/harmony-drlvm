@@ -2347,7 +2347,8 @@ EscAnalyzer::scanCalleeMethod(Inst* call) {
     }
     
     {
-        CompilationContext inlineCC(irManager.getMemoryManager(), &ci, ci.getCompilationContext());
+        CompilationContext inlineCC(irManager.getMemoryManager(), &ci, irManager.getCurrentJITContext());
+        inlineCC.setPipeline(irManager.getCompilationContext()->getPipeline());
         inlineCC.setHIRManager(inlinedIRM);
         runTranslatorSession(inlineCC);
     }

@@ -28,6 +28,8 @@
 #include "Tree.h"
 #include "irmanager.h"
 
+#define PRAGMA_INLINE "org/vmmagic/pragma/Inline"
+
 namespace Jitrino {
 
 class MemoryManager;
@@ -89,19 +91,19 @@ private:
 class Inliner
 {
 public:
-    Inliner(SessionAction* argSource, MemoryManager& mm, IRManager& irm,  bool doProfileOnly=false);
+    Inliner(SessionAction* argSource, MemoryManager& mm, IRManager& irm,  
+        bool doProfileOnly, bool usePriorityQueue, const char* inlinerPipelineName);
 
     // Inline this method into the current CFG and process it for further
     // inline candidates.  If the argument is the top level CFG, only processing
     // occurs.
-    void inlineRegion(InlineNode* inlineNode, bool updatePriorityQueue = true);
+    void inlineRegion(InlineNode* inlineNode);
 
     // Connect input and return operands of the region to the top-level method.  Do not yet splice.
     void connectRegion(InlineNode* inlineNode);
 
-    // Build the flowgraph for the next inline candidate method.  Note, this flowgraph
-    // is not yet connected to the top level CFG.   
-    InlineNode* getNextRegionToInline(CompilationContext& inlineCC);
+    // Searches the flowgraph for the next inline candidate method.
+    MethodCallInst* getNextRegionToInline();
 
     InlineTree& getInlineTree() { return _inlineTree; } 
 
@@ -112,6 +114,10 @@ public:
     static double getProfileMethodCount(CompilationInterface& compileIntf, MethodDesc& methodDesc); 
     
     static void runInlinerPipeline(CompilationContext& inlineCC, const char* pipeName);
+
+    void doInline(MemoryManager& tmpMM, MethodCallInst* call);
+
+    void setConnectEarly(bool early) {connectEarly = early;}
 
 private:
     class CallSite {
@@ -191,6 +197,10 @@ private:
     bool isBCmapRequired;
     void* bc2HIRMapHandler;
     TranslatorAction* translatorAction;
+    NamedType* inlinePragma;
+    bool usePriorityQueue;
+    const char* inlinerPipelineName;
+    bool connectEarly;
 };
 
 

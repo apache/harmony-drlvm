@@ -38,13 +38,6 @@ CompilationContext::CompilationContext(MemoryManager& _mm, CompilationInterface*
     init();
 }
 
-CompilationContext::CompilationContext(MemoryManager& _mm, CompilationInterface* ci, const CompilationContext* cc) 
-: mm(_mm), compilationInterface(ci), jitContext(cc->getCurrentJITContext())
-{
-    init();
-    pipeline = cc->pipeline;
-}
-
 void CompilationContext::init()
 {
     compilationFailed = compilationFinished = false;

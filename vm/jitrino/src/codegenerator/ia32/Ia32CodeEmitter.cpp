@@ -474,6 +474,7 @@ void CodeEmitter::emitCode( void ) {
                     // if the inst is the only in the bb)
                     Inst* nopInst = irManager->newInst(Mnemonic_NOP);
                     bb->prependInst(nopInst,inst);
+                    nopInst->setCodeOffset( (uint32)(ip-blockStartIp) );
                     ip = nopInst->emit(ip);
                     // the last two
                     ip = (uint8*)EncoderBase::nops((char*)ip,2);
@@ -919,7 +920,19 @@ void CodeEmitter::orderNodesAndMarkInlinees(StlList<MethodMarkerPseudoInst*>& in
                 if (methMarkerInst != NULL) {    // inlined locations for methMarkerInst 
                     assert(methInfo == methodLocationMap[methMarkerInst]);
                     if( ! inst->hasKind(Inst::Kind_PseudoInst)) {
-                        instSizeMap[(POINTER_SIZE_INT) inst->getCodeStartAddr()] = inst->getCodeSize();
+                        POINTER_SIZE_INT instAddr = (POINTER_SIZE_INT)inst->getCodeStartAddr();
+                        POINTER_SIZE_INT nextAddr = (POINTER_SIZE_INT)inst->getNext()->getCodeStartAddr();
+                        uint32 instSize = inst->getCodeSize();
+                        if (inst->getMnemonic() == Mnemonic_NOP && instAddr+instSize < nextAddr) {
+                            // there is a special case when code patching support generates 3 (ia32) or 13 (em64t) nops
+                            // before calls for future runtime patching. First nop is generated as a common CFG inst.
+                            // The rest ones are generated directly to the memory using encoder.
+                            // Taking this into account:
+                            assert(nextAddr > instAddr);
+                            instSizeMap[instAddr] = nextAddr-instAddr;
+                        } else {
+                            instSizeMap[instAddr] = instSize;
+                        }
                     }
                     uint16 bcOffset = inst->getBCOffset();
                     methInfo->includeInst(inst,bcOffset);
