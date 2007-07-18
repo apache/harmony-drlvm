@@ -1844,7 +1844,7 @@ namespace CPVerifier {
 
             vf_Result tcr;
 
-            while( true) {
+            while( instr < m_code_length ) {
                 if( !workmap_is_a_copy_of_stackmap && props.isMultiway(instr) ) {
                     //if instruction has a stackmap and workmap was not just obtained from that stackmap
                     // add constraint: workmap is assignable to stackmap(instr)
@@ -1906,16 +1906,6 @@ namespace CPVerifier {
                         PropsHead *target_pro = props.getInstrProps(target);
 
                         if( !props.isDataflowPassed(target) ) {
-                            //for each local and stack (except just added retaddr) replace other retaddresses
-                            //by SM_BOGUS to avoid ret from non-top subroutine on stack
-                            assert(workmap->depth == target_pro->stackmap.depth);
-                            for( unsigned i = 0; i < m_stack_start + workmap->depth - 1; i++ ) {
-                                StackmapElement &el = target_pro->stackmap.elements[i];
-                                if( el.getAnyIncomingValue().isRetAddr() ) {
-                                    el.newIncomingType(&mem, SM_BOGUS);
-                                }
-                            }
-
                             for( unsigned i = 0; i < m_stack_start; i++ ) {
                                 StackmapElement &el = target_pro->stackmap.elements[i];
                                 el.clearJsrModified();
@@ -2009,6 +1999,9 @@ namespace CPVerifier {
                 }
 
             }
+
+            // control went out of method bounds
+            return error(VF_ErrorCodeEnd, "control went out of method bounds");
         }
 
         inline vf_Result vf_Context_t::dataflow_handlers(Address instr) {
@@ -2311,6 +2304,47 @@ namespace CPVerifier {
 
             //if it is a first ret from the given subroutine (majority of the cases)
             if( subrdata->retCount == 1 ) {
+                //remove newly appeared ret addresses: it might happen
+                //if non-top subroutine made a ret
+                StackmapHead* original = inpro->getStackmap();
+                unsigned i;
+
+                for( i = 0; i < m_stack_start + workmap->depth; i++ ) {
+                    if( i < m_stack_start && !workmap->elements[i].isJsrModified() ) {
+                        //nothing new here
+                        continue;
+                    }
+
+                    SmConstant val = workmap->elements[i].getAnyPossibleValue();
+                    if( val.isRetAddr() ) {
+                        //check if it's a newly appeared ret addfress
+
+                        // '-1' is twice below to exclude top of the stack. 
+                        // top of the stack contains ret address for the current subroutine
+                        // it also cleaned up if it's still there
+
+                        if( i < m_stack_start + original->depth - 1 && 
+                            original->elements[i].getAnyIncomingValue() == val ) 
+                        {
+                            //most likely: this ret address was there before
+                            continue;
+                        }
+
+                        //iterate thru original types and look for this ret address
+                        int found_in_original = 0;
+                        for( unsigned j = 0; j < m_stack_start + original->depth - 1; j++ ) {
+                            if( original->elements[j].getAnyIncomingValue() == val ) {
+                                found_in_original = 1;
+                                break;
+                            }
+                        }
+                        if( !found_in_original ) {
+                            //original types did not have this ret address
+                            workmap->elements[i] = _WorkmapElement(SM_BOGUS);
+                        }
+                    }
+                }
+
                 //TODO make sure incoming was created as JSR transformation
                 tc_memcpy(outpro->getWorkmap(), workmap, sizeof(WorkmapHead) + sizeof(WorkmapElement) * (m_stack_start + workmap->depth));
                 return VF_OK;

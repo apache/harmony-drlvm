@@ -1,0 +1,8 @@
+<project name="RUN HARMONY-3862 Regression Test">
+    <target name="run-test">
+        <run-junit-test 
+            test="org.apache.harmony.drlvm.tests.regression.h3862.SubrBounds">
+        </run-junit-test>
+    </target>
+</project>
+

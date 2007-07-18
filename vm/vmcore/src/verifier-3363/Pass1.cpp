@@ -473,12 +473,9 @@ namespace CPVerifier {
             }
         }
 
-        if(dead_code_parsing) {
-            return VF_OK;
-        }
-
-        // control went out of method bounds
-        return error(VF_ErrorCodeEnd, "control went out of method bounds");
+        //it might be a dead code -- code followed by JSR which never returns
+        //if it's a dead code - it's OK, if it's not - we will catch it on the second pass
+        return VF_OK;
     }
 
 } // namespace CPVerifier
