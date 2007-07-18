@@ -49,7 +49,8 @@ namespace CPVerifier {
     * Get SmConstant by type name.
     */
     SmConstant vf_TypePool::get_ref_type(const char *type_name, int length) {
-        assert(type_name[0] != 'L');
+        //TODO: this assert raise false alarms when type name starts with 'L'
+        //assert(type_name[0] != 'L');
 
         int index = -1;
         // find type in hash
