@@ -27,3 +27,5 @@ gc/WeakReferenceTest.java
 # HARMONY-3639
 thread/ManyThreadsTest.java
 
+# HARMONY-3299 intermittent
+stress/Sync.java
