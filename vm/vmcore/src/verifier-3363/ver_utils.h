@@ -396,7 +396,7 @@ namespace CPVerifier {
         * @param key - key for hash function
         * @return Hash index relevant to key.
         */
-        unsigned vf_Hash::HashFunc( const char *key, int length ) {
+        unsigned HashFunc( const char *key, int length ) {
             unsigned result = 0;
 
             int idx = 0;

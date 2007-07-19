@@ -104,13 +104,13 @@ namespace CPVerifier {
         int ref_mustbe_assignable(SmConstant from, SmConstant to);
 
 
-        class_handler vf_TypePool::sm_get_handler(SmConstant type) {
+        class_handler sm_get_handler(SmConstant type) {
             unsigned index = type.getReferenceIdx();
             assert(index <= currentTypeId);
             return (validTypes+index)->cls;
         }
 
-        const char* vf_TypePool::sm_get_refname(SmConstant type) {
+        const char* sm_get_refname(SmConstant type) {
             unsigned index = type.getReferenceIdx();
             assert(index <= currentTypeId);
             return (validTypes+index)->name;
@@ -158,7 +158,7 @@ namespace CPVerifier {
 
         //return SmConstant (known verification type) corresponding to java/lang/Throwable
         //returned value is cached
-        SmConstant vf_TypePool::sm_get_const_throwable() {
+        SmConstant sm_get_const_throwable() {
             return sm_get_const_existing("java/lang/Throwable", &const_throwable);
         }
 
@@ -170,7 +170,7 @@ namespace CPVerifier {
 
         //return SmConstant (known verification type) corresponding to char[]
         //returned value is cached
-        SmConstant vf_TypePool::sm_get_const_arrayref_of_char() {
+        SmConstant sm_get_const_arrayref_of_char() {
             return sm_get_const_existing("[C", &const_arrayref_of_char);
         }
 
@@ -263,7 +263,7 @@ namespace CPVerifier {
 
         //Get next free table entry index.
         //Reallocate table if out of free entries.
-        unsigned vf_TypePool::check_table() {
+        unsigned check_table() {
             if( currentTypeId == tableSize - 1) {
                 validTypes = (vf_ValidType*)tc_realloc(validTypes, tableSize+=tableIncr);
             }

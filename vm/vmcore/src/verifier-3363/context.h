@@ -291,7 +291,7 @@ namespace CPVerifier {
         void restore_workmap_after_jsr(Address jsr_target);
 
         //when we hit RET instruction we update the data for the given subroutine with current derived types
-        vf_Result vf_Context_t::new_ret_vector_constraint(Address target_instr);
+        vf_Result new_ret_vector_constraint(Address target_instr);
 
         /////////////////////////////////////////////////////////////////////////////////////////////////////
 
