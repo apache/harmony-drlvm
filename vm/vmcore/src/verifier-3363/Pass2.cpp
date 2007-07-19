@@ -1706,6 +1706,15 @@ namespace CPVerifier {
             } else if( opcode != OP_INVOKESTATIC ) {
                 //pop object ref
                 POP_ref( expected_ref );
+
+                if( opcode == OP_INVOKESPECIAL ) {
+                    //TODO: is verifier the right place for this check?
+                    
+                    //check that 'expected_ref' is a super class of 'this'
+                    if( !tpool.mustbe_assignable(tpool.sm_get_const_this(), expected_ref) ) {
+                        return error(VF_ErrorUnknown, "incorrect use of invokespecial");
+                    }
+                }
             }
 
             //push OUTs
