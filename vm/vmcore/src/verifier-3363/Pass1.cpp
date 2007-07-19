@@ -269,7 +269,7 @@ namespace CPVerifier {
     /*
     * Obtain the length of a compound instruction
     */
-    inline int vf_Context_t::instr_get_len_compound(Address instr, OpCode opcode) {
+    int vf_Context_t::instr_get_len_compound(Address instr, OpCode opcode) {
         if( opcode == OP_WIDE ) {
             ParseInfo &pi = instr_get_parse_info( (OpCode)m_bytecode[instr+1] );
 
