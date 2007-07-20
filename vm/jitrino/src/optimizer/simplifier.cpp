@@ -1931,70 +1931,6 @@ Simplifier::simplifyCmp(Type* dstType,
 }
 
 Opnd*
-Simplifier::simplifyPredCmp(Type* dstType,
-                            Type::Tag instType, // source type
-                            ComparisonModifier mod,
-                            Opnd* src1,
-                            Opnd* src2) {
-    assert(0);
-    ConstInst::ConstValue res;
-    if (ConstantFolder::isConstant(src1)) {
-        if (ConstantFolder::isConstant(src2)) {
-            return foldComparison(mod, 
-                                  instType, 
-                                  src1->getInst()->asConstInst(), 
-                                  src2->getInst()->asConstInst());
-        } else {
-            // can fold if (src1 == 0) and comparison is Cmp_Gt_Un
-            if (ConstantFolder::isConstantZero(src1) && 
-                ((mod & Cmp_Mask)==Cmp_GT_Un)) {
-                switch (dstType->tag) {
-                case Type::Int32: return genLdConstant((int32)0)->getDst();
-                default:
-                    break;
-                }
-            }
-        }
-    } else if (ConstantFolder::isConstantZero(src2) &&
-               ((mod & Cmp_Mask) == Cmp_GTE_Un)) {
-        switch (dstType->tag) {
-        case Type::Int32: return genLdConstant((int32)1)->getDst();
-        default:
-            break;
-        }
-    }
-    // if operands are identical and not FP, then we can simplify it now
-    if ((src1 == src2) && !Type::isFloatingPoint(instType)) {
-        switch (mod & Cmp_Mask) {
-        case Cmp_EQ: case Cmp_GTE: case Cmp_GTE_Un:
-            return genLdConstant((int32)1)->getDst();
-        case Cmp_NE_Un: case Cmp_GT: case Cmp_GT_Un:
-            return genLdConstant((int32)0)->getDst();
-        default:
-            assert(0);
-        }
-    }
-    
-    // try to simplify to a new comparison
-    { 
-        ComparisonModifier newMod;
-        Type::Tag newInstType;
-        Opnd *newSrc1;
-        Opnd *newSrc2;
-        if (simplifyCmpToCmp(instType, mod, src1, src2,
-                             newInstType, newMod, newSrc1, newSrc2)) {
-            // can simplify it.
-            Inst *res = genCmp(dstType, newInstType, newMod, 
-                               newSrc1, (newSrc2 
-                                         ? newSrc2
-                                         : OpndManager::getNullOpnd()));
-            return res->getDst();
-        }
-    }
-    return NULL;
-}
-
-Opnd*
 Simplifier::simplifyCmp3(Type* dstType,
                          Type::Tag instType,
                          ComparisonModifier mod,
@@ -3194,14 +3130,6 @@ Simplifier::simplifyAddScaledIndex(Opnd* base, Opnd* index) {
     if ((constIndexInst != NULL) && (index->getType()->tag == Type::Int32)) {
         if (constIndexInst->getValue().i4 == 0)
             return base;
-    }
-    return NULL;
-}
-
-Opnd*
-Simplifier::simplifyScaledDiffRef(Opnd* src1, Opnd* src2) {
-    if (src1 == src2) {
-    } else {
     }
     return NULL;
 }
@@ -4530,97 +4458,6 @@ Simplifier::simplifyTauStaticCast(Opnd *src, Opnd *tauCheckedCast, Type *castTyp
     return NULL;
 }
 
-bool
-Simplifier::simplifyPredBranch(LabelInst *label, Opnd *src)
-{
-    Inst *inst = src->getInst();
-    if (inst->getOpcode() != Op_PredCmp) {
-        return false;
-    }
-    bool isTaken;
-    Type::Tag type = inst->getType();
-    ComparisonModifier mod = inst->getComparisonModifier();
-    switch (inst->getNumSrcOperands()) {
-    case 1:
-        if(canFoldBranch(type,
-            mod,
-            inst->getSrc(0),
-            isTaken)) { 
-            if (isTaken) {
-                genJump(label);
-            } else {
-                // just fall through
-            }
-            return true;
-        }
-        else {
-            if(simplifyBranch(type, mod, label, inst->getSrc(0)))
-                return true;
-        }
-        break;
-    case 2:
-        if(canFoldBranch(type,
-            mod,
-            inst->getSrc(0),
-            inst->getSrc(1),
-            isTaken)) {
-            if (isTaken) {
-                genJump(label);
-            } else {
-                // just fall through
-            }
-            return true;
-        }
-        else {
-            if(simplifyBranch(type, mod, label, inst->getSrc(0), inst->getSrc(1)))
-                return true;
-        }
-        break;
-    }
-    return false;
-}
-
-Inst*
-Simplifier::casePredBranch(BranchInst* pbInst) {
-    assert(pbInst->getNumSrcOperands() == 1);
-    Opnd *srcOpnd = pbInst->getSrc(0);
-    Inst *inst = srcOpnd->getInst();
-    if (inst->getOpcode() != Op_PredCmp) return 0;
-    bool isTaken;
-    Type::Tag type = inst->getType();
-    ComparisonModifier mod = inst->getComparisonModifier();
-    switch (inst->getNumSrcOperands()) {
-    case 1:
-        if(canFoldBranch(type,
-                         mod,
-                         inst->getSrc(0),
-                         isTaken)) { 
-            foldBranch(pbInst, isTaken);
-            return NULL;
-        }
-        else {
-            if(simplifyBranch(type, mod, pbInst->getTargetLabel(), inst->getSrc(0)))
-                return NULL;
-        }
-        break;
-    case 2:
-        if(canFoldBranch(type,
-            mod,
-            inst->getSrc(0),
-            inst->getSrc(1),
-            isTaken)) {
-            foldBranch(pbInst, isTaken);
-            return NULL;
-        }
-        else {
-            if(simplifyBranch(type, mod, pbInst->getTargetLabel(), inst->getSrc(0), inst->getSrc(1)))
-                return NULL;
-        }
-        break;
-    }
-
-    return inst;
-}
 
 void
 SimplifierWithInstFactory::genThrowSystemException(CompilationInterface::SystemExceptionId exceptionId)

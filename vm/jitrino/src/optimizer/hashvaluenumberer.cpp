@@ -516,7 +516,6 @@ public:
     }
     Inst* caseLdArrayBaseAddr(Inst* inst)           { return hashInst(inst); }
     Inst* caseAddScaledIndex(Inst* inst)            { return hashInst(inst); }
-    Inst* caseScaledDiffRef(Inst* inst)             { return hashInst(inst); }
 
     // Stores:
     Inst* caseStVar(Inst* inst) { return caseDefault(inst); }
@@ -992,12 +991,6 @@ public:
         return hashInst(inst);
     }
 
-    virtual Inst*
-    casePredCmp(Inst* inst) { return hashInst(inst); }
-
-    virtual Inst*
-    casePredBranch(BranchInst* inst) { return lookupInst(inst); }
-
     // default
     Inst* caseDefault(Inst* inst)                   { return inst; }
 private:
@@ -1355,7 +1348,6 @@ public:
     void addBranchConditions(DominatorNode* domNode);
 private:
     void addInfoFromBranch(Node* targetNode, BranchInst *branchi, bool isTrueEdge);
-    void addInfoFromPredBranch(Node* targetNode, BranchInst *branchi, bool isTrueEdge);
     void addInfoFromBranchCompare(Node* targetNode, 
                                   ComparisonModifier mod,
                                   Type::Tag comparisonType,
@@ -1548,11 +1540,7 @@ InstValueNumberer::addBranchConditions(DominatorNode* domNode)
             assert(branchi1 != NULL);
             BranchInst* branchi = branchi1->asBranchInst();
             if (branchi) {
-                if (branchi->getOpcode() == Op_PredBranch) {
-                    addInfoFromPredBranch(block, branchi, taken);
-                } else if (branchi->getOpcode() != Op_Switch || !taken) {
-                    addInfoFromBranch(block, branchi, taken);
-                }
+                addInfoFromBranch(block, branchi, taken);
             } else {
                 // default edge of switch, skip it
             }
@@ -1972,35 +1960,6 @@ void InstValueNumberer::addInfoFromBranch(Node* targetNode, BranchInst *branchi,
                              (numSrcs==2 ? branchi->getSrc(1) : 0));
 }
 
-void InstValueNumberer::addInfoFromPredBranch(Node* targetNode, BranchInst *branchi, 
-                                              bool isTrueEdge)
-{
-    const OptimizerFlags& optimizerFlags = irManager.getOptimizerFlags();     
-    if (!optimizerFlags.elim_checks) return;
-
-    if (Log::isEnabled()) {
-        Log::out() << "addInfoFromPredBranch " << (isTrueEdge ? "taken " : "notTaken ");
-        branchi->print(Log::out());
-        Log::out() << ::std::endl;
-    }
-
-    Opnd *srcOp = branchi->getSrc(0);
-    Inst *pcmpi = srcOp->getInst();
-    if (pcmpi->getOpcode() != Op_PredCmp) {
-        return; 
-    }
-
-        pcmpi->getComparisonModifier();
-    uint32 numSrcs = pcmpi->getNumSrcOperands();
-    addInfoFromBranchCompare(targetNode, 
-                             pcmpi->getComparisonModifier(),
-                             pcmpi->getType(),
-                             isTrueEdge,
-                             pcmpi->getNumSrcOperands(),
-                             pcmpi->getSrc(0),
-                             (numSrcs==2 ? branchi->getSrc(1) : 0));
-}
-
 void InstValueNumberer::recordHasTypeTau(Opnd *opnd,
                                          Type *type,
                                          Inst *tauHasTypeInst)
@@ -2063,8 +2022,6 @@ void InstValueNumberer::addInfoFromBranchCompare(Node* targetNode,
     Operation negCmpOperation(Op_Cmp, comparisonType, negModhere);
     Operation branchOperation(Op_Branch, comparisonType, modhere);
     Operation negBranchOperation(Op_Branch, comparisonType, negModhere);
-    Operation predCmpOperation(Op_PredCmp, comparisonType, modhere);
-    Operation negPredCmpOperation(Op_PredCmp, comparisonType, negModhere);
     switch (numSrcOperands) {
     case 1:
         {
@@ -2083,14 +2040,10 @@ void InstValueNumberer::addInfoFromBranchCompare(Node* targetNode,
                 Log::out() << "cmpOperation.hashcode() == "
                            << (int) cmpOperation.encodeForHashing()
                            << ::std::endl;
-                Log::out() << "predCmpOperation.hashcode() == "
-                           << (int) predCmpOperation.encodeForHashing()
-                           << ::std::endl;
             }
             Inst *tauEdge = getBlockTauEdge(targetNode)->getInst();
             setHashToInst(tauEdge, getKey(branchOperation, src0->getId()));
             setHashToInst(tauEdge, getKey(cmpOperation, src0->getId()));
-            setHashToInst(tauEdge, getKey(predCmpOperation, src0->getId()));
             
             if (Log::isEnabled()) {
                 Log::out() << "adding false comparison: ";
@@ -2107,14 +2060,10 @@ void InstValueNumberer::addInfoFromBranchCompare(Node* targetNode,
                 Log::out() << "negCmpOperation.hashcode() == "
                            << (int) negCmpOperation.encodeForHashing()
                            << ::std::endl;
-                Log::out() << "negPredCmpOperation.hashcode() == "
-                           << (int) negPredCmpOperation.encodeForHashing()
-                           << ::std::endl;
             }
 
             setHashToInst(getTauUnsafe(), getKey(negBranchOperation, src0->getId()));
             setHashToInst(getTauUnsafe(), getKey(negCmpOperation, src0->getId()));
-            setHashToInst(getTauUnsafe(), getKey(negPredCmpOperation, src0->getId()));
         }
         break;
     case 2:
@@ -2146,8 +2095,6 @@ void InstValueNumberer::addInfoFromBranchCompare(Node* targetNode,
                           getKey(branchOperation, posSrc0->getId(), posSrc1->getId()));
             setHashToInst(tauEdge,
                           getKey(cmpOperation, posSrc0->getId(), posSrc1->getId()));
-            setHashToInst(tauEdge,
-                          getKey(predCmpOperation, posSrc0->getId(), posSrc1->getId()));
 
             if (Log::isEnabled()) {
                 Log::out() << "adding false comparison: ";
@@ -2172,8 +2119,6 @@ void InstValueNumberer::addInfoFromBranchCompare(Node* targetNode,
             setHashToInst(getTauUnsafe(),
                           getKey(negCmpOperation, negSrc0->getId(), 
                                  negSrc1->getId()));
-            setHashToInst(getTauUnsafe(),
-                          getKey(negPredCmpOperation, src0->getId(), src1->getId()));
         }
         break;
     default:

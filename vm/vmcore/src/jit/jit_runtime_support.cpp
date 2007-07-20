@@ -349,6 +349,7 @@ static LilCodeStub* rth_gen_lil_type_test(LilCodeStub* cs, RthTypeTestNull null,
 // General stats update
 static void rth_type_test_update_stats(VTable* sub, Class* super)
 {
+    UNSAFE_REGION_START
     VM_Statistics::get_vm_stats().num_type_checks ++;
     if (sub->clss == super)
         VM_Statistics::get_vm_stats().num_type_checks_equal_type ++;
@@ -360,6 +361,7 @@ static void rth_type_test_update_stats(VTable* sub, Class* super)
         VM_Statistics::get_vm_stats().num_type_checks_super_is_interface ++;
     else if (super->get_depth() >= vm_max_fast_instanceof_depth())
         VM_Statistics::get_vm_stats().num_type_checks_super_is_too_deep ++;
+    UNSAFE_REGION_END
 }
 
 // Checkcast stats update
@@ -382,6 +384,7 @@ static void rth_update_checkcast_stats(ManagedObject* o, Class* super)
 // Instanceof stats update
 static void rth_update_instanceof_stats(ManagedObject* o, Class* super)
 {
+    UNSAFE_REGION_START
     VM_Statistics::get_vm_stats().num_instanceof++;
     super->instanceof_slow_path_taken();
     if (o == (ManagedObject*)VM_Global_State::loader_env->managed_null) {
@@ -393,6 +396,7 @@ static void rth_update_instanceof_stats(ManagedObject* o, Class* super)
             VM_Statistics::get_vm_stats().num_instanceof_fast_decision ++;
         rth_type_test_update_stats(o->vt(), super);
     }
+    UNSAFE_REGION_END
 }
 #endif // VM_STATS
 
@@ -2777,6 +2781,7 @@ class_alloc_new_object_and_run_constructor(Class* clss,
 static void update_general_type_checking_stats(VTable *sub, Class *super)
 {
 #ifdef VM_STATS
+    UNSAFE_REGION_START
     VM_Statistics::get_vm_stats().num_type_checks++;
     if (sub->clss == super)
         VM_Statistics::get_vm_stats().num_type_checks_equal_type++;
@@ -2788,6 +2793,7 @@ static void update_general_type_checking_stats(VTable *sub, Class *super)
         VM_Statistics::get_vm_stats().num_type_checks_super_is_interface++;
     else if (super->get_depth() >= vm_max_fast_instanceof_depth())
         VM_Statistics::get_vm_stats().num_type_checks_super_is_too_deep++;
+    UNSAFE_REGION_END
 #endif // VM_STATS
 }
 

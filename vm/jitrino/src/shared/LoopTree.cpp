@@ -216,13 +216,12 @@ Edge* LoopTree::coalesceEdges(Edges& edges) {
         Edge* e = *ite;
         assert(e->getTargetNode() == header);  // must share the same header
 
-        fg->replaceEdgeTarget(e, block);
+        fg->replaceEdgeTarget(e, block, true);
         block->setExecCount(block->getExecCount()+e->getSourceNode()->getExecCount()*e->getEdgeProb());
     }
 
     // create factored edge <block,header>
-    Edge* edge = fg->addEdge(block,header);
-    edge->setEdgeProb(1.0);
+    Edge* edge = fg->addEdge(block,header, 1.0);
     return edge;
 }
 

@@ -41,30 +41,6 @@
 
 namespace Jitrino {
 
-class NodeRenameTable : public HashTable<Node,Node> {
-public:
-    typedef HashTableIter<Node, Node> Iter;
-
-    NodeRenameTable(MemoryManager& mm,uint32 size) :
-                    HashTable<Node,Node>(mm,size) {}
-    Node *getMapping(Node *node) {
-        return (Node*)lookup(node);
-    }
-    void     setMapping(Node *node, Node *to) {
-        insert(node,to);
-    }
-    
-protected:
-    virtual bool keyEquals(Node* key1,Node* key2) const {
-        return key1 == key2;
-    }
-    virtual uint32 getKeyHashCode(Node* key) const {
-        // return hash of address bits
-        return ((uint32)(((POINTER_SIZE_INT)key) >> sizeof(void*)));
-    }
-};
-
-
 void         
 FlowGraph::foldBranch(ControlFlowGraph& fg, BranchInst* br, bool isTaken)
 {
@@ -127,7 +103,7 @@ FlowGraph::tailDuplicate(IRManager& irm, Node* pred, Node* tail, DefUseBuilder& 
     Node* copy = duplicateRegion(irm, tail, region, defUses);
 
     // Specialize for pred.
-    Edge* edge = fg.replaceEdgeTarget(pred->findTargetEdge(tail), copy);
+    Edge* edge = fg.replaceEdgeTarget(pred->findTargetEdge(tail), copy, true);
     copy->setExecCount(pred->getExecCount()*edge->getEdgeProb());
     if(copy->getExecCount() < tail->getExecCount())  {
         tail->setExecCount(tail->getExecCount() - copy->getExecCount());
@@ -260,8 +236,8 @@ static Node* duplicateNode(IRManager& irm, Node *node, StlBitVector* nodesInRegi
                                 Node* succ =  node->getUnconditionalEdge()->getTargetNode();
                                 Edge* succEdge = node->findTargetEdge(succ);
                                 stBlock->setExecCount(node->getExecCount()*succEdge->getEdgeProb());
-                                fg.replaceEdgeTarget(succEdge, stBlock);
-                                fg.replaceEdgeTarget(newNode->findTargetEdge(succ), stBlock);
+                                fg.replaceEdgeTarget(succEdge, stBlock, true);
+                                fg.replaceEdgeTarget(newNode->findTargetEdge(succ), stBlock, true);
                                 fg.addEdge(stBlock, succ)->setEdgeProb(1.0);
                                 defUses->addUses(stVar);
                                 nodesInRegion->resize(stBlock->getId()+1);
@@ -325,7 +301,7 @@ static Node* _duplicateRegion(IRManager& irm, Node* node, Node* entry, StlBitVec
         if(succ != entry && nodesInRegion.getBit(succ->getId())) {
             Node* newSucc = _duplicateRegion(irm, succ, entry, nodesInRegion, defUses, nodeRenameTable, opndRenameTable);
             assert(newSucc != NULL);
-            fg.replaceEdgeTarget(newNode->findTargetEdge(succ), newSucc);
+            fg.replaceEdgeTarget(newNode->findTargetEdge(succ), newSucc, true);
         }
     }    
 
@@ -333,7 +309,7 @@ static Node* _duplicateRegion(IRManager& irm, Node* node, Node* entry, StlBitVec
 }
 
 
-static Node* _duplicateRegion(IRManager& irm, Node* entry, StlBitVector& nodesInRegion, DefUseBuilder& defUses, NodeRenameTable& nodeRenameTable, OpndRenameTable& opndRenameTable, double newEntryFreq) {
+Node* FlowGraph::duplicateRegion(IRManager& irm, Node* entry, StlBitVector& nodesInRegion, DefUseBuilder& defUses, NodeRenameTable& nodeRenameTable, OpndRenameTable& opndRenameTable, double newEntryFreq) {
     Node* newEntry = _duplicateRegion(irm, entry, entry, nodesInRegion, &defUses, &nodeRenameTable, &opndRenameTable);
     if(newEntryFreq == 0) {
         return newEntry;
@@ -356,7 +332,7 @@ Node* FlowGraph::duplicateRegion(IRManager& irm, Node* entry, StlBitVector& node
     // prepare the hashtable for the operand rename translation
     OpndRenameTable    *opndRenameTable = new (dupMemManager) OpndRenameTable(dupMemManager,10);
     NodeRenameTable *nodeRenameTable = new (dupMemManager) NodeRenameTable(dupMemManager,10);
-    return _duplicateRegion(irm, entry, nodesInRegion, defUses, *nodeRenameTable, *opndRenameTable, newEntryFreq);
+    return duplicateRegion(irm, entry, nodesInRegion, defUses, *nodeRenameTable, *opndRenameTable, newEntryFreq);
 }
 
 void FlowGraph::renameOperandsInNode(Node *node, OpndRenameTable *renameTable) {
@@ -614,7 +590,7 @@ static bool inlineJSR(IRManager* irManager, Node *block, DefUseBuilder& defUses,
         OpndRenameTable    *opndRenameTable = new (inlineManager) OpndRenameTable(inlineManager,10);
         NodeRenameTable *nodeRenameTable = new (inlineManager) NodeRenameTable(inlineManager,10);
 
-        Node* newEntry = _duplicateRegion(*irManager, entryJSR, nodesInJSR, defUses, *nodeRenameTable, *opndRenameTable, 0);
+        Node* newEntry = FlowGraph::duplicateRegion(*irManager, entryJSR, nodesInJSR, defUses, *nodeRenameTable, *opndRenameTable, 0);
 
         fg.removeEdge(block,retTarget);
         fg.removeEdge(block,entryJSR);

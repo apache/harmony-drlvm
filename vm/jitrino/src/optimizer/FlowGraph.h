@@ -69,6 +69,8 @@ public:
     static Node* tailDuplicate(IRManager& irm, Node* pred, Node* tail, DefUseBuilder& defUses);
 
     static Node* duplicateRegion(IRManager& irm, Node* entry, StlBitVector& nodesInRegion, DefUseBuilder& defUses, double newEntryFreq=0.0);
+    static Node* duplicateRegion(IRManager& irm, Node* entry, StlBitVector& nodesInRegion, DefUseBuilder& defUses, NodeRenameTable& nodeRenameTable, OpndRenameTable& opndRenameTable, double newEntryFreq = 0.0);
+    
 
     static void  renameOperandsInNode(Node *node, OpndRenameTable *renameTable);
 
@@ -83,6 +85,21 @@ public:
 
     static void printDotFile(ControlFlowGraph& cfg, MethodDesc& methodDesc,const char *suffix);
 
+};
+
+class NodeRenameTable : public HashTable<Node,Node> {
+public:
+    typedef HashTableIter<Node, Node> Iter;
+
+    NodeRenameTable(MemoryManager& mm,uint32 size):HashTable<Node,Node>(mm,size) {}
+    Node *getMapping(Node *node) { return (Node*)lookup(node);  }
+    void     setMapping(Node *node, Node *to) { insert(node,to); }
+
+protected:
+    virtual bool keyEquals(Node* key1,Node* key2) const { return key1 == key2; }
+    
+    // return hash of address bits
+    virtual uint32 getKeyHashCode(Node* key) const { return ((uint32)(((POINTER_SIZE_INT)key) >> sizeof(void*))); }
 };
 
 } //namespace Jitrino 

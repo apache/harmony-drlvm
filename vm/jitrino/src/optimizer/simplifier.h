@@ -127,7 +127,6 @@ public:
         return NULL;
     }
     Opnd* simplifyAddScaledIndex(Opnd* base, Opnd* index);
-    Opnd* simplifyScaledDiffRef(Opnd* src1, Opnd* src2);
     // stores
     void simplifyTauStInd(Inst *inst); // modifies instr in place if possible
     void simplifyTauStField(Inst *inst); // modifies instr in place if possible
@@ -168,11 +167,6 @@ public:
 
     // tau operations
     Opnd* simplifyTauAnd(MultiSrcInst *tauAndInst);
-
-    // predicate operations
-    Opnd* simplifyPredCmp(Type* dstType, Type::Tag srcType, ComparisonModifier, Opnd* src1, Opnd* src2);
-    // if branch can be simplified, generates alternate instructions and returns true;
-    bool simplifyPredBranch(LabelInst* label, Opnd *src);
 
     Opnd* propagateCopy(Opnd*);
 
@@ -635,14 +629,7 @@ public:
             return opnd->getInst();
         return inst;
     }
-    Inst* caseScaledDiffRef(Inst* inst) {
-        Opnd* opnd = simplifyScaledDiffRef(inst->getSrc(0),
-                                           inst->getSrc(1));
-        if (opnd != NULL)
-            return opnd->getInst();
-        return inst;
-    }
-
+    
     // stores
     Inst* caseStVar(Inst* inst) {return caseDefault(inst);}
 
@@ -980,19 +967,6 @@ public:
             return opnd->getInst();
         return inst;
     }
-
-    Inst* casePredCmp(Inst* inst) {
-        Opnd* opnd = simplifyPredCmp(inst->getDst()->getType(),
-                                     inst->getType(),
-                                     inst->getComparisonModifier(),
-                                     inst->getSrc(0),
-                                     inst->getSrc(1));
-        if (opnd != NULL)
-            return opnd->getInst();
-        return inst;
-    }
-
-    Inst* casePredBranch(BranchInst* inst);
 
     // default
     Inst* caseDefault(Inst* inst)  {

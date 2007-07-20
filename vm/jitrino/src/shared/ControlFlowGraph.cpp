@@ -423,7 +423,7 @@ bool ControlFlowGraph::isEdgeProfileConsistent(bool checkEdgeProbs, bool checkEx
 Node* ControlFlowGraph::splitNodeAtInstruction(CFGInst *inst, bool splitAfter, bool keepDispatch, CFGInst* labelInst) {
     Node *node = inst->getNode();
     Node* dispatchNode = keepDispatch ? node->getExceptionEdgeTarget() : NULL;
-    Node* nextNode =  splitNode(node, splitAfter, labelInst);
+    Node* newNode =  splitNode(node, splitAfter, labelInst);
     if (inst == node->getLastInst()) {
         assert(!splitAfter || (node->getOutDegree() == 1 && node->getUnconditionalEdge()!=NULL)
             || (node->getOutDegree()==2 && node->getExceptionEdgeTarget()!=NULL));
@@ -439,12 +439,12 @@ Node* ControlFlowGraph::splitNodeAtInstruction(CFGInst *inst, bool splitAfter, b
     for (CFGInst *ins = splitAfter ? inst->next() : inst; ins != NULL; ) {
         CFGInst *nextins = ins->next();
         ins->unlink();
-        nextNode->appendInst(ins);
+        newNode->appendInst(ins);
         ins = nextins;
     } 
-    nextNode->setExecCount(node->getExecCount());
-    node->findTargetEdge(nextNode)->setEdgeProb(1.0);
-    return nextNode;
+    newNode->setExecCount(node->getExecCount());
+    node->findTargetEdge(newNode)->setEdgeProb(1.0);
+    return newNode;
 }
 
 // Splice a new empty block on the CFG edge.

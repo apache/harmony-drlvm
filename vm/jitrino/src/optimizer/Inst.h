@@ -1193,7 +1193,6 @@ public:
                              Opnd *tauBaseIsArray);
     Inst*    makeLdArrayBaseAddr(Type* type, Opnd* dst, Opnd* array);
     Inst*    makeAddScaledIndex(Opnd* dst, Opnd* base, Opnd* index);
-    Inst*    makeScaledDiffRef(Opnd* dst, Opnd* src1, Opnd *src2);
     Inst*    makeStVar(VarOpnd* var, Opnd* src);
     Inst*    makeStVar(SsaVarOpnd* var, Opnd* src);
     Inst*    makeTauStInd(Modifier, Type::Tag, Opnd* src, Opnd* ptr, Opnd *tauNonNullBase,
@@ -1297,9 +1296,7 @@ public:
     Inst*    makeTauHasType(Opnd *taudst, Opnd* src, Type* type);
     Inst*    makeTauHasExactType(Opnd *taudst, Opnd* src, Type* type);
     Inst*    makeTauIsNonNull(Opnd *taudst, Opnd* src);
-    Inst*    makePredCmp(ComparisonModifier mod, Type::Tag type, Opnd* dst, Opnd* src1, Opnd* src2);
-    Inst*    makePredBranch(Opnd *predSrc, LabelInst* labelInst);
-
+    
     //
     //
     //
@@ -1776,9 +1773,6 @@ public:
     caseAddScaledIndex(Inst* inst)=0;// {return caseDefault(inst);}
 
     virtual Inst*
-    caseScaledDiffRef(Inst* inst)=0;// {return caseDefault(inst);}
-
-    virtual Inst*
     caseStVar(Inst* inst)=0;//              {return caseDefault(inst);}
 
     virtual Inst*
@@ -2031,12 +2025,6 @@ public:
 
     virtual Inst*
     caseTauIsNonNull(Inst* inst)=0;//         {return caseDefault(inst);}
-
-    virtual Inst*
-    casePredCmp(Inst* inst)=0;//         {return caseDefault(inst);}
-
-    virtual Inst*
-    casePredBranch(BranchInst* inst)=0;//         {return caseDefault(inst);}
 
     virtual Inst*
     caseDefault(Inst* inst)=0;//            {return NULL;}

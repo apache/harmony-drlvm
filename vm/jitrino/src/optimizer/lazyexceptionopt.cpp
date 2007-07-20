@@ -944,7 +944,6 @@ LazyExceptionOpt::instHasSideEffect(Inst* inst) {
         case Op_TauArrayLen:
         case Op_LdArrayBaseAddr:
         case Op_AddScaledIndex:
-        case Op_ScaledDiffRef:
             return true;
         case Op_StVar:
             return false;
@@ -1096,9 +1095,6 @@ LazyExceptionOpt::instHasSideEffect(Inst* inst) {
         case Op_TauHasType:
         case Op_TauHasExactType:
         case Op_TauIsNonNull:
-            return false;
-        case Op_PredCmp:
-        case Op_PredBranch:
             return false;
         default:
             return true;

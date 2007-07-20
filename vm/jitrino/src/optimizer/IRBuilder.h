@@ -376,7 +376,6 @@ public:
     Opnd*      genPrefetch(Opnd* base, Opnd *offset, Opnd *hints);
     Opnd*      genCopy(Opnd* src);
     Opnd*      genTauPi(Opnd* src, Opnd *tau, PiCondition *cond);
-    Opnd*      genScaledDiffRef(Opnd* src1, Opnd* src2);
     // compressed reference instructions
     Opnd*      genLdFieldOffset(FieldDesc* fieldDesc);
     Opnd*      genLdArrayBaseOffset(Type *elemType);
@@ -396,12 +395,6 @@ public:
 private:
 
     void readFlagsFromCommandLine(SessionAction* argSource, const char* argPrefix);
-
-    // RECURSIVE GEN
-    // additional gen methods used only recursively
-    Opnd*      genPredCmp(Type *dstType, Type::Tag instType, ComparisonModifier mod,
-                          Opnd *src1, Opnd *src2);
-    void       genPredBranch(LabelInst* label, Opnd *src);
 
 private:
     //

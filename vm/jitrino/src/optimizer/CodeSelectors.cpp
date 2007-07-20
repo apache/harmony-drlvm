@@ -1285,16 +1285,6 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback, I
                     getCGInst(inst->getSrc(1)));
             }
             break;
-            // subtract 2 reference to yield difference as # of elements
-        case Op_ScaledDiffRef:
-            {
-                assert(inst->getNumSrcOperands() == 2);
-                cgInst = instructionCallback.scaledDiffRef(getCGInst(inst->getSrc(0)),
-                    getCGInst(inst->getSrc(1)),
-                    (Type *)inst->getSrc(0)->getType(),
-                    (Type *)inst->getSrc(1)->getType());
-            }
-            break;
         case Op_UncompressRef:
             {
                 assert(inst->getNumSrcOperands() == 1);
@@ -1996,35 +1986,6 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback, I
         case Op_TauIsNonNull:
             {
                 cgInst = instructionCallback.tauPoint();
-            }
-            break;
-        case Op_PredCmp:
-            {
-                if (inst->getNumSrcOperands() == 2) {
-                    // binary comparison
-                    CompareOp::Operators cmpOp = mapToComparisonOp(inst);
-                    CompareOp::Types opType = mapToCompareOpType(inst);
-                    cgInst = instructionCallback.pred_cmp(cmpOp, opType,
-                        getCGInst(inst->getSrc(0)),
-                        getCGInst(inst->getSrc(1)));
-                } else {
-                    assert(inst->getNumSrcOperands() == 1);
-                    // unary comparison against zero
-                    if (inst->getComparisonModifier() == Cmp_Zero) {
-                        cgInst = instructionCallback.pred_czero(mapToCompareZeroOpType(inst),
-                            getCGInst(inst->getSrc(0)));
-                    } else {
-                        // Nonzero
-                        cgInst = instructionCallback.pred_cnzero(mapToCompareZeroOpType(inst),
-                            getCGInst(inst->getSrc(0)));
-                    }
-                }
-            }
-            break;
-        case Op_PredBranch:
-            {
-                assert(inst->getNumSrcOperands() == 1);
-                instructionCallback.pred_btrue(getCGInst(inst->getSrc(0)));
             }
             break;
         default:

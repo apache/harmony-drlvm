@@ -2227,12 +2227,6 @@ Inst* InstFactory::makeAddScaledIndex(Opnd* dst, Opnd* ptr, Opnd* index) {
 }
 
 //
-Inst* InstFactory::makeScaledDiffRef(Opnd* dst, Opnd* src1, Opnd *src2) {
-    return makeInst(Op_ScaledDiffRef, Modifier(), dst->getType()->tag, dst, 
-                    src1, src2);
-}
-
-//
 Inst* InstFactory::makeUncompressRef(Opnd* dst, Opnd* compref)
 {
     return makeInst(Op_UncompressRef, Modifier(), dst->getType()->tag, 
@@ -2664,14 +2658,6 @@ Inst* InstFactory::makeTauIsNonNull(Opnd* dst, Opnd* src) {
                     Type::Tau, dst, src);
 }
 
-Inst* InstFactory::makePredCmp(ComparisonModifier mod, Type::Tag type, Opnd *dst,
-                               Opnd *src1, Opnd *src2) {
-    return makeInst(Op_PredCmp, mod, type, dst, src1, src2);
-}
-
-Inst* InstFactory::makePredBranch(Opnd *predSrc, LabelInst* labelInst) {
-    return makeBranchInst(Op_PredBranch, predSrc, labelInst);
-}
 
 //-----------------------------------------------------------------------------
 // InstOptimizer methods
@@ -2749,7 +2735,6 @@ InstOptimizer::dispatch(Inst* inst) {
     case Op_TauArrayLen:           return caseTauArrayLen(inst);
     case Op_LdArrayBaseAddr:    return caseLdArrayBaseAddr(inst);
     case Op_AddScaledIndex:     return caseAddScaledIndex(inst);
-    case Op_ScaledDiffRef:      return caseScaledDiffRef(inst);
     case Op_StVar:              return caseStVar(inst);
     case Op_TauStInd:              return caseTauStInd(inst);
     case Op_TauStField:            return caseTauStField(inst);
@@ -2826,8 +2811,6 @@ InstOptimizer::dispatch(Inst* inst) {
     case Op_TauHasType:         return caseTauHasType(inst->asTypeInst());
     case Op_TauHasExactType:    return caseTauHasExactType(inst->asTypeInst());
     case Op_TauIsNonNull:       return caseTauIsNonNull(inst);
-    case Op_PredCmp:            return casePredCmp(inst);
-    case Op_PredBranch:         return casePredBranch(inst->asBranchInst());
 
     default:
         ::std::cerr << "Unknown opcode! " << inst->getOpcode() << " : "

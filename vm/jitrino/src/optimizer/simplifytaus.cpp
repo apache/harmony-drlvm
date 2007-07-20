@@ -552,7 +552,6 @@ Opnd *TauWalkerState::findReplacement(Opnd *src, Type *type, bool exactType)
     case Op_TauArrayLen:
     case Op_LdArrayBaseAddr:
     case Op_AddScaledIndex:
-    case Op_ScaledDiffRef:
         assert(0);        // not an object type
         
     case Op_StVar:
@@ -713,8 +712,6 @@ Opnd *TauWalkerState::findReplacement(Opnd *src, Type *type, bool exactType)
     case Op_TauHasType:
     case Op_TauHasExactType:
     case Op_TauIsNonNull:
-    case Op_PredCmp:
-    case Op_PredBranch:
         assert(0); // none of the above yield objects
         
     default:

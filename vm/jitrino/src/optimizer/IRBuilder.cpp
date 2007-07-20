@@ -1061,34 +1061,6 @@ IRBuilder::genShr(Type* dstType,
     return dst;
 }
 
-// Comparison with predicate result
-Opnd*
-IRBuilder::genPredCmp(Type* dstType,
-                      Type::Tag instType, // source type for inst
-                      ComparisonModifier mod,
-                      Opnd* src1,
-                      Opnd* src2) {
-    src1 = propagateCopy(src1);
-    src2 = propagateCopy(src2);
-    
-    Operation operation(Op_PredCmp, instType, mod);
-    uint32 hashcode = operation.encodeForHashing();
-    Opnd* dst = lookupHash(hashcode, src1, src2);
-    if (dst) return dst;
-    
-    if (irBuilderFlags.doSimplify) {
-        dst = simplifier->simplifyPredCmp(dstType, instType, mod, src1, src2);
-    }
-    if (!dst) {
-        // result of comparison is always a 32-bit int
-        dst = createOpnd(dstType);
-        Inst *i = instFactory->makePredCmp(mod, instType, dst, src1, src2);
-        appendInst(i);
-    }
-    insertHash(hashcode, src1, src2, dst->getInst());
-    return dst;
-}
-
 // Comparison
 Opnd*
 IRBuilder::genCmp(Type* dstType,
@@ -1187,19 +1159,6 @@ IRBuilder::genBranch(Type::Tag instType,
         }
     }
     appendInst(instFactory->makeBranch(mod, instType, src, label));
-}
-
-void
-IRBuilder::genPredBranch(LabelInst* label,
-                         Opnd* src) {
-    src = propagateCopy(src);
-    if (irBuilderFlags.doSimplify) {
-        if (simplifier->simplifyPredBranch(label, src)) {
-            // simplified branch was emitted;
-            return;
-        }
-    }
-    appendInst(instFactory->makePredBranch(src, label));
 }
 
 
@@ -2360,18 +2319,6 @@ IRBuilder::genAddScaledIndex(Opnd* ptr, Opnd* index) {
     return dst;
 }
 
-Opnd*
-IRBuilder::genScaledDiffRef(Opnd* src1, Opnd* src2) {
-    src1 = propagateCopy(src1);
-    src2 = propagateCopy(src2);
-    Opnd* dst = lookupHash(Op_ScaledDiffRef, src1, src2);
-    if (dst) return dst;
-
-    dst = createOpnd(typeManager->getInt32Type());
-    appendInst(instFactory->makeScaledDiffRef(dst, src1, src2));
-    insertHash(Op_ScaledDiffRef, src1, src2, dst->getInst());
-    return dst;
-}
 
 Opnd*
 IRBuilder::genUncompressRef(Opnd *compref)

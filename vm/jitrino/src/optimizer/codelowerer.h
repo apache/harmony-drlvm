@@ -197,8 +197,6 @@ private:
 
     Inst* caseAddScaledIndex(Inst* inst) {return caseDefault(inst);}
 
-    Inst* caseScaledDiffRef(Inst* inst) {return caseDefault(inst);}
-
     Inst* caseStVar(Inst* inst) {return caseDefault(inst);}
 
     Inst* caseTauStInd(Inst* inst) {return caseDefault(inst);}
@@ -360,10 +358,6 @@ private:
     Inst* caseTauHasExactType(TypeInst* inst) {return caseDefault(inst);}
 
     Inst* caseTauIsNonNull(Inst* inst) {return caseDefault(inst);}
-
-    Inst* casePredCmp(Inst* inst) {return caseDefault(inst);}
-
-    Inst* casePredBranch(BranchInst* inst) {return caseDefault(inst);}
 
     IRManager& _irm;
     bool _preserveSsa;

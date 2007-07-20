@@ -671,49 +671,6 @@ CG_OpndHandle*    InstCodeSelector::diffRef(bool           ovf,
     return sub(ArithmeticOp::I4, ref1, ref2);
 }   
 
-//_______________________________________________________________________________________________________________
-//  Subtract reference from reference and scale down by element type.
-
-CG_OpndHandle*    InstCodeSelector::scaledDiffRef(CG_OpndHandle* ref1, 
-                                                  CG_OpndHandle* ref2,
-                                                  Type*          type1,
-                                                  Type*          type2)  
-{ 
-    Opnd* r1 = (Opnd*)ref1;
-    Type * elemRefType = r1->getType();
-
-#ifdef _DEBUG
-    Opnd* r2 = (Opnd*)ref2;
-    assert( elemRefType->isManagedPtr() && elemRefType==r2->getType() );
-#endif
-    Type * elemType = ((PtrType *)elemRefType)->getPointedToType();
-
-    uint32 size = getByteSize(irManager.getTypeSize(elemType));
-    assert(size > 0);
-    uint32 shift;
-    switch(size) {
-    case 1:
-        shift = 0; 
-        break; 
-    case 2:
-        shift = 1; 
-        break; 
-    case 4:
-        shift = 2; 
-        break; 
-    default:
-        assert(0);
-        return NULL;
-    }
-    
-    Opnd *dstOpnd = (Opnd *)diffRef(false, ref1, ref2);
-
-    if(shift == 0) {
-        return dstOpnd;
-    } else {
-        return shr(IntegerOp::I4,dstOpnd,irManager.newImmOpnd(typeManager.getUInt8Type(),shift));
-    }
-}    
  
 //_______________________________________________________________________________________________________________
 //  Multiply numeric values
@@ -3139,13 +3096,6 @@ CG_OpndHandle*  InstCodeSelector::tauSafe()
     return getTauUnsafe();
 }
 
-//_______________________________________________________________________________________________________________
-// result is a predicate
-CG_OpndHandle*  InstCodeSelector::pred_cmp(CompareOp::Operators,CompareOp::Types,CG_OpndHandle* src1,CG_OpndHandle* src2)
-{
-    ICS_ASSERT(0);
-    return 0;
-}
 
 //_______________________________________________________________________________________________________________
 CG_OpndHandle*  InstCodeSelector::pred_czero(CompareZeroOp::Types,CG_OpndHandle* src)
@@ -3161,11 +3111,6 @@ CG_OpndHandle*  InstCodeSelector::pred_cnzero(CompareZeroOp::Types,CG_OpndHandle
     return 0;
 }
 
-//_______________________________________________________________________________________________________________
-void InstCodeSelector::pred_btrue(CG_OpndHandle* src1)
-{
-    ICS_ASSERT(0);
-}
 
 // END new tau instructions
 

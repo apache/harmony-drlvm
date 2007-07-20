@@ -126,7 +126,6 @@ public:
     CG_OpndHandle *addRef(RefArithmeticOp::Types, CG_OpndHandle*, CG_OpndHandle*);
     CG_OpndHandle *subRef(RefArithmeticOp::Types, CG_OpndHandle*, CG_OpndHandle*);
     CG_OpndHandle *diffRef(bool, CG_OpndHandle*, CG_OpndHandle*);
-    CG_OpndHandle *scaledDiffRef(CG_OpndHandle*,CG_OpndHandle*, Type*, Type*);
 
     CG_OpndHandle *tau_div(DivOp::Types, CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*);
     CG_OpndHandle *tau_rem(DivOp::Types, CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*);
@@ -278,7 +277,6 @@ public:
     CG_OpndHandle *tau_callvirt(uint32, CG_OpndHandle**, Type*, MethodDesc*, CG_OpndHandle*, CG_OpndHandle*)  { NOT_IMPLEMENTED_C("tau_callvirt") }
     CG_OpndHandle *select(CompareOp::Types, CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("select") }
     CG_OpndHandle *cmp3(CompareOp::Operators,CompareOp::Types, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("cmp3") }
-    CG_OpndHandle *pred_cmp(CompareOp::Operators,CompareOp::Types, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("pred_cmp") }
     CG_OpndHandle *tau_optimisticBalancedMonitorEnter(CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("tau_optimisticBalancedMonitorEnter") }
     CG_OpndHandle *addOffsetPlusHeapbase(Type*, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("addOffsetPlusHeapbase") }
     CG_OpndHandle *tau_ldField(Type*, CG_OpndHandle*, Type::Tag, FieldDesc*, bool, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("tau_ldField") }
@@ -291,7 +289,6 @@ public:
     void          initValueObj(Type*, CG_OpndHandle*)                     { NOT_IMPLEMENTED_V("initValueObj") }
     void          copyValueObj(Type*, CG_OpndHandle*, CG_OpndHandle*)     { NOT_IMPLEMENTED_V("copyValueObj") }
     void          prefetch(CG_OpndHandle*, uint32, int)                   { NOT_IMPLEMENTED_V("prefetch") }
-    void          pred_btrue(CG_OpndHandle*)                              { NOT_IMPLEMENTED_V("pred_btrue") }
     void          jump()                                                  { NOT_IMPLEMENTED_V("jump") }
     void          throwLazyException(uint32, CG_OpndHandle**, MethodDesc*) { NOT_IMPLEMENTED_V("throwLazyException") }
     void          tau_stStatic(CG_OpndHandle*, FieldDesc*, Type::Tag, bool, CG_OpndHandle*) { NOT_IMPLEMENTED_V("tau_stStatic") } 

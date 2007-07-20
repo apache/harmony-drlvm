@@ -220,7 +220,7 @@ public:
             // CFG for inlining
             Node* bbpCFGController = bbp.getBBPSubCFGController(originalTargetId,sourceDispatchId);
             if (bbpCFGController) { // just retarget the edge
-                fg->replaceEdgeTarget(edge, bbpCFGController);
+                fg->replaceEdgeTarget(edge, bbpCFGController, true);
             } else { // we need a new bbpCFG
                 ControlFlowGraph* bbpCFG = bbp.createBBPSubCFG(*irManager, tlsBaseReg);
             
@@ -293,7 +293,7 @@ BBPolling::getOrCreateTLSBaseReg(Edge* e)
         Edge* other = otherEdges[otherIdx];
         if (other->getTargetNode() != loopHeader)
             break;
-        fg->replaceEdgeTarget(other, bbpFlagAddrBlock);
+        fg->replaceEdgeTarget(other, bbpFlagAddrBlock, true);
     }
 
     assert(loopHeader->isBlockNode());

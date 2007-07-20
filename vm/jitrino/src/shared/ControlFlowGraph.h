@@ -1300,7 +1300,7 @@ public:
    *
    * @param[in] edge        - the edge to change the target
    * @param[in] newTarget   - a new <code>Target</code> node
-   * @param[in] keepOldBody - modify old or create a new edge
+   * @param[in] keepOldEdge - modify old or create a new edge
    * 
    * @return The edge connecting the <code>Source</code> node of the  
    *         edge and the </code>newTarget</code> node.
@@ -1308,7 +1308,7 @@ public:
    * @note The removal of the old edge is needed
    *       while inlining CFG: edge IDs must be renewed.
    */
-    Edge* replaceEdgeTarget(Edge* edge, Node *newTarget, bool keepOldBody = false);
+    Edge* replaceEdgeTarget(Edge* edge, Node *newTarget, bool keepOldEdge = false);
 
   /** 
    * Checks if CFG is annotated with the edge profile information.

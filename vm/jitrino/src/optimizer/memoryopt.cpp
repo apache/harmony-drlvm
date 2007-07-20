@@ -924,7 +924,6 @@ MemoryOptInitWalker::applyToInst(Inst *i)
     case Op_AddOffset:
     case Op_AddOffsetPlusHeapbase:
         
-    case Op_ScaledDiffRef:
         // the following are irrelevant, but cased so we
         // notice any additions:
 
@@ -967,8 +966,6 @@ MemoryOptInitWalker::applyToInst(Inst *i)
     case Op_TauHasType:
     case Op_TauHasExactType:
     case Op_TauIsNonNull:
-    case Op_PredCmp:
-    case Op_PredBranch:
         break;
 
     //case Op_TauStRef:

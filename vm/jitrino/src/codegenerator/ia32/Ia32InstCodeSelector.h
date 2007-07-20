@@ -65,10 +65,8 @@ public:
     virtual CG_OpndHandle*  tauSafe();   // operation is always safe
 
     // result is a predicate
-    virtual CG_OpndHandle*  pred_cmp(CompareOp::Operators,CompareOp::Types,CG_OpndHandle* src1,CG_OpndHandle* src2);
     virtual CG_OpndHandle*  pred_czero(CompareZeroOp::Types,CG_OpndHandle* src);
     virtual CG_OpndHandle*  pred_cnzero(CompareZeroOp::Types,CG_OpndHandle* src);
-    virtual void            pred_btrue(CG_OpndHandle* src1);
     // END new tau instructions
 
     //
@@ -80,7 +78,6 @@ public:
     CG_OpndHandle* sub(ArithmeticOp::Types,CG_OpndHandle* src1,CG_OpndHandle* src2);
     CG_OpndHandle* subRef(RefArithmeticOp::Types,CG_OpndHandle* refSrc, CG_OpndHandle* intSrc);
     CG_OpndHandle* diffRef(bool ovf, CG_OpndHandle* ref1,CG_OpndHandle* ref2);
-    CG_OpndHandle* scaledDiffRef(CG_OpndHandle* ref1,CG_OpndHandle* ref2, Type*, Type*);
     CG_OpndHandle* mul(ArithmeticOp::Types,CG_OpndHandle* src1,CG_OpndHandle* src2);
     CG_OpndHandle* tau_div(DivOp::Types,CG_OpndHandle* src1,CG_OpndHandle* src2,CG_OpndHandle *tauSrc1NonZero);
     CG_OpndHandle* tau_rem(DivOp::Types,CG_OpndHandle* src1,CG_OpndHandle* src2,CG_OpndHandle *tauSrc2NonZero);

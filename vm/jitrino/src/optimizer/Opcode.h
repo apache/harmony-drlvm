@@ -359,7 +359,6 @@ enum Opcode {
     Op_TauArrayLen,        
     Op_LdArrayBaseAddr,             // load the base (zero'th element) address of array
     Op_AddScaledIndex,              // Add a scaled index to an array element address
-    Op_ScaledDiffRef,               // Subtract two references to yield a difference in number of objects
     // Store instructions
     Op_StVar,
     Op_TauStInd,                  // StoreModifier
@@ -471,9 +470,6 @@ enum Opcode {
     Op_TauHasType,
     Op_TauHasExactType,
     Op_TauIsNonNull,
-
-    Op_PredCmp,
-    Op_PredBranch,
 
     // prefixes: unaligned, volatile, tail,
     NumOpcodes,

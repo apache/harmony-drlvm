@@ -190,7 +190,6 @@ public:
     virtual CG_OpndHandle*  sub(ArithmeticOp::Types,CG_OpndHandle* src1,CG_OpndHandle* src2) = 0;
     virtual CG_OpndHandle*  subRef(RefArithmeticOp::Types,CG_OpndHandle* refSrc, CG_OpndHandle* intSrc) = 0;
     virtual CG_OpndHandle*  diffRef(bool ovf, CG_OpndHandle* ref1,CG_OpndHandle* ref2) = 0;
-    virtual CG_OpndHandle*  scaledDiffRef(CG_OpndHandle*, CG_OpndHandle*, Type*, Type*) = 0;
     virtual CG_OpndHandle*  mul(ArithmeticOp::Types,CG_OpndHandle* src1,CG_OpndHandle* src2) = 0;
     virtual CG_OpndHandle*  tau_div(DivOp::Types,CG_OpndHandle* src1,CG_OpndHandle* src2,
                                     CG_OpndHandle *tauSrc1NonZero) = 0;
@@ -222,7 +221,6 @@ public:
     // END PRED DEPRECATED
 
     // result is a predicate
-    virtual CG_OpndHandle*  pred_cmp(CompareOp::Operators,CompareOp::Types,CG_OpndHandle* src1,CG_OpndHandle* src2) = 0;
     virtual CG_OpndHandle*  pred_czero(CompareZeroOp::Types,CG_OpndHandle* src) = 0;
     virtual CG_OpndHandle*  pred_cnzero(CompareZeroOp::Types,CG_OpndHandle* src) = 0;
 
@@ -231,8 +229,6 @@ public:
     virtual void            bzero(CompareZeroOp::Types,CG_OpndHandle* src) = 0;
     virtual void            bnzero(CompareZeroOp::Types,CG_OpndHandle* src) = 0;
     // END PRED DEPRECATED
-
-    virtual void            pred_btrue(CG_OpndHandle* src1) = 0;
 
     virtual void            jump() = 0;
     virtual void            tableSwitch(CG_OpndHandle* src, uint32 nTargets) = 0;       

@@ -465,8 +465,7 @@ void LoopBuilder::peelLoops(StlVector<Edge*>& loopEdgesIn) {
             //
             Opcode op1 = ((Inst*)tail->getLastInst())->getOpcode();
             Opcode op2 = ((Inst*)header->getLastInst())->getOpcode();
-            if(flags.invert && (op1 != Op_Branch) && (op1 != Op_PredBranch)
-               && (op2 != Op_Branch) && (op2 != Op_PredBranch)) {
+            if(flags.invert && (op1 != Op_Branch) && (op2 != Op_Branch)) {
                 if(isInversionCandidate(originalInvertedHeader, header, nodesInLoop, next, exit)) {
                     preheader = FlowGraph::tailDuplicate(irManager, preheader, header, defUses); 
                     tail = header;

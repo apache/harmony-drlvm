@@ -147,7 +147,6 @@ static OpcodeInfo opcodeTable[] = {
     { Op_TauArrayLen,           false, MB::CSEable,       MK::None,                                  "arraylen ",        "arraylen  %0 ((%1,%2)) -) %l",           },       
     { Op_LdArrayBaseAddr,       false, MB::CSEable,       MK::None,                                  "ldbase",        "ldbase    %s -) %l",           }, // load the base (zero'th element) address of array
     { Op_AddScaledIndex,        false, MB::Movable,       MK::None,                                  "addindex",      "addindex  %s -) %l",           }, // Add a scaled index to an array element address
-    { Op_ScaledDiffRef,         false, MB::Movable,       MK::None,                                  "diffref",       "diffref   %s -) %l",           }, // Subtract two references to yield a difference in number of objects
     { Op_StVar,                 true,  MB::None,          MK::None,                                  "stvar ",        "stvar     %0 -) %l",           },
     { Op_TauStInd,              true,  MB::StoreOrSync,   MK::Store_AutoCompress,                    "stind",         "stind%m:%t %0 ((%2,%3,%4)) -) [%1]",        },
     { Op_TauStField,            true,  MB::StoreOrSync,   MK::Store_AutoCompress,                    "stfld",         "stfld%m:%t %0 ((%2,%3)) -) [%1.%d]",     },
@@ -237,10 +236,6 @@ static OpcodeInfo opcodeTable[] = {
     { Op_TauHasType,            false, MB::Movable,       MK::None,                             "tauhastype ",        "tauhastype      %0,%d -) %l",        }, // temporary declaration that source is of given type
     { Op_TauHasExactType,       false, MB::CSEable,       MK::None,                             "tauexacttype ",        "tauexacttype      %0,%d -) %l",        }, // temporary declaration that source is exactly of given type
     { Op_TauIsNonNull,          true, MB::CSEable,       MK::None,                             "tauisnonnull ",        "tauisnonnull      %0 -) %l",        }, // temporary declaration that source null
-
-    { Op_PredCmp,               false, MB::Movable,       MK::Comparison,                            "predcmp",        "pc%m:%t %s -) %l",              }, 
-    { Op_PredBranch,            true,  MB::ControlFlow,   MK::None,                                  "predbr",        "if %s goto %l",         }, 
-
 };                                                             
 
 unsigned short Modifier::encode(Opcode opcode, uint32 numbits) const

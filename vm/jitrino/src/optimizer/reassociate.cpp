@@ -375,7 +375,6 @@ Reassociate::addAddOffsetAssoc(StlDeque<OpndWithPriority> &opnds,
         case Op_LdArrayLenOffset:
         case Op_LdArrayLenOffsetPlusHeapbase:
         case Op_AddScaledIndex:
-        case Op_ScaledDiffRef:
         case Op_TauArrayLen:
     default:
         break;
