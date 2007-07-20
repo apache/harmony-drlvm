@@ -102,8 +102,10 @@ public:
     // Connect input and return operands of the region to the top-level method.  Do not yet splice.
     void connectRegion(InlineNode* inlineNode);
 
+    void compileAndConnectRegion(InlineNode* inlineNode, CompilationContext& inlineCC);
+
     // Searches the flowgraph for the next inline candidate method.
-    MethodCallInst* getNextRegionToInline();
+    InlineNode* getNextRegionToInline(CompilationContext& inlineCC);
 
     InlineTree& getInlineTree() { return _inlineTree; } 
 
@@ -115,11 +117,15 @@ public:
     
     static void runInlinerPipeline(CompilationContext& inlineCC, const char* pipeName);
 
-    void doInline(MemoryManager& tmpMM, MethodCallInst* call);
+    /**runs inliner for a specified top level call. 
+     * If call==NULL runs inliner for all calls in a method: priority queue is used to find methods to inline
+     */
+    void runInliner(MethodCallInst* call);
 
     void setConnectEarly(bool early) {connectEarly = early;}
 
 private:
+
     class CallSite {
     public:
         CallSite(int32 benefit, Node* callNode, InlineNode* inlineNode) : benefit(benefit), callNode(callNode), inlineNode(inlineNode) {}

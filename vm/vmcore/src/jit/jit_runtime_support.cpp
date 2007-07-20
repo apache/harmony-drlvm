@@ -2166,7 +2166,6 @@ static void *rth_invokeinterface_addr_withresolve(Class_Handle klass, unsigned c
     END_RAISE_AREA;
     assert(m!=NULL);
 
-
     assert(obj!=NULL);
     assert(obj->vt()!=NULL);
     Class* objClass = obj->vt()->clss;
@@ -2174,7 +2173,10 @@ static void *rth_invokeinterface_addr_withresolve(Class_Handle klass, unsigned c
     assert(objClass->is_initialized() || objClass->is_initializing());
 
     char* infc_vtable = (char*)Class::helper_get_interface_vtable(obj, m->get_class());
-    assert(infc_vtable);
+    if(infc_vtable == NULL) {
+        exn_throw_by_name("java/lang/IncompatibleClassChangeError", objClass->get_name()->bytes);
+        return NULL;
+    }
     unsigned base_index = (unsigned)(infc_vtable - (char*)objClass->get_vtable()->methods)/sizeof(char*);
     Method* infc_method = objClass->get_method_from_vtable(base_index + m->get_index());
     assert(infc_method);

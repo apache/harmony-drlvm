@@ -287,7 +287,7 @@ void HelperInliner::inlineVMHelper(MethodCallInst* call) {
     }
 
     Inliner inliner(session, localMM, *irm, false, false, flags.inlinerPipelineName);
-    inliner.doInline(localMM, call);
+    inliner.runInliner(call);
 }
 
 void HelperInliner::finalizeCall(MethodCallInst* callInst) {

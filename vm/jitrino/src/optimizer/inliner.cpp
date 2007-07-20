@@ -65,6 +65,7 @@ namespace Jitrino {
 #define INLINE_EXACT_ALL_BONUS 0
 #define INLINE_SKIP_EXCEPTION_PATH true
 
+#define PRAGMA_INLINE_BENEFIT (2*1000*1000*1000)
 
 DEFINE_SESSION_ACTION(InlinePass, inline, "Method Inlining");
 
@@ -810,35 +811,24 @@ Inliner::inlineRegion(InlineNode* inlineNode) {
     MethodDesc &methodDesc = inlinedIRM.getMethodDesc();
     
     if (Log::isEnabled()) {
-        Log::out() << "inlineAndProcessRegion "
-                   << methodDesc.getParentType()->getName() << "."
-                   << methodDesc.getName() << ::std::endl;
+        Log::out()<<"inlineAndProcessRegion "<< methodDesc.getParentType()->getName() << "."<< methodDesc.getName()<<std::endl;
     }
 
-    //
     // Scale block counts in the inlined region for this particular call site
-    //
-    if (callNode != NULL)
+    if (callNode != NULL) {
         scaleBlockCounts(callNode, inlinedIRM);
-    
-    //
-    // Update priority queue with calls in this region
-    //
-    if (usePriorityQueue) {
-        processRegion(inlineNode, dtree, ltree);
     }
     
-    //
+    // Update priority queue with calls in this region and check @Inline pragmas
+    processRegion(inlineNode, dtree, ltree);
+    
     // If top level flowgraph 
-    //
     if (inlineNode == _inlineTree.getRoot()) {
         Log::out() << "inlineNode is root" << ::std::endl;
         return;
     }
 
-    // 
     // Splice region into top level flowgraph at call site
-    //
     assert(callInst->getOpcode() == Op_DirectCall);
     Log::out() << "Inlining " << methodDesc.getParentType()->getName() 
         << "." << methodDesc.getName() << ::std::endl;
@@ -874,8 +864,8 @@ void Inliner::runTranslatorSession(CompilationContext& inlineCC) {
     inlineCC.setCurrentSessionAction(NULL);
 }
 
-MethodCallInst*
-Inliner::getNextRegionToInline() {
+InlineNode*
+Inliner::getNextRegionToInline(CompilationContext& inlineCC) {
     // If in DPGO profiling mode, don't inline if profile information is not available.
     if(_doProfileOnlyInlining && !_toplevelIRM.getFlowGraph().hasEdgeProfile()) {
         return NULL;
@@ -895,20 +885,21 @@ Inliner::getNextRegionToInline() {
         // Find new candidate.
         callNode = _inlineCandidates.top().callNode;
         inlineParentNode = _inlineCandidates.top().inlineNode;
+        int benefit = _inlineCandidates.top().benefit;
         _inlineCandidates.pop();
-        
+
         call = ((Inst*)callNode->getLastInst())->asMethodCallInst();
         assert(call != NULL);
         methodDesc = call->getMethodDesc();
-        
+        bool isPragmaInline = benefit == PRAGMA_INLINE_BENEFIT;
+
         // If candidate would cause top level method to exceed size threshold, throw away.
         
         uint32 methodByteSize = methodDesc->getByteCodeSize();
         methodByteSize = (methodByteSize <= CALL_COST) ? 1 : methodByteSize-CALL_COST;
         newByteSize = _currentByteSize + methodByteSize;
         double factor = ((double) newByteSize) / ((double) _initByteSize);
-        if(newByteSize < _minInlineStop || factor <= _maxInlineGrowthFactor
-           || (methodByteSize < _inlineSmallMaxByteSize)) {
+        if(isPragmaInline || newByteSize < _minInlineStop || factor <= _maxInlineGrowthFactor || (methodByteSize < _inlineSmallMaxByteSize)) {
             found = true;
         } else {
             Log::out() << "Skip inlining " << methodDesc->getParentType()->getName() << "." << methodDesc->getName() << ::std::endl;
@@ -916,25 +907,28 @@ Inliner::getNextRegionToInline() {
                                    << (int)methodByteSize
                                    << ", newByteSize = " << (int)newByteSize
                                    << ", factor=" << factor
-                                   << ::std::endl;
+                                   << std::endl;
         }
     }
     
     if(!found) {
         // No more candidates.  Done with inlining.
         assert(_inlineCandidates.empty());
-        Log::out() << "Done inlining " << ::std::endl;
+        Log::out() << "Done inlining " << std::endl;
         return NULL;
     }
     
-    //
     // Set candidate as current inlined region
-    //
     Log::out() << "Opt:   Inline " << methodDesc->getParentType()->getName() << "." << methodDesc->getName() << 
-        methodDesc->getSignatureString() << ::std::endl;
-    
+        methodDesc->getSignatureString() << std::endl;
+
+    // Generate flowgraph for new region
+    InlineNode* inlineNode = createInlineNode(inlineCC, call);
+    assert(inlineNode!=NULL);
+    inlineParentNode->addChild(inlineNode);
+
     _currentByteSize = newByteSize;
-    return call;
+    return inlineNode;
 }
 
 InlineNode* Inliner::createInlineNode(CompilationContext& inlineCC, MethodCallInst* call) {
@@ -977,19 +971,24 @@ Inliner::processDominatorNode(InlineNode *inlineNode, DominatorNode* dnode, Loop
             assert(call != NULL);
             MethodDesc* methodDesc = call->getMethodDesc();
 
-            Log::out() << "Considering inlining instruction I"
-                                   << (int)call->getId() << ::std::endl;
-            if(canInlineInto(*methodDesc)) {
+            Log::out() << "Considering inlining instruction I" << (int)call->getId() << ::std::endl;
+            if (methodDesc->hasAnnotation(inlinePragma)) {
+                assert(!methodDesc->isSynchronized()); //not tested!
+                if (Log::isEnabled()) {
+                    Log::out()<<"Found Inline pragma, adding to the queue:";call->print(Log::out());Log::out()<<std::endl;
+                }
+                _inlineCandidates.push(CallSite(PRAGMA_INLINE_BENEFIT, node, inlineNode));
+            } else if (usePriorityQueue && canInlineInto(*methodDesc)) {
                 uint32 size = methodDesc->getByteCodeSize();
                 int32 benefit = computeInlineBenefit(node, *methodDesc, inlineNode, ltree->getLoopDepth(node));
                 assert(size > 0);
                 Log::out() << "Inline benefit " << methodDesc->getParentType()->getName() << "." << methodDesc->getName() << " == " << (int) benefit << ::std::endl;
                 if(0 < size && benefit > _minBenefitThreshold) {
                     // Inline candidate
-                    Log::out() << "Add to queue" << ::std::endl;
+                    Log::out() << "Add to queue" << std::endl;
                     _inlineCandidates.push(CallSite(benefit, node, inlineNode));
                 } else {
-                    Log::out() << "Will not inline" << ::std::endl;
+                    Log::out() << "Will not inline" << std::endl;
                 }
             }
         }
@@ -1118,73 +1117,61 @@ void Inliner::runInlinerPipeline(CompilationContext& inlineCC, const char* pipeN
 
 typedef StlVector<MethodCallInst*> InlineVector;
 
-void Inliner::doInline(MemoryManager& tmpMM, MethodCallInst* origCall) {
+void Inliner::runInliner(MethodCallInst* call) {
     CompilationContext* topCC = _toplevelIRM.getCompilationContext();
     CompilationInterface* ci = topCC->getVMCompilationInterface();
-
-    InlineVector pragmaInlineCalls(tmpMM);
-    bool firstIteration = true;
+    InlineNode* rootRegionNode = (InlineNode*) getInlineTree().getRoot();
+    bool first = true;
     do {
-        MethodCallInst* call = NULL;
-        bool rootMethodAnalysis = firstIteration && origCall == NULL;
-        if (firstIteration) {
-            call = origCall;
-            firstIteration = false;
-        } else {
-            call = *pragmaInlineCalls.rbegin();
-            pragmaInlineCalls.pop_back();
-            assert(call!=NULL);
-        }
-        
-        InlineNode* ir = NULL;
-        if (!rootMethodAnalysis) { // processing custom call in a method
-            assert(call!=NULL);
+        InlineNode* regionNode = NULL;
+        {
             CompilationContext inlineCC(topCC->getCompilationLevelMemoryManager(), ci, topCC->getCurrentJITContext());
             inlineCC.setPipeline(topCC->getPipeline());//workaround for logging issue. Pipeline must not be NULL
-            ir = createInlineNode(inlineCC, call);
-            IRManager &regionManager = ir->getIRManager();
-            assert(inlineCC.getHIRManager() == &regionManager);
-
-            // Connect region arguments to top-level flowgraph
-            if(connectEarly) {
-                connectRegion(ir);
-            }
-
-            // Optimize inlined region before splicing
-            inlineCC.stageId = topCC->stageId;
-            Inliner::runInlinerPipeline(inlineCC, inlinerPipelineName);
-            topCC->stageId = inlineCC.stageId;
-
-            // Splice into flow graph and find next region.
-            if(!connectEarly) {
-                connectRegion(ir);
-            }
-            OptPass::computeDominatorsAndLoops(regionManager);
-        } else {// processing whole method
-            ir = (InlineNode*)getInlineTree().getRoot();
-        }
-
-        //check all methods with @Inline pragmas
-        const Nodes& nodesInRegion = ir->getIRManager().getFlowGraph().getNodes();
-        for (Nodes::const_iterator it = nodesInRegion.begin(), end = nodesInRegion.end(); it!=end; ++it) {
-            Node* node = *it;
-            for (Inst* inst = (Inst*)node->getFirstInst(); inst!=NULL; inst = inst->getNextInst()) {
-                if (inst->isMethodCall()) {
-                    MethodCallInst* methodCall = inst->asMethodCallInst();
-                    MethodDesc* md = methodCall->getMethodDesc();
-                    if (md->hasAnnotation(inlinePragma)) {
-                        assert(!md->isSynchronized()); //not tested!
-                        pragmaInlineCalls.push_back(methodCall);
-                        if (Log::isEnabled()) {
-                            Log::out()<<"Found Inline pragma, adding to the queue:";methodCall->print(Log::out());Log::out()<<std::endl;
-                        }
-                    }
+            if (first) {
+                if (call == NULL) { //if method is null -> check all calls in top level method
+                    regionNode = rootRegionNode;
+                } else {
+                    regionNode = createInlineNode(inlineCC, call); //if method is not null -> inline it first
+                    rootRegionNode->addChild(regionNode);
                 }
+                first = false;
+            } else {
+                regionNode = getNextRegionToInline(inlineCC);
             }
+
+            if (regionNode == NULL) {
+                break;
+            }
+            compileAndConnectRegion(regionNode, inlineCC);
         }
         //inline current region
-        inlineRegion(ir);
-    } while (!pragmaInlineCalls.empty());
+        inlineRegion(regionNode);
+    } while (true);
+}
+
+void Inliner::compileAndConnectRegion(InlineNode* inlineNode, CompilationContext& inlineCC) {
+    MethodCallInst* call = inlineNode->getCallInst()!=NULL ? inlineNode->getCallInst()->asMethodCallInst() : NULL;
+    if (call!=NULL) { // processing custom call in a method
+        IRManager &regionManager = inlineNode->getIRManager();
+        assert(inlineCC.getHIRManager() == &regionManager);
+
+        // Connect region arguments to top-level flowgraph
+        if(connectEarly) {
+            connectRegion(inlineNode);
+        }
+
+        // Optimize inlined region before splicing
+        CompilationContext* topCC = regionManager.getCompilationContext();
+        inlineCC.stageId = topCC->stageId;
+        Inliner::runInlinerPipeline(inlineCC, inlinerPipelineName);
+        topCC->stageId = inlineCC.stageId;
+
+        // Splice into flow graph and find next region.
+        if(!connectEarly) {
+            connectRegion(inlineNode);
+        }
+        OptPass::computeDominatorsAndLoops(regionManager);
+    } 
 }
 
 void InlinePass::_run(IRManager& irm) {
@@ -1198,23 +1185,16 @@ void InlinePass::_run(IRManager& irm) {
     MemoryManager tmpMM("Inliner::tmp_mm");
     Inliner inliner(this, tmpMM, irm, irm.getFlowGraph().hasEdgeProfile(), true, pipeName);
     inliner.setConnectEarly(connectEarly);
-    inliner.doInline(tmpMM, NULL);
-
-    // Inline calls
-    do {
-        MethodCallInst* call = inliner.getNextRegionToInline();
-        if (call == NULL) {
-            break;
-        }
-        inliner.doInline(tmpMM, call);
-    } while (true);
+    inliner.runInliner(NULL); //call is unspecified -> check all calls using priority queue
+    
     const OptimizerFlags& optimizerFlags = irm.getOptimizerFlags();
     // Print the results to logging / dot file
     if(optimizerFlags.dumpdot) {
         inliner.getInlineTree().printDotFile(irm.getMethodDesc(), "inlinetree");
     }
     if(Log::isEnabled()) {
-        Log::out() << indent(irm) << "Opt: Inline Tree" << ::std::endl;
+        Log::out()<<std::endl;
+        Log::out() << indent(irm) << "Opt: Inline Tree" << std::endl;
         inliner.getInlineTree().printIndentedTree(Log::out(), "  ");
     }
    Log::out() << "Inline Checksum == " << (int) inliner.getInlineTree().computeCheckSum() << ::std::endl;
