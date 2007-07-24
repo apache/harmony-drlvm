@@ -16,6 +16,3 @@ H3909
 # Exclude this test because JVMTI is not implemented for x86_64 in JIT mode yet
 H3982
 
-#HARMONY-4093
-H2113
-
