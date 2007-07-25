@@ -145,52 +145,51 @@ APR_DECLARE(size_t) port_vmem_reserved_size(){
 
 APR_DECLARE(size_t) port_vmem_committed_size(){
     char* buf = (char*) malloc(PATH_MAX + 1);
-
+    size_t vmem = 0;
     pid_t my_pid = getpid();
+
     sprintf(buf, "/proc/%d/statm", my_pid);
     FILE* file = fopen(buf, "r");
     if (!file) {
-        return 0;
+        goto cleanup;
     }
     size_t size = 0;
     ssize_t len = getline(&buf, &size, file);
+    fclose(file);
     if (len == -1) {
-        return 0;
+        goto cleanup;
     }
-    size_t vmem;
-    int res = sscanf(buf, "%lu", &vmem);
-    if (res < 1) {
-        return 0;
-    }
-    if (buf) {
-        free(buf);
-    }
+    sscanf(buf, "%lu", &vmem);
+
+cleanup:
+    free(buf);
     return vmem * port_vmem_page_sizes()[0];
 }
 
 APR_DECLARE(size_t) port_vmem_max_size(){
     char* buf = (char*) malloc(PATH_MAX + 1);
+    int pid, ppid, pgrp, session, tty_nr, tpgid, exit_signal, processor;
+    char comm[PATH_MAX];
+    char state;
+    unsigned long flags, minflt, cminflt, majflt, cmajflt, utime, stime,
+        starttime, vsize, rlim = 0, startcode, endcode, startstack, kstkesp,
+        kstkeip, signal, blocked, sigignore, sigcatch, wchan, nswap, cnswap;
+    long cutime, cstime, priority, nice, unused, itrealvalue, rss;
 
     pid_t my_pid = getpid();
     sprintf(buf, "/proc/%d/stat", my_pid);
     FILE* file = fopen(buf, "r");
     if (!file) {
-        return 0;
+        goto cleanup;
     }
     size_t size = 0;
     ssize_t len = getline(&buf, &size, file);
+    fclose(file);
     if (len == -1) {
-        return 0;
+        goto cleanup;
     }
-    int pid, ppid, pgrp, session, tty_nr, tpgid, exit_signal, processor;
-    char comm[PATH_MAX];
-    char state;
-    unsigned long flags, minflt, cminflt, majflt, cmajflt, utime, stime,
-        starttime, vsize, rlim, startcode, endcode, startstack, kstkesp,
-        kstkeip, signal, blocked, sigignore, sigcatch, wchan, nswap, cnswap;
-    long cutime, cstime, priority, nice, unused, itrealvalue, rss;
 
-    int res = sscanf(buf, "%d %s %c %d %d %d %d %d %lu %lu %lu %lu "
+    sscanf(buf, "%d %s %c %d %d %d %d %d %lu %lu %lu %lu "
         "%lu %lu %lu %ld %ld %ld %ld %ld %ld %lu %lu %ld %lu %lu %lu "
         "%lu %lu %lu %lu %lu %lu %lu %lu %lu %lu %d %d",
         &pid, &comm, &state, &ppid, &pgrp, &session, &tty_nr, &tpgid, &flags,
@@ -198,9 +197,9 @@ APR_DECLARE(size_t) port_vmem_max_size(){
         &priority, &nice, &unused, &itrealvalue, &starttime, &vsize, &rss, &rlim,
         &startcode, &endcode, &startstack, &kstkesp, &kstkeip, &signal, &blocked,
         &sigignore, &sigcatch, &wchan, &nswap, &cnswap, &exit_signal, &processor);
-    if (res < 25) { // rlim position
-        return 0;
-    };
+
+cleanup:
+    free(buf);
     return rlim;
 }
 
