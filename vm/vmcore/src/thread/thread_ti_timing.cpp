@@ -65,7 +65,7 @@ jthread_get_thread_cpu_time(jthread java_thread, jlong * nanos_ptr)
     int64 kernel_time;
 
     assert(nanos_ptr);
-    hythread_t native_thread = java_thread
+    hythread_t native_thread = (NULL == java_thread)
         ? hythread_self() : vm_jthread_get_tm_data(java_thread);
     assert(native_thread);
     return hythread_get_thread_times(native_thread, &kernel_time,
