@@ -585,7 +585,7 @@ void InfoBlockWriter::runImpl() {
     uint32 stackInfoSize = (uint32)stackInfo->getByteSize();
     uint32 gcInfoSize = (uint32)gcMap->getByteSize();
     uint32 bcMapSize = (uint32)bcMap->getByteSize(); // we should write at least the size of map  in the info block
-    assert(bcMapSize >= sizeof(POINTER_SIZE_INT));   // so  bcMapSize should be more than 4 for ia32
+    assert(bcMapSize >= 4);   // minimum size for empty  BCMap for all platforms
 
     Byte* infoBlock = compIntf.allocateInfoBlock(stackInfoSize + gcInfoSize + bcMapSize);
     stackInfo->write(infoBlock);
