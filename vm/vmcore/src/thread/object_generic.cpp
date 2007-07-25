@@ -155,8 +155,15 @@ jobject object_clone(JNIEnv *jenv, jobject jobj)
     if(gc_requires_barriers())
         gc_heap_wrote_object(result);
 
-    memcpy(result, h->object, size);
-    result->set_obj_info(0);
+    // Gregory - Skip object header copying, it should be initialized
+    // by GC already, and copying may erase some information that GC
+    // wrote in it at allocation time
+    const size_t skip = ManagedObject::get_constant_header_size();
+    assert(skip <= size);
+    jbyte *dest = (jbyte *)result + skip;
+    jbyte *src = (jbyte *)h->object + skip;
+    memcpy(dest, src, size - skip);
+
     ObjectHandle new_handle = oh_allocate_local_handle();
     new_handle->object = result;
     tmn_suspend_enable(); 
