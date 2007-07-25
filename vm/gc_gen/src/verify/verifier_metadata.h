@@ -46,6 +46,9 @@ typedef struct Heap_Verifier_Metadata{
   Pool* hashcode_pool_after_gc;
 
   Pool* new_objects_pool;
+
+  Pool* obj_with_fin_pool;
+  Pool* finalizable_obj_pool;
 } Heap_Verifier_Metadata;
 
 extern Heap_Verifier_Metadata* verifier_metadata;
@@ -56,7 +59,10 @@ void gc_verifier_metadata_destruct(Heap_Verifier* heap_verifier);
 Vector_Block* gc_verifier_metadata_extend(Pool* pool, Boolean is_set_pool);
 
 void verifier_clear_pool(Pool* working_pool, Pool* free_pool, Boolean is_vector_stack);
-Pool* verifier_copy_pool_reverse_order(Pool* source_pool);
+void verifier_remove_pool(Pool* working_pool, Pool* free_pool, Boolean is_vector_stack);
+void verifier_copy_pool_reverse_order(Pool* dest_pool, Pool* source_pool);
+void verifier_copy_pool(Pool* dest_pool, Pool* source_pool);
+
 
 inline Vector_Block* verifier_free_set_pool_get_entry(Pool* free_pool)
 {

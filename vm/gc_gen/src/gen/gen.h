@@ -155,11 +155,10 @@ void* los_try_alloc(POINTER_SIZE_INT size, GC* gc);
 Space* gc_get_nos(GC_Gen* gc);
 Space* gc_get_mos(GC_Gen* gc);
 Space* gc_get_los(GC_Gen* gc);
-Space* gc_get_pos(GC_Gen* gc);
+
 void gc_set_nos(GC_Gen* gc, Space* nos);
 void gc_set_mos(GC_Gen* gc, Space* mos);
 void gc_set_los(GC_Gen* gc, Space* los);
-void gc_set_pos(GC_Gen* gc, Space* pos);
 
 unsigned int gc_get_processor_num(GC_Gen* gc);
 
@@ -173,7 +172,10 @@ void gc_gen_reclaim_heap(GC_Gen* gc);
 void gc_gen_assign_free_area_to_mutators(GC_Gen* gc);
 
 void gc_gen_adjust_heap_size(GC_Gen* gc, int64 pause_time);
-  
+
+void gc_gen_update_space_before_gc(GC_Gen* gc);
+void gc_gen_update_space_after_gc(GC_Gen* gc);
+
 void gc_gen_mode_adapt_init(GC_Gen *gc);
 
 void gc_gen_iterate_heap(GC_Gen *gc);
@@ -181,5 +183,6 @@ void gc_gen_iterate_heap(GC_Gen *gc);
 extern Boolean GEN_NONGEN_SWITCH ;
 
 #endif /* ifndef _GC_GEN_H_ */
+
 
 

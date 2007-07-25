@@ -154,7 +154,7 @@ inline void normal_chunk_init(Chunk_Header *chunk, unsigned int slot_size)
   assert((POINTER_SIZE_INT)chunk->adj_next == (POINTER_SIZE_INT)chunk + NORMAL_CHUNK_SIZE_BYTES);
   
   chunk->next = NULL;
-  chunk->status = CHUNK_NEED_ZEROING;
+  chunk->status = CHUNK_NORMAL | CHUNK_NEED_ZEROING;
   chunk->slot_size = slot_size;
   chunk->slot_num = NORMAL_CHUNK_SLOT_NUM(chunk);
   chunk->slot_index = 0;
@@ -170,7 +170,7 @@ inline void abnormal_chunk_init(Chunk_Header *chunk, unsigned int chunk_size, un
   assert((POINTER_SIZE_INT)chunk->adj_next == (POINTER_SIZE_INT)chunk + chunk_size);
   
   chunk->next = NULL;
-  chunk->status = CHUNK_NIL;
+  chunk->status = CHUNK_IN_USE | CHUNK_ABNORMAL;
   chunk->slot_size = obj_size;
   chunk->slot_num = 1;
   chunk->slot_index = 0;
@@ -194,130 +194,69 @@ inline void abnormal_chunk_init(Chunk_Header *chunk, unsigned int chunk_size, un
 #define LARGE_GRANULARITY_BITS  7
 #define CHUNK_GRANULARITY_BITS  10
 
-#define SMALL_GRANULARITY       (1 << SMALL_GRANULARITY_BITS)
-#define MEDIUM_GRANULARITY      (1 << MEDIUM_GRANULARITY_BITS)
-#define LARGE_GRANULARITY       (1 << LARGE_GRANULARITY_BITS)
 #define CHUNK_GRANULARITY       (1 << CHUNK_GRANULARITY_BITS)
-
-#define SMALL_GRANULARITY_LOW_MASK    ((POINTER_SIZE_INT)(SMALL_GRANULARITY-1))
-#define SMALL_GRANULARITY_HIGH_MASK   (~SMALL_GRANULARITY_LOW_MASK)
-#define MEDIUM_GRANULARITY_LOW_MASK   ((POINTER_SIZE_INT)(MEDIUM_GRANULARITY-1))
-#define MEDIUM_GRANULARITY_HIGH_MASK  (~MEDIUM_GRANULARITY_LOW_MASK)
-#define LARGE_GRANULARITY_LOW_MASK    ((POINTER_SIZE_INT)(LARGE_GRANULARITY-1))
-#define LARGE_GRANULARITY_HIGH_MASK   (~LARGE_GRANULARITY_LOW_MASK)
 #define CHUNK_GRANULARITY_LOW_MASK    ((POINTER_SIZE_INT)(CHUNK_GRANULARITY-1))
 #define CHUNK_GRANULARITY_HIGH_MASK   (~CHUNK_GRANULARITY_LOW_MASK)
 
-#define SMALL_LOCAL_CHUNK_NUM   (MEDIUM_OBJ_THRESHOLD >> SMALL_GRANULARITY_BITS)
-#define MEDIUM_LOCAL_CHUNK_NUM  ((LARGE_OBJ_THRESHOLD - MEDIUM_OBJ_THRESHOLD) >> MEDIUM_GRANULARITY_BITS)
+#define SMALL_IS_LOCAL_ALLOC   TRUE
+#define MEDIUM_IS_LOCAL_ALLOC  TRUE
+#define LARGE_IS_LOCAL_ALLOC  FALSE
 
-#define SMALL_SIZE_ROUNDUP(size)    (size)
-#define MEDIUM_SIZE_ROUNDUP(size)   (((size) + MEDIUM_GRANULARITY-1) & MEDIUM_GRANULARITY_HIGH_MASK)
-#define LARGE_SIZE_ROUNDUP(size)    (((size) + LARGE_GRANULARITY-1) & LARGE_GRANULARITY_HIGH_MASK)
+#define NORMAL_SIZE_ROUNDUP(size, seg)  (((size) + seg->granularity-1) & seg->gran_high_mask)
 #define SUPER_OBJ_TOTAL_SIZE(size)  (sizeof(Chunk_Header) + (size))
 #define SUPER_SIZE_ROUNDUP(size)    ((SUPER_OBJ_TOTAL_SIZE(size) + CHUNK_GRANULARITY-1) & CHUNK_GRANULARITY_HIGH_MASK)
 
-#define SMALL_SIZE_TO_INDEX(size)   (((size) >> SMALL_GRANULARITY_BITS) - 1)
-#define MEDIUM_SIZE_TO_INDEX(size)  ((((size)-MEDIUM_OBJ_THRESHOLD) >> MEDIUM_GRANULARITY_BITS) - 1)
-#define LARGE_SIZE_TO_INDEX(size)   ((((size)-LARGE_OBJ_THRESHOLD) >> LARGE_GRANULARITY_BITS) - 1)
+#define NORMAL_SIZE_TO_INDEX(size, seg) ((((size)-(seg)->size_min) >> (seg)->gran_shift_bits) - 1)
 #define ALIGNED_CHUNK_SIZE_TO_INDEX(size)     (((size) >> NORMAL_CHUNK_SHIFT_COUNT) - 1)
 #define UNALIGNED_CHUNK_SIZE_TO_INDEX(size)   (((size) >> CHUNK_GRANULARITY_BITS) - 1)
 
-#define SMALL_INDEX_TO_SIZE(index)  (((index) + 1) << SMALL_GRANULARITY_BITS)
-#define MEDIUM_INDEX_TO_SIZE(index) ((((index) + 1) << MEDIUM_GRANULARITY_BITS) + MEDIUM_OBJ_THRESHOLD)
-#define LARGE_INDEX_TO_SIZE(index)  ((((index) + 1) << LARGE_GRANULARITY_BITS) + LARGE_OBJ_THRESHOLD)
+#define NORMAL_INDEX_TO_SIZE(index, seg)  ((((index) + 1) << (seg)->gran_shift_bits) + (seg)->size_min)
 #define ALIGNED_CHUNK_INDEX_TO_SIZE(index)    (((index) + 1) << NORMAL_CHUNK_SHIFT_COUNT)
 #define UNALIGNED_CHUNK_INDEX_TO_SIZE(index)  (((index) + 1) << CHUNK_GRANULARITY_BITS)
 
-#define SMALL_PFC_STEAL_NUM   3
-#define MEDIUM_PFC_STEAL_NUM  3
-#define LARGE_PFC_STEAL_NUM   3
 
-#define SMALL_PFC_STEAL_THRESHOLD   3
-#define MEDIUM_PFC_STEAL_THRESHOLD  3
-#define LARGE_PFC_STEAL_THRESHOLD   3
+#define PFC_STEAL_NUM   3
+#define PFC_STEAL_THRESHOLD   3
+
+#define SIZE_SEGMENT_NUM  3
+typedef struct Size_Segment {
+  unsigned int size_min;
+  unsigned int size_max;
+  unsigned int seg_index;
+  Boolean local_alloc;
+  unsigned int chunk_num;
+  unsigned int gran_shift_bits;
+  POINTER_SIZE_INT granularity;
+  POINTER_SIZE_INT gran_low_mask;
+  POINTER_SIZE_INT gran_high_mask;
+} Size_Segment;
 
 
-inline Chunk_Header *sspace_get_small_pfc(Sspace *sspace, unsigned int index)
+inline Chunk_Header *sspace_get_pfc(Sspace *sspace, unsigned int seg_index, unsigned int index)
 {
-  Pool *pfc_pool = sspace->small_pfc_pools[index];
+  Pool *pfc_pool = sspace->pfc_pools[seg_index][index];
   Chunk_Header *chunk = (Chunk_Header*)pool_get_entry(pfc_pool);
   assert(!chunk || chunk->status == (CHUNK_NORMAL | CHUNK_NEED_ZEROING));
   return chunk;
 }
-inline void sspace_put_small_pfc(Sspace *sspace, Chunk_Header *chunk, unsigned int index)
-{
-  assert(chunk);
-  
-  Pool *pfc_pool = sspace->small_pfc_pools[index];
-  pool_put_entry(pfc_pool, chunk);
-}
 
-inline Chunk_Header *sspace_get_medium_pfc(Sspace *sspace, unsigned int index)
+inline void sspace_put_pfc(Sspace *sspace, Chunk_Header *chunk)
 {
-  Pool *pfc_pool = sspace->medium_pfc_pools[index];
-  Chunk_Header *chunk = (Chunk_Header*)pool_get_entry(pfc_pool);
-  assert(!chunk || chunk->status == (CHUNK_NORMAL | CHUNK_NEED_ZEROING));
-  return chunk;
-}
-inline void sspace_put_medium_pfc(Sspace *sspace, Chunk_Header *chunk, unsigned int index)
-{
-  assert(chunk);
+  unsigned int size = chunk->slot_size;
+  assert(chunk && (size <= SUPER_OBJ_THRESHOLD));
   
-  Pool *pfc_pool = sspace->medium_pfc_pools[index];
-  pool_put_entry(pfc_pool, chunk);
-}
-
-inline Chunk_Header *sspace_get_large_pfc(Sspace *sspace, unsigned int index)
-{
-  Pool *pfc_pool = sspace->large_pfc_pools[index];
-  Chunk_Header *chunk = (Chunk_Header*)pool_get_entry(pfc_pool);
-  assert(!chunk || chunk->status == (CHUNK_NORMAL | CHUNK_NEED_ZEROING));
-  return chunk;
-}
-inline void sspace_put_large_pfc(Sspace *sspace, Chunk_Header *chunk, unsigned int index)
-{
-  assert(chunk);
-  
-  Pool *pfc_pool = sspace->large_pfc_pools[index];
-  pool_put_entry(pfc_pool, chunk);
-}
-
-/*
-inline Chunk_Header *sspace_get_pfc(Sspace *sspace, unsigned int size)
-{
-  assert(size <= SUPER_OBJ_THRESHOLD);
-  
-  if(size > LARGE_OBJ_THRESHOLD)
-    return sspace_get_large_pfc(sspace, size);
-  else if(size > MEDIUM_OBJ_THRESHOLD)
-    return sspace_get_medium_pfc(sspace, size);
-  return sspace_get_small_pfc(sspace, size);
-}
-*/
-
-inline void sspace_put_pfc(Sspace *sspace, Chunk_Header *chunk, unsigned int size)
-{
-  assert(size <= SUPER_OBJ_THRESHOLD);
-  
+  Size_Segment **size_segs = sspace->size_segments;
   chunk->status = CHUNK_NORMAL | CHUNK_NEED_ZEROING;
-  unsigned int index;
   
-  if(size > LARGE_OBJ_THRESHOLD){
-    assert(!(size & LARGE_GRANULARITY_LOW_MASK));
-    assert((size > LARGE_OBJ_THRESHOLD) && (size <= SUPER_OBJ_THRESHOLD));
-    index = LARGE_SIZE_TO_INDEX(size);
-    sspace_put_large_pfc(sspace, chunk, index);
-  } else if(size > MEDIUM_OBJ_THRESHOLD){
-    assert(!(size & MEDIUM_GRANULARITY_LOW_MASK));
-    assert((size > MEDIUM_OBJ_THRESHOLD) && (size <= LARGE_OBJ_THRESHOLD));
-    index = MEDIUM_SIZE_TO_INDEX(size);
-    sspace_put_medium_pfc(sspace, chunk, index);
-  } else {
-    assert(!(size & SMALL_GRANULARITY_LOW_MASK));
-    assert(size <= MEDIUM_OBJ_THRESHOLD);
-    index = SMALL_SIZE_TO_INDEX(size);
-    sspace_put_small_pfc(sspace, chunk, index);
+  for(unsigned int i = 0; i < SIZE_SEGMENT_NUM; ++i){
+    if(size <= size_segs[i]->size_max){
+      assert(!(size & size_segs[i]->gran_low_mask));
+      assert(size > size_segs[i]->size_min);
+      unsigned int index = NORMAL_SIZE_TO_INDEX(size, size_segs[i]);
+      Pool *pfc_pool = sspace->pfc_pools[i][index];
+      pool_put_entry(pfc_pool, chunk);
+      return;
+    }
   }
 }
 
@@ -328,9 +267,7 @@ extern void sspace_put_free_chunk(Sspace *sspace, Free_Chunk *chunk);
 extern Free_Chunk *sspace_get_normal_free_chunk(Sspace *sspace);
 extern Free_Chunk *sspace_get_abnormal_free_chunk(Sspace *sspace, unsigned int chunk_size);
 extern Free_Chunk *sspace_get_hyper_free_chunk(Sspace *sspace, unsigned int chunk_size, Boolean is_normal_chunk);
-extern Chunk_Header *sspace_steal_small_pfc(Sspace *sspace, unsigned int index);
-extern Chunk_Header *sspace_steal_medium_pfc(Sspace *sspace, unsigned int index);
-extern Chunk_Header *sspace_steal_large_pfc(Sspace *sspace, unsigned int index);
+extern Chunk_Header *sspace_steal_pfc(Sspace *sspace, unsigned int index);
 
 extern void zeroing_free_chunk(Free_Chunk *chunk);
 

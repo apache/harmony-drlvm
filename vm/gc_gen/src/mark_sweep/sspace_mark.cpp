@@ -17,6 +17,18 @@
 #include "sspace_mark_sweep.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 
+Boolean obj_is_marked_in_table(Partial_Reveal_Object *obj)
+{
+  unsigned int index_in_word;
+  volatile POINTER_SIZE_INT *p_color_word = get_color_word_in_table(obj, index_in_word);
+  assert(p_color_word);
+  
+  POINTER_SIZE_INT color_word = *p_color_word;
+  POINTER_SIZE_INT mark_color = cur_mark_color << index_in_word;
+  
+  return color_word & mark_color;
+}
+
 static FORCE_INLINE void scan_slot(Collector *collector, REF *p_ref)
 {
   Partial_Reveal_Object *p_obj = read_slot(p_ref);
@@ -31,6 +43,7 @@ static FORCE_INLINE void scan_slot(Collector *collector, REF *p_ref)
 
 static FORCE_INLINE void scan_object(Collector *collector, Partial_Reveal_Object *p_obj)
 {
+  assert((((POINTER_SIZE_INT)p_obj) % GC_OBJECT_ALIGNMENT) == 0);
   if(!object_has_ref_field(p_obj)) return;
   
   REF *p_ref;
@@ -173,4 +186,9 @@ retry:
   collector->trace_stack = NULL;
   
   return;
+}
+
+void trace_obj_in_ms_marking(Collector *collector, void *p_obj)
+{
+  trace_object(collector, (Partial_Reveal_Object *)p_obj);
 }

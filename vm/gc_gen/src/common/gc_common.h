@@ -72,6 +72,8 @@
 
 #define USE_32BITS_HASHCODE
 
+//#define ONLY_SSPACE_IN_HEAP
+
 typedef void (*TaskType)(void*);
 
 enum Collection_Algorithm{
@@ -100,7 +102,8 @@ enum Collection_Kind {
   MINOR_COLLECTION = 0x1,
   MAJOR_COLLECTION = 0x2,
   FALLBACK_COLLECTION = 0x4,
-  EXTEND_COLLECTION = 0x8
+  EXTEND_COLLECTION = 0x8,
+  UNIQUE_SWEEP_COLLECTION = 0x10
 };
 
 extern Boolean IS_FALLBACK_COMPACTION;  /* only for mark/fw bits debugging purpose */

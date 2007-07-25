@@ -177,21 +177,26 @@ static void gc_update_repointed_sets(GC* gc, Pool* pool)
       iter = vector_block_iterator_advance(root_set,iter);
 
       Partial_Reveal_Object* p_obj = read_slot(p_ref);
-      if(IS_MOVE_COMPACT){
-        if(obj_is_moved(p_obj))
-          *p_ref = obj_get_fw_in_table(p_obj);
-      } else {
-        if( // obj_is_fw_in_oi(p_obj) && //NOTE:: we removed the minor_copy algorithm at the moment, so we don't need this check
-            obj_is_moved(p_obj)){
-          /* Condition obj_is_moved(p_obj) is for preventing mistaking previous mark bit of large obj as fw bit when fallback happens.
-           * Because until fallback happens, perhaps the large obj hasn't been marked. So its mark bit remains as the last time.
-           * In major collection condition obj_is_fw_in_oi(p_obj) can be omitted,
-           * since those which can be scanned in MOS & NOS must have been set fw bit in oi.
-           */
-          assert(address_belongs_to_gc_heap(obj_get_fw_in_oi(p_obj), gc));
-          write_slot(p_ref , obj_get_fw_in_oi(p_obj));
+        if(IS_MOVE_COMPACT){
+        /*This condition is removed because we do los sliding compaction at every major compaction after add los minor sweep.*/
+        //if(obj_is_moved(p_obj)) 
+          /*Fixme: los_boundery ruined the modularity of gc_common.h*/
+          if(p_obj < los_boundary){
+            write_slot(p_ref, obj_get_fw_in_oi(p_obj));
+          }else{
+            *p_ref = obj_get_fw_in_table(p_obj);
+          }
+        }else{
+          if(obj_is_fw_in_oi(p_obj)){
+            /* Condition obj_is_moved(p_obj) is for preventing mistaking previous mark bit of large obj as fw bit when fallback happens.
+             * Because until fallback happens, perhaps the large obj hasn't been marked. So its mark bit remains as the last time.
+             * This condition is removed because we do los sliding compaction at every major compaction after add los minor sweep.
+             * In major collection condition obj_is_fw_in_oi(p_obj) can be omitted,
+             * since those which can be scanned in MOS & NOS must have been set fw bit in oi.  */
+            assert((POINTER_SIZE_INT)obj_get_fw_in_oi(p_obj) > DUAL_MARKBITS);
+            write_slot(p_ref, obj_get_fw_in_oi(p_obj));
+          }
         }
-      }
     }
     root_set = pool_iterator_next(pool);
   } 
@@ -366,5 +371,6 @@ void gc_metadata_verify(GC* gc, Boolean is_before_gc)
   
   return;  
 }
+
 
 

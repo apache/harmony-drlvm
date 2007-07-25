@@ -19,6 +19,7 @@
  */
 
 #include "fspace.h"
+#include "../gen/gen.h"
 
 Boolean NOS_PARTIAL_FORWARD = FALSE;
 
@@ -75,6 +76,11 @@ void fspace_initialize(GC* gc, void* start, POINTER_SIZE_INT fspace_size, POINTE
   fspace->num_collections = 0;
   fspace->time_collections = 0;
   fspace->survive_ratio = 0.2f;
+  fspace->last_alloced_size = 0;
+  fspace->accumu_alloced_size = 0;  
+  fspace->total_alloced_size = 0;
+  fspace->last_surviving_size = 0;
+  fspace->period_surviving_size = 0;
   
   fspace->gc = gc;
   gc_set_nos((GC_Gen*)gc, (Space*)fspace);
@@ -98,7 +104,7 @@ void fspace_destruct(Fspace *fspace)
   fspace_destruct_blocks(fspace);
   STD_FREE(fspace);   
 }
- 
+
 void fspace_reset_for_allocation(Fspace* fspace)
 { 
   unsigned int first_idx = fspace->first_block_idx;
@@ -106,7 +112,7 @@ void fspace_reset_for_allocation(Fspace* fspace)
   unsigned int marked_last_idx = 0;
   Boolean is_major_collection = !gc_match_kind(fspace->gc, MINOR_COLLECTION);
   Boolean gen_mode = gc_is_gen_mode();
-
+  
   if(  is_major_collection || 
          NOS_PARTIAL_FORWARD == FALSE || !gen_mode)            
   {
@@ -176,14 +182,13 @@ Block_Header* fspace_get_next_block()
 
 void collector_execute_task(GC* gc, TaskType task_func, Space* space);
 
-#include "../gen/gen.h"
 unsigned int mspace_free_block_idx;
 
 /* world is stopped when starting fspace_collection */      
 void fspace_collection(Fspace *fspace)
 {
   fspace->num_collections++;  
-  
+
   GC* gc = fspace->gc;
   mspace_free_block_idx = ((GC_Gen*)gc)->mos->free_block_idx;
 

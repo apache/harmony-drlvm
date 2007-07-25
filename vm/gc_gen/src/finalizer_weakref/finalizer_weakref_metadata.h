@@ -34,8 +34,8 @@ typedef struct Finref_Metadata{
   
   Pool *free_pool;                              // list of free buffers for the five pools below
   
-  Pool *obj_with_fin_pool;                      // list of objects that have finalizer;
-                                                // these objects are added in when they are allocated
+  Pool *obj_with_fin_pool;                      // list of objects that have finalizers
+                                                // these objects are added in when they are being allocated
   Pool *finalizable_obj_pool;                   // temporary buffer for finalizable objects identified during one single GC
   
   Pool *softref_pool;                           // temporary buffer for soft references identified during one single GC
@@ -46,13 +46,13 @@ typedef struct Finref_Metadata{
   
   Pool *fallback_ref_pool;                      // temporary buffer for weakref needing to be put to vm when resurrection fallback happens
   
-  Vector_Block *finalizable_obj_set;            // buffer for finalizable_objects_pool
+  Vector_Block *finalizable_obj_set;            // buffer for finalizable_obj_pool
   Vector_Block *repset;                         // buffer for repset_pool
   
   Boolean pending_finalizers;                   // there are objects waiting to be finalized
   Boolean pending_weakrefs;                     // there are weak references waiting to be enqueued
   
-  unsigned int gc_referent_offset;              // the referent field's offset in Reference Class
+  unsigned int gc_referent_offset;              // the referent field's offset in Reference Class; it is a constant during VM's liftime
 }Finref_Metadata;
 
 extern unsigned int get_gc_referent_offset(void);
@@ -68,13 +68,13 @@ extern void gc_set_weakref_sets(GC *gc);
 extern void gc_reset_finref_metadata(GC *gc);
 
 extern void mutator_add_finalizer(Mutator *mutator, Partial_Reveal_Object *ref);
-extern void gc_add_finalizer(GC *gc, Vector_Block* &vector_block_in_use, Partial_Reveal_Object *ref);
+extern Vector_Block *gc_add_finalizer(GC *gc, Vector_Block *vector_block_in_use, Partial_Reveal_Object *ref);
 extern void gc_add_finalizable_obj(GC *gc, Partial_Reveal_Object *ref);
 extern void collector_add_softref(Collector *collector, Partial_Reveal_Object *ref);
 extern void collector_add_weakref(Collector *collector, Partial_Reveal_Object *ref);
 extern void collector_add_phanref(Collector *collector, Partial_Reveal_Object *ref);
 extern void finref_repset_add_entry(GC *gc, REF* ref);
-extern void finref_add_fallback_ref(GC *gc, Vector_Block* &vector_block_in_use, Partial_Reveal_Object *p_ref);
+extern Vector_Block *finref_add_fallback_ref(GC *gc, Vector_Block *vector_block_in_use, Partial_Reveal_Object *p_ref);
 
 extern Boolean obj_with_fin_pool_is_empty(GC *gc);
 extern Boolean finalizable_obj_pool_is_empty(GC *gc);
@@ -86,6 +86,7 @@ extern Boolean finref_repset_pool_is_empty(GC *gc);
 extern void gc_clear_weakref_pools(GC *gc);
 
 extern Vector_Block *finref_metadata_extend(void);
+/* Every place requesting a free vector block in finref should call this function */
 inline Vector_Block *finref_get_free_block(GC *gc)
 {
   Vector_Block *block = pool_get_entry(gc->finref_metadata->free_pool);
@@ -104,7 +105,8 @@ inline void gc_reset_finalizable_objects(GC *gc)
   Finref_Metadata *metadata = gc->finref_metadata;
   
   assert(!metadata->finalizable_obj_set);
-  metadata->finalizable_obj_set = pool_get_entry(metadata->free_pool);
+  metadata->finalizable_obj_set = finref_get_free_block(gc);
+  assert(metadata->finalizable_obj_set);
 }
 /* called after loop of recording finalizable objects */
 inline void gc_put_finalizable_objects(GC *gc)
@@ -121,7 +123,8 @@ inline void finref_reset_repset(GC *gc)
   Finref_Metadata *metadata = gc->finref_metadata;
   
   assert(!metadata->repset);
-  metadata->repset = pool_get_entry(metadata->free_pool);
+  metadata->repset = finref_get_free_block(gc);
+  assert(metadata->repset);
 }
 /* called after loop of recording repointed reference */
 inline void finref_put_repset(GC *gc)

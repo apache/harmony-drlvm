@@ -105,6 +105,7 @@ static void mspace_move_objects(Collector* collector, Mspace* mspace)
 
       /* current sector is done, let's move it. */
       POINTER_SIZE_INT sector_distance = (POINTER_SIZE_INT)src_sector_addr - (POINTER_SIZE_INT)dest_sector_addr;
+      assert((sector_distance % GC_OBJECT_ALIGNMENT) == 0);
       curr_block->table[curr_sector] = sector_distance;
 
       memmove(dest_sector_addr, src_sector_addr, curr_sector_size);
@@ -151,6 +152,7 @@ static void mspace_fix_repointed_refs(Collector *collector, Mspace *mspace)
 static volatile unsigned int num_marking_collectors = 0;
 static volatile unsigned int num_fixing_collectors = 0;
 static volatile unsigned int num_moving_collectors = 0;
+static volatile unsigned int num_restoring_collectors = 0;
 static volatile unsigned int num_extending_collectors = 0;
 
 void move_compact_mspace(Collector* collector) 
@@ -201,6 +203,7 @@ void move_compact_mspace(Collector* collector)
   old_num = atomic_inc32(&num_moving_collectors);
   if( ++old_num == num_active_collectors ){
     /* single thread world */
+    if(lspace->move_object) lspace_compute_object_target(collector, lspace);    
     gc->collect_result = gc_collection_result(gc);
     if(!gc->collect_result){
       num_moving_collectors++; 
@@ -225,9 +228,21 @@ void move_compact_mspace(Collector* collector)
     /* last collector's world here */
     lspace_fix_repointed_refs(collector, lspace);   
     gc_fix_rootset(collector);
+    if(lspace->move_object)  lspace_sliding_compact(collector, lspace);    
     num_fixing_collectors++; 
   }
   while(num_fixing_collectors != num_active_collectors + 1);
+
+
+  /* Pass 4: **************************************************
+     restore obj_info                                         */
+  atomic_cas32( &num_restoring_collectors, 0, num_active_collectors);
+  
+  collector_restore_obj_info(collector);
+
+  atomic_inc32(&num_restoring_collectors);
+
+  while(num_restoring_collectors != num_active_collectors);
 
    /* Dealing with out of memory in mspace */  
   if(mspace->free_block_idx > fspace->first_block_idx){    

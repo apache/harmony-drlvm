@@ -85,7 +85,7 @@ void verifier_update_info_after_resurrect(Heap_Verifier* heap_verifier);
 
 void verify_gc_effect(Heap_Verifier* heap_verifier);
 
-
+void verifier_reset_hash_distance();
 
 inline unsigned int verifier_get_gc_collect_kind(GC_Verifier* gc_verifier)
 {  return gc_verifier->gc_collect_kind;  }
@@ -96,4 +96,5 @@ inline void verifier_set_fallback_collection(GC_Verifier* gc_verifier, Boolean i
 {  gc_verifier->is_before_fallback_collection = is_before_fallback;  }
 
 #endif
+
 

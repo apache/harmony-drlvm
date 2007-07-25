@@ -48,10 +48,18 @@ typedef struct Lspace{
   GC* gc;
   /*LOS_Shrink:This field stands for sliding compact to lspace */
   Boolean move_object;
-  /*For_statistic: size allocated science last time collect los, ie. last major*/
-  volatile POINTER_SIZE_INT alloced_size;
-  /*For_statistic: size survived after lspace_sweep*/  
-  POINTER_SIZE_INT surviving_size;
+
+  /* Size allocted since last minor collection. */
+  volatile uint64 last_alloced_size;
+  /* Size allocted since last major collection. */
+  uint64 accumu_alloced_size;
+  /* Total size allocated since VM starts. */
+  uint64 total_alloced_size;
+
+  /* Size survived from last collection. */
+  uint64 last_surviving_size;
+  /* Size survived after a certain period. */
+  uint64 period_surviving_size;  
   /* END of Space --> */
 
   Free_Area_Pool* free_pool;
@@ -72,8 +80,7 @@ Managed_Object_Handle lspace_alloc(POINTER_SIZE_INT size, Allocator* allocator);
 void* lspace_try_alloc(Lspace* lspace, POINTER_SIZE_INT alloc_size);
 void lspace_sliding_compact(Collector* collector, Lspace* lspace);
 void lspace_compute_object_target(Collector* collector, Lspace* lspace);
-void lspace_sweep(Lspace* lspace);
-void lspace_reset_after_collection(Lspace* lspace);
+void lspace_reset_for_slide(Lspace* lspace);
 void lspace_collection(Lspace* lspace);
 
 inline POINTER_SIZE_INT lspace_free_memory_size(Lspace* lspace){ /* FIXME:: */ return 0; }
@@ -125,5 +132,50 @@ void lspace_fix_after_copy_nursery(Collector* collector, Lspace* lspace);
 void lspace_fix_repointed_refs(Collector* collector, Lspace* lspace);
 
 POINTER_SIZE_INT lspace_get_failure_size(Lspace* lspace);
+
+inline Partial_Reveal_Object* lspace_get_next_marked_object_by_oi( Lspace* lspace, unsigned int* iterate_index)
+{
+    POINTER_SIZE_INT next_area_start = (POINTER_SIZE_INT)lspace->heap_start + (*iterate_index) * KB;
+    BOOLEAN reach_heap_end = 0;
+    unsigned int hash_extend_size = 0;
+
+    while(!reach_heap_end){
+        //FIXME: This while shoudl be if, try it!
+        while(!*((POINTER_SIZE_INT*)next_area_start)){
+            assert(((Free_Area*)next_area_start)->size);
+            next_area_start += ((Free_Area*)next_area_start)->size;
+        }
+        if(next_area_start < (POINTER_SIZE_INT)lspace->heap_end){
+            //If there is a living object at this addr, return it, and update iterate_index
+
+#ifdef USE_32BITS_HASHCODE
+            hash_extend_size  = (hashcode_is_attached((Partial_Reveal_Object*)next_area_start))?GC_OBJECT_ALIGNMENT:0;
+#endif
+
+            if(obj_is_marked_in_oi((Partial_Reveal_Object*)next_area_start)){
+                POINTER_SIZE_INT obj_size = ALIGN_UP_TO_KILO(vm_object_size((Partial_Reveal_Object*)next_area_start) + hash_extend_size);
+                *iterate_index = (unsigned int)((next_area_start + obj_size - (POINTER_SIZE_INT)lspace->heap_start) >> BIT_SHIFT_TO_KILO);
+                return (Partial_Reveal_Object*)next_area_start;
+            //If this is a dead object, go on to find  a living one.
+            }else{
+                POINTER_SIZE_INT obj_size = ALIGN_UP_TO_KILO(vm_object_size((Partial_Reveal_Object*)next_area_start)+ hash_extend_size);
+                next_area_start += obj_size;
+            }
+        }else{
+            reach_heap_end = 1;
+        } 
+    }
+    return NULL;
+
+}
+
+inline static Partial_Reveal_Object* lspace_get_first_marked_object_by_oi(Lspace* lspace, unsigned int* mark_bit_idx)
+{
+    return lspace_get_next_marked_object_by_oi(lspace, mark_bit_idx);
+}
+
+void lspace_reset_for_sweep(Lspace* lspace);
+void lspace_sweep(Lspace* lspace);
+
 
 #endif /*_LSPACE_H_ */

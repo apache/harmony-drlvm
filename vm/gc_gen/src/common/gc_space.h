@@ -38,10 +38,18 @@ typedef struct Space{
   unsigned int collect_algorithm;
   GC* gc;
   Boolean move_object;
-  /*Size allocted after last collection. */
-  POINTER_SIZE_INT alloced_size;
-  /*For_statistic*/  
-  POINTER_SIZE_INT surviving_size;
+
+  /* Size allocted since last minor collection. */
+  volatile uint64 last_alloced_size;
+  /* Size allocted since last major collection. */
+  uint64 accumu_alloced_size;
+  /* Total size allocated since VM starts. */
+  uint64 total_alloced_size;
+
+  /* Size survived from last collection. */
+  uint64 last_surviving_size;
+  /* Size survived after a certain period. */
+  uint64 period_surviving_size;  
 }Space;
 
 inline POINTER_SIZE_INT space_committed_size(Space* space){ return space->committed_heap_size;}
@@ -71,10 +79,19 @@ typedef struct Blocked_Space {
   unsigned int collect_algorithm;
   GC* gc;
   Boolean move_object;
-  /*Size allocted after last collection. */
-  POINTER_SIZE_INT alloced_size;
-  /*For_statistic*/  
-  POINTER_SIZE_INT surviving_size;
+
+  /* Size allocted since last minor collection. */
+  volatile uint64 last_alloced_size;
+  /* Size allocted since last major collection. */
+  uint64 accumu_alloced_size;
+  /* Total size allocated since VM starts. */
+  uint64 total_alloced_size;
+
+  /* Size survived from last collection. */
+  uint64 last_surviving_size;
+  /* Size survived after a certain period. */
+  uint64 period_surviving_size;  
+
   /* END of Space --> */
 
   Block* blocks; /* short-cut for mpsace blockheader access, not mandatory */

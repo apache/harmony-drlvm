@@ -38,33 +38,33 @@ enum Transform_Kind {
 
 typedef struct Space_Tuner{
     Transform_Kind kind;
-    /*Fixme: These flags is set if the los tuning status changes in the process of tuning, remove one of them*/
-    Boolean reverse_1;
-    Boolean reverse_2;
+    /*This flags is set if the tuning direction changes in the process of tuning*/
+    Boolean reverse;
     
     POINTER_SIZE_INT tuning_size;
     /*Used for LOS_Shrink*/
     Block_Header* interim_blocks;
     /*This flag is set when tuning strategy decide to tune los size.
-      *i.e. wasted memory is greater than wast_threshold.
-      */
+      *i.e. wasted memory is greater than wast_threshold.  */
     Boolean need_tune;
     /*This flag is set if gc is caused by los alloc failure.*/
     Boolean force_tune;
     
-    /*LOS alloc speed since last major*/
-    POINTER_SIZE_INT speed_los;
-    POINTER_SIZE_INT old_speed_los;
-    /*MOS alloc speed since last major*/
-    POINTER_SIZE_INT speed_mos;
-    POINTER_SIZE_INT old_speed_mos;
-    
-    /*Total wasted memory of los science last los variation*/
-    POINTER_SIZE_INT wast_los;
-    /*Total wasted memory of mos science last los variation*/
-    POINTER_SIZE_INT wast_mos;
+    uint64 speed_los;
+    uint64 last_speed_los;
 
-    POINTER_SIZE_INT current_dw;
+    uint64 speed_mos;
+    uint64 last_speed_mos;
+
+    uint64 speed_nos;
+    uint64 last_speed_nos;
+        
+    /*Total wasted memory of los science last los variation*/
+    uint64 wast_los;
+    /*Total wasted memory of mos science last los variation*/
+    uint64 wast_mos;
+
+    uint64 current_dw;
     /*NOS survive size of last minor, this could be the least meaningful space unit when talking about tuning.*/
     POINTER_SIZE_INT current_ds;
 

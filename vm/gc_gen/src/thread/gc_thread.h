@@ -47,6 +47,7 @@ typedef struct Allocator{
   void *ceiling;
   void* end;
   Block *alloc_block;
+  Chunk_Header ***local_chunks;
   Space* alloc_space;
   GC   *gc;
   VmThreadHandle thread_handle;   /* This thread; */

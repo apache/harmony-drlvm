@@ -171,6 +171,7 @@ void verifier_trace_objsets(Heap_Verifier* heap_verifier, Pool* obj_set_pool)
       /*p_obj can be NULL , When GC happened, the obj in Finalize objs list will be clear.*/
       //assert(p_obj != NULL);  
       if(p_obj == NULL) continue;
+      if(heap_verifier->gc_is_gen_mode && heap_verifier->is_before_gc && !obj_belongs_to_nos(p_obj)) continue;
       verifier_tracestack_push(p_obj, gc_verifier->trace_stack);
     } 
     obj_set = pool_iterator_next(obj_set_pool);
@@ -203,21 +204,23 @@ void verifier_trace_objsets(Heap_Verifier* heap_verifier, Pool* obj_set_pool)
 void verifier_scan_resurrect_objects(Heap_Verifier* heap_verifier)
 {
   GC_Gen* gc    =  (GC_Gen*)heap_verifier->gc;
+  Heap_Verifier_Metadata* verifier_metadata = heap_verifier->heap_verifier_metadata;
   verifier_update_info_before_resurrect(heap_verifier);
 #ifndef BUILD_IN_REFERENT
   heap_verifier->gc_verifier->is_tracing_resurrect_obj = TRUE;
   if(heap_verifier->is_before_gc){
-    verifier_trace_objsets(heap_verifier, gc->finref_metadata->obj_with_fin_pool);
+    verifier_copy_pool(verifier_metadata->obj_with_fin_pool, gc->finref_metadata->obj_with_fin_pool);
+    verifier_trace_objsets(heap_verifier, verifier_metadata->obj_with_fin_pool);
   }else{
 	  if(!heap_verifier->gc_verifier->is_before_fallback_collection){
       verify_live_finalizable_obj(heap_verifier, gc->finref_metadata->obj_with_fin_pool);
-      Pool* finalizable_obj_pool = verifier_copy_pool_reverse_order(gc->finref_metadata->finalizable_obj_pool);
-      verifier_trace_objsets(heap_verifier, finalizable_obj_pool);
-      verifier_clear_pool(finalizable_obj_pool, heap_verifier->heap_verifier_metadata->free_set_pool, FALSE);
-      sync_pool_destruct(finalizable_obj_pool);
+      verifier_copy_pool_reverse_order(verifier_metadata->finalizable_obj_pool, gc->finref_metadata->finalizable_obj_pool);
+      verifier_trace_objsets(heap_verifier, verifier_metadata->finalizable_obj_pool);
+      verifier_clear_pool(verifier_metadata->finalizable_obj_pool, heap_verifier->heap_verifier_metadata->free_set_pool, FALSE);
     }else{
-      verifier_trace_objsets(heap_verifier, gc->finref_metadata->obj_with_fin_pool);	
+      verifier_trace_objsets(heap_verifier, verifier_metadata->obj_with_fin_pool );	
     }
+    verifier_clear_pool(verifier_metadata->obj_with_fin_pool, heap_verifier->heap_verifier_metadata->free_set_pool, FALSE);
   }
   heap_verifier->gc_verifier->is_tracing_resurrect_obj = FALSE;
   verifier_update_info_after_resurrect(heap_verifier);
@@ -225,10 +228,14 @@ void verifier_scan_resurrect_objects(Heap_Verifier* heap_verifier)
 }
 
 void verifier_scan_unreachable_objects(Heap_Verifier* heap_verifier);
-
+void verifier_scan_prepare()
+{ 
+  verifier_reset_hash_distance(); 
+}
 void verifier_scan_live_objects(Heap_Verifier* heap_verifier)
 {
   Heap_Verifier_Metadata* verifier_metadata = heap_verifier->heap_verifier_metadata;
+  verifier_scan_prepare();
   verifier_trace_rootsets(heap_verifier, verifier_metadata->root_set_pool);
   verifier_scan_resurrect_objects(heap_verifier);
   verifier_scan_unreachable_objects(heap_verifier);
@@ -413,6 +420,7 @@ void verifier_init_object_scanner(Heap_Verifier* heap_verifier)
   heap_verifier->live_obj_scanner = verifier_scan_live_objects;
   heap_verifier->all_obj_scanner   = verifier_scan_all_objects;
 }
+
 
 
 

@@ -16,6 +16,7 @@
 
 #include "sspace_mark_sweep.h"
 #include "sspace_verify.h"
+#include "gc_ms.h"
 #include "../gen/gen.h"
 #include "../thread/collector.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
@@ -64,7 +65,7 @@ static volatile unsigned int num_sweeping_collectors = 0;
 void mark_sweep_sspace(Collector *collector)
 {
   GC *gc = collector->gc;
-  Sspace *sspace = (Sspace*)gc_get_pos((GC_Gen*)gc);
+  Sspace *sspace = gc_get_sspace(gc);
   
   unsigned int num_active_collectors = gc->num_active_collectors;
   

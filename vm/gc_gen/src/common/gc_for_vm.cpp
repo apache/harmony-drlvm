@@ -23,6 +23,7 @@
 #include "compressed_ref.h"
 
 #include "../gen/gen.h"
+#include "../mark_sweep/gc_ms.h"
 #include "interior_pointer.h"
 #include "../thread/collector.h"
 #include "../verify/verify_live_heap.h"
@@ -42,7 +43,13 @@ Boolean gc_requires_barriers()
 int gc_init() 
 {      
   assert(p_global_gc == NULL);
-  GC* gc = (GC*)STD_MALLOC(sizeof(GC_Gen));
+
+#ifndef ONLY_SSPACE_IN_HEAP
+  unsigned int gc_struct_size = sizeof(GC_Gen);
+#else
+  unsigned int gc_struct_size = sizeof(GC_MS);
+#endif
+  GC* gc = (GC*)STD_MALLOC(gc_struct_size);
   assert(gc);
   memset(gc, 0, sizeof(GC));  
   p_global_gc = gc;
@@ -52,8 +59,15 @@ int gc_init()
   gc_tls_init();
 
   gc_metadata_initialize(gc); /* root set and mark stack */
-  
+
+#ifndef ONLY_SSPACE_IN_HEAP
   gc_gen_initialize((GC_Gen*)gc, min_heap_size_bytes, max_heap_size_bytes);
+#else
+  gc_ms_initialize((GC_MS*)gc, min_heap_size_bytes, max_heap_size_bytes);
+#endif
+  
+  set_native_finalizer_thread_flag(!IGNORE_FINREF);
+  set_native_ref_enqueue_thread_flag(!IGNORE_FINREF);
 
 #ifndef BUILD_IN_REFERENT
   gc_finref_metadata_initialize(gc);
@@ -69,7 +83,13 @@ int gc_init()
 void gc_wrapup() 
 { 
   GC* gc =  p_global_gc;
+
+#ifndef ONLY_SSPACE_IN_HEAP
   gc_gen_destruct((GC_Gen*)gc);
+#else
+  gc_ms_destruct((GC_MS*)gc);
+#endif
+
   gc_metadata_destruct(gc); /* root set and mark stack */
 #ifndef BUILD_IN_REFERENT
   gc_finref_metadata_destruct(gc);
@@ -154,20 +174,32 @@ void gc_thread_init(void* gc_info)
 void gc_thread_kill(void* gc_info)
 {  mutator_destruct(p_global_gc, gc_info);  }
 
-int64 gc_free_memory() 
+int64 gc_free_memory()
 {
+#ifndef ONLY_SSPACE_IN_HEAP
   return (int64)gc_gen_free_memory_size((GC_Gen*)p_global_gc);
+#else
+  return (int64)gc_ms_free_memory_size((GC_MS*)p_global_gc);
+#endif
 }
 
 /* java heap size.*/
 int64 gc_total_memory() 
 {
-  return (int64)((POINTER_SIZE_INT)gc_gen_total_memory_size((GC_Gen*)p_global_gc)); 
+#ifndef ONLY_SSPACE_IN_HEAP
+  return (int64)((POINTER_SIZE_INT)gc_gen_total_memory_size((GC_Gen*)p_global_gc));
+#else
+  return (int64)((POINTER_SIZE_INT)gc_ms_total_memory_size((GC_MS*)p_global_gc));
+#endif
 }
 
 int64 gc_max_memory() 
 {
-  return (int64)((POINTER_SIZE_INT)gc_gen_total_memory_size((GC_Gen*)p_global_gc)); 
+#ifndef ONLY_SSPACE_IN_HEAP
+  return (int64)((POINTER_SIZE_INT)gc_gen_total_memory_size((GC_Gen*)p_global_gc));
+#else
+  return (int64)((POINTER_SIZE_INT)gc_ms_total_memory_size((GC_MS*)p_global_gc));
+#endif
 }
 
 int64 gc_get_collection_count()
@@ -233,6 +265,10 @@ int32 gc_get_hashcode(Managed_Object_Handle p_object)
 #else //USE_32BITS_HASHCODE
 int32 gc_get_hashcode(Managed_Object_Handle p_object)
 {
+#ifdef ONLY_SSPACE_IN_HEAP
+  return (int32)p_object;
+#endif
+
   Partial_Reveal_Object* p_obj = (Partial_Reveal_Object*)p_object;
   if(!p_obj) return 0;
   assert(address_belongs_to_gc_heap(p_obj, p_global_gc));
@@ -288,7 +324,11 @@ void gc_iterate_heap() {
     // data structures in not consistent for heap iteration
     if (!JVMTI_HEAP_ITERATION) return;
 
+#ifndef ONLY_SSPACE_IN_HEAP
     gc_gen_iterate_heap((GC_Gen *)p_global_gc);
+#else
+    gc_ms_iterate_heap((GC_MS*)p_global_gc);
+#endif
 }
 
 void gc_set_mutator_block_flag()

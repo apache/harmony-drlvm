@@ -16,9 +16,9 @@
 
 #include "sspace.h"
 #include "sspace_chunk.h"
-#include "../gen/gen.h"
-#include "../common/gc_space.h"
 #include "sspace_verify.h"
+#include "gc_ms.h"
+#include "../gen/gen.h"
 
 struct GC_Gen;
 
@@ -56,8 +56,13 @@ void sspace_initialize(GC *gc, void *start, unsigned int sspace_size, unsigned i
   sspace->gc = gc;
   
   sspace_init_chunks(sspace);
-  
-  gc_set_pos((GC_Gen*)gc, (Space*)sspace);
+
+#ifdef ONLY_SSPACE_IN_HEAP
+  gc_ms_set_sspace((GC_MS*)gc, sspace);
+#else
+  gc_set_mos((GC_Gen*)gc, (Space*)sspace);
+#endif
+
 #ifdef SSPACE_VERIFY
   sspace_verify_init(gc);
 #endif
@@ -73,13 +78,66 @@ void sspace_destruct(Sspace *sspace)
   STD_FREE(sspace);
 }
 
-void mutator_init_small_chunks(Mutator *mutator)
+void allocator_init_local_chunks(Allocator *allocator)
 {
-  unsigned int size = sizeof(Chunk_Header*) * (SMALL_LOCAL_CHUNK_NUM + MEDIUM_LOCAL_CHUNK_NUM);
-  Chunk_Header **chunks = (Chunk_Header**)STD_MALLOC(size);
-  memset(chunks, 0, size);
-  mutator->small_chunks = chunks;
-  mutator->medium_chunks = chunks + SMALL_LOCAL_CHUNK_NUM;
+  Sspace *sspace = gc_get_sspace(allocator->gc);
+  Size_Segment **size_segs = sspace->size_segments;
+  
+  /* Alloc mem for size segments (Chunk_Header**) */
+  unsigned int seg_size = sizeof(Chunk_Header**) * SIZE_SEGMENT_NUM;
+  Chunk_Header ***local_chunks = (Chunk_Header***)STD_MALLOC(seg_size);
+  memset(local_chunks, 0, seg_size);
+  
+  /* Alloc mem for local chunk pointers */
+  unsigned int chunk_ptr_size = 0;
+  for(unsigned int i = SIZE_SEGMENT_NUM; i--;){
+    if(size_segs[i]->local_alloc){
+      chunk_ptr_size += size_segs[i]->chunk_num;
+    }
+  }
+  chunk_ptr_size *= sizeof(Chunk_Header*);
+  Chunk_Header **chunk_ptrs = (Chunk_Header**)STD_MALLOC(chunk_ptr_size);
+  memset(chunk_ptrs, 0, chunk_ptr_size);
+  
+  for(unsigned int i = 0; i < SIZE_SEGMENT_NUM; ++i){
+    if(size_segs[i]->local_alloc){
+      local_chunks[i] = chunk_ptrs;
+      chunk_ptrs += size_segs[i]->chunk_num;
+    }
+  }
+  
+  allocator->local_chunks = local_chunks;
+}
+
+void allocactor_destruct_local_chunks(Allocator *allocator)
+{
+  Sspace *sspace = gc_get_sspace(allocator->gc);
+  Size_Segment **size_segs = sspace->size_segments;
+  Chunk_Header ***local_chunks = allocator->local_chunks;
+  Chunk_Header **chunk_ptrs = NULL;
+  unsigned int chunk_ptr_num = 0;
+  
+  /* Find local chunk pointers' head and their number */
+  for(unsigned int i = 0; i < SIZE_SEGMENT_NUM; ++i){
+    if(size_segs[i]->local_alloc){
+      chunk_ptr_num += size_segs[i]->chunk_num;
+      assert(local_chunks[i]);
+      if(!chunk_ptrs)
+        chunk_ptrs = local_chunks[i];
+    }
+  }
+  
+  /* Put local pfc to the according pools */
+  for(unsigned int i = 0; i < chunk_ptr_num; ++i){
+    if(chunk_ptrs[i])
+      sspace_put_pfc(sspace, chunk_ptrs[i]);
+  }
+  
+  /* Free mem for local chunk pointers */
+  STD_FREE(chunk_ptrs);
+  
+  /* Free mem for size segments (Chunk_Header**) */
+  STD_FREE(local_chunks);
 }
 
 extern void mark_sweep_sspace(Collector *collector);

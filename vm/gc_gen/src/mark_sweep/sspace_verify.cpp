@@ -47,8 +47,12 @@ volatile POINTER_SIZE_INT live_obj_in_mark = 0;
 void sspace_verify_init(GC *gc)
 {
   gc_in_verify = gc;
-  
+
+#ifndef ONLY_SSPACE_IN_HEAP
   POINTER_SIZE_INT heap_size = gc_gen_total_memory_size((GC_Gen*)gc);
+#else
+  POINTER_SIZE_INT heap_size = gc_ms_total_memory_size((GC_MS*)gc);
+#endif
   card_num = heap_size >> VERIFY_CARD_SIZE_BYTES_SHIFT;
   POINTER_SIZE_INT cards_size = sizeof(Verify_Card) * card_num;
   
@@ -268,7 +272,7 @@ void sspace_verify_after_collection(GC *gc)
   
   clear_verify_cards();
   
-  Sspace *sspace = (Sspace*)gc_get_pos((GC_Gen*)gc);
+  Sspace *sspace = gc_get_sspace(gc);
   Chunk_Header *chunk = (Chunk_Header*)space_heap_start((Space*)sspace);
   Chunk_Header *sspace_ceiling = (Chunk_Header*)space_heap_end((Space*)sspace);
   POINTER_SIZE_INT total_live_obj = 0;
@@ -314,7 +318,7 @@ void sspace_verify_after_collection(GC *gc)
 /*
 void sspace_verify_super_obj(GC *gc)
 {
-  Sspace *sspace = (Sspace*)gc_get_pos((GC_Gen*)gc);
+  Sspace *sspace = gc_get_sspace(gc);
   Chunk_Header *chunk = (Chunk_Header*)space_heap_start((Space*)sspace);
   Chunk_Header *sspace_ceiling = (Chunk_Header*)space_heap_end((Space*)sspace);
   

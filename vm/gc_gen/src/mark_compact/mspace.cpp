@@ -71,6 +71,12 @@ void mspace_initialize(GC* gc, void* start, POINTER_SIZE_INT mspace_size, POINTE
   mspace->num_collections = 0;
   mspace->time_collections = 0;
   mspace->survive_ratio = 0.2f;
+  mspace->last_alloced_size = 0;
+  mspace->accumu_alloced_size = 0;  
+  mspace->total_alloced_size = 0;
+  mspace->last_surviving_size = 0;
+  mspace->period_surviving_size = 0;
+  
 
   mspace->move_object = TRUE;
   mspace->gc = gc;
@@ -165,5 +171,6 @@ float mspace_get_expected_threshold_ratio(Mspace* mspace)
 {
     return mspace->expected_threshold_ratio;
 }
+
 
 

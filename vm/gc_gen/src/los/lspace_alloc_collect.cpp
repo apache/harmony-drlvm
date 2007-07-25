@@ -160,10 +160,10 @@ void* lspace_try_alloc(Lspace* lspace, POINTER_SIZE_INT alloc_size){
           p_result = free_pool_former_lists_atomic_take_area_piece(pool, list_hint, alloc_size);
           if(p_result){
               memset(p_result, 0, alloc_size);
-              POINTER_SIZE_INT vold = lspace->alloced_size;
-              POINTER_SIZE_INT vnew = vold + alloc_size;
-              while( vold != atomic_casptrsz(&lspace->alloced_size, vnew, vold) ){                      
-                  vold = lspace->alloced_size;
+              uint64 vold = lspace->last_alloced_size;
+              uint64 vnew = vold + alloc_size;
+              while( vold != port_atomic_cas64(&lspace->last_alloced_size, vnew, vold) ){                      
+                  vold = lspace->last_alloced_size;
                   vnew = vold + alloc_size;
               }
               return p_result;
@@ -179,10 +179,10 @@ void* lspace_try_alloc(Lspace* lspace, POINTER_SIZE_INT alloc_size){
           p_result = free_pool_last_list_atomic_take_area_piece(pool, alloc_size);
           if(p_result){
               memset(p_result, 0, alloc_size);
-              POINTER_SIZE_INT vold = lspace->alloced_size;
-              POINTER_SIZE_INT vnew = vold + alloc_size;
-              while( vold != atomic_casptrsz(&lspace->alloced_size, vnew, vold) ){                      
-                  vold = lspace->alloced_size;
+              uint64 vold = lspace->last_alloced_size;
+              uint64 vnew = vold + alloc_size;
+              while( vold != port_atomic_cas64(&lspace->last_alloced_size, vnew, vold) ){                      
+                  vold = lspace->last_alloced_size;
                   vnew = vold + alloc_size;
               }
               return p_result;
@@ -308,7 +308,7 @@ void lspace_sliding_compact(Collector* collector, Lspace* lspace)
   return;
 }
 
-void lspace_reset_after_collection(Lspace* lspace)
+void lspace_reset_for_slide(Lspace* lspace)
 {
     GC* gc = lspace->gc;
     Space_Tuner* tuner = gc->tuner;
@@ -321,22 +321,15 @@ void lspace_reset_after_collection(Lspace* lspace)
 
     switch(tuner->kind){
       case TRANS_FROM_MOS_TO_LOS:{
-        if(lspace->move_object){
-          assert(tuner->force_tune);
-          Block* mos_first_block = ((GC_Gen*)gc)->mos->blocks;
-          lspace->heap_end = (void*)mos_first_block;
-          assert(!(tuner->tuning_size % GC_BLOCK_SIZE_BYTES));
-          new_fa_size = (POINTER_SIZE_INT)lspace->scompact_fa_end - (POINTER_SIZE_INT)lspace->scompact_fa_start + tuner->tuning_size;
-          Free_Area* fa = free_area_new(lspace->scompact_fa_start,  new_fa_size);
-          if(new_fa_size >= GC_OBJ_SIZE_THRESHOLD) free_pool_add_area(lspace->free_pool, fa);
-        }else{
-          void* origin_end = lspace->heap_end;
-          lspace->heap_end = (void*)(((GC_Gen*)gc)->mos->blocks);
-          /*The assumption that the first word of one KB must be zero when iterating lspace in 
-          that function lspace_get_next_marked_object is not true*/
-          Free_Area* trans_fa = free_area_new(origin_end, trans_size);
-          if(trans_size >= GC_OBJ_SIZE_THRESHOLD) free_pool_add_area(lspace->free_pool, trans_fa);
-        }
+        /*Lspace collection in major collection must move object*/
+        assert(lspace->move_object);
+        //debug_minor_sweep
+        Block* mos_first_block = ((GC_Gen*)gc)->mos->blocks;
+        lspace->heap_end = (void*)mos_first_block;
+        assert(!(tuner->tuning_size % GC_BLOCK_SIZE_BYTES));
+        new_fa_size = (POINTER_SIZE_INT)lspace->scompact_fa_end - (POINTER_SIZE_INT)lspace->scompact_fa_start + tuner->tuning_size;
+        Free_Area* fa = free_area_new(lspace->scompact_fa_start,  new_fa_size);
+        if(new_fa_size >= GC_OBJ_SIZE_THRESHOLD) free_pool_add_area(lspace->free_pool, fa);
         lspace->committed_heap_size += trans_size;
         break;
       }
@@ -355,22 +348,29 @@ void lspace_reset_after_collection(Lspace* lspace)
         break;
       }
       default:{
-        if(lspace->move_object){
-          assert(tuner->kind == TRANS_NOTHING);
-          assert(!tuner->tuning_size);
-          new_fa_size = (POINTER_SIZE_INT)lspace->scompact_fa_end - (POINTER_SIZE_INT)lspace->scompact_fa_start;
-          Free_Area* fa = free_area_new(lspace->scompact_fa_start,  new_fa_size);
-          if(new_fa_size >= GC_OBJ_SIZE_THRESHOLD) free_pool_add_area(lspace->free_pool, fa);
-        }
+        assert(lspace->move_object);
+        assert(tuner->kind == TRANS_NOTHING);
+        assert(!tuner->tuning_size);
+        new_fa_size = (POINTER_SIZE_INT)lspace->scompact_fa_end - (POINTER_SIZE_INT)lspace->scompact_fa_start;
+        Free_Area* fa = free_area_new(lspace->scompact_fa_start,  new_fa_size);
+        if(new_fa_size >= GC_OBJ_SIZE_THRESHOLD) free_pool_add_area(lspace->free_pool, fa);
         break;
       }
     }
 
-    /*For_statistic los information.*/
-    lspace->alloced_size = 0;    
-    lspace->surviving_size = 0;
+//    lspace->accumu_alloced_size = 0;    
+//    lspace->last_alloced_size = 0;        
+    lspace->period_surviving_size = (POINTER_SIZE_INT)lspace->scompact_fa_start - (POINTER_SIZE_INT)lspace->heap_start;
+    lspace->survive_ratio = (float)lspace->accumu_alloced_size / (float)lspace->committed_heap_size;
 
     los_boundary = lspace->heap_end;
+}
+
+
+void lspace_reset_for_sweep(Lspace* lspace)
+{
+//  lspace->last_alloced_size = 0;    
+  lspace->last_surviving_size = 0;
 }
 
 void lspace_sweep(Lspace* lspace)
@@ -379,23 +379,20 @@ void lspace_sweep(Lspace* lspace)
   POINTER_SIZE_INT cur_size = 0;
   void *cur_area_start, *cur_area_end;
 
-  /*If it is TRANS_FROM_MOS_TO_LOS now, we must clear the fa alread added in lspace_reset_after_collection*/
   free_area_pool_reset(lspace->free_pool);
 
   Partial_Reveal_Object* p_prev_obj = (Partial_Reveal_Object *)lspace->heap_start;
-  Partial_Reveal_Object* p_next_obj = lspace_get_first_marked_object(lspace, &mark_bit_idx);
+  Partial_Reveal_Object* p_next_obj = lspace_get_first_marked_object_by_oi(lspace, &mark_bit_idx);
   if(p_next_obj){
-    obj_unmark_in_vt(p_next_obj);
-    /* we need this because, in hybrid situation of gen_mode and non_gen_mode, LOS will only be marked
-       in non_gen_mode, and not reset in gen_mode. When it switches back from gen_mode to non_gen_mode,
-       the last time marked object is thought to be already marked and not scanned for this cycle. */
+//    obj_unmark_in_vt(p_next_obj);
+    /*Fixme: This might not be necessary, for there is a bit clearing operation in forward_object->obj_mark_in_oi*/
     obj_clear_dual_bits_in_oi(p_next_obj);
     /*For_statistic: sum up the size of suvived large objects, useful to deciede los extention.*/
-unsigned int obj_size = vm_object_size(p_next_obj);
+    unsigned int obj_size = vm_object_size(p_next_obj);
 #ifdef USE_32BITS_HASHCODE
     obj_size += (hashcode_is_attached(p_next_obj))?GC_OBJECT_ALIGNMENT:0;
 #endif
-    lspace->surviving_size += ALIGN_UP_TO_KILO(obj_size);    
+    lspace->last_surviving_size += ALIGN_UP_TO_KILO(obj_size);    
   }
 
   cur_area_start = (void*)ALIGN_UP_TO_KILO(p_prev_obj);
@@ -416,16 +413,16 @@ unsigned int obj_size = vm_object_size(p_next_obj);
     /* successfully create an area */
 
     p_prev_obj = p_next_obj;
-    p_next_obj = lspace_get_next_marked_object(lspace, &mark_bit_idx);
+    p_next_obj = lspace_get_next_marked_object_by_oi(lspace, &mark_bit_idx);
     if(p_next_obj){
-      obj_unmark_in_vt(p_next_obj);
+//      obj_unmark_in_vt(p_next_obj);
       obj_clear_dual_bits_in_oi(p_next_obj);
       /*For_statistic: sum up the size of suvived large objects, useful to deciede los extention.*/
       unsigned int obj_size = vm_object_size(p_next_obj);
 #ifdef USE_32BITS_HASHCODE
       obj_size += (hashcode_is_attached(p_next_obj))?GC_OBJECT_ALIGNMENT:0;
 #endif
-      lspace->surviving_size += ALIGN_UP_TO_KILO(obj_size);
+      lspace->last_surviving_size += ALIGN_UP_TO_KILO(obj_size);
     }
 
 #ifdef USE_32BITS_HASHCODE
@@ -449,10 +446,6 @@ unsigned int obj_size = vm_object_size(p_next_obj);
    mark_bit_idx = 0;
    assert(!lspace_get_first_marked_object(lspace, &mark_bit_idx));
 
-  /*Update survive ratio here. If we tune LOS this time, the ratio is computed by the new committed size.*/
-  /*Fixme: We should keep the surviving size of last time, and set denominator to last_survive + current_alloc*/
-  lspace->survive_ratio = (float)lspace->surviving_size / (float)lspace->committed_heap_size;
-
   return;
-
 }
+

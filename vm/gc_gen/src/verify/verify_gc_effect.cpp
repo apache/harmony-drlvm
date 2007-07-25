@@ -73,6 +73,7 @@ void verify_gc_reset(Heap_Verifier* heap_verifier)
 
 void verify_live_finalizable_obj(Heap_Verifier* heap_verifier, Pool* live_finalizable_objs_pool)
 {
+  if(heap_verifier->gc_is_gen_mode) return;
   pool_iterator_init(live_finalizable_objs_pool);
   Vector_Block* live_fin_objs = pool_iterator_next(live_finalizable_objs_pool);
   while(live_fin_objs){
@@ -255,19 +256,21 @@ inline Object_Hashcode_Inform* verifier_copy_hashcode(Partial_Reveal_Object* p_o
   return obj_hash_info;
 }
 #else 
+#define GCGEN_HASH_MASK 0x1fc
 inline Object_Hashcode_Inform* verifier_copy_hashcode(Partial_Reveal_Object* p_obj, Heap_Verifier* heap_verifier, Boolean is_before_gc)  
 {
   hash_obj_distance ++;
   
-  if(!hashcode_is_set(p_obj))  return NULL;
+  Obj_Info_Type info = get_obj_info_raw(p_obj);
+
+  int hash = info & GCGEN_HASH_MASK;
+
+  if(!hash)  return NULL;
 
   GC_Verifier* gc_verifier = heap_verifier->gc_verifier;  
   if(is_before_gc) gc_verifier->num_hash_before_gc++;
   else gc_verifier->num_hash_after_gc++;
 
-  Obj_Info_Type info = get_obj_info_raw(p_obj);
-
-  int hash = info & GCGEN_HASH_MASK;
   unsigned int size = sizeof(Object_Hashcode_Inform);
   Object_Hashcode_Inform* obj_hash_info = (Object_Hashcode_Inform*) STD_MALLOC(size);
   assert(obj_hash_info);
@@ -525,6 +528,9 @@ void verifier_clear_gc_verification(Heap_Verifier* heap_verifier)
   verify_gc_reset(heap_verifier);  
   verifier_set_fallback_collection(heap_verifier->gc_verifier, FALSE);  
 }
+
+void verifier_reset_hash_distance()
+{ hash_obj_distance = 0;}
 
 
 

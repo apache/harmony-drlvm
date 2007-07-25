@@ -20,6 +20,7 @@
 
 #include "mutator.h"
 #include "../trace_forward/fspace.h"
+#include "../mark_sweep/sspace.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 
 struct GC_Gen;
@@ -41,7 +42,11 @@ void mutator_initialize(GC* gc, void *unused_gc_information)
     mutator->obj_with_fin = finref_get_free_block(gc);
   else
     mutator->obj_with_fin = NULL;
-       
+
+#ifdef ONLY_SSPACE_IN_HEAP
+  allocator_init_local_chunks((Allocator*)mutator);
+#endif
+  
   lock(gc->mutator_list_lock);     // vvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 
   mutator->next = (Mutator *)gc->mutator_list;
@@ -62,6 +67,10 @@ void mutator_destruct(GC* gc, void *unused_gc_information)
   Mutator *mutator = (Mutator *)gc_get_tls();
 
   alloc_context_reset((Allocator*)mutator);
+
+#ifdef ONLY_SSPACE_IN_HEAP
+  allocactor_destruct_local_chunks((Allocator*)mutator);
+#endif
 
   if(gc_is_gen_mode()){ /* put back the remset when a mutator exits */
     pool_put_entry(gc->metadata->mutator_remset_pool, mutator->rem_set);
@@ -114,4 +123,5 @@ void gc_prepare_mutator_remset(GC* gc)
   }  
   return;
 }
+
 

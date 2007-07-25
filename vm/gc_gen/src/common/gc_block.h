@@ -77,7 +77,7 @@ typedef union Block{
 #define OFFSET_TABLE_SIZE_WORDS (OFFSET_TABLE_SIZE_BYTES >> BIT_SHIFT_TO_BYTES_PER_WORD)
 #define OBJECT_INDEX_TO_OFFSET_TABLE(p_obj)   (ADDRESS_OFFSET_IN_BLOCK_BODY(p_obj) >> SECTOR_SIZE_SHIFT_COUNT)
 
-#define GC_BLOCK_HEADER_SIZE_BYTES (OFFSET_TABLE_SIZE_BYTES + GC_BLOCK_HEADER_VARS_SIZE_BYTES)
+#define GC_BLOCK_HEADER_SIZE_BYTES ((OFFSET_TABLE_SIZE_BYTES + GC_BLOCK_HEADER_VARS_SIZE_BYTES  + GC_OBJECT_ALIGN_MASK ) & (~GC_OBJECT_ALIGN_MASK))
 #define GC_BLOCK_BODY_SIZE_BYTES (GC_BLOCK_SIZE_BYTES - GC_BLOCK_HEADER_SIZE_BYTES)
 #define GC_BLOCK_BODY(block) ((void*)((POINTER_SIZE_INT)(block) + GC_BLOCK_HEADER_SIZE_BYTES))
 /*LOS_Shrink: We have some fake block headers when trying to compute mos object target, 
@@ -353,5 +353,6 @@ inline int obj_lookup_hashcode_in_buf(Partial_Reveal_Object *p_obj)
 #endif
 
 #endif //#ifndef _BLOCK_H_
+
 
 

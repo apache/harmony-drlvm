@@ -37,6 +37,7 @@ static FORCE_INLINE void scan_slot(Collector *collector, REF *p_ref)
 
 static FORCE_INLINE void scan_object(Collector* collector, Partial_Reveal_Object *p_obj) 
 {
+  assert((((POINTER_SIZE_INT)p_obj) % GC_OBJECT_ALIGNMENT) == 0);
   if (!object_has_ref_field_before_scan(p_obj)) return;
     
   REF *p_ref;

@@ -17,6 +17,7 @@
 #include "sspace.h"
 #include "sspace_chunk.h"
 #include "sspace_mark_sweep.h"
+#include "gc_ms.h"
 #include "../gen/gen.h"
 
 static Boolean slot_is_alloc_in_table(POINTER_SIZE_INT *table, unsigned int slot_index)
@@ -105,9 +106,9 @@ void chunk_set_slot_index(Chunk_Header* chunk, unsigned int first_free_word_inde
 }
 
 
-/* 1. No need of synchronization. This is a mutator local chunk no matter it is a small or medium obj chunk.
+/* 1. No need of synchronization. This is a allocator local chunk no matter it is a small or medium obj chunk.
  * 2. If this chunk runs out of space, clear the chunk pointer.
- *    So it is important to give an argument which is a local chunk pointer of a mutator while invoking this func.
+ *    So it is important to give an argument which is a local chunk pointer of a allocator while invoking this func.
  */
 static void *alloc_in_chunk(Chunk_Header* &chunk)
 {
@@ -132,143 +133,107 @@ static void *alloc_in_chunk(Chunk_Header* &chunk)
 }
 
 /* alloc small without-fin object in sspace without getting new free chunk */
-void *sspace_fast_alloc(unsigned size, Allocator *allocator)
+void *sspace_thread_local_alloc(unsigned size, Allocator *allocator)
 {
   if(size > SUPER_OBJ_THRESHOLD) return NULL;
   
-  if(size <= MEDIUM_OBJ_THRESHOLD){  /* small object */
-    size = SMALL_SIZE_ROUNDUP(size);
-    Chunk_Header **small_chunks = ((Mutator*)allocator)->small_chunks;
-    unsigned int index = SMALL_SIZE_TO_INDEX(size);
-    
-    if(!small_chunks[index]){
-      Sspace *sspace = (Sspace*)gc_get_pos((GC_Gen*)allocator->gc);
-      Chunk_Header *chunk = sspace_get_small_pfc(sspace, index);
-      //if(!chunk)
-        //chunk = sspace_steal_small_pfc(sspace, index);
+  Sspace *sspace = gc_get_sspace(allocator->gc);
+  void *p_obj = NULL;
+  
+  unsigned int seg_index = 0;
+  Size_Segment *size_seg = sspace->size_segments[0];
+  
+  for(; seg_index < SIZE_SEGMENT_NUM; ++seg_index, ++size_seg)
+    if(size <= size_seg->size_max) break;
+  assert(seg_index < SIZE_SEGMENT_NUM);
+  
+  size = NORMAL_SIZE_ROUNDUP(size, size_seg);
+  unsigned int index = NORMAL_SIZE_TO_INDEX(size, size_seg);
+  Boolean local_alloc = size_seg->local_alloc;
+  Chunk_Header *chunk = NULL;
+  
+  if(local_alloc){
+    Chunk_Header **chunks = allocator->local_chunks[seg_index];
+    chunk = chunks[index];
+    if(!chunk){
+      chunk = sspace_get_pfc(sspace, seg_index, index);
+      //if(!chunk) chunk = sspace_steal_pfc(sspace, seg_index, index);
       if(!chunk) return NULL;
-      small_chunks[index] = chunk;
+      chunk->status |= CHUNK_IN_USE;
+      chunks[index] = chunk;
     }
-    return alloc_in_chunk(small_chunks[index]);
-  } else if(size <= LARGE_OBJ_THRESHOLD){  /* medium object */
-    size = MEDIUM_SIZE_ROUNDUP(size);
-    Chunk_Header **medium_chunks = ((Mutator*)allocator)->medium_chunks;
-    unsigned int index = MEDIUM_SIZE_TO_INDEX(size);
-    
-    if(!medium_chunks[index]){
-      Sspace *sspace = (Sspace*)gc_get_pos((GC_Gen*)allocator->gc);
-      Chunk_Header *chunk = sspace_get_medium_pfc(sspace, index);
-      //if(!chunk)
-        //chunk = sspace_steal_medium_pfc(sspace, index);
-      if(!chunk) return NULL;
-      medium_chunks[index] = chunk;
-    }
-    return alloc_in_chunk(medium_chunks[index]);
-  } else {  /* large object */
-    assert(size <= SUPER_OBJ_THRESHOLD);
-    size = LARGE_SIZE_ROUNDUP(size);
-    unsigned int index = LARGE_SIZE_TO_INDEX(size);
-    Sspace *sspace = (Sspace*)gc_get_pos((GC_Gen*)allocator->gc);
-    Chunk_Header *chunk = sspace_get_large_pfc(sspace, index);
-    //if(!chunk)
-      //chunk = sspace_steal_large_pfc(sspace, index);
+    p_obj = alloc_in_chunk(chunks[index]);
+  } else {
+    chunk = sspace_get_pfc(sspace, seg_index, index);
+    //if(!chunk) chunk = sspace_steal_pfc(sspace, seg_index, index);
     if(!chunk) return NULL;
-    void *p_obj = alloc_in_chunk(chunk);
+    p_obj = alloc_in_chunk(chunk);
     if(chunk)
-      sspace_put_large_pfc(sspace, chunk, index);
-    return p_obj;
+      sspace_put_pfc(sspace, chunk);
   }
-}
-
-static void *alloc_small_obj(unsigned size, Allocator *allocator)
-{
-  assert(size <= MEDIUM_OBJ_THRESHOLD);
-  assert(!(size & SMALL_GRANULARITY_LOW_MASK));
   
-  Chunk_Header **small_chunks = ((Mutator*)allocator)->small_chunks;
-  unsigned int index = SMALL_SIZE_TO_INDEX(size);
-  if(!small_chunks[index]){
-    Sspace *sspace = (Sspace*)gc_get_pos((GC_Gen*)allocator->gc);
-    Chunk_Header *chunk = sspace_get_small_pfc(sspace, index);
-    //if(!chunk)
-      //chunk = sspace_steal_small_pfc(sspace, index);
+  assert(p_obj);
+
+#ifdef SSPACE_ALLOC_INFO
+  sspace_alloc_info(size);
+#endif
+#ifdef SSPACE_VERIFY
+  sspace_verify_alloc(p_obj, size);
+#endif
+
+  return p_obj;
+}
+static void *sspace_alloc_normal_obj(Sspace *sspace, unsigned size, Allocator *allocator)
+{
+  void *p_obj = NULL;
+  
+  unsigned int seg_index = 0;
+  Size_Segment *size_seg = sspace->size_segments[0];
+  
+  for(; seg_index < SIZE_SEGMENT_NUM; ++seg_index, ++size_seg)
+    if(size <= size_seg->size_max) break;
+  assert(seg_index < SIZE_SEGMENT_NUM);
+  
+  size = NORMAL_SIZE_ROUNDUP(size, size_seg);
+  unsigned int index = NORMAL_SIZE_TO_INDEX(size, size_seg);
+  Boolean local_alloc = size_seg->local_alloc;
+  Chunk_Header *chunk = NULL;
+  
+  if(local_alloc){
+    Chunk_Header **chunks = allocator->local_chunks[seg_index];
+    chunk = chunks[index];
+    if(!chunk){
+      chunk = sspace_get_pfc(sspace, seg_index, index);
+      if(!chunk){
+        chunk = (Chunk_Header*)sspace_get_normal_free_chunk(sspace);
+        if(chunk) normal_chunk_init(chunk, size);
+      }
+      //if(!chunk) chunk = sspace_steal_pfc(sspace, seg_index, index);
+      if(!chunk) return NULL;
+      chunk->status |= CHUNK_IN_USE;
+      chunks[index] = chunk;
+    }
+    p_obj = alloc_in_chunk(chunks[index]);
+  } else {
+    chunk = sspace_get_pfc(sspace, seg_index, index);
     if(!chunk){
       chunk = (Chunk_Header*)sspace_get_normal_free_chunk(sspace);
-      if(chunk){
-        normal_chunk_init(chunk, size);
-      } else {
-        /*chunk = sspace_steal_small_pfc(sspace, index);
-        if(!chunk)*/ return NULL;
-      }
+      if(chunk) normal_chunk_init(chunk, size);
     }
-    chunk->status |= CHUNK_IN_USE | CHUNK_NORMAL;
-    small_chunks[index] = chunk;
+    //if(!chunk) chunk = sspace_steal_pfc(sspace, seg_index, index);
+    if(!chunk) return NULL;
+    p_obj = alloc_in_chunk(chunk);
+    if(chunk)
+      sspace_put_pfc(sspace, chunk);
   }
   
-  return alloc_in_chunk(small_chunks[index]);
-}
-
-static void *alloc_medium_obj(unsigned size, Allocator *allocator)
-{
-  assert((size > MEDIUM_OBJ_THRESHOLD) && (size <= LARGE_OBJ_THRESHOLD));
-  assert(!(size & MEDIUM_GRANULARITY_LOW_MASK));
-  
-  Chunk_Header **medium_chunks = ((Mutator*)allocator)->medium_chunks;
-  unsigned int index = MEDIUM_SIZE_TO_INDEX(size);
-  if(!medium_chunks[index]){
-    Sspace *sspace = (Sspace*)gc_get_pos((GC_Gen*)allocator->gc);
-    Chunk_Header *chunk = sspace_get_medium_pfc(sspace, index);
-    //if(!chunk)
-      //chunk = sspace_steal_medium_pfc(sspace, index);
-    if(!chunk){
-      chunk = (Chunk_Header*)sspace_get_normal_free_chunk(sspace);
-      if(chunk){
-        normal_chunk_init(chunk, size);
-      } else {
-        /*chunk = sspace_steal_medium_pfc(sspace, index);
-        if(!chunk) */return NULL;
-      }
-    }
-    chunk->status |= CHUNK_IN_USE | CHUNK_NORMAL;
-    medium_chunks[index] = chunk;
-  }
-  
-  return alloc_in_chunk(medium_chunks[index]);
-}
-
-/* FIXME:: this is a simple version. It may return NULL while there are still pfc in pool put by other mutators */
-static void *alloc_large_obj(unsigned size, Allocator *allocator)
-{
-  assert((size > LARGE_OBJ_THRESHOLD) && (size <= SUPER_OBJ_THRESHOLD));
-  assert(!(size & LARGE_GRANULARITY_LOW_MASK));
-  
-  Sspace *sspace = (Sspace*)gc_get_pos((GC_Gen*)allocator->gc);
-  unsigned int index = LARGE_SIZE_TO_INDEX(size);
-  Chunk_Header *chunk = sspace_get_large_pfc(sspace, index);
-  //if(!chunk)
-    //chunk = sspace_steal_large_pfc(sspace, index);
-  if(!chunk){
-    chunk = (Chunk_Header*)sspace_get_normal_free_chunk(sspace);
-    if(chunk){
-      normal_chunk_init(chunk, size);
-    } else {
-      /*chunk = sspace_steal_large_pfc(sspace, index);
-      if(!chunk)*/ return NULL;
-    }
-  }
-  chunk->status |= CHUNK_NORMAL;
-  
-  void *p_obj = alloc_in_chunk(chunk);
-  if(chunk)
-    sspace_put_large_pfc(sspace, chunk, index);
   return p_obj;
 }
 
-static void *alloc_super_obj(unsigned size, Allocator *allocator)
+static void *sspace_alloc_super_obj(Sspace *sspace, unsigned size, Allocator *allocator)
 {
   assert(size > SUPER_OBJ_THRESHOLD);
-  
-  Sspace *sspace = (Sspace*)gc_get_pos((GC_Gen*)allocator->gc);
+
   unsigned int chunk_size = SUPER_SIZE_ROUNDUP(size);
   assert(chunk_size > SUPER_OBJ_THRESHOLD);
   assert(!(chunk_size & CHUNK_GRANULARITY_LOW_MASK));
@@ -281,7 +246,6 @@ static void *alloc_super_obj(unsigned size, Allocator *allocator)
   
   if(!chunk) return NULL;
   abnormal_chunk_init(chunk, chunk_size, size);
-  chunk->status = CHUNK_IN_USE | CHUNK_ABNORMAL;
   chunk->table[0] = cur_alloc_color;
   set_super_obj_mask(chunk->base);
   assert(get_obj_info_raw((Partial_Reveal_Object*)chunk->base) & SUPER_OBJ_MASK);
@@ -291,14 +255,22 @@ static void *alloc_super_obj(unsigned size, Allocator *allocator)
 
 static void *sspace_try_alloc(unsigned size, Allocator *allocator)
 {
-  if(size <= MEDIUM_OBJ_THRESHOLD)
-    return alloc_small_obj(SMALL_SIZE_ROUNDUP(size), allocator);
-  else if(size <= LARGE_OBJ_THRESHOLD)
-    return alloc_medium_obj(MEDIUM_SIZE_ROUNDUP(size), allocator);
-  else if(size <= SUPER_OBJ_THRESHOLD)
-    return alloc_large_obj(LARGE_SIZE_ROUNDUP(size), allocator);
+  Sspace *sspace = gc_get_sspace(allocator->gc);
+  void *p_obj = NULL;
+  
+  if(size <= SUPER_OBJ_THRESHOLD)
+    p_obj = sspace_alloc_normal_obj(sspace, size, allocator);
   else
-    return alloc_super_obj(size, allocator);
+    p_obj = sspace_alloc_super_obj(sspace, size, allocator);
+
+#ifdef SSPACE_ALLOC_INFO
+  if(p_obj) sspace_alloc_info(size);
+#endif
+#ifdef SSPACE_VERIFY
+  if(p_obj) sspace_verify_alloc(p_obj, size);
+#endif
+
+  return p_obj;
 }
 
 /* FIXME:: the collection should be seperated from the alloation */

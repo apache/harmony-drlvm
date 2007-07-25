@@ -68,6 +68,7 @@ FORCE_INLINE Partial_Reveal_Object* collector_forward_object(Collector* collecto
     return NULL;
   }
 
+assert((((POINTER_SIZE_INT)p_targ_obj) % GC_OBJECT_ALIGNMENT) == 0);
 #ifdef USE_32BITS_HASHCODE
   if(obj_is_set_hashcode){
     memcpy(p_targ_obj, p_obj, size-GC_OBJECT_ALIGNMENT);

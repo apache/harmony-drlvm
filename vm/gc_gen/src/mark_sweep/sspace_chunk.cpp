@@ -16,63 +16,68 @@
 
 #include "sspace_chunk.h"
 
-/* PFC stands for partially free chunk */
-#define SMALL_PFC_POOL_NUM    SMALL_LOCAL_CHUNK_NUM
-#define MEDIUM_PFC_POOL_NUM   MEDIUM_LOCAL_CHUNK_NUM
-#define LARGE_PFC_POOL_NUM    ((SUPER_OBJ_THRESHOLD - LARGE_OBJ_THRESHOLD) >> LARGE_GRANULARITY_BITS)
 #define NUM_ALIGNED_FREE_CHUNK_BUCKET   (HYPER_OBJ_THRESHOLD >> NORMAL_CHUNK_SHIFT_COUNT)
 #define NUM_UNALIGNED_FREE_CHUNK_BUCKET (HYPER_OBJ_THRESHOLD >> CHUNK_GRANULARITY_BITS)
 
-
 /* PFC stands for partially free chunk */
-static Pool  *small_pfc_pools[SMALL_PFC_POOL_NUM];
-static Pool  *medium_pfc_pools[MEDIUM_PFC_POOL_NUM];
-static Pool  *large_pfc_pools[LARGE_PFC_POOL_NUM];
+static Size_Segment *size_segments[SIZE_SEGMENT_NUM];
+static Pool **pfc_pools[SIZE_SEGMENT_NUM];
+static Boolean  *pfc_steal_flags[SIZE_SEGMENT_NUM];
+
 static Free_Chunk_List  aligned_free_chunk_lists[NUM_ALIGNED_FREE_CHUNK_BUCKET];
 static Free_Chunk_List  unaligned_free_chunk_lists[NUM_UNALIGNED_FREE_CHUNK_BUCKET];
 static Free_Chunk_List  hyper_free_chunk_list;
 
-static Boolean  small_pfc_steal_flags[SMALL_PFC_POOL_NUM];
-static Boolean  medium_pfc_steal_flags[MEDIUM_PFC_POOL_NUM];
-static Boolean  large_pfc_steal_flags[LARGE_PFC_POOL_NUM];
+
+static void init_size_segment(Size_Segment *seg, unsigned int size_min, unsigned int size_max, unsigned int gran_shift_bits, Boolean local_alloc)
+{
+  seg->size_min = size_min;
+  seg->size_max = size_max;
+  seg->local_alloc = local_alloc;
+  seg->chunk_num = (seg->size_max - seg->size_min) >> gran_shift_bits;
+  seg->gran_shift_bits = gran_shift_bits;
+  seg->granularity = (POINTER_SIZE_INT)(1 << gran_shift_bits);
+  seg->gran_low_mask = seg->granularity - 1;
+  seg->gran_high_mask = ~seg->gran_low_mask;
+}
 
 void sspace_init_chunks(Sspace *sspace)
 {
-  unsigned int i;
+  unsigned int i, j;
   
-  /* Init small obj partially free chunk pools */
-  for(i=SMALL_PFC_POOL_NUM; i--;){
-    small_pfc_steal_flags[i] = FALSE;
-    small_pfc_pools[i] = sync_pool_create();
+  /* Init size segments */
+  Size_Segment *size_seg_start = (Size_Segment*)STD_MALLOC(sizeof(Size_Segment) * SIZE_SEGMENT_NUM);
+  for(i = SIZE_SEGMENT_NUM; i--;){
+    size_segments[i] = size_seg_start + i;
+    size_segments[i]->seg_index = i;
   }
+  init_size_segment(size_segments[0], 0, MEDIUM_OBJ_THRESHOLD, SMALL_GRANULARITY_BITS, SMALL_IS_LOCAL_ALLOC);
+  init_size_segment(size_segments[1], MEDIUM_OBJ_THRESHOLD, LARGE_OBJ_THRESHOLD, MEDIUM_GRANULARITY_BITS, MEDIUM_IS_LOCAL_ALLOC);
+  init_size_segment(size_segments[2], LARGE_OBJ_THRESHOLD, SUPER_OBJ_THRESHOLD, LARGE_GRANULARITY_BITS, LARGE_IS_LOCAL_ALLOC);
   
-  /* Init medium obj partially free chunk pools */
-  for(i=MEDIUM_PFC_POOL_NUM; i--;){
-    medium_pfc_steal_flags[i] = FALSE;
-    medium_pfc_pools[i] = sync_pool_create();
-  }
-  
-  /* Init large obj partially free chunk pools */
-  for(i=LARGE_PFC_POOL_NUM; i--;){
-    large_pfc_steal_flags[i] = FALSE;
-    large_pfc_pools[i] = sync_pool_create();
+  /* Init partially free chunk pools */
+  for(i = SIZE_SEGMENT_NUM; i--;){
+    pfc_pools[i] = (Pool**)STD_MALLOC(sizeof(Pool*) * size_segments[i]->chunk_num);
+    pfc_steal_flags[i] = (Boolean*)STD_MALLOC(sizeof(Boolean) * size_segments[i]->chunk_num);
+    for(j=size_segments[i]->chunk_num; j--;){
+      pfc_pools[i][j] = sync_pool_create();
+      pfc_steal_flags[i][j] = FALSE;
+    }
   }
   
   /* Init aligned free chunk lists */
-  for(i=NUM_ALIGNED_FREE_CHUNK_BUCKET; i--;)
+  for(i = NUM_ALIGNED_FREE_CHUNK_BUCKET; i--;)
     free_chunk_list_init(&aligned_free_chunk_lists[i]);
   
   /* Init nonaligned free chunk lists */
-  for(i=NUM_UNALIGNED_FREE_CHUNK_BUCKET; i--;)
+  for(i = NUM_UNALIGNED_FREE_CHUNK_BUCKET; i--;)
     free_chunk_list_init(&unaligned_free_chunk_lists[i]);
   
   /* Init super free chunk lists */
   free_chunk_list_init(&hyper_free_chunk_list);
-    
-  /* Init Sspace struct's chunk fields */
-  sspace->small_pfc_pools = small_pfc_pools;
-  sspace->medium_pfc_pools = medium_pfc_pools;
-  sspace->large_pfc_pools = large_pfc_pools;
+  
+  sspace->size_segments = size_segments;
+  sspace->pfc_pools = pfc_pools;
   sspace->aligned_free_chunk_lists = aligned_free_chunk_lists;
   sspace->unaligned_free_chunk_lists = unaligned_free_chunk_lists;
   sspace->hyper_free_chunk_list = &hyper_free_chunk_list;
@@ -85,7 +90,7 @@ void sspace_init_chunks(Sspace *sspace)
   sspace_put_free_chunk(sspace, free_chunk);
 }
 
-static void pfc_pool_set_steal_flag(Pool *pool, unsigned int steal_threshold, unsigned int &steal_flag)
+static void pfc_pool_set_steal_flag(Pool *pool, unsigned int steal_threshold, Boolean &steal_flag)
 {
   Chunk_Header *chunk = (Chunk_Header*)pool_get_entry(pool);
   while(chunk){
@@ -105,29 +110,16 @@ static void empty_pool(Pool *pool)
 
 void sspace_clear_chunk_list(GC *gc)
 {
-  unsigned int i;
+  unsigned int i, j;
   unsigned int collector_num = gc->num_collectors;
-  unsigned int steal_threshold;
+  unsigned int steal_threshold = collector_num << PFC_STEAL_THRESHOLD;
   
-  steal_threshold = collector_num << SMALL_PFC_STEAL_THRESHOLD;
-  for(i=SMALL_PFC_POOL_NUM; i--;){
-    Pool *pool = small_pfc_pools[i];
-    pfc_pool_set_steal_flag(pool, steal_threshold, small_pfc_steal_flags[i]);
-    empty_pool(pool);
-  }
-  
-  steal_threshold = collector_num << MEDIUM_PFC_STEAL_THRESHOLD;
-  for(i=MEDIUM_PFC_POOL_NUM; i--;){
-    Pool *pool = medium_pfc_pools[i];
-    pfc_pool_set_steal_flag(pool, steal_threshold, medium_pfc_steal_flags[i]);
-    empty_pool(pool);
-  }
-  
-  steal_threshold = collector_num << LARGE_PFC_STEAL_THRESHOLD;
-  for(i=LARGE_PFC_POOL_NUM; i--;){
-    Pool *pool = large_pfc_pools[i];
-    pfc_pool_set_steal_flag(pool, steal_threshold, large_pfc_steal_flags[i]);
-    empty_pool(pool);
+  for(i = SIZE_SEGMENT_NUM; i--;){
+    for(j = size_segments[i]->chunk_num; j--;){
+      Pool *pool = pfc_pools[i][j];
+      pfc_pool_set_steal_flag(pool, steal_threshold, pfc_steal_flags[i][j]);
+      empty_pool(pool);
+    }
   }
   
   for(i=NUM_ALIGNED_FREE_CHUNK_BUCKET; i--;)
@@ -141,12 +133,17 @@ void sspace_clear_chunk_list(GC *gc)
   /* release small obj chunks of each mutator */
   Mutator *mutator = gc->mutator_list;
   while(mutator){
-    Chunk_Header **chunks = mutator->small_chunks;
-    for(i=SMALL_LOCAL_CHUNK_NUM; i--;)
-      chunks[i] = NULL;
-    chunks = mutator->medium_chunks;
-    for(i=MEDIUM_LOCAL_CHUNK_NUM; i--;)
-      chunks[i] = NULL;
+    Chunk_Header ***local_chunks = mutator->local_chunks;
+    for(i = SIZE_SEGMENT_NUM; i--;){
+      if(!size_segments[i]->local_alloc){
+        assert(!local_chunks[i]);
+        continue;
+      }
+      Chunk_Header **chunks = local_chunks[i];
+      assert(chunks);
+      for(j = size_segments[i]->chunk_num; j--;)
+        chunks[j] = NULL;
+    }
     mutator = mutator->next;
   }
 }
@@ -377,38 +374,15 @@ Free_Chunk *sspace_get_hyper_free_chunk(Sspace *sspace, unsigned int chunk_size,
 
 #define min_value(x, y) (((x) < (y)) ? (x) : (y))
 
-Chunk_Header *sspace_steal_small_pfc(Sspace *sspace, unsigned int index)
+Chunk_Header *sspace_steal_pfc(Sspace *sspace, unsigned int seg_index, unsigned int index)
 {
+  Size_Segment *size_seg = sspace->size_segments[seg_index];
   Chunk_Header *pfc = NULL;
-  unsigned int max_index = min_value(index + SMALL_PFC_STEAL_NUM + 1, SMALL_PFC_POOL_NUM);
+  unsigned int max_index = min_value(index + PFC_STEAL_NUM + 1, size_seg->chunk_num);
   ++index;
   for(; index < max_index; ++index){
-    if(!small_pfc_steal_flags[index]) continue;
-    pfc = sspace_get_small_pfc(sspace, index);
-    if(pfc) return pfc;
-  }
-  return NULL;
-}
-Chunk_Header *sspace_steal_medium_pfc(Sspace *sspace, unsigned int index)
-{
-  Chunk_Header *pfc = NULL;
-  unsigned int max_index = min_value(index + MEDIUM_PFC_STEAL_NUM + 1, MEDIUM_PFC_POOL_NUM);
-  ++index;
-  for(; index < max_index; ++index){
-    if(!medium_pfc_steal_flags[index]) continue;
-    pfc = sspace_get_medium_pfc(sspace, index);
-    if(pfc) return pfc;
-  }
-  return NULL;
-}
-Chunk_Header *sspace_steal_large_pfc(Sspace *sspace, unsigned int index)
-{
-  Chunk_Header *pfc = NULL;
-  unsigned int max_index = min_value(index + LARGE_PFC_STEAL_NUM + 1, LARGE_PFC_POOL_NUM);
-  ++index;
-  for(; index < max_index; ++index){
-    if(!large_pfc_steal_flags[index]) continue;
-    pfc = sspace_get_large_pfc(sspace, index);
+    if(!pfc_steal_flags[seg_index][index]) continue;
+    pfc = sspace_get_pfc(sspace, seg_index, index);
     if(pfc) return pfc;
   }
   return NULL;
@@ -479,42 +453,27 @@ static unsigned int pfc_info(Chunk_Header *chunk, Boolean before_gc)
   return live_num;
 }
 
-enum Obj_Type {
-  SMALL_OBJ,
-  MEDIUM_OBJ,
-  LARGE_OBJ
-};
-static unsigned int index_to_size(unsigned int index, Obj_Type type)
+static void pfc_pools_info(Sspace *sspace, Boolean before_gc)
 {
-  if(type == SMALL_OBJ)
-    return SMALL_INDEX_TO_SIZE(index);
-  if(type == MEDIUM_OBJ)
-    return MEDIUM_INDEX_TO_SIZE(index);
-  assert(type == LARGE_OBJ);
-  return LARGE_INDEX_TO_SIZE(index);
-}
-
-static void pfc_pools_info(Sspace *sspace, Pool **pools, unsigned int pool_num, Obj_Type type, Boolean before_gc)
-{
-  unsigned int index;
-  
-  for(index = 0; index < pool_num; ++index){
-    Pool *pool = pools[index];
-    Chunk_Header *chunk = NULL;
-    unsigned int chunk_counter = 0;
-    unsigned int slot_num = 0;
-    unsigned int live_num = 0;
-    pool_iterator_init(pool);
-    while(chunk = (Chunk_Header*)pool_iterator_next(pool)){
-      ++chunk_counter;
-      slot_num += chunk->slot_num;
-      live_num += pfc_info(chunk, before_gc);
-    }
-    if(slot_num){
-      printf("Size: %x\tchunk num: %d\tlive obj: %d\ttotal obj: %d\tLive Ratio: %f\n", index_to_size(index, type), chunk_counter, live_num, slot_num, (float)live_num/slot_num);
-      assert(live_num < slot_num);
-      free_mem_size += index_to_size(index, type) * (slot_num-live_num);
-      assert(free_mem_size < sspace->committed_heap_size);
+  for(unsigned int i = 0; i < SIZE_SEGMENT_NUM; ++i){
+    for(unsigned int j = 0; j < size_segments[i]->chunk_num; ++j){
+      Pool *pool = pfc_pools[i][j];
+      Chunk_Header *chunk = NULL;
+      unsigned int chunk_counter = 0;
+      unsigned int slot_num = 0;
+      unsigned int live_num = 0;
+      pool_iterator_init(pool);
+      while(chunk = (Chunk_Header*)pool_iterator_next(pool)){
+        ++chunk_counter;
+        slot_num += chunk->slot_num;
+        live_num += pfc_info(chunk, before_gc);
+      }
+      if(slot_num){
+        printf("Size: %x\tchunk num: %d\tlive obj: %d\ttotal obj: %d\tLive Ratio: %f\n", NORMAL_INDEX_TO_SIZE(j, size_segments[i]), chunk_counter, live_num, slot_num, (float)live_num/slot_num);
+        assert(live_num < slot_num);
+        free_mem_size += NORMAL_INDEX_TO_SIZE(j, size_segments[i]) * (slot_num-live_num);
+        assert(free_mem_size < sspace->committed_heap_size);
+      }
     }
   }
 }
@@ -554,14 +513,8 @@ void sspace_chunks_info(Sspace *sspace, Boolean before_gc)
 {
   if(!before_gc) return;
   
-  printf("\n\nSMALL PFC INFO:\n\n");
-  pfc_pools_info(sspace, small_pfc_pools, SMALL_PFC_POOL_NUM, SMALL_OBJ, before_gc);
-  
-  printf("\n\nMEDIUM PFC INFO:\n\n");
-  pfc_pools_info(sspace, medium_pfc_pools, MEDIUM_PFC_POOL_NUM, MEDIUM_OBJ, before_gc);
-  
-  printf("\n\nLARGE PFC INFO:\n\n");
-  pfc_pools_info(sspace, large_pfc_pools, LARGE_PFC_POOL_NUM, LARGE_OBJ, before_gc);
+  printf("\n\nPFC INFO:\n\n");
+  pfc_pools_info(sspace, before_gc);
   
   printf("\n\nALIGNED FREE CHUNK INFO:\n\n");
   free_lists_info(sspace, aligned_free_chunk_lists, NUM_ALIGNED_FREE_CHUNK_BUCKET, ALIGNED_CHUNK);

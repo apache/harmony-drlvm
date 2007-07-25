@@ -23,6 +23,7 @@
 #include "../thread/mutator.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 #include "../gen/gen.h"
+#include "../mark_sweep/gc_ms.h"
 #include "../common/space_tuner.h"
 #include "interior_pointer.h"
 
@@ -279,7 +280,11 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
   gc->cause = gc_cause;
   gc_decide_collection_kind((GC_Gen*)gc, gc_cause);
 
+  gc_gen_update_space_before_gc((GC_Gen*)gc);
+
+#ifndef ONLY_SSPACE_IN_HEAP
   gc_compute_space_tune_size_before_marking(gc, gc_cause);
+#endif
 
 #ifdef MARK_BIT_FLIPPING
   if(gc_match_kind(gc, MINOR_COLLECTION)) mark_bit_flip();
@@ -301,7 +306,11 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
 
   if(!IGNORE_FINREF ) gc_set_obj_with_fin(gc);
 
+#ifndef ONLY_SSPACE_IN_HEAP
   gc_gen_reclaim_heap((GC_Gen*)gc);
+#else
+  gc_ms_reclaim_heap((GC_MS*)gc);
+#endif
   
   gc_reset_interior_pointer_table();
 
@@ -310,9 +319,11 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
   int64 pause_time = time_now() - start_time;  
   gc->time_collections += pause_time;
 
+#ifndef ONLY_SSPACE_IN_HEAP
   gc_adjust_heap_size(gc, pause_time);
 
   gc_gen_adapt((GC_Gen*)gc, pause_time);
+#endif
 
   if(gc_is_gen_mode()) gc_prepare_mutator_remset(gc);
   
@@ -326,12 +337,15 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
 #endif
   }
 
+#ifndef ONLY_SSPACE_IN_HEAP
   gc_space_tuner_reset(gc);
-
+  gc_gen_update_space_after_gc((GC_Gen*)gc);
   gc_assign_free_area_to_mutators(gc);
+#endif
 
   vm_reclaim_native_objs();  
   vm_resume_threads_after();
   return;
 }
+
 

@@ -368,6 +368,7 @@ static void mspace_sliding_compact(Collector* collector, Mspace* mspace)
 
        unsigned int obj_size = (unsigned int)((POINTER_SIZE_INT)start_pos - (POINTER_SIZE_INT)p_obj);
       if(p_obj != p_target_obj){
+        assert((((POINTER_SIZE_INT)p_target_obj) % GC_OBJECT_ALIGNMENT) == 0);
         memmove(p_target_obj, p_obj, obj_size);
       }
       set_obj_info(p_target_obj, 0);
@@ -466,7 +467,6 @@ void slide_compact_mspace(Collector* collector)
   old_num = atomic_inc32(&num_repointing_collectors);
   /*last collector's world here*/
   if( ++old_num == num_active_collectors ){
-    /*LOS_Shrink: but lspace->move_object could be set individually without shrinking LOS.*/
     if(lspace->move_object) lspace_compute_object_target(collector, lspace);
     gc->collect_result = gc_collection_result(gc);
     if(!gc->collect_result){

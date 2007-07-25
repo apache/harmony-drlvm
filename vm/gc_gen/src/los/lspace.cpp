@@ -49,7 +49,7 @@ void lspace_initialize(GC* gc, void* start, POINTER_SIZE_INT lspace_size)
 
   lspace->gc = gc;
   /*LOS_Shrink:*/
-  lspace->move_object = FALSE;
+  lspace->move_object = 0;
 
   /*Treat with free area buddies*/
   lspace->free_pool = (Free_Area_Pool*)STD_MALLOC(sizeof(Free_Area_Pool));
@@ -61,7 +61,12 @@ void lspace_initialize(GC* gc, void* start, POINTER_SIZE_INT lspace_size)
   lspace->num_collections = 0;
   lspace->time_collections = 0;
   lspace->survive_ratio = 0.5f;
-
+  lspace->last_alloced_size = 0;
+  lspace->accumu_alloced_size = 0;  
+  lspace->total_alloced_size = 0;
+  lspace->last_surviving_size = 0;
+  lspace->period_surviving_size = 0;
+  
   gc_set_los((GC_Gen*)gc, (Space*)lspace);
   p_global_lspace_move_obj = &(lspace->move_object);
   los_boundary = lspace->heap_end;
@@ -104,15 +109,18 @@ void lspace_fix_repointed_refs(Collector* collector, Lspace* lspace)
 
 void lspace_collection(Lspace* lspace)
 {
-  /* heap is marked already, we need only sweep here. */
   lspace->num_collections ++;
-  lspace_reset_after_collection(lspace); 
-  /*When sliding compacting lspace, we don't need to sweep it anymore.
-  What's more, the assumption that the first word of one KB must be zero when iterating 
-  lspace in that function lspace_get_next_marked_object is not true*/  
-  if(!lspace->move_object) lspace_sweep(lspace);
-  else lspace->surviving_size = (POINTER_SIZE_INT)lspace->scompact_fa_start - (POINTER_SIZE_INT)lspace->heap_start;
-  lspace->move_object = FALSE;
+
+  if(!lspace->move_object){
+    lspace_reset_for_sweep(lspace);
+    lspace_sweep(lspace);   
+  }else{
+    /* The real action of LOS sliding compaction is done together with MOS compaction. */
+    lspace_reset_for_slide(lspace); 
+    /* When sliding compacting lspace, we don't need to sweep it anymore.
+      * What's more, the assumption that the first word of one KB must be zero when iterating 
+      * lspace in that function lspace_get_next_marked_object is not true */  
+  }
   return;
 }
 

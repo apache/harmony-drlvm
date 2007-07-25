@@ -19,9 +19,8 @@
  */
 
 #include "gc_thread.h"
-
 #include "../gen/gen.h"
-
+#include "../mark_sweep/gc_ms.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 
 //#define GC_OBJ_SIZE_STATISTIC
@@ -73,14 +72,19 @@ Managed_Object_Handle gc_alloc(unsigned size, Allocation_Handle ah, void *unused
   gc_alloc_statistic_obj_distrubution(size);
 #endif
 
+#ifndef ONLY_SSPACE_IN_HEAP
   if ( size > GC_OBJ_SIZE_THRESHOLD )
     p_obj = (Managed_Object_Handle)los_alloc(size, allocator);
-  else{
+  else
     p_obj = (Managed_Object_Handle)nos_alloc(size, allocator);
-  }
-  
+#else
+  p_obj = (Managed_Object_Handle)gc_ms_alloc(size, allocator);
+#endif
+
   if( p_obj == NULL )
     return NULL;
+
+  assert((((POINTER_SIZE_INT)p_obj) % GC_OBJECT_ALIGNMENT) == 0);
     
   obj_set_vt((Partial_Reveal_Object*)p_obj, (VT)ah);
   
@@ -111,9 +115,14 @@ Managed_Object_Handle gc_alloc_fast (unsigned size, Allocation_Handle ah, void *
  
   /* Try to allocate an object from the current Thread Local Block */
   Managed_Object_Handle p_obj;
+#ifndef ONLY_SSPACE_IN_HEAP
   p_obj = (Managed_Object_Handle)thread_local_alloc(size, allocator);
+#else
+  p_obj = (Managed_Object_Handle)gc_ms_fast_alloc(size, allocator);
+#endif
   if(p_obj == NULL) return NULL;
-   
+
+  assert((((POINTER_SIZE_INT)p_obj) % GC_OBJECT_ALIGNMENT) == 0);
   obj_set_vt((Partial_Reveal_Object*)p_obj, (VT)ah);
   
   return p_obj;

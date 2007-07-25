@@ -54,6 +54,8 @@ void mspace_update_info_after_space_tuning(Mspace* mspace)
   }
 }
 
+
+Space* gc_get_nos(GC_Gen* gc);
 void mspace_reset_after_compaction(Mspace* mspace)
 {
   unsigned int old_num_used = mspace->num_used_blocks;
@@ -79,9 +81,8 @@ void mspace_reset_after_compaction(Mspace* mspace)
   }
   mspace->num_used_blocks = new_num_used;
   /*For_statistic mos infomation*/
-  mspace->surviving_size = new_num_used * GC_BLOCK_SIZE_BYTES;
-  mspace->alloced_size = 0;
-  
+  mspace->period_surviving_size = new_num_used * GC_BLOCK_SIZE_BYTES;
+ 
   /* we should clear the remaining blocks which are set to be BLOCK_COMPACTED or BLOCK_TARGET */
   for(; i < mspace->num_managed_blocks; i++){
     Block_Header* block = (Block_Header*)&(blocks[i]);
@@ -335,6 +336,7 @@ void mspace_collection(Mspace* mspace)
 
   return;  
 } 
+
 
 
 

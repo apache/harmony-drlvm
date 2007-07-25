@@ -196,10 +196,11 @@ static void gc_decide_next_collect(GC_Gen* gc, int64 pause_time)
 
   POINTER_SIZE_INT mos_free_size = space_free_memory_size(mspace);
   POINTER_SIZE_INT nos_free_size = space_free_memory_size(fspace);
+  assert(nos_free_size == space_committed_size((Space*)fspace));
   POINTER_SIZE_INT total_free_size = mos_free_size  + nos_free_size;
   if(!gc_match_kind((GC*)gc, MINOR_COLLECTION)) gc->force_gen_mode = FALSE;
   if(!gc->force_gen_mode){
-    /*For major collection:*/
+    /*Major collection:*/
     if(!gc_match_kind((GC*)gc, MINOR_COLLECTION)){
       mspace->time_collections += pause_time;
   
@@ -212,8 +213,7 @@ static void gc_decide_next_collect(GC_Gen* gc, int64 pause_time)
       
       /*If major is caused by LOS, or collection kind is EXTEND_COLLECTION, all survive ratio is not updated.*/
       if((gc->cause != GC_CAUSE_LOS_IS_FULL) && (!gc_match_kind((GC*)gc, EXTEND_COLLECTION))){
-        POINTER_SIZE_INT major_surviving_size = space_committed_size((Space*)mspace) - mos_free_size;
-        survive_ratio = (float)major_surviving_size/(float)space_committed_size((Space*)mspace);
+        survive_ratio = (float)mspace->period_surviving_size/(float)mspace->committed_heap_size;
         mspace->survive_ratio = survive_ratio;
       }
       /*If there is no minor collection at all, we must give mspace expected threshold a reasonable value.*/
@@ -223,11 +223,14 @@ static void gc_decide_next_collect(GC_Gen* gc, int64 pause_time)
         *a conservative and reasonable number to avoid next fall back.
         *In fallback compaction, the survive_ratio of mspace must be 1.*/
       if(gc_match_kind((GC*)gc, FALLBACK_COLLECTION)) fspace->survive_ratio = 1;
-    /*For minor collection:*/    
-    }else{
+
+    }
+    /*Minor collection:*/    
+    else
+    {
       /*Give a hint to mini_free_ratio. */
       if(fspace->num_collections == 1){
-        /*fixme: This is only set for tuning the first warehouse!*/
+        /*Fixme: This is only set for tuning the first warehouse!*/
         Tslow = pause_time / gc->survive_ratio;
         SMax = (POINTER_SIZE_INT)((float)(gc->committed_heap_size - gc->los->committed_heap_size) * ( 1 - gc->survive_ratio ));
         last_total_free_size = gc->committed_heap_size - gc->los->committed_heap_size;
@@ -237,6 +240,9 @@ static void gc_decide_next_collect(GC_Gen* gc, int64 pause_time)
       POINTER_SIZE_INT free_size_threshold;
 
       POINTER_SIZE_INT minor_surviving_size = last_total_free_size - total_free_size;
+      /*If the first GC is caused by LOS, mspace->last_alloced_size should be smaller than this minor_surviving_size
+        *Because the last_total_free_size is not accurate.*/
+      if(fspace->num_collections != 1) assert(minor_surviving_size == mspace->last_alloced_size);
   
       float k = Tslow * fspace->num_collections/fspace->time_collections;
       float m = ((float)minor_surviving_size)*1.0f/((float)(SMax - GC_MOS_MIN_EXTRA_REMAIN_SIZE ));

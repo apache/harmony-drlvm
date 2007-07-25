@@ -38,7 +38,7 @@ static Boolean fspace_alloc_block(Fspace* fspace, Allocator* allocator)
     Block_Header* alloc_block = (Block_Header*)&(fspace->blocks[allocated_idx - fspace->first_block_idx]);
     
     allocator_init_free_block(allocator, alloc_block);
-            
+
     return TRUE;
   }
 
@@ -84,5 +84,6 @@ void* fspace_alloc(unsigned size, Allocator *allocator)
   return p_return;
   
 }
+
 
 

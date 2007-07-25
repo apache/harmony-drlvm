@@ -32,6 +32,7 @@ typedef struct Mutator {
   void* ceiling;
   void* end;
   void* alloc_block;
+  Chunk_Header ***local_chunks;
   Space* alloc_space;
   GC* gc;
   VmThreadHandle thread_handle;   /* This thread; */
@@ -39,8 +40,6 @@ typedef struct Mutator {
   
   Vector_Block* rem_set;
   Vector_Block* obj_with_fin;
-  Chunk_Header **small_chunks;
-  Chunk_Header **medium_chunks;
   Mutator* next;  /* The gc info area associated with the next active thread. */
 } Mutator;
 

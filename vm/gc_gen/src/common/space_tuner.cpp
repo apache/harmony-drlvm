@@ -29,39 +29,38 @@ Space* gc_get_nos(GC_Gen* gc);
 Space* gc_get_los(GC_Gen* gc);
 float mspace_get_expected_threshold_ratio(Mspace* mspace);
 POINTER_SIZE_INT lspace_get_failure_size(Lspace* lspace);
-    
+
+/* Calculate speed of allocation and waste memory of specific space respectively, 
+  * then decide whether to execute a space tuning according to the infomation.*/
 void gc_decide_space_tune(GC* gc, unsigned int cause)
 {
   Blocked_Space* mspace = (Blocked_Space*)gc_get_mos((GC_Gen*)gc);
   Blocked_Space* fspace = (Blocked_Space*)gc_get_nos((GC_Gen*)gc);  
   Space* lspace = (Space*)gc_get_los((GC_Gen*)gc);  
   Space_Tuner* tuner = gc->tuner;
-  //debug_adjust
-  assert(fspace->free_block_idx >= fspace->first_block_idx);
-  unsigned int nos_alloc_size = (fspace->free_block_idx - fspace->first_block_idx) * GC_BLOCK_SIZE_BYTES;
-  fspace->alloced_size = nos_alloc_size;
-  /*Fixme: LOS_Adaptive: There should be a condition here, that fspace->collection_num != 0*/
-  mspace->alloced_size += (unsigned int)((float)nos_alloc_size * fspace->survive_ratio);
-  /*For_statistic alloc speed: Speed could be represented by sum of alloced size.
-   *The right of this time los/mos alloc speed is the biggest.
-   */
-  tuner->speed_los = lspace->alloced_size;
-  tuner->speed_los = (tuner->speed_los + tuner->old_speed_los) >> 1;
-  tuner->speed_mos = mspace->alloced_size;
-  tuner->speed_mos = (tuner->speed_mos + tuner->old_speed_mos) >> 1;
+
+  tuner->speed_los = lspace->accumu_alloced_size;
+  tuner->speed_los = (tuner->speed_los + tuner->last_speed_los) >> 1;
+  /*The possible survivors from the newly allocated NOS should be counted into the speed of MOS*/
+  tuner->speed_mos = mspace->accumu_alloced_size +   (uint64)((float)fspace->last_alloced_size * fspace->survive_ratio);;
+  tuner->speed_mos = (tuner->speed_mos + tuner->last_speed_mos) >> 1;
+  tuner->speed_nos = fspace->accumu_alloced_size;
+  tuner->speed_nos = (tuner->speed_nos + tuner->last_speed_nos) >> 1;
   
-  /*For_statistic wasted memory*/
-  POINTER_SIZE_INT curr_used_los = lspace->surviving_size + lspace->alloced_size;
-  POINTER_SIZE_INT curr_wast_los = 0;
+  /*Statistic wasted memory*/
+  uint64 curr_used_los = lspace->last_surviving_size + lspace->last_alloced_size;
+  uint64 curr_wast_los = 0;
   if(gc->cause != GC_CAUSE_LOS_IS_FULL) curr_wast_los =  lspace->committed_heap_size - curr_used_los;
-  tuner->wast_los += curr_wast_los;
+  tuner->wast_los += (POINTER_SIZE_INT)curr_wast_los;
   
-  POINTER_SIZE_INT curr_used_mos = mspace->surviving_size + mspace->alloced_size;
+  uint64 curr_used_mos = 
+                                mspace->period_surviving_size + mspace->accumu_alloced_size + (uint64)(fspace->last_alloced_size * fspace->survive_ratio);
   float expected_mos_ratio = mspace_get_expected_threshold_ratio((Mspace*)mspace);
-  POINTER_SIZE_INT expected_mos = (POINTER_SIZE_INT)((mspace->committed_heap_size + fspace->committed_heap_size) * expected_mos_ratio);
-  POINTER_SIZE_INT curr_wast_mos = 0;
+  uint64 expected_mos = (uint64)((mspace->committed_heap_size + fspace->committed_heap_size) * expected_mos_ratio);
+  uint64 curr_wast_mos = 0;
   if(expected_mos > curr_used_mos) curr_wast_mos = expected_mos - curr_used_mos;
   tuner->wast_mos += curr_wast_mos;
+
   tuner->current_dw = ABS_DIFF(tuner->wast_mos, tuner->wast_los);
 
   /*For_statistic ds in heuristic*/
@@ -86,6 +85,14 @@ void gc_decide_space_tune(GC* gc, unsigned int cause)
 extern POINTER_SIZE_INT min_los_size_bytes;
 extern POINTER_SIZE_INT min_none_los_size_bytes;
 
+/*Open this macro if we want to tune the space size according to allocation speed computed in major collection.
+  *By default, we will use allocation speed computed in minor collection. */
+//#define SPACE_TUNE_BY_MAJOR_SPEED
+
+
+/* The tuning size computing before marking is not precise. We only estimate the probable direction of space tuning.
+  * If this function decide to set TRANS_NOTHING, then we just call the normal marking function.
+  * Else, we call the marking function for space tuning.  */
 void gc_compute_space_tune_size_before_marking(GC* gc, unsigned int cause)
 {
   if(gc_match_kind(gc, MINOR_COLLECTION))  return;
@@ -93,39 +100,50 @@ void gc_compute_space_tune_size_before_marking(GC* gc, unsigned int cause)
   gc_decide_space_tune(gc, cause);
   
   Space_Tuner* tuner = gc->tuner;
-  if((tuner->speed_los == 0) && ( tuner->speed_mos == 0)) return;
+  assert((tuner->speed_los != 0) && ( tuner->speed_mos != 0)) ;
   if((!tuner->need_tune) && (!tuner->force_tune)) return;
   
   Blocked_Space* mspace = (Blocked_Space*)gc_get_mos((GC_Gen*)gc);
   Blocked_Space* fspace = (Blocked_Space*)gc_get_nos((GC_Gen*)gc);
   Space* lspace = (Space*)gc_get_los((GC_Gen*)gc);
 
-  POINTER_SIZE_INT los_expect_surviving_sz = (POINTER_SIZE_INT)((float)(lspace->surviving_size + lspace->alloced_size) * lspace->survive_ratio);
+  POINTER_SIZE_INT los_expect_surviving_sz = (POINTER_SIZE_INT)((float)(lspace->last_surviving_size + lspace->last_alloced_size) * lspace->survive_ratio);
   POINTER_SIZE_INT los_expect_free_sz = ((lspace->committed_heap_size > los_expect_surviving_sz) ? 
                                                             (lspace->committed_heap_size - los_expect_surviving_sz) : 0);
-  POINTER_SIZE_INT mos_expect_survive_sz = (POINTER_SIZE_INT)((float)(mspace->surviving_size + mspace->alloced_size) * mspace->survive_ratio);
+  
+  POINTER_SIZE_INT mos_expect_survive_sz = (POINTER_SIZE_INT)((float)(mspace->period_surviving_size + mspace->accumu_alloced_size) * mspace->survive_ratio);
   float mos_expect_threshold_ratio = mspace_get_expected_threshold_ratio((Mspace*)mspace);
   POINTER_SIZE_INT mos_expect_threshold = (POINTER_SIZE_INT)((mspace->committed_heap_size + fspace->committed_heap_size) * mos_expect_threshold_ratio);
   POINTER_SIZE_INT mos_expect_free_sz = ((mos_expect_threshold > mos_expect_survive_sz)?
                                                             (mos_expect_threshold - mos_expect_survive_sz) : 0);
-  POINTER_SIZE_INT total_expect_free_sz = los_expect_free_sz + mos_expect_free_sz;
 
+  POINTER_SIZE_INT non_los_expect_surviving_sz = (POINTER_SIZE_INT)(mos_expect_survive_sz + fspace->last_alloced_size * fspace->survive_ratio);
+  POINTER_SIZE_INT non_los_committed_size = mspace->committed_heap_size + fspace->committed_heap_size;
+  POINTER_SIZE_INT non_los_expect_free_sz = (non_los_committed_size > non_los_expect_surviving_sz) ? (non_los_committed_size - non_los_expect_surviving_sz):(0) ;
+
+#ifdef SPACE_TUNE_BY_MAJOR_SPEED
+  /*Fixme: tuner->speed_los here should be computed by sliding compact LOS, to be implemented!*/
+  POINTER_SIZE_INT total_expect_free_sz = los_expect_free_sz + mos_expect_free_sz;
   float new_los_ratio = (float)tuner->speed_los / (float)(tuner->speed_los  + tuner->speed_mos);
   POINTER_SIZE_INT new_free_los_sz = (POINTER_SIZE_INT)((float)total_expect_free_sz * new_los_ratio);
+#else
+  POINTER_SIZE_INT total_expect_free_sz = los_expect_free_sz + non_los_expect_free_sz;
+  float new_los_ratio = (float)tuner->speed_los / (float)(tuner->speed_los  + tuner->speed_nos);
+  POINTER_SIZE_INT new_free_los_sz = (POINTER_SIZE_INT)((float)total_expect_free_sz * new_los_ratio);
+#endif
+
 
   /*LOS_Extend:*/
   if((new_free_los_sz > los_expect_free_sz) )
   { 
     tuner->kind = TRANS_FROM_MOS_TO_LOS;
     tuner->tuning_size = new_free_los_sz - los_expect_free_sz;
-    lspace->move_object = 0;
   }
   /*LOS_Shrink:*/
   else if(new_free_los_sz < los_expect_free_sz)
   {
     tuner->kind = TRANS_FROM_LOS_TO_MOS;
     tuner->tuning_size = los_expect_free_sz - new_free_los_sz;
-    lspace->move_object = 1;
   }
   /*Nothing*/
   else
@@ -137,7 +155,6 @@ void gc_compute_space_tune_size_before_marking(GC* gc, unsigned int cause)
   if( (!tuner->force_tune) && (tuner->tuning_size < tuner->min_tuning_size) ){
     tuner->kind = TRANS_NOTHING;
     tuner->tuning_size = 0;
-    lspace->move_object = 0;
   }
 
   /*If los or non-los is already the smallest size, there is no need to tune anymore.
@@ -148,14 +165,13 @@ void gc_compute_space_tune_size_before_marking(GC* gc, unsigned int cause)
     assert((lspace->committed_heap_size == min_los_size_bytes) || (fspace->committed_heap_size + mspace->committed_heap_size == min_none_los_size_bytes));
     tuner->kind = TRANS_NOTHING;
     tuner->tuning_size = 0;
-    lspace->move_object = 0;
   }
-  
+
+  /*If the strategy upward doesn't decide to extend los, but current GC is caused by los, force an extension here.*/
   if(tuner->force_tune){
     if(tuner->kind != TRANS_FROM_MOS_TO_LOS){
       tuner->kind = TRANS_FROM_MOS_TO_LOS;
       tuner->tuning_size = 0;
-      tuner->reverse_1 = 1;
     }
   }
 
@@ -167,6 +183,7 @@ void gc_compute_space_tune_size_before_marking(GC* gc, unsigned int cause)
 
 static POINTER_SIZE_INT non_los_live_obj_size;
 static  POINTER_SIZE_INT los_live_obj_size;
+/* Only when we call the special marking function for space tuning, we can get the accumulation of the sizes. */
 static void gc_compute_live_object_size_after_marking(GC* gc, POINTER_SIZE_INT non_los_size)
 {
   non_los_live_obj_size = 0;
@@ -204,6 +221,12 @@ static void gc_compute_live_object_size_after_marking(GC* gc, POINTER_SIZE_INT n
 
 }
 
+/* If this GC is caused by a LOS allocation failure, we set the "force_tune" flag. 
+  * Attention1:  The space tuning strategy will extend or shrink LOS according to the wasted memory size and allocation speed.
+  * If the strategy decide to shrink or the size extended is not large enough to hold the failed object, we set the "doforce" flag in 
+  * function "gc_compute_space_tune_size_after_marking". And only if "force_tune" and "doforce" are both true, we decide the 
+  * size of extention by this function.
+  * Attention2: The total heap size might extend in this function. */
 static void compute_space_tune_size_for_force_tune(GC *gc, POINTER_SIZE_INT max_tune_for_min_non_los)
 {
   Space_Tuner* tuner = gc->tuner;
@@ -219,7 +242,6 @@ static void compute_space_tune_size_for_force_tune(GC *gc, POINTER_SIZE_INT max_
   if(lspace_free_size >= failure_size){
     tuner->tuning_size = 0;
     tuner->kind = TRANS_NOTHING;
-    lspace->move_object = 1;
   }else{
     tuner->tuning_size = failure_size -lspace_free_size;
     
@@ -250,25 +272,24 @@ static void compute_space_tune_size_for_force_tune(GC *gc, POINTER_SIZE_INT max_
       if(tuner->tuning_size > potential_max_tuning_size){
         tuner->tuning_size = 0;
         tuner->kind = TRANS_NOTHING;
-        lspace->move_object = 0;      
       }else{
         /*We have tuner->tuning_size > max_tuning_size up there.*/
         extend_heap_size = tuner->tuning_size - max_tuning_size;
         blocked_space_extend(fspace, (unsigned int)extend_heap_size);
         gc->committed_heap_size += extend_heap_size;
         tuner->kind = TRANS_FROM_MOS_TO_LOS;
-        lspace->move_object = 1;        
       }
-    } else{
+    }
+    else
+    {
       tuner->kind = TRANS_FROM_MOS_TO_LOS;
-      lspace->move_object = 1;
     }
   }
 
   return;
 }
 
-static void make_sure_tuning_size(GC* gc)
+static void check_tuning_size(GC* gc)
 {
   Space_Tuner* tuner = gc->tuner;
   Lspace *lspace = (Lspace*)gc_get_los((GC_Gen*)gc);
@@ -277,41 +298,48 @@ static void make_sure_tuning_size(GC* gc)
 
   POINTER_SIZE_INT los_free_sz =  ((lspace->committed_heap_size > los_live_obj_size) ? 
                                                    (lspace->committed_heap_size - los_live_obj_size) : 0);
+
+#ifdef SPACE_TUNE_BY_MAJOR_SPEED
   float mos_expect_threshold_ratio = mspace_get_expected_threshold_ratio((Mspace*)mspace);
   POINTER_SIZE_INT mos_expect_threshold = (POINTER_SIZE_INT)((mspace->committed_heap_size + fspace->committed_heap_size) * mos_expect_threshold_ratio);
   POINTER_SIZE_INT mos_free_sz = ((mos_expect_threshold > non_los_live_obj_size)?
                                                             (mos_expect_threshold - non_los_live_obj_size) : 0);
   POINTER_SIZE_INT total_free_sz = los_free_sz + mos_free_sz;
-
   float new_los_ratio = (float)tuner->speed_los / (float)(tuner->speed_los  + tuner->speed_mos);
   POINTER_SIZE_INT new_free_los_sz = (POINTER_SIZE_INT)((float)total_free_sz * new_los_ratio);
+#else
+  POINTER_SIZE_INT non_los_committed_size = mspace->committed_heap_size + fspace->committed_heap_size;
+  POINTER_SIZE_INT non_los_free_sz = ((non_los_committed_size > non_los_live_obj_size)?
+                                                                (non_los_committed_size - non_los_live_obj_size):0);
+  POINTER_SIZE_INT total_free_sz = los_free_sz + non_los_free_sz;
+  float new_los_ratio = (float)tuner->speed_los / (float)(tuner->speed_los  + tuner->speed_nos);
+  POINTER_SIZE_INT new_free_los_sz = (POINTER_SIZE_INT)((float)total_free_sz * new_los_ratio);
+#endif
 
   /*LOS_Extend:*/
   if((new_free_los_sz > los_free_sz) )
   { 
     tuner->kind = TRANS_FROM_MOS_TO_LOS;
     tuner->tuning_size = new_free_los_sz - los_free_sz;
-    lspace->move_object = 0; //This is necessary, because the flag might be set by gc_compute_space_tune_size_before_marking.
   }
   /*LOS_Shrink:*/
   else if(new_free_los_sz < los_free_sz)
   {
     tuner->kind = TRANS_FROM_LOS_TO_MOS;
     tuner->tuning_size = los_free_sz - new_free_los_sz;
-    lspace->move_object = 1;
   }
   /*Nothing*/
   else
   {
     tuner->tuning_size = 0;
-    tuner->kind = TRANS_NOTHING;//This is necessary, because the original value of kind might not be NOTHING.
+    /*This is necessary, because the original value of kind might not be NOTHING. */
+    tuner->kind = TRANS_NOTHING;
   }
 
   /*If not force tune, and the tuning size is too small, tuner will not take effect.*/
   if( (!tuner->force_tune) && (tuner->tuning_size < tuner->min_tuning_size) ){
     tuner->kind = TRANS_NOTHING;
     tuner->tuning_size = 0;
-    lspace->move_object = 0;
   }
 
   /*If los or non-los is already the smallest size, there is no need to tune anymore.
@@ -322,19 +350,19 @@ static void make_sure_tuning_size(GC* gc)
     assert((lspace->committed_heap_size == min_los_size_bytes) || (fspace->committed_heap_size + mspace->committed_heap_size == min_none_los_size_bytes));
     tuner->kind = TRANS_NOTHING;
     tuner->tuning_size = 0;
-    lspace->move_object = 0;
   }
   
   if(tuner->force_tune){
     if(tuner->kind != TRANS_FROM_MOS_TO_LOS){
       tuner->kind = TRANS_FROM_MOS_TO_LOS;
-      tuner->reverse_2 = 1;
+      tuner->reverse = 1;
     }
   }
 
   return;  
 }
 
+/* This is the real function that decide tuning_size, because we have know the total size of living objects after "mark_scan_heap_for_space_tune". */
 void gc_compute_space_tune_size_after_marking(GC *gc)
 {
   Blocked_Space* mspace = (Blocked_Space*)gc_get_mos((GC_Gen*)gc);
@@ -347,7 +375,7 @@ void gc_compute_space_tune_size_after_marking(GC *gc)
 
   gc_compute_live_object_size_after_marking(gc, non_los_size);
 
-  make_sure_tuning_size(gc);
+  check_tuning_size(gc);
   
   /*We should assure that the non_los area is no less than min_none_los_size_bytes*/
   POINTER_SIZE_INT max_tune_for_min_non_los = 0;
@@ -369,15 +397,11 @@ void gc_compute_space_tune_size_after_marking(GC *gc)
         tuner->tuning_size = max_tuning_size;
       /*Round down so as not to break max_tuning_size*/
       tuner->tuning_size = round_down_to_size(tuner->tuning_size, GC_BLOCK_SIZE_BYTES);
-      if(tuner->tuning_size == 0){
-        //If tuning size is zero, we should reset kind to NOTHING, in case that gc_init_block_for_collectors relink the block list.
-        tuner->kind = TRANS_NOTHING;
-        lspace->move_object = 0;
-      }
+       /*If tuning size is zero, we should reset kind to NOTHING, in case that gc_init_block_for_collectors relink the block list.*/
+      if(tuner->tuning_size == 0)  tuner->kind = TRANS_NOTHING;
     }else{ 
       tuner->tuning_size = 0;
       tuner->kind = TRANS_NOTHING;
-      lspace->move_object = 0;
     }
   }
   /*Not force tune, LOS Shrink*/
@@ -391,28 +415,22 @@ void gc_compute_space_tune_size_after_marking(GC *gc)
         tuner->tuning_size = max_tuning_size;
       /*Round down so as not to break max_tuning_size*/
       tuner->tuning_size = round_down_to_size(tuner->tuning_size, GC_BLOCK_SIZE_BYTES);
-      if(tuner->tuning_size == 0){
-        tuner->kind = TRANS_NOTHING;
-        lspace->move_object = 0;
-      }
+      if(tuner->tuning_size == 0)  tuner->kind = TRANS_NOTHING;
     }else{
       /* this is possible because of the reservation in gc_compute_live_object_size_after_marking*/        
       tuner->tuning_size = 0;
       tuner->kind = TRANS_NOTHING;
-      lspace->move_object = 0;
     }
   }
 
   /*If the tuning strategy give a bigger tuning_size than failure size, we just follow the strategy and set noforce.*/
   Boolean doforce = TRUE;
   POINTER_SIZE_INT failure_size = lspace_get_failure_size((Lspace*)lspace);  
-  if( (tuner->kind == TRANS_FROM_MOS_TO_LOS) && (!tuner->reverse_2) && (tuner->tuning_size > failure_size) )
+  if( (tuner->kind == TRANS_FROM_MOS_TO_LOS) && (!tuner->reverse) && (tuner->tuning_size > failure_size) )
     doforce = FALSE;
 
-  /*If force tune*/
-  if( (tuner->force_tune) && (doforce) ){
+  if( (tuner->force_tune) && (doforce) )
     compute_space_tune_size_for_force_tune(gc, max_tune_for_min_non_los);
-  }
 
   return;
   
@@ -428,10 +446,12 @@ void  gc_space_tuner_reset(GC* gc)
     tuner->need_tune = FALSE;
     tuner->force_tune = FALSE;
 
-    tuner->old_speed_los = tuner->speed_los;
-    tuner->old_speed_mos = tuner->speed_mos;
+    tuner->last_speed_los = tuner->speed_los;
+    tuner->last_speed_mos = tuner->speed_mos;
+    tuner->last_speed_nos = tuner->speed_nos;
     tuner->speed_los = 0;
     tuner->speed_mos = 0;
+    tuner->speed_nos = 0;    
 
     tuner->current_dw  = 0;
     tuner->current_ds = 0;
@@ -444,8 +464,7 @@ void  gc_space_tuner_reset(GC* gc)
       tuner->wast_mos = 0;
     }
     tuner->kind = TRANS_NOTHING;    
-    tuner->reverse_1 = 0;
-    tuner->reverse_2 = 0;
+    tuner->reverse = 0;
   }
   
   return;  
@@ -518,5 +537,6 @@ void gc_space_tuner_release_fake_blocks_for_los_shrink(GC* gc)
   STD_FREE(tuner->interim_blocks);
   return;
 }
+
 
 

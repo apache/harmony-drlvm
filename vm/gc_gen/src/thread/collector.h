@@ -26,6 +26,7 @@
 
 struct Block_Header;
 struct Stealable_Stack;
+struct Chunk_Header;
 struct Free_Chunk_List;
 
 #define NORMAL_SIZE_SEGMENT_GRANULARITY_BITS  8
@@ -40,6 +41,7 @@ typedef struct Collector{
   void *ceiling;
   void *end;
   void *alloc_block;
+  Chunk_Header ***local_chunks;
   Space* alloc_space;
   GC* gc;
   VmThreadHandle thread_handle;   /* This thread; */

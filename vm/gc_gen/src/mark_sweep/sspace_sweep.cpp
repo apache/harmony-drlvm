@@ -171,7 +171,7 @@ static void collector_sweep_normal_chunk(Collector *collector, Sspace *sspace, C
     //zeroing_free_areas_in_pfc((Chunk_Header*)chunk, live_num);
 #endif
     chunk_pad_last_index_word((Chunk_Header*)chunk, mark_mask_in_table);
-    sspace_put_pfc(sspace, chunk, chunk->slot_size);
+    sspace_put_pfc(sspace, chunk);
   }
   /* the rest: chunks with free rate < 0.1. we don't use them */
 #ifdef SSPACE_VERIFY

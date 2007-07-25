@@ -26,8 +26,7 @@
  * The sweep space accomodates objects collected by mark-sweep
  */
 
-#define ONLY_SSPACE_IN_HEAP
-
+struct Size_Segment;
 struct Free_Chunk_List;
 
 typedef struct Sspace {
@@ -42,15 +41,23 @@ typedef struct Sspace {
   unsigned int collect_algorithm;
   GC *gc;
   Boolean move_object;
-  /* Size allocted after last collection. Not available in fspace now. */
-  unsigned int alloced_size;
-  /* For_statistic: not available now for fspace */
-  unsigned int surviving_size;
+
+  /* Size allocted since last minor collection. */
+  volatile POINTER_SIZE_INT last_alloced_size;
+  /* Size allocted since last major collection. */
+  volatile POINTER_SIZE_INT accumu_alloced_size;
+  /* Total size allocated since VM starts. */
+  volatile POINTER_SIZE_INT total_alloced_size;
+
+  /* Size survived from last collection. */
+  POINTER_SIZE_INT last_surviving_size;
+  /* Size survived after a certain period. */
+  POINTER_SIZE_INT period_surviving_size;  
+
   /* END of Space --> */
   
-  Pool **small_pfc_pools;
-  Pool **medium_pfc_pools;
-  Pool **large_pfc_pools;
+  Size_Segment **size_segments;
+  Pool ***pfc_pools;
   Free_Chunk_List *aligned_free_chunk_lists;
   Free_Chunk_List *unaligned_free_chunk_lists;
   Free_Chunk_List *hyper_free_chunk_list;
@@ -59,16 +66,24 @@ typedef struct Sspace {
 void sspace_initialize(GC *gc, void *start, unsigned int sspace_size, unsigned int commit_size);
 void sspace_destruct(Sspace *sspace);
 
-void *sspace_fast_alloc(unsigned size, Allocator *allocator);
+void *sspace_thread_local_alloc(unsigned size, Allocator *allocator);
 void *sspace_alloc(unsigned size, Allocator *allocator);
 
 void sspace_reset_for_allocation(Sspace *sspace);
 
 void sspace_collection(Sspace *sspace);
 
-void mutator_init_small_chunks(Mutator *mutator);
+void allocator_init_local_chunks(Allocator *allocator);
+void allocactor_destruct_local_chunks(Allocator *allocator);
 void collector_init_free_chunk_list(Collector *collector);
 
 POINTER_SIZE_INT sspace_free_memory_size(Sspace *sspace);
+
+
+#ifndef ONLY_SSPACE_IN_HEAP
+#define gc_get_sspace(gc) ((Sspace*)gc_get_mos((GC_Gen*)(gc)))
+#else
+#define gc_get_sspace(gc) (gc_ms_get_sspace((GC_MS*)(gc)));
+#endif
 
 #endif // _SWEEP_SPACE_H_

@@ -68,7 +68,9 @@ void verifier_metadata_initialize(Heap_Verifier* heap_verifier)
   heap_verifier_metadata->new_objects_pool  = sync_pool_create();  
   heap_verifier_metadata->hashcode_pool_before_gc = sync_pool_create();
   heap_verifier_metadata->hashcode_pool_after_gc = sync_pool_create();
-  
+  heap_verifier_metadata->obj_with_fin_pool= sync_pool_create();
+  heap_verifier_metadata->finalizable_obj_pool= sync_pool_create();
+
   verifier_metadata = heap_verifier_metadata;
   heap_verifier->heap_verifier_metadata = heap_verifier_metadata;
   return;
@@ -90,6 +92,9 @@ void gc_verifier_metadata_destruct(Heap_Verifier* heap_verifier)
   sync_pool_destruct(metadata->new_objects_pool);  
   sync_pool_destruct(metadata->hashcode_pool_before_gc);
   sync_pool_destruct(metadata->hashcode_pool_after_gc);
+  
+  sync_pool_destruct(metadata->obj_with_fin_pool);
+  sync_pool_destruct(metadata->finalizable_obj_pool);
 
   for(unsigned int i=0; i<metadata->num_alloc_segs; i++){
     assert(metadata->segments[i]);
@@ -160,9 +165,14 @@ void verifier_clear_pool(Pool* working_pool, Pool* free_pool, Boolean is_vector_
   }
 }
 
-Pool* verifier_copy_pool_reverse_order(Pool* source_pool)
+void verifier_remove_pool(Pool* working_pool, Pool* free_pool, Boolean is_vector_stack)
 {
-  Pool* dest_pool = sync_pool_create();
+  verifier_clear_pool(working_pool, free_pool, is_vector_stack);
+  sync_pool_destruct(working_pool);
+}
+
+void verifier_copy_pool_reverse_order(Pool* dest_pool, Pool* source_pool)
+{
   pool_iterator_init(source_pool);
   Vector_Block* dest_set = verifier_free_set_pool_get_entry(verifier_metadata->free_set_pool);
   
@@ -176,5 +186,33 @@ Pool* verifier_copy_pool_reverse_order(Pool* source_pool)
     pool_put_entry(dest_pool, dest_set);
     dest_set = verifier_free_set_pool_get_entry(verifier_metadata->free_set_pool);
   }
-  return dest_pool;
+  return ;
+}
+
+/*copy dest pool to source pool, ignore NULL slot*/
+void verifier_copy_pool(Pool* dest_pool, Pool* source_pool)
+{
+  Pool* temp_pool = sync_pool_create();
+  
+  Vector_Block* dest_set = verifier_free_set_pool_get_entry(verifier_metadata->free_set_pool);
+  pool_iterator_init(source_pool);
+  while(Vector_Block *source_set = pool_iterator_next(source_pool)){
+    POINTER_SIZE_INT *iter = vector_block_iterator_init(source_set);
+    while( !vector_block_iterator_end(source_set, iter)){
+      assert(!vector_block_is_full(dest_set));
+      if(*iter)  vector_block_add_entry(dest_set, *iter);
+      iter = vector_block_iterator_advance(source_set, iter);
+    }
+    pool_put_entry(temp_pool, dest_set);
+    dest_set = verifier_free_set_pool_get_entry(verifier_metadata->free_set_pool);
+  }
+  
+  dest_set = NULL;
+  pool_iterator_init(temp_pool);
+  while(dest_set = pool_iterator_next(temp_pool)){
+    pool_put_entry(dest_pool, dest_set);
+  }
+  
+  sync_pool_destruct(temp_pool);
+  return;
 }

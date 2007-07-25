@@ -24,6 +24,7 @@
 #include "../mark_compact/mspace.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 #include "../common/space_tuner.h"
+#include "../mark_sweep/sspace.h"
 
 unsigned int MINOR_COLLECTORS = 0;
 unsigned int MAJOR_COLLECTORS = 0;
@@ -99,11 +100,14 @@ static void collector_reset_thread(Collector *collector)
   collector_reset_weakref_sets(collector);
 #endif
 
+#ifndef ONLY_SSPACE_IN_HEAP
   /*For LOS_Shrink and LOS_Extend*/
   if(collector->gc->tuner->kind != TRANS_NOTHING){
     collector->non_los_live_obj_size = 0;
     collector->los_live_obj_size = 0;
   }
+#endif
+
   collector->result = TRUE;
   return;
 }
@@ -238,11 +242,19 @@ unsigned int NUM_COLLECTORS = 0;
 
 struct GC_Gen;
 unsigned int gc_get_processor_num(GC_Gen*);
+#ifdef ONLY_SSPACE_IN_HEAP
+struct GC_MS;
+unsigned int gc_ms_get_processor_num(GC_MS *gc);
+#endif
 
 void collector_initialize(GC* gc)
 {
   //FIXME::
+#ifndef ONLY_SSPACE_IN_HEAP
   unsigned int num_processors = gc_get_processor_num((GC_Gen*)gc);
+#else
+  unsigned int num_processors = gc_ms_get_processor_num((GC_MS*)gc);
+#endif
   
   unsigned int nthreads = max( max( MAJOR_COLLECTORS, MINOR_COLLECTORS), max(NUM_COLLECTORS, num_processors)); 
 
@@ -259,6 +271,10 @@ void collector_initialize(GC* gc)
     collector->thread_handle = (VmThreadHandle)(POINTER_SIZE_INT)i;
     collector->gc = gc;
     collector_init_thread(collector);
+
+#ifdef ONLY_SSPACE_IN_HEAP
+    collector_init_free_chunk_list(collector);
+#endif
     
     gc->collectors[i] = collector;
   }

@@ -64,7 +64,7 @@ inline Boolean hashcode_is_buffered(Partial_Reveal_Object* p_obj)
 }
 
 inline int hashcode_gen(void* addr)
-{ return (int)(POINTER_SIZE_INT)addr; }
+{ return (int)(((POINTER_SIZE_INT)addr) >> 2); }
 
 typedef struct Hashcode_Buf{
   Seq_List* list;

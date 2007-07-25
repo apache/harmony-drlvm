@@ -25,6 +25,7 @@
 #include "../verify/verify_live_heap.h"
 #include "../common/space_tuner.h"
 #include "../common/compressed_ref.h"
+
 #ifdef USE_32BITS_HASHCODE
 #include "../common/hashcode.h"
 #endif
@@ -231,9 +232,6 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
                                 space_committed_size((Space*)gc_gen->mos) +
                                 space_committed_size((Space*)gc_gen->los);
   
-  set_native_finalizer_thread_flag(!IGNORE_FINREF);
-  set_native_ref_enqueue_thread_flag(!IGNORE_FINREF);
-  
   return;
 }
 
@@ -244,8 +242,8 @@ void gc_gen_destruct(GC_Gen *gc_gen)
   Space* los = (Space*)gc_gen->los;
 
   POINTER_SIZE_INT nos_size = space_committed_size(nos);
-  POINTER_SIZE_INT mos_size = space_committed_size(nos);
-  POINTER_SIZE_INT los_size = space_committed_size(nos);
+  POINTER_SIZE_INT mos_size = space_committed_size(mos);
+  POINTER_SIZE_INT los_size = space_committed_size(los);
 
   void* nos_start = nos->heap_start;
   void* mos_start = mos->heap_start;
@@ -270,11 +268,10 @@ void gc_gen_destruct(GC_Gen *gc_gen)
 Space* gc_get_nos(GC_Gen* gc){ return (Space*)gc->nos;}
 Space* gc_get_mos(GC_Gen* gc){ return (Space*)gc->mos;}
 Space* gc_get_los(GC_Gen* gc){ return (Space*)gc->los;}
-Space* gc_get_pos(GC_Gen* gc) { return NULL; }
+
 void gc_set_nos(GC_Gen* gc, Space* nos){ gc->nos = (Fspace*)nos;}
 void gc_set_mos(GC_Gen* gc, Space* mos){ gc->mos = (Mspace*)mos;}
 void gc_set_los(GC_Gen* gc, Space* los){ gc->los = (Lspace*)los;}
-void gc_set_pos(GC_Gen* gc, Space* pos) {}
 
 void* mos_alloc(unsigned size, Allocator *allocator){return mspace_alloc(size, allocator);}
 void* nos_alloc(unsigned size, Allocator *allocator){return fspace_alloc(size, allocator);}
@@ -296,6 +293,9 @@ void gc_decide_collection_kind(GC_Gen* gc, unsigned int cause)
   else
     gc->collect_kind = MINOR_COLLECTION;
 
+#ifdef ONLY_SSPACE_IN_HEAP
+  gc->collect_kind = UNIQUE_SWEEP_COLLECTION;
+#endif
   return;
 }
 
@@ -372,15 +372,14 @@ void gc_gen_adjust_heap_size(GC_Gen* gc, int64 pause_time)
   Fspace* nos = gc->nos;
   Lspace* los = gc->los;
   /*We can not tolerate gc->survive_ratio be greater than threshold twice continuously.
-   *Or, we must adjust heap size
-   */
+   *Or, we must adjust heap size */
   static unsigned int tolerate = 0;
 
   POINTER_SIZE_INT heap_total_size = los->committed_heap_size + mos->committed_heap_size + nos->committed_heap_size;
   assert(heap_total_size == gc->committed_heap_size);
 
-  assert(nos->surviving_size == 0);  
-  POINTER_SIZE_INT heap_surviving_size = mos->surviving_size + los->surviving_size; 
+  assert(nos->last_surviving_size == 0);  
+  POINTER_SIZE_INT heap_surviving_size = (POINTER_SIZE_INT)(mos->period_surviving_size + los->period_surviving_size);
   assert(heap_total_size > heap_surviving_size);
 
   float heap_survive_ratio = (float)heap_surviving_size / (float)heap_total_size;
@@ -428,7 +427,8 @@ void gc_gen_adjust_heap_size(GC_Gen* gc, int64 pause_time)
 }
 
 Boolean IS_FALLBACK_COMPACTION = FALSE; /* only for debugging, don't use it. */
-
+static unsigned int mspace_num_used_blocks_before_minor;
+static unsigned int mspace_num_used_blocks_after_minor;
 void gc_gen_reclaim_heap(GC_Gen* gc)
 { 
   if(verify_live_heap) gc_verify_heap((GC*)gc, TRUE);
@@ -442,13 +442,28 @@ void gc_gen_reclaim_heap(GC_Gen* gc)
   
   if(gc_match_kind((GC*)gc, MINOR_COLLECTION)){
     /* FIXME:: move_object is only useful for nongen_slide_copy */
-    gc->mos->move_object = FALSE;
+    gc->mos->move_object = 0;
+    /* This is for compute mspace->last_alloced_size */
+
+    mspace_num_used_blocks_before_minor = mspace->free_block_idx - mspace->first_block_idx;
     fspace_collection(gc->nos);
-    gc->mos->move_object = TRUE;      
+    mspace_num_used_blocks_after_minor = mspace->free_block_idx - mspace->first_block_idx;
+    assert( mspace_num_used_blocks_before_minor <= mspace_num_used_blocks_after_minor );
+    mspace->last_alloced_size = GC_BLOCK_SIZE_BYTES * ( mspace_num_used_blocks_after_minor - mspace_num_used_blocks_before_minor );
+
+    /*If the current minor collection failed, i.e. there happens a fallback, we should not do the minor sweep of LOS*/
+    if(gc->collect_result != FALSE)
+      lspace_collection(gc->los);
+
+    gc->mos->move_object = 1;      
   }else{
     /* process mos and nos together in one compaction */
+    gc->los->move_object = 1;
+
     mspace_collection(gc->mos); /* fspace collection is included */
     lspace_collection(gc->los);
+
+    gc->los->move_object = 0;
   }
 
   if(gc->collect_result == FALSE && gc_match_kind((GC*)gc, MINOR_COLLECTION)){
@@ -463,10 +478,12 @@ void gc_gen_reclaim_heap(GC_Gen* gc)
     gc->collect_kind = FALLBACK_COLLECTION;    
 
     if(verify_live_heap) event_gc_collect_kind_changed((GC*)gc);
-
+    
+    gc->los->move_object = 1;
     mspace_collection(gc->mos); /* fspace collection is included */
     lspace_collection(gc->los);
-    
+    gc->los->move_object = 0;    
+
     IS_FALLBACK_COMPACTION = FALSE;
   }
   
@@ -478,13 +495,47 @@ void gc_gen_reclaim_heap(GC_Gen* gc)
   
   if(verify_live_heap) gc_verify_heap((GC*)gc, FALSE);
 
-  /*Fixme: clear root set here to support verify.*/
+  /* FIXME:: clear root set here to support verify. */
 #ifdef COMPRESS_REFERENCE
   gc_set_pool_clear(gc->metadata->gc_uncompressed_rootset_pool);
 #endif
-
   assert(!gc->los->move_object);
   return;
+}
+
+void gc_gen_update_space_before_gc(GC_Gen *gc)
+{
+  /* Update before every GC to avoid the atomic operation in every fspace_alloc_block */
+  assert( gc->nos->free_block_idx >= gc->nos->first_block_idx );
+  gc->nos->last_alloced_size = GC_BLOCK_SIZE_BYTES * ( gc->nos->free_block_idx - gc->nos->first_block_idx );
+
+  gc->nos->accumu_alloced_size += gc->nos->last_alloced_size;
+  gc->los->accumu_alloced_size += gc->los->last_alloced_size;
+}
+
+void gc_gen_update_space_after_gc(GC_Gen *gc)
+{
+  /* Minor collection, but also can be every n minor collections, use fspace->num_collections to identify. */
+  if (gc_match_kind((GC*)gc, MINOR_COLLECTION)){
+    gc->mos->accumu_alloced_size += gc->mos->last_alloced_size;
+    /* The alloced_size reset operation of mos and nos is not necessary, because they are not accumulated.
+     * But los->last_alloced_size must be reset, because it is accumulated. */
+    gc->los->last_alloced_size = 0;
+  /* Major collection, but also can be every n major collections, use mspace->num_collections to identify. */
+  }else{
+    gc->mos->total_alloced_size += gc->mos->accumu_alloced_size;
+    gc->mos->last_alloced_size = 0;
+    gc->mos->accumu_alloced_size = 0;
+
+    gc->nos->total_alloced_size += gc->nos->accumu_alloced_size;
+    gc->nos->last_alloced_size = 0;
+    gc->nos->accumu_alloced_size = 0;
+
+    gc->los->total_alloced_size += gc->los->accumu_alloced_size;
+    gc->los->last_alloced_size = 0;
+    gc->los->accumu_alloced_size = 0;
+    
+  }
 }
 
 void gc_gen_iterate_heap(GC_Gen *gc)

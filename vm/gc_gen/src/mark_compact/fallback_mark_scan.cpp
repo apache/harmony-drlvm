@@ -35,6 +35,7 @@ static void scan_object(Collector* collector, REF *p_ref)
 {
   Partial_Reveal_Object *p_obj = read_slot(p_ref);
   assert(p_obj);
+  assert((((POINTER_SIZE_INT)p_obj) % GC_OBJECT_ALIGNMENT) == 0);
   
   if(obj_belongs_to_nos(p_obj) && obj_is_fw_in_oi(p_obj)){
     assert(obj_get_vt(p_obj) == obj_get_vt(obj_get_fw_in_oi(p_obj)));
@@ -208,4 +209,5 @@ void fallback_clear_fwd_obj_oi_init(Collector* collector)
   fspace_block_iterate_init((Fspace*)((GC_Gen*)collector->gc)->nos);
 }
 #endif
+
 
