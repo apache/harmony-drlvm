@@ -18,7 +18,7 @@
 <project name="REGRESSION TESTS RUN" default="do-regression-testing">
     
     <property name="jvm.under.test" value="${build.deploy.dir}/jdk/jre/bin/java"/>
-    <property name="reg.test.timeout" value="300000" />
+    <property name="reg.test.timeout" value="600000" />
     <property name="reg.test.halt.on.error" value="false"/>
     <!-- Mark used by custom test launchers for test failure notification -->
     <property name="reg.test.failed.mark" value="-=@@@ Reg Test Failed @@@=-"/>
