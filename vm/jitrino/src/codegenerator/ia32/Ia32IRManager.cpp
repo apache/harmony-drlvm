@@ -1071,15 +1071,24 @@ Inst * IRManager::newCopySequence(Opnd * targetBOpnd, Opnd * sourceBOpnd, uint32
                 Inst * defInst = base->getDefiningInst();
                 if(defInst && defInst->getMnemonic() == Mnemonic_MOV) {
                     addr = defInst->getOpnd(1);
-                    if(!addr->getRuntimeInfo())
-                        addr = NULL;
+                    if(!addr->getRuntimeInfo()) {
+                        // addr opnd may be spilled. Let's try deeper
+                        defInst = addr->getDefiningInst();
+                        if(defInst && defInst->getMnemonic() == Mnemonic_MOV) {
+                            addr = defInst->getOpnd(1);
+                        } else {
+                            addr = NULL;
+                        }
+                    }
                 }
             }
 #else
             Opnd * addr = sourceOpnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement);
 #endif
-            void * fpPtr = (void *)((ConstantAreaItem *)addr->getRuntimeInfo()->getValue(0))->getValue();
-            if( addr && addr->getRuntimeInfo()->getKind()==Opnd::RuntimeInfo::Kind_ConstantAreaItem) {
+            Opnd::RuntimeInfo* addrRI = addr == NULL ? NULL : addr->getRuntimeInfo();
+
+            if( addrRI && addrRI->getKind()==Opnd::RuntimeInfo::Kind_ConstantAreaItem) {
+                void * fpPtr = (void *)((ConstantAreaItem *)addrRI->getValue(0))->getValue();
                 if (sourceByteSize==4) {
                     float val = *(float *)fpPtr;
                     if(val == 0 && !signbit(val)) {

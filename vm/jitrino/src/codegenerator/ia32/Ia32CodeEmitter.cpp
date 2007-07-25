@@ -45,7 +45,7 @@ public:
         :memoryManager("CodeEmitter"),
         exceptionHandlerInfos(memoryManager), constantAreaLayout(memoryManager),
         traversalInfo(memoryManager), methodLocationMap(memoryManager), 
-        entryExitMap(memoryManager), instSizeMap(memoryManager)
+        entryExitMap(memoryManager), instSizeMap(memoryManager), bcMap(NULL), inlineBCMap(NULL)
     {
     }
 
@@ -68,8 +68,8 @@ protected:
     void registerDirectCall(MethodDesc * md, void * instStartAddr);
     
     ///methods fo registering bc-offsets for inlined methods
-    void registerInlineInfoOffsets(Node* node, InlineInfoMap::Entry* parentEntry, InlineInfoMap* inlineBCMap);
-    void registerInlineInfoOffsets( void );
+    void registerBCOffsets(Node* node, InlineInfoMap::Entry* parentEntry);
+    void registerBCMappingAndInlineInfo();
 
     void orderNodesAndMarkInlinees(StlList<MethodMarkerPseudoInst*>& container, 
         Node * node, bool isForward);
@@ -135,6 +135,8 @@ protected:
     StlMap<MethodMarkerPseudoInst*, CompiledMethodInfo* > methodLocationMap;
     StlMap<MethodMarkerPseudoInst*, MethodMarkerPseudoInst* > entryExitMap;
     StlMap<POINTER_SIZE_INT, unsigned> instSizeMap;
+    BcMap* bcMap;
+    InlineInfoMap* inlineBCMap;
 };
 
 typedef StlMap<POINTER_SIZE_INT, uint16> LocationMap;
@@ -291,7 +293,6 @@ void CodeEmitter::ConstantAreaLayout::finalizeSwitchTables()
 //________________________________________________________________________________________
 void CodeEmitter::runImpl()
 {
-    irManager->setInfo(INLINE_INFO_KEY, new(irManager->getMemoryManager()) InlineInfoMap(irManager->getMemoryManager()));
     constantAreaLayout.doLayout(irManager);
     irManager->resolveRuntimeInfo();
     emitCode();
@@ -300,7 +301,7 @@ void CodeEmitter::runImpl()
     constantAreaLayout.finalizeSwitchTables();
     traversalInfo.resize(irManager->getFlowGraph()->getMaxNodeId() + 1, 0);
     registerExceptionHandlers();
-    registerInlineInfoOffsets();
+    registerBCMappingAndInlineInfo();
     if (irManager->getCompilationInterface().isCompileLoadEventRequired()) {
         reportCompiledInlinees();
     }
@@ -328,7 +329,14 @@ static bool isBCMapCandidate(Inst* inst) {
 
 typedef StlVector<MethodMarkerPseudoInst*> Markers;
 
-void CodeEmitter::registerInlineInfoOffsets(Node* node, InlineInfoMap::Entry* parentEntry, InlineInfoMap* inlineBCMap) {
+static uint16 getTopLevelEntryOffset(InlineInfoMap::Entry* entry) {
+    if (entry->parentEntry==NULL) {
+        return entry->bcOffset;
+    } 
+    return getTopLevelEntryOffset(entry->parentEntry);
+}
+
+void CodeEmitter::registerBCOffsets(Node* node, InlineInfoMap::Entry* parentEntry) {
     assert(traversalInfo[node->getId()] == 0);
     traversalInfo[node->getId()] = 1;   
     
@@ -355,20 +363,35 @@ void CodeEmitter::registerInlineInfoOffsets(Node* node, InlineInfoMap::Entry* pa
                 assert(parentEntry->method == endMarker->getMethodDesc()->getMethodHandle());
                 parentEntry = parentEntry->parentEntry;
             }
-        } else if (isBCMapCandidate(inst) && parentEntry!=NULL) {
-            if (Log::isEnabled()) {
-                IRPrinter::printIndent(Log::out(), parentEntry->getInlineDepth()+1);
-                IRPrinter::printInst(Log::out(), inst);
-                Log::out()<<" bc offset="<<inst->getBCOffset()<<std::endl;
-            }
-            uint16 bcOffset = inst->getBCOffset();
-            assert(bcOffset!=ILLEGAL_BC_MAPPING_VALUE || !InstUtils::instMustHaveBCMapping(inst)); 
-            InlineInfoMap::Entry* e = inlineBCMap->newEntry(parentEntry, parentEntry->method, bcOffset);
+        } else if (isBCMapCandidate(inst)) {
+            uint16 globalBCMapOffset = inst->getBCOffset(); 
+            POINTER_SIZE_INT nativeInstStartOffset = (POINTER_SIZE_INT)inst->getCodeStartAddr() - (POINTER_SIZE_INT)irManager->getCodeStartAddr();
+            POINTER_SIZE_INT nativeInstEndOffset = nativeInstStartOffset + inst->getCodeSize();
+            assert(fit32(nativeInstStartOffset));
+            if (parentEntry) {
+                if (Log::isEnabled()) {
+                    IRPrinter::printIndent(Log::out(), parentEntry->getInlineDepth()+1);
+                    IRPrinter::printInst(Log::out(), inst);
+                    Log::out()<<" native-offset="<<nativeInstEndOffset<<" bc-offset="<<inst->getBCOffset();
+                }
+                uint16 bcOffset = inst->getBCOffset();
+                globalBCMapOffset = getTopLevelEntryOffset(parentEntry);
+                assert(bcOffset!=ILLEGAL_BC_MAPPING_VALUE || !InstUtils::instMustHaveBCMapping(inst)); 
+                InlineInfoMap::Entry* e = inlineBCMap->newEntry(parentEntry, parentEntry->method, bcOffset);
 
-            //register whole entry chain now
-            POINTER_SIZE_INT nativeOffset = (POINTER_SIZE_INT)inst->getCodeStartAddr() + inst->getCodeSize() - (POINTER_SIZE_INT)irManager->getCodeStartAddr();
-            assert(fit32(nativeOffset));
-            inlineBCMap->registerEntry(e, (uint32)nativeOffset);
+                //register whole entry chain now
+                inlineBCMap->registerEntry(e, (uint32)nativeInstEndOffset);
+            }
+            if (Log::isEnabled()) {
+                if (!parentEntry) {
+                    IRPrinter::printInst(Log::out(), inst);
+                    Log::out()<<" native-offset="<<nativeInstStartOffset;
+                }
+                Log::out()<<" global-bc-offset="<<globalBCMapOffset<<std::endl;
+            }
+            if (globalBCMapOffset!=ILLEGAL_BC_MAPPING_VALUE) {
+                bcMap->setEntry(nativeInstStartOffset, globalBCMapOffset);
+            }
         }
     }
     const Edges& edges = node->getOutEdges();
@@ -376,7 +399,7 @@ void CodeEmitter::registerInlineInfoOffsets(Node* node, InlineInfoMap::Entry* pa
         Edge* e = *ite;
         Node* n = e->getTargetNode();
         if (traversalInfo[n->getId()]==0) {
-            registerInlineInfoOffsets(n, parentEntry, inlineBCMap);
+            registerBCOffsets(n, parentEntry);
         }
     }
     
@@ -384,18 +407,22 @@ void CodeEmitter::registerInlineInfoOffsets(Node* node, InlineInfoMap::Entry* pa
 }
 
 //________________________________________________________________________________________
-void CodeEmitter::registerInlineInfoOffsets() 
+void CodeEmitter::registerBCMappingAndInlineInfo() 
 {
+    bcMap = new(irManager->getMemoryManager()) BcMap(irManager->getMemoryManager());
+    irManager->setInfo(BCMAP_INFO_KEY, bcMap);
+    
+    inlineBCMap = new(irManager->getMemoryManager()) InlineInfoMap(irManager->getMemoryManager());
+    irManager->setInfo(INLINE_INFO_KEY, inlineBCMap);
+
     //process all inlined methods and register all insts that can throw exceptions in InlineInfoMap
     assert(traversalInfo.size() == irManager->getFlowGraph()->getMaxNodeId() + 1);
     std::fill(traversalInfo.begin(), traversalInfo.end(), 0);
-    InlineInfoMap* inlineBCMap = (InlineInfoMap*)irManager->getInfo(INLINE_INFO_KEY);
-    assert(inlineBCMap!=NULL && inlineBCMap->isEmpty());
     Node* entry = irManager->getFlowGraph()->getEntryNode();
     
-    Log::out()<<"--Inline info offsets registration STARTED"<<std::endl;
-    registerInlineInfoOffsets(entry, NULL, inlineBCMap);
-    Log::out()<<"--Inline info offsets registration FINISHED"<<std::endl;
+    Log::out()<<"--BC mapping info offsets registration STARTED"<<std::endl;
+    registerBCOffsets(entry, NULL);
+    Log::out()<<"--BC mapping info offsets registration FINISHED"<<std::endl;
 }
 
 //________________________________________________________________________________________
@@ -560,9 +587,6 @@ void CodeEmitter::packCode() {
 //________________________________________________________________________________________
 void CodeEmitter::postPass()
 {  
-    MemoryManager& irmm = irManager->getMemoryManager();
-    BcMap* bcMap = new(irmm) BcMap(irmm);
-    irManager->setInfo(BCMAP_INFO_KEY, bcMap);
     bool newOpndsCreated = false;
     for( BasicBlock * bb = (BasicBlock*)irManager->getFlowGraph()->getEntryNode(); bb != NULL; bb=bb->getLayoutSucc()) {
         for (Inst* inst = (Inst*)bb->getFirstInst(); inst!=NULL; inst = inst->getNextInst()) {
@@ -590,8 +614,6 @@ void CodeEmitter::postPass()
                 } else 
                     continue;
                 int64 offset=targetCodeStartAddr-instCodeEndAddr;
-
-                uint16 bcOffset = inst->getBCOffset();
 #ifdef _EM64T_
                 if ( !fit32(offset) ) { // offset is not a signed value that fits into 32 bits
                     // this is for direct calls only
@@ -626,14 +648,6 @@ void CodeEmitter::postPass()
                         // code patcher knows about this collision
                         registerDirectCall(md,callAddr);
                     }
-
-                    if (bcOffset != ILLEGAL_BC_MAPPING_VALUE) {
-                        bcMap->setEntry((POINTER_SIZE_INT)movAddr, bcOffset); // MOV
-                        // add both possible calls into bcMap
-                        bcMap->setEntry((POINTER_SIZE_INT)callAddr, bcOffset); // CALL (immediate)
-                        bcMap->setEntry((POINTER_SIZE_INT)callAddr+2, bcOffset); // CALL (register)
-                    }
-
                     newOpndsCreated = true;
                 } 
                 else 
@@ -645,19 +659,6 @@ void CodeEmitter::postPass()
 
                     if (inst->hasKind(Inst::Kind_CallInst) && md){
                         registerDirectCall(md,instCodeStartAddr);
-                    }
-
-                    if (bcOffset != ILLEGAL_BC_MAPPING_VALUE && isBCMapCandidate(inst)) {
-                        if (Log::isEnabled()) {
-                            Log::out()<<"Registering inst in BCMAP:"; IRPrinter::printInst(Log::out(), inst); 
-                            Log::out()<<" bcOffset="<<bcOffset<<std::endl;
-                        }
-                        bcMap->setEntry((POINTER_SIZE_INT)instCodeStartAddr, bcOffset);
-                        if (inst->hasKind(Inst::Kind_CallInst)){
-                            // the call can be moved two bytes further after transformation
-                            // into register form during code patching 
-                            bcMap->setEntry((POINTER_SIZE_INT)instCodeStartAddr+2, bcOffset);
-                        }
                     }
                 }
             }   

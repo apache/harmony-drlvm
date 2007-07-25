@@ -31,12 +31,10 @@ namespace Jitrino {
 
 namespace Ia32 {
 
-const static int byteCodeOffsetSize = sizeof(POINTER_SIZE_INT); // byteCodeAddrSize should be 2, 4 will allow easy mem alignment
-
-typedef StlHashMap<POINTER_SIZE_INT, uint16>      BCByNCMap;
+typedef StlHashMap<uint32, uint16>      BCByNCMap;
 /**
-   * Bcmap is simple storage with precise mapping between native address to
-   * byte code, i.e. if there is no byte code for certain native address then
+   * Bcmap is simple storage with precise mapping between native offset in a method to
+   * byte code, i.e. if there is no byte code for certain native offset in a method then
    * invalid value is returned.
    */
 
@@ -44,98 +42,62 @@ class BcMap {
 public:
     BcMap(MemoryManager& memMgr) : theMap(memMgr) {}
 
-    POINTER_SIZE_INT getByteSize() {
-        POINTER_SIZE_INT mapSize = (POINTER_SIZE_INT)theMap.size();
-        //TODO: use only 2 byte to keep BC offset but not 4 nor 8!!
-        return  (mapSize * (byteCodeOffsetSize + sizeof(POINTER_SIZE_INT)) + sizeof(POINTER_SIZE_INT));
+    uint32 getByteSize() const {
+        return 4 /*size*/+theMap.size() * (4 + 2/*native offset + bc offset*/);
     }
 
-    void write(Byte* output) {
-        POINTER_SIZE_INT* data = (POINTER_SIZE_INT*)output;
-        BCByNCMap::const_iterator citer;
-        POINTER_SIZE_INT mapSize;
-        POINTER_SIZE_INT i = 0;
-
-        mapSize = (POINTER_SIZE_INT)theMap.size();
-        data[0] = mapSize; //store map size
-        data = data + 1;
-
-        for (citer = theMap.begin(); citer != theMap.end(); citer++) {
-            data[i*2] = (POINTER_SIZE_INT)citer->first;  // write key i.e. native addr
-            data[i*2+1] = (POINTER_SIZE_INT)citer->second;  // write value i.e. bc offset
-            i++;
+    void write(Byte* image) {
+        *((uint32*)image)=theMap.size();
+        uint32 imageOffset = 4;
+        for (BCByNCMap::const_iterator it = theMap.begin(), end = theMap.end(); it!=end; it++) {
+            uint32 nativeOffset = it->first;
+            uint16 bcOffset = it->second;
+            *((uint32*)(image + imageOffset)) = nativeOffset;
+            imageOffset+=4;
+            *((uint16*)(image + imageOffset)) = bcOffset;
+            imageOffset+=2;
         }
         return;
     }
 
-    POINTER_SIZE_INT readByteSize(const Byte* input) const {
-        POINTER_SIZE_INT* data = (POINTER_SIZE_INT*)input;
-        POINTER_SIZE_INT sizeOfMap = data[0];
-
-        return (sizeOfMap * (byteCodeOffsetSize + sizeof(POINTER_SIZE_INT)) + sizeof(POINTER_SIZE_INT));
-    }
-
-    /** read is deprecated method since creating HashMap is too cost */
-    void read(const Byte* output) {
-        POINTER_SIZE_INT* data = (POINTER_SIZE_INT*)output;
-        POINTER_SIZE_INT mapSize;
-        POINTER_SIZE_INT i = 0;
-
-        mapSize = data[0]; //read map size
-        data = data + 1;
-
-        for (i = 0; i < mapSize; i++) {
-            POINTER_SIZE_INT ncAddr = data[i * 2];
-            uint16 bcOffset = (uint16)data[i * 2 + 1];
-            setEntry(ncAddr, bcOffset);  // read key i.e. native addr and read value i.e. bc offset
-        }
-        return;
-    }
-
-    void writeZerroSize(Byte* output) {
-        POINTER_SIZE_INT* data = (POINTER_SIZE_INT*)(output);
-        data[0] = 0;
-
-        return;
-    }
-    void setEntry(POINTER_SIZE_INT key, uint16 value) {
-        theMap[key] =  value;
+    POINTER_SIZE_INT readByteSize(const Byte* image) const {
+        uint32 sizeOfMap = *(uint32*)image;;
+        return 4 + sizeOfMap * (4+2);
     }
 
     
-    static uint16 get_bc_location_for_native(POINTER_SIZE_INT ncAddress, Byte* output) {
-        POINTER_SIZE_INT* data = (POINTER_SIZE_INT*)output;
-        POINTER_SIZE_INT mapSize;
-        POINTER_SIZE_INT i = 0;
+    void setEntry(uint32 key, uint16 value) {
+        theMap[key] =  value;
+    }
 
-        mapSize = data[0]; //read map size 
-        data = data + 1;
-
-        for (i = 0; i < mapSize; i++) {
-            POINTER_SIZE_INT ncAddr = data[i * 2];
-            uint16 bcOffset = (uint16)data[i * 2 + 1];
-            if (ncAddr == ncAddress) return bcOffset;
+    static uint16 get_bc_offset_for_native_offset(uint32 ncOffset, Byte* image) {
+        uint32 mapSize = *(uint32*)image; //read map size
+        uint32 imageOffset=4;
+        for (uint32 i = 0; i < mapSize; i++) {
+            uint32 nativeOffset = *(uint32*)(image+imageOffset);
+            imageOffset+=4;
+            uint16 bcOffset = *(uint16*)(image+imageOffset);
+            imageOffset+=2;
+            if (nativeOffset == ncOffset) {
+                return bcOffset;
+            }
         }
         return ILLEGAL_BC_MAPPING_VALUE;
     }
 
-    static POINTER_SIZE_INT get_native_location_for_bc(uint16 bcOff, Byte* output) {
-        POINTER_SIZE_INT* data = (POINTER_SIZE_INT*)output;
-        POINTER_SIZE_INT mapSize;
-        POINTER_SIZE_INT i = 0;
-
-        mapSize = data[0]; //read map size 
-        data = data + 1;
-
-        POINTER_SIZE_INT ncAddress = 0xdeadbeef;
-
-        for (i = 0; i < mapSize; i++) {
-            POINTER_SIZE_INT ncAddr = data[i * 2];
-            uint16 bcOffset = (uint16)data[i * 2 + 1];
-            if (bcOffset == bcOff) ncAddress = ncAddr;
+    static uint32 get_native_offset_for_bc_offset(uint16 bcOff, Byte* image) {
+        uint32 mapSize = *(uint32*)image; //read map size
+        uint32 imageOffset=4;
+        for (uint32 i = 0; i < mapSize; i++) {
+            uint32 nativeOffset = *(uint32*)(image+imageOffset);
+            imageOffset+=4;
+            uint16 bcOffset = *(uint16*)(image+imageOffset);
+            imageOffset+=2;
+            if (bcOffset == bcOff) {
+                return nativeOffset;
+            }
         }
-
-        return ncAddress;
+        return MAX_UINT32;
     }
 
 private:

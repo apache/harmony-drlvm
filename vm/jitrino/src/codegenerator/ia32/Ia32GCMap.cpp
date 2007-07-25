@@ -591,13 +591,7 @@ void InfoBlockWriter::runImpl() {
     stackInfo->write(infoBlock);
     gcMap->write(infoBlock+stackInfoSize);
 
-    if (compIntf.isBCMapInfoRequired()) {
-        bcMap->write(infoBlock + stackInfoSize + gcInfoSize);
-    } else {
-        // if no bc info write size equal to zerro
-        // this will make possible handle errors in case
-        bcMap->writeZerroSize(infoBlock + stackInfoSize + gcInfoSize);
-    } 
+    bcMap->write(infoBlock + stackInfoSize + gcInfoSize);
 }
 
 }} //namespace

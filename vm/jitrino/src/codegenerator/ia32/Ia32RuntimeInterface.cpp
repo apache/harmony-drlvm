@@ -81,16 +81,15 @@ bool RuntimeInterface::getBcLocationForNative(MethodDesc* method, POINTER_SIZE_I
     POINTER_SIZE_INT stackInfoSize = stackInfo.readByteSize(infoBlock);
     POINTER_SIZE_INT gcMapSize = GCMap::readByteSize(infoBlock + stackInfoSize);
 
-    const char* methName;
-
-    uint16 bcOffset = BcMap::get_bc_location_for_native(native_pc, infoBlock + stackInfoSize + gcMapSize);
+    POINTER_SIZE_INT nativeOffset = (POINTER_SIZE_INT)native_pc - (POINTER_SIZE_INT)method->getCodeBlockAddress(0);
+    assert(nativeOffset<=1024*1024*1024);//extra check: we do not generate such a large methods..
+    uint16 bcOffset = BcMap::get_bc_offset_for_native_offset((uint32)nativeOffset, infoBlock + stackInfoSize + gcMapSize);
     if (bcOffset != ILLEGAL_BC_MAPPING_VALUE) {
         *bc_pc = bcOffset;
         return true;
-    } else if (Log::isLogEnabled(LogStream::RT)) {
-        methName = method->getName();
-        Log::log(LogStream::RT) << "Native code for method: " << methName << " BC = " << bc_pc 
-                << " not found " << std::endl;
+    } 
+    if (Log::isLogEnabled(LogStream::RT)) {
+        Log::log(LogStream::RT) << "Native code for method: "<<method->getName()<<" BC = " << bc_pc << " not found " << std::endl;
     }
     return false;
 }
@@ -101,16 +100,13 @@ bool RuntimeInterface::getNativeLocationForBc(MethodDesc* method, uint16 bc_pc, 
     POINTER_SIZE_INT stackInfoSize = stackInfo.readByteSize(infoBlock);
     POINTER_SIZE_INT gcMapSize = GCMap::readByteSize(infoBlock + stackInfoSize);
 
-    const char* methName;
-
-    POINTER_SIZE_INT ncAddr = BcMap::get_native_location_for_bc(bc_pc, infoBlock + stackInfoSize + gcMapSize);
-    if (ncAddr != ILLEGAL_BC_MAPPING_VALUE) {
-        *native_pc =  ncAddr;
+    uint32 nativeOffset = BcMap::get_native_offset_for_bc_offset(bc_pc, infoBlock + stackInfoSize + gcMapSize);
+    if (nativeOffset!= MAX_UINT32) {
+        *native_pc =  (POINTER_SIZE_INT)(method->getCodeBlockAddress(0) + nativeOffset);
         return true;
-    } else if (Log::isLogEnabled(LogStream::RT)) {
-        methName = method->getName();
-        Log::log(LogStream::RT) << "Native code for method: " << methName << " BC = " << bc_pc 
-                << " not found " << std::endl;
+    } 
+    if (Log::isLogEnabled(LogStream::RT)) {
+        Log::log(LogStream::RT) << "Native code for method: "<<method->getName()<<" BC = " << bc_pc << " not found " << std::endl;
     }
     return false;
 }
