@@ -91,7 +91,7 @@ public:
     // For other types return NULL.
     Class* load_type_desc();
 
-    bool is_loaded() const {return clss != NULL;}
+    bool is_loaded();
 
     const String* get_type_name(){
         return name;

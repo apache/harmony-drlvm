@@ -843,7 +843,8 @@ VMEXPORT Type_Info_Handle type_info_create_from_java_descriptor(ClassLoaderHandl
  * <code>type_info_is_unboxed</code> returned <code>TRUE</code>. 
  * If the type info is a vector or a general array, return the
  * class handle for the array type (not the element type).
- * Does not leave any exception on stack.
+ * Invokes class loader with no exception but preserves previously
+ * raised exception.
  */
 VMEXPORT Class_Handle type_info_get_class_no_exn(Type_Info_Handle tih);
 

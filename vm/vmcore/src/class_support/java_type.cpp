@@ -146,6 +146,21 @@ Class* TypeDesc::load_type_desc()
     }
 }
 
+bool TypeDesc::is_loaded()
+{
+    if (clss != NULL)
+        return true;
+
+    assert(name);
+    assert(loader);
+    Class* loaded_class = loader->LookupClass(name);
+
+    if (loaded_class)
+        clss = loaded_class;
+
+    return (clss != NULL);
+}
+
 TypeDesc* TypeDesc::type_desc_create_vector()
 {
     TypeDesc* td = get_vector_type();

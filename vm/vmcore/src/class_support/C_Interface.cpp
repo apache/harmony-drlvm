@@ -2076,8 +2076,17 @@ Class_Handle type_info_get_class(Type_Info_Handle tih)
 
 Class_Handle type_info_get_class_no_exn(Type_Info_Handle tih)
 {
-    Class_Handle ch = type_info_get_class(tih);
+    // Store raised exception
+    jthrowable exc_object = exn_get();
+    // Workaround to let JIT invoke class loader even if exception is pending
     exn_clear();
+    Class_Handle ch = type_info_get_class(tih);
+    // To clear exn_class if set
+    exn_clear();
+    // Restore saved exception
+    if (exc_object)
+        exn_raise_object(exc_object);
+
     return ch;
 } // type_info_get_class_no_exn
 
@@ -2131,22 +2140,7 @@ Boolean type_info_is_resolved(Type_Info_Handle tih) {
             }
             return type_info_is_resolved(td->get_element_type());
         case K_Object:
-            {
-                bool res = td->is_loaded();
-                if (!res) {
-                    const String* typeName = td->get_type_name();
-                    assert(typeName);
-                    res =  td->get_classloader()->LookupClass(typeName) != NULL;
-                    if (res) {
-                        // type descs for some bootstrap classes (e.g. java/lang/Throwable) 
-                        // are not initialized by default. Do it here to avoid extra lookups next time
-                        td->load_type_desc();
-                        assert(td->is_loaded());
-                    }
-                }
-                
-                return res;
-            }
+                return td->is_loaded();
         default:
             ABORT("Unexpected kind");
             return 0;
