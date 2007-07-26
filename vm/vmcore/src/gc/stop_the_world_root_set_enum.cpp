@@ -137,14 +137,6 @@ vm_enumerate_root_set_all_threads()
     // it is convenient to have gc_enabled_status == disabled
     // during the enumeration -salikh
 
-    // Mark the global safepoint status as enumerating the universe..
-    assert(get_global_safepoint_status() == nill);
-    global_safepoint_status = enumerate_the_universe;
-
-    // Identify the thread driving the GC.
-    assert(p_the_safepoint_control_thread == 0);    
-    p_the_safepoint_control_thread = p_TLS_vmthread;
-
     stop_the_world_root_set_enumeration();
     
     assert(!hythread_is_suspend_enabled());
@@ -157,11 +149,6 @@ vm_enumerate_root_set_all_threads()
 void vm_resume_threads_after()
 {
     TRACE2("vm.gc", "vm_resume_threads_after()");
-    // Check that we are still enumerating the universe and formally mark the end of it.
-    assert(get_global_safepoint_status() == enumerate_the_universe);
-    global_safepoint_status = nill;
-    assert(p_the_safepoint_control_thread == p_TLS_vmthread);
-    p_the_safepoint_control_thread = 0;
 
     jvmti_send_gc_finish_event();
     jvmti_clean_reclaimed_object_tags();

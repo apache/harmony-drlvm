@@ -148,11 +148,6 @@ enum safepoint_state {
 };
 
 /**
- * @return Thread safepoint state.
- */
-VMEXPORT enum safepoint_state get_global_safepoint_status();
-
-/**
  * @return <code>TRUE</code> if no apparent trash was found in the object.
  * 
  * Used for debugging.

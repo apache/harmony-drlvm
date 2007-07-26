@@ -73,17 +73,6 @@ using namespace std;
 #define LOG_DOMAIN "vmcore.thread"
 #include "cxxlog.h"
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
-
-volatile VM_thread *p_the_safepoint_control_thread = 0;     // only set when a gc is happening
-volatile safepoint_state global_safepoint_status = nill;
-
-#ifdef __cplusplus
-}
-#endif
 
 jint jthread_allocate_vm_thread_pool(JavaVM *java_vm,
                                      vm_thread_t vm_thread)

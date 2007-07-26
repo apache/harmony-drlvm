@@ -2381,13 +2381,6 @@ unsigned vm_vector_size(Class_Handle vector_class, int length)
 
 
 
-enum safepoint_state get_global_safepoint_status()
-{
-    return global_safepoint_status;
-} //get_global_safepoint_status
-
-
-
 void vm_gc_lock_enum()
 {
     hythread_global_lock();
