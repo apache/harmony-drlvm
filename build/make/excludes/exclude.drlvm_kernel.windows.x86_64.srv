@@ -1,6 +1,3 @@
 ## These tests are too slow
 java/lang/RuntimeAdditionalTest*.java
 
-# HARMONY-2453
-java/lang/SystemTest.java
-
