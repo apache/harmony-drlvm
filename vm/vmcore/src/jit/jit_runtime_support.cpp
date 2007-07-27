@@ -2179,7 +2179,17 @@ static void *rth_invokeinterface_addr_withresolve(Class_Handle klass, unsigned c
     }
     unsigned base_index = (unsigned)(infc_vtable - (char*)objClass->get_vtable()->methods)/sizeof(char*);
     Method* infc_method = objClass->get_method_from_vtable(base_index + m->get_index());
-    assert(infc_method);
+    if(infc_method == NULL) {
+        // objClass does not implement interface method
+        char* msg = (char*)STD_ALLOCA(objClass->get_name()->len + 1
+            + m->get_name()->len + m->get_descriptor()->len + 1);
+        strcpy(msg, objClass->get_name()->bytes);
+        strcat(msg, ".");
+        strcat(msg, m->get_name()->bytes);
+        strcat(msg, m->get_descriptor()->bytes);
+        exn_throw_by_name("java/lang/AbstractMethodError", msg);
+        return NULL; // not reachable
+    }
     assert(infc_method->get_class()->is_initialized() || objClass->is_initializing());
     return infc_method->get_indirect_address();
 }
