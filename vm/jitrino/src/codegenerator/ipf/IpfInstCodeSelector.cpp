@@ -203,41 +203,6 @@ CG_OpndHandle *IpfInstCodeSelector::diffRef(bool          ovf,
     return dst;
 }   
 
-//----------------------------------------------------------------------------//
-// Subtract reference from reference and scale down by element type.
-
-CG_OpndHandle *IpfInstCodeSelector::scaledDiffRef(CG_OpndHandle *src1_, 
-                                                  CG_OpndHandle *src2_,
-                                                  Type          *type1,
-                                                  Type          *type2) {
-
-    IPF_LOG << "      scaledDiffRef" << endl;
-    IPF_ASSERT(type1->isManagedPtr() && type1==type2);
-    IPF_ASSERT(((Opnd *)src1_)->isReg());
-    IPF_ASSERT(((Opnd *)src2_)->isReg());
-
-    Opnd    *src1     = (Opnd *)src1_;
-    Opnd    *src2     = (Opnd *)src2_;
-    RegOpnd *dst      = opndManager->newRegOpnd(OPND_G_REG, DATA_I32);
-    Type    *elemType = ((PtrType *)type1)->getPointedToType();
-    uint32  size      = IpfType::getSize(toDataKind(elemType->tag));
-    uint32  shift     = 0;
-        
-    switch(size) {
-        case 1 : shift = 0;     break; 
-        case 2 : shift = 1;     break; 
-        case 4 : shift = 2;     break; 
-        case 8 : shift = 3;     break; 
-        default: IPF_ASSERT(0); return NULL;
-    }
-
-    addNewInst(INST_SUB, p0, dst, src1, src2);
-    if(shift == 0) return dst;
-    
-    RegOpnd *scaledDst = opndManager->newRegOpnd(OPND_G_REG, DATA_I32);
-    addNewInst(INST_SHR, p0, scaledDst, dst, opndManager->newImm(shift));
-    return scaledDst;
-}
 
 //----------------------------------------------------------------------------//
 // Divide two numeric values
