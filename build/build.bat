@@ -33,79 +33,63 @@ REM  Check environment variables.
 REM 
 REM  For the quick start, build needs the following 
 REM  variables to be set:
-REM  JAVA_HOME = <Path to 1.4-compatible JRE>
+REM  JAVA_HOME = <Path to 1.5-compatible JRE>
 REM  ANT_HOME = <Path to Apache Ant 1.6.5>
+REM  ANT_OPTS = <proxy-host proxy-port> - set it if you work from firewall
 REM  COMPILER_CFG_SCRIPT = <Whatever script that is configuring environment for C/C++ compiler>
+REM  (not that COMPILER_CFG_SCRIPT is an optional setting)
 REM ================================================
 
-REM Script for configuring C/C++ compiler, Intel C compiler by default.
+REM ==========================================================================
+REM
+REM Set up COMPILER_CFG_SCRIPT if it is not set externally
+REM
+REM ==========================================================================
 
-REM Select configuration depending on 64-bitness of Windows
-IF _%PROCESSOR_ARCHITEW6432%_==_AMD64_ GOTO X86_64_CONFIG
-IF _%PROCESSOR_ARCHITECTURE%_==_AMD64_ GOTO X86_64_CONFIG
-IF _%CXX%_ == _msvc_ GOTO MSVC_COMPILER
-GOTO DEFAULT_COMPILER
+REM select configuration depending on 64-bitness of Windows
+REM Note: PROCESSOR_ARCHITEW6432 is set by cygwin
+SET PLATFORM_64BIT_ARG=
+IF _%PROCESSOR_ARCHITEW6432%_==_AMD64_ SET PLATFORM_64BIT_ARG=amd64
+IF _%PROCESSOR_ARCHITECTURE%_==_AMD64_ SET PLATFORM_64BIT_ARG=amd64
 
-:MSVC_COMPILER
-IF DEFINED COMPILER_CFG_SCRIPT GOTO CHOOSE_ARGS
+REM COMPILER_CFG_SCRIPT may be set externally 
+IF DEFINED COMPILER_CFG_SCRIPT GOTO CHECK_COMPILER_CONFIGURATION
 
-REM Try Platform SDK first
-SET COMPILER_CFG_SCRIPT=C:\Program Files\Microsoft Platform SDK\SetEnv.Cmd
-IF EXIST "%COMPILER_CFG_SCRIPT%" GOTO CHOOSE_ARGS
+REM Compiler may be set for 'icl' for Windows x86
+IF _%CXX%_ == _icl_ (
+  IF _%PLATFORM_64BIT_ARG%_==_amd64_ (
+      ECHO error: CXX=icl is not supported on Windows/x86_64
+      GOTO ERROR
+  )
+  SET COMPILER_CFG_SCRIPT=C:\Program Files\Intel\Compiler\C++\9.0\IA32\Bin\iclvars.bat
+  GOTO CHECK_COMPILER_CONFIGURATION
+)
 
-REM Try Platform SDK at another location
-SET COMPILER_CFG_SCRIPT=C:\Program Files\Microsoft SDK\SetEnv.bat
-IF EXIST "%COMPILER_CFG_SCRIPT%" GOTO CHOOSE_ARGS
+REM Default compiler is MSVC for DRLVM build on Windows
+REM MSVC 2005 must be used for Windows x86_64
+IF _%PLATFORM_64BIT_ARG%_==_amd64_ GOTO MSVC_X86_64
 
-REM Then try Mirosoft Visual Studio .NET 2003
+:MSVC_X86
 SET COMPILER_CFG_SCRIPT=C:\Program Files\Microsoft Visual Studio .NET 2003\Common7\Tools\vsvars32.bat
-IF EXIST "%COMPILER_CFG_SCRIPT%" GOTO CHOOSE_ARGS
+GOTO CHECK_COMPILER_CONFIGURATION
 
-REM Otherwise try Mocrosoft Visual Studio 6
-SET COMPILER_CFG_SCRIPT=C:\Program Files\Microsoft Visual Studio\VC98\Bin\VCVARS32.BAT
-IF EXIST "%COMPILER_CFG_SCRIPT%" GOTO CHOOSE_ARGS
-GOTO NO_CFG_SCRIPT
-
-:CHOOSE_ARGS
-IF "%BUILD_CFG%" == "release" (
-    SET COMPILER_CFG_ARG=/RETAIL
-) ELSE (
-    SET COMPILER_CFG_ARG=/DEBUG
-)
-GOTO RUN_COMPILER_CONFIGURATION
-
-:DEFAULT_COMPILER
-IF NOT DEFINED VS71COMNTOOLS (
-    IF EXIST "C:\Program Files\Microsoft Visual Studio .NET 2003\Common7\Tools" (
-        SET VS71COMNTOOLS=C:\Program Files\Microsoft Visual Studio .NET 2003\Common7\Tools\
-    )
-)
-
-IF DEFINED COMPILER_CFG_SCRIPT GOTO RUN_COMPILER_CONFIGURATION
-SET COMPILER_CFG_SCRIPT=C:\Program Files\Intel\Compiler\C++\9.0\IA32\Bin\iclvars.bat
-IF EXIST "%COMPILER_CFG_SCRIPT%" GOTO RUN_COMPILER_CONFIGURATION
-GOTO NO_CFG_SCRIPT
-
-:X86_64_CONFIG
-SET PLATFORM_64BIT=amd64
-
-IF DEFINED COMPILER_CFG_SCRIPT GOTO RUN_COMPILER_CONFIGURATION
-
-REM Select Microsoft Visual Studio 2005 on Windows x64 edition
+:MSVC_X86_64
 SET COMPILER_CFG_SCRIPT=C:\Program Files (x86)\Microsoft Visual Studio 8\VC\vcvarsall.bat
+
+:CHECK_COMPILER_CONFIGURATION
 IF EXIST "%COMPILER_CFG_SCRIPT%" GOTO RUN_COMPILER_CONFIGURATION
 
-:NO_CFG_SCRIPT
-ECHO error: Cannot guess the location of compiler configuration script
-ECHO Please set COMPILER_CFG_SCRIPT and/or CXX
+REM COMPILER_CFG_SCRIPT is not detected or points to unexisting file
+ECHO Error: COMPILER_CFG_SCRIPT is unset or points to non-existing file
+ECHO        A set/detected COMPILER_CFG_SCRIPT value is: %COMPILER_CFG_SCRIPT%
+ECHO Note: you may set COMPILER_CFG_SCRIPT and/or CXX before running build.bat
 GOTO ERROR
 
 :RUN_COMPILER_CONFIGURATION
 ECHO COMPILER_CFG_SCRIPT="%COMPILER_CFG_SCRIPT%"
-ECHO PLATFORM_64BIT="%PLATFORM_64BIT%"
-ECHO COMPILER_CFG_ARG="%COMPILER_CFG_ARG%"
+ECHO PLATFORM_64BIT_ARG="%PLATFORM_64BIT_ARG%"
 ECHO ON
-CALL "%COMPILER_CFG_SCRIPT%" %PLATFORM_64BIT% %COMPILER_CFG_ARG%
+CALL "%COMPILER_CFG_SCRIPT%" %PLATFORM_64BIT_ARG%
 @ECHO OFF
 
 IF NOT ERRORLEVEL 0 (
@@ -166,4 +150,3 @@ ECHO *
 EXIT /B 1
 
 :THEEND
-
