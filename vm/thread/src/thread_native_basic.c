@@ -382,11 +382,19 @@ hythread_t hythread_self_slow() {
 }
 
 static void thread_set_self(hythread_t  thread) {
-    //tm_self_tls = thread;
-    _asm{
-        mov eax, thread
-        mov fs:[0x14], eax
-    }
+  // tm_self_tls = thread;
+#ifndef _WIN64
+#   if (_MSC_VER >= 1400)
+        __writefsdword(offsetof(NT_TIB, ArbitraryUserPointer), thread);
+#   else
+        _asm{
+            mov eax, thread
+            mov fs:[0x14], eax
+        }
+#   endif
+#else
+    __writegsqword(offsetof(NT_TIB, ArbitraryUserPointer), thread);
+#endif
 }
 #else
 /**

@@ -27,6 +27,14 @@ extern "C" {
 #include <stddef.h>
 #include "hycomp.h"
 
+
+#ifdef _WIN32
+#   if (_MSC_VER >= 1400)
+#       include <intrin.h>
+#   endif
+#endif
+
+
 /* 
  * Idea behind these declarations is to make some functions static inlined for 
  * all files that include hythread_ext.h/hythread.h except one, that 
@@ -402,21 +410,13 @@ typedef struct HyThread_public {
    
 
 
-#ifdef _EM64T_
-#   ifdef _WIN64
-        //don't use optimized asm monitor enter and exit helpers
-#   else
-        //use optimized asm monitor enter and exit helpers
-#       define ASM_MONITOR_HELPER
-#   endif
-#else
 #ifdef _IPF_
     //don't use optimized asm monitor enter and exit helpers
 #else
     //use optimized asm monitor enter and exit helpers
 #   define ASM_MONITOR_HELPER
 #endif
-#endif
+
 
 #if defined (_WIN32)
 #   define HYTHREAD_FAST_TLS_ATTRIBUTE
@@ -468,11 +468,23 @@ extern "C" {
 #endif /* __cplusplus */
 
 hy_inline hythread_t VMCALL hythread_self() {
-    register hythread_t t;
-    _asm { mov eax, fs:[0x14]
-           mov t, eax;
-    }
-    return t;
+#ifndef _WIN64
+#   if (_MSC_VER >= 1400)
+        // file winnt.h can't be included here
+        // 0x14 = offsetof(NT_TIB, ArbitraryUserPointer)
+        return (hythread_t) __readfsdword(0x14);
+#   else
+        register hythread_t t;
+        _asm { mov eax, fs:[0x14]
+               mov t, eax;
+        }
+        return t;
+#   endif
+#else
+    // file winnt.h can't be included here
+    // 0x28 = offsetof(NT_TIB, ArbitraryUserPointer)
+    return (hythread_t) __readgsqword(0x28);
+#endif
 }
 
 #define tm_self_tls (hythread_self())

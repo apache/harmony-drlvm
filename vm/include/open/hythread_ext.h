@@ -381,20 +381,11 @@ hy_inline IDATA VMCALL hythread_is_suspend_enabled(){
  * point where safe suspension is possible.
  */
 hy_inline void VMCALL hythread_suspend_enable() {
+    register hythread_t thread;
     assert(!hythread_is_suspend_enabled());
 
-#ifdef FS14_TLS_USE
-    // the macros could work for WIN32
-    __asm {
-        mov eax, fs:[0x14]
-        dec[eax] HyThread_public.disable_count
-    }
-#else
-    {
-        register hythread_t thread = tm_self_tls;
-        ((HyThread_public *)thread)->disable_count--;
-    }
-#endif
+    thread = tm_self_tls;
+    ((HyThread_public *)thread)->disable_count--;
 }
 
 /**
@@ -419,24 +410,8 @@ hy_inline void VMCALL hythread_suspend_disable()
     // default group only.
     assert(((HyThread_public *)hythread_self())->group == get_java_thread_group());
 
-#ifdef FS14_TLS_USE
-    // the macros could work for WIN32
-    __asm {
-        mov eax, fs:[0x14]
-        inc[eax] HyThread_public.disable_count
-        mov eax,[eax] HyThread_public.request
-        test eax, eax
-        jnz suspended
-    }
-    return;
-
-  suspended:
-    thread = tm_self_tls;
-
-#else
     thread = tm_self_tls;
     ((HyThread_public *)thread)->disable_count++;
-#endif
 
     if (((HyThread_public *)thread)->request && 
 	((HyThread_public *)thread)->disable_count == 1) {
