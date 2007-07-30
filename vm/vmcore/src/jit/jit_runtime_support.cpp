@@ -2190,6 +2190,17 @@ static void *rth_invokeinterface_addr_withresolve(Class_Handle klass, unsigned c
         exn_throw_by_name("java/lang/AbstractMethodError", msg);
         return NULL; // not reachable
     }
+    if(infc_method->is_protected() || infc_method->is_private()) {
+        // objClass overrides interface method as protected or private
+        char* msg = (char*)STD_ALLOCA(objClass->get_name()->len + 1
+            + m->get_name()->len + m->get_descriptor()->len + 1);
+        strcpy(msg, objClass->get_name()->bytes);
+        strcat(msg, ".");
+        strcat(msg, m->get_name()->bytes);
+        strcat(msg, m->get_descriptor()->bytes);
+        exn_throw_by_name("java/lang/IllegalAccessError", msg);
+        return NULL; // not reachable
+    }
     assert(infc_method->get_class()->is_initialized() || objClass->is_initializing());
     return infc_method->get_indirect_address();
 }
