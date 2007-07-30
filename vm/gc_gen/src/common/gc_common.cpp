@@ -127,6 +127,9 @@ static size_t get_size_property(const char* name)
 
 void gc_parse_options(GC* gc) 
 {
+  if (!get_boolean_property("vm.assert_dialog", TRUE, VM_PROPERTIES))
+    disable_assert_dialogs();
+  
   POINTER_SIZE_INT max_heap_size = HEAP_SIZE_DEFAULT;
   POINTER_SIZE_INT min_heap_size = min_heap_size_bytes;
   

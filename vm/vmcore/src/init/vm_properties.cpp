@@ -266,7 +266,11 @@ static void init_java_properties(Properties & properties)
 //vm part
 static void init_vm_properties(Properties & properties)
 {
+#ifdef _DEBUG
         properties.set_new("vm.assert_dialog", "true");
+#else
+        properties.set_new("vm.assert_dialog", "false");
+#endif
         properties.set_new("vm.crash_handler", "false");
         properties.set_new("vm.finalize", "true");
         properties.set_new("vm.jit_may_inline_sync", "true");

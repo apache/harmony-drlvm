@@ -288,6 +288,11 @@ void init_mem() {
 
 int gc_init() {
     INFO2("gc.init", "GC init called\n");
+
+    if (!get_boolean_property("vm.assert_dialog", TRUE, VM_PROPERTIES)) {
+        disable_assert_dialogs();
+    }
+
     init_mem();
     init_slots();
     init_select_gc();

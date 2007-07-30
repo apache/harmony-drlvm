@@ -356,6 +356,11 @@ std::string DrlEMImpl::readConfiguration() {
 
 bool DrlEMImpl::init() {
     _execute_method = JIT_execute_method_default;
+
+    if (!get_boolean_property("vm.assert_dialog", TRUE, VM_PROPERTIES)) {
+        disable_assert_dialogs();
+    }
+
     std::string config = readConfiguration();
     if (!config.empty()) {
         buildChains(config);
