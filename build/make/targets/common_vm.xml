@@ -103,6 +103,10 @@
                 <defineset define="_REENTRANT" />
                 <defineset define="LINUX_TLS_OPT" />
 
+                <select arch="em64t">
+                    <compilerarg value="-ftls-model=initial-exec" /> 
+                </select>
+                
                 <select arch="ia32">
                     <defineset define="_LARGEFILE64_SOURCE" />
                 </select>

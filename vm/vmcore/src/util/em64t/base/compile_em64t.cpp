@@ -142,6 +142,27 @@ void compile_protect_arguments(Method_Handle method, GcFrame * gc) {
     }
 }
 
+// Convert a reference, if null, from a managed null
+// (represented by heap_base) to an unmanaged one (NULL/0). Uses %rdi.
+char * gen_convert_managed_to_unmanaged_null_em64t(char * ss,
+                                                  const R_Opnd & input_param1) {
+    if (&input_param1 != &rdi_opnd) {
+        ss = mov(ss, rdi_opnd,  input_param1);
+    }
+
+    if (VM_Global_State::loader_env->compress_references) {
+        ss = mov(ss, rcx_opnd, Imm_Opnd(size_64, (int64)VM_Global_State::loader_env->heap_base));
+        ss = alu(ss, cmp_opc, rdi_opnd, rcx_opnd);
+        ss = branch8(ss, Condition_NE, Imm_Opnd(size_8, 0));  // not null, branch around the mov 0
+        char *backpatch_address__not_managed_null = ((char *)ss) - 1;
+        ss = mov(ss, rdi_opnd, Imm_Opnd(0));
+        signed offset = (signed)ss - (signed)backpatch_address__not_managed_null - 1;
+        *backpatch_address__not_managed_null = (char)offset;
+    }
+    return ss;
+}
+
+
 /*    BEGIN COMPILE-ME STUBS    */
 
 // compile_me stack frame

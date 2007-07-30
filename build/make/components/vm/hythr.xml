@@ -102,7 +102,7 @@ Version: $Revision: 1.4.2.4 $
             </select>
 
             <select os="lnx">
-                <syslibset libs="stdc++,rt" />
+                <syslibset libs="stdc++,rt,pthread" />
                 <linkerarg value="-Wl,-init" />
                 <linkerarg value="-Wl,hythread_library_init" />
                 <linkerarg value="-Wl,--version-script,${src}/thread/src/hythr.exp" />

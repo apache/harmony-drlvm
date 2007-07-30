@@ -206,9 +206,10 @@ jint vm_attach(JavaVM * java_vm, JNIEnv ** p_jni_env)
     gc_thread_init(&vm_thread->_gc_private_information);
 
     if (ti_is_enabled()) {
-        vm_thread->jvmti_thread.owned_monitors =
-            (jobject*)apr_palloc(vm_thread->pool,
-                sizeof(jobject) * TM_MAX_OWNED_MONITOR_NUMBER);
+        vm_thread->jvmti_thread.owned_monitors_size = TM_INITIAL_OWNED_MONITOR_SIZE;
+        vm_thread->jvmti_thread.owned_monitors = (jobject*)apr_palloc(vm_thread->pool,
+                TM_INITIAL_OWNED_MONITOR_SIZE * sizeof(jobject));
+
         vm_thread->jvmti_thread.jvmti_jit_breakpoints_handling_buffer =
             (jbyte*)apr_palloc(vm_thread->pool,
                 sizeof(jbyte) * TM_JVMTI_MAX_BUFFER_SIZE);

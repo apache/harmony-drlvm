@@ -508,7 +508,6 @@ hy_inline void VMCALL hythread_suspend_disable()
 // possible values for tm_status_t
 #define TM_OS_ERROR (TM_ERROR_START+1)
 
-#define TM_MAX_OWNED_MONITOR_NUMBER 200 //FIXME: switch to dynamic resize
 // if default stack size is not through -Xss parameter, it is 256kb
 #define TM_DEFAULT_STACKSIZE (512 * 1024)
 

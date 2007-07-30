@@ -22,7 +22,6 @@
 
 #include <open/hythread_ext.h>
 #include <open/thread_helpers.h>
-#include "thread_private.h"
 #include "open/thread_externals.h"
 #include "open/jthread.h"
 

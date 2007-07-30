@@ -25,6 +25,7 @@
 #define GC_BYTES_IN_THREAD_LOCAL (20 * sizeof(void *))
 #define CONVERT_ERROR(stat)	(stat)
 #define TM_JVMTI_MAX_BUFFER_SIZE 50
+#define TM_INITIAL_OWNED_MONITOR_SIZE 32
 
 #ifdef __cplusplus
 extern "C"
@@ -94,6 +95,11 @@ struct JVMTIThread
      * owned monitors count.
      */
     int owned_monitors_nmb;
+
+    /**
+     * owned monitors array size.
+     */
+     int owned_monitors_size;
 
     /**
      * For support of JVMTI events: EXCEPTION, EXCEPTION_CATCH

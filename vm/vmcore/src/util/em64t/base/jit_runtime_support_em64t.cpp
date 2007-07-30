@@ -27,6 +27,8 @@
 #include "port_general.h"
 #include "heap.h"
 #include "vm_threads.h"
+#include "nogc.h"
+#include "compile.h"
 
 #include "lil.h"
 #include "lil_code_generator.h"
@@ -170,6 +172,118 @@ Vector_Handle rth_multianewarrayhelper()
     return vm_rt_multianewarray_recursive(c, lens, dims);
 }
 
+static void* getaddress__setup_java_to_native_frame()
+{
+    static void *addr = 0;
+    if (addr) {
+        return addr;
+    }
+
+    const int stub_size = 32 + m2n_push_m2n_size(1, 0);
+    char *stub = (char *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_MAX/2, CAA_Allocate);
+
+#ifdef _DEBUG
+    memset(stub, 0xcc /*int 3*/, stub_size);
+#endif
+    char *ss = stub;
+
+    // Stack changes
+    //    prev        new
+    //
+    //    ...         ...
+    //  --------    --------   ------------
+    //    ret         ret
+    //  --------    --------
+    //    ret         r12
+    //  --------    --------    m2n frame
+    //
+    //                ...
+    //
+    //              --------   ------------
+    //                ret
+    //              --------
+
+    ss = alu(ss, sub_opc, rsp_opnd, Imm_Opnd(m2n_sizeof_m2n_frame - 8));
+    ss = mov(ss, r11_opnd, M_Base_Opnd(rsp_reg, m2n_sizeof_m2n_frame - 8));
+    ss = mov(ss, M_Base_Opnd(rsp_reg, m2n_sizeof_m2n_frame - 8), r12_opnd);
+    ss = mov(ss, M_Base_Opnd(rsp_reg, 0), r11_opnd);
+    ss = mov(ss, r12_opnd, rdi_opnd);
+
+    ss = m2n_gen_push_m2n(ss, NULL, FRAME_UNKNOWN, false, 1, 0,
+            m2n_sizeof_m2n_frame);
+    ss = mov(ss,  rdi_opnd, r12_opnd);
+    ss = ret(ss);
+
+    assert((ss - stub) <= stub_size);
+    addr = stub;
+
+    compile_add_dynamic_generated_code_chunk("setup_java_to_native_frame", stub, stub_size);
+
+    // Put TI support here.
+    DUMP_STUB(stub, "getaddress__setup_java_to_native_frame", ss - stub);
+
+    return addr;
+} //getaddress__setup_java_to_native_frame
+
+VMEXPORT char *gen_setup_j2n_frame(char *s)
+{
+    s = call(s, (char *)getaddress__setup_java_to_native_frame() );
+    return s;
+} //setup_j2n_frame
+
+static void m2n_free_local_handles() {
+    assert(!hythread_is_suspend_enabled());
+
+    if (exn_raised()) {
+        exn_rethrow();
+    }
+
+    M2nFrame * m2n = m2n_get_last_frame();
+    free_local_object_handles3(m2n->local_object_handles);
+}
+
+static void* getaddress__pop_java_to_native_frame()
+{
+    static void *addr = 0;
+    if (addr) {
+        return addr;
+    }
+
+    const int stub_size = 32 + m2n_pop_m2n_size(false, 1, 0);
+    char *stub = (char *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_MAX/2, CAA_Allocate);
+#ifdef _DEBUG
+    memset(stub, 0xcc /*int 3*/, stub_size);
+#endif
+    char *ss = stub;
+
+    ss = mov(ss, r12_opnd, rax_opnd);
+
+    ss = m2n_gen_pop_m2n(ss, false, 1, 8, 0);
+
+    ss = mov(ss, rax_opnd, r12_opnd);
+    ss = mov(ss, r11_opnd, M_Base_Opnd(rsp_reg, 0));
+    ss = mov(ss, r12_opnd, M_Base_Opnd(rsp_reg, m2n_sizeof_m2n_frame - 8));
+    ss = mov(ss, M_Base_Opnd(rsp_reg, m2n_sizeof_m2n_frame - 8), r11_opnd);
+    ss = alu(ss, add_opc, rsp_opnd, Imm_Opnd(m2n_sizeof_m2n_frame - 8));
+    ss = ret(ss);
+
+    assert((ss - stub) <= stub_size);
+    addr = stub;
+
+    compile_add_dynamic_generated_code_chunk("pop_java_to_native_frame", stub, stub_size);
+
+    // Put TI support here.
+    DUMP_STUB(stub, "getaddress__pop_java_to_native_frame", ss - stub);
+
+    return addr;
+} //getaddress__pop_java_to_native_frame
+
+VMEXPORT char *gen_pop_j2n_frame(char *s)
+{
+    s = call(s, (char *)getaddress__pop_java_to_native_frame() );
+    return s;
+} //setup_j2n_frame
+
 
 // see jit_lock_rt_support.cpp for the implementation
 NativeCodePtr rth_get_lil_monitor_enter_static();
@@ -180,6 +294,11 @@ NativeCodePtr rth_get_lil_monitor_exit_static();
 NativeCodePtr rth_get_lil_monitor_exit();
 NativeCodePtr rth_get_lil_monitor_exit_non_null();
 
+void * getaddress__vm_monitor_enter_naked();
+void * getaddress__vm_monitor_enter_static_naked();
+void * getaddress__vm_monitor_exit_naked();
+void * getaddress__vm_monitor_exit_static_naked();
+
 void * vm_get_rt_support_addr(VM_RT_SUPPORT f) {
 
 #ifdef VM_STATS
@@ -188,8 +307,9 @@ void * vm_get_rt_support_addr(VM_RT_SUPPORT f) {
 
     NativeCodePtr res = rth_get_lil_helper(f);
     if (res) return res;
-    
+
     switch(f) {
+#ifdef _WIN64
     // Monitor enter runtime helpers
     case VM_RT_MONITOR_ENTER_STATIC:
         return rth_get_lil_monitor_enter_static();
@@ -205,6 +325,23 @@ void * vm_get_rt_support_addr(VM_RT_SUPPORT f) {
         return rth_get_lil_monitor_exit();
     case VM_RT_MONITOR_EXIT_NON_NULL:
         return rth_get_lil_monitor_exit_non_null();
+#else
+    // Monitor enter runtime helpers
+    case VM_RT_MONITOR_ENTER_STATIC:
+        return getaddress__vm_monitor_enter_static_naked();
+    case VM_RT_MONITOR_ENTER:
+        return getaddress__vm_monitor_enter_naked();
+    case VM_RT_MONITOR_ENTER_NON_NULL:
+        return getaddress__vm_monitor_enter_naked();
+
+   // Monitor exit runtime helpers
+    case VM_RT_MONITOR_EXIT_STATIC:
+        return getaddress__vm_monitor_exit_static_naked();
+    case VM_RT_MONITOR_EXIT:
+        return getaddress__vm_monitor_exit_naked();
+    case VM_RT_MONITOR_EXIT_NON_NULL:
+        return getaddress__vm_monitor_exit_naked();
+#endif
 
     // Object creation helper
     case VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE:

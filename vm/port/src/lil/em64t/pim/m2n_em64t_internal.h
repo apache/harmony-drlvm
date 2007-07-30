@@ -85,6 +85,7 @@ inline size_t m2n_get_size() {
 char * m2n_gen_ts_to_register(char * buf, const R_Opnd * reg,
                               unsigned num_callee_saves_used, unsigned num_callee_saves_max,
                               unsigned num_std_need_to_save, unsigned num_ret_need_to_save);
+unsigned m2n_ts_to_register_size(unsigned num_std_need_to_save, unsigned num_ret_need_to_save);
 
 /**
  * Generate code to set the local handles of an M2nFrame.
@@ -107,6 +108,7 @@ char * m2n_gen_set_local_handles_imm(char * buf, unsigned bytes_to_m2n, const Im
  */
 char * m2n_gen_push_m2n(char * buf, Method_Handle method, frame_type current_frame_type, bool handles,
                         unsigned num_callee_saves, unsigned num_std_need_to_save, int32 bytes_to_m2n_top);
+unsigned m2n_push_m2n_size(unsigned num_callee_saves, unsigned num_std_need_to_save);
 
 /**
  * Generate code to pop an M2nFrame off the stack.
@@ -119,6 +121,7 @@ char * m2n_gen_push_m2n(char * buf, Method_Handle method, frame_type current_fra
  */
 char * m2n_gen_pop_m2n(char * buf, bool handles, unsigned num_callee_saves,
                        int32 bytes_to_m2n_bottom, unsigned preserve_ret);
+unsigned m2n_pop_m2n_size(bool handles, unsigned num_callee_saves, unsigned preserve_ret);
 
 // returns top of the specified frame on the stack (it should point to return ip)
 void * m2n_get_frame_base(M2nFrame *);

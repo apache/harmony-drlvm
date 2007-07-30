@@ -134,6 +134,12 @@ void * m2n_get_frame_base(M2nFrame * m2nf) {
 
 /*    Internal Interface    */
 
+unsigned m2n_ts_to_register_size(unsigned num_std_need_to_save,
+                                 unsigned num_ret_need_to_save) {
+    return 13 + (6 * num_std_need_to_save) +
+            3 + (6 * num_ret_need_to_save);
+}
+
 // rsp should point to the bottom of the activation frame since push may occur
 // inputs should be preserved outside if required since we do a call
 // num_std_need_to_save registers will be preserved
@@ -264,6 +270,12 @@ char * m2n_gen_set_local_handles_imm(char * buf, unsigned bytes_to_m2n, const Im
     return buf;
 }
 
+unsigned m2n_push_m2n_size(unsigned num_callee_saves,
+                           unsigned num_std_need_to_save) {
+    return 82 - (5 * num_callee_saves) +
+            m2n_ts_to_register_size(num_std_need_to_save, 0);
+}
+
 // inputs should be preserved outside if required since we do a call
 // num_std_need_to_save registers will be preserved
 char * m2n_gen_push_m2n(char * buf, Method_Handle method, 
@@ -321,6 +333,11 @@ char * m2n_gen_push_m2n(char * buf, Method_Handle method,
     buf = lea(buf, r9_opnd, M_Base_Opnd(rsp_reg, bytes_to_m2n_top));
     buf = mov(buf,  M_Base_Opnd(rax_reg, 0), r9_opnd, size_64);
     return buf;
+}
+
+unsigned m2n_pop_m2n_size(bool handles, unsigned num_callee_saves, unsigned preserve_ret)
+{
+    return 56 - 5*num_callee_saves + (preserve_ret ? 4: 0);
 }
 
 static void m2n_pop_local_handles() {
@@ -399,8 +416,9 @@ char * m2n_gen_pop_m2n(char * buf, bool handles, unsigned num_callee_saves,
             size_64);
         bytes_to_m2n_bottom += LcgEM64TContext::GR_SIZE;
     }
+
     return buf;
-}
+}//m2n_gen_pop_m2n
 
 // returns pointer to the registers used for jvmti PopFrame
 Registers* get_pop_frame_registers(M2nFrame* m2nf) {

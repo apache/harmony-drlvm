@@ -398,7 +398,19 @@ static void jthread_add_owned_monitor(jobject monitor)
         jvmti_thread->wait_monitor = NULL;
     }
 
-    assert(jvmti_thread->owned_monitors_nmb < TM_MAX_OWNED_MONITOR_NUMBER);
+    if (jvmti_thread->owned_monitors_nmb >= jvmti_thread->owned_monitors_size) {
+        int new_size = jvmti_thread->owned_monitors_size * 2;
+
+        TRACE(("Increasing owned_monitors_size to: %d", new_size));
+        jobject* new_monitors = (jobject*)apr_palloc(vm_thread->pool,
+                new_size * sizeof(jobject));
+        assert(new_monitors);
+        memcpy(new_monitors, jvmti_thread->owned_monitors,
+                jvmti_thread->owned_monitors_size * sizeof(jobject));
+        jvmti_thread->owned_monitors = new_monitors;
+        jvmti_thread->owned_monitors_size = new_size;
+    }
+
     jvmti_thread->owned_monitors[jvmti_thread->owned_monitors_nmb]
         = vm_thread->jni_env->NewGlobalRef(monitor);
     jvmti_thread->owned_monitors_nmb++;

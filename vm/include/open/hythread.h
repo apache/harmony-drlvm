@@ -402,9 +402,20 @@ typedef struct HyThread_public {
    
 
 
-#if (defined (_WIN32) && !defined (_WIN64))
-//use optimized asm monitor enter and exit helpers
-#define ASM_MONITOR_HELPER
+#ifdef _EM64T_
+#   ifdef _WIN64
+        //don't use optimized asm monitor enter and exit helpers
+#   else
+        //use optimized asm monitor enter and exit helpers
+#       define ASM_MONITOR_HELPER
+#   endif
+#else
+#ifdef _IPF_
+    //don't use optimized asm monitor enter and exit helpers
+#else
+    //use optimized asm monitor enter and exit helpers
+#   define ASM_MONITOR_HELPER
+#endif
 #endif
 
 #if defined (_WIN32)
