@@ -331,6 +331,10 @@ public:
       { encoder->ipf_movl(dest, upper_32, lower_32, pred);
         _gen_an_IR_1i_0(curr_bc_addr, ST_il, pred, dest/**/); }
 
+    void ipf_movi64 (unsigned dest, uint64 imm64, unsigned pred=0)
+     { encoder->ipf_movi64(dest, imm64, pred);
+        _gen_an_IR_1i_0(curr_bc_addr, ST_il, pred, dest/**/); }
+
      void ipf_brl_call(Branch_Prefetch_Hint ph, Branch_Whether_Hint wh, Branch_Dealloc_Hint dh, unsigned b1, uint64 imm64, unsigned pred=0)
      {
          encoder->ipf_brl_call(ph, wh, dh, b1, imm64, pred);

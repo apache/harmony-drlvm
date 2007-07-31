@@ -74,6 +74,7 @@ uint64* m2n_get_bsp(M2nFrame* m2nf)
 
 uint64* m2n_get_extra_saved(M2nFrame* m2nf)
 {
+    do_flushrs();
     return (uint64*)*get_stacked_register_address(m2n_get_bsp(m2nf), M2N_EXTRA_SAVED_PTR);
 }
 
@@ -194,6 +195,44 @@ void m2n_set_frame_type(M2nFrame* m2nf, frame_type m2nf_type) {
 
 //***** Stub Interface
 
+// Flushes register stack of the current thread into backing store and calls target procedure.
+NativeCodePtr m2n_gen_flush_and_call() {
+    static NativeCodePtr addr = NULL;
+
+    if (addr != NULL) {
+        return addr;
+    }
+
+    tl::MemoryPool mem_pool;
+    Merced_Code_Emitter emitter(mem_pool, 2, 0);
+    emitter.disallow_instruction_exchange();
+    emitter.memory_type_is_unknown();
+
+    // We need to remember pfs & b0 here but there is no space to save them in.
+    // Register stack contains valid outputs and we don't know how many registers are used.
+    // Memory stack holds output values beyound those 8 which are on register stack.
+    // The only place is general caller-saves registers. It is save to use them with out preserving
+    // because they are alredy preserved by the corresponding M2N frame.
+
+    // r4 is used to keep a thread pointer...so let's use r5 & r6.
+
+    emitter.ipf_mfap(PRESERV_GENERAL_REG1, AR_pfs);
+    emitter.ipf_mfbr(PRESERV_GENERAL_REG2, BRANCH_RETURN_LINK_REG);
+
+    emitter.flush_buffer();
+    emitter.ipf_flushrs();
+
+    emitter.ipf_bricall(br_many, br_sptk, br_none, BRANCH_RETURN_LINK_REG, BRANCH_CALL_REG);
+
+    emitter.ipf_mtbr(BRANCH_RETURN_LINK_REG, PRESERV_GENERAL_REG2);
+    emitter.ipf_mtap(AR_pfs, PRESERV_GENERAL_REG1);
+
+    emitter.ipf_brret(br_few, br_sptk, br_none, BRANCH_RETURN_LINK_REG);
+
+    addr = finalize_stub(emitter, "");
+    return addr;
+}
+
 unsigned m2n_gen_push_m2n(Merced_Code_Emitter* emitter, Method_Handle method, frame_type current_frame_type, bool handles, unsigned num_on_stack, unsigned num_local, unsigned num_out, bool do_alloc)
 {
     // Allocate new frame
@@ -211,7 +250,8 @@ unsigned m2n_gen_push_m2n(Merced_Code_Emitter* emitter, Method_Handle method, fr
     // Save predicates, SP, and callee saves general registers
     emitter->ipf_adds(M2N_SAVED_SP, num_on_stack, SP_REG);
 
-    emitter->ipf_mfpr(M2N_SAVED_PR              );
+    emitter->ipf_mfpr(M2N_SAVED_PR               );
+    emitter->ipf_mfap(M2N_SAVED_UNAT,     AR_unat);
     emitter->ipf_mov (M2N_SAVED_R4,             4);
     emitter->ipf_mov (M2N_SAVED_R5,             5);
     emitter->ipf_mov (M2N_SAVED_R6,             6);
@@ -221,6 +261,61 @@ unsigned m2n_gen_push_m2n(Merced_Code_Emitter* emitter, Method_Handle method, fr
     emitter->ipf_mov(M2N_OBJECT_HANDLES, 0);
     emit_mov_imm_compactor(*emitter, M2N_METHOD, (uint64)method);
     emit_mov_imm_compactor(*emitter, M2N_FRAME_TYPE, (uint64)current_frame_type);
+
+    const int P1 = SCRATCH_PRED_REG;
+    const int P2 = SCRATCH_PRED_REG2;
+    const int OLD_RSE_MODE = SCRATCH_GENERAL_REG2;
+    const int NEW_RSE_MODE = SCRATCH_GENERAL_REG3;
+    // SCRATCH_GENERAL_REG4 & SCRATCH_GENERAL_REG5 are reserved for std places.
+    const int BSP = SCRATCH_GENERAL_REG6;
+    const int IMM_8 = SCRATCH_GENERAL_REG7;
+    const int IMM_1F8 = SCRATCH_GENERAL_REG8;
+    const int TMP_REG = SCRATCH_GENERAL_REG9;
+    // Scratch branch register.
+    const int TMP_BRANCH_REG = 6;
+
+    // Switch RSE to "forced lazy" mode. This is required to access RNAT.
+    emitter->ipf_mfap(OLD_RSE_MODE, AR_rsc);
+    emitter->ipf_dep(NEW_RSE_MODE, 0, OLD_RSE_MODE, 0, 2);
+    emitter->ipf_mtap(AR_rsc, NEW_RSE_MODE);
+
+    // Flush must be the first instruction in the group.
+    emitter->flush_buffer();
+    // Spill parent frames so that corresponding RNAT bits become valid.
+    emitter->ipf_flushrs();
+    // Extract backing store pointer
+    emitter->ipf_mfap(BSP, AR_bsp);
+    // Remember parent RNAT collection.
+    emitter->ipf_mfap(M2N_EXTRA_RNAT, AR_rnat);
+
+    // TODO: This is not fully legal reset nat bits for the whole m2n frame because it
+    // contains r4-r7 general registers which may have corresponding unat bits up.
+    emitter->ipf_mov(M2N_EXTRA_UNAT, 0);
+
+/* The following code spills M2N into backing store.
+    emitter->ipf_movl(IMM_1F8, 0, (uint64)0x1f8);
+    emitter->ipf_movl(IMM_8, 0, (uint64)0x8);
+
+    // Forcebly spill M2N frame into backing store.
+    for(int i = M2N_NUMBER_INPUTS; i < M2N_NUMBER_LOCALS; i++) {
+        emitter->ipf_and(TMP_REG, IMM_1F8, BSP);
+        emitter->ipf_cmp(icmp_eq, cmp_none, P1, P2, IMM_1F8, TMP_REG);
+        emitter->ipf_add(BSP, BSP, IMM_8, P1);
+        emitter->ipf_st_inc_imm(int_mem_size_8, mem_st_spill, mem_none, BSP, 32 + i, 8);
+    }
+
+    // Remember UNAT collection for the current frame.
+    emitter->ipf_sub(BSP, BSP, IMM_8);
+    emitter->ipf_mfap(M2N_EXTRA_UNAT, AR_unat);
+    emitter->ipf_st(int_mem_size_8, mem_st_none, mem_none, BSP, M2N_EXTRA_UNAT);
+
+    // Restore original UNAT.
+    emitter->ipf_mtap(AR_unat, M2N_SAVED_UNAT);
+    emitter->flush_buffer();
+*/
+
+    // Switch RSE to the original mode.
+    emitter->ipf_mtap(AR_rsc, OLD_RSE_MODE);
 
     // Link M2nFrame into list of current thread
     size_t offset_lm2nf = (size_t)&((VM_thread*)0)->last_m2n_frame;
@@ -284,9 +379,9 @@ void m2n_gen_pop_m2n(Merced_Code_Emitter* emitter, bool handles, M2nPreserveRet 
     }
 
     if (handles) {
-        emit_call_with_gp(*emitter, (void**)m2n_pop_local_handles);
+        emit_call_with_gp(*emitter, (void**)m2n_pop_local_handles, false);
     } else {
-        emit_call_with_gp(*emitter, (void**)m2n_free_local_handles);
+        emit_call_with_gp(*emitter, (void**)m2n_free_local_handles, false);
     }
     
     // Restore return register

@@ -222,7 +222,7 @@ static void gen_vm_rt_ljf_wrapper_code_compactor(Merced_Code_Emitter &emitter,
         emitter.ipf_mov(out_arg0 + arg, IN_REG0 + arg);
     }
 
-    emit_call_with_gp(emitter, func);
+    emit_call_with_gp(emitter, func, true);
 
     // 20030512 If compressing references, translate a NULL result to a managed null (heap_base).
     if (translate_returned_ref) {
@@ -320,7 +320,7 @@ static void get_vm_rt_new_with_thread_pointer_compactor(Merced_Code_Emitter &emi
     emitter.ipf_mov(out0+0, IN_REG0);
     emitter.ipf_mov(out0+1, IN_REG1);
     emitter.ipf_adds(out0+2, (int)offset_gc_local, THREAD_PTR_REG);
-    emit_call_with_gp(emitter, (void **)p_update_allocation_stats);
+    emit_call_with_gp(emitter, (void **)p_update_allocation_stats, false);
     emit_dealloc_for_single_call(emitter, save_pfs, save_b0, save_gp);
     enforce_calling_conventions(&emitter);
 #endif // VM_STATS
@@ -371,7 +371,7 @@ static void get_vm_rt_new_with_thread_pointer_compactor(Merced_Code_Emitter &emi
         emitter.ipf_mov(out0+0, IN_REG0);
         emitter.ipf_mov(out0+1, IN_REG1);
         emitter.ipf_adds(out0+2, (int)offset_gc_local, THREAD_PTR_REG);
-        emit_call_with_gp(emitter, fast_obj_alloc_proc);
+        emit_call_with_gp(emitter, fast_obj_alloc_proc, false);
 
         // If the fast allocation procedure returned a non-NULL result then return, else fall through to the slow allocation path.
         emitter.ipf_cmp(icmp_eq, cmp_none, SCRATCH_PRED_REG, SCRATCH_PRED_REG2, 0, RETURN_VALUE_REG);
@@ -387,7 +387,7 @@ static void get_vm_rt_new_with_thread_pointer_compactor(Merced_Code_Emitter &emi
     emitter.ipf_mov(out_arg0+0, IN_REG0);
     emitter.ipf_mov(out_arg0+1, IN_REG1);
     emitter.ipf_adds(out_arg0+2, (int)offset_gc_local, THREAD_PTR_REG);
-    emit_call_with_gp(emitter, slow_obj_alloc_proc);
+    emit_call_with_gp(emitter, slow_obj_alloc_proc, true);
 
     // pop m2n frame and return
     m2n_gen_pop_m2n(&emitter, false, MPR_Gr);
@@ -416,7 +416,7 @@ static void get_vm_rt_new_vector_with_thread_pointer_compactor(Merced_Code_Emitt
         emitter.ipf_mov(out0+0, IN_REG0);
         emitter.ipf_mov(out0+1, IN_REG1);
         emitter.ipf_adds(out0+2, (int)offset_gc_local, THREAD_PTR_REG);
-        emit_call_with_gp(emitter, (void **)p_vm_new_vector_update_stats);
+        emit_call_with_gp(emitter, (void **)p_vm_new_vector_update_stats, false);
         emit_dealloc_for_single_call(emitter, save_pfs, save_b0, save_gp);
         enforce_calling_conventions(&emitter);
     }
@@ -434,7 +434,7 @@ static void get_vm_rt_new_vector_with_thread_pointer_compactor(Merced_Code_Emitt
         emitter.ipf_mov(out0, IN_REG0);
         emitter.ipf_mov(out0+1, IN_REG1);
         emitter.ipf_adds(out0+2, (int)offset_gc_local, THREAD_PTR_REG);
-        emit_call_with_gp(emitter, fast_obj_alloc_proc);
+        emit_call_with_gp(emitter, fast_obj_alloc_proc, false);
 
         // If the fast allocation procedure returned a non-NULL result then return, else fall through to the slow allocation path.
         emitter.ipf_cmp(icmp_eq, cmp_none, SCRATCH_PRED_REG, SCRATCH_PRED_REG2, 0, RETURN_VALUE_REG);
@@ -449,7 +449,7 @@ static void get_vm_rt_new_vector_with_thread_pointer_compactor(Merced_Code_Emitt
     emitter.ipf_mov(out_arg0+0, IN_REG0);
     emitter.ipf_mov(out_arg0+1, IN_REG1);
     emitter.ipf_adds(out_arg0+2, (int)offset_gc_local, THREAD_PTR_REG);
-    emit_call_with_gp(emitter, slow_obj_alloc_proc);
+    emit_call_with_gp(emitter, slow_obj_alloc_proc, true);
 
     // pop m2n frame and return
     m2n_gen_pop_m2n(&emitter, false, MPR_Gr);
@@ -761,7 +761,7 @@ static void emit_fast_type_check_without_vm_stats(Merced_Code_Emitter& emitter,
     emitter.ipf_add(sc1, sc2, sc3);
     emitter.ipf_ld(int_mem_size_8, mem_ld_none, mem_none, out0+0, sc1);
     emitter.ipf_mov(out0+1, super_class);
-    emit_call_with_gp(emitter, (void **)p_class_is_subtype);
+    emit_call_with_gp(emitter, (void **)p_class_is_subtype, false);
     emit_dealloc_for_single_call(emitter, save_pfs, save_b0, save_gp);
 
     if (is_instanceof)
@@ -793,7 +793,7 @@ static void emit_vm_stats_update_call(Merced_Code_Emitter& emitter, void **funct
         emitter.ipf_mov(out0+i, IN_REG0+i);
     }
 
-    emit_call_with_gp(emitter, function);
+    emit_call_with_gp(emitter, function, false);
 
     emit_dealloc_for_single_call(emitter, save_pfs, save_b0, save_gp);
     enforce_calling_conventions(&emitter);
@@ -828,7 +828,7 @@ static void *get_vm_rt_aastore_address_compactor()
     emitter.ipf_mov(out0+0, IN_REG0);
     emitter.ipf_mov(out0+1, IN_REG1);
     emitter.ipf_mov(out0+2, IN_REG2);
-    emit_call_with_gp(emitter, (void **)p_vm_rt_aastore);
+    emit_call_with_gp(emitter, (void **)p_vm_rt_aastore, false);
 
     // Restore pfs, b0, and gp
     emit_dealloc_for_single_call(emitter, save_pfs, save_b0, save_gp);
@@ -1105,7 +1105,7 @@ static void *get_vm_rt_initialize_class_compactor()
 
     Boolean (*p_is_class_initialized)(Class *clss);
     p_is_class_initialized = is_class_initialized;
-    emit_call_with_gp(emitter, (void**)p_is_class_initialized);
+    emit_call_with_gp(emitter, (void**)p_is_class_initialized, false);
 
     emitter.ipf_cmp(icmp_ne, cmp_none, SCRATCH_PRED_REG, SCRATCH_PRED_REG2, RETURN_VALUE_REG, SCRATCH_GENERAL_REG3);
     emitter.ipf_brret(br_many, br_sptk, br_none, BRANCH_RETURN_LINK_REG, SCRATCH_PRED_REG);
@@ -1115,7 +1115,7 @@ static void *get_vm_rt_initialize_class_compactor()
     emitter.ipf_mov(out_arg0+0, IN_REG0);
     void (*p_class_initialize)(Class *clss);
     p_class_initialize = vm_rt_class_initialize;
-    emit_call_with_gp(emitter, (void **)p_class_initialize);
+    emit_call_with_gp(emitter, (void **)p_class_initialize, true);
     // pop m2n frame and return
     m2n_gen_pop_m2n(&emitter, false, MPR_None);
     enforce_calling_conventions(&emitter);
@@ -1364,7 +1364,7 @@ void gen_convert_class_arg(Merced_Code_Emitter &emitter, bool check_null)
         // Call struct_Class_to_java_lang_Class() to convert the struct Class* argument to a java_lang_Class reference. 
         int out_arg0 = m2n_gen_push_m2n(&emitter, 0, FRAME_UNKNOWN, false, 0, 0, 1);
         emitter.ipf_mov(out_arg0, IN_REG0);
-        emit_call_with_gp(emitter, (void **)p_struct_Class_to_java_lang_Class);
+        emit_call_with_gp(emitter, (void **)p_struct_Class_to_java_lang_Class, true);
         m2n_gen_pop_m2n(&emitter, false, MPR_Gr);
         enforce_calling_conventions(&emitter);
 
@@ -1376,7 +1376,7 @@ void gen_convert_class_arg(Merced_Code_Emitter &emitter, bool check_null)
         // Call struct_Class_to_java_lang_Class() to convert the struct Class* argument to a java_lang_Class reference. 
         int out_arg0 = m2n_gen_push_m2n(&emitter, 0, FRAME_UNKNOWN, false, 0, 0, 1);
         emitter.ipf_mov(out_arg0, IN_REG0);
-        emit_call_with_gp(emitter, (void **)p_struct_Class_to_java_lang_Class);
+        emit_call_with_gp(emitter, (void **)p_struct_Class_to_java_lang_Class, true);
         m2n_gen_pop_m2n(&emitter, false, MPR_Gr);
         enforce_calling_conventions(&emitter);
 
@@ -1522,7 +1522,7 @@ void emit_hashcode_override(Emitter_Handle eh, Method *method)
         out0, save_pfs, save_b0, save_gp);
 
     emitter.ipf_mov(out0, IN_REG0);
-    emit_call_with_gp(emitter, (void **)p_generic_hashcode);
+    emit_call_with_gp(emitter, (void **)p_generic_hashcode, false);
 
     // Restore pfs, b0, and gp
     emit_dealloc_for_single_call(emitter, save_pfs, save_b0, save_gp);
@@ -1549,7 +1549,7 @@ void emit_arraycopy_override(Emitter_Handle eh, Method *method)
     emitter.ipf_mov(out0+3, IN_REG3);
     emitter.ipf_mov(out0+4, IN_REG4);
     
-    emit_call_with_gp(emitter, (void **)p_array_copy);
+    emit_call_with_gp(emitter, (void **)p_array_copy, false);
 
     // Restore pfs, b0, and gp
     emit_dealloc_for_single_call(emitter, save_pfs, save_b0, save_gp);
@@ -1572,7 +1572,7 @@ void emit_system_currenttimemillis_override(Emitter_Handle eh, Method *method)
         (void **)func,
         out0, save_pfs, save_b0, save_gp);
 
-    emit_call_with_gp(emitter, (void **)func);
+    emit_call_with_gp(emitter, (void **)func, false);
 
     // Restore pfs, b0, and gp
     emit_dealloc_for_single_call(emitter, save_pfs, save_b0, save_gp);
@@ -1647,7 +1647,7 @@ void emit_readinternal_override(Emitter_Handle eh, Method *method)
     emitter.ipf_mov(out0+5, IN_REG4);
 
     int (*func)(JNIEnv*, Java_java_io_FileInputStream*, int, Vector_Handle, int, int) = readinternal_override;
-    emit_call_with_gp(emitter, (void **)func);
+    emit_call_with_gp(emitter, (void **)func, false);
     
     // Restore pfs, b0, and gp
     emitter.ipf_mov(GP_REG, save_gp);
@@ -2186,7 +2186,7 @@ static void *gen_faster_char_arraycopy_no_exc()
     emitter.ipf_adds(out0+0, first_element_offset, sc2);
     emitter.ipf_adds(out0+1, first_element_offset, sc1);
     emitter.ipf_add(out0+2, length, length);
-    emit_call_with_gp(emitter, (void **)p_memmove);
+    emit_call_with_gp(emitter, (void **)p_memmove, false);
 
     // Restore pfs, b0, and gp
     emit_dealloc_for_single_call(emitter, save_pfs, save_b0, save_gp);
@@ -2331,7 +2331,7 @@ static void *create_direct_helper_call_wrapper(void **fptr, int num_args, const 
     {
         emitter.ipf_mov(out0+i, IN_REG0+i);
     }
-    emit_call_with_gp(emitter, fptr);
+    emit_call_with_gp(emitter, fptr, false);
 
     // Restore pfs, b0, and gp
     emit_dealloc_for_single_call(emitter, save_pfs, save_b0, save_gp);
@@ -2530,7 +2530,7 @@ void *emit_counting_wrapper_for_jit_helper(VM_RT_SUPPORT f, void *helper, int nu
 
     // Call increment_helper_count. 
     emit_movl_compactor(emitter, out0, (uint64)f);
-    emit_call_with_gp(emitter, (void **)p_increment_helper_count);
+    emit_call_with_gp(emitter, (void **)p_increment_helper_count, false);
 
     // Restore fp args
     emitter.ipf_adds(SP_REG, 16, SP_REG);

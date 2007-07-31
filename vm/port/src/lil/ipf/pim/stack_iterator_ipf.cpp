@@ -71,8 +71,8 @@ struct StackIterator {
     M2nFrame*         m2nfl;
     uint64            ip;
     uint64*           bsp;
-    uint64*           last_legal_rsnat;
-    uint64            extra_nats;
+    uint64            extra_rnats;
+    uint64            extra_unats;
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -82,28 +82,60 @@ struct StackIterator {
 // this flush.  We assume that all nat bits we are interested in do not change from the time of flush
 // to after we are finished with the iterator that calls this function, even if the rse engine has
 // returned to a point prior to bsp.
+/*
 static void si_init_nats(StackIterator* si, uint64* bsp, uint64 rnat)
 {
     si->last_legal_rsnat = (uint64*)((uint64)bsp & ~0x1f8);
     si->extra_nats = rnat;
 }
+*/
 
 // This function flushes the rse and puts the value of bsp/bspstore into res[1] and rnat into res[0]
+/*
 extern "C" void get_rnat_and_bsp(uint64* res);
 extern "C" void get_rnat_and_bspstore(uint64* res);
+*/
+
+static uint64 get_rnat(uint64 * bsp) {
+    uint64 * last_m2n = (uint64 *)m2n_get_last_frame();
+    uint64 * rnat_ptr = (uint64*)((uint64)bsp | (uint64)0x1f8);
+    uint64 * extra_nat_ptr;
+
+    if (rnat_ptr <= last_m2n) {
+        return *rnat_ptr;
+    }
+
+    // All nat bits for last M2N are stored at M2N_EXTRA_UNAT.
+    // All nat bits for parent frames are stored at M2N_EXTRA_RNAT.
+
+    if (bsp >= last_m2n) {
+        extra_nat_ptr = last_m2n + (M2N_EXTRA_UNAT - 32);
+    } else {
+        extra_nat_ptr = last_m2n + (M2N_EXTRA_RNAT - 32);
+    }
+
+    if (rnat_ptr <= extra_nat_ptr) {
+        // There is rnat collection inside M2N. Need to adjust...
+        extra_nat_ptr += 1;
+    }
+
+    return *extra_nat_ptr;
+}
 
 // Setup the stacked register for the current frame given bsp and ar.pfs (cfm for current frame)
 static void si_setup_stacked_registers(StackIterator* si)
 {
+    const uint64 ALL_ONES = ~0;
     uint64 pfs = *si->c.p_ar_pfs;
     unsigned sof = (unsigned)EXTRACT64_SOF(pfs);
 
     uint64 nats_lo = si->c.nats_lo & 0xffffffff;
     uint64 nats_hi = 0;
     uint64* bsp = si->bsp;
-    uint64 nats = (bsp<=si->last_legal_rsnat ? *(uint64*)((uint64)bsp|(uint64)0x1f8) : si->extra_nats);
+    uint64 nats = get_rnat(bsp);
+
     unsigned index = (unsigned)(((uint64)bsp & (uint64)0x1f8) >> 3);
-    uint64 mask = 1 << index;
+    uint64 mask = ((uint64)1) << index;
 
     for(unsigned i=0; i<sof; i++) {
         // Set the location of the stack register
@@ -119,12 +151,9 @@ static void si_setup_stacked_registers(StackIterator* si)
         mask <<= 1;
         // If bsp is on a spilled rsnat recompute nats and mask
         if (((uint64)bsp&(uint64)0x1f8) == (uint64)0x1f8) {
-            if (bsp<=si->last_legal_rsnat)
-                nats = *bsp;
-            else
-                nats = si->extra_nats;
             bsp++;
             mask = 1;
+            nats = get_rnat(bsp);
         }
     }
 
@@ -154,11 +183,12 @@ static void si_unwind_from_m2n(StackIterator* si)
     assert(M2N_SAVED_R7 < 64);
     si->c.nats_lo = si->c.nats_lo & ~(uint64)0xf0 | (si->c.nats_lo >> (M2N_SAVED_R4-4)) & (uint64)0xf0;
 
-    // IP, SP, PFS, preds, m2nfl
+    // IP, SP, PFS, preds, unat, m2nfl
     si->c.p_eip    =  si->c.p_gr[M2N_SAVED_RETURN_ADDRESS];
     si->c.sp       = *si->c.p_gr[M2N_SAVED_SP];
     si->c.p_ar_pfs =  si->c.p_gr[M2N_SAVED_PFS];
     si->c.preds    = *si->c.p_gr[M2N_SAVED_PR];
+    si->c.ar_unat     = *si->c.p_gr[M2N_SAVED_UNAT];
     si->m2nfl      = m2n_get_previous_frame(si->m2nfl);
 }
 
@@ -167,18 +197,17 @@ static void si_unwind_bsp(StackIterator* si)
 {
     uint64 pfs = *si->c.p_ar_pfs;
     unsigned sol = (unsigned)EXTRACT64_SOL(pfs);
-    assert(sol<=96); // ichebyki
-    // ichebyki assert(sol<96);
-    uint64* bsp = si->bsp;
+
+    assert(sol<=96);
+
+    uint64 bsp = (uint64)si->bsp;
+    uint64 local_area_size = sol << 3;
 
     // Direct computation, see IPF arch manual, volume 3, table 6.2.
-    uint64 b = (uint64)bsp;
-    uint64 s = sol<<3;
-
-    uint64 d2 = b-s;
-    uint64 d3 = 62*8-(b&0x1f8)+s;
-    if (d3>=63*8)
-        if (d3>=126*8)
+    uint64 d2 = bsp - local_area_size;
+    uint64 d3 = 62*8 - (bsp & 0x1f8) + local_area_size;
+    if (d3 >= 63*8)
+        if (d3 >= 126*8)
             d2 -= 16;
         else
             d2 -= 8;
@@ -327,126 +356,27 @@ static transfer_control_stub_type gen_transfer_control_stub()
 //////////////////////////////////////////////////////////////////////////
 // Stack Iterator Interface
 
-StackIterator* si_create_from_native()
-{
-    hythread_suspend_disable();
-    // Allocate iterator
-    StackIterator* res = (StackIterator*)STD_MALLOC(sizeof(StackIterator));
-    assert(res);
-
-    // Setup last_legal_rsnat and extra_nats
-    uint64 t[2];
-    get_rnat_and_bsp(t);
-    si_init_nats(res, (uint64*)t[1], t[0]);
-
-    // Setup current frame
-    res->cci = NULL;
-    res->m2nfl = m2n_get_last_frame();
-    res->ip = 0;
-    res->c.p_eip = &res->ip;
-    hythread_suspend_enable();
-    return res;
-}
-
-#if defined (PLATFORM_POSIX)
 StackIterator* si_create_from_native(VM_thread* thread)
 {
-	hythread_suspend_disable();
     // Allocate iterator
     StackIterator* res = (StackIterator*)STD_MALLOC(sizeof(StackIterator));
     assert(res);
 
-    // Setup last_legal_rsnat and extra_nats
-    uint64 t[2];
-    get_rnat_and_bsp(t);
-    si_init_nats(res, (uint64*)t[1], t[0]);
-
     // Setup current frame
     res->cci = NULL;
     res->m2nfl = m2n_get_last_frame(thread);
     res->ip = 0;
     res->c.p_eip = &res->ip;
-    hythread_suspend_enable();
     return res;
-
-#if 0	
-    // FIXME: code is outdated
-    assert(0);
-    abort();
-
-    // Allocate iterator
-    StackIterator* res = (StackIterator*)malloc(sizeof(StackIterator));
-    assert(res);
-
-    TRACE2("SIGNALLING", "stack iterator: create from native pthread_t " << ((pthread_t)GetCurrentThreadId()));
-
-    if (thread == p_TLS_vmthread) {
-        get_rnat_and_bspstore(thread->t);
-    } else {
-        assert(thread->suspend_request > 0);
-
-        TRACE2("SIGNALLING", "thread state before " << thread << " " <<
-            thread->t[0] << " " << thread->t[1] << " " << thread->suspended_state);
-        //if (thread->suspended_state == NOT_SUSPENDED) {
-        TRACE2("SIGNALLING", "sending SIGUSR2 to thread " << thread);
-        assert(thread->thread_id != 0);
-        
-        if (sem_init(&thread->suspend_self, 0, 0) != 0) {
-            DIE("sem_init() failed" <<  strerror(errno));
-        }
-        
-        thread->t[0] = NOT_VALID;
-        thread->t[1] = NOT_VALID;
-        
-        TRACE2("SIGNALLING", "BEFORE KILL thread = " << thread << " killing " << thread->thread_id);
-
-        if (pthread_kill(thread->thread_id, SIGUSR2) != 0) {
-            DIE("pthread_kill(" << thread->thread_id << ", SIGUSR2) failed :" << strerror(errno));
-        }
-        
-        si_reload_registers();
-        
-        TRACE2("SIGNALLING", "BEFORE WAIT thread = " << thread);
-        
-        int ret;
-        do {
-            ret = sem_wait(&thread->suspend_self);
-            TRACE2("SIGNALLING", "sem_wait " << (&thread->suspend_self) <<
-                " exited, errno = " << errno);
-        } while((ret != 0) && (errno == EINTR));
-        
-        TRACE2("SIGNALLING", "AFTER WAIT thread = " << thread);
-        
-        sem_destroy(&thread->suspend_self);
-        assert(thread->suspended_state == SUSPENDED_IN_SIGNAL_HANDLER);
-        thread->suspended_state = NOT_SUSPENDED;
-        // assert(thread->t[0] != NOT_VALID);
-        // assert(thread->t[1] != NOT_VALID);
-    }
-    
-    TRACE2("SIGNALLING", "thread state after " << thread << " " << thread->t[0] << " " <<  thread->t[1] << " " << m2n_get_last_frame(thread));
-
-    TRACE2("SIGNALLING", "stack iterator: create from native, rnat, bsp/bspstore " << thread->t[0] << " " <<  thread->t[1]);
-
-    // Setup last_legal_rsnat and extra_nats
-    uint64 rnat = thread->t[0];
-    uint64* bsp = (uint64*)thread->t[1];
-
-    si_init_nats(res, bsp, rnat);
-
-    // Check that bsp covers everything
-    assert((uint64)m2n_get_last_frame(thread)+(M2N_NUMBER_LOCALS+9)*8 <= (uint64)bsp);
-
-    // Setup current frame
-    res->cci = NULL;
-    res->m2nfl = m2n_get_last_frame(thread);
-    res->ip = 0;
-    res->c.p_eip = &res->ip;
-
-    return res;
-#endif
 }
 
+StackIterator* si_create_from_native()
+{
+    return si_create_from_native(p_TLS_vmthread);
+}
+
+/*
+#if defined (PLATFORM_POSIX)
 #elif defined (PLATFORM_NT)
 
 // Get the bspstore and rnat values of another thread from the OS.
@@ -488,6 +418,7 @@ StackIterator* si_create_from_native(VM_thread* thread)
 #else
 #error Stack iterator is not implemented for the given platform
 #endif
+*/
 
 // On IPF stack iterators must be created from threads (suspended) in native code.
 // We do not support threads suspended in managed code yet.

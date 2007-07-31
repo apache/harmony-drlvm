@@ -232,18 +232,7 @@ _label_:
 
 StackIterator* si_create_from_native()
 {
-    ASSERT_NO_INTERPRETER
-    // Allocate iterator
-    StackIterator* res = (StackIterator*)STD_MALLOC(sizeof(StackIterator));
-    assert(res);
-    memset(res, 0, sizeof(StackIterator));
-
-    res->cci = NULL;
-    res->m2nfl = m2n_get_last_frame();
-    res->ip = 0;
-    res->c.p_eip = &res->ip;
-
-    return res;
+    return si_create_from_native(p_TLS_vmthread);
 }
 
 StackIterator* si_create_from_native(VM_thread* thread)

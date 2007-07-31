@@ -600,6 +600,10 @@ public:
         return 16 + stk_output_size;
     }
 
+    bool has_push_m2n() {
+        return has_m2n;
+    }
+
 private:
     //*****************
     // helper functions, used by visitor functions
@@ -1966,7 +1970,13 @@ public:
                 // Set new gp
                 emit_mov_imm_compactor(emitter, GP_REG, (uint64)gp_new);
             }
-            emitter.ipf_brl_call(br_many, br_sptk, br_none, BRANCH_RETURN_LINK_REG, (uint64)fn_addr);
+            emit_mov_imm_compactor(emitter, tmp_res->addr, (uint64)fn_addr, 0);
+            if (context.has_push_m2n()) {
+                emitter.ipf_mtbr(BRANCH_CALL_REG, tmp_res->addr);
+                emit_mov_imm_compactor(emitter, tmp_res->addr, (uint64)m2n_gen_flush_and_call(), 0);
+            }
+            emitter.ipf_mtbr(tmp_br, tmp_res->addr);
+            emitter.ipf_bricall(br_few, br_sptk, br_none, BRANCH_RETURN_LINK_REG, tmp_br);
             if (gp_new != gp_old) {
                 // Restore gp
                 const LcgIpfLoc* gp_save_gr = context.get_gp_save_gr();
@@ -1990,9 +2000,12 @@ public:
             else {
                 ASSERT(0, "Unexpected kind");  // address can't be FP!
             }
+            if (context.has_push_m2n()) {
+                emitter.ipf_mtbr(BRANCH_CALL_REG, call_addr_gr);
+                emit_mov_imm_compactor(emitter, call_addr_gr, (uint64)m2n_gen_flush_and_call(), 0);
+            }
             emitter.ipf_mtbr(tmp_br, call_addr_gr);
-            emitter.ipf_bricall(br_few, br_sptk, br_none,
-                                 BRANCH_RETURN_LINK_REG, tmp_br);
+            emitter.ipf_bricall(br_few, br_sptk, br_none, BRANCH_RETURN_LINK_REG, tmp_br);
         }
     }  // call
 

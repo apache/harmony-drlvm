@@ -39,6 +39,7 @@
 #define SCRATCH_PRED_REG9      14
 #define SCRATCH_PRED_REG10     15
 #define SCRATCH_BRANCH_REG      6
+#define SCRATCH_BRANCH_REG2     7
 #define BRANCH_RETURN_LINK_REG  0
 #define GP_REG                  1
 #define RETURN_VALUE_REG        8
@@ -60,12 +61,16 @@
 #define SCRATCH_GENERAL_REG16  29
 #define SCRATCH_GENERAL_REG17  30
 #define SCRATCH_GENERAL_REG18  31
+#define PRESERV_GENERAL_REG1    5
+#define PRESERV_GENERAL_REG2    6
 #define SP_REG                 12
 #define FIRST_PRES_FP_REG      16
 #define LAST_PRES_FP_REG       31
 #define FIRST_FP_ARG_REG        8
 #define LAST_FP_ARG_REG        15
 
+// br2 is used for keeping function address to be called.
+#define BRANCH_CALL_REG SCRATCH_BRANCH_REG2
 
 #define IN_REG0                32
 #define IN_REG1                33

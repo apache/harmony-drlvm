@@ -311,7 +311,6 @@ __label15__
 // Stack Iterator Interface
 
 StackIterator * si_create_from_native() {
-    ASSERT_NO_INTERPRETER
     return si_create_from_native(p_TLS_vmthread);
 }
 

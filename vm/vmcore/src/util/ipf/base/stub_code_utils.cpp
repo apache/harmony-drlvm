@@ -75,10 +75,11 @@ void emit_dealloc_for_single_call(Merced_Code_Emitter& emitter,
     emitter.ipf_mtbr(BRANCH_RETURN_LINK_REG, save_b0_reg, pred);
 }
 
-
+NativeCodePtr m2n_gen_flush_and_call();
 
 void emit_call_with_gp(Merced_Code_Emitter& emitter,
                        void **proc_ptr,
+                       bool flushrs,
                        int saved_gp_reg)
 {
     void *new_gp = proc_ptr[1];
@@ -94,7 +95,14 @@ void emit_call_with_gp(Merced_Code_Emitter& emitter,
 
     uint64 branch_target = (uint64)(*proc_ptr);
 
-    emitter.ipf_brl_call(br_many, br_sptk, br_none, BRANCH_RETURN_LINK_REG, branch_target);
+    emit_mov_imm_compactor(emitter, SCRATCH_GENERAL_REG, branch_target, 0);
+    if (flushrs) {
+        emitter.ipf_mtbr(BRANCH_CALL_REG, SCRATCH_GENERAL_REG);
+        emit_mov_imm_compactor(emitter, SCRATCH_GENERAL_REG, (uint64)m2n_gen_flush_and_call(), 0);
+    }
+    emitter.ipf_mtbr(SCRATCH_BRANCH_REG, SCRATCH_GENERAL_REG);
+    emitter.ipf_bricall(br_few, br_sptk, br_none, BRANCH_RETURN_LINK_REG, SCRATCH_BRANCH_REG);
+
     // Restore the saved GP.
     if (new_gp != vm_gp && saved_gp_reg != 0)
         emitter.ipf_mov(GP_REG, saved_gp_reg);
@@ -102,7 +110,7 @@ void emit_call_with_gp(Merced_Code_Emitter& emitter,
 
 
 void emit_branch_with_gp(Merced_Code_Emitter& emitter,
-             void **proc_ptr)
+                         void **proc_ptr)
 {
     void *new_gp = proc_ptr[1];
     void *vm_gp = get_vm_gp_value();
@@ -115,7 +123,7 @@ void emit_branch_with_gp(Merced_Code_Emitter& emitter,
 
     uint64 branch_target = (uint64)(*proc_ptr);
 
-    emit_movl_compactor(emitter, SCRATCH_GENERAL_REG, branch_target, 0);
+    emit_mov_imm_compactor(emitter, SCRATCH_GENERAL_REG, branch_target, 0);
     emitter.ipf_mtbr(SCRATCH_BRANCH_REG, SCRATCH_GENERAL_REG);
     emitter.ipf_bri(br_cond, br_few, br_sptk, br_none, SCRATCH_BRANCH_REG);
 
@@ -241,7 +249,7 @@ void emit_print_reg(Merced_Code_Emitter &emitter, char *msg, unsigned print_reg,
     emit_movl_compactor(emitter, out0, (uint64) msg);
     emitter.ipf_mov(out0+1, print_reg);
     // call a helper function
-    emit_call_with_gp(emitter, (void **) print_helper);
+    emit_call_with_gp(emitter, (void **) print_helper, false);
 
     emitter.ipf_adds(SP_REG, 16, SP_REG);
     // restore the scratch regs

@@ -69,6 +69,7 @@ protected:
     
     ///methods fo registering bc-offsets for inlined methods
     void registerBCOffsets(Node* node, InlineInfoMap::Entry* parentEntry);
+    InlineInfoMap::Entry* processBlockOffsets(Node* node, InlineInfoMap::Entry* parentEntry);
     void registerBCMappingAndInlineInfo();
 
     void orderNodesAndMarkInlinees(StlList<MethodMarkerPseudoInst*>& container, 
@@ -336,10 +337,7 @@ static uint16 getTopLevelEntryOffset(InlineInfoMap::Entry* entry) {
     return getTopLevelEntryOffset(entry->parentEntry);
 }
 
-void CodeEmitter::registerBCOffsets(Node* node, InlineInfoMap::Entry* parentEntry) {
-    assert(traversalInfo[node->getId()] == 0);
-    traversalInfo[node->getId()] = 1;   
-    
+InlineInfoMap::Entry* CodeEmitter::processBlockOffsets(Node* node, InlineInfoMap::Entry* parentEntry) {
     for (Inst* inst = (Inst*)node->getFirstInst(); inst!=NULL; inst = inst->getNextInst()) {
         if (inst->getKind() == Inst::Kind_MethodEntryPseudoInst) {
             if (Log::isEnabled()) {
@@ -394,6 +392,13 @@ void CodeEmitter::registerBCOffsets(Node* node, InlineInfoMap::Entry* parentEntr
             }
         }
     }
+    return parentEntry;
+}
+
+void CodeEmitter::registerBCOffsets(Node* node, InlineInfoMap::Entry* parentEntry) {
+    assert(traversalInfo[node->getId()] == 0);
+    traversalInfo[node->getId()] = 1;   
+    parentEntry = processBlockOffsets(node, parentEntry);
     const Edges& edges = node->getOutEdges();
     for (Edges::const_iterator ite = edges.begin(), ende = edges.end(); ite!=ende; ++ite) {
         Edge* e = *ite;

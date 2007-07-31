@@ -72,7 +72,7 @@ void gen_vm_rt_athrow_internal_compactor(Merced_Code_Emitter &emitter)
     emitter.ipf_mov(out_arg0+1,  IN_REG1);
     emitter.ipf_mov(out_arg0+2,  0);
     emitter.ipf_mov(out_arg0+3,  0);
-    emit_call_with_gp(emitter, (void **)exn_athrow, 5);
+    emit_call_with_gp(emitter, (void **)exn_athrow, true, 5);
 } //gen_vm_rt_athrow_internal_compactor
 
 

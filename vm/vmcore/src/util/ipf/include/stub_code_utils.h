@@ -68,13 +68,14 @@ void emit_dealloc_for_single_call(Merced_Code_Emitter& emitter,
 // If saved_gp_reg is not specified, then gp is neither saved nor restored.
 void emit_call_with_gp(Merced_Code_Emitter& emitter,
                        void **proc_ptr,
+                       bool flushrs,
                        int saved_gp_reg = 0);
 
 // Emit a branch instruction.  Before the branch, the gp is set to the
 // value specified in the function pointer.
 // This function is normally used to implement tail calls.
 void emit_branch_with_gp(Merced_Code_Emitter& emitter,
-             void **proc_ptr);
+                         void **proc_ptr);
 
 
 void emit_movl_compactor(Merced_Code_Emitter& emitter, unsigned dst_reg, uint64 u64_value, unsigned pred=0);

@@ -100,11 +100,14 @@ uint64* m2n_get_arg_word(M2nFrame*, unsigned n);
 uint64* m2n_get_bsp(M2nFrame*);
 uint64* m2n_get_extra_saved(M2nFrame*);
 
+// Flushes register stack of the current thread into backing store and calls target procedure.
+NativeCodePtr m2n_gen_flush_and_call();
+
 // An M2nFrame will always have 8 input registers, some local stacked registers to save stuff, and some outputs
 
 #define M2N_NUMBER_ALIGNS            2
 #define M2N_NUMBER_INPUTS            8
-#define M2N_NUMBER_LOCALS            14
+#define M2N_NUMBER_LOCALS            17
 
 // The following registers are used in M2nFrames to hold the indicated values
 // The register numbers must be distinct, at least 40 (so they don't conflict with inputs), and less than 40+M2N_NUMBER_LOCALS
@@ -115,14 +118,18 @@ uint64* m2n_get_extra_saved(M2nFrame*);
 #define M2N_SAVED_SP                 43
 #define M2N_SAVED_GP                 44
 #define M2N_SAVED_PR                 45
-#define M2N_SAVED_R4                 46
-#define M2N_SAVED_R5                 47
-#define M2N_SAVED_R6                 48
-#define M2N_SAVED_R7                 49
-#define M2N_EXTRA_SAVED_PTR          50
-#define M2N_OBJECT_HANDLES           51
-#define M2N_METHOD                   52
-#define M2N_FRAME_TYPE               53
+#define M2N_SAVED_UNAT               46
+#define M2N_SAVED_R4                 47
+#define M2N_SAVED_R5                 48
+#define M2N_SAVED_R6                 49
+#define M2N_SAVED_R7                 50
+#define M2N_EXTRA_SAVED_PTR          51
+#define M2N_OBJECT_HANDLES           52
+#define M2N_METHOD                   53
+#define M2N_FRAME_TYPE               54
+#define M2N_EXTRA_RNAT               55
+// this must be last register
+#define M2N_EXTRA_UNAT               56
 
 // Only the callee saves general registers are normally saved in the M2nFrame along with special things like pfs, return address, etc.
 // The full set of preserved registers includes callee saves floating point and branch registers as well.
