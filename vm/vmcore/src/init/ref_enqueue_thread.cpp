@@ -38,9 +38,8 @@ void set_native_ref_enqueue_thread_flag(Boolean flag)
 {  native_ref_thread_flag = flag; }
 
 
+extern jobject get_system_thread_group(JNIEnv *jni_env);
 static IDATA ref_enqueue_thread_func(void **args);
-static void wait_ref_thread_attached(void);
-extern jobject get_system_thread_group(JNIEnv* jni_env);
 
 void ref_enqueue_thread_init(JavaVM *java_vm, JNIEnv* jni_env)
 {
@@ -49,9 +48,11 @@ void ref_enqueue_thread_init(JavaVM *java_vm, JNIEnv* jni_env)
     
     ref_thread_info = (Ref_Enqueue_Thread_Info *)STD_MALLOC(sizeof(Ref_Enqueue_Thread_Info));
     ref_thread_info->shutdown = false;
-    ref_thread_info->thread_attached = 0;
     
     IDATA status = hysem_create(&ref_thread_info->pending_sem, 0, REF_ENQUEUE_THREAD_NUM);
+    assert(status == TM_ERROR_NONE);
+    
+    status = hysem_create(&ref_thread_info->attached_sem, 0, REF_ENQUEUE_THREAD_NUM);
     assert(status == TM_ERROR_NONE);
     
     status = hycond_create(&ref_thread_info->end_cond);
@@ -59,13 +60,15 @@ void ref_enqueue_thread_init(JavaVM *java_vm, JNIEnv* jni_env)
     status = hymutex_create(&ref_thread_info->end_mutex, TM_MUTEX_DEFAULT);
     assert(status == TM_ERROR_NONE);
     
+    ref_thread_info->thread_num = REF_ENQUEUE_THREAD_NUM;
+    
     void **args = (void **)STD_MALLOC(sizeof(void *)*2);
     args[0] = (void *)java_vm;
     args[1] = (void*)get_system_thread_group(jni_env);
     status = hythread_create(NULL, 0, REF_ENQUEUE_THREAD_PRIORITY, 0, (hythread_entrypoint_t)ref_enqueue_thread_func, args);
     assert(status == TM_ERROR_NONE);
     
-    wait_ref_thread_attached();
+    hysem_wait(ref_thread_info->attached_sem);
 }
 
 void ref_enqueue_shutdown(void)
@@ -80,17 +83,17 @@ static uint32 atomic_inc32(volatile apr_uint32_t *mem)
 static uint32 atomic_dec32(volatile apr_uint32_t *mem)
 {  return (uint32)apr_atomic_dec32(mem); }
 
-static void inc_ref_thread_num(void)
-{ atomic_inc32(&ref_thread_info->thread_attached); }
-
-static void dec_ref_thread_num(void)
-{ atomic_dec32(&ref_thread_info->thread_attached); }
-
-static void wait_ref_thread_attached(void)
-{ while(ref_thread_info->thread_attached < REF_ENQUEUE_THREAD_NUM); }
-
 void wait_native_ref_thread_detached(void)
-{ while(ref_thread_info->thread_attached){hythread_yield();} }
+{
+    hymutex_lock(&ref_thread_info->end_mutex);
+    while(ref_thread_info->thread_num){
+        atomic_inc32(&ref_thread_info->end_waiting_num);
+        IDATA status = hycond_wait_timed(&ref_thread_info->end_cond, &ref_thread_info->end_mutex, (I_64)1000, 0);
+        atomic_dec32(&ref_thread_info->end_waiting_num);
+        if(status != TM_ERROR_NONE) break;
+    }
+    hymutex_unlock(&ref_thread_info->end_mutex);
+}
 
 static void wait_ref_enqueue_end(void)
 {
@@ -109,7 +112,7 @@ static void wait_ref_enqueue_end(void)
 
 void activate_ref_enqueue_thread(Boolean wait)
 {
-    IDATA stat = hysem_set(ref_thread_info->pending_sem, REF_ENQUEUE_THREAD_NUM);
+    IDATA stat = hysem_set(ref_thread_info->pending_sem, ref_thread_info->thread_num);
     assert(stat == TM_ERROR_NONE);
     
     if(wait)
@@ -143,9 +146,9 @@ static IDATA ref_enqueue_thread_func(void **args)
     IDATA status = AttachCurrentThreadAsDaemon(java_vm, (void**)&jni_env, jni_args);
     assert(status == JNI_OK);
     set_current_thread_context_loader(jni_env);
-    inc_ref_thread_num();
+    hysem_post(ref_thread_info->attached_sem);
     
-    while(true){
+    while(TRUE){
         /* Waiting for pending weak references */
         wait_pending_reference();
         
@@ -160,7 +163,6 @@ static IDATA ref_enqueue_thread_func(void **args)
     }
     
     status = DetachCurrentThread(java_vm);
-    dec_ref_thread_num();
-    //status = jthread_detach(java_thread);
+    atomic_dec32(&ref_thread_info->thread_num);
     return status;
 }

@@ -52,10 +52,9 @@ void mutator_initialize(GC* gc, void *unused_gc_information)
 
   mutator->next = (Mutator *)gc->mutator_list;
   gc->mutator_list = mutator;
+  gc->num_mutators++;
 
   unlock(gc->mutator_list_lock); // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  
-  gc->num_mutators++;
   
   gc_set_tls(mutator);
   
@@ -73,16 +72,6 @@ void mutator_destruct(GC* gc, void *unused_gc_information)
   allocactor_destruct_local_chunks((Allocator*)mutator);
 #endif
 
-  if(gc_is_gen_mode()){ /* put back the remset when a mutator exits */
-    pool_put_entry(gc->metadata->mutator_remset_pool, mutator->rem_set);
-    mutator->rem_set = NULL;
-  }
-  
-  if(mutator->obj_with_fin){
-    pool_put_entry(gc->finref_metadata->obj_with_fin_pool, mutator->obj_with_fin);
-    mutator->obj_with_fin = NULL;
-  }
-
   lock(gc->mutator_list_lock);     // vvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 
   volatile Mutator *temp = gc->mutator_list;
@@ -95,10 +84,19 @@ void mutator_destruct(GC* gc, void *unused_gc_information)
     }
     temp->next = mutator->next;
   }
+  gc->num_mutators--;
 
   unlock(gc->mutator_list_lock); // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-  gc->num_mutators--;
+  
+  if(gc_is_gen_mode()){ /* put back the remset when a mutator exits */
+    pool_put_entry(gc->metadata->mutator_remset_pool, mutator->rem_set);
+    mutator->rem_set = NULL;
+  }
+  
+  if(mutator->obj_with_fin){
+    pool_put_entry(gc->finref_metadata->obj_with_fin_pool, mutator->obj_with_fin);
+    mutator->obj_with_fin = NULL;
+  }
   
   //gc_set_tls(NULL);
   
@@ -124,5 +122,6 @@ void gc_prepare_mutator_remset(GC* gc)
   }  
   return;
 }
+
 
 

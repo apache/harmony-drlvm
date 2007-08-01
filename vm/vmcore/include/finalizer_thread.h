@@ -43,17 +43,19 @@
 
 
 typedef struct Fin_Thread_Info {
-    hysem_t pending_sem;                        // finalizer pending event
+    hysem_t pending_sem;            // finalizer pending event
+    hysem_t attached_sem;           // fin thread attached event
     
-    hycond_t end_cond;                          // finalization end condition variable
-    hymutex_t end_mutex;                        // finalization end mutex
+    /* Using pair of cond and mutex rather than sem is because the waiting thread num is not constant */
+    hycond_t end_cond;              // finalization end condition variable
+    hymutex_t end_mutex;            // finalization end mutex
     
-    hycond_t mutator_block_cond;                // mutator block condition variable for heavy finalizable obj load
-    hymutex_t mutator_block_mutex;              // mutator block mutex for heavy finalizable obj load
+    /* Using pair of cond and mutex rather than sem is because the waiting thread num is not constant */
+    hycond_t mutator_block_cond;    // mutator block condition variable for heavy finalizable obj load
+    hymutex_t mutator_block_mutex;  // mutator block mutex for heavy finalizable obj load
     
     hythread_t *thread_ids;
     volatile unsigned int thread_num;
-    volatile unsigned int thread_attached;
     
     volatile Boolean shutdown;
     volatile Boolean on_exit;

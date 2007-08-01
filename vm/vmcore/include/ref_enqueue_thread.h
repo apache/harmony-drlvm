@@ -33,11 +33,15 @@
 
 
 typedef struct Ref_Enqueue_Thread_Info {
-    hysem_t pending_sem;
+    hysem_t pending_sem;    // weakref pending event
+    hysem_t attached_sem;   // ref enqueue thread attached event
+    
+    /* Using pair of cond and mutex rather than sem is because the waiting thread num is not constant */
     hycond_t end_cond;      // ref enqueue end condition variable
     hymutex_t end_mutex;    // ref enqueue end mutex
+    
     Boolean shutdown;
-    volatile unsigned int thread_attached;
+    volatile unsigned int thread_num;
     volatile unsigned int end_waiting_num;  // thread num waiting for finalization end
 }Ref_Enqueue_Thread_Info;
 
