@@ -1581,7 +1581,8 @@ CG_OpndHandle* InstCodeSelector::tau_checkElemType(CG_OpndHandle* array,
     appendInsts(irManager.newRuntimeHelperCallInst(
                 CompilationInterface::Helper_IsValidElemType, lengthof(args), args, flag));
 
-    bzero(CompareZeroOp::Ref, flag);
+    // the helper returns boolean value
+    bzero(CompareZeroOp::I4, flag);
     codeSelector.genTrueEdge(currentBasicBlock, throwBasicBlock, 0);
 
     return getTauUnsafe();

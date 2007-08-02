@@ -164,7 +164,10 @@ AR CodeGen::valloc(jtype jt)
     for (unsigned i=0; is_gr(ar) && i<m_jframe->size(); i++) {
         Val& s = m_jframe->dip(i);
         if (!s.is_mem() || !s.uses(ar)) { continue; };
-        bool need_double_slot = is_ia32() && is_wide(s.jt());
+        
+        //WARN: both slots for i64 type have register assigned, but for dbl64 - only first slot is marked..
+        bool need_double_slot = is_ia32() && s.jt()==dbl64; 
+        
         push(s.as_opnd(iplatf));
         if (need_double_slot) {
             Opnd hi_mem(iplatf, s.base(), s.disp() + STACK_SLOT_SIZE, s.index(), s.scale());
@@ -502,7 +505,7 @@ void CodeGen::vpush2(const Val& op_lo, const Val& op_hi)
     assert(op_lo.jt() != jvoid && is_big(op_lo.jt()));
     assert(op_hi.jt() != jvoid && is_big(op_hi.jt()));
     assert(op_hi.jt() == op_lo.jt());
-    // not a big problem, just a self-check - this is expected usage sheme
+    // not a big problem, just a self-check - this is expected usage scheme
     //assert(op_hi.kind() == op_lo.kind());
     
     m_jframe->push(op_lo.jt());
