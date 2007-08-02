@@ -937,6 +937,9 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 				RelativePath="..\..\..\..\vm\vmcore\src\thread\thread_generic.cpp">
 			</File>
 			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\thread\helpers\thread_helpers_ia32.cpp">
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\thread\thread_java_attrs.cpp">
 			</File>
 			<File
@@ -983,13 +986,6 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 				Filter="">
 				<File
 					RelativePath="..\..\..\..\vm\vmcore\src\thread\win\atomics.cpp">
-				</File>
-			</Filter>
-			<Filter
-				Name="helpers"
-				Filter="">
-				<File
-					RelativePath="..\..\..\..\vm\vmcore\src\thread\helpers\thread_helpers.cpp">
 				</File>
 			</Filter>
 		</Filter>
@@ -1148,6 +1144,9 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\port\src\lil\lil_code_generator_utils.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\port\src\lil\pim\m2n.cpp">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\port\src\lil\ia32\pim\m2n_ia32.cpp">
