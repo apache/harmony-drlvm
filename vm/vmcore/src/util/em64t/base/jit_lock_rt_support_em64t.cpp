@@ -222,16 +222,16 @@ static char * gen_restore_monitor_exit(char *ss, char *patch_addr_null_arg)
     char *backpatch_address__fast_monitor_failed = ((char *)ss) - 1;
     ss = ret(ss);
 
-    signed offset = (signed)ss - (signed)backpatch_address__fast_monitor_failed - 1;
+    POINTER_SIZE_SINT offset = (POINTER_SIZE_SINT)ss - (POINTER_SIZE_SINT)backpatch_address__fast_monitor_failed - 1;
     *backpatch_address__fast_monitor_failed = (char)offset;
 
     //  Monitor illegal state happend
     ss = jump(ss, (char*)exn_get_rth_throw_illegal_state_exception());
 
-    offset = (signed)ss - (signed)backpatch_address__null_pointer - 1;
+    offset = (POINTER_SIZE_SINT)ss - (POINTER_SIZE_SINT)backpatch_address__null_pointer - 1;
     *backpatch_address__null_pointer = (char)offset;
     if (patch_addr_null_arg != NULL) {
-        offset = (signed)ss - (signed)patch_addr_null_arg - 1;
+        offset = (POINTER_SIZE_SINT)ss - (POINTER_SIZE_SINT)patch_addr_null_arg - 1;
         *patch_addr_null_arg = (char)offset;
     }
 

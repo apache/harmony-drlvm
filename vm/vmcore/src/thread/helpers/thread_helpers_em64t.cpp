@@ -112,7 +112,7 @@ char* gen_monitorenter_fast_path_helper(char *ss, const R_Opnd & input_param1) {
     ss = ret(ss);                                                // ret
 
     //check_zero:
-    signed offset = (signed)ss - (signed)check_zero - 1;
+    POINTER_SIZE_SINT offset = (POINTER_SIZE_SINT)ss - (POINTER_SIZE_SINT)check_zero - 1;
     *check_zero = (char)offset;
 
     ss = test(ss, rax_opnd, rax_opnd, size_16);                  //  test ax,ax
@@ -134,18 +134,18 @@ char* gen_monitorenter_fast_path_helper(char *ss, const R_Opnd & input_param1) {
 	ss = mov(ss, M_Base_Opnd(rdi_reg, 1), rax_opnd, size_8);     // mov byte[ecx+1],al
 
     //finish:
-    offset = (signed)ss - (signed)finish - 1;
+    offset = (POINTER_SIZE_SINT)ss - (POINTER_SIZE_SINT)finish - 1;
     *finish = (char)offset;
 #endif
     ss = alu(ss, add_opc, rsp_opnd, Imm_Opnd(size_8, 0x8));      // add rsp,0x8
     ss = ret(ss);                                                // ret
 
     //failed:
-    offset = (signed)ss - (signed)failed1 - 1;
+    offset = (POINTER_SIZE_SINT)ss - (POINTER_SIZE_SINT)failed1 - 1;
     *failed1 = (char)offset;
-    offset = (signed)ss - (signed)failed2 - 1;
+    offset = (POINTER_SIZE_SINT)ss - (POINTER_SIZE_SINT)failed2 - 1;
     *failed2 = (char)offset;
-    offset = (signed)ss - (signed)failed3 - 1;
+    offset = (POINTER_SIZE_SINT)ss - (POINTER_SIZE_SINT)failed3 - 1;
     *failed3 = (char)offset;
 
 #endif //ASM_MONITOR_HELPER
@@ -205,7 +205,7 @@ char* gen_monitor_exit_helper(char *ss, const R_Opnd & input_param1) {
     ss = ret(ss);                                               // ret
 
     //zero_rec:
-    signed offset = (signed)ss - (signed)zero_rec - 1;
+    POINTER_SIZE_SINT offset = (POINTER_SIZE_SINT)ss - (POINTER_SIZE_SINT)zero_rec - 1;
     *zero_rec = (char)offset;
 
     ss = mov(ss, M_Base_Opnd(rdi_reg, 2),
@@ -213,7 +213,7 @@ char* gen_monitor_exit_helper(char *ss, const R_Opnd & input_param1) {
 	ss = ret(ss);                                                // ret
 
     //fat:
-    offset = (signed)ss - (signed)fat - 1;
+    offset = (POINTER_SIZE_SINT)ss - (POINTER_SIZE_SINT)fat - 1;
     *fat = (char)offset;
 
 #endif
@@ -257,7 +257,7 @@ char* gen_monitorexit_slow_path_helper(char *ss, const R_Opnd & input_param1) {
 fast_tls_func* get_tls_helper(hythread_tls_key_t key) {
     //     return tm_self_tls->thread_local_storage[key];
     unsigned key_offset =
-        (unsigned) &(((HyThread_public *) (0))->thread_local_storage[key]);
+        (unsigned)(POINTER_SIZE_INT)&(((HyThread_public *) (0))->thread_local_storage[key]);
 
     const int stub_size = 126;
     char *stub = (char *)malloc(stub_size);

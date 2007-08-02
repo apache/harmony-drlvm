@@ -156,7 +156,7 @@ char * gen_convert_managed_to_unmanaged_null_em64t(char * ss,
         ss = branch8(ss, Condition_NE, Imm_Opnd(size_8, 0));  // not null, branch around the mov 0
         char *backpatch_address__not_managed_null = ((char *)ss) - 1;
         ss = mov(ss, rdi_opnd, Imm_Opnd(0));
-        signed offset = (signed)ss - (signed)backpatch_address__not_managed_null - 1;
+        POINTER_SIZE_SINT offset = (POINTER_SIZE_SINT)ss - (POINTER_SIZE_SINT)backpatch_address__not_managed_null - 1;
         *backpatch_address__not_managed_null = (char)offset;
     }
     return ss;
