@@ -956,15 +956,7 @@ NativeCodePtr exn_get_rth_throw_arithmetic()
 Class_Handle exn_get_class_cast_exception_type()
 {
     assert(hythread_is_suspend_enabled());
-    Class *exn_clss;
-
-    Global_Env *env = VM_Global_State::loader_env;
-    String *exc_str = env->string_pool.lookup("java/lang/ClassCastException");
-    exn_clss =
-        env->bootstrap_class_loader->LoadVerifyAndPrepareClass(env, exc_str);
-    assert(exn_clss);
-
-    return exn_clss;
+    return VM_Global_State::loader_env->java_lang_ClassCastException_Class;
 }
 
 // rth_throw_class_cast_exception throws a class cast exception (lazily)

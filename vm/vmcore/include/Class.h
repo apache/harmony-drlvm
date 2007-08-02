@@ -710,7 +710,7 @@ private:
 /** Converts a class name from an internal (VM) form to the Java form.
  * @param[in] class_name - the class name in an internal form
  * @return The class name in the Java form.*/
-String* class_name_get_java_name(const String* class_name);
+VMEXPORT String* class_name_get_java_name(const String* class_name);
 
 // A Java class
 extern "C" {

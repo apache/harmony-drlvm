@@ -2234,7 +2234,7 @@ Opcode_CHECKCAST(StackFrame& frame) {
     ManagedObject *obj = UNCOMPRESS_REF(frame.stack.pick().cr);
 
     if (!(obj == 0 || vm_instanceof(obj, objClass))) {
-        interp_throw_exception("java/lang/ClassCastException");
+        interp_throw_exception("java/lang/ClassCastException", obj->vt()->clss->get_java_name()->bytes);
         return;
     }
     frame.ip += 3;

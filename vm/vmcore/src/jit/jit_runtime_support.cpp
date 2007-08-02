@@ -2292,10 +2292,10 @@ static void *rth_checkcast_withresolve(Class_Handle klass, unsigned cp_idx, Mana
     obj = obj_h->object;
     oh_discard_local_handle(obj_h);
     END_RAISE_AREA
-    
+
     Boolean res = class_is_subtype(objClass, castClass);
     if (!res) {
-        exn_throw_by_name("java/lang/ClassCastException");
+        exn_throw_by_name("java/lang/ClassCastException", objClass->get_java_name()->bytes);
     }
     return obj;
 }
