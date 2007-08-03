@@ -353,6 +353,7 @@ void lspace_reset_for_slide(Lspace* lspace)
         assert(tuner->kind == TRANS_NOTHING);
         assert(!tuner->tuning_size);
         new_fa_size = (POINTER_SIZE_INT)lspace->scompact_fa_end - (POINTER_SIZE_INT)lspace->scompact_fa_start;
+        if(new_fa_size == 0) break;
         Free_Area* fa = free_area_new(lspace->scompact_fa_start,  new_fa_size);
         if(new_fa_size >= GC_OBJ_SIZE_THRESHOLD) free_pool_add_area(lspace->free_pool, fa);
         break;
