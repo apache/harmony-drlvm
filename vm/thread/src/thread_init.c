@@ -282,15 +282,16 @@ static IDATA init_group_list() {
     groups_count = 0;
 
     lock_table = (HyFatLockTable *) malloc (sizeof(HyFatLockTable));
-    lock_table->table = (hythread_monitor_t *)calloc(INITIAL_FAT_TABLE_ENTRIES,
+    memset(lock_table, 0, sizeof(HyFatLockTable));
+    lock_table->tables[0] = (hythread_monitor_t *)calloc(HY_FAT_TABLE_ENTRIES,
                                               sizeof(hythread_monitor_t));
-    lock_table->live_objs = (unsigned char *)calloc(INITIAL_FAT_TABLE_ENTRIES,
+    lock_table->live_objs = (unsigned char *)calloc(HY_FAT_TABLE_ENTRIES,
                                          sizeof(unsigned char));
-    lock_table->size = INITIAL_FAT_TABLE_ENTRIES;
+    lock_table->size = HY_FAT_TABLE_ENTRIES;
     lock_table->array_cursor = 0;
 
     assert (lock_table);
-    assert (lock_table->table);
+    assert (lock_table->tables[0]);
     assert (lock_table->live_objs);
     
     if (hymutex_create(&lock_table->mutex, APR_THREAD_MUTEX_NESTED)) {
@@ -316,6 +317,7 @@ static IDATA init_group_list() {
 static IDATA destroy_group_list() {
     hythread_group_t cur;
     IDATA status,status2;
+    int i;
 
     // This method works only if there are no running threads.
     // there is no good way to kill running threads 
@@ -335,7 +337,10 @@ static IDATA destroy_group_list() {
     }
 
     free(lock_table->live_objs);
-    free(lock_table->table);
+
+    for (i = 0; i < HY_MAX_FAT_TABLES && lock_table->tables[i]; i++) {
+        free(lock_table->tables[i]);
+    }
 
     hymutex_destroy(&lock_table->mutex);
     hycond_destroy(&lock_table->write);

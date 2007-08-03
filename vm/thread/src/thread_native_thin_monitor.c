@@ -53,7 +53,8 @@
 // lockword operations
 #define THREAD_ID(lockword) (lockword >> 16)
 #define IS_FAT_LOCK(lockword) (lockword >> 31)
-#define FAT_LOCK_ID(lockword) ((lockword << 1) >> 12)
+#define FAT_LOCK_ID(lockword) \
+    ((lockword >> HY_FAT_LOCK_ID_OFFSET) & HY_FAT_LOCK_ID_MASK)
 // lock reservation support
 #define RESERVED_BITMASK ((1<<10))
 #define IS_RESERVED(lockword) (0==(lockword & RESERVED_BITMASK))
@@ -62,6 +63,10 @@
 #define RECURSION_INC(lockword_ptr, lockword) (*lockword_ptr= lockword + (1<<11))
 #define RECURSION_DEC(lockword_ptr, lockword) (*lockword_ptr=lockword - (1<<11))
 #define MAX_RECURSION 31
+
+#define FAT_LOCK(_x_) \
+    lock_table->tables[((U_32)(_x_))/HY_FAT_TABLE_ENTRIES]\
+                      [((U_32)(_x_))%HY_FAT_TABLE_ENTRIES]
 
 
 /*
@@ -775,7 +780,7 @@ hythread_monitor_t locktable_get_fat_monitor(IDATA lock_id) {
     assert(lock_id >=0 && (U_32)lock_id < lock_table->size);
     // we don't need to protect this read, because monitor can't vanish or
     // be moved in lock table while we are doing get_fat_monitor
-    fat_monitor = lock_table->table[lock_id];
+    fat_monitor = FAT_LOCK(lock_id);
     return fat_monitor;
 }
 
@@ -785,50 +790,60 @@ hythread_monitor_t locktable_get_fat_monitor(IDATA lock_id) {
 
 IDATA locktable_put_fat_monitor(hythread_monitor_t fat_monitor) {
     U_32 i = 0;
-    int mon_index;
+    U_32 mon_index;
     short free_slot_found = 0;
 
     if (lock_table == 0) { 
         DIE (("Lock table not initialized!"));
     }
 
-
     locktable_writer_enter();
+    mon_index = lock_table->array_cursor;
+
     for(i =0; i < lock_table->size; i++) {
-	if (lock_table->table[lock_table->array_cursor] == 0) {
-            assert(lock_table->live_objs[lock_table->array_cursor] == 0);
-            lock_table->table[lock_table->array_cursor] = fat_monitor;
+        hythread_monitor_t* table;
+
+        if (mon_index == lock_table->size) 
+            mon_index = 0;
+
+        table = lock_table->tables[mon_index / HY_FAT_TABLE_ENTRIES];
+
+        if (table[mon_index % HY_FAT_TABLE_ENTRIES] == 0) {
+            assert(lock_table->live_objs[mon_index] == 0);
+            table[mon_index % HY_FAT_TABLE_ENTRIES] = fat_monitor;
             free_slot_found = 1;
             break;
         }
-        lock_table->array_cursor++;
-        if (lock_table->array_cursor == lock_table->size) 
-            lock_table->array_cursor = 0;
+        ++mon_index;
     }   
 
     if(!free_slot_found) {
-        int old_size;
+        U_32 old_size;
+        hythread_monitor_t* table;
+
+        if (lock_table->size >= HY_MAX_FAT_LOCKS) {
+            DIE (("Fat monitor table is exceeded!"));
+        }
         
         old_size = lock_table->size;
-        lock_table->size += INITIAL_FAT_TABLE_ENTRIES;
-        lock_table->table = realloc(lock_table->table, 
-				    lock_table->size * sizeof(hythread_monitor_t));
-        assert(lock_table->table);
+        lock_table->size += HY_FAT_TABLE_ENTRIES;
+        table = (hythread_monitor_t *)calloc(HY_FAT_TABLE_ENTRIES,
+                                               sizeof(hythread_monitor_t));
+        assert(table);
+        lock_table->tables[old_size / HY_FAT_TABLE_ENTRIES] = table;
         
-        lock_table->live_objs = realloc(lock_table->live_objs, 
+        lock_table->live_objs = realloc(lock_table->live_objs,
 					lock_table->size * sizeof(unsigned char));
         assert(lock_table->live_objs);
 
-        memset(lock_table->table + old_size, 0, 
-               INITIAL_FAT_TABLE_ENTRIES * sizeof(hythread_monitor_t));
-        memset(lock_table->live_objs + old_size, 0, 
-               INITIAL_FAT_TABLE_ENTRIES * sizeof(unsigned char));
+        memset(lock_table->live_objs + old_size, 0,
+               HY_FAT_TABLE_ENTRIES * sizeof(unsigned char));
       
-        lock_table->array_cursor = old_size;
-        lock_table->table[lock_table->array_cursor] = fat_monitor;
+        table[0] = fat_monitor;
+        mon_index = old_size;
+    }
 
-    }      
-    mon_index = lock_table->array_cursor;
+    lock_table->array_cursor = mon_index + 1;
     locktable_writer_exit();
     return mon_index;
 }
@@ -855,9 +870,10 @@ void VMCALL hythread_reclaim_resources()
     int old_slots_occupied = 0;
     int new_slots_occupied = 0;
     
-    for (i < lock_table->size)
-	if (lock_table->table[i]) 
-	    old_slots_occupied++;
+    for (;i < lock_table->size; i++) {
+        if (FAT_LOCK(i))
+            old_slots_occupied++;
+    }
 #endif
 
     locktable_reader_enter();
@@ -875,7 +891,7 @@ void VMCALL hythread_reclaim_resources()
 
     for(i = 0; i < lock_table->size; i++) {
         if (lock_table->live_objs[i]) {
-            assert(lock_table->table[i]);
+            assert(FAT_LOCK(i));
 #ifdef DEBUG_NATIVE_RESOURCE_COLLECTION
             new_slots_occupied++;
 #endif
@@ -883,9 +899,9 @@ void VMCALL hythread_reclaim_resources()
             // reset the live array for the next major GC cycle
             lock_table->live_objs[i] = 0;  
         } else {
-            if (lock_table->table[i]) {
-                hythread_monitor_destroy(lock_table->table[i]);
-                lock_table->table[i] = 0;
+            if (FAT_LOCK(i)) {
+                hythread_monitor_destroy(FAT_LOCK(i));
+                FAT_LOCK(i)  = 0;
             }
         }
     }
@@ -904,8 +920,8 @@ hythread_monitor_t  locktable_delete_entry(int lock_id) {
     hythread_monitor_t  m;
     DIE(("shouldn't get here"));
     assert(lock_id >=0 && (U_32)lock_id < lock_table->size);
-    m = lock_table->table[lock_id];
-    lock_table->table[lock_id] = NULL;
+    m = FAT_LOCK(lock_id);
+    FAT_LOCK(lock_id) = NULL;
     return m;
 }
 

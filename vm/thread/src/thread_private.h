@@ -52,7 +52,14 @@
 
 #define FAST_LOCAL_STORAGE_SIZE 10
 
-#define INITIAL_FAT_TABLE_ENTRIES 16*1024   //make this table exapandible if workloads show it is necessary
+#define HY_FAT_LOCK_ID_OFFSET 11     // fat lock ID offset within lockword
+#define HY_FAT_LOCK_ID_MASK 0xFFFFF  // nonzero bits (starting from 0 bit) to mask fat lock ID
+
+#define HY_FAT_TABLE_ENTRIES (16*1024)   // fat lock table is exapandible by adding new table
+#define HY_MAX_FAT_LOCKS (HY_FAT_LOCK_ID_MASK + 1)// max total count of fat locks
+// max count of tables for exapansion
+#define HY_MAX_FAT_TABLES ((HY_MAX_FAT_LOCKS + HY_FAT_TABLE_ENTRIES - 1)/HY_FAT_TABLE_ENTRIES)
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -421,7 +428,7 @@ typedef enum hythread_locktable_state {
     
 typedef struct HyFatLockTable {
     // locktable itself
-    hythread_monitor_t *table;
+    hythread_monitor_t* tables[HY_MAX_FAT_TABLES];
     
     // mutex guarding locktable
     hymutex_t mutex;
