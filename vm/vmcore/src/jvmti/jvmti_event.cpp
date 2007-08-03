@@ -1413,9 +1413,9 @@ void jvmti_send_exception_event(jthrowable exn_object,
         jvmtiEventException func =
             (jvmtiEventException)ti_env->get_event_callback(JVMTI_EVENT_EXCEPTION);
         if (NULL != func) {
-
             tmn_suspend_enable();
             assert(hythread_is_suspend_enabled());
+            BEGIN_RAISE_AREA;
 
             func((jvmtiEnv *)ti_env, jni_env,
                 reinterpret_cast<jthread>(hThread),
@@ -1423,6 +1423,8 @@ void jvmti_send_exception_event(jthrowable exn_object,
                 location, exn_object,
                 reinterpret_cast<jmethodID>(catch_method),
                 catch_location);
+
+            END_RAISE_AREA;
             tmn_suspend_disable();
         }
         ti_env = next_env;
