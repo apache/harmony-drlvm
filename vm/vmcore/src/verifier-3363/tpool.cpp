@@ -217,7 +217,17 @@ namespace CPVerifier {
                 //to must be Object or an interface
                 return ref_mustbe_assignable(sm_get_const_object(), get_type(to_name + dim) );
             }
+        } else if( from_array ) {
+            //from is an array, to is not an array
+
+            //must be checked before
+            assert( from != to );
+
+            return to == sm_get_const_object() || !strcmp(to_name, "java.lang.Cloneable") || 
+                    !strcmp(to_name, "java.io.Serializable");
         } else {
+            //both not arrays
+
             //check whether TO class is loaded
             if( !to_type->cls ) {
                 to_type->cls = vf_resolve_class(k_class, to_type->name, false);
@@ -234,10 +244,8 @@ namespace CPVerifier {
                 return true;
             }
 
-
             //check whether FROM class is loaded
 
-            if( from_array ) from = sm_get_const_object();
 
             if( !from_type->cls ) {
                 from_type->cls = vf_resolve_class(k_class, from_type->name, false);
