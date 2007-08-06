@@ -295,6 +295,14 @@ namespace CPVerifier {
 
         /////////////////////////////////////////////////////////////////////////////////////////////////////
 
+        //check conditions for accessing protected non-static fields in different package
+        vf_Result popFieldRef(SmConstant expected_ref, unsigned short cp_idx);
+
+        //check conditions for accessing protected virtual methods in different package
+        vf_Result popVirtualRef(SmConstant expected_ref, unsigned short cp_idx);
+
+        /////////////////////////////////////////////////////////////////////////////////////////////////////
+
         //add one more possible value (type) that can come to the given point (local or stack)
         vf_Result add_incoming_value(SmConstant new_value, StackmapElement *destination);
 

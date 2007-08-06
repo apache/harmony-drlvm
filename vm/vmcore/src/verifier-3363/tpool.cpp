@@ -261,6 +261,76 @@ namespace CPVerifier {
         }
     }
 
+    //check if expected_ref is a super class of 'this', its package differs
+    int vf_TypePool::checkSuperAndPackage(SmConstant expected_ref) {
+        //check that expected ref is a super of 'this'
+        vf_ValidType *expected_type = &validTypes[expected_ref.getReferenceIdx()];
+
+        if (!class_is_extending_class(k_class, (char*)expected_type->name)) {
+            return _FALSE;
+        }
+
+        class_handler &referred = expected_type->cls;
+
+        if( !referred || referred == CLASS_NOT_LOADED ) {
+            //we need to ersolve class here
+            referred = vf_resolve_class(k_class, expected_type->name, true);
+
+            //referred class can't be resolved ==> return anything
+            if( !referred ) return _BOGUS;
+        }
+
+        //check that they are in different packages and method is protected
+        if( class_is_same_package(k_class, referred) ) {
+            return _FALSE;
+        }
+
+        return _TRUE;
+    }
+
+    //check if expected_ref is a super class of 'this', its package differs, and it's protected
+    int vf_TypePool::checkVirtualAccess(SmConstant expected_ref, unsigned short method_idx) {
+        //check if expected_ref is a super class of 'this', its package differs
+        int sp;
+        if( (sp = checkSuperAndPackage(expected_ref)) != _TRUE ) {
+            return sp;
+        }
+
+        //check further
+        //check that they are in different packages and method is protected
+        method_handler method = class_resolve_method(k_class, method_idx);
+
+        if (!method || method_is_static(method)) {
+            //it's not a VerifyError
+            return _FALSE;
+        }
+        
+        // for arrays function clone is public
+        return !method_is_protected(method) ? _FALSE : !memcmp(method_get_name(method), "clone", 6) ? _CLONE : _TRUE;
+    }
+
+    //check if expected_ref is a super class of 'this', its package differs, and it's protected
+    int vf_TypePool::checkFieldAccess(SmConstant expected_ref, unsigned short field_idx) {
+        //check if expected_ref is a super class of 'this', its package differs
+        int sp;
+        if( (sp = checkSuperAndPackage(expected_ref)) != _TRUE ) {
+            return sp;
+        }
+
+        //check further
+        //check that they are in different packages and method is protected
+        field_handler field = class_resolve_nonstatic_field(k_class, field_idx);
+
+        if (!field) {
+            //it's not a VerifyError
+            return _FALSE;
+        }
+        
+        // for arrays function clone is public
+        return field_is_protected(field) ? _TRUE : _FALSE;
+    }
+
+
     void vf_TypePool::NewConstraint(const char *available,
         const char *required)
     {

@@ -234,6 +234,11 @@ namespace CPVerifier {
             return SM_BOGUS;
         }
 
+        //check if expected_ref is a super class of 'this', its package differs, and it's protected
+        enum FieldAndMethodCheck {_FALSE, _CLONE, _BOGUS, _TRUE};
+        int checkFieldAccess(SmConstant expected_ref, unsigned short method_idx);
+        int checkVirtualAccess(SmConstant expected_ref, unsigned short method_idx);
+        int checkSuperAndPackage(SmConstant expected_ref);
     private:
         //ref to the main class of the verifier
         vf_Context_t *context;

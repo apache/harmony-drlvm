@@ -1520,7 +1520,10 @@ namespace CPVerifier {
             if( !tpool.cpool_get_field(cp_idx, &ref, &value) ) return error(VF_ErrorUnknown, "incorrect constantpool entry");
 
             //pop INs
-            POP_ref(ref);
+             vf_Result result;
+             if( (result = popFieldRef(ref, cp_idx)) != VF_OK ) {
+                return result;
+             }
 
             //push OUTs
             PUSH_z(value);
@@ -1556,7 +1559,10 @@ namespace CPVerifier {
             }
 
             if( workmap_stackview(0).getAnyPossibleValue() != SM_THISUNINIT ) {
-                POP_ref(expected_ref);
+                vf_Result result;
+                if( (result = popFieldRef(expected_ref, cp_idx)) != VF_OK ) {
+                    return result;
+                }
             } else if( expected_ref == tpool.sm_get_const_this() ) {
                 workmap_pop();
             } else {
@@ -1703,18 +1709,22 @@ namespace CPVerifier {
                 } else {
                     if( expected_ref != wm_init.getConst() ) return error(VF_ErrorUnknown, "incorrect uninitialized type");
                 }
+            } else if( opcode == OP_INVOKESPECIAL ) {
+                //pop object ref (it must extend be either 'this' or a sub class of 'this')
+                POP_ref( tpool.sm_get_const_this() );
+                    
+                //check that 'expected_ref' is a super class of 'this'
+                if( !tpool.mustbe_assignable(tpool.sm_get_const_this(), expected_ref) ) {
+                    return error(VF_ErrorUnknown, "incorrect use of invokespecial");
+                }
+            } else if( opcode == OP_INVOKEVIRTUAL ) {
+                vf_Result result;
+                if( (result = popVirtualRef(expected_ref, cp_idx)) != VF_OK ) {
+                    return result;
+                }
             } else if( opcode != OP_INVOKESTATIC ) {
                 //pop object ref
                 POP_ref( expected_ref );
-
-                if( opcode == OP_INVOKESPECIAL ) {
-                    //TODO: is verifier the right place for this check?
-                    
-                    //check that 'expected_ref' is a super class of 'this'
-                    if( !tpool.mustbe_assignable(tpool.sm_get_const_this(), expected_ref) ) {
-                        return error(VF_ErrorUnknown, "incorrect use of invokespecial");
-                    }
-                }
             }
 
             //push OUTs
@@ -2559,4 +2569,60 @@ namespace CPVerifier {
             return VF_OK;
         }
 
+        vf_Result vf_Context_t::popFieldRef(SmConstant expected_ref, unsigned short cp_idx) {
+            int check = tpool.checkFieldAccess( expected_ref, cp_idx);
+            if ( check == vf_TypePool::_BOGUS ) return error(VF_ErrorResolve, "can't resolve constantpool class");
+
+            if( check != vf_TypePool::_FALSE ) {
+                assert(check == vf_TypePool::_TRUE);
+
+                //pop object ref (it must extend be either 'this' or a sub class of 'this')
+                POP_ref( tpool.sm_get_const_this() );
+
+                //check that 'expected_ref' is a super class of 'this'
+                if( !tpool.mustbe_assignable(tpool.sm_get_const_this(), expected_ref) ) {
+                    return error(VF_ErrorUnknown, "incorrect use of invokespecial");
+                }
+            } else {
+                POP_ref( expected_ref );
+            }
+            return VF_OK;
+        }
+
+
+        vf_Result vf_Context_t::popVirtualRef(SmConstant expected_ref, unsigned short cp_idx) {
+            int check = tpool.checkVirtualAccess( expected_ref, cp_idx);
+            if ( check == vf_TypePool::_BOGUS ) return error(VF_ErrorResolve, "can't resolve constantpool class");
+
+            if( check != vf_TypePool::_FALSE ) {
+                if( !workmap_can_pop(1) ) return error(VF_ErrorDataFlow, "unable to pop from empty operand stack");
+                WorkmapElement value = workmap_pop();
+
+                if( check == vf_TypePool::_CLONE ) {
+                    //if the first value is an array ==> expect array here
+                    SmConstant c = value.getAnyPossibleValue();
+                    if( c.isReference() && tpool.sm_get_refname(c)[0] == '[' ) {
+                        if( !workmap_expect(value, SM_ANYARRAY) ) return error(VF_ErrorIncompatibleArgument, "incompartible argument");
+                        if( !workmap_expect(value, expected_ref) ) return error(VF_ErrorIncompatibleArgument, "incompartible argument");
+                    } else {
+                        check = vf_TypePool::_TRUE;
+                    }
+                }
+
+                if ( check != vf_TypePool::_CLONE ) {
+                    assert(check == vf_TypePool::_TRUE);
+
+                    //pop object ref (it must extend be either 'this' or a sub class of 'this')
+                    if( !workmap_expect(value, tpool.sm_get_const_this()) ) return error(VF_ErrorIncompatibleArgument, "incompartible argument");
+
+                    //check that 'expected_ref' is a super class of 'this'
+                    if( !tpool.mustbe_assignable(tpool.sm_get_const_this(), expected_ref) ) {
+                        return error(VF_ErrorUnknown, "incorrect use of invokespecial");
+                    }
+                }
+            } else {
+                POP_ref( expected_ref );
+            }
+            return VF_OK;
+        }
 } // namespace CPVerifier
