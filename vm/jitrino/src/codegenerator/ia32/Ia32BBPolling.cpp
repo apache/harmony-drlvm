@@ -231,7 +231,7 @@ public:
                     fg->setUnwindNode(unwind);
                 }
                 fg->spliceFlowGraphInline(edge, *bbpCFG);
-                bbp.setBBPSubCFGController(originalTargetId,sourceDispatchId,edge->getTargetNode());
+                bbp.setBBPSubCFGController(originalTargetId,sourceDispatchId,bbpCFG->getEntryNode());
             }
         }
         if (Log::isEnabled())
@@ -416,9 +416,6 @@ BBPolling::isThreadInterruptablePoint(const Inst* inst) {
 
 bool
 BBPolling::hasNativeInterruptablePoints(const Node* node) {
-    if (node->isDispatchNode()) {
-        return true;
-    }
     if (node->isBlockNode()) {
         // If current BB has an inst that is ThreadInterruptablePoint itself
         // the hasThreadInterruptablePoint becomes true for it
@@ -433,12 +430,12 @@ BBPolling::hasNativeInterruptablePoints(const Node* node) {
 
 bool
 BBPolling::hasAllThreadInterruptablePredecessors(const Node* node) {
-    if (node->isDispatchNode()) {
-        return true;
-    }
     LoopTree* lt = irManager.getFlowGraph()->getLoopTree();
     assert(lt->isValid());
     const Edges& edges = node->getInEdges();
+    
+    if (edges.size()==0) return false;    
+
     // All the predecessors must be processed earlier!
     for (Edges::const_iterator ite = edges.begin(), ende = edges.end(); ite!=ende; ++ite) {
         Edge* e = *ite;

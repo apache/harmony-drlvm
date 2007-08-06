@@ -963,7 +963,8 @@ public:
         CSEHashKey key = getKey(Operation(Op_TauCheckCast, Type::SystemObject,
                                           Modifier(Exception_Sometimes)),
                                 inst->getSrc(0)->getId(),
-                                inst->getTypeInfo()->getId());
+                                inst->getTypeInfo()->getId(),
+                                inst->getNode()->getExceptionEdgeTarget()->getId());
         return hashInst(inst, key);
     }
 

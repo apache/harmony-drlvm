@@ -2159,6 +2159,7 @@ static void *rth_invokeinterface_addr_withresolve(Class_Handle klass, unsigned c
     hythread_suspend_enable();
     Global_Env* env = VM_Global_State::loader_env;
     m = resolve_interface_method_env(env, klass, cp_idx, true);
+    assert(m);
     hythread_suspend_disable();
 
     obj = obj_h->object;
@@ -2172,12 +2173,15 @@ static void *rth_invokeinterface_addr_withresolve(Class_Handle klass, unsigned c
     assert(objClass!=NULL);
     assert(objClass->is_initialized() || objClass->is_initializing());
 
-    char* infc_vtable = (char*)Class::helper_get_interface_vtable(obj, m->get_class());
-    if(infc_vtable == NULL) {
-        exn_throw_by_name("java/lang/IncompatibleClassChangeError", objClass->get_name()->bytes);
-        return NULL;
+    unsigned base_index = 0;
+    if(m->get_class()->is_interface()) {
+        char* infc_vtable = (char*)Class::helper_get_interface_vtable(obj, m->get_class());
+        if(infc_vtable == NULL) {
+            exn_throw_by_name("java/lang/IncompatibleClassChangeError", objClass->get_name()->bytes);
+            return NULL;
+        }
+        base_index = (unsigned)(infc_vtable - (char*)objClass->get_vtable()->methods)/sizeof(char*);
     }
-    unsigned base_index = (unsigned)(infc_vtable - (char*)objClass->get_vtable()->methods)/sizeof(char*);
     Method* infc_method = objClass->get_method_from_vtable(base_index + m->get_index());
     if(infc_method == NULL) {
         // objClass does not implement interface method

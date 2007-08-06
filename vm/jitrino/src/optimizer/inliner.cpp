@@ -850,9 +850,15 @@ Inliner::inlineRegion(InlineNode* inlineNode) {
     Edge* edgeToInlined = callNode->getUnconditionalEdge();
     ControlFlowGraph& parentCFG = parent->getFlowGraph();
     parentCFG.spliceFlowGraphInline(edgeToInlined, inlinedFlowGraph);
-    parentCFG.removeEdge(callNode->getExceptionEdge());
-    callInst->unlink();
 
+    if (inlinedFlowGraph.getUnwindNode() == NULL) {
+        // Replace original call with PseudoThrow to keep graph topology.
+        callNode->appendInst(_instFactory.makePseudoThrow());
+    } else {
+        // Inlined graph has exception path so just remove original edge.
+        parentCFG.removeEdge(callNode->getExceptionEdge());
+    }
+    callInst->unlink();
 }
 
 
