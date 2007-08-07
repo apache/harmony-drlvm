@@ -6,16 +6,14 @@ gc/LOS.java
 gc/MultiThreads.java
 perf/MultiThreadsSimple.java
 
-# HARMONY-2972
-StackTest.java
-exception/FinalizeStackTest.java
-stress/Stack.java
-
 # fails on Ubuntu6 x86_64
 gc/Mark.java
 
 # HARMONY-2772 
 stress/Mix.java
+
+# HARMONY-3010 HARMONY-4292
+stress/Stack.java
 
 # HARMONY-3299 intermittent
 stress/Sync.java

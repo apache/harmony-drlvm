@@ -7,8 +7,8 @@ stress/Threads.java
 # HARMONY-3495 hangs intermittently
 gc/NPE.java
 
-# HARMONY-3731
-StackTest.java
+# HARMONY-3010 HARMONY-4292
+stress/Stack.java
 
 # HARMONY-3917
 gc/PhantomReferenceTest.java

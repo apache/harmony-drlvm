@@ -747,11 +747,9 @@ static JIT_Result compile_do_compilation(Method* method)
     } else if (method->get_state()==Method::ST_NotCompiled && exn_raised()) {
         method->unlock();
         return JIT_FAILURE;
-#ifndef _EM64T_	
-    } else if(!check_available_stack_size(get_default_stack_size()/100)) {
+    } else if(!check_available_stack_size(0x4000)) {
         method->unlock();
         return JIT_FAILURE;
-#endif
     }
 
     if (method->is_native()) {

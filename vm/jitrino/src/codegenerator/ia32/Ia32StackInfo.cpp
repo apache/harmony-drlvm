@@ -213,43 +213,46 @@ void StackInfo::unwind(MethodDesc* pMethodDesc, JitFrameContext* context, bool i
             <<::std::endl;
     }
 
-    assert(!(context->rsp & 15));
     context->rsp += stackDepth;
+    assert((context->rsp & 0xf) == 0x8);
 
     POINTER_SIZE_INT offset = context->rsp;
     context->p_rip = (POINTER_SIZE_INT *) (offset);
 
-    offset += icalleeOffset; 
-    if(getRegMask(RegName_R15) & icalleeMask) {
-        context->p_r15 = (POINTER_SIZE_INT *)  offset;
-        offset += offset_step;
-    }
-    if(getRegMask(RegName_R14) & icalleeMask) {
-        context->p_r14 = (POINTER_SIZE_INT *)  offset;
-        offset += offset_step;
-    }
-    if(getRegMask(RegName_R13) & icalleeMask) {
-        context->p_r13 = (POINTER_SIZE_INT *)  offset;
-        offset += offset_step;
-    }
-    if(getRegMask(RegName_R12) & icalleeMask) {
-        context->p_r12 = (POINTER_SIZE_INT *)  offset;
-        offset += offset_step;
-    }
-    if(getRegMask(RegName_RDI) & icalleeMask) {
-        context->p_rdi = (POINTER_SIZE_INT *)  offset;
-        offset += offset_step;
-    }
-    if(getRegMask(RegName_RSI) & icalleeMask) {
-        context->p_rsi = (POINTER_SIZE_INT *)  offset;
-        offset += offset_step;
-    }
-    if(getRegMask(RegName_RBP) & icalleeMask) {
-        context->p_rbp = (POINTER_SIZE_INT *)  offset;
-        offset += offset_step;
-    }
-    if(getRegMask(RegName_RBX) & icalleeMask) {
-        context->p_rbx = (POINTER_SIZE_INT *)  offset;
+    offset += icalleeOffset;
+
+    if(stackDepth != 0) {
+        if(getRegMask(RegName_R15) & icalleeMask) {
+            context->p_r15 = (POINTER_SIZE_INT *)  offset;
+            offset += offset_step;
+        }
+        if(getRegMask(RegName_R14) & icalleeMask) {
+            context->p_r14 = (POINTER_SIZE_INT *)  offset;
+            offset += offset_step;
+        }
+        if(getRegMask(RegName_R13) & icalleeMask) {
+            context->p_r13 = (POINTER_SIZE_INT *)  offset;
+            offset += offset_step;
+        }
+        if(getRegMask(RegName_R12) & icalleeMask) {
+            context->p_r12 = (POINTER_SIZE_INT *)  offset;
+            offset += offset_step;
+        }
+        if(getRegMask(RegName_RDI) & icalleeMask) {
+            context->p_rdi = (POINTER_SIZE_INT *)  offset;
+            offset += offset_step;
+        }
+        if(getRegMask(RegName_RSI) & icalleeMask) {
+            context->p_rsi = (POINTER_SIZE_INT *)  offset;
+            offset += offset_step;
+        }
+        if(getRegMask(RegName_RBP) & icalleeMask) {
+            context->p_rbp = (POINTER_SIZE_INT *)  offset;
+            offset += offset_step;
+        }
+        if(getRegMask(RegName_RBX) & icalleeMask) {
+            context->p_rbx = (POINTER_SIZE_INT *)  offset;
+        }
     }
     context->rsp += offset_step; //IP register size
 #else
@@ -265,21 +268,23 @@ void StackInfo::unwind(MethodDesc* pMethodDesc, JitFrameContext* context, bool i
     uint32 offset = context->esp;
     context->p_eip = (POINTER_SIZE_INT *) offset;
 
-    offset += icalleeOffset; 
-    if(getRegMask(RegName_EDI) & icalleeMask) {
-        context->p_edi = (POINTER_SIZE_INT *)  offset;
-        offset += offset_step;
-    }
-    if(getRegMask(RegName_ESI) & icalleeMask) {
-        context->p_esi = (POINTER_SIZE_INT *)  offset;
-        offset += offset_step;
-    }
-    if(getRegMask(RegName_EBP) & icalleeMask) {
-        context->p_ebp = (POINTER_SIZE_INT *)  offset;
-        offset += offset_step;
-    }
-    if(getRegMask(RegName_EBX) & icalleeMask) {
-        context->p_ebx = (POINTER_SIZE_INT *)  offset;
+    offset += icalleeOffset;
+    if(stackDepth != 0) {
+        if(getRegMask(RegName_EDI) & icalleeMask) {
+            context->p_edi = (POINTER_SIZE_INT *)  offset;
+            offset += offset_step;
+        }
+        if(getRegMask(RegName_ESI) & icalleeMask) {
+            context->p_esi = (POINTER_SIZE_INT *)  offset;
+            offset += offset_step;
+        }
+        if(getRegMask(RegName_EBP) & icalleeMask) {
+            context->p_ebp = (POINTER_SIZE_INT *)  offset;
+            offset += offset_step;
+        }
+        if(getRegMask(RegName_EBX) & icalleeMask) {
+            context->p_ebx = (POINTER_SIZE_INT *)  offset;
+        }
     }
     context->esp += offset_step; //IP register size
 #endif

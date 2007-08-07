@@ -391,6 +391,9 @@ void set_guard_stack() {
     size_t guard_stack_size = get_guard_stack_size();
     size_t guard_page_size = get_guard_page_size();
 
+    assert(((size_t)(&stack_addr)) > ((size_t)((char*)stack_addr - stack_size
+        + guard_stack_size + 2 * guard_page_size)));
+
     err = mprotect(stack_addr - stack_size  + guard_page_size +  
             guard_stack_size, guard_page_size, PROT_NONE );
 
@@ -409,19 +412,34 @@ void set_guard_stack() {
 }
 
 size_t get_available_stack_size() {
-    char* stack_adrr = (char*) get_stack_addr();
-    size_t used_stack_size = stack_adrr - ((char*)&stack_adrr);
-    size_t available_stack_size =
-            get_stack_size() - used_stack_size
+    char* stack_addr = (char*) get_stack_addr();
+    size_t used_stack_size = stack_addr - ((char*)&stack_addr);
+    int available_stack_size;
+
+    if (((char*)&stack_addr) > (stack_addr - get_stack_size() + get_guard_page_size() + get_guard_stack_size())) {
+        available_stack_size = get_stack_size() - used_stack_size
             - 2 * get_guard_page_size() - get_guard_stack_size();
-    return available_stack_size;
+    } else {
+        available_stack_size = get_stack_size() - used_stack_size - get_guard_page_size();
+    }
+
+    if (available_stack_size > 0) {
+        return (size_t) available_stack_size;
+    } else {
+        return 0;
+    }
 }
 size_t get_default_stack_size() {
     size_t default_stack_size = get_stack_size();
     return default_stack_size;
 }
 bool check_available_stack_size(size_t required_size) {
-    if (get_available_stack_size() < required_size) {
+    size_t available_stack_size = get_available_stack_size();
+
+    if (available_stack_size < required_size) {
+        if (available_stack_size < get_guard_stack_size()) {
+            remove_guard_stack();
+        }
         Global_Env *env = VM_Global_State::loader_env;
         exn_raise_by_class(env->java_lang_StackOverflowError_Class);
         return false;
@@ -431,7 +449,7 @@ bool check_available_stack_size(size_t required_size) {
 }
 
 size_t get_restore_stack_size() {
-    return 0x8000;
+    return 0x0200;
 }
 
 bool check_stack_size_enough_for_exception_catch(void* sp) {

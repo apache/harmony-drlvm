@@ -11,6 +11,9 @@ StackTest.java
 exception/FinalizeStackTest.java
 stress/Stack.java
 
+# HARMONY-3010 HARMONY-4292
+stress/Stack.java
+
 # Server mode failures specific to Windows x86_64
 stress/Mix.java
 

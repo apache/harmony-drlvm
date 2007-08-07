@@ -495,7 +495,8 @@ void si_copy_to_registers(StackIterator * si, Registers * regs) {
 }
 
 void si_set_callback(StackIterator* si, NativeCodePtr* callback) {
-    si->jit_frame_context.rsp = si->jit_frame_context.rsp - 4;
+    const static uint64 red_zone_size = 0x80;
+    si->jit_frame_context.rsp = si->jit_frame_context.rsp - red_zone_size - sizeof(void*);
     *((uint64*) si->jit_frame_context.rsp) = *(si->jit_frame_context.p_rip);
     si->jit_frame_context.p_rip = ((uint64*)callback);
 }

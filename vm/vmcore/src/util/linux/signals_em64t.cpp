@@ -137,6 +137,21 @@ void asm_exception_catch_callback() {
         : /* no output operands */
         : /* no input operands */
     );
+#ifdef _DEBUG
+    asm (
+        "movq %%rbp, %%rsp\n"
+        "popq %%rbp\n"
+        "retq $0x80;\n"
+        : /* no output operands */
+        : /* no input operands */
+    );
+#else // _DEBUG
+    asm (
+        "retq $0x80;\n"
+        : /* no output operands */
+        : /* no input operands */
+    );
+#endif // ! _DEBUG}
 }
 
 // exception catch support for JVMTI
@@ -291,11 +306,42 @@ inline size_t get_guard_page_size() {
 void set_guard_stack();
 
 void init_stack_info() {
-    p_TLS_vmthread->stack_addr = find_stack_addr();
-    p_TLS_vmthread->stack_size = hythread_get_thread_stacksize(hythread_self());
+    char* stack_addr = (char *)find_stack_addr();
+    unsigned int stack_size = hythread_get_thread_stacksize(hythread_self());
+    p_TLS_vmthread->stack_addr = stack_addr;
+    p_TLS_vmthread->stack_size = stack_size;
     common_guard_stack_size = find_guard_stack_size();
     common_guard_page_size =find_guard_page_size();
 
+    // stack should be mapped so it's result of future mapping
+    char* res;
+
+    // begin of the stack can be protected by OS, but this part already mapped
+    // found address of current stack page
+    char* current_page_addr =
+            (char*)(((size_t)&res) & (~(common_guard_page_size-1)));
+
+    // leave place for mmap work
+    char* mapping_page_addr = current_page_addr - common_guard_page_size;
+
+    // makes sure that stack allocated till mapping_page_addr
+    //stack_holder(mapping_page_addr);
+
+    // found size of the stack area which should be maped
+    size_t stack_mapping_size = (size_t)mapping_page_addr
+            - (size_t)stack_addr + stack_size;
+
+    // maps unmapped part of the stack
+    res = (char*) mmap(stack_addr - stack_size,
+            stack_mapping_size,
+            PROT_READ | PROT_WRITE,
+            MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS | MAP_GROWSDOWN,
+            -1,
+            0);
+    // stack should be mapped, checks result
+    assert(res == (stack_addr - stack_size));
+
+    // set guard page
     set_guard_stack();
 }
 
@@ -305,6 +351,9 @@ void set_guard_stack() {
     size_t stack_size = get_stack_size();
     size_t guard_stack_size = get_guard_stack_size();
     size_t guard_page_size = get_guard_page_size();
+
+    assert(((size_t)(&stack_addr)) > ((size_t)((char*)stack_addr - stack_size
+        + guard_stack_size + 2 * guard_page_size)));
 
     err = mprotect(stack_addr - stack_size + guard_page_size + guard_stack_size,
         guard_page_size, PROT_NONE);
@@ -320,16 +369,31 @@ void set_guard_stack() {
 }
 
 size_t get_available_stack_size() {
-    char* stack_adrr = (char*) get_stack_addr();
-    size_t used_stack_size = stack_adrr - ((char*)&stack_adrr);
-    size_t available_stack_size =
-            get_stack_size() - used_stack_size
+    char* stack_addr = (char*) get_stack_addr();
+    size_t used_stack_size = stack_addr - ((char*)&stack_addr);
+    int available_stack_size;
+
+    if (((char*)&stack_addr) > (stack_addr - get_stack_size() + get_guard_page_size() + get_guard_stack_size())) {
+        available_stack_size = get_stack_size() - used_stack_size
             - 2 * get_guard_page_size() - get_guard_stack_size();
-    return available_stack_size;
+    } else {
+        available_stack_size = get_stack_size() - used_stack_size - get_guard_page_size();
+    }
+
+    if (available_stack_size > 0) {
+        return (size_t) available_stack_size;
+    } else {
+        return 0;
+    }
 }
 
 bool check_available_stack_size(size_t required_size) {
-    if (get_available_stack_size() < required_size) {
+    size_t available_stack_size = get_available_stack_size();
+
+    if (available_stack_size < required_size) {
+        if (available_stack_size < get_guard_stack_size()) {
+            remove_guard_stack();
+        }
         Global_Env *env = VM_Global_State::loader_env;
         exn_raise_by_class(env->java_lang_StackOverflowError_Class);
         return false;
@@ -339,7 +403,7 @@ bool check_available_stack_size(size_t required_size) {
 }
 
 size_t get_restore_stack_size() {
-    return 0x8000;
+    return 0x0800;
 }
 
 bool check_stack_size_enough_for_exception_catch(void* sp) {
@@ -379,6 +443,10 @@ bool check_stack_overflow(siginfo_t *info, ucontext_t *uc) {
 
     char* guard_page_begin = stack_addr - stack_size + guard_page_size + guard_stack_size;
     char* guard_page_end = guard_page_begin + guard_page_size;
+
+    // FIXME: Workaround for main thread
+    guard_page_end += guard_page_size;
+
     char* fault_addr = (char*)(info->si_addr);
     //char* esp_value = (char*)(uc->uc_mcontext.gregs[REG_ESP]);
 
@@ -410,7 +478,6 @@ void stack_overflow_handler(int signum, siginfo_t* UNREF info, void* context)
         } else {
             remove_guard_stack();
             exn_raise_by_class(env->java_lang_StackOverflowError_Class);
-            p_TLS_vmthread->restore_guard_page = true;
         }
     }
 }

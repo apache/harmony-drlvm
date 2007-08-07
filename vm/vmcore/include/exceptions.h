@@ -270,6 +270,7 @@ void exn_rethrow();
 void exn_rethrow_if_pending();
 
 void set_guard_stack();
+void remove_guard_stack();
 void init_stack_info();
 #ifndef WIN32
 void remove_guard_stack();

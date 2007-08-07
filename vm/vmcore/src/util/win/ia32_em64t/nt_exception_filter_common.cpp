@@ -156,6 +156,7 @@ void set_guard_stack() {
     void* stack_addr = get_stack_addr();
     size_t stack_size = get_stack_size();
     size_t page_size = get_guard_page_size();
+    assert(((size_t)(&stack_addr)) > ((size_t)((char*)stack_addr - stack_size + 3 * page_size)));
 
     if (!VirtualFree((char*)stack_addr - stack_size + page_size,
         page_size, MEM_DECOMMIT)) {
@@ -174,20 +175,45 @@ void set_guard_stack() {
     p_TLS_vmthread->restore_guard_page = false;
 }
 
+void remove_guard_stack() {
+    void* stack_addr = get_stack_addr();
+    size_t stack_size = get_stack_size();
+    size_t page_size = get_guard_page_size();
+    DWORD oldProtect;
+
+    assert(((size_t)(&stack_addr)) > ((size_t)((char*)stack_addr - stack_size + 3 * page_size)));
+    p_TLS_vmthread->restore_guard_page = true;
+
+    if (!VirtualProtect((char*)stack_addr - stack_size + page_size + page_size,
+        page_size, PAGE_READWRITE, &oldProtect)) {
+        // should be successful always
+        assert(0);
+    }
+}
+
 size_t get_available_stack_size() {
-    char* stack_adrr = (char*) get_stack_addr();
-    size_t used_stack_size = ((size_t)stack_adrr) - ((size_t)(&stack_adrr));
-    size_t available_stack_size =
+    char* stack_addr = (char*) get_stack_addr();
+    size_t used_stack_size = ((size_t)stack_addr) - ((size_t)(&stack_addr));
+    int available_stack_size =
             get_stack_size() - used_stack_size
             - 2 * get_guard_page_size() - get_guard_stack_size();
-    return available_stack_size;
+
+    if (available_stack_size > 0) {
+        return (size_t) available_stack_size;
+    } else {
+        return 0;
+    }
 }
 size_t get_default_stack_size() {
     size_t default_stack_size = get_stack_size();
     return default_stack_size;
 }
 bool check_available_stack_size(size_t required_size) {
-    if (get_available_stack_size() < required_size) {
+    size_t available_stack_size = get_available_stack_size();
+    if (available_stack_size < required_size) {
+        if (available_stack_size < get_guard_stack_size()) {
+            remove_guard_stack();
+        }
         Global_Env *env = VM_Global_State::loader_env;
         exn_raise_by_class(env->java_lang_StackOverflowError_Class);
         return false;
@@ -197,7 +223,7 @@ bool check_available_stack_size(size_t required_size) {
 }
 
 size_t get_restore_stack_size() {
-    return 0x8000;
+    return 0x0100;
 }
 
 bool check_stack_size_enough_for_exception_catch(void* sp) {

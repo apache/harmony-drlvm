@@ -158,7 +158,12 @@ static ManagedObject *create_lazy_exception(
         tmn_suspend_enable();
         jthrowable exc_object = create_exception(
             (Class*) exn_class, (Method*) exn_constr, vm_exn_constr_args);
-        result = exc_object->object;
+
+        if (exc_object) {
+            result = exc_object->object;
+        } else {
+            result = NULL;
+        }
         tmn_suspend_disable();
     }
     set_unwindable(unwindable);
