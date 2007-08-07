@@ -59,6 +59,11 @@ static Boolean is_valid_instance(jobject obj, Class* clss)
     return result;
 }
 
+Boolean is_valid_throwable_object(jobject exc)
+{
+    return is_valid_instance(exc, VM_Global_State::loader_env->java_lang_Throwable_Class);
+}
+
 Boolean is_valid_thread_object(jthread thread)
 {
     return is_valid_instance(thread, VM_Global_State::loader_env->java_lang_Thread_Class);

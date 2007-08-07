@@ -1,0 +1,9 @@
+<project name="RUN HARMONY-3341 Regression Test">
+    <target name="run-test">
+        <!-- use special launcher for JVMTI tests -->
+        <run-jvmti-test
+            test="org.apache.harmony.drlvm.tests.regression.h3341.StopThreadInWait"
+            agent="StopThreadInWait"/>
+    </target>
+</project>
+

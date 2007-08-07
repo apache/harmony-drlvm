@@ -379,6 +379,7 @@ void jvmti_set_single_step_breakpoints_for_method(DebugUtilsTI *ti,
 void jvmti_remove_single_step_breakpoints(DebugUtilsTI *ti, jvmti_thread_t jvmti_thread);
 
 // Object check functions
+Boolean is_valid_throwable_object(jthread thread);
 Boolean is_valid_thread_object(jthread thread);
 Boolean is_valid_thread_group_object(jthreadGroup group);
 Boolean is_valid_class_object(jclass klass);

@@ -413,22 +413,17 @@ jvmtiStopThread(jvmtiEnv* env,
         return JVMTI_ERROR_THREAD_NOT_ALIVE;
     }
 
-    if (exception == NULL) return JVMTI_ERROR_INVALID_OBJECT;
-    tmn_suspend_disable();       //---------------------------------v
-    ObjectHandle h = (ObjectHandle)exception;
-    ManagedObject *mo = h->object;
-
-    // Check that reference pointer points to the heap
-    if (mo < (ManagedObject*)VM_Global_State::loader_env->heap_base ||
-        mo > (ManagedObject*)VM_Global_State::loader_env->heap_end)
-    {
-        tmn_suspend_enable();
+    if (! is_valid_throwable_object(exception))
         return JVMTI_ERROR_INVALID_OBJECT;
-    }
 
-    tmn_suspend_enable();       //---------------------------------^
 
-    return (jvmtiError)jthread_exception_stop(thread, exception);
+    if (TM_ERROR_NONE != jthread_exception_stop(thread, exception))
+        return JVMTI_ERROR_INTERNAL;
+
+    // force exit from wait
+    jthread_interrupt(thread);
+
+    return JVMTI_ERROR_NONE;
 }
 
 /*
