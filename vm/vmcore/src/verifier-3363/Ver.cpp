@@ -96,13 +96,13 @@ vf_verify_class_constraints( class_handler klass, unsigned verifyAll, char **err
 
     // get constraints for class
     vf_HashEntry_t *hash_entry = hash->Lookup( class_get_name( klass ) );
-    if( !hash_entry || !hash_entry->data ) {
+    if( !hash_entry || !hash_entry->data_ptr ) {
         // no constraint data
         return VF_OK;
     }
 
     // check method constraints
-    vf_TypeConstraint_t *constraint = (vf_TypeConstraint_t*)hash_entry->data;
+    vf_TypeConstraint_t *constraint = (vf_TypeConstraint_t*)hash_entry->data_ptr;
     for( ; constraint; constraint = constraint->next )
     {
         vf_Result result = vf_force_check_constraint( klass, constraint );

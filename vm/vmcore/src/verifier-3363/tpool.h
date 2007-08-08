@@ -69,10 +69,10 @@ namespace CPVerifier {
     class vf_TypePool {
 
     public:
-        vf_TypePool(vf_Context_t *_context, unsigned init_table_size);
+        vf_TypePool(vf_Context_t *_context, unsigned table_incr);
 
         ~vf_TypePool() {
-            tc_free(validTypes);
+            if( validTypes ) tc_free(validTypes);
         }
 
         SmConstant cpool_get_ldcarg(unsigned short cp_idx);
@@ -104,16 +104,19 @@ namespace CPVerifier {
         int ref_mustbe_assignable(SmConstant from, SmConstant to);
 
 
+        vf_ValidType *getVaildType(unsigned index) {
+            assert(index && validTypes && index < validTypesTableSz);
+            return validTypes + index;
+        }
+
         class_handler sm_get_handler(SmConstant type) {
             unsigned index = type.getReferenceIdx();
-            assert(index <= currentTypeId);
-            return (validTypes+index)->cls;
+            return getVaildType(index)->cls;
         }
 
         const char* sm_get_refname(SmConstant type) {
             unsigned index = type.getReferenceIdx();
-            assert(index <= currentTypeId);
-            return (validTypes+index)->name;
+            return getVaildType(index)->name;
         }
 
         //return SmConstant (known verification type) corresponding to 'type_name' and cache result in the 'cache'
@@ -235,7 +238,7 @@ namespace CPVerifier {
         }
 
         //check if expected_ref is a super class of 'this', its package differs, and it's protected
-        enum FieldAndMethodCheck {_FALSE, _CLONE, _BOGUS, _TRUE};
+        enum FieldAndMethodCheck {_FALSE, _CLONE, _TRUE};
         int checkFieldAccess(SmConstant expected_ref, unsigned short method_idx);
         int checkVirtualAccess(SmConstant expected_ref, unsigned short method_idx);
         int checkSuperAndPackage(SmConstant expected_ref);
@@ -253,8 +256,8 @@ namespace CPVerifier {
         vf_Hash hash;
         vf_ValidType *validTypes;
         unsigned tableIncr;
-        unsigned tableSize;
-        unsigned currentTypeId;
+        unsigned validTypesTableMax;
+        unsigned validTypesTableSz;
 
         /*****************/
         //cache for SmConstant constants;
@@ -269,10 +272,11 @@ namespace CPVerifier {
         //Get next free table entry index.
         //Reallocate table if out of free entries.
         unsigned check_table() {
-            if( currentTypeId == tableSize - 1) {
-                validTypes = (vf_ValidType*)tc_realloc(validTypes, tableSize+=tableIncr);
+            if( validTypesTableSz + 1 >= validTypesTableMax ) {
+                validTypesTableMax += tableIncr;
+                validTypes = (vf_ValidType*)tc_realloc(validTypes, sizeof(vf_ValidType) * validTypesTableMax);
             }
-            return currentTypeId++;
+            return validTypesTableSz++;
         }
 
         int is_bool_array_conv_needed(const char *type_name, int length);
@@ -281,6 +285,7 @@ namespace CPVerifier {
 
     class_handler vf_resolve_class( class_handler k_class, const char *name, bool need_load);
     int vf_is_valid(class_handler from, class_handler to);
+    int vf_is_extending(class_handler from, class_handler to);
 
 } // namespace CPVerifier
 

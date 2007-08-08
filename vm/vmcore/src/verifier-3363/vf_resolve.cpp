@@ -61,6 +61,13 @@ namespace CPVerifier {
             return true;
         }
 
+        return vf_is_extending(from, to);
+    }
+
+    /**
+    * Returns true if 'from' is (not necessarily directly) extending 'to'
+    */
+    int vf_is_extending(class_handler from, class_handler to) {
         while (from) {
             if( from == to ) return true;
             from = class_get_super_class(from);
@@ -76,18 +83,26 @@ namespace CPVerifier {
         const char *name,         // resolved class name
         bool need_load)      // load flag
     {
-        // get class loader
-        classloader_handler class_loader = class_get_class_loader( k_class );
-
-        // receive class
-        class_handler result;
         if( need_load ) {
-            result = cl_load_class( class_loader, name );
+            return cl_load_class( class_get_class_loader( k_class ), name );
         } else {
-            result = cl_get_class( class_loader, name );
-        }
+            // get class loader
+            classloader_handler class_loader = 0;
+            class_handler sup = k_class;
 
-        return result;
+            while( sup ) {
+                classloader_handler class_loader2 = class_get_class_loader( k_class );
+                if( class_loader != class_loader2 ) {
+                    class_loader = class_loader2;
+                    class_handler result = cl_get_class( class_loader, name );
+                    if( result ) {
+                        return result;
+                    }
+                }
+                sup = class_get_super_class(sup);
+            }
+            return 0;
+        }
     } // vf_resolve_class
 
 } // namespace CPVerifier

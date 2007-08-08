@@ -24,12 +24,10 @@
 
 namespace CPVerifier {
 
-    vf_TypePool::vf_TypePool(vf_Context_t *_context, unsigned init_table_size)
-        : context(_context), k_class(_context->k_class), tableIncr(init_table_size),
-        tableSize(init_table_size), currentTypeId(0)
+    vf_TypePool::vf_TypePool(vf_Context_t *_context, unsigned table_incr)
+        : context(_context), k_class(_context->k_class), tableIncr(table_incr),
+        validTypesTableMax(0), validTypesTableSz(1), validTypes(0)
     {
-        validTypes = (vf_ValidType *)tc_malloc(sizeof(vf_ValidType)*tableIncr);
-
         const_object = const_class = const_string = const_throwable = const_arrayref_of_bb =
             const_arrayref_of_char = const_arrayref_of_double = const_arrayref_of_float =
             const_arrayref_of_integer = const_arrayref_of_long = const_arrayref_of_short = 
@@ -52,13 +50,10 @@ namespace CPVerifier {
         //TODO: this assert raise false alarms when type name starts with 'L'
         //assert(type_name[0] != 'L');
 
-        int index = -1;
         // find type in hash
         vf_HashEntry_t *entry = hash.NewHashEntry( type_name, length );
-        if( entry->data ) {
-            index = (int)((vf_ValidType*)entry->data - validTypes);
-            assert(index >= 0 && (unsigned)index < tableSize);
-        } else {
+        unsigned index = entry->data_index;
+        if( !index ) {
             //convert array of booleans to array of bytes
             if( is_bool_array_conv_needed(type_name, length) ) {
                 char *new_name = (char*)context->mem.malloc(length+1);
@@ -68,13 +63,15 @@ namespace CPVerifier {
                 context->mem.dealloc_last(new_name, length+1);
             }
             // Get next free table entry index
-            if( index == -1 ) {
+            if( !index ) {
                 index = check_table();
-                (validTypes+index)->cls = 0;
-                (validTypes+index)->name = entry->key;
+                validTypes[index].cls = 0;
+                validTypes[index].name = entry->key;
             }
-            entry->data = (void*)(validTypes+index);
+            entry->data_index = index;
         }
+
+        assert(index < validTypesTableSz);
         return SmConstant::getReference(index);
     }
 
@@ -188,8 +185,8 @@ namespace CPVerifier {
     int vf_TypePool::ref_mustbe_assignable(SmConstant from, SmConstant to) {
         if( to == sm_get_const_object() ) return true;
 
-        vf_ValidType *to_type = &validTypes[to.getReferenceIdx()];
-        vf_ValidType *from_type = &validTypes[from.getReferenceIdx()];
+        vf_ValidType *to_type = getVaildType(to.getReferenceIdx());
+        vf_ValidType *from_type = getVaildType(from.getReferenceIdx());
 
         const char *to_name = to_type->name;
         const char *from_name = from_type->name;
@@ -264,36 +261,30 @@ namespace CPVerifier {
     //check if expected_ref is a super class of 'this', its package differs
     int vf_TypePool::checkSuperAndPackage(SmConstant expected_ref) {
         //check that expected ref is a super of 'this'
-        vf_ValidType *expected_type = &validTypes[expected_ref.getReferenceIdx()];
-
-        if (!class_is_extending_class(k_class, (char*)expected_type->name)) {
-            return _FALSE;
-        }
-
+        vf_ValidType *expected_type = getVaildType(expected_ref.getReferenceIdx());
         class_handler &referred = expected_type->cls;
 
-        if( !referred || referred == CLASS_NOT_LOADED ) {
-            //we need to ersolve class here
-            referred = vf_resolve_class(k_class, expected_type->name, true);
-
-            //referred class can't be resolved ==> return anything
-            if( !referred ) return _BOGUS;
+        if( referred == CLASS_NOT_LOADED ) {
+            //referred class can't be resolved ==> it's not a super class
+            return false;
         }
 
-        //check that they are in different packages and method is protected
-        if( class_is_same_package(k_class, referred) ) {
-            return _FALSE;
+        if( !referred ) {
+            //try to get class here
+            referred = vf_resolve_class(k_class, expected_type->name, false);
+
+            //referred class can't be resolved ==> it's not a super class
+            if( !referred ) return false;
         }
 
-        return _TRUE;
+        return !class_is_same_package(k_class, referred) && vf_is_extending(k_class, referred);
     }
 
     //check if expected_ref is a super class of 'this', its package differs, and it's protected
     int vf_TypePool::checkVirtualAccess(SmConstant expected_ref, unsigned short method_idx) {
         //check if expected_ref is a super class of 'this', its package differs
-        int sp;
-        if( (sp = checkSuperAndPackage(expected_ref)) != _TRUE ) {
-            return sp;
+        if( !checkSuperAndPackage(expected_ref) ) {
+            return _FALSE;
         }
 
         //check further
@@ -312,9 +303,8 @@ namespace CPVerifier {
     //check if expected_ref is a super class of 'this', its package differs, and it's protected
     int vf_TypePool::checkFieldAccess(SmConstant expected_ref, unsigned short field_idx) {
         //check if expected_ref is a super class of 'this', its package differs
-        int sp;
-        if( (sp = checkSuperAndPackage(expected_ref)) != _TRUE ) {
-            return sp;
+        if( !checkSuperAndPackage(expected_ref) ) {
+            return _FALSE;
         }
 
         //check further

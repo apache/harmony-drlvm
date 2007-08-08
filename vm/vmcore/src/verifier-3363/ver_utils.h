@@ -66,11 +66,12 @@ namespace CPVerifier {
     struct vf_HashEntry_t {
         const char *key;            // hash entry key
         int key_size;               // hash entry key size
-        void *data;                 // pointer to hash entry data
+        union {                     // hash entry data
+            unsigned data_index;    // when it's an index
+            void* data_ptr;         // when it's data
+        };
         vf_HashEntry_t *next;       // next hash entry
     };
-
-
 
     class Stack {
     protected:
@@ -341,7 +342,10 @@ namespace CPVerifier {
                 hash_entry->key = hash_key;
                 hash_entry->key_size = length;
                 hash_entry->next = m_hash[hash_index];
-                hash_entry->data = 0;
+
+                hash_entry->data_ptr = 0;
+                hash_entry->data_index = 0;
+
                 m_hash[hash_index] = hash_entry;
             }
 

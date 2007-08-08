@@ -2175,8 +2175,8 @@ namespace CPVerifier {
                 // create hash entry for checked class
                 cc->source = string->NewHashEntry( constraint->source )->key;
 
-                cc->next = (CPVerifier::vf_TypeConstraint_t*)hash_entry->data;
-                hash_entry->data = cc;
+                cc->next = (CPVerifier::vf_TypeConstraint_t*)hash_entry->data_ptr;
+                hash_entry->data_ptr = cc;
             }
 
             // unlock data modification
@@ -2571,7 +2571,6 @@ namespace CPVerifier {
 
         vf_Result vf_Context_t::popFieldRef(SmConstant expected_ref, unsigned short cp_idx) {
             int check = tpool.checkFieldAccess( expected_ref, cp_idx);
-            if ( check == vf_TypePool::_BOGUS ) return error(VF_ErrorResolve, "can't resolve constantpool class");
 
             if( check != vf_TypePool::_FALSE ) {
                 assert(check == vf_TypePool::_TRUE);
@@ -2592,7 +2591,6 @@ namespace CPVerifier {
 
         vf_Result vf_Context_t::popVirtualRef(SmConstant expected_ref, unsigned short cp_idx) {
             int check = tpool.checkVirtualAccess( expected_ref, cp_idx);
-            if ( check == vf_TypePool::_BOGUS ) return error(VF_ErrorResolve, "can't resolve constantpool class");
 
             if( check != vf_TypePool::_FALSE ) {
                 if( !workmap_can_pop(1) ) return error(VF_ErrorDataFlow, "unable to pop from empty operand stack");
