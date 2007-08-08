@@ -19,6 +19,9 @@ gc/NPE.java
 # HARMONY-3639
 thread/ManyThreadsTest.java
 
+# HARMONY-4601
+thread/SmallStackThreadTest.java
+
 #################################
 ######## to be analyzed #########
 #################################

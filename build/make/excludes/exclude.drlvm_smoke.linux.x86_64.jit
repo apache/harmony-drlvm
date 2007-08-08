@@ -27,3 +27,6 @@ thread/ManyThreadsTest.java
 
 # HARMONY-3299 intermittent
 stress/Sync.java
+
+# HARMONY-4601
+thread/SmallStackThreadTest.java
