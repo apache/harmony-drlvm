@@ -139,19 +139,7 @@ static void init_java_properties(Properties & properties)
     if (port_executable_name(&launcher_dir, prop_pool) != APR_SUCCESS) {
         LDIE(13, "Failed to find executable location");
     }
-    // directory for the executable
-    char *p = strrchr(launcher_dir, PORT_FILE_SEPARATOR);
-    if (NULL == p)
-        LDIE(14, "Failed to determine executable parent directory");
-    *p = '\0';
-    // home directory
-    char* home_path = apr_pstrdup(prop_pool, launcher_dir);
-    p = strrchr(home_path, PORT_FILE_SEPARATOR);
-    if (NULL == p)
-        LDIE(15, "Failed to determine java home directory");
-    *p = '\0';
 
-    properties.set_new("java.home", home_path);
     properties.set_new("java.vm.specification.version", "1.0");
     properties.set_new("java.vm.specification.vendor", "Sun Microsystems Inc.");
     properties.set_new("java.vm.specification.name", "Java Virtual Machine Specification");
@@ -186,8 +174,21 @@ static void init_java_properties(Properties & properties)
 
     char* vm_dir = properties.get(O_A_H_VM_VMDIR);
 
-    char* lib_path = apr_pstrcat(prop_pool, launcher_dir,
-            PORT_PATH_SEPARATOR_STR, vm_dir, NULL);
+    // home directory
+    char* home_path = apr_pstrdup(prop_pool, vm_dir);
+    char* p = strrchr(home_path, PORT_FILE_SEPARATOR);
+    if (NULL == p)
+        LDIE(15, "Failed to determine java home directory");
+    *p = '\0';
+
+    char* lib_path = apr_pstrcat(prop_pool, vm_dir,
+            PORT_PATH_SEPARATOR_STR, home_path, NULL);
+
+    p = strrchr(home_path, PORT_FILE_SEPARATOR);
+    if (NULL == p)
+        LDIE(15, "Failed to determine java home directory");
+    *p = '\0';
+    properties.set_new("java.home", home_path);
 
     properties.destroy(vm_dir);
     vm_dir = NULL;
