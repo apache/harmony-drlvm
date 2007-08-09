@@ -537,8 +537,11 @@ Method* class_lookup_method_recursive(Class *clss, const String* name, const Str
     assert(clss);
     Method *m = 0;
     Class *oclss = clss;
-    for(; clss && !m; clss = clss->get_super_class()) {
-        m = clss->lookup_method(name, desc);
+    m = clss->lookup_method(name, desc);
+    if(m)return m;
+
+    for(clss = clss->get_super_class(); clss && !m; clss = clss->get_super_class()) {
+        m = class_lookup_method_recursive(clss, name, desc);
     }
     if(m)return m;
 
