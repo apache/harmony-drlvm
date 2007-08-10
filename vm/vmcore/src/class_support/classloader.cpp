@@ -1293,26 +1293,26 @@ bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
         char* comp_path = bootstrap_components_classpath(m_env);
         char *kernel_path = (char *) malloc(strlen(kernel_dir_path) 
                                         + strlen(PORT_FILE_SEPARATOR_STR) 
-                                        + strlen(KERNEL_JAR) + 1
-                                        + (comp_path ? strlen(comp_path) + strlen(PORT_PATH_SEPARATOR_STR) : 0) );
-    
+                                        + strlen(KERNEL_JAR) + strlen(PORT_PATH_SEPARATOR_STR)
+                                        + (comp_path ? strlen(comp_path) : 0)
+                                        + 1 );
+
         strcpy(kernel_path, kernel_dir_path);
         strcat(kernel_path, PORT_FILE_SEPARATOR_STR);
         strcat(kernel_path, KERNEL_JAR);
+        strcat(kernel_path, PORT_PATH_SEPARATOR_STR);
         m_env->JavaProperties()->destroy(kernel_dir_path);
         if (comp_path) {
-            strcat(kernel_path, PORT_PATH_SEPARATOR_STR);
             strcat(kernel_path, comp_path);
             STD_FREE(comp_path);
         }
 
         char *luni_path = m_env->JavaProperties()->get(O_A_H_BOOT_CLASS_PATH);
-        
+
         char *vmboot = (char *) malloc(strlen(luni_path == NULL ? "" : luni_path) 
-                                + strlen(kernel_path) + strlen(PORT_PATH_SEPARATOR_STR) + 1);
-        
+                                + strlen(kernel_path) + 1);
+
         strcpy(vmboot, kernel_path);
-        strcat(vmboot, PORT_PATH_SEPARATOR_STR);
         if(luni_path != NULL) {
             strcat(vmboot, luni_path);
             m_env->JavaProperties()->destroy(luni_path);
@@ -1321,36 +1321,34 @@ bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
         free(kernel_path);
         bcp_value = vmboot;
     }
-    
+
     /*
      *  now if there a pre or post bootclasspath, add those
      */
-     
+
     char *prepend = m_env->VmProperties()->get(XBOOTCLASSPATH_P);
     char *append = m_env->VmProperties()->get(XBOOTCLASSPATH_A);
-    
+
     if (prepend || append) {
-        
         char *temp = (char *) malloc(strlen(bcp_value) 
                                     + (prepend ? strlen(prepend) + strlen(PORT_PATH_SEPARATOR_STR) : 0 )
                                     + (append  ? strlen(append) + strlen(PORT_PATH_SEPARATOR_STR) : 0 ) + 1);
-       
-       if (prepend) { 
+
+        if (prepend) { 
             strcpy(temp, prepend);
             strcat(temp, PORT_PATH_SEPARATOR_STR);
             strcat(temp, bcp_value);
-       }
-       else {
+        } else {
             strcpy(temp, bcp_value);
-       }
-       
-       if (append) {
+        }
+
+        if (append) {
             strcat(temp, PORT_PATH_SEPARATOR_STR);
             strcat(temp, append);
-       }
-       
-       free(bcp_value);
-       bcp_value = temp;
+        }
+
+        free(bcp_value);
+        bcp_value = temp;
     }
     m_env->VmProperties()->destroy(prepend);
     m_env->VmProperties()->destroy(append);
@@ -1358,11 +1356,11 @@ bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
      *  set VM_BOOT_CLASS_PATH and SUN_BOOT_CLASS_PATH for any code 
      *  that needs it
      */
-     
+
     m_env->VmProperties()->set(VM_BOOT_CLASS_PATH, bcp_value);
     m_env->JavaProperties()->set(VM_BOOT_CLASS_PATH, bcp_value);
     m_env->JavaProperties()->set(SUN_BOOT_CLASS_PATH, bcp_value);
-    
+
     // create temp pool for apr functions
     apr_pool_t *tmp_pool;
     apr_pool_create(&tmp_pool, NULL);
@@ -1371,7 +1369,7 @@ bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
 
     SetClasspathFromString(bcp_value, tmp_pool);
     free(bcp_value);
-        
+
     // check if vm.bootclasspath.appendclasspath property is set to true
     if( TRUE == get_boolean_property("vm.bootclasspath.appendclasspath", FALSE, VM_PROPERTIES) ) {
         // append classpath to bootclasspath
