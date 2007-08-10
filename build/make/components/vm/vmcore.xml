@@ -166,17 +166,14 @@ Version: $Revision: 1.5.2.3 $
 
                     <select arch="ia32">
                         <include name="util/linux/signals_ia32.cpp" />
-                        <include name="util/linux/native_modules_ia32.cpp" />
                     </select>
 
                     <select arch="em64t">
                         <include name="util/linux/signals_em64t.cpp" />
-                        <include name="util/linux/native_modules_em64t.cpp" />
                     </select>
 
                     <select arch="ipf">
                         <include name="util/linux/signals_ipf.cpp" />
-                        <include name="util/linux/native_modules_ipf.cpp" />
                     </select>
                 </select>
             </fileset>

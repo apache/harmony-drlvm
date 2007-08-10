@@ -99,6 +99,12 @@ static char* get_module_filename(void* code_ptr)
     native_module_t* modules;
     int modules_count;
 
+#ifdef _IPF_
+    // On IPF function pointer is not a pointer to a function, it is a pointer
+    // to a table with first element of it the address of the funtion
+    void **ptr = (void**)code_ptr;
+    code_ptr = ptr[0];
+#endif
     if (! get_all_native_modules(&modules, &modules_count))
         return NULL;
 
