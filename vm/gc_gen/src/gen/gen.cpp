@@ -453,7 +453,7 @@ void gc_gen_reclaim_heap(GC_Gen* gc)
     mspace->last_alloced_size = GC_BLOCK_SIZE_BYTES * ( mspace_num_used_blocks_after_minor - mspace_num_used_blocks_before_minor );
 
     /*If the current minor collection failed, i.e. there happens a fallback, we should not do the minor sweep of LOS*/
-    if(gc->collect_result != FALSE)
+    if(gc->collect_result != FALSE && !gc_is_gen_mode())
       lspace_collection(gc->los);
 
     gc->mos->move_object = 1;      
