@@ -19,5 +19,5 @@ H3982
 H4512
 # Exclude this test because JVMTI is not implemented for x86_64 in JIT mode yet
 H3341
-
-
+# Exclude this test because SOE handling is not ready for x86_64 in JIT/VM yet
+H4265

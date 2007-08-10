@@ -166,21 +166,68 @@ StackLayouter::StackLayouter ()
 {
 };
 
-static void insertSOEHandler(IRManager& irm, uint32 maxStackSize) {
-    if (maxStackSize == 0) {
+
+static bool isSOEHandler(ObjectType* type) {
+    static const char* soeHandlers[] = {"java/lang/Object", "java/lang/Throwable", "java/lang/Error", "java/lang/StackOverflowError", NULL};
+    const char* typeName = type->getName();
+    for (size_t i=0;soeHandlers[i]!=NULL; i++) {
+        if (!strcmp(typeName, soeHandlers[i])) {
+            return true;
+        }
+    }
+    return false;
+}
+
+//checks if SOE can be caught in this method
+static bool hasSOEHandlers(IRManager& irm) {
+    //A contract with VM: check extra page for synchronized methods or methods with SOE handlers.
+    if (irm.getMethodDesc().isSynchronized()) {
+        return true;
+    }
+
+    const Nodes& nodes= irm.getFlowGraph()->getNodes();
+    for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
+       Node* node = *it;
+        if (node->isCatchBlock()) {
+            const Edges& edges = node->getInEdges();
+            for (Edges::const_iterator ite = edges.begin(), ende = edges.end(); ite!=ende; ++ite) {
+                Edge* e = *ite;
+                CatchEdge* catchEdge = (CatchEdge*)e;
+                ObjectType* catchType = catchEdge->getType()->asObjectType();
+                assert(catchType!=NULL);
+                if (isSOEHandler(catchType)) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+#define MAX_STACK_FOR_SOE_HANDLERS 0x2000
+
+static void insertSOECheck(IRManager& irm, uint32 maxStackUsedByMethod) {
+#ifdef _EM64T_
+    //SOE checking is not finished on EM64T
+    //TODO: work on stack alignment & SOE checkers
+    if (true) return; 
+#endif
+    uint32 stackToCheck = maxStackUsedByMethod + (hasSOEHandlers(irm) ? MAX_STACK_FOR_SOE_HANDLERS : 0);
+    if (stackToCheck == 0) {
         return;
     }
-#ifdef _EM64T_
-    RegName eaxReg = RegName_RAX;
-    RegName espReg = RegName_RSP;
-#else
-    RegName eaxReg = RegName_EAX;
-    RegName espReg = RegName_ESP;
-#endif
-    Opnd* guardedMemOpnd = irm.newMemOpnd(irm.getTypeFromTag(Type::IntPtr), MemOpndKind_Heap, irm.getRegOpnd(espReg), -(int)maxStackSize);
-    Inst* guardInst = irm.newInst(Mnemonic_MOV, irm.getRegOpnd(eaxReg), guardedMemOpnd);
-    Inst* entryInst = irm.getEntryPointInst();
-    guardInst->insertAfter(entryInst);
+    static const uint32 PAGE_SIZE=0x1000;
+    
+    uint32 nPagesToCheck = stackToCheck / PAGE_SIZE;
+    Inst* prevInst = irm.getEntryPointInst();
+    for(uint32 i=0;i<=nPagesToCheck; i++) {
+        uint32 offset = i < nPagesToCheck ? PAGE_SIZE * (i+1) : stackToCheck;
+        Opnd* guardedMemOpnd = irm.newMemOpnd(irm.getTypeFromTag(Type::IntPtr), MemOpndKind_Heap, irm.getRegOpnd(STACK_REG), -(int)offset);
+        Inst* guardInst = irm.newInst(Mnemonic_TEST, guardedMemOpnd, irm.getRegOpnd(STACK_REG));
+        guardInst->insertAfter(prevInst);
+        guardInst->setBCOffset(0);
+        prevInst = guardInst;
+    }
 }
 
 void StackLayouter::runImpl()
@@ -198,7 +245,7 @@ void StackLayouter::runImpl()
     createProlog();
     createEpilog();
     uint32 maxStackDepth = irm.calculateStackDepth();
-    insertSOEHandler(irm, maxStackDepth);
+    insertSOECheck(irm, maxStackDepth);
     irm.layoutAliasOpnds();
 
     //fill StackInfo object

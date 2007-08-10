@@ -166,6 +166,7 @@ void StackInfo::read(MethodDesc* pMethodDesc, POINTER_SIZE_INT eip, bool isFirst
     localOffset = ((StackInfo *)data)->localOffset;
     offsetOfThis = ((StackInfo *)data)->offsetOfThis;
     itraceMethodExitString = ((StackInfo *)data)->itraceMethodExitString;
+    soeCheckAreaOffset = ((StackInfo *)data)->soeCheckAreaOffset;
     
     if (!isFirst){
         DepthEntry * entry = getHashEntry(data, eip, hashTableSize);
@@ -178,20 +179,22 @@ void StackInfo::read(MethodDesc* pMethodDesc, POINTER_SIZE_INT eip, bool isFirst
         calleeSaveRegsMask = entry->info.calleeSaveRegs;
         stackDepth = entry->info.stackDepth;
     }else{
-        DepthEntry * entry = NULL;
-        uint32 i = CALL_MIN_SIZE;
-        for (; i<= CALL_MAX_SIZE; i++) {
-            entry = getHashEntry(data, eip + i, hashTableSize);
-            if(entry)
-                break;
-        }
-        if (entry && (entry->info.callSize == i)) {
-            stackDepth = entry->info.stackDepth;
+        POINTER_SIZE_INT eipOffset = eip - (POINTER_SIZE_INT)pMethodDesc->getCodeBlockAddress(0);
+        assert(fit32(eipOffset) && eipOffset >= 0);
+        if (eipOffset <= soeCheckAreaOffset) {
+            stackDepth = 0; //0 depth -> stack overflow error
         } else {
-            if (((POINTER_SIZE_INT)pMethodDesc->getCodeBlockAddress(0)) == eip) {
-                stackDepth = 0;
+            DepthEntry * entry = NULL;
+            uint32 i = CALL_MIN_SIZE;
+            for (; i<= CALL_MAX_SIZE; i++) {
+                entry = getHashEntry(data, eip + i, hashTableSize);
+                if(entry)
+                    break;
+            }
+            if (entry && (entry->info.callSize == i)) {
+                stackDepth = entry->info.stackDepth; //call site's depth
             } else {
-                stackDepth = frameSize;
+                stackDepth = frameSize; //hardware NPE's depth
             }
         }
 

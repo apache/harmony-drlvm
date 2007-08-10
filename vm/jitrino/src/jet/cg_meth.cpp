@@ -84,6 +84,7 @@ void Compiler::gen_prolog(void) {
         gen_brk();
     }
 
+
     if (m_infoBlock.get_bc_size() == 1 && m_bc[0] == OPCODE_RETURN && !g_jvmtiMode) {
         // empty method, nothing to do; the same is in gen_return();
         return;
@@ -92,7 +93,7 @@ void Compiler::gen_prolog(void) {
     // A special stack preparation is performed in order to deal with 
     // a stack overflow error (SOE) at runtime:
     // First, the callee-save registers are not changed until we are 
-    // absolutely sure we have enouhg stack. In this case, if SOE happens,
+    // absolutely sure we have enough stack. In this case, if SOE happens,
     // we'll simply do nothing in unwind_stack().
     
     //
@@ -117,22 +118,29 @@ void Compiler::gen_prolog(void) {
     // frame setup procedures
     rlock(m_ci);
     
-    // Here is pretty rare case, though still need to be proceeded:
-    // When we allocate a stack frame of size more than one page then the 
-    // memory page(s) may not be accessible and even not allocated.
-    // A direct access to such [non existing] page raises 'access 
-    // violation'. To avoid the problem we need simply probe (make read 
-    // access) to the pages sequentially. In response on read-access to 
-    // inaccessible page, the OS grows up the stack, so pages become 
-    // accessible.
-    const unsigned PAGE_SIZE = 0x1000;
-    unsigned pages = 
-                  (frameSize + m_max_native_stack_depth + 
-                   PAGE_SIZE -1)/PAGE_SIZE;
-    //
-    for (unsigned i=1; i<pages; i++) {
-        AR ar = valloc(i32);
-        ld4(ar, sp, frameSize-i*PAGE_SIZE);
+    {
+        // Here is pretty rare case, though still need to be proceeded:
+        // When we allocate a stack frame of size more than one page then the 
+        // memory page(s) may not be accessible and even not allocated.
+        // A direct access to such [non existing] page raises 'access 
+        // violation'. To avoid the problem we need simply probe (make read 
+        // access) to the pages sequentially. In response on read-access to 
+        // inaccessible page, the OS grows up the stack, so pages become 
+        // accessible.
+        const unsigned PAGE_SIZE = 0x1000;
+        unsigned pages = 
+            (frameSize + m_max_native_stack_depth + 
+            PAGE_SIZE -1)/PAGE_SIZE;
+        
+        if (method_is_synchronized(m_method) || hasSOEHandlers)  {
+            //A contract with VM: check extra page for synchronized methods or methods with SOE handlers.
+            pages++;
+        }
+        //
+        for (unsigned i=1; i<pages; i++) {
+            AR ar = valloc(i32);
+            ld4(ar, sp, frameSize-i*PAGE_SIZE);
+        }
     }
     // When requested, store the whole context (==including scratch registers)
     // - normally for JVMTI PopFrame support.

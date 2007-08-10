@@ -139,7 +139,7 @@ update_handler_address(NativeCodePtr new_handler_ip)
 // Lazy Exception Utilities
 
 // Note: Function runs from unwindable area before exception throwing
-// function can be safe point & should be called with disable reqursion = 1
+// function can be safe point & should be called with disable recursion = 1
 static ManagedObject *create_lazy_exception(
     Class_Handle exn_class,
     Method_Handle exn_constr,
@@ -311,9 +311,13 @@ static void exn_propagate_exception(
 #endif // VM_STATS
 
                     if (restore_guard_page) {
-                        if (!check_stack_size_enough_for_exception_catch(si_get_sp(si))) {
+                        bool res = check_stack_size_enough_for_exception_catch(si_get_sp(si));
+                        //must always be enough. otherwise program behavior is unspecified: finally blocks, monitor exits are not executed
+                        assert(res); 
+                        if (!res) {
                             break;
                         }
+
                     }
 
                     // Setup handler context
@@ -374,8 +378,14 @@ static void exn_propagate_exception(
                 }
             }
 
+            
             // No appropriate handler found, undo synchronization
-            vm_monitor_exit_synchronized_method(si);
+
+            // Contract with JIT: check SOE for synchronized methods before monenter
+            // So if SOE happens in synchronized method -> no need to call monexit
+            if (!restore_guard_page) {
+                vm_monitor_exit_synchronized_method(si);
+            }
 
             BEGIN_RAISE_AREA;
             jvalue ret_val = {(jlong)0};

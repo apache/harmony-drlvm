@@ -525,6 +525,19 @@ void CodeEmitter::emitCode( void ) {
         }
         bb->setCodeSize( (uint32)(ip-blockStartIp) );
     }
+
+    //register SOE checks offset to be used in unwind as 0-depth area        
+    StackInfo* stackInfo = (StackInfo*)irManager->getInfo(STACK_INFO_KEY);
+    assert(stackInfo);//stack layout must be done before emitter
+    for (Inst* inst = (Inst*)irManager->getEntryPointInst()->getNext(); inst!=NULL; inst = inst->getNextInst()) {
+        if (inst->getMnemonic() != Mnemonic_TEST) {
+            break;
+        }
+        stackInfo->setSOECheckAreaOffset(inst->getCodeOffset());
+    }                
+
+
+
     unsigned codeSize = (unsigned)(ip-codeStreamStart);
     assert( codeSize < maxMethodSize );
 

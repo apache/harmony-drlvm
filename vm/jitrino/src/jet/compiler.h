@@ -65,6 +65,7 @@ public:
     {
         m_hjit = jh;
         m_bEmulation = false;
+        hasSOEHandlers = false;
     }
     /**
      * @brief Main compilation routine.
@@ -412,6 +413,9 @@ private:
      */
     char *  m_vmCode;
     
+    /// 'TRUE' if this method has catch handlers suitable for StackOverflowError
+    bool    hasSOEHandlers;
+
     /**
      * @brief Parses method's signature at the given constant pool entry.
      *

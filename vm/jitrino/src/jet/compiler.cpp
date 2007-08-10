@@ -83,6 +83,20 @@ unsigned Compiler::g_rejectEndID = NOTHING;
  */
 static unsigned methodsSeen = 0;
 
+
+static bool isSOEHandler(Class_Handle cls) {
+    if (cls==NULL) return true; //-> finally block
+    static const char* soeHandlers[] = {"java/lang/Throwable", "java/lang/Error", "java/lang/StackOverflowError", NULL};
+    const char* typeName = class_get_name(cls);
+    for (size_t i=0;soeHandlers[i]!=NULL; i++) {
+        if (!strcmp(typeName, soeHandlers[i])) {
+            return true;
+        }
+    }
+    return false;
+}
+
+
 JIT_Result Compiler::compile(Compile_Handle ch, Method_Handle method,
                              const OpenMethodExecutionParams& params)
 {
@@ -414,6 +428,9 @@ JIT_Result Compiler::compile(Compile_Handle ch, Method_Handle method,
     // ... now, generate exception handlers ...
     for (unsigned i=0; i<m_handlers.size(); i++) {
         comp_gen_code_bb(m_handlers[i].handler);
+        if (isSOEHandler(m_handlers[i].klass)) {
+            hasSOEHandlers=true;
+        }
     }
     
     // ... and finally, generate prolog.

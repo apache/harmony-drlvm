@@ -54,6 +54,9 @@ void* RuntimeInterface::getAddressOfThis(MethodDesc * methodDesc, const JitFrame
 #else
     stackInfo.read(methodDesc, *context->p_eip, isFirst);
     assert(isFirst || (uint32)context->p_eip+4 == context->esp);
+    if (stackInfo.getStackDepth() == 0) { //stack overflow exception
+        return NULL;
+    }
     return (void *)(context->esp + stackInfo.getStackDepth() + stackInfo.getOffsetOfThis());
 #endif
 }

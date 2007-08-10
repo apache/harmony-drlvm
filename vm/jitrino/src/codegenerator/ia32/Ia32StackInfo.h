@@ -94,7 +94,9 @@ public:
         localOffset(0), 
         calleeSaveRegsMask(0),
         stackDepth(-1),
-        offsetOfThis(0){ stackDepthInfo = new(mm) DepthMap(mm);}
+        offsetOfThis(0), 
+        soeCheckAreaOffset(0)
+        { stackDepthInfo = new(mm) DepthMap(mm);}
 
     StackInfo() 
         : byteSize(0), hashTableSize(0), frameSize(0),
@@ -106,7 +108,7 @@ public:
         localOffset(0), 
         stackDepthInfo(NULL),
         calleeSaveRegsMask(0),
-        stackDepth(-1),offsetOfThis(0) {}
+        stackDepth(-1),offsetOfThis(0),soeCheckAreaOffset(0) {}
 
     /** writes StackInfo data into memory
      */
@@ -167,6 +169,10 @@ public:
 
     uint32 getOffsetOfThis() const {return offsetOfThis;}
 
+    uint32 getSOECheckAreaOffset() const {return soeCheckAreaOffset;}
+
+    void setSOECheckAreaOffset(uint32 v) {soeCheckAreaOffset = v;}
+
     /** returns byte size of StackInfo data
     */
     POINTER_SIZE_INT getByteSize() const;
@@ -203,6 +209,7 @@ private:
     uint32 calleeSaveRegsMask;
     int32  stackDepth;
     uint32 offsetOfThis;
+    uint32 soeCheckAreaOffset;
 
     friend class StackLayouter;
 };
