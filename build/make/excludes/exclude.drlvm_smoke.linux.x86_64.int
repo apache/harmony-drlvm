@@ -22,6 +22,3 @@ thread/ManyThreadsTest.java
 
 # This stress test is very slow on interpreter
 stress/Intern.java
-
-# HARMONY-4601
-thread/SmallStackThreadTest.java

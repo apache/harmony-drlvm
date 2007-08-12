@@ -271,7 +271,7 @@ enum Lock_State{
 };
 
 #define try_lock(x) (!atomic_cas32(&(x), LOCKED, FREE_LOCK))
-#define lock(x) while( !try_lock(x)){ while( x==LOCKED );}
+#define lock(x) while( !try_lock(x)){ while( x==LOCKED ){ vm_thread_yield();}}
 #define unlock(x) do{ x = FREE_LOCK;}while(0)
 
 #endif //_GC_PLATFORM_H_
