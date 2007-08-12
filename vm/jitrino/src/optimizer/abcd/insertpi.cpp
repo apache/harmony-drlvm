@@ -827,9 +827,6 @@ void InsertPi::insertPiForOpndAndAliases(Node *block,
     const PiBound &lb = cond.getLb();
     const PiBound &ub = cond.getUb();
 
-    if((_problemType == Lower) && lb.isUndefined()) return;
-    else if((_problemType == Upper) && ub.isUndefined()) return;
-
     if (_useAliases) {
         if (Log::isEnabled()) {
             Log::out() << "Inserting Pi Node for opnd ";

@@ -39,6 +39,62 @@ void IOpnd::printFullName(std::ostream& os) const
 }
 
 //------------------------------------------------------------------------------
+void TwoStateOpndToEdgeListMap::setState(bool is_lower)
+{
+    _is_lower = is_lower;
+    MapIdTo2stList::iterator it = _map.begin(), end = _map.end();
+    for ( ; it != end; it++ ) {
+        assert(it->second);
+        it->second->setState(is_lower);
+    }
+}
+
+void TwoStateOpndToEdgeListMap::addEdge(uint32 opnd_id, IneqEdge* edge)
+{
+    MapIdTo2stList::iterator it = _map.find(opnd_id);
+    if ( it == _map.end() ) {
+        TwoStateEdgeList* new_lst = new (_mm) TwoStateEdgeList(_mm);
+        new_lst->addEdge(edge);
+        _map[opnd_id] = new_lst;
+    }else{
+        it->second->addEdge(edge);
+    }
+}
+
+void TwoStateOpndToEdgeListMap::addEdgeSingleState
+    (uint32 opnd_id, IneqEdge *edge, bool is_lower)
+{
+    MapIdTo2stList::iterator it = _map.find(opnd_id);
+    if ( it == _map.end() ) {
+        TwoStateEdgeList* new_lst = new (_mm) TwoStateEdgeList(_mm);
+        new_lst->addEdgeSingleState(edge, is_lower);
+        _map[opnd_id] = new_lst;
+    }else{
+        it->second->addEdgeSingleState(edge, is_lower);
+    }
+}
+
+TwoStateEdgeList::iterator
+    TwoStateOpndToEdgeListMap::eListBegin(uint32 opnd_id) const
+{
+    MapIdTo2stList::const_iterator it = _map.find(opnd_id);
+    if ( it == _map.end() ) {
+        return TwoStateEdgeList::emptyIterator();
+    }
+    return it->second->begin();
+}
+
+TwoStateEdgeList::iterator
+    TwoStateOpndToEdgeListMap::eListEnd(uint32 opnd_id) const
+{
+    MapIdTo2stList::const_iterator it = _map.find(opnd_id);
+    if ( it == _map.end() ) {
+        return TwoStateEdgeList::emptyIterator();
+    }
+    return it->second->end();
+}
+
+//------------------------------------------------------------------------------
 
 bool InequalityGraph::has_other_opnd_with_same_id(IdToOpndMap& map, IOpnd* opnd)
 {
@@ -49,38 +105,24 @@ bool InequalityGraph::has_other_opnd_with_same_id(IdToOpndMap& map, IOpnd* opnd)
     return false;
 }
 
-//------------------------------------------------------------------------------
-
-const InequalityGraph::EdgeList& InequalityGraph::getInEdges(IOpnd* opnd) const
-{ 
-    OpndEdgeMap::const_iterator it = _opnd_to_inedges_map.find(opnd->getID());
-
-    if ( it == _opnd_to_inedges_map.end() ) {
-        return _emptyList;
-    }
-    return it->second;
-}
-
-const InequalityGraph::EdgeList& InequalityGraph::getOutEdges(IOpnd* opnd) const
-{ 
-    OpndEdgeMap::const_iterator it = _opnd_to_outedges_map.find(opnd->getID());
-    if ( it == _opnd_to_outedges_map.end() ) {
-        return _emptyList;
-    }
-    return it->second;
-}
-
-void InequalityGraph::addEdgeToIdMap
-     (OpndEdgeMap& mp, uint32 id, IneqEdge* edge)
+InequalityGraph::edge_iterator InequalityGraph::inEdgesBegin(IOpnd* opnd) const
 {
-    OpndEdgeMap::iterator it = mp.find(id);
-    if ( it == mp.end() ) {
-        StlList<IneqEdge*> * new_list = new (_mem_mgr) StlList<IneqEdge*>(_mem_mgr);
-        new_list->push_back(edge);
-        mp.insert(std::make_pair(id, *new_list));
-    }else{
-        it->second.push_back(edge);
-    }
+    return _opnd_to_inedges_map_2st.eListBegin(opnd->getID());
+}
+
+InequalityGraph::edge_iterator InequalityGraph::inEdgesEnd(IOpnd* opnd) const
+{
+    return _opnd_to_inedges_map_2st.eListEnd(opnd->getID());
+}
+
+InequalityGraph::edge_iterator InequalityGraph::outEdgesBegin(IOpnd* opnd) const
+{
+    return _opnd_to_outedges_map_2st.eListBegin(opnd->getID());
+}
+
+InequalityGraph::edge_iterator InequalityGraph::outEdgesEnd(IOpnd* opnd) const
+{
+    return _opnd_to_outedges_map_2st.eListEnd(opnd->getID());
 }
 
 void InequalityGraph::addEdge(IOpnd* from, IOpnd* to, int32 distance)
@@ -94,23 +136,55 @@ void InequalityGraph::addEdge(IOpnd* from, IOpnd* to, int32 distance)
     IneqEdge* p_edge = new (_mem_mgr) IneqEdge(from, to, distance);
     _edges.push_back(p_edge);
 
-    addEdgeToIdMap(_opnd_to_outedges_map, from->getID(), p_edge);
-    addEdgeToIdMap(_opnd_to_inedges_map, to->getID(), p_edge);
+    _opnd_to_outedges_map_2st.addEdge(from->getID(), p_edge);
+    _opnd_to_inedges_map_2st.addEdge(to->getID(), p_edge);
+}
+
+void InequalityGraph::setState(bool is_lower)
+{
+    _is_lower = is_lower;
+    _opnd_to_inedges_map_2st.setState(is_lower);
+    _opnd_to_outedges_map_2st.setState(is_lower);
 }
 
 void InequalityGraph::addEdge(uint32 id_from, uint32 id_to, int32 distance)
 {
-    IOpnd *from, *to;
-    IdToOpndMap::iterator it;
-
-    it = _id_to_opnd_map.find(id_from);
-    assert(it != _id_to_opnd_map.end());
-    from = it->second;
-    it = _id_to_opnd_map.find(id_to);
-    assert(it != _id_to_opnd_map.end());
-    to = it->second;
-
+    IOpnd* from = getOpndById(id_from);
+    IOpnd* to = getOpndById(id_to);
     addEdge(from, to, distance);
+}
+
+IOpnd* InequalityGraph::getOpndById(uint32 id) const
+{
+    IdToOpndMap::const_iterator it = _id_to_opnd_map.find(id);
+    assert(it != _id_to_opnd_map.end());
+    return it->second;
+}
+
+void InequalityGraph::addEdgeSingleState
+     (uint32 id_from, uint32 id_to, int32 distance, bool is_lower)
+{
+    IOpnd* from = getOpndById(id_from);
+    IOpnd* to = getOpndById(id_to);
+    addEdgeSingleState(from, to, distance, is_lower);
+}
+
+void InequalityGraph::addEdgeSingleState
+     (IOpnd* from, IOpnd* to, int32 distance, bool is_lower)
+{
+    assert(!has_other_opnd_with_same_id(_id_to_opnd_map, from));
+    assert(!has_other_opnd_with_same_id(_id_to_opnd_map, to));
+
+    _id_to_opnd_map[from->getID()] = from;
+    _id_to_opnd_map[to->getID()] = to;
+
+    IneqEdge* p_edge = new (_mem_mgr) IneqEdge(from, to, distance);
+    _edges.push_back(p_edge);
+
+    _opnd_to_outedges_map_2st.
+        addEdgeSingleState(from->getID(), p_edge, is_lower);
+    _opnd_to_inedges_map_2st.
+        addEdgeSingleState(to->getID(), p_edge, is_lower);
 }
 
 void InequalityGraph::addOpnd(IOpnd* opnd)
@@ -152,6 +226,35 @@ void InequalityGraph::printDotEnd(std::ostream& os) const
     os << "}" << std::endl;
 }
 
+void InequalityGraph::printEdge(std::ostream& os, IneqEdge* e, PrnEdgeType t) const
+{
+    IOpnd* from_opnd = e->getSrc();
+    IOpnd* to_opnd = e->getDst();
+    os << "\""; from_opnd->printName(os); os << "\"";
+    os << " -> ";
+    os << "\""; to_opnd->printName(os); os << "\"";
+    os << " [label=\"" << e->getLength() << "\"";
+    switch (t) {
+        case tPERM_EDGE  : break;
+        case tLOWER_EDGE : os << "color=\"red\""; break;
+        case tUPPER_EDGE : os << "color=\"blue\""; break;
+    };
+    os << "];" << std::endl;
+}
+
+void InequalityGraph::printListWithSetExcluded (std::ostream& os, 
+    EdgeSet* edge_set, EdgeList* elist, PrnEdgeType ptype) const
+{
+    EdgeList::iterator it = elist->begin(),
+        end = elist->end();
+    for (; it != end; it++) {
+        IneqEdge* edge = (*it);
+        if ( edge_set->count(edge) == 0 ) {
+            printEdge(os, edge, ptype);
+        }
+    }
+}
+
 void InequalityGraph::printDotBody(std::ostream& os) const
 {
     IdToOpndMap::const_iterator it = _id_to_opnd_map.begin(), 
@@ -163,19 +266,31 @@ void InequalityGraph::printDotBody(std::ostream& os) const
         opnd->printFullName(os);
         os << "}\"];" << std::endl;
     }
+
+    MemoryManager print_graph_mm("InequalityGraph::printDotBody.mm");
+    EdgeSet edge_set(print_graph_mm);
+
     for (it = _id_to_opnd_map.begin(); it != last; it++ ) {
         IOpnd* from_opnd = it->second;
-        const EdgeList& out_edges_list = getOutEdges(from_opnd);
-        EdgeList::const_iterator out_iter = out_edges_list.begin(), 
-            out_last = out_edges_list.end();
-        for (; out_iter != out_last; out_iter++) {
-            IOpnd* to_opnd = (*out_iter)->getDst();
-            os << "\""; from_opnd->printName(os); os << "\"";
-            os << " -> ";
-            os << "\""; to_opnd->printName(os); os << "\"";
-            os << " [label=\"" << (*out_iter)->getLength() << "\"];" 
-               << std::endl;
+        TwoStateEdgeList* out_list =
+            _opnd_to_outedges_map_2st.get2stListByOpnd(from_opnd);
+        if ( !out_list ) {
+            continue;
         }
+        EdgeList *perm_lst = out_list->getPermanentEdgeList(),
+              *lower_lst = out_list->getOneStateEdgeList(true /* lower */ ),
+              *upper_lst = out_list->getOneStateEdgeList(false/* upper */ );
+
+        edge_set.clear();
+        EdgeList::iterator out_lst_it = perm_lst->begin(),
+            out_lst_end = perm_lst->end();
+        for (;out_lst_it != out_lst_end; out_lst_it++) {
+            IneqEdge* edge = (*out_lst_it);
+            edge_set.insert(edge);
+            printEdge(os, edge, tPERM_EDGE);
+        }
+        printListWithSetExcluded(os, &edge_set, lower_lst, tLOWER_EDGE);
+        printListWithSetExcluded(os, &edge_set, upper_lst, tUPPER_EDGE);
     }
 }
 
@@ -187,6 +302,7 @@ IOpnd* InequalityGraph::findOpnd(uint32 id) const
     }
     return it->second;
 }
+
 //------------------------------------------------------------------------------
 
 TrueReducedFalseChart* BoundAllocator::create_empty_TRFChart()
@@ -553,11 +669,10 @@ void ClassicAbcdSolver::updateMemDistanceWithPredecessors (IOpnd* dest,
                                                            uint32 prn_level, 
                                                       meet_func_t meet_f)
 {
-    const InequalityGraph::EdgeList& in_edges = _igraph.getInEdges(dest);
-    assert(!in_edges.empty());
-    InequalityGraph::EdgeList::const_iterator in_iter = in_edges.begin();
-    InequalityGraph::EdgeList::const_iterator in_last = in_edges.end();
-    IneqEdge* in_edge = (*in_iter);
+    InequalityGraph::edge_iterator in_it = _igraph.inEdgesBegin(dest);
+    InequalityGraph::edge_iterator in_end = _igraph.inEdgesEnd(dest);
+    assert(in_it != in_end);
+    IneqEdge* in_edge = in_it.get();
     assert(in_edge->getDst() == dest);
     ProveResult res;
     assert(!_mem_distance.hasLeqBoundResult(dest, bound));
@@ -565,8 +680,8 @@ void ClassicAbcdSolver::updateMemDistanceWithPredecessors (IOpnd* dest,
                 _bound_alloc.create_dec_const(bound, 
                                               in_edge->getLength()),
                 prn_level + 1);
-    in_iter++;
-    for (; in_iter != in_last; in_iter++) {
+    in_it.next();
+    for (; in_it != in_end; in_it.next()) {
         if(((res >= Reduced)  && (meet_f == meetBest)) ||
            ((res == False) && (meet_f == meetWorst))) {
             // For any x, meetBest(True, x)    == True
@@ -580,7 +695,7 @@ void ClassicAbcdSolver::updateMemDistanceWithPredecessors (IOpnd* dest,
             }
             break;
         }
-        in_edge = (*in_iter);
+        in_edge = in_it.get();
         assert(in_edge->getDst() == dest);
         IOpnd* pred = in_edge->getSrc();
         res = meet_f(res, 
@@ -648,7 +763,9 @@ ProveResult ClassicAbcdSolver::prove(IOpnd* dest, Bound* bound,
     }
     
     // if dest has no predecessor then fail
-    if ( _igraph.getInEdges(dest).empty() ) {
+    InequalityGraph::edge_iterator in_it = _igraph.inEdgesBegin(dest);
+    InequalityGraph::edge_iterator in_end = _igraph.inEdgesEnd(dest);
+    if ( in_it == in_end ) {
         prn.prnStrLn("no predecessors => False");
         return False;
     }
@@ -976,6 +1093,7 @@ void printExampleGraph()
     graph.addEdge(0, 1, 3);
     graph.addEdge(1, 2, -3);
     graph.addEdge(2, 0, 1);
+
     graph.printDotFile(std::cout);
 }
 
@@ -1057,10 +1175,165 @@ void testOverflow()
     //g.printDotFile(std::cout);
 
     intmax.setConstant(25);
-    (*g.getOutEdges(&i2).begin())->setLength(INT_MAX - 5);
+    InequalityGraph::edge_iterator it = g.outEdgesBegin(&i2);
+    it.get()->setLength(INT_MAX - 5);
     //g.printDotFile(std::cout);
     assert(!solver.demandProve(&zero, &i2, 0, false));
     //logfile << " testOverflow: OK" << std::endl;
+}
+
+void verifyNodesRange
+     (const uint32* ids_gold, uint32 id_count,
+      const InequalityGraph::edge_iterator& begin_range,
+      const InequalityGraph::edge_iterator& end_range, bool check_src_nodes)
+{
+    // note: this implementation is intended for use with small arrays,
+    //    it is far from optimal asymptotically
+    InequalityGraph::edge_iterator it = begin_range;
+    InequalityGraph::edge_iterator end = end_range;
+    uint32 found_count = 0;
+    for (; it != end; it.next()) {
+        IneqEdge* edge = it.get();
+        IOpnd* op = check_src_nodes ? edge->getSrc() : edge->getDst();
+        uint32 op_id = op->getID();
+        bool found = false;
+        for (uint32 i = 0; i < id_count; i++) {
+            if ( op_id == ids_gold[i] ) {
+                found = true;
+                found_count++;
+            }
+        }
+        assert(found);
+    }
+    assert(found_count == id_count);
+}
+
+void assertInNodesEqual(InequalityGraph& g,
+     IOpnd& opnd, const uint32* ids_gold, uint32 id_count)
+{
+    const InequalityGraph::edge_iterator in_iter = g.inEdgesBegin(&opnd),
+          in_end = g.inEdgesEnd(&opnd);
+    verifyNodesRange(ids_gold, id_count,
+            in_iter, in_end, true /* check_src_nodes */);
+}
+
+void assertOutNodesEqual(InequalityGraph& g,
+     IOpnd& opnd, const uint32* ids_gold, uint32 id_count)
+{
+    const InequalityGraph::edge_iterator out_iter = g.outEdgesBegin(&opnd),
+          out_end = g.outEdgesEnd(&opnd);
+
+    verifyNodesRange(ids_gold, id_count,
+            out_iter, out_end, false /* check_src_nodes */);
+}
+
+void testTwoStateOpndToEdgeListMap()
+{
+    MemoryManager mm("testTwoStateOpndToEdgeListMap.MemoryManager");
+    TwoStateOpndToEdgeListMap edges_map_2st(mm);
+
+    IOpnd o0(0), o1(1), o2(2), o3(3), o4(4);
+    IneqEdge e1(&o0, &o1, 0),
+             e2(&o0, &o2, 0),
+             e3(&o0, &o3, 0);
+
+    // e1: o0, o1
+    // e2: o0, o2
+    // e3: o0, o3 .. not_lower
+    edges_map_2st.addEdge(1, &e1);
+    edges_map_2st.addEdge(1, &e2);
+    edges_map_2st.addEdgeSingleState(1, &e3, false);
+
+    edges_map_2st.setState(false);
+    {
+        TwoStateEdgeList::iterator it = edges_map_2st.eListBegin(1),
+            it_end = edges_map_2st.eListEnd(1);
+        uint32 found = 0;
+        for (; it != it_end; it.next() ) {
+            IneqEdge* e = it.get();
+            assert(e == &e1 || e == &e2 || e == &e3);
+            found++;
+        }
+        assert(found == 3);
+    }
+
+    edges_map_2st.setState(true);
+    {
+        TwoStateEdgeList::iterator it = edges_map_2st.eListBegin(1),
+            it_end = edges_map_2st.eListEnd(1);
+        uint32 found = 0;
+        for (; it != it_end; it.next() ) {
+            IneqEdge* e = it.get();
+            assert(e == &e1 || e == &e2);
+            found++;
+        }
+        assert(found == 2);
+    }
+}
+
+void testBasicIGraphOperations()
+{
+    MemoryManager mm("testOverflow.MemoryManager");
+    InequalityGraph g(mm);
+
+    assert(g.isEmpty());
+    IOpnd i0(00), i1(01, true /*phi */), i2(02), i3(03), 
+          intmax(20, false /* phi */, true /* constant */), 
+          zero(22, false /* phi */, true /* constant */), 
+          length(21);
+
+    intmax.setConstant(INT_MAX);
+    zero.setConstant(0);
+    g.addOpnd(&zero);
+    g.addOpnd(&i0);
+    g.addOpnd(&i1);
+    g.addOpnd(&i2);
+    g.addOpnd(&i3);
+    g.addOpnd(&intmax);
+    g.addOpnd(&length);
+
+    g.addEdge(&intmax, &i0, 0);
+    g.addEdge(&i0, &i1, 0);
+    g.addEdge(&i1, &i2, 0);
+    g.addEdge(i2.getID(), i3.getID(), 1);
+    g.addEdge(&i3, &i1, 0);
+    g.addEdge(&length, &i2, -1);
+
+    g.addEdgeSingleState(&length, &i1, -1, true /* is_lower */);
+    g.addEdgeSingleState(i3.getID(), i2.getID(), -1, false /* is_lower */);
+
+    g.setState(true /* is_lower */);
+    {
+        const uint32 i1_in_gold[] = {0, 3, length.getID()};
+        assertInNodesEqual(g, i1, i1_in_gold, 3);
+        const uint32 i1_out_gold[] = {2};
+        assertOutNodesEqual(g, i1, i1_out_gold, 1);
+        const uint32 i2_in_gold[] = {1, length.getID()};
+        assertInNodesEqual(g, i2, i2_in_gold, 2);
+        const uint32 i3_out_gold[] = {1};
+        assertOutNodesEqual(g, i3, i3_out_gold, 1);
+    }
+
+    g.setState(false /* is_lower */);
+    {
+        const uint32 i1_in_gold[] = {0, 3};
+        assertInNodesEqual(g, i1, i1_in_gold, 2);
+        const uint32 i1_out_gold[] = {2};
+        assertOutNodesEqual(g, i1, i1_out_gold, 1);
+        const uint32 i2_in_gold[] = {1, length.getID(), 3};
+        assertInNodesEqual(g, i2, i2_in_gold, 3);
+        const uint32 i3_out_gold[] = {1, 2};
+        assertOutNodesEqual(g, i3, i3_out_gold, 2);
+    }
+
+    g.setState(true /* is_lower */);
+    {
+        const uint32 i3_out_gold[] = {1};
+        assertOutNodesEqual(g, i3, i3_out_gold, 1);
+    }
+    std::ofstream f;
+    f.open("testBasicIGraphOperations.dot");
+    g.printDotFile(f);
 }
 
 //------------------------------------------------------------------------------
@@ -1068,7 +1341,9 @@ void testOverflow()
 int classic_abcd_test_main()
 {
     std::cout << "running ABCD self-tests" << std::endl;
+    testTwoStateOpndToEdgeListMap();
     testMemoizedDistances();
+    testBasicIGraphOperations();
     testSimpleIGraph();
     testDoubleCycleGraph();
     testPaperIGraph();

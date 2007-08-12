@@ -73,12 +73,19 @@ private:
     /* ids of PiOpnd, SsaOpnd, VarOpnd may alias their IDs,
      * encoding all in one ID with unaliasing
      */
-    static const uint64 min_var_opnd = 0;
-    static const uint64 min_ssa_opnd = MAX_UINT32 / 4;
-    static const uint64 min_pi_opnd = (min_ssa_opnd) * 2;
-    static const uint64 min_const_opnd = (min_ssa_opnd) * 3;
+    static const uint32 min_var_opnd = 0;
+    static const uint32 min_ssa_opnd = MAX_UINT32 / 4;
+    static const uint32 min_pi_opnd = (min_ssa_opnd) * 2;
+    static const uint32 min_const_opnd = (min_ssa_opnd) * 3;
 };
 //------------------------------------------------------------------------------
+
+// for debugging purposes
+void printIOpnd(IOpnd* opnd)
+{
+    opnd->printName(std::cout);
+    std::cout << std::endl;
+}
 
 bool inInt32(int64 c) {
     return (int64)(int32)c == c;
@@ -120,7 +127,7 @@ IOpndProxy::IOpndProxy(int32 c, uint32 id) :
     IOpnd(0, false /* is_phi */, true /* is_constant */),
     _opnd(NULL)
 {
-    setID((uint32)min_const_opnd + id);
+    setID(min_const_opnd + id);
     setConstant(c);
 }
 
@@ -144,18 +151,17 @@ uint32 IOpndProxy::getProxyIdByOpnd(Opnd* opnd)
 class BuildInequalityGraphWalker {
 public:
     BuildInequalityGraphWalker(InequalityGraph* igraph, bool isLower) :
-       _igraph(igraph), _isLower(isLower), _const_id_counter(1 /*reserve 0 for solver*/)
+        _igraph(igraph), _const_id_counter(1 /*reserve 0 for solver*/),
+        _map_opnd_to_pi_inst(igraph->getMemoryManager())
     {}
 
-    void startNode(DominatorNode *domNode) {}
+    void startNode(DominatorNode *domNode);
     void applyToInst(Inst* i);
-    void finishNode(DominatorNode *domNode) {}
+    void finishNode(DominatorNode *domNode);
 
     void enterScope() {}
     void exitScope() {}
 private:
-    void updateDstForInst(Inst* inst);
-
     // returns true if an edge to const opnd is actually added
     bool addEdgeIfConstOpnd(IOpndProxy* dst, Opnd* const_src, Opnd* src, 
                             bool negate_src);
@@ -166,27 +172,48 @@ private:
     bool addDistance(IOpndProxy* dst, IOpndProxy* src, int64 constant, 
                      bool negate);
 
-    // same as addDistance, but swap 'from' and 'to' if 'negate'
-    void addDistanceSwapNegate(IOpndProxy* to, IOpndProxy* from, int64 c, 
-                               bool negate);
+    void addDistanceSingleProblem(IOpndProxy* to, IOpndProxy* from, int64 c, 
+                                  bool lower_problem);
 
-    // add edges to (or from) 'dst' induced by given bounds
-    void addPiEdgesForBounds(IOpndProxy* dst, 
-                             const PiBound& lb, const PiBound& ub);
-
-    void addPiEdgesWithOneBoundInf
-         (IOpndProxy* dst, bool lb_is_inf, const PiBound& non_inf_bound);
+    void addPiEdgesSingleProblem
+         (IOpndProxy* dst, bool lower_problem, const PiBound& non_inf_bound);
 
     IOpndProxy* findProxy(Opnd* opnd);
 
     IOpndProxy* addOldOrCreateOpnd(Opnd* opnd);
 
     InequalityGraph* _igraph;
-    bool _isLower;
     uint32 _const_id_counter;
+
+    // operands are mapped to their renaming Pi instructions during the walk
+    // (applyToInst), and then this mapping is used to create edges between
+    // operands in InequalityGraph. This allows to link newer operands with
+    // constraints (edges) rather than old ones;
+    //
+    // Example:
+    //   if ( x.1 < y.1 ) {
+    //     pi( x.1 : [undef, y.1 - 1] ) -> x.2 // inst.X
+    //     pi( y.1 : [x.1 + 1, undef] ) -> y.2 // inst.Y
+    //   }
+    //
+    // we collect the mapping:
+    //     x.1 -> inst.X
+    //     y.1 -> inst.Y
+    // to deduce edges:
+    //     upper-only edge: x.2 - y.2 <= -1 // hint: 'to' - 'from'
+    //     lower-only edge: 1 <= y.2 - x.2
+    // instead of the straightforward:
+    //     upper-only edge: x.2 - y.1 <= -1 // hint: 'to' - 'from'
+    //     lower-only edge: 1 <= y.2 - x.1
+    //
+    // (ideally there should only be 2 elements in the map for each basic block
+    //  at most (taken from "if a < b" or such), but our InsertPi sometimes adds
+    //  more)
+    typedef StlMap<IOpndProxy*, TauPiInst*> OpndToPiInst2ElemMap;
+    OpndToPiInst2ElemMap _map_opnd_to_pi_inst;
 };
 //------------------------------------------------------------------------------
- 
+
 IOpndProxy* BuildInequalityGraphWalker::findProxy(Opnd* opnd)
 {
     assert(_igraph);
@@ -201,6 +228,28 @@ void BuildInequalityGraphWalker::addAllSrcOpndsForPhi(Inst* inst)
         IOpndProxy* proxy_src = addOldOrCreateOpnd(inst->getSrc(j));
         addDistance(findProxy(inst->getDst()), proxy_src, 0, false /*negate*/);
     }
+}
+//------------------------------------------------------------------------------
+
+void BuildInequalityGraphWalker::startNode(DominatorNode *domNode)
+{
+    if ( Log::isEnabled() &&
+         !_map_opnd_to_pi_inst.empty() ) {
+        Log::out() << "_map_opnd_to_pi_inst before clear:" << std::endl;
+        OpndToPiInst2ElemMap::const_iterator 
+            it = _map_opnd_to_pi_inst.begin(),
+            end = _map_opnd_to_pi_inst.end();
+        for (; it != end; it++ ) {
+            IOpndProxy* opnd = it->first;
+            TauPiInst* inst = it->second;
+            Log::out() << " opnd: ";
+            opnd->printName(Log::out());
+            Log::out() << " -> inst: ";
+            inst->print(Log::out());
+            Log::out() << std::endl;
+        }
+    }
+    _map_opnd_to_pi_inst.clear();
 }
 //------------------------------------------------------------------------------
 
@@ -266,10 +315,14 @@ void BuildInequalityGraphWalker::applyToInst(Inst* inst)
             proxy_dst = addOldOrCreateOpnd(inst->getDst());
             IOpndProxy* src0 = findProxy(inst->getSrc(0));
             addDistance(proxy_dst, src0, 0, false /* negate */);
-            const PiCondition* condition = inst->asTauPiInst()->getCond();
-            addPiEdgesForBounds(proxy_dst, 
-                                condition->getLb(), 
-                                condition->getUb());
+            _map_opnd_to_pi_inst[src0] = inst->asTauPiInst();
+            if ( Log::isEnabled() ) {
+                Log::out() << "mapping (src->pi inst): src: ";
+                src0->printName(Log::out());
+                Log::out() << " inst: ";
+                inst->print(Log::out());
+                Log::out() << std::endl;
+            }
         }
             break;
         case Op_TauArrayLen:
@@ -286,14 +339,46 @@ void BuildInequalityGraphWalker::applyToInst(Inst* inst)
 }
 //------------------------------------------------------------------------------
 
+void BuildInequalityGraphWalker::finishNode(DominatorNode *domNode)
+{
+    OpndToPiInst2ElemMap::const_iterator it = _map_opnd_to_pi_inst.begin(),
+        end = _map_opnd_to_pi_inst.end();
+    for (; it != end; it++ ) {
+        TauPiInst* pi_inst = it->second;
+        const PiCondition* condition = pi_inst->getCond();
+        const PiBound& lb = condition->getLb();
+        const PiBound& ub = condition->getUb();
+        IOpndProxy* dst = findProxy(pi_inst->getDst());
+        assert(dst);
+        /*
+         * pi (src0 \in [undef,A + c] -) dst
+         *      dst <= A + c <-> (dst - A) <= c
+         *      edge(from:A, to:dst, c)
+         *
+         * pi (src0 \in [A + c,undef] -) dst
+         *      (A + c) <= dst <-> (A - dst) <= -c
+         *      edge(from:dst, to:A, -c)
+         */
+        bool lb_defined = !lb.isUndefined();
+        bool ub_defined = !ub.isUndefined();
+        if ( lb_defined ) {
+            addPiEdgesSingleProblem(dst, true /* lower_problem */, lb);
+        }
+        if ( ub_defined ) {
+            addPiEdgesSingleProblem(dst, false /* lower_problem */, ub);
+        }
+    }
+}
+
 // returns true if the edge is actually added
 bool BuildInequalityGraphWalker::addDistance
      (IOpndProxy* dst, IOpndProxy* src, int64 constant, bool negate)
 {
     assert(dst && src);
-    // Note: is this an optimization?  It prevents adding a link from
-    // unconstrained operands.  This is always safe, and it shouldn't lose
-    // opportunity, but maybe we should discuss it to be sure?
+    // This prevention to put some edges is *not* an optimization of any kind.
+    // Operands can be marked unconstrained by various reasons, for example:
+    // because the constant value does not fit into int32 (which is critical for
+    // array access)
     if ( !src->isUnconstrained() ) {
         if ( !inInt32(constant) ) {
             return false;
@@ -301,17 +386,21 @@ bool BuildInequalityGraphWalker::addDistance
         if ( negate ) {
             constant = (-1) * constant;
         }
-        _igraph->addEdge(src->getID(), dst->getID(), (int32)constant);
+        _igraph->addEdge(src->getID(), dst->getID(), constant);
         return true;
     }
     return false;
 }
 //------------------------------------------------------------------------------
 
-void BuildInequalityGraphWalker::addDistanceSwapNegate
-     (IOpndProxy* to, IOpndProxy* from, int64 c, bool negate)
+void BuildInequalityGraphWalker::addDistanceSingleProblem
+     (IOpndProxy* to, IOpndProxy* from, int64 c, bool lower_problem)
 {
-    addDistance(!negate ? to : from, !negate ? from : to, c, negate);
+    assert(to && from);
+    if ( from->isUnconstrained() || !inInt32(c) ) {
+        return;
+    }
+    _igraph->addEdgeSingleState(from->getID(), to->getID(), c, lower_problem);
 }
 //------------------------------------------------------------------------------
 
@@ -331,42 +420,33 @@ bool BuildInequalityGraphWalker::addEdgeIfConstOpnd
 }
 //------------------------------------------------------------------------------
 
-/*
- * pi (src0 \in [undef,A + c] -) dst
- *      dst <= A + c <-> (dst - A) <= c
- *      edge(from:A, to:dst, c)
- *
- * pi (src0 \in [A + c,undef] -) dst
- *      (A + c) <= dst <-> (A - dst) <= -c
- *      edge(from:dst, to:A, -c)
- */
-void BuildInequalityGraphWalker::addPiEdgesForBounds
-     (IOpndProxy* dst, const PiBound& lb, const PiBound& ub)
-{
-    if ( _isLower && !lb.isUndefined() ) {
-        addPiEdgesWithOneBoundInf(dst, false, lb);
-    }
-    else if ( !_isLower && !ub.isUndefined() ) {
-        addPiEdgesWithOneBoundInf(dst, true, ub);
-    }
-}
-//------------------------------------------------------------------------------
-
-void BuildInequalityGraphWalker::addPiEdgesWithOneBoundInf
-     (IOpndProxy* dst, bool lb_is_inf, const PiBound& non_inf_bound)
+void BuildInequalityGraphWalker::addPiEdgesSingleProblem
+     (IOpndProxy* dst, bool lower_problem, const PiBound& non_inf_bound)
 {
     if ( non_inf_bound.isVarPlusConst()  ) {
         Opnd* var = non_inf_bound.getVar().the_var;
-        addDistanceSwapNegate(dst /* to */, 
-                              findProxy(var) /* from */,
-                              non_inf_bound.getConst(), 
-                              false /* negate */);
+        IOpndProxy* var_proxy = findProxy(var);
+        assert(var_proxy);
+        if ( _map_opnd_to_pi_inst.count(var_proxy) == 0 ) {
+            addDistanceSingleProblem(dst /* to */,
+                                  var_proxy /* from */,
+                                  non_inf_bound.getConst(),
+                                  lower_problem);
+        }else{
+            TauPiInst* pi_inst = _map_opnd_to_pi_inst[var_proxy];
+            IOpndProxy* newer_var_proxy = findProxy(pi_inst->getDst());
+            assert(newer_var_proxy);
+            addDistanceSingleProblem(dst /* to */,
+                                  newer_var_proxy /* from */,
+                                  non_inf_bound.getConst(),
+                                  lower_problem);
+        }
     } else if ( non_inf_bound.isConst() ) {
         MemoryManager& mm = _igraph->getMemoryManager();
         IOpndProxy* c_opnd = new (mm) 
-            IOpndProxy((int32)non_inf_bound.getConst(), _const_id_counter++);
+            IOpndProxy(non_inf_bound.getConst(), _const_id_counter++);
         _igraph->addOpnd(c_opnd);
-        addDistanceSwapNegate(c_opnd /* to */, dst, 0, false /* negate */);
+        addDistanceSingleProblem(c_opnd /* to */, dst, 0, lower_problem);
     }
 }
 //------------------------------------------------------------------------------
@@ -399,6 +479,85 @@ private:
 };
 //------------------------------------------------------------------------------
 
+ClassicAbcd::ClassicAbcd(SessionAction* arg_source, IRManager &ir_manager,
+        MemoryManager& mem_manager, DominatorTree& dom0) :
+    _irManager(ir_manager), 
+    _mm(mem_manager),
+    _domTree(dom0),
+    _redundantChecks(mem_manager),
+    _zeroIOp(NULL),
+    _dump_abcd_stats(ir_manager.getOptimizerFlags().dump_abcd_stats)
+{
+    _runTests = arg_source->getBoolArg("run_tests", false);
+    _useAliases = arg_source->getBoolArg("use_aliases", true);
+    _zeroIOp = new (mem_manager) IOpndProxy(0, 0 /*using reserved ID*/);
+}
+//------------------------------------------------------------------------------
+
+void ClassicAbcd::updateOrInitValue
+     (InstRedundancyMap& map, Inst* inst, RedundancyType type)
+{
+    if ( map.count(inst) == 0 ) {
+        map[inst] = type;
+    }else{
+        int32 new_rtype = (int32)map[inst];
+        new_rtype |= (int32)type;
+        map[inst] = (RedundancyType)new_rtype;
+    }
+}
+//------------------------------------------------------------------------------
+
+void ClassicAbcd::markRedundantInstructions
+     (bool upper_problem, InequalityGraph& igraph, ControlFlowGraph& cfg)
+{
+    ClassicAbcdSolver solver(igraph, igraph.getMemoryManager());
+    igraph.setState(!upper_problem /* is_lower */);
+
+    for (Nodes::const_iterator i = cfg.getNodes().begin(); 
+            i != cfg.getNodes().end(); 
+            ++i) {
+        Node *curr_node = *i;
+
+        for (Inst *curr_inst = (Inst*)curr_node->getFirstInst();
+             curr_inst != NULL; curr_inst = curr_inst->getNextInst()) {
+
+            if (curr_inst->getOpcode() == Op_TauCheckBounds) {
+                assert(curr_inst->getNumSrcOperands() == 2);
+                if (Log::isEnabled()) {
+                    Log::out() << "Trying to eliminate CheckBounds instruction ";
+                    curr_inst->print(Log::out());
+                    Log::out() << std::endl;
+                }
+
+                Opnd *idxOp = curr_inst->getSrc(1);
+                IOpnd *idxIOp = igraph.findOpnd(IOpndProxy::getProxyIdByOpnd(idxOp));
+
+                IOpnd *boundsIOp = _zeroIOp;
+                if ( upper_problem ) {
+                    Opnd *boundsOp = curr_inst->getSrc(0);
+                    boundsIOp = igraph.findOpnd(IOpndProxy::getProxyIdByOpnd(boundsOp));
+                }
+                bool res = solver.demandProve
+                           (boundsIOp, idxIOp, upper_problem ? -1 : 0, upper_problem);
+                if (res) {
+                    RedundancyType rt = upper_problem ? rtUPPER_MASK : rtLOWER_MASK;
+                    updateOrInitValue(_redundantChecks, curr_inst, rt);
+                    if (Log::isEnabled()) {
+                        Log::out() << "can eliminate";
+                        if ( upper_problem ) {
+                            Log::out() << " upper ";
+                        }else{
+                            Log::out() << " lower ";
+                        }
+                        Log::out() << "bound check!\n";
+                    }
+                }
+            }
+        }
+    }
+}
+//------------------------------------------------------------------------------
+
 void ClassicAbcd::runPass()
 {
     static bool run_once = true;
@@ -420,127 +579,37 @@ void ClassicAbcd::runPass()
         Log::out() << "ClassicAbcd pass started" << std::endl;
     }
 
-    StlMap<Inst *, uint32> redundantChecks(_mm);
+    MemoryManager ineq_mm("ClassicAbcd::InequalityGraph");
+    InsertPi insertPi(ineq_mm, _domTree, _irManager, _useAliases);
+    insertPi.insertPi();
+    InequalityGraph igraph(ineq_mm);
+    igraph.addOpnd(_zeroIOp);
+    BuildInequalityGraphWalker igraph_walker(&igraph, false /*lower*/);
+    typedef ScopedDomNodeInst2DomWalker<true, BuildInequalityGraphWalker>
+        IneqBuildDomWalker;
+    IneqBuildDomWalker dom_walker(igraph_walker);
+    DomTreeWalk<true, IneqBuildDomWalker>(_domTree, dom_walker, ineq_mm);
 
-    {
-        MemoryManager ineq_mm("ClassicAbcd::InequalityGraph");
-
-        InsertPi insertPi(ineq_mm, _domTree, _irManager, _useAliases, InsertPi::Upper);
-        insertPi.insertPi();
-
-        InequalityGraph igraph(ineq_mm);
-
-        BuildInequalityGraphWalker igraph_walker(&igraph, false /*lower*/);
-        typedef ScopedDomNodeInst2DomWalker<true, BuildInequalityGraphWalker>
-            IneqBuildDomWalker;
-        IneqBuildDomWalker dom_walker(igraph_walker);
-        DomTreeWalk<true, IneqBuildDomWalker>(_domTree, dom_walker, ineq_mm);
-
-        if ( Log::isEnabled() ) {
-            InequalityGraphPrinter printer(igraph);
-            printer.printDotFile(method_desc, "inequality.graph");
-        }
-
-        ClassicAbcdSolver solver(igraph, ineq_mm);
-
-        for (Nodes::const_iterator i = cfg.getNodes().begin(); i != cfg.getNodes().end(); ++i) {
-            Node *curr_node = *i;
-
-            for (Inst *curr_inst = (Inst*)curr_node->getFirstInst();
-                 curr_inst != NULL; curr_inst = curr_inst->getNextInst()) {
-
-                if (curr_inst->getOpcode() == Op_TauCheckBounds) {
-                    assert(curr_inst->getNumSrcOperands() == 2);
-                    Opnd *idxOp = curr_inst->getSrc(1);
-                    Opnd *boundsOp = curr_inst->getSrc(0);
-
-                    if (Log::isEnabled()) {
-                        Log::out() << "Trying to eliminate CheckBounds instruction ";
-                        curr_inst->print(Log::out());
-                        Log::out() << std::endl;
-                    }
-
-                    IOpnd *idxIOp = igraph.findOpnd(IOpndProxy::getProxyIdByOpnd(idxOp));
-                    IOpnd *boundsIOp = igraph.findOpnd(IOpndProxy::getProxyIdByOpnd(boundsOp));
-
-                    bool upper_res = solver.demandProve(boundsIOp, idxIOp, -1, true /*upper*/);
-                    if (upper_res) {
-                        redundantChecks[curr_inst] = 0x1 /*upper redundant*/;
-                        if (Log::isEnabled()) {
-                            Log::out() << "can eliminate upper bound check!\n";
-                        }
-                    }
-                }
-            }
-        }
-        insertPi.removePi();
+    if ( Log::isEnabled() ) {
+        Log::out() << "added zero opnd for solving lower bound problem: ";
+        _zeroIOp->printFullName(Log::out());
+        Log::out() << std::endl;
+        InequalityGraphPrinter printer(igraph);
+        printer.printDotFile(method_desc, "inequality.graph");
     }
 
+    _redundantChecks.clear();
+    markRedundantInstructions(true /* upper_problem */, igraph, cfg);
+    markRedundantInstructions(false /* upper_problem */, igraph, cfg);
 
-    {
-        MemoryManager ineq_mm("ClassicAbcd::InequalityGraph");
+    insertPi.removePi();
 
-        InsertPi insertPi(ineq_mm, _domTree, _irManager, _useAliases, InsertPi::Lower);
-        insertPi.insertPi();
+    uint32 checks_eliminated = 0;
 
-        InequalityGraph igraph(ineq_mm);
-
-        BuildInequalityGraphWalker igraph_walker(&igraph, true /*lower*/);
-        typedef ScopedDomNodeInst2DomWalker<true, BuildInequalityGraphWalker>
-            IneqBuildDomWalker;
-        IneqBuildDomWalker dom_walker(igraph_walker);
-        DomTreeWalk<true, IneqBuildDomWalker>(_domTree, dom_walker, ineq_mm);
-
-        IOpndProxy *zeroIOp = new (ineq_mm) IOpndProxy(0, 0 /*using reserved ID*/);
-        igraph.addOpnd(zeroIOp);
-        if ( Log::isEnabled() ) {
-            Log::out() << "added zero opnd for solving lower bound problem: ";
-            zeroIOp->printFullName(Log::out());
-            Log::out() << std::endl;
-        }
-
-        if ( Log::isEnabled() ) {
-            InequalityGraphPrinter printer(igraph);
-            printer.printDotFile(method_desc, "inequality.graph.inverted");
-        }
-
-        ClassicAbcdSolver solver(igraph, ineq_mm);
-
-        for (Nodes::const_iterator i = cfg.getNodes().begin(); i != cfg.getNodes().end(); ++i) {
-            Node *curr_node = *i;
-
-            for (Inst *curr_inst = (Inst*)curr_node->getFirstInst();
-                 curr_inst != NULL; curr_inst = curr_inst->getNextInst()) {
-
-                if (curr_inst->getOpcode() == Op_TauCheckBounds) {
-                    assert(curr_inst->getNumSrcOperands() == 2);
-                    Opnd *idxOp = curr_inst->getSrc(1);
-
-                    if (Log::isEnabled()) {
-                        Log::out() << "Trying to eliminate CheckBounds instruction ";
-                        curr_inst->print(Log::out());
-                        Log::out() << std::endl;
-                    }
-
-                    IOpnd *idxIOp = igraph.findOpnd(IOpndProxy::getProxyIdByOpnd(idxOp));
-
-                    bool lower_res = solver.demandProve(zeroIOp, idxIOp, 0, false /*lower*/);
-                    if (lower_res) {
-                        redundantChecks[curr_inst] |= 0x2 /*lower redundant*/;
-                        if (Log::isEnabled()) {
-                            Log::out() << "can eliminate lower bound check!\n";
-                        }
-                    }
-                }
-            }
-        }
-        insertPi.removePi();
-    }
-
-    for(StlMap<Inst *, uint32>::const_iterator i = redundantChecks.begin();
-        i != redundantChecks.end(); ++i) {
+    for(InstRedundancyMap::const_iterator i = _redundantChecks.begin();
+        i != _redundantChecks.end(); ++i) {
         Inst *redundant_inst = i->first;
-        bool fully_redundant = i->second == 0x3;
+        bool fully_redundant = (i->second == rtFULL_MASK);
 
         if (fully_redundant) {
             // should we check if another tau has already been placed in
@@ -563,6 +632,7 @@ void ClassicAbcd::runPass()
             Inst* copy = instFactory.makeCopy(dstOp, tauOp);
             copy->insertBefore(redundant_inst);
             FlowGraph::eliminateCheck(cfg, redundant_inst->getNode(), redundant_inst, false);
+            checks_eliminated++;
             
             if (Log::isEnabled()) {
                 Log::out() << "Replaced bound check with inst ";
@@ -570,6 +640,22 @@ void ClassicAbcd::runPass()
                 Log::out() << std::endl;
             }
         }
+    }
+
+    uint32 checks_total = _redundantChecks.size();
+    if ( _dump_abcd_stats && checks_total > 0 ) {
+        std::ofstream checks_log;
+        checks_log.open("bounds_checks.log", std::fstream::out | std::fstream::app);
+        checks_log << "removed bounds checks of: "
+            << method_desc.getParentType()->getName()
+            << "." << method_desc.getName()
+            << method_desc.getSignatureString()
+            << " total checks: " << checks_total
+            << "; eliminated: " << checks_eliminated
+            << "; fraction: "
+            << (double) checks_eliminated / (double) checks_total
+            << std::endl;
+        checks_log.close();
     }
 
     Log::out() << "ClassicAbcd pass finished" << std::endl;

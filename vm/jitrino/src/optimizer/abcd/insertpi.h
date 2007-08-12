@@ -30,18 +30,11 @@ namespace Jitrino {
 
 class InsertPi {
 public:
-    enum ProblemType {
-        Upper = 2,
-        Lower = 1,
-        Both = 0
-    };
-
     InsertPi(MemoryManager& mm, DominatorTree& dom_tree, IRManager& irm, 
-             bool use_aliases, ProblemType type = Both) :
+             bool use_aliases) :
         _mm(mm), 
         _domTree(dom_tree), 
         _useAliases(use_aliases),
-        _problemType(type),
         _irManager(irm),
         _blockTauEdge(0),
         _lastTauEdgeBlock(0),
@@ -107,7 +100,6 @@ private:
     MemoryManager& _mm;
     DominatorTree& _domTree;
     bool _useAliases;
-    ProblemType _problemType;
     IRManager& _irManager;
 
     SsaTmpOpnd* _blockTauEdge;

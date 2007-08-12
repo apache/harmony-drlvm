@@ -101,6 +101,9 @@ struct OptimizerFlags {
     int unguard_dcall_percent;
     int unguard_dcall_percent_of_entry;
 
+    //classic_abcd
+    bool dump_abcd_stats;
+
 
     AbcdFlags*              abcdFlags;
     GcmFlags*               gcmFlags;

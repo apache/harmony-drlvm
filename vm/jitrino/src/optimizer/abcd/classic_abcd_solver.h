@@ -98,28 +98,216 @@ private:
     int32 _length;
 };
 
-class InequalityGraph {
-    typedef StlMap<uint32, StlList<IneqEdge*> > OpndEdgeMap;
+typedef StlList<IneqEdge*> EdgeList;
+typedef StlSet<IneqEdge*> EdgeSet;
+
+class TwoStateEdgeList {
 public:
-    typedef StlList<IneqEdge*> EdgeList;
+    TwoStateEdgeList(MemoryManager& mm) :
+        _mm(mm),
+        _permanent(mm),
+        _lower(mm),
+        _upper(mm),
+        _is_lower(false)
+    {
+    }
+
+    bool isLowerState() { return _is_lower; }
+
+    void addEdge(IneqEdge* edge)
+    {
+        _permanent.push_back(edge);
+    }
+
+    void addEdgeSingleState(IneqEdge *edge, bool is_lower)
+    {
+        EdgeList* list = is_lower ? (&_lower) : (&_upper);
+        list->push_back(edge);
+    }
+
+    // the iterator is 'invalidated' when the state of the TwoStateEdgeList
+    // changes
+    class iterator {
+    public:
+        void next()
+        {
+            if ( _first_it != _first_end ) {
+                _first_it++;
+            }else if ( _second_it != _second_end ) {
+                _second_it++;
+            }else{
+                assert(0);
+            }
+        }
+
+        IneqEdge* get()
+        {
+            if ( _first_it != _first_end ) {
+                return (*_first_it);
+            }else if ( _second_it != _second_end ) {
+                return (*_second_it);
+            }else{
+                return NULL;
+            }
+        }
+
+        bool operator==(iterator& other)
+        {
+            return _first_it == other._first_it &&
+                _second_it == other._second_it;
+        }
+
+        bool operator!=(iterator& other)
+        {
+            return !(*this == other);
+        }
+    private:
+        friend class TwoStateEdgeList;
+        iterator(EdgeList* first, EdgeList* second, bool is_end)
+        {
+            assert(first && second);
+            _first_end = first->end();
+            _second_end = second->end();
+            if ( !is_end ) {
+                _first_it = first->begin();
+                _second_it = second->begin();
+            }else{
+                _first_it = _first_end;
+                _second_it = _second_end;
+            }
+        }
+
+        void moveEnd()
+        {
+            _first_it = _first_end;
+            _second_it = _second_end;
+        }
+
+        EdgeList::iterator _first_it, _second_it, _first_end, _second_end;
+    };
+
+    iterator begin()
+    {
+        iterator ret(&_permanent, getSecond(), false /* is_end */);
+        return ret;
+    }
+
+    iterator end()
+    {
+        iterator ret(&_permanent, getSecond(), true);
+        return ret;
+    }
+
+    static iterator emptyIterator()
+    {
+        static MemoryManager mm("Memory Manager for EdgeList::empty_iterator");
+        static EdgeList* empty_list = new(mm) EdgeList(mm);
+        iterator ret(empty_list, empty_list, false /* is_end */);
+        return ret;
+    }
+
+private:
+    friend class TwoStateOpndToEdgeListMap;
+    friend class InequalityGraph;
+
+    void setState(bool is_lower) { _is_lower = is_lower; }
+
+    EdgeList* getSecond() { return getOneStateEdgeList(_is_lower); }
+
+    EdgeList* getPermanentEdgeList() { return &_permanent; }
+
+    EdgeList* getOneStateEdgeList(bool lower_state)
+    {
+        return lower_state ? &_lower : &_upper;
+    }
+
+    MemoryManager& _mm;
+    EdgeList _permanent, _lower, _upper;
+    bool _is_lower;
+};
+
+class TwoStateOpndToEdgeListMap {
+    typedef StlMap<uint32, TwoStateEdgeList* > MapIdTo2stList;
+public:
+    TwoStateOpndToEdgeListMap(MemoryManager& mm) :
+        _is_lower(false),
+        _mm(mm),
+        _map(mm)
+    {}
+
+    void setState(bool is_lower);
+
+    bool isLowerState() { return _is_lower; }
+
+    void addEdge(uint32 opnd_id, IneqEdge* edge);
+
+    void addEdgeSingleState(uint32 opnd_id, IneqEdge *edge, bool is_lower);
+
+    TwoStateEdgeList::iterator eListBegin(uint32 opnd_id) const;
+
+    TwoStateEdgeList::iterator eListEnd(uint32 opnd_id) const;
+private:
+    friend class InequalityGraph;
+
+    // return the corresponding list or NULL
+    TwoStateEdgeList* get2stListByOpnd(IOpnd* opnd) const
+    {
+        MapIdTo2stList::const_iterator it = _map.find(opnd->getID());
+        if ( it == _map.end() ) {
+            return NULL;
+        }
+        return it->second;
+    }
+
+    bool _is_lower;
+    MemoryManager& _mm;
+    MapIdTo2stList _map;
+};
+
+class InequalityGraph {
+public:
+    typedef TwoStateEdgeList::iterator edge_iterator;
+private:
+    typedef StlMap<uint32, StlList<IneqEdge*> > OpndEdgeMap;
+
+public:
     InequalityGraph(MemoryManager& mem_mgr) : 
         _mem_mgr(mem_mgr), 
         _id_to_opnd_map(mem_mgr),
         _edges(mem_mgr),
-        _opnd_to_inedges_map(mem_mgr), 
-        _opnd_to_outedges_map(mem_mgr),
-        _emptyList(mem_mgr)
+        _opnd_to_inedges_map_2st(mem_mgr),
+        _opnd_to_outedges_map_2st(mem_mgr),
+        _is_lower(false)
     {}
 
+    // Inequality Graph can be visible in two states: lower and upper
+    // In both states operands are the same. Some edges are visible in both
+    // states, some only in one of two
+    void setState(bool is_lower);
+
+    bool isLowerState() { return _is_lower; }
+
+    // add edge by operands visible in all states
     void addEdge(IOpnd* from, IOpnd* to, int32 distance);
 
+    // add edge by operand IDs visible in all states
     void addEdge(uint32 id_from, uint32 id_to, int32 distance);
+
+    // add edge by operand IDs visible in a given state
+    void addEdgeSingleState(uint32 id_from, uint32 id_to, int32 distance, bool is_lower);
+
+    // add edge by operands visible in a given state
+    void addEdgeSingleState(IOpnd* from, IOpnd* to, int32 distance, bool is_lower);
 
     void addOpnd(IOpnd* opnd);
 
-    const EdgeList& getInEdges(IOpnd* opnd) const;
+    edge_iterator inEdgesBegin(IOpnd* opnd) const;
 
-    const EdgeList& getOutEdges(IOpnd* opnd) const;
+    edge_iterator inEdgesEnd(IOpnd* opnd) const;
+
+    edge_iterator outEdgesBegin(IOpnd* opnd) const;
+
+    edge_iterator outEdgesEnd(IOpnd* opnd) const;
 
     void printDotFile(std::ostream& os) const;
 
@@ -139,14 +327,31 @@ private:
     void printDotBody(std::ostream& os) const;
     void printDotEnd(std::ostream& os) const;
 
-    void addEdgeToIdMap (OpndEdgeMap& mp, uint32 id, IneqEdge* edge);
+    IOpnd* getOpndById(uint32 id) const;
+
+    enum PrnEdgeType
+    {
+        tPERM_EDGE,
+        tLOWER_EDGE,
+        tUPPER_EDGE
+    };
+
+    void printEdge(std::ostream& os, IneqEdge* e, PrnEdgeType t) const;
+
+    void prnDotEdgeList
+        (std::ostream& os, IOpnd* from_opnd, 
+         EdgeList* lst, PrnEdgeType type) const;
+
+    void printListWithSetExcluded (std::ostream& os,
+         StlSet<IneqEdge*>* edge_set, EdgeList* elist, PrnEdgeType ptype) const;
 
     MemoryManager& _mem_mgr;
     IdToOpndMap _id_to_opnd_map;
     EdgeList _edges;
 
-    OpndEdgeMap _opnd_to_inedges_map, _opnd_to_outedges_map;
-    EdgeList _emptyList;
+    TwoStateOpndToEdgeListMap
+        _opnd_to_inedges_map_2st, _opnd_to_outedges_map_2st;
+    bool _is_lower;
 };
 
 class Bound : public HasBoundState {

@@ -167,6 +167,8 @@ void OptInitAction::readFlags()
     optimizerFlags.unguard_dcall_percent = getIntArg("unguard_dcall_percent", 30);
     optimizerFlags.unguard_dcall_percent_of_entry= getIntArg("unguard_dcall_percent_of_entry", 10);
 
+    //classic_abcd
+    optimizerFlags.dump_abcd_stats = getBoolArg("dump_abcd_stats", false);
 
     optimizerFlags.abcdFlags = new (mm) AbcdFlags;
     memset(optimizerFlags.abcdFlags, sizeof(AbcdFlags), 0);
@@ -208,6 +210,8 @@ void showFlags(std::ostream& os) {
     os << "    hvn_constants[={ON|off}]    - value-number constants from equality tests" << std::endl;
     os << "    sink_constants[={ON|off}]   - eliminate globals whose values are constant" << std::endl;
     os << "    sink_constants1[={on|OFF}]  - make sink_constants more aggressive" << std::endl;
+    os << "    dump_abcd_stats[={on|OFF}]  - dump (to bounds_checks.log) how many bounds checks "
+                                         << "were eliminated per method" << std::endl;
 
     Abcd::showFlags(os);
     GlobalCodeMotion::showFlags(os);

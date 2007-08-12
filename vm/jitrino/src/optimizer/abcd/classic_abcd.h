@@ -31,26 +31,39 @@ namespace Jitrino {
 class ClassicAbcd {
 public:    
     ClassicAbcd(SessionAction* arg_source, IRManager &ir_manager, 
-                MemoryManager& mem_manager, DominatorTree& dom0) 
-    :
-        _irManager(ir_manager), 
-        _mm(mem_manager),
-        _domTree(dom0)
-    {
-        _runTests = arg_source->getBoolArg("run_tests", false);
-        _useAliases = arg_source->getBoolArg("use_aliases", true);
-    }
-
+                MemoryManager& mem_manager, DominatorTree& dom0);
     void runPass();
 private:
     friend class BuildInequalityGraphWalker;
 
+    enum RedundancyType {
+        rtNONE_MASK = 0x0,
+        rtLOWER_MASK = 0x1,
+        rtUPPER_MASK = 0x2,
+        rtFULL_MASK  = 0x3
+    };
+
+    typedef StlMap<Inst *, RedundancyType> InstRedundancyMap;
+
+    // utility-method to update a value for markRedundantInstructions(...)
+    void updateOrInitValue
+         (InstRedundancyMap& map, Inst* inst, RedundancyType type);
+
+    // marks upper-redundant or lower-redundant operations and stores output in
+    // _redundantChecks, if an instruction was marked as redundant, the value is
+    // correctly updated with the new redundancy info
+    void markRedundantInstructions
+         (bool upper_problem, InequalityGraph& igraph, ControlFlowGraph& cfg);
+
     IRManager& _irManager;
     MemoryManager& _mm;
     DominatorTree& _domTree;
+    InstRedundancyMap _redundantChecks;
+    IOpnd* _zeroIOp;
 
     bool _runTests;
     bool _useAliases;
+    bool _dump_abcd_stats;
 };
 
 } //namespace Jitrino 
