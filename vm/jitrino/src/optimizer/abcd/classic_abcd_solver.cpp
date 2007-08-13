@@ -1250,7 +1250,7 @@ void testTwoStateOpndToEdgeListMap()
             it_end = edges_map_2st.eListEnd(1);
         uint32 found = 0;
         for (; it != it_end; it.next() ) {
-            IneqEdge* e = it.get();
+            UNUSED IneqEdge* e = it.get();
             assert(e == &e1 || e == &e2 || e == &e3);
             found++;
         }
@@ -1263,7 +1263,7 @@ void testTwoStateOpndToEdgeListMap()
             it_end = edges_map_2st.eListEnd(1);
         uint32 found = 0;
         for (; it != it_end; it.next() ) {
-            IneqEdge* e = it.get();
+            UNUSED IneqEdge* e = it.get();
             assert(e == &e1 || e == &e2);
             found++;
         }
