@@ -242,15 +242,13 @@ namespace CPVerifier {
             }
 
             //check whether FROM class is loaded
-
-
             if( !from_type->cls ) {
                 from_type->cls = vf_resolve_class(k_class, from_type->name, false);
                 if( !from_type->cls ) from_type->cls = CLASS_NOT_LOADED;
             }
 
             if( from_type->cls && from_type->cls != CLASS_NOT_LOADED ) {
-                return vf_is_valid(from_type->cls, to_type->cls);
+                return vf_is_extending(from_type->cls, to_type->cls);
             } else {
                 NewConstraint(from_type->name, to_type->name);
                 return 1;

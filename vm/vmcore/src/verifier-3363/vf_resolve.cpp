@@ -38,6 +38,12 @@ namespace CPVerifier {
             return VF_ErrorLoadClass;
         }
 
+        //no need to load the source
+        if( class_is_interface_(target) ){
+            return VF_OK;
+        }
+
+
         // get stack reference class
         class_handler source = vf_resolve_class( klass, constraint->source, true );
         if( !source ) {
@@ -45,24 +51,12 @@ namespace CPVerifier {
         }
 
         // check restriction
-        if( !vf_is_valid( source, target ) ) {
+        if( !vf_is_extending( source, target ) ) {
             return VF_ErrorIncompatibleArgument;
         }
         return VF_OK;
     } // vf_force_check_constraint
 
-
-    /**
-    * Returns true if 'from' is assignable to 'to' in terms of verifier, namely:
-    * if 'to' is an interface or a (not necessarily direct) super class of 'to'
-    */
-    int vf_is_valid(class_handler from, class_handler to) {
-        if( class_is_interface_(to) ){
-            return true;
-        }
-
-        return vf_is_extending(from, to);
-    }
 
     /**
     * Returns true if 'from' is (not necessarily directly) extending 'to'
@@ -83,24 +77,26 @@ namespace CPVerifier {
         const char *name,         // resolved class name
         bool need_load)      // load flag
     {
-        // get class loader
-        classloader_handler class_loader = 0;
-        class_handler sup = k_class;
+        if( need_load ) {
+            return cl_load_class( class_get_class_loader( k_class ), name );
+        } else {
+            // get class loader
+            classloader_handler class_loader = 0;
+            class_handler sup = k_class;
 
-        while( sup ) {
-            classloader_handler class_loader2 = class_get_class_loader( sup );
-            if( class_loader != class_loader2 ) {
-                class_loader = class_loader2;
-
-                class_handler result = need_load ? cl_load_class( class_loader, name ) : cl_get_class( class_loader, name );
-
-                if( result ) {
-                    return result;
+            while( sup ) {
+                classloader_handler class_loader2 = class_get_class_loader( sup );
+                if( class_loader != class_loader2 ) {
+                    class_loader = class_loader2;
+                    class_handler result = cl_get_class( class_loader, name );
+                    if( result ) {
+                        return result;
+                    }
                 }
+                sup = class_get_super_class(sup);
             }
-            sup = class_get_super_class(sup);
+            return 0;
         }
-        return 0;
     } // vf_resolve_class
 
 } // namespace CPVerifier

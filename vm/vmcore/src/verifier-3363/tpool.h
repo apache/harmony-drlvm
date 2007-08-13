@@ -284,7 +284,6 @@ namespace CPVerifier {
     };
 
     class_handler vf_resolve_class( class_handler k_class, const char *name, bool need_load);
-    int vf_is_valid(class_handler from, class_handler to);
     int vf_is_extending(class_handler from, class_handler to);
 
 } // namespace CPVerifier
