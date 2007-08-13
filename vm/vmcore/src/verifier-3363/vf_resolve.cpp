@@ -83,26 +83,24 @@ namespace CPVerifier {
         const char *name,         // resolved class name
         bool need_load)      // load flag
     {
-        if( need_load ) {
-            return cl_load_class( class_get_class_loader( k_class ), name );
-        } else {
-            // get class loader
-            classloader_handler class_loader = 0;
-            class_handler sup = k_class;
+        // get class loader
+        classloader_handler class_loader = 0;
+        class_handler sup = k_class;
 
-            while( sup ) {
-                classloader_handler class_loader2 = class_get_class_loader( k_class );
-                if( class_loader != class_loader2 ) {
-                    class_loader = class_loader2;
-                    class_handler result = cl_get_class( class_loader, name );
-                    if( result ) {
-                        return result;
-                    }
+        while( sup ) {
+            classloader_handler class_loader2 = class_get_class_loader( sup );
+            if( class_loader != class_loader2 ) {
+                class_loader = class_loader2;
+
+                class_handler result = need_load ? cl_load_class( class_loader, name ) : cl_get_class( class_loader, name );
+
+                if( result ) {
+                    return result;
                 }
-                sup = class_get_super_class(sup);
             }
-            return 0;
+            sup = class_get_super_class(sup);
         }
+        return 0;
     } // vf_resolve_class
 
 } // namespace CPVerifier
