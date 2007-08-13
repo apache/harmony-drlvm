@@ -170,7 +170,18 @@ public:
     {
         return (void *)_get_address_of_this(this, method, context);
     }
-
+    
+    Boolean
+        is_soe_area(Method_Handle            method,
+        const JitFrameContext* context
+        )
+    {
+        if (_is_soe_area != 0) {
+            return (Boolean)_is_soe_area(this, method, context);
+        }
+        return 0;
+        
+    }
 
     Boolean
     call_returns_a_reference(Method_Handle            method,
@@ -372,6 +383,12 @@ private:
                             Method_Handle            method,
                             const JitFrameContext* context
                             );
+
+    Boolean
+        (*_is_soe_area)(JIT_Handle              jit,
+        Method_Handle                           method,
+        const JitFrameContext*                  context
+        );
 
     Boolean
     (*_call_returns_a_reference)(JIT_Handle               jit,

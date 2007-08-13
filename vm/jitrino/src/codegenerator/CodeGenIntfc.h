@@ -576,6 +576,7 @@ public:
     virtual void  fixHandlerContext(MethodDesc* methodDesc, ::JitFrameContext* context, bool isFirst) = 0;
 
     virtual void* getAddressOfThis(MethodDesc* methodDesc, const ::JitFrameContext* context, bool isFirst) = 0;
+    virtual bool  isSOEArea(MethodDesc* methodDesc, const ::JitFrameContext* context, bool isFirst) {return false;}
 
     virtual bool getBcLocationForNative(MethodDesc* method, POINTER_SIZE_INT native_pc, uint16 *bc_pc) = 0;
     virtual bool getNativeLocationForBc(MethodDesc* method,  uint16 bc_pc, POINTER_SIZE_INT *native_pc) = 0;

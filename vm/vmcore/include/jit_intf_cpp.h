@@ -201,6 +201,24 @@ public:
                         ) = 0;
 
 
+    //
+    // Returns if EIP is in SOE checking area: an area in a prologue of
+    // the method before all instructions from bytecode
+    // This function is called when an exception is propagated out of
+    // a stack frame of a synchronized method.  The VM checks if 
+    // exception was thrown from SOE area (stack overflow error)
+    // and do not call monitor_exit if its true.
+    //
+    // Arguments:
+    // - method   -- A handle for the method which corresponds to the current frame.
+    // - context  -- The register context.
+    //
+
+    virtual Boolean
+        is_soe_area(Method_Handle            method,  // in
+        const JitFrameContext   *context              // in
+        ) = 0;
+
 
 
     //

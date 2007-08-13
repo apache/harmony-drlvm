@@ -67,9 +67,6 @@ void LoopBuilder::readFlags(Action* argSource, LoopBuilderFlags* flags) {
     flags->peeling_threshold = argSource->getIntArg(p, "loop.peeling_threshold", 2);
     flags->fullpeel = argSource->getBoolArg(p, "loop.fullpeel", false);
     flags->fullpeel_max_inst = argSource->getIntArg(p, "loop.fullpeel_max_inst", 40);
-    flags->unroll = argSource->getBoolArg(p, "loop.unroll", false);
-    flags->unroll_count = argSource->getIntArg(p, "loop.unroll_count", 4);
-    flags->unroll_threshold = argSource->getIntArg(p, "loop.unroll_threshold", 10);
     flags->peel_upto_branch_no_instanceof = argSource->getBoolArg(p, "loop.peel_upto_branch_no_instanceof", true);
 
 }
@@ -84,9 +81,6 @@ void LoopBuilder::showFlags(std::ostream& os) {
     os << "    loop.peel_upto_branch[={on|OFF}]   - peel only up to a branch" << std::endl;
     os << "    loop.old_static_peeling[={on|OFF}] - use old-style peeling for static runs" << std::endl;
     os << "    loop.peeling_threshold[=int]  - (default 2)" << std::endl;
-    os << "    loop.unroll[={on|OFF}]" << std::endl;
-    os << "    loop.unroll_count[=int] - (default 4)" << std::endl;
-    os << "    loop.unroll_threshold[=int] - (default 10)" << std::endl;
     os << "    loop.peel_upto_branch_no_instanceof[={on|OFF}] - with peel_upto_branch, peel only up to a branch or instanceof" << std::endl;
 }
 
@@ -563,53 +557,6 @@ void LoopBuilder::peelLoops(StlVector<Edge*>& loopEdgesIn) {
                     if(preheader == tail)
                         preheader = header->getInEdges().back()->getSourceNode();            
                 }            
-            }
-
-            if(flags.unroll && newHeader == originalInvertedHeader && newTail != NULL && header->getExecCount() >= heatThreshold && (header->getExecCount() >= flags.unroll_threshold * preheader->getExecCount())) {
-                header = newHeader;
-                // n is the number of times to unroll the loop
-                uint32 n = ::std::min(flags.unroll_count, (uint32) (header->getExecCount() / preheader->getExecCount()));
-                double headerFreq = header->getExecCount();
-                Node* backTarget = header;
-                Edge* backEdge = tail->findTargetEdge(header);
-                double noEarlyExitProb = (tail->getExecCount() * backEdge->getEdgeProb()) / header->getExecCount();
-                if(!(noEarlyExitProb > 0 && noEarlyExitProb <= 1)) {
-                    Log::out() << "headerFreq=" << headerFreq << std::endl;
-                    Log::out() << "tailFreq=" << tail->getExecCount() << std::endl;
-                    Log::out() << "backProb=" << backEdge->getEdgeProb() << std::endl;
-                    Log::out() << "noEarlyExit=" << noEarlyExitProb << std::endl;
-                    assert(0);
-                }
-
-                uint32 k;
-                double scale = 1;
-                double sum = 1;
-                for(k = 0; k < (n-1); ++k) {
-                    // Probability of starting the k+1 iteration.
-                    scale *= noEarlyExitProb;
-                    sum += scale;
-                }
-                for(k = 0; k < (n-1); ++k) {
-                    Node* unrolled = FlowGraph::duplicateRegion(irManager, header, nodesToPeel, defUses, headerFreq * scale / sum);
-                    scale /= noEarlyExitProb;
-                    backEdge = tail->findTargetEdge(backTarget);
-                    if(backEdge == NULL) {
-                        //
-                        // An intervening stVar block was added to promote a temp to a var 
-                        // in the duplicated block.  The new tail should be the stVar block.
-                        //
-                        tail =  tail->getUnconditionalEdge()->getTargetNode();
-                        assert(tail != NULL);
-                        Edge* backEdge = tail->findTargetEdge(backTarget);
-                        if( !(backEdge != NULL) ) assert(0);
-                    }
-                    fg.replaceEdgeTarget(backEdge, unrolled);
-                    backTarget = unrolled;
-                }
-                assert(header->getInDegree() == 2);
-                tail = header->getInEdges().front()->getSourceNode();
-                if(preheader == tail)
-                    tail = header->getInEdges().back()->getSourceNode();
             }
             if(preheader->getOutDegree() > 1) {
                 Edge* edge = preheader->findTargetEdge(header);

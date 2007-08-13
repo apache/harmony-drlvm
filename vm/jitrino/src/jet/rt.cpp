@@ -417,6 +417,25 @@ void rt_fix_handler_context(JIT_Handle jit, Method_Handle method,
     *psp = sp_val;
 }
 
+Boolean rt_is_soe_area(JIT_Handle jit, Method_Handle method, const JitFrameContext * context) {
+    char * pinfo = (char*)method_get_info_block_jit(method, jit);
+
+    assert(MethodInfoBlock::is_valid_data(pinfo));
+    
+    MethodInfoBlock infoBlock(pinfo);
+    assert(!(infoBlock.get_flags() & JMF_SP_FRAME)); // not yet 
+
+    void *** pip = (void***)((char*)context + ip_off);
+    char * where = (char*)**pip;
+    char * meth_start = infoBlock.get_code_start();
+    unsigned whereLen = (unsigned)(where - meth_start);
+    if (whereLen<infoBlock.get_warmup_len()) {
+        return 1;
+    }
+    return 0;
+
+}
+
 void * rt_get_address_of_this(JIT_Handle jit, Method_Handle method,
                               const JitFrameContext * context)
 {

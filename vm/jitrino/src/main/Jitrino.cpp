@@ -326,6 +326,12 @@ Jitrino::GetAddressOfThis(MethodDesc* methodDesc, const ::JitFrameContext* conte
     return runtimeInterface->getAddressOfThis(methodDesc, context, isFirst);
 }
 
+bool
+Jitrino::IsSOEArea(MethodDesc* methodDesc, const ::JitFrameContext* context, bool isFirst) {
+    return runtimeInterface->isSOEArea(methodDesc, context, isFirst);
+}
+
+
 #ifdef USE_SECURITY_OBJECT
 void *
 Jitrino::GetAddressOfSecurityObject(MethodDesc* methodDesc, const ::JitFrameContext* context) {

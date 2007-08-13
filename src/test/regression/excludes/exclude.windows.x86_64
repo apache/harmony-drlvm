@@ -21,3 +21,4 @@ H4512
 H3341
 # Exclude this test because SOE handling is not ready for x86_64 in JIT/VM yet
 H4265
+H4292

@@ -129,6 +129,9 @@ lib_handle(NULL)
     GET_FUNCTION(fn, handle, "JIT_get_address_of_this");
     _get_address_of_this = (void * (*)(JIT_Handle, Method_Handle, const JitFrameContext *)) fn;
 
+    GET_OPTIONAL_FUNCTION(fn, handle, "JIT_is_soe_area");
+    _is_soe_area = (Boolean (*)(JIT_Handle, Method_Handle, const JitFrameContext *)) fn;
+
     GET_FUNCTION(fn, handle, "JIT_call_returns_a_reference");
     _call_returns_a_reference = (Boolean (*)(JIT_Handle, Method_Handle, const JitFrameContext *)) fn;
 

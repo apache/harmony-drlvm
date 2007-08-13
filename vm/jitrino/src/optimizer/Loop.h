@@ -44,9 +44,6 @@ struct LoopBuilderFlags {
     uint32 peeling_threshold; 
     bool fullpeel;
     uint32 fullpeel_max_inst;
-    bool unroll;
-    uint32 unroll_count;
-    uint32 unroll_threshold; 
     bool peel_upto_branch_no_instanceof;
 };
 

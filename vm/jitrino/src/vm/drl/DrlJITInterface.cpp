@@ -470,6 +470,22 @@ JIT_fix_handler_context(JIT_Handle jit, Method_Handle method,
 }
 
 extern "C"
+JITEXPORT Boolean
+JIT_is_soe_area
+(JIT_Handle jit, Method_Handle method,
+                        const ::JitFrameContext   *context)
+{
+#ifdef USE_FAST_PATH
+    if (isJET(jit)) {
+        return Jet::rt_is_soe_area(jit, method, context);
+    }
+#endif
+    MethodDesc methodDesc(method, jit);
+    return Jitrino::IsSOEArea(&methodDesc, context, context->is_ip_past == FALSE);
+}
+
+
+extern "C"
 JITEXPORT void *
 JIT_get_address_of_this(JIT_Handle jit, Method_Handle method,
                         const ::JitFrameContext   *context)

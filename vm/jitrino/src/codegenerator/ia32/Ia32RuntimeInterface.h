@@ -53,6 +53,7 @@ public:
 
     virtual void* getAddressOfThis(MethodDesc* methodDesc, const JitFrameContext* context, bool isFirst);
 
+    virtual bool isSOEArea(MethodDesc* methodDesc, const ::JitFrameContext* context, bool isFirst);
 
     virtual void* getAddressOfSecurityObject(MethodDesc* methodDesc, const JitFrameContext* context) { assert(0); return NULL; }
 

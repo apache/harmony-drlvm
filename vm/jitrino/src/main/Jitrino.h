@@ -53,6 +53,7 @@ public:
     static bool  CanEnumerate(MethodDesc* methodDesc, NativeCodePtr eip);
     static void  FixHandlerContext(MethodDesc* methodDesc, ::JitFrameContext* context, bool isFirst);
     static void* GetAddressOfThis(MethodDesc* methodDesc, const ::JitFrameContext* context, bool isFirst);
+    static bool  IsSOEArea(MethodDesc* methodDesc, const ::JitFrameContext* context, bool isFirst);
 #ifdef USE_SECURITY_OBJECT
     static void* GetAddressOfSecurityObject(MethodDesc* methodDesc, const ::JitFrameContext* context);
 #endif

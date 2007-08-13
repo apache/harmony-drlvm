@@ -138,8 +138,8 @@ bool FixupSyncEdgesWalker::isCatchAll(Node *node, Opnd *&caughtOpnd,
     Inst *nextInst = firstInst->getNextInst();
     Node *ciNode = node;
     int counter = 0;
-    while (nextInst->getOpcode() != Op_Catch) {
-        if (nextInst == firstInst) {
+    while ( (nextInst && nextInst->getOpcode() != Op_Catch) || !nextInst ) {
+        if (nextInst == NULL) {
             if (++counter > 3) {
                 if (EXTRA_DEBUGGING && Log::isEnabled()) {
                     Log::out() << " isCatchAll case 5" << ::std::endl;
@@ -213,17 +213,26 @@ bool FixupSyncEdgesWalker::isCatchAllAndMonExit(Node *node, Opnd *&caughtOpnd,
                                                 Node *&catchInstNode)
 {
     catchInstNode = 0;
-    if (isCatchAll(node, caughtOpnd, catchInstNode) &&
+    if (node && isCatchAll(node, caughtOpnd, catchInstNode) &&
         isMonExit(catchInstNode, monOpnd, dispatchNode, dispatchEdge)) {
         // make sure that's all it is
         assert(catchInstNode);
         Inst *labelInst = (Inst*)catchInstNode->getFirstInst();
         Inst *catchInst = labelInst->getNextInst();
         // with DPGO, we may see an incCounter here
-        Inst *thirdInst = catchInst->getNextInst(); // monexit or tausafe or incCounter
-        Inst *fourthInst = thirdInst->getNextInst(); // label or monexit or tausafe or incCounter
-        Inst *fifthInst = fourthInst->getNextInst(); // label or taumonexit(tausafe)
-        Inst *sixthInst = fifthInst->getNextInst(); // .. or label
+        Inst *thirdInst  = catchInst  == NULL ? NULL : catchInst->getNextInst();  // monexit or tausafe or incCounter
+        Inst *fourthInst = thirdInst  == NULL ? NULL : thirdInst->getNextInst();  // label or monexit or tausafe or incCounter
+        Inst *fifthInst, *sixthInst;
+        if ( fourthInst && fourthInst->getNextInst() == NULL ) {
+            fifthInst = labelInst;
+        }else{
+            fifthInst  = fourthInst == NULL ? NULL : fourthInst->getNextInst(); // label or taumonexit(tausafe)
+        }
+        if ( fifthInst && fifthInst->getNextInst() == NULL ) {
+            sixthInst = labelInst;
+        }else{
+            sixthInst  = fifthInst  == NULL ? NULL : fifthInst->getNextInst();  // .. or label
+        }
         return ((labelInst == fourthInst)
                 || ((labelInst == fifthInst) && 
                     ((thirdInst->getOpcode() == Op_TauSafe) ||
@@ -276,8 +285,7 @@ Node *FixupSyncEdgesWalker::getFirstCatchNode(Node *dispatchNode)
             return target;
         }
     }
-    assert(0);
-    return false;
+    return NULL;
 }
 
 // look for a particular idiom:

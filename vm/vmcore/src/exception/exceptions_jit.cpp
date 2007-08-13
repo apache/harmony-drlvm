@@ -173,11 +173,11 @@ static ManagedObject *create_lazy_exception(
 
 
 //////////////////////////////////////////////////////////////////////////
-// Main Exception Propogation Function
+// Main Exception Propagation Function
 
 // This function propagates an exception to its handler.
 // It can only be called for the current thread.
-// The input stack iterator provides the starting point for propogation.  If the top frame is an M2nFrame, it is ignored.
+// The input stack iterator provides the starting point for propagation.  If the top frame is an M2nFrame, it is ignored.
 // Let A be the current frame, let B be the most recent M2nFrame prior to A.
 // The exception is propagated to the first managed frame between A and B that has a handler for the exception,
 // or to the native code that managed frame immediately after B if no such managed frame exists.
@@ -187,7 +187,7 @@ static ManagedObject *create_lazy_exception(
 // The client should either use si_transfer_control to resume it, or use an OS context mechanism
 // copied from the final stack iterator.
 
-// function can be safe point & should be called with disable reqursion = 1
+// function can be safe point & should be called with disable recursion = 1
 static void exn_propagate_exception(
     StackIterator * si,
     ManagedObject ** exn_obj,
@@ -267,7 +267,7 @@ static void exn_propagate_exception(
     }
 
     // When VM is in shutdown stage we need to execute "finally" clause to
-    // release monitors and propogate an exception to the upper frames.
+    // release monitors and propagate an exception to the upper frames.
     Class_Handle search_exn_class = !VM_Global_State::loader_env->IsVmShutdowning()
         ? exn_class : VM_Global_State::loader_env->JavaLangObject_Class;
 
@@ -378,14 +378,8 @@ static void exn_propagate_exception(
                 }
             }
 
-            
             // No appropriate handler found, undo synchronization
-
-            // Contract with JIT: check SOE for synchronized methods before monenter
-            // So if SOE happens in synchronized method -> no need to call monexit
-            if (!restore_guard_page) {
-                vm_monitor_exit_synchronized_method(si);
-            }
+            vm_monitor_exit_synchronized_method(si);
 
             BEGIN_RAISE_AREA;
             jvalue ret_val = {(jlong)0};

@@ -39,6 +39,19 @@ void RuntimeInterface::unwindStack(MethodDesc* methodDesc, JitFrameContext* cont
     stackInfo.unwind(methodDesc, context, isFirst);
 }
 
+bool RuntimeInterface::isSOEArea(MethodDesc* methodDesc, const ::JitFrameContext* context, bool isFirst) {
+#ifdef _EM64T_
+    POINTER_SIZE_INT eip = *context->p_rip;
+#else
+    POINTER_SIZE_INT eip = *context->p_eip;
+#endif
+    StackInfo stackInfo;
+    stackInfo.read(methodDesc, eip, isFirst);
+    POINTER_SIZE_INT eipOffset = eip - (POINTER_SIZE_INT)methodDesc->getCodeBlockAddress(0);
+    assert(fit32(eipOffset) && eipOffset >= 0);
+    return eipOffset<=stackInfo.getSOECheckAreaOffset();
+}
+
 void* RuntimeInterface::getAddressOfThis(MethodDesc * methodDesc, const JitFrameContext* context, bool isFirst) {
     assert(!methodDesc->isStatic());
     if (!methodDesc->isSynchronized() &&  !methodDesc->isParentClassIsLikelyExceptionType()) {
@@ -54,9 +67,7 @@ void* RuntimeInterface::getAddressOfThis(MethodDesc * methodDesc, const JitFrame
 #else
     stackInfo.read(methodDesc, *context->p_eip, isFirst);
     assert(isFirst || (uint32)context->p_eip+4 == context->esp);
-    if (stackInfo.getStackDepth() == 0) { //stack overflow exception
-        return NULL;
-    }
+    assert(stackInfo.getStackDepth()==0 || !isFirst);
     return (void *)(context->esp + stackInfo.getStackDepth() + stackInfo.getOffsetOfThis());
 #endif
 }

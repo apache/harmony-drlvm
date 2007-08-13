@@ -83,23 +83,31 @@ void vm_monitor_exit_synchronized_method(StackIterator *si)
     CodeChunkInfo *cci = si_get_code_chunk_info(si);
     assert(cci);
     Method *method = cci->get_method();
-
+    JIT *jit = cci->get_jit();
+    
     assert(!hythread_is_suspend_enabled());
-    if (method->is_synchronized()) {
-        if (method->is_static()) {
-            TRACE2("tm.locks", ("unlock static sync methods...%x",
-                struct_Class_to_java_lang_Class(method->get_class())));
-            IDATA UNREF status = vm_monitor_try_exit(
-                struct_Class_to_java_lang_Class(method->get_class()));
-        }
-        else {
-            JIT *jit = cci->get_jit();
-            void **p_this =
-                (void **) jit->get_address_of_this(method,
-                si_get_jit_context(si));
-            TRACE2("tm.locks", ("unlock sync methods...%x" , *p_this));
-            IDATA UNREF status = vm_monitor_try_exit((ManagedObject *) * p_this);
-        }
+
+    if (!method->is_synchronized()) {
+        return;
+    }
+    //SOE checking area is an area in the beginning of a method.
+    //when unwinding from SOE EIP no need to call monexit -> no monenter was done
+    Boolean is_soe_area = jit->is_soe_area(method, si_get_jit_context(si));
+    if (is_soe_area) {
+        return;
+    }
+    if (method->is_static()) {
+        TRACE2("tm.locks", ("unlock static sync methods...%x",
+            struct_Class_to_java_lang_Class(method->get_class())));
+        IDATA UNREF status = vm_monitor_try_exit(
+            struct_Class_to_java_lang_Class(method->get_class()));
+    }
+    else {
+        void **p_this =
+            (void **) jit->get_address_of_this(method,
+            si_get_jit_context(si));
+        TRACE2("tm.locks", ("unlock sync methods...%x" , *p_this));
+        IDATA UNREF status = vm_monitor_try_exit((ManagedObject *) * p_this);
     }
 }
 

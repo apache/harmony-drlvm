@@ -170,7 +170,7 @@ struct VM_thread
     // In case exception is thrown, Exception object is put here
     volatile struct Exception thread_exception;
 
-    // flag which indicate that guard page on the stak should be restored
+    // flag which indicate that guard page on the stack should be restored
     unsigned char restore_guard_page;
 
     // thread stack address

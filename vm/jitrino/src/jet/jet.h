@@ -110,6 +110,11 @@ void rt_fix_handler_context(JIT_Handle jit, Method_Handle method,
                             JitFrameContext * context);
 
 /**
+* @brief Returns 'TRUE' if EIP referenced by context points to SOE checking area of the method
+*/
+Boolean rt_is_soe_area(JIT_Handle jit, Method_Handle method, const JitFrameContext * context);
+
+/**
  * @brief Returns address of 'this' argument for the given method.
  *
  * Returns an address where the 'this' pointer is stored. This is normally 
