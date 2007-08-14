@@ -264,18 +264,18 @@ void parse_vm_arguments(Global_Env *p_env)
         } else if (strcmp(option, "-client") == 0 || strcmp(option, "-server") == 0) {
             p_env->VmProperties()->set("em.properties", option + 1);
 
-        } else if (begins_with(option, "-Xms")) {
-            // cut -Xms
-            const char* arg = option + 4;
+        } else if (begins_with(option, "-Xms") || begins_with(option, "-ms")) {
+            // cut -Xms || -ms
+            const char* arg = option + (begins_with(option, "-ms") ? 3 : 4);
             TRACE2("init", "gc.ms = " << arg);
             if (atoi(arg) == 0) {
                 LECHO(34, "Negative or invalid heap size. Default value will be used!");
             }
             p_env->VmProperties()->set("gc.ms", arg);
 
-        } else if (begins_with(option, "-Xmx")) {
+        } else if (begins_with(option, "-Xmx") || begins_with(option, "-mx")) {
             // cut -Xmx
-            const char* arg = option + 4;
+            const char* arg = option + (begins_with(option, "-mx") ? 3 : 4);
             TRACE2("init", "gc.mx = " << arg);
             if (atoi(arg) == 0) {
                 LECHO(34, "Negative or invalid heap size. Default value will be used!");
