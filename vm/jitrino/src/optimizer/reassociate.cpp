@@ -90,7 +90,8 @@ Reassociate::Reassociate(IRManager &irManager0,
       mm(memManager),
       cfgRpoNum(memManager),
       priority(memManager),
-      minDepth(false)
+      minDepth(false), 
+      maxReassocDepth(64)
 {
 }
 
@@ -265,7 +266,7 @@ Reassociate::addAddAssoc(StlDeque<OpndWithPriority> &opnds,
              Type* type, Opnd* opnd)
 {
     Inst *inst = opnd->getInst();
-    if (inst->getType() == type->tag) {
+    if (inst->getType() == type->tag && opnds.size() < maxReassocDepth) {
     switch(inst->getOpcode()) {
     case Op_Add:
         if (inst->getOverflowModifier() != Overflow_None) break;
@@ -333,7 +334,7 @@ Reassociate::addMulAssoc(StlDeque<OpndWithPriority> &opnds,
              Type* type, Opnd* opnd)
 {
     Inst *inst = opnd->getInst();
-    if (inst->getType() == type->tag) {
+    if (inst->getType() == type->tag  && opnds.size() < maxReassocDepth) {
     switch(inst->getOpcode()) {
     case Op_Mul:
         if (inst->getOverflowModifier() != Overflow_None) break;
@@ -356,7 +357,7 @@ Reassociate::addAddOffsetAssoc(StlDeque<OpndWithPriority> &opnds,
                                Type* type, Opnd* opnd)
 {
     Inst *inst = opnd->getInst();
-    if (inst->getType() == type->tag) {
+    if (inst->getType() == type->tag  && opnds.size() < maxReassocDepth) {
     switch(inst->getOpcode()) {
     case Op_AddOffset:
         addAddOffsetAssoc(opnds, compressed, type, inst->getSrc(0));

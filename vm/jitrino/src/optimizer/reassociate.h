@@ -124,6 +124,7 @@ private:
     uint32 numBlocks;
     
     bool minDepth;
+    uint32 maxReassocDepth;
 };
 
 } //namespace Jitrino 
