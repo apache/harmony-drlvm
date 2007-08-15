@@ -235,6 +235,38 @@ void CodeGen::gen_field_op(JavaByteCodes opcode,  Class_Handle enclClass, unsign
     do_field_op(fieldOp);
 }
 
+Opnd CodeGen::get_field_addr(const FieldOpInfo& fieldOp, jtype jt) {
+    Opnd where;
+    if (!fieldOp.isStatic()) { //generate check null
+        unsigned ref_depth = fieldOp.isPut() ? (is_wide(jt) ? 2 : 1) : 0;
+        gen_check_null(ref_depth);
+        if (fieldOp.fld) { //field is resolved -> offset is available
+            unsigned fld_offset = field_get_offset(fieldOp.fld);
+            Val& ref = vstack(ref_depth, true);
+            where = Opnd(jt, ref.reg(), fld_offset);
+        }  else { //field is not resolved -> generate code to request offset
+            static const CallSig cs_get_offset(CCONV_STDCALL, iplatf, i32, i32);
+            gen_call_vm(cs_get_offset, rt_helper_field_get_offset_withresolve, 0, fieldOp.enclClass, fieldOp.cpIndex, fieldOp.isPut());
+            runlock(cs_get_offset);
+            rlock(gr_ret);
+            Val& ref = vstack(ref_depth, true);
+            runlock(gr_ret);
+            alu(alu_add, gr_ret, ref.as_opnd());
+            where = Opnd(jt, gr_ret, 0);
+        }
+    } else {
+        if (fieldOp.fld) { //field is resolved -> address is available
+            char * fld_addr = (char*)field_get_address(fieldOp.fld);
+            where = vaddr(jt, fld_addr);
+        }  else { //field is not resolved -> generate code to request address
+            static const CallSig cs_get_addr(CCONV_STDCALL, iplatf, i32, i32);
+            gen_call_vm(cs_get_addr, rt_helper_field_get_address_withresolve, 0, fieldOp.enclClass, fieldOp.cpIndex, fieldOp.isPut());
+            runlock(cs_get_addr);
+            where = Opnd(jt, gr_ret, 0);
+        }
+    }
+    return where;
+}
 
 void CodeGen::do_field_op(const FieldOpInfo& fieldOp)
 {
@@ -253,36 +285,6 @@ void CodeGen::do_field_op(const FieldOpInfo& fieldOp)
         jt = iplatf;
     }
 
-    Opnd where;
-    if (!fieldOp.isStatic()) { //generate check null
-        unsigned ref_depth = fieldOp.isPut() ? (is_wide(jt) ? 2 : 1) : 0;
-        Val& ref = vstack(ref_depth, true);
-        gen_check_null(ref_depth);
-        if (fieldOp.fld) { //field is resolved -> offset is available
-            unsigned fld_offset = field_get_offset(fieldOp.fld);
-            where = Opnd(jt, ref.reg(), fld_offset);
-        }  else { //field is not resolved -> generate code to request offset
-            static const CallSig cs_get_offset(CCONV_STDCALL, iplatf, i32, i32);
-            gen_call_vm(cs_get_offset, rt_helper_field_get_offset_withresolve, 0, fieldOp.enclClass, fieldOp.cpIndex, fieldOp.isPut());
-            runlock(cs_get_offset);
-            alu(alu_add, gr_ret, ref.as_opnd());
-            where = Opnd(jt, gr_ret, 0);
-        }
-    } else {
-        if (fieldOp.fld) { //field is resolved -> address is available
-            char * fld_addr = (char*)field_get_address(fieldOp.fld);
-            where = vaddr(jt, fld_addr);
-        }  else { //field is not resolved -> generate code to request address
-            static const CallSig cs_get_addr(CCONV_STDCALL, iplatf, i32, i32);
-            gen_call_vm(cs_get_addr, rt_helper_field_get_address_withresolve, 0, fieldOp.enclClass, fieldOp.cpIndex, fieldOp.isPut());
-            runlock(cs_get_addr);
-            where = Opnd(jt, gr_ret, 0);
-        }
-    }
-    rlock(where);
-
-    // notify all listeners
-
     if (fieldOp.isPut() && compilation_params.exe_notify_field_modification && !fieldIsMagic)  {
         gen_modification_watchpoint(fieldOp.opcode, jt, fieldOp.fld);
     }
@@ -290,9 +292,12 @@ void CodeGen::do_field_op(const FieldOpInfo& fieldOp)
         gen_access_watchpoint(fieldOp.opcode, jt, fieldOp.fld);
     }
     if (fieldOp.isPut() && ! fieldIsMagic) {
+        Opnd where = get_field_addr(fieldOp, jt);
         gen_write_barrier(fieldOp.opcode, fieldOp.fld, where);
     }
 
+    Opnd where = get_field_addr(fieldOp, jt);
+    rlock(where);
     
 
     //generate get/put op

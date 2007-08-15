@@ -1612,8 +1612,9 @@ JavaByteCodeTranslator::invokestatic(uint32 constPoolIndex) {
     //
     //  Try some optimizations for System::arraycopy(...), Min, Max, Abs...
     //
-    if (translationFlags.genArrayCopyRepMove == true &&
-        genArrayCopyRepMove(methodDesc,numArgs,srcOpnds)) {
+    if (!compilationInterface.needWriteBarriers()    //genArrayCopyRepMove is not ready to work in WB mode
+        && translationFlags.genArrayCopyRepMove == true 
+        && genArrayCopyRepMove(methodDesc,numArgs,srcOpnds)) {
         return;
     } else if (translationFlags.genArrayCopy == true &&
         genArrayCopy(methodDesc,numArgs,srcOpnds)) {

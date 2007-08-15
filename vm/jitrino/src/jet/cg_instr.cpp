@@ -420,28 +420,18 @@ void CodeGen::gen_write_barrier(JavaByteCodes opcode, Field_Handle fieldHandle, 
     int mode = -1;
     
     if (opcode == OPCODE_PUTFIELD) {
-        //
         mode = 0;
-        //
-        assert(fieldSlotAddress.is_reg());
         baseObject = vstack(1, true);
         rlock(baseObject);
-        slotAddress = fieldSlotAddress;
-        rlock(slotAddress);
     }
     else if (opcode == OPCODE_PUTSTATIC) {
-        //
         mode = 1;
-        //
-        assert(fieldSlotAddress.is_reg());
         baseObject = Val(jobj, NULL_REF);
-        slotAddress = fieldSlotAddress;
-        rlock(slotAddress);
+        rlock(baseObject);
     }
     else if (opcode == OPCODE_AASTORE) {
-        //
         mode = 2;
-        //
+
         baseObject = vstack(2, true);
         rlock(baseObject);
         
@@ -453,14 +443,20 @@ void CodeGen::gen_write_barrier(JavaByteCodes opcode, Field_Handle fieldHandle, 
         AR index = idx.is_imm() ? ar_x : idx.reg();
         unsigned scale = idx.is_imm() ? 0 : jtypes[jt].size;
         slotAddress = Val(jobj, valloc(jobj));
+        rlock(slotAddress);
         Opnd address(jobj, base, disp, index, scale);
         lea(slotAddress.as_opnd(), address);
-        rlock(slotAddress);
     }
     else {
         // must not happen
         assert(false);
         return;
+    }
+    if (mode == 0 || mode == 1) {
+        assert(fieldSlotAddress.is_mem());
+        slotAddress = Val(jobj, valloc(jobj));
+        rlock(slotAddress);
+        lea(slotAddress.as_opnd(), fieldSlotAddress);
     }
 
     value = vstack(0);
@@ -470,7 +466,7 @@ void CodeGen::gen_write_barrier(JavaByteCodes opcode, Field_Handle fieldHandle, 
     Val modeArg((int)mode);
     Val metaAArg((int)0);
     Val metaBArg((int)0);
-    
+   
     gen_args(csig, 0, &baseObject, &slotAddress, &value,  &metaAArg, &metaBArg, &modeArg);
     // according to contract with CG guys, the WB code neither 
     // throws an exception nor may lead to GC - may use gen_call_novm.

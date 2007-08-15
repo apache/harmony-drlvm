@@ -1109,6 +1109,12 @@ protected:
     void do_field_op(const FieldOpInfo& fieldOp);
 
     /**
+    * @brief Returns mem-opnd that is address of the given field. Used by do_field_op
+    * Invokes gen_check_null() for GETFIELD and PUTFIELD.
+    */
+    Opnd get_field_addr(const FieldOpInfo& fieldOp, jtype jt);
+
+    /**
      * PMF instance to get arguments from.
      */
     PMF *               m_pmf;
