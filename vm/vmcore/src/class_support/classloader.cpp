@@ -95,6 +95,7 @@ bool ClassLoader::Initialize( ManagedObject* loader )
 
 ClassLoader::~ClassLoader() 
 {
+    Global_Env *env = VM_Global_State::loader_env;
     ClassTable::iterator it;
     ClassTable* LoadedClasses = GetLoadedClasses();
     for (it = LoadedClasses->begin(); it != LoadedClasses->end(); it++)
@@ -133,6 +134,7 @@ ClassLoader::~ClassLoader()
         natives_unload_library(info->handle);        
     }
 
+    env->em_interface->ClassloaderUnloadingCallback((ClassLoaderHandle)this);
     delete CodeMemoryManager;
     CodeMemoryManager = NULL;
 

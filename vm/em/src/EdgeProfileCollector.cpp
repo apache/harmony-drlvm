@@ -234,8 +234,7 @@ static void logReadyProfile(const std::string& catName, const std::string& profi
 }
 
 
-void EdgeProfileCollector::onTimeout()
-{
+void EdgeProfileCollector::onTimeout() {
     if(!newProfiles.empty()) {
         hymutex_lock(&profilesLock);
         greenProfiles.insert(greenProfiles.end(), newProfiles.begin(), newProfiles.end());
@@ -243,24 +242,26 @@ void EdgeProfileCollector::onTimeout()
         hymutex_unlock(&profilesLock);
     }
 
-    std::vector<EdgeMethodProfile*>::iterator it = greenProfiles.begin();
-    std::vector<EdgeMethodProfile*>::iterator end = greenProfiles.end();
+    if (!unloadedMethodProfiles.empty()) {
+        cleanUnloadedProfiles();
+    }
 
-    while( it != end ){
+    
+    for (EdgeProfiles::iterator it = greenProfiles.begin(), end = greenProfiles.end(); it!=end; ++it) {
         EdgeMethodProfile* profile = *it;
-
         if( isMethodHot( profile ) ){
             profile->setHotMethod();
             tmpProfiles.push_back(profile);
             *it = NULL;
         }
-        it++;
     }
 
     if (!tmpProfiles.empty()) {
+        hymutex_lock(&profilesLock);
         std::remove(greenProfiles.begin(), greenProfiles.end(), (EdgeMethodProfile*)NULL);
         greenProfiles.resize(greenProfiles.size() - tmpProfiles.size());
-        for (std::vector<EdgeMethodProfile*>::iterator it = tmpProfiles.begin(), end = tmpProfiles.end(); it!=end; ++it) {
+        hymutex_unlock(&profilesLock);
+        for (EdgeProfiles::iterator it = tmpProfiles.begin(), end = tmpProfiles.end(); it!=end; ++it) {
             EdgeMethodProfile* profile = *it;
             if (loggingEnabled) {
                 logReadyProfile(catName, name, profile);
@@ -269,6 +270,41 @@ void EdgeProfileCollector::onTimeout()
         }
         tmpProfiles.clear();
     }
+}
 
-    return;
+void EdgeProfileCollector::cleanUnloadedProfiles() {
+    for (EdgeProfiles::const_iterator it = unloadedMethodProfiles.begin(), end = unloadedMethodProfiles.end(); it!=end; ++it) {    
+        EdgeMethodProfile* profile = *it;
+        profilesByMethod.erase(profile->mh);
+
+        EdgeProfiles::iterator it2 = std::find(greenProfiles.begin(), greenProfiles.end(), profile);
+        assert(it2!=greenProfiles.end());
+        *it2=NULL;
+
+        delete profile;
+    }
+    unloadedMethodProfiles.clear();
+    greenProfiles.erase(std::remove(greenProfiles.begin(), greenProfiles.end(), (EdgeMethodProfile*)NULL), greenProfiles.end());
+}
+
+
+static void addProfilesForClassloader(ClassLoaderHandle h, EdgeProfiles& from, EdgeProfiles& to) {
+    for (EdgeProfiles::iterator it = from.begin(), end = from.end(); it!=end; ++it) {
+        EdgeMethodProfile* profile = *it;
+        Class_Handle ch =  method_get_class(profile->mh);;
+        ClassLoaderHandle clh = class_get_class_loader(ch);
+        if (clh == h) {
+            to.push_back(profile);
+        }
+    }
+}
+
+void EdgeProfileCollector::classloaderUnloadingCallback(ClassLoaderHandle h) {
+    hymutex_lock(&profilesLock);
+
+    //can't modify profiles map in async mode here -> it could be iterated by the checker thread without lock
+    addProfilesForClassloader(h, greenProfiles, unloadedMethodProfiles);
+    addProfilesForClassloader(h, newProfiles, unloadedMethodProfiles);
+
+    hymutex_unlock(&profilesLock);
 }

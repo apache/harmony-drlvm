@@ -55,6 +55,11 @@ ProfilerThreadTimeout()
     DrlEMFactory::getEMInstance()->tbsTimeout();
 }
 
+static void 
+ClassloaderUnloadingCallback(ClassLoaderHandle class_handle) {
+    DrlEMFactory::getEMInstance()->classloaderUnloadingCallback(class_handle);        
+}
+
 static const char*
 GetName() {
     return OPEN_EM;
@@ -174,6 +179,7 @@ int EmInitialize(OpenComponentHandle* p_component,
     vm_intf->ExecuteMethod = ExecuteMethod;
     vm_intf->CompileMethod = CompileMethod;
     vm_intf->ProfilerThreadTimeout = ProfilerThreadTimeout;
+    vm_intf->ClassloaderUnloadingCallback = ClassloaderUnloadingCallback;
 
     component_interface = (OpenComponentHandle) c_intf;
     allocator_interface = (OpenInstanceAllocatorHandle) a_intf;

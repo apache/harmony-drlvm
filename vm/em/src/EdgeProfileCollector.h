@@ -29,6 +29,9 @@
 #include <map>
 
 class EdgeMethodProfile;
+typedef std::map<Method_Handle, EdgeMethodProfile*> EdgeProfilesMap;
+typedef std::vector<EdgeMethodProfile*> EdgeProfiles;
+
 
 class EdgeProfileCollector : public ProfileCollector, public TbsEMClient {
 public:
@@ -42,7 +45,8 @@ public:
     virtual uint32 getInitialTimeout() const {return initialTimeout;}
     virtual uint32 getTimeout() const {return timeout;}
     virtual void onTimeout();
-    
+    virtual void classloaderUnloadingCallback(ClassLoaderHandle h);
+
     MethodProfile* getMethodProfile(Method_Handle mh) const ;
     EdgeMethodProfile* createProfile(Method_Handle mh, uint32 numCounters, uint32* counterKeys, uint32 checkSum);
 
@@ -51,6 +55,8 @@ public:
 
 
 private:
+    void cleanUnloadedProfiles();
+
     uint32 initialTimeout;
     uint32 timeout;
     uint32 eThreshold;
@@ -61,9 +67,10 @@ private:
     bool isMethodHot( EdgeMethodProfile* profile );    
     typedef std::map<Method_Handle, EdgeMethodProfile*> EdgeProfilesMap;
     EdgeProfilesMap profilesByMethod;
-    std::vector<EdgeMethodProfile*> greenProfiles;
-    std::vector<EdgeMethodProfile*> newProfiles;
-    std::vector<EdgeMethodProfile*> tmpProfiles;
+    EdgeProfiles greenProfiles;
+    EdgeProfiles newProfiles;
+    EdgeProfiles tmpProfiles;
+    EdgeProfiles unloadedMethodProfiles;
     mutable hymutex_t profilesLock;
 };
 

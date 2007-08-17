@@ -80,6 +80,8 @@ extern "C" {
    */
         void (*ProfilerThreadTimeout) ();
 
+        void (*ClassloaderUnloadingCallback) (ClassLoaderHandle class_handle);
+
     };
     typedef const struct _OpenEmVm* OpenEmVmHandle;
 

@@ -39,10 +39,15 @@ class MethodProfile {
 public:
     MethodProfile(Method_Profile_Handle _handle, ProfileType _type, MethodDesc& _md)
         : handle(_handle), type(_type), md(_md){}
-        virtual ~MethodProfile(){};
-        Method_Profile_Handle getHandle() const { return handle;} 
-        MethodDesc& getMethod() const {return md;}
-        ProfileType getProfileType() const {return type;}
+
+    virtual ~MethodProfile(){};
+
+    Method_Profile_Handle getHandle() const { return handle;} 
+
+    MethodDesc& getMethod() const {return md;}
+
+    ProfileType getProfileType() const {return type;}
+
 private:
     Method_Profile_Handle handle;
     ProfileType type;

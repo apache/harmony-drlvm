@@ -162,7 +162,7 @@ void DrlEMImpl::deallocateResources() {
         RChain* chain = *cit;
         for (RSteps::const_iterator sit = chain->steps.begin(), send = chain->steps.end(); sit!=send; ++sit) {
             RStep* step = *sit;
-            //todo: handle jit instance -> unload or deinit
+            //todo:call deinit on JIT instance
             delete step;
         }
         delete chain;
@@ -838,3 +838,6 @@ int DrlEMImpl::getTbsTimeout() const {
 
 
 
+void DrlEMImpl::classloaderUnloadingCallback(ClassLoaderHandle class_handle) {
+    //notify every profile collector about classloader unloading
+}

@@ -134,7 +134,8 @@ EBMethodProfile* EBProfileCollector::createProfile(Method_Handle mh) {
     assert(profilesByMethod.find(mh) == profilesByMethod.end());
     profilesByMethod[mh] = profile;
     if (mode == EB_PCMODE_ASYNC) {
-    newProfiles.push_back(profile);
+        //can't modify profiles map -> it could be iterated by the checker thread without lock
+        newProfiles.push_back(profile);
     }
 
     hymutex_unlock(&profilesLock);
@@ -164,7 +165,11 @@ void EBProfileCollector::onTimeout() {
         hymutex_unlock(&profilesLock);
     }
 
-    for (std::vector<EBMethodProfile*>::iterator it = greenProfiles.begin(), end = greenProfiles.end(); it!=end; ++it) {
+    if (!unloadedMethodProfiles.empty()) {
+        cleanUnloadedProfiles(true);
+    }
+
+    for (EBProfiles::iterator it = greenProfiles.begin(), end = greenProfiles.end(); it!=end; ++it) {
         EBMethodProfile* profile = *it;
         if (profile->entryCounter >= eThreshold || profile->backedgeCounter >= bThreshold) {
             tmpProfiles.push_back(profile);
@@ -172,9 +177,11 @@ void EBProfileCollector::onTimeout() {
         }
     }
     if (!tmpProfiles.empty()) {
+        hymutex_lock(&profilesLock);
         std::remove(greenProfiles.begin(), greenProfiles.end(), (EBMethodProfile*)NULL);
         greenProfiles.resize(greenProfiles.size() - tmpProfiles.size());
-        for (std::vector<EBMethodProfile*>::iterator it = tmpProfiles.begin(), end = tmpProfiles.end(); it!=end; ++it) {
+        hymutex_unlock(&profilesLock);
+        for (EBProfiles::iterator it = tmpProfiles.begin(), end = tmpProfiles.end(); it!=end; ++it) {
             EBMethodProfile* profile = *it;
             if (loggingEnabled) {
                 logReadyProfile(catName, name, profile);
@@ -192,4 +199,53 @@ void EBProfileCollector::syncModeJitCallback(MethodProfile* mp) {
         logReadyProfile(catName, name, (EBMethodProfile*)mp);
     }
     em->methodProfileIsReady(mp);
+}
+
+static void addProfilesForClassloader(ClassLoaderHandle h, EBProfiles& from, EBProfiles& to, bool erase) {
+    for (EBProfiles::iterator it = from.begin(), end = from.end(); it!=end; ++it) {
+        EBMethodProfile* profile = *it;
+        Class_Handle ch =  method_get_class(profile->mh);;
+        ClassLoaderHandle clh = class_get_class_loader(ch);
+        if (clh == h) {
+            to.push_back(profile);
+            if (erase) {
+                *it=NULL;
+            }
+        }
+    }
+    if (erase) {
+        from.erase(std::remove(from.begin(), from.end(), (EBMethodProfile*)NULL), from.end());
+    }
+}
+
+void EBProfileCollector::cleanUnloadedProfiles(bool removeFromGreen) {
+    for (EBProfiles::const_iterator it = unloadedMethodProfiles.begin(), end = unloadedMethodProfiles.end(); it!=end; ++it) {    
+        EBMethodProfile* profile = *it;
+        profilesByMethod.erase(profile->mh);
+        if (removeFromGreen) {
+            EBProfiles::iterator it2 = std::find(greenProfiles.begin(), greenProfiles.end(), profile);
+            assert(it2!=greenProfiles.end());
+            *it2=NULL;
+        }
+        delete profile;
+    }
+    unloadedMethodProfiles.clear();
+    if (removeFromGreen) {
+        greenProfiles.erase(std::remove(greenProfiles.begin(), greenProfiles.end(), (EBMethodProfile*)NULL), greenProfiles.end());
+    }
+}
+
+void EBProfileCollector::classloaderUnloadingCallback(ClassLoaderHandle h) {
+    hymutex_lock(&profilesLock);
+    
+    //can't modify profiles map in async mode here -> it could be iterated by the checker thread without lock
+    bool erase = mode != EB_PCMODE_ASYNC;
+    addProfilesForClassloader(h, greenProfiles, unloadedMethodProfiles, erase);
+    addProfilesForClassloader(h, newProfiles, unloadedMethodProfiles, erase);
+    
+    if (erase) {
+        cleanUnloadedProfiles(false);
+    }
+
+    hymutex_unlock(&profilesLock);
 }

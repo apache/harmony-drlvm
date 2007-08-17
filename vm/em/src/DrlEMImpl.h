@@ -93,6 +93,8 @@ public:
     virtual JIT_Result compileMethod(Method_Handle method_handle);
     virtual unsigned int getNumProfilerThreads() const { return tbsClients.empty() ? 0 : 1;}
 
+    virtual void classloaderUnloadingCallback(ClassLoaderHandle class_handle); 
+
 //EM_PC interface impl:
     virtual void methodProfileIsReady(MethodProfile* mp);
 

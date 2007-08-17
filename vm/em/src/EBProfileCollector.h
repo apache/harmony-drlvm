@@ -30,6 +30,9 @@
 
 class EBMethodProfile;
 
+typedef std::map<Method_Handle, EBMethodProfile*> EBProfilesMap;
+typedef std::vector<EBMethodProfile*> EBProfiles;
+
 class EBProfileCollector : public ProfileCollector, public TbsEMClient {
 public:
     // Profile checking modes
@@ -56,6 +59,7 @@ public:
     virtual uint32 getTimeout() const {return timeout;}
     virtual void onTimeout();
     virtual MethodProfile* getMethodProfile(Method_Handle mh) const ;
+    virtual void classloaderUnloadingCallback(ClassLoaderHandle h);
     
     EBMethodProfile* createProfile(Method_Handle mh);
     void syncModeJitCallback(MethodProfile* mp);
@@ -66,6 +70,9 @@ public:
     EB_ProfilerMode getMode() const {return mode;}
 
 private:
+
+    void cleanUnloadedProfiles(bool removeFromGreen);
+
     EB_ProfilerMode mode;
     uint32 eThreshold;
     uint32 bThreshold;
@@ -74,20 +81,22 @@ private:
     bool loggingEnabled;
     std::string catName;
     
-    typedef std::map<Method_Handle, EBMethodProfile*> EBProfilesMap;
     //Mapping of method profile by method handles
     EBProfilesMap profilesByMethod;
     
     // method profiles to check every during tbs callback
     // field is used only in EB_PCMODE_ASYNC mode
-    std::vector<EBMethodProfile*> greenProfiles;
+    EBProfiles greenProfiles;
     
     // newly created method profiles since the last check during tbs callback
     // field is used only in EB_PCMODE_ASYNC mode
-    std::vector<EBMethodProfile*> newProfiles;
+    EBProfiles newProfiles;
 
     // preallocated mem for temporary (method-local) needs
-    std::vector<EBMethodProfile*> tmpProfiles;
+    EBProfiles tmpProfiles;
+
+    EBProfiles unloadedMethodProfiles;
+
     mutable hymutex_t profilesLock;
 };
 
