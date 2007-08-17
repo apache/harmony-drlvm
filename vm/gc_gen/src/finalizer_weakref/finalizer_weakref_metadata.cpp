@@ -44,6 +44,7 @@ void set_gc_referent_offset(unsigned int offset)
 
 void gc_finref_metadata_initialize(GC *gc)
 {
+  TRACE2("gc.process", "GC: gc finref metadata init ... \n");
   unsigned int seg_size =  FINREF_METADATA_SEG_SIZE_BYTES + FINREF_METADATA_BLOCK_SIZE_BYTES;
   void *first_segment = STD_MALLOC(seg_size);
   memset(first_segment, 0, seg_size);
@@ -82,6 +83,7 @@ void gc_finref_metadata_initialize(GC *gc)
 
 void gc_finref_metadata_destruct(GC *gc)
 {
+  TRACE2("gc.process", "GC: GC finref metadata destruct ...");
   Finref_Metadata *metadata = gc->finref_metadata;
   
   sync_pool_destruct(metadata->free_pool);

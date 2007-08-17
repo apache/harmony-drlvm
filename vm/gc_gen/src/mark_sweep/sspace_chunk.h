@@ -23,33 +23,36 @@
 enum Chunk_Status {
   CHUNK_NIL = 0,
   CHUNK_FREE = 0x1,
-  CHUNK_IN_USE = 0x2,
-  CHUNK_USED = 0x4,
+  CHUNK_FRESH = 0x2,
   CHUNK_NORMAL = 0x10,
   CHUNK_ABNORMAL = 0x20,
-  CHUNK_NEED_ZEROING = 0x100
+  CHUNK_NEED_ZEROING = 0x100,
+  CHUNK_TO_MERGE = 0x200,
+  CHUNK_IN_USE = 0x400, /* just keep info for now, not used */
+  CHUNK_USED = 0x800 /* just keep info for now, not used */
 };
 
 typedef volatile POINTER_SIZE_INT Chunk_Status_t;
 
-typedef struct Chunk_Heaer_Basic {
-  Chunk_Heaer_Basic *next;
+typedef struct Chunk_Header_Basic {
+  Chunk_Header_Basic *next;
   Chunk_Status_t status;
-  Chunk_Heaer_Basic *adj_prev;  // adjacent previous chunk, for merging continuous free chunks
-  Chunk_Heaer_Basic *adj_next;  // adjacent next chunk
-} Chunk_Heaer_Basic;
+  Chunk_Header_Basic *adj_prev;  // adjacent previous chunk, for merging continuous free chunks
+  Chunk_Header_Basic *adj_next;  // adjacent next chunk
+} Chunk_Header_Basic;
 
 typedef struct Chunk_Header {
-  /* Beginning of Chunk_Heaer_Basic */
+  /* Beginning of Chunk_Header_Basic */
   Chunk_Header *next;           /* pointing to the next pfc in the pfc pool */
   Chunk_Status_t status;
-  Chunk_Heaer_Basic *adj_prev;  // adjacent previous chunk, for merging continuous free chunks
-  Chunk_Heaer_Basic *adj_next;  // adjacent next chunk
-  /* End of Chunk_Heaer_Basic */
+  Chunk_Header_Basic *adj_prev;  // adjacent previous chunk, for merging continuous free chunks
+  Chunk_Header_Basic *adj_next;  // adjacent next chunk
+  /* End of Chunk_Header_Basic */
   void *base;
   unsigned int slot_size;
   unsigned int slot_num;
   unsigned int slot_index;      /* the index of which is the first free slot in this chunk */
+  unsigned int alloc_num;       /* the index of which is the first free slot in this chunk */
   POINTER_SIZE_INT table[1];
 } Chunk_Header;
 
@@ -88,6 +91,7 @@ typedef struct Chunk_Header {
 #define CHUNK_END(chunk)  ((chunk)->adj_next)
 #define CHUNK_SIZE(chunk) ((POINTER_SIZE_INT)chunk->adj_next - (POINTER_SIZE_INT)chunk)
 
+
 inline void *slot_index_to_addr(Chunk_Header *chunk, unsigned int index)
 { return (void*)((POINTER_SIZE_INT)chunk->base + chunk->slot_size * index); }
 
@@ -95,12 +99,12 @@ inline unsigned int slot_addr_to_index(Chunk_Header *chunk, void *addr)
 { return (unsigned int)(((POINTER_SIZE_INT)addr - (POINTER_SIZE_INT)chunk->base) / chunk->slot_size); }
 
 typedef struct Free_Chunk {
-  /* Beginning of Chunk_Heaer_Basic */
+  /* Beginning of Chunk_Header_Basic */
   Free_Chunk *next;             /* pointing to the next free Free_Chunk */
   Chunk_Status_t status;
-  Chunk_Heaer_Basic *adj_prev;  // adjacent previous chunk, for merging continuous free chunks
-  Chunk_Heaer_Basic *adj_next;  // adjacent next chunk
-  /* End of Chunk_Heaer_Basic */
+  Chunk_Header_Basic *adj_prev;  // adjacent previous chunk, for merging continuous free chunks
+  Chunk_Header_Basic *adj_next;  // adjacent next chunk
+  /* End of Chunk_Header_Basic */
   Free_Chunk *prev;             /* pointing to the prev free Free_Chunk */
 } Free_Chunk;
 
@@ -147,7 +151,18 @@ inline void chunk_pad_last_index_word(Chunk_Header *chunk, POINTER_SIZE_INT allo
   chunk->table[last_word_index] |= padding_mask;
 }
 
-extern POINTER_SIZE_INT alloc_mask_in_table;
+/* Depadding the last index word in table to facilitate allocation */
+inline void chunk_depad_last_index_word(Chunk_Header *chunk)
+{
+  unsigned int ceiling_index_in_last_word = (chunk->slot_num * COLOR_BITS_PER_OBJ) % BITS_PER_WORD;
+  if(!ceiling_index_in_last_word)
+    return;
+  POINTER_SIZE_INT depadding_mask = (1 << ceiling_index_in_last_word) - 1;
+  unsigned int last_word_index = (chunk->slot_num-1) / SLOT_NUM_PER_WORD_IN_TABLE;
+  chunk->table[last_word_index] &= depadding_mask;
+}
+
+extern POINTER_SIZE_INT cur_alloc_mask;
 /* Used for allocating a fixed-size chunk from free area lists */
 inline void normal_chunk_init(Chunk_Header *chunk, unsigned int slot_size)
 {
@@ -155,13 +170,14 @@ inline void normal_chunk_init(Chunk_Header *chunk, unsigned int slot_size)
   assert((POINTER_SIZE_INT)chunk->adj_next == (POINTER_SIZE_INT)chunk + NORMAL_CHUNK_SIZE_BYTES);
   
   chunk->next = NULL;
-  chunk->status = CHUNK_NORMAL | CHUNK_NEED_ZEROING;
+  chunk->status = CHUNK_FRESH | CHUNK_NORMAL | CHUNK_NEED_ZEROING;
   chunk->slot_size = slot_size;
   chunk->slot_num = NORMAL_CHUNK_SLOT_NUM(chunk);
   chunk->slot_index = 0;
+  chunk->alloc_num = 0;
   chunk->base = NORMAL_CHUNK_BASE(chunk);
   memset(chunk->table, 0, NORMAL_CHUNK_TABLE_SIZE_BYTES(chunk));//memset table
-  chunk_pad_last_index_word(chunk, alloc_mask_in_table);
+  chunk_pad_last_index_word(chunk, cur_alloc_mask);
 }
 
 /* Used for allocating a chunk for large object from free area lists */
@@ -171,7 +187,7 @@ inline void abnormal_chunk_init(Chunk_Header *chunk, unsigned int chunk_size, un
   assert((POINTER_SIZE_INT)chunk->adj_next == (POINTER_SIZE_INT)chunk + chunk_size);
   
   chunk->next = NULL;
-  chunk->status = CHUNK_IN_USE | CHUNK_ABNORMAL;
+  chunk->status = CHUNK_ABNORMAL;
   chunk->slot_size = obj_size;
   chunk->slot_num = 1;
   chunk->slot_index = 0;
@@ -215,11 +231,14 @@ inline void abnormal_chunk_init(Chunk_Header *chunk, unsigned int chunk_size, un
 #define ALIGNED_CHUNK_INDEX_TO_SIZE(index)    (((index) + 1) << NORMAL_CHUNK_SHIFT_COUNT)
 #define UNALIGNED_CHUNK_INDEX_TO_SIZE(index)  (((index) + 1) << CHUNK_GRANULARITY_BITS)
 
+#define SUPER_OBJ_MASK ((Obj_Info_Type)0x1)  /* the lowest bit in obj info */
 
 #define PFC_STEAL_NUM   3
 #define PFC_STEAL_THRESHOLD   3
 
+
 #define SIZE_SEGMENT_NUM  3
+
 typedef struct Size_Segment {
   unsigned int size_min;
   unsigned int size_max;
@@ -232,6 +251,17 @@ typedef struct Size_Segment {
   POINTER_SIZE_INT gran_high_mask;
 } Size_Segment;
 
+inline Size_Segment *sspace_get_size_seg(Sspace *sspace, unsigned int size)
+{
+  Size_Segment **size_segs = sspace->size_segments;
+  
+  unsigned int seg_index = 0;
+  for(; seg_index < SIZE_SEGMENT_NUM; ++seg_index)
+    if(size <= size_segs[seg_index]->size_max) break;
+  assert(seg_index < SIZE_SEGMENT_NUM);
+  assert(size_segs[seg_index]->seg_index == seg_index);
+  return size_segs[seg_index];
+}
 
 inline Chunk_Header *sspace_get_pfc(Sspace *sspace, unsigned int seg_index, unsigned int index)
 {
@@ -245,30 +275,37 @@ inline void sspace_put_pfc(Sspace *sspace, Chunk_Header *chunk)
 {
   unsigned int size = chunk->slot_size;
   assert(chunk && (size <= SUPER_OBJ_THRESHOLD));
+  assert(chunk->slot_index < chunk->slot_num);
   
   Size_Segment **size_segs = sspace->size_segments;
   chunk->status = CHUNK_NORMAL | CHUNK_NEED_ZEROING;
   
   for(unsigned int i = 0; i < SIZE_SEGMENT_NUM; ++i){
-    if(size <= size_segs[i]->size_max){
-      assert(!(size & size_segs[i]->gran_low_mask));
-      assert(size > size_segs[i]->size_min);
-      unsigned int index = NORMAL_SIZE_TO_INDEX(size, size_segs[i]);
-      Pool *pfc_pool = sspace->pfc_pools[i][index];
-      pool_put_entry(pfc_pool, chunk);
-      return;
-    }
+    if(size > size_segs[i]->size_max) continue;
+    assert(!(size & size_segs[i]->gran_low_mask));
+    assert(size > size_segs[i]->size_min);
+    unsigned int index = NORMAL_SIZE_TO_INDEX(size, size_segs[i]);
+    Pool *pfc_pool = sspace->pfc_pools[i][index];
+    pool_put_entry(pfc_pool, chunk);
+    return;
   }
 }
 
 
 extern void sspace_init_chunks(Sspace *sspace);
 extern void sspace_clear_chunk_list(GC *gc);
+
 extern void sspace_put_free_chunk(Sspace *sspace, Free_Chunk *chunk);
 extern Free_Chunk *sspace_get_normal_free_chunk(Sspace *sspace);
 extern Free_Chunk *sspace_get_abnormal_free_chunk(Sspace *sspace, unsigned int chunk_size);
 extern Free_Chunk *sspace_get_hyper_free_chunk(Sspace *sspace, unsigned int chunk_size, Boolean is_normal_chunk);
+
+extern void sspace_init_pfc_pool_iterator(Sspace *sspace);
+extern Pool *sspace_grab_next_pfc_pool(Sspace *sspace);
+
 extern Chunk_Header *sspace_steal_pfc(Sspace *sspace, unsigned int index);
+
+extern POINTER_SIZE_INT free_mem_in_sspace(Sspace *sspace, Boolean show_chunk_info);
 
 extern void zeroing_free_chunk(Free_Chunk *chunk);
 

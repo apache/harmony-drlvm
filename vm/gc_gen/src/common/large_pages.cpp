@@ -68,15 +68,15 @@ void* alloc_large_pages(size_t size, const char* hint)
     alloc_addr = VirtualAlloc(NULL, size, MEM_RESERVE | MEM_COMMIT | MEM_LARGE_PAGES, PAGE_READWRITE);    
     release_lock_memory_priv();    
     if(alloc_addr == NULL){
-      printf("GC large_page: No required number of large pages found. Please reboot.....\n");
+      WARN2("gc.base","GC large_page: No required number of large pages found. Please reboot.....\n");
       return NULL;
     }else
       return alloc_addr;
   }else{
-    printf("GC large_page: Check that you have permissions:\n");
-    printf("GC large_page: Control Panel->Administrative Tools->Local Security Settings->->User Rights Assignment->Lock pages in memory;\n");
-    printf("GC large_page: Start VM as soon after reboot as possible, because large pages become fragmented and unusable after a while;\n");
-    printf("GC large_page: Heap size should be multiple of large page size.\n");
+    WARN2("gc.base","GC large_page: Check that you have permissions:");
+    WARN2("gc.base","GC large_page: Control Panel->Administrative Tools->Local Security Settings->->User Rights Assignment->Lock pages in memory;");
+    WARN2("gc.base","GC large_page: Start VM as soon after reboot as possible, because large pages become fragmented and unusable after a while;");
+    WARN2("gc.base","GC large_page: Heap size should be multiple of large page size.");
     return NULL;
   }
 }
@@ -107,7 +107,7 @@ static const char* parse_value(const char* buf, int len, const char* name, int n
 static void parse_proc_meminfo(size_t required_size){
   FILE* f = fopen("/proc/meminfo", "r");
   if (f == NULL){
-    printf("GC large_page: Can't open /proc/meminfo \n");
+    WARN2("gc.base","GC large_page: Can't open /proc/meminfo");
     return;
   }
 
@@ -124,18 +124,18 @@ static void parse_proc_meminfo(size_t required_size){
   if (buf) free(buf);
   
   if (proc_huge_pages_total == (size_t)-1){
-    printf("GC large_page: Large pages are not supported by kernel.\n");
-    printf("GC large_page: CONFIG_HUGETLB_PAGE and CONFIG_HUGETLBFS needs to be enabled.\n");
+    WARN2("gc.base","GC large_page: Large pages are not supported by kernel.");
+    WARN2("gc.base","GC large_page: CONFIG_HUGETLB_PAGE and CONFIG_HUGETLBFS needs to be enabled.");
   } else if (proc_huge_pages_total == 0){
-    printf("GC large_page: No large pages reserved,  Use following command: echo num> /proc/sys/vm/nr_hugepages.\n");
-    printf("GC large_page: Do it just after kernel boot before huge pages become fragmented.\n");
+    WARN2("gc.base","GC large_page: No large pages reserved,  Use following command: echo num> /proc/sys/vm/nr_hugepages.");
+    WARN2("gc.base","GC large_page: Do it just after kernel boot before huge pages become fragmented.");
   } else if (proc_huge_pages_free * proc_huge_page_size < required_size) {
     if (proc_huge_pages_total * proc_huge_page_size >= required_size) {
-      printf("GC large_page: Not enough free large pages, some of reserved space is already busy.\n");
+      WARN2("gc.base","GC large_page: Not enough free large pages, some of reserved space is already busy.");
     } else {
-      printf("GC large_page: Not enough reserved large pages.\n");
+      WARN2("gc.base","GC large_page: Not enough free large pages, some of reserved space is already busy.");
     }
-    printf("GC large_page: Large pages can be only allocated.\n");
+    WARN2("gc.base","GC large_page: Large pages can be only allocated.");
   }
 }
 
@@ -150,9 +150,9 @@ void* mmap_large_pages(size_t size, const char* path)
 
   int fd = open(buf, O_CREAT | O_RDWR, 0700);
   if (fd == -1){
-    printf("GC large_page: Can't open Mount hugetlbfs with: mount none /mnt/huge -t hugetlbfsi.\n");
-    printf("GC large_page: Check you have appropriate permissions to /mnt/huge.\n");
-    printf("GC large_page: Use command line switch -Dgc.lp=/mnt/huge.\n");
+    WARN2("gc.base","GC large_page: Can't open Mount hugetlbfs with: mount none /mnt/huge -t hugetlbfsi.");
+    WARN2("gc.base","GC large_page: Check you have appropriate permissions to /mnt/huge.");
+    WARN2("gc.base","GC large_page: Use command line switch -Dgc.lp=/mnt/huge.");
     free(buf);
     return NULL;
   }
@@ -160,7 +160,7 @@ void* mmap_large_pages(size_t size, const char* path)
 
   void* addr = mmap(0, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
   if (addr == MAP_FAILED){
-    printf("GC large_page: Map failed.\n");
+    WARN2("gc.base","GC large_page: Map failed.");
     close(fd);
     free(buf);
     return NULL;
@@ -174,7 +174,7 @@ void* alloc_large_pages(size_t size, const char* hint){
   parse_proc_meminfo(size);
   void* alloc_addr = mmap_large_pages(size, hint);
   if(alloc_addr == NULL){
-    printf("GC large_page: Large pages allocation failed.\n");
+    WARN2("gc.base","GC large_page: Large pages allocation failed.");
     return NULL;
   }
   return alloc_addr;

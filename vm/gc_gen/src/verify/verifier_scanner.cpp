@@ -422,8 +422,3 @@ void verifier_init_object_scanner(Heap_Verifier* heap_verifier)
   heap_verifier->all_obj_scanner   = verifier_scan_all_objects;
 }
 
-
-
-
-
-

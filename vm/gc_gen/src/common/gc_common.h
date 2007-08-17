@@ -22,6 +22,7 @@
 #ifndef _GC_COMMON_H_
 #define _GC_COMMON_H_
 
+#include "cxxlog.h" 
 #include "port_vmem.h"
 
 #include "platform_lowlevel.h"
@@ -37,10 +38,13 @@
 
 #include "../gen/gc_for_barrier.h"
 
+#define GC_GEN_STATS
 #define null 0
 
 #define KB  (1<<10)
 #define MB  (1<<20)
+/*used for print size info in verbose system*/
+#define verbose_print_size(size) (((size)/MB!=0)?(size)/MB:(((size)/KB!=0)?(size)/KB:(size)))<<(((size)/MB!=0)?"MB":(((size)/KB!=0)?"KB":"B"))
 
 #define BITS_PER_BYTE 8 
 #define BYTES_PER_WORD (sizeof(POINTER_SIZE_INT))
@@ -73,7 +77,7 @@
 
 #define USE_32BITS_HASHCODE
 
-//#define ONLY_SSPACE_IN_HEAP
+//#define USE_MARK_SWEEP_GC
 
 typedef void (*TaskType)(void*);
 
@@ -104,7 +108,8 @@ enum Collection_Kind {
   MAJOR_COLLECTION = 0x2,
   FALLBACK_COLLECTION = 0x4,
   EXTEND_COLLECTION = 0x8,
-  UNIQUE_SWEEP_COLLECTION = 0x10
+  MARK_SWEEP_GC = 0x10,
+  SWEEP_COMPACT_GC = 0x20
 };
 
 extern Boolean IS_FALLBACK_COMPACTION;  /* only for mark/fw bits debugging purpose */
@@ -394,6 +399,11 @@ typedef struct GC{
   Vector_Block* uncompressed_root_set;
 
   Space_Tuner* tuner;
+  
+  /* system info */
+  unsigned int _system_alloc_unit;
+  unsigned int _machine_page_size_bytes;
+  unsigned int _num_processors;
 
 }GC;
 
@@ -416,6 +426,8 @@ inline Boolean gc_match_kind(GC *gc, unsigned int kind)
   assert(gc->collect_kind && kind);
   return gc->collect_kind & kind;
 }
+
+inline unsigned int gc_get_processor_num(GC* gc) { return gc->_num_processors; }
 
 void gc_parse_options(GC* gc);
 void gc_reclaim_heap(GC* gc, unsigned int gc_cause);

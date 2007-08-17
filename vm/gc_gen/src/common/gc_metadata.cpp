@@ -38,7 +38,7 @@ void gc_metadata_initialize(GC* gc)
   /* FIXME:: since we use a list to arrange the root sets and tasks, we can
      dynamically alloc space for metadata. 
      We just don't have this dynamic support at the moment. */
-
+  TRACE2("gc.process", "GC: GC metadata init ...\n");
   unsigned int seg_size = GC_METADATA_SIZE_BYTES + METADATA_BLOCK_SIZE_BYTES;
   void* metadata = STD_MALLOC(seg_size);
   memset(metadata, 0, seg_size);
@@ -86,6 +86,7 @@ void gc_metadata_initialize(GC* gc)
 
 void gc_metadata_destruct(GC* gc)
 {
+  TRACE2("gc.process", "GC: GC metadata destruct ...");
   GC_Metadata* metadata = gc->metadata;
   sync_pool_destruct(metadata->free_task_pool);
   sync_pool_destruct(metadata->mark_task_pool);
@@ -120,7 +121,7 @@ Vector_Block* gc_metadata_extend(Pool* pool)
  
   unsigned int num_alloced = metadata->num_alloc_segs;
   if(num_alloced == GC_METADATA_SEGMENT_NUM){
-    printf("Run out GC metadata, please give it more segments!\n");
+    DIE2("gc.verbose","Warning: Run out GC metadata, please give it more segments!");
     exit(0);
   }
 
@@ -178,26 +179,27 @@ static void gc_update_repointed_sets(GC* gc, Pool* pool)
       iter = vector_block_iterator_advance(root_set,iter);
 
       Partial_Reveal_Object* p_obj = read_slot(p_ref);
-        if(IS_MOVE_COMPACT){
-        /*This condition is removed because we do los sliding compaction at every major compaction after add los minor sweep.*/
-        //if(obj_is_moved(p_obj)) 
-          /*Fixme: los_boundery ruined the modularity of gc_common.h*/
-          if(p_obj < los_boundary){
-            write_slot(p_ref, obj_get_fw_in_oi(p_obj));
-          }else{
-            *p_ref = obj_get_fw_in_table(p_obj);
-          }
+      if(IS_MOVE_COMPACT){
+      /*This condition is removed because we do los sliding compaction at every major compaction after add los minor sweep.*/
+      //if(obj_is_moved(p_obj)) 
+        /*Fixme: los_boundery ruined the modularity of gc_common.h*/
+        if(p_obj < los_boundary){
+          write_slot(p_ref, obj_get_fw_in_oi(p_obj));
         }else{
-          if(obj_is_fw_in_oi(p_obj)){
-            /* Condition obj_is_moved(p_obj) is for preventing mistaking previous mark bit of large obj as fw bit when fallback happens.
-             * Because until fallback happens, perhaps the large obj hasn't been marked. So its mark bit remains as the last time.
-             * This condition is removed because we do los sliding compaction at every major compaction after add los minor sweep.
-             * In major collection condition obj_is_fw_in_oi(p_obj) can be omitted,
-             * since those which can be scanned in MOS & NOS must have been set fw bit in oi.  */
-            assert((POINTER_SIZE_INT)obj_get_fw_in_oi(p_obj) > DUAL_MARKBITS);
-            write_slot(p_ref, obj_get_fw_in_oi(p_obj));
-          }
+          *p_ref = obj_get_fw_in_table(p_obj);
         }
+      }else{
+        if(obj_is_fw_in_oi(p_obj)){
+          /* Condition obj_is_moved(p_obj) is for preventing mistaking previous mark bit of large obj as fw bit when fallback happens.
+           * Because until fallback happens, perhaps the large obj hasn't been marked. So its mark bit remains as the last time.
+           * This condition is removed because we do los sliding compaction at every major compaction after add los minor sweep.
+           * In major collection condition obj_is_fw_in_oi(p_obj) can be omitted,
+           * since those which can be scanned in MOS & NOS must have been set fw bit in oi.
+           */
+          assert(address_belongs_to_gc_heap(obj_get_fw_in_oi(p_obj), gc));
+          write_slot(p_ref, obj_get_fw_in_oi(p_obj));
+        }
+      }
     }
     root_set = pool_iterator_next(pool);
   } 

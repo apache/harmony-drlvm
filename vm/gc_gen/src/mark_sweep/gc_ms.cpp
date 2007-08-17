@@ -17,29 +17,19 @@
 
 #include "../common/gc_common.h"
 
-#ifdef ONLY_SSPACE_IN_HEAP
+#ifdef USE_MARK_SWEEP_GC
 
 #include "gc_ms.h"
-#include "port_sysinfo.h"
-
 #include "../finalizer_weakref/finalizer_weakref.h"
 #include "../common/compressed_ref.h"
 #ifdef USE_32BITS_HASHCODE
 #include "../common/hashcode.h"
 #endif
 
-static void gc_ms_get_system_info(GC_MS *gc_ms)
-{
-  gc_ms->_machine_page_size_bytes = (unsigned int)port_vmem_page_sizes()[0];
-  gc_ms->_num_processors = port_CPUs_number();
-  gc_ms->_system_alloc_unit = vm_get_system_alloc_unit();
-  SPACE_ALLOC_UNIT = max(gc_ms->_system_alloc_unit, GC_BLOCK_SIZE_BYTES);
-}
 
 void gc_ms_initialize(GC_MS *gc_ms, POINTER_SIZE_INT min_heap_size, POINTER_SIZE_INT max_heap_size)
 {
   assert(gc_ms);
-  gc_ms_get_system_info(gc_ms);
   
   max_heap_size = round_down_to_size(max_heap_size, SPACE_ALLOC_UNIT);
   min_heap_size = round_up_to_size(min_heap_size, SPACE_ALLOC_UNIT);
@@ -83,7 +73,4 @@ void gc_ms_iterate_heap(GC_MS *gc)
 {
 }
 
-unsigned int gc_ms_get_processor_num(GC_MS *gc)
-{ return gc->_num_processors; }
-
-#endif // ONLY_SSPACE_IN_HEAP
+#endif // USE_MARK_SWEEP_GC

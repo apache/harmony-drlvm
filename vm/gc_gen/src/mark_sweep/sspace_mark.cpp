@@ -27,7 +27,7 @@ Boolean obj_is_marked_in_table(Partial_Reveal_Object *obj)
   POINTER_SIZE_INT color_word = *p_color_word;
   POINTER_SIZE_INT mark_color = cur_mark_color << index_in_word;
   
-  return color_word & mark_color;
+  return (Boolean)(color_word & mark_color);
 }
 
 static FORCE_INLINE void scan_slot(Collector *collector, REF *p_ref)
@@ -191,5 +191,6 @@ retry:
 
 void trace_obj_in_ms_marking(Collector *collector, void *p_obj)
 {
+  obj_mark_in_table((Partial_Reveal_Object*)p_obj);
   trace_object(collector, (Partial_Reveal_Object *)p_obj);
 }

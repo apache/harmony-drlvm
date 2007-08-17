@@ -23,6 +23,9 @@
 #include "../gen/gen.h"
 #include "../common/space_tuner.h"
 
+#ifdef GC_GEN_STATS
+#include "../gen/gen_stats.h"
+#endif
 static void free_pool_lock_nr_list(Free_Area_Pool* pool, unsigned int list_index)
 {
     Lockable_Bidir_List* list_head = &pool->sized_area_list[list_index];
@@ -246,9 +249,15 @@ void lspace_compute_object_target(Collector* collector, Lspace* lspace)
   collector->hashcode_set = free_set_pool_get_entry(collector->gc->metadata);
 #endif
   
+#ifdef GC_GEN_STATS
+  GC_Gen_Collector_Stats* stats = (GC_Gen_Collector_Stats*)collector->stats;
+#endif
   while( p_obj ){
     assert( obj_is_marked_in_vt(p_obj));
     unsigned int obj_size = vm_object_size(p_obj);
+#ifdef GC_GEN_STATS
+  gc_gen_collector_update_moved_los_obj_stats_major(stats, vm_object_size(p_obj));
+#endif
     assert(((POINTER_SIZE_INT)dest_addr + obj_size) <= (POINTER_SIZE_INT)lspace->heap_end);
 #ifdef USE_32BITS_HASHCODE 
     obj_size += hashcode_is_attached(p_obj)? GC_OBJECT_ALIGNMENT : 0 ;
@@ -276,6 +285,7 @@ void lspace_compute_object_target(Collector* collector, Lspace* lspace)
   
   lspace->scompact_fa_start = dest_addr;
   lspace->scompact_fa_end= lspace->heap_end;
+  lspace->last_surviving_size = (POINTER_SIZE_INT)dest_addr - (POINTER_SIZE_INT)lspace->heap_start;
   return;
 }
 
@@ -353,7 +363,6 @@ void lspace_reset_for_slide(Lspace* lspace)
         assert(tuner->kind == TRANS_NOTHING);
         assert(!tuner->tuning_size);
         new_fa_size = (POINTER_SIZE_INT)lspace->scompact_fa_end - (POINTER_SIZE_INT)lspace->scompact_fa_start;
-        if(new_fa_size == 0) break;
         Free_Area* fa = free_area_new(lspace->scompact_fa_start,  new_fa_size);
         if(new_fa_size >= GC_OBJ_SIZE_THRESHOLD) free_pool_add_area(lspace->free_pool, fa);
         break;
@@ -377,6 +386,12 @@ void lspace_reset_for_sweep(Lspace* lspace)
 
 void lspace_sweep(Lspace* lspace)
 {
+  TRACE2("gc.process", "GC: lspace sweep algo start ...\n");
+
+#ifdef GC_GEN_STATS
+  GC_Gen_Stats* stats = ((GC_Gen*)lspace->gc)->stats;
+  gc_gen_stats_set_los_collected_flag((GC_Gen*)lspace->gc, true);
+#endif
   unsigned int mark_bit_idx = 0;
   POINTER_SIZE_INT cur_size = 0;
   void *cur_area_start, *cur_area_end;
@@ -395,6 +410,10 @@ void lspace_sweep(Lspace* lspace)
     obj_size += (hashcode_is_attached(p_next_obj))?GC_OBJECT_ALIGNMENT:0;
 #endif
     lspace->last_surviving_size += ALIGN_UP_TO_KILO(obj_size);    
+#ifdef GC_GEN_STATS
+    stats->los_suviving_obj_num++;
+    stats->los_suviving_obj_size += obj_size;
+#endif
   }
 
   cur_area_start = (void*)ALIGN_UP_TO_KILO(p_prev_obj);
@@ -425,6 +444,10 @@ void lspace_sweep(Lspace* lspace)
       obj_size += (hashcode_is_attached(p_next_obj))?GC_OBJECT_ALIGNMENT:0;
 #endif
       lspace->last_surviving_size += ALIGN_UP_TO_KILO(obj_size);
+#ifdef GC_GEN_STATS
+      stats->los_suviving_obj_num++;
+      stats->los_suviving_obj_size += obj_size;
+#endif
     }
 
 #ifdef USE_32BITS_HASHCODE
@@ -448,6 +471,8 @@ void lspace_sweep(Lspace* lspace)
    mark_bit_idx = 0;
    assert(!lspace_get_first_marked_object(lspace, &mark_bit_idx));
 
+  TRACE2("gc.process", "GC: end of lspace sweep algo ...\n");
   return;
 }
+
 

@@ -65,7 +65,7 @@ static int get_int_property(const char *property_name)
         return_value = atoi(value);
         destroy_property_value(value);
     }else{
-        printf("property value %s is not set\n", property_name);
+        DIE2("gc.base","Warning: property value "<<property_name<<"is not set!");
         exit(0);
     }
       
@@ -77,7 +77,7 @@ static Boolean get_boolean_property(const char *property_name)
   assert(property_name);
   char *value = get_property(property_name, VM_PROPERTIES);
   if (NULL == value){
-    printf("property value %s is not set\n", property_name);
+    DIE2("gc.base","Warning: property value "<<property_name<<"is not set!");
     exit(0);
   }
   
@@ -96,7 +96,7 @@ static Boolean get_boolean_property(const char *property_name)
   {
     return_value = TRUE;
   }else{
-    printf("property value %s is not properly set\n", property_name);
+    DIE2("gc.base","Warning: property value "<<property_name<<"is not set!");
     exit(0);
   }
     
@@ -128,6 +128,7 @@ static size_t get_size_property(const char* name)
 
 void gc_parse_options(GC* gc) 
 {
+  TRACE2("gc.process", "GC: parse options ...\n");
   if (!get_boolean_property("vm.assert_dialog", TRUE, VM_PROPERTIES))
     disable_assert_dialogs();
   
@@ -139,11 +140,11 @@ void gc_parse_options(GC* gc)
 
     if (max_heap_size < min_heap_size){
       max_heap_size = min_heap_size;
-      printf("Max heap size: too small, reset to %d MB!\n", max_heap_size/MB);
+      WARN2("gc.base","Warning: Max heap size you set is too small, reset to "<<max_heap_size/MB<<" MB!");
     }
     if (0 == max_heap_size){
       max_heap_size = HEAP_SIZE_DEFAULT;
-      printf("Max heap size: zero, reset to %d MB! \n", max_heap_size/MB);
+      WARN2("gc.base","Warning: Max heap size you set euqals to zero, reset to "<<max_heap_size/MB<<" MB!");
     }
  
     min_heap_size = max_heap_size / 10;
@@ -157,13 +158,13 @@ void gc_parse_options(GC* gc)
     min_heap_size = get_size_property("gc.ms");
     if (min_heap_size < min_heap_size_bytes){
       min_heap_size = min_heap_size_bytes;
-      printf("Min heap size: too small, reset to %d MB! \n", min_heap_size/MB);    
+      WARN2("gc.base","Warning: Min heap size you set is too small, reset to "<<min_heap_size/MB<<" MB!");
     } 
   }
 
   if (min_heap_size > max_heap_size){
     max_heap_size = min_heap_size;
-    printf("Max heap size: too small, reset to %d MB\n", max_heap_size / MB);
+    WARN2("gc.base","Warning: Max heap size is too small, reset to "<<max_heap_size/MB<<" MB!");
   }
 
   min_heap_size_bytes = min_heap_size;
@@ -274,9 +275,15 @@ void gc_adjust_heap_size(GC* gc, int64 pause_time)
 
 void gc_copy_interior_pointer_table_to_rootset();
 
+/*used for computing collection time and mutator time*/
+static int64 collection_start_time = time_now();  
+static int64 collection_end_time = time_now();
 void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
 { 
-  int64 start_time =  time_now();
+  INFO2("gc.process", "\nGC: GC start ...\n");
+
+  collection_start_time =  time_now();
+  int64 mutator_time = collection_start_time -collection_end_time;
 
   /* FIXME:: before mutators suspended, the ops below should be very careful
      to avoid racing with mutators. */
@@ -284,22 +291,22 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
   gc->cause = gc_cause;
   gc_decide_collection_kind((GC_Gen*)gc, gc_cause);
 
+#ifndef USE_MARK_SWEEP_GC
   gc_gen_update_space_before_gc((GC_Gen*)gc);
-
-#ifndef ONLY_SSPACE_IN_HEAP
   gc_compute_space_tune_size_before_marking(gc, gc_cause);
 #endif
 
 #ifdef MARK_BIT_FLIPPING
   if(gc_match_kind(gc, MINOR_COLLECTION)) mark_bit_flip();
 #endif
-  
+
   gc_metadata_verify(gc, TRUE);
 #ifndef BUILD_IN_REFERENT
   gc_finref_metadata_verify((GC*)gc, TRUE);
 #endif
   
   /* Stop the threads and collect the roots. */
+  INFO2("gc.process", "GC: stop the threads and enumerate rootset ...\n");
   gc_reset_rootset(gc);  
   vm_enumerate_root_set_all_threads();
   gc_copy_interior_pointer_table_to_rootset();
@@ -310,7 +317,7 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
 
   if(!IGNORE_FINREF ) gc_set_obj_with_fin(gc);
 
-#ifndef ONLY_SSPACE_IN_HEAP
+#ifndef USE_MARK_SWEEP_GC
   gc_gen_reclaim_heap((GC_Gen*)gc);
 #else
   gc_ms_reclaim_heap((GC_MS*)gc);
@@ -320,10 +327,14 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
 
   gc_metadata_verify(gc, FALSE);
 
-  int64 pause_time = time_now() - start_time;  
+  collection_end_time = time_now(); 
+
+  int64 pause_time = collection_end_time - collection_start_time;  
   gc->time_collections += pause_time;
 
-#ifndef ONLY_SSPACE_IN_HEAP
+#ifndef USE_MARK_SWEEP_GC
+  gc_gen_collection_verbose_info((GC_Gen*)gc, pause_time, mutator_time);
+  gc_gen_space_verbose_info((GC_Gen*)gc);
   gc_adjust_heap_size(gc, pause_time);
 
   gc_gen_adapt((GC_Gen*)gc, pause_time);
@@ -332,6 +343,7 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
   if(gc_is_gen_mode()) gc_prepare_mutator_remset(gc);
   
   if(!IGNORE_FINREF ){
+    INFO2("gc.process", "GC: finref process after collection ...\n");
     gc_put_finref_to_vm(gc);
     gc_reset_finref_metadata(gc);
     gc_activate_finref_threads((GC*)gc);
@@ -341,7 +353,7 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
 #endif
   }
 
-#ifndef ONLY_SSPACE_IN_HEAP
+#ifndef USE_MARK_SWEEP_GC
   gc_space_tuner_reset(gc);
   gc_gen_update_space_after_gc((GC_Gen*)gc);
   gc_assign_free_area_to_mutators(gc);
@@ -349,6 +361,7 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
 
   vm_reclaim_native_objs();  
   vm_resume_threads_after();
+  INFO2("gc.process", "GC: GC end\n");
   return;
 }
 

@@ -24,6 +24,9 @@
 #include "../gen/gen.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 
+#ifdef GC_GEN_STATS
+#include "../gen/gen_stats.h"
+#endif
 static void scan_slot(Collector* collector, REF *p_ref)
 {
   if( read_slot(p_ref) == NULL) return;
@@ -48,6 +51,10 @@ static void scan_object(Collector* collector, REF *p_ref)
   if(!obj_mark_in_vt(p_obj))
     return;
   
+#ifdef GC_GEN_STATS
+  GC_Gen_Collector_Stats* stats = (GC_Gen_Collector_Stats*)collector->stats;
+  gc_gen_collector_update_marked_obj_stats_major(stats);
+#endif
   if( !object_has_ref_field(p_obj) ) return;
   
     /* scan array object */
@@ -102,6 +109,9 @@ void mark_scan_heap_for_fallback(Collector* collector)
 { 
   GC* gc = collector->gc;
   GC_Metadata* metadata = gc->metadata;
+#ifdef GC_GEN_STATS
+  GC_Gen_Collector_Stats* stats = (GC_Gen_Collector_Stats*)collector->stats;
+#endif
   
   assert(gc_match_kind(gc, FALLBACK_COLLECTION));
 
@@ -125,6 +135,10 @@ void mark_scan_heap_for_fallback(Collector* collector)
       assert(*p_ref);
       
       collector_tracestack_push(collector, p_ref);
+
+#ifdef GC_GEN_STATS
+      gc_gen_collector_update_rootset_ref_num(stats);   
+#endif
 
     } 
     root_set = pool_iterator_next(metadata->gc_rootset_pool);

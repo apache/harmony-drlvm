@@ -30,6 +30,10 @@
 #include "../los/lspace.h"
 #include "../finalizer_weakref/finalizer_weakref_metadata.h"
 
+#ifdef GC_GEN_STATS
+struct GC_Gen_Stats;
+#endif
+
 enum Write_Barrier_Kind{
   WRITE_BARRIER_NIL,  
   WRITE_BARRIER_SLOT,  
@@ -86,7 +90,12 @@ typedef struct GC_Gen {
   Vector_Block* uncompressed_root_set;
   
   //For_LOS_extend
-  Space_Tuner* tuner;  
+  Space_Tuner* tuner;
+  
+  /* system info */
+  unsigned int _system_alloc_unit;
+  unsigned int _machine_page_size_bytes;
+  unsigned int _num_processors;
   /* END of GC --> */
   
   Block* blocks;
@@ -97,18 +106,21 @@ typedef struct GC_Gen {
   Boolean force_major_collect;
   Gen_Mode_Adaptor* gen_mode_adaptor;
   Boolean force_gen_mode;
-  
-  /* system info */ 
-  unsigned int _system_alloc_unit;
-  unsigned int _machine_page_size_bytes;
-  unsigned int _num_processors;
-  
+
+#ifdef GC_GEN_STATS
+  GC_Gen_Stats* stats; /*used to record stats when collection*/
+#endif
+
 } GC_Gen;
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
 void gc_gen_initialize(GC_Gen *gc, POINTER_SIZE_INT initial_heap_size, POINTER_SIZE_INT final_heap_size);
 void gc_gen_destruct(GC_Gen *gc);
+void gc_gen_collection_verbose_info(GC_Gen *gc, int64 pause_time, int64 mutator_time);
+void gc_gen_space_verbose_info(GC_Gen *gc);
+void gc_gen_initial_verbose_info(GC_Gen *gc);
+void gc_gen_wrapup_verbose(GC_Gen* gc);
                         
 inline POINTER_SIZE_INT gc_gen_free_memory_size(GC_Gen* gc)
 {  return space_free_memory_size((Blocked_Space*)gc->nos) +
@@ -161,8 +173,6 @@ void gc_set_nos(GC_Gen* gc, Space* nos);
 void gc_set_mos(GC_Gen* gc, Space* mos);
 void gc_set_los(GC_Gen* gc, Space* los);
 
-unsigned int gc_get_processor_num(GC_Gen* gc);
-
 void gc_decide_collection_algorithm(GC_Gen* gc, char* minor_algo, char* major_algo);
 void gc_decide_collection_kind(GC_Gen* gc, unsigned int cause);
 
@@ -184,6 +194,4 @@ void gc_gen_iterate_heap(GC_Gen *gc);
 extern Boolean GEN_NONGEN_SWITCH ;
 
 #endif /* ifndef _GC_GEN_H_ */
-
-
 

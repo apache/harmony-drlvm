@@ -26,6 +26,9 @@
 #include "../finalizer_weakref/finalizer_weakref.h"
 #include "../common/compressed_ref.h"
 
+#ifdef GC_GEN_STATS
+#include "../gen/gen_stats.h"
+#endif
 static FORCE_INLINE Boolean fspace_object_to_be_forwarded(Partial_Reveal_Object *p_obj, Fspace *fspace)
 {
   assert(obj_belongs_to_nos(p_obj));  
@@ -114,9 +117,14 @@ static FORCE_INLINE void forward_object(Collector *collector, REF *p_ref)
     if( !addr_belongs_to_nos(p_ref) && address_belongs_to_gc_heap(p_ref, gc))
       collector_remset_add_entry(collector, ( Partial_Reveal_Object**) p_ref); 
     
-    if(obj_mark_in_oi(p_obj)) 
+    if(obj_mark_in_oi(p_obj)){
       scan_object(collector, p_obj);
-    
+#ifdef GC_GEN_STATS
+      GC_Gen_Collector_Stats* stats = (GC_Gen_Collector_Stats*)collector->stats;
+      gc_gen_collector_update_marked_nos_obj_stats_minor(stats);
+#endif
+
+    }
     return;
   }
     
@@ -142,6 +150,13 @@ static FORCE_INLINE void forward_object(Collector *collector, REF *p_ref)
     return;
   }  
   /* otherwise, we successfully forwarded */
+
+#ifdef GC_GEN_STATS
+  GC_Gen_Collector_Stats* stats = (GC_Gen_Collector_Stats*)collector->stats;
+  gc_gen_collector_update_marked_nos_obj_stats_minor(stats);
+  gc_gen_collector_update_moved_nos_obj_stats_minor(stats, vm_object_size(p_obj));
+#endif
+
   write_slot(p_ref, p_target_obj);
 
 
@@ -170,6 +185,9 @@ static void collector_trace_rootsets(Collector* collector)
 {
   GC* gc = collector->gc;
   GC_Metadata* metadata = gc->metadata;
+#ifdef GC_GEN_STATS
+  GC_Gen_Collector_Stats* stats = (GC_Gen_Collector_Stats*)collector->stats;
+#endif
   
   unsigned int num_active_collectors = gc->num_active_collectors;
   atomic_cas32( &num_finished_collectors, 0, num_active_collectors);
@@ -181,6 +199,8 @@ static void collector_trace_rootsets(Collector* collector)
   Vector_Block* root_set = pool_iterator_next(metadata->gc_rootset_pool);
 
   /* first step: copy all root objects to trace tasks. */ 
+
+  TRACE2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]: copy root objects to trace stack ......");
   while(root_set){
     POINTER_SIZE_INT* iter = vector_block_iterator_init(root_set);
     while(!vector_block_iterator_end(root_set,iter)){
@@ -189,6 +209,11 @@ static void collector_trace_rootsets(Collector* collector)
       
       if(!*p_ref) continue;  /* root ref cann't be NULL, but remset can be */
       Partial_Reveal_Object *p_obj = read_slot(p_ref);
+
+#ifdef GC_GEN_STATS
+      gc_gen_collector_update_rootset_ref_num(stats);
+#endif
+
       if(obj_belongs_to_nos(p_obj)){
         collector_tracestack_push(collector, p_ref);
       }
@@ -200,6 +225,10 @@ static void collector_trace_rootsets(Collector* collector)
   
   /* second step: iterate over the trace tasks and forward objects */
   collector->trace_stack = free_task_pool_get_entry(metadata);
+
+  TRACE2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]: finish copying root objects to trace stack.");
+
+  TRACE2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]: trace and forward objects ......");
 
 retry:
   Vector_Block* trace_task = pool_get_entry(metadata->mark_task_pool);
@@ -238,6 +267,7 @@ retry:
     atomic_dec32(&num_finished_collectors);
     goto retry;      
   }
+  TRACE2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]: finish tracing and forwarding objects.");
 
   /* now we are done, but each collector has a private stack that is empty */  
   trace_task = (Vector_Block*)collector->trace_stack;
@@ -256,7 +286,10 @@ void gen_forward_pool(Collector* collector)
   collector_trace_rootsets(collector);
   
   /* the rest work is not enough for parallelization, so let only one thread go */
-  if( collector->thread_handle != 0 ) return;
+  if( (POINTER_SIZE_INT)collector->thread_handle != 0 ) {
+    TRACE2("gc.process", "GC: collector["<<(POINTER_SIZE_INT)collector->thread_handle<<"] finished");
+    return;
+  }
 
   gc->collect_result = gc_collection_result(gc);
   if(!gc->collect_result){
@@ -280,6 +313,8 @@ void gen_forward_pool(Collector* collector)
   gc_fix_rootset(collector);
   
   fspace_reset_for_allocation(space);  
+
+  TRACE2("gc.process", "GC: collector[0] finished");
 
   return;
   

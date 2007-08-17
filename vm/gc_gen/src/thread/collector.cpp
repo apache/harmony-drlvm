@@ -101,7 +101,7 @@ static void collector_reset_thread(Collector *collector)
   collector_reset_weakref_sets(collector);
 #endif
 
-#ifndef ONLY_SSPACE_IN_HEAP
+#ifndef USE_MARK_SWEEP_GC
   /*For LOS_Shrink and LOS_Extend*/
   if(collector->gc->tuner->kind != TRANS_NOTHING){
     collector->non_los_live_obj_size = 0;
@@ -224,12 +224,37 @@ static void collector_terminate_thread(Collector* collector)
   return;
 }
 
+#include "../common/gc_common.h"
+#ifdef GC_GEN_STATS
+
+#include "../gen/gen_stats.h"
+
+void collector_init_stats(Collector* collector)
+{
+#ifndef USE_MARK_SWEEP_GC
+  gc_gen_collector_stats_initialize(collector);
+#endif
+}
+
+void collector_destruct_stats(Collector* collector)
+{
+#ifndef USE_MARK_SWEEP_GC
+  gc_gen_collector_stats_destruct(collector);
+#endif
+}
+
+#endif
+
 void collector_destruct(GC* gc) 
 {
+  TRACE2("gc.process", "GC: GC collectors destruct ...");
   for(unsigned int i=0; i<gc->num_collectors; i++)
   {
     Collector* collector = gc->collectors[i];
     collector_terminate_thread(collector);
+#ifdef GC_GEN_STATS
+    collector_destruct_stats(collector);
+#endif
     STD_FREE(collector);
    
   }
@@ -241,21 +266,12 @@ void collector_destruct(GC* gc)
 
 unsigned int NUM_COLLECTORS = 0;
 
-struct GC_Gen;
-unsigned int gc_get_processor_num(GC_Gen*);
-#ifdef ONLY_SSPACE_IN_HEAP
-struct GC_MS;
-unsigned int gc_ms_get_processor_num(GC_MS *gc);
-#endif
-
 void collector_initialize(GC* gc)
 {
+  TRACE2("gc.process", "GC: GC collectors init ... \n");
+
   //FIXME::
-#ifndef ONLY_SSPACE_IN_HEAP
-  unsigned int num_processors = gc_get_processor_num((GC_Gen*)gc);
-#else
-  unsigned int num_processors = gc_ms_get_processor_num((GC_MS*)gc);
-#endif
+  unsigned int num_processors = gc_get_processor_num(gc);
   
   unsigned int nthreads = max( max( MAJOR_COLLECTORS, MINOR_COLLECTORS), max(NUM_COLLECTORS, num_processors)); 
 
@@ -273,10 +289,14 @@ void collector_initialize(GC* gc)
     collector->gc = gc;
     collector_init_thread(collector);
 
-#ifdef ONLY_SSPACE_IN_HEAP
+#ifdef USE_MARK_SWEEP_GC
     collector_init_free_chunk_list(collector);
 #endif
-    
+
+#ifdef GC_GEN_STATS
+    collector_init_stats(collector);
+#endif
+
     gc->collectors[i] = collector;
   }
 

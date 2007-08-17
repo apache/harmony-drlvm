@@ -533,5 +533,3 @@ void verifier_clear_gc_verification(Heap_Verifier* heap_verifier)
 void verifier_reset_hash_distance()
 { hash_obj_distance = 0;}
 
-
-

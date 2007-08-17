@@ -48,6 +48,9 @@ static Boolean fspace_alloc_block(Fspace* fspace, Allocator* allocator)
 }
 
 /* FIXME:: the collection should be separated from the allocation */
+#ifdef GC_GEN_STATS
+#include "../gen/gen_stats.h"
+#endif
 void* fspace_alloc(unsigned size, Allocator *allocator) 
 {
   void*  p_return = NULL;
@@ -64,6 +67,11 @@ void* fspace_alloc(unsigned size, Allocator *allocator)
     /* after holding lock, try if other thread collected already */
     if ( !space_has_free_block((Blocked_Space*)fspace) ) {  
         if(attempts < 2) {
+#ifdef GC_GEN_STATS
+        GC_Gen* gc = (GC_Gen*)allocator->gc;
+        GC_Gen_Stats* stats = gc->stats;
+        gc_gen_update_nos_alloc_obj_stats(stats, fspace->committed_heap_size);
+#endif
           gc_reclaim_heap(allocator->gc, GC_CAUSE_NOS_IS_FULL); 
           if(allocator->alloc_block){
             vm_gc_unlock_enum();  
@@ -85,6 +93,4 @@ void* fspace_alloc(unsigned size, Allocator *allocator)
   return p_return;
   
 }
-
-
 

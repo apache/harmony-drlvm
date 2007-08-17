@@ -20,12 +20,20 @@
 #include "../gen/gen.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 
+#ifdef GC_GEN_STATS
+#include "../gen/gen_stats.h"
+#endif
+
 static FORCE_INLINE void scan_slot(Collector* collector, REF *p_ref)
 {
   Partial_Reveal_Object *p_obj = read_slot(p_ref);
   if(p_obj == NULL) return;
 
   if(obj_mark_in_vt(p_obj)){
+#ifdef GC_GEN_STATS
+    GC_Gen_Collector_Stats* stats = (GC_Gen_Collector_Stats*)collector->stats;
+    gc_gen_collector_update_marked_obj_stats_major(stats);
+#endif
     collector_tracestack_push(collector, p_obj);
     unsigned int obj_size = vm_object_size(p_obj);
 #ifdef USE_32BITS_HASHCODE
@@ -117,6 +125,9 @@ void mark_scan_heap_for_space_tune(Collector *collector)
 {
   GC* gc = collector->gc;
   GC_Metadata* metadata = gc->metadata;
+#ifdef GC_GEN_STATS
+  GC_Gen_Collector_Stats* stats = (GC_Gen_Collector_Stats*)collector->stats;
+#endif
 
   /* reset the num_finished_collectors to be 0 by one collector. This is necessary for the barrier later. */
   unsigned int num_active_collectors = gc->num_active_collectors;
@@ -146,6 +157,11 @@ void mark_scan_heap_for_space_tune(Collector *collector)
       */
       if(obj_mark_in_vt(p_obj)){
         collector_tracestack_push(collector, p_obj);
+
+#ifdef GC_GEN_STATS 
+        gc_gen_collector_update_rootset_ref_num(stats);
+#endif
+
         unsigned int obj_size = vm_object_size(p_obj);
 #ifdef USE_32BITS_HASHCODE
         obj_size += (hashcode_is_set(p_obj))?GC_OBJECT_ALIGNMENT:0;
@@ -210,5 +226,6 @@ retry:
 
 void trace_obj_in_space_tune_marking(Collector *collector, void *p_obj)
 {
+  obj_mark_in_vt((Partial_Reveal_Object*)p_obj);
   trace_object(collector, (Partial_Reveal_Object *)p_obj);
 }

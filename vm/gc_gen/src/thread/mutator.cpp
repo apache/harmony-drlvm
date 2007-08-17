@@ -44,7 +44,7 @@ void mutator_initialize(GC* gc, void *unused_gc_information)
   else
     mutator->obj_with_fin = NULL;
 
-#ifdef ONLY_SSPACE_IN_HEAP
+#ifdef USE_MARK_SWEEP_GC
   allocator_init_local_chunks((Allocator*)mutator);
 #endif
   
@@ -68,7 +68,7 @@ void mutator_destruct(GC* gc, void *unused_gc_information)
 
   alloc_context_reset((Allocator*)mutator);
 
-#ifdef ONLY_SSPACE_IN_HEAP
+#ifdef USE_MARK_SWEEP_GC
   allocactor_destruct_local_chunks((Allocator*)mutator);
 #endif
 
@@ -105,6 +105,7 @@ void mutator_destruct(GC* gc, void *unused_gc_information)
 
 void gc_reset_mutator_context(GC* gc)
 {
+  TRACE2("gc.process", "GC: reset mutator context  ...\n");
   Mutator *mutator = gc->mutator_list;
   while (mutator) {
     alloc_context_reset((Allocator*)mutator);    
@@ -122,6 +123,5 @@ void gc_prepare_mutator_remset(GC* gc)
   }  
   return;
 }
-
 
 

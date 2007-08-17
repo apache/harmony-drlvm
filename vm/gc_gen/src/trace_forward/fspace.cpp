@@ -185,6 +185,11 @@ void collector_execute_task(GC* gc, TaskType task_func, Space* space);
 
 unsigned int mspace_free_block_idx;
 
+
+#ifdef GC_GEN_STATS
+#include "../gen/gen_stats.h"
+#endif
+
 /* world is stopped when starting fspace_collection */      
 void fspace_collection(Fspace *fspace)
 {
@@ -206,20 +211,30 @@ void fspace_collection(Fspace *fspace)
 
 #ifdef MARK_BIT_FLIPPING
     
-    case MINOR_NONGEN_FORWARD_POOL:
-      collector_execute_task(gc, (TaskType)nongen_forward_pool, (Space*)fspace);    
-      break;
+case MINOR_NONGEN_FORWARD_POOL:
+  TRACE2("gc.process", "GC: nongen_forward_pool algo start ... \n");
+  collector_execute_task(gc, (TaskType)nongen_forward_pool, (Space*)fspace);   
+  TRACE2("gc.process", "\nGC: end of nongen forward algo ... \n");
+#ifdef GC_GEN_STATS
+  gc_gen_stats_set_nos_algo((GC_Gen*)gc, MINOR_NONGEN_FORWARD_POOL);
+#endif
+  break;
         
 #endif /*#ifdef MARK_BIT_FLIPPING */
 
-    case MINOR_GEN_FORWARD_POOL:
-      collector_execute_task(gc, (TaskType)gen_forward_pool, (Space*)fspace);
-      break;
+case MINOR_GEN_FORWARD_POOL:
+  TRACE2("gc.process", "gen_forward_pool algo start ... \n");
+  collector_execute_task(gc, (TaskType)gen_forward_pool, (Space*)fspace);
+  TRACE2("gc.process", "\nGC: end of gen forward algo ... \n");
+#ifdef GC_GEN_STATS
+  gc_gen_stats_set_nos_algo((GC_Gen*)gc, MINOR_NONGEN_FORWARD_POOL);
+#endif
+  break;
         
-    default:
-      printf("\nSpecified minor collection algorithm doesn't exist!\n");
-      exit(0);    
-      break;
+default:
+  DIE2("gc.collection","Specified minor collection algorithm doesn't exist!");
+  exit(0);    
+  break;
   }
 
   return; 

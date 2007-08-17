@@ -62,6 +62,7 @@ void lspace_initialize(GC* gc, void* start, POINTER_SIZE_INT lspace_size)
   lspace->num_collections = 0;
   lspace->time_collections = 0;
   lspace->survive_ratio = 0.5f;
+
   lspace->last_alloced_size = 0;
   lspace->accumu_alloced_size = 0;  
   lspace->total_alloced_size = 0;
@@ -129,3 +130,4 @@ POINTER_SIZE_INT lspace_get_failure_size(Lspace* lspace)
 {
   return lspace->failure_size;
 }
+

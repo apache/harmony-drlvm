@@ -30,6 +30,9 @@ Space* gc_get_nos(GC_Gen* gc);
 static volatile Block_Header* next_block_for_compact;
 static volatile Block_Header* next_block_for_target;
 
+#ifdef GC_GEN_STATS
+#include "../gen/gen_stats.h"
+#endif
 void mspace_update_info_after_space_tuning(Mspace* mspace)
 {
   Space_Tuner *tuner = mspace->gc->tuner;
@@ -308,9 +311,25 @@ void mspace_collection(Mspace* mspace)
 
   //For_LOS_extend
   if(gc->tuner->kind != TRANS_NOTHING){
+
+    TRACE2("gc.process", "GC: slide compact algo start ... \n");
     collector_execute_task(gc, (TaskType)slide_compact_mspace, (Space*)mspace);
+    TRACE2("gc.process", "\nGC: end of slide compact algo ... \n");
+
+#ifdef GC_GEN_STATS
+    gc_gen_stats_set_mos_algo((GC_Gen*)gc, MAJOR_COMPACT_SLIDE);
+#endif
+
   }else if (gc_match_kind(gc, FALLBACK_COLLECTION)){
+
+    TRACE2("gc.process", "GC: slide compact algo start ... \n");
     collector_execute_task(gc, (TaskType)slide_compact_mspace, (Space*)mspace);  
+    TRACE2("gc.process", "\nGC: end of slide compact algo ... \n");
+
+#ifdef GC_GEN_STATS
+    gc_gen_stats_set_los_collected_flag((GC_Gen*)gc, true);
+    gc_gen_stats_set_mos_algo((GC_Gen*)gc, MAJOR_COMPACT_SLIDE);
+#endif
     //IS_MOVE_COMPACT = TRUE;
     //collector_execute_task(gc, (TaskType)move_compact_mspace, (Space*)mspace);
     //IS_MOVE_COMPACT = FALSE;
@@ -318,17 +337,29 @@ void mspace_collection(Mspace* mspace)
 
     switch(mspace->collect_algorithm){
       case MAJOR_COMPACT_SLIDE:
-        collector_execute_task(gc, (TaskType)slide_compact_mspace, (Space*)mspace);    
+  TRACE2("gc.process", "GC: slide compact algo start ... \n");
+  collector_execute_task(gc, (TaskType)slide_compact_mspace, (Space*)mspace); 
+  TRACE2("gc.process", "\nGC: end of slide compact algo ... \n");
+#ifdef GC_GEN_STATS
+  gc_gen_stats_set_los_collected_flag((GC_Gen*)gc, true);
+  gc_gen_stats_set_mos_algo((GC_Gen*)gc, MAJOR_COMPACT_SLIDE);
+#endif
         break;
         
       case MAJOR_COMPACT_MOVE:
         IS_MOVE_COMPACT = TRUE;
-        collector_execute_task(gc, (TaskType)move_compact_mspace, (Space*)mspace);
-        IS_MOVE_COMPACT = FALSE;
-        break;
-  
+
+  TRACE2("gc.process", "GC: move compact algo start ... \n");
+  collector_execute_task(gc, (TaskType)move_compact_mspace, (Space*)mspace);
+  TRACE2("gc.process", "\nGC: end of move compact algo ... \n");
+  IS_MOVE_COMPACT = FALSE;
+#ifdef GC_GEN_STATS
+  gc_gen_stats_set_mos_algo((GC_Gen*)gc, MAJOR_COMPACT_MOVE);
+#endif
+  break;
+
       default:
-        printf("\nThe speficied major collection algorithm doesn't exist!\n");
+        DIE2("gc.collect", "The speficied major collection algorithm doesn't exist!");
         exit(0);
         break;
     }
@@ -337,8 +368,4 @@ void mspace_collection(Mspace* mspace)
 
   return;  
 } 
-
-
-
-
 

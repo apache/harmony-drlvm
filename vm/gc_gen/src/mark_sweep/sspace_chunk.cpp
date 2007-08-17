@@ -85,7 +85,7 @@ void sspace_init_chunks(Sspace *sspace)
   
   /* Init the first free chunk: from heap start to heap end */
   Free_Chunk *free_chunk = (Free_Chunk*)sspace->heap_start;
-  free_chunk->adj_next = (Chunk_Heaer_Basic*)sspace->heap_end;
+  free_chunk->adj_next = (Chunk_Header_Basic*)sspace->heap_end;
   POINTER_SIZE_INT chunk_size = sspace->reserved_heap_size;
   assert(chunk_size > CHUNK_GRANULARITY && !(chunk_size % CHUNK_GRANULARITY));
   sspace_put_free_chunk(sspace, free_chunk);
@@ -103,12 +103,6 @@ static void pfc_pool_set_steal_flag(Pool *pool, unsigned int steal_threshold, Bo
   steal_flag = steal_threshold ? FALSE : TRUE;
 }
 
-static void empty_pool(Pool *pool)
-{
-  pool->top = (Stack_Top)NULL;
-  pool->cur = NULL;
-}
-
 void sspace_clear_chunk_list(GC *gc)
 {
   unsigned int i, j;
@@ -119,7 +113,7 @@ void sspace_clear_chunk_list(GC *gc)
     for(j = size_segments[i]->chunk_num; j--;){
       Pool *pool = pfc_pools[i][j];
       pfc_pool_set_steal_flag(pool, steal_threshold, pfc_steal_flags[i][j]);
-      empty_pool(pool);
+      pool_empty(pool);
     }
   }
   
@@ -202,15 +196,15 @@ static Free_Chunk *partition_normal_free_chunk(Sspace *sspace, Free_Chunk *chunk
 {
   assert(CHUNK_SIZE(chunk) > NORMAL_CHUNK_SIZE_BYTES);
   
-  Chunk_Heaer_Basic *adj_next = chunk->adj_next;
+  Chunk_Header_Basic *adj_next = chunk->adj_next;
   Free_Chunk *normal_chunk = (Free_Chunk*)(((POINTER_SIZE_INT)chunk + NORMAL_CHUNK_SIZE_BYTES-1) & NORMAL_CHUNK_HIGH_MASK);
   
   if(chunk != normal_chunk){
     assert(chunk < normal_chunk);
-    chunk->adj_next = (Chunk_Heaer_Basic*)normal_chunk;
+    chunk->adj_next = (Chunk_Header_Basic*)normal_chunk;
     sspace_put_free_chunk(sspace, chunk);
   }
-  normal_chunk->adj_next = (Chunk_Heaer_Basic*)((POINTER_SIZE_INT)normal_chunk + NORMAL_CHUNK_SIZE_BYTES);
+  normal_chunk->adj_next = (Chunk_Header_Basic*)((POINTER_SIZE_INT)normal_chunk + NORMAL_CHUNK_SIZE_BYTES);
   if(normal_chunk->adj_next != adj_next){
     assert(normal_chunk->adj_next < adj_next);
     Free_Chunk *back_chunk = (Free_Chunk*)normal_chunk->adj_next;
@@ -232,7 +226,7 @@ static void partition_abnormal_free_chunk(Sspace *sspace,Free_Chunk *chunk, unsi
   
   Free_Chunk *back_chunk = (Free_Chunk*)((POINTER_SIZE_INT)chunk + chunk_size);
   back_chunk->adj_next = chunk->adj_next;
-  chunk->adj_next = (Chunk_Heaer_Basic*)back_chunk;
+  chunk->adj_next = (Chunk_Header_Basic*)back_chunk;
   sspace_put_free_chunk(sspace, back_chunk);
 }
 
@@ -373,6 +367,40 @@ Free_Chunk *sspace_get_hyper_free_chunk(Sspace *sspace, unsigned int chunk_size,
   return chunk;
 }
 
+typedef struct PFC_Pool_Iterator {
+  volatile unsigned int seg_index;
+  volatile unsigned int chunk_index;
+  SpinLock lock;
+} PFC_Pool_Iterator;
+
+static PFC_Pool_Iterator pfc_pool_iterator;
+
+void sspace_init_pfc_pool_iterator(Sspace *sspace)
+{
+  assert(pfc_pool_iterator.lock == FREE_LOCK);
+  pfc_pool_iterator.seg_index = 0;
+  pfc_pool_iterator.chunk_index = 0;
+}
+
+Pool *sspace_grab_next_pfc_pool(Sspace *sspace)
+{
+  Pool *pfc_pool = NULL;
+  
+  lock(pfc_pool_iterator.lock);
+  for(; pfc_pool_iterator.seg_index < SIZE_SEGMENT_NUM; ++pfc_pool_iterator.seg_index){
+    for(; pfc_pool_iterator.chunk_index < size_segments[pfc_pool_iterator.seg_index]->chunk_num; ++pfc_pool_iterator.chunk_index){
+      pfc_pool = pfc_pools[pfc_pool_iterator.seg_index][pfc_pool_iterator.chunk_index];
+      ++pfc_pool_iterator.chunk_index;
+      unlock(pfc_pool_iterator.lock);
+      return pfc_pool;
+    }
+    pfc_pool_iterator.chunk_index = 0;
+  }
+  unlock(pfc_pool_iterator.lock);
+  
+  return NULL;
+}
+
 #define min_value(x, y) (((x) < (y)) ? (x) : (y))
 
 Chunk_Header *sspace_steal_pfc(Sspace *sspace, unsigned int seg_index, unsigned int index)
@@ -389,13 +417,140 @@ Chunk_Header *sspace_steal_pfc(Sspace *sspace, unsigned int seg_index, unsigned 
   return NULL;
 }
 
+static POINTER_SIZE_INT free_mem_in_pfc_pools(Sspace *sspace, Boolean show_chunk_info)
+{
+  Size_Segment **size_segs = sspace->size_segments;
+  Pool ***pfc_pools = sspace->pfc_pools;
+  POINTER_SIZE_INT free_mem_size = 0;
+  
+  for(unsigned int i = 0; i < SIZE_SEGMENT_NUM; ++i){
+    for(unsigned int j = 0; j < size_segs[i]->chunk_num; ++j){
+      Pool *pfc_pool = pfc_pools[i][j];
+      if(pool_is_empty(pfc_pool))
+        continue;
+      pool_iterator_init(pfc_pool);
+      Chunk_Header *chunk = (Chunk_Header*)pool_iterator_next(pfc_pool);
+      assert(chunk);
+      unsigned int slot_num = chunk->slot_num;
+      unsigned int chunk_num = 0;
+      unsigned int alloc_num = 0;
+      while(chunk){
+        assert(chunk->slot_num == slot_num);
+        ++chunk_num;
+        alloc_num += chunk->alloc_num;
+        chunk = (Chunk_Header*)pool_iterator_next(pfc_pool);
+      }
+      unsigned int total_slot_num = slot_num * chunk_num;
+      assert(alloc_num < total_slot_num);
+#ifdef SSPACE_CHUNK_INFO
+      if(show_chunk_info)
+        printf("Size: %x\tchunk num: %d\tLive Ratio: %f\n", NORMAL_INDEX_TO_SIZE(j, size_segs[i]), chunk_num, (float)alloc_num/total_slot_num);
+#endif
+      free_mem_size += NORMAL_INDEX_TO_SIZE(j, size_segs[i]) * (total_slot_num-alloc_num);
+      assert(free_mem_size < sspace->committed_heap_size);
+    }
+  }
+  
+  return free_mem_size;
+}
+
+static POINTER_SIZE_INT free_mem_in_free_lists(Sspace *sspace, Free_Chunk_List *lists, unsigned int list_num, Boolean show_chunk_info)
+{
+  POINTER_SIZE_INT free_mem_size = 0;
+  
+  for(unsigned int index = 0; index < list_num; ++index){
+    Free_Chunk *chunk = lists[index].head;
+    if(!chunk) continue;
+    POINTER_SIZE_INT chunk_size = CHUNK_SIZE(chunk);
+    assert(chunk_size <= HYPER_OBJ_THRESHOLD);
+    unsigned int chunk_num = 0;
+    while(chunk){
+      assert(CHUNK_SIZE(chunk) == chunk_size);
+      ++chunk_num;
+      chunk = chunk->next;
+    }
+    free_mem_size += chunk_size * chunk_num;
+    assert(free_mem_size < sspace->committed_heap_size);
+#ifdef SSPACE_CHUNK_INFO
+    if(show_chunk_info)
+      printf("Free Size: %x\tnum: %d\n", chunk_size, chunk_num);
+#endif
+  }
+  
+  return free_mem_size;
+}
+
+static POINTER_SIZE_INT free_mem_in_hyper_free_list(Sspace *sspace, Boolean show_chunk_info)
+{
+  POINTER_SIZE_INT free_mem_size = 0;
+  
+  Free_Chunk_List *list = sspace->hyper_free_chunk_list;
+  Free_Chunk *chunk = list->head;
+  while(chunk){
+#ifdef SSPACE_CHUNK_INFO
+    if(show_chunk_info)
+      printf("Size: %x\n", CHUNK_SIZE(chunk));
+#endif
+    free_mem_size += CHUNK_SIZE(chunk);
+    assert(free_mem_size < sspace->committed_heap_size);
+    chunk = chunk->next;
+  }
+  
+  return free_mem_size;
+}
+
+POINTER_SIZE_INT free_mem_in_sspace(Sspace *sspace, Boolean show_chunk_info)
+{
+  POINTER_SIZE_INT free_mem_size = 0;
+
+#ifdef SSPACE_CHUNK_INFO
+  if(show_chunk_info)
+    printf("\n\nPFC INFO:\n\n");
+#endif
+  free_mem_size += free_mem_in_pfc_pools(sspace, show_chunk_info);
+
+#ifdef SSPACE_CHUNK_INFO
+  if(show_chunk_info)
+    printf("\n\nALIGNED FREE CHUNK INFO:\n\n");
+#endif
+  free_mem_size += free_mem_in_free_lists(sspace, aligned_free_chunk_lists, NUM_ALIGNED_FREE_CHUNK_BUCKET, show_chunk_info);
+
+#ifdef SSPACE_CHUNK_INFO
+  if(show_chunk_info)
+    printf("\n\nUNALIGNED FREE CHUNK INFO:\n\n");
+#endif
+  free_mem_size += free_mem_in_free_lists(sspace, unaligned_free_chunk_lists, NUM_UNALIGNED_FREE_CHUNK_BUCKET, show_chunk_info);
+
+#ifdef SSPACE_CHUNK_INFO
+  if(show_chunk_info)
+    printf("\n\nSUPER FREE CHUNK INFO:\n\n");
+#endif
+  free_mem_size += free_mem_in_hyper_free_list(sspace, show_chunk_info);
+  
+  return free_mem_size;
+}
+
+
+#ifdef SSPACE_CHUNK_INFO
+void sspace_chunks_info(Sspace *sspace, Boolean show_info)
+{
+  if(!show_info) return;
+  
+  POINTER_SIZE_INT free_mem_size = free_mem_in_sspace(sspace, TRUE);
+  
+  float free_mem_ratio = (float)free_mem_size / sspace->committed_heap_size;
+  printf("\n\nFree mem ratio: %f\n\n", free_mem_ratio);
+}
+#endif
+
+
 /* Because this computation doesn't use lock, its result is not accurate. And it is enough. */
 POINTER_SIZE_INT sspace_free_memory_size(Sspace *sspace)
 {
   POINTER_SIZE_INT free_size = 0;
   
   vm_gc_lock_enum();
-  
+  /*
   for(unsigned int i=NUM_ALIGNED_FREE_CHUNK_BUCKET; i--;)
     free_size += NORMAL_CHUNK_SIZE_BYTES * (i+1) * sspace->aligned_free_chunk_lists[i].chunk_num;
   
@@ -407,136 +562,13 @@ POINTER_SIZE_INT sspace_free_memory_size(Sspace *sspace)
     free_size += CHUNK_SIZE(hyper_chunk);
     hyper_chunk = hyper_chunk->next;
   }
-  
+  */
+  free_size = free_mem_in_sspace(sspace, FALSE);
   vm_gc_unlock_enum();
   
   return free_size;
 }
 
-
-#ifdef SSPACE_CHUNK_INFO
-
-extern POINTER_SIZE_INT alloc_mask_in_table;
-static POINTER_SIZE_INT free_mem_size;
-
-static unsigned int word_set_bit_num(POINTER_SIZE_INT word)
-{
-  unsigned int count = 0;
-  
-  while(word){
-    word &= word - 1;
-    ++count;
-  }
-  return count;
-}
-
-static unsigned int pfc_info(Chunk_Header *chunk, Boolean before_gc)
-{
-  POINTER_SIZE_INT *table = ((Chunk_Header*)chunk)->table;
-  unsigned int slot_num = chunk->slot_num;
-  unsigned int live_num = 0;
-  
-  unsigned int index_word_num = (slot_num + SLOT_NUM_PER_WORD_IN_TABLE - 1) / SLOT_NUM_PER_WORD_IN_TABLE;
-  for(unsigned int i=0; i<index_word_num; ++i){
-    table[i] &= alloc_mask_in_table;
-    unsigned int live_num_in_word = (table[i] == alloc_mask_in_table) ? SLOT_NUM_PER_WORD_IN_TABLE : word_set_bit_num(table[i]);
-    live_num += live_num_in_word;
-  }
-  if(before_gc){
-    unsigned int slot_num_in_last_word = slot_num % SLOT_NUM_PER_WORD_IN_TABLE;
-    if(slot_num_in_last_word){
-      unsigned int fake_live_num_in_last_word = SLOT_NUM_PER_WORD_IN_TABLE - slot_num_in_last_word;
-      assert(live_num >= fake_live_num_in_last_word);
-      live_num -= fake_live_num_in_last_word;
-    }
-  }
-  assert(live_num <= slot_num);
-  return live_num;
-}
-
-static void pfc_pools_info(Sspace *sspace, Boolean before_gc)
-{
-  for(unsigned int i = 0; i < SIZE_SEGMENT_NUM; ++i){
-    for(unsigned int j = 0; j < size_segments[i]->chunk_num; ++j){
-      Pool *pool = pfc_pools[i][j];
-      Chunk_Header *chunk = NULL;
-      unsigned int chunk_counter = 0;
-      unsigned int slot_num = 0;
-      unsigned int live_num = 0;
-      pool_iterator_init(pool);
-      while(chunk = (Chunk_Header*)pool_iterator_next(pool)){
-        ++chunk_counter;
-        slot_num += chunk->slot_num;
-        live_num += pfc_info(chunk, before_gc);
-      }
-      if(slot_num){
-        printf("Size: %x\tchunk num: %d\tlive obj: %d\ttotal obj: %d\tLive Ratio: %f\n", NORMAL_INDEX_TO_SIZE(j, size_segments[i]), chunk_counter, live_num, slot_num, (float)live_num/slot_num);
-        assert(live_num < slot_num);
-        free_mem_size += NORMAL_INDEX_TO_SIZE(j, size_segments[i]) * (slot_num-live_num);
-        assert(free_mem_size < sspace->committed_heap_size);
-      }
-    }
-  }
-}
-
-enum Chunk_Type {
-  ALIGNED_CHUNK,
-  UNALIGNED_CHUNK
-};
-static unsigned int chunk_index_to_size(unsigned int index, Chunk_Type type)
-{
-  if(type == ALIGNED_CHUNK)
-    return ALIGNED_CHUNK_INDEX_TO_SIZE(index);
-  assert(type == UNALIGNED_CHUNK);
-  return UNALIGNED_CHUNK_INDEX_TO_SIZE(index);
-}
-
-static void free_lists_info(Sspace *sspace, Free_Chunk_List *lists, unsigned int list_num, Chunk_Type type)
-{
-  unsigned int index;
-  
-  for(index = 0; index < list_num; ++index){
-    Free_Chunk *chunk = lists[index].head;
-    unsigned int chunk_counter = 0;
-    while(chunk){
-      ++chunk_counter;
-      unsigned int chunk_size = CHUNK_SIZE(chunk);
-      assert(chunk_size <= HYPER_OBJ_THRESHOLD);
-      free_mem_size += chunk_size;
-      assert(free_mem_size < sspace->committed_heap_size);
-      chunk = chunk->next;
-    }
-    printf("Free Size: %x\tnum: %d\n", chunk_index_to_size(index, type), chunk_counter);
-  }
-}
-
-void sspace_chunks_info(Sspace *sspace, Boolean before_gc)
-{
-  if(!before_gc) return;
-  
-  printf("\n\nPFC INFO:\n\n");
-  pfc_pools_info(sspace, before_gc);
-  
-  printf("\n\nALIGNED FREE CHUNK INFO:\n\n");
-  free_lists_info(sspace, aligned_free_chunk_lists, NUM_ALIGNED_FREE_CHUNK_BUCKET, ALIGNED_CHUNK);
-  
-  printf("\n\nUNALIGNED FREE CHUNK INFO:\n\n");
-  free_lists_info(sspace, unaligned_free_chunk_lists, NUM_UNALIGNED_FREE_CHUNK_BUCKET, UNALIGNED_CHUNK);
-  
-  printf("\n\nSUPER FREE CHUNK INFO:\n\n");
-  Free_Chunk_List *list = &hyper_free_chunk_list;
-  Free_Chunk *chunk = list->head;
-  while(chunk){
-    printf("Size: %x\n", CHUNK_SIZE(chunk));
-    free_mem_size += CHUNK_SIZE(chunk);
-    assert(free_mem_size < sspace->committed_heap_size);
-    chunk = chunk->next;
-  }
-  printf("\n\nFree mem ratio: %f\n\n", (float)free_mem_size / sspace->committed_heap_size);
-  free_mem_size = 0;
-}
-
-#endif
 
 #ifdef SSPACE_ALLOC_INFO
 

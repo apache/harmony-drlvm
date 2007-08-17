@@ -54,6 +54,7 @@ FORCE_INLINE Partial_Reveal_Object* collector_forward_object(Collector* collecto
   if(p_targ_obj == NULL){
     /* failed to forward an obj */
     collector->result = FALSE;
+    TRACE2("gc.collect", "failed to forward an obj, minor collection failed.");
     return NULL;
   }
     

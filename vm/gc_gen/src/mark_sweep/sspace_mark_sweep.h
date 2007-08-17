@@ -22,6 +22,10 @@
 #include "sspace_verify.h"
 
 #define PFC_REUSABLE_RATIO 0.1
+#define SSPACE_COMPACT_RATIO 0.15
+
+inline Boolean chunk_is_reusable(Chunk_Header *chunk)
+{ return (float)(chunk->slot_num-chunk->alloc_num)/chunk->slot_num > PFC_REUSABLE_RATIO; }
 
 enum Obj_Color {
   OBJ_COLOR_BLUE = 0x0,
@@ -37,15 +41,10 @@ enum Obj_Color {
   #define BLACK_MASK_IN_TABLE  ((POINTER_SIZE_INT)0xAAAAAAAA)
 #endif
 
-extern POINTER_SIZE_INT alloc_mask_in_table;
-extern POINTER_SIZE_INT mark_mask_in_table;
 extern POINTER_SIZE_INT cur_alloc_color;
 extern POINTER_SIZE_INT cur_mark_color;
-
-#define SUPER_OBJ_MASK ((Obj_Info_Type)0x1)  /* the lowest bit in obj info */
-
-inline void set_super_obj_mask(void *large_obj)
-{ ((Partial_Reveal_Object*)large_obj)->obj_info |= SUPER_OBJ_MASK; }
+extern POINTER_SIZE_INT cur_alloc_mask;
+extern POINTER_SIZE_INT cur_mark_mask;
 
 inline Boolean is_super_obj(Partial_Reveal_Object *obj)
 {
@@ -92,9 +91,11 @@ inline Boolean obj_mark_in_table(Partial_Reveal_Object *obj)
     POINTER_SIZE_INT temp = (POINTER_SIZE_INT)atomic_casptr((volatile void**)p_color_word, (void*)new_word, (void*)old_word);
     if(temp == old_word){
 #ifdef SSPACE_VERIFY
+#ifndef SSPACE_VERIFY_FINREF
       assert(obj_is_marked_in_vt(obj));
+#endif
       obj_unmark_in_vt(obj);
-      sspace_verify_mark(obj, vm_object_size(obj));
+      sspace_record_mark(obj, vm_object_size(obj));
 #endif
       return TRUE;
     }
@@ -105,10 +106,29 @@ inline Boolean obj_mark_in_table(Partial_Reveal_Object *obj)
   return FALSE;
 }
 
-extern void sspace_mark_scan(Collector *collector);
-extern void sspace_sweep(Collector *collector, Sspace *sspace);
-extern void gc_collect_free_chunks(GC *gc, Sspace *sspace);
+inline void collector_add_free_chunk(Collector *collector, Free_Chunk *chunk)
+{
+  Free_Chunk_List *list = collector->free_chunk_list;
+  
+  chunk->status = CHUNK_FREE | CHUNK_TO_MERGE;
+  chunk->next = list->head;
+  chunk->prev = NULL;
+  if(list->head)
+    list->head->prev = chunk;
+  else
+    list->tail = chunk;
+  list->head = chunk;
+}
 
-extern void chunk_set_slot_index(Chunk_Header* chunk, unsigned int first_free_word_index);
+
+extern void sspace_mark_scan(Collector *collector);
+extern void gc_init_chunk_for_sweep(GC *gc, Sspace *sspace);
+extern void sspace_sweep(Collector *collector, Sspace *sspace);
+extern void compact_sspace(Collector *collector, Sspace *sspace);
+extern void gc_collect_free_chunks(GC *gc, Sspace *sspace);
+extern Chunk_Header_Basic *sspace_grab_next_chunk(Sspace *sspace, Chunk_Header_Basic *volatile *shared_next_chunk, Boolean need_construct);
+
+extern void pfc_set_slot_index(Chunk_Header *chunk, unsigned int first_free_word_index, POINTER_SIZE_INT alloc_color);
+extern void pfc_reset_slot_index(Chunk_Header *chunk);
 
 #endif // _SSPACE_MARK_SWEEP_H_

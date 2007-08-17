@@ -57,6 +57,7 @@ typedef struct Sspace {
 
   /* END of Space --> */
   
+  Boolean need_compact;
   Size_Segment **size_segments;
   Pool ***pfc_pools;
   Free_Chunk_List *aligned_free_chunk_lists;
@@ -81,7 +82,7 @@ void collector_init_free_chunk_list(Collector *collector);
 POINTER_SIZE_INT sspace_free_memory_size(Sspace *sspace);
 
 
-#ifndef ONLY_SSPACE_IN_HEAP
+#ifndef USE_MARK_SWEEP_GC
 #define gc_get_sspace(gc) ((Sspace*)gc_get_mos((GC_Gen*)(gc)))
 #else
 #define gc_get_sspace(gc) (gc_ms_get_sspace((GC_MS*)(gc)));

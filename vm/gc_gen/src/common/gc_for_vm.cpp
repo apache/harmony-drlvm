@@ -20,6 +20,7 @@
  */
 
 #include <cxxlog.h>
+#include "port_sysinfo.h"
 #include "vm_threads.h"
 #include "compressed_ref.h"
 
@@ -41,11 +42,20 @@ void gc_tls_init();
 Boolean gc_requires_barriers() 
 {   return p_global_gc->generate_barrier; }
 
+static void gc_get_system_info(GC *gc)
+{
+  gc->_machine_page_size_bytes = (unsigned int)port_vmem_page_sizes()[0];
+  gc->_num_processors = port_CPUs_number();
+  gc->_system_alloc_unit = vm_get_system_alloc_unit();
+  SPACE_ALLOC_UNIT = max(gc->_system_alloc_unit, GC_BLOCK_SIZE_BYTES);
+}
+
 int gc_init() 
 {      
+  INFO2("gc.process", "GC: call GC init...\n");
   assert(p_global_gc == NULL);
 
-#ifndef ONLY_SSPACE_IN_HEAP
+#ifndef USE_MARK_SWEEP_GC
   unsigned int gc_struct_size = sizeof(GC_Gen);
 #else
   unsigned int gc_struct_size = sizeof(GC_MS);
@@ -58,10 +68,12 @@ int gc_init()
   gc_parse_options(gc);
   
   gc_tls_init();
-
+  
+  gc_get_system_info(gc);
+  
   gc_metadata_initialize(gc); /* root set and mark stack */
 
-#ifndef ONLY_SSPACE_IN_HEAP
+#ifndef USE_MARK_SWEEP_GC
   gc_gen_initialize((GC_Gen*)gc, min_heap_size_bytes, max_heap_size_bytes);
 #else
   gc_ms_initialize((GC_MS*)gc, min_heap_size_bytes, max_heap_size_bytes);
@@ -78,14 +90,17 @@ int gc_init()
   
   mutator_need_block = FALSE;
 
+  INFO2("gc.process", "GC: end of GC init\n");
   return JNI_OK;
 }
 
 void gc_wrapup() 
 { 
+  INFO2("gc.process", "GC: call GC wrapup ....");
   GC* gc =  p_global_gc;
 
-#ifndef ONLY_SSPACE_IN_HEAP
+#ifndef USE_MARK_SWEEP_GC
+  gc_gen_wrapup_verbose((GC_Gen*)gc);
   gc_gen_destruct((GC_Gen*)gc);
 #else
   gc_ms_destruct((GC_MS*)gc);
@@ -104,6 +119,7 @@ void gc_wrapup()
   STD_FREE(p_global_gc);
 
   p_global_gc = NULL;
+  INFO2("gc.process", "GC: end of GC wrapup\n");
 }
 
 #ifdef COMPRESS_REFERENCE
@@ -177,7 +193,7 @@ void gc_thread_kill(void* gc_info)
 
 int64 gc_free_memory()
 {
-#ifndef ONLY_SSPACE_IN_HEAP
+#ifndef USE_MARK_SWEEP_GC
   return (int64)gc_gen_free_memory_size((GC_Gen*)p_global_gc);
 #else
   return (int64)gc_ms_free_memory_size((GC_MS*)p_global_gc);
@@ -187,7 +203,7 @@ int64 gc_free_memory()
 /* java heap size.*/
 int64 gc_total_memory() 
 {
-#ifndef ONLY_SSPACE_IN_HEAP
+#ifndef USE_MARK_SWEEP_GC
   return (int64)((POINTER_SIZE_INT)gc_gen_total_memory_size((GC_Gen*)p_global_gc));
 #else
   return (int64)((POINTER_SIZE_INT)gc_ms_total_memory_size((GC_MS*)p_global_gc));
@@ -196,7 +212,7 @@ int64 gc_total_memory()
 
 int64 gc_max_memory() 
 {
-#ifndef ONLY_SSPACE_IN_HEAP
+#ifndef USE_MARK_SWEEP_GC
   return (int64)((POINTER_SIZE_INT)gc_gen_total_memory_size((GC_Gen*)p_global_gc));
 #else
   return (int64)((POINTER_SIZE_INT)gc_ms_total_memory_size((GC_MS*)p_global_gc));
@@ -266,8 +282,8 @@ int32 gc_get_hashcode(Managed_Object_Handle p_object)
 #else //USE_32BITS_HASHCODE
 int32 gc_get_hashcode(Managed_Object_Handle p_object)
 {
-#ifdef ONLY_SSPACE_IN_HEAP
-  return (int32)p_object;
+#ifdef USE_MARK_SWEEP_GC
+  return (int32)0;//p_object;
 #endif
 
   Partial_Reveal_Object* p_obj = (Partial_Reveal_Object*)p_object;
@@ -325,7 +341,7 @@ void gc_iterate_heap() {
     // data structures in not consistent for heap iteration
     if (!JVMTI_HEAP_ITERATION) return;
 
-#ifndef ONLY_SSPACE_IN_HEAP
+#ifndef USE_MARK_SWEEP_GC
     gc_gen_iterate_heap((GC_Gen *)p_global_gc);
 #else
     gc_ms_iterate_heap((GC_MS*)p_global_gc);

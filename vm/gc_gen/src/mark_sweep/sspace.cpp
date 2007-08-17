@@ -58,7 +58,7 @@ void sspace_initialize(GC *gc, void *start, unsigned int sspace_size, unsigned i
   
   sspace_init_chunks(sspace);
 
-#ifdef ONLY_SSPACE_IN_HEAP
+#ifdef USE_MARK_SWEEP_GC
   gc_ms_set_sspace((GC_MS*)gc, sspace);
 #else
   gc_set_mos((GC_Gen*)gc, (Space*)sspace);
@@ -141,6 +141,7 @@ void allocactor_destruct_local_chunks(Allocator *allocator)
   STD_FREE(local_chunks);
 }
 
+extern void sspace_decide_compaction_need(Sspace *sspace);
 extern void mark_sweep_sspace(Collector *collector);
 
 void sspace_collection(Sspace *sspace) 
@@ -152,10 +153,15 @@ void sspace_collection(Sspace *sspace)
   sspace_alloc_info_summary();
 #endif
 #ifdef SSPACE_CHUNK_INFO
-  sspace_chunks_info(sspace, TRUE);
+  sspace_chunks_info(sspace, FALSE);
 #endif
 
+  sspace_decide_compaction_need(sspace);
+  if(sspace->need_compact)
+    gc->collect_kind = SWEEP_COMPACT_GC;
+  //printf("\n\n>>>>>>>>%s>>>>>>>>>>>>\n\n", sspace->need_compact ? "SWEEP COMPACT" : "MARK SWEEP");
 #ifdef SSPACE_VERIFY
+  sspace_verify_before_collection(gc);
   sspace_verify_vtable_mark(gc);
 #endif
 

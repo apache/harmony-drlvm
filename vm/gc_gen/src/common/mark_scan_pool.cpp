@@ -24,6 +24,9 @@
 #include "../gen/gen.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 
+#ifdef GC_GEN_STATS
+#include "../gen/gen_stats.h"
+#endif
 static FORCE_INLINE void scan_slot(Collector* collector, REF *p_ref)
 {
   Partial_Reveal_Object *p_obj = read_slot(p_ref);
@@ -31,6 +34,10 @@ static FORCE_INLINE void scan_slot(Collector* collector, REF *p_ref)
 
   if(obj_mark_in_vt(p_obj))
     collector_tracestack_push(collector, p_obj);
+#ifdef GC_GEN_STATS
+    GC_Gen_Collector_Stats* stats = (GC_Gen_Collector_Stats*)collector->stats;
+    gc_gen_collector_update_marked_obj_stats_major(stats);
+#endif
   
   return;
 }
@@ -110,6 +117,9 @@ void mark_scan_pool(Collector* collector)
 {
   GC* gc = collector->gc;
   GC_Metadata* metadata = gc->metadata;
+#ifdef GC_GEN_STATS
+  GC_Gen_Collector_Stats* stats = (GC_Gen_Collector_Stats*)collector->stats;
+#endif
 
   /* reset the num_finished_collectors to be 0 by one collector. This is necessary for the barrier later. */
   unsigned int num_active_collectors = gc->num_active_collectors;
@@ -137,8 +147,13 @@ void mark_scan_pool(Collector* collector)
          and the second time the value is the ref slot is the old position as expected.
          This can be worked around if we want. 
       */
-      if(obj_mark_in_vt(p_obj))
+      if(obj_mark_in_vt(p_obj)){
         collector_tracestack_push(collector, p_obj);
+#ifdef GC_GEN_STATS
+        gc_gen_collector_update_rootset_ref_num(stats);
+        gc_gen_collector_update_marked_obj_stats_major(stats);
+#endif
+      }
 
     } 
     root_set = pool_iterator_next(metadata->gc_rootset_pool);
@@ -192,5 +207,6 @@ retry:
 
 void trace_obj_in_normal_marking(Collector *collector, void *p_obj)
 {
+  obj_mark_in_vt((Partial_Reveal_Object*)p_obj);
   trace_object(collector, (Partial_Reveal_Object *)p_obj);
 }

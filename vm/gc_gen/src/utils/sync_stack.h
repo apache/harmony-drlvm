@@ -147,6 +147,12 @@ inline Boolean sync_stack_is_empty(Sync_Stack* stack)
   return (stack_top_get_entry(stack->top) == NULL);
 }
 
+inline void sync_stack_empty(Sync_Stack* stack)
+{
+  stack->top = (Stack_Top)NULL;
+  stack->cur = NULL;
+}
+
 inline unsigned int sync_stack_size(Sync_Stack* stack)
 {
   unsigned int entry_count = 0;

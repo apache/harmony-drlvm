@@ -17,162 +17,80 @@
 
 #include "sspace.h"
 #include "sspace_chunk.h"
-#include "sspace_mark_sweep.h"
+//#include "sspace_mark_sweep.h"
+#include "sspace_alloc.h"
 #include "gc_ms.h"
 #include "../gen/gen.h"
 
-static Boolean slot_is_alloc_in_table(POINTER_SIZE_INT *table, unsigned int slot_index)
-{
-  unsigned int color_bits_index = slot_index * COLOR_BITS_PER_OBJ;
-  unsigned int word_index = color_bits_index / BITS_PER_WORD;
-  unsigned int index_in_word = color_bits_index % BITS_PER_WORD;
-  
-  return (Boolean)(table[word_index] & (cur_alloc_color << index_in_word));
-}
 
-static void alloc_slot_in_table(POINTER_SIZE_INT *table, unsigned int slot_index)
+/* Only used in pfc_set_slot_index() */
+inline unsigned int first_free_index_in_color_word(POINTER_SIZE_INT word, POINTER_SIZE_INT alloc_color)
 {
-  assert(!slot_is_alloc_in_table(table, slot_index));
-  
-  unsigned int color_bits_index = slot_index * COLOR_BITS_PER_OBJ;
-  unsigned int word_index = color_bits_index / BITS_PER_WORD;
-  unsigned int index_in_word = color_bits_index % BITS_PER_WORD;
-  
-  table[word_index] |= cur_alloc_color << index_in_word;
-}
-
-static unsigned int first_free_index_in_color_word(POINTER_SIZE_INT word)
-{
-  unsigned int index = 0;
-  
-  while(index < BITS_PER_WORD){
-    if(!(word & (cur_mark_color << index)))
+  for(unsigned int index = 0; index < BITS_PER_WORD; index += COLOR_BITS_PER_OBJ)
+    if(!(word & (alloc_color << index)))
       return index;
-    index += COLOR_BITS_PER_OBJ;
-  }
   
   assert(0);  /* There must be a free obj in this table word */
   return MAX_SLOT_INDEX;
 }
 
-static Boolean next_free_index_in_color_word(POINTER_SIZE_INT word, unsigned int &index)
+/* Given an index word in table, set pfc's slot_index
+ * The value of argument alloc_color can be cur_alloc_color or cur_mark_color.
+ * It depends on in which phase this func is called.
+ * In sweeping phase, sspace has been marked but alloc and mark colors have not been flipped,
+ * so we have to use cur_mark_color as alloc_color.
+ * In compaction phase, two colors have been flipped, so we use cur_alloc_color.
+ */
+void pfc_set_slot_index(Chunk_Header *chunk, unsigned int first_free_word_index, POINTER_SIZE_INT alloc_color)
 {
-  while(index < BITS_PER_WORD){
-    if(!(word & (cur_alloc_color << index)))
-      return TRUE;
-    index += COLOR_BITS_PER_OBJ;
-  }
-  return FALSE;
-}
-
-static unsigned int composed_slot_index(unsigned int word_index, unsigned int index_in_word)
-{
-  unsigned int color_bits_index = word_index*BITS_PER_WORD + index_in_word;
-  return color_bits_index/COLOR_BITS_PER_OBJ;
-}
-
-static unsigned int next_free_slot_index_in_table(POINTER_SIZE_INT *table, unsigned int slot_index, unsigned int slot_num)
-{
-  assert(slot_is_alloc_in_table(table, slot_index));
-  
-  unsigned int max_word_index = ((slot_num-1) * COLOR_BITS_PER_OBJ) / BITS_PER_WORD;
-  Boolean found = FALSE;
-  
-  unsigned int color_bits_index = slot_index * COLOR_BITS_PER_OBJ;
-  unsigned int word_index = color_bits_index / BITS_PER_WORD;
-  unsigned int index_in_word = color_bits_index % BITS_PER_WORD;
-  
-  while(word_index < max_word_index){
-    found = next_free_index_in_color_word(table[word_index], index_in_word);
-    if(found)
-      return composed_slot_index(word_index, index_in_word);
-    ++word_index;
-    index_in_word = 0;
-   }
-  
-  index_in_word = 0;
-  found = next_free_index_in_color_word(table[word_index], index_in_word);
-  if(found)
-    return composed_slot_index(word_index, index_in_word);
-  
-  return MAX_SLOT_INDEX;
-}
-
-/* Used for collecting pfc */
-void chunk_set_slot_index(Chunk_Header* chunk, unsigned int first_free_word_index)
-{
-  unsigned int index_in_word = first_free_index_in_color_word(chunk->table[first_free_word_index]);
+  unsigned int index_in_word = first_free_index_in_color_word(chunk->table[first_free_word_index], alloc_color);
   assert(index_in_word != MAX_SLOT_INDEX);
   chunk->slot_index = composed_slot_index(first_free_word_index, index_in_word);
 }
 
-
-/* 1. No need of synchronization. This is a allocator local chunk no matter it is a small or medium obj chunk.
- * 2. If this chunk runs out of space, clear the chunk pointer.
- *    So it is important to give an argument which is a local chunk pointer of a allocator while invoking this func.
- */
-static void *alloc_in_chunk(Chunk_Header* &chunk)
+/* From the table's beginning search the first free slot, and set it to pfc's slot_index */
+void pfc_reset_slot_index(Chunk_Header *chunk)
 {
   POINTER_SIZE_INT *table = chunk->table;
-  unsigned int slot_index = chunk->slot_index;
   
-  void *p_obj = (void*)((POINTER_SIZE_INT)chunk->base + ((POINTER_SIZE_INT)chunk->slot_size * slot_index));
-  alloc_slot_in_table(table, slot_index);
-  if(chunk->status & CHUNK_NEED_ZEROING)
-    memset(p_obj, 0, chunk->slot_size);
-#ifdef SSPACE_VERIFY
-  sspace_verify_free_area((POINTER_SIZE_INT*)p_obj, chunk->slot_size);
-#endif
-  
-  chunk->slot_index = next_free_slot_index_in_table(table, slot_index, chunk->slot_num);
-  if(chunk->slot_index == MAX_SLOT_INDEX){
-    chunk->status = CHUNK_USED | CHUNK_NORMAL;
-    chunk = NULL;
+  unsigned int index_word_num = (chunk->slot_num + SLOT_NUM_PER_WORD_IN_TABLE - 1) / SLOT_NUM_PER_WORD_IN_TABLE;
+  for(unsigned int i=0; i<index_word_num; ++i){
+    if(table[i] != cur_alloc_mask){
+      pfc_set_slot_index(chunk, i, cur_alloc_color);
+      return;
+    }
   }
-  
-  return p_obj;
 }
 
-/* alloc small without-fin object in sspace without getting new free chunk */
+/* Alloc small without-fin object in sspace without getting new free chunk */
 void *sspace_thread_local_alloc(unsigned size, Allocator *allocator)
 {
-  if(size > SUPER_OBJ_THRESHOLD) return NULL;
+  if(size > LARGE_OBJ_THRESHOLD) return NULL;
   
   Sspace *sspace = gc_get_sspace(allocator->gc);
-  void *p_obj = NULL;
   
-  unsigned int seg_index = 0;
-  Size_Segment *size_seg = sspace->size_segments[0];
+  /* Flexible alloc mechanism:
+  Size_Segment *size_seg = sspace_get_size_seg(sspace, size);
+  unsigned int seg_index = size_seg->seg_index;
+  */
+  unsigned int seg_index = (size-GC_OBJECT_ALIGNMENT) / MEDIUM_OBJ_THRESHOLD;
+  assert(seg_index <= 2);
+  Size_Segment *size_seg = sspace->size_segments[seg_index];
+  assert(size_seg->local_alloc);
   
-  for(; seg_index < SIZE_SEGMENT_NUM; ++seg_index, ++size_seg)
-    if(size <= size_seg->size_max) break;
-  assert(seg_index < SIZE_SEGMENT_NUM);
-  
-  size = NORMAL_SIZE_ROUNDUP(size, size_seg);
+  size = (unsigned int)NORMAL_SIZE_ROUNDUP(size, size_seg);
   unsigned int index = NORMAL_SIZE_TO_INDEX(size, size_seg);
-  Boolean local_alloc = size_seg->local_alloc;
-  Chunk_Header *chunk = NULL;
   
-  if(local_alloc){
-    Chunk_Header **chunks = allocator->local_chunks[seg_index];
-    chunk = chunks[index];
-    if(!chunk){
-      chunk = sspace_get_pfc(sspace, seg_index, index);
-      //if(!chunk) chunk = sspace_steal_pfc(sspace, seg_index, index);
-      if(!chunk) return NULL;
-      chunk->status |= CHUNK_IN_USE;
-      chunks[index] = chunk;
-    }
-    p_obj = alloc_in_chunk(chunks[index]);
-  } else {
+  Chunk_Header **chunks = allocator->local_chunks[seg_index];
+  Chunk_Header *chunk = chunks[index];
+  if(!chunk){
     chunk = sspace_get_pfc(sspace, seg_index, index);
     //if(!chunk) chunk = sspace_steal_pfc(sspace, seg_index, index);
     if(!chunk) return NULL;
-    p_obj = alloc_in_chunk(chunk);
-    if(chunk)
-      sspace_put_pfc(sspace, chunk);
+    chunk->status |= CHUNK_IN_USE;
+    chunks[index] = chunk;
   }
-  
+  void *p_obj = alloc_in_chunk(chunks[index]);
   assert(p_obj);
 
 #ifdef SSPACE_ALLOC_INFO
@@ -184,23 +102,19 @@ void *sspace_thread_local_alloc(unsigned size, Allocator *allocator)
 
   return p_obj;
 }
+
 static void *sspace_alloc_normal_obj(Sspace *sspace, unsigned size, Allocator *allocator)
 {
+  Size_Segment *size_seg = sspace_get_size_seg(sspace, size);
+  unsigned int seg_index = size_seg->seg_index;
+  
+  size = (unsigned int)NORMAL_SIZE_ROUNDUP(size, size_seg);
+  unsigned int index = NORMAL_SIZE_TO_INDEX(size, size_seg);
+  
+  Chunk_Header *chunk = NULL;
   void *p_obj = NULL;
   
-  unsigned int seg_index = 0;
-  Size_Segment *size_seg = sspace->size_segments[0];
-  
-  for(; seg_index < SIZE_SEGMENT_NUM; ++seg_index, ++size_seg)
-    if(size <= size_seg->size_max) break;
-  assert(seg_index < SIZE_SEGMENT_NUM);
-  
-  size = NORMAL_SIZE_ROUNDUP(size, size_seg);
-  unsigned int index = NORMAL_SIZE_TO_INDEX(size, size_seg);
-  Boolean local_alloc = size_seg->local_alloc;
-  Chunk_Header *chunk = NULL;
-  
-  if(local_alloc){
+  if(size_seg->local_alloc){
     Chunk_Header **chunks = allocator->local_chunks[seg_index];
     chunk = chunks[index];
     if(!chunk){
@@ -223,6 +137,8 @@ static void *sspace_alloc_normal_obj(Sspace *sspace, unsigned size, Allocator *a
     }
     //if(!chunk) chunk = sspace_steal_pfc(sspace, seg_index, index);
     if(!chunk) return NULL;
+    assert(chunk->alloc_num < chunk->slot_num);
+    ++chunk->alloc_num;
     p_obj = alloc_in_chunk(chunk);
     if(chunk)
       sspace_put_pfc(sspace, chunk);

@@ -19,8 +19,6 @@
  * @author Xiao-Feng Li, 2006/10/05
  */
 
-#include "port_sysinfo.h"
-
 #include "gen.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 #include "../verify/verify_live_heap.h"
@@ -31,6 +29,9 @@
 #include "../common/hashcode.h"
 #endif
 
+#ifdef GC_GEN_STATS
+#include "gen_stats.h"
+#endif
 /* fspace size limit is not interesting. only for manual tuning purpose */
 POINTER_SIZE_INT min_nos_size_bytes = 16 * MB;
 POINTER_SIZE_INT max_nos_size_bytes = 256 * MB;
@@ -54,20 +55,13 @@ void* nos_boundary;
 
 #define RESERVE_BOTTOM ((void*)0x1000000)
 
-static void gc_gen_get_system_info(GC_Gen *gc_gen) 
-{
-  gc_gen->_machine_page_size_bytes = (unsigned int)port_vmem_page_sizes()[0];
-  gc_gen->_num_processors = port_CPUs_number();
-  gc_gen->_system_alloc_unit = vm_get_system_alloc_unit();
-  SPACE_ALLOC_UNIT = max(gc_gen->_system_alloc_unit, GC_BLOCK_SIZE_BYTES);
-}
-
 void* alloc_large_pages(size_t size, const char* hint);
 
+void gc_gen_initial_verbose_info(GC_Gen *gc);
 void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_SIZE_INT max_heap_size) 
 {
-  assert(gc_gen); 
-  gc_gen_get_system_info(gc_gen); 
+  TRACE2("gc.process", "GC: GC_Gen heap init ... \n");
+  assert(gc_gen);
 
   max_heap_size = round_down_to_size(max_heap_size, SPACE_ALLOC_UNIT);
   min_heap_size = round_up_to_size(min_heap_size, SPACE_ALLOC_UNIT);
@@ -130,8 +124,8 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
   assert((POINTER_SIZE_INT)nos_boundary%SPACE_ALLOC_UNIT == 0);
   nos_base = vm_reserve_mem(nos_boundary, nos_reserve_size);
   if( nos_base != nos_boundary ){
-    printf("Static NOS mapping: Can't reserve memory at %x for size %x for NOS.\n", nos_boundary, nos_reserve_size);  
-    printf("Please not use static NOS mapping by undefining STATIC_NOS_MAPPING, or adjusting NOS_BOUNDARY value.\n");
+    DIE2("gc.base","Warning: Static NOS mapping: Can't reserve memory at address"<<nos_boundary<<" for size "<<nos_reserve_size<<" for NOS.");
+    DIE2("gc.base","Please not use static NOS mapping by undefining STATIC_NOS_MAPPING, or adjusting NOS_BOUNDARY value.");
     exit(0);
   }
   reserved_end = (void*)((POINTER_SIZE_INT)nos_base + nos_reserve_size);
@@ -142,7 +136,7 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
   while( !reserved_base || reserved_base >= nos_base){
     los_mos_base = (void*)((POINTER_SIZE_INT)los_mos_base - SPACE_ALLOC_UNIT);
     if(los_mos_base < RESERVE_BOTTOM){
-      printf("Static NOS mapping: Can't allocate memory at address %x for specified size %x for MOS", reserved_base, los_mos_size);  
+      DIE2("gc.base","Static NOS mapping: Can't reserve memory at address"<<reserved_base<<" for specified size "<<los_mos_size);
       exit(0);      
     }
     reserved_base = vm_reserve_mem(los_mos_base, los_mos_size);
@@ -156,9 +150,9 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
     if(reserved_base == NULL) {
       free(large_page_hint);
       large_page_hint = NULL;
-      printf("GC use small pages.\n");
+      WARN2("gc.base","GC use small pages.");
     }else{
-      printf("GC use large pages.\n");
+      WARN2("gc.base","GC use large pages.");
     }
   }
   
@@ -172,11 +166,11 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
     }
 
     if(max_size_reduced){
-      printf("Max heap size: can't be reserved, reduced to %d MB according to virtual memory limitation.\n", max_heap_size/MB);
+      WARN2("gc.base","Max heap size: can't be reserved, reduced to "<< max_heap_size/MB<<" MB according to virtual memory limitation.");
     }
 
     if(max_heap_size < min_heap_size){
-      printf("Heap size: invalid, please reimput a smaller \"ms\" paramenter!\n");  
+      DIE2("gc.base","Heap size: invalid, please reimput a smaller \"ms\" paramenter!");
       exit(0);
     }
     reserved_base = (void*)round_up_to_size((POINTER_SIZE_INT)reserved_base, SPACE_ALLOC_UNIT);
@@ -233,11 +227,17 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
                                 space_committed_size((Space*)gc_gen->mos) +
                                 space_committed_size((Space*)gc_gen->los);
   
+#ifdef GC_GEN_STATS
+  gc_gen_stats_initialize(gc_gen);
+#endif
+
+  gc_gen_initial_verbose_info(gc_gen);
   return;
 }
 
 void gc_gen_destruct(GC_Gen *gc_gen) 
 {
+  TRACE2("gc.process", "GC: GC_Gen heap destruct ......");
   Space* nos = (Space*)gc_gen->nos;
   Space* mos = (Space*)gc_gen->mos;
   Space* los = (Space*)gc_gen->los;
@@ -262,6 +262,9 @@ void gc_gen_destruct(GC_Gen *gc_gen)
   vm_unmap_mem(nos_start, nos_size);
   vm_unmap_mem(mos_start, mos_size);
   vm_unmap_mem(los_start, los_size);
+#ifdef GC_GEN_STATS
+  gc_gen_stats_destruct(gc_gen);
+#endif
 
   return;  
 }
@@ -280,8 +283,6 @@ void* los_alloc(unsigned size, Allocator *allocator){return lspace_alloc(size, a
 void* los_try_alloc(POINTER_SIZE_INT size, GC* gc){  return lspace_try_alloc((Lspace*)((GC_Gen*)gc)->los, size); }
 
 
-unsigned int gc_get_processor_num(GC_Gen* gc){ return gc->_num_processors;}
-
 Boolean FORCE_FULL_COMPACT = FALSE;
 
 void gc_decide_collection_kind(GC_Gen* gc, unsigned int cause)
@@ -294,8 +295,8 @@ void gc_decide_collection_kind(GC_Gen* gc, unsigned int cause)
   else
     gc->collect_kind = MINOR_COLLECTION;
 
-#ifdef ONLY_SSPACE_IN_HEAP
-  gc->collect_kind = UNIQUE_SWEEP_COLLECTION;
+#ifdef USE_MARK_SWEEP_GC
+  gc->collect_kind = MARK_SWEEP_GC;
 #endif
   return;
 }
@@ -318,7 +319,7 @@ void gc_decide_collection_algorithm(GC_Gen* gc, char* minor_algo, char* major_al
       gc_enable_gen_mode();
     
     }else{
-      printf("\nGC algorithm setting incorrect. Will use default value.\n");  
+      WARN2("gc.base","\nWarning: GC algorithm setting incorrect. Will use default value.\n");
     
     }
   }
@@ -336,7 +337,7 @@ void gc_decide_collection_algorithm(GC_Gen* gc, char* minor_algo, char* major_al
      MAJOR_ALGO= MAJOR_COMPACT_MOVE;
     
     }else{
-     printf("\nGC algorithm setting incorrect. Will use default algorithm.\n");  
+     WARN2("gc.base","\nWarning: GC algorithm setting incorrect. Will use default value.\n");
       
     }
   }
@@ -372,8 +373,9 @@ void gc_gen_adjust_heap_size(GC_Gen* gc, int64 pause_time)
   Mspace* mos = gc->mos;
   Fspace* nos = gc->nos;
   Lspace* los = gc->los;
-  /*We can not tolerate gc->survive_ratio be greater than threshold twice continuously.
-   *Or, we must adjust heap size */
+  /* We can not tolerate gc->survive_ratio be greater than threshold twice continuously.
+   * Or, we must adjust heap size
+   */
   static unsigned int tolerate = 0;
 
   POINTER_SIZE_INT heap_total_size = los->committed_heap_size + mos->committed_heap_size + nos->committed_heap_size;
@@ -415,8 +417,41 @@ void gc_gen_adjust_heap_size(GC_Gen* gc, int64 pause_time)
 #else
   assert(!large_page_hint);
   POINTER_SIZE_INT old_nos_size = nos->committed_heap_size;
+  INFO2("gc.process", "GC: gc_gen heap extension after GC["<<gc->num_collections<<"] ...");
   blocked_space_extend(nos, (unsigned int)adjust_size);
-  nos->survive_ratio = (float)old_nos_size * nos->survive_ratio / (float)nos->committed_heap_size;
+  INFO2("gc.space","GC: heap extension: from "<<heap_total_size/MB<<"MB  to  "<<new_heap_total_size/MB<<"MB\n");
+  if (!NOS_SIZE) {
+    nos->survive_ratio = (float)old_nos_size * nos->survive_ratio / (float)nos->committed_heap_size;
+    if( NOS_PARTIAL_FORWARD )
+      object_forwarding_boundary = (void*)&nos->blocks[nos->num_managed_blocks >>1 ];
+    else
+      object_forwarding_boundary = (void*)&nos->blocks[nos->num_managed_blocks];
+  }
+  else {
+    /*if user specified NOS_SIZE, adjust mos and nos size to keep nos size as an constant*/
+    old_nos_size = nos->committed_heap_size;
+    nos_boundary = (void*)((POINTER_SIZE_INT)nos->heap_end - NOS_SIZE);
+    nos->committed_heap_size = NOS_SIZE;
+    nos->heap_start = nos_boundary;
+    nos->blocks = (Block*)nos_boundary;
+    nos->first_block_idx = ((Block_Header*)nos_boundary)->block_idx;
+    nos->num_managed_blocks = (unsigned int)(NOS_SIZE >> GC_BLOCK_SHIFT_COUNT);
+    nos->num_total_blocks = nos->num_managed_blocks;
+    nos->free_block_idx = nos->first_block_idx;
+    if( NOS_PARTIAL_FORWARD )
+      object_forwarding_boundary = (void*)&nos->blocks[nos->num_managed_blocks >>1 ];
+    else
+      object_forwarding_boundary = (void*)&nos->blocks[nos->num_managed_blocks];
+
+    mos->heap_end = nos_boundary;
+    mos->committed_heap_size += old_nos_size-NOS_SIZE;
+    mos->num_managed_blocks = (unsigned int)(mos->committed_heap_size >> GC_BLOCK_SHIFT_COUNT);
+    mos->num_total_blocks = mos->num_managed_blocks;
+    mos->ceiling_block_idx = ((Block_Header*)nos_boundary)->block_idx - 1;
+
+    mos->survive_ratio = (float) mos->last_surviving_size / (float)mos->committed_heap_size;
+  }
+
   /*Fixme: gc fields should be modified according to nos extend*/
   gc->committed_heap_size += adjust_size;
   //debug_adjust
@@ -430,8 +465,11 @@ void gc_gen_adjust_heap_size(GC_Gen* gc, int64 pause_time)
 Boolean IS_FALLBACK_COMPACTION = FALSE; /* only for debugging, don't use it. */
 static unsigned int mspace_num_used_blocks_before_minor;
 static unsigned int mspace_num_used_blocks_after_minor;
+void gc_gen_stats_verbose(GC_Gen* gc);
 void gc_gen_reclaim_heap(GC_Gen* gc)
 { 
+  INFO2("gc.process", "GC: start GC_Gen ...\n");
+
   if(verify_live_heap) gc_verify_heap((GC*)gc, TRUE);
 
   Blocked_Space* fspace = (Blocked_Space*)gc->nos;
@@ -440,24 +478,44 @@ void gc_gen_reclaim_heap(GC_Gen* gc)
   fspace->num_used_blocks = fspace->free_block_idx - fspace->first_block_idx;
 
   gc->collect_result = TRUE;
+#ifdef GC_GEN_STATS
+  gc_gen_stats_reset_before_collection((GC_Gen*)gc);
+  gc_gen_collector_stats_reset((GC_Gen*)gc);
+#endif
   
   if(gc_match_kind((GC*)gc, MINOR_COLLECTION)){
+
+    INFO2("gc.process", "GC: start minor collection ...\n");
+
     /* FIXME:: move_object is only useful for nongen_slide_copy */
     gc->mos->move_object = 0;
     /* This is for compute mspace->last_alloced_size */
 
     mspace_num_used_blocks_before_minor = mspace->free_block_idx - mspace->first_block_idx;
     fspace_collection(gc->nos);
+
+#ifdef GC_GEN_STATS
+    gc_gen_collector_stats_verbose_minor_collection(gc);
+#endif
     mspace_num_used_blocks_after_minor = mspace->free_block_idx - mspace->first_block_idx;
     assert( mspace_num_used_blocks_before_minor <= mspace_num_used_blocks_after_minor );
     mspace->last_alloced_size = GC_BLOCK_SIZE_BYTES * ( mspace_num_used_blocks_after_minor - mspace_num_used_blocks_before_minor );
 
     /*If the current minor collection failed, i.e. there happens a fallback, we should not do the minor sweep of LOS*/
-    if(gc->collect_result != FALSE && !gc_is_gen_mode())
+    if(gc->collect_result != FALSE && !gc_is_gen_mode()) {
+#ifdef GC_GEN_STATS
+      gc->stats->num_minor_collections++;
+#endif
       lspace_collection(gc->los);
-
+    }
     gc->mos->move_object = 1;      
+
+    INFO2("gc.process", "GC: end of minor collection ...\n");
+
   }else{
+
+    INFO2("gc.process", "GC: start major collection ...\n");
+
     /* process mos and nos together in one compaction */
     gc->los->move_object = 1;
 
@@ -465,9 +523,19 @@ void gc_gen_reclaim_heap(GC_Gen* gc)
     lspace_collection(gc->los);
 
     gc->los->move_object = 0;
+
+#ifdef GC_GEN_STATS
+    gc->stats->num_major_collections++;
+    gc_gen_collector_stats_verbose_major_collection(gc);
+#endif
+
+    INFO2("gc.process", "GC: end of major collection ...\n");
   }
 
   if(gc->collect_result == FALSE && gc_match_kind((GC*)gc, MINOR_COLLECTION)){
+
+    INFO2("gc.process", "GC: Minor collection failed, transform to fallback collection ...");
+
     if(gc_is_gen_mode()) gc_clear_remset((GC*)gc);  
     
     /* runout mspace in minor collection */
@@ -477,6 +545,11 @@ void gc_gen_reclaim_heap(GC_Gen* gc)
     IS_FALLBACK_COMPACTION = TRUE;
     gc_reset_collect_result((GC*)gc);
     gc->collect_kind = FALLBACK_COLLECTION;    
+#ifdef GC_GEN_STATS
+    /*since stats is changed in minor collection, we need to reset stats before fallback collection*/
+    gc_gen_stats_reset_before_collection((GC_Gen*)gc);
+    gc_gen_collector_stats_reset((GC_Gen*)gc);
+#endif
 
     if(verify_live_heap) event_gc_collect_kind_changed((GC*)gc);
     
@@ -486,10 +559,18 @@ void gc_gen_reclaim_heap(GC_Gen* gc)
     gc->los->move_object = 0;    
 
     IS_FALLBACK_COMPACTION = FALSE;
+
+#ifdef GC_GEN_STATS
+    gc->stats->num_fallback_collections++;
+    gc_gen_collector_stats_verbose_major_collection(gc);
+#endif
+
+    INFO2("gc.process", "GC: end of fallback collection ...");
+
   }
   
   if( gc->collect_result == FALSE){
-    printf("Out of Memory!\n");
+    DIE2("gc.collect", "Out of Memory!\n");
     assert(0);
     exit(0);
   }
@@ -500,7 +581,15 @@ void gc_gen_reclaim_heap(GC_Gen* gc)
 #ifdef COMPRESS_REFERENCE
   gc_set_pool_clear(gc->metadata->gc_uncompressed_rootset_pool);
 #endif
+
   assert(!gc->los->move_object);
+#ifdef GC_GEN_STATS
+  gc_gen_stats_update_after_collection((GC_Gen*)gc);
+  gc_gen_stats_verbose(gc);
+#endif
+
+  INFO2("gc.process", "GC: end of GC_Gen\n");
+
   return;
 }
 
@@ -602,3 +691,95 @@ void gc_gen_iterate_heap(GC_Gen *gc)
     }
   }
 }
+
+void gc_gen_collection_verbose_info(GC_Gen *gc, int64 pause_time, int64 mutator_time)
+{
+
+#ifdef GC_GEN_STATS
+  GC_Gen_Stats* stats = ((GC_Gen*)gc)->stats;
+  stats->total_mutator_time += mutator_time;
+  stats->total_pause_time += pause_time;
+#endif
+
+  INFO2("gc.collect","GC: GC_Gen Collection Info:"
+    <<"\nGC: GC id: GC["<<gc->num_collections<<"]"
+    <<"\nGC: current collection num: "<<gc->num_collections);
+
+  switch(gc->collect_kind) {
+  case MINOR_COLLECTION:
+    INFO2("gc.collect","GC: collection type: minor");
+#ifdef GC_GEN_STATS
+    INFO2("gc.collect","GC: current minor collection num: "<<gc->stats->num_minor_collections);
+#endif
+    break;
+  case MAJOR_COLLECTION:
+    INFO2("gc.collect","GC: collection type: major");
+#ifdef GC_GEN_STATS
+    INFO2("gc.collect","GC: current major collection num: "<<gc->stats->num_major_collections);
+#endif
+    break;
+  case FALLBACK_COLLECTION:
+    INFO2("gc.collect","GC: collection type: fallback");
+#ifdef GC_GEN_STATS
+    INFO2("gc.collect","GC: current fallback collection num: "<<gc->stats->num_fallback_collections);
+#endif
+  }
+
+  switch(gc->cause) {
+  case GC_CAUSE_NOS_IS_FULL:
+    INFO2("gc.collect","GC: collection cause: nursery object space is full");
+    break;
+  case GC_CAUSE_LOS_IS_FULL:
+    INFO2("gc.collect","GC: collection cause: large object space is full");
+    break;
+  case GC_CAUSE_RUNTIME_FORCE_GC:
+    INFO2("gc.collect","GC: collection cause: runtime force gc");
+  }
+
+  INFO2("gc.collect","GC: pause time: "<<(pause_time>>10)<<"ms"
+    <<"\nGC: mutator time from last collection: "<<(mutator_time>>10)<<"ms\n");
+
+}
+
+void gc_gen_space_verbose_info(GC_Gen *gc)
+{
+  INFO2("gc.space","GC: Heap info after GC["<<gc->num_collections<<"]:"
+    <<"\nGC: Heap size: "<<verbose_print_size(gc->committed_heap_size)<<", free size:"<<verbose_print_size(gc_gen_free_memory_size(gc))
+    <<"\nGC: LOS size: "<<verbose_print_size(gc->los->committed_heap_size)<<", free size:"<<verbose_print_size(lspace_free_memory_size(gc->los))
+    <<"\nGC: MOS size: "<<verbose_print_size(gc->mos->committed_heap_size)<<", free size:"<<verbose_print_size(space_free_memory_size((Blocked_Space*)gc->mos))
+    <<"\nGC: NOS size: "<<verbose_print_size(gc->nos->committed_heap_size)<<", free size:"<<verbose_print_size(space_free_memory_size((Blocked_Space*)gc->nos))<<"\n");
+}
+
+inline void gc_gen_initial_verbose_info(GC_Gen *gc)
+{
+  INFO2("gc.base","GC_Gen initial:"
+    <<"\nmax heap size: "<<verbose_print_size(max_heap_size_bytes)
+    <<"\nmin heap size: "<<verbose_print_size(min_heap_size_bytes)
+    <<"\ninitial heap size: "<<verbose_print_size(gc->committed_heap_size)
+    <<"\ninitial num collectors: "<<gc->num_collectors
+    <<"\ninitial nos size: "<<verbose_print_size(gc->nos->committed_heap_size)
+    <<"\nnos collection algo: "
+    <<((gc->nos->collect_algorithm==MINOR_NONGEN_FORWARD_POOL)?"nongen forward":"gen forward")
+    <<"\ninitial mos size: "<<verbose_print_size(gc->mos->committed_heap_size)
+    <<"\nmos collection algo: "
+    <<((gc->mos->collect_algorithm==MAJOR_COMPACT_MOVE)?"move compact":"slide compact")
+    <<"\ninitial los size: "<<verbose_print_size(gc->los->committed_heap_size)<<"\n");
+}
+
+void gc_gen_wrapup_verbose(GC_Gen* gc)
+{
+#ifdef GC_GEN_STATS
+  GC_Gen_Stats* stats = gc->stats;
+
+  INFO2("gc.base", "GC: All Collection info: "
+    <<"\nGC: total nos alloc obj size: "<<verbose_print_size(stats->total_size_nos_alloc)
+    <<"\nGC: total los alloc obj num: "<<stats->obj_num_los_alloc
+    <<"\nGC: total nos alloc obj size:"<<verbose_print_size(stats->total_size_los_alloc)
+    <<"\nGC: total collection num: "<<gc->num_collections
+    <<"\nGC: minor collection num: "<<stats->num_minor_collections
+    <<"\nGC: major collection num: "<<stats->num_major_collections
+    <<"\nGC: total collection time: "<<stats->total_pause_time
+    <<"\nGC: total appliction execution time: "<<stats->total_mutator_time<<"\n");
+#endif
+}
+

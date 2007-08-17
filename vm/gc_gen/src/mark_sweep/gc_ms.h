@@ -18,7 +18,7 @@
 #ifndef _GC_MS_H_
 #define _GC_MS_H_
 
-#ifdef ONLY_SSPACE_IN_HEAP
+#ifdef USE_MARK_SWEEP_GC
 
 #include "sspace.h"
 
@@ -64,14 +64,14 @@ typedef struct GC_MS {
   
   //For_LOS_extend
   Space_Tuner *tuner;
-  /* END of GC --> */
-  
-  Sspace *sspace;
   
   /* system info */
   unsigned int _system_alloc_unit;
   unsigned int _machine_page_size_bytes;
   unsigned int _num_processors;
+  /* END of GC --> */
+  
+  Sspace *sspace;
   
 } GC_MS;
 
@@ -101,9 +101,8 @@ void gc_ms_initialize(GC_MS *gc, POINTER_SIZE_INT initial_heap_size, POINTER_SIZ
 void gc_ms_destruct(GC_MS *gc);
 void gc_ms_reclaim_heap(GC_MS *gc);
 void gc_ms_iterate_heap(GC_MS *gc);
-unsigned int gc_ms_get_processor_num(GC_MS *gc);
 
 
-#endif // ONLY_SSPACE_IN_HEAP
+#endif // USE_MARK_SWEEP_GC
 
 #endif // _GC_MS_H_

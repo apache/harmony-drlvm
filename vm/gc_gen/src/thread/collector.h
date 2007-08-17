@@ -80,6 +80,12 @@ typedef struct Collector{
   POINTER_SIZE_INT los_live_obj_size;
   POINTER_SIZE_INT segment_live_size[NORMAL_SIZE_SEGMENT_NUM];
   unsigned int result;
+
+  /*for collect statistics info*/
+#ifdef GC_GEN_STATS
+  void* stats;
+#endif
+
  
 }Collector;
 

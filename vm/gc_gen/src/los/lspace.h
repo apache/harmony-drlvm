@@ -84,7 +84,10 @@ void lspace_compute_object_target(Collector* collector, Lspace* lspace);
 void lspace_reset_for_slide(Lspace* lspace);
 void lspace_collection(Lspace* lspace);
 
-inline POINTER_SIZE_INT lspace_free_memory_size(Lspace* lspace){ /* FIXME:: */ return 0; }
+inline POINTER_SIZE_INT lspace_free_memory_size(Lspace* lspace)
+{ /* FIXME:: */
+  return (lspace->committed_heap_size - (POINTER_SIZE_INT)lspace->last_surviving_size);
+}
 inline POINTER_SIZE_INT lspace_committed_size(Lspace* lspace){ return lspace->committed_heap_size; }
 
 inline Partial_Reveal_Object* lspace_get_next_marked_object( Lspace* lspace, unsigned int* iterate_index)
