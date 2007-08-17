@@ -285,7 +285,6 @@ void lspace_compute_object_target(Collector* collector, Lspace* lspace)
   
   lspace->scompact_fa_start = dest_addr;
   lspace->scompact_fa_end= lspace->heap_end;
-  lspace->last_surviving_size = (POINTER_SIZE_INT)dest_addr - (POINTER_SIZE_INT)lspace->heap_start;
   return;
 }
 
@@ -372,6 +371,7 @@ void lspace_reset_for_slide(Lspace* lspace)
 //    lspace->accumu_alloced_size = 0;    
 //    lspace->last_alloced_size = 0;        
     lspace->period_surviving_size = (POINTER_SIZE_INT)lspace->scompact_fa_start - (POINTER_SIZE_INT)lspace->heap_start;
+    lspace->last_surviving_size = lspace->period_surviving_size;
     lspace->survive_ratio = (float)lspace->accumu_alloced_size / (float)lspace->committed_heap_size;
 
     los_boundary = lspace->heap_end;

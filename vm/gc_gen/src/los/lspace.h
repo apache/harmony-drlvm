@@ -50,7 +50,7 @@ typedef struct Lspace{
   /*LOS_Shrink:This field stands for sliding compact to lspace */
   Boolean move_object;
 
-  /* Size allocted since last minor collection. */
+  /* Size allocted since last collection. */
   volatile uint64 last_alloced_size;
   /* Size allocted since last major collection. */
   uint64 accumu_alloced_size;
@@ -86,7 +86,8 @@ void lspace_collection(Lspace* lspace);
 
 inline POINTER_SIZE_INT lspace_free_memory_size(Lspace* lspace)
 { /* FIXME:: */
-  return (lspace->committed_heap_size - (POINTER_SIZE_INT)lspace->last_surviving_size);
+  assert(lspace->committed_heap_size > (POINTER_SIZE_INT)lspace->last_surviving_size + (POINTER_SIZE_INT)lspace->last_alloced_size);
+  return (lspace->committed_heap_size - (POINTER_SIZE_INT)lspace->last_surviving_size - (POINTER_SIZE_INT)lspace->last_alloced_size);
 }
 inline POINTER_SIZE_INT lspace_committed_size(Lspace* lspace){ return lspace->committed_heap_size; }
 
