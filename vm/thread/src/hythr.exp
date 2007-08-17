@@ -41,6 +41,7 @@ hythread_tls_get_request_offset;
 hythread_get_hythread_offset_in_tls;
 hythread_uses_fast_tls;
 hythread_tls_get_offset;
+hythread_get_struct_size;
 hythread_global_lock;
 hythread_global_unlock;
 hythread_attach_to_group;

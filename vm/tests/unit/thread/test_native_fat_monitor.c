@@ -60,8 +60,10 @@ int test_wait_signal(void){
     waiting_count = 0;
 
     for (i = 0; i < NMB; i++){
-        threads[i] = NULL;
-        hythread_create(&threads[i], 0, 0, 0, run_for_test_wait_signal, NULL);
+        threads[i] = (hythread_t)calloc(1, hythread_get_struct_size());
+        assert(threads[i]);
+        hythread_create_with_group(threads[i], NULL, 0, 0,
+            (hythread_entrypoint_t)run_for_test_wait_signal, NULL);
     }
 
     // Wait till all tested threads call wait() 

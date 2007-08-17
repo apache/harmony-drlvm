@@ -109,8 +109,9 @@ void finalizer_threads_init(JavaVM *java_vm, JNIEnv *jni_env)
         void **args = (void **)STD_MALLOC(sizeof(void *) * 2);
         args[0] = (void*)java_vm;
         args[1] = (void*)get_system_thread_group(jni_env);
-        fin_thread_info->thread_ids[i] = NULL;
-        status = hythread_create(&fin_thread_info->thread_ids[i], 0, FINALIZER_THREAD_PRIORITY, 0, (hythread_entrypoint_t)finalizer_thread_func, args);
+        fin_thread_info->thread_ids[i] = (hythread_t)STD_CALLOC(1, hythread_get_struct_size());
+        status = hythread_create_with_group(fin_thread_info->thread_ids[i], NULL, 0,
+            FINALIZER_THREAD_PRIORITY, (hythread_entrypoint_t)finalizer_thread_func, args);
         assert(status == TM_ERROR_NONE);
         hysem_wait(fin_thread_info->attached_sem);
     }    

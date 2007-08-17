@@ -28,7 +28,8 @@
 
 
 /**
- * Creates the iterator that can be used to retrieve all threads in the specific group.
+ * Creates the iterator that can be used to retrieve all threads in the specific group
+ * and acquires the thread lock.
  * 
  * @param[in] group thread group number
  */
@@ -42,7 +43,8 @@ hythread_iterator_t VMCALL hythread_iterator_create(hythread_group_t group) {
 }
 
 /**
- * Releases the iterator over the specific thread group.
+ * Releases the iterator over the specific thread group and releases the thread
+ * lock.
  * 
  * @param[in] it thread group iterator
  */

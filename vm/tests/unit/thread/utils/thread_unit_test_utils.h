@@ -15,6 +15,7 @@
  *  limitations under the License.
  */
 
+#include <stdlib.h>
 #include "jvmti_types.h"
 #include "apr_thread_proc.h"
 #include "open/hycomp.h"

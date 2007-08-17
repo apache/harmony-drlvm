@@ -2313,7 +2313,9 @@ jvmti_create_event_thread()
 
     // create TI event thread
     JNIEnv *jni_env = p_TLS_vmthread->jni_env;
-    IDATA status = hythread_create(&ti->event_thread, 0, 0, 0,
+    ti->event_thread = (hythread_t)STD_CALLOC(1, hythread_get_struct_size());
+    assert(ti->event_thread);
+    IDATA status = hythread_create_with_group(ti->event_thread, NULL, 0, 0,
         jvmti_event_thread_function, jni_env);
     if( status != TM_ERROR_NONE ) {
         DIE("jvmti_create_event_thread: creating thread is failed!");

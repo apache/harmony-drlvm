@@ -234,18 +234,5 @@
                 <linkerarg value="-lgcc_s" />
             </select>
         </linker>
-
-        <fileset id="unit.test.c.framework.src"
-                 dir="${build.VM.home}/tests/unit/framework">
-            <include name="*.c" />
-        </fileset>
-
-        <path id="unit.test.common.c.include">
-            <pathelement location="${build.VM.home}/tests/unit/framework" />
-            <pathelement location="${build.VM.home}/include" />
-            <pathelement location="${build.VM.home}/include/open" />
-            <pathelement location="${build.VM.home}/vmcore/src/thread" />
-            <pathelement location="${build.VM.home}/port/include" />
-        </path>
     </target>
 </project>

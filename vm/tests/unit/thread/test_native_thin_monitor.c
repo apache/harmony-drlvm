@@ -106,7 +106,7 @@ int test_hythread_thin_monitor_fat_unlock(void){
     tf_assert_same(status, TM_ERROR_NONE);
 
     status = hythread_thin_monitor_wait_timed(&lockword_ptr, 1000,100);
-    printf("status: %d\n", status);
+    printf("status: %d\n", (int)status);
     tf_assert_same(status, TM_ERROR_TIMEOUT);
 
     status = hythread_thin_monitor_exit(&lockword_ptr);
@@ -119,7 +119,7 @@ int start_proc(void *args);
 int test_hythread_thin_monitor_enter_contended(void){
     apr_pool_t *pool;
     void **args; 
-    hythread_t thread = NULL;
+    hythread_t thread;
     hythread_thin_monitor_t lockword_ptr;
     IDATA status;
     int i;
@@ -137,7 +137,10 @@ int test_hythread_thin_monitor_enter_contended(void){
 
     args[0] = &lockword_ptr;
     args[1] = 0;
-    status = hythread_create(&thread, 0, 0, 0, start_proc, args);
+    thread = (hythread_t)calloc(1, hythread_get_struct_size());
+    assert(thread);
+    status = hythread_create_with_group(thread, NULL, 0, 0,
+        (hythread_entrypoint_t)start_proc, args);
     tf_assert_same(status, TM_ERROR_NONE);
     for(i = 0; i < 100000; i++) {
         tf_assert_same(args[1], 0);
@@ -153,9 +156,9 @@ int test_hythread_thin_monitor_enter_contended(void){
     status = hythread_thin_monitor_enter(&lockword_ptr);
     tf_assert_same(status, TM_ERROR_NONE);
     args[1] = 0;
-    thread = NULL;
     hythread_suspend_enable();    
-    status = hythread_create(&thread, 0, 0, 0, start_proc, args);
+    status = hythread_create_with_group(thread, NULL, 0, 0,
+        (hythread_entrypoint_t)start_proc, args);
     tf_assert_same(status, TM_ERROR_NONE);
     for(i = 0; i < 100000; i++) {
         tf_assert_same(args[1], 0);
@@ -167,7 +170,7 @@ int test_hythread_thin_monitor_enter_contended(void){
 
     hythread_join(thread);
     
-    tf_assert_same((int)args[1], 1);
+    tf_assert_same((IDATA)args[1], 1);
 
     return 0;
 }

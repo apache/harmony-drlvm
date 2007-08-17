@@ -65,7 +65,9 @@ void ref_enqueue_thread_init(JavaVM *java_vm, JNIEnv* jni_env)
     void **args = (void **)STD_MALLOC(sizeof(void *)*2);
     args[0] = (void *)java_vm;
     args[1] = (void*)get_system_thread_group(jni_env);
-    status = hythread_create(NULL, 0, REF_ENQUEUE_THREAD_PRIORITY, 0, (hythread_entrypoint_t)ref_enqueue_thread_func, args);
+    hythread_t thread = (hythread_t)STD_CALLOC(1, hythread_get_struct_size());
+    status = hythread_create_with_group(thread, NULL, 0, REF_ENQUEUE_THREAD_PRIORITY,
+        (hythread_entrypoint_t)ref_enqueue_thread_func, args);
     assert(status == TM_ERROR_NONE);
     
     hysem_wait(ref_thread_info->attached_sem);

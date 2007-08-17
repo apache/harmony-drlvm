@@ -1,4 +1,4 @@
-LIBRARY	HYTHR
+LIBRARY HYTHR
 
 EXPORTS
  
@@ -40,6 +40,7 @@ hythread_get_priority
 hythread_tls_get
 hythread_tls_get_request_offset
 hythread_tls_get_offset
+hythread_get_struct_size
 hythread_global_lock
 hythread_global_unlock
 hythread_attach_to_group
@@ -88,9 +89,6 @@ hythread_thin_monitor_get_owner
 hythread_native_resource_is_live
 hythread_reclaim_resources
 
-
-
-
 hysem_post
 hysem_wait
 hysem_destroy
@@ -120,7 +118,6 @@ hymutex_lock
 hymutex_trylock
 hymutex_unlock
 hymutex_destroy
-
 
 hythread_is_alive
 hythread_is_terminated

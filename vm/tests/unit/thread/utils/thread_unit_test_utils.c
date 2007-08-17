@@ -19,11 +19,11 @@
 #include "jni.h"
 #include "testframe.h"
 #include "thread_unit_test_utils.h"
-#include <open/jthread.h>
-#include <open/hythread.h>
-#include <open/hythread_ext.h>
-#include <open/ti_thread.h>
-#include <open/thread_externals.h>
+#include "open/jthread.h"
+#include "open/hythread.h"
+#include "open/hythread_ext.h"
+#include "open/ti_thread.h"
+#include "open/thread_externals.h"
 #include "apr_time.h"
 
 
@@ -269,10 +269,11 @@ void tested_os_threads_run(hythread_entrypoint_t run_method_param){
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
         // Create thread
-        status = hythread_create(&tts->native_thread,  // new thread OS handle 
-                                 0, 5, 0,
-                                 run_method_param, // start proc
-                                 tts); 
+        tts->native_thread =
+            (hythread_t)calloc(1, hythread_get_struct_size());
+        assert(tts->native_thread);
+        status = hythread_create_with_group(tts->native_thread,
+            NULL, 0, 5, run_method_param, tts);
         tf_assert_v(status == TM_ERROR_NONE);
         tested_thread_wait_started(tts);
     }

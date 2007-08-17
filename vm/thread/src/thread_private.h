@@ -214,7 +214,6 @@ typedef struct HyThread {
      * Handle to OS thread.
      */
     osthread_t os_handle;
-    
 
 // Synchronization stuff
 
@@ -328,30 +327,27 @@ typedef struct HyThreadGroup {
  */
 typedef struct HyThreadMonitor {
     
-    /**
-     * Mutex
-     */
+    /// Monitor mutex.
     hymutex_t mutex;
 
-    /**
-     * Condition variable
-     */
+    /// Monitor condition varibale.
     hycond_t condition;
     
-    /**
-     * Recursion count 
-     */
+    /// Mutex recurtion count.
     IDATA recursion_count;
-    hythread_t owner; 
-    hythread_t inflate_owner;
-    hythread_t last_wait;
-    int inflate_count;
-    int wait_count;
-    int notify_flag;
 
-    /**
-     * Owner thread ID. 
-     */
+    /// Current mutex owner.
+    hythread_t owner;
+
+    /// Number of threads waiting on a condition variable
+    /// or queued to acquire a monitor mutex after wakeup
+    int wait_count;
+
+    /// Number of notify events sent by the user,
+    /// it is bounded by the wait_count
+    int notify_count;
+
+    /// Owner thread ID. 
     IDATA thread_id;
 
     UDATA flags;
@@ -510,7 +506,6 @@ int os_thread_create(osthread_t* phandle, UDATA stacksize, UDATA priority,
 int os_thread_set_priority(osthread_t thread, int priority);
 osthread_t os_thread_current();
 int os_thread_cancel(osthread_t);
-int os_thread_join(osthread_t);
 void os_thread_exit(IDATA status);
 void os_thread_yield_other(osthread_t);
 int os_get_thread_times(osthread_t os_thread, int64* pkernel, int64* puser);

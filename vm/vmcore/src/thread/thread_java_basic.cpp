@@ -124,16 +124,7 @@ IDATA jthread_create_with_function(JNIEnv *jni_env,
         return TM_ERROR_NULL_POINTER;
     }
     hythread_t native_thread = vm_jthread_get_tm_data(java_thread);
-
-    // This is for irregular use. In ordinary live valid jthread instance
-    // contains weak reference associated with it and native thread to reuse. 
-    if (native_thread == NULL) {
-        assert(0);
-        if (!jthread_thread_init(jni_env, java_thread, NULL, 0)) {
-            return TM_ERROR_OUT_OF_MEMORY;
-        }
-        native_thread = vm_jthread_get_tm_data(java_thread);
-    }
+    assert(native_thread);
 
     vm_thread_t vm_thread =
         (vm_thread_t) hythread_tls_get(native_thread, TM_THREAD_VM_TLS_KEY);
@@ -164,9 +155,8 @@ IDATA jthread_create_with_function(JNIEnv *jni_env,
         attrs->stacksize = default_stacksize;
     }
 
-    status =
-        hythread_create(&native_thread, attrs->stacksize,
-                        attrs->priority, 0, jthread_wrapper_proc, attrs);
+    status = hythread_create_with_group(native_thread, NULL, attrs->stacksize,
+                        attrs->priority, jthread_wrapper_proc, attrs);
 
     TRACE(("TM: Created thread: id=%d", hythread_get_id(native_thread)));
 
@@ -242,9 +232,12 @@ jlong jthread_thread_init(JNIEnv *env,
             // delete used weak reference
             env->DeleteGlobalRef(vm_thread->weak_ref);
         }
+    } else {
+        native_thread = (hythread_t)STD_CALLOC(1, hythread_get_struct_size());
+        assert(native_thread);
     }
     
-    IDATA status = hythread_struct_init(&native_thread);
+    IDATA status = hythread_struct_init(native_thread);
     if (status != TM_ERROR_NONE) {
         return 0;
     }
@@ -403,11 +396,31 @@ IDATA jthread_yield()
  */
 static void stop_callback(void)
 {
-    vm_thread_t vm_thread = p_TLS_vmthread;
+    hythread_t native_thread = hythread_self();
+    assert(native_thread);
+    vm_thread_t vm_thread =
+        (vm_thread_t) hythread_tls_get(native_thread, TM_THREAD_VM_TLS_KEY);
     assert(vm_thread);
     jobject excn = vm_thread->stop_exception;
 
+    // Does not return if the exception could be thrown straight away
     jthread_throw_exception_object(excn);
+
+    // getting here means top stack frame is non-unwindable.
+    if (hythread_get_state(native_thread) &
+            (TM_THREAD_STATE_SLEEPING | TM_THREAD_STATE_WAITING_WITH_TIMEOUT
+                | TM_THREAD_STATE_WAITING | TM_THREAD_STATE_IN_MONITOR_WAIT
+                | TM_THREAD_STATE_WAITING_INDEFINITELY | TM_THREAD_STATE_PARKED))
+    {
+        // This is needed for correct stopping of a thread blocked on monitor_wait.
+        // The thread needs some flag to exit its waiting loop.
+        // We piggy-back on interrupted status. A correct exception from TLS
+        // will be thrown because the check of exception status on leaving
+        // JNI frame comes before checking return status in Object.wait().
+        // Interrupted status will be cleared by function returning TM_ERROR_INTERRUPT.
+        // (though, in case of parked thread, it will not be cleared)
+        hythread_interrupt(native_thread);
+    }
 } // stop_callback
 
 /**

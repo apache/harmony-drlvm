@@ -22,6 +22,8 @@
 #ifndef _TESTFRAME_H_
 #define _TESTFRAME_H_
 
+#include <stdlib.h>
+
 #ifdef  __cplusplus
 extern "C" {
 #endif

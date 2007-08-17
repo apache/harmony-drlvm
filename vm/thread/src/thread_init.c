@@ -73,8 +73,6 @@ void hythread_library_init(void) {
  * @param[out] lib pointer to the created thread library
  * @return The thread library's initStatus will be set to 0 on success or 
  * a negative value on failure.
- * 
- * @see hythread_attach, hythread_shutdown
  */
 IDATA VMCALL hythread_lib_create(hythread_library_t * lib) {
     apr_status_t apr_status;
@@ -121,8 +119,6 @@ void VMCALL hythread_lib_destroy(hythread_library_t lib) {
  * @param[in] lib pointer to the thread library to be initialized (non-NULL)
  * @return The thread library's initStatus will be set to 0 on success or 
  * a negative value on failure.
- * 
- * @see hythread_attach, hythread_shutdown
  */
 void VMCALL hythread_init(hythread_library_t lib) {
     apr_status_t apr_status;

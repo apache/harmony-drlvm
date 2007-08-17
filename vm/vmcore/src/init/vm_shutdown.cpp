@@ -309,28 +309,36 @@ void vm_interrupt_handler(int UNREF x) {
 
     status = JNI_GetCreatedJavaVMs(NULL, 0, &nVMs);
     assert(nVMs <= 1);
-    if (status != JNI_OK) return;
+    if (status != JNI_OK)
+        return;
 
     vmBuf = (JavaVM **) STD_MALLOC(nVMs * sizeof(JavaVM *));
     status = JNI_GetCreatedJavaVMs(vmBuf, nVMs, &nVMs);
     assert(nVMs <= 1);
-    if (status != JNI_OK) goto cleanup;
-
-    status = hythread_attach(NULL);
-    if (status != TM_ERROR_NONE) goto cleanup;
-
+    if (status != JNI_OK)
+        goto cleanup;
 
     threadBuf = (hythread_t *) STD_MALLOC((nVMs + 1) * sizeof(hythread_t));
-    threadBuf[nVMs] = NULL;
+    assert(threadBuf);
 
     // Create a new thread for each VM to avoid scalability and deadlock problems.
     for (int i = 0; i < nVMs; i++) {
-        threadBuf[i] = NULL;
-        hythread_create((threadBuf + i), 0, HYTHREAD_PRIORITY_NORMAL, 0, vm_interrupt_entry_point, (void *)vmBuf[i]);
+        threadBuf[i] = (hythread_t)STD_CALLOC(1, hythread_get_struct_size());
+        assert(threadBuf[i]);
+        status = hythread_create_with_group(threadBuf[i], NULL, 0,
+            HYTHREAD_PRIORITY_NORMAL, vm_interrupt_entry_point, (void *)vmBuf[i]);
+        assert(status == TM_ERROR_NONE);
     }
 
     // spawn a new thread which will terminate the process.
-    hythread_create(NULL, 0, HYTHREAD_PRIORITY_NORMAL, 0, vm_interrupt_process, (void *)threadBuf);
+    threadBuf[nVMs] = (hythread_t)STD_CALLOC(1, hythread_get_struct_size());
+    assert(threadBuf[nVMs]);
+    status = hythread_create_with_group(threadBuf[nVMs], NULL, 0,
+        HYTHREAD_PRIORITY_NORMAL, vm_interrupt_process, (void *)threadBuf);
+    assert(status == TM_ERROR_NONE);
+
+    // set a NULL terminator
+    threadBuf[nVMs] = NULL;
 
 cleanup:
     STD_FREE(vmBuf);
@@ -347,21 +355,22 @@ void vm_dump_handler(int UNREF x) {
 
     status = JNI_GetCreatedJavaVMs(NULL, 0, &nVMs);
     assert(nVMs <= 1);
-    if (status != JNI_OK) return;
+    if (status != JNI_OK)
+        return;
 
     vmBuf = (JavaVM **) STD_MALLOC(nVMs * sizeof(JavaVM *));
     status = JNI_GetCreatedJavaVMs(vmBuf, nVMs, &nVMs);
     assert(nVMs <= 1);
-
-    IDATA htstatus;
-    if (status != JNI_OK) goto cleanup;
-
-    htstatus = hythread_attach(NULL);
-    if (htstatus != TM_ERROR_NONE) goto cleanup;
+    if (status != JNI_OK)
+        goto cleanup;
 
     // Create a new thread for each VM to avoid scalability and deadlock problems.
     for (int i = 0; i < nVMs; i++) {
-        hythread_create(NULL, 0, HYTHREAD_PRIORITY_NORMAL, 0, vm_dump_entry_point, (void *)vmBuf[i]);
+        hythread_t thread = (hythread_t)STD_CALLOC(1, hythread_get_struct_size());
+        assert(thread);
+        IDATA hy_status = hythread_create_with_group(thread, NULL, 0,
+            HYTHREAD_PRIORITY_NORMAL, vm_dump_entry_point, (void *)vmBuf[i]);
+        assert(hy_status == TM_ERROR_NONE);
     }
 
 cleanup:

@@ -123,7 +123,7 @@ GC_Thread::GC_Thread(Garbage_Collector *p_gc, int gc_thread_id)
     stat = hysem_create(&_gc_thread_work_done_event, 0, 1); 
     assert(stat == TM_ERROR_NONE);
     _thread_handle=NULL;
-    stat = hythread_create_with_group(&_thread_handle, get_thread_group(), 0, 0, 0, gc_thread_func, this);
+    stat = hythread_create(&_thread_handle, 0, 0, 0, gc_thread_func, this);
     if (stat != TM_ERROR_NONE) { 
         DIE("GC_Thread::GC_Thread(..): CreateThread() failed...exiting...");
     }

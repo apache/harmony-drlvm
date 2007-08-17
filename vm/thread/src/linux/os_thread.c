@@ -50,23 +50,23 @@ int os_thread_create(/* out */osthread_t* phandle, UDATA stacksize, UDATA priori
         int (VMAPICALL *func)(void*), void *data)
 {
     pthread_t thread;
-    pthread_attr_t attr, *pattr = NULL;
+    pthread_attr_t attr;
     int r;
 
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+
     if (stacksize != 0) {
-	pattr = &attr;
-	pthread_attr_init(pattr);
-	r = pthread_attr_setstacksize(pattr, stacksize);
+	r = pthread_attr_setstacksize(&attr, stacksize);
 	if (r) {
-	    pthread_attr_destroy(pattr);
+	    pthread_attr_destroy(&attr);
 	    return r;
 	}
     }
 
-    r = pthread_create(&thread, pattr, (void*(*)(void*))func, data);
+    r = pthread_create(&thread, &attr, (void*(*)(void*))func, data);
 
-    if (pattr)
-	pthread_attr_destroy(pattr);
+    pthread_attr_destroy(&attr);
 
     if (r == 0) {
         *phandle = thread;

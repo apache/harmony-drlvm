@@ -117,11 +117,10 @@ vm_thread_t jthread_allocate_vm_thread(hythread_t native_thread)
 #endif // _DEBUG
 
     // allocate VM thread
-    vm_thread = (vm_thread_t)STD_MALLOC(sizeof(VM_thread));
+    vm_thread = (vm_thread_t)STD_CALLOC(1, sizeof(VM_thread));
     if (!vm_thread) {
         return NULL;
     }
-    memset(vm_thread, 0, sizeof(VM_thread));
 
     // set VM thread to thread local storage
     IDATA status =

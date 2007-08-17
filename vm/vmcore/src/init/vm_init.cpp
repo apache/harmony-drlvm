@@ -598,14 +598,17 @@ jint vm_attach_internal(JNIEnv ** p_jni_env, jthread * java_thread, JavaVM * jav
 
     native_thread = hythread_self();
     if (!native_thread) {
-        status = (jint)hythread_attach_to_group(&native_thread,
-            ((JavaVM_Internal *)java_vm)->vm_env->hythread_lib, NULL);
-        if (status != TM_ERROR_NONE) return JNI_ERR;
+        hythread_t native_thread = (hythread_t)STD_CALLOC(1, hythread_get_struct_size());
+        assert(native_thread);
+        IDATA hy_status = hythread_attach_to_group(native_thread, NULL, NULL);
+        if (hy_status != TM_ERROR_NONE)
+            return JNI_ERR;
     }
     assert(native_thread);
 
     status = vm_attach(java_vm, &jni_env);
-    if (status != JNI_OK) return status;
+    if (status != JNI_OK)
+        return status;
 
     *p_jni_env = jni_env;
 
@@ -630,7 +633,9 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
 
     vm_env = java_vm->vm_env;
 
-    if (hythread_attach_ex(NULL, vm_env->hythread_lib) != TM_ERROR_NONE) {
+    hythread_t main_thread = (hythread_t)STD_CALLOC(1, hythread_get_struct_size());
+    assert(main_thread);
+    if (hythread_attach_to_group(main_thread, NULL, NULL) != TM_ERROR_NONE) {
         return JNI_ERR;
     }
 

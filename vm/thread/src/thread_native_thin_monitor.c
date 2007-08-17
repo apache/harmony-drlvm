@@ -125,7 +125,6 @@ int unreserve_count=0;
 int inflate_contended=0;
 int inflate_waited=0;
 int unreserve_count_self=0;
-int inflate_count=0;
 int fat_lock2_count = 0;
 int init_reserve_cout = 0;
 int cas_cout = 0;
@@ -622,7 +621,6 @@ hythread_monitor_t VMCALL hythread_inflate_lock(hythread_thin_monitor_t *lockwor
     // however this invariant is true because we hold monitor->mutex during this function
     // so it cannot be called twice for the signle monitor concurrently
 
-    TRACE(("inflate tmj%d\n", ++inflate_count));
     lockword = *lockword_ptr;
     if (IS_FAT_LOCK (lockword)) {
         return locktable_get_fat_monitor(FAT_LOCK_ID(lockword));
@@ -657,8 +655,6 @@ hythread_monitor_t VMCALL hythread_inflate_lock(hythread_thin_monitor_t *lockwor
     TRACE(("hythread_inflate_lock  %d thread: %d\n", FAT_LOCK_ID(*lockword_ptr), tm_self_tls->thread_id));
     //assert(FAT_LOCK_ID(*lockword_ptr) != 2);
     TRACE(("FAT ID : 0x%x", *lockword_ptr));
-    fat_monitor->inflate_count++;
-    fat_monitor->inflate_owner=tm_self_tls;
 #ifdef LOCK_RESERVATION
     assert(!IS_RESERVED(*lockword_ptr));
 #endif

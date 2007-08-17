@@ -40,8 +40,8 @@ int test_hythread_self_base(void) {
 int test_hythread_create(void){
     apr_pool_t *pool;
     void **args; 
-    hythread_t thread = NULL;
-    int r;
+    hythread_t thread;
+    IDATA r;
     
     apr_pool_create(&pool, NULL);
 
@@ -53,7 +53,10 @@ int test_hythread_create(void){
     ((jthread_threadattr_t *)args[1])->stacksize = 1024000;
     ((jthread_threadattr_t *)args[1])->priority  = 1;
     
-    r = hythread_create_with_group(&thread, args[0], 1024000, 1, 0, start_proc, args);
+    thread = (hythread_t)calloc(1, hythread_get_struct_size());
+    assert(thread);
+    r = hythread_create_with_group(thread, args[0], 1024000, 1,
+        (hythread_entrypoint_t)start_proc, args);
     tf_assert(r == 0 && "thread creation failed");
 
     r = hythread_join(thread);
@@ -107,8 +110,10 @@ int test_hythread_iterator(void) {
     hylatch_create(&end, 1);
 
     for (i = 0; i < n; i++) {
-        thread = NULL;
-        hythread_create_with_group(&thread, group, 0, 0, 0, start_proc_empty, NULL);
+        thread = (hythread_t)calloc(1, hythread_get_struct_size());
+        assert(thread);
+        hythread_create_with_group(thread, group, 0, 0,
+            (hythread_entrypoint_t)start_proc_empty, NULL);
     }
 
     // Wait util all threads have started.
@@ -117,7 +122,7 @@ int test_hythread_iterator(void) {
     // Notify all threads
     hylatch_count_down(end);
 
-    printf ("iterator size: %d\n", hythread_iterator_size(iterator));
+    printf ("iterator size: %d\n", (int)hythread_iterator_size(iterator));
     tf_assert(hythread_iterator_size(iterator) == n);
     i = 0;
     while(hythread_iterator_has_next(iterator)) {
@@ -145,8 +150,10 @@ int test_hythread_iterator_default(void) {
     hylatch_create(&end, 1);
 
     for (i = 0; i < n; i++) {
-        thread = NULL;
-        hythread_create(&thread, 0, 0, 0, start_proc_empty, NULL);
+        thread = (hythread_t)calloc(1, hythread_get_struct_size());
+        assert(thread);
+        hythread_create_with_group(thread, NULL, 0, 0,
+            (hythread_entrypoint_t)start_proc_empty, NULL);
     }
 
     // Wait util all threads have started.
@@ -155,7 +162,7 @@ int test_hythread_iterator_default(void) {
     // Notify all threads
     hylatch_count_down(end);
 
-    printf("default group iterator: %d\n", hythread_iterator_size(iterator));
+    printf("default group iterator: %d\n", (int)hythread_iterator_size(iterator));
     tf_assert(hythread_iterator_size(iterator) >= n);
     i = 0;
     while(hythread_iterator_has_next(iterator)) {
@@ -182,7 +189,7 @@ int test_hythread_create_many(void){
     void **args; 
     hythread_t thread = NULL;
     hythread_group_t group = NULL;
-    int r;
+    IDATA r;
     
     char *buf;
     int i = 10;
@@ -199,9 +206,10 @@ int test_hythread_create_many(void){
         ((jthread_threadattr_t *)args[1])->stacksize = 1024000;
         ((jthread_threadattr_t *)args[1])->priority  = 1;
         
-        thread = NULL;
-
-        r = hythread_create_with_group(&thread, group, 1024000, 1, 0, start_proc, args);
+        thread = (hythread_t)calloc(1, hythread_get_struct_size());
+        assert(thread);
+        r = hythread_create_with_group(thread, group, 1024000, 1,
+            (hythread_entrypoint_t)start_proc, args);
         tf_assert(r == 0 && "thread creation failed");
         buf = (char *)apr_pcalloc(pool, sizeof(char)*12);
 

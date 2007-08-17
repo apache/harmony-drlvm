@@ -28,7 +28,7 @@ int start_proc(void *args);
 int test_hythread_thread_suspend(void){
     apr_pool_t *pool;
     void **args; 
-    hythread_t thread = NULL;
+    hythread_t thread;
     hythread_thin_monitor_t lockword_ptr;
     IDATA status;
     int i;
@@ -41,7 +41,10 @@ int test_hythread_thread_suspend(void){
 
     args[0] = &lockword_ptr;
     args[1] = 0;
-    hythread_create(&thread, 0, 0, 0, start_proc, args);
+    thread = (hythread_t)calloc(1, hythread_get_struct_size());
+    assert(thread);
+    hythread_create_with_group(thread, NULL, 0, 0,
+        (hythread_entrypoint_t)start_proc, args);
     hythread_sleep(500); 
     hythread_suspend_other(thread);
     hythread_suspend_disable();
@@ -63,7 +66,7 @@ int test_hythread_thread_suspend(void){
     
     hythread_join(thread);
     
-    tf_assert_same((int)args[1], 1);
+    tf_assert_same((IDATA)args[1], 1);
 
     return 0;
 }
@@ -86,8 +89,10 @@ int test_hythread_thread_suspend_all(void){
     args[0] = lockword_ptr;
     args[1] = 0;
     for(i = 0; i < 10; i++) {
-        thread = NULL;
-        hythread_create(&thread, 0, 0, 0, start_proc, args);
+        thread = (hythread_t)calloc(1, hythread_get_struct_size());
+        assert(thread);
+        hythread_create_with_group(thread, NULL, 0, 0,
+            (hythread_entrypoint_t)start_proc, args);
     } 
     hythread_sleep(500); 
     hythread_suspend_all(NULL, ((HyThread_public*)hythread_self())->group);

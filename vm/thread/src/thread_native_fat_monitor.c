@@ -51,14 +51,16 @@ IDATA VMCALL hythread_monitor_init_with_name(hythread_monitor_t *mon_ptr, UDATA 
         return TM_ERROR_OUT_OF_MEMORY;
     }
     r = hymutex_create(&mon->mutex, TM_MUTEX_NESTED);
-    if (r) goto cleanup;
+    if (r) {
+        goto cleanup;
+    }
     r = hycond_create(&mon->condition);
-    if (r) goto cleanup;
+    if (r) {
+        goto cleanup;
+    }
 
     mon->flags = flags;
     mon->name  = name;
-    mon->owner = 0;
-    mon->notify_flag = 0;
 
     *mon_ptr = mon;
     return TM_ERROR_NONE;
@@ -165,10 +167,6 @@ IDATA monitor_wait_impl(hythread_monitor_t mon_ptr, I_64 ms, IDATA nano, IDATA i
         return TM_ERROR_ILLEGAL_STATE;
     }
 
-#ifdef _DEBUG
-    mon_ptr->last_wait=tm_self_tls;
-#endif
-
     saved_recursion = mon_ptr->recursion_count;
 
     assert(saved_recursion>=0);
@@ -184,12 +182,15 @@ IDATA monitor_wait_impl(hythread_monitor_t mon_ptr, I_64 ms, IDATA nano, IDATA i
 
     do {
         apr_time_t start;
-        assert(0 <= mon_ptr->notify_flag && mon_ptr->notify_flag < mon_ptr->wait_count);
+        assert(mon_ptr->notify_count >= 0);
+        assert(mon_ptr->notify_count < mon_ptr->wait_count);
         start = apr_time_now();
         status = condvar_wait_impl(&mon_ptr->condition, &mon_ptr->mutex, ms, nano, interruptable);
         if (status != TM_ERROR_NONE
-	                    || mon_ptr->notify_flag || hythread_interrupted(self))
+            || mon_ptr->notify_count || hythread_interrupted(self))
+        {
             break;
+        }
         // we should not change ms and nano if both are 0 (meaning "no timeout")
         if (ms || nano) {
             apr_interval_time_t elapsed;
@@ -209,14 +210,23 @@ IDATA monitor_wait_impl(hythread_monitor_t mon_ptr, I_64 ms, IDATA nano, IDATA i
             assert(0 <= nano && nano < 1000000);
         }
     } while (1);
-    if (mon_ptr->notify_flag)
-        mon_ptr->notify_flag -= 1;
+
+    // consume the notify_count unless we got an error
+    // or were interrupted
+    if (mon_ptr->notify_count > 0
+        && ((status == TM_ERROR_NONE && !hythread_interrupted(self))
+            || mon_ptr->notify_count == mon_ptr->wait_count))
+    {
+        mon_ptr->notify_count--;
+    }
+
     hymutex_lock(&self->mutex);
     self->state &= ~TM_THREAD_STATE_IN_MONITOR_WAIT;
     self->current_condition = NULL;
     self->waited_monitor = NULL;
     hymutex_unlock(&self->mutex);
     mon_ptr->wait_count--;
+    assert(mon_ptr->notify_count <= mon_ptr->wait_count);
 
     if (self->request) {
         int save_count;
@@ -326,7 +336,7 @@ IDATA VMCALL hythread_monitor_notify_all(hythread_monitor_t mon_ptr) {
     if (mon_ptr->owner != tm_self_tls) {
         return TM_ERROR_ILLEGAL_STATE;
     }
-    mon_ptr->notify_flag = mon_ptr->wait_count;
+    mon_ptr->notify_count = mon_ptr->wait_count;
     return hycond_notify_all(&mon_ptr->condition);
 }
 
@@ -372,8 +382,8 @@ IDATA VMCALL hythread_monitor_notify(hythread_monitor_t mon_ptr) {
     if (mon_ptr->owner != tm_self_tls) {
         return TM_ERROR_ILLEGAL_STATE;
     }
-    if (mon_ptr->notify_flag < mon_ptr->wait_count)
-        mon_ptr->notify_flag += 1;
+    if (mon_ptr->notify_count < mon_ptr->wait_count)
+        mon_ptr->notify_count += 1;
     return hycond_notify(&mon_ptr->condition);
 }
 

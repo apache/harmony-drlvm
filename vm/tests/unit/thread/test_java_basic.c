@@ -67,7 +67,7 @@ int test_jthread_attach(void) {
     tested_thread_sturct_t * tts;
 
     // Initialize tts structures and run all tested threads
-    tested_os_threads_run(run_for_test_jthread_attach);
+    tested_os_threads_run((hythread_entrypoint_t)run_for_test_jthread_attach);
     
     // Make second attach to the same jthread.
     reset_tested_thread_iterator(&tts);
@@ -222,7 +222,7 @@ void JNICALL run_for_test_jthread_timed_join(jvmtiEnv * jvmti_env, JNIEnv * jni_
     } else {
         // wait until timeout or previous thread ends 
         status = jthread_timed_join(prev_tts->java_thread, timed_join_wait_time, 0);
-        printf("-------- status = %08x (%i) %i\n", status,  status, timed_join_wait_time);
+        printf("-------- status = %#08x (%d) %d\n", (int)status, (int)status, timed_join_wait_time);
         tts->phase = TT_PHASE_DEAD;
         if (timed_join_wait_time > CLICK_TIME_MSEC * 10){
             // must be thread end

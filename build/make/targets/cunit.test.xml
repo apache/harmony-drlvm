@@ -16,174 +16,215 @@
 -->
 <project name="C UNIT TESTS">
     <target name="cunit.test" depends="init_component">
+
+        <!-- Set cunit tests include dirs -->
         <path id="unit.test.c.include">
             <pathelement location="${build.VM.home}/tests/unit/thread/utils" />
+            <pathelement location="${build.VM.home}/tests/unit/framework" />
             <pathelement location="${build.semi.dir}/extra/apr/include" />
             <pathelement location="${build.semi.dir}/extra/apr/include/apr-1" />
+            <pathelement location="${build.VM.home}/include" />
             <pathelement location="${build.VM.home}/vmcore/include" />
+            <pathelement location="${build.VM.home}/port/include" />
         </path>
+
+        <!-- Set cunit tests sources -->
         <fileset id="unit.test.c.src" dir="${build.VM.home}/tests/unit/thread">
             <include name="*.c" />
-            <exclude name="*performance*"/>
         </fileset>
-        <!-- compiler to compile framework as well as the unit tests -->
-        <compiler name="${build.cxx}" id="unit.test.c.compiler">
-            <defineset define="APR_DECLARE_STATIC, _DEBUG, VM_STATS" />
-            <defineset define="BUILDING_VM" />
-            <select os="win">
-                <defineset define="PLATFORM_NT, WIN32, _WINDOWS" />
-                <defineset define="_WIN32_WINNT=0x0501" />
+
+        <!-- Create cunit tests work dir -->
+        <property name="unit.test.c.workdir" value="${build.dir}/_cunit.tests" />
+        <mkdir dir="${unit.test.c.workdir}/_obj" />
+        <mkdir dir="${unit.test.c.workdir}/_bin" />
+        <mkdir dir="${unit.test.c.workdir}/report" />
+
+        <compiler name="${build.cxx}" id="cunit.test.compiler">
+            <defineset define="APR_DECLARE_STATIC, BUILDING_VM"/>
+            <select cfg="release">
+                <defineset define="NDEBUG" />
+                <select os="win">
+                    <select cxx="icl">
+                        <compilerarg value="/QxN" />
+                        <compilerarg value="/O3" />
+                        <compilerarg value="/Qip" />
+                    </select>
+                    <select cxx="msvc">
+                        <compilerarg value="/Ox" />
+
+                    </select>
+                </select>
+                <select osfamily="unix">
+                    <compilerarg value="-O2" />
+                </select>
             </select>
-            <select os="lnx">
-                <defineset define="LINUX, GC_V4" />
-                <defineset define="USE_DLL_JIT, PLATFORM_POSIX" />
-                <defineset define="__SMP__, _REENTRANT" />
-                <defineset define="LINUX_TLS_OPT, _IA32_" />
-                <defineset define="_LARGEFILE64_SOURCE" />
-                <compilerarg value="-Wall" />
-                <compilerarg value="-fno-exceptions" />
-                <compilerarg value="-g" />
-                <compilerarg value="-O0" />
+ 
+            <select cfg="debug">
+                <defineset define="_DEBUG,VM_STATS" />
+                <select osfamily="unix">
+                    <compilerarg value="-O0" />
+                    <compilerarg value="-g" />
+                    <compilerarg value="-ggdb3" />
+                </select>
+                <select os="win" cxx="icl">
+                    <compilerarg value="/QxN" />
+                    <compilerarg value="/Qip" />
+                    <compilerarg value="/O3" />
+                </select>
             </select>
+
             <select arch="ia32">
                 <defineset define="_IA32_" />
             </select>
+            <select arch="ipf">
+                <defineset define="_IPF_,POINTER64,HYIA64" />
+            </select>
             <select arch="em64t">
-                <defineset define="_EM64T_" />
-                <defineset define="POINTER64" />
-                <defineset define="LAZY_LOCK" />
+                <defineset define="_EM64T_,POINTER64,LAZY_LOCK,HYX86_64" />
+            </select>
+            <select arch="ppc32">
+                <defineset define="_PPC32_,_PPC_,HYPPC32" />
+            </select>
+            <select os="win">
+                <defineset define="PLATFORM_NT,WIN32,_WINDOWS" />
+                <defineset>
+                    <define name="_WIN32_WINNT" value="0x0501" />
+                </defineset>
+                <compilerarg value="/nologo" />
+                <compilerarg value="/W3" />
+                <select arch="ia32,ipf">
+                    <compilerarg value="/WX" />
+                </select>
+                <compilerarg value="/Zi" />
+            </select>
+            <select osfamily="unix">
+                <defineset define="PLATFORM_POSIX" />
+                <compilerarg value="-fno-exceptions" />
+                <select os="macosx">
+                    <defineset define="MACOSX" />
+                </select>
+                <select os="lnx">
+                    <defineset define="LINUX" />
+                </select>
+                <defineset define="__SMP__,_REENTRANT,LINUX_TLS_OPT" />
+                <select arch="em64t">
+                    <compilerarg value="-ftls-model=initial-exec" /> 
+                </select>
+                <select arch="ia32">
+                    <defineset define="_LARGEFILE64_SOURCE" />
+                </select>
+                <select os="lnx" arch="em64t,ipf">
+                    <compilerarg value="-fPIC" />
+                </select>
+                <select cxx="icc">
+                    <compilerarg value="-w1" />
+                </select>
+            </select>
+            <select cxx="icc,icl">                  
+                <compilerarg value="-mp" />
             </select>
         </compiler>
-        <!-- Compiling framework -->
-        <echo message="## Compiling framework..." />
-        <!-- a new property: cunit tests work dir -->
-        <property name="unit.test.c.workdir"
-                          value="${build.dir}/_cunit.tests" />
-        <mkdir dir="${unit.test.c.workdir}/_obj" />
-        <cc objdir="${unit.test.c.workdir}/_obj"
-                    debug="true"
-                    runtime="static"
-                    multithreaded="true">
-            <compiler refid="unit.test.c.compiler" />
-            <fileset refid="unit.test.c.framework.src" />
+       
+        <!-- Compiling cunit tests and framework -->
+        <echo message="cunit: Compiling tests and framework..." />
+        <cc objdir="${unit.test.c.workdir}/_obj" multithreaded="true">
+            <compiler refid="cunit.test.compiler" />
             <fileset dir="${build.VM.home}/tests/unit/thread/utils">
                 <include name="*.c" />
             </fileset>
-            <includepath refid="unit.test.common.c.include" />
+            <fileset dir="${build.VM.home}/tests/unit/framework">
+                <include name="*.c" />
+            </fileset>
+            <fileset refid="unit.test.c.src"/>
             <includepath refid="unit.test.c.include" />
         </cc>
-        <!-- a list of all source files with unit tests -->
-        <pathconvert pathsep=","
-                             property="unit.test.c.files"
-                             refid="unit.test.c.src" />
-        <!-- operation system sensitive executive binary file extention.
-                     simply said: "" or ".exe" ;) -->
+        
+        <!-- Create a list of cunit tests excecutable -->
+        <pathconvert pathsep="," property="unit.test.c.files" refid="unit.test.c.src" />
+        <propertyregex override="yes" property="unit.test.c.files" input="${unit.test.c.files}"
+            regexp="\.c" replace="" defaultValue="${unit.test.c.files}" />
         <condition property="extention" value=".exe">
             <isset property="if.win" />
         </condition>
         <property name="extention" value="" />
-        <!-- replacing: 'xxx.c, yyy.c' => 'xxx yyy' -->
-        <propertyregex override="yes"
-                               property="unit.test.c.files"
-                               input="${unit.test.c.files}"
-                               regexp="\.c"
-                               replace=""
-                               defaultValue="${unit.test.c.files}" />
-        <!-- Compiling unit tests -->
-        <echo message="## Compiling C unit tests" />
-        <cc objdir="${unit.test.c.workdir}/_obj"
-                    debug="true"
-                    runtime="static"
-                    multithreaded="true" 
-                    subsystem="console">
-            <compiler refid="unit.test.c.compiler" />
-            <fileset refid="unit.test.c.src" />
-            <includepath refid="unit.test.common.c.include" />
-            <includepath refid="unit.test.c.include" />
-        </cc>
-        <mkdir dir="${unit.test.c.workdir}/_bin" />
 
-        <mkdir dir="${unit.test.c.workdir}/report" />
-        <!-- set of properties which will be needed for test execution -->
+        <!-- Compiling cunit tests -->
         <property name="filename" value="--" />
-        <property name="outputproperty" value="--" />
-        <property name="resultproperty" value="--" />
+
+        <echo message="cunit: Compiling tests..." />
         <for list="${unit.test.c.files}" param="file" delimiter=",">
             <sequential>
-                <!-- make it possible to overwrite the property -->
+
                 <var name="filename" unset="true" />
                 <basename property="filename" file="@{file}" />
-                <!-- Linking unit test -->
-                <echo message="## Linking C unit test: ${filename}" />
-                <cc name="${build.cxx}"
-                            debug="true"
-                            outfile="${unit.test.c.workdir}/_bin/${filename}"
-                            outtype="executable" 
-                            subsystem="console">
+
+                <echo message="cunit: Compile test: ${filename}" />
+                
+                <cc outfile="${unit.test.c.workdir}/_bin/${filename}${extention}"
+                    runtime="dynamic" multithreaded="true" subsystem="console">
+                    
+                    <compiler refid="cunit.test.compiler" />
+                    
                     <linker name="${build.cxx}">
                         <fileset dir="${unit.test.c.workdir}/_obj">
-                            <include name="${filename}.o*" />
                             <include name="thread_unit_test_main.o*" />
                             <include name="thread_unit_test_utils.o*" />
                             <include name="testframe.o*" />
+                            <include name="${filename}.o*" />
                         </fileset>
 
-                        <libset libs="hythr" dir="${build.semi.dir}/vm/hythr/_bin" />
-                        <libset libs="encoder" dir="${build.semi.dir}/vm/encoder/_bin" />
-                        <libset libs="aprutil-1" dir="${build.semi.dir}/extra/aprutil/_bin" />
-                        <libset libs="port" dir="${build.semi.dir}/vm/port/_bin" />
-                        <libset libs="log4cxx" dir="${build.semi.dir}/extra/log4cxx/_bin" />
-                        <libset libs="hyzlib" dir="${external.dep.CLASSLIB}/deploy/jdk/jre/bin" />
-                        <libset libs="harmonyvm" dir="${build.semi.dir}/vm/vmcore/_bin" />
-                        <libset libs="icuuc" dir="${external.dep.CLASSLIB.libdir}" />
                         <select os="win">
-                            <syslibset libs="advapi32, ws2_32, mswsock, user32, userenv, odbc32" />
-                            <linkerarg value="/NODEFAULTLIB:libcmt.lib" />
+                            <libset type="shared" libs="harmonyvm"
+                                dir="${build.semi.dir}/vm/vmcore/_bin" />
+                            <libset type="shared" libs="hythr"
+                                dir="${build.semi.dir}/vm/hythr/_bin" />
+                            <linkerarg value="/libpath:${build.deploy.dir}/jdk/jre/bin/default" />
+                            <linkerarg value="/NODEFAULTLIB:libcmtd" />
                         </select>
+                        
                         <select os="lnx">
-                            <syslibset type="shared" libs="stdc++, gcc_s, pthread, rt" />
-                            <select arch="ia32">
-                                <libset type="shared" libs="icuuc" />
-                                <libset type="shared" libs="icudata"
-                                    dir="${external.dep.CLASSLIB}/depends/libs/linux.x86" />
-                                </select>               
-                            <select arch="em64t">
-                                <libset type="shared" libs="icuuc"
-                                    dir="${external.dep.CLASSLIB}/depends/libs/linux.x86_64" />
-                                <libset type="shared" libs="icudata"
-                                    dir="${external.dep.CLASSLIB}/depends/libs/linux.x86_64" />
-                            </select>
-                            <select arch="ipf">
-                                <libset type="shared" libs="icuuc"
-                                    dir="${external.dep.CLASSLIB}/depends/libs/linux.ia64" />
-                                <libset type="shared" libs="icudata"
-                                    dir="${external.dep.CLASSLIB}/depends/libs/linux.ia64" />
-                            </select>
+                            <libset type="shared" libs="harmonyvm"
+                                dir="${build.deploy.dir}/jdk/jre/bin/default" />
+                            <linkerarg value="-rpath" />
+                            <linkerarg value="${build.deploy.dir}/jdk/jre/bin" />
+                            <linkerarg value="-rpath" />
+                            <linkerarg value="${build.deploy.dir}/jdk/jre/bin/default" />
                         </select>
                     </linker>
                 </cc>
             </sequential>
         </for>
-        
+                    
+        <!-- Executing cunit tests... -->
+        <property name="outputproperty" value="--" />
+        <property name="resultproperty" value="--" />
         <delete file="${build.semi.dir}/cunit.test.failed" failonerror="false" />
-            
+
+        <echo message="cunit: Compiling tests..." />
         <for list="${unit.test.c.files}" param="file" delimiter=",">
             <sequential>
-                <!-- make it possible to overwrite the property -->
+                
                 <var name="filename" unset="true" />
                 <basename property="filename" file="@{file}" />
-                <!-- Executing unit test -->
-                <echo message="## Executing C unit test: ${filename}" />
+                
+                <!-- Executing unit test... -->
+                <echo message="cunit: Executing test: ${filename} ..." />
                 <var name="outputproperty" unset="true" />
                 <var name="resultproperty" unset="true" />
                 <exec dir="${unit.test.c.workdir}/_bin"
-                              executable="${unit.test.c.workdir}/_bin/${filename}${extention}"
-                              resultproperty="resultproperty"
-                              outputproperty="outputproperty">
+                    executable="${unit.test.c.workdir}/_bin/${filename}${extention}"
+                    resultproperty="resultproperty"
+                    outputproperty="outputproperty">
+                    
                     <arg value="-Dorg.apache.harmony.vm.vmdir=${build.deploy.dir}/jdk/jre/bin/default"/>
                     <arg value="-Djava.home=${build.deploy.dir}/jdk/jre ${test.vmargs}"/>
                     <arg value="-XX:vm.jvmti.enabled=true"/>
+                    <select arch="ipf">
+                        <arg value="-Xint"/>
+                    </select>
+                    
                     <env key="JAVA_HOME" value="${build.deploy.dir}/jdk/jre" />
+                    
                     <select os="win">
                         <env key="Path" path="${build.deploy.dir}/jdk/jre/bin/:${build.deploy.dir}/jdk/jre/bin/default:${env.Path}" />
                     </select>
@@ -191,38 +232,47 @@
                         <env key="LD_LIBRARY_PATH" path="${build.deploy.dir}/jdk/jre/bin/:${build.deploy.dir}/jdk/jre/bin/default" />
                     </select>
                 </exec>
-                <echo file="${unit.test.c.workdir}/report/${filename}.out"
-                              message="${outputproperty}" />
-                <echo message="${outputproperty}" />
+
+                <!-- Echo test output... -->
+                <echo file="${unit.test.c.workdir}/report/${filename}.out" message="${outputproperty}" />
+                <!-- echo message="${outputproperty}" / -->
+
+                <!-- Checking test result... -->
                 <if>
                     <not>
                         <equals arg1="${resultproperty}" arg2="0" />
                     </not>
                     <then>
+                        
+                        <!-- Test failed... -->
                         <property name="test.failed" value="true" />
-                        <echo message="## TEST FAILED" />
+                        <echo message="cunit: TEST FAILED" />
                         <echo file="${build.semi.dir}/cunit.test.failed" message="${filename} FAILED${line.separator}" append="true"/>
 
-<echo file="${unit.test.c.workdir}/report/TEST-${filename}.xml"><![CDATA[<?xml version="1.0" encoding="UTF-8" ?>
-<testsuite errors="0" failures="1" name="@@@@@" tests="1" time="0.01">
-<testcase classname="@@@@@" name="test" time="0.1"><error message="FAILED"/></testcase>
-<system-out><![CDATA[@out]!]></system-out>
-</testsuite>]]> 
-</echo>
+                        <echo file="${unit.test.c.workdir}/report/TEST-${filename}.xml"><![CDATA[<?xml version="1.0" encoding="UTF-8" ?>
+                            <testsuite errors="0" failures="1" name="@@@@@" tests="1" time="0.01">
+                                <testcase classname="@@@@@" name="test" time="0.1"><error message="FAILED"/></testcase>
+                                <system-out><![CDATA[@out]!]></system-out>
+                            </testsuite>]]>
+                        </echo>
 
                     </then>
                     <else>
-                        <echo message="## TEST PASSED" />
-<echo file="${unit.test.c.workdir}/report/TEST-${filename}.xml"><![CDATA[<?xml version="1.0" encoding="UTF-8" ?>
-<testsuite errors="0" failures="0" name="@@@@@" tests="1" time="0.01">
-<testcase classname="@@@@@" name="test" time="0.1"></testcase>
-<system-out><![CDATA[@out]!]></system-out>
-</testsuite>]]> 
-</echo>
+                        
+                        <!-- Test passed... -->
+                        <echo message="cunit: TEST PASSED" />
+                        <echo file="${unit.test.c.workdir}/report/TEST-${filename}.xml"><![CDATA[<?xml version="1.0" encoding="UTF-8" ?>
+                            <testsuite errors="0" failures="0" name="@@@@@" tests="1" time="0.01">
+                                <testcase classname="@@@@@" name="test" time="0.1"></testcase>
+                                <system-out><![CDATA[@out]!]></system-out>
+                            </testsuite>]]>
+                        </echo>
+                        
                     </else>
                 </if>
-                <replace file="${unit.test.c.workdir}/report/TEST-${filename}.xml" token="@@@@@" value="${filename}" /> 
-                <!-- grab System.out to xml-file -->
+
+                <!-- Setting file output to xml... -->
+                <replace file="${unit.test.c.workdir}/report/TEST-${filename}.xml" token="@@@@@" value="${filename}" />
                 <if>
                     <isset property="outputproperty" />
                     <then>
@@ -235,6 +285,7 @@
             </sequential>
         </for>
 
+        <!-- Creating execution report... -->
         <property name="cunit.tests.report.dir" location="${unit.test.c.workdir}/report/html"/>
         <delete dir="${cunit.tests.report.dir}" />
         <mkdir dir="${cunit.tests.report.dir}" />
@@ -246,6 +297,7 @@
         </junitreport>
 
         <echo message="## Please find tests and results at ${build.dir}/_cunit.tests/" />
-        <fail unless="run.all.tests" if="test.failed" message="## SOME TESTS FAILED"/>
+        <fail unless="run.all.tests" if="test.failed" message="cunit: SOME TESTS FAILED"/>
     </target>
 </project>
+

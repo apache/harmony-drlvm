@@ -37,7 +37,6 @@ static IDATA HYTHREAD_PROC interrupter_thread_function(void *args);
  */
 void VMCALL hythread_interrupt(hythread_t thread) {
     IDATA status;
-    hythread_t thr = NULL;
     hymutex_lock(&thread->mutex);
     thread->state |= TM_THREAD_STATE_INTERRUPTED;
     
@@ -49,19 +48,20 @@ void VMCALL hythread_interrupt(hythread_t thread) {
     // If thread was doing any kind of wait, notify it.
     if (thread->state & (TM_THREAD_STATE_PARKED | TM_THREAD_STATE_SLEEPING)) {
         if (thread->current_condition) {
-	    status = hycond_notify_all(thread->current_condition);
-	    assert(status == TM_ERROR_NONE);
-	}
+            status = hycond_notify_all(thread->current_condition);
+            assert(status == TM_ERROR_NONE);
+        }
     } else if (thread->state & TM_THREAD_STATE_IN_MONITOR_WAIT) {
         if (thread->current_condition && (hythread_monitor_try_enter(thread->waited_monitor) == TM_ERROR_NONE)) {
             hythread_monitor_interrupt_wait(thread->waited_monitor, thread);
             hythread_monitor_exit(thread->waited_monitor);
         } else {
-            status = hythread_create(&thr, 0, 0, 0, interrupter_thread_function, (void *)thread);
+            hythread_t interrupt_thread = (hythread_t)calloc(1, hythread_get_struct_size());
+            status = hythread_create_with_group(interrupt_thread, 0, 0, 0,
+                interrupter_thread_function, (void *)thread);
             assert (status == TM_ERROR_NONE);
-	}
+        }
     }
-
     hymutex_unlock(&thread->mutex);
 }
 
@@ -81,7 +81,7 @@ static IDATA HYTHREAD_PROC interrupter_thread_function(void *args) {
     hymutex_unlock(&thread->mutex);
 
     hythread_monitor_enter(monitor);
-    hythread_monitor_notify_all(monitor);
+    hythread_monitor_interrupt_wait(monitor, thread);
 
     hythread_exit(monitor);
     return 0;
