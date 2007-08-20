@@ -160,7 +160,7 @@ static void wait_finalization_end(Boolean must_wait)
     hymutex_lock(&fin_thread_info->end_mutex);
     unsigned int fin_obj_num = vm_get_finalizable_objects_quantity();
     while(fin_thread_info->working_thread_num || fin_obj_num){
-        unsigned int wait_time = restrict_wait_time(fin_obj_num + 100, FIN_MAX_WAIT_TIME << 7);
+        unsigned int wait_time = restrict_wait_time((fin_obj_num + 100)<<1, FIN_MAX_WAIT_TIME << 7);
         atomic_inc32(&fin_thread_info->end_waiting_num);
         IDATA status = hycond_wait_timed(&fin_thread_info->end_cond, &fin_thread_info->end_mutex, (I_64)wait_time, 0);
         atomic_dec32(&fin_thread_info->end_waiting_num);
