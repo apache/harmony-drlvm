@@ -598,7 +598,7 @@ jint vm_attach_internal(JNIEnv ** p_jni_env, jthread * java_thread, JavaVM * jav
 
     native_thread = hythread_self();
     if (!native_thread) {
-        hythread_t native_thread = (hythread_t)STD_CALLOC(1, hythread_get_struct_size());
+        native_thread = (hythread_t)STD_CALLOC(1, hythread_get_struct_size());
         assert(native_thread);
         IDATA hy_status = hythread_attach_to_group(native_thread, NULL, NULL);
         if (hy_status != TM_ERROR_NONE)
