@@ -435,11 +435,7 @@ void parse_jit_arguments(JavaVMInitArgs* vm_arguments)
 // converts exposed verbosity category names 
 // to the internally used logger category names.
 static char* convert_logging_category(char* category) {
-    if (0 == strcmp("gc", category)) {
-        // hijack the standard category "gc" (-verbose:gc) to the
-        // more specific internal category "gc.verbose"
-        return "gc.verbose";
-    } else if (0 == strcmp("gc*", category) || 0 == strcmp("gc.*", category)) {
+    if (0 == strcmp("gc*", category) || 0 == strcmp("gc.*", category)) {
         // handle the non-standard logging category specification
         return "gc";
     } else {
