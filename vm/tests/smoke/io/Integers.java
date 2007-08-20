@@ -34,7 +34,7 @@ class Spaghetti implements Serializable {
 }
 
 public class Integers {
-    private static final int SPAGHETTI_NUM = 1000;
+    private static final int SPAGHETTI_NUM = 500;
     private static final Random rnd = new Random();
 
     public static void main(String[] args) throws Exception {
