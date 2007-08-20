@@ -662,6 +662,8 @@ extern void (*gc_write_barrier)(Managed_Object_Handle p_base_of_obj_with_slot);
 VMEXPORT extern void * (*gc_heap_base_address)();
 VMEXPORT extern void * (*gc_heap_ceiling_address)();
 
+extern Boolean (*gc_supports_class_unloading)();
+
 #else // USE_GC_STATIC
 
 //@}
@@ -787,6 +789,7 @@ GCExport void gc_set_mutator_block_flag();
  */
 GCExport Boolean gc_clear_mutator_block_flag();
 
+GCExport Boolean gc_supports_class_unloading();
 
 // XXX move this elsewhere -salikh
 #ifdef JNIEXPORT

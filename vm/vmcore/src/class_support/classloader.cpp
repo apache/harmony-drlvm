@@ -464,14 +464,14 @@ ClassLoader* ClassLoader::LookupLoader( ManagedObject* loader )
 }
 
 
-void ClassLoader::UnloadClassLoader( ManagedObject* loader )
+void ClassLoader::UnloadClassLoader( ClassLoader* loader )
 {
     LMAutoUnlock aulock( &(ClassLoader::m_tableLock) );
     unsigned i;
     for(i = 0; i < m_nextEntry; i++)
     {
         ClassLoader* cl = m_table[i];
-        if( loader == cl->m_loader ) break;
+        if( loader == cl) break;
     }
     if (i == m_nextEntry) return;
     ClassLoader* cl = m_table[i];
@@ -486,10 +486,18 @@ void ClassLoader::gc_enumerate()
 {
     TRACE2("enumeration", "enumerating classes");
     LMAutoUnlock aulock( &(ClassLoader::m_tableLock) );
-
+    
+    Boolean do_class_unloading = gc_supports_class_unloading();
     for(unsigned int i = 0; i < m_nextEntry; i++) {
-        if(m_table[i]->m_loader != NULL) {
+        //assert (m_table[i]->m_loader);
+        if (m_table[i]->m_markBit) {
             vm_enumerate_root_reference((void**)(&(m_table[i]->m_loader)), FALSE);
+        }
+        else {
+            if(do_class_unloading)
+               vm_enumerate_weak_root_reference((void**)(&(m_table[i]->m_loader)), FALSE);
+            else
+               vm_enumerate_root_reference((void**)(&(m_table[i]->m_loader)), FALSE);
         }
     }
 }
@@ -505,8 +513,66 @@ void ClassLoader::ClearMarkBits()
             << m_table[i] << " (" << m_table[i]->m_loader << " : "
             << m_table[i]->m_loader->vt_unsafe()->clss->get_name()->bytes << ") and its classes");
         m_table[i]->m_markBit = 0;
+        Class*   c;
+        ReportedClasses::iterator itc;
+        ReportedClasses* RepClasses = m_table[i]->GetReportedClasses();
+        for (itc = RepClasses->begin(); itc != RepClasses->end(); itc++)
+        {
+            c = itc->second;
+            if (c && c->get_vtable()) c->get_vtable()->vtmark = 0;
+        }
+        ClassTable* ct = m_table[i]->GetLoadedClasses();
+        ClassTable::iterator it;
+        for (it = ct->begin(); it != ct->end(); it++)
+        {
+            c = it->second;
+            if (c && c->get_vtable()) c->get_vtable()->vtmark = 0;
+        }
      }
     TRACE2("classloader.unloading.clear", "Finished clearing mark bits");
+}
+
+void ClassLoader::StartUnloading()
+{
+    TRACE2("classloader.unloading.marking", "Finished marking loaders");
+    TRACE2("classloader.unloading.do", "Start checking loaders ready to be unloaded");
+    LMAutoUnlock aulock( &(ClassLoader::m_tableLock) );
+    vector<ClassLoader*> unloadinglist;
+    unsigned i;
+    for(i = 0; i < m_nextEntry; i++) {
+        if(m_table[i]->m_loader) {
+           TRACE2("classloader.unloading.debug", "  Skipping live classloader "
+                << m_table[i] << " (" << m_table[i]->m_loader << " : "
+                << ((VTable*)(*(unsigned**)(m_table[i]->m_loader)))->clss->get_name()->bytes << ")");
+            continue;
+        }
+        TRACE2("classloader.unloading.stats", "  Unloading classloader "
+            << m_table[i] << " (" << m_table[i] << ")");
+#ifdef _DEBUG // check that all j.l.Classes inside j.l.ClassLoader are also unloaded
+        ClassTable* ct = m_table[i]->GetLoadedClasses();
+        ClassTable::iterator it;
+        for (it = ct->begin(); it != ct->end(); it++)
+        {
+            Class* c = it->second;
+            if (*c->get_class_handle())
+            {
+                DIE("FAILED on unloading classloader: \n" << (void*)m_table[i] << 
+                    "live j.l.Class of unloaded class is detected: " << c->get_name()->bytes);
+                assert (false);
+            }
+         }
+#endif
+        unloadinglist.push_back(m_table[i]);
+    }
+
+    // safely remove classloaders from m_table
+    vector<ClassLoader*>::iterator it;
+    for (it = unloadinglist.begin(); it != unloadinglist.end(); it++)
+    {
+        UnloadClassLoader(*it);
+    }
+    
+    TRACE2("classloader.unloading.do", "Finished checking loaders");
 }
 
 
@@ -1031,6 +1097,11 @@ GenericFunctionPointer ClassLoader::LookupNative(Method* method)
 void class_unloading_clear_mark_bits() {
     ClassLoader::ClearMarkBits();
 }
+
+void class_unloading_start() {
+    ClassLoader::StartUnloading();
+}
+
 inline void
 BootstrapClassLoader::SetClasspathFromString(char* bcp,
                                                apr_pool_t* tmp_pool)
@@ -1847,5 +1918,7 @@ void BootstrapClassLoader::ReportException(const char* exn_name, std::stringstre
 
     ClassLoader::ReportException(exn_name, message_stream);
 }
+
+
 
 

@@ -204,6 +204,7 @@ void move_compact_mspace(Collector* collector)
       gc_update_weakref_ignore_finref(gc);
     }
 #endif
+    identify_dead_weak_roots(gc, gc->metadata->weak_roots_pool);
 
     /* let other collectors go */
     num_marking_collectors++; 
@@ -293,8 +294,8 @@ void move_compact_mspace(Collector* collector)
   mspace_reset_after_compaction(mspace);
   fspace_reset_for_allocation(fspace);
 
-
   gc_set_pool_clear(gc->metadata->gc_rootset_pool);
+  gc_set_pool_clear(gc->metadata->weak_roots_pool);
   
   TRACE2("gc.process", "GC: collector[0]  finished");
   return;

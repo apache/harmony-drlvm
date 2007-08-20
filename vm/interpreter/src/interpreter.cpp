@@ -3332,6 +3332,7 @@ interpreterInvokeStatic(StackFrame& prevFrame, Method *method) {
     // Setup locals and stack on C stack.
     SETUP_LOCALS_AND_STACK(frame, method);
 
+    frame.This = *(method->get_class()->get_class_handle()); 
     int args = method->get_num_arg_slots();
 
     for(int i = args-1; i >= 0; --i) {

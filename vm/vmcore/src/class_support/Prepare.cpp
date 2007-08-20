@@ -905,6 +905,20 @@ void Class::create_vtable(unsigned n_vtable_entries)
     {
         m_is_suitable_for_fast_instanceof = 1;
     }
+
+    Global_Env* env = VM_Global_State::loader_env;
+    if (!env->InBootstrap()){
+        tmn_suspend_disable();
+        vtable->jlC = *get_class_handle(); 
+        tmn_suspend_enable();
+    }
+    else {
+        // for BootStrap mode jlC is set in create_instance_for_class
+        // class_handle is NULL in bootstrap mode 
+        assert (!get_class_handle());
+        vtable->jlC = NULL;
+    }
+    
     m_vtable = vtable;
 } // Class::create_vtable
 

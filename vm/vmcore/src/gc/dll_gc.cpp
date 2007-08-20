@@ -70,7 +70,7 @@ static Boolean default_gc_supports_frontier_allocation(unsigned *offset_of_curre
 static void default_gc_add_weak_root_set_entry(
         Managed_Object_Handle*, Boolean, Boolean);
 
-
+static Boolean default_gc_supports_class_unloading();
 
 Boolean (*gc_supports_compressed_references)() = 0;
 void (*gc_add_root_set_entry)(Managed_Object_Handle *ref, Boolean is_pinned) = 0;
@@ -132,6 +132,8 @@ void (*gc_iterate_heap)() = 0;
 void (*gc_finalize_on_exit)() = 0;
 void (*gc_set_mutator_block_flag)() = 0;
 Boolean (*gc_clear_mutator_block_flag)() = 0;
+
+Boolean (*gc_supports_class_unloading)() = 0;
 
 static apr_dso_handle_sym_t getFunction(apr_dso_handle_t *handle, const char *name, const char *dllName)
 {
@@ -316,6 +318,11 @@ void vm_add_gc(const char *dllName)
             (apr_dso_handle_sym_t)default_gc_write_barrier);
     gc_test_safepoint = (void (*)()) getFunctionOptional(handle, "gc_test_safepoint", dllName, (apr_dso_handle_sym_t)default_gc_test_safepoint);
 
+    gc_supports_class_unloading = (Boolean (*)())
+        getFunctionOptional(handle, 
+                            "gc_supports_class_unloading", 
+                            dllName,
+                            (apr_dso_handle_sym_t)default_gc_supports_class_unloading);     
 } //vm_add_gc
 
 
@@ -541,4 +548,9 @@ static void default_gc_add_weak_root_set_entry(
     // default to strong reference semantics
     gc_add_root_set_entry(root, pinned);
 }
+
+static Boolean default_gc_supports_class_unloading()
+{
+    return TRUE;
+} //default_gc_supports_class_unloading
 #endif // !USE_GC_STATIC

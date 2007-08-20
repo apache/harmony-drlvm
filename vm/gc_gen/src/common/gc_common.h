@@ -396,6 +396,7 @@ typedef struct GC{
   
   /* FIXME:: this is wrong! root_set belongs to mutator */
   Vector_Block* root_set;
+  Vector_Block* weak_root_set;
   Vector_Block* uncompressed_root_set;
 
   Space_Tuner* tuner;
@@ -465,4 +466,6 @@ extern void* los_boundary;
 extern Boolean* p_global_lspace_move_obj;
 inline Boolean obj_is_moved(Partial_Reveal_Object* p_obj)
 {  return ((p_obj >= los_boundary) || (*p_global_lspace_move_obj)); }
+
+extern Boolean VTABLE_TRACING;
 #endif //_GC_COMMON_H_

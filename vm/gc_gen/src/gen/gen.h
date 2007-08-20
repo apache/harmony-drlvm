@@ -87,6 +87,7 @@ typedef struct GC_Gen {
 
   /* FIXME:: this is wrong! root_set belongs to mutator */
   Vector_Block* root_set;
+  Vector_Block* weak_root_set;
   Vector_Block* uncompressed_root_set;
   
   //For_LOS_extend
@@ -193,5 +194,59 @@ void gc_gen_iterate_heap(GC_Gen *gc);
 
 extern Boolean GEN_NONGEN_SWITCH ;
 
+inline Boolean obj_is_dead_in_gen_minor_gc(Partial_Reveal_Object *p_obj)
+{
+  /*
+   * The first condition is for supporting switch between nongen and gen minor collection
+   * With this kind of switch dead objects in MOS & LOS may be set the mark or fw bit in oi
+   */
+  return obj_belongs_to_nos(p_obj) && !obj_is_marked_or_fw_in_oi(p_obj);
+}
+
+inline Boolean obj_is_dead_in_nongen_minor_gc(Partial_Reveal_Object *p_obj)
+{
+  return (obj_belongs_to_nos(p_obj) && !obj_is_fw_in_oi(p_obj))
+          || (!obj_belongs_to_nos(p_obj) && !obj_is_marked_in_oi(p_obj));
+}
+
+inline Boolean obj_is_dead_in_major_gc(Partial_Reveal_Object *p_obj)
+{
+  return !obj_is_marked_in_vt(p_obj);
+}
+
+// clear the two least significant bits of p_obj first
+inline Boolean gc_obj_is_dead(GC *gc, Partial_Reveal_Object *p_obj)
+{
+  assert(p_obj);
+  if(gc_match_kind(gc, MINOR_COLLECTION)){
+    if(gc_is_gen_mode())
+      return obj_is_dead_in_gen_minor_gc(p_obj);
+    else
+      return obj_is_dead_in_nongen_minor_gc(p_obj);
+  } else {
+    return obj_is_dead_in_major_gc(p_obj);
+  }
+}
+
+extern Boolean forward_first_half;
+extern void* object_forwarding_boundary;
+
+inline Boolean fspace_obj_to_be_forwarded(Partial_Reveal_Object *p_obj)
+{
+  if(!obj_belongs_to_nos(p_obj)) return FALSE;
+  return forward_first_half? (p_obj < object_forwarding_boundary):(p_obj>=object_forwarding_boundary);
+}
+
+inline Boolean obj_need_move(GC *gc, Partial_Reveal_Object *p_obj)
+{
+  if(gc_is_gen_mode() && gc_match_kind(gc, MINOR_COLLECTION))
+    return fspace_obj_to_be_forwarded(p_obj);
+  
+  Space *space = space_of_addr(gc, p_obj);
+  return space->move_object;
+}
+
 #endif /* ifndef _GC_GEN_H_ */
+
+
 

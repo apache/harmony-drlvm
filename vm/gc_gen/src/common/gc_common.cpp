@@ -47,6 +47,8 @@ extern unsigned int NUM_COLLECTORS;
 extern unsigned int MINOR_COLLECTORS;
 extern unsigned int MAJOR_COLLECTORS;
 
+extern Boolean IGNORE_VTABLE_TRACING;
+
 POINTER_SIZE_INT HEAP_SIZE_DEFAULT = 256 * MB;
 POINTER_SIZE_INT min_heap_size_bytes = 16 * MB;
 POINTER_SIZE_INT max_heap_size_bytes = 0;
@@ -254,6 +256,10 @@ void gc_parse_options(GC* gc)
     JVMTI_HEAP_ITERATION = get_boolean_property("gc.heap_iteration");
   }
 
+  if (is_property_set("gc.ignore_vtable_tracing", VM_PROPERTIES) == 1) {
+    IGNORE_VTABLE_TRACING = get_boolean_property("gc.ignore_vtable_tracing");
+  }
+
   if (is_property_set("gc.use_large_page", VM_PROPERTIES) == 1){
     char* value = get_property("gc.use_large_page", VM_PROPERTIES);
     large_page_hint = strdup(value);
@@ -364,5 +370,7 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
   INFO2("gc.process", "GC: GC end\n");
   return;
 }
+
+
 
 

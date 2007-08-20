@@ -45,6 +45,15 @@ static FORCE_INLINE void scan_slot(Collector *collector, REF *p_ref)
 static FORCE_INLINE void scan_object(Collector *collector, Partial_Reveal_Object *p_obj)
 {
   assert((((POINTER_SIZE_INT)p_obj) % GC_OBJECT_ALIGNMENT) == 0);
+  
+  Partial_Reveal_VTable *vtable = uncompress_vt(obj_get_vt(p_obj));
+  if(VTABLE_TRACING)
+    if(vtable->vtmark == VT_UNMARKED) {
+      vtable->vtmark = VT_MARKED;
+      if(obj_mark_in_table(vtable->jlC))
+        collector_tracestack_push(collector, vtable->jlC);
+    }
+  
   if(!object_has_ref_field(p_obj)) return;
   
   REF *p_ref;

@@ -96,6 +96,7 @@ void mark_sweep_sspace(Collector *collector)
       gc_update_weakref_ignore_finref(gc);
     }
 #endif
+    identify_dead_weak_roots(gc, gc->metadata->weak_roots_pool);
     gc_init_chunk_for_sweep(gc, sspace);
     /* let other collectors go */
     num_marking_collectors++;

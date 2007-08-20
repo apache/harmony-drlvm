@@ -117,9 +117,18 @@ typedef struct GC_VTable_Info {
   
 } GC_VTable_Info;
 
+enum VT_Mark_Status {
+  VT_UNMARKED          = 0,
+  VT_MARKED            = 0x1,
+  VT_FALLBACK_MARKED   = 0x2
+};
+
+struct Partial_Reveal_Object;
 typedef struct Partial_Reveal_VTable {
   //--Fixme: emt64
   GC_VTable_Info *gcvt;
+  Partial_Reveal_Object* jlC;
+  unsigned int vtmark;           
 } Partial_Reveal_VTable;
 
 typedef struct Partial_Reveal_Object {
@@ -297,6 +306,8 @@ inline Boolean type_has_finalizer(Partial_Reveal_VTable *vt)
 }
 
 #endif //#ifndef _GC_TYPES_H_
+
+
 
 
 

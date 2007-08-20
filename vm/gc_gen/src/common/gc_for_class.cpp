@@ -139,7 +139,7 @@ void gc_class_prepared (Class_Handle ch, VTable_Handle vth)
   }
   
   gcvt_size = (gcvt_size + GCVT_ALIGN_MASK) & ~GCVT_ALIGN_MASK;
-  gcvt = (GC_VTable_Info*) malloc(gcvt_size);
+  gcvt = (GC_VTable_Info*) class_alloc_via_classloader(ch, gcvt_size);
   assert(gcvt);
   assert(!((POINTER_SIZE_INT)gcvt % GCVT_ALIGNMENT));
 
@@ -196,6 +196,8 @@ void gc_class_prepared (Class_Handle ch, VTable_Handle vth)
 
   return;
 }  /* gc_class_prepared */
+
+
 
 
 

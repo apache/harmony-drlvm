@@ -40,6 +40,14 @@ static void scan_object(Collector* collector, REF *p_ref)
   Partial_Reveal_Object *p_obj = read_slot(p_ref);
   assert(p_obj);
   assert((((POINTER_SIZE_INT)p_obj) % GC_OBJECT_ALIGNMENT) == 0);
+
+  Partial_Reveal_VTable *vtable = uncompress_vt(obj_get_vt(p_obj));
+  if(VTABLE_TRACING)
+    if(!(vtable->vtmark & VT_FALLBACK_MARKED)) {
+      vtable->vtmark |= VT_FALLBACK_MARKED;  //we need different marking for fallback compaction
+      collector_tracestack_push(collector, &(vtable->jlC));
+      //64bits consideration is needed, vtable->jlC is an uncompressed reference
+    }
   
   if(obj_belongs_to_nos(p_obj) && obj_is_fw_in_oi(p_obj)){
     assert(obj_get_vt(p_obj) == obj_get_vt(obj_get_fw_in_oi(p_obj)));
@@ -224,5 +232,7 @@ void fallback_clear_fwd_obj_oi_init(Collector* collector)
   fspace_block_iterate_init((Fspace*)((GC_Gen*)collector->gc)->nos);
 }
 #endif
+
+
 
 

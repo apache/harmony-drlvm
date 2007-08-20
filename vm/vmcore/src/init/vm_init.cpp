@@ -110,6 +110,13 @@ static jint lib_dependent_opts() {
 void create_instance_for_class(Global_Env * vm_env, Class *clss) 
 {
     clss->get_class_loader()->AllocateAndReportInstance(vm_env, clss);
+    // set jlC to vtable - for non BS classes jlc is set in create_vtable
+    if (clss->get_vtable()) // vtable = NULL for interfaces 
+    {
+        assert (!clss->get_vtable()->jlC); // used for BS classes only
+        clss->get_vtable()->jlC = *clss->get_class_handle();
+        assert (!clss->get_class_loader()->GetLoader());
+    }
 } //create_instance_for_class
 
 /**

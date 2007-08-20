@@ -284,6 +284,8 @@ void* los_try_alloc(POINTER_SIZE_INT size, GC* gc){  return lspace_try_alloc((Ls
 
 
 Boolean FORCE_FULL_COMPACT = FALSE;
+Boolean IGNORE_VTABLE_TRACING = TRUE;
+Boolean VTABLE_TRACING        = FALSE;
 
 void gc_decide_collection_kind(GC_Gen* gc, unsigned int cause)
 {
@@ -294,6 +296,11 @@ void gc_decide_collection_kind(GC_Gen* gc, unsigned int cause)
     gc->collect_kind = MAJOR_COLLECTION;
   else
     gc->collect_kind = MINOR_COLLECTION;
+    
+  if(IGNORE_VTABLE_TRACING || (gc->collect_kind == MINOR_COLLECTION))
+    VTABLE_TRACING = FALSE;
+  else
+    VTABLE_TRACING = TRUE;
 
 #ifdef USE_MARK_SWEEP_GC
   gc->collect_kind = MARK_SWEEP_GC;
@@ -782,4 +789,6 @@ void gc_gen_wrapup_verbose(GC_Gen* gc)
     <<"\nGC: total appliction execution time: "<<stats->total_mutator_time<<"\n");
 #endif
 }
+
+
 

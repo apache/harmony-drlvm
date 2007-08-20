@@ -244,6 +244,7 @@ static void gc_refix_rootset(Collector *collector, void *start_address, void *en
 #ifndef BUILD_IN_REFERENT
   gc_update_finref_repointed_refs(gc);
 #endif
+  gc_reupdate_repointed_sets(gc, gc->metadata->weak_roots_pool, start_address, end_address, addr_diff);
 
   update_rootset_interior_pointer();
 }

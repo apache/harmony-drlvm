@@ -23,5 +23,8 @@
 #define __UNLOADING_H__
 
 void class_unloading_clear_mark_bits();
+void class_unloading_start();
 #endif
+
+
 

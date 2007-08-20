@@ -67,7 +67,7 @@ void* RuntimeInterface::getAddressOfThis(MethodDesc * methodDesc, const JitFrame
 #else
     stackInfo.read(methodDesc, *context->p_eip, isFirst);
     assert(isFirst || (uint32)context->p_eip+4 == context->esp);
-    assert(stackInfo.getStackDepth()==0 || !isFirst);
+    //assert(stackInfo.getStackDepth()==0 || !isFirst);
     return (void *)(context->esp + stackInfo.getStackDepth() + stackInfo.getOffsetOfThis());
 #endif
 }
@@ -142,4 +142,6 @@ uint16 RuntimeInterface::getInlinedBc(InlineInfoPtr ptr, uint32 offset, uint32 i
 
 
 }}; //namespace Ia32
+
+
 

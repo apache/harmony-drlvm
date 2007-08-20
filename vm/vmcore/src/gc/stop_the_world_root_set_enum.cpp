@@ -98,7 +98,7 @@ stop_the_world_root_set_enumeration()
 
     jvmti_send_gc_start_event();
 
-    class_unloading_clear_mark_bits();
+    if(gc_supports_class_unloading()) class_unloading_clear_mark_bits();
 
     current_vm_thread = p_TLS_vmthread;
     // Run through list of active threads and enumerate each one of them.
@@ -149,6 +149,8 @@ vm_enumerate_root_set_all_threads()
 void vm_resume_threads_after()
 {
     TRACE2("vm.gc", "vm_resume_threads_after()");
+
+    if(gc_supports_class_unloading()) class_unloading_start();
 
     jvmti_send_gc_finish_event();
     jvmti_clean_reclaimed_object_tags();
@@ -220,5 +222,7 @@ void vm_enumerate_thread(VM_thread *thread)
 //////////////////////////////////////////////////////////////////////////////
 ///////////////////////  LINUX/ WINDOWS specific /////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
+
+
 
 

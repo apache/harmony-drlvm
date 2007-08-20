@@ -48,9 +48,16 @@ static FORCE_INLINE void scan_slot(Collector *collector, REF *p_ref)
   return;
 }
 
+void trace_forwarded_gen_jlC_from_vtable(Collector* collector, Partial_Reveal_Object *p_obj); 
 static FORCE_INLINE void scan_object(Collector* collector, Partial_Reveal_Object *p_obj) 
 {
   assert((((POINTER_SIZE_INT)p_obj) % GC_OBJECT_ALIGNMENT) == 0);
+  Partial_Reveal_VTable *vtable = uncompress_vt(obj_get_vt(p_obj));
+  if(VTABLE_TRACING)
+    if(vtable->vtmark == VT_UNMARKED) {
+      vtable->vtmark = VT_MARKED;
+      trace_forwarded_gen_jlC_from_vtable(collector, vtable->jlC);
+    }
   if (!object_has_ref_field(p_obj)) return;
     
   REF *p_ref;
@@ -160,6 +167,40 @@ static FORCE_INLINE void forward_object(Collector *collector, REF *p_ref)
   write_slot(p_ref, p_target_obj);
 
 
+  scan_object(collector, p_target_obj); 
+  return;
+}
+
+void trace_forwarded_gen_jlC_from_vtable(Collector* collector, Partial_Reveal_Object *p_obj) 
+//Forward the vtable->jlc and trace the forwarded object. But do not update the vtable->jlc but leave them for weakroots updating
+//We probably do not need this function if we do not perform class unloading in copy-collections. That means all vtable->jlc would be strong roots in this algorithm
+{
+  Space* space = collector->collect_space; 
+  GC* gc = collector->gc;
+
+  if(!obj_belongs_to_nos(p_obj)) return; 
+
+  /* Fastpath: object has already been forwarded*/
+  if(obj_is_fw_in_oi(p_obj))          return;
+
+  if(NOS_PARTIAL_FORWARD && !fspace_object_to_be_forwarded(p_obj, (Fspace*)space)) {
+    assert(!obj_is_fw_in_oi(p_obj));
+    if(obj_mark_in_oi(p_obj)) 
+      scan_object(collector, p_obj);
+    return;
+  }
+    
+  /* following is the logic for forwarding */  
+  Partial_Reveal_Object* p_target_obj = collector_forward_object(collector, p_obj);
+  if( p_target_obj == NULL ){
+    if(collector->result == FALSE ){
+      /* failed to forward, let's get back to controller. */
+      vector_stack_clear(collector->trace_stack);
+      return;
+    }
+    assert(obj_get_fw_in_oi(p_obj));
+    return;
+  }  
   scan_object(collector, p_target_obj); 
   return;
 }
@@ -309,6 +350,7 @@ void gen_forward_pool(Collector* collector)
       gc_update_weakref_ignore_finref(gc);
     }
 #endif
+  identify_dead_weak_roots(gc, gc->metadata->weak_roots_pool);
   
   gc_fix_rootset(collector);
   

@@ -75,6 +75,8 @@ static void vm_enumerate_jlc(Class* c, bool b_weak = false)
     else {
         vm_enumerate_weak_root_reference((void**)c->get_class_handle(), FALSE);
     }
+    if(c->get_vtable())
+      vm_enumerate_weak_root_reference((void**)&(c->get_vtable()->jlC), FALSE);
 }
 
 static void vm_enumerate_class_static(Class* c)
@@ -110,6 +112,7 @@ void vm_enumerate_static_fields()
 {
     TRACE2("enumeration", "vm_enumerate_static_fields()");
     GlobalClassLoaderIterator ClIterator;
+    Boolean do_class_unloading = gc_supports_class_unloading();
     ClassLoader *cl = ClIterator.first();
     while(cl) {
         GlobalClassLoaderIterator::ClassIterator itc;
@@ -130,7 +133,7 @@ void vm_enumerate_static_fields()
             assert(c);
             if (!cl->IsBootstrap())
             {
-                vm_enumerate_jlc(c, true/*enum as weak root*/);
+                vm_enumerate_jlc(c, do_class_unloading/*enum as weak root if gc supports that*/);
                 vm_enumerate_class_static(c);
             }
         }

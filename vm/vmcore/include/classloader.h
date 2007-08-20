@@ -227,9 +227,10 @@ public:
     static ClassLoader* FindByObject( ManagedObject* loader );
     // ppervov: NOTE: LookupLoader has side effect of adding 'loader' to the collection
     VMEXPORT static ClassLoader* LookupLoader( ManagedObject* loader );
-    static void UnloadClassLoader( ManagedObject* loader );
+    static void UnloadClassLoader( ClassLoader* loader);
     static void gc_enumerate();
     static void ClearMarkBits();
+    static void StartUnloading();
     static unsigned GetClassLoaderNumber() { return m_nextEntry; }
     static ClassLoader** GetClassLoaderTable() { return m_table; }
     static void DeleteClassLoaderTable(){

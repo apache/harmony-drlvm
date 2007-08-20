@@ -76,6 +76,7 @@ void gc_metadata_initialize(GC* gc)
   gc_metadata.mutator_remset_pool = sync_pool_create();
   gc_metadata.collector_remset_pool = sync_pool_create();
   gc_metadata.collector_repset_pool = sync_pool_create();
+  gc_metadata.weak_roots_pool = sync_pool_create();
 #ifdef USE_32BITS_HASHCODE  
   gc_metadata.collector_hashcode_pool = sync_pool_create();
 #endif
@@ -97,6 +98,7 @@ void gc_metadata_destruct(GC* gc)
   sync_pool_destruct(metadata->mutator_remset_pool);
   sync_pool_destruct(metadata->collector_remset_pool);
   sync_pool_destruct(metadata->collector_repset_pool);
+  sync_pool_destruct(metadata->weak_roots_pool);
 #ifdef USE_32BITS_HASHCODE  
   sync_pool_destruct(metadata->collector_hashcode_pool);
 #endif
@@ -212,6 +214,8 @@ void gc_fix_rootset(Collector* collector)
   GC* gc = collector->gc;  
   GC_Metadata* metadata = gc->metadata;
 
+  gc_update_weak_roots_pool(gc);
+
   /* MINOR_COLLECTION doesn't need rootset update, but need reset */
   if( !gc_match_kind(gc, MINOR_COLLECTION)){
     gc_update_repointed_sets(gc, metadata->gc_rootset_pool);
@@ -220,6 +224,7 @@ void gc_fix_rootset(Collector* collector)
 #endif
   } else {
     gc_set_pool_clear(metadata->gc_rootset_pool);
+    gc_set_pool_clear(metadata->weak_roots_pool);
   }
 
 #ifdef COMPRESS_REFERENCE
@@ -255,6 +260,12 @@ void gc_set_rootset(GC* gc)
      gc_rootset_pool after the entry pointed by gc->root_set. So we clear this value
      only after we know we are not going to fallback. */
     // gc->root_set = NULL;
+
+  if(vector_block_is_empty(gc->weak_root_set))
+     pool_put_entry(free_set_pool, gc->weak_root_set);
+  else  	
+     pool_put_entry(metadata->weak_roots_pool, gc->weak_root_set);
+  gc->weak_root_set = NULL;
   
   if(!gc_is_gen_mode()) return;
 
@@ -323,6 +334,11 @@ void gc_reset_rootset(GC* gc)
   gc->root_set = free_set_pool_get_entry(&gc_metadata);
   assert(vector_block_is_empty(gc->root_set));
 
+  assert(pool_is_empty(gc_metadata.weak_roots_pool));
+  assert(gc->weak_root_set == NULL);
+  gc->weak_root_set = free_set_pool_get_entry(&gc_metadata);
+  assert(vector_block_is_empty(gc->weak_root_set));
+
 #ifdef COMPRESS_REFERENCE
   assert(pool_is_empty(gc_metadata.gc_uncompressed_rootset_pool));
   assert(gc->uncompressed_root_set == NULL);
@@ -374,6 +390,8 @@ void gc_metadata_verify(GC* gc, Boolean is_before_gc)
   
   return;  
 }
+
+
 
 
 
