@@ -20,3 +20,7 @@ stress/Mix.java
 # HARMONY-3917
 gc/PhantomReferenceTest.java
 gc/WeakReferenceTest.java
+
+# HARMONY-4657
+thread/ManyThreadsTest.java
+

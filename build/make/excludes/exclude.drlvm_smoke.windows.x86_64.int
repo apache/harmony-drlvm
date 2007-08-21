@@ -14,3 +14,6 @@ gc/WeakReferenceTest.java
 # This stress test is very slow on interpreter
 stress/Intern.java
 
+# HARMONY-4657
+thread/ManyThreadsTest.java
+

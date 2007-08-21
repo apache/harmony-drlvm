@@ -24,3 +24,6 @@ gc/WeakReferenceTest.java
 # HARMONY-4185
 gc/Mark.java
 
+# HARMONY-4657
+thread/ManyThreadsTest.java
+
