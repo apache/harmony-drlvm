@@ -1364,6 +1364,9 @@ void  SpillGen::assignReg (Opline& opline, Instx* begx, Instx* endx, RegName rn)
     if (loadOpnd(opline, begx, opnd_reg))
         (begx-1)->regusage[opline.idx] |= mk;
 
+    bool has_def = false;
+    Instx* savex = endx;
+
     for (Instx* ptrx = begx; ptrx <= endx; ++ptrx)
     {
         if (opline.save_changed && opline.catched && ptrx->inst->hasKind(Inst::Kind_CallInst))
@@ -1376,7 +1379,11 @@ void  SpillGen::assignReg (Opline& opline, Instx* begx, Instx* endx, RegName rn)
         {// the operand is used in the instruction
             ++reguses;
             if (opline.isDef(ptrx->inst))
+            {
+                has_def = true;
                 opline.save_changed = true;
+                savex = ptrx;
+            }
         }
         else
         {// the operand is not used in the instruction, so it can be evicted
@@ -1384,17 +1391,18 @@ void  SpillGen::assignReg (Opline& opline, Instx* begx, Instx* endx, RegName rn)
                 ptrx->evicts->push_back(opnd_reg);
         }
 
-        if (ptrx != endx)
+    //  special processing for dead-definition (begx == endx && has_def)
+        if (ptrx != endx || (begx == endx && has_def))
             ptrx->regusage[opline.idx] |= mk;
     }
 
     bool before = false;
-    if (endx->inst->getMnemonic() == Mnemonic_CALL && !opline.isDef(endx->inst))
+    if (savex->inst->getMnemonic() == Mnemonic_CALL && !opline.isDef(savex->inst))
     {
-        Constraint ci = static_cast<CallInst*>(endx->inst)->getCalleeSaveRegs(getRegKind(rn));
+        Constraint ci = static_cast<CallInst*>(savex->inst)->getCalleeSaveRegs(getRegKind(rn));
         before = (ci.getMask() & mk) == 0;
     }
-    saveOpnd(opline, endx, opnd_reg, before ? 0 : mk, opline.idx, before);
+    saveOpnd(opline, savex, opnd_reg, before ? 0 : mk, opline.idx, before);
 
 #ifdef _DEBUG_SPILLGEN
     assigns.incr(reguses);
