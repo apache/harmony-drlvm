@@ -237,7 +237,7 @@ void LoopUnrollPass::_run(IRManager& irm) {
 
         //check config settings
         bool failed = false;
-        size_t nodesInLoop = loopHeader->getNodesInLoop().size();
+        int nodesInLoop = (int)loopHeader->getNodesInLoop().size();
         const char* reason = "unknown";
         if (nodesInLoop > flags.largeLoopSize) {
             reason = "loop is too large";
