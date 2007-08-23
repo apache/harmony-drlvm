@@ -116,15 +116,20 @@ NativeCodePtr static get_ip_for_invoke_call_ip(VM_thread* thread,
     }
     while (ip < next_ip);
 
-    assert(call_ip);
-
-    TRACE2("jvmti.break.ss", "Predicting VIRTUAL type breakpoint on address: " << call_ip);
-
     // ip now points to the call instruction which actually invokes a
     // virtual method. We're going to set a sythetic breakpoint there
     // and allow execution up until that point to get the virtual
     // table address and offset inside of it to determine exactly
     // which method is going to invoked in runtime.
+    //
+    // In case call_ip is NULL, it means that we've already inside of
+    // the calling of the method, but the method is not yet ready to
+    // be executed, e.g. it is being resolved or compiled at the
+    // time. In this case, just setting single step state inside of
+    // the target thread will enabled stepping of this method
+    // automatically.
+    TRACE2("jvmti.break.ss", "Predicting VIRTUAL type breakpoint on address: " << call_ip);
+
     return call_ip;
 #else
     NOT_IMPLEMENTED;
@@ -292,14 +297,19 @@ jvmti_SingleStepLocation( VM_thread* thread,
             {
                 NativeCodePtr ip = get_ip_for_invoke_call_ip(thread, location,
                     location + 5);
-                error = _allocate(sizeof(jvmti_StepLocation),
-                    (unsigned char**)next_step );
-                assert(error == JVMTI_ERROR_NONE);
-                *count = 1;
-                (*next_step)->method = method;
-                (*next_step)->location = location;
-                (*next_step)->native_location = ip;
-                (*next_step)->no_event = true;
+                if (NULL != ip)
+                {
+                    error = _allocate(sizeof(jvmti_StepLocation),
+                        (unsigned char**)next_step );
+                    assert(error == JVMTI_ERROR_NONE);
+                    *count = 1;
+                    (*next_step)->method = method;
+                    (*next_step)->location = location;
+                    (*next_step)->native_location = ip;
+                    (*next_step)->no_event = true;
+                }
+                else
+                    *count = 0;
             }
             break;
 
@@ -345,14 +355,19 @@ jvmti_SingleStepLocation( VM_thread* thread,
             {
                 NativeCodePtr ip = get_ip_for_invoke_call_ip(thread, location,
                     location + 3);
-                error = _allocate(sizeof(jvmti_StepLocation),
-                    (unsigned char**)next_step );
-                assert(error == JVMTI_ERROR_NONE);
-                *count = 1;
-                (*next_step)->method = method;
-                (*next_step)->location = location;
-                (*next_step)->native_location = ip;
-                (*next_step)->no_event = true;
+                if (NULL != ip)
+                {
+                    error = _allocate(sizeof(jvmti_StepLocation),
+                        (unsigned char**)next_step );
+                    assert(error == JVMTI_ERROR_NONE);
+                    *count = 1;
+                    (*next_step)->method = method;
+                    (*next_step)->location = location;
+                    (*next_step)->native_location = ip;
+                    (*next_step)->no_event = true;
+                }
+                else
+                    *count = 0;
             }
             break;
 
