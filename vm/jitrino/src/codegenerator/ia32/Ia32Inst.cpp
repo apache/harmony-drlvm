@@ -584,7 +584,7 @@ void Inst::makeNative(IRManager * irManager)
 void * Inst::getCodeStartAddr() const 
 {
     if (hasKind(Inst::Kind_PseudoInst)) {
-        return (void*)0xDEADBEEF;
+        return (void*)(POINTER_SIZE_INT)0xDEADBEEF;
     }
     BasicBlock* bb = getBasicBlock();
     return bb!=NULL?(uint8*)bb->getCodeStartAddr()+codeOffset:0;

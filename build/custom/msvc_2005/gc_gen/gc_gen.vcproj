@@ -410,6 +410,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\common\hashcode.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\gc_gen\src\common\interior_pointer.cpp"
 				>
 			</File>
@@ -431,6 +435,10 @@
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\gc_gen\src\common\space_tuner.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\common\weak_roots.cpp"
 				>
 			</File>
 		</Filter>
@@ -457,6 +465,14 @@
 				RelativePath="..\..\..\..\vm\gc_gen\src\gen\gen_adapt.cpp"
 				>
 			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\gen\gen_stats.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\gen\gen_stats.h"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="jni"
@@ -479,10 +495,6 @@
 			>
 			<File
 				RelativePath="..\..\..\..\vm\gc_gen\src\mark_compact\fallback_mark_scan.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\gc_gen\src\mark_compact\los_extention_mark_scan.cpp"
 				>
 			</File>
 			<File
@@ -517,28 +529,72 @@
 				RelativePath="..\..\..\..\vm\gc_gen\src\mark_compact\mspace_slide_compact.cpp"
 				>
 			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\mark_compact\space_tune_mark_scan.cpp"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="mark_sweep"
 			>
 			<File
-				RelativePath="..\..\..\..\vm\gc_gen\src\mark_sweep\free_area_pool.cpp"
+				RelativePath="..\..\..\..\vm\gc_gen\src\mark_sweep\gc_ms.cpp"
 				>
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\gc_gen\src\mark_sweep\free_area_pool.h"
+				RelativePath="..\..\..\..\vm\gc_gen\src\mark_sweep\gc_ms.h"
 				>
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\gc_gen\src\mark_sweep\lspace.cpp"
+				RelativePath="..\..\..\..\vm\gc_gen\src\mark_sweep\sspace.cpp"
 				>
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\gc_gen\src\mark_sweep\lspace.h"
+				RelativePath="..\..\..\..\vm\gc_gen\src\mark_sweep\sspace.h"
 				>
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\gc_gen\src\mark_sweep\lspace_alloc_collect.cpp"
+				RelativePath="..\..\..\..\vm\gc_gen\src\mark_sweep\sspace_alloc.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\mark_sweep\sspace_alloc.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\mark_sweep\sspace_chunk.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\mark_sweep\sspace_chunk.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\mark_sweep\sspace_compact.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\mark_sweep\sspace_mark.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\mark_sweep\sspace_mark_sweep.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\mark_sweep\sspace_mark_sweep.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\mark_sweep\sspace_sweep.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\mark_sweep\sspace_verify.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\mark_sweep\sspace_verify.h"
 				>
 			</File>
 		</Filter>
@@ -615,6 +671,10 @@
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\gc_gen\src\utils\bit_ops.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\utils\seq_list.h"
 				>
 			</File>
 			<File
@@ -699,6 +759,30 @@
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\gc_gen\src\finalizer_weakref\finalizer_weakref_metadata.h"
+				>
+			</File>
+		</Filter>
+		<Filter
+			Name="los"
+			>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\los\free_area_pool.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\los\free_area_pool.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\los\lspace.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\los\lspace.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\gc_gen\src\los\lspace_alloc_collect.cpp"
 				>
 			</File>
 		</Filter>

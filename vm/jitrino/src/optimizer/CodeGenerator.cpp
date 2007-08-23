@@ -85,7 +85,7 @@ InlineInfoMap::getImageSize() const {
         return sizeof(uint32);
     }
     return getIndexSize(entryByOffset.size())   //index size
-          + entries.size() * sizeof(Entry); //all entries size;
+          + (uint32)(entries.size() * sizeof(Entry)); //all entries size;
 }
 
 void
@@ -128,7 +128,7 @@ InlineInfoMap::write(InlineInfoPtr image)
         Entry* imageEntry = entriesInImage + entryIdx;
         *header = nativeOffset;
         header++;
-        *header = (char*)imageEntry - (char*)image;
+        *header = (uint32)((char*)imageEntry - (char*)image);
         header++;
     }
     *header = 0;

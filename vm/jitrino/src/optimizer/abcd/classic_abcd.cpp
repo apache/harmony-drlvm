@@ -386,7 +386,7 @@ bool BuildInequalityGraphWalker::addDistance
         if ( negate ) {
             constant = (-1) * constant;
         }
-        _igraph->addEdge(src->getID(), dst->getID(), constant);
+        _igraph->addEdge(src->getID(), dst->getID(), (int32)constant);
         return true;
     }
     return false;
@@ -400,7 +400,7 @@ void BuildInequalityGraphWalker::addDistanceSingleProblem
     if ( from->isUnconstrained() || !inInt32(c) ) {
         return;
     }
-    _igraph->addEdgeSingleState(from->getID(), to->getID(), c, lower_problem);
+    _igraph->addEdgeSingleState(from->getID(), to->getID(), (int32)c, lower_problem);
 }
 //------------------------------------------------------------------------------
 
@@ -444,7 +444,7 @@ void BuildInequalityGraphWalker::addPiEdgesSingleProblem
     } else if ( non_inf_bound.isConst() ) {
         MemoryManager& mm = _igraph->getMemoryManager();
         IOpndProxy* c_opnd = new (mm) 
-            IOpndProxy(non_inf_bound.getConst(), _const_id_counter++);
+            IOpndProxy((int32)non_inf_bound.getConst(), _const_id_counter++);
         _igraph->addOpnd(c_opnd);
         addDistanceSingleProblem(c_opnd /* to */, dst, 0, lower_problem);
     }
@@ -642,7 +642,7 @@ void ClassicAbcd::runPass()
         }
     }
 
-    uint32 checks_total = _redundantChecks.size();
+    size_t checks_total = _redundantChecks.size();
     if ( _dump_abcd_stats && checks_total > 0 ) {
         std::ofstream checks_log;
         checks_log.open("bounds_checks.log", std::fstream::out | std::fstream::app);

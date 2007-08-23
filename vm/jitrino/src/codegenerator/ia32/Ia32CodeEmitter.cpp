@@ -388,7 +388,7 @@ InlineInfoMap::Entry* CodeEmitter::processBlockOffsets(Node* node, InlineInfoMap
                 Log::out()<<" global-bc-offset="<<globalBCMapOffset<<std::endl;
             }
             if (globalBCMapOffset!=ILLEGAL_BC_MAPPING_VALUE) {
-                bcMap->setEntry(nativeInstStartOffset, globalBCMapOffset);
+                bcMap->setEntry((uint32)nativeInstStartOffset, globalBCMapOffset);
             }
         }
     }
@@ -948,7 +948,7 @@ void CodeEmitter::orderNodesAndMarkInlinees(StlList<MethodMarkerPseudoInst*>& in
                             // The rest ones are generated directly to the memory using encoder.
                             // Taking this into account:
                             assert(nextAddr > instAddr);
-                            instSizeMap[instAddr] = nextAddr-instAddr;
+                            instSizeMap[instAddr] = (uint32)(nextAddr-instAddr);
                         } else {
                             instSizeMap[instAddr] = instSize;
                         }

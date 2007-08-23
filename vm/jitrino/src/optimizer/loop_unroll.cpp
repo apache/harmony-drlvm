@@ -144,7 +144,7 @@ private:
 typedef StlVector<Inst*> InstStack;
 typedef StlVector<LoopUnrollInfo*> UnrollInfos;
 
-static void log_ident(int n)  {for (int i=0;i<n;++i) Log::out()<<"  "; }
+static void log_ident(size_t n)  {for (size_t i=0;i<n;++i) Log::out()<<"  "; }
 static int signof(int v) { return (v == 0) ? 0 : ( v < 0 ? -1 : 1); }
 
 
@@ -237,7 +237,7 @@ void LoopUnrollPass::_run(IRManager& irm) {
 
         //check config settings
         bool failed = false;
-        int nodesInLoop = loopHeader->getNodesInLoop().size();
+        size_t nodesInLoop = loopHeader->getNodesInLoop().size();
         const char* reason = "unknown";
         if (nodesInLoop > flags.largeLoopSize) {
             reason = "loop is too large";

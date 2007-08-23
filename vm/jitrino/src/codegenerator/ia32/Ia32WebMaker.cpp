@@ -386,7 +386,7 @@ void WebMaker::phase1()
                             opndxp->opdefs.push_back(OpDef());
                             OpDef& opdef = opndxp->opdefs.back();
                             opdef.visited = false;
-                            opdef.linkx = &opdef - &opndxp->opdefs.front();
+                            opdef.linkx = (unsigned int)(&opdef - &opndxp->opdefs.front());
                             opdef.globid = -1;
                             opdef.defp   = instp;
                             opdef.useps  = 0;

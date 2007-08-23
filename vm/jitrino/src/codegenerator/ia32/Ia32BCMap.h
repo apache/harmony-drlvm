@@ -43,11 +43,11 @@ public:
     BcMap(MemoryManager& memMgr) : theMap(memMgr) {}
 
     uint32 getByteSize() const {
-        return 4 /*size*/+theMap.size() * (4 + 2/*native offset + bc offset*/);
+        return 4 /*size*/+(uint32)theMap.size() * (4 + 2/*native offset + bc offset*/);
     }
 
     void write(Byte* image) {
-        *((uint32*)image)=theMap.size();
+        *((uint32*)image)=(uint32)theMap.size();
         uint32 imageOffset = 4;
         for (BCByNCMap::const_iterator it = theMap.begin(), end = theMap.end(); it!=end; it++) {
             uint32 nativeOffset = it->first;

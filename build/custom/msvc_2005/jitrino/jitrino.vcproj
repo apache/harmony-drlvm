@@ -548,6 +548,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\loop_unroll.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\memoryopt.cpp"
 				>
 			</File>
@@ -1115,14 +1119,6 @@
 					>
 				</File>
 				<File
-					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32i586InstsExpansion.cpp"
-					>
-				</File>
-				<File
-					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32I8Lowerer.cpp"
-					>
-				</File>
-				<File
 					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32Inst.cpp"
 					>
 				</File>
@@ -1313,14 +1309,6 @@
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\shared\BitSet.h"
-				>
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\jitrino\src\shared\CGSupport.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\jitrino\src\shared\CGSupport.h"
 				>
 			</File>
 			<File
