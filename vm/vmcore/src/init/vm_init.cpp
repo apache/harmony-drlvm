@@ -758,6 +758,7 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     vm_env->java_lang_Object->object =
         class_alloc_new_object(vm_env->JavaLangObject_Class);    
     // Create java.lang.OutOfMemoryError.
+    class_initialize(vm_env->java_lang_OutOfMemoryError_Class);
     vm_env->java_lang_OutOfMemoryError = oh_allocate_global_handle();
     vm_env->java_lang_OutOfMemoryError->object = 
         class_alloc_new_object(vm_env->java_lang_OutOfMemoryError_Class);
