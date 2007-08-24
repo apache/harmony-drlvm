@@ -24,6 +24,7 @@
   */
  
 #include "arith_rt.h"
+#include "Algorithms.h"
 
 #include <stdlib.h>
 #include <float.h>
@@ -138,7 +139,7 @@ double __stdcall rt_h_dbl_a(double v1, double v2, JavaByteCodes op)
     if (finite(v1) && !finite(v2)) {
         return v1;
     }
-    return fmod(v1,v2);
+    return jitrino_ieee754_fmod_double(v1,v2);
 }
 
 float __stdcall rt_h_flt_a(float v1, float v2, JavaByteCodes op)
@@ -170,7 +171,7 @@ float __stdcall rt_h_flt_a(float v1, float v2, JavaByteCodes op)
     if (finite(v1) && !finite(v2)) {
         return v1;
     }
-    return fmod(v1,v2);
+    return fmod((double)v1,(double)v2);
 }
 
 jlong __stdcall rt_h_i64_shift(jlong v1, int v2, JavaByteCodes op)

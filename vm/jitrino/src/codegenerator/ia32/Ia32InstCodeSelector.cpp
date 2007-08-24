@@ -27,6 +27,7 @@
 #include "Opcode.h"
 #include "Ia32Tls.h"
 #include "Ia32CgUtils.h"
+#include "Algorithms.h"
 
 #include <float.h>
 #include <math.h>
@@ -128,12 +129,12 @@ float   __stdcall   convI8F4    (uint64 v) {    return (float)(int64)v; }
 // FP remainder internal helpers (temp solution to be optimized)
 float   __stdcall   remF4   (float v0, float v1)stdcall__;
 float   __stdcall   remF4   (float v0, float v1)   { 
-    return fmodf(v0,v1);
+    return fmod((double)v0,(double)v1);
 }
 
 double  __stdcall   remF8   (double v0, double v1)stdcall__;
 double  __stdcall   remF8   (double v0, double v1)  {
-    return  fmod(v0,v1);
+    return jitrino_ieee754_fmod_double(v0,v1);
 } 
 
 void __stdcall initialize_array(uint8* array, uint32 elems_offset, uint8* data, uint32 num_elems) stdcall__;
