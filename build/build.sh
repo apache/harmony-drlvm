@@ -37,12 +37,21 @@ export MACHINE_ARCH=`uname -m`
 # Check external resources / software installation
 # ================================================
 
+if [ -x "$ANT_HOME/bin/ant" ]; then
+    # running locally installed ant
+    ANT_COMMAND="$ANT_HOME/bin/ant --noconfig"
+elif [ -x "`which ant 2>/dev/null`" ]; then
+    # running pre-installed ant from GNU/Linux distribution
+    ANT_COMMAND="`which ant`"
+fi
+
+
 if [ ! -x $JAVA_HOME/bin/java ] ; then
     echo "* Neither $JAVA_HOME/bin/java not found."
     echo "* Make sure you have J2SDK or DRLVM installed on your computer and that"
     echo "* JAVA_HOME environment variable points out to its installation dir"
     ERROR
-elif [ ! -x $ANT_HOME/bin/ant ]; then
+elif [ ! -x "${ANT_COMMAND%% *}" ]; then
     echo "* File $ANT_HOME/bin/ant not found."
     echo "* Make sure you have Ant 1.6.5 or above installed from"
     echo "* http://ant.apache.org/bindownload.cgi and that ANT_HOME environment"
@@ -61,8 +70,4 @@ CLASSPATH=`pwd`/make/tmp/cpptasks/patched.classes:$CLASSPATH
 CLASSPATH=`pwd`/make/tmp/ant-contrib.jar:$CLASSPATH
 export CLASSPATH
 
-ANT_COMMAND="$ANT_HOME/bin/ant --noconfig"
-
 $ANT_COMMAND -f ./make/build.xml "$@"  || ERROR
-
-
