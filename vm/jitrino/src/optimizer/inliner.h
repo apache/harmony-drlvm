@@ -207,6 +207,7 @@ private:
     bool usePriorityQueue;
     const char* inlinerPipelineName;
     bool connectEarly;
+    bool isPseudoThrowInserted;
 };
 
 

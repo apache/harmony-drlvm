@@ -53,7 +53,7 @@ EB_PROF.backedgeThreshold=100000
 
 -XX:jit.CD_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
 
--XX:jit.CD_OPT.path.optimizer=ssa,devirt,inline,uce,purge,simplify,dce,uce,memopt,simplify,dce,uce,lower,dessa,statprof
+-XX:jit.CD_OPT.path.optimizer=ssa,devirt,inline,purge,simplify,dce,uce,memopt,simplify,dce,uce,lower,dessa,statprof
 -XX:jit.CD_OPT.path.codegen=lock_method,bbp,gcpoints,cafl,dce1,i8l-,early_prop-,itrace-,native,constraints,dce2,regalloc,spillgen,layout,copy,rce-,stack,break-,iprof-,emitter!,si_insts,gcmap,info,unlock_method
 -XX:jit.CD_OPT.path.dce1=cg_dce
 -XX:jit.CD_OPT.path.dce2=cg_dce

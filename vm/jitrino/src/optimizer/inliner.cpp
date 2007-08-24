@@ -34,6 +34,7 @@
 #include "JavaByteCodeParser.h"
 #include "StaticProfiler.h"
 #include "optimizer.h"
+#include "deadcodeeliminator.h"
 
 namespace Jitrino {
 
@@ -79,7 +80,8 @@ Inliner::Inliner(SessionAction* argSource, MemoryManager& mm, IRManager& irm,
       _currentByteSize(irm.getMethodDesc().getByteCodeSize()), 
       _inlineTree(new (mm) InlineNode(irm, 0, 0)),
       translatorAction(NULL), inlinePragma(NULL), 
-      usePriorityQueue(_usePriorityQueue), inlinerPipelineName(inlinePipeline), connectEarly(true)
+      usePriorityQueue(_usePriorityQueue), inlinerPipelineName(inlinePipeline),
+      connectEarly(true), isPseudoThrowInserted(false)
 {
     
     const char* translatorName = argSource->getStringArg("translatorActionName", "translator");
@@ -854,6 +856,7 @@ Inliner::inlineRegion(InlineNode* inlineNode) {
     if (inlinedFlowGraph.getUnwindNode() == NULL) {
         // Replace original call with PseudoThrow to keep graph topology.
         callNode->appendInst(_instFactory.makePseudoThrow());
+        isPseudoThrowInserted = true;
     } else {
         // Inlined graph has exception path so just remove original edge.
         parentCFG.removeEdge(callNode->getExceptionEdge());
@@ -1153,6 +1156,16 @@ void Inliner::runInliner(MethodCallInst* call) {
         //inline current region
         inlineRegion(regionNode);
     } while (true);
+
+
+    // Clean up phase.
+    DeadCodeEliminator dce(_toplevelIRM);
+    dce.eliminateUnreachableCode();
+    assert(_toplevelIRM.getInSsa());
+    OptPass::fixupSsa(_toplevelIRM);
+    if (isPseudoThrowInserted) {
+        dce.removeExtraPseudoThrow();
+    }
 }
 
 void Inliner::compileAndConnectRegion(InlineNode* inlineNode, CompilationContext& inlineCC) {
