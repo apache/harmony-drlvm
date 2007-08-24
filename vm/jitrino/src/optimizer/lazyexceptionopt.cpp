@@ -697,6 +697,7 @@ LazyExceptionOpt::methodCallHasSideEffect(Inst* inst) {
         return true;
     }
 
+/*
     if (cmd->getParentType()->needsInitialization()) {
 #ifdef _DEBUG
         if (Log::isEnabled()) {
@@ -706,6 +707,7 @@ LazyExceptionOpt::methodCallHasSideEffect(Inst* inst) {
 #endif
         return true;  // cannot compile <init> before <clinit> (to fix vm)
     }
+*/
 
     if (mse == MSE_Unknown) {  // try to compile method
         //TODO: avoid compilation here. Use translator to perform analysis needed

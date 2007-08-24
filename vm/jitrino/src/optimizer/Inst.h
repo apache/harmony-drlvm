@@ -473,6 +473,8 @@ public:
     void visit(InstFormatVisitor& visitor)  {visitor.accept(this);}
     bool isMethodMarker() const { return true; }
     enum Kind {Entry, Exit};
+    bool isMethodEntryMarker() { return kind == Entry; }
+    bool isMethodExitMarker() { return kind == Exit; }
     MethodDesc *getMethodDesc() { return methodDesc; }
 
     void removeOpnd() {

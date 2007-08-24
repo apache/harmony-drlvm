@@ -1135,10 +1135,19 @@ DeadCodeEliminator::markEssentialPseudoThrows(LoopNode* loopNode, BitSet& essent
         if (Log::isEnabled()) {
             Log::out() << "Analyzing Node ID: " << node->getId() << std::endl;
         }
+        if (!node->isBlockNode()) continue;
         Edge* exceptionEdge = node->getExceptionEdge();
-        if ((exceptionEdge != NULL) && !loopNode->inLoop(exceptionEdge->getTargetNode())) {
+        while (exceptionEdge != NULL) {
+            Node* targetNode = exceptionEdge->getTargetNode();
             if (Log::isEnabled()) {
-                Log::out() << " Loop ID exit exception edge detected: ";
+                Log::out() << "  inspecting dispatch edge to node: " << targetNode->getId() << std::endl;
+            }
+            if (!loopNode->inLoop(targetNode)) break;
+            exceptionEdge = targetNode->getExceptionEdge();
+        }
+        if (exceptionEdge != NULL) {
+            if (Log::isEnabled()) {
+                Log::out() << " Loop exit exception edge detected: ";
             }
             if (((Inst*)node->getLastInst())->getOpcode() == Op_PseudoThrow) {
                 if (essentialNodes.getBit(node->getId())) {
