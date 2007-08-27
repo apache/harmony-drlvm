@@ -210,6 +210,9 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
   gc_gen->blocks = (Block*)reserved_base;
   gc_gen->force_major_collect = FALSE;
   gc_gen->force_gen_mode = FALSE;
+
+  max_heap_size_bytes = max_heap_size;
+  min_heap_size_bytes = min_heap_size;
   
   gc_los_initialize(gc_gen, reserved_base, los_size);
   gc_mos_initialize(gc_gen, (void*)((POINTER_SIZE_INT)reserved_base + los_size), mos_reserve_size, mos_commit_size);
