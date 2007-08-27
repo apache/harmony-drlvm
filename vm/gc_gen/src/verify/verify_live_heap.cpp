@@ -115,7 +115,7 @@ void gc_verify_heap(GC* gc, Boolean is_before_gc)
 void event_gc_collect_kind_changed(GC* gc)
 {
   /*GC collection kind were changed from normal MINOR or MAJOR  to FALLBACK MAJOR*/
-  assert(gc->collect_kind == FALLBACK_COLLECTION);
+  assert(gc_match_kind(gc, FALLBACK_COLLECTION));
   if(!heap_verifier->need_verify_gc) return;
   
   /*finish the fallbacked gc verify*/
@@ -145,6 +145,7 @@ void event_mutator_allocate_newobj(Partial_Reveal_Object* p_newobj, POINTER_SIZE
 
 Heap_Verifier* get_heap_verifier()
 { return heap_verifier; }
+
 
 
 

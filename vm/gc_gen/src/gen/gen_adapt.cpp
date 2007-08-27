@@ -101,11 +101,11 @@ void gc_gen_mode_adapt(GC_Gen* gc, int64 pause_time)
   Blocked_Space* mspace = (Blocked_Space*)gc->mos;
   Gen_Mode_Adaptor* gen_mode_adaptor = gc->gen_mode_adaptor;
 
-  POINTER_SIZE_INT mos_free_size = space_free_memory_size(mspace);
-  POINTER_SIZE_INT nos_free_size = space_free_memory_size(fspace);
+  POINTER_SIZE_INT mos_free_size = blocked_space_free_mem_size(mspace);
+  POINTER_SIZE_INT nos_free_size = blocked_space_free_mem_size(fspace);
   POINTER_SIZE_INT total_free_size = mos_free_size  + nos_free_size;
   
-  if(!gc_match_kind((GC*)gc, MINOR_COLLECTION)) {
+  if(gc_match_kind((GC*)gc, MAJOR_COLLECTION)) {
     assert(!gc_is_gen_mode());
     
     if(gen_mode_adaptor->major_survive_ratio_threshold != 0 && mspace->survive_ratio > gen_mode_adaptor->major_survive_ratio_threshold){    
@@ -195,20 +195,20 @@ static void gc_decide_next_collect(GC_Gen* gc, int64 pause_time)
 
   float survive_ratio = 0.2f;
 
-  POINTER_SIZE_INT mos_free_size = space_free_memory_size(mspace);
-  POINTER_SIZE_INT nos_free_size = space_free_memory_size(fspace);
+  POINTER_SIZE_INT mos_free_size = blocked_space_free_mem_size(mspace);
+  POINTER_SIZE_INT nos_free_size = blocked_space_free_mem_size(fspace);
   assert(nos_free_size == space_committed_size((Space*)fspace));
   POINTER_SIZE_INT total_free_size = mos_free_size  + nos_free_size;
-  if(!gc_match_kind((GC*)gc, MINOR_COLLECTION)) gc->force_gen_mode = FALSE;
+  if(gc_match_kind((GC*)gc, MAJOR_COLLECTION)) gc->force_gen_mode = FALSE;
   if(!gc->force_gen_mode){
     /*Major collection:*/
-    if(!gc_match_kind((GC*)gc, MINOR_COLLECTION)){
+    if(gc_match_kind((GC*)gc, MAJOR_COLLECTION)){
       mspace->time_collections += pause_time;
   
       Tslow = (float)pause_time;
       SMax = total_free_size;
       /*If fall back happens, and nos_boundary is up to heap_ceiling, then we force major.*/
-      if(gc->nos->num_managed_blocks == 0)
+      if(((Fspace*)gc->nos)->num_managed_blocks == 0)
         gc->force_major_collect = TRUE;
       else gc->force_major_collect = FALSE;
       
@@ -293,8 +293,7 @@ Boolean gc_compute_new_space_size(GC_Gen* gc, POINTER_SIZE_INT* mos_size, POINTE
   POINTER_SIZE_INT new_mos_size;
 
   POINTER_SIZE_INT curr_nos_size = space_committed_size((Space*)fspace);
-  POINTER_SIZE_INT used_mos_size = space_used_memory_size(mspace);
-  POINTER_SIZE_INT free_mos_size = space_committed_size((Space*)mspace) - used_mos_size;
+  POINTER_SIZE_INT used_mos_size = blocked_space_used_mem_size(mspace);
 
   POINTER_SIZE_INT total_size;
 
@@ -455,9 +454,9 @@ void gc_gen_adapt(GC_Gen* gc, int64 pause_time)
       <<verbose_print_size(adapt_size)
       <<" size was transfered from nos to mos)\n"); 
   }
-
-  POINTER_SIZE_INT used_mos_size = space_used_memory_size((Blocked_Space*)mspace);  
-  POINTER_SIZE_INT free_mos_size = space_free_memory_size((Blocked_Space*)mspace);  
+  
+  POINTER_SIZE_INT used_mos_size = blocked_space_used_mem_size((Blocked_Space*)mspace);
+  POINTER_SIZE_INT free_mos_size = blocked_space_free_mem_size((Blocked_Space*)mspace);
 
   POINTER_SIZE_INT new_free_mos_size = new_mos_size -  used_mos_size;
   

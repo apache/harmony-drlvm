@@ -34,15 +34,15 @@ static volatile Block *first_block_to_move = NULL;
 static void set_first_and_end_block_to_move(Collector *collector, unsigned int mem_changed_size)
 {
   GC_Gen *gc_gen = (GC_Gen *)collector->gc;
-  Mspace *mspace = gc_gen->mos;
-  Fspace *fspace = gc_gen->nos;
+  Space *nos = gc_gen->nos;
   
   assert (!(mem_changed_size % SPACE_ALLOC_UNIT));
   
   unsigned int mos_added_block_num = mem_changed_size >> GC_BLOCK_SHIFT_COUNT;    // block number needing moving
   first_block_to_move = nos_first_free_block - mos_added_block_num;
-  if(first_block_to_move < (Block *)space_heap_start((Space *)fspace))
-    first_block_to_move = (Block *)space_heap_start((Space *)fspace);
+  Block *nos_start_block = (Block*)space_heap_start(nos);
+  if(first_block_to_move < nos_start_block)
+    first_block_to_move = nos_start_block;
 }
 
 static POINTER_SIZE_INT fspace_shrink(Fspace *fspace)
@@ -252,8 +252,7 @@ static void gc_refix_rootset(Collector *collector, void *start_address, void *en
 static void move_compacted_blocks_to_mspace(Collector *collector, unsigned int addr_diff)
 {
   GC_Gen *gc_gen = (GC_Gen *)collector->gc;
-  Mspace *mspace = gc_gen->mos;
-  Fspace *fspace = gc_gen->nos;
+  Mspace *mspace = (Mspace *)gc_gen->mos;
   
   while(Block_Header *block = mspace_block_iter_next_for_extension(mspace, (Block_Header *)nos_first_free_block)){
     Partial_Reveal_Object *p_obj = (Partial_Reveal_Object *)block->base;
@@ -272,9 +271,8 @@ static volatile unsigned int num_space_changing_collectors = 0;
 void mspace_extend_compact(Collector *collector)
 {
   GC_Gen *gc_gen = (GC_Gen *)collector->gc;
-  Mspace *mspace = gc_gen->mos;
-  Fspace *fspace = gc_gen->nos;
-  Lspace *lspace = gc_gen->los;
+  Mspace *mspace = (Mspace *)gc_gen->mos;
+  Fspace *fspace = (Fspace *)gc_gen->nos;
 
   /*For_LOS adaptive: when doing EXTEND_COLLECTION, mspace->survive_ratio should not be updated in gc_decide_next_collect( )*/
   gc_gen->collect_kind |= EXTEND_COLLECTION;

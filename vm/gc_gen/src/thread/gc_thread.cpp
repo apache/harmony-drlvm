@@ -23,6 +23,8 @@
 
 static hythread_tls_key_t tls_gc_key;       
 POINTER_SIZE_INT tls_gc_offset;
+hythread_group_t gc_thread_group = NULL;
+
 
 void gc_tls_init()
 {

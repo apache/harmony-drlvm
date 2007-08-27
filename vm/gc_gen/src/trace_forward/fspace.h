@@ -36,12 +36,12 @@ extern void* object_forwarding_boundary;
 
 typedef Blocked_Space Fspace;
 
-void fspace_initialize(GC* gc, void* start, POINTER_SIZE_INT fspace_size, POINTER_SIZE_INT commit_size);
+Fspace *fspace_initialize(GC* gc, void* start, POINTER_SIZE_INT fspace_size, POINTER_SIZE_INT commit_size);
 void fspace_destruct(Fspace *fspace);
 
 void* fspace_alloc(unsigned size, Allocator *allocator);
 
-void fspace_reset_for_allocation(Fspace* fspace);
+void fspace_reset_after_collection(Fspace* fspace);
 
 /* gen mode */
 void gen_forward_pool(Collector* collector); 

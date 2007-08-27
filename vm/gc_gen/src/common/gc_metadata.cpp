@@ -76,6 +76,7 @@ void gc_metadata_initialize(GC* gc)
   gc_metadata.mutator_remset_pool = sync_pool_create();
   gc_metadata.collector_remset_pool = sync_pool_create();
   gc_metadata.collector_repset_pool = sync_pool_create();
+  gc_metadata.dirty_obj_snaptshot_pool = sync_pool_create();
   gc_metadata.weak_roots_pool = sync_pool_create();
 #ifdef USE_32BITS_HASHCODE  
   gc_metadata.collector_hashcode_pool = sync_pool_create();
@@ -98,6 +99,7 @@ void gc_metadata_destruct(GC* gc)
   sync_pool_destruct(metadata->mutator_remset_pool);
   sync_pool_destruct(metadata->collector_remset_pool);
   sync_pool_destruct(metadata->collector_repset_pool);
+  sync_pool_destruct(metadata->dirty_obj_snaptshot_pool);
   sync_pool_destruct(metadata->weak_roots_pool);
 #ifdef USE_32BITS_HASHCODE  
   sync_pool_destruct(metadata->collector_hashcode_pool);
@@ -234,7 +236,7 @@ void gc_fix_rootset(Collector* collector)
 
   update_rootset_interior_pointer();
   /* it was pointing to the last root_set entry in gc_rootset_pool (before rem_sets). */
-  gc->root_set = NULL;
+  //gc->root_set = NULL;
   
   return;
 }
@@ -262,9 +264,9 @@ void gc_set_rootset(GC* gc)
     // gc->root_set = NULL;
 
   if(vector_block_is_empty(gc->weak_root_set))
-     pool_put_entry(free_set_pool, gc->weak_root_set);
-  else  	
-     pool_put_entry(metadata->weak_roots_pool, gc->weak_root_set);
+    pool_put_entry(free_set_pool, gc->weak_root_set);
+  else
+    pool_put_entry(metadata->weak_roots_pool, gc->weak_root_set);
   gc->weak_root_set = NULL;
   
   if(!gc_is_gen_mode()) return;
@@ -287,8 +289,9 @@ void gc_set_rootset(GC* gc)
     pool_put_entry(metadata->collector_remset_pool, collector->rem_set);
     collector->rem_set = NULL;
   }
-
-  if( !gc_match_kind(gc, MINOR_COLLECTION )){
+  
+  assert(gc_match_either_kind(gc, MINOR_COLLECTION|NORMAL_MAJOR_COLLECTION));
+  if( gc_match_kind(gc, NORMAL_MAJOR_COLLECTION )){
     /* all the remsets are useless now */
     /* clean and put back mutator remsets */  
     root_set = pool_get_entry( mutator_remset_pool );
@@ -330,7 +333,8 @@ void gc_set_rootset(GC* gc)
 void gc_reset_rootset(GC* gc)
 {
   assert(pool_is_empty(gc_metadata.gc_rootset_pool));
-  assert(gc->root_set == NULL);
+  ///TODO: check the statements below  assert(gc->root_set == NULL); 
+  if(gc->root_set != NULL) gc->root_set = NULL; 
   gc->root_set = free_set_pool_get_entry(&gc_metadata);
   assert(vector_block_is_empty(gc->root_set));
 
@@ -348,6 +352,17 @@ void gc_reset_rootset(GC* gc)
 
   return;
 }
+
+void gc_clear_rootset(GC* gc)
+{
+  gc_reset_interior_pointer_table();
+  gc_set_pool_clear(gc->metadata->gc_rootset_pool);
+#ifdef COMPRESS_REFERENCE
+  gc_set_pool_clear(gc->metadata->gc_uncompressed_rootset_pool);
+#endif
+  gc->root_set = NULL;
+}
+
 
 void gc_clear_remset(GC* gc)
 {
@@ -389,6 +404,63 @@ void gc_metadata_verify(GC* gc, Boolean is_before_gc)
   }
   
   return;  
+}
+
+#ifdef _DEBUG
+Boolean obj_is_mark_black_in_table(Partial_Reveal_Object* p_obj);
+#endif
+
+void gc_reset_snaptshot(GC* gc)
+{
+  GC_Metadata* metadata = gc->metadata;
+
+  /*reset mutator local snapshot block*/
+  Mutator *mutator = gc->mutator_list;
+  while (mutator) {
+    Vector_Block* local_snapshot = mutator->dirty_obj_snapshot;
+    assert(local_snapshot);
+    if(!vector_block_is_empty(local_snapshot)){
+#ifdef _DEBUG
+      POINTER_SIZE_INT* iter = vector_block_iterator_init(local_snapshot);
+      while(!vector_block_iterator_end(local_snapshot,iter)){
+        Partial_Reveal_Object* p_obj = (Partial_Reveal_Object*) *iter;
+        iter = vector_block_iterator_advance(local_snapshot, iter);
+#ifdef USE_MARK_SWEEP_GC
+        assert(obj_is_mark_black_in_table(p_obj));
+#endif
+      }
+#endif
+      vector_block_clear(mutator->dirty_obj_snapshot);
+    }
+    mutator = mutator->next;
+  }
+
+  /*reset global snapshot pool*/
+  Pool* global_snapshot = metadata->dirty_obj_snaptshot_pool;
+
+  if(!pool_is_empty(global_snapshot)){
+    Vector_Block* snapshot_block = pool_get_entry(global_snapshot);
+    while(snapshot_block != NULL){
+      if(!vector_block_is_empty(snapshot_block)){
+#ifdef _DEBUG
+        POINTER_SIZE_INT* iter = vector_block_iterator_init(snapshot_block);
+        while(!vector_block_iterator_end(snapshot_block,iter)){
+          Partial_Reveal_Object* p_obj = (Partial_Reveal_Object*) *iter;          
+          iter = vector_block_iterator_advance(snapshot_block, iter);
+#ifdef USE_MARK_SWEEP_GC
+          assert(obj_is_mark_black_in_table(p_obj));
+#endif
+        }
+#endif
+      }
+      vector_block_clear(snapshot_block);
+      pool_put_entry(metadata->free_set_pool,snapshot_block);
+      snapshot_block = pool_get_entry(global_snapshot);
+    }
+  }
+
+
+  
 }
 
 

@@ -20,6 +20,8 @@
  */
 
 #include "fspace.h"
+#include "../common/gc_concurrent.h"
+#include "../common/collection_scheduler.h"
 
 static Boolean fspace_alloc_block(Fspace* fspace, Allocator* allocator)
 {    
@@ -59,13 +61,15 @@ void* fspace_alloc(unsigned size, Allocator *allocator)
   p_return = thread_local_alloc(size, allocator);
   if (p_return)  return p_return;
 
+  if(gc_need_start_concurrent_mark(allocator->gc))
+    gc_start_concurrent_mark(allocator->gc);
   /* ran out local block, grab a new one*/  
   Fspace* fspace = (Fspace*)allocator->alloc_space;
   int attempts = 0;
   while( !fspace_alloc_block(fspace, allocator)){
     vm_gc_lock_enum();
     /* after holding lock, try if other thread collected already */
-    if ( !space_has_free_block((Blocked_Space*)fspace) ) {  
+    if ( !blocked_space_has_free_block((Blocked_Space*)fspace) ) {  
         if(attempts < 2) {
 #ifdef GC_GEN_STATS
         GC_Gen* gc = (GC_Gen*)allocator->gc;

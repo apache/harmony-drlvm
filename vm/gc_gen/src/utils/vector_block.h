@@ -64,7 +64,7 @@ inline Boolean vector_block_is_full(Vector_Block* block)
 */
 
 inline Boolean vector_block_is_empty(Vector_Block* block)
-{ return block->tail == block->entries; }
+{ return block->tail == block->head; }
 
 inline void vector_block_add_entry(Vector_Block* block, POINTER_SIZE_INT value)
 {
@@ -73,6 +73,95 @@ inline void vector_block_add_entry(Vector_Block* block, POINTER_SIZE_INT value)
 #endif
 
   *(block->tail++) = value; 
+}
+
+inline POINTER_SIZE_INT vector_block_get_entry(Vector_Block* block)
+{
+#ifdef _DEBUG
+  assert(!vector_block_is_empty(block));
+#endif
+
+  POINTER_SIZE_INT value = *(block->head++);
+
+#ifdef _DEBUG
+  assert(value);
+#endif
+  return value;
+}
+
+#define VECTOR_BLOCK_SHARE_BIT 0x01
+#define VECTOR_BLOCK_FULL_BIT  0x02
+#define VECTOR_BLOCK_SHARE_ID_SHIFT 0x05
+#define VECTOR_BLOCK_EXCLUSIVE_ID 0xFFff
+inline Boolean vector_block_is_shared(Vector_Block* block)
+{
+  return (Boolean)((POINTER_SIZE_INT)block->next & VECTOR_BLOCK_SHARE_BIT);
+}
+
+inline Boolean vector_block_is_set_full(Vector_Block* block)
+{
+  return (Boolean)((POINTER_SIZE_INT)block->next & VECTOR_BLOCK_FULL_BIT);
+}
+
+inline Boolean vector_block_set_full(Vector_Block* block)
+{
+  POINTER_SIZE_INT old_shared_var = (POINTER_SIZE_INT) block->next;
+  POINTER_SIZE_INT new_shared_var = old_shared_var | VECTOR_BLOCK_FULL_BIT;
+
+  while(TRUE){
+    POINTER_SIZE_INT old_var = (POINTER_SIZE_INT)atomic_casptr((volatile void **)& block->next ,(void*) new_shared_var,(void*) old_shared_var);
+    if(old_var == old_shared_var) return TRUE;
+    old_shared_var = (POINTER_SIZE_INT) block->next;
+    new_shared_var = old_shared_var | VECTOR_BLOCK_FULL_BIT;
+  }
+  assert(0);
+  return FALSE;
+
+}
+
+inline Boolean vector_block_set_shared(Vector_Block* block, unsigned int share_id)
+{
+  POINTER_SIZE_INT new_shared_var = (POINTER_SIZE_INT)((share_id << VECTOR_BLOCK_SHARE_ID_SHIFT) | VECTOR_BLOCK_SHARE_BIT);
+  POINTER_SIZE_INT old_shared_var = (POINTER_SIZE_INT) block->next;
+  if(old_shared_var != 0) return FALSE;
+
+  while(TRUE){
+    POINTER_SIZE_INT old_var = (POINTER_SIZE_INT)atomic_casptr((volatile void **)& block->next ,(void*) new_shared_var,(void*) old_shared_var);
+    if(old_var == old_shared_var) return TRUE;
+    old_shared_var = (POINTER_SIZE_INT) block->next;
+    if(old_shared_var != 0) return FALSE;
+  }    
+}
+
+inline Boolean vector_block_not_full_set_unshared(Vector_Block* block)
+{
+  POINTER_SIZE_INT new_shared_var = (POINTER_SIZE_INT) 0;
+  POINTER_SIZE_INT old_shared_var = (POINTER_SIZE_INT) block->next;
+
+  if(old_shared_var & VECTOR_BLOCK_FULL_BIT) return FALSE;
+
+  while(TRUE){
+    POINTER_SIZE_INT old_var = (POINTER_SIZE_INT)atomic_casptr((volatile void **)& block->next ,(void*) new_shared_var,(void*) old_shared_var);
+    if(old_var == old_shared_var) return TRUE;
+    old_shared_var = (POINTER_SIZE_INT) block->next;
+    if(old_shared_var & VECTOR_BLOCK_FULL_BIT) return FALSE;    
+  }
+  assert(0);
+  return FALSE;
+}
+
+inline Boolean vector_block_set_exclusive(Vector_Block* block)
+{
+  POINTER_SIZE_INT new_shared_var = (POINTER_SIZE_INT)((VECTOR_BLOCK_EXCLUSIVE_ID << VECTOR_BLOCK_SHARE_ID_SHIFT) | VECTOR_BLOCK_SHARE_BIT);
+  POINTER_SIZE_INT old_shared_var = (POINTER_SIZE_INT) block->next;
+  if(old_shared_var & VECTOR_BLOCK_SHARE_BIT) return FALSE;
+
+  while(TRUE){
+    POINTER_SIZE_INT old_var = (POINTER_SIZE_INT)atomic_casptr((volatile void **)& block->next ,(void*) new_shared_var,(void*) old_shared_var);
+    if(old_var == old_shared_var) return TRUE;
+    old_shared_var = (POINTER_SIZE_INT) block->next;
+    if(old_shared_var & VECTOR_BLOCK_SHARE_BIT) return FALSE;
+  }
 }
 
 inline void vector_block_clear(Vector_Block* block)

@@ -19,18 +19,20 @@
 #include "sspace_alloc.h"
 #include "sspace_mark_sweep.h"
 #include "sspace_verify.h"
-#include "../common/fix_repointed_refs.h"
 
 
 #define PFC_SORT_NUM  8
-
-static Chunk_Header_Basic *volatile next_chunk_for_fixing;
 
 void sspace_decide_compaction_need(Sspace *sspace)
 {
   POINTER_SIZE_INT free_mem_size = free_mem_in_sspace(sspace, FALSE);
   float free_mem_ratio = (float)free_mem_size / sspace->committed_heap_size;
+
+#ifdef USE_MARK_SWEEP_GC
   if((free_mem_ratio > SSPACE_COMPACT_RATIO) && (sspace->gc->cause != GC_CAUSE_RUNTIME_FORCE_GC)){
+#else
+  if(gc_match_kind(sspace->gc, MAJOR_COLLECTION)){
+#endif
     sspace->need_compact = sspace->move_object = TRUE;
   } else {
     sspace->need_compact = sspace->move_object = FALSE;
@@ -39,7 +41,7 @@ void sspace_decide_compaction_need(Sspace *sspace)
 
 static inline void sorted_chunk_bucket_add_entry(Chunk_Header **head, Chunk_Header **tail, Chunk_Header *chunk)
 {
-  chunk->adj_prev = NULL; /* Field adj_prev is used as prev */
+  chunk->prev = NULL; /* Field adj_prev is used as prev */
   
   if(!*head){
     assert(!*tail);
@@ -50,7 +52,7 @@ static inline void sorted_chunk_bucket_add_entry(Chunk_Header **head, Chunk_Head
   
   assert(*tail);
   chunk->next = *head;
-  (*head)->adj_prev = (Chunk_Header_Basic*)chunk;
+  (*head)->prev = chunk;
   *head = chunk;
 }
 
@@ -112,7 +114,7 @@ static Boolean pfc_pool_roughly_sort(Pool *pfc_pool, Chunk_Header **least_free_c
       tail = bucket_tail[i];
     } else {
       tail->next = bucket_head[i];
-      bucket_head[i]->adj_prev = (Chunk_Header_Basic*)tail;
+      bucket_head[i]->prev = tail;
       tail = bucket_tail[i];
     }
   }
@@ -133,7 +135,7 @@ static inline Chunk_Header *get_least_free_chunk(Chunk_Header **least_free_chunk
   Chunk_Header *result = *least_free_chunk;
   *least_free_chunk = (*least_free_chunk)->next;
   if(*least_free_chunk)
-    (*least_free_chunk)->adj_prev = NULL;
+    (*least_free_chunk)->prev = NULL;
   else
     *most_free_chunk = NULL;
   return result;
@@ -145,11 +147,12 @@ static inline Chunk_Header *get_most_free_chunk(Chunk_Header **least_free_chunk,
     return NULL;
   }
   Chunk_Header *result = *most_free_chunk;
-  *most_free_chunk = (Chunk_Header*)(*most_free_chunk)->adj_prev;
+  *most_free_chunk = (*most_free_chunk)->prev;
   if(*most_free_chunk)
     (*most_free_chunk)->next = NULL;
   else
     *least_free_chunk = NULL;
+  assert(!result->next);
   return result;
 }
 
@@ -175,7 +178,6 @@ static inline void move_obj_between_chunks(Chunk_Header **dest_ptr, Chunk_Header
   }
   
   /* dest might be set to NULL, so we use *dest_ptr here */
-  (*dest_ptr)->alloc_num += src->alloc_num - alloc_num;
   assert((*dest_ptr)->alloc_num <= (*dest_ptr)->slot_num);
   src->alloc_num = alloc_num;
   if(!dest){
@@ -185,7 +187,7 @@ static inline void move_obj_between_chunks(Chunk_Header **dest_ptr, Chunk_Header
   }
 }
 
-static void sspace_move_objects(Collector *collector, Sspace *sspace)
+void sspace_compact(Collector *collector, Sspace *sspace)
 {
   Chunk_Header *least_free_chunk, *most_free_chunk;
   Pool *pfc_pool = sspace_grab_next_pfc_pool(sspace);
@@ -225,111 +227,4 @@ static void sspace_move_objects(Collector *collector, Sspace *sspace)
   }
 }
 
-static void sspace_init_chunk_for_ref_fixing(Sspace *sspace)
-{
-  next_chunk_for_fixing = (Chunk_Header_Basic*)space_heap_start((Space*)sspace);
-  next_chunk_for_fixing->adj_prev = NULL;
-}
-
-static void normal_chunk_fix_repointed_refs(Chunk_Header *chunk)
-{
-  /* Init field slot_index and depad the last index word in table for fixing */
-  chunk->slot_index = 0;
-  chunk_depad_last_index_word(chunk);
-  
-  unsigned int alloc_num = chunk->alloc_num;
-  assert(alloc_num);
-  
-  /* After compaction, many chunks are filled with objects.
-   * For these chunks, we needn't find the allocated slot one by one by calling next_alloc_slot_in_chunk.
-   * That is a little time consuming.
-   * We'd like to fix those objects by incrementing their addr to find the next.
-   */
-  if(alloc_num == chunk->slot_num){  /* Filled with objects */
-    unsigned int slot_size = chunk->slot_size;
-    Partial_Reveal_Object *p_obj = (Partial_Reveal_Object*)slot_index_to_addr(chunk, 0);
-    for(unsigned int i = alloc_num; i--;){
-      object_fix_ref_slots(p_obj);
-#ifdef SSPACE_VERIFY
-      sspace_verify_fix_in_compact();
-#endif
-      p_obj = (Partial_Reveal_Object*)((POINTER_SIZE_INT)p_obj + slot_size);
-    }
-  } else {  /* Chunk is not full */
-    while(alloc_num){
-      Partial_Reveal_Object *p_obj = next_alloc_slot_in_chunk(chunk);
-      assert(p_obj);
-      object_fix_ref_slots(p_obj);
-#ifdef SSPACE_VERIFY
-      sspace_verify_fix_in_compact();
-#endif
-      --alloc_num;
-    }
-  }
-  
-  if(chunk->alloc_num != chunk->slot_num){
-    chunk_pad_last_index_word(chunk, cur_alloc_mask);
-    pfc_reset_slot_index(chunk);
-  }
-}
-
-static void abnormal_chunk_fix_repointed_refs(Chunk_Header *chunk)
-{
-  object_fix_ref_slots((Partial_Reveal_Object*)chunk->base);
-#ifdef SSPACE_VERIFY
-  sspace_verify_fix_in_compact();
-#endif
-}
-
-static void sspace_fix_repointed_refs(Collector *collector, Sspace *sspace)
-{
-  Chunk_Header_Basic *chunk = sspace_grab_next_chunk(sspace, &next_chunk_for_fixing, TRUE);
-  
-  while(chunk){
-    if(chunk->status & CHUNK_NORMAL)
-      normal_chunk_fix_repointed_refs((Chunk_Header*)chunk);
-    else if(chunk->status & CHUNK_ABNORMAL)
-      abnormal_chunk_fix_repointed_refs((Chunk_Header*)chunk);
-    
-    chunk = sspace_grab_next_chunk(sspace, &next_chunk_for_fixing, TRUE);
-  }
-}
-
-static volatile unsigned int num_moving_collectors = 0;
-static volatile unsigned int num_fixing_collectors = 0;
-
-void compact_sspace(Collector *collector, Sspace *sspace)
-{
-  GC *gc = collector->gc;
-  
-  unsigned int num_active_collectors = gc->num_active_collectors;
-  
-  /* Pass 1: **************************************************
-     move live objects between pfcs with the same size *****************/
-  atomic_cas32(&num_moving_collectors, 0, num_active_collectors+1);
-  
-  sspace_move_objects(collector, sspace);
-  
-  unsigned int old_num = atomic_inc32(&num_moving_collectors);
-  if( ++old_num == num_active_collectors ){
-    /* last collector's world here */
-#ifdef SSPACE_TIME
-    sspace_compact_time(FALSE);
-#endif
-    sspace_init_chunk_for_ref_fixing(sspace);
-    /* let other collectors go */
-    num_moving_collectors++;
-  }
-  while(num_moving_collectors != num_active_collectors + 1);
-  
-  /* Pass 2: **************************************************
-     sweep dead objects ***************************************/
-  atomic_cas32( &num_fixing_collectors, 0, num_active_collectors);
-  
-  sspace_fix_repointed_refs(collector, sspace);
-  
-  atomic_inc32(&num_fixing_collectors);
-  while(num_fixing_collectors != num_active_collectors);
-  
-}
 

@@ -47,6 +47,10 @@ typedef struct GC_MS {
   unsigned int num_collectors;
   unsigned int num_active_collectors; /* not all collectors are working */
   
+  Marker** markers;
+  unsigned int num_markers;
+  unsigned int num_active_markers;
+  
   /* metadata is the pool for rootset, markstack, etc. */
   GC_Metadata *metadata;
   Finref_Metadata *finref_metadata;
@@ -64,7 +68,12 @@ typedef struct GC_MS {
   
   //For_LOS_extend
   Space_Tuner *tuner;
-  
+
+  unsigned int gc_concurrent_status;
+  Collection_Scheduler* collection_scheduler;
+
+  SpinLock concurrent_mark_lock;
+  SpinLock enumerate_rootset_lock;
   /* system info */
   unsigned int _system_alloc_unit;
   unsigned int _machine_page_size_bytes;
@@ -102,6 +111,9 @@ void gc_ms_destruct(GC_MS *gc);
 void gc_ms_reclaim_heap(GC_MS *gc);
 void gc_ms_iterate_heap(GC_MS *gc);
 
+void gc_ms_start_concurrent_mark(GC_MS* gc);
+void gc_ms_start_concurrent_mark(GC_MS* gc, unsigned int num_markers);
+void gc_ms_update_space_statistics(GC_MS* gc);
 
 #endif // USE_MARK_SWEEP_GC
 

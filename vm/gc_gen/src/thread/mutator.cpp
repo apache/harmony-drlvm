@@ -38,6 +38,7 @@ void mutator_initialize(GC* gc, void *unused_gc_information)
     mutator->rem_set = free_set_pool_get_entry(gc->metadata);
     assert(vector_block_is_empty(mutator->rem_set));
   }
+  mutator->dirty_obj_snapshot = free_set_pool_get_entry(gc->metadata);
   
   if(!IGNORE_FINREF )
     mutator->obj_with_fin = finref_get_free_block(gc);
@@ -97,6 +98,13 @@ void mutator_destruct(GC* gc, void *unused_gc_information)
     pool_put_entry(gc->finref_metadata->obj_with_fin_pool, mutator->obj_with_fin);
     mutator->obj_with_fin = NULL;
   }
+
+  if( mutator->dirty_obj_snapshot != NULL){
+    if(vector_block_is_empty(mutator->dirty_obj_snapshot))
+      pool_put_entry(gc->metadata->free_set_pool, mutator->dirty_obj_snapshot);
+    else /* FIXME:: this condition may be released. */
+      pool_put_entry(gc->metadata->dirty_obj_snaptshot_pool, mutator->dirty_obj_snapshot);
+  }
   
   //gc_set_tls(NULL);
   
@@ -122,6 +130,60 @@ void gc_prepare_mutator_remset(GC* gc)
     mutator = mutator->next;
   }  
   return;
+}
+
+/*
+Boolean gc_local_snapshot_is_empty(GC* gc)
+{
+  lock(gc->mutator_list_lock);
+
+  Mutator *mutator = gc->mutator_list;
+  while (mutator) {
+    if(mutator->concurrent_mark_handshake_status != LOCAL_SNAPSHOT_CONTAINER_IS_EMPTY){
+      unlock(gc->mutator_list_lock); 
+      return FALSE;
+    }
+    mutator = mutator->next;
+  }  
+
+  unlock(gc->mutator_list_lock); 
+  return TRUE;
+}*/
+
+Boolean gc_local_snapshot_is_empty(GC* gc)
+{
+  lock(gc->mutator_list_lock);
+
+  Mutator *mutator = gc->mutator_list;
+  while (mutator) {
+    Vector_Block* local_snapshot_set = mutator->dirty_obj_snapshot;
+    if(!vector_block_is_empty(local_snapshot_set)){
+      unlock(gc->mutator_list_lock); 
+      return FALSE;
+    }
+    mutator = mutator->next;
+  }  
+
+  unlock(gc->mutator_list_lock); 
+  return TRUE;
+}
+
+Vector_Block* gc_get_local_snapshot(GC* gc, unsigned int shared_id)
+{
+  lock(gc->mutator_list_lock);
+
+  Mutator *mutator = gc->mutator_list;
+  while (mutator) {
+    Vector_Block* local_snapshot = mutator->dirty_obj_snapshot;
+    if(!vector_block_is_empty(local_snapshot) && vector_block_set_shared(local_snapshot,shared_id)){
+      unlock(gc->mutator_list_lock); 
+      return local_snapshot;
+    }
+    mutator = mutator->next;
+  }  
+
+  unlock(gc->mutator_list_lock); 
+  return NULL;
 }
 
 

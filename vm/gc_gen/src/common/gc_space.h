@@ -26,6 +26,13 @@
 
 extern unsigned int SPACE_ALLOC_UNIT;
 
+typedef struct Space_Statistics{
+  POINTER_SIZE_INT num_live_obj;
+  POINTER_SIZE_INT size_live_obj;
+  POINTER_SIZE_INT size_free_space;
+  POINTER_SIZE_INT last_size_free_space;
+}Space_Statistics;
+
 struct GC;
 /* all Spaces inherit this Space structure */
 typedef struct Space{
@@ -40,6 +47,8 @@ typedef struct Space{
   GC* gc;
   Boolean move_object;
 
+  Space_Statistics* space_statistic;
+
   /* Size allocted since last minor collection. */
   volatile uint64 last_alloced_size;
   /* Size allocted since last major collection. */
@@ -52,6 +61,9 @@ typedef struct Space{
   /* Size survived after a certain period. */
   uint64 period_surviving_size;  
 }Space;
+
+struct Allocator;
+typedef void *(*Space_Alloc_Func)(unsigned, Allocator *);
 
 inline POINTER_SIZE_INT space_committed_size(Space* space){ return space->committed_heap_size;}
 inline void* space_heap_start(Space* space){ return space->heap_start; }
@@ -81,6 +93,8 @@ typedef struct Blocked_Space {
   GC* gc;
   Boolean move_object;
 
+  Space_Statistics* space_statistic;
+
   /* Size allocted since last minor collection. */
   volatile uint64 last_alloced_size;
   /* Size allocted since last major collection. */
@@ -105,12 +119,14 @@ typedef struct Blocked_Space {
   unsigned int num_used_blocks;
   unsigned int num_managed_blocks;
   unsigned int num_total_blocks;
+  
+  volatile Block_Header* block_iterator;
   /* END of Blocked_Space --> */
 }Blocked_Space;
 
-inline Boolean space_has_free_block(Blocked_Space* space){ return space->free_block_idx <= space->ceiling_block_idx; }
-inline unsigned int space_free_memory_size(Blocked_Space* space){ return GC_BLOCK_SIZE_BYTES * (space->ceiling_block_idx - space->free_block_idx + 1);  }
-inline Boolean space_used_memory_size(Blocked_Space* space){ return GC_BLOCK_SIZE_BYTES * (space->free_block_idx - space->first_block_idx); }
+inline Boolean blocked_space_has_free_block(Blocked_Space *space){ return space->free_block_idx <= space->ceiling_block_idx; }
+inline unsigned int blocked_space_free_mem_size(Blocked_Space *space){ return GC_BLOCK_SIZE_BYTES * (space->ceiling_block_idx - space->free_block_idx + 1);  }
+inline Boolean blocked_space_used_mem_size(Blocked_Space *space){ return GC_BLOCK_SIZE_BYTES * (space->free_block_idx - space->first_block_idx); }
 
 inline void space_init_blocks(Blocked_Space* space)
 { 
@@ -196,6 +212,33 @@ inline void blocked_space_extend(Blocked_Space* space, unsigned int changed_size
   last_block->next = NULL;
   space->ceiling_block_idx = last_block->block_idx;
   space->num_managed_blocks = (unsigned int)(space->committed_heap_size >> GC_BLOCK_SHIFT_COUNT);
+}
+
+inline void blocked_space_block_iterator_init(Blocked_Space *space)
+{ space->block_iterator = (Block_Header*)space->blocks; }
+
+inline void blocked_space_block_iterator_init_free(Blocked_Space *space)
+{ space->block_iterator = (Block_Header*)&space->blocks[space->free_block_idx - space->first_block_idx]; }
+
+inline Block_Header *blocked_space_block_iterator_get(Blocked_Space *space)
+{ return (Block_Header*)space->block_iterator; }
+
+inline Block_Header *blocked_space_block_iterator_next(Blocked_Space *space)
+{
+  Block_Header *cur_block = (Block_Header*)space->block_iterator;
+  
+  while(cur_block != NULL){
+    Block_Header *next_block = cur_block->next;
+    
+    Block_Header *temp = (Block_Header*)atomic_casptr((volatile void **)&space->block_iterator, next_block, cur_block);
+    if(temp != cur_block){
+      cur_block = (Block_Header*)space->block_iterator;
+      continue;
+    }
+    return cur_block;
+  }
+  /* run out space blocks */
+  return NULL;
 }
 
 #endif //#ifndef _GC_SPACE_H_

@@ -18,70 +18,45 @@
 #include "sspace_mark_sweep.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 
-static Sspace *sspace_in_marking;
-static FORCE_INLINE Boolean obj_mark_gray(Partial_Reveal_Object *obj)
+static Sspace *sspace_in_fallback_marking;
+static FORCE_INLINE Boolean obj_mark(Partial_Reveal_Object *obj)
 {
-  if(obj_belongs_to_space(obj, (Space*)sspace_in_marking))
-    return obj_mark_gray_in_table(obj);
-  else
-    return obj_mark_in_vt(obj);
-}
-
-static FORCE_INLINE Boolean obj_mark_black(Partial_Reveal_Object *obj)
-{
-  if(obj_belongs_to_space(obj, (Space*)sspace_in_marking))
+  if(obj_belongs_to_space(obj, (Space*)sspace_in_fallback_marking))
     return obj_mark_black_in_table(obj);
   else
     return obj_mark_in_vt(obj);
 }
 
-
-/* The caller must be in places where alloc color and mark color haven't been flipped */
-Boolean obj_is_marked_in_table(Partial_Reveal_Object *obj)
-{
-  unsigned int index_in_word;
-  volatile POINTER_SIZE_INT *p_color_word = get_color_word_in_table(obj, index_in_word);
-  assert(p_color_word);
-  
-  POINTER_SIZE_INT color_word = *p_color_word;
-  POINTER_SIZE_INT mark_color = cur_mark_gray_color << index_in_word;
-  
-  return (Boolean)(color_word & mark_color);
-}
-
 static FORCE_INLINE void scan_slot(Collector *collector, REF *p_ref)
 {
-  Partial_Reveal_Object *p_obj = read_slot(p_ref);
-  if( p_obj == NULL) return;
+  if( read_slot(p_ref) == NULL) return;
   
-  assert(address_belongs_to_gc_heap(p_obj, collector->gc));
-  if(obj_mark_gray(p_obj)){
-    assert(p_obj);
-    collector_tracestack_push(collector, p_obj);
-  }
+  collector_tracestack_push(collector, p_ref);
 }
 
-static FORCE_INLINE void scan_object(Collector *collector, Partial_Reveal_Object *p_obj)
+static FORCE_INLINE void scan_object(Collector *collector, REF *p_ref)
 {
+  Partial_Reveal_Object *p_obj = read_slot(p_ref);
+  assert(p_obj);
   assert((((POINTER_SIZE_INT)p_obj) % GC_OBJECT_ALIGNMENT) == 0);
   
-  Partial_Reveal_VTable *vtable = uncompress_vt(obj_get_vt(p_obj));
-  if(VTABLE_TRACING)
-    if(vtable->vtmark == VT_UNMARKED) {
-      vtable->vtmark = VT_MARKED;
-      if(obj_mark_black(vtable->jlC))
-        collector_tracestack_push(collector, vtable->jlC);
-    }
+  if(obj_belongs_to_nos(p_obj) && obj_is_fw_in_oi(p_obj)){
+    assert(obj_get_vt(p_obj) == obj_get_vt(obj_get_fw_in_oi(p_obj)));
+    p_obj = obj_get_fw_in_oi(p_obj);
+    assert(p_obj);
+    write_slot(p_ref, p_obj);
+  }
+  
+  if(!obj_mark(p_obj))
+    return;
   
   if(!object_has_ref_field(p_obj)) return;
-  
-  REF *p_ref;
   
   if(object_is_array(p_obj)){   /* scan array object */
     Partial_Reveal_Array *array = (Partial_Reveal_Array*)p_obj;
     unsigned int array_length = array->array_len;
     
-    p_ref = (REF *)((POINTER_SIZE_INT)array + (int)array_first_element_offset(array));
+    REF *p_ref = (REF *)((POINTER_SIZE_INT)array + (int)array_first_element_offset(array));
     for (unsigned int i = 0; i < array_length; i++)
       scan_slot(collector, p_ref+i);
     
@@ -93,7 +68,7 @@ static FORCE_INLINE void scan_object(Collector *collector, Partial_Reveal_Object
   int *ref_iterator = object_ref_iterator_init(p_obj);
   
   for(unsigned int i=0; i<num_refs; i++){
-    p_ref = object_ref_iterator_get(ref_iterator+i, p_obj);
+    REF *p_ref = object_ref_iterator_get(ref_iterator+i, p_obj);
     scan_slot(collector, p_ref);
   }
 
@@ -103,16 +78,14 @@ static FORCE_INLINE void scan_object(Collector *collector, Partial_Reveal_Object
 
 }
 
-static void trace_object(Collector *collector, Partial_Reveal_Object *p_obj)
+static void trace_object(Collector *collector, REF *p_ref)
 {
-  scan_object(collector, p_obj);
-  obj_mark_black(p_obj);
+  scan_object(collector, p_ref);
   
   Vector_Block *trace_stack = collector->trace_stack;
   while(!vector_stack_is_empty(trace_stack)){
-    p_obj = (Partial_Reveal_Object*)vector_stack_pop(trace_stack);
-    scan_object(collector, p_obj);
-    obj_mark_black(p_obj);
+    p_ref = (REF*)vector_stack_pop(trace_stack);
+    scan_object(collector, p_ref);
     trace_stack = collector->trace_stack;
   }
 }
@@ -135,11 +108,11 @@ static void trace_object(Collector *collector, Partial_Reveal_Object *p_obj)
 /* for marking phase termination detection */
 static volatile unsigned int num_finished_collectors = 0;
 
-void sspace_mark_scan(Collector *collector, Sspace *sspace)
+void sspace_fallback_mark_scan(Collector *collector, Sspace *sspace)
 {
   GC *gc = collector->gc;
   GC_Metadata *metadata = gc->metadata;
-  sspace_in_marking = sspace;
+  sspace_in_fallback_marking = sspace;
   
   /* reset the num_finished_collectors to be 0 by one collector. This is necessary for the barrier later. */
   unsigned int num_active_collectors = gc->num_active_collectors;
@@ -157,9 +130,8 @@ void sspace_mark_scan(Collector *collector, Sspace *sspace)
       REF *p_ref = (REF*)*iter;
       iter = vector_block_iterator_advance(root_set,iter);
       
-      Partial_Reveal_Object *p_obj = read_slot(p_ref);
       /* root ref can't be NULL, (remset may have NULL ref entry, but this function is only for MAJOR_COLLECTION */
-      assert(p_obj != NULL);
+      assert(read_slot(p_ref) != NULL);
       /* we have to mark the object before putting it into marktask, because
          it is possible to have two slots containing a same object. They will
          be scanned twice and their ref slots will be recorded twice. Problem
@@ -167,9 +139,7 @@ void sspace_mark_scan(Collector *collector, Sspace *sspace)
          and the second time the value is the ref slot is the old position as expected.
          This can be worked around if we want.
       */
-      assert(address_belongs_to_gc_heap(p_obj, gc));
-      if(obj_mark_gray(p_obj))
-        collector_tracestack_push(collector, p_obj);
+      collector_tracestack_push(collector, p_ref);
     }
     root_set = pool_iterator_next(metadata->gc_rootset_pool);
   }
@@ -186,12 +156,12 @@ retry:
   while(mark_task){
     POINTER_SIZE_INT *iter = vector_block_iterator_init(mark_task);
     while(!vector_block_iterator_end(mark_task, iter)){
-      Partial_Reveal_Object *p_obj = (Partial_Reveal_Object*)*iter;
+      REF *p_ref = (REF*)*iter;
       iter = vector_block_iterator_advance(mark_task, iter);
       
       /* FIXME:: we should not let mark_task empty during working, , other may want to steal it.
          degenerate my stack into mark_task, and grab another mark_task */
-      trace_object(collector, p_obj);
+      trace_object(collector, p_ref);
     }
    /* run out one task, put back to the pool and grab another task */
    vector_stack_clear(mark_task);
@@ -220,8 +190,7 @@ retry:
   return;
 }
 
-void trace_obj_in_ms_marking(Collector *collector, void *p_obj)
+void trace_obj_in_ms_fallback_marking(Collector *collector, void *p_ref)
 {
-  obj_mark_gray((Partial_Reveal_Object*)p_obj);
-  trace_object(collector, (Partial_Reveal_Object*)p_obj);
+  trace_object(collector, (REF*)p_ref);
 }

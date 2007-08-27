@@ -65,6 +65,8 @@
 
 #endif /* else MARK_BIT_FLIPPING */
 
+#define OBJ_DIRTY_BIT 0x20
+
 /*emt64 related!*/
 #define COMPRESS_VTABLE
 
@@ -306,6 +308,7 @@ inline Boolean type_has_finalizer(Partial_Reveal_VTable *vt)
 }
 
 #endif //#ifndef _GC_TYPES_H_
+
 
 
 

@@ -30,7 +30,6 @@ void gc_reset_block_for_collectors(GC* gc, Mspace* mspace);
 void gc_init_block_for_collectors(GC* gc, Mspace* mspace);
 
 void mspace_update_info_after_space_tuning(Mspace* mspace);
-void mspace_reset_after_compaction(Mspace* mspace);
 
 Block_Header* mspace_get_first_compact_block(Mspace* mspace);
 Block_Header* mspace_get_first_target_block(Mspace* mspace);
@@ -53,5 +52,6 @@ void fallback_clear_fwd_obj_oi_init(Collector* collector);
 extern Boolean IS_MOVE_COMPACT;
 
 #endif /* _MSPACE_COLLECT_COMPACT_H_ */
+
 
 

@@ -130,6 +130,8 @@ static void *sspace_alloc_normal_obj(Sspace *sspace, unsigned size, Allocator *a
     }
     p_obj = alloc_in_chunk(chunks[index]);
   } else {
+    if(gc_need_start_concurrent_mark(allocator->gc))
+      gc_start_concurrent_mark(allocator->gc);
     chunk = sspace_get_pfc(sspace, seg_index, index);
     if(!chunk){
       chunk = (Chunk_Header*)sspace_get_normal_free_chunk(sspace);
@@ -137,8 +139,6 @@ static void *sspace_alloc_normal_obj(Sspace *sspace, unsigned size, Allocator *a
     }
     //if(!chunk) chunk = sspace_steal_pfc(sspace, seg_index, index);
     if(!chunk) return NULL;
-    assert(chunk->alloc_num < chunk->slot_num);
-    ++chunk->alloc_num;
     p_obj = alloc_in_chunk(chunk);
     if(chunk)
       sspace_put_pfc(sspace, chunk);
@@ -150,6 +150,9 @@ static void *sspace_alloc_normal_obj(Sspace *sspace, unsigned size, Allocator *a
 static void *sspace_alloc_super_obj(Sspace *sspace, unsigned size, Allocator *allocator)
 {
   assert(size > SUPER_OBJ_THRESHOLD);
+
+  if(gc_need_start_concurrent_mark(allocator->gc))
+    gc_start_concurrent_mark(allocator->gc);
 
   unsigned int chunk_size = SUPER_SIZE_ROUNDUP(size);
   assert(chunk_size > SUPER_OBJ_THRESHOLD);
@@ -187,6 +190,7 @@ static void *sspace_try_alloc(unsigned size, Allocator *allocator)
   if(p_obj) sspace_verify_alloc(p_obj, size);
 #endif
 
+  if(p_obj && gc_is_concurrent_mark_phase()) obj_mark_black_in_table((Partial_Reveal_Object*)p_obj,size);
   return p_obj;
 }
 
@@ -206,7 +210,7 @@ void *sspace_alloc(unsigned size, Allocator *allocator)
     vm_gc_unlock_enum();
     return p_obj;
   }
-  gc_reclaim_heap(allocator->gc, GC_CAUSE_POS_IS_FULL);
+  gc_reclaim_heap(allocator->gc, GC_CAUSE_SSPACE_IS_FULL);
   vm_gc_unlock_enum();
 
 #ifdef SSPACE_CHUNK_INFO

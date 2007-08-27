@@ -23,7 +23,7 @@
 
 struct GC_Gen;
 
-void sspace_initialize(GC *gc, void *start, unsigned int sspace_size, unsigned int commit_size)
+Sspace *sspace_initialize(GC *gc, void *start, POINTER_SIZE_INT sspace_size, POINTER_SIZE_INT commit_size)
 {
   /* With sspace in the heap, the heap must be composed of a single sspace or a sspace and a NOS.
    * In either case, the reserved size and committed size of sspace must be the same.
@@ -58,6 +58,10 @@ void sspace_initialize(GC *gc, void *start, unsigned int sspace_size, unsigned i
   
   sspace_init_chunks(sspace);
 
+  sspace->space_statistic = (Space_Statistics*)STD_MALLOC(sizeof(Space_Statistics));
+  assert(sspace->space_statistic);
+  memset(sspace->space_statistic, 0, sizeof(Space_Statistics));
+
 #ifdef USE_MARK_SWEEP_GC
   gc_ms_set_sspace((GC_MS*)gc, sspace);
 #else
@@ -67,7 +71,7 @@ void sspace_initialize(GC *gc, void *start, unsigned int sspace_size, unsigned i
 #ifdef SSPACE_VERIFY
   sspace_verify_init(gc);
 #endif
-  return;
+  return sspace;
 }
 
 static void sspace_destruct_chunks(Sspace *sspace) { return; }
@@ -77,6 +81,13 @@ void sspace_destruct(Sspace *sspace)
   //FIXME:: when map the to-half, the decommission start address should change
   sspace_destruct_chunks(sspace);
   STD_FREE(sspace);
+}
+
+void sspace_reset_after_collection(Sspace *sspace)
+{
+  sspace->move_object = FALSE;
+  sspace->need_compact = FALSE;
+  sspace->need_fix = FALSE;
 }
 
 void allocator_init_local_chunks(Allocator *allocator)
@@ -110,6 +121,27 @@ void allocator_init_local_chunks(Allocator *allocator)
   allocator->local_chunks = local_chunks;
 }
 
+void allocator_clear_local_chunks(Allocator *allocator, Boolean reuse_pfc)
+{
+  Sspace *sspace = gc_get_sspace(allocator->gc);
+  Size_Segment **size_segs = sspace->size_segments;
+  Chunk_Header ***local_chunks = allocator->local_chunks;
+  
+  for(unsigned int i = SIZE_SEGMENT_NUM; i--;){
+    if(!size_segs[i]->local_alloc){
+      assert(!local_chunks[i]);
+      continue;
+    }
+    Chunk_Header **chunks = local_chunks[i];
+    assert(chunks);
+    for(unsigned int j = size_segs[i]->chunk_num; j--;){
+      if(chunks[j] && reuse_pfc)
+        sspace_put_pfc(sspace, chunks[j]);
+      chunks[j] = NULL;
+    }
+  }
+}
+
 void allocactor_destruct_local_chunks(Allocator *allocator)
 {
   Sspace *sspace = gc_get_sspace(allocator->gc);
@@ -141,6 +173,18 @@ void allocactor_destruct_local_chunks(Allocator *allocator)
   STD_FREE(local_chunks);
 }
 
+#ifdef USE_MARK_SWEEP_GC
+void sspace_set_space_statistic(Sspace *sspace)
+{
+  GC_MS* gc = (GC_MS*)sspace->gc;
+
+  for(unsigned int i=0; i<gc->num_collectors; ++i){
+    sspace->surviving_obj_num += gc->collectors[i]->live_obj_num;
+    sspace->surviving_obj_size += gc->collectors[i]->live_obj_size;
+  }
+}
+#endif
+
 extern void sspace_decide_compaction_need(Sspace *sspace);
 extern void mark_sweep_sspace(Collector *collector);
 
@@ -157,8 +201,12 @@ void sspace_collection(Sspace *sspace)
 #endif
 
   sspace_decide_compaction_need(sspace);
-  if(sspace->need_compact)
-    gc->collect_kind = SWEEP_COMPACT_GC;
+  if(sspace->need_compact && gc_match_kind(gc, MARK_SWEEP_GC)){
+    assert(gc_match_kind(gc, MS_COLLECTION));
+    gc->collect_kind = MS_COMPACT_COLLECTION;
+  }
+  if(sspace->need_compact || gc_match_kind(gc, MAJOR_COLLECTION))
+    sspace->need_fix = TRUE;
   //printf("\n\n>>>>>>>>%s>>>>>>>>>>>>\n\n", sspace->need_compact ? "SWEEP COMPACT" : "MARK SWEEP");
 #ifdef SSPACE_VERIFY
   sspace_verify_before_collection(gc);

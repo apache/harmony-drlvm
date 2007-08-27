@@ -75,11 +75,14 @@ typedef struct Space_Tuner{
     POINTER_SIZE_INT min_tuning_size;
 }Space_Tuner;
 
-void gc_compute_space_tune_size_before_marking(GC* gc, unsigned int cause);
+void gc_compute_space_tune_size_before_marking(GC* gc);
 void gc_compute_space_tune_size_after_marking(GC *gc);
 void gc_space_tuner_reset(GC* gc);
 void gc_space_tuner_initialize(GC* gc);
 void gc_space_tuner_init_fake_blocks_for_los_shrink(GC* gc);
 void gc_space_tuner_release_fake_blocks_for_los_shrink(GC* gc);
+
+inline Boolean gc_has_space_tuner(GC* gc)
+{ return (Boolean)(POINTER_SIZE_INT)gc->tuner; }
 
 #endif /* _SPACE_TUNER_H_ */

@@ -103,7 +103,7 @@ static void collector_reset_thread(Collector *collector)
 
 #ifndef USE_MARK_SWEEP_GC
   /*For LOS_Shrink and LOS_Extend*/
-  if(collector->gc->tuner->kind != TRANS_NOTHING){
+  if(gc_has_space_tuner(collector->gc) && collector->gc->tuner->kind != TRANS_NOTHING){
     collector->non_los_live_obj_size = 0;
     collector->los_live_obj_size = 0;
   }
@@ -137,9 +137,9 @@ static void assign_collector_with_task(GC* gc, TaskType task_func, Space* space)
 {
   /* FIXME:: to adaptively identify the num_collectors_to_activate */
   if( MINOR_COLLECTORS && gc_match_kind(gc, MINOR_COLLECTION)){
-    gc->num_active_collectors = MINOR_COLLECTORS;      
-  }else if ( MAJOR_COLLECTORS && !gc_match_kind(gc, MINOR_COLLECTION)){
-    gc->num_active_collectors = MAJOR_COLLECTORS;  
+    gc->num_active_collectors = MINOR_COLLECTORS;
+  }else if ( MAJOR_COLLECTORS && gc_match_kind(gc, MAJOR_COLLECTION)){
+    gc->num_active_collectors = MAJOR_COLLECTORS;
   }else{
     gc->num_active_collectors = gc->num_collectors;
   }
@@ -291,6 +291,8 @@ void collector_initialize(GC* gc)
 
 #ifdef USE_MARK_SWEEP_GC
     collector_init_free_chunk_list(collector);
+#else
+    gc_gen_hook_for_collector_init(collector);
 #endif
 
 #ifdef GC_GEN_STATS

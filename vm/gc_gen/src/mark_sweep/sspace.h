@@ -34,14 +34,16 @@ typedef struct Sspace {
   /* <-- first couple of fields are overloadded as Space */
   void *heap_start;
   void *heap_end;
-  unsigned int reserved_heap_size;
-  unsigned int committed_heap_size;
+  POINTER_SIZE_INT reserved_heap_size;
+  POINTER_SIZE_INT committed_heap_size;
   unsigned int num_collections;
   int64 time_collections;
   float survive_ratio;
   unsigned int collect_algorithm;
   GC *gc;
   Boolean move_object;
+
+  Space_Statistics* space_statistic;
 
   /* Size allocted since last minor collection. */
   volatile POINTER_SIZE_INT last_alloced_size;
@@ -58,15 +60,23 @@ typedef struct Sspace {
   /* END of Space --> */
   
   Boolean need_compact;
+  Boolean need_fix;   /* There are repointed ref needing fixing */
   Size_Segment **size_segments;
   Pool ***pfc_pools;
   Free_Chunk_List *aligned_free_chunk_lists;
   Free_Chunk_List *unaligned_free_chunk_lists;
   Free_Chunk_List *hyper_free_chunk_list;
+  POINTER_SIZE_INT surviving_obj_num;
+  POINTER_SIZE_INT surviving_obj_size;
 } Sspace;
 
-void sspace_initialize(GC *gc, void *start, unsigned int sspace_size, unsigned int commit_size);
+#ifdef USE_MARK_SWEEP_GC
+void sspace_set_space_statistic(Sspace *sspace);
+#endif
+
+Sspace *sspace_initialize(GC *gc, void *start, POINTER_SIZE_INT sspace_size, POINTER_SIZE_INT commit_size);
 void sspace_destruct(Sspace *sspace);
+void sspace_reset_after_collection(Sspace *sspace);
 
 void *sspace_thread_local_alloc(unsigned size, Allocator *allocator);
 void *sspace_alloc(unsigned size, Allocator *allocator);

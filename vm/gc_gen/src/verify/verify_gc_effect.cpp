@@ -17,6 +17,9 @@
 
 #include "verifier_common.h"
 #include "verify_gc_effect.h"
+#ifdef USE_MARK_SWEEP_GC
+#include "../mark_sweep/sspace_mark_sweep.h"
+#endif
 
 static POINTER_SIZE_INT hash_obj_distance = 0;
 
@@ -144,7 +147,7 @@ static Boolean fspace_object_was_forwarded(Partial_Reveal_Object *p_obj, Fspace 
   GC_Verifier* gc_verifier = heap_verifier->gc_verifier;
   assert(obj_belongs_to_space(p_obj, (Space*)fspace));
   unsigned int forwarded_first_part;
-  if(!gc_verifier->gc_collect_kind == MINOR_COLLECTION  || !NOS_PARTIAL_FORWARD || heap_verifier->gc_is_gen_mode)
+  if(!(gc_verifier->gc_collect_kind == MINOR_COLLECTION) || !NOS_PARTIAL_FORWARD || heap_verifier->gc_is_gen_mode)
     forwarded_first_part = true;
   else
     forwarded_first_part = forward_first_half^1;
@@ -293,6 +296,7 @@ void verifier_update_verify_info(Partial_Reveal_Object* p_obj, Heap_Verifier* he
   Heap_Verifier_Metadata* verifier_metadata = heap_verifier->heap_verifier_metadata;
   GC_Verifier* gc_verifier = heap_verifier->gc_verifier;
 
+#ifndef USE_MARK_SWEEP_GC
   GC_Gen* gc = (GC_Gen*)heap_verifier->gc;
   Space* mspace = gc_get_mos(gc);
   Space* nspace = gc_get_nos(gc);
@@ -313,6 +317,20 @@ void verifier_update_verify_info(Partial_Reveal_Object* p_obj, Heap_Verifier* he
       }
     }
   }
+#else
+  GC_MS* gc = (GC_MS*)heap_verifier->gc;
+  if(!heap_verifier->is_before_gc){
+    /*in GC_MS mark sweep algorithm, all live objects should be set their mark bit*/
+    assert(obj_is_alloc_color_in_table(p_obj));
+    if(!obj_is_alloc_color_in_table(p_obj))
+      printf("\nERROR: obj after GC should be set its alloc color!\n");
+  }else{
+    //ynhe
+    if(gc_mark_is_concurrent())
+      assert(obj_is_mark_black_in_table(p_obj));
+  }
+#endif
+
    /*store the object information*/
   void* p_obj_information =  verifier_copy_obj_information(p_obj);
   void* obj_hash_info = verifier_copy_hashcode(p_obj, heap_verifier, heap_verifier->is_before_gc);
@@ -532,4 +550,5 @@ void verifier_clear_gc_verification(Heap_Verifier* heap_verifier)
 
 void verifier_reset_hash_distance()
 { hash_obj_distance = 0;}
+
 

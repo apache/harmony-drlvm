@@ -38,6 +38,8 @@ typedef struct Mspace{
   GC* gc;
   Boolean move_object;
 
+  Space_Statistics* space_statistic;
+
   /* Size allocted since last minor collection. */
   volatile uint64 last_alloced_size;
   /* Size allocted since last major collection. */
@@ -61,23 +63,20 @@ typedef struct Mspace{
   unsigned int num_used_blocks;
   unsigned int num_managed_blocks;
   unsigned int num_total_blocks;
+  
+  volatile Block_Header* block_iterator;
   /* END of Blocked_Space --> */
   
-  volatile Block_Header* block_iterator;    
   /*Threshold computed by NOS adaptive*/
   float expected_threshold_ratio;
 }Mspace;
 
-void mspace_initialize(GC* gc, void* reserved_base, POINTER_SIZE_INT mspace_size, POINTER_SIZE_INT commit_size);
+Mspace *mspace_initialize(GC* gc, void* reserved_base, POINTER_SIZE_INT mspace_size, POINTER_SIZE_INT commit_size);
 void mspace_destruct(Mspace* mspace);
 
 void* mspace_alloc(unsigned size, Allocator *allocator);
 void mspace_collection(Mspace* mspace);
-
-void mspace_block_iterator_init(Mspace* mspace);
-void mspace_block_iterator_init_free(Mspace* mspace);
-Block_Header* mspace_block_iterator_next(Mspace* mspace);
-Block_Header* mspace_block_iterator_get(Mspace* mspace);
+void mspace_reset_after_collection(Mspace* mspace);
 
 void mspace_fix_after_copy_nursery(Collector* collector, Mspace* mspace);
 

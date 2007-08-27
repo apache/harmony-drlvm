@@ -36,6 +36,7 @@ static FORCE_INLINE void scan_slot(Heap_Verifier* heap_verifier, REF*p_ref)
 static FORCE_INLINE void scan_object(Heap_Verifier* heap_verifier, Partial_Reveal_Object *p_obj) 
 {
   GC_Verifier* gc_verifier = heap_verifier->gc_verifier;
+#ifndef USE_MARK_SWEEP_GC
   if(gc_verifier->is_before_fallback_collection) {
     if(obj_belongs_to_nos(p_obj) && obj_is_fw_in_oi(p_obj)){
       assert(obj_get_vt(p_obj) == obj_get_vt(obj_get_fw_in_oi(p_obj)));
@@ -43,6 +44,7 @@ static FORCE_INLINE void scan_object(Heap_Verifier* heap_verifier, Partial_Revea
       assert(p_obj);
     }
   }
+#endif
   if(!obj_mark_in_vt(p_obj)) return;
  
   verify_object_header(p_obj, heap_verifier); 
@@ -204,9 +206,10 @@ void verifier_trace_objsets(Heap_Verifier* heap_verifier, Pool* obj_set_pool)
 
 void verifier_scan_resurrect_objects(Heap_Verifier* heap_verifier)
 {
-  GC_Gen* gc    =  (GC_Gen*)heap_verifier->gc;
+  GC* gc    =  heap_verifier->gc;
   Heap_Verifier_Metadata* verifier_metadata = heap_verifier->heap_verifier_metadata;
   verifier_update_info_before_resurrect(heap_verifier);
+  return;
 #ifndef BUILD_IN_REFERENT
   heap_verifier->gc_verifier->is_tracing_resurrect_obj = TRUE;
   if(heap_verifier->is_before_gc){
@@ -361,6 +364,7 @@ void verifier_scan_los_objects(Space* lspace, Heap_Verifier* heap_verifier)
 
 void verifier_scan_all_objects(Heap_Verifier* heap_verifier)
 {
+#ifndef USE_MARK_SWEEP_GC
   GC_Gen* gc       = (GC_Gen*)heap_verifier->gc;
   Space* fspace     = gc_get_nos(gc);
   Space* mspace   = gc_get_mos(gc);
@@ -369,6 +373,9 @@ void verifier_scan_all_objects(Heap_Verifier* heap_verifier)
   verifier_scan_nos_mos_objects(fspace, heap_verifier);
   verifier_scan_nos_mos_objects(mspace, heap_verifier);
   verifier_scan_los_objects(lspace, heap_verifier);
+#else
+  assert(0);
+#endif
 }
 /*<--------all objects scanner end--------->*/
 
@@ -405,6 +412,7 @@ void verifier_scan_los_unreachable_objects(Space* lspace, Heap_Verifier* heap_ve
 
 void verifier_scan_unreachable_objects(Heap_Verifier* heap_verifier)
 {
+#ifndef USE_MARK_SWEEP_GC
   if(heap_verifier->is_before_gc) return;
   GC_Gen* gc       = (GC_Gen*)heap_verifier->gc;  
   Space* mspace   = gc_get_mos(gc);
@@ -412,7 +420,9 @@ void verifier_scan_unreachable_objects(Heap_Verifier* heap_verifier)
   
   verifier_scan_mos_unreachable_objects(mspace, heap_verifier);
   verifier_scan_los_unreachable_objects(lspace, heap_verifier);
-
+#else
+  return;
+#endif
 }
 /*<--------unreachable objects scanner end------>*/
 
@@ -421,4 +431,5 @@ void verifier_init_object_scanner(Heap_Verifier* heap_verifier)
   heap_verifier->live_obj_scanner = verifier_scan_live_objects;
   heap_verifier->all_obj_scanner   = verifier_scan_all_objects;
 }
+
 

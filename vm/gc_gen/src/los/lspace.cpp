@@ -29,7 +29,7 @@ void gc_set_los(GC_Gen* gc, Space* lspace);
 
 extern POINTER_SIZE_INT min_los_size_bytes;
 extern POINTER_SIZE_INT min_none_los_size_bytes;
-void lspace_initialize(GC* gc, void* start, POINTER_SIZE_INT lspace_size)
+Lspace *lspace_initialize(GC* gc, void* start, POINTER_SIZE_INT lspace_size)
 {
   Lspace* lspace = (Lspace*)STD_MALLOC( sizeof(Lspace));
   assert(lspace);
@@ -62,18 +62,16 @@ void lspace_initialize(GC* gc, void* start, POINTER_SIZE_INT lspace_size)
   lspace->num_collections = 0;
   lspace->time_collections = 0;
   lspace->survive_ratio = 0.5f;
-
   lspace->last_alloced_size = 0;
   lspace->accumu_alloced_size = 0;  
   lspace->total_alloced_size = 0;
   lspace->last_surviving_size = 0;
   lspace->period_surviving_size = 0;
   
-  gc_set_los((GC_Gen*)gc, (Space*)lspace);
   p_global_lspace_move_obj = &(lspace->move_object);
   los_boundary = lspace->heap_end;
 
-  return;
+  return lspace;
 }
 
 void lspace_destruct(Lspace* lspace)

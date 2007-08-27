@@ -56,6 +56,7 @@ void gc_finref_metadata_initialize(GC *gc)
   finref_metadata.free_pool = sync_pool_create();
   finref_metadata.obj_with_fin_pool = sync_pool_create();
   finref_metadata.finalizable_obj_pool = sync_pool_create();
+  finref_metadata.finalizable_obj_pool_copy = sync_pool_create();
   finref_metadata.softref_pool = sync_pool_create();
   finref_metadata.weakref_pool = sync_pool_create();
   finref_metadata.phanref_pool = sync_pool_create();
@@ -89,6 +90,7 @@ void gc_finref_metadata_destruct(GC *gc)
   sync_pool_destruct(metadata->free_pool);
   sync_pool_destruct(metadata->obj_with_fin_pool);
   sync_pool_destruct(metadata->finalizable_obj_pool);
+  sync_pool_destruct(metadata->finalizable_obj_pool_copy);
   sync_pool_destruct(metadata->softref_pool);
   sync_pool_destruct(metadata->weakref_pool);
   sync_pool_destruct(metadata->phanref_pool);
@@ -204,6 +206,7 @@ void collector_reset_weakref_sets(Collector *collector)
   collector->phanref_set= finref_get_free_block(gc);
 }
 
+#include "../common/gc_concurrent.h"
 /* put back last weak references block of each collector */
 void gc_set_weakref_sets(GC *gc)
 {
@@ -220,6 +223,20 @@ void gc_set_weakref_sets(GC *gc)
     collector->weakref_set= NULL;
     collector->phanref_set= NULL;
   }
+  
+  if(gc_mark_is_concurrent()){
+    unsigned int num_active_markers = gc->num_active_markers;
+    for(unsigned int i = 0; i < num_active_markers; i++)
+    {
+      Collector *marker = (Collector*)gc->markers[i];
+      pool_put_entry(metadata->softref_pool, marker->softref_set);
+      pool_put_entry(metadata->weakref_pool, marker->weakref_set);
+      pool_put_entry(metadata->phanref_pool, marker->phanref_set);
+      marker->softref_set = NULL;
+      marker->weakref_set= NULL;
+      marker->phanref_set= NULL;
+    }
+  }
   return;
 }
 
@@ -233,9 +250,13 @@ void gc_reset_finref_metadata(GC *gc)
   assert(pool_is_empty(metadata->softref_pool));
   assert(pool_is_empty(metadata->weakref_pool));
   assert(pool_is_empty(metadata->phanref_pool));
-  assert(pool_is_empty(metadata->repset_pool));
   assert(metadata->finalizable_obj_set == NULL);
   assert(metadata->repset == NULL);
+  
+  if(!pool_is_empty(metadata->repset_pool))
+    finref_metadata_clear_pool(metadata->repset_pool);
+  if(!pool_is_empty(metadata->fallback_ref_pool))
+    finref_metadata_clear_pool(metadata->fallback_ref_pool);
   
   /* Extract empty blocks in obj_with_fin_pool and put them into free_pool */
   Vector_Block *block = pool_get_entry(obj_with_fin_pool);
@@ -378,10 +399,9 @@ Boolean finref_repset_pool_is_empty(GC *gc)
   return pool_has_no_ref(gc->finref_metadata->repset_pool);
 }
 
-static void finref_metadata_clear_pool(Pool *pool)
+void finref_metadata_clear_pool(Pool *pool)
 {
-  while(Vector_Block* block = pool_get_entry(pool))
-  {
+  while(Vector_Block* block = pool_get_entry(pool)){
     vector_block_clear(block);
     pool_put_entry(finref_metadata.free_pool, block);
   }
@@ -393,3 +413,19 @@ void gc_clear_weakref_pools(GC *gc)
   finref_metadata_clear_pool(gc->finref_metadata->weakref_pool);
   finref_metadata_clear_pool(gc->finref_metadata->phanref_pool);
 }
+
+Boolean finref_copy_pool(Pool *src_pool, Pool *dest_pool, GC *gc)
+{
+  Vector_Block *dest_block = finref_get_free_block(gc);
+  pool_iterator_init(src_pool);
+  while(Vector_Block *src_block = pool_iterator_next(src_pool)){
+    POINTER_SIZE_INT *iter = vector_block_iterator_init(src_block);
+    while(!vector_block_iterator_end(src_block, iter)){
+      assert(*iter);
+      finref_metadata_add_entry(gc, dest_block, dest_pool, *iter);
+      iter = vector_block_iterator_advance(src_block, iter);
+    }
+  }
+ return TRUE;
+}
+

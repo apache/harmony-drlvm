@@ -83,13 +83,15 @@ Boolean verifier_copy_rootsets(GC* gc, Heap_Verifier* heap_verifier)
 
 Boolean verify_rootset_slot(REF* p_ref, Heap_Verifier* heap_verifier)
 {
+  Partial_Reveal_Object* p_obj = read_slot(p_ref);
+  assert(address_belongs_to_gc_heap(p_obj,heap_verifier->gc));
+#ifndef USE_MARK_SWEEP_GC
   GC_Gen* gc    = (GC_Gen*)heap_verifier->gc;
   Space* mspace = gc_get_mos(gc);
   Space* lspace  = gc_get_los(gc);
 
-  Partial_Reveal_Object* p_obj = read_slot(p_ref);
   if(p_obj == NULL){
-    if(gc->collect_kind !=MINOR_COLLECTION ||(!heap_verifier->gc_is_gen_mode && !NOS_PARTIAL_FORWARD)){
+    if(gc_match_kind((GC*)gc, MAJOR_COLLECTION) ||(!heap_verifier->gc_is_gen_mode && !NOS_PARTIAL_FORWARD)){
       assert(0);
       return FALSE;
     }else{
@@ -106,12 +108,14 @@ Boolean verify_rootset_slot(REF* p_ref, Heap_Verifier* heap_verifier)
   }
   assert(address_belongs_to_gc_heap(p_obj,heap_verifier->gc));
   if(heap_verifier->is_before_gc){
+#endif
     //if(!address_belongs_to_gc_heap(p_ref) && address_belongs_to_gc_heap(p_obj)){
     if(!address_belongs_to_gc_heap(p_obj, heap_verifier->gc)){
       printf("\nERROR: obj referenced by rootset is outside the heap error!\n");
       assert(0);
       return FALSE;
     }
+#ifndef USE_MARK_SWEEP_GC
   }else{
     if(heap_verifier->gc_verifier->is_before_fallback_collection){
       if(!address_belongs_to_gc_heap(p_obj, heap_verifier->gc)){
@@ -128,6 +132,7 @@ Boolean verify_rootset_slot(REF* p_ref, Heap_Verifier* heap_verifier)
       return FALSE;
    }
   }
+#endif
   return TRUE;
 }
 
@@ -211,10 +216,12 @@ void verifier_collect_kind_log(Heap_Verifier* heap_verifier)
     gc_kind = " fallback collection.";
   }else if(gc_match_kind(gc, EXTEND_COLLECTION)){ 
     gc_kind = " extend collection.";
-  }else if(gc_match_kind(gc, MAJOR_COLLECTION)){ 
+  }else if(gc_match_kind(gc, NORMAL_MAJOR_COLLECTION)){ 
     if(gc->tuner->kind == TRANS_NOTHING)  gc_kind = "major collection (normal)";
     else if(gc->tuner->kind == TRANS_FROM_LOS_TO_MOS) gc_kind = "major collection (LOS shrink)";
     else if(gc->tuner->kind == TRANS_FROM_MOS_TO_LOS) gc_kind = "major collection (LOS extend)";
+  }else if(gc_match_kind(gc, MARK_SWEEP_GC)){
+    gc_kind = " mark sweep collection.";
   }
   printf(" GC_kind: %s\n", gc_kind);
 }
@@ -253,4 +260,5 @@ void verifier_hashcode_log(GC_Verifier* gc_verifier)
 {
     printf(" %-14s:    %-7s |   Before %10d   |   After %10d   |\n", "hashcode", "NUM", gc_verifier->num_hash_before_gc, gc_verifier->num_hash_after_gc);
 }
+
 

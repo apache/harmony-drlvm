@@ -22,11 +22,14 @@
 #include "gc_common.h"
 #include "gc_metadata.h"
 #include "../thread/mutator.h"
+#include "../thread/marker.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 #include "../gen/gen.h"
 #include "../mark_sweep/gc_ms.h"
 #include "../common/space_tuner.h"
 #include "interior_pointer.h"
+#include "collection_scheduler.h"
+#include "gc_concurrent.h"
 
 unsigned int Cur_Mark_Bit = 0x1;
 unsigned int Cur_Forward_Bit = 0x2;
@@ -43,6 +46,7 @@ extern Boolean FORCE_FULL_COMPACT;
 extern Boolean MINOR_ALGORITHM;
 extern Boolean MAJOR_ALGORITHM;
 
+extern unsigned int NUM_MARKERS;
 extern unsigned int NUM_COLLECTORS;
 extern unsigned int MINOR_COLLECTORS;
 extern unsigned int MAJOR_COLLECTORS;
@@ -56,6 +60,7 @@ POINTER_SIZE_INT max_heap_size_bytes = 0;
 extern Boolean JVMTI_HEAP_ITERATION ;
 
 extern Boolean IS_MOVE_COMPACT;
+extern Boolean USE_CONCURRENT_GC;
 
 static int get_int_property(const char *property_name)
 {
@@ -189,6 +194,11 @@ void gc_parse_options(GC* gc)
     NUM_COLLECTORS = (num==0)? NUM_COLLECTORS:num;
   }
 
+  if (is_property_set("gc.num_markers", VM_PROPERTIES) == 1) {
+    unsigned int num = get_int_property("gc.num_markers");
+    NUM_MARKERS = (num==0)? NUM_MARKERS:num;
+  }
+
   /* GC algorithm decision */
   /* Step 1: */
   char* minor_algo = NULL;
@@ -265,89 +275,107 @@ void gc_parse_options(GC* gc)
     large_page_hint = strdup(value);
     destroy_property_value(value);
   }
+
+  if (is_property_set("gc.concurrent_gc", VM_PROPERTIES) == 1){
+    USE_CONCURRENT_GC= get_boolean_property("gc.concurrent_gc");
+  }
   
   return;
 }
 
 void gc_assign_free_area_to_mutators(GC* gc)
 {
+#ifndef USE_MARK_SWEEP_GC
   gc_gen_assign_free_area_to_mutators((GC_Gen*)gc);
-}
-
-void gc_adjust_heap_size(GC* gc, int64 pause_time)
-{
-  gc_gen_adjust_heap_size((GC_Gen*)gc, pause_time);
+#endif
 }
 
 void gc_copy_interior_pointer_table_to_rootset();
 
 /*used for computing collection time and mutator time*/
-static int64 collection_start_time = time_now();  
+static int64 collection_start_time = time_now();
 static int64 collection_end_time = time_now();
+
+int64 get_collection_end_time()
+{ return collection_end_time; }
+
 void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
-{ 
+{
   INFO2("gc.process", "\nGC: GC start ...\n");
-
-  collection_start_time =  time_now();
-  int64 mutator_time = collection_start_time -collection_end_time;
-
+  
+  collection_start_time = time_now();
+  int64 mutator_time = collection_start_time - collection_end_time;
+  
   /* FIXME:: before mutators suspended, the ops below should be very careful
      to avoid racing with mutators. */
-  gc->num_collections++;  
+  gc->num_collections++;
   gc->cause = gc_cause;
   gc_decide_collection_kind((GC_Gen*)gc, gc_cause);
-
-#ifndef USE_MARK_SWEEP_GC
-  gc_gen_update_space_before_gc((GC_Gen*)gc);
-  gc_compute_space_tune_size_before_marking(gc, gc_cause);
-#endif
 
 #ifdef MARK_BIT_FLIPPING
   if(gc_match_kind(gc, MINOR_COLLECTION)) mark_bit_flip();
 #endif
 
-  gc_metadata_verify(gc, TRUE);
+  if(!USE_CONCURRENT_GC){
+    gc_metadata_verify(gc, TRUE);
 #ifndef BUILD_IN_REFERENT
-  gc_finref_metadata_verify((GC*)gc, TRUE);
+    gc_finref_metadata_verify((GC*)gc, TRUE);
 #endif
-  
+  }
   /* Stop the threads and collect the roots. */
+  lock(gc->enumerate_rootset_lock);
   INFO2("gc.process", "GC: stop the threads and enumerate rootset ...\n");
-  gc_reset_rootset(gc);  
+  gc_clear_rootset(gc);
+  gc_reset_rootset(gc);
   vm_enumerate_root_set_all_threads();
   gc_copy_interior_pointer_table_to_rootset();
-  gc_set_rootset(gc); 
+  gc_set_rootset(gc);
+  unlock(gc->enumerate_rootset_lock);
+  
+  if(USE_CONCURRENT_GC && gc_mark_is_concurrent()){
+    gc_finish_concurrent_mark(gc);
+  }
   
   /* this has to be done after all mutators are suspended */
   gc_reset_mutator_context(gc);
-
+  
   if(!IGNORE_FINREF ) gc_set_obj_with_fin(gc);
 
 #ifndef USE_MARK_SWEEP_GC
-  gc_gen_reclaim_heap((GC_Gen*)gc);
+  gc_gen_reclaim_heap((GC_Gen*)gc, collection_start_time);
 #else
   gc_ms_reclaim_heap((GC_MS*)gc);
 #endif
-  
+
+  /* FIXME:: clear root set here to support verify. */
+#ifdef COMPRESS_REFERENCE
+  gc_set_pool_clear(gc->metadata->gc_uncompressed_rootset_pool);
+#endif
+
   gc_reset_interior_pointer_table();
-
+  
   gc_metadata_verify(gc, FALSE);
-
+  
   collection_end_time = time_now(); 
 
-  int64 pause_time = collection_end_time - collection_start_time;  
-  gc->time_collections += pause_time;
-
 #ifndef USE_MARK_SWEEP_GC
-  gc_gen_collection_verbose_info((GC_Gen*)gc, pause_time, mutator_time);
+  gc_gen_collection_verbose_info((GC_Gen*)gc, collection_end_time - collection_start_time, mutator_time);
   gc_gen_space_verbose_info((GC_Gen*)gc);
-  gc_adjust_heap_size(gc, pause_time);
-
-  gc_gen_adapt((GC_Gen*)gc, pause_time);
 #endif
 
   if(gc_is_gen_mode()) gc_prepare_mutator_remset(gc);
   
+  int64 mark_time = 0;
+  if(USE_CONCURRENT_GC && gc_mark_is_concurrent()){
+    gc_reset_concurrent_mark(gc);
+    mark_time = gc_get_concurrent_mark_time(gc);
+  }
+
+#ifndef USE_MARK_SWEEP_GC
+  if(USE_CONCURRENT_GC && gc_need_start_concurrent_mark(gc))
+    gc_start_concurrent_mark(gc);
+#endif
+
   if(!IGNORE_FINREF ){
     INFO2("gc.process", "GC: finref process after collection ...\n");
     gc_put_finref_to_vm(gc);
@@ -359,18 +387,17 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
 #endif
   }
 
-#ifndef USE_MARK_SWEEP_GC
-  gc_space_tuner_reset(gc);
-  gc_gen_update_space_after_gc((GC_Gen*)gc);
-  gc_assign_free_area_to_mutators(gc);
+#ifdef USE_MARK_SWEEP_GC
+  gc_ms_update_space_statistics((GC_MS*)gc);
 #endif
 
-  vm_reclaim_native_objs();  
+  gc_assign_free_area_to_mutators(gc);
+  
+  if(USE_CONCURRENT_GC) gc_update_collection_scheduler(gc, mutator_time, mark_time);
+  
+  vm_reclaim_native_objs();
   vm_resume_threads_after();
   INFO2("gc.process", "GC: GC end\n");
   return;
 }
-
-
-
 

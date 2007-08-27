@@ -42,6 +42,7 @@ typedef struct Mutator {
   Vector_Block* rem_set;
   Vector_Block* obj_with_fin;
   Mutator* next;  /* The gc info area associated with the next active thread. */
+  Vector_Block* dirty_obj_snapshot;
 } Mutator;
 
 void mutator_initialize(GC* gc, void* tls_gc_info);
@@ -51,4 +52,6 @@ void mutator_reset(GC *gc);
 void gc_reset_mutator_context(GC* gc);
 void gc_prepare_mutator_remset(GC* gc);
 
+Boolean gc_local_snapshot_is_empty(GC* gc);
+Vector_Block* gc_get_local_snapshot(GC* gc, unsigned int shared_id);
 #endif /*ifndef _MUTATOR_H_ */

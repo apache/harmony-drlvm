@@ -24,6 +24,7 @@
 
 #include "port_vmem.h"
 #include "port_atomic.h"
+#include "port_malloc.h"
 
 #include <assert.h>
 
@@ -64,6 +65,18 @@ extern char* large_page_hint;
 #define VmThreadHandle  void*
 #define VmEventHandle   hysem_t
 #define THREAD_OK       TM_ERROR_NONE
+#define THREAD_GROUP    hythread_group_t
+
+extern THREAD_GROUP gc_thread_group;
+
+inline THREAD_GROUP get_gc_thread_group () {
+    if (!gc_thread_group) {
+        IDATA UNUSED stat = hythread_group_create(&gc_thread_group);
+        assert(stat == TM_ERROR_NONE);
+    }
+    return gc_thread_group;
+}
+
 
 inline int vm_wait_event(VmEventHandle event)
 {   int stat = (int)hysem_wait(event);
@@ -91,13 +104,12 @@ inline void* vm_thread_local()
 
 inline int vm_create_thread(int (*func)(void*), void *data)
 { 
-  hythread_t* ret_thread = NULL;
+  hythread_t ret_thread = (hythread_t)STD_CALLOC(1,hythread_get_struct_size());;
   UDATA stacksize = 0;
-  UDATA priority = 0;
-  UDATA suspend = 0;
+  UDATA priority = 5;
   
-  return (int)hythread_create(ret_thread, stacksize, priority, suspend, 
-                             (hythread_entrypoint_t)func, data);
+  return (int)hythread_create_with_group(ret_thread, get_gc_thread_group(), stacksize, priority,  
+                              (hythread_entrypoint_t)func, data);
 }
 
 inline void *atomic_casptr(volatile void **mem, void *with, const void *cmp) 

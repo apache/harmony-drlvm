@@ -38,7 +38,7 @@ static void fspace_destruct_blocks(Fspace* fspace)
 struct GC_Gen;
 void gc_set_nos(GC_Gen* gc, Space* space);
 
-void fspace_initialize(GC* gc, void* start, POINTER_SIZE_INT fspace_size, POINTER_SIZE_INT commit_size) 
+Fspace *fspace_initialize(GC* gc, void* start, POINTER_SIZE_INT fspace_size, POINTER_SIZE_INT commit_size) 
 {    
   assert( (fspace_size%GC_BLOCK_SIZE_BYTES) == 0 );
   Fspace* fspace = (Fspace *)STD_MALLOC(sizeof(Fspace));
@@ -84,7 +84,6 @@ void fspace_initialize(GC* gc, void* start, POINTER_SIZE_INT fspace_size, POINTE
   fspace->period_surviving_size = 0;
   
   fspace->gc = gc;
-  gc_set_nos((GC_Gen*)gc, (Space*)fspace);
   /* above is same as Mspace init --> */
   
   forward_first_half = TRUE;
@@ -97,7 +96,7 @@ void fspace_initialize(GC* gc, void* start, POINTER_SIZE_INT fspace_size, POINTE
   else
     object_forwarding_boundary = (void*)&fspace->blocks[fspace->num_managed_blocks];
      
-  return;
+  return fspace;
 }
 
 void fspace_destruct(Fspace *fspace) 
@@ -106,12 +105,12 @@ void fspace_destruct(Fspace *fspace)
   STD_FREE(fspace);   
 }
 
-void fspace_reset_for_allocation(Fspace* fspace)
+void fspace_reset_after_collection(Fspace* fspace)
 { 
   unsigned int first_idx = fspace->first_block_idx;
   unsigned int marked_start_idx = 0; //was for oi markbit reset, now useless
   unsigned int marked_last_idx = 0;
-  Boolean is_major_collection = !gc_match_kind(fspace->gc, MINOR_COLLECTION);
+  Boolean is_major_collection = gc_match_kind(fspace->gc, MAJOR_COLLECTION);
   Boolean gen_mode = gc_is_gen_mode();
   
   if(  is_major_collection || 
@@ -152,7 +151,16 @@ void fspace_reset_for_allocation(Fspace* fspace)
     block->free = block->base;
 
   }
-
+  
+  /* For los extension
+   * num_managed_blocks of fspace might be 0.
+   * In this case, the last block we found is mos' last block.
+   * And this implementation depends on the fact that mos and nos are continuous.
+   */
+  int last_block_index = fspace->num_managed_blocks - 1;
+  Block_Header *fspace_last_block = (Block_Header*)&fspace->blocks[last_block_index];
+  fspace_last_block->next = NULL;
+  
   return;
 }
 
@@ -196,7 +204,7 @@ void fspace_collection(Fspace *fspace)
   fspace->num_collections++;  
 
   GC* gc = fspace->gc;
-  mspace_free_block_idx = ((GC_Gen*)gc)->mos->free_block_idx;
+  mspace_free_block_idx = ((Blocked_Space*)((GC_Gen*)gc)->mos)->free_block_idx;
 
   if(gc_is_gen_mode()){
     fspace->collect_algorithm = MINOR_GEN_FORWARD_POOL;
@@ -210,32 +218,32 @@ void fspace_collection(Fspace *fspace)
   switch(fspace->collect_algorithm){
 
 #ifdef MARK_BIT_FLIPPING
-    
-case MINOR_NONGEN_FORWARD_POOL:
-  TRACE2("gc.process", "GC: nongen_forward_pool algo start ... \n");
-  collector_execute_task(gc, (TaskType)nongen_forward_pool, (Space*)fspace);   
-  TRACE2("gc.process", "\nGC: end of nongen forward algo ... \n");
+
+    case MINOR_NONGEN_FORWARD_POOL:
+      TRACE2("gc.process", "GC: nongen_forward_pool algo start ... \n");
+      collector_execute_task(gc, (TaskType)nongen_forward_pool, (Space*)fspace);
+      TRACE2("gc.process", "\nGC: end of nongen forward algo ... \n");
 #ifdef GC_GEN_STATS
-  gc_gen_stats_set_nos_algo((GC_Gen*)gc, MINOR_NONGEN_FORWARD_POOL);
+      gc_gen_stats_set_nos_algo((GC_Gen*)gc, MINOR_NONGEN_FORWARD_POOL);
 #endif
-  break;
-        
+      break;
+
 #endif /*#ifdef MARK_BIT_FLIPPING */
 
-case MINOR_GEN_FORWARD_POOL:
-  TRACE2("gc.process", "gen_forward_pool algo start ... \n");
-  collector_execute_task(gc, (TaskType)gen_forward_pool, (Space*)fspace);
-  TRACE2("gc.process", "\nGC: end of gen forward algo ... \n");
+    case MINOR_GEN_FORWARD_POOL:
+      TRACE2("gc.process", "gen_forward_pool algo start ... \n");
+      collector_execute_task(gc, (TaskType)gen_forward_pool, (Space*)fspace);
+      TRACE2("gc.process", "\nGC: end of gen forward algo ... \n");
 #ifdef GC_GEN_STATS
-  gc_gen_stats_set_nos_algo((GC_Gen*)gc, MINOR_NONGEN_FORWARD_POOL);
+      gc_gen_stats_set_nos_algo((GC_Gen*)gc, MINOR_NONGEN_FORWARD_POOL);
 #endif
-  break;
-        
-default:
-  DIE2("gc.collection","Specified minor collection algorithm doesn't exist!");
-  exit(0);    
-  break;
+      break;
+    
+    default:
+      DIE2("gc.collection","Specified minor collection algorithm doesn't exist!");
+      exit(0);
+      break;
   }
-
+  
   return; 
 }

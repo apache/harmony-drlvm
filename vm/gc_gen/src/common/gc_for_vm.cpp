@@ -27,9 +27,12 @@
 #include "../gen/gen.h"
 #include "../mark_sweep/gc_ms.h"
 #include "interior_pointer.h"
+#include "../thread/marker.h"
 #include "../thread/collector.h"
 #include "../verify/verify_live_heap.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
+#include "collection_scheduler.h"
+#include "gc_concurrent.h"
 #ifdef USE_32BITS_HASHCODE
 #include "hashcode.h"
 #endif
@@ -51,7 +54,7 @@ static void gc_get_system_info(GC *gc)
 }
 
 int gc_init() 
-{      
+{
   INFO2("gc.process", "GC: call GC init...\n");
   assert(p_global_gc == NULL);
 
@@ -85,7 +88,13 @@ int gc_init()
 #ifndef BUILD_IN_REFERENT
   gc_finref_metadata_initialize(gc);
 #endif
+  if(USE_CONCURRENT_GC){
+    collection_scheduler_initialize(gc);
+    marker_initialize(gc);
+  }
+  
   collector_initialize(gc);
+  
   gc_init_heap_verification(gc);
   
   mutator_need_block = FALSE;
@@ -111,6 +120,7 @@ void gc_wrapup()
   gc_finref_metadata_destruct(gc);
 #endif
   collector_destruct(gc);
+  marker_destruct(gc);
 
   if( verify_live_heap ){
     gc_terminate_heap_verification(gc);
@@ -173,19 +183,19 @@ Boolean gc_supports_class_unloading()
   return VTABLE_TRACING;
 }
 
-void gc_add_weak_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinned, Boolean is_short_weak) 
+void gc_add_weak_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinned, Boolean is_short_weak)
 {
   //assert(is_short_weak == FALSE); //Currently no need for short_weak_roots
   Partial_Reveal_Object** p_ref = (Partial_Reveal_Object**)ref;
   Partial_Reveal_Object* p_obj = *p_ref;
   /* we don't enumerate NULL reference and nos_boundary
-     FIXME:: nos_boundary is a static field in GCHelper.java for fast write barrier, not a real object reference 
+     FIXME:: nos_boundary is a static field in GCHelper.java for fast write barrier, not a real object reference
      this should be fixed that magic Address field should not be enumerated. */
 #ifdef COMPRESS_REFERENCE
   if (p_obj == (Partial_Reveal_Object*)HEAP_NULL || p_obj == NULL || p_obj == nos_boundary ) return;
 #else
   if (p_obj == NULL || p_obj == nos_boundary ) return;
-#endif  
+#endif
   assert( !obj_is_marked_in_vt(p_obj));
   assert( address_belongs_to_gc_heap(p_obj, p_global_gc));
   gc_weak_rootset_add_entry(p_global_gc, p_ref, is_short_weak);

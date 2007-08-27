@@ -38,6 +38,8 @@ typedef struct Finref_Metadata{
   Pool *obj_with_fin_pool;                      // list of objects that have finalizers
                                                 // these objects are added in when they are being allocated
   Pool *finalizable_obj_pool;                   // temporary buffer for finalizable objects identified during one single GC
+
+  Pool *finalizable_obj_pool_copy;
   
   Pool *softref_pool;                           // temporary buffer for soft references identified during one single GC
   Pool *weakref_pool;                           // temporary buffer for weak references identified during one single GC
@@ -83,6 +85,10 @@ extern Boolean softref_pool_is_empty(GC *gc);
 extern Boolean weakref_pool_is_empty(GC *gc);
 extern Boolean phanref_pool_is_empty(GC *gc);
 extern Boolean finref_repset_pool_is_empty(GC *gc);
+
+extern void finref_metadata_clear_pool(Pool *pool);
+extern Boolean finref_copy_pool(Pool* src_pool, Pool* dest_pool, GC* gc);
+
 
 extern void gc_clear_weakref_pools(GC *gc);
 

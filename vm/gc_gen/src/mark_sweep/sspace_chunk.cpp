@@ -124,22 +124,23 @@ void sspace_clear_chunk_list(GC *gc)
     free_chunk_list_clear(&unaligned_free_chunk_lists[i]);
   
   free_chunk_list_clear(&hyper_free_chunk_list);
-  
-  /* release small obj chunks of each mutator */
+
+#ifdef USE_MARK_SWEEP_GC
+  /* release local chunks of each mutator in unique mark-sweep GC */
   Mutator *mutator = gc->mutator_list;
   while(mutator){
-    Chunk_Header ***local_chunks = mutator->local_chunks;
-    for(i = SIZE_SEGMENT_NUM; i--;){
-      if(!size_segments[i]->local_alloc){
-        assert(!local_chunks[i]);
-        continue;
-      }
-      Chunk_Header **chunks = local_chunks[i];
-      assert(chunks);
-      for(j = size_segments[i]->chunk_num; j--;)
-        chunks[j] = NULL;
-    }
+    allocator_clear_local_chunks((Allocator*)mutator, FALSE);
     mutator = mutator->next;
+  }
+#endif
+}
+
+void gc_clear_collector_local_chunks(GC *gc)
+{
+  assert(gc_match_kind(gc, MAJOR_COLLECTION));
+  /* release local chunks of each collector in gen GC */
+  for(unsigned int i = gc->num_collectors; i--;){
+    allocator_clear_local_chunks((Allocator*)gc->collectors[i], TRUE);
   }
 }
 
@@ -150,7 +151,6 @@ void sspace_clear_chunk_list(GC *gc)
 static void list_put_free_chunk(Free_Chunk_List *list, Free_Chunk *chunk)
 {
   chunk->status = CHUNK_FREE;
-  chunk->adj_prev = NULL;
   chunk->prev = NULL;
 
   lock(list->lock);
@@ -158,6 +158,8 @@ static void list_put_free_chunk(Free_Chunk_List *list, Free_Chunk *chunk)
   if(list->head)
     list->head->prev = chunk;
   list->head = chunk;
+  if(!list->tail)
+    list->tail = chunk;
   assert(list->chunk_num < ~((unsigned int)0));
   ++list->chunk_num;
   unlock(list->lock);
@@ -171,6 +173,8 @@ static Free_Chunk *free_list_get_head(Free_Chunk_List *list)
     list->head = chunk->next;
     if(list->head)
       list->head->prev = NULL;
+    else
+      list->tail = NULL;
     assert(list->chunk_num);
     --list->chunk_num;
     assert(chunk->status == CHUNK_FREE);
@@ -336,21 +340,22 @@ Free_Chunk *sspace_get_hyper_free_chunk(Sspace *sspace, unsigned int chunk_size,
   
   Free_Chunk_List *list = sspace->hyper_free_chunk_list;
   lock(list->lock);
-  Free_Chunk **p_next = &list->head;
+  Free_Chunk *prev_chunk = NULL;
   Free_Chunk *chunk = list->head;
   while(chunk){
     if(CHUNK_SIZE(chunk) >= chunk_size){
       Free_Chunk *next_chunk = chunk->next;
-      *p_next = next_chunk;
-      if(next_chunk){
-        if(chunk != list->head)
-          next_chunk->prev = (Free_Chunk *)p_next;  /* utilize an assumption: next is the first field of Free_Chunk */
-        else
-          next_chunk->prev = NULL;
-      }
+      if(prev_chunk)
+        prev_chunk->next = next_chunk;
+      else
+        list->head = next_chunk;
+      if(next_chunk)
+        next_chunk->prev = prev_chunk;
+      else
+        list->tail = prev_chunk;
       break;
     }
-    p_next = &chunk->next;
+    prev_chunk = chunk;
     chunk = chunk->next;
   }
   unlock(list->lock);
@@ -366,6 +371,26 @@ Free_Chunk *sspace_get_hyper_free_chunk(Sspace *sspace, unsigned int chunk_size,
   
   return chunk;
 }
+
+void sspace_collect_free_chunks_to_list(Sspace *sspace, Free_Chunk_List *list)
+{
+  unsigned int i;
+  
+  for(i = NUM_ALIGNED_FREE_CHUNK_BUCKET; i--;)
+    move_free_chunks_between_lists(list, &sspace->aligned_free_chunk_lists[i]);
+  
+  for(i = NUM_UNALIGNED_FREE_CHUNK_BUCKET; i--;)
+    move_free_chunks_between_lists(list, &sspace->unaligned_free_chunk_lists[i]);
+  
+  move_free_chunks_between_lists(list, sspace->hyper_free_chunk_list);
+  
+  Free_Chunk *chunk = list->head;
+  while(chunk){
+    chunk->status = CHUNK_FREE | CHUNK_TO_MERGE;
+    chunk = chunk->next;
+  }
+}
+
 
 typedef struct PFC_Pool_Iterator {
   volatile unsigned int seg_index;

@@ -27,22 +27,34 @@
 inline Boolean chunk_is_reusable(Chunk_Header *chunk)
 { return (float)(chunk->slot_num-chunk->alloc_num)/chunk->slot_num > PFC_REUSABLE_RATIO; }
 
+#define OBJ_ALLOC_BIT_IN_TABLE  0x01
+#define OBJ_BLACK_BIT_IN_TABLE  0x02
+#define OBJ_GRAY_BIT_IN_TABLE   0x04
+#define OBJ_COLOR_BIT_IN_TABLE  0x06
+#define OBJ_DIRTY_BIT_IN_TABLE  0x08
+
 enum Obj_Color {
-  OBJ_COLOR_BLUE = 0x0,
-  OBJ_COLOR_WHITE = 0x1,
-  OBJ_COLOR_BLACK = 0x2,
-  OBJ_COLOR_GRAY = 0x3,
-  OBJ_COLOR_MASK = 0x3
+  OBJ_COLOR_BLUE =  0x0,
+  OBJ_COLOR_WHITE = OBJ_ALLOC_BIT_IN_TABLE,
+  OBJ_COLOR_GRAY =  OBJ_GRAY_BIT_IN_TABLE,
+  OBJ_COLOR_BLACK = OBJ_BLACK_BIT_IN_TABLE,
+  OBJ_COLOR_MASK =  OBJ_COLOR_BIT_IN_TABLE
 };
 
 #ifdef POINTER64
-  #define BLACK_MASK_IN_TABLE  ((POINTER_SIZE_INT)0xAAAAAAAAAAAAAAAA)
+  //#define BLACK_MASK_IN_TABLE  ((POINTER_SIZE_INT)0xAAAAAAAAAAAAAAAA)
+  #define MARK_MASK_IN_TABLE  ((POINTER_SIZE_INT)0x2222222222222222)
+  #define FLIP_COLOR_MASK_IN_TABLE  ((POINTER_SIZE_INT)0x3333333333333333)
+  //#define DIRY_MASK_IN_TABLE   ((POINTER_SIZE_INT)0x4444444444444444)
 #else
-  #define BLACK_MASK_IN_TABLE  ((POINTER_SIZE_INT)0xAAAAAAAA)
+  #define MARK_MASK_IN_TABLE  ((POINTER_SIZE_INT)0x22222222)
+  #define FLIP_COLOR_MASK_IN_TABLE  ((POINTER_SIZE_INT)0x33333333)
+  //#define DIRY_MASK_IN_TABLE   ((POINTER_SIZE_INT)0x44444444)
 #endif
 
 extern POINTER_SIZE_INT cur_alloc_color;
-extern POINTER_SIZE_INT cur_mark_color;
+extern POINTER_SIZE_INT cur_mark_gray_color;
+extern POINTER_SIZE_INT cur_mark_black_color;
 extern POINTER_SIZE_INT cur_alloc_mask;
 extern POINTER_SIZE_INT cur_mark_mask;
 
@@ -73,7 +85,25 @@ inline POINTER_SIZE_INT *get_color_word_in_table(Partial_Reveal_Object *obj, uns
   
   return &chunk->table[word_index];
 }
+inline POINTER_SIZE_INT *get_color_word_in_table(Partial_Reveal_Object *obj, unsigned int &index_in_word, unsigned int size)
+{
+  Chunk_Header *chunk;
+  unsigned int index;
+  
+  if(size > SUPER_OBJ_THRESHOLD){
+    chunk = ABNORMAL_CHUNK_HEADER(obj);
+    index = 0;
+  } else {
+    chunk = NORMAL_CHUNK_HEADER(obj);
+    index = slot_addr_to_index(chunk, obj);
+  }
+  unsigned int word_index = index >> 3;
+  index_in_word = COLOR_BITS_PER_OBJ * (index & (((unsigned int)(SLOT_NUM_PER_WORD_IN_TABLE-1))));
+  
+  return &chunk->table[word_index];
+}
 
+#if 0
 /* Accurate marking: TRUE stands for being marked by this collector, and FALSE for another collector */
 inline Boolean obj_mark_in_table(Partial_Reveal_Object *obj)
 {
@@ -106,6 +136,207 @@ inline Boolean obj_mark_in_table(Partial_Reveal_Object *obj)
   return FALSE;
 }
 
+#endif
+
+inline Boolean obj_is_mark_gray_in_table(Partial_Reveal_Object *obj)
+{
+  POINTER_SIZE_INT *p_color_word;
+  unsigned int index_in_word;
+  p_color_word = get_color_word_in_table(obj, index_in_word);
+  POINTER_SIZE_INT current_word = *p_color_word;
+  POINTER_SIZE_INT mark_gray_color = cur_mark_gray_color << index_in_word;
+  POINTER_SIZE_INT mark_black_color = cur_mark_black_color<< index_in_word;
+  
+
+  if(current_word & mark_gray_color && !(current_word & mark_black_color))
+    return TRUE;
+  else
+    return FALSE;
+}
+
+inline Boolean obj_is_mark_black_in_table(Partial_Reveal_Object *obj)
+{
+  POINTER_SIZE_INT *p_color_word;
+  unsigned int index_in_word;
+  p_color_word = get_color_word_in_table(obj, index_in_word);
+  POINTER_SIZE_INT current_word = *p_color_word;
+  POINTER_SIZE_INT mark_black_color = cur_mark_black_color << index_in_word;
+  
+  if(current_word & mark_black_color)
+    return TRUE;
+  else
+    return FALSE;
+  
+}
+
+inline Boolean obj_is_mark_black_in_table(Partial_Reveal_Object *obj, unsigned int size)
+{
+  POINTER_SIZE_INT *p_color_word;
+  unsigned int index_in_word;
+  p_color_word = get_color_word_in_table(obj, index_in_word, size);
+  POINTER_SIZE_INT current_word = *p_color_word;
+  POINTER_SIZE_INT mark_black_color = cur_mark_black_color << index_in_word;
+  
+  if(current_word & mark_black_color)
+    return TRUE;
+  else
+    return FALSE;
+  
+}
+
+
+inline Boolean obj_mark_gray_in_table(Partial_Reveal_Object *obj)
+{
+  volatile POINTER_SIZE_INT *p_color_word;
+  unsigned int index_in_word;
+  p_color_word = get_color_word_in_table(obj, index_in_word);
+  assert(p_color_word);
+  
+  //POINTER_SIZE_INT color_bits_mask = ~(OBJ_COLOR_MASK << index_in_word);
+  POINTER_SIZE_INT mark_color = cur_mark_gray_color << index_in_word;
+  
+  POINTER_SIZE_INT old_word = *p_color_word;  
+  if(old_word & mark_color) return FALSE; /*already marked gray or black.*/
+  
+  //POINTER_SIZE_INT new_word = (old_word & color_bits_mask) | mark_color;
+  POINTER_SIZE_INT new_word = old_word | mark_color;
+  while(new_word != old_word) {
+    POINTER_SIZE_INT temp = (POINTER_SIZE_INT)atomic_casptr((volatile void**)p_color_word, (void*)new_word, (void*)old_word);
+    if(temp == old_word){
+      return TRUE; /*returning true does not mean it's marked by this thread. */
+    }
+    old_word = *p_color_word;
+    if(old_word & mark_color) return FALSE; /*already marked gray or black.*/
+    
+    //new_word = (old_word & color_bits_mask) | mark_color;
+    new_word = old_word | mark_color;
+  }
+  
+  return FALSE;
+}
+
+inline Boolean obj_mark_black_in_table(Partial_Reveal_Object *obj, unsigned int size)
+{
+  //assert(obj_is_mark_in_table(obj));
+  volatile POINTER_SIZE_INT *p_color_word;
+  unsigned int index_in_word;
+  p_color_word = get_color_word_in_table(obj, index_in_word, size);
+  assert(p_color_word);
+  
+  //POINTER_SIZE_INT color_bits_mask = ~(OBJ_COLOR_MASK << index_in_word);
+  POINTER_SIZE_INT mark_black_color = cur_mark_black_color << index_in_word;
+  
+  POINTER_SIZE_INT old_word = *p_color_word;  
+  if(old_word & mark_black_color) return FALSE; /*already marked black*/
+  
+  POINTER_SIZE_INT new_word = old_word | mark_black_color;
+  while(new_word != old_word) {
+    POINTER_SIZE_INT temp = (POINTER_SIZE_INT)atomic_casptr((volatile void**)p_color_word, (void*)new_word, (void*)old_word);
+    if(temp == old_word){
+      return TRUE; /*returning true does not mean it's marked by this thread. */
+    }
+    old_word = *p_color_word;
+    if(old_word & mark_black_color) return FALSE; /*already marked black*/
+    
+    new_word = old_word | mark_black_color;
+  }
+  
+  return FALSE;
+
+}
+
+inline Boolean obj_mark_black_in_table(Partial_Reveal_Object *obj)
+{
+ // assert(obj_is_mark_in_table(obj));
+  volatile POINTER_SIZE_INT *p_color_word;
+  unsigned int index_in_word;
+  p_color_word = get_color_word_in_table(obj, index_in_word);
+  assert(p_color_word);
+  
+  POINTER_SIZE_INT color_bits_mask = ~(OBJ_COLOR_MASK << index_in_word);
+  POINTER_SIZE_INT mark_black_color = cur_mark_black_color << index_in_word;
+  
+  POINTER_SIZE_INT old_word = *p_color_word;
+  if(obj_is_mark_black_in_table(obj)) return FALSE; /*already marked black*/
+  
+  POINTER_SIZE_INT new_word = old_word | mark_black_color;
+  while(new_word != old_word) {
+    POINTER_SIZE_INT temp = (POINTER_SIZE_INT)atomic_casptr((volatile void**)p_color_word, (void*)new_word, (void*)old_word);
+    if(temp == old_word){
+      return TRUE; /*returning true does not mean it's marked by this thread. */
+    }
+    old_word = *p_color_word;
+    if(obj_is_mark_black_in_table(obj)) return FALSE; /*already marked black*/
+    
+    new_word = old_word | mark_black_color;
+  }
+  
+  return FALSE;
+}
+
+inline Boolean obj_dirty_in_table(Partial_Reveal_Object *obj)
+{
+  volatile POINTER_SIZE_INT *p_color_word;
+  unsigned int index_in_word;
+  p_color_word = get_color_word_in_table(obj, index_in_word);
+  assert(p_color_word);
+  
+  POINTER_SIZE_INT obj_dirty_bit_in_word = OBJ_DIRTY_BIT_IN_TABLE<< index_in_word;
+  
+  POINTER_SIZE_INT old_word = *p_color_word;
+  if(old_word & obj_dirty_bit_in_word) return FALSE; 
+  
+  POINTER_SIZE_INT new_word = old_word | obj_dirty_bit_in_word;
+  while(new_word != old_word) {
+    POINTER_SIZE_INT temp = (POINTER_SIZE_INT)atomic_casptr((volatile void**)p_color_word, (void*)new_word, (void*)old_word);
+    if(temp == old_word){
+      return TRUE; /*returning true does not mean it's marked by this thread. */
+    }
+    old_word = *p_color_word;
+    if(old_word & obj_dirty_bit_in_word) return FALSE; 
+    
+    new_word = old_word | obj_dirty_bit_in_word;
+  }
+  
+  return FALSE;
+}
+
+inline Boolean obj_is_dirty_in_table(Partial_Reveal_Object *obj)
+{
+  POINTER_SIZE_INT *p_color_word;
+  unsigned int index_in_word;
+  p_color_word = get_color_word_in_table(obj, index_in_word);
+  POINTER_SIZE_INT current_word = *p_color_word;
+  POINTER_SIZE_INT obj_dirty_bit_in_word = OBJ_DIRTY_BIT_IN_TABLE<< index_in_word;
+  
+
+  if(current_word & obj_dirty_bit_in_word)
+    return TRUE;
+  else
+    return FALSE;
+}
+
+inline Boolean obj_is_alloc_color_in_table(Partial_Reveal_Object *obj)
+{
+  POINTER_SIZE_INT *p_color_word;
+  unsigned int index_in_word;
+  p_color_word = get_color_word_in_table(obj, index_in_word);
+  POINTER_SIZE_INT current_word = *p_color_word;
+  POINTER_SIZE_INT obj_alloc_color_bit_in_word = cur_alloc_color<< index_in_word;
+  
+
+  if(current_word & obj_alloc_color_bit_in_word)
+    return TRUE;
+  else
+    return FALSE;
+
+}
+
+inline Boolean obj_need_take_snaptshot(Partial_Reveal_Object *obj)
+{
+  return !obj_is_mark_black_in_table(obj) && !obj_is_dirty_in_table(obj); 
+}
+
 inline void collector_add_free_chunk(Collector *collector, Free_Chunk *chunk)
 {
   Free_Chunk_List *list = collector->free_chunk_list;
@@ -121,11 +352,13 @@ inline void collector_add_free_chunk(Collector *collector, Free_Chunk *chunk)
 }
 
 
-extern void sspace_mark_scan(Collector *collector);
+extern void sspace_mark_scan(Collector *collector, Sspace *sspace);
+extern void sspace_fallback_mark_scan(Collector *collector, Sspace *sspace);
 extern void gc_init_chunk_for_sweep(GC *gc, Sspace *sspace);
 extern void sspace_sweep(Collector *collector, Sspace *sspace);
-extern void compact_sspace(Collector *collector, Sspace *sspace);
-extern void gc_collect_free_chunks(GC *gc, Sspace *sspace);
+extern void sspace_compact(Collector *collector, Sspace *sspace);
+extern void sspace_merge_free_chunks(GC *gc, Sspace *sspace);
+extern void sspace_remerge_free_chunks(GC *gc, Sspace *sspace);
 extern Chunk_Header_Basic *sspace_grab_next_chunk(Sspace *sspace, Chunk_Header_Basic *volatile *shared_next_chunk, Boolean need_construct);
 
 extern void pfc_set_slot_index(Chunk_Header *chunk, unsigned int first_free_word_index, POINTER_SIZE_INT alloc_color);

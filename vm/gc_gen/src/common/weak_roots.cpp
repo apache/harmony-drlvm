@@ -16,7 +16,7 @@
 
 #include "gc_common.h"
 #include "gc_metadata.h"
-#include "../gen/gen.h"
+#include "object_status.h"
 
 void identify_dead_weak_roots(GC *gc, Pool *pool)
 {

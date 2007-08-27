@@ -48,7 +48,9 @@ typedef struct GC_Metadata{
 #ifdef USE_32BITS_HASHCODE
   Pool* collector_hashcode_pool;
 #endif
-      
+
+  Pool* dirty_obj_snaptshot_pool;
+
 }GC_Metadata;
 
 extern GC_Metadata gc_metadata;
@@ -59,12 +61,16 @@ void gc_metadata_verify(GC* gc, Boolean is_before_gc);
 
 void gc_set_rootset(GC* gc);
 void gc_reset_rootset(GC* gc);
+void gc_clear_rootset(GC* gc);
 void gc_fix_rootset(Collector* collector);
+void gc_clear_remset(GC* gc);
+void gc_reset_snaptshot(GC* gc);
 
 void identify_dead_weak_roots(GC *gc, Pool *pool);
 void gc_update_weak_roots_pool(GC *gc);
 
 void gc_clear_remset(GC* gc);
+
 inline void  gc_task_pool_clear(Pool* task_pool)
 {
   Vector_Block* task = pool_get_entry(task_pool);
@@ -128,6 +134,23 @@ inline void mutator_remset_add_entry(Mutator* mutator, Partial_Reveal_Object** p
   pool_put_entry(gc_metadata.mutator_remset_pool, root_set);
   mutator->rem_set = free_set_pool_get_entry(&gc_metadata);  
   assert(mutator->rem_set);
+}
+
+inline void mutator_snapshotset_add_entry(Mutator* mutator, Partial_Reveal_Object* p_obj)
+{
+  Vector_Block* dirty_obj_snapshot = mutator->dirty_obj_snapshot;    
+  vector_block_add_entry(dirty_obj_snapshot, (POINTER_SIZE_INT)p_obj);
+
+  if( !vector_block_is_full(dirty_obj_snapshot) ) return;
+
+  vector_block_set_full(dirty_obj_snapshot);
+
+  if(vector_block_set_exclusive(dirty_obj_snapshot)){    
+   //?vector_block_set_full(dirty_obj_snapshot); //ynhe
+    pool_put_entry(gc_metadata.dirty_obj_snaptshot_pool, dirty_obj_snapshot);
+  }
+ 
+  mutator->dirty_obj_snapshot = free_set_pool_get_entry(&gc_metadata);
 }
 
 inline void collector_repset_add_entry(Collector* collector, Partial_Reveal_Object** p_ref)

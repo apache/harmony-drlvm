@@ -93,7 +93,9 @@ extern void fallback_finref_cleanup(GC *gc);
 extern void gc_put_finref_to_vm(GC *gc);
 extern void put_all_fin_on_exit(GC *gc);
 
-extern void gc_update_finref_repointed_refs(GC* gc);
+extern void gc_update_finref_repointed_refs(GC *gc);
 extern void gc_activate_finref_threads(GC *gc);
+
+void gc_copy_finaliable_obj_to_rootset(GC *gc);
 
 #endif // _FINREF_H_

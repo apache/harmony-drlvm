@@ -50,6 +50,8 @@ typedef struct Lspace{
   /*LOS_Shrink:This field stands for sliding compact to lspace */
   Boolean move_object;
 
+  Space_Statistics* space_statistic; 
+
   /* Size allocted since last collection. */
   volatile uint64 last_alloced_size;
   /* Size allocted since last major collection. */
@@ -75,9 +77,9 @@ typedef struct Lspace{
   void* scompact_fa_end;
 }Lspace;
 
-void lspace_initialize(GC* gc, void* reserved_base, POINTER_SIZE_INT lspace_size);
+Lspace *lspace_initialize(GC* gc, void* reserved_base, POINTER_SIZE_INT lspace_size);
 void lspace_destruct(Lspace* lspace);
-Managed_Object_Handle lspace_alloc(POINTER_SIZE_INT size, Allocator* allocator);
+Managed_Object_Handle lspace_alloc(unsigned size, Allocator* allocator);
 void* lspace_try_alloc(Lspace* lspace, POINTER_SIZE_INT alloc_size);
 void lspace_sliding_compact(Collector* collector, Lspace* lspace);
 void lspace_compute_object_target(Collector* collector, Lspace* lspace);
@@ -85,11 +87,20 @@ void lspace_reset_for_slide(Lspace* lspace);
 void lspace_collection(Lspace* lspace);
 
 inline POINTER_SIZE_INT lspace_free_memory_size(Lspace* lspace)
-{ /* FIXME:: */
+{
+  if(!lspace) return 0;
+  /* FIXME:: */
   assert(lspace->committed_heap_size > (POINTER_SIZE_INT)lspace->last_surviving_size + (POINTER_SIZE_INT)lspace->last_alloced_size);
   return (lspace->committed_heap_size - (POINTER_SIZE_INT)lspace->last_surviving_size - (POINTER_SIZE_INT)lspace->last_alloced_size);
 }
-inline POINTER_SIZE_INT lspace_committed_size(Lspace* lspace){ return lspace->committed_heap_size; }
+
+inline POINTER_SIZE_INT lspace_committed_size(Lspace* lspace)
+{
+  if(lspace)
+    return lspace->committed_heap_size;
+  else
+    return 0;
+}
 
 inline Partial_Reveal_Object* lspace_get_next_marked_object( Lspace* lspace, unsigned int* iterate_index)
 {

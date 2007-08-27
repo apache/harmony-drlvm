@@ -36,17 +36,19 @@ typedef volatile POINTER_SIZE_INT Chunk_Status_t;
 
 typedef struct Chunk_Header_Basic {
   Chunk_Header_Basic *next;
+  Chunk_Header_Basic *prev;
   Chunk_Status_t status;
-  Chunk_Header_Basic *adj_prev;  // adjacent previous chunk, for merging continuous free chunks
   Chunk_Header_Basic *adj_next;  // adjacent next chunk
+  Chunk_Header_Basic *adj_prev;  // adjacent previous chunk, for merging continuous free chunks
 } Chunk_Header_Basic;
 
 typedef struct Chunk_Header {
   /* Beginning of Chunk_Header_Basic */
   Chunk_Header *next;           /* pointing to the next pfc in the pfc pool */
+  Chunk_Header *prev;           /* pointing to the prev pfc in the pfc pool */
   Chunk_Status_t status;
-  Chunk_Header_Basic *adj_prev;  // adjacent previous chunk, for merging continuous free chunks
   Chunk_Header_Basic *adj_next;  // adjacent next chunk
+  Chunk_Header_Basic *adj_prev;  // adjacent previous chunk, for merging continuous free chunks
   /* End of Chunk_Header_Basic */
   void *base;
   unsigned int slot_size;
@@ -65,7 +67,7 @@ typedef struct Chunk_Header {
 #define ABNORMAL_CHUNK_HEADER(addr) ((Chunk_Header*)((POINTER_SIZE_INT)addr & CHUNK_GRANULARITY_HIGH_MASK))
 
 #define MAX_SLOT_INDEX 0xFFffFFff
-#define COLOR_BITS_PER_OBJ 2   // should be powers of 2
+#define COLOR_BITS_PER_OBJ 4   // should be powers of 2
 #define SLOT_NUM_PER_WORD_IN_TABLE  (BITS_PER_WORD /COLOR_BITS_PER_OBJ)
 
 /* Two equations:
@@ -101,11 +103,11 @@ inline unsigned int slot_addr_to_index(Chunk_Header *chunk, void *addr)
 typedef struct Free_Chunk {
   /* Beginning of Chunk_Header_Basic */
   Free_Chunk *next;             /* pointing to the next free Free_Chunk */
-  Chunk_Status_t status;
-  Chunk_Header_Basic *adj_prev;  // adjacent previous chunk, for merging continuous free chunks
-  Chunk_Header_Basic *adj_next;  // adjacent next chunk
-  /* End of Chunk_Header_Basic */
   Free_Chunk *prev;             /* pointing to the prev free Free_Chunk */
+  Chunk_Status_t status;
+  Chunk_Header_Basic *adj_next;  // adjacent next chunk
+  Chunk_Header_Basic *adj_prev;  // adjacent previous chunk, for merging continuous free chunks
+  /* End of Chunk_Header_Basic */
 } Free_Chunk;
 
 typedef struct Free_Chunk_List {
@@ -139,6 +141,31 @@ inline void free_chunk_list_clear(Free_Chunk_List *list)
   assert(list->lock == FREE_LOCK);
 }
 
+inline void free_list_detach_chunk(Free_Chunk_List *list, Free_Chunk *chunk)
+{
+  if(chunk->prev)
+    chunk->prev->next = chunk->next;
+  else  // chunk is the head
+    list->head = chunk->next;
+  if(chunk->next)
+    chunk->next->prev = chunk->prev;
+}
+
+inline void move_free_chunks_between_lists(Free_Chunk_List *to_list, Free_Chunk_List *from_list)
+{
+  if(to_list->tail){
+    to_list->head->prev = from_list->tail;
+  } else {
+    to_list->tail = from_list->tail;
+  }
+  if(from_list->head){
+    from_list->tail->next = to_list->head;
+    to_list->head = from_list->head;
+  }
+  from_list->head = NULL;
+  from_list->tail = NULL;
+}
+
 /* Padding the last index word in table to facilitate allocation */
 inline void chunk_pad_last_index_word(Chunk_Header *chunk, POINTER_SIZE_INT alloc_mask)
 {
@@ -167,7 +194,7 @@ extern POINTER_SIZE_INT cur_alloc_mask;
 inline void normal_chunk_init(Chunk_Header *chunk, unsigned int slot_size)
 {
   assert(chunk->status == CHUNK_FREE);
-  assert((POINTER_SIZE_INT)chunk->adj_next == (POINTER_SIZE_INT)chunk + NORMAL_CHUNK_SIZE_BYTES);
+  assert(CHUNK_SIZE(chunk) == NORMAL_CHUNK_SIZE_BYTES);
   
   chunk->next = NULL;
   chunk->status = CHUNK_FRESH | CHUNK_NORMAL | CHUNK_NEED_ZEROING;
@@ -184,7 +211,7 @@ inline void normal_chunk_init(Chunk_Header *chunk, unsigned int slot_size)
 inline void abnormal_chunk_init(Chunk_Header *chunk, unsigned int chunk_size, unsigned int obj_size)
 {
   assert(chunk->status == CHUNK_FREE);
-  assert((POINTER_SIZE_INT)chunk->adj_next == (POINTER_SIZE_INT)chunk + chunk_size);
+  assert(CHUNK_SIZE(chunk) == chunk_size);
   
   chunk->next = NULL;
   chunk->status = CHUNK_ABNORMAL;
@@ -231,7 +258,7 @@ inline void abnormal_chunk_init(Chunk_Header *chunk, unsigned int chunk_size, un
 #define ALIGNED_CHUNK_INDEX_TO_SIZE(index)    (((index) + 1) << NORMAL_CHUNK_SHIFT_COUNT)
 #define UNALIGNED_CHUNK_INDEX_TO_SIZE(index)  (((index) + 1) << CHUNK_GRANULARITY_BITS)
 
-#define SUPER_OBJ_MASK ((Obj_Info_Type)0x1)  /* the lowest bit in obj info */
+#define SUPER_OBJ_MASK ((Obj_Info_Type)0x20)  /* the 4th bit in obj info */
 
 #define PFC_STEAL_NUM   3
 #define PFC_STEAL_THRESHOLD   3
@@ -274,6 +301,7 @@ inline Chunk_Header *sspace_get_pfc(Sspace *sspace, unsigned int seg_index, unsi
 inline void sspace_put_pfc(Sspace *sspace, Chunk_Header *chunk)
 {
   unsigned int size = chunk->slot_size;
+  assert(chunk->base && chunk->alloc_num);
   assert(chunk && (size <= SUPER_OBJ_THRESHOLD));
   assert(chunk->slot_index < chunk->slot_num);
   
@@ -309,5 +337,9 @@ extern POINTER_SIZE_INT free_mem_in_sspace(Sspace *sspace, Boolean show_chunk_in
 
 extern void zeroing_free_chunk(Free_Chunk *chunk);
 
+extern void allocator_clear_local_chunks(Allocator *allocator, Boolean reuse_pfc);
+extern void gc_clear_collector_local_chunks(GC *gc);
+
+extern void sspace_collect_free_chunks_to_list(Sspace *sspace, Free_Chunk_List *list);
 
 #endif //#ifndef _SSPACE_CHUNK_H_

@@ -22,10 +22,15 @@
 #include "../common/gc_common.h"
 #include "../common/gc_space.h"
 #include "../gen/gen.h"
+#include "../mark_sweep/gc_ms.h"
 #include "../common/space_tuner.h"
 #ifdef USE_32BITS_HASHCODE
 #include "../common/hashcode.h"
 #endif
+#ifdef USE_MARK_SWEEP_GC
+#include "../mark_sweep/sspace_mark_sweep.h"
+#endif
+#include "../common/gc_concurrent.h"
 
 struct Heap_Verifier;
 struct Allocation_Verifier;
@@ -113,6 +118,22 @@ inline void verify_live_object_slot(REF* p_ref, Heap_Verifier* heap_verifier)
   assert(p_obj);
   assert(uncompress_vt(obj_get_vt(p_obj)));
   assert(!address_belongs_to_gc_heap(uncompress_vt(obj_get_vt(p_obj)), (GC*)heap_verifier->gc));
+
+//ynhe
+
+#ifdef USE_MARK_SWEEP_GC
+  GC_MS* gc = (GC_MS*)heap_verifier->gc;
+  if(!heap_verifier->is_before_gc){
+    /*in GC_MS mark sweep algorithm, all live objects should be set their mark bit*/
+    assert(obj_is_alloc_color_in_table(p_obj));
+    if(!obj_is_alloc_color_in_table(p_obj))
+      printf("\nERROR: obj after GC should be set its alloc color!\n");
+  }else{
+    //ynhe
+    if(gc_mark_is_concurrent())
+      assert(obj_is_mark_black_in_table(p_obj));
+  }
+#endif
 }
 
 inline void verify_all_object_slot(REF* p_ref, Heap_Verifier* heap_verifier)

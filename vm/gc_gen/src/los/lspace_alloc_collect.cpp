@@ -22,7 +22,8 @@
 #include "lspace.h"
 #include "../gen/gen.h"
 #include "../common/space_tuner.h"
-
+#include "../common/gc_concurrent.h"
+#include "../common/collection_scheduler.h"
 #ifdef GC_GEN_STATS
 #include "../gen/gen_stats.h"
 #endif
@@ -197,13 +198,17 @@ void* lspace_try_alloc(Lspace* lspace, POINTER_SIZE_INT alloc_size){
   return p_result;
 }
 
-void* lspace_alloc(POINTER_SIZE_INT size, Allocator *allocator)
+void* lspace_alloc(unsigned size, Allocator *allocator)
 {
     unsigned int try_count = 0;
     void* p_result = NULL;
     POINTER_SIZE_INT alloc_size = ALIGN_UP_TO_KILO(size);
     Lspace* lspace = (Lspace*)gc_get_los((GC_Gen*)allocator->gc);
     Free_Area_Pool* pool = lspace->free_pool;
+
+    if(gc_need_start_concurrent_mark(allocator->gc))
+      gc_start_concurrent_mark(allocator->gc);   
+
     
     while( try_count < 2 ){
         if(p_result = lspace_try_alloc(lspace, alloc_size))
@@ -334,7 +339,7 @@ void lspace_reset_for_slide(Lspace* lspace)
         /*Lspace collection in major collection must move object*/
         assert(lspace->move_object);
         //debug_minor_sweep
-        Block* mos_first_block = ((GC_Gen*)gc)->mos->blocks;
+        Block* mos_first_block = ((Blocked_Space*)((GC_Gen*)gc)->mos)->blocks;
         lspace->heap_end = (void*)mos_first_block;
         assert(!(tuner->tuning_size % GC_BLOCK_SIZE_BYTES));
         new_fa_size = (POINTER_SIZE_INT)lspace->scompact_fa_end - (POINTER_SIZE_INT)lspace->scompact_fa_start + tuner->tuning_size;
@@ -346,7 +351,7 @@ void lspace_reset_for_slide(Lspace* lspace)
       case TRANS_FROM_LOS_TO_MOS:{
         assert(lspace->move_object);
         assert(tuner->tuning_size);
-        Block* mos_first_block = ((GC_Gen*)gc)->mos->blocks;
+        Block* mos_first_block = ((Blocked_Space*)((GC_Gen*)gc)->mos)->blocks;
         assert( (POINTER_SIZE_INT)lspace->heap_end - trans_size == (POINTER_SIZE_INT)mos_first_block );
         lspace->heap_end = (void*)mos_first_block;
         lspace->committed_heap_size -= trans_size;
@@ -475,5 +480,4 @@ void lspace_sweep(Lspace* lspace)
   TRACE2("gc.process", "GC: end of lspace sweep algo ...\n");
   return;
 }
-
 

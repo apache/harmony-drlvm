@@ -33,6 +33,7 @@ static volatile Block_Header* next_block_for_target;
 #ifdef GC_GEN_STATS
 #include "../gen/gen_stats.h"
 #endif
+
 void mspace_update_info_after_space_tuning(Mspace* mspace)
 {
   Space_Tuner *tuner = mspace->gc->tuner;
@@ -60,44 +61,6 @@ void mspace_update_info_after_space_tuning(Mspace* mspace)
 
 
 Space* gc_get_nos(GC_Gen* gc);
-void mspace_reset_after_compaction(Mspace* mspace)
-{
-  unsigned int old_num_used = mspace->num_used_blocks;
-  unsigned int new_num_used = mspace->free_block_idx - mspace->first_block_idx;
-  unsigned int num_used = old_num_used>new_num_used? old_num_used:new_num_used;
-  
-  Block* blocks = mspace->blocks;
-  unsigned int i;
-  for(i=0; i < num_used; i++){
-    Block_Header* block = (Block_Header*)&(blocks[i]);
-    assert(!((POINTER_SIZE_INT)block % GC_BLOCK_SIZE_BYTES));
-    block->status = BLOCK_USED;
-    block->free = block->new_free;
-    block->new_free = block->base;
-    block->src = NULL;
-    block->next_src = NULL;
-    assert(!block->dest_counter);
-
-    if(i >= new_num_used){
-      block->status = BLOCK_FREE; 
-      block->free = GC_BLOCK_BODY(block);
-    }
-  }
-  mspace->num_used_blocks = new_num_used;
-  /*For_statistic mos infomation*/
-  mspace->period_surviving_size = new_num_used * GC_BLOCK_SIZE_BYTES;
- 
-  /* we should clear the remaining blocks which are set to be BLOCK_COMPACTED or BLOCK_TARGET */
-  for(; i < mspace->num_managed_blocks; i++){
-    Block_Header* block = (Block_Header*)&(blocks[i]);
-    assert(block->status& (BLOCK_COMPACTED|BLOCK_TARGET|BLOCK_DEST));
-    block->status = BLOCK_FREE;
-    block->src = NULL;
-    block->next_src = NULL;
-    block->free = GC_BLOCK_BODY(block);
-    assert(!block->dest_counter);
-  }
-}
 
 void gc_reset_block_for_collectors(GC* gc, Mspace* mspace)
 {
@@ -337,27 +300,27 @@ void mspace_collection(Mspace* mspace)
 
     switch(mspace->collect_algorithm){
       case MAJOR_COMPACT_SLIDE:
-  TRACE2("gc.process", "GC: slide compact algo start ... \n");
-  collector_execute_task(gc, (TaskType)slide_compact_mspace, (Space*)mspace); 
-  TRACE2("gc.process", "\nGC: end of slide compact algo ... \n");
+        TRACE2("gc.process", "GC: slide compact algo start ... \n");
+        collector_execute_task(gc, (TaskType)slide_compact_mspace, (Space*)mspace);
+        TRACE2("gc.process", "\nGC: end of slide compact algo ... \n");
 #ifdef GC_GEN_STATS
-  gc_gen_stats_set_los_collected_flag((GC_Gen*)gc, true);
-  gc_gen_stats_set_mos_algo((GC_Gen*)gc, MAJOR_COMPACT_SLIDE);
+        gc_gen_stats_set_los_collected_flag((GC_Gen*)gc, true);
+        gc_gen_stats_set_mos_algo((GC_Gen*)gc, MAJOR_COMPACT_SLIDE);
 #endif
         break;
         
       case MAJOR_COMPACT_MOVE:
         IS_MOVE_COMPACT = TRUE;
-
-  TRACE2("gc.process", "GC: move compact algo start ... \n");
-  collector_execute_task(gc, (TaskType)move_compact_mspace, (Space*)mspace);
-  TRACE2("gc.process", "\nGC: end of move compact algo ... \n");
-  IS_MOVE_COMPACT = FALSE;
+        
+        TRACE2("gc.process", "GC: move compact algo start ... \n");
+        collector_execute_task(gc, (TaskType)move_compact_mspace, (Space*)mspace);
+        TRACE2("gc.process", "\nGC: end of move compact algo ... \n");
+        IS_MOVE_COMPACT = FALSE;
 #ifdef GC_GEN_STATS
-  gc_gen_stats_set_mos_algo((GC_Gen*)gc, MAJOR_COMPACT_MOVE);
+        gc_gen_stats_set_mos_algo((GC_Gen*)gc, MAJOR_COMPACT_MOVE);
 #endif
-  break;
-
+        break;
+  
       default:
         DIE2("gc.collect", "The speficied major collection algorithm doesn't exist!");
         exit(0);
@@ -368,4 +331,5 @@ void mspace_collection(Mspace* mspace)
 
   return;  
 } 
+
 

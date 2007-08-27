@@ -92,24 +92,39 @@ enum Collection_Algorithm{
   
   /* major collection */
   MAJOR_COMPACT_SLIDE,
-  MAJOR_COMPACT_MOVE
+  MAJOR_COMPACT_MOVE,
+  MAJOR_MARK_SWEEP
   
 };
 
 /* Possible combinations:
  * MINOR_COLLECTION
- * MAJOR_COLLECTION
+ * NORMAL_MAJOR_COLLECTION
  * FALLBACK_COLLECTION
- * MAJOR_COLLECTION | EXTEND_COLLECTION
+ * NORMAL_MAJOR_COLLECTION | EXTEND_COLLECTION
  * FALLBACK_COLLECTION | EXTEND_COLLECTION
+ * MS_COLLECTION
+ * MS_COMPACT_COLLECTION
  */
 enum Collection_Kind {
-  MINOR_COLLECTION = 0x1,
-  MAJOR_COLLECTION = 0x2,
-  FALLBACK_COLLECTION = 0x4,
-  EXTEND_COLLECTION = 0x8,
-  MARK_SWEEP_GC = 0x10,
-  SWEEP_COMPACT_GC = 0x20
+  /* Two main kinds: generational GC and mark-sweep GC; this is decided at compiling time */
+  GEN_GC = 0x1,
+  MARK_SWEEP_GC = 0x2,
+  /* Mask of bits standing for two basic kinds */
+  GC_BASIC_KIND_MASK = ~(unsigned int)0x7,
+  
+  /* Sub-kinds of generational GC use the 4~7th LSB */
+  MINOR_COLLECTION = 0x11,  /* 0x10 & GEN_GC */
+  MAJOR_COLLECTION = 0x21,  /* 0x20 & GEN_GC */
+  
+  /* Sub-kinds of major collection use the 8~11th LSB */
+  NORMAL_MAJOR_COLLECTION = 0x121,  /* 0x100 & MAJOR_COLLECTION */
+  FALLBACK_COLLECTION = 0x221,  /* 0x200 & MAJOR_COLLECTION */
+  EXTEND_COLLECTION = 0x421,  /* 0x400 & MAJOR_COLLECTION */
+  
+  /* Sub-kinds of mark-sweep GC use the 12~15th LSB */
+  MS_COLLECTION = 0x1002,  /* 0x1000 & MARK_SWEEP_GC */
+  MS_COMPACT_COLLECTION = 0x2002  /* 0x2000 & MARK_SWEEP_GC */
 };
 
 extern Boolean IS_FALLBACK_COMPACTION;  /* only for mark/fw bits debugging purpose */
@@ -118,7 +133,7 @@ enum GC_CAUSE{
   GC_CAUSE_NIL,
   GC_CAUSE_NOS_IS_FULL,
   GC_CAUSE_LOS_IS_FULL,
-  GC_CAUSE_POS_IS_FULL,
+  GC_CAUSE_SSPACE_IS_FULL,
   GC_CAUSE_RUNTIME_FORCE_GC
 };
 
@@ -356,13 +371,35 @@ inline Boolean obj_is_marked_in_oi(Partial_Reveal_Object* p_obj)
 
 #endif /* MARK_BIT_FLIPPING */
 
+inline Boolean obj_is_dirty_in_oi(Partial_Reveal_Object* p_obj)
+{
+  Obj_Info_Type info = get_obj_info_raw(p_obj);
+  return (Boolean)(info & OBJ_DIRTY_BIT);
+}
+
+inline Boolean obj_dirty_in_oi(Partial_Reveal_Object* p_obj)
+{
+  Obj_Info_Type info = get_obj_info_raw(p_obj);
+  if( info & OBJ_DIRTY_BIT ) return FALSE;
+  
+  Obj_Info_Type new_info = info | OBJ_DIRTY_BIT;
+  while(info != atomic_cas32((volatile unsigned int *)get_obj_info_addr(p_obj),new_info, info)){
+    info = get_obj_info_raw(p_obj);
+    if( info & OBJ_DIRTY_BIT ) return FALSE;
+    new_info =  info |OBJ_DIRTY_BIT;
+  }
+  return TRUE;
+}
+
 /* all GCs inherit this GC structure */
+struct Marker;
 struct Mutator;
 struct Collector;
 struct GC_Metadata;
 struct Finref_Metadata;
 struct Vector_Block;
 struct Space_Tuner;
+struct Collection_Scheduler;
 
 typedef struct GC{
   void* heap_start;
@@ -382,6 +419,10 @@ typedef struct GC{
   Collector** collectors;
   unsigned int num_collectors;
   unsigned int num_active_collectors; /* not all collectors are working */
+
+  Marker** markers;
+  unsigned int num_markers;
+  unsigned int num_active_markers;
   
   /* metadata is the pool for rootset, tracestack, etc. */  
   GC_Metadata* metadata;
@@ -400,6 +441,13 @@ typedef struct GC{
   Vector_Block* uncompressed_root_set;
 
   Space_Tuner* tuner;
+
+  unsigned int gc_concurrent_status; /*concurrent GC status: only support CONCURRENT_MARK_PHASE now*/
+  Collection_Scheduler* collection_scheduler;
+
+  SpinLock concurrent_mark_lock;
+  SpinLock enumerate_rootset_lock;
+
   
   /* system info */
   unsigned int _system_alloc_unit;
@@ -422,16 +470,28 @@ inline Boolean address_belongs_to_gc_heap(void* addr, GC* gc)
   return (addr >= gc_heap_base(gc) && addr < gc_heap_ceiling(gc));
 }
 
+/* gc must match exactly that kind if returning TRUE */
 inline Boolean gc_match_kind(GC *gc, unsigned int kind)
 {
   assert(gc->collect_kind && kind);
-  return gc->collect_kind & kind;
+  return (Boolean)((gc->collect_kind & kind) == kind);
+}
+/* multi_kinds is a combination of multi collect kinds
+ * gc must match one of them.
+ */
+inline Boolean gc_match_either_kind(GC *gc, unsigned int multi_kinds)
+{
+  multi_kinds &= GC_BASIC_KIND_MASK;
+  assert(gc->collect_kind && multi_kinds);
+  return (Boolean)(gc->collect_kind & multi_kinds);
 }
 
 inline unsigned int gc_get_processor_num(GC* gc) { return gc->_num_processors; }
 
 void gc_parse_options(GC* gc);
 void gc_reclaim_heap(GC* gc, unsigned int gc_cause);
+
+int64 get_collection_end_time();
 
 /* generational GC related */
 

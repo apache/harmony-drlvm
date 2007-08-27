@@ -345,6 +345,41 @@ static POINTER_SIZE_INT sspace_live_obj_num(Sspace *sspace, Boolean gc_finished)
   return live_num;
 }
 
+static void allocator_verify_local_chunks(Allocator *allocator)
+{
+  Sspace *sspace = gc_get_sspace(allocator->gc);
+  Size_Segment **size_segs = sspace->size_segments;
+  Chunk_Header ***local_chunks = allocator->local_chunks;
+  
+  for(unsigned int i = SIZE_SEGMENT_NUM; i--;){
+    if(!size_segs[i]->local_alloc){
+      assert(!local_chunks[i]);
+      continue;
+    }
+    Chunk_Header **chunks = local_chunks[i];
+    assert(chunks);
+    for(unsigned int j = size_segs[i]->chunk_num; j--;){
+      assert(!chunks[j]);
+    }
+  }
+}
+
+static void gc_verify_allocator_local_chunks(GC *gc)
+{
+  if(gc_match_kind(gc, MARK_SWEEP_GC)){
+    Mutator *mutator = gc->mutator_list;
+    while(mutator){
+      allocator_verify_local_chunks((Allocator*)mutator);
+      mutator = mutator->next;
+    }
+  }
+  
+  if(gc_match_kind(gc, MAJOR_COLLECTION))
+    for(unsigned int i = gc->num_collectors; i--;){
+      allocator_verify_local_chunks((Allocator*)gc->collectors[i]);
+    }
+}
+
 void sspace_verify_before_collection(GC *gc)
 {
   printf("Allocated obj: %d\n", alloc_obj_num);
@@ -374,6 +409,7 @@ void sspace_verify_after_collection(GC *gc)
   POINTER_SIZE_INT total_live_obj = sspace_live_obj_num(sspace, TRUE);
   printf("Live obj after collection: %d\n", total_live_obj);
   check_and_clear_mark_cards();
+  gc_verify_allocator_local_chunks(gc);
 }
 
 /*
@@ -398,6 +434,7 @@ void sspace_verify_super_obj(GC *gc)
 
 /* sspace verify marking with vtable marking in advance */
 
+Sspace *sspace_in_verifier;
 static Pool *trace_pool = NULL;
 static Vector_Block *trace_stack = NULL;
 POINTER_SIZE_INT live_obj_in_verify_marking = 0;
@@ -429,7 +466,7 @@ static FORCE_INLINE void scan_slot(GC *gc, REF *p_ref)
   Partial_Reveal_Object *p_obj = read_slot(p_ref);
   if( p_obj == NULL) return;
   
-  if(obj_mark_in_vtable(gc, p_obj))
+  if(obj_belongs_to_space(p_obj, (Space*)sspace_in_verifier) && obj_mark_in_vtable(gc, p_obj))
     tracestack_push(p_obj);
   
   return;
@@ -479,6 +516,7 @@ static void trace_object(GC *gc, Partial_Reveal_Object *p_obj)
 
 void sspace_verify_vtable_mark(GC *gc)
 {
+  sspace_in_verifier = gc_get_sspace(gc);
   GC_Metadata *metadata = gc->metadata;
   Pool *rootset_pool = metadata->gc_rootset_pool;
   
@@ -496,7 +534,7 @@ void sspace_verify_vtable_mark(GC *gc)
       
       Partial_Reveal_Object *p_obj = read_slot(p_ref);
       assert(p_obj!=NULL);
-      if(obj_mark_in_vtable(gc, p_obj))
+      if(obj_belongs_to_space(p_obj, (Space*)sspace_in_verifier) && obj_mark_in_vtable(gc, p_obj))
         tracestack_push(p_obj);
     }
     root_set = pool_iterator_next(metadata->gc_rootset_pool);

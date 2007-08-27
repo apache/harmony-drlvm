@@ -15,27 +15,13 @@
  *  limitations under the License.
  */
 
-/**
- * @author Xiao-Feng Li, 2006/10/05
- */
-
-#ifndef _COLLECTOR_H_
-#define _COLLECTOR_H_
+#ifndef _MARKER_H_
+#define _MARKER_H_
 
 #include "../common/gc_space.h"
+#include "../mark_sweep/sspace_chunk.h"
 
-struct Block_Header;
-struct Stealable_Stack;
-struct Chunk_Header;
-struct Free_Chunk_List;
-
-#define NORMAL_SIZE_SEGMENT_GRANULARITY_BITS  8
-#define NORMAL_SIZE_SEGMENT_GRANULARITY (1 << NORMAL_SIZE_SEGMENT_GRANULARITY_BITS)
-#define NORMAL_SIZE_SEGMENT_NUM (GC_OBJ_SIZE_THRESHOLD / NORMAL_SIZE_SEGMENT_GRANULARITY)
-#define SIZE_TO_SEGMENT_INDEX(size) ((((size) + NORMAL_SIZE_SEGMENT_GRANULARITY-1) >> NORMAL_SIZE_SEGMENT_GRANULARITY_BITS) - 1)
-#define SEGMENT_INDEX_TO_SIZE(index)  (((index)+1) << NORMAL_SIZE_SEGMENT_GRANULARITY_BITS)
-
-typedef struct Collector{
+typedef struct Marker{
   /* <-- first couple of fields are overloaded as Allocator */
   void *free;
   void *ceiling;
@@ -48,7 +34,7 @@ typedef struct Collector{
   /* End of Allocator --> */
 
   /* FIXME:: for testing */
-  Space* collect_space;
+  Space* mark_space;
 
   Vector_Block *trace_stack;
   
@@ -80,49 +66,30 @@ typedef struct Collector{
   POINTER_SIZE_INT segment_live_size[NORMAL_SIZE_SEGMENT_NUM];
   unsigned int result;
 
-  /*for collect statistics info*/
-#ifdef GC_GEN_STATS
-  void* stats;
-#endif
+  VmEventHandle markroot_finished_event;
 
- 
-}Collector;
+  Boolean marker_is_active;
+  int64 time_mark;
+  Marker* next; 
+} Marker;
 
-void collector_destruct(GC* gc);
-void collector_initialize(GC* gc);
-void collector_reset(GC* gc);
+typedef Marker* Marker_List;
 
-void collector_execute_task(GC* gc, TaskType task_func, Space* space);
+#define MAX_NUM_MARKERS 0xff
+#define MIN_NUM_MARKERS 0x01
 
-void collector_restore_obj_info(Collector* collector);
-#ifdef USE_32BITS_HASHCODE
-void collector_attach_hashcode(Collector *collector);
-#endif
+void marker_initialize(GC* gc);
+void marker_destruct(GC* gc);
 
-#ifndef USE_MARK_SWEEP_GC
-void gc_gen_hook_for_collector_init(Collector *collector);
-#endif
+void marker_execute_task(GC* gc, TaskType task_func, Space* space);
+void marker_execute_task_concurrent(GC* gc, TaskType task_func, Space* space, unsigned int num_markers);
+void marker_execute_task_concurrent(GC* gc, TaskType task_func, Space* space);
 
-inline Boolean gc_collection_result(GC* gc)
-{
-  Boolean result = TRUE;
-  for(unsigned i=0; i<gc->num_active_collectors; i++){
-    Collector* collector = gc->collectors[i];
-    result &= collector->result;
-  }  
-  return result;
-}
-
-inline void gc_reset_collect_result(GC* gc)
-{
-  for(unsigned i=0; i<gc->num_active_collectors; i++){
-    Collector* collector = gc->collectors[i];
-    collector->result = TRUE;
-  }  
-  
-  gc->collect_result = TRUE;
-  return;
-}
+void marker_notify_mark_root_done(Marker* marker);
+void wait_mark_finish(GC* gc);
+Boolean is_mark_finished(GC* gc);
 
 
-#endif //#ifndef _COLLECTOR_H_
+
+#endif //_MARKER_H_
+

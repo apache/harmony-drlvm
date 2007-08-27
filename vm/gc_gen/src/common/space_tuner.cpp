@@ -33,7 +33,7 @@ POINTER_SIZE_INT lspace_get_failure_size(Lspace* lspace);
 
 /* Calculate speed of allocation and waste memory of specific space respectively, 
   * then decide whether to execute a space tuning according to the infomation.*/
-void gc_decide_space_tune(GC* gc, unsigned int cause)
+static void gc_decide_space_tune(GC* gc)
 {
   Blocked_Space* mspace = (Blocked_Space*)gc_get_mos((GC_Gen*)gc);
   Blocked_Space* fspace = (Blocked_Space*)gc_get_nos((GC_Gen*)gc);  
@@ -94,11 +94,11 @@ extern POINTER_SIZE_INT min_none_los_size_bytes;
 /* The tuning size computing before marking is not precise. We only estimate the probable direction of space tuning.
   * If this function decide to set TRANS_NOTHING, then we just call the normal marking function.
   * Else, we call the marking function for space tuning.  */
-void gc_compute_space_tune_size_before_marking(GC* gc, unsigned int cause)
+void gc_compute_space_tune_size_before_marking(GC* gc)
 {
   if(gc_match_kind(gc, MINOR_COLLECTION))  return;
   
-  gc_decide_space_tune(gc, cause);
+  gc_decide_space_tune(gc);
   
   Space_Tuner* tuner = gc->tuner;
   assert((tuner->speed_los != 0) && ( tuner->speed_mos != 0)) ;
@@ -440,7 +440,7 @@ void gc_compute_space_tune_size_after_marking(GC *gc)
 void  gc_space_tuner_reset(GC* gc)
 {
   Space_Tuner* tuner = gc->tuner;
-  if( !gc_match_kind(gc, MINOR_COLLECTION)){
+  if( gc_match_kind(gc, MAJOR_COLLECTION)){
     /*Clear the fields every major collection except the wast area statistic.*/
     tuner->tuning_size = 0;
     tuner->interim_blocks = NULL;
@@ -538,6 +538,4 @@ void gc_space_tuner_release_fake_blocks_for_los_shrink(GC* gc)
   STD_FREE(tuner->interim_blocks);
   return;
 }
-
-
 

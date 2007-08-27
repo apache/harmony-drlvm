@@ -156,14 +156,14 @@ static void mspace_compute_object_target(Collector* collector, Mspace* mspace)
 
 #include "../common/fix_repointed_refs.h"
 
-static void mspace_fix_repointed_refs(Collector* collector, Mspace* mspace)
+static void mspace_fix_repointed_refs(Collector *collector, Mspace *mspace)
 {
-  Block_Header* curr_block = mspace_block_iterator_next(mspace);
+  Block_Header *curr_block = blocked_space_block_iterator_next((Blocked_Space*)mspace);
   
   /* for MAJOR_COLLECTION, we must iterate over all compact blocks */
   while( curr_block){
     block_fix_ref_after_repointing(curr_block); 
-    curr_block = mspace_block_iterator_next(mspace);
+    curr_block = blocked_space_block_iterator_next((Blocked_Space*)mspace);
   }
 
   return;
@@ -181,7 +181,7 @@ static inline Block_Header *set_next_block_for_dest(Mspace *mspace)
 {
   assert(!next_block_for_dest);
   
-  Block_Header *block = mspace_block_iterator_get(mspace);
+  Block_Header *block = blocked_space_block_iterator_get((Blocked_Space*)mspace);
   
   if(block->status != BLOCK_DEST)
     return block;
@@ -248,7 +248,7 @@ static Block_Header *check_dest_block(Mspace *mspace)
       cur_dest_block = cur_dest_block->next;
     }
   } else {
-    cur_dest_block = mspace_block_iterator_get(mspace);
+    cur_dest_block = blocked_space_block_iterator_get((Blocked_Space*)mspace);
   }
 
   unsigned int total_dest_counter = 0;
@@ -312,7 +312,7 @@ static inline void gc_init_block_for_fix_repointed_refs(GC* gc, Mspace* mspace)
   POINTER_SIZE_INT tuning_size = tuner->tuning_size;
   /*If LOS_Shrink, we just fix the repointed refs from the start of old mspace.*/
   if((tuner->kind == TRANS_NOTHING) || (tuner->kind == TRANS_FROM_LOS_TO_MOS)){
-    mspace_block_iterator_init(mspace);
+    blocked_space_block_iterator_init((Blocked_Space*)mspace);
     return;
   }else{
     /*If LOS_Extend, we fix from the new start of mspace, because the block list is start from there.*/
@@ -333,7 +333,7 @@ static inline void gc_init_block_for_sliding_compact(GC *gc, Mspace *mspace)
 
   if( tuner->kind == TRANS_NOTHING ){
     /*If space is not tuned, we just start from mspace->heap_start.*/
-    mspace_block_iterator_init(mspace);
+    blocked_space_block_iterator_init((Blocked_Space*)mspace);
     return;
   }else if (tuner->kind == TRANS_FROM_MOS_TO_LOS){
     /*If LOS_Extend, we compact from the new start of mspace, because the block list is start from there.*/
@@ -399,16 +399,6 @@ static void mspace_sliding_compact(Collector* collector, Mspace* mspace)
 
 }
 
-/*For LOS_Extend*/
-static void mspace_restore_block_chain(Mspace* mspace)
-{
-  GC* gc = mspace->gc;
-  Fspace* fspace = (Fspace*)gc_get_nos((GC_Gen*)gc);
-  if(gc->tuner->kind == TRANS_FROM_MOS_TO_LOS) {
-      Block_Header* fspace_last_block = (Block_Header*)&fspace->blocks[fspace->num_managed_blocks - 1];
-      fspace_last_block->next = NULL;
-  }
-}
 
 static volatile unsigned int num_marking_collectors = 0;
 static volatile unsigned int num_repointing_collectors = 0;
@@ -560,7 +550,8 @@ void slide_compact_mspace(Collector* collector)
   old_num = atomic_inc32(&num_restoring_collectors);
 
   if( ++old_num == num_active_collectors ){
-    if(gc->tuner->kind != TRANS_NOTHING) mspace_update_info_after_space_tuning(mspace);
+    if(gc->tuner->kind != TRANS_NOTHING)
+      mspace_update_info_after_space_tuning(mspace);
     num_restoring_collectors++;
   }
   while(num_restoring_collectors != num_active_collectors + 1);
@@ -585,12 +576,6 @@ void slide_compact_mspace(Collector* collector)
   /* Leftover: **************************************************
    */
   
-  mspace_reset_after_compaction(mspace);
-  fspace_reset_for_allocation(fspace);
-
-  /*For LOS_Extend*/
-  mspace_restore_block_chain(mspace);
-
   gc_set_pool_clear(gc->metadata->gc_rootset_pool);
   gc_set_pool_clear(gc->metadata->weak_roots_pool);
   

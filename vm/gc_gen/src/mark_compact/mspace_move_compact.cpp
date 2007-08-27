@@ -150,13 +150,13 @@ static void mspace_move_objects(Collector* collector, Mspace* mspace)
 
 static void mspace_fix_repointed_refs(Collector *collector, Mspace *mspace)
 {
-  Block_Header* curr_block = mspace_block_iterator_next(mspace);
+  Block_Header* curr_block = blocked_space_block_iterator_next((Blocked_Space*)mspace);
   
   while( curr_block){
     if(curr_block->block_idx >= mspace->free_block_idx) break;    
     curr_block->free = curr_block->new_free; //
     block_fix_ref_after_marking(curr_block);
-    curr_block = mspace_block_iterator_next(mspace);
+    curr_block = blocked_space_block_iterator_next((Blocked_Space*)mspace);
   }
   
   return;
@@ -233,7 +233,7 @@ void move_compact_mspace(Collector* collector)
     }
  
     gc_reset_block_for_collectors(gc, mspace);
-    mspace_block_iterator_init(mspace);
+    blocked_space_block_iterator_init((Blocked_Space*)mspace);
     num_moving_collectors++; 
   }
   while(num_moving_collectors != num_active_collectors + 1);
@@ -291,8 +291,6 @@ void move_compact_mspace(Collector* collector)
     TRACE2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]  finished");
     return;
   }
-  mspace_reset_after_compaction(mspace);
-  fspace_reset_for_allocation(fspace);
 
   gc_set_pool_clear(gc->metadata->gc_rootset_pool);
   gc_set_pool_clear(gc->metadata->weak_roots_pool);

@@ -27,7 +27,7 @@
 #include "../common/hashcode.h"
 #endif
 
-void* mos_alloc(unsigned size, Allocator *allocator);
+extern Space_Alloc_Func mos_alloc;
 
 /* NOS forward obj to MOS in MINOR_COLLECTION */
 FORCE_INLINE Partial_Reveal_Object* collector_forward_object(Collector* collector, Partial_Reveal_Object* p_obj)

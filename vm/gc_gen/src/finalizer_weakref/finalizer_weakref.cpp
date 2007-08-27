@@ -29,6 +29,8 @@
 #include "../gen/gen.h"
 #include "../mark_sweep/gc_ms.h"
 #include "../common/space_tuner.h"
+#include "../common/compressed_ref.h"
+#include "../common/object_status.h"
 
 Boolean IGNORE_FINREF = FALSE;
 Boolean DURING_RESURRECTION = FALSE;
@@ -102,7 +104,7 @@ static void identify_finalizable_objects(Collector *collector)
   }
   gc_put_finalizable_objects(gc);
   
-  if(gc_match_kind(gc, MAJOR_COLLECTION|FALLBACK_COLLECTION|SWEEP_COMPACT_GC))
+  if(gc_match_either_kind(gc, MAJOR_COLLECTION|MS_COMPACT_COLLECTION))
     finref_add_repset_from_pool(gc, obj_with_fin_pool);
 }
 
@@ -133,9 +135,9 @@ static inline void resurrect_obj_tree(Collector *collector, REF *p_ref)
       trace_object = trace_obj_in_gen_fw;
     else
       trace_object = trace_obj_in_nongen_fw;
-  } else if(gc_match_kind(gc, MAJOR_COLLECTION)){
+  } else if(gc_match_kind(gc, NORMAL_MAJOR_COLLECTION)){
     p_ref_or_obj = p_obj;
-    if(gc->tuner->kind != TRANS_NOTHING){
+    if(gc_has_space_tuner(gc) && (gc->tuner->kind != TRANS_NOTHING)){
       trace_object = trace_obj_in_space_tune_marking;
       unsigned int obj_size = vm_object_size(p_obj);
 #ifdef USE_32BITS_HASHCODE
@@ -147,13 +149,15 @@ static inline void resurrect_obj_tree(Collector *collector, REF *p_ref)
       } else {
         collector->los_live_obj_size += round_up_to_size(obj_size, KB); 
       }
-    }else{  
+    } else if(gc_get_mos((GC_Gen*)gc)->collect_algorithm == MAJOR_MARK_SWEEP){
+      trace_object = trace_obj_in_ms_marking;
+    } else {  
       trace_object = trace_obj_in_normal_marking;
     }
   } else if(gc_match_kind(gc, FALLBACK_COLLECTION)){
     trace_object = trace_obj_in_fallback_marking;
   } else {
-    assert(gc_match_kind(gc, MARK_SWEEP_GC|SWEEP_COMPACT_GC));
+    assert(gc_match_kind(gc, MARK_SWEEP_GC));
     p_ref_or_obj = p_obj;
     trace_object = trace_obj_in_ms_marking;
   }
@@ -168,9 +172,8 @@ static inline void resurrect_obj_tree(Collector *collector, REF *p_ref)
     POINTER_SIZE_INT *iter = vector_block_iterator_init(task_block);
     while(!vector_block_iterator_end(task_block, iter)){
       void *p_ref_or_obj = (void*)*iter;
-      assert((gc_match_kind(gc, MINOR_COLLECTION | FALLBACK_COLLECTION) && *(Partial_Reveal_Object **)p_ref_or_obj)
-              || (gc_match_kind(gc, MAJOR_COLLECTION) && p_ref_or_obj)
-              || (gc_match_kind(gc, MARK_SWEEP_GC|SWEEP_COMPACT_GC) && p_ref_or_obj));
+      assert((gc_match_either_kind(gc, MINOR_COLLECTION|FALLBACK_COLLECTION) && *(Partial_Reveal_Object **)p_ref_or_obj)
+              || (gc_match_either_kind(gc, NORMAL_MAJOR_COLLECTION|MS_COLLECTION|MS_COMPACT_COLLECTION) && p_ref_or_obj));
       trace_object(collector, p_ref_or_obj);
       if(collector->result == FALSE)  break; /* Resurrection fallback happens; force return */
       
@@ -235,7 +238,7 @@ static void resurrect_finalizable_objects(Collector *collector)
    * Because it is outside heap, we can't update it in ref fixing.
    * In minor collection p_ref of the root dead obj is automatically updated while tracing.
    */
-  if(gc_match_kind(gc, MAJOR_COLLECTION|FALLBACK_COLLECTION|SWEEP_COMPACT_GC))
+  if(gc_match_either_kind(gc, MAJOR_COLLECTION|MS_COMPACT_COLLECTION))
     finref_add_repset_from_pool(gc, finalizable_obj_pool);
   metadata->pending_finalizers = TRUE;
   
@@ -246,7 +249,7 @@ static void resurrect_finalizable_objects(Collector *collector)
 
 static void identify_dead_refs(GC *gc, Pool *pool)
 {
-  if(gc_match_kind(gc, MAJOR_COLLECTION|FALLBACK_COLLECTION|SWEEP_COMPACT_GC))
+  if(gc_match_either_kind(gc, MAJOR_COLLECTION|MS_COMPACT_COLLECTION))
     finref_reset_repset(gc);
   pool_iterator_init(pool);
   Vector_Block *block = pool_iterator_next(pool);
@@ -270,7 +273,7 @@ static void identify_dead_refs(GC *gc, Pool *pool)
           if(gc_match_kind(gc, MINOR_COLLECTION)){
             assert(obj_is_fw_in_oi(p_referent));
             write_slot(p_referent_field, (obj_get_fw_in_oi(p_referent)));
-          } else if(!gc_match_kind(gc, MARK_SWEEP_GC)){
+          } else if(!gc_match_kind(gc, MS_COLLECTION)){
             finref_repset_add_entry(gc, p_referent_field);
           }
         }
@@ -283,7 +286,7 @@ static void identify_dead_refs(GC *gc, Pool *pool)
     block = pool_iterator_next(pool);
   }
   
-  if(gc_match_kind(gc, MAJOR_COLLECTION|FALLBACK_COLLECTION|SWEEP_COMPACT_GC)){
+  if(gc_match_either_kind(gc, MAJOR_COLLECTION|MS_COMPACT_COLLECTION)){
     finref_put_repset(gc);
     finref_add_repset_from_pool(gc, pool);
   }
@@ -319,7 +322,7 @@ static void identify_dead_phanrefs(Collector *collector)
   Finref_Metadata *metadata = gc->finref_metadata;
   Pool *phanref_pool = metadata->phanref_pool;
   
-  if(gc_match_kind(gc, MAJOR_COLLECTION|FALLBACK_COLLECTION|SWEEP_COMPACT_GC))
+  if(gc_match_either_kind(gc, MAJOR_COLLECTION|MS_COMPACT_COLLECTION))
     finref_reset_repset(gc);
 //  collector_reset_repset(collector);
   pool_iterator_init(phanref_pool);
@@ -344,7 +347,7 @@ static void identify_dead_phanrefs(Collector *collector)
           if(gc_match_kind(gc, MINOR_COLLECTION)){
             assert(obj_is_fw_in_oi(p_referent));
             write_slot(p_referent_field, (obj_get_fw_in_oi(p_referent)));
-          } else if(!gc_match_kind(gc, MARK_SWEEP_GC)){
+          } else if(!gc_match_kind(gc, MS_COLLECTION)){
             finref_repset_add_entry(gc, p_referent_field);
           }
         *p_ref = (REF)NULL;
@@ -362,7 +365,7 @@ static void identify_dead_phanrefs(Collector *collector)
     block = pool_iterator_next(phanref_pool);
   }
 //  collector_put_repset(collector);
-  if(gc_match_kind(gc, MAJOR_COLLECTION|FALLBACK_COLLECTION|SWEEP_COMPACT_GC)){
+  if(gc_match_either_kind(gc, MAJOR_COLLECTION|MS_COMPACT_COLLECTION)){
     finref_put_repset(gc);
     finref_add_repset_from_pool(gc, phanref_pool);
   }
@@ -631,14 +634,14 @@ void gc_update_weakref_ignore_finref(GC *gc)
 {
   Finref_Metadata *metadata = gc->finref_metadata;
   
-  if(gc_match_kind(gc, MAJOR_COLLECTION|FALLBACK_COLLECTION|SWEEP_COMPACT_GC))
+  if(gc_match_either_kind(gc, MAJOR_COLLECTION|MS_COMPACT_COLLECTION))
     finref_reset_repset(gc);
-  if(!gc_match_kind(gc, MARK_SWEEP_GC)){
+  if(!gc_match_kind(gc, MS_COLLECTION)){
     update_referent_field_ignore_finref(gc, metadata->softref_pool);
     update_referent_field_ignore_finref(gc, metadata->weakref_pool);
     update_referent_field_ignore_finref(gc, metadata->phanref_pool);
   }
-  if(gc_match_kind(gc, MAJOR_COLLECTION|FALLBACK_COLLECTION|SWEEP_COMPACT_GC))
+  if(gc_match_either_kind(gc, MAJOR_COLLECTION|MS_COMPACT_COLLECTION))
     finref_put_repset(gc);
 }
 
@@ -667,7 +670,11 @@ static inline void move_compaction_update_ref(GC *gc, REF *p_ref)
     *p_ref = obj_get_fw_in_table(p_obj);
 }
 
-static inline void sweep_compaction_update_ref(GC *gc, REF *p_ref)
+/* In two cases mark-sweep needs fixing repointed refs:
+ * 1. ms with compaction
+ * 2. ms as a mos collection algorithm
+ */
+static inline void moving_mark_sweep_update_ref(GC *gc, REF *p_ref)
 {
   /* There are only two kinds of p_ref being added into finref_repset_pool:
    * 1. p_ref is in a vector block from one finref pool;
@@ -696,40 +703,6 @@ static inline void sweep_compaction_update_ref(GC *gc, REF *p_ref)
 extern Boolean IS_MOVE_COMPACT;
 
 /* parameter pointer_addr_in_pool means it is p_ref or p_obj in pool */
-static void destructively_fix_finref_pool(GC *gc, Pool *pool, Boolean pointer_addr_in_pool)
-{
-  Finref_Metadata *metadata = gc->finref_metadata;
-  REF *p_ref;
-  Partial_Reveal_Object *p_obj;
-  
-  /* NOTE:: this is destructive to the root sets. */
-  Vector_Block *repset = pool_get_entry(pool);
-  while(repset){
-    POINTER_SIZE_INT *iter = vector_block_iterator_init(repset);
-    for(; !vector_block_iterator_end(repset,iter); iter = vector_block_iterator_advance(repset,iter)){
-      if(pointer_addr_in_pool)
-        p_ref = (REF*)*iter;
-      else
-        p_ref = (REF*)iter;
-      p_obj = read_slot(p_ref);
-      
-      if(IS_MOVE_COMPACT){
-        move_compaction_update_ref(gc, p_ref);
-      } else if(gc_match_kind(gc, SWEEP_COMPACT_GC)){
-        if(obj_is_fw_in_oi(p_obj))
-          sweep_compaction_update_ref(gc, p_ref);
-      } else {
-        assert((obj_is_marked_in_vt(p_obj) && obj_is_fw_in_oi(p_obj)));
-        write_slot(p_ref , obj_get_fw_in_oi(p_obj));
-      }
-    }
-    vector_block_clear(repset);
-    pool_put_entry(metadata->free_pool, repset);
-    repset = pool_get_entry(pool);
-  }
-}
-
-/* parameter pointer_addr_in_pool means it is p_ref or p_obj in pool */
 static void nondestructively_fix_finref_pool(GC *gc, Pool *pool, Boolean pointer_addr_in_pool)
 {
   Finref_Metadata *metadata = gc->finref_metadata;
@@ -748,11 +721,11 @@ static void nondestructively_fix_finref_pool(GC *gc, Pool *pool, Boolean pointer
         p_ref = (REF*)iter;
       p_obj = read_slot(p_ref);
       
-      if(!IS_MOVE_COMPACT){
+      if(IS_MOVE_COMPACT){
         move_compaction_update_ref(gc, p_ref);
-      } else if(gc_match_kind(gc, SWEEP_COMPACT_GC)){
+      } else if(gc_match_kind(gc, MS_COMPACT_COLLECTION) || gc_get_mos((GC_Gen*)gc)->collect_algorithm==MAJOR_MARK_SWEEP){
         if(obj_is_fw_in_oi(p_obj))
-          sweep_compaction_update_ref(gc, p_ref);
+          moving_mark_sweep_update_ref(gc, p_ref);
       } else {
         assert((obj_is_marked_in_vt(p_obj) && obj_is_fw_in_oi(p_obj)));
         write_slot(p_ref , obj_get_fw_in_oi(p_obj));
@@ -770,7 +743,7 @@ void gc_update_finref_repointed_refs(GC *gc)
   Pool *repset_pool = metadata->repset_pool;
   Pool *fallback_ref_pool = metadata->fallback_ref_pool;
   
-  destructively_fix_finref_pool(gc, repset_pool, TRUE);
+  nondestructively_fix_finref_pool(gc, repset_pool, TRUE);
   if(!pool_is_empty(fallback_ref_pool)){
     assert(IS_FALLBACK_COMPACTION);
     nondestructively_fix_finref_pool(gc, fallback_ref_pool, FALSE);
@@ -787,3 +760,26 @@ void gc_activate_finref_threads(GC *gc)
     vm_hint_finalize();
   }
 }
+
+static void finref_copy_pool_to_rootset(GC *gc, Pool *src_pool)
+{
+  pool_iterator_init(src_pool);
+  while(Vector_Block *root_set = pool_iterator_next(src_pool)){
+    POINTER_SIZE_INT *iter = vector_block_iterator_init(root_set);
+    while(!vector_block_iterator_end(root_set, iter)){
+      gc_compressed_rootset_add_entry(gc, (REF*)iter);
+      iter = vector_block_iterator_advance(root_set, iter);
+    }
+  }
+}
+
+void gc_copy_finaliable_obj_to_rootset(GC *gc)
+{
+  Pool *finalizable_obj_pool = gc->finref_metadata->finalizable_obj_pool;
+  Pool *finalizable_obj_pool_copy = gc->finref_metadata->finalizable_obj_pool_copy;
+  Pool *free_pool = gc->metadata->gc_rootset_pool;
+  finref_metadata_clear_pool(finalizable_obj_pool_copy);
+  finref_copy_pool(finalizable_obj_pool, finalizable_obj_pool_copy, gc);
+  finref_copy_pool_to_rootset(gc, finalizable_obj_pool_copy);
+}
+

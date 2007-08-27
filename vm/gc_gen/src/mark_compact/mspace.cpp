@@ -35,7 +35,7 @@ struct GC_Gen;
 extern void gc_set_mos(GC_Gen* gc, Space* space);
 extern Space* gc_get_nos(GC_Gen* gc);
 
-void mspace_initialize(GC* gc, void* start, POINTER_SIZE_INT mspace_size, POINTER_SIZE_INT commit_size)
+Mspace *mspace_initialize(GC* gc, void* start, POINTER_SIZE_INT mspace_size, POINTER_SIZE_INT commit_size)
 {
   Mspace* mspace = (Mspace*)STD_MALLOC( sizeof(Mspace));
   assert(mspace);
@@ -69,6 +69,11 @@ void mspace_initialize(GC* gc, void* start, POINTER_SIZE_INT mspace_size, POINTE
   
   space_init_blocks((Blocked_Space*)mspace);
 
+  mspace->space_statistic = (Space_Statistics*)STD_MALLOC(sizeof(Space_Statistics));
+  assert(mspace->space_statistic);
+  memset(mspace->space_statistic, 0, sizeof(Space_Statistics));
+
+
   mspace->num_collections = 0;
   mspace->time_collections = 0;
   mspace->survive_ratio = 0.2f;
@@ -84,9 +89,7 @@ void mspace_initialize(GC* gc, void* start, POINTER_SIZE_INT mspace_size, POINTE
 
   mspace->expected_threshold_ratio = 0.5f;
 
-  gc_set_mos((GC_Gen*)gc, (Space*)mspace);
-
-  return;
+  return mspace;
 }
 
 
@@ -97,47 +100,52 @@ void mspace_destruct(Mspace* mspace)
   STD_FREE(mspace);  
 }
 
-void mspace_block_iterator_init_free(Mspace* mspace)
+void mspace_reset_after_collection(Mspace* mspace)
 {
-  mspace->block_iterator = (Block_Header*)&mspace->blocks[mspace->free_block_idx - mspace->first_block_idx];
-}
-
-#include "../common/space_tuner.h"
-void mspace_block_iterator_init(Mspace* mspace)
-{
-  mspace->block_iterator = (Block_Header*)mspace->blocks;
-  return;
-}
-
-Block_Header* mspace_block_iterator_get(Mspace* mspace)
-{
-  return (Block_Header*)mspace->block_iterator;
-}
-
-Block_Header* mspace_block_iterator_next(Mspace* mspace)
-{
-  Block_Header* cur_block = (Block_Header*)mspace->block_iterator;
+  unsigned int old_num_used = mspace->num_used_blocks;
+  unsigned int new_num_used = mspace->free_block_idx - mspace->first_block_idx;
+  unsigned int num_used = old_num_used>new_num_used? old_num_used:new_num_used;
   
-  while(cur_block != NULL){
-    Block_Header* next_block = cur_block->next;
+  Block* blocks = mspace->blocks;
+  unsigned int i;
+  for(i=0; i < num_used; i++){
+    Block_Header* block = (Block_Header*)&(blocks[i]);
+    assert(!((POINTER_SIZE_INT)block % GC_BLOCK_SIZE_BYTES));
+    block->status = BLOCK_USED;
+    block->free = block->new_free;
+    block->new_free = block->base;
+    block->src = NULL;
+    block->next_src = NULL;
+    assert(!block->dest_counter);
 
-    Block_Header* temp = (Block_Header*)atomic_casptr((volatile void **)&mspace->block_iterator, next_block, cur_block);
-    if(temp != cur_block){
-      cur_block = (Block_Header*)mspace->block_iterator;
-      continue;
+    if(i >= new_num_used){
+      block->status = BLOCK_FREE; 
+      block->free = GC_BLOCK_BODY(block);
     }
-    return cur_block;
   }
-  /* run out space blocks */
-  return NULL;  
+  mspace->num_used_blocks = new_num_used;
+  /*For_statistic mos infomation*/
+  mspace->period_surviving_size = new_num_used * GC_BLOCK_SIZE_BYTES;
+ 
+  /* we should clear the remaining blocks which are set to be BLOCK_COMPACTED or BLOCK_TARGET */
+  for(; i < mspace->num_managed_blocks; i++){
+    Block_Header* block = (Block_Header*)&(blocks[i]);
+    assert(block->status& (BLOCK_COMPACTED|BLOCK_TARGET|BLOCK_DEST));
+    block->status = BLOCK_FREE;
+    block->src = NULL;
+    block->next_src = NULL;
+    block->free = GC_BLOCK_BODY(block);
+    assert(!block->dest_counter);
+  }
 }
+
 
 #include "../common/fix_repointed_refs.h"
 
 void mspace_fix_after_copy_nursery(Collector* collector, Mspace* mspace)
 {
   //the first block is not set yet
-  Block_Header* curr_block = mspace_block_iterator_next(mspace);
+  Block_Header* curr_block = blocked_space_block_iterator_next((Blocked_Space*)mspace);
   unsigned int first_block_idx = mspace->first_block_idx;
   unsigned int old_num_used = mspace->num_used_blocks;
   unsigned int old_free_idx = first_block_idx + old_num_used;
@@ -155,7 +163,7 @@ void mspace_fix_after_copy_nursery(Collector* collector, Mspace* mspace)
     else  /* for blocks used for nos copy */
       block_fix_ref_after_copying(curr_block); 
          
-    curr_block = mspace_block_iterator_next(mspace);
+    curr_block = blocked_space_block_iterator_next((Blocked_Space*)mspace);
   }
    
   return;  

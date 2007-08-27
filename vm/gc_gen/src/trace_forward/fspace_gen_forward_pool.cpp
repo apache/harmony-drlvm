@@ -354,8 +354,6 @@ void gen_forward_pool(Collector* collector)
   
   gc_fix_rootset(collector);
   
-  fspace_reset_for_allocation(space);  
-
   TRACE2("gc.process", "GC: collector[0] finished");
 
   return;

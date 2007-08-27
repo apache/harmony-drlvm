@@ -76,7 +76,7 @@ static void zeroing_free_areas_in_pfc(Chunk_Header *chunk, unsigned int live_num
   assert(live_num >= slot_index);
   live_num -= slot_index;
   POINTER_SIZE_INT index_word = table[word_index];
-  POINTER_SIZE_INT mark_color = cur_mark_color << (COLOR_BITS_PER_OBJ * (slot_index % SLOT_NUM_PER_WORD_IN_TABLE));
+  POINTER_SIZE_INT mark_color = cur_mark_black_color << (COLOR_BITS_PER_OBJ * (slot_index % SLOT_NUM_PER_WORD_IN_TABLE));
   for(; slot_index < slot_num; ++slot_index){
     assert(!(index_word & ~cur_mark_mask));
     if(index_word & mark_color){
@@ -100,7 +100,7 @@ static void zeroing_free_areas_in_pfc(Chunk_Header *chunk, unsigned int live_num
     }
     mark_color <<= COLOR_BITS_PER_OBJ;
     if(!mark_color){
-      mark_color = cur_mark_color;
+      mark_color = cur_mark_black_color;
       ++word_index;
       index_word = table[word_index];
       while(index_word == cur_mark_mask && cur_free_slot_num == 0 && slot_index < slot_num){
@@ -137,14 +137,14 @@ static void collector_sweep_normal_chunk(Collector *collector, Sspace *sspace, C
     live_num += live_num_in_word;
     if((first_free_word_index == MAX_SLOT_INDEX) && (live_num_in_word < SLOT_NUM_PER_WORD_IN_TABLE)){
       first_free_word_index = i;
-      pfc_set_slot_index((Chunk_Header*)chunk, first_free_word_index, cur_mark_color);
+      pfc_set_slot_index((Chunk_Header*)chunk, first_free_word_index, cur_mark_black_color);
     }
   }
   assert(live_num <= slot_num);
   chunk->alloc_num = live_num;
-#ifdef SSPACE_VERIFY
+  collector->live_obj_size += live_num * chunk->slot_size;
   collector->live_obj_num += live_num;
-#endif
+
   if(!live_num){  /* all objects in this chunk are dead */
     collector_add_free_chunk(collector, (Free_Chunk*)chunk);
   } else if(chunk_is_reusable(chunk)){  /* most objects in this chunk are swept, add chunk to pfc list*/
@@ -163,19 +163,17 @@ static inline void collector_sweep_abnormal_chunk(Collector *collector, Sspace *
   if(!table[0]){
     collector_add_free_chunk(collector, (Free_Chunk*)chunk);
   }
-#ifdef SSPACE_VERIFY
   else {
+    collector->live_obj_size += CHUNK_SIZE(chunk);
     collector->live_obj_num++;
   }
-#endif
 }
 
 void sspace_sweep(Collector *collector, Sspace *sspace)
 {
   Chunk_Header_Basic *chunk;
-#ifdef SSPACE_VERIFY
+  collector->live_obj_size = 0;
   collector->live_obj_num = 0;
-#endif
 
   chunk = sspace_grab_next_chunk(sspace, &next_chunk_for_sweep, TRUE);
   while(chunk){
@@ -192,20 +190,50 @@ void sspace_sweep(Collector *collector, Sspace *sspace)
   }
 }
 
-static void free_list_detach_chunk(Free_Chunk_List *list, Free_Chunk *chunk)
-{
-  if(chunk->prev)
-    chunk->prev->next = chunk->next;
-  else  // chunk is the head
-    list->head = chunk->next;
-  if(chunk->next)
-    chunk->next->prev = chunk->prev;
-}
+/************ For merging free chunks in sspace ************/
 
-void gc_collect_free_chunks(GC *gc, Sspace *sspace)
+static void merge_free_chunks_in_list(Sspace *sspace, Free_Chunk_List *list)
 {
   Free_Chunk *sspace_ceiling = (Free_Chunk*)space_heap_end((Space*)sspace);
+  Free_Chunk *chunk = list->head;
   
+  while(chunk){
+    assert(chunk->status == (CHUNK_FREE | CHUNK_TO_MERGE));
+    /* Remove current chunk from the chunk list */
+    list->head = chunk->next;
+    if(list->head)
+      list->head->prev = NULL;
+    /* Check if the prev adjacent chunks are free */
+    Free_Chunk *prev_chunk = (Free_Chunk*)chunk->adj_prev;
+    while(prev_chunk && prev_chunk->status == (CHUNK_FREE | CHUNK_TO_MERGE)){
+      assert(prev_chunk < chunk);
+      /* Remove prev_chunk from list */
+      free_list_detach_chunk(list, prev_chunk);
+      prev_chunk->adj_next = chunk->adj_next;
+      chunk = prev_chunk;
+      prev_chunk = (Free_Chunk*)chunk->adj_prev;
+    }
+    /* Check if the back adjcent chunks are free */
+    Free_Chunk *back_chunk = (Free_Chunk*)chunk->adj_next;
+    while(back_chunk < sspace_ceiling && back_chunk->status == (CHUNK_FREE | CHUNK_TO_MERGE)){
+      assert(chunk < back_chunk);
+      /* Remove back_chunk from list */
+      free_list_detach_chunk(list, back_chunk);
+      back_chunk = (Free_Chunk*)back_chunk->adj_next;
+      chunk->adj_next = (Chunk_Header_Basic*)back_chunk;
+    }
+    if(back_chunk < sspace_ceiling)
+      back_chunk->adj_prev = (Chunk_Header_Basic*)chunk;
+    
+    /* put the free chunk to the according free chunk list */
+    sspace_put_free_chunk(sspace, chunk);
+    
+    chunk = list->head;
+  }
+}
+
+void sspace_merge_free_chunks(GC *gc, Sspace *sspace)
+{
   Free_Chunk_List free_chunk_list;
   free_chunk_list.head = NULL;
   free_chunk_list.tail = NULL;
@@ -213,49 +241,26 @@ void gc_collect_free_chunks(GC *gc, Sspace *sspace)
   /* Collect free chunks from collectors to one list */
   for(unsigned int i=0; i<gc->num_collectors; ++i){
     Free_Chunk_List *list = gc->collectors[i]->free_chunk_list;
-    if(free_chunk_list.tail){
-      free_chunk_list.head->prev = list->tail;
-    } else {
-      free_chunk_list.tail = list->tail;
-    }
-    if(list->head){
-      list->tail->next = free_chunk_list.head;
-      free_chunk_list.head = list->head;
-    }
-    list->head = NULL;
-    list->tail = NULL;
+    move_free_chunks_between_lists(&free_chunk_list, list);
   }
   
-  Free_Chunk *chunk = free_chunk_list.head;
-  while(chunk){
-    assert(chunk->status == (CHUNK_FREE | CHUNK_TO_MERGE));
-    /* Remove current chunk from the chunk list */
-    free_chunk_list.head = chunk->next;
-    if(free_chunk_list.head)
-      free_chunk_list.head->prev = NULL;
-    /* Check if the back adjcent chunks are free */
-    Free_Chunk *back_chunk = (Free_Chunk*)chunk->adj_next;
-    while(back_chunk < sspace_ceiling && back_chunk->status == (CHUNK_FREE | CHUNK_TO_MERGE)){
-      /* Remove back_chunk from list */
-      free_list_detach_chunk(&free_chunk_list, back_chunk);
-      chunk->adj_next = back_chunk->adj_next;
-      back_chunk = (Free_Chunk*)chunk->adj_next;
-    }
-    /* Check if the prev adjacent chunks are free */
-    Free_Chunk *prev_chunk = (Free_Chunk*)chunk->adj_prev;
-    while(prev_chunk && prev_chunk->status == (CHUNK_FREE | CHUNK_TO_MERGE)){
-      /* Remove prev_chunk from list */
-      free_list_detach_chunk(&free_chunk_list, prev_chunk);
-      prev_chunk->adj_next = chunk->adj_next;
-      chunk = prev_chunk;
-      prev_chunk = (Free_Chunk*)chunk->adj_prev;
-    }
-    
-    //zeroing_free_chunk(chunk);
-    
-    /* put the free chunk to the according free chunk list */
-    sspace_put_free_chunk(sspace, chunk);
-    
-    chunk = free_chunk_list.head;
+  merge_free_chunks_in_list(sspace, &free_chunk_list);
+}
+
+void sspace_remerge_free_chunks(GC *gc, Sspace *sspace)
+{
+  Free_Chunk_List free_chunk_list;
+  free_chunk_list.head = NULL;
+  free_chunk_list.tail = NULL;
+  
+  /* Collect free chunks from sspace free chunk lists to one list */
+  sspace_collect_free_chunks_to_list(sspace, &free_chunk_list);
+  
+  /* Collect free chunks from collectors to one list */
+  for(unsigned int i=0; i<gc->num_collectors; ++i){
+    Free_Chunk_List *list = gc->collectors[i]->free_chunk_list;
+    move_free_chunks_between_lists(&free_chunk_list, list);
   }
+  
+  merge_free_chunks_in_list(sspace, &free_chunk_list);
 }

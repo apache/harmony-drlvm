@@ -22,6 +22,8 @@
 #include "gc_ms.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 #include "../common/compressed_ref.h"
+#include "../thread/marker.h"
+#include "../verify/verify_live_heap.h"
 #ifdef USE_32BITS_HASHCODE
 #include "../common/hashcode.h"
 #endif
@@ -61,12 +63,49 @@ void gc_ms_destruct(GC_MS *gc_ms)
 
 void gc_ms_reclaim_heap(GC_MS *gc)
 {
+  if(verify_live_heap) gc_verify_heap((GC*)gc, TRUE);
+  
   sspace_collection(gc_ms_get_sspace(gc));
   
-  /* FIXME:: clear root set here to support verify */
-#ifdef COMPRESS_REFERENCE
-  gc_set_pool_clear(gc->metadata->gc_uncompressed_rootset_pool);
-#endif
+  if(verify_live_heap) gc_verify_heap((GC*)gc, FALSE);
+}
+
+void sspace_mark_scan_concurrent(Marker* marker);
+void gc_ms_start_concurrent_mark(GC_MS* gc, unsigned int num_markers)
+{
+  if(gc->num_active_markers == 0)
+    pool_iterator_init(gc->metadata->gc_rootset_pool);
+  
+  marker_execute_task_concurrent((GC*)gc,(TaskType)sspace_mark_scan_concurrent,(Space*)gc->sspace, num_markers);
+}
+
+void gc_ms_start_concurrent_mark(GC_MS* gc)
+{
+  pool_iterator_init(gc->metadata->gc_rootset_pool);
+  
+  marker_execute_task_concurrent((GC*)gc,(TaskType)sspace_mark_scan_concurrent,(Space*)gc->sspace);
+}
+
+void gc_ms_update_space_statistics(GC_MS* gc)
+{
+  POINTER_SIZE_INT num_live_obj = 0;
+  POINTER_SIZE_INT size_live_obj = 0;
+  
+  Space_Statistics* sspace_stat = gc->sspace->space_statistic;
+
+  unsigned int num_collectors = gc->num_active_collectors;
+  Collector** collectors = gc->collectors;
+  unsigned int i;
+  for(i = 0; i < num_collectors; i++){
+    Collector* collector = collectors[i];
+    num_live_obj += collector->live_obj_num;
+    size_live_obj += collector->live_obj_size;
+  }
+
+  sspace_stat->num_live_obj = num_live_obj;
+  sspace_stat->size_live_obj = size_live_obj;  
+  sspace_stat->last_size_free_space = sspace_stat->size_free_space;
+  sspace_stat->size_free_space = gc->committed_heap_size - size_live_obj;/*TODO:inaccurate value.*/
 }
 
 void gc_ms_iterate_heap(GC_MS *gc)
