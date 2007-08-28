@@ -78,6 +78,8 @@ char*   StaticConsts::rt_helper_get_invokeinterface_addr_withresolve = NULL;
 
 unsigned StaticConsts::rt_array_length_offset = NOTHING;
 unsigned StaticConsts::rt_suspend_req_flag_offset = NOTHING;
+char*    StaticConsts::rt_method_entry_flag_address = NULL;
+char*    StaticConsts::rt_method_exit_flag_address = NULL;
 int StaticConsts::rt_vtable_offset = 0;
 
 bool StaticConsts::g_jvmtiMode = false;

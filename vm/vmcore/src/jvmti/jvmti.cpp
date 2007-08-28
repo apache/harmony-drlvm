@@ -325,7 +325,9 @@ DebugUtilsTI::DebugUtilsTI() :
     prepareListNumber(0),
     global_capabilities(0),
     single_step_enabled(false),
-    cml_report_inlined(false)
+    cml_report_inlined(false),
+    method_entry_enabled_flag(0),
+    method_exit_enabled_flag(0)
 {
     jvmtiError UNUSED res = _allocate( MAX_NOTIFY_LIST * sizeof(Class**),
         (unsigned char**)&notifyLoadList );

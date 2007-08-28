@@ -383,6 +383,41 @@ jvmtiSetEventNotificationMode(jvmtiEnv* env,
                     }
                 }
             }
+            else if(JVMTI_EVENT_METHOD_ENTRY == event_type)
+            {
+                if (JVMTI_ENABLE == mode)
+                {
+                    TRACE2("jvmti.event.method.entry", "ENABLED global method entry flag");
+                    ti->set_method_entry_flag(1);
+                }
+                else if (JVMTI_DISABLE == mode && ti->get_method_entry_flag() != 0)
+                {
+                    LMAutoUnlock lock(&ti->TIenvs_lock);
+                    bool disable = check_event_is_disable(JVMTI_EVENT_METHOD_ENTRY, ti);
+                    if (disable) {
+                        TRACE2("jvmti.event.method.entry", "DISABLED global method entry flag");
+                        ti->set_method_entry_flag(0);
+                    }
+                }
+            }
+            else if(JVMTI_EVENT_METHOD_EXIT == event_type || JVMTI_EVENT_FRAME_POP == event_type)
+            {
+                if (JVMTI_ENABLE == mode)
+                {
+                    TRACE2("jvmti.event.method.exit", "ENABLED global method exit flag");
+                    ti->set_method_entry_flag(1);
+                }
+                else if (JVMTI_DISABLE == mode && ti->get_method_entry_flag() != 0)
+                {
+                    LMAutoUnlock lock(&ti->TIenvs_lock);
+                    bool disable = check_event_is_disable(JVMTI_EVENT_METHOD_EXIT, ti) ||
+                        check_event_is_disable(JVMTI_EVENT_FRAME_POP, ti);
+                    if (disable) {
+                        TRACE2("jvmti.event.method.entry", "DISABLED global method entry flag");
+                        ti->set_method_entry_flag(0);
+                    }
+                }
+            }
         }
         if( JVMTI_EVENT_DATA_DUMP_REQUEST == event_type ) {
             if(JVMTI_ENABLE == mode) {

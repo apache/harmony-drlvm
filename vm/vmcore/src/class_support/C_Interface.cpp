@@ -2928,3 +2928,13 @@ Boolean method_has_annotation(Method_Handle target, Class_Handle antn_type) {
     }
     return false;
 }
+
+char * get_method_entry_flag_address()
+{
+    return VM_Global_State::loader_env->TI->get_method_entry_flag_address();
+}
+
+char * get_method_exit_flag_address()
+{
+    return VM_Global_State::loader_env->TI->get_method_exit_flag_address();
+}

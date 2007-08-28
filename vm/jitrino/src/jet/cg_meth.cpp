@@ -511,8 +511,17 @@ void Compiler::gen_prolog(void) {
     // JVMTI method_enter notification
     //
     if (compilation_params.exe_notify_method_entry) {
+        AR ar = valloc(iplatf);
+        Opnd flag_addr(iplatf, ar);
+        mov(flag_addr,Opnd(iplatf,(int_ptr)rt_method_entry_flag_address));
+        Opnd mem(i16, ar, 0);
+        alu(alu_cmp, mem, Opnd(0));
+        unsigned br_off = br(z, 0, 0, taken);
+        
         static const CallSig cs_ti_menter(CCONV_HELPERS, jobj);
         gen_call_vm(cs_ti_menter, rt_helper_ti_method_enter, 0, m_method);
+        
+        patch(br_off, ip());
     }
     
     
@@ -592,6 +601,7 @@ void Compiler::gen_return(jtype retType)
     }
     
     if (compilation_params.exe_notify_method_exit) {
+
         // JVMTI helper takes pointer to return value and method handle
         const CallSig cs_ti_mexit(CCONV_STDCALL, jobj, jobj);
         // The call is a bit unusual, and is processed as follows:
@@ -618,10 +628,20 @@ void Compiler::gen_return(jtype retType)
             lea(retValPtr.as_opnd(), stackTop);
         }
         runlock(retValPtr);
+
+        AR ar = valloc(iplatf);
+        Opnd flag_addr(iplatf, ar);
+        mov(flag_addr,Opnd(iplatf,(int_ptr)rt_method_exit_flag_address));
+        Opnd mem(i16, ar, 0);
+        alu(alu_cmp, mem, Opnd(0));
+        unsigned br_off = br(z, 0, 0, taken);
+
         Val vmeth(jobj, m_method);
         gen_args(cs_ti_mexit, 0, &vmeth, &retValPtr);
         gen_call_vm(cs_ti_mexit, rt_helper_ti_method_exit, cs_ti_mexit.count());
         runlock(cs_ti_mexit);
+
+        patch(br_off, ip());
     }
 
     if (is_f(retType)) {

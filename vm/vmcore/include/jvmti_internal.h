@@ -338,6 +338,36 @@ class DebugUtilsTI {
             cml_report_inlined = value;
         }
 
+        char *get_method_entry_flag_address()
+        {
+            return &method_entry_enabled_flag;
+        }
+
+        char *get_method_exit_flag_address()
+        {
+            return &method_exit_enabled_flag;
+        }
+
+        char get_method_entry_flag()
+        {
+            return method_entry_enabled_flag;
+        }
+
+        char get_method_exit_flag()
+        {
+            return method_exit_enabled_flag;
+        }
+
+        void set_method_entry_flag(char value)
+        {
+            method_entry_enabled_flag = value;
+        }
+
+        void get_method_exit_flag(char value)
+        {
+            method_exit_enabled_flag = value;
+        }
+
     private:
 
     protected:
@@ -357,6 +387,7 @@ class DebugUtilsTI {
         unsigned global_capabilities;
         bool single_step_enabled;
         bool cml_report_inlined;
+        char method_entry_enabled_flag, method_exit_enabled_flag;
 }; /* end of class DebugUtilsTI */
 
 jvmtiError add_event_to_thread(jvmtiEnv *env, jvmtiEvent event_type, jthread event_thread);

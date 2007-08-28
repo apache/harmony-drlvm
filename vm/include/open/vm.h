@@ -1101,6 +1101,20 @@ VMEXPORT size_t get_size_property(const char *property_name, size_t default_valu
 // Numbers can include 'm' or 'M' for megabytes, 'k' or 'K' for kilobytes, and 'g' or 'G' for gigabytes (for example, 32k is the same as 32768).
 VMEXPORT int64 get_numerical_property(const char *property_name, int64 default_value, PropertyTable table_number);
 
+/**
+ * Returns the address of the global flag that specifies whether
+ * MethodEntry event is enabled. JIT should call this function in case
+ * a method is compiled with exe_notify_method_entry flag set.
+ */
+VMEXPORT char *get_method_entry_flag_address();
+
+/**
+ * Returns the address of the global flag that specifies whether
+ * MethodExit event is enabled. JIT should call this function in case
+ * a method is compiled with exe_notify_method_entry flag set.
+ */
+VMEXPORT char *get_method_exit_flag_address();
+
 ////
 // end miscellaneous functions.
 ////

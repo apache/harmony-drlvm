@@ -98,6 +98,18 @@ public:
     static unsigned     rt_suspend_req_flag_offset;
     
     /**
+     * @brief An address of 'method entry flag'.
+     * @see exe_notify_method_enter
+     */
+    static char*        rt_method_entry_flag_address;
+    
+    /**
+     * @brief An address of 'method exit flag'.
+     * @see exe_notify_method_exit
+     */
+    static char*        rt_method_exit_flag_address;
+    
+    /**
      * @brief Address of helper that returns a pointer to 
         thread local struct.
      * @param none
