@@ -20,7 +20,7 @@
 
 #include "../gen/gen.h"
 #include "../mark_sweep/gc_ms.h"
-
+#include "../mark_sweep/sspace_mark_sweep.h"
 
 inline Boolean obj_is_dead_in_gen_minor_gc(Partial_Reveal_Object *p_obj)
 {
@@ -38,8 +38,6 @@ inline Boolean obj_is_dead_in_nongen_minor_gc(Partial_Reveal_Object *p_obj)
   return (obj_belongs_to_nos(p_obj) && !obj_is_fw_in_oi(p_obj))
           || (!obj_belongs_to_nos(p_obj) && !obj_is_marked_in_oi(p_obj));
 }
-
-extern Boolean obj_is_mark_black_in_table(Partial_Reveal_Object *obj);
 
 /* The caller must be in places where alloc color and mark color haven't been flipped */
 inline Boolean obj_is_dead_in_sweep_major_gc(Partial_Reveal_Object *p_obj)
