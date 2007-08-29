@@ -1,9 +1,0 @@
-<project name="RUN HARMONY-4511 Regression Test">
-    <target name="run-test">
-        <!-- use special launcher for JVMTI tests -->
-        <run-jvmti-test
-            test="org.apache.harmony.drlvm.tests.regression.h4511.GCTagged"
-            agent="GCTagged"/>
-    </target>
-</project>
-
