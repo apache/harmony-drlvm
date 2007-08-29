@@ -38,9 +38,7 @@
 
 using namespace std;
 
-#ifdef _EM64T_
 #define _SKIP_CATCHED
-#endif
 
 namespace Jitrino
 {
