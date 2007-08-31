@@ -371,6 +371,7 @@ InlineInfoMap::Entry* CodeEmitter::processBlockOffsets(Node* node, InlineInfoMap
                     IRPrinter::printIndent(Log::out(), parentEntry->getInlineDepth()+1);
                     IRPrinter::printInst(Log::out(), inst);
                     Log::out()<<" native-offset="<<nativeInstEndOffset<<" bc-offset="<<inst->getBCOffset();
+                    Log::out().flush();
                 }
                 uint16 bcOffset = inst->getBCOffset();
                 globalBCMapOffset = getTopLevelEntryOffset(parentEntry);

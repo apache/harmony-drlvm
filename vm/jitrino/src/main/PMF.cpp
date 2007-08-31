@@ -24,6 +24,7 @@
 #include "PMFAction.h"
 #include "FixFileName.h"
 #include "JITInstanceContext.h"
+#include "CompilationContext.h"
 #include <ctype.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -2583,7 +2584,13 @@ bool IAction::isLogEnabled (const char* streamname) const
 #ifndef _NOLOG
 LogStream& IAction::log (LogStream::SID sid) const
 {
-    return (step->logs == 0) ? LogStream::log_sink() : step->logs->log(sid);
+    CompilationContext* currentCC = CompilationContext::getCurrentContext();
+    CompilationContext* topLevelCC = CompilationContext::getCurrentContext()->getVMCompilationInterface()->getCompilationContext();
+    const IAction* action = this;
+    if (currentCC != topLevelCC) {
+        action = topLevelCC->getCurrentSessionAction();
+    }
+    return (action!=NULL && action->step->logs == 0) ? LogStream::log_sink() : action->step->logs->log(sid);
 }
 #endif
 

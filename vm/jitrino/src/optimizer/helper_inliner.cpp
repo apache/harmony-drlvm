@@ -24,6 +24,7 @@
 #include "inliner.h"
 #include "LoopTree.h"
 #include "Dominator.h"
+#include "StlPriorityQueue.h"
 
 namespace Jitrino {
 
@@ -35,7 +36,7 @@ struct HelperInlinerFlags {
 
 #define DECLARE_STANDARD_HELPER_FLAGS(name) \
     bool  name##_doInlining;\
-    int   name##_hotnessPercentToInline;\
+    uint32   name##_hotnessPercentToInline;\
     const char* name##_className;\
     const char* name##_methodName;\
     const char* name##_signature;\
@@ -114,10 +115,11 @@ void HelperInlinerAction::init() {
 
 class HelperInliner {
 public:
-    HelperInliner(HelperInlinerSession* _sessionAction, MemoryManager& tmpMM, CompilationContext* _cc, Inst* _inst)  
+    HelperInliner(HelperInlinerSession* _sessionAction, MemoryManager& tmpMM, CompilationContext* _cc, Inst* _inst, uint32 _hotness)  
         : flags(((HelperInlinerAction*)_sessionAction->getAction())->getFlags()), localMM(tmpMM), 
         cc(_cc), inst(_inst), session(_sessionAction), method(NULL)
     {
+        hotness=_hotness;
         irm = cc->getHIRManager();
         instFactory = &irm->getInstFactory();
         opndManager = &irm->getOpndManager();
@@ -128,6 +130,9 @@ public:
     virtual ~HelperInliner(){};
     
     virtual void run()=0;
+
+    uint32 hotness;
+
 protected:
     MethodDesc* ensureClassIsResolvedAndInitialized(const char* className,  const char* methodName, const char* signature);
     virtual void doInline() = 0;
@@ -147,13 +152,19 @@ protected:
     OpndManager* opndManager;
     TypeManager* typeManager;
     ControlFlowGraph* cfg;
-
 };
+
+class HelperInlinerCompare {
+public:
+    bool operator()(const HelperInliner* hi1, const HelperInliner* hi2) { return hi1->hotness < hi2->hotness; }
+};
+
+
 #define DECLARE_HELPER_INLINER(name, flagPrefix)\
 class name : public HelperInliner {\
 public:\
-    name (HelperInlinerSession* session, MemoryManager& tmpMM, CompilationContext* cc, Inst* inst)\
-        : HelperInliner(session, tmpMM, cc, inst){}\
+    name (HelperInlinerSession* session, MemoryManager& tmpMM, CompilationContext* cc, Inst* inst, uint32 hotness)\
+        : HelperInliner(session, tmpMM, cc, inst, hotness){}\
     \
     virtual void run() { \
         if (Log::isEnabled())  {\
@@ -188,53 +199,57 @@ void HelperInlinerSession::_run(IRManager& irm) {
     //finding all helper calls
     ControlFlowGraph& fg = irm.getFlowGraph();
     double entryExecCount = fg.hasEdgeProfile() ? fg.getEntryNode()->getExecCount(): 1;
-    StlVector<HelperInliner*> helperInliners(tmpMM);
+    uint32 maxNodeCount = irm.getOptimizerFlags().hir_node_threshold;
+    StlPriorityQueue<HelperInliner*, StlVector<HelperInliner*>, HelperInlinerCompare> *helperInlineCandidates = 
+        new (tmpMM) StlPriorityQueue<HelperInliner*, StlVector<HelperInliner*>, HelperInlinerCompare>(tmpMM);
     const Nodes& nodes = fg.getNodesPostOrder();//process checking only reachable nodes.
     for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
         Node* node = *it;
-        int nodePercent = fg.hasEdgeProfile() ? (int)(node->getExecCount()*100/entryExecCount) : 0;
+        double execCount = node->getExecCount();
+        assert (execCount >= 0);
+        uint32 nodePercent = fg.hasEdgeProfile() ? (uint32)(execCount*100/entryExecCount) : 0;
         if (node->isBlockNode()) {
             for (Inst* inst = (Inst*)node->getFirstInst(); inst!=NULL; inst = inst->getNextInst()) {
                 Opcode opcode = inst->getOpcode();
                 switch(opcode) {
                     case Op_NewObj:
                         if (flags.newObj_doInlining && nodePercent >= flags.newObj_hotnessPercentToInline) {
-                            helperInliners.push_back(new (tmpMM) NewObjHelperInliner(this, tmpMM, cc, inst));
+                            helperInlineCandidates->push(new (tmpMM) NewObjHelperInliner(this, tmpMM, cc, inst, nodePercent));
                         }
                         break;
                     case Op_NewArray:
                         if (flags.newArray_doInlining && nodePercent >= flags.newArray_hotnessPercentToInline) {
-                            helperInliners.push_back(new (tmpMM) NewArrayHelperInliner(this, tmpMM, cc, inst));
+                            helperInlineCandidates->push(new (tmpMM) NewArrayHelperInliner(this, tmpMM, cc, inst, nodePercent));
                         }
                         break;
                     case Op_TauMonitorEnter:
                         if (flags.objMonEnter_doInlining && nodePercent >= flags.objMonEnter_hotnessPercentToInline) {
-                            helperInliners.push_back(new (tmpMM) ObjMonitorEnterHelperInliner(this, tmpMM, cc, inst));
+                            helperInlineCandidates->push(new (tmpMM) ObjMonitorEnterHelperInliner(this, tmpMM, cc, inst, nodePercent));
                         }
                         break;
                     case Op_TauMonitorExit:
                         if (flags.objMonExit_doInlining && nodePercent >= flags.objMonExit_hotnessPercentToInline) {
-                            helperInliners.push_back(new (tmpMM) ObjMonitorExitHelperInliner(this, tmpMM, cc, inst));
+                            helperInlineCandidates->push(new (tmpMM) ObjMonitorExitHelperInliner(this, tmpMM, cc, inst, nodePercent));
                         }
                         break;
                     case Op_TauStRef:
                         if (flags.wb_doInlining && nodePercent >= flags.wb_hotnessPercentToInline) {
-                            helperInliners.push_back(new (tmpMM) WriteBarrierHelperInliner(this, tmpMM, cc, inst));
+                            helperInlineCandidates->push(new (tmpMM) WriteBarrierHelperInliner(this, tmpMM, cc, inst, nodePercent));
                         }
                         break;
                     case Op_TauLdIntfcVTableAddr:
                         if (flags.ldInterface_doInlining && nodePercent >= flags.ldInterface_hotnessPercentToInline) {
-                            helperInliners.push_back(new (tmpMM) LdInterfaceHelperInliner(this, tmpMM, cc, inst));
+                            helperInlineCandidates->push(new (tmpMM) LdInterfaceHelperInliner(this, tmpMM, cc, inst, nodePercent));
                         }
                         break;
                     case Op_TauCheckCast:
                         if (flags.checkCast_doInlining && nodePercent >= flags.checkCast_hotnessPercentToInline) {
-                            helperInliners.push_back(new (tmpMM) CheckCastHelperInliner(this, tmpMM, cc, inst));
+                            helperInlineCandidates->push(new (tmpMM) CheckCastHelperInliner(this, tmpMM, cc, inst, nodePercent));
                         }
                         break;
                     case Op_TauInstanceOf:
                         if (flags.instanceOf_doInlining && nodePercent >= flags.instanceOf_hotnessPercentToInline) {
-                            helperInliners.push_back(new (tmpMM) InstanceOfHelperInliner(this, tmpMM, cc, inst));
+                            helperInlineCandidates->push(new (tmpMM) InstanceOfHelperInliner(this, tmpMM, cc, inst, nodePercent));
                         }
                         break;
                     default: break;
@@ -244,10 +259,10 @@ void HelperInlinerSession::_run(IRManager& irm) {
     }
 
     //running all inliners
-    //TODO: set inline limit!
-    for (StlVector<HelperInliner*>::const_iterator it = helperInliners.begin(), end = helperInliners.end(); it!=end; ++it) {
-        HelperInliner* inliner = *it;
+    while(!helperInlineCandidates->empty() && (fg.getNodeCount() < maxNodeCount)) {
+        HelperInliner* inliner = helperInlineCandidates->top();
         inliner->run();
+        helperInlineCandidates->pop();
     }
 }
 
@@ -348,6 +363,7 @@ void NewObjHelperInliner::doInline() {
     instFactory->makeLdConst(allocationHandleOpnd, allocationHandle)->insertBefore(inst);
     Opnd* args[2] = {objSizeOpnd, allocationHandleOpnd};
     MethodCallInst* call = instFactory->makeDirectCall(callResOpnd, tauSafeOpnd, tauSafeOpnd, 2, args, method)->asMethodCallInst();
+    assert(inst->getBCOffset()!=ILLEGAL_BC_MAPPING_VALUE);
     call->setBCOffset(inst->getBCOffset());
     call->insertBefore(inst);
     inst->unlink();
@@ -407,6 +423,7 @@ void NewArrayHelperInliner::doInline() {
     Opnd* args[3] = {numElements, elemSizeOpnd, allocationHandleOpnd};
     Opnd* callResOpnd = opndManager->createSsaTmpOpnd(typeManager->getUnmanagedPtrType(typeManager->getInt8Type()));
     MethodCallInst* call = instFactory->makeDirectCall(callResOpnd, tauSafeOpnd, tauSafeOpnd, 3, args, method)->asMethodCallInst();
+    assert(inst->getBCOffset()!=ILLEGAL_BC_MAPPING_VALUE);
     call->setBCOffset(inst->getBCOffset());
     call->insertBefore(inst);
     inst->unlink();
@@ -439,6 +456,7 @@ void ObjMonitorEnterHelperInliner::doInline() {
     instFactory->makeTauSafe(tauSafeOpnd)->insertBefore(inst);
     Opnd* args[1] = {objOpnd};
     MethodCallInst* call = instFactory->makeDirectCall(opndManager->getNullOpnd(), tauSafeOpnd, tauSafeOpnd, 1, args, method)->asMethodCallInst();
+    assert(inst->getBCOffset()!=ILLEGAL_BC_MAPPING_VALUE);
     call->setBCOffset(inst->getBCOffset());
     call->insertBefore(inst);
     inst->unlink();
@@ -474,6 +492,7 @@ void ObjMonitorExitHelperInliner::doInline() {
     instFactory->makeTauSafe(tauSafeOpnd)->insertBefore(inst);
     Opnd* args[1] = {objOpnd};
     MethodCallInst* call = instFactory->makeDirectCall(opndManager->getNullOpnd(), tauSafeOpnd, tauSafeOpnd, 1, args, method)->asMethodCallInst();
+    assert(inst->getBCOffset()!=ILLEGAL_BC_MAPPING_VALUE);
     call->setBCOffset(inst->getBCOffset());
     call->insertBefore(inst);
     inst->unlink();
@@ -501,6 +520,7 @@ void WriteBarrierHelperInliner::doInline() {
     instFactory->makeTauSafe(tauSafeOpnd)->insertBefore(inst);
     Opnd* args[3] = {objBaseOpnd, ptrOpnd, srcOpnd};
     MethodCallInst* call = instFactory->makeDirectCall(opndManager->getNullOpnd(), tauSafeOpnd, tauSafeOpnd, 3, args, method)->asMethodCallInst();
+    assert(inst->getBCOffset()!=ILLEGAL_BC_MAPPING_VALUE);
     call->setBCOffset(inst->getBCOffset());
     call->insertBefore(inst);
     inst->unlink();
@@ -550,6 +570,7 @@ void LdInterfaceHelperInliner::doInline() {
     instFactory->makeTauSafe(tauSafeOpnd)->insertBefore(inst);
     Opnd* args[2] = {baseOpnd, typeOpnd};
     MethodCallInst* call = instFactory->makeDirectCall(resOpnd, tauSafeOpnd, tauSafeOpnd, 2, args, method)->asMethodCallInst();
+    assert(inst->getBCOffset()!=ILLEGAL_BC_MAPPING_VALUE);
     call->setBCOffset(inst->getBCOffset());
     call->insertBefore(inst);
     inst->unlink();
@@ -609,6 +630,7 @@ void CheckCastHelperInliner::doInline() {
 
     Opnd* args[6] = {objOpnd, typeOpnd, isArrayOpnd, isInterfaceOpnd, isFinalOpnd, fastCheckDepthOpnd};
     MethodCallInst* call = instFactory->makeDirectCall(opndManager->getNullOpnd(), tauSafeOpnd, tauSafeOpnd, 6, args, method)->asMethodCallInst();
+    assert(inst->getBCOffset()!=ILLEGAL_BC_MAPPING_VALUE);
     call->setBCOffset(inst->getBCOffset());
     
     call->insertBefore(inst);
@@ -670,6 +692,7 @@ void InstanceOfHelperInliner::doInline() {
 
     Opnd* args[6] = {objOpnd, typeOpnd, isArrayOpnd, isInterfaceOpnd, isFinalOpnd, fastCheckDepthOpnd};
     MethodCallInst* call = instFactory->makeDirectCall(inst->getDst(), tauSafeOpnd, tauSafeOpnd, 6, args, method)->asMethodCallInst();
+    assert(inst->getBCOffset()!=ILLEGAL_BC_MAPPING_VALUE);
     call->setBCOffset(inst->getBCOffset());
 
     call->insertBefore(inst);

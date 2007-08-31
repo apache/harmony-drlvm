@@ -1908,6 +1908,7 @@ void IRManager::expandSystemExceptions(uint32 reservedForFlags)
                        )){
                         Node* throwBasicBlock = fg->createBlockNode();
                         Inst* throwInst = newRuntimeHelperCallInst(CompilationInterface::Helper_NullPtrException, 0, NULL, NULL);
+                        assert(lastInst->getBCOffset()!=ILLEGAL_BC_MAPPING_VALUE);
                         throwInst->setBCOffset(lastInst->getBCOffset());
                         throwBasicBlock->appendInst(throwInst);
 #ifndef _EM64T_

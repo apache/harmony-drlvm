@@ -887,6 +887,22 @@ public:
    */
     CFGInst* getLabelInst() const {CFGInst* first = getFirstInst(); assert(first==NULL || first->isLabel()); return first;}
 
+
+    /** 
+    * Gets bytecode offset of the first inst with bc-mapping in the node
+    * 
+    * @return  bytecode offset of the first inst with bc-mapping in the node
+    */
+    uint16 getNodeStartBCOffset() const;
+
+    /** 
+    * Gets bytecode offset of the last inst with bc-mapping in the node
+    * 
+    * @return  bytecode offset of the last inst with bc-mapping in the node
+    */
+    uint16 getNodeEndBCOffset() const;
+
+
 protected:
   /** 
    * The constructor of Node.

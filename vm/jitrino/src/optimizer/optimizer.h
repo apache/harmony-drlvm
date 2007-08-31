@@ -39,6 +39,11 @@ struct OptimizerFlags {
     //global optimizer flags
     bool dumpdot;
 
+    // Max number of nodes HIR would grow up to during various inlinings
+    uint32 hir_node_threshold;
+    // A share of node limit inlining may use (in percents), the remaining share is for helper inlining
+    uint32 inline_node_quota;
+
     bool cse_final;
 
     uint32 hash_init_factor;

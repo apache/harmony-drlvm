@@ -61,19 +61,22 @@ private:
 
 class InlineNode : public TreeNode {
 public:
-    InlineNode(IRManager& irm, Inst *callInst, Node *callNode) : _irm(irm), _callInst(callInst), _callNode(callNode) {}
+    InlineNode(IRManager& irm, Inst *callInst, Node *callNode, bool forced = false)
+        : _irm(irm), _callInst(callInst), _callNode(callNode), _forceInline(forced) {}
     InlineNode* getChild()    {return (InlineNode*) child;}
     InlineNode* getSiblings() {return (InlineNode*) siblings;}
     InlineNode* getParent()   {return (InlineNode*) parent;}
     IRManager&  getIRManager()      { return _irm; }
     Inst*       getCallInst() { return _callInst; }
-    Node*    getCallNode() { return _callNode; }
+    Node*       getCallNode() { return _callNode; }
+    bool        isForced() { return _forceInline; }
     void print(::std::ostream& os);
     void printTag(::std::ostream& os);
 private:
     IRManager&  _irm;
     Inst*       _callInst;
-    Node*    _callNode;
+    Node*       _callNode;
+    bool        _forceInline;
 };
 
 class InlineTree : public Tree {
@@ -193,7 +196,9 @@ private:
     int32 _inlineRecursionPenalty;
     int32 _inlineExactArgBonus;
     int32 _inlineExactAllBonus;
-    
+
+    uint32 _inlineMaxNodeThreshold;
+
     bool _inlineSkipExceptionPath;
     bool _inlineSkipApiMagicMethods;
     Method_Table* _inlineSkipMethodTable;

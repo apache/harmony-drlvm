@@ -190,6 +190,7 @@ Devirtualizer::genGuardedDirectCall(IRManager &regionIRM, Node* node, Inst* call
     ControlFlowGraph &regionFG = regionIRM.getFlowGraph();
     assert(!methodDesc->isStatic());
     assert(call == node->getLastInst());
+    uint16 bcOffset = call->getBCOffset();
 
     Log::out() << "Generating guarded direct call to " << objectType->getName()
         << "." << methodDesc->getName() << ::std::endl;
@@ -214,6 +215,9 @@ Devirtualizer::genGuardedDirectCall(IRManager &regionIRM, Node* node, Inst* call
     Node* guard = node;
     Node* directCallBlock = regionFG.createBlockNode(_instFactory.makeLabel());
     Node* virtualCallBlock = regionFG.createBlockNode(_instFactory.makeLabel());
+    directCallBlock->getFirstInst()->setBCOffset(bcOffset);
+    virtualCallBlock->getFirstInst()->setBCOffset(bcOffset);
+
     Node* merge = next;
 
     //
@@ -289,12 +293,14 @@ Devirtualizer::genGuardedDirectCall(IRManager &regionIRM, Node* node, Inst* call
         VarOpnd* returnVar = _opndManager.createVarOpnd(dst->getType(), false);
         
         Node* directStVarBlock = regionFG.createBlockNode(_instFactory.makeLabel());
+        directStVarBlock->getFirstInst()->setBCOffset(bcOffset);
         directStVarBlock->setExecCount(directCallBlock->getExecCount());
         regionFG.addEdge(directCallBlock, directStVarBlock)->setEdgeProb(1.0);
         Inst* stVar1 = _instFactory.makeStVar(returnVar, ssaTmp1);
         directStVarBlock->appendInst(stVar1);
         
         Node* virtualStVarBlock = regionFG.createBlockNode(_instFactory.makeLabel());
+        virtualStVarBlock->getFirstInst()->setBCOffset(bcOffset);
         regionFG.addEdge(virtualCallBlock, virtualStVarBlock);
         Inst* stVar2 = _instFactory.makeStVar(returnVar, ssaTmp2);
         virtualStVarBlock->appendInst(stVar2);
@@ -319,6 +325,7 @@ Devirtualizer::genGuardedDirectCall(IRManager &regionIRM, Node* node, Inst* call
         bool needPhiBlock = (merge->getInDegree() > 0);
         if (needPhiBlock) {
             Node* phiBlock = regionFG.createBlockNode(_instFactory.makeLabel());
+            phiBlock->getFirstInst()->setBCOffset(bcOffset);
             regionFG.addEdge(phiBlock, merge);
             regionFG.addEdge(directStVarBlock, phiBlock)->setEdgeProb(1.0);
             regionFG.addEdge(virtualStVarBlock, phiBlock);

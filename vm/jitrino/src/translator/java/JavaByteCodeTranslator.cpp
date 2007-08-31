@@ -1445,6 +1445,37 @@ JavaByteCodeTranslator::popArgs(uint32 numArgs) {
     return srcOpnds;
 }
 
+class JavaMethodSignature : public MethodSignature {
+public:
+    JavaMethodSignature(MemoryManager& mm, CompilationInterface ci, Class_Handle cl, const char* sigStr){
+        nParams = JavaLabelPrepass::getNumArgsBySignature(sigStr);
+        const char* sigSuffix = sigStr;
+        if (nParams > 0) {
+            sigSuffix++;
+            paramTypes = new (mm) Type*[nParams];
+            for (uint32 i=0;i<nParams;i++) {
+                uint32 len = 0;
+                Type* type = JavaLabelPrepass::getTypeByDescriptorString(ci, cl, sigSuffix, len);
+                assert(type!=NULL);
+                paramTypes[i] = type;
+                sigSuffix+=len;
+            }
+        } else {
+            paramTypes = NULL;
+        }
+        retType = JavaLabelPrepass::getRetTypeBySignature(ci, cl, sigSuffix);
+    }
+    
+    virtual ~JavaMethodSignature(){};
+    virtual uint32 getNumParams() const { return nParams;}
+    virtual Type** getParamTypes() const { return paramTypes;}
+    virtual Type* getRetType() const {return retType;}
+private:
+    uint32 nParams;
+    Type** paramTypes;
+    Type* retType;
+
+};
 
 void JavaByteCodeTranslator::genCallWithResolve(JavaByteCodes bc, unsigned cpIndex) {
     assert(bc == OPCODE_INVOKESPECIAL || bc == OPCODE_INVOKESTATIC || bc == OPCODE_INVOKEVIRTUAL || bc == OPCODE_INVOKEINTERFACE);
@@ -1455,11 +1486,13 @@ void JavaByteCodeTranslator::genCallWithResolve(JavaByteCodes bc, unsigned cpInd
     assert(enclosingClass!=NULL);
     const char* methodSig = methodSignatureString(cpIndex);
     assert(methodSig);
-    uint32 numArgs = JavaLabelPrepass::getNumArgsBySignature(methodSig) + (isStatic ? 0 : 1); 
+    JavaMethodSignature* sig = new (memManager) JavaMethodSignature(irBuilder.getIRManager()->getMemoryManager(),
+        compilationInterface, (Class_Handle)enclosingClass->getVMTypeHandle(), methodSig);
+    uint32 numArgs = sig->getNumParams() + (isStatic ? 0 : 1); 
     assert(numArgs > 0 || isStatic);
 
     Opnd** args = popArgs(numArgs);
-    Type* returnType = JavaLabelPrepass::getRetTypeBySignature(compilationInterface, methodToCompile.getParentHandle(), methodSig);
+    Type* returnType = sig->getRetType();
     
 
     if (bc != OPCODE_INVOKEINTERFACE) {
@@ -1483,7 +1516,7 @@ void JavaByteCodeTranslator::genCallWithResolve(JavaByteCodes bc, unsigned cpInd
     Opnd* tauTypesChecked = NULL;// let IRBuilder handle types
 
     Opnd* dst = irBuilder.genIndirectCallWithResolve(returnType, tauNullCheckedFirstArg, tauTypesChecked, 
-                                numArgs, args, enclosingClass, bc, cpIndex);
+                                numArgs, args, enclosingClass, bc, cpIndex, sig);
     if (returnType->tag != Type::Void) {
         pushOpnd(dst);
     }

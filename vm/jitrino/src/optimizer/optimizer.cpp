@@ -63,6 +63,9 @@
 
 namespace Jitrino {
 
+#define HIR_NODE_THRESHOLD 1300
+#define INLINE_NODE_QUOTA 60  // percents
+
 class OptInitAction : public Action {
 public:
     void init() {readFlags();}
@@ -105,6 +108,8 @@ void OptInitAction::readFlags()
     memset( &optimizerFlags, 0, sizeof(OptimizerFlags));
 
     optimizerFlags.dumpdot= getBoolArg("dumpdot", false);
+    optimizerFlags.hir_node_threshold = getIntArg("hir_node_threshold", HIR_NODE_THRESHOLD);
+    optimizerFlags.inline_node_quota = getIntArg("inline_node_quota", INLINE_NODE_QUOTA);
 
     optimizerFlags.cse_final = getBoolArg("cse_final", true);
 
@@ -196,6 +201,7 @@ void OptInitAction::readFlags()
 void showFlags(std::ostream& os) {
     os << "\n"<<OPT_INIT_NAME<<std::endl;
     os << "  global optimizer flags:"<<std::endl;
+    os << "    hir_node_threshold=<n>      - max number of CFG nodes for inlining" << std::endl;
     os << "    elim_cmp3[={ON|off}]        - eliminate cmp3 tests" << std::endl;
     os << "    elim_checks[={ON|off}]      - try to eliminate some checks using branch conditions" << std::endl;
     os << "    use_mulhi{ON|off}]          - use MulHi opcode" << std::endl;

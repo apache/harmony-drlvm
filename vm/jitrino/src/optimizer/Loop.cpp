@@ -794,6 +794,7 @@ public:
         Inst* labelInst = (Inst*)header->getFirstInst();
         assert(labelInst->isLabel() && !labelInst->isCatchLabel());
         newPreHeader->appendInst(instFactory.makeLabel());
+        newPreHeader->getFirstInst()->setBCOffset(labelInst->getBCOffset());
         if (numEdges > 1 ) {
             for (Inst* phi = labelInst->getNextInst();phi!=NULL && phi->isPhi(); phi = phi->getNextInst()) {
                 Opnd *orgDst = phi->getDst();

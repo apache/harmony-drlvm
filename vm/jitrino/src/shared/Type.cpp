@@ -526,7 +526,7 @@ TypeManager::getMethodPtrType(MethodDesc* methodDesc) {
 }
 
 UnresolvedMethodPtrType*    
-TypeManager::getUnresolvedMethodPtrType(ObjectType* enclosingClass, uint32 cpIndex) {
+TypeManager::getUnresolvedMethodPtrType(ObjectType* enclosingClass, uint32 cpIndex, MethodSignature* sig) {
     PtrHashTable<UnresolvedMethodPtrType>* methodsPerClass = unresMethodPtrTypes.lookup(enclosingClass);
     if (!methodsPerClass) {
         methodsPerClass = new (memManager) PtrHashTable<UnresolvedMethodPtrType>(memManager, 32);
@@ -534,7 +534,8 @@ TypeManager::getUnresolvedMethodPtrType(ObjectType* enclosingClass, uint32 cpInd
     }
     UnresolvedMethodPtrType* methType = methodsPerClass->lookup((void*)(POINTER_SIZE_INT)cpIndex);
     if (!methType) {
-        methType = new (memManager) UnresolvedMethodPtrType(enclosingClass, cpIndex, *this);
+        methType = new (memManager) UnresolvedMethodPtrType(enclosingClass, cpIndex, *this, 
+            sig->getNumParams(), sig->getParamTypes(), sig->getRetType());
         methodsPerClass->insert((void*)(POINTER_SIZE_INT)cpIndex, methType);
     }
     return methType;
@@ -1008,6 +1009,7 @@ void    MethodPtrType::print(::std::ostream& os) {
 }
 
 void UnresolvedMethodPtrType::print(::std::ostream& os) {
+    //TODO: think about caching signature string as a separate field to avoid VM calls here
     Class_Handle ch = (Class_Handle)enclosingClass->getVMTypeHandle();
     const char* method_class = const_pool_get_method_class_name(ch, (unsigned short)cpIndex);
     const char* method_name = const_pool_get_method_name(ch, (unsigned short)cpIndex);

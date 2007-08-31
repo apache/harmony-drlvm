@@ -111,6 +111,8 @@ Inliner::Inliner(SessionAction* argSource, MemoryManager& mm, IRManager& irm,
     _inlineExactArgBonus = argSource->getIntArg("exact_single_parameter_bonus", INLINE_EXACT_ARG_BONUS);
     _inlineExactAllBonus = argSource->getIntArg("exact_all_parameter_bonus", INLINE_EXACT_ALL_BONUS);
 
+    _inlineMaxNodeThreshold = irm.getOptimizerFlags().hir_node_threshold * irm.getOptimizerFlags().inline_node_quota / 100;
+
     _inlineSkipExceptionPath = argSource->getBoolArg("skip_exception_path", INLINE_SKIP_EXCEPTION_PATH);
 #if defined  (_EM64T_) || defined (_IPF_)
     _inlineSkipApiMagicMethods  = false;
@@ -160,7 +162,7 @@ Inliner::computeInlineBenefit(Node* node, MethodDesc& methodDesc, InlineNode* pa
     if (inlinePragma!=NULL && methodDesc.hasAnnotation(inlinePragma)) {
         //methods marked with inline pragma processed separately and are always inlined
         //regardless of it benefits and size limitations.
-        return -1;
+        assert(0);
     }
     if (_inlineBonusMethodTable!=NULL && _inlineBonusMethodTable->accept_this_method(methodDesc)) {
         benefit+=1000;
@@ -894,13 +896,12 @@ Inliner::getNextRegionToInline(CompilationContext& inlineCC) {
         // Find new candidate.
         callNode = _inlineCandidates.top().callNode;
         inlineParentNode = _inlineCandidates.top().inlineNode;
-        int benefit = _inlineCandidates.top().benefit;
         _inlineCandidates.pop();
 
         call = ((Inst*)callNode->getLastInst())->asMethodCallInst();
         assert(call != NULL);
         methodDesc = call->getMethodDesc();
-        bool isPragmaInline = benefit == PRAGMA_INLINE_BENEFIT;
+        bool isPragmaInline = methodDesc->hasAnnotation(inlinePragma);;
 
         // If candidate would cause top level method to exceed size threshold, throw away.
         
@@ -944,7 +945,8 @@ InlineNode* Inliner::createInlineNode(CompilationContext& inlineCC, MethodCallIn
     MethodDesc *methodDesc = call->getMethodDesc();
     IRManager* inlinedIRM = new (_tmpMM) IRManager(_tmpMM, _toplevelIRM, *methodDesc, NULL);
     // Augment inline tree
-    InlineNode *inlineNode = new (_tmpMM) InlineNode(*inlinedIRM, call, call->getNode());
+    bool forceInline = methodDesc->hasAnnotation(inlinePragma);
+    InlineNode *inlineNode = new (_tmpMM) InlineNode(*inlinedIRM, call, call->getNode(), forceInline);
     
     inlineCC.setHIRManager(inlinedIRM);
     
@@ -993,6 +995,7 @@ Inliner::processDominatorNode(InlineNode *inlineNode, DominatorNode* dnode, Loop
                 assert(size > 0);
                 Log::out() << "Inline benefit " << methodDesc->getParentType()->getName() << "." << methodDesc->getName() << " == " << (int) benefit << ::std::endl;
                 if(0 < size && benefit > _minBenefitThreshold) {
+                    assert(benefit < PRAGMA_INLINE_BENEFIT);
                     // Inline candidate
                     Log::out() << "Add to queue" << std::endl;
                     _inlineCandidates.push(CallSite(benefit, node, inlineNode));
@@ -1155,6 +1158,10 @@ void Inliner::runInliner(MethodCallInst* call) {
         }
         //inline current region
         inlineRegion(regionNode);
+        // Limit inlining by node count. All @Inline methods still must be inlined.
+        if (!regionNode->isForced() && _toplevelIRM.getFlowGraph().getNodeCount() > _inlineMaxNodeThreshold) {
+            break;
+        }
     } while (true);
 
 

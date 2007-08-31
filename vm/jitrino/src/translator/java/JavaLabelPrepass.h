@@ -312,8 +312,9 @@ public:
     void genCompare   (Type *type);
     void invoke       (MethodDesc *mdesc);
     void pseudoInvoke (const char* mdesc);
-    static  uint32  getNumArgsBySignature(const char*& methodSig);
-    static  Type*   getRetTypeBySignature(CompilationInterface& ci, Class_Handle enclClass, const char* methodSig);
+    static uint32  getNumArgsBySignature(const char* methodSig);
+    static Type*   getRetTypeBySignature(CompilationInterface& ci, Class_Handle enclClass, const char* methodSig);
+    static Type*   getTypeByDescriptorString(CompilationInterface& ci, Class_Handle enclClass, const char* descriptorString, uint32& len);
 
     // remaining instructions
 

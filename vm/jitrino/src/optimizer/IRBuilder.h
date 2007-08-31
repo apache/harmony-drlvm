@@ -131,7 +131,8 @@ public:
                                     Opnd* args[],
                                     ObjectType* ch,
                                     JavaByteCodes bc,
-                                    uint32 cpIndex
+                                    uint32 cpIndex,
+                                    MethodSignature* sig
                                     );
     
     Opnd* genDirectCall(MethodDesc* methodDesc, // TR //SI

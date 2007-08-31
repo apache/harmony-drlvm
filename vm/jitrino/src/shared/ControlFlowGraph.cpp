@@ -191,6 +191,30 @@ Edge* Node::findEdgeTo(bool isForward, Node* node) const {
 
 }
 
+uint16 Node::getNodeStartBCOffset() const {
+    if (!isBlockNode()) {
+        return ILLEGAL_BC_MAPPING_VALUE;
+    }
+    CFGInst* inst = getFirstInst();
+    while (inst!=NULL && inst->getBCOffset()==ILLEGAL_BC_MAPPING_VALUE) {
+        inst = inst->next();
+    }
+    return inst==NULL ? ILLEGAL_BC_MAPPING_VALUE : inst->getBCOffset();
+}
+
+uint16 Node::getNodeEndBCOffset() const {
+    if (!isBlockNode()) {
+        return ILLEGAL_BC_MAPPING_VALUE;
+    }
+    CFGInst* inst = getLastInst();
+    while (inst!=NULL && inst->getBCOffset()==ILLEGAL_BC_MAPPING_VALUE) {
+        inst = inst->prev();
+    }
+    return inst==NULL ? ILLEGAL_BC_MAPPING_VALUE : inst->getBCOffset();
+}
+
+
+
 //////////////////////////////////////////////////////////////////////////
 // CFG methods
 
@@ -817,6 +841,9 @@ Node* ControlFlowGraph::splitNode(Node* node, bool newBlockAtEnd, CFGInst* inst)
 Node* ControlFlowGraph::splitEdge(Edge *edge, CFGInst* inst, bool keepOldEdge) {
     Node* target = edge->getTargetNode();
     Node* newNode = createBlockNode(inst);
+    if (inst!=NULL && target->getFirstInst()!=NULL) {
+        inst->setBCOffset(target->getFirstInst()->getBCOffset());
+    }
 
     replaceEdgeTarget(edge, newNode, keepOldEdge);
     addEdge(newNode, target);

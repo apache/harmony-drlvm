@@ -122,7 +122,7 @@ static TlsStore<TlsLogStreams> tlslogstreams;
  */
 LogStreams& LogStreams::current(JITInstanceContext* jitContext) {
 
-    CompilationContext* ccp = CompilationContext::getCurrentContext();
+    CompilationContext* ccp = CompilationContext::getCurrentContext()->getVMCompilationInterface()->getCompilationContext();
     LogStreams* cls = ccp->getCurrentLogs();
     if (cls != 0) 
         return *cls;

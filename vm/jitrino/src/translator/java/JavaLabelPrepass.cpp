@@ -1349,7 +1349,7 @@ void JavaLabelPrepass::pseudoInvoke(const char* methodSig) {
     }
 }
 
-uint32 JavaLabelPrepass::getNumArgsBySignature(const char*& methodSig) 
+uint32 JavaLabelPrepass::getNumArgsBySignature(const char* methodSig) 
 {
     assert(methodSig);
     assert(*methodSig == '(');
@@ -1391,76 +1391,87 @@ uint32 JavaLabelPrepass::getNumArgsBySignature(const char*& methodSig)
 Type* JavaLabelPrepass::getRetTypeBySignature(CompilationInterface& ci, Class_Handle enclClass, const char* origSig) 
 {
     assert(*origSig== '(' || *origSig == ')');
-    while( *(origSig++) != ')' ); // in case getNumArgsBySignature was not run earlier
+    while( *(origSig++) != ')' ); 
 
-    Type* retType = NULL;
+    uint32 stub=0;
+    return getTypeByDescriptorString(ci, enclClass, origSig, stub);
+}
+
+Type* JavaLabelPrepass::getTypeByDescriptorString(CompilationInterface& ci, Class_Handle enclClass, const char* descriptorString, uint32& len) {
     uint32 arrayDim = 0;
-    const char* methodSig = origSig;
-
-
+    len=1;
+    Type* resType = NULL;
     // collect array dimension if any
-    while( *(methodSig) == '[' ) {
+    while( *(descriptorString) == '[' ) {
         arrayDim++;
-        methodSig++;
+        descriptorString++;
+        len++;
     }
 
     bool arrayIsWrapped = false;
     TypeManager& typeManager = ci.getTypeManager();
-    switch( *methodSig ) 
+    switch( *descriptorString ) 
     {
-    case 'L': {
+    case 'L': 
+        {
+            //TODO: check by name if type is already resolved!!!
             if (!typeManager.isLazyResolutionMode()) {
-                retType = typeManager.getUnresolvedObjectType();
+                resType = typeManager.getUnresolvedObjectType();
             } else {
-                retType = ci.getTypeFromDescriptor(enclClass, origSig);
+                resType = ci.getTypeFromDescriptor(enclClass, descriptorString);
                 //in lazy resolution mode retType is already valid array type
                 arrayIsWrapped = true;
             }
+            while( *(++descriptorString) != ';' ) {
+                len++;
+                assert(*descriptorString);
+            }
+            len++; //';' char
         }
         break;
     case 'B':
-        retType = typeManager.getInt8Type();
+        resType = typeManager.getInt8Type();
         break;
     case 'C':
-        retType = typeManager.getCharType();
+        resType = typeManager.getCharType();
         break;
     case 'D':
-        retType = typeManager.getDoubleType();
+        resType = typeManager.getDoubleType();
         break;
     case 'F':
-        retType = typeManager.getSingleType();
+        resType = typeManager.getSingleType();
         break;
     case 'I':
-        retType = typeManager.getInt32Type();
+        resType = typeManager.getInt32Type();
         break;
     case 'J':
-        retType = typeManager.getInt64Type();
+        resType = typeManager.getInt64Type();
         break;
     case 'S':
-        retType = typeManager.getInt16Type();
+        resType = typeManager.getInt16Type();
         break;
     case 'Z':
-        retType = typeManager.getBooleanType();
+        resType = typeManager.getBooleanType();
         break;
     case 'V':
-        retType = typeManager.getVoidType();
+        resType = typeManager.getVoidType();
         break; // leave stack as is
     case '[': // all '[' are already skipped
     case '(': // we have already pass it
     case ')': // we have just leave it back
     default: // impossible! Verifier must check and catch this
         assert(0);
-        retType = typeManager.getUnresolvedObjectType();
+        resType = typeManager.getUnresolvedObjectType();
         break;
     }
-    assert(retType);
+    assert(resType);
 
     if (!arrayIsWrapped && arrayDim > 0) {
         for (;arrayDim > 0; arrayDim--) {
-            retType = typeManager.getArrayType(retType, false);
+            resType = typeManager.getArrayType(resType, false);
         }
     }
-    return retType;
+    return resType;
 }
 
 void JavaLabelPrepass::invoke(MethodDesc* methodDesc) {
@@ -1950,7 +1961,7 @@ void JavaLabelPrepass::print_loc_vars(uint32 offset, uint32 index)
                     << "][index=" << index << "] is empty" << ::std::endl;
     } else {
         Log::out() << "localVars[offset=" << offset << "][index=" << index << "].var->declT = "; 
-        (*iter).second->getDeclaredType()->print(::std::cout); 
+        (*iter).second->getDeclaredType()->print(Log::out()); 
         Log::out() << ::std::endl;
     }
 }

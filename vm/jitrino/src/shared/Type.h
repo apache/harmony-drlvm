@@ -50,7 +50,7 @@ class OrNullType;
 class TypeManager;
 class TypeFailStream;
 class TypeFactsManager;
-
+class MethodSignature;
 typedef SsaOpnd* ValueName;
 
 class Type {
@@ -422,27 +422,6 @@ public:
     virtual bool isInstance() = 0;
 };
 
-class UnresolvedMethodPtrType : public FunctionPtrType {
-public:
-    UnresolvedMethodPtrType(ObjectType* _enclosingClass, uint32 _cpIndex, TypeManager& tm, bool isCompressed=false, ValueName obj=NULL) 
-        : FunctionPtrType(isCompressed), enclosingClass(_enclosingClass), cpIndex(_cpIndex), typeManager(tm), object(obj) {}
-        virtual ~UnresolvedMethodPtrType() {}
-
-        UnresolvedMethodPtrType* asUnresolvedMethodPtrType() { return this; }
-        uint32 getNumParams() {assert(0); return 0;}
-        Type* getParamType(uint32 n){assert(0); return NULL;}
-        Type* getReturnType() {assert(0); return NULL;}
-        bool isInstance() { assert(0); return false;}
-        void print(::std::ostream& os);
-        virtual bool    isUnresolvedType() {return true;}
-private:
-    ObjectType* enclosingClass;
-    uint32      cpIndex;
-    TypeManager& typeManager;
-    ValueName object;
-
-};
-
 class MethodPtrType : public FunctionPtrType {
 public:
     MethodPtrType(MethodDesc* md, TypeManager& tm, bool isCompressed=false, ValueName obj=NULL) 
@@ -454,7 +433,7 @@ public:
     Type* getParamType(uint32 i);
     Type* getReturnType() { return methodDesc->getReturnType(); }
     bool isInstance() { return methodDesc->isInstance(); }
-    MethodDesc*     getMethodDesc()         {return methodDesc;}
+    virtual MethodDesc*     getMethodDesc()         {return methodDesc;}
     void print(::std::ostream& os);
     ValueName getThisValueName() { return object; }
 private:
@@ -462,6 +441,40 @@ private:
     TypeManager& typeManager;
     ValueName object;
 };
+
+
+class UnresolvedMethodPtrType : public MethodPtrType {
+public:
+    UnresolvedMethodPtrType(ObjectType* _enclosingClass, uint32 _cpIndex, TypeManager& tm, 
+        uint32 _nParams, Type** _paramTypes, Type* _returnType, 
+        bool isCompressed=false, ValueName obj=NULL) 
+        : MethodPtrType(NULL, tm, isCompressed, obj), 
+        enclosingClass(_enclosingClass), cpIndex(_cpIndex),
+        nParams(_nParams), paramTypes(_paramTypes), returnType(_returnType)
+    {}
+
+    virtual ~UnresolvedMethodPtrType() {}
+
+    UnresolvedMethodPtrType* asUnresolvedMethodPtrType() { return this; }
+    uint32 getNumParams() {return nParams;}
+    Type* getParamType(uint32 n){ assert(n<nParams); return paramTypes[n];}
+    Type* getReturnType() {return returnType;}
+    bool isInstance() { assert(0); return false;}
+    virtual MethodDesc* getMethodDesc() {assert(0); return NULL;}
+
+    void print(::std::ostream& os);
+    virtual bool isUnresolvedType() {return true;}
+private:
+    void initSignature();
+    ObjectType* enclosingClass;
+    uint32      cpIndex;
+    
+    uint32 nParams;
+    Type** paramTypes;
+    Type* returnType;
+};
+
+
 
 class VTablePtrType : public Type {
 public:
@@ -722,7 +735,7 @@ public:
 
     MethodPtrType*    getMethodPtrType(MethodDesc* methodDesc);
 
-    UnresolvedMethodPtrType*    getUnresolvedMethodPtrType(ObjectType* enclosingClass, uint32 cpIndex);
+    UnresolvedMethodPtrType*    getUnresolvedMethodPtrType(ObjectType* enclosingClass, uint32 cpIndex, MethodSignature* sig);
         
     MethodPtrType* getMethodPtrObjType(ValueName obj, MethodDesc* methodDesc);
         
@@ -832,6 +845,15 @@ private:
     bool         lazyResolutionMode;
 };
 
+class MethodSignature {
+public:
+    MethodSignature(){}
+    virtual ~MethodSignature(){}
+
+    virtual uint32 getNumParams() const = 0;
+    virtual Type** getParamTypes() const = 0;
+    virtual Type* getRetType() const = 0;
+};
 } //namespace Jitrino 
 
 #endif // _TYPE_H_

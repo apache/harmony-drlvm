@@ -1259,7 +1259,8 @@ Opnd* IRBuilder::genIndirectCallWithResolve(Type* returnType,
                                 Opnd* args[],
                                 ObjectType* ch,
                                 JavaByteCodes bc,
-                                uint32 cpIndex
+                                uint32 cpIndex,
+                                MethodSignature* sig
                                 )
 {
     assert(!returnType->isNullObject());
@@ -1299,7 +1300,7 @@ Opnd* IRBuilder::genIndirectCallWithResolve(Type* returnType,
             break;
         default: assert(0);
         }
-        callAddrOpnd = genVMHelperCall(vmHelperId, typeManager->getUnresolvedMethodPtrType(ch, cpIndex), numHelperArgs, helperArgs);
+        callAddrOpnd = genVMHelperCall(vmHelperId, typeManager->getUnresolvedMethodPtrType(ch, cpIndex, sig), numHelperArgs, helperArgs);
         insertHash(Op_VMHelperCall, bc, cpIndex, numArgs>0?args[0]->getId() : 0, callAddrOpnd->getInst());
     }
 

@@ -42,10 +42,15 @@ void TranslatorSession::run () {
     TranslatorAction* action = (TranslatorAction*)getAction();
     flags = action->getFlags();
 #ifdef _DEBUG
+/*
+    TODO: to avoid recursive compilation with OPT we need to finish this task
+    1) Fix lazy exceptions opt
+    2) Ia32CodeEmmitter forces creation of interned strings during compilation -> fix it.
     if (flags.assertOnRecursion) {
         int rec = Jitrino::getCompilationRecursionLevel();
         assert( rec == 1);
     }
+*/
 #endif
     translate();
     postTranslatorCleanup();

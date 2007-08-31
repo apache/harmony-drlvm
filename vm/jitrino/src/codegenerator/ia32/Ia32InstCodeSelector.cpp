@@ -129,7 +129,7 @@ float   __stdcall   convI8F4    (uint64 v) {    return (float)(int64)v; }
 // FP remainder internal helpers (temp solution to be optimized)
 float   __stdcall   remF4   (float v0, float v1)stdcall__;
 float   __stdcall   remF4   (float v0, float v1)   { 
-    return fmod((double)v0,(double)v1);
+    return (float)fmod((double)v0,(double)v1);
 }
 
 double  __stdcall   remF8   (double v0, double v1)stdcall__;
