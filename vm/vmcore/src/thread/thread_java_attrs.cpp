@@ -54,8 +54,3 @@ IDATA VMCALL jthread_set_priority(jthread java_thread, jint priority)
  *
  * @param[in] thread thread those attribute is read
  */
-jboolean jthread_is_daemon(jthread thread)
-{
-    vm_thread_t vm_thread = (vm_thread_t)thread;
-    return (jboolean)vm_thread->daemon;
-}

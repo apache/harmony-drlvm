@@ -327,60 +327,6 @@ jthread_associate_native_and_java_thread(JNIEnv * jni_env,
 } // jthread_associate_native_and_java_thread
 
 /**
- * Waits till the <code>thread</code> is finished.
- *
- * @param[in] java_thread a thread to wait for
- * @return TM_THREAD_TIMEOUT or TM_THREAD_INTERRUPTED or 0 in case thread
- * was successfully joined.
- * @sa java.lang.Thread.join()
- */
-IDATA jthread_join(jthread java_thread)
-{
-    if (java_thread == NULL) {
-        return TM_ERROR_NULL_POINTER;
-    }
-    
-    hythread_t native_thread = jthread_get_native_thread(java_thread);
-    if (!native_thread) {
-        return TM_ERROR_NONE;
-    }
-    IDATA status = hythread_join_interruptable(native_thread, 0, 0);
-    
-    TRACE(("TM: jthread %d joined %d", hythread_get_id(hythread_self()),
-           hythread_get_id(native_thread)));
-
-    return status;
-} // jthread_join
-
-/**
- * Waits till the <code>thread</code> is finished with specific timeout.
- *
- * @param[in] java_thread a thread to wait for
- * @param[in] millis timeout in milliseconds to wait
- * @param[in] nanos timeout in nanoseconds to wait
- * @return TM_THREAD_TIMEOUT or TM_THREAD_INTERRUPTED or 0 in case thread
- * was successfully joined.
- * @sa java.lang.Thread.join()
- */
-IDATA jthread_timed_join(jthread java_thread, jlong millis, jint nanos)
-{
-    if (java_thread == NULL) {
-        return TM_ERROR_NULL_POINTER;
-    }
-    
-    hythread_t native_thread = jthread_get_native_thread(java_thread);
-    if (!native_thread) {
-        return TM_ERROR_NONE;
-    }
-    IDATA status = hythread_join_interruptable(native_thread, millis, nanos);
-
-    TRACE(("TM: jthread %d joined %d", hythread_get_self_id(),
-           hythread_get_id(native_thread)));
-
-    return status;
-} // jthread_timed_join
-
-/**
  * Lets an another thread to pass.
  * @sa java.lang.Thread.yield()
  */

@@ -37,16 +37,6 @@ struct JVMTISingleStepState;
 struct ClassLoader;
 
 /**
- * These are thread level gc states.
- */
-enum gc_state {
-    zero = 0,
-    gc_moving_to_safepoint,
-    gc_at_safepoint,
-    gc_enumeration_done
-};
-
-/**
  * Java-specific context that is attached to tm_thread control structure by Java layer
  */
 struct JVMTIThread
@@ -127,7 +117,7 @@ struct VM_thread
     /**
      * Native thread which is associated with VM_thread
      */
-    hythread_t native_thread;
+    hythread_t p_HyThread;
 
     /**
      * Java thread object to corresponding java.lang.Thread instance
@@ -179,8 +169,6 @@ struct VM_thread
     // thread stack size
     UDATA stack_size;
 
-    // ??
-    enum gc_state gc_status;
     int finalize_thread_flags;
 
     // CPU registers.

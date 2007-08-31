@@ -239,7 +239,8 @@ JNIEXPORT jboolean JNICALL Java_java_lang_VMThreadManager_isAlive
 JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_join
   (JNIEnv * UNREF jenv, jclass clazz, jobject thread, jlong millis, jint nanos)
 {
-    return (jint)jthread_timed_join(thread, millis, nanos);
+    assert(0);  //wjw  this API is no longer used, remove it as soon as it is convenient
+    return (jint) 0;
 }
 
 /*
@@ -250,12 +251,10 @@ JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_join
 JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_getState
   (JNIEnv * UNREF jenv, jclass clazz, jobject jthread)
 {
-    jint state;	
-    IDATA stat;
-    
-    stat = jthread_get_jvmti_state(jthread, &state);
-    assert(stat == TM_ERROR_NONE);
-    return state;
+    hythread_t tm_native_thread = jthread_get_native_thread(jthread);
+    IDATA retval = hythread_get_state(tm_native_thread);
+
+    return retval;
 }
 
 

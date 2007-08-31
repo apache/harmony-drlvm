@@ -588,7 +588,16 @@ public class Thread implements Runnable {
     public final void join() throws InterruptedException {
         synchronized (lock) {
             while (isAlive()) {
-                lock.wait();
+                // 2000msec timeout added to provide graceful degradation
+                // in case there is a race condition where lock.wait somehow
+                // misses the "detach() lock.notifyAll()"
+                // Or, more likely, does not see this.isAlive = false 
+                // because this.isAlive is still stuck in a CPU's store buffer
+                // the only drawback is if there are 100's of threads doing join()'s
+                // and the overhead of the continual timeouts may be a problem
+                // Let's first see a big money workload that waits on 100's of threads
+                // simultaneously before we worry
+                lock.wait(2000);
             }
         }
     }
@@ -744,6 +753,12 @@ public class Thread implements Runnable {
                 throw new OutOfMemoryError("Failed to create new thread");
             } 
             
+
+            // wjw -- why are we *waiting* for a child thread to actually start running?
+            // this *guarantees* two context switches
+            // nothing in j.l.Thread spec says we have to do this
+            // my guess is that this actually masks an underlying race condition that we need to fix.
+           
             boolean interrupted = false;
             while(!this.started) {
                 try {
@@ -802,19 +817,26 @@ public class Thread implements Runnable {
      
         int state = (VMThreadManager.getState(this));
 
-        if (0 != (state & VMThreadManager.JVMTI_THREAD_STATE_TERMINATED)) {         
+        if (0 != (state & VMThreadManager.TM_THREAD_STATE_TERMINATED)) {         
             return State.TERMINATED;
-        } else if  (0 != (state & VMThreadManager.JVMTI_THREAD_STATE_WAITING_WITH_TIMEOUT)) {
+        } else if  (0 != (state & VMThreadManager.TM_THREAD_STATE_WAITING_WITH_TIMEOUT)) {
             return State.TIMED_WAITING;
-        } else if (0 != (state & VMThreadManager.JVMTI_THREAD_STATE_WAITING) 
-                || 0 != (state & VMThreadManager.JVMTI_THREAD_STATE_PARKED)) {
+        } else if (0 != (state & VMThreadManager.TM_THREAD_STATE_WAITING) 
+                || 0 != (state & VMThreadManager.TM_THREAD_STATE_PARKED)) {
             return State.WAITING;
-        } else if (0 != (state & VMThreadManager.JVMTI_THREAD_STATE_BLOCKED_ON_MONITOR_ENTER)) {
+        } else if (0 != (state & VMThreadManager.TM_THREAD_STATE_BLOCKED_ON_MONITOR_ENTER)) {
             return State.BLOCKED;
-        } else if (0 != (state & VMThreadManager.JVMTI_THREAD_STATE_ALIVE)) {
+
+        } else if (0 != (state & VMThreadManager.TM_THREAD_STATE_RUNNABLE)) {
+            return State.RUNNABLE;
+
+        //TODO track down all situations where a thread is really in RUNNABLE state 
+        // but TM_THREAD_STATE_RUNNABLE is not set.  In the meantime, leave the following
+        // TM_THREAD_STATE_ALIVE test as it is.
+        } else if (0 != (state & VMThreadManager.TM_THREAD_STATE_ALIVE)) {
             return State.RUNNABLE;
         } else { 
-            return State.NEW;
+            return State.NEW;  // by deduction, if its none of the above
         }
     }
 

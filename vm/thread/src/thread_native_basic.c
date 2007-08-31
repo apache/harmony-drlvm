@@ -607,7 +607,7 @@ IDATA VMCALL hythread_struct_init(hythread_t new_thread)
     new_thread->safepoint_callback = NULL;
 
     hymutex_lock(&new_thread->mutex);
-    new_thread->state = TM_THREAD_STATE_ALLOCATED;
+    new_thread->state = 0;
     hymutex_unlock(&new_thread->mutex);
 
     status = hylatch_set(new_thread->join_event, 1);

@@ -59,8 +59,6 @@ VMEXPORT IDATA jthread_create(JNIEnv * jni_env, jthread thread, jthread_threadat
 VMEXPORT IDATA jthread_create_with_function(JNIEnv * jni_env, jthread thread, jthread_threadattr_t *attrs);
 VMEXPORT IDATA jthread_attach(JNIEnv * jni_env, jthread thread, jboolean daemon);
 VMEXPORT IDATA jthread_detach(jthread thread);
-VMEXPORT IDATA jthread_join(jthread thread);
-VMEXPORT IDATA jthread_timed_join(jthread thread, jlong millis, jint nanos);
 VMEXPORT IDATA jthread_yield();
 VMEXPORT IDATA jthread_stop(jthread thread);
 VMEXPORT IDATA jthread_exception_stop(jthread thread, jobject throwable);
@@ -99,7 +97,6 @@ VMEXPORT jthread jthread_get_java_thread(hythread_t thread);
 
 VMEXPORT IDATA jthread_set_priority(jthread thread, jint priority);
 VMEXPORT jint jthread_get_priority(jthread thread);
-VMEXPORT jboolean jthread_is_daemon(jthread thread);
 
 /**
  * Sets the name for the <code>thread</code>.

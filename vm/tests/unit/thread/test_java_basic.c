@@ -23,12 +23,6 @@
 #include "thread_manager.h"
 
 /*
- * Time for jthread_timed_join() to wait
- * set in test_jthread_timed_join() and used in run_for_test_jthread_timed_join()
- */
-int timed_join_wait_time;
-
-/*
  * Test jthread_attach()
  */
 int HYTHREAD_PROC run_for_test_jthread_attach(void *args){
@@ -140,142 +134,6 @@ int test_hythread_create_with_function(void) {
         check_tested_thread_structures(tts);
         tested_thread_wait_running(tts);
     }
-    // Terminate all threads and clear tts structures
-    tested_threads_destroy();
-
-    return TEST_PASSED;
-}
-
-/*
- * Test jthread_join()
- */
-void JNICALL run_for_test_jthread_join(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
-
-    tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
-    tested_thread_sturct_t * prev_tts = tts; 
-    IDATA status;
-
-    prev_tested_thread(&prev_tts);
-    if (prev_tts == NULL){
-        // its the first tested thread
-        tts->phase = TT_PHASE_RUNNING;
-        tested_thread_started(tts);
-        tested_thread_wait_for_stop_request(tts);
-        tts->phase = TT_PHASE_DEAD;
-        tested_thread_ended(tts);
-    } else {
-        // wait until previous thread ends 
-        tts->phase = TT_PHASE_WAITING_ON_JOIN;
-        tested_thread_started(tts);
-        status = jthread_join(prev_tts->java_thread);
-        tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_DEAD : TT_PHASE_ERROR);
-        tested_thread_ended(tts);
-    }
-}
-
-int test_jthread_join(void) {
-
-    tested_thread_sturct_t * tts;
-    
-    tf_assert(MAX_TESTED_THREAD_NUMBER > 1);
-
-    // Initialize tts structures and run all tested threads
-    tested_threads_run(run_for_test_jthread_join);
-
-    reset_tested_thread_iterator(&tts);
-    next_tested_thread(&tts);
-    check_tested_thread_phase(tts, TT_PHASE_RUNNING);
-    while(next_tested_thread(&tts)){
-        check_tested_thread_phase(tts, TT_PHASE_WAITING_ON_JOIN);
-    }
-
-    // make the first thread terminated and test that all threads are terminated
-    reset_tested_thread_iterator(&tts);
-    next_tested_thread(&tts);
-    tested_thread_send_stop_request(tts);
-    tested_thread_wait_ended(tts);
-    while(next_tested_thread(&tts)){
-        tested_thread_wait_ended(tts);
-    }
-
-    // Terminate all threads (not needed here) and clear tts structures
-    tested_threads_destroy();
-
-    return TEST_PASSED;
-}
-
-/*
- * Test jthread_timed_join()
- */
-void JNICALL run_for_test_jthread_timed_join(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
-
-    tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
-    tested_thread_sturct_t * prev_tts = tts;
-    IDATA status;
-
-    prev_tested_thread(&prev_tts);
-    tts->phase = TT_PHASE_RUNNING;
-    tested_thread_started(tts);
-    if (prev_tts == NULL){
-        tested_thread_wait_for_stop_request(tts);
-        tts->phase = TT_PHASE_DEAD;
-    } else {
-        // wait until timeout or previous thread ends 
-        status = jthread_timed_join(prev_tts->java_thread, timed_join_wait_time, 0);
-        printf("-------- status = %#08x (%d) %d\n", (int)status, (int)status, timed_join_wait_time);
-        tts->phase = TT_PHASE_DEAD;
-        if (timed_join_wait_time > CLICK_TIME_MSEC * 10){
-            // must be thread end
-            //tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_DEAD : TT_PHASE_ERROR);
-        } else {
-            // must be timeout
-           //tts->phase = (status == TM_ERROR_TIMEOUT ? TT_PHASE_DEAD : TT_PHASE_ERROR);
-        }
-    }
-    tested_thread_ended(tts);
-}
-
-int test_jthread_timed_join(void) {
-
-    tested_thread_sturct_t * tts;
-    
-    tf_assert(MAX_TESTED_THREAD_NUMBER > 1);
-
-    /*
-     * Test for jthread_timed_join() exit due to timeout
-     */
-    timed_join_wait_time = 10 * CLICK_TIME_MSEC;
-    // Initialize tts structures and run all tested threads
-    tested_threads_run(run_for_test_jthread_timed_join);
-
-    // skip the first thread
-    reset_tested_thread_iterator(&tts);
-    next_tested_thread(&tts);
-    jthread_sleep(20 * CLICK_TIME_MSEC * MAX_TESTED_THREAD_NUMBER, 0);
-    while(next_tested_thread(&tts)){
-        check_tested_thread_phase(tts, TT_PHASE_DEAD);
-    }
-
-    // Terminate all threads and clear tts structures
-    tested_threads_destroy();
-
-    /*
-     * Test for jthread_timed_join() before timeout
-     */
-    timed_join_wait_time = 1000 * CLICK_TIME_MSEC * MAX_TESTED_THREAD_NUMBER;
-    // Initialize tts structures and run all tested threads
-    tested_threads_run(run_for_test_jthread_timed_join);
-
-    // make the first thread terminated and test that all threads are terminated
-    reset_tested_thread_iterator(&tts);
-    next_tested_thread(&tts);
-    tested_thread_send_stop_request(tts);
-    tested_thread_wait_ended(tts);
-    jthread_sleep(20 * CLICK_TIME_MSEC * MAX_TESTED_THREAD_NUMBER, 0);
-    while(next_tested_thread(&tts)){
-        check_tested_thread_phase(tts, TT_PHASE_DEAD);
-    }
-
     // Terminate all threads and clear tts structures
     tested_threads_destroy();
 
@@ -485,8 +343,6 @@ TEST_LIST_START
     TEST(test_hythread_create)
     TEST(test_hythread_create_with_function)
     TEST(test_jthread_get_JNI_env)
-    TEST(test_jthread_join)
-    TEST(test_jthread_timed_join)
     TEST(test_jthread_exception_stop)
     TEST(test_jthread_stop)
     TEST(test_jthread_sleep)
