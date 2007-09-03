@@ -2590,7 +2590,7 @@ LogStream& IAction::log (LogStream::SID sid) const
     if (currentCC != topLevelCC) {
         action = topLevelCC->getCurrentSessionAction();
     }
-    return (action!=NULL && action->step->logs == 0) ? LogStream::log_sink() : action->step->logs->log(sid);
+    return (action == NULL || action->step->logs == NULL) ? LogStream::log_sink() : action->step->logs->log(sid);
 }
 #endif
 

@@ -60,6 +60,8 @@ class IAction
 {
 public:
 
+    IAction ()                                      : step(0) {}
+
     IActionFactory* getFactory () const             {return step->factory;}
     const char* getName () const                    {return step->factory->getName();}
     const char* getArg (const char* key) const      {return (step->args) ? step->args->get(key) : 0;}
