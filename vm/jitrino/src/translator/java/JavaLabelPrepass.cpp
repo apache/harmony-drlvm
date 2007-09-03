@@ -340,7 +340,6 @@ public:
         } else {
             slot = &hi->push(exceptionType);
             StateInfo::setNonNull(slot);
-            StateInfo::setExactType(slot);
         }
         assert(prepass.getNumVars() + 1 == (unsigned)hi->stackDepth);
         slot->vars = new (memManager) SlotVar(
@@ -731,7 +730,11 @@ void JavaLabelPrepass::setStackVars() {
         VariableIncarnation* var = getOrCreateVarInc(currentOffset, i, type);
 
         // Do not merge stack vars of incompatible types
-        if (sv && (sv->getVarIncarnation()->getDeclaredType() == var->getDeclaredType())) {
+        if (sv) {
+            assert(sv->getVarIncarnation()->getDeclaredType());
+            assert(var->getDeclaredType());
+            UNUSED Type* commonType = typeManager.getCommonType(sv->getVarIncarnation()->getDeclaredType(),var->getDeclaredType());
+            assert(commonType);
             VariableIncarnation::linkAndMergeIncarnations(sv->getVarIncarnation(),var,&typeManager);
             var->setMultipleDefs();
         } else {
