@@ -363,7 +363,7 @@ class DebugUtilsTI {
             method_entry_enabled_flag = value;
         }
 
-        void get_method_exit_flag(char value)
+        void set_method_exit_flag(char value)
         {
             method_exit_enabled_flag = value;
         }

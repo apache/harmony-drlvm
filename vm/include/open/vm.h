@@ -1111,7 +1111,7 @@ VMEXPORT char *get_method_entry_flag_address();
 /**
  * Returns the address of the global flag that specifies whether
  * MethodExit event is enabled. JIT should call this function in case
- * a method is compiled with exe_notify_method_entry flag set.
+ * a method is compiled with exe_notify_method_exit flag set.
  */
 VMEXPORT char *get_method_exit_flag_address();
 
