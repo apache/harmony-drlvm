@@ -716,6 +716,7 @@ is_trusted_classloader(const String *name) {
 
 //define constant for class file version 
 static const uint16 JAVA5_CLASS_FILE_VERSION = 49;
+static const uint16 JAVA6_CLASS_FILE_VERSION = 50;
 
 bool Field::parse(Global_Env& env, Class *clss, ByteReader &cfs, bool is_trusted_cl)
 {
@@ -2709,15 +2710,6 @@ bool Class::parse_interfaces(ByteReader &cfs)
 } // Class::parse_interfaces
 
 
-//
-// magic number, and major/minor version numbers of class file
-//
-#define CLASSFILE_MAGIC 0xCAFEBABE
-#define CLASSFILE_MAJOR 45
-// Supported class files up to this version
-#define CLASSFILE_MAJOR_MAX 49
-#define CLASSFILE_MINOR 3
-
 /*
  *  Parses and verifies the classfile. Format is (from JVM spec):
  *
@@ -2780,7 +2772,7 @@ bool Class::parse(Global_Env* env,
         return false;
     }
     //See comment in specification 4.2 about supported versions.
-    if (!(m_version >= CLASSFILE_MAJOR
+    if (!(m_version >= CLASSFILE_MAJOR_MIN
         && m_version <= CLASSFILE_MAJOR_MAX))
     {
         REPORT_FAILED_CLASS_CLASS(m_class_loader, this, "java/lang/UnsupportedClassVersionError",
@@ -2833,13 +2825,19 @@ bool Class::parse(Global_Env* env,
         REPORT_FAILED_CLASS_FORMAT(this, "interface cannot be final");
         return false;
     }
-    //not only ACC_FINAL flag is prohibited if is_interface, also ACC_SYNTHETIC and ACC_ENUM.
-    if(is_interface() && (is_synthetic() || is_enum()))
+    // not only ACC_FINAL flag is prohibited if is_interface, also
+    // ACC_SYNTHETIC and ACC_ENUM. But in Java6 there appears to be an
+    // exception to this rule, the package annotation interfaces
+    // package-info can be interfaces with synthetic flag. So the
+    // check is different for different class file versions
+    if ((m_version <= JAVA5_CLASS_FILE_VERSION && is_interface() && (is_synthetic() || is_enum())) ||
+        (m_version == JAVA6_CLASS_FILE_VERSION && is_interface() && is_enum()))
     {
         REPORT_FAILED_CLASS_FORMAT(this,
-        "if class is interface, no flags except ACC_ABSTRACT or ACC_PUBLIC can be set");
+            "if class is interface, no flags except ACC_ABSTRACT or ACC_PUBLIC can be set");
         return false;
     }
+
     if(is_final() && is_abstract()) {
         REPORT_FAILED_CLASS_FORMAT(this, "abstract class cannot be final");
         return false;

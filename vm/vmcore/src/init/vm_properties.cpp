@@ -157,7 +157,8 @@ static void init_java_properties(Properties & properties)
     properties.set_new("java.specification.version", "1.5");
     properties.set_new("java.specification.vendor", "Sun Microsystems Inc.");
     properties.set_new("java.specification.name", "Java Platform API Specification");
-    properties.set_new("java.class.version", "49.0");
+    properties.set_new("java.class.version", EXPAND(CLASSFILE_MAJOR_MAX) "."
+        EXPAND(CLASSFILE_MINOR_MAX));
     properties.set_new("java.class.path", ".");
 
     /*

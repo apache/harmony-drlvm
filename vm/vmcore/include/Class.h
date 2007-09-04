@@ -35,6 +35,15 @@
 
 #include <vector>
 
+//
+// magic number, and major/minor version numbers of class file
+//
+#define CLASSFILE_MAGIC 0xCAFEBABE
+#define CLASSFILE_MAJOR_MIN 45
+// Supported class files up to this version
+#define CLASSFILE_MAJOR_MAX 50
+#define CLASSFILE_MINOR_MAX 0
+
 // forward declarations
 struct Class;
 
