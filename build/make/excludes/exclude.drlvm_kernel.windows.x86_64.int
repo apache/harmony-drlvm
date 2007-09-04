@@ -5,3 +5,7 @@ java/lang/RuntimeAdditionalTest*.java
 java/lang/ClassGenericsTest.java
 java/lang/ClassGenericsTest4.java
 
+# These tests have a very long stack on interpreter. Bug is HARMONY-4733
+java/lang/ClassGenericsTest3.java
+java/lang/ClassGenericsTest5.java
+

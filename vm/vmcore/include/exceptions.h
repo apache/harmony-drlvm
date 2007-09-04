@@ -240,11 +240,12 @@ assert(!is_unwindable());
 
 #define BEGIN_RAISE_AREA \
 { \
+if (is_unwindable()) exn_rethrow_if_pending();\
 bool unwindable = set_unwindable(false);
 
 #define END_RAISE_AREA \
-set_unwindable(unwindable);\
 if (unwindable) exn_rethrow_if_pending();\
+set_unwindable(unwindable);\
 }
 
 
@@ -272,9 +273,6 @@ void exn_rethrow_if_pending();
 void set_guard_stack();
 void remove_guard_stack();
 void init_stack_info();
-#ifndef WIN32
-void remove_guard_stack();
-#endif
 VMEXPORT size_t get_available_stack_size();
 VMEXPORT bool check_available_stack_size(size_t required_size);
 VMEXPORT size_t get_default_stack_size();

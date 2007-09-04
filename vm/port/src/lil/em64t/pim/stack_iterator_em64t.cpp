@@ -468,34 +468,42 @@ void si_transfer_control(StackIterator * si) {
     tcs(&local_si);
 }
 
+inline static uint64 unref_reg(uint64* p_reg) {
+    return p_reg ? *p_reg : 0;
+}
+
 void si_copy_to_registers(StackIterator * si, Registers * regs) {
     ASSERT_NO_INTERPRETER    
-
+  
     regs->rsp = si->jit_frame_context.rsp;
-    regs->rbp = *si->jit_frame_context.p_rbp;
-    regs->rip = *si->jit_frame_context.p_rip;
+    regs->rbp = unref_reg(si->jit_frame_context.p_rbp);
+    regs->rip = unref_reg(si->jit_frame_context.p_rip);
 
-    regs->rbx = *si->jit_frame_context.p_rbx;
-    regs->r12 = *si->jit_frame_context.p_r12;
-    regs->r13 = *si->jit_frame_context.p_r13;
-    regs->r14 = *si->jit_frame_context.p_r14;
-    regs->r15 = *si->jit_frame_context.p_r15;
+    regs->rbx = unref_reg(si->jit_frame_context.p_rbx);
+    regs->r12 = unref_reg(si->jit_frame_context.p_r12);
+    regs->r13 = unref_reg(si->jit_frame_context.p_r13);
+    regs->r14 = unref_reg(si->jit_frame_context.p_r14);
+    regs->r15 = unref_reg(si->jit_frame_context.p_r15);
 
-    regs->rax = *si->jit_frame_context.p_rax;
-    regs->rcx = *si->jit_frame_context.p_rcx;
-    regs->rdx = *si->jit_frame_context.p_rdx;
-    regs->rsi = *si->jit_frame_context.p_rsi;
-    regs->rdi = *si->jit_frame_context.p_rdi;
-    regs->r8 = *si->jit_frame_context.p_r8;
-    regs->r9 = *si->jit_frame_context.p_r9;
-    regs->r10 = *si->jit_frame_context.p_r10;
-    regs->r11 = *si->jit_frame_context.p_r11;
+    regs->rax = unref_reg(si->jit_frame_context.p_rax);
+    regs->rcx = unref_reg(si->jit_frame_context.p_rcx);
+    regs->rdx = unref_reg(si->jit_frame_context.p_rdx);
+    regs->rsi = unref_reg(si->jit_frame_context.p_rsi);
+    regs->rdi = unref_reg(si->jit_frame_context.p_rdi);
+    regs->r8 = unref_reg(si->jit_frame_context.p_r8);
+    regs->r9 = unref_reg(si->jit_frame_context.p_r9);
+    regs->r10 = unref_reg(si->jit_frame_context.p_r10);
+    regs->r11 = unref_reg(si->jit_frame_context.p_r11);
 
     regs->eflags = si->jit_frame_context.eflags;
 }
 
 void si_set_callback(StackIterator* si, NativeCodePtr* callback) {
+#ifdef WIN32
+    const static uint64 red_zone_size = 0x00;
+#else
     const static uint64 red_zone_size = 0x80;
+#endif
     si->jit_frame_context.rsp = si->jit_frame_context.rsp - red_zone_size - sizeof(void*);
     *((uint64*) si->jit_frame_context.rsp) = *(si->jit_frame_context.p_rip);
     si->jit_frame_context.p_rip = ((uint64*)callback);

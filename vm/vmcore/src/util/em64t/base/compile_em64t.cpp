@@ -146,16 +146,12 @@ void compile_protect_arguments(Method_Handle method, GcFrame * gc) {
 // (represented by heap_base) to an unmanaged one (NULL/0). Uses %rdi.
 char * gen_convert_managed_to_unmanaged_null_em64t(char * ss,
                                                   const R_Opnd & input_param1) {
-    if (&input_param1 != &rdi_opnd) {
-        ss = mov(ss, rdi_opnd,  input_param1);
-    }
-
     if (VM_Global_State::loader_env->compress_references) {
-        ss = mov(ss, rcx_opnd, Imm_Opnd(size_64, (int64)VM_Global_State::loader_env->heap_base));
-        ss = alu(ss, cmp_opc, rdi_opnd, rcx_opnd);
+        ss = mov(ss, r11_opnd, Imm_Opnd(size_64, (int64)VM_Global_State::loader_env->heap_base));
+        ss = alu(ss, cmp_opc, input_param1, r11_opnd, size_64);
         ss = branch8(ss, Condition_NE, Imm_Opnd(size_8, 0));  // not null, branch around the mov 0
         char *backpatch_address__not_managed_null = ((char *)ss) - 1;
-        ss = mov(ss, rdi_opnd, Imm_Opnd(0));
+        ss = mov(ss, input_param1, Imm_Opnd(0));
         POINTER_SIZE_SINT offset = (POINTER_SIZE_SINT)ss - (POINTER_SIZE_SINT)backpatch_address__not_managed_null - 1;
         *backpatch_address__not_managed_null = (char)offset;
     }
@@ -299,6 +295,8 @@ static NativeCodePtr compile_get_compile_me_generic() {
 }
 
 NativeCodePtr compile_gen_compile_me(Method_Handle method) {
+    ASSERT_RAISE_AREA;
+
     int STUB_SIZE = 64;
 #ifdef VM_STATS
     ++VM_Statistics::get_vm_stats().num_compileme_generated;

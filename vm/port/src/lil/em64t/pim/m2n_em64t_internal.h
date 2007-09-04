@@ -32,7 +32,11 @@
 #include "open/types.h"
 #include "encoder.h"
 
+#ifdef _WIN64
+const unsigned m2n_sizeof_m2n_frame = 112;
+#else
 const unsigned m2n_sizeof_m2n_frame = 96;
+#endif
 
 typedef struct M2nFrame M2nFrame;
 

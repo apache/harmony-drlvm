@@ -1606,7 +1606,7 @@ static NativeCodePtr rth_get_lil_gc_safe_point(int * dyn_count) {
         "call %1i;"
         "pop_m2n;"
         "ret;",
-        (POINTER_SIZE_INT)(FRAME_POPABLE | FRAME_SAFE_POINT),
+        (POINTER_SIZE_INT)(FRAME_NON_UNWINDABLE | FRAME_POPABLE | FRAME_SAFE_POINT),
         hythread_safe_point_ptr);
     assert(cs && lil_is_valid(cs));
     addr = LilCodeGenerator::get_platform()->compile(cs);
@@ -1808,7 +1808,7 @@ static NativeCodePtr rth_get_lil_stub_withresolve(int * dyn_count, f_resolve foo
         assert(cs);
     }
 
-    cs = lil_parse_onto_end(cs, "push_m2n 0, %0i;", (POINTER_SIZE_INT)FRAME_POPABLE);
+    cs = lil_parse_onto_end(cs, "push_m2n 0, %0i;", (POINTER_SIZE_INT)(FRAME_POPABLE));
     assert(cs);
     cs = lil_parse_onto_end(cs, in2out);
     assert(cs);
@@ -1848,7 +1848,7 @@ static NativeCodePtr rth_get_lil_stub_withresolve(int * dyn_count, f_resolve_man
         assert(cs);
     }
 
-    cs = lil_parse_onto_end(cs, "push_m2n 0, %0i;", (POINTER_SIZE_INT)FRAME_POPABLE);
+    cs = lil_parse_onto_end(cs, "push_m2n 0, %0i;", (POINTER_SIZE_INT)(FRAME_POPABLE));
     assert(cs);
     cs = lil_parse_onto_end(cs, in2out);
     assert(cs);
@@ -1887,7 +1887,7 @@ static NativeCodePtr rth_get_lil_stub_withresolve(int * dyn_count, f_resolve_int
         assert(cs);
     }
 
-    cs = lil_parse_onto_end(cs, "push_m2n 0, %0i;", (POINTER_SIZE_INT)FRAME_POPABLE);
+    cs = lil_parse_onto_end(cs, "push_m2n 0, %0i;", (POINTER_SIZE_INT)(FRAME_POPABLE));
     assert(cs);
     cs = lil_parse_onto_end(cs, in2out);
     assert(cs);

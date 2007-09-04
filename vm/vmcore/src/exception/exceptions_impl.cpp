@@ -239,6 +239,9 @@ jthrowable create_exception(Class* exc_class, Method* exc_init, jvalue* args) {
 
     if (!man_obj) {
         exn_raise_object(VM_Global_State::loader_env->java_lang_OutOfMemoryError);
+        if (suspended_enabled) {
+            tmn_suspend_enable();
+        }
         return NULL;
     }
 
@@ -247,6 +250,9 @@ jthrowable create_exception(Class* exc_class, Method* exc_init, jvalue* args) {
     args[0].l = exc_object;
 
     if (exn_raised()) { //if RuntimeException or Error
+        if (suspended_enabled) {
+            tmn_suspend_enable();
+        }
         return NULL;
     }
 
@@ -303,6 +309,7 @@ jthrowable create_exception(Exception* exception)
 
 void exn_throw_object_internal(jthrowable exc_object)
 {
+    BEGIN_RAISE_AREA;
     // functions can be invoked in suspend disabled and enabled state
     if (hythread_is_suspend_enabled()) {
         tmn_suspend_disable();
@@ -310,11 +317,13 @@ void exn_throw_object_internal(jthrowable exc_object)
     assert(!hythread_is_suspend_enabled());
     TRACE2("exn", ("%s", "exn_throw_object(), delegating to exn_throw_for_JIT()"));
     exn_throw_for_JIT(exc_object->object, NULL, NULL, NULL, NULL);
+    END_RAISE_AREA;
 }
 
 void exn_throw_by_class_internal(Class* exc_class, const char* exc_message,
     jthrowable exc_cause)
 {
+    BEGIN_RAISE_AREA;
     // functions can be invoked in suspend disabled and enabled state
     if (!hythread_is_suspend_enabled()) {
         // exception is throwing, so suspend can be enabled safely
@@ -322,7 +331,7 @@ void exn_throw_by_class_internal(Class* exc_class, const char* exc_message,
     }
     assert(hythread_is_suspend_enabled());
 #ifdef VM_LAZY_EXCEPTION
-    set_unwindable(false);
+    //set_unwindable(false);
 
     jvalue args[3];
     Method* exc_init = prepare_exc_creating(
@@ -333,11 +342,11 @@ void exn_throw_by_class_internal(Class* exc_class, const char* exc_message,
             "exn_throw_by_class(),create exception and delegating to exn_throw_for_JIT()"));
         jthrowable exc_object = exn_create(exc_class, exc_message, exc_cause);
         exn_rethrow_if_pending();
-        set_unwindable(true);
+        //set_unwindable(true);
         exn_throw_object_internal(exc_object);
     } else {
         TRACE2("exn", ("%s", "exn_throw_by_class(), lazy delegating to exn_throw_for_JIT()"));
-        set_unwindable(true);
+        //set_unwindable(true);
 
         // no return, so enable isn't required
         tmn_suspend_disable();
@@ -345,26 +354,24 @@ void exn_throw_by_class_internal(Class* exc_class, const char* exc_message,
         //tmn_suspend_enable();
     }
 #else
-    set_unwindable(false);
     jthrowable exc_object = exn_create(exc_class, exc_message, exc_cause);
-    set_unwindable(true);
     exn_rethrow_if_pending();
     exn_throw_object_internal(exc_object);
 #endif
+    END_RAISE_AREA;
 }
 
 void exn_throw_by_name_internal(const char* exc_name, const char* exc_message,
     jthrowable exc_cause)
 {
+    BEGIN_RAISE_AREA;
     // functions can be invoked in suspend disabled and enabled state
     if (!hythread_is_suspend_enabled()) {
         // exception is throwing, so suspend can be enabled safely
         tmn_suspend_enable();
     }
     assert(hythread_is_suspend_enabled());
-    set_unwindable(false);
     Class *exc_class = get_exc_class(exc_name);
-    set_unwindable(true);
 
     if (exc_class == NULL) {
         assert(exn_raised());
@@ -372,6 +379,7 @@ void exn_throw_by_name_internal(const char* exc_name, const char* exc_message,
         return; // unreachable code
     }
     exn_throw_by_class_internal(exc_class, exc_message, exc_cause);
+    END_RAISE_AREA;
 }
 
 void exn_raise_object_internal(jthrowable exc_object)

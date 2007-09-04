@@ -197,7 +197,9 @@ static void exn_propagate_exception(
     jvalue* vm_exn_constr_args)
 {
     assert(!hythread_is_suspend_enabled());
+    ASSERT_RAISE_AREA;
     ASSERT_NO_INTERPRETER;
+
     assert(*exn_obj || exn_class);
 
     // Save the throw context
@@ -347,6 +349,8 @@ static void exn_propagate_exception(
 
                     // Create exception if necessary
                     if (!*exn_obj && !handler->is_exc_obj_dead()) {
+                        assert(!exn_raised());
+
                         *exn_obj = create_lazy_exception(exn_class, exn_constr,
                             jit_exn_constr_args, vm_exn_constr_args);
                     }
@@ -358,7 +362,6 @@ static void exn_propagate_exception(
                                 jit_exn_constr_args, vm_exn_constr_args);
                         }
 
-                        BEGIN_RAISE_AREA;
                         // Reload exception object pointer because it could have
                         // moved while calling JVMTI callback
 
@@ -366,8 +369,6 @@ static void exn_propagate_exception(
                             interrupted_method_jit, interrupted_method,
                             interrupted_method_location,
                             jit, method, handler->get_handler_ip());
-
-                        END_RAISE_AREA;
                     }
 
                     TRACE2("exn", ("setting return pointer to %d", exn_obj));
@@ -381,11 +382,9 @@ static void exn_propagate_exception(
             // No appropriate handler found, undo synchronization
             vm_monitor_exit_synchronized_method(si);
 
-            BEGIN_RAISE_AREA;
             jvalue ret_val = {(jlong)0};
             jvmti_process_method_exception_exit_event(
                 reinterpret_cast<jmethodID>(method), JNI_TRUE, ret_val, si);
-            END_RAISE_AREA;
 
             // Goto previous frame
             si_goto_previous(si);
@@ -409,6 +408,9 @@ static void exn_propagate_exception(
 
     // Reload exception object pointer because it could have
     // moved while calling JVMTI callback
+    if (exn_raised()) {
+        return;
+    }
 
     *exn_obj = jvmti_jit_exception_event_callback_call(*exn_obj,
         interrupted_method_jit, interrupted_method, interrupted_method_location,
@@ -453,7 +455,13 @@ void exn_throw_for_JIT(ManagedObject* exn_obj, Class_Handle exn_class,
  * !!!! NO TRACE2, INFO, WARN, ECHO, ASSERT, ...
  */
     assert(!hythread_is_suspend_enabled());
+
+    if(exn_raised()) {
+        return;
+    }
+
     ASSERT_NO_INTERPRETER
+    ASSERT_RAISE_AREA;
 
     if ((exn_obj == NULL) && (exn_class == NULL)) {
         exn_class = VM_Global_State::loader_env->java_lang_NullPointerException_Class;
@@ -461,9 +469,15 @@ void exn_throw_for_JIT(ManagedObject* exn_obj, Class_Handle exn_class,
     ManagedObject* local_exn_obj = exn_obj;
     StackIterator* si = si_create_from_native();
 
+    if (exn_raised()) {
+        return;
+    }
+
 #ifndef _IPF_
     assert(is_gc_frame_before_m2n_frame());
 #endif // _IPF_
+
+    assert(!exn_raised());
 
     if (si_is_past_end(si)) {
         //FIXME LAZY EXCEPTION (2006.05.12)
@@ -473,12 +487,11 @@ void exn_throw_for_JIT(ManagedObject* exn_obj, Class_Handle exn_class,
     }
 
     si_transfer_all_preserved_registers(si);
+    assert(!exn_raised());
 
     DebugUtilsTI* ti = VM_Global_State::loader_env->TI;
-
     exn_propagate_exception(si, &local_exn_obj, exn_class, exn_constr,
         jit_exn_constr_args, vm_exn_constr_args);
-
     M2nFrame* m2nFrame = m2n_get_last_frame();
     ObjectHandles* last_m2n_frame_handles = m2n_get_local_handles(m2nFrame);
 
@@ -511,7 +524,9 @@ void exn_athrow(ManagedObject* exn_obj, Class_Handle exn_class,
     Method_Handle exn_constr, uint8* exn_constr_args)
 {
     assert(!hythread_is_suspend_enabled());
+    BEGIN_RAISE_AREA;
     exn_throw_for_JIT(exn_obj, exn_class, exn_constr, exn_constr_args, NULL);
+    END_RAISE_AREA;
 }
 
 
@@ -525,17 +540,23 @@ void exn_athrow_regs(Registers * regs, Class_Handle exn_class, bool java_code)
 {
     assert(!hythread_is_suspend_enabled());
     assert(exn_class);
+
 #ifndef _IPF_
     M2nFrame *m2nf;
+    StackIterator *si;
 
     if (java_code) {
         m2nf = m2n_push_suspended_frame(regs);
     }
 
-    StackIterator *si = si_create_from_native();
+    BEGIN_RAISE_AREA;
+
+    si = si_create_from_native();
     ManagedObject *local_exn_obj = NULL;
     exn_propagate_exception(si, &local_exn_obj, exn_class, NULL, NULL, NULL);
     si_copy_to_registers(si, regs);
+
+    END_RAISE_AREA;
 
     m2n_set_last_frame(si_get_m2n(si));
     si_free(si);

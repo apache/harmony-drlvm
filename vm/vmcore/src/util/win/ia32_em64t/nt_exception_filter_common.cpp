@@ -121,8 +121,13 @@ inline size_t find_guard_page_size() {
 }
 
 inline size_t find_guard_stack_size() {
-    // guaerded stack size on windows can be equals one page size only :(
-    return find_guard_page_size();
+#   ifdef _EM64T_
+       //this code in future should be used on both platforms x86-32 and x86-64
+        return 64*1024;
+#   else
+        // guaerded stack size on windows 32 can be equals one page size only :(
+        return find_guard_page_size();
+#   endif
 }
 
 static size_t common_guard_stack_size;
@@ -150,13 +155,31 @@ void init_stack_info() {
     p_TLS_vmthread->stack_size = hythread_get_thread_stacksize(hythread_self());
     common_guard_stack_size = find_guard_stack_size();
     common_guard_page_size = find_guard_page_size();
+
+
+    //this code in future should be used on both platforms x86-32 and x86-64
+#   ifdef _EM64T_
+    ULONG guard_stack_size_param = common_guard_stack_size;
+
+    if (!SetThreadStackGuarantee(&guard_stack_size_param)) {
+        // should be successful always
+        assert(0);
+    }
+#   endif
 }
 
 void set_guard_stack() {
     void* stack_addr = get_stack_addr();
     size_t stack_size = get_stack_size();
     size_t page_size = get_guard_page_size();
-    assert(((size_t)(&stack_addr)) > ((size_t)((char*)stack_addr - stack_size + 3 * page_size)));
+    size_t guard_stack_size = get_guard_stack_size();
+  
+    //assert(((size_t)(&stack_addr)) > ((size_t)((char*)stack_addr - stack_size + 2 * page_size + guard_stack_size)));
+    if (((size_t)(&stack_addr)) < ((size_t)((char*)stack_addr - stack_size + 2 * page_size + guard_stack_size))) {
+        Global_Env *env = VM_Global_State::loader_env;
+        exn_raise_by_class(env->java_lang_StackOverflowError_Class);
+        return;
+    }
 
     if (!VirtualFree((char*)stack_addr - stack_size + page_size,
         page_size, MEM_DECOMMIT)) {
@@ -164,14 +187,11 @@ void set_guard_stack() {
         assert(0);
     }
 
-    DWORD oldProtect;
-
-    if (!VirtualProtect((char*)stack_addr - stack_size + page_size + page_size,
-        page_size, PAGE_GUARD | PAGE_READWRITE, &oldProtect)) {
+    if (!VirtualAlloc( (char*)stack_addr - stack_size + page_size + guard_stack_size,
+        page_size, MEM_COMMIT, PAGE_GUARD | PAGE_READWRITE)) {
         // should be successful always
         assert(0);
     }
-
     p_TLS_vmthread->restore_guard_page = false;
 }
 
@@ -179,12 +199,13 @@ void remove_guard_stack() {
     void* stack_addr = get_stack_addr();
     size_t stack_size = get_stack_size();
     size_t page_size = get_guard_page_size();
+    size_t guard_stack_size = get_guard_stack_size();
     DWORD oldProtect;
 
     assert(((size_t)(&stack_addr)) > ((size_t)((char*)stack_addr - stack_size + 3 * page_size)));
     p_TLS_vmthread->restore_guard_page = true;
 
-    if (!VirtualProtect((char*)stack_addr - stack_size + page_size + page_size,
+    if (!VirtualProtect((char*)stack_addr - stack_size + page_size + guard_stack_size,
         page_size, PAGE_READWRITE, &oldProtect)) {
         // should be successful always
         assert(0);
@@ -194,9 +215,14 @@ void remove_guard_stack() {
 size_t get_available_stack_size() {
     char* stack_addr = (char*) get_stack_addr();
     size_t used_stack_size = ((size_t)stack_addr) - ((size_t)(&stack_addr));
-    int available_stack_size =
-            get_stack_size() - used_stack_size
+    int available_stack_size;
+
+    if (!p_TLS_vmthread->restore_guard_page) {
+        available_stack_size = get_stack_size() - used_stack_size
             - 2 * get_guard_page_size() - get_guard_stack_size();
+    } else {
+        available_stack_size = get_stack_size() - used_stack_size - get_guard_page_size();
+    }
 
     if (available_stack_size > 0) {
         return (size_t) available_stack_size;
@@ -204,10 +230,12 @@ size_t get_available_stack_size() {
         return 0;
     }
 }
+
 size_t get_default_stack_size() {
     size_t default_stack_size = get_stack_size();
     return default_stack_size;
 }
+
 bool check_available_stack_size(size_t required_size) {
     size_t available_stack_size = get_available_stack_size();
     if (available_stack_size < required_size) {
@@ -223,7 +251,7 @@ bool check_available_stack_size(size_t required_size) {
 }
 
 size_t get_restore_stack_size() {
-    return 0x0100;
+    return 0x0200;
 }
 
 bool check_stack_size_enough_for_exception_catch(void* sp) {
@@ -434,8 +462,11 @@ void __cdecl c_exception_handler(Class* exn_class, bool in_java)
 
     M2nFrame* prev_m2n = m2n_get_last_frame();
     M2nFrame* m2n = NULL;
-    if (in_java)
+    if (in_java) {
         m2n = m2n_push_suspended_frame(&regs);
+    } else {
+        prev_m2n = m2n_get_previous_frame(prev_m2n);
+    }
 
     TRACE2("signals", ("should throw exception %p at IP=%p, SP=%p",
                 exn_class, regs.get_ip(), regs_get_sp(&regs)));

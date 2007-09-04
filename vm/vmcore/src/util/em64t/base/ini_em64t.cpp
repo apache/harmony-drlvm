@@ -29,6 +29,7 @@
 #include "open/em.h"
 
 #include "environment.h"
+#include "exceptions.h"
 #include "Class.h"
 #include "object_handles.h"
 #include "nogc.h"
@@ -111,13 +112,16 @@ static invoke_managed_func_int_t gen_invoke_managed_func() {
     stub = push(stub, rbp_opnd);
     stub = mov(stub, rbp_opnd, rsp_opnd);
 
+    // align stack pointer if required (rsp % 16 == 0)
+    stub = alu(stub, and_opc, rsp_opnd, Imm_Opnd(0xfffffff0));
+
     // 1) move stacked arguments in reverse (right-to-left) order
     stub  = mov(stub, rcx_opnd, M_Base_Opnd(rbp_reg, STACK_NARGS_OFFSET));
     stub = alu(stub, or_opc, rcx_opnd, rcx_opnd);
     stub = branch8(stub, Condition_Z, Imm_Opnd(size_8, 0));
     labels.add_patch_to_label(MOVE_STACK_ARGS_END, stub - 1, LPT_Rel8);
     
-    // align stack if required (rsp % 16 == 0)
+    // align stack arguments if required (rsp % 16 == 0)
     stub = test(stub, rcx_opnd, Imm_Opnd(size_32, 1));
     stub = branch8(stub, Condition_Z, Imm_Opnd(size_8, 0));
     labels.add_patch_to_label(COMPUTE_ADDRESS, stub - 1, LPT_Rel8);
@@ -202,6 +206,7 @@ void JIT_execute_method_default(JIT_Handle jh, jmethodID methodID,
                                 jvalue * result, jvalue * args) {
     
     assert(!hythread_is_suspend_enabled());
+    ASSERT_RAISE_AREA;
 
     static const invoke_managed_func_int_t invoke_managed_func = 
         (invoke_managed_func_int_t) gen_invoke_managed_func();

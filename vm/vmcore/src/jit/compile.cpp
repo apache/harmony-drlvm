@@ -747,7 +747,7 @@ static JIT_Result compile_do_compilation(Method* method)
     } else if (method->get_state()==Method::ST_NotCompiled && exn_raised()) {
         method->unlock();
         return JIT_FAILURE;
-    } else if(!check_available_stack_size(0x4000)) {
+    } else if(!check_available_stack_size(0x8000)) {
         method->unlock();
         return JIT_FAILURE;
     }

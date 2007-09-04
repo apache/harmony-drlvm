@@ -25,7 +25,7 @@ vectored_exception_handler PROC
     cld
     sub     rsp, 32 ; allocate stack for 4 registers
     call    vectored_exception_handler_internal
-    add     esp, 32
+    add     rsp, 32
     popfq
     ret
 
@@ -44,9 +44,25 @@ asm_c_exception_handler PROC
 
     pushfq
     cld
+    push    rax
+    push    rbx
+    push    rcx
+    push    rdx
+    push    r8
+    push    r9
+    push    r10
+    push    r11
     sub     rsp, 32 ; allocate stack for 4 registers
     call    c_exception_handler
-    add     esp, 32
+    add     rsp, 32
+    pop     r11
+    pop     r10
+    pop     r9
+    pop     r8
+    pop     rdx
+    pop     rcx
+    pop     rbx
+    pop     rax
     popfq
     ret
 
@@ -64,9 +80,25 @@ asm_exception_catch_callback PROC
 
     pushfq
     cld
+    push    rax
+    push    rbx
+    push    rcx
+    push    rdx
+    push    r8
+    push    r9
+    push    r10
+    push    r11
     sub     rsp, 32 ; allocate stack for 4 registers
     call    exception_catch_callback_wrapper
-    add     esp, 32
+    add     rsp, 32
+    pop     r11
+    pop     r10
+    pop     r9
+    pop     r8
+    pop     rdx
+    pop     rcx
+    pop     rbx
+    pop     rax
     popfq
     ret
 
@@ -84,9 +116,25 @@ asm_jvmti_exception_catch_callback PROC
 
     pushfq
     cld
+    push    rax
+    push    rbx
+    push    rcx
+    push    rdx
+    push    r8
+    push    r9
+    push    r10
+    push    r11
     sub     rsp, 32 ; allocate stack for 4 registers
     call    jvmti_exception_catch_callback_wrapper
-    add     esp, 32
+    add     rsp, 32
+    pop     r11
+    pop     r10
+    pop     r9
+    pop     r8
+    pop     rdx
+    pop     rcx
+    pop     rbx
+    pop     rax
     popfq
     ret
 

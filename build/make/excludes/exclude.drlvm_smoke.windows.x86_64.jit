@@ -6,15 +6,13 @@ gc/LOS.java
 gc/MultiThreads.java
 perf/MultiThreadsSimple.java
 
-# HARMONY-2972
-StackTest.java
-exception/FinalizeStackTest.java
+# HARMONY-3019
 stress/Stack.java
 
 # HARMONY-2977
 io/Integers.java
 
-# HARMONY-3010 HARMONY-4292
+# HARMONY-2972 HARMONY-3010 HARMONY-4292
 stress/Stack.java
 
 # HARMONY-3917
