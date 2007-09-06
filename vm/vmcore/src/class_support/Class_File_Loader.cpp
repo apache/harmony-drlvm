@@ -2816,6 +2816,12 @@ bool Class::parse(Global_Env* env,
         m_access_flags |= ACC_ABSTRACT;
     }
 
+    //for class file version lower than 49 these three flags should be set to zero
+    //See specification 4.5 Fields, for 1.4 Java.
+    if(m_version < JAVA5_CLASS_FILE_VERSION) {
+        m_access_flags &= ~(ACC_SYNTHETIC | ACC_ENUM | ACC_ANNOTATION);
+    }
+
     /*
      *   can't be both final and interface, or both final and abstract
      *   See specification 4.2 about access_flags.
@@ -2854,12 +2860,7 @@ bool Class::parse(Global_Env* env,
         REPORT_FAILED_CLASS_FORMAT(this, "not interface can't be annotation");
         return false;
     }
-    //for class file version lower than 49 these three flags should be set to zero
-    //See specification 4.5 Fields, for 1.4 Java.    
-    if(m_version < JAVA5_CLASS_FILE_VERSION) {
-        m_access_flags &= ~(ACC_SYNTHETIC | ACC_ENUM | ACC_ANNOTATION);    
-    }
-    
+
     /*
      * parse this_class & super_class & verify their constant pool entries
      */
