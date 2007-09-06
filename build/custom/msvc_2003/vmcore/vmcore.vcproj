@@ -1284,6 +1284,40 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 				</File>
 			</Filter>
 		</Filter>
+		<Filter
+			Name="cp_verifier"
+			Filter="">
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\context.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\instr_props.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\Pass1.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\Pass2.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\stackmap.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\tpool.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\tpool.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\Ver.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\ver_utils.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\vf_resolve.cpp">
+			</File>
+		</Filter>
 	</Files>
 	<Globals>
 	</Globals>
