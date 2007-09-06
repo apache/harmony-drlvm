@@ -514,7 +514,7 @@
                                            deploy.copy_classlib,
                                            deploy.antlr,
                                            deploy.vmmagic,
-                                           deploy-hdklibs">
+                                           deploy-hdk-stuff">
         
         <!-- copy our hythr for the launcher to use -->
         
@@ -539,16 +539,22 @@
         
     </target>
 
-    <target name="deploy-hdklibs">
+    <target name="deploy-hdk-stuff">
         <mkdir dir="${build.deploy.dir}/lib" />
         <copy todir="${build.deploy.dir}/lib">
-            <fileset dir="${build.semi.dir}/vm">
+            <fileset dir="${build.semi.dir}">
                 <include name="**/*.lib"/>
                 <include name="**/*.exp"/>
             </fileset>
             <flattenmapper/>
         </copy>
-
+        <mkdir dir="${build.deploy.dir}/include" />
+        <copy todir="${build.deploy.dir}/include">
+            <fileset dir="${build.semi.dir}">
+                <include name="**/apr/include/**/*.h"/>
+            </fileset>
+            <regexpmapper from="^(.*)/([^/]+)/include/(.*)" to="\3" handledirsep="yes"/>
+        </copy>
     </target>
 
     <!-- ==================================================================
@@ -563,6 +569,7 @@
         <mkdir dir="${canonical.deploy.dir}/jdk/bin" />
         <mkdir dir="${canonical.deploy.dir}/jdk/include" />
         <mkdir dir="${canonical.deploy.dir}/lib" />
+        <mkdir dir="${canonical.deploy.dir}/include" />
 
         <copy todir="${canonical.deploy.dir}/jdk/jre">
             <fileset dir="${build.deploy.dir}/jdk/jre"/>
@@ -576,6 +583,10 @@
             <fileset dir="${build.deploy.dir}/lib"/>
         </copy>
         
+        <copy todir="${canonical.deploy.dir}/include">
+            <fileset dir="${build.deploy.dir}/include"/>
+        </copy>
+
         <chmod perm="755">
             <fileset dir="${canonical.deploy.dir}/jdk/jre/bin">
                 <include name="java" />
