@@ -514,7 +514,7 @@
                                            deploy.copy_classlib,
                                            deploy.antlr,
                                            deploy.vmmagic,
-                                           deploy.tweakname">
+                                           deploy-hdklibs">
         
         <!-- copy our hythr for the launcher to use -->
         
@@ -528,28 +528,27 @@
         
         <copy file="harmonyvm.properties" todir="${build.deploy.dir}/jdk/jre/bin/default"/>
 
-        <if>
-            <and>
-                <isset property="if.unix" />
-                <available type="dir" file="${build.deploy.dir}/jdk/jre/bin" />
-            </and>
-            <then>
-                <chmod perm="755">
-                    <fileset dir="${build.deploy.dir}/jdk/jre/bin">
-                        <include name="java" />
-                        <include name="*.so" />
-                        <include name="*.dylib" />
-                        <include name="*.so.*" />
-                    </fileset>
-                </chmod>
-            </then>
-        </if>
+        <chmod perm="755">
+            <fileset dir="${build.deploy.dir}/jdk/jre/bin">
+                <include name="java" />
+                <include name="*.so" />
+                <include name="*.dylib" />
+                <include name="*.so.*" />
+            </fileset>
+        </chmod>
         
     </target>
 
-    <!-- tweak the names of java -> java.exec and
-         java.sh -> java so typing "java" works -->
-    <target name="deploy.tweakname">
+    <target name="deploy-hdklibs">
+        <mkdir dir="${build.deploy.dir}/lib" />
+        <copy todir="${build.deploy.dir}/lib">
+            <fileset dir="${build.semi.dir}/vm">
+                <include name="**/*.lib"/>
+                <include name="**/*.exp"/>
+            </fileset>
+            <flattenmapper/>
+        </copy>
+
     </target>
 
     <!-- ==================================================================
@@ -563,6 +562,7 @@
         <mkdir dir="${canonical.deploy.dir}/jdk/lib" />
         <mkdir dir="${canonical.deploy.dir}/jdk/bin" />
         <mkdir dir="${canonical.deploy.dir}/jdk/include" />
+        <mkdir dir="${canonical.deploy.dir}/lib" />
 
         <copy todir="${canonical.deploy.dir}/jdk/jre">
             <fileset dir="${build.deploy.dir}/jdk/jre"/>
@@ -571,21 +571,19 @@
         <copy todir="${canonical.deploy.dir}/jdk/include">
             <fileset dir="${build.deploy.dir}/jdk/include"/>
         </copy>
+
+        <copy todir="${canonical.deploy.dir}/lib">
+            <fileset dir="${build.deploy.dir}/lib"/>
+        </copy>
         
-        <if>
-            <isset property="if.lnx"/>
-            <then>
-                <chmod perm="755">
-                    <fileset dir="${canonical.deploy.dir}/jdk/jre/bin">
-                        <include name="java" />
-                        <include name="javaw" />
-                        <include name="eclipse.sh" />
-                        <include name="*.so" />
-                        <include name="*.so.*" />
-                    </fileset>
-                </chmod>
-            </then>
-        </if>
+        <chmod perm="755">
+            <fileset dir="${canonical.deploy.dir}/jdk/jre/bin">
+                <include name="java" />
+                <include name="javaw" />
+                <include name="*.so" />
+                <include name="*.so.*" />
+            </fileset>
+        </chmod>
     </target>
 
     <target name="deploy.antlr">
