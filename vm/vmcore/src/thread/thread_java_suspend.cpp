@@ -82,7 +82,15 @@ jthread_resume_all(jvmtiError *results,
 IDATA VMCALL jthread_suspend(jthread java_thread)
 {
     hythread_t native_thread = vm_jthread_get_tm_data(java_thread);
-    return hythread_suspend_other(native_thread);
+    IDATA status;
+
+    while ((status= hythread_suspend_other(native_thread)) != TM_ERROR_NONE)
+    {
+        hythread_safe_point();
+        hythread_exception_safe_point();
+    }
+
+    return TM_ERROR_NONE;
 } // jthread_suspend
 
 /**
