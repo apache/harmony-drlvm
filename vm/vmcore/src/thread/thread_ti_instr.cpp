@@ -25,6 +25,7 @@
 #include <open/jthread.h>
 #include <open/thread_externals.h>
 #include "vm_threads.h"
+#include "object_handles.h"
 
 /**
  * Returns the list of all Java threads.
@@ -47,7 +48,7 @@ IDATA VMCALL jthread_get_all_threads(jthread ** threads, jint * count_ptr)
         hythread_t native_thread = hythread_iterator_next(&iterator);
         vm_thread_t vm_thread =
             (vm_thread_t) hythread_tls_get(native_thread, TM_THREAD_VM_TLS_KEY);
-        if (vm_thread) {
+        if (vm_thread && vm_thread->java_thread) {
             java_thread_count++;
         }
     }
@@ -64,8 +65,14 @@ IDATA VMCALL jthread_get_all_threads(jthread ** threads, jint * count_ptr)
         hythread_t native_thread = hythread_iterator_next(&iterator);
         vm_thread_t vm_thread =
             (vm_thread_t) hythread_tls_get(native_thread, TM_THREAD_VM_TLS_KEY);
-        if (vm_thread) {
-            java_threads[java_thread_count++] = vm_thread->java_thread;
+        if (vm_thread && vm_thread->java_thread) {
+            hythread_suspend_disable();
+            ObjectHandle thr = oh_allocate_local_handle();
+            assert(thr);
+            thr->object = vm_thread->java_thread->object;
+            assert(thr->object);
+            hythread_suspend_enable();
+            java_threads[java_thread_count++] = thr;
         }
     }
     *threads = java_threads;
