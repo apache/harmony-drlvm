@@ -73,24 +73,26 @@ private:
 
     // Connection Graph Structure
 // CnG node types
-    static const uint32 NT_OBJECT   = 8;  // Op_LdRef,Op_NewObj,Op_NewArray,Op_NewMultiArray    
-    static const uint32 NT_DEFARG   = NT_OBJECT+1;  // formal parameter - Op_DefArg
-    static const uint32 NT_RETVAL   = 16;           // Op_DirectCall,Op_IndirectMemoryCall-returned by method 
-    static const uint32 NT_CATCHVAL = NT_RETVAL+1;  // catched value
-    static const uint32 NT_LDOBJ    = 32;           // Op_LdConstant,Op_TauLdInd,Op_LdVar, 
+    enum CnGNodeTypes {
+        NT_OBJECT   = 8,  // Op_LdRef,Op_NewObj,Op_NewArray,Op_NewMultiArray    
+        NT_DEFARG   = NT_OBJECT+1,  // formal parameter - Op_DefArg
+        NT_RETVAL   = 16,           // Op_DirectCall,Op_IndirectMemoryCall-returned by method 
+        NT_CATCHVAL = NT_RETVAL+1,  // catched value
+        NT_LDOBJ    = 32,           // Op_LdConstant,Op_TauLdInd,Op_LdVar, 
                                                     // Op_TauStaticCast,Op_TauCast 
-    static const uint32 NT_INTPTR   = NT_LDOBJ+1;   // Op_SaveRet
-    static const uint32 NT_VARVAL   = NT_LDOBJ+2;   // Op_StVar,Op_Phi
-    static const uint32 NT_ARRELEM  = NT_LDOBJ+3;   // Op_LdArrayBaseAddr,Op_AddScaledIndex
-    static const uint32 NT_REF      = NT_LDOBJ+4;   // reference value - Op_LdFieldAddr,
+        NT_INTPTR   = NT_LDOBJ+1,   // Op_SaveRet
+        NT_VARVAL   = NT_LDOBJ+2,   // Op_StVar,Op_Phi
+        NT_ARRELEM  = NT_LDOBJ+3,   // Op_LdArrayBaseAddr,Op_AddScaledIndex
+        NT_REF      = NT_LDOBJ+4,   // reference value - Op_LdFieldAddr,
                                                     // Op_LdStaticAddr, Op_TauCast, Op_TauStaticCast
-    static const uint32 NT_STFLD    = 64;           // Op_LdStaticAddr
-    static const uint32 NT_INSTFLD  = NT_STFLD+1;   // Op_LdFieldAddr
-    static const uint32 NT_ACTARG   = 128;          // Op_DirectCall,Op_IndirectMemoryCall
-    static const uint32 NT_EXITVAL  = 256;          // returned value - Op_Return
-    static const uint32 NT_THRVAL   = NT_EXITVAL+1; // thrown value - Op_Throw
-    static const uint32 NT_LDVAL    = 512;          // Op_TauLdInd, Op_TauStInd
-	static const uint32 NT_OBJS     = NT_OBJECT|NT_RETVAL|NT_LDOBJ;  //for findCnGNode_op
+        NT_STFLD    = 64,           // Op_LdStaticAddr
+        NT_INSTFLD  = NT_STFLD+1,   // Op_LdFieldAddr
+        NT_ACTARG   = 128,          // Op_DirectCall,Op_IndirectMemoryCall
+        NT_EXITVAL  = 256,          // returned value - Op_Return
+        NT_THRVAL   = NT_EXITVAL+1, // thrown value - Op_Throw
+        NT_LDVAL    = 512,          // Op_TauLdInd, Op_TauStInd
+        NT_OBJS     = NT_OBJECT|NT_RETVAL|NT_LDOBJ  //for findCnGNode_op
+    };
 // CnG node reference types
     static const uint32 NR_PRIM = 0;
     static const uint32 NR_REF = 1;
@@ -245,22 +247,8 @@ private:
     // list of Op_Branch and Op_TauCheckNull instructions (for scalar replacement optimization)
     Insts* checkInsts;
 
-    // variable used to output debug information
-    int _cfgirun;
-    int _instrInfo;
-    int _instrInfo2;
-    int _cngnodes;
-    int _cngedges;
-    int _scanMtds;
-    int _setState;
-    int _printstat;
-    int _eainfo;
-    int _seinfo;
-    int _scinfo;
-#define  prsNum  10
-    int prsArr[prsNum];
-
-
+    bool shortLog;
+    bool verboseLog;
     // common method for both EscAnalyzer constructors
     void init();
     // output escape analysis flags
@@ -299,12 +287,12 @@ private:
 /**
  * Creates new CnG node for specified call instruction argument. 
  * @param inst - instruction,
- * @param md - callee method description,
+ * @param mpt - callee method description,
  * @param ntype - CnG node type,
  * @param narg - method argument.
  * @return created CnGnode. 
  */
-    CnGNode* addCnGNode_mp(Inst* inst, MethodDesc* md, uint32 ntype, uint32 narg);
+    CnGNode* addCnGNode_mp(Inst* inst, MethodPtrType* mpt, uint32 ntype, uint32 narg);
 
 /**
  * Creates new CnG node for specified return or throw instruction. 
@@ -1003,6 +991,12 @@ private:
  * @param scObjFlds - list to collect onode operand field usage.
  */
     void checkToScalarizeFinalFiels(CnGNode* onode, ScObjFlds* scObjFlds);
+
+
+    void instrExam_processLdFieldAddr(Inst* inst);
+    void instrExam2_processLdFieldAddr(Inst* inst);
+    static void getLdFieldAddrInfo(Inst* inst, Type*& type, uint32& nType);
+
 };
 
 } //namespace Jitrino 

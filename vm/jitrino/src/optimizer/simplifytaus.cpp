@@ -602,7 +602,7 @@ Opnd *TauWalkerState::findReplacement(Opnd *src, Type *type, bool exactType)
             TypeInst *srcTypeInst = srcInst->asTypeInst();
             assert(srcTypeInst);
             Type *castType = srcTypeInst->getTypeInfo();
-            if (irManager.getTypeManager().isSubClassOf(castType, type)) {
+            if (irManager.getTypeManager().isResolvedAndSubClassOf(castType, type)) {
                 // is guaranteed by the cast
                 Opnd *tauOpnd = srcInst->getSrc(1);
                 assert(tauOpnd->getType()->tag == Type::Tau);
@@ -625,7 +625,7 @@ Opnd *TauWalkerState::findReplacement(Opnd *src, Type *type, bool exactType)
             TypeInst *srcTypeInst = srcInst->asTypeInst();
             assert(srcTypeInst);
             Type *castType = srcTypeInst->getTypeInfo();
-            if (irManager.getTypeManager().isSubClassOf(castType, type)) {
+            if (irManager.getTypeManager().isResolvedAndSubClassOf(castType, type)) {
                 // is guaranteed
                 return genTauSafe();
             } else {

@@ -30,6 +30,7 @@
 #include "open/vm.h"
 #include "jit_import.h"
 #include "jit_intf.h"
+#include "VMMagic.h"
 
 #include <vector>
 using std::vector;
@@ -37,17 +38,6 @@ using std::vector;
 namespace Jitrino {
 namespace Jet {
 
-bool CodeGen::is_magic_class(const char* kname)
-{
-    static const char unboxedName[] = "org/vmmagic/unboxed/";
-    static const unsigned nameLen = sizeof(unboxedName)-1;
-
-    assert(kname!=NULL);
-    if (*kname=='L') {
-        return !strncmp(kname+1, unboxedName, nameLen);
-    }
-    return !strncmp(kname, unboxedName, nameLen);
-}
 
 static size_t sizeof_jt(jtype jt) {
     static size_t sizes[] =  { 
@@ -107,7 +97,7 @@ bool Compiler::gen_magic(void)
     
     const char* kname = const_pool_get_method_class_name(m_klass, (unsigned short)jinst.op0);
 
-    if (!is_magic_class(kname)) {
+    if (!VMMagicUtils::isVMMagicClass(kname)) {
         return false;
     }
     // This is a magic -> transform it

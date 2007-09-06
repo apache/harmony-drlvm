@@ -32,24 +32,12 @@
 #include "Jitrino.h"
 #include "EMInterface.h"
 #include "inliner.h"
+#include "VMMagic.h"
 
 #include <assert.h>
 #include <stdio.h>
 
 namespace Jitrino {
-
-// magics support: both typenames and descriptor names are supported
-static bool isVMMagicClass(const char* kname) {
-    static const char magicPackage[] = "org/vmmagic/unboxed/";
-    static const unsigned magicPackageLen = sizeof(magicPackage)-1;
-    bool res = false;
-    if (*kname=='L') {
-        res = !strncmp(kname+1, magicPackage, magicPackageLen);
-    } else {
-        res = !strncmp(kname, magicPackage, magicPackageLen);
-    }
-    return res;
-}
 
 static bool matchType(const char* candidate, const char* typeName) {
     if (candidate[0]=='L') {
@@ -62,7 +50,7 @@ static bool matchType(const char* candidate, const char* typeName) {
 }
 
 static Type* convertVMMagicType2HIR(TypeManager& tm, const char* name) {
-    assert(isVMMagicClass(name));
+    assert(VMMagicUtils::isVMMagicClass(name));
 
     if (matchType(name, "org/vmmagic/unboxed/Address")
         //TODO: ObjectReference must have a ManagedPointer/Object type
@@ -184,7 +172,7 @@ JavaByteCodeTranslator::JavaByteCodeTranslator(CompilationInterface& ci,
                     //TODO: numX->numY auto conversion not tested
                 }
             } 
-            if (isVMMagicClass(type->getName())) {
+            if (VMMagicUtils::isVMMagicClass(type->getName())) {
                 type = convertVMMagicType2HIR(typeManager, type);
             }
             arg = irBuilder.genArgDef(DefArgNoModifier,type);
@@ -731,7 +719,7 @@ JavaByteCodeTranslator::getstatic(uint32 constPoolIndex) {
         bool fieldValueInlined = false;
         Type* fieldType = field->getFieldType();
         assert(fieldType);
-        bool fieldIsMagic = isVMMagicClass(fieldType->getName());
+        bool fieldIsMagic = VMMagicUtils::isVMMagicClass(fieldType->getName());
         if (fieldIsMagic) {
             fieldType = convertVMMagicType2HIR(typeManager, fieldType);
         }
@@ -774,7 +762,7 @@ JavaByteCodeTranslator::getstatic(uint32 constPoolIndex) {
             linkingException(constPoolIndex, OPCODE_GETSTATIC);
         }
         const char* fieldTypeName = const_pool_get_field_descriptor(methodToCompile.getParentHandle(), constPoolIndex);
-        bool fieldIsMagic = isVMMagicClass(fieldTypeName);
+        bool fieldIsMagic = VMMagicUtils::isVMMagicClass(fieldTypeName);
         Type* fieldType = fieldIsMagic ? convertVMMagicType2HIR(typeManager, fieldTypeName) 
                                        : compilationInterface.getFieldType(methodToCompile.getParentHandle(), constPoolIndex);
         Opnd* res = irBuilder.genLdStaticWithResolve(fieldType, methodToCompile.getParentType()->asObjectType(), constPoolIndex);
@@ -788,7 +776,7 @@ JavaByteCodeTranslator::putstatic(uint32 constPoolIndex) {
     if (field && field->isStatic()) {
         Type* fieldType = getFieldType(field,constPoolIndex);
         assert(fieldType);
-        bool fieldIsMagic = isVMMagicClass(fieldType->getName());
+        bool fieldIsMagic = VMMagicUtils::isVMMagicClass(fieldType->getName());
         if (fieldIsMagic) {
             fieldType = convertVMMagicType2HIR(typeManager, fieldType);
         }
@@ -799,7 +787,7 @@ JavaByteCodeTranslator::putstatic(uint32 constPoolIndex) {
             linkingException(constPoolIndex, OPCODE_PUTSTATIC);
         }
         const char* fieldTypeName = const_pool_get_field_descriptor(methodToCompile.getParentHandle(), constPoolIndex);
-        bool fieldIsMagic = isVMMagicClass(fieldTypeName);
+        bool fieldIsMagic = VMMagicUtils::isVMMagicClass(fieldTypeName);
         Type* fieldType = fieldIsMagic ? convertVMMagicType2HIR(typeManager, fieldTypeName) 
                                        : compilationInterface.getFieldType(methodToCompile.getParentHandle(), constPoolIndex);
         Opnd* value = popOpnd();
@@ -812,7 +800,7 @@ JavaByteCodeTranslator::getfield(uint32 constPoolIndex) {
     FieldDesc *field = compilationInterface.getNonStaticField(methodToCompile.getParentHandle(), constPoolIndex, false);
     if (field && !field->isStatic()) {
         Type* fieldType = getFieldType(field, constPoolIndex);
-        if (isVMMagicClass(fieldType->getName())) {
+        if (VMMagicUtils::isVMMagicClass(fieldType->getName())) {
             fieldType = convertVMMagicType2HIR(typeManager, fieldType);
         }
         pushOpnd(irBuilder.genLdField(fieldType,popOpnd(),field));
@@ -822,7 +810,7 @@ JavaByteCodeTranslator::getfield(uint32 constPoolIndex) {
             linkingException(constPoolIndex, OPCODE_GETFIELD);
         }
         Type* fieldType = compilationInterface.getFieldType(methodToCompile.getParentHandle(), constPoolIndex);
-        if (isVMMagicClass(fieldType->getName())) {
+        if (VMMagicUtils::isVMMagicClass(fieldType->getName())) {
             fieldType = convertVMMagicType2HIR(typeManager, fieldType);
         }
         Opnd* base = popOpnd();
@@ -1445,15 +1433,22 @@ JavaByteCodeTranslator::popArgs(uint32 numArgs) {
     return srcOpnds;
 }
 
+//Helper class used to initialize unresolved method ptrs
 class JavaMethodSignature : public MethodSignature {
 public:
-    JavaMethodSignature(MemoryManager& mm, CompilationInterface ci, Class_Handle cl, const char* sigStr){
-        nParams = JavaLabelPrepass::getNumArgsBySignature(sigStr);
+    JavaMethodSignature(MemoryManager& mm, CompilationInterface ci, bool instanceMethod, Class_Handle cl, const char* sigStr){
+        signatureStr = sigStr;
+        nParams = JavaLabelPrepass::getNumArgsBySignature(sigStr) + (instanceMethod ? 1 : 0);
         const char* sigSuffix = sigStr;
         if (nParams > 0) {
-            sigSuffix++;
             paramTypes = new (mm) Type*[nParams];
-            for (uint32 i=0;i<nParams;i++) {
+            uint32 i = 0;
+            if (instanceMethod) {
+                paramTypes[0] = ci.getTypeManager().getUnresolvedObjectType();
+                i++;
+            }
+            sigSuffix++;
+            for (; i < nParams; i++) {
                 uint32 len = 0;
                 Type* type = JavaLabelPrepass::getTypeByDescriptorString(ci, cl, sigSuffix, len);
                 assert(type!=NULL);
@@ -1470,10 +1465,12 @@ public:
     virtual uint32 getNumParams() const { return nParams;}
     virtual Type** getParamTypes() const { return paramTypes;}
     virtual Type* getRetType() const {return retType;}
+    virtual const char* getSignatureString() const {return signatureStr;}
 private:
     uint32 nParams;
     Type** paramTypes;
     Type* retType;
+    const char* signatureStr;
 
 };
 
@@ -1486,9 +1483,9 @@ void JavaByteCodeTranslator::genCallWithResolve(JavaByteCodes bc, unsigned cpInd
     assert(enclosingClass!=NULL);
     const char* methodSig = methodSignatureString(cpIndex);
     assert(methodSig);
-    JavaMethodSignature* sig = new (memManager) JavaMethodSignature(irBuilder.getIRManager()->getMemoryManager(),
-        compilationInterface, (Class_Handle)enclosingClass->getVMTypeHandle(), methodSig);
-    uint32 numArgs = sig->getNumParams() + (isStatic ? 0 : 1); 
+    JavaMethodSignature* sig = new (memManager) JavaMethodSignature(irBuilder.getIRManager()->getMemoryManager(), 
+        compilationInterface, !isStatic, (Class_Handle)enclosingClass->getVMTypeHandle(), methodSig);
+    uint32 numArgs = sig->getNumParams();
     assert(numArgs > 0 || isStatic);
 
     Opnd** args = popArgs(numArgs);
@@ -1498,7 +1495,7 @@ void JavaByteCodeTranslator::genCallWithResolve(JavaByteCodes bc, unsigned cpInd
     if (bc != OPCODE_INVOKEINTERFACE) {
         const char* kname = const_pool_get_method_class_name(methodToCompile.getParentHandle(), cpIndex);
         const char* mname = const_pool_get_method_name(methodToCompile.getParentHandle(), cpIndex);
-        if (isVMMagicClass(kname)) {
+        if (VMMagicUtils::isVMMagicClass(kname)) {
             assert(bc == OPCODE_INVOKESTATIC || bc == OPCODE_INVOKEVIRTUAL);
             UNUSED bool res = genVMMagic(mname, numArgs, args, returnType);    
             assert(res);
@@ -1537,7 +1534,7 @@ JavaByteCodeTranslator::invokevirtual(uint32 constPoolIndex) {
     Opnd** srcOpnds = popArgs(numArgs);
     Type* returnType = methodDesc->getReturnType();
 
-    if (isVMMagicClass(methodDesc->getParentType()->getName())) {
+    if (VMMagicUtils::isVMMagicClass(methodDesc->getParentType()->getName())) {
         genVMMagic(methodDesc->getName(), numArgs, srcOpnds, returnType);
         return;
     }
@@ -1914,7 +1911,7 @@ JavaByteCodeTranslator::monitorexit() {
 void 
 JavaByteCodeTranslator::genLdVar(uint32 varIndex,JavaLabelPrepass::JavaVarType javaType) {
     Opnd *var = getVarOpndLdVar(javaType,varIndex);
-    if (isVMMagicClass(var->getType()->getName())) {
+    if (VMMagicUtils::isVMMagicClass(var->getType()->getName())) {
         var->setType(convertVMMagicType2HIR(typeManager, var->getType()));
     }
     Opnd *opnd;
@@ -2314,7 +2311,7 @@ JavaByteCodeTranslator::genInvokeStatic(MethodDesc * methodDesc,
 
     const char* kname = methodDesc->getParentType()->getName(); 
     const char* mname = methodDesc->getName(); 
-    if (isVMMagicClass(kname)) {
+    if (VMMagicUtils::isVMMagicClass(kname)) {
         UNUSED bool res = genVMMagic(mname, numArgs, srcOpnds, returnType);    
         assert(res);
         return;
@@ -2325,7 +2322,7 @@ JavaByteCodeTranslator::genInvokeStatic(MethodDesc * methodDesc,
     }
     Opnd *tauNullChecked = irBuilder.genTauSafe(); // always safe, is a static method call
     Type* resType = returnType;
-    if (isVMMagicClass(resType->getName())) {
+    if (VMMagicUtils::isVMMagicClass(resType->getName())) {
         resType = convertVMMagicType2HIR(typeManager, resType);
     }
     dst = irBuilder.genDirectCall(methodDesc, 
@@ -3535,7 +3532,7 @@ bool JavaByteCodeTranslator::genVMMagic(const char* mname, uint32 numArgs, Opnd 
 
 
 bool JavaByteCodeTranslator::genVMHelper(const char* mname, uint32 numArgs, Opnd **srcOpnds, Type *returnType) {
-    Type* resType = isVMMagicClass(returnType->getName()) ? convertVMMagicType2HIR(typeManager, returnType) : returnType;
+    Type* resType = VMMagicUtils::isVMMagicClass(returnType->getName()) ? convertVMMagicType2HIR(typeManager, returnType) : returnType;
 
     if (!strcmp(mname,"getTlsBaseAddress")) {
         assert(numArgs == 0);

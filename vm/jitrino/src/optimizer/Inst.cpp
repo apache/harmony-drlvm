@@ -2127,26 +2127,27 @@ Inst* InstFactory::makeTauLdElem(Modifier mod, Type* type, Opnd* dst, Opnd* arra
                         tauBaseNonNull, tauAddressInRange, type);
 }
 
+#ifdef BRM_CHECK_TYPES
+static void doBRMCheck(Opnd* src, Opnd* dst) {
+    Type *srcType = src->getType();
+    Type *dstType = dst->getType();
+    assert((srcType == dstType) || (srcType->isNullObject() && dstType->isObject()) 
+        || (srcType->isObject() && dstType->isObject() 
+            && (srcType->isUnresolvedType() || dstType->isUnresolvedType()
+                || srcType->asObjectType()->isSubClassOf(dstType->asObjectType()))));
+}
+#endif
+
 Inst* InstFactory::makeLdVar(Opnd* dst, VarOpnd* var) {
 #ifdef BRM_CHECK_TYPES
-    Type *srcType = var->getType();
-    Type *dstType = dst->getType();
-    assert((srcType == dstType) ||
-           (srcType->isNullObject() && dstType->isObject()) ||
-           (srcType->isObject() && dstType->isObject() &&
-            ((ObjectType *)srcType)->isSubClassOf((ObjectType *)dstType)));
+    doBRMCheck(var, dst);
 #endif
     return makeVarAccessInst(Op_LdVar, dst->getType()->tag, dst, var);
 }
 
 Inst* InstFactory::makeLdVar(Opnd* dst, SsaVarOpnd* var) {
 #ifdef BRM_CHECK_TYPES
-    Type *srcType = var->getType();
-    Type *dstType = dst->getType();
-    assert((srcType == dstType) ||
-           (srcType->isNullObject() && dstType->isObject()) ||
-           (srcType->isObject() && dstType->isObject() &&
-            ((ObjectType *)srcType)->isSubClassOf((ObjectType *)dstType)));
+    doBRMCheck(var, dst);
 #endif
     return makeVarAccessInst(Op_LdVar, dst->getType()->tag, dst, var);
 }
@@ -2345,24 +2346,14 @@ Inst* InstFactory::makeTauStElem(Modifier mod, Type::Tag type, Opnd* src,
 
 Inst* InstFactory::makeStVar(VarOpnd* var, Opnd* src) {
 #ifdef BRM_CHECK_TYPES
-    Type *srcType = src->getType();
-    Type *dstType = var->getType();
-    assert((srcType == dstType) ||
-           (srcType->isNullObject() && dstType->isObject()) ||
-           (srcType->isObject() && dstType->isObject() &&
-            ((ObjectType *)srcType)->isSubClassOf((ObjectType *)dstType)));
+    doBRMCheck(src, var);
 #endif
     return makeVarAccessInst(Op_StVar, src->getType()->tag, var, src);
 }
 
 Inst* InstFactory::makeStVar(SsaVarOpnd* var, Opnd* src) {
 #ifdef BRM_CHECK_TYPES
-    Type *srcType = src->getType();
-    Type *dstType = var->getType();
-    assert((srcType == dstType) ||
-           (srcType->isNullObject() && dstType->isObject()) ||
-           (srcType->isObject() && dstType->isObject() &&
-            ((ObjectType *)srcType)->isSubClassOf((ObjectType *)dstType)));
+    doBRMCheck(src, var);
 #endif
     return makeVarAccessInst(Op_StVar, src->getType()->tag, var, src);
 }

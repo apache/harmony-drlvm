@@ -1411,20 +1411,12 @@ Type* JavaLabelPrepass::getTypeByDescriptorString(CompilationInterface& ci, Clas
         len++;
     }
 
-    bool arrayIsWrapped = false;
     TypeManager& typeManager = ci.getTypeManager();
     switch( *descriptorString ) 
     {
     case 'L': 
         {
-            //TODO: check by name if type is already resolved!!!
-            if (!typeManager.isLazyResolutionMode()) {
-                resType = typeManager.getUnresolvedObjectType();
-            } else {
-                resType = ci.getTypeFromDescriptor(enclClass, descriptorString);
-                //in lazy resolution mode retType is already valid array type
-                arrayIsWrapped = true;
-            }
+            resType = ci.getTypeFromDescriptor(enclClass, descriptorString);
             while( *(++descriptorString) != ';' ) {
                 len++;
                 assert(*descriptorString);
@@ -1469,7 +1461,7 @@ Type* JavaLabelPrepass::getTypeByDescriptorString(CompilationInterface& ci, Clas
     }
     assert(resType);
 
-    if (!arrayIsWrapped && arrayDim > 0) {
+    if (arrayDim > 0) {
         for (;arrayDim > 0; arrayDim--) {
             resType = typeManager.getArrayType(resType, false);
         }
@@ -1879,7 +1871,7 @@ void StateTable::mergeSlots(StateInfo::SlotInfo* inSlot, StateInfo::SlotInfo* sl
         if (type) prepass.getVisited()->setBit(offset,false);
         return;
     }
-
+    
     Type* new_type = typeManager.getCommonType(in_type,type);
     if (new_type != NULL) {
         if (vars) {

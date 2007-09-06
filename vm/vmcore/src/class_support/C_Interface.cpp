@@ -2063,6 +2063,12 @@ Boolean type_info_is_primitive(Type_Info_Handle tih)
 } //type_info_is_primitive
 
 
+const char* type_info_get_type_name(Type_Info_Handle tih) {
+    TypeDesc* td = (TypeDesc*)tih;
+    assert(td);
+    return td->get_type_name()->bytes;
+}
+
 Class_Handle type_info_get_class(Type_Info_Handle tih)
 {
     TypeDesc* td = (TypeDesc*)tih;

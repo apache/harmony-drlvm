@@ -446,11 +446,11 @@ private:
 class UnresolvedMethodPtrType : public MethodPtrType {
 public:
     UnresolvedMethodPtrType(ObjectType* _enclosingClass, uint32 _cpIndex, TypeManager& tm, 
-        uint32 _nParams, Type** _paramTypes, Type* _returnType, 
+        uint32 _nParams, Type** _paramTypes, Type* _returnType,  const char* _signatureStr,
         bool isCompressed=false, ValueName obj=NULL) 
         : MethodPtrType(NULL, tm, isCompressed, obj), 
         enclosingClass(_enclosingClass), cpIndex(_cpIndex),
-        nParams(_nParams), paramTypes(_paramTypes), returnType(_returnType)
+        nParams(_nParams), paramTypes(_paramTypes), returnType(_returnType), signatureStr(_signatureStr)
     {}
 
     virtual ~UnresolvedMethodPtrType() {}
@@ -472,6 +472,7 @@ private:
     uint32 nParams;
     Type** paramTypes;
     Type* returnType;
+    const char* signatureStr;
 };
 
 
@@ -723,6 +724,7 @@ public:
     void          initArrayType(Type* elemType, bool isCompressed, void* arrayVMTypeHandle);
     Type*         getCommonType(Type* type1, Type *type2);
     ObjectType*   getCommonObjectType(ObjectType *o1, ObjectType *o2);
+    bool          isResolvedAndSubClassOf(Type* type1, Type *type2);
     bool          isSubClassOf(Type* type1, Type *type2) { return isSubTypeOf(type1, type2); }
     bool          isSubTypeOf(Type* type1, Type* type2);
 
@@ -853,6 +855,7 @@ public:
     virtual uint32 getNumParams() const = 0;
     virtual Type** getParamTypes() const = 0;
     virtual Type* getRetType() const = 0;
+    virtual const char* getSignatureString() const = 0;
 };
 } //namespace Jitrino 
 

@@ -70,6 +70,9 @@ static ComObjStat comObjStat;
 EscAnalyzer::CalleeMethodInfos* EscAnalyzer::calleeMethodInfos=NULL;
 Mutex EscAnalyzer::calleeMethodInfosLock;
 
+static void logMethod(MethodPtrType* mpt);
+static void logMethod(MethodDesc* md);
+static bool isVMHelperCall(Inst* inst, CompilationInterface::RuntimeHelperId id);
 
 void
 EscapeAnalysisPass::_run(IRManager& irm) {
@@ -101,7 +104,6 @@ EscAnalyzer::EscAnalyzer(MemoryManager& mm, SessionAction* argSource, IRManager&
     do_sync_removal_sm = argSource->getBoolArg("do_sync_removal_sm",true);
     do_scalar_repl = argSource->getBoolArg("do_scalar_repl",true);
     do_esc_scalar_repl = argSource->getBoolArg("do_esc_scalar_repl",true);
-    print_scinfo = argSource->getBoolArg("sc_info",false);
     execCountMultiplier_string = argSource->getStringArg("exec_count_mult", NULL);
     ec_mult = ( execCountMultiplier_string==NULL ? 0 : atof(execCountMultiplier_string) );
     do_scalar_repl_only_final_fields_in_use = argSource->getBoolArg("do_scalar_repl_only_final_fields_in_use",false);
@@ -111,6 +113,9 @@ EscAnalyzer::EscAnalyzer(MemoryManager& mm, SessionAction* argSource, IRManager&
     const char* translatorName = argSource->getStringArg("translatorActionName", "translator");
     translatorAction = (TranslatorAction*)PMF::getAction(argSource->getPipeline(), translatorName);
     assert(translatorAction);
+
+    shortLog = Log::isEnabled();
+    verboseLog = shortLog && argSource->isLogEnabled("escape_verbose");
 
     init();
 }
@@ -124,6 +129,8 @@ EscAnalyzer::EscAnalyzer(EscAnalyzer* parent, IRManager& irm)
     debug_method = parent->debug_method;
     translatorAction  = parent->translatorAction;
     method_ea_level = parent->method_ea_level + 1;
+    shortLog = parent->shortLog;
+    verboseLog = parent->verboseLog;
 
     init();
 }
@@ -142,50 +149,6 @@ void EscAnalyzer::init() {
     exam2Insts = new (eaMemManager) Insts(eaMemManager);
     methodEndInsts = new (eaMemManager) Insts(eaMemManager);
     checkInsts = new (eaMemManager) Insts(eaMemManager);
-
-    _cfgirun=0;
-    _instrInfo=0;
-    _instrInfo2=0;
-    _cngnodes=0;
-    _cngedges=0;
-    _scanMtds=0;
-    _setState=0;
-    _printstat=0;
-    _eainfo=0;
-    _seinfo=0;
-    if (Log::isEnabled())
-        _scinfo = 1;
-    else
-        if (print_scinfo)
-            _scinfo=1;
-        else 
-            _scinfo=0;
-    std::fill(prsArr, prsArr + prsNum, 0);
-
-
-    int pr = allProps;
-    int prsBound[] = {1000000000,100000000,10000000,1000000,100000,10000,1000,100,10,1};
-    if (pr-prsBound[0]-prsBound[0]<0 && pr!= 0) {
-        for (int i=0; i<prsNum; i++) {
-            if (pr >= prsBound[i] && pr-prsBound[i] >= 0) {
-                prsArr[i] = 1;
-                pr -= prsBound[i];
-            }
-        }
-
-        _eainfo     = prsArr[8];
-        _seinfo     = prsArr[9];
-        if (debug_method==NULL || strcmp(debug_method,"all")==0) {
-            _cfgirun    = prsArr[0];
-            _instrInfo  = prsArr[1];
-            _instrInfo2 = prsArr[2];
-            _cngnodes   = prsArr[3];
-            _cngedges   = prsArr[4];
-            _scanMtds   = prsArr[5];
-            _setState   = prsArr[6];
-            _printstat  = prsArr[7];
-        }
-    }
 }
 
 void 
@@ -220,31 +183,8 @@ EscAnalyzer::doAnalysis() {
     lastCnGNodeId = 0;    // initialization of private field
     defArgNumber = -1;   // initialization of private field
 
-    if (Log::isEnabled() && debug_method!=NULL) {
-        if (strcmp(mn,debug_method)==0) {
-            _cfgirun    = prsArr[0];
-            _instrInfo  = prsArr[1];
-            _instrInfo2 = prsArr[2];
-            _cngnodes   = prsArr[3];
-            _cngedges   = prsArr[4];
-            _scanMtds   = prsArr[5];
-            _setState   = prsArr[6];
-            _printstat  = prsArr[7];
-            Log::out() << "_cfgirun     " << _cfgirun    << std::endl;
-            Log::out() << "_instrInfo   " << _instrInfo  << std::endl;
-            Log::out() << "_instrInfo2  " << _instrInfo2 << std::endl;
-            Log::out() << "_cngnodes    " << _cngnodes   << std::endl;
-            Log::out() << "_cngedges    " << _cngedges   << std::endl;
-            Log::out() << "_scanMtds    " << _scanMtds   << std::endl;
-            Log::out() << "_setState    " << _setState   << std::endl;
-            Log::out() << "_printstat   " << _printstat  << std::endl;
-            Log::out() << "_eainfo      " << _eainfo     << std::endl;
-            Log::out() << "_seinfo      " << _seinfo     << std::endl;
-            Log::out() << "_scinfo      " << _scinfo     << std::endl;
-        }
-    }
 
-    if (_eainfo || _seinfo) {
+    if (verboseLog) {
         Log::out()<<"======  doAnalysis  ====== "<<mn<<"   level: ";
         Log::out()<<method_ea_level<<"   "; 
         if (mh.isSynchronized())
@@ -266,32 +206,29 @@ EscAnalyzer::doAnalysis() {
 
 //  exam instructions
 
-#ifdef _DEBUG
-        if (_cfgirun) {
+        if (verboseLog) {
             Log::out() <<std::endl;
             Log::out() <<"Scan "<< cur <<"  Node ";
             FlowGraph::printLabel(Log::out(),node);
             Log::out() <<"  Id. "<<node->getId() <<std::endl;
         }
-#endif
+
 
         instrExam(node);
 
     };
 
-#ifdef _DEBUG
-    if (_cngnodes) {
+    if (verboseLog) {
         Log::out() <<"printCnGNodes: "; 
         mh.printFullName(Log::out()); 
         Log::out() << std::endl;
         printCnGNodes("First run result: nodes",Log::out());
     }
-#endif
 
     cngEdges=new (eaMemManager) CnGEdges(eaMemManager);   // Common part of connection graph (edges)
     instrExam2();
     
-    if (_cngedges) {
+    if (verboseLog) {
         Log::out() <<"printCnGEdges: "; 
         mh.printFullName(Log::out()); 
         Log::out() << std::endl;
@@ -300,14 +237,13 @@ EscAnalyzer::doAnalysis() {
 
     setCreatedObjectStates();
 
-    if (_eainfo) {
+    if (verboseLog) {
         printCreatedObjectsInfo(Log::out());
     }
 
     saveScannedMethodInfo();    // to save states of contained obj, if needed
 
-#ifdef _DEBUG
-    if (_cngedges) {
+    if (verboseLog) {
         Log::out() << "++++++++++++++ printRefInfo()    ";
         mh.printFullName(Log::out());
         Log::out() << std::endl;
@@ -316,9 +252,8 @@ EscAnalyzer::doAnalysis() {
         mh.printFullName(Log::out());
         Log::out() << std::endl;
     }
-#endif
 
-    if (_cngnodes) {
+    if (verboseLog) {
         Log::out() <<"printCnGNodes: "; 
         mh.printFullName(Log::out()); 
         Log::out() << std::endl;
@@ -326,7 +261,7 @@ EscAnalyzer::doAnalysis() {
     }
 
     if (method_ea_level == 0) {  
-        createdObjectInfo();     // prints if _printstat==1
+        createdObjectInfo();     // prints if verboseLog
     }
 
     if (method_ea_level == 0) {
@@ -341,14 +276,12 @@ EscAnalyzer::doAnalysis() {
                 eaFixupVars(irManager);
             }
         }
-#ifdef _DEBUG
-        if (_seinfo && Log::isEnabled()) {
+        if (verboseLog && Log::isEnabled()) {
             printCreatedObjectsInfo(Log::out());
         }
-#endif
     }
 
-    if (_eainfo || _seinfo) {
+    if (verboseLog) {
         Log::out()<<"======  doAnalysis  ====== "<<mn<<"   level: ";
         Log::out()<<method_ea_level<<"   end   "; 
         if (mh.isSynchronized())
@@ -359,45 +292,31 @@ EscAnalyzer::doAnalysis() {
         Log::out()<< std::endl;
     }
 
-    if (Log::isEnabled() && debug_method!=NULL) {
-        if (strcmp(mn,debug_method)==0) {
-            _cfgirun    = 0;
-            _instrInfo  = 0;
-            _instrInfo2 = 0;
-            _cngnodes   = 0;
-            _cngedges   = 0;
-            _scanMtds   = 0;
-            _setState   = 0;
-            _printstat  = 0;
-        }
-    }
-
     return;
 }  // doAnalysis() 
 
-
 void 
 EscAnalyzer::instrExam(Node* node) {
-    Inst *headInst = (Inst*)node->getFirstInst();
-    int insnum=0;
-    Type* type;
-    CnGNode* cgnode;
-    uint32 ntype=0;
-    MethodDesc* md;
-    uint32 n;
-    bool addinst;
-    Inst* method_inst;
+    TypeManager& typeManager = irManager.getTypeManager();
+    int insnum = 0;
 
-    for (Inst* inst=headInst->getNextInst();inst!=NULL;inst=inst->getNextInst()) {
+    if (shortLog) {
+        Log::out() <<"instrExam: Checking node: "; FlowGraph::printLabel(Log::out(), node); 
+        Log::out()<<" dfNum="<<node->getDfNum()<<std::endl;
+    }
+
+    for (Inst* inst=(Inst*)node->getSecondInst();inst!=NULL;inst=inst->getNextInst()) {
         insnum++;
-        ntype=0;
-        if (_instrInfo) {
-            Log::out() <<"instrExam:" << std::endl;
-            Log::out() <<"++Node Id."<<node->getId()<<"  "<<node->getDfNum()<<std::endl;
-            Log::out() <<"instrExam++Node Id."<<node->getId()<<"  "<<node->getDfNum()<<std::endl;
-            Log::out() << "==";
-            inst->print(Log::out()); 
-            Log::out() << std::endl;
+        
+        Type* type = NULL;
+        CnGNode* cgnode = NULL;
+        uint32 ntype=0;
+        MethodPtrType* methType = NULL;
+        uint32 n = 0;
+        bool addinst = false;
+        Inst* method_inst = NULL;
+        if (shortLog) {
+            Log::out() <<"Checking inst:";  debug_inst_info(inst,Log::out());
         }
 
         switch (inst->getOpcode()) {
@@ -414,12 +333,6 @@ EscAnalyzer::instrExam(Node* node) {
                     ntype=NT_DEFARG;    // for Op_DefArg
                     defArgNumber++;
                 }
-#ifdef _DEBUG
-                if (_instrInfo) {
-                    Log::out() <<"Node Id."<<node->getId()<<std::endl;
-                    debug_inst_info(inst,Log::out()); 
-                }
-#endif
                 if (inst->getDst()->getType()->isObject()) {
                     type=inst->getDst()->getType();
                     assert(findCnGNode_op(inst->getDst()->getId())==NULL);
@@ -428,12 +341,6 @@ EscAnalyzer::instrExam(Node* node) {
                 break;
 
             case Op_Conv:     // conv
-#ifdef _DEBUG
-                if (_instrInfo) {
-                    Log::out() <<"Node Id."<<node->getId()<<std::endl;
-                    debug_inst_info(inst,Log::out()); 
-                }
-#endif                
                 if (inst->getDst()->getType()->isObject()) {
                     type=inst->getDst()->getType();
                     assert(findCnGNode_op(inst->getDst()->getId())==NULL);
@@ -441,74 +348,31 @@ EscAnalyzer::instrExam(Node* node) {
                 }
                 break;                
 
+            case Op_AddOffset: // used to get non-static field addr in lazy resolution mode.
             case Op_LdFieldAddr:     // ldflda
-                ntype=NT_INSTFLD;
             case Op_LdStaticAddr:    // ldsflda
-                if (ntype==0)
-                    ntype=NT_STFLD;    // for LdStaticAddr
-#ifdef _DEBUG
-                if (_instrInfo) {
-                    Log::out() <<"Node Id."<<node->getId()<<std::endl;
-                    debug_inst_info(inst,Log::out()); 
-                }
-#endif
-                FieldAccessInst* fainst;
-                if ((fainst=inst->asFieldAccessInst())!=NULL) {
-                    type=fainst->getFieldDesc()->getFieldType();  //field type
-                    if (type->isReference()) {
-                        assert(findCnGNode_op(inst->getDst()->getId())==NULL);
-                        cgnode = addCnGNode_op(inst,type,NT_REF);
-                        CnGNode* n = findCnGNode_fl(inst,ntype);
-                        if (n==NULL) {
-                            n = addCnGNode_fl(inst,ntype);
-                        }
-                        cgnode->lNode=n;   // stick nodes 
-                        exam2Insts->push_back(inst);
-                    } else {
-                        if (ntype==NT_INSTFLD) {
-                            assert(findCnGNode_op(inst->getDst()->getId())==NULL);
-                            cgnode = addCnGNode_op(inst,type,NT_REF);
-                            CnGNode* n = findCnGNode_fl(inst,ntype);
-                            if (n==NULL) {
-                                n = addCnGNode_fl(inst,ntype);
-                            }
-                            exam2Insts->push_back(inst);
-                            cgnode->lNode=n;   // stick nodes 
-                        }
-                    }
-                }
+                instrExam_processLdFieldAddr(inst);
                 break;
-
             case Op_TauLdInd:        // ldind
-#ifdef _DEBUG
-                if (_instrInfo) {
-                    Log::out() <<"Node Id."<<node->getId()<<std::endl;
-                    debug_inst_info(inst,Log::out()); 
-                }
-#endif
-                type = inst->getDst()->getType();
-                if (type->isReference()) {   //isObject()) {
-                    assert(findCnGNode_op(inst->getDst()->getId())==NULL);
-                    cgnode = addCnGNode_op(inst,type,NT_LDOBJ);
-                    exam2Insts->push_back(inst);
-                }
-                if (inst->getSrc(0)->getInst()->getOpcode()==Op_LdStaticAddr)
-                    break;
-                if (type->isValue()) {
-                    assert(findCnGNode_op(inst->getDst()->getId())==NULL);
-                    cgnode = addCnGNode_op(inst,type,NT_LDVAL);
-                    exam2Insts->push_back(inst);
+                {
+                    type = inst->getDst()->getType();
+                    if (type->isReference()) {   //isObject()) {
+                        assert(findCnGNode_op(inst->getDst()->getId())==NULL);
+                        cgnode = addCnGNode_op(inst,type,NT_LDOBJ);
+                        exam2Insts->push_back(inst);
+                    }
+                    if (inst->getSrc(0)->getInst()->getOpcode()==Op_LdStaticAddr)
+                        break;
+                    if (type->isValue()) {
+                        assert(findCnGNode_op(inst->getDst()->getId())==NULL);
+                        cgnode = addCnGNode_op(inst,type,NT_LDVAL);
+                        exam2Insts->push_back(inst);
+                    }
                 }
                 break;
 
             case Op_LdArrayBaseAddr: // ldbase
             case Op_AddScaledIndex:  // addindex
-#ifdef _DEBUG
-                if (_instrInfo) {
-                    Log::out() <<"Node Id."<<node->getId()<<std::endl;
-                    debug_inst_info(inst,Log::out()); 
-                }
-#endif
                 if (inst->getDst()->getType()->isReference()) {
                     type=inst->getDst()->getType();
                     assert(findCnGNode_op(inst->getDst()->getId())==NULL);
@@ -518,52 +382,30 @@ EscAnalyzer::instrExam(Node* node) {
                 break;
 
             case Op_VMHelperCall:      // callvmhelper
-#ifdef _DEBUG
-                if (_instrInfo) {
-                    Log::out() <<"Node Id."<<node->getId()<<std::endl;
-                    debug_inst_info(inst,Log::out()); 
-                }
-#endif
-                if (!inst->getDst()->isNull()) {
-                    if (inst->getDst()->getType()->isObject()) {
-                        CompilationInterface::RuntimeHelperId  callId = 
-                            inst->asVMHelperCallInst()->getVMHelperId();
-                        switch(callId) {
-                            case CompilationInterface::Helper_GetTLSBase:
-                                ntype = NT_ARRELEM;
-                                break;
-                            case CompilationInterface::Helper_NewObj_UsingVtable:
-                            case CompilationInterface::Helper_NewVector_UsingVtable:
-                                ntype = NT_OBJECT;
-                                break;
-                            default:
-                                ntype = 0;
-                                assert(0);
-                        }
-                        type=inst->getDst()->getType();
-                        assert(findCnGNode_op(inst->getDst()->getId())==NULL);
-                        cgnode = addCnGNode_op(inst,type,ntype);
+                {
+                    CompilationInterface::RuntimeHelperId  callId = inst->asVMHelperCallInst()->getVMHelperId();
+                    switch(callId) {
+                        case CompilationInterface::Helper_GetStaticFieldAddrWithResolve: 
+                            instrExam_processLdFieldAddr(inst);
+                            break;
+                        case CompilationInterface::Helper_CheckCastWithResolve:
+                            assert(findCnGNode_op(inst->getDst()->getId())==NULL);
+                            addCnGNode_op(inst,inst->getDst()->getType(), NT_REF);
+                            exam2Insts->push_back(inst);
+                            break;
+                        case CompilationInterface::Helper_NewObjWithResolve: 
+                        case CompilationInterface::Helper_NewArrayWithResolve:
+                        case CompilationInterface::Helper_NewMultiArray:
+                            assert(findCnGNode_op(inst->getDst()->getId())==NULL);
+                            addCnGNode_op(inst,inst->getDst()->getType(), NT_OBJECT);
+                            break;
+                        default:
+                            break;
                     }
                 }
-#ifdef _DEBUG 
-                if (_seinfo) {
-                    CompilationInterface::RuntimeHelperId  callId = 
-                        inst->asVMHelperCallInst()->getVMHelperId();
-                    if (method_ea_level == 0 && callId != CompilationInterface::Helper_Throw_Lazy) {
-
-                        Log::out() <<"iE:        callvmhelper    ";
-                        inst->print(Log::out()); 
-                        Log::out()<<std::endl;
-                    }
-                }
-#endif
                 break;
-
             case Op_JitHelperCall:      // calljithelper
                 if (method_ea_level == 0) {
-                    Log::out() <<"iE:        calljithelper    ";
-                    inst->print(Log::out()); 
-                    Log::out()<<std::endl;
                     switch(inst->asJitHelperCallInst()->getJitHelperId()) {
                         case InitializeArray:
                         case FillArrayWithConst:
@@ -579,24 +421,15 @@ EscAnalyzer::instrExam(Node* node) {
                 break;
 
             case Op_TauStInd:        // stind    
-#ifdef _DEBUG
-                if (_instrInfo) {
-                    Log::out() <<"Node Id."<<node->getId()<<std::endl;
-                    debug_inst_info(inst,Log::out()); 
-                }
-#endif
-                if ((type=inst->getSrc(0)->getType())->isObject() || type->isValue()) {
-                    exam2Insts->push_back(inst);
+                {
+                    type=inst->getSrc(0)->getType();
+                    if (type->isObject() || type->isValue()) {
+                        exam2Insts->push_back(inst);
+                    }
                 }
                 break;
 
             case Op_DirectCall:      // call
-#ifdef _DEBUG
-                if (_instrInfo) {
-                    Log::out() <<"Node Id."<<node->getId()<<std::endl;
-                    debug_inst_info(inst,Log::out()); 
-                }
-#endif
                 if (!inst->getDst()->isNull()) {
                     if (inst->getDst()->getType()->isObject()) {
                         type=inst->getDst()->getType();
@@ -604,48 +437,31 @@ EscAnalyzer::instrExam(Node* node) {
                         cgnode = addCnGNode_op(inst,type,NT_RETVAL);
                     }
                 }
-                md=inst->asMethodInst()->getMethodDesc();
-                n=md->getNumParams();
+                methType = typeManager.getMethodPtrType(inst->asMethodInst()->getMethodDesc());
+                assert(methType!=NULL);
+                n=methType->getNumParams();
                 addinst=false;
                 for (uint32 i = 0; i < n; i++) {
-                    Type* tt = md->getParamType(i);
+                    Type* tt = methType->getParamType(i);
                     if (!tt->isReference()) {
                         continue;
                     }
                     addinst=true;
                     assert(findCnGNode_mp(inst->getId(),i)==NULL);
-                    cgnode = addCnGNode_mp(inst,md,NT_ACTARG, i);
+                    cgnode = addCnGNode_mp(inst, methType, NT_ACTARG, i);
                 }
                 if (addinst) {
                     exam2Insts->push_back(inst);
                 }
-#ifdef _DEBUG  
-                if (_seinfo) {
+                if (verboseLog) {
                     if (method_ea_level == 0) {
                         Log::out() <<"iE:        call        ";
-                        if (md->isSynchronized())
-                            Log::out() << "sync   "; 
-                        if (md->isStatic())
-                            Log::out() << "stat   ";
-                        if (md->isNative())
-                            Log::out() << "native   ";
-                        inst->print(Log::out()); 
-                        Log::out()<<std::endl;
-                        Log::out() << "           ";
-                        md->printFullName(Log::out()); 
-                        Log::out() << std::endl;
+                        logMethod(methType);
                     }
                 }
-#endif
                 break;
 
             case Op_IndirectMemoryCall:  //callimem
-#ifdef _DEBUG
-                if (_instrInfo) {
-                    Log::out() <<"Node Id."<<node->getId()<<std::endl;
-                    debug_inst_info(inst,Log::out()); 
-                }
-#endif
                 if (!inst->getDst()->isNull()) {
                     if (inst->getDst()->getType()->isObject()) {
                         type=inst->getDst()->getType();
@@ -655,55 +471,38 @@ EscAnalyzer::instrExam(Node* node) {
                 }
                 method_inst=inst->getSrc(0)->getInst();
                 if (method_inst->getOpcode() == Op_LdVar) {
-                    Opnd* funptr = inst->getSrc(0);
-                    Type* optype = funptr->getType();
-                    MethodPtrType* opmtype = optype->asMethodPtrType();
-                    md = opmtype->getMethodDesc();
+                    methType = inst->getSrc(0)->getType()->asMethodPtrType();
+                } else if (method_inst->asMethodInst()!=NULL) {
+                    methType = typeManager.getMethodPtrType(method_inst->asMethodInst()->getMethodDesc());
                 } else {
-                    md=method_inst->asMethodInst()->getMethodDesc();
+                    assert(method_inst->isVMHelperCallInst()); //lazy resolution helper
+                    methType = inst->getSrc(0)->getType()->asMethodPtrType();
                 }
-                n=md->getNumParams();
+                assert(methType!=NULL);
+                
+                n=methType->getNumParams();
                 addinst=false;
                 for (uint32 i = 0; i < n; i++) {
-                    Type* tt = md->getParamType(i);
+                    Type* tt = methType->getParamType(i);
                     if (!tt->isReference()) {
                         continue;
                     }
                     addinst=true;
                     assert(findCnGNode_mp(inst->getId(),i)==NULL);
-                    cgnode = addCnGNode_mp(inst,md,NT_ACTARG,i);
+                    cgnode = addCnGNode_mp(inst, methType, NT_ACTARG, i);
                 }
                 if (addinst) {
                     exam2Insts->push_back(inst);
                 }
-#ifdef _DEBUG 
-                if (_seinfo) {
+
+                if (verboseLog) {
                     if (method_ea_level == 0) {
-                        Log::out() <<"iE:        callimem    ";
-                        if (md->isSynchronized())
-                            Log::out() << "sync   "; 
-                        if (md->isStatic())
-                            Log::out() << "stat   ";
-                        if (md->isNative())
-                            Log::out() << "native   ";
-                        inst->print(Log::out()); 
-                        Log::out()<<std::endl;
-                        Log::out() << "           ";
-                        md->printFullName(Log::out()); 
-                        Log::out() << std::endl;
+                        logMethod(methType);
                     }
                 }
-#endif
                 break;
 
             case Op_IntrinsicCall:   // callintr
-#ifdef _DEBUG
-                if (_instrInfo) {
-                    Log::out() <<"Node Id."<<node->getId()<<std::endl;
-                    debug_inst_info(inst,Log::out()); 
-                }
-#endif
-
                 if (!inst->getDst()->isNull()) {
                     assert(0);
                 }
@@ -720,39 +519,18 @@ EscAnalyzer::instrExam(Node* node) {
                 if (addinst) {
                     exam2Insts->push_back(inst);
                 }
-
-#ifdef _DEBUG 
-                if (_seinfo) {
-                    if (method_ea_level == 0) {
-                        Log::out() <<"iE:        callintr    ";
-                        inst->print(Log::out()); 
-                        Log::out()<<std::endl;
-                    }
-                }
-#endif
                 break;
 
             case Op_Catch:           // catch
-#ifdef _DEBUG
-                if (_instrInfo) {
-                    Log::out() <<"Node Id."<<node->getId()<<std::endl;
-                    debug_inst_info(inst,Log::out()); 
-                }
-#endif
-                if (inst->getDst()->getType()->isObject()) {
-                    type=inst->getDst()->getType();
+                type = inst->getDst()->getType();
+                if (type->isObject()) {
+                    assert(!type->isUnresolvedType());
                     assert(findCnGNode_op(inst->getDst()->getId())==NULL);
                     cgnode = addCnGNode_op(inst,type,NT_CATCHVAL);
                 }
                 break;
 
             case Op_StVar:           // stvar
-#ifdef _DEBUG
-                if (_instrInfo) {
-                    Log::out() <<"Node Id."<<node->getId()<<std::endl;
-                    debug_inst_info(inst,Log::out()); 
-                }
-#endif
                 type = inst->getDst()->getType();
                 if (type->isObject()) {
                     assert(findCnGNode_op(inst->getDst()->getId())==NULL);
@@ -762,12 +540,6 @@ EscAnalyzer::instrExam(Node* node) {
                 break;
 
             case Op_Phi:             // phi
-#ifdef _DEBUG
-                if (_instrInfo) {
-                    Log::out() <<"Node Id."<<node->getId()<<std::endl;
-                    debug_inst_info(inst,Log::out()); 
-                }
-#endif
                 type = inst->getDst()->getType();
                 if (type->isReference()) {
                     assert(findCnGNode_op(inst->getDst()->getId())==NULL);
@@ -777,12 +549,6 @@ EscAnalyzer::instrExam(Node* node) {
                 break;
 
             case Op_LdVar:             // ldvar
-#ifdef _DEBUG
-                if (_instrInfo) {
-                    Log::out() <<"Node Id."<<node->getId()<<std::endl;
-                    debug_inst_info(inst,Log::out()); 
-                }
-#endif
                 type = inst->getDst()->getType();
                 if (type->isReference()) {
                     assert(findCnGNode_op(inst->getDst()->getId())==NULL);
@@ -794,16 +560,11 @@ EscAnalyzer::instrExam(Node* node) {
             case Op_Return:          // return     
                 ntype=NT_EXITVAL;
             case Op_Throw:           // throw
-                if (ntype==0)
+                if (ntype==0) 
                     ntype=NT_THRVAL;
-#ifdef _DEBUG
-                if (_instrInfo) {
-                    Log::out() <<"Node Id."<<node->getId()<<std::endl;
-                    debug_inst_info(inst,Log::out()); 
-                }
-#endif
                 if (inst->getNumSrcOperands()>0) {
-                    if (inst->getSrc(0)->getType()->isObject()) {
+                    type = inst->getSrc(0)->getType();
+                    if (type->isObject()) {
                         assert(findCnGNode_in(inst->getId())==NULL);
                         cgnode = addCnGNode_ex(inst,ntype);
                         exam2Insts->push_back(inst);
@@ -813,12 +574,6 @@ EscAnalyzer::instrExam(Node* node) {
 
             case Op_TauStaticCast:   // staticcast
             case Op_TauCast:         // cast
-#ifdef _DEBUG
-                if (_instrInfo) {
-                    Log::out() <<"Node Id."<<node->getId()<<std::endl;
-                    debug_inst_info(inst,Log::out()); 
-                }
-#endif
                 type = inst->getDst()->getType();
                 if (type->isObject()) {
                     assert(findCnGNode_op(inst->getDst()->getId())==NULL);
@@ -828,12 +583,6 @@ EscAnalyzer::instrExam(Node* node) {
                 break;
 
             case Op_SaveRet:           // saveret
-#ifdef _DEBUG
-                if (_instrInfo) {
-                    Log::out() <<"Node Id."<<node->getId()<<std::endl;
-                    debug_inst_info(inst,Log::out()); 
-                }
-#endif
                 type = inst->getDst()->getType();
                 if (type->isIntPtr()) {
                     cgnode = findCnGNode_op(inst->getDst()->getId());
@@ -846,14 +595,6 @@ EscAnalyzer::instrExam(Node* node) {
             case Op_TauMonitorExit:  // monexit
                 if (do_sync_removal && method_ea_level == 0) {
                     addMonInst(inst);
-#ifdef _DEBUG
-                    if (_seinfo) {
-                        Log::out() << "iE: monX  Node Id."
-                            << node->getId() << "  ";
-                        inst->print(Log::out()); 
-                        Log::out()<<std::endl;
-                    }
-#endif
                 }
                 break;
 
@@ -871,123 +612,181 @@ EscAnalyzer::instrExam(Node* node) {
             case Op_Copy:       
 
             case Op_Box:
-
-                if (_instrInfo) {
-                    Log::out() <<"--Node Id."<<node->getId()<<std::endl;
-                    Log::out() << "    =="; 
-                    inst->print(Log::out()); 
-                    Log::out() << std::endl;
-                }
                 break;
 
             default:
-
-                if (_instrInfo) {
-                    Log::out() <<"~~Node Id."<<node->getId()<<std::endl;
-                    Log::out() << "    =="; 
-                    inst->print(Log::out()); 
-                    Log::out() << std::endl;
-                }
+                break;
         }
     }
     return;
 }  // instrExam(Node* node) 
 
 
+void EscAnalyzer::getLdFieldAddrInfo(Inst* inst, Type*& type, uint32& nType) {
+    type = NULL;
+    nType = 0;
+    if (inst->getOpcode() == Op_LdFieldAddr || inst->getOpcode() == Op_LdStaticAddr) {
+        FieldAccessInst* fainst = inst->asFieldAccessInst();
+        type = fainst->getFieldDesc()->getFieldType();
+        nType = inst->getOpcode() == Op_LdFieldAddr ?  NT_INSTFLD : NT_STFLD;
+    } else {
+        if (inst->getOpcode() == Op_AddOffset) {
+            nType = NT_INSTFLD;
+        } else {
+            assert(isVMHelperCall(inst, CompilationInterface::Helper_GetStaticFieldAddrWithResolve));
+            nType = NT_STFLD;
+        }
+        assert(inst->getDst()->getType()->isManagedPtr());
+        type = inst->getDst()->getType()->asPtrType()->getPointedToType();
+    }
+    assert(type!=NULL && nType!=0);
+}
+
+void  EscAnalyzer::instrExam_processLdFieldAddr(Inst* inst) {
+    Type* type = NULL;
+    uint32 nType = 0;
+    getLdFieldAddrInfo(inst, type, nType);
+    if (type->isReference() || nType==NT_INSTFLD) {
+        assert(findCnGNode_op(inst->getDst()->getId())==NULL);
+        CnGNode* cgnode = addCnGNode_op(inst,type,NT_REF);
+        CnGNode* n = findCnGNode_fl(inst,nType);
+        if (n==NULL) {
+            n = addCnGNode_fl(inst,nType);
+        }
+        cgnode->lNode=n;   // stick nodes 
+        exam2Insts->push_back(inst);
+    } 
+}
+
+void 
+EscAnalyzer::instrExam2_processLdFieldAddr(Inst* inst) {
+    Type* type = NULL;
+    uint32 nType = 0;
+    getLdFieldAddrInfo(inst, type, nType);
+
+    bool isref = type->isReference();
+    if (isref || nType==NT_INSTFLD) {
+        assert(!isref || findCnGNode_op(inst->getDst()->getId()));
+        if (nType == NT_INSTFLD) {
+            CnGNode* cgnode=findCnGNode_fl(inst,nType);    //  field node
+            assert(cgnode!=NULL);
+            CnGNode* cgn_src=findCnGNode_op(inst->getSrc(0)->getId());  // instance node
+            assert(cgn_src!=NULL);
+            //  adding fld edge for ldflda
+            addEdge(cgn_src,cgnode,ET_FIELD,inst);
+
+            // special for java/lang/String::value
+            if (inst->asFieldAccessInst()!=NULL) {
+                FieldDesc* fd=inst->asFieldAccessInst()->getFieldDesc();
+                if (fd->getParentType()->isSystemString()&&strcmp(fd->getName(),"value")==0) {
+                    addEdge(cgnode,cgn_src,ET_DEFER,inst);
+                }
+                if (method_ea_level == 0 && cgn_src->nInst->getOpcode()==Op_NewObj) {
+                    //fail if instance type is not compatible with 
+                    //store/load type. Incompatibility can be the result of not cleaned dead code.
+                    //see HARMONY-4115 for details.
+                    Inst* instantceInst = cgn_src->nInst;
+                    ObjectType* instanceType = instantceInst->asTypeInst()->getTypeInfo()->asObjectType();
+                    assert(instanceType!=NULL);
+                    ObjectType* fieldObjectType = fd->getParentType()->asObjectType();
+                    assert(fieldObjectType!=NULL);
+                    if (!instanceType->isSubClassOf(fieldObjectType)) {
+                        if (shortLog) {
+                            Log::out()<<"FAILURE: instance type: "<<instanceType->getName();
+                            Log::out()<<" is not compatible with field object type: "<<fieldObjectType->getName()<<std::endl;
+                            Log::out()<<"Instance inst: ";instantceInst->print(Log::out());
+                            Log::out()<<" field inst: ";inst->print(Log::out()); Log::out()<<std::endl;
+                        }
+                        assert(0);
+                        Jitrino::crash("Jitrino failure:escape: illegal HIR sequence");
+                    }
+                }
+            }
+        }
+    }
+}
+
 void 
 EscAnalyzer::instrExam2() {
+    TypeManager& typeManager = irManager.getTypeManager();
     Insts *instrs = exam2Insts;
     int insnum=0;
-    Insts::iterator it;
     Inst* inst;
-    Type* type;
-    CnGNode* cgnode;
-    CnGNode* cgn_src;
-    uint32 ntype=0;
-    MethodDesc* md;
-    uint32 n;
-    Inst* method_inst;
-    bool not_exam = false;
+    Insts::iterator it;
 
     for (it = instrs->begin( ); it != instrs->end( ); it++ ) {
         inst=*it;
         insnum++;
-        ntype=0;
 
-#ifdef _DEBUG
-        if (_instrInfo2) {
-            Log::out() <<"instrExam2:  Node Id."<<inst->getNode()->getId()<< " ";
-            FlowGraph::printLabel(Log::out(),inst->getNode()); Log::out() << std::endl;
-            inst->print(Log::out()); Log::out() << std::endl;
+        Type* type = NULL;
+        CnGNode* cgnode = NULL;
+        CnGNode* cgn_src = NULL;
+        uint32 ntype=0;
+        MethodPtrType* methType = NULL;
+        uint32 n = 0;
+        Inst* method_inst = NULL;
+        bool not_exam = false;
+
+
+        if (shortLog) {
+            Node * node = inst->getNode();
+            Log::out() <<"instrExam2: node: "; FlowGraph::printLabel(Log::out(), node); 
+            Log::out()<<" dfNum="<<node->getDfNum()<<std::endl;
+            Log::out() <<"inst :";  inst->print(Log::out());  Log::out() << std::endl;
         }
-#endif
 
         switch (inst->getOpcode()) {
-            case Op_LdFieldAddr:     // ldflda
-                ntype=NT_INSTFLD;
-            case Op_LdStaticAddr:    // ldsflda
-                if (ntype==0)
-                    ntype=NT_STFLD;    // for LdStaticAddr
-                FieldAccessInst* fainst;
-                if ((fainst=inst->asFieldAccessInst())!=NULL) {
-                    bool isref = fainst->getFieldDesc()->getFieldType()->isReference();
-                    if (isref || ntype==NT_INSTFLD) {
-                        cgn_src=findCnGNode_op(inst->getDst()->getId());  //  field address node
-                        if (isref)
-                            assert(cgn_src!=NULL);
-                        cgnode=findCnGNode_fl(inst,ntype);    //  field node
-                        assert(cgnode!=NULL);
-                        if (ntype == NT_INSTFLD) {
-                            cgn_src=findCnGNode_op(inst->getSrc(0)->getId());  // instance node
-                            //  adding fld edge for ldflda
-                            addEdge(cgn_src,cgnode,ET_FIELD,inst);
-                            // special for java/lang/String::value
-                            FieldDesc* fd=inst->asFieldAccessInst()->getFieldDesc();
-                            if (fd->getParentType()->isSystemString()&&strcmp(fd->getName(),"value")==0) {
-                                addEdge(cgnode,cgn_src,ET_DEFER,inst);
-                            }
-                            if (method_ea_level == 0 && cgn_src->nInst->getOpcode()==Op_NewObj) {
-                                //fail if instance type is not compatible with 
-                                //store/load type. Incompatibility can be the result of not cleaned dead code.
-                                //see HARMONY-4115 for details.
-                                Inst* instantceInst = cgn_src->nInst;
-                                ObjectType* instanceType = instantceInst->asTypeInst()->getTypeInfo()->asObjectType();
-                                assert(instanceType!=NULL);
-                                ObjectType* fieldObjectType = fd->getParentType()->asObjectType();
-                                assert(fieldObjectType!=NULL);
-                                if (!instanceType->isSubClassOf(fieldObjectType)) {
-                                    if (Log::isEnabled()) {
-                                        Log::out()<<"FAILURE: instance type: "<<instanceType->getName();
-                                        Log::out()<<" is not compatible with field object type: "<<fieldObjectType->getName()<<std::endl;
-                                        Log::out()<<"Instance inst: ";instantceInst->print(Log::out());
-                                        Log::out()<<" field inst: ";inst->print(Log::out()); Log::out()<<std::endl;
+                case Op_AddOffset:
+                case Op_LdFieldAddr:
+                case Op_LdStaticAddr:
+                    instrExam2_processLdFieldAddr(inst);
+                    break;
+                case Op_VMHelperCall:
+                    {
+                        CompilationInterface::RuntimeHelperId helperId = inst->asVMHelperCallInst()->getVMHelperId();
+                        switch(helperId) {
+                            case CompilationInterface::Helper_GetStaticFieldAddrWithResolve:
+                                instrExam2_processLdFieldAddr(inst);
+                                break;
+                            case CompilationInterface::Helper_CheckCastWithResolve:
+                                {   //handling is equal to taucheckcast
+                                    cgnode = findCnGNode_op(inst->getDst()->getId());
+                                    assert(cgnode!=NULL);
+                                    if (cgnode->lNode == NULL) {
+                                        cgn_src=findCnGNode_op(inst->getSrc(2)->getId());
+                                        assert(cgn_src!=NULL);
+                                        cgnode->lNode = cgn_src;
                                     }
-                                    assert(0);
-                                    Jitrino::crash("Jitrino failure:escape: illegal HIR sequence");
                                 }
-                            }
+                            default: break;
                         }
                     }
-                }
-                break;
+                    break;
+                case Op_TauLdInd:        // ldind
+                {
+                    type=inst->getDst()->getType();
+                    if (type->isObject()) {
+                        cgnode=findCnGNode_op(inst->getDst()->getId());
+                        assert(cgnode!=NULL);
+                        // ref to loaded object
+                        cgn_src=findCnGNode_op(inst->getSrc(0)->getId());
+                        assert(cgn_src!=NULL);
+                        addEdge(cgn_src,cgnode,ET_POINT,inst);  
+                    }
+                    if (type->isValue()) {
+                        Inst* srcInst = inst->getSrc(0)->getInst();
+                        uint32 src_opcode = srcInst->getOpcode();
+                        if (src_opcode==Op_LdStaticAddr || isVMHelperCall(srcInst, CompilationInterface::Helper_GetStaticFieldAddrWithResolve)) {
+                            break;
+                        }
 
-            case Op_TauLdInd:        // ldind
-                type=inst->getDst()->getType();
-                if (type->isObject()) {
-                    cgnode=findCnGNode_op(inst->getDst()->getId());
-                    assert(cgnode!=NULL);
-                    // ref to loaded object
-                    cgn_src=findCnGNode_op(inst->getSrc(0)->getId());
-                    assert(cgn_src!=NULL);
-                    addEdge(cgn_src,cgnode,ET_POINT,inst);  
-                }
-                if (type->isValue()) {
-                    cgnode=findCnGNode_op(inst->getDst()->getId());
-                    assert(cgnode!=NULL);
-                    // ref to loaded object
-                    cgn_src=findCnGNode_op(inst->getSrc(0)->getId());
-                    assert(cgn_src!=NULL);
-                    addEdge(cgn_src,cgnode,ET_POINT,inst);  
+                        cgnode=findCnGNode_op(inst->getDst()->getId());
+                        assert(cgnode!=NULL);
+                        // ref to loaded object
+                        cgn_src=findCnGNode_op(inst->getSrc(0)->getId());
+                        assert(cgn_src!=NULL);
+                        addEdge(cgn_src,cgnode,ET_POINT,inst);  
+                    }
                 }
                 break;
 
@@ -1013,40 +812,47 @@ EscAnalyzer::instrExam2() {
                 }
                 break;
 
-            case Op_TauStInd:        // stind    
-                if (inst->getSrc(0)->getType()->isObject()) {
-                    // ref to loaded address
-                    cgn_src=findCnGNode_op(inst->getSrc(0)->getId());
-                    assert(cgn_src!=NULL);
-                    cgnode=findCnGNode_op(inst->getSrc(1)->getId());
-                    assert(cgnode!=NULL);
-                    addEdge(cgnode,cgn_src,ET_DEFER,inst); 
-                    break;
-                }
-                if ((type=inst->getSrc(0)->getType())->isValue()) {
-                    uint32 src_opcode = inst->getSrc(1)->getInst()->getOpcode();
-                    if (src_opcode==Op_LdStaticAddr)
+            case Op_TauStInd:        // stind 
+                {
+                    type = inst->getSrc(0)->getType();
+                    if (type->isObject()) {
+                        // ref to loaded address
+                        cgn_src=findCnGNode_op(inst->getSrc(0)->getId());
+                        assert(cgn_src!=NULL);
+                        cgnode=findCnGNode_op(inst->getSrc(1)->getId());
+                        assert(cgnode!=NULL);
+                        addEdge(cgnode,cgn_src,ET_DEFER,inst); 
                         break;
-                    cgn_src=findCnGNode_op(inst->getSrc(0)->getId());
-                    if (cgn_src==NULL) {
-                        cgn_src = addCnGNode_op(inst->getSrc(0)->getInst(),type,NT_LDVAL);
                     }
-                    cgnode=findCnGNode_op(inst->getSrc(1)->getId());
-                    assert(cgnode!=NULL);
-                    addEdge(cgnode,cgn_src,ET_DEFER,inst); 
+                    if (type->isValue()) {
+                        Inst* srcInst = inst->getSrc(1)->getInst();
+                        uint32 src_opcode = srcInst->getOpcode();
+                        if (src_opcode==Op_LdStaticAddr  || isVMHelperCall(srcInst, CompilationInterface::Helper_GetStaticFieldAddrWithResolve)) {
+                            break;
+                        }
+                        cgn_src=findCnGNode_op(inst->getSrc(0)->getId());
+                        if (cgn_src==NULL) {
+                            cgn_src = addCnGNode_op(inst->getSrc(0)->getInst(),type,NT_LDVAL);
+                        }
+                        cgnode=findCnGNode_op(inst->getSrc(1)->getId());
+                        assert(cgnode!=NULL);
+                        addEdge(cgnode,cgn_src,ET_DEFER,inst); 
+                    }
                 }
                 break;
 
             case Op_DirectCall:      // call
-                md=inst->asMethodInst()->getMethodDesc();
-                n=md->getNumParams();
+                methType = typeManager.getMethodPtrType(inst->asMethodInst()->getMethodDesc());
+                n = methType->getNumParams();
                 for (uint32 i = 0; i < n; i++) {
-                    Type* tt = md->getParamType(i);
-                    if (!tt->isReference()) 
+                    Type* tt = methType->getParamType(i);
+                    if (!tt->isReference())  {
                         continue;
+                    }
                     cgnode=findCnGNode_mp(inst->getId(),i);
                     assert(cgnode!=NULL);
-                    cgn_src=findCnGNode_op(inst->getSrc(2+i)->getId());
+                    Opnd* param = inst->getSrc(2+i);
+                    cgn_src=findCnGNode_op(param->getId());
                     assert(cgn_src!=NULL);
                     addEdge(cgnode,cgn_src,ET_DEFER,inst); 
                 }
@@ -1055,19 +861,24 @@ EscAnalyzer::instrExam2() {
             case Op_IndirectMemoryCall:  //callimem
                 method_inst=inst->getSrc(0)->getInst();
                 if (method_inst->getOpcode() == Op_LdVar) {
-                    MethodPtrType* mpt = inst->getSrc(0)->getType()->asMethodPtrType();
-                    md = mpt->getMethodDesc();
+                    methType = inst->getSrc(0)->getType()->asMethodPtrType();
+                } else if (method_inst->asMethodInst()!=NULL) {
+                    methType = typeManager.getMethodPtrType(method_inst->asMethodInst()->getMethodDesc());
                 } else {
-                    md=method_inst->asMethodInst()->getMethodDesc();
+                    assert(method_inst->isVMHelperCallInst()); //lazy resolution helper
+                    methType = inst->getSrc(0)->getType()->asMethodPtrType();
                 }
-                n=md->getNumParams();
+                assert(methType!=NULL);
+                n = methType->getNumParams();
                 for (uint32 i = 0; i < n; i++) {
-                    Type* tt = md->getParamType(i);
-                    if (!tt->isReference()) 
+                    Type* tt = methType->getParamType(i);
+                    if (!tt->isReference()) {
                         continue;
+                    }
                     cgnode = findCnGNode_mp(inst->getId(),i);
                     assert(cgnode!=NULL);
-                    cgn_src=findCnGNode_op(inst->getSrc(3+i)->getId());
+                    Opnd* param = inst->getSrc(3+i);
+                    cgn_src=findCnGNode_op(param->getId());
                     assert(cgn_src!=NULL);
                     addEdge(cgnode,cgn_src,ET_DEFER,inst); 
                 }
@@ -1083,8 +894,10 @@ EscAnalyzer::instrExam2() {
                          cgn_src = findCnGNode_op(inst->getSrc(2)->getId());
                          assert(cgn_src!=NULL);
                          addEdge(cgnode,cgn_src,ET_DEFER,inst);
-                    Log::out() << "need to add edge from "<< cgnode->cngNodeId << " - " << cgnode->opndId << " to "
-                        << cgn_src->cngNodeId << " - " << cgn_src->opndId << std::endl;
+                         if (verboseLog) {
+                             Log::out() << "need to add edge from "<< cgnode->cngNodeId << " - " << cgnode->opndId << " to "
+                                 << cgn_src->cngNodeId << " - " << cgn_src->opndId << std::endl;
+                         }
                          break;
                     default:
                          assert(0);
@@ -1092,7 +905,8 @@ EscAnalyzer::instrExam2() {
                 break;
 
             case Op_StVar:           // stvar
-                if (inst->getDst()->getType()->isObject()) {
+                type = inst->getDst()->getType();
+                if (type->isObject()) {
                     cgnode = findCnGNode_op(inst->getDst()->getId());
                     assert(cgnode!=NULL);
                     cgn_src=findCnGNode_op(inst->getSrc(0)->getId());
@@ -1102,12 +916,14 @@ EscAnalyzer::instrExam2() {
                 break;
 
             case Op_Phi:             // phi
-                if (inst->getDst()->getType()->isObject()) {
+                type = inst->getDst()->getType();
+                if (type->isObject()) {
                     uint32 nsrc=inst->getNumSrcOperands();
                     cgnode = findCnGNode_op(inst->getDst()->getId());
                     assert(cgnode!=NULL);
                     for (uint32 i=0; i<nsrc; i++) {
-                        cgn_src=findCnGNode_op(inst->getSrc(i)->getId());
+                        Opnd* srcOpnd = inst->getSrc(i);
+                        cgn_src=findCnGNode_op(srcOpnd->getId());
                         assert(cgn_src!=NULL);
                         addEdge(cgn_src,cgnode,ET_DEFER,inst);
                     }
@@ -1141,7 +957,6 @@ EscAnalyzer::instrExam2() {
 
             case Op_TauStaticCast:   // staticcast
             case Op_TauCast:         // cast
-                type = inst->getDst()->getType();
                 cgnode = findCnGNode_op(inst->getDst()->getId());
                 assert(cgnode!=NULL);
                 if (cgnode->lNode == NULL) {
@@ -1158,11 +973,11 @@ EscAnalyzer::instrExam2() {
                 break;
 
             default:
-                if (_instrInfo2) {
+                if (verboseLog) {
                     not_exam = true;
                 }
         }
-        if (_instrInfo2) {
+        if (verboseLog) {
             if (not_exam) {
                 Log::out() <<"!!! Not examined. ";
                 inst->print(Log::out()); Log::out() << std::endl;
@@ -1217,7 +1032,9 @@ EscAnalyzer::addCnGNode(Inst* inst, Type* type, uint32 ntype) {
     }
     if (cgnode->nodeType==NT_OBJECT && cgnode->nodeRefType == NR_REF) {
         NamedType* nt = (NamedType*)(inst->getDst())->getType();
-        if (nt->isFinalizable()) {  // finalized objects cannot be removed
+        if (nt->isUnresolvedType() || nt->isFinalizable()) {  
+            // finalized objects cannot be removed
+            // unresolved objects too (not tested)
             setOutEscaped(cgnode);
         }
     }
@@ -1233,30 +1050,26 @@ EscAnalyzer::addCnGNode_op(Inst* inst, Type* type, uint32 ntype) {
 
     cgnode->opndId = opnd->getId();
     cgnode->refObj = opnd;
-#ifdef _DEBUG
-    if (_cngnodes) {
+    if (shortLog) {
         Log::out() <<"++++ addNode  "; printCnGNode(cgnode,Log::out());
         Log::out() << std::endl;
     }
-#endif
     return cgnode;
 }  // addCnGNode_op(Inst* inst, Type* type, uint32 ntype) 
 
 
 EscAnalyzer::CnGNode*
-EscAnalyzer::addCnGNode_mp(Inst* inst, MethodDesc* md, uint32 ntype, uint32 narg) {
-    Type* type = md->getParamType(narg);
+EscAnalyzer::addCnGNode_mp(Inst* inst, MethodPtrType* mpt, uint32 ntype, uint32 narg) {
+    Type* type = mpt->getParamType(narg);
     CnGNode* cgnode = addCnGNode(inst, type, ntype); // new CG node
 
     cgnode->opndId = 0;
     cgnode->argNumber = narg;
-    cgnode->refObj = md;
-#ifdef _DEBUG
-    if (_cngnodes) {
+    cgnode->refObj = mpt;
+    if (shortLog) {
         Log::out() <<"++++ addNode  "; printCnGNode(cgnode,Log::out());
         Log::out() << std::endl;
     }
-#endif
     return cgnode;
 }  // addCnGNode_mp(Inst* inst, MethodDesc* md, uint32 ntype, uint32 narg) 
 
@@ -1268,12 +1081,10 @@ EscAnalyzer::addCnGNode_ex(Inst* inst, uint32 ntype) {
 
     cgnode->opndId = 0;
     cgnode->refObj = inst->getSrc(0);   // returned or thrown operand
-#ifdef _DEBUG
-    if (_cngnodes) {
+    if (shortLog) {
         Log::out() <<"++++ addNode  "; printCnGNode(cgnode,Log::out());
         Log::out() << std::endl;
     }
-#endif
     return cgnode;
 }  // addCnGNode_ex(Inst* inst, uint32 ntype) 
 
@@ -1285,12 +1096,10 @@ EscAnalyzer::addCnGNode_fl(Inst* inst, uint32 ntype) {
 
     cgnode->opndId = 0;
     cgnode->refObj = inst;   // returned or thrown operand
-#ifdef _DEBUG
-    if (_cngnodes) {
+    if (shortLog) {
         Log::out() <<"++++ addNode  "; printCnGNode(cgnode,Log::out());
         Log::out() << std::endl;
     }
-#endif
     return cgnode;
 }  // addCnGNode_fl(Inst* inst, uint32 ntype) 
 
@@ -1342,39 +1151,36 @@ EscAnalyzer::findCnGNode_mp(uint32 iId, uint32 aId) {
 
 EscAnalyzer::CnGNode*
 EscAnalyzer::findCnGNode_fl(Inst* inst, uint32 ntype) {
-    CnGNodes::iterator it;
-    FieldDesc* fd1;
-    FieldDesc* fd2;
-    uint32 idr = 0;
-    if (ntype==NT_INSTFLD)
+    FieldDesc* fd1 = NULL;
+    if (inst->asFieldAccessInst()==NULL) {// unresolved field access
+        assert(inst->getOpcode() == Op_AddOffset || isVMHelperCall(inst, CompilationInterface::Helper_GetStaticFieldAddrWithResolve));
+    } else {
+        fd1 = inst->asFieldAccessInst()->getFieldDesc();
+    }
+
+    uint32 idr = 0; //object field used to reference this field
+    if (ntype==NT_INSTFLD) {
         idr=inst->getSrc(0)->getId();
-    assert(inst->asFieldAccessInst()!=NULL);
-    fd1 = inst->asFieldAccessInst()->getFieldDesc();
-    for (it = cngNodes->begin( ); it != cngNodes->end( ); it++ ) {
-        if ((*it)->nodeType==ntype) {
-            assert(((Inst*)((*it)->refObj))->asFieldAccessInst()!=NULL);
-            fd2 = ((Inst*)((*it)->refObj))->asFieldAccessInst()->getFieldDesc();
-            if ( fd1->getParentType()==fd2->getParentType() && 
-                    strcmp(fd1->getName(),fd2->getName())==0) {
+    }
+    for (CnGNodes::iterator it = cngNodes->begin( ); it != cngNodes->end( ); it++ ) {
+        CnGNode* cgNode = *it;
+        if (cgNode->nodeType==ntype) {
+            Inst* inst2 = (Inst*)cgNode->refObj;
+            FieldDesc* fd2 = NULL;
+            if (inst2->asFieldAccessInst()==NULL) {
+                assert(inst2->getOpcode() == Op_AddOffset || isVMHelperCall(inst2, CompilationInterface::Helper_GetStaticFieldAddrWithResolve));
+            } else {
+                fd2 = inst2->asFieldAccessInst()->getFieldDesc();
+            }
+            if ((fd1==NULL) != (fd2==NULL)) {
+                continue; // nodes for resolved & unresolved fields
+            }
+            if ( (fd1!=NULL && fd1->getFieldHandle() == fd2->getFieldHandle()) || inst == inst2/*don't optimize*/ ) {
                 if (ntype==NT_INSTFLD) {
-                    uint32 idf=((Inst*)((*it)->refObj))->getSrc(0)->getId();
+                    uint32 idf = inst2->getSrc(0)->getId();
                     if (idr!=idf) {
-#ifdef _DEBUG
-                        if (_cngedges) {
-                            Log::out()
-                                << "++++ findCnGNode_fl: required " << idr 
-                                << " - found  " << idf << " not found" << std::endl;
-                        }
-#endif
                         continue;
                     }
-#ifdef _DEBUG
-                    if (_cngedges) {
-                        Log::out()
-                            << "++++ findCnGNode_fl: required " << idr
-                            << " - found  " << idf << std::endl;
-                    }
-#endif
                 }
                 return (*it);
             }
@@ -1398,31 +1204,28 @@ EscAnalyzer::addEdge(CnGNode* cgnfrom, CnGNode* cgnto,
         assert(cgn1!=NULL);
     }
     if (cgnfrom->nodeType == NT_REF && cgnfrom->lNode == NULL) {
-        assert(cgnfrom->nInst->getOpcode()==Op_TauCast || cgnfrom->nInst->getOpcode()==Op_TauStaticCast);
-        cgn1 = findCnGNode_op(cgnfrom->nInst->getSrc(0)->getId());
+        bool helperCall = isVMHelperCall(cgnfrom->nInst, CompilationInterface::Helper_CheckCastWithResolve);
+        assert(cgnfrom->nInst->getOpcode()==Op_TauCast  || cgnfrom->nInst->getOpcode()==Op_TauStaticCast || helperCall);
+        cgn1 = findCnGNode_op(cgnfrom->nInst->getSrc(helperCall ? 2 : 0)->getId());
         assert(cgn1!=NULL);
         cgnfrom->lNode = cgn1;
     }
 
-#ifdef _DEBUG
-    if (_cngedges) {
+    if (verboseLog) {
         Log::out() 
             << "++++ addEdge: " << cgnfrom->cngNodeId << "-" << cgnfrom->opndId
             << " ( "<<cgn1->cngNodeId << "-" << cgn1->opndId << " ) to "
             << cgnto->cngNodeId << "-" << cgnto->opndId << " ( "
             << cgn2->cngNodeId << "-" << cgn2->opndId << " )" << std::endl;
     }
-#endif
     if (cgn1==cgn2) {
-#ifdef _DEBUG
-       if (_cngedges) {
+       if (verboseLog) {
             Log::out() << "+++++++ equal " 
                 << cgnfrom->cngNodeId<< "-" << cgnfrom->opndId
                 << " ( "<<cgn1->cngNodeId << "-" << cgn1->opndId << " ) to "
                 << cgnto->cngNodeId << "-" << cgnto->opndId << " ( "
                 << cgn2->cngNodeId << "-" << cgn2->opndId << " )" << std::endl;
         }
-#endif
         return;
     }
     for ( it = cngEdges->begin( ); it != cngEdges->end( ); it++ ) {
@@ -1431,11 +1234,9 @@ EscAnalyzer::addEdge(CnGNode* cgnfrom, CnGNode* cgnto,
             for ( itr = (*it)->refList->begin( ); itr != (*it)->refList->end( ); itr++ ) {
                 if ((*itr)->cngNodeTo == cgn2 && (*itr)->edgeType == etype && cgn1->nodeType != NT_INSTFLD) {
                     if (etype==ET_FIELD || cgn1->nodeType==NT_ACTARG) {
-#ifdef _DEBUG
-                        if (_cngedges) {
+                        if (verboseLog) {
                             Log::out() << "++++ addEdge: ET_FIELD || cgn1==NT_ACTARG && *->cngNodeTo == cgn2" <<  std::endl;
                         }
-#endif
                         return;
                     }
                     if (inst->getOpcode() == Op_IntrinsicCall) { //callintr
@@ -1443,11 +1244,9 @@ EscAnalyzer::addEdge(CnGNode* cgnfrom, CnGNode* cgnto,
                         switch(iid) {
                             case ArrayCopyDirect:
                             case ArrayCopyReverse:
-#ifdef _DEBUG
-                                if (_cngedges) {
+                                if (verboseLog) {
                                     Log::out() << "++++ addEdge: callintr" <<  std::endl;
                                 }
-#endif
                                 return;
                             default:
                                assert(0);
@@ -1456,19 +1255,15 @@ EscAnalyzer::addEdge(CnGNode* cgnfrom, CnGNode* cgnto,
                     if (inst->getOpcode() == Op_LdFieldAddr) {
                         FieldDesc* fd=inst->asFieldAccessInst()->getFieldDesc();
                         if (fd->getParentType()->isSystemString()&&strcmp(fd->getName(),"value")==0) {
-#ifdef _DEBUG
-                            if (_cngedges) {
+                            if (verboseLog) {
                                 Log::out() << "++++ addEdge: ldflda String.value" <<  std::endl;
                             }
-#endif
                             return;
                         }
                     }
-#ifdef _DEBUG
-                    if (_cngedges) {
+                    if (verboseLog) {
                         Log::out() << "++++ addEdge: edge already exists and new is added" <<  std::endl;
                     }
-#endif
                 }
             }
             ref = new (eaMemManager) CnGRef;
@@ -1476,11 +1271,9 @@ EscAnalyzer::addEdge(CnGNode* cgnfrom, CnGNode* cgnto,
             ref->edgeType=etype;
             ref->edgeInst=inst;
             (*it)->refList->push_back(ref);
-#ifdef _DEBUG
-            if (_cngedges) {
+            if (verboseLog) {
                 Log::out() << "++++ addEdge: added CnGRef" <<  std::endl;
             }
-#endif
             return;
         } 
     }
@@ -1495,11 +1288,9 @@ EscAnalyzer::addEdge(CnGNode* cgnfrom, CnGNode* cgnto,
     cgedge->refList=el;
     cngEdges->push_back(cgedge);
     cgn1->outEdges=el;
-#ifdef _DEBUG
-    if (_cngedges) {
+    if (verboseLog) {
         Log::out() << "++++ addEdge: added edge" <<  std::endl;
     }
-#endif
 
 }  // addEdge(CnGNode* cgnfrom, CnGNode* cgnto, uint32 etype, Inst* inst) 
 
@@ -1515,13 +1306,11 @@ EscAnalyzer::setCreatedObjectStates() {
             || (nt==NT_RETVAL && (*it)->nInst->getOpcode()==Op_IndirectMemoryCall)
             || (nt==NT_RETVAL && (*it)->nInst->asMethodInst()->getMethodDesc()->isNative())) {
             initNodeType = NT_STFLD;
-#ifdef _DEBUG
-            if (_setState) {
+            if (verboseLog) {
                 Log::out() <<"-- before scanGE:  nodeId "
                     <<(*it)->cngNodeId<<"  opId "<<(*it)->opndId<<" state ";
                 printState(*it); Log::out() << std::endl;
             }
-#endif
             scanCnGNodeRefsGE(*it,false);
         }
     }
@@ -1529,13 +1318,10 @@ EscAnalyzer::setCreatedObjectStates() {
     scannedObjsRev->clear();
     for (it = cngNodes->begin( ); it != cngNodes->end( ); it++ ) {
         if ((*it)->nodeType&NT_EXITVAL || (*it)->nodeType==NT_DEFARG) {  // returned, thrown , defarg
-#ifdef _DEBUG
-            if (_setState) {
-                Log::out() <<"-- before scanEVDA:  nodeId "
-                    <<(*it)->cngNodeId<<"  opId "<<(*it)->opndId<<" state ";
+            if (verboseLog) {
+                Log::out() <<"-- before scanEVDA:  nodeId " <<(*it)->cngNodeId<<"  opId "<<(*it)->opndId<<" state ";
                 printState(*it); Log::out() << std::endl;
             }
-#endif
             initNodeType = (*it)->nodeType;
             scanCnGNodeRefsGE(*it,false);
             scannedObjs->clear();
@@ -1547,13 +1333,10 @@ EscAnalyzer::setCreatedObjectStates() {
     for (it = cngNodes->begin( ); it != cngNodes->end( ); it++ ) {
         if ((*it)->nodeType==NT_ACTARG) {
             curMDNode=(*it)->cngNodeId;
-#ifdef _DEBUG
-            if (_setState) {
-                Log::out() <<"-- before scanAE:  nodeId "
-                    <<(*it)->cngNodeId<<"  opId "<<(*it)->opndId<<" state ";
+            if (verboseLog) {
+                Log::out() <<"-- before scanAE:  nodeId " <<(*it)->cngNodeId<<"  opId "<<(*it)->opndId<<" state ";
                 printState(*it);  Log::out() << std::endl;
             }
-#endif
             initNodeType = NT_ACTARG;
             scanCnGNodeRefsAE(*it,false);
             scannedObjs->clear();
@@ -1575,8 +1358,7 @@ EscAnalyzer::setCreatedObjectStates() {
                 for (it = cngNodes->begin( ); it != cngNodes->end( ); it++ ) {
                     if ( (*it)->nodeType==NT_OBJECT) {
                         if (ltree->getLoopHeader((*it)->nInst->getNode(),false)) {
-#ifdef _DEBUG
-                            if (_setState) {
+                            if (verboseLog) {
                                 Log::out() 
                                     <<"--setSt loop:  nodeId "
                                     <<(*it)->cngNodeId<<"  opId "
@@ -1584,17 +1366,16 @@ EscAnalyzer::setCreatedObjectStates() {
                                 printState(*it);
                                 Log::out() <<" to set loop" << std::endl;
                             }
-#endif
                             setLoopCreated(*it);
                             comObjStat._n_lo++;
                         }
                     }
                 }
         } else {
-#ifdef _DEBUG
-            mh.printFullName(Log::out()); Log::out() << std::endl;
-            Log::out() << "DominatorTree isn't valid  " << std::endl;
-#endif
+            if (verboseLog) {
+                mh.printFullName(Log::out()); Log::out() << std::endl;
+                Log::out() << "DominatorTree isn't valid  " << std::endl;
+            }
         }
     }
     for (it = cngNodes->begin( ); it != cngNodes->end( ); it++ ) {
@@ -1604,34 +1385,32 @@ EscAnalyzer::setCreatedObjectStates() {
                     it1++) {
                 CnGNode* n=findCnGNode_id(*it1);   // method argument node
                 assert(n!=NULL);
-                MethodDesc* mdesc = (MethodDesc*)n->refObj;
+                MethodPtrType* mpt = (MethodPtrType*)n->refObj;
                 Inst* callInst = n->nInst;
-#ifdef _DEBUG
-                if (_setState) {
+                if (verboseLog) {
                     Log::out()<<"--setSt chk arg_esc:  nodeId " <<(*it)->cngNodeId
                         <<"  opId " <<(*it)->opndId<<" state "; 
                     printState(*it); Log::out() << std::endl; 
                     Log::out() << "       "; callInst->print(Log::out());
                     Log::out() << std::endl;
                 }
-#endif
-                if (mdesc->isNative()) {  // not scanned native methods 
+                if (mpt->isUnresolvedMethodPtrType() || mpt->getMethodDesc()->isNative()) {  // not scanned native methods 
                     setEscState(*it,GLOBAL_ESCAPE);
-#ifdef _DEBUG
-                    if (_scanMtds==1) {
-                        mdesc->printFullName(Log::out());
+                    if (verboseLog) {
+                        mpt->print(Log::out());
                         Log::out() << std::endl;
-                        Log::out() << "    isNative: " 
-                            << mdesc->isNative() << std::endl;
+                        if (mpt->isUnresolvedMethodPtrType()) {
+                            Log::out() << "    isUnresolved: true" << std::endl;
+                        } else {
+                            Log::out() << "    isNative: true" << std::endl;
+                        }
+                        
                     }
-                    if (_setState) {
-                        Log::out() <<"--setSt 1:  nodeId "
-                            <<(*it)->cngNodeId<<"  opId "<<(*it)->opndId
-                            <<" state ";
+                    if (verboseLog) {
+                        Log::out() <<"--setSt 1:  nodeId " <<(*it)->cngNodeId<<"  opId "<<(*it)->opndId <<" state ";
                         printState(*it); 
                         Log::out()<<" to gl.esc."<< std::endl;
                     }
-#endif
                     break;
                 }
                 if (callInst->getOpcode()!=Op_DirectCall) {   // not direct call
@@ -1642,8 +1421,7 @@ EscAnalyzer::setCreatedObjectStates() {
                             mu = findMonUnit((*it)->opndId);
                         if (mu != NULL) {
                             addMonUnitVCall(mu,callInst);
-#ifdef _DEBUG
-                            if (_seinfo) {
+                            if (verboseLog) {
                                 Log::out() << "=-=-=-=- callimem for this ";
                                 Log::out() << std::endl;
                                 Log::out() << "=-=- ";
@@ -1653,94 +1431,54 @@ EscAnalyzer::setCreatedObjectStates() {
                                 Log::out() << std::endl;
                                 callInst->print(Log::out());
                                 Log::out() << std::endl;
-                                mdesc->printFullName(Log::out());
+                                mpt->print(Log::out());
                                 Log::out() << std::endl;
                                 Log::out() << "=-=-=-=- end " << std::endl;
                             }
-#endif
                             continue;
                         }
                     }
-#ifdef _DEBUG
-                    if (_scanMtds==1) {
-                        callInst->print(Log::out());
-                        Log::out() << std::endl;
-                        mdesc->printFullName(Log::out());
-                        Log::out() << std::endl;
-                        Log::out() << "    isStatic: " 
-                            << mdesc->isStatic() << std::endl;
-                        Log::out() << "    isFinal: " 
-                            << mdesc->isFinal() << std::endl;
-                        Log::out() << "---------------" << std::endl;
-                        Log::out() << "    NumParams: " 
-                            << mdesc->getNumParams()<< std::endl;
-                        Log::out() << "    isInstance: " 
-                            << mdesc->isInstance() << std::endl;
-                        Log::out() << "    isVirtual: " 
-                            << mdesc->isVirtual() << std::endl;
-                        Log::out() << "    isAbstract: " 
-                            << mdesc->isAbstract() << std::endl;
-                        Log::out() << "    isInstanceInitializer: " 
-                            << mdesc->isInstanceInitializer() << std::endl;
-                        Log::out() << "    isOverridden: " 
-                            << mdesc->isOverridden() << std::endl;
-                    }
-                    if (_setState) {
-                        Log::out() <<"--setSt 2:  nodeId "
-                            <<(*it)->cngNodeId<<"  opId "<<(*it)->opndId
-                            <<" state ";
+                    if (verboseLog) {
+                        callInst->print(Log::out()); Log::out() << std::endl;
+                        logMethod(mpt);
+
+                        Log::out() <<"--setSt 2:  nodeId " <<(*it)->cngNodeId<<"  opId "<<(*it)->opndId <<" state ";
                         printState(*it);
                         Log::out() <<" to v.call." << std::endl;
                     }
-#endif
                     continue; //break;
                 }
-                CalleeMethodInfo* mtdInfo = findMethodInfo(mdesc,callInst);
+                CalleeMethodInfo* mtdInfo = mpt->isUnresolvedMethodPtrType() ? NULL : findMethodInfo(mpt->getMethodDesc(), callInst);
                 if (mtdInfo == NULL) {    // no info about called method
                     setEscState(*it,GLOBAL_ESCAPE);
-#ifdef _DEBUG
-                    if (_setState) {
-                        Log::out() <<"--setSt 3:  nodeId "
-                            <<(*it)->cngNodeId<<"  opId "<<(*it)->opndId
-                            <<" state ";
-                        printState(*it);
-                        Log::out() <<" to gl.esc." << std::endl;
+                    if (verboseLog) {
+                        Log::out() <<"--setSt 3:  nodeId " <<(*it)->cngNodeId<<"  opId "<<(*it)->opndId <<" state ";
+                        printState(*it);Log::out() <<" to gl.esc." << std::endl;
                     }
-#endif
                     break;
                 } else {  // to use info about scanned method
                     uint32 narg = n->argNumber;
                     ParamInfos::iterator it2;
                     uint32 state = 0;
-#ifdef _DEBUG
-                    if (_setState) {
+                    if (verboseLog) {
                         Log::out() << "--setSt cmi: method " 
                             << mtdInfo->methodIdent->parentName << "::"
                             << mtdInfo->methodIdent->name << " "
                             << mtdInfo->methodIdent->signature << std::endl;
                     }
-#endif
-                    for (it2 = mtdInfo->paramInfos->begin( ); 
-                            it2 != mtdInfo->paramInfos->end( ); it2++) {
-#ifdef _DEBUG
-                        if (_setState) {
+                    for (it2 = mtdInfo->paramInfos->begin( );  it2 != mtdInfo->paramInfos->end( ); it2++) {
+                        if (verboseLog) {
                             Log::out() 
                                 <<(*it2)->paramNumber<<" == "<<narg<<" state "
                                 <<(*it2)->state <<" < "<< getEscState(*it)<<"  ";
                             printState(*it);  Log::out() << std::endl;
                         }
-#endif
                         if ((*it2)->paramNumber == narg) { //???to add scanning of contained obj
                             if ((state=(*it2)->state&ESC_MASK) < getEscState(*it)) {
-#ifdef _DEBUG
-                                if (_setState) {
-                                    Log::out()<<"--setSt cmi1:  nodeId " 
-                                        <<(*it)->cngNodeId<<"  opId "<<(*it)->opndId
-                                        <<" state "; 
-                                    printState(*it);
-                                    Log::out() <<" to state " <<state<< std::endl;
+                                if (verboseLog) {
+                                    Log::out()<<"--setSt cmi1:  nodeId " <<(*it)->cngNodeId<<"  opId "<<(*it)->opndId <<" state "; 
+                                    printState(*it); Log::out() <<" to state " <<state<< std::endl;
                                 }
-#endif
                                 setEscState(*it,state);
                             }
                         }
@@ -1780,25 +1518,21 @@ EscAnalyzer::setCreatedObjectStates() {
             }
             CalleeMethodInfo* mthInfo = findMethodInfo(mdesc,(*it)->nInst);
             if (mthInfo == NULL) {
-#ifdef _DEBUG
-                if (_setState) {
+                if (verboseLog) {
                     Log::out() <<"--setCOS 4:  nodeId "
                         <<(*it)->cngNodeId<<"  opId "<<(*it)->opndId <<" state ";
                     printState(*it); Log::out() <<" to gl.esc."<< std::endl;
                 }
-#endif
                 initNodeType = NT_STFLD;
                 scanCnGNodeRefsGE(*it,false);
             } else {
                 if (getEscState(*it)>((mthInfo->retValueState)&ESC_MASK) || getOutEscaped(*it)==0) {
-#ifdef _DEBUG
-                    if (_setState) {
+                    if (verboseLog) {
                         Log::out() <<"--setCOS 5:  nodeId "
                             <<(*it)->cngNodeId<<"  opId "<<(*it)->opndId <<" state ";
                         printState(*it);
                         Log::out() <<" to "<< mthInfo->retValueState<< std::endl;
                     }
-#endif
                     if (((mthInfo->retValueState)&ESC_MASK) == GLOBAL_ESCAPE) {
                         initNodeType = NT_STFLD;   // global_escape propagate
                     } else {
@@ -1818,12 +1552,10 @@ EscAnalyzer::setCreatedObjectStates() {
         if ((nt&(NT_OBJECT|NT_RETVAL) || nt==NT_LDOBJ) && (getEscState(*it)!=GLOBAL_ESCAPE)) {
             if ((*it)->outEdges == NULL)
                 continue;
-#ifdef _DEBUG
-            if (_setState) {
+            if (verboseLog) {
                 Log::out() <<"--setCOS 6: to check subobj nodes ";
                 printCnGNode(*it,Log::out()); Log::out() << std::endl;
             }
-#endif
             checkSubobjectStates(*it);
         }
         scannedObjs->clear();
@@ -1846,38 +1578,29 @@ EscAnalyzer::scanCnGNodeRefsGE(CnGNode* cgn, bool check_var_src) {
     if (cgn->nodeType != NT_STFLD && cgn->nodeType != NT_THRVAL && cgn->nodeType != NT_EXITVAL 
         && cgn->nodeType != NT_DEFARG && cgn->nodeType != NT_RETVAL && cgn->nodeType != NT_LDOBJ)
         assert(needFix);
-#ifdef _DEBUG
-    if (_setState) {
-        Log::out() <<"--scanGE 1:  nodeId "<<cgn->cngNodeId
-            <<"  opId "<<cgn->opndId<<" state ";
+    if (verboseLog) {
+        Log::out() <<"--scanGE 1:  nodeId "<<cgn->cngNodeId <<"  opId "<<cgn->opndId<<" state ";
         printState(cgn); 
-        Log::out() <<" " << nodeTypeToString(cgn) <<cgn->nodeType
-            <<"  check_var_src " << check_var_src << std::endl;
+        Log::out() <<" " << nodeTypeToString(cgn) <<cgn->nodeType <<"  check_var_src " << check_var_src << std::endl;
     }
-#endif
     if (cgn->nodeType == NT_LDVAL) {
-#ifdef _DEBUG
-        if (_setState) {
+        if (verboseLog) {
             Log::out() <<"--scanGE > 1: primitive type " << std::endl;
         }
-#endif
         return;
     }
     if (scObjs->size()!=0) {
         if (checkScanned(scObjs,cgn->cngNodeId)) {
-#ifdef _DEBUG
-            if (_setState) {
+            if (verboseLog) {
                 Log::out() <<"--scanGE > 1: was scanned earlier " << std::endl;
             }
-#endif
             return;
         }
     }
 
     if (initNodeType!=NT_EXITVAL && initNodeType!=NT_DEFARG) { // 
         if (getEscState(cgn) > GLOBAL_ESCAPE) {
-#ifdef _DEBUG
-            if (_setState) {
+            if (verboseLog) {
                 Log::out() <<"--scanGE 2:  nodeId "
                     <<cgn->cngNodeId<<"  opId "<<cgn->opndId <<" state ";
                 printState(cgn);
@@ -1885,14 +1608,12 @@ EscAnalyzer::scanCnGNodeRefsGE(CnGNode* cgn, bool check_var_src) {
                 Log::out() <<"--scanGE 2: "<< nodeTypeToString(cgn) 
                     << cgn->nodeType <<" initNode "<<initNodeType<< std::endl;
             }
-#endif
             setEscState(cgn,GLOBAL_ESCAPE);
         }
     } 
     if (initNodeType==NT_EXITVAL) {
         if (getOutEscaped(cgn) == 0) {
-#ifdef _DEBUG
-            if (_setState) {
+            if (verboseLog) {
                 Log::out() <<"--scanGE 3:  nodeId "
                     <<cgn->cngNodeId<<"  opId "<<cgn->opndId <<" state ";
                 printState(cgn);
@@ -1900,17 +1621,14 @@ EscAnalyzer::scanCnGNodeRefsGE(CnGNode* cgn, bool check_var_src) {
                 Log::out() <<"--scanGE 3: "<< nodeTypeToString(cgn) 
                     << cgn->nodeType <<" initNode "<<initNodeType<< std::endl;
             }
-#endif
             setOutEscaped(cgn);
         }
         // The objects created in the method are not global escaped through return
     }
     if (initNodeType==NT_DEFARG) {
         if (needFix) {
-#ifdef _DEBUG
-            if (_setState) {
-                Log::out() <<"--scanGE 4:  nodeId "
-                    <<cgn->cngNodeId<<"  opId "<<cgn->opndId <<" state ";
+            if (verboseLog) {
+                Log::out() <<"--scanGE 4:  nodeId " <<cgn->cngNodeId<<"  opId "<<cgn->opndId <<" state ";
                 printState(cgn);
                 if (cgn->nodeType == NT_OBJECT || cgn->nodeType == NT_LDOBJ || cgn->nodeType == NT_RETVAL) {
                     Log::out() <<" to gl.esc."<< std::endl;
@@ -1920,7 +1638,6 @@ EscAnalyzer::scanCnGNodeRefsGE(CnGNode* cgn, bool check_var_src) {
                 Log::out() <<"--scanGE 4: "<< nodeTypeToString(cgn) 
                     << cgn->nodeType <<" initNode "<<initNodeType<< std::endl;
             }
-#endif
             if (cgn->nodeType == NT_OBJECT || cgn->nodeType == NT_LDOBJ || cgn->nodeType == NT_RETVAL) {
                 setEscState(cgn,GLOBAL_ESCAPE); //objects escaped through defarg - global escape
             } else {
@@ -1936,32 +1653,26 @@ EscAnalyzer::scanCnGNodeRefsGE(CnGNode* cgn, bool check_var_src) {
             next_node = (*it1)->cngNodeTo;
             needFix = isStateNeedGEFix(getFullState(next_node),next_node->nodeType);
             if (!needFix) {
-#ifdef _DEBUG
-                if (_setState) {
+                if (verboseLog) {
                     Log::out() <<"--scanGE 5.0 next:  already set  ";
                     printState(next_node); Log::out() << std::endl;
                 }
-#endif
                 continue;
             }
             if (next_node->nodeType == NT_LDOBJ && next_node->nInst->getOpcode()==Op_LdVar 
                 && cgn->nodeType!=NT_VARVAL) {
                 to_check_var_src = true;
             }
-#ifdef _DEBUG
-            if (_setState) {
+            if (verboseLog) {
                 Log::out() <<"--scanGE 5 next:  nodeId "
                     <<next_node->cngNodeId<<"  opId "<<next_node->opndId <<" state ";
                 printState(next_node); Log::out() << std::endl;
             }
-#endif
             scanCnGNodeRefsGE(next_node,to_check_var_src);
-#ifdef _DEBUG
-            if (_setState) {
+            if (verboseLog) {
                 Log::out() <<"--scanGE ret 1 for node:  " << next_node->cngNodeId
                     <<"  opId " << next_node->opndId << std::endl;
             }
-#endif
         }
     }
     if (check_var_src) {
@@ -1971,28 +1682,22 @@ EscAnalyzer::scanCnGNodeRefsGE(CnGNode* cgn, bool check_var_src) {
                 next_node = findCnGNode_op(cgn->nInst->getSrc(i)->getId());
                 needFix = isStateNeedGEFix(getFullState(next_node),next_node->nodeType);
                 if (!needFix) {
-#ifdef _DEBUG
-                    if (_setState) {
+                    if (verboseLog) {
                         Log::out() <<"--scanGE 6.0 next:  already set  ";
                         printState(next_node); Log::out() << std::endl;
                     }
-#endif
                     continue;
                 }
-#ifdef _DEBUG
-                if (_setState) {
+                if (verboseLog) {
                     Log::out() <<"--scanGE 6 next:  nodeId "
                         <<next_node->cngNodeId<<"  opId "<<next_node->opndId <<" state ";
                     printState(next_node); Log::out() << std::endl;
                 }
-#endif
                 scanCnGNodeRefsGE(next_node,check_var_src);
-#ifdef _DEBUG
-                if (_setState) {
+                if (verboseLog) {
                     Log::out() <<"--scanGE ret 2 for node:  " << next_node->cngNodeId
                         <<"  opId " << next_node->opndId << std::endl;
                 }
-#endif
             }
         }
     }
@@ -2013,30 +1718,24 @@ EscAnalyzer::scanCnGNodeRefsAE(CnGNode* cgn, bool check_var_src) {
         assert(getEscState(cgn)!=ARG_ESCAPE);
     }
     assert(getEscState(cgn)!=GLOBAL_ESCAPE);
-#ifdef _DEBUG
-    if (_setState) {
+    if (verboseLog) {
         Log::out() <<"--scanAE < 1:  nodeId "<<cgn->cngNodeId
             <<"  opId "<<cgn->opndId<<" state ";
         printState(cgn);
         Log::out() <<" " << nodeTypeToString(cgn) <<cgn->nodeType
             <<"  check_var_src " << check_var_src << std::endl;
     }
-#endif
     if (cgn->nodeType == NT_LDVAL) {   // primitive type value
-#ifdef _DEBUG
-        if (_setState) {
+        if (verboseLog) {
             Log::out() <<"--scanAE > 1: primitive type " << std::endl;
         }
-#endif
         return;
     }
     if (scObjs->size()!=0) {
         if (checkScanned(scObjs,cgn->cngNodeId)) {
-#ifdef _DEBUG
-            if (_setState) {
+            if (verboseLog) {
                 Log::out() <<"--scanAE > 2: was scanned earlier " << std::endl;
             }
-#endif
             return;
         }
     }
@@ -2047,22 +1746,17 @@ EscAnalyzer::scanCnGNodeRefsAE(CnGNode* cgn, bool check_var_src) {
 
     if (cgn->nodeMDs!=NULL && curMDNode!=0) {
          cgn->nodeMDs->push_back(curMDNode);
-#ifdef _DEBUG
-        if (_setState) {
+        if (verboseLog) {
             Log::out() <<"--scanAE 1_1:  nodeId "<<cgn->cngNodeId
                 <<"  opId "<<cgn->opndId <<" curMDNode "<<curMDNode<< std::endl;
         }
-#endif
     }
     if (getEscState(cgn) > ARG_ESCAPE) {
-#ifdef _DEBUG
-        if (_setState) {
-            Log::out() <<"--scanAE 2:  nodeId "<<cgn->cngNodeId
-                <<"  opId "<<cgn->opndId<<" state ";
+        if (verboseLog) {
+            Log::out() <<"--scanAE 2:  nodeId "<<cgn->cngNodeId <<"  opId "<<cgn->opndId<<" state ";
             printState(cgn);
             Log::out() <<" to arg.esc."<< std::endl;
         }
-#endif
         setEscState(cgn,ARG_ESCAPE);
     }
 
@@ -2075,15 +1769,11 @@ EscAnalyzer::scanCnGNodeRefsAE(CnGNode* cgn, bool check_var_src) {
                 continue;
             if (getEscState(next_node) == ARG_ESCAPE && cgn->nodeType != NT_ACTARG)
                 continue;
-#ifdef _DEBUG
-            if (_setState) {
-                Log::out() <<"--scanAE 3 next:  nodeId "
-                    <<next_node->cngNodeId<<"  opId "<<next_node->opndId <<" state ";
+            if (verboseLog) {
+                Log::out() <<"--scanAE 3 next:  nodeId " <<next_node->cngNodeId<<"  opId "<<next_node->opndId <<" state ";
                 printState(next_node); 
-                Log::out() << " " << nodeTypeToString(next_node) 
-                    << " ref.type " << next_node->nodeRefType << std::endl;
+                Log::out() << " " << nodeTypeToString(next_node) << " ref.type " << next_node->nodeRefType << std::endl;
             }
-#endif
             if (next_node->nodeType == NT_LDVAL)
                 continue;
             if (next_node->nodeType == NT_LDOBJ)
@@ -2100,27 +1790,23 @@ EscAnalyzer::scanCnGNodeRefsAE(CnGNode* cgn, bool check_var_src) {
                 next_node = findCnGNode_op(cgn->nInst->getSrc(i)->getId());
                 if (getEscState(next_node) <= ARG_ESCAPE)
                     continue;
-#ifdef _DEBUG
-                if (_setState) {
+                if (verboseLog) {
                     Log::out() <<"--scanAE 4 next:  nodeId "
                         <<next_node->cngNodeId<<"  opId "<<next_node->opndId <<" state ";
                     printState(next_node); Log::out() << std::endl;
                 }
-#endif
                 scanCnGNodeRefsAE(next_node,check_var_src);
                 curMDNode = curMDNode_saved;
             }
         }
     }
 
-#ifdef _DEBUG
-    if (_setState) {
+    if (verboseLog) {
         Log::out() <<"--scanAE > 4: exit:  nodeId "<<cgn->cngNodeId
             <<"  opId "<<cgn->opndId<<" state "; printState(cgn);
         Log::out() <<" " << nodeTypeToString(cgn) <<cgn->nodeType
             <<"  check_var_src " << check_var_src << std::endl;
     }
-#endif
 }  // scanCnGNodeRefsAE(CnGNode* cgn, bool check_var_src)
 
 
@@ -2138,18 +1824,14 @@ EscAnalyzer::checkSubobjectStates(CnGNode* node) {
     Inst* n_inst = node->nInst;
     CnGNode* nt = NULL;
 
-#ifdef _DEBUG
-    if (_setState) {
+    if (verboseLog) {
         Log::out() <<"--checkSOS 0: ";
         printCnGNode(node,Log::out());Log::out() << std::endl;
     }
-#endif
     if (node->outEdges==NULL) {
-#ifdef _DEBUG
-        if (_setState) {
+        if (verboseLog) {
             Log::out() <<"--checkSOS 1: return "  << std::endl;
         }
-#endif
         return;
     }
 
@@ -2169,12 +1851,10 @@ EscAnalyzer::checkSubobjectStates(CnGNode* node) {
         n_inst = node_fld->nInst;
         for (it = node_fld->outEdges->begin( ); it != node_fld->outEdges->end( ); it++ ) {
             cgn = (*it)->cngNodeTo;
-#ifdef _DEBUG
-            if (_setState) {
+            if (verboseLog) {
                 Log::out() <<"--checkSOS 2: ";
                 printCnGNode(cgn,Log::out());Log::out() << std::endl;
             }
-#endif
             if (getEscState(cgn) < getEscState(node_fld)) {
                 if (getEscState(cgn)==GLOBAL_ESCAPE) {
                     gle = true;
@@ -2191,33 +1871,27 @@ EscAnalyzer::checkSubobjectStates(CnGNode* node) {
             }
             no_mod = true;
         }
-#ifdef _DEBUG
-        if (_setState) {
+        if (verboseLog) {
             Log::out() <<"--checkSOS 2:  " << no_mod << " " << gle  << " " << calle << " " << arge
                 << std::endl;
         }
-#endif
         if (gle || calle || arge) {
             if (node_fld->nodeType==NT_ARRELEM) {
                 if (n_inst->getOpcode() == Op_AddScaledIndex) {
                     n_inst = n_inst->getSrc(0)->getInst();
                     nt = findCnGNode_op(n_inst->getSrc(0)->getId());
-#ifdef _DEBUG
-                    if (_setState) {
+                    if (verboseLog) {
                         Log::out() <<"--checkSOS 3:  "; printCnGNode(nt,Log::out()); Log::out() << std::endl;
                     }
-#endif
                     if (nt->lNode != NULL) {
                         nt = nt->lNode;
                     }
                 }
             }
-#ifdef _DEBUG
-            if (_setState) {
+            if (verboseLog) {
                 Log::out() <<"--checkSOS 4: found  ";
                 printCnGNode(nt,Log::out());Log::out() << std::endl;
             }
-#endif
             if (gle) {
                 initNodeType = NT_STFLD; 
             } else {
@@ -2261,15 +1935,13 @@ EscAnalyzer::findMethodInfo(MethodDesc* mdesc,Inst* callInst) {
     const char* ch3 = mdesc->getSignatureString();
     CalleeMethodInfo* mtdInfo = getMethodInfo(ch1,ch2,ch3);
     if (mtdInfo == NULL) {
-#ifdef _DEBUG
-        if (_scanMtds==1) {
+        if (verboseLog) {
             Log::out() << "      = = = = = = = =  To scan method " << std::endl;
             mdesc->printFullName(Log::out());
             Log::out() << std::endl;
             callInst->print(Log::out());
             Log::out() << std::endl;
         }
-#endif
         if (method_ea_level < maxMethodExamLevel) {
             scanCalleeMethod(callInst);
             mtdInfo=getMethodInfo(ch1,ch2,ch3);
@@ -2297,40 +1969,21 @@ EscAnalyzer::getMethodInfo(const char* ch1,const char* ch2,const char* ch3) {
 
 void
 EscAnalyzer::scanCalleeMethod(Inst* call) {
-    MethodDesc* methodDesc = 0;
-    
-#ifdef _DEBUG
-    if (_scanMtds==1) {
+    if (verboseLog) {
         Log::out() << "=="; 
         call->print(Log::out()); 
         Log::out() << std::endl;
     }
-#endif
     if (call == NULL) {  // scanned Op_DirectCall, not scanned Op_IndirectMemoryCall
         Log::out() << "scanMethod: NULL" << std::endl;
         return;
     }
-    methodDesc = call->asMethodCallInst()->getMethodDesc();
+    
+    MethodDesc* methodDesc = call->asMethodCallInst()->getMethodDesc();
 
-#ifdef _DEBUG
-    if (_scanMtds==1) {
-        Log::out() << std::endl; 
-        Log::out() << "scanMethod: " << methodDesc->getParentType()->getName() 
-            << "." << methodDesc->getName() << methodDesc->getSignatureString() 
-            << "  " << methodDesc << std::endl;
-        Log::out() << "    NumParams: " 
-            << methodDesc->getNumParams()<< std::endl;
-        Log::out() << "    isNative: " << methodDesc->isNative() << std::endl;
-        Log::out() << "    isStatic: " << methodDesc->isStatic() << std::endl;
-        Log::out() << "    isInstance: " << methodDesc->isInstance() << std::endl;
-        Log::out() << "    isFinal: " << methodDesc->isFinal() << std::endl;
-        Log::out() << "    isVirtual: " << methodDesc->isVirtual() << std::endl;
-        Log::out() << "    isAbstract: " << methodDesc->isAbstract() << std::endl;
-        Log::out() << "    isInstanceInitializer: " 
-            << methodDesc->isInstanceInitializer() << std::endl;
-        Log::out() << "    isOverridden: " << methodDesc->isOverridden() << std::endl;
-   }
-#endif
+    if (verboseLog) {
+        Log::out() << std::endl; Log::out() << "scanMethod: "; logMethod(methodDesc);
+    }
 
     OpndManager& _opndManager(irManager.getOpndManager());
     Opnd *returnOpnd = 0;
@@ -2466,8 +2119,7 @@ EscAnalyzer::saveScannedMethodInfo() {
     calleeMethodInfos->push_back(minfo);
     calleeMethodInfosLock.unlock();  // Unlock 
 
-#ifdef _DEBUG
-    if (_scanMtds==1) {
+    if (verboseLog) {
         ParamInfos::iterator it2;
         Log::out() << "====     ===== calleeMethodInfo  " << std::endl;
         Log::out() << minfo->methodIdent->parentName << "  ";
@@ -2480,7 +2132,6 @@ EscAnalyzer::saveScannedMethodInfo() {
         }
         Log::out() << "==== end ===== calleeMethodInfo  " << std::endl;
     }
-#endif
 }  // saveScannedMethodInfo(MemoryManager& mm)
 
 
@@ -2567,10 +2218,8 @@ EscAnalyzer::printCnGNodes(char* text,::std::ostream& os) {
             }
         }
         if ((*it)->nodeType & NT_ACTARG) {    //node of actual method parameter
-            os << ((MethodDesc*)(*it)->refObj)->getParentType()->getName() << "::";
-            os << ((MethodDesc*)(*it)->refObj)->getName() << std::endl;
-            os << "                                ";
-            os << ((MethodDesc*)(*it)->refObj)->getParamType((*it)->opndId)->getName();
+            ((MethodPtrType*)(*it)->refObj)->print(os);
+            os << std::endl;
         }
         if ((*it)->nodeType & NT_STFLD) {    //field node 
             fd = ((Inst*)(*it)->refObj)->asFieldAccessInst()->getFieldDesc();
@@ -2592,7 +2241,8 @@ EscAnalyzer::printCnGNode(CnGNode* cgn,::std::ostream& os) {
     } else {
         if (cgn->nodeType & NT_ACTARG) {   //node of actual method parameter
             os << "nArg "<<cgn->argNumber<<"  ";
-            os << "method "<<cgn->refObj<<"  ";
+            os << "method ";
+            ((MethodPtrType*)cgn->refObj)->print(os);
         } 
     }
     if (cgn->nodeType==NT_DEFARG)
@@ -2822,7 +2472,7 @@ EscAnalyzer::printCreatedObjectsInfo(::std::ostream& os) {
                     os << std::endl; os <<"    ";
                     printCnGNode(n,os);
                     os << std::endl; os <<"      ";
-                    ((MethodDesc*)n->refObj)->printFullName(os);
+                    ((MethodPtrType*)n->refObj)->print(os);
                 }
             }
             os << std::endl;
@@ -2857,7 +2507,7 @@ EscAnalyzer::createdObjectInfo() {
                 n_ne++;
         }
     }
-    if (_printstat==1) {
+    if (verboseLog) {
         Log::out() << "**************  Created object info: ";
         mh.printFullName(Log::out()); 
         Log::out() << std::endl; 
@@ -2875,7 +2525,7 @@ EscAnalyzer::createdObjectInfo() {
     comObjStat._n_ae+=n_ae;
     comObjStat._n_ne+=n_ne;
 
-    if (_printstat==1) {
+    if (verboseLog) {
         Log::out() << "**************  Common created object info " << std::endl; 
         Log::out() << "  Number of created objects: " << comObjStat._n0 << std::endl; 
         Log::out() << "    Global escaped objects: " << comObjStat._n_ge << std::endl; 
@@ -2894,14 +2544,13 @@ EscAnalyzer::printOriginObjects(Inst* inst, bool all, std::string text) {
 
     if (scannedObjs->size()!=0) {
         if (checkScannedObjs(inst->getId())) {
-            if (_seinfo || _scinfo) {
-                Log::out() << "instId " << inst->getId() 
-                    << "  .  .  . " << std::endl;
+            if (verboseLog) {
+                Log::out() << "instId " << inst->getId() << "  .  .  . " << std::endl;
             }
             return;
         }
     }
-    if (_seinfo || _scinfo) {
+    if (verboseLog) {
         Log::out() << text; 
         inst->print(Log::out()); 
         Log::out() << std::endl;
@@ -2911,7 +2560,7 @@ EscAnalyzer::printOriginObjects(Inst* inst, bool all, std::string text) {
         if (returnOpnd != NULL) {
             CnGNode* n = findCnGNode_op(returnOpnd->getId());
             if (n != NULL) {
-                if (_seinfo || _scinfo) {
+                if (verboseLog) {
                     Log::out()<< text << "  ";
                     printCnGNode(n,Log::out()); 
                     Log::out()<< std::endl;
@@ -2925,7 +2574,7 @@ EscAnalyzer::printOriginObjects(Inst* inst, bool all, std::string text) {
             } else {
                 md = inst->getSrc(0)->getInst()->asMethodInst()->getMethodDesc();
             }
-            if (_seinfo || _scinfo) {
+            if (verboseLog) {
                 Log::out() << text << "  "; 
                 md->printFullName(Log::out() ); 
                 Log::out() << std::endl;
@@ -2937,7 +2586,7 @@ EscAnalyzer::printOriginObjects(Inst* inst, bool all, std::string text) {
         Opnd *dst = inst->getDst(); 
         CnGNode* n = findCnGNode_op(dst->getId());
         if (n != NULL) {
-            if (_seinfo || _scinfo) {
+            if (verboseLog) {
                 Log::out()<< text << "  "; 
                 printCnGNode(n,Log::out()); 
                 Log::out()<< std::endl;
@@ -2953,7 +2602,7 @@ EscAnalyzer::printOriginObjects(Inst* inst, bool all, std::string text) {
         {
             CnGNode* n = findCnGNode_in(inst->getId());
             if (n != NULL) {
-                if (_seinfo || _scinfo) {
+                if (verboseLog) {
                     Log::out() << text << "  "; 
                     printCnGNode(n,Log::out() ); 
                     Log::out() << std::endl;
@@ -3081,18 +2730,7 @@ EscAnalyzer::what_inst(Inst* inst,::std::ostream& os) {
     if (inst->asMethodInst()) {
         os << "        MethodInst" << std::endl;
         MethodDesc* md=inst->asMethodInst()->getMethodDesc();
-        os << "          isNative " << md->isNative() << std::endl;
-        os << "          isSynchronized " << md->isSynchronized() << std::endl;
-        os << "          isStatic " << md->isStatic() << std::endl;
-        os << "          isInstsnce " << md->isInstance() << std::endl;
-        os << "          isFinal " << md->isFinal() << std::endl;
-        os << "          isVirtual " << md->isVirtual() << std::endl;
-        os << "          isAbstract " << md->isAbstract() << std::endl;
-        os << "          isClassInitializer " << md->isClassInitializer() << std::endl;
-        os << "          isInstanceInitializer " << md->isInstanceInitializer() << std::endl;
-        os << "          isOverridden " << md->isOverridden() << std::endl;
-        os << "          Name " << md->getName() << std::endl;
-        os << "          Signature " << md->getSignatureString() << std::endl;
+        logMethod(md);
         uint32 n=md->getNumParams();
         os << "          Params " << n << std::endl;
         for (uint32 i = 0; i < n; i++) {
@@ -3147,28 +2785,30 @@ EscAnalyzer::debug_inst_info(Inst* inst,::std::ostream& os) {
     uint32 nsrc;
 
     os << "  =="; inst->print(os); os << std::endl;
-    os << "  Inst Info:" << std::endl;
-    what_inst(inst,os);
-    os << "  Dst & Src Info:" << std::endl;
-    dst=inst->getDst();
-    nsrc=inst->getNumSrcOperands();
-    os << "  ";
-    if (!dst->isNull())
-        dst->print(os);
-    else
-        os << "dst NULL";
-    os << "  --srcnum " << nsrc << std::endl;
-    if (!dst->isNull()) {
-        os << "  dst ";
-        debug_opnd_info(dst, os);
-    } else
-        os << std::endl;
-    if ( nsrc != 0 ) {
-        os << "  sources" << std::endl;
-        for (uint32 i=0; i<nsrc; i++) {
-            src=inst->getSrc(i);
-            os << "  <<" <<i<<">> ";
-            debug_opnd_info(src, os);
+    if (verboseLog) {
+        os << "  Inst Info:" << std::endl;
+        what_inst(inst,os);
+        os << "  Dst & Src Info:" << std::endl;
+        dst=inst->getDst();
+        nsrc=inst->getNumSrcOperands();
+        os << "  ";
+        if (!dst->isNull())
+            dst->print(os);
+        else
+            os << "dst NULL";
+        os << "  --srcnum " << nsrc << std::endl;
+        if (!dst->isNull()) {
+            os << "  dst ";
+            debug_opnd_info(dst, os);
+        } else
+            os << std::endl;
+        if ( nsrc != 0 ) {
+            os << "  sources" << std::endl;
+            for (uint32 i=0; i<nsrc; i++) {
+                src=inst->getSrc(i);
+                os << "  <<" <<i<<">> ";
+                debug_opnd_info(src, os);
+            }
         }
     }
 }  // debug_inst_info(Inst* inst,::std::ostream& os) 
@@ -3258,16 +2898,13 @@ EscAnalyzer::checkMonitorsOnThis() {
         node = findCnGNode_op((*it)->opndId);
 
         Inst* opndInst = node->nInst;
-#ifdef _DEBUG
-        if (_seinfo) {
+        if (verboseLog) {
             Log::out() << "    checkMOT: ";
             opndInst->print(Log::out()); 
             Log::out()  << std::endl;
         }
-#endif
         if (opndInst->getOpcode()==Op_DefArg && opndInst->getDefArgModifier()==NonNullThisArg) {
-#ifdef _DEBUG
-            if (_seinfo) {
+            if (verboseLog) {
                 Log::out() << "    checkMOT: " << (int)(opndInst->getDefArgModifier()) << " "
                     << (opndInst->getDefArgModifier()==DefArgNoModifier) << " " 
                     << (opndInst->getDefArgModifier()==NonNullThisArg) << " " 
@@ -3278,7 +2915,6 @@ EscAnalyzer::checkMonitorsOnThis() {
                     Log::out() << "    defarg.ths isn't global "<< std::endl; 
                 }
             }
-#endif
             return true;
         }
     }
@@ -3302,13 +2938,11 @@ EscAnalyzer::scanSyncInsts() {
     if (monitorInstUnits == NULL)
         return;
 
-#ifdef _DEBUG
-    if (_seinfo) {
+    if (verboseLog) {
         if (monitorInstUnits->size() > 0) {
             Log::out() << "Synchronized units: " << monitorInstUnits->size() << std::endl;
         }
     }
-#endif
     for (it = monitorInstUnits->begin( ); it != monitorInstUnits->end( ); it++ ) {
         node = findCnGNode_op((*it)->opndId);
         checkedState = 0;
@@ -3319,20 +2953,15 @@ EscAnalyzer::scanSyncInsts() {
             checkedState = checkState(node->nInst,nState);
             scannedObjs->clear();
             if (checkedState != nState && checkedState != 0) {
-#ifdef _DEBUG
-                if (_setState) {
-                    Log::out() <<"--scanSyncInsts 1: node "
-                            <<node->cngNodeId<<" opndId "<<node->opndId
-                            <<" state ";
+                if (verboseLog) {
+                    Log::out() <<"--scanSyncInsts 1: node " <<node->cngNodeId<<" opndId "<<node->opndId <<" state ";
                     printState(node); 
                     Log::out()<<" to esc.state "<< checkedState << std::endl;
                 }
-#endif
                 setEscState(node,checkedState);
             }
         }
-#ifdef _DEBUG
-        if (_seinfo) {
+        if (verboseLog) {
             Log::out() <<"--sync: state "; 
             Log::out() << checkedState << "  "; 
             if (checkedState != nState)
@@ -3354,12 +2983,10 @@ EscAnalyzer::scanSyncInsts() {
                 Log::out() << "      no Callee methods (nodeMDs) " << std::endl;
             }
         }
-#endif
 
         syncInsts = (*it)->monInsts;
         vcInsts = (*it)->icallInsts;
-#ifdef _DEBUG
-        if (_seinfo) {
+        if (verboseLog) {
             for (it1 = syncInsts->begin( ); it1 != syncInsts->end( ); it1++ ) {
                 Log::out() << "   -"; 
                 (*it1)->print(Log::out());
@@ -3381,7 +3008,6 @@ EscAnalyzer::scanSyncInsts() {
                 Log::out() << "     no VCallee methods (icallInsts) " << std::endl;
             }
         }
-#endif
         if (getVirtualCall(node)!=0) {
             if (checkedState > GLOBAL_ESCAPE && do_sync_removal_vc) {
                 uint32 bs_size = irManager.getFlowGraph().getMaxNodeId();
@@ -3391,15 +3017,13 @@ EscAnalyzer::scanSyncInsts() {
                     fgnodes.clear();
                 }
                 markLockedNodes(&fgnodes,syncInsts);
-#ifdef _DEBUG
-                if (_seinfo) {
+                if (verboseLog) {
                     Log::out() << "=-=- vc loc.esc."  << std::endl;
                     printOriginObjects(node->nInst,false);
                     scannedObjs->clear();
                 }
-#endif
                 if (node->nodeType==NT_OBJECT) {
-                    if (_seinfo) {
+                    if (verboseLog) {
                         Log::out() << "=-=- vc to optimize object  ";
                         node->nInst->print(Log::out());
                         Log::out() << std::endl;
@@ -3407,7 +3031,7 @@ EscAnalyzer::scanSyncInsts() {
                     fixMonitorInstsVCalls(*it,&fgnodes);
                 }
                 if (node->nodeType==NT_RETVAL) {
-                    if (_seinfo) {
+                    if (verboseLog) {
                         Log::out() << "=-=- vc to optimize retval  ";
                         node->nInst->print(Log::out());
                         Log::out() << std::endl;
@@ -3416,25 +3040,24 @@ EscAnalyzer::scanSyncInsts() {
                 }
                 to_fix_ssa = true;
             } else {
-#ifdef _DEBUG
-               if (_seinfo && do_sync_removal_vc) {
+               if (verboseLog && do_sync_removal_vc) {
                     Log::out() << "=-=- vc gl.esc."  << std::endl;
                     printOriginObjects(node->nInst,false);
                     scannedObjs->clear();
                 }
-#endif
             }
         } else {
             if (node->nodeType==NT_OBJECT && getEscState(node) != GLOBAL_ESCAPE) {
-                if (_seinfo) {
+                if (verboseLog) {
                     Log::out() << "++++ to optimize (remove) object"  << std::endl;
                 }
                 removeMonitorInsts(syncInsts);
             }
 
             if (node->nodeType==NT_DEFARG && getEscState(node) != GLOBAL_ESCAPE
-                    && node->nInst->getDefArgModifier()==NonNullThisArg && mh.isSynchronized()) {
-                if (_seinfo) {
+                    && node->nInst->getDefArgModifier()==NonNullThisArg && mh.isSynchronized()) 
+            {
+                if (verboseLog) {
                     Log::out() << "++++ to optimize (fix) defarg.ths"  << std::endl;
                 }
 #ifndef PLATFORM_POSIX
@@ -3473,13 +3096,11 @@ EscAnalyzer::markLockedNodes(BitSet* bs, Insts* syncInsts) {
         if ((*si_i)->getOpcode() == Op_TauMonitorEnter) { //monenter
             n = (*si_i)->getNode();
             bs->setBit(n->getId(),true);
-#ifdef _DEBUG
-            if (_seinfo) {
+            if (verboseLog) {
                 Log::out() << "=-=-=Marked node: "  << n->getId() << " ";
                 FlowGraph::printLabel(Log::out(),n); Log::out() << "   ";
                 (*si_i)->print(Log::out());  Log::out() << std::endl;
             }
-#endif
             inst = (Inst*)(n->getLastInst());
             assert(inst!=NULL);
             if (inst->getOpcode() == Op_TauMonitorExit) {
@@ -3503,13 +3124,11 @@ EscAnalyzer::markLockedNodes2(Node* node, BitSet* bs, Opnd* moninstop) {
 
     if (scannedObjs->size()!=0) {
         if (checkScannedObjs(node->getId())) {
-#ifdef _DEBUG
-            if (_seinfo) {
+            if (verboseLog) {
                 Log::out() << "=-=- marked node previously: "  << node->getId() << " ";
                 FlowGraph::printLabel(Log::out(),node);
                 Log::out() << std::endl;
             }
-#endif
             return found;
         }
     }
@@ -3517,23 +3136,19 @@ EscAnalyzer::markLockedNodes2(Node* node, BitSet* bs, Opnd* moninstop) {
     for (eit=oedges.begin(); eit!=oedges.end(); eit++) {
         n = (*eit)->getTargetNode();
         bs->setBit(n->getId(),true);
-#ifdef _DEBUG
-        if (_seinfo) {
+        if (verboseLog) {
             Log::out() << "=-=- Marked node: "  << n->getId() << " ";
             FlowGraph::printLabel(Log::out(),n);
             Log::out() << std::endl;
         }
-#endif
         inst = (Inst*)(n->getLastInst());
         if (inst !=NULL) {
             if (inst->getOpcode() == Op_TauMonitorExit) {
-#ifdef _DEBUG
-                if (_seinfo) {
+                if (verboseLog) {
                     Log::out() << "=-=- Marked node: found monexit  "  << n->getId() << " ";
                     FlowGraph::printLabel(Log::out(),n); Log::out() << "   ";
                     inst->print(Log::out());  Log::out() << std::endl;
                 }
-#endif
                 continue;
             }
         }
@@ -3642,55 +3257,44 @@ EscAnalyzer::fixMonitorInstsVCalls(MonUnit* mu, BitSet* bs) {
     Node* addedMonNode = NULL;
     Node* newCallNode = NULL;
     ControlFlowGraph& fg = irManager.getFlowGraph();
-#ifdef _DEBUG
+
     Node* entry_node = fg.getEntryNode();
     Node* muo_node = opi->getNode();
-#endif
 
     // values 0 and 1 to set flag variable
-#ifdef _DEBUG
-    if (_seinfo) {
+    if (verboseLog) {
         Log::out() << "=-=- w0 Before " << std::endl;
         FlowGraph::print(Log::out(),entry_node);
     }
-#endif
     insertLdConst(1);
     insertLdConst(0);
-#ifdef _DEBUG
-    if (_seinfo) {
+    
+    if (verboseLog) {
         Log::out() << "=-=- w0 After " << std::endl;
         FlowGraph::print(Log::out(),entry_node);
     }
-#endif
 
     // insert flag=0 before monitor instruction source opnd creation instruction
-#ifdef _DEBUG
-    if (_seinfo) {
+    if (verboseLog) {
         Log::out() << "=-=- w1 Before " << std::endl;
         FlowGraph::print(Log::out(),muo_node);
     }
-#endif
     stvar0 = _instFactory.makeStVar(muflag, i32_0);
     stvar0->insertBefore(opi);
-#ifdef _DEBUG
-    if (_seinfo) {
+    if (verboseLog) {
         Log::out() << "=-=- w1 After " << std::endl;
         FlowGraph::print(Log::out(),muo_node);
     }
-#endif
 
     // insert flag=1 before virtual call instructions
-#ifdef _DEBUG
-    if (_seinfo) {
+    if (verboseLog) {
         Log::out() << "=-=-=-=- Start w2" << std::endl;
     }
-#endif
     for (inst_it = vcInsts->begin( ); inst_it != vcInsts->end( ); inst_it++ ) {
         oldCallNode = (*inst_it)->getNode();
         addedMonNode = NULL;
         newCallNode = NULL;
-#ifdef _DEBUG
-        if (_seinfo) {
+        if (verboseLog) {
             Log::out() << "=-=- w2 Before " << std::endl;
             FlowGraph::print(Log::out(),oldCallNode);
             if (bs->getBit(oldCallNode->getId())) {
@@ -3699,12 +3303,13 @@ EscAnalyzer::fixMonitorInstsVCalls(MonUnit* mu, BitSet* bs) {
                 Log::out() << "=-=- monenter isn't needed " << std::endl;
             }
         }
-#endif
         stvar1 = _instFactory.makeStVar(muflag, i32_1);
         stvar1->insertBefore(*inst_it);
         if (bs->getBit((*inst_it)->getNode()->getId())) {
             Inst* mi = syncInsts->front();
             Inst* ime = _instFactory.makeTauMonitorEnter(mi->getSrc(0), mi->getSrc(1));
+            assert(mi->getBCOffset()!=ILLEGAL_BC_MAPPING_VALUE);
+            ime->setBCOffset(mi->getBCOffset());
             ime->insertBefore(*inst_it);
             newCallNode = fg.splitNodeAtInstruction(ime,true,false,_instFactory.makeLabel());
             SsaTmpOpnd* opflag = _opndManager.createSsaTmpOpnd(typeInt32);
@@ -3716,8 +3321,7 @@ EscAnalyzer::fixMonitorInstsVCalls(MonUnit* mu, BitSet* bs) {
             addedMonNode =  fg.splitNodeAtInstruction(branch_inst,true, false, _instFactory.makeLabel());
             fg.addEdge(oldCallNode,newCallNode);        
         }
-#ifdef _DEBUG
-        if (_seinfo) {
+        if (verboseLog) {
             if (bs->getBit(oldCallNode->getId())) {
                 Log::out() << "=-=- monenter is inserted " << std::endl;
             }
@@ -3730,13 +3334,10 @@ EscAnalyzer::fixMonitorInstsVCalls(MonUnit* mu, BitSet* bs) {
                 FlowGraph::print(Log::out(),newCallNode);
             }
         }
-#endif
     }
-#ifdef _DEBUG
-    if (_seinfo) {
+    if (verboseLog) {
         Log::out() << "=-=-=-=- Finish w2" << std::endl;
     }
-#endif
 
     insertFlagCheck(syncInsts,muflag,0);
 
@@ -3762,20 +3363,16 @@ EscAnalyzer::insertFlagCheck(Insts* syncInsts, Opnd* muflag, uint32 chk) {
         chk_opnd = insertLdConst(1);
     }
     assert(chk_opnd!=NULL);
-#ifdef _DEBUG
-    if (_seinfo) {
+    if (verboseLog) {
         Log::out() << "=-=-=-=- Start w3" << std::endl;
     }
-#endif
     for (inst_it = syncInsts->begin( ); inst_it != syncInsts->end( ); inst_it++ ) {
         Inst* curMonInst = (*inst_it);
         Node* oldnode = curMonInst->getNode();
-#ifdef _DEBUG
-        if (_seinfo) {
+        if (verboseLog) {
             Log::out() << "=-=- w3 Before " << std::endl;
             FlowGraph::print(Log::out(),oldnode);
         }
-#endif
         Node* afterMonInstBlock = NULL;
         Node* tiInstBlock = NULL;
         if ((*inst_it)->getNextInst()!=NULL) {
@@ -3797,13 +3394,9 @@ EscAnalyzer::insertFlagCheck(Insts* syncInsts, Opnd* muflag, uint32 chk) {
                 i32_flag, chk_opnd, (LabelInst*)(afterMonInstBlock->getFirstInst()));
         // insert flag check
         branch_inst->insertBefore(curMonInst);
-#ifdef _DEBUG
-        Node* monInstBlock = 
-#endif
-        fg.splitNodeAtInstruction(branch_inst,true, false, _instFactory.makeLabel());
+        Node* monInstBlock = fg.splitNodeAtInstruction(branch_inst,true, false, _instFactory.makeLabel());
         fg.addEdge(oldnode,afterMonInstBlock);
-#ifdef _DEBUG
-        if (_seinfo) {
+        if (verboseLog) {
             Log::out() << "=-=- w3 After " << std::endl;
             FlowGraph::print(Log::out(),oldnode);
             FlowGraph::print(Log::out(),monInstBlock);
@@ -3811,13 +3404,10 @@ EscAnalyzer::insertFlagCheck(Insts* syncInsts, Opnd* muflag, uint32 chk) {
                 FlowGraph::print(Log::out(),tiInstBlock);
             }
         }
-#endif
     }
-#ifdef _DEBUG
-    if (_seinfo) {
+    if (verboseLog) {
         Log::out() << "=-=-=-=- Finish w3" << std::endl;
     }
-#endif
 } // insertFlagCheck(Insts* syncInsts, Opnd* muflag, uint32 chk)
 
 
@@ -3828,9 +3418,7 @@ EscAnalyzer::removeMonitorInsts(Insts* syncInsts) {
     Edge* excedge = NULL;
     Node* targetnode = NULL;
     Inst* reminst;
-#ifdef _DEBUG
     bool canthrow = false;
-#endif
 
     for (it1 = syncInsts->begin( ); it1 != syncInsts->end( ); it1++ ) {
         reminst = *it1;
@@ -3844,35 +3432,29 @@ EscAnalyzer::removeMonitorInsts(Insts* syncInsts) {
             excedge = NULL;
             targetnode = NULL;
         }
-#ifdef _DEBUG
-        if (_seinfo) {
+        if (shortLog) {
             canthrow = reminst->getOperation().canThrow();
-            Log::out() << "  ";
             reminst->print(Log::out());
-            Log::out() << std::endl;
-            Log::out() << "    canThrow "<< canthrow;
-            Log::out() << std::endl;
-            if (excedge==NULL) {
-                Log::out() << "    exception edge is NULL " << std::endl;
-            } else {
-                Log::out() << "    target node is " 
-                    << targetnode->getId() << std::endl;
-            }
-            if (canthrow && (excedge==NULL)) {
-                const Edges& out_edges = reminst->getNode()->getOutEdges();
-                Edges::const_iterator eit;
-                Node* n; 
-                for (eit = out_edges.begin(); eit != out_edges.end(); ++eit) {
-                    n = (*eit)->getTargetNode();
-                    Log::out() << "    edge to node " 
-                        << n->getId() << " kind " << (*eit)->getKind() << std::endl;
+            Log::out() << "  ";
+            if (verboseLog) {
+                Log::out() << std::endl; Log::out() << "    canThrow "<< canthrow; Log::out() << std::endl;
+                if (excedge==NULL) {
+                    Log::out() << "    exception edge is NULL " << std::endl;
+                } else {
+                    Log::out() << "    target node is "  << targetnode->getId() << std::endl;
+                }
+                if (canthrow && (excedge==NULL)) {
+                    const Edges& out_edges = reminst->getNode()->getOutEdges();
+                    for (Edges::const_iterator eit = out_edges.begin(); eit != out_edges.end(); ++eit) {
+                        Node* n = (*eit)->getTargetNode();
+                        Log::out() << "    edge to node " << n->getId() << " kind " << (*eit)->getKind() << std::endl;
+                    }
                 }
             }
         }
-#endif
 
         reminst->unlink();
-        if (_seinfo) {
+        if (shortLog) {
             Log::out() << "    unlinked: "; 
             reminst->print(Log::out());
             Log::out() << std::endl;
@@ -3880,14 +3462,11 @@ EscAnalyzer::removeMonitorInsts(Insts* syncInsts) {
         if (targetnode != NULL) {
             if (targetnode->getInEdges().size() > 1) {
                 fg.removeEdge(excedge);
-#ifdef _DEBUG
-                if (_seinfo) {
+                if (shortLog) {
                     Log::out() << "    removed edge: " 
                         << excedge->getSourceNode()->getId() << " -> "
-                        << excedge->getTargetNode()->getId() << " kind " << excedge->getKind(); 
-                    Log::out() << std::endl;
+                        << excedge->getTargetNode()->getId() << " kind " << excedge->getKind() << std::endl;
                 }
-#endif
             } else {
                 scannedObjs->clear();
                 removeNode(targetnode);
@@ -3905,12 +3484,9 @@ EscAnalyzer::removeNode(Node* node) {
     Edges::const_iterator eit;
     Node* n; 
 
-#ifdef _DEBUG
-    if (_seinfo) {
-        Log::out() << "    to remove node " 
-            << node->getId() << std::endl;
+    if (shortLog) {
+        Log::out() << "    to remove node "; FlowGraph::printLabel(Log::out(), node); Log::out() << std::endl;
    }
-#endif
     if (scannedObjs->size()!=0) {
         if (checkScannedObjs(node->getId())) {
             return;
@@ -3931,12 +3507,9 @@ EscAnalyzer::removeNode(Node* node) {
     }
     irManager.getFlowGraph().removeNode(node);
     scannedObjs->pop_back();
-#ifdef _DEBUG
-    if (_seinfo) {
-        Log::out() << "    removed node " 
-            << node->getId() << std::endl;
+    if (shortLog) {
+        Log::out() << "    removed node "; FlowGraph::printLabel(Log::out(), node); Log::out() << std::endl;
     }
-#endif
 } // removeNode(Node* node) 
 
 
@@ -3958,13 +3531,11 @@ EscAnalyzer::insertReadJitHelperCall() {
     SsaTmpOpnd* stThis = _opndManager.createSsaTmpOpnd(typeInt32);
     Node* newBlock = NULL;
 
-#ifdef _DEBUG
-    if (_seinfo) {
+    if (verboseLog) {
         Log::out() << "++++ insertRJHC: before"  << std::endl;
         FlowGraph::print(Log::out(),oldBlock);
         Log::out() << "++++ insertRJHC: before end"  << std::endl;
     }
-#endif
         // insert jit helper call
     Opnd** args = NULL;
     InstFactory& instfactory = irManager.getInstFactory();
@@ -3974,14 +3545,12 @@ EscAnalyzer::insertReadJitHelperCall() {
     newBlock = fg.splitNodeAtInstruction(jhcinst,true, false,instfactory.makeLabel());
     fg.addEdge(oldBlock,fg.getUnwindNode());
     insertLdConst(0);
-#ifdef _DEBUG
-    if (_seinfo) {
+    if (verboseLog) {
         Log::out() << "++++ insertRJHC: after"  << std::endl;
         FlowGraph::print(Log::out(),oldBlock);
         FlowGraph::print(Log::out(),newBlock);
         Log::out() << "++++ insertRJHC: after end"  << std::endl;
     }
-#endif
     insertSaveJitHelperCall((Inst*)(newBlock->getFirstInst()),i32_0); // to restore default value
     return stThis;
 }  // insertReadJitHelperCall() 
@@ -3991,34 +3560,33 @@ void
 EscAnalyzer::checkCallSyncMethod() {
     CnGNodes::iterator it;
     CnGRefs::iterator it2;
-    CnGNode* node;
-    CnGNode* aanode;
-    MethodDesc* md;
-    CalleeMethodInfo* mtdInfo;
-    uint32 callee_state;
 
     for (it = cngNodes->begin( ); it != cngNodes->end( ); it++ ) {
+        CnGNode* node = NULL;
+        CnGNode* aanode = NULL;
+        MethodPtrType* mpt = NULL;
+        CalleeMethodInfo* mtdInfo = NULL;
+        uint32 callee_state = 0;
+
         node = (*it);
         if (node->nodeType == NT_ACTARG && node->argNumber == 0) {
-            md = (MethodDesc*)(node->refObj);
-            if (md->isSynchronized() && node->nInst->getOpcode()==Op_DirectCall) {
+            mpt = (MethodPtrType*)(node->refObj);
+            if (!mpt->isUnresolvedMethodPtrType() && mpt->getMethodDesc()->isSynchronized() && node->nInst->getOpcode()==Op_DirectCall) {
+                MethodDesc* md = mpt->getMethodDesc();
                 const char* ch1 = md->getParentType()->getName(); 
                 const char* ch2 = md->getName(); 
                 const char* ch3 = md->getSignatureString();
                 mtdInfo = getMethodInfo(ch1,ch2,ch3);
                 if (mtdInfo==NULL) {
                     callee_state = 0;
-#ifdef _DEBUG
-                    if (_seinfo) {
+                    if (verboseLog) {
                         Log::out() << "=-   Methodinfo is NULL"; 
                         Log::out() << std::endl;
                     }
-#endif
                 } else {
                     callee_state = getMethodParamState(mtdInfo,0);
                 }
-#ifdef _DEBUG
-                if (_seinfo) {
+                if (verboseLog) {
                     Log::out() << "---- checkCallSyncMethod:"  << std::endl;
                     node->nInst->print(Log::out()); 
                     Log::out() << std::endl;
@@ -4037,7 +3605,6 @@ EscAnalyzer::checkCallSyncMethod() {
                     Log::out() << " instance: " << md->isInstance() <<
                         " initializer: " << md->isInstanceInitializer() << " end" << std::endl;
                 }
-#endif
                 if (callee_state == 0)
                     callee_state = GLOBAL_ESCAPE;
                 if (!isGlobalState(callee_state)) {
@@ -4045,26 +3612,20 @@ EscAnalyzer::checkCallSyncMethod() {
                     aanode = node->outEdges->front()->cngNodeTo;
                     if (!isGlobalState(aanode->state)&&
                         (aanode->nodeType==NT_OBJECT||aanode->nodeType==NT_RETVAL)) {
-                        if (_seinfo) {
+                        if (verboseLog) {
                             Log::out() << "=-=- sm this.agr.saving for  ";
                             node->nInst->print(Log::out());
                             Log::out() << std::endl;
                         }
                         insertLdConst(1);
                         insertSaveJitHelperCall(node->nInst,i32_1);
-#ifdef _DEBUG
-                        if (_seinfo) {
-                            Log::out() 
-                                << "  checkCSM: this was saved"   
-                                << std::endl;
+                        if (verboseLog) {
+                            Log::out() << "  checkCSM: this was saved" << std::endl;
                         }
                     } else {
-                        if (_seinfo) {
-                            Log::out() 
-                                << "  checkCSM: this wasn't saved"   
-                                << std::endl;
+                        if (verboseLog) {
+                            Log::out() << "  checkCSM: this wasn't saved"   << std::endl;
                         }
-#endif
                     }
                 }
             }
@@ -4078,16 +3639,14 @@ EscAnalyzer::insertSaveJitHelperCall(Inst* inst_before, SsaTmpOpnd* stVal) {
     Node* oldBlock = inst_before->getNode();
     ControlFlowGraph& fg = irManager.getFlowGraph();
 
-#ifdef _DEBUG
     Node* icBlock = stVal->getInst()->getNode();
-    if (_seinfo) {
+    if (verboseLog) {
         Log::out() << "++++ insertSJHC: before"  << std::endl;
         if (icBlock != oldBlock)
             FlowGraph::print(Log::out(),icBlock);
         FlowGraph::print(Log::out(),oldBlock);
         Log::out() << "++++ insertSJHC: before end"  << std::endl;
     }
-#endif
         // create jit helper call
     Opnd* args[1] = {stVal};
     InstFactory& instfactory = irManager.getInstFactory();
@@ -4102,16 +3661,15 @@ EscAnalyzer::insertSaveJitHelperCall(Inst* inst_before, SsaTmpOpnd* stVal) {
     UNUSED Node* newBlock = fg.splitNodeAtInstruction(jhcinst, true, false, instfactory.makeLabel());
         // add dispatch edge to oldBlock
     fg.addEdge(oldBlock,fg.getUnwindNode());
-#ifdef _DEBUG
-    if (_seinfo) {
+    if (verboseLog) {
         Log::out() << "++++ insertSJHC: after"  << std::endl;
-        if (icBlock != oldBlock)
+        if (icBlock != oldBlock) {
             FlowGraph::print(Log::out(),icBlock);
+        }
         FlowGraph::print(Log::out(),oldBlock);
         FlowGraph::print(Log::out(),newBlock);
         Log::out() << "++++ insertSJHC: after end"  << std::endl;
     }
-#endif
 }  // insertSaveJitHelperCall(Inst* inst_before, SsaTmpOpnd* stVal) 
 
 
@@ -4160,7 +3718,7 @@ EscAnalyzer::scanLocalObjects() {
         if ((*it)->nodeType == NT_OBJECT && getEscState(*it)==NO_ESCAPE 
             && getOutEscaped(*it) == 0 && !((*it)->nInst->getOpcode()==Op_LdRef)) {
             if (prTitle) {
-                if (_scinfo) {
+                if (verboseLog) {
                     os_sc << "================ Local Object States   < "; 
                     irManager.getMethodDesc().printFullName(os_sc); 
                     os_sc << std::endl;
@@ -4182,7 +3740,7 @@ EscAnalyzer::scanLocalObjects() {
                     lloids->push_back(stnode->opndId);
                 }
             }
-            if (_scinfo) {
+            if (verboseLog) {
                 os_sc << "- - - checkCnG returns "; 
                 if (stnode == NULL) {
                     os_sc << " null "; 
@@ -4195,12 +3753,12 @@ EscAnalyzer::scanLocalObjects() {
     }
     if (prTitle)
         return;
-    if (_scinfo) {
+    if (verboseLog) {
         os_sc << "CFGOpnds: " << irManager.getOpndManager().getNumSsaOpnds() << "  CnGNodes: "
             << cngNodes->size() << "  Local Objects: " << lo_count << std::endl;
     }
     if (lnoids != NULL || lloids != NULL) {
-        if (_scinfo) {
+        if (verboseLog) {
             if (lnoids != NULL) {
                 if (lnoids->size()>0) {
                     os_sc << "lnoids size: " << lnoids->size() << " - ";
@@ -4227,7 +3785,7 @@ EscAnalyzer::scanLocalObjects() {
         if (lnoids != NULL) {
             if (lnoids->size()>0) {
                 doopt = true;
-                if (_scinfo) {
+                if (verboseLog) {
                     os_sc << "lnoids size: " << lnoids->size() << " - ";
                     for (lo_it=lnoids->begin(); lo_it!=lnoids->end(); lo_it++) {
                         os_sc << " " << (*lo_it);
@@ -4235,7 +3793,7 @@ EscAnalyzer::scanLocalObjects() {
                     os_sc << std::endl;
                 }
             } else {
-                if (_scinfo) {
+                if (verboseLog) {
                     os_sc << "lnoids size: 0" << std::endl;
                 }
             }
@@ -4243,7 +3801,7 @@ EscAnalyzer::scanLocalObjects() {
         if (lloids != NULL) {
             if (lloids->size()>0) {
                 doopt = true;
-                if (_scinfo) {
+                if (verboseLog) {
                     os_sc << "lloids size: " << lloids->size() << " - ";
                     for (lo_it=lloids->begin(); lo_it!=lloids->end(); lo_it++) {
                         os_sc << " " << (*lo_it);
@@ -4251,7 +3809,7 @@ EscAnalyzer::scanLocalObjects() {
                     os_sc << std::endl;
                 }
             } else {
-                if (_scinfo) {
+                if (verboseLog) {
                     os_sc << "lloids size: 0" << std::endl;
                 }
             }
@@ -4264,7 +3822,7 @@ EscAnalyzer::scanLocalObjects() {
                 doLOScalarReplacement(lloids);
             }
         }    }
-    if (_scinfo) {
+    if (verboseLog) {
         os_sc << "================                       > " ;
         irManager.getMethodDesc().printFullName(os_sc); 
         os_sc << std::endl;
@@ -4296,7 +3854,7 @@ EscAnalyzer::scanEscapedObjects() {
             }
             vco_count++;  // number of vc objects
             if (prTitle) {
-                if (_scinfo) {
+                if (verboseLog) {
                     os_sc << "================ Escaped Object States   < "; 
                     irManager.getMethodDesc().printFullName(os_sc); 
                     os_sc << std::endl;
@@ -4318,7 +3876,7 @@ EscAnalyzer::scanEscapedObjects() {
                     lloids->push_back(stnode->opndId);
                 }
             }
-            if (_scinfo) {
+            if (verboseLog) {
                 os_sc << "- - - checkCnG returns "; 
                 if (stnode == NULL) {
                     os_sc << " null "; 
@@ -4334,14 +3892,14 @@ EscAnalyzer::scanEscapedObjects() {
     if (prTitle)
         return;
 
-    if (_scinfo) {
+    if (verboseLog) {
         os_sc << "CFGOpnds: " << irManager.getOpndManager().getNumSsaOpnds() << "  CnGNodes: "
             << cngNodes->size() << "  VC Objects: " << vco_count << "  lnoids size "
             << (lnoids!=NULL?lnoids->size():0) << "  lloids size " 
             << (lloids!=NULL?lloids->size():0)<< std::endl;
     }
     if (lnoids != NULL || lloids != NULL) {
-        if (_scinfo) {
+        if (verboseLog) {
             if (lnoids != NULL) {
                 if (lnoids->size()>0) {
                     os_sc << "lnoids size: " << lnoids->size() << " - ";
@@ -4368,7 +3926,7 @@ EscAnalyzer::scanEscapedObjects() {
         if (lnoids != NULL) {
             if (lnoids->size()>0) {
                 doopt = true;
-                if (_scinfo) {
+                if (verboseLog) {
                     os_sc << "lnoids size: " << lnoids->size() << " - ";
                     for (lo_it=lnoids->begin(); lo_it!=lnoids->end(); lo_it++) {
                         os_sc << " " << (*lo_it);
@@ -4380,7 +3938,7 @@ EscAnalyzer::scanEscapedObjects() {
         if (lloids != NULL) {
             if (lloids->size()>0) {
                 doopt = true;
-                if (_scinfo) {
+                if (verboseLog) {
                     os_sc << "lloids size: " << lloids->size() << " - ";
                     for (lo_it=lloids->begin(); lo_it!=lloids->end(); lo_it++) {
                         os_sc << " " << (*lo_it);
@@ -4399,7 +3957,7 @@ EscAnalyzer::scanEscapedObjects() {
         }
     }
 
-    if (_scinfo) {
+    if (verboseLog) {
         os_sc << "================                       > " ;
         irManager.getMethodDesc().printFullName(os_sc); 
         os_sc << std::endl;
@@ -4427,7 +3985,7 @@ EscAnalyzer::doLOScalarReplacement(ObjIds* loids) {
     for (lo_it=loids->begin(); lo_it!=loids->end(); lo_it++) {
         onode = findCnGNode_op(*lo_it);
         if (onode == NULL) {
-            if (_scinfo) {
+            if (verboseLog) {
                 os_sc << " - - no cng node for opId " << *lo_it << std::endl;
             }
             continue;
@@ -4435,7 +3993,7 @@ EscAnalyzer::doLOScalarReplacement(ObjIds* loids) {
         if (onode->nodeRefType == NR_PRIM) {
             continue;
         }
-        if (_scinfo) {
+        if (verboseLog) {
             os_sc << " - - method: ";
             irManager.getMethodDesc().printFullName(os_sc); 
             os_sc << std::endl;
@@ -4452,12 +4010,12 @@ EscAnalyzer::doLOScalarReplacement(ObjIds* loids) {
         scObjFlds->clear();
         collectStLdInsts(onode, scObjFlds);
 
-        if (_scinfo) {
+        if (verboseLog) {
             os_sc << " doLOSR: found object fields " << scObjFlds->size() << std::endl;
         }
 
         if (onode->nodeType == NT_LDOBJ) {
-            if (_scinfo) {
+            if (verboseLog) {
                 os_sc << "*-*-*- not optimized " << std::endl;
             }
             continue;
@@ -4492,7 +4050,7 @@ EscAnalyzer::doLOScalarReplacement(ObjIds* loids) {
                     Inst* ld_init_val_inst = NULL;
                     sco->fldVarOpnd = fl_var_opnd;
 
-                    if (_scinfo) {
+                    if (verboseLog) {
                         os_sc<<" PointedType "; fl_type1->print(os_sc); os_sc <<std::endl;
                         os_sc<<" OperandType "; fl_type->print(os_sc); os_sc <<std::endl;
                     }
@@ -4503,14 +4061,14 @@ EscAnalyzer::doLOScalarReplacement(ObjIds* loids) {
                     }
 
                     scalarizeOFldUsage(sco);
-                    if (_scinfo) {
+                    if (verboseLog) {
                         os_sc << "++++ old newobj added fld_var: before"  << std::endl;
                         FlowGraph::print(os_sc,onode->nInst->getNode());
                         os_sc << "++++ old newobj: before end"  << std::endl;
                     }
                     ld_init_val_inst->insertBefore(onode->nInst);
                     _instFactory.makeStVar(fl_var_opnd,fl_init_opnd)->insertBefore(onode->nInst);
-                    if (_scinfo) {
+                    if (verboseLog) {
                         os_sc << "++++ old newobj added fld_var: after"  << std::endl;
                         FlowGraph::print(os_sc,onode->nInst->getNode());
                         os_sc << "++++ old newobj: after end"  << std::endl;
@@ -4530,13 +4088,13 @@ EscAnalyzer::doLOScalarReplacement(ObjIds* loids) {
         }
         Node* no_node = onode->nInst->getNode();
         if (no_node != NULL) {
-            if (_scinfo) {
+            if (verboseLog) {
                 os_sc << "++++ old newobj removed: before"  << std::endl;
                 FlowGraph::print(os_sc,no_node);
                 os_sc << "++++ old newobj: after end"  << std::endl;
             }        
             removeInst(onode->nInst);
-            if (_scinfo) {
+            if (verboseLog) {
                 os_sc << "++++ old newobj removed: after"  << std::endl;
                 FlowGraph::print(os_sc,no_node);
                 os_sc << "++++ old newobj: after end"  << std::endl;
@@ -4570,7 +4128,7 @@ EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
     for (lo_it=loids->begin(); lo_it!=loids->end(); lo_it++) {
         onode = findCnGNode_op(*lo_it);
         if (onode == NULL) {
-            if (_scinfo) {
+            if (verboseLog) {
                 os_sc << " - - no cng node for opId " << *lo_it << std::endl;
             }
             continue;
@@ -4585,7 +4143,7 @@ EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
         }
         double path_prob = -1;
         path_prob = checkLocalPath(onode->nInst);
-        if (_scinfo) {
+        if (verboseLog) {
             os_sc<<"pp      " << (path_prob )<<std::endl;
             os_sc<<"en*m    " << (entryNode_execCount*ec_mult)<<std::endl;
             os_sc<<"pp<en*m " << (path_prob < entryNode_execCount*ec_mult)<<std::endl;
@@ -4598,7 +4156,7 @@ EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
             }
             continue;
         }
-        if (_scinfo) {
+        if (verboseLog) {
             os_sc << " - - method: ";
             irManager.getMethodDesc().printFullName(os_sc); 
             os_sc << std::endl;
@@ -4616,13 +4174,11 @@ EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
         lonode = NULL;
         nonode = NULL;
         if (lobj_opt) {
-#ifdef _DEBUG
-            if (_scinfo) {
+            if (verboseLog) {
                 printOriginObjects(onode->nInst,false);
             }
-#endif
             if (onode->nInst->getOpcode() != Op_LdVar) {
-                if (_scinfo) {
+                if (verboseLog) {
                     os_sc << "  doEO 1 "; onode->nInst->print(os_sc);
                     os_sc << std::endl;
                 }
@@ -4630,7 +4186,7 @@ EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
             }
             Inst* phi = onode->nInst->getSrc(0)->getInst();
             if (phi->getOpcode() != Op_Phi) {
-                if (_scinfo) {
+                if (verboseLog) {
                     os_sc << "  doEO 2 "; phi->print(os_sc);
                     os_sc << std::endl;
                 }
@@ -4638,14 +4194,14 @@ EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
             }
             uint32 nsrc = phi->getNumSrcOperands();
             if (nsrc > 2) {
-                if (_scinfo) {
+                if (verboseLog) {
                     os_sc << "  doEO 3" << std::endl;
                 }
                 continue;
             }
             for (uint32 i=0; i<nsrc; i++) {
                 inst = phi->getSrc(i)->getInst();
-                if (_scinfo) {
+                if (verboseLog) {
                     os_sc << "  doEO phi "; inst->print(os_sc);
                     os_sc << std::endl;
                 }
@@ -4653,7 +4209,7 @@ EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
                     break;
                 }
                 inst = inst->getSrc(0)->getInst();
-                if (_scinfo) {
+                if (verboseLog) {
                     os_sc << "  doEO stvar "; inst->print(os_sc);
                     os_sc << std::endl;
                 }
@@ -4668,7 +4224,7 @@ EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
                 }
             }
             if (nonode == NULL || lonode == NULL) {
-                if (_scinfo) {
+                if (verboseLog) {
                     os_sc << "  doEO 4" << std::endl;
                     if (nonode == NULL) {
                         os_sc << "  nonode NULL" << std::endl;
@@ -4679,7 +4235,7 @@ EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
                 }
                 continue;
             }
-            if (_scinfo) {
+            if (verboseLog) {
                 os_sc << "  no_src "; printCnGNode(nonode,os_sc); os_sc << std::endl;
                 os_sc << "  lo_src "; printCnGNode(lonode,os_sc); os_sc << std::endl;
             }
@@ -4694,7 +4250,7 @@ EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
         if (lobj_opt) {
             collectCallInsts(nonode->cngNodeId, vc_insts, vcids);
             if (vc_insts->size() > 0 ) {
-                if (_scinfo) {
+                if (verboseLog) {
                     os_sc << "--- no opt: newobj escaped  " << std::endl;
                     for (it3=vc_insts->begin(); it3!=vc_insts->end(); it3++) {
                         (*it3)->print(os_sc); os_sc << std::endl;
@@ -4709,16 +4265,16 @@ EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
                 nscObjFlds->clear();
             }
             collectStLdInsts(nonode, nscObjFlds);
-            if (_scinfo) {
+            if (verboseLog) {
                 os_sc << " doEOSR: found object fields for newobj " << nscObjFlds->size() << std::endl;
             }
             if (!checkObjFlds(nscObjFlds, scObjFlds)) {
-                if (_scinfo) {
+                if (verboseLog) {
                     os_sc << " checkObjFlds failed " << std::endl;
                 }
                 continue;
             }
-                if (_scinfo) {
+                if (verboseLog) {
                     os_sc << " checkObjFlds passed " << std::endl;
                 }
         }
@@ -4726,11 +4282,11 @@ EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
         // to collect call & callimem instructions
         collectCallInsts(onode->cngNodeId, vc_insts, vcids);
 
-        if (_scinfo) {
+        if (verboseLog) {
             os_sc << " doEOSR: found object fields " << scObjFlds->size() << " vc_inst " << vc_insts->size()  
                 << std::endl;
         }
-        if (_scinfo) {
+        if (verboseLog) {
             for (it3=vc_insts->begin(); it3!=vc_insts->end(); it3++) {
                 (*it3)->print(os_sc); os_sc << std::endl;
             }
@@ -4778,7 +4334,7 @@ EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
                 Inst* ld_init_val_inst = NULL;
                 sco->fldVarOpnd = fl_var_opnd;
 
-                if (_scinfo) {
+                if (verboseLog) {
                     os_sc<<" PoitedType "; fl_type1->print(os_sc); os_sc <<std::endl;
                     os_sc<<" OperandType "; fl_type->print(os_sc); os_sc <<std::endl;
                 }
@@ -4788,14 +4344,14 @@ EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
                     ld_init_val_inst = _instFactory.makeLdConst(fl_init_opnd, 0);
                 }
                 scalarizeOFldUsage(sco);
-                if (_scinfo) {
+                if (verboseLog) {
                     os_sc << "++++ old newobj added fld_var: before"  << std::endl;
                     FlowGraph::print(os_sc,node_no);
                     os_sc << "++++ old newobj: before end"  << std::endl;
                 }
                 ld_init_val_inst->insertBefore(nobj_inst);
                 _instFactory.makeStVar(fl_var_opnd,fl_init_opnd)->insertBefore(nobj_inst);
-                if (_scinfo) {
+                if (verboseLog) {
                     os_sc << "++++ old newobj added fld_var: after"  << std::endl;
                     FlowGraph::print(os_sc,node_no);
                     os_sc << "++++ old newobj: after end"  << std::endl;
@@ -4840,7 +4396,7 @@ EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
             }
         }
         restoreEOCreation(vc_insts, scObjFlds, ob_var_opnd, ob_id);
-        if (_scinfo) {
+        if (verboseLog) {
             os_sc << "++++ old newobj: before"  << std::endl;
             FlowGraph::print(os_sc,node_no);
             os_sc << "++++ old newobj: before end"  << std::endl;
@@ -4858,7 +4414,7 @@ EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
         if (methodEndInsts->size()!=0)
             fixMethodEndInsts(ob_id);
         removeInst(nobj_inst);
-        if (_scinfo) {
+        if (verboseLog) {
             os_sc << "++++ old newobj: after"  << std::endl;
             FlowGraph::print(os_sc,node_no);
             os_sc << "++++ old newobj: after end"  << std::endl;
@@ -4910,7 +4466,7 @@ EscAnalyzer::collectStLdInsts(CnGNode* onode, ScObjFlds* scObjFlds) {
                 Insts* fl_insts = new (eaMemManager) Insts(eaMemManager);
                 fnode =(*it1)->cngNodeTo;
                 if (fnode->outEdges == NULL) {
-                    if (_scinfo) {
+                    if (verboseLog) {
                         os_sc << "collectStLdInsts: no ref from fld" << std::endl;
                         printCnGNode(onode, os_sc); os_sc << std::endl;
                         printCnGNode(fnode, os_sc); os_sc << std::endl;
@@ -4919,13 +4475,13 @@ EscAnalyzer::collectStLdInsts(CnGNode* onode, ScObjFlds* scObjFlds) {
                 }
                 for (it2 = fnode->outEdges->begin(); it2 != fnode->outEdges->end(); it2++) {
                     inst = (*it2)->edgeInst;
-                    if (_scinfo) {
+                    if (verboseLog) {
                         os_sc << "- - - to remove: ";
                         FlowGraph::printLabel(os_sc,inst->getNode()); os_sc<<" ";
                         inst->print(os_sc); os_sc<< std::endl;
                     }
                     fl_insts->push_back(inst);
-                    if (_scinfo) {
+                    if (verboseLog) {
                         if (inst->getOpcode() == Op_TauStInd) {
                             inst=inst->getSrc(1)->getInst();
                         }
@@ -4955,7 +4511,7 @@ EscAnalyzer::collectStLdInsts(CnGNode* onode, ScObjFlds* scObjFlds) {
             }
         }
     } else {
-        if (_scinfo) {
+        if (verboseLog) {
             os_sc << "- - - to remove 2: ";
             onode->nInst->print(os_sc);
             os_sc << std::endl;
@@ -5006,7 +4562,7 @@ EscAnalyzer::scalarizeOFldUsage(ScObjFld* scfld) {
         if (node_before==NULL) {
             os_sc << "node_before NULL "; st_ld_inst->print(os_sc); os_sc << std::endl;
         }
-        if (_scinfo) {
+        if (verboseLog) {
             os_sc << "++++ scalarizeOFldUsage: before"  << std::endl;
             FlowGraph::print(os_sc,node_before);
             os_sc << "++++ scalarizeOFldUsage: before end"  << std::endl;
@@ -5027,7 +4583,7 @@ EscAnalyzer::scalarizeOFldUsage(ScObjFld* scfld) {
         if (inst_ad->getOpcode()==Op_AddScaledIndex) {
             removeInst(inst_ad->getSrc(0)->getInst());
         }
-        if (_scinfo) {
+        if (verboseLog) {
             os_sc << "++++ scalarizeOFldUsage: after"  << std::endl;
             FlowGraph::print(os_sc,node_before);
 
@@ -5043,7 +4599,7 @@ EscAnalyzer::checkOpndUsage(ObjIds* lnoids, ObjIds* lloids, bool check_loc) {
     Nodes::const_iterator niter;
     bool do_break = false;
 
-    if (_scinfo) {
+    if (verboseLog) {
         os_sc << "  -------- Objects used in:  check_loc " << check_loc << std::endl;
     }
     for(niter = nodes.begin(); niter != nodes.end(); ++niter) {
@@ -5054,7 +4610,7 @@ EscAnalyzer::checkOpndUsage(ObjIds* lnoids, ObjIds* lloids, bool check_loc) {
             uint32 nsrc = inst->getNumSrcOperands();
             for (uint32 i=0; i<nsrc; i++) {
                 if (!(opnd=inst->getSrc(i))->isSsaOpnd()) { // check ssa operands
-                    if (_scinfo) {
+                    if (verboseLog) {
                         os_sc << "  not ssa opnd " << i << "  ";
                         inst->print(os_sc); os_sc << std::endl; 
                     }
@@ -5062,7 +4618,7 @@ EscAnalyzer::checkOpndUsage(ObjIds* lnoids, ObjIds* lloids, bool check_loc) {
                 }
                 uint32 opcode=inst->getOpcode();
                 if (checkScanned(lnoids,opnd->getId())) {
-                    if (_scinfo) {
+                    if (verboseLog) {
                         os_sc << " no "; FlowGraph::printLabel(os_sc,inst->getNode()); 
                         os_sc << "  "; inst->print(os_sc); os_sc << std::endl; 
                     }
@@ -5075,13 +4631,13 @@ EscAnalyzer::checkOpndUsage(ObjIds* lnoids, ObjIds* lloids, bool check_loc) {
                     if (!check_loc)
                         if (opcode == Op_IndirectMemoryCall || opcode == Op_DirectCall)
                             continue;
-                    if (_scinfo) {
+                    if (verboseLog) {
                         os_sc << " no   remove " << opnd->getId() << std::endl; 
                     }
                     lnoids->remove(opnd->getId());
                 }
                 if (checkScanned(lloids,opnd->getId())) {
-                    if (_scinfo) {
+                    if (verboseLog) {
                         os_sc << " lo "; FlowGraph::printLabel(os_sc,inst->getNode()); 
                         os_sc << "  "; inst->print(os_sc); os_sc << std::endl; 
                     }
@@ -5106,7 +4662,7 @@ EscAnalyzer::checkOpndUsage(ObjIds* lnoids, ObjIds* lloids, bool check_loc) {
                             continue;
                         }
                     }
-                    if (_scinfo) {
+                    if (verboseLog) {
                         os_sc << " lo   remove " << opnd->getId() << std::endl; 
                     }
                     lloids->remove(opnd->getId());
@@ -5122,7 +4678,7 @@ EscAnalyzer::checkOpndUsage(ObjIds* lnoids, ObjIds* lloids, bool check_loc) {
             }
         }
     }
-    if (_scinfo) {
+    if (verboseLog) {
         os_sc << "  -------- " << std::endl;
     }
     return;
@@ -5138,7 +4694,7 @@ EscAnalyzer::checkTauOpnd(Inst* tau_inst) {
     uint32 sc_opnd_id = tau_inst->getSrc(0)->getId(); 
     Inst* inst1;
 
-    if (_scinfo) {
+    if (verboseLog) {
         os_sc << "  -------- Check tau opnd " << std::endl;
     }
     for(niter = nodes.begin(); niter != nodes.end(); ++niter) {
@@ -5147,7 +4703,7 @@ EscAnalyzer::checkTauOpnd(Inst* tau_inst) {
         Opnd* opnd;
         for (Inst* inst=headInst->getNextInst();inst!=NULL;inst=inst->getNextInst()) {
             if (inst->getOpcode() == Op_InitObj) {
-                if (_scinfo) {
+                if (verboseLog) {
                     os_sc << " Op_InitObj: ";
                     inst->print(os_sc); os_sc << std::endl;
                 }
@@ -5158,7 +4714,7 @@ EscAnalyzer::checkTauOpnd(Inst* tau_inst) {
                     continue;
                 if (opnd->getId()==tau_opnd_id) {
                     uint32 opcode=inst->getOpcode();
-                    if (_scinfo) {
+                    if (verboseLog) {
                         os_sc << "      "; FlowGraph::printLabel(os_sc,inst->getNode()); 
                         os_sc << "  "; inst->print(os_sc); os_sc << std::endl; 
                         if (opcode == Op_IndirectMemoryCall || opcode == Op_DirectCall) {
@@ -5188,7 +4744,7 @@ EscAnalyzer::checkTauOpnd(Inst* tau_inst) {
                             maydo = false;
                         if (inst1->getSrc(0)->getId() != sc_opnd_id)
                             maydo = false;
-                        if (_scinfo) {
+                        if (verboseLog) {
                             os_sc << "      "; FlowGraph::printLabel(os_sc,inst1->getNode()); 
                             os_sc << "  "; inst1->print(os_sc); os_sc << std::endl; 
                         }
@@ -5211,7 +4767,7 @@ EscAnalyzer::checkOpndUsage(uint32 lobjid) {
     bool maydo = true;
     uint32 n_used = 0;
 
-    if (_scinfo) {
+    if (verboseLog) {
         os_sc << "  -------- Used in " << std::endl;
     }
     for(niter = nodes.begin(); niter != nodes.end(); ++niter) {
@@ -5220,7 +4776,7 @@ EscAnalyzer::checkOpndUsage(uint32 lobjid) {
         Opnd* opnd;
         for (Inst* inst=headInst->getNextInst();inst!=NULL;inst=inst->getNextInst()) {
             if (inst->getOpcode() == Op_InitObj) {
-                if (_scinfo) {
+                if (verboseLog) {
                     os_sc << " Op_InitObj: ";
                     inst->print(os_sc); os_sc << std::endl;
                 }
@@ -5232,7 +4788,7 @@ EscAnalyzer::checkOpndUsage(uint32 lobjid) {
                 if (opnd->getId()==lobjid) {
                     n_used++;
                     uint32 opcode=inst->getOpcode();
-                    if (_scinfo) {
+                    if (verboseLog) {
                         os_sc << "    "; FlowGraph::printLabel(os_sc,inst->getNode()); 
                         os_sc << "  "; inst->print(os_sc); os_sc << std::endl; 
                         if (opcode == Op_IndirectMemoryCall || opcode == Op_DirectCall) {
@@ -5253,7 +4809,7 @@ EscAnalyzer::checkOpndUsage(uint32 lobjid) {
             }
         }
     }
-    if (_scinfo) {
+    if (verboseLog) {
         os_sc << "  -------- opnd used: " << n_used << "  maydo " << maydo << std::endl;
     }
     return maydo;
@@ -5287,7 +4843,7 @@ EscAnalyzer::checkCnGtoScalarize(CnGNode* scnode, bool check_loc) {
     ob_ref_type = scnode->nodeRefType;   // object ref type
     if (!check_loc && (ob_ref_type != NR_REF))
         return NULL;   // vc arrays not scalarized
-    if (_scinfo) {
+    if (verboseLog) {
         os_sc << "=="; printCnGNode(scnode,os_sc);
         ((Opnd*)scnode->refObj)->printWithType(os_sc);
         NamedType* nt = (NamedType*)((Opnd*)scnode->refObj)->getType();
@@ -5300,7 +4856,7 @@ EscAnalyzer::checkCnGtoScalarize(CnGNode* scnode, bool check_loc) {
         checkOpndUsage(scnode->opndId);
     }
 
-    if (_scinfo) {
+    if (verboseLog) {
         os_sc << "  -------- begin - Ref from node  " << scnode->cngNodeId << " - " 
             << scnode->opndId << std::endl;
     }
@@ -5308,7 +4864,7 @@ EscAnalyzer::checkCnGtoScalarize(CnGNode* scnode, bool check_loc) {
         for (it1 = scnode->outEdges->begin(); it1 != scnode->outEdges->end(); it1++) {
             if ((*it1)->edgeType == ET_FIELD) {
                 ob_fld_count++;  // number of object fields
-                if (_scinfo) {
+                if (verboseLog) {
                     os_sc<<"++ "<<scnode->cngNodeId<< "  ->  " << 
                         (*it1)->cngNodeTo->cngNodeId << " - "<< 
                         (*it1)->cngNodeTo->opndId << std::endl;
@@ -5323,7 +4879,7 @@ EscAnalyzer::checkCnGtoScalarize(CnGNode* scnode, bool check_loc) {
                 if (nf->outEdges != NULL || 
                     (*it1)->cngNodeTo->nInst->getOpcode() != Op_LdArrayBaseAddr) {
                     ob_fld_usage_count++;
-                    if (_scinfo) {
+                    if (verboseLog) {
                         os_sc << "  fld-" << std::endl << "    ";
                         printCnGNode(nf,os_sc); os_sc << std::endl << "    ";
                         (*it1)->cngNodeTo->nInst->print(os_sc); os_sc << std::endl;
@@ -5331,7 +4887,7 @@ EscAnalyzer::checkCnGtoScalarize(CnGNode* scnode, bool check_loc) {
                 }
                 if (nf->outEdges != NULL) {
                     for (it2 = nf->outEdges->begin( ); it2 != nf->outEdges->end( ); it2++ ) {
-                        if (_scinfo) {
+                        if (verboseLog) {
                             os_sc << "    " << edgeTypeToString(*it2) << std::endl;
                         }
                         switch ((*it2)->edgeType) {
@@ -5340,7 +4896,7 @@ EscAnalyzer::checkCnGtoScalarize(CnGNode* scnode, bool check_loc) {
                             case ET_FIELD: ob_fld_field_count++; break;
                             default: ob_fld_unkn_count++;
                         }
-                        if (_scinfo) {
+                        if (verboseLog) {
                             CnGNode* node = NULL;
                             if ((node=findCnGNode_id((*it2)->cngNodeTo->cngNodeId))!=NULL) {
                                 os_sc << "      ";
@@ -5362,19 +4918,19 @@ EscAnalyzer::checkCnGtoScalarize(CnGNode* scnode, bool check_loc) {
                 } else {
                     ob_nfld_count++;
                 }
-                if (_scinfo) {
+                if (verboseLog) {
                     os_sc << "  not_fld  " << edgeTypeToString(*it1) << "  ";
                     (*it1)->cngNodeTo->nInst->print(os_sc); os_sc << std::endl;
                 }
             }
         }
     }
-    if (_scinfo) {
+    if (verboseLog) {
         os_sc << "  -------- end - Ref from node  " << std::endl;
     }
     uint32 n=scnode->cngNodeId;
 
-    if (_scinfo) {
+    if (verboseLog) {
         os_sc << "  -------- begin - Ref to node  " << scnode->cngNodeId << " - " 
             << scnode->opndId << std::endl;
     }
@@ -5390,7 +4946,7 @@ EscAnalyzer::checkCnGtoScalarize(CnGNode* scnode, bool check_loc) {
                         call_count++;
                 } else
                     ref_to_obj_count++;  // number of ref to object
-                if (_scinfo) {
+                if (verboseLog) {
                     os_sc << "  Ref to object. Edge: " << (*ite)->cngNodeFrom->cngNodeId 
                         << " - "  << (*ite)->cngNodeFrom->opndId << "  ->  " 
                         << (*it2)->cngNodeTo->cngNodeId 
@@ -5406,7 +4962,7 @@ EscAnalyzer::checkCnGtoScalarize(CnGNode* scnode, bool check_loc) {
             }
         }
     }
-    if (_scinfo) {
+    if (verboseLog) {
         os_sc << "  -------- end - Ref to node  " << std::endl;
     }
 
@@ -5419,13 +4975,13 @@ EscAnalyzer::checkCnGtoScalarize(CnGNode* scnode, bool check_loc) {
                     (!check_loc && (getEscState(scnode)!=NO_ESCAPE)) ) {
                     storeId = true;
                 } else {
-                    if (_scinfo) {
+                    if (verboseLog) {
                         os_sc << "----scalar no opt:     check_loc " << check_loc 
                             << "  state " << getEscState(scnode) << std::endl;
                     }
                 }
             } else {
-                if (_scinfo) {
+                if (verboseLog) {
                     os_sc << "----scalar no opt: LOBJ  final fields " << ob_fin_fld_count 
                         << "  used field " << ob_fld_usage_count << std::endl;
                 }
@@ -5435,31 +4991,30 @@ EscAnalyzer::checkCnGtoScalarize(CnGNode* scnode, bool check_loc) {
         if (ob_ref_type == NR_REF) {   // NT_OBJECT - object
             if (ob_stvar_count == 1) {     // find ldvar target operand
                 if (ob_fin_fld_count!=ob_fld_usage_count) {
-                    if (_scinfo) {
+                    if (verboseLog) {
                         os_sc << "----scalar no opt:  stvar=1  final fields " << ob_fin_fld_count 
                             << "  used field " << ob_fld_usage_count << std::endl;
                     }
                     goto MM;
                 }
 
-                if (_scinfo) {
-                    os_sc << "************* " << ((Opnd*)scnode->refObj)->getType()->getName() 
-                        << std::endl;
+                if (verboseLog) {
+                    os_sc << "************* " << ((Opnd*)scnode->refObj)->getType()->getName() << std::endl;
                 }
                 assert(vnode!=NULL);
                 CnGNode* lobj = getLObj(vnode);  // scalarizable load object
                 if (lobj != NULL) {
-                    if (_scinfo) {
+                    if (verboseLog) {
                         printOriginObjects(lobj->nInst,false,"  ");
                     }
                     bool notnullsrcs = checkVVarSrcs(lobj->nInst);
-                    if (_scinfo) {
+                    if (verboseLog) {
                         os_sc << "----checkCnG: stvar=1 checkVVSrcs   " << notnullsrcs << std::endl;
                     }
                     if (!notnullsrcs) {
                         goto MM;
                     }
-                    if (_scinfo) {
+                    if (verboseLog) {
                         os_sc << "----check srcs opernds for optimized load object (cng node): " 
                             << lobj->cngNodeId << std::endl;
                     }
@@ -5481,7 +5036,7 @@ EscAnalyzer::checkCnGtoScalarize(CnGNode* scnode, bool check_loc) {
                 if (ob_fin_fld_count==ob_fld_usage_count) {
                     storeId = true;
                 } else {
-                    if (_scinfo) {
+                    if (verboseLog) {
                         os_sc << "----scalar no opt: onlyFF  final fields " << ob_fin_fld_count 
                             << "  used field " << ob_fld_usage_count << std::endl;
                     }
@@ -5494,7 +5049,7 @@ EscAnalyzer::checkCnGtoScalarize(CnGNode* scnode, bool check_loc) {
                     if (getEscState(scnode)!=GLOBAL_ESCAPE && getVirtualCall(scnode)==0) {
                         storeId = true;
                     } else {
-                        if (_scinfo) {
+                        if (verboseLog) {
                             os_sc << "----scalar no opt: GLOBAL,  fin.flds " << ob_fin_fld_count 
                                 << "  used flds " << ob_fld_usage_count << std::endl;
                         }
@@ -5507,19 +5062,19 @@ EscAnalyzer::checkCnGtoScalarize(CnGNode* scnode, bool check_loc) {
         if (ob_fld_usage_count <= 1 && check_loc && ob_stvar_count == 0) {
             storeId = true;
         } else {
-            if (_scinfo) {
+            if (verboseLog) {
                 os_sc << "----scalar no opt: arr:  fld " << ob_fld_count 
                     << "  used flds " << ob_fld_usage_count << std::endl; 
             }
         }
     } else {
-        if (_scinfo) {
+        if (verboseLog) {
             os_sc << "----scalar no opt:     ref to " << ref_to_obj_count << "  not field " 
                 << ob_nfld_count << "  obj stvar " << ob_stvar_count << std::endl;
         }
     }
 MM:
-    if (_scinfo) {
+    if (verboseLog) {
         os_sc << "----checkCnG: ntype " << scnode->nodeType   
             << "    flds " << ob_fld_count 
             << "  not flds " << ob_nfld_count
@@ -5535,13 +5090,13 @@ MM:
             << "  unkn.refs " << ob_fld_unkn_count <<  std::endl;
     }
     if (storeId) {
-        if (_scinfo) {
+        if (verboseLog) {
             os_sc << "----scalar may be opt:  "; printCnGNode(scnode,os_sc);   
             os_sc <<  std::endl;
         }
         return rnode;
     }
-    if (_scinfo) {
+    if (verboseLog) {
         os_sc << "----scalar no opt:  "; printCnGNode(scnode,os_sc);   
         os_sc <<  std::endl;
     }
@@ -5557,7 +5112,7 @@ EscAnalyzer::checkLocalPath(Inst* nob_inst) {
     Opnd* objOpnd = nob_inst->getDst();
     uint32 objId = objOpnd ->getId();
 
-    if (_scinfo) {
+    if (verboseLog) {
         os_sc << "  -------- Find local path for  "; FlowGraph::printLabel(os_sc,node); 
         os_sc << " id." << node->getId() << "  "; 
         nob_inst->print(os_sc); os_sc << std::endl;
@@ -5569,7 +5124,7 @@ EscAnalyzer::checkLocalPath(Inst* nob_inst) {
     if (node->getKind() != Node::Kind_Exit)
         prob = checkNextNodes(node,objId,0);
 
-    if (_scinfo) {
+    if (verboseLog) {
         double enc = irManager.getFlowGraph().getEntryNode()->getExecCount();
         os_sc << "  Path count " << prob << "    ENTRY node count " << enc 
             << "  exec_count_mult " << ec_mult << std::endl;
@@ -5593,7 +5148,7 @@ EscAnalyzer::checkNextNodes(Node* n, uint32 obId, double cprob) {
     double no = -4;
 
     if (node->getKind()==Node::Kind_Exit) {
-        if (_scinfo) {
+        if (verboseLog) {
             os_sc << " ****  Node EXIT : "; FlowGraph::printLabel(os_sc,node); 
             os_sc << " id." << node->getId() << " execCount " << node->getExecCount()
                 << "   in prob " << cprob << std::endl;
@@ -5620,7 +5175,7 @@ EscAnalyzer::checkNextNodes(Node* n, uint32 obId, double cprob) {
             for (uint32 i=0; i<nsrc; i++) {
                 opnd=inst->getSrc(i);
                 if (opnd->getId()==obId) {
-                    if (_scinfo) {
+                    if (verboseLog) {
                         inst->print(os_sc); os_sc << std::endl;
                     }
                     return no;
@@ -5701,7 +5256,7 @@ EscAnalyzer::restoreEOCreation(Insts* vc_insts, ScObjFlds* scObjFlds, VarOpnd* o
         node_obj1 = NULL;
         node_after1 = NULL;
         node_var1 = NULL;
-        if (_scinfo) {
+        if (verboseLog) {
             os_sc << "++++ objectCreate: before"  << std::endl;
             FlowGraph::print(os_sc,node_before);
             os_sc << "++++ objectCreate: before end"  << std::endl;
@@ -5749,11 +5304,13 @@ EscAnalyzer::restoreEOCreation(Insts* vc_insts, ScObjFlds* scObjFlds, VarOpnd* o
                 if (tau_inst == NULL) {
                     continue;
                 }
-                if (_scinfo) {
+                if (verboseLog) {
                     os_sc << "---- tau_inst can throw " << tau_inst->getOperation().canThrow() << "  "; 
                     tau_inst->print(os_sc); os_sc << std::endl;
                     os_sc << std::endl;
                 }
+                assert(vc->getBCOffset()!=ILLEGAL_BC_MAPPING_VALUE);
+                tau_inst->setBCOffset(vc->getBCOffset());
                 tau_inst->insertBefore(vc);
                 vc->setSrc(i1,tau_inst->getDst());
                 if (tau_inst->getOperation().canThrow() == true) {
@@ -5857,7 +5414,7 @@ EscAnalyzer::restoreEOCreation(Insts* vc_insts, ScObjFlds* scObjFlds, VarOpnd* o
                 node_after1->appendInst(stv);
             }
             if (node_after1 != NULL) {
-                if (_scinfo) {
+                if (verboseLog) {
                     os_sc << "!!!! to restore not final fields "  << std::endl;
                 }
                 Node* node_call = node_var;
@@ -5876,7 +5433,7 @@ EscAnalyzer::restoreEOCreation(Insts* vc_insts, ScObjFlds* scObjFlds, VarOpnd* o
         node_obj1=fg.splitNodeAtInstruction(newobj,splitAfter,false, _instFactory.makeLabel());
         fg.addEdge(node_obj,dispatchNode);
 
-        if (_scinfo) {
+        if (verboseLog) {
             os_sc << "++++ objectCreate: after"  << std::endl;
             FlowGraph::print(os_sc,node_before);
             FlowGraph::print(os_sc,node_obj);
@@ -5902,28 +5459,24 @@ EscAnalyzer::removeInst(Inst* reminst) {
     Edge* excedge = NULL;
 
     if (reminst->getNode()!=NULL) {
-        if (_scinfo) {
-            os_sc <<"--rmInst done: CFGnode " << reminst->getNode()->getId() <<"  ";
-            ((Inst*)(reminst->getNode()->getLabelInst()))->print(os_sc); os_sc << "  ";
-            reminst->print(os_sc);
-            os_sc << std::endl;
+        if (shortLog) {
+            Node* node = reminst->getNode();
+            os_sc <<"--rmInst done: CFGnode "; FlowGraph::printLabel(Log::out(), node);
+            os_sc << "   "; reminst->print(os_sc); os_sc << std::endl;
         }
         if (reminst->getOperation().canThrow()==true) {
             excedge = (Edge*)reminst->getNode()->getExceptionEdge();
             assert(excedge != NULL);
-            if (_scinfo) {
-                os_sc <<"--rmEdge done: to "; ((Inst*)(excedge->getTargetNode()->getLabelInst()))->print(os_sc);
-                os_sc << std::endl;
+            if (shortLog) {
+                os_sc <<"--rmEdge done: to "; FlowGraph::printLabel(Log::out(), excedge->getTargetNode()); os_sc << std::endl;
             }
             fg.removeEdge(excedge);
         }
         reminst->unlink();
-        return;
-    }
-    if (_scinfo) {
-        os_sc <<"--rmInst null: CFGnode  NULL  ";
-        reminst->print(os_sc);
-        os_sc << std::endl;
+    } else {
+        if (shortLog) {
+            os_sc <<"--rmInst null: CFGnode  NULL  "; reminst->print(os_sc); os_sc << std::endl;
+        }
     }
 } // removeInst(Inst* reminst)
 
@@ -5960,7 +5513,7 @@ EscAnalyzer::fixMethodEndInsts(uint32 ob_id) {
         if (o->getId() != ob_id)
             continue;
 
-        if (_scinfo) {
+        if (verboseLog) {
             os_sc << "++++ Op_MethodEnd " << std::endl;
             mei->print(os_sc); os_sc << std::endl;
             os_sc << "  -- replaced by " << std::endl;
@@ -5970,7 +5523,7 @@ EscAnalyzer::fixMethodEndInsts(uint32 ob_id) {
         _instFactory.makeLdNull(null_opnd)->insertBefore(mei);
         mei->setSrc(i,null_opnd);
 
-        if (_scinfo) {
+        if (verboseLog) {
             mei->getPrevInst()->print(os_sc); os_sc << std::endl;
             mei->print(os_sc); os_sc << std::endl;
             os_sc << "++++             " << std::endl;
@@ -6004,17 +5557,14 @@ EscAnalyzer::checkVVarSrcs(Inst* inst) {
 
     if (scannedObjs->size()!=0) {
         if (checkScannedObjs(inst->getId())) {
-#ifdef _DEBUG
-            if (_scinfo) {
+            if (verboseLog) {
                 os_sc << "instId " << inst->getId() 
                     << "  .  .  .   returns false" << std::endl;
             }
-#endif
             return false;
         }
     }
-#ifdef _DEBUG
-    if (_scinfo) {
+    if (verboseLog) {
         os_sc << text; 
         inst->print(os_sc); 
         os_sc << std::endl;
@@ -6047,7 +5597,6 @@ EscAnalyzer::checkVVarSrcs(Inst* inst) {
             break;
         }
     }
-#endif
     
     if (inst->getOpcode()==Op_DirectCall || inst->getOpcode()==Op_IndirectMemoryCall) {
         return false;
@@ -6091,11 +5640,9 @@ EscAnalyzer::checkVVarSrcs(Inst* inst) {
             }
     }
     scannedObjs->pop_back();
-#ifdef _DEBUG
-    if (_scinfo) {
+    if (verboseLog) {
         os_sc << "           1 returns " << res << std::endl;
     }
-#endif
     return res;
 }  // checkVVarSrcs(Inst* inst) 
 
@@ -6150,7 +5697,7 @@ EscAnalyzer::fixCheckInsts(uint32 opId) {
         if ((*iit)->getSrc(0)->getId()!=opId) {
             continue;
         }
-        if (_scinfo) {
+        if (verboseLog) {
             os_sc << "  **  "; (*iit)->print(os_sc); os_sc << std::endl;
         }
         Inst* inst = (*iit);
@@ -6163,7 +5710,7 @@ EscAnalyzer::fixCheckInsts(uint32 opId) {
             if (inst->getComparisonModifier()==Cmp_NonZero) {
                 excedge = inst->getNode()->getFalseEdge();
             }
-            if (_scinfo) {
+            if (verboseLog) {
                 os_sc <<"-- to remove edge: to "; 
                 ((Inst*)( excedge->getTargetNode()->getLabelInst() ))->print(os_sc);
                 os_sc << std::endl;
@@ -6176,7 +5723,7 @@ EscAnalyzer::fixCheckInsts(uint32 opId) {
         if (opcode == Op_TauIsNonNull || opcode == Op_TauCheckNull || opcode == Op_TauHasType) {
             if (inst->getOperation().canThrow()==true) {
                 excedge = (Edge*)inst->getNode()->getExceptionEdge();
-                if (_scinfo) {
+                if (verboseLog) {
                     os_sc <<"-- exc edge to "; 
                     ((Inst*)(excedge->getTargetNode()->getLabelInst()))->print(os_sc);
                     os_sc << std::endl;
@@ -6197,33 +5744,33 @@ EscAnalyzer::checkToScalarizeFinalFiels(CnGNode* onode, ScObjFlds* scObjFlds) {
     InstFactory& _instFactory = irManager.getInstFactory();
     TypeManager& _typeManager  = irManager.getTypeManager();
 
-    if (_scinfo) {
+    if (verboseLog) {
         os_sc << "########################" << std::endl;
         printCnGNode(onode,os_sc); os_sc << std::endl;
     }
     scObjFlds->clear();
     collectStLdInsts(onode, scObjFlds);
     if (scObjFlds->size() != 0) {
-        if (_scinfo) {
+        if (verboseLog) {
             os_sc << " used fields: " << scObjFlds->size() << "  final fields exist: ";
         }
         for (ito = scObjFlds->begin( ); ito != scObjFlds->end( ); ito++ ){
             sco = (*ito);
-            if (_scinfo) {
+            if (verboseLog) {
                 os_sc << sco->isFinalFld << " ";
             }
             if (sco->isFinalFld) {
                 do_fsc = true;
             }
-            if (_scinfo) {
+            if (verboseLog) {
                 os_sc << " field usage : " << sco->ls_insts->size();
             }
         }
-        if (_scinfo) {
+        if (verboseLog) {
             os_sc << std::endl;
         }
     }
-    if (_scinfo) {
+    if (verboseLog) {
         if (scObjFlds->size() != 0 && do_fsc) {
             printCnGNode(onode,os_sc); os_sc << std::endl;
             os_sc << " ############# try to do" << std::endl;
@@ -6254,12 +5801,12 @@ EscAnalyzer::checkToScalarizeFinalFiels(CnGNode* onode, ScObjFlds* scObjFlds) {
             }
             VarOpnd* fl_var_opnd = _opndManager.createVarOpnd(fl_type, false);
             sco->fldVarOpnd = fl_var_opnd;
-            if (_scinfo) {
+            if (verboseLog) {
                 os_sc<<" PoitedType "; fl_type1->print(os_sc); os_sc <<std::endl;
                 os_sc<<" OperandType "; fl_type->print(os_sc); os_sc <<std::endl;
             }
             scalarizeOFldUsage(sco);
-            if (_scinfo) {
+            if (verboseLog) {
                 os_sc << "++++ old newobj added fld_var: before"  << std::endl;
                 FlowGraph::print(os_sc,onode->nInst->getNode());
                 os_sc << "++++ old newobj: before end"  << std::endl;
@@ -6281,7 +5828,7 @@ EscAnalyzer::checkToScalarizeFinalFiels(CnGNode* onode, ScObjFlds* scObjFlds) {
             ldf->insertAfter(lda);
             Inst* stv = _instFactory.makeStVar(fl_var_opnd,fl_tmp_opnd_ld);
             stv->insertAfter(ldf);
-            if (_scinfo) {
+            if (verboseLog) {
                 os_sc << "++++ old newobj added fld_var: after"  << std::endl;
                 FlowGraph::print(os_sc,onode->nInst->getNode());
                 os_sc << "++++ old newobj: after end"  << std::endl;
@@ -6289,6 +5836,36 @@ EscAnalyzer::checkToScalarizeFinalFiels(CnGNode* onode, ScObjFlds* scObjFlds) {
         }
     }
 } // checkToScalarizeFinalFiels(CnGNode* onode, ScObjFlds* scObjFlds)
+
+static void logMethod(MethodPtrType* mpt) {
+    mpt->print(Log::out()); Log::out() << std::endl;
+    if (mpt->isUnresolvedMethodPtrType()) {
+        Log::out() << "    isUnresolved: true" << std::endl;
+    } else {
+        MethodDesc* mdesc = mpt->getMethodDesc();
+        logMethod(mdesc);
+    }
+}
+
+static void logMethod(MethodDesc* mdesc) {
+    Log::out() << "    isStatic: "  << mdesc->isStatic() << std::endl;
+    Log::out() << "    isFinal: " << mdesc->isFinal() << std::endl;
+    Log::out() << "---------------" << std::endl;
+    Log::out() << "    NumParams: " << mdesc->getNumParams()<< std::endl;
+    Log::out() << "    isInstance: " << mdesc->isInstance() << std::endl;
+    Log::out() << "    isVirtual: "  << mdesc->isVirtual() << std::endl;
+    Log::out() << "    isAbstract: " << mdesc->isAbstract() << std::endl;
+    Log::out() << "    isInstanceInitializer: "  << mdesc->isInstanceInitializer() << std::endl;
+    Log::out() << "    isOverridden: " << mdesc->isOverridden() << std::endl;
+}
+
+static bool isVMHelperCall(Inst* inst, CompilationInterface::RuntimeHelperId id) {
+    VMHelperCallInst* callInst = inst->asVMHelperCallInst();
+    if (callInst==NULL) {
+        return false;
+    }
+    return callInst->getVMHelperId() == id;
+}
 
 } //namespace Jitrino 
 

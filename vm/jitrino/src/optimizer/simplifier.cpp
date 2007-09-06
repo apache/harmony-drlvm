@@ -3037,7 +3037,7 @@ Opnd*
 Simplifier::simplifyTauCast(Opnd* src, Opnd *tauCheckedNull, Type* castType) {
     Type *opndType = src->getType();
     if (isNullObject(src) || 
-        irManager.getTypeManager().isSubClassOf(opndType, castType)) {
+        irManager.getTypeManager().isResolvedAndSubClassOf(opndType, castType)) {
         return genTauStaticCast(src, tauCheckedNull, castType)->getDst();
     }
     return NULL;
@@ -3047,10 +3047,10 @@ Opnd*
 Simplifier::simplifyTauAsType(Opnd* src, Opnd* tauCheckedNull, Type* type) {
     Type* srcType = src->getType();
     if (isNullObject(src) || 
-        irManager.getTypeManager().isSubClassOf(srcType, type))
+        irManager.getTypeManager().isResolvedAndSubClassOf(srcType, type))
         return src;
     if (isExactType(src) &&
-        !irManager.getTypeManager().isSubClassOf(srcType, type)) {
+        !irManager.getTypeManager().isResolvedAndSubClassOf(srcType, type)) {
         ConstInst::ConstValue val;
         val.i = NULL;
         return genLdConstant(irManager.getTypeManager().getNullObjectType(),
@@ -3065,7 +3065,7 @@ Simplifier::simplifyTauInstanceOf(Opnd* src, Opnd* tauCheckedNull, Type* type) {
 
     bool srcIsNonNull = (tauCheckedNull->getInst()->getOpcode() != Op_TauUnsafe);
     if (srcIsNonNull &&
-        irManager.getTypeManager().isSubClassOf(srcType, type)) {
+        irManager.getTypeManager().isResolvedAndSubClassOf(srcType, type)) {
         return genLdConstant((int32)1)->getDst();
     } 
 
@@ -3075,7 +3075,7 @@ Simplifier::simplifyTauInstanceOf(Opnd* src, Opnd* tauCheckedNull, Type* type) {
     }
 
     if (isExactType(src) &&
-        !irManager.getTypeManager().isSubClassOf(srcType, type))
+        !irManager.getTypeManager().isResolvedAndSubClassOf(srcType, type))
         return genLdConstant((int32)0)->getDst();
 
     return NULL;
@@ -3088,7 +3088,7 @@ Simplifier::simplifyTauCheckElemType(Opnd* arrayBase, Opnd* src, bool &alwaysThr
     assert(arrayBase->getType()->isArrayType());
     Type *arrayElemType = ((ArrayType*)arrayBase->getType())->getElementType();
     if (isExactType(arrayBase) &&
-        irManager.getTypeManager().isSubClassOf(src->getType(), arrayElemType)) {
+        irManager.getTypeManager().isResolvedAndSubClassOf(src->getType(), arrayElemType)) {
         return genTauHasExactType(arrayBase,arrayBase->getType())->getDst();
     }
     // check to see if src was loaded from arrayBase
@@ -4354,9 +4354,9 @@ Simplifier::simplifyTauCheckCast(Opnd* src, Opnd* tauCheckedNull, Type* castType
         return genTauSafe()->getDst();
     } else if (opndType->isUnresolvedType()) {
         return NULL;
-    } else if (irManager.getTypeManager().isSubClassOf(opndType, castType)) {
+    } else if (irManager.getTypeManager().isResolvedAndSubClassOf(opndType, castType)) {
         return genTauHasType(src, castType)->getDst();
-    } else if (!irManager.getTypeManager().isSubClassOf(castType, opndType)) {
+    } else if (!irManager.getTypeManager().isResolvedAndSubClassOf(castType, opndType)) {
         if (Log::isEnabled()) {
             Log::out() << "in simplifyTauCheckCast: castToType ";
             castType->print(Log::out());
@@ -4416,7 +4416,7 @@ Simplifier::simplifyTauHasType(Opnd* src, Type* castType)
                 return foundRecurse;
             }
             // couldn't be more precise, just use this one.
-            if (irManager.getTypeManager().isSubClassOf(typeInfo, castType)) {
+            if (irManager.getTypeManager().isResolvedAndSubClassOf(typeInfo, castType)) {
                 return tauCastChecked;
             }
         }

@@ -34,6 +34,7 @@
 #include "JITInstanceContext.h"
 #include "PlatformDependant.h"
 #include "mkernel.h"
+#include "VMMagic.h"
 
 /**
 * @brief A lock used to protect method's data in multi-threaded compilation.
@@ -449,7 +450,12 @@ CompilationInterface::getTypeFromDrlVMTypeHandle(Type_Info_Handle typeHandle) {
     } else if (type_info_is_reference(typeHandle)) {
         bool lazy = typeManager.isLazyResolutionMode();
         if (lazy && !type_info_is_resolved(typeHandle)) {
-            return typeManager.getUnresolvedObjectType();
+            const char* kname = type_info_get_type_name(typeHandle);
+            assert(kname!=NULL);
+            bool forceResolve = VMMagicUtils::isVMMagicClass(kname);
+            if (!forceResolve) {
+                return typeManager.getUnresolvedObjectType();
+            }
         }
         Class_Handle classHandle = type_info_get_class_no_exn(typeHandle);
         if (!classHandle) {
@@ -838,17 +844,19 @@ NamedType* CompilationInterface::resolveNamedType(Class_Handle enclClass, uint32
 NamedType* CompilationInterface::getNamedType(Class_Handle enclClass, uint32 cpIndex, ResolveNewCheck checkNew) {
     Class_Handle ch = NULL;
     if (typeManager.isLazyResolutionMode() && !class_is_cp_entry_resolved(compileHandle, enclClass, cpIndex)) {
-        NamedType * res = getUnresolvedType(typeManager, enclClass, cpIndex);
-        return res; 
+        const char* className = const_pool_get_class_name(enclClass, cpIndex);
+        bool forceResolve = VMMagicUtils::isVMMagicClass(className);
+        if (!forceResolve) {
+            return getUnresolvedType(typeManager, enclClass, cpIndex);
+        }
+    }
+    if (checkNew == ResolveNewCheck_DoCheck) {
+        ch = resolve_class_new(compileHandle,enclClass,cpIndex);
     } else {
-        if (checkNew == ResolveNewCheck_DoCheck) {
-            ch = resolve_class_new(compileHandle,enclClass,cpIndex);
-        } else {
-            ch = resolve_class(compileHandle,enclClass,cpIndex);
-        }
-        if (ch == NULL) {
-            return typeManager.getUnresolvedObjectType();
-        }
+        ch = resolve_class(compileHandle,enclClass,cpIndex);
+    }
+    if (ch == NULL) {
+        return typeManager.getUnresolvedObjectType();
     }
     if (class_is_primitive(ch)) {
         return typeManager.getValueType(ch);

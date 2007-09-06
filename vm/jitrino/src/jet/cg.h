@@ -1027,12 +1027,6 @@ public:
         }
     }
 
-    /**
-    * @brief Checks if the class name is vmmagic class
-    * @return  - true if the class name is vmmagic class
-    */
-    static bool is_magic_class(const char* kname);
-
 protected:
     /**
      * @brief Tests whether the specified flag is set in method's compilation

@@ -823,6 +823,11 @@ VMEXPORT Boolean type_info_is_vector(Type_Info_Handle tih);
 VMEXPORT Boolean type_info_is_general_array(Type_Info_Handle tih);
 
 /**
+* Get the name of the class referenced by this type info handle
+*/
+VMEXPORT const char* type_info_get_type_name(Type_Info_Handle tih);
+
+/**
  * Get the class if <code>type_info_is_reference</code> or 
  * <code>type_info_is_unboxed</code> returned <code>TRUE</code>. 
  * If the type info is a vector or a general array, return the

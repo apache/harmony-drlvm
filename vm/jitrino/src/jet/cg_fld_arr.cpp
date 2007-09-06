@@ -27,6 +27,7 @@
 #include "cg.h"
 #include <open/vm.h>
 #include "trace.h"
+#include "VMMagic.h"
 
 namespace Jitrino {
 namespace Jet {
@@ -280,7 +281,7 @@ void CodeGen::do_field_op(const FieldOpInfo& fieldOp)
     jtype jt = to_jtype(class_get_cp_field_type(fieldOp.enclClass, fieldOp.cpIndex));
     
     const char* fieldDescName = const_pool_get_field_descriptor(fieldOp.enclClass, fieldOp.cpIndex);
-    bool fieldIsMagic = is_magic_class(fieldDescName);
+    bool fieldIsMagic = VMMagicUtils::isVMMagicClass(fieldDescName);
     if (fieldIsMagic) {
         jt = iplatf;
     }
