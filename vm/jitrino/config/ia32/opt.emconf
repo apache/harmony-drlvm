@@ -22,6 +22,8 @@ CS_OPT.file=jitrino
 
 # Options to be passed to JIT
 
+-XX:jit.arg.lazyResolution=on
+
 -XX:jit.CS_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
 
 -XX:jit.CS_OPT.path.optimizer=ssa,devirt,inline,purge,simplify,dce,uce,lazyexc,throwopt,escape,dce,uce,memopt,simplify,dce,uce,lower,statprof,unroll,ssa,simplify,dce,uce,dessa,statprof

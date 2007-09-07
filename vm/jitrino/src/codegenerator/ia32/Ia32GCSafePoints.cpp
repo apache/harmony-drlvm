@@ -421,19 +421,26 @@ void GCSafePointsInfo::updateMptrInfoInPairs(GCSafePointPairs& res, Opnd* newMpt
     }
 }
 
-static bool isStaticFieldPtrDefWithCall(Inst* inst) {
+static bool isStaticFieldPtrDef(Inst* inst, const StlSet<Opnd*>& staticFieldPtrs) {
     if (inst->hasKind(Inst::Kind_CallInst)) {
         CallInst* callInst = (CallInst*)inst;
         Opnd::RuntimeInfo * rt = callInst->getRuntimeInfo();
         if (rt && rt->getKind() == Opnd::RuntimeInfo::Kind_HelperAddress
             && ((CompilationInterface::RuntimeHelperId)(POINTER_SIZE_INT)rt->getValue(0)
-                    == CompilationInterface::Helper_GetStaticFieldAddrWithResolve))
+            == CompilationInterface::Helper_GetStaticFieldAddrWithResolve))
         {
+            return true;
+        }
+    } else if (inst->getMnemonic() == Mnemonic_MOV) {
+        Opnd* fromOpnd = inst->getOpnd(1);
+        if (staticFieldPtrs.find(fromOpnd)!=staticFieldPtrs.end()) {
             return true;
         }
     }
     return false;
+
 }
+
 
 void GCSafePointsInfo::updatePairsOnInst(Inst* inst, GCSafePointPairs& res) {
     runLivenessFilter(inst, res);//filter pairs with dead mptrs from list
@@ -453,7 +460,7 @@ void GCSafePointsInfo::updatePairsOnInst(Inst* inst, GCSafePointPairs& res) {
     if (!opndType->isObject() && !opndType->isManagedPtr()) {
         return;
     }
-    if (isStaticFieldPtrDefWithCall(inst)) {
+    if (isStaticFieldPtrDef(inst, staticMptrs)) {
         removePairByMPtrOpnd(res, opnd);
         staticMptrs.insert(opnd);
         return;
