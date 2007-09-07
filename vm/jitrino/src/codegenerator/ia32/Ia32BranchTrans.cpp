@@ -214,19 +214,6 @@ BranchTranslator::runImpl()
 
                         if (cmpOp1->getDefScope() == Opnd::DefScope_Temporary) {
                             cmpOp1 = getMOVsChainSource(cmpInst, cmpOp1);
-                            if (!cmpOp1->isPlacedIn(OpndKind_Imm)) {
-                                for(Inst * copy = (Inst *)bb->getLastInst();copy!=NULL; copy=copy->getPrevInst()) {
-                                    Inst::Opnds opnds(copy, Inst::OpndRole_Def|Inst::OpndRole_ForIterator);
-                                    for (Inst::Opnds::iterator ito = opnds.begin(); ito != opnds.end(); ito = opnds.next(ito)){
-                                        Opnd * opnd = copy->getOpnd(ito);
-                                        if (opnd == cmpOp1 && copy->getMnemonic() == Mnemonic_MOV) {
-                                            cmpOp1 = copy->getOpnd(1);
-                                        } else {
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
                             if (cmpOp1->isPlacedIn(OpndKind_Imm)) {
                                 cmpOp2 = getMOVsChainSource(cmpInst, cmpOp2);
                                 if (cmpOp2->isPlacedIn(OpndKind_Imm)) { 
