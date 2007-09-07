@@ -350,6 +350,9 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\tailduplicator.h">
 			</File>
 			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\throwopt.cpp">
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\walkers.cpp">
 			</File>
 			<File
@@ -836,6 +839,12 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 			Name="shared"
 			Filter="">
 			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\shared\Algorithms.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\shared\Algorithms.h">
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\shared\Arena.cpp">
 			</File>
 			<File
@@ -960,6 +969,12 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\shared\unionfind.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\shared\VMMagic.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\shared\VMMagic.h">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\shared\XTimer.cpp">
