@@ -1416,7 +1416,11 @@ Type* JavaLabelPrepass::getTypeByDescriptorString(CompilationInterface& ci, Clas
     {
     case 'L': 
         {
-            resType = ci.getTypeFromDescriptor(enclClass, descriptorString);
+            if (!typeManager.isLazyResolutionMode()) {
+                resType = typeManager.getUnresolvedObjectType();
+            } else {
+                resType = ci.getTypeFromDescriptor(enclClass, descriptorString);
+            }
             while( *(++descriptorString) != ';' ) {
                 len++;
                 assert(*descriptorString);
