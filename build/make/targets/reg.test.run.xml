@@ -17,9 +17,8 @@
 
 <project name="REGRESSION TESTS RUN" default="do-regression-testing">
     
-    <property name="jvm.under.test" value="${build.deploy.dir}/jdk/jre/bin/java"/>
-    <property name="reg.test.timeout" value="600000" />
-    <property name="reg.test.halt.on.error" value="false"/>
+    <import file="test.common.xml"/>
+    
     <!-- Mark used by custom test launchers for test failure notification -->
     <property name="reg.test.failed.mark" value="-=@@@ Reg Test Failed @@@=-"/>
 
@@ -28,28 +27,14 @@
     </target>
 
     <target name="launch-tests">
+        <prepare-test-run test-dir="${reg.test.dir}"/>
         <echo>
-=====================================
-DRLVM Regression Testing on platform: ${hy.platform}
-=====================================
+        =====================================
+        Tested JVM: ${test.jvm.exe}
+        =====================================
         </echo>
 
-        <property name="exclude.list.file" 
-                  location="${reg.test.src}/excludes/exclude.${hy.platform}"/>
-
-        <!-- Check up exclude list to use -->
-        <condition property="exclude.list" value="${exclude.list.file}">
-            <and>
-                <!-- don't look into xlist if we're 
-                     checking particular regression -->
-                <not>
-                    <isset property="test.case"/>
-                </not>
-                <!-- use this xlist, if it is available for 
-                     this platform configuration -->
-                <available file="${exclude.list.file}"/>
-            </and>
-        </condition>
+        <take-xlist name="exclude.list" file="${reg.test.src}/excludes/exclude.${hy.platform}"/>
 
         <!-- Choose regression tests to execute.
              Use 
@@ -104,12 +89,7 @@ DRLVM Regression Testing on platform: ${hy.platform}
     </target>
 
     <target name="make-report">
-        <junitreport todir="${reg.test.dir}/reports">
-            <fileset dir="${reg.test.dir}/reports">
-                <include name="TEST*-*.xml"/>
-            </fileset>
-            <report format="frames" todir="${reg.test.dir}/reports/html"/>
-        </junitreport>
+        <gen-test-report dir="${reg.test.dir}/reports"/>
         <echo message="========================================"/>
         <echo message="Regression testing report was stored in:"/>
         <echo message="========================================"/>
@@ -169,10 +149,10 @@ DRLVM Regression Testing on platform: ${hy.platform}
         <attribute name="vmarg" default=""/>
         <element name="junit-element" optional="true"/>
         <sequential>
-            <junit jvm="${jvm.under.test}"
+            <junit jvm="${test.jvm.exe}"
                    fork="yes"
                    haltonfailure="false"
-                   haltonerror="${reg.test.halt.on.error}"
+                   haltonerror="${test.failfast}"
                    printsummary="withOutAndErr"
                    dir="${basedir}"
                    failureproperty="reg.test.errors"
@@ -211,7 +191,7 @@ DRLVM Regression Testing on platform: ${hy.platform}
                 <junit-element>
                     <jvmti-junit-element/>
                     <jvmarg
-                        value="-agentpath:${reg.test.2launch.native.path}/${lib.prefix}@{agent}${lib.suffix}"
+                        value="-agentpath:${reg.test.2launch.native.path}/${shlib.prefix}@{agent}${shlib.suffix}"
                         />
                 </junit-element>
             </run-junit-test>
@@ -228,7 +208,7 @@ DRLVM Regression Testing on platform: ${hy.platform}
         <element name="java-element" optional="true"/>
         <sequential>
             <echo message="Running regression test: @{test}"/>
-            <java jvm="${jvm.under.test}"
+            <java jvm="${test.jvm.exe}"
                   classname="@{test}"
                   resultproperty="@{test}.res.code"
                   output="${reg.test.dir}/reports/@{test}.txt"

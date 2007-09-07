@@ -15,40 +15,45 @@
     limitations under the License.
 -->
 <project name="UNIT TESTS">
+    
+    <import file="test.common.xml"/>
+    
+    <property name="unit.test.dir" location="${base.test.dir}/unit.tests"/>
+    <property name="unit.test.classes" location="${unit.test.dir}/classes"/>
+
     <target name="unit.test" depends="java_test_unit" />
     <target name="java_test_unit" depends="init_component">
         <if>
             <isreference refid="unit.test.javasrc" />
             <then>
-                <mkdir dir="${build.dir}/_unit.tests/classes" />
-                <javac classpath="${build.junit.jar}" destdir="${build.dir}/_unit.tests/classes">
+                <mkdir dir="${unit.test.classes}" />
+                <javac classpath="${build.junit.jar}" destdir="${unit.test.classes}">
                     <src refid="unit.test.javasrc" />
                     <patternset refid="unit.test.java.pattern" />
                     <bootclasspath>
                         <path id="java.classpath">
-                            <pathelement location="${build.deploy.dir}/jdk/jre/lib"/>
+                            <pathelement location="${test.jre.home}/lib"/>
                         </path>
                     </bootclasspath>
                 </javac>
-                <mkdir dir="${build.dir}/_unit.tests/report" />
-                <junit printsummary="true" haltonfailure="no"
-                       fork="yes" forkmode="once" jvm="${build.deploy.dir}/jdk/jre/bin/java.exe" failureproperty="some.unit.test.is.failed">
-                    <jvmarg value="-Xbootclasspath/p:${build.dir}/_unit.tests/classes;${build.junit.jar}" />
+                <prepare-test-run test-dir="${unit.test.dir}"/>
+                <junit printsummary="true" 
+                    haltonfailure="${test.failfast}"
+                    timeout="${test.timeout}"
+                    fork="yes" forkmode="once" 
+                    jvm="${test.jvm.exe}" 
+                    failureproperty="test.failed">
+                    
+                    <jvmarg value="-Xbootclasspath/p:${unit.test.classes}${path.separator}${junit.jar}" />
                     <formatter type="plain" usefile="true" />
-                    <batchtest todir="${build.dir}/_unit.tests/report">
-                        <fileset dir="${build.dir}/_unit.tests/classes" includes="**/*">
-<!--                            <patternset refid="unit.test.pattern" /> -->
+                    <batchtest todir="${unit.test.dir}/report">
+                        <fileset dir="${unit.test.classes}" includes="**/*">
                         </fileset>
                     </batchtest>
                 </junit>
 
-                <condition property="result.message" value="SOME TESTS FAILED!">
-                    <istrue value="${some.unit.test.is.failed}"/>
-                </condition>
-                <property name="result.message" value="" />
-
-                <echo message="Please find test classes and results at ${build.dir}/_unit.tests/" />
-                <echo message="${result.message}"/>
+                <echo message="Please find test classes and results at ${unit.test.dir}" />
+                <fail unless="run.all.tests" if="test.failed" message="Some unit tests failed"/>
             </then>
         </if>
     </target>

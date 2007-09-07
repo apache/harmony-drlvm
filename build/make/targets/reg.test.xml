@@ -19,34 +19,15 @@
     <import file="${basedir}/targets/reg.test.run.xml"/>
     
     <property name="reg.test.src" location="${basedir}/../../src/test/regression"/>
-    <property name="reg.test.dir" location="${build.semi.dir}/reg.tests"/>
+    <property name="reg.test.dir" location="${base.test.dir}/reg.tests"/>
     <property name="reg.test.class.path" location="${reg.test.dir}/classes"/>
     <property name="reg.test.native.path" location="${reg.test.dir}/native"/>
-    <property name="jasmin.jar" location="./tmp/jasmin.jar"/>
     <property name="reg.test.package" value="org.apache.harmony.drlvm.tests.regression"/>
     
     <propertyregex property="reg.test.unpackage" 
         input="${reg.test.package}" regexp="\." replace="/"/>
 
-    <if> <!-- Set up os specific settings - library suffix and prefix -->
-        <os family="windows"/>
-        <then>
-            <property name="lib.prefix" value=""/>
-            <property name="lib.suffix" value=".dll"/>
-        </then>
-        <elseif>
-            <os family="unix"/>
-            <then>
-                <property name="lib.prefix" value="lib"/>
-                <property name="lib.suffix" value=".so"/>
-            </then>
-        </elseif>
-        <else>
-            <fail>Is not designed for this platform!</fail>
-        </else>
-    </if>
-
-    <target name="compile-reg-tests-prepare" depends="">
+    <target name="compile-reg-tests-prepare">
         <mkdir dir="${reg.test.class.path}" />
         <mkdir dir="${reg.test.native.path}" />
 
@@ -86,7 +67,7 @@
         <pathconvert pathsep=" "
                      property="reg.test.src.jasmin.list"
                      refid="reg.test.src.jasmin.set"/>
-       
+        <ensure-resource name="jasmin.jar"/>
         <java jar="${jasmin.jar}" fork="true" outputproperty="jasmin-reg-out" errorproperty="jasmin-reg-err">
             <arg line="-d ${reg.test.class.path}"/>
             <arg line="${reg.test.src.jasmin.list}"/>
@@ -97,12 +78,8 @@
 
     <target name="compile-reg-tests-java"
             depends="compile-reg-tests-prepare, compile-reg-tests-j">
-        <javac srcdir="${reg.test.src}"
-               includes="**/*.java"
-               destdir="${reg.test.class.path}"
-               source="1.5" target="1.5" 
-               debug="true"
-               verbose="no" listfiles="no">
+        <ensure-resource name="vmmagic.jar"/>
+        <compile-java src="${reg.test.src}" dest="${reg.test.class.path}">
             <depend targetdir="${reg.test.class.path}">
                 <mapper>
                     <chainedmapper>
@@ -118,9 +95,9 @@
             </depend>
             <classpath>
                 <pathelement path="${java.class.path}/"/>
-                <fileset dir="${build.VMMAGIC.home}" includes="vmmagic-20070207.jar" />
+                <fileset file="${vmmagic.jar}" />
             </classpath>
-        </javac>
+        </compile-java>
     </target>
 
     <target name="compile-reg-tests-native" depends="compile-reg-tests-prepare">
@@ -135,7 +112,7 @@
                                 <replacestring from="\" to="/"/>
                             </filtermapper>
                             <regexpmapper from="(H\d\d*)/([^/]+)\.c.?.?$$" 
-                                          to="\1/${lib.prefix}\2${lib.suffix}"/>
+                                          to="\1/${shlib.prefix}\2${shlib.suffix}"/>
                         </chainedmapper>
                         </mapper>
                     </depend>
@@ -167,7 +144,7 @@
                     link="shared"
                     outfile="${reg.test.native.path}/${outfile}"
                     objdir="${objdir}">
-                    <includepath path="${build.deploy.dir}/jdk/include" />
+                    <includepath path="${test.jdk.home}/include" />
                     <!--select os="lnx">
                         <linkerarg value="-lstdc++" />
                     </select-->
@@ -180,39 +157,16 @@
                     </and>
                 </condition>
 
-                <antcall target="reg.embed.manifest" />
+                <runtarget target="reg.embed.manifest" />
             </sequential>
         </for>
     </target>
 
     <target name="reg.embed.manifest" if="add.manifest">
-        <echo message="Adding manifest to ${reg.test.native.path}/${outfile}${shlib.suffix}" />
-        <exec executable="mt.exe">
-            <arg value="-nologo" />
-            <arg value="-manifest" />
-            <arg value="${reg.test.native.path}/${outfile}${shlib.suffix}${manifest.suffix}" />
-            <arg value="-outputresource:${reg.test.native.path}/${outfile}${shlib.suffix};#2" />
-        </exec>
+        <embed-manifest lib="${reg.test.native.path}/${outfile}${shlib.suffix}" />
     </target>
 
-    <target name="pre-reg-test" depends="compile-reg-tests-java, compile-reg-tests-native">
-        <delete quiet="true" dir="${reg.test.dir}/reports" />
-        <mkdir dir="${reg.test.dir}/reports" />       
-
-        <condition property="junit.jar" value="${junit.home}/junit.jar">
-            <isset property="junit.home" />
-        </condition>
-        <property name="junit.jar" 
-            location="${external.dep.CLASSLIB}/depends/jars/junit_3.8.2/junit.jar"/>
-        <available file="${junit.jar}" property="junit.found"/>
-        <fail unless="junit.found">
-                ==============================================
-                Please set the classpath of junit as follows:
-                build.bat -Djunit.jar=%JUNIT_HOME% test
-                ==============================================
-        </fail>
-    </target>
-
-    <target name="reg.test" depends="pre-reg-test, do-regression-testing" />
+    <target name="reg.test" depends="compile-reg-tests-java, 
+        compile-reg-tests-native, do-regression-testing" />
     
 </project>

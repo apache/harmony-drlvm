@@ -17,23 +17,28 @@
 -->
 <project name="KERNEL TESTS">
 
+    <import file="test.common.xml"/>
+    
     <property name="kernel.test.javasrc" location="${build.VM.home}/tests/kernel" />
-    <property name="kernel.test.dir" location="${build.semi.dir}/kernel.tests"/>
+    <property name="kernel.test.dir" location="${base.test.dir}/kernel.tests"/>
+    <property name="kernel.test.summary" location="${kernel.test.dir}/status.txt"/>
     <property name="test.resource.path" location="${kernel.test.dir}/resources"/>
     <property name="test.class.path" location="${kernel.test.dir}/classes"/>
     
-    <property name="test.jvm.exe" value="${build.deploy.dir}/jdk/jre/bin/java"/>
-    <property file="test.properties"/>
-
     <target name="kernel.test" 
         depends="compile-kernel-test, run-kernel-test, report-kernel-test, check-kernel-test"/>
     
-    <target name="run-kernel-test" depends="-prepare-kernel-test">
-        <condition property="kernel.test.continue" value="true" else="false">
-            <isfalse value="${kernel.test.failfast}"/>
-        </condition>
-        <for list="${test.mode}" param="mode"
-            trim="true" keepgoing="${kernel.test.continue}">
+    <target name="run-kernel-test">
+        <prepare-test-run test-dir="${kernel.test.dir}"/>
+        <delete file="${kernel.test.summary}" quiet="true"/>
+        
+        <echo>
+        ==================================
+        Tested JVM: ${test.jvm.exe}
+        ==================================
+        </echo>
+        
+        <for list="${test.mode}" param="mode" trim="true">
             <sequential>
                 <antcall target="-run-kernel-test-batch"> 
                     <param name="kernel.mode" value="@{mode}" />
@@ -41,115 +46,72 @@
             </sequential>
         </for>
     </target>
-   
+    
     <target name="report-kernel-test">
         <for list="${test.mode}" param="mode"
             trim="true" keepgoing="true">
             <sequential>
-                <junitreport todir="${kernel.test.dir}/reports/@{mode}.mode">
-                    <fileset dir="${kernel.test.dir}/reports/@{mode}.mode">
-                        <include name="*.xml" />
-                    </fileset>
-                    <report format="frames" 
-                        todir="${kernel.test.dir}/reports/@{mode}.mode/html" />
-                </junitreport>
+                <gen-test-report dir="${kernel.test.dir}/reports/@{mode}.mode"/>
             </sequential>
         </for>
     </target>
 
     <target name="check-kernel-test">
-        <loadfile property="kernel.test.summary" 
-            srcFile="${kernel.test.dir}/reports/summary"/>
+        <loadfile property="kernel.test.summary.txt" 
+            srcFile="${kernel.test.summary}"/>
         <echo message="  ***************************${line.separator}"/>
         <echo message="  *** Kernel tests status ***${line.separator}"/>
         <echo message="  ***************************${line.separator}"/>
         <echo message="${line.separator}"/>
-        <echo message="${kernel.test.summary}"/>
+        <echo message="${kernel.test.summary.txt}"/>
         <echo message="${line.separator}"/>
-        <echo>Please find detailed results under ${kernel.test.dir}/reports directory.</echo>
+        <echo>Please find detailed results under ${kernel.test.dir}${file.separator}reports directory.</echo>
         
         <condition property="test.failed">
-            <contains string="${kernel.test.summary}" substring="FAILED" />
+            <contains string="${kernel.test.summary.txt}" substring="FAILED" />
         </condition>
         <fail unless="run.all.tests" if="test.failed" message="There were test failures."/>
     </target>
-       
-    <target name="compile-kernel-test">
-        <mkdir dir="${test.resource.path}" />
-        <javac srcdir="${kernel.test.javasrc}/../kernel_resources" 
-            destdir="${test.resource.path}" 
-            source="1.5" target="1.5" debug="true">
-        </javac>
-        <mkdir dir="${test.class.path}" />
-        <javac srcdir="${kernel.test.javasrc}" 
-            destdir="${test.class.path}" 
-            source="1.5" target="1.5" debug="true">
-        </javac>
-        <delete quiet="true" dir="${test.class.path}/notfound" />
-    </target>
-    
-    <target name="-prepare-kernel-test">
-        <delete quiet="true" dir="${kernel.test.dir}/reports" />
-        <mkdir dir="${kernel.test.dir}/reports" />       
 
-        <condition property="junit.jar" value="${junit.home}/junit.jar">
-            <isset property="junit.home" />
-        </condition>
-        <property name="junit.jar" 
-            location="${external.dep.CLASSLIB}/depends/jars/junit_3.8.2/junit.jar"/>
-        <available file="${junit.jar}" property="junit.found"/>
-        <fail unless="junit.found">
-                ==============================================
-                Please set the classpath of junit as follows:
-                build.bat -Djunit.jar=%JUNIT_HOME% test
-                ==============================================
-        </fail>
+    <target name="compile-kernel-test">
+        <compile-java src="${kernel.test.javasrc}/../kernel_resources" 
+            dest="${test.resource.path}"/>
+        <compile-java src="${kernel.test.javasrc}" 
+            dest="${test.class.path}"/>
+        <delete quiet="true" dir="${test.class.path}/notfound" />
     </target>
     
     <target name="-run-kernel-test-batch">
         <propertycopy property="kernel.mode.name" from="${kernel.mode}.name" override="on"/>       
-        <propertycopy property="kernel.mode.switch" from="${kernel.mode}.switch" override="on"/>
-        <echo>
-        ==================================
-        Run kernel tests using ${kernel.mode.name}
-        ==================================
-        </echo>
-        <property name="exclude.file" location="./excludes/exclude.drlvm_kernel.${hy.platform}.${kernel.mode}" />
-        <if>
-            <available file="${exclude.file}" />
-            <then>
-                  <property name="kernel.exclude.file.${kernel.mode}.present" value="true" />
-                  <loadfile property="foo" srcFile="${exclude.file}"/>
-                  <echo>
-Using exclude file = ${exclude.file}   
-        
-${foo}
-                  </echo>
-            </then>
-        </if>
-        
+        <propertycopy property="kernel.mode.switch" from="${kernel.mode}.switch" override="on"/>        
         <property name="report.dir"
             location="${kernel.test.dir}/reports/${kernel.mode}.mode"/>
         <mkdir dir="${report.dir}" />
+
+        <echo>
+        ==================================
+        Run kernel tests using ${kernel.mode.name} 
+        ==================================
+        </echo>
         
+        <take-xlist name="exclude.file" file="./excludes/exclude.drlvm_kernel.${hy.platform}.${kernel.mode}"/>
+
         <junit fork="yes" failureproperty="kernel.failed"
             filtertrace="no" printsummary="on" showoutput="off"
-            haltonfailure="${kernel.test.failfast}"
+            haltonfailure="${test.failfast}"
             forkmode="${kernel.test.forkmode}" 
             timeout="${test.timeout}"
             jvm="${test.jvm.exe}">
 
-            <jvmarg line="-XX:-vm.assert_dialog ${kernel.mode.switch} ${test.vmargs}" />
+            <jvmarg line="${kernel.mode.switch} ${test.vmargs}" />
             <jvmarg value="-Dtest.resource.path=${test.resource.path}"/>
             <jvmarg value="-Xbootclasspath/a:${junit.jar}${path.separator}${test.class.path}" />
             <formatter type="xml"/>
             <batchtest todir="${report.dir}" unless="test.case">
                 <fileset dir="${kernel.test.javasrc}"> 
-                   <!-- <patternset refid="kernel.test.java.pattern"/> -->
                     <include name="org/apache/harmony/**/*Test.java" />
                     <include name="java/lang/**/*Test*.java" />
-                    <excludesfile name="${exclude.file}" if="kernel.exclude.file.${kernel.mode}.present" />
-                    
+                    <excludesfile name="${exclude.file}" if="exclude.file" />
                 </fileset>
             </batchtest>
             <test name="${test.case}" todir="${report.dir}" if="test.case" />
@@ -159,7 +121,7 @@ ${foo}
             <isset property="kernel.failed" />
         </condition>
 
-        <concat append="on" destfile="${kernel.test.dir}/reports/summary" 
+        <concat append="on" destfile="${kernel.test.summary}" 
             >      ${kernel.mode.name} ${kernel.status}${line.separator}</concat>
     </target>
 </project>

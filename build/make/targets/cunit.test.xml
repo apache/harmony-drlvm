@@ -15,29 +15,44 @@
     limitations under the License.
 -->
 <project name="C UNIT TESTS">
-    <target name="cunit.test" depends="init_component">
+    
+    <import file="test.common.xml"/>
+    
+    <property name="cunit.test.dir" location="${base.test.dir}/cunit.tests"/>
+    <property name="cunit.test.summary" location="${base.test.dir}/cunit.test.failed"/>
+    <property name="cunit.obj.dir" location="${cunit.test.dir}/obj" />
+    <property name="cunit.bin.dir" location="${cunit.test.dir}/bin" />
+    
+    <property name="test.vmdir" location="${test.jre.home}/bin/default"/>
+    
+    <!-- Set cunit tests sources -->
+    <fileset id="unit.test.c.src" dir="${build.VM.home}/tests/unit/thread">
+        <include name="*.c" />
+    </fileset>
 
+    <!-- Create a list of cunit tests excecutable -->
+    <condition property="cunit.test.list" value="${test.case}">
+        <isset property="test.case"/>
+    </condition>
+    <pathconvert pathsep="," property="cunit.test.list" refid="unit.test.c.src">
+        <globmapper from="*.c" to="*"/>
+    </pathconvert>
+    
+    <target name="cunit.test" depends="init_component,cunit-compile,cunit-run,cunit-report"/>
+
+    <target name="cunit-compile" >
         <!-- Set cunit tests include dirs -->
         <path id="unit.test.c.include">
             <pathelement location="${build.VM.home}/tests/unit/thread/utils" />
             <pathelement location="${build.VM.home}/tests/unit/framework" />
-            <pathelement location="${build.semi.dir}/extra/apr/include" />
-            <pathelement location="${build.semi.dir}/extra/apr/include/apr-1" />
+            <pathelement location="${hdk.include.dir}/apr-1" />
             <pathelement location="${build.VM.home}/include" />
             <pathelement location="${build.VM.home}/vmcore/include" />
             <pathelement location="${build.VM.home}/port/include" />
         </path>
 
-        <!-- Set cunit tests sources -->
-        <fileset id="unit.test.c.src" dir="${build.VM.home}/tests/unit/thread">
-            <include name="*.c" />
-        </fileset>
-
-        <!-- Create cunit tests work dir -->
-        <property name="unit.test.c.workdir" value="${build.dir}/_cunit.tests" />
-        <mkdir dir="${unit.test.c.workdir}/_obj" />
-        <mkdir dir="${unit.test.c.workdir}/_bin" />
-        <mkdir dir="${unit.test.c.workdir}/report" />
+        <mkdir dir="${cunit.obj.dir}" />
+        <mkdir dir="${cunit.bin.dir}" />
 
         <compiler name="${build.cxx}" id="cunit.test.compiler">
             <defineset define="APR_DECLARE_STATIC, BUILDING_VM"/>
@@ -126,8 +141,8 @@
         </compiler>
        
         <!-- Compiling cunit tests and framework -->
-        <echo message="cunit: Compiling tests and framework..." />
-        <cc objdir="${unit.test.c.workdir}/_obj" multithreaded="true">
+        <echo message="Compiling tests and framework..." />
+        <cc objdir="${cunit.obj.dir}" multithreaded="true">
             <compiler refid="cunit.test.compiler" />
             <fileset dir="${build.VM.home}/tests/unit/thread/utils">
                 <include name="*.c" />
@@ -139,34 +154,22 @@
             <includepath refid="unit.test.c.include" />
         </cc>
         
-        <!-- Create a list of cunit tests excecutable -->
-        <pathconvert pathsep="," property="unit.test.c.files" refid="unit.test.c.src" />
-        <propertyregex override="yes" property="unit.test.c.files" input="${unit.test.c.files}"
-            regexp="\.c" replace="" defaultValue="${unit.test.c.files}" />
-        <condition property="extention" value=".exe">
-            <isset property="if.win" />
-        </condition>
-        <property name="extention" value="" />
-
         <!-- Compiling cunit tests -->
-        <property name="filename" value="--" />
-
-        <echo message="cunit: Compiling tests..." />
-        <for list="${unit.test.c.files}" param="file" delimiter=",">
+        <for list="${cunit.test.list}" param="file" delimiter=",">
             <sequential>
 
                 <var name="filename" unset="true" />
                 <basename property="filename" file="@{file}" />
 
-                <echo message="cunit: Compile test: ${filename}" />
+                <echo message="Link test: ${filename}" />
                 
-                <cc outfile="${unit.test.c.workdir}/_bin/${filename}${extention}"
+                <cc outfile="${cunit.bin.dir}/${filename}"
                     runtime="dynamic" multithreaded="true" subsystem="console">
                     
                     <compiler refid="cunit.test.compiler" />
                     
                     <linker name="${build.cxx}">
-                        <fileset dir="${unit.test.c.workdir}/_obj">
+                        <fileset dir="${cunit.obj.dir}">
                             <include name="thread_unit_test_main.o*" />
                             <include name="thread_unit_test_utils.o*" />
                             <include name="testframe.o*" />
@@ -175,129 +178,103 @@
 
                         <select os="win">
                             <libset type="shared" libs="harmonyvm"
-                                dir="${build.semi.dir}/vm/vmcore/_bin" />
+                                dir="${hdk.lib.dir}" />
                             <libset type="shared" libs="hythr"
-                                dir="${build.semi.dir}/vm/hythr/_bin" />
-                            <linkerarg value="/libpath:${build.deploy.dir}/jdk/jre/bin/default" />
+                                dir="${hdk.lib.dir}" />
+                            <linkerarg value="/libpath:${test.vmdir}" />
                             <linkerarg value="/NODEFAULTLIB:libcmtd" />
                         </select>
                         
                         <select os="lnx">
                             <libset type="shared" libs="harmonyvm"
-                                dir="${build.deploy.dir}/jdk/jre/bin/default" />
+                                dir="${test.vmdir}" />
                             <linkerarg value="-rpath" />
-                            <linkerarg value="${build.deploy.dir}/jdk/jre/bin" />
+                            <linkerarg value="${test.jre.home}/bin" />
                             <linkerarg value="-rpath" />
-                            <linkerarg value="${build.deploy.dir}/jdk/jre/bin/default" />
+                            <linkerarg value="${test.vmdir}" />
                         </select>
                     </linker>
                 </cc>
             </sequential>
         </for>
-                    
-        <!-- Executing cunit tests... -->
-        <property name="outputproperty" value="--" />
-        <property name="resultproperty" value="--" />
-        <delete file="${build.semi.dir}/cunit.test.failed" failonerror="false" />
-
-        <echo message="cunit: Compiling tests..." />
-        <for list="${unit.test.c.files}" param="file" delimiter=",">
+    </target>            
+    
+    <target name="cunit-run"> 
+        <delete dir="${cunit.test.dir}/reports" quiet="true"/>
+        <mkdir dir="${cunit.test.dir}/reports" />
+        <delete file="${cunit.test.summary}" failonerror="false" />
+        
+        <echo message="Running tests..." />
+        <for list="${cunit.test.list}" param="file" delimiter=",">
             <sequential>
                 
                 <var name="filename" unset="true" />
                 <basename property="filename" file="@{file}" />
                 
                 <!-- Executing unit test... -->
-                <echo message="cunit: Executing test: ${filename} ..." />
+                <echo message="Running: ${filename}" />
                 <var name="outputproperty" unset="true" />
                 <var name="resultproperty" unset="true" />
-                <exec dir="${unit.test.c.workdir}/_bin"
-                    executable="${unit.test.c.workdir}/_bin/${filename}${extention}"
+                <exec dir="${cunit.bin.dir}"
+                    executable="${cunit.bin.dir}/${filename}${exe.suffix}"
                     resultproperty="resultproperty"
-                    outputproperty="outputproperty">
+                    outputproperty="outputproperty" 
+                    timeout="${test.timeout}">
                     
-                    <arg value="-Dorg.apache.harmony.vm.vmdir=${build.deploy.dir}/jdk/jre/bin/default"/>
-                    <arg value="-Djava.home=${build.deploy.dir}/jdk/jre ${test.vmargs}"/>
+                    <arg value="-Dorg.apache.harmony.vm.vmdir=${test.vmdir}"/>
+                    <arg value="-Djava.home=${test.jre.home}"/>
                     <arg value="-XX:vm.jvmti.enabled=true"/>
+                    <arg value="${test.vmargs}"/>
                     <select arch="ipf">
                         <arg value="-Xint"/>
                     </select>
                     
-                    <env key="JAVA_HOME" value="${build.deploy.dir}/jdk/jre" />
+                    <env key="JAVA_HOME" value="${test.jre.home}" />
                     
                     <select os="win">
-                        <env key="Path" path="${build.deploy.dir}/jdk/jre/bin/:${build.deploy.dir}/jdk/jre/bin/default:${env.Path}" />
+                        <env key="Path" path="${test.jre.home}/bin/;${test.vmdir};${env.Path}" />
                     </select>
                     <select os="lnx">
-                        <env key="LD_LIBRARY_PATH" path="${build.deploy.dir}/jdk/jre/bin/:${build.deploy.dir}/jdk/jre/bin/default" />
+                        <env key="LD_LIBRARY_PATH" path="${test.jre.home}/bin/:${test.vmdir}" />
                     </select>
                 </exec>
 
-                <!-- Echo test output... -->
-                <echo file="${unit.test.c.workdir}/report/${filename}.out" message="${outputproperty}" />
-                <!-- echo message="${outputproperty}" / -->
+                <echo file="${cunit.test.dir}/reports/${filename}.out" message="${outputproperty}" />
 
                 <!-- Checking test result... -->
+                <condition property="@{file}.status" value="true" else="false">
+                    <equals arg1="${resultproperty}" arg2="0" />
+                </condition>
+
+                <to-junit-xml xml="${cunit.test.dir}/reports/TEST-${filename}.xml" 
+                    suite="${filename}"
+                    status="${@file}.status}"
+                    out="${outputproperty}"/>
+                
                 <if>
-                    <not>
-                        <equals arg1="${resultproperty}" arg2="0" />
-                    </not>
+                    <istrue value="${@{file}.status}"/>
                     <then>
-                        
-                        <!-- Test failed... -->
-                        <property name="test.failed" value="true" />
-                        <echo message="cunit: TEST FAILED" />
-                        <echo file="${build.semi.dir}/cunit.test.failed" message="${filename} FAILED${line.separator}" append="true"/>
-
-                        <echo file="${unit.test.c.workdir}/report/TEST-${filename}.xml"><![CDATA[<?xml version="1.0" encoding="UTF-8" ?>
-                            <testsuite errors="0" failures="1" name="@@@@@" tests="1" time="0.01">
-                                <testcase classname="@@@@@" name="test" time="0.1"><error message="FAILED"/></testcase>
-                                <system-out><![CDATA[@out]!]></system-out>
-                            </testsuite>]]>
-                        </echo>
-
+                        <echo message=" PASSED : ${filename}" />
                     </then>
                     <else>
-                        
-                        <!-- Test passed... -->
-                        <echo message="cunit: TEST PASSED" />
-                        <echo file="${unit.test.c.workdir}/report/TEST-${filename}.xml"><![CDATA[<?xml version="1.0" encoding="UTF-8" ?>
-                            <testsuite errors="0" failures="0" name="@@@@@" tests="1" time="0.01">
-                                <testcase classname="@@@@@" name="test" time="0.1"></testcase>
-                                <system-out><![CDATA[@out]!]></system-out>
-                            </testsuite>]]>
-                        </echo>
-                        
+                        <echo message="*** FAILED **** : ${filename}" />
+                        <echo message="*** FAILED **** : ${filename} (${resultproperty} res code)${line.separator}" file="${cunit.test.summary}" append="true"/>
                     </else>
                 </if>
 
-                <!-- Setting file output to xml... -->
-                <replace file="${unit.test.c.workdir}/report/TEST-${filename}.xml" token="@@@@@" value="${filename}" />
-                <if>
-                    <isset property="outputproperty" />
-                    <then>
-                        <replace file="${unit.test.c.workdir}/report/TEST-${filename}.xml" token="@out]!" value="${outputproperty}]" />
-                    </then>
-                    <else>
-                        <replace file="${unit.test.c.workdir}/report/TEST-${filename}.xml" token="@out]!" value="]" />
-                    </else>
-                </if>
+                <!-- Overall status property -->
+                <condition property="test.failed">
+                    <isfalse value="${@{file}.status}"/>
+                </condition>
+
             </sequential>
         </for>
-
-        <!-- Creating execution report... -->
-        <property name="cunit.tests.report.dir" location="${unit.test.c.workdir}/report/html"/>
-        <delete dir="${cunit.tests.report.dir}" />
-        <mkdir dir="${cunit.tests.report.dir}" />
-        <junitreport todir="${cunit.tests.report.dir}">
-            <fileset dir="${unit.test.c.workdir}/report">
-                <include name="*.xml"/>
-            </fileset>
-            <report format="frames" todir="${cunit.tests.report.dir}"/>
-        </junitreport>
-
-        <echo message="## Please find tests and results at ${build.dir}/_cunit.tests/" />
-        <fail unless="run.all.tests" if="test.failed" message="cunit: SOME TESTS FAILED"/>
     </target>
+    
+    <target name="cunit-report"> 
+        <gen-test-report dir="${cunit.test.dir}/reports"/>
+        <echo message="Please find tests and results at ${cunit.test.dir}" />
+        <fail unless="run.all.tests" if="test.failed" message="Some cunit tests failed"/>
+    </target>
+    
 </project>
-

@@ -15,60 +15,40 @@
     limitations under the License.
 -->
 <project name="JVMTI TESTS">
+    
+    <import file="test.common.xml"/>
+    
     <property name="jvmti.test.src" location="${build.VM.home}/tests/jvmti" />
-    <property name="jvmti.test.dir" location="${build.semi.dir}/jvmti.tests"/>
+    <property name="jvmti.test.dir" location="${base.test.dir}/jvmti.tests"/>
+    <property name="jvmti.test.summary" location="${base.test.dir}/jvmti.test.failed"/>
     <property name="jvmti.test.class.path" location="${jvmti.test.dir}/classes"/>
     <property name="jvmti.test.native.path" location="${jvmti.test.dir}/native"/>
 
-    <property file="test.properties"/>
-
-    <patternset id="jvmti.test.src.pattern">
+    <dirset id="jvmti.test.src.dirs.set" dir="${jvmti.test.src}">
         <include name="*" />
-        <!-- This test fails -->
-        <!--exclude name="FailingTest" /-->
-    </patternset>
+    </dirset>
 
-    <property name="jvmti.test.timeout" value="180000" />
+    <condition property="jvmti.test.src.dirs.list" value="${test.case}">
+        <isset property="test.case"/>
+    </condition>
+    <pathconvert pathsep=","
+                 property="jvmti.test.src.dirs.list" 
+                 refid="jvmti.test.src.dirs.set">
+        <flattenmapper/>
+    </pathconvert>
 
-    <target name="compile-jvmti-tests-prepare" depends="">
-        <dirset id="jvmti.test.src.dirs.set"
-                dir="${jvmti.test.src}">
-            <patternset refid="jvmti.test.src.pattern" />
-        </dirset>
-
-        <pathconvert pathsep=","
-                     property="jvmti.test.src.dirs.list"
-                     refid="jvmti.test.src.dirs.set" />
+    <target name="compile-jvmti-tests-java">
+        <compile-java dest="${jvmti.test.class.path}" src="${jvmti.test.src}"/>
     </target>
 
-    <target name="compile-jvmti-tests-java"
-            depends="compile-jvmti-tests-prepare, init_component">
-        <mkdir dir="${jvmti.test.class.path}" />
-        <for list="${jvmti.test.src.dirs.list}" param="directory"
-             delimiter=",">
-            <sequential>
-                <var name="testdir" unset="true" />
-                <basename property="testdir" file="@{directory}" />
-                <javac destdir="${jvmti.test.class.path}"
-                       source="1.5" target="1.5" listfiles="true"
-                       debug="true">
-                    <src path="${jvmti.test.src}" />
-                    <include name="${testdir}/**/*.java" />
-                </javac>
-            </sequential>
-        </for>
-    </target>
-
-    <target name="compile-jvmti-tests-native"
-        depends="compile-jvmti-tests-prepare, init_component">
+    <target name="compile-jvmti-tests-native" depends="init_component">
         <mkdir dir="${jvmti.test.native.path}" />
 
         <for list="${jvmti.test.src.dirs.list}" param="directory"
              delimiter=",">
             <sequential>
-                <var name="outputdir" unset="true" />
-                <basename property="outputdir" file="@{directory}" />
-                <echo message="## Compiling JVMTI natives in: @{directory}" />
+                <var name="outputdir" value="@{directory}" />
+                <echo message="## Compiling JVMTI natives : @{directory}" />
                 <mkdir dir="${jvmti.test.native.path}/${outputdir}" />
                 <cc name="${build.cxx}"
                     debug="true"
@@ -76,14 +56,14 @@
                     multithreaded="true"
                     link="shared"
                     outfile="${jvmti.test.native.path}/${outputdir}/${outputdir}">
-                    <includepath path="${build.deploy.dir}/jdk/include" />
+                    <includepath path="${test.jdk.home}/include" />
                     <select os="lnx">
                         <linkerarg value="-lstdc++" />
                     </select>
                     <select os="win">
                         <compilerarg value="/EHsc" />
                     </select>
-                    <fileset dir="@{directory}">
+                    <fileset dir="${jvmti.test.src}/${outputdir}">
                         <include name="**/*.cpp" />
                     </fileset>
                 </cc>
@@ -95,96 +75,47 @@
                     </and>
                 </condition>
 
-                <antcall target="jvmti.embed.manifest" />
+                <runtarget target="jvmti.embed.manifest" />
             </sequential>
         </for>
     </target>
 
     <target name="jvmti.embed.manifest" if="add.manifest">
-        <echo message="Adding manifest to ${jvmti.test.native.path}/${outputdir}/${outputdir}${shlib.suffix}" />
-        <exec executable="mt.exe">
-            <arg value="-nologo" />
-            <arg value="-manifest" />
-            <arg value="${jvmti.test.native.path}/${outputdir}/${outputdir}${shlib.suffix}${manifest.suffix}" />
-            <arg value="-outputresource:${jvmti.test.native.path}/${outputdir}/${outputdir}${shlib.suffix};#2" />
-        </exec>
+        <embed-manifest lib="${jvmti.test.native.path}/${outputdir}/${outputdir}${shlib.suffix}" />
     </target>
 
     <target name="pre-jvmti-test" depends="compile-jvmti-tests-java,
                                            compile-jvmti-tests-native">
-        <condition property="junit.jar" value="${junit.home}/junit.jar">
-            <isset property="junit.home" />
-        </condition>
-        <property name="junit.jar"
-                  location="${external.dep.CLASSLIB}/depends/jars/junit_3.8.2/junit.jar" />
-        <if>
-            <not>
-                <available file="${junit.jar}"/>
-            </not>
-            <then>
-                <echo>
-                ==============================================
-                Please set the classpath of junit as follows:
-                build.bat -Djunit.jar=%JUNIT_HOME% test
-                ==============================================
-                </echo>
-                <fail message="JVMTI tests misconfigured" />
-            </then>
-        </if>
-
-        <delete quiet="true" dir="${jvmti.test.dir}/reports" />
-        <mkdir dir="${jvmti.test.dir}/reports" />
+        <prepare-test-run test-dir="${jvmti.test.dir}"/>
+        <delete file="${jvmti.test.summary}" quiet="true"/>
     </target>
 
     <target name="run-jvmti-tests">
         <propertycopy property="mode.name" from="${jvmti.tests.mode}.name" override="on"/>       
         <propertycopy property="mode.switch" from="${jvmti.tests.mode}.switch" override="on"/>
+        <property name="report.dir" 
+            location="${jvmti.test.dir}/reports/${jvmti.tests.mode}"/>
+        <mkdir dir="${report.dir}" />
+
         <echo>
         ==================================
         Run JVMTI tests using ${mode.name}
         ==================================
         </echo>
-        <property name="exclude.file" location="./excludes/exclude.drlvm_jvmti.${hy.platform}.${jvmti.tests.mode}" />
-        <if>
-            <available file="${exclude.file}" />
-            <then>                  
-                  <property name="jvmti.exclude.file.${jvmti.tests.mode}.present" value="true" />
-                  <loadfile property="foo" srcFile="${exclude.file}"/>
-                  <echo>
-Using exclude file = ${exclude.file}   
+
+        <take-xlist name="exclude.file" file="./excludes/exclude.drlvm_jvmti.${hy.platform}.${jvmti.tests.mode}"/>
         
-${foo}
-                  </echo>
-            </then>
-        </if>
-
-        <property name="report.dir" 
-            location="${jvmti.test.dir}/reports/${jvmti.tests.mode}"/>
-        <mkdir dir="${report.dir}" />
-
-        <for list="${jvmti.test.src.dirs.list}" param="directory"
-             delimiter=",">
-
+        <for list="${jvmti.test.src.dirs.list}" param="directory">
             <sequential>
-                <var name="testname" unset="true" />
-                <basename property="testname" file="@{directory}" />
+                <var name="testname" value="@{directory}"/>
                 <echo message="Running ${testname}" />
                 <junit fork="yes"
                        forkmode="perTest"
                        failureproperty="${testname}.failed"
+                       haltonfailure="${test.failfast}"
                        timeout="${test.timeout}"
-                       jvm="${build.deploy.dir}/jdk/jre/bin/java">
-                    <jvmarg value="-XX:-vm.assert_dialog" />
-                    <select os="win">
-                        <jvmarg
-                        value="-agentpath:${jvmti.test.native.path}/${testname}/${testname}.dll"
-                        />
-                    </select>
-                    <select os="lnx">
-                        <jvmarg
-                        value="-agentpath:${jvmti.test.native.path}/${testname}/lib${testname}.so"
-                        />
-                    </select>
+                       jvm="${test.jvm.exe}">
+                    <jvmarg value="-agentpath:${jvmti.test.native.path}/${testname}/${shlib.prefix}${testname}${shlib.suffix}"/>
                     <jvmarg line="${mode.switch} ${test.vmargs}" />
                     <formatter type="brief"/>
                     <formatter type="xml" />
@@ -192,14 +123,14 @@ ${foo}
                     <batchtest todir="${report.dir}">
                         <fileset dir="${jvmti.test.src}" >
                             <include name="**/${testname}.java"/>
-                            <excludesfile name="${exclude.file}" if="jvmti.exclude.file.${jvmti.tests.mode}.present"/>
+                            <excludesfile name="${exclude.file}" if="exclude.file"/>
                         </fileset>
                     </batchtest>
                 </junit>
                 <if>
                     <isset property="${testname}.failed" />
                     <then>
-                        <echo file="${build.semi.dir}/jvmti.test.failed" message="${testname} failed on ${mode.name}${line.separator}" append="true"/>
+                        <echo file="${jvmti.test.summary}" message="${testname} failed on ${mode.name}${line.separator}" append="true"/>
                     </then>
                 </if>
 
@@ -208,7 +139,6 @@ ${foo}
     </target>
   
     <target name="jvmti.test" depends="pre-jvmti-test">
-        <delete file="${build.semi.dir}/jvmti.test.failed" failonerror="false" />
         <for list="${test.mode}" param="mode" trim="true">
             <sequential>
                 <if>
@@ -225,7 +155,7 @@ ${foo}
             </sequential>
         </for>
 
-        <available property="test.failed" file="${build.semi.dir}/jvmti.test.failed" />
-        <fail unless="run.all.tests" if="test.failed" message="Some tests failed"/>
+        <available property="test.failed" file="${jvmti.test.summary}" />
+        <fail unless="run.all.tests" if="test.failed" message="Some jvmti tests failed"/>
     </target>
 </project>
