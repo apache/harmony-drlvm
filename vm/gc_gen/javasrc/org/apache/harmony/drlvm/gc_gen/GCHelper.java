@@ -76,7 +76,7 @@ public class GCHelper {
        be a constant in future.
     */
 
-    public static Address NOS_BOUNDARY = getNosBoundary();
+    public static Address NOS_BOUNDARY = Address.fromLong(getNosBoundary());
     public static boolean GEN_MODE = getGenMode();
 
     @Inline
@@ -93,7 +93,7 @@ public class GCHelper {
 
     private static native int helperCallback();
     private static native boolean getGenMode(); 
-    private static native Address getNosBoundary();    
+    private static native long getNosBoundary();    
     private static native int TLSGCOffset();
 }
 

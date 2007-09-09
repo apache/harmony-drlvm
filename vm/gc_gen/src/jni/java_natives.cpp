@@ -37,9 +37,9 @@ JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_TLSGCOffse
     return (jint)tls_gc_offset;
 }
 
-JNIEXPORT jobject JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getNosBoundary(JNIEnv *e, jclass c)
+JNIEXPORT jlong JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getNosBoundary(JNIEnv *e, jclass c)
 {
-    return (jobject)nos_boundary;
+    return (jlong)nos_boundary;
 }
 
 JNIEXPORT jboolean JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getGenMode(JNIEnv *e, jclass c)
