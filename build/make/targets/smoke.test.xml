@@ -90,7 +90,7 @@
                     </and>
                 </condition>
 
-                <runtarget target="smoke.embed.manifest" />
+                <antcall target="smoke.embed.manifest" />
             </sequential>
         </for>
     </target>

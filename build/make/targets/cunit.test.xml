@@ -248,7 +248,7 @@
 
                 <to-junit-xml xml="${cunit.test.dir}/reports/TEST-${filename}.xml" 
                     suite="${filename}"
-                    status="${@file}.status}"
+                    status="${@{file}.status}"
                     out="${outputproperty}"/>
                 
                 <if>

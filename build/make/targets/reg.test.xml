@@ -157,7 +157,7 @@
                     </and>
                 </condition>
 
-                <runtarget target="reg.embed.manifest" />
+                <antcall target="reg.embed.manifest" />
             </sequential>
         </for>
     </target>

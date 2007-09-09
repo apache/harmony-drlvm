@@ -75,7 +75,7 @@
                     </and>
                 </condition>
 
-                <runtarget target="jvmti.embed.manifest" />
+                <antcall target="jvmti.embed.manifest" />
             </sequential>
         </for>
     </target>
