@@ -114,7 +114,7 @@ EscAnalyzer::EscAnalyzer(MemoryManager& mm, SessionAction* argSource, IRManager&
     translatorAction = (TranslatorAction*)PMF::getAction(argSource->getPipeline(), translatorName);
     assert(translatorAction);
 
-    shortLog = Log::isEnabled();
+    shortLog = argSource->log(LogStream::CT).isEnabled();
     verboseLog = shortLog && argSource->isLogEnabled("escape_verbose");
 
     init();
@@ -1034,7 +1034,7 @@ EscAnalyzer::addCnGNode(Inst* inst, Type* type, uint32 ntype) {
         NamedType* nt = (NamedType*)(inst->getDst())->getType();
         if (nt->isUnresolvedType() || nt->isFinalizable()) {  
             // finalized objects cannot be removed
-            // unresolved objects too (not tested)
+            // unresolved objects too
             setOutEscaped(cgnode);
         }
     }
@@ -1381,8 +1381,7 @@ EscAnalyzer::setCreatedObjectStates() {
     for (it = cngNodes->begin( ); it != cngNodes->end( ); it++ ) {
         uint32 nt = (*it)->nodeType;
         if ((nt&(NT_OBJECT|NT_RETVAL) || nt==NT_LDOBJ) && (getEscState(*it)==ARG_ESCAPE)) {
-            for (it1 = (*it)->nodeMDs->begin(); it1 != (*it)->nodeMDs->end(); 
-                    it1++) {
+            for (it1 = (*it)->nodeMDs->begin(); it1 != (*it)->nodeMDs->end();  it1++) {
                 CnGNode* n=findCnGNode_id(*it1);   // method argument node
                 assert(n!=NULL);
                 MethodPtrType* mpt = (MethodPtrType*)n->refObj;
@@ -1519,8 +1518,7 @@ EscAnalyzer::setCreatedObjectStates() {
             CalleeMethodInfo* mthInfo = findMethodInfo(mdesc,(*it)->nInst);
             if (mthInfo == NULL) {
                 if (verboseLog) {
-                    Log::out() <<"--setCOS 4:  nodeId "
-                        <<(*it)->cngNodeId<<"  opId "<<(*it)->opndId <<" state ";
+                    Log::out() <<"--setCOS 4:  nodeId " <<(*it)->cngNodeId<<"  opId "<<(*it)->opndId <<" state ";
                     printState(*it); Log::out() <<" to gl.esc."<< std::endl;
                 }
                 initNodeType = NT_STFLD;
@@ -1528,8 +1526,7 @@ EscAnalyzer::setCreatedObjectStates() {
             } else {
                 if (getEscState(*it)>((mthInfo->retValueState)&ESC_MASK) || getOutEscaped(*it)==0) {
                     if (verboseLog) {
-                        Log::out() <<"--setCOS 5:  nodeId "
-                            <<(*it)->cngNodeId<<"  opId "<<(*it)->opndId <<" state ";
+                        Log::out() <<"--setCOS 5:  nodeId " <<(*it)->cngNodeId<<"  opId "<<(*it)->opndId <<" state ";
                         printState(*it);
                         Log::out() <<" to "<< mthInfo->retValueState<< std::endl;
                     }
@@ -2190,7 +2187,6 @@ EscAnalyzer::eaFixupVars(IRManager& irm) {
 void
 EscAnalyzer::printCnGNodes(char* text,::std::ostream& os) {
     CnGNodes::const_iterator it;
-    FieldDesc* fd;
     std::string t1;
     std::string t2;
     os << "    "<< text << std::endl;
@@ -2222,9 +2218,8 @@ EscAnalyzer::printCnGNodes(char* text,::std::ostream& os) {
             os << std::endl;
         }
         if ((*it)->nodeType & NT_STFLD) {    //field node 
-            fd = ((Inst*)(*it)->refObj)->asFieldAccessInst()->getFieldDesc();
-            os << fd->getParentType()->getName() << "::"<< fd->getName() << std::endl;
-            os << "                                "<<fd->getFieldType()->getName();
+            Inst* inst = (Inst*)(*it)->refObj;
+            inst->print(Log::out());
         }
         os << std::endl;
     }
@@ -3715,8 +3710,9 @@ EscAnalyzer::scanLocalObjects() {
     CnGNode* stnode = NULL;
 
     for (it = cngNodes->begin( ); it != cngNodes->end( ); it++ ) {
-        if ((*it)->nodeType == NT_OBJECT && getEscState(*it)==NO_ESCAPE 
-            && getOutEscaped(*it) == 0 && !((*it)->nInst->getOpcode()==Op_LdRef)) {
+        CnGNode* cgNode = *it;
+        if (cgNode->nodeType == NT_OBJECT && getEscState(cgNode)==NO_ESCAPE 
+            && getOutEscaped(cgNode) == 0 && !(cgNode->nInst->getOpcode()==Op_LdRef)) {
             if (prTitle) {
                 if (verboseLog) {
                     os_sc << "================ Local Object States   < "; 
@@ -3726,7 +3722,7 @@ EscAnalyzer::scanLocalObjects() {
                 prTitle = false;
             }
             lo_count++;  // number of local objects
-            stnode = checkCnGtoScalarize(*it,true);
+            stnode = checkCnGtoScalarize(cgNode,true);
             if (stnode != NULL) {
                 if (stnode->nodeType == NT_OBJECT) {
                     if (lnoids == NULL) {
@@ -4843,12 +4839,16 @@ EscAnalyzer::checkCnGtoScalarize(CnGNode* scnode, bool check_loc) {
     ob_ref_type = scnode->nodeRefType;   // object ref type
     if (!check_loc && (ob_ref_type != NR_REF))
         return NULL;   // vc arrays not scalarized
+    if (scnode->nodeType == NT_OBJECT && ((Opnd*)scnode->refObj)->getType()->isUnresolvedType()) {
+        //do not scalarize unresolved types -> resolution can have side effect
+        return NULL; 
+    }
     if (verboseLog) {
         os_sc << "=="; printCnGNode(scnode,os_sc);
         ((Opnd*)scnode->refObj)->printWithType(os_sc);
         NamedType* nt = (NamedType*)((Opnd*)scnode->refObj)->getType();
-        if (nt->isFinalizable()) {
-            os_sc << " - finalizable ";
+        if (nt->isUnresolvedType() || nt->isFinalizable()) {
+            os_sc << " - finalizable or unresolved";
         }
         os_sc << std::endl;
         os_sc << "  =="; ((Opnd*)scnode->refObj)->getInst()->print(os_sc); 

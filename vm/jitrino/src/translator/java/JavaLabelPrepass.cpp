@@ -406,6 +406,9 @@ public:
                 //but verifier is turned off for bootstrap classes
                 if (Log::isEnabled()) Log::out()<<"WARNING: resolving type from inside of compilation session!!"<<std::endl;
                 exceptionType = compilationInterface.resolveNamedType(enclosingMethod->getParentHandle(),exceptionTypeToken);
+                if (exceptionType->isUnresolvedType()) {
+                    return 0;
+                }
             }
         } else {
             //FIXME should use j.l.Throwable for correct type propagation ??

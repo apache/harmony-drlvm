@@ -835,9 +835,12 @@ static NamedType* getUnresolvedType(TypeManager& typeManager, Class_Handle enclC
 NamedType* CompilationInterface::resolveNamedType(Class_Handle enclClass, uint32 cpIndex) {
     //this method is allowed to use only for unresolved exception types
     Class_Handle ch = resolve_class(compileHandle,enclClass,cpIndex);
+    if (ch == NULL) {
+        return typeManager.getUnresolvedObjectType();
+    }
     assert(!class_is_primitive(ch));
     ObjectType* res = typeManager.getObjectType(ch);    
-    assert(res->isLikelyExceptionType());
+    assert(res->isLikelyExceptionType()); //double check that this method is used only to resolve exception types when verifier is off
     return res;
 }
 
