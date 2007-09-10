@@ -502,9 +502,7 @@
     <target name="clean" depends="detect.os.arch.cxx.cfg,
                                   init.unix,
                                   init.win">
-        <delete dir="../${build.os.short}_${build.arch}_${build.cxx}_${build.cfg}/harmony" failonerror="false" />
-        <delete dir="../${build.os.short}_${build.arch}_${build.cxx}_${build.cfg}/deploy" failonerror="false" />
-        <delete dir="../${build.os.short}_${build.arch}_${build.cxx}_${build.cfg}/semis" failonerror="false" />
+        <delete dir="../${build.os.short}_${build.arch}_${build.cxx}_${build.cfg}" failonerror="false" />
         <delete dir="${canonical.deploy.dir}" failonerror="false"/>
     </target>
 
