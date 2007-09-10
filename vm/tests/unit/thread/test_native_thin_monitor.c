@@ -16,8 +16,6 @@
  */
 
 #include <stdio.h>
-#include <apr_pools.h>
-#include <apr_atomic.h>
 #include "testframe.h"
 #include <open/hythread_ext.h>
 
@@ -117,15 +115,13 @@ int test_hythread_thin_monitor_fat_unlock(void){
 
 int start_proc(void *args);
 int test_hythread_thin_monitor_enter_contended(void){
-    apr_pool_t *pool;
     void **args; 
-    hythread_t thread;
+    hythread_t thread = NULL;
     hythread_thin_monitor_t lockword_ptr;
     IDATA status;
     int i;
-    apr_pool_create(&pool, NULL);
 
-    args = (void**) apr_palloc(pool, sizeof(void *) *3); 
+    args = (void**)calloc(3, sizeof(void *));
     
     status = hythread_thin_monitor_create(&lockword_ptr);
     tf_assert_same(status, TM_ERROR_NONE);
@@ -137,9 +133,7 @@ int test_hythread_thin_monitor_enter_contended(void){
 
     args[0] = &lockword_ptr;
     args[1] = 0;
-    thread = (hythread_t)calloc(1, hythread_get_struct_size());
-    assert(thread);
-    status = hythread_create_with_group(thread, NULL, 0, 0,
+    status = hythread_create(&thread, 0, 0, 0,
         (hythread_entrypoint_t)start_proc, args);
     tf_assert_same(status, TM_ERROR_NONE);
     for(i = 0; i < 100000; i++) {
@@ -157,7 +151,7 @@ int test_hythread_thin_monitor_enter_contended(void){
     tf_assert_same(status, TM_ERROR_NONE);
     args[1] = 0;
     hythread_suspend_enable();    
-    status = hythread_create_with_group(thread, NULL, 0, 0,
+    status = hythread_create_ex(thread, NULL, 0, 0,
         (hythread_entrypoint_t)start_proc, args);
     tf_assert_same(status, TM_ERROR_NONE);
     for(i = 0; i < 100000; i++) {

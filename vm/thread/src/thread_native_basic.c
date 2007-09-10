@@ -85,23 +85,27 @@ IDATA add_to_fast_thread_array(hythread_t thread,int id)
 	fast_thread_array[id]=thread;
 	return TM_ERROR_NONE;
 }*/
-static void thread_set_self(hythread_t thread);
+static void hythread_set_self(hythread_t thread);
 
 /**
- * Creates a new thread.
+ * Creates a new thread in a given group.
  *
- * @param[out] new_thread The newly created thread.
- * @param[in] group thread group, or NULL; in case of NULL this thread will go to the default group.
- * @param[in] attr threadattr to use to determine how to create the thread, or NULL for default attributes
- * @param[in] func function to run in the new thread
- * @param[in] data argument to be passed to starting function
+ * @param[in] new_thread a new allocated thread.
+ * @param[in] group      a thread group or NULL
+ *                       in case of NULL this thread will go to the default group.
+ * @param[in] stacksize  a new thread stack size or 0
+ *                       in case of 0 the thread will be set the default stack size
+ * @param[in] priority   a new thread priority or 0
+ *                       in case of 0 the thread will be set HYTHREAD_PRIORITY_NORMAL priority
+ * @param[in] func       a function to run in the new thread
+ * @param[in] data       an argument to be passed to starting function
  */
-IDATA VMCALL hythread_create_with_group(hythread_t new_thread,
-                                        hythread_group_t group,
-                                        UDATA stacksize,
-                                        UDATA priority,
-                                        hythread_entrypoint_t func,
-                                        void *data)
+IDATA VMCALL hythread_create_ex(hythread_t new_thread,
+                                hythread_group_t group,
+                                UDATA stacksize,
+                                UDATA priority,
+                                hythread_entrypoint_t func,
+                                void *data)
 {
     int result;
     hythread_t self;
@@ -166,30 +170,23 @@ IDATA VMCALL hythread_create(hythread_t *handle, UDATA stacksize, UDATA priority
     if (handle) {
         *handle = thread;
     }
-    return hythread_create_with_group(thread, NULL, stacksize, priority, func, data);
+    return hythread_create_ex(thread, NULL, stacksize, priority, func, data);
 }
 
 /**
  * Registers the current OS thread with the threading subsystem.
  *
- * @param[in] new_thread thread to register
- * @param[in] lib        thread library to attach to
- * @param[in] group      thread group, or NULL; in case of NULL this thread will
- *                       go to the default group
+ * @param[in] new_thread a new thread to register
+ * @param[in] lib        a new thread library or NULL
+ *                       in case of NULL this thread will go to the default group
+ * @param[in] group      a new thread group or NULL
+ *                       in case of NULL this thread will go to the default group
  */
-IDATA hythread_attach_to_group(hythread_t new_thread,
-                               hythread_library_t lib,
-                               hythread_group_t group)
+IDATA hythread_attach_ex(hythread_t new_thread,
+                         hythread_library_t lib,
+                         hythread_group_t group)
 {
-    hythread_t self;
-
     assert(new_thread);
-    self = hythread_self();
-    if (self) {
-        // The thread is already attached, just fill a given thread structure.
-        *new_thread = *self;
-        return TM_ERROR_NONE;
-    }
 
     hythread_struct_init(new_thread);
     assert(lib == NULL);
@@ -197,7 +194,7 @@ IDATA hythread_attach_to_group(hythread_t new_thread,
     new_thread->os_handle = os_thread_current();
     assert(new_thread->os_handle);
 
-    TRACE(("TM: native attached: native: %p ", self));
+    TRACE(("TM: native attached: native: %p ", new_thread));
 
     return register_to_group(new_thread,
         (group == NULL ? TM_DEFAULT_GROUP : group));
@@ -221,27 +218,26 @@ IDATA hythread_attach_to_group(hythread_t new_thread,
  * @see hythread_detach
  */
 IDATA VMCALL hythread_attach(hythread_t *handle) {
+    IDATA status;
+    hythread_t self;
+
     hythread_t thread = (hythread_t)calloc(1, hythread_get_struct_size());
     assert(thread);
     if (handle) {
         *handle = thread;
     }
-    return hythread_attach_to_group(thread, NULL, NULL);
-}
 
-/**
- * Attach an OS thread to the threading library.
- *
- * @param[out] handle pointer to a hythread_t to be set (will be ignored if null)
- * @param[in] lib thread library to attach thread to
- * @return  0 on success or negative value on failure
- *
- * @note (*handle) should be NULL or point to hythread_t structure  
- * @see hythread_detach
- */
-IDATA VMCALL hythread_attach_ex(hythread_t *handle, hythread_library_t lib) {
-    assert(handle);
-    return hythread_attach_to_group(*handle, NULL, NULL);
+    // get current thread
+    self = hythread_self();
+
+    // attach thread
+    status = hythread_attach_ex(thread, NULL, NULL);
+
+    // restore current thread
+    if (self) {
+        hythread_set_self(self);
+    }
+    return status;
 }
 
 /**
@@ -275,7 +271,7 @@ void VMCALL hythread_detach(hythread_t thread) {
         // of forceful termination by hythread_cancel(), but thread
         // local storage can be zeroed only for current thread.
         if (thread == hythread_self() ) {
-            thread_set_self(NULL);
+            hythread_set_self(NULL);
         }
         fast_thread_array[thread->thread_id] = NULL;
         
@@ -352,7 +348,7 @@ hythread_t hythread_self_slow() {
     return thread;
 }
 
-static void thread_set_self(hythread_t  thread) {
+static void hythread_set_self(hythread_t  thread) {
     apr_threadkey_private_set(thread, TM_THREAD_KEY);
 }
 #else 
@@ -362,7 +358,7 @@ hythread_t hythread_self_slow() {
     return hythread_self();
 }
 
-static void thread_set_self(hythread_t thread) {
+static void hythread_set_self(hythread_t thread) {
 #ifndef _WIN64
 #   if (_MSC_VER >= 1400)
         __writefsdword(offsetof(NT_TIB, ArbitraryUserPointer), thread);
@@ -383,7 +379,7 @@ hythread_t hythread_self_slow() {
     return hythread_self();
 }
 
-static void thread_set_self(hythread_t  thread) {
+static void hythread_set_self(hythread_t  thread) {
     tm_self_tls = thread;
 }
 #endif // defined(_WIN32) && defined(HYTHREAD_FAST_TLS)
@@ -537,7 +533,7 @@ static IDATA register_to_group(hythread_t thread, hythread_group_t group) {
 
     assert(thread->os_handle);
 
-    thread_set_self(thread);
+    hythread_set_self(thread);
     assert(thread == tm_self_tls);
 
     thread->state |= TM_THREAD_STATE_ALIVE | TM_THREAD_STATE_RUNNABLE;
@@ -607,7 +603,7 @@ IDATA VMCALL hythread_struct_init(hythread_t new_thread)
     new_thread->safepoint_callback = NULL;
 
     hymutex_lock(&new_thread->mutex);
-    new_thread->state = 0;
+    new_thread->state = TM_THREAD_STATE_NEW;
     hymutex_unlock(&new_thread->mutex);
 
     status = hylatch_set(new_thread->join_event, 1);

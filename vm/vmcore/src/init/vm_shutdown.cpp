@@ -115,7 +115,7 @@ static void vm_shutdown_stop_java_threads(Global_Env * vm_env) {
             hythread_iterator_size(it) * sizeof(hythread_t));
     int size = 0;
     while(native_thread = hythread_iterator_next(&it)) {
-        vm_thread = get_vm_thread(native_thread);
+        vm_thread = jthread_get_vm_thread(native_thread);
         if (native_thread != self && vm_thread != NULL) {
             hythread_set_safepoint_callback(native_thread,
                     vm_shutdown_callback);
@@ -138,7 +138,7 @@ static void vm_shutdown_stop_java_threads(Global_Env * vm_env) {
     // safe for killing, e.g. in malloc()
     it = hythread_iterator_create(NULL);
     while(native_thread = hythread_iterator_next(&it)) {
-        vm_thread = get_vm_thread(native_thread);
+        vm_thread = jthread_get_vm_thread(native_thread);
         // we should not cancel self and
         // non-java threads (i.e. vm_thread == NULL)
         if (native_thread != self && vm_thread != NULL) {
@@ -236,16 +236,19 @@ jint vm_destroy(JavaVM_Internal * java_vm, jthread java_thread)
 }
 
 static IDATA vm_interrupt_process(void * data) {
-    hythread_t * threadBuf;
+    vm_thread_t * threadBuf;
     int i;
 
-    threadBuf = (hythread_t *)data;
+    threadBuf = (vm_thread_t *)data;
     i = 0;
     // Join all threads.
     while (threadBuf[i] != NULL) {
-        hythread_join(threadBuf[i]);
+        hythread_join((hythread_t)threadBuf[i]);
+        STD_FREE(threadBuf[i]);
         i++;
     }
+
+    STD_FREE(threadBuf);
 
     // Return 130 to be compatible with RI.
     exit(130);
@@ -271,6 +274,26 @@ static IDATA vm_interrupt_entry_point(void * data) {
         DetachCurrentThread(java_vm);
     }
     return status;
+}
+
+/**
+ * Release allocated resourses.
+ */
+static IDATA vm_dump_process(void * data) {
+    vm_thread_t * threadBuf;
+    int i;
+
+    threadBuf = (vm_thread_t *)data;
+    i = 0;
+    // Join all threads and release allocated resources.
+    while (threadBuf[i] != NULL) {
+        hythread_join((hythread_t)threadBuf[i]);
+        STD_FREE(threadBuf[i]);
+        i++;
+    }
+    STD_FREE(threadBuf);
+
+    return TM_ERROR_NONE;
 }
 
 /**
@@ -303,7 +326,7 @@ static IDATA vm_dump_entry_point(void * data) {
  */
 void vm_interrupt_handler(int UNREF x) {
     JavaVM ** vmBuf;
-    hythread_t * threadBuf;
+    vm_thread_t * threadBuf;
     int nVMs;
     IDATA status;
 
@@ -318,23 +341,20 @@ void vm_interrupt_handler(int UNREF x) {
     if (status != JNI_OK)
         goto cleanup;
 
-    threadBuf = (hythread_t *) STD_MALLOC((nVMs + 1) * sizeof(hythread_t));
+    threadBuf = (vm_thread_t*) STD_MALLOC((nVMs + 1) * sizeof(vm_thread_t));
     assert(threadBuf);
 
     // Create a new thread for each VM to avoid scalability and deadlock problems.
     for (int i = 0; i < nVMs; i++) {
-        threadBuf[i] = (hythread_t)STD_CALLOC(1, hythread_get_struct_size());
-        assert(threadBuf[i]);
-        status = hythread_create_with_group(threadBuf[i], NULL, 0,
-            HYTHREAD_PRIORITY_NORMAL, vm_interrupt_entry_point, (void *)vmBuf[i]);
+        threadBuf[i] = jthread_allocate_thread();
+        status = hythread_create_ex((hythread_t)threadBuf[i], NULL, 0, 0,
+            vm_interrupt_entry_point, (void *)vmBuf[i]);
         assert(status == TM_ERROR_NONE);
     }
 
     // spawn a new thread which will terminate the process.
-    threadBuf[nVMs] = (hythread_t)STD_CALLOC(1, hythread_get_struct_size());
-    assert(threadBuf[nVMs]);
-    status = hythread_create_with_group(threadBuf[nVMs], NULL, 0,
-        HYTHREAD_PRIORITY_NORMAL, vm_interrupt_process, (void *)threadBuf);
+    status = hythread_create(NULL, 0, 0, 0,
+        vm_interrupt_process, (void *)threadBuf);
     assert(status == TM_ERROR_NONE);
 
     // set a NULL terminator
@@ -349,29 +369,37 @@ cleanup:
  * Prints java stack traces for each VM running in the current process.
  */
 void vm_dump_handler(int UNREF x) {
-    JavaVM ** vmBuf;
     int nVMs;
-    jint status;
+    vm_thread_t *threadBuf;
 
-    status = JNI_GetCreatedJavaVMs(NULL, 0, &nVMs);
+    jint status = JNI_GetCreatedJavaVMs(NULL, 0, &nVMs);
     assert(nVMs <= 1);
     if (status != JNI_OK)
         return;
 
-    vmBuf = (JavaVM **) STD_MALLOC(nVMs * sizeof(JavaVM *));
+    JavaVM ** vmBuf = (JavaVM **) STD_MALLOC(nVMs * sizeof(JavaVM *));
     status = JNI_GetCreatedJavaVMs(vmBuf, nVMs, &nVMs);
     assert(nVMs <= 1);
-    if (status != JNI_OK)
+    if (status != JNI_OK) {
         goto cleanup;
+    }
+
+    threadBuf =
+        (vm_thread_t*)STD_MALLOC((nVMs + 1) * sizeof(vm_thread_t));
+    assert(threadBuf);
 
     // Create a new thread for each VM to avoid scalability and deadlock problems.
     for (int i = 0; i < nVMs; i++) {
-        hythread_t thread = (hythread_t)STD_CALLOC(1, hythread_get_struct_size());
-        assert(thread);
-        IDATA hy_status = hythread_create_with_group(thread, NULL, 0,
-            HYTHREAD_PRIORITY_NORMAL, vm_dump_entry_point, (void *)vmBuf[i]);
+        threadBuf[i] = jthread_allocate_thread();
+        IDATA UNUSED hy_status = hythread_create_ex((hythread_t)threadBuf[i],
+            NULL, 0, 0, vm_dump_entry_point, (void *)vmBuf[i]);
         assert(hy_status == TM_ERROR_NONE);
     }
+
+    // spawn a new thread which will release resources.
+    status = hythread_create(NULL, 0, 0, 0,
+        vm_dump_process, (void *)threadBuf);
+    assert(status == TM_ERROR_NONE);
 
 cleanup:
     STD_FREE(vmBuf);

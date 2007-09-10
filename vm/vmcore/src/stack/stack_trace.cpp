@@ -247,11 +247,9 @@ void st_print_all(FILE* f) {
 
 void st_print(FILE* f, hythread_t thread)
 {
-    VM_thread * vm_thread;
-    
     assert(hythread_is_suspend_enabled());
 
-    vm_thread = get_vm_thread(thread);
+    vm_thread_t vm_thread = jthread_get_vm_thread(thread);
     
     if (vm_thread == NULL) {
         // Do not print native stack.

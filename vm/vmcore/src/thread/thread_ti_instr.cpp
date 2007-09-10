@@ -46,8 +46,7 @@ IDATA VMCALL jthread_get_all_threads(jthread ** threads, jint * count_ptr)
     IDATA java_thread_count = 0;
     for (IDATA i = 0; i < count; i++) {
         hythread_t native_thread = hythread_iterator_next(&iterator);
-        vm_thread_t vm_thread =
-            (vm_thread_t) hythread_tls_get(native_thread, TM_THREAD_VM_TLS_KEY);
+        vm_thread_t vm_thread = jthread_get_vm_thread(native_thread);
         if (vm_thread && vm_thread->java_thread) {
             java_thread_count++;
         }
@@ -63,8 +62,7 @@ IDATA VMCALL jthread_get_all_threads(jthread ** threads, jint * count_ptr)
     java_thread_count = 0;
     for (IDATA i = 0; i < count; i++) {
         hythread_t native_thread = hythread_iterator_next(&iterator);
-        vm_thread_t vm_thread =
-            (vm_thread_t) hythread_tls_get(native_thread, TM_THREAD_VM_TLS_KEY);
+        vm_thread_t vm_thread = jthread_get_vm_thread(native_thread);
         if (vm_thread && vm_thread->java_thread) {
             hythread_suspend_disable();
             ObjectHandle thr = oh_allocate_local_handle();
@@ -202,8 +200,7 @@ IDATA VMCALL jthread_get_thread_count(jint * count_ptr)
     IDATA java_thread_count = 0;
     for (IDATA i = 0; i < count; i++) {
         hythread_t native_thread = hythread_iterator_next(&iterator);
-        vm_thread_t vm_thread =
-            (vm_thread_t) hythread_tls_get(native_thread, TM_THREAD_VM_TLS_KEY);
+        vm_thread_t vm_thread = jthread_get_vm_thread(native_thread);
         if (vm_thread) {
             java_thread_count++;
         }
@@ -409,8 +406,7 @@ IDATA VMCALL jthread_get_lock_owner(jobject monitor, jthread * lock_owner)
     if (!native_thread) {
         *lock_owner = NULL;
     } else {
-        vm_thread_t vm_thread =
-            (vm_thread_t) hythread_tls_get(native_thread, TM_THREAD_VM_TLS_KEY);
+        vm_thread_t vm_thread = jthread_get_vm_thread(native_thread);
         assert(vm_thread);
         *lock_owner = vm_thread->java_thread;
     }

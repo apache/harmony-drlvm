@@ -19,7 +19,7 @@
 #include "testframe.h"
 #include "thread_unit_test_utils.h"
 
-#define TEST_TLS_KEY (TM_THREAD_VM_TLS_KEY + 1)
+#define TEST_TLS_KEY (TM_THREAD_QUANTITY_OF_PREDEFINED_TLS_KEYS + 1)
 
 /*
  * Test test_jthread_set_and_get_local_storage

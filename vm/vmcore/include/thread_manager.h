@@ -35,6 +35,7 @@ extern "C"
 struct jvmti_frame_pop_listener;
 struct JVMTISingleStepState;
 struct ClassLoader;
+struct Registers;
 
 /**
  * Java-specific context that is attached to tm_thread control structure by Java layer
@@ -109,7 +110,7 @@ struct JVMTIThread
 
     struct jvmti_frame_pop_listener *frame_pop_listener;
     struct JVMTISingleStepState *ss_state;
-    void *jvmti_saved_exception_registers;
+    struct Registers *jvmti_saved_exception_registers;
 };
 
 struct VM_thread
@@ -117,17 +118,25 @@ struct VM_thread
     /**
      * Native thread which is associated with VM_thread
      */
-    hythread_t p_HyThread;
+#ifdef __cplusplus
+private:
+#endif // __cplusplus
 
-    /**
-     * Java thread object to corresponding java.lang.Thread instance
-     */
-    jobject java_thread;
+    struct HyThread hy_thread;
+
+#ifdef __cplusplus
+public:
+#endif // __cplusplus
 
     /**
      * Thread reference object to corresponding java.lang.ThreadWeakRef instance
      */
     jobject weak_ref;
+
+    /**
+     * Java thread object to corresponding java.lang.Thread instance
+     */
+    jobject java_thread;
 
     /**
      * Exception that has to be thrown in stopped thread
@@ -172,7 +181,7 @@ struct VM_thread
     int finalize_thread_flags;
 
     // CPU registers.
-    void *regs;
+    struct Registers *regs;
 
     // This field is private the to M2nFrame module, init code should set it to NULL
     // Informational frame - created when native is called from Java,
@@ -258,6 +267,46 @@ struct jthread_thread_attr
      */
     const void *arg;
 };
+
+/**
+ * Gets VM_thread from native thread
+ */
+hy_inline vm_thread_t jthread_self_vm_thread()
+{
+    register hythread_t self = hythread_self();
+    return (self && self->java_status == TM_STATUS_INITIALIZED)
+            ? ((vm_thread_t)self) : NULL;
+} // jthread_self_vm_thread
+
+/**
+ * Gets VM_thread from a given native thread
+ */
+hy_inline vm_thread_t jthread_get_vm_thread(hythread_t native)
+{
+    return (native && native->java_status == TM_STATUS_INITIALIZED)
+            ? ((vm_thread_t)native) : NULL;
+} // jthread_get_vm_thread
+
+/**
+ * Gets unsafe VM_thread from native thread.
+ * VM_thread could be not initialized.
+ */
+hy_inline vm_thread_t jthread_self_vm_thread_unsafe()
+{
+    register hythread_t self = hythread_self();
+    return (self && self->java_status != TM_STATUS_WITHOUT_JAVA)
+            ? ((vm_thread_t)self) : NULL;
+} // jthread_self_vm_thread_unsafe
+
+/**
+ * Gets unsafe VM_thread from a given native thread.
+ * VM_thread could be not initialized.
+ */
+hy_inline vm_thread_t jthread_get_vm_thread_unsafe(hythread_t native)
+{
+    return (native && native->java_status != TM_STATUS_WITHOUT_JAVA)
+            ? ((vm_thread_t)native) : NULL;
+} // jthread_get_vm_thread_unsafe
 
 #ifdef __cplusplus
 }

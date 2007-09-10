@@ -372,10 +372,7 @@ jthread_monitor_timed_wait(jobject monitor, jlong millis, jint nanos)
 
 static void jthread_add_owned_monitor(jobject monitor)
 {
-    hythread_t native_thread = hythread_self();
-    assert(native_thread);
-    vm_thread_t vm_thread =
-        (vm_thread_t)hythread_tls_get(native_thread, TM_THREAD_VM_TLS_KEY);
+    vm_thread_t vm_thread = jthread_self_vm_thread();
     assert(vm_thread);
     jvmti_thread_t jvmti_thread = &vm_thread->jvmti_thread;
 
@@ -420,10 +417,7 @@ static void jthread_add_owned_monitor(jobject monitor)
 
 static void jthread_remove_owned_monitor(jobject monitor)
 {
-    hythread_t native_thread = hythread_self();
-    assert(native_thread);
-    vm_thread_t vm_thread =
-        (vm_thread_t)hythread_tls_get(native_thread, TM_THREAD_VM_TLS_KEY);
+    vm_thread_t vm_thread = jthread_self_vm_thread();
     assert(vm_thread);
     jvmti_thread_t jvmti_thread = &vm_thread->jvmti_thread;
 
@@ -452,10 +446,7 @@ static void jthread_remove_owned_monitor(jobject monitor)
 
 static void jthread_set_owned_monitor(jobject monitor)
 {
-    hythread_t native_thread = hythread_self();
-    assert(native_thread);
-    vm_thread_t vm_thread =
-        (vm_thread_t)hythread_tls_get(native_thread, TM_THREAD_VM_TLS_KEY);
+    vm_thread_t vm_thread = jthread_self_vm_thread();
     assert(vm_thread);
     jvmti_thread_t jvmti_thread = &vm_thread->jvmti_thread;
 
@@ -472,10 +463,7 @@ static void jthread_set_owned_monitor(jobject monitor)
 
 static void jthread_set_wait_monitor(jobject monitor)
 {
-    hythread_t native_thread = hythread_self();
-    assert(native_thread);
-    vm_thread_t vm_thread =
-        (vm_thread_t)hythread_tls_get(native_thread, TM_THREAD_VM_TLS_KEY);
+    vm_thread_t vm_thread = jthread_self_vm_thread();
     assert(vm_thread);
     jvmti_thread_t jvmti_thread = &vm_thread->jvmti_thread;
 

@@ -957,8 +957,7 @@ jvmtiError DebugUtilsTI::jvmti_single_step_start(void)
     // Set single step in all threads
     while ((ht = hythread_iterator_next(&threads_iterator)) != NULL)
     {
-        vm_thread_t vm_thread =
-            (vm_thread_t)hythread_tls_get(ht, TM_THREAD_VM_TLS_KEY);
+        vm_thread_t vm_thread = jthread_get_vm_thread(ht);
         if( !vm_thread ) {
             // Skip thread that isn't started yet.
             // SingleStep state will be enabled for it in

@@ -56,8 +56,8 @@ void VMCALL hythread_interrupt(hythread_t thread) {
             hythread_monitor_interrupt_wait(thread->waited_monitor, thread);
             hythread_monitor_exit(thread->waited_monitor);
         } else {
-            hythread_t interrupt_thread = (hythread_t)calloc(1, hythread_get_struct_size());
-            status = hythread_create_with_group(interrupt_thread, 0, 0, 0,
+            hythread_t interrupt_thread = NULL;
+            status = hythread_create(&interrupt_thread, 0, 0, 0,
                 interrupter_thread_function, (void *)thread);
             assert (status == TM_ERROR_NONE);
         }

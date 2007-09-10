@@ -98,60 +98,26 @@ void jthread_deallocate_vm_thread_pool(vm_thread_t vm_thread)
     // Destroy current VM_thread pool.
     apr_pool_destroy(vm_thread->pool);
 
-    // mark VM_thread structure
-    jobject weak_ref = vm_thread->weak_ref;
-    memset(vm_thread, 0, sizeof(VM_thread));
-    vm_thread->weak_ref = weak_ref;
+    // zero VM_thread structure
+    memset(&vm_thread->java_thread, 0,
+        sizeof(VM_thread) - offsetof(VM_thread, java_thread));
+
+    // change java_status
+    ((hythread_t)(vm_thread))->java_status = TM_STATUS_ALLOCATED;
 }
 
-vm_thread_t jthread_allocate_vm_thread(hythread_t native_thread)
+vm_thread_t jthread_get_vm_thread_ptr_safe(jobject thread_obj)
 {
-    assert(native_thread);
-    vm_thread_t vm_thread;
-
-    // check current VM thread
-#ifdef _DEBUG
-    vm_thread =
-        (vm_thread_t)hythread_tls_get(native_thread, TM_THREAD_VM_TLS_KEY);
-    assert(NULL == vm_thread);
-#endif // _DEBUG
-
-    // allocate VM thread
-    vm_thread = (vm_thread_t)STD_CALLOC(1, sizeof(VM_thread));
-    if (!vm_thread) {
-        return NULL;
-    }
-
-    // set VM thread to thread local storage
-    IDATA status =
-        hythread_tls_set(native_thread, TM_THREAD_VM_TLS_KEY, vm_thread);
-    if (status != TM_ERROR_NONE) {
-        return NULL;
-    }
-    return vm_thread;
+    hythread_t native = jthread_get_native_thread(thread_obj);
+    return jthread_get_vm_thread(native);
 }
 
-VM_thread *get_vm_thread_ptr_safe(JNIEnv * jenv, jobject jThreadObj)
+vm_thread_t jthread_get_vm_thread_ptr_stub()
 {
-    hythread_t t = jthread_get_native_thread(jThreadObj);
-    if (t == NULL) {
-        return NULL;
-    }
-    return (VM_thread *) hythread_tls_get(t, TM_THREAD_VM_TLS_KEY);
+    return jthread_self_vm_thread();
 }
 
-VM_thread *get_thread_ptr_stub()
-{
-    return get_vm_thread(hythread_self());
-}
-
-vm_thread_accessor *get_thread_ptr = get_thread_ptr_stub;
-
-void set_TLS_data(VM_thread * thread)
-{
-    hythread_tls_set(hythread_self(), TM_THREAD_VM_TLS_KEY, thread);
-    //printf ("sett ls call %p %p\n", get_thread_ptr(), get_vm_thread(hythread_self()));
-}
+vm_thread_accessor get_thread_ptr = jthread_get_vm_thread_ptr_stub;
 
 IDATA jthread_throw_exception(char *name, char *message)
 {
@@ -179,6 +145,66 @@ IDATA jthread_throw_exception_object(jobject object)
 
     return 0;
 }
+
+/**
+ * Allocates VM_thread structure
+ */
+vm_thread_t jthread_allocate_thread()
+{
+    vm_thread_t vm_thread =
+            (vm_thread_t)STD_CALLOC(1, sizeof(struct VM_thread));
+    assert(vm_thread);
+    ((hythread_t)vm_thread)->java_status = TM_STATUS_ALLOCATED;
+    return vm_thread;
+} // jthread_allocate_thread
+
+/**
+ * Sets resisters to JVMTI thread
+ */
+void vm_set_jvmti_saved_exception_registers(vm_thread_t vm_thread,
+                                            Registers & regs)
+{
+    assert(vm_thread);
+    jvmti_thread_t jvmti_thread = &vm_thread->jvmti_thread;
+    if (!jvmti_thread->jvmti_saved_exception_registers) {
+        jvmti_thread->jvmti_saved_exception_registers =
+            (Registers*)STD_MALLOC(sizeof(Registers));
+        assert(jvmti_thread->jvmti_saved_exception_registers);
+    }
+    *(jvmti_thread->jvmti_saved_exception_registers) = regs;
+} // vm_set_jvmti_saved_exception_registers
+
+/**
+ * Sets exception registers
+ */
+void vm_set_exception_registers(vm_thread_t vm_thread, Registers & regs)
+{
+    assert(vm_thread);
+    if (!vm_thread->regs) {
+        vm_thread->regs = (Registers*)malloc(sizeof(Registers));
+        assert(vm_thread->regs);
+    }
+    *(vm_thread->regs) = regs;
+} // vm_set_exception_registers
+
+/**
+ * Gets IP from exception registers
+ */
+void *vm_get_ip_from_regs(vm_thread_t vm_thread)
+{
+    assert(vm_thread);
+    assert(vm_thread->regs);
+    return vm_thread->regs->get_ip();
+} // vm_get_ip_from_regs
+
+/**
+ * Resets IP in exception registers
+ */
+void vm_reset_ip_from_regs(vm_thread_t vm_thread)
+{
+    assert(vm_thread);
+    vm_thread->regs->reset_ip();
+} // vm_reset_ip_from_regs
 
 /**
  * This file contains the functions which eventually should become part of vmcore.

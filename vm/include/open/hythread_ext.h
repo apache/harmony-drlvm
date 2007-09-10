@@ -153,6 +153,14 @@ extern "C" {
 #include "hycond_win.h"
 #endif // _WIN32
 
+#ifdef __linux__
+#define osthread_t pthread_t
+#elif _WIN32
+#define osthread_t HANDLE
+#else // !_WIN32 && !__linux__
+#error "threading is only supported on __linux__ or _WIN32"
+#endif // !_WIN32 && !__linux__
+
 #if !defined (_IPF_)
 //use lock reservation
 #define LOCK_RESERVATION
@@ -167,7 +175,189 @@ typedef U_32  hythread_thin_monitor_t;
 
 typedef void (*hythread_event_callback_proc)(void);
 
- 
+/**
+ * Native thread control structure.
+ */
+typedef struct HyThread {
+
+#ifndef POSIX
+    // This is dummy pointer for Microsoft Visual Studio debugging
+    // If this is removed, Visual Studio, when attached to VM, will show
+    // no symbolic information
+    void* reserved;
+#endif
+
+// Public fields exported by HyThread_public. If you change these fields,
+// please, check fields in hythread.h/HyThread_public
+
+    /**
+     * Number of requests made for this thread, it includes both
+     * suspend requests and safe point callback requests.
+     * The field is modified by atomic operations.
+     *
+     * Increment in functions:
+     *    1. send_suspend_request()
+     *          - sets suspend request for a given thread
+     *    2. hythread_set_safepoint_callback()
+     *          - sets safe point callback request for a given thread
+     *
+     * Decrement in functions:
+     *    1. hythread_resume()
+     *          - removes suspend request for a given thread
+     *    2. hythread_exception_safe_point()
+     *          - removes safe point callback request for current thread
+     */
+    uint32 request;
+
+    /**
+     * Field indicating that thread can safely be suspended.
+     * Safe suspension is enabled on value 0.
+     *
+     * The disable_count is increased/decreaded in
+     * hythread_suspend_disable()/hythread_suspend_enable() function
+     * for current thread only.
+     *
+     * Also disable_count could be reset to value 0 and restored in
+     * hythread_set_suspend_disable()/hythread_set_suspend_disable() function
+     * for current thread only.
+     *
+     * Function hythread_exception_safe_point() sets disable_count to
+     * value 1 before safe point callback function calling and restores
+     * it after the call.
+     *
+     * Function thread_safe_point_impl() sets disable_count to
+     * value 0 before entering to the safe point and restores it
+     * after exitting.
+     */
+    int16 disable_count;
+
+    /**
+     * Group for this thread. Different groups are needed in order
+     * to be able to quickly iterate over the specific group.
+     * Examples are: Java threads, GC private threads.
+     * Equal to the address of the head of the list of threads for this group.
+     */
+    hythread_group_t  group;
+
+    /**
+     * Array representing thread local storage
+     */
+    void *thread_local_storage[10];
+
+
+// Private fields
+
+    /**
+     * Each thread keeps a pointer to the library it belongs to.
+     */
+    hythread_library_t library;
+
+// Suspension
+
+    /**
+     * Number of suspend requests made for this thread.
+     * The field is modified by atomic operations.
+     *
+     * After increment/decrement of suspend_count, request field
+     * should be incremented/decremented too.
+     */
+    uint32 suspend_count;
+
+    /**
+     * Function to be executed at safepoint upon thread resume.
+     *
+     * Field is set in hythread_set_safepoint_callback() function
+     * and reset hythread_exception_safe_point() function.
+     *
+     * After set/reset of safepoint_callback, request field
+     * should be incremented/decremented too.
+     */
+    hythread_event_callback_proc safepoint_callback;
+
+    /**
+     * Event used to notify suspended thread that it needs to wake up.
+     */
+    hysem_t resume_event;
+
+// Basic manipulation fields
+
+    /**
+     * Points to the next thread within the group.
+     */
+    hythread_t next;
+
+    /**
+     * Points to the last thread within the group.
+     */
+    hythread_t prev;
+
+    /**
+     * Handle to OS thread.
+     */
+    osthread_t os_handle;
+
+// Synchronization stuff
+
+    /**
+     * Thread local lock, used to serialize thread state;
+     */
+    hymutex_t mutex;
+
+    /**
+     * Conditional variable used to implement wait function for sleep/park;
+     */
+    hycond_t condition;
+
+    /**
+     * Event reserved for threads that invoke join.
+     */
+    hylatch_t join_event;
+
+    /**
+     * Current conditional variable thread is waiting on (used for interrupting)
+     */
+    hycond_t *current_condition;
+
+// State
+
+    /**
+     * Thread state. Holds thread state flags as defined in JVMTI specification, plus some additional
+     * flags. See <a href=http://java.sun.com/j2se/1.5.0/docs/guide/jvmti/jvmti.html#GetThreadState>
+     * JVMTI Specification </a> for more details.
+     */
+    IDATA state;
+
+// Attributes
+
+    /**
+     * Hint for scheduler about thread priority
+     */
+    int priority;
+
+    /**
+     * Flag illustrates that java thread status
+     */
+    int java_status;
+
+    /**
+     * Size of thread's stack, set on creation
+     */
+    UDATA stacksize;
+
+// Monitors
+
+    /**
+     *  Monitor this thread is waiting on now.
+     */
+    hythread_monitor_t waited_monitor;
+
+    /**
+     * ID for this thread. The maximum number of threads is governed by the size of lockword record.
+     */
+    IDATA thread_id;
+
+} HyThread;
+
 //@}
 /** @name Thread Manager initialization / shutdown
  */
@@ -189,8 +379,8 @@ hythread_group_t VMCALL get_java_thread_group(void);
  */
 //@{
 
-IDATA VMCALL hythread_create_with_group(hythread_t new_thread, hythread_group_t group, UDATA stacksize, UDATA priority, hythread_entrypoint_t func, void *data);
-IDATA VMCALL hythread_attach_to_group(hythread_t new_handle, hythread_library_t lib, hythread_group_t group);
+IDATA VMCALL hythread_create_ex(hythread_t new_thread, hythread_group_t group, UDATA stacksize, UDATA priority, hythread_entrypoint_t func, void *data);
+IDATA VMCALL hythread_attach_ex(hythread_t new_handle, hythread_library_t lib, hythread_group_t group);
 UDATA VMCALL hythread_clear_interrupted_other(hythread_t thread);
 IDATA VMCALL hythread_join(hythread_t t);
 IDATA VMCALL hythread_join_timed(hythread_t t, I_64 millis, IDATA nanos);
@@ -423,7 +613,6 @@ hy_inline void VMCALL hythread_suspend_disable()
     return;
 }
 
-#define TM_THREAD_VM_TLS_KEY 0
 #define TM_THREAD_QUANTITY_OF_PREDEFINED_TLS_KEYS 1
 
  //@}
@@ -432,24 +621,44 @@ hy_inline void VMCALL hythread_suspend_disable()
   */
 //@{
 
-#define TM_THREAD_STATE_ALIVE JVMTI_THREAD_STATE_ALIVE  // 0x0001 Thread is alive. Zero if thread is new (not started) or terminated.  
-#define TM_THREAD_STATE_TERMINATED JVMTI_THREAD_STATE_TERMINATED // 0x0002Thread has completed execution.  
-#define TM_THREAD_STATE_RUNNABLE JVMTI_THREAD_STATE_RUNNABLE // 0x0004 Thread is runnable.  
-#define TM_THREAD_STATE_BLOCKED_ON_MONITOR_ENTER JVMTI_THREAD_STATE_BLOCKED_ON_MONITOR_ENTER // 0x0400  Thread is waiting to enter a synchronization block/method or, after an Object.wait(), waiting to re-enter a synchronization block/method.  
-#define TM_THREAD_STATE_WAITING JVMTI_THREAD_STATE_WAITING // 0x0080  Thread is waiting.  
-#define TM_THREAD_STATE_WAITING_INDEFINITELY JVMTI_THREAD_STATE_WAITING_INDEFINITELY // 0x0010  Thread is waiting without a timeout. For example, Object.wait().  
-#define TM_THREAD_STATE_WAITING_WITH_TIMEOUT JVMTI_THREAD_STATE_WAITING_WITH_TIMEOUT // 0x0020  Thread is waiting with a maximum time to wait specified. For example, Object.wait(long).  
-#define TM_THREAD_STATE_SLEEPING JVMTI_THREAD_STATE_SLEEPING // 0x0040  Thread is sleeping -- Thread.sleep(long).  
-#define TM_THREAD_STATE_IN_MONITOR_WAIT JVMTI_THREAD_STATE_IN_OBJECT_WAIT // 0x0100  Thread is waiting on an object monitor -- Object.wait.  
-#define TM_THREAD_STATE_PARKED JVMTI_THREAD_STATE_PARKED // 0x0200  Thread is parked, for example: LockSupport.park, LockSupport.parkUtil and LockSupport.parkNanos.  
-#define TM_THREAD_STATE_UNPARKED  0x0800 // 0x0800  Thread is unparked, to track staled unparks;
-#define TM_THREAD_STATE_SUSPENDED JVMTI_THREAD_STATE_SUSPENDED // 0x100000  Thread suspended. java.lang.Thread.suspend() or a JVMTI suspend function (such as SuspendThread) has been called on the thread. If this bit is set, the other bits refer to the thread state before suspension.  
-#define TM_THREAD_STATE_INTERRUPTED JVMTI_THREAD_STATE_INTERRUPTED // 0x200000  Thread has been interrupted.  
-#define TM_THREAD_STATE_IN_NATIVE JVMTI_THREAD_STATE_IN_NATIVE // 0x400000  Thread is in native code--that is, a native method is running which has not called back into the VM or Java programming language code. 
-
-#define TM_THREAD_STATE_ALLOCATED JVMTI_THREAD_STATE_VENDOR_1 // 0x10000000 Thread just has been allocated.
-#define TM_THREAD_STATE_RESERVED1 JVMTI_THREAD_STATE_VENDOR_2 // 0x20000000 Defined by VM vendor.  
-#define TM_THREAD_STATE_RESERVED2 JVMTI_THREAD_STATE_VENDOR_3 // 0x40000000 Defined by VM vendor 
+// 0x00000000   Thread is new.
+#define TM_THREAD_STATE_NEW                      0
+// 0x00000001   Thread is alive. Zero if thread is new (not started) or terminated.
+#define TM_THREAD_STATE_ALIVE                    JVMTI_THREAD_STATE_ALIVE
+// 0x00000002   Thread has completed execution.
+#define TM_THREAD_STATE_TERMINATED               JVMTI_THREAD_STATE_TERMINATED
+// 0x00000004   Thread is runnable.
+#define TM_THREAD_STATE_WAITING                  JVMTI_THREAD_STATE_WAITING
+// 0x00000010   Thread is waiting without a timeout. For example, Object.wait().
+#define TM_THREAD_STATE_WAITING_INDEFINITELY     JVMTI_THREAD_STATE_WAITING_INDEFINITELY
+// 0x00000020   Thread is waiting with a maximum time to wait specified.
+//              For example, Object.wait(long).
+#define TM_THREAD_STATE_WAITING_WITH_TIMEOUT     JVMTI_THREAD_STATE_WAITING_WITH_TIMEOUT
+// 0x00000040   Thread is sleeping. For example, Thread.sleep(long).
+#define TM_THREAD_STATE_RUNNABLE                 JVMTI_THREAD_STATE_RUNNABLE
+// 0x00000080   Thread is waiting.
+#define TM_THREAD_STATE_SLEEPING                 JVMTI_THREAD_STATE_SLEEPING
+// 0x00000100   Thread is waiting on an object monitor -- Object.wait.
+#define TM_THREAD_STATE_IN_MONITOR_WAIT          JVMTI_THREAD_STATE_IN_OBJECT_WAIT
+// 0x00000200   Thread is parked.
+//              For example: LockSupport.park, LockSupport.parkUtil and LockSupport.parkNanos.
+#define TM_THREAD_STATE_PARKED                   JVMTI_THREAD_STATE_PARKED
+// 0x00000400   Thread is waiting to enter a synchronization block/method or,
+//              after an Object.wait(), waiting to re-enter a synchronization block/method.
+#define TM_THREAD_STATE_BLOCKED_ON_MONITOR_ENTER JVMTI_THREAD_STATE_BLOCKED_ON_MONITOR_ENTER
+// 0x00000800   Thread is unparked, to track staled unparks
+#define TM_THREAD_STATE_UNPARKED                 0x0800
+// 0x00100000   Thread suspended.
+//              For example, java.lang.Thread.suspend()
+//              or a JVMTI suspend function (such as SuspendThread)
+//              has been called on the thread. If this bit is set,
+//              the other bits refer to the thread state before suspension.
+#define TM_THREAD_STATE_SUSPENDED                JVMTI_THREAD_STATE_SUSPENDED
+// 0x00200000   Thread has been interrupted.
+#define TM_THREAD_STATE_INTERRUPTED              JVMTI_THREAD_STATE_INTERRUPTED
+// 0x00400000   Thread is in native code. That is a native method is running which
+//              has not called back into the VM or Java programming language code.
+#define TM_THREAD_STATE_IN_NATIVE                JVMTI_THREAD_STATE_IN_NATIVE
 
 #define TM_MUTEX_DEFAULT  0   
 #define TM_MUTEX_NESTED   1  
@@ -485,6 +694,11 @@ hy_inline void VMCALL hythread_suspend_disable()
 
 // if default stack size is not through -Xss parameter, it is 256kb
 #define TM_DEFAULT_STACKSIZE (512 * 1024)
+
+// java thread status
+#define TM_STATUS_WITHOUT_JAVA  0   // native thread cannot has associated java thread
+#define TM_STATUS_ALLOCATED     1   // associated java thread is allocated
+#define TM_STATUS_INITIALIZED   2   // associated java thread is initialized
 
 #if defined(__cplusplus)
 }

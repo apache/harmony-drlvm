@@ -16,9 +16,6 @@
  */
 
 #include <stdio.h>
-#include <apr_pools.h>
-#include <apr_time.h>
-#include <open/hythread_ext.h>
 #include "testframe.h"
 #include "thread_manager.h"
 
@@ -38,29 +35,26 @@ int test_hythread_self_base(void) {
  * Test tm_create(..)
  */
 int test_hythread_create(void){
-    apr_pool_t *pool;
     void **args; 
     hythread_t thread;
-    IDATA r;
+    IDATA res;
     
-    apr_pool_create(&pool, NULL);
-
-    args = (void**) apr_palloc(pool, sizeof(void *) *2); 
+    args = (void**)calloc(2, sizeof(void *));
     
     hythread_group_create((hythread_group_t *)&args[0]); 
     
-    args[1] = apr_palloc(pool, sizeof(jthread_threadattr_t));
+    args[1] = calloc(1, sizeof(jthread_threadattr_t));
     ((jthread_threadattr_t *)args[1])->stacksize = 1024000;
     ((jthread_threadattr_t *)args[1])->priority  = 1;
     
     thread = (hythread_t)calloc(1, hythread_get_struct_size());
     assert(thread);
-    r = hythread_create_with_group(thread, args[0], 1024000, 1,
+    res = hythread_create_ex(thread, args[0], 1024000, 1,
         (hythread_entrypoint_t)start_proc, args);
-    tf_assert(r == 0 && "thread creation failed");
+    tf_assert(res == TM_ERROR_NONE && "thread creation failed");
 
-    r = hythread_join(thread);
-    tf_assert(r == 0 && "thread join failed");
+    res = hythread_join(thread);
+    tf_assert(res == TM_ERROR_NONE && "thread join failed");
     return TEST_PASSED;
 }
 
@@ -89,10 +83,10 @@ static void wait_for_all_treads_are_terminated(hythread_group_t group, int count
         if (n <= count)
             break;
 
-        apr_sleep(1000); // 1ms
+        hythread_sleep(1); // 1ms
     }
 
-    apr_sleep(100000);// 0.1s to let system threads finish their work
+    hythread_sleep(100);// 0.1s to let system threads finish their work
 }
 
 hylatch_t start;
@@ -110,10 +104,12 @@ int test_hythread_iterator(void) {
     hylatch_create(&end, 1);
 
     for (i = 0; i < n; i++) {
+        IDATA status;
         thread = (hythread_t)calloc(1, hythread_get_struct_size());
         assert(thread);
-        hythread_create_with_group(thread, group, 0, 0,
+        status = hythread_create_ex(thread, group, 0, 0,
             (hythread_entrypoint_t)start_proc_empty, NULL);
+        tf_assert_same(status, TM_ERROR_NONE);
     }
 
     // Wait util all threads have started.
@@ -150,10 +146,10 @@ int test_hythread_iterator_default(void) {
     hylatch_create(&end, 1);
 
     for (i = 0; i < n; i++) {
-        thread = (hythread_t)calloc(1, hythread_get_struct_size());
-        assert(thread);
-        hythread_create_with_group(thread, NULL, 0, 0,
+        IDATA status;
+        status = hythread_create(NULL, 0, 0, 0,
             (hythread_entrypoint_t)start_proc_empty, NULL);
+        tf_assert_same(status, TM_ERROR_NONE);
     }
 
     // Wait util all threads have started.
@@ -185,40 +181,29 @@ int test_hythread_iterator_default(void) {
  * Test tm_create(..)
  */
 int test_hythread_create_many(void){
-    apr_pool_t *pool;
     void **args; 
     hythread_t thread = NULL;
     hythread_group_t group = NULL;
-    IDATA r;
-    
-    char *buf;
+    IDATA res;
     int i = 10;
     
     hythread_group_create(&group);
     while(i--) {
-        apr_pool_create(&pool, NULL);
-
-        args = (void**) apr_palloc(pool, sizeof(void *) *2); 
+        args = (void**)calloc(2, sizeof(void *));
     
         args[0] = group; 
         
-        args[1] = apr_palloc(pool, sizeof(jthread_threadattr_t));
+        args[1] = calloc(1, sizeof(jthread_threadattr_t));
         ((jthread_threadattr_t *)args[1])->stacksize = 1024000;
         ((jthread_threadattr_t *)args[1])->priority  = 1;
         
         thread = (hythread_t)calloc(1, hythread_get_struct_size());
         assert(thread);
-        r = hythread_create_with_group(thread, group, 1024000, 1,
+        res = hythread_create_ex(thread, group, 1024000, 1,
             (hythread_entrypoint_t)start_proc, args);
-        tf_assert(r == 0 && "thread creation failed");
-        buf = (char *)apr_pcalloc(pool, sizeof(char)*12);
-
-        /*
-          sprintf(buf, "Thread %d\0", i);
-          hythread_set_name(thread, buf);
-        */
-        r = hythread_join(thread);
-        tf_assert(r == 0 && "thread join failed");
+        tf_assert(res == TM_ERROR_NONE && "thread creation failed");
+        res = hythread_join(thread);
+        tf_assert(res == TM_ERROR_NONE && "thread join failed");
     }
 
     //check thread structures:

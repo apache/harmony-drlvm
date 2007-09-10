@@ -24,8 +24,7 @@
 #include "open/hythread_ext.h"
 #include "open/ti_thread.h"
 #include "open/thread_externals.h"
-#include "apr_time.h"
-
+#include "thread_manager.h"
 
 /*
  * Utilities for thread manager unit tests 
@@ -36,10 +35,8 @@ tested_thread_sturct_t * dummy_tts = &dummy_tts_struct;
 tested_thread_sturct_t tested_threads[MAX_TESTED_THREAD_NUMBER];
 JavaVM * GLOBAL_VM = NULL;
 
-apr_pool_t *pool = NULL;
-
 void sleep_a_click(void){
-    apr_sleep(CLICK_TIME_MSEC * 1000);
+    hythread_sleep(CLICK_TIME_MSEC);
 }
 
 jthread new_jobject_thread(JNIEnv * jni_env) {
@@ -64,25 +61,20 @@ jobject new_jobject_thread_death(JNIEnv * jni_env) {
     return (*jni_env)->NewObject(jni_env, thread_death_class, constructor);
 }
 
-jthread new_jobject(){
+jthread new_jobject()
+{
+    _jobject *jobj;
+    _jjobject *jjobj;
 
-    apr_status_t status;
-    _jobject *obj;
-    _jjobject *object;
-
-    if (!pool){
-        status = apr_pool_create(&pool, NULL);
-        if (status) return NULL; 
-    }
-
-    obj = apr_palloc(pool, sizeof(_jobject));
-    object = apr_palloc(pool, sizeof(_jjobject));
-    assert(obj);
-    obj->object = object;
-    obj->object->data = NULL;
-    obj->object->daemon = 0;
-    obj->object->name = NULL;
-    return obj;
+    jobj = (_jobject *)calloc(1, sizeof(_jobject));
+    jjobj = (_jjobject *)calloc(1, sizeof(_jjobject));
+    assert(jobj);
+    assert(jjobj);
+    jobj->object = jjobj;
+    jobj->object->data = NULL;
+    jobj->object->daemon = 0;
+    jobj->object->name = NULL;
+    return jobj;
 }
 
 void delete_jobject(jobject obj){
@@ -105,7 +97,6 @@ void test_java_thread_setup(int argc, char *argv[]) {
     log_debug("test_java_thread_init()");
 
     hythread_sleep(1000);
-    apr_initialize();
     JNI_CreateJavaVM(&GLOBAL_VM, &jni_env, &args);
 }
 
@@ -269,11 +260,11 @@ void tested_os_threads_run(hythread_entrypoint_t run_method_param){
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
         // Create thread
-        tts->native_thread =
-            (hythread_t)calloc(1, hythread_get_struct_size());
-        assert(tts->native_thread);
-        status = hythread_create_with_group(tts->native_thread,
-            NULL, 0, 5, run_method_param, tts);
+        tts->native_thread = (hythread_t)calloc(1, sizeof(struct VM_thread));
+        tf_assert_v(tts->native_thread != NULL);
+        tts->native_thread->java_status = TM_STATUS_ALLOCATED;
+        status = hythread_create_ex(tts->native_thread,
+            NULL, 0, 0, run_method_param, tts);
         tf_assert_v(status == TM_ERROR_NONE);
         tested_thread_wait_started(tts);
     }
@@ -344,7 +335,7 @@ int check_structure(tested_thread_sturct_t *tts){
 
     hythread = (hythread_t) vm_jthread_get_tm_data(java_thread);
     tf_assert_same(hythread, tts->native_thread);
-    vm_thread = (vm_thread_t)hythread_tls_get(hythread, TM_THREAD_VM_TLS_KEY);
+    vm_thread = jthread_get_vm_thread(hythread);
     tf_assert(vm_thread);
     jvmti_thread = &(vm_thread->jvmti_thread);
     tf_assert(jvmti_thread);

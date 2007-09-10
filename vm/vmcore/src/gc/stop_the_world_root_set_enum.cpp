@@ -81,7 +81,7 @@ vm_enumerate_the_current_thread(VM_thread * vm_thread)
 static void
 stop_the_world_root_set_enumeration()
 {
-    VM_thread * current_vm_thread;
+    vm_thread_t current_vm_thread;
 
     TRACE2("vm.gc", "stop_the_world_root_set_enumeration()");
 
@@ -104,7 +104,7 @@ stop_the_world_root_set_enumeration()
     // Run through list of active threads and enumerate each one of them.
     hythread_t tm_thread = hythread_iterator_next(&iterator);    
     while (tm_thread) {
-        VM_thread *thread = get_vm_thread(tm_thread);
+        vm_thread_t thread = jthread_get_vm_thread(tm_thread);
         //assert(thread);
         if (thread && thread != current_vm_thread) {
             vm_enumerate_thread(thread);

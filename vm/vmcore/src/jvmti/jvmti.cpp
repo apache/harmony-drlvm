@@ -645,10 +645,6 @@ jint DebugUtilsTI::Init(JavaVM *vm)
                 "vm.jvmti.compiled_method_load.inlined",
                 FALSE, VM_PROPERTIES);
 
-        // FIXME: workaround to let get_vm_thread_ptr_safe function and other JNI code
-        // to work in OnLoad phase
-        NativeObjectHandles noh;
-
         while (agent)
         {
             int result = 0;

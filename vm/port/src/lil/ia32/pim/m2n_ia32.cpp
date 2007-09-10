@@ -57,7 +57,8 @@ M2nFrame* m2n_get_last_frame(VM_thread* thread)
 VMEXPORT // temporary solution for interpreter unplug
 void m2n_set_last_frame(M2nFrame* lm2nf)
 {
-    p_TLS_vmthread->last_m2n_frame = lm2nf;
+    vm_thread_t vm_thread = jthread_self_vm_thread_unsafe();
+    vm_thread->last_m2n_frame = lm2nf;
 }
 
 VMEXPORT

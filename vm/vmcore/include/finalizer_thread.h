@@ -29,6 +29,7 @@
 #include "open/hythread_ext.h"
 #include "open/types.h"
 #include "open/gc.h"
+#include "thread_manager.h"
 
 
 #define FINALIZER_THREAD_PRIORITY (HYTHREAD_PRIORITY_NORMAL + 2)
@@ -54,7 +55,7 @@ typedef struct Fin_Thread_Info {
     hycond_t mutator_block_cond;    // mutator block condition variable for heavy finalizable obj load
     hymutex_t mutator_block_mutex;  // mutator block mutex for heavy finalizable obj load
     
-    hythread_t *thread_ids;
+    vm_thread_t *thread_ids;
     volatile unsigned int thread_num;
     
     volatile Boolean shutdown;

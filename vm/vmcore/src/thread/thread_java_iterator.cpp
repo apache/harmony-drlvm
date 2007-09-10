@@ -65,8 +65,7 @@ jobject VMCALL jthread_iterator_next(jthread_iterator_t * it)
     hythread_t native_thread = hythread_iterator_next((hythread_iterator_t *) it);
     while (native_thread != NULL) {
         if (hythread_is_alive(native_thread)) {
-            vm_thread_t vm_thread = (vm_thread_t)hythread_tls_get(native_thread,
-                                        TM_THREAD_VM_TLS_KEY);
+            vm_thread_t vm_thread = jthread_get_vm_thread(native_thread);
             if (vm_thread) {
                 return vm_thread->java_thread;
             }

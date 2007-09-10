@@ -288,11 +288,11 @@ static size_t common_guard_stack_size;
 static size_t common_guard_page_size;
 
 inline void* get_stack_addr() {
-    return p_TLS_vmthread->stack_addr;
+    return jthread_self_vm_thread_unsafe()->stack_addr;
 }
 
 inline size_t get_stack_size() {
-  return p_TLS_vmthread->stack_size;
+    return jthread_self_vm_thread_unsafe()->stack_size;
 }
 
 inline size_t get_guard_stack_size() {
@@ -306,10 +306,11 @@ inline size_t get_guard_page_size() {
 void set_guard_stack();
 
 void init_stack_info() {
+    vm_thread_t vm_thread = jthread_self_vm_thread_unsafe();
     char* stack_addr = (char *)find_stack_addr();
     unsigned int stack_size = hythread_get_thread_stacksize(hythread_self());
-    p_TLS_vmthread->stack_addr = stack_addr;
-    p_TLS_vmthread->stack_size = stack_size;
+    vm_thread->stack_addr = stack_addr;
+    vm_thread->stack_size = stack_size;
     common_guard_stack_size = find_guard_stack_size();
     common_guard_page_size =find_guard_page_size();
 
@@ -365,7 +366,7 @@ void set_guard_stack() {
 
     err = sigaltstack (&sigalt, NULL);
 
-    p_TLS_vmthread->restore_guard_page = false;
+    jthread_self_vm_thread_unsafe()->restore_guard_page = false;
 }
 
 size_t get_available_stack_size() {

@@ -154,10 +154,8 @@ jint vm_attach(JavaVM * java_vm, JNIEnv ** p_jni_env)
     // mode until current thread is not attaced to VM.
     assert(hythread_is_suspend_enabled());
 
-    vm_thread_t vm_thread = p_TLS_vmthread;
-    if (!vm_thread) {
-        vm_thread = jthread_allocate_vm_thread(hythread_self());
-    }
+    vm_thread_t vm_thread = jthread_self_vm_thread_unsafe();
+    assert(vm_thread);
 
     // if the assertion is false we cannot notify the parent thread
     // that we started and it would hang in waitloop
@@ -214,6 +212,7 @@ jint vm_attach(JavaVM * java_vm, JNIEnv ** p_jni_env)
             (jbyte*)apr_palloc(vm_thread->pool,
                 sizeof(jbyte) * TM_JVMTI_MAX_BUFFER_SIZE);
     }
+    ((hythread_t)vm_thread)->java_status = TM_STATUS_INITIALIZED;
 
     assert(hythread_is_suspend_enabled());
     return JNI_OK;

@@ -54,7 +54,8 @@ void m2n_set_last_frame(VM_thread* thread, M2nFrame * lm2nf) {
 }
 
 void m2n_set_last_frame(M2nFrame * lm2nf) {
-    p_TLS_vmthread->last_m2n_frame = lm2nf;
+    vm_thread_t vm_thread = jthread_self_vm_thread_unsafe();
+    vm_thread->last_m2n_frame = lm2nf;
 }
 
 M2nFrame * m2n_get_previous_frame(M2nFrame * m2nf) {

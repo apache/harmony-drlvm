@@ -40,8 +40,6 @@
 #include "thread_manager.h"
 #include "cci.h"
 
-#define jvmti_test_jenv (p_TLS_vmthread->jni_env)
-
 class JavaStackIterator
 {
     StackIterator* si;
@@ -293,11 +291,11 @@ jvmtiGetStackTrace(jvmtiEnv* env,
 
     bool thread_suspended = false;
     // Suspend thread before getting stacks
-    VM_thread *vm_thread;
+    vm_thread_t vm_thread;
     if (NULL != thread)
     {
-        vm_thread = get_vm_thread_ptr_safe(jvmti_test_jenv, thread);
         // Check that this thread is not current
+        vm_thread = jthread_get_vm_thread_ptr_safe(thread);
         if (vm_thread != p_TLS_vmthread)
         {
             // to avoid suspension of each other due to race condition
@@ -489,7 +487,7 @@ jvmtiGetThreadListStackTraces(jvmtiEnv* env,
 
         // FIXME: suspended thread might be resumed in other jvmti thread?
         if (info[i].state != JVMTI_THREAD_STATE_SUSPENDED) {
-            if (IsSameObject(jvmti_test_jenv, currentThread, threads[i]))
+            if (IsSameObject(p_TLS_vmthread->jni_env, currentThread, threads[i]))
                 continue;
             jthread_suspend(threads[i]);
         }
@@ -572,11 +570,11 @@ jvmtiGetFrameCount(jvmtiEnv* env,
 
     bool thread_suspended = false;
     // Suspend thread before getting stacks
-    VM_thread *vm_thread;
+    vm_thread_t vm_thread;
     if (NULL != thread)
     {
-        vm_thread = get_vm_thread_ptr_safe(jvmti_test_jenv, thread);
         // Check that this thread is not current
+        vm_thread = jthread_get_vm_thread_ptr_safe(thread);
         if (vm_thread != p_TLS_vmthread)
         {
             jthread_suspend(thread);
@@ -656,7 +654,7 @@ jvmtiPopFrame(jvmtiEnv* env,
 
     // check stack depth
     hythread_t hy_thread = jthread_get_native_thread(thread);
-    VM_thread* vm_thread = get_vm_thread(hy_thread);
+    vm_thread_t vm_thread = jthread_get_vm_thread(hy_thread);
 
     jint depth;
     if (interpreter_enabled()) {
@@ -741,11 +739,11 @@ jvmtiGetFrameLocation(jvmtiEnv* env,
 
     bool thread_suspended = false;
     // Suspend thread before getting stacks
-    VM_thread *vm_thread;
+    vm_thread_t vm_thread;
     if (NULL != thread)
     {
-        vm_thread = get_vm_thread_ptr_safe(jvmti_test_jenv, thread);
         // Check that this thread is not current
+        vm_thread = jthread_get_vm_thread_ptr_safe(thread);
         if (vm_thread != p_TLS_vmthread)
         {
             jthread_suspend(thread);
@@ -760,7 +758,7 @@ jvmtiGetFrameLocation(jvmtiEnv* env,
         // check error condition: JVMTI_ERROR_ILLEGAL_ARGUMENT
         // check error condition: JVMTI_ERROR_NO_MORE_FRAMES
         errStack = interpreter.interpreter_ti_getFrameLocation(env,
-            get_vm_thread_ptr_safe(jvmti_test_jenv, thread),
+            jthread_get_vm_thread_ptr_safe(thread),
             depth, method_ptr, location_ptr);
     else
     {
@@ -835,9 +833,9 @@ jvmtiNotifyFramePop(jvmtiEnv* env,
         return JVMTI_ERROR_ILLEGAL_ARGUMENT;
     }
 
-    VM_thread *vm_thread;
+    vm_thread_t vm_thread;
     if (NULL != thread)
-        vm_thread = get_vm_thread_ptr_safe(jvmti_test_jenv, thread);
+        vm_thread = jthread_get_vm_thread_ptr_safe(thread);
     else
         vm_thread = p_TLS_vmthread;
 

@@ -104,12 +104,10 @@ inline void* vm_thread_local()
 
 inline int vm_create_thread(int (*func)(void*), void *data)
 { 
-  hythread_t ret_thread = (hythread_t)STD_CALLOC(1,hythread_get_struct_size());;
-  UDATA stacksize = 0;
-  UDATA priority = 5;
-  
-  return (int)hythread_create_with_group(ret_thread, get_gc_thread_group(), stacksize, priority,  
-                              (hythread_entrypoint_t)func, data);
+  hythread_t ret_thread = (hythread_t)STD_CALLOC(1, hythread_get_struct_size());;
+  assert(ret_thread);
+  return (int)hythread_create_ex(ret_thread, get_gc_thread_group(), 0, 0,
+                    (hythread_entrypoint_t)func, data);
 }
 
 inline void *atomic_casptr(volatile void **mem, void *with, const void *cmp) 

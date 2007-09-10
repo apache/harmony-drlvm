@@ -181,11 +181,9 @@ int test_jthread_get_deadlocked_threads(void) {
     int dead_list_count;
     jthread *dead_list;
     int i = 0;
-    apr_status_t apr_status;
-    apr_pool_t *pool = NULL;
 
-    apr_status = apr_pool_create(&pool, NULL);
-    thread_list = apr_palloc(pool, sizeof(int) * MAX_TESTED_THREAD_NUMBER);
+    thread_list =
+        (jthread*)calloc(MAX_TESTED_THREAD_NUMBER, sizeof(int));
 
     // Initialize tts structures and run all tested threads
     tested_threads_run_with_different_monitors(run_for_test_jthread_get_deadlocked_threads);

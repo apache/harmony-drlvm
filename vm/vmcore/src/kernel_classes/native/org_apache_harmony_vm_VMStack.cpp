@@ -444,7 +444,7 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getThreadStack
     unsigned size = 0;
     StackTraceFrame* frames;
 
-    VM_thread *p_thread = get_vm_thread_ptr_safe(jenv, thread);
+    vm_thread_t p_thread = jthread_get_vm_thread_ptr_safe(thread);
     if (p_thread != NULL) {
         if (p_thread == get_thread_ptr()) {
             st_get_trace(p_thread, &size, &frames);

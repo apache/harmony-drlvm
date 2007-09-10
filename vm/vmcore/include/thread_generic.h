@@ -24,13 +24,12 @@
 #define THREAD_GENERIC_HEADER
 
 #include "vm_threads.h"
-#include "jni.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-VMEXPORT VM_thread *get_vm_thread_ptr_safe(JNIEnv *, jobject);
+VMEXPORT vm_thread_t jthread_get_vm_thread_ptr_safe(jobject thread_obj);
 
 /////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////

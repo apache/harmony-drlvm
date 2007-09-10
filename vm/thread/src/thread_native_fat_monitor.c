@@ -355,12 +355,15 @@ IDATA VMCALL hythread_monitor_notify_all(hythread_monitor_t mon_ptr) {
  * @see hythread_monitor_notify, hythread_monitor_notify_all, hythread_monitor_enter, hythread_monitor_wait
  */
 IDATA VMCALL hythread_monitor_interrupt_wait(hythread_monitor_t mon_ptr,
-					     hythread_t thread) {
+                                             hythread_t thread)
+{
     if (mon_ptr->owner != tm_self_tls) {
         return TM_ERROR_ILLEGAL_STATE;
     }
-
-    assert (thread->state & TM_THREAD_STATE_INTERRUPTED);
+    // While waiting on monitor, thread state TM_THREAD_STATE_INTERRUPTED
+    // could already clear if condition was notified by another thread,
+    // so thread state TM_THREAD_STATE_INTERRUPTED check is illegal here.
+    // Just notify condition.
     return hycond_notify_all(&mon_ptr->condition);
 }
 

@@ -2501,10 +2501,10 @@ static inline
 void UNUSED dump_all_java_stacks() {
     hythread_iterator_t  iterator;
     hythread_suspend_all(&iterator, NULL);
-    VM_thread *thread = get_vm_thread (hythread_iterator_next(&iterator));
+    VM_thread *thread = jthread_get_vm_thread(hythread_iterator_next(&iterator));
     while(thread) {
         stack_dump(thread);
-        thread = get_vm_thread (hythread_iterator_next(&iterator));
+        thread = jthread_get_vm_thread(hythread_iterator_next(&iterator));
     }
 
     hythread_resume_all( NULL);

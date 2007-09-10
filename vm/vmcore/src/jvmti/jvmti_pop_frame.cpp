@@ -79,7 +79,7 @@ jvmtiError jvmti_jit_pop_frame(jthread java_thread)
     }
 
     hythread_t hy_thread = jthread_get_native_thread(java_thread);
-    VM_thread* vm_thread = get_vm_thread(hy_thread);
+    vm_thread_t vm_thread = jthread_get_vm_thread(hy_thread);
 
     M2nFrame* top_frame = m2n_get_last_frame(vm_thread);
     frame_type type = m2n_get_frame_type(top_frame);

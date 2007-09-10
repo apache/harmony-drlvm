@@ -39,8 +39,6 @@
 #include "cci.h"
 #include "Class.h"
 
-#define jvmti_test_jenv (p_TLS_vmthread->jni_env)
-
 /*
  * Local Variable functions:
  *
@@ -167,11 +165,11 @@ jvmtiGetLocalObject(jvmtiEnv* env,
 
     bool thread_suspended = false;
     // Suspend thread before getting stacks
-    VM_thread *vm_thread;
+    vm_thread_t vm_thread;
     if (NULL != thread)
     {
         // Check that this thread is not current
-        vm_thread = get_vm_thread_ptr_safe(jvmti_test_jenv, thread);
+        vm_thread = jthread_get_vm_thread_ptr_safe(thread);
         if (vm_thread != p_TLS_vmthread)
         {
             jthread_suspend(thread);
@@ -248,11 +246,11 @@ jvmtiGetLocalInt(jvmtiEnv* env,
 
     bool thread_suspended = false;
     // Suspend thread before getting stacks
-    VM_thread *vm_thread;
+    vm_thread_t vm_thread;
     if (NULL != thread)
     {
         // Check that this thread is not current
-        vm_thread = get_vm_thread_ptr_safe(jvmti_test_jenv, thread);
+        vm_thread = jthread_get_vm_thread_ptr_safe(thread);
         if (vm_thread != p_TLS_vmthread)
         {
             jthread_suspend(thread);
@@ -316,11 +314,11 @@ jvmtiGetLocalLong(jvmtiEnv* env,
 
     bool thread_suspended = false;
     // Suspend thread before getting stacks
-    VM_thread *vm_thread;
+    vm_thread_t vm_thread;
     if (NULL != thread)
     {
         // Check that this thread is not current
-        vm_thread = get_vm_thread_ptr_safe(jvmti_test_jenv, thread);
+        vm_thread = jthread_get_vm_thread_ptr_safe(thread);
         if (vm_thread != p_TLS_vmthread)
         {
             jthread_suspend(thread);
@@ -432,11 +430,11 @@ jvmtiSetLocalObject(jvmtiEnv* env,
 
     bool thread_suspended = false;
     // Suspend thread before getting stacks
-    VM_thread *vm_thread;
+    vm_thread_t vm_thread;
     if (NULL != thread)
     {
         // Check that this thread is not current
-        vm_thread = get_vm_thread_ptr_safe(jvmti_test_jenv, thread);
+        vm_thread = jthread_get_vm_thread_ptr_safe(thread);
         if (vm_thread != p_TLS_vmthread)
         {
             jthread_suspend(thread);
@@ -509,11 +507,11 @@ jvmtiSetLocalInt(jvmtiEnv* env,
 
     bool thread_suspended = false;
     // Suspend thread before getting stacks
-    VM_thread *vm_thread;
+    vm_thread_t vm_thread;
     if (NULL != thread)
     {
         // Check that this thread is not current
-        vm_thread = get_vm_thread_ptr_safe(jvmti_test_jenv, thread);
+        vm_thread = jthread_get_vm_thread_ptr_safe(thread);
         if (vm_thread != p_TLS_vmthread)
         {
             jthread_suspend(thread);
@@ -577,11 +575,11 @@ jvmtiSetLocalLong(jvmtiEnv* env,
 
     bool thread_suspended = false;
     // Suspend thread before getting stacks
-    VM_thread *vm_thread;
+    vm_thread_t vm_thread;
     if (NULL != thread)
     {
         // Check that this thread is not current
-        vm_thread = get_vm_thread_ptr_safe(jvmti_test_jenv, thread);
+        vm_thread = jthread_get_vm_thread_ptr_safe(thread);
         if (vm_thread != p_TLS_vmthread)
         {
             jthread_suspend(thread);

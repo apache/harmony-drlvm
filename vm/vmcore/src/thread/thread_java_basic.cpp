@@ -60,8 +60,7 @@ static IDATA HYTHREAD_PROC jthread_wrapper_proc(void *arg)
     // Association should be already done.
     hythread_t native_thread = hythread_self();
     assert(native_thread);
-    vm_thread_t vm_thread = 
-        (vm_thread_t) hythread_tls_get(native_thread, TM_THREAD_VM_TLS_KEY);
+    vm_thread_t vm_thread = jthread_get_vm_thread_unsafe(native_thread);
     assert(vm_thread);
     jobject java_thread = vm_thread->java_thread;
 
@@ -126,8 +125,7 @@ IDATA jthread_create_with_function(JNIEnv *jni_env,
     hythread_t native_thread = vm_jthread_get_tm_data(java_thread);
     assert(native_thread);
 
-    vm_thread_t vm_thread =
-        (vm_thread_t) hythread_tls_get(native_thread, TM_THREAD_VM_TLS_KEY);
+    vm_thread_t vm_thread = jthread_get_vm_thread_unsafe(native_thread);
     assert(vm_thread);
     vm_thread->java_thread = jni_env->NewGlobalRef(java_thread);
 
@@ -155,7 +153,7 @@ IDATA jthread_create_with_function(JNIEnv *jni_env,
         attrs->stacksize = default_stacksize;
     }
 
-    status = hythread_create_with_group(native_thread, NULL, attrs->stacksize,
+    status = hythread_create_ex(native_thread, NULL, attrs->stacksize,
                         attrs->priority, jthread_wrapper_proc, attrs);
 
     TRACE(("TM: Created thread: id=%d", hythread_get_id(native_thread)));
@@ -190,8 +188,7 @@ IDATA jthread_attach(JNIEnv *jni_env, jthread java_thread, jboolean daemon)
         return status;
     }
 
-    vm_thread_t vm_thread =
-        (vm_thread_t) hythread_tls_get(native_thread, TM_THREAD_VM_TLS_KEY);
+    vm_thread_t vm_thread = jthread_get_vm_thread(native_thread);
     assert(vm_thread);
     vm_thread->java_thread = jni_env->NewGlobalRef(java_thread);
     vm_thread->jni_env = jni_env;
@@ -225,16 +222,15 @@ jlong jthread_thread_init(JNIEnv *env,
 {
     hythread_t native_thread = NULL;
     if (dead_thread) {
-        native_thread = (hythread_t) ((IDATA) dead_thread);
-        vm_thread_t vm_thread =
-            (vm_thread_t) hythread_tls_get(native_thread, TM_THREAD_VM_TLS_KEY);
+        native_thread = (hythread_t)((IDATA) dead_thread);
+        vm_thread_t vm_thread = jthread_get_vm_thread_unsafe(native_thread);
+        assert(vm_thread);
         if (vm_thread->weak_ref) {
             // delete used weak reference
             env->DeleteGlobalRef(vm_thread->weak_ref);
         }
     } else {
-        native_thread = (hythread_t)STD_CALLOC(1, hythread_get_struct_size());
-        assert(native_thread);
+        native_thread = (hythread_t)jthread_allocate_thread();
     }
     
     IDATA status = hythread_struct_init(native_thread);
@@ -267,8 +263,7 @@ IDATA jthread_detach(jthread java_thread)
 
     hythread_t native_thread = jthread_get_native_thread(java_thread);
     assert(native_thread);
-    vm_thread_t vm_thread =
-        (vm_thread_t) hythread_tls_get(native_thread, TM_THREAD_VM_TLS_KEY);
+    vm_thread_t vm_thread = jthread_get_vm_thread(native_thread);
     assert(vm_thread);
     JNIEnv *jni_env = vm_thread->jni_env;
 
@@ -308,13 +303,7 @@ jthread_associate_native_and_java_thread(JNIEnv * jni_env,
         return TM_ERROR_NULL_POINTER;
     }
 
-    vm_thread_t vm_thread =
-        (vm_thread_t)hythread_tls_get(native_thread, TM_THREAD_VM_TLS_KEY);
-
-    if (!vm_thread) {
-        // init VM_thread structure in native thread local
-        vm_thread = jthread_allocate_vm_thread(native_thread);
-    }
+    vm_thread_t vm_thread = jthread_get_vm_thread_unsafe(native_thread);
     assert(vm_thread);
 
     vm_thread->weak_ref = 
@@ -344,8 +333,7 @@ static void stop_callback(void)
 {
     hythread_t native_thread = hythread_self();
     assert(native_thread);
-    vm_thread_t vm_thread =
-        (vm_thread_t) hythread_tls_get(native_thread, TM_THREAD_VM_TLS_KEY);
+    vm_thread_t vm_thread = jthread_get_vm_thread(native_thread);
     assert(vm_thread);
     jobject excn = vm_thread->stop_exception;
 
@@ -381,8 +369,7 @@ IDATA jthread_stop(jthread java_thread)
     assert(java_thread);
     hythread_t native_thread = vm_jthread_get_tm_data(java_thread);
     assert(native_thread);
-    vm_thread_t vm_thread =
-        (vm_thread_t) hythread_tls_get(native_thread, TM_THREAD_VM_TLS_KEY);
+    vm_thread_t vm_thread = jthread_get_vm_thread(native_thread);
     assert(vm_thread);
     JNIEnv *env = vm_thread->jni_env;
     assert(env);
@@ -406,8 +393,7 @@ IDATA jthread_exception_stop(jthread java_thread, jobject excn)
     assert(java_thread);
     hythread_t native_thread = vm_jthread_get_tm_data(java_thread);
     assert(native_thread);
-    vm_thread_t vm_thread =
-        (vm_thread_t) hythread_tls_get(native_thread, TM_THREAD_VM_TLS_KEY);
+    vm_thread_t vm_thread = jthread_get_vm_thread(native_thread);
     assert(vm_thread);
 
     // Install safepoint callback that would throw exception
@@ -477,8 +463,7 @@ JNIEnv * jthread_get_JNI_env(jthread java_thread)
     if (native_thread == NULL) {
         return NULL;
     }
-    vm_thread_t vm_thread =
-        (vm_thread_t) hythread_tls_get(native_thread, TM_THREAD_VM_TLS_KEY);
+    vm_thread_t vm_thread = jthread_get_vm_thread(native_thread);
     if (vm_thread == NULL) {
         return NULL;
     }
@@ -513,8 +498,7 @@ jthread jthread_get_thread(jlong thread_id)
     if (native_thread == NULL) {
         return NULL;
     }
-    vm_thread_t vm_thread =
-        (vm_thread_t) hythread_tls_get(native_thread, TM_THREAD_VM_TLS_KEY);
+    vm_thread_t vm_thread = jthread_get_vm_thread(native_thread);
     assert(vm_thread);
     jobject java_thread = vm_thread->java_thread;
     assert(java_thread);
@@ -543,8 +527,7 @@ jthread jthread_get_java_thread(hythread_t native_thread)
         TRACE(("TM: native thread is NULL"));
         return NULL;
     }
-    vm_thread_t vm_thread =
-        (vm_thread_t) hythread_tls_get(native_thread, TM_THREAD_VM_TLS_KEY);
+    vm_thread_t vm_thread = jthread_get_vm_thread(native_thread);
     if (vm_thread == NULL) {
         TRACE(("TM: vm_thread_t thread is NULL"));
         return NULL;
@@ -580,8 +563,7 @@ IDATA VMCALL jthread_wait_for_all_nondaemon_threads()
 {
     hythread_t native_thread = hythread_self();
     assert(native_thread);
-    vm_thread_t vm_thread =
-        (vm_thread_t)hythread_tls_get(native_thread, TM_THREAD_VM_TLS_KEY);
+    vm_thread_t vm_thread = jthread_get_vm_thread(native_thread);
     return hythread_wait_for_nondaemon_threads(native_thread, 
                                                (vm_thread->daemon ? 0 : 1));
 } // jthread_wait_for_all_nondaemon_threads

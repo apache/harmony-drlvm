@@ -17,7 +17,6 @@
 
 #include <stdlib.h>
 #include "jvmti_types.h"
-#include "apr_thread_proc.h"
 #include "open/hycomp.h"
 #include "open/jthread.h"
 #include "thread_manager.h"

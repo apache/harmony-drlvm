@@ -66,12 +66,17 @@ int test_jthread_get_contended_monitor(void) {
 
         reset_tested_thread_iterator(&tts);
         while(next_tested_thread(&tts)){
-            tf_assert_same(jthread_get_contended_monitor(tts->java_thread, &contended_monitor), TM_ERROR_NONE);
+            while(tts->phase == TT_PHASE_NONE) {
+                // thread is not started yet
+                hythread_yield();
+            }
             if (tts->phase == TT_PHASE_IN_CRITICAL_SECTON){
+                tf_assert_same(jthread_get_contended_monitor(tts->java_thread,
+                    &contended_monitor), TM_ERROR_NONE);
                 tf_assert_null(contended_monitor);
                 tf_assert_null(critical_tts);
                 critical_tts = tts;
-            } else if (tts->phase != TT_PHASE_DEAD){
+            } else if (tts->phase != TT_PHASE_DEAD) {
                 check_tested_thread_phase(tts, TT_PHASE_WAITING_ON_MONITOR);
                 // This can't be guaranteed
                 //tf_assert(vm_objects_are_equal(contended_monitor, tts->monitor));
@@ -130,6 +135,10 @@ int test_jthread_holds_lock(void) {
 
         reset_tested_thread_iterator(&tts);
         while(next_tested_thread(&tts)){
+            while(tts->phase == TT_PHASE_NONE) {
+                // thread is not started yet
+                hythread_yield();
+            }
             if (tts->phase == TT_PHASE_IN_CRITICAL_SECTON){
                 tf_assert(jthread_holds_lock(tts->java_thread, tts->monitor) > 0);
                 tf_assert_null(critical_tts);
@@ -198,6 +207,10 @@ int test_jthread_get_lock_owner(void) {
 
         reset_tested_thread_iterator(&tts);
         while(next_tested_thread(&tts)){
+            while(tts->phase == TT_PHASE_NONE) {
+                // thread is not started yet
+                hythread_yield();
+            }
             if (tts->phase == TT_PHASE_IN_CRITICAL_SECTON){
                 tf_assert_null(critical_tts);
                 critical_tts = tts;
@@ -261,15 +274,21 @@ int test_jthread_get_owned_monitors(void) {
         hysem_wait(mon_enter);
 
         reset_tested_thread_iterator(&tts);
-        while(next_tested_thread(&tts)){
-            tf_assert_same(jthread_get_owned_monitors (tts->java_thread, 
-                                                       &owned_monitors_count, &owned_monitors), TM_ERROR_NONE);
+        while(next_tested_thread(&tts)) {
+            while(tts->phase == TT_PHASE_NONE) {
+                // thread is not started yet
+                hythread_yield();
+            }
             if (tts->phase == TT_PHASE_IN_CRITICAL_SECTON){
+                tf_assert_same(jthread_get_owned_monitors (tts->java_thread,
+                    &owned_monitors_count, &owned_monitors), TM_ERROR_NONE);
                 tf_assert(critical_tts == NULL);
                 critical_tts = tts;
                 tf_assert_same(owned_monitors_count, 1);
                 tf_assert_same(owned_monitors[0]->object, tts->monitor->object);
             } else if (tts->phase == TT_PHASE_WAITING_ON_MONITOR){
+                tf_assert_same(jthread_get_owned_monitors (tts->java_thread,
+                    &owned_monitors_count, &owned_monitors), TM_ERROR_NONE);
                 tf_assert_same(owned_monitors_count, 0);
             }
         }

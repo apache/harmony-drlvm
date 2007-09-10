@@ -177,6 +177,9 @@
                         </fileset>
 
                         <select os="win">
+                            <select cfg="debug">
+                                <linkerarg value="/DEBUG" />
+                            </select>
                             <libset type="shared" libs="harmonyvm"
                                 dir="${hdk.lib.dir}" />
                             <libset type="shared" libs="hythr"

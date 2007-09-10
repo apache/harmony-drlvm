@@ -176,7 +176,7 @@ int test_jthread_exception_stop (void){
         check_tested_thread_phase(tts, TT_PHASE_ANY);
         hythread = vm_jthread_get_tm_data(tts->java_thread);
         tf_assert(hythread);
-        vm_thread = (vm_thread_t)hythread_tls_get(hythread, TM_THREAD_VM_TLS_KEY);
+        vm_thread = jthread_get_vm_thread(hythread);
         tf_assert(vm_thread);
         tf_assert(vm_objects_are_equal(excn, vm_thread->stop_exception));
     }
@@ -219,8 +219,7 @@ int test_jthread_stop (void){
 
         hythread = vm_jthread_get_tm_data(tts->java_thread);
         tf_assert(hythread);
-        vm_thread =
-            (vm_thread_t)hythread_tls_get(hythread, TM_THREAD_VM_TLS_KEY);
+        vm_thread = jthread_get_vm_thread(hythread);
         tf_assert(vm_thread);
         stop_excn_class = (*env)->CallObjectMethod(env,
             vm_thread->stop_exception, getClassId);

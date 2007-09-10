@@ -153,7 +153,7 @@ class DebugUtilsTI {
         hythread_tls_key_t TL_ti_enabled; //thread local TI flag
 
         // TI event thread data
-        hythread_t event_thread;
+        vm_thread_t event_thread;
         hycond_t event_cond;
         int event_cond_initialized;
 

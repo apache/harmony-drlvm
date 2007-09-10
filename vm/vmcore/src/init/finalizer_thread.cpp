@@ -103,15 +103,17 @@ void finalizer_threads_init(JavaVM *java_vm, JNIEnv *jni_env)
     status = hymutex_create(&fin_thread_info->mutator_block_mutex, TM_MUTEX_DEFAULT);
     assert(status == TM_ERROR_NONE);
     
-    fin_thread_info->thread_ids = (hythread_t *)STD_MALLOC(sizeof(hythread_t) * fin_thread_info->thread_num);
+    fin_thread_info->thread_ids =
+        (vm_thread_t*)STD_MALLOC(fin_thread_info->thread_num * sizeof(vm_thread_t));
+    void **args = (void **)STD_MALLOC(sizeof(void *) * 2);
+    args[0] = (void*)java_vm;
+    args[1] = (void*)get_system_thread_group(jni_env);
     
     for(unsigned int i = 0; i < fin_thread_info->thread_num; i++){
-        void **args = (void **)STD_MALLOC(sizeof(void *) * 2);
-        args[0] = (void*)java_vm;
-        args[1] = (void*)get_system_thread_group(jni_env);
-        fin_thread_info->thread_ids[i] = (hythread_t)STD_CALLOC(1, hythread_get_struct_size());
-        status = hythread_create_with_group(fin_thread_info->thread_ids[i], NULL, 0,
-            FINALIZER_THREAD_PRIORITY, (hythread_entrypoint_t)finalizer_thread_func, args);
+        fin_thread_info->thread_ids[i] = jthread_allocate_thread();
+        status = hythread_create_ex((hythread_t)fin_thread_info->thread_ids[i],
+            NULL, 0, FINALIZER_THREAD_PRIORITY,
+            (hythread_entrypoint_t)finalizer_thread_func, args);
         assert(status == TM_ERROR_NONE);
         hysem_wait(fin_thread_info->attached_sem);
     }    
@@ -256,7 +258,7 @@ static Boolean self_is_finalizer_thread(void)
     hythread_t self = hythread_self();
     
     for(unsigned int i=0; i<fin_thread_info->thread_num; ++i)
-        if(self == fin_thread_info->thread_ids[i])
+        if(self == (hythread_t)fin_thread_info->thread_ids[i])
             return TRUE;
     
     return FALSE;

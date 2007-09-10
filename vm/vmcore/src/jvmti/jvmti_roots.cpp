@@ -369,7 +369,7 @@ void ti_enumerate_roots(TIEnv *ti_env, hythread_iterator_t iterator)
     // Run through list of active threads and enumerate each one of them.
     hythread_t tm_thread = hythread_iterator_next(&iterator);
     while (tm_thread && !ti_env->iteration_state->abort) {
-        VM_thread *thread = get_vm_thread(tm_thread);
+        vm_thread_t thread = jthread_get_vm_thread(tm_thread);
         if (thread)
             ti_enumerate_thread(ti_env, thread);
         tm_thread = hythread_iterator_next(&iterator);
