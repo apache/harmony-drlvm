@@ -100,13 +100,13 @@ SD2_OPT.useProfile=EDGE_PROF,VALUE_PROF
 -XX:jit.SD2_OPT.SD2_OPT_helper_inliner_pipeline.path=ssa
 -XX:jit.SD2_OPT.arg.optimizer.inline_helpers.pipeline=SD2_OPT_helper_inliner_pipeline
 
--XX:jit.SD2_OPT.arg.optimizer.inline_helpers.newObj=off
--XX:jit.SD2_OPT.arg.optimizer.inline_helpers.newObj_className=org/apache/harmony/drlvm/gc_cc/GCHelper
+-XX:jit.SD2_OPT.arg.optimizer.inline_helpers.newObj=on
+-XX:jit.SD2_OPT.arg.optimizer.inline_helpers.newObj_className=org/apache/harmony/drlvm/gc_gen/GCHelper
 -XX:jit.SD2_OPT.arg.optimizer.inline_helpers.newObj_methodName=alloc
 -XX:jit.SD2_OPT.arg.optimizer.inline_helpers.newObj_hotnessPercent=1
 
--XX:jit.SD2_OPT.arg.optimizer.inline_helpers.newArray=off
--XX:jit.SD2_OPT.arg.optimizer.inline_helpers.newArray_className=org/apache/harmony/drlvm/gc_cc/GCHelper
+-XX:jit.SD2_OPT.arg.optimizer.inline_helpers.newArray=on
+-XX:jit.SD2_OPT.arg.optimizer.inline_helpers.newArray_className=org/apache/harmony/drlvm/gc_gen/GCHelper
 -XX:jit.SD2_OPT.arg.optimizer.inline_helpers.newArray_methodName=allocArray
 -XX:jit.SD2_OPT.arg.optimizer.inline_helpers.newArray_hotnessPercent=1
 
@@ -144,8 +144,8 @@ SD2_OPT.useProfile=EDGE_PROF,VALUE_PROF
 -Djava.compiler=server
 
 #GC magics support
--Dvm.components.gc_cc.startupclass=org.apache.harmony.drlvm.gc_cc.GCHelper
--XX:vm.component.classpath.gc_cc=gc_cc.jar
+-Dvm.components.gc_gen.startupclass=org.apache.harmony.drlvm.gc_gen.GCHelper
+-XX:vm.component.classpath.gc_gen=gc_gen.jar
 
 #TM properties
 -Dvm.components.hythr.startupclass=org.apache.harmony.drlvm.thread.ThreadHelper
