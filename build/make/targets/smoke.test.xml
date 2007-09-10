@@ -240,7 +240,7 @@
                                 </or>
                             </and>
                         </condition>
-                        <to-junit-xml xml="${test.report}.xml"
+                        <to-junit-xml xml="${smoke.test.dir}/reports/TEST-${class.name}_${mode.id}.xml"
                             suite="${class.name}_${mode.id}" test="${mode.name}" status="${@{test}.is.passed}"
                             out="${@{test}.out}" err="${@{test}.err}"/>
 
