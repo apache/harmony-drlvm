@@ -467,6 +467,17 @@ Class_Handle method_get_class(Method_Handle m)
     return ((Method *)m)->get_class();
 }
 
+void method_lock(Method_Handle m)
+{
+    assert(m);
+    return ((Method *)m)->lock();
+}
+
+void method_unlock(Method_Handle m)
+{
+    assert(m);
+    return ((Method *)m)->unlock();
+}
 
 
 Java_Type method_get_return_type(Method_Handle m)

@@ -131,8 +131,13 @@ void TranslatorAction::readFlags() {
     
     flags.genMinMaxAbs = getBoolArg("genMinMaxAbs", false);
     flags.genFMinMaxAbs = getBoolArg("genFMinMaxAbs", false);
- 
-    flags.lazyResolution = getBoolArg("lazyResolution", false);
+
+#ifdef _IA32_ 
+    bool defaultIsLazy = true;
+#else
+    bool defaultIsLazy = false;
+#endif
+    flags.lazyResolution = getBoolArg("lazyResolution", defaultIsLazy);
     flags.assertOnRecursion = getBoolArg("assertOnRecursion", flags.lazyResolution);
 }
 

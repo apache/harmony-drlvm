@@ -53,11 +53,11 @@ SD2_OPT.useProfile=EDGE_PROF,VALUE_PROF
 -XDjit.RA3.path=webmaker,cg_regalloc
 -XDjit.RA3.arg.webmaker.calc=true
 
--XX:jit.SD1_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
+-XX:jit.SD1_OPT.path=opt_init,lock_method,translator,optimizer,hir2lir,codegen,unlock_method
 
 -XX:jit.SD1_OPT.path.optimizer=ssa,simplify,dce,uce,vp_instrument,devirt_virtual,edge_instrument,dessa,statprof
 -XX:jit.SD1_OPT.path.devirt_virtual=devirt
--XX:jit.SD1_OPT.path.codegen=lock_method,bbp,btr,gcpoints,cafl,dce1,i8l,api_magic,early_prop,peephole,itrace-,native,constraints,dce2,regalloc,spillgen,copy,i586,layout,rce+,stack,break-,iprof-,peephole,emitter!,si_insts,gcmap,info,unlock_method
+-XX:jit.SD1_OPT.path.codegen=bbp,btr,gcpoints,cafl,dce1,i8l,api_magic,early_prop,peephole,itrace-,native,constraints,dce2,regalloc,spillgen,copy,i586,layout,rce+,stack,break-,iprof-,peephole,emitter!,si_insts,gcmap,info
 -XX:jit.SD1_OPT.path.dce1=cg_dce
 -XX:jit.SD1_OPT.path.dce2=cg_dce
 

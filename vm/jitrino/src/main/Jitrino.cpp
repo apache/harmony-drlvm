@@ -251,9 +251,6 @@ bool compileMethod(CompilationContext* cc) {
 
 bool Jitrino::CompileMethod(CompilationContext* cc) {
     CompilationInterface* compilationInterface = cc->getVMCompilationInterface();
-//#ifdef _IPF_ //IPF CG params are not safe -> add them to CompilationContext and remove this lock
-//    compilationInterface->lockMethodData();
-//#endif
     bool success = false;
     MethodDesc& methodDesc = *compilationInterface->getMethodToCompile();
     initialize_parameters(cc, methodDesc);
@@ -264,9 +261,6 @@ bool Jitrino::CompileMethod(CompilationContext* cc) {
     } else {
         success = compileMethod(cc);
     }
-//#ifdef _IPF_
-//    compilationInterface->unlockMethodData();
-//#endif
     return success;
 }
 

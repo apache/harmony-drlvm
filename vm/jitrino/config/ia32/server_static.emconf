@@ -22,10 +22,10 @@ SS_OPT.file=jitrino
 
 # Options to be passed to JIT
 
--XX:jit.SS_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
+-XX:jit.SS_OPT.path=opt_init,lock_method,translator,optimizer,hir2lir,codegen,unlock_method
 
 -XX:jit.SS_OPT.path.optimizer=ssa,simplify,dce,uce,statprof,devirt,inline,purge,simplify,dce,uce,lazyexc,throwopt,statprof,hvn,dce,uce,dessa,statprof,peel,ssa,hvn,simplify,dce,uce,lower,dce,uce,unroll,ssa,simplify,dce,uce,memopt,reassoc,dce,uce,hvn,dce,uce,classic_abcd,dce,uce,gcm,dessa,statprof
--XX:jit.SS_OPT.path.codegen=lock_method,bbp,btr,gcpoints,cafl,dce1,i8l,api_magic,early_prop,peephole,itrace-,native,constraints,dce2,regalloc,spillgen,copy,i586,layout,rce+,stack,break-,iprof-,peephole,emitter!,si_insts,gcmap,info,unlock_method
+-XX:jit.SS_OPT.path.codegen=bbp,btr,gcpoints,cafl,dce1,i8l,api_magic,early_prop,peephole,itrace-,native,constraints,dce2,regalloc,spillgen,copy,i586,layout,rce+,stack,break-,iprof-,peephole,emitter!,si_insts,gcmap,info
 -XX:jit.SS_OPT.path.dce1=cg_dce
 -XX:jit.SS_OPT.path.dce2=cg_dce
 -XX:jit.SS_OPT.path.regalloc=bp_regalloc1,bp_regalloc2

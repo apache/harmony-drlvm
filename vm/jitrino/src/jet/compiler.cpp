@@ -50,15 +50,14 @@ using std::stack;
     #include "Jitrino.h"
     #include "EMInterface.h"
     #include "JITInstanceContext.h"
-    /**
-    * A lock used to protect method's data in multi-threaded compilation.
-    * See VMInterface.h 
-    * CompilationInterface::lockMethodData/unlockMethodData for details.
-    */
-    extern Jitrino::Mutex g_compileLock;
-#else
-    static Jitrino::Mutex g_compileLock;
 #endif
+/**
+* A lock used to protect method's data in multi-threaded compilation.
+* See VMInterface.h 
+* CompilationInterface::lockMethodData/unlockMethodData for details.
+*/
+static Jitrino::Mutex g_compileLock;
+
 
 #include "../main/Log.h"
 using Jitrino::Log;

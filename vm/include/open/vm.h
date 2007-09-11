@@ -561,6 +561,16 @@ VMEXPORT const char  *method_get_descriptor(Method_Handle mh);
  */
 VMEXPORT Class_Handle method_get_class(Method_Handle mh);
 
+/*
+* Acquires lock associated with method
+*/
+VMEXPORT void method_lock(Method_Handle mh);
+
+/*
+* Releases lock associated with method
+*/
+VMEXPORT void method_unlock(Method_Handle mh);
+
 /**
  * @return <code>TRUE</code> if the method is private.
  */

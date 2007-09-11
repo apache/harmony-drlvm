@@ -36,11 +36,6 @@
 #include "mkernel.h"
 #include "VMMagic.h"
 
-/**
-* @brief A lock used to protect method's data in multi-threaded compilation.
-*/
-Jitrino::Mutex g_compileLock;
-
 namespace Jitrino {
 
 
@@ -793,9 +788,17 @@ typeManager(tpm), compilation_params(comp_params)
     flushToZeroAllowed = false;
 }
 
-void    CompilationInterface::lockMethodData(void)    { g_compileLock.lock();     }
+void CompilationInterface::lockMethodData(void)    { 
+    assert(methodToCompile);
+    Method_Handle mh = methodToCompile->getMethodHandle();
+    method_lock(mh);
+}
 
-void    CompilationInterface::unlockMethodData(void)  { g_compileLock.unlock();   }
+void CompilationInterface::unlockMethodData(void)  { 
+    assert(methodToCompile);
+    Method_Handle mh = methodToCompile->getMethodHandle();
+    method_unlock(mh);
+}
 
 Byte*   CompilationInterface::allocateCodeBlock(size_t size, size_t alignment, CodeBlockHeat heat, int32 id, 
 bool simulate) {
