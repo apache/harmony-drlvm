@@ -41,8 +41,10 @@ public class Throwable implements Serializable {
 	private final String detailMessage;
 
 	private StackTraceElement[] stackTrace;
-	
-	private transient Object state;
+
+    private transient Class [] stackClasses;
+
+    private transient Object state;
 
     /**
      * @com.intel.drl.spec_ref 
@@ -80,6 +82,7 @@ public class Throwable implements Serializable {
      */
 	public Throwable fillInStackTrace() {
 		state = VMStack.getStackState();
+        stackClasses = VMStack.getStackClasses(state);
 		return this;
 	}
 
@@ -107,14 +110,9 @@ public class Throwable implements Serializable {
     /**
      * @com.intel.drl.spec_ref 
      */
-	public StackTraceElement[] getStackTrace() {
-	    if (stackTrace == null) {
-	        stackTrace = VMStack.getStackTrace(state);
-	    }
-		StackTraceElement[] st = new StackTraceElement[stackTrace.length];
-		System.arraycopy(stackTrace, 0, st, 0, stackTrace.length);
-		return st;
-	}
+    public StackTraceElement[] getStackTrace() {
+        return getStackTrace(true);
+    }
 
     /**
      * @com.intel.drl.spec_ref 
@@ -149,15 +147,37 @@ public class Throwable implements Serializable {
     /**
      * @com.intel.drl.spec_ref 
      */
-	public void printStackTrace(PrintWriter pw) {
+    public void printStackTrace(PrintWriter pw) {
 		pw.println(makeThrowableString());
-	}
+    }
+
+    private void initStackTrace() {
+        if (stackTrace == null) {
+            stackTrace = VMStack.getStackTrace(state);
+            state = null;
+            stackClasses = null;
+        }
+    }
+
+    private StackTraceElement[] getStackTrace(boolean copyArray)
+    {
+        StackTraceElement[] st;
+        initStackTrace();
+
+        if (copyArray) {
+            st = new StackTraceElement[stackTrace.length];
+            System.arraycopy(stackTrace, 0, st, 0, stackTrace.length);
+        } else {
+            st = stackTrace;
+        }
+        return st;
+    }
 
 	private String makeThrowableString() {
         StringBuffer sb = new StringBuffer();
         sb.append(toString());
 	    if (stackTrace == null) {
-	        stackTrace = VMStack.getStackTrace(state);
+            initStackTrace();
 	    }
 	    // FIXME stackTrace should never be null here
         if (stackTrace != null) {
@@ -173,7 +193,7 @@ public class Throwable implements Serializable {
             StackTraceElement[] parentStackTrace = wCause.stackTrace;
             wCause = wCause.getCause();
     	    if (wCause.stackTrace == null) {
-    	        wCause.stackTrace = VMStack.getStackTrace(wCause.state);
+                wCause.initStackTrace();
     	    }
             sb.append("\nCaused by: ").append(wCause.toString());
     	    // FIXME wCause.stackTrace should never be null here
@@ -242,7 +262,7 @@ public class Throwable implements Serializable {
 
         private void writeObject(ObjectOutputStream s) throws IOException {
             if (stackTrace == null) {
-                stackTrace = VMStack.getStackTrace(state);
+                initStackTrace();
             }
             s.defaultWriteObject();
         }

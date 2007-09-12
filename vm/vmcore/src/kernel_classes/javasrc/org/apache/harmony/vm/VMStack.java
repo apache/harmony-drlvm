@@ -78,7 +78,7 @@ public final class VMStack {
      * @api2vm
      */
     public static native Class[] getClasses(int maxSize, boolean considerPrivileged);
-    
+
     /**
      * Saves stack information of currently executing thread. Returned object
      * can be used as a handler to obtain an array of
@@ -88,7 +88,27 @@ public final class VMStack {
      * @return handler of the current stack. 
      */
     public static native Object getStackState();
-    
+
+    /**
+     * Collects and returns the classes of invoked methods as an array of the
+     * {@link Class} objects. This method may be used by
+     * <code>java.lang.Throwable</code> class implementation.
+     * <p>
+     * Resulting stack should contain native stack frames as well as reflection
+     * stack frames.
+     * <p>
+     * <b>Note</b>, that it returns classes for all stack, without any checks.
+     * It's fast, simple version of {@link VMStack#getClasses() VMStack.getClasses()}
+     * method, and used from Throwable class implementation.
+     *
+     * @param state handler returned by the
+     *        {@link VMStack#getStackState() VMStack.getStackState()} method.
+     * @return array of <code>Class</code> elements. If stack is
+     *         empty then null should be returned.
+     * @api2vm
+     */
+    public static native Class[] getStackClasses(Object state);
+
     /**
      * Collects and returns the stack of invoked methods as an array of the
      * {@link StackTraceElement} objects. This method may be used by
@@ -108,6 +128,6 @@ public final class VMStack {
      * @api2vm
      */
     public static native StackTraceElement[] getStackTrace(Object state);
-    
+
     public static native StackTraceElement[] getThreadStackTrace(Thread t);
 }

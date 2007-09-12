@@ -241,7 +241,6 @@ Java_java_security_AccessController_getStackDomains(JNIEnv *jenv, jclass UNREF)
     return arr;
 }
 
-
 /*
  * Class:     org_apache_harmony_vm_VMStack
  * Method:    getStackState
@@ -274,6 +273,52 @@ JNIEXPORT jobject JNICALL Java_org_apache_harmony_vm_VMStack_getStackState
 
     return array;
 } // Java_org_apache_harmony_vm_VMStack_getStackState
+
+/*
+ * Class:     org_apache_harmony_vm_VMStack
+ * Method:    getStackClasses
+ * Signature: (Ljava/lang/Object;)[Ljava/lang/Class;
+ */
+JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getStackClasses
+  (JNIEnv *jenv, jclass, jobject state)
+{
+    ASSERT_RAISE_AREA;
+    if (NULL == state)
+        return NULL;
+
+    Global_Env* genv = jni_get_vm_env(jenv);
+
+     // state object contains raw data as long array
+    jlongArray array = (jlongArray)state;
+    assert(array);
+
+    // copy data to array
+    jlong* array_data = jenv->GetLongArrayElements(array, NULL);
+
+    // get depth of the stack
+    StackTraceFrame* frames = (StackTraceFrame*) array_data;
+    unsigned size = jenv->GetArrayLength(array) * 8 / sizeof(StackTraceFrame);
+
+    // get class array class
+    jclass cac = struct_Class_to_java_lang_Class_Handle(genv->JavaLangClass_Class);
+    assert(cac);
+
+    // create java array
+    jobjectArray arr = jenv->NewObjectArray(size, cac, NULL);
+    if (arr == NULL) {
+        return NULL;
+    }
+
+    // find and store classes of the methods on the stack
+    for (unsigned i=0; i < size; i++) {
+        Method* m = frames[i].method;
+        Class* c = m->get_class();
+        jclass jc = struct_Class_to_java_lang_Class_Handle(c);
+        jenv->SetObjectArrayElement(arr, i, jc);
+    }
+
+    return arr;
+}
 
 /*
  * Class:     org_apache_harmony_vm_VMStack

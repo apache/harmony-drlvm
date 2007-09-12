@@ -62,6 +62,13 @@ JNIEXPORT jobject JNICALL
 Java_org_apache_harmony_vm_VMStack_getStackState(JNIEnv *, jclass);
 
 /*
+ * Method: org.apache.harmony.vm.VMStack.getStackClasse(Ljava/lang/Object;)[Ljava/lang/Class
+ */
+JNIEXPORT jobjectArray JNICALL
+Java_org_apache_harmony_vm_VMStack_getStackClasses(JNIEnv *, jclass,
+    jobject);
+
+/*
  * Method: org.apache.harmony.vm.VMStack.getStackTrace(Ljava/lang/Object;)[Ljava/lang/StackTraceElement;
  */
 JNIEXPORT jobjectArray JNICALL
