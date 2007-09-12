@@ -129,6 +129,25 @@ ${@{file}.content}
             </if>
         </sequential>
     </macrodef>
+    
+    <macrodef name="escape-cdata">
+        <attribute name="file"/>
+        <attribute name="property"/>
+        <sequential>
+            <loadfile property="@{property}" srcFile="@{file}" >
+                <filterchain>
+                    <escapeunicode/>
+                    <tokenfilter>
+                        <replaceregex pattern="&amp;" replace="&amp;#38;" flags="gi"/>
+                        <replaceregex pattern="&lt;" replace="&amp;#60;" flags="gi"/>
+                        <replaceregex pattern=">" replace="&amp;#62;" flags="gi"/>
+                        <replaceregex pattern="&quot;" replace="&amp;#34;" flags="gi"/>
+                        <replaceregex pattern="'" replace="&amp;#39;" flags="gi"/>
+                    </tokenfilter>
+                </filterchain>
+            </loadfile>
+        </sequential>
+    </macrodef>
 
     <macrodef name="to-junit-xml">
         <attribute name="xml" description="name of xml file"/>
@@ -138,6 +157,7 @@ ${@{file}.content}
         <attribute name="out" default="" description="test output"/>
         <attribute name="err" default="" description="test error"/>
         <attribute name="time" default="0.01" description="test execution time"/>
+        <attribute name="msg" default="FAILED" description="error message"/>
         <sequential>
             <echo file="@{xml}"><![CDATA[<?xml version="1.0" encoding="UTF-8" ?>
             <testsuite errors="0" failures="@F@" name="@SUITE@" tests="1" time="@TIME@">
@@ -149,7 +169,7 @@ ${@{file}.content}
             <condition property="@{xml}.failed" value="0" else="1">
                 <istrue value="@{status}"/>
             </condition>
-            <condition property="@{xml}.message" value="" else="&lt;failure message='FAILED'/>">
+            <condition property="@{xml}.message" value="" else="&lt;failure message='@{msg}'/>">
                 <istrue value="@{status}"/>
             </condition>
             <condition property="@{xml}.out" value="]" else="@{out}]">

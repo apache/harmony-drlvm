@@ -205,8 +205,23 @@
                             <env key="LD_LIBRARY_PATH" value="${test.jre.home}/bin:${env.LD_LIBRARY_PATH}" />
                         </java>
 
-                        <loadfile property="@{test}.out" srcFile="${test.report}.out" />
-                        <loadfile property="@{test}.err" srcFile="${test.report}.out.err" />
+                        <loadfile property="@{test}.out" srcFile="${test.report}.out">
+                            <filterchain>
+                                <tokenfilter>
+                                    <!-- Should escape CDATA end marker -->
+                                    <replaceregex pattern="]]>" replace="]]&amp;gt;" flags="gi"/>
+                                </tokenfilter>
+                            </filterchain>
+                        </loadfile>
+                        <loadfile property="@{test}.err" srcFile="${test.report}.out.err">
+                            <filterchain>
+                                <tokenfilter>
+                                    <!-- Should escape CDATA end marker -->
+                                    <replaceregex pattern="]]>" replace="]]&amp;gt;" flags="gi"/>
+                                </tokenfilter>
+                            </filterchain>
+                        </loadfile>
+
                         <!-- loadfile does not define the property if file is empty -->
                         <property name="@{test}.out" value=""/>
                         <property name="@{test}.err" value=""/>
@@ -240,9 +255,13 @@
                                 </or>
                             </and>
                         </condition>
+
+                        <escape-cdata file="${test.report}.out.err" property="@{test}.msg"/>
                         <to-junit-xml xml="${smoke.test.dir}/reports/TEST-${class.name}_${mode.id}.xml"
-                            suite="${class.name}_${mode.id}" test="${mode.name}" status="${@{test}.is.passed}"
-                            out="${@{test}.out}" err="${@{test}.err}"/>
+                            suite="${class.name}_${mode.id}" test="${mode.name}" 
+                            status="${@{test}.is.passed}"
+                            out="${@{test}.out}" err="${@{test}.err}" 
+                            msg="Exit code: ${res.code} Err: ${@{test}.msg}"/>
 
                         <if>
                             <istrue value="${@{test}.is.passed}" />
