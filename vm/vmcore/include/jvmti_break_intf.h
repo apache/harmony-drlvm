@@ -84,7 +84,7 @@ typedef bool (*BPInterfaceProcedure) (VMBreakPoint *bp);
 class VMBreakPoints
 {
 public:
-    VMBreakPoints() : m_break(NULL), m_last(NULL), m_local(NULL)
+    VMBreakPoints() : m_break(NULL), m_local(NULL)
     {
         for(unsigned index = 0; index < PRIORITY_NUMBER; index++ ) {
             m_intf[index] = NULL;
@@ -153,7 +153,6 @@ private:
 private:
     VMBreakInterface* m_intf[PRIORITY_NUMBER];
     VMBreakPoint*     m_break;
-    VMBreakPoint*     m_last;
     VMLocalBreak*     m_local;
     Lock_Manager      m_lock;
 };

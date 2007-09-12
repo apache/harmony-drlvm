@@ -83,24 +83,9 @@ VMBreakPoints::new_intf(TIEnv *env,
 
     TRACE2("jvmti.break", "Create breakpoint interface: " << intf );
 
-    // add interface to the end of list
-    if( NULL == m_intf[priority] ) {
-        m_intf[priority] = intf;
-    } else {
-        VMBreakInterface *last = m_intf[priority];
-        for( ; last->m_next; last = last->m_next )
-            ;
-        last->m_next = intf;
-    }
-
-    // correct thread processing breakpoints
-    for(VMLocalBreak *local = m_local; local; local = local->next) {
-        if( local->priority == priority && NULL == local->intf ) {
-            TRACE2("jvmti.break", "Set local thread interface: "
-                << local << ", intf: " << intf );
-            local->intf = intf;
-        }
-    }
+    // add interface to the top of list
+    intf->m_next = m_intf[priority];
+    m_intf[priority] = intf;
 
     unlock();
 
@@ -214,29 +199,9 @@ VMBreakPoints::insert_breakpoint(VMBreakPoint* bp)
         << (bp->method ? method_get_descriptor((Method*)bp->method) : "")
         << " :" << bp->location << " :" << bp->addr);
 
-    // add breakpoint to the end of list
-    if(m_last) {
-        m_last->next = bp;
-    } else {
-        m_break = bp;
-    }
-    m_last = bp;
-    bp->next = NULL;
-
-    // correct thread processing breakpoints
-    for(VMLocalBreak *local = m_local; local; local = local->next) {
-        if( !local->bp_next ) {
-            TRACE2("jvmti.break", "Set local thread next breakpoint: "
-                << local << ", next: "
-                << (bp->method
-                    ? class_get_name(method_get_class((Method*)bp->method)) : "(nil)")
-                << "."
-                << (bp->method ? method_get_name((Method*)bp->method) : "(nil)")
-                << (bp->method ? method_get_descriptor((Method*)bp->method) : "")
-                << " :" << bp->location << " :" << bp->addr);
-            local->bp_next = bp;
-        }
-    }
+    // add breakpoint to the top of list
+    bp->next = m_break;
+    m_break = bp;
     return;
 }
 
@@ -303,20 +268,12 @@ VMBreakPoints::remove_breakpoint(VMBreakPoint* bp)
         << " :" << bp->location << " :" << bp->addr);
 
     // remove breakpoint from list
-    VMBreakPoint *last = NULL;
-    for( VMBreakPoint *index = m_break;
-         index;
-         last = index, index = index->next )
+    for (VMBreakPoint** plast = &m_break; *plast;
+         plast = &((*plast)->next))
     {
-        if(index == bp) {
-            if(m_last == bp) {
-                m_last = last;
-            }
-            if(last) {
-                last->next = index->next;
-            } else {
-                m_break = index->next;
-            }
+        if (*plast == bp)
+        {
+            *plast = (*plast)->next;
             break;
         }
     }
