@@ -140,9 +140,9 @@ void Opnd::normalizeMemSubOpnds(void)
     Opnd* base = getMemOpndSubOpnd(MemOpndSubOpndKind_Base);
     Opnd* disp = getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement);
     if (base != NULL && base->isPlacedIn(OpndKind_Imm)) {
-        assert(disp == NULL || !disp->isPlacedIn(OpndKind_Imm));
+        assert(disp == NULL || !disp->isPlacedIn(OpndKind_Imm) || base->getType()->isNullObject());
+        setMemOpndSubOpnd(MemOpndSubOpndKind_Displacement, base);
         // can't call setMemOpndSubOpnd() as it fights against zero opnd.
-        memOpndSubOpnds[MemOpndSubOpndKind_Displacement] = base;//== setMemOpndSubOpnd(MemOpndSubOpndKind_Displacement, base);
         memOpndSubOpnds[MemOpndSubOpndKind_Base] = disp; //==setMemOpndSubOpnd(MemOpndSubOpndKind_Base, disp);
     }
 }
