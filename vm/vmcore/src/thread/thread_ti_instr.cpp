@@ -365,8 +365,10 @@ jthread_get_contended_monitor(jthread java_thread, jobject * monitor)
     assert(java_thread);
     hythread_t native_thread = vm_jthread_get_tm_data(java_thread);
     jvmti_thread_t jvmti_thread = jthread_get_jvmti_thread(native_thread);
-    assert(jvmti_thread);
-    *monitor = jvmti_thread->contended_monitor;
+    if (jvmti_thread)
+        *monitor = jvmti_thread->contended_monitor;
+	else
+		*monitor = NULL;
     return TM_ERROR_NONE;
 } // jthread_get_contended_monitor
 
@@ -382,8 +384,10 @@ IDATA VMCALL jthread_get_wait_monitor(jthread java_thread, jobject * monitor)
     assert(java_thread);
     hythread_t native_thread = vm_jthread_get_tm_data(java_thread);
     jvmti_thread_t jvmti_thread = jthread_get_jvmti_thread(native_thread);
-    assert(jvmti_thread);
-    *monitor = jvmti_thread->wait_monitor;
+    if (jvmti_thread)
+        *monitor = jvmti_thread->wait_monitor;
+	else
+		*monitor = NULL;
     return TM_ERROR_NONE;
 } // jthread_get_wait_monitor
 
@@ -467,7 +471,11 @@ jthread_get_owned_monitors(jthread java_thread,
     }
     hythread_t native_thread = vm_jthread_get_tm_data(java_thread);
     jvmti_thread_t jvmti_thread = jthread_get_jvmti_thread(native_thread);
-    assert(jvmti_thread);
+    if (!jvmti_thread)
+	{
+        status = hythread_global_unlock();
+        return status;
+	}
 
     jobject *monitors =
         (jobject *) malloc(sizeof(jobject *) *

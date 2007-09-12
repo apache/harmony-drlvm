@@ -48,8 +48,10 @@ jthread_get_thread_blocked_time(jthread java_thread, jlong * nanos_ptr)
     hythread_t native_thread = vm_jthread_get_tm_data(java_thread);
     assert(native_thread);
     jvmti_thread_t jvmti_thread = jthread_get_jvmti_thread(native_thread);
-    assert(jvmti_thread);
-    *nanos_ptr = jvmti_thread->blocked_time;
+    if (jvmti_thread)
+        *nanos_ptr = jvmti_thread->blocked_time;
+	else
+		*nanos_ptr = 0;
     return TM_ERROR_NONE;
 } // jthread_get_thread_blocked_time
 
@@ -119,8 +121,10 @@ jthread_get_thread_waited_time(jthread java_thread, jlong * nanos_ptr)
     hythread_t native_thread = vm_jthread_get_tm_data(java_thread);
     assert(native_thread);
     jvmti_thread_t jvmti_thread = jthread_get_jvmti_thread(native_thread);
-    assert(jvmti_thread);
-    *nanos_ptr = jvmti_thread->waited_time;
+    if (jvmti_thread)
+        *nanos_ptr = jvmti_thread->waited_time;
+	else
+		*nanos_ptr = 0;
 
     return TM_ERROR_NONE;
 } // jthread_get_thread_waited_time
@@ -137,8 +141,10 @@ jlong VMCALL jthread_get_thread_blocked_times_count(jthread java_thread)
     hythread_t native_thread = jthread_get_native_thread(java_thread);
     assert(native_thread);
     jvmti_thread_t jvmti_thread = jthread_get_jvmti_thread(native_thread);
-    assert(jvmti_thread);
-    return jvmti_thread->blocked_count;
+    if (jvmti_thread)
+        return jvmti_thread->blocked_count;
+	else
+		return 0;
 } // jthread_get_thread_blocked_times_count
 
 /**
@@ -153,8 +159,10 @@ jlong VMCALL jthread_get_thread_waited_times_count(jthread java_thread)
     hythread_t native_thread = jthread_get_native_thread(java_thread);
     assert(native_thread);
     jvmti_thread_t jvmti_thread = jthread_get_jvmti_thread(native_thread);
-    assert(jvmti_thread);
-    return jvmti_thread->waited_count;
+    if (jvmti_thread)
+        return jvmti_thread->waited_count;
+	else
+		return 0;
 } // jthread_get_thread_waited_times_count
 
 /**
