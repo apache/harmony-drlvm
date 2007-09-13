@@ -220,8 +220,8 @@ namespace CPVerifier {
             //must be checked before
             assert( from != to );
 
-            return to == sm_get_const_object() || !strcmp(to_name, "java.lang.Cloneable") || 
-                    !strcmp(to_name, "java.io.Serializable");
+            return to == sm_get_const_object() || !strcmp(to_name, "java/lang/Cloneable") || 
+                    !strcmp(to_name, "java/io/Serializable");
         } else {
             //both not arrays
 
