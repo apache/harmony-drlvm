@@ -250,6 +250,7 @@
                 </condition>
 
                 <escape-cdata file="${cunit.test.dir}/reports/${filename}.out" property="@{file}.msg"/>
+                <property name="@{file}.msg" value=""/>
                 <to-junit-xml xml="${cunit.test.dir}/reports/TEST-${filename}.xml" 
                     suite="${filename}"
                     status="${@{file}.status}"

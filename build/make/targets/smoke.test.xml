@@ -257,6 +257,7 @@
                         </condition>
 
                         <escape-cdata file="${test.report}.out.err" property="@{test}.msg"/>
+                        <property name="@{test}.msg" value=""/>
                         <to-junit-xml xml="${smoke.test.dir}/reports/TEST-${class.name}_${mode.id}.xml"
                             suite="${class.name}_${mode.id}" test="${mode.name}" 
                             status="${@{test}.is.passed}"
