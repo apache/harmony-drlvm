@@ -385,7 +385,7 @@ namespace CPVerifier {
             int idx = 0;
 
             for( ; idx < length - 3; idx += 4 ) {
-                if( *((int32*) (key+idx) ) != *((int32*) (h_key+idx) ) ) return false;
+                if( *((uint32*) (key+idx) ) != *((uint32*) (h_key+idx) ) ) return false;
             }
 
             for( ; idx < length; idx++) {
@@ -406,7 +406,7 @@ namespace CPVerifier {
             int idx = 0;
 
             for( ; idx < length - 3; idx += 4 ) {
-                result += *((int32*) (key+idx) );
+                result += *((uint32*) (key+idx) );
             }
 
             for( ; idx < length; idx++) {

@@ -413,7 +413,7 @@ namespace CPVerifier {
 
         case OP_ALOAD: {
             //get local index from bytecode
-            int local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
+            unsigned local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
 
             //call macro
             CHECK_ALOAD( local_idx );
@@ -475,7 +475,7 @@ namespace CPVerifier {
 
         case OP_ASTORE: {
             //get local index from bytecode
-            int local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
+            unsigned local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
 
             //call MACRO
             CHECK_ASTORE( local_idx );
@@ -654,7 +654,7 @@ namespace CPVerifier {
 
         case OP_DLOAD: {
             //get local index from bytecode
-            int local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
+            unsigned local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
 
             //call macro
             CHECK_xxLOAD( local_idx, SM_DOUBLE );
@@ -688,7 +688,7 @@ namespace CPVerifier {
 
         case OP_DSTORE: {
             //get local index from bytecode
-            int local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
+            unsigned local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
 
             CHECK_xxSTORE( local_idx, SM_DOUBLE );
 
@@ -932,7 +932,7 @@ namespace CPVerifier {
 
         case OP_FLOAD: {
             //get local index from bytecode
-            int local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
+            unsigned local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
 
             //call macro
             CHECK_xLOAD( local_idx, SM_FLOAT );
@@ -966,7 +966,7 @@ namespace CPVerifier {
 
         case OP_FSTORE: {
             //get local index from bytecode
-            int local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
+            unsigned local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
 
             CHECK_xSTORE( local_idx, SM_FLOAT );
 
@@ -1107,7 +1107,7 @@ namespace CPVerifier {
                              }
 
         case OP_IINC: {
-            int local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
+            unsigned local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
 
             if( !workmap_valid_local(local_idx) ) {
                 return error(VF_ErrorLocals, "invalid local index");
@@ -1122,7 +1122,7 @@ namespace CPVerifier {
 
         case OP_ILOAD: {
             //get local index from bytecode
-            int local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
+            unsigned local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
 
             //call macro
             CHECK_xLOAD( local_idx, SM_INTEGER );
@@ -1168,7 +1168,7 @@ namespace CPVerifier {
 
         case OP_ISTORE: {
             //get local index from bytecode
-            int local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
+            unsigned local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
 
             CHECK_xSTORE( local_idx, SM_INTEGER );
 
@@ -1303,7 +1303,7 @@ namespace CPVerifier {
 
         case OP_LLOAD: {
             //get local index from bytecode
-            int local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
+            unsigned local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
 
             //call macro
             CHECK_xxLOAD( local_idx, SM_LONG );
@@ -1337,7 +1337,7 @@ namespace CPVerifier {
 
         case OP_LSTORE: {
             //get local index from bytecode
-            int local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
+            unsigned local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
 
             CHECK_xxSTORE( local_idx, SM_LONG );
 
@@ -1515,7 +1515,7 @@ namespace CPVerifier {
 
         case OP_GETFIELD: {
             //check and resolve instruction
-            int cp_idx = read_int16(m_bytecode + instr + 1);
+            unsigned short cp_idx = read_int16(m_bytecode + instr + 1);
             SmConstant ref, value;
             if( !tpool.cpool_get_field(cp_idx, &ref, &value) ) return error(VF_ErrorUnknown, "incorrect constantpool entry");
 
@@ -1533,7 +1533,7 @@ namespace CPVerifier {
 
         case OP_GETSTATIC: {
             //check and resolve instruction
-            int cp_idx = read_int16(m_bytecode + instr + 1);
+            unsigned short cp_idx = read_int16(m_bytecode + instr + 1);
             SmConstant value;
             if( !tpool.cpool_get_field(cp_idx, 0, &value) ) return error(VF_ErrorUnknown, "incorrect constantpool entry");
 
@@ -1545,7 +1545,7 @@ namespace CPVerifier {
 
         case OP_PUTFIELD: {
             //check and resolve instruction
-            int cp_idx = read_int16(m_bytecode + instr + 1);
+            unsigned short cp_idx = read_int16(m_bytecode + instr + 1);
             SmConstant expected_ref, expected_val;
             if( !tpool.cpool_get_field(cp_idx, &expected_ref, &expected_val) ) {
                 return error(VF_ErrorUnknown, "incorrect constantpool entry");
@@ -1574,7 +1574,7 @@ namespace CPVerifier {
 
         case OP_PUTSTATIC: {
             //check and resolve instruction
-            int cp_idx = read_int16(m_bytecode + instr + 1);
+            unsigned short cp_idx = read_int16(m_bytecode + instr + 1);
             SmConstant expected_val;
             if( !tpool.cpool_get_field(cp_idx, 0, &expected_val) ) return error(VF_ErrorUnknown, "incorrect constantpool entry");
 
@@ -1751,7 +1751,7 @@ namespace CPVerifier {
                      }
         case OP_RET: {
             //get local index from bytecode
-            int local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
+            unsigned local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
 
             //check whether it is a valid local
             if( !workmap_valid_local(local_idx) ) {

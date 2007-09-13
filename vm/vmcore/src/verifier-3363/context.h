@@ -534,12 +534,12 @@ namespace CPVerifier {
         int instr_get_len_compound(Address instr, OpCode opcode);
 
         //read two-byte value
-        static int16 read_int16(byte* ptr) {
+        static uint16 read_int16(byte* ptr) {
             return (ptr[0] << 8) | ptr[1];
         }
 
         //read four-byte value
-        static int32 read_int32(byte* ptr) {
+        static uint32 read_int32(byte* ptr) {
             return (ptr[0] << 24) | (ptr[1] << 16) | (ptr[2] << 8) | ptr[3];
         }
 
