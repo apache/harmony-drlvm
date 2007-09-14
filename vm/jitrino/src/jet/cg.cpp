@@ -307,7 +307,7 @@ void CodeGen::gen_check_div_by_zero(jtype jt, unsigned divizor_depth)
         }
         // fall through to the next checks
     }
-    // Long constant on the stack and we are on 64bit platform - check 
+    // Long value on the stack and we are on 64bit platform - check 
     // a single constant at once
     if (s.is_imm() && jt == i64 && !is_big(i64)) {
         if (s.lval() == 0) {
@@ -323,11 +323,11 @@ void CodeGen::gen_check_div_by_zero(jtype jt, unsigned divizor_depth)
     assert(jt != i64 || !vis_imm(divizor_depth+1));
     
     if (s.is_reg()) {
-        Opnd reg = s.as_opnd(i32);
+        Opnd reg = s.as_opnd(jtmov(jt));
         alu(alu_test, reg, reg);
     }
     else {
-        Opnd mem = s.as_opnd(i32);
+        Opnd mem = s.as_opnd(jtmov(jt));
         alu(alu_cmp, mem, Opnd(0));
     }
     if (jt == i32 || !is_big(jt)) {
