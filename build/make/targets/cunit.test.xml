@@ -255,7 +255,8 @@
                     suite="${filename}"
                     status="${@{file}.status}"
                     out="${outputproperty}"
-                    msg="Exit code: ${resultproperty} Err: ${@{file}.msg}"/>
+                    msg="Exit code: ${resultproperty}"
+                    detail="Exit code: ${resultproperty} Err: ${@{file}.msg}"/>
                 
                 <if>
                     <istrue value="${@{file}.status}"/>

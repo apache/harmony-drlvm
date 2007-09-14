@@ -158,6 +158,7 @@ ${@{file}.content}
         <attribute name="err" default="" description="test error"/>
         <attribute name="time" default="0.01" description="test execution time"/>
         <attribute name="msg" default="FAILED" description="error message"/>
+        <attribute name="detail" default="" description="error details or backtrace"/>
         <sequential>
             <echo file="@{xml}"><![CDATA[<?xml version="1.0" encoding="UTF-8" ?>
             <testsuite errors="0" failures="@F@" name="@SUITE@" tests="1" time="@TIME@">
@@ -169,7 +170,7 @@ ${@{file}.content}
             <condition property="@{xml}.failed" value="0" else="1">
                 <istrue value="@{status}"/>
             </condition>
-            <condition property="@{xml}.message" value="" else="&lt;failure message='@{msg}'/>">
+            <condition property="@{xml}.message" value="" else="&lt;failure message='@{msg}'>@{detail}&lt;/failure>">
                 <istrue value="@{status}"/>
             </condition>
             <condition property="@{xml}.out" value="]" else="@{out}]">

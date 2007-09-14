@@ -262,7 +262,8 @@
                             suite="${class.name}_${mode.id}" test="${mode.name}" 
                             status="${@{test}.is.passed}"
                             out="${@{test}.out}" err="${@{test}.err}" 
-                            msg="Exit code: ${res.code} Err: ${@{test}.msg}"/>
+                            msg="Exit code: ${res.code}"
+                            detail="Exit code: ${res.code} Err: ${@{test}.msg}"/>
 
                         <if>
                             <istrue value="${@{test}.is.passed}" />
