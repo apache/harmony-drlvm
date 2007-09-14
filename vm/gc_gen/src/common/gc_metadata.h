@@ -195,7 +195,7 @@ inline void collector_hashcodeset_add_entry(Collector* collector, Partial_Reveal
 }
 #endif
 
-inline void collector_tracestack_push(Collector* collector, void* p_task)
+FORCE_INLINE void collector_tracestack_push(Collector* collector, void* p_task)
 {
   /* we don't have assert as others because p_task is a p_obj for marking,
      or a p_ref for trace forwarding. The latter can be a root set pointer */

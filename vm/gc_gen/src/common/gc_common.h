@@ -214,7 +214,7 @@ inline int* object_ref_iterator_init(Partial_Reveal_Object *obj)
   return gcvt->gc_ref_offset_array;    
 }
 
-inline REF* object_ref_iterator_get(int* iterator, Partial_Reveal_Object *obj)
+FORCE_INLINE REF* object_ref_iterator_get(int* iterator, Partial_Reveal_Object *obj)
 {
   return (REF*)((POINTER_SIZE_INT)obj + *iterator);
 }
@@ -294,7 +294,7 @@ inline void obj_set_fw_in_oi(Partial_Reveal_Object *obj,void *dest)
 inline Boolean obj_is_marked_in_oi(Partial_Reveal_Object *obj) 
 {  return ( get_obj_info_raw(obj) & CONST_MARK_BIT ); }
 
-inline Boolean obj_mark_in_oi(Partial_Reveal_Object *obj) 
+FORCE_INLINE Boolean obj_mark_in_oi(Partial_Reveal_Object *obj) 
 {  
   Obj_Info_Type info = get_obj_info_raw(obj);
   if ( info & CONST_MARK_BIT ) return FALSE;
@@ -512,10 +512,10 @@ extern Boolean NOS_PARTIAL_FORWARD;
 
 #endif /* STATIC_NOS_MAPPING */
 
-inline Boolean addr_belongs_to_nos(void* addr)
+FORCE_INLINE Boolean addr_belongs_to_nos(void* addr)
 { return addr >= nos_boundary; }
 
-inline Boolean obj_belongs_to_nos(Partial_Reveal_Object* p_obj)
+FORCE_INLINE Boolean obj_belongs_to_nos(Partial_Reveal_Object* p_obj)
 { return addr_belongs_to_nos(p_obj); }
 
 extern void* los_boundary;

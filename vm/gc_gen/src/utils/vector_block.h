@@ -201,7 +201,7 @@ inline void vector_stack_clear(Vector_Block* block)
 #endif
 }
 
-inline Boolean vector_stack_is_empty(Vector_Block* block)
+FORCE_INLINE Boolean vector_stack_is_empty(Vector_Block* block)
 {  return (block->head == block->tail); }
 
 /*
@@ -209,10 +209,10 @@ inline Boolean vector_stack_is_empty(Vector_Block* block)
 { return (block->head - block->entries) == VECTOR_BLOCK_ENTRY_NUM; }
 */
 
-inline Boolean vector_stack_is_full(Vector_Block* block)
+FORCE_INLINE Boolean vector_stack_is_full(Vector_Block* block)
 {  return (block->head == block->entries); }
 
-inline void vector_stack_push(Vector_Block* block, POINTER_SIZE_INT value)
+FORCE_INLINE void vector_stack_push(Vector_Block* block, POINTER_SIZE_INT value)
 { 
   block->head--;
 #ifdef _DEBUG
@@ -221,7 +221,7 @@ inline void vector_stack_push(Vector_Block* block, POINTER_SIZE_INT value)
   *(block->head) = value;
 }
 
-inline POINTER_SIZE_INT vector_stack_pop(Vector_Block* block)
+FORCE_INLINE POINTER_SIZE_INT vector_stack_pop(Vector_Block* block)
 {   
   POINTER_SIZE_INT value = *block->head;
 #ifdef _DEBUG
