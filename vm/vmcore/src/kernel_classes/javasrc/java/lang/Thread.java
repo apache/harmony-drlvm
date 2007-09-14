@@ -294,6 +294,7 @@ public class Thread implements Runnable {
         
         long oldPointer = (oldRef == null) ? 0 : oldRef.getNativeAddr();
         long newPointer = VMThreadManager.init(this, newRef, oldPointer);
+
         if (newPointer == 0) {
             throw new OutOfMemoryError("Failed to create new thread");
         }
@@ -669,6 +670,13 @@ public class Thread implements Runnable {
     public void run() {
         if (target != null) {
             target.run();
+        }
+    }
+
+    void setAlive(boolean alive) {
+        synchronized (lock) {
+            this.isAlive = true;
+            lock.notifyAll();
         }
     }
 

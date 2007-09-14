@@ -30,6 +30,7 @@
 #include "cxxlog.h"
 
 static jmethodID jthread_get_run_method(JNIEnv * env, jthread java_thread);
+static jmethodID jthread_get_set_alive_method(JNIEnv * env, jthread java_thread);
 static IDATA jthread_associate_native_and_java_thread(JNIEnv * env,
     jthread java_thread, hythread_t native_thread, jobject weak_ref);
 
@@ -80,6 +81,9 @@ static IDATA HYTHREAD_PROC jthread_wrapper_proc(void *arg)
     }
 
     // Send Thread Start event.
+    assert(hythread_is_alive(native_thread));
+    jni_env->CallVoidMethod(java_thread,
+        jthread_get_set_alive_method(jni_env, java_thread), true);
     jvmti_send_thread_start_end_event(1);
     jthread_start_count();
 
@@ -199,6 +203,7 @@ IDATA jthread_attach(JNIEnv *jni_env, jthread java_thread, jboolean daemon)
     }
 
     // Send Thread Start event.
+    assert(hythread_is_alive(native_thread));
     jvmti_send_thread_start_end_event(1);
     jthread_start_count();
 
@@ -593,5 +598,18 @@ static jmethodID jthread_get_run_method(JNIEnv * env, jthread java_thread)
     }
     TRACE("run method find exit");
     return run_method;
+} // jthread_get_run_method
+
+static jmethodID jthread_get_set_alive_method(JNIEnv * env, jthread java_thread)
+{
+    static jmethodID set_alive_method = NULL;
+
+    TRACE("run method find enter");
+    if (!set_alive_method) {
+        jclass clazz = env->GetObjectClass(java_thread);
+        set_alive_method = env->GetMethodID(clazz, "setAlive", "(Z)V");
+    }
+    TRACE("run method find exit");
+    return set_alive_method;
 } // jthread_get_run_method
 
