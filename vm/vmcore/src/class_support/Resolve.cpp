@@ -987,6 +987,11 @@ Boolean class_is_cp_entry_resolved(Compile_Handle ch, Class_Handle clazz, unsign
                     clazz->unlock();*/
                     res = true;
                 }
+
+                //if array of primitives -> return true;
+                if (*typeName->bytes=='[' && !strchr(typeName->bytes, 'L')) {
+                    return true;
+                }
             }
 
         } 

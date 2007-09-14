@@ -227,9 +227,8 @@ void CodeGen::gen_field_op(JavaByteCodes opcode,  Class_Handle enclClass, unsign
                 fieldOp.fld = fld;
             }
         }
-        if(fieldOp.fld == NULL) { 
+        if(fieldOp.fld == NULL && !lazy) {  //in lazy resolution mode exception will be thrown from lazy resolution helper
             //TODO: we can avoid this check and use lazy resolution code path in this case!
-            assert(!lazy);
             gen_call_throw(ci_helper_linkerr, rt_helper_throw_linking_exc, 0, enclClass, cpIndex, opcode);
         }
     }

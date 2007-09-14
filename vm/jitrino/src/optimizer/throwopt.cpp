@@ -57,13 +57,12 @@ void ThrowInstEliminator::eliminateThrowInst() {
     const Nodes& nodes = flowGraph.getNodes();
     StlVector<bool> visited_nodes(irManager.getMemoryManager(), flowGraph.getMaxNodeId(), false);
     StlVector<Inst *> pseudo_insts(irManager.getMemoryManager(), 10);
-    LoopTree * loop_tree = irManager.getLoopTree();
-    Nodes::const_iterator node_iter;
+    LoopTree * loop_tree = irManager.getLoopTree();    
     bool restore_ssa = false;
 
     loop_tree->rebuild(false);
 
-    for(node_iter = nodes.begin(); node_iter != nodes.end(); ++node_iter) {
+    for(Nodes::const_iterator node_iter = nodes.begin(), end = nodes.end(); node_iter != end; ++node_iter) {
         Node * throw_node = *node_iter;
         Inst * throw_inst = (Inst *)throw_node->getLastInst();
         
