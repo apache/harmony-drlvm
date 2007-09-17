@@ -8,3 +8,7 @@ java/lang/RuntimeAdditionalTest39.java
 java/lang/RuntimeAdditionalTest40.java
 java/lang/RuntimeAdditionalTest41.java
 java/lang/RuntimeAdditionalTest42.java
+
+# Excluded because of HARMONY-4598
+java/lang/RuntimeTest.java
+java/lang/SystemExtensionTest.java
