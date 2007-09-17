@@ -485,7 +485,9 @@ jthread_get_owned_monitors(jthread java_thread,
         return TM_ERROR_OUT_OF_MEMORY;
     }
     for (int i = 0; i < jvmti_thread->owned_monitors_nmb; i++) {
-        monitors[i] = jvmti_thread->owned_monitors[i];
+        // change the order of reported monitors to be compliant with RI
+        monitors[jvmti_thread->owned_monitors_nmb - 1 - i] =
+                jvmti_thread->owned_monitors[i];
     }
     *monitors_ptr = monitors;
     *monitor_count_ptr = jvmti_thread->owned_monitors_nmb;
