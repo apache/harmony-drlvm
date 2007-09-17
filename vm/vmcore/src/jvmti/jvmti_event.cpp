@@ -410,7 +410,7 @@ jvmtiSetEventNotificationMode(jvmtiEnv* env,
                 else if (JVMTI_DISABLE == mode && ti->get_method_exit_flag() != 0)
                 {
                     LMAutoUnlock lock(&ti->TIenvs_lock);
-                    bool disable = check_event_is_disable(JVMTI_EVENT_METHOD_EXIT, ti) ||
+                    bool disable = check_event_is_disable(JVMTI_EVENT_METHOD_EXIT, ti) &&
                         check_event_is_disable(JVMTI_EVENT_FRAME_POP, ti);
                     if (disable) {
                         TRACE2("jvmti.event.method.exit", "DISABLED global method exit flag");
