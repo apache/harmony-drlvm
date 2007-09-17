@@ -424,7 +424,7 @@ namespace CPVerifier {
                     return error(VF_ErrorBranch, "jump out of method or to the middle of an instruction");
                 }
 
-                if( instr_direct(pi) ) {
+                if( instr_direct(pi, opcode, m_bytecode, instr) ) {
                     //TODO: though the spec does not require to check the dead code for correctness
                     //RI seems to check it and some Harmony negative tests have broken dead code
 
@@ -438,7 +438,7 @@ namespace CPVerifier {
                     // go to the next instruction
                     instr += instr_len;
                 }
-            } else if( instr_direct(pi) ) {
+            } else if( instr_direct(pi, opcode, m_bytecode, instr) ) {
                 dead_code_stack.push(instr+instr_len);
 
                 // it is not a jump ==> it is return or throw or ret

@@ -1902,13 +1902,13 @@ namespace CPVerifier {
 
                     if( props.isMultiway(target) || instr_is_jsr(opcode) ) {
                         //TODO: need to test commented out optimization
-                        //&& (!instr_direct(pi) || props.isDataflowPassed(target))
+                        //&& (!instr_direct(pi, opcode, m_bytecode, instr) || props.isDataflowPassed(target))
                         if( (tcr=new_generic_vector_constraint(target)) != VF_OK ) {
                             return tcr;
                         }
                     }
 
-                    if( instr_direct(pi) ) {
+                    if( instr_direct(pi, opcode, m_bytecode, instr) ) {
                         //goto, goto_w
                         if( !props.isDataflowPassed(target) ) {
                             if( target < instr ) next_start_pc = 0;
@@ -1987,7 +1987,7 @@ namespace CPVerifier {
                     }
 
                     instr += instr_len;
-                } else if( instr_direct(pi) ) {
+                } else if( instr_direct(pi, opcode, m_bytecode, instr) ) {
                     // it is not a jump ==> it is ret, return or throw
                     return VF_OK;
                 } else if( instr_is_switch(pi) ) {

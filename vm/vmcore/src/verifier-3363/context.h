@@ -559,8 +559,8 @@ namespace CPVerifier {
         }
 
         //whether this instruction GOTO, RETURN, ATHROW, or RET
-        static int instr_direct(ParseInfo &pi) {
-            return pi.flags & PI_DIRECT;
+        static int instr_direct(ParseInfo &pi, OpCode opcode, byte* code, Address instr) {
+            return (pi.flags & PI_DIRECT) || (opcode == OP_WIDE && code[instr + 1] == OP_RET);
         }
 
         //whether this instruction a *SWITCH
