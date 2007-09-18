@@ -35,6 +35,7 @@
 #include "environment.h"
 #include "exceptions.h"
 #include "vm_strings.h"
+#include "vm_arrays.h"
 #include "thread_generic.h"
 
 #include "java_lang_VMClassRegistry.h"
@@ -288,36 +289,46 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getStackClasse
 
     Global_Env* genv = jni_get_vm_env(jenv);
 
-     // state object contains raw data as long array
+    // get class array class
+    static Class *arr_class = (Class *)class_get_array_of_class(genv->JavaLangClass_Class);
+    assert(arr_class);
+
+    // state object contains raw data as long array
     jlongArray array = (jlongArray)state;
     assert(array);
 
-    // copy data to array
-    jlong* array_data = jenv->GetLongArrayElements(array, NULL);
-
     // get depth of the stack
-    StackTraceFrame* frames = (StackTraceFrame*) array_data;
     unsigned size = jenv->GetArrayLength(array) * 8 / sizeof(StackTraceFrame);
 
-    // get class array class
-    jclass cac = struct_Class_to_java_lang_Class_Handle(genv->JavaLangClass_Class);
-    assert(cac);
+    tmn_suspend_disable();       //---------------------------------v
 
     // create java array
-    jobjectArray arr = jenv->NewObjectArray(size, cac, NULL);
+    Vector_Handle arr = vm_new_vector(arr_class, size);
     if (arr == NULL) {
+        tmn_suspend_enable();
         return NULL;
     }
+
+    // copy data to array
+    Vector_Handle ja = (Vector_Handle)array->object;
+    StackTraceFrame* frames = (StackTraceFrame*)get_vector_element_address_int64(ja, 0);
 
     // find and store classes of the methods on the stack
     for (unsigned i=0; i < size; i++) {
         Method* m = frames[i].method;
         Class* c = m->get_class();
-        jclass jc = struct_Class_to_java_lang_Class_Handle(c);
-        jenv->SetObjectArrayElement(arr, i, jc);
+
+        ManagedObject *elem= struct_Class_to_java_lang_Class(c);
+        STORE_REFERENCE((ManagedObject *)arr, get_vector_element_address_ref(arr, i), elem);
     }
 
-    return arr;
+    ObjectHandle java_array = oh_allocate_local_handle();
+    java_array->object = (ManagedObject*)arr;
+
+    tmn_suspend_enable();        //---------------------------------^
+
+    return (jobjectArray)java_array;
+
 }
 
 /*
