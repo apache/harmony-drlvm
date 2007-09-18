@@ -308,8 +308,6 @@ jvmti_SingleStepLocation( VM_thread* thread,
                     (*next_step)->native_location = ip;
                     (*next_step)->no_event = true;
                 }
-                else
-                    *count = 0;
             }
             break;
 
@@ -335,16 +333,19 @@ jvmti_SingleStepLocation( VM_thread* thread,
             {
                 unsigned short index = jvmti_GetHalfWordValue( bytecode, location + 1 );
                 Class *klass = method_get_class( method );
-                assert(klass->get_constant_pool().is_entry_resolved(index));
 
-                if(!method_is_native(klass->get_constant_pool().get_ref_method(index))) {
-                    *count = 1;
-                    error = _allocate( sizeof(jvmti_StepLocation), (unsigned char**)next_step );
-                    assert( error == JVMTI_ERROR_NONE );
-                    (*next_step)->method = klass->get_constant_pool().get_ref_method(index);
-                    (*next_step)->location = 0;
-                    (*next_step)->native_location = NULL;
-                    (*next_step)->no_event = false;
+                if (klass->get_constant_pool().is_entry_resolved(index))
+                {
+                    Method *invoke_method = klass->get_constant_pool().get_ref_method(index); 
+                    if(!method_is_native(invoke_method)) {
+                        *count = 1;
+                        error = _allocate( sizeof(jvmti_StepLocation), (unsigned char**)next_step );
+                        assert( error == JVMTI_ERROR_NONE );
+                        (*next_step)->method = invoke_method;
+                        (*next_step)->location = 0;
+                        (*next_step)->native_location = NULL;
+                        (*next_step)->no_event = false;
+                    }
                 }
             }
             break;
@@ -366,8 +367,6 @@ jvmti_SingleStepLocation( VM_thread* thread,
                     (*next_step)->native_location = ip;
                     (*next_step)->no_event = true;
                 }
-                else
-                    *count = 0;
             }
             break;
 
