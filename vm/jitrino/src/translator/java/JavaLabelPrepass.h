@@ -436,7 +436,7 @@ public:
     void if_acmpne(uint32 targetOffset,uint32 nextOffset);
     void goto_(uint32 targetOffset,uint32 nextOffset);
     void jsr(uint32 offset, uint32 nextOffset);
-    void ret(uint16 varIndex);
+    void ret(uint16 varIndex, const uint8* byteCodes);
     void tableswitch(JavaSwitchTargetsIter*);
     void lookupswitch(JavaLookupSwitchTargetsIter*);
     void incrementReturn();
@@ -549,15 +549,15 @@ public:
     StateInfo *getStateInfo(uint32 offset) {
         return hashtable[offset];
     }
-    StateInfo *createStateInfo(uint32 offset, bool createStack = false) {
+    StateInfo *createStateInfo(uint32 offset, unsigned stackDepth = MAX_UINT32) {
         StateInfo *state = hashtable[offset];
         if (state == NULL) {
             state = new (memManager) StateInfo();
             hashtable[offset] = state;
         }
-        if (createStack && state->stack == NULL) {
+        if (stackDepth != MAX_UINT32 && state->stack == NULL) {
             state->stack = new (memManager) StateInfo::SlotInfo[maxDepth];
-            state->stackDepth = numVars;
+            state->stackDepth = stackDepth;
         }
         if(Log::isEnabled()) {
             Log::out() << "CREATESTATE " <<(int)offset << " depth " << state->stackDepth << ::std::endl;
@@ -568,6 +568,7 @@ public:
 
     void copySlotInfo(StateInfo::SlotInfo& to, StateInfo::SlotInfo& from);
     void mergeSlots(StateInfo::SlotInfo* inSlot, StateInfo::SlotInfo* slot, uint32 offset, bool isVar);
+    void rewriteSlots(StateInfo::SlotInfo* inSlot, StateInfo::SlotInfo* slot, uint32 offset, bool isVar);
     void setStackInfo(StateInfo *inState, uint32 offset, bool includeVars, bool includeStack);
     void setStateInfo(StateInfo *inState, uint32 offset, bool isFallThru, bool varsOnly = false);
     void setStateInfoFromFinally(StateInfo *inState, uint32 offset);

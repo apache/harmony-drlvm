@@ -205,7 +205,7 @@ protected:
     virtual void if_acmpne(uint32 targetOffset,uint32 nextOffset) = 0;
     virtual void goto_(uint32 targetOffset,uint32 nextOffset) = 0;
     virtual void jsr(uint32 offset, uint32 nextOffset) = 0;
-    virtual void ret(uint16 varIndex) = 0;
+    virtual void ret(uint16 varIndex, const uint8* byteCodes) = 0;
     virtual void tableswitch(JavaSwitchTargetsIter*) = 0;
     virtual void lookupswitch(JavaLookupSwitchTargetsIter*) = 0;
     virtual void ireturn(uint32 off) = 0;

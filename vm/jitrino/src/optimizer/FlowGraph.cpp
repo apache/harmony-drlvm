@@ -529,8 +529,9 @@ static bool inlineJSR(IRManager* irManager, Node *block, DefUseBuilder& defUses,
         // JSR never returns.  Convert to jmp.
         //
         saveReturn->unlink();
-        if(retVar != NULL)
-            stVar->unlink();
+        if(retVar != NULL) {
+            irManager->getOpndManager().deleteVar((VarOpnd*)retVar);
+        }
 
         const Edges& inEdges = entryJSR->getInEdges();
         for(eiter = inEdges.begin(); eiter != inEdges.end();) {

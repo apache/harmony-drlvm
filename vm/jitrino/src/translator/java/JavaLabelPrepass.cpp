@@ -204,7 +204,6 @@ void VariableIncarnation::createVarOpnd(IRBuilder* irBuilder)
 {
     if (opnd) return;
     opnd = irBuilder->genVarDef(declaredType, false);
-
     if(Log::isEnabled()) {
         Log::out() << "Create operand for VarIncarnation:" << ::std::endl;
         Log::out() << "    opnd:"; opnd->print(Log::out()); Log::out() << ::std::endl;
@@ -328,7 +327,7 @@ public:
                          handlerOffset,
                          exceptionType);
         block->addHandler(handler);
-        StateInfo *hi = prepass.stateTable->createStateInfo(handlerOffset, true);
+        StateInfo *hi = prepass.stateTable->createStateInfo(handlerOffset, prepass.getNumVars());
         hi->addCatchHandler(handler);
         StateInfo::SlotInfo* slot;
         if (hi->stackDepth != prepass.getNumVars()) {
@@ -566,7 +565,6 @@ JavaLabelPrepass::JavaLabelPrepass(MemoryManager& mm,
 }
 
 void JavaLabelPrepass::offset(uint32 offset) {
-    if (Log::isEnabled()) Log::out() << std::endl << "PREPASS OFFSET " << (int32)offset << ", blockNo=" << blockNumber << std::endl;
     bytecodevisited->setBit(offset,true);
     if (offset==0)
         stateTable->restoreStateInfo(&stateInfo, offset);
@@ -970,7 +968,7 @@ void JavaLabelPrepass::jsr(uint32 targetOffset, uint32 nextOffset) {
 
     getVisited()->setBit(targetOffset,false);
 }
-void JavaLabelPrepass::ret(uint16 varIndex) { 
+void JavaLabelPrepass::ret(uint16 varIndex, const uint8* byteCodes) { 
     StateInfo::SlotInfo *slot = &stateInfo.stack[varIndex];
     VariableIncarnation* var = slot->vars->getVarIncarnation();
     assert(var);
@@ -985,7 +983,7 @@ void JavaLabelPrepass::ret(uint16 varIndex) {
     JsrEntryToJsrNextMap::const_iterator iter;
     for (iter = sub_entry_range.first; iter != sub_entry_range.second; iter++) {
         assert((*iter).first == subEntryOffset);
-        uint32 jsrTargetOffset = (*iter).second;
+        uint32 jsrNextOffset = (*iter).second;
 
         // according to JVM Spec:
         //      When executing the ret instruction, which implements a
@@ -997,7 +995,8 @@ void JavaLabelPrepass::ret(uint16 varIndex) {
         // propagating new objects created in finally section 
         //      to the instruction that follows the JSR
         //
-        stateTable->setStateInfoFromFinally(&stateInfo, jsrTargetOffset);
+        stateTable->setStateInfoFromFinally(&stateInfo, jsrNextOffset);
+        labelStack->push((uint8*)byteCodes + jsrNextOffset);
     }
 }
 
@@ -1824,7 +1823,6 @@ void  StateTable::setStackInfo(StateInfo *inState, uint32 offset, bool includeVa
             }
             state->stackDepth = to;
         } else { // needs to merge the states
-            assert(!includeStack || state->stackDepth == stackDepth);
             if(Log::isEnabled()) {
                 Log::out() << " before\n";
                 printState(state);
@@ -1833,11 +1831,22 @@ void  StateTable::setStackInfo(StateInfo *inState, uint32 offset, bool includeVa
                 struct StateInfo::SlotInfo *inSlot = &inState->stack[i];
                 struct StateInfo::SlotInfo *slot   = &stack[i];
                 if(Log::isEnabled()) {
-                    Log::out() << " i = " << i << ::std::endl;
-                    Log::out() << "inSlot: ";StateInfo::print(*inSlot, Log::out());Log::out() << ::std::endl;
-                    Log::out() << "slot:   ";StateInfo::print(*slot, Log::out());Log::out() << ::std::endl;
+                    Log::out() << "    i = " << i << ::std::endl;
+                    Log::out() << "            inSlot: ";StateInfo::print(*inSlot, Log::out());Log::out() << ::std::endl;
+                    Log::out() << "            slot:   ";StateInfo::print(*slot, Log::out());Log::out() << ::std::endl;
                 }
-                mergeSlots(inSlot, slot, offset, i < (unsigned)numVars);
+                if(i < state->stackDepth) {
+                    mergeSlots(inSlot, slot, offset, i < (unsigned)numVars);
+                } else { // inState has more slots. Additional ones should not be merged.
+                    rewriteSlots(inSlot, slot, offset, i < (unsigned)numVars);
+                }
+            }
+            if(includeStack) {
+                assert(state->stackDepth <= stackDepth);
+                if(state->stackDepth < stackDepth) {
+                    prepass.getVisited()->setBit(offset,false);
+                    state->stackDepth = stackDepth;
+                }
             }
         }
         if(Log::isEnabled()) {
@@ -1847,13 +1856,33 @@ void  StateTable::setStackInfo(StateInfo *inState, uint32 offset, bool includeVa
     }
 }
 
+void StateTable::rewriteSlots(StateInfo::SlotInfo* inSlot, StateInfo::SlotInfo* slot, uint32 offset, bool isVar) {
+
+    Type *intype = inSlot->type;
+    slot->type = intype;
+
+    assert(inSlot->vars);
+    if(!slot->vars) {
+        VariableIncarnation* var_inc = inSlot->vars->getVarIncarnation();
+        assert(var_inc);
+        slot->vars = new (memManager) SlotVar(var_inc);
+    }
+    slot->vars->addVarIncarnations(inSlot->vars, memManager, offset);
+    if (!isVar) {
+         slot->vars->mergeVarIncarnations(&typeManager);
+    }
+
+    slot->slotFlags = inSlot->slotFlags;
+    slot->jsrLabelOffset = inSlot->jsrLabelOffset;
+}
+
 void StateTable::mergeSlots(StateInfo::SlotInfo* inSlot, StateInfo::SlotInfo* slot, uint32 offset, bool isVar) {
 
     if (!getStateInfo(offset)->isVisited()) {
-        assert(NULL == slot->type);
-        assert(NULL == slot->vars);
-        copySlotInfo(*slot, *inSlot);
-        return;
+        if (!slot->type && !slot->vars) {
+            copySlotInfo(*slot, *inSlot);
+            return;
+        } // else it is an node after (next) jsr. The state was propagated here from ret.
     }
 
     slot->jsrLabelOffset = inSlot->jsrLabelOffset;
@@ -1913,32 +1942,30 @@ void  StateTable::setStateInfoFromFinally(StateInfo *inState, uint32 offset) {
         Log::out() << "SETSTATE FROM FINALLY offset=" <<(int)offset << " depth=" << inState->stackDepth << ::std::endl;
         printState(inState);
     }
+    unsigned stackDepth = inState->stackDepth;
     StateInfo *state = getStateInfo(offset);
     assert(state);
-    unsigned stackDepth = inState->stackDepth;
+    assert(state->stackDepth <= stackDepth);
+
+    if(state != NULL && Log::isEnabled()) {
+        Log::out() << " before\n";
+        printState(state);
+    }
     if (stackDepth > 0) {
-        if (maxDepth < stackDepth) maxDepth = stackDepth;
-        if (Log::isEnabled()) Log::out() << "MAXDEPTH " << maxDepth << ::std::endl;
-        struct StateInfo::SlotInfo *stack = state->stack;
-        // stack must be propagated from JSR to jsrNext earlier
-        assert(stack);
-        assert(state->stackDepth == stackDepth);
-        if(Log::isEnabled()) {
-            Log::out() << " before\n";
-            printState(state);
+        if (maxDepth < stackDepth) {
+            maxDepth = stackDepth;
+            if (Log::isEnabled()) Log::out() << "MAXDEPTH " << maxDepth << ::std::endl;
         }
+        struct StateInfo::SlotInfo *stack = state->stack;
+        state->stackDepth = stackDepth;
         for (unsigned i=0; i < stackDepth; i++) {
             struct StateInfo::SlotInfo *inSlot = &inState->stack[i];
             struct StateInfo::SlotInfo *slot   = &stack[i];
             Type *intype = inSlot->type;
             Type *type  = slot->type;
-            if (Log::isEnabled()) Log::out() << "STACK " << i << ": "<< type << ::std::endl;
+//            if (Log::isEnabled()) Log::out() << "STACK " << i << ": "<< type << ::std::endl;
             if (!type && intype) {  // don't merge, just rewrite!
-                slot->type      = intype;
-                // Consider copying not pointers but SlotVat structures.
-                slot->vars      = inSlot->vars;
-                slot->slotFlags = inSlot->slotFlags;
-                slot->jsrLabelOffset = inSlot->jsrLabelOffset;
+                rewriteSlots(inSlot, slot, offset, i < numVars);
                 prepass.getVisited()->setBit(offset,false);
             } else if (!intype) {
                 continue;

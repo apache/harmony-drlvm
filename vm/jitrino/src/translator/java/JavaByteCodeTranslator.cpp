@@ -300,10 +300,14 @@ JavaByteCodeTranslator::getVarOpndStVar(JavaLabelPrepass::JavaVarType javaType,
         // error: invalid local variable id
         invalid();
     VariableIncarnation* varInc = prepass.getVarInc(currentOffset, index);
-    assert(varInc);
-    StateInfo::SlotInfo* slot = &stateInfo->stack[index];
-    slot->vars = new (memManager) SlotVar(varInc);
-    Opnd* var = varInc->getOpnd();
+    Opnd* var = NULL;
+    StateInfo::SlotInfo* slot = NULL;
+    slot = &stateInfo->stack[index];
+    if(varInc) {
+        slot->vars = new (memManager) SlotVar(varInc);
+        var = varInc->getOpnd();
+    }
+
     if (var) {
         assert(var->isVarOpnd());
         return var->asVarOpnd();
@@ -414,9 +418,6 @@ JavaByteCodeTranslator::offset(uint32 offset) {
         getNextLabelId(); // skip this DEAD byte code
         return;
     }
-
-    // start a new basic block
-    if (Log::isEnabled()) Log::out() << "TRANSLATOR BASICBLOCK " << (int32)offset << " " << ::std::endl;
 
     // finish the previous basic block, if any work was required
     if (!lastInstructionWasABranch) {
@@ -1306,7 +1307,7 @@ JavaByteCodeTranslator::jsr(uint32 targetOffset, uint32 nextOffset) {
 }
 
 void 
-JavaByteCodeTranslator::ret(uint16 varIndex) {
+JavaByteCodeTranslator::ret(uint16 varIndex, const uint8* byteCodes) {
     lastInstructionWasABranch = true;
     checkStack();
     irBuilder.genRet(getVarOpndLdVar(JavaLabelPrepass::RET,varIndex));
@@ -1995,6 +1996,8 @@ JavaByteCodeTranslator::genReturn(uint32 off) {
         }
     }
     irBuilder.genReturn();
+    // some manually written test case can leave non empty opnd stack after return
+    opndStack.makeEmpty();
 }
 
 //-----------------------------------------------------------------------------

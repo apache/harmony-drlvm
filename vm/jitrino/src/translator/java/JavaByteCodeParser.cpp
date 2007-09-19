@@ -605,13 +605,13 @@ JavaByteCodeParserCallback::parseByteCode(const uint8* byteCodes,uint32 off) {
         linearPassEnd = true; 
         if (labelStack != NULL) {
             // If labelStack is stack then the order of pushes should be reverted.
-            // For now it is line.
+            // For now it is line. (labelStack is a Queue)
             labelStack->push((uint8*)byteCodes + off+si16(bcp+1));
             labelStack->push((uint8*)byteCodes + off+3);
         }
         break;
     case 0xa9:    
-        ret(su8(bcp+1));    
+        ret(su8(bcp+1), byteCodes);    
         linearPassEnd = true;    
         break;
     case 0xaa:    
@@ -682,7 +682,7 @@ JavaByteCodeParserCallback::parseByteCode(const uint8* byteCodes,uint32 off) {
         case 0x38: fstore(su16(bcp+2),off);                   break;
         case 0x39: dstore(su16(bcp+2),off);                   break;
         case 0x3a: astore(su16(bcp+2),off);                   break;
-        case 0xa9: ret(su16(bcp+2));    linearPassEnd = true; break;
+        case 0xa9: ret(su16(bcp+2), byteCodes);    linearPassEnd = true; break;
         case 0x84: iinc(su16(bcp+2),si16(bcp+4));             break;
         default:
             assert(0);
@@ -712,7 +712,7 @@ JavaByteCodeParserCallback::parseByteCode(const uint8* byteCodes,uint32 off) {
         linearPassEnd = true;
         if (labelStack != NULL) {
             // If labelStack is stack then the order of pushes should be reverted.
-            // For now it is line.
+            // For now it is line. (labelStack is a Queue)
             labelStack->push((uint8*)byteCodes + off+si32(bcp+1));
             labelStack->push((uint8*)byteCodes + off+5);
         }

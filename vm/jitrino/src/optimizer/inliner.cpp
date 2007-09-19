@@ -416,7 +416,7 @@ protected:
     void if_acmpne(uint32 targetOffset,uint32 nextOffset)  {}
     void goto_(uint32 targetOffset,uint32 nextOffset)  {}
     void jsr(uint32 offset, uint32 nextOffset)  {}
-    void ret(uint16 varIndex)  {}
+    void ret(uint16 varIndex,const uint8* byteCodes)  {}
     void tableswitch(JavaSwitchTargetsIter*)  {}
     void lookupswitch(JavaLookupSwitchTargetsIter*)  {}
     void ireturn(uint32 off)  {}

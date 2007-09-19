@@ -921,10 +921,17 @@ bool Compiler::comp_gen_insts(unsigned pc, unsigned parentPC,
                 assert(jsr_lead == pc);
                 // Simply load the state back to the parent's
                 BBState* prevState = m_bbStates[parentPC];
-                assert(m_jsrStates.find(jsr_lead) != m_jsrStates.end());
-                const BBState* jsrState = m_jsrStates[jsr_lead];
-                //prevState.jframe.init(&jsrState.jframe);
-                *prevState = *jsrState;
+//                assert(m_jsrStates.find(jsr_lead) != m_jsrStates.end());
+                if(m_jsrStates.find(jsr_lead) == m_jsrStates.end()) {
+                    // There can be a specific testcase with jsr without respective ret
+                    // In this case we can try to continue if there is a bb_State for jsr_lead
+                    // This is a temporary solution. HARMONY-4740 is devoted to the complete one.
+                    assert(m_bbStates.find(jsr_lead) != m_bbStates.end());
+                } else {
+                    const BBState* jsrState = m_jsrStates[jsr_lead];
+                    //prevState.jframe.init(&jsrState.jframe);
+                    *prevState = *jsrState;
+                }
             }
             else {
                 // we have a fall through (and not through a JSR) path 
@@ -948,8 +955,15 @@ bool Compiler::comp_gen_insts(unsigned pc, unsigned parentPC,
         // when the parentPC is the real parent, that is in a JSR subroutine
         // with several blocks.
         if (parentBB.jsr_target && jsr_lead != parentPC && jsr_lead != pc) {
-            assert(m_jsrStates.find(parentPC) != m_jsrStates.end());
-            parentState = m_jsrStates[parentPC];
+            // There can be a specific testcase with jsr without respective ret
+            // In this case we can try to continue if there is a bb_State for parentPC
+            // This is a temporary solution. HARMONY-4740 is devoted to the complete one.
+//            assert(m_jsrStates.find(parentPC) != m_jsrStates.end());
+            if(m_jsrStates.find(parentPC) != m_jsrStates.end()) {
+                parentState = m_jsrStates[parentPC];
+            } else {
+                parentState = m_bbStates[parentPC];
+            }
         }
         else {
             parentState = m_bbStates[parentPC];
