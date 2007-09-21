@@ -267,8 +267,8 @@ void rt_unwind(JIT_Handle jit, Method_Handle method,
 void rt_enum(JIT_Handle jit, Method_Handle method, 
              GC_Enumeration_Handle henum, JitFrameContext * context)
 {
-    if (!context->is_ip_past) {
-        // The IP pointts directly to the instructions - this must be a 
+    if (!context->is_ip_past && !StaticConsts::g_jvmtiMode) {
+        // The IP points directly to the instructions - this must be a 
         // hardware NPE happened. Check the presumption:
         assert(method_get_num_handlers(method) == 0);
 #ifdef _DEBUG

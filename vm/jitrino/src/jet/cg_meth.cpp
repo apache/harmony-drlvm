@@ -768,8 +768,8 @@ void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth, unsigned short
     // on registers.
     if (opcod != OPCODE_INVOKEINTERFACE && meth != NULL) {
         stackFix = gen_stack_to_args(true, cs, 0);
-        gen_gc_stack(-1, true);
         vpark();
+        gen_gc_stack(-1, true);
     }
     //
     // Check for null here - we just spilled all the args and 
@@ -814,8 +814,8 @@ void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth, unsigned short
 
         //2.  call java method
         stackFix = gen_stack_to_args(true, cs, 0);
-        gen_gc_stack(-1, true);
         vpark();
+        gen_gc_stack(-1, true);
         
         AR gr = valloc(iplatf);
         ld(jobj, gr, gr_ret); //load indirect addr
@@ -843,8 +843,8 @@ void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth, unsigned short
         rlock(gr_ret);
         //st(jobj, gr_ret, m_base, voff(m_stack.scratch()));
         stackFix = gen_stack_to_args(true, cs, 0);
-        gen_gc_stack(-1, true);
         vpark();
+        gen_gc_stack(-1, true);
         unsigned offset = method_get_offset(meth);
         //ld(jobj, gr_ret, m_base, voff(m_stack.scratch()));
         runlock(gr_ret);

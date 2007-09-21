@@ -91,6 +91,9 @@ void Compiler::handle_inst(void)
         // Do not allow values to cross instruction boundaries
         // on a temporary registers
         vpark();
+        // We must have GC info at every bytecode instruction
+        // to support possible enumeration at a breakpoint 
+        gen_gc_stack(-1, false);
     }
 
     const bool has_fall_through = !jinst.is_set(OPF_DEAD_END);
