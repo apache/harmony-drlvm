@@ -219,12 +219,13 @@ void JNICALL CallVoidMethodA(JNIEnv * jni_env,
 {
     TRACE2("jni", "CallVoidMethodA called, id = " << methodID);
     assert(hythread_is_suspend_enabled());
+    jvalue UNREF result;
     
     if (exn_raised()) return;
 
     String *name = ((Method*)methodID)->get_name();
     bool non_virtual = name == VM_Global_State::loader_env->Init_String;
-    call_method_no_ref_result(jni_env, obj, methodID, args, 0, non_virtual);
+    call_method_no_ref_result(jni_env, obj, methodID, args, &result, non_virtual);
 } //CallVoidMethodA
 
 
