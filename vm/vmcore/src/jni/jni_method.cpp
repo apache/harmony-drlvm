@@ -222,7 +222,9 @@ void JNICALL CallVoidMethodA(JNIEnv * jni_env,
     
     if (exn_raised()) return;
 
-    call_method_no_ref_result(jni_env, obj, methodID, args, 0, FALSE);
+    String *name = ((Method*)methodID)->get_name();
+    bool non_virtual = name == VM_Global_State::loader_env->Init_String;
+    call_method_no_ref_result(jni_env, obj, methodID, args, 0, non_virtual);
 } //CallVoidMethodA
 
 
