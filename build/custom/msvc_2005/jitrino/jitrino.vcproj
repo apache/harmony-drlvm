@@ -656,6 +656,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\throwopt.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\walkers.cpp"
 				>
 			</File>
@@ -1119,6 +1123,14 @@
 					>
 				</File>
 				<File
+					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32i586InstsExpansion.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32I8Lowerer.cpp"
+					>
+				</File>
+				<File
 					RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\ia32\Ia32Inst.cpp"
 					>
 				</File>
@@ -1296,6 +1308,14 @@
 			Name="shared"
 			>
 			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\shared\Algorithms.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\shared\Algorithms.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\shared\Arena.cpp"
 				>
 			</File>
@@ -1469,6 +1489,14 @@
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\shared\unionfind.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\shared\VMMagic.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\shared\VMMagic.h"
 				>
 			</File>
 			<File

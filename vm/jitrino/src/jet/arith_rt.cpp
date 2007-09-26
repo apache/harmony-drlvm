@@ -171,7 +171,7 @@ float __stdcall rt_h_flt_a(float v1, float v2, JavaByteCodes op)
     if (finite(v1) && !finite(v2)) {
         return v1;
     }
-    return fmod((double)v1,(double)v2);
+    return (float)fmod((double)v1,(double)v2);
 }
 
 jlong __stdcall rt_h_i64_shift(jlong v1, int v2, JavaByteCodes op)
