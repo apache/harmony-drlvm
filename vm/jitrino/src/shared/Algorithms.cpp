@@ -43,7 +43,8 @@ namespace Jitrino {
 #define __LOp(x) *(int*)x
  
 double jitrino_ieee754_fmod_double(double x, double y) {
-	const double one = 1.0, Zero[] = {0.0, -0.0,};
+	const double one = 1.0, Zero[] = {0.0, -1.0*0.0,};
+
 	int n,hx,hy,hz,ix,iy,sx,i;
 	unsigned lx,ly,lz;
 

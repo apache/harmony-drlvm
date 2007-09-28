@@ -2099,7 +2099,11 @@ static NativeCodePtr rth_get_lil_invokestatic_addr_withresolve(int * dyn_count) 
 static void *rth_invokevirtual_addr_withresolve(Class_Handle klass, unsigned cp_idx, ManagedObject* obj) {
     ASSERT_THROW_AREA;
 
-    assert(obj!=NULL);
+    Global_Env* env = VM_Global_State::loader_env;
+    if (obj == NULL) {
+        exn_throw_by_class(env->java_lang_NullPointerException_Class);
+        return NULL;
+    }
 
     Method* m = NULL;
 
@@ -2108,7 +2112,6 @@ static void *rth_invokevirtual_addr_withresolve(Class_Handle klass, unsigned cp_
     obj_h->object = obj;
 
     hythread_suspend_enable();
-    Global_Env* env = VM_Global_State::loader_env;
     m = resolve_virtual_method_env(env, klass, cp_idx, true);
     hythread_suspend_disable();
 
@@ -2148,7 +2151,11 @@ static NativeCodePtr rth_get_lil_invokevirtual_addr_withresolve(int * dyn_count)
 static void *rth_invokeinterface_addr_withresolve(Class_Handle klass, unsigned cp_idx, ManagedObject* obj) {
     ASSERT_THROW_AREA;
 
-    assert(obj!=NULL);
+    Global_Env* env = VM_Global_State::loader_env;
+    if (obj == NULL) {
+        exn_throw_by_class(env->java_lang_NullPointerException_Class);
+        return NULL;
+    }
 
     Method* m = NULL;
 
@@ -2157,7 +2164,6 @@ static void *rth_invokeinterface_addr_withresolve(Class_Handle klass, unsigned c
     obj_h->object = obj;
 
     hythread_suspend_enable();
-    Global_Env* env = VM_Global_State::loader_env;
     m = resolve_interface_method_env(env, klass, cp_idx, true);
     assert(m);
     hythread_suspend_disable();
