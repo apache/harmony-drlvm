@@ -587,7 +587,12 @@ VMBreakPoints::process_native_breakpoint()
     // inside of callbacks
     InstructionDisassembler idisasm(*bp->disasm);
 
-    for (unsigned priority = 0; priority < PRIORITY_NUMBER; priority++)
+    bool is_enabled = VM_Global_State::loader_env->TI->isLocallyEnabled();
+    // if is_enabled is false then we should continue execution without
+    // reporting breakpoint event
+    for (unsigned priority = 0;
+        is_enabled && priority < PRIORITY_NUMBER;
+        priority++)
     {
         bp = find_breakpoint(addr);
         assert(!bp || bp->addr == addr);
@@ -808,7 +813,12 @@ VMBreakPoints::process_interpreter_breakpoint(jmethodID method, jlocation locati
         << " :" << location );
 
     jbyte orig_byte = bp->saved_byte;
-    for (unsigned priority = 0; priority < PRIORITY_NUMBER; priority++)
+    bool is_enabled = VM_Global_State::loader_env->TI->isLocallyEnabled();
+    // if is_enabled is false then we should continue execution without
+    // reporting breakpoint event
+    for (unsigned priority = 0;
+        is_enabled && priority < PRIORITY_NUMBER;
+        priority++)
     {
         bp = find_breakpoint(method, location);;
         assert(bp->method == method);
@@ -1317,7 +1327,7 @@ bool jvmti_jit_breakpoint_handler(Registers *regs)
     TRACE2("jvmti.break", "BREAKPOINT occured: " << native_location);
 
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
-    if (!ti->isEnabled() || ti->getPhase() != JVMTI_PHASE_LIVE)
+    if (ti->getPhase() != JVMTI_PHASE_LIVE)
         return false;
 
     // Now it is necessary to set up a transition to

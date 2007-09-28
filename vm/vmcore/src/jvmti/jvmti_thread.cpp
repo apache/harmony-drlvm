@@ -499,34 +499,37 @@ jvmtiGetThreadInfo(jvmtiEnv* env,
     if (info_ptr == NULL)
         return JVMTI_ERROR_NULL_POINTER;
 
-    if (NULL != thread)
-    {
-        if (!is_valid_thread_object(thread))
+    if (NULL != thread) {
+        if (!is_valid_thread_object(thread)) {
             return JVMTI_ERROR_INVALID_THREAD;
-    }
-    else
+        }
+    } else {
         thread = jthread_self();
-
-    ti->setLocallyDisabled();//-----------------------------------V
+        assert(thread != NULL);
+    }
 
     jclass cl = GetObjectClass(jvmti_test_jenv, thread);
-    jmethodID id = jvmti_test_jenv -> GetMethodID(cl, "getName","()Ljava/lang/String;");
-    jstring  name = jvmti_test_jenv -> CallObjectMethod (thread, id);
-    info_ptr -> name = (char *)jvmti_test_jenv -> GetStringUTFChars (name, false);
 
-    id = jvmti_test_jenv -> GetMethodID(cl, "getPriority","()I");
-    info_ptr -> priority = jvmti_test_jenv -> CallIntMethod (thread, id);
+    jfieldID id = jvmti_test_jenv->GetFieldID(cl, "name", "Ljava/lang/String;");
+    assert(id != NULL); // field must exist in kernel class
+    jstring name = jvmti_test_jenv->GetObjectField(thread, id);
+    info_ptr->name = (char*)jvmti_test_jenv->GetStringUTFChars(name, false);
 
-    id = jvmti_test_jenv -> GetMethodID(cl, "isDaemon","()Z");
-    info_ptr -> is_daemon = jvmti_test_jenv -> CallBooleanMethod (thread, id);
+    id = jvmti_test_jenv->GetFieldID(cl, "priority", "I");
+    assert(id != NULL); // field must exist in kernel class
+    info_ptr->priority = jvmti_test_jenv->GetIntField(thread, id);
 
-    id = jvmti_test_jenv -> GetMethodID(cl, "getThreadGroup","()Ljava/lang/ThreadGroup;");
-    info_ptr -> thread_group = jvmti_test_jenv -> CallObjectMethod (thread, id);
+    id = jvmti_test_jenv->GetFieldID(cl, "daemon","Z");
+    assert(id != NULL); // field must exist in kernel class
+    info_ptr->is_daemon = jvmti_test_jenv->GetBooleanField(thread, id);
 
-    id = jvmti_test_jenv -> GetMethodID(cl, "getContextClassLoader","()Ljava/lang/ClassLoader;");
-    info_ptr -> context_class_loader = jvmti_test_jenv -> CallObjectMethod (thread, id);
+    id = jvmti_test_jenv->GetFieldID(cl, "group","Ljava/lang/ThreadGroup;");
+    assert(id != NULL); // field must exist in kernel class
+    info_ptr->thread_group = jvmti_test_jenv->GetObjectField(thread, id);
 
-    ti->setLocallyEnabled();//------------------------------------^
+    id = jvmti_test_jenv->GetFieldID(cl, "contextClassLoader","Ljava/lang/ClassLoader;");
+    assert(id != NULL); // field must exist in kernel class
+    info_ptr->context_class_loader = jvmti_test_jenv->GetObjectField(thread, id);
 
     return JVMTI_ERROR_NONE;
 }
@@ -682,14 +685,12 @@ jvmtiRunAgentThread(jvmtiEnv* env,
         return JVMTI_ERROR_NULL_POINTER;
     }
 
-    ti->setLocallyDisabled();//-----------------------------------V
-
     // Set daemon flag for the thread
     jclass thread_class = GetObjectClass(jvmti_test_jenv, thread);
     assert(thread_class);
-    jmethodID set_daemon = GetMethodID(jvmti_test_jenv, thread_class, "setDaemon", "(Z)V");
-    assert(set_daemon);
-    CallVoidMethod(jvmti_test_jenv, thread, set_daemon, JNI_TRUE);
+    jfieldID is_daemon = jvmti_test_jenv->GetFieldID(thread_class, "daemon", "Z");
+    assert(is_daemon);
+    jvmti_test_jenv->SetBooleanField(thread, is_daemon, JNI_TRUE);
 
     jni_env = jthread_get_JNI_env(jthread_self());
 
@@ -702,8 +703,6 @@ jvmtiRunAgentThread(jvmtiEnv* env,
     attrs.arg = arg;
 
     jthread_create_with_function(jni_env, thread, &attrs);
-
-    ti->setLocallyEnabled();//-----------------------------------^
 
     return JVMTI_ERROR_NONE;
 }

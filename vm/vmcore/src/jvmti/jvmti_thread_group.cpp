@@ -61,26 +61,25 @@ jvmtiGetTopThreadGroups(jvmtiEnv* env,
         return JVMTI_ERROR_NULL_POINTER;
     }
 
-    ti->setLocallyDisabled();//-----------------------------------V
-
     jclass cl = struct_Class_to_java_lang_Class_Handle(VM_Global_State::loader_env->java_lang_Thread_Class);
-    jmethodID id = jvmti_test_jenv -> GetMethodID(cl,
-            "getThreadGroup","()Ljava/lang/ThreadGroup;");
-    jobject current_thread = (jobject)jthread_self();
-    jobject group = jvmti_test_jenv -> CallObjectMethod (current_thread, id);
+    jfieldID id = jvmti_test_jenv->GetFieldID(cl, "group","Ljava/lang/ThreadGroup;");
+    assert(id != NULL);
+    jthread current_thread = jthread_self();
+    jobject group = jvmti_test_jenv->GetObjectField(current_thread, id);
 
     cl = struct_Class_to_java_lang_Class_Handle(VM_Global_State::loader_env->java_lang_ThreadGroup_Class);
-    id = jvmti_test_jenv -> GetMethodID(cl,
-            "getParent","()Ljava/lang/ThreadGroup;");
+    id = jvmti_test_jenv->GetFieldID(cl, "parent","Ljava/lang/ThreadGroup;");
+    assert(id != NULL);
 
-    jobject parent = jvmti_test_jenv -> CallObjectMethod (group, id);
-    while (parent)
-    {
-        group = parent;
-        parent = jvmti_test_jenv -> CallObjectMethod (group, id);
-    }
+    for(jobject parent = group; parent != NULL;
+        group = parent, parent = jvmti_test_jenv->GetObjectField(group, id))
+    {} // empty loop
 
-    ti->setLocallyEnabled();//-----------------------------------^
+    //while(parent != NULL)
+    //{
+    //    group = parent;
+    //    parent = jvmti_test_jenv->GetObjectField(group, id);
+    //}
 
     jvmtiError jvmti_error = _allocate(sizeof(jthreadGroup*),
             (unsigned char **)groups_ptr);
@@ -123,28 +122,27 @@ jvmtiGetThreadGroupInfo(jvmtiEnv* env,
         return JVMTI_ERROR_INVALID_THREAD_GROUP;
     }
 
-    if (info_ptr == NULL)
-    {
+    if (info_ptr == NULL) {
         return JVMTI_ERROR_NULL_POINTER;
     }
 
-    ti->setLocallyDisabled();//-----------------------------------V
-
     jclass cl = GetObjectClass(jvmti_test_jenv, group);
-    jmethodID id = jvmti_test_jenv -> GetMethodID(cl, "getParent","()Ljava/lang/ThreadGroup;");
-    info_ptr -> parent = jvmti_test_jenv -> CallObjectMethod (group, id);
+    jfieldID id = jvmti_test_jenv->GetFieldID(cl, "parent","Ljava/lang/ThreadGroup;");
+    assert(id != NULL);
+    info_ptr->parent = jvmti_test_jenv->GetObjectField(group, id);
 
-    id = jvmti_test_jenv -> GetMethodID(cl, "getName","()Ljava/lang/String;");
-    jstring  name = jvmti_test_jenv -> CallObjectMethod (group, id);
-    info_ptr -> name = (char *)jvmti_test_jenv -> GetStringUTFChars (name, false);
+    id = jvmti_test_jenv->GetFieldID(cl, "name","Ljava/lang/String;");
+    assert(id != NULL);
+    jstring name = jvmti_test_jenv->GetObjectField(group, id);
+    info_ptr->name = (char*)jvmti_test_jenv->GetStringUTFChars(name, false);
 
-    id = jvmti_test_jenv -> GetMethodID(cl, "getMaxPriority","()I");
-    info_ptr -> max_priority = jvmti_test_jenv -> CallIntMethod (group, id);
+    id = jvmti_test_jenv->GetFieldID(cl, "maxPriority","I");
+    assert(id != NULL);
+    info_ptr->max_priority = jvmti_test_jenv->GetIntField(group, id);
 
-    id = jvmti_test_jenv -> GetMethodID(cl, "isDaemon","()Z");
-    info_ptr -> is_daemon = jvmti_test_jenv -> CallBooleanMethod (group, id);
-
-    ti->setLocallyEnabled();//-----------------------------------^
+    id = jvmti_test_jenv->GetFieldID(cl, "daemon","Z");
+    assert(id != NULL);
+    info_ptr->is_daemon = jvmti_test_jenv->GetBooleanField(group, id);
 
     return JVMTI_ERROR_NONE;
 }
