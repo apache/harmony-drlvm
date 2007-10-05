@@ -70,7 +70,7 @@ public class InternMap {
     void poll()
     {
         Entry toRemove;
-        while ((toRemove = (Entry)referenceQueue.poll()) != null) {
+        while ((toRemove = (Entry)(WeakReference<String>)referenceQueue.poll()) != null) {
                 removeEntry(toRemove);
         }
     }

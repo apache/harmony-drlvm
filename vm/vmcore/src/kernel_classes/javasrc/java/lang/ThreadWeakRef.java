@@ -40,6 +40,6 @@ class ThreadWeakRef extends WeakReference<Thread> {
     }
 
     public static ThreadWeakRef poll() {
-        return (ThreadWeakRef)refQueue.poll();
+        return (ThreadWeakRef)( WeakReference<Thread>)refQueue.poll();
     }
 }
