@@ -23,15 +23,11 @@
         <patternset id="java.classes.pattern"  includes="**/*.class"/>
         <patternset id="java.source.pattern"  includes="**/*.java"/>
 
-        <javac srcdir="${java.source.dir}" destdir="${java.build.dir}"
-               source="${hy.javac.source}" target="${hy.javac.target}"
-               debug="${hy.java.debug}"
-               compiler="${hy.javac.compiler}">
-            <!--src refid="java.source" /-->
+        <hy.javac srcdir="${java.source.dir}" destdir="${java.build.dir}">
             <patternset refid="java.source.pattern" />
             <classpath refid="java.class.path"/>
             <bootclasspath refid="java.boot.class.path"/>
-        </javac>
+        </hy.javac>
         <fileset id="java.sources.fileset" dir="${java.source.dir}">
             <patternset refid="java.source.pattern" />
         </fileset>
