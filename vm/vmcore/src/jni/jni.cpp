@@ -34,6 +34,7 @@
 #include "open/jthread.h"
 #include "open/vm_util.h"
 
+#include "jni.h"
 #include "lock_manager.h"
 #include "Class.h"
 #include "classloader.h"
@@ -400,7 +401,7 @@ static jint jni_init()
 
 /*    BEGIN: List of directly exported functions.    */
 
-JNIEXPORT jint JNICALL JNI_GetDefaultJavaVMInitArgs(void * args)
+jint JNICALL JNI_GetDefaultJavaVMInitArgs(void * args)
 {
     // TODO: current implementation doesn't support JDK1_1InitArgs.
     if (((JavaVMInitArgs *)args)->version == JNI_VERSION_1_1) {
@@ -410,7 +411,7 @@ JNIEXPORT jint JNICALL JNI_GetDefaultJavaVMInitArgs(void * args)
     return JNI_OK;
 }
 
-JNIEXPORT jint JNICALL JNI_GetCreatedJavaVMs(JavaVM ** vmBuf,
+jint JNICALL JNI_GetCreatedJavaVMs(JavaVM ** vmBuf,
                                                jsize bufLen,
                                                jsize * nVMs)
 {
@@ -434,7 +435,7 @@ JNIEXPORT jint JNICALL JNI_GetCreatedJavaVMs(JavaVM ** vmBuf,
     return JNI_OK;
 }
 
-JNIEXPORT jint JNICALL JNI_CreateJavaVM(JavaVM ** p_vm, JNIEnv ** p_jni_env,
+jint JNICALL JNI_CreateJavaVM(JavaVM ** p_vm, JNIEnv ** p_jni_env,
                                           void * args) {
     jboolean daemon = JNI_FALSE;
     char * name = "main";

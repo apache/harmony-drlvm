@@ -1,0 +1,6 @@
+LIBRARY harmonyvm
+
+EXPORTS
+    JNI_CreateJavaVM=_JNI_CreateJavaVM@12
+    JNI_GetCreatedJavaVMs=_JNI_GetCreatedJavaVMs@12
+    JNI_GetDefaultJavaVMInitArgs=_JNI_GetDefaultJavaVMInitArgs@4

@@ -1794,7 +1794,7 @@ extern "C" {
  * Function attribute used when building VM from sources
  */
 #ifdef BUILDING_VM
-#define _JNI_EXPORT_ JNIEXPORT
+#define _JNI_EXPORT_
 #else
 #define _JNI_EXPORT_ JNIIMPORT
 #endif

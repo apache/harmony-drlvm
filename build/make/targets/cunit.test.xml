@@ -172,6 +172,7 @@
                         <fileset dir="${cunit.obj.dir}">
                             <include name="thread_unit_test_main.o*" />
                             <include name="thread_unit_test_utils.o*" />
+                            <include name="thread_util_platform_dependent.o*" />
                             <include name="testframe.o*" />
                             <include name="${filename}.o*" />
                         </fileset>

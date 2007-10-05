@@ -123,3 +123,7 @@ jthread new_jobject_thread(JNIEnv * jni_env);
 jobject new_jobject_thread_death(JNIEnv * jni_env);
 jthread new_jobject();
 void delete_jobject(jobject obj);
+
+typedef jint (JNICALL *create_java_vm_func)(JavaVM **vm, JNIEnv **env,
+    JavaVMInitArgs *args);
+create_java_vm_func test_get_java_vm_ptr(void);

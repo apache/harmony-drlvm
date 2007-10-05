@@ -81,9 +81,13 @@ void delete_jobject(jobject obj){
 }
 
 void test_java_thread_setup(int argc, char *argv[]) {
+    create_java_vm_func CreateJavaVM;
     JavaVMInitArgs args;
     JNIEnv * jni_env;
     int i;
+
+    CreateJavaVM = test_get_java_vm_ptr();
+    assert(CreateJavaVM);
 
     args.version = JNI_VERSION_1_2;
     args.nOptions = argc;
@@ -97,7 +101,7 @@ void test_java_thread_setup(int argc, char *argv[]) {
     log_debug("test_java_thread_init()");
 
     hythread_sleep(1000);
-    JNI_CreateJavaVM(&GLOBAL_VM, &jni_env, &args);
+    CreateJavaVM(&GLOBAL_VM, &jni_env, &args);
 }
 
 void test_java_thread_teardown(void) {
