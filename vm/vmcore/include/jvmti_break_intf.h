@@ -64,7 +64,7 @@ struct VMBreakPoint
 struct VMBreakPointRef
 {
     VMBreakPoint*    bp;
-    void*            data;
+    POINTER_SIZE_INT data;
     VMBreakPointRef* next;
 };
 
@@ -78,7 +78,7 @@ struct VMLocalBreak
 };
 
 // Pointer to interface callback function
-typedef bool (*BPInterfaceCallBack)(TIEnv *env, VMBreakPoint* bp, void *data);
+typedef bool (*BPInterfaceCallBack)(TIEnv *env, VMBreakPoint* bp, POINTER_SIZE_INT data);
 typedef bool (*BPInterfaceProcedure) (VMBreakPoint *bp);
 
 class VMBreakPoints
@@ -176,11 +176,11 @@ public:
 
     // 'data' must be allocated with JVMTI Allocate (or internal _allocate)
     // Users must not deallocate 'data', it will be deallocated by 'remove'
-    VMBreakPointRef* add_reference(jmethodID method, jlocation location, void* data);
+    VMBreakPointRef* add_reference(jmethodID method, jlocation location, POINTER_SIZE_INT data);
     // To specify address explicitly
     VMBreakPointRef* add_reference(jmethodID method, jlocation location,
-                    NativeCodePtr addr, void* data);
-    VMBreakPointRef* add_reference(NativeCodePtr addr, void* data);
+                    NativeCodePtr addr, POINTER_SIZE_INT data);
+    VMBreakPointRef* add_reference(NativeCodePtr addr, POINTER_SIZE_INT data);
 
     bool remove_reference(VMBreakPointRef* ref);
     void remove_all_reference()
@@ -203,7 +203,7 @@ protected:
     TIEnv* get_env() { return m_env; }
 
 private:
-    inline VMBreakPointRef* add_reference_internal(VMBreakPoint *bp, void *data);
+    inline VMBreakPointRef* add_reference_internal(VMBreakPoint *bp, POINTER_SIZE_INT data);
 
 protected:
     VMBreakInterface*   m_next;

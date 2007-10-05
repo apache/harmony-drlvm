@@ -461,12 +461,12 @@ jvmti_setup_jit_single_step(DebugUtilsTI *ti, Method* m, jlocation location)
     jvmti_StepLocation *locations;
     unsigned locations_count;
 
-    jvmti_SingleStepLocation(p_TLS_vmthread, m, (unsigned)location,
-                            &locations, &locations_count);
-
     // lock breakpoints
     VMBreakPoints* vm_brpt = VM_Global_State::loader_env->TI->vm_brpt;
     LMAutoUnlock lock(vm_brpt->get_lock());
+
+    jvmti_SingleStepLocation(p_TLS_vmthread, m, (unsigned)location,
+                            &locations, &locations_count);
 
     jvmti_remove_single_step_breakpoints(ti, jvmti_thread);
 
@@ -495,7 +495,7 @@ jvmti_set_single_step_breakpoints_for_method(DebugUtilsTI *ti,
 }
 
 static void jvmti_start_single_step_in_virtual_method(DebugUtilsTI *ti, VMBreakPoint* bp,
-                                                      void *data)
+                                                      POINTER_SIZE_INT data)
 {
 #if (defined _IA32_) || (defined _EM64T_)
     VM_thread *vm_thread = p_TLS_vmthread;
@@ -506,10 +506,15 @@ static void jvmti_start_single_step_in_virtual_method(DebugUtilsTI *ti, VMBreakP
     // This is a virtual breakpoint set exactly on the call
     // instruction for the virtual method. In this place it is
     // possible to determine the target method in runtime
-    bool* UNREF virtual_flag = (bool *)data;
-    assert(*virtual_flag == true);
+    bool UNREF virtual_flag = (bool)data;
+    assert(virtual_flag == true);
 
     InstructionDisassembler *disasm = bp->disasm;
+
+    InstructionDisassembler::Type UNREF type = disasm->get_type();
+    assert(type == InstructionDisassembler::RELATIVE_CALL ||
+        type == InstructionDisassembler::INDIRECT_CALL);
+
     const InstructionDisassembler::Opnd& op = disasm->get_opnd(0);
     Method *method;
     if (op.kind == InstructionDisassembler::Kind_Mem)
@@ -572,7 +577,7 @@ static void jvmti_start_single_step_in_virtual_method(DebugUtilsTI *ti, VMBreakP
 
 // Callback function for JVMTI single step processing
 static bool jvmti_process_jit_single_step_event(TIEnv* UNREF unused_env,
-                                                VMBreakPoint* bp, void *data)
+                                                VMBreakPoint* bp, POINTER_SIZE_INT data)
 {
     assert(bp);
 
@@ -603,7 +608,7 @@ static bool jvmti_process_jit_single_step_event(TIEnv* UNREF unused_env,
     NativeCodePtr addr = bp->addr;
     assert(addr);
 
-    if (NULL != data)
+    if ((bool)data)
     {
         jvmti_start_single_step_in_virtual_method(ti, bp, data);
         return true;
@@ -727,24 +732,12 @@ void jvmti_set_single_step_breakpoints(DebugUtilsTI *ti, jvmti_thread_t jvmti_th
             << " :" << locations[iii].location
             << " :" << locations[iii].native_location);
 
-        void *data = NULL;
-        if (locations[iii].no_event)
-        {
-            bool *virtual_flag;
-            jvmtiError error = _allocate(sizeof(bool),
-                (unsigned char**)&virtual_flag);
-
-            assert(error == JVMTI_ERROR_NONE);
-            *virtual_flag = true;
-            data = virtual_flag;
-        }
-
         VMBreakPointRef* ref =
             ss_state->predicted_breakpoints->add_reference(
                 (jmethodID)locations[iii].method,
                 locations[iii].location,
                 locations[iii].native_location,
-                data);
+                (POINTER_SIZE_INT)locations[iii].no_event);
         assert(ref);
     }
 }

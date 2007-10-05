@@ -615,7 +615,9 @@ VMBreakPoints::process_native_breakpoint()
                 {
                     local.intf = intf->m_next;
                     VMBreakPoint local_bp = *bp;
-                    void *data = ref->data;
+                    // Set local copy's pointer to local copy of disassembler
+                    local_bp.disasm = &idisasm;
+                    POINTER_SIZE_INT data = ref->data;
 
                     Method *method = (Method*)bp->method;
                     jlocation location = bp->location;
@@ -844,7 +846,7 @@ VMBreakPoints::process_interpreter_breakpoint(jmethodID method, jlocation locati
                 {
                     local.intf = intf->m_next;
                     VMBreakPoint local_bp = *bp;
-                    void *data = ref->data;
+                    POINTER_SIZE_INT data = ref->data;
 
                     TRACE2("jvmti.break.intf",
                         "Calling interpreter breakpoint callback function: "
@@ -933,7 +935,7 @@ VMBreakInterface::VMBreakInterface(TIEnv *env,
 }
 
 inline VMBreakPointRef*
-VMBreakInterface::add_reference_internal(VMBreakPoint *bp, void *data)
+VMBreakInterface::add_reference_internal(VMBreakPoint *bp, POINTER_SIZE_INT data)
 {
     VMBreakPointRef* bp_ref =
         (VMBreakPointRef*)STD_MALLOC(sizeof(VMBreakPointRef));
@@ -956,7 +958,7 @@ VMBreakInterface::add_reference_internal(VMBreakPoint *bp, void *data)
 }
 
 VMBreakPointRef*
-VMBreakInterface::add_reference(jmethodID method, jlocation location, void* data)
+VMBreakInterface::add_reference(jmethodID method, jlocation location, POINTER_SIZE_INT data)
 {
     assert(method);
 
@@ -993,7 +995,7 @@ VMBreakInterface::add_reference(jmethodID method, jlocation location, void* data
 
 VMBreakPointRef*
 VMBreakInterface::add_reference(jmethodID method, jlocation location,
-                                NativeCodePtr addr, void* data)
+                                NativeCodePtr addr, POINTER_SIZE_INT data)
 {
     assert(method);
 
@@ -1033,7 +1035,7 @@ VMBreakInterface::add_reference(jmethodID method, jlocation location,
 }
 
 VMBreakPointRef*
-VMBreakInterface::add_reference(NativeCodePtr addr, void* data)
+VMBreakInterface::add_reference(NativeCodePtr addr, POINTER_SIZE_INT data)
 {
     assert(addr);
     assert(!interpreter_enabled());
@@ -1103,9 +1105,6 @@ VMBreakInterface::remove_reference(VMBreakPointRef* bp_ref)
 
     VMBreakPoint* brpt = found->bp;
     assert(brpt);
-
-    if (found->data)
-        _deallocate((unsigned char*)found->data);
 
     STD_FREE(found);
 

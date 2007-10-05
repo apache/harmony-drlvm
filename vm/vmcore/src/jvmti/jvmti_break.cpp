@@ -39,7 +39,7 @@
 
 
 // Callback function for JVMTI breakpoint processing
-bool jvmti_process_breakpoint_event(TIEnv *env, VMBreakPoint* bp, void* UNREF data)
+bool jvmti_process_breakpoint_event(TIEnv *env, VMBreakPoint* bp, POINTER_SIZE_INT UNREF data)
 {
     assert(bp);
 
@@ -197,7 +197,7 @@ jvmtiSetBreakpoint(jvmtiEnv* env,
     if (NULL != bp)
         return JVMTI_ERROR_DUPLICATE;
 
-    if (!brpt_intf->add_reference(method, location, NULL))
+    if (!brpt_intf->add_reference(method, location, (POINTER_SIZE_INT)false))
         return JVMTI_ERROR_INTERNAL;
 
     TRACE2("jvmti.break", "SetBreakpoint is successful");

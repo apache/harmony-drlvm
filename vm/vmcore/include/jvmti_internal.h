@@ -423,6 +423,6 @@ void jvmti_SingleStepLocation(VM_thread* thread, Method *method,
     unsigned location, jvmti_StepLocation **next_step, unsigned *count);
 
 // Callback function for JVMTI breakpoint processing
-bool jvmti_process_breakpoint_event(TIEnv *env, VMBreakPoint* bp, void* data);
+bool jvmti_process_breakpoint_event(TIEnv *env, VMBreakPoint* bp, POINTER_SIZE_INT data);
 
 #endif /* _JVMTI_INTERNAL_H_ */
