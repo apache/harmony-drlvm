@@ -834,9 +834,9 @@ void Encoder::movp_impl(AR op0, const void *op1)
     EncoderBase::Operands args;
     args.add(devirt(op0));
 #ifdef _EM64T_
-    args.add(EncoderBase::Operand(OpndSize_64, (::int_ptr)op1));
+    args.add(EncoderBase::Operand(OpndSize_64, (int_ptr)op1));
 #else
-    args.add(EncoderBase::Operand(OpndSize_32, (::int_ptr)op1));
+    args.add(EncoderBase::Operand(OpndSize_32, (int_ptr)op1));
 #endif
     ip(EncoderBase::encode(ip(), Mnemonic_MOV, args));
 }

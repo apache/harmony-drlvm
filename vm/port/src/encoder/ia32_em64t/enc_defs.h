@@ -57,18 +57,11 @@
 #else
     #define REG_STACK       RegName_ESP
     #define REG_MAX         RegName_EDI
-    typedef long int_ptr;
     #define MAX_REGS        8
 #endif
 
 ENCODER_NAMESPACE_START
 
-/**
- * 'int_ptr' is a signed integer type which has the 
- * same size as a pointer on the target platform.
- * Luckily, the long type serves as desired.
- */
-typedef long int_ptr;
 /**
  * A number of bytes 'eaten' by an ordinary PUSH/POP.
  */
