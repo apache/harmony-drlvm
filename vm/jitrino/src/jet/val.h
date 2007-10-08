@@ -334,6 +334,7 @@ public:
     */
     void    to_mem(AR base, int disp, AR index = ar_x, unsigned scale=0)
     {
+        m_surviveCalls = false;
         m_kind = opnd_mem;
         m_base = base; m_index = index;
         m_scale = scale; m_disp = disp;
@@ -343,6 +344,7 @@ public:
      */
     void    to_reg(AR ar)
     {
+        m_surviveCalls = false;
         m_kind = opnd_reg;
         m_reg = ar;
     }
