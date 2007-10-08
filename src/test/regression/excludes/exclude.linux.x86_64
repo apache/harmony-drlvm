@@ -1,11 +1,13 @@
-# Exclude this test because of problems with hardware exceptions handling in VM for this platform
+# Excluded because of HARMONY-4265
 H1859
-H2086
+# Exclude this test because JVMTI is not implemented for x86_64 in JIT mode yet
 H2151
+# Test crashes. Needs investigation
+H2196
 # Exclude this test because JVMTI is not implemented for x86_64 in JIT mode yet
 H2926
+# Exclude this test because JVMTI is not implemented for x86_64 in JIT mode yet
 H3027
-H3228
 # Exclude this test because JVMTI is not implemented for x86_64 in JIT mode yet
 H3730
 # Exclude this test because JVMTI is not implemented for x86_64 in JIT mode yet
@@ -22,6 +24,5 @@ H4512
 H3341
 # Exclude this test because SOE handling is not ready for x86_64 in JIT/VM yet
 H4265
-H4292
 # Exclude this test because JVMTI is not implemented for x86_64 in JIT mode yet
 H4511
