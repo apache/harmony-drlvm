@@ -1,0 +1,9 @@
+<project name="RUN HARMONY-2196 Regression Test">
+    <target name="run-test">
+        <run-pjava-test 
+             test="org.apache.harmony.drlvm.tests.regression.h2196.LoopExcTest"
+             vmarg="-Xem:server_static">
+        </run-pjava-test>
+    </target>
+</project>
+
