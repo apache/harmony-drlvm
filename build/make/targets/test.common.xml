@@ -130,6 +130,7 @@ ${@{file}.content}
         </sequential>
     </macrodef>
     
+    <!-- Loads content of a file and escapes XML-specific symbols for attribute value -->
     <macrodef name="escape-cdata">
         <attribute name="file"/>
         <attribute name="property"/>
@@ -146,6 +147,8 @@ ${@{file}.content}
                     </tokenfilter>
                 </filterchain>
             </loadfile>
+            <!-- loadfile does not define the property if file is empty -->
+            <property name="@{property}" value=""/>
         </sequential>
     </macrodef>
 

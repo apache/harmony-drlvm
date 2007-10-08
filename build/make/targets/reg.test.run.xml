@@ -215,7 +215,6 @@
                   fork="yes"
                   timeout="${reg.test.timeout}">
                 <java-element/>
-                <jvmarg value="-XX:-vm.assert_dialog" />
                 <jvmarg line="@{vmarg}" />
                 <arg line="@{args}" />
                 <classpath>
@@ -223,16 +222,29 @@
                     <pathelement path="@{classpath}"/>
                 </classpath>
             </java>
-            <fail>
-test failure: 
-Test '@{test}' FAILED! (${@{test}.res.code} exit code)
+            
+            <!-- prepare JUnit-style report -->
+            <condition property="@{test}.is.passed" value="true" else="false">
+                <equals arg1="${@{test}.res.code}" arg2="@{expected-code}"/>
+            </condition>
+            <escape-cdata file="${reg.test.dir}/reports/@{test}.txt" property="@{test}.msg"/>
+            <to-junit-xml xml="${reg.test.dir}/reports/TEST-@{test}.xml"
+                suite="@{test}" 
+                status="${@{test}.is.passed}"
+                out="${@{test}.msg}"
+                msg="Exit code: ${@{test}.res.code}"
+                detail="Exit code: ${@{test}.res.code} Err: ${@{test}.msg}"/>
+
+            <if>
+                <isfalse value="${@{test}.is.passed}"/>
+                <then>
+                    <echo>
+@{test} FAILED! (${@{test}.res.code} exit code)
 See ${reg.test.dir}/reports/@{test}.txt file for details.
-                <condition>
-                    <not>
-                        <equals arg1="${@{test}.res.code}" arg2="@{expected-code}"/>
-                    </not>
-                </condition>
-            </fail>
+                    </echo>
+                    <fail message="${reg.test.failed.mark}"/>
+                </then>
+            </if>
         </sequential>
     </macrodef>
 
