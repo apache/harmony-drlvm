@@ -208,9 +208,9 @@ jlong __stdcall rt_h_i64_a(jlong v1, jlong v2, JavaByteCodes op)
         return v1 * v2;
         // special cases according to JVM Spec
     case OPCODE_IDIV:
-        return (v2 == -1 && v1 == LONG_MIN) ? v1 : v1 / v2;
+        return (v2 == -1 && v1 == jLONG_MIN) ? v1 : v1 / v2;
     case OPCODE_IREM:
-        return (v2 == -1 && v1 == LONG_MIN) ? 0 : v1 % v2;
+        return (v2 == -1 && v1 == jLONG_MIN) ? 0 : v1 % v2;
     default:
         break;
     }

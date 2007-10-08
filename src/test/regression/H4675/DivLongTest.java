@@ -11,7 +11,7 @@ public class DivLongTest extends TestCase {
         assertEquals(1, res);
     }
 
-    /*  crash on x86_64 - to be fixed
+    /** HARMONY-4898 */
     public void testLDIV_min() {
         long l_min = Long.MIN_VALUE;
         long l_1 = -1;
@@ -26,5 +26,5 @@ public class DivLongTest extends TestCase {
         long res = l_min % l_1;
 
         assertEquals(0, res);
-    } */
+    }
 }
