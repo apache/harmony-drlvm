@@ -35,10 +35,12 @@
         <element name="javac-elements" implicit="yes" optional="yes"/>
         <sequential>
             <mkdir dir="@{dest}" />
-            <hy.javac srcdir="@{src}" destdir="@{dest}">
+            <javac srcdir="@{src}" destdir="@{dest}" 
+                target="${hy.javac.target}" source="${hy.javac.source}" 
+                compiler="${hy.javac.compiler}" debug="${hy.javac.debug}">
                 <include name="**/*.java"/>
                 <javac-elements/>
-            </hy.javac>
+            </javac>
         </sequential>
     </macrodef>
     
