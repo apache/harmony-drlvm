@@ -19,7 +19,7 @@
     
     <import file="test.common.xml"/>
     
-    <!-- Mark used by custom test launchers for test failure notification -->
+    <!-- Marker used by custom test launchers for test failure notification -->
     <property name="reg.test.failed.mark" value="-=@@@ Reg Test Failed @@@=-"/>
 
     <target name="do-regression-testing" 
@@ -167,16 +167,14 @@
                 <formatter type="brief"/>
                 <formatter type="xml"/>
             </junit>
-            <if>
-                <isset property="reg.test.custom.launched"/>
-                <then>
-                    <fail message="${reg.test.failed.mark}">
-                        <condition>
-                            <istrue value="${reg.test.errors}"/>
-                        </condition>
-                    </fail>
-                </then>
-            </if>
+            <fail message="${reg.test.failed.mark}">
+                <condition>
+                    <and>
+                        <isset property="reg.test.custom.launched"/>
+                        <istrue value="${reg.test.errors}"/>
+                    </and>
+                </condition>
+            </fail>
         </sequential>
     </macrodef>
 
@@ -207,7 +205,7 @@
         <attribute name="args" default=""/>
         <element name="java-element" optional="true"/>
         <sequential>
-            <echo message="Running regression test: @{test}"/>
+            <echo message="Running @{test}"/>
             <java jvm="${test.jvm.exe}"
                   classname="@{test}"
                   resultproperty="@{test}.res.code"
@@ -238,12 +236,12 @@
             <if>
                 <isfalse value="${@{test}.is.passed}"/>
                 <then>
-                    <echo>
-@{test} FAILED! (${@{test}.res.code} exit code)
-See ${reg.test.dir}/reports/@{test}.txt file for details.
-                    </echo>
+                    <echo message="*** FAILED **** : @{test} (${@{test}.res.code} exit code)"/>
                     <fail message="${reg.test.failed.mark}"/>
                 </then>
+                <else>
+                    <echo message="PASSED : @{test}"/>
+                </else>
             </if>
         </sequential>
     </macrodef>

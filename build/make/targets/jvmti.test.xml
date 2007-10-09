@@ -41,7 +41,7 @@
         <compile-java dest="${jvmti.test.class.path}" src="${jvmti.test.src}"/>
     </target>
 
-    <target name="compile-jvmti-tests-native" depends="init_component">
+    <target name="compile-jvmti-tests-native">
         <mkdir dir="${jvmti.test.native.path}" />
 
         <for list="${jvmti.test.src.dirs.list}" param="directory"
@@ -57,12 +57,8 @@
                     link="shared"
                     outfile="${jvmti.test.native.path}/${outputdir}/${outputdir}">
                     <includepath path="${test.jdk.home}/include" />
-                    <select os="lnx">
-                        <linkerarg value="-lstdc++" />
-                    </select>
-                    <select os="win">
-                        <compilerarg value="/EHsc" />
-                    </select>
+                    <linkerarg value="-lstdc++" if="is.unix"/>
+                    <compilerarg value="/EHsc" if="is.windows"/>
                     <fileset dir="${jvmti.test.src}/${outputdir}">
                         <include name="**/*.cpp" />
                     </fileset>
@@ -144,7 +140,7 @@
                 <if>
                     <or>
                         <equals arg1="@{mode}" arg2="int" />
-                        <equals arg1="${build.arch}" arg2="ia32" />
+                        <isset property="is.x86"/>
                     </or>
                     <then>
                         <antcall target="run-jvmti-tests" > 

@@ -27,11 +27,13 @@
         unit.test       - builds and runs unit tests for the
                           designated components
         cunit.test      - builds and runs cunit tests
+        ehwa.test       - runs automated Eclispe HWA scenario
+        kernel.test     - builds and runs tests for kernel.classes
         smoke.test      - builds and runs smoke tests for the
                           designated components
         jvmti.test      - builds and runs JVMTI tests
-        test            - builds and runs unit & smoke tests for the
-                          designated components
+        test            - builds and runs unit & smoke tests 
+        test2           - builds and runs all pre-commit tests in parallel
 
     It is possible to specify the components to be built, via the
     COMPONENTS property.
@@ -389,42 +391,37 @@
     </target>
 
     <!-- Main target for tests run: call unit.test and smoke.test -->
-    <target name="test" depends="setup, init, set.target.to.test">
-        <condition property="component_to_test" value="vm">
-            <equals arg1="${COMPONENTS}" arg2="deploy" />
-            <!-- test means smoke test on vm -->
-        </condition>
-        <property name="component_to_test" value="${COMPONENTS}" />
-        <subant buildpath="." antfile="build_component.xml" target="build" inheritall="true" failonerror="true">
-            <property name="_component" value="${component_to_test}" />
-            <property name="_target" value="${target}" />
-        </subant>
+    <target name="test" depends="init,jvmti.test, cunit.test, smoke.test, kernel.test">
+        <fail if="test.failed" message="Some tests failed"/>
     </target>
     
-    <target name="test2" depends="init">
-        <property file="test.properties"/>
-        <parallel threadsPerProcessor="1" failonany="no">
-        <ant antfile="${external.dep.CLASSLIB}/build.xml" inheritAll="no" output="${build.semi.dir}/hut.log">
+    <target name="hut.test" depends="init">
+        <property name="hut.module" value="*"/>
+        <ant antfile="${external.dep.CLASSLIB}/build.xml" inheritAll="no">
             <target name="properties"/>
             <target name="test"/>
             <property name="hy.test.vm.name" value="drl"/>
             <property name="test.jre.home" value="${build.deploy.dir}/jdk/jre"/>
             <property name="short.report" value="true"/>
-            <property name="hy.test.vmargs" value="-XX:-vm.assert_dialog ${test.vmargs}"/>
+            <property name="hy.test.vmargs" value="${test.vmargs}"/>
+            <property name="build.module" value="${hut.module}"/>
         </ant>
-        <ant antfile="targets/kernel.test.xml" target="kernel.test" output="${build.semi.dir}/kernel.log"/>
-        <ant antfile="targets/ehwa.test.xml" target="ehwa" output="${build.semi.dir}/ehwa.log"/>
-        <!--ant target="test" output="${build.semi.dir}/test.log"/-->
-        <sequential>
-            <ant target="cunit.test" output="${build.semi.dir}/cunit.log"/>
-            <ant target="smoke.test" output="${build.semi.dir}/smoke.log"/>
-            <ant target="jvmti.test" output="${build.semi.dir}/jvmti.log"/>
-        </sequential>
-        </parallel>
     </target>
-
-    <target name="set.target.to.test">
-        <property name="target" value="test" />
+    
+    <target name="test2" depends="init">
+        <property file="test.properties"/>
+        <property name="run.all.tests" value="true"/>
+        <property name="base.test.dir" location="${build.semi.dir}/../tests"/>
+        <parallel threadsPerProcessor="1" failonany="no">
+            <ant target="hut.test" output="${base.test.dir}/hut.log"/>
+            <ant antfile="targets/kernel.test.xml" target="kernel.test" output="${base.test.dir}/kernel.log"/>
+            <ant antfile="targets/ehwa.test.xml" target="ehwa" output="${base.test.dir}/ehwa.log"/>
+            <ant antfile="targets/jvmti.test.xml" target="jvmti.test" output="${base.test.dir}/jvmti.log"/>
+            <ant antfile="targets/smoke.test.xml" target="smoke.test" output="${base.test.dir}/smoke.log"/>
+            <ant antfile="targets/reg.test.xml" target="reg.test" output="${base.test.dir}/reg.log"/>
+            <ant target="cunit.test" output="${base.test.dir}/cunit.log"/>
+        </parallel>
+        <fail if="test.failed" message="Some tests failed"/>
     </target>
 
     <!-- Main target to run unit tests -->
@@ -442,11 +439,8 @@
     </target>
 
     <!-- Main target to run smoke tests -->
-    <target name="smoke.test" depends="setup, init">
-        <subant buildpath="." antfile="build_component.xml" target="build" inheritall="true" failonerror="true">
-            <property name="_component" value="vm" />
-            <property name="_target" value="smoke.test" />
-        </subant>
+    <target name="smoke.test" depends="init">
+        <ant antfile="targets/smoke.test.xml" target="smoke.test"/>
     </target>
 
     <!-- Main target to run kernel tests -->
@@ -460,11 +454,8 @@
     </target>
 
     <!-- Main target to run jvmti tests /-->
-    <target name="jvmti.test" depends="setup, init">
-        <subant buildpath="." antfile="build_component.xml" target="build" inheritall="true" failonerror="true">
-            <property name="_component" value="vm" />
-            <property name="_target" value="jvmti.test" />
-        </subant>
+    <target name="jvmti.test" depends="init">
+        <ant antfile="targets/jvmti.test.xml" target="jvmti.test"/>
     </target>
 
     <!-- Main target to run regression test /-->

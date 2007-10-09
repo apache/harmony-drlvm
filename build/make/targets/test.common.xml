@@ -25,7 +25,14 @@
     <property name="test.jvm.exe" location="${test.jre.home}/bin/java"/>
     <property name="base.test.dir" location="${build.semi.dir}/../tests"/>
     <property file="test.properties"/>
-    
+    <if>
+        <isset property="is.ia64"/>
+        <then>
+            <!-- only default and interpreter modes currently supported on IA64 -->
+            <propertyregex property="test.mode" input="${test.mode}" regexp="(jet|opt|srv)" replace="" override="on" />
+        </then>
+    </if>
+
     <property name="jasmin.jar" location="${basedir}/tmp/jasmin.jar"/>
     <property name="vmmagic.jar" location="${test.hdk.home}/jdk/jre/lib/boot/vmmagic-20070207.jar"/>
     
@@ -35,12 +42,10 @@
         <element name="javac-elements" implicit="yes" optional="yes"/>
         <sequential>
             <mkdir dir="@{dest}" />
-            <javac srcdir="@{src}" destdir="@{dest}" 
-                target="${hy.javac.target}" source="${hy.javac.source}" 
-                compiler="${hy.javac.compiler}" debug="${hy.javac.debug}">
+            <hy.javac srcdir="@{src}" destdir="@{dest}" >
                 <include name="**/*.java"/>
                 <javac-elements/>
-            </javac>
+            </hy.javac>
         </sequential>
     </macrodef>
     

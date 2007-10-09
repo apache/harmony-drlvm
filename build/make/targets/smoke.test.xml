@@ -29,15 +29,12 @@
         <exclude name="**/*$*.class"/>
     </patternset>
 
-    <target name="smoke.test.native.init">
-        <fileset id="smoke.test.native.refid"
-                dir="${smoke.test.src}">
-            <include name="**/*.c"/>
-        </fileset>
-        <pathconvert property="smoke.test.native.list"
-                     refid="smoke.test.native.refid" pathsep="," />
-
-    </target>
+    <fileset id="smoke.test.native.refid"
+            dir="${smoke.test.src}">
+        <include name="**/*.c"/>
+    </fileset>
+    <pathconvert property="smoke.test.native.list"
+                 refid="smoke.test.native.refid" pathsep="," />
 
     <target name="smoke.test" depends="clean, compile.smoke.test, java_test_smoke, build_report">
         <available property="test.failed" file="${smoke.test.summary}" />
@@ -54,7 +51,7 @@
     </target>
 
 
-    <target name="compile.smoke.test.native" depends="init_component, smoke.test.native.init">
+    <target name="compile.smoke.test.native">
         <mkdir dir="${smoke.test.native.path}" />
 
         <for list="${smoke.test.native.list}" param="full.file.path" delimiter=",">
@@ -77,9 +74,7 @@
                     link="shared"
                     outfile="${smoke.test.native.path}/${outputdir}/${outputfile}">
                     <includepath path="${test.jdk.home}/include" />
-                    <select os="lnx">
-                        <linkerarg value="-lstdc++" />
-                    </select>
+                    <!--linkerarg value="-lstdc++" if="is.linux"/-->
                     <fileset file="@{full.file.path}" />                    
                 </cc>
 
@@ -257,7 +252,6 @@
                         </condition>
 
                         <escape-cdata file="${test.report}.out.err" property="@{test}.msg"/>
-                        <property name="@{test}.msg" value=""/>
                         <to-junit-xml xml="${smoke.test.dir}/reports/TEST-${class.name}_${mode.id}.xml"
                             suite="${class.name}_${mode.id}" test="${mode.name}" 
                             status="${@{test}.is.passed}"
