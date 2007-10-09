@@ -23,7 +23,6 @@
 #include "open/hythread.h"
 #include "open/hythread_ext.h"
 #include "open/ti_thread.h"
-#include "open/thread_externals.h"
 #include "thread_manager.h"
 
 /*
@@ -268,7 +267,7 @@ void tested_os_threads_run(hythread_entrypoint_t run_method_param){
         tf_assert_v(tts->native_thread != NULL);
         tts->native_thread->java_status = TM_STATUS_ALLOCATED;
         status = hythread_create_ex(tts->native_thread,
-            NULL, 0, 0, run_method_param, tts);
+            NULL, 0, 0, NULL, run_method_param, tts);
         tf_assert_v(status == TM_ERROR_NONE);
         tested_thread_wait_started(tts);
     }

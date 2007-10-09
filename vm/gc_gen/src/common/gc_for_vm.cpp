@@ -58,6 +58,8 @@ int gc_init()
   INFO2("gc.process", "GC: call GC init...\n");
   assert(p_global_gc == NULL);
 
+  vm_gc_lock_init();
+
 #ifndef USE_MARK_SWEEP_GC
   unsigned int gc_struct_size = sizeof(GC_Gen);
 #else
@@ -205,7 +207,9 @@ void gc_add_weak_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinned, B
 void gc_force_gc() 
 {
   vm_gc_lock_enum();
+
   gc_reclaim_heap(p_global_gc, GC_CAUSE_RUNTIME_FORCE_GC);  
+
   vm_gc_unlock_enum();
 }
 

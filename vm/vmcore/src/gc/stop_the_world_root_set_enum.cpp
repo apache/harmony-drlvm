@@ -90,8 +90,17 @@ stop_the_world_root_set_enumeration()
     INFO2("threads","Start thread suspension ");
     vm_time_start_hook(&_start_time);   //thread suspension time measurement        
     
-    hythread_iterator_t  iterator;
+    hythread_iterator_t iterator;
     hythread_suspend_all(&iterator, NULL);
+
+    // no matter how counter-intuitive,
+    // gc_force_gc() expects gc_enabled_status == disabled,
+    // but, obviously, at a GC safepoint.
+    // See gc-safety (aka suspend-safety) rules explained elsewhere
+    // -salikh 2005-05-12
+    // it is convenient to have gc_enabled_status == disabled
+    // during the enumeration -salikh
+    hythread_suspend_disable();
 
     thread_suspend_time = vm_time_end_hook(&_start_time, &_end_time);
     INFO2("tm.suspend","Thread suspension time: "<< thread_suspend_time <<" mksec");
@@ -133,15 +142,9 @@ stop_the_world_root_set_enumeration()
 void 
 vm_enumerate_root_set_all_threads()
 {
-    assert(!hythread_is_suspend_enabled());
-    // it is convenient to have gc_enabled_status == disabled
-    // during the enumeration -salikh
-
+    assert(hythread_is_suspend_enabled());
     stop_the_world_root_set_enumeration();
-    
     assert(!hythread_is_suspend_enabled());
-    // vm_gc_unlock_enum expects suspend enabled, enable it here
-
 } //vm_enumerate_root_set_all_threads
 
 
@@ -156,7 +159,8 @@ void vm_resume_threads_after()
     jvmti_clean_reclaimed_object_tags();
 
     // Run through list of active threads and resume each one of them.
-    hythread_resume_all( NULL);
+    hythread_suspend_enable();
+    hythread_resume_all(NULL);
 
     // Make sure register stack is up-to-date with the potentially updated backing store
     si_reload_registers();

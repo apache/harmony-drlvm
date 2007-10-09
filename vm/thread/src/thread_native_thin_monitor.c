@@ -22,10 +22,8 @@
 
 #undef LOG_DOMAIN
 #define LOG_DOMAIN "tm.locks"
-#define _TM_PROP_EXPORT
 
 #include <open/hythread_ext.h>
-#include <open/thread_externals.h>
 #include "thread_private.h"
 #include <apr_atomic.h>
 #include <port_atomic.h>
@@ -68,6 +66,7 @@
     lock_table->tables[((U_32)(_x_))/HY_FAT_TABLE_ENTRIES]\
                       [((U_32)(_x_))%HY_FAT_TABLE_ENTRIES]
 
+tm_props *tm_properties = NULL;
 
 /*
  * Lock table which holds the omapping between LockID and fat lock (OS fat_monitor) pointer.
@@ -156,7 +155,6 @@ void unreserve_self_lock(hythread_thin_monitor_t *lockword_ptr) {
     assert(!IS_RESERVED(*lockword_ptr));
     TRACE(("unreserved self"));
 }
-          
 
 /**
  * Used lockword

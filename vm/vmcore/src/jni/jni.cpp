@@ -538,7 +538,7 @@ jint JNICALL JNI_CreateJavaVM(JavaVM ** p_vm, JNIEnv ** p_jni_env,
     jvmti_send_vm_init_event(vm_env);
 
     // Thread start event for the main thread should be sent after VMInit callback has finished.
-    jvmti_send_thread_start_end_event(1);
+    jvmti_send_thread_start_end_event(p_TLS_vmthread, 1);
 
     // Register created VM.
     APR_RING_INSERT_TAIL(&GLOBAL_VMS, java_vm, JavaVM_Internal, link);
@@ -1558,7 +1558,9 @@ VMEXPORT jint JNICALL DetachCurrentThread(JavaVM * vm)
     IDATA status;
     
     java_thread = jthread_self();
-    if (java_thread == NULL) return JNI_EDETACHED;
+    if (java_thread == NULL) {
+        return JNI_EDETACHED;
+    }
 
     status = jthread_detach(java_thread);
     

@@ -40,26 +40,32 @@
  * @param[in] count the created key
  * @sa java.util.concurrent.CountDownLatch 
  */
-IDATA VMCALL hylatch_create(hylatch_t *latch, IDATA count) {
-    int r;
-    hylatch_t l;
+IDATA VMCALL hylatch_create(hylatch_t *latch_ptr, IDATA count) {
+    int res;
+    hylatch_t latch;
     
-    l = malloc(sizeof(HyLatch));
-    if (l == NULL) {
+    latch = malloc(sizeof(HyLatch));
+    if (latch == NULL) {
         return TM_ERROR_OUT_OF_MEMORY;
     }
-    r = hymutex_create(&l->mutex, TM_MUTEX_DEFAULT);
-    if (r) goto cleanup;
-    r = hycond_create(&l->condition);
-    if (r) goto cleanup;
-        
-    l->count = count;
-    *latch = l;
+    res = hymutex_create(&latch->mutex, TM_MUTEX_DEFAULT);
+    if (res) {
+        goto cleanup;
+    }
+    res = hycond_create(&latch->condition);
+    if (res) {
+        goto cleanup_mutex;
+    }
+    latch->count = count;
+    *latch_ptr = latch;
     return TM_ERROR_NONE;
 
+cleanup_mutex:
+    hymutex_destroy(&latch->mutex);
+
 cleanup:
-    free(l);
-    return r;
+    free(latch);
+    return res;
 }
 
 //wait method implementation
@@ -68,7 +74,9 @@ static IDATA latch_wait_impl(hylatch_t latch, I_64 ms, IDATA nano, IDATA interru
     IDATA status;
         
     status = hymutex_lock(&latch->mutex);
-    if (status != TM_ERROR_NONE) return status;
+    if (status != TM_ERROR_NONE) {
+        return status;
+    }
     while (latch->count) {
         status = condvar_wait_impl(&latch->condition, &latch->mutex, ms, nano, interruptable);
         //check interruption and other problems
@@ -80,9 +88,8 @@ static IDATA latch_wait_impl(hylatch_t latch, I_64 ms, IDATA nano, IDATA interru
         if (ms || nano) break;
     }
     status = hymutex_unlock(&latch->mutex);
-    if (status != TM_ERROR_NONE) return status;
 
-    return TM_ERROR_NONE;
+    return status;
 }
 
 /**
@@ -196,16 +203,16 @@ IDATA VMCALL hylatch_get_count(IDATA *count, hylatch_t latch) {
 
     return TM_ERROR_NONE;       
 }
+
 /**
  * Destroys the latch and releases the associated memory.
  * 
  * @param[in] latch the latch 
  */
 IDATA VMCALL hylatch_destroy(hylatch_t latch) {
-    hymutex_destroy(&latch->mutex);
-    hycond_destroy(&latch->condition);
-
+    IDATA status = hymutex_destroy(&latch->mutex);
+    status |= hycond_destroy(&latch->condition);
     free(latch);
-    return TM_ERROR_NONE;       
+    return status;
 }
 

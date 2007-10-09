@@ -23,7 +23,6 @@
 #include <open/ti_thread.h>
 #include <open/hythread_ext.h>
 #include <open/jthread.h>
-#include <open/thread_externals.h>
 #include "vm_threads.h"
 #include "object_handles.h"
 

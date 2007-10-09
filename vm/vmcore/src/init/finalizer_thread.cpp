@@ -112,7 +112,7 @@ void finalizer_threads_init(JavaVM *java_vm, JNIEnv *jni_env)
     for(unsigned int i = 0; i < fin_thread_info->thread_num; i++){
         fin_thread_info->thread_ids[i] = jthread_allocate_thread();
         status = hythread_create_ex((hythread_t)fin_thread_info->thread_ids[i],
-            NULL, 0, FINALIZER_THREAD_PRIORITY,
+            NULL, 0, FINALIZER_THREAD_PRIORITY, NULL,
             (hythread_entrypoint_t)finalizer_thread_func, args);
         assert(status == TM_ERROR_NONE);
         hysem_wait(fin_thread_info->attached_sem);
@@ -122,9 +122,7 @@ void finalizer_threads_init(JavaVM *java_vm, JNIEnv *jni_env)
 void finalizer_shutdown(Boolean start_finalization_on_exit)
 {
     if(start_finalization_on_exit){
-        tmn_suspend_disable();
         gc_force_gc();
-        tmn_suspend_enable();
         activate_finalizer_threads(TRUE);
         tmn_suspend_disable();
         gc_finalize_on_exit();

@@ -336,7 +336,7 @@ bool check_available_stack_size(size_t required_size) {
 
     if (available_stack_size < required_size) {
         if (available_stack_size < get_guard_stack_size()) {
-            remove_guard_stack();
+            remove_guard_stack(p_TLS_vmthread);
         }
         exn_raise_by_name("java/lang/StackOverflowError");
         return false;
@@ -359,7 +359,7 @@ bool check_stack_size_enough_for_exception_catch(void* sp) {
 }
 
 
-void remove_guard_stack() {
+void remove_guard_stack(vm_thread_t vm_thread) {
     int err;
     char* stack_addr = (char*) get_stack_addr();
     size_t stack_size = get_stack_size();
@@ -418,9 +418,10 @@ void stack_overflow_handler(int signum, siginfo_t* UNREF info, void* context)
             throw_from_sigcontext(
                 uc, env->java_lang_StackOverflowError_Class);
         } else {
-            remove_guard_stack();
+            vm_thread_t vm_thread = p_TLS_vmthread;
+            remove_guard_stack(vm_thread);
             exn_raise_by_name("java/lang/StackOverflowError");
-            p_TLS_vmthread->restore_guard_page = true;
+            vm_thread->restore_guard_page = true;
         }
     }
 }

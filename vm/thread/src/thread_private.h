@@ -22,7 +22,6 @@
 #include <open/types.h>
 #include <open/hythread_ext.h>
 #include <open/ti_thread.h>
-#include <open/thread_externals.h>
 #include <apr_pools.h>
 #include <apr_thread_mutex.h>
 #include <apr_thread_cond.h>
@@ -174,7 +173,7 @@ typedef struct HyLatch {
     /**
      * Latch count
      */
-    int count;
+    IDATA count;
 
     /**
      * Condition event used to signal threads which are waiting on the latch.
@@ -185,11 +184,6 @@ typedef struct HyLatch {
      * Mutex associated with the latch data.
      */
     hymutex_t mutex;  
-    /**
-      * latch sub pool
-      * will be destroyed by latch_destroy()
-     */
-    apr_pool_t *pool;       
     
 } HyLatch;
 
@@ -312,7 +306,7 @@ IDATA sem_wait_impl(hysem_t sem, I_64 ms, IDATA nano, IDATA interruptable);
  * portability functions, private for thread module
  */
 int os_thread_create(osthread_t* phandle, UDATA stacksize, UDATA priority,
-        int (VMAPICALL *func)(void*), void *data);
+        hythread_wrapper_t func, void *data);
 int os_thread_set_priority(osthread_t thread, int priority);
 osthread_t os_thread_current();
 int os_thread_cancel(osthread_t);

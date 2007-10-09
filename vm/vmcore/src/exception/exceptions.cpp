@@ -40,8 +40,9 @@
 bool exn_raised()
 {
     // no need to disable gc for simple null equality check
-    return ((NULL != p_TLS_vmthread->thread_exception.exc_object)
-        || (NULL != p_TLS_vmthread->thread_exception.exc_class));
+    vm_thread_t vm_thread = p_TLS_vmthread;
+    return ((NULL != vm_thread->thread_exception.exc_object)
+        || (NULL != vm_thread->thread_exception.exc_class));
 }
 
 
@@ -54,8 +55,9 @@ jthrowable exn_get()
     // we can check heap references for equality to NULL
     // without disabling gc, because GC wouldn't change 
     // null to non-null and vice versa.
-    if ((NULL == p_TLS_vmthread->thread_exception.exc_object)
-        && (NULL == p_TLS_vmthread->thread_exception.exc_class)) {
+    vm_thread_t vm_thread = p_TLS_vmthread;
+    if ((NULL == vm_thread->thread_exception.exc_object)
+        && (NULL == vm_thread->thread_exception.exc_class)) {
         return NULL;
     }
 
@@ -63,13 +65,13 @@ jthrowable exn_get()
     // curent thread exception
     jobject exc;
 
-    if (NULL != p_TLS_vmthread->thread_exception.exc_object) {
+    if (NULL != vm_thread->thread_exception.exc_object) {
         tmn_suspend_disable();
         exc = oh_allocate_local_handle();
-        exc->object = (ManagedObject *) p_TLS_vmthread->thread_exception.exc_object;
+        exc->object = (ManagedObject *) vm_thread->thread_exception.exc_object;
         tmn_suspend_enable();
-    } else if (NULL != p_TLS_vmthread->thread_exception.exc_class) {
-        exc = exn_create((Exception*)&(p_TLS_vmthread->thread_exception));
+    } else if (NULL != vm_thread->thread_exception.exc_class) {
+        exc = exn_create((Exception*)&(vm_thread->thread_exception));
     } else {
         DIE(("It's impossible internal error in exception handling."));
     }
@@ -80,20 +82,21 @@ Class* exn_get_class() {
     // we can check heap references for equality to NULL
     // without disabling gc, because GC wouldn't change
     // null to non-null and vice versa.
-    if ((NULL == p_TLS_vmthread->thread_exception.exc_object)
-        && (NULL == p_TLS_vmthread->thread_exception.exc_class)) {
+    vm_thread_t vm_thread = p_TLS_vmthread;
+    if ((NULL == vm_thread->thread_exception.exc_object)
+        && (NULL == vm_thread->thread_exception.exc_class)) {
         return NULL;
     }
 
     Class* result;
 
-    if (NULL != p_TLS_vmthread->thread_exception.exc_object) {
+    if (NULL != vm_thread->thread_exception.exc_object) {
         tmn_suspend_disable_recursive();
-        ManagedObject* exn = p_TLS_vmthread->thread_exception.exc_object;
+        ManagedObject* exn = vm_thread->thread_exception.exc_object;
         result = exn->vt()->clss;
         tmn_suspend_enable_recursive();
-    } else if (NULL != p_TLS_vmthread->thread_exception.exc_class) {
-        result = p_TLS_vmthread->thread_exception.exc_class;
+    } else if (NULL != vm_thread->thread_exception.exc_class) {
+        result = vm_thread->thread_exception.exc_class;
     } else {
         DIE(("It's impossible internal error in exception handling."));
     }
@@ -346,21 +349,22 @@ void exn_rethrow()
 
     exn_throw_for_JIT(exn, NULL, NULL, NULL, NULL);
 #else
-    if (NULL != p_TLS_vmthread->thread_exception.exc_object) {
-        ManagedObject* exn_mng_object = p_TLS_vmthread->thread_exception.exc_object;
+    vm_thread_t vm_thread = p_TLS_vmthread;
+    if (NULL != vm_thread->thread_exception.exc_object) {
+        ManagedObject* exn_mng_object = vm_thread->thread_exception.exc_object;
         clear_exception_internal();
 
         check_pop_frame(exn_mng_object);
 
         exn_throw_for_JIT(exn_mng_object, NULL, NULL, NULL, NULL);
-    } else if (NULL != p_TLS_vmthread->thread_exception.exc_class) {
-        Class * exc_class = p_TLS_vmthread->thread_exception.exc_class;
-        const char* exc_message = p_TLS_vmthread->thread_exception.exc_message;
+    } else if (NULL != vm_thread->thread_exception.exc_class) {
+        Class * exc_class = vm_thread->thread_exception.exc_class;
+        const char* exc_message = vm_thread->thread_exception.exc_message;
         jthrowable exc_cause = NULL;
 
-        if (p_TLS_vmthread->thread_exception.exc_cause){
+        if (vm_thread->thread_exception.exc_cause){
             exc_cause = oh_allocate_local_handle();
-            exc_cause->object = p_TLS_vmthread->thread_exception.exc_cause;
+            exc_cause->object = vm_thread->thread_exception.exc_cause;
         }
         clear_exception_internal();
 

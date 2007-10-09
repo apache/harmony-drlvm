@@ -47,7 +47,7 @@ pid_t gettid(void)
  *         of insufficient memory, system error otherwise.
  */
 int os_thread_create(/* out */osthread_t* phandle, UDATA stacksize, UDATA priority,
-        int (VMAPICALL *func)(void*), void *data)
+        hythread_wrapper_t func, void *data)
 {
     pthread_t thread;
     pthread_attr_t attr;

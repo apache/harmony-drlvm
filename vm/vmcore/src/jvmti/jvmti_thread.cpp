@@ -695,7 +695,7 @@ jvmtiRunAgentThread(jvmtiEnv* env,
     jni_env = jthread_get_JNI_env(jthread_self());
 
     // Run new thread
-    jthread_threadattr_t attrs = {0};
+    jthread_start_proc_data attrs = {0};
     attrs.priority = priority; 
     attrs.daemon = JNI_TRUE;
     attrs.jvmti_env = env;

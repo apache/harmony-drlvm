@@ -170,10 +170,10 @@ typedef struct HyLatch *hylatch_t;
 
 typedef struct HyThread *hythread_iterator_t;
 typedef struct HyThreadLibrary *hythread_library_t;
-
 typedef U_32  hythread_thin_monitor_t;
-
 typedef void (*hythread_event_callback_proc)(void);
+typedef int (HYTHREAD_PROC *hythread_wrapper_t)(void*);
+typedef struct hythread_start_proc_data * hythread_start_proc_data_t;
 
 /**
  * Native thread control structure.
@@ -337,7 +337,12 @@ typedef struct HyThread {
     /**
      * Flag illustrates that java thread status
      */
-    int java_status;
+    char java_status;
+
+    /**
+     * Release indicator
+     */
+    char need_to_free;
 
     /**
      * Size of thread's stack, set on creation
@@ -358,6 +363,38 @@ typedef struct HyThread {
 
 } HyThread;
 
+/**
+ * Start procedure data structure.
+ */
+typedef struct hythread_start_proc_data {
+
+    /**
+     * A new thread
+     */
+    hythread_t thread;
+
+    /**
+     * Thread group of a new thread
+     */
+    hythread_group_t group;
+
+    /**
+     * Thread start procedure
+     */
+    hythread_entrypoint_t proc;
+
+    /**
+     * Start procedure arguments
+     */
+    void *proc_args;
+} hythread_start_proc_data;
+
+typedef struct tm_props {
+    int use_soft_unreservation;
+} tm_props;
+
+extern VMIMPORT tm_props *tm_properties;
+
 //@}
 /** @name Thread Manager initialization / shutdown
  */
@@ -370,6 +407,8 @@ IDATA VMCALL hythread_global_lock();
 IDATA VMCALL hythread_global_unlock();
 void VMCALL hythread_init(hythread_library_t lib);
 void VMCALL hythread_shutdown();
+void VMCALL hythread_shutdowning();
+int VMCALL hythread_lib_state();
 IDATA VMCALL hythread_lib_create(hythread_library_t * lib);
 void VMCALL hythread_lib_destroy(hythread_library_t lib);
 hythread_group_t VMCALL get_java_thread_group(void);
@@ -379,8 +418,11 @@ hythread_group_t VMCALL get_java_thread_group(void);
  */
 //@{
 
-IDATA VMCALL hythread_create_ex(hythread_t new_thread, hythread_group_t group, UDATA stacksize, UDATA priority, hythread_entrypoint_t func, void *data);
+IDATA VMCALL hythread_create_ex(hythread_t new_thread, hythread_group_t group, UDATA stacksize, UDATA priority, hythread_wrapper_t wrapper, hythread_entrypoint_t func, void *data);
 IDATA VMCALL hythread_attach_ex(hythread_t new_handle, hythread_library_t lib, hythread_group_t group);
+void VMCALL hythread_detach_ex(hythread_t thread);
+IDATA VMCALL hythread_set_to_group(hythread_t thread, hythread_group_t group);
+void VMCALL hythread_set_self(hythread_t thread);
 UDATA VMCALL hythread_clear_interrupted_other(hythread_t thread);
 IDATA VMCALL hythread_join(hythread_t t);
 IDATA VMCALL hythread_join_timed(hythread_t t, I_64 millis, IDATA nanos);
@@ -389,6 +431,7 @@ IDATA VMCALL hythread_get_self_id();
 IDATA VMCALL hythread_get_id(hythread_t t);
 hythread_t VMCALL hythread_get_thread(IDATA id);
 IDATA VMCALL hythread_struct_init(hythread_t new_thread);
+IDATA VMCALL hythread_struct_release(hythread_t thread);
 IDATA VMCALL hythread_cancel_all(hythread_group_t group);
 IDATA hythread_group_create(hythread_group_t *group);
 IDATA VMCALL hythread_group_release(hythread_group_t group);
@@ -603,6 +646,8 @@ hy_inline void VMCALL hythread_suspend_disable()
     thread = tm_self_tls;
     ((HyThread_public *)thread)->disable_count++;
 
+    //apr_memory_rw_barrier();
+
     if (((HyThread_public *)thread)->request && 
 	((HyThread_public *)thread)->disable_count == 1) {
         // enter to safe point if suspend request was set
@@ -699,6 +744,10 @@ hy_inline void VMCALL hythread_suspend_disable()
 #define TM_STATUS_WITHOUT_JAVA  0   // native thread cannot has associated java thread
 #define TM_STATUS_ALLOCATED     1   // associated java thread is allocated
 #define TM_STATUS_INITIALIZED   2   // associated java thread is initialized
+
+#define TM_LIBRARY_STATUS_NOT_INITIALIZED   0
+#define TM_LIBRARY_STATUS_INITIALIZED       1
+#define TM_LIBRARY_STATUS_SHUTDOWN          2
 
 #if defined(__cplusplus)
 }

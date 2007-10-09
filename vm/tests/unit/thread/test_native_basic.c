@@ -43,13 +43,13 @@ int test_hythread_create(void){
     
     hythread_group_create((hythread_group_t *)&args[0]); 
     
-    args[1] = calloc(1, sizeof(jthread_threadattr_t));
-    ((jthread_threadattr_t *)args[1])->stacksize = 1024000;
-    ((jthread_threadattr_t *)args[1])->priority  = 1;
+    args[1] = calloc(1, sizeof(struct jthread_start_proc_data));
+    ((jthread_start_proc_data_t)args[1])->stacksize = 1024000;
+    ((jthread_start_proc_data_t)args[1])->priority  = 1;
     
     thread = (hythread_t)calloc(1, hythread_get_struct_size());
     assert(thread);
-    res = hythread_create_ex(thread, args[0], 1024000, 1,
+    res = hythread_create_ex(thread, args[0], 1024000, 1, NULL,
         (hythread_entrypoint_t)start_proc, args);
     tf_assert(res == TM_ERROR_NONE && "thread creation failed");
 
@@ -107,7 +107,7 @@ int test_hythread_iterator(void) {
         IDATA status;
         thread = (hythread_t)calloc(1, hythread_get_struct_size());
         assert(thread);
-        status = hythread_create_ex(thread, group, 0, 0,
+        status = hythread_create_ex(thread, group, 0, 0, NULL,
             (hythread_entrypoint_t)start_proc_empty, NULL);
         tf_assert_same(status, TM_ERROR_NONE);
     }
@@ -193,13 +193,13 @@ int test_hythread_create_many(void){
     
         args[0] = group; 
         
-        args[1] = calloc(1, sizeof(jthread_threadattr_t));
-        ((jthread_threadattr_t *)args[1])->stacksize = 1024000;
-        ((jthread_threadattr_t *)args[1])->priority  = 1;
+        args[1] = calloc(1, sizeof(struct jthread_start_proc_data));
+        ((jthread_start_proc_data_t)args[1])->stacksize = 1024000;
+        ((jthread_start_proc_data_t)args[1])->priority  = 1;
         
         thread = (hythread_t)calloc(1, hythread_get_struct_size());
         assert(thread);
-        res = hythread_create_ex(thread, group, 1024000, 1,
+        res = hythread_create_ex(thread, group, 1024000, 1, NULL,
             (hythread_entrypoint_t)start_proc, args);
         tf_assert(res == TM_ERROR_NONE && "thread creation failed");
         res = hythread_join(thread);
@@ -222,7 +222,7 @@ int test_hythread_create_many(void){
 
 int start_proc(void *args) {
     void** attrs = (void **)args; 
-    tf_assert_same(hythread_get_priority(hythread_self()), ((jthread_threadattr_t *)attrs[1])->priority);
+    tf_assert_same(hythread_get_priority(hythread_self()), ((jthread_start_proc_data_t)attrs[1])->priority);
     tf_assert_same(((HyThread_public*)hythread_self())->group, attrs[0]);
     return 0;
 }

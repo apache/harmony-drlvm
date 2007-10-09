@@ -2396,18 +2396,26 @@ unsigned vm_vector_size(Class_Handle vector_class, int length)
     return vector_class->calculate_array_size(length);
 } // vm_vector_size
 
+static hymutex_t vm_gc_lock;
 
+void vm_gc_lock_init()
+{
+    IDATA UNUSED status = hymutex_create(&vm_gc_lock, TM_MUTEX_NESTED);
+    assert(status == TM_ERROR_NONE);
+} // vm_gc_lock_init
 
 void vm_gc_lock_enum()
 {
-    hythread_global_lock();
+    int disable_count = hythread_reset_suspend_disable();
+    IDATA UNUSED status = hymutex_lock(&vm_gc_lock);
+    assert(status == TM_ERROR_NONE);
+    hythread_set_suspend_disable(disable_count);
 } // vm_gc_lock_enum
-
-
 
 void vm_gc_unlock_enum()
 {
-     hythread_global_unlock();
+    IDATA UNUSED status = hymutex_unlock(&vm_gc_lock);
+    assert(status == TM_ERROR_NONE);
 } // vm_gc_unlock_enum
 
 

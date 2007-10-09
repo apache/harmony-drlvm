@@ -25,7 +25,6 @@
 #include "open/hythread.h"
 #include "open/jthread.h"
 #include "open/gc.h"
-#include "open/thread_externals.h"
 
 #include "jni.h"
 #include "jni_direct.h"
@@ -89,7 +88,34 @@ static jint exec_shutdown_sequence(JNIEnv * jni_env) {
 }
 
 static void vm_shutdown_callback() {
+    hythread_suspend_enable();
+    set_unwindable(false);
+
+    vm_thread_t vm_thread = jthread_self_vm_thread();
+    assert(vm_thread);
+
+    jobject java_thread = vm_thread->java_thread;
+    assert(java_thread);
+
+    IDATA UNUSED status = jthread_detach(java_thread);
+    assert(status == TM_ERROR_NONE);
+
     hythread_exit(NULL);
+}
+
+static void vm_thread_cancel(vm_thread_t thread) {
+    assert(thread);
+
+    // grab hythread global lock
+    hythread_global_lock();
+
+    IDATA UNUSED status = jthread_vm_detach(thread);
+    assert(status == TM_ERROR_NONE);
+
+    hythread_cancel((hythread_t)thread);
+
+    // release hythread global lock
+    hythread_global_unlock();
 }
 
 /**
@@ -142,8 +168,9 @@ static void vm_shutdown_stop_java_threads(Global_Env * vm_env) {
         // we should not cancel self and
         // non-java threads (i.e. vm_thread == NULL)
         if (native_thread != self && vm_thread != NULL) {
-            hythread_cancel(native_thread);
+            vm_thread_cancel(vm_thread);
             TRACE2("shutdown", "cancelling " << native_thread);
+            STD_FREE(vm_thread);
         }
     }
     hythread_iterator_release(&it);
@@ -194,7 +221,7 @@ jint vm_destroy(JavaVM_Internal * java_vm, jthread java_thread)
         wait_native_ref_thread_detached();
 
     // Raise uncaught exception to current thread.
-    // It will be properly processed in jthread_detach().
+    // It will be properly processed in jthread_java_detach().
     if (uncaught_exception) {
         exn_raise_object(uncaught_exception);
     }
@@ -204,6 +231,9 @@ jint vm_destroy(JavaVM_Internal * java_vm, jthread java_thread)
     // This event should be sent before Agent_OnUnload called.
     jvmti_send_vm_death_event();
 
+    // prepare thread manager to shutdown
+    hythread_shutdowning();
+
     // Stop all (except current) java threads
     // before destroying VM-wide data.
     vm_shutdown_stop_java_threads(java_vm->vm_env);
@@ -211,9 +241,12 @@ jint vm_destroy(JavaVM_Internal * java_vm, jthread java_thread)
     // TODO: ups we don't stop native threads as well :-((
     // We are lucky! Currently, there are no such threads.
 
-    // Detach current thread.
+    // Detach current main thread.
     status = jthread_detach(java_thread);
-    if (status != TM_ERROR_NONE) return JNI_ERR;
+
+    // check detach status
+    if (status != TM_ERROR_NONE)
+        return JNI_ERR;
 
     // Shutdown signals
     extern void shutdown_signals();
@@ -347,7 +380,7 @@ void vm_interrupt_handler(int UNREF x) {
     // Create a new thread for each VM to avoid scalability and deadlock problems.
     for (int i = 0; i < nVMs; i++) {
         threadBuf[i] = jthread_allocate_thread();
-        status = hythread_create_ex((hythread_t)threadBuf[i], NULL, 0, 0,
+        status = hythread_create_ex((hythread_t)threadBuf[i], NULL, 0, 0, NULL,
             vm_interrupt_entry_point, (void *)vmBuf[i]);
         assert(status == TM_ERROR_NONE);
     }
@@ -389,17 +422,18 @@ void vm_dump_handler(int UNREF x) {
     assert(threadBuf);
 
     // Create a new thread for each VM to avoid scalability and deadlock problems.
+    IDATA UNUSED hy_status;
     for (int i = 0; i < nVMs; i++) {
         threadBuf[i] = jthread_allocate_thread();
-        IDATA UNUSED hy_status = hythread_create_ex((hythread_t)threadBuf[i],
-            NULL, 0, 0, vm_dump_entry_point, (void *)vmBuf[i]);
+        hy_status = hythread_create_ex((hythread_t)threadBuf[i],
+            NULL, 0, 0, NULL, vm_dump_entry_point, (void *)vmBuf[i]);
         assert(hy_status == TM_ERROR_NONE);
     }
 
     // spawn a new thread which will release resources.
-    status = hythread_create(NULL, 0, 0, 0,
+    hy_status = hythread_create(NULL, 0, 0, 0,
         vm_dump_process, (void *)threadBuf);
-    assert(status == TM_ERROR_NONE);
+    assert(hy_status == TM_ERROR_NONE);
 
 cleanup:
     STD_FREE(vmBuf);

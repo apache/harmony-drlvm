@@ -22,7 +22,6 @@
 
 #include <open/jthread.h>
 #include <open/hythread_ext.h>
-#include <open/thread_externals.h>
 #include "vm_threads.h"
 
 /**

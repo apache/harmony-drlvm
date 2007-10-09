@@ -25,8 +25,8 @@
 #include "port_dso.h"
 
 #include "open/gc.h"
+#include "open/hythread_ext.h"
 #include "open/jthread.h"   // this is for jthread_self()
-#include "open/thread_externals.h"
 
 #include "init.h"
 #include "classloader.h"

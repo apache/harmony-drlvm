@@ -293,6 +293,7 @@ int gc_init() {
         disable_assert_dialogs();
     }
 
+    vm_gc_lock_init();
     init_mem();
     init_slots();
     init_select_gc();

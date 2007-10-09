@@ -2044,7 +2044,8 @@ static void process_jvmti_event(jvmtiEvent event_type, int per_thread, ...) {
     va_end(args);
 }
 
-void jvmti_send_thread_start_end_event(int is_start)
+void jvmti_send_thread_start_end_event(vm_thread_t vm_thread,
+                                       int is_start)
 {
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     if (!ti->isEnabled())
@@ -2061,7 +2062,8 @@ void jvmti_send_thread_start_end_event(int is_start)
     if (!ti->is_single_step_enabled())
         return;
 
-    jvmti_thread_t jvmti_thread = jthread_self_jvmti();
+    jvmti_thread_t jvmti_thread = jthread_get_jvmti_thread((hythread_t)vm_thread);
+    assert(jvmti_thread);
     if (is_start)
     {
         // Init single step state for the thread
@@ -2349,7 +2351,7 @@ jvmti_create_event_thread()
     // create TI event thread
     JNIEnv *jni_env = p_TLS_vmthread->jni_env;
     ti->event_thread = jthread_allocate_thread();
-    IDATA status = hythread_create_ex((hythread_t)ti->event_thread, NULL, 0, 0,
+    IDATA status = hythread_create_ex((hythread_t)ti->event_thread, NULL, 0, 0, NULL,
         jvmti_event_thread_function, jni_env);
     if( status != TM_ERROR_NONE ) {
         DIE("jvmti_create_event_thread: creating thread is failed!");

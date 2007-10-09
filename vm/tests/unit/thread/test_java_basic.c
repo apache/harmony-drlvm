@@ -28,15 +28,27 @@
 int HYTHREAD_PROC run_for_test_jthread_attach(void *args){
     tested_thread_sturct_t * tts;
     hythread_t native_thread;
+    vm_thread_t vm_thread;
     JNIEnv * jni_env;
     IDATA status;
+
+    // grab hythread global lock
+    hythread_global_lock();
 
     tts = (tested_thread_sturct_t *) args;
     native_thread = hythread_self();
     if (!native_thread) {
-        status = hythread_attach(&native_thread);
+        native_thread = (hythread_t)calloc(1, sizeof(struct VM_thread));
+        if (native_thread == NULL) {
+            hythread_global_unlock();
+            tf_assert_same(native_thread, NULL);
+            return 0;
+        }
+        native_thread->java_status = TM_STATUS_ALLOCATED;
+        status = hythread_attach_ex(native_thread, NULL, NULL);
         if (status != JNI_OK) {
             tts->phase = TT_PHASE_ERROR;
+            hythread_global_unlock();
             return 0;
         }
     }
@@ -44,15 +56,23 @@ int HYTHREAD_PROC run_for_test_jthread_attach(void *args){
     status = vm_attach(GLOBAL_VM, &jni_env);
     if (status != JNI_OK) {
         tts->phase = TT_PHASE_ERROR;
+        hythread_global_unlock();
         return 0;
     }
 
     status = jthread_attach(jni_env, tts->java_thread, JNI_FALSE);
     tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_ATTACHED : TT_PHASE_ERROR);
+
+    // release hythread global lock
+    hythread_global_unlock();
+
     tested_thread_started(tts);
     tested_thread_wait_for_stop_request(tts);
-    status = jthread_detach(tts->java_thread);
+
+    vm_thread = jthread_self_vm_thread();
+    status = jthread_detach(vm_thread->java_thread);
     tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_DEAD : TT_PHASE_ERROR);
+
     tested_thread_ended(tts);
     return 0;
 }

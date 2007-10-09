@@ -151,7 +151,7 @@ int test_hythread_thin_monitor_enter_contended(void){
     tf_assert_same(status, TM_ERROR_NONE);
     args[1] = 0;
     hythread_suspend_enable();    
-    status = hythread_create_ex(thread, NULL, 0, 0,
+    status = hythread_create_ex(thread, NULL, 0, 0, NULL,
         (hythread_entrypoint_t)start_proc, args);
     tf_assert_same(status, TM_ERROR_NONE);
     for(i = 0; i < 100000; i++) {

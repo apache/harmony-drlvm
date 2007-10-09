@@ -32,7 +32,7 @@
  *         of insufficient memory, system error otherwise.
  */
 int os_thread_create(/* out */osthread_t* phandle, UDATA stacksize, UDATA priority,
-        int (VMAPICALL *func)(void*), void *data)
+        hythread_wrapper_t func, void *data)
 {
     HANDLE handle = (HANDLE)_beginthreadex(NULL, stacksize, (unsigned(__stdcall *)(void*))func, data, STACK_SIZE_PARAM_IS_A_RESERVATION, NULL);
 

@@ -327,6 +327,7 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
   INFO2("gc.process", "GC: stop the threads and enumerate rootset ...\n");
   gc_clear_rootset(gc);
   gc_reset_rootset(gc);
+  int disable_count = hythread_reset_suspend_disable();
   vm_enumerate_root_set_all_threads();
   gc_copy_interior_pointer_table_to_rootset();
   gc_set_rootset(gc);
@@ -397,6 +398,8 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
   
   vm_reclaim_native_objs();
   vm_resume_threads_after();
+  assert(hythread_is_suspend_enabled());
+  hythread_set_suspend_disable(disable_count);
   INFO2("gc.process", "GC: GC end\n");
   return;
 }

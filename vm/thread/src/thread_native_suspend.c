@@ -24,7 +24,6 @@
 #define LOG_DOMAIN "tm.suspend"
 
 #include <open/hythread_ext.h>
-#include <open/thread_externals.h>
 #include "thread_private.h"
 #include <apr_atomic.h>
 
@@ -141,7 +140,7 @@ static void thread_safe_point_impl(hythread_t thread)
     } while (thread->suspend_count);
 
     // restore disable_count value
-    thread->disable_count = gc_disable_count;
+    hythread_set_suspend_disable(gc_disable_count);
 
     return;
 } // thread_safe_point_impl
@@ -366,8 +365,13 @@ IDATA VMCALL hythread_suspend_all(hythread_iterator_t* iter_ptr,
     hythread_iterator_t iter;
     TRACE(("suspend all threads"));
 
+    assert(hythread_is_suspend_enabled());
+
     // try to prevent cyclic suspend dead-lock
     thread_safe_point_impl(self);
+
+    // get global lock to prevent new thread creation
+    hythread_global_lock();
 
     // send suspend requests to all threads
     TRACE(("send suspend requests"));
@@ -400,8 +404,6 @@ IDATA VMCALL hythread_suspend_all(hythread_iterator_t* iter_ptr,
     return TM_ERROR_NONE;
 }
 
-
-
 /**
  * Resumes all threads in the selected group.
  *
@@ -412,19 +414,23 @@ IDATA VMCALL hythread_resume_all(hythread_group_t group)
     hythread_t self = tm_self_tls;
     hythread_t next;
     hythread_iterator_t iter;
-    iter = hythread_iterator_create(group);
+
     TRACE(("resume all threads"));
 
-    // send suspend requests to all threads
+    // send resume requests to all threads
+    iter = hythread_iterator_create(group);
     while ((next = hythread_iterator_next(&iter)) != NULL) {
         if (next != self) {
             hythread_resume(next);
         }
     }
     hythread_iterator_release(&iter);
+
+    // release global lock which was got in hythread_suspend_all()
+    hythread_global_unlock();
+
     return TM_ERROR_NONE;
 }
-
 
 /**
  * Reset disable_count for currect thread.
@@ -453,6 +459,8 @@ void VMCALL hythread_set_suspend_disable(int count)
 
     assert(count >= 0);
     self->disable_count = count;
+
+    apr_memory_rw_barrier();
 
     if (count && self->suspend_count) {
         thread_safe_point_impl(self);

@@ -20,8 +20,6 @@
  */
 
 
-#include "open/thread_externals.h"
-
 #include "platform_lowlevel.h"
 #include <assert.h>
 
@@ -101,9 +99,6 @@ void jthread_deallocate_vm_thread_pool(vm_thread_t vm_thread)
     // zero VM_thread structure
     memset(&vm_thread->java_thread, 0,
         sizeof(VM_thread) - offsetof(VM_thread, java_thread));
-
-    // change java_status
-    ((hythread_t)(vm_thread))->java_status = TM_STATUS_ALLOCATED;
 }
 
 vm_thread_t jthread_get_vm_thread_ptr_safe(jobject thread_obj)

@@ -129,13 +129,6 @@ JNIEXPORT void JNICALL Java_java_lang_VMMemoryManager_runGC
   (JNIEnv *, jclass)
 {
     assert(hythread_is_suspend_enabled());
-    // no matter how counter-intuitive,
-    // gc_force_gc() expects gc_enabled_status == disabled,
-    // but, obviously, at a GC safepoint.
-    // See gc-safety (aka suspend-safety) rules explained elsewhere
-    // -salikh 2005-05-12
-    tmn_suspend_disable();
     gc_force_gc();      
-    tmn_suspend_enable();
     return;
 }

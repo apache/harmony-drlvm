@@ -20,7 +20,6 @@
 #include "thread_unit_test_utils.h"
 #include <open/jthread.h>
 #include <open/ti_thread.h>
-#include <open/thread_externals.h>
 
 hysem_t mon_enter;
 

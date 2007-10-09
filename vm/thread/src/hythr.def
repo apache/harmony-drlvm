@@ -3,6 +3,7 @@ LIBRARY HYTHR
 EXPORTS
  
 hythread_detach
+hythread_detach_ex
 hythread_uses_fast_tls
 hythread_tls_alloc
 hythread_sleep_interruptable
@@ -18,6 +19,7 @@ hythread_park
 hythread_monitor_init_with_name
 hythread_monitor_try_enter
 hythread_self
+hythread_set_self
 hythread_self_slow
 hythread_tls_free
 hythread_yield
@@ -58,6 +60,7 @@ hythread_cancel_all
 hythread_group_create
 hythread_group_release
 hythread_group_get_list
+hythread_set_to_group
 hythread_is_suspend_enabled
 hythread_suspend_enable
 hythread_suspend_disable
@@ -122,6 +125,8 @@ hythread_is_alive
 hythread_is_terminated
 hythread_init
 hythread_shutdown
+hythread_shutdowning
+hythread_lib_state
 hythread_lib_create
 hythread_lib_destroy
 hythread_lib_lock

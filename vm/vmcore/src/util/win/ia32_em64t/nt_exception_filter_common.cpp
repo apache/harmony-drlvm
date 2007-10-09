@@ -196,7 +196,7 @@ void set_guard_stack() {
     jthread_self_vm_thread_unsafe()->restore_guard_page = false;
 }
 
-void remove_guard_stack() {
+void remove_guard_stack(vm_thread_t vm_thread) {
     void* stack_addr = get_stack_addr();
     size_t stack_size = get_stack_size();
     size_t page_size = get_guard_page_size();
@@ -204,7 +204,7 @@ void remove_guard_stack() {
     DWORD oldProtect;
 
     assert(((size_t)(&stack_addr)) > ((size_t)((char*)stack_addr - stack_size + 3 * page_size)));
-    p_TLS_vmthread->restore_guard_page = true;
+    vm_thread->restore_guard_page = true;
 
     if (!VirtualProtect((char*)stack_addr - stack_size + page_size + guard_stack_size,
         page_size, PAGE_READWRITE, &oldProtect)) {
@@ -241,7 +241,7 @@ bool check_available_stack_size(size_t required_size) {
     size_t available_stack_size = get_available_stack_size();
     if (available_stack_size < required_size) {
         if (available_stack_size < get_guard_stack_size()) {
-            remove_guard_stack();
+            remove_guard_stack(p_TLS_vmthread);
         }
         Global_Env *env = VM_Global_State::loader_env;
         exn_raise_by_class(env->java_lang_StackOverflowError_Class);

@@ -165,15 +165,7 @@ jvmtiForceGarbageCollection(jvmtiEnv* env)
 
     CHECK_EVERYTHING();
 
-    // no matter how counter-intuitive,
-    // gc_force_gc() expects suspend_enabled_status == disabled,
-    // but, obviously, at a GC safepoint.
-    // for more details, see
-    // * "SAFE SUSPENSION" section of Developers' Guide
-    // * "THREAD SUSPENSION" section of Thread Manager documentation
-    hythread_suspend_disable();
     gc_force_gc();
-    hythread_suspend_enable();
 
     return JVMTI_ERROR_NONE;
 }

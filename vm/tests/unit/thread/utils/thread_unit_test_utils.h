@@ -76,7 +76,7 @@ typedef struct {
     hysem_t ended;
     int phase;
     jint peak_count;
-    jthread_threadattr_t attrs;
+    struct jthread_start_proc_data attrs;
     jclass excn;
 } tested_thread_sturct_t;
 

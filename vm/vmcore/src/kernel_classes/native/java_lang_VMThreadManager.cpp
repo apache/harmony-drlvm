@@ -27,9 +27,9 @@
 #include "open/hythread_ext.h"
 #include "open/jthread.h"
 #include "open/ti_thread.h"
-#include "open/thread_externals.h"
 #include "jni_utils.h"
 #include "thread_manager.h"
+#include "vm_threads.h"
 
 /*
  * Class:     java_lang_VMThreadManager
@@ -160,7 +160,7 @@ JNIEXPORT jlong JNICALL Java_java_lang_VMThreadManager_init
 JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_start
   (JNIEnv *jenv, jclass clazz, jobject thread, jlong stackSize, jboolean daemon, jint priority)
 {
-    jthread_threadattr_t attrs = {0};
+    jthread_start_proc_data attrs = {0};
 
     attrs.daemon = daemon;
     attrs.priority = priority;

@@ -271,7 +271,7 @@ void exn_rethrow();
 void exn_rethrow_if_pending();
 
 void set_guard_stack();
-void remove_guard_stack();
+void remove_guard_stack(vm_thread_t vm_thread);
 void init_stack_info();
 VMEXPORT size_t get_available_stack_size();
 VMEXPORT bool check_available_stack_size(size_t required_size);

@@ -51,6 +51,10 @@ VMEXPORT size_t vm_number_of_gc_bytes_in_thread_local();
  */
 VMEXPORT void *vm_get_gc_thread_local();
 
+/**
+ * Initializes the lock that guards all GC-related operations in the VM.
+ */
+VMEXPORT void vm_gc_lock_init();
 
 /**
  * Acquire the lock that guards all GC-related operations in the VM.
@@ -59,7 +63,6 @@ VMEXPORT void *vm_get_gc_thread_local();
  * enumeration.
  */
 VMEXPORT void vm_gc_lock_enum();
-
 
 /**
  * Release the system-wide lock acquired by <code>vm_gc_lock_enum()</code>.

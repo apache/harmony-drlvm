@@ -19,7 +19,6 @@
 #define THREAD_MANAGER_HEADER
 
 #include "open/jthread.h"
-#include "open/thread_externals.h"
 #include "exceptions_type.h"
 
 #define GC_BYTES_IN_THREAD_LOCAL (20 * sizeof(void *))
@@ -229,8 +228,13 @@ public:
 /**
  * Java thread creation attributes.
  */
-struct jthread_thread_attr
+struct jthread_start_proc_data
 {
+    /**
+     * HyThread library procedure data
+     */
+    hythread_start_proc_data hy_data;
+
     /**
      * Pointer to Java VM.
      */
@@ -267,6 +271,50 @@ struct jthread_thread_attr
      */
     const void *arg;
 };
+
+/**
+ * Registrates current thread in VM, so it could execute Java.
+ *
+ * @param[in] java_vm    - current thread will be attached to the specified VM
+ * @param[out] p_jni_env - will point to JNI environment assocciated with the thread
+ */
+VMEXPORT jint vm_attach(JavaVM * java_vm, JNIEnv ** p_jni_env);
+
+/**
+ * Frees java related resources before thread exit.
+ */
+VMEXPORT jint vm_detach(jthread java_thread);
+
+/**
+ * Stores a pointer to TM-specific data in the <code>java.lang.Thread</code> object.
+ *
+ * A typical implementation may store a pointer within a private
+ * non-static field of Thread.
+ *
+ * @param[in] thread    - a <code>java.lang.Thread</code> object those private field
+ *                        is going to be used for data storage
+ * @param[in] data_ptr  - a pointer to data to be stored
+ */
+VMEXPORT void vm_jthread_set_tm_data(jthread thread, void *data_ptr);
+
+/**
+ * Retrieves TM-specific data from the <code>java.lang.Thread</code> object.
+ *
+ * @param[in] thread - a thread
+ *
+ * @return TM-specific data previously stored, or <code>NULL</code>,
+ *         if there are none.
+ */
+VMEXPORT hythread_t vm_jthread_get_tm_data(jthread thread);
+
+/**
+ * <code>vm_objects_are_equal<br>
+ * obj1 jobject<br>
+ * obj2 jobject</code>
+ *
+ * @return <code>int</code>
+ */
+VMEXPORT int vm_objects_are_equal(jobject obj1, jobject obj2);
 
 /**
  * Gets VM_thread from native thread

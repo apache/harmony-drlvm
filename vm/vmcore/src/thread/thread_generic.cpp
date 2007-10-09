@@ -46,7 +46,6 @@ using namespace std;
 #include "open/hythread.h"
 #include "open/hythread_ext.h"
 #include "open/jthread.h"
-#include "open/thread_externals.h"
 
 #include "open/types.h"
 #include "open/vm_util.h"
@@ -100,21 +99,16 @@ extern struct JNINativeInterface_ jni_vtable;
  */
 static jint run_java_detach(jthread java_thread)
 {
-    static Method *detach = NULL;
-    const char *method_name = "detach";
-    const char *descriptor = "(Ljava/lang/Throwable;)V";
-    jvalue args[2];
-    JNIEnv *jni_env;
-    Global_Env *vm_env;
-    Class *thread_class;
-
     assert(hythread_is_suspend_enabled());
 
-    jni_env = jthread_get_JNI_env(java_thread);
-    vm_env = jni_get_vm_env(jni_env);
-    thread_class = vm_env->java_lang_Thread_Class;
+    JNIEnv *jni_env = jthread_get_JNI_env(java_thread);
+    Global_Env *vm_env = jni_get_vm_env(jni_env);
+    Class *thread_class = vm_env->java_lang_Thread_Class;
 
+    static Method *detach = NULL;
     if (detach == NULL) {
+        const char *method_name = "detach";
+        const char *descriptor = "(Ljava/lang/Throwable;)V";
         detach = class_lookup_method(thread_class, method_name, descriptor);
         if (detach == NULL) {
             TRACE("Failed to find thread's detach method " << descriptor <<
@@ -122,7 +116,9 @@ static jint run_java_detach(jthread java_thread)
             return TM_ERROR_INTERNAL;
         }
     }
+
     // Initialize arguments.
+    jvalue args[2];
     args[0].l = java_thread;
     if (vm_env->IsVmShutdowning()) {
         args[1].l = NULL;
@@ -141,6 +137,23 @@ static jint run_java_detach(jthread java_thread)
              << exn_get_name());
         return TM_ERROR_INTERNAL;
     }
+    return TM_ERROR_NONE;
+}
+
+/**
+ * Runs java.lang.Thread.detach() method
+ *
+ * This function will release any resources associated with the given java thread.
+ *
+ * @param[in] java_thread Java thread to be detached
+ */
+IDATA jthread_java_detach(jthread java_thread) {
+    assert(java_thread);
+    assert(hythread_is_suspend_enabled());
+
+    // could return error if detach throws an exception,
+    // keep exception and ignore an error
+    run_java_detach(java_thread);
     return TM_ERROR_NONE;
 }
 
@@ -223,47 +236,39 @@ jint vm_attach(JavaVM * java_vm, JNIEnv ** p_jni_env)
  */
 jint vm_detach(jthread java_thread)
 {
-    VM_thread *p_vm_thread;
-
     assert(hythread_is_suspend_enabled());
 
-    // could return error if detach throws an exception,
-    // keep exception and ignore an error
-    run_java_detach(java_thread);
+    hythread_t native_thread = jthread_get_native_thread(java_thread);
+    assert(native_thread);
+    vm_thread_t p_vm_thread = jthread_get_vm_thread(native_thread);
+    assert(p_vm_thread);
 
     // Send Thread End event
-    jvmti_send_thread_start_end_event(0);
+    jvmti_send_thread_start_end_event(p_vm_thread, 0);
 
     hythread_suspend_disable();
 
-    p_vm_thread = get_thread_ptr();
+    // change java_status for native thread
+    native_thread->java_status = TM_STATUS_ALLOCATED;
 
-    // Notify GC about thread detaching.
-    gc_thread_kill(&p_vm_thread->_gc_private_information);
-    assert(p_vm_thread->gc_frames == 0);
+    if (native_thread == hythread_self()) {
+        // Notify GC about thread detaching.
+        // FIXME - GC notify detach thread works for current thread only
+        gc_thread_kill(&p_vm_thread->_gc_private_information);
+        assert(p_vm_thread->gc_frames == 0);
+    }
 
 #ifdef PLATFORM_POSIX
     // Remove guard page on the stack on linux
-    remove_guard_stack();
-#endif
+    remove_guard_stack(p_vm_thread);
+#endif // PLATFORM_POSIX
 
-    // Destroy current VM_thread pool.
+    // Destroy current VM_thread pool and zero VM_thread structure
     jthread_deallocate_vm_thread_pool(p_vm_thread);
 
     hythread_suspend_enable();
 
     return JNI_OK;
-
-/** TODO: Check if we need these actions!!!
-#ifndef NDEBUG
-    hythread_t tm_native_thread = jthread_get_native_thread();
-    assert(tm_native_thread);
-    assert(tm_native_thread == hythread_self());
-#endif
-
-    // 3) Remove tm_thread_t pointer from java.lang.Thread object.
-    vm_jthread_set_tm_data(jthread java_thread, NULL);
-*/
 }
 
 void vm_notify_obj_alive(void *p_obj)

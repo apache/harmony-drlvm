@@ -229,8 +229,8 @@ IDATA VMCALL hysem_getvalue(IDATA *count, hysem_t sem) {
  * @see hysem_init, hysem_wait, hysem_post
  */
 IDATA VMCALL hysem_destroy(hysem_t sem) {
-    hymutex_destroy(&sem->mutex);
-    hycond_destroy(&sem->condition);
+    IDATA status = hymutex_destroy(&sem->mutex);
+    status |= hycond_destroy(&sem->condition);
     free(sem);
-    return TM_ERROR_NONE;
+    return status;
 }

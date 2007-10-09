@@ -26,7 +26,6 @@
 #include <open/hythread_ext.h>
 #include "thread_private.h"
 
-
 //global constants:
 
 // Global pointer to the threading library
@@ -40,7 +39,7 @@ apr_threadkey_t *TM_THREAD_KEY;
 
 //Thread manager global lock
 hymutex_t TM_START_LOCK;
-static int TM_INITIALIZED = 0;
+static int hythread_library_state = TM_LIBRARY_STATUS_NOT_INITIALIZED;
 #define GLOBAL_MONITOR_NAME "global_monitor"
 hythread_monitor_t p_global_monitor;
 
@@ -131,8 +130,9 @@ void VMCALL hythread_init(hythread_library_t lib) {
     }
     assert(TM_LIBRARY == lib);
 
-    if (TM_INITIALIZED) return;
-    TM_INITIALIZED = 1;
+    if (hythread_library_state != TM_LIBRARY_STATUS_NOT_INITIALIZED)
+        return;
+    hythread_library_state = TM_LIBRARY_STATUS_INITIALIZED;
      
     apr_status = apr_initialize();
     assert(apr_status == APR_SUCCESS);
@@ -170,6 +170,24 @@ void VMCALL hythread_init(hythread_library_t lib) {
     mon = (hythread_monitor_t*)hythread_global(GLOBAL_MONITOR_NAME);
     *mon = p_global_monitor;
     assert(mon);
+}
+
+/**
+ * Prepares to shutdown the hythread library.
+ *
+ * @return none
+ *
+ * @see hythread_init
+ */
+void VMCALL hythread_shutdowning() {
+    hythread_library_state = TM_LIBRARY_STATUS_SHUTDOWN;
+}
+
+/**
+ * Returns hythread library state
+ */
+int VMCALL hythread_lib_state() {
+    return hythread_library_state;
 }
 
 /**
@@ -215,38 +233,35 @@ void VMCALL hythread_lib_unlock(hythread_t self) {
  * The lock blocks new thread creation and thread exit operations. 
  */
 IDATA VMCALL hythread_global_lock() {
-    IDATA r = 0;
-    hythread_t self = tm_self_tls;
-    int saved_count;
+    IDATA status;
+    hythread_t self = hythread_self();
 
     // we need not care about suspension if the thread
-    // is not even tattached to hythread
-    if (self == NULL)
+    // is not even attached to hythread
+    if (self == NULL) {
         return hymutex_lock(&TM_LIBRARY->TM_LOCK);
+    }
 
-    // suspend_disable_count must be 0 on potentially
+    // disable_count must be 0 on potentially
     // blocking operation to prevent suspension deadlocks,
     // meaning that the thread is safe for suspension
-    saved_count = hythread_reset_suspend_disable();
-    r = hymutex_lock(&TM_LIBRARY->TM_LOCK);
-    if (r) return r;
+    assert(hythread_is_suspend_enabled());
+
+    status = hymutex_lock(&TM_LIBRARY->TM_LOCK);
+    assert(status == TM_ERROR_NONE);
 
     // make sure we do not get a global thread lock
     // while being requested to suspend
-    while (self->request) {
+    while (self->suspend_count) {
         // give up global thread lock before safepoint,
         // because this thread can be suspended at a safepoint
-        r = hymutex_unlock(&TM_LIBRARY->TM_LOCK);
-        if (r) return r;
+        status = hymutex_unlock(&TM_LIBRARY->TM_LOCK);
+        assert(status == TM_ERROR_NONE);
         hythread_safe_point();
-        r = hymutex_lock(&TM_LIBRARY->TM_LOCK);
-        if (r) return r;
+        status = hymutex_lock(&TM_LIBRARY->TM_LOCK);
+        assert(status == TM_ERROR_NONE);
     }
-
-    // do not use hythread_set_suspend_disable() as we do not
-    // want safe points happening under global lock
-    self->disable_count = saved_count;
-    return 0;
+    return TM_ERROR_NONE;
 }
 
 /**
@@ -254,7 +269,11 @@ IDATA VMCALL hythread_global_lock() {
  * 
  */
 IDATA VMCALL hythread_global_unlock() {
-    return hymutex_unlock(&TM_LIBRARY->TM_LOCK);;
+    IDATA status;
+    assert(!hythread_self() || hythread_is_suspend_enabled());
+    status = hymutex_unlock(&TM_LIBRARY->TM_LOCK);
+    assert(status == TM_ERROR_NONE);
+    return TM_ERROR_NONE;
 }
 
 hythread_group_t VMCALL get_java_thread_group(void) {

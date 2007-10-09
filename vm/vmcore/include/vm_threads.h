@@ -35,6 +35,7 @@
 #include "open/vm_gc.h"
 
 #include "jvmti.h"
+#include "jvmti_direct.h"
 #include "jni_direct.h"
 #include "thread_manager.h"
 #include "vm_core_types.h"
@@ -46,7 +47,7 @@
 #define tmn_suspend_enable_recursive hythread_suspend_enable
 
 typedef vm_thread_t (*vm_thread_accessor)();
-VMEXPORT extern vm_thread_accessor get_thread_ptr;
+extern VMEXPORT vm_thread_accessor get_thread_ptr;
 
 #define p_TLS_vmthread (jthread_self_vm_thread())
 
@@ -83,5 +84,45 @@ void vm_set_exception_registers(vm_thread_t vm_thread, Registers & regs);
 void *vm_get_ip_from_regs(vm_thread_t vm_thread);
 void vm_reset_ip_from_regs(vm_thread_t vm_thread);
 
+/**
+ * @param[in] obj - jobject those address needs to be given
+ *
+ * @return The address of the memory chunk in the object which can be used by the
+ *         Thread Manager for synchronization purposes.
+ */
+hythread_thin_monitor_t * vm_object_get_lockword_addr(jobject obj);
+
+/**
+ * @return The size of the memory chunk in the object that can be used by
+ *         Thread Manager for synchronization purposes.
+ *
+ * The returned size must be equal for all Java objets and is constant over time.
+ * It should be possible to call this method during initialization time.
+ */
+size_t vm_object_get_lockword_size();
+
+/**
+ * Creates exception object using given class name and message and throws it
+ * using <code>jthread_throw_exception</code> method.
+ *
+ * @param[in] name     - char* name
+ * @param[in] message  - char* message
+ *
+ * @return <code>int</code>
+ */
+IDATA jthread_throw_exception(char* name, char* message);
+
+/**
+ * Throws given exception object. Desides whether current thread is unwindable
+ * and throws it, raises exception otherwise.
+ */
+IDATA jthread_throw_exception_object(jobject object);
+
+/**
+ * <code>ti</code> is enabled
+ *
+ * @return <code>int</code>
+ */
+int ti_is_enabled();
 
 #endif //!_VM_THREADS_H_

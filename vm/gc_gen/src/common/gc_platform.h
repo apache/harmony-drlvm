@@ -106,7 +106,7 @@ inline int vm_create_thread(int (*func)(void*), void *data)
 { 
   hythread_t ret_thread = (hythread_t)STD_CALLOC(1, hythread_get_struct_size());;
   assert(ret_thread);
-  return (int)hythread_create_ex(ret_thread, get_gc_thread_group(), 0, 0,
+  return (int)hythread_create_ex(ret_thread, get_gc_thread_group(), 0, 0, NULL,
                     (hythread_entrypoint_t)func, data);
 }
 

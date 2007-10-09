@@ -51,14 +51,16 @@ extern "C" {
 //@{
 
 typedef struct JVMTIThread *jvmti_thread_t;
-typedef struct jthread_thread_attr jthread_threadattr_t;
+typedef struct jthread_start_proc_data * jthread_start_proc_data_t;
 typedef struct VM_thread * vm_thread_t;
 
-VMEXPORT jlong jthread_thread_init(JNIEnv* env, jthread java_thread, jobject weak_ref, hythread_t old_thread);
-VMEXPORT IDATA jthread_create(JNIEnv * jni_env, jthread thread, jthread_threadattr_t *attrs);
-VMEXPORT IDATA jthread_create_with_function(JNIEnv * jni_env, jthread thread, jthread_threadattr_t *attrs);
+VMEXPORT jlong jthread_thread_init(JNIEnv *jni_env, jthread java_thread, jobject weak_ref, hythread_t dead_thread);
+VMEXPORT IDATA jthread_create(JNIEnv * jni_env, jthread thread, jthread_start_proc_data_t attrs);
+VMEXPORT IDATA jthread_create_with_function(JNIEnv * jni_env, jthread thread, jthread_start_proc_data_t attrs);
 VMEXPORT IDATA jthread_attach(JNIEnv * jni_env, jthread thread, jboolean daemon);
 VMEXPORT IDATA jthread_detach(jthread thread);
+VMEXPORT IDATA jthread_java_detach(jthread thread);
+VMEXPORT IDATA jthread_vm_detach(vm_thread_t vm_thread);
 VMEXPORT IDATA jthread_yield();
 VMEXPORT IDATA jthread_stop(jthread thread);
 VMEXPORT IDATA jthread_exception_stop(jthread thread, jobject throwable);

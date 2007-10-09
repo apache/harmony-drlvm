@@ -26,6 +26,7 @@
 #include "jvmti.h"
 #include "open/hythread_ext.h"
 #include "vm_core_types.h"
+#include "vm_threads.h"
 
 struct TIEventThread
 {
@@ -129,7 +130,7 @@ void jvmti_send_class_file_load_hook_event(const Global_Env* env,
     int classlen, unsigned char* classbytes,
     int* newclasslen, unsigned char** newclass);
 void jvmti_send_class_prepare_event(Class* clss);
-VMEXPORT void jvmti_send_thread_start_end_event(int is_start);
+VMEXPORT void jvmti_send_thread_start_end_event(vm_thread_t thread, int is_start);
 void jvmti_send_vm_death_event();
 void jvmti_send_gc_finish_event();
 void jvmti_send_gc_start_event();
