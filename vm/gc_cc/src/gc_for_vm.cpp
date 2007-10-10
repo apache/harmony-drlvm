@@ -30,7 +30,6 @@
 
 volatile int thread_list_lock;
 int num_threads = 0;
-Ptr vtable_base;
 
 size_t tls_offset_current=MAX_UINT32, tls_offset_clean=MAX_UINT32, tls_offset_ceiling=MAX_UINT32;
 static hythread_tls_key_t tls_key_current=MAX_UINT32, tls_key_clean=MAX_UINT32, tls_key_ceiling=MAX_UINT32;
@@ -41,7 +40,6 @@ static unsigned int pending_finalizers_hint_counter = 0;
 
 #ifdef POINTER64
 GCExport Boolean gc_supports_compressed_references() {
-    vtable_base = (Ptr) vm_get_vtable_base();
     return true;
 }
 #endif

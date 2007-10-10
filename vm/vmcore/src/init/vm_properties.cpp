@@ -289,6 +289,10 @@ static void init_vm_properties(Properties & properties)
         properties.set_new("gc.dll", PORT_DSO_NAME(GC_DLL));
         properties.set_new("thread.soft_unreservation", "false");
 
+#ifdef POINTER64
+        properties.set_new("vm.compress_references", "true");
+#endif
+
         int n_api_dll_files = sizeof(api_dll_files) / sizeof(char *);
         /*
         *  pass NULL for the pathname as we don't want 

@@ -687,6 +687,9 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     parse_vm_arguments(vm_env);
 
     vm_env->verify = get_boolean_property("vm.use_verifier", TRUE, VM_PROPERTIES);
+#ifdef POINTER64
+    vm_env->compress_references = get_boolean_property("vm.compress_references", TRUE, VM_PROPERTIES);
+#endif
 
     // "Tool Interface" enabling.
     vm_env->TI->setExecutionMode(vm_env);
@@ -723,8 +726,13 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     // 20030404 This handshaking protocol isn't quite correct. It doesn't
     // work at the moment because JIT has not yet been modified to support
     // compressed references, so it never answers "true" to supports_compressed_references().
-    status = check_compression();
-    if (status != JNI_OK) return status;
+    // ppervov: this check is not correct since a call to
+    // gc_supports_compressed_references returns capability while a call to
+    // vm_references_are_compressed returns current VM state, not potential
+    // ability to support compressed mode
+    // So, this check is turned off for now and it is FIXME
+    //status = check_compression();
+    //if (status != JNI_OK) return status;
 
     // Prepares to load natives
     status = natives_init();

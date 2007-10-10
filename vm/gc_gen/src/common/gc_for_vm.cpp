@@ -71,7 +71,12 @@ int gc_init()
   p_global_gc = gc;
 
   gc_parse_options(gc);
-  
+
+  if(vm_vtable_pointers_are_compressed()) {
+    // ppervov: reference compression and vtable compression are orthogonal
+    vtable_base = vm_get_vtable_base();
+  }
+
   gc_tls_init();
   
   gc_get_system_info(gc);
@@ -137,7 +142,6 @@ void gc_wrapup()
 #ifdef COMPRESS_REFERENCE
 Boolean gc_supports_compressed_references()
 {
-  vtable_base = vm_get_vtable_base();
   return TRUE;
 }
 #endif

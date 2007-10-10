@@ -58,6 +58,7 @@ int64 timer_dt;
 Ptr heap_base;
 size_t max_heap_size;
 size_t min_heap_size;
+Ptr vtable_base;
 bool ignore_finalizers = false;
 bool remember_root_set = false;
 const char *lp_hint = NULL;
@@ -293,12 +294,19 @@ int gc_init() {
         disable_assert_dialogs();
     }
 
+#ifdef POINTER64
+    if(vm_vtable_pointers_are_compressed()) {
+        vtable_base = (Ptr)vm_get_vtable_base();
+    }
+#endif
+
     vm_gc_lock_init();
     init_mem();
     init_slots();
     init_select_gc();
     gc_end = apr_time_now();
     timer_init();
+
     return JNI_OK;
 }
 

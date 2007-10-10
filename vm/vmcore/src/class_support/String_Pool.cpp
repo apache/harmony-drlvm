@@ -326,7 +326,7 @@ void String_Pool::register_interned_string(String * str) {
 ManagedObject * String_Pool::intern(String * str) {
     jobject string = oh_allocate_local_handle();
     ManagedObject* lang_string = string_create_from_utf8(str->bytes, str->len);
-    
+
     if (!lang_string) { // if OutOfMemory
         return NULL;
     }
@@ -356,13 +356,13 @@ ManagedObject * String_Pool::intern(String * str) {
     if (VM_Global_State::loader_env->compress_references) {
         COMPRESSED_REFERENCE compressed_lang_string =
             compress_reference(string->object);
-        assert(is_compressed_reference(compressed_lang_string));     
+        assert(is_compressed_reference(compressed_lang_string));
         uint32 result = apr_atomic_cas32(
             /*destination*/ (volatile uint32 *)&str->intern.compressed_ref, 
-            /*exchange*/    compressed_lang_string,  
-            /*comparand*/   0);    
+            /*exchange*/    compressed_lang_string,
+            /*comparand*/   0);
         if (result == 0) {
-            // Note the successful write of the object. 
+            // Note the successful write of the object.
             gc_heap_write_global_slot_compressed(
                 (COMPRESSED_REFERENCE *)&str->intern.compressed_ref,
                 (Managed_Object_Handle)string->object);
@@ -374,11 +374,11 @@ ManagedObject * String_Pool::intern(String * str) {
     } else {
         void *result =
             (void *)apr_atomic_casptr(
-            /*destination*/ (volatile void **)&str->intern.raw_ref, 
-            /*exchange*/    (void *)string->object, 
-            /*comparand*/   (void *)NULL);    
+            /*destination*/ (volatile void **)&str->intern.raw_ref,
+            /*exchange*/    (void *)string->object,
+            /*comparand*/   (void *)NULL);
         if (result == NULL) {
-            // Note the successful write of the object. 
+            // Note the successful write of the object.
             gc_heap_write_global_slot(
                 (Managed_Object_Handle *)&str->intern.raw_ref,
                 (Managed_Object_Handle)string->object);

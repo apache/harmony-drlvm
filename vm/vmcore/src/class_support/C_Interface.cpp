@@ -800,13 +800,13 @@ void *class_get_const_string_intern_addr(Class_Handle cl, unsigned index)
     }
 
     if (must_instantiate) {
+        BEGIN_RAISE_AREA;
         // vm_instantiate_cp_string_resolved assumes that GC is disabled
         tmn_suspend_disable();
         // Discard the result. We are only interested in the side-effect of setting str->intern.
-        BEGIN_RAISE_AREA;
         vm_instantiate_cp_string_resolved(str);
-        END_RAISE_AREA;
         tmn_suspend_enable();
+        END_RAISE_AREA;
     }
 
     if (env->compress_references) {
