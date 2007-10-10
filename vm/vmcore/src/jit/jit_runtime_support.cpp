@@ -3300,8 +3300,8 @@ int __stdcall vm_instanceof(ManagedObject *obj, Class *c)
     c->instanceof_slow_path_taken();
 #endif
 
-    // managed null is NULL too
-    if (obj == NULL) {
+    ManagedObject *null_ref = (ManagedObject *)VM_Global_State::loader_env->managed_null;
+    if (obj == null_ref) {
 #ifdef VM_STATS
         VM_Statistics::get_vm_stats().num_instanceof_null++;
 #endif
