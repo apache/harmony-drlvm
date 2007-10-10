@@ -46,11 +46,19 @@ public:
         INDIRECT_CALL
     };
     /**
-     * IA-32 general-purpose registers set.
+     * General-purpose registers set.
      */
     enum Register {
-        IA32_REG_NONE, IA32_REG_EAX, IA32_REG_EBX, IA32_REG_ECX,
-        IA32_REG_EDX, IA32_REG_ESI, IA32_REG_EDI, IA32_REG_EBP, IA32_REG_ESP
+        DISASM_REG_NONE,
+#ifdef _IA32_
+        DISASM_REG_EAX, DISASM_REG_EBX, DISASM_REG_ECX, DISASM_REG_EDX,
+        DISASM_REG_ESI, DISASM_REG_EDI, DISASM_REG_EBP, DISASM_REG_ESP
+#elif defined _EM64T_
+        DISASM_REG_RAX, DISASM_REG_RBX, DISASM_REG_RCX, DISASM_REG_RDX,
+        DISASM_REG_RSI, DISASM_REG_RDI, DISASM_REG_RSP, DISASM_REG_RBP,
+        DISASM_REG_R8 , DISASM_REG_R9 , DISASM_REG_R10, DISASM_REG_R11,
+        DISASM_REG_R12, DISASM_REG_R13, DISASM_REG_R14, DISASM_REG_R15
+#endif
     };
     /**
      * Kind of operand 
@@ -71,7 +79,7 @@ public:
         Opnd()
             {
                 kind = Kind_Imm;
-                base = index = reg = IA32_REG_NONE;
+                base = index = reg = DISASM_REG_NONE;
                 scale = 0;
                 disp = 0;
             }

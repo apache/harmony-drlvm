@@ -33,21 +33,42 @@
 static InstructionDisassembler::Register convertRegName2Register(RegName reg)
 {
     switch(reg) {
-    case RegName_Null:  return InstructionDisassembler::IA32_REG_NONE;
-    case RegName_EAX:   return InstructionDisassembler::IA32_REG_EAX;
-    case RegName_EBX:   return InstructionDisassembler::IA32_REG_EBX;
-    case RegName_ECX:   return InstructionDisassembler::IA32_REG_ECX;
-    case RegName_EDX:   return InstructionDisassembler::IA32_REG_EDX;
-    case RegName_ESI:   return InstructionDisassembler::IA32_REG_ESI;
-    case RegName_EDI:   return InstructionDisassembler::IA32_REG_EDI;
-    case RegName_EBP:   return InstructionDisassembler::IA32_REG_EBP;
-    case RegName_ESP:   return InstructionDisassembler::IA32_REG_ESP;
+#ifdef _IA32_
+    case RegName_Null:  return InstructionDisassembler::DISASM_REG_NONE;
+    case RegName_EAX:   return InstructionDisassembler::DISASM_REG_EAX;
+    case RegName_EBX:   return InstructionDisassembler::DISASM_REG_EBX;
+    case RegName_ECX:   return InstructionDisassembler::DISASM_REG_ECX;
+    case RegName_EDX:   return InstructionDisassembler::DISASM_REG_EDX;
+    case RegName_ESI:   return InstructionDisassembler::DISASM_REG_ESI;
+    case RegName_EDI:   return InstructionDisassembler::DISASM_REG_EDI;
+    case RegName_EBP:   return InstructionDisassembler::DISASM_REG_EBP;
+    case RegName_ESP:   return InstructionDisassembler::DISASM_REG_ESP;
+#elif defined(_EM64T_)
+    case RegName_Null:  return InstructionDisassembler::DISASM_REG_NONE;
+    case RegName_RAX:   return InstructionDisassembler::DISASM_REG_RAX;
+    case RegName_RBX:   return InstructionDisassembler::DISASM_REG_RBX;
+    case RegName_RCX:   return InstructionDisassembler::DISASM_REG_RCX;
+    case RegName_RDX:   return InstructionDisassembler::DISASM_REG_RDX;
+    case RegName_RSI:   return InstructionDisassembler::DISASM_REG_RSI;
+    case RegName_RDI:   return InstructionDisassembler::DISASM_REG_RDI;
+    case RegName_RSP:   return InstructionDisassembler::DISASM_REG_RSP;
+    case RegName_RBP:   return InstructionDisassembler::DISASM_REG_RBP;
+    case RegName_R8 :   return InstructionDisassembler::DISASM_REG_R8;
+    case RegName_R9 :   return InstructionDisassembler::DISASM_REG_R9;
+    case RegName_R10:   return InstructionDisassembler::DISASM_REG_R10;
+    case RegName_R11:   return InstructionDisassembler::DISASM_REG_R11;
+    case RegName_R12:   return InstructionDisassembler::DISASM_REG_R12;
+    case RegName_R13:   return InstructionDisassembler::DISASM_REG_R13;
+    case RegName_R14:   return InstructionDisassembler::DISASM_REG_R14;
+    case RegName_R15:   return InstructionDisassembler::DISASM_REG_R15;
+#endif
     default:
+        assert(0);
         break;
     }
     // Some other registers (e.g. AL or XMM or whatever) - not
     // supported currently
-    return InstructionDisassembler::IA32_REG_NONE;
+    return InstructionDisassembler::DISASM_REG_NONE;
 }
 
 static void convertOperand2Opnd(
@@ -74,7 +95,7 @@ static void convertOperand2Opnd(
 
 #ifdef _IPF_
 const char* InstructionDisassembler::get_reg_value(
-    InstructionDisassembler::Register reg,
+    Register reg,
     const Registers* pcontext) const
 {
     assert(0);
@@ -84,10 +105,29 @@ const char* InstructionDisassembler::get_reg_value(
 #elif defined _EM64T_
 
 const char* InstructionDisassembler::get_reg_value(
-    InstructionDisassembler::Register reg,
+    Register reg,
     const Registers* pcontext) const
 {
-    assert(0);
+    switch(reg) {
+    case DISASM_REG_NONE: return NULL;
+    case DISASM_REG_RAX:  return (const char*)pcontext->rax;
+    case DISASM_REG_RBX:  return (const char*)pcontext->rbx;
+    case DISASM_REG_RCX:  return (const char*)pcontext->rcx;
+    case DISASM_REG_RDX:  return (const char*)pcontext->rdx;
+    case DISASM_REG_RSI:  return (const char*)pcontext->rsi;
+    case DISASM_REG_RDI:  return (const char*)pcontext->rdi;
+    case DISASM_REG_RBP:  return (const char*)pcontext->rbp;
+    case DISASM_REG_RSP:  return (const char*)pcontext->rsp;
+    case DISASM_REG_R8 :  return (const char*)pcontext->r8 ;
+    case DISASM_REG_R9 :  return (const char*)pcontext->r9 ;
+    case DISASM_REG_R10:  return (const char*)pcontext->r10;
+    case DISASM_REG_R11:  return (const char*)pcontext->r11;
+    case DISASM_REG_R12:  return (const char*)pcontext->r12;
+    case DISASM_REG_R13:  return (const char*)pcontext->r13;
+    case DISASM_REG_R14:  return (const char*)pcontext->r14;
+    case DISASM_REG_R15:  return (const char*)pcontext->r15;
+    default: assert(false);
+    }
     return NULL;
 }
 
@@ -98,15 +138,15 @@ const char* InstructionDisassembler::get_reg_value(
     const Registers* pcontext) const
 {
     switch(reg) {
-    case IA32_REG_NONE: return NULL;
-    case IA32_REG_EAX:  return (const char*)pcontext->eax;
-    case IA32_REG_EBX:  return (const char*)pcontext->ebx;
-    case IA32_REG_ECX:  return (const char*)pcontext->ecx;
-    case IA32_REG_EDX:  return (const char*)pcontext->edx;
-    case IA32_REG_ESI:  return (const char*)pcontext->esi;
-    case IA32_REG_EDI:  return (const char*)pcontext->edi;
-    case IA32_REG_EBP:  return (const char*)pcontext->ebp;
-    case IA32_REG_ESP:  return (const char*)pcontext->esp;
+    case DISASM_REG_NONE: return NULL;
+    case DISASM_REG_EAX:  return (const char*)pcontext->eax;
+    case DISASM_REG_EBX:  return (const char*)pcontext->ebx;
+    case DISASM_REG_ECX:  return (const char*)pcontext->ecx;
+    case DISASM_REG_EDX:  return (const char*)pcontext->edx;
+    case DISASM_REG_ESI:  return (const char*)pcontext->esi;
+    case DISASM_REG_EDI:  return (const char*)pcontext->edi;
+    case DISASM_REG_EBP:  return (const char*)pcontext->ebp;
+    case DISASM_REG_ESP:  return (const char*)pcontext->esp;
     default: assert(false);
     }
     return NULL;
@@ -178,7 +218,7 @@ InstructionDisassembler::get_target_address_from_context(const Registers* pconte
         {
             const Opnd& op = get_opnd(0);
             if (op.kind == Kind_Reg) {
-                assert(op.reg != IA32_REG_NONE);
+                assert(op.reg != DISASM_REG_NONE);
                 return (NativeCodePtr)get_reg_value(op.reg, pcontext);
             }
             else if (op.kind == Kind_Mem) {

@@ -34,6 +34,7 @@
     #define _EM64T_
 #endif
 
+#define USE_ENCODER_DEFINES
 #include "enc_prvt.h"
 #include "enc_defs.h"
 

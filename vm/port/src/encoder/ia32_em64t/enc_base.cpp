@@ -21,6 +21,7 @@
 #include "enc_base.h"
 #include <climits>
 #include <string.h>
+#define USE_ENCODER_DEFINES
 #include "enc_prvt.h"
 #include <stdio.h>
 

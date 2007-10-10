@@ -86,6 +86,7 @@ enum OpcodeByteKind {
     OpcodeByteKind_OpcodeMask               = 0x00FF
 };
 
+#ifdef USE_ENCODER_DEFINES
 
 #define N           {0, 0, 0, 0 }
 #define U           {1, 0, 1, OpndRole_Use }
@@ -214,6 +215,8 @@ enum OpcodeByteKind {
     #define REX_W   OpcodeByteKind_REX_W
 
 #endif
+
+#endif // USE_ENCODER_DEFINES
 
 /** 
  * @brief Represents the REX part of instruction.
