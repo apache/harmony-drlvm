@@ -63,7 +63,6 @@ static InstructionDisassembler::Register convertRegName2Register(RegName reg)
     case RegName_R15:   return InstructionDisassembler::DISASM_REG_R15;
 #endif
     default:
-        assert(0);
         break;
     }
     // Some other registers (e.g. AL or XMM or whatever) - not
