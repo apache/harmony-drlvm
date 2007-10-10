@@ -75,8 +75,6 @@
 
 #include <semaphore.h>
 
-
-
 void linux_ucontext_to_regs(Registers* regs, ucontext_t* uc)
 {
     memcpy(regs->gr, uc->uc_mcontext.sc_gr, sizeof(regs->gr));
@@ -464,21 +462,6 @@ void null_java_reference_handler(int signum, siginfo_t* UNREF info, void* contex
 
 void initialize_signals() {
     struct sigaction sa;
-/*
- * MOVED TO PORT, DO NOT USE USR2
-
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_SIGINFO | SA_RESTART;
-    sa.sa_sigaction = yield_other_handler;
-    sigaction(SIGUSR2, &sa, NULL);
-*/
-
-    /* FIXME: handler parameters mismatch
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_SIGINFO;
-    sa.sa_sigaction = &jvmti_jit_breakpoint_handler;
-    sigaction(SIGTRAP, &sa, NULL);
-    */
     
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_SIGINFO | SA_ONSTACK;;

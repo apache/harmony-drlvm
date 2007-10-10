@@ -72,12 +72,6 @@
 #include "stack_dump.h"
 #include "jvmti_break_intf.h"
 
-// Variables used to locate the context from the signal handler
-static int sc_nest = -1;
-static uint32 exam_point;
-
-
-
 void linux_ucontext_to_regs(Registers* regs, ucontext_t *uc)
 {
     regs->eax = uc->uc_mcontext.gregs[REG_EAX];
@@ -630,89 +624,6 @@ void jvmti_jit_breakpoint_handler(int signum, siginfo_t* UNREF info, void* conte
     }
 }
 
-/*
-See function initialize_signals() below first please.
-
-Two kinds of signal contexts (and stack frames) are tried in
-locate_sigcontext(), one is sigcontext, which is the way of
-Linux kernel implements( see Linux kernel source
-arch/i386/kernel/signal.c for detail); the other is ucontext,
-used in some other other platforms.
-
-The sigcontext locating in Linux is not so simple as expected,
-because it involves not only the kernel, but also glibc/linuxthreads,
-which VM is linked against. In glibc/linuxthreads, user-provided
-signal handler is wrapped by linuxthreads signal handler, i.e.
-the signal handler really registered in system is not the one
-provided by user. So when Linux kernel finishes setting up signal
-stack frame and returns to user mode for singal handler execution,
-locate_sigcontext() is not the one being invoked immediately. It's 
-called by linuxthreads function. That means the user stack viewed by
-locate_sigcontext() is NOT NECESSARILY the signal frame set-up by
-kernel, we need find the true one according to glibc/linuxthreads
-specific signal implementation in different versions.
-
-Because locate_sigcontext() uses IA32 physical register epb for
-call stack frame, compilation option `-fomit-frame-pointer' MUST
-not be used when gcc compiles it; and as gcc info, `-O2' will do
-`-fomit-frame-pointer' by default, although we haven't seen that
-in our experiments.
-*/
-
-void locate_sigcontext(int UNREF signum)
-{
-    sigcontext *sc;
-    uint32 *ebp;
-    int i;
-
-    asm("movl  %%ebp,%0" : "=r" (ebp));     // ebp = EBP register
-
-#define SC_SEARCH_WIDTH 3
-    for (i = 0; i < SC_SEARCH_WIDTH; i++) {
-        sc = (sigcontext *)(ebp + 3 );
-        if (sc->eip == ((uint32)exam_point)) {  // found
-            sc_nest = i;
-        // we will try to find the real sigcontext setup by Linux kernel,
-        // because if we want to change the execution path after the signal
-        // handling, we must modify the sigcontext used by kernel. 
-        // LinuxThreads in glibc 2.1.2 setups a sigcontext for our singal
-        // handler, but we should not modify it, because kernel doesn't use 
-        // it when resumes the application. Then we must find the sigcontext
-        // setup by kernel, and modify it in singal handler. 
-        // but, with glibc 2.2.3, it's useless to modify only the sigcontext
-        // setup by Linux kernel, because LinuxThreads does a interesting 
-        // copy after our signal handler returns, which destroys the 
-        // modification we have just done in the handler. So with glibc 2.2.3,
-        // what we need do is simply to modify the sigcontext setup by 
-        // LinuxThreads, which will be copied to overwrite the one setup by 
-        // kernel. Really complicated..., not really. We use a simple trick
-        // to overcome the changes in glibc from version to version, that is,
-        // we modify both sigcontexts setup by kernel and LinuxThreads. Then
-        // it will always work. 
-
-        } else {                    // not found
-            struct ucontext *uc;
-            uc = (struct ucontext *)ebp[4];
-            if ((ebp < (uint32 *)uc) && ((uint32 *)uc < ebp + 0x100)) {
-                sc = (sigcontext *)&uc->uc_mcontext;
-                if (sc->eip == ((uint32)exam_point)) {  // found
-                    sc_nest = i;
-                    break; 
-                }
-            }
-        }
-
-        ebp = (uint32 *)ebp[0];
-    }
-
-     if (sc_nest < 0) {
-        printf("cannot locate sigcontext.\n");
-        printf("Please add or remove any irrelevant statement(e.g. add a null printf) in VM source code, then rebuild it. If problem remains, please submit a bug report. Thank you very much\n");
-        exit(1);
-    }
-}
-
-
 /**
  * Print out the call stack of the aborted thread.
  * @note call stacks may be used for debugging
@@ -733,36 +644,6 @@ void abort_handler (int signum, siginfo_t* UNREF info, void* context) {
         st_print_stack(&regs);
     }
 }
-
-/*
- * MOVED TO PORT, DO NOT USE USR2
- * USR2 signal used to yield the thread at suspend algorithm
- * 
- 
-void yield_other_handler(int signum, siginfo_t* info, void* context) {
-    // FIXME: integration, should be moved to port or OpenTM
-    
-    VM_thread* thread = p_active_threads_list;
-    pthread_t self = GetCurrentThreadId();
-    TRACE2("SIGNALLING", "get_context_handler, try to find pthread_t " << self);
-
-    while (thread) {
-
-        TRACE2("SIGNALLING", "get_context_handler, finding pthread_t " << self);
-
-        if (thread->thread_id != self) {
-        thread = thread->p_active;
-        continue;
-    }
-
-    sem_post(&thread->yield_other_sem);
-    return;
-    }
-
-    LDIE(35, "Cannot find Java thread using signal context");
-
-}
-*/
 
 void general_signal_handler(int signum, siginfo_t* info, void* context)
 {
@@ -819,23 +700,8 @@ void general_signal_handler(int signum, siginfo_t* info, void* context)
 
 void initialize_signals()
 {
-    // First figure out how to locate the context in the
-    // signal handler.  Apparently you have to do it differently
-    // on different versions of Linux.
-    
-    //Now register the real signal handlers. signal() function in Linux
-    //kernel has SYSV semantics, i.e. the handler is a kind of ONE SHOT
-    //behaviour, which is different from BSD. But glibc2 in Linux
-    //implements BSD semantics.
     struct sigaction sa;
-/*
- * MOVED TO PORT, DO NOT USE USR2
 
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_SIGINFO | SA_RESTART;
-    sa.sa_sigaction = yield_other_handler;
-    sigaction(SIGUSR2, &sa, NULL);
-*/
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_SIGINFO;
     sa.sa_sigaction = &general_signal_handler;
