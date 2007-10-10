@@ -255,6 +255,12 @@ bool DecoderBase::try_mn(Mnemonic mn, const unsigned char ** pbuf, Inst * pinst)
     return false;
 }
 
+#ifdef _IA32_
+#define DISASM_REG_SIZE OpndSize_32
+#else
+#define DISASM_REG_SIZE OpndSize_64
+#endif
+
 bool DecoderBase::decodeModRM(const EncoderBase::OpcodeDesc& odesc,
                               const unsigned char ** pbuf, Inst * pinst)
 {
@@ -273,7 +279,7 @@ bool DecoderBase::decodeModRM(const EncoderBase::OpcodeDesc& odesc,
     //XXX
     scale=scale; base = base; index = index; disp = disp; reg = reg;
 
-    reg = getRegName(OpndKind_GPReg, OpndSize_32, modrm.reg);
+    reg = getRegName(OpndKind_GPReg, DISASM_REG_SIZE, modrm.reg);
     if (modrm.mod == 3) {
         // we have only modrm. no sib, no disp.
         reg = getRegName(OpndKind_GPReg, opndDesc.size, modrm.rm);
@@ -290,13 +296,13 @@ bool DecoderBase::decodeModRM(const EncoderBase::OpcodeDesc& odesc,
             // no index
         }
         else {
-            index = getRegName(OpndKind_GPReg, OpndSize_32, sib.index);
+            index = getRegName(OpndKind_GPReg, DISASM_REG_SIZE, sib.index);
         }
-        base = getRegName(OpndKind_GPReg, OpndSize_32, sib.base);
+        base = getRegName(OpndKind_GPReg, DISASM_REG_SIZE, sib.base);
     }
     else {
         if (modrm.mod != 0 || modrm.rm != 5) {
-            base = getRegName(OpndKind_GPReg, OpndSize_32, modrm.rm);
+            base = getRegName(OpndKind_GPReg, DISASM_REG_SIZE, modrm.rm);
         }
         else {
             // mod=0 && rm == 5 => only disp32
