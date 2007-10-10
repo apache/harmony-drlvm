@@ -2,8 +2,6 @@
 H1859
 # Exclude this test because JVMTI is not implemented for x86_64 in JIT mode yet
 H2151
-# Test crashes. Needs investigation
-H2196
 # Exclude this test because JVMTI is not implemented for x86_64 in JIT mode yet
 H2926
 # Exclude this test because JVMTI is not implemented for x86_64 in JIT mode yet
@@ -24,5 +22,7 @@ H4512
 H3341
 # Exclude this test because SOE handling is not ready for x86_64 in JIT/VM yet
 H4265
+# Test crashes on SOE
+H4292
 # Exclude this test because JVMTI is not implemented for x86_64 in JIT mode yet
 H4511
