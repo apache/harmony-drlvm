@@ -1675,10 +1675,12 @@ public:
      *         caller thread.*/
     ManagedObject* allocate_instance();
 
-    /** Calculates a size of the block allocated for the array, which is represented by 
+    /**
+	 * Calculates a size of the block allocated for the array, which is represented by 
      * the given class.
-     * @param[in] length - the length of the array
-     * @return The size of the array of specified length in bytes.*/
+     * @param[in] length the length of the array
+     * @return The size of the array of specified length in bytes, or 0 if the size is too big.
+	 */
     unsigned calculate_array_size(int length) const {
         if (length < 0) {
             return 0;
@@ -1696,14 +1698,13 @@ public:
 
         // check overflow, we need:
         // first_elem_offset + (length << m_array_element_shift)
-        //      + GC_OBJECT_ALIGNMENT < NEXT_TO_HIGH_BIT_CLEAR_MASK
+        //      + GC_OBJECT_ALIGNMENT < NEXT_TO_HIGH_BIT_SET_MASK
         //
-        if (((NEXT_TO_HIGH_BIT_CLEAR_MASK - GC_OBJECT_ALIGNMENT - first_elem_offset)
-                    >> m_array_element_shift) < (unsigned)length) {
+        if (((NEXT_TO_HIGH_BIT_SET_MASK - GC_OBJECT_ALIGNMENT - first_elem_offset)
+                    >> m_array_element_shift) <= (unsigned)length) {
             // zero means overflow
             return 0;
         }
-
 
         unsigned size = first_elem_offset + (length << m_array_element_shift);
         size = (((size + (GC_OBJECT_ALIGNMENT - 1)) & (~(GC_OBJECT_ALIGNMENT - 1))));
