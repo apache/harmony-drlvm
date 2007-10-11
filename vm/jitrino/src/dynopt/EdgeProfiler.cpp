@@ -37,17 +37,37 @@
 
 namespace Jitrino {
 
+#define MAX(a, b) ((a)>(b)?a:b)
+
 static bool isMethodTrivial( ControlFlowGraph& cfg );
-static uint32 computeCheckSum( MemoryManager& mm, ControlFlowGraph& cfg,  const StlSet<Node*>& nodesToIgnore);
+static void checkBCMapping( ControlFlowGraph& cfg );
+static uint32 computeCheckSum( MemoryManager& mm, IRManager& irm, const StlSet<Node*>& nodesToIgnore, bool bcLevel);
 static bool calculateProbsFromProfile(MemoryManager& mm, ControlFlowGraph& fg, const Edges& edges, DominatorTree* dt, LoopTree* lt, EdgeMethodProfile* profile, bool bcLevelProfiling, const StlSet<Node*>& nodesToIgnore);
 static Node* selectNodeToInstrument(IRManager& irm, Edge* edge);
-static void selectEdgesToInstrument(MemoryManager& mm, IRManager& irm, Edges& result, const StlSet<Node*>& nodesToIgnore);
+static void selectEdgesToInstrument(MemoryManager& mm, IRManager& irm, Edges& result, const StlSet<Node*>& nodesToIgnore, bool bcLevel);
 static uint32 genKey( uint32 n, Edge* edge, bool bcLevel, bool debug);
 static bool hasCatch( Node* node );
-static void selectedNodesToIgnore(IRManager& irm, LoopTree* lt, StlSet<Node*>& result);
+static void selectNodesToIgnore(IRManager& irm, LoopTree* lt, StlSet<Node*>& result, bool bcLevel);
+
+class EdgeProfileFlags {
+public:
+    bool bcLevelProfiling;
+
+    EdgeProfileFlags() : bcLevelProfiling(false) {}
+};
+
+class EdgeProfilerAction : public Action {
+public:
+    void init() {
+        flags.bcLevelProfiling = getBoolArg("bcLevel", false);
+    }
+    const EdgeProfileFlags& getFlags() {return flags;}
+protected:
+    EdgeProfileFlags flags;
+};
 
 
-DEFINE_SESSION_ACTION(EdgeProfilerInstrumentationPass, edge_instrument, "Perform edge instrumentation pass")
+DEFINE_SESSION_ACTION_WITH_ACTION(EdgeProfilerInstrumentationPass, EdgeProfilerAction, edge_instrument, "Perform edge instrumentation pass")
 
 void EdgeProfilerInstrumentationPass::_run(IRManager& irm)
 {
@@ -55,26 +75,39 @@ void EdgeProfilerInstrumentationPass::_run(IRManager& irm)
     MemoryManager mm("Edge InstrumentationPass");
     MethodDesc& md = irm.getMethodDesc();
     InstFactory& instFactory = irm.getInstFactory();
-    OptPass::computeDominatorsAndLoops(irm);
+    EdgeProfilerAction* action = (EdgeProfilerAction*)getAction();
+    const EdgeProfileFlags& flags = action->getFlags();
+
     bool debug = Log::isEnabled();
+    
+    if (debug) {
+        Log::out()<<"EdgeProfilerInstrumentationPass. BcLevel="<<flags.bcLevelProfiling<<std::endl;
+    }
+
+    if (flags.bcLevelProfiling) {
+        checkBCMapping(flowGraph);
+    }
+
+    OptPass::computeDominatorsAndLoops(irm);
+   
+    LogStream& irdump = log(LogStream::IRDUMP);
+    if (irdump.isEnabled()) {
+        printHIR(irm, "IR before instrumentation");
+    }
+
     LoopTree* lt = irm.getLoopTree();    
-
-
     //set of nodes with out-edges are not taken into account during instrumentation
     //and checksum calculation
     //such nodes are optional in CFG. E.g. nodes with class initializers insts
     StlSet<Node*> nodesToIgnore(mm);
-    selectedNodesToIgnore(irm, lt, nodesToIgnore);
-
+    selectNodesToIgnore(irm, lt, nodesToIgnore, flags.bcLevelProfiling);
     //compute checksum first
-    uint32 _checkSum = computeCheckSum(mm, flowGraph,  nodesToIgnore);
-
+    uint32 _checkSum = computeCheckSum(mm, irm, nodesToIgnore, flags.bcLevelProfiling);
     StlVector<uint32> counterKeys(mm);
     // Instrument method entry first.
     Node* entryNode = flowGraph.getEntryNode();
     entryNode->prependInst(instFactory.makeIncCounter(0));
     bool methodIsTrivial = isMethodTrivial(flowGraph);
-    bool bcLevelProfiling = false;
     if (!methodIsTrivial) {
         // Scan the CFG node in topological order and record the blocks and
         // edges where we need to add instrumentation code.
@@ -82,15 +115,14 @@ void EdgeProfilerInstrumentationPass::_run(IRManager& irm)
         // we won't disturb the CFG as we are traversing it.
         
         Edges edgesToInstrument(mm);
-        selectEdgesToInstrument(mm, irm, edgesToInstrument, nodesToIgnore);
+        selectEdgesToInstrument(mm, irm, edgesToInstrument, nodesToIgnore, flags.bcLevelProfiling);
         //compute edge-ids before CFG modification: edge-ids are part of CFG consistency check.
         for (Edges::const_iterator it = edgesToInstrument.begin(), end = edgesToInstrument.end(); it!=end; ++it) {
             Edge* edge = *it;
-            uint32 key = genKey((uint32)counterKeys.size() + 1, edge, bcLevelProfiling, debug);
+            uint32 key = genKey((uint32)counterKeys.size() + 1, edge, flags.bcLevelProfiling, debug);
             assert( key != 0 );
             counterKeys.push_back(key);
         }
-
         // Now revisit all of the edges that need to be instrumented
         // and generate instrumentation code.
         uint32 i = 0;
@@ -102,6 +134,11 @@ void EdgeProfilerInstrumentationPass::_run(IRManager& irm)
             Inst* incInst = instFactory.makeIncCounter( key );
             assert(((Inst*)nodeToInstrument->getFirstInst())->getOpcode() != Op_IncCounter );
             nodeToInstrument->prependInst(incInst);
+        }
+
+        if (flags.bcLevelProfiling) { //remove duplicates from keys
+            std::sort(counterKeys.begin(), counterKeys.end());
+            counterKeys.resize(std::unique(counterKeys.begin(), counterKeys.end()) - counterKeys.begin());
         }
     } 
     
@@ -120,13 +157,21 @@ void EdgeProfilerInstrumentationPass::_run(IRManager& irm)
 
 }
 
-DEFINE_SESSION_ACTION(EdgeProfilerAnnotationPass, edge_annotate, "Perform edge annotation pass")
+DEFINE_SESSION_ACTION_WITH_ACTION(EdgeProfilerAnnotationPass, EdgeProfilerAction, edge_annotate, "Perform edge annotation pass")
 
 void EdgeProfilerAnnotationPass::_run(IRManager& irm) {
     ControlFlowGraph& flowGraph = irm.getFlowGraph();
     MethodDesc& md = irm.getMethodDesc();
     MemoryManager mm("Edge AnnotationPass");
     bool debug = Log::isEnabled();
+    EdgeProfilerAction* action = (EdgeProfilerAction*)getAction();
+    const EdgeProfileFlags& flags = action->getFlags();
+
+    if (debug) {
+        Log::out()<<"EdgeProfilerAnnotationPass. BcLevel="<<flags.bcLevelProfiling<<std::endl;
+    }
+
+
     // Create the edge profile structure for the compiled method in 'irm'.
     ProfilingInterface* pi = irm.getProfilingInterface();
     bool edgeProfilerMode = pi->isProfilingEnabled(ProfileType_Edge, JITProfilingRole_USE);
@@ -146,11 +191,16 @@ void EdgeProfilerAnnotationPass::_run(IRManager& irm) {
 
     LoopTree* lt = irm.getLoopTree();
 
+    LogStream& irdump = log(LogStream::IRDUMP);
+    if (irdump.isEnabled()) {
+        printHIR(irm, "IR before instrumentation");
+    }
+
     // sync checksum
     StlSet<Node*> nodesToIgnore(mm); //see instrumentation pass for comments
-    selectedNodesToIgnore(irm, lt, nodesToIgnore);
+    selectNodesToIgnore(irm, lt, nodesToIgnore, flags.bcLevelProfiling);
 
-    uint32 cfgCheckSum = computeCheckSum(mm, flowGraph, nodesToIgnore);
+    uint32 cfgCheckSum = computeCheckSum(mm, irm, nodesToIgnore, flags.bcLevelProfiling);
 
     EdgeMethodProfile* edgeProfile = pi->getEdgeMethodProfile(mm, md);
     uint32 profileCheckSum = edgeProfile->getCheckSum();
@@ -158,10 +208,11 @@ void EdgeProfilerAnnotationPass::_run(IRManager& irm) {
     if (cfgCheckSum == profileCheckSum) {
         // Start propagating the CFG from instrumented edges.
         Edges edges(mm);
-        selectEdgesToInstrument(mm, irm, edges, nodesToIgnore);
-        assert(edges.size() == edgeProfile->getNumCounters());
-        bool bcLevelProfiling = false; //TODO:
-        bool res = calculateProbsFromProfile(mm, flowGraph, edges, dt, lt, edgeProfile, bcLevelProfiling, nodesToIgnore);
+        selectEdgesToInstrument(mm, irm, edges, nodesToIgnore, flags.bcLevelProfiling);
+        //assert if num counters is not equal -> must be guaranteed after checksum check
+        //for BC-level profiling checksum calculation is simplified -> no assertion
+        assert(edges.size() == edgeProfile->getNumCounters() || flags.bcLevelProfiling);
+        bool res = calculateProbsFromProfile(mm, flowGraph, edges, dt, lt, edgeProfile, flags.bcLevelProfiling, nodesToIgnore);
         if (res) {
             flowGraph.setEdgeProfile(true);
         }
@@ -229,23 +280,58 @@ static bool calculateProbsFromProfile(MemoryManager& mm, ControlFlowGraph& fg, c
     
     //2. calculate edge-freq for every edge.
     
-    //2.1 get freqs for instrumented edges from profile
+    //2.1 get freqs from profile
     StlVector<double> edgeFreqs(mm, fg.getMaxEdgeId(), -1);
     uint32 n = 1;
     for (Edges::const_iterator it = pEdges.begin(), end = pEdges.end(); it!=end; ++it, ++n) {
         Edge* edge = *it;
         uint32 key = genKey(n, edge, bcLevelProfiling, debug);
         uint32* counterAddr = profile->getCounter(key);
-        assert(counterAddr!=NULL);
+        assert(bcLevelProfiling || counterAddr!=NULL);
+        uint32 freq = 0;
         if (counterAddr == NULL) {
-            return false;
+            if (!bcLevelProfiling) { //avoid crash, use static profiler for a method
+                return false;
+            }
+        }  else {
+            freq = *counterAddr;
         }
-        uint32 freq = *counterAddr;
+
         setEdgeFreq(edgeFreqs, edge, freq, debug);
     }
 
+    //2.2 propagate edge frequencies on linear paths
+    // this operation is needed because we do not instrument artificial edges (edges that connect nodes with the same bc-mapping)
+    if (bcLevelProfiling) {
+        for (StlVector<Node*>::reverse_iterator it = nodes.rbegin(), end = nodes.rend(); it!=end; ++it) {
+            Node* node = *it;
+            const Edges& outEdges = node->getOutEdges();
+            for (Edges::const_iterator it2 = outEdges.begin(), end2 = outEdges.end(); it2!=end2; ++it2) {                    
+                Edge* edge = *it2;
+                double freq = edgeFreqs[edge->getId()];
+                if (freq==-1) { //this edge has no profile -> can't use it for propagation
+                    continue;
+                }
+                Node* targetNode = edge->getTargetNode();
+                //check pattern for artificial nodes: 1 unconditional + no changes in bcmapping
+                if (targetNode->isBlockNode() && targetNode->getOutDegree() <= 2 && targetNode->getUnconditionalEdge()!=NULL) { 
+                    Edge* unconditionalEdge = targetNode->getUnconditionalEdge();
+                    if (targetNode->getFirstInst()->getBCOffset() == unconditionalEdge->getTargetNode()->getFirstInst()->getBCOffset()) {
+                        double ufreq = edgeFreqs[unconditionalEdge->getId()];
+                        double newUFreq= freq + MAX(ufreq, 0);
+                        if (debug) {
+                            Log::out()<<"Restoring profile for artificial edge : edge-id="<<unconditionalEdge->getId()<<std::endl;
+                        }
+                        setEdgeFreq(edgeFreqs, unconditionalEdge, newUFreq, debug);
+
+                    }
+                }
+            }
+        }
+    }
     
-    //2.2 fix catch freqs, so we will have estimated D->C edges
+    
+    //2.3 fix catch freqs, so we will have estimated D->C edges
     if (debug) {
         Log::out()<<"\tFixing catch freqs"<<std::endl;
     }
@@ -261,7 +347,7 @@ static bool calculateProbsFromProfile(MemoryManager& mm, ControlFlowGraph& fg, c
         for (Edges::const_iterator it2 = outEdges.begin(), end2 = outEdges.end(); it2!=end2; ++it2) {                    
             Edge* edge = *it2;
             double edgeFreq = edgeFreqs[edge->getId()];
-            assert(edgeFreq >= 0);
+            edgeFreq = MAX(0, edgeFreq); //if Cn->Ln edge is marked as artificial it's not instrumented
             nodeFreq+=edgeFreq;
         }
         node->setExecCount(nodeFreq);
@@ -271,7 +357,8 @@ static bool calculateProbsFromProfile(MemoryManager& mm, ControlFlowGraph& fg, c
         updateDispatchPathsToCatch(node, edgeFreqs, debug);
     }
 
-    //2.3 propagate freqs to every edge and save node freqs
+    //2.4 calculate freqs for every edge in topological order
+    // set up nodes exec count for every node.
     if (debug) {
         Log::out()<<"\tPropagating edge freqs"<<std::endl;
     }
@@ -321,6 +408,7 @@ static bool calculateProbsFromProfile(MemoryManager& mm, ControlFlowGraph& fg, c
                     Log::out()<<" freq="<<edgeFreq<<std::endl;
                 }
                 if (edgeFreq == -1) {
+                    //the only way to get not estimated edge here is to have catch  loops (monexit pattern)
 #ifdef _DEBUG
                     Node* head = lt->getLoopHeader(node, false); //catch loops are not instrumented
                     assert(head != NULL && (head->isCatchBlock() || head->isDispatchNode() || hasCatch(head)));
@@ -363,7 +451,7 @@ static bool calculateProbsFromProfile(MemoryManager& mm, ControlFlowGraph& fg, c
                 if (edgeFreq != -1) {
                     freqLeft-=edgeFreq;
                 } else {
-                    assert(notEstimatedEdge==NULL || ignored); // for ignored nodes we can't estimate every edge
+                    // here we can have 2 not-estimated edges only of this block was connected to 'ignored' node during annotation.
                     if (notEstimatedEdge == NULL) {
                         notEstimatedEdge = edge;   
                     } else if (notEstimatedEdge->getTargetNode()->isDispatchNode()) {
@@ -390,29 +478,7 @@ static bool calculateProbsFromProfile(MemoryManager& mm, ControlFlowGraph& fg, c
         } 
     }
     
-#if 0
-    //2.99 debug check : check that every child node in dom-tree that is in the same loop as parent
-    //has nodeFreq <= parent freq
-    if (debug) {
-        Log::out()<<"Running check using dominator tree.."<<std::endl;
-    }
-    uint32 rootHeight = dt->getHeight();
-    for (StlVector<Node*>::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it, n++) {
-        Node* node = *it;
-        DominatorNode* dNode = dt->getDominatorNode(node);
-        if (dNode->getHeight()!=rootHeight) {
-            Node* parent = dNode->getParent()->getNode();
-            //have wrong nodes freqs on BB->DN (see 2.3), but edge freqs are OK.
-            //bool parentIgnored = nodesToIgnore.find(parent)!=nodesToIgnore.end();
-            if (node->isBlockNode() && parent->isBlockNode() 
-                && lt->getLoopHeader(parent, false) == lt->getLoopHeader(node, false))
-            { 
-                assert(parent->getExecCount() >= node->getExecCount());
-            }
-        }
-    }
-#endif
-    
+   
     //3. calculate edge probs using edge freqs. 
     if (debug) {
         Log::out()<<"Calculating edge probs using freqs.."<<std::endl;
@@ -468,13 +534,19 @@ static uint32 _computeCheckSum(Node* node, const StlSet<Node*>& nodesToIgnore, S
     return dSum+childsSum;
 }
 
-static uint32 computeCheckSum( MemoryManager& mm, ControlFlowGraph& cfg,  const StlSet<Node*>& nodesToIgnore) {
+static uint32 computeCheckSum( MemoryManager& mm, IRManager& irm,  const StlSet<Node*>& nodesToIgnore, bool bcLevel) {
     bool debug = Log::isEnabled();
     if (debug) {
         Log::out()<< "calculating checksum.." << std::endl;
     }
-    StlVector<bool> flags(mm, cfg.getMaxNodeId(), false);
-    uint32 checkSum = _computeCheckSum(cfg.getEntryNode(), nodesToIgnore, flags, 1, debug);
+    uint32 checkSum = 0;
+    if (!bcLevel) {
+        ControlFlowGraph& cfg = irm.getFlowGraph();
+        StlVector<bool> flags(mm, cfg.getMaxNodeId(), false);
+        checkSum = _computeCheckSum(cfg.getEntryNode(), nodesToIgnore, flags, 1, debug);
+    } else {
+        checkSum = irm.getMethodDesc().getByteCodeSize();
+    }
     if( debug){
         Log::out()<< "checkSum= "<<checkSum<<std::endl;
     }
@@ -528,19 +600,20 @@ static bool hasCatch( Node* node ) {
     
 }*/
 
-static void selectedNodesToIgnore(IRManager& irm, LoopTree* lt, StlSet<Node*>& result) {
+static void selectNodesToIgnore(IRManager& irm, LoopTree* lt, StlSet<Node*>& result, bool bcLevel) {
     ControlFlowGraph& fg = irm.getFlowGraph();
     bool debug = Log::isEnabled();
     if (debug) {
         Log::out() << "Selecting nodes to ignore:"<<std::endl;
     }
+
     const Nodes& nodes = fg.getNodes();
     for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
         Node* node = *it;
-        //first pattern to ignore: class initializers
+        //first pattern to ignore: class initializers in non-bc-level mode
         Node* loopHead = lt->getLoopHeader(node, false);
         bool inCatchLoop = loopHead!=NULL && (loopHead->isCatchBlock() || loopHead->isDispatchNode() || hasCatch(loopHead));
-        if (node->isBlockNode() 
+        if (!bcLevel && node->isBlockNode()  
             && node->getOutDegree() == 2  && node->getExceptionEdge()!=NULL 
             && ((Inst*)node->getLastInst())->getOpcode() == Op_InitType) 
         {
@@ -554,20 +627,20 @@ static void selectedNodesToIgnore(IRManager& irm, LoopTree* lt, StlSet<Node*>& r
             if (debug) {
                 Log::out() << "\tIgnoring catch-loop preheader node:";FlowGraph::printLabel(Log::out(), node);Log::out() << std::endl;
             }
-        } else if (node->isCatchBlock()) {  //avoid mon-exit loops (catch loops) instrumentation
+        } else if (node->isCatchBlock()) {  
             Node* blockWithCatchInst = NULL;
             if (hasCatch(node)) {
-                blockWithCatchInst = node;
+            //    blockWithCatchInst = node; //TODO: recheck
             } else {
                 assert(node->hasOnlyOneSuccEdge());
                 Edge* e =  *node->getOutEdges().begin();
                 blockWithCatchInst = e->getTargetNode();
-                if (blockWithCatchInst->hasTwoOrMorePredEdges()) {
-                    result.insert(node);
-                    if (debug) {
-                        Log::out() << "\tIgnoring '1-catch-inst*N-catches' node:";FlowGraph::printLabel(Log::out(), node);Log::out() << std::endl;
-                    }
-                } 
+            }
+            if (blockWithCatchInst!=NULL && blockWithCatchInst->hasTwoOrMorePredEdges()) { //avoid mon-exit loops (catch loops) instrumentation
+                result.insert(node);
+                if (debug) {
+                    Log::out() << "\tIgnoring '1-catch-inst*N-catches' node:";FlowGraph::printLabel(Log::out(), node);Log::out() << std::endl;
+                }
             }
         }
     }
@@ -576,13 +649,15 @@ static void selectedNodesToIgnore(IRManager& irm, LoopTree* lt, StlSet<Node*>& r
     }
 }
 
-static void _selectEdgesToInstrument(Node* srcNode, LoopTree* loopTree, Edges& result,
-                                     const StlSet<Node*>& nodesToIgnore,  StlVector<bool>& flags) 
+static void _selectEdgesToInstrument(Node* srcNode, IRManager& irm, Edges& result,
+                                     const StlSet<Node*>& nodesToIgnore,  StlVector<bool>& flags, bool bcLevel) 
 {
     bool profileDispatchEdges = true; //TODO: cmd-line param
 
     assert(flags[srcNode->getId()] == false);
     flags[srcNode->getId()] = true;
+    Node* returnNode = irm.getFlowGraph().getReturnNode();
+    LoopTree* loopTree = irm.getLoopTree();
     const Edges& oEdges = srcNode->getOutEdges();
     bool ignored = nodesToIgnore.find(srcNode)!=nodesToIgnore.end();
     if (!ignored && srcNode->isBlockNode()) {
@@ -590,9 +665,9 @@ static void _selectEdgesToInstrument(Node* srcNode, LoopTree* loopTree, Edges& r
         if (srcNode->isCatchBlock()) {
             // for a catch block we can have only 1 successor edge if catch inst is in next block
             // if catch inst is in catch block -> instrument every outgoing edge to be able to restore catch
-            // node frequency easily.
+            // node frequency.
             assert(hasCatch(srcNode) || srcNode->hasOnlyOneSuccEdge());
-        } else {
+        } else if (!bcLevel) { //instrument all edges if bcLevel profiling. Artificial edges will be filtered later
             for(Edges::const_iterator it = oEdges.begin(); it!= oEdges.end(); ++it ){
                 Edge* edge = *it;
                 Node* targetNode = edge->getTargetNode();
@@ -614,10 +689,21 @@ static void _selectEdgesToInstrument(Node* srcNode, LoopTree* loopTree, Edges& r
             Edge* edge = *it;
             Node* targetNode = edge->getTargetNode();
             if( targetNode->isBlockNode() && edge!=skipEdge){
-                result.push_back(edge);
+                bool skip = false;
+                if (bcLevel && targetNode->getNodeStartBCOffset() == edge->getSourceNode()->getNodeEndBCOffset()) {
+                    skip = true;//skip this edge, it's artificial code
+                }
+                if (bcLevel && targetNode == returnNode) {
+                    skip = true;
+                }
+                if (!skip) {
+                    result.push_back(edge);
+                } 
                 if (debug) {
                     Log::out()<<"\tedge id="<<edge->getId()<<" ("; FlowGraph::printLabel(Log::out(), edge->getSourceNode());
-                    Log::out()<<"->"; FlowGraph::printLabel(Log::out(), edge->getTargetNode());Log::out()<<")"<<std::endl;
+                    Log::out()<<"->"; FlowGraph::printLabel(Log::out(), edge->getTargetNode());Log::out()<<")";
+                    if (skip) Log::out()<<" SKIPPED as artificial ";
+                    Log::out()<<std::endl;
                 }
             }
         }
@@ -628,15 +714,14 @@ static void _selectEdgesToInstrument(Node* srcNode, LoopTree* loopTree, Edges& r
         Edge* edge = *it;
         Node* targetNode = edge->getTargetNode();
         if (flags[targetNode->getId()] == false && !(ignored && targetNode->isDispatchNode())) {
-            _selectEdgesToInstrument(targetNode, loopTree, result, nodesToIgnore, flags);
+            _selectEdgesToInstrument(targetNode, irm, result, nodesToIgnore, flags, bcLevel);
         }
     }
 }
 
 static void selectEdgesToInstrument(MemoryManager& mm, IRManager& irm, Edges& result,  
-                                    const StlSet<Node*>& nodesToIgnore) 
+                                    const StlSet<Node*>& nodesToIgnore, bool bcLevel) 
 {
-    LoopTree* loopTree = irm.getLoopTree(); 
     ControlFlowGraph& fg = irm.getFlowGraph();
     StlVector<bool> flags(mm, fg.getMaxNodeId(), false);
 
@@ -644,7 +729,7 @@ static void selectEdgesToInstrument(MemoryManager& mm, IRManager& irm, Edges& re
     if (debug) {
         Log::out() << "List of edges to instrument: "<<std::endl;
     }
-    _selectEdgesToInstrument(fg.getEntryNode(), loopTree, result, nodesToIgnore,flags);
+    _selectEdgesToInstrument(fg.getEntryNode(), irm, result, nodesToIgnore, flags, bcLevel);
     if (debug) {
         Log::out() << "End of list.."<<std::endl;
     }
@@ -689,8 +774,15 @@ static bool isMethodTrivial( ControlFlowGraph& cfg ) {
 
 static uint32 genKey( uint32 pos, Edge* edge, bool bcLevel, bool debug)  {
     uint32 key = 0;
+    if (debug) {
+        Log::out()<<"\t\t key for edge with id="<<edge->getId()<<" ("; FlowGraph::printLabel(Log::out(), edge->getSourceNode());
+        Log::out() << "->"; FlowGraph::printLabel(Log::out(), edge->getTargetNode()); Log::out()<<") is ";Log::out().flush();
+    }
     if (bcLevel) {
-        assert(0); //TODO:
+        uint16 bcBefore = edge->getSourceNode()->getNodeEndBCOffset();
+        uint16 bcAfter  = edge->getTargetNode()->getNodeStartBCOffset();
+        assert(bcBefore!=ILLEGAL_BC_MAPPING_VALUE && bcAfter!=ILLEGAL_BC_MAPPING_VALUE);
+        key = (((uint32)bcBefore)<<16) + bcAfter;
     } else {
         //TODO: this algorithm is not 100% effective: we can't rely on edges order in CFG
         uint32 edgePos = 0;
@@ -709,10 +801,27 @@ static uint32 genKey( uint32 pos, Edge* edge, bool bcLevel, bool debug)  {
         key = pos + (edgePos << 16);
     }
     if (debug) {
-        Log::out()<<"\t\t key for edge with id="<<edge->getId()<<" ("; FlowGraph::printLabel(Log::out(), edge->getSourceNode());
-        Log::out() << "->"; FlowGraph::printLabel(Log::out(), edge->getTargetNode()); Log::out()<<") is "<< key << std::endl;
+        Log::out() << key << std::endl;
     }
     return key;
 }
 
+static void checkBCMapping( ControlFlowGraph& cfg ) {
+#ifdef _DEBUG
+    const Nodes& nodes = cfg.getNodes();
+    for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
+       Node* node = *it;
+        if (node->isBlockNode() && node!=cfg.getReturnNode()) {
+            CFGInst* inst = node->getFirstInst();
+            assert(inst!=NULL && inst->isLabel());
+            if (inst->getBCOffset()==ILLEGAL_BC_MAPPING_VALUE) {
+                if (Log::isEnabled()) {
+                    Log::out()<<"Illegal BC-Map for node:";FlowGraph::printLabel(Log::out(), node);
+                }
+                assert(inst->getBCOffset()!=ILLEGAL_BC_MAPPING_VALUE);
+            }
+        }
+    }
+#endif
+}
 } //namespace
