@@ -226,11 +226,11 @@ static transfer_control_stub_type gen_transfer_control_stub()
 
     // Restore processor flags
     ss = alu(ss, xor_opc, rcx_opnd,  rcx_opnd);
-    ss = mov(ss, rcx_opnd,  M_Base_Opnd(rdx_reg, CONTEXT_OFFSET(eflags)), size_32);
+    ss = mov(ss, rcx_opnd,  M_Base_Opnd(rdx_reg, CONTEXT_OFFSET(eflags)), size_8);
     ss = test(ss, rcx_opnd, rcx_opnd);
     ss = branch8(ss, Condition_Z,  Imm_Opnd(size_8, 0));
     char* patch_offset = ((char*)ss) - 1; // Store location for jump patch
-    ss = alu(ss, and_opc, rcx_opnd, Imm_Opnd(size_64, 0xffff));
+    ss = alu(ss, and_opc, rcx_opnd, Imm_Opnd(size_32, 0xff));
     ss = push(ss,  rcx_opnd);
     *ss++ = (char)0x9D; // POPFD
     // Patch conditional jump
