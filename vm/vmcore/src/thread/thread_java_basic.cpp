@@ -98,7 +98,7 @@ int HYTHREAD_PROC jthread_wrapper_start_proc(void *arg)
         return 0;
     }
 
-    // register to group and set ALIVE state
+    // register to group and set ALIVE & RUNNABLE states
     status = hythread_set_to_group(native_thread, start_proc_data.hy_data.group);
     assert(status == TM_ERROR_NONE);
 
@@ -133,15 +133,6 @@ int HYTHREAD_PROC jthread_wrapper_start_proc(void *arg)
         status = hythread_increase_nondaemon_threads_count(native_thread);
         assert(status == TM_ERROR_NONE);
     }
-
-    // set RUNNABLE state
-    status = hythread_thread_lock(native_thread);
-    assert(status == TM_ERROR_NONE);
-    IDATA state = hythread_get_state(native_thread);
-    status = hythread_set_state(native_thread, state | TM_THREAD_STATE_RUNNABLE);
-    assert(status == TM_ERROR_NONE);
-    status = hythread_thread_unlock(native_thread);
-    assert(status == TM_ERROR_NONE);
 
     // increase started thread count
     jthread_start_count();
@@ -183,7 +174,7 @@ int HYTHREAD_PROC jthread_wrapper_start_proc(void *arg)
     status = hythread_thread_lock(native_thread);
     assert(status == TM_ERROR_NONE);
     // FIXME - remove INTERRUPTED state after TM state transition complete
-    state = hythread_get_state(native_thread);
+    IDATA state = hythread_get_state(native_thread);
     status = hythread_set_state(native_thread,
         TM_THREAD_STATE_TERMINATED | (TM_THREAD_STATE_INTERRUPTED & state));
     assert(status == TM_ERROR_NONE);

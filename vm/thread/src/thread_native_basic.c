@@ -540,10 +540,6 @@ IDATA VMCALL hythread_set_to_group(hythread_t thread, hythread_group_t group) {
     assert(status == TM_ERROR_NONE);
 
     assert(thread->os_handle);
-
-    hymutex_lock(&thread->mutex);
-    thread->state |= TM_THREAD_STATE_ALIVE;
-    hymutex_unlock(&thread->mutex);
     
     if (!thread->thread_id) {
         char free_slot_found = 0;
@@ -579,6 +575,10 @@ IDATA VMCALL hythread_set_to_group(hythread_t thread, hythread_group_t group) {
     thread->next = cur;
     thread->prev = prev;
     prev->next = cur->prev = thread;
+
+    hymutex_lock(&thread->mutex);
+    thread->state |= TM_THREAD_STATE_ALIVE | TM_THREAD_STATE_RUNNABLE;
+    hymutex_unlock(&thread->mutex);
 
     status = hythread_global_unlock();
     assert(status == TM_ERROR_NONE);
@@ -681,7 +681,7 @@ static int HYTHREAD_PROC hythread_wrapper_start_proc(void *arg) {
     if (hythread_lib_state() != TM_LIBRARY_STATUS_INITIALIZED) {
         // set TERMINATED state
         hymutex_lock(&thread->mutex);
-        thread->state |= TM_THREAD_STATE_TERMINATED;
+        thread->state = TM_THREAD_STATE_TERMINATED;
         hymutex_unlock(&thread->mutex);
 
         // set hythread_self()
@@ -704,7 +704,7 @@ static int HYTHREAD_PROC hythread_wrapper_start_proc(void *arg) {
         return 0;
     }
 
-    // register to group and set ALIVE state
+    // register to group and set ALIVE & RUNNABLE states
     status = hythread_set_to_group(thread, start_proc_data.group);
     assert(status == TM_ERROR_NONE);
 
@@ -716,11 +716,6 @@ static int HYTHREAD_PROC hythread_wrapper_start_proc(void *arg) {
     status = hythread_set_priority(thread, thread->priority);
     // FIXME - cannot set priority
     //assert(status == TM_ERROR_NONE);
-
-    // set RUNNABLE state
-    hymutex_lock(&thread->mutex);
-    thread->state |= TM_THREAD_STATE_RUNNABLE;
-    hymutex_unlock(&thread->mutex);
 
     // release hythread global lock
     status = hythread_global_unlock();
