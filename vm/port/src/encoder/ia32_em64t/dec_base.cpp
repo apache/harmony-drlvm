@@ -200,6 +200,16 @@ bool DecoderBase::decode_aux(const EncoderBase::OpcodeDesc& odesc, unsigned aux,
         *pbuf += 4;
         }        
         return true;
+#ifdef _EM64T_
+    case OpcodeByteKind_io:
+        {
+        long long int ival = *(long long int*)*pbuf;
+        opnd = EncoderBase::Operand(OpndSize_64, ival);
+        ++pinst->argc;
+        *pbuf += 8;
+        }        
+        return true;
+#endif
     case OpcodeByteKind_plus_i:
         {
             unsigned regid = data_byte - byte;
