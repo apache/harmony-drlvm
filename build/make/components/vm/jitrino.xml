@@ -56,7 +56,6 @@ Version: $Revision: 1.6.2.8 $
                 <include name="translator/*.cpp" />
                 <include name="translator/java/*.cpp" />
                 <include name="vm/*.cpp" />
-                <include name="vm/drl/*.cpp" />
                 <include name="codegenerator/*.cpp" />
 
                 <select arch="ipf">
@@ -83,7 +82,6 @@ Version: $Revision: 1.6.2.8 $
                     <include name="translator" />
                     <include name="translator/java" />
                     <include name="vm" />
-                    <include name="vm/drl" />
                     <include name="codegenerator" />
 
                     <select arch="ia32,em64t">

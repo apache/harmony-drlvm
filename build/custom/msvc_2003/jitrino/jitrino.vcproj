@@ -555,24 +555,20 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 			Name="vm"
 			Filter="">
 			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\vm\EMInterface.cpp">
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\vm\EMInterface.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\vm\JITInterface.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\vm\VMInterface.cpp">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\vm\VMInterface.h">
 			</File>
-			<Filter
-				Name="drlvm"
-				Filter="">
-				<File
-					RelativePath="..\..\..\..\vm\jitrino\src\vm\drl\DrlEMInterface.cpp">
-				</File>
-				<File
-					RelativePath="..\..\..\..\vm\jitrino\src\vm\drl\DrlJITInterface.cpp">
-				</File>
-				<File
-					RelativePath="..\..\..\..\vm\jitrino\src\vm\drl\DrlVMInterface.cpp">
-				</File>
-			</Filter>
 		</Filter>
 		<Filter
 			Name="codegen"
