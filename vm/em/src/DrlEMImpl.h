@@ -55,6 +55,7 @@ public:
     apr_dso_handle_t* libHandle;
 
     bool (*enable_profiling)(JIT_Handle, PC_Handle, EM_JIT_PC_Role);
+    void (*profile_notification_callback)(JIT_Handle, PC_Handle, Method_Handle);
 };
 
 

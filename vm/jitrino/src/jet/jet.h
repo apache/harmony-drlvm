@@ -80,6 +80,7 @@ bool rt_check_method(JIT_Handle jit, Method_Handle method);
 void rt_unwind(JIT_Handle jit, Method_Handle method, 
                JitFrameContext * context);
 
+
 /**
  * @brief Enumerates root set for a given method.
  *
@@ -246,6 +247,12 @@ JIT_Result compile_with_params(JIT_Handle jh, Compile_Handle compile,
  * @return Supported features
  */
 OpenMethodExecutionParams get_exe_capabilities();
+
+/**
+* @brief Notifies JET that profile is collected and counters could be removed 
+* now.
+*/
+void rt_profile_notification_callback(JIT_Handle jit, PC_Handle pc, Method_Handle mh);
 
 }}; // ~namespace Jitrino::Jet
 

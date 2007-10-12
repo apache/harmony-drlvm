@@ -59,6 +59,9 @@ Method_Profile_Handle ProfilingInterface::getMethodProfileHandle(ProfileType typ
     return profileAccessInterface->get_method_profile(emHandle, getPCHandle(type), md.getMethodHandle());
 }
 
+EM_PCTYPE ProfilingInterface::getProfileType(PC_Handle pch) const {
+    return profileAccessInterface->get_pc_type(emHandle, pch);
+}
 
 bool ProfilingInterface::hasMethodProfile(ProfileType type, MethodDesc& md, JITProfilingRole role) const {
 

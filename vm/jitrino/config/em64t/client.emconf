@@ -30,19 +30,21 @@ JET_CLINIT.file=jitrino
 JET_DPGO.file=jitrino
 CD_OPT.file=jitrino
 
+
 #Confuguration of profile collector and recompilation
 JET_DPGO.genProfile=EB_PROF
 EB_PROF.profilerType=EB_PROFILER
 CD_OPT.useProfile=EB_PROF
 
 
-EB_PROF.mode=SYNC
+EB_PROF.mode=ASYNC
 EB_PROF.entryThreshold=10000
 EB_PROF.backedgeThreshold=100000
 
-# these options could be used only in async profiler mode
-#EB_PROF.tbsTimeout=5
-#EB_PROF.tbsInitialTimeout=0
+# these options are used only in ASYNC profiler mode only
+EB_PROF.tbsTimeout=7
+EB_PROF.tbsInitialTimeout=0
+
 
 
 

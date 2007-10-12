@@ -98,6 +98,23 @@ JITEXPORT void JIT_set_profile_access_interface(JIT_Handle jit, EM_Handle em, st
    */
 JITEXPORT bool JIT_enable_profiling(JIT_Handle jit, PC_Handle pc, EM_JIT_PC_Role role);
 
+
+
+/**
+* Notifies JIT that profile is collected.
+*
+* EM uses this method to notify JIT that profile is collected.
+* JIT could use this information to patch profiling counters.
+*
+* @param[in] jit  - the JIT instance handle
+* @param[in] pc   - the handle of the profile collector instance
+* @param[in] mh   - the handle of the method with collected profile
+*
+* @note The given method is optional. Currently only JET supports this method. 
+*/
+JITEXPORT void JIT_profile_notification_callback(JIT_Handle jit, PC_Handle pc, Method_Handle mh);
+
+
 #ifdef __cplusplus
 }
 #endif

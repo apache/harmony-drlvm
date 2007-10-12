@@ -102,6 +102,32 @@ inline unsigned count_slots(unsigned num, const jtype * args)
     return slots;
 }
 
+/**
+ * The structure contains information about counter for patching profiling counter after 
+ * profile is ready
+ */
+struct ProfileCounterInfo  {
+   //This field contains composite info on counter size (first byte) and offset (last 3 bytes)
+   uint32 offsetInfo;
+   //Link to the basic block to calculate counter's offset after code layout
+    BBInfo* bb;
+    ProfileCounterInfo() : offsetInfo(0), bb(NULL){}
+
+    static uint32 getInstSize(uint32 offsetInfo) { return offsetInfo >> 24;}
+    static uint32 getInstOffset(uint32 offsetInfo) { return offsetInfo & 0x00FFFFFF;}
+    static uint32 createOffsetInfo(uint32 instSize, uint32 instOffset) {
+        assert(instSize<0xFF && instOffset<0xFFFFFF); 
+        return (instSize<<24) | (instOffset);
+    }
+};
+
+/**
+ * Map contains patching information for all the counters in current method
+ */    
+typedef  std::vector<ProfileCounterInfo> ProfileCounterInfos;
+
+
+
 /** the class is used by codegen internally to keep field information */
 class FieldOpInfo {
 public:
@@ -1287,6 +1313,8 @@ protected:
     * @brief Compilation handle.
     */    
     Compile_Handle  m_compileHandle;
+
+    ProfileCounterInfos m_profileCountersMap;
 
 };
 

@@ -503,6 +503,19 @@ JIT_Result Compiler::compile(Compile_Handle ch, Method_Handle method,
     //
     // runtime data. must be initialized before code patching
     //
+    
+    //register profiler counters  mapping info if present
+    if (!m_profileCountersMap.empty()) {
+        m_infoBlock.num_profiler_counters = (uint32)m_profileCountersMap.size();
+        m_infoBlock.profiler_counters_map =  new uint32[m_infoBlock.num_profiler_counters];
+        for (size_t i =0; i<m_profileCountersMap.size(); i++) {
+            ProfileCounterInfo& info = m_profileCountersMap[i];
+            uint32 offset = ProfileCounterInfo::getInstOffset(info.offsetInfo) + (info.bb->addr - m_vmCode);
+            uint32 offsetInfo = ProfileCounterInfo::createOffsetInfo(ProfileCounterInfo::getInstSize(info.offsetInfo), offset);
+            m_infoBlock.profiler_counters_map[i]=offsetInfo;
+        }
+    }
+
     unsigned data_size = m_infoBlock.get_total_size();
     char * pdata;
     if (m_bEmulation) {

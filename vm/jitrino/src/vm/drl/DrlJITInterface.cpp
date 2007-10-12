@@ -151,6 +151,17 @@ JIT_enable_profiling(JIT_Handle jit, PC_Handle pc, EM_JIT_PC_Role role)
 
 extern "C"
 JITEXPORT void
+JIT_profile_notification_callback(JIT_Handle jit, PC_Handle pc, Method_Handle mh) 
+{
+    JITInstanceContext* jitContext = Jitrino::getJITInstanceContext(jit);
+    if (jitContext->isJet()) {
+        Jet::rt_profile_notification_callback(jit, pc, mh);
+    } //opt does not support counters patching today.
+}
+
+
+extern "C"
+JITEXPORT void
 JIT_gc_start(JIT_Handle jit)
 {
 }

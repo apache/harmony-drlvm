@@ -893,7 +893,7 @@ private:
  *       'mov mem, fr' using FLD, FST and FXCH.
  * 
  * @todo IPF support. The basic idea is to hide one or two registers from 
- * application and use them in Ecoder internally to emulate complex address 
+ * application and use them in Encoder internally to emulate complex address 
  * form and other operations that are not natively support in IPF's 
  * instruction set.
  */
@@ -996,6 +996,16 @@ public:
             trace(to_str(alu), to_str(op0), to_str(op1));
         }
         alu_impl(alu, op0, op1);
+    }
+
+   /**
+   * Generates n-byte long NOP instruction.
+   */
+    void nop(uint32 n) {
+        if (is_trace_on()) {
+            trace(string("nop"), to_str((int)n), string());
+        }
+        nop_impl(n);
     }
     
     /**
@@ -1477,6 +1487,8 @@ private:
     void not_impl(const Opnd& op0);
     /// Implementation of alu().
     void alu_impl(ALU op, const Opnd& op0, const Opnd& op1);
+   //Implementation of nop()
+    void nop_impl(uint32 n);
     /// Implementation of cmovcc().
     void cmovcc_impl(COND c, const Opnd& op0, const Opnd& op1);
     /// Implementation of cmpxchg().

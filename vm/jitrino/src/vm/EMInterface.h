@@ -107,6 +107,8 @@ public:
     // at run-time i.e. when there is no any memory managers available.
     Method_Profile_Handle getMethodProfileHandle(ProfileType type, MethodDesc& md) const;
 
+    EM_PCTYPE getProfileType(PC_Handle pc) const;
+
     bool hasMethodProfile(ProfileType type, MethodDesc& md, JITProfilingRole role=JITProfilingRole_USE) const;
     bool enableProfiling(PC_Handle pc, JITProfilingRole role);
     bool isProfilingEnabled(ProfileType pcType, JITProfilingRole jitRole) const;

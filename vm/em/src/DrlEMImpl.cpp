@@ -72,7 +72,6 @@ void DrlEMFactory::deinitEMInstance() {
     emInstance = NULL;
 }
 
-
 static EM_PCTYPE get_pc_type(EM_Handle _this, PC_Handle pc) {
     assert(_this!=NULL);
     assert(pc!=NULL);
@@ -86,7 +85,6 @@ static PC_Handle get_pc(EM_Handle _this,  EM_PCTYPE profile_type,  JIT_Handle jh
     return (PC_Handle)em->getProfileCollector(profile_type, jh, jit_role);
 }
 
-
 static Method_Profile_Handle 
 get_method_profile(EM_Handle _this, PC_Handle pch, Method_Handle mh) {
     assert(_this!=NULL);
@@ -95,7 +93,6 @@ get_method_profile(EM_Handle _this, PC_Handle pch, Method_Handle mh) {
     ProfileCollector* pc  = (ProfileCollector*)pch;
     return (Method_Profile_Handle)pc->getMethodProfile(mh);
 }
-
 
 
 RStep::RStep(JIT_Handle _jit, const std::string& _jitName, RChain* _chain, apr_dso_handle_t* _libHandle)
@@ -373,6 +370,9 @@ static bool enable_profiling_stub(JIT_Handle jit, PC_Handle pc, EM_JIT_PC_Role r
     return false;
 }
 
+static void profile_notification_callback_stub(JIT_Handle, PC_Handle, Method_Handle) {
+}
+
 bool DrlEMImpl::initJIT(const std::string& libName, apr_dso_handle_t* libHandle, RStep& step) {
     apr_dso_handle_sym_t fn = NULL;
     if (apr_dso_sym(&fn, libHandle, "JIT_init") != APR_SUCCESS) {
@@ -393,6 +393,12 @@ bool DrlEMImpl::initJIT(const std::string& libName, apr_dso_handle_t* libHandle,
         step.enable_profiling = (bool(*)(JIT_Handle, PC_Handle, EM_JIT_PC_Role))fn;
     } else {
         step.enable_profiling = enable_profiling_stub;
+    }
+
+    if (pcEnabled && apr_dso_sym(&fn, libHandle, "JIT_profile_notification_callback") == APR_SUCCESS) {
+        step.profile_notification_callback = (void(*)(JIT_Handle, PC_Handle, Method_Handle))fn;
+    } else {
+        step.profile_notification_callback = profile_notification_callback_stub;
     }
 
     return true;
@@ -749,6 +755,7 @@ void DrlEMImpl::methodProfileIsReady(MethodProfile* mp) {
         hymutex_unlock(&recompilationLock);
         return;
     }
+    
     methodsInRecompile.insert((Method_Profile_Handle)mp);
     nMethodsRecompiled++;
     hymutex_unlock(&recompilationLock);
@@ -764,10 +771,13 @@ void DrlEMImpl::methodProfileIsReady(MethodProfile* mp) {
         for (RSteps::const_iterator sit = chain->steps.begin(), send = chain->steps.end(); sit!=send; ++sit) {
             RStep* step = *sit;
             if (step->jit == jit) {
+
+                //notify JIT which has generated this profile that profile is ready.
+                step->profile_notification_callback(step->jit, mp->pc, mp->mh);
+
                 ++sit;
                 RStep* nextStep = sit!=send ? *sit: NULL;
                 if (nextStep != NULL) {
-
                     if (nextStep->loggingEnabled) {
                         methodName = method_get_name(mp->mh);
                         Class_Handle ch = method_get_class(mp->mh);

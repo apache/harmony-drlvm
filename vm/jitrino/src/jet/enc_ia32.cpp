@@ -680,6 +680,12 @@ void Encoder::alu_impl(ALU alu, const Opnd& op0, const Opnd& op1)
     ip(EncoderBase::encode(ip(), mn, args));
 }
 
+void Encoder::nop_impl(uint32 n) 
+{
+    ip(EncoderBase::nops(ip(), n));
+}
+
+
 void Encoder::cmovcc_impl(COND c, const Opnd& op0, const Opnd& op1) 
 {
     ConditionMnemonic cm = devirt(c);

@@ -100,6 +100,8 @@ public:
     MethodInfoBlock(char * pdata) {
         assert(is_valid_data(pdata));
         m_data = NULL;
+		num_profiler_counters = 0;
+		profiler_counters_map = NULL;
         load(pdata);
     }
 
@@ -108,7 +110,7 @@ public:
      */
     ~MethodInfoBlock()
     {
-        assert (m_data == NULL);
+		assert (m_data == NULL);
     }
 
     /**
@@ -236,7 +238,7 @@ public:
      */
     unsigned get_total_size(void) const
     {
-        return get_hdr_size() + get_dyn_size();
+        return get_hdr_size() + get_bcmap_size() + get_profile_counters_map_size();
     }
     /**
      * @brief Sets a length of 'warm-up code'.
@@ -312,10 +314,20 @@ public:
         // MethodInfoBlock instance, then feel free to remove this assert().
         // and **UNCOMMENT the delete[]**
         assert(m_data == NULL);
+		assert(profiler_counters_map == NULL);
+		assert(num_profiler_counters == 0);
         //delete[] m_data; m_data = NULL; // just for sure
         
         rt_header = (BlockHeader*)from;
         rt_inst_addrs = (const char**)(from + get_hdr_size());
+        
+       // load profiling counters info
+        char* countersInfo =  from + get_hdr_size() + get_bcmap_size();
+        num_profiler_counters = *(uint32*)countersInfo;
+		if (num_profiler_counters > 0) {
+			profiler_counters_map = (uint32*)(countersInfo + sizeof(uint32));
+		}
+        profiler_counters_map = (uint32*)(countersInfo + sizeof(uint32));
     }
 
     /**
@@ -391,7 +403,7 @@ private:
     }
 
     /**
-     * @brief Calculates and returns size occupied by variable part of 
+     * @brief Calculates and returns size occupied by bc-map related variable part of 
      *        MethodInfoBlock.
      *
      * @note Obviously, all fields used to calculate the variable size 
@@ -400,9 +412,18 @@ private:
      *
      * @return size needed to store variable part of MethodInfoBlock.
      */
-    unsigned        get_dyn_size(void) const
+    unsigned        get_bcmap_size(void) const
     {
         return sizeof(rt_inst_addrs[0])*rt_header->m_bc_size;
+    }
+
+   /**
+   * @brief Calculates and returns size occupied by profiling counters info in 
+   *        MethodInfoBlock.
+   *
+   */
+    unsigned get_profile_counters_map_size() const {
+        return sizeof (uint32) + num_profiler_counters * sizeof(uint32);
     }
 
     /**
@@ -527,9 +548,16 @@ private:
      * #init). During runtime, it points into the buffer provided to #load.
      */
     const char **   rt_inst_addrs;  // [bc_size]
-    char **   data_ips; // [m_num_datas]
-    unsigned* depths;   // [m_num_datas]
-    unsigned* masks;    // [m_num_datas*words(m_max_stack_depth)]
+
+public:
+   /**
+   * Number of profile counters in the method
+   */
+    uint32   num_profiler_counters;
+   /**
+   * Profiling counters information for patching: counter size and offset
+   */
+    uint32*  profiler_counters_map;
 };
 
 

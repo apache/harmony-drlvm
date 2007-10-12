@@ -57,7 +57,7 @@ typedef void *Method_Profile_Handle;
    */
 typedef enum JIT_Result {
   /** 
-   * The method compilation has finished successufuly.
+   * The method compilation has finished successfully.
    */
     JIT_SUCCESS,
   /** 

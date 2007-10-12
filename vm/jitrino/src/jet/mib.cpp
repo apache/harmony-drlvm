@@ -20,7 +20,7 @@
  */
 /**
  * @file
- * @brief MethodInfoBlock implementaion.
+ * @brief MethodInfoBlock implementation.
  */
  
 #include "mib.h"
@@ -36,6 +36,9 @@ MethodInfoBlock::MethodInfoBlock(void)
     //
     rt_header = &m_header;
     rt_header->code_start = NULL;
+    num_profiler_counters = 0;
+    profiler_counters_map= NULL;
+
 }
 
 void MethodInfoBlock::init(unsigned bc_size, unsigned stack_max, 
@@ -51,10 +54,10 @@ void MethodInfoBlock::init(unsigned bc_size, unsigned stack_max,
     rt_header->m_in_slots = in_slots;
     rt_header->m_flags = flags;
 
-    // All the values must be initialized *before* get_dyn_size() !
-    unsigned dyn_size = get_dyn_size();
-    m_data = new char[dyn_size];
-    memset(m_data, 0, dyn_size);
+    // All the values must be initialized *before* get_bcmap_size() !
+    unsigned bcmap_size = get_bcmap_size();
+    m_data = new char[bcmap_size];
+    memset(m_data, 0, bcmap_size);
     rt_inst_addrs = (const char**)m_data;
 }
 
@@ -62,8 +65,15 @@ void MethodInfoBlock::save(char * to)
 {
     memset(to, 0, get_total_size());
     memcpy(to, rt_header, get_hdr_size());
-    memcpy(to +  get_hdr_size(), m_data, get_dyn_size());
+    memcpy(to +  get_hdr_size(), m_data, get_bcmap_size());
     rt_inst_addrs = (const char**)(to + get_hdr_size());
+
+   //store information about profiling counters for the method in MethodInfoBlock
+    uint32* countersInfo = (uint32*)(to +  get_hdr_size() + get_bcmap_size());
+    countersInfo[0]=num_profiler_counters;
+    if (num_profiler_counters > 0) {
+        memcpy(countersInfo+1, profiler_counters_map, num_profiler_counters * sizeof(uint32));
+    }
 }
 
 const char * MethodInfoBlock::get_ip(unsigned pc) const

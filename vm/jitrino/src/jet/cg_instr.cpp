@@ -31,6 +31,10 @@
 namespace Jitrino {
 namespace Jet {
 
+//Number of nops to put before counter instruction to be able to atomically
+//replace beginning of the instruction with jump
+#define NOPS_PER_COUNTER 1
+
 void CodeGen::gen_prof_be(void)
 {
     if (!is_set(JMF_PROF_ENTRY_BE)) {
@@ -45,7 +49,17 @@ void CodeGen::gen_prof_be(void)
     movp(addr, m_p_backedge_counter);
     int off = 0;
 #endif
+    uint32 offset = (uint32)(m_codeStream.ip() - m_codeStream.data() - m_bbinfo->ipoff); //store offsets inside of BB now. Fix it to method's offset after code layout
+    //put number of nops to align counter instruction
+    nop(NOPS_PER_COUNTER);
     alu(alu_add, Opnd(i32, addr, off), 1);
+
+   //store information about profiling counters
+    uint32 new_offset = (uint32)(m_codeStream.ip() - m_codeStream.data() - m_bbinfo->ipoff);
+    ProfileCounterInfo info;
+    info.bb = m_bbinfo;
+    info.offsetInfo = ProfileCounterInfo::createOffsetInfo(new_offset - offset, offset);
+    m_profileCountersMap.push_back(info);
 }
 
 void CodeGen::gen_gc_safe_point()

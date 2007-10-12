@@ -32,6 +32,7 @@
 #include "jit_intf.h"
 
 #include "port_threadunsafe.h"
+#include "EMInterface.h"
 
 #if !defined(_IPF_)
 #include "enc_ia32.h"
@@ -590,6 +591,63 @@ void rt_native2bc(JIT_Handle jit, Method_Handle method, const void * ip,
     }
 
     return EXE_ERROR_NONE;
+}
+
+
+void rt_profile_notification_callback(JIT_Handle jit, PC_Handle pch, Method_Handle mh) 
+{
+   JITInstanceContext* jitContext = JITInstanceContext::getContextForJIT(jit);
+
+   //heck that profiler type is EB, counters are patched only for Entry Backage profile
+   if ((jitContext->getProfilingInterface())->getProfileType(pch) == EM_PCTYPE_ENTRY_BACKEDGE) {
+       //Get MethodInfoBlock of the method to be patched
+       char * pinfo = (char*)method_get_info_block_jit(mh, jit);
+       assert(MethodInfoBlock::is_valid_data(pinfo));
+       MethodInfoBlock infoBlock(pinfo);
+
+       if (infoBlock.get_flags() & DBG_TRACE_RT) {
+           const char* methodName = method_get_name(mh);
+           const char* className = class_get_name(method_get_class(mh));
+           dbg_rt("rt.patch_eb_counters: patching method %s.%s\n", className, methodName);
+       }
+
+       //Replace counters with nops in 3 steps:
+       //1. Atomically replace first 2 bytes of counter instruction with jump to the 
+       //next instruction
+       //2. Replace all the remaining bytes of counter instruction with nops
+       //3. Atomically replace jump with 2 nops
+       Byte* methodAddr = method_get_code_block_addr_jit(mh, jit);
+       for (uint32 i = 0 ; i<infoBlock.num_profiler_counters; i++) {
+           uint32 offsetInfo = infoBlock.profiler_counters_map[i];
+           uint32 codeOffset = ProfileCounterInfo::getInstOffset(offsetInfo);
+           uint32 patchedSize = ProfileCounterInfo::getInstSize(offsetInfo);
+
+           Byte* patchedAddr = methodAddr + codeOffset;
+           //1. Generate jump to the next instruction
+           char* jmpIP = (char*)patchedAddr;
+           char jmpOffset = (char)(patchedSize - 2);
+           if (((POINTER_SIZE_INT)jmpIP)&0x1) {
+               jmpIP++;
+               jmpOffset--;
+           }
+
+           //to guarantee that first replacing will be atomic we have to 
+           //manually write jmp instruction instead of using encoder
+           *(uint16*)jmpIP = (uint16)((0xeb) | jmpOffset << 8);
+           assert(((uint16)(int_ptr)(jmpIP) & 0x01)==0);
+
+           //2. Put nops instead of inst, 1 byte nops are used here for asm 
+           //readability
+           char* ip = jmpIP + 2;
+           for (int i=0; i<jmpOffset; i++) {
+               EncoderBase::nops(ip+i, 1);
+           }
+
+           //3. Atomically replace jump with nop;
+           *(uint16*)jmpIP = (uint16)0x9090; //2 nops atomically.
+       }
+      infoBlock.release();
+   }
 }
 
 }};    // ~namespace Jitrino::Jet
