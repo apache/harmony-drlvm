@@ -244,6 +244,29 @@ APR_DECLARE(size_t) port_vmem_max_size(){
     }
 }
 
+APR_DECLARE(apr_status_t) port_vmem_allocate(void **addr, size_t size, unsigned int mode)
+{
+    LPVOID start = NULL;
+    DWORD protection = convertProtectionMask(mode);
+
+	start = VirtualAlloc(*addr, size, MEM_COMMIT, protection);
+	if (!start) {
+		return apr_get_os_error();
+	}
+
+    *addr = start;
+    return APR_SUCCESS;
+}
+
+APR_DECLARE(apr_status_t) port_vmem_free(void *addr, size_t UNREF size)
+{
+	if (!VirtualFree(addr, 0, MEM_RELEASE)) {
+		return apr_get_os_error();
+	}
+
+	return APR_SUCCESS;
+}
+
 #ifdef __cplusplus
 }
 #endif

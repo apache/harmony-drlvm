@@ -159,6 +159,27 @@ APR_DECLARE(size_t) port_vmem_reserved_size();
  */
 APR_DECLARE(size_t) port_vmem_max_size();
 
+/**
+ * Allocate memory with default page size.
+ * @param[in,out] addr - desired starting address of the region to allocate. If
+ *                       <code>NULL</code>, the system determines the
+ *                       appropriate location.On success, the actual
+ *                       allocated address is returned
+ * @param size         - the size of the region in bytes. For large pages,
+                         the size must be multiply of page size
+ * @param mode  - the bit mask of <code>PORT_VMEM_MODE_*</code> flags
+ */
+APR_DECLARE(apr_status_t) port_vmem_allocate(void **addr, size_t size, unsigned int mode);
+
+/**
+ * Releases previously reserved virtual memory region as a whole.
+ * If the region was committed, the function first decommits it.
+ * @param addr - the memory region address
+ * @param size - size of the allocated memory
+ * @return <code>APR_SUCCESS</code> if OK; otherwise, an error code.
+ */
+APR_DECLARE(apr_status_t) port_vmem_free(void *addr, size_t size);
+
 /** @} */
 
 #ifdef __cplusplus

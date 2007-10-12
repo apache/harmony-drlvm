@@ -203,6 +203,34 @@ cleanup:
     return rlim;
 }
 
+APR_DECLARE(apr_status_t) port_vmem_allocate(void **addr, size_t size, unsigned int mode)
+{
+    void *start = NULL;
+    int protection = convertProtectionBits(mode);
+
+#ifdef MAP_ANONYMOUS
+    start = mmap(*addr, size, protection, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+#elif defined(MAP_ANON)
+    start = mmap(*addr, size, protection, MAP_PRIVATE | MAP_ANON, -1, 0);
+#else
+    int fd = open("/dev/zero", O_RDONLY);
+    start = mmap(*addr, size, protection, MAP_PRIVATE, fd, 0);
+    close(fd);
+#endif
+
+    if (MAP_FAILED == start)
+        return apr_get_os_error();
+
+    *addr = start;
+    return APR_SUCCESS;
+}
+
+APR_DECLARE(apr_status_t) port_vmem_free(void *addr, size_t size)
+{
+	munmap(addr, size);
+	return APR_SUCCESS;
+}
+
 #ifdef __cplusplus
 }
 #endif

@@ -221,9 +221,13 @@ jint vm_attach(JavaVM * java_vm, JNIEnv ** p_jni_env)
         vm_thread->jvmti_thread.owned_monitors = (jobject*)apr_palloc(vm_thread->pool,
                 TM_INITIAL_OWNED_MONITOR_SIZE * sizeof(jobject));
 
+        void *addr = NULL;
+        apr_status_t UNREF status = port_vmem_allocate(&addr, TM_JVMTI_MAX_BUFFER_SIZE,
+            PORT_VMEM_MODE_READ | PORT_VMEM_MODE_WRITE | PORT_VMEM_MODE_EXECUTE);
+        assert(status == APR_SUCCESS);
+
         vm_thread->jvmti_thread.jvmti_jit_breakpoints_handling_buffer =
-            (jbyte*)apr_palloc(vm_thread->pool,
-                sizeof(jbyte) * TM_JVMTI_MAX_BUFFER_SIZE);
+            reinterpret_cast<jbyte *>(addr);
     }
     ((hythread_t)vm_thread)->java_status = TM_STATUS_INITIALIZED;
 
@@ -262,6 +266,15 @@ jint vm_detach(jthread java_thread)
     // Remove guard page on the stack on linux
     remove_guard_stack(p_vm_thread);
 #endif // PLATFORM_POSIX
+
+    if (ti_is_enabled())
+    {
+        apr_status_t UNREF status;
+        status = port_vmem_free(
+            p_vm_thread->jvmti_thread.jvmti_jit_breakpoints_handling_buffer,
+            TM_JVMTI_MAX_BUFFER_SIZE);
+        assert(status == APR_SUCCESS);
+    }
 
     // Destroy current VM_thread pool and zero VM_thread structure
     jthread_deallocate_vm_thread_pool(p_vm_thread);
