@@ -177,7 +177,7 @@ static transfer_control_stub_type gen_transfer_control_stub()
         return addr;
     }
 
-    const int STUB_SIZE = 240;
+    const int STUB_SIZE = 247;
     char * stub = (char *)malloc_fixed_code_for_jit(STUB_SIZE,
         DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_COLD, CAA_Allocate);
     char * ss = stub;
@@ -230,6 +230,7 @@ static transfer_control_stub_type gen_transfer_control_stub()
     ss = test(ss, rcx_opnd, rcx_opnd);
     ss = branch8(ss, Condition_Z,  Imm_Opnd(size_8, 0));
     char* patch_offset = ((char*)ss) - 1; // Store location for jump patch
+    ss = alu(ss, and_opc, rcx_opnd, Imm_Opnd(size_64, 0xffff));
     ss = push(ss,  rcx_opnd);
     *ss++ = (char)0x9D; // POPFD
     // Patch conditional jump
