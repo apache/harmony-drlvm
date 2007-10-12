@@ -92,7 +92,7 @@ struct Filter {
         FilterAttr<Mnemonic>                                mnemonic;
         FilterAttr<int32>                                   operandNumber;
         FilterAttr<Opnd::RuntimeInfo::Kind>                 rtKind;
-        FilterAttr<CompilationInterface::RuntimeHelperId>   rtHelperID;
+        FilterAttr<VM_RT_SUPPORT>                           rtHelperID;
         FilterAttr<std::string>                             rtIntHelperName;
         FilterAttr<bool>                                    isNative;
         FilterAttr<bool>                                    isStatic;
@@ -111,7 +111,7 @@ struct Filter {
 
         StlMap<int, OpndFilter> operandFilters;
 
-        Filter() : isInitialized(false), isNegative(false), isOR(false), mnemonic(Mnemonic_NULL), operandNumber(-1), rtKind(Opnd::RuntimeInfo::Kind_Null),rtHelperID(CompilationInterface::Helper_Null), rtIntHelperName("none"), isNative(false), isStatic(false), isSynchronized(false), isNoInlining(false), isInstance(false), isFinal(false), isVirtual(false), isAbstract(false), isClassInitializer(false), isInstanceInitializer(false), isStrict(false), isRequireSecObject(false), isInitLocals(false), isOverridden(false), operandFilters(Jitrino::getGlobalMM()) {}
+        Filter() : isInitialized(false), isNegative(false), isOR(false), mnemonic(Mnemonic_NULL), operandNumber(-1), rtKind(Opnd::RuntimeInfo::Kind_Null), rtHelperID(VM_RT_UNKNOWN), rtIntHelperName("none"), isNative(false), isStatic(false), isSynchronized(false), isNoInlining(false), isInstance(false), isFinal(false), isVirtual(false), isAbstract(false), isClassInitializer(false), isInstanceInitializer(false), isStrict(false), isRequireSecObject(false), isInitLocals(false), isOverridden(false), operandFilters(Jitrino::getGlobalMM()) {}
 
         Filter& operator=(const Filter& c) {
             Filter& f = *this;
@@ -806,7 +806,7 @@ bool InternalProfiler::passFilter(Inst * inst, Filter& filter) {
     if(filter.rtHelperID.isInitialized) {
         if(!rt)
             return false;
-        res = filter.rtHelperID.value == (CompilationInterface::RuntimeHelperId)(POINTER_SIZE_INT)rt->getValue(0);
+        res = filter.rtHelperID.value == (VM_RT_SUPPORT)(POINTER_SIZE_INT)rt->getValue(0);
         if(filter.rtHelperID.isNegative)
             res = !res;
 

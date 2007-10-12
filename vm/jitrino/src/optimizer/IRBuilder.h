@@ -169,7 +169,7 @@ public:
                                   uint32 numArgs,
                                   Opnd*  args[]);
 
-    Opnd*  genVMHelperCall(CompilationInterface::RuntimeHelperId helperId,
+    Opnd*  genVMHelperCall(VM_RT_SUPPORT helperId,
                             Type* returnType,
                             uint32 numArgs,
                             Opnd*  args[]);

@@ -294,96 +294,20 @@ public:
         Exception_DivideByZero,
         Num_SystemExceptions
     };
-    //
-    //    Runtime helper methods
-    //
-    enum RuntimeHelperId {
-        Helper_Null = 0,
-        Helper_NewObj_UsingVtable,    // Object* obj = f(void * vtableId, uint32 size)
-        Helper_NewVector_UsingVtable, // Vector* vec = f(uint32 numElem, void * arrVtableId);
-        Helper_NewObj,             // Object* obj    = f(void* objTypeRuntimeId)
-        Helper_NewVector,          // Vector* vec    = f(uint32 numElem, void* arrTypeRuntimeId)
-        Helper_NewMultiArray,      // Array * arr    = f(void* arrTypeRuntimeId,uint32 numDims, uint32 dimN, ...,uint32 dim1)    
-        Helper_LdInterface,        // Vtable* vtable = f(Object* obj, void* interfRuntimeId)
-        Helper_LdRef,           // [String|Ref]* str = f(void* classRuntimeId, uint32 strToken)
-        Helper_ObjMonitorEnter,    //                = f(Object* obj)
-        Helper_ObjMonitorExit,     //                = f(Object* obj)
-        Helper_TypeMonitorEnter,   //                = f(void* typeRuntimeId)
-        Helper_TypeMonitorExit,    //                = f(void* typeRuntimeId)
-        Helper_Cast,               // toType* obj    = f(Object* obj, void* toTypeRuntimeId)
-        Helper_IsInstanceOf,       // [1(yes)/0(no)] = f(Object* obj, void* typeRuntimeId) a
-        Helper_InitType,           //                = f(void* typeRutimeId)
-        Helper_IsValidElemType,    // [1(yes)/0(no)] = f(Object* elem, Object* array)
-        Helper_Throw_KeepStackTrace, //                f(Object* exceptionObj)
-        Helper_Throw_SetStackTrace, //                 f(Object* exceptionObj)
-        Helper_Throw_Lazy,          //                 f(MethodHandle /*of the <init>*/, .../*<init> params*/, ClassHandle)
-        Helper_EndCatch,
-        Helper_NullPtrException,   //                  f()
-        Helper_ArrayBoundsException,//                 f()
-        Helper_ElemTypeException,  //                  f()
-        Helper_DivideByZeroException, //               f()
-        Helper_Throw_LinkingException, //              f(uint32 ConstPoolNdx, void* classRuntimeId, uint32 opcode)
-        Helper_CharArrayCopy,      //                = f(char[] src, uint32 srcPos, char[] dst, uint32 dstPos, uint32 len)
-        Helper_DivI32,        // int32  z        = f(int32  x, int32  y)
-        Helper_DivU32,        // uint32 z       = f(uint32 x, uint32 y)
-        Helper_DivI64,        // int64  z       = f(int64  x, int64  y)
-        Helper_DivU64,        // uint64 z        = f(uint64 x, uint64 y)
-        Helper_DivSingle,     // float  z        = f(float  x, float  y)
-        Helper_DivDouble,     // double z        = f(double x, double y)
-        Helper_RemI32,        // int32  z        = f(int32  x, int32  y)
-        Helper_RemU32,        // uint32 z       = f(uint32 x, uint32 y)
-        Helper_RemI64,        // int64  z       = f(int64  x, int64  y)
-        Helper_RemU64,        // uint64 z        = f(uint64 x, uint64 y)
-        Helper_RemSingle,     // float  z        = f(float  x, float  y)
-        Helper_RemDouble,     // double z        = f(double x, double y)
-        Helper_MulI64,        // int64  z        = f(int64 x, int64 y) 
-        Helper_ShlI64,        // int64  z        = f
-        Helper_ShrI64,        // int64  z        = f
-        Helper_ShruI64,       // int64  z        = f
-        Helper_ConvStoI32,    // int32  x        = f(float x) 
-        Helper_ConvStoI64,    // int64  x        = f(float x) 
-        Helper_ConvDtoI32,    // int32  x        = f(double x) 
-        Helper_ConvDtoI64,    // int64  x        = f(double x) 
-        Helper_EnableThreadSuspension,//           f()
-        Helper_GetTLSBase,    // int *           = f()
-        Helper_MethodEntry, // f(MethodHandle)
-        Helper_MethodExit,   // f(MethodHandle, void* ret_value)
-        Helper_WriteBarrier,
-        Helper_NewObjWithResolve,       //f(class_handle, cp_index)
-        Helper_NewArrayWithResolve,     //f(class_handle, cp_index, length)
-        Helper_GetNonStaticFieldOffsetWithResolve, //f(class_handle, cp_index)
-        Helper_GetStaticFieldAddrWithResolve,       //f(class_handle, cp_index)
-        Helper_CheckCastWithResolve,                //f(class_handle, cp_index, obj)
-        Helper_InstanceOfWithResolve,               //f(class_handle, cp_index, obj)
-        Helper_GetInvokeStaticAddrWithResolve,      //f(class_handle, cp_index)
-        Helper_GetInvokeInterfaceAddrWithResolve,   //f(class_handle, cp_index, obj)
-        Helper_GetInvokeVirtualAddrWithResolve,     //f(class_handle, cp_index, obj)
-        Helper_GetInvokeSpecialAddrWithResolve,     //f(class_handle, cp_index)
-        Helper_InitializeClassWithResolve,          //f(class_handle, cp_index)
-        Num_Helpers
-    };
 
-    enum VmCallingConvention {
-        CallingConvention_Drl = 0,
-        CallingConvention_Stdcall,
-        CallingConvention_Cdecl,
-        Num_CallingConvention
-    };
-
-
-    static const char*   getRuntimeHelperName(RuntimeHelperId helperId);
+    static const char*   getRuntimeHelperName(VM_RT_SUPPORT helperId);
     /**
-     * Returns RuntimeHelperId by its string representation. Name comparison 
-     * is case-sensitive.
-     * If the helperName is unknown, then Helper_Null is returned.
+     * Returns helper ID by its string representation. Name comparison 
+     * is case-insensitive.
+     * If the helperName is unknown, then VM_RT_UNKNOWN is returned.
      */
-    static RuntimeHelperId str2rid( const char * helperName );
+    static VM_RT_SUPPORT str2rid( const char * helperName );
 
-    VmCallingConvention getRuntimeHelperCallingConvention(RuntimeHelperId id);
-    bool        isInterruptible(RuntimeHelperId id);
-    bool        mayBeInterruptible(RuntimeHelperId id);
-    void*       getRuntimeHelperAddress(RuntimeHelperId);
-    void*       getRuntimeHelperAddressForType(RuntimeHelperId, Type*);
+    HELPER_CALLING_CONVENTION getRuntimeHelperCallingConvention(VM_RT_SUPPORT id);
+    bool        isInterruptible(VM_RT_SUPPORT id);
+    bool        mayBeInterruptible(VM_RT_SUPPORT id);
+    void*       getRuntimeHelperAddress(VM_RT_SUPPORT);
+    void*       getRuntimeHelperAddressForType(VM_RT_SUPPORT, Type*);
 
 
     Type*      getFieldType(Class_Handle enclClass, uint32 cpIndex);
@@ -526,7 +450,6 @@ private:
      */
     CompilationContext* compilationContext;
 
-    VM_RT_SUPPORT   translateHelperId(RuntimeHelperId runtimeHelperId);
     JIT_Handle      getJitHandle() const;
     MethodDesc*     getMethodDesc(Method_Handle method, JIT_Handle jit);
 

@@ -1409,8 +1409,8 @@ AliasRep AliasManager::getReference(Opnd *addr)
     case Op_VMHelperCall:
         {
             VMHelperCallInst* callInst = addri->asVMHelperCallInst();
-            assert(callInst->getVMHelperId() == CompilationInterface::Helper_GetNonStaticFieldOffsetWithResolve
-                || callInst->getVMHelperId() == CompilationInterface::Helper_GetStaticFieldAddrWithResolve);
+            assert(callInst->getVMHelperId() == VM_RT_GET_NONSTATIC_FIELD_OFFSET_WITHRESOLVE
+                || callInst->getVMHelperId() == VM_RT_GET_STATIC_FIELD_ADDR_WITHRESOLVE);
             Opnd* enclClass = callInst->getSrc(0);
             Opnd* cpIdx = callInst->getSrc(1);
             return findOrInsertAlias(getUnresolvedObjectField(0, enclClass, cpIdx));

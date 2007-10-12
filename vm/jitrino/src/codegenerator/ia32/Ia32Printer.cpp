@@ -434,7 +434,7 @@ void IRPrinter::printRuntimeInfo(const Opnd::RuntimeInfo * info)
             {
             os<<"h:"<<
                 irManager->getCompilationInterface().getRuntimeHelperName(
-                    (CompilationInterface::RuntimeHelperId)(POINTER_SIZE_INT)info->getValue(0)
+                    (VM_RT_SUPPORT)(POINTER_SIZE_INT)info->getValue(0)
                 );
             }break;
         case Opnd::RuntimeInfo::Kind_InternalHelperAddress:

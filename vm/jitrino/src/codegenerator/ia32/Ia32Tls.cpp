@@ -69,7 +69,7 @@ Opnd* createTlsBaseLoadGeneric(IRManager& irManager, Node* ctrlNode, Type* tlsBa
 {
     // Dunno where the HYTHR keeps its thread structure - request through the helper
     Opnd* tlsBase = irManager.newOpnd(tlsBaseType);
-    Inst* callInst = irManager.newRuntimeHelperCallInst(CompilationInterface::Helper_GetTLSBase, 0, NULL, tlsBase);
+    Inst* callInst = irManager.newRuntimeHelperCallInst(VM_RT_GC_GET_TLS_BASE, 0, NULL, tlsBase);
     ctrlNode->appendInst(callInst);
     return tlsBase;
 }

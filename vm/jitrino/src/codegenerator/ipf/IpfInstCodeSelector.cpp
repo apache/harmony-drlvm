@@ -1316,7 +1316,7 @@ CG_OpndHandle *IpfInstCodeSelector::tau_callintr(uint32              numArgs,
 
     IPF_LOG << "      tau_callintr" << endl;
 
-    CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_CharArrayCopy;
+    VM_RT_SUPPORT hId = VM_RT_CHAR_ARRAYCOPY_NO_EXC;
     uint64   address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd     *helperAddress = opndManager->newImm(address);
     RegOpnd  *retOpnd       = NULL;
@@ -1365,9 +1365,9 @@ void IpfInstCodeSelector::throwException(CG_OpndHandle *exceptionObj, bool creat
 
     Opnd *helperArgs[] = { (Opnd *)exceptionObj };
 
-    CompilationInterface::RuntimeHelperId hId;
-    if (createStackTrace) hId = CompilationInterface::Helper_Throw_SetStackTrace;
-    else                  hId = CompilationInterface::Helper_Throw_KeepStackTrace;
+    VM_RT_SUPPORT hId;
+    if (createStackTrace) hId = VM_RT_THROW_SET_STACK_TRACE;
+    else                  hId = VM_RT_THROW;
     
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
@@ -1382,16 +1382,16 @@ void IpfInstCodeSelector::throwSystemException(CompilationInterface::SystemExcep
 
     IPF_LOG << "      throwSystemException" << endl;
     
-    CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_Null;
+    VM_RT_SUPPORT hId = CompilationInterface::Helper_Null;
     switch (id) {
         case CompilationInterface::Exception_NullPointer: 
-            hId = CompilationInterface::Helper_NullPtrException;      break;
+            hId = VM_RT_NULL_PTR_EXCEPTION;      break;
         case CompilationInterface::Exception_ArrayIndexOutOfBounds: 
-            hId = CompilationInterface::Helper_ArrayBoundsException;  break;
+            hId = VM_RT_IDX_OUT_OF_BOUNDS;  break;
         case CompilationInterface::Exception_ArrayTypeMismatch: 
-            hId = CompilationInterface::Helper_ElemTypeException;     break;
+            hId = VM_RT_ARRAY_STORE_EXCEPTION;     break;
         case CompilationInterface::Exception_DivideByZero: 
-            hId = CompilationInterface::Helper_DivideByZeroException; break;
+            hId = VM_RT_DIVIDE_BY_ZERO_EXCEPTION; break;
         default: 
             IPF_ERR << "unexpected id " << id << endl;
     }
@@ -1418,7 +1418,7 @@ void IpfInstCodeSelector::throwLinkingException(Class_Handle encClass,
         opndManager->newImm(opcode)
     };
     
-    CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_Throw_LinkingException;
+    VM_RT_SUPPORT hId = VM_RT_THROW_LINKING_EXCEPTION;
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
     
@@ -1461,7 +1461,7 @@ CG_OpndHandle *IpfInstCodeSelector::tau_checkNull(CG_OpndHandle *base, bool chec
     cmp(CMPLT_CMP_CREL_EQ, truePred, p0, base, zero);
 
     // p2  brl.call  b0 = helperAddress
-    CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_NullPtrException;
+    VM_RT_SUPPORT hId = VM_RT_NULL_PTR_EXCEPTION;
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
     directCall(0, NULL, NULL, helperAddress, truePred, CMPLT_WH_DPNT);
@@ -1482,7 +1482,7 @@ CG_OpndHandle *IpfInstCodeSelector::tau_checkBounds(CG_OpndHandle *arrayLen,
     cmp(CMPLT_CMP_CREL_GE, truePred, p0, index, arrayLen);
 
     // p2  brl.call  b0 = helperAddress
-    CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_ArrayBoundsException;
+    VM_RT_SUPPORT hId = VM_RT_IDX_OUT_OF_BOUNDS;
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
     directCall(0, NULL, NULL, helperAddress, truePred, CMPLT_WH_DPNT);
@@ -1503,7 +1503,7 @@ CG_OpndHandle *IpfInstCodeSelector::tau_checkLowerBound(CG_OpndHandle *a,
     cmp(CMPLT_CMP_CREL_GT, truePred, p0, a, b);
 
     // p2  brl.call  b0 = helperAddress
-    CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_ArrayBoundsException;
+    VM_RT_SUPPORT hId = VM_RT_IDX_OUT_OF_BOUNDS;
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
     directCall(0, NULL, NULL, helperAddress, truePred, CMPLT_WH_DPNT);
@@ -1524,7 +1524,7 @@ CG_OpndHandle *IpfInstCodeSelector::tau_checkUpperBound(CG_OpndHandle *a,
     cmp(CMPLT_CMP_CREL_GEU, truePred, p0, a, b);
 
     // p2  brl.call  b0 = helperAddress
-    CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_ArrayBoundsException;
+    VM_RT_SUPPORT hId = VM_RT_IDX_OUT_OF_BOUNDS;
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
     directCall(0, NULL, NULL, helperAddress, truePred, CMPLT_WH_DPNT);
@@ -1552,7 +1552,7 @@ CG_OpndHandle *IpfInstCodeSelector::tau_checkElemType(CG_OpndHandle *array,
 
     // p0   brl.call b0, Helper_IsValidElemType
     // p0   mov retOpnd, r8
-    CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_IsValidElemType;
+    VM_RT_SUPPORT hId = VM_RT_AASTORE_TEST;
     uint64  address         = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress1 = opndManager->newImm(address);
     RegOpnd *retOpnd        = opndManager->newRegOpnd(OPND_G_REG, DATA_U64);
@@ -1564,7 +1564,7 @@ CG_OpndHandle *IpfInstCodeSelector::tau_checkElemType(CG_OpndHandle *array,
     cmp(CMPLT_CMP_CREL_EQ, truePred, p0, retOpnd, r0);
 
     // p3   brl.call b0, Helper_ElemTypeException
-    hId     = CompilationInterface::Helper_ElemTypeException;
+    hId     = VM_RT_ARRAY_STORE_EXCEPTION;
     address = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress2 = opndManager->newImm(address);
     directCall(0, NULL, NULL, helperAddress2, truePred, CMPLT_WH_DPNT);
@@ -1586,7 +1586,7 @@ CG_OpndHandle *IpfInstCodeSelector::tau_checkZero(CG_OpndHandle *src_) {
     cmp(CMPLT_CMP_CREL_EQ, truePred, p0, src, r0);
 
     // p2  brl.call  b0 = helperAddress
-    CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_DivideByZeroException;
+    VM_RT_SUPPORT hId = VM_RT_DIVIDE_BY_ZERO_EXCEPTION;
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
     directCall(0, NULL, NULL, helperAddress, truePred, CMPLT_WH_DPNT);
@@ -1611,7 +1611,7 @@ CG_OpndHandle *IpfInstCodeSelector::tau_checkCast(ObjectType    *toType,
         (Opnd *)opndManager->newImm((uint64) toType->getRuntimeIdentifier())
     };
     
-    CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_Cast;
+    VM_RT_SUPPORT hId = VM_RT_CHECKCAST;
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
     directCall(2, helperArgs, NULL, helperAddress, p0);
@@ -1701,7 +1701,7 @@ CG_OpndHandle *IpfInstCodeSelector::ldString(MethodDesc *enclosingMethod,
     };
     
     RegOpnd *retOpnd = opndManager->newRegOpnd(OPND_G_REG, DATA_BASE);
-    CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_LdRef;
+    VM_RT_SUPPORT hId = VM_RT_LDC_STRING;
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
     
@@ -1811,7 +1811,7 @@ CG_OpndHandle *IpfInstCodeSelector::tau_ldIntfTableAddr(Type          *dstType,
         (Opnd *)opndManager->newImm((uint64) vtableType->getRuntimeIdentifier())
     };
     
-    CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_LdInterface;
+    VM_RT_SUPPORT hId = VM_RT_GET_INTERFACE_VTABLE_VER0;
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
     RegOpnd *retOpnd       = opndManager->newRegOpnd(toOpndKind(dstType->tag), toDataKind(dstType->tag));
@@ -1880,7 +1880,7 @@ CG_OpndHandle *IpfInstCodeSelector::tau_instanceOf(ObjectType    *type,
         opndManager->newImm((uint64) type->getRuntimeIdentifier()) 
     };
     
-    CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_IsInstanceOf;
+    VM_RT_SUPPORT hId = VM_RT_INSTANCEOF;
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
     RegOpnd *retOpnd       = opndManager->newRegOpnd(OPND_G_REG, DATA_I32);
@@ -1900,7 +1900,7 @@ void IpfInstCodeSelector::initType(Type *type) {
     uint64 typeRuntimeId = (uint64) type->asNamedType()->getRuntimeIdentifier();
     Opnd   *helperArgs[] = { opndManager->newImm(typeRuntimeId) };
     
-    CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_InitType;
+    VM_RT_SUPPORT hId = VM_RT_INITIALIZE_CLASS;
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
     
@@ -1919,7 +1919,7 @@ CG_OpndHandle *IpfInstCodeSelector::newObj(ObjectType *objType) {
         opndManager->newImm((int64) objType->getAllocationHandle())
     };
     
-    CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_NewObj_UsingVtable;
+    VM_RT_SUPPORT hId = VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE;
     uint64   address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd     *helperAddress = opndManager->newImm(address);
     OpndKind opndKind       = toOpndKind(objType->tag);
@@ -1943,7 +1943,7 @@ CG_OpndHandle *IpfInstCodeSelector::newArray(ArrayType     *arrayType,
         (Opnd *)numElems
     };
     
-    CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_NewVector_UsingVtable;
+    VM_RT_SUPPORT hId = VM_RT_NEW_VECTOR_USING_VTABLE;
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
     RegOpnd *retOpnd       = opndManager->newRegOpnd(OPND_G_REG, DATA_BASE);
@@ -1967,7 +1967,7 @@ CG_OpndHandle *IpfInstCodeSelector::newMultiArray(ArrayType      *arrayType,
         helperArgs[i + 2] = (Opnd *)dims[numDims - 1 - i];
     }
 
-    CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_NewMultiArray;
+    VM_RT_SUPPORT hId = VM_RT_MULTIANEWARRAY_RESOLVED;
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
     RegOpnd *retOpnd       = opndManager->newRegOpnd(OPND_G_REG, DATA_BASE);
@@ -2054,7 +2054,7 @@ void IpfInstCodeSelector::tau_monitorEnter(CG_OpndHandle *obj,
     
     Opnd *helperArgs[] = { (Opnd *)obj };
 
-    CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_ObjMonitorEnter;
+    VM_RT_SUPPORT hId = VM_RT_MONITOR_ENTER_NON_NULL;
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
     
@@ -2071,7 +2071,7 @@ void IpfInstCodeSelector::tau_monitorExit(CG_OpndHandle *obj,
 
     Opnd *helperArgs[] = { (Opnd *)obj };
 
-    CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_ObjMonitorExit;
+    VM_RT_SUPPORT hId = VM_RT_MONITOR_EXIT_NON_NULL;
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
     
@@ -2088,7 +2088,7 @@ void IpfInstCodeSelector::typeMonitorEnter(NamedType *type) {
     uint64 typeRuntimeId = (uint64) type->getRuntimeIdentifier();
     Opnd   *helperArgs[] = { opndManager->newImm(typeRuntimeId) };
 
-    CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_TypeMonitorEnter;
+    VM_RT_SUPPORT hId = VM_RT_MONITOR_ENTER_STATIC;
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
     
@@ -2105,7 +2105,7 @@ void IpfInstCodeSelector::typeMonitorExit(NamedType *type) {
     uint64 typeRuntimeId = (uint64) type->getRuntimeIdentifier();
     Opnd   *helperArgs[] = { opndManager->newImm(typeRuntimeId) };
 
-    CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_TypeMonitorExit;
+    VM_RT_SUPPORT hId = VM_RT_MONITOR_EXIT_STATIC;
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
     
@@ -2921,7 +2921,7 @@ void IpfInstCodeSelector::divDouble(RegOpnd *dst, CG_OpndHandle *src1, CG_OpndHa
         //
         Opnd *helperArgs[] = { (Opnd *)src1, (Opnd *)src2 };
     
-        CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_RemDouble;
+        VM_RT_SUPPORT hId = VM_RT_DREM;
         uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
         Opnd    *helperAddress = opndManager->newImm(address);
         
@@ -2943,7 +2943,7 @@ CG_OpndHandle *IpfInstCodeSelector::ldRef(Type *dstType,
         opndManager->newImm(refToken),
         opndManager->newImm((int64) enclosingMethod->getParentType()->getRuntimeIdentifier())
     };
-    CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_LdRef;
+    VM_RT_SUPPORT hId = VM_RT_LDC_STRING;
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
     
@@ -3036,7 +3036,7 @@ void IpfInstCodeSelector::divFloat(RegOpnd *dst, CG_OpndHandle *src1, CG_OpndHan
         //
         Opnd *helperArgs[] = { (Opnd *)src1, (Opnd *)src2 };
     
-        CompilationInterface::RuntimeHelperId hId = CompilationInterface::Helper_RemSingle;
+        VM_RT_SUPPORT hId = VM_RT_FREM;
         uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
         Opnd    *helperAddress = opndManager->newImm(address);
         

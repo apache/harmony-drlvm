@@ -3539,60 +3539,60 @@ bool JavaByteCodeTranslator::genVMHelper(const char* mname, uint32 numArgs, Opnd
 
     if (!strcmp(mname,"getTlsBaseAddress")) {
         assert(numArgs == 0);
-        Opnd* res = irBuilder.genVMHelperCall(CompilationInterface::Helper_GetTLSBase, resType, numArgs, srcOpnds);
+        Opnd* res = irBuilder.genVMHelperCall(VM_RT_GC_GET_TLS_BASE, resType, numArgs, srcOpnds);
         pushOpnd(res);
         return true;
     }
 
     if (!strcmp(mname,"newResolvedUsingAllocHandleAndSize")) {
         assert(numArgs == 2);
-        Opnd* res = irBuilder.genVMHelperCall(CompilationInterface::Helper_NewObj_UsingVtable, resType, numArgs, srcOpnds);
+        Opnd* res = irBuilder.genVMHelperCall(VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE, resType, numArgs, srcOpnds);
         pushOpnd(res);
         return true;
     }
 
     if (!strcmp(mname,"newVectorUsingAllocHandle")) {
         assert(numArgs == 2);
-        Opnd* res = irBuilder.genVMHelperCall(CompilationInterface::Helper_NewVector_UsingVtable, resType, numArgs, srcOpnds);
+        Opnd* res = irBuilder.genVMHelperCall(VM_RT_NEW_VECTOR_USING_VTABLE, resType, numArgs, srcOpnds);
         pushOpnd(res);
         return true;
     }
 
     if (!strcmp(mname,"monitorEnter")) {
         assert(numArgs == 1);
-        irBuilder.genVMHelperCall(CompilationInterface::Helper_ObjMonitorEnter, resType, numArgs, srcOpnds);
+        irBuilder.genVMHelperCall(VM_RT_MONITOR_ENTER_NON_NULL, resType, numArgs, srcOpnds);
         return true;
     }
 
     if (!strcmp(mname,"monitorExit")) {
         assert(numArgs == 1);
-        irBuilder.genVMHelperCall(CompilationInterface::Helper_ObjMonitorExit, resType, numArgs, srcOpnds);
+        irBuilder.genVMHelperCall(VM_RT_MONITOR_EXIT_NON_NULL, resType, numArgs, srcOpnds);
         return true;
     }
 
     if (!strcmp(mname,"writeBarrier")) {
         assert(numArgs == 3);
-        irBuilder.genVMHelperCall(CompilationInterface::Helper_WriteBarrier, resType, numArgs, srcOpnds);
+        irBuilder.genVMHelperCall(VM_RT_GC_HEAP_WRITE_REF, resType, numArgs, srcOpnds);
         return true;
     }
 
     if (!strcmp(mname,"getInterfaceVTable")) {
         assert(numArgs == 2);
-        Opnd* res = irBuilder.genVMHelperCall(CompilationInterface::Helper_LdInterface, resType, numArgs, srcOpnds);
+        Opnd* res = irBuilder.genVMHelperCall(VM_RT_GET_INTERFACE_VTABLE_VER0, resType, numArgs, srcOpnds);
         pushOpnd(res);
         return true;
     }
 
     if (!strcmp(mname,"checkCast")) {
         assert(numArgs == 2);
-        Opnd* res = irBuilder.genVMHelperCall(CompilationInterface::Helper_Cast, resType, numArgs, srcOpnds);
+        Opnd* res = irBuilder.genVMHelperCall(VM_RT_CHECKCAST, resType, numArgs, srcOpnds);
         pushOpnd(res);
         return true;
     }
 
     if (!strcmp(mname,"instanceOf")) {
         assert(numArgs == 2);
-        Opnd* res = irBuilder.genVMHelperCall(CompilationInterface::Helper_IsInstanceOf, resType, numArgs, srcOpnds);
+        Opnd* res = irBuilder.genVMHelperCall(VM_RT_INSTANCEOF, resType, numArgs, srcOpnds);
         pushOpnd(res);
         return true;
     }

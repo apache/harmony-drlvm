@@ -256,7 +256,7 @@ void InstCodeSelector::throwLinkingException(Class_Handle encClass, uint32 cp_nd
     Opnd* opcodeArg = irManager.newImmOpnd(typeManager.getUInt32Type(), opcode);
 
     Opnd* args[] = {encClassArg, cpIndexArg, opcodeArg};
-    appendInsts(irManager.newRuntimeHelperCallInst(CompilationInterface::Helper_Throw_LinkingException, lengthof(args), args, NULL));
+    appendInsts(irManager.newRuntimeHelperCallInst(VM_RT_THROW_LINKING_EXCEPTION, lengthof(args), args, NULL));
 }
 //_______________________________________________________________________________________________________________
 Opnd * InstCodeSelector::convertIntToInt(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd, bool isZeroExtend)
@@ -321,17 +321,17 @@ Opnd * InstCodeSelector::convertIntToFp(Opnd * srcOpnd, Type * dstType, Opnd * d
 Opnd * InstCodeSelector::convertFpToInt(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd)
 {
     assert(srcOpnd->getType()->isFP() && dstType->isInteger());
-    CompilationInterface::RuntimeHelperId helperId;
+    VM_RT_SUPPORT helperId;
     OpndSize dstSize=irManager.getTypeSize(dstType);
     if (dstSize<=OpndSize_32){
         if (dstOpnd==NULL)
             dstOpnd=irManager.newOpnd(typeManager.getInt32Type());
-        helperId=srcOpnd->getType()->isSingle()?CompilationInterface::Helper_ConvStoI32:CompilationInterface::Helper_ConvDtoI32;
+        helperId=srcOpnd->getType()->isSingle()?VM_RT_F2I:VM_RT_D2I;
     }else{
         assert(dstSize==OpndSize_64);
         if (dstOpnd==NULL)
             dstOpnd=irManager.newOpnd(dstType);
-        helperId=srcOpnd->getType()->isSingle()?CompilationInterface::Helper_ConvStoI64:CompilationInterface::Helper_ConvDtoI64;
+        helperId=srcOpnd->getType()->isSingle()?VM_RT_F2L:VM_RT_D2L;
     }
 
     Opnd * args[] = {srcOpnd};
@@ -1361,8 +1361,8 @@ void InstCodeSelector::throwException(CG_OpndHandle* exceptionObj, bool createSt
     Opnd * args[]={ (Opnd*)exceptionObj };
     CallInst * callInst=irManager.newRuntimeHelperCallInst(
         createStackTrace ? 
-            CompilationInterface::Helper_Throw_SetStackTrace : 
-            CompilationInterface::Helper_Throw_KeepStackTrace, 
+            VM_RT_THROW_SET_STACK_TRACE : 
+            VM_RT_THROW, 
         lengthof(args), args, NULL
     );
     appendInsts(callInst);
@@ -1378,19 +1378,19 @@ void InstCodeSelector::throwSystemException(CompilationInterface::SystemExceptio
     switch (id) {
         case CompilationInterface::Exception_NullPointer:
             callInst=irManager.newRuntimeHelperCallInst(
-                CompilationInterface::Helper_NullPtrException, 0, NULL, NULL);
+                VM_RT_NULL_PTR_EXCEPTION, 0, NULL, NULL);
             break;
         case CompilationInterface::Exception_ArrayIndexOutOfBounds:
             callInst=irManager.newRuntimeHelperCallInst(
-                CompilationInterface::Helper_ArrayBoundsException, 0, NULL, NULL);
+                VM_RT_IDX_OUT_OF_BOUNDS, 0, NULL, NULL);
             break;
         case CompilationInterface::Exception_ArrayTypeMismatch:
             callInst=irManager.newRuntimeHelperCallInst(
-                CompilationInterface::Helper_ElemTypeException, 0, NULL, NULL);
+                VM_RT_ARRAY_STORE_EXCEPTION, 0, NULL, NULL);
             break;
         case CompilationInterface::Exception_DivideByZero:
             callInst=irManager.newRuntimeHelperCallInst(
-                CompilationInterface::Helper_DivideByZeroException, 0, NULL, NULL);
+                VM_RT_DIVIDE_BY_ZERO_EXCEPTION, 0, NULL, NULL);
             break;
         default:
             assert(0);
@@ -1507,7 +1507,7 @@ CG_OpndHandle* InstCodeSelector::tau_checkBounds(CG_OpndHandle* arrayLen,
         cmpType = CompareOp::I;
 
     Node* throwBasicBlock = irManager.getFlowGraph()->createBlockNode();
-    Inst* throwInst = irManager.newRuntimeHelperCallInst(CompilationInterface::Helper_ArrayBoundsException, 0, NULL, NULL);
+    Inst* throwInst = irManager.newRuntimeHelperCallInst(VM_RT_IDX_OUT_OF_BOUNDS, 0, NULL, NULL);
     throwInst->setBCOffset(currentHIRInstBCOffset);
     throwBasicBlock->appendInst(throwInst);
                 
@@ -1541,7 +1541,7 @@ CG_OpndHandle* InstCodeSelector::tau_checkLowerBound(CG_OpndHandle* a,
         cmpOp = CompareOp::Gtu;
     }
     Node* throwBasicBlock = irManager.getFlowGraph()->createBlockNode();
-    Inst* throwInst = irManager.newRuntimeHelperCallInst(CompilationInterface::Helper_ArrayBoundsException, 0, NULL, NULL);
+    Inst* throwInst = irManager.newRuntimeHelperCallInst(VM_RT_IDX_OUT_OF_BOUNDS, 0, NULL, NULL);
     throwInst->setBCOffset(currentHIRInstBCOffset);
     throwBasicBlock->appendInst(throwInst);
     
@@ -1571,7 +1571,7 @@ CG_OpndHandle* InstCodeSelector::tau_checkElemType(CG_OpndHandle* array,
                                                       CG_OpndHandle* tauIsArray) 
 {
     Node* throwBasicBlock = irManager.getFlowGraph()->createBlockNode();
-    Inst* throwInst = irManager.newRuntimeHelperCallInst(CompilationInterface::Helper_ElemTypeException, 0, NULL, NULL);
+    Inst* throwInst = irManager.newRuntimeHelperCallInst(VM_RT_ARRAY_STORE_EXCEPTION, 0, NULL, NULL);
     assert(currentHIRInstBCOffset!=ILLEGAL_BC_MAPPING_VALUE);
     throwInst->setBCOffset(currentHIRInstBCOffset);
     throwBasicBlock->appendInst(throwInst);
@@ -1580,7 +1580,7 @@ CG_OpndHandle* InstCodeSelector::tau_checkElemType(CG_OpndHandle* array,
     Opnd * flag = irManager.newOpnd(typeManager.getInt32Type());
 
     appendInsts(irManager.newRuntimeHelperCallInst(
-                CompilationInterface::Helper_IsValidElemType, lengthof(args), args, flag));
+                VM_RT_AASTORE_TEST, lengthof(args), args, flag));
 
     // the helper returns boolean value
     bzero(CompareZeroOp::I4, flag);
@@ -1595,7 +1595,7 @@ CG_OpndHandle* InstCodeSelector::tau_checkElemType(CG_OpndHandle* array,
 CG_OpndHandle*  InstCodeSelector::tau_checkZero(CG_OpndHandle* src) 
 {
     Node* throwBasicBlock = irManager.getFlowGraph()->createBlockNode();
-    Inst* throwInst = irManager.newRuntimeHelperCallInst(CompilationInterface::Helper_DivideByZeroException, 0, NULL, NULL);
+    Inst* throwInst = irManager.newRuntimeHelperCallInst(VM_RT_DIVIDE_BY_ZERO_EXCEPTION, 0, NULL, NULL);
     assert(currentHIRInstBCOffset!=ILLEGAL_BC_MAPPING_VALUE);
     throwInst->setBCOffset(currentHIRInstBCOffset);
     throwBasicBlock->appendInst(throwInst);
@@ -2070,7 +2070,7 @@ void InstCodeSelector::tau_stRef(CG_OpndHandle* src,
 {
     Opnd* helperOpnds[] = {(Opnd*)base,(Opnd*)ptr,(Opnd*)src};
     CallInst * callInst = irManager.newRuntimeHelperCallInst(
-                                        CompilationInterface::Helper_WriteBarrier,
+                                        VM_RT_GC_HEAP_WRITE_REF,
                                         3,helperOpnds,NULL);
     appendInsts(callInst);
 }
@@ -2118,7 +2118,7 @@ CG_OpndHandle* InstCodeSelector::newObj(ObjectType* objType)
     Opnd * retOpnd=irManager.newOpnd(objType);
 
     CallInst * callInst=irManager.newRuntimeHelperCallInst(
-        CompilationInterface::Helper_NewObj_UsingVtable,
+        VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE,
         2, helperOpnds, retOpnd);
     appendInsts(callInst);
     return retOpnd;
@@ -2137,7 +2137,7 @@ CG_OpndHandle* InstCodeSelector::newArray(ArrayType*      arrayType,
     };
     Opnd * retOpnd=irManager.newOpnd(arrayType);
     CallInst * callInst=irManager.newRuntimeHelperCallInst(
-        CompilationInterface::Helper_NewVector_UsingVtable,
+        VM_RT_NEW_VECTOR_USING_VTABLE,
         2, helperOpnds, retOpnd);
     appendInsts(callInst);
     return retOpnd;
@@ -2158,7 +2158,7 @@ CG_OpndHandle*  InstCodeSelector::newMultiArray(ArrayType*      arrayType,
         helperOpnds[i + 2] = (Opnd*)dims[numDims - 1 - i];
     Opnd * retOpnd=irManager.newOpnd(arrayType);
     CallInst * callInst=irManager.newRuntimeHelperCallInst(
-        CompilationInterface::Helper_NewMultiArray,
+        VM_RT_MULTIANEWARRAY_RESOLVED,
         2+numDims, helperOpnds, retOpnd);
     appendInsts(callInst);
     return retOpnd;
@@ -2193,7 +2193,7 @@ CG_OpndHandle* InstCodeSelector::ldRef(Type *dstType,
         };
     #endif
 
-        CallInst * callInst = irManager.newRuntimeHelperCallInst(CompilationInterface::Helper_LdRef, 2, helperOpnds, retOpnd);
+        CallInst * callInst = irManager.newRuntimeHelperCallInst(VM_RT_LDC_STRING, 2, helperOpnds, retOpnd);
         appendInsts(callInst);
     } else {
         // this optimized version is based on determinig item address at compile time.
@@ -2392,7 +2392,7 @@ CG_OpndHandle*  InstCodeSelector::tau_ldIntfTableAddr(Type *         dstType,
     Opnd * retOpnd=irManager.newOpnd(dstType);
 
     CallInst * callInst=irManager.newRuntimeHelperCallInst(
-        CompilationInterface::Helper_LdInterface,
+        VM_RT_GET_INTERFACE_VTABLE_VER0,
         2, helperOpnds, retOpnd);
     appendInsts(callInst);
     return retOpnd;
@@ -2703,11 +2703,11 @@ CG_OpndHandle* InstCodeSelector::callhelper(uint32              numArgs,
 CG_OpndHandle* InstCodeSelector::callvmhelper(uint32              numArgs, 
                                               CG_OpndHandle**     args, 
                                               Type*               retType,
-                                              CompilationInterface::RuntimeHelperId  callId) 
+                                              VM_RT_SUPPORT  callId) 
 {
     Opnd* dstOpnd=NULL;
     switch(callId) {
-    case CompilationInterface::Helper_Throw_Lazy:
+    case VM_RT_THROW_LAZY:
     {
 
         Opnd **hlpArgs = new (memManager) Opnd* [numArgs+1];
@@ -2719,11 +2719,11 @@ CG_OpndHandle* InstCodeSelector::callvmhelper(uint32              numArgs,
             hlpArgs[i+1] = (Opnd*)args[i+1];
         hlpArgs[numArgs] = irManager.newImmOpnd(getRuntimeIdType(), 
                                                Opnd::RuntimeInfo::Kind_MethodRuntimeId, md);
-        appendInsts(irManager.newRuntimeHelperCallInst(CompilationInterface::Helper_Throw_Lazy,
+        appendInsts(irManager.newRuntimeHelperCallInst(VM_RT_THROW_LAZY,
                                                        numArgs+1, (Opnd**)hlpArgs, dstOpnd));
         break;
     }
-    case CompilationInterface::Helper_GetTLSBase:
+    case VM_RT_GC_GET_TLS_BASE:
     {
         assert(numArgs == 0);
         Type* tlsBaseType = typeManager.getUnmanagedPtrType(typeManager.getInt8Type());
@@ -2732,28 +2732,28 @@ CG_OpndHandle* InstCodeSelector::callvmhelper(uint32              numArgs,
         break;
     }
     //vmhelper slow paths
-    case CompilationInterface::Helper_NewObj_UsingVtable:
-    case CompilationInterface::Helper_NewVector_UsingVtable:
-    case CompilationInterface::Helper_ObjMonitorEnter:
-    case CompilationInterface::Helper_ObjMonitorExit:
-    case CompilationInterface::Helper_WriteBarrier:
-    case CompilationInterface::Helper_LdInterface:
-    case CompilationInterface::Helper_Cast:
-    case CompilationInterface::Helper_IsInstanceOf:
+    case VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE:
+    case VM_RT_NEW_VECTOR_USING_VTABLE:
+    case VM_RT_MONITOR_ENTER_NON_NULL:
+    case VM_RT_MONITOR_EXIT_NON_NULL:
+    case VM_RT_GC_HEAP_WRITE_REF:
+    case VM_RT_GET_INTERFACE_VTABLE_VER0:
+    case VM_RT_CHECKCAST:
+    case VM_RT_INSTANCEOF:
     
     //helpers used by JIT in lazy resolution mode
-    case CompilationInterface::Helper_NewObjWithResolve:
-    case CompilationInterface::Helper_NewArrayWithResolve:
-    case CompilationInterface::Helper_GetNonStaticFieldOffsetWithResolve:
-    case CompilationInterface::Helper_GetStaticFieldAddrWithResolve:
-    case CompilationInterface::Helper_CheckCastWithResolve:
-    case CompilationInterface::Helper_InstanceOfWithResolve:
-    case CompilationInterface::Helper_GetInvokeStaticAddrWithResolve:
-    case CompilationInterface::Helper_GetInvokeInterfaceAddrWithResolve:
-    case CompilationInterface::Helper_GetInvokeVirtualAddrWithResolve:
-    case CompilationInterface::Helper_GetInvokeSpecialAddrWithResolve:
-    case CompilationInterface::Helper_InitializeClassWithResolve:
-    case CompilationInterface::Helper_NewMultiArray:
+    case VM_RT_NEWOBJ_WITHRESOLVE:
+    case VM_RT_NEWARRAY_WITHRESOLVE:
+    case VM_RT_GET_NONSTATIC_FIELD_OFFSET_WITHRESOLVE:
+    case VM_RT_GET_STATIC_FIELD_ADDR_WITHRESOLVE:
+    case VM_RT_CHECKCAST_WITHRESOLVE:
+    case VM_RT_INSTANCEOF_WITHRESOLVE:
+    case VM_RT_GET_INVOKESTATIC_ADDR_WITHRESOLVE:
+    case VM_RT_GET_INVOKEINTERFACE_ADDR_WITHRESOLVE:
+    case VM_RT_GET_INVOKEVIRTUAL_ADDR_WITHRESOLVE:
+    case VM_RT_GET_INVOKE_SPECIAL_ADDR_WITHRESOLVE:
+    case VM_RT_INITIALIZE_CLASS_WITHRESOLVE:
+    case VM_RT_MULTIANEWARRAY_RESOLVED:
 {
         dstOpnd = retType==NULL ? NULL: irManager.newOpnd(retType);
         CallInst * callInst=irManager.newRuntimeHelperCallInst(callId, numArgs, (Opnd**)args, dstOpnd);
@@ -2824,7 +2824,7 @@ void  InstCodeSelector::copyValueObj(Type* objType, CG_OpndHandle *dstAddr, CG_O
 void InstCodeSelector::tau_monitorEnter(CG_OpndHandle* obj, CG_OpndHandle* tauIsNonNull) 
 {
     Opnd * helperOpnds[] = { (Opnd*)obj };
-    CallInst * callInst=irManager.newRuntimeHelperCallInst(CompilationInterface::Helper_ObjMonitorEnter,
+    CallInst * callInst=irManager.newRuntimeHelperCallInst(VM_RT_MONITOR_ENTER_NON_NULL,
         1, helperOpnds, NULL);
     appendInsts(callInst);
 }
@@ -2836,7 +2836,7 @@ void InstCodeSelector::tau_monitorExit(CG_OpndHandle* obj,
                                           CG_OpndHandle* tauIsNonNull) 
 {
     Opnd * helperOpnds[] = { (Opnd*)obj };
-    CallInst * callInst=irManager.newRuntimeHelperCallInst(CompilationInterface::Helper_ObjMonitorExit,
+    CallInst * callInst=irManager.newRuntimeHelperCallInst(VM_RT_MONITOR_EXIT_NON_NULL,
         1, helperOpnds, NULL);
     appendInsts(callInst);
 }
@@ -2902,7 +2902,7 @@ void InstCodeSelector::monitorExitFence(CG_OpndHandle* obj)
 void InstCodeSelector::typeMonitorEnter(NamedType *type) 
 {
     Opnd * helperOpnds[]={irManager.newImmOpnd(getRuntimeIdType(), Opnd::RuntimeInfo::Kind_TypeRuntimeId, type)};
-    CallInst * callInst=irManager.newRuntimeHelperCallInst(CompilationInterface::Helper_TypeMonitorEnter,
+    CallInst * callInst=irManager.newRuntimeHelperCallInst(VM_RT_MONITOR_ENTER_STATIC,
         1, helperOpnds, NULL);
     appendInsts(callInst);
 }
@@ -2914,7 +2914,7 @@ void InstCodeSelector::typeMonitorEnter(NamedType *type)
 void InstCodeSelector::typeMonitorExit(NamedType *type) 
 {
     Opnd * helperOpnds[]={irManager.newImmOpnd(getRuntimeIdType(), Opnd::RuntimeInfo::Kind_TypeRuntimeId, type)};
-    CallInst * callInst=irManager.newRuntimeHelperCallInst(CompilationInterface::Helper_TypeMonitorExit,
+    CallInst * callInst=irManager.newRuntimeHelperCallInst(VM_RT_MONITOR_EXIT_STATIC,
         1, helperOpnds, NULL);
     appendInsts(callInst);
 }
@@ -2944,7 +2944,7 @@ CG_OpndHandle* InstCodeSelector::tau_cast(ObjectType *toType,
     Opnd * dst=irManager.newOpnd(toType);
     Opnd * args[]={ (Opnd*)obj, irManager.newImmOpnd(getRuntimeIdType(), Opnd::RuntimeInfo::Kind_TypeRuntimeId, toType) };
     CallInst * callInst=irManager.newRuntimeHelperCallInst(
-        CompilationInterface::Helper_Cast,
+        VM_RT_CHECKCAST,
         lengthof(args), args, dst
     );
     appendInsts(callInst);
@@ -2965,7 +2965,7 @@ CG_OpndHandle* InstCodeSelector::tau_checkCast(ObjectType *   toType,
     Opnd * dst=irManager.newOpnd(toType);
     Opnd * args[]={ (Opnd*)obj, irManager.newImmOpnd(getRuntimeIdType(), Opnd::RuntimeInfo::Kind_TypeRuntimeId, toType) };
     CallInst * callInst=irManager.newRuntimeHelperCallInst(
-        CompilationInterface::Helper_Cast,
+        VM_RT_CHECKCAST,
         lengthof(args), args, dst
     );
     appendInsts(callInst);
@@ -3003,7 +3003,7 @@ CG_OpndHandle* InstCodeSelector::tau_instanceOf(ObjectType *type,
 #endif
     Opnd * args[]={ (Opnd*)obj, irManager.newImmOpnd(getRuntimeIdType(), Opnd::RuntimeInfo::Kind_TypeRuntimeId, type) };
     CallInst * callInst=irManager.newRuntimeHelperCallInst(
-        CompilationInterface::Helper_IsInstanceOf,
+        VM_RT_INSTANCEOF,
         lengthof(args), args, dst
     );
     appendInsts(callInst);
@@ -3019,7 +3019,7 @@ void InstCodeSelector::initType(Type* type)
     NamedType * namedType = type->asNamedType();
     Opnd * args[]={ irManager.newImmOpnd(getRuntimeIdType(), Opnd::RuntimeInfo::Kind_TypeRuntimeId, namedType) };
     CallInst * callInst=irManager.newRuntimeHelperCallInst(
-        CompilationInterface::Helper_InitType,
+        VM_RT_INITIALIZE_CLASS,
         lengthof(args), args, NULL
     );
     appendInsts(callInst);
@@ -3132,7 +3132,7 @@ void InstCodeSelector::methodEntry(MethodDesc* mDesc) {
         Opnd **hlpArgs = new (memManager) Opnd* [1];
         hlpArgs[0] = irManager.newImmOpnd(getRuntimeIdType(), 
                                                Opnd::RuntimeInfo::Kind_MethodRuntimeId, mDesc);
-        appendInsts(irManager.newRuntimeHelperCallInst(CompilationInterface::Helper_MethodEntry,
+        appendInsts(irManager.newRuntimeHelperCallInst(VM_RT_JVMTI_METHOD_ENTER_CALLBACK,
                                                        1, (Opnd**)hlpArgs, dstOpnd));
     }
 }
@@ -3174,7 +3174,7 @@ void InstCodeSelector::genExitHelper(Opnd* ret_val, MethodDesc* mDesc) {
     Opnd* hlpArgs[] = { irManager.newImmOpnd(getRuntimeIdType(), Opnd::RuntimeInfo::Kind_MethodRuntimeId, mDesc),
             bufOpnd };
 
-    appendInsts(irManager.newRuntimeHelperCallInst(CompilationInterface::Helper_MethodExit,
+    appendInsts(irManager.newRuntimeHelperCallInst(VM_RT_JVMTI_METHOD_EXIT_CALLBACK,
                                                     2, (Opnd**)hlpArgs, NULL));
 }
 

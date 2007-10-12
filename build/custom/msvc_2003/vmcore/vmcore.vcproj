@@ -570,6 +570,9 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\jit\primitives_support.cpp">
 			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\jit\rt_helper_info.cpp">
+			</File>
 		</Filter>
 		<Filter
 			Name="jni"

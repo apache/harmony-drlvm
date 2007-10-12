@@ -380,7 +380,7 @@ BBPolling::createBBPSubCFG(IRManager& irManager, Opnd* tlsBaseReg)
 #endif
 
     bbpBBHelpCaller->appendInst(irManager.newRuntimeHelperCallInst(
-        CompilationInterface::Helper_EnableThreadSuspension, 0, NULL, NULL)
+        VM_RT_GC_SAFE_POINT, 0, NULL, NULL)
         );
     
     bbpCFG->addEdge(bbpBBController,bbpBBHelpCaller, 0);
@@ -405,7 +405,7 @@ BBPolling::isThreadInterruptablePoint(const Inst* inst) {
             }
             CompilationInterface* ci = CompilationContext::getCurrentContext()->getVMCompilationInterface();
             if ( ri->getKind() == Opnd::RuntimeInfo::Kind_HelperAddress &&
-                 ci->isInterruptible((CompilationInterface::RuntimeHelperId)(POINTER_SIZE_INT)ri->getValue(0)) )
+                 ci->isInterruptible((VM_RT_SUPPORT)(POINTER_SIZE_INT)ri->getValue(0)) )
             {
                 return true;
             }

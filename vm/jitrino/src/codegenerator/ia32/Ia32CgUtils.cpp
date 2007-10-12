@@ -242,10 +242,10 @@ bool InstUtils::instMustHaveBCMapping(Inst* inst) {
     } else if (ri->getKind() == Opnd::RuntimeInfo::Kind_InternalHelperAddress) { 
         return false;
     } else if (ri->getKind() == Opnd::RuntimeInfo::Kind_HelperAddress) { 
-        CompilationInterface::RuntimeHelperId helperId = (CompilationInterface::RuntimeHelperId)(POINTER_SIZE_INT)ri->getValue(0);
+        VM_RT_SUPPORT helperId = (VM_RT_SUPPORT)(POINTER_SIZE_INT)ri->getValue(0);
         switch (helperId) {
-            case CompilationInterface::Helper_GetTLSBase:
-            case CompilationInterface::Helper_EnableThreadSuspension:
+            case VM_RT_GC_GET_TLS_BASE:
+            case VM_RT_GC_SAFE_POINT:
                 return false;
             default:
                 break;

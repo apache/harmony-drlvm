@@ -426,8 +426,8 @@ static bool isStaticFieldPtrDef(Inst* inst, const StlSet<Opnd*>& staticFieldPtrs
         CallInst* callInst = (CallInst*)inst;
         Opnd::RuntimeInfo * rt = callInst->getRuntimeInfo();
         if (rt && rt->getKind() == Opnd::RuntimeInfo::Kind_HelperAddress
-            && ((CompilationInterface::RuntimeHelperId)(POINTER_SIZE_INT)rt->getValue(0)
-            == CompilationInterface::Helper_GetStaticFieldAddrWithResolve))
+            && ((VM_RT_SUPPORT)(POINTER_SIZE_INT)rt->getValue(0)
+            == VM_RT_GET_STATIC_FIELD_ADDR_WITHRESOLVE))
         {
             return true;
         }

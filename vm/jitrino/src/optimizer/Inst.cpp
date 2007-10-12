@@ -1606,7 +1606,7 @@ InstFactory::makeVMHelperCallInst(Opcode op,
                                     Opnd* dst,
                                     uint32 nArgs,
                                     Opnd** args_,
-                                    CompilationInterface::RuntimeHelperId id) {
+                                    VM_RT_SUPPORT id) {
     VMHelperCallInst * inst = 
         new (memManager) VMHelperCallInst(op, mod, type, dst, nArgs, args_, id);
     inst->id       = numInsts++;
@@ -2043,7 +2043,7 @@ InstFactory::makeJitHelperCall(Opnd* dst, JitHelperCallId id, uint32 numArgs, Op
 }
 
 Inst*
-InstFactory::makeVMHelperCall(Opnd* dst, CompilationInterface::RuntimeHelperId id, uint32 numArgs, Opnd** args) {
+InstFactory::makeVMHelperCall(Opnd* dst, VM_RT_SUPPORT id, uint32 numArgs, Opnd** args) {
     Type::Tag returnType = dst->isNull()? Type::Void : dst->getType()->tag;
     args = copyOpnds(args, numArgs);
     return makeVMHelperCallInst(Op_VMHelperCall, Modifier(Exception_Sometimes), returnType, dst, numArgs, args, id);

@@ -479,7 +479,7 @@ EntryPointPseudoInst * IRManager::newEntryPointPseudoInst(const CallingConventio
         hlpArgs[0] = newImmOpnd(typeManager.getIntPtrType(), 
             Opnd::RuntimeInfo::Kind_MethodRuntimeId, &methodDesc);
             Node* prolog = getFlowGraph()->getEntryNode();
-            prolog->appendInst(newRuntimeHelperCallInst(CompilationInterface::Helper_MethodEntry,
+            prolog->appendInst(newRuntimeHelperCallInst(VM_RT_JVMTI_METHOD_ENTER_CALLBACK,
                     1, (Opnd**)hlpArgs, NULL));
     }
 
@@ -513,7 +513,7 @@ CallInst * IRManager::newCallInst(Opnd * targetOpnd, const CallingConvention * c
 }
 
 //_________________________________________________________________________________________________
-CallInst * IRManager::newRuntimeHelperCallInst(CompilationInterface::RuntimeHelperId helperId, 
+CallInst * IRManager::newRuntimeHelperCallInst(VM_RT_SUPPORT helperId, 
     uint32 numArgs, Opnd ** args, Opnd * retOpnd)
 {
     Inst * instList = NULL;
@@ -1251,15 +1251,15 @@ Inst * IRManager::newPushPopSequence(Mnemonic mn, Opnd * opnd, uint32 regUsageMa
 }
 
 //_________________________________________________________________________________________________
-const CallingConvention * IRManager::getCallingConvention(CompilationInterface::RuntimeHelperId helperId)const
+const CallingConvention * IRManager::getCallingConvention(VM_RT_SUPPORT helperId)const
 {
-    CompilationInterface::VmCallingConvention callConv=compilationInterface.getRuntimeHelperCallingConvention(helperId);
+    HELPER_CALLING_CONVENTION callConv = compilationInterface.getRuntimeHelperCallingConvention(helperId);
     switch (callConv){
-        case CompilationInterface::CallingConvention_Drl:
+        case CALLING_CONVENTION_DRL:
             return &CallingConvention_DRL;
-        case CompilationInterface::CallingConvention_Stdcall:
+        case CALLING_CONVENTION_STDCALL:
             return &CallingConvention_STDCALL;
-        case CompilationInterface::CallingConvention_Cdecl:
+        case CALLING_CONVENTION_CDECL:
             return &CallingConvention_CDECL;
         default:
             assert(0);
@@ -1721,12 +1721,12 @@ void IRManager::finalizeCallSites()
                         //shadow - is an area on stack reserved to map parameters passed with registers
                         bool needShadow = rt->getKind() == Opnd::RuntimeInfo::Kind_InternalHelperAddress;
                         if (!needShadow && rt->getKind() == Opnd::RuntimeInfo::Kind_HelperAddress) {
-                                CompilationInterface::RuntimeHelperId helperId = (CompilationInterface::RuntimeHelperId)(POINTER_SIZE_INT)rt->getValue(0);
+                                VM_RT_SUPPORT helperId = (VM_RT_SUPPORT)(POINTER_SIZE_INT)rt->getValue(0);
                                 //ABOUT: VM does not allocate shadow for most of the helpers
                                 //however some helpers are direct pointers to native funcs
                                 //TODO: create VM interface to get calling conventions for the helper
                                 //today  this knowledge is hardcoded here
-                                needShadow = helperId == CompilationInterface::Helper_GetTLSBase;
+                                needShadow = helperId == VM_RT_GC_GET_TLS_BASE;
                         }
                         if (needShadow) {
                             uint32 shadowSize = 4 * sizeof(POINTER_SIZE_INT);
@@ -1907,7 +1907,7 @@ void IRManager::expandSystemExceptions(uint32 reservedForFlags)
 #endif
                        )){
                         Node* throwBasicBlock = fg->createBlockNode();
-                        Inst* throwInst = newRuntimeHelperCallInst(CompilationInterface::Helper_NullPtrException, 0, NULL, NULL);
+                        Inst* throwInst = newRuntimeHelperCallInst(VM_RT_NULL_PTR_EXCEPTION, 0, NULL, NULL);
                         assert(lastInst->getBCOffset()!=ILLEGAL_BC_MAPPING_VALUE);
                         throwInst->setBCOffset(lastInst->getBCOffset());
                         throwBasicBlock->appendInst(throwInst);
@@ -1995,7 +1995,7 @@ void IRManager::resolveRuntimeInfo(Opnd* opnd) const {
         case Opnd::RuntimeInfo::Kind_HelperAddress: 
             /** The value of the operand is compilationInterface->getRuntimeHelperAddress */
             value=(POINTER_SIZE_INT)compilationInterface.getRuntimeHelperAddress(
-                (CompilationInterface::RuntimeHelperId)(POINTER_SIZE_INT)info->getValue(0)
+                (VM_RT_SUPPORT)(POINTER_SIZE_INT)info->getValue(0)
                 );
             assert(value!=0);
             break;
@@ -2297,7 +2297,7 @@ bool IRManager::isGCSafePoint(const Inst* inst) {
         if (!isInternalHelper) {
             CompilationInterface* ci = CompilationContext::getCurrentContext()->getVMCompilationInterface();
             isNonGCVMHelper = rt && rt->getKind() == Opnd::RuntimeInfo::Kind_HelperAddress 
-                && !ci->mayBeInterruptible((CompilationInterface::RuntimeHelperId)(POINTER_SIZE_INT)rt->getValue(0));
+                && !ci->mayBeInterruptible((VM_RT_SUPPORT)(POINTER_SIZE_INT)rt->getValue(0));
         }
         bool isGCPoint = !isInternalHelper && !isNonGCVMHelper;
         return isGCPoint;

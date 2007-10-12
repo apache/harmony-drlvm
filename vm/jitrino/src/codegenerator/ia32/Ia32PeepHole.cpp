@@ -244,8 +244,8 @@ PeepHoleOpt::Changed PeepHoleOpt::handleInst_HelperCall(
     void* rt_data = ri->getValue(0);
     POINTER_SIZE_INT helperId = (POINTER_SIZE_INT)rt_data;
     switch(helperId) {
-    case CompilationInterface::Helper_ConvStoI32:
-    case CompilationInterface::Helper_ConvDtoI32:
+    case VM_RT_F2I:
+    case VM_RT_D2I:
         return handleInst_Convert_F2I_D2I(inst);
     default:
         break;

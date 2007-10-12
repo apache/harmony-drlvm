@@ -38,101 +38,8 @@
 bool vm_print_total_stats = false;
 int vm_print_total_stats_level = 0;
 
-// 20030425 The list of JIT support functions below must be kept in synch with the enum VM_RT_SUPPORT in jit_runtime_support.h.
-typedef struct JIT_RT_Function_Entry {
-    VM_RT_SUPPORT  function;
-    char           *function_name;
-    int             number_of_args;
-} JIT_RT_Function_Entry;
-
-static JIT_RT_Function_Entry _jit_rt_function_entries_base[] = {
-    {VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE, "VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE", 2},
-    {VM_RT_NEW_VECTOR_USING_VTABLE,            "VM_RT_NEW_VECTOR_USING_VTABLE",            2},
-    {VM_RT_MULTIANEWARRAY_RESOLVED,            "VM_RT_MULTIANEWARRAY_RESOLVED",            8},
-    {VM_RT_LDC_STRING,                         "VM_RT_LDC_STRING",                         2},
-
-    {VM_RT_THROW,                              "VM_RT_THROW",                              1},
-    {VM_RT_THROW_LAZY,                         "VM_RT_THROW_LAZY",                         8},
-    {VM_RT_IDX_OUT_OF_BOUNDS,                  "VM_RT_IDX_OUT_OF_BOUNDS",                  0},
-    {VM_RT_NULL_PTR_EXCEPTION,                 "VM_RT_NULL_PTR_EXCEPTION",                 0},
-    {VM_RT_DIVIDE_BY_ZERO_EXCEPTION,           "VM_RT_DIVIDE_BY_ZERO_EXCEPTION",           0},
-    {VM_RT_ARRAY_STORE_EXCEPTION,              "VM_RT_ARRAY_STORE_EXCEPTION",              0},
-    {VM_RT_THROW_LINKING_EXCEPTION,            "VM_RT_THROW_LINKING_EXCEPTION",            0},
-    {VM_RT_THROW_SET_STACK_TRACE,              "VM_RT_THROW_SET_STACK_TRACE",              1},
-
-    {VM_RT_MONITOR_ENTER,                      "VM_RT_MONITOR_ENTER",                      1},
-    {VM_RT_MONITOR_ENTER_NON_NULL,             "VM_RT_MONITOR_ENTER_NON_NULL",             1},
-    {VM_RT_MONITOR_EXIT,                       "VM_RT_MONITOR_EXIT",                       1},
-    {VM_RT_MONITOR_EXIT_NON_NULL,              "VM_RT_MONITOR_EXIT_NON_NULL",              1},
-    {VM_RT_MONITOR_ENTER_STATIC,               "VM_RT_MONITOR_ENTER_STATIC",               1},
-    {VM_RT_MONITOR_EXIT_STATIC,                "VM_RT_MONITOR_EXIT_STATIC",                1},
-
-    {VM_RT_CHECKCAST,                          "VM_RT_CHECKCAST",                          2},
-    {VM_RT_INSTANCEOF,                         "VM_RT_INSTANCEOF",                         2},
-    {VM_RT_AASTORE,                            "VM_RT_AASTORE",                            3},
-    {VM_RT_AASTORE_TEST,                       "VM_RT_AASTORE_TEST",                       2},
-    {VM_RT_GET_INTERFACE_VTABLE_VER0,          "VM_RT_GET_INTERFACE_VTABLE_VER0",          2},
-
-    {VM_RT_INITIALIZE_CLASS,                   "VM_RT_INITIALIZE_CLASS",                   1},
-
-    {VM_RT_GC_HEAP_WRITE_REF,                  "VM_RT_GC_HEAP_WRITE_REF",                  3},
-    {VM_RT_GC_SAFE_POINT,                      "VM_RT_GC_SAFE_POINT",                      0},
-    {VM_RT_GC_GET_TLS_BASE,                    "VM_RT_GET_TLS_BASE",                       0},
-
-    {VM_RT_JVMTI_METHOD_ENTER_CALLBACK,        "VM_RT_JVMTI_METHOD_ENTER_CALLBACK",        1},
-    {VM_RT_JVMTI_METHOD_EXIT_CALLBACK,         "VM_RT_JVMTI_METHOD_EXIT_CALLBACK",         2},
-    {VM_RT_JVMTI_FIELD_ACCESS_CALLBACK,        "VM_RT_JVMTI_FIELD_ACCESS__CALLBACK",       4},
-    {VM_RT_JVMTI_FIELD_MODIFICATION_CALLBACK,  "VM_RT_JVMTI_FIELD_MODIFICATION_CALLBACK",  5},
-
-    {VM_RT_NEWOBJ_WITHRESOLVE,                      "VM_RT_NEWOBJ_WITHRESOLVE",                     2},
-    {VM_RT_NEWARRAY_WITHRESOLVE,                    "VM_RT_NEWARRAY_WITHRESOLVE",                   3},
-    {VM_RT_GET_NONSTATIC_FIELD_OFFSET_WITHRESOLVE,  "VM_RT_GET_NONSTATIC_FIELD_OFFSET_WITHRESOLVE", 2},
-    {VM_RT_GET_STATIC_FIELD_ADDR_WITHRESOLVE,       "VM_RT_GET_STATIC_FIELD_ADDR_WITHRESOLVE",      2},
-    {VM_RT_CHECKCAST_WITHRESOLVE,                   "VM_RT_CHECKCAST_WITHRESOLVE",                  3},
-    {VM_RT_INSTANCEOF_WITHRESOLVE,                  "VM_RT_INSTANCEOF_WITHRESOLVE",                 3},
-    {VM_RT_GET_INVOKESTATIC_ADDR_WITHRESOLVE,       "VM_RT_GET_INVOKESTATIC_ADDR_WITHRESOLVE",      2},
-    {VM_RT_GET_INVOKEINTERFACE_ADDR_WITHRESOLVE,    "VM_RT_GET_INVOKEINTERFACE_ADDR_WITHRESOLVE",   3},
-    {VM_RT_GET_INVOKEVIRTUAL_ADDR_WITHRESOLVE,      "VM_RT_GET_INVOKEVIRTUAL_ADDR_WITHRESOLVE",     3},
-    {VM_RT_GET_INVOKE_SPECIAL_ADDR_WITHRESOLVE,     "VM_RT_GET_INVOKE_SPECIAL_ADDR_WITHRESOLVE",    2},
-    {VM_RT_INITIALIZE_CLASS_WITHRESOLVE,           "VM_RT_INITIALIZE_CLASS_WITHRESOLVE",          2},
-
-
-    {VM_RT_F2I,                                "VM_RT_F2I",                                1},
-    {VM_RT_F2L,                                "VM_RT_F2L",                                1},
-    {VM_RT_D2I,                                "VM_RT_D2I",                                1},
-    {VM_RT_D2L,                                "VM_RT_D2L",                                1},
-    {VM_RT_LSHL,                               "VM_RT_LSHL",                               2},
-    {VM_RT_LSHR,                               "VM_RT_LSHR",                               2},
-    {VM_RT_LUSHR,                              "VM_RT_LUSHR",                              2},
-    {VM_RT_LMUL,                               "VM_RT_LMUL",                               2},
-#ifdef VM_LONG_OPT
-    {VM_RT_LMUL_CONST_MULTIPLIER,              "VM_RT_LMUL_CONST_MULTIPLIER",              2},
-#endif // VM_LONG_OPT
-    {VM_RT_LREM,                               "VM_RT_LREM",                               2},
-    {VM_RT_LDIV,                               "VM_RT_LDIV",                               2},
-    {VM_RT_ULDIV,                              "VM_RT_ULDIV",                              2},
-    {VM_RT_CONST_LDIV,                         "VM_RT_CONST_LDIV",                         2},
-    {VM_RT_CONST_LREM,                         "VM_RT_CONST_LREM",                         2},
-    {VM_RT_IMUL,                               "VM_RT_IMUL",                               2},
-    {VM_RT_IREM,                               "VM_RT_IREM",                               2},
-    {VM_RT_IDIV,                               "VM_RT_IDIV",                               2},
-    {VM_RT_FREM,                               "VM_RT_FREM",                               2},
-    {VM_RT_FDIV,                               "VM_RT_FDIV",                               2},
-    {VM_RT_DREM,                               "VM_RT_DREM",                               2},
-    {VM_RT_DDIV,                               "VM_RT_DDIV",                               2},
-
-    {VM_RT_CHAR_ARRAYCOPY_NO_EXC,              "VM_RT_CHAR_ARRAYCOPY_NO_EXC",              5},
-
-    {VM_RT_WRITE_BARRIER_FASTCALL,             "VM_RT_WRITE_BARRIER_FASTCALL",             2},
-};
-
-static JIT_RT_Function_Entry *jit_rt_function_entries = &(_jit_rt_function_entries_base[0]);
-static int sizeof_jit_rt_function_entries = sizeof(_jit_rt_function_entries_base) / sizeof(_jit_rt_function_entries_base[0]);
-
-
 VM_Statistics::VM_Statistics()
-    : rt_function_map(56),
-      rt_function_requests(56),
+    : rt_function_requests(56),
       rt_function_calls(56)
 {
     num_exceptions                          = 0;
@@ -324,17 +231,6 @@ VM_Statistics::VM_Statistics()
     total_vtable_bytes = 0;
     total_hot_statics_bytes = 0;
     total_hot_vtable_bytes = 0;
-
-    // Enter the JIT RT support functions into a <function number> -> <function name, argument number> map.
-    for (int i = 0;  i < sizeof_jit_rt_function_entries;  i++) {
-        char *fn_name;
-        int   num_args;
-        VM_RT_SUPPORT  fn_number = jit_rt_function_entries[i].function;
-        assert( !rt_function_map.lookup((void *)fn_number, &num_args, (void **)&fn_name) );
-        fn_name   = jit_rt_function_entries[i].function_name;
-        num_args  = jit_rt_function_entries[i].number_of_args;
-        rt_function_map.add((void *)fn_number, num_args, fn_name);
-    }
 
     apr_pool_create(&vm_stats_pool, 0);    
 } //VM_Statistics::VM_Statistics
@@ -604,10 +500,7 @@ void VM_Statistics::print_rt_function_stats()
         quick_sort(pair_array, 0, num_entries-1);
         for (i = 0;  i < num_entries;  i++) {
             VM_RT_SUPPORT fn_number = (VM_RT_SUPPORT)((POINTER_SIZE_INT)(pair_array[i]->key));       
-            int   num_args = 0;
-            char *fn_name = NULL;
-            bool UNUSED found = rt_function_map.lookup((void *)fn_number, &num_args, (void **)&fn_name);
-            assert(found);  // else changes were made to the enum VM_RT_SUPPORT in jit_runtime_support.h.
+            const char *fn_name = vm_helper_get_name(fn_number);
             printf("%11d :::: %s\n", pair_array[i]->value, fn_name);
         }
         STD_FREE(pair_array);
@@ -623,10 +516,7 @@ void VM_Statistics::print_rt_function_stats()
         quick_sort(pair_array, 0, num_entries-1);
         for (i = 0;  i < num_entries;  i++) {
             VM_RT_SUPPORT fn_number = (VM_RT_SUPPORT)((POINTER_SIZE_INT)(pair_array[i]->key));       
-            int   num_args = 0;
-            char *fn_name = NULL;
-            bool found = rt_function_map.lookup((void *)fn_number, &num_args, (void **)&fn_name);
-            assert(found);  // else changes were made to the enum VM_RT_SUPPORT in jit_runtime_support.h.
+            const char *fn_name = vm_helper_get_name(fn_number);
             printf("%11d :::: %s\n", pair_array[i]->value, fn_name);
         }
         printf("\n");

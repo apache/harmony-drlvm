@@ -1270,7 +1270,7 @@ Opnd* IRBuilder::genIndirectCallWithResolve(Type* returnType,
     }
 
     if (callAddrOpnd == NULL) {
-        CompilationInterface::RuntimeHelperId vmHelperId = CompilationInterface::Helper_Null;
+        VM_RT_SUPPORT vmHelperId = VM_RT_UNKNOWN;
         MemoryManager& mm = irManager->getMemoryManager();
         Opnd* clsOpnd = createTypeOpnd(ch);
         Opnd* idxOpnd = genLdConstant((int)cpIndex);
@@ -1281,20 +1281,20 @@ Opnd* IRBuilder::genIndirectCallWithResolve(Type* returnType,
         helperArgs[2] = NULL;
         switch(bc) {
         case OPCODE_INVOKESTATIC:
-            vmHelperId = CompilationInterface::Helper_GetInvokeStaticAddrWithResolve;
+            vmHelperId = VM_RT_GET_INVOKESTATIC_ADDR_WITHRESOLVE;
             numHelperArgs = 2;
             break;
         case OPCODE_INVOKEVIRTUAL:
-            vmHelperId = CompilationInterface::Helper_GetInvokeVirtualAddrWithResolve;
+            vmHelperId = VM_RT_GET_INVOKEVIRTUAL_ADDR_WITHRESOLVE;
             helperArgs[2] = args[0];
             numHelperArgs = 3;
             break;
         case OPCODE_INVOKESPECIAL:
-            vmHelperId = CompilationInterface::Helper_GetInvokeSpecialAddrWithResolve;
+            vmHelperId = VM_RT_GET_INVOKE_SPECIAL_ADDR_WITHRESOLVE;
             numHelperArgs = 2;
             break;
         case OPCODE_INVOKEINTERFACE:
-            vmHelperId = CompilationInterface::Helper_GetInvokeInterfaceAddrWithResolve;
+            vmHelperId = VM_RT_GET_INVOKEINTERFACE_ADDR_WITHRESOLVE;
             helperArgs[2] = args[0];
             numHelperArgs = 3;
             break;
@@ -1440,7 +1440,7 @@ IRBuilder::genJitHelperCall(JitHelperCallId helperId,
 }
 
 Opnd*
-IRBuilder::genVMHelperCall(CompilationInterface::RuntimeHelperId helperId,
+IRBuilder::genVMHelperCall(VM_RT_SUPPORT helperId,
                             Type* returnType,
                             uint32 numArgs,
                             Opnd*  args[]) {
@@ -2001,7 +2001,7 @@ IRBuilder::genLdFieldAddrWithResolve(Type* type, Opnd* base, ObjectType* enclCla
     args[0] = createTypeOpnd(enclClass);
     args[1] = genLdConstant((int)cpIndex);
     args[2] = genLdConstant((int)putfield?1:0);
-    Opnd* offsetOpnd = genVMHelperCall(CompilationInterface::Helper_GetNonStaticFieldOffsetWithResolve, 
+    Opnd* offsetOpnd = genVMHelperCall(VM_RT_GET_NONSTATIC_FIELD_OFFSET_WITHRESOLVE, 
                                     typeManager->getInt32Type(), 3, args);
     insertHash(Op_VMHelperCall, opcode, base->getId(), cpIndex, dst->getInst());
 
@@ -2052,7 +2052,7 @@ IRBuilder::genLdStaticAddrWithResolve(Type* type, ObjectType* enclClass, uint32 
     args[0] = createTypeOpnd(enclClass);
     args[1] = genLdConstant((int)cpIndex);
     args[2] = genLdConstant((int)putfield?1:0);
-    appendInst(instFactory->makeVMHelperCall(dst, CompilationInterface::Helper_GetStaticFieldAddrWithResolve, 3, args));
+    appendInst(instFactory->makeVMHelperCall(dst, VM_RT_GET_STATIC_FIELD_ADDR_WITHRESOLVE, 3, args));
     insertHash(Op_VMHelperCall, OPCODE_GETSTATIC, cpIndex, dst->getInst());
     return dst;
 }
@@ -2786,7 +2786,7 @@ IRBuilder::genNewObjWithResolve(ObjectType* enclClass, uint32 cpIndex) {
     Opnd** args = new (irManager->getMemoryManager()) Opnd*[2];
     args[0]=clsOpnd;
     args[1]=idxOpnd;
-    Opnd* res = genVMHelperCall(CompilationInterface::Helper_NewObjWithResolve, typeManager->getUnresolvedObjectType(), 2, args);
+    Opnd* res = genVMHelperCall(VM_RT_NEWOBJ_WITHRESOLVE, typeManager->getUnresolvedObjectType(), 2, args);
     return res;
 }
 
@@ -2800,7 +2800,7 @@ IRBuilder::genNewArrayWithResolve(NamedType* elemType, Opnd* numElems, ObjectTyp
     args[1]=idxOpnd;
     args[2]=numElems;
     Type* resType = typeManager->getArrayType(elemType);
-    Opnd* res = genVMHelperCall(CompilationInterface::Helper_NewArrayWithResolve, resType, 3, args);
+    Opnd* res = genVMHelperCall(VM_RT_NEWARRAY_WITHRESOLVE, resType, 3, args);
     return res;
 }
 
@@ -2838,7 +2838,7 @@ IRBuilder::genMultianewarrayWithResolve(NamedType* arrayType,
     Opnd** args = new (irManager->getMemoryManager()) Opnd*[2];
     args[0] = enclClsOpnd;
     args[1] = idxOpnd;
-    Opnd* clsOpnd = genVMHelperCall(CompilationInterface::Helper_InitializeClassWithResolve, 
+    Opnd* clsOpnd = genVMHelperCall(VM_RT_INITIALIZE_CLASS_WITHRESOLVE, 
                                     typeManager->getUnmanagedPtrType(typeManager->getInt8Type()),
                                     2, args);
     
@@ -2850,7 +2850,7 @@ IRBuilder::genMultianewarrayWithResolve(NamedType* arrayType,
     for (uint32 i=0; i<dimensions; i++) {
         args2[i+2]=numElems[dimensions-1-i];
     }
-    Opnd* dst = genVMHelperCall(CompilationInterface::Helper_NewMultiArray, arrayType, (uint32)nArgs2, args2);
+    Opnd* dst = genVMHelperCall(VM_RT_MULTIANEWARRAY_RESOLVED, arrayType, (uint32)nArgs2, args2);
     return dst;
 }
 
@@ -2989,7 +2989,7 @@ IRBuilder::genCastWithResolve(Opnd* src, Type* type, ObjectType* enclClass, uint
     args[0] = createTypeOpnd(enclClass);
     args[1] = genLdConstant((int)cpIndex);
     args[2] = src;
-    dst = genVMHelperCall(CompilationInterface::Helper_CheckCastWithResolve, type, 3, args);
+    dst = genVMHelperCall(VM_RT_CHECKCAST_WITHRESOLVE, type, 3, args);
     insertHash(Op_VMHelperCall, OPCODE_CHECKCAST, src->getId(), cpIndex, dst->getInst());
     return dst;
 }
@@ -3074,7 +3074,7 @@ IRBuilder::genInstanceOfWithResolve(Opnd* src, ObjectType* enclClass, uint32 cpI
     args[0] = createTypeOpnd(enclClass);
     args[1] = genLdConstant((int)cpIndex);
     args[2] = src;
-    dst = genVMHelperCall(CompilationInterface::Helper_InstanceOfWithResolve, typeManager->getInt32Type(), 3, args);
+    dst = genVMHelperCall(VM_RT_INSTANCEOF_WITHRESOLVE, typeManager->getInt32Type(), 3, args);
     insertHash(Op_VMHelperCall, OPCODE_INSTANCEOF, src->getId(), cpIndex,  dst->getInst());
     return dst;
 }

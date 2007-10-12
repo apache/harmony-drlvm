@@ -207,7 +207,7 @@ public:
         uint32 numArgs, Opnd ** args, Opnd * retOpnd);
 
     /** A specialization of the newCallInst to create a VM Helper CallInst. */
-    CallInst *  newRuntimeHelperCallInst(CompilationInterface::RuntimeHelperId helperId, 
+    CallInst *  newRuntimeHelperCallInst(VM_RT_SUPPORT helperId, 
         uint32 numArgs, Opnd ** args, Opnd * retOpnd);
     /** A specialization of the newCallInst to create an internal helper CallInst. */
     CallInst *  newInternalRuntimeHelperCallInst(const char * internalHelperID, uint32 numArgs, Opnd ** args, Opnd * retOpnd);
@@ -261,7 +261,7 @@ public:
     void setHasNonExceptionCalls(){ hasNonExceptionCalls=true; }
     bool getHasNonExceptionCalls()const{ return hasNonExceptionCalls; }
     //-----------------------------------------------------------------------------------------------
-    const CallingConvention * getCallingConvention(CompilationInterface::RuntimeHelperId helperId)const;
+    const CallingConvention * getCallingConvention(VM_RT_SUPPORT helperId)const;
 
     const CallingConvention * getCallingConvention(MethodDesc * methodDesc)const;
 

@@ -241,7 +241,6 @@ public:
     uint64 total_hot_statics_bytes;
     uint64 total_hot_vtable_bytes;
 
-    SimpleHashtable rt_function_map;
     SimpleHashtable rt_function_requests;
     SimpleHashtable rt_function_calls;
 

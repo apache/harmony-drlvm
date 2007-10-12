@@ -1013,8 +1013,8 @@ class VMHelperCallInst : public Inst {
 public:
     void visit(InstFormatVisitor& visitor)  {visitor.accept(this);}
     bool isVMHelperCallInst() const { return true; }
-    CompilationInterface::RuntimeHelperId getVMHelperId() const {return vmHelperId;}
-    bool isThrowLazy() const {return vmHelperId == CompilationInterface::Helper_Throw_Lazy;}
+    VM_RT_SUPPORT getVMHelperId() const {return vmHelperId;}
+    bool isThrowLazy() const {return vmHelperId == VM_RT_THROW_LAZY;}
 private:
     virtual void handlePrintEscape(::std::ostream&, char code) const;
     friend class InstFactory;
@@ -1024,7 +1024,7 @@ private:
                      Opnd* dst,
                      uint32 nArgs,
                      Opnd** args_,
-                     CompilationInterface::RuntimeHelperId id) 
+                     VM_RT_SUPPORT id) 
                      : Inst(op, mod, type, dst, nArgs), vmHelperId(id)
     {
         args = args_;
@@ -1042,7 +1042,7 @@ private:
         args[srcIndex] = src;
     }
     Opnd**    args;
-    CompilationInterface::RuntimeHelperId vmHelperId;
+    VM_RT_SUPPORT vmHelperId;
 };
 
 
@@ -1137,7 +1137,7 @@ public:
                                Opnd* tauNullChecked, Opnd* tauTypesChecked, 
                                uint32 numArgs, Opnd** args);
     Inst*    makeJitHelperCall(Opnd* dst, JitHelperCallId id, uint32 numArgs, Opnd** args);
-    Inst*    makeVMHelperCall(Opnd* dst, CompilationInterface::RuntimeHelperId id, uint32 numArgs,
+    Inst*    makeVMHelperCall(Opnd* dst, VM_RT_SUPPORT id, uint32 numArgs,
                                Opnd** args);
     
 
@@ -1519,7 +1519,7 @@ private:
                                            Opnd* dst,
                                            uint32 nArgs,
                                            Opnd** args_,
-                                           CompilationInterface::RuntimeHelperId id);
+                                           VM_RT_SUPPORT id);
 
 
     PhiInst* makePhiInst(Type::Tag type, Opnd* dst, uint32 nArgs, Opnd** args_);

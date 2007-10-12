@@ -512,7 +512,7 @@ LazyExceptionOpt::fixOptCandidates(BitSet* bs) {
                 tinst = *it1;
                 assert(tinst != NULL);
                 tlinst=irManager.getInstFactory().makeVMHelperCall(  
-                        OpndManager::getNullOpnd(), CompilationInterface::Helper_Throw_Lazy, opcount, opnds);
+                        OpndManager::getNullOpnd(), VM_RT_THROW_LAZY, opcount, opnds);
 #ifdef _DEBUG
                 if (Log::isEnabled()) {
                     Log::out() << "  2nd      ";

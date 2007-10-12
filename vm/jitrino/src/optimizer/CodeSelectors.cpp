@@ -902,7 +902,7 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback, I
         case Op_VMHelperCall:
             {
                 VMHelperCallInst* call = inst->asVMHelperCallInst();
-                CompilationInterface::RuntimeHelperId callId = call->getVMHelperId();
+                VM_RT_SUPPORT callId = call->getVMHelperId();
                 cgInst = 
                     instructionCallback.callvmhelper(inst->getNumSrcOperands(),
                     genCallArgs(call,0),

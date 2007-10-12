@@ -492,119 +492,43 @@ CompilationInterface::getTypeFromDrlVMTypeHandle(Type_Info_Handle typeHandle) {
     return type;
 }
 
-VM_RT_SUPPORT CompilationInterface::translateHelperId(RuntimeHelperId runtimeHelperId) {
-    VM_RT_SUPPORT vmHelperId = (VM_RT_SUPPORT)-1;
-    switch (runtimeHelperId) {
-    case Helper_NewObj_UsingVtable:    vmHelperId = VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE; break; 
-    case Helper_NewVector_UsingVtable: vmHelperId = VM_RT_NEW_VECTOR_USING_VTABLE; break;
-    case Helper_NewMultiArray:         vmHelperId = VM_RT_MULTIANEWARRAY_RESOLVED; break;
-    case Helper_LdInterface:           vmHelperId = VM_RT_GET_INTERFACE_VTABLE_VER0; break;
-    case Helper_LdRef:                 vmHelperId = VM_RT_LDC_STRING; break;
-    case Helper_ObjMonitorEnter:       vmHelperId = VM_RT_MONITOR_ENTER_NON_NULL; break;
-    case Helper_ObjMonitorExit:        vmHelperId = VM_RT_MONITOR_EXIT_NON_NULL; break;
-    case Helper_TypeMonitorEnter:      vmHelperId = VM_RT_MONITOR_ENTER_STATIC; break;
-    case Helper_TypeMonitorExit:       vmHelperId = VM_RT_MONITOR_EXIT_STATIC; break;
-    case Helper_Cast:                  vmHelperId = VM_RT_CHECKCAST; break;
-    case Helper_IsInstanceOf:          vmHelperId = VM_RT_INSTANCEOF; break;
-    case Helper_InitType:              vmHelperId = VM_RT_INITIALIZE_CLASS; break;
-    case Helper_IsValidElemType:       vmHelperId = VM_RT_AASTORE_TEST; break;
-    case Helper_Throw_KeepStackTrace:  vmHelperId = VM_RT_THROW; break;
-    case Helper_Throw_SetStackTrace:   vmHelperId = VM_RT_THROW_SET_STACK_TRACE; break;
-    case Helper_Throw_Lazy:            vmHelperId = VM_RT_THROW_LAZY; break;
-    case Helper_NullPtrException:      vmHelperId = VM_RT_NULL_PTR_EXCEPTION; break;
-    case Helper_ArrayBoundsException:  vmHelperId = VM_RT_IDX_OUT_OF_BOUNDS; break;
-    case Helper_ElemTypeException:     vmHelperId = VM_RT_ARRAY_STORE_EXCEPTION; break;
-    case Helper_DivideByZeroException: vmHelperId = VM_RT_DIVIDE_BY_ZERO_EXCEPTION; break;
-    case Helper_Throw_LinkingException: vmHelperId = VM_RT_THROW_LINKING_EXCEPTION; break;
-    case Helper_EnableThreadSuspension: vmHelperId = VM_RT_GC_SAFE_POINT; break;
-    case Helper_GetTLSBase:            vmHelperId = VM_RT_GC_GET_TLS_BASE; break;
-    case Helper_CharArrayCopy:         vmHelperId = VM_RT_CHAR_ARRAYCOPY_NO_EXC; break;
-    case Helper_DivI32:                vmHelperId = VM_RT_IDIV; break;
-    case Helper_DivU32:                assert(0); break;
-    case Helper_DivI64:                vmHelperId = VM_RT_LDIV; break;
-    case Helper_DivU64:                vmHelperId = VM_RT_ULDIV; break;
-    case Helper_DivSingle:             vmHelperId = VM_RT_FDIV; break;
-    case Helper_DivDouble:             vmHelperId = VM_RT_DDIV; break;
-    case Helper_RemI32:                vmHelperId = VM_RT_IREM; break;
-    case Helper_RemU32:                assert(0); break;
-    case Helper_RemI64:                vmHelperId = VM_RT_LREM; break;
-    case Helper_RemU64:                assert(0); break;
-    case Helper_RemSingle:             vmHelperId = VM_RT_FREM; break;
-    case Helper_RemDouble:             vmHelperId = VM_RT_DREM; break;
-    case Helper_MulI64:                vmHelperId = VM_RT_LMUL; break;
-    case Helper_ShlI64:                vmHelperId = VM_RT_LSHL; break;
-    case Helper_ShrI64:                vmHelperId = VM_RT_LSHR; break;
-    case Helper_ShruI64:               vmHelperId = VM_RT_LUSHR; break;
-    case Helper_ConvStoI32:            vmHelperId = VM_RT_F2I; break;
-    case Helper_ConvStoI64:            vmHelperId = VM_RT_F2L; break;
-    case Helper_ConvDtoI32:            vmHelperId = VM_RT_D2I; break;
-    case Helper_ConvDtoI64:            vmHelperId = VM_RT_D2L; break;
-    case Helper_MethodEntry:           vmHelperId = VM_RT_JVMTI_METHOD_ENTER_CALLBACK; break;
-    case Helper_MethodExit:            vmHelperId = VM_RT_JVMTI_METHOD_EXIT_CALLBACK; break;
-    case Helper_WriteBarrier:          vmHelperId = VM_RT_GC_HEAP_WRITE_REF; break;
-    case Helper_NewObjWithResolve:                  vmHelperId=VM_RT_NEWOBJ_WITHRESOLVE; break;
-    case Helper_NewArrayWithResolve:                vmHelperId=VM_RT_NEWARRAY_WITHRESOLVE; break;
-    case Helper_GetNonStaticFieldOffsetWithResolve: vmHelperId=VM_RT_GET_NONSTATIC_FIELD_OFFSET_WITHRESOLVE; break;
-    case Helper_GetStaticFieldAddrWithResolve:      vmHelperId=VM_RT_GET_STATIC_FIELD_ADDR_WITHRESOLVE; break;
-    case Helper_CheckCastWithResolve:               vmHelperId=VM_RT_CHECKCAST_WITHRESOLVE; break;
-    case Helper_InstanceOfWithResolve:              vmHelperId=VM_RT_INSTANCEOF_WITHRESOLVE; break;
-    case Helper_GetInvokeStaticAddrWithResolve:     vmHelperId=VM_RT_GET_INVOKESTATIC_ADDR_WITHRESOLVE; break;
-    case Helper_GetInvokeInterfaceAddrWithResolve:  vmHelperId=VM_RT_GET_INVOKEINTERFACE_ADDR_WITHRESOLVE; break;
-    case Helper_GetInvokeVirtualAddrWithResolve:    vmHelperId=VM_RT_GET_INVOKEVIRTUAL_ADDR_WITHRESOLVE; break;
-    case Helper_GetInvokeSpecialAddrWithResolve:    vmHelperId=VM_RT_GET_INVOKE_SPECIAL_ADDR_WITHRESOLVE; break;
-    case Helper_InitializeClassWithResolve:         vmHelperId=VM_RT_INITIALIZE_CLASS_WITHRESOLVE; break;
+const char*
+CompilationInterface::getRuntimeHelperName(VM_RT_SUPPORT id){
+    return vm_helper_get_name(id);
+}
 
-
-    default:
-        assert(0);
-    }
-    return vmHelperId;
+VM_RT_SUPPORT CompilationInterface::str2rid( const char * helperName ) {
+    return vm_helper_get_by_name(helperName);
 }
 
 void*        
-CompilationInterface::getRuntimeHelperAddress(RuntimeHelperId runtimeHelperId) {
-    VM_RT_SUPPORT drlHelperId = translateHelperId(runtimeHelperId);
-    return vm_get_rt_support_addr(drlHelperId);
+CompilationInterface::getRuntimeHelperAddress(VM_RT_SUPPORT id) {
+    return vm_get_rt_support_addr(id);
 }
 
 void*        
-CompilationInterface::getRuntimeHelperAddressForType(RuntimeHelperId runtimeHelperId, Type* type) {
-    VM_RT_SUPPORT drlHelperId = translateHelperId(runtimeHelperId);
+CompilationInterface::getRuntimeHelperAddressForType(VM_RT_SUPPORT id, Type* type) {
     Class_Handle handle = NULL;
     if (type != NULL && type->isNamedType())
         handle = (Class_Handle) ((NamedType *)type)->getVMTypeHandle();
-    void* addr = vm_get_rt_support_addr_optimized(drlHelperId, handle);
+    void* addr = vm_get_rt_support_addr_optimized(id, handle);
     assert(addr != NULL);
     return addr;
 }
 
-CompilationInterface::VmCallingConvention 
-CompilationInterface::getRuntimeHelperCallingConvention(RuntimeHelperId id) {
-    switch(id) {
-    case Helper_NewMultiArray:
-    case Helper_WriteBarrier:
-        return CallingConvention_Cdecl;
-    case Helper_ShlI64:                
-    case Helper_ShrI64:                
-    case Helper_ShruI64:
-    case Helper_Throw_Lazy:
-    case Helper_Throw_LinkingException:
-        return CallingConvention_Drl;
-    default:
-        return CallingConvention_Stdcall;
-    }
+HELPER_CALLING_CONVENTION 
+CompilationInterface::getRuntimeHelperCallingConvention(VM_RT_SUPPORT id) {
+    return vm_helper_get_calling_convention(id);
 }
 
 bool
-CompilationInterface::isInterruptible(RuntimeHelperId runtimeHelperId)  {
-    VM_RT_SUPPORT drlHelperId = translateHelperId(runtimeHelperId);
-    return INTERRUPTIBLE_ALWAYS == vm_helper_get_interruptibility_kind(drlHelperId);
+CompilationInterface::isInterruptible(VM_RT_SUPPORT id)  {
+    return INTERRUPTIBLE_ALWAYS == vm_helper_get_interruptibility_kind(id);
 }
 
 bool
-CompilationInterface::mayBeInterruptible(RuntimeHelperId runtimeHelperId)  {
-    VM_RT_SUPPORT drlHelperId = translateHelperId(runtimeHelperId);
-    return INTERRUPTIBLE_NEVER != vm_helper_get_interruptibility_kind(drlHelperId);
+CompilationInterface::mayBeInterruptible(VM_RT_SUPPORT id)  {
+    return INTERRUPTIBLE_NEVER != vm_helper_get_interruptibility_kind(id);
 }
 
 bool

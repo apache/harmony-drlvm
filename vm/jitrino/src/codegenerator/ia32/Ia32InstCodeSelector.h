@@ -221,7 +221,7 @@ public:
     CG_OpndHandle* tau_callintr(uint32 numArgs, CG_OpndHandle** args, Type* retType,IntrinsicCallOp::Id callId,      CG_OpndHandle *tauNullsChecked, CG_OpndHandle *tauTypesChecked);
     CG_OpndHandle* callhelper(uint32 numArgs, CG_OpndHandle** args, Type* retType,JitHelperCallOp::Id callId);
     CG_OpndHandle* callvmhelper(uint32 numArgs, CG_OpndHandle** args, Type* retType,
-                                CompilationInterface::RuntimeHelperId callId);
+                                VM_RT_SUPPORT callId);
     
     CG_OpndHandle* box(ObjectType * boxedType, CG_OpndHandle* val);
     CG_OpndHandle* unbox(Type * dstType, CG_OpndHandle* objHandle);
@@ -283,7 +283,7 @@ public:
     void   genReturn();
     CG_OpndHandle* runtimeHelperCall(uint32 numArgs, CG_OpndHandle** args,
                       Type *retType, 
-                      CompilationInterface::RuntimeHelperId helper,
+                      VM_RT_SUPPORT helper,
                       Type *typeArgument,
                       Opnd * nonNullFirstArgTau);
     void genExitHelper(Opnd* retOpnd, MethodDesc* meth);
@@ -445,7 +445,7 @@ private:
     uint32                          switchNumTargets;
     PersistentInstructionId         currPersistentId;
     Opnd *                          currPredOpnd;
-    static CompilationInterface::RuntimeHelperId
+    static VM_RT_SUPPORT
                                  divOpHelperIds[],
                                  remOpHelperIds[];
     static uint32 _tauUnsafe;

@@ -29,7 +29,7 @@
  * of those function.
  *
  * If changes are made to enum <code>VM_RT_SUPPORT</code> below, the list of 
- * JIT support functions in <code>vm_stats.cpp</code> must also be changed.
+ * descriptions in <code>tr_helper_info.cpp</code> must also be changed.
  */
 
 #ifdef __cplusplus
@@ -38,6 +38,9 @@ extern "C" {
 
 typedef
 enum VM_RT_SUPPORT {
+
+/** Void id marker */
+    VM_RT_UNKNOWN=0,
 
 /**
  * Object creation routines.
@@ -701,6 +704,14 @@ enum VM_RT_SUPPORT {
 
 } VM_RT_SUPPORT;
 
+/** 
+* VM RT helpers have different calling conventions.
+*/
+enum HELPER_CALLING_CONVENTION {
+    CALLING_CONVENTION_DRL = 0,
+    CALLING_CONVENTION_STDCALL,
+    CALLING_CONVENTION_CDECL,
+};
 
 /** 
  * VM RT helpers can be interrupted differently.
@@ -746,9 +757,17 @@ VMEXPORT LilCodeStub *vm_get_rt_support_stub(VM_RT_SUPPORT f, Class_Handle c);
 /**
  *  Checks if helper is a suspension point
  */
-
 VMEXPORT HELPER_INTERRUPTIBILITY_KIND vm_helper_get_interruptibility_kind(VM_RT_SUPPORT f);
 
+VMEXPORT HELPER_CALLING_CONVENTION vm_helper_get_calling_convention(VM_RT_SUPPORT f);
+VMEXPORT const char* vm_helper_get_name(VM_RT_SUPPORT id);
+
+/**
+* Returns Id of runtime helper by its string representation. 
+* Name comparison is case-insensitive.
+* If the helperName is unknown, then VM_RT_UNKNOWN is returned.
+*/
+VMEXPORT VM_RT_SUPPORT vm_helper_get_by_name(const char* name);
 
 #ifdef __cplusplus
 }

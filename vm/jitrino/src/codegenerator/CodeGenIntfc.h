@@ -279,7 +279,7 @@ public:
     virtual CG_OpndHandle*  callhelper(uint32 numArgs, CG_OpndHandle** args, Type* retType,
                                        JitHelperCallOp::Id callId) = 0;
     virtual CG_OpndHandle*  callvmhelper(uint32 numArgs, CG_OpndHandle** args, Type* retType,
-                                       CompilationInterface::RuntimeHelperId callId) = 0;
+                                       VM_RT_SUPPORT callId) = 0;
 
     virtual CG_OpndHandle*  ldc_i4(int32 val) = 0;
     virtual CG_OpndHandle*  ldc_i8(int64 val) = 0;

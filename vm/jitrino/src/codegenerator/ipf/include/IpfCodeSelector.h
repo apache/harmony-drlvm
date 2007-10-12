@@ -301,7 +301,7 @@ public:
     //---------------------------------------------------------------------------//
 
     CG_OpndHandle* callvmhelper(uint32, CG_OpndHandle**, Type*
-                        , CompilationInterface::RuntimeHelperId) { NOT_IMPLEMENTED_C("unbox") }
+                        , VM_RT_SUPPORT) { NOT_IMPLEMENTED_C("unbox") }
 
     CG_OpndHandle* convUPtrToObject(ObjectType*, CG_OpndHandle*)              { NOT_IMPLEMENTED_C("convUPtrToObject") }
     CG_OpndHandle* convToUPtr(PtrType*, CG_OpndHandle*)                       { NOT_IMPLEMENTED_C("convToUPtr") }

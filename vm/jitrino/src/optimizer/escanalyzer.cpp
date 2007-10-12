@@ -72,7 +72,7 @@ Mutex EscAnalyzer::calleeMethodInfosLock;
 
 static void logMethod(MethodPtrType* mpt);
 static void logMethod(MethodDesc* md);
-static bool isVMHelperCall(Inst* inst, CompilationInterface::RuntimeHelperId id);
+static bool isVMHelperCall(Inst* inst, VM_RT_SUPPORT id);
 
 void
 EscapeAnalysisPass::_run(IRManager& irm) {
@@ -383,19 +383,19 @@ EscAnalyzer::instrExam(Node* node) {
 
             case Op_VMHelperCall:      // callvmhelper
                 {
-                    CompilationInterface::RuntimeHelperId  callId = inst->asVMHelperCallInst()->getVMHelperId();
+                    VM_RT_SUPPORT  callId = inst->asVMHelperCallInst()->getVMHelperId();
                     switch(callId) {
-                        case CompilationInterface::Helper_GetStaticFieldAddrWithResolve: 
+                        case VM_RT_GET_STATIC_FIELD_ADDR_WITHRESOLVE: 
                             instrExam_processLdFieldAddr(inst);
                             break;
-                        case CompilationInterface::Helper_CheckCastWithResolve:
+                        case VM_RT_CHECKCAST_WITHRESOLVE:
                             assert(findCnGNode_op(inst->getDst()->getId())==NULL);
                             addCnGNode_op(inst,inst->getDst()->getType(), NT_REF);
                             exam2Insts->push_back(inst);
                             break;
-                        case CompilationInterface::Helper_NewObjWithResolve: 
-                        case CompilationInterface::Helper_NewArrayWithResolve:
-                        case CompilationInterface::Helper_NewMultiArray:
+                        case VM_RT_NEWOBJ_WITHRESOLVE: 
+                        case VM_RT_NEWARRAY_WITHRESOLVE:
+                        case VM_RT_MULTIANEWARRAY_RESOLVED:
                             assert(findCnGNode_op(inst->getDst()->getId())==NULL);
                             addCnGNode_op(inst,inst->getDst()->getType(), NT_OBJECT);
                             break;
@@ -633,7 +633,7 @@ void EscAnalyzer::getLdFieldAddrInfo(Inst* inst, Type*& type, uint32& nType) {
         if (inst->getOpcode() == Op_AddOffset) {
             nType = NT_INSTFLD;
         } else {
-            assert(isVMHelperCall(inst, CompilationInterface::Helper_GetStaticFieldAddrWithResolve));
+            assert(isVMHelperCall(inst, VM_RT_GET_STATIC_FIELD_ADDR_WITHRESOLVE));
             nType = NT_STFLD;
         }
         assert(inst->getDst()->getType()->isManagedPtr());
@@ -743,12 +743,12 @@ EscAnalyzer::instrExam2() {
                     break;
                 case Op_VMHelperCall:
                     {
-                        CompilationInterface::RuntimeHelperId helperId = inst->asVMHelperCallInst()->getVMHelperId();
+                        VM_RT_SUPPORT helperId = inst->asVMHelperCallInst()->getVMHelperId();
                         switch(helperId) {
-                            case CompilationInterface::Helper_GetStaticFieldAddrWithResolve:
+                            case VM_RT_GET_STATIC_FIELD_ADDR_WITHRESOLVE:
                                 instrExam2_processLdFieldAddr(inst);
                                 break;
-                            case CompilationInterface::Helper_CheckCastWithResolve:
+                            case VM_RT_CHECKCAST_WITHRESOLVE:
                                 {   //handling is equal to taucheckcast
                                     cgnode = findCnGNode_op(inst->getDst()->getId());
                                     assert(cgnode!=NULL);
@@ -776,7 +776,7 @@ EscAnalyzer::instrExam2() {
                     if (type->isValue()) {
                         Inst* srcInst = inst->getSrc(0)->getInst();
                         uint32 src_opcode = srcInst->getOpcode();
-                        if (src_opcode==Op_LdStaticAddr || isVMHelperCall(srcInst, CompilationInterface::Helper_GetStaticFieldAddrWithResolve)) {
+                        if (src_opcode==Op_LdStaticAddr || isVMHelperCall(srcInst, VM_RT_GET_STATIC_FIELD_ADDR_WITHRESOLVE)) {
                             break;
                         }
 
@@ -827,7 +827,7 @@ EscAnalyzer::instrExam2() {
                     if (type->isValue()) {
                         Inst* srcInst = inst->getSrc(1)->getInst();
                         uint32 src_opcode = srcInst->getOpcode();
-                        if (src_opcode==Op_LdStaticAddr  || isVMHelperCall(srcInst, CompilationInterface::Helper_GetStaticFieldAddrWithResolve)) {
+                        if (src_opcode==Op_LdStaticAddr  || isVMHelperCall(srcInst, VM_RT_GET_STATIC_FIELD_ADDR_WITHRESOLVE)) {
                             break;
                         }
                         cgn_src=findCnGNode_op(inst->getSrc(0)->getId());
@@ -1153,7 +1153,7 @@ EscAnalyzer::CnGNode*
 EscAnalyzer::findCnGNode_fl(Inst* inst, uint32 ntype) {
     FieldDesc* fd1 = NULL;
     if (inst->asFieldAccessInst()==NULL) {// unresolved field access
-        assert(inst->getOpcode() == Op_AddOffset || isVMHelperCall(inst, CompilationInterface::Helper_GetStaticFieldAddrWithResolve));
+        assert(inst->getOpcode() == Op_AddOffset || isVMHelperCall(inst, VM_RT_GET_STATIC_FIELD_ADDR_WITHRESOLVE));
     } else {
         fd1 = inst->asFieldAccessInst()->getFieldDesc();
     }
@@ -1168,7 +1168,7 @@ EscAnalyzer::findCnGNode_fl(Inst* inst, uint32 ntype) {
             Inst* inst2 = (Inst*)cgNode->refObj;
             FieldDesc* fd2 = NULL;
             if (inst2->asFieldAccessInst()==NULL) {
-                assert(inst2->getOpcode() == Op_AddOffset || isVMHelperCall(inst2, CompilationInterface::Helper_GetStaticFieldAddrWithResolve));
+                assert(inst2->getOpcode() == Op_AddOffset || isVMHelperCall(inst2, VM_RT_GET_STATIC_FIELD_ADDR_WITHRESOLVE));
             } else {
                 fd2 = inst2->asFieldAccessInst()->getFieldDesc();
             }
@@ -1204,7 +1204,7 @@ EscAnalyzer::addEdge(CnGNode* cgnfrom, CnGNode* cgnto,
         assert(cgn1!=NULL);
     }
     if (cgnfrom->nodeType == NT_REF && cgnfrom->lNode == NULL) {
-        bool helperCall = isVMHelperCall(cgnfrom->nInst, CompilationInterface::Helper_CheckCastWithResolve);
+        bool helperCall = isVMHelperCall(cgnfrom->nInst, VM_RT_CHECKCAST_WITHRESOLVE);
         assert(cgnfrom->nInst->getOpcode()==Op_TauCast  || cgnfrom->nInst->getOpcode()==Op_TauStaticCast || helperCall);
         cgn1 = findCnGNode_op(cgnfrom->nInst->getSrc(helperCall ? 2 : 0)->getId());
         assert(cgn1!=NULL);
@@ -5859,7 +5859,7 @@ static void logMethod(MethodDesc* mdesc) {
     Log::out() << "    isOverridden: " << mdesc->isOverridden() << std::endl;
 }
 
-static bool isVMHelperCall(Inst* inst, CompilationInterface::RuntimeHelperId id) {
+static bool isVMHelperCall(Inst* inst, VM_RT_SUPPORT id) {
     VMHelperCallInst* callInst = inst->asVMHelperCallInst();
     if (callInst==NULL) {
         return false;
