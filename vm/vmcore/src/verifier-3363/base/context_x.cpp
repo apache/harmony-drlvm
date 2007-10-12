@@ -25,9 +25,6 @@
 
 namespace CPVerifier {
 
-template class vf_Context_x<CPVerifier_5::vf_Context_5, CPVerifier_5::WorkmapElement, CPVerifier_5::_WorkmapElement, CPVerifier_5::StackmapElement>;
-template class vf_Context_x<CPVerifier_6::vf_Context_6, CPVerifier_6::WorkmapElement, CPVerifier_6::_WorkmapElement, CPVerifier_6::StackmapElement>;
-
 
 // "virtual" methods
 
@@ -2093,6 +2090,10 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
 }
 
 ////////////////////////////////////////////////////////////////
+
+
+template class vf_Context_x<CPVerifier_5::vf_Context_5, CPVerifier_5::WorkmapElement, CPVerifier_5::_WorkmapElement, CPVerifier_5::StackmapElement>;
+template class vf_Context_x<CPVerifier_6::vf_Context_6, CPVerifier_6::WorkmapElement, CPVerifier_6::_WorkmapElement, CPVerifier_6::StackmapElement>;
 
 
 } // namespace CPVerifier
