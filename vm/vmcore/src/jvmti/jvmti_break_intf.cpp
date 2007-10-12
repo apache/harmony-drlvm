@@ -542,6 +542,35 @@ VMBreakPoints::remove_thread_local_break(VMLocalBreak *local)
     assert(false);
 }
 
+static char *gen_push(char *code_addr, POINTER_SIZE_INT value)
+{
+#ifdef _IA32_
+    return push(code_addr, Imm_Opnd(size_32, value));
+#elif defined _EM64T_
+    int32 high = (int32)((uint32)(value >> 32));
+    int32 low = (int32)((uint32)value);
+    code_addr = alu(code_addr, sub_opc, rsp_opnd, Imm_Opnd(size_8, 8));
+    code_addr = mov(code_addr, M_Base_Opnd(rsp_reg, 4), Imm_Opnd(size_32, high), size_32);
+    return mov(code_addr, M_Base_Opnd(rsp_reg, 0), Imm_Opnd(size_32, low), size_32);
+#else
+    assert(0);
+    return NULL;
+#endif
+}
+
+static char *gen_jump(char *code_addr, char *target_addr)
+{
+#ifdef _IA32_
+    return jump(code_addr, target_addr);
+#elif defined _EM64T_
+    code_addr = gen_push(code_addr, (POINTER_SIZE_INT)target_addr);
+    return ret(code_addr);
+#else
+    assert(0);
+    return NULL;
+#endif
+}
+
 void
 VMBreakPoints::process_native_breakpoint()
 {
@@ -697,18 +726,17 @@ VMBreakPoints::process_native_breakpoint()
             instruction_length - 1);
 
         // Create JMP $next_instruction instruction in the execution buffer
-        jump((char *)instruction_buffer + instruction_length,
+        gen_jump((char *)instruction_buffer + instruction_length,
             next_instruction);
         break;
     }
     case InstructionDisassembler::RELATIVE_JUMP:
     {
-        jint instruction_length = idisasm.get_length_with_prefix();
         char *jump_target = (char *)idisasm.get_jump_target_address();
 
         // Create JMP to the absolute address which conditional jump
         // had in the execution buffer
-        jump((char *)instruction_buffer, jump_target);
+        gen_jump((char *)instruction_buffer, jump_target);
         break;
     }
     case InstructionDisassembler::RELATIVE_COND_JUMP:
@@ -726,11 +754,11 @@ VMBreakPoints::process_native_breakpoint()
         code = branch8(code, get_condition_code(jump_type), Imm_Opnd(size_8, 0));
         char *branch_address = code - 1;
 
-        code = jump(code, next_instruction);
+        code = gen_jump(code, next_instruction);
         jint offset = (jint)(code - branch_address - 1);
         *branch_address = offset;
 
-        jump(code, jump_target);
+        gen_jump(code, jump_target);
         break;
     }
     case InstructionDisassembler::RELATIVE_CALL:
@@ -740,20 +768,19 @@ VMBreakPoints::process_native_breakpoint()
         char *code = (char *)instruction_buffer;
 
         // Push "return address" to the $next_instruction
-        code = push(code, Imm_Opnd(size_platf, (POINTER_SIZE_INT)next_instruction));
+        code = gen_push(code, (POINTER_SIZE_INT)next_instruction);
 
         // Jump to the target address of the call instruction
-        jump(code, jump_target);
+        gen_jump(code, jump_target);
         break;
     }
     case InstructionDisassembler::INDIRECT_JUMP:
     {
-        jint instruction_length = idisasm.get_length_with_prefix();
         char *jump_target = (char *)idisasm.get_target_address_from_context(&regs);
 
         // Create JMP to the absolute address which conditional jump
         // had in the execution buffer
-        jump((char *)instruction_buffer, jump_target);
+        gen_jump((char *)instruction_buffer, jump_target);
         break;
     }
     case InstructionDisassembler::INDIRECT_CALL:
@@ -763,10 +790,10 @@ VMBreakPoints::process_native_breakpoint()
         char *code = (char *)instruction_buffer;
 
         // Push "return address" to the $next_instruction
-        code = push(code, Imm_Opnd(size_platf, (POINTER_SIZE_INT)next_instruction));
+        code = gen_push(code, (POINTER_SIZE_INT)next_instruction);
 
         // Jump to the target address of the call instruction
-        jump(code, jump_target);
+        gen_jump(code, jump_target);
         break;
     }
     }

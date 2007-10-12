@@ -81,6 +81,15 @@ void linux_ucontext_to_regs(Registers* regs, ucontext_t *uc)
     regs->rbp = uc->uc_mcontext.gregs[REG_RBP];
     regs->rip = uc->uc_mcontext.gregs[REG_RIP];
     regs->rsp = uc->uc_mcontext.gregs[REG_RSP];
+    regs->r8 = uc->uc_mcontext.gregs[REG_R8];
+    regs->r9 = uc->uc_mcontext.gregs[REG_R9];
+    regs->r10 = uc->uc_mcontext.gregs[REG_R10];
+    regs->r11 = uc->uc_mcontext.gregs[REG_R11];
+    regs->r12 = uc->uc_mcontext.gregs[REG_R12];
+    regs->r13 = uc->uc_mcontext.gregs[REG_R13];
+    regs->r14 = uc->uc_mcontext.gregs[REG_R14];
+    regs->r15 = uc->uc_mcontext.gregs[REG_R15];
+    regs->eflags = uc->uc_mcontext.gregs[REG_EFL];
 }
 
 void linux_regs_to_ucontext(ucontext_t *uc, Registers* regs)
@@ -94,6 +103,15 @@ void linux_regs_to_ucontext(ucontext_t *uc, Registers* regs)
     uc->uc_mcontext.gregs[REG_RBP] = regs->rbp;
     uc->uc_mcontext.gregs[REG_RIP] = regs->rip;
     uc->uc_mcontext.gregs[REG_RSP] = regs->rsp;
+    uc->uc_mcontext.gregs[REG_R8] = regs->r8;
+    uc->uc_mcontext.gregs[REG_R9] = regs->r9;
+    uc->uc_mcontext.gregs[REG_R10] = regs->r10;
+    uc->uc_mcontext.gregs[REG_R11] = regs->r11;
+    uc->uc_mcontext.gregs[REG_R12] = regs->r12;
+    uc->uc_mcontext.gregs[REG_R13] = regs->r13;
+    uc->uc_mcontext.gregs[REG_R14] = regs->r14;
+    uc->uc_mcontext.gregs[REG_R15] = regs->r15;
+    uc->uc_mcontext.gregs[REG_EFL] = regs->eflags;
 }
 
 // exception catch support for stack restore
@@ -536,14 +554,24 @@ void null_java_divide_by_zero_handler(int signum, siginfo_t* info, void* context
     }
 }
 
-/**
- * Print out the call stack of the aborted thread.
- * @note call stacks may be used for debugging
- */
-void abort_handler (int signum, siginfo_t* info, void* context) {
-    fprintf(stderr, "SIGABRT in VM code.\n");
+void jvmti_jit_breakpoint_handler(int signum, siginfo_t* UNREF info, void* context)
+{
     ucontext_t *uc = (ucontext_t *)context;
     Registers regs;
+
+    linux_ucontext_to_regs(&regs, uc);
+    TRACE2("signals", "JVMTI breakpoint detected at " <<
+        (void *)regs.rip);
+    assert(!interpreter_enabled());
+
+    bool handled = jvmti_jit_breakpoint_handler(&regs);
+    if (handled)
+    {
+        linux_regs_to_ucontext(uc, &regs);
+        return;
+    }
+
+    fprintf(stderr, "SIGTRAP in VM code.\n");
     linux_ucontext_to_regs(&regs, uc);
 
     // setup default handler
@@ -557,10 +585,72 @@ void abort_handler (int signum, siginfo_t* info, void* context) {
     }
 }
 
+/**
+ * Print out the call stack of the aborted thread.
+ * @note call stacks may be used for debugging
+ */
+void abort_handler (int signum, siginfo_t* UNREF info, void* context) {
+    fprintf(stderr, "SIGABRT in VM code.\n");
+    Registers regs;
+    ucontext_t *uc = (ucontext_t *)context;
+    linux_ucontext_to_regs(&regs, uc);
+
+    // setup default handler
+    signal(signum, SIG_DFL);
+
+    if (!is_gdb_crash_handler_enabled() ||
+        !gdb_crash_handler())
+    {
+        // print stack trace
+        st_print_stack(&regs);
+    }
+}
+
+void general_signal_handler(int signum, siginfo_t* info, void* context)
+{
+    bool replaced = false;
+    ucontext_t* uc = (ucontext_t *)context;
+    POINTER_SIZE_INT saved_ip = (POINTER_SIZE_INT)uc->uc_mcontext.gregs[REG_RIP];
+    POINTER_SIZE_INT new_ip = 0;
+
+    // If exception is occured in processor instruction previously
+    // instrumented by breakpoint, the actual exception address will reside
+    // in jvmti_jit_breakpoints_handling_buffer
+    // We should replace exception address with saved address of instruction
+    POINTER_SIZE_INT break_buf =
+        (POINTER_SIZE_INT)p_TLS_vmthread->jvmti_thread.jvmti_jit_breakpoints_handling_buffer;
+    if (saved_ip >= break_buf &&
+        saved_ip < break_buf + TM_JVMTI_MAX_BUFFER_SIZE)
+    {
+        // Breakpoints should not occur in breakpoint buffer
+        assert(signum != SIGTRAP);
+
+        replaced = true;
+        new_ip = (POINTER_SIZE_INT)vm_get_ip_from_regs(p_TLS_vmthread);
+        uc->uc_mcontext.gregs[REG_RIP] = (greg_t)new_ip;
+    }
+
+    // FIXME: Should unify all signals here as it is done on ia32
+    jvmti_jit_breakpoint_handler(signum, info, context);
+
+    // If EIP was not changed in specific handler to start another handler,
+    // we should restore original EIP, if it's nesessary
+    if (replaced &&
+        (POINTER_SIZE_INT)uc->uc_mcontext.gregs[REG_RIP] == new_ip)
+    {
+        uc->uc_mcontext.gregs[REG_RIP] = (greg_t)saved_ip;
+    }
+}
+
 void initialize_signals()
 {
     struct sigaction sa;
 
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_SIGINFO;
+    sa.sa_sigaction = &general_signal_handler;
+    sigaction(SIGTRAP, &sa, NULL);
+    
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_SIGINFO | SA_ONSTACK;;
     sa.sa_sigaction = &null_java_reference_handler;
