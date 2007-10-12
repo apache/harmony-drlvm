@@ -147,6 +147,7 @@ AttributeID code_attrs[] = {
     {"LineNumberTable", NULL, ATTR_LineNumberTable},
     {"LocalVariableTable", NULL, ATTR_LocalVariableTable},
     {"LocalVariableTypeTable", NULL, ATTR_LocalVariableTypeTable},
+    {"StackMapTable", NULL, ATTR_StackMapTable},
     {NULL, NULL, ATTR_UNDEF}
 };
  
@@ -1470,6 +1471,9 @@ bool Method::_parse_code(Global_Env& env, ConstantPool& cp, unsigned code_attr_l
     unsigned num_lvt_entries = 0;
     unsigned num_lvtt_entries = 0;
 
+    unsigned numStackMap = 0;
+    m_stackmap = 0;
+
     for (i=0; i<n_attrs; i++) {
         Attributes cur_attr = parse_attribute(_class, cfs, code_attrs, &attr_len);
         switch(cur_attr) {
@@ -1578,6 +1582,32 @@ bool Method::_parse_code(Global_Env& env, ConstantPool& cp, unsigned code_attr_l
                 }
                 break;
             }
+
+        case ATTR_StackMapTable:
+            //TODO: skip if classfile version less than 50
+            numStackMap++;
+            if (numStackMap > 1) {
+                REPORT_FAILED_METHOD(" there is more than one StackMap attribute");
+                return false;
+            }
+
+            m_stackmap = (uint8*)Method::Alloc(attr_len + 6);
+            if(!cfs.skip(-6)) { // read once again attribute head
+                REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/InternalError",
+                    _class->get_name()->bytes << ": inernal error: unable to read beginning of an attribute");
+                return false;
+            }
+
+            unsigned i;
+            for (i=0; i<attr_len + 6; i++) {
+                if(!cfs.parse_u1(&m_stackmap[i])) {
+                    REPORT_FAILED_METHOD("truncated class file: failed to parse bytecode");
+                    return false;
+                }
+            }
+
+            break;
+
         case ATTR_UNDEF:
             // unrecognized attribute; skipped
             break;

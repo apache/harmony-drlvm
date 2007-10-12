@@ -49,6 +49,7 @@ enum Attributes {
     ATTR_RuntimeVisibleParameterAnnotations,    // Method
     ATTR_RuntimeInvisibleParameterAnnotations,  // Method
     ATTR_AnnotationDefault,     // Method (spec does not limit number???)
+    ATTR_StackMapTable,         // Method
     N_ATTR,
     ATTR_UNDEF,
     ATTR_ERROR
@@ -812,6 +813,15 @@ public:
     {
         pending_breakpoints--;
     }
+
+
+    uint8* m_stackmap;
+public:
+    uint8* get_stackmap() {
+        return m_stackmap;
+    }
+
+
 }; // Method
 
 #endif

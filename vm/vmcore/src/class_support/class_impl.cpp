@@ -509,6 +509,17 @@ method_get_exc_method_can_throw( method_handler hmethod,
 } // method_get_exc_method_can_throw
 
 /**
+ * Gets StackMapTable attribute bytes.
+ */
+unsigned char *
+method_get_stackmaptable( method_handler hmethod)
+{
+    assert( hmethod );
+    Method *method = (Method*)hmethod;
+    return method->get_stackmap();
+} // method_get_stackmaptable
+
+/**
  * Function sets verify data in class loader.
  */
 void

@@ -47,6 +47,7 @@ enum vf_Result
     VF_ErrorJsrOther,           // invalid subroutine
     VF_ClassNotLoaded,          // verified class not loaded yet
     VF_ErrorInternal,           // error in verification process
+    VF_ErrorStackmap,           // error in stackmap attribute
     VF_Continue                 // intermediate status, continue analysis
 };
 

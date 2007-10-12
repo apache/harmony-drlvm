@@ -493,6 +493,21 @@ method_get_number_exc_method_can_throw( method_handler hmethod );
 const char *
 method_get_exc_method_can_throw( method_handler hmethod, unsigned short index );
 
+
+/**
+ * Gets StackMapTable attribute.
+ * Parameter <i>hmethod</i> must not equal to <code>NULL</code>.
+ * If parameter <i>index</i> is out of range, returns <code>NULL</code>.
+ *
+ * @param hmethod   method handle
+ *
+ * @return          StackMapTable bytes
+ */
+unsigned char *
+method_get_stackmaptable( method_handler hmethod );
+
+
+
 /**
  * Class loader interface
  */
