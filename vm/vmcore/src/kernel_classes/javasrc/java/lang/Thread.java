@@ -274,6 +274,9 @@ public class Thread implements Runnable {
         if (threadGroup == null) {
             threadGroup = currentThread.group;
         }
+
+        threadGroup.checkGroup();
+
         this.group = threadGroup;
         this.daemon = currentThread.daemon;
         this.contextClassLoader = currentThread.contextClassLoader;
@@ -301,8 +304,6 @@ public class Thread implements Runnable {
 
         SecurityUtils.putContext(this, AccessController.getContext());
         checkAccess();
-        // adding the thread to the thread group should be the last action
-        threadGroup.add(this);
     }
 
     /**
@@ -747,6 +748,9 @@ public class Thread implements Runnable {
                 throw new IllegalThreadStateException(
                         "This thread was already started!");
             }
+
+            // adding the thread to the thread group
+            group.add(this);
 
             
             if (VMThreadManager.start(this, stackSize, daemon, priority) != 0) {

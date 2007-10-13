@@ -273,26 +273,33 @@ public class ThreadGroupTest extends TestCase {
      */
     public void testActiveGroupCount_DestroyNonEmptySubgroup() {
         ThreadGroup tg1 = new ThreadGroup("group 1");
-        new ThreadGroup(tg1, "group 11");
+        ThreadGroup tg11 = new ThreadGroup(tg1, "group 11");
         ThreadGroup tg12 = new ThreadGroup(tg1, "group 12");
-        new ThreadGroup(tg1, "group 13");
-        new ThreadGroup(tg12, "group 121");
-        new ThreadGroup(tg12, "group 122");
+        ThreadGroup tg13 = new ThreadGroup(tg1, "group 13");
+        ThreadGroup tg121 = new ThreadGroup(tg12, "group 121");
+        ThreadGroup tg122 = new ThreadGroup(tg12, "group 122");
         ThreadGroup tg123 = new ThreadGroup(tg12, "group 123");
-        new ThreadTest.ThreadRunning(tg123, "thread 1231").start();
-        new ThreadTest.ThreadRunning(tg123, "thread 1232").start();
-        // tg1 and its non-empty subgroups tg123 and tg12 
-        // should not be destroyed.
-        // All empty subgroups shoud be destroyed.
+        new ThreadTest.ThreadRunning(tg122, "thread 1221").start();
+        new ThreadTest.ThreadRunning(tg122, "thread 1222").start();
+        // Non-empty subgroup tg122 should not be destroyed.
         // IllegalThreadStateException should be thrown.
+        // Groups residing on the right from tg123 in the groups tree
+        // should not be destroyed as well.
         try {
             tg1.destroy();
             fail("IllegalThreadStateException has not been thrown when " +
             "destroying non-empty subgroup");
         } catch (IllegalThreadStateException e) {
         }
-        assertEquals("wrong group count in tg1", 2, tg1.activeGroupCount());
-        assertEquals("wrong group count in tg12", 1, tg12.activeGroupCount());
+        assertEquals("wrong group count in tg1", 0, tg1.activeGroupCount());
+        assertEquals("wrong group count in tg12", 0, tg12.activeGroupCount());
+        assertTrue("tg1 is not destroyed", tg1.isDestroyed());
+        assertTrue("tg11 is not destroyed", tg11.isDestroyed());
+        assertTrue("tg12 is not destroyed", tg12.isDestroyed());
+        assertTrue("tg13 is destroyed", !tg13.isDestroyed());
+        assertTrue("tg121 is not destroyed", tg121.isDestroyed());
+        assertTrue("tg122 is destroyed", !tg122.isDestroyed());
+        assertTrue("tg123 is destroyed", !tg123.isDestroyed());
     }
 
     /**
