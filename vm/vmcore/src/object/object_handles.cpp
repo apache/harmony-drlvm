@@ -548,7 +548,7 @@ LilCodeStub* oh_gen_init_handle(LilCodeStub* cs, char* base_var, unsigned handle
 {
     char buf[200];
     POINTER_SIZE_INT offset = oh_get_handle_offset(handle_indx);
-    if (null_check && VM_Global_State::loader_env->compress_references) {
+    if (null_check && REFS_IS_COMPRESSED_MODE) {
         sprintf(buf,
                 "jc %s=0x%"PI_FMT"X:ref,%%n; st [%s+%"PI_FMT"d:ref],%s; j %%o; :%%g; st [%s+%"PI_FMT"d:ref],0; :%%g;",
                 val, (POINTER_SIZE_INT)VM_Global_State::loader_env->heap_base,

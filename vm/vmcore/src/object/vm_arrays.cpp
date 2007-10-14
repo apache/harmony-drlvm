@@ -560,11 +560,7 @@ ArrayCopyResult array_copy(ManagedObject *src, int32 srcOffset, ManagedObject *d
 #ifdef VM_STATS
                 increment_array_copy_counter(VM_Statistics::get_vm_stats().num_arraycopy_object_same_type);
 #endif // VM_STATS
-                if (VM_Global_State::loader_env->compress_references) {
-                    memmove(dst_body, src_body, length * sizeof(COMPRESSED_REFERENCE));
-                } else {
-                    memmove(dst_body, src_body, length * sizeof(RAW_REFERENCE));  // length pointers, each a ManagedObject*
-                }
+                memmove(dst_body, src_body, length * REF_SIZE);
             } else {
                 // If the types are different, the arrays are different and no overlap of the source and destination is possible.
 #ifdef VM_STATS
@@ -573,7 +569,8 @@ ArrayCopyResult array_copy(ManagedObject *src, int32 srcOffset, ManagedObject *d
                 Class* dst_elem_clss = dst_class->get_array_element_class();
                 assert(dst_elem_clss);
                 
-                if (VM_Global_State::loader_env->compress_references) {
+                REFS_RUNTIME_SWITCH_IF
+#ifdef REFS_RUNTIME_OR_COMPRESSED
                     COMPRESSED_REFERENCE *src_body_compressed = (COMPRESSED_REFERENCE *)src_body;
                     COMPRESSED_REFERENCE *dst_body_compressed = (COMPRESSED_REFERENCE *)dst_body;
                     for (int count = 0; count < length; count++) {
@@ -594,7 +591,9 @@ ArrayCopyResult array_copy(ManagedObject *src, int32 srcOffset, ManagedObject *d
                         dst_body_compressed[count] = src_body_compressed[count];
                         // There is not a gc_heap_write_ref call here since gc is disabled and we use gc_heap_wrote_object interface below.
                     }
-                } else {
+#endif // REFS_RUNTIME_OR_COMPRESSED
+                REFS_RUNTIME_SWITCH_ELSE
+#ifdef REFS_RUNTIME_OR_UNCOMPRESSED
                      for (int count = 0; count < length; count++) {
                         // For non-null elements check if types are compatible.
                         if (src_body[count] != NULL) {
@@ -611,7 +610,8 @@ ArrayCopyResult array_copy(ManagedObject *src, int32 srcOffset, ManagedObject *d
                         dst_body[count] = src_body[count];
                         // There is not a gc_heap_write_ref call here since gc is disabled and we use gc_heap_wrote_object interface below.
                     }
-                }
+#endif // REFS_RUNTIME_OR_UNCOMPRESSED
+                REFS_RUNTIME_SWITCH_ENDIF
             }
 
             gc_heap_wrote_object(dst);

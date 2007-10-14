@@ -375,7 +375,7 @@ static void default_gc_heap_slot_write_ref(Managed_Object_Handle UNREF p_base_of
                                            Managed_Object_Handle *p_slot,
                                            Managed_Object_Handle value)
 {
-    assert(!VM_Global_State::loader_env->compress_references);
+    assert(!REFS_IS_COMPRESSED_MODE);
     assert(p_slot != NULL);
     *p_slot = value;
 } //default_gc_heap_slot_write_ref
@@ -387,7 +387,8 @@ static void default_gc_heap_slot_write_ref_compressed(Managed_Object_Handle UNRE
 {
     // p_slot is the address of a 32 bit slot holding the offset of a referenced object in the heap.
     // That slot is being updated, so store the heap offset of value's object. If value is NULL, store a 0 offset.
-    assert(VM_Global_State::loader_env->compress_references);
+    assert(REFS_IS_COMPRESSED_MODE);
+#ifndef REFS_USE_UNCOMPRESSED
     assert(p_slot != NULL);
     if (value != NULL) {
         COMPRESSED_REFERENCE value_offset = compress_reference((ManagedObject *)value);
@@ -395,6 +396,7 @@ static void default_gc_heap_slot_write_ref_compressed(Managed_Object_Handle UNRE
     } else {
         *p_slot = 0;
     }
+#endif // REFS_USE_UNCOMPRESSED
 } //default_gc_heap_slot_write_ref_compressed
 
 
@@ -413,7 +415,8 @@ static void default_gc_heap_write_global_slot_compressed(uint32 *p_slot,
 {
     // p_slot is the address of a 32 bit global variable holding the offset of a referenced object in the heap.
     // That slot is being updated, so store the heap offset of value's object. If value is NULL, store a 0 offset.
-    assert(VM_Global_State::loader_env->compress_references);
+    assert(REFS_IS_COMPRESSED_MODE);
+#ifndef REFS_USE_UNCOMPRESSED
     assert(p_slot != NULL);
     if (value != NULL) {
         COMPRESSED_REFERENCE value_offset = compress_reference((ManagedObject *)value);
@@ -421,6 +424,7 @@ static void default_gc_heap_write_global_slot_compressed(uint32 *p_slot,
     } else {
         *p_slot = 0;
     }
+#endif // REFS_USE_UNCOMPRESSED
 } //default_gc_heap_write_global_slot_compressed
 
 

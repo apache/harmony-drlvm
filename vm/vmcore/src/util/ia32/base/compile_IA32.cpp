@@ -154,7 +154,8 @@ void patch_code_with_threads_suspended(Byte * UNREF code_block, Byte * UNREF new
 // (represented by heap_base) to an unmanaged one (NULL/0). Uses %eax.
 char * gen_convert_managed_to_unmanaged_null_ia32(char * ss,
                                                   unsigned stack_pointer_offset) {
-    if (VM_Global_State::loader_env->compress_references) {
+#ifdef REFS_RUNTIME_OR_COMPRESSED
+    REFS_RUNTIME_SWITCH_IF
         ss = mov(ss,  eax_opnd,  M_Base_Opnd(esp_reg, stack_pointer_offset));
         ss = alu(ss, cmp_opc,  eax_opnd,  Imm_Opnd((int32)VM_Global_State::loader_env->heap_base) );
         ss = branch8(ss, Condition_NE,  Imm_Opnd(size_8, 0));  // not null, branch around the mov 0
@@ -162,7 +163,8 @@ char * gen_convert_managed_to_unmanaged_null_ia32(char * ss,
         ss = mov(ss,  M_Base_Opnd(esp_reg, stack_pointer_offset),  Imm_Opnd(0));
         signed offset = (signed)ss - (signed)backpatch_address__not_managed_null - 1;
         *backpatch_address__not_managed_null = (char)offset;
-    } 
+    REFS_RUNTIME_SWITCH_ENDIF
+#endif // REFS_RUNTIME_OR_COMPRESSED
     return ss;
 }
 

@@ -79,43 +79,55 @@ public:
 
     // Dereferences the slot and converts it to a raw object pointer.
     void *dereference() {
-        if (VM_Global_State::loader_env->compress_references) {
+        REFS_RUNTIME_SWITCH_IF
+#ifdef REFS_RUNTIME_OR_COMPRESSED
             assert(content.compressed != NULL);
             return (void*)((UDATA)*content.compressed + (UDATA)heap_base);
-        } else {
+#endif // REFS_RUNTIME_OR_COMPRESSED
+        REFS_RUNTIME_SWITCH_ELSE
+#ifdef REFS_RUNTIME_OR_UNCOMPRESSED
             assert(content.raw != NULL);
             return *content.raw;
-        }
+#endif // REFS_RUNTIME_OR_UNCOMPRESSED
+        REFS_RUNTIME_SWITCH_ENDIF
     }
 
     // Writes a new object reference into the slot.
     void write(void *obj) {
-        if (VM_Global_State::loader_env->compress_references) {
+        REFS_RUNTIME_SWITCH_IF
+#ifdef REFS_RUNTIME_OR_COMPRESSED
             if (obj != NULL) {
                 *content.compressed = (uint32) ((UDATA)obj - (UDATA)heap_base);
             } else {
                 *content.compressed = 0;
             }
-        } else {
+#endif // REFS_RUNTIME_OR_COMPRESSED
+        REFS_RUNTIME_SWITCH_ELSE
+#ifdef REFS_RUNTIME_OR_UNCOMPRESSED
             *content.raw = obj;
-        }
+#endif // REFS_RUNTIME_OR_UNCOMPRESSED
+        REFS_RUNTIME_SWITCH_ENDIF
     }
 
     // Returns true if the slot points to a null reference.
     bool is_null() {
-        if (VM_Global_State::loader_env->compress_references) {
+        REFS_RUNTIME_SWITCH_IF
+#ifdef REFS_RUNTIME_OR_COMPRESSED
             assert(content.compressed != NULL);
             return (*content.compressed == 0);
-        } else {
+#endif // REFS_RUNTIME_OR_COMPRESSED
+        REFS_RUNTIME_SWITCH_ELSE
+#ifdef REFS_RUNTIME_OR_UNCOMPRESSED
             assert(content.raw != NULL);
             return (*content.raw == NULL);
-        }
+#endif // REFS_RUNTIME_OR_UNCOMPRESSED
+        REFS_RUNTIME_SWITCH_ENDIF
     }
 
     // Returns the raw value of a managed null, which may be different
     // depending on whether compressed references are used.
     static void *managed_null() {
-        return (VM_Global_State::loader_env->compress_references ? heap_base : NULL);
+        return VM_Global_State::loader_env->managed_null;
     }
 
 };

@@ -1573,11 +1573,17 @@ Class* UserDefinedClassLoader::DoLoadClass(Global_Env* env, const String* classN
     // can cause GC and we would like to get away with code that doesn't
     // protect references from GC.
     ManagedObject* jstr;
-    if (env->compress_references) {
+    
+    REFS_RUNTIME_SWITCH_IF
+#ifdef REFS_RUNTIME_OR_COMPRESSED
         jstr = uncompress_compressed_reference(class_name_with_dots->intern.compressed_ref);
-    } else {
+#endif // REFS_RUNTIME_OR_COMPRESSED
+    REFS_RUNTIME_SWITCH_ELSE
+#ifdef REFS_RUNTIME_OR_UNCOMPRESSED
         jstr = class_name_with_dots->intern.raw_ref;
-    }
+#endif // REFS_RUNTIME_OR_UNCOMPRESSED
+    REFS_RUNTIME_SWITCH_ENDIF
+
     if (jstr != NULL) {
         ObjectHandle h = oh_allocate_local_handle();
         h->object = jstr;
@@ -1662,7 +1668,7 @@ Class* UserDefinedClassLoader::DoLoadClass(Global_Env* env, const String* classN
         //      signal successful loading for our CL
         SuccessLoadingClass(className);
     } else
-    	INFO2("class", "[Loaded " << (NULL != className ? className->bytes : "NULL") <<
+        INFO2("class", "[Loaded " << (NULL != className ? className->bytes : "NULL") <<
               " by " << (NULL != clss->get_class_loader()->GetName() ? clss->get_class_loader()->GetName()->bytes : "NULL")
                << "]");
     return clss;

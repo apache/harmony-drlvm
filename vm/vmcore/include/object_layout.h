@@ -18,20 +18,18 @@
 #ifndef _OBJECT_LAYOUT_H_
 #define _OBJECT_LAYOUT_H_
 
-// Define USE_COMPRESSED_VTABLE_POINTERS here to explicitly enable compressed vtable
+// Define USE_COMPRESSED_VTABLE_POINTERS here to enable compressed vtable
 // pointers within objects.
-// Define USE_UNCOMPRESSED_VTABLE_POINTERS to explicitly disable them.
-#if defined _IPF_ || defined _EM64T_
+#ifdef POINTER64
 #define USE_COMPRESSED_VTABLE_POINTERS
-#else // !_IPF_
-#define USE_UNCOMPRESSED_VTABLE_POINTERS
-#endif // _IPF_
+#endif // POINTER64
 
 #include <assert.h>
 #include "open/types.h"
 #include "open/hythread_ext.h"
 #include "jni.h"
 #include "open/vm.h"
+#include "open/gc.h"
 
 typedef struct VTable VTable;
 
@@ -39,50 +37,171 @@ typedef struct VTable VTable;
 extern "C" {
 #endif
 
+#ifdef POINTER64
+
+#if !defined(REFS_USE_COMPRESSED) && !defined(REFS_USE_UNCOMPRESSED)
+#ifndef REFS_USE_RUNTIME_SWITCH
+#define REFS_USE_RUNTIME_SWITCH
+#endif
+#endif
+
+#else // POINTER64
+// 32-bit platform always uses uncompressed 32-bit references
+#ifdef REFS_USE_COMPRESSED
+#undef REFS_USE_COMPRESSED
+#endif
+#ifdef REFS_USE_RUNTIME_SWITCH
+#undef REFS_USE_RUNTIME_SWITCH
+#endif
+
+#ifndef REFS_USE_UNCOMPRESSED
+#define REFS_USE_UNCOMPRESSED
+#endif
+
+#endif // POINTER64
+
+// Definitions for building ifdefs
+#if defined(REFS_USE_RUNTIME_SWITCH) || defined(REFS_USE_UNCOMPRESSED)
+#define REFS_RUNTIME_OR_UNCOMPRESSED
+#endif
+
+#if defined(REFS_USE_RUNTIME_SWITCH) || defined(REFS_USE_COMPRESSED)
+#define REFS_RUNTIME_OR_COMPRESSED
+#endif
+
 /// Raw and compressed reference pointers
 
 typedef ManagedObject*  RAW_REFERENCE;
 typedef uint32          COMPRESSED_REFERENCE;
 
-VMEXPORT bool is_compressed_reference(COMPRESSED_REFERENCE value);
-VMEXPORT bool is_null_compressed_reference(COMPRESSED_REFERENCE value);
+// Useful macros: REFS_IS_COMPRESSED_MODE effectively specifies compressed mode
+// REF_SIZE returns size of type used for references
+// REF_MANAGED_NULL defines 'null' reference value for current compression mode
+// REF_INIT_BY_ADDR initializes reference with value of proper size
+#if defined(REFS_USE_COMPRESSED)
+
+#define REFS_IS_COMPRESSED_MODE 1
+#define REF_SIZE (sizeof(uint32))
+#define REF_MANAGED_NULL VM_Global_State::loader_env->heap_base
+#define REF_INIT_BY_ADDR(_ref_addr_, _val_)                                 \
+    *((COMPRESSED_REFERENCE*)(_ref_addr_)) = (COMPRESSED_REFERENCE)(_val_);
+
+#elif defined(REFS_USE_UNCOMPRESSED)
+
+#define REFS_IS_COMPRESSED_MODE 0
+#define REF_SIZE (sizeof(ManagedObject*))
+#define REF_MANAGED_NULL NULL
+#define REF_INIT_BY_ADDR(_ref_addr_, _val_)                                 \
+    *((ManagedObject**)(_ref_addr_)) = (ManagedObject*)(_val_);
+
+#else // for REFS_USE_RUNTIME_SWITCH
+
+#define REFS_IS_COMPRESSED_MODE                                             \
+                    (VM_Global_State::loader_env->compress_references)
+#define REF_SIZE (VM_Global_State::loader_env->compress_references ?        \
+                    sizeof(COMPRESSED_REFERENCE) :                          \
+                    sizeof(ManagedObject *))
+#define REF_MANAGED_NULL                                                    \
+    (VM_Global_State::loader_env->compress_references ?                     \
+            VM_Global_State::loader_env->heap_base : NULL)
+#define REF_INIT_BY_ADDR(_ref_addr_, _val_)                                 \
+    if (VM_Global_State::loader_env->compress_references) {                 \
+        *((COMPRESSED_REFERENCE*)(_ref_addr_)) =                            \
+                                    (COMPRESSED_REFERENCE)(_val_);          \
+    } else {                                                                \
+        *((ManagedObject**)(_ref_addr_)) = (ManagedObject*)(_val_);         \
+    }
+#endif
+
+// Helper macros for using in 'if'
+#ifdef REFS_USE_RUNTIME_SWITCH
+#define REFS_RUNTIME_SWITCH_IF if (REFS_IS_COMPRESSED_MODE) {
+#define REFS_RUNTIME_SWITCH_ELSE } else {
+#define REFS_RUNTIME_SWITCH_ENDIF }
+#else // REFS_USE_RUNTIME_SWITCH
+#define REFS_RUNTIME_SWITCH_IF
+#define REFS_RUNTIME_SWITCH_ELSE
+#define REFS_RUNTIME_SWITCH_ENDIF
+#endif // REFS_USE_RUNTIME_SWITCH
+
+
+bool is_compressed_reference(COMPRESSED_REFERENCE value);
 
 VMEXPORT COMPRESSED_REFERENCE compress_reference(ManagedObject *obj);
 VMEXPORT ManagedObject* uncompress_compressed_reference(COMPRESSED_REFERENCE compressed_ref);
-VMEXPORT ManagedObject* get_raw_reference_pointer(ManagedObject **slot_addr);
 
-// Store the reference "VALUE" in the slot at address "SLOT_ADDR"
-// in the object "CONTAINING_OBJECT".
-// Signature: void store_reference(ManagedObject* CONTAINING_OBJECT,
-//                                 ManagedObject** SLOT_ADDR,
-//                                 ManagedObject* VALUE);
-#define STORE_REFERENCE(CONTAINING_OBJECT, SLOT_ADDR, VALUE)                                  \
-    {                                                                                         \
-        if (VM_Global_State::loader_env->compress_references) {                               \
-            gc_heap_slot_write_ref_compressed((Managed_Object_Handle)(CONTAINING_OBJECT),     \
-                                              (uint32*)(SLOT_ADDR),                           \
-                                              (Managed_Object_Handle)(VALUE));                \
-        } else {                                                                              \
-            gc_heap_slot_write_ref((Managed_Object_Handle)(CONTAINING_OBJECT),                \
-                                   (Managed_Object_Handle*)(SLOT_ADDR),                      \
-                                   (Managed_Object_Handle)(VALUE));                           \
-        }                                                                                     \
+
+// Given the address of a slot containing a reference, returns the raw reference pointer whether the slot held
+// a compressed or uncompressed.reference.
+inline ManagedObject *get_raw_reference_pointer(ManagedObject **slot_addr)
+{
+#ifdef REFS_USE_RUNTIME_SWITCH
+    if (vm_references_are_compressed()) {
+#endif // REFS_USE_RUNTIME_SWITCH
+#ifdef REFS_RUNTIME_OR_COMPRESSED
+    COMPRESSED_REFERENCE offset = *((COMPRESSED_REFERENCE *)slot_addr);
+    assert(is_compressed_reference(offset));
+    if (offset != 0) {
+        return (ManagedObject*)((POINTER_SIZE_INT)vm_heap_base_address() + offset);
     }
 
-// Store the reference "VALUE" in the static field or
-// other global slot at address "SLOT_ADDR".
-// Signature: void store_global_reference(COMPRESSED_REFERENCE* SLOT_ADDR,
-//                                        ManagedObject* VALUE);
-#define STORE_GLOBAL_REFERENCE(SLOT_ADDR, VALUE)                              \
-    {                                                                         \
-        if (VM_Global_State::loader_env->compress_references) {               \
-            gc_heap_write_global_slot_compressed((uint32*)(SLOT_ADDR),        \
-                (Managed_Object_Handle)(VALUE));                              \
-        } else {                                                              \
-            gc_heap_write_global_slot((Managed_Object_Handle*)(SLOT_ADDR),    \
-                                      (Managed_Object_Handle)(VALUE));        \
-        }                                                                     \
+    return NULL;
+#endif // REFS_RUNTIME_OR_COMPRESSED
+REFS_RUNTIME_SWITCH_ELSE
+#ifdef REFS_RUNTIME_OR_UNCOMPRESSED
+        return *slot_addr;
+#endif // REFS_RUNTIME_OR_UNCOMPRESSED
+REFS_RUNTIME_SWITCH_ENDIF
+} //get_raw_reference_pointer
+
+
+// Store the reference "_value_" in the slot at address "_slot_addr_"
+// in the object "_object_".
+#if defined(REFS_USE_COMPRESSED)
+#define STORE_REFERENCE(_object_, _slot_addr_, _value_)                     \
+        gc_heap_slot_write_ref_compressed((Managed_Object_Handle)_object_,  \
+                                          (uint32*)_slot_addr_,             \
+                                          (Managed_Object_Handle)_value_);
+#elif defined(REFS_USE_UNCOMPRESSED)
+#define STORE_REFERENCE(_object_, _slot_addr_, _value_)                     \
+        gc_heap_slot_write_ref((Managed_Object_Handle)_object_,             \
+                               (Managed_Object_Handle*)_slot_addr_,         \
+                               (Managed_Object_Handle)_value_);
+#else // for REFS_USE_RUNTIME_SWITCH
+#define STORE_REFERENCE(_object_, _slot_addr_, _value_)                     \
+    if (VM_Global_State::loader_env->compress_references) {                 \
+        gc_heap_slot_write_ref_compressed((Managed_Object_Handle)_object_,  \
+                                          (uint32*)_slot_addr_,             \
+                                          (Managed_Object_Handle)_value_);  \
+    } else {                                                                \
+        gc_heap_slot_write_ref((Managed_Object_Handle)_object_,             \
+                               (Managed_Object_Handle*)_slot_addr_,         \
+                               (Managed_Object_Handle)_value_);             \
     }
+#endif // REFS_USE_RUNTIME_SWITCH
+
+
+// Store the reference "value" in the static field or
+// other global slot at address "slot_addr".
+#if defined(REFS_USE_COMPRESSED)
+#define STORE_GLOBAL_REFERENCE(_slot_addr_, _value_)                    \
+        gc_heap_write_global_slot_compressed((uint32*)(_slot_addr_),    \
+                                   (Managed_Object_Handle)(_value_));
+#elif defined(REFS_USE_UNCOMPRESSED)
+#define STORE_GLOBAL_REFERENCE(_slot_addr_, _value_)                    \
+        gc_heap_write_global_slot((Managed_Object_Handle*)(_slot_addr_),\
+                                  (Managed_Object_Handle)(_value_));
+#else // for REFS_USE_RUNTIME_SWITCH
+#define STORE_GLOBAL_REFERENCE(_slot_addr_, _value_)                    \
+    if (VM_Global_State::loader_env->compress_references) {             \
+        gc_heap_write_global_slot_compressed((uint32*)(_slot_addr_),    \
+                                  (Managed_Object_Handle)(_value_));    \
+    } else {                                                            \
+        gc_heap_write_global_slot((Managed_Object_Handle*)(_slot_addr_),\
+                                  (Managed_Object_Handle)(_value_));    \
+    }
+#endif // REFS_USE_RUNTIME_SWITCH
+
 
 
 // The object layout is currently as follows
@@ -110,7 +229,7 @@ typedef struct ManagedObject {
     }
     static unsigned header_offset() { return sizeof(uint32); }
     static bool are_vtable_pointers_compressed() { return true; }
-#elif defined USE_UNCOMPRESSED_VTABLE_POINTERS
+#else // USE_COMPRESSED_VTABLE_POINTERS
     VTable *vt_raw;
     POINTER_SIZE_INT obj_info;
     VTable *vt_unsafe() { return vt_raw; }
@@ -120,7 +239,7 @@ typedef struct ManagedObject {
     }
     static unsigned header_offset() { return sizeof(VTable *); }
     static bool are_vtable_pointers_compressed() { return false; }
-#endif
+#endif // USE_COMPRESSED_VTABLE_POINTERS
     /// returns the size of constant object header part (vt pointer and obj_info)
     static size_t get_constant_header_size() { return sizeof(ManagedObject); }
     /// returns the size of object header including dynamically enabled fields.

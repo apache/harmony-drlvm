@@ -57,10 +57,7 @@ static unsigned java_array_of_char_length_offset()
 
 static bool enable_fast_char_arraycopy()
 {
-    Global_Env *env = VM_Global_State::loader_env;
-    if (env->compress_references)
-        return false;
-    return true;
+    return !(REFS_IS_COMPRESSED_MODE);
 }
 
 static ManagedObject *

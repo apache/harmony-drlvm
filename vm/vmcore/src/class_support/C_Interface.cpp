@@ -793,11 +793,15 @@ void *class_get_const_string_intern_addr(Class_Handle cl, unsigned index)
     assert(str);
 
     bool must_instantiate;
-    if (env->compress_references) {
+    REFS_RUNTIME_SWITCH_IF
+#ifdef REFS_RUNTIME_OR_COMPRESSED
         must_instantiate = (str->intern.compressed_ref == 0 /*NULL*/);
-    } else {
+#endif // REFS_RUNTIME_OR_COMPRESSED
+    REFS_RUNTIME_SWITCH_ELSE
+#ifdef REFS_RUNTIME_OR_UNCOMPRESSED
         must_instantiate = (str->intern.raw_ref == NULL);
-    }
+#endif // REFS_RUNTIME_OR_UNCOMPRESSED
+    REFS_RUNTIME_SWITCH_ENDIF
 
     if (must_instantiate) {
         BEGIN_RAISE_AREA;
@@ -809,11 +813,15 @@ void *class_get_const_string_intern_addr(Class_Handle cl, unsigned index)
         END_RAISE_AREA;
     }
 
-    if (env->compress_references) {
+    REFS_RUNTIME_SWITCH_IF
+#ifdef REFS_RUNTIME_OR_COMPRESSED
         return &(str->intern.compressed_ref);
-    } else {
+#endif // REFS_RUNTIME_OR_COMPRESSED
+    REFS_RUNTIME_SWITCH_ELSE
+#ifdef REFS_RUNTIME_OR_UNCOMPRESSED
         return &(str->intern.raw_ref);
-    }
+#endif // REFS_RUNTIME_OR_UNCOMPRESSED
+    REFS_RUNTIME_SWITCH_ENDIF
 } //class_get_const_string_intern_addr
 
 
@@ -2440,7 +2448,7 @@ size_t vm_number_of_gc_bytes_in_thread_local()
 
 VMEXPORT Boolean vm_references_are_compressed()
 {
-    return VM_Global_State::loader_env->compress_references;
+    return REFS_IS_COMPRESSED_MODE;
 } //vm_references_are_compressed
 
 

@@ -146,7 +146,8 @@ void compile_protect_arguments(Method_Handle method, GcFrame * gc) {
 // (represented by heap_base) to an unmanaged one (NULL/0). Uses %rdi.
 char * gen_convert_managed_to_unmanaged_null_em64t(char * ss,
                                                   const R_Opnd & input_param1) {
-    if (VM_Global_State::loader_env->compress_references) {
+#ifdef REFS_RUNTIME_OR_COMPRESSED
+    REFS_RUNTIME_SWITCH_IF
         ss = mov(ss, r11_opnd, Imm_Opnd(size_64, (int64)VM_Global_State::loader_env->heap_base));
         ss = alu(ss, cmp_opc, input_param1, r11_opnd, size_64);
         ss = branch8(ss, Condition_NE, Imm_Opnd(size_8, 0));  // not null, branch around the mov 0
@@ -154,7 +155,8 @@ char * gen_convert_managed_to_unmanaged_null_em64t(char * ss,
         ss = mov(ss, input_param1, Imm_Opnd(0));
         POINTER_SIZE_SINT offset = (POINTER_SIZE_SINT)ss - (POINTER_SIZE_SINT)backpatch_address__not_managed_null - 1;
         *backpatch_address__not_managed_null = (char)offset;
-    }
+    REFS_RUNTIME_SWITCH_ENDIF
+#endif // REFS_RUNTIME_OR_COMPRESSED
     return ss;
 }
 

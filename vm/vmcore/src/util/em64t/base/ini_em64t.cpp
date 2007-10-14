@@ -243,10 +243,8 @@ void JIT_execute_method_default(JIT_Handle jh, jmethodID methodID,
     if(!method->is_static()) {
         ObjectHandle handle = (ObjectHandle) args[arg_num++].l;
         assert(handle);
-        // only compressed references are supported yet
-        assert(VM_Global_State::loader_env->compress_references);
         // convert from native to managed NULL
-        gr_args[gr_nargs++] = handle->object != NULL
+        gr_args[gr_nargs++] = (handle->object != NULL)
             ? (uint64) handle->object : (uint64) VM_Global_State::loader_env->managed_null;
     }
 
@@ -259,8 +257,6 @@ void JIT_execute_method_default(JIT_Handle jh, jmethodID methodID,
         case JAVA_TYPE_ARRAY: {
             ObjectHandle handle = (ObjectHandle) args[arg_num++].l;
             uint64 ref = handle ? (uint64) handle->object : 0;
-            // only compressed references are supported yet
-            assert(VM_Global_State::loader_env->compress_references);
             // convert from native to managed NULL
             ref = ref ? ref : (uint64) VM_Global_State::loader_env->managed_null;
             if (gr_nargs < MAX_GR) {
@@ -356,10 +352,8 @@ void JIT_execute_method_default(JIT_Handle jh, jmethodID methodID,
             method_entry_point,
             gr_nargs,  fr_nargs, stack_nargs,
             gr_args, fr_args, stack_args);
-        // only compressed references are supported yet
-        assert(VM_Global_State::loader_env->compress_references);
         // convert from managed to native NULL
-        ref = ref != (uint64) VM_Global_State::loader_env->managed_null ? ref : (uint64) NULL;
+        ref = (ref != (uint64) VM_Global_State::loader_env->managed_null) ? ref : (uint64) NULL;
         if (ref) {
             handle = oh_allocate_local_handle();
             handle->object = (ManagedObject*) ref;

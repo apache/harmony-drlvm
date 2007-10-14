@@ -951,7 +951,7 @@ void JNICALL SetStaticObjectField(JNIEnv * jni_env,
     if (!ensure_initialised(jni_env, f->get_class())) return;
     assert(f->is_static());
     tmn_suspend_disable();       //---------------------------------v
-    ManagedObject **field_addr = (ManagedObject **)f->get_address();
+    void* field_addr = f->get_address();
     ObjectHandle v = (ObjectHandle)value;
 
     ManagedObject *val = NULL;
@@ -959,7 +959,7 @@ void JNICALL SetStaticObjectField(JNIEnv * jni_env,
         val = v->object;
     }
     // compress static fields.
-    STORE_GLOBAL_REFERENCE((COMPRESSED_REFERENCE *)field_addr, val);
+    STORE_GLOBAL_REFERENCE(field_addr, val);
 
     tmn_suspend_enable();        //---------------------------------^
 } //SetStaticObjectField

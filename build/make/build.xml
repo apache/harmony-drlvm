@@ -126,7 +126,7 @@
                 <equals arg1="${machine.arch}" arg2="amd64" />
             </or>
         </condition>
-	<condition property="build.arch" value="ppc32">
+        <condition property="build.arch" value="ppc32">
             <or>
                 <equals arg1="${os.arch}" arg2="ppc32" />
                 <equals arg1="${os.arch}" arg2="ppc" />
@@ -183,16 +183,16 @@
     <!-- initialization target specific for unix -->
     <target name="init.unix" if="if.unix">
         <property name="build.os.family" value="unix" />
-	<condition property="build.os" value="macosx">
+        <condition property="build.os" value="macosx">
             <isset property="if.macosx" />
         </condition>
         <property name="build.os" value="Linux" />
-	<condition property="build.os.short" value="macosx">
+        <condition property="build.os.short" value="macosx">
             <isset property="if.macosx" />
         </condition>
         <property name="build.os.short" value="lnx" />
         <property name="build.executable.pattern" value="\1" />
-	<condition property="build.shared.pattern" value="lib\1.dylib">
+        <condition property="build.shared.pattern" value="lib\1.dylib">
             <isset property="if.macosx" />
         </condition>
         <property name="build.shared.pattern" value="lib\1.so lib\1.so.*" />
@@ -273,10 +273,37 @@
     </target>
 
 
+    <target name="init.compressed.mode">
+        <!-- refs.comp.mode from command line -->
+        <condition property="refs.comp.mode.tmp" value="${COMPRESSED_MODE}">
+            <isset property="COMPRESSED_MODE" />
+        </condition>
+        <!-- refs.comp.mode from environment or properties.file -->
+        <condition property="refs.comp.mode.tmp" value="${env.COMPRESSED_MODE}">
+            <isset property="env.COMPRESSED_MODE" />
+        </condition>
+
+        <condition property="refs.comp.mode" value="REFS_USE_COMPRESSED">
+            <and>
+                <isset property="refs.comp.mode.tmp" />
+                <equals arg1="${refs.comp.mode.tmp}" arg2="compressed" />
+            </and>
+        </condition>
+        <condition property="refs.comp.mode" value="REFS_USE_UNCOMPRESSED">
+            <and>
+                <isset property="refs.comp.mode.tmp" />
+                <equals arg1="${refs.comp.mode.tmp}" arg2="uncompressed" />
+            </and>
+        </condition>
+        <property name="refs.comp.mode" value="REFS_USE_RUNTIME_SWITCH"/>
+    </target>
+
+
     <!-- initialization target: loading and setting build properties -->
     <target name="init" depends="detect.os.arch.cxx.cfg,
                                  init.unix,
                                  init.win,
+                                 init.compressed.mode,
                                  set.semis.dirs,
                                  plugin.antcontrib,
                                  set.externals,

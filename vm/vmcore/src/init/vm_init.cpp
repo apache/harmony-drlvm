@@ -687,7 +687,7 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     parse_vm_arguments(vm_env);
 
     vm_env->verify = get_boolean_property("vm.use_verifier", TRUE, VM_PROPERTIES);
-#ifdef POINTER64
+#if defined(POINTER64) && defined(REFS_USE_RUNTIME_SWITCH)
     vm_env->compress_references = get_boolean_property("vm.compress_references", TRUE, VM_PROPERTIES);
 #endif
 
@@ -721,7 +721,7 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     // TODO: find another way to initialize the following.
     vm_env->heap_base = (Byte *)gc_heap_base_address();
     vm_env->heap_end  = (Byte *)gc_heap_ceiling_address();
-    vm_env->managed_null = (vm_references_are_compressed() ? vm_env->heap_base : NULL);
+    vm_env->managed_null = REF_MANAGED_NULL;
 
     // 20030404 This handshaking protocol isn't quite correct. It doesn't
     // work at the moment because JIT has not yet been modified to support

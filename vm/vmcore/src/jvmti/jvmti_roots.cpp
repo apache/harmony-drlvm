@@ -218,9 +218,12 @@ static void ti_add_compressed_root_set_entry(
         uint32 *ref, 
         Boolean UNREF pinned)
 {
+    assert(REFS_IS_COMPRESSED_MODE);
+#ifndef REFS_USE_UNCOMPRESSED
     Managed_Object_Handle obj = (Managed_Object_Handle)
         uncompress_compressed_reference(*ref);
     ti_enumerate_root(ref, obj);
+#endif // REFS_USE_UNCOMPRESSED
 }
 
 //

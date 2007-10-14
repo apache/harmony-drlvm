@@ -108,17 +108,22 @@ jarray JNICALL NewObjectArray(JNIEnv * jni_env,
     // only if the elem is non-null.
     if (elem != NULL) {
         ManagedObject **elems = (ManagedObject **)get_vector_element_address_ref(vector, 0);
-        if (vm_env->compress_references) {
+
+        REFS_RUNTIME_SWITCH_IF
+#ifdef REFS_RUNTIME_OR_COMPRESSED
             COMPRESSED_REFERENCE elem_offset = compress_reference((ManagedObject *)elem);
             COMPRESSED_REFERENCE *compressed_elems = (COMPRESSED_REFERENCE *)elems;
             for (int i = 0; i < length; i++) {
                 compressed_elems[i] = elem_offset;
             }
-        } else {
+#endif // REFS_RUNTIME_OR_COMPRESSED
+        REFS_RUNTIME_SWITCH_ELSE
+#ifdef REFS_RUNTIME_OR_UNCOMPRESSED
             for (int i = 0; i < length; i++) {
                 elems[i] = elem;
             }
-        }
+#endif // REFS_RUNTIME_OR_UNCOMPRESSED
+        REFS_RUNTIME_SWITCH_ENDIF
     }
 
     ObjectHandle new_handle = oh_allocate_local_handle();

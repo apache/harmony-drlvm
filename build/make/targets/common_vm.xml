@@ -35,6 +35,8 @@
                 <pathelement location="${build.vm.home}/include" />
             </includepath>
 
+            <defineset define="${refs.comp.mode}" />
+
             <select cfg="release">
                 <defineset define="NDEBUG" />
             </select>

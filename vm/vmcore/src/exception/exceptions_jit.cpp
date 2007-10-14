@@ -646,13 +646,18 @@ NativeCodePtr exn_get_rth_throw()
         "m2n_save_all;" "out platform:ref,pint,pint,pint:void;");
     assert(cs);
 
-    if (VM_Global_State::loader_env->compress_references)
+    REFS_RUNTIME_SWITCH_IF
+#ifdef REFS_RUNTIME_OR_COMPRESSED
         cs = lil_parse_onto_end(cs,
             "jc i0=%0i:ref,%n;"
             "o0=i0;" "j %o;" ":%g;" "o0=0:ref;" ":%g;",
             VM_Global_State::loader_env->heap_base);
-    else
+#endif // REFS_RUNTIME_OR_COMPRESSED
+    REFS_RUNTIME_SWITCH_ELSE
+#ifdef REFS_RUNTIME_OR_UNCOMPRESSED
         cs = lil_parse_onto_end(cs, "o0=i0;");
+#endif // REFS_RUNTIME_OR_UNCOMPRESSED
+    REFS_RUNTIME_SWITCH_ENDIF
     assert(cs);
 
     lil_parse_onto_end(cs,

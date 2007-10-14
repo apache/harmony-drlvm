@@ -543,7 +543,7 @@ void VM_Statistics::print_string_pool_stats() {
             
             bool is_interned = false;
             String * string = string_pool.lookup(key, key_len);
-            if (VM_Global_State::loader_env->compress_references) {
+            if (REFS_IS_COMPRESSED_MODE) {
                 if (string->intern.compressed_ref) {
                     is_interned = true;
                 }

@@ -41,7 +41,8 @@ void vm_enumerate_interned_strings()
     String *ps = VM_Global_State::loader_env->string_pool.get_first_string_intern();
     // 20030405 Don't enumerate references that are *unmanaged null* (i.e. zero/NULL)
     // since vm_enumerate_root_reference() expects to be called with slots containing managed refs.
-    if (VM_Global_State::loader_env->compress_references) {
+    REFS_RUNTIME_SWITCH_IF
+#ifdef REFS_RUNTIME_OR_COMPRESSED
         while (ps != NULL) {
             COMPRESSED_REFERENCE compressed_ref = ps->intern.compressed_ref;
             assert(is_compressed_reference(compressed_ref));
@@ -50,7 +51,9 @@ void vm_enumerate_interned_strings()
                 VM_Global_State::loader_env->pin_interned_strings);
             ps = VM_Global_State::loader_env->string_pool.get_next_string_intern();
         }
-    } else {
+#endif // REFS_RUNTIME_OR_COMPRESSED
+    REFS_RUNTIME_SWITCH_ELSE
+#ifdef REFS_RUNTIME_OR_UNCOMPRESSED
         while (ps != NULL) {
             ManagedObject* s = ps->intern.raw_ref;
             assert(s != NULL);
@@ -58,7 +61,8 @@ void vm_enumerate_interned_strings()
                 VM_Global_State::loader_env->pin_interned_strings);
             ps = VM_Global_State::loader_env->string_pool.get_next_string_intern();
         }
-    }
+#endif // REFS_RUNTIME_OR_UNCOMPRESSED
+    REFS_RUNTIME_SWITCH_ENDIF
 } //vm_enumerate_interned_strings
 
 
@@ -81,7 +85,6 @@ static void vm_enumerate_jlc(Class* c, bool b_weak = false)
 
 static void vm_enumerate_class_static(Class* c)
 {
-    Global_Env *global_env = VM_Global_State::loader_env;
     assert (c);
     ConstPoolEntry* cp = c->get_constant_pool().get_error_chain();
     while(cp) {
@@ -97,11 +100,15 @@ static void vm_enumerate_class_static(Class* c)
             if(f->is_static()) {
                 if(field_is_enumerable_reference(f)){
                     // The field is static and it is a reference.
-                    if (global_env->compress_references) {
+                    REFS_RUNTIME_SWITCH_IF
+#ifdef REFS_RUNTIME_OR_COMPRESSED
                         vm_enumerate_compressed_root_reference((uint32 *)f->get_address(), FALSE);
-                    } else {
+#endif // REFS_RUNTIME_OR_COMPRESSED
+                    REFS_RUNTIME_SWITCH_ELSE
+#ifdef REFS_RUNTIME_OR_UNCOMPRESSED
                         vm_enumerate_root_reference((void **)f->get_address(), FALSE);
-                    }
+#endif // REFS_RUNTIME_OR_UNCOMPRESSED
+                    REFS_RUNTIME_SWITCH_ENDIF
                 }
             }
         }
@@ -147,7 +154,8 @@ void vm_enumerate_static_fields()
 #ifdef _DEBUG
 static void check_ref(void** ref)
 {
-    if (VM_Global_State::loader_env->compress_references) {
+#ifdef REFS_RUNTIME_OR_COMPRESSED
+    REFS_RUNTIME_SWITCH_IF
         // 20030324 DEBUG: verify the slot whose reference is being passed.
         ManagedObject **p_obj = (ManagedObject **)ref;  
         ManagedObject* obj = *p_obj;
@@ -156,7 +164,8 @@ static void check_ref(void** ref)
             assert(((POINTER_SIZE_INT)VM_Global_State::loader_env->heap_base <= (POINTER_SIZE_INT)obj)
                 && ((POINTER_SIZE_INT)obj <= (POINTER_SIZE_INT)VM_Global_State::loader_env->heap_end));
         } 
-    }
+    REFS_RUNTIME_SWITCH_ENDIF
+#endif // REFS_RUNTIME_OR_UNCOMPRESSED
 }
 #endif // _DEBUG
 
@@ -189,9 +198,10 @@ vm_enumerate_weak_root_reference(void **ref, Boolean is_pinned)
 // Resembles vm_enumerate_root_reference() but is passed the address of a uint32 slot containing a compressed reference.
 VMEXPORT void vm_enumerate_compressed_root_reference(uint32 *ref, Boolean is_pinned)
 {
-    assert(VM_Global_State::loader_env->compress_references);
+    assert(REFS_IS_COMPRESSED_MODE);
 
 #if _DEBUG
+#ifndef REFS_USE_UNCOMPRESSED
         // 20030324 Temporary: verify the slot whose reference is being passed.
         COMPRESSED_REFERENCE compressed_ref = *ref;
         ManagedObject* obj = (ManagedObject *)uncompress_compressed_reference(compressed_ref);
@@ -199,6 +209,7 @@ VMEXPORT void vm_enumerate_compressed_root_reference(uint32 *ref, Boolean is_pin
         bool is_in_heap = (((POINTER_SIZE_INT)VM_Global_State::loader_env->heap_base <= (POINTER_SIZE_INT)obj)
             && ((POINTER_SIZE_INT)obj <= (POINTER_SIZE_INT)VM_Global_State::loader_env->heap_end));
         assert (is_null || is_in_heap);
+#endif // REFS_USE_UNCOMPRESSED
 #endif // _DEBUG
 
     gc_add_compressed_root_set_entry(ref, is_pinned);

@@ -95,11 +95,8 @@ static unsigned sizeof_field_type(Field *field, bool do_field_compaction)
         {
             if (field->is_magic_type()) {
                 sz = get_magic_type_size(field);
-            } else if (VM_Global_State::loader_env->compress_references) {
-                // compress static reference fields.
-                sz = sizeof(COMPRESSED_REFERENCE);
             } else {
-                sz = OBJECT_REF_SIZE;
+                sz = REF_SIZE;
             }
         }
         break;
@@ -454,10 +451,8 @@ bool assign_values_to_class_static_final_fields(Class *clss)
                     // compress static reference fields.
                     if (cvalue.object == NULL) { //cvalue.string == NULL
                         // We needn't deal with this case, because the object field must be set in static initializer.
-                        if (VM_Global_State::loader_env->compress_references) {
-                            // initialize the field explicitly.
-                            *((COMPRESSED_REFERENCE *)field_addr) = 0;  // i.e., null
-                        }
+                        // initialize the field explicitly.
+                        REF_INIT_BY_ADDR(field_addr, 0); // i.e., null
                         break;
                     }
                     static const String* jlstring_desc_string =
@@ -474,7 +469,7 @@ bool assign_values_to_class_static_final_fields(Class *clss)
                                 << clss->get_name()->bytes << "." << field->get_name()->bytes);
                             return false;
                         }
-                        STORE_GLOBAL_REFERENCE((COMPRESSED_REFERENCE *)field_addr, str);
+                        STORE_GLOBAL_REFERENCE(field_addr, str);
                         // ------------------------------------------------------------^^
                     } else {
                         ABORT("Unexpected type descriptor");
@@ -489,10 +484,8 @@ bool assign_values_to_class_static_final_fields(Class *clss)
                 // ... if field isn't constant it will be initialized by 0, and <clinit> shall initialize it in future.
             } else {
                 if ((field_type == '[') || (field_type == 'L')) {
-                    if (VM_Global_State::loader_env->compress_references) {
-                        // initialize the field explicitly.
-                        *((COMPRESSED_REFERENCE *)field_addr) = 0;  // i.e., null
-                    }
+                    // initialize the field explicitly.
+                    REF_INIT_BY_ADDR(field_addr, 0); // i.e., null
                 }
             }
         } // end if static field

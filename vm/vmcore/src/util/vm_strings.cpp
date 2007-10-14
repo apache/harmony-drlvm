@@ -225,7 +225,7 @@ static void string_set_fields_separate(ManagedObject* str, unsigned length, unsi
     Byte* str_raw = (Byte*)str;
     *(uint32*)(str_raw+f_count_offset) = length;
     *(uint32*)(str_raw+f_offset_offset) = offset;
-    STORE_REFERENCE(str_raw, str_raw+f_value_offset, chars);
+    STORE_REFERENCE(str, (ManagedObject**)(str_raw+f_value_offset), (ManagedObject*)chars);
 }
 
 // GC must be disabled but at a same point
@@ -550,17 +550,21 @@ Java_java_lang_String *vm_instantiate_cp_string_resolved(String *str)
 {
     ASSERT_RAISE_AREA;
     assert(!hythread_is_suspend_enabled());
-    Global_Env *env = VM_Global_State::loader_env;
-    if (env->compress_references) {
+
+    REFS_RUNTIME_SWITCH_IF
+#ifdef REFS_RUNTIME_OR_COMPRESSED
         if (str->intern.compressed_ref != 0) {
             return uncompress_compressed_reference(str->intern.compressed_ref);
         }
-    } else {
+#endif // REFS_RUNTIME_OR_COMPRESSED
+    REFS_RUNTIME_SWITCH_ELSE
+#ifdef REFS_RUNTIME_OR_UNCOMPRESSED
         if (str->intern.raw_ref != NULL) {
             return str->intern.raw_ref;
         }
-    }
-    return env->string_pool.intern(str);
+#endif // REFS_RUNTIME_OR_UNCOMPRESSED
+    REFS_RUNTIME_SWITCH_ENDIF
+    return VM_Global_State::loader_env->string_pool.intern(str);
 } //vm_instantiate_cp_string_resolved
 
 // Interning of strings

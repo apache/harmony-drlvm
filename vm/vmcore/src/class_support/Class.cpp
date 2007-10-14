@@ -940,6 +940,7 @@ String* class_name_get_java_name(const String* class_name) {
 ////////////////////////////////////////////////////////////////////
 // begin Support for compressed and raw reference pointers
 
+#ifndef REFS_USE_UNCOMPRESSED
 bool is_compressed_reference(COMPRESSED_REFERENCE compressed_ref) 
 {
     // A compressed reference is an offset into the heap.
@@ -950,16 +951,10 @@ bool is_compressed_reference(COMPRESSED_REFERENCE compressed_ref)
 
 
 
-bool is_null_compressed_reference(COMPRESSED_REFERENCE compressed_ref)
-{
-    // Null compressed references are represented as 0.
-    return (compressed_ref == 0); 
-} //is_null_compressed_reference
-
-
-
 COMPRESSED_REFERENCE compress_reference(ManagedObject *obj) {
+#ifdef REFS_USE_RUNTIME_SWITCH
     assert(VM_Global_State::loader_env->compress_references);
+#endif // REFS_USE_RUNTIME_SWITCH
      COMPRESSED_REFERENCE compressed_ref;
      if(obj == NULL)
          compressed_ref = 0;
@@ -973,7 +968,9 @@ COMPRESSED_REFERENCE compress_reference(ManagedObject *obj) {
 
 
 ManagedObject *uncompress_compressed_reference(COMPRESSED_REFERENCE compressed_ref) {
+#ifdef REFS_USE_RUNTIME_SWITCH
     assert(VM_Global_State::loader_env->compress_references);
+#endif // REFS_USE_RUNTIME_SWITCH
     assert(is_compressed_reference(compressed_ref));
     if (compressed_ref == 0) {
         return NULL;
@@ -981,25 +978,7 @@ ManagedObject *uncompress_compressed_reference(COMPRESSED_REFERENCE compressed_r
         return (ManagedObject *)(VM_Global_State::loader_env->heap_base + compressed_ref);
     }
 } //uncompress_compressed_reference
-
-
-
-// Given the address of a slot containing a reference, returns the raw reference pointer whether the slot held
-// a compressed or uncompressed.reference.
-ManagedObject *get_raw_reference_pointer(ManagedObject **slot_addr)
-{
-    ManagedObject *obj = NULL;
-    if (VM_Global_State::loader_env->compress_references) {
-        COMPRESSED_REFERENCE offset = *((COMPRESSED_REFERENCE *)slot_addr);
-        assert(is_compressed_reference(offset));
-        if (offset != 0) {
-            obj = (ManagedObject *)(VM_Global_State::loader_env->heap_base + offset);
-        }
-    } else {
-        obj = *slot_addr;
-    }
-    return obj;
-} //get_raw_reference_pointer
+#endif // REFS_USE_UNCOMPRESSED
 
 
 // end Support for compressed and raw reference pointers
@@ -1212,7 +1191,7 @@ unsigned Class::calculate_size()
 
 void* Class::code_alloc(size_t size, size_t alignment, Code_Allocation_Action action)
 {
-	assert (m_class_loader);
+    assert (m_class_loader);
     return m_class_loader->CodeAlloc(size, alignment, action);
 }
 

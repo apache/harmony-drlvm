@@ -122,8 +122,7 @@ inline ManagedObject **get_vector_element_address_ref(Vector_Handle vector, int3
 {
     return (ManagedObject **)((POINTER_SIZE_INT)vector + 
                                       (POINTER_SIZE_INT)VM_VECTOR_FIRST_ELEM_OFFSET_REF + 
-                                      ((POINTER_SIZE_INT)idx * 
-                                       (VM_Global_State::loader_env->compress_references? sizeof(COMPRESSED_REFERENCE) : sizeof(ManagedObject *))));
+                                      ((POINTER_SIZE_INT)idx * REF_SIZE));
 } //get_vector_element_address_ref
 
 

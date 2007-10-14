@@ -109,11 +109,13 @@ ready_for_exceptions(false)
     // HT support from command line disabled. VM should automatically detect HT status at startup.
     is_hyperthreading_enabled = false;
     use_lil_stubs = true;
-#if defined _IPF_ || defined _EM64T_
+#ifdef REFS_USE_RUNTIME_SWITCH
+#ifdef POINTER64
     compress_references = true;
-#else // !_IPF_
+#else // POINTER64
     compress_references = false;
-#endif // !_IPF_
+#endif // POINTER64
+#endif // REFS_USE_RUNTIME_SWITCH
 
     strings_are_compressed = false;
 
@@ -129,14 +131,14 @@ ready_for_exceptions(false)
 
     GlobalCodeMemoryManager = new PoolManager(DEFAULT_COMMOT_JIT_CODE_POOL_SIZE, system_page_size, use_large_pages, 
         true/*is_code*/, true/*is_resize_allowed*/);
-	if (vm_vtable_pointers_are_compressed()) {
+    if (vm_vtable_pointers_are_compressed()) {
         VTableMemoryManager = new PoolManager(DEFAULT_COMMOT_VTABLE_POOL_SIZE_NO_RESIZE, system_page_size, use_large_pages, 
             false/*is_code*/, false/*is_resize_allowed*/);
-	}
-	else {
-		VTableMemoryManager = new PoolManager(DEFAULT_VTABLE_POOL_SIZE, system_page_size, use_large_pages, 
-			false/*is_code*/, true/*is_resize_allowed*/);
-	}
+    }
+    else {
+        VTableMemoryManager = new PoolManager(DEFAULT_VTABLE_POOL_SIZE, system_page_size, use_large_pages, 
+            false/*is_code*/, true/*is_resize_allowed*/);
+    }
 
     verify_all = false;
     verify_strict = false;

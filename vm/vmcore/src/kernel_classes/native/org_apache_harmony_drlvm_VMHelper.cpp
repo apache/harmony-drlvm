@@ -29,7 +29,7 @@ JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_VMHelper_getPointerTypeSize
 
 
 JNIEXPORT jboolean JNICALL Java_org_apache_harmony_drlvm_VMHelper_isCompressedRefsMode(JNIEnv *, jclass) {
-    return (jboolean)VM_Global_State::loader_env->compress_references;
+    return (jboolean)REFS_IS_COMPRESSED_MODE;
 }
 
 JNIEXPORT jboolean JNICALL Java_org_apache_harmony_drlvm_VMHelper_isCompressedVTableMode(JNIEnv *, jclass) {
@@ -42,18 +42,15 @@ JNIEXPORT jboolean JNICALL Java_org_apache_harmony_drlvm_VMHelper_isCompressedVT
 
 
 JNIEXPORT jlong JNICALL Java_org_apache_harmony_drlvm_VMHelper_getCompressedModeVTableBaseOffset(JNIEnv *, jclass) {
-    bool cm = (jboolean)VM_Global_State::loader_env->compress_references;
-    if (cm) {
-        return (jlong)vm_get_vtable_base();
-    }
-    return -1;
+#ifdef USE_COMPRESSED_VTABLE_POINTERS
+    return (jlong)vm_get_vtable_base();
+#else
+    return 0;
+#endif
 }
 
 
 JNIEXPORT jlong JNICALL Java_org_apache_harmony_drlvm_VMHelper_getCompressedModeObjectBaseOffset(JNIEnv *, jclass) {
-    bool cm = (jboolean)VM_Global_State::loader_env->compress_references;
-    if (cm) {
-        return (jlong)(POINTER_SIZE_INT)VM_Global_State::loader_env->heap_base;;
-    }
-    return -1;
+
+    return (jlong)(POINTER_SIZE_INT)REF_MANAGED_NULL;
 }

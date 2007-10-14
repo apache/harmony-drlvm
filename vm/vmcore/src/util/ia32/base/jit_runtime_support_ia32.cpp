@@ -113,7 +113,7 @@ static void *getaddress__vm_checkcast_naked()
         lil_free_code_stub(cs);
         return addr;
     }
-    const int stub_size = (VM_Global_State::loader_env->compress_references? 82 : 58);
+    const int stub_size = (REFS_IS_COMPRESSED_MODE ? 82 : 58);
     char *stub = (char *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_COLD, CAA_Allocate);
 #ifdef _DEBUG
     memset(stub, 0xcc /*int 3*/, stub_size);
@@ -128,13 +128,17 @@ static void *getaddress__vm_checkcast_naked()
 #endif // VM_STATS
 
     ss = mov(ss,  eax_opnd,  M_Base_Opnd(esp_reg, +4) );
-    if (VM_Global_State::loader_env->compress_references) {
-        ss = alu(ss, cmp_opc,  eax_opnd,  Imm_Opnd((unsigned)VM_Global_State::loader_env->heap_base)); //is eax == NULL?
+    REFS_RUNTIME_SWITCH_IF
+#ifdef REFS_RUNTIME_OR_COMPRESSED
+        ss = alu(ss, cmp_opc,  eax_opnd,  Imm_Opnd((unsigned)VM_Global_State::loader_env->managed_null)); //is eax == NULL?
         ss = branch8(ss, Condition_NZ,  Imm_Opnd(size_8, 0));
-    } else {
+#endif // REFS_RUNTIME_OR_COMPRESSED
+    REFS_RUNTIME_SWITCH_ELSE
+#ifdef REFS_RUNTIME_OR_UNCOMPRESSED
         ss = test(ss,  eax_opnd,  eax_opnd);
         ss = branch8(ss, Condition_NE,  Imm_Opnd(size_8, 0));  // will get backpatched
-    }
+#endif // REFS_RUNTIME_OR_UNCOMPRESSED
+    REFS_RUNTIME_SWITCH_ENDIF
     char *backpatch_address__not_null = ((char *)ss) - 1;
 
     // The object reference is null, so return null.     
@@ -253,7 +257,7 @@ static void *getaddress__vm_initialize_class_naked()
              (void *)class_initialize,
              APR_OFFSETOF(VM_thread, thread_exception.exc_object),
              APR_OFFSETOF(VM_thread, thread_exception.exc_class),
-	     (void*)exn_rethrow);
+             (void*)exn_rethrow);
         assert(lil_is_valid(cs));
         addr = LilCodeGenerator::get_platform()->compile(cs);
 
@@ -502,15 +506,17 @@ aastore_ia32(volatile ManagedObject *elem,
             int idx,
             Vector_Handle array)
 {
-    if (VM_Global_State::loader_env->compress_references) {
+#ifdef REFS_RUNTIME_OR_COMPRESSED
+    REFS_RUNTIME_SWITCH_IF
         // 20030321 Convert a null reference from a managed (heap_base) to an unmanaged null (NULL/0).
-        if (elem == (volatile ManagedObject *)VM_Global_State::loader_env->heap_base) {
+        if (elem == (volatile ManagedObject *)VM_Global_State::loader_env->managed_null) {
             elem = NULL;
         }
-        if (array == (ManagedObject *)VM_Global_State::loader_env->heap_base) {
+        if (array == (ManagedObject *)VM_Global_State::loader_env->managed_null) {
             array = NULL;
         }
-    }
+    REFS_RUNTIME_SWITCH_ENDIF
+#endif // REFS_RUNTIME_OR_UNCOMPRESSED
 
     assert ((elem == NULL) || (((ManagedObject *)elem)->vt() != NULL));
 #ifdef VM_STATS
@@ -549,13 +555,19 @@ aastore_ia32(volatile ManagedObject *elem,
             // 20030502 Someone earlier commented out a call to the GC interface function gc_heap_slot_write_ref() and replaced it
             // by code to directly store a NULL in the element without notifying the GC. I've retained that change here but I wonder if
             // there could be a problem later with, say, concurrent GCs.
-            if (VM_Global_State::loader_env->compress_references) {
-                COMPRESSED_REFERENCE *elem_ptr = (COMPRESSED_REFERENCE *)get_vector_element_address_ref(array, idx);
-                *elem_ptr = (COMPRESSED_REFERENCE)NULL;
-            } else {
-                ManagedObject **elem_ptr = get_vector_element_address_ref(array, idx);
+            ManagedObject **elem_ptr = get_vector_element_address_ref(array, idx);
+            
+            REFS_RUNTIME_SWITCH_IF
+#ifdef REFS_RUNTIME_OR_COMPRESSED
+                *((COMPRESSED_REFERENCE*)elem_ptr) = (COMPRESSED_REFERENCE)NULL;
+#endif // REFS_RUNTIME_OR_COMPRESSED
+            REFS_RUNTIME_SWITCH_ELSE
+#ifdef REFS_RUNTIME_OR_UNCOMPRESSED
+                
                 *elem_ptr = (ManagedObject *)NULL;
-            }
+#endif // REFS_RUNTIME_OR_UNCOMPRESSED
+            REFS_RUNTIME_SWITCH_ENDIF
+
             return 0;
         }
     }
@@ -793,7 +805,7 @@ void * getaddress__vm_get_interface_vtable_old_naked()  //wjw verify that this w
         return addr;
     }
 
-    const int stub_size = (VM_Global_State::loader_env->compress_references? 69 : 50);
+    const int stub_size = (REFS_IS_COMPRESSED_MODE ? 69 : 50);
     char *stub = (char *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_DEFAULT, CAA_Allocate);
 #ifdef _DEBUG
     memset(stub, 0xcc /*int 3*/, stub_size);
@@ -1005,15 +1017,17 @@ void * getaddress__gc_write_barrier_fastcall()
 
     ss = push(ss,  ecx_opnd);
 
-    if (VM_Global_State::loader_env->compress_references) {
+#ifdef REFS_RUNTIME_OR_COMPRESSED
+    REFS_RUNTIME_SWITCH_IF
         // 20030321 Convert a null reference in %ecx from a managed (heap_base) to an unmanaged null (0/NULL). 
-        ss = test(ss,  ecx_opnd,  Imm_Opnd((unsigned)VM_Global_State::loader_env->heap_base));
+        ss = test(ss,  ecx_opnd,  Imm_Opnd((unsigned)VM_Global_State::loader_env->managed_null));
         ss = branch8(ss, Condition_NE,  Imm_Opnd(size_8, 0));  // branch around mov 0
         char *backpatch_address__not_managed_null = ((char *)ss) - 1;
         ss = mov(ss,  ecx_opnd,  Imm_Opnd(0));
         signed offset = (signed)ss - (signed)backpatch_address__not_managed_null - 1;
         *backpatch_address__not_managed_null = (char)offset;
-    }
+    REFS_RUNTIME_SWITCH_ENDIF
+#endif // REFS_RUNTIME_OR_UNCOMPRESSED
 
     ss = call(ss, (char *)gc_write_barrier);
     ss = alu(ss, add_opc,  esp_opnd,  Imm_Opnd(4));

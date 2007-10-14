@@ -351,7 +351,8 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
     for(i=(is_static?0:1); i<num_args; i++) {
         if (is_reference(method_args_get_type_info(msh, i))) {
             POINTER_SIZE_INT handle_offset = oh_get_handle_offset(hn);
-            if (VM_Global_State::loader_env->compress_references) {
+            REFS_RUNTIME_SWITCH_IF
+#ifdef REFS_RUNTIME_OR_COMPRESSED
                 cs = lil_parse_onto_end(cs,
                                         "jc i%0i=%1i:ref,%n;"
                                         "o%2i=l0+%3i;"
@@ -362,7 +363,9 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
                                         i,
                                         VM_Global_State::loader_env->managed_null,
                                         arg_base+i, handle_offset, arg_base+i);
-            } else {
+#endif // REFS_RUNTIME_OR_COMPRESSED
+            REFS_RUNTIME_SWITCH_ELSE
+#ifdef REFS_RUNTIME_OR_UNCOMPRESSED
                 cs = lil_parse_onto_end(cs,
                                         "jc i%0i=0:ref,%n;"
                                         "o%1i=l0+%2i;"
@@ -373,7 +376,8 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
                                         i,
                                         arg_base+i, handle_offset,
                                         arg_base+i);
-            }
+#endif // REFS_RUNTIME_OR_UNCOMPRESSED
+            REFS_RUNTIME_SWITCH_ENDIF
             hn++;
         } else {
             cs = lil_parse_onto_end(cs, "o%0i=i%1i;", arg_base+i, i);
@@ -477,13 +481,15 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
                                 "jc l1=0,ret_done;"
                                 "ld l1,[l1+0:ref];"
                                 ":ret_done;");
-        if (VM_Global_State::loader_env->compress_references) {
+#ifdef REFS_RUNTIME_OR_COMPRESSED
+        REFS_RUNTIME_SWITCH_IF
             cs = lil_parse_onto_end(cs,
                                     "jc l1!=0,done_translating_ret;"
                                     "l1=%0i:ref;"
                                     ":done_translating_ret;",
                                     VM_Global_State::loader_env->managed_null);
-        }
+        REFS_RUNTIME_SWITCH_ENDIF
+#endif // REFS_RUNTIME_OR_UNCOMPRESSED
         assert(cs);
     }
 

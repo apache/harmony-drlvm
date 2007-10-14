@@ -353,7 +353,8 @@ ManagedObject * String_Pool::intern(String * str) {
 
     // Atomically update the string structure since some other thread might be trying to make the same update.
     // The GC won't be able to enumerate here since GC is disabled, so there are no race conditions with GC.
-    if (VM_Global_State::loader_env->compress_references) {
+    REFS_RUNTIME_SWITCH_IF
+#ifdef REFS_RUNTIME_OR_COMPRESSED
         COMPRESSED_REFERENCE compressed_lang_string =
             compress_reference(string->object);
         assert(is_compressed_reference(compressed_lang_string));
@@ -371,7 +372,9 @@ ManagedObject * String_Pool::intern(String * str) {
         }
         // Some other thread may have beaten us to the slot.
         lang_string = (ManagedObject *)uncompress_compressed_reference(str->intern.compressed_ref);
-    } else {
+#endif // REFS_RUNTIME_OR_COMPRESSED
+    REFS_RUNTIME_SWITCH_ELSE
+#ifdef REFS_RUNTIME_OR_UNCOMPRESSED
         void *result =
             (void *)apr_atomic_casptr(
             /*destination*/ (volatile void **)&str->intern.raw_ref,
@@ -387,7 +390,9 @@ ManagedObject * String_Pool::intern(String * str) {
         }
         // Some other thread may have beaten us to the slot.
         lang_string = str->intern.raw_ref;
-    }
+#endif // REFS_RUNTIME_OR_UNCOMPRESSED
+    REFS_RUNTIME_SWITCH_ENDIF
+
     oh_discard_local_handle(string);
     return lang_string;
 }

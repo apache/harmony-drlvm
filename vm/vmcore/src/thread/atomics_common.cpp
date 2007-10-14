@@ -35,6 +35,7 @@
  * Platform dependent atomic functions are in corresponding arch/ subfolders.
  */
 
+#ifndef REFS_USE_UNCOMPRESSED
 bool gc_heap_slot_cas_ref_compressed (Managed_Object_Handle p_base_of_object_with_slot,
                                       COMPRESSED_REFERENCE *p_slot,
                                       Managed_Object_Handle expected,
@@ -54,8 +55,9 @@ bool gc_heap_slot_cas_ref_compressed (Managed_Object_Handle p_base_of_object_wit
     //INTERNAL(gc_write_barrier) (p_base_of_object_with_slot);
     return result;
 }
+#endif // REFS_USE_UNCOMPRESSED
 
-
+#ifndef REFS_USE_COMPRESSED
 bool gc_heap_slot_cas_ref (Managed_Object_Handle p_base_of_object_with_slot,
                            Managed_Object_Handle *p_slot,
                            Managed_Object_Handle expected,
@@ -68,6 +70,7 @@ bool gc_heap_slot_cas_ref (Managed_Object_Handle p_base_of_object_with_slot,
     //INTERNAL(gc_write_barrier) (p_base_of_object_with_slot);
     return res;
 }
+#endif // REFS_USE_COMPRESSED
 
 
 JNIEXPORT jlong getFieldOffset(JNIEnv * env, jobject field) 
@@ -96,19 +99,21 @@ JNIEXPORT jboolean compareAndSetObjectField
 
     bool result;
 
-    if (VM_Global_State::loader_env->compress_references) {
+    REFS_RUNTIME_SWITCH_IF
+#ifdef REFS_RUNTIME_OR_COMPRESSED
         result = gc_heap_slot_cas_ref_compressed((Managed_Object_Handle)(java_ref),
                                                  (COMPRESSED_REFERENCE *)(field_addr),
                                                  (Managed_Object_Handle)(exp),
                                                  (Managed_Object_Handle)(val));
-    }
-    else
-    {
+#endif // REFS_RUNTIME_OR_COMPRESSED
+    REFS_RUNTIME_SWITCH_ELSE
+#ifdef REFS_RUNTIME_OR_UNCOMPRESSED
         result = gc_heap_slot_cas_ref((Managed_Object_Handle)(java_ref),
                                       (Managed_Object_Handle *)(field_addr),
                                       (Managed_Object_Handle)(exp),
                                       (Managed_Object_Handle)(val));
-    }
+#endif // REFS_RUNTIME_OR_UNCOMPRESSED
+    REFS_RUNTIME_SWITCH_ENDIF
 
     tmn_suspend_enable();
     return  (jboolean)(result?JNI_TRUE:JNI_FALSE);
@@ -188,19 +193,24 @@ JNIEXPORT jboolean compareAndSetObjectArray
 
     bool result;
 
-    if (VM_Global_State::loader_env->compress_references) {
+#ifdef REFS_USE_RUNTIME_SWITCH
+    if (VM_Global_State::loader_env->compress_references)
+#endif // REFS_USE_RUNTIME_SWITCH
+#ifdef REFS_RUNTIME_OR_COMPRESSED
         result = gc_heap_slot_cas_ref_compressed((Managed_Object_Handle)(vector_handle),
                                                  (COMPRESSED_REFERENCE *)(element_address),
                                                  (Managed_Object_Handle)(exp),
                                                  (Managed_Object_Handle)(val));
-    }
+#endif // REFS_RUNTIME_OR_COMPRESSED
+#ifdef REFS_USE_RUNTIME_SWITCH
     else
-    {
+#endif // REFS_USE_RUNTIME_SWITCH
+#ifdef REFS_RUNTIME_OR_UNCOMPRESSED
         result = gc_heap_slot_cas_ref((Managed_Object_Handle)(vector_handle),
                                       (Managed_Object_Handle *)(element_address),
                                       (Managed_Object_Handle)(exp),
                                       (Managed_Object_Handle)(val));
-    }
+#endif // REFS_RUNTIME_OR_UNCOMPRESSED
 
     tmn_suspend_enable();
     return (jboolean)(result?JNI_TRUE:JNI_FALSE);

@@ -64,7 +64,9 @@ struct Global_Env {
      */
     bool is_hyperthreading_enabled; // VM automatically detects HT status at startup.
     bool use_lil_stubs;             // 20030307: Use LIL stubs instead of hand crafted ones.  Default off (IPF) on (IA32).
+#ifdef REFS_USE_RUNTIME_SWITCH
     bool compress_references;       // 20030311 Compress references in references and vector elements.
+#endif
     bool strings_are_compressed;    // 2003-05-19: The VM searches the java.lang.String class for a "byte[] bvalue" field at startup,
                                     // as an indication that the Java class library supports compressed strings with 8-bit characters.
     bool use_large_pages;           // 20040109 Use large pages for class-related data such as vtables.

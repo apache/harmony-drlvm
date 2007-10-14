@@ -3197,7 +3197,9 @@ interpreter_execute_method(
         case JAVA_TYPE_ARRAY:
             h = (ObjectHandle) args[arg++].l;
 #ifdef COMPRESS_MODE
+#ifdef REFS_USE_RUNTIME_SWITCH
             assert(VM_Global_State::loader_env->compress_references);
+#endif // REFS_USE_RUNTIME_SWITCH
 #endif
             CREF cref;
             if (h == NULL) {
