@@ -244,3 +244,16 @@ HELPER_CALLING_CONVENTION vm_helper_get_calling_convention(VM_RT_SUPPORT id)
         return CALLING_CONVENTION_STDCALL;
     }
 }
+
+VMEXPORT 
+int vm_helper_get_numargs(VM_RT_SUPPORT id)
+{
+    HelperInfoMap::const_iterator it = helper_map->find(id);
+    if (helper_map->end() != it) {
+        assert(it->second);
+        return it->second->number_of_args;
+    } else {
+        ASSERT(false, "Unexpected helper id " << id);
+        return 0;
+    }
+}

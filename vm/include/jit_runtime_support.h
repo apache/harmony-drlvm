@@ -763,6 +763,12 @@ VMEXPORT HELPER_CALLING_CONVENTION vm_helper_get_calling_convention(VM_RT_SUPPOR
 VMEXPORT const char* vm_helper_get_name(VM_RT_SUPPORT id);
 
 /**
+ * Returns number of helper arguments.
+ * Intended primarily for debugging.
+ */
+VMEXPORT int vm_helper_get_numargs(VM_RT_SUPPORT id);
+
+/**
 * Returns Id of runtime helper by its string representation. 
 * Name comparison is case-insensitive.
 * If the helperName is unknown, then VM_RT_UNKNOWN is returned.

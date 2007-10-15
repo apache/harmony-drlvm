@@ -2471,9 +2471,8 @@ static void increment_helper_count(VM_RT_SUPPORT f) {
 #if _DEBUG
     static bool print_helper_info = false;
     if (print_helper_info) {
-        int   num_args;
-        char *fn_name;
-        VM_Statistics::get_vm_stats().rt_function_map.lookup((void *)f, &num_args, (void **)&fn_name);
+        int   num_args = vm_helper_get_numargs(f);
+        const char *fn_name = vm_helper_get_name(f);
         printf("Calling helper %s, %d args\n", fn_name, num_args);
     }
 #endif // _DEBUG
@@ -2739,11 +2738,8 @@ void *vm_get_rt_support_addr(VM_RT_SUPPORT f)
 
 #ifdef VM_STATS
     if (true) {
-        int   num_args = 0;
-        char *helper_name = NULL;
-        bool found = VM_Statistics::get_vm_stats().rt_function_map.lookup((void *)f, &num_args, (void **)&helper_name);
-        assert(found);  // else changes were made to the enum VM_RT_SUPPORT in jit_runtime_support.h.
-
+        int   num_args = vm_helper_get_numargs(f);
+        const char *helper_name = vm_helper_get_name(f);
         void *wrapper = emit_counting_wrapper_for_jit_helper(f, helper, num_args, helper_name);
         return wrapper;
     } else
