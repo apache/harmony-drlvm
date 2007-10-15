@@ -20,7 +20,6 @@
  *
  */
 
-#include "DrlVMInterface.h"
 #include "MemoryAttribute.h"
 #include "IpfCodeSelector.h"
 #include "IpfIrPrinter.h"
@@ -1382,7 +1381,7 @@ void IpfInstCodeSelector::throwSystemException(CompilationInterface::SystemExcep
 
     IPF_LOG << "      throwSystemException" << endl;
     
-    VM_RT_SUPPORT hId = CompilationInterface::Helper_Null;
+    VM_RT_SUPPORT hId = VM_RT_UNKNOWN;
     switch (id) {
         case CompilationInterface::Exception_NullPointer: 
             hId = VM_RT_NULL_PTR_EXCEPTION;      break;

@@ -26,7 +26,6 @@
 
 #include "IpfCfg.h"
 #include "IpfOpndManager.h"
-#include "DrlVMInterface.h"
 
 namespace Jitrino {
 namespace IPF {

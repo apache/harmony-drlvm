@@ -155,7 +155,9 @@ JIT_profile_notification_callback(JIT_Handle jit, PC_Handle pc, Method_Handle mh
 {
     JITInstanceContext* jitContext = Jitrino::getJITInstanceContext(jit);
     if (jitContext->isJet()) {
+#ifdef USE_FAST_PATH
         Jet::rt_profile_notification_callback(jit, pc, mh);
+#endif
     } //opt does not support counters patching today.
 }
 
