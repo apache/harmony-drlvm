@@ -242,6 +242,8 @@
         <!-- semi-built component location -->
         <property name="build.semi.dir" location="../${build.os.short}_${build.arch}_${build.cxx}_${build.cfg}/semis" />
         <mkdir dir="${build.semi.dir}" />
+        
+        <property name="base.test.dir" location="${build.semi.dir}/../tests"/>
 
         <property name="generated.properties.file" value="${build.semi.dir}/env.properties" />
 
@@ -438,16 +440,15 @@
     <target name="test2" depends="init">
         <property file="test.properties"/>
         <property name="run.all.tests" value="true"/>
-        <property name="base.test.dir" location="${build.semi.dir}/../tests"/>
         <mkdir dir="${base.test.dir}"/>
         <parallel threadsPerProcessor="1" failonany="no">
-            <ant target="hut.test" output="${base.test.dir}/hut.log"/>
-            <ant antfile="targets/kernel.test.xml" target="kernel.test" output="${base.test.dir}/kernel.log"/>
-            <ant antfile="targets/ehwa.test.xml" target="ehwa" output="${base.test.dir}/ehwa.log"/>
-            <ant antfile="targets/jvmti.test.xml" target="jvmti.test" output="${base.test.dir}/jvmti.log"/>
-            <ant antfile="targets/smoke.test.xml" target="smoke.test" output="${base.test.dir}/smoke.log"/>
-            <ant antfile="targets/reg.test.xml" target="reg.test" output="${base.test.dir}/reg.log"/>
-            <ant target="cunit.test" output="${base.test.dir}/cunit.log"/>
+            <ant target="hut.test"      output="${base.test.dir}/hut.log"/>
+            <ant target="kernel.test"   output="${base.test.dir}/kernel.log"/>
+            <ant target="ehwa"          output="${base.test.dir}/ehwa.log"/>
+            <ant target="jvmti.test"    output="${base.test.dir}/jvmti.log"/>
+            <ant target="smoke.test"    output="${base.test.dir}/smoke.log"/>
+            <ant target="reg.test"      output="${base.test.dir}/reg.log"/>
+            <ant target="cunit.test"    output="${base.test.dir}/cunit.log"/>
         </parallel>
         <fail if="test.failed" message="Some tests failed"/>
     </target>
@@ -464,31 +465,37 @@
             <property name="_component" value="vm" />
             <property name="_target" value="cunit.test" />
         </subant>
+        <available property="test.failed" file="${base.test.dir}/cunit.test.failed" />
     </target>
 
     <!-- Main target to run smoke tests -->
     <target name="smoke.test" depends="init">
         <ant antfile="targets/smoke.test.xml" target="smoke.test"/>
+        <available property="test.failed" file="${base.test.dir}/smoke.test.failed" />
     </target>
 
     <!-- Main target to run kernel tests -->
     <target name="kernel.test" depends="extern_dep,init" >
         <ant antfile="targets/kernel.test.xml" target="kernel.test"/>
+        <available property="test.failed" file="${base.test.dir}/kernel.test.failed" />
     </target>
 
     <!-- Main target to run Eclipse HelloWorld test scenario -->
     <target name="ehwa.test" depends="init" >
         <ant antfile="targets/ehwa.test.xml" target="ehwa"/>
+        <available property="test.failed" file="${base.test.dir}/ehwa.test.failed" />
     </target>
 
     <!-- Main target to run jvmti tests /-->
     <target name="jvmti.test" depends="init">
         <ant antfile="targets/jvmti.test.xml" target="jvmti.test"/>
+        <available property="test.failed" file="${base.test.dir}/jvmti.test.failed" />
     </target>
 
     <!-- Main target to run regression test /-->
     <target name="reg.test" depends="init">
         <ant antfile="targets/reg.test.xml" target="reg.test"/>
+        <available property="test.failed" file="${base.test.dir}/reg.test.failed" />
     </target>
 
     <!-- process (build/create javadoc/etc...) all the specified components -->

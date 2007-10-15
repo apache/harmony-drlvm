@@ -270,11 +270,6 @@
                     </else>
                 </if>
 
-                <!-- Overall status property -->
-                <condition property="test.failed">
-                    <isfalse value="${@{file}.status}"/>
-                </condition>
-
             </sequential>
         </for>
     </target>
@@ -282,6 +277,7 @@
     <target name="cunit-report"> 
         <gen-test-report dir="${cunit.test.dir}/reports"/>
         <echo message="Please find tests and results at ${cunit.test.dir}" />
+        <available property="test.failed" file="${cunit.test.summary}" />
         <fail unless="run.all.tests" if="test.failed" message="Some cunit tests failed"/>
     </target>
     
