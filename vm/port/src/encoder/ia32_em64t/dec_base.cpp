@@ -233,14 +233,28 @@ bool DecoderBase::decode_aux(const EncoderBase::OpcodeDesc& odesc, unsigned aux,
 bool DecoderBase::try_mn(Mnemonic mn, const unsigned char ** pbuf, Inst * pinst) {
     const unsigned char * save_pbuf = *pbuf;
     EncoderBase::OpcodeDesc * opcodes = EncoderBase::opcodes[mn];
+
     for (unsigned i=0; !opcodes[i].last; i++) {
         const EncoderBase::OpcodeDesc& odesc = opcodes[i];
+        char *opcode_ptr = const_cast<char *>(odesc.opcode);
+        int opcode_len = odesc.opcode_len;
+
         *pbuf = save_pbuf;
-        if (odesc.opcode_len != 0) {
-            if (memcmp(*pbuf, odesc.opcode, odesc.opcode_len)) {
+        if (opcode_len != 0) {
+#ifdef _EM64T_
+            // Match REX prefixes
+            if (((*pbuf)[0] & 0xf0) == 0x40 && opcode_ptr[0] == 0x48)
+            {
+                (*pbuf)++;
+                opcode_ptr++;
+                opcode_len--;
+            }
+#endif
+
+            if (memcmp(*pbuf, opcode_ptr, opcode_len)) {
                 continue;
             }
-            *pbuf += odesc.opcode_len;
+            *pbuf += opcode_len;
         }
         if (odesc.aux0 != 0) {
             
@@ -257,7 +271,7 @@ bool DecoderBase::try_mn(Mnemonic mn, const unsigned char ** pbuf, Inst * pinst)
         }
         else {
             // Can't have empty opcode
-            assert(odesc.opcode_len != 0);
+            assert(opcode_len != 0);
             pinst->odesc = &opcodes[i];
             return true;
         }
