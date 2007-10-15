@@ -300,7 +300,7 @@
 
 
     <!-- initialization target: loading and setting build properties -->
-    <target name="init" depends="detect.os.arch.cxx.cfg,
+    <target name="init" depends="svn-prop,extern_dep,detect.os.arch.cxx.cfg,
                                  init.unix,
                                  init.win,
                                  init.compressed.mode,
@@ -439,6 +439,7 @@
         <property file="test.properties"/>
         <property name="run.all.tests" value="true"/>
         <property name="base.test.dir" location="${build.semi.dir}/../tests"/>
+        <mkdir dir="${base.test.dir}"/>
         <parallel threadsPerProcessor="1" failonany="no">
             <ant target="hut.test" output="${base.test.dir}/hut.log"/>
             <ant antfile="targets/kernel.test.xml" target="kernel.test" output="${base.test.dir}/kernel.log"/>

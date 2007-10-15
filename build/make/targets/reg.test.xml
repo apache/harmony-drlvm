@@ -145,9 +145,8 @@
                     outfile="${reg.test.native.path}/${outfile}"
                     objdir="${objdir}">
                     <includepath path="${test.jdk.home}/include" />
-                    <!--select os="lnx">
-                        <linkerarg value="-lstdc++" />
-                    </select-->
+                    <compilerarg value="/EHsc" if="is.windows"/>
+                    <!--linkerarg value="-lstdc++" if="is.linux"/-->
                     <fileset file="@{nativefile}"/>
                 </cc>
                 <condition property="add.manifest">
