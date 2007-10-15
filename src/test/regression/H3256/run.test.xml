@@ -1,0 +1,7 @@
+<project name="RUN HARMONY-3256 Regression Test">
+    <target name="run-test">
+        <run-pjava-test
+            test="org.apache.harmony.drlvm.tests.regression.h3256.InterruptTimedWaitingTest"/>
+    </target>
+</project>
+

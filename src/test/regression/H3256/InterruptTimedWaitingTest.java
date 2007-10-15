@@ -1,4 +1,6 @@
-public class TestInterruptTimedWaiting {
+package org.apache.harmony.drlvm.tests.regression.h3256;
+
+public class InterruptTimedWaitingTest {
 
 	Object lock = new Object();
 	int threadCount = 100;
@@ -72,15 +74,17 @@ public class TestInterruptTimedWaiting {
 			// check for exception received
 			if (loopCount < 0) {
 				System.out.println(i + " FAILED: waiting thread has not received the InterruptedException");
+				System.exit(-1);
 			}
 			// check for interrupted status cleared
 			if (t.isInterrupted()) {
 				System.out.println(i + " FAILED: interrupt status has not been cleared");
+				System.exit(-2);
 			}
 		}
 	}
 
 	public static void main(String args[]) {
-		new TestInterruptTimedWaiting().testInterrupt_Waiting();
+		new InterruptTimedWaitingTest().testInterrupt_Waiting();
 	}
 }
