@@ -17,17 +17,14 @@
 
 <project name="REGRESSION TESTS RUN" default="do-regression-testing">
     
+    <property name="reg.test.summary" location="${base.test.dir}/reg.test.failed"/>
     <import file="test.common.xml"/>
     
-    <!-- Marker used by custom test launchers for test failure notification -->
-    <property name="reg.test.failed.mark" value="-=@@@ Reg Test Failed @@@=-"/>
-
-    <target name="do-regression-testing" 
-            depends="launch-tests,make-report,check-results">
-    </target>
+    <target name="do-regression-testing" depends="launch-tests,make-report,check-results"/>
 
     <target name="launch-tests">
         <prepare-test-run test-dir="${reg.test.dir}"/>
+        <delete file="${reg.test.summary}" quiet="true"/>
         <echo>
         =====================================
         Tested JVM: ${test.jvm.exe}
@@ -61,8 +58,9 @@
                     <then>
                         <!-- Launch the tests with a custom launchers 
                                                 placed near the tests -->
-                        <run-custom-launcher 
-                            launcher="@{reg.test.2launch.src.dir}/run.test.xml"/>
+                        <ant antfile="@{reg.test.2launch.src.dir}/run.test.xml" 
+                            target="run-test" 
+                            inheritAll="true" inheritRefs="true"/>
                     </then>
                     <else>
                         <!-- Execution of unit tests checking for regression -->
@@ -98,50 +96,9 @@
     </target>
     
     <target name="check-results">
-        <fail if="reg.test.errors" 
-            message="There were test failures"/>
+        <available property="test.failed" file="${reg.test.summary}" />
+        <fail unless="run.all.tests" if="test.failed" message="There were test failures"/>
     </target>
-
-    <!-- Macrodefinition launching the custom launcher -->
-    <macrodef name="run-custom-launcher">
-        <attribute name="launcher"/>
-        <sequential>
-            <!-- 
-                Set up try-catch block to catch the test failure.
-
-                It's possible to use <antfetch> task for this purpose:
-                    <antfetch 
-                        antfile="@{launcher}" target="run-test" 
-                        return="reg.test.errors" 
-                        inheritAll="true" inheritRefs="true"/>
-                but it fails with NPE while <macrodef> processing...
-            -->
-            <trycatch property="reg.test.failure.message"
-                      reference="reg.test.failure.reference">
-                <try>
-                    <ant antfile="@{launcher}" target="run-test" 
-                             inheritAll="true" inheritRefs="true">
-                         <property name="reg.test.custom.launched" value="true"/>
-                    </ant>
-                </try>
-                <catch>
-                    <if>
-                        <!-- it was a test failure -->
-                        <contains string="${reg.test.failure.message}" 
-                                  substring="${reg.test.failed.mark}"/>
-                        <then>
-                            <!-- set up the property -->
-                            <property name="reg.test.errors" value="true"/>
-                        </then>
-                        <else>
-                            <!-- propagate the error -->
-                            <throw refid="reg.test.failure.reference"/>
-                        </else>
-                    </if>
-                </catch>
-            </trycatch>
-        </sequential>
-    </macrodef>
 
     <!-- Macrodefinition launching JUnit test -->
     <macrodef name="run-junit-test">
@@ -151,14 +108,11 @@
         <sequential>
             <junit jvm="${test.jvm.exe}"
                    fork="yes"
-                   haltonfailure="false"
-                   haltonerror="${test.failfast}"
                    printsummary="withOutAndErr"
                    dir="${basedir}"
                    failureproperty="reg.test.errors"
                    timeout="${reg.test.timeout}">
-                <jvmarg value="-XX:-vm.assert_dialog" />
-                <jvmarg line="@{vmarg}"/>
+                <jvmarg line="@{vmarg} ${test.vmargs}"/>
                 <test name="@{test}" todir="${reg.test.dir}/reports"/>
                 <classpath>
                     <pathelement path="${reg.test.class.path}"/>
@@ -167,11 +121,18 @@
                 <formatter type="brief"/>
                 <formatter type="xml"/>
             </junit>
-            <fail message="${reg.test.failed.mark}">
+            
+            <if>
+                <istrue value="${reg.test.errors}"/>
+                <then>
+                    <echo message="*** FAILED **** : @{test}${line.separator}" file="${reg.test.summary}" append="true"/>
+                </then>
+            </if>
+            <fail message="@{test} failed">
                 <condition>
                     <and>
-                        <isset property="reg.test.custom.launched"/>
                         <istrue value="${reg.test.errors}"/>
+                        <istrue value="${test.failfast}"/>
                     </and>
                 </condition>
             </fail>
@@ -213,7 +174,7 @@
                   fork="yes"
                   timeout="${reg.test.timeout}">
                 <java-element/>
-                <jvmarg line="@{vmarg}" />
+                <jvmarg line="@{vmarg} ${test.vmargs}" />
                 <arg line="@{args}" />
                 <classpath>
                     <pathelement path="${reg.test.class.path}"/>
@@ -233,11 +194,17 @@
                 msg="Exit code: ${@{test}.res.code}"
                 detail="Exit code: ${@{test}.res.code} Err: ${@{test}.msg}"/>
 
+            <!-- handle test result -->
             <if>
                 <isfalse value="${@{test}.is.passed}"/>
                 <then>
                     <echo message="*** FAILED **** : @{test} (${@{test}.res.code} exit code)"/>
-                    <fail message="${reg.test.failed.mark}"/>
+                    <echo message="*** FAILED **** : @{test} (${@{test}.res.code} exit code)${line.separator}" file="${reg.test.summary}" append="true"/>
+                    <fail message="@{test} failed">
+                        <condition>
+                            <istrue value="${test.failfast}"/>
+                        </condition>
+                    </fail>
                 </then>
                 <else>
                     <echo message="PASSED : @{test}"/>

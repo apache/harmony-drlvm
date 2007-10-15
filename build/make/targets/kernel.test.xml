@@ -31,6 +31,7 @@
     <target name="run-kernel-test">
         <prepare-test-run test-dir="${kernel.test.dir}"/>
         <delete file="${kernel.test.summary}" quiet="true"/>
+        <delete file="${base.test.dir}/kernel.test.failed" quiet="true"/>
         
         <echo>
         ==================================
@@ -70,7 +71,19 @@
         <condition property="test.failed">
             <contains string="${kernel.test.summary.txt}" substring="FAILED" />
         </condition>
+        <antcall target="touch-failures-file"/>
         <fail unless="run.all.tests" if="test.failed" message="There were test failures."/>
+    </target>
+    
+    <target name="touch-failures-file" if="test.failed">
+        <copy file="${kernel.test.summary}" tofile="${base.test.dir}/kernel.test.failed">
+            <filterchain>
+                <linecontains>
+                    <contains value="FAILED"/>
+                </linecontains>
+                <trim/>
+            </filterchain>
+        </copy>
     </target>
 
     <target name="compile-kernel-test">
