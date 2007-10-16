@@ -50,6 +50,7 @@ void LoopTree::findLoopHeaders(Nodes& headers) { // out
         for(eiter = edges.begin(); eiter != edges.end(); ++eiter) {
             Node* pred = (*eiter)->getSourceNode();
             if (dom->dominates(n, pred)) {
+                assert(n->isBlockNode());
                 headers.push_back(n);
                 break;
             }

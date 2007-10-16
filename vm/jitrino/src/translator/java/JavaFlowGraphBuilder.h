@@ -46,9 +46,7 @@ private:
     Node*        edgesForBlock(Node* block);
     void         edgesForHandler(Node* entry);
     void         edgeForFallthrough(Node* block);
-    void         eliminateUnnestedLoopsOnDispatch();
-    bool         lastInstIsMonitorExit(Node* node);
-
+    
     Node* createBlockNodeOrdered(LabelInst* label);
     Node* createBlockNodeAfter(Node* node, LabelInst* label);
     void addEdge(Node* source, Node* target);

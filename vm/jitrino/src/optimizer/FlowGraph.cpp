@@ -348,57 +348,6 @@ void FlowGraph::renameOperandsInNode(Node *node, OpndRenameTable *renameTable) {
     }
 }
 
-
-
-
-static void breakMonitorExitLoop(ControlFlowGraph& fg, Node* node, Inst* monExit) {
-
-    // Look for the following type of loop where a handler with a 
-    // monitorexit handles itself.  
-    // D1:
-    // 
-    // B1:
-    //   t1 = catch
-    //   ...
-    //
-    // B2:
-    //   monitorExit t2 ---> D1
-    assert(node->getLastInst() == monExit);
-    assert(monExit->getOpcode() == Op_TauMonitorExit);
-
-    Node* dispatch =  node->getExceptionEdge()->getTargetNode();
-    Node* catchBlock = node;
-    std::vector<Edge*> exceptionEdges;
-    exceptionEdges.push_back(node->getExceptionEdge());
-
-    // Look for a catchBlock that dominates the node.  Assume no control flow.
-    while(!((Inst*)catchBlock->getFirstInst())->isCatchLabel() && catchBlock->getInEdges().size() == 1) {
-        catchBlock = catchBlock->getInEdges().front()->getSourceNode();
-        Edge* exceptionEdge = catchBlock->getExceptionEdge();
-        if(exceptionEdge == NULL || exceptionEdge->getTargetNode() != dispatch)
-            return;
-        exceptionEdges.push_back(exceptionEdge);
-    }
-
-    if(((Inst*)catchBlock->getFirstInst())->isCatchLabel()) {
-        // We are in a catch.
-        if(dispatch->findTargetEdge(catchBlock)) {
-            // We have a cycle!
-            Node* newDispatch =  dispatch->getExceptionEdge()->getTargetNode();
-            assert(newDispatch != NULL);
-
-            std::vector<Edge*>::iterator i;
-            for(i = exceptionEdges.begin(); i != exceptionEdges.end(); ++i) {
-                Edge* exceptionEdge = *i;
-                assert(exceptionEdge->getTargetNode() == dispatch);
-                fg.replaceEdgeTarget(exceptionEdge, newDispatch);
-            }
-        }
-    }
-}
-
-
-
 //
 // used to find 'saveret' that starts the node
 //     'labelinst' and 'stvar' are skipped
@@ -847,9 +796,16 @@ void FlowGraph::doTranslatorCleanupPhase(IRManager& irm) {
     InstFactory& instFactory = irm.getInstFactory();
     OpndManager& opndManager = irm.getOpndManager();
 
+
     static CountTime cleanupPhaseTimer("ptra::fg::cleanupPhase");
     AutoTimer tm(cleanupPhaseTimer);
     fg.purgeUnreachableNodes();
+
+#ifdef _DEBUG
+    //check if loop structure is valid after translator
+    OptPass::computeLoops(irm, false);
+#endif
+
 
     inlineJSRs(&irm);
     fg.purgeUnreachableNodes();
@@ -866,11 +822,7 @@ void FlowGraph::doTranslatorCleanupPhase(IRManager& irm) {
                 continue;
             }
             Inst *last = (Inst*)node->getLastInst();
-            if (last->getOpcode() == Op_TauMonitorExit) {
-                // Check for monitor exit loop.  
-                breakMonitorExitLoop(fg, node, last);
-            }
-            else if (last->isBranch()) {
+            if (last->isBranch()) {
                 if (last->isLeave()) {
                     // Inline Finally - only necessary after translation
                     inlineFinally(irm, node);

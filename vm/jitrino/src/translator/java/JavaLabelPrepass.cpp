@@ -453,11 +453,36 @@ public:
             //
             // add new CatchBlock
             //
-            prevCatch = catchBlock = 
-                new (memManager) CatchBlock(nextRegionId++, tryOffset, endOffset, numCatch++);
-            prepass.stateTable->getStateInfo(tryOffset)->addExceptionInfo(catchBlock);
-            prepass.exceptionTable.push_back(catchBlock);
-            addHandlerForCatchBlock(catchBlock, handlerOffset, exceptionType);
+            if (handlerOffset < endOffset && handlerOffset > tryOffset) { 
+                //self-handling block: add 2 CatchBlocks(ExceptionInfos) with the following boundaries:
+                //[tryOffset, handlerOffset], [handlerOffset, endOffset]
+                //The reason is to avoid loops with dispatch node as header:
+                // Details:
+                // For a single CatchBlock(ExceptionInfo) we have only 1 dispatch node today 
+                // (dispatch node is referenced by LabelInfo field in ExceptionInfo structure)
+                // Having single dispatch node for self-catching regions we will have a loop with
+                // dispatch node as a loop-header.
+                // To avoid having dispatch nodes as a loop-header we create 2 (CatchBlocks)ExceptionInfos here: 
+                // doing this we have 2 dispatch nodes for 2 ExceptionInfos and loop-header is automatically 
+                // moved to the next (after the second dispatch)block node with CatchLabelInst instruction.
+                // Example to reproduce: comment out this if clause and check IR for monexit loops.
+
+                prevCatch = catchBlock = new (memManager) CatchBlock(nextRegionId++, tryOffset, handlerOffset, numCatch++);
+                prepass.stateTable->getStateInfo(tryOffset)->addExceptionInfo(catchBlock);
+                prepass.exceptionTable.push_back(catchBlock);
+                addHandlerForCatchBlock(catchBlock, handlerOffset, exceptionType);
+
+                prevCatch = catchBlock = new (memManager) CatchBlock(nextRegionId++, handlerOffset, endOffset, numCatch++);
+                prepass.stateTable->getStateInfo(handlerOffset)->addExceptionInfo(catchBlock);
+                prepass.exceptionTable.push_back(catchBlock);
+                addHandlerForCatchBlock(catchBlock, handlerOffset, exceptionType);
+            } else { 
+                prevCatch = catchBlock = new (memManager) CatchBlock(nextRegionId++, tryOffset, endOffset, numCatch++);
+                prepass.stateTable->getStateInfo(tryOffset)->addExceptionInfo(catchBlock);
+                prepass.exceptionTable.push_back(catchBlock);
+                addHandlerForCatchBlock(catchBlock, handlerOffset, exceptionType);
+            } 
+            
         }
         return 1; // all exceptionTypes are OK
     }
