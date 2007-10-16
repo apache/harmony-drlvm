@@ -131,8 +131,9 @@ jvmtiGetAllThreads(jvmtiEnv* env,
         jthread_iterator_release(&iterator);
         return err; 
     } 
-    for (i=0;i<java_thread_count;i++)    {
-        java_threads[i]=p_TLS_vmthread->jni_env->NewLocalRef(jthread_iterator_next(&iterator));
+    for (i=0;i<java_thread_count;i++) {
+        java_threads[i]= oh_copy_to_local_handle(jthread_iterator_next(&iterator));
+        assert(java_threads[i]);
     }
     *threads_count_ptr = java_thread_count;
     *threads_ptr = java_threads;

@@ -137,15 +137,17 @@ int HYTHREAD_PROC jthread_wrapper_start_proc(void *arg)
     // increase started thread count
     jthread_start_count();
 
-    // Send Thread Start event.
+    // set j.l.Thread.isAlive field to true
     assert(hythread_is_alive(native_thread));
     jni_env->SetBooleanField(java_thread,
         jthread_get_alive_field(jni_env, java_thread), true);
-    jvmti_send_thread_start_end_event(vm_thread, 1);
 
     // release hythread global lock
     status = hythread_global_unlock();
     assert(status == TM_ERROR_NONE);
+
+    // set JVMTI Thread Start event
+    jvmti_send_thread_start_end_event(vm_thread, 1);
 
     jvmtiStartFunction start_jvmti_proc = start_proc_data.proc;
     if (start_jvmti_proc != NULL) {
