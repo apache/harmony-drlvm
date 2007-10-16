@@ -37,7 +37,7 @@ namespace CPVerifier {
     //predefined verification types
     enum SmConstPredefined {
         SM_NONE                         = 0,
-        SM_ONEWORDED                    = 1,
+        SM_LOW_WORD                     = 1,
         SM_REF_OR_UNINIT_OR_RETADR      = 3,
         SM_REF_OR_UNINIT                = 5,
         SM_THISUNINIT                   = 7,

@@ -731,7 +731,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
             WorkmapElement value = workmap_pop();
 
             //check INs
-            if( !workmap_expect(value, SM_ONEWORDED) ) return error(VF_ErrorIncompatibleArgument, "incompartible argument");
+            if( !workmap_expect(value, SM_LOW_WORD) ) return error(VF_ErrorIncompatibleArgument, "incompartible argument");
 
             //push OUTs
             workmap_push( value );
@@ -750,7 +750,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
             WorkmapElement value2 = workmap_pop();
 
             //check INs
-            if( !workmap_expect(value1, SM_ONEWORDED) || !workmap_expect(value2, SM_ONEWORDED) ) {
+            if( !workmap_expect(value1, SM_LOW_WORD) || !workmap_expect(value2, SM_LOW_WORD) ) {
                 return error(VF_ErrorIncompatibleArgument, "incompartible argument");
             }
 
@@ -772,8 +772,8 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
             WorkmapElement value2 = workmap_pop();
             WorkmapElement value3 = workmap_pop();
 
-            //check INs  !!! SM_HIGH_WORD must be a one-word element !!!
-            if( !workmap_expect(value1, SM_ONEWORDED) || !workmap_expect(value2, SM_ONEWORDED) ) {
+            //check INs  !!! SM_HIGH_WORD is a two-word element: Long and Double are not !!!
+            if( !workmap_expect(value1, SM_LOW_WORD) || !workmap_expect(value3, SM_LOW_WORD) ) {
                 return error(VF_ErrorIncompatibleArgument, "incompartible argument");
             }
 
@@ -797,7 +797,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
             WorkmapElement value2 = workmap_pop();
 
             //check INs
-            if( !workmap_expect(value1, SM_ONEWORDED) ) {
+            if( !workmap_expect(value2, SM_LOW_WORD) ) {
                 return error(VF_ErrorIncompatibleArgument, "incompartible argument");
             }
 
@@ -822,7 +822,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
             WorkmapElement value3 = workmap_pop();
 
             //check INs
-            if( !workmap_expect(value1, SM_ONEWORDED) || !workmap_expect(value3, SM_ONEWORDED) ) {
+            if( !workmap_expect(value2, SM_LOW_WORD) || !workmap_expect(value3, SM_LOW_WORD) ) {
                 return error(VF_ErrorIncompatibleArgument, "incompartible argument");
             }
 
@@ -849,7 +849,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
             WorkmapElement value4 = workmap_pop();
 
             //check INs
-            if( !workmap_expect(value1, SM_ONEWORDED) || !workmap_expect(value3, SM_ONEWORDED) ) {
+            if( !workmap_expect(value2, SM_LOW_WORD) || !workmap_expect(value4, SM_LOW_WORD) ) {
                 return error(VF_ErrorIncompatibleArgument, "incompartible argument");
             }
 
@@ -1452,7 +1452,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
             WorkmapElement value = workmap_pop();
 
             //check INs
-            if( !workmap_expect(value, SM_ONEWORDED) ) {
+            if( !workmap_expect(value, SM_LOW_WORD) ) {
                 return error(VF_ErrorIncompatibleArgument, "incompartible argument");
             }
             break;
@@ -1463,11 +1463,11 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
             if( !workmap_can_pop(2) ) return error(VF_ErrorDataFlow, "unable to pop from empty operand stack");
 
             //pop INs
-            WorkmapElement hi_val = workmap_pop();
             workmap_pop();
+            WorkmapElement lo_val = workmap_pop();
 
             //check INs
-            if( !workmap_expect(hi_val, SM_ONEWORDED) ) {
+            if( !workmap_expect(lo_val, SM_LOW_WORD) ) {
                 return error(VF_ErrorIncompatibleArgument, "incompartible argument");
             }
             break;
@@ -1515,8 +1515,8 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
             WorkmapElement value2 = workmap_pop();
 
             //check INs
-            if( !workmap_expect(value1, SM_ONEWORDED) ||
-                !workmap_expect(value2, SM_ONEWORDED) )
+            if( !workmap_expect(value1, SM_LOW_WORD) ||
+                !workmap_expect(value2, SM_LOW_WORD) )
             {
                 return error(VF_ErrorIncompatibleArgument, "incompartible argument");
             }

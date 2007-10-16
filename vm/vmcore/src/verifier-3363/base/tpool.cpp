@@ -145,15 +145,15 @@ namespace CPVerifier {
 
         //migth have to change switch below if merging is done with constants
         assert( from != SM_NONE );
-        assert( from != SM_ONEWORDED );
+        assert( from != SM_LOW_WORD );
         assert( from != SM_REF_OR_UNINIT_OR_RETADR );
         assert( from != SM_REF_OR_UNINIT );
         assert( from != SM_ANYARRAY );
         assert( from != SM_BOGUS );
 
         switch ( to.c ) {
-        case SM_ONEWORDED:
-            return !from.isLongOrDouble();
+        case SM_LOW_WORD:
+            return from != SM_HIGH_WORD;
 
         case SM_REF_OR_UNINIT_OR_RETADR:
             return from == SM_NULL || from == SM_THISUNINIT || !from.isPrimitive();
