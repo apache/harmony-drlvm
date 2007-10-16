@@ -1671,8 +1671,13 @@ static NativeCodePtr rth_get_lil_jvmti_method_exit_callback(int * dyn_count) {
     cs = lil_parse_onto_end(cs,
         "push_m2n 0, %0i;"
         "out platform:pint,pint:void;"
+#ifdef _EM64T_
+        "o0=i0;"
+        "o1=i1;"
+#else
         "o0=i1;"
         "o1=i0;"
+#endif
         "call %1i;"
         "pop_m2n;"
         "ret;",
