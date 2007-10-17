@@ -433,25 +433,26 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
     {
         cs = lil_parse_onto_end(cs,
                                 "out platform:pint,g1,g8:void;"
-                                "o0=%0i:pint;"
-                                "o1=%1i:g1;"
-                                "o2=0:g8;"
                                 "l2=ts;"
-                                "ld l2,[l2+%2i:ref];"
+                                "ld l2,[l2+%0i:ref];"
                                 "jc l2!=0,_mex_exn_raised;"
                                 "l2=ts;"
-                                "ld l2,[l2+%3i:ref];"
+                                "ld l2,[l2+%1i:ref];"
                                 "jc l2!=0,_mex_exn_raised;"
+                                "o1=%2i:g1;"
                                 "o2=l1:g8;"
                                 "j _mex_exn_cont;"
                                 ":_mex_exn_raised;"
-                                "o1=%4i:g1;"
+                                "o1=%3i:g1;"
+                                "o2=0:g8;"
                                 ":_mex_exn_cont;"
+                                "o0=%4i:pint;"
                                 "call %5i;",
-                                (jmethodID)method,
+                                eoo,
+								eco,
                                 (POINTER_SIZE_INT)JNI_FALSE,
-                                eoo, eco,
                                 (POINTER_SIZE_INT)JNI_TRUE,
+                                (jmethodID)method,
                                 jvmti_process_method_exit_event);
         assert(cs);
     }
