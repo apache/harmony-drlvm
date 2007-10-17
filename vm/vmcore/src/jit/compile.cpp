@@ -449,7 +449,7 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
                                 "o0=%4i:pint;"
                                 "call %5i;",
                                 eoo,
-								eco,
+                                eco,
                                 (POINTER_SIZE_INT)JNI_FALSE,
                                 (POINTER_SIZE_INT)JNI_TRUE,
                                 (jmethodID)method,
