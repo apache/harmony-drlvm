@@ -147,7 +147,9 @@ void regs_push_return_address(Registers* pregs, void* ret_addr)
 }
 
 extern "C" {
-void __attribute__ ((used, cdecl)) c_exception_handler(Class* exn_class, bool java_code) {
+// Gregory -
+// Attribute cdecl is not used here because it has no meaning in x86_64 calling conventions
+void __attribute__ ((used)) c_exception_handler(Class* exn_class, bool java_code) {
     // this exception handler is executed *after* NT exception handler returned
     DebugUtilsTI* ti = VM_Global_State::loader_env->TI;
     // Create local copy for registers because registers in TLS can be changed
