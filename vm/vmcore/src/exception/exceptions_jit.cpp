@@ -188,7 +188,7 @@ static ManagedObject *create_lazy_exception(
 // copied from the final stack iterator.
 
 // function can be safe point & should be called with disable recursion = 1
-static void exn_propagate_exception(
+static ManagedObject * exn_propagate_exception(
     StackIterator * si,
     ManagedObject ** exn_obj,
     Class_Handle exn_class,
@@ -248,6 +248,7 @@ static void exn_propagate_exception(
     }
 
 #ifdef VM_STATS
+    assert(exn_class);
     exn_class->class_thrown();
     UNSAFE_REGION_START
     VM_Statistics::get_vm_stats().num_exceptions++;
@@ -375,7 +376,7 @@ static void exn_propagate_exception(
 
                     si_set_return_pointer(si, (void **) exn_obj);
                     si_free(throw_si);
-                    return;
+                    return NULL;
                 }
             }
 
@@ -409,18 +410,16 @@ static void exn_propagate_exception(
     // Reload exception object pointer because it could have
     // moved while calling JVMTI callback
     if (exn_raised()) {
-        return;
+        si_free(throw_si);
+        return NULL;
     }
 
     *exn_obj = jvmti_jit_exception_event_callback_call(*exn_obj,
         interrupted_method_jit, interrupted_method, interrupted_method_location,
         NULL, NULL, NULL);
 
-    set_exception_object_internal(*exn_obj);
-
-    *exn_obj = NULL;
-    si_set_return_pointer(si, (void **) exn_obj);
     si_free(throw_si);
+    return *exn_obj;
 }   //exn_propagate_exception
 
 #ifndef _IPF_
@@ -490,27 +489,38 @@ void exn_throw_for_JIT(ManagedObject* exn_obj, Class_Handle exn_class,
     assert(!exn_raised());
 
     DebugUtilsTI* ti = VM_Global_State::loader_env->TI;
-    exn_propagate_exception(si, &local_exn_obj, exn_class, exn_constr,
+    exn_obj = exn_propagate_exception(si, &local_exn_obj, exn_class, exn_constr,
         jit_exn_constr_args, vm_exn_constr_args);
+
+    if (exn_raised()) {
+        si_free(si);
+        return;
+    }
+
     M2nFrame* m2nFrame = m2n_get_last_frame();
     ObjectHandles* last_m2n_frame_handles = m2n_get_local_handles(m2nFrame);
 
     if (last_m2n_frame_handles) {
         free_local_object_handles2(last_m2n_frame_handles);
     }
+    set_exception_object_internal(exn_obj);
 
     if (ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_EXCEPTION_EVENT)) {
         Registers regs = {0};
         VM_thread *thread = p_TLS_vmthread;
         NativeCodePtr callback = (NativeCodePtr)
-                asm_jvmti_exception_catch_callback;
+                jvmti_exception_catch_callback;
 
         si_copy_to_registers(si, &regs);
         vm_set_exception_registers(thread, regs);
         si_set_callback(si, &callback);
     } else if (p_TLS_vmthread->restore_guard_page) {
+        Registers regs = {0};
+        VM_thread *thread = p_TLS_vmthread;
         NativeCodePtr callback = (NativeCodePtr)
-                asm_exception_catch_callback;
+                exception_catch_callback;
+        si_copy_to_registers(si, &regs);
+        vm_set_exception_registers(thread, regs);
         si_set_callback(si, &callback);
     }
 
@@ -541,45 +551,70 @@ void exn_athrow(ManagedObject* exn_obj, Class_Handle exn_class,
 // Mutates the regs value, which should be used to "resume" the managed code.
 
 // function can be safe point & should be called with disable reqursion = 1
-void exn_athrow_regs(Registers * regs, Class_Handle exn_class, bool java_code)
+void exn_athrow_regs(Registers * regs, Class_Handle exn_class, bool java_code, bool transfer_control)
 {
     assert(!hythread_is_suspend_enabled());
     assert(exn_class);
 
 #ifndef _IPF_
-    M2nFrame *m2nf;
+    M2nFrame *cur_m2nf = (M2nFrame *) STD_ALLOCA(m2n_get_size());
+    M2nFrame *unw_m2nf;
+    ManagedObject *exn_obj = NULL;
     StackIterator *si;
+    DebugUtilsTI* ti = VM_Global_State::loader_env->TI;
+    VM_thread* vmthread = p_TLS_vmthread;
 
     if (java_code) {
-        m2nf = m2n_push_suspended_frame(regs);
+        m2n_push_suspended_frame(vmthread, cur_m2nf, regs);
     }
 
     BEGIN_RAISE_AREA;
 
     si = si_create_from_native();
     ManagedObject *local_exn_obj = NULL;
-    exn_propagate_exception(si, &local_exn_obj, exn_class, NULL, NULL, NULL);
+    exn_obj = exn_propagate_exception(si, &local_exn_obj, exn_class, NULL, NULL, NULL);
+
+    //free local handles
+    ObjectHandles* last_m2n_frame_handles = m2n_get_local_handles(cur_m2nf);
+
+    if (last_m2n_frame_handles) {
+        free_local_object_handles2(last_m2n_frame_handles);
+    }
+
+    if (ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_EXCEPTION_EVENT)) {
+        Registers regs = {0};
+        VM_thread *thread = p_TLS_vmthread;
+        NativeCodePtr callback = (NativeCodePtr)
+                jvmti_exception_catch_callback;
+
+        si_copy_to_registers(si, &regs);
+        vm_set_exception_registers(thread, regs);
+        si_set_callback(si, &callback);
+    } else if (p_TLS_vmthread->restore_guard_page) {
+        Registers regs = {0};
+        VM_thread *thread = p_TLS_vmthread;
+        NativeCodePtr callback = (NativeCodePtr)
+                exception_catch_callback;
+        si_copy_to_registers(si, &regs);
+        vm_set_exception_registers(thread, regs);
+        si_set_callback(si, &callback);
+    }
+
     si_copy_to_registers(si, regs);
 
-#ifdef _WIN32
-    END_RAISE_AREA;
-#else
-    /*
-     * FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME
-     * Gregory -
-     * This is a workaround for bug HARMONY-4873. This code should
-     * actually be replaced with END_RAISE_AREA when the bug is fixed
-     */
-    set_unwindable(unwindable);
-    }
-#endif
+    if (transfer_control) {
+        set_exception_object_internal(exn_obj);
+        si_transfer_control(si);
+        assert(!"si_transfer_control should not return");
+    } 
 
-    m2n_set_last_frame(si_get_m2n(si));
+    unw_m2nf = si_get_m2n(si);
     si_free(si);
 
-    if (java_code) {
-        STD_FREE(m2nf);
-    }
+    END_RAISE_AREA;
+
+    set_exception_object_internal(exn_obj);
+    m2n_set_last_frame(unw_m2nf);
 #endif
 }   //exn_athrow_regs
 
@@ -588,24 +623,47 @@ void exn_athrow_regs(Registers * regs, Class_Handle exn_class, bool java_code)
 
 // exception catch callback to restore stack after Stack Overflow Error
 void exception_catch_callback() {
+    Registers regs = {0};
+    VM_thread *thread = p_TLS_vmthread;
+    assert(thread);
+
+    if (thread->regs) {
+        regs = *(Registers*)thread->regs;
+    }
+
     if (p_TLS_vmthread->restore_guard_page) {
         set_guard_stack();
     }
+
+    M2nFrame* m2n = (M2nFrame *) STD_ALLOCA(m2n_get_size());
+    m2n_push_suspended_frame(thread, m2n, &regs);
+    M2nFrame* prev_m2n = m2n_get_previous_frame(m2n);
+
+    StackIterator *si =
+        si_create_from_registers(&regs, false, prev_m2n);
+    si_transfer_control(si);
 }
 
 // exception catch support for JVMTI, also restore stack after Stack Overflow Error
-void jvmti_exception_catch_callback(Registers* regs) {
+void jvmti_exception_catch_callback() {
+    Registers regs = {0};
+    VM_thread *thread = p_TLS_vmthread;
+    assert(thread);
+
+    if (thread->regs) {
+        regs = *(Registers*)thread->regs;
+    }
+
     if (p_TLS_vmthread->restore_guard_page) {
         set_guard_stack();
     }
 
-    M2nFrame *m2nf = m2n_push_suspended_frame(regs);
+    M2nFrame* m2n = (M2nFrame *) STD_ALLOCA(m2n_get_size());
+    m2n_push_suspended_frame(thread, m2n, &regs);
+    M2nFrame* prev_m2n = m2n_get_previous_frame(m2n);
 
-    StackIterator *si = si_create_from_native();
-
-    if (si_is_native(si)) {
-        si_goto_previous(si);
-    }
+    StackIterator *si =
+        si_create_from_registers(&regs, false, prev_m2n);
 
     if (!si_is_native(si))
     {
@@ -625,9 +683,7 @@ void jvmti_exception_catch_callback(Registers* regs) {
         assert(0);
 #endif
     }
-
-    m2n_set_last_frame(m2n_get_previous_frame(m2nf));
-    STD_FREE(m2nf);
+    si_transfer_control(si);
 }
 
 //////////////////////////////////////////////////////////////////////////

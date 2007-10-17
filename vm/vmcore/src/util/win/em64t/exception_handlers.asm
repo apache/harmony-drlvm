@@ -4,12 +4,6 @@ EXTRN   vectored_exception_handler_internal:PROC
 PUBLIC  asm_c_exception_handler
 EXTRN   c_exception_handler:PROC
 
-PUBLIC  asm_exception_catch_callback
-EXTRN   exception_catch_callback_wrapper:PROC
-
-PUBLIC  asm_jvmti_exception_catch_callback
-EXTRN   jvmti_exception_catch_callback_wrapper:PROC
-
 _TEXT   SEGMENT
 
 vectored_exception_handler PROC
@@ -68,77 +62,6 @@ asm_c_exception_handler PROC
 
 asm_c_exception_handler ENDP
 
-
-asm_exception_catch_callback PROC
-
-; void __cdecl exception_catch_callback_wrapper()
-; Args:
-;   rcx - none
-;   rdx - none
-;   r8  - none
-;   r9  - none
-
-    pushfq
-    cld
-    push    rax
-    push    rbx
-    push    rcx
-    push    rdx
-    push    r8
-    push    r9
-    push    r10
-    push    r11
-    sub     rsp, 32 ; allocate stack for 4 registers
-    call    exception_catch_callback_wrapper
-    add     rsp, 32
-    pop     r11
-    pop     r10
-    pop     r9
-    pop     r8
-    pop     rdx
-    pop     rcx
-    pop     rbx
-    pop     rax
-    popfq
-    ret
-
-asm_exception_catch_callback ENDP
-
-
-asm_jvmti_exception_catch_callback PROC
-
-; void __cdecl jvmti_exception_catch_callback_wrapper()
-; Args:
-;   rcx - none
-;   rdx - none
-;   r8  - none
-;   r9  - none
-
-    pushfq
-    cld
-    push    rax
-    push    rbx
-    push    rcx
-    push    rdx
-    push    r8
-    push    r9
-    push    r10
-    push    r11
-    sub     rsp, 32 ; allocate stack for 4 registers
-    call    jvmti_exception_catch_callback_wrapper
-    add     rsp, 32
-    pop     r11
-    pop     r10
-    pop     r9
-    pop     r8
-    pop     rdx
-    pop     rcx
-    pop     rbx
-    pop     rax
-    popfq
-    ret
-
-asm_jvmti_exception_catch_callback ENDP
 
 _TEXT   ENDS
 

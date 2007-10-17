@@ -114,64 +114,56 @@ void linux_regs_to_ucontext(ucontext_t *uc, Registers* regs)
     uc->uc_mcontext.gregs[REG_EFL] = regs->eflags;
 }
 
-// exception catch support for stack restore
-extern "C" {
-    static void __attribute__ ((used)) exception_catch_callback_wrapper(){
-        exception_catch_callback();
+// Max. 6 arguments can be set up
+void regs_push_param(Registers* pregs, POINTER_SIZE_INT param, int num)
+{
+    switch (num)
+    {
+    case 0:
+        pregs->rdi = param;
+        return;
+    case 1:
+        pregs->rsi = param;
+        return;
+    case 2:
+        pregs->rdx = param;
+        return;
+    case 3:
+        pregs->rcx = param;
+        return;
+    case 4:
+        pregs->r8 = param;
+        return;
+    case 5:
+        pregs->r9 = param;
+        return;
     }
 }
 
-void asm_exception_catch_callback() {
-    asm (
-        "pushq %%rax;\n"
-        "pushq %%rbx;\n"
-        "pushq %%rcx;\n"
-        "pushq %%rdx;\n"
-        "pushq %%rsi;\n"
-        "pushq %%rdi;\n"
-        "pushq %%r8;\n"
-        "pushq %%r9;\n"
-        "pushq %%r10;\n"
-        "pushq %%r11;\n"
-        "call exception_catch_callback_wrapper;\n"
-        "popq %%r11;\n"
-        "popq %%r10;\n"
-        "popq %%r9;\n"
-        "popq %%r8;\n"
-        "popq %%rdi;\n"
-        "popq %%rsi;\n"
-        "popq %%rdx;\n"
-        "popq %%rcx;\n"
-        "popq %%rbx;\n"
-        "popq %%rax;\n"
-        : /* no output operands */
-        : /* no input operands */
-    );
-#ifdef _DEBUG
-    asm (
-        "movq %%rbp, %%rsp\n"
-        "popq %%rbp\n"
-        "retq $0x80;\n"
-        : /* no output operands */
-        : /* no input operands */
-    );
-#else // _DEBUG
-    asm (
-        "retq $0x80;\n"
-        : /* no output operands */
-        : /* no input operands */
-    );
-#endif // ! _DEBUG}
+void regs_push_return_address(Registers* pregs, void* ret_addr)
+{
+    pregs->rsp = pregs->rsp - 8;
+    *((void**)pregs->rsp) = ret_addr;
 }
 
-// exception catch support for JVMTI
-void asm_jvmti_exception_catch_callback() {
-    // FIXME: not implemented
-    fprintf(stderr, "FIXME: asm_jvmti_exception_catch_callback: not implemented\n");
-    assert(0);
-    abort();
+extern "C" {
+void __attribute__ ((used, cdecl)) c_exception_handler(Class* exn_class, bool java_code) {
+    // this exception handler is executed *after* NT exception handler returned
+    DebugUtilsTI* ti = VM_Global_State::loader_env->TI;
+    // Create local copy for registers because registers in TLS can be changed
+    Registers regs = {0};
+    VM_thread *thread = p_TLS_vmthread;
+    assert(thread);
+    assert(exn_class);
 
+    if (thread->regs) {
+        regs = *(Registers*)thread->regs;
+    }
+
+    exn_athrow_regs(&regs, exn_class, java_code, true);
 }
+}
+
 static void throw_from_sigcontext(ucontext_t *uc, Class* exc_clss)
 {
     Registers regs;
@@ -179,8 +171,21 @@ static void throw_from_sigcontext(ucontext_t *uc, Class* exc_clss)
 
     DebugUtilsTI* ti = VM_Global_State::loader_env->TI;
     bool java_code = (vm_identify_eip((void *)regs.rip) == VM_TYPE_JAVA);
+    VM_thread* vmthread = p_TLS_vmthread;
+    NativeCodePtr callback = (NativeCodePtr) c_exception_handler;
+    const static uint64 red_zone_size = 0x80;
 
-    exn_athrow_regs(&regs, exc_clss, java_code);
+    vm_set_exception_registers(vmthread, regs);
+    regs.rsp -= red_zone_size;
+    regs_push_param(&regs, java_code, 1);
+    assert(exc_clss);
+    regs_push_param(&regs, (POINTER_SIZE_INT)exc_clss, 0);
+    // imitate return IP on stack
+    regs_push_return_address(&regs, NULL);
+    regs_push_return_address(&regs, NULL);
+
+    // set up the real exception handler address
+    regs.set_ip(callback);
     linux_regs_to_ucontext(uc, &regs);
 }
 
@@ -384,7 +389,7 @@ size_t get_available_stack_size() {
     size_t used_stack_size = stack_addr - ((char*)&stack_addr);
     int available_stack_size;
 
-    if (((char*)&stack_addr) > (stack_addr - get_stack_size() + get_guard_page_size() + get_guard_stack_size())) {
+    if (!(p_TLS_vmthread->restore_guard_page)) {
         available_stack_size = get_stack_size() - used_stack_size
             - 2 * get_guard_page_size() - get_guard_stack_size();
     } else {
@@ -424,6 +429,12 @@ bool check_stack_size_enough_for_exception_catch(void* sp) {
             get_stack_size() - used_stack_size
             - 2 * get_guard_page_size() - get_guard_stack_size();
     return get_restore_stack_size() < available_stack_size;
+}
+
+void remove_guard_stack() {
+    vm_thread_t vm_thread = jthread_self_vm_thread_unsafe();
+    assert(vm_thread);
+    remove_guard_stack(vm_thread);
 }
 
 void remove_guard_stack(vm_thread_t vm_thread) {
@@ -476,6 +487,10 @@ void stack_overflow_handler(int signum, siginfo_t* UNREF info, void* context)
     ucontext_t *uc = (ucontext_t *)context;
     Global_Env *env = VM_Global_State::loader_env;
 
+    vm_thread_t vm_thread = p_TLS_vmthread;
+    remove_guard_stack(vm_thread);
+    vm_thread->restore_guard_page = true;
+
     if (java_throw_from_sigcontext(
                 uc, env->java_lang_StackOverflowError_Class)) {
         return;
@@ -487,7 +502,6 @@ void stack_overflow_handler(int signum, siginfo_t* UNREF info, void* context)
             throw_from_sigcontext(
                 uc, env->java_lang_StackOverflowError_Class);
         } else {
-            remove_guard_stack(p_TLS_vmthread);
             exn_raise_by_class(env->java_lang_StackOverflowError_Class);
         }
     }

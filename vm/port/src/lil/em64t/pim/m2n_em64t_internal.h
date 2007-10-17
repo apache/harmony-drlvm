@@ -78,8 +78,7 @@ struct M2nFrame {
  * returns size of m2n frame in bytes
  */
 inline size_t m2n_get_size() {
-    // omit regs
-    return sizeof(M2nFrame) - 16;
+    return sizeof(M2nFrame);
 }
 
 /**

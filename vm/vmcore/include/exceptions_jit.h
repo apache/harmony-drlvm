@@ -42,13 +42,13 @@ void exn_athrow(ManagedObject* exn_obj, Class_Handle exn_class, Method_Handle ex
 // Must be called with the current thread "suspended" in managed code and regs holds the suspended values.
 // Exception defined as in previous two functions.
 // Mutates the regs value, which should be used to "resume" the managed code.
-void exn_athrow_regs(Registers* regs, Class_Handle exn_class, bool java_code);
+void exn_athrow_regs(Registers* regs, Class_Handle exn_class, bool java_code, bool transfer_control=false);
 
 // exception catch callback to restore stack after Stack Overflow Error
 void exception_catch_callback();
 
 // exception catch support for JVMTI
-void jvmti_exception_catch_callback(Registers* regs);
+void jvmti_exception_catch_callback();
 
 //**** Runtime exception support
 

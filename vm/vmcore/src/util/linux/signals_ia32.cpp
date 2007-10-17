@@ -100,62 +100,34 @@ void linux_regs_to_ucontext(ucontext_t *uc, Registers* regs)
     uc->uc_mcontext.gregs[REG_EFL] = regs->eflags;
 }
 
-// exception catch support for stack restore
+void regs_push_param(Registers* pregs, POINTER_SIZE_INT param, int UNREF num)
+{
+    pregs->esp = pregs->esp - 4;
+    *((uint32*)pregs->esp) = param;
+}
+
+void regs_push_return_address(Registers* pregs, void* ret_addr)
+{
+    pregs->esp = pregs->esp - 4;
+    *((void**)pregs->esp) = ret_addr;
+}
+
 extern "C" {
-    static void __attribute__ ((used, cdecl)) exception_catch_callback_wrapper(){
-        exception_catch_callback();
+void __attribute__ ((used, cdecl)) c_exception_handler(Class* exn_class, bool java_code) {
+    // this exception handler is executed *after* NT exception handler returned
+    DebugUtilsTI* ti = VM_Global_State::loader_env->TI;
+    // Create local copy for registers because registers in TLS can be changed
+    Registers regs = {0};
+    VM_thread *thread = p_TLS_vmthread;
+    assert(thread);
+    assert(exn_class);
+
+    if (thread->regs) {
+        regs = *(Registers*)thread->regs;
     }
-}
 
-void __attribute__ ((cdecl)) asm_exception_catch_callback() {
-    asm (
-        "pushl %%eax;\n"
-        "pushl %%ebx;\n"
-        "pushl %%ecx;\n"
-        "pushl %%edx;\n"
-        "call exception_catch_callback_wrapper;\n"
-        "popl %%edx;\n"
-        "popl %%ecx;\n"
-        "popl %%ebx;\n"
-        "popl %%eax;\n"
-        : /* no output operands */
-        : /* no input operands */
-    );
+    exn_athrow_regs(&regs, exn_class, java_code, true);
 }
-
-// exception catch support for JVMTI
-extern "C" {
-    static void __attribute__ ((used, cdecl)) jvmti_exception_catch_callback_wrapper(Registers regs){
-        jvmti_exception_catch_callback(&regs);
-    }
-}
-
-void __attribute__ ((cdecl)) asm_jvmti_exception_catch_callback() {
-    //naked_jvmti_exception_catch_callback:
-    asm (
-        "addl $-36, %%esp;\n"
-        "movl %%eax, -36(%%ebp);\n"
-        "movl %%ebx, -32(%%ebp);\n"
-        "movl %%ecx, -28(%%ebp);\n"
-        "movl %%edx, -24(%%ebp);\n"
-        "movl %%esp, %%eax;\n"
-        "movl (%%ebp), %%ebx;\n"
-        "movl 4(%%ebp), %%ecx;\n"
-        "addl $44, %%eax;\n"
-        "movl %%edi, -20(%%ebp);\n"
-        "movl %%esi, -16(%%ebp);\n"
-        "movl %%ebx, -12(%%ebp);\n"
-        "movl %%eax, -8(%%ebp);\n"
-        "movl %%ecx, -4(%%ebp);\n"
-        "call jvmti_exception_catch_callback_wrapper;\n"
-        "movl -36(%%ebp), %%eax;\n"
-        "movl -32(%%ebp), %%ebx;\n"
-        "movl -28(%%ebp), %%ecx;\n"
-        "movl -24(%%ebp), %%edx;\n"
-        "addl $36, %%esp;\n"
-        : /* no output operands */
-        : /* no input operands */
-    );
 }
 
 static void throw_from_sigcontext(ucontext_t *uc, Class* exc_clss)
@@ -163,16 +135,20 @@ static void throw_from_sigcontext(ucontext_t *uc, Class* exc_clss)
     Registers regs;
     linux_ucontext_to_regs(&regs, uc);
 
-    uint32 exception_esp = regs.esp;
     DebugUtilsTI* ti = VM_Global_State::loader_env->TI;
     bool java_code = (vm_identify_eip((void *)regs.eip) == VM_TYPE_JAVA);
-    exn_athrow_regs(&regs, exc_clss, java_code);
-    assert(exception_esp <= regs.esp);
-    if (ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_EXCEPTION_EVENT)) {
-        regs.esp = regs.esp - 4;
-        *((uint32*) regs.esp) = regs.eip;
-        regs.eip = ((uint32)asm_jvmti_exception_catch_callback);
-    }
+    VM_thread* vmthread = p_TLS_vmthread;
+    NativeCodePtr callback = (NativeCodePtr) c_exception_handler;
+
+    vm_set_exception_registers(vmthread, regs);
+    regs_push_param(&regs, java_code, 1/*2nd arg */);
+    assert(exc_clss);
+    regs_push_param(&regs, (POINTER_SIZE_INT)exc_clss, 0/* 1st arg */);
+    // imitate return IP on stack
+    regs_push_return_address(&regs, NULL);
+
+    // set up the real exception handler address
+    regs.set_ip(callback);
     linux_regs_to_ucontext(uc, &regs);
 }
 
@@ -412,7 +388,7 @@ size_t get_available_stack_size() {
     size_t used_stack_size = stack_addr - ((char*)&stack_addr);
     int available_stack_size;
 
-    if (((char*)&stack_addr) > (stack_addr - get_stack_size() + get_guard_page_size() + get_guard_stack_size())) {
+    if (!(p_TLS_vmthread->restore_guard_page)) {
         available_stack_size = get_stack_size() - used_stack_size
             - 2 * get_guard_page_size() - get_guard_stack_size();
     } else {
@@ -455,6 +431,12 @@ bool check_stack_size_enough_for_exception_catch(void* sp) {
             get_stack_size() - used_stack_size
             - 2 * get_guard_page_size() - get_guard_stack_size();
     return get_restore_stack_size() < available_stack_size;
+}
+
+void remove_guard_stack() {
+    vm_thread_t vm_thread = jthread_self_vm_thread_unsafe();
+    assert(vm_thread);
+    remove_guard_stack(vm_thread);
 }
 
 void remove_guard_stack(vm_thread_t vm_thread) {
@@ -509,6 +491,10 @@ void stack_overflow_handler(int signum, siginfo_t* UNREF info, void* context)
     ucontext_t *uc = (ucontext_t *)context;
     Global_Env *env = VM_Global_State::loader_env;
 
+    vm_thread_t vm_thread = p_TLS_vmthread;
+    remove_guard_stack(vm_thread);
+    vm_thread->restore_guard_page = true;
+
     if (java_throw_from_sigcontext(
                 uc, env->java_lang_StackOverflowError_Class)) {
         return;
@@ -520,10 +506,7 @@ void stack_overflow_handler(int signum, siginfo_t* UNREF info, void* context)
             throw_from_sigcontext(
                 uc, env->java_lang_StackOverflowError_Class);
         } else {
-            vm_thread_t vm_thread = p_TLS_vmthread;
-            remove_guard_stack(vm_thread);
             exn_raise_by_class(env->java_lang_StackOverflowError_Class);
-            vm_thread->restore_guard_page = true;
         }
     }
 }

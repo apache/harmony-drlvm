@@ -102,7 +102,7 @@ LcgEM64TContext::LcgEM64TContext(LilCodeStub * stub, tl::MemoryPool & m):
     /*    4) INITILIZE STACK INFORMATION    */
 
     if (has_m2n) {
-        stk_m2n_size = (unsigned)m2n_get_size();
+        stk_m2n_size = (unsigned)(m2n_get_size() - 2*sizeof(void*));
     } else {
         // preserve space for callee-saves registers
         stk_m2n_size = lil_cs_get_max_locals(stub) * GR_SIZE;

@@ -58,7 +58,7 @@ void compile_protect_arguments(Method_Handle method, GcFrame * gc) {
     assert(m2n_get_size() % 8 == 0);
     // 15 = 1(alignment) + n(fp) + n(gp) registers were preserved on the stack
     uint64 * const inputs_addr = m2n_base_addr
-            - (m2n_get_size() / 8)
+            - (m2n_get_size() / 8) + 2
             - 1 - MAX_GR - MAX_FR;
      // 1(return ip);
 #ifdef _WIN64
@@ -176,7 +176,7 @@ const int ALIGNMENT = 8;
 
 const int32 gr_stack_size = (1 + MAX_GR)*GR_STACK_SIZE
         + SHADOW;
-const int32 stack_size = (int32)m2n_get_size()
+const int32 stack_size = (int32)(m2n_get_size() - 2*sizeof(void*))
         + MAX_FR*FR_STACK_SIZE
         + gr_stack_size + ALIGNMENT;
 
@@ -246,7 +246,7 @@ static NativeCodePtr compile_get_compile_me_generic() {
     stub = call(stub, (char *)&compile_me);
 
     // pop m2n from the stack
-    const int32 bytes_to_m2n_bottom = (int32)(stack_size - m2n_get_size());
+    const int32 bytes_to_m2n_bottom = (int32)(stack_size - (m2n_get_size() - 2*sizeof(void*)));
     stub = m2n_gen_pop_m2n(stub, false, 0, bytes_to_m2n_bottom, 1);
 
     // restore gp inputs from the stack

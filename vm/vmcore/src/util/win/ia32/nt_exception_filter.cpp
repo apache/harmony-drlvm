@@ -67,48 +67,6 @@ void print_state(LPEXCEPTION_POINTERS nt_exception, const char *msg)
     fprintf(stderr, "    EIP: 0x%08x\n", nt_exception->ContextRecord->Eip);
 }
 
-void __declspec(naked) asm_exception_catch_callback() {
-    __asm {
-        push ebp
-        mov ebp, esp
-        push eax
-        push ebx
-        push ecx
-        push edx
-       pushfd
-       cld
-        call exception_catch_callback_wrapper
-       popfd
-        pop edx
-        pop ecx
-        pop ebx
-        pop eax
-        leave
-        ret
-    }
-}
-
-void __declspec(naked) asm_jvmti_exception_catch_callback() {
-    __asm {
-        push ebp
-        mov ebp, esp
-        push eax
-        push ebx
-        push ecx
-        push edx
-       pushfd
-       cld
-        call jvmti_exception_catch_callback_wrapper
-       popfd
-        pop edx
-        pop ecx
-        pop ebx
-        pop eax
-        leave
-        ret
-    }
-}
-
 LONG __declspec(naked) NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_exception)
 {
     __asm {

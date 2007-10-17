@@ -194,6 +194,10 @@ void m2n_set_frame_type(M2nFrame* m2nf, frame_type m2nf_type) {
     *get_stacked_register_address(m2n_get_bsp(m2nf), M2N_FRAME_TYPE) = m2nf_type;
 }
 
+size_t m2n_get_size() {
+    return sizeof(M2nFrame);
+}
+
 //***** Stub Interface
 
 // Flushes register stack of the current thread into backing store and calls target procedure.

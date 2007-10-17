@@ -356,6 +356,11 @@ bool check_stack_size_enough_for_exception_catch(void* sp) {
     return get_restore_stack_size() < available_stack_size;
 }
 
+void remove_guard_stack() {
+    vm_thread_t vm_thread = jthread_self_vm_thread_unsafe();
+    assert(vm_thread);
+    remove_guard_stack(vm_thread);
+}
 
 void remove_guard_stack(vm_thread_t vm_thread) {
     int err;

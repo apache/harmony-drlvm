@@ -503,7 +503,7 @@ void si_set_callback(StackIterator* si, NativeCodePtr* callback) {
 #ifdef WIN32
     const static uint64 red_zone_size = 0x00;
 #else
-    const static uint64 red_zone_size = 0x80;
+    const static uint64 red_zone_size = 0x88;
 #endif
     si->jit_frame_context.rsp = si->jit_frame_context.rsp - red_zone_size - sizeof(void*);
     *((uint64*) si->jit_frame_context.rsp) = *(si->jit_frame_context.p_rip);

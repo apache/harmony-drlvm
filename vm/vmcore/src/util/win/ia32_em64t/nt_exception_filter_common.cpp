@@ -196,6 +196,12 @@ void set_guard_stack() {
     jthread_self_vm_thread_unsafe()->restore_guard_page = false;
 }
 
+void remove_guard_stack() {
+    vm_thread_t vm_thread = jthread_self_vm_thread_unsafe();
+    assert(vm_thread);
+    remove_guard_stack(vm_thread);
+}
+
 void remove_guard_stack(vm_thread_t vm_thread) {
     void* stack_addr = get_stack_addr();
     size_t stack_size = get_stack_size();
@@ -262,21 +268,6 @@ bool check_stack_size_enough_for_exception_catch(void* sp) {
             get_stack_size() - used_stack_size
             - 2 * get_guard_page_size() - get_guard_stack_size();
     return get_restore_stack_size() < available_stack_size;
-}
-
-
-// exception catch callback to restore stack after Stack Overflow Error
-void __cdecl exception_catch_callback_wrapper(){
-    exception_catch_callback();
-}
-
-// exception catch support for JVMTI
-void __cdecl jvmti_exception_catch_callback_wrapper(){
-	Registers regs = {0};
-	if (p_TLS_vmthread->regs) {
-		regs = *(Registers*)p_TLS_vmthread->regs;
-	}
-    jvmti_exception_catch_callback(&regs);
 }
 
 LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception)
@@ -461,37 +452,9 @@ void __cdecl c_exception_handler(Class* exn_class, bool in_java)
         regs = *(Registers*)thread->regs;
     }
 
-    M2nFrame* prev_m2n = m2n_get_last_frame();
-    M2nFrame* m2n = NULL;
-    if (in_java) {
-        m2n = m2n_push_suspended_frame(&regs);
-    } else {
-        prev_m2n = m2n_get_previous_frame(prev_m2n);
-    }
-
     TRACE2("signals", ("should throw exception %p at IP=%p, SP=%p",
                 exn_class, regs.get_ip(), regs_get_sp(&regs)));
-    exn_athrow_regs(&regs, exn_class, false);
+    exn_athrow_regs(&regs, exn_class, in_java, true);
 
-    if (ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_EXCEPTION_EVENT)) {
-        // Set return address to current IP
-        regs_push_return_address(&regs, regs.get_ip());
-        // Set IP to callback address
-        regs.set_ip(asm_jvmti_exception_catch_callback);
-    } else if (thread->restore_guard_page) {
-        // Set return address to current IP
-        regs_push_return_address(&regs, regs.get_ip());
-        // Set IP to callback address
-        regs.set_ip(asm_exception_catch_callback);
-    }
-
-    StackIterator *si =
-        si_create_from_registers(&regs, false, prev_m2n);
-
-    if (m2n)
-        STD_FREE(m2n);
-
-    vm_set_exception_registers(thread, regs);
-    si_transfer_control(si);
     assert(!"si_transfer_control should not return");
 }
