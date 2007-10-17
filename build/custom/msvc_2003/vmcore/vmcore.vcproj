@@ -1264,34 +1264,61 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 			Name="cp_verifier"
 			Filter="">
 			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\context.h">
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\java5\context_5.cpp">
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\instr_props.h">
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\java5\context_5.h">
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\Pass1.cpp">
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\java6\context_6.cpp">
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\Pass2.cpp">
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\java6\context_6.h">
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\stackmap.h">
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\base\context_base.cpp">
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\tpool.cpp">
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\base\context_base.h">
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\tpool.h">
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\base\context_x.cpp">
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\Ver.cpp">
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\base\context_x.h">
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\ver_utils.h">
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\base\instr_props.h">
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\vf_resolve.cpp">
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\java5\instr_props_5.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\base\stackmap.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\java5\stackmap_5.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\java6\stackmap_6.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\base\stackmap_x.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\base\tpool.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\base\tpool.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\base\ver.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\base\ver_utils.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\base\vf_resolve.cpp">
 			</File>
 		</Filter>
 	</Files>
