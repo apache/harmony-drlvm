@@ -446,6 +446,11 @@ M2nFrame * si_get_m2n(StackIterator * si) {
     return si->m2n_frame;
 }
 
+void** si_get_return_pointer(StackIterator* si)
+{
+    return (void**)si->jit_frame_context.p_rax;
+}
+
 void si_set_return_pointer(StackIterator * si, void ** return_value) {
     // TODO: check if it is needed to dereference return_value
     si->jit_frame_context.p_rax = (uint64 *)return_value;

@@ -672,16 +672,9 @@ void jvmti_exception_catch_callback() {
         Method* catch_method = catch_cci->get_method();
         NativeCodePtr catch_method_location = si_get_ip(si);
         JIT* catch_method_jit = catch_cci->get_jit();
-#ifndef _EM64T_
-        //
-        // FIXME: implement si_get_return_pointer() for EM64T
-        //
         ManagedObject** exn_obj = (ManagedObject**) si_get_return_pointer(si);
         *exn_obj = jvmti_jit_exception_catch_event_callback_call( *exn_obj,
                 catch_method_jit, catch_method, catch_method_location);
-#else
-        assert(0);
-#endif
     }
     si_transfer_control(si);
 }
