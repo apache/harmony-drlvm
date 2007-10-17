@@ -302,9 +302,6 @@ const char *args[][2] =
 "Generates code with write barriers (Java-based GC).                    \n"
 },
 
-//-------------------------------------------------------------------------
-// "                                                                      \n"
-// "                                                                      \n"
 };
 
 static void print_id(void);
