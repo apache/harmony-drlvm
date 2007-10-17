@@ -430,7 +430,8 @@ void Compiler::handle_ik_meth(const JInst& jinst) {
             }
         }
         else {
-            meth = resolve_virtual_method(m_compileHandle, m_klass, jinst.op0);
+            assert(opkod == OPCODE_INVOKESPECIAL);
+            meth = resolve_special_method(m_compileHandle, m_klass, jinst.op0);
         }
         // if class to call to is available, but method is not found in the class
         // meth here will be equal to NULL and lazy resolution call will be
