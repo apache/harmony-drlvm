@@ -164,7 +164,7 @@ public:
     Tree(): root(NULL) {}
     TreeNode* getRoot() {return root;}
 
-    virtual void printDotFile(MethodDesc& mh, char *suffix) {
+    virtual void printDotFile(MethodDesc& mh, const char *suffix) {
         if (root == NULL) return;
         PrintDotFile::printDotFile(mh,suffix);
     }

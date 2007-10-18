@@ -103,22 +103,20 @@ static const char* c_str (Str& str)
  
 static const char* c_str (MemoryManager& mm, Str& str)
 {
-    char* buffp = "";
-
     if (str.count != 0)
     {
-        buffp = new (mm) char[str.count + 1];
+        char* buffp = new (mm) char[str.count + 1];
         memcpy(buffp, str.ptr, str.count);
         buffp[str.count] = 0;
+        return buffp;
     }
 
-    return buffp;
+    return "";
 }
 
 
 static const char* c_str (MemoryManager& mm, Str* fqnamep, size_t fqnsize)
 {
-    char* buffp = "";
     size_t count = 0;
 
     Str* strp = fqnamep;
@@ -127,6 +125,7 @@ static const char* c_str (MemoryManager& mm, Str* fqnamep, size_t fqnsize)
 
     if (count != 0)
     {
+        char* buffp;
         char* ptr = buffp = new (mm) char[count+1];
         strp = fqnamep;
         for (size_t n = fqnsize; n != 0; --n, ++strp)
@@ -138,9 +137,10 @@ static const char* c_str (MemoryManager& mm, Str* fqnamep, size_t fqnsize)
         }
         --ptr;  // skip the last '.'
         *ptr = 0;
+        return buffp;
     }
 
-    return buffp;
+    return "";
 }
 
 

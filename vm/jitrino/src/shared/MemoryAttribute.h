@@ -214,7 +214,7 @@ public:
         //
         struct Info {
             Tag          tag;
-            char *       name;
+            const char * name;
             bool         canBeWrittenByJittedCode;
             bool         killedByCalls;
             IdKind       idKind;

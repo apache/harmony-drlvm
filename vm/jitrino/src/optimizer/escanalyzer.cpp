@@ -2185,7 +2185,7 @@ EscAnalyzer::eaFixupVars(IRManager& irm) {
 
 
 void
-EscAnalyzer::printCnGNodes(char* text,::std::ostream& os) {
+EscAnalyzer::printCnGNodes(const char* text,::std::ostream& os) {
     CnGNodes::const_iterator it;
     std::string t1;
     std::string t2;
@@ -2285,7 +2285,7 @@ EscAnalyzer::nodeTypeToString(CnGNode* cgn) {
 
 
 void
-EscAnalyzer::printCnGEdges(char* text,::std::ostream& os) {
+EscAnalyzer::printCnGEdges(const char* text,::std::ostream& os) {
     CnGEdges* cge = cngEdges;
     CnGEdges::iterator it;
     CnGRefs::iterator it1;

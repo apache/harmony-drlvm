@@ -278,12 +278,12 @@ void Inst::handlePrintEscape(::std::ostream& os, char code) const {
     }
 }
 
-char *messageStr(const char *string) {
+const char *messageStr(const char *string) {
     if (strcmp(string, "<init>")==0)
         return "_init_";
     if (strcmp(string, "<clinit>")==0)
         return "_clinit_";
-    return (char *)string;
+    return string;
 }
 
 void MethodEntryInst::handlePrintEscape(::std::ostream& os, char code) const {

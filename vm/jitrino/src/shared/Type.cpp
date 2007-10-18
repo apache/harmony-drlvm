@@ -967,7 +967,7 @@ void    EnumType::print(::std::ostream& os) {
     os << "enum:" << getName();
 }
 
-extern char *messageStr(const char *);
+extern const char *messageStr(const char *);
 
 void    ObjectType::print(::std::ostream& os) {
     if (isCompressedReference()) {

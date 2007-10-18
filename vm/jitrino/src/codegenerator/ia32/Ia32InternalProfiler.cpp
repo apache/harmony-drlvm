@@ -26,7 +26,7 @@ namespace Ia32{
 
     template<class T> struct AttrDesc {
         T value;
-        char * name;
+        const char * name;
     };
 
     struct BBStats {

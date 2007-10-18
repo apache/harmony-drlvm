@@ -807,7 +807,7 @@ void ClassicAbcdSolver::Printer::prnLevel()
     }
 }
 
-void ClassicAbcdSolver::Printer::prnStr(char* str)
+void ClassicAbcdSolver::Printer::prnStr(const char* str)
 {
     prnLevel();
     if (Log::isEnabled()) {
@@ -815,7 +815,7 @@ void ClassicAbcdSolver::Printer::prnStr(char* str)
     }
 }
 
-void ClassicAbcdSolver::Printer::prnStrLn(char* str)
+void ClassicAbcdSolver::Printer::prnStrLn(const char* str)
 {
     if (Log::isEnabled()) {
         prnStr(str);

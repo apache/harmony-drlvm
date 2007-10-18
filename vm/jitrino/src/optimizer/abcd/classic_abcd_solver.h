@@ -533,9 +533,9 @@ private:
 
         void prnLevel();
 
-        void prnStr(char* str);
+        void prnStr(const char* str);
 
-        void prnStrLn(char* str);
+        void prnStrLn(const char* str);
 
     private:
         uint32 _level;

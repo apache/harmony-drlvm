@@ -451,7 +451,7 @@ private:
  * @param text - output information naming,
  * @param os - log.
  */
-    void printCnGNodes(char* text,::std::ostream& os);
+    void printCnGNodes(const char* text,::std::ostream& os);
 
 /**
  * Outputs connection graph node information into the specified log. 
@@ -472,7 +472,7 @@ private:
  * @param text - output information naming,
  * @param os - log.
  */
-    void printCnGEdges(char* text,::std::ostream& os); 
+    void printCnGEdges(const char* text,::std::ostream& os); 
 
 /**
  * Creates string representing CnG edge type. 
