@@ -79,6 +79,7 @@
         <property name="external.dep.CLASSLIB.includes" value="${external.dep.CLASSLIB}/deploy/include" />
         <property name="external.dep.CLASSLIB.libdir" value="${external.dep.CLASSLIB}/deploy/lib" />
         <property name="external.dep.CLASSLIB.jardir" value="${external.dep.CLASSLIB}/deploy/jdk/jre/lib/boot"/>
+        <property name="external.dep.CLASSLIB.dlldir" value="${external.dep.CLASSLIB}/deploy/jdk/jre/bin"/>
         
     </target>
 

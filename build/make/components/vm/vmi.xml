@@ -90,7 +90,10 @@ Version: $Revision: 1.4.2.4 $
                 <syslibset libs="msvcrt" />
             </select>
 
-            <libset libs="hyzip, hypool, hyprt"  dir="${external.dep.CLASSLIB.libdir}" />
+            <libset libs="hyzip, hypool"
+                    dir="${external.dep.CLASSLIB.libdir}" />
+            <libset libs="hyprt"
+                    dir="${external.dep.CLASSLIB.dlldir}" />
 
         </linker>
     </target>
