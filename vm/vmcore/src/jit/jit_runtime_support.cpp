@@ -497,16 +497,7 @@ static Class* rth_aastore(ManagedObject* elem, int idx, Vector_Handle array)
 #endif // VM_STATS
 
         ManagedObject** elem_ptr = get_vector_element_address_ref(array, idx);
-
-        REFS_RUNTIME_SWITCH_IF
-#ifdef REFS_RUNTIME_OR_COMPRESSED
-            *((COMPRESSED_REFERENCE*)elem_ptr) = (COMPRESSED_REFERENCE)NULL;
-#endif // REFS_RUNTIME_OR_COMPRESSED
-        REFS_RUNTIME_SWITCH_ELSE
-#ifdef REFS_RUNTIME_OR_UNCOMPRESSED
-            *elem_ptr= (ManagedObject*)NULL;
-#endif // REFS_RUNTIME_OR_UNCOMPRESSED
-        REFS_RUNTIME_SWITCH_ENDIF
+        REF_INIT_BY_ADDR(elem_ptr, NULL);
     }
     return NULL;
 } //rth_aastore
@@ -3279,16 +3270,7 @@ vm_rt_aastore(ManagedObject *elem, int idx, Vector_Handle array)
         // elem is null. We don't have to check types for a null reference.
         // We also don't have to record stores of null references.
         ManagedObject** elem_ptr = get_vector_element_address_ref(array, idx);
-
-        REFS_RUNTIME_SWITCH_IF
-#ifdef REFS_RUNTIME_OR_COMPRESSED
-            *((COMPRESSED_REFERENCE*)elem_ptr) = (COMPRESSED_REFERENCE)NULL;
-#endif // REFS_RUNTIME_OR_COMPRESSED
-        REFS_RUNTIME_SWITCH_ELSE
-#ifdef REFS_RUNTIME_OR_UNCOMPRESSED
-            *elem_ptr= (ManagedObject*)NULL;
-#endif // REFS_RUNTIME_OR_UNCOMPRESSED
-        REFS_RUNTIME_SWITCH_ENDIF
+        REF_INIT_BY_ADDR(elem_ptr, NULL);
     }
     return NULL;
 } //vm_rt_aastore

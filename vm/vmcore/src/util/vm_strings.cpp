@@ -225,7 +225,7 @@ static void string_set_fields_separate(ManagedObject* str, unsigned length, unsi
     Byte* str_raw = (Byte*)str;
     *(uint32*)(str_raw+f_count_offset) = length;
     *(uint32*)(str_raw+f_offset_offset) = offset;
-    STORE_REFERENCE(str, (ManagedObject**)(str_raw+f_value_offset), (ManagedObject*)chars);
+    STORE_REFERENCE(str, str_raw+f_value_offset, chars);
 }
 
 // GC must be disabled but at a same point

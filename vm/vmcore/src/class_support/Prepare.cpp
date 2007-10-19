@@ -452,7 +452,11 @@ bool assign_values_to_class_static_final_fields(Class *clss)
                     if (cvalue.object == NULL) { //cvalue.string == NULL
                         // We needn't deal with this case, because the object field must be set in static initializer.
                         // initialize the field explicitly.
-                        REF_INIT_BY_ADDR(field_addr, 0); // i.e., null
+#ifdef REFS_RUNTIME_OR_COMPRESSED
+                        REFS_RUNTIME_SWITCH_IF
+                            REF_INIT_BY_ADDR(field_addr, 0); // i.e., null
+                        REFS_RUNTIME_SWITCH_ENDIF
+#endif // REFS_RUNTIME_OR_COMPRESSED
                         break;
                     }
                     static const String* jlstring_desc_string =
@@ -485,7 +489,11 @@ bool assign_values_to_class_static_final_fields(Class *clss)
             } else {
                 if ((field_type == '[') || (field_type == 'L')) {
                     // initialize the field explicitly.
-                    REF_INIT_BY_ADDR(field_addr, 0); // i.e., null
+#ifdef REFS_RUNTIME_OR_COMPRESSED
+                    REFS_RUNTIME_SWITCH_IF
+                        REF_INIT_BY_ADDR(field_addr, 0); // i.e., null
+                    REFS_RUNTIME_SWITCH_ENDIF
+#endif // REFS_RUNTIME_OR_COMPRESSED
                 }
             }
         } // end if static field

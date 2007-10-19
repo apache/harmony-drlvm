@@ -84,7 +84,7 @@ typedef uint32          COMPRESSED_REFERENCE;
 #define REF_SIZE (sizeof(uint32))
 #define REF_MANAGED_NULL VM_Global_State::loader_env->heap_base
 #define REF_INIT_BY_ADDR(_ref_addr_, _val_)                                 \
-    *((COMPRESSED_REFERENCE*)(_ref_addr_)) = (COMPRESSED_REFERENCE)(_val_);
+    *((COMPRESSED_REFERENCE*)(_ref_addr_)) = (COMPRESSED_REFERENCE)(_val_)
 
 #elif defined(REFS_USE_UNCOMPRESSED)
 
@@ -92,7 +92,7 @@ typedef uint32          COMPRESSED_REFERENCE;
 #define REF_SIZE (sizeof(ManagedObject*))
 #define REF_MANAGED_NULL NULL
 #define REF_INIT_BY_ADDR(_ref_addr_, _val_)                                 \
-    *((ManagedObject**)(_ref_addr_)) = (ManagedObject*)(_val_);
+    *((ManagedObject**)(_ref_addr_)) = (ManagedObject*)(_val_)
 
 #else // for REFS_USE_RUNTIME_SWITCH
 
@@ -159,24 +159,24 @@ REFS_RUNTIME_SWITCH_ENDIF
 // in the object "_object_".
 #if defined(REFS_USE_COMPRESSED)
 #define STORE_REFERENCE(_object_, _slot_addr_, _value_)                     \
-        gc_heap_slot_write_ref_compressed((Managed_Object_Handle)_object_,  \
-                                          (uint32*)_slot_addr_,             \
-                                          (Managed_Object_Handle)_value_);
+        gc_heap_slot_write_ref_compressed((Managed_Object_Handle)(_object_),\
+                                          (uint32*)(_slot_addr_),           \
+                                          (Managed_Object_Handle)(_value_))
 #elif defined(REFS_USE_UNCOMPRESSED)
 #define STORE_REFERENCE(_object_, _slot_addr_, _value_)                     \
-        gc_heap_slot_write_ref((Managed_Object_Handle)_object_,             \
-                               (Managed_Object_Handle*)_slot_addr_,         \
-                               (Managed_Object_Handle)_value_);
+        gc_heap_slot_write_ref((Managed_Object_Handle)(_object_),           \
+                               (Managed_Object_Handle*)(_slot_addr_),       \
+                               (Managed_Object_Handle)(_value_))
 #else // for REFS_USE_RUNTIME_SWITCH
 #define STORE_REFERENCE(_object_, _slot_addr_, _value_)                     \
     if (VM_Global_State::loader_env->compress_references) {                 \
-        gc_heap_slot_write_ref_compressed((Managed_Object_Handle)_object_,  \
-                                          (uint32*)_slot_addr_,             \
-                                          (Managed_Object_Handle)_value_);  \
+        gc_heap_slot_write_ref_compressed((Managed_Object_Handle)(_object_),\
+                                          (uint32*)(_slot_addr_),           \
+                                          (Managed_Object_Handle)(_value_));\
     } else {                                                                \
-        gc_heap_slot_write_ref((Managed_Object_Handle)_object_,             \
-                               (Managed_Object_Handle*)_slot_addr_,         \
-                               (Managed_Object_Handle)_value_);             \
+        gc_heap_slot_write_ref((Managed_Object_Handle)(_object_),           \
+                               (Managed_Object_Handle*)(_slot_addr_),       \
+                               (Managed_Object_Handle)(_value_));           \
     }
 #endif // REFS_USE_RUNTIME_SWITCH
 
@@ -186,11 +186,11 @@ REFS_RUNTIME_SWITCH_ENDIF
 #if defined(REFS_USE_COMPRESSED)
 #define STORE_GLOBAL_REFERENCE(_slot_addr_, _value_)                    \
         gc_heap_write_global_slot_compressed((uint32*)(_slot_addr_),    \
-                                   (Managed_Object_Handle)(_value_));
+                                   (Managed_Object_Handle)(_value_))
 #elif defined(REFS_USE_UNCOMPRESSED)
 #define STORE_GLOBAL_REFERENCE(_slot_addr_, _value_)                    \
         gc_heap_write_global_slot((Managed_Object_Handle*)(_slot_addr_),\
-                                  (Managed_Object_Handle)(_value_));
+                                  (Managed_Object_Handle)(_value_))
 #else // for REFS_USE_RUNTIME_SWITCH
 #define STORE_GLOBAL_REFERENCE(_slot_addr_, _value_)                    \
     if (VM_Global_State::loader_env->compress_references) {             \

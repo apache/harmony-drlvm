@@ -193,24 +193,21 @@ JNIEXPORT jboolean compareAndSetObjectArray
 
     bool result;
 
-#ifdef REFS_USE_RUNTIME_SWITCH
-    if (VM_Global_State::loader_env->compress_references)
-#endif // REFS_USE_RUNTIME_SWITCH
+    REFS_RUNTIME_SWITCH_IF
 #ifdef REFS_RUNTIME_OR_COMPRESSED
         result = gc_heap_slot_cas_ref_compressed((Managed_Object_Handle)(vector_handle),
                                                  (COMPRESSED_REFERENCE *)(element_address),
                                                  (Managed_Object_Handle)(exp),
                                                  (Managed_Object_Handle)(val));
 #endif // REFS_RUNTIME_OR_COMPRESSED
-#ifdef REFS_USE_RUNTIME_SWITCH
-    else
-#endif // REFS_USE_RUNTIME_SWITCH
+    REFS_RUNTIME_SWITCH_ELSE
 #ifdef REFS_RUNTIME_OR_UNCOMPRESSED
         result = gc_heap_slot_cas_ref((Managed_Object_Handle)(vector_handle),
                                       (Managed_Object_Handle *)(element_address),
                                       (Managed_Object_Handle)(exp),
                                       (Managed_Object_Handle)(val));
 #endif // REFS_RUNTIME_OR_UNCOMPRESSED
+    REFS_RUNTIME_SWITCH_ENDIF
 
     tmn_suspend_enable();
     return (jboolean)(result?JNI_TRUE:JNI_FALSE);
