@@ -87,10 +87,10 @@ static const jvmtiCapabilities jvmti_supported_jit_capabilities =
     1, // can_get_source_debug_extension
     1, // can_access_local_variables
     0, // can_maintain_original_method_order
-    0, // can_generate_single_step_events
+    1, // can_generate_single_step_events
     1, // can_generate_exception_events
     1, // can_generate_frame_pop_events
-    0, // can_generate_breakpoint_events
+    1, // can_generate_breakpoint_events
     1, // can_suspend
     0, // can_redefine_any_class
     1, // can_get_current_thread_cpu_time

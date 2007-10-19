@@ -78,7 +78,7 @@ struct VMLocalBreak
 };
 
 // Pointer to interface callback function
-typedef bool (*BPInterfaceCallBack)(TIEnv *env, VMBreakPoint* bp, POINTER_SIZE_INT data);
+typedef bool (*BPInterfaceCallBack)(TIEnv *env, const VMBreakPoint* bp, const POINTER_SIZE_INT data);
 typedef bool (*BPInterfaceProcedure) (VMBreakPoint *bp);
 
 class VMBreakPoints

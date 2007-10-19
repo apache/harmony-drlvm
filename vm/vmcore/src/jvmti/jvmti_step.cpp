@@ -494,8 +494,8 @@ jvmti_set_single_step_breakpoints_for_method(DebugUtilsTI *ti,
     }
 }
 
-static void jvmti_start_single_step_in_virtual_method(DebugUtilsTI *ti, VMBreakPoint* bp,
-                                                      POINTER_SIZE_INT data)
+static void jvmti_start_single_step_in_virtual_method(DebugUtilsTI *ti, const VMBreakPoint* bp,
+    const POINTER_SIZE_INT data, const unsigned char bytecode)
 {
 #if (defined _IA32_) || (defined _EM64T_)
     VM_thread *vm_thread = p_TLS_vmthread;
@@ -517,11 +517,11 @@ static void jvmti_start_single_step_in_virtual_method(DebugUtilsTI *ti, VMBreakP
 
     const InstructionDisassembler::Opnd& op = disasm->get_opnd(0);
     Method *method;
-    if (op.kind == InstructionDisassembler::Kind_Mem)
+    if (bytecode == OPCODE_INVOKEVIRTUAL)
     {
         // Invokevirtual uses indirect call from VTable. The base
         // address is in the register, offset is in displacement *
-        // scale. This method is much faster than 
+        // scale.
         VTable* vtable = (VTable*)disasm->get_reg_value(op.base, &regs);
         assert(vtable);
         // For x86 based architectures offset cannot be longer than 32
@@ -530,7 +530,7 @@ static void jvmti_start_single_step_in_virtual_method(DebugUtilsTI *ti, VMBreakP
             op.scale + op.disp);
         method = class_get_method_from_vt_offset(vtable, offset);
     }
-    else if (op.kind == InstructionDisassembler::Kind_Reg)
+    else if (bytecode == OPCODE_INVOKEINTERFACE)
     {
         // This is invokeinterface bytecode which uses register
         // call so we need to search through all methods for this
@@ -577,7 +577,7 @@ static void jvmti_start_single_step_in_virtual_method(DebugUtilsTI *ti, VMBreakP
 
 // Callback function for JVMTI single step processing
 static bool jvmti_process_jit_single_step_event(TIEnv* UNREF unused_env,
-                                                VMBreakPoint* bp, POINTER_SIZE_INT data)
+    const VMBreakPoint* bp, const POINTER_SIZE_INT data)
 {
     assert(bp);
 
@@ -610,7 +610,10 @@ static bool jvmti_process_jit_single_step_event(TIEnv* UNREF unused_env,
 
     if ((bool)data)
     {
-        jvmti_start_single_step_in_virtual_method(ti, bp, data);
+        const unsigned char *bytecode = reinterpret_cast<Method *>(method)->get_byte_code_addr();
+        const unsigned char bc = bytecode[location];
+        assert(bc == OPCODE_INVOKEINTERFACE || bc == OPCODE_INVOKEVIRTUAL);
+        jvmti_start_single_step_in_virtual_method(ti, bp, data, bc);
         return true;
     }
 

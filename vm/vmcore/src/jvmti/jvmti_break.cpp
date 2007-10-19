@@ -39,7 +39,7 @@
 
 
 // Callback function for JVMTI breakpoint processing
-bool jvmti_process_breakpoint_event(TIEnv *env, VMBreakPoint* bp, POINTER_SIZE_INT UNREF data)
+bool jvmti_process_breakpoint_event(TIEnv *env, const VMBreakPoint* bp, const POINTER_SIZE_INT UNREF data)
 {
     assert(bp);
 
