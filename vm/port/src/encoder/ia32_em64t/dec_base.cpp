@@ -25,6 +25,7 @@
  */
 
 #include "dec_base.h"
+#include "open/common.h"
 
 bool DecoderBase::is_prefix(const unsigned char * bytes)
 {
@@ -105,8 +106,15 @@ unsigned DecoderBase::decode(const void * addr, Inst * pinst)
     return tmp.size;
 }
 
+#ifdef _EM64T_
+#define EXTEND_REG(reg, flag)                        \
+    ((NULL == rex || 0 == rex->flag) ? reg : (reg + 8))
+#else
+#define EXTEND_REG(reg, flag) (reg)
+#endif
+
 bool DecoderBase::decode_aux(const EncoderBase::OpcodeDesc& odesc, unsigned aux,
-             const unsigned char ** pbuf, Inst * pinst) 
+    const unsigned char ** pbuf, Inst * pinst, const Rex UNREF *rex)
 {
     OpcodeByteKind kind = (OpcodeByteKind)(aux & OpcodeByteKind_KindMask);
     unsigned byte = (aux & OpcodeByteKind_OpcodeMask);
@@ -120,15 +128,15 @@ bool DecoderBase::decode_aux(const EncoderBase::OpcodeDesc& odesc, unsigned aux,
         {
         const ModRM& modrm = *(ModRM*)*pbuf;
         unsigned regIndex = odesc.opnds[0].kind == OpndKind_GPReg ? 0 : 1;
-        RegName reg = getRegName(OpndKind_GPReg, opndDesc.size, modrm.reg);
+        RegName reg = getRegName(OpndKind_GPReg, opndDesc.size, EXTEND_REG(modrm.reg, r));
         EncoderBase::Operand& regOpnd = pinst->operands[regIndex];
         if (regIndex == 0) {
             regOpnd = EncoderBase::Operand(reg);
             ++pinst->argc;
-            decodeModRM(odesc, pbuf, pinst);
+            decodeModRM(odesc, pbuf, pinst, rex);
         }
         else {
-            decodeModRM(odesc, pbuf, pinst);
+            decodeModRM(odesc, pbuf, pinst, rex);
             ++pinst->argc;
             regOpnd = EncoderBase::Operand(reg);
         }
@@ -139,6 +147,9 @@ bool DecoderBase::decode_aux(const EncoderBase::OpcodeDesc& odesc, unsigned aux,
     case OpcodeByteKind_rw:
     case OpcodeByteKind_rd:
         {
+            // Gregory -
+            // Here we don't parse register because for current needs
+            // disassembler doesn't require to parse all operands
             unsigned regid = data_byte - byte;
             if (regid>7) {
                 return false;
@@ -172,7 +183,7 @@ bool DecoderBase::decode_aux(const EncoderBase::OpcodeDesc& odesc, unsigned aux,
         if (modrm.reg != byte) {
             return false;
         }
-        decodeModRM(odesc, pbuf, pinst);
+        decodeModRM(odesc, pbuf, pinst, rex);
         ++pinst->argc;
         }
         return true;
@@ -238,6 +249,10 @@ bool DecoderBase::try_mn(Mnemonic mn, const unsigned char ** pbuf, Inst * pinst)
         const EncoderBase::OpcodeDesc& odesc = opcodes[i];
         char *opcode_ptr = const_cast<char *>(odesc.opcode);
         int opcode_len = odesc.opcode_len;
+        Rex *prex = NULL;
+#ifdef _EM64T_
+        Rex rex;
+#endif
 
         *pbuf = save_pbuf;
         if (opcode_len != 0) {
@@ -245,6 +260,8 @@ bool DecoderBase::try_mn(Mnemonic mn, const unsigned char ** pbuf, Inst * pinst)
             // Match REX prefixes
             if (((*pbuf)[0] & 0xf0) == 0x40 && opcode_ptr[0] == 0x48)
             {
+                rex = *(Rex *)*pbuf;
+                prex = &rex;
                 (*pbuf)++;
                 opcode_ptr++;
                 opcode_len--;
@@ -258,11 +275,11 @@ bool DecoderBase::try_mn(Mnemonic mn, const unsigned char ** pbuf, Inst * pinst)
         }
         if (odesc.aux0 != 0) {
             
-            if (!decode_aux(odesc, odesc.aux0, pbuf, pinst)) {
+            if (!decode_aux(odesc, odesc.aux0, pbuf, pinst, prex)) {
                 continue;
             }
             if (odesc.aux1 != 0) {
-                if (!decode_aux(odesc, odesc.aux1, pbuf, pinst)) {
+                if (!decode_aux(odesc, odesc.aux1, pbuf, pinst, prex)) {
                     continue;
                 }
             }
@@ -279,14 +296,8 @@ bool DecoderBase::try_mn(Mnemonic mn, const unsigned char ** pbuf, Inst * pinst)
     return false;
 }
 
-#ifdef _IA32_
-#define DISASM_REG_SIZE OpndSize_32
-#else
-#define DISASM_REG_SIZE OpndSize_64
-#endif
-
 bool DecoderBase::decodeModRM(const EncoderBase::OpcodeDesc& odesc,
-                              const unsigned char ** pbuf, Inst * pinst)
+    const unsigned char ** pbuf, Inst * pinst, const Rex *rex)
 {
     EncoderBase::Operand& opnd = pinst->operands[pinst->argc];
     const EncoderBase::OpndDesc& opndDesc = odesc.opnds[pinst->argc];
@@ -300,13 +311,17 @@ bool DecoderBase::decodeModRM(const EncoderBase::OpcodeDesc& odesc,
     RegName index = RegName_Null;
     int disp = 0;
     unsigned scale = 0; 
-    //XXX
-    scale=scale; base = base; index = index; disp = disp; reg = reg;
+    OpndSize reg_size = OpndSize_32;
 
-    reg = getRegName(OpndKind_GPReg, DISASM_REG_SIZE, modrm.reg);
+#ifdef _EM64T_
+    if (NULL != rex && 0 != rex->w)
+        reg_size = OpndSize_64;
+#endif
+
+    reg = getRegName(OpndKind_GPReg, reg_size, EXTEND_REG(modrm.reg, r));
     if (modrm.mod == 3) {
         // we have only modrm. no sib, no disp.
-        reg = getRegName(OpndKind_GPReg, opndDesc.size, modrm.rm);
+        reg = getRegName(OpndKind_GPReg, opndDesc.size, EXTEND_REG(modrm.rm, b));
         opnd = EncoderBase::Operand(reg);
         return true;
     }
@@ -320,13 +335,13 @@ bool DecoderBase::decodeModRM(const EncoderBase::OpcodeDesc& odesc,
             // no index
         }
         else {
-            index = getRegName(OpndKind_GPReg, DISASM_REG_SIZE, sib.index);
+            index = getRegName(OpndKind_GPReg, reg_size, EXTEND_REG(sib.index, x));
         }
-        base = getRegName(OpndKind_GPReg, DISASM_REG_SIZE, sib.base);
+        base = getRegName(OpndKind_GPReg, reg_size, EXTEND_REG(sib.base, b));
     }
     else {
         if (modrm.mod != 0 || modrm.rm != 5) {
-            base = getRegName(OpndKind_GPReg, DISASM_REG_SIZE, modrm.rm);
+            base = getRegName(OpndKind_GPReg, reg_size, EXTEND_REG(modrm.rm, b));
         }
         else {
             // mod=0 && rm == 5 => only disp32

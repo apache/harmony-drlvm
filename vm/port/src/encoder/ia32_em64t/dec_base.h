@@ -93,10 +93,10 @@ public:
     static unsigned decode(const void * addr, Inst * pinst);
 private:
     static bool decodeModRM(const EncoderBase::OpcodeDesc& odesc,
-                            const unsigned char ** pbuf, Inst * pinst);
+        const unsigned char ** pbuf, Inst * pinst, const Rex *rex);
     static bool decode_aux(const EncoderBase::OpcodeDesc& odesc,
-                        unsigned aux, const unsigned char ** pbuf, 
-                        Inst * pinst);
+        unsigned aux, const unsigned char ** pbuf, 
+        Inst * pinst, const Rex *rex);
     static bool try_mn(Mnemonic mn, const unsigned char ** pbuf, Inst * pinst);
 
     static bool is_prefix(const unsigned char * bytes);

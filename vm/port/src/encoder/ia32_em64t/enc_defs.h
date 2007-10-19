@@ -158,6 +158,11 @@ enum OpndRole {
 
 #define REGNAME(k,s,i) ( ((k & OpndKind_Any)<<24) | ((s & OpndSize_Any)<<16) | (i&0xFF) )
 
+// Gregory -
+// It is critical that all register indexes (3rd number) inside of the
+// following table go in ascending order. That is R8 goes after
+// RDI. It is necessary for decoder when extending registers from RAX-DRI
+// to R8-R15 by simply adding 8 to the index on EM64T architecture
 enum RegName {
 
     RegName_Null = 0, 
@@ -207,16 +212,6 @@ enum RegName {
     RegName_R13D = REGNAME(OpndKind_GPReg,OpndSize_32,13),
     RegName_R14D = REGNAME(OpndKind_GPReg,OpndSize_32,14),
     RegName_R15D = REGNAME(OpndKind_GPReg,OpndSize_32,15),
-
-    RegName_R8S  = REGNAME(OpndKind_GPReg,OpndSize_16,8),
-    RegName_R9S  = REGNAME(OpndKind_GPReg,OpndSize_16,9),
-    RegName_R10S = REGNAME(OpndKind_GPReg,OpndSize_16,10),
-    RegName_R11S = REGNAME(OpndKind_GPReg,OpndSize_16,11),
-    RegName_R12S = REGNAME(OpndKind_GPReg,OpndSize_16,12),
-    RegName_R13S = REGNAME(OpndKind_GPReg,OpndSize_16,13),
-    RegName_R14S = REGNAME(OpndKind_GPReg,OpndSize_16,14),
-    RegName_R15S = REGNAME(OpndKind_GPReg,OpndSize_16,15),
-
 #endif //~_EM64T_
 
     RegName_AX=REGNAME(OpndKind_GPReg,OpndSize_16,0),
@@ -227,12 +222,25 @@ enum RegName {
     RegName_BP=REGNAME(OpndKind_GPReg,OpndSize_16,5),
     RegName_SI=REGNAME(OpndKind_GPReg,OpndSize_16,6),
     RegName_DI=REGNAME(OpndKind_GPReg,OpndSize_16,7),
+
+#ifdef _EM64T_
+    RegName_R8S  = REGNAME(OpndKind_GPReg,OpndSize_16,8),
+    RegName_R9S  = REGNAME(OpndKind_GPReg,OpndSize_16,9),
+    RegName_R10S = REGNAME(OpndKind_GPReg,OpndSize_16,10),
+    RegName_R11S = REGNAME(OpndKind_GPReg,OpndSize_16,11),
+    RegName_R12S = REGNAME(OpndKind_GPReg,OpndSize_16,12),
+    RegName_R13S = REGNAME(OpndKind_GPReg,OpndSize_16,13),
+    RegName_R14S = REGNAME(OpndKind_GPReg,OpndSize_16,14),
+    RegName_R15S = REGNAME(OpndKind_GPReg,OpndSize_16,15),
+#endif //~_EM64T_
     
     RegName_AL=REGNAME(OpndKind_GPReg,OpndSize_8,0),
     RegName_CL=REGNAME(OpndKind_GPReg,OpndSize_8,1),
     RegName_DL=REGNAME(OpndKind_GPReg,OpndSize_8,2),
     RegName_BL=REGNAME(OpndKind_GPReg,OpndSize_8,3),
-    // Used in enc_tabl.cpp
+    // FIXME: Used in enc_tabl.cpp
+    // AH is not accessible on EM64T, instead encoded register is SPL, so decoded
+    // register will return incorrect enum
     RegName_AH=REGNAME(OpndKind_GPReg,OpndSize_8,4),
 #if !defined(_EM64T_)    
     RegName_CH=REGNAME(OpndKind_GPReg,OpndSize_8,5),
