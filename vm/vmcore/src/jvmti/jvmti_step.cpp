@@ -515,20 +515,36 @@ static void jvmti_start_single_step_in_virtual_method(DebugUtilsTI *ti, const VM
     assert(type == InstructionDisassembler::RELATIVE_CALL ||
         type == InstructionDisassembler::INDIRECT_CALL);
 
+    Global_Env * vm_env = jni_get_vm_env(vm_thread->jni_env);
     const InstructionDisassembler::Opnd& op = disasm->get_opnd(0);
     Method *method;
+
     if (bytecode == OPCODE_INVOKEVIRTUAL)
     {
-        // Invokevirtual uses indirect call from VTable. The base
-        // address is in the register, offset is in displacement *
-        // scale.
-        VTable* vtable = (VTable*)disasm->get_reg_value(op.base, &regs);
-        assert(vtable);
-        // For x86 based architectures offset cannot be longer than 32
-        // bits, so unsigned is ok here
-        unsigned offset = (unsigned)((POINTER_SIZE_INT)disasm->get_reg_value(op.index, &regs) *
-            op.scale + op.disp);
-        method = class_get_method_from_vt_offset(vtable, offset);
+        assert(op.kind == InstructionDisassembler::Kind_Mem ||
+            op.kind == InstructionDisassembler::Kind_Reg);
+        if (op.kind == InstructionDisassembler::Kind_Mem)
+        {
+            // Invokevirtual uses indirect call from VTable. The base
+            // address is in the register, offset is in displacement *
+            // scale.
+            VTable* vtable = (VTable*)disasm->get_reg_value(op.base, &regs);
+            assert(vtable);
+            // For x86 based architectures offset cannot be longer than 32
+            // bits, so unsigned is ok here
+            unsigned offset = (unsigned)((POINTER_SIZE_INT)disasm->get_reg_value(op.index, &regs) *
+                op.scale + op.disp);
+            method = class_get_method_from_vt_offset(vtable, offset);
+        }
+        else if (op.kind == InstructionDisassembler::Kind_Reg)
+        {
+            // Call through a register, it has to point to the address of a compiled method
+            NativeCodePtr ip = disasm->get_target_address_from_context(&regs);
+            CodeChunkInfo *cci = vm_env->vm_methods->find(ip);
+            assert(cci);
+            method = cci->get_method();
+            assert(method->get_state() == Method::ST_Compiled);
+        }
     }
     else if (bytecode == OPCODE_INVOKEINTERFACE)
     {
@@ -536,7 +552,6 @@ static void jvmti_start_single_step_in_virtual_method(DebugUtilsTI *ti, const VM
         // call so we need to search through all methods for this
         // one to find it, no way to get vtable and offset in it
         NativeCodePtr ip = disasm->get_target_address_from_context(&regs);
-        Global_Env * vm_env = jni_get_vm_env(vm_thread->jni_env);
         CodeChunkInfo *cci = vm_env->vm_methods->find(ip);
         if (cci)
             method = cci->get_method();
