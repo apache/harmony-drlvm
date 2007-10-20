@@ -576,7 +576,15 @@ static jint vm_create_jthread(jthread * thread_object, JNIEnv * jni_env, jobject
     args[5].i = (jint)hythread_get_priority(native_thread);
     args[6].z = daemon;
     
-    vm_execute_java_method_array((jmethodID) constructor, 0, args);
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
+    if (ti->isEnabled()) {
+        ti->setLocallyDisabled();//-----------------------------------V
+        vm_execute_java_method_array((jmethodID) constructor, 0, args);
+        ti->setLocallyEnabled();//-----------------------------------^
+    } else {
+        vm_execute_java_method_array((jmethodID) constructor, 0, args);
+    }
+
     if (exn_raised()) {
         TRACE("Failed to initialize new thread object, exception = " << exn_get_name());
         hythread_suspend_enable();
