@@ -154,6 +154,11 @@
                     <compilerarg value="/Qip" />
                 </select>
             </select>
+
+            <select hynosig="true">
+                <defineset define="HY_NO_SIG" />
+            </select>
+
         </compiler>
 
         <compiler id="common.cpp.compiler" name="${build.cxx}" extends="common.compiler">
