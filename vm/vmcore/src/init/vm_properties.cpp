@@ -51,7 +51,11 @@ static const char *api_dll_files[] =
     "hysig",
 #endif
     "hyprt",
+#if defined(HY_LOCAL_ZLIB)
+    "z",
+#else
     "hyzlib",
+#endif
     "hytext",
     "hynio",
     "vmi",
