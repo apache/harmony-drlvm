@@ -159,10 +159,6 @@
                 <defineset define="HY_NO_SIG" />
             </select>
 
-            <select hylocalzlib="true">
-                <defineset define="HY_LOCAL_ZLIB" />
-            </select>
-
         </compiler>
 
         <compiler id="common.cpp.compiler" name="${build.cxx}" extends="common.compiler">

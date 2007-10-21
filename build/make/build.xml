@@ -319,7 +319,6 @@
             <param name="arch" expression="${build.arch}" />
             <param name="cxx" expression="${build.cxx}" />
             <param name="hynosig" expression="${hy.no.sig}" />
-            <param name="hylocalzlib" expression="${hy.local.zlib}" />
         </xslt>
 
         <xmlproperty file="${build.semi.dir}/deploy.xml" keeproot="true" collapseAttributes="true" />
@@ -371,7 +370,6 @@
         <echo message="     svn revision = ${svn.revision}" />
         <echo message="       components = ${COMPONENTS}" />
         <echo message="        hy.no.sig = ${hy.no.sig}" />
-        <echo message="    hy.local.zlib = ${hy.local.zlib}" />
     </target>
 
     <target name="setup" depends="svn-prop,extern_dep,detect.os.arch.cxx.cfg, set.semis.dirs" unless="skip.setup">

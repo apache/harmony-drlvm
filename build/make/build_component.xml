@@ -140,7 +140,6 @@ Version: $Revision: 1.9.2.5 $
                     <param name="arch" expression="${build.arch}" />
                     <param name="cxx" expression="${build.cxx}" />
                     <param name="hynosig" expression="${hy.no.sig}" />
-                    <param name="hylocalzlib" expression="${hy.local.zlib}" />
                 </xslt>
                 <echo file="${build.targets.file}" append="true">
                     <![CDATA[
@@ -267,7 +266,6 @@ Version: $Revision: 1.9.2.5 $
             <param name="arch" expression="${build.arch}" />
             <param name="cxx" expression="${build.cxx}" />
             <param name="hynosig" expression="${hy.no.sig}" />
-            <param name="hylocalzlib" expression="${hy.local.zlib}" />
         </xslt>
 
         <!-- Load the semis/build/init_${component.name}.xml content. -->
