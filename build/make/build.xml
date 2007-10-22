@@ -41,11 +41,11 @@
     Usage example:
         (Windows)
         c:\harmony\vm> build.bat update
-        c:\harmony\vm> build.bat -DCOMPONENTS="vm.interpeter vm.vmcore"
+        c:\harmony\vm> build.bat -DCOMPONENTS="vm.interpreter vm.vmcore"
 
         (Linux)
         # ~/harmony/vm ./build.sh update
-        # ~/harmony/vm ./build.sh -DCOMPONENTS="vm.interpeter vm.vmcore"
+        # ~/harmony/vm ./build.sh -DCOMPONENTS="vm.interpreter vm.vmcore"
 
   -->
 
