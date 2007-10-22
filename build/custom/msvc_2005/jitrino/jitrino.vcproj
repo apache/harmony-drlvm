@@ -924,7 +924,15 @@
 			Name="vm"
 			>
 			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\vm\EMInterface.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\vm\EMInterface.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\vm\JITInterface.cpp"
 				>
 			</File>
 			<File
@@ -935,30 +943,6 @@
 				RelativePath="..\..\..\..\vm\jitrino\src\vm\VMInterface.h"
 				>
 			</File>
-			<Filter
-				Name="drlvm"
-				>
-				<File
-					RelativePath="..\..\..\..\vm\jitrino\src\vm\drl\DrlEMInterface.cpp"
-					>
-				</File>
-				<File
-					RelativePath="..\..\..\..\vm\jitrino\src\vm\drl\DrlEMInterface.h"
-					>
-				</File>
-				<File
-					RelativePath="..\..\..\..\vm\jitrino\src\vm\drl\DrlJITInterface.cpp"
-					>
-				</File>
-				<File
-					RelativePath="..\..\..\..\vm\jitrino\src\vm\drl\DrlVMInterface.cpp"
-					>
-				</File>
-				<File
-					RelativePath="..\..\..\..\vm\jitrino\src\vm\drl\DrlVMInterface.h"
-					>
-				</File>
-			</Filter>
 		</Filter>
 		<Filter
 			Name="codegen"

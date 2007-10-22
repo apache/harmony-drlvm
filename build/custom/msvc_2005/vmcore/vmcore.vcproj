@@ -157,7 +157,7 @@
 				LinkIncremental="2"
 				AdditionalLibraryDirectories="&quot;$(ProjectDir)\..\..\..\win_em64t_msvc_$(ConfigurationName)\semis\vm\port\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_em64t_msvc_$(ConfigurationName)\semis\extra\apr\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_em64t_msvc_$(ConfigurationName)\semis\extra\aprutil\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_em64t_msvc_$(ConfigurationName)\semis\extra\zlib\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_em64t_msvc_$(ConfigurationName)\semis\extra\log4cxx\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_em64t_msvc_$(ConfigurationName)\semis\vm\hythr\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_em64t_msvc_$(ConfigurationName)\semis\vm\jthread\_bin&quot;;&quot;$(ProjectDir)\..\..\..\..\..\working_classlib\deploy\lib&quot;"
 				IgnoreDefaultLibraryNames="msvcrt.lib"
-				ModuleDefinitionFile=""
+				ModuleDefinitionFile="$(ProjectDir)\..\..\..\..\vm\vmcore\src\harmonyvm64.def"
 				AddModuleNamesToAssembly=""
 				GenerateDebugInformation="true"
 				ProgramDatabaseFile="$(OutDir)/harmonyvm.pdb"
@@ -326,6 +326,7 @@
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;$(ProjectDir)\..\..\..\win_em64t_msvc_$(ConfigurationName)\semis\vm\port\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_em64t_msvc_$(ConfigurationName)\semis\extra\apr\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_em64t_msvc_$(ConfigurationName)\semis\extra\aprutil\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_em64t_msvc_$(ConfigurationName)\semis\extra\zlib\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_em64t_msvc_$(ConfigurationName)\semis\extra\log4cxx\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_em64t_msvc_$(ConfigurationName)\semis\vm\hythr\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_em64t_msvc_$(ConfigurationName)\semis\vm\jthread\_bin&quot;;&quot;$(ProjectDir)\..\..\..\..\..\working_classlib\deploy\lib&quot;"
 				IgnoreDefaultLibraryNames="msvcrt.lib"
+				ModuleDefinitionFile="$(ProjectDir)\..\..\..\..\vm\vmcore\src\harmonyvm64.def"
 				AddModuleNamesToAssembly=""
 				GenerateDebugInformation="true"
 				ProgramDatabaseFile="$(OutDir)/harmonyvm.pdb"
@@ -943,6 +944,10 @@
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\jit\primitives_support.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\jit\rt_helper_info.cpp"
 				>
 			</File>
 		</Filter>
