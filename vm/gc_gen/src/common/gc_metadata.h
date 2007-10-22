@@ -27,7 +27,7 @@
 #include "../thread/collector.h"
 #include "../thread/mutator.h"
 
-#define GC_METADATA_SEGMENT_NUM 128
+#define GC_METADATA_SEGMENT_NUM 256
 
 typedef struct GC_Metadata{
   void *segments[GC_METADATA_SEGMENT_NUM]; /* address array of malloced segments for free pool */
