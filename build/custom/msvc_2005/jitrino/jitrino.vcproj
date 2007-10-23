@@ -500,6 +500,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\HLOAPIMagics.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\HLOAPIMagics.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\inliner.cpp"
 				>
 			</File>
