@@ -872,6 +872,19 @@ CompilationInterface::getStaticField(Class_Handle enclClass, uint32 cpIndex, boo
     return getFieldDesc(res);
 }
 
+MethodDesc*  
+CompilationInterface::getMethodByName(Class_Handle enclClass, const char* name) {
+    Method_Handle res = class_get_method_by_name(enclClass, name);
+    assert(res != NULL); // this functionality should be used only for those resolved for sure
+    return getMethodDesc(res);
+}
+
+FieldDesc*  
+CompilationInterface::getFieldByName(Class_Handle enclClass, const char* name) {
+    Field_Handle res = class_get_field_by_name(enclClass, name);
+    return res == NULL ? NULL : getFieldDesc(res);
+}
+
 Type*
 CompilationInterface::getFieldType(Class_Handle enclClass, uint32 cpIndex) {
     Java_Type drlType = (Java_Type)class_get_cp_field_type(enclClass, (unsigned short)cpIndex);

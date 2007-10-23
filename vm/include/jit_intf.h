@@ -207,6 +207,9 @@ VMEXPORT unsigned     class_number_fields(Class_Handle ch);
 VMEXPORT Field_Handle class_get_field(Class_Handle ch, unsigned idx);
 VMEXPORT int          class_get_super_offset();
 
+VMEXPORT Field_Handle   class_get_field_by_name(Class_Handle ch, const char* name);
+VMEXPORT Method_Handle  class_get_method_by_name(Class_Handle ch, const char* name);
+
 VMEXPORT int          class_get_depth(Class_Handle cl);
 //#endif
 //::

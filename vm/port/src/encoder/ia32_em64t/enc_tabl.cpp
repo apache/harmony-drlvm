@@ -436,7 +436,6 @@ BEGIN_OPCODES()
 END_OPCODES()
 END_MNEMONIC()
  
-
 #undef DEFINE_ALU_OPCODES
 //
 //
@@ -1409,7 +1408,7 @@ END_OPCODES()
 END_MNEMONIC()
 
 /*
-MOVS is a special case. 
+MOVS and CMPS are the special cases. 
 Most the code in both CG and Encoder do not expect 2 memory operands. 
 Also, they are not supposed to setup constrains on which register the 
 memory reference must reside - m8,m8 or m32,m32 is not the choice.
@@ -1435,6 +1434,27 @@ BEGIN_MNEMONIC(MOVS32, MF_NONE, DU_DU_DU)
 BEGIN_OPCODES()
     {OpcodeInfo::ia32,  {0xA5},         {r32,r32,ECX},  DU_DU_DU },
     {OpcodeInfo::em64t, {0xA5},         {r64,r64,RCX},  DU_DU_DU },
+END_OPCODES()
+END_MNEMONIC()
+
+BEGIN_MNEMONIC(CMPSB, MF_AFFECTS_FLAGS, DU_DU_DU)
+BEGIN_OPCODES()
+    {OpcodeInfo::ia32,  {0xA6},         {r32,r32,ECX},    DU_DU_DU },
+    {OpcodeInfo::em64t, {0xA6},         {r64,r64,RCX},    DU_DU_DU },
+END_OPCODES()
+END_MNEMONIC()
+
+BEGIN_MNEMONIC(CMPSW, MF_AFFECTS_FLAGS, DU_DU_DU)
+BEGIN_OPCODES()
+    {OpcodeInfo::ia32,  {Size16, 0xA7}, {r32,r32,ECX},  DU_DU_DU },
+    {OpcodeInfo::em64t, {Size16, 0xA7}, {r64,r64,RCX},  DU_DU_DU },
+END_OPCODES()
+END_MNEMONIC()
+
+BEGIN_MNEMONIC(CMPSD, MF_AFFECTS_FLAGS, DU_DU_DU)
+BEGIN_OPCODES()
+    {OpcodeInfo::ia32,  {0xA7},         {r32,r32,ECX},  DU_DU_DU },
+    {OpcodeInfo::em64t, {0xA7},         {r64,r64,RCX},  DU_DU_DU },
 END_OPCODES()
 END_MNEMONIC()
 

@@ -403,12 +403,14 @@ IntrinsicCallOp::Id _BlockCodeSelector::convertIntrinsicId(IntrinsicCallId callI
 
 JitHelperCallOp::Id _BlockCodeSelector::convertJitHelperId(JitHelperCallId callId) {
     switch(callId) {
-    case InitializeArray: return JitHelperCallOp::InitializeArray;
-    case SaveThisState: return JitHelperCallOp::SaveThisState;
-    case ReadThisState: return JitHelperCallOp::ReadThisState;
-    case LockedCompareAndExchange: return JitHelperCallOp::LockedCompareAndExchange;
-    case AddValueProfileValue: return JitHelperCallOp::AddValueProfileValue;
-    case FillArrayWithConst: return JitHelperCallOp::FillArrayWithConst;
+    case InitializeArray:           return JitHelperCallOp::InitializeArray;
+    case SaveThisState:             return JitHelperCallOp::SaveThisState;
+    case ReadThisState:             return JitHelperCallOp::ReadThisState;
+    case LockedCompareAndExchange:  return JitHelperCallOp::LockedCompareAndExchange;
+    case AddValueProfileValue:      return JitHelperCallOp::AddValueProfileValue;
+    case FillArrayWithConst:        return JitHelperCallOp::FillArrayWithConst;
+    case StringCompareTo:           return JitHelperCallOp::StringCompareTo;
+    case StringRegionMatches:       return JitHelperCallOp::StringRegionMatches;
     }
     assert(0);
     return JitHelperCallOp::InitializeArray; // to keep compiler quiet

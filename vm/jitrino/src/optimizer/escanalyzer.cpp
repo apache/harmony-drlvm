@@ -413,6 +413,8 @@ EscAnalyzer::instrExam(Node* node) {
                         case ReadThisState:
                         case LockedCompareAndExchange:
                         case AddValueProfileValue:
+                        case StringCompareTo:
+                        case StringRegionMatches:
                             break;
                         default:
                             assert(0);

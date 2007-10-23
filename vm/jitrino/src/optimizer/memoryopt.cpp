@@ -666,6 +666,8 @@ MemoryOptInitWalker::applyToInst(Inst *i)
             case ReadThisState:
             case LockedCompareAndExchange:
             case AddValueProfileValue:
+            case StringCompareTo:
+            case StringRegionMatches:
                 break;
             default:
                 assert(0);

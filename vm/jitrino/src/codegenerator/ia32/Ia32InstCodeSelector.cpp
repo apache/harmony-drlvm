@@ -178,6 +178,8 @@ void InstCodeSelector::onCFGInit(IRManager& irManager)
     irManager.registerInternalHelperInfo("add_value_profile_value", IRManager::InternalHelperInfo((void*)&add_value_profile_value,&CallingConvention_STDCALL));
 
     irManager.registerInternalHelperInfo("fill_array_with_const", IRManager::InternalHelperInfo((void*)&fill_array_with_const,&CallingConvention_STDCALL));
+    irManager.registerInternalHelperInfo("String_compareTo", IRManager::InternalHelperInfo(NULL,&CallingConvention_STDCALL));
+    irManager.registerInternalHelperInfo("String_regionMatches", IRManager::InternalHelperInfo(NULL,&CallingConvention_STDCALL));
 }
 
 //_______________________________________________________________________________________________________________
@@ -2686,6 +2688,20 @@ CG_OpndHandle* InstCodeSelector::callhelper(uint32              numArgs,
         assert(numArgs == 4);
         Opnd * newArgs[4] = {(Opnd *)args[0], (Opnd *)args[1], (Opnd *)args[2], (Opnd *)args[3]};
         appendInsts(irManager.newInternalRuntimeHelperCallInst("fill_array_with_const", numArgs, newArgs, dstOpnd));
+        break;
+    }
+    case StringCompareTo:
+    {
+        assert(numArgs == 7);
+        Opnd * newArgs[7] = {(Opnd *)args[0], (Opnd *)args[1], (Opnd *)args[2], (Opnd *)args[3], (Opnd *)args[4], (Opnd *)args[5], (Opnd *)args[6]};
+        appendInsts(irManager.newInternalRuntimeHelperCallInst("String_compareTo", numArgs, newArgs, dstOpnd));
+        break;
+    }
+    case StringRegionMatches:
+    {
+        assert(numArgs == 5);
+        Opnd * newArgs[5] = {(Opnd *)args[0], (Opnd *)args[1], (Opnd *)args[2], (Opnd *)args[3], (Opnd *)args[4]};
+        appendInsts(irManager.newInternalRuntimeHelperCallInst("String_regionMatches", numArgs, newArgs, dstOpnd));
         break;
     }
     default:

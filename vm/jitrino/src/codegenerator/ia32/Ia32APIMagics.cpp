@@ -60,6 +60,8 @@ public:
     virtual void run()=0;
 protected:
 
+    Opnd*  addElemIndexWithLEA(Opnd* array, Opnd* index, Node* node);
+
     IRManager* irm;
     CallInst* callInst;
     MethodDesc*  md;
@@ -79,6 +81,8 @@ DECLARE_HELPER_INLINER(Integer_numberOfLeadingZeros_Handler_x_I_x_I);
 DECLARE_HELPER_INLINER(Integer_numberOfTrailingZeros_Handler_x_I_x_I);
 DECLARE_HELPER_INLINER(Long_numberOfLeadingZeros_Handler_x_J_x_I);
 DECLARE_HELPER_INLINER(Long_numberOfTrailingZeros_Handler_x_J_x_I);
+DECLARE_HELPER_INLINER(String_compareTo_Handler_x_String_x_I);
+DECLARE_HELPER_INLINER(String_regionMatches_Handler_x_I_x_String_x_I_x_I_x_Z);
 
 void APIMagicsHandlerSession::runImpl() {
     CompilationContext* cc = getCompilationContext();
@@ -92,34 +96,45 @@ void APIMagicsHandlerSession::runImpl() {
         Node* node = *it;
         if (node->isBlockNode()) {
             for (Inst* inst = (Inst*)node->getFirstInst(); inst!=NULL; inst = inst->getNextInst()) {
-                if (!inst->hasKind(Inst::Kind_CallInst) || !((CallInst*)inst)->isDirect()) {
+                if (!inst->hasKind(Inst::Kind_CallInst)) {
                     continue;
                 }
-                CallInst* callInst = (CallInst*)inst;
-                Opnd * targetOpnd=callInst->getOpnd(callInst->getTargetOpndIndex());
-                assert(targetOpnd->isPlacedIn(OpndKind_Imm));
-                Opnd::RuntimeInfo * ri=targetOpnd->getRuntimeInfo();
-                if( !ri || ri->getKind() != Opnd::RuntimeInfo::Kind_MethodDirectAddr) { 
-                    continue; 
-                };
-                MethodDesc * md = (MethodDesc*)ri->getValue(0);
-                const char* className = md->getParentType()->getName();
-                const char* methodName = md->getName();
-                const char* signature = md->getSignatureString();
-                if (!strcmp(className, "java/lang/Integer")) {
-                    if (!strcmp(methodName, "numberOfLeadingZeros") && !strcmp(signature, "(I)I")) {
-                        handlers.push_back(new (tmpMM) Integer_numberOfLeadingZeros_Handler_x_I_x_I(irm, callInst, md));
-                    } else if (!strcmp(methodName, "numberOfTrailingZeros") && !strcmp(signature, "(I)I")) {
-                        handlers.push_back(new (tmpMM) Integer_numberOfTrailingZeros_Handler_x_I_x_I(irm, callInst, md));
-                    }
-                } else if (!strcmp(className, "java/lang/Long")) {
-                    if (!strcmp(methodName, "numberOfLeadingZeros") && !strcmp(signature, "(J)I")) {
-                        handlers.push_back(new (tmpMM) Long_numberOfLeadingZeros_Handler_x_J_x_I(irm, callInst, md));
-                    } else if (!strcmp(methodName, "numberOfTrailingZeros") && !strcmp(signature, "(J)I")) {
-                        handlers.push_back(new (tmpMM) Long_numberOfTrailingZeros_Handler_x_J_x_I(irm, callInst, md));
+                if ( ((CallInst*)inst)->isDirect() ) {
+                    CallInst* callInst = (CallInst*)inst;
+                    Opnd * targetOpnd=callInst->getOpnd(callInst->getTargetOpndIndex());
+                    assert(targetOpnd->isPlacedIn(OpndKind_Imm));
+                    Opnd::RuntimeInfo * ri=targetOpnd->getRuntimeInfo();
+                    if( !ri ) { 
+                        continue; 
+                    };
+                    if( ri->getKind() == Opnd::RuntimeInfo::Kind_MethodDirectAddr ){
+                        MethodDesc * md = (MethodDesc*)ri->getValue(0);
+                        const char* className = md->getParentType()->getName();
+                        const char* methodName = md->getName();
+                        const char* signature = md->getSignatureString();
+                        if (!strcmp(className, "java/lang/Integer")) {
+                            if (!strcmp(methodName, "numberOfLeadingZeros") && !strcmp(signature, "(I)I")) {
+                                handlers.push_back(new (tmpMM) Integer_numberOfLeadingZeros_Handler_x_I_x_I(irm, callInst, md));
+                            } else if (!strcmp(methodName, "numberOfTrailingZeros") && !strcmp(signature, "(I)I")) {
+                                handlers.push_back(new (tmpMM) Integer_numberOfTrailingZeros_Handler_x_I_x_I(irm, callInst, md));
+                            }
+                        } else if (!strcmp(className, "java/lang/Long")) {
+                            if (!strcmp(methodName, "numberOfLeadingZeros") && !strcmp(signature, "(J)I")) {
+                                handlers.push_back(new (tmpMM) Long_numberOfLeadingZeros_Handler_x_J_x_I(irm, callInst, md));
+                            } else if (!strcmp(methodName, "numberOfTrailingZeros") && !strcmp(signature, "(J)I")) {
+                                handlers.push_back(new (tmpMM) Long_numberOfTrailingZeros_Handler_x_J_x_I(irm, callInst, md));
+                            }
+                        }
+                    } else if( ri->getKind() == Opnd::RuntimeInfo::Kind_InternalHelperAddress ) {
+                        if( strcmp((char*)ri->getValue(0),"String_compareTo")==0 ) {
+                            if(getBoolArg("String_compareTo_as_magic", true))
+                                handlers.push_back(new (tmpMM) String_compareTo_Handler_x_String_x_I(irm, callInst, NULL));
+                        } else if( strcmp((char*)ri->getValue(0),"String_regionMatches")==0 ) {
+                            if(getBoolArg("String_regionMatches_as_magic", true))
+                                handlers.push_back(new (tmpMM) String_regionMatches_Handler_x_I_x_String_x_I_x_I_x_Z(irm, callInst, NULL));
+                        }
                     }
                 }
-
             }
         }
     }
@@ -294,6 +309,238 @@ void Long_numberOfTrailingZeros_Handler_x_J_x_I::run() {
     cfg->addEdge(zeroNode, nextNode);
 
 #endif
+}
+
+void String_compareTo_Handler_x_String_x_I::run() {
+    //mov ds:esi, this
+    //mov es:edi, src
+    //mov ecx, min(this.count, src.count)
+    //repne cmpw
+    //if ZF == 0 (one of strings is a prefix)
+    //  return this.count - src.count
+    //else
+    //  return [ds:esi-2] - [es:edi-2]
+
+    Node* callInstNode = callInst->getNode();
+    Node* nextNode = callInstNode->getUnconditionalEdgeTarget();
+    assert(nextNode!=NULL);
+    cfg->removeEdge(callInstNode->getUnconditionalEdge());
+
+    // arguments of the call are already prepared by respective HLO pass
+    // they are not the strings but 'value' arrays
+    Opnd* thisArr = getCallSrc(callInst, 0);
+    Opnd* thisIdx = getCallSrc(callInst, 1);
+    Opnd* thisLen = getCallSrc(callInst, 2);
+    Opnd* trgtArr = getCallSrc(callInst, 3);
+    Opnd* trgtIdx = getCallSrc(callInst, 4);
+    Opnd* trgtLen = getCallSrc(callInst, 5);
+    Opnd* valForCounter = getCallSrc(callInst, 6);
+    Opnd* res = getCallDst(callInst);
+
+#ifdef _EM64T_
+    RegName counterRegName = RegName_RCX;
+    RegName thisAddrRegName = RegName_RSI;
+    RegName trgtAddrRegName = RegName_RDI;
+    Type*   counterType = irm->getTypeManager().getInt64Type();
+#else
+    RegName counterRegName = RegName_ECX;
+    RegName thisAddrRegName = RegName_ESI;
+    RegName trgtAddrRegName = RegName_EDI;
+    Type*   counterType = irm->getTypeManager().getInt32Type();
+#endif
+
+    Node* counterIsZeroNode = irm->getFlowGraph()->createBlockNode();
+    // if counter is zero jump to counterIsZeroNode immediately
+    callInstNode->appendInst(irm->newInst(Mnemonic_TEST, valForCounter, valForCounter));
+    BranchInst* br = irm->newBranchInst(Mnemonic_JZ, NULL, NULL);
+    callInstNode->appendInst(br);
+    Node* node = irm->getFlowGraph()->createBlockNode();
+    br->setTrueTarget(counterIsZeroNode);
+    br->setFalseTarget(node);
+    irm->getFlowGraph()->addEdge(counterIsZeroNode, nextNode, 1);
+    irm->getFlowGraph()->addEdge(callInstNode, counterIsZeroNode, 0.05);
+    irm->getFlowGraph()->addEdge(callInstNode, node, 0.95);
+
+    // prepare counter
+    Opnd* counter = irm->newRegOpnd(counterType,counterRegName);
+    node->appendInst(irm->newCopyPseudoInst(Mnemonic_MOV, counter, valForCounter));
+
+    // prepare this position
+    Opnd* thisAddr = addElemIndexWithLEA(thisArr,thisIdx,node);
+    Opnd* thisAddrReg = irm->newRegOpnd(thisAddr->getType(),thisAddrRegName);
+    node->appendInst(irm->newCopyPseudoInst(Mnemonic_MOV, thisAddrReg, thisAddr));
+
+    // prepare trgt position
+    Opnd* trgtAddr = addElemIndexWithLEA(trgtArr,trgtIdx,node);
+    Opnd* trgtAddrReg = irm->newRegOpnd(trgtAddr->getType(),trgtAddrRegName);
+    node->appendInst(irm->newCopyPseudoInst(Mnemonic_MOV, trgtAddrReg, trgtAddr));
+
+    Inst* compareInst = irm->newInst(Mnemonic_CMPSW,thisAddrReg,trgtAddrReg,counter);
+    compareInst->setPrefix(InstPrefix_REPZ);
+    node->appendInst(compareInst);
+
+    // counter is 0 means the same as last comparison leaves zero at ZF
+    br = irm->newBranchInst(Mnemonic_JZ, NULL, NULL);
+    node->appendInst(br);
+
+    Node* differentStringsNode = irm->getFlowGraph()->createBlockNode();
+    br->setTrueTarget(counterIsZeroNode);
+    br->setFalseTarget(differentStringsNode);
+    irm->getFlowGraph()->addEdge(node, counterIsZeroNode, 0.5);
+    irm->getFlowGraph()->addEdge(node, differentStringsNode, 0.5);
+    irm->getFlowGraph()->addEdge(differentStringsNode, nextNode, 1);
+
+    // counter is zero
+    counterIsZeroNode->appendInst(irm->newInstEx(Mnemonic_SUB, 1, res, thisLen, trgtLen));
+
+    // strings are different
+    Opnd* two = irm->newImmOpnd(counterType,2);
+    differentStringsNode->appendInst(irm->newInstEx(Mnemonic_SUB, 1, thisAddrReg, thisAddrReg, two));
+    differentStringsNode->appendInst(irm->newInstEx(Mnemonic_SUB, 1, trgtAddrReg, trgtAddrReg, two));
+    Type* charType = irm->getTypeManager().getCharType();
+    Opnd* thisChar = irm->newMemOpnd(charType, thisAddrReg);
+    Opnd* trgtChar = irm->newMemOpnd(charType, trgtAddrReg);
+    Opnd* dst = irm->newOpnd(charType);
+    differentStringsNode->appendInst(irm->newInstEx(Mnemonic_SUB, 1, dst, thisChar, trgtChar));
+    differentStringsNode->appendInst(irm->newInstEx(Mnemonic_MOVSX, 1, res, dst));
+
+    callInst->unlink();
+}
+
+void String_regionMatches_Handler_x_I_x_String_x_I_x_I_x_Z::run() {
+    //mov ds:esi, this
+    //mov es:edi, src
+    //mov ecx, counter
+    //repne cmpw
+    //if ZF == 0 (one of strings is a prefix)
+    //  return this.count - src.count
+    //else
+    //  return [ds:esi-2] - [es:edi-2]
+
+    Node* node = callInst->getNode();
+    Node* nextNode = NULL;
+
+    if(callInst == node->getLastInst()) {
+        nextNode = node->getUnconditionalEdgeTarget();
+        assert(nextNode!=NULL);
+    } else {
+        nextNode = irm->getFlowGraph()->splitNodeAtInstruction(callInst, true, true, NULL);
+    }
+    cfg->removeEdge(node->getUnconditionalEdge());
+
+    // arguments of the call are already prepared by respective HLO pass
+    // they are not the strings but 'value' arrays
+    Opnd* thisArr = getCallSrc(callInst, 0);
+    Opnd* thisIdx = getCallSrc(callInst, 1);
+    Opnd* trgtArr = getCallSrc(callInst, 2);
+    Opnd* trgtIdx = getCallSrc(callInst, 3);
+    Opnd* valForCounter = getCallSrc(callInst, 4);
+    Opnd* res = getCallDst(callInst);
+
+#ifdef _EM64T_
+    RegName counterRegName = RegName_RCX;
+    RegName thisAddrRegName = RegName_RSI;
+    RegName trgtAddrRegName = RegName_RDI;
+    Type*   counterType = irm->getTypeManager().getInt64Type();
+#else
+    RegName counterRegName = RegName_ECX;
+    RegName thisAddrRegName = RegName_ESI;
+    RegName trgtAddrRegName = RegName_EDI;
+    Type*   counterType = irm->getTypeManager().getInt32Type();
+#endif
+
+    // prepare counter
+    Opnd* counter = irm->newRegOpnd(counterType,counterRegName);
+    node->appendInst(irm->newCopyPseudoInst(Mnemonic_MOV, counter, valForCounter));
+
+    // prepare this position
+    Opnd* thisAddr = addElemIndexWithLEA(thisArr,thisIdx,node);
+    Opnd* thisAddrReg = irm->newRegOpnd(thisAddr->getType(),thisAddrRegName);
+    node->appendInst(irm->newCopyPseudoInst(Mnemonic_MOV, thisAddrReg, thisAddr));
+
+    // prepare trgt position
+    Opnd* trgtAddr = addElemIndexWithLEA(trgtArr,trgtIdx,node);
+    Opnd* trgtAddrReg = irm->newRegOpnd(trgtAddr->getType(),trgtAddrRegName);
+    node->appendInst(irm->newCopyPseudoInst(Mnemonic_MOV, trgtAddrReg, trgtAddr));
+
+    Inst* compareInst = irm->newInst(Mnemonic_CMPSW,thisAddrReg,trgtAddrReg,counter);
+    compareInst->setPrefix(InstPrefix_REPZ);
+    node->appendInst(compareInst);
+
+    // counter is 0 means the same as last comparison leaves zero at ZF
+    BranchInst* br = irm->newBranchInst(Mnemonic_JZ, NULL, NULL);
+    node->appendInst(br);
+
+    Node* sameRegionsNode = irm->getFlowGraph()->createBlockNode();
+    Node* diffRegionsNode = irm->getFlowGraph()->createBlockNode();
+    br->setTrueTarget(sameRegionsNode);
+    br->setFalseTarget(diffRegionsNode);
+    irm->getFlowGraph()->addEdge(node, sameRegionsNode, 0.5);
+    irm->getFlowGraph()->addEdge(sameRegionsNode, nextNode, 1);
+    irm->getFlowGraph()->addEdge(node, diffRegionsNode, 0.5);
+    irm->getFlowGraph()->addEdge(diffRegionsNode, nextNode, 1);
+
+    // regions are equal
+    Opnd* one = irm->newImmOpnd(res->getType(),1);
+    sameRegionsNode->appendInst(irm->newInst(Mnemonic_MOV, res, one));
+
+    // regions are different
+    Opnd* zero = irm->newImmOpnd(res->getType(),0);
+    diffRegionsNode->appendInst(irm->newInst(Mnemonic_MOV, res, zero));
+
+    callInst->unlink();
+}
+
+//  Compute address of the array element given 
+//  address of the first element and index
+//  using 'LEA' instruction
+
+Opnd*  APIMagicHandler::addElemIndexWithLEA(Opnd* array, Opnd* index, Node* node) 
+{
+    ArrayType * arrayType=((Opnd*)array)->getType()->asArrayType();
+    Type * elemType=arrayType->getElementType();
+    Type * dstType=irm->getManagedPtrType(elemType);
+
+    TypeManager& typeManager = irm->getTypeManager();
+#ifdef _EM64T_
+    Type * indexType = typeManager.getInt64Type();
+    Type * offType = typeManager.getInt64Type();
+#else
+    Type * indexType = typeManager.getInt32Type();
+    Type * offType = typeManager.getInt32Type();
+#endif
+        
+    uint32 elemSize = 0;
+    if (elemType->isReference()
+        && Type::isCompressedReference(elemType->tag, irm->getCompilationInterface()) 
+        && !elemType->isCompressedReference()) {
+        elemSize = 4;
+    } else {
+        elemSize = getByteSize(irm->getTypeSize(elemType));
+    }
+    Opnd * elemSizeOpnd  = irm->newImmOpnd(indexType, elemSize);
+    
+    Opnd * indexOpnd = index;
+    assert(index->getType() == indexType); //when this assertion fails 'convert' should be implemented
+//    indexOpnd = convert(indexOpnd, indexType);
+
+    if ( indexOpnd->isPlacedIn(OpndKind_Imm) ) {
+        // we need to put index operand on a register to satisfy LEA constraint
+        int64 immValue = indexOpnd->getImmValue();
+        if (immValue == 0) {
+            indexOpnd = NULL;
+            elemSizeOpnd = NULL;
+        } else {
+            Opnd * indexReg = irm->newOpnd(indexType);
+            node->appendInst(irm->newCopyPseudoInst(Mnemonic_MOV, indexReg, indexOpnd));
+            indexOpnd = indexReg;
+        }
+    }    
+    Opnd * arrOffset = irm->newImmOpnd(offType, arrayType->getArrayElemOffset());
+    Opnd * addr = irm->newMemOpnd(dstType,(Opnd*)array, indexOpnd, elemSizeOpnd, arrOffset);
+    Opnd * dst = irm->newOpnd(dstType);
+    node->appendInst(irm->newInstEx(Mnemonic_LEA, 1, dst, addr));
+    return dst;
 }
 
 }} //namespace

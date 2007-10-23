@@ -513,7 +513,10 @@ void GCSafePointsInfo::updatePairsOnInst(Inst* inst, GCSafePointPairs& res) {
         if (inst->hasKind(Inst::Kind_ControlTransferInst) ||
             inst->getMnemonic() == Mnemonic_MOVS8         ||
             inst->getMnemonic() == Mnemonic_MOVS16        ||
-            inst->getMnemonic() == Mnemonic_MOVS32        ) {
+            inst->getMnemonic() == Mnemonic_MOVS32        ||
+            inst->getMnemonic() == Mnemonic_CMPSB         ||
+            inst->getMnemonic() == Mnemonic_CMPSW         ||
+            inst->getMnemonic() == Mnemonic_CMPSD         ) {
             //Do nothing, calls return only bases
         } else {
             Opnd* fromOpnd = NULL;
@@ -532,9 +535,7 @@ void GCSafePointsInfo::updatePairsOnInst(Inst* inst, GCSafePointPairs& res) {
                     fromOpnd = inst->getOpnd(useIndex1);
                     break;                
                 case Mnemonic_ADD: { 
-#ifdef _EM64T_
                 case Mnemonic_SUB:
-#endif
                         fromOpnd = opnd;
                         Opnd* offsetOpnd = inst->getOpnd(useIndex1);
                         Opnd* immOffset = findImmediateSource(offsetOpnd);

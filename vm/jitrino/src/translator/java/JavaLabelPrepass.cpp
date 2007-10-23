@@ -635,6 +635,7 @@ void JavaLabelPrepass::parseDone() {
     labelOffsets = new (memManager) uint32[numLabels];
     struct LabelOffsetVisitor avisitor(labelOffsets);
     labels->visitElems(avisitor);
+    if (Log::isEnabled()) Log::out() << ::std::endl << "================= PREPASS IS FINISHED =================" << ::std::endl << ::std::endl;
 }
 
 uint32 JavaLabelPrepass::getLabelId(uint32 offset) {

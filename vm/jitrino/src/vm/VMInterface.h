@@ -328,6 +328,8 @@ public:
     FieldDesc*  getNonStaticField(Class_Handle enclClass, uint32 cpIndex, bool putfield);
     FieldDesc*  getStaticField(Class_Handle enclClass, uint32 cpIndex, bool putfield);
 
+    FieldDesc*  getFieldByName(Class_Handle enclClass, const char* name);
+    MethodDesc* getMethodByName(Class_Handle enclClass, const char* name);
     
 
     // resolve-by-name methods

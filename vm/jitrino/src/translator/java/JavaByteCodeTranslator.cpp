@@ -562,6 +562,7 @@ JavaByteCodeTranslator::parseDone()
         jsrEntryMap->insert(std::make_pair(entry_inst, ret_inst));
     }
     irBuilder.getIRManager()->setJsrEntryMap(jsrEntryMap);
+    if (Log::isEnabled()) Log::out() << ::std::endl << "================= TRANSLATOR IS FINISHED =================" << ::std::endl << ::std::endl;
 }
 
 //-----------------------------------------------------------------------------

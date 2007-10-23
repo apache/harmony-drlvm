@@ -436,6 +436,9 @@ Mnemonic_CMOVcc,                        // Conditional Move
 Mnemonic_CMP,                           // Compare Two Operands
 Mnemonic_CMPXCHG,                       // Compare and exchange
 Mnemonic_CMPXCHG8B,                     // Compare and Exchange 8 Bytes
+Mnemonic_CMPSB,                         // Compare Two Bytes at DS:ESI and ES:EDI
+Mnemonic_CMPSW,                         // Compare Two Words at DS:ESI and ES:EDI
+Mnemonic_CMPSD,                         // Compare Two Doublewords at DS:ESI and ES:EDI
 //
 // double -> float
 Mnemonic_CVTSD2SS,                      // Convert Scalar Double-Precision Floating-Point Value to Scalar Single-Precision Floating-Point Value

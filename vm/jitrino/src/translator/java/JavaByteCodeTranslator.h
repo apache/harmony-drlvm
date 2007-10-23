@@ -56,7 +56,9 @@ public:
     void offset_done(uint32 offset);
     void checkStack();
     // called before parsing starts
-    virtual void parseInit() {}
+    virtual void parseInit() {
+        if (Log::isEnabled()) Log::out() << ::std::endl << "================= TRANSLATOR STARTED =================" << ::std::endl << ::std::endl;
+    }
     // called after parsing ends, but not if an error occurs
     virtual void parseDone();
     // called when an error occurs during the byte code parsing

@@ -476,6 +476,10 @@ void JitHelperCallInst::handlePrintEscape(::std::ostream& os, char code) const {
         os << "AddValueProfileValue"; break;
     case FillArrayWithConst:
         os << "FillArrayWithConst"; break;
+    case StringCompareTo:
+        os << "StringCompareTo"; break;
+    case StringRegionMatches:
+        os << "StringRegionMatches"; break;
     default:
         assert(0); break;
         }
@@ -2038,8 +2042,16 @@ Inst*
 InstFactory::makeJitHelperCall(Opnd* dst, JitHelperCallId id, uint32 numArgs, Opnd** args) {
     Type::Tag returnType = dst->isNull()? Type::Void : dst->getType()->tag;
     args = copyOpnds(args, numArgs);
-    return makeJitHelperCallInst(Op_JitHelperCall, Modifier(Exception_Sometimes), 
-                                 returnType, dst, numArgs, args, id);
+    Modifier mod;
+    switch(id) {
+        case StringCompareTo:
+        case StringRegionMatches:
+            mod = Modifier(Exception_Never);
+            break;
+        default:
+            mod = Modifier(Exception_Sometimes);
+    }
+    return makeJitHelperCallInst(Op_JitHelperCall, mod, returnType, dst, numArgs, args, id);
 }
 
 Inst*

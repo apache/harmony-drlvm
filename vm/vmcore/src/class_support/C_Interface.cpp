@@ -1780,6 +1780,30 @@ Field_Handle class_get_field(Class_Handle ch, unsigned idx)
     return ch->get_field(idx);
 } // class_get_field
 
+Method_Handle class_get_method_by_name(Class_Handle ch, const char* name)
+{
+    assert(ch);
+    for(int idx = 0; idx < ch->get_number_of_methods(); idx++) {
+        Method_Handle meth = ch->get_method(idx);
+        if(strcmp(meth->get_name()->bytes, name) == 0) {
+            return meth;
+        }
+    }
+    return NULL;
+} // class_get_method_by_name
+
+Field_Handle class_get_field_by_name(Class_Handle ch, const char* name)
+{
+    assert(ch);
+    for(int idx = 0; idx < ch->get_number_of_fields(); idx++) {
+        Field_Handle fld = ch->get_field(idx);
+        if(strcmp(fld->get_name()->bytes, name) == 0) {
+            return fld;
+        }
+    }
+    return NULL;
+} // class_get_field_by_name
+
 Field_Handle class_get_instance_field(Class_Handle ch, unsigned idx)
 {
     assert(ch);

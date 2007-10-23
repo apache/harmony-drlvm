@@ -134,6 +134,12 @@ Inliner::Inliner(SessionAction* argSource, MemoryManager& mm, IRManager& irm,
             _inlineSkipMethodTable->add_method_record("java/lang/Integer", "numberOfTrailingZeros", "(I)I", des, false);
             _inlineSkipMethodTable->add_method_record("java/lang/Long", "numberOfLeadingZeros", "(J)I", des, false);
             _inlineSkipMethodTable->add_method_record("java/lang/Long", "numberOfTrailingZeros", "(J)I", des, false);
+            if(argSource->getBoolArg("String_compareTo_as_magic",true)) {
+                _inlineSkipMethodTable->add_method_record("java/lang/String", "compareTo", "(Ljava/lang/String;)I", des, false);
+            }
+            if(argSource->getBoolArg("String_regionMatches_as_magic",true)) {
+                _inlineSkipMethodTable->add_method_record("java/lang/String", "regionMatches", "(ILjava/lang/String;II)Z", des, false);
+            }
 #endif 
         }
     }

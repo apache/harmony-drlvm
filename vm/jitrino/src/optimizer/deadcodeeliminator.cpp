@@ -354,7 +354,16 @@ void
 DeadCodeEliminator::copyPropagate(Inst* inst) {
     uint32 numSrcs = inst->getNumSrcOperands();
     for (uint32 i=0; i<numSrcs; i++) {
-        inst->setSrc(i, copyPropagate(inst->getSrc(i)));
+        Opnd* opnd = inst->getSrc(i);
+        Opnd* propagated = copyPropagate(opnd);
+        if (opnd != propagated) {
+            if (Log::isEnabled()) {
+                Log::out() << "    Operand "; opnd->print(Log::out());
+                Log::out() << " replaced by "; propagated->print(Log::out());
+                Log::out() << std::endl;
+            }
+            inst->setSrc(i, propagated);
+        }
     }
 }
 

@@ -169,7 +169,9 @@ public:
         SaveThisState,
         ReadThisState,
         LockedCompareAndExchange,
-        AddValueProfileValue
+        AddValueProfileValue,
+        StringCompareTo,
+        StringRegionMatches
     };
 };
 

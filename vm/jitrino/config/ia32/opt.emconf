@@ -24,7 +24,7 @@ CS_OPT.file=jitrino
 
 -XX:jit.CS_OPT.path=opt_init,lock_method,translator,optimizer,hir2lir,codegen,unlock_method
 
--XX:jit.CS_OPT.path.optimizer=ssa,devirt,inline,purge,simplify,dce,uce,lazyexc,throwopt,escape,dce,uce,memopt,simplify,dce,uce,lower,statprof,unroll,ssa,simplify,dce,uce,dessa,statprof
+-XX:jit.CS_OPT.path.optimizer=ssa,devirt,hlo_api_magic,inline,purge,simplify,dce,uce,lazyexc,throwopt,escape,dce,uce,memopt,simplify,dce,uce,lower,statprof,unroll,ssa,simplify,dce,uce,dessa,statprof
 -XX:jit.CS_OPT.path.codegen=bbp,btr,gcpoints,cafl,dce1,i8l,api_magic,early_prop,peephole,itrace-,native,constraints,dce2,regalloc,spillgen,copy,i586,layout,rce+,stack,break-,iprof-,peephole,emitter!,si_insts,gcmap,info
 -XX:jit.CS_OPT.path.dce1=cg_dce
 -XX:jit.CS_OPT.path.dce2=cg_dce
@@ -34,7 +34,7 @@ CS_OPT.file=jitrino
 
 #inliner configuration
 -XX:jit.CS_OPT.CS_OPT_inliner_pipeline.filter=-
--XX:jit.CS_OPT.CS_OPT_inliner_pipeline.path=ssa,devirt
+-XX:jit.CS_OPT.CS_OPT_inliner_pipeline.path=ssa,devirt,hlo_api_magic
 -XX:jit.CS_OPT.arg.optimizer.inline.pipeline=CS_OPT_inliner_pipeline
 
 

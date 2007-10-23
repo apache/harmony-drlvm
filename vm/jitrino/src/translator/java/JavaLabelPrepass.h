@@ -225,7 +225,9 @@ public:
     void parseError();
 
     // called to initialize parsing
-    void parseInit() {}
+    void parseInit() {
+        if (Log::isEnabled()) Log::out() << ::std::endl << "================= PREPASS STARTED =================" << ::std::endl << ::std::endl;
+    }
 
     // called to indicate end of parsing
     void parseDone();

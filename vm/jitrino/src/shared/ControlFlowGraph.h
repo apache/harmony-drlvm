@@ -1254,7 +1254,7 @@ public:
     
   /** 
    * Orders the nodes in the graph. 
-   * If <code>isForwarisForward</code> is <code>TRUE</code>, updates the  
+   * If <code>isForward</code> is <code>TRUE</code>, updates the  
    * internal CFG collection of nodes and node df-numbers.
    * Affects nodes and graph traversal and ordering numbers.
    *  
