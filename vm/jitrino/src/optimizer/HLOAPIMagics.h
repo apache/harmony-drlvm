@@ -107,6 +107,8 @@ public:
     HLOAPIMagicHandler(MethodCallInst* inst)
     : callInst(inst)
     {}
+    virtual ~HLOAPIMagicHandler(){}
+
     void setIRBuilder(HLOAPIMagicIRBuilder* irb) {builder = irb;}
     virtual void run() = 0;
 
