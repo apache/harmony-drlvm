@@ -326,17 +326,17 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
             case JAVA_TYPE_ARRAY:
                 {
                     ASSERT_TAGS(prevFrame.stack.ref(pos));
-                    CREF& cr = prevFrame.stack.pick(pos--).cr;
-                    ASSERT_OBJECT(UNCOMPRESS_REF(cr));
-                    if (cr == 0) {
+                    REF& ref = prevFrame.stack.pick(pos--).ref;
+                    ASSERT_OBJECT(UNCOMPRESS_INTERP(ref));
+                    if (ref == 0) {
                         arg = 0;
                     } else {
-#ifdef COMPRESS_MODE
+#ifdef REF32
                         ObjectHandle new_handle = oh_allocate_local_handle();
-                        new_handle->object = UNCOMPRESS_REF(cr);
+                        new_handle->object = UNCOMPRESS_INTERP(ref);
                         arg = (uword) new_handle;
 #else
-                        arg = (uword) &cr;
+                        arg = (uword) &ref;
 #endif
                     }
                     if (n_ints != MAX_REG_INTS) {
@@ -459,9 +459,9 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
                         << method->get_descriptor()->bytes <<
                         "\nVM WARNING: Not allowed, return NULL (0) instead\n");
                     }
-                    prevFrame.stack.pick().cr = COMPRESS_REF(*ref);
+                    prevFrame.stack.pick().ref = COMPRESS_INTERP(*ref);
                 } else {
-                    prevFrame.stack.pick().cr = 0;
+                    prevFrame.stack.pick().ref = 0;
                 }
                 prevFrame.stack.ref() = FLAG_OBJECT;
             }
@@ -615,17 +615,17 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
             case JAVA_TYPE_ARRAY:
                 {
                     ASSERT_TAGS(prevFrame.stack.ref(pos));
-                    CREF& cr = prevFrame.stack.pick(pos--).cr;
-                    ASSERT_OBJECT(UNCOMPRESS_REF(cr));
-                    if (cr == 0) {
+                    REF& ref = prevFrame.stack.pick(pos--).ref;
+                    ASSERT_OBJECT(UNCOMPRESS_INTERP(ref));
+                    if (ref == 0) {
                         arg = 0;
                     } else {
-#ifdef COMPRESS_MODE
+#ifdef REF32
                         ObjectHandle new_handle = oh_allocate_local_handle();
-                        new_handle->object = UNCOMPRESS_REF(cr);
+                        new_handle->object = UNCOMPRESS_INTERP(ref);
                         arg = (uword) new_handle;
 #else
-                        arg = (uword) &cr;
+                        arg = (uword) &ref;
 #endif
                     }
                     if (n_ints != MAX_REG_INTS) {
@@ -745,9 +745,9 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
                         << method->get_descriptor()->bytes <<
                         "\nVM WARNING: Not allowed, return NULL (0) instead\n");
                     }
-                    prevFrame.stack.pick().cr = COMPRESS_REF(*ref);
+                    prevFrame.stack.pick().ref = COMPRESS_INTERP(*ref);
                 } else {
-                    prevFrame.stack.pick().cr = 0;
+                    prevFrame.stack.pick().ref = 0;
                 }
                 prevFrame.stack.ref() = FLAG_OBJECT;
             }

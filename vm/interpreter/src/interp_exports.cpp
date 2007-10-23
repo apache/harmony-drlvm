@@ -141,10 +141,10 @@ void EXPORT JIT_init(JIT_Handle UNREF h, const char* UNREF name) {
 }
 
 EXPORT Boolean JIT_supports_compressed_references(JIT_Handle UNREF jh) {
-#if defined _IPF_ || defined _EM64T_
-    return true;
-#else
+#ifdef REFS_USE_UNCOMPRESSED
     return false;
+#else
+    return true;
 #endif
 }
 

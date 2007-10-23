@@ -309,17 +309,17 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
             case JAVA_TYPE_ARRAY:
                 {
                     ASSERT_TAGS(prevFrame.stack.ref(pos));
-                    CREF& cr = prevFrame.stack.pick(pos--).cr;
-                    ASSERT_OBJECT(UNCOMPRESS_REF(cr));
-                    if (cr == 0) {
+                    REF& ref = prevFrame.stack.pick(pos--).ref;
+                    ASSERT_OBJECT(UNCOMPRESS_INTERP(ref));
+                    if (ref == 0) {
                         args[argId++] = 0;
                     } else {
-#ifdef COMPRESS_MODE
+#ifdef REF32
                         ObjectHandle new_handle = oh_allocate_local_handle();
-                        new_handle->object = UNCOMPRESS_REF(cr);
+                        new_handle->object = UNCOMPRESS_INTERP(ref);
                         args[argId++] = (uword) new_handle;
 #else
-                        args[argId++] = (uword) &cr;
+                        args[argId++] = (uword) &ref;
 #endif
                     }
                     while(*mtype == '[') mtype++;
@@ -414,7 +414,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
                 hythread_suspend_disable();
                 prevFrame.stack.popClearRef(sz);
 
-                CREF cr;
+                REF stack_ref;
                 prevFrame.stack.push();
                 if (ref != 0) {
                     ASSERT_OBJECT(*ref);
@@ -428,14 +428,14 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
                         "\nVM WARNING: Not allowed, return NULL (0) instead\n");
                     }
                     if (*ref) {
-                        cr = COMPRESS_REF(*ref);
+                        stack_ref = COMPRESS_INTERP(*ref);
                     } else {
-                        cr = 0;
+                        stack_ref = 0;
                     }
                 } else {
-                    cr = 0;
+                    stack_ref = 0;
                 }
-                prevFrame.stack.pick().cr = cr;
+                prevFrame.stack.pick().ref = stack_ref;
                 prevFrame.stack.ref() = FLAG_OBJECT;
             }
             break;
@@ -583,17 +583,17 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
             case JAVA_TYPE_ARRAY:
                 {
                     ASSERT_TAGS(prevFrame.stack.ref(pos));
-                    CREF& cr = prevFrame.stack.pick(pos--).cr;
-                    ASSERT_OBJECT(UNCOMPRESS_REF(cr));
-                    if (cr == 0) {
+                    REF& ref = prevFrame.stack.pick(pos--).ref;
+                    ASSERT_OBJECT(UNCOMPRESS_INTERP(ref));
+                    if (ref == 0) {
                         args[argId++] = 0;
                     } else {
-#ifdef COMPRESS_MODE
+#ifdef REF32
                         ObjectHandle new_handle = oh_allocate_local_handle();
-                        new_handle->object = UNCOMPRESS_REF(cr);
+                        new_handle->object = UNCOMPRESS_INTERP(ref);
                         args[argId++] = (uword) new_handle;
 #else
-                        args[argId++] = (uword) &cr;
+                        args[argId++] = (uword) &ref;
 #endif
                     }
                     while(*mtype == '[') mtype++;
@@ -688,7 +688,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
                 hythread_suspend_disable();
                 prevFrame.stack.popClearRef(sz);
 
-                CREF cr;
+                REF stack_ref;
                 prevFrame.stack.push();
                 if (ref != 0) {
                     ASSERT_OBJECT(*ref);
@@ -703,14 +703,14 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
 
                     }
                     if (*ref) {
-                        cr = COMPRESS_REF(*ref);
+                        stack_ref = COMPRESS_INTERP(*ref);
                     } else {
-                        cr = 0;
+                        stack_ref = 0;
                     }
                 } else {
-                    cr = 0;
+                    stack_ref = 0;
                 }
-                prevFrame.stack.pick().cr = cr;
+                prevFrame.stack.pick().ref = stack_ref;
                 prevFrame.stack.ref() = FLAG_OBJECT;
             }
             break;

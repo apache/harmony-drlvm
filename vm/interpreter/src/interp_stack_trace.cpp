@@ -152,13 +152,14 @@ interpreter_st_get_trace(VM_thread *p_vmthread, unsigned* res_depth, StackTraceF
     interp_si_free(si);
 }
 
-#ifdef COMPRESS_MODE
+
+#if defined(REF32) // Compressed references; cref is COMPRESSED_REFERENCE
 #define vm_enumerate(cref,f) vm_enumerate_compressed_root_reference(cref,f)
-#else
-static inline void** m2v(CREF* obj) {
+#else // Uncompressed or runtime switchable; ref us uncompressed
+static inline void** m2v(REF* obj) {
     return (void**)obj;
 }
-#define vm_enumerate(cref,f) vm_enumerate_root_reference(m2v(cref),f)
+#define vm_enumerate(ref,f) vm_enumerate_root_reference(m2v(ref),f)
 #endif
 
 void
@@ -201,13 +202,13 @@ interp_enumerate_root_set_single_thread_on_stack(VM_thread *thread) {
             for(i = 0; i <= si->stack.index; i++) {
                 if (si->stack.refs[i] == FLAG_OBJECT) {
                     DEBUG_GC("  Stack[" << i << "] ");
-                    CREF* cref = &si->stack.data[i].cr;
-                    ManagedObject *obj = UNCOMPRESS_REF(*cref);
+                    REF* ref = &si->stack.data[i].ref;
+                    ManagedObject *obj = UNCOMPRESS_INTERP(*ref);
                     if (obj == 0) {
                         DEBUG_GC("NULL");
                     } else {
                         DEBUG_GC(obj->vt()->clss->get_name()->bytes << endl);
-                        vm_enumerate(cref, FALSE);
+                        vm_enumerate(ref, FALSE); // CHECK!!! can we enumerate uncompressed ref in compressed mode
                     }
                 }
             }
@@ -217,13 +218,13 @@ interp_enumerate_root_set_single_thread_on_stack(VM_thread *thread) {
             for(j = 0; j < si->locals.varNum; j++) {
                 if (si->locals.refs[j] == FLAG_OBJECT) {
                     DEBUG_GC("  Locals[" << j << "] ");
-                    CREF* cref = &si->locals.var[j].cr;
-                    ManagedObject *obj = UNCOMPRESS_REF(*cref);
+                    REF* ref = &si->locals.vars[j].ref;
+                    ManagedObject *obj = UNCOMPRESS_INTERP(*ref);
                     if (obj == 0) {
                         DEBUG_GC("NULL\n");
                     } else {
                         DEBUG_GC(obj->vt()->clss->get_name()->bytes << endl);
-                        vm_enumerate(cref, FALSE);
+                        vm_enumerate(ref, FALSE); // CHECK!!! can we enumerate uncompressed ref in compressed mode
                     }
                 }
             }
@@ -300,14 +301,14 @@ interp_ti_enumerate_root_set_single_thread_on_stack(jvmtiEnv* ti_env, VM_thread 
             for(i = 0; i <= si->stack.index; i++) {
                 if (si->stack.refs[i] == FLAG_OBJECT) {
                     DEBUG_GC("  Stack[" << i << "] ");
-                    CREF* cref = &si->stack.data[i].cr;
-                    ManagedObject *obj = UNCOMPRESS_REF(*cref);
+                    REF* ref = &si->stack.data[i].ref;
+                    ManagedObject *obj = UNCOMPRESS_INTERP(*ref);
                     if (obj == 0) {
                         DEBUG_GC("NULL");
                     } else {
                         DEBUG_GC(obj->vt()->clss->get_name()->bytes << endl);
                         vm_ti_enumerate_stack_root(ti_env,
-                            cref, (Managed_Object_Handle)obj, 
+                            ref, (Managed_Object_Handle)obj, 
                             JVMTI_HEAP_ROOT_STACK_LOCAL,
                             depth, method_id, slot++);
                     }
@@ -319,14 +320,14 @@ interp_ti_enumerate_root_set_single_thread_on_stack(jvmtiEnv* ti_env, VM_thread 
             for(j = 0; j < si->locals.varNum; j++) {
                 if (si->locals.refs[j] == FLAG_OBJECT) {
                     DEBUG_GC("  Locals[" << j << "] ");
-                    CREF* cref = &si->locals.var[j].cr;
-                    ManagedObject *obj = UNCOMPRESS_REF(*cref);
+                    REF* ref = &si->locals.vars[j].ref;
+                    ManagedObject *obj = UNCOMPRESS_INTERP(*ref);
                     if (obj == 0) {
                         DEBUG_GC("NULL\n");
                     } else {
                         DEBUG_GC(obj->vt()->clss->get_name()->bytes << endl);
                         vm_ti_enumerate_stack_root(ti_env,
-                            cref, (Managed_Object_Handle)obj, 
+                            ref, (Managed_Object_Handle)obj, 
                             JVMTI_HEAP_ROOT_STACK_LOCAL,
                             depth, method_id, slot++);
                     }

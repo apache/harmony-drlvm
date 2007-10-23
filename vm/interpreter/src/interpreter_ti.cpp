@@ -177,7 +177,7 @@ interpreter_ti_getObject(
 
     assert(hythread_is_suspend_enabled());
     hythread_suspend_disable();
-    ManagedObject *obj = UNCOMPRESS_REF(frame->locals(slot).cr);
+    ManagedObject *obj = UNCOMPRESS_INTERP(frame->locals(slot).ref);
     if (NULL == obj) {
         *value_ptr = NULL;
     } else {
@@ -263,7 +263,7 @@ interpreter_ti_setObject(
     }
 
     ObjectHandle handle = (ObjectHandle) value;
-    frame->locals(slot).cr = COMPRESS_REF(handle->object);
+    frame->locals(slot).ref = COMPRESS_INTERP(handle->object);
     return JVMTI_ERROR_NONE;
 }
 
@@ -568,8 +568,8 @@ static inline void field_modification_callback(Field *field, StackFrame& frame, 
 void getfield_callback(Field *field, StackFrame& frame) {
     if (!field_event_mask(field, false)) return;
 
-    CREF cref = frame.stack.pick(0).cr;
-    ManagedObject *obj = UNCOMPRESS_REF(cref);
+    REF ref = frame.stack.pick(0).ref;
+    ManagedObject *obj = UNCOMPRESS_INTERP(ref);
     field_access_callback(field, frame, obj);
 }
 
@@ -595,7 +595,7 @@ jvalue new_field_value(Field *field, StackFrame& frame) {
         case VM_DATA_TYPE_CLASS:
         {
             ObjectHandle h = oh_allocate_local_handle();
-            h->object = UNCOMPRESS_REF(frame.stack.pick().cr);
+            h->object = UNCOMPRESS_INTERP(frame.stack.pick().ref);
             val.l = h;
         }
             break;
@@ -618,17 +618,17 @@ void putfield_callback(Field *field, StackFrame& frame) {
     if (!field_event_mask(field, true)) return;
 
     Java_Type type = field->get_java_type();
-    CREF cref;
+    REF ref;
 
     if (type == VM_DATA_TYPE_INT64 || type == VM_DATA_TYPE_F8) {
-        cref = frame.stack.pick(2).cr;
+        ref = frame.stack.pick(2).ref;
     } else {
-        cref = frame.stack.pick(1).cr;
+        ref = frame.stack.pick(1).ref;
     }
 
     M2N_ALLOC_MACRO;
     jvalue val = new_field_value(field, frame);
-    field_modification_callback(field, frame, UNCOMPRESS_REF(cref), val);
+    field_modification_callback(field, frame, UNCOMPRESS_INTERP(ref), val);
     M2N_FREE_MACRO;
 }
 

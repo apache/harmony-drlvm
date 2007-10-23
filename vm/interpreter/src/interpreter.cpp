@@ -162,7 +162,7 @@ Opcode_NOP(StackFrame& frame) {
 static inline void
 Opcode_ACONST_NULL(StackFrame& frame) {
     frame.stack.push();
-    frame.stack.pick().u = 0;
+    frame.stack.pick().ref = 0;
     frame.stack.ref() = FLAG_OBJECT;
     frame.ip++;
 }
@@ -230,7 +230,7 @@ Opcode_ALOAD(StackFrame& frame) {
     frame.stack.push();
     frame.stack.pick() = val;
     frame.stack.ref() = frame.locals.ref(varId);
-    if (frame.locals.ref(varId) == FLAG_OBJECT) { ASSERT_OBJECT(UNCOMPRESS_REF(val.cr)); }
+    if (frame.locals.ref(varId) == FLAG_OBJECT) { ASSERT_OBJECT(UNCOMPRESS_INTERP(val.ref)); }
     DEBUG_BYTECODE("var" << (int)varId << " -> stack (val = " << (int)frame.stack.pick().i << ")");
     frame.ip += 2;
 }
@@ -988,12 +988,10 @@ ldc(StackFrame& frame, uint32 index) {
 #endif
 
     frame.stack.push();
-    if(cp.is_string(index)) {
-        // FIXME: is string reference packed??
-        // possibly not
+    if(cp.is_string(index))
+    {
         String* str = cp.get_string(index);
-        // FIXME: only compressed references
-        frame.stack.pick().cr = COMPRESS_REF(vm_instantiate_cp_string_resolved(str));
+        frame.stack.pick().ref = COMPRESS_INTERP(vm_instantiate_cp_string_resolved(str));
         frame.stack.ref() = FLAG_OBJECT;
         return !check_current_thread_exception();
     } 
@@ -1005,7 +1003,7 @@ ldc(StackFrame& frame, uint32 index) {
         }
         assert(!hythread_is_suspend_enabled());
         
-        frame.stack.pick().cr = COMPRESS_REF(*(other_class->get_class_handle()));
+        frame.stack.pick().ref = COMPRESS_INTERP(*(other_class->get_class_handle()));
         frame.stack.ref() = FLAG_OBJECT;
         
         return !exn_raised();
@@ -1093,8 +1091,7 @@ Opcode_NEWARRAY(StackFrame& frame) {
         return;
     }
    
-    // COMPRESS_REF will fail assertion if array == 0 on ipf 
-    frame.stack.pick().cr = COMPRESS_REF((ManagedObject*)array);
+    frame.stack.pick().ref = COMPRESS_INTERP((ManagedObject*)array);
     DEBUG_BYTECODE(" (val = " << hex << (int)frame.stack.pick().i << ")");
     frame.stack.ref() = FLAG_OBJECT;
     frame.ip += 2;
@@ -1127,8 +1124,7 @@ Opcode_ANEWARRAY(StackFrame& frame) {
     set_vector_length(array, length);
     DEBUG_BYTECODE("length = " << dec << length);
 
-    // COMPRESS_REF will fail assertion if array == 0 on ipf 
-    frame.stack.pick().cr = COMPRESS_REF((ManagedObject*)array);
+    frame.stack.pick().ref = COMPRESS_INTERP((ManagedObject*)array);
     frame.stack.ref() = FLAG_OBJECT;
     frame.ip += 3;
 }
@@ -1156,7 +1152,7 @@ allocDimensions(StackFrame& frame, Class *arrayClass, int depth) {
             if (d < max_depth) max_depth = d;
         }
 
-        frame.stack.pick(depth - 1 - d).cr = 0;
+        frame.stack.pick(depth - 1 - d).ref = 0;
         frame.stack.ref(depth - 1 - d) = FLAG_OBJECT;
     }
 
@@ -1175,7 +1171,7 @@ allocDimensions(StackFrame& frame, Class *arrayClass, int depth) {
         return false;
     }
     set_vector_length(array, length[0]);
-    frame.stack.pick(depth - 1).cr = COMPRESS_REF(array);
+    frame.stack.pick(depth - 1).ref = COMPRESS_INTERP(array);
     if (max_depth == 0) return true;
 
     d = 1;
@@ -1190,15 +1186,17 @@ allocDimensions(StackFrame& frame, Class *arrayClass, int depth) {
         set_vector_length(element, length[d]);
 
         if (d != max_depth) {
-            frame.stack.pick(depth - 1 - d).cr = COMPRESS_REF(element);
+            frame.stack.pick(depth - 1 - d).ref = COMPRESS_INTERP(element);
             d++;
             continue;
         }
 
         while(true) {
-            array = UNCOMPRESS_REF(frame.stack.pick((depth - 1) - (d - 1)).cr);
-            CREF* addr = (CREF*) get_vector_element_address_ref(array, pos[d-1]);
-            *addr = COMPRESS_REF(element);
+            array = UNCOMPRESS_INTERP(frame.stack.pick((depth - 1) - (d - 1)).ref);
+            // addr can be a pointer to either ManagedObject* or COMPRESSED_REFERENCE
+            ManagedObject** addr = get_vector_element_address_ref(array, pos[d-1]);
+
+            STORE_UREF_BY_ADDR(addr, element);
             pos[d-1]++;
 
             if (pos[d-1] < length[d-1]) {
@@ -1262,8 +1260,7 @@ Opcode_NEW(StackFrame& frame) {
    
     frame.stack.push();
 
-    // COMPRESS_REF will fail assertion if obj == 0 on ipf 
-    frame.stack.pick().cr = COMPRESS_REF((ManagedObject*)obj);
+    frame.stack.pick().ref = COMPRESS_INTERP(obj);
     DEBUG_BYTECODE(" (val = " << hex << (int)frame.stack.pick().i << ")");
     frame.stack.ref() = FLAG_OBJECT;
     frame.ip += 3;
@@ -1399,12 +1396,12 @@ Opcode_WIDE_IINC(StackFrame& frame) {
 
 static inline void 
 Opcode_ARRAYLENGTH(StackFrame& frame) {
-    CREF cref = frame.stack.pick().cr;
-    if (cref == 0) {
+    REF st_ref = frame.stack.pick().ref;
+    if (st_ref == 0) {
         throwNPE();
         return;
     }
-    ManagedObject *ref = UNCOMPRESS_REF(cref);
+    ManagedObject *ref = UNCOMPRESS_INTERP(st_ref);
 
     frame.stack.ref() = FLAG_NONE;
     frame.stack.pick().i = get_vector_length((Vector_Handle)ref);
@@ -1414,12 +1411,12 @@ Opcode_ARRAYLENGTH(StackFrame& frame) {
 
 static inline void
 Opcode_AALOAD(StackFrame& frame) {
-    CREF cref = frame.stack.pick(1).cr;
-    if (cref == 0) {
+    REF st_ref = frame.stack.pick(1).ref;
+    if (st_ref == 0) {
         throwNPE();
         return;
     }
-    Vector_Handle array = (Vector_Handle) UNCOMPRESS_REF(cref);
+    Vector_Handle array = (Vector_Handle) UNCOMPRESS_INTERP(st_ref);
     uint32 length = get_vector_length(array);
     uint32 pos = frame.stack.pick(0).u;
 
@@ -1432,21 +1429,25 @@ Opcode_AALOAD(StackFrame& frame) {
 
     frame.stack.pop();
 
-    CREF* addr = (CREF*) get_vector_element_address_ref(array, pos);
-    /* FIXME: assume compressed reference */
-    frame.stack.pick().cr = *addr;
+    // Array contains elements according to REFS_IS_COMPRESSED_MODE
+    // But even in compressed mode on 64-bit platform interpreter's
+    // stack can contain uncompressed references (according to REF32)
+    // So we'll convert references if needed
+    ManagedObject** pelem = get_vector_element_address_ref(array, pos);
+    ManagedObject* urefelem = UNCOMPRESS_REF(*pelem);
+    frame.stack.pick().ref = COMPRESS_INTERP(urefelem);
     frame.ip++;
 }
 
 #define DEF_OPCODE_XALOAD(CODE,arraytype,type,store)                            \
 static inline void                                                              \
 Opcode_ ## CODE(StackFrame& frame) {                                            \
-    CREF cref = frame.stack.pick(1).cr;                         \
-    if (cref == 0) {                                                            \
+    REF ref = frame.stack.pick(1).ref;                                          \
+    if (ref == 0) {                                                             \
         throwNPE();                                                             \
         return;                                                                 \
     }                                                                           \
-    Vector_Handle array = (Vector_Handle) UNCOMPRESS_REF(cref);                 \
+    Vector_Handle array = (Vector_Handle) UNCOMPRESS_INTERP(ref);               \
     uint32 length = get_vector_length(array);                                   \
     uint32 pos = frame.stack.pick(0).u;                                         \
                                                                                 \
@@ -1459,8 +1460,7 @@ Opcode_ ## CODE(StackFrame& frame) {                                            
                                                                                 \
     frame.stack.pop();                                                          \
                                                                                 \
-    type* addr = (type*) get_vector_element_address_ ## arraytype(array, pos);  \
-    /* FIXME: assume compressed reference */                                    \
+    type* addr = get_vector_element_address_ ## arraytype(array, pos);          \
     frame.stack.pick().store = *addr;                                           \
     frame.stack.ref() = FLAG_NONE;                                              \
     frame.ip++;                                                                 \
@@ -1474,12 +1474,12 @@ DEF_OPCODE_XALOAD(FALOAD, f32, float, f)
 
 static inline void
 Opcode_LALOAD(StackFrame& frame) {
-    CREF cref = frame.stack.pick(1).cr;
-    if (cref == 0) {
+    REF ref = frame.stack.pick(1).ref;
+    if (ref == 0) {
         throwNPE();
         return;
     }
-    Vector_Handle array = (Vector_Handle) UNCOMPRESS_REF(cref);
+    Vector_Handle array = (Vector_Handle) UNCOMPRESS_INTERP(ref);
     uint32 length = get_vector_length(array);
     uint32 pos = frame.stack.pick(0).u;
 
@@ -1499,12 +1499,12 @@ Opcode_LALOAD(StackFrame& frame) {
 
 static inline void
 Opcode_AASTORE(StackFrame& frame) {
-    CREF cref = frame.stack.pick(2).cr;
-    if (cref == 0) {
+    REF ref = frame.stack.pick(2).ref;
+    if (ref == 0) {
         throwNPE();
         return;
     }
-    Vector_Handle array = (Vector_Handle) UNCOMPRESS_REF(cref);
+    Vector_Handle array = (Vector_Handle) UNCOMPRESS_INTERP(ref);
     uint32 length = get_vector_length(array);
     uint32 pos = frame.stack.pick(1).u;
 
@@ -1515,19 +1515,22 @@ Opcode_AASTORE(StackFrame& frame) {
         return;
     }
 
-    // TODO: check ArrayStoreException
+    // Check ArrayStoreException
     ManagedObject *arrayObj = (ManagedObject*) array;
     Class *arrayClass = arrayObj->vt()->clss;
     Class *elementClass = arrayClass->get_array_element_class();
-    ManagedObject* obj = UNCOMPRESS_REF(frame.stack.pick().cr);
-    if (!(obj == 0 || vm_instanceof(obj, elementClass))) {
+    ManagedObject* obj = UNCOMPRESS_INTERP(frame.stack.pick().ref);
+    if (!obj == 0 && !vm_instanceof(obj, elementClass)) {
         interp_throw_exception("java/lang/ArrayStoreException");
         return;
     }
 
-    // FIXME: compressed refs only
-    CREF* addr = (CREF*) get_vector_element_address_ref(array, pos);
-    *addr = frame.stack.pick().cr;
+    // Array contains elements according to REFS_IS_COMPRESSED_MODE
+    // But even in compressed mode on 64-bit platform interpreter's
+    // stack can contain uncompressed references (according to REF32)
+    // So we'll convert references if needed
+    ManagedObject** pelem = get_vector_element_address_ref(array, pos);
+    STORE_UREF_BY_ADDR(pelem, obj);
     frame.stack.ref(2) = FLAG_NONE;
     frame.stack.ref(0) = FLAG_NONE;
     frame.stack.pop(3);
@@ -1537,12 +1540,12 @@ Opcode_AASTORE(StackFrame& frame) {
 #define DEF_OPCODE_IASTORE(CODE,arraytype,type,ldtype)                          \
 static inline void                                                              \
 Opcode_ ## CODE(StackFrame& frame) {                                            \
-    CREF cref = frame.stack.pick(2).cr;                         \
-    if (cref == 0) {                                                            \
+    REF ref = frame.stack.pick(2).ref;                                          \
+    if (ref == 0) {                                                             \
         throwNPE();                                                             \
         return;                                                                 \
     }                                                                           \
-    Vector_Handle array = (Vector_Handle) UNCOMPRESS_REF(cref);                 \
+    Vector_Handle array = (Vector_Handle) UNCOMPRESS_INTERP(ref);               \
     uint32 length = get_vector_length(array);                                   \
     uint32 pos = frame.stack.pick(1).u;                                         \
                                                                                 \
@@ -1577,12 +1580,12 @@ DEF_OPCODE_IASTORE(FASTORE, f32, float, f)
 
 static inline void
 Opcode_LASTORE(StackFrame& frame) {
-    CREF cref = frame.stack.pick(3).cr;
-    if (cref == 0) {
+    REF ref = frame.stack.pick(3).ref;
+    if (ref == 0) {
         throwNPE();
         return;
     }
-    Vector_Handle array = (Vector_Handle) UNCOMPRESS_REF(cref);
+    Vector_Handle array = (Vector_Handle) UNCOMPRESS_INTERP(ref);
     uint32 length = get_vector_length(array);
     uint32 pos = frame.stack.pick(2).u;
 
@@ -1678,11 +1681,13 @@ Opcode_PUTSTATIC(StackFrame& frame) {
 
         case VM_DATA_TYPE_ARRAY:
         case VM_DATA_TYPE_CLASS:
-            frame.stack.ref() = FLAG_NONE;
-            *(CREF*)addr = frame.stack.pick().cr;
-            frame.stack.pop();
-            break;
-
+            {
+                ManagedObject* val = UNCOMPRESS_INTERP(frame.stack.pick().ref);
+                STORE_UREF_BY_ADDR(addr, val);
+                frame.stack.ref() = FLAG_NONE;
+                frame.stack.pop();
+                break;
+            }
         case VM_DATA_TYPE_INT64:
         case VM_DATA_TYPE_F8:
             {
@@ -1691,6 +1696,7 @@ Opcode_PUTSTATIC(StackFrame& frame) {
                 frame.stack.pop(2);
                 break;
             }
+
         default:
             ABORT("Unexpected data type");
     }
@@ -1756,10 +1762,12 @@ Opcode_GETSTATIC(StackFrame& frame) {
             break;
         case VM_DATA_TYPE_ARRAY:
         case VM_DATA_TYPE_CLASS:
-            frame.stack.pick().cr = *(CREF*)addr;
-            frame.stack.ref() = FLAG_OBJECT;
-            break;
-            
+            {
+                ManagedObject* val = UNCOMPRESS_REF(*((ManagedObject**)addr));
+                frame.stack.pick().ref = COMPRESS_INTERP(val);
+                frame.stack.ref() = FLAG_OBJECT;
+                break;
+            }
         case VM_DATA_TYPE_INT64:
         case VM_DATA_TYPE_F8:
             {
@@ -1767,8 +1775,8 @@ Opcode_GETSTATIC(StackFrame& frame) {
                 val.d = *(double*)addr;
                 frame.stack.push();
                 frame.stack.setLong(0, val);
+                break;
             }
-            break;
 
         default:
             ABORT("Unexpected data type");
@@ -1802,138 +1810,84 @@ Opcode_PUTFIELD(StackFrame& frame) {
     DEBUG_BYTECODE(field->get_name()->bytes << " " << field->get_descriptor()->bytes
             << " (val = " << hex << (int)frame.stack.pick().i << ")");
 
+    uint16 obj_ref_pos = 1;
+
+    if (field->get_java_type() == VM_DATA_TYPE_INT64 ||
+        field->get_java_type() == VM_DATA_TYPE_F8)
+        ++obj_ref_pos;
+
+    REF ref = frame.stack.pick(obj_ref_pos).ref;
+
+    if (ref == 0) {
+        throwNPE();
+        return;
+    }
+
+    ManagedObject *obj = UNCOMPRESS_INTERP(ref);
+    uint8* addr = ((uint8*)obj) + field->get_offset();
+
     switch (field->get_java_type()) {
 
 #ifdef COMPACT_FIELDS // use compact fields on ipf
         case VM_DATA_TYPE_BOOLEAN:
         case VM_DATA_TYPE_INT8:
-            {
-                uint32 val = frame.stack.pick(0).u;
-                CREF cref = frame.stack.pick(1).cr;
-                if (cref == 0) {
-                    throwNPE();
-                    return;
-                }
-                ManagedObject *obj = UNCOMPRESS_REF(cref);
-                uint8 *addr = ((uint8*)obj) + field->get_offset();
-                *(uint8*)addr = (uint8) val;
-                frame.stack.ref(1) = FLAG_NONE;
-                frame.stack.pop(2);
-                break;
-            }
+            *(uint8*)addr = (uint8)frame.stack.pick(0).u;
+            frame.stack.ref(1) = FLAG_NONE;
+            frame.stack.pop(2);
+            break;
 
         case VM_DATA_TYPE_CHAR:
         case VM_DATA_TYPE_INT16:
-            {
-                uint32 val = frame.stack.pick(0).u;
-                CREF cref = frame.stack.pick(1).cr;
-                if (cref == 0) {
-                    throwNPE();
-                    return;
-                }
-                ManagedObject *obj = UNCOMPRESS_REF(cref);
-                uint8 *addr = ((uint8*)obj) + field->get_offset();
-                *(uint16*)addr = (uint16) val;
-                frame.stack.ref(1) = FLAG_NONE;
-                frame.stack.pop(2);
-                break;
-            }
+            *(uint16*)addr = (uint16)frame.stack.pick(0).u;
+            frame.stack.ref(1) = FLAG_NONE;
+            frame.stack.pop(2);
+            break;
 
 #else // ia32 not using compact fields
         case VM_DATA_TYPE_BOOLEAN:
-            {
-                uint32 val = frame.stack.pick(0).u;
-                CREF cref = frame.stack.pick(1).cr;
-                if (cref == 0) {
-                    throwNPE();
-                    return;
-                }
-                ManagedObject *obj = UNCOMPRESS_REF(cref);
-                uint8 *addr = ((uint8*)obj) + field->get_offset();
-                *(uint32*)addr = (uint8) val;
-                frame.stack.ref(1) = FLAG_NONE;
-                frame.stack.pop(2);
-                break;
-            }
+            *(uint32*)addr = (uint8)frame.stack.pick(0).u;
+            frame.stack.ref(1) = FLAG_NONE;
+            frame.stack.pop(2);
+            break;
+
         case VM_DATA_TYPE_INT8:
-            {
-                int32 val = frame.stack.pick(0).i;
-                CREF cref = frame.stack.pick(1).cr;
-                if (cref == 0) {
-                    throwNPE();
-                    return;
-                }
-                ManagedObject *obj = UNCOMPRESS_REF(cref);
-                uint8 *addr = ((uint8*)obj) + field->get_offset();
-                *(int32*)addr = (int8) val;
-                frame.stack.ref(1) = FLAG_NONE;
-                frame.stack.pop(2);
-                break;
-            }
+            *(int32*)addr = (int8)frame.stack.pick(0).i;
+            frame.stack.ref(1) = FLAG_NONE;
+            frame.stack.pop(2);
+            break;
 
         case VM_DATA_TYPE_CHAR:
-            {
-                uint32 val = frame.stack.pick(0).u;
-                CREF cref = frame.stack.pick(1).cr;
-                if (cref == 0) {
-                    throwNPE();
-                    return;
-                }
-                ManagedObject *obj = UNCOMPRESS_REF(cref);
-                uint8 *addr = ((uint8*)obj) + field->get_offset();
-                *(uint32*)addr = (uint16) val;
-                frame.stack.ref(1) = FLAG_NONE;
-                frame.stack.pop(2);
-                break;
-            }
-        case VM_DATA_TYPE_INT16:
-            {
-                int32 val = frame.stack.pick(0).i;
-                CREF cref = frame.stack.pick(1).cr;
-                if (cref == 0) {
-                    throwNPE();
-                    return;
-                }
-                ManagedObject *obj = UNCOMPRESS_REF(cref);
-                uint8 *addr = ((uint8*)obj) + field->get_offset();
-                *(int32*)addr = (int16) val;
-                frame.stack.ref(1) = FLAG_NONE;
-                frame.stack.pop(2);
-                break;
-            }
+            *(uint32*)addr = (uint16)frame.stack.pick(0).u;
+            frame.stack.ref(1) = FLAG_NONE;
+            frame.stack.pop(2);
+            break;
 
+        case VM_DATA_TYPE_INT16:
+            *(int32*)addr = (int16)frame.stack.pick(0).i;
+            frame.stack.ref(1) = FLAG_NONE;
+            frame.stack.pop(2);
+            break;
 #endif
-        case VM_DATA_TYPE_ARRAY:
-        case VM_DATA_TYPE_CLASS:
         case VM_DATA_TYPE_INT32:
         case VM_DATA_TYPE_F4:
+            *(int32*)addr = frame.stack.pick(0).i;
+            frame.stack.ref(1) = FLAG_NONE;
+            frame.stack.pop(2);
+            break;
+
+        case VM_DATA_TYPE_ARRAY:
+        case VM_DATA_TYPE_CLASS:
             {
-                CREF val = frame.stack.pick(0).cr;
-                CREF cref = frame.stack.pick(1).cr;
-                if (cref == 0) {
-                    throwNPE();
-                    return;
-                }
-                ManagedObject *obj = UNCOMPRESS_REF(cref);
-                uint8 *addr = ((uint8*)obj) + field->get_offset();
-                // compressed references is uint32
-                *(CREF*)addr = val;
-                frame.stack.ref(1) = FLAG_NONE;
+                ManagedObject* val = UNCOMPRESS_INTERP(frame.stack.pick(0).ref);
+                STORE_UREF_BY_ADDR(addr, val);
                 frame.stack.ref(0) = FLAG_NONE;
+                frame.stack.ref(1) = FLAG_NONE;
                 frame.stack.pop(2);
                 break;
             }
-
         case VM_DATA_TYPE_INT64:
         case VM_DATA_TYPE_F8:
             {
-                CREF cref = frame.stack.pick(2).cr;
-                if (cref == 0) {
-                    throwNPE();
-                    return;
-                }
-                ManagedObject *obj = UNCOMPRESS_REF(cref);
-                uint8 *addr = ((uint8*)obj) + field->get_offset();
                 double *vaddr = (double*) addr;
                 *vaddr = frame.stack.getLong(0).d;
                 frame.stack.ref(2) = FLAG_NONE;
@@ -1963,12 +1917,12 @@ Opcode_GETFIELD(StackFrame& frame) {
         M2N_FREE_MACRO;
     }
 
-    CREF cref = frame.stack.pick(0).cr;
-    if (cref == 0) {
+    REF ref = frame.stack.pick(0).ref;
+    if (ref == 0) {
         throwNPE();
         return;
     }
-    ManagedObject *obj = UNCOMPRESS_REF(cref);
+    ManagedObject *obj = UNCOMPRESS_INTERP(ref);
     uint8 *addr = ((uint8*)obj) + field->get_offset();
     frame.stack.ref() = FLAG_NONE;
 
@@ -1976,51 +1930,42 @@ Opcode_GETFIELD(StackFrame& frame) {
 
 #ifdef COMPACT_FIELDS // use compact fields on ipf
         case VM_DATA_TYPE_BOOLEAN:
-            {
-                frame.stack.pick(0).u = (uint32) *(uint8*)addr;
-                break;
-            }
+            frame.stack.pick(0).u = (uint32) *(uint8*)addr;
+            break;
+
         case VM_DATA_TYPE_INT8:
-            {
-                frame.stack.pick(0).i = (int32) *(int8*)addr;
-                break;
-            }
+            frame.stack.pick(0).i = (int32) *(int8*)addr;
+            break;
 
         case VM_DATA_TYPE_CHAR:
-            {
-                frame.stack.pick(0).u = (uint32) *(uint16*)addr;
-                break;
-            }
+            frame.stack.pick(0).u = (uint32) *(uint16*)addr;
+            break;
+
         case VM_DATA_TYPE_INT16:
-            {
-                frame.stack.pick(0).i = (int32) *(int16*)addr;
-                break;
-            }
+            frame.stack.pick(0).i = (int32) *(int16*)addr;
+            break;
+
 #else // ia32 - not using compact fields
         case VM_DATA_TYPE_BOOLEAN:
         case VM_DATA_TYPE_CHAR:
-                frame.stack.pick(0).u = *(uint32*)addr;
-                break;
+            frame.stack.pick(0).u = *(uint32*)addr;
+            break;
         case VM_DATA_TYPE_INT8:
         case VM_DATA_TYPE_INT16:
 #endif
-
         case VM_DATA_TYPE_INT32:
         case VM_DATA_TYPE_F4:
-            {
-                frame.stack.pick(0).i = *(int32*)addr;
-                break;
-            }
+            frame.stack.pick(0).i = *(int32*)addr;
+            break;
 
         case VM_DATA_TYPE_ARRAY:
         case VM_DATA_TYPE_CLASS:
             {
+                ManagedObject* val = UNCOMPRESS_REF(*((ManagedObject**)addr));
+                frame.stack.pick(0).ref = COMPRESS_INTERP(val);
                 frame.stack.ref() = FLAG_OBJECT;
-                frame.stack.pick(0).cr = *(CREF*)addr;
-                ASSERT_OBJECT(UNCOMPRESS_REF(frame.stack.pick(0).cr));
                 break;
             }
-
         case VM_DATA_TYPE_INT64:
         case VM_DATA_TYPE_F8:
             {
@@ -2231,7 +2176,7 @@ Opcode_CHECKCAST(StackFrame& frame) {
     
     DEBUG_BYTECODE("class = " << class_get_name(objClass));
 
-    ManagedObject *obj = UNCOMPRESS_REF(frame.stack.pick().cr);
+    ManagedObject *obj = UNCOMPRESS_INTERP(frame.stack.pick().ref);
 
     if (!(obj == 0 || vm_instanceof(obj, objClass))) {
         interp_throw_exception("java/lang/ClassCastException", obj->vt()->clss->get_java_name()->bytes);
@@ -2249,28 +2194,24 @@ Opcode_INSTANCEOF(StackFrame& frame) {
     
     DEBUG_BYTECODE("class = " << class_get_name(objClass));
 
-    ManagedObject *obj = UNCOMPRESS_REF(frame.stack.pick().cr);
-
-#ifdef COMPRESS_MODE
+    ManagedObject *obj = UNCOMPRESS_INTERP(frame.stack.pick().ref);
     // FIXME ivan 20041027: vm_instanceof checks null pointers, it assumes
     // that null is Class::managed_null, but uncompress_compressed_reference
     // doesn't return managed_null for null compressed references
-    frame.stack.pick().u = (!(obj == 0)) && vm_instanceof(obj, objClass);
-#else
-    frame.stack.pick().u = vm_instanceof(obj, objClass);
-#endif
+    frame.stack.pick().u = (obj != 0) && vm_instanceof(obj, objClass);
+
     frame.stack.ref() = FLAG_NONE;
     frame.ip += 3;
 }
 
 static inline void
 Opcode_MONITORENTER(StackFrame& frame) {
-    CREF cr = frame.stack.pick().cr;
-    if (cr == 0) {
+    REF ref = frame.stack.pick().ref;
+    if (ref == 0) {
         throwNPE();
         return;
     }
-    frame.locked_monitors->monitor = UNCOMPRESS_REF(cr);
+    frame.locked_monitors->monitor = UNCOMPRESS_INTERP(ref);
 
     M2N_ALLOC_MACRO;
     vm_monitor_enter_wrapper(frame.locked_monitors->monitor);
@@ -2285,13 +2226,13 @@ Opcode_MONITORENTER(StackFrame& frame) {
 
 static inline void
 Opcode_MONITOREXIT(StackFrame& frame) {
-    CREF cr = frame.stack.pick().cr;
-    if (cr == 0) {
+    REF ref = frame.stack.pick().ref;
+    if (ref == 0) {
         throwNPE();
         return;
     }
     M2N_ALLOC_MACRO;
-    vm_monitor_exit_wrapper(UNCOMPRESS_REF(cr));
+    vm_monitor_exit_wrapper(UNCOMPRESS_INTERP(ref));
     M2N_FREE_MACRO;
 
     if (check_current_thread_exception())
@@ -2310,8 +2251,8 @@ Opcode_MONITOREXIT(StackFrame& frame) {
 
 static inline void
 Opcode_ATHROW(StackFrame& frame) {
-    CREF cr = frame.stack.pick().cr;
-    ManagedObject *obj = UNCOMPRESS_REF(cr);
+    REF ref = frame.stack.pick().ref;
+    ManagedObject *obj = UNCOMPRESS_INTERP(ref);
     if (obj == NULL) {
         throwNPE();
         return;
@@ -2538,7 +2479,7 @@ method_exit_callback_with_frame(Method *method, StackFrame& frame) {
         case JAVA_TYPE_ARRAY:
         case JAVA_TYPE_STRING:
             h = oh_allocate_local_handle();
-            h->object = (ManagedObject*) UNCOMPRESS_REF(frame.stack.pick().cr);
+            h->object = UNCOMPRESS_INTERP(frame.stack.pick().ref);
             val.l = (jobject) h;
             break;
 
@@ -2620,7 +2561,7 @@ interpreter(StackFrame &frame) {
         if (frame.method->is_static()) {
             ml->monitor = *(frame.method->get_class()->get_class_handle());
         } else {
-            ml->monitor = UNCOMPRESS_REF(frame.locals(0).cr);
+            ml->monitor = UNCOMPRESS_INTERP(frame.locals(0).ref);
         }
         vm_monitor_enter_wrapper(ml->monitor);
     }
@@ -3088,7 +3029,7 @@ got_exception:
         if (processExceptionHandler(frame, &frame.exc)) {
             frame.stack.clear();
             frame.stack.push();
-            frame.stack.pick().cr = COMPRESS_REF(frame.exc);
+            frame.stack.pick().ref = COMPRESS_INTERP(frame.exc);
             frame.stack.ref() = FLAG_OBJECT;
             frame.exc = NULL;
             
@@ -3167,14 +3108,13 @@ interpreter_execute_method(
 
     if(!method->is_static()) {
         frame.locals.ref(pos) = FLAG_OBJECT;
-        // COMPRESS_REF will fail assertion if obj == 0 on ipf
-        CREF cr = 0;
+        REF ref = 0;
         ObjectHandle h = (ObjectHandle) args[arg++].l;
         if (h) {
-            cr = COMPRESS_REF(h->object);
+            ref = COMPRESS_INTERP(h->object);
             frame.This = h->object;
         }
-        frame.locals(pos++).cr = cr;
+        frame.locals(pos++).ref = ref;
     }
 
     Arg_List_Iterator iter = method->get_argument_list();
@@ -3195,21 +3135,14 @@ interpreter_execute_method(
             break;
         case JAVA_TYPE_CLASS:
         case JAVA_TYPE_ARRAY:
-            h = (ObjectHandle) args[arg++].l;
-#ifdef COMPRESS_MODE
-#ifdef REFS_USE_RUNTIME_SWITCH
-            assert(VM_Global_State::loader_env->compress_references);
-#endif // REFS_USE_RUNTIME_SWITCH
-#endif
-            CREF cref;
-            if (h == NULL) {
-                cref = 0;
-            } else {
-                cref = COMPRESS_REF(h->object);
+            {
+                h = (ObjectHandle) args[arg++].l;
+
+                REF ref = (h == NULL) ? 0 : COMPRESS_INTERP(h->object);
+                frame.locals.ref(pos) = FLAG_OBJECT;
+                frame.locals(pos++).ref = ref;
+                ASSERT_OBJECT(UNCOMPRESS_INTERP(ref));
             }
-            frame.locals.ref(pos) = FLAG_OBJECT;
-            frame.locals(pos++).cr = cref;
-            ASSERT_OBJECT(UNCOMPRESS_REF(cref));
             break;
         case JAVA_TYPE_FLOAT:
             frame.locals(pos++).f = args[arg++].f;
@@ -3290,11 +3223,11 @@ interpreter_execute_method(
         case JAVA_TYPE_STRING:
          
             { 
-                ASSERT_OBJECT(UNCOMPRESS_REF(frame.stack.pick().cr));
+                ASSERT_OBJECT(UNCOMPRESS_INTERP(frame.stack.pick().ref));
                 ObjectHandle h = 0; 
-                if (frame.stack.pick().cr) {
+                if (frame.stack.pick().ref) {
                     h = oh_allocate_local_handle();
-                    h->object = UNCOMPRESS_REF(frame.stack.pick().cr);
+                    h->object = UNCOMPRESS_INTERP(frame.stack.pick().ref);
                 } 
                 resultPtr->l = h;
             }
@@ -3490,14 +3423,14 @@ static void
 interpreterInvokeVirtual(StackFrame& prevFrame, Method *method) {
 
     int args = method->get_num_arg_slots();
-    CREF cr = prevFrame.stack.pick(args-1).cr;
+    REF ref = prevFrame.stack.pick(args-1).ref;
 
-    if (cr == 0) {
+    if (ref == 0) {
         throwNPE();
         return;
     }
 
-    ManagedObject *obj = UNCOMPRESS_REF(cr);
+    ManagedObject *obj = UNCOMPRESS_INTERP(ref);
     ASSERT_OBJECT(obj);
 
     Class *objClass = obj->vt()->clss;
@@ -3524,14 +3457,14 @@ static void
 interpreterInvokeInterface(StackFrame& prevFrame, Method *method) {
 
     int args = method->get_num_arg_slots();
-    CREF cr = prevFrame.stack.pick(args-1).cr;
+    REF ref = prevFrame.stack.pick(args-1).ref;
 
-    if (cr == 0) {
+    if (ref == 0) {
         throwNPE();
         return;
     }
 
-    ManagedObject *obj = UNCOMPRESS_REF(cr);
+    ManagedObject *obj = UNCOMPRESS_INTERP(ref);
     ASSERT_OBJECT(obj);
 
     if (!vm_instanceof(obj, method->get_class())) {
@@ -3580,9 +3513,9 @@ static void
 interpreterInvokeSpecial(StackFrame& prevFrame, Method *method) {
 
     int args = method->get_num_arg_slots();
-    CREF cr = prevFrame.stack.pick(args-1).cr;
+    REF ref = prevFrame.stack.pick(args-1).ref;
 
-    if (cr == 0) {
+    if (ref == 0) {
         throwNPE();
         return;
     }
@@ -3595,7 +3528,7 @@ interpreterInvokeSpecial(StackFrame& prevFrame, Method *method) {
         return;
     }
 
-    ManagedObject *obj = UNCOMPRESS_REF(cr);
+    ManagedObject *obj = UNCOMPRESS_INTERP(ref);
 
     StackFrame frame;
     memset(&frame, 0, sizeof(frame));

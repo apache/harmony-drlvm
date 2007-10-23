@@ -79,7 +79,10 @@ extern bool interpreter_enable_debug;
 
 /** \def ASSERT_OBJECT(a)
   * \brief Checks the object.*/
-#define ASSERT_OBJECT(a) assert((a == 0) || ((*((a)->vt()->clss->get_class_handle()))->vt()->clss == VM_Global_State::loader_env->JavaLangClass_Class))
+#define ASSERT_OBJECT(a)                                       \
+    assert((a == 0) ||                                         \
+    ( (*((a)->vt()->clss->get_class_handle()))->vt()->clss ==  \
+            VM_Global_State::loader_env->JavaLangClass_Class))
 
 #ifndef INTERPRETER_USE_MALLOC_ALLOCATION
 /** \def ALLOC_FRAME(sz)
@@ -94,72 +97,74 @@ extern bool interpreter_enable_debug;
 #define FREE_FRAME(ptr) m_free(ptr)
 #endif
 
-/***** Compressed pointers on *****/
-#if defined _IPF_ || defined _EM64T_
-#define COMPRESS_MODE
-#endif
-
-#if defined _IPF_ || defined _EM64T_
-#  define COMPACT_FIELDS
-#  define uword uint64
-#  define word int64
-#  ifdef COMPRESS_MODE
-#    define CREF COMPRESSED_REFERENCE
-#    define PTR32
-#  else
-#    define CREF ManagedObject*
-#  endif
+#if POINTER64
+#   define COMPACT_FIELDS
+#   define uword uint64
+#   define word int64
 #else
-// no define for: COMPACT_FIELDS
-/** The unsigned <code>int</code> value */
-#    define uword uint32
-/** The signed <code>int</code> value */
-#    define word int32
-/** The compressed reference */
-#    define CREF uint32
-#    define PTR32
+#   define uword uint32
+#   define word int32
 #endif
 
-#ifdef COMPRESS_MODE
-/** \def COMPRESS_REF(ref)
-  * \brief Calls <code>compress_reference(ref)</code>.*/
-#define COMPRESS_REF(ref) compress_reference(ref)
-/** \def UNCOMPRESS_REF(cref)
-  * \brief Calls <code>uncompress_compressed_reference(cref)</code>.*/
-#define UNCOMPRESS_REF(cref) uncompress_compressed_reference(cref)
-
-#else /* ! COMPRESS_MODE */
-
-/**
- * The fake compressed reference.
- * 
- * @param[in] obj - the object to compress
- * @return The compressed reference.
- */
-static inline CREF
-fake_compress_reference(ManagedObject *obj) {
-    return (CREF) obj;
-}
-
-/**
- * Uncompresses the compressed reference.
- * 
- * @param[in] compressed_ref - the compressed reference
- * @return The uncompressed reference.
- */
-static inline ManagedObject*
-fake_uncompress_compressed_reference(CREF compressed_ref) {
-    return (ManagedObject*) compressed_ref;
-}
-
-/** \def COMPRESS_REF(ref)
-  * \brief Calls <code>fake_compress_reference(ref)</code>.*/
-#define COMPRESS_REF(ref) fake_compress_reference(ref)
-/** \def UNCOMPRESS_REF(cref)
-  * \brief Calls <code>fake_uncompress_compressed_reference(cref)</code>.*/
-#define UNCOMPRESS_REF(cref) fake_uncompress_compressed_reference(cref)
-
+#if defined(POINTER64) && defined(REFS_USE_COMPRESSED)
+#define REF32                // Use compressed references
+typedef COMPRESSED_REFERENCE REF;
+#else
+typedef ManagedObject* REF;  // Use uncompressed references
 #endif
+
+#if defined(REF32) || !defined(POINTER64)
+#define VAL32 // Value is 32-bit
+#endif
+
+
+// Create uncompressed value
+#define MAKEREFVAL(_val_)   (*((ManagedObject**)(&(_val_))))
+// Create compressed value
+#define MAKECRVAL(_val_)    (*((COMPRESSED_REFERENCE*)(&(_val_))))
+
+// Macros to compress/uncompress references in fiels and arrays
+// Note: VM references are references in heap and fields and arrays
+//       interpreter references are references in method stack and local vars
+#if defined(REFS_USE_COMPRESSED)
+// Both VM and interpreter references are compressed
+#define STORE_UREF_BY_ADDR(_addr_, _val_)                                    \
+    *((COMPRESSED_REFERENCE*)(_addr_)) = compress_reference(_val_)
+#define UNCOMPRESS_REF(cref) (uncompress_compressed_reference(MAKECRVAL(cref)))
+//----------------------
+#elif defined(REFS_USE_UNCOMPRESSED)
+// Both VM and interpreter references are uncompressed
+#define STORE_UREF_BY_ADDR(_addr_, _val_)                                    \
+    *((ManagedObject**)(_addr_)) = (ManagedObject*)(_val_)
+#define UNCOMPRESS_REF(cref) ((ManagedObject*)(cref))
+//----------------------
+#else // for REFS_USE_RUNTIME_SWITCH
+// interpreter refs are uncompressed; VM refs can be either
+#define STORE_UREF_BY_ADDR(_addr_, _val_)                                   \
+    if (REFS_IS_COMPRESSED_MODE) {                                          \
+        *((COMPRESSED_REFERENCE*)(_addr_)) = compress_reference(_val_);     \
+    } else {                                                                \
+        *((ManagedObject**)(_addr_)) = (ManagedObject*)(_val_);             \
+    }
+#define UNCOMPRESS_REF(cref)    ( REFS_IS_COMPRESSED_MODE ?                 \
+            (uncompress_compressed_reference(MAKECRVAL(cref))) :            \
+            (MAKEREFVAL(cref)))
+//----------------------
+#endif
+
+// Macros for compressing/uncompressing referenceses in interpreter's
+// method stack and local vars
+#ifdef REF32
+#define COMPRESS_INTERP(ref)    (compress_reference(ref))
+#define UNCOMPRESS_INTERP(cref) (uncompress_compressed_reference(cref))
+#define REF_NULL                (MANAGED_NULL)
+#else // REF32
+#define COMPRESS_INTERP(ref)    ((ManagedObject*)(ref))
+#define UNCOMPRESS_INTERP(cref) ((ManagedObject*)(cref))
+#define REF_NULL                0
+#endif // REF32
+
+
 
 /** Defines byte ordering in Value2 in different situations.*/
 
@@ -197,13 +202,13 @@ union Value {
     int32 i;
 /** The float value.*/
     float f;
-/** The compressed reference.*/
-    CREF cr;
+///** Compressed/uncompressed reference.*/
+    REF ref;
 };
 
 /** Holds 64-bit values */
 union Value2 {
-#ifdef PTR32
+#ifdef VAL32
 /** Two 32-bit values */
     Value v[2];
 #else
@@ -215,6 +220,8 @@ union Value2 {
     uint64 u64;
 /** The double value */
     double d;
+/** The reference */
+    ManagedObject* ref;
 };
 
 /** The local variable types.*/
@@ -361,7 +368,7 @@ class Stack {
 /** The storage for local variables of the executed Java method.*/
 class Locals {
     // local variable value
-    Value *var;
+    Value *vars;
     // references to the local variable type
     uint8 *refs;
     // locals size
@@ -689,8 +696,8 @@ Locals::~Locals() {
 
 void
 Locals::init(void *ptr, uint32 size) {
-    var = (Value*) ptr;
-    refs = (uint8*)(var + size);
+    vars = (Value*) ptr;
+    refs = (uint8*)(vars + size);
     varNum = size;
     for(uint32 i = 0; i < varNum; i++) refs[i] = 0;
 }
@@ -703,12 +710,12 @@ Locals::getStorageSize(int size) {
 Value&
 Locals::operator () (uint32 id) {
     assert(id < varNum);
-    return var[id];
+    return vars[id];
 }
 
 void
 Locals::setLong(int idx, Value2 val) {
-#ifdef PTR32
+#ifdef VAL32
     operator() (idx+l0) = val.v[a0];
     operator() (idx+l1) = val.v[a1];
 #else
@@ -719,7 +726,7 @@ Locals::setLong(int idx, Value2 val) {
 Value2
 Locals::getLong(int idx) {
     Value2 val;
-#ifdef PTR32
+#ifdef VAL32
     val.v[a0] = operator() (idx+l0);
     val.v[a1] = operator() (idx+l1);
 #else
@@ -754,7 +761,7 @@ Stack::pick(int offset) {
 
 void
 Stack::setLong(int idx, Value2 val) {
-#ifdef PTR32
+#ifdef VAL32
     pick(idx + s0) = val.v[a0];
     pick(idx + s1) = val.v[a1];
 #else
@@ -765,7 +772,7 @@ Stack::setLong(int idx, Value2 val) {
 Value2
 Stack::getLong(int idx) {
     Value2 val;
-#ifdef PTR32
+#ifdef VAL32
     val.v[a0] = pick(idx + s0);
     val.v[a1] = pick(idx + s1);
 #else
