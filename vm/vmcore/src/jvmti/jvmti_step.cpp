@@ -541,9 +541,15 @@ static void jvmti_start_single_step_in_virtual_method(DebugUtilsTI *ti, const VM
             // Call through a register, it has to point to the address of a compiled method
             NativeCodePtr ip = disasm->get_target_address_from_context(&regs);
             CodeChunkInfo *cci = vm_env->vm_methods->find(ip);
-            assert(cci);
-            method = cci->get_method();
-            assert(method->get_state() == Method::ST_Compiled);
+            if (NULL != cci)
+            {
+                // Compiled method, set bytecode in it
+                method = cci->get_method();
+                assert(method->get_state() == Method::ST_Compiled);
+            }
+            else
+                // Method is not compiled, nothing to do
+                method = NULL;
         }
     }
     else if (bytecode == OPCODE_INVOKEINTERFACE)
@@ -584,7 +590,8 @@ static void jvmti_start_single_step_in_virtual_method(DebugUtilsTI *ti, const VM
     // The determined method is the one which is called by
     // invokevirtual or invokeinterface bytecodes. It should be
     // started to be single stepped from the beginning
-    jvmti_set_single_step_breakpoints_for_method(ti, jvmti_thread, method);
+    if (NULL != method)
+        jvmti_set_single_step_breakpoints_for_method(ti, jvmti_thread, method);
 #else
     NOT_IMPLEMENTED;
 #endif
