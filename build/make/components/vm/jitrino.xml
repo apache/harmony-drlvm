@@ -325,6 +325,7 @@ Version: $Revision: 1.6.2.8 $
                 <linkerarg value="-shared" />
                 <linkerarg value="-ldl" />
                 <linkerarg value="-lm" />
+		<linkerarg value="--version-script=${build.vm.home}/jitrino/build/jitrino.exp" />
             </select>
         </linker>
 

@@ -32,6 +32,9 @@
 #include "open/em.h"
 #include "jni_types.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 VMEXPORT void
 JIT_execute_method_default(JIT_Handle jit, 
@@ -44,5 +47,8 @@ vm_execute_java_method_array(jmethodID method,
                              jvalue *result,
                              jvalue *args);
 
+#ifdef __cplusplus
+}
+#endif
 
 #endif

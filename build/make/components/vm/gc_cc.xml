@@ -91,6 +91,7 @@ Version: $Revision: 1.4.2.3 $
             <libset libs="${vm.hythr.lib}" dir="${vm.hythr.libdir}" />
             <select os="lnx">
                 <linkerarg value="-Bsymbolic" />
+                <linkerarg value="--version-script=${build.vm.home}/gc_cc/build/gc_cc.exp" />
             </select>
         </linker>
 

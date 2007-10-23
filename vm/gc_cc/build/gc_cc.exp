@@ -1,0 +1,42 @@
+GC_CC_0.1 {
+  global :
+    Java_org_apache_harmony_drlvm_gc_1cc_GCHelper_getCleanedOffset;
+    Java_org_apache_harmony_drlvm_gc_1cc_GCHelper_getCurrentOffset;
+    gc_add_root_set_entry;
+    gc_add_root_set_entry_interior_pointer;
+    gc_add_weak_root_set_entry;
+    gc_alloc;
+    gc_alloc_fast;
+    gc_alloc_pinned;
+    gc_class_prepared;
+    gc_finalize_on_exit;
+    gc_force_gc;
+    gc_free_memory;
+    gc_get_collection_count;
+    gc_get_collection_time;
+    gc_get_hashcode;
+    gc_get_next_live_object;
+    gc_heap_base_address;
+    gc_heap_ceiling_address;
+    gc_heap_slot_write_ref;
+    gc_heap_write_ref;
+    gc_heap_wrote_object;
+    gc_init;
+    gc_is_object_pinned;
+    gc_iterate_heap;
+    gc_max_memory;
+    gc_pin_object;
+    gc_pinned_malloc_noclass;
+    gc_requires_barriers;
+    gc_supports_frontier_allocation;
+    gc_thread_init;
+    gc_thread_kill;
+    gc_time_since_last_gc;
+    gc_total_memory;
+    gc_unpin_object;
+    gc_vm_initialized;
+    gc_wrapup;
+    gc_write_barrier;
+
+  local : *;
+};

@@ -347,7 +347,7 @@ Version: $Revision: 1.5.2.3 $
 
             <select os="lnx">
                 <syslibset type="shared" libs="m,dl,stdc++,z,xml2,pthread,gcc_s,rt" /> 
-                <linkerarg value="--export-dynamic" />
+                <linkerarg value="--version-script=${build.vm.home}/vmcore/build/vmcore.exp" />
 		<select arch="ia32">
 			<libset type="shared" libs="icuuc"
                         	dir="${external.dep.CLASSLIB}/depends/libs/linux.x86" />

@@ -148,6 +148,10 @@ protected:
     long m_nInc;
 };
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * @brief Generates an VM's helper to invoke the provided function.
  *
@@ -161,6 +165,10 @@ protected:
  * was raised for the current thread, and rethrows it if necessary.
  */
 VMEXPORT void * vm_create_helper_for_function(void* (*fptr)(void*));
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* #ifndef _VM_UTILS_H_ */
 
