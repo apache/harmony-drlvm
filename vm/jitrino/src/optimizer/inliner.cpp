@@ -125,15 +125,17 @@ Inliner::Inliner(SessionAction* argSource, MemoryManager& mm, IRManager& irm,
     if(skipMethods != NULL || _inlineSkipApiMagicMethods) {
         _inlineSkipMethodTable = new (_tmpMM) Method_Table(_tmpMM, skipMethods, "SKIP_METHODS", false);
         if (_inlineSkipApiMagicMethods) {
-#if defined  (_EM64T_) || defined (_IPF_)
+#if defined (_IPF_)
 //TODO: IA32 helpers should work on EM64T too -> TODO test
 #else
             //is_accepted will return 'true' for these methods by skip table-> no inlining will be done
             Method_Table::Decision des = Method_Table::mt_accepted; 
+#ifndef  _EM64T_ // not tested
             _inlineSkipMethodTable->add_method_record("java/lang/Integer", "numberOfLeadingZeros", "(I)I", des, false);
             _inlineSkipMethodTable->add_method_record("java/lang/Integer", "numberOfTrailingZeros", "(I)I", des, false);
             _inlineSkipMethodTable->add_method_record("java/lang/Long", "numberOfLeadingZeros", "(J)I", des, false);
             _inlineSkipMethodTable->add_method_record("java/lang/Long", "numberOfTrailingZeros", "(J)I", des, false);
+#endif
             if(argSource->getBoolArg("String_compareTo_as_magic",true)) {
                 _inlineSkipMethodTable->add_method_record("java/lang/String", "compareTo", "(Ljava/lang/String;)I", des, false);
             }

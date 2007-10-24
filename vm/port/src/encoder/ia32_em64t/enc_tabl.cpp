@@ -1439,22 +1439,22 @@ END_MNEMONIC()
 
 BEGIN_MNEMONIC(CMPSB, MF_AFFECTS_FLAGS, DU_DU_DU)
 BEGIN_OPCODES()
-    {OpcodeInfo::ia32,  {0xA6},         {r32,r32,ECX},    DU_DU_DU },
-    {OpcodeInfo::em64t, {0xA6},         {r64,r64,RCX},    DU_DU_DU },
+    {OpcodeInfo::ia32,  {0xA6},         {ESI,EDI,ECX},    DU_DU_DU },
+    {OpcodeInfo::em64t, {0xA6},         {RSI,RDI,RCX},    DU_DU_DU },
 END_OPCODES()
 END_MNEMONIC()
 
 BEGIN_MNEMONIC(CMPSW, MF_AFFECTS_FLAGS, DU_DU_DU)
 BEGIN_OPCODES()
-    {OpcodeInfo::ia32,  {Size16, 0xA7}, {r32,r32,ECX},  DU_DU_DU },
-    {OpcodeInfo::em64t, {Size16, 0xA7}, {r64,r64,RCX},  DU_DU_DU },
+    {OpcodeInfo::ia32,  {Size16, 0xA7}, {ESI,EDI,ECX},  DU_DU_DU },
+    {OpcodeInfo::em64t, {Size16, 0xA7}, {RSI,RDI,RCX},  DU_DU_DU },
 END_OPCODES()
 END_MNEMONIC()
 
 BEGIN_MNEMONIC(CMPSD, MF_AFFECTS_FLAGS, DU_DU_DU)
 BEGIN_OPCODES()
-    {OpcodeInfo::ia32,  {0xA7},         {r32,r32,ECX},  DU_DU_DU },
-    {OpcodeInfo::em64t, {0xA7},         {r64,r64,RCX},  DU_DU_DU },
+    {OpcodeInfo::ia32,  {0xA7},         {ESI,EDI,ECX},  DU_DU_DU },
+    {OpcodeInfo::em64t, {0xA7},         {RSI,RDI,RCX},  DU_DU_DU },
 END_OPCODES()
 END_MNEMONIC()
 

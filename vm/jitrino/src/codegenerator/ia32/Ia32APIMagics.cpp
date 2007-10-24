@@ -60,7 +60,8 @@ public:
     virtual void run()=0;
 protected:
 
-    Opnd*  addElemIndexWithLEA(Opnd* array, Opnd* index, Node* node);
+    void    convertIntToInt(Opnd* dst, Opnd* src, Node* node);
+    Opnd*   addElemIndexWithLEA(Opnd* array, Opnd* index, Node* node);
 
     IRManager* irm;
     CallInst* callInst;
@@ -108,6 +109,7 @@ void APIMagicsHandlerSession::runImpl() {
                         continue; 
                     };
                     if( ri->getKind() == Opnd::RuntimeInfo::Kind_MethodDirectAddr ){
+#ifndef _EM64T_
                         MethodDesc * md = (MethodDesc*)ri->getValue(0);
                         const char* className = md->getParentType()->getName();
                         const char* methodName = md->getName();
@@ -125,6 +127,7 @@ void APIMagicsHandlerSession::runImpl() {
                                 handlers.push_back(new (tmpMM) Long_numberOfTrailingZeros_Handler_x_J_x_I(irm, callInst, md));
                             }
                         }
+#endif
                     } else if( ri->getKind() == Opnd::RuntimeInfo::Kind_InternalHelperAddress ) {
                         if( strcmp((char*)ri->getValue(0),"String_compareTo")==0 ) {
                             if(getBoolArg("String_compareTo_as_magic", true))
@@ -363,7 +366,7 @@ void String_compareTo_Handler_x_String_x_I::run() {
 
     // prepare counter
     Opnd* counter = irm->newRegOpnd(counterType,counterRegName);
-    node->appendInst(irm->newCopyPseudoInst(Mnemonic_MOV, counter, valForCounter));
+    convertIntToInt(counter, valForCounter, node);
 
     // prepare this position
     Opnd* thisAddr = addElemIndexWithLEA(thisArr,thisIdx,node);
@@ -451,7 +454,7 @@ void String_regionMatches_Handler_x_I_x_String_x_I_x_I_x_Z::run() {
 
     // prepare counter
     Opnd* counter = irm->newRegOpnd(counterType,counterRegName);
-    node->appendInst(irm->newCopyPseudoInst(Mnemonic_MOV, counter, valForCounter));
+    convertIntToInt(counter, valForCounter, node);
 
     // prepare this position
     Opnd* thisAddr = addElemIndexWithLEA(thisArr,thisIdx,node);
@@ -491,6 +494,25 @@ void String_regionMatches_Handler_x_I_x_String_x_I_x_I_x_Z::run() {
     callInst->unlink();
 }
 
+// this intends for indexes and counters conversion
+// ATTENTION !!! Zero Extention is used for this
+void  APIMagicHandler::convertIntToInt(Opnd* dst, Opnd* src, Node* node) 
+{
+    Type* dstType = dst->getType();
+    Type* srcType = src->getType();
+
+    // this works only for equal types 
+    // or Int32 into Int64 conversion
+    assert(srcType == dstType || (srcType == irm->getTypeManager().getInt32Type() &&
+                                  dstType == irm->getTypeManager().getInt64Type()));
+
+    if(srcType != dstType) {
+        node->appendInst(irm->newInstEx(Mnemonic_MOVZX, 1, dst, src));
+    } else {
+        node->appendInst(irm->newCopyPseudoInst(Mnemonic_MOV, dst, src));
+    }
+}
+
 //  Compute address of the array element given 
 //  address of the first element and index
 //  using 'LEA' instruction
@@ -520,22 +542,14 @@ Opnd*  APIMagicHandler::addElemIndexWithLEA(Opnd* array, Opnd* index, Node* node
     }
     Opnd * elemSizeOpnd  = irm->newImmOpnd(indexType, elemSize);
     
-    Opnd * indexOpnd = index;
-    assert(index->getType() == indexType); //when this assertion fails 'convert' should be implemented
-//    indexOpnd = convert(indexOpnd, indexType);
-
-    if ( indexOpnd->isPlacedIn(OpndKind_Imm) ) {
-        // we need to put index operand on a register to satisfy LEA constraint
-        int64 immValue = indexOpnd->getImmValue();
-        if (immValue == 0) {
+    Opnd * indexOpnd = NULL;
+    if ( index->isPlacedIn(OpndKind_Imm) && index->getImmValue() == 0 ) {
             indexOpnd = NULL;
             elemSizeOpnd = NULL;
-        } else {
-            Opnd * indexReg = irm->newOpnd(indexType);
-            node->appendInst(irm->newCopyPseudoInst(Mnemonic_MOV, indexReg, indexOpnd));
-            indexOpnd = indexReg;
-        }
-    }    
+    } else {
+        indexOpnd = irm->newOpnd(indexType);
+        convertIntToInt(indexOpnd,index,node);
+    } 
     Opnd * arrOffset = irm->newImmOpnd(offType, arrayType->getArrayElemOffset());
     Opnd * addr = irm->newMemOpnd(dstType,(Opnd*)array, indexOpnd, elemSizeOpnd, arrOffset);
     Opnd * dst = irm->newOpnd(dstType);

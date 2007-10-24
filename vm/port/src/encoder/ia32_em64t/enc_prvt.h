@@ -156,6 +156,11 @@ enum OpcodeByteKind {
     #define RDX     { OpndKind_GPReg, OpndSize_64, RegName_RDX }
 #endif
 
+#define ESI         {OpndKind_GPReg, OpndSize_32, RegName_ESI}
+#ifdef _EM64T_
+    #define RSI     { OpndKind_GPReg, OpndSize_64, RegName_RSI }
+#endif
+
 #define EDI         {OpndKind_GPReg, OpndSize_32, RegName_EDI}
 #ifdef _EM64T_
     #define RDI     { OpndKind_GPReg, OpndSize_64, RegName_RDI }
