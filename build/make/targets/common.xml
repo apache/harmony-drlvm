@@ -20,14 +20,10 @@
         <property name="common.src" value="" />
                 
         <compiler id="common.cpp.compiler" name="${build.cxx}">
-            <select os="win">
-                <defineset define="WIN32,_WINDOWS" />
-            </select>
+            <defineset define="WIN32,_WINDOWS" if="is.windows"/>
         </compiler>
         <compiler id="common.c.compiler" name="${build.cxx}">
-            <select os="win">
-                <defineset define="WIN32,_WINDOWS" />
-            </select>
+            <defineset define="WIN32,_WINDOWS" if="is.windows"/>
         </compiler>
         <linker name="${build.cxx}" id="common.linker">
         </linker>

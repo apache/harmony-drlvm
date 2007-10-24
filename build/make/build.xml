@@ -174,11 +174,47 @@
         <property name="build.cfg" value="${env.BUILD_CFG}" />
         <property name="build.cxx" value="${env.CXX}" />
 
+        <condition property="is.gcc">
+            <equals arg1="${build.cxx}" arg2="gcc"/>
+        </condition>
+
+        <condition property="is.icc">
+            <equals arg1="${build.cxx}" arg2="icc"/>
+        </condition>
+
+        <condition property="is.icl">
+            <equals arg1="${build.cxx}" arg2="icl"/>
+        </condition>
+
+        <condition property="is.msvc">
+            <equals arg1="${build.cxx}" arg2="msvc"/>
+        </condition>
+
+        <condition property="is.cfg.debug">
+            <equals arg1="${build.cfg}" arg2="debug"/>
+        </condition>
+        <condition property="is.cfg.release">
+            <not><equals arg1="${build.cfg}" arg2="debug"/></not>
+        </condition>
+        
         <!-- build debug: true/false -->
         <condition property="build.is.debug" value="true">
             <equals arg1="${build.cfg}" arg2="debug" />
         </condition>
         <property name="build.is.debug" value="false" />
+        
+        <condition property="is.unix.x86_64">
+            <and>
+                <isset property="is.unix"/>
+                <isset property="is.x86_64"/>
+            </and>
+        </condition>
+        <condition property="is.unix.x86">
+            <and>
+                <isset property="is.unix"/>
+                <isset property="is.x86"/>
+            </and>
+        </condition>
     </target>
 
     <!-- initialization target specific for unix -->
@@ -449,7 +485,7 @@
         <parallel threadsPerProcessor="1" failonany="no">
             <ant target="hut.test"      output="${base.test.dir}/hut.log"/>
             <ant target="kernel.test"   output="${base.test.dir}/kernel.log"/>
-            <ant target="ehwa"          output="${base.test.dir}/ehwa.log"/>
+            <ant target="ehwa.test"     output="${base.test.dir}/ehwa.log"/>
             <ant target="jvmti.test"    output="${base.test.dir}/jvmti.log"/>
             <ant target="smoke.test"    output="${base.test.dir}/smoke.log"/>
             <ant target="reg.test"      output="${base.test.dir}/reg.log"/>
@@ -465,11 +501,8 @@
     </target>
 
     <!-- Run cunit tests only -->
-    <target name="cunit.test" depends="setup, init">
-        <subant buildpath="." antfile="build_component.xml" target="build" inheritall="true" failonerror="true">
-            <property name="_component" value="vm" />
-            <property name="_target" value="cunit.test" />
-        </subant>
+    <target name="cunit.test" depends="init">
+        <ant antfile="targets/cunit.test.xml" target="cunit.test"/>
         <available property="test.failed" file="${base.test.dir}/cunit.test.failed" />
     </target>
 
@@ -480,7 +513,7 @@
     </target>
 
     <!-- Main target to run kernel tests -->
-    <target name="kernel.test" depends="extern_dep,init" >
+    <target name="kernel.test" depends="init" >
         <ant antfile="targets/kernel.test.xml" target="kernel.test"/>
         <available property="test.failed" file="${base.test.dir}/kernel.test.failed" />
     </target>

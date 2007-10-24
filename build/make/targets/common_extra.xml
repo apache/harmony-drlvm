@@ -29,26 +29,16 @@
                   location="${build.semi.dir}/${component.as.path}/_classes" />
 
         <compiler id="common.cpp.compiler" name="${build.cxx}">
-            <select os="win">
-                <defineset define="WIN32,_WINDOWS" />
-            </select>
+            <defineset define="WIN32,_WINDOWS" if="is.windows"/>
         </compiler>
         <compiler id="common.c.compiler" name="${build.cxx}">
-            <select os="win">
-                <defineset define="WIN32,_WINDOWS" />
-            </select>
+            <defineset define="WIN32,_WINDOWS" if="is.windows"/>
         </compiler>
         <linker name="${build.cxx}" id="common.linker">
-            <select os="win">
-                <syslibset libs="advapi32,odbc32,userenv,ws2_32,mswsock" />
-            </select>
-            <select osfamily="unix">
-                <syslibset type="static" libs="z,pthread,xml2" />
-                <syslibset type="shared" libs="m,dl,stdc++" />
-            </select>
-            <select os="lnx" cxx="gcc">
-                <syslibset type="shared" libs="gcc_s" />
-            </select>
+            <syslibset libs="advapi32,odbc32,userenv,ws2_32,mswsock" if="is.windows"/>
+            <syslibset type="static" libs="z,pthread,xml2" if="is.unix"/>
+            <syslibset type="shared" libs="m,dl,stdc++" if="is.unix"/>
+            <syslibset type="shared" libs="gcc_s" if="is.gcc"/>
         </linker>
     </target>
 </project>

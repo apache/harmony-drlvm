@@ -17,6 +17,7 @@
 <project name="C UNIT TESTS">
     
     <import file="test.common.xml"/>
+    <import file="common_vm.xml"/>
     
     <property name="cunit.test.dir" location="${base.test.dir}/cunit.tests"/>
     <property name="cunit.test.summary" location="${base.test.dir}/cunit.test.failed"/>
@@ -38,9 +39,9 @@
         <globmapper from="*.c" to="*"/>
     </pathconvert>
     
-    <target name="cunit.test" depends="init_component,cunit-compile,cunit-run,cunit-report"/>
+    <target name="cunit.test" depends="cunit-compile,cunit-run,cunit-report"/>
 
-    <target name="cunit-compile" >
+    <target name="cunit-compile" depends="common_vm">
         <!-- Set cunit tests include dirs -->
         <path id="unit.test.c.include">
             <pathelement location="${build.VM.home}/tests/unit/thread/utils" />
@@ -54,90 +55,8 @@
         <mkdir dir="${cunit.obj.dir}" />
         <mkdir dir="${cunit.bin.dir}" />
 
-        <compiler name="${build.cxx}" id="cunit.test.compiler">
+        <compiler name="${build.cxx}" id="cunit.test.compiler" extends="common.c.compiler">
             <defineset define="APR_DECLARE_STATIC, BUILDING_VM"/>
-            <select cfg="release">
-                <defineset define="NDEBUG" />
-                <select os="win">
-                    <select cxx="icl">
-                        <compilerarg value="/QxN" />
-                        <compilerarg value="/O3" />
-                        <compilerarg value="/Qip" />
-                    </select>
-                    <select cxx="msvc">
-                        <compilerarg value="/Ox" />
-
-                    </select>
-                </select>
-                <select osfamily="unix">
-                    <compilerarg value="-O2" />
-                </select>
-            </select>
- 
-            <select cfg="debug">
-                <defineset define="_DEBUG,VM_STATS" />
-                <select osfamily="unix">
-                    <compilerarg value="-O0" />
-                    <compilerarg value="-g" />
-                    <compilerarg value="-ggdb3" />
-                </select>
-                <select os="win" cxx="icl">
-                    <compilerarg value="/QxN" />
-                    <compilerarg value="/Qip" />
-                    <compilerarg value="/O3" />
-                </select>
-            </select>
-
-            <select arch="ia32">
-                <defineset define="_IA32_" />
-            </select>
-            <select arch="ipf">
-                <defineset define="_IPF_,POINTER64,HYIA64" />
-            </select>
-            <select arch="em64t">
-                <defineset define="_EM64T_,POINTER64,LAZY_LOCK,HYX86_64" />
-            </select>
-            <select arch="ppc32">
-                <defineset define="_PPC32_,_PPC_,HYPPC32" />
-            </select>
-            <select os="win">
-                <defineset define="PLATFORM_NT,WIN32,_WINDOWS" />
-                <defineset>
-                    <define name="_WIN32_WINNT" value="0x0501" />
-                </defineset>
-                <compilerarg value="/nologo" />
-                <compilerarg value="/W3" />
-                <select arch="ia32,ipf">
-                    <compilerarg value="/WX" />
-                </select>
-                <compilerarg value="/Zi" />
-            </select>
-            <select osfamily="unix">
-                <defineset define="PLATFORM_POSIX" />
-                <compilerarg value="-fno-exceptions" />
-                <select os="macosx">
-                    <defineset define="MACOSX" />
-                </select>
-                <select os="lnx">
-                    <defineset define="LINUX" />
-                </select>
-                <defineset define="__SMP__,_REENTRANT,LINUX_TLS_OPT" />
-                <select arch="em64t">
-                    <compilerarg value="-ftls-model=initial-exec" /> 
-                </select>
-                <select arch="ia32">
-                    <defineset define="_LARGEFILE64_SOURCE" />
-                </select>
-                <select os="lnx" arch="em64t,ipf">
-                    <compilerarg value="-fPIC" />
-                </select>
-                <select cxx="icc">
-                    <compilerarg value="-w1" />
-                </select>
-            </select>
-            <select cxx="icc,icl">                  
-                <compilerarg value="-mp" />
-            </select>
         </compiler>
        
         <!-- Compiling cunit tests and framework -->
@@ -177,26 +96,18 @@
                             <include name="${filename}.o*" />
                         </fileset>
 
-                        <select os="win">
-                            <select cfg="debug">
-                                <linkerarg value="/DEBUG" />
-                            </select>
-                            <libset type="shared" libs="harmonyvm"
-                                dir="${hdk.lib.dir}" />
-                            <libset type="shared" libs="hythr"
-                                dir="${hdk.lib.dir}" />
-                            <linkerarg value="/libpath:${test.vmdir}" />
-                            <linkerarg value="/NODEFAULTLIB:libcmtd" />
-                        </select>
+                        <linkerarg value="/DEBUG" if="is.windows" unless="is.cfg.release"/>
+                        <libset type="shared" libs="harmonyvm,hythr"
+                            dir="${hdk.lib.dir}" if="is.windows"/>
+                        <linkerarg value="/libpath:${test.vmdir}" if="is.windows" />
+                        <linkerarg value="/NODEFAULTLIB:libcmtd" if="is.windows" />
                         
-                        <select os="lnx">
-                            <libset type="shared" libs="harmonyvm"
-                                dir="${test.vmdir}" />
-                            <linkerarg value="-rpath" />
-                            <linkerarg value="${test.jre.home}/bin" />
-                            <linkerarg value="-rpath" />
-                            <linkerarg value="${test.vmdir}" />
-                        </select>
+                        <libset type="shared" libs="harmonyvm"
+                            dir="${test.vmdir}" if="is.unix"/>
+                        <linkerarg value="-rpath" if="is.unix"/>
+                        <linkerarg value="${test.jre.home}/bin" if="is.unix"/>
+                        <linkerarg value="-rpath" if="is.unix"/>
+                        <linkerarg value="${test.vmdir}" if="is.unix"/>
                     </linker>
                 </cc>
             </sequential>
@@ -215,6 +126,9 @@
                 <var name="filename" unset="true" />
                 <basename property="filename" file="@{file}" />
                 
+                <condition property="cunit.extra.args" value="-Xint" else="">
+                    <isset property="is.ia64"/>
+                </condition>
                 <!-- Executing unit test... -->
                 <echo message="Running: ${filename}" />
                 <var name="outputproperty" unset="true" />
@@ -228,19 +142,11 @@
                     <arg value="-Dorg.apache.harmony.vm.vmdir=${test.vmdir}"/>
                     <arg value="-Djava.home=${test.jre.home}"/>
                     <arg value="-XX:vm.jvmti.enabled=true"/>
-                    <arg value="${test.vmargs}"/>
-                    <select arch="ipf">
-                        <arg value="-Xint"/>
-                    </select>
+                    <arg line="${test.vmargs} ${cunit.extra.args}"/>
                     
                     <env key="JAVA_HOME" value="${test.jre.home}" />
-                    
-                    <select os="win">
-                        <env key="Path" path="${test.jre.home}/bin/;${test.vmdir};${env.Path}" />
-                    </select>
-                    <select os="lnx">
-                        <env key="LD_LIBRARY_PATH" path="${test.jre.home}/bin/:${test.vmdir}" />
-                    </select>
+                    <env key="Path" path="${test.jre.home}/bin/;${test.vmdir};${env.Path}" />
+                    <env key="LD_LIBRARY_PATH" path="${test.jre.home}/bin/:${test.vmdir}" />
                 </exec>
 
                 <echo file="${cunit.test.dir}/reports/${filename}.out" message="${outputproperty}" />

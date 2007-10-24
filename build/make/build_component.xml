@@ -83,7 +83,6 @@ Version: $Revision: 1.9.2.5 $
     <target name="is.build.constructed">
         <dependset>
             <srcfileset dir="components" includes="**/*.xml" />
-            <srcfileset dir="targets" includes="**/*.xml" />
             <srcfilelist dir="." files="deploy.xml,selector.xsl,build_component.xsl,build_component.xml" />
             <targetfileset dir="${build.semi.dir}" includes="done.txt" />
         </dependset>
@@ -93,8 +92,6 @@ Version: $Revision: 1.9.2.5 $
     <!-- sets some properties used by the build construction -->
     <target name="generate.init" unless="build.constructed">
         <mkdir dir="${build.semi.dir}/build" />
-        <!-- creating directory under build.semi.dir to store semi results for targets -->
-        <mkdir dir="${build.semi.dir}/build/targets" />
         <property name="build.file" value="${build.semi.dir}/build.tmp.xml" />
         <echo file="${build.file}">
             <![CDATA[            
@@ -111,9 +108,7 @@ Version: $Revision: 1.9.2.5 $
         </echo>
     </target>
 
-    <!-- generates semis/build_targets.xml
-        (processes targets with xslt to get the version for current build configuration
-         and imports them to the semis/build_targets.xml) -->
+    <!-- generates semis/build_targets.xml -->
     <target name="generate.targets" unless="build.constructed">
         <echo file="${build.targets.file}" append="true">
             <![CDATA[
@@ -123,34 +118,24 @@ Version: $Revision: 1.9.2.5 $
         <var name="targets.list.var" value="" />
         <property name="target.target.file" value="" />
         <for param="target">
-            <!-- all files in targets directory are targets for the build -->
             <fileset dir="targets">
                 <include name="**" />
+                <exclude name="*test*"/>
             </fileset>
 
             <sequential>
                 <basename property="@{target}.name" file="@{target}" />
                 <!-- target name (with suffix and .xml)-->
                 <propertycopy name="targetname" override="true" from="@{target}.name" />
-                <!-- processing targets with xslt to filter select tags -->
-                <xslt in="@{target}" out="${build.semi.dir}/build/targets/${targetname}" style="./selector.xsl">
-                    <param name="cfg" expression="${build.cfg}" />
-                    <param name="os" expression="${build.os.short}" />
-                    <param name="osfamily" expression="${build.os.family}" />
-                    <param name="arch" expression="${build.arch}" />
-                    <param name="cxx" expression="${build.cxx}" />
-                    <param name="hynosig" expression="${hy.no.sig}" />
-                    <param name="hylocalzlib" expression="${hy.local.zlib}" />
-                </xslt>
                 <echo file="${build.targets.file}" append="true">
                     <![CDATA[
-    <import file="${build.semi.dir}/build/targets/${targetname}" />
+    <import file="${basedir}/targets/${targetname}" />
                     ]]>
                 </echo>
 
                 <!-- load the content of the semis/build/targets/${targetname} -->
                 <var name="target.target.file" unset="true" />
-                <loadfile property="target.target.file" srcfile="${build.semi.dir}/build/targets/${targetname}" />
+                <loadfile property="target.target.file" srcfile="targets/${targetname}" />
 
                 <!-- ${t.file} = ${targetname}.file (file content) -->
                 <propertycopy override="true" name="t.file" from="target.target.file" />
@@ -177,11 +162,6 @@ Version: $Revision: 1.9.2.5 $
 </project> 
             ]]>
         </echo>
-
-        <!-- FIXME: do we need it? -->
-        <fileset id="targets" dir="${build.semi.dir}/build/targets">
-            <include name="**" />
-        </fileset>
     </target>
 
     <!-- processes descriptors with xslt - to get init_${component}.xml
