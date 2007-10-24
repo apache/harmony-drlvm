@@ -544,6 +544,7 @@ VMCORE_0.1 {
     method_vars_is_managed_pointer;
     method_vars_is_pinned;
     object_get_vtable_offset;
+    port_atomic_cas64;
     port_vmem_page_sizes;
     port_CPUs_number;
     resolve_class;
