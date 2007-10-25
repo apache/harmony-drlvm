@@ -56,7 +56,6 @@ static const char *api_dll_files[] =
 #else
     "hyzlib",
 #endif
-    "hytext",
     "hynio",
     "vmi",
     "hyluni",
