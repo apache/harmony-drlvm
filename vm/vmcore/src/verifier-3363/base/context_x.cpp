@@ -469,6 +469,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
                            }
 
         case OP_ARETURN: {
+            if( return_type == SM_BOGUS ) return error(VF_ErrorDataFlow, "returned a value from a void method");
             POP_ref( return_type );
             break;
                          }

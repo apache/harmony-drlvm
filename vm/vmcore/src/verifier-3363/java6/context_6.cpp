@@ -28,7 +28,7 @@ namespace CPVerifier_6 {
         vf_Result tcr;
 
         //nothing to verify
-        if( !method_get_code_length( m_method ) ) {
+        if( !method_get_code_length( method ) ) {
             return VF_OK;
         }
 
