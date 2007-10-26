@@ -371,7 +371,7 @@ public:
     bool isLaidOut() const {return laidOut;}
     void setLaidOut(bool v) {laidOut = true;}
 
-    /** returns the pointer to the native code for this basic block */
+    /** returns the pointer to the emitted native code for the method. */
     void * getCodeStartAddr() const {return codeStartAddr;}
     void   setCodeStartAddr(void* addr) {codeStartAddr = addr;} 
 

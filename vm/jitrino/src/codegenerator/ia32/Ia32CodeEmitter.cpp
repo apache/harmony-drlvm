@@ -500,7 +500,8 @@ void CodeEmitter::emitCode( void ) {
                 bool callIsNotForPatching = rt && (rt->getKind() == Opnd::RuntimeInfo::Kind_InternalHelperAddress ||
                                                    rt->getKind() == Opnd::RuntimeInfo::Kind_HelperAddress);
 
-                if (!callIsNotForPatching) { // the call may be patched at runtime
+                if (!callIsNotForPatching) 
+                { // the call may be patched at runtime
                     // nops for self-jump <opcode + 8 bit displacement(-3)> for atomic write at aligned ip
                     // there are 3 bytes reserved to allow self-jump to be aligned for sure
                     // the first (must be the real inst in CFG to cheat code compactor that removes these nops
@@ -511,12 +512,12 @@ void CodeEmitter::emitCode( void ) {
                     ip = nopInst->emit(ip);
                     // the last two
                     ip = (uint8*)EncoderBase::nops((char*)ip,2);
+                }
 #ifdef _EM64T_
                     // these nops are required for call transformation from immediate into register form
                     // nops for MOV r11, callTarget (when !fit32(call_offset) ) <opcode + 8 byte address>
                     ip = (uint8*)EncoderBase::nops((char*)ip, 10);
 #endif
-                }
             }
             
             uint8 * instStartIp = ip;
