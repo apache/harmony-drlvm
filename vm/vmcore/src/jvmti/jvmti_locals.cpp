@@ -193,12 +193,12 @@ jvmtiGetLocalObject(jvmtiEnv* env,
 
         tmn_suspend_disable();
         OpenExeJpdaError result = jit->get_local_var(method, jfc, slot,
-            VM_DATA_TYPE_MP, &obj);
+            VM_DATA_TYPE_CLASS, &obj);
         si_free(si);
 
         if (result == EXE_ERROR_NONE)
         {
-            if (NULL != obj)
+            if (obj != (ManagedObject *)VM_Global_State::loader_env->managed_null)
             {
                 ObjectHandle oh = oh_allocate_local_handle();
                 oh->object = obj;
@@ -459,12 +459,12 @@ jvmtiSetLocalObject(jvmtiEnv* env,
         OpenExeJpdaError result;
         if (NULL != value)
             result = jit->set_local_var(method, jfc, slot,
-                VM_DATA_TYPE_MP, &value->object);
+                VM_DATA_TYPE_CLASS, &value->object);
         else
         {
-            ManagedObject *n = NULL;
+            ManagedObject *n = (ManagedObject *)VM_Global_State::loader_env->managed_null;
             result = jit->set_local_var(method, jfc, slot,
-                VM_DATA_TYPE_MP, &n);
+                VM_DATA_TYPE_CLASS, &n);
         }
 
         si_free(si);

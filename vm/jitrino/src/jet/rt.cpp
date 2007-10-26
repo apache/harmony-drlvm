@@ -546,6 +546,12 @@ void rt_native2bc(JIT_Handle jit, Method_Handle method, const void * ip,
         if (!tst(map, var_num)) {
             return EXE_ERROR_TYPE_MISMATCH;
         }
+#ifdef _EM64T_
+    case VM_DATA_TYPE_STRING:
+        var_ptr_to_64 = (uint64*)value_ptr;
+        *var_ptr_to_64 = *(uint64*)(ebp + frame.local(var_num));
+        break;
+#endif
     default:
         var_ptr_to32 = (uint32*)value_ptr;
         *var_ptr_to32 = *(uint32*)(ebp + frame.local(var_num));
