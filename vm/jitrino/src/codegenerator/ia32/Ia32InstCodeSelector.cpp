@@ -1748,7 +1748,7 @@ CG_OpndHandle*    InstCodeSelector::ldStaticAddr(Type* fieldRefType, FieldDesc *
     Opnd * addr=irManager.newImmOpnd(fieldRefType, Opnd::RuntimeInfo::Kind_StaticFieldAddress, fieldDesc);
 #else
     Opnd* immOp = irManager.newImmOpnd(fieldRefType, Opnd::RuntimeInfo::Kind_StaticFieldAddress, fieldDesc);
-    Opnd* addr =  irManager.newOpnd(typeManager.getUnmanagedPtrType(fieldRefType));
+    Opnd* addr =  irManager.newOpnd(typeManager.getManagedPtrType(fieldRefType));
     appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, addr, immOp));
 #endif
     return addr;

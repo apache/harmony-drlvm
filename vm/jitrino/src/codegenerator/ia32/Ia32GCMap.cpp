@@ -84,8 +84,6 @@ void GCMap::processBasicBlock(IRManager& irm, const Node* block) {
 
 #ifdef _DEBUG
 
-static bool isManaged(Opnd* op) { return op->getType()->isObject() || op->getType()->isManagedPtr();}
-
 static bool isUnmanagedFieldPtr(Opnd* opnd) {
     if (opnd->getMemOpndKind()!=MemOpndKind_Heap) {
         Log::out()<<"GCMap::isUnmanagedFieldPtr: not a heap opnd"<<std::endl;
@@ -127,10 +125,10 @@ static void checkManaged2UnmanagedConv(IRManager& irm, Opnd* opnd) {
                 if (op0!=opnd && op1!=opnd) {
                     continue;
                 }
-                if (isManaged(op0)==isManaged(op1)) {
+               if (GCSafePointsInfo::isManaged(op0)==GCSafePointsInfo::isManaged(op1)) {
                     continue;
                 }
-                Opnd* managedOpnd = isManaged(op0)?op0:op1;
+                Opnd* managedOpnd = GCSafePointsInfo::isManaged(op0)?op0:op1;
                 bool res = isUnmanagedFieldPtr(managedOpnd);
                 if (!res) {
                     Log::out()<<"GCMap::checkManaged2UnmanagedConv failure, managedOpnd="<<managedOpnd->getFirstId()<<std::endl;
@@ -406,7 +404,7 @@ void GCMap::checkObject(TypeManager& tm, const void* p)  {
 void GCSafePoint::enumerate(GCInterface* gcInterface, const JitFrameContext* context, const StackInfo& stackInfo) const {
 #ifdef ENABLE_GC_RT_CHECKS
     MemoryManager mm("tmp");
-    DrlVMTypeManager tm(mm);
+    TypeManager tm(mm);
 #endif
     //The algorithm of enumeration is
     //1. Derive all offsets for MPTRs with offsets unknown during compile time.

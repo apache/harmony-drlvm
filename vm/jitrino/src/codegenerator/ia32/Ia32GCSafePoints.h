@@ -109,20 +109,23 @@ public:
     }
     
     const StlSet<Opnd*>& getStaticFieldMptrs() const {return staticMptrs;}
+   bool isStaticFieldMptr(Opnd* opnd) const { return staticMptrs.find(opnd)!=staticMptrs.end();}        
     void dump(const char* stage) const;    
-
+   
     static bool isGCSafePoint(const Inst* inst)  {return IRManager::isGCSafePoint(inst);}
     static bool graphHasSafePoints(const IRManager& irm);
     static bool blockHasSafePoints(const Node* b);
     /** if pairs!=NULL counts only gcpoints with non-empty pairs*/
     static uint32 getNumSafePointsInBlock(const Node* b, const GCSafePointPairsMap* pairsMap = NULL);
     static MPtrPair* findPairByMPtrOpnd(GCSafePointPairs& pairs, const Opnd* mptr);
-        
+   static bool isManaged(Opnd* op) { return op->getType()->isObject() || op->getType()->isManagedPtr();}
+
 private:
     void _calculate();
     void insertLivenessFilters();
     void calculateMPtrs();
     void filterLiveMPtrsOnGCSafePoints();
+   void filterStaticMptrs(Inst* inst);        
 
     void checkPairsOnNodeExits() const ;
     void checkPairsOnGCSafePoints() const ;
@@ -133,7 +136,6 @@ private:
     void derivePairsOnEntry(const Node* node, GCSafePointPairs& res);
     void updatePairsOnInst(Inst* inst, GCSafePointPairs& res) ;
     void addAllLive(const BitSet* ls, GCSafePointPairs& res, const GCSafePointPairs& predBlockPairs) const ;
-    void processStaticFieldMptr(Opnd* opnd, Opnd* from, bool forceStatic);
     
     bool hasEqualElements(GCSafePointPairs& p1, GCSafePointPairs& p2) const  {
         if (p1.size()!=p2.size()) {

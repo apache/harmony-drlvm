@@ -377,68 +377,68 @@ Opnd* GCSafePointsInfo::getBaseAccordingMode(Opnd* opnd) const {
     return mode == MODE_1_FIX_BASES ? opnd : NULL;
 }    
 
-void GCSafePointsInfo::processStaticFieldMptr(Opnd* opnd, Opnd* fromOpnd, bool forceStatic) {
-    StlSet<Opnd*>::iterator sit = staticMptrs.find(fromOpnd);
-    if (sit==staticMptrs.end()) {
-        Opnd::RuntimeInfo* info = fromOpnd->isPlacedIn(OpndKind_Imm) ? fromOpnd->getRuntimeInfo() : NULL;
-        bool isStaticFieldMptr = info!=NULL && info->getKind() == Opnd::RuntimeInfo::Kind_StaticFieldAddress;
-        if (!isStaticFieldMptr && !forceStatic) {
-            return;
-        } 
-        assert(isStaticFieldMptr);
-        staticMptrs.insert(fromOpnd);
-    }
-    if (fromOpnd!=opnd) {
-        staticMptrs.insert(opnd);
-    }
-}
-
 
 void GCSafePointsInfo::updateMptrInfoInPairs(GCSafePointPairs& res, Opnd* newMptr, Opnd* fromOpnd, int offset, bool fromOpndIsBase) {
+   assert(!isStaticFieldMptr(newMptr));
     if (fromOpndIsBase) { //from is base
         removePairByMPtrOpnd(res, newMptr);
-        assert(staticMptrs.find(newMptr) == staticMptrs.end());
         MPtrPair p(newMptr, getBaseAccordingMode(fromOpnd), offset);
         res.push_back(p);
     } else { //fromOpnd is mptr
-        MPtrPair* fromPair = findPairByMPtrOpnd(res, fromOpnd);
-        if (fromPair != NULL) {
-            int newOffset = adjustOffsets(fromPair->offset, offset);
-            //remove old pair, add new
-            MPtrPair* pair = newMptr == fromOpnd ? fromPair : findPairByMPtrOpnd(res, newMptr);
-            if (pair != NULL) { //reuse old pair
-                pair->offset = newOffset;
-                pair->base = fromPair->base;
-                pair->mptr = newMptr;
-            } else { // new mptr, was not used before
-                MPtrPair toPair(newMptr, fromPair->base, newOffset);
-                res.push_back(toPair);
-            }
-        } else {
-            processStaticFieldMptr(newMptr, fromOpnd, true);
-            dbg_point();
-        }
+       MPtrPair* fromPair = findPairByMPtrOpnd(res, fromOpnd);
+       assert(fromPair != NULL);
+       int newOffset = adjustOffsets(fromPair->offset, offset);
+       //remove old pair, add new
+       MPtrPair* pair = newMptr == fromOpnd ? fromPair : findPairByMPtrOpnd(res, newMptr);
+       if (pair != NULL) { //reuse old pair
+           pair->offset = newOffset;
+           pair->base = fromPair->base;
+           pair->mptr = newMptr;
+       } else { // new mptr, was not used before
+           MPtrPair toPair(newMptr, fromPair->base, newOffset);
+           res.push_back(toPair);
+       }
+   }
+}
+
+static void add_static(Opnd* opnd, StlSet<Opnd*>& set, Opnd* cause) {
+    set.insert(opnd);
+    if (Log::isEnabled()) {
+        Log::out()<<"Registering as static opnd, firstId="<<opnd->getFirstId()<<" reason-opndid:"<<(cause?cause->getFirstId() : (uint32)-1)<<std::endl;
     }
 }
 
-static bool isStaticFieldPtrDef(Inst* inst, const StlSet<Opnd*>& staticFieldPtrs) {
+void GCSafePointsInfo::filterStaticMptrs(Inst* inst) {
     if (inst->hasKind(Inst::Kind_CallInst)) {
         CallInst* callInst = (CallInst*)inst;
         Opnd::RuntimeInfo * rt = callInst->getRuntimeInfo();
         if (rt && rt->getKind() == Opnd::RuntimeInfo::Kind_HelperAddress
-            && ((VM_RT_SUPPORT)(POINTER_SIZE_INT)rt->getValue(0)
-            == VM_RT_GET_STATIC_FIELD_ADDR_WITHRESOLVE))
+            && ((VM_RT_SUPPORT)(POINTER_SIZE_INT)rt->getValue(0) == VM_RT_GET_STATIC_FIELD_ADDR_WITHRESOLVE))
         {
-            return true;
+            Opnd* callRes = callInst->getOpnd(0);
+            add_static(callRes, staticMptrs, NULL);
         }
     } else if (inst->getMnemonic() == Mnemonic_MOV) {
+        Opnd* toOpnd = inst->getOpnd(0);
         Opnd* fromOpnd = inst->getOpnd(1);
-        if (staticFieldPtrs.find(fromOpnd)!=staticFieldPtrs.end()) {
-            return true;
+        if (!isManaged(fromOpnd) && !isManaged(toOpnd)) {
+            return;
+         }
+        if (fromOpnd->isPlacedIn(OpndKind_Mem) && fromOpnd->getMemOpndKind() == MemOpndKind_Heap) {
+            //loading value from memory -> can be object only, not is a mptr to a static field
+            return;
         }
-    }
-    return false;
-
+        if (staticMptrs.find(fromOpnd)!=staticMptrs.end()) {
+            add_static(toOpnd, staticMptrs, fromOpnd);
+        } else if (fromOpnd->isPlacedIn(OpndKind_Imm)) { //imms are compile-time known values -> can only be static
+            Opnd::RuntimeInfo* info = fromOpnd->getRuntimeInfo();
+            bool isStaticFieldMptr = info!=NULL && info->getKind() == Opnd::RuntimeInfo::Kind_StaticFieldAddress;
+            if (isStaticFieldMptr) {
+                add_static(fromOpnd, staticMptrs, NULL);
+                add_static(toOpnd, staticMptrs, fromOpnd);
+            }
+        }
+   }
 }
 
 
@@ -460,12 +460,12 @@ void GCSafePointsInfo::updatePairsOnInst(Inst* inst, GCSafePointPairs& res) {
     if (!opndType->isObject() && !opndType->isManagedPtr()) {
         return;
     }
-    if (isStaticFieldPtrDef(inst, staticMptrs)) {
+   filterStaticMptrs(inst);
+   if (isStaticFieldMptr(opnd)) {
         removePairByMPtrOpnd(res, opnd);
-        staticMptrs.insert(opnd);
-        return;
-    }
-    if (mode == MODE_1_FIX_BASES) { //3 addr form
+       return; // no more analysis required
+   }
+   if (mode == MODE_1_FIX_BASES) { //3 addr form
         if (opndType->isObject()) { // MODE_1_FIX_BASES -> obj & mptr types are not coalesced
             StlMap<Inst*, Opnd*>::const_iterator ait;
             if (!ambiguityFilters.empty() && ((ait = ambiguityFilters.find(inst))!=ambiguityFilters.end())) {
