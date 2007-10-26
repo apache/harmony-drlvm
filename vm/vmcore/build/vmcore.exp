@@ -710,5 +710,6 @@ VMCORE_0.1 {
     *jvmti_interpreter_exception_catch_event_callback_call*;
     *NativeObjectHandles*;
     *interpreter_table*;
+    _tag_pointer;
   local : *;
 };
