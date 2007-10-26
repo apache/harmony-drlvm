@@ -321,7 +321,7 @@ private:
     
     bool    isIntegerType(Type * type)
     { return type->isInteger()||type->isBoolean()||type->isChar(); }
-    void    copyOpnd(Opnd *dst, Opnd *src);
+    void    copyOpnd(Opnd *dst, Opnd *src, bool doZeroExtension=false);
     void    copyOpndTrivialOrTruncatingConversion(Opnd *dst, Opnd *src);
 
     Opnd * convert(CG_OpndHandle * oph, Type * dstType, Opnd * dstOpnd=NULL, bool isZeroExtend=false);

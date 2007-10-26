@@ -244,9 +244,9 @@ void InstCodeSelector::copyOpndTrivialOrTruncatingConversion(Opnd *dst, Opnd *sr
 
 //_______________________________________________________________________________________________________________
 //    Copy any kind of the operand
-void InstCodeSelector::copyOpnd(Opnd *dst, Opnd *src) 
+void InstCodeSelector::copyOpnd(Opnd *dst, Opnd *src, bool doZeroExtension) 
 { 
-    convert(src, dst->getType(), dst);
+    convert(src, dst->getType(), dst, doZeroExtension);
 }
 
 
@@ -1895,29 +1895,25 @@ CG_OpndHandle* InstCodeSelector::simpleLdInd(Type * dstType, Opnd * addr,
                                                 Opnd * baseTau,
                                                 Opnd * offsetTau) 
 {
-#ifndef _EM64T_
-    Opnd * opnd = irManager.newMemOpndAutoKind(irManager.getTypeFromTag(memType), addr);
-    Opnd * dst = irManager.newOpnd(dstType);
-    copyOpnd(dst, opnd);
-    return dst;
-#else
+#ifdef _EM64T_
     if(memType > Type::Float && memType!=Type::UnmanagedPtr) {
         Opnd * opnd = irManager.newMemOpndAutoKind(typeManager.getInt32Type(), addr);
-        Opnd * tmp =  irManager.newOpnd(typeManager.getInt32Type());
         Opnd * dst = irManager.newOpnd(typeManager.getInt64Type());
-        appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, dst, irManager.newImmOpnd(typeManager.getInt64Type(),0)));
-        appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, tmp, opnd));
-        copyOpnd(dst, tmp);
+        // loading compressed 32-bit managed address, ensure zero-extention
+        copyOpnd(dst, opnd, true);
+        // uncompress
         Type* unmanagedPtrType = typeManager.getUnmanagedPtrType(typeManager.getInt8Type());
         dst = simpleOp_I8(Mnemonic_ADD, dstType, dst, irManager.newImmOpnd(unmanagedPtrType, (POINTER_SIZE_INT)VMInterface::getHeapBase()));
         return dst;
-    } else {
+    } 
+    else 
+#endif
+    {
         Opnd * opnd = irManager.newMemOpndAutoKind(irManager.getTypeFromTag(memType), addr);
         Opnd * dst = irManager.newOpnd(dstType);
         copyOpnd(dst, opnd);
         return dst;
     }
-#endif
 }
 
 //_______________________________________________________________________________________________________________
