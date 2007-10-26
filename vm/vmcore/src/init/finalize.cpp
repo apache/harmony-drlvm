@@ -112,7 +112,6 @@ class Objects_To_Finalize: public Object_Queue
     bool is_class_ignored(Class* test);
     bool classes_cached;
     Lock_Manager ignore_lock;
-    Class* CharsetEncoder;
     Class* FileDescriptor;
     Class* FileOutputStream;
 
@@ -278,7 +277,7 @@ void Objects_To_Finalize::add_object(ManagedObject *p_obj)
     }
 } //Objects_To_Finalize::add_object
 
-// workaround method to ignore classes java.nio.charset.CharsetEncoder
+// workaround method to ignore classes
 // java.io.FileDescriptor & java.io.FileOutputStream during finalization on exit
 bool Objects_To_Finalize::is_class_ignored(Class* test) {
     assert(!hythread_is_suspend_enabled());
@@ -287,16 +286,11 @@ bool Objects_To_Finalize::is_class_ignored(Class* test) {
     
         tmn_suspend_enable();
         
-        String* CharsetEncoderName =
-                VM_Global_State::loader_env->string_pool.lookup("com/ibm/icu4jni/charset/CharsetEncoderICU");
         String* FileDescriptorName =
                 VM_Global_State::loader_env->string_pool.lookup("java/io/FileDescriptor");
         String* FileOutputStreamName =
                 VM_Global_State::loader_env->string_pool.lookup("java/io/FileOutputStream");
         
-        Class* CharsetEncoder = 
-            VM_Global_State::loader_env->bootstrap_class_loader->LoadVerifyAndPrepareClass(
-                VM_Global_State::loader_env, CharsetEncoderName);
         Class* FileDescriptor = 
             VM_Global_State::loader_env->bootstrap_class_loader->LoadVerifyAndPrepareClass(
                 VM_Global_State::loader_env, FileDescriptorName);
@@ -306,15 +300,12 @@ bool Objects_To_Finalize::is_class_ignored(Class* test) {
         
         tmn_suspend_disable();
         ignore_lock._lock();
-        this->CharsetEncoder = CharsetEncoder;
         this->FileDescriptor = FileDescriptor;
         this->FileOutputStream = FileOutputStream;
         classes_cached = true;
         ignore_lock._unlock();
     }
-    return ((test==CharsetEncoder) 
-            || (test==FileDescriptor) 
-            || (test==FileOutputStream));
+    return ((test==FileDescriptor) || (test==FileOutputStream));
 }
 
 void Objects_To_Finalize::check_fields_obtained() {
