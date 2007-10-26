@@ -234,6 +234,14 @@ jint vm_destroy(JavaVM_Internal * java_vm, jthread java_thread)
     // prepare thread manager to shutdown
     hythread_shutdowning();
 
+    // Call Agent_OnUnload() for agents and unload agents.
+    // Gregory -
+    // We cannot call this function after vm_shutdown_stop_java_threads!!!
+    // In this case agent's thread won't be shutdown properly, and the
+    // code of agent's thread will run in unmapped address space
+    // of unloaded agent's library. This is bad and will almost certainly crash.
+    java_vm->vm_env->TI->Shutdown(java_vm);
+
     // Stop all (except current) java threads
     // before destroying VM-wide data.
     vm_shutdown_stop_java_threads(java_vm->vm_env);
@@ -251,9 +259,6 @@ jint vm_destroy(JavaVM_Internal * java_vm, jthread java_thread)
     // Shutdown signals
     extern void shutdown_signals();
     shutdown_signals();
-
-    // Call Agent_OnUnload() for agents and unload agents.
-    java_vm->vm_env->TI->Shutdown(java_vm);
 
     // Block thread creation.
     // TODO: investigate how to achieve that with ThreadManager
