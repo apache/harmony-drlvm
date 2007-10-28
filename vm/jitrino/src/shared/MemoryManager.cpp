@@ -21,7 +21,11 @@
  *
  */
 
+#ifdef WIN32
 #include <malloc.h>
+#else
+#include <stdlib.h>
+#endif
 #include <iostream>
 #include <stdio.h>
 #include <assert.h>

@@ -21,7 +21,9 @@
 #include "compiler.h"
 #include "trace.h"
 
+#ifdef WIN32
 #include <malloc.h>
+#endif
 #include <memory.h>
 #include <assert.h>
 #include <stdlib.h>

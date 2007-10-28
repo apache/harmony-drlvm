@@ -21,7 +21,11 @@
 #ifndef _PORT_MALLOC_H_
 #define _PORT_MALLOC_H_
 
+#ifdef WIN32
 #include <malloc.h>
+#else
+#include <stdlib.h>
+#endif
 
 // FIXME
 // Very basic memory allocation utilities

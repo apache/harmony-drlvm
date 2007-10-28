@@ -24,7 +24,11 @@
 #include "trace.h"
 #include "stats.h"
 
+#ifdef WIN32
 #include <malloc.h>
+#else
+#include <stdlib.h>
+#endif
 
 #include <stdarg.h>
 #include <algorithm>

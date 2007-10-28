@@ -23,7 +23,11 @@
   */
 #include <assert.h>
 #include <algorithm>
+#ifdef WIN32
 #include <malloc.h>
+#else
+#include <stdlib.h>
+#endif
 
 #include "open/vm.h"
 #include "open/hythread_ext.h"

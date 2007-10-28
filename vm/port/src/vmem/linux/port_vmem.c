@@ -23,7 +23,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <errno.h>
-#include <malloc.h>
+#include <stdlib.h>
 #include <limits.h>
 #include "port_vmem.h"
 
