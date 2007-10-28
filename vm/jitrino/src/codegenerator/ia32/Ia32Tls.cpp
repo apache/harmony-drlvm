@@ -55,7 +55,7 @@ Opnd* createTlsBaseLoadSequence(IRManager& irManager, Node* ctrlNode, Type* tlsB
 #elif defined(_WIN32)
     // Fast access through FS:[0x14]
     tlsBase = createTlsBaseLoadWin(irManager, ctrlNode, tlsBaseType);
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(FREEBSD)
     // On Linux, try the fast way
     tlsBase = createTlsBaseLoadLin(irManager, ctrlNode, tlsBaseType);
 #else

@@ -209,7 +209,7 @@ bool CPUID::isSSE2Supported() {
         cpuid
         mov    fflags, edx
     };
-#elif defined (__linux__)
+#elif defined (__linux__) || defined(FREEBSD)
     unsigned int stub;
     //ebx must be restored for -fPIC
      __asm__ __volatile__ (
