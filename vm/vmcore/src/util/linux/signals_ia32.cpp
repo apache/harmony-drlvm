@@ -46,6 +46,9 @@
 #include <signal.h>
 
 #include <pthread.h>
+#if defined(FREEBSD)
+#include <pthread_np.h>
+#endif
 #include <sys/time.h>
 #include "method_lookup.h"
 
@@ -240,7 +243,13 @@ inline void* find_stack_addr() {
     size_t stack_size;
 
     pthread_t thread = pthread_self();
+    err = pthread_attr_init(&pthread_attr);
+    assert(!err);
+#if defined(FREEBSD)
+    err = pthread_attr_get_np(thread, &pthread_attr);
+#else
     err = pthread_getattr_np(thread, &pthread_attr);
+#endif
     assert(!err);
     err = pthread_attr_getstack(&pthread_attr, &stack_addr, &stack_size);
     assert(!err);
@@ -321,7 +330,7 @@ void init_stack_info() {
 
     
     common_guard_stack_size = find_guard_stack_size();
-    common_guard_page_size =find_guard_page_size();
+    common_guard_page_size = find_guard_page_size();
 
     // stack should be mapped so it's result of future mapping
     char* res;
