@@ -179,4 +179,15 @@ void* alloc_large_pages(size_t size, const char* hint){
   }
   return alloc_addr;
 }
+#elif defined(FREEBSD)
+void* mmap_large_pages(size_t size, const char* path)
+{
+  return NULL;
+}
+void* alloc_large_pages(size_t size, const char* hint)
+{
+  return NULL;
+}
+#else
+#error Need to define mmap_large_pages and alloc_large_pages
 #endif
