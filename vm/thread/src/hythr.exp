@@ -16,6 +16,7 @@ hythread_interrupted;
 hythread_park;
 hythread_monitor_init_with_name;
 hythread_monitor_try_enter;
+hythread_self_slow;
 hythread_self;
 hythread_set_self;
 tm_self_tls;
