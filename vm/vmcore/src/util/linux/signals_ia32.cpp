@@ -682,7 +682,7 @@ void general_signal_handler(int signum, siginfo_t* info, void* context)
         break;
     default:
         // Unknown signal
-        assert(1);
+        assert(0);
         break;
     }
 
