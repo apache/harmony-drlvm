@@ -27,6 +27,10 @@
 #include "environment.h"
 
 #include "crash_handler.h"
+#if defined(FREEBSD)
+#include <dlfcn.h>
+extern int main (int argc, char **argv, char **envp);
+#endif
 
 static char g_executable[1024]; // Executable file name
 static char g_strpid[128];      // Current pid as a string
@@ -81,6 +85,15 @@ bool gdb_crash_handler()
 #endif
 
 int get_executable_name(char executable[], int len) {
+#if defined(FREEBSD)
+    Dl_info info;
+    if (dladdr( (const void*)&main, &info) == 0) {
+        return -1;
+    }
+    strncpy(executable, info.dli_fname, len);
+    executable[len] = '\0';
+    return 0;
+#else
     int n = readlink("/proc/self/exe", executable, len);
     if (n == -1) {
         perror("Can't determine executable name");
@@ -88,6 +101,7 @@ int get_executable_name(char executable[], int len) {
     }
     executable[n] = '\0';
     return 0;
+#endif
 }
 
 

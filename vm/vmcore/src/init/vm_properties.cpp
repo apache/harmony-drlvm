@@ -28,6 +28,9 @@
 #include "vm_properties.h"
 #include "init.h"
 #include "native_modules.h"
+#if defined(FREEBSD)
+#include <dlfcn.h>
+#endif
 
 inline char* unquote(char *str)
 {
@@ -110,6 +113,13 @@ static char* get_module_filename(void* code_ptr)
     void **ptr = (void**)code_ptr;
     code_ptr = ptr[0];
 #endif
+#if defined(FREEBSD)
+    Dl_info info;
+    if (dladdr( (const void*)code_ptr, &info) == 0) {
+        return NULL;
+    }
+    return apr_pstrdup(prop_pool, info.dli_fname);
+#else
     if (! get_all_native_modules(&modules, &modules_count))
         return NULL;
 
@@ -124,6 +134,7 @@ static char* get_module_filename(void* code_ptr)
     clear_native_modules(&modules);
 
     return filename;
+#endif
 }
 
 static void init_java_properties(Properties & properties)
