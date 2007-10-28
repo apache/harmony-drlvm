@@ -143,6 +143,14 @@ APR_DECLARE(size_t) port_vmem_reserved_size(){
     return port_vmem_committed_size();
 }
 
+#ifdef FREEBSD
+APR_DECLARE(size_t) port_vmem_committed_size(){
+    return 0; /* TOFIX: Implement */
+}
+APR_DECLARE(size_t) port_vmem_max_size(){
+    return 0; /* TOFIX: Implement */
+}
+#else
 APR_DECLARE(size_t) port_vmem_committed_size(){
     char* buf = (char*) malloc(PATH_MAX + 1);
     size_t vmem = 0;
@@ -202,6 +210,7 @@ cleanup:
     free(buf);
     return rlim;
 }
+#endif
 
 APR_DECLARE(apr_status_t) port_vmem_allocate(void **addr, size_t size, unsigned int mode)
 {

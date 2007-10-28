@@ -173,6 +173,9 @@ APR_DECLARE(apr_status_t) apr_thread_times(apr_thread_t *thread,
 
 APR_DECLARE(apr_status_t) apr_get_thread_time(apr_thread_t *thread, apr_int64_t* nanos_ptr)
 {
+#ifdef FREEBSD
+    return APR_ENOTIME; /* TOFIX: Implement */
+#else
     clockid_t clock_id;
     pthread_t *os_thread;
     struct timespec tp;
@@ -200,6 +203,7 @@ APR_DECLARE(apr_status_t) apr_get_thread_time(apr_thread_t *thread, apr_int64_t*
 
     *nanos_ptr = tp.tv_sec * 1000000000ULL + tp.tv_nsec;
     return APR_SUCCESS;
+#endif
 }
 
 
