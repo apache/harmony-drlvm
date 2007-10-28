@@ -23,9 +23,8 @@
 
 #ifdef _WIN32
 #include <malloc.h>
-#else
-#include <stdlib.h>
 #endif
+#include <stdlib.h>
 #include <assert.h>
 #include "Arena.h"
 
