@@ -37,6 +37,10 @@
 #include <sys/mman.h>
 #endif
 
+#ifndef MAP_ANONYMOUS
+#define MAP_ANONYMOUS MAP_ANON
+#endif
+
 // Variables partially sorted by usage pattern. Should optimize cache lines
 
 unsigned int heap_mark_phase;

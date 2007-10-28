@@ -28,8 +28,12 @@
 
 #include <assert.h>
 
-#ifdef __linux__
+#if defined(__linux__) || defined(FREEBSD)
 #include <ctype.h>
+#endif
+
+#ifndef MAP_ANONYMOUS
+#define MAP_ANONYMOUS MAP_ANON
 #endif
 
 #include <apr_time.h>

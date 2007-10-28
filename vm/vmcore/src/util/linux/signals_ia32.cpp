@@ -346,7 +346,12 @@ void init_stack_info() {
     res = (char*) mmap(stack_addr - stack_size,
             stack_mapping_size,
             PROT_READ | PROT_WRITE,
-            MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS | MAP_GROWSDOWN,
+            MAP_FIXED | MAP_PRIVATE |
+#if defined(FREEBSD)
+              MAP_ANON | MAP_STACK, 
+#else
+              MAP_ANONYMOUS | MAP_GROWSDOWN,
+#endif
             -1,
             0);
     // stack should be mapped, checks result
