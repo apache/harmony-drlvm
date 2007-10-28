@@ -77,7 +77,7 @@
  * <li><code>BOOLEAN</code>      - something that can be zero or non-zero</li>
  * </ul>
  */
-#ifdef LINUX
+#if defined(LINUX) || defined(FREEBSD)
 #if defined(_EM64T_) || defined(_IPF_)
 typedef long int I_64;
 typedef unsigned long int U_64;
@@ -155,7 +155,7 @@ typedef char I_8;
 #endif
 #define PVMCALL VMCALL *
 
-#ifdef LINUX
+#if defined(LINUX) || defined(FREEBSD)
 #define BOOLEAN UDATA
 #endif
 

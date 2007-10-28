@@ -141,11 +141,11 @@ extern "C" {
  */
 //@{
 
-#ifdef __linux__
+#if defined(LINUX) || defined(FREEBSD)
 #include <pthread.h>
 #define hymutex_t pthread_mutex_t
 #define hycond_t pthread_cond_t
-#endif // __linux__
+#endif // LINUX || FREEBSD
 
 #ifdef _WIN32
 #define hymutex_t CRITICAL_SECTION
@@ -153,7 +153,7 @@ extern "C" {
 #include "hycond_win.h"
 #endif // _WIN32
 
-#ifdef __linux__
+#if defined(__linux__) || defined(FREEBSD) 
 #define osthread_t pthread_t
 #elif _WIN32
 #define osthread_t HANDLE

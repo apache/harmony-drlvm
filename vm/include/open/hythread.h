@@ -434,6 +434,10 @@ typedef struct HyThread_public {
 #       define HYTHREAD_FAST_TLS (1)
 #       define HYTHREAD_FAST_TLS_ATTRIBUTE __attribute__((tls_model("initial-exec")))
 #   endif
+#elif defined(FREEBSD)
+#   define APR_TLS_USE
+#   define HYTHREAD_FAST_TLS_ATTRIBUTE   
+#   undef HYTHREAD_FAST_TLS
 #else
 #   undef HYTHREAD_FAST_TLS
 #endif
