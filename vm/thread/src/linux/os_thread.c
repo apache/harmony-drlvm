@@ -17,13 +17,16 @@
 
 #include <assert.h>
 #include <apr_atomic.h>
+#if defined(LINUX)
 #include <linux/unistd.h>	// gettid()
+#endif
 #include <sched.h>		// sched_param
 #include <semaphore.h>
 #include <unistd.h>
 
 #include "thread_private.h"
 
+#ifdef LINUX
 #ifdef _syscall0
 _syscall0(pid_t,gettid)
 pid_t gettid(void);
@@ -32,6 +35,7 @@ pid_t gettid(void)
 {
     return (pid_t)syscall(__NR_gettid);
 }
+#endif
 #endif
 
 /**
@@ -91,6 +95,17 @@ int os_thread_create(/* out */osthread_t* phandle, UDATA stacksize, UDATA priori
  */
 int os_thread_set_priority(osthread_t os_thread, int priority)
 {
+#if defined(FREEBSD)
+    /* Not sure why we don't just use this on linux? - MRH */
+    struct sched_param param;
+    int policy;
+    int r = pthread_getschedparam(os_thread, &policy, &param);
+    if (r == 0) {
+        param.sched_priority = priority;
+        r = pthread_setschedparam(os_thread, policy, &param);
+    }
+    return r;
+#else
     // setting thread priority on linux is only supported for current thread
     if (os_thread == pthread_self()) {
 	int r;
@@ -103,6 +118,7 @@ int os_thread_set_priority(osthread_t os_thread, int priority)
         // setting other thread priority not supported on linux
         return 0;
     }
+#endif
 }
 
 /**
@@ -213,6 +229,9 @@ int os_get_thread_times(osthread_t os_thread, int64* pkernel, int64* puser)
     clockid_t clock_id;
     struct timespec tp;
     int r;
+#ifdef FREEBSD
+    return EINVAL; /* TOFIX: Implement */
+#else
 
     r = pthread_getcpuclockid(os_thread, &clock_id);
     if (r) return r;
@@ -222,6 +241,7 @@ int os_get_thread_times(osthread_t os_thread, int64* pkernel, int64* puser)
 
     *puser = tp.tv_sec * 1000000000ULL + tp.tv_nsec;
     return 0;
+#endif
 }
 
 UDATA os_get_foreign_thread_stack_size() {
