@@ -23,6 +23,9 @@
 #include "thread_private.h"
 #include <open/hythread_ext.h>
 
+#if !defined(PTHREAD_MUTEX_RECURSIVE_NP) && defined(PTHREAD_MUTEX_RECURSIVE)
+#define PTHREAD_MUTEX_RECURSIVE_NP PTHREAD_MUTEX_RECURSIVE
+#endif
 
 /** @name Mutex
  *

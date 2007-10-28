@@ -55,6 +55,10 @@
 #endif
 #include <assert.h>
 
+#if !defined(PTHREAD_MUTEX_RECURSIVE_NP) && defined(PTHREAD_MUTEX_RECURSIVE)
+#define PTHREAD_MUTEX_RECURSIVE_NP PTHREAD_MUTEX_RECURSIVE
+#endif
+
 
 namespace Jitrino { 
 
