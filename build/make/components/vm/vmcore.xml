@@ -266,7 +266,7 @@ Version: $Revision: 1.5.2.3 $
             <defineset define="BUILDING_VM,GC_V4,USE_DLL_JIT,APR_DECLARE_STATIC" />
         </compiler>
 
-        <select os="lnx" arch="ia32">
+        <select os="lnx,freebsd" arch="ia32">
             <fileset id="asm.fileset"
                      dir="${build.vm.home}/vmcore">
                 <include name="src/util/ia32/base/*.asm" />
