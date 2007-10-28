@@ -194,7 +194,15 @@
                         <property name="build.os.short" value="lnx" />
                     </then>
                     <else>
-                        <property name="build.os.short" value="macosx" />
+                        <if>
+                            <isset property="if.freebsd" />
+                            <then>
+                                <property name="build.os.short" value="freebsd" />
+                            </then>
+                            <else>
+                                <property name="build.os.short" value="macosx" />
+                            </else>
+                        </if>
                     </else>
                 </if>
             </then>

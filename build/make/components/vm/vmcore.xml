@@ -66,6 +66,17 @@ Version: $Revision: 1.5.2.3 $
 
             
             <defineset define="BUILDING_VM,GC_V4,USE_DLL_JIT,APR_DECLARE_STATIC" />
+
+            <select os="freebsd">
+                <defineset define="FREEBSD" />
+            </select>
+            <select os="macosx">
+                <defineset define="MACOSX" />
+            </select>
+            <select os="lnx">
+                <defineset define="LINUX" />
+            </select>
+
         </compiler>
 
         <compiler id="cpp.compiler" extends="common.cpp.compiler">
@@ -296,6 +307,26 @@ Version: $Revision: 1.5.2.3 $
 				resource="${external.dep.CLASSLIB}/depends/libs/linux.ia64/libicudata.so.34"/>
 		</select>
 	</select>
+	<select os="freebsd" >
+		<select arch="ia32">
+			<symlink overwrite="yes" link="${external.dep.CLASSLIB}/depends/libs/freebsd.x86/libicuuc.so"
+				resource="${external.dep.CLASSLIB}/depends/libs/freebsd.x86/libicuuc.so.34"/>
+			<symlink overwrite="yes" link="${external.dep.CLASSLIB}/depends/libs/freebsd.x86/libicudata.so"
+				resource="${external.dep.CLASSLIB}/depends/libs/freebsd.x86/libicudata.so.34"/>
+		</select>
+		<select arch="em64t">
+			<symlink overwrite="yes" link="${external.dep.CLASSLIB}/depends/libs/freebsd.x86_64/libicuuc.so"
+				resource="${external.dep.CLASSLIB}/depends/libs/freebsd.x86_64/libicuuc.so.34"/>
+			<symlink overwrite="yes" link="${external.dep.CLASSLIB}/depends/libs/freebsd.x86_64/libicudata.so"
+				resource="${external.dep.CLASSLIB}/depends/libs/freebsd.x86_64/libicudata.so.34"/>
+		</select>
+		<select arch="ipf">
+			<symlink overwrite="yes" link="${external.dep.CLASSLIB}/depends/libs/freebsd.ia64/libicuuc.so"
+				resource="${external.dep.CLASSLIB}/depends/libs/freebsd.ia64/libicuuc.so.34"/>
+			<symlink overwrite="yes" link="${external.dep.CLASSLIB}/depends/libs/freebsd.ia64/libicudata.so"
+				resource="${external.dep.CLASSLIB}/depends/libs/freebsd.ia64/libicudata.so.34"/>
+		</select>
+	</select>
 
         <linker id="linker" extends="common.linker">
             <libset libs="${vm.port.lib}"
@@ -360,12 +391,24 @@ Version: $Revision: 1.5.2.3 $
 			<libset type="shared" libs="icuuc"
                         	dir="${external.dep.CLASSLIB}/depends/libs/linux.ia64" />
 		</select>
-                <!--linkerarg value="-lz" />
-                <linkerarg value="-lxml2" />
-                <linkerarg value="-lm" />
-                <linkerarg value="-ldl" />
-                <linkerarg value="-lpthread" />
-                <linkerarg value="-lstdc++" /-->
+            </select>
+            <select os="freebsd">
+                <syslibset type="shared" libs="m,stdc++,z,pthread" /> 
+                <libset libs="xml2" dir="/usr/local/lib" />
+                <linkerarg value="--export-dynamic" />
+                <linkerarg value="--version-script=${build.vm.home}/vmcore/build/vmcore.exp" />
+		<select arch="ia32">
+			<libset type="shared" libs="icuuc"
+                        	dir="${external.dep.CLASSLIB}/depends/libs/freebsd.x86" />
+		</select>
+		<select arch="em64t">
+			<libset type="shared" libs="icuuc"
+                        	dir="${external.dep.CLASSLIB}/depends/libs/freebsd.x86_64" />
+		</select>
+		<select arch="ipf">
+			<libset type="shared" libs="icuuc"
+                        	dir="${external.dep.CLASSLIB}/depends/libs/freebsd.ia64" />
+		</select>
             </select>
         </linker>
         <echo message="Copying files for internationalization..."/>

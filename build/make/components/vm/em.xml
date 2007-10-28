@@ -80,11 +80,17 @@ Version: $Revision: 1.5.2.2 $
             <libset libs="${vm.vmcore.lib}" dir="${vm.vmcore.libdir}" />
             <libset libs="${extra.apr.lib}" dir="${extra.apr.libdir}" />
             <libset libs="${vm.hythr.lib}" dir="${vm.hythr.libdir}" />
-            <select osfamily="unix">
+            <select os="lnx">
                 <syslibset type="shared" libs="m,dl,stdc++,z,xml2,pthread" />
                 <linkerarg value="--version-script=${build.vm.home}/em/build/em.exp" />
                 <!-- syslibset type="static" libs="z,pthread,xml2" />
                 <syslibset type="shared" libs="m,dl,stdc++" / -->
+            </select>
+            <select os="freebsd">
+                <syslibset type="shared" libs="m,stdc++,z,pthread" />
+                <libset libs="xml2" dir="/usr/local/lib" />
+                <linkerarg value="--export-dynamic" />
+                <linkerarg value="--version-script=${build.vm.home}/em/build/em.exp" />
             </select>
         </linker>
     </target>

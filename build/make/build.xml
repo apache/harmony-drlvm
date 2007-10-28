@@ -98,6 +98,9 @@
         <condition property="if.lnx" value="true">
             <os name="linux" />
         </condition>
+        <condition property="if.freebsd" value="true">
+            <os name="freebsd" />
+        </condition>
         <condition property="if.macosx" value="true">
             <os name="mac os x" />
         </condition>
@@ -223,9 +226,15 @@
         <condition property="build.os" value="macosx">
             <isset property="if.macosx" />
         </condition>
+        <condition property="build.os" value="freebsd">
+            <isset property="if.freebsd" />
+        </condition>
         <property name="build.os" value="Linux" />
         <condition property="build.os.short" value="macosx">
             <isset property="if.macosx" />
+        </condition>
+        <condition property="build.os.short" value="freebsd">
+            <isset property="if.freebsd" />
         </condition>
         <property name="build.os.short" value="lnx" />
         <property name="build.executable.pattern" value="\1" />

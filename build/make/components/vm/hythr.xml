@@ -60,6 +60,9 @@ Version: $Revision: 1.4.2.4 $
                 <defineset define="_USRDLL" />
             </select>
 
+            <select os="freebsd">
+                <defineset define="FREEBSD" />
+            </select>
             <select os="macosx">
                 <defineset define="MACOSX" />
             </select>
@@ -103,6 +106,12 @@ Version: $Revision: 1.4.2.4 $
 
             <select os="lnx">
                 <syslibset libs="stdc++,rt,pthread" />
+                <linkerarg value="-Wl,-init" />
+                <linkerarg value="-Wl,hythread_library_init" />
+                <linkerarg value="-Wl,--version-script,${src}/thread/src/hythr.exp" />
+            </select>
+            <select os="freebsd">
+                <syslibset libs="stdc++,pthread" />
                 <linkerarg value="-Wl,-init" />
                 <linkerarg value="-Wl,hythread_library_init" />
                 <linkerarg value="-Wl,--version-script,${src}/thread/src/hythr.exp" />

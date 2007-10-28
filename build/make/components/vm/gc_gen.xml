@@ -69,6 +69,10 @@ Version: $Revision: 1.2 $
 
             <defineset define="BUILDING_GC" />
 
+            <select os="freebsd">
+                <defineset define="FREEBSD" />
+            </select>
+
             <select os="win">
                 <defineset define="_USRDLL" />
             </select>

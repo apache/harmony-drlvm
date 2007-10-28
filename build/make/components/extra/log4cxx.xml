@@ -103,6 +103,9 @@ Version: $Revision: 1.4.2.6 $
                 </select>
                 <defineset define="STDC_HEADERS,LOG4CXX,LOG4CXX_STATIC,APR_DECLARE_EXPORT,APU_DECLARE_EXPORT" />
             </select>
+            <select os="freebsd">
+                <defineset define="FREEBSD" />
+            </select>
         </compiler>
     </target>
 </project>

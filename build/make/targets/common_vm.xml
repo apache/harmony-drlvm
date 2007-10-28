@@ -72,6 +72,7 @@
 
 
             <defineset define="MACOSX" if="is.macosx"/>
+            <defineset define="FREEBSD" if="is.freebsd"/>
             <defineset define="LINUX" if="is.linux"/>
 
             <defineset if="is.unix">
