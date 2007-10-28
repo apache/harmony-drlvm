@@ -75,6 +75,7 @@
 #include "stack_dump.h"
 #include "jvmti_break_intf.h"
 
+#if defined(LINUX)
 void linux_ucontext_to_regs(Registers* regs, ucontext_t *uc)
 {
     regs->eax = uc->uc_mcontext.gregs[REG_EAX];
@@ -102,6 +103,49 @@ void linux_regs_to_ucontext(ucontext_t *uc, Registers* regs)
     uc->uc_mcontext.gregs[REG_ESP] = regs->esp;
     uc->uc_mcontext.gregs[REG_EFL] = regs->eflags;
 }
+
+#define UCONTEXT_TO_REGS linux_ucontext_to_regs
+#define REGS_TO_UCONTEXT linux_regs_to_ucontext
+#define REGISTER_EIP uc->uc_mcontext.gregs[REG_EIP]
+
+#else
+#if defined(FREEBSD)
+void freebsd_ucontext_to_regs(Registers* regs, ucontext_t *uc)
+{
+    regs->eax = uc->uc_mcontext.mc_eax;
+    regs->ecx = uc->uc_mcontext.mc_ecx;
+    regs->edx = uc->uc_mcontext.mc_edx;
+    regs->edi = uc->uc_mcontext.mc_edi;
+    regs->esi = uc->uc_mcontext.mc_esi;
+    regs->ebx = uc->uc_mcontext.mc_ebx;
+    regs->ebp = uc->uc_mcontext.mc_ebp;
+    regs->eip = uc->uc_mcontext.mc_eip;
+    regs->esp = uc->uc_mcontext.mc_esp;
+    regs->eflags = uc->uc_mcontext.mc_eflags;
+}
+
+void freebsd_regs_to_ucontext(ucontext_t *uc, Registers* regs)
+{
+    uc->uc_mcontext.mc_eax = regs->eax;
+    uc->uc_mcontext.mc_ecx = regs->ecx;
+    uc->uc_mcontext.mc_edx = regs->edx;
+    uc->uc_mcontext.mc_edi = regs->edi;
+    uc->uc_mcontext.mc_esi = regs->esi;
+    uc->uc_mcontext.mc_ebx = regs->ebx;
+    uc->uc_mcontext.mc_ebp = regs->ebp;
+    uc->uc_mcontext.mc_eip = regs->eip;
+    uc->uc_mcontext.mc_esp = regs->esp;
+    uc->uc_mcontext.mc_eflags = regs->eflags;
+}
+
+#define UCONTEXT_TO_REGS freebsd_ucontext_to_regs
+#define REGS_TO_UCONTEXT freebsd_regs_to_ucontext
+#define REGISTER_EIP uc->uc_mcontext.mc_eip
+#else
+#error need to add correct mcontext_t lookup for registers
+#endif
+#endif
+
 
 void regs_push_param(Registers* pregs, POINTER_SIZE_INT param, int UNREF num)
 {
@@ -136,7 +180,7 @@ void __attribute__ ((used, cdecl)) c_exception_handler(Class* exn_class, bool ja
 static void throw_from_sigcontext(ucontext_t *uc, Class* exc_clss)
 {
     Registers regs;
-    linux_ucontext_to_regs(&regs, uc);
+    UCONTEXT_TO_REGS(&regs, uc);
 
     DebugUtilsTI* ti = VM_Global_State::loader_env->TI;
     bool java_code = (vm_identify_eip((void *)regs.eip) == VM_TYPE_JAVA);
@@ -152,13 +196,13 @@ static void throw_from_sigcontext(ucontext_t *uc, Class* exc_clss)
 
     // set up the real exception handler address
     regs.set_ip(callback);
-    linux_regs_to_ucontext(uc, &regs);
+    REGS_TO_UCONTEXT(uc, &regs);
 }
 
 static bool java_throw_from_sigcontext(ucontext_t *uc, Class* exc_clss)
 {
     ASSERT_NO_INTERPRETER;
-    unsigned *eip = (unsigned *) uc->uc_mcontext.gregs[REG_EIP];
+    unsigned *eip = (unsigned *) REGISTER_EIP;
     VM_Code_Type vmct = vm_identify_eip((void *)eip);
     if(vmct != VM_TYPE_JAVA) {
         return false;
@@ -388,9 +432,14 @@ void set_guard_stack() {
     // sets alternative, guard stack
     stack_t sigalt;
     sigalt.ss_sp = stack_addr - stack_size + guard_page_size;
+#if defined(FREEBSD)
+    sigalt.ss_flags = 0;
+#else
     sigalt.ss_flags = SS_ONSTACK;
+#endif
     sigalt.ss_size = guard_stack_size;
     err = sigaltstack (&sigalt, NULL);
+
     assert(!err);
 
     // notify that stack is OK and there are no needs to restore it
@@ -530,8 +579,7 @@ void null_java_reference_handler(int signum, siginfo_t* UNREF info, void* contex
     ucontext_t *uc = (ucontext_t *)context;
     Global_Env *env = VM_Global_State::loader_env;
 
-    TRACE2("signals", "NPE or SOE detected at " <<
-        (void *)uc->uc_mcontext.gregs[REG_EIP]);
+    TRACE2("signals", "NPE or SOE detected at " << (void*)REGISTER_EIP);
 
     if (check_stack_overflow(info, uc)) {
         stack_overflow_handler(signum, info, context);
@@ -546,7 +594,7 @@ void null_java_reference_handler(int signum, siginfo_t* UNREF info, void* contex
     }
     fprintf(stderr, "SIGSEGV in VM code.\n");
     Registers regs;
-    linux_ucontext_to_regs(&regs, uc);
+    UCONTEXT_TO_REGS(&regs, uc);
 
     // setup default handler
     signal(signum, SIG_DFL);
@@ -565,8 +613,8 @@ void null_java_divide_by_zero_handler(int signum, siginfo_t* UNREF info, void* c
     ucontext_t *uc = (ucontext_t *)context;
     Global_Env *env = VM_Global_State::loader_env;
 
-    TRACE2("signals", "ArithmeticException detected at " <<
-        (void *)uc->uc_mcontext.gregs[REG_EIP]);
+    TRACE2("signals",
+           "ArithmeticException detected at " << (void*)REGISTER_EIP);
 
     if (!interpreter_enabled()) {
         if (java_throw_from_sigcontext(
@@ -577,7 +625,7 @@ void null_java_divide_by_zero_handler(int signum, siginfo_t* UNREF info, void* c
 
     fprintf(stderr, "SIGFPE in VM code.\n");
     Registers regs;
-    linux_ucontext_to_regs(&regs, uc);
+    UCONTEXT_TO_REGS(&regs, uc);
 
     // setup default handler
     signal(signum, SIG_DFL);
@@ -595,7 +643,7 @@ void jvmti_jit_breakpoint_handler(int signum, siginfo_t* UNREF info, void* conte
     ucontext_t *uc = (ucontext_t *)context;
     Registers regs;
 
-    linux_ucontext_to_regs(&regs, uc);
+    UCONTEXT_TO_REGS(&regs, uc);
     TRACE2("signals", "JVMTI breakpoint detected at " <<
         (void *)regs.eip);
     assert(!interpreter_enabled());
@@ -603,12 +651,12 @@ void jvmti_jit_breakpoint_handler(int signum, siginfo_t* UNREF info, void* conte
     bool handled = jvmti_jit_breakpoint_handler(&regs);
     if (handled)
     {
-        linux_regs_to_ucontext(uc, &regs);
+        REGS_TO_UCONTEXT(uc, &regs);
         return;
     }
 
     fprintf(stderr, "SIGTRAP in VM code.\n");
-    linux_ucontext_to_regs(&regs, uc);
+    UCONTEXT_TO_REGS(&regs, uc);
 
     // setup default handler
     signal(signum, SIG_DFL);
@@ -629,7 +677,7 @@ void abort_handler (int signum, siginfo_t* UNREF info, void* context) {
     fprintf(stderr, "SIGABRT in VM code.\n");
     Registers regs;
     ucontext_t *uc = (ucontext_t *)context;
-    linux_ucontext_to_regs(&regs, uc);
+    UCONTEXT_TO_REGS(&regs, uc);
     
     // setup default handler
     signal(signum, SIG_DFL);
@@ -646,7 +694,7 @@ void general_signal_handler(int signum, siginfo_t* info, void* context)
 {
     bool replaced = false;
     ucontext_t* uc = (ucontext_t *)context;
-    uint32 saved_eip = (uint32)uc->uc_mcontext.gregs[REG_EIP];
+    uint32 saved_eip = (uint32)REGISTER_EIP;
     uint32 new_eip = 0;
 
     // If exception is occured in processor instruction previously
@@ -663,7 +711,7 @@ void general_signal_handler(int signum, siginfo_t* info, void* context)
 
         replaced = true;
         new_eip = (uint32)vm_get_ip_from_regs(p_TLS_vmthread);
-        uc->uc_mcontext.gregs[REG_EIP] = (greg_t)new_eip;
+        REGISTER_EIP = new_eip;
     }
 
     switch (signum)
@@ -689,9 +737,9 @@ void general_signal_handler(int signum, siginfo_t* info, void* context)
     // If EIP was not changed in specific handler to start another handler,
     // we should restore original EIP, if it's nesessary
     if (replaced &&
-        (uint32)uc->uc_mcontext.gregs[REG_EIP] == new_eip)
+        (uint32)REGISTER_EIP == new_eip)
     {
-        uc->uc_mcontext.gregs[REG_EIP] = (greg_t)saved_eip;
+        REGISTER_EIP = saved_eip;
     }
 }
 
