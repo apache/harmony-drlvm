@@ -12,7 +12,10 @@ gc/Mark.java
 # HARMONY-2772 
 stress/Mix.java
 
-# HARMONY-3010 HARMONY-4292
+# HARMONY-4265
+exception/FinalizeStackTest.java
+
+# HARMONY-3010 HARMONY-4265 HARMONY-4292
 stress/Stack.java
 
 # HARMONY-3299 intermittent
