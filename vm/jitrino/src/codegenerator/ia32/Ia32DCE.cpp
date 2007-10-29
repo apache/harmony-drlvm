@@ -59,6 +59,37 @@ void DCE::runImpl()
     for (Nodes::const_iterator it = nodes.begin(),end = nodes.end();it!=end; ++it) {
         Node* node = *it;
         if (node->isBlockNode()){
+            //Here we'll try to remove redundant branches that could appear after 
+            //branch translations. All such branches are supposed to be conditional.
+            Inst * inst = (Inst *)node->getLastInst();
+            if(inst && node->getOutEdges().size() > 1) {
+                Edges edges = node->getOutEdges();
+                for (Edges::const_iterator ite1 = ++edges.begin(), end = edges.end(); ite1 != end; ++ite1) {
+                    for (Edges::const_iterator ite2 = edges.begin(); ite1 != ite2; ++ite2) {
+                        Edge *edge1 = *ite1;
+                        Edge *edge2 = *ite2;
+                        assert(edge1 != edge2);
+
+                        //If this condition is satisfied then there are at least two branches with 
+                        //the same destination
+                        if (edge1->getTargetNode() == edge2->getTargetNode()) {
+                            //Check that edges are conditional and the last instruction is branch, 
+                            //the other situations are not permitted at the moment
+                            assert(inst->hasKind(Inst::Kind_BranchInst));
+                            assert(edge1->getKind() == Edge::Kind_True || 
+                                        edge1->getKind() == Edge::Kind_False);
+                            assert(edge2->getKind() == Edge::Kind_True || 
+                                        edge2->getKind() == Edge::Kind_False);
+                            
+                            //Remove last instruction if it is a branch
+                            inst->unlink();
+                            irManager->getFlowGraph()->removeEdge(edge2);
+                        }
+                    
+                    }
+                }
+           }
+
             irManager->getLiveAtExit(node, ls);
             for (Inst * inst=(Inst*)node->getLastInst(), * prevInst=NULL; inst!=NULL; inst=prevInst){
                 prevInst=inst->getPrevInst();
@@ -105,4 +136,5 @@ void DCE::runImpl()
 }
 
 }}; //namespace Ia32
+
 
