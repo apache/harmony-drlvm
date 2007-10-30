@@ -23,6 +23,7 @@
 #include "Ia32GCSafePoints.h"
 #include "XTimer.h"
 #include "BitSet.h"
+#include "Ia32CgUtils.h"
 
 
 namespace Jitrino
@@ -334,18 +335,6 @@ static bool isHeapBase(Opnd* immOpnd) {
 #endif
 }
 
-static Opnd* findImmediateSource(Opnd* opnd) {
-    Opnd* res = opnd;
-    while (!res->isPlacedIn(OpndKind_Imm)) {
-        Inst* defInst = res->getDefiningInst();
-        if (!defInst || defInst->getMnemonic()!=Mnemonic_MOV) {
-            return NULL;
-        }
-        res = defInst->getOpnd(1);
-    }
-    return res;
-}
-
 int32 GCSafePointsInfo::getOffsetFromImmediate(Opnd* offsetOpnd) const {
     if (offsetOpnd->isPlacedIn(OpndKind_Immediate)) {
         if (offsetOpnd->getImmValue() == 0 && offsetOpnd->getRuntimeInfo()!=NULL) {
@@ -538,7 +527,7 @@ void GCSafePointsInfo::updatePairsOnInst(Inst* inst, GCSafePointPairs& res) {
                 case Mnemonic_SUB:
                         fromOpnd = opnd;
                         Opnd* offsetOpnd = inst->getOpnd(useIndex1);
-                        Opnd* immOffset = findImmediateSource(offsetOpnd);
+                        Opnd* immOffset = OpndUtils::findImmediateSource(offsetOpnd);
                         if (immOffset) {
                            if (isHeapBase(immOffset)) {
                                offset = 0;

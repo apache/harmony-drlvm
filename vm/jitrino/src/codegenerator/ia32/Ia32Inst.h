@@ -289,7 +289,7 @@ public:
     /** 
      * Returns the number of occurrences of the operand in LIR.
      * The value may take into account basic block execution count (profile information).
-     * Non-zero result means the operand is used in LIR and non-zero means it is not.
+     * Non-zero result means the operand is used in LIR and zero means it is not.
      * 
      * The refCount value is calculated during IRManager::calculateOpndStatistics.
      */
@@ -300,11 +300,16 @@ public:
 
     /** 
      * Return the defining inst for operands with a single definition. 
-     * If the operand has multiple deinitions the method returns 0.
+     * If the operand has multiple definitions the method returns 0.
      *
-     * The definingInst value is calculated during IRManager::calculateOpndStatistics.
+     * The definingInst value is normally calculated during IRManager::calculateOpndStatistics.
      */
     Inst * getDefiningInst()const{ return definingInst; }
+
+    /** 
+     * Assigns the defining inst for operands with a single definition. 
+     */
+    void setDefiningInst(Inst * inst);
 
     /** 
      * Returns true if the operand is used in liveness analysis.
@@ -333,8 +338,6 @@ protected:
 
     void addRefCount(uint32& index, uint32 blockExecCount);
 
-    void setDefiningInst(Inst * inst);
-
 #ifdef _DEBUG
     void checkConstraints();
 #else
@@ -344,7 +347,9 @@ private:
 
     //-------------------------------------------------------------------------
     Opnd(uint32 _id, Type * t, Constraint c)
-        :id(_id), firstId(_id), type(t), memOpndKind(MemOpndKind_Null), segReg(RegName_Null), immValue(0), runtimeInfo(NULL)
+        :id(_id), firstId(_id), type(t), memOpndKind(MemOpndKind_Null), 
+        defScope(DefScope_Null), definingInst(NULL), refCount(0),
+        segReg(RegName_Null), immValue(0), runtimeInfo(NULL)
         { constraints[ConstraintKind_Initial]=constraints[ConstraintKind_Calculated]=c; }
 
     //-------------------------------------------------------------------------

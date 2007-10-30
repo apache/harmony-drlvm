@@ -641,9 +641,11 @@ void CodeEmitter::postPass()
                     Type* targetType = irManager->getTypeManager().getInt64Type();
 
                     Opnd* targetVal = irManager->newImmOpnd(targetType,(int64)targetCodeStartAddr);
+                    targetVal->setRuntimeInfo(inst->getOpnd(targetOpndIndex)->getRuntimeInfo());
                     Opnd* targetReg = irManager->newRegOpnd(targetType, RegName_R11);
                     
                     Inst* movInst = irManager->newInst(Mnemonic_MOV, targetReg, targetVal);
+                    targetReg->setDefiningInst(movInst);
 
                     inst->setOpnd(targetOpndIndex,targetReg);
 
@@ -684,8 +686,9 @@ void CodeEmitter::postPass()
             }   
         }
     }  
-    if (newOpndsCreated)
+    if (newOpndsCreated) {
         irManager->fixLivenessInfo();
+    }
 }
 
 //________________________________________________________________________________________

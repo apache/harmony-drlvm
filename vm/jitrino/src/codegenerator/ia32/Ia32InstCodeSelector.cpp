@@ -207,7 +207,7 @@ Inst * InstCodeSelector::appendInsts(Inst *inst)
 {
     assert(currentBasicBlock);
     inst->setBCOffset(currentHIRInstBCOffset);
-    assert(!InstUtils::instMustHaveBCMapping(inst) || currentHIRInstBCOffset!=ILLEGAL_BC_MAPPING_VALUE);
+    assert(currentHIRInstBCOffset!=ILLEGAL_BC_MAPPING_VALUE || !InstUtils::instMustHaveBCMapping(inst));
     if (Log::isEnabled()){
         Inst * i=inst; 
         do {

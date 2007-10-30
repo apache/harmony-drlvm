@@ -229,6 +229,19 @@ Opnd* OpndUtils::getFloatZeroConst(void)
     return m_opndFloatZero;
 }
 
+Opnd* OpndUtils::findImmediateSource(Opnd* opnd) 
+{
+    Opnd* res = opnd;
+    while (!res->isPlacedIn(OpndKind_Imm)) {
+        Inst* defInst = res->getDefiningInst();
+        if (!defInst || defInst->getMnemonic()!=Mnemonic_MOV) {
+            return NULL;
+        }
+        res = defInst->getOpnd(1);
+    }
+    return res;
+}
+
 //All CALL insts except some special helpers that never cause stacktrace printing
 bool InstUtils::instMustHaveBCMapping(Inst* inst) {
     if (!inst->hasKind(Inst::Kind_CallInst)) {
@@ -236,7 +249,8 @@ bool InstUtils::instMustHaveBCMapping(Inst* inst) {
     }
     CallInst* callInst = (CallInst*)inst;
     Opnd * targetOpnd=callInst->getOpnd(callInst->getTargetOpndIndex());
-    Opnd::RuntimeInfo * ri=targetOpnd->getRuntimeInfo();
+    Opnd* immOpnd = OpndUtils::findImmediateSource(targetOpnd);
+    Opnd::RuntimeInfo * ri = immOpnd ? immOpnd->getRuntimeInfo() : NULL;
     if(!ri) {
         return true;
     } else if (ri->getKind() == Opnd::RuntimeInfo::Kind_InternalHelperAddress) { 

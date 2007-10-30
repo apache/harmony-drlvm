@@ -177,6 +177,13 @@ public:
      * Tests 2 operands for equality.
      */
     static bool equals(const Opnd* a, const Opnd* b);
+
+    /**
+     * Searches for a source of an immediate value (if any) of the specified operand.
+     * Returns the "defining" operand or \c NULL.
+     */
+    static Opnd* findImmediateSource(Opnd* opnd);
+
     //
     // The following are not static and require IRManager
     //
