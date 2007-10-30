@@ -137,7 +137,7 @@ void * getaddress__vm_monitor_enter_naked()
         return addr;
     }
 
-    const int stub_size = 160;
+    const int stub_size = 192;
     char *stub = (char *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_MAX/2, CAA_Allocate);
 #ifdef _DEBUG
     memset(stub, 0xcc /*int 3*/, stub_size);
@@ -170,7 +170,7 @@ void * getaddress__vm_monitor_enter_static_naked()
         return addr;
     }
 
-    const int stub_size = 176;
+    const int stub_size = 208;
     char *stub = (char *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_MAX/2, CAA_Allocate);
 #ifdef _DEBUG
     memset(stub, 0xcc /*int 3*/, stub_size);
@@ -248,7 +248,7 @@ void * getaddress__vm_monitor_exit_naked()
         return addr;
     }
 
-    const int stub_size = 112;
+    const int stub_size = 144;
     char *stub = (char *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_MAX/2, CAA_Allocate);
     char *ss = stub;
 
@@ -281,7 +281,7 @@ void * getaddress__vm_monitor_exit_static_naked()
         return addr;
     }
 
-    const int stub_size = 112;
+    const int stub_size = 144;
     char *stub = (char *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_MAX/2, CAA_Allocate);
     char *ss = stub;
 
