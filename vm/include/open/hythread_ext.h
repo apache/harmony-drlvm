@@ -737,8 +737,13 @@ hy_inline void VMCALL hythread_suspend_disable()
 // possible values for tm_status_t
 #define TM_OS_ERROR (TM_ERROR_START+1)
 
-// if default stack size is not through -Xss parameter, it is 256kb
+// if default stack size is not through -Xss parameter, it is 512kb
+#ifndef POINTER64
 #define TM_DEFAULT_STACKSIZE (512 * 1024)
+#else
+// Make stack size default to 2Mb on 64-bit platforms
+#define TM_DEFAULT_STACKSIZE (2048 * 1024)
+#endif
 
 // java thread status
 #define TM_STATUS_WITHOUT_JAVA  0   // native thread cannot has associated java thread
