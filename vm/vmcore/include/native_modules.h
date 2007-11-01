@@ -51,6 +51,7 @@ struct native_module_t {
 
 
 bool get_all_native_modules(native_module_t**, int*);
+void dump_native_modules(native_module_t* modules, FILE *out);
 void clear_native_modules(native_module_t**);
 native_module_t* find_native_module(native_module_t* modules, void* code_ptr);
 

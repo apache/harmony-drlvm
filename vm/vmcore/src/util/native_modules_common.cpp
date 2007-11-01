@@ -33,3 +33,18 @@ native_module_t* find_native_module(native_module_t* modules, void* code_ptr)
     // no matching module
     return NULL;
 }
+
+void dump_native_modules(native_module_t* modules, FILE *out)
+{
+    for (native_module_t* module = modules; module; module = module->next)
+    {
+        fprintf(out, "%s:\n", module->filename);
+
+        for (size_t i = 0; i < module->seg_count; i++)
+        {
+            char* base = (char*)module->segments[i].base;
+
+            fprintf(out, "\t%p:%p\n", base, base + module->segments[i].size);
+        }
+    }
+}
