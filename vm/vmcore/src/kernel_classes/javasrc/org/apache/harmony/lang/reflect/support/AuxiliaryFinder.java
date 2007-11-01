@@ -85,7 +85,7 @@ public final class AuxiliaryFinder {
         } else if (ownerType != null) { // BUG
             int i = 0, j = 1; i = j/i;
         }
-        klass = AuxiliaryLoader.ersatzLoader.findClass(binaryClassName); // XXX: should we propagate the class loader of initial user's request (Field.getGenericType()) or use this one?
+        klass = AuxiliaryLoader.findClass(binaryClassName, startPoint); // XXX: should we propagate the class loader of initial user's request (Field.getGenericType()) or use this one?
         return klass; //it may be null
 //FRAGMENT FINISH ^
 //############################################################################################################################################
@@ -387,7 +387,7 @@ public final class AuxiliaryFinder {
      * To use in findGenericClassDeclarationForParameterizedType method. 
      */
     private static Class verifyParameterizedType(InterimParameterizedType fldType, Object startPoint) throws ClassNotFoundException {
-        Class klass = AuxiliaryLoader.ersatzLoader.findClass(fldType.rawType.classTypeName.substring(1).replace('/', '.')/*fldType.rawType.classTypeName*/);
+        Class klass = AuxiliaryLoader.findClass(fldType.rawType.classTypeName.substring(1).replace('/', '.')/*fldType.rawType.classTypeName*/, startPoint);
         if (fldType.currentClauseName != null && fldType.currentClauseName.length() > 0) {
             return klass; // has been verified
         }
@@ -405,7 +405,7 @@ public final class AuxiliaryFinder {
         
         if (fldType.ownerType == null) {
             try{
-                if (AuxiliaryLoader.ersatzLoader.findClass(rtnm.substring(1).replace('/', '.')) != null){
+                if (AuxiliaryLoader.findClass(rtnm.substring(1).replace('/', '.'), startPoint) != null){
                     // telescoping a final unit:
                     InterimClassType newCT = new InterimClassType();
                     newCT.classTypeName = rtnm;
@@ -418,7 +418,7 @@ public final class AuxiliaryFinder {
         } else {
             if (!rtnm.equals((fldType.ownerType instanceof InterimParameterizedType ? ((InterimParameterizedType)fldType.ownerType).rawType.classTypeName : ((InterimClassType)fldType.ownerType).classTypeName))) {
                 try{
-                    if (AuxiliaryLoader.ersatzLoader.findClass(rtnm.substring(1).replace('/', '.')) != null){
+                    if (AuxiliaryLoader.findClass(rtnm.substring(1).replace('/', '.'), startPoint) != null){
                         // telescoping an intermediate unit:
                         newPT = new InterimParameterizedType();
 /* ### */                        newPT.signature = fldType.signature.substring(0, fldType.signature.lastIndexOf("$"+snm)); //XXX: ???

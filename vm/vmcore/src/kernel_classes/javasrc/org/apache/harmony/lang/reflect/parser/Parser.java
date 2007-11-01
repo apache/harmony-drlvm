@@ -107,7 +107,7 @@ public class Parser {
                     genericExceptionTypes[i] = (Type) pType; 
                 } else if (throwns[i] instanceof InterimClassType) {
                     try {
-                        genericExceptionTypes[i] = (Type) AuxiliaryLoader.ersatzLoader.findClass(((InterimClassType)throwns[i]).classTypeName.substring(1).replace('/', '.')); // XXX: should we propagate the class loader of initial user's request (Field.getGenericType()) or use this one?
+                        genericExceptionTypes[i] = (Type) AuxiliaryLoader.findClass(((InterimClassType)throwns[i]).classTypeName.substring(1).replace('/', '.'), startPoint); // XXX: should we propagate the class loader of initial user's request (Field.getGenericType()) or use this one?
                     } catch (ClassNotFoundException e) {
                         throw new TypeNotPresentException(((InterimClassType)throwns[i]).classTypeName.substring(1).replace('/', '.'), e);
                     } catch (ExceptionInInitializerError e) {
@@ -256,12 +256,12 @@ public class Parser {
                 genericParameterTypes[i] = (Type) pType;
             } else if (methodParameters[i] instanceof InterimClassType) {
                 try {
-                    genericParameterTypes[i] = (Type) AuxiliaryLoader.ersatzLoader
+                    genericParameterTypes[i] = (Type) AuxiliaryLoader
                             .findClass(((InterimClassType) methodParameters[i]).classTypeName
                                     .substring(
                                             (((InterimClassType) methodParameters[i]).classTypeName
                                                     .charAt(0) == 'L' ? 1
-                                                    : 0)).replace('/', '.')); // XXX: should we propagate the class loader of initial user's request (Field.getGenericType()) or use this one?
+                                                    : 0)).replace('/', '.'), startPoint); // XXX: should we propagate the class loader of initial user's request (Field.getGenericType()) or use this one?
                 } catch (ClassNotFoundException e) {
                     throw new TypeNotPresentException(
                             ((InterimClassType) methodParameters[i]).classTypeName
@@ -581,12 +581,12 @@ public class Parser {
                 genericExceptionTypes[i] = (Type) pType;
             } else if (throwns[i] instanceof InterimClassType) {
                 try {
-                    genericExceptionTypes[i] = (Type) AuxiliaryLoader.ersatzLoader
+                    genericExceptionTypes[i] = (Type) AuxiliaryLoader
                             .findClass(((InterimClassType) throwns[i]).classTypeName
                                     .substring(
                                             (((InterimClassType) throwns[i]).classTypeName
                                                     .charAt(0) == 'L' ? 1
-                                                    : 0)).replace('/', '.')); // XXX:
+                                                    : 0)).replace('/', '.'), startPoint); // XXX:
                                                                                 // should
                                                                                 // we
                                                                                 // propagate
@@ -712,12 +712,12 @@ public class Parser {
                 genericParameterTypes[i] = (Type) pType;
             } else if (methodParameters[i] instanceof InterimClassType) {
                 try {
-                    genericParameterTypes[i] = (Type) AuxiliaryLoader.ersatzLoader
+                    genericParameterTypes[i] = (Type) AuxiliaryLoader
                             .findClass(((InterimClassType) methodParameters[i]).classTypeName
                                     .substring(
                                             (((InterimClassType) methodParameters[i]).classTypeName
                                                     .charAt(0) == 'L' ? 1 : 0))
-                                    .replace('/', '.')); // XXX: should we
+                                    .replace('/', '.'), startPoint); // XXX: should we
                                                             // propagate the
                                                             // class loader of
                                                             // initial user's
@@ -924,7 +924,7 @@ public class Parser {
                             //FIXME: any potential issue to change findClass->loadClass
                             genericInterfaces[i] = (Type) c.getClass().getClassLoader().loadClass(AuxiliaryFinder.transform(((InterimClassType)superInterfaces[i]).classTypeName.substring(1).replace('/', '.'))); // XXX: should we propagate the class loader of initial user's request (Field.getGenericType()) or use this one?
                         } else {
-                            genericInterfaces[i] = (Type) AuxiliaryLoader.ersatzLoader.findClass(AuxiliaryFinder.transform(((InterimClassType)superInterfaces[i]).classTypeName.substring(1).replace('/', '.'))); // XXX: should we propagate the class loader of initial user's request (Field.getGenericType()) or use this one?
+                            genericInterfaces[i] = (Type) AuxiliaryLoader.findClass(AuxiliaryFinder.transform(((InterimClassType)superInterfaces[i]).classTypeName.substring(1).replace('/', '.')), startPoint); // XXX: should we propagate the class loader of initial user's request (Field.getGenericType()) or use this one?
                         }
                     } catch (ClassNotFoundException e) {
                         throw new TypeNotPresentException(((InterimClassType)superInterfaces[i]).classTypeName.substring(1).replace('/', '.'), e);

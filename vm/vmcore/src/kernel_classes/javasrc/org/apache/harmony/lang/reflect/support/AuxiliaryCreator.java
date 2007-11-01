@@ -83,7 +83,7 @@ public final class AuxiliaryCreator {
         } else if (nextLayer instanceof InterimClassType) {
             Type cType;
             try {
-                cType = (Type) AuxiliaryLoader.ersatzLoader.findClass(((InterimClassType)nextLayer).classTypeName.substring((((InterimClassType)nextLayer).classTypeName.charAt(0)=='L'? 1 : 0)).replace('/', '.'));
+                cType = (Type) AuxiliaryLoader.findClass(((InterimClassType)nextLayer).classTypeName.substring((((InterimClassType)nextLayer).classTypeName.charAt(0)=='L'? 1 : 0)).replace('/', '.'), startPoint);
             } catch(ClassNotFoundException e) {
                 throw new TypeNotPresentException(((InterimClassType)nextLayer).classTypeName.substring((((InterimClassType)nextLayer).classTypeName.charAt(0)=='L'? 1 : 0)).replace('/', '.'), e);
             }
@@ -127,7 +127,7 @@ public final class AuxiliaryCreator {
             }
             return (Type) pType;
         } else { //ClassType
-            return AuxiliaryLoader.ersatzLoader.findClass(((InterimClassType) nextppType).classTypeName.substring(1).replace('/', '.')); // XXX: should we propagate the class loader of initial user's request (Field.getGenericType()) or use this one?
+            return AuxiliaryLoader.findClass(((InterimClassType) nextppType).classTypeName.substring(1).replace('/', '.'), startPoint); // XXX: should we propagate the class loader of initial user's request (Field.getGenericType()) or use this one?
         }
     }
     
@@ -189,11 +189,13 @@ public final class AuxiliaryCreator {
             } else if (pType instanceof InterimGenericArrayType) {
                 res = AuxiliaryCreator.createGenericArrayType((InterimGenericArrayType)pType, startPoint);
             } else { // ClassType
-                res = (Type) AuxiliaryLoader.ersatzLoader.findClass(((InterimClassType)pType).classTypeName.substring(1).replace('/', '.')); // XXX: should we propagate the class loader of initial user's request (Field.getGenericType()) or use this one?
+                String className = ((InterimClassType)
+                        pType).classTypeName.substring(1).replace('/', '.');
+                res = (Type) AuxiliaryLoader.findClass(className, startPoint); // XXX: should we propagate the class loader of initial user's request (Field.getGenericType()) or use this one?
             }
         return res;
     }
-    
+
     /**
      * This method creates an array of Type objects representing the actual type arguments to this type.
      * 

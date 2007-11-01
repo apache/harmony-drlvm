@@ -53,7 +53,7 @@ public final class TypeVariableImpl<D extends GenericDeclaration> implements Typ
 
         while (klass != null) {
             // TODO: it should be revised to provide the correct classloader for resolving.
-            AuxiliaryLoader.ersatzLoader.resolve(klass);
+            AuxiliaryLoader.resolve(klass);
             klass = klass.getDeclaringClass();
         }
 
@@ -116,7 +116,8 @@ public final class TypeVariableImpl<D extends GenericDeclaration> implements Typ
                     bounds[0] = (Type) pType;
                 } else if (pTypeParameter.classBound instanceof InterimClassType) {
                     try {
-                        bounds[0] = (Type) AuxiliaryLoader.ersatzLoader.findClass(((InterimClassType)pTypeParameter.classBound).classTypeName.substring(1).replace('/', '.'));
+                        bounds[0] = (Type)
+                            AuxiliaryLoader.findClass(((InterimClassType)pTypeParameter.classBound).classTypeName.substring(1).replace('/', '.'), startPoint);
                     } catch (ClassNotFoundException e) {
                             throw new TypeNotPresentException(((InterimClassType)pTypeParameter.classBound).classTypeName.substring(1).replace('/', '.'), e);
                     } catch (ExceptionInInitializerError e) {
@@ -145,7 +146,7 @@ public final class TypeVariableImpl<D extends GenericDeclaration> implements Typ
                     bounds[i] = (Type) pType;
                 } else if (pTypeParameter.interfaceBounds[i - 1] instanceof InterimClassType) {
                     try {
-                        bounds[i] = (Type) AuxiliaryLoader.ersatzLoader.findClass(((InterimClassType)pTypeParameter.interfaceBounds[i - 1]).classTypeName.substring(1).replace('/', '.'));
+                        bounds[i] = (Type) AuxiliaryLoader.findClass(((InterimClassType)pTypeParameter.interfaceBounds[i - 1]).classTypeName.substring(1).replace('/', '.'), startPoint);
                     } catch (ClassNotFoundException e) {
                         throw new TypeNotPresentException(((InterimClassType)pTypeParameter.interfaceBounds[i - 1]).classTypeName.substring(1).replace('/', '.'), e);
                     } catch (ExceptionInInitializerError e) {

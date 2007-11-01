@@ -49,9 +49,8 @@ public final class AuxiliaryChecker {
 
         InterimClassType currentClass = currentBit.rawType;
         Class klazz = null;
-        AuxiliaryLoader loader = AuxiliaryLoader.ersatzLoader;
         try{
-            klazz = loader.findClass(AuxiliaryFinder.transform(currentClass.classTypeName.substring(1).replace('/', '.')));
+            klazz = AuxiliaryLoader.findClass(AuxiliaryFinder.transform(currentClass.classTypeName.substring(1).replace('/', '.')), startPoint);
         } catch (Throwable e) {
             
         }
@@ -84,7 +83,7 @@ public final class AuxiliaryChecker {
             klazz = null;
             try{
                 //klazz = ClassLoader.findClass(currentClass.classTypeName);
-                klazz = loader.findClass(AuxiliaryFinder.transform(currentClass.classTypeName.substring(1).replace('/', '.')));
+                klazz = AuxiliaryLoader.findClass(AuxiliaryFinder.transform(currentClass.classTypeName.substring(1).replace('/', '.')), startPoint);
             } catch (Throwable e) {
             
             }

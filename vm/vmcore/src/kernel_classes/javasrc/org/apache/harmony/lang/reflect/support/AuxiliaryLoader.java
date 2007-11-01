@@ -17,6 +17,10 @@
 package org.apache.harmony.lang.reflect.support;
 
 import java.security.AccessController;
+import java.security.PrivilegedAction;
+import java.lang.reflect.Member;
+import java.lang.reflect.Method;
+import java.lang.reflect.InvocationTargetException;
 
 /**
  * @author Serguei S. Zapreyev
@@ -29,11 +33,10 @@ import java.security.AccessController;
  * (This should be considered as a temporary decision. A correct approach
  * in using loader facilities should be implemented later.)
  */
-public final class AuxiliaryLoader extends ClassLoader {
-    public static final AuxiliaryLoader ersatzLoader = new AuxiliaryLoader();
+public final class AuxiliaryLoader {
 
-    public Class<?> findClass(final String classTypeName)
-            throws ClassNotFoundException {
+    public static Class<?> findClass(final String classTypeName,
+            Object startPoint) throws ClassNotFoundException {
         if (classTypeName.equals("byte")) {
             return byte.class;
         } else if (classTypeName.equals("char")) {
@@ -53,57 +56,23 @@ public final class AuxiliaryLoader extends ClassLoader {
         } else if (classTypeName.equals("void")) {
             return void.class;
         }
-        ClassLoader cl = this.getClass().getClassLoader();
-
-        if (cl == null) {
-            cl = ClassLoader.getSystemClassLoader();
-        }
-
-        try {
-            return cl.loadClass(classTypeName);
-        } catch (Throwable _) {} // ignore
-
+        final ClassLoader loader = getClassLoader(startPoint);
         Class c = (Class) AccessController.doPrivileged(
-                new java.security.PrivilegedAction<Object>() {
+                new PrivilegedAction<Object>() {
             public Object run() {
-
-                // based on an empiric knowledge
-                ClassLoader cl = ClassLoader.getSystemClassLoader();
-
                 try {
-                    java.lang.reflect.Method[] ms = 
-                            cl.getClass().getDeclaredMethods();
-                    int i = 0;
-
-                    for (; i < ms.length; i++) {
-                        if (!ms[i].getName().equals("loadClass")) {
-                            continue;
-                        }
-
-                        if (ms[i].getParameterTypes().length != 2) {
-                            continue;
-                        }
-
-                        if (!ms[i].getParameterTypes()[0].getName().equals(
-                                    "java.lang.String")) {
-                             continue;
-                        }
-
-                        if (!ms[i].getParameterTypes()[1].getName().equals(
-                                    "boolean")) {
-                            continue;
-                        }
-                        break;
-                    }
-                    ms[i].setAccessible(true);
-                    return (Object) ms[i].invoke((Object) cl, new Object[] {
+                    Method loadClassMethod = findLoadClassMethod(
+                            loader.getClass());
+                    loadClassMethod.setAccessible(true);
+                    return (Object) loadClassMethod.invoke((Object) loader,
+                            new Object[] {
                             (Object) AuxiliaryFinder.transform(classTypeName),
                             new Boolean(false) });
-                } catch (java.lang.IllegalAccessException e) {
+                } catch (IllegalAccessException e) {
                     System.err.println("Error: AuxiliaryLoader.findClass(" +
                             classTypeName + "): " + e.toString());
                     e.printStackTrace();
-                } catch (java.lang.reflect.InvocationTargetException e) {
+                } catch (InvocationTargetException e) {
                     System.err.println("Error: AuxiliaryLoader.findClass(" +
                             classTypeName + "): " + e.getTargetException());
                     e.getTargetException().printStackTrace();
@@ -122,24 +91,73 @@ public final class AuxiliaryLoader extends ClassLoader {
         return c;
     }
 
-    public void resolve(final Class c) {
+    /**
+     * @param startPoint an instance of the Class, Method, Constructor or Field
+     * type to start the search of a type variable declaration place.
+     */
+    private static ClassLoader getClassLoader(Object startPoint) {
+        ClassLoader res = null;
+
+        if (startPoint instanceof Class) {
+            res = ((Class) startPoint).getClassLoader();
+        } else if (startPoint instanceof Member) {
+            res = ((Member) startPoint).getDeclaringClass().getClassLoader();
+        } else {
+            res = startPoint.getClass().getClassLoader();
+        }
+
+        if (res == null) {
+            res = ClassLoader.getSystemClassLoader();
+        }
+        return res;
+    }
+
+    /**
+     * Looks for loadClass(String name, boolean resolve) Method in the
+     * specified 'loader' class (of the type ClassLoader) or its super class.
+     */
+    private static Method findLoadClassMethod(Class loaderClass) {
+        Method res = null;
+        Method[] ms = loaderClass.getDeclaredMethods();
+
+        for (int i = 0; i < ms.length; i++) {
+            if (!ms[i].getName().equals("loadClass")) {
+                continue;
+            }
+
+            if (ms[i].getParameterTypes().length != 2) {
+                continue;
+            }
+
+            if (!ms[i].getParameterTypes()[0].getName().equals(
+                        "java.lang.String")) {
+                continue;
+            }
+
+            if (!ms[i].getParameterTypes()[1].getName().equals(
+                        "boolean")) {
+                continue;
+            }
+            res = ms[i];
+            break;
+        }
+
+        // no null check is required - at leas this methopd will be found in 
+        // java.lang.ClassLoader
+        return res != null ? res :
+                findLoadClassMethod(loaderClass.getSuperclass());
+    }
+
+    public static void resolve(final Class c) {
         AccessController.doPrivileged(new java.security.PrivilegedAction<Object>() {
             public Object run() {
-                ClassLoader cl = AuxiliaryLoader.this.getClass().getClassLoader();
-                if (cl == null) {
-                    cl = ClassLoader.getSystemClassLoader();
-                }
+                ClassLoader loader = getClassLoader(c);
+
                 try {
-                    java.lang.reflect.Method[] ms = cl.getClass()
-                            .getDeclaredMethods();
-                    int i = 0;
-                    for (; i < ms.length; i++) {
-                        if (ms[i].getName().equals("loadClass")) {
-                            break;
-                        }
-                    }
-                    ms[i].setAccessible(true);
-                    ms[i].invoke((Object) cl, new Object[] {
+                    Method loadClassMethod = findLoadClassMethod(
+                            loader.getClass());
+                    loadClassMethod.setAccessible(true);
+                    loadClassMethod.invoke((Object) loader, new Object[] {
                             (Object) c.getCanonicalName(), (Object) true });
                 } catch (java.lang.IllegalAccessException _) {
                 } catch (java.lang.reflect.InvocationTargetException _) {
