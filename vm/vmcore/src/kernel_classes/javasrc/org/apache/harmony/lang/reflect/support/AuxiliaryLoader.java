@@ -54,71 +54,72 @@ public final class AuxiliaryLoader extends ClassLoader {
             return void.class;
         }
         ClassLoader cl = this.getClass().getClassLoader();
+
         if (cl == null) {
             cl = ClassLoader.getSystemClassLoader();
         }
+
         try {
             return cl.loadClass(classTypeName);
-        } catch (Throwable _) {
-            Class c = (Class) AccessController
-                    .doPrivileged(new java.security.PrivilegedAction<Object>() {
-                        public Object run() {
-                            // based on an empiric knowledge
-                            ClassLoader cl = ClassLoader.getSystemClassLoader();
-                            try {
-                                java.lang.reflect.Method[] ms = cl.getClass()
-                                        .getDeclaredMethods();
-                                int i = 0;
-                                for (; i < ms.length; i++) {
-                                    if (ms[i].getName().equals("loadClass")
-                                            && ms[i].getParameterTypes().length == 2
-                                            && ms[i].getParameterTypes()[0]
-                                                    .getName().equals(
-                                                            "java.lang.String")
-                                            && ms[i].getParameterTypes()[1]
-                                                    .getName()
-                                                    .equals("boolean")) {
-                                        break;
-                                    }
-                                }
-                                ms[i].setAccessible(true);
-                                return (Object) ms[i]
-                                        .invoke(
-                                                (Object) cl,
-                                                new Object[] {
-                                                        (Object) AuxiliaryFinder
-                                                                .transform(classTypeName),
-                                                        new Boolean(false) });
-                            } catch (java.lang.IllegalAccessException e) {
-                                System.err
-                                        .println("Error: AuxiliaryLoader.findClass("
-                                                + classTypeName
-                                                + "): "
-                                                + e.toString());
-                                e.printStackTrace();
-                            } catch (java.lang.reflect.InvocationTargetException e) {
-                                System.err
-                                        .println("Error: AuxiliaryLoader.findClass("
-                                                + classTypeName
-                                                + "): "
-                                                + e.getTargetException()
-                                                        .toString());
-                                e.getTargetException().printStackTrace();
-                            } catch (Exception e) {
-                                System.err
-                                        .println("Error: AuxiliaryLoader.findClass("
-                                                + classTypeName
-                                                + "): "
-                                                + e.toString());
-                                e.printStackTrace();
-                            }
-                            return null;
+        } catch (Throwable _) {} // ignore
+
+        Class c = (Class) AccessController.doPrivileged(
+                new java.security.PrivilegedAction<Object>() {
+            public Object run() {
+
+                // based on an empiric knowledge
+                ClassLoader cl = ClassLoader.getSystemClassLoader();
+
+                try {
+                    java.lang.reflect.Method[] ms = 
+                            cl.getClass().getDeclaredMethods();
+                    int i = 0;
+
+                    for (; i < ms.length; i++) {
+                        if (!ms[i].getName().equals("loadClass")) {
+                            continue;
                         }
-                    });
-            if (c == null)
-                throw new ClassNotFoundException(classTypeName);
-            return c;
+
+                        if (ms[i].getParameterTypes().length != 2) {
+                            continue;
+                        }
+
+                        if (!ms[i].getParameterTypes()[0].getName().equals(
+                                    "java.lang.String")) {
+                             continue;
+                        }
+
+                        if (!ms[i].getParameterTypes()[1].getName().equals(
+                                    "boolean")) {
+                            continue;
+                        }
+                        break;
+                    }
+                    ms[i].setAccessible(true);
+                    return (Object) ms[i].invoke((Object) cl, new Object[] {
+                            (Object) AuxiliaryFinder.transform(classTypeName),
+                            new Boolean(false) });
+                } catch (java.lang.IllegalAccessException e) {
+                    System.err.println("Error: AuxiliaryLoader.findClass(" +
+                            classTypeName + "): " + e.toString());
+                    e.printStackTrace();
+                } catch (java.lang.reflect.InvocationTargetException e) {
+                    System.err.println("Error: AuxiliaryLoader.findClass(" +
+                            classTypeName + "): " + e.getTargetException());
+                    e.getTargetException().printStackTrace();
+                } catch (Exception e) {
+                    System.err.println("Error: AuxiliaryLoader.findClass(" +
+                            classTypeName + "): " + e.toString());
+                    e.printStackTrace();
+                }
+                return null;
+            }
+        });
+
+        if (c == null) {
+            throw new ClassNotFoundException(classTypeName);
         }
+        return c;
     }
 
     public void resolve(final Class c) {
