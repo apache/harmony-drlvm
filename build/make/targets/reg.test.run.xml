@@ -41,7 +41,7 @@
              to specify particular tests to execute -->
         <property name="test.case" value="H*"/>
 
-        <for param="reg.test.2launch.src.dir">
+        <for param="reg.test.2launch">
             <!-- Go through directories containing regression tests -->
             <dirset dir="${reg.test.src}" includes="${test.case}">
                 <excludesfile name="${exclude.list}" if="exclude.list"/>
@@ -50,23 +50,27 @@
                 <!-- Set up the property pointing to the natives path -->
                 <var name="reg.test.2launch.native.path" unset="true"/>
                 <pathconvert property="reg.test.2launch.native.path">
-                    <path path="@{reg.test.2launch.src.dir}"/>
+                    <path path="@{reg.test.2launch}"/>
                     <map from="${reg.test.src}" to="${reg.test.native.path}"/>
                 </pathconvert>
                 <if>
-                    <available file="@{reg.test.2launch.src.dir}/run.test.xml"/>
+                    <available file="@{reg.test.2launch}/run.test.xml"/>
                     <then>
                         <!-- Launch the tests with a custom launchers 
                                                 placed near the tests -->
-                        <ant antfile="@{reg.test.2launch.src.dir}/run.test.xml" 
+                        <ant antfile="@{reg.test.2launch}/run.test.xml" 
                             target="run-test" 
                             inheritAll="true" inheritRefs="true"/>
                     </then>
                     <else>
-                        <!-- Execution of unit tests checking for regression -->
+                        <!-- Run standard JUnit tests -->
+                        <condition property="@{reg.test.2launch}.extra.arg" else=""
+                            value="-Djava.library.path=${reg.test.2launch.native.path}">
+                            <available file="${reg.test.2launch.native.path}"/>
+                        </condition>
                         <for param="reg.unit.test.src">
                             <!-- Go through unit tests in the directory -->
-                            <fileset dir="@{reg.test.2launch.src.dir}">
+                            <fileset dir="@{reg.test.2launch}">
                                 <include name="*Test.java"/>
                                 <include name="*Test.j"/>
                             </fileset>
@@ -76,7 +80,8 @@
                                   input="@{reg.unit.test.src}"
                                   regexp=".*H(\d\d*)[/\\](..*)\.j.*" 
                                   replace="${reg.test.package}.h\1.\2"/>
-                                <run-junit-test test="${unit.test.class}"/>
+                                <run-junit-test test="${unit.test.class}"
+                                    vmarg="${@{reg.test.2launch}.extra.arg}"/>
                             </sequential>
                         </for>
                     </else>
