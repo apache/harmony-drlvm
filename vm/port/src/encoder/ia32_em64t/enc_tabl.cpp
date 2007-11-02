@@ -1107,7 +1107,9 @@ BEGIN_OPCODES()
     {OpcodeInfo::all,     {Size16, 0x0F, 0xB6, _r}, {r16, r_m8},    D_U },
     {OpcodeInfo::all,     {0x0F, 0xB6, _r},         {r32, r_m8},    D_U },
     {OpcodeInfo::em64t,   {REX_W, 0x0F, 0xB6, _r},  {r64, r_m8},    D_U },
+
     {OpcodeInfo::all,     {0x0F, 0xB7, _r},         {r32, r_m16},   D_U },
+    {OpcodeInfo::em64t,   {REX_W, 0x0F, 0xB7, _r},  {r64, r_m16},   D_U },
     //workaround to get r/rm32->r64 ZX mov functionality:
     //simple 32bit reg copying zeros high bits in 64bit reg
     {OpcodeInfo::em64t,   {0x8B, _r},  {r64, r_m32},   D_U },
