@@ -27,7 +27,7 @@ public class Test extends TestCase {
             assertEquals(0, 1); //the number of this line must be in tracktracelement
         } catch (Throwable e) {
             StackTraceElement thisFrame = findThisFrame(e);
-            assertEquals(10, thisFrame.getLineNumber());
+            assertEquals(27, thisFrame.getLineNumber());
         }
     }
 
@@ -39,7 +39,7 @@ public class Test extends TestCase {
             fail();//the number of this line must be in tracktracelement
         } catch (Throwable e) {
             StackTraceElement thisFrame = findThisFrame(e);
-            assertEquals(22, thisFrame.getLineNumber());
+            assertEquals(39, thisFrame.getLineNumber());
         }
     }
 
@@ -51,7 +51,7 @@ public class Test extends TestCase {
             assertEquals(true, false);//the number of this line must be in tracktracelement
         } catch (Throwable e) {
             StackTraceElement thisFrame = findThisFrame(e);
-            assertEquals(34, thisFrame.getLineNumber());
+            assertEquals(51, thisFrame.getLineNumber());
         }
 
     }
@@ -64,7 +64,7 @@ public class Test extends TestCase {
             assertNotNull(null);//the number of this line must be in tracktracelement
         } catch (Throwable e) {
             StackTraceElement thisFrame = findThisFrame(e);
-            assertEquals(47, thisFrame.getLineNumber());
+            assertEquals(64, thisFrame.getLineNumber());
         }
 
     }
@@ -77,7 +77,7 @@ public class Test extends TestCase {
             assertEquals("", "fail");//the number of this line must be in tracktracelement
         } catch (Throwable e) {
             StackTraceElement thisFrame = findThisFrame(e);
-            assertEquals(60, thisFrame.getLineNumber());
+            assertEquals(77, thisFrame.getLineNumber());
         }
 
     }
