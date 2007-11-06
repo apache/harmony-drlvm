@@ -41,11 +41,16 @@
              to specify particular tests to execute -->
         <property name="test.case" value="H*"/>
 
+        <dirset dir="${reg.test.src}" includes="${test.case}" id="reg.run.set">
+            <excludesfile name="${exclude.list}" if="exclude.list"/>
+        </dirset>
+
+        <pathconvert property="reg.dir.list" setonempty="no" refid="reg.run.set"/>
+        <fail unless="reg.dir.list" message="No test found: ${test.case}"/>
+
         <for param="reg.test.2launch">
             <!-- Go through directories containing regression tests -->
-            <dirset dir="${reg.test.src}" includes="${test.case}">
-                <excludesfile name="${exclude.list}" if="exclude.list"/>
-            </dirset>
+            <dirset refid="reg.run.set"/>
             <sequential>
                 <!-- Set up the property pointing to the natives path -->
                 <var name="reg.test.2launch.native.path" unset="true"/>

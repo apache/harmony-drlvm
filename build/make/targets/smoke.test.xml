@@ -142,13 +142,17 @@
         <!-- TODO: to allow using package name for test.case, need to convert it to path
         <propertyregex property="test.file" override="yes" global="true"
             input="${test.case}" regexp="(\.|\\)" replace="/"/-->
+        
+        <fileset dir="${smoke.test.src}" id="smoke.run.set">
+            <include name="**/*.java" unless="test.case"/>
+            <include name="${test.case}" if="test.case"/>
+            <excludesfile name="${exclude.file}" if="exclude.file" />
+        </fileset>
+        <pathconvert property="smoke.run.list" setonempty="no" refid="smoke.run.set"/>
+        <fail unless="smoke.run.list" message="No test found: ${test.case}"/>
 
         <for param="test">
-            <fileset dir="${smoke.test.src}">
-                <include name="**/*.java" unless="test.case"/>
-                <include name="${test.case}" if="test.case"/>
-                <excludesfile name="${exclude.file}" if="exclude.file" />
-            </fileset>
+            <fileset refid="smoke.run.set"/>
             <sequential>
                 <!-- unset res.code variable to use it for next run-->
                 <var name="res.code" unset="true"/>
