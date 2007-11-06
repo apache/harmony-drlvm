@@ -15,7 +15,7 @@
  *  limitations under the License.
  */
 
-package org.apache.harmony.drlvm.tests.regression.H3110;
+package org.apache.harmony.drlvm.tests.regression.h3110;
 
 import java.lang.reflect.*;
 import junit.framework.TestCase;

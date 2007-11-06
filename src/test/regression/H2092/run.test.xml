@@ -17,12 +17,12 @@
 <project name="RUN HARMONY-2092 Regression Test">
     <target name="run-test">
         <run-junit-test
-            test="org.apache.harmony.drlvm.tests.regression.H2092.Test"
+            test="org.apache.harmony.drlvm.tests.regression.h2092.Test"
             vmarg="-Xem:jet">
         </run-junit-test>
 
         <run-junit-test
-            test="org.apache.harmony.drlvm.tests.regression.H2092.Test"
+            test="org.apache.harmony.drlvm.tests.regression.h2092.Test"
             vmarg="-Xem:opt">
         </run-junit-test>
     </target>

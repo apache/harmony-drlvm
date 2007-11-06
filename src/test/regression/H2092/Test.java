@@ -16,7 +16,7 @@
  */
 
 
-package org.apache.harmony.drlvm.tests.regression.H2092;
+package org.apache.harmony.drlvm.tests.regression.h2092;
 
 import junit.framework.TestCase;
 

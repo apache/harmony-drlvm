@@ -15,7 +15,7 @@
  *  limitations under the License.
  */
 
-package org.apache.harmony.drlvm.tests.regression.H2113;
+package org.apache.harmony.drlvm.tests.regression.h2113;
 
 import junit.framework.TestCase;
 

@@ -98,6 +98,21 @@
                 <fileset file="${vmmagic.jar}" />
             </classpath>
         </compile-java>
+        
+        <pathconvert property="bad.reg.pkg.names" setonempty="no" pathsep="  ">
+            <path>
+                <dirset dir="${reg.test.class.path}/${reg.test.unpackage}">
+                    <exclude name="h*"/>
+                    <include name="H*"/>
+                </dirset>
+            </path>
+            <flattenmapper/>
+        </pathconvert>
+        <fail if="bad.reg.pkg.names"> 
+        Some of package names in these tests violate conventions:
+        ${bad.reg.pkg.names}
+        Please check README.txt located in ${reg.test.src}
+        </fail>
     </target>
 
     <target name="compile-reg-tests-native" depends="compile-reg-tests-prepare">

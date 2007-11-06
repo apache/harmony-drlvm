@@ -14,7 +14,7 @@
 ;  See the License for the specific language governing permissions and
 ;  limitations under the License.
 ;
-.class public org.apache.harmony.drlvm.tests.regression.H1578.dcmp1
+.class public org.apache.harmony.drlvm.tests.regression.h1578.dcmp1
 .super java/lang/Object
 ;
 ; standard initializer

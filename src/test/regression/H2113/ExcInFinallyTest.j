@@ -14,7 +14,7 @@
 ;  See the License for the specific language governing permissions and
 ;  limitations under the License.
 ;
-.class public org/apache/harmony/drlvm/tests/regression/H2113/ExcInFinallyTest
+.class public org/apache/harmony/drlvm/tests/regression/h2113/ExcInFinallyTest
 .super java/lang/Object
 
 .method public <init>()V

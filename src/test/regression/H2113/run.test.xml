@@ -17,7 +17,7 @@
 <project name="RUN HARMONY-2113 Regression Test">
     <target name="run-test">
         <run-junit-test
-            test="org.apache.harmony.drlvm.tests.regression.H2113.Test"
+            test="org.apache.harmony.drlvm.tests.regression.h2113.Test"
             vmarg="-Xem:opt">
         </run-junit-test>
     </target>
