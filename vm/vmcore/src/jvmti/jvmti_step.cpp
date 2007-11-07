@@ -519,6 +519,30 @@ static void jvmti_start_single_step_in_virtual_method(DebugUtilsTI *ti, const VM
     const InstructionDisassembler::Opnd& op = disasm->get_opnd(0);
     Method *method;
 
+    // Disassembler points to the last CALL instruction inside of
+    // invoke* bytecode. We assume that this CALL is a call to the
+    // method. If target address can be found in methods lookup table,
+    // then it is the breakpoint is set on its beginning. Otherwise
+    // this is method resolution or compilation stub. Nothing shold be
+    // done. Breakpoint will be inserted once the method is compiled.
+    NativeCodePtr ip = disasm->get_target_address_from_context(&regs);
+    CodeChunkInfo *cci = vm_env->vm_methods->find(ip);
+    if (NULL != cci)
+    {
+        // Compiled method, set bytecode in it
+        method = cci->get_method();
+        assert(method->get_state() == Method::ST_Compiled);
+    }
+    else
+        // Method is not compiled, nothing to do
+        method = NULL;
+
+#if 0
+    // Gregory -
+    // Here is commented the old implementation of single step prediction
+    // for invokevirtual and invokeinterface bytecodes. Don't delete this
+    // code, it may be still be used some day because it contains some
+    // optimizations that don't require lookup in methods table
     if (bytecode == OPCODE_INVOKEVIRTUAL)
     {
         assert(op.kind == InstructionDisassembler::Kind_Mem ||
@@ -584,6 +608,7 @@ static void jvmti_start_single_step_in_virtual_method(DebugUtilsTI *ti, const VM
             method = (Method *)((POINTER_SIZE_INT)stub_op.imm);
         }
     }
+#endif
 
     TRACE2("jvmti.break.ss", "Removing VIRTUAL single step breakpoint: " << bp->addr);
 
