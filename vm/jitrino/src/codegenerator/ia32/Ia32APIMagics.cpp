@@ -397,15 +397,16 @@ void String_compareTo_Handler_x_String_x_I::run() {
     counterIsZeroNode->appendInst(irm->newInstEx(Mnemonic_SUB, 1, res, thisLen, trgtLen));
 
     // strings are different
-    Opnd* two = irm->newImmOpnd(counterType,2);
-    differentStringsNode->appendInst(irm->newInstEx(Mnemonic_SUB, 1, thisAddrReg, thisAddrReg, two));
-    differentStringsNode->appendInst(irm->newInstEx(Mnemonic_SUB, 1, trgtAddrReg, trgtAddrReg, two));
+    Opnd* minustwo = irm->newImmOpnd(counterType,-2);
     Type* charType = irm->getTypeManager().getCharType();
-    Opnd* thisChar = irm->newMemOpnd(charType, thisAddrReg);
-    Opnd* trgtChar = irm->newMemOpnd(charType, trgtAddrReg);
-    Opnd* dst = irm->newOpnd(charType);
-    differentStringsNode->appendInst(irm->newInstEx(Mnemonic_SUB, 1, dst, thisChar, trgtChar));
-    differentStringsNode->appendInst(irm->newInstEx(Mnemonic_MOVSX, 1, res, dst));
+    Opnd* thisChar = irm->newMemOpnd(charType, thisAddrReg, NULL, NULL, minustwo);
+    Opnd* trgtChar = irm->newMemOpnd(charType, trgtAddrReg, NULL, NULL, minustwo);
+    Type* intType = res->getType();
+    Opnd* thisInt = irm->newOpnd(intType);
+    Opnd* trgtInt = irm->newOpnd(intType);
+    differentStringsNode->appendInst(irm->newInstEx(Mnemonic_MOVZX, 1, thisInt, thisChar));
+    differentStringsNode->appendInst(irm->newInstEx(Mnemonic_MOVZX, 1, trgtInt, trgtChar));
+    differentStringsNode->appendInst(irm->newInstEx(Mnemonic_SUB, 1, res, thisInt, trgtInt));
 
     callInst->unlink();
 }
