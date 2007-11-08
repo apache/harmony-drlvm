@@ -1090,6 +1090,7 @@ DeadCodeEliminator::removeExtraPseudoThrow() {
 
     if (Log::isLogEnabled(LogStream::DOTDUMP)) {
         OptPass::printDotFile(irManager, Log::getStageId(), "rept", "after_loop_tree");
+        OptPass::printHIR(irManager);
     }
 
     // Nodes containing essential PseudoThrow instructions
@@ -1181,11 +1182,12 @@ DeadCodeEliminator::markEssentialPseudoThrows(LoopNode* loopNode, BitSet& essent
             }
         }
     }
-    assert(mbEssentialNode != NULL);
-    essentialNodes.setBit(mbEssentialNode->getId());
-    if (Log::isEnabled()) {
-        Log::out() << "Found essential PseudoThrow in node ID: "
-            << mbEssentialNode->getId() << std::endl;
+    if (mbEssentialNode != NULL) {
+        essentialNodes.setBit(mbEssentialNode->getId());
+        if (Log::isEnabled()) {
+            Log::out() << "Found essential PseudoThrow in node ID: "
+                << mbEssentialNode->getId() << std::endl;
+        }
     }
     return;
 }
