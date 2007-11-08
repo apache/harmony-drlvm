@@ -50,7 +50,7 @@ namespace Jet {
 
 const CallSig ci_helper_o(CCONV_HELPERS, jobj);
 const CallSig ci_helper_v(CCONV_HELPERS);
-const CallSig ci_helper_io(CCONV_HELPERS, i32, jobj);
+const CallSig ci_helper_oi(CCONV_HELPERS, jobj, i32);
 const CallSig ci_helper_linkerr(CCONV_HELPERS, jobj, i32, i32);
 
 void CodeGen::do_mov(const Val& dst_s, const Val& src_s, bool skipTypeCheck)

@@ -133,13 +133,6 @@ void CodeGen::gen_arr_store(jtype jt, bool helperOk)
         gen_write_barrier(m_curr_inst->opcode, NULL, Opnd(0));
         static const CallSig cs_aastore(CCONV_HELPERS, jobj, i32, jobj);
         unsigned stackFix = gen_stack_to_args(true, cs_aastore, 0);
-#ifdef _EM64T_
-        // Huh ? Do we really have another order of args here ?
-        AR gr = valloc(jobj);
-        mov(gr, cs_aastore.reg(0));
-        mov(cs_aastore.reg(0), cs_aastore.reg(2));
-        mov(cs_aastore.reg(2), gr);
-#endif
         gen_call_vm(cs_aastore, rt_helper_aastore, 3);
         if (stackFix != 0) {
             alu(alu_sub, sp, stackFix);
@@ -245,7 +238,7 @@ Opnd CodeGen::get_field_addr(const FieldOpInfo& fieldOp, jtype jt) {
             Val& ref = vstack(ref_depth, true);
             where = Opnd(jt, ref.reg(), fld_offset);
         }  else { //field is not resolved -> generate code to request offset
-            static const CallSig cs_get_offset(CCONV_STDCALL, iplatf, i32, i32);
+            static const CallSig cs_get_offset(CCONV_HELPERS, iplatf, i32, i32);
             gen_call_vm(cs_get_offset, rt_helper_field_get_offset_withresolve, 0, fieldOp.enclClass, fieldOp.cpIndex, fieldOp.isPut());
             runlock(cs_get_offset);
             rlock(gr_ret);
@@ -259,7 +252,7 @@ Opnd CodeGen::get_field_addr(const FieldOpInfo& fieldOp, jtype jt) {
             char * fld_addr = (char*)field_get_address(fieldOp.fld);
             where = vaddr(jt, fld_addr);
         }  else { //field is not resolved -> generate code to request address
-            static const CallSig cs_get_addr(CCONV_STDCALL, iplatf, i32, i32);
+            static const CallSig cs_get_addr(CCONV_HELPERS, iplatf, i32, i32);
             gen_call_vm(cs_get_addr, rt_helper_field_get_address_withresolve, 0, fieldOp.enclClass, fieldOp.cpIndex, fieldOp.isPut());
             runlock(cs_get_addr);
             where = Opnd(jt, gr_ret, 0);

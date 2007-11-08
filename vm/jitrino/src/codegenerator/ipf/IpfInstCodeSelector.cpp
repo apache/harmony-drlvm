@@ -1938,8 +1938,8 @@ CG_OpndHandle *IpfInstCodeSelector::newArray(ArrayType     *arrayType,
     IPF_LOG << "      newArray of " << arrayType->getElementType()->getName() << endl;
 
     Opnd *helperArgs[] = {
-        opndManager->newImm((int64) arrayType->getAllocationHandle()),
-        (Opnd *)numElems
+        (Opnd *)numElems,
+        opndManager->newImm((int64) arrayType->getAllocationHandle())
     };
     
     VM_RT_SUPPORT hId = VM_RT_NEW_VECTOR_USING_VTABLE;

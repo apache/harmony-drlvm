@@ -19,8 +19,6 @@
  * @version $Revision: 1.1.2.1.4.3 $
  */  
 
-
-
 //MVM
 #include <iostream>
 
@@ -33,6 +31,7 @@ using namespace std;
 #include "Class.h"
 #include "exceptions.h"
 #include "vm_threads.h"
+#include "jit_runtime_support_common.h"
 
 #include "compile.h"
 #include "nogc.h"
@@ -41,6 +40,7 @@ using namespace std;
 #include "environment.h"
 #include "lil.h"
 #include "lil_code_generator.h"
+#include "lil_code_generator_utils.h"
 
 #include "interpreter.h"
 
@@ -49,62 +49,107 @@ using namespace std;
 #define LOG_DOMAIN "invoke"
 #include "cxxlog.h"
 
-#ifdef _WIN32
-static int64 __declspec(naked) __stdcall
-vm_invoke_native_array_stub(uint32 *args,
-                            int sz,
-                            void* f)
-{
-    __asm {
-        push ebp
-        mov ebp, esp
-        push ebx // FIXME: check jit calling conventions,
-        push esi // is it necessary to save the registers here
-        push edi
+#include "dump.h"
 
-        mov eax, [ebp+8]
-        mov ecx, [ebp+12]
-        lea eax, [eax+ecx*4-4]
-        sub eax, esp
-        or ecx, ecx
-        je e
-        l:
-        push [esp+eax]
-        loop l
-        e:
-        mov eax, [ebp+16]
-        call eax
-        lea esp, [ebp-12]
-        pop edi
-        pop esi
-        pop ebx
-        leave
-        ret
+typedef double (*DoubleFuncPtr)(uint32* args, int args_size, void* func);
+typedef ManagedObject* (*RefFuncPtr)(uint32* args, int args_size, void* func);
+typedef float (*FloatFuncPtr)(uint32* args, int args_size, void* func);
+typedef int32 (*IntFuncPtr)(uint32* args, int args_size, void* func);
+
+static IntFuncPtr gen_invoke_managed_func() {
+    static IntFuncPtr func = NULL;
+    
+    if (func) {
+        return func;
     }
-}
-#else /* Linux */
-extern "C" {
-    int64 vm_invoke_native_array_stub(uint32 *args,
-                                      int sz,
-                                      void *func);
-}
 
+    // Defines stack alignment on managed function enter.
+    const int32 STACK_ALIGNMENT = MANAGED_STACK_ALIGNMENT;
+    const int32 STACK_ALIGNMENT_MASK = ~(STACK_ALIGNMENT - 1);
+    const char * LOOP_BEGIN = "loop_begin";
+    const char * LOOP_END = "loop_end";
+
+    // [ebp + 8] - args
+    // [ebp + 12] - size
+    // [ebp + 16] - func
+    const int32 STACK_ARGS_OFFSET = 8;
+    const int32 STACK_NARGS_OFFSET = 12;
+    const int32 STACK_FUNC_OFFSET = 16;
+    const int32 STACK_CALLEE_SAVED_OFFSET = -12;
+    
+    const int STUB_SIZE = 124;
+    char * stub = (char *) malloc_fixed_code_for_jit(STUB_SIZE,
+        DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_DEFAULT, CAA_Allocate);
+#ifdef _DEBUG
+    memset(stub, 0xcc /*int 3*/, STUB_SIZE);
 #endif
+    
+    tl::MemoryPool pool;
+    LilCguLabelAddresses labels(&pool, stub);
+    
+    func = (IntFuncPtr) stub;
 
-typedef double (*DoubleFuncPtr)(uint32*,int,void*);
-typedef ManagedObject* (*RefFuncPtr)(uint32*,int,void*);
-typedef float (*FloatFuncPtr)(uint32*,int,void*);
-typedef int32 (*IntFuncPtr)(uint32*,int,void*);
+    // Initialize ebp-based stack frame.
+    stub = push(stub, ebp_opnd);
+    stub = mov(stub, ebp_opnd, esp_opnd);
+    
+    // Preserve callee-saved registers.
+    stub = push(stub, ebx_opnd);
+    stub = push(stub, esi_opnd);
+    stub = push(stub, edi_opnd);
 
-DoubleFuncPtr vm_invoke_native_array_stub_double =
-        (DoubleFuncPtr) vm_invoke_native_array_stub;
-RefFuncPtr vm_invoke_native_array_stub_ref =
-        (RefFuncPtr) vm_invoke_native_array_stub;
-IntFuncPtr vm_invoke_native_array_stub_int =
-        (IntFuncPtr) vm_invoke_native_array_stub;
-FloatFuncPtr vm_invoke_native_array_stub_float =
-        (FloatFuncPtr) vm_invoke_native_array_stub;
+    // Load an array of arguments ('args') and its size from the stack.
+    stub = mov(stub, eax_opnd, M_Base_Opnd(ebp_reg, STACK_ARGS_OFFSET));
+    stub = mov(stub, ecx_opnd, M_Base_Opnd(ebp_reg, STACK_NARGS_OFFSET));
+    
 
+    // Align memory stack.
+    stub = lea(stub, ebx_opnd, M_Index_Opnd(n_reg, ecx_reg, 4, 4));
+    stub = mov(stub, esi_opnd, ebx_opnd);
+    stub = neg(stub, esi_opnd);
+    stub = alu(stub, add_opc, esi_opnd, esp_opnd);
+    stub = alu(stub, and_opc, esi_opnd, Imm_Opnd(size_32, STACK_ALIGNMENT_MASK));
+    stub = alu(stub, add_opc, ebx_opnd, esi_opnd);
+    stub = mov(stub, esp_opnd, ebx_opnd);
+    
+    // Load a pointer to the last argument of 'args' array.
+    stub = lea(stub, eax_opnd, M_Index_Opnd(eax_reg, ecx_reg, -4, 4));
+    stub = alu(stub, sub_opc, eax_opnd, esp_opnd);
+    stub = alu(stub, or_opc, ecx_opnd, ecx_opnd);
+    stub = branch8(stub, Condition_Z, Imm_Opnd(size_8, 0));
+    labels.add_patch_to_label(LOOP_END, stub - 1, LPT_Rel8);
+    
+// LOOP_BEGIN:
+    // Push inputs on the stack.
+    labels.define_label(LOOP_BEGIN, stub, false);
+    
+    stub = push(stub, M_Index_Opnd(esp_reg, eax_reg, 0, 1));
+    stub = loop(stub, Imm_Opnd(size_8, 0));
+    labels.add_patch_to_label(LOOP_BEGIN, stub - 1, LPT_Rel8);
+
+// LOOP_END:    
+    labels.define_label(LOOP_END, stub, false);
+    
+    // Call target function.
+    stub = mov(stub, eax_opnd, M_Base_Opnd(ebp_reg, STACK_FUNC_OFFSET));
+    stub = call(stub, eax_opnd);
+    
+    // Restore callee-saved registers from the stack.
+    stub = lea(stub, esp_opnd, M_Base_Opnd(ebp_reg, STACK_CALLEE_SAVED_OFFSET));
+    stub = pop(stub, edi_opnd);
+    stub = pop(stub, esi_opnd);
+    stub = pop(stub, ebx_opnd);
+    
+    // Leave current frame.
+    stub = pop(stub, ebp_opnd);
+    stub = ret(stub);
+    
+    assert(stub - (char *)func <= STUB_SIZE);
+
+    DUMP_STUB(func, "invoke_managed_func", stub - (char *)func);
+
+    return func;
+}
 
 void
 JIT_execute_method_default(JIT_Handle jit, jmethodID methodID, jvalue *return_value, jvalue *args) {
@@ -116,6 +161,8 @@ JIT_execute_method_default(JIT_Handle jit, jmethodID methodID, jvalue *return_va
     //printf("execute: push: prev = 0x%p, curr=0x%p\n", lastFrame, &lastFrame);
 
 //    fprintf(stderr, "Not implemented\n");
+
+    static const IntFuncPtr invoke_managed_func = gen_invoke_managed_func();
 
     Method *method = (Method*) methodID;
     TRACE("enter method "
@@ -196,14 +243,14 @@ JIT_execute_method_default(JIT_Handle jit, jmethodID methodID, jvalue *return_va
 
     switch(ret_type) {
         case JAVA_TYPE_VOID:
-            vm_invoke_native_array_stub(arg_words, argId, meth_addr);
+            invoke_managed_func(arg_words, argId, meth_addr);
             break;
 
         case JAVA_TYPE_CLASS:
         case JAVA_TYPE_ARRAY:
         case JAVA_TYPE_STRING:
             {
-                ManagedObject *ref = vm_invoke_native_array_stub_ref(arg_words, argId, meth_addr);
+                ManagedObject *ref = ((RefFuncPtr)invoke_managed_func)(arg_words, argId, meth_addr);
                 ObjectHandle h = oh_allocate_local_handle();
 
                 if (ref != NULL) {
@@ -220,19 +267,19 @@ JIT_execute_method_default(JIT_Handle jit, jmethodID methodID, jvalue *return_va
         case JAVA_TYPE_CHAR:
         case JAVA_TYPE_SHORT:
         case JAVA_TYPE_INT:
-            resultPtr->i = vm_invoke_native_array_stub_int(arg_words, argId, meth_addr);
+            resultPtr->i = ((IntFuncPtr)invoke_managed_func)(arg_words, argId, meth_addr);
             break;
 
         case JAVA_TYPE_FLOAT:
-            resultPtr->f = vm_invoke_native_array_stub_float(arg_words, argId, meth_addr);
+            resultPtr->f = ((FloatFuncPtr)invoke_managed_func)(arg_words, argId, meth_addr);
             break;
 
         case JAVA_TYPE_LONG:
-            resultPtr->j = vm_invoke_native_array_stub(arg_words, argId, meth_addr);
+            resultPtr->j = ((IntFuncPtr)invoke_managed_func)(arg_words, argId, meth_addr);
             break;
 
         case JAVA_TYPE_DOUBLE:
-            resultPtr->d = vm_invoke_native_array_stub_double(arg_words, argId, meth_addr);
+            resultPtr->d = ((DoubleFuncPtr)invoke_managed_func)(arg_words, argId, meth_addr);
             break;
 
         default:

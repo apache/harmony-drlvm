@@ -1217,7 +1217,10 @@ public:
     { assert(callingConvention!=NULL); return callingConvention; }
 
     uint32 getArgStackDepth(Inst::OpndRole role)const
-    { return (role & Inst::OpndRole_UseDef)==Inst::OpndRole_Def?defArgStackDepth:useArgStackDepth; }
+    { return ((role & Inst::OpndRole_UseDef) == Inst::OpndRole_Def) ? defArgStackDepth : useArgStackDepth; }
+
+    uint32 getArgStackDepthAlignment(Inst::OpndRole role) const
+    { return ((role & Inst::OpndRole_UseDef) == Inst::OpndRole_Def) ? useArgStackDepthAlignment : useArgStackDepthAlignment; }
 
     void setOwnerInst(Inst * oi){ ownerInst = oi; }
 protected:
@@ -1236,6 +1239,7 @@ protected:
     StlVector<StackOpndInfo>                    useStackOpndInfos;
     
     uint32 defArgStackDepth, useArgStackDepth;
+    uint32 defArgStackDepthAlignment, useArgStackDepthAlignment;
 
 };
 
@@ -1285,6 +1289,9 @@ public:
     uint32 getArgStackDepth()const
     { return callingConventionClient.getArgStackDepth(Inst::OpndRole_Use); }
 
+    uint32 getArgStackDepthAlignment() const
+    { return callingConventionClient.getArgStackDepthAlignment(Inst::OpndRole_Use); }
+    
     CallingConventionClient& getCallingConventionClient(){ return callingConventionClient; }
     const CallingConventionClient& getCallingConventionClient()const { return callingConventionClient; }
 

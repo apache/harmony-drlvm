@@ -81,12 +81,12 @@ void CodeGen::gen_gc_safe_point()
     //      test [eax+rt_suspend_req_flag_offset], 0
     // I don't believe this will gain any improvements for .jet, so using 
     // portable and 'official' way:
-    gen_call_vm(cs_v, rt_helper_get_tls_base_ptr, 0);
+    gen_call_vm(platform_v, rt_helper_get_tls_base_ptr, 0);
     // The address of flag is now in gr_ret
     Opnd mem(i32, gr_ret, rt_suspend_req_flag_offset);
     alu(alu_cmp, mem, Opnd(0));
     unsigned br_off = br(z, 0, 0, taken);
-    gen_call_vm_restore(false, cs_v, rt_helper_gc_safepoint, 0);
+    gen_call_vm_restore(false, helper_v, rt_helper_gc_safepoint, 0);
     patch(br_off, ip());
 }
 

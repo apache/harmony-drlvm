@@ -247,15 +247,10 @@ public:
     unsigned size(void) const
     {
         unsigned sz = -unused();
-        if (CCONV_MANAGED & CCONV_STACK_ALIGN16) {
-            return ((sz + 15) & ~0xF);
-        }
-        else if (CCONV_MANAGED & CCONV_STACK_ALIGN_HALF16) {
-            return ((sz + 15) & ~0xF) + 8;
-        }
-        else {
-            return ((sz + 3) & ~0x03);
-        }
+        unsigned alignment = (CCONV_MANAGED & CCONV_STACK_ALIGN_HALF16) ? CCONV_STACK_ALIGN16
+            : CCONV_MANAGED & CCONV_STACK_ALIGN_MASK;
+        alignment = (alignment == 0) ? CCONV_STACK_ALIGN4 : alignment; 
+        return ((sz + (alignment - 1)) & ~(alignment - 1));
     }
 
     //
@@ -378,4 +373,5 @@ private:
 }}; // ~namespace Jitrino::Jet
 
 #endif      // ~__SFRAME_H_INCLUDED__
+
 

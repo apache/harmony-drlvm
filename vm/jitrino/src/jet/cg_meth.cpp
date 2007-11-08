@@ -70,14 +70,21 @@ void Compiler::gen_prolog(void) {
     // Debugging things
     //
 
-    // Ensure stack is aligned properly - for _ALIGN16 only here.
-    // _ALIGN_HALF16 is handled below.
-    if (is_set(DBG_CHECK_STACK) && (m_ci.cc() & CCONV_STACK_ALIGN16)){
-        alu(alu_test, sp, 0xF);
+    // Ensure stack is aligned properly.
+    unsigned alignment = (m_ci.cc() & CCONV_STACK_ALIGN_HALF16) ? CCONV_STACK_ALIGN16
+        : m_ci.cc() & CCONV_STACK_ALIGN_MASK;
+    if (is_set(DBG_CHECK_STACK) && alignment != 0) {
+        if (m_ci.cc() & CCONV_STACK_ALIGN_HALF16) {
+            alu(alu_sub, sp, (unsigned)STACK_SLOT_SIZE);
+        }
+        alu(alu_test, sp, (alignment - 1));
         unsigned br_off = br(eq, 0, 0);
         gen_dbg_rt(false, "Misaligned stack @ %s", meth_fname());
         gen_brk();
         patch(br_off, ip());
+        if (m_ci.cc() & CCONV_STACK_ALIGN_HALF16) {
+            alu(alu_add, sp, (unsigned)STACK_SLOT_SIZE);
+        }
     }
     
     if (is_set(DBG_BRK)) {
@@ -102,18 +109,7 @@ void Compiler::gen_prolog(void) {
     //
     unsigned frameSize = m_stack.size();
     alu(alu_sub, sp, frameSize);
-    
-    // Ensure stack is aligned properly - do it here for _ALIGN_HALF16,
-    // as the stack must be (sp%16==0) at this point
-    if (is_set(DBG_CHECK_STACK) && (m_ci.cc() & CCONV_STACK_ALIGN_HALF16)){
-        assert((frameSize+8) % 16 == 0);
-        alu(alu_test, sp, 0xF);
-        unsigned br_off = br(eq, 0, 0);
-        gen_dbg_rt(false, "Misaligned stack @ %s", meth_fname());
-        gen_brk();
-        patch(br_off, ip());
-    }
-    
+        
     // Lock all the args registers to avoid them to be rewritten by the 
     // frame setup procedures
     rlock(m_ci);
@@ -533,6 +529,10 @@ void Compiler::gen_prolog(void) {
         else {
             AR gr = gr0;
             if (cs_mon.reg(0) != gr_x) {
+                if (cs_mon.size() != 0) {
+                    assert(cs_mon.caller_pops());
+                    alu(alu_sub, sp, cs_mon.size());                    
+                }
                 ld(jobj, cs_mon.reg(0), m_base, voff(m_stack.thiz()));
             }
             else {
@@ -585,6 +585,10 @@ void Compiler::gen_return(jtype retType)
         }
         AR gr = valloc(jobj);
         if (cs_mon.reg(0) != gr_x) {
+            if (cs_mon.size() != 0) {
+                assert(cs_mon.caller_pops());
+                alu(alu_sub, sp, cs_mon.size());                    
+            }            
             vpark(cs_mon.reg(0));
             ld(jobj, cs_mon.reg(0), m_base, voff(m_stack.thiz()));
         }
@@ -603,7 +607,7 @@ void Compiler::gen_return(jtype retType)
     if (compilation_params.exe_notify_method_exit) {
 
         // JVMTI helper takes pointer to return value and method handle
-        const CallSig cs_ti_mexit(CCONV_STDCALL, jobj, jobj);
+        const CallSig cs_ti_mexit(CCONV_HELPERS, jobj, jobj);
         // The call is a bit unusual, and is processed as follows:
         // we load an address of the top of the operand stack into 
         // a temporary register, and then pass this value as pointer
@@ -685,8 +689,11 @@ void Compiler::gen_return(jtype retType)
         Opnd op = vstack(0, true).as_opnd();
         st(jtmov(retType), op.reg(), m_base, voff(m_stack.scratch()));
         ld(jobj, gtmp, m_base, voff(m_stack.scratch()));
-        if (cs_trace_arg.reg(0) != gr_x)  { 
-            assert(cs_trace_arg.size() == 0);
+        if (cs_trace_arg.reg(0) != gr_x)  {
+            if (cs_trace_arg.size() != 0) {
+                assert(cs_trace_arg.caller_pops());
+                alu(alu_sub, sp, cs_trace_arg.size());                    
+            }
             mov(cs_trace_arg.reg(0), gtmp);
         }
         else {
@@ -793,14 +800,14 @@ void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth, unsigned short
         assert(m_lazy_resolution);
         //1. get method address
         if (opcod == OPCODE_INVOKESTATIC || opcod == OPCODE_INVOKESPECIAL) {
-            static const CallSig cs_get_is_addr(CCONV_STDCALL, iplatf, i32);
+            static const CallSig cs_get_is_addr(CCONV_HELPERS, iplatf, i32);
             char* helper = opcod == OPCODE_INVOKESTATIC ?  rt_helper_get_invokestatic_addr_withresolve :
                                                            rt_helper_get_invokespecial_addr_withresolve;
             gen_call_vm(cs_get_is_addr, helper, 0, m_klass, cpIndex);
             runlock(cs_get_is_addr);
         } else {
             assert(opcod == OPCODE_INVOKEVIRTUAL || opcod == OPCODE_INVOKEINTERFACE);
-            static const CallSig cs_get_iv_addr(CCONV_STDCALL, iplatf, i32, jobj);
+            static const CallSig cs_get_iv_addr(CCONV_HELPERS, iplatf, i32, jobj);
             char * helper = opcod == OPCODE_INVOKEVIRTUAL ? rt_helper_get_invokevirtual_addr_withresolve : 
                                                             rt_helper_get_invokeinterface_addr_withresolve;
             // setup constant parameters first,
@@ -825,7 +832,7 @@ void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth, unsigned short
     else if (opcod == OPCODE_INVOKEINTERFACE) {
         // if it's INVOKEINTERFACE, then first resolve it
         Class_Handle klass = method_get_class(meth);
-        const CallSig cs_vtbl(CCONV_STDCALL, jobj, jobj);
+        const CallSig cs_vtbl(CCONV_HELPERS, jobj, jobj);
         // Prepare args for ldInterface helper
         if (cs_vtbl.reg(0) == gr_x) {
             assert(cs_vtbl.size() != 0);
@@ -833,7 +840,10 @@ void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth, unsigned short
             st(jobj, thiz.reg(), sp, cs_vtbl.off(0));
         }
         else {
-            assert(cs_vtbl.size() == 0);
+            if (cs_vtbl.size() != 0) {
+                assert(cs_vtbl.caller_pops());
+                alu(alu_sub, sp, cs_vtbl.size());                    
+            }
             mov(cs_vtbl.get(0), thiz.as_opnd());
         }
         gen_call_vm(cs_vtbl, rt_helper_get_vtable, 1, klass);
@@ -975,7 +985,9 @@ void CodeGen::gen_save_ret(jtype jt)
         Opnd tmp(jt, gtmp);
         mov(tmp, Opnd(jt, gr_ret));
         if (cs_trace_arg.reg(0) != gr_x)  { 
-            assert(cs_trace_arg.size() == 0);
+            if (cs_trace_arg.size() != 0) {
+                alu(alu_sub, sp, cs_trace_arg.size());
+            }
             mov(cs_trace_arg.reg(0), gtmp);
         }
         else {

@@ -517,19 +517,24 @@ void Encoder::call(const Opnd& target, const CallSig& ci, bool check_stack)
     if (is_trace_on()) {
         trace("call", to_str(target), "");
     }
-    if (check_stack && 
-        (ci.cc() & (CCONV_STACK_ALIGN_HALF16|CCONV_STACK_ALIGN16))) {
-        if (ci.cc() & CCONV_STACK_ALIGN16) {
-            alu(alu_sub, sp, 8);
+        
+    unsigned alignment = (ci.cc() &  CCONV_STACK_ALIGN_HALF16) ? CCONV_STACK_ALIGN16
+        : ci.cc() & CCONV_STACK_ALIGN_MASK;
+    if (check_stack && alignment != 0) {
+        alu(alu_sub, sp, (unsigned)STACK_SLOT_SIZE);
+        if (ci.cc() & CCONV_STACK_ALIGN_HALF16) {
+            alu(alu_sub, sp, (unsigned)STACK_SLOT_SIZE);
         }
-        alu(alu_test, sp, 0x0F);
+        alu(alu_test, sp, (alignment - 1));
         unsigned br_off = br(z, 0, 0, taken);
         trap();
-        if (ci.cc() & CCONV_STACK_ALIGN16) {
-            alu(alu_add, sp, 8);
-        }
         patch(br_off, ip());
+        if (ci.cc() & CCONV_STACK_ALIGN_HALF16) {
+            alu(alu_add, sp, (unsigned)STACK_SLOT_SIZE);
+        }
+        alu(alu_add, sp, (unsigned)STACK_SLOT_SIZE);
     }
+    
     call_impl(target);
     if (ci.caller_pops() && ci.size() != 0) {
         alu(alu_add, sp, ci.size());

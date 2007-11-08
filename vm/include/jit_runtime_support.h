@@ -64,8 +64,8 @@ enum VM_RT_SUPPORT {
     VM_RT_NEW_VECTOR_USING_VTABLE=101,
 /**   
  * @param The parameters are the following:
- *        \arg <code>Allocation_Handle</code> for the vector class
  *        \arg Vector length
+ *        \arg <code>Allocation_Handle</code> for the vector class
  *
  * @return Reference to the new object.
  *
@@ -92,8 +92,8 @@ enum VM_RT_SUPPORT {
     VM_RT_LDC_STRING=103,
 /**
  * @param The parameters are the following:
- *        \arg Const pool index pointing to a CONSTANT_Class.
  *        \arg Class handle of the class owning the const pool
+ *        \arg Const pool index pointing to a CONSTANT_Class.
  *
  * @return \arg Reference to the String object.
  *         \arg Reference to the const string represented by an entry in the
@@ -304,9 +304,9 @@ enum VM_RT_SUPPORT {
     VM_RT_AASTORE=402,
 /**
  * @param The parameters are the following:
- *        \arg Element
- *        \arg Index
  *        \arg Array
+ *        \arg Index
+ *        \arg Element
  *
  * @return None.
  *

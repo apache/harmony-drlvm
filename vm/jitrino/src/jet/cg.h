@@ -55,9 +55,9 @@ extern const CallSig ci_helper_o;
  */
 extern const CallSig ci_helper_v;
 /**
- * CallSig for a VM helper that takes 2 args: (#i32, #jobj).
+ * CallSig for a VM helper that takes 2 args: (#jobj, #i32).
  */
-extern const CallSig ci_helper_io;
+extern const CallSig ci_helper_oi;
 /**
  * CallSig for VM helper THROW_LINKAGE_ERROR.
  */

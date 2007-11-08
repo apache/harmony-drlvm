@@ -55,7 +55,7 @@ void CodeGen::gen_new_array(Class_Handle enclClass, unsigned cpIndex)
         return;
     } 
     assert(lazy);
-    static const CallSig cs_newarray_withresolve(CCONV_STDCALL, iplatf, i32, i32);
+    static const CallSig cs_newarray_withresolve(CCONV_HELPERS, iplatf, i32, i32);
     Val sizeVal = vstack(0);
     // setup constant parameters first,
     Val vclass(iplatf, enclClass);
@@ -82,22 +82,11 @@ void CodeGen::gen_new_array(Allocation_Handle ah) {
         gen_call_throw(ci_helper_linkerr, rt_helper_throw_linking_exc, 0,
                        m_klass, jinst.op0, jinst.opcode);
     }
-#ifdef _EM64T_
     static const CallSig cs_new_arr(CCONV_HELPERS, i32, jobj);
     unsigned stackFix = gen_stack_to_args(true, cs_new_arr, 0, 1);
     gen_call_vm(cs_new_arr, rt_helper_new_array, 1, ah);
     runlock(cs_new_arr);
-#else
-    static const CallSig cs_new_arr(CCONV_HELPERS, jobj, i32);
-    rlock(cs_new_arr);
-    AR artmp = valloc(jobj);
-    rlock(artmp);
-    Encoder::gen_args(cs_new_arr, artmp, 0, 1, ah);
-    unsigned stackFix = gen_stack_to_args(true, cs_new_arr, 1, 1);
-    runlock(artmp);
-    gen_call_vm(cs_new_arr, rt_helper_new_array, cs_new_arr.count());
-    runlock(cs_new_arr);
-#endif
+    
     if (stackFix != 0) {
         alu(alu_sub, sp, stackFix);
     }
@@ -129,7 +118,7 @@ void CodeGen::gen_multianewarray(Class_Handle enclClass, unsigned short cpIndex,
     bool resolve = !lazy || class_is_cp_entry_resolved(m_compileHandle, enclClass, cpIndex);
     if(!resolve) {
         assert(lazy);
-        static CallSig ci_get_class_withresolve(CCONV_STDCALL, iplatf, i32);
+        static CallSig ci_get_class_withresolve(CCONV_HELPERS, iplatf, i32);
         gen_call_vm(ci_get_class_withresolve, rt_helper_get_class_withresolve, 0, enclClass, cpIndex);
         runlock(ci_get_class_withresolve);
         klassVal = Val(jobj, gr_ret);
@@ -179,12 +168,12 @@ void CodeGen::gen_new(Class_Handle enclClass, unsigned short cpIndex)
             }
             unsigned size = class_get_boxed_data_size(klass);
             Allocation_Handle ah = class_get_allocation_handle(klass);
-            static CallSig ci_new(CCONV_STDCALL, i32, jobj);
+            static CallSig ci_new(CCONV_HELPERS, i32, jobj);
             gen_call_vm(ci_new, rt_helper_new, 0, size, ah);
         }
     } else {
         assert(lazy);
-        static CallSig ci_new_with_resolve(CCONV_STDCALL, iplatf, i32);
+        static CallSig ci_new_with_resolve(CCONV_HELPERS, iplatf, i32);
         gen_call_vm(ci_new_with_resolve, rt_helper_new_withresolve, 0, enclClass, cpIndex);
     }
     gen_save_ret(jobj);
@@ -204,7 +193,7 @@ void CodeGen::gen_instanceof_cast(JavaByteCodes opcode, Class_Handle enclClass, 
             assert(!lazy);
             gen_call_throw(ci_helper_linkerr, rt_helper_throw_linking_exc, 0, enclClass, cpIdx, opcode);
         }
-        static const CallSig cs(CCONV_STDCALL, jobj, jobj);
+        static const CallSig cs(CCONV_HELPERS, jobj, jobj);
         unsigned stackFix = gen_stack_to_args(true, cs, 0, 1);
         char * helper = opcode == OPCODE_CHECKCAST ? rt_helper_checkcast : rt_helper_instanceof;
         gen_call_vm(cs, helper, 1, klass);
@@ -215,7 +204,7 @@ void CodeGen::gen_instanceof_cast(JavaByteCodes opcode, Class_Handle enclClass, 
         gen_save_ret(opcode == OPCODE_CHECKCAST ? jobj : i32);
     } else {
         assert(lazy);
-        static const CallSig cs_with_resolve(CCONV_STDCALL, iplatf, i32, jobj);
+        static const CallSig cs_with_resolve(CCONV_HELPERS, iplatf, i32, jobj);
         char * helper = opcode == OPCODE_CHECKCAST ? rt_helper_checkcast_withresolve : rt_helper_instanceof_withresolve;
         Val tos = vstack(0);
         // setup constant parameters first,
@@ -233,7 +222,7 @@ void CodeGen::gen_monitor_ee(void)
 {
     const JInst& jinst = *m_curr_inst;
     gen_check_null(0);
-    static const CallSig cs_mon(CCONV_MANAGED, jobj);
+    static const CallSig cs_mon(CCONV_HELPERS, jobj);
     unsigned stackFix = gen_stack_to_args(true, cs_mon, 0);
     gen_call_vm(cs_mon,
             jinst.opcode == OPCODE_MONITORENTER ? 
@@ -246,7 +235,7 @@ void CodeGen::gen_monitor_ee(void)
 
 void CodeGen::gen_athrow(void)
 {
-    static const CallSig cs_throw(CCONV_MANAGED, jobj);
+    static const CallSig cs_throw(CCONV_HELPERS, jobj);
     unsigned stackFix = gen_stack_to_args(true, cs_throw, 0);
     gen_call_vm(cs_throw, rt_helper_throw, 1);
     runlock(cs_throw);

@@ -30,12 +30,35 @@
 #include "platform_lowlevel.h"
 #include "heap.h"
 
+/**
+ * When entering managed function, obey the (sp)%%4 == 0 rule.
+ */
+#define STACK_ALIGN4         (0x00000004)
+
+/**
+ * When entering managed function, obey the (sp)%%8 == 0 rule.
+ */
+#define STACK_ALIGN_HALF16   (0x00000008)
+
+/**
+ * When entering managed function, obey the (sp)%%16 == 0 rule.
+ */
+#define STACK_ALIGN16         (0x00000010)
+
+
+#ifdef _EM64T_
+    #define MANAGED_STACK_ALIGNMENT STACK_ALIGN_HALF16
+#else
+    // Use 16-byte stack pointer alignment to avoid perf penalty on SSE usage in JITted code. 
+    #define MANAGED_STACK_ALIGNMENT STACK_ALIGN16
+#endif
+
 VMEXPORT // temporary solution for interpreter unplug
 int __stdcall vm_instanceof(ManagedObject *obj, Class *c);
 
 // Implements VM_RT_AASTORE
 void * __stdcall
-vm_rt_aastore(ManagedObject *elem, int idx, Vector_Handle array);
+vm_rt_aastore(Vector_Handle array, int idx, ManagedObject *elem);
 
 // Implements VM_RT_AASTORE_TEST
 int __stdcall

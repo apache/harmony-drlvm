@@ -126,7 +126,7 @@ static NativeCodePtr rth_get_lil_multianewarray(int* dyn_count)
     static NativeCodePtr addr = NULL;
 
     if (!addr) {
-        LilCodeStub* cs = lil_parse_code_stub("entry 0:managed::ref;");
+        LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall::ref;");
         assert(cs);
         if (dyn_count) {
             cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
@@ -195,7 +195,7 @@ static NativeCodePtr rth_get_lil_ldc_ref(int* dyn_count)
 
     if (!addr) {
         ManagedObject* (*p_instantiate_ref)(Class*,unsigned) = rth_ldc_ref_helper;
-        LilCodeStub* cs = lil_parse_code_stub("entry 0:managed:g4,pint:ref;");
+        LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:pint,g4:ref;");
         assert(cs);
         if (dyn_count) {
             cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
@@ -203,9 +203,7 @@ static NativeCodePtr rth_get_lil_ldc_ref(int* dyn_count)
         }
         cs = lil_parse_onto_end(cs,
             "push_m2n 0, %0i;"
-            "out platform:pint,g4:ref;"
-            "o0=i1;"
-            "o1=i0;"
+            "in2out platform:ref;"
             "call %1i;"
             "pop_m2n;"
             "ret;",
@@ -406,7 +404,7 @@ static NativeCodePtr rth_get_lil_checkcast(int* dyn_count)
     static NativeCodePtr addr = NULL;
 
     if (!addr) {
-        LilCodeStub* cs = lil_parse_code_stub("entry 0:rth:ref,pint:ref;");
+        LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:ref,pint:ref;");
 
 #ifdef VM_STATS
         if (dyn_count) {
@@ -435,7 +433,7 @@ static NativeCodePtr rth_get_lil_instanceof(int* dyn_count)
     static NativeCodePtr addr = NULL;
 
     if (!addr) {
-        LilCodeStub* cs = lil_parse_code_stub("entry 0:rth:ref,pint:g4;");
+        LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:ref,pint:g4;");
 #ifdef VM_STATS
         assert(dyn_count);
         cs = lil_parse_onto_end(cs, "inc [%0i:pint]; in2out platform:void; call %1i;", dyn_count, rth_update_instanceof_stats);
@@ -458,7 +456,7 @@ static NativeCodePtr rth_get_lil_instanceof(int* dyn_count)
 
 // Store a reference into an array at a given index and return NULL,
 // or return the Class* for the exception to throw.
-static Class* rth_aastore(ManagedObject* elem, int idx, Vector_Handle array)
+static Class* rth_aastore(Vector_Handle array, int idx, ManagedObject* elem)
 {
 #ifdef VM_STATS
     VM_Statistics::get_vm_stats().num_aastore ++;
@@ -507,9 +505,9 @@ static NativeCodePtr rth_get_lil_aastore(int * dyn_count)
     static NativeCodePtr addr = NULL;
 
     if (!addr) {
-        Class* (*p_aastore)(ManagedObject*, int, Vector_Handle) = rth_aastore;
-        // The args are the element ref to store, the index, and the array to store into\n"
-        LilCodeStub* cs = lil_parse_code_stub("entry 0:rth:ref,pint,ref:void;");
+        Class* (*p_aastore)(Vector_Handle, int, ManagedObject*) = rth_aastore;
+        // The args are the array to store into, the index, and the element ref to store\n"
+        LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:ref,pint,ref:void;");
 #ifdef VM_STATS
         assert(dyn_count);
         cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
@@ -583,7 +581,7 @@ static NativeCodePtr rth_get_lil_aastore_test(int * dyn_count)
     if (!addr) {
         bool (*p_aastore_test)(ManagedObject*, Vector_Handle) = rth_aastore_test;
         // The args are the element ref to store and the array to store into\n
-        LilCodeStub* cs = lil_parse_code_stub("entry 0:rth:ref,ref:void;");
+        LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:ref,ref:void;");
         assert(cs);
 #ifdef VM_STATS
         assert(dyn_count);
@@ -620,7 +618,7 @@ static NativeCodePtr rth_get_lil_throw_linking_exception(int* dyn_count)
     if (!addr) {
         void (*p_throw_linking_error)(Class_Handle ch, unsigned index, unsigned opcode) =
             vm_rt_class_throw_linking_error;
-        LilCodeStub* cs = lil_parse_code_stub("entry 0:managed:pint,g4,g4:void;");
+        LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:pint,g4,g4:void;");
         assert(cs);
         if (dyn_count) {
             cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
@@ -661,7 +659,7 @@ static NativeCodePtr rth_get_lil_get_interface_vtable(int* dyn_count)
 
     if (!addr) {
         void* (*p_get_ivtable)(ManagedObject*, Class*) = rth_get_interface_vtable;
-        LilCodeStub* cs = lil_parse_code_stub("entry 0:rth:ref,pint:pint;");
+        LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:ref,pint:pint;");
         assert(cs);
         if (dyn_count) {
             cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
@@ -734,7 +732,7 @@ static NativeCodePtr rth_get_lil_initialize_class(int* dyn_count)
         POINTER_SIZE_INT (*p_is_inited)(Class*) = is_class_initialized;
         void (*p_init)(Class*) = class_initialize;
         void (*p_rethrow)() = exn_rethrow;
-        LilCodeStub* cs = lil_parse_code_stub("entry 0:rth:pint:void;");
+        LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:pint:void;");
         assert(cs);
 #ifdef VM_STATS
         assert(dyn_count);
@@ -801,7 +799,7 @@ static NativeCodePtr rth_get_lil_f2i(int* dyn_count)
 
     if (!addr) {
         int32 (*p_f2i)(float) = f2i;
-        LilCodeStub* cs = lil_parse_code_stub("entry 0:rth:f4:g4;");
+        LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:f4:g4;");
         assert(cs);
         if (dyn_count) {
             cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
@@ -854,7 +852,7 @@ static NativeCodePtr rth_get_lil_f2l(int* dyn_count)
 
     if (!addr) {
         int64 (*p_f2l)(float) = f2l;
-        LilCodeStub* cs = lil_parse_code_stub("entry 0:rth:f4:g8;");
+        LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:f4:g8;");
         assert(cs);
         if (dyn_count) {
             cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
@@ -899,7 +897,7 @@ static NativeCodePtr rth_get_lil_d2i(int* dyn_count)
 
     if (!addr) {
         int32 (*p_d2i)(double) = d2i;
-        LilCodeStub* cs = lil_parse_code_stub("entry 0:rth:f8:g4;");
+        LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:f8:g4;");
         assert(cs);
         if (dyn_count) {
             cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
@@ -952,7 +950,7 @@ static NativeCodePtr rth_get_lil_d2l(int* dyn_count)
 
     if (!addr) {
         int64 (*p_d2l)(double) = d2l;
-        LilCodeStub* cs = lil_parse_code_stub("entry 0:rth:f8:g8;");
+        LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:f8:g8;");
         assert(cs);
         if (dyn_count) {
             cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
@@ -985,7 +983,7 @@ static NativeCodePtr rth_get_lil_lshl(int* dyn_count)
 
     if (!addr) {
         int64 (*p_lshl)(int64, int32) = lshl;
-        LilCodeStub* cs = lil_parse_code_stub("entry 0:managed:g8,g4:g8;");
+        LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:g8,g4:g8;");
         assert(cs);
         if (dyn_count) {
             cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
@@ -1018,7 +1016,7 @@ static NativeCodePtr rth_get_lil_lshr(int* dyn_count)
 
     if (!addr) {
         int64 (*p_lshr)(int64, int32) = lshr;
-        LilCodeStub* cs = lil_parse_code_stub("entry 0:managed:g8,g4:g8;");
+        LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:g8,g4:g8;");
         assert(cs);
         if (dyn_count) {
             cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
@@ -1051,7 +1049,7 @@ static NativeCodePtr rth_get_lil_lushr(int* dyn_count)
 
     if (!addr) {
         uint64 (*p_lushr)(uint64, uint32) = lushr;
-        LilCodeStub* cs = lil_parse_code_stub("entry 0:managed:g8,g4:g8;");
+        LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:g8,g4:g8;");
         assert(cs);
         if (dyn_count) {
             cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
@@ -1084,7 +1082,7 @@ static NativeCodePtr rth_get_lil_lmul(int* dyn_count)
 
     if (!addr) {
         int64 (*p_lmul)(int64, int64) = lmul;
-        LilCodeStub* cs = lil_parse_code_stub("entry 0:rth:g8,g8:g8;");
+        LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:g8,g8:g8;");
         assert(cs);
         if (dyn_count) {
             cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
@@ -1118,7 +1116,7 @@ static NativeCodePtr rth_get_lil_lrem(int* dyn_count)
 
     if (!addr) {
         int64 (*p_lrem)(int64, int64) = lrem;
-        LilCodeStub* cs = lil_parse_code_stub("entry 0:rth:g8,g8:g8;");
+        LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:g8,g8:g8;");
         assert(cs);
         if (dyn_count) {
             cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
@@ -1155,7 +1153,7 @@ static NativeCodePtr rth_get_lil_ldiv(int* dyn_count)
 
     if (!addr) {
         int64 (*p_ldiv)(int64, int64) = ldiv;
-        LilCodeStub* cs = lil_parse_code_stub("entry 0:rth:g8,g8:g8;");
+        LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:g8,g8:g8;");
         assert(cs);
         if (dyn_count) {
             cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
@@ -1192,7 +1190,7 @@ static NativeCodePtr rth_get_lil_ludiv(int* dyn_count)
 
     if (!addr) {
         uint64 (*p_ludiv)(uint64, uint64) = ludiv;
-        LilCodeStub* cs = lil_parse_code_stub("entry 0:rth:g8,g8:g8;");
+        LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:g8,g8:g8;");
         assert(cs);
         if (dyn_count) {
             cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
@@ -1225,7 +1223,7 @@ static NativeCodePtr rth_get_lil_ldiv_const(int* dyn_count)
         // This constant must be kept in sync with MAGIC in ir.cpp
         POINTER_SIZE_INT divisor_offset = 40;
         int64 (*p_ldiv)(int64, int64) = ldiv;
-        LilCodeStub* cs = lil_parse_code_stub("entry 0:rth:g8,pint:g8;");
+        LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:g8,pint:g8;");
         assert(cs);
         if (dyn_count) {
             cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
@@ -1257,7 +1255,7 @@ static NativeCodePtr rth_get_lil_lrem_const(int* dyn_count)
         // This constant must be kept in sync with MAGIC in ir.cpp
         POINTER_SIZE_INT divisor_offset = 40;
         int64 (*p_lrem)(int64, int64) = lrem;
-        LilCodeStub* cs = lil_parse_code_stub("entry 0:rth:g8,pint:g8;");
+        LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:g8,pint:g8;");
         assert(cs);
         if (dyn_count) {
             cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
@@ -1292,7 +1290,7 @@ static NativeCodePtr rth_get_lil_imul(int* dyn_count)
 
     if (!addr) {
         int32 (*p_imul)(int32, int32) = imul;
-        LilCodeStub* cs = lil_parse_code_stub("entry 0:rth:g4,g4:g4;");
+        LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:g4,g4:g4;");
         assert(cs);
         if (dyn_count) {
             cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
@@ -1326,7 +1324,7 @@ static NativeCodePtr rth_get_lil_irem(int* dyn_count)
 
     if (!addr) {
         int32 (*p_irem)(int32, int32) = irem;
-        LilCodeStub* cs = lil_parse_code_stub("entry 0:rth:g4,g4:g4;");
+        LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:g4,g4:g4;");
         assert(cs);
         if (dyn_count) {
             cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
@@ -1363,7 +1361,7 @@ static NativeCodePtr rth_get_lil_idiv(int* dyn_count)
 
     if (!addr) {
         int32 (*p_idiv)(int32, int32) = idiv;
-        LilCodeStub* cs = lil_parse_code_stub("entry 0:rth:g4,g4:g4;");
+        LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:g4,g4:g4;");
         assert(cs);
         if (dyn_count) {
             cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
@@ -1430,7 +1428,7 @@ static NativeCodePtr rth_get_lil_frem(int* dyn_count)
 
     if (!addr) {
         float (*p_frem)(float, float) = frem;
-        LilCodeStub* cs = lil_parse_code_stub("entry 0:rth:f4,f4:f4;");
+        LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:f4,f4:f4;");
         assert(cs);
         if (dyn_count) {
             cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
@@ -1463,7 +1461,7 @@ static NativeCodePtr rth_get_lil_fdiv(int* dyn_count)
 
     if (!addr) {
         float (*p_fdiv)(float, float) = fdiv;
-        LilCodeStub* cs = lil_parse_code_stub("entry 0:managed:f4,f4:f4;");
+        LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:f4,f4:f4;");
         assert(cs);
         if (dyn_count) {
             cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
@@ -1496,7 +1494,7 @@ static NativeCodePtr rth_get_lil_drem(int* dyn_count)
 
     if (!addr) {
         double (*p_drem)(double, double) = my_drem;
-        LilCodeStub* cs = lil_parse_code_stub("entry 0:managed:f8,f8:f8;");
+        LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:f8,f8:f8;");
         assert(cs);
         if (dyn_count) {
             cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
@@ -1529,7 +1527,7 @@ static NativeCodePtr rth_get_lil_ddiv(int* dyn_count)
 
     if (!addr) {
         double (*p_ddiv)(double, double) = ddiv;
-        LilCodeStub* cs = lil_parse_code_stub("entry 0:managed:f8,f8:f8;");
+        LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:f8,f8:f8;");
         assert(cs);
         if (dyn_count) {
             cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
@@ -1567,7 +1565,7 @@ static NativeCodePtr rth_wrap_exn_throw(int* dyncount, const char* name, NativeC
     if (wrappers.lookup(stub, &_junk, &wrapper)) return wrapper;
 
     LilCodeStub* cs = lil_parse_code_stub(
-        "entry 0:managed:arbitrary;"
+        "entry 0:stdcall:arbitrary;"
         "inc [%0i:g4];"
         "tailcall %1i;",
         dyncount, lil_npc_to_fp(stub));
@@ -1591,7 +1589,7 @@ static NativeCodePtr rth_get_lil_gc_safe_point(int * dyn_count) {
         return addr;
     }
     void (*hythread_safe_point_ptr)() = jvmti_safe_point;
-    LilCodeStub* cs = lil_parse_code_stub("entry 0:managed::void;");
+    LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall::void;");
     assert(cs);
     if (dyn_count) {
         cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
@@ -1624,7 +1622,7 @@ static NativeCodePtr rth_get_lil_jvmti_method_enter_callback(int * dyn_count) {
             return addr;
     }
     void (*jvmti_method_enter_callback_ptr)(Method_Handle) = jvmti_method_enter_callback;
-    LilCodeStub* cs = lil_parse_code_stub("entry 0:managed:pint:void;");
+    LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:pint:void;");
     assert(cs);
     if (dyn_count) {
             cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
@@ -1653,7 +1651,7 @@ static NativeCodePtr rth_get_lil_jvmti_method_exit_callback(int * dyn_count) {
         return addr;
     }
     void (*jvmti_method_exit_callback_ptr)(Method_Handle, jvalue *) = jvmti_method_exit_callback;
-    LilCodeStub* cs = lil_parse_code_stub("entry 0:managed:pint,pint:void;");
+    LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:pint,pint:void;");
     assert(cs);
     if (dyn_count) {
         cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
@@ -1661,14 +1659,7 @@ static NativeCodePtr rth_get_lil_jvmti_method_exit_callback(int * dyn_count) {
     }
     cs = lil_parse_onto_end(cs,
         "push_m2n 0, %0i;"
-        "out platform:pint,pint:void;"
-#ifdef _EM64T_
-        "o0=i0;"
-        "o1=i1;"
-#else
-        "o0=i1;"
-        "o1=i0;"
-#endif
+        "in2out platform:void;"
         "call %1i;"
         "pop_m2n;"
         "ret;",
@@ -1691,7 +1682,7 @@ static NativeCodePtr rth_get_lil_jvmti_field_access_callback(int * dyn_count) {
     void (*jvmti_field_access_callback_ptr)(Field_Handle, Method_Handle,
             jlocation, ManagedObject*) = jvmti_field_access_callback;
 
-    LilCodeStub* cs = lil_parse_code_stub("entry 0:managed:pint,pint,g8,pint:void;");
+    LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:pint,pint,g8,pint:void;");
     assert(cs);
     if (dyn_count) {
         cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
@@ -1718,7 +1709,7 @@ static NativeCodePtr rth_get_lil_jvmti_field_access_callback(int * dyn_count) {
     //        return addr;
     //    }
     //LilCodeStub* cs = lil_parse_code_stub(
-    //    "entry 0:managed:pint,pint,g8,pint:void;"
+    //    "entry 0:stdcall:pint,pint,g8,pint:void;"
     //    "push_m2n 0, 0;"
     //    "in2out platform:void;"
     //    "call %0i;"
@@ -1738,7 +1729,7 @@ static NativeCodePtr rth_get_lil_jvmti_field_modification_callback(int * dyn_cou
         }
     void (*jvmti_field_modification_callback_ptr)(Field_Handle, Method_Handle,
             jlocation, ManagedObject*, jvalue*) = jvmti_field_modification_callback;
-    LilCodeStub* cs = lil_parse_code_stub("entry 0:managed:pint,pint,g8,pint,pint:void;");
+    LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:pint,pint,g8,pint,pint:void;");
     assert(cs);
     if (dyn_count) {
         cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
@@ -1765,7 +1756,7 @@ static NativeCodePtr rth_get_lil_jvmti_field_modification_callback(int * dyn_cou
     //    return addr;
     //}
     //LilCodeStub* cs = lil_parse_code_stub(
-    //    "entry 0:managed:pint,pint,g8,pint,pint:void;"
+    //    "entry 0:stdcall:pint,pint,g8,pint,pint:void;"
     //    "push_m2n 0, 0;"
     //    "in2out platform:void;"
     //    "call %0i;"
@@ -1797,11 +1788,11 @@ static NativeCodePtr rth_get_lil_stub_withresolve(int * dyn_count, f_resolve foo
     LilCodeStub* cs = NULL;
     const char* in2out = NULL;
     if (type == ResolveResType_Unmanaged) {
-        cs = lil_parse_code_stub("entry 0:rth:pint,pint:pint;");
+        cs = lil_parse_code_stub("entry 0:stdcall:pint,pint:pint;");
         in2out = "in2out platform:pint;";
     } else {
         assert(type == ResolveResType_Managed);
-        cs = lil_parse_code_stub("entry 0:rth:pint,pint:ref;");
+        cs = lil_parse_code_stub("entry 0:stdcall:pint,pint:ref;");
         in2out = "in2out platform:ref;";
     }
     assert(cs);
@@ -1836,11 +1827,11 @@ static NativeCodePtr rth_get_lil_stub_withresolve(int * dyn_count, f_resolve_man
     LilCodeStub* cs = NULL;
     const char* in2out = NULL;
     if (type == ResolveResType_Unmanaged) {
-        cs = lil_parse_code_stub("entry 0:rth:pint,pint,ref:pint;");
+        cs = lil_parse_code_stub("entry 0:stdcall:pint,pint,ref:pint;");
         in2out = "in2out platform:pint;";
     } else {
         assert(type == ResolveResType_Managed);
-        cs = lil_parse_code_stub("entry 0:rth:pint,pint,ref:ref;");
+        cs = lil_parse_code_stub("entry 0:stdcall:pint,pint,ref:ref;");
         in2out = "in2out platform:ref;";
     }
 
@@ -1875,11 +1866,11 @@ static NativeCodePtr rth_get_lil_stub_withresolve(int * dyn_count, f_resolve_int
     LilCodeStub* cs = NULL;
     const char* in2out = NULL;
     if (type == ResolveResType_Unmanaged) {
-        cs = lil_parse_code_stub("entry 0:rth:pint,pint,pint:pint;");
+        cs = lil_parse_code_stub("entry 0:stdcall:pint,pint,pint:pint;");
         in2out = "in2out platform:pint;";
     } else {
         assert(type == ResolveResType_Managed);
-        cs = lil_parse_code_stub("entry 0:rth:pint,pint,pint:ref;");
+        cs = lil_parse_code_stub("entry 0:stdcall:pint,pint,pint:ref;");
         in2out = "in2out platform:ref;";
     }
 
@@ -2909,7 +2900,7 @@ LilCodeStub *gen_lil_typecheck_stub(bool is_checkcast)
     if (is_checkcast) {
         // args: ManagedObject *obj, Class *super; returns a ManagedObject*
         cs = lil_parse_code_stub
-        ("entry 0:rth:ref,pint:ref;"
+        ("entry 0:stdcall:ref,pint:ref;"
          "jc i0!=%0i:ref,nonnull;"
          "r=i0;"  // return obj if obj==NULL
          "ret;",
@@ -2918,7 +2909,7 @@ LilCodeStub *gen_lil_typecheck_stub(bool is_checkcast)
     else {
         // args: ManagedObject *obj, Class *super; returns a boolean
         cs = lil_parse_code_stub
-        ("entry 0:rth:ref,pint:g4;"
+        ("entry 0:stdcall:ref,pint:g4;"
          "jc i0!=%0i:ref,nonnull;"
          "r=0:g4;"  // return FALSE if obj==NULL
          "ret;",
@@ -2969,7 +2960,7 @@ LilCodeStub *gen_lil_typecheck_stub_specialized(bool is_checkcast,
     if (is_checkcast) {
         // args: ManagedObject *obj, Class *super; returns a ManagedObject*
         cs = lil_parse_code_stub
-        ("entry 0:rth:ref,pint:ref;"
+        ("entry 0:stdcall:ref,pint:ref;"
          "jc i0!=%0i,nonnull;"
          "r=i0;"  // return obj if obj==NULL
          "ret;",
@@ -2978,7 +2969,7 @@ LilCodeStub *gen_lil_typecheck_stub_specialized(bool is_checkcast,
     else {
         // args: ManagedObject *obj, Class *super; returns a boolean
         cs = lil_parse_code_stub
-        ("entry 0:rth:ref,pint:g4;"
+        ("entry 0:stdcall:ref,pint:g4;"
          "jc i0!=%0i,nonnull;"
          "r=0:g4;"  // return FALSE if obj==NULL
          "ret;",
@@ -3235,7 +3226,7 @@ vm_aastore_test(ManagedObject *elem,
 // 20030505 This JIT support routine expects to be called directly from managed code. 
 // The return value is either NULL or the ClassHandle for an exception to throw.
 void * __stdcall
-vm_rt_aastore(ManagedObject *elem, int idx, Vector_Handle array)
+vm_rt_aastore(Vector_Handle array, int idx, ManagedObject *elem)
 {
 #ifdef VM_STATS
     VM_Statistics::get_vm_stats().num_aastore ++;

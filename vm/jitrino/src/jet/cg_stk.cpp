@@ -67,8 +67,7 @@ void CodeGen::gen_ldc(void)
         return;
     }
     assert(m_curr_inst->opcode != OPCODE_LDC2_W);
-    gen_call_vm(ci_helper_io, rt_helper_ldc_string, 0, m_curr_inst->op0, 
-                m_klass);
+    gen_call_vm(ci_helper_oi, rt_helper_ldc_string, 0, m_klass, m_curr_inst->op0);
     gen_save_ret(jobj);
     vstack(0).set(VA_NZ);
     m_bbstate->seen_gcpt = true;

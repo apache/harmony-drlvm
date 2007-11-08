@@ -37,6 +37,7 @@
 #include "JITInstanceContext.h"
 #include "PMFAction.h"
 #include "Ia32CodeGeneratorFlags.h"
+#include "Ia32CallingConvention.h"
 
 #include "LoopTree.h"
 
@@ -52,12 +53,6 @@ namespace Ia32
 {
 
 const char * newString(MemoryManager& mm, const char * str, uint32 length=EmptyUint32);
-#ifdef _EM64T_
-    #define STACK_REG RegName_RSP
-#else
-    #define STACK_REG RegName_ESP
-#endif
-
 
 //========================================================================================
 // STL aux classes (need to be moved somewhere)

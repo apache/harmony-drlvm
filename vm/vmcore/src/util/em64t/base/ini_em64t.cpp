@@ -39,6 +39,7 @@
 #include "encoder.h"
 #include "ini.h"
 #include "lil_code_generator_utils.h"
+#include "jit_runtime_support_common.h"
 
 #define LOG_DOMAIN "vm.helpers"
 #include "cxxlog.h"
@@ -111,6 +112,8 @@ static invoke_managed_func_int_t gen_invoke_managed_func() {
     func = (invoke_managed_func_int_t) stub;
     stub = push(stub, rbp_opnd);
     stub = mov(stub, rbp_opnd, rsp_opnd);
+
+    assert(MANAGED_STACK_ALIGNMENT == STACK_ALIGN_HALF16);
 
     // align stack pointer if required (rsp % 16 == 0)
     stub = alu(stub, and_opc, rsp_opnd, Imm_Opnd(0xfffffff0));

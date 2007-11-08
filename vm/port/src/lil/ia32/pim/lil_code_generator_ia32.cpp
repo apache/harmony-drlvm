@@ -34,6 +34,7 @@
 #include "m2n_ia32_internal.h"
 #include "vm_threads.h"
 #include "encoder.h"
+#include "jit_runtime_support_common.h"
 
 // Strategy:
 //   Up to 2 standard places
@@ -1399,11 +1400,22 @@ public:
     {
         adjust_stack_for_return();
         unsigned sz = sig_size_on_stack(ctxt.entry_sig);
-        if (ctxt.entry_cc.callee_pop && sz) {
-            *buf = ::ret(*buf, Imm_Opnd(sz));
-        } else {
-            *buf = ::ret(*buf);
+        
+        if (ctxt.entry_cc.callee_pop) {
+            if (lil_sig_get_cc(ctxt.entry_sig) == LCC_Managed) {
+                // Managed calling convention assumes callee responsibility to 
+                // handle alignment properly. Assuming that arguments were aligned, 
+                // size of input arguments plus return pointer on the stack also should be aligned
+                sz += sizeof(POINTER_SIZE_INT);
+                sz = (sz + (MANAGED_STACK_ALIGNMENT - 1)) & ~(MANAGED_STACK_ALIGNMENT - 1);
+                sz -= sizeof(POINTER_SIZE_INT);
+            }
+            if (sz != 0) {
+                *buf = ::ret(*buf, Imm_Opnd(sz));
+                return;
+            }
         }
+        *buf = ::ret(*buf);
     }
 
     void push_m2n(Method_Handle method, frame_type current_frame_type, bool handles)

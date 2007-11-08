@@ -566,7 +566,7 @@ static void *get_vm_rt_new_vector__using_vtable_address()
     }
 
     if (VM_Global_State::loader_env->use_lil_stubs) {
-        LilCodeStub* cs = lil_parse_code_stub("entry 0:managed::ref;");
+        LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall::ref;");
         assert(cs);
         cs = lil_parse_onto_end(cs,
             "push_m2n 0, 0;"
@@ -818,7 +818,7 @@ static void *get_vm_rt_aastore_address_compactor()
     // Allocate frame, save pfs, b0, and gp
     int out0, save_pfs, save_b0, save_gp;
     const int num_in_args = 3, num_out_args = 3;
-    void *(*p_vm_rt_aastore)(ManagedObject *elem, int idx, Vector_Handle array);
+    void *(*p_vm_rt_aastore)(Vector_Handle array, int idx, ManagedObject *elem);
     p_vm_rt_aastore = vm_rt_aastore;
     emit_alloc_for_single_call(emitter, num_in_args, num_out_args,
         (void **)p_vm_rt_aastore,

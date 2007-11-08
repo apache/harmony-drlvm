@@ -295,7 +295,7 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
     if (is_synchronised) {
         if (is_static) {
             cs = lil_parse_onto_end(cs,
-                                    "out managed:pint:void;"
+                                    "out stdcall:pint:void;"
                                     "o0=%0i;"
                                     "call %1i;",
                                     clss,
@@ -303,7 +303,7 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
             assert(cs);
         } else {
             cs = lil_parse_onto_end(cs,
-                                    "out managed:ref:void;"
+                                    "out stdcall:ref:void;"
                                     "o0=i0;"
                                     "call %0i;",
                                     lil_npc_to_fp(vm_get_rt_support_addr(VM_RT_MONITOR_ENTER)));
@@ -461,7 +461,7 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
     if (is_synchronised) {
         if (is_static) {
             cs = lil_parse_onto_end(cs,
-                "out managed:pint:void;"
+                "out stdcall:pint:void;"
                 "o0=%0i;"
                 "call %1i;",
                 clss,
@@ -469,7 +469,7 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
         } else {
             cs = lil_parse_onto_end(cs,
                 "ld l0,[l0+%0i:ref];"
-                "out managed:ref:void; o0=l0; call %1i;",
+                "out stdcall:ref:void; o0=l0; call %1i;",
                 oh_get_handle_offset(0),
                 lil_npc_to_fp(vm_get_rt_support_addr(VM_RT_MONITOR_EXIT)));
         }
@@ -880,4 +880,5 @@ VMEXPORT void compiled_method_load(Method_Handle method, uint32 codeSize,
     }
 }
   
+
 

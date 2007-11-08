@@ -27,6 +27,30 @@
 #include "Ia32IRConstants.h"
 #include "Ia32Constraint.h"
 
+/**
+ * When entering a function, obey the (sp)%%4 == 0 rule.
+ */
+#define STACK_ALIGN4         (0x00000004)
+
+/**
+ * When entering a function, obey the (sp+8)%%16 == 0 rule
+ * (Required by Intel 64 calling convention).
+ */
+#define STACK_ALIGN_HALF16    (0x00000008)
+
+/**
+ * When entering a function, obey the (sp)%%16 == 0 rule.
+ */
+#define STACK_ALIGN16         (0x00000010)
+
+
+#ifdef _EM64T_
+    #define STACK_REG RegName_RSP
+    #define STACK_ALIGNMENT STACK_ALIGN_HALF16  
+#else
+    #define STACK_REG RegName_ESP
+    #define STACK_ALIGNMENT STACK_ALIGN16  
+#endif
 
 namespace Jitrino
 {
@@ -85,6 +109,12 @@ public:
     /** True arguments are pushed from the last to the first, false in the other case
     */
     virtual bool    pushLastToFirst()const =0;
+    
+    /**
+     * Defines alignment of all arguments passed on the memmory stack plus return pointer.
+     */
+    virtual uint32 getAlignment()const { return 0; }
+    
     /**
      * Maps a string representation of CallingConvention to the 
      * appropriate CallingConvention_* item. 
@@ -123,14 +153,26 @@ public:
 //========================================================================================
 // class DRLCallingConvention
 //========================================================================================
-/** Implementation of CallingConvention for the DRL IA32 calling convention
-*/
-class DRLCallingConvention: public STDCALLCallingConvention
+
+/**
+ * Implementation of CallingConvention for the DRL IA32 calling convention
+ */
+class DRLCallingConventionIA32: public STDCALLCallingConvention
 {   
 public: 
-    virtual ~DRLCallingConvention() {}
+    virtual ~DRLCallingConventionIA32() {}
     virtual bool    pushLastToFirst()const{ return false; }
+    virtual uint32 getAlignment()const { return STACK_ALIGNMENT; }
+};
 
+/**
+ * Implementation of CallingConvention for the DRL EM64T calling convention
+ */
+class DRLCallingConventionEM64T: public STDCALLCallingConvention
+{   
+public: 
+    virtual ~DRLCallingConventionEM64T() {}
+    virtual uint32 getAlignment()const { return STACK_ALIGN16; }
 };
 
 //========================================================================================
@@ -148,6 +190,12 @@ public:
     virtual bool    pushLastToFirst()const{ return true; }
 #endif
 };
+
+#ifdef _EM64T_
+typedef DRLCallingConventionEM64T   DRLCallingConvention;
+#else
+typedef DRLCallingConventionIA32    DRLCallingConvention;
+#endif
 
 extern STDCALLCallingConvention     CallingConvention_STDCALL;
 extern DRLCallingConvention         CallingConvention_DRL;

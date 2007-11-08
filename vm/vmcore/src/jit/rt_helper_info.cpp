@@ -57,7 +57,7 @@ static JIT_RT_Function_Entry _jit_rt_function_entries_base[] = {
     {VM_RT_ARRAY_STORE_EXCEPTION,              "VM_RT_ARRAY_STORE_EXCEPTION",
             INTERRUPTIBLE_ALWAYS,              CALLING_CONVENTION_STDCALL,              0},
     {VM_RT_THROW_LINKING_EXCEPTION,            "VM_RT_THROW_LINKING_EXCEPTION",
-            INTERRUPTIBLE_ALWAYS,              CALLING_CONVENTION_DRL,                  0},
+            INTERRUPTIBLE_ALWAYS,              CALLING_CONVENTION_STDCALL,              0},
     {VM_RT_THROW_SET_STACK_TRACE,              "VM_RT_THROW_SET_STACK_TRACE",
             INTERRUPTIBLE_ALWAYS,              CALLING_CONVENTION_STDCALL,              1},
 
@@ -137,11 +137,11 @@ static JIT_RT_Function_Entry _jit_rt_function_entries_base[] = {
     {VM_RT_D2L,                                "VM_RT_D2L",
             INTERRUPTIBLE_NEVER,               CALLING_CONVENTION_STDCALL,              1},
     {VM_RT_LSHL,                               "VM_RT_LSHL",
-            INTERRUPTIBLE_NEVER,               CALLING_CONVENTION_DRL,                  2},
+            INTERRUPTIBLE_NEVER,               CALLING_CONVENTION_STDCALL,              2},
     {VM_RT_LSHR,                               "VM_RT_LSHR",
-            INTERRUPTIBLE_NEVER,               CALLING_CONVENTION_DRL,                  2},
+            INTERRUPTIBLE_NEVER,               CALLING_CONVENTION_STDCALL,              2},
     {VM_RT_LUSHR,                              "VM_RT_LUSHR",
-            INTERRUPTIBLE_NEVER,               CALLING_CONVENTION_DRL,                  2},
+            INTERRUPTIBLE_NEVER,               CALLING_CONVENTION_STDCALL,              2},
     {VM_RT_LMUL,                               "VM_RT_LMUL",
             INTERRUPTIBLE_NEVER,               CALLING_CONVENTION_STDCALL,              2},
 #ifdef VM_LONG_OPT

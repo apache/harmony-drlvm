@@ -232,7 +232,7 @@ static void *getaddress__vm_initialize_class_naked()
 
     if (VM_Global_State::loader_env->use_lil_stubs) {
         LilCodeStub* cs = lil_parse_code_stub(
-            "entry 0:managed:pint:void;   // The single argument is a Class_Handle \n"
+            "entry 0:stdcall:pint:void;   // The single argument is a Class_Handle \n"
             "locals 3;\
              in2out platform:pint; \
              call %0i; \
@@ -495,16 +495,16 @@ static void* vm_aastore_arraystore()
 
 
 static void *__stdcall
-aastore_ia32(volatile ManagedObject *elem,
+aastore_ia32(Vector_Handle array,
              int idx,
-             Vector_Handle array);
+             volatile ManagedObject *elem);
 
 
 // 20030321 This JIT support routine expects to be called directly from managed code. 
 static void *__stdcall
-aastore_ia32(volatile ManagedObject *elem,
+aastore_ia32(Vector_Handle array,
             int idx,
-            Vector_Handle array)
+            volatile ManagedObject *elem)
 {
 #ifdef REFS_RUNTIME_OR_COMPRESSED
     REFS_RUNTIME_SWITCH_IF
@@ -578,8 +578,8 @@ static void *getaddress__vm_aastore()
     }
 
     LilCodeStub* cs = lil_parse_code_stub(
-        "entry 0:managed:ref,pint,ref:void;   // The args are the element ref to store, the index, and the array to store into\n"
-        "in2out managed:pint; "
+        "entry 0:stdcall:ref,pint,ref:void;   // The args are the array to store into, the index, and the element ref to store\n"
+        "in2out stdcall:pint; "
         "call %0i;                            // vm_rt_aastore either returns NULL or the ClassHandle of an exception to throw \n"
         "jc r!=0,aastore_failed; \
          ret; \

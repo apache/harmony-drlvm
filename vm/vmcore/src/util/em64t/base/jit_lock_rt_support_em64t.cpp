@@ -348,7 +348,7 @@ NativeCodePtr rth_get_lil_monitor_enter_static() {
         return addr;
     }    
 
-    LilCodeStub * cs = lil_parse_code_stub("entry 0:managed:pint:void;");
+    LilCodeStub * cs = lil_parse_code_stub("entry 0:stdcall:pint:void;");
 #ifdef VM_STATS
 //    int * value = VM_Statistics::get_vm_stats().rt_function_calls.lookup_or_add((void*)VM_RT_MONITOR_ENTER_STATIC, 0, NULL);
 //    cs = lil_parse_onto_end(cs, "inc [%0i:pint];", value);
@@ -383,7 +383,7 @@ NativeCodePtr rth_get_lil_monitor_enter() {
         return addr;
     }    
 
-    LilCodeStub * cs = lil_parse_code_stub("entry 0:managed:ref:void;");
+    LilCodeStub * cs = lil_parse_code_stub("entry 0:stdcall:ref:void;");
 
 #ifdef VM_STATS
 //    int * value = VM_Statistics::get_vm_stats().rt_function_calls.lookup_or_add((void*)VM_RT_MONITOR_ENTER, 0, NULL);
@@ -406,7 +406,7 @@ NativeCodePtr rth_get_lil_monitor_enter() {
     // throw NullPointerException
     cs = lil_parse_onto_end(cs,
         ":throw_null_pointer;"
-        "out managed::void;"
+        "out stdcall::void;"
         "call.noret %0i;",
         lil_npc_to_fp(exn_get_rth_throw_null_pointer())
     );
@@ -429,7 +429,7 @@ NativeCodePtr rth_get_lil_monitor_enter_non_null() {
     }    
 
     LilCodeStub * cs = lil_parse_code_stub(
-        "entry 0:managed:ref:void;"
+        "entry 0:stdcall:ref:void;"
         "locals 1;"
         "l0 = i0;"
     );    
@@ -476,7 +476,7 @@ static LilCodeStub * rth_get_lil_monitor_exit_generic(LilCodeStub * cs) {
             "jc r!=%1i, illegal_monitor;"
             "ret;"
             ":illegal_monitor;"
-            "out managed::void;"
+            "out stdcall::void;"
             "call.noret %2i;",
             vm_monitor_try_exit,
             (POINTER_SIZE_INT)TM_ERROR_NONE,
@@ -491,7 +491,7 @@ NativeCodePtr rth_get_lil_monitor_exit_static() {
         return addr;
     }    
 
-    LilCodeStub * cs = lil_parse_code_stub("entry 0:managed:pint:void;");
+    LilCodeStub * cs = lil_parse_code_stub("entry 0:stdcall:pint:void;");
 #ifdef VM_STATS
 //    int * value = VM_Statistics::get_vm_stats().rt_function_calls.lookup_or_add((void*)VM_RT_MONITOR_EXIT_STATIC, 0, NULL);
 //    cs = lil_parse_onto_end(cs, "inc [%0i:pint];", value);
@@ -527,7 +527,7 @@ NativeCodePtr rth_get_lil_monitor_exit() {
         return addr;
     }    
 
-    LilCodeStub * cs = lil_parse_code_stub("entry 0:managed:ref:void;");
+    LilCodeStub * cs = lil_parse_code_stub("entry 0:stdcall:ref:void;");
 
 #ifdef VM_STATS
 //    int * value = VM_Statistics::get_vm_stats().rt_function_calls.lookup_or_add((void*)VM_RT_MONITOR_EXIT, 0, NULL);
@@ -550,7 +550,7 @@ NativeCodePtr rth_get_lil_monitor_exit() {
     // throw NullPointerException
     cs = lil_parse_onto_end(cs,
         ":throw_null_pointer;"
-        "out managed::void;"
+        "out stdcall::void;"
         "call.noret %0i;",
         lil_npc_to_fp(exn_get_rth_throw_null_pointer())
     );
@@ -573,7 +573,7 @@ NativeCodePtr rth_get_lil_monitor_exit_non_null() {
     }    
 
     LilCodeStub * cs = lil_parse_code_stub(
-        "entry 0:managed:ref:void;"
+        "entry 0:stdcall:ref:void;"
         "in2out platform:g4;"
     );    
     assert(cs);

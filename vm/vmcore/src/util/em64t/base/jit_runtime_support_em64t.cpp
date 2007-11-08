@@ -83,7 +83,7 @@ NativeCodePtr rth_get_lil_new_resolved_using_vtable_and_size() {
         return addr;
     }
 
-    LilCodeStub* cs = lil_parse_code_stub("entry 0:managed:g4,pint:ref;");
+    LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:g4,pint:ref;");
     assert(cs);
 
 #ifdef VM_STATS
@@ -114,7 +114,7 @@ NativeCodePtr rth_get_lil_new_vector_using_vtable() {
         return addr;
     }
 
-    LilCodeStub* cs = lil_parse_code_stub("entry 0:managed:g4,pint:ref;");
+    LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:g4,pint:ref;");
     assert(cs);
 
 #ifdef VM_STATS

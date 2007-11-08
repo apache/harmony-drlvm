@@ -804,25 +804,39 @@ void JumpInst::verify() const {
 //_________________________________________________________________________________________________
 void CallingConventionClient::finalizeInfos(Inst::OpndRole role, CallingConvention::ArgKind argKind)
 {
-    assert(callingConvention!=NULL);
-    StlVector<CallingConvention::OpndInfo> & infos = getInfos(role);
-    callingConvention->getOpndInfo(argKind, (uint32)infos.size(), infos.empty()?(CallingConvention::OpndInfo*)NULL:&infos.front());
-    bool lastToFirst=callingConvention->pushLastToFirst();
     uint32 slotNumber=0;
-    for (
-        uint32 i=lastToFirst?0:(uint32)infos.size()-1, 
-        end=lastToFirst?(uint32)infos.size():(uint32)-1, 
-        inc=lastToFirst?1:-1;
-        i!=end;
-        i+=inc
-        ){
-        CallingConvention::OpndInfo & info=infos[i];
-        for (uint32 j=0; j<info.slotCount; j++){
+    StlVector<CallingConvention::OpndInfo> & infos = getInfos(role);
+
+    assert(callingConvention != NULL);
+
+    callingConvention->getOpndInfo(argKind, (uint32)infos.size(),
+        infos.empty() ? (CallingConvention::OpndInfo*)NULL : &infos.front());
+    
+    for (uint32 i = 0, n = (uint32)infos.size(); i != n; i++) {
+        uint32 index = callingConvention->pushLastToFirst() ? i : (n - 1 - i);
+        CallingConvention::OpndInfo & info = infos[index];
+        for (uint32 j = 0; j < info.slotCount; j++) {
             if (!info.isReg)
-                info.slots[j]=0xFFFF & slotNumber++;
+                info.slots[j] = 0xFFFF & slotNumber++;
         }
     }
-    (role==Inst::OpndRole_Def?defArgStackDepth:useArgStackDepth)=slotNumber*sizeof(POINTER_SIZE_INT); 
+    unsigned stackOpndSize = slotNumber * sizeof(POINTER_SIZE_INT);
+    unsigned stackAlignmentSize = 0;
+    
+    if (argKind == CallingConvention::ArgKind_InArg) {
+        // Compute stack alignment.
+        unsigned stackOnEnterSize = stackOpndSize + sizeof(POINTER_SIZE_INT);
+        unsigned alignment = callingConvention->getAlignment();
+        
+        if (alignment != 0 && stackOnEnterSize & (alignment - 1)) {
+            stackAlignmentSize = alignment - (stackOnEnterSize & (alignment - 1));
+        }
+    }
+    
+    stackOpndSize += stackAlignmentSize;
+    
+    (role == Inst::OpndRole_Def ? defArgStackDepth : useArgStackDepth) = stackOpndSize;
+    (role == Inst::OpndRole_Def ? defArgStackDepthAlignment : useArgStackDepthAlignment) = stackAlignmentSize;
 }
 
 //_________________________________________________________________________________________________

@@ -29,15 +29,11 @@
 namespace Jitrino {
 namespace Jet {
 
-const CallSig cs_v(CCONV_STDCALL);
+const CallSig helper_v(CCONV_HELPERS);
+const CallSig platform_v(CCONV_HELPERS);
 
 void CallSig::init(void)
 {
-    // can't have stack alignment in calling convention when callee pops
-    // so if any of ALIGN set, then CALLER_POPS must also be set.
-    assert( !(m_cc&(CCONV_STACK_ALIGN16|CCONV_STACK_ALIGN_HALF16)) || 
-            (m_cc&CCONV_CALLER_POPS));
-    
     unsigned num = (unsigned)m_args.size();
     m_data.resize(num);
     unsigned fps = 0, gps = 0;
@@ -90,11 +86,18 @@ void CallSig::init(void)
         }
     }
     m_stack = -off;
-    // Do alignment
-    if (m_stack != 0 && 
-        (m_cc & (CCONV_STACK_ALIGN16|CCONV_STACK_ALIGN_HALF16))) {
-        m_stack = (m_stack+15) & 0xFFFFFFF0;
+    m_alignment = 0;
+    
+    unsigned stack_on_enter_size = m_stack + sizeof(POINTER_SIZE_INT);
+    // Do alignment.
+    unsigned alignment = (m_cc & CCONV_STACK_ALIGN_HALF16) ? CCONV_STACK_ALIGN16
+        : m_cc & CCONV_STACK_ALIGN_MASK;
+    if (alignment != 0 && stack_on_enter_size & (alignment - 1)) {
+        unsigned stack_on_enter_aligned =
+            (stack_on_enter_size + (alignment - 1)) & ~((alignment - 1));
+        m_alignment = stack_on_enter_aligned - stack_on_enter_size;
     }
+    m_stack += m_alignment;
 }
 
 

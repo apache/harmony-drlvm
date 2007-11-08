@@ -83,6 +83,9 @@ void __stdcall CodeGen::dbg_trace_arg(void * val, int idx, jtype jt)
 
 void CodeGen::gen_dbg_check_stack(bool start)
 {
+    if (m_infoBlock.get_bc_size() == 1 && m_bc[0] == OPCODE_RETURN) {
+        return; // empty method, nothing to do
+    }
     if (start) {
         // We store SP before a code to be checked ...
         st(jobj, sp, m_base, voff(m_stack.dbg_scratch()));

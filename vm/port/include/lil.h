@@ -108,10 +108,6 @@ managed  = calling convention used by jitted code
 rth      = calling convention used to call runtime helpers
 stdcall  = Windows's stdcall calling convention
 
-20021204: The rth calling convention should be used for all runtime helpers.  Unfortunately, on IA32 we are inconsistent in the calling
-             conventions used to call runtime helpers - some use stdcall, some use the managed code conventions.  So for now, rth is to be
-             used for stdcall helpers, managed should be used for the rest.  In the future we can harmonise this and correct the problem.
-
 l is a label (sequence of alpha, digit, _, starting with alpha or _)
 v is a variable, one of: i0, i1, ... (input variables), sp0, sp1, ... (standard places), l0, l1, ... (local variables),
 o0, o1, ... (output variables), r (return variable)

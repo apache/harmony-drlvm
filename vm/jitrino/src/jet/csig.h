@@ -53,7 +53,12 @@ namespace Jet {
 /**
  * @brief All args go though memory.
  */
-#define CCONV_MEM                   (0x00000004)
+#define CCONV_MEM                   (0x00000020)
+
+/**
+ * @brief When entering a function, obey the (sp)%%4 == 0 rule.
+ */
+#define CCONV_STACK_ALIGN4          (0x00000004)
 
 /**
  * @brief When entering a function, obey the (sp+8)%%16 == 0 rule (Intel 64
@@ -67,6 +72,12 @@ namespace Jet {
 #define CCONV_STACK_ALIGN16         (0x00000010)
 
 /**
+ * Mask to extract stack alignment form calling convention.
+ */
+#define CCONV_STACK_ALIGN_MASK      (CCONV_STACK_ALIGN4 | CCONV_STACK_ALIGN_HALF16 | CCONV_STACK_ALIGN16)
+
+
+/**
  * @brief IA-32's stdcall convention.
  */
 #define CCONV_STDCALL_IA32     (CCONV_MEM)
@@ -74,7 +85,7 @@ namespace Jet {
 /**
  * @brief IA-32's cdecl convention.
  */
-#define CCONV_CDECL_IA32       (CCONV_CALLER_POPS|CCONV_MEM)
+#define CCONV_CDECL_IA32       (CCONV_CALLER_POPS | CCONV_MEM)
 
 #ifdef _EM64T_
     /**
@@ -89,6 +100,7 @@ namespace Jet {
      * @brief On IA-32 it's CCONV_CDECL_IA32, on EM64T it's CCONV_EM64T.
      */
     #define CCONV_CDECL     CCONV_EM64T
+    #define CCONV_PLATFORM  CCONV_EM64T
 	#ifdef _WIN32
 		/// A nubmer of FR registers dedicated to pass float-point arguments.
 		#define MAX_FR_ARGS (4)
@@ -98,13 +110,14 @@ namespace Jet {
 #else
     #define CCONV_STDCALL   CCONV_STDCALL_IA32
     #define CCONV_CDECL     CCONV_CDECL_IA32
+    #define CCONV_PLATFORM  CCONV_CDECL
 	#define MAX_FR_ARGS (0)
 #endif
 
 /**
  * @brief IA-32's DRLVM's convention for managed code.
  */
-#define CCONV_MANAGED_IA32     (CCONV_L2R | CCONV_MEM)
+#define CCONV_MANAGED_IA32     (CCONV_L2R | CCONV_MEM | CCONV_STACK_ALIGN16)
 /**
  * @brief A special case - VM's helper MULTIANEWARRAY always has cdecl-like
  *        convention.
@@ -116,14 +129,11 @@ namespace Jet {
      * @brief On IA-32 it's CCONV_MANAGED_IA32, on EM64T it's CCONV_EM64T.
      */
     #define CCONV_MANAGED   CCONV_EM64T
-    /**
-     * @brief On IA-32 it's CCONV_MANAGED_IA32, on EM64T it's CCONV_EM64T.
-     */
-    #define CCONV_HELPERS   CCONV_EM64T
 #else
     #define CCONV_MANAGED   CCONV_MANAGED_IA32
-    #define CCONV_HELPERS   CCONV_MANAGED_IA32 //CCONV_STDCALL
 #endif
+
+#define CCONV_HELPERS   CCONV_STDCALL
 
 ///@}   // ~JET_CCONV
 
@@ -257,6 +267,13 @@ public:
     }
     
     /**
+     * @brief Returns size (in bytes) of padding area to achieve proper alignment.  
+     */
+    unsigned alignment() const {
+        return m_alignment;
+    }
+    
+    /**
      * @brief Returns size (in bytes) of the stack size needed to pass args
      *        that go through the stack.
      */
@@ -366,6 +383,11 @@ private:
      * This implies presumption that a valid AR is alwys > 0.
      */
     ::std::vector<int>      m_data;
+    
+    /**
+     * @brief Returns size (in bytes) of padding area to achieve proper alignment.
+     */  
+    unsigned                m_alignment;
     /**
      * @brief Size (in bytes) of stack frame needed to pass arguments.
      *
@@ -382,7 +404,8 @@ private:
 /**
  * @brief CallSig for stdcall function that takes no args.
  */
-extern const CallSig cs_v;
+extern const CallSig helper_v;
+extern const CallSig platform_v;
 
 
 }}; // ~namespace Jitrino::Jet

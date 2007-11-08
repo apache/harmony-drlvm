@@ -690,7 +690,7 @@ NativeCodePtr exn_get_rth_throw()
         return addr;
     }
 
-    LilCodeStub *cs = lil_parse_code_stub("entry 0:managed:ref:void;"
+    LilCodeStub *cs = lil_parse_code_stub("entry 0:stdcall:ref:void;"
         "push_m2n 0, 0;"
         "m2n_save_all;" "out platform:ref,pint,pint,pint:void;");
     assert(cs);
@@ -799,14 +799,14 @@ NativeCodePtr exn_get_rth_throw_lazy_trampoline()
     const unsigned cap_and_size = (unsigned)((0<<16) | 16);
 
 #ifdef _IPF_
-    LilCodeStub *cs = lil_parse_code_stub("entry 1:managed::void;"
+    LilCodeStub *cs = lil_parse_code_stub("entry 1:stdcall::void;"
         "push_m2n 0, 0, handles;"
         "m2n_save_all;"
         "out platform:ref,pint,pint,pint:void;"
         "o0=0:ref;" "o1=sp0;" "o2=0;" "o3=0;" "call.noret %0i;",
         exn_athrow);
 #else
-    LilCodeStub *cs = lil_parse_code_stub("entry 1:managed::void;"
+    LilCodeStub *cs = lil_parse_code_stub("entry 1:stdcall::void;"
         "push_m2n 0, 0, handles;"
         "m2n_save_all;"
         "locals 1;"
@@ -842,7 +842,7 @@ NativeCodePtr exn_get_rth_throw_null_pointer()
     Class *exn_clss =
         VM_Global_State::loader_env->java_lang_NullPointerException_Class;
     LilCodeStub *cs =
-        lil_parse_code_stub("entry 0:managed::void;" "std_places 1;"
+        lil_parse_code_stub("entry 0:stdcall::void;" "std_places 1;"
         "sp0=%0i;" "tailcall %1i;",
         exn_clss,
         lil_npc_to_fp(exn_get_rth_throw_lazy_trampoline()));
@@ -883,7 +883,7 @@ NativeCodePtr exn_get_rth_throw_illegal_monitor_state() {
         return addr;
     }
 
-    LilCodeStub *cs = lil_parse_code_stub("entry 0:managed::void;"
+    LilCodeStub *cs = lil_parse_code_stub("entry 0:stdcall::void;"
         "std_places 1;" "sp0=%0i;" "tailcall %1i;",
         exn_get_illegal_monitor_state_exception_type(),
         lil_npc_to_fp(exn_get_rth_throw_lazy_trampoline())
@@ -910,7 +910,7 @@ NativeCodePtr exn_get_rth_throw_array_index_out_of_bounds()
 
     Global_Env *env = VM_Global_State::loader_env;
     Class *exn_clss = env->java_lang_ArrayIndexOutOfBoundsException_Class;
-    LilCodeStub *cs = lil_parse_code_stub("entry 0:managed::void;"
+    LilCodeStub *cs = lil_parse_code_stub("entry 0:stdcall::void;"
         "std_places 1;" "sp0=%0i;" "tailcall %1i;",
         exn_clss,
         lil_npc_to_fp(exn_get_rth_throw_lazy_trampoline()));
@@ -950,7 +950,7 @@ NativeCodePtr exn_get_rth_throw_negative_array_size()
         return addr;
     }
 
-    LilCodeStub *cs = lil_parse_code_stub("entry 0:managed::void;"
+    LilCodeStub *cs = lil_parse_code_stub("entry 0:stdcall::void;"
         "std_places 1;" "sp0=%0i;" "tailcall %1i;",
         exn_get_negative_array_size_exception_type(),
         lil_npc_to_fp(exn_get_rth_throw_lazy_trampoline()));
@@ -990,7 +990,7 @@ NativeCodePtr exn_get_rth_throw_illegal_state_exception()
         return addr;
     }
 
-    LilCodeStub *cs = lil_parse_code_stub("entry 0:managed::void;"
+    LilCodeStub *cs = lil_parse_code_stub("entry 0:stdcall::void;"
         "std_places 1;" "sp0=%0i;" "tailcall %1i;",
         exn_get_illegal_state_exception_type(),
         lil_npc_to_fp(exn_get_rth_throw_lazy_trampoline()));
@@ -1013,7 +1013,7 @@ NativeCodePtr exn_get_rth_throw_array_store()
     }
 
     Global_Env *env = VM_Global_State::loader_env;
-    LilCodeStub *cs = lil_parse_code_stub("entry 0:managed::void;"
+    LilCodeStub *cs = lil_parse_code_stub("entry 0:stdcall::void;"
         "std_places 1;" "sp0=%0i;" "tailcall %1i;",
         env->java_lang_ArrayStoreException_Class,
         lil_npc_to_fp(exn_get_rth_throw_lazy_trampoline()));
@@ -1037,7 +1037,7 @@ NativeCodePtr exn_get_rth_throw_arithmetic()
     }
 
     Global_Env *env = VM_Global_State::loader_env;
-    LilCodeStub *cs = lil_parse_code_stub("entry 0:managed::void;"
+    LilCodeStub *cs = lil_parse_code_stub("entry 0:stdcall::void;"
         "std_places 1;" "sp0=%0i;" "tailcall %1i;",
         env->java_lang_ArithmeticException_Class,
         lil_npc_to_fp(exn_get_rth_throw_lazy_trampoline()));
@@ -1067,7 +1067,7 @@ NativeCodePtr exn_get_rth_throw_class_cast_exception()
         return addr;
     }
 
-    LilCodeStub *cs = lil_parse_code_stub("entry 0:managed::void;"
+    LilCodeStub *cs = lil_parse_code_stub("entry 0:stdcall::void;"
         "std_places 1;" "sp0=%0i;" "tailcall %1i;",
         exn_get_class_cast_exception_type(),
         lil_npc_to_fp(exn_get_rth_throw_lazy_trampoline()));
@@ -1106,7 +1106,7 @@ NativeCodePtr exn_get_rth_throw_incompatible_class_change_exception()
         return addr;
     }
 
-    LilCodeStub *cs = lil_parse_code_stub("entry 0:managed::void;"
+    LilCodeStub *cs = lil_parse_code_stub("entry 0:stdcall::void;"
         "std_places 1;" "sp0=%0i;" "tailcall %1i;",
         exn_get_incompatible_class_change_exception_type(),
         lil_npc_to_fp(exn_get_rth_throw_lazy_trampoline()));

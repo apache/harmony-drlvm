@@ -1027,7 +1027,7 @@ NativeCodePtr prepare_gen_throw_abstract_method_error(Class_Handle clss, Method_
     NativeCodePtr addr = NULL;
     void (*p_throw_ame)(Class_Handle, Method_Handle) =
         prepare_throw_abstract_method_error;
-    LilCodeStub* cs = lil_parse_code_stub("entry 0:rth::void;"
+    LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall::void;"
         "push_m2n 0, 0;"
         "m2n_save_all;"
         "out platform:pint,pint:void;"
@@ -1066,7 +1066,7 @@ NativeCodePtr prepare_gen_throw_illegal_access_error(Class_Handle to, Method_Han
     NativeCodePtr addr = NULL;
     void (*p_throw_iae)(Class_Handle, Method_Handle) =
         prepare_throw_illegal_access_error;
-    LilCodeStub* cs = lil_parse_code_stub("entry 0:rth::void;"
+    LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall::void;"
         "push_m2n 0, 0;"
         "m2n_save_all;"
         "out platform:pint,pint:void;"

@@ -72,7 +72,9 @@ namespace Ia32 {
  *  |                               |
  *  |                               |
  *  |                               |
- *  +-------------------------------+   localBase               <--- "real" ESP
+ *  +-------------------------------+   localBase    
+ *  |      alignment padding        |
+ *  |-------------------------------+   <--- "real" ESP
  *  |           EAX                 |
  *  |           ECX                 |
  *  |           EDX                 |
@@ -132,9 +134,6 @@ protected:
     int32 inargEnd;
     int32 frameSize;
     uint32 outArgSize;
-#ifdef _EM64T_
-    bool stackCorrection;
-#endif
     StackInfo * stackInfo;
 
     MemoryManager memoryManager;
@@ -159,9 +158,6 @@ StackLayouter::StackLayouter ()
     inargEnd(0),
     frameSize(0),
     outArgSize(0),
-#ifdef _EM64T_
-    stackCorrection(0),
-#endif
     memoryManager("StackLayouter")
 {
 };
@@ -265,143 +261,94 @@ void StackLayouter::checkUnassignedOpnds()
 {
     for (uint32 i=0, n=irManager->getOpndCount(); i<n; i++) {
 #ifdef _DEBUG
-		Opnd * opnd = irManager->getOpnd(i);
+        Opnd * opnd = irManager->getOpnd(i);
         assert(!opnd->getRefCount() || opnd->hasAssignedPhysicalLocation());
 #endif
-	}
+    }
 }
 
 void StackLayouter::createProlog()
 {
-    IRManager & irm=getIRManager();
+    const uint32 slotSize = sizeof(POINTER_SIZE_INT); 
+    const uint32 stackSizeAlignment = (STACK_ALIGNMENT == STACK_ALIGN_HALF16) ? STACK_ALIGN16 : STACK_ALIGNMENT; 
+    IRManager & irm = getIRManager();
+    EntryPointPseudoInst * entryPointInst = NULL;
+    int offset = 0;
+    
+    entryPointInst = irManager->getEntryPointInst();
+    assert(entryPointInst->getNode() == irManager->getFlowGraph()->getEntryNode());
 
-    for (uint32 i = 0; i<irm.getOpndCount(); i++)//create or reset displacements for stack memory operands
-    {
-		Opnd * opnd = irm.getOpnd(i);
-        if(opnd->getRefCount() && opnd->getMemOpndKind() == MemOpndKind_StackAutoLayout) {
+    // Create or reset displacements for stack memory operands.
+    for (uint32 i = 0; i < irm.getOpndCount(); i++) {
+        Opnd * opnd = irm.getOpnd(i);
+        if (opnd->getRefCount() && opnd->getMemOpndKind() == MemOpndKind_StackAutoLayout) {
             Opnd * dispOpnd=opnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement);
-            if (dispOpnd==NULL){
-                dispOpnd=irm.newImmOpnd(irm.getTypeManager().getInt32Type(), 0);
+            if (dispOpnd == NULL){
+                dispOpnd = irm.newImmOpnd(irm.getTypeManager().getInt32Type(), 0);
                 opnd->setMemOpndSubOpnd(MemOpndSubOpndKind_Displacement, dispOpnd);
             }
             dispOpnd->assignImmValue(0);
         }
-    }//end for
+    }
 
-    int offset = 0;
-
-    //return EIP area
+    // Return EIP area.
     retEIPBase = offset;
     offset += sizeof(POINTER_SIZE_INT);
-
     retEIPEnd = inargBase = offset;
 
-    uint32 slotSize=sizeof(POINTER_SIZE_INT); 
 
-    EntryPointPseudoInst * entryPointInst = irManager->getEntryPointInst();
-    assert(entryPointInst->getNode()==irManager->getFlowGraph()->getEntryNode());
-    if (entryPointInst) {//process entry-point instruction
+    // Assign displacements for input operands.
+    if (entryPointInst) {
         const StlVector<CallingConventionClient::StackOpndInfo>& stackOpndInfos = 
             ((const EntryPointPseudoInst*)entryPointInst)->getCallingConventionClient().getStackOpndInfos(Inst::OpndRole_Def);
 
-        for (uint32 i=0, n=(uint32)stackOpndInfos.size(); i<n; i++) {//assign displacements for input operands
-
-            uint64 argOffset = 
-#ifdef _EM64T_
-                !entryPointInst->getCallingConventionClient().getCallingConvention()->pushLastToFirst() ?
-                ((n-1)*slotSize-stackOpndInfos[i].offset):
-#endif
-            stackOpndInfos[i].offset;
-
-            Opnd * opnd=entryPointInst->getOpnd(stackOpndInfos[i].opndIndex);
+        for (uint32 i = 0, n = (uint32)stackOpndInfos.size(); i < n; i++) {
+            uint64 argOffset = stackOpndInfos[i].offset;
+            Opnd * opnd = entryPointInst->getOpnd(stackOpndInfos[i].opndIndex);
             Opnd * disp = opnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement);
-            disp->assignImmValue(offset+argOffset);
+            disp->assignImmValue(offset + argOffset);
         }
     }
-
-
     inargEnd = offset;
-
     icalleeEnd = offset = 0;
 
     uint32 calleeSavedRegs=irm.getCallingConvention()->getCalleeSavedRegs(OpndKind_GPReg).getMask();
-
     uint32 usageRegMask = irManager->getTotalRegUsage(OpndKind_GPReg);
-
     Inst * lastPush = NULL;
-
+    
+    // Push callee-save registers onto stack.
 #ifdef _EM64T_
-    //--------------------------------
-    unsigned counter = 0;
-    for (uint32 reg = RegName_R15; reg >= RegName_RAX ; reg--) {
-        uint32 mask = getRegMask((RegName)reg);
-        if((mask & calleeSavedRegs) && (usageRegMask & mask)) counter++;
-    }
-    //--------------------------------
-    for (uint32 reg = RegName_R15; reg >= RegName_RAX ; reg--) {
+    for (uint32 reg = RegName_R15; reg >= RegName_RAX; reg--) {
 #else
-    for (uint32 reg = RegName_EDI; reg>=RegName_EAX; reg--) {//push callee-save registers onto stack
+    for (uint32 reg = RegName_EDI; reg >= RegName_EAX; reg--) {
 #endif
         uint32 mask = getRegMask((RegName)reg);
-        if((mask & calleeSavedRegs) && (usageRegMask & mask)) {
+        if ((mask & calleeSavedRegs) && (usageRegMask & mask)) {
             Inst * inst = irm.newInst(Mnemonic_PUSH, irm.getRegOpnd((RegName)reg));
-            if (!lastPush)
+            if (!lastPush) {
                 lastPush = inst;
+            }
             inst->insertAfter(entryPointInst);
             offset -= slotSize;
         }
     }
-#ifdef _EM64T_
-    if(!(counter & 1)) {
-    Opnd * rsp = irManager->getRegOpnd(STACK_REG);
-    Type* uint64_type = irManager->getTypeFromTag(Type::UInt64);
-    Inst* newIns = irManager->newInst(Mnemonic_SUB,rsp,irManager->newImmOpnd(uint64_type, slotSize));
-        newIns->insertAfter(entryPointInst);
-        offset -= slotSize;
-        stackCorrection = 1;
-    }
-#endif
-
     icalleeBase = fcalleeEnd = fcalleeBase = acalleeEnd = acalleeBase = localEnd = offset;
 
-
+    // Retrieve relations not earlier than all memory locations are assigned.
     IRManager::AliasRelation * relations = new(irm.getMemoryManager()) IRManager::AliasRelation[irm.getOpndCount()];
-    irm.getAliasRelations(relations);// retrieve relations no earlier than all memory locations are assigned
+    irm.getAliasRelations(relations);
 
-#ifdef _EM64T_
-    //--------------------------------
-    counter = 0;
-    for (uint32 i = 0; i<irm.getOpndCount(); i++)//assign displacements for local variable operands
-    {
+    // Assign displacements for local variable operands.
+    for (uint32 i = 0; i < irm.getOpndCount(); i++) {
         Opnd * opnd = irm.getOpnd(i);
         if (opnd->getRefCount() == 0)
             continue;
         if(opnd->getMemOpndKind() == MemOpndKind_StackAutoLayout) {
-            Opnd * dispOpnd=opnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement);
-            if (dispOpnd->getImmValue()==0) {
-                uint32 cb=getByteSize(opnd->getSize());
-                cb=(cb+slotSize-1)&~(slotSize-1);
-                counter+=cb;
-            }
-        }
-    }
-    if (counter & 15) {
-        offset -= 16-(counter&15);
-    }
-    //--------------------------------
-#endif
-
-    for (uint32 i = 0; i<irm.getOpndCount(); i++)//assign displacements for local variable operands
-    {
-        Opnd * opnd = irm.getOpnd(i);
-        if (opnd->getRefCount() == 0)
-            continue;
-        if(opnd->getMemOpndKind() == MemOpndKind_StackAutoLayout) {
-            Opnd * dispOpnd=opnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement);
-            if (dispOpnd->getImmValue()==0) {
+            Opnd * dispOpnd = opnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement);
+            if (dispOpnd->getImmValue() == 0) {
                 if (relations[opnd->getId()].outerOpnd == NULL) {
-                    uint32 cb=getByteSize(opnd->getSize());
-                    cb=(cb+slotSize-1)&~(slotSize-1);
+                    uint32 cb = getByteSize(opnd->getSize());
+                    cb=(cb + slotSize - 1) & ~(slotSize - 1);
                     offset -= cb;
                     dispOpnd->assignImmValue(offset);
                 }
@@ -409,32 +356,37 @@ void StackLayouter::createProlog()
         }
     }
 
+    // Align stack pointer. Local area should preserve alignment available on function enter.
+    offset = offset & ~(stackSizeAlignment - 1);
+
+    // Assert local area is properly aligned.
+    assert((offset & (STACK_ALIGNMENT - 1)) == 0);    
+    
     localBase = offset;
 
     if (localEnd>localBase) {
-        Inst* newIns = irm.newInst(Mnemonic_SUB, irm.getRegOpnd(STACK_REG), irm.newImmOpnd(irm.getTypeManager().getInt32Type(), localEnd-localBase));
+        Inst* newIns = irm.newInst(Mnemonic_SUB, irm.getRegOpnd(STACK_REG), irm.newImmOpnd(irm.getTypeManager().getInt32Type(), localEnd - localBase));
         newIns->insertAfter(lastPush ? lastPush : entryPointInst);
     }
 
     frameSize = icalleeEnd -localBase;
-
 }       
 
 void StackLayouter::createEpilog()
 { // Predeccessors of en and irm.isEpilog(en->pred)
-    IRManager & irm=getIRManager();
-    uint32 calleeSavedRegs=irm.getCallingConvention()->getCalleeSavedRegs(OpndKind_GPReg).getMask();
+    IRManager & irm = getIRManager();
+    uint32 calleeSavedRegs = irm.getCallingConvention()->getCalleeSavedRegs(OpndKind_GPReg).getMask();
     const Edges& inEdges = irm.getFlowGraph()->getExitNode()->getInEdges();
     uint32 usageRegMask = irManager->getTotalRegUsage(OpndKind_GPReg);
     for (Edges::const_iterator ite = inEdges.begin(), ende = inEdges.end(); ite!=ende; ++ite) {
         Edge* edge = *ite;
         if (irm.isEpilog(edge->getSourceNode())) {
             Node * epilog = edge->getSourceNode();
-            Inst * retInst=(Inst*)epilog->getLastInst();
+            Inst * retInst = (Inst*)epilog->getLastInst();
             assert(retInst->hasKind(Inst::Kind_RetInst));
-            if (localEnd>localBase) {
-                //restore stack pointer
-                Inst* newIns = irm.newInst(Mnemonic_ADD, irm.getRegOpnd(STACK_REG), irm.newImmOpnd(irm.getTypeManager().getInt32Type(), localEnd-localBase));
+            if (localEnd > localBase) {
+                // Restore stack pointer.
+                Inst* newIns = irm.newInst(Mnemonic_ADD, irm.getRegOpnd(STACK_REG), irm.newImmOpnd(irm.getTypeManager().getInt32Type(), localEnd - localBase));
                 newIns->insertBefore(retInst);
             }
 #ifdef _EM64T_
@@ -448,12 +400,6 @@ void StackLayouter::createEpilog()
                     newIns->insertBefore(retInst);
                 }
             }
-#ifdef _EM64T_
-            if (stackCorrection) {//restore stack pointer
-                Inst* newIns = irm.newInst(Mnemonic_ADD, irm.getRegOpnd(STACK_REG), irm.newImmOpnd(irm.getTypeManager().getInt32Type(), sizeof(POINTER_SIZE_INT)));
-                newIns->insertBefore(retInst);
-            }
-#endif
         }
     }
 }

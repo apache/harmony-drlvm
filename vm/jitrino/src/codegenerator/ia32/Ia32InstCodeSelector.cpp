@@ -2176,13 +2176,13 @@ CG_OpndHandle* InstCodeSelector::ldRef(Type *dstType,
     if (codeSelector.methodCodeSelector.slowLdString || dstType->isSystemClass()) {
         NamedType * parentType=enclosingMethod->getParentType();
     #ifdef _EM64T_
-        Opnd * st = irManager.getRegOpnd(RegName_RDI);
-        appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, st, irManager.newImmOpnd(typeManager.getInt64Type(), refToken)));
-        Opnd * tp = irManager.getRegOpnd(RegName_RSI);
+        Opnd * tp = irManager.getRegOpnd(RegName_RDI);
         appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, tp,irManager.newImmOpnd(getRuntimeIdType(), Opnd::RuntimeInfo::Kind_TypeRuntimeId, parentType)));
+        Opnd * st = irManager.getRegOpnd(RegName_RSI);
+        appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, st, irManager.newImmOpnd(typeManager.getInt64Type(), refToken)));
         Opnd * helperOpnds[] = {
-            st,
-            tp
+            tp,
+            st
         };
     #else
         Opnd * helperOpnds[] = {

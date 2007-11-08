@@ -1692,77 +1692,70 @@ void IRManager::finalizeCallSites()
 #endif
 
     const Nodes& nodes = fg->getNodes();
-    for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
+    for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it != end; ++it) {
         Node* node = *it;
         if (node->isBlockNode()) {
-            for (Inst * inst=(Inst*)node->getLastInst(), * prevInst=NULL; inst!=NULL; inst=prevInst) {
-                prevInst=inst->getPrevInst();
+            for (Inst * inst = (Inst*)node->getLastInst(), * prevInst = NULL; inst != NULL; inst = prevInst) {
+                prevInst = inst->getPrevInst();
                 if (inst->getMnemonic() == Mnemonic_CALL) {
-                    const CallInst * callInst=(const CallInst*)inst;
+                    const CallInst * callInst = (const CallInst*)inst;
+                    const CallingConvention * cc =
+                        callInst->getCallingConventionClient().getCallingConvention();
                     const StlVector<CallingConventionClient::StackOpndInfo>& stackOpndInfos = 
                         callInst->getCallingConventionClient().getStackOpndInfos(Inst::OpndRole_Use);
-                    Inst * instToPrepend=inst;
+                    
+                    Inst * instToPrepend = inst;
                     Opnd * const * opnds = callInst->getOpnds();
-#ifdef _EM64T_
-                    unsigned sz = 0;
-                    for (uint32 i=0, n=(uint32)stackOpndInfos.size(); i<n; i++) {
-                        sz += sizeof(POINTER_SIZE_INT); 
-                    }
-                    unsigned corr = 0;
 
-                    if(sz&15) {
-                        corr += 16-(sz&15);
+                    unsigned shadowSize = 0;
+                    
+                    // Align stack.
+                    if (callInst->getArgStackDepthAlignment() > 0) {
+                        node->prependInst(newInst(Mnemonic_SUB, getRegOpnd(STACK_REG),
+                            newImmOpnd(typeManager.getInt32Type(), callInst->getArgStackDepthAlignment())), inst);
                     }
+
+                    // Put inputs on the stack.
+                    for (uint32 i = 0, n = (uint32)stackOpndInfos.size(); i < n; i++) {
+                        Opnd* opnd = opnds[stackOpndInfos[i].opndIndex];
+                        Inst * pushInst = newCopyPseudoInst(Mnemonic_PUSH, opnd);
+                        pushInst->insertBefore(instToPrepend);
+                        instToPrepend = pushInst;
+                    }
+                    
 #ifdef _WIN64
+                    // Assert that shadow doesn't break stack alignment computed earlier.
+                    assert((shadowSize & (STACK_ALIGNMENT - 1)) == 0);
                     Opnd::RuntimeInfo * rt = callInst->getRuntimeInfo();
+                    bool needShadow = false;
                     if (rt) {
-                        //stack size for parameters: "number of entries is equal to 4 or the maximum number ofparameters
-                        //See http://msdn2.microsoft.com/en-gb/library/ms794596.aspx for details
-                        //shadow - is an area on stack reserved to map parameters passed with registers
-                        bool needShadow = rt->getKind() == Opnd::RuntimeInfo::Kind_InternalHelperAddress;
+                        // Stack size for parameters: "number of entries is equal to 4 or the maximum number of parameters"
+                        // See http://msdn2.microsoft.com/en-gb/library/ms794596.aspx for details.
+                        // Shadow - is an area on stack reserved to map parameters passed with registers.
+                        needShadow = rt->getKind() == Opnd::RuntimeInfo::Kind_InternalHelperAddress;
                         if (!needShadow && rt->getKind() == Opnd::RuntimeInfo::Kind_HelperAddress) {
                                 VM_RT_SUPPORT helperId = (VM_RT_SUPPORT)(POINTER_SIZE_INT)rt->getValue(0);
-                                //ABOUT: VM does not allocate shadow for most of the helpers
-                                //however some helpers are direct pointers to native funcs
-                                //TODO: create VM interface to get calling conventions for the helper
-                                //today  this knowledge is hardcoded here
+                                // ABOUT: VM does not allocate shadow for most of the helpers
+                                // however some helpers are direct pointers to native functions.
+                                // TODO: create VM interface to get calling conventions for the helper
+                                // today  this knowledge is hardcoded here
                                 needShadow = helperId == VM_RT_GC_GET_TLS_BASE;
                         }
-                        if (needShadow) {
-                            uint32 shadowSize = 4 * sizeof(POINTER_SIZE_INT);
-                            corr += shadowSize;
-                        }
                     }
-#endif
-                    if (corr)
-                    {
-                        node->prependInst(newInst(Mnemonic_SUB, getRegOpnd(STACK_REG), newImmOpnd(typeManager.getInt32Type(), corr)), inst);
-                        node->appendInst(newInst(Mnemonic_ADD, getRegOpnd(STACK_REG), newImmOpnd(typeManager.getInt32Type(), corr)), inst);
+                    if (needShadow) {                        
+                        // Arrange shadow area on the stack. 
+                        shadowSize = 4 * sizeof(POINTER_SIZE_INT);
+                        node->prependInst(newInst(Mnemonic_SUB, getRegOpnd(STACK_REG), newImmOpnd(typeManager.getInt32Type(), shadowSize)), inst);
                     }
-                    sz = 0;
+
 #endif
-                    for (uint32 i=0, n=(uint32)stackOpndInfos.size(); i<n; i++) {
-#ifdef _EM64T_
-                        uint32 index = callInst->getCallingConventionClient().getCallingConvention()->pushLastToFirst()?i:n-1-i;
-                        Inst * pushInst=newCopyPseudoInst(Mnemonic_PUSH, opnds[stackOpndInfos[index].opndIndex]);
-                        sz+=sizeof(POINTER_SIZE_INT);//getByteSize(opnds[stackOpndInfos[index].opndIndex]->getSize());
-#else
-                        Inst * pushInst=newCopyPseudoInst(Mnemonic_PUSH, opnds[stackOpndInfos[i].opndIndex]);
-#endif
-                        pushInst->insertBefore(instToPrepend);
-                        instToPrepend=pushInst;
-                    }
-#ifdef _EM64T_
-                    if(sz && !((CallInst *)inst)->getCallingConventionClient().getCallingConvention()->calleeRestoresStack()) {
-                        Inst* newIns = newInst(Mnemonic_ADD, getRegOpnd(STACK_REG), newImmOpnd(typeManager.getInt32Type(), sz));
+                    unsigned stackPopSize = cc->calleeRestoresStack() ? 0 : callInst->getArgStackDepth();
+                    stackPopSize += shadowSize;
+                    // Restore stack pointer.
+                    if(stackPopSize != 0) {
+                        Inst* newIns = newInst(Mnemonic_ADD, getRegOpnd(STACK_REG), newImmOpnd(typeManager.getInt32Type(), stackPopSize));
                         newIns->insertAfter(inst);
                     }
-#else
-                    if(!((CallInst *)inst)->getCallingConventionClient().getCallingConvention()->calleeRestoresStack()) {
-                        Inst* newIns = newInst(Mnemonic_ADD, getRegOpnd(RegName_ESP), newImmOpnd(typeManager.getInt32Type(), ((CallInst *)inst)->getArgStackDepth()));
-                        newIns->insertAfter(inst);
-                    }
-#endif
                 }
             }
         }
