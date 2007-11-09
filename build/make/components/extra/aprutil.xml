@@ -28,9 +28,8 @@ Version: $Revision: 1.3.2.5 $
 
 <project name="extra.aprutil">
 
-    <target name="prepare_src">
-        <mkdir dir="${build.dir}/src" />
-        <property name="src" location="${build.dir}/src" />
+    <target name="-get-src" unless="is.aprutil.configured">
+        <mkdir dir="${src}" />
         <copy todir="${src}" failonerror="true">
             <fileset dir="${build.APRUTIL.home}/" includes="**/*" />
         </copy>
@@ -46,11 +45,12 @@ Version: $Revision: 1.3.2.5 $
                 <include name="**/*" />
             </fileset>
         </chmod>
-        <property name="includes" location="${src}/include" />
     </target>
 
-    <target name="configure-check" depends="prepare_src">
-        <condition property="aprutil-config-available" value="true">
+    <target name="-setup">
+        <property name="src" location="${build.dir}/src" />
+        <property name="includes" location="${src}/include" />
+        <condition property="is.aprutil.configured" value="true">
             <and>
                 <available file="${includes}/apu.h" />
                 <available file="${includes}/apu_want.h" />
@@ -62,40 +62,35 @@ Version: $Revision: 1.3.2.5 $
         </condition>
     </target>
 
-    <target name="configure" unless="aprutil-config-available">
-        <select osfamily="unix">
-            <exec executable="sh" dir="${src}">
-                <arg value="./buildconf" />
-                <arg value="--with-apr=${extra.apr.src}" />
-            </exec>
-            <exec executable="sh" dir="${src}">
-                <arg value="./configure" />
-                <arg value="--with-apr=${extra.apr.src}" />
-                <arg value="CC=${build.cxx}" />
-            </exec>
-            <exec executable="sh" dir="${src}/xml/expat">
-                <arg value="./configure" />
-                <arg value="CC=${build.cxx}" />
-            </exec>
-        </select>
-        <select os="win">
-            <copy tofile="${includes}/apu.h" file="${includes}/apu.hw" />
-            <!--
-                        <replaceregexp file="${includes}/apu.h" match="#define *APU_HAVE_APR_ICONV.*" replace="#define APU_HAVE_APR_ICONV 0" />
-                        -->
-            <copy tofile="${includes}/apu_want.h" file="${includes}/apu_want.hw" />
-            <copy tofile="${includes}/apr_ldap.h" file="${includes}/apr_ldap.hw" />
-            <!--
-                        <replaceregexp file="${includes}/apr_ldap.h" match="#define APR_HAS_LDAP.*" replace="#define APR_HAS_LDAP 0" />
-                        -->
-            <copy tofile="${includes}/private/apu_config.h" file="${includes}/private/apu_config.hw" />
-            <copy tofile="${includes}/private/apu_select_dbm.h" file="${includes}/private/apu_select_dbm.hw" />
-            <copy tofile="${src}/xml/expat/lib/expat.h" file="${src}/xml/expat/lib/expat.h.in" />
-            <copy tofile="${src}/xml/expat/lib/config.h" file="${src}/xml/expat/lib/winconfig.h" />
-        </select>
+    <target name="-configure-unix" unless="is.aprutil.configured" if="is.unix">
+        <exec executable="sh" dir="${src}">
+            <arg value="./buildconf" />
+            <arg value="--with-apr=${extra.apr.src}" />
+        </exec>
+        <exec executable="sh" dir="${src}">
+            <arg value="./configure" />
+            <arg value="--with-apr=${extra.apr.src}" />
+            <arg value="CC=${build.cxx}" />
+        </exec>
+        <exec executable="sh" dir="${src}/xml/expat">
+            <arg value="./configure" />
+            <arg value="CC=${build.cxx}" />
+        </exec>
     </target>
-
-    <target name="init" depends="configure-check, configure, common_extra">
+    
+    <target name="-configure-win" unless="is.aprutil.configured" if="is.windows">
+        <copy tofile="${includes}/apu.h" file="${includes}/apu.hw" />
+        <copy tofile="${includes}/apu_want.h" file="${includes}/apu_want.hw" />
+        <copy tofile="${includes}/apr_ldap.h" file="${includes}/apr_ldap.hw" />
+        <copy tofile="${includes}/private/apu_config.h" file="${includes}/private/apu_config.hw" />
+        <copy tofile="${includes}/private/apu_select_dbm.h" file="${includes}/private/apu_select_dbm.hw" />
+        <copy tofile="${src}/xml/expat/lib/expat.h" file="${src}/xml/expat/lib/expat.h.in" />
+        <copy tofile="${src}/xml/expat/lib/config.h" file="${src}/xml/expat/lib/winconfig.h" />
+    </target>
+            
+    <target name="configure" depends="-setup,-get-src,-configure-win,-configure-unix"/>
+    
+    <target name="init" depends="configure,-init-win,-init-unix">
         <property name="build.depends" value="extra.apr, extra.apriconv" />
         <property name="libname" value="aprutil-1" />
         <property name="outtype" value="static" />
@@ -106,9 +101,9 @@ Version: $Revision: 1.3.2.5 $
             <replacefilter token="XML_MICRO_VERSION" value="1" />
             <replacefilter token="VERSION" value='"expat_1.95.1"' />
         </replace>
-
-    	<select osfamily="unix">
-
+    </target>
+    
+    <target name="-init-unix" depends="common_extra" if="is.unix">
             <compiler id="c.compiler" extends="common.c.compiler">
                 <fileset dir="${src}" includes="**/*.c" excludes="test/*.c ldap/*.c xml/expat/lib/*" />
                 <fileset dir="${src}/xml/expat/lib" includes="xmlparse.c xmlrole.c xmltok.c" />
@@ -122,20 +117,15 @@ Version: $Revision: 1.3.2.5 $
                 <includepath path="${src}/xml/expat" />
                 <defineset define="APU_DECLARE_EXPORT" />
                 <defineset define="APR_DECLARE_EXPORT" />
-                <!--                <select cxx="gcc"> -->
                 <defineset define="_HAVE_CONFIG_H _REENTRANT _GNU_SOURCE" />
-                <!--                </select> -->
                 <defineset>
                     <define name="APU_HAVE_APR_ICONV" value="0" />
                 </defineset>
-                <select osfamily="unix" arch="em64t">
-                    <compilerarg value="-fPIC" />
-                </select>
+                <compilerarg value="-fPIC" if="is.x86_64"/>
             </compiler>
+    </target>
 
-        </select>
-        <echo message="apriconv: ${extra.apriconv.includes} " />
-        <select os="win">
+    <target name="-init-win" depends="common_extra" if="is.windows">
             <compiler id="c.compiler" extends="common.c.compiler">
                 <includepath>
                     <pathelement location="${extra.apriconv.includes}" />
@@ -168,6 +158,5 @@ Version: $Revision: 1.3.2.5 $
                 <fileset dir="${src}/xml/expat/lib" includes="xmlparse.c xmlrole.c xmltok.c" />
                 <defineset define="APR_DECLARE_EXPORT,APU_DECLARE_EXPORT,API_DECLARE_EXPORT,APU_USE_SDBM" />
             </compiler>
-        </select>
     </target>
 </project>

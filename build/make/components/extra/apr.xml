@@ -28,17 +28,14 @@ Version: $Revision: 1.4.2.5 $
   -->
 
 <project name="extra.apr">
-    <target name="copy.apr.includes">
+    <target name="-copy-apr-includes" unless="is.apr.configured">
         <mkdir dir="${build.dir}/include/apr-1" />
-
         <copy todir="${build.dir}/include/apr-1">
             <fileset dir="${includes.apr}" includes="*.h" />
         </copy>
-
-        <property name="includes" location="${build.dir}/include/apr-1" />
     </target>
 
-    <target name="prepare_src">
+    <target name="-get-src" unless="is.apr.configured">
         <mkdir dir="${build.dir}/src" />
         <copy todir="${build.dir}/src" failonerror="true">
             <fileset dir="${build.APR.home}" includes="**/*" />
@@ -48,90 +45,47 @@ Version: $Revision: 1.4.2.5 $
                 <include name="**/*" />
             </fileset>
         </chmod>
-        <property name="src" location="${build.dir}/src" />
-        <property name="includes.apr" location="${src}/include" />
     </target>
 
-    <target name="configure-check" depends="prepare_src">
-        <condition property="apr-config-available" value="true">
-            <available file="${includes.apr}/apr.h" />
+    <target name="-setup">
+        <property name="src" location="${build.dir}/src" />
+        <property name="includes.apr" location="${src}/include" />
+        <condition property="is.apr.configured" value="true">
+            <available file="${build.dir}/include/apr-1/apr.h" />
         </condition>
     </target>
 
-    <target name="apr-configure" unless="apr-config-available">
-        <select osfamily="unix">
-        	
-<!--            <exec executable="sh" dir="${src}">
-                <arg value="./buildconf" />
-            </exec>
--->
+    <target name="apr-configure" depends="-setup,-get-src" unless="apr-config-available" if="is.unix">
             <exec executable="sh" dir="${src}">
                 <arg value="./configure" />
             </exec>
-
             <replaceregexp file="${includes.apr}/apr.h" match="#define APR_HAS_OS_UUID           1" replace="#define APR_HAS_OS_UUID           0" />
-
             <replaceregexp file="${includes.apr}/apr.h" match="APR_HAS_POSIXSEM_SERIALIZE        0" replace="APR_HAS_POSIXSEM_SERIALIZE        1" />
-
             <replaceregexp file="${includes.apr}/apr.h" match="#define APR_HAS_PROC_PTHREAD_SERIALIZE    0" replace="#define APR_HAS_PROC_PTHREAD_SERIALIZE    1" />
-        </select>
-
-        <select os="win">
-            <copy file="${includes.apr}/apr.hw" tofile="${includes.apr}/apr.h" failonerror="true" />
-        </select>
     </target>
 
-    <target name="init" depends="configure-check, apr-configure, copy.apr.includes, common_extra">
+    <target name="init" depends="apr-configure,-init-unix,-init-win,-copy-apr-includes">
+        <property name="includes" location="${build.dir}/include/apr-1" />
         <property name="libname" value="apr-1" />
         <property name="outtype" value="static" />
+    </target>
 
-        <select osfamily="unix">
-
+    <target name="-init-unix" depends="common_extra" if="is.unix">
         	<!-- simply invoke make to let it build as the APR people suggest  -->
             <!-- we'll need to tune this wrt flags and such                    -->
-        	<select arch="em64t">
-                <replaceregexp file="${src}/build/apr_rules.mk" match="CFLAGS=" replace="CFLAGS=-fpic " />
-            </select>
-            
-        	<exec executable="make" dir="${src}"/>
-        	        		
-        	<!-- the rest of the build expect the lib to be in _bin  -->
-        	
-        	<copy file="${src}/.libs/lib${libname}.a" todir="${src}/../_bin" />
+        <condition property="extra.flags" value="-fpic" else="">
+            <isset property="is.x86_64"/>
+        </condition>
+        <replaceregexp file="${src}/build/apr_rules.mk" match="CFLAGS=" replace="CFLAGS=${extra.flags} " />
 
-    	<!--  this is the original build approach - leaving here for now 
-    	
-            <compiler id="c.compiler" extends="common.c.compiler">
-                <includepath path="${src}/include" />
-                <includepath path="${src}/include/arch" />
-                <includepath path="${src}/include/arch/unix" />
-
-                <fileset dir="${src}">
-                    <include name="**/unix/*.c" />
-                    <exclude name="**/unix/apr_app.c" />
-                </fileset>
-
-                <fileset dir="${src}/file_io/unix" includes="copy.c fileacc.c filepath_util.c fullrw.c mktemp.c tempdir.c" />
-                <fileset dir="${src}/memory/unix" includes="*.c" />
-                <fileset dir="${src}/misc/unix" includes="*.c" />
-                <fileset dir="${src}/mmap/unix" includes="common.c" />
-                <fileset dir="${src}/network_io/unix" includes="inet_ntop.c inet_pton.c sockaddr.c" />
-                <fileset dir="${src}/poll/unix" includes="select.c" />
-                <fileset dir="${src}/random/unix" includes="*.c" />
-                <fileset dir="${src}/strings" includes="*.c" />
-                <fileset dir="${src}/tables" includes="*.c" />
-                <fileset dir="${src}/support/unix" includes="waitio.c" />
-
-                <defineset define="APR_DECLARE_EXPORT,PLATFORM_POSIX,_LARGEFILE64_SOURCE" />
-                <defineset define="_HAVE_CONFIG_H,_REENTRANT,_GNU_SOURCE" />
-
-                <select arch="ipf,em64t">
-                    <compilerarg value="-fPIC" />
-                </select>
-            </compiler>
-            -->
-        </select>
-        <select os="win">
+        <exec executable="make" dir="${src}"/>
+        <!-- the rest of the build expect the lib to be in _bin  -->
+    	<copy file="${src}/.libs/libapr-1.a" todir="${src}/../_bin" />
+    </target>
+    
+    <target name="-init-win" depends="common_extra" if="is.windows">
+        <copy file="${includes.apr}/apr.hw" tofile="${includes.apr}/apr.h"/>
+        
             <compiler id="c.compiler" extends="common.c.compiler">
                 <includepath>
                     <dirset dir="${src}">
@@ -185,6 +139,5 @@ Version: $Revision: 1.4.2.5 $
 
                 <defineset define="APR_DECLARE_EXPORT" />
             </compiler>
-        </select>
     </target>
 </project>
