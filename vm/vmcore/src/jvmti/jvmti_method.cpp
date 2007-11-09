@@ -667,9 +667,9 @@ jvmtiIsMethodObsolete(jvmtiEnv* env,
         return JVMTI_ERROR_INVALID_METHODID;
     }
     /**
-     * Get method synthetic
+     * Since we don't have RedefineClasses yet, always return false
      */
-    *is_obsolete_ptr = (jboolean)(reinterpret_cast<Method*>(method)->is_deprecated() ? JNI_TRUE : JNI_FALSE);
+    *is_obsolete_ptr = JNI_FALSE;
 
     return JVMTI_ERROR_NONE;
 } // jvmtiIsMethodObsolete
