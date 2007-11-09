@@ -165,10 +165,10 @@ namespace CPVerifier {
             return from == SM_NULL || from.isReference() && sm_get_refname(from)[0] == '[';
 
         case SM_NULL:
-        case SM_THISUNINIT:
             assert(0);
             return false;
 
+        case SM_THISUNINIT:
         case SM_HIGH_WORD:
         case SM_INTEGER:
         case SM_FLOAT:

@@ -353,7 +353,7 @@ namespace CPVerifier_6 {
 
             //skip copying workmap->elements[m_max_locals] that in case of constructor contains flags
 
-            for( ; i < m_stack_start + lastWorkmap->depth; i++ ) {
+            for( i = m_stack_start; i < m_stack_start + lastWorkmap->depth; i++ ) {
                 sm->elements[i].const_val = lastWorkmap->elements[i].const_val;
                 if( sm->elements[i].const_val == SM_THISUNINIT ) flag_element = SmConstant(SM_THISUNINIT);
             }

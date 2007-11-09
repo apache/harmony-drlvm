@@ -34,6 +34,7 @@ namespace CPVerifier {
 #define add_incoming_value              (((ActualClass*)this)->add_incoming_value)
 #define new_scalar_constraint           (((ActualClass*)this)->new_scalar_constraint)
 #define new_scalar_array2ref_constraint (((ActualClass*)this)->new_scalar_array2ref_constraint)
+#define new_bogus_propagation_constraint (((ActualClass*)this)->new_bogus_propagation_constraint)
 #define new_ret_vector_constraint       (((ActualClass*)this)->new_ret_vector_constraint)
 #define push_handler                    (((ActualClass*)this)->push_handler)
 
@@ -1575,12 +1576,18 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
                 return error(VF_ErrorUnknown, "unable to pop from the empty stack");
             }
 
-            if( workmap_stackview(0).getAnyPossibleValue() != SM_THISUNINIT ) {
+            WorkmapElement &w0 = workmap_stackview(0);
+            if( w0.getAnyPossibleValue() != SM_THISUNINIT ) {
                 vf_Result result;
+
                 if( (result = popFieldRef(expected_ref, cp_idx)) != VF_OK ) {
                     return result;
                 }
             } else if( expected_ref == tpool.sm_get_const_this() ) {
+                if( !workmap_expect_strict(w0, SM_THISUNINIT) ) {
+                    return error(VF_ErrorUnknown, "Incompatible argument");
+                }
+
                 workmap_pop();
             } else {
                 return error(VF_ErrorUnknown, "incorrect uninitialized type");
@@ -1682,7 +1689,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
                 }
 
                 assert( uninit_value != SM_NONE );
-                WorkmapElement wm_init = _WorkmapElement( sm_convert_to_initialized( uninit_value ) );
+                SmConstant init_val = sm_convert_to_initialized( uninit_value );
 
                 //exception might be thrown from the constructor, all uninit values will be invalid
                 //BUT if try block contains both this and the next instruction then no extra actions is necessary:
@@ -1694,14 +1701,14 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
                     WorkmapElement &wm_el = workmap->elements[i];
 
                     if( wm_el.getAnyPossibleValue() == uninit_value ) {
-                        wm_el = wm_init;
+
+                        new_bogus_propagation_constraint(wm_el, init_val);
 
                         //respect changed_locals
                         if( i < m_stack_start ) {
                             changed_locals[ i ] = 1;
 
-                            //don't need to set "jsr modified" flag for constant
-                            assert(wm_el.isJsrModified());
+                            wm_el.setJsrModified();
 
                             //will be set later
                             //locals_changed = true;
@@ -1724,7 +1731,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
                     }
 
                 } else {
-                    if( expected_ref != wm_init.getConst() ) return error(VF_ErrorUnknown, "incorrect uninitialized type");
+                    if( expected_ref != init_val ) return error(VF_ErrorUnknown, "incorrect uninitialized type");
                 }
             } else if( opcode == OP_INVOKESPECIAL ) {
                 //pop object ref (it must extend be either 'this' or a sub class of 'this')

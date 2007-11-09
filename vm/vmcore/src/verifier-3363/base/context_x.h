@@ -90,7 +90,7 @@ namespace CPVerifier {
         }
 
         //looking the operand stack
-        WorkmapElement workmap_stackview(int depth) {
+        WorkmapElement &workmap_stackview(int depth) {
             assert( depth >= 0 && workmap_can_pop(depth+1) );
             return workmap->elements[ workmap->depth + m_stack_start - depth - 1];
         }

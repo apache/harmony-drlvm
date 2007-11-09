@@ -320,6 +320,18 @@ namespace CPVerifier_5 {
             }
             return VF_OK;
         }
+
+        void new_bogus_propagation_constraint(WorkmapElement &wm_el, SmConstant init_val) {
+            if( !wm_el.isVariable() ) {
+                wm_el = _WorkmapElement (init_val);
+            } else {
+
+                WorkmapElement wm_init = _WorkmapElement (new_variable());
+                wm_init.var_ptr->newIncomingType(&mem, init_val);
+                wm_el.getVariable()->newGenericConstraint(&mem, wm_init.getVariable());
+                wm_el = wm_init;
+            }
+        }
     };
 
 } // namespace CPVerifier

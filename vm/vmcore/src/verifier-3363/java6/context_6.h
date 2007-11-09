@@ -139,6 +139,10 @@ namespace CPVerifier_6 {
             *to = _WorkmapElement( tpool.get_ref_from_array(from->const_val) );
             return VF_OK;
         }
+
+        void new_bogus_propagation_constraint(WorkmapElement &wm_el, SmConstant init_val) {
+            wm_el = _WorkmapElement (init_val);
+        }
     };
 
 } // namespace CPVerifier

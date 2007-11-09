@@ -290,14 +290,6 @@ namespace CPVerifier_5 {
                     //goto, goto_w
                     if( !props.isDataflowPassed(target) ) {
                         if( target < instr ) next_start_pc = 0;
-
-                        //if we like to flush StackMapTable attribute from this method
-                        if( stackmapattr_calculation && !props.isMultiway(target) ) {
-                            //store workmap to flush it further
-                            assert(!props.getInstrProps(target));
-                            storeWorkmapCopy(target);
-                        }
-
                         instr = target;
                         continue;
                     } else {
