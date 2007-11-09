@@ -208,42 +208,41 @@ public:
      * @brief Info about single opcode - its opcode bytes, operands, 
      *        operands' roles.
      */
-    struct OpcodeDesc {
-        /**
-         * @brief Raw opcode bytes.
-         *
-         * 'Raw' opcode bytes which do not require any analysis and are  
-         * independent from arguments/sizes/etc (may include opcode size
-         * prefix).
-         */
-        char        opcode[5];     // 4 bytes
-        unsigned    opcode_len;    // 4
-        unsigned    aux0;          // 4
-        unsigned    aux1;          // 4
-        /**
-         * @brief Info about opcode's operands.
-         * 
-         * The [3] mostly comes from IDIV/IMUL which both may have up to 3 
-         * operands.
-         */
-        OpndDesc        opnds[3];   // 12*3 = 36
-        unsigned        first_opnd; // 4
-        /**
-         * @brief Info about operands - total number, number of uses/defs, 
-         *        operands' roles.
-         */
-        OpndRolesDesc   roles;   // 16
-        /**
-         * @brief If not zero, then this is final OpcodeDesc structure in 
-         *        the list of opcodes for a given mnemonic.
-         */
-        char            last;    // 1
-                                 // total: 74
-        /**
-         * @brief Padding to make structure's size a power of 2.
-         */
-        char padding[128-74];
-    };
+   union OpcodeDesc {
+       char dummy[128]; // To make total size a power of 2
+
+       struct {
+           /**
+           * @brief Raw opcode bytes.
+           *
+           * 'Raw' opcode bytes which do not require any analysis and are
+           * independent from arguments/sizes/etc (may include opcode size
+           * prefix).
+           */
+           char        opcode[5];
+           unsigned    opcode_len;
+           unsigned    aux0;
+           unsigned    aux1;
+           /**
+           * @brief Info about opcode's operands.
+           * 
+           * The [3] mostly comes from IDIV/IMUL which both may have up to 3
+           * operands.
+           */
+           OpndDesc        opnds[3];
+           unsigned        first_opnd;
+           /**
+           * @brief Info about operands - total number, number of uses/defs,
+           *        operands' roles.
+           */
+           OpndRolesDesc   roles;
+           /**
+           * @brief If not zero, then this is final OpcodeDesc structure in
+           *        the list of opcodes for a given mnemonic.
+           */
+           char            last;
+       };
+   };
 public:
     /**
      * @brief General info about mnemonic.
