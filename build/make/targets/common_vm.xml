@@ -97,11 +97,11 @@
             <compilerarg value="-g" if="is.unix" unless="is.cfg.release"/>
             <compilerarg value="-ggdb3" if="is.unix" unless="is.cfg.release"/>
 
-            <compilerarg value="/Ox" if="is.msvc" unless="is.cfg.debug"/>
+            <compilerarg value="/O2" if="is.msvc" unless="is.cfg.debug"/>
             <compilerarg value="/Od" if="is.windows" unless="is.cfg.release"/>
             
             <compilerarg value="/O3" if="is.icl" unless="is.cfg.debug"/>
-            <compilerarg value="-mp" if="is.icl"/>
+            <compilerarg value="/mp" if="is.icl"/>
             <compilerarg value="-mp" if="is.icc"/>
             <compilerarg value="/QxN" if="is.icl"/>
             <compilerarg value="/Qip" if="is.icl"/>
