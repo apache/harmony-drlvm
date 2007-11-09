@@ -31,8 +31,6 @@ Version: $Revision: 1.1.2.11 $
         <property name="build.depends" value="extra.apr,
                                               extra.apriconv,
                                               extra.aprutil,
-                                              extra.eclipse_script,
-                                              extra.java_script,
                                               extra.jre_libraries,
                                               extra.log4cxx,
                                               extra.zlib" />

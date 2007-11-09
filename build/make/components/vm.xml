@@ -29,7 +29,6 @@ Version: $Revision: 1.4.2.4 $
 
 <project name="vm">
     <target name="init" depends="common">
-        <select arch="ia32">
             <property  name="build.depends" value="vm.vmcore, 
                                                    vm.em, 
                                                    vm.gc_gen,
@@ -39,31 +38,5 @@ Version: $Revision: 1.4.2.4 $
                                                    vm.hythr,
                                                    vm.jitrino,
                                                    vm.kernel_classes" />
-        </select>
-
-        <!-- ia32 dependence but w/o vm.vmi -->
-        <select arch="ipf">
-            <property name="build.depends" value="vm.vmcore,
-                                                  vm.em, 
-                                                  vm.gc_gen,
-                                                  vm.gc_cc,
-                                                  vm.interpreter,
-                                                  vm.hythr,
-                                                  vm.jitrino,
-                                                  vm.kernel_classes" />
-        </select>
-        
-        <!-- ia32 dependence but w/o vm.vmi and vm.jitrino -->
-        <select arch="em64t">
-            <property name="build.depends" value="vm.vmcore,
-                                                  vm.em,
-                                                  vm.gc_gen, 
-                                                  vm.gc_cc, 
-                                                  vm.interpreter,
-                                                  vm.hythr,
-                                                  vm.jitrino,
-                                                  vm.kernel_classes"  />
-        </select>
-
     </target>
 </project>
