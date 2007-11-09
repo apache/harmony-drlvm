@@ -28,17 +28,16 @@ Version: $Revision: 1.3.2.3 $
 
 <project name="extra.zlib">
 
-    <target name="init" >
-        <select os="win">
+    <target name="init" if="is.windows">
             <property name="includes" value="${build.dir}/include" />
             <mkdir dir="${includes}" />
 
             <property name="libdir" value="${build.dir}/_bin"/>
             <mkdir dir="${libdir}" />
 
-            <select arch="em64t">
-                <property name="select.ZLIB.home" value="${build.ZLIB-x86_64.home}"/>
-            </select>
+            <condition property="select.ZLIB.home" value="${build.ZLIB-x86_64.home}">
+                <isset property="is.x86_64"/>
+            </condition>
             <property name="select.ZLIB.home" value="${build.ZLIB.home}"/>
             
             <copy file="${select.ZLIB.home}/zlib1.dll"
@@ -54,7 +53,6 @@ Version: $Revision: 1.3.2.3 $
             </copy>
 
             <property name="libname" value="zdll" />
-        </select>
     </target>
     
 </project>

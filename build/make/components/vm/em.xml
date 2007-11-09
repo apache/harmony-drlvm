@@ -37,13 +37,8 @@ Version: $Revision: 1.5.2.2 $
         <compiler id="cpp.compiler" extends="common.cpp.compiler">
             <includepath>
                 <dirset dir="${src}">
-                    <select os="win">
-                        <include name="vmcore/src/util/win/include" />
-                    </select>
-
-                    <select osfamily="unix">
-                        <include name="vmcore/src/util/linux/include" />
-                    </select>
+                    <include name="vmcore/src/util/win/include" if="is.windows"/>
+                    <include name="vmcore/src/util/linux/include" if="is.unix"/>
                 </dirset>
 
                 <dirset dir="${src}">
@@ -57,18 +52,12 @@ Version: $Revision: 1.5.2.2 $
 
             <defineset define="BUILDING_EM" />
 
-            <select os="win">
-                <defineset define="_USRDLL" />
-            </select>
+            <defineset define="_USRDLL" if="is.windows"/>
 
             <fileset dir="${src}/em/src">
                 <include name="*.cpp" />
             </fileset>
 
-            <select osfamily="unix">
-                <compilerarg value="-Wno-deprecated" />
-                <compilerarg value="-fno-exceptions" />
-            </select>
        </compiler>
 
         <linker id="linker" extends="common.linker">
@@ -81,18 +70,14 @@ Version: $Revision: 1.5.2.2 $
             <libset libs="${vm.vmcore.lib}" dir="${vm.vmcore.libdir}" />
             <libset libs="${extra.apr.lib}" dir="${extra.apr.libdir}" />
             <libset libs="${vm.hythr.lib}" dir="${vm.hythr.libdir}" />
-            <select os="lnx">
-                <syslibset type="shared" libs="m,dl,stdc++,z,xml2,pthread" />
-                <linkerarg value="--version-script=${build.vm.home}/em/build/em.exp" />
-                <!-- syslibset type="static" libs="z,pthread,xml2" />
-                <syslibset type="shared" libs="m,dl,stdc++" / -->
-            </select>
-            <select os="freebsd">
-                <syslibset type="shared" libs="m,stdc++,z,pthread" />
-                <libset libs="xml2" dir="/usr/local/lib" />
-                <linkerarg value="--export-dynamic" />
-                <linkerarg value="--version-script=${build.vm.home}/em/build/em.exp" />
-            </select>
+            
+            <syslibset type="shared" libs="m,dl,stdc++,z,xml2,pthread" if="is.linux"/>
+            
+            <syslibset type="shared" libs="m,stdc++,z,pthread" if="is.freebsd"/>
+            <libset libs="xml2" dir="/usr/local/lib" if="is.freebsd"/>
+            <linkerarg value="--export-dynamic" if="is.freebsd"/>
+            
+            <linkerarg value="--version-script=${build.vm.home}/em/build/em.exp" if="is.unix"/>
         </linker>
     </target>
 </project>

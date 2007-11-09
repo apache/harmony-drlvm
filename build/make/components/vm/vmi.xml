@@ -37,71 +37,42 @@ Version: $Revision: 1.4.2.4 $
         <compiler id="cpp.compiler" extends="common.cpp.compiler">
             <includepath>
                 <pathelement location="${extra.apr.includes}" />
-            </includepath>
-
-            <select os="lnx">
-                <defineset define="LINUX" />
-            </select>
-
-            <select os="win" arch="ia32">
-                <defineset define="_STATIC_CPPLIB" />
-            </select>
-
-            <includepath>
                 <dirset dir="${build.vm.home}">
                     <include name="vmcore/include" />
-
-                    <select os="win">
-                        <include name="vmcore/src/util/win/include" />
-                    </select>
-
-                    <select osfamily="unix">
-                        <include name="vmcore/src/util/linux/include" />
-                    </select>
+                    <include name="vmcore/src/util/win/include" if="is.windows"/>
+                    <include name="vmcore/src/util/linux/include" if="is.unix"/>
                 </dirset>
-
                 <pathelement location="${external.dep.CLASSLIB.includes}" />
-
-
             </includepath>
 
             <fileset dir="${src}">
                 <include name="*.cpp" />
             </fileset>
+
+            <!--select os="win" arch="ia32">
+                <defineset define="_STATIC_CPPLIB" />
+            </select-->
         </compiler>
 
         <linker id="linker" extends="common.linker">
-            <select os="win">
-                <linkerarg value="/export:VMI_GetVMIFromJavaVM" />
-                <linkerarg value="/export:VMI_GetVMIFromJNIEnv" />
-                <libset libs="${vm.vmcore.lib}" dir="${vm.vmcore.libdir}" />
-            </select>
+            <linkerarg value="/export:VMI_GetVMIFromJavaVM" if="is.windows"/>
+            <linkerarg value="/export:VMI_GetVMIFromJNIEnv" if="is.windows"/>
+            <libset libs="${vm.vmcore.lib}" dir="${vm.vmcore.libdir}" if="is.windows"/>
 
-            <select osfamily="unix">
-                <linkerarg value="--version-script,${src}/vmi.exp" />
-            </select>
+            <linkerarg value="--version-script,${src}/vmi.exp" if="is.unix"/>
 
-            <select cfg="debug" os="win">
-                <linkerarg value="/NODEFAULTLIB:libcmtd.lib" />
-                <syslibset libs="msvcrtd" />
-            </select>
+            <linkerarg value="/NODEFAULTLIB:libcmtd.lib" if="is.windows" unless="is.cfg.release"/>
+            <syslibset libs="msvcrtd" if="is.windows" unless="is.cfg.release"/>
 
-            <select cfg="release" os="win">
-                <linkerarg value="/NODEFAULTLIB:libcmt.lib" />
-                <syslibset libs="msvcrt" />
-            </select>
+            <linkerarg value="/NODEFAULTLIB:libcmt.lib" if="is.windows" unless="is.cfg.debug"/>
+            <syslibset libs="msvcrt" if="is.windows" unless="is.cfg.debug"/>
 
-            <select osfamily="windows">
-                <libset libs="hyzip, hypool, hyprt"
-                        dir="${external.dep.CLASSLIB.libdir}" />
-            </select>
-            <select osfamily="unix">
-                <libset libs="hyzip, hypool"
-                        dir="${external.dep.CLASSLIB.libdir}" />
-                <libset libs="hyprt"
-                        dir="${external.dep.CLASSLIB.dlldir}" />
-            </select>
-
+            <libset libs="hyzip, hypool, hyprt"
+                        dir="${external.dep.CLASSLIB.libdir}" if="is.windows"/>
+            <libset libs="hyzip, hypool"
+                        dir="${external.dep.CLASSLIB.libdir}" if="is.unix"/>
+            <libset libs="hyprt"
+                        dir="${external.dep.CLASSLIB.dlldir}" if="is.unix"/>
         </linker>
     </target>
 </project>

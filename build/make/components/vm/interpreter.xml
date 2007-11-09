@@ -42,127 +42,60 @@ Version: $Revision: 1.3.2.3 $
                 <include name="interpreter_ti.cpp" />
                 <include name="interp_exports.cpp" />
                 <include name="interp_vm_helpers.cpp" />
-                <select arch="ia32">
-                    <include name="interp_native_ia32.cpp" />
-                </select>
-                <select arch="ipf">
-                    <include name="interp_native_ipf.cpp" />
-                </select>
-                <select arch="em64t">
-                    <include name="interp_native_em64t.cpp" />
-                </select>
+                <include name="interp_native_ia32.cpp" if="is.x86"/>
+                <include name="interp_native_ipf.cpp" if="is.ia64"/>
+                <include name="interp_native_em64t.cpp" if="is.x86_64"/>
             </fileset>
 
+            <includepath path="${extra.zlib.includes}" if="is.windows"/>
             <includepath>
                 <pathelement location="${extra.apr.includes}" />
                 <pathelement location="${extra.log4cxx.includes}" />
 
-                <select os="win">
-                    <pathelement location="${extra.zlib.includes}" />
-                </select>
-            </includepath>
-
-            <includepath>
                 <dirset dir="${build.vm.home}">
                     <include name="include" />
                     <include name="vmcore/include" />
                     <include name="port/include" />
 
-                    <select os="win">
-                        <include name="vmcore/src/util/win/include" />
-                        <include name="vm/win" />
-                    </select>
+                    <include name="vmcore/src/util/win/include" if="is.windows"/>
+                    <include name="vmcore/src/util/linux/include" if="is.unix"/>
 
-                    <select osfamily="unix">
-                        <include name="vm/common/base" />
-                        <include name="vmcore/src/util/linux/include" />
-                    </select>
+                    <include name="vmcore/src/util/ipf/include" if="is.ia64"/>
+                    <include name="vmcore/src/util/ipf/base_natives" if="is.ia64"/>
+                    <include name="port/src/lil/ipf/pim/include" if="is.ia64"/>
 
-                    <select arch="ipf">
-                        <include name="vmcore/src/util/ipf/include" />
-                        <include name="vm/ipf/include" />
-                        <include name="vmcore/src/util/ipf/base_natives" />
-                        <include name="vm/ipf/dynopt_ipf" />
-                        <include name="port/src/lil/ipf/pim/include" />
-                    </select>
+                    <include name="vmcore/src/util/ia32/base_natives" if="is.x86"/>
+                    <include name="port/src/encoder/ia32_em64t" if="is.x86"/>
+                    <include name="port/src/lil/ia32/pim/include" if="is.x86"/>
 
-                    <select arch="ia32">
-                        <include name="vmcore/src/util/ia32/base_natives" />
-                        <include name="vm/ia32/debugger/include" />
-                        <include name="port/src/encoder/ia32_em64t" />
-                        <include name="port/src/lil/ia32/pim/include" />
-                    </select>
-
-                    <select arch="em64t">
-                        <include name="vmcore/src/util/em64t/base_natives" />
-                        <include name="vm/em64t/debugger/include" />
-                        <include name="port/src/encoder/ia32_em64t" />
-                        <include name="port/src/lil/em64t/pim/include" />
-                    </select>
-
-                    <select os="win" arch="ipf">
-                        <include name="vm/common/dynopt" />
-                    </select>
+                    <include name="vmcore/src/util/em64t/base_natives" if="is.x86_64"/>
+                    <include name="port/src/encoder/ia32_em64t" if="is.x86_64"/>
+                    <include name="port/src/lil/em64t/pim/include" if="is.x86_64"/>
                 </dirset>
             </includepath>
 
             <defineset define="GC_V4,USE_DLL_JIT,BUILDING_JIT" />
 
-            <select os="win">
-                <select cfg="release">
-                    <compilerarg value="/Op" />
-
-                    <select cxx="icl">
-                        <compilerarg value="/Qip" />
-                    </select>
-                </select>
-
-                <select cxx="icl">
-                    <compilerarg value="-Qwd1572" />
-                </select>
-            </select>
-
-            <select os="win" cxx="icl">
-                <compilerarg value="-Qwd1572" />
-            </select>
+            <compilerarg value="/Op" if="is.windows" unless="is.cfg.debug"/>
+            <compilerarg value="-Qwd1572" if="is.icl"/>
         </compiler>
 
         <fileset id="asm.fileset" dir="${src}">
-            <select os="lnx,freebsd" arch="ia32">
-                <include name="invokeJNI_ia32.asm" />
-            </select>
+            <include name="invokeJNI_ia32.asm" if="is.unix.x86"/>
+            <include name="invokeJNI_em64t.asm" if="is.unix.x86_64"/>
+            <include name="invokeJNI_ipf.asm" if="is.unix.ia64"/>
 
-            <select os="lnx" arch="em64t">
-                <include name="invokeJNI_em64t.asm" />
-            </select>
-
-            <select os="lnx" arch="ipf">
-                <include name="invokeJNI_ipf.asm" />
-            </select>
-
-            <select os="win" arch="ia32">
-                <exclude name="*" />
-            </select>
-            <select os="win" arch="ipf">
-                <include name="invokeJNI_Windows_ipf.asm" />
-            </select>
-            <select os="win" arch="em64t">
-                <include name="invokeJNI_Windows_em64t.asm" />
-            </select>
+            <exclude name="*" if="is.windows.x86"/>
+            <include name="invokeJNI_Windows_ipf.asm" if="is.windows.ia64"/>
+            <include name="invokeJNI_Windows_em64t.asm" if="is.windows.x86_64"/>
         </fileset>
 
         <linker id="linker" extends="common.linker">
-            <select os="lnx">
-                <linkerarg value="--version-script=${build.vm.home}/interpreter/build/interpreter.exp" />
-            </select>
+            <linkerarg value="--version-script=${build.vm.home}/interpreter/build/interpreter.exp" if="is.unix"/>
 
-            <select os="win" cfg="debug">
-                <linkerarg value="/NODEFAULTLIB:libcmt.lib" />
-            </select>
+            <linkerarg value="/NODEFAULTLIB:libcmt.lib" if="is.windows" unless="is.cfg.release"/>
 
-            <select os="win">
-                <syslibset libs="advapi32,userenv,ws2_32,vmcore,odbc32,mswsock" />
-            </select>
+            <syslibset libs="advapi32,userenv,ws2_32,vmcore,odbc32,mswsock" if="is.windows"/>
 
             <libset libs="${vm.vmcore.lib}" dir="${vm.vmcore.libdir}" />
            <libset libs="${vm.hythr.lib}" dir="${vm.hythr.libdir}" />

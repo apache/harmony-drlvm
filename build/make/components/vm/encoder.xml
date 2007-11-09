@@ -35,18 +35,14 @@ Version: $Revision: 1.3.2.2 $
 
         <compiler id="cpp.compiler" extends="common.cpp.compiler">
             <defineset define="APR_DECLARE_EXPORT" />
-            <defineset define="NO_EBCODER_INLINE" />
+            <!--defineset define="NO_EBCODER_INLINE" /-->
 
             <includepath>
                 <pathelement location="${build.vm.home}/include" />
             </includepath>
             <fileset dir="${build.vm.home}/port/src/encoder">
-                <select arch="ia32,em64t">
-                    <include name="ia32_em64t/*.cpp" />
-                </select>
-                <select arch="ipf">
-                    <include name="ipf/*.cpp" />
-                </select>
+                <include name="ia32_em64t/*.cpp" unless="is.ia64"/>
+                <include name="ipf/*.cpp" if="is.ia64"/>
             </fileset>
         </compiler>
     </target>

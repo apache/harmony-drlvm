@@ -48,14 +48,12 @@ Version: $Revision: 1.4.2.6 $
     </target>
 
     <target name="configure" unless="config-available">
-        <select os="win">
-            <copy tofile="${includes}/log4cxx/log4cxx.h" file="${includes}/log4cxx/log4cxx.hw" />
-            <copy tofile="${includes}/log4cxx/private/log4cxx_private.h" file="${includes}/log4cxx/private/log4cxx_private.hw" />
-        </select>
-        <select osfamily="unix">
-            <copy tofile="${includes}/log4cxx/log4cxx.h" file="${includes}/log4cxx/log4cxx.h.in" />
-            <copy tofile="${includes}/log4cxx/private/log4cxx_private.h" file="${includes}/log4cxx/private/log4cxx_private.h.in" />
-        </select>
+        <condition property="plaf.ext" value="hw" else="h.in">
+            <isset property="is.windows"/>
+        </condition>
+        
+        <copy tofile="${includes}/log4cxx/log4cxx.h" file="${includes}/log4cxx/log4cxx.${plaf.ext}" />
+        <copy tofile="${includes}/log4cxx/private/log4cxx_private.h" file="${includes}/log4cxx/private/log4cxx_private.${plaf.ext}" />
 
         <property name="logchar_is_utf8" value="0" />
         <property name="has.wchar_t" value="1" />
@@ -76,37 +74,22 @@ Version: $Revision: 1.4.2.6 $
         <property name="libname" value="log4cxx" />
         <property name="outtype" value="static" />
         <compiler id="cpp.compiler" extends="common.cpp.compiler">
-            <select os="lnx">
-                <includepath path="/usr/include/libxml2" />
-            </select>
+            <includepath path="/usr/include/libxml2" if="is.unix"/>
             <includepath>
                 <pathelement location="${includes}" />
                 <pathelement location="${extra.apr.includes}" />
                 <pathelement location="${extra.aprutil.includes}" />
-                <select os="win">
-                    <pathelement location="${extra.apriconv.includes}" />
-                </select>
             </includepath>
+            <includepath path="${extra.apriconv.includes}" if="is.windows"/>
             <fileset dir="${src}/src">
                 <include name="*.cpp" />
-                <select os="lnx">
-                    <exclude name="iconv_module.cpp" />
-                </select>
+                <exclude name="iconv_module.cpp" if="is.unix"/>
             </fileset>
-            <select os="win">
-                <compilerarg value="/EHsc" />
-                <defineset define="_USRDLL,DLL_EXPORTS,APR_DECLARE_EXPORT,APU_DECLARE_EXPORT,LOG4CXX_STATIC,LOG4CXX" />
-            </select>
-            <select osfamily="unix">
-                <includepath path="/usr/include/libxml2" />
-                <select arch="em64t,ipf">
-                    <compilerarg value="-fPIC" />
-                </select>
-                <defineset define="STDC_HEADERS,LOG4CXX,LOG4CXX_STATIC,APR_DECLARE_EXPORT,APU_DECLARE_EXPORT" />
-            </select>
-            <select os="freebsd">
-                <defineset define="FREEBSD" />
-            </select>
+            <compilerarg value="/EHsc" if="is.windows"/>
+            <defineset define="_USRDLL,DLL_EXPORTS,APR_DECLARE_EXPORT,APU_DECLARE_EXPORT,LOG4CXX_STATIC,LOG4CXX" if="is.windows"/>
+            <compilerarg value="-fPIC" if="is.unix" unless="is.x86"/>
+            <defineset define="STDC_HEADERS,LOG4CXX,LOG4CXX_STATIC,APR_DECLARE_EXPORT,APU_DECLARE_EXPORT" if="is.unix"/>
+            <defineset define="FREEBSD" if="is.freebsd"/>
         </compiler>
     </target>
 </project>

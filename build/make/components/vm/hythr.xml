@@ -45,41 +45,12 @@ Version: $Revision: 1.4.2.4 $
 
             <fileset dir="${src}">
                 <include name="thread/src/*.c" />
-                <select os="win">
-                  <include name="thread/src/win/*.c" />
-                </select>
-                <select osfamily="unix">
-                  <include name="thread/src/linux/*.c" />
-                </select>
+              <include name="thread/src/win/*.c" if="is.windows"/>
+              <include name="thread/src/linux/*.c" if="is.unix"/>
             </fileset>
 
-            <select os="win" cfg="release" cxx="icl">
-                <compilerarg value="/Qip" />
-            </select>
+            <defineset define="_USRDLL" if="is.windows"/>
 
-            <select os="win">
-                <defineset define="_USRDLL" />
-            </select>
-
-            <select os="freebsd">
-                <defineset define="FREEBSD" />
-            </select>
-            <select os="macosx">
-                <defineset define="MACOSX" />
-            </select>
-            <select os="lnx">
-                <defineset define="LINUX" />
-            </select>
-            <select os="lnx" arch="em64t,ipf">
-                <defineset define="LINUX64" />
-                <defineset define="LINUXPPC64" />
-            </select>
-            <select os="win" arch="em64t">
-                <defineset define="_EM64T_" />
-            </select>
-            <select osfamily="unix">
-                <compilerarg value="-fno-exceptions" />
-            </select>
             <defineset define="APR_DECLARE_STATIC" />
         </compiler>
 
@@ -96,31 +67,17 @@ Version: $Revision: 1.4.2.4 $
             <libset libs="${extra.apr.lib}"
                     dir="${extra.apr.libdir}" />
 
-                    
-            <select os="win">
-                <linkerarg value="/DEF:${src}/thread/src/hythr.def" />
-            </select>
+            <linkerarg value="/DEF:${src}/thread/src/hythr.def" if="is.windows"/>
 
-            <select cfg="debug" os="win">
-                <linkerarg value="/NODEFAULTLIB:libcmt.lib" />
-            </select>
+            <linkerarg value="/NODEFAULTLIB:libcmt.lib" if="is.windows" unless="is.cfg.release"/>
 
-            <select os="lnx">
-                <syslibset libs="stdc++,rt,pthread" />
-                <linkerarg value="-Wl,-init" />
-                <linkerarg value="-Wl,hythread_library_init" />
-                <linkerarg value="-Wl,--version-script,${src}/thread/src/hythr.exp" />
-            </select>
-            <select os="freebsd">
-                <syslibset libs="stdc++,pthread" />
-                <linkerarg value="-Wl,-init" />
-                <linkerarg value="-Wl,hythread_library_init" />
-                <linkerarg value="-Wl,--version-script,${src}/thread/src/hythr.exp" />
-            </select>
+            <syslibset libs="stdc++,rt,pthread" if="is.linux"/>
+            <syslibset libs="stdc++,pthread" if="is.freebsd"/>
+            <linkerarg value="-Wl,-init" if="is.unix"/>
+            <linkerarg value="-Wl,hythread_library_init" if="is.unix"/>
+            <linkerarg value="-Wl,--version-script,${src}/thread/src/hythr.exp" if="is.unix"/>
 
-            <select os="win">
-                <syslibset libs="advapi32,ws2_32" />
-            </select>
+            <syslibset libs="advapi32,ws2_32" if="is.windows"/>
         </linker>
 
     </target>

@@ -43,12 +43,8 @@ Version: $Revision: 1.2 $
                     <include name="include" />
                     <include name="vmcore/include" />
                     <include name="vm/interface" />
-                    <select os="win">
-                        <include name="vmcore/src/util/win/include" />
-                    </select>
-                    <select osfamily="unix">
-                        <include name="vmcore/src/util/linux/include" />
-                    </select>
+                    <include name="vmcore/src/util/win/include" if="is.windows"/>
+                    <include name="vmcore/src/util/linux/include" if="is.unix"/>
                 </dirset>
             </includepath>
 
@@ -70,46 +66,28 @@ Version: $Revision: 1.2 $
 
             <defineset define="BUILDING_GC" />
 
-            <select os="freebsd">
-                <defineset define="FREEBSD" />
-            </select>
-
-            <select os="win">
-                <defineset define="_USRDLL" />
-            </select>
-
-            <select os="win" cfg="release" cxx="icl">
-                <compilerarg value="/Qip" />
-            </select>
+            <defineset define="_USRDLL" if="is.windows"/>
         </compiler>
 
-        <select os="win" arch="ipf">
+        <!--select os="win" arch="ipf">
             <fileset id="asm.fileset"
                      dir="${build.vm.home}/gc_gen/src">
                 <include name="ini_ipf_low_level.asm" />
             </fileset>
-        </select>
+        </select-->
 
         <linker id="linker" extends="common.linker">
-            <select os="win">
-                <syslibset libs="advapi32,odbc32,ws2_32,mswsock" />
-                <libset libs="${vm.vmcore.lib}" dir="${vm.vmcore.libdir}" />
-            </select>
+            <syslibset libs="advapi32,odbc32,ws2_32,mswsock" if="is.windows"/>
+            <libset libs="${vm.vmcore.lib}" dir="${vm.vmcore.libdir}" if="is.windows"/>
 
-            <select os="win" arch="ipf">
-                <syslibset libs="AdvAPI32" />
-            </select>
+            <syslibset libs="AdvAPI32" if="is.windows.ia64"/>
 
-            <select os="win" cfg="debug">
-                <linkerarg value="/NODEFAULTLIB:libcmtd.lib" />
-                <syslibset libs="msvcrtd" />
-            </select>
+            <linkerarg value="/NODEFAULTLIB:libcmtd.lib" if="is.windows" unless="is.cfg.release"/>
+            <syslibset libs="msvcrtd" if="is.windows" unless="is.cfg.release"/>
 
             <libset libs="${vm.hythr.lib}" dir="${vm.hythr.libdir}" />
-            <select os="lnx">
-                <linkerarg value="-Bsymbolic" />
-                <linkerarg value="--version-script=${build.vm.home}/gc_gen/build/gc_gen.exp" />
-            </select>
+            <linkerarg value="-Bsymbolic" if="is.unix"/>
+            <linkerarg value="--version-script=${build.vm.home}/gc_gen/build/gc_gen.exp" if="is.unix"/>
         </linker>
 
         <!-- Java helpers -->

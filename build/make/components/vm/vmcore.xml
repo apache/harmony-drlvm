@@ -28,7 +28,7 @@ Version: $Revision: 1.5.2.3 $
 
 <project name="vm.vmcore">
 
-    <target name="stamp_version" depends="common_vm" if="svn.revision">
+    <target name="stamp_version" if="svn.revision" unless="skip.svn.stamp">
         <copy file="${build.vm.home}/vmcore/include/version_svn_tag_orig.h"
               tofile="${build.vm.home}/vmcore/include/version_svn_tag.h" overwrite="true">
             <filterset>
@@ -36,14 +36,26 @@ Version: $Revision: 1.5.2.3 $
             </filterset>
         </copy>
     </target>
+    
+    <target name="-check-version" if="svn.revision">
+        <uptodate property="skip.svn.stamp" srcfile="${build.vm.home}/.svn/entries" 
+            targetfile="${build.vm.home}/vmcore/include/version_svn_tag.h"/>
+    </target>
 
-    <target name="copy_version" depends="common_vm" unless="svn.revision">
+    <target name="copy_version" unless="svn.revision">
         <copy file="${build.vm.home}/vmcore/include/version_svn_tag_orig.h"
               tofile="${build.vm.home}/vmcore/include/version_svn_tag.h" overwrite="false">
         </copy>
     </target>
 
-    <target name="init" depends="common_vm, stamp_version, copy_version">
+    <target name="-init-unix" if="is.unix">
+        <symlink overwrite="yes" link="${external.dep.CLASSLIB}/depends/libs/${hy.platform}/libicuuc.so"
+            resource="${external.dep.CLASSLIB}/depends/libs/${hy.platform}/libicuuc.so.34"/>
+        <symlink overwrite="yes" link="${external.dep.CLASSLIB}/depends/libs/${hy.platform}/libicudata.so"
+            resource="${external.dep.CLASSLIB}/depends/libs/${hy.platform}/libicudata.so.34"/>
+    </target>
+
+    <target name="init" depends="common_vm, -check-version, stamp_version, copy_version, -init-unix">
         <property name="build.depends" value="extra.apr,
                                               extra.aprutil,
                                               extra.log4cxx,
@@ -65,19 +77,7 @@ Version: $Revision: 1.5.2.3 $
                 <pathelement location="${vm.port.includes}" />
             </includepath>
 
-            
             <defineset define="BUILDING_VM,GC_V4,USE_DLL_JIT,APR_DECLARE_STATIC" />
-
-            <select os="freebsd">
-                <defineset define="FREEBSD" />
-            </select>
-            <select os="macosx">
-                <defineset define="MACOSX" />
-            </select>
-            <select os="lnx">
-                <defineset define="LINUX" />
-            </select>
-
         </compiler>
 
         <compiler id="cpp.compiler" extends="common.cpp.compiler">
@@ -103,16 +103,10 @@ Version: $Revision: 1.5.2.3 $
 
             <fileset dir="${build.vm.home}/vmcore/src/kernel_classes/native">
                 <include name="*.cpp" />
-
-                <select osfamily="unix">
-                    <exclude name="Runtime_win.cpp" />
-                    <exclude name="System_win.cpp" />
-                </select>
-
-                <select os="win">
-                    <exclude name="Runtime_lnx.cpp" />
-                    <exclude name="System_lnx.cpp" />
-                </select>
+                <exclude name="Runtime_win.cpp" if="is.unix"/>
+                <exclude name="System_win.cpp" if="is.unix"/>
+                <exclude name="Runtime_lnx.cpp" if="is.windows"/>
+                <exclude name="System_lnx.cpp" if="is.windows"/>
             </fileset>
 
             <fileset dir="${build.vm.home}">
@@ -120,223 +114,74 @@ Version: $Revision: 1.5.2.3 $
                 <include name="port/src/lil/pim/*.cpp" />
                 <include name="vmstart/src/compmgr/*.cpp" />
 
-                <select arch="ipf">
-                    <include name="port/src/lil/ipf/pim/*.cpp" />
-                </select>
-
-                <select arch="ia32">
-                    <include name="port/src/lil/ia32/pim/*.cpp" />
-                </select>
-
-                <select arch="em64t">
-                    <include name="port/src/lil/em64t/pim/*.cpp" />
-                </select>
+                <include name="port/src/lil/ipf/pim/*.cpp" if="is.ia64"/>
+                <include name="port/src/lil/ia32/pim/*.cpp" if="is.x86"/>
+                <include name="port/src/lil/em64t/pim/*.cpp" if="is.x86_64"/>
             </fileset>
 
             <fileset dir="${build.vm.home}/vmcore/src">
-                <select os="win">
-                    <include name="thread/win/*.cpp" />
-                    <include name="util/win/*.cpp" />
-                </select>
+                <include name="thread/win/*.cpp" if="is.windows"/>
+                <include name="util/win/*.cpp" if="is.windows"/>
 
-                <select os="win" arch="ia32">
-                    <include name="util/win/ia32/*.cpp" />
-                    <include name="util/win/ia32_em64t/*.cpp" />
-                </select>
+                <include name="util/win/ia32/*.cpp" if="is.windows.x86"/>
+                <include name="util/win/em64t/*.cpp" if="is.windows.x86_64"/>
+                <include name="util/win/ia32_em64t/*.cpp" if="is.windows" unless="is.ia64"/>
+                <include name="util/win/ipf/*.cpp" if="is.windows.ia64"/>
 
-                <select os="win" arch="em64t">
-                    <include name="util/win/em64t/*.cpp" />
-                    <include name="util/win/ia32_em64t/*.cpp" />
-                </select>
+                <include name="util/ipf/**/*.cpp" if="is.ia64"/>
+                <include name="util/ia32/**/*.cpp" if="is.x86"/>
+                <include name="util/em64t/**/*.cpp" if="is.x86_64"/>
 
-                <select os="win" arch="ipf">
-                    <include name="util/win/ipf/*.cpp" />
-                </select>
-
-                <select arch="ipf">
-                    <include name="util/ipf/base/*.cpp" />
-                    <include name="util/ipf/base_natives/*.cpp" />
-                    <include name="util/ipf/code_emit/*.cpp" />
-                </select>
-
-                <select arch="ia32">
-                    <include name="util/ia32/base/*.cpp" />
-                    <include name="util/ia32/base_natives/*.cpp" />
-                </select>
-
-                <select arch="em64t">
-                    <include name="util/em64t/base/*.cpp" />
-                    <include name="util/em64t/base_natives/*.cpp" />
-                </select>
-
-                <select osfamily="unix">
-                    <include name="thread/linux/*.cpp" />
-                    <include name="util/linux/os_wrapper.cpp" />
-                    <include name="util/linux/stubs.cpp" />
-                    <include name="util/linux/crash_handler.cpp" />
-                    <include name="util/linux/native_modules.cpp" />
-
-                    <select arch="ia32">
-                        <include name="util/linux/signals_ia32.cpp" />
-                    </select>
-
-                    <select arch="em64t">
-                        <include name="util/linux/signals_em64t.cpp" />
-                    </select>
-
-                    <select arch="ipf">
-                        <include name="util/linux/signals_ipf.cpp" />
-                    </select>
-                </select>
+                <include name="thread/linux/*.cpp" if="is.unix"/>
+                <include name="util/linux/*.cpp" if="is.unix"/>
+                <exclude name="util/linux/signals_ia32.cpp" unless="is.unix.x86"/>
+                <exclude name="util/linux/signals_em64t.cpp" unless="is.unix.x86_64"/>
+                <exclude name="util/linux/signals_ipf.cpp" unless="is.unix.ia64"/>
             </fileset>
 
+            <includepath path="${extra.zlib.includes}" if="is.windows"/>
             <includepath>
                 <pathelement location="${extra.apr.includes}" />
                 <pathelement location="${extra.apr.includes}/apr-1" />
                 <pathelement location="${extra.log4cxx.includes}" />
-		<pathelement location="${external.dep.CLASSLIB.includes}/icu4c" />		
-                <select os="win">
-                    <pathelement location="${extra.zlib.includes}" />
-                </select>
-            </includepath>
+		        <pathelement location="${external.dep.CLASSLIB.includes}/icu4c" />
 
-            <includepath>
                 <dirset dir="${build.vm.home}">
                     <include name="include" />
                     <include name="vmcore/include" />
                     <include name="port/include" />
+                
+                    <include name="vmcore/src/util/win/include" if="is.windows"/>
+                    <include name="vmcore/src/util/linux/include" if="is.unix"/>
+
+                    <include name="vmcore/src/util/ipf/include" if="is.ia64"/>
+                    <include name="vmcore/src/util/ipf/base_natives" if="is.ia64"/>
+                    <include name="port/src/lil/ipf/pim/include" if="is.ia64"/>
+
+                    <include name="vmcore/src/util/ia32/base_natives" if="is.x86"/>
+                    <include name="port/src/encoder/ia32_em64t" if="is.x86"/>
+                    <include name="port/src/lil/ia32/pim/include" if="is.x86"/>
+
+                    <include name="vmcore/src/util/em64t/base_natives" if="is.x86_64"/>
+                    <include name="port/src/encoder/ia32_em64t" if="is.x86_64"/>
+                    <include name="port/src/lil/em64t/pim/include" if="is.x86_64"/>
                 </dirset>
-		
-		<pathelement path="${external.dep.CLASSLIB.includes}/icu4c" />
-                <pathelement path="${extra.log4cxx.includes}" />
-
-                <select os="win">
-                    <dirset dir="${build.vm.home}">
-                        <include name="vmcore/src/util/win/include" />
-                        <include name="vm/win" />
-                    </dirset>
-
-                    <pathelement path="${extra.zlib.includes}" />
-                </select>
-
-                <select osfamily="unix">
-                    <dirset dir="${build.vm.home}">
-                        <include name="vm/common/base" />
-                        <include name="vmcore/src/util/linux/include" />
-                        <include name="vm/linux" />
-                    </dirset>
-                </select>
-
-                <select arch="ipf">
-                    <dirset dir="${build.vm.home}">
-                        <include name="vmcore/src/util/ipf/include" />
-                        <include name="vm/ipf/base" />
-                        <include name="vmcore/src/util/ipf/base_natives" />
-                        <include name="vm/ipf/dynopt_ipf" />
-                        <include name="port/src/lil/ipf/pim/include" />
-
-                        <select os="win">
-                            <include name="vm/common/dynopt" />
-                        </select>
-                    </dirset>
-                </select>
-
-                <select arch="ia32">
-                    <dirset dir="${build.vm.home}">
-                        <include name="vmcore/src/util/ia32/base_natives" />
-                        <include name="vm/ia32/debugger/include" />
-                        <include name="port/src/encoder/ia32_em64t" />
-                        <include name="port/src/lil/ia32/pim/include" />
-                    </dirset>
-                </select>
-
-                <select arch="em64t">
-                    <dirset dir="${build.vm.home}">
-                        <include name="vmcore/src/util/em64t/base_natives" />
-                        <include name="vm/em64t/debugger/include" />
-                        <include name="port/src/encoder/ia32_em64t" />
-                        <include name="port/src/lil/em64t/pim/include" />
-                    </dirset>
-                </select>
             </includepath>
-
-            <select os="win" cfg="release" cxx="icl">
-                <compilerarg value="/Qip" />
-            </select>
 
             <defineset define="BUILDING_VM,GC_V4,USE_DLL_JIT,APR_DECLARE_STATIC" />
         </compiler>
 
-        <select os="lnx,freebsd" arch="ia32">
-            <fileset id="asm.fileset"
-                     dir="${build.vm.home}/vmcore">
-                <include name="src/util/ia32/base/*.asm" />
-            </fileset>
-        </select>
-
-        <select os="lnx" arch="ipf">
-            <fileset id="asm.fileset"
-                 dir="${build.vm.home}/vmcore">
-                <include name="src/util/ipf/base/*.asm" />
-            </fileset>
-        </select>
-
-        <select os="win" arch="em64t">
-            <fileset id="asm.fileset"
-                 dir="${build.vm.home}/vmcore">
-                <include name="src/util/win/em64t/*.asm" />
-            </fileset>
-        </select>
-
-	<select os="lnx" >
-		<select arch="ia32">
-			<symlink overwrite="yes" link="${external.dep.CLASSLIB}/depends/libs/linux.x86/libicuuc.so"
-				resource="${external.dep.CLASSLIB}/depends/libs/linux.x86/libicuuc.so.34"/>
-			<symlink overwrite="yes" link="${external.dep.CLASSLIB}/depends/libs/linux.x86/libicudata.so"
-				resource="${external.dep.CLASSLIB}/depends/libs/linux.x86/libicudata.so.34"/>
-		</select>
-		<select arch="em64t">
-			<symlink overwrite="yes" link="${external.dep.CLASSLIB}/depends/libs/linux.x86_64/libicuuc.so"
-				resource="${external.dep.CLASSLIB}/depends/libs/linux.x86_64/libicuuc.so.34"/>
-			<symlink overwrite="yes" link="${external.dep.CLASSLIB}/depends/libs/linux.x86_64/libicudata.so"
-				resource="${external.dep.CLASSLIB}/depends/libs/linux.x86_64/libicudata.so.34"/>
-		</select>
-		<select arch="ipf">
-			<symlink overwrite="yes" link="${external.dep.CLASSLIB}/depends/libs/linux.ia64/libicuuc.so"
-				resource="${external.dep.CLASSLIB}/depends/libs/linux.ia64/libicuuc.so.34"/>
-			<symlink overwrite="yes" link="${external.dep.CLASSLIB}/depends/libs/linux.ia64/libicudata.so"
-				resource="${external.dep.CLASSLIB}/depends/libs/linux.ia64/libicudata.so.34"/>
-		</select>
-	</select>
-	<select os="freebsd" >
-		<select arch="ia32">
-			<symlink overwrite="yes" link="${external.dep.CLASSLIB}/depends/libs/freebsd.x86/libicuuc.so"
-				resource="${external.dep.CLASSLIB}/depends/libs/freebsd.x86/libicuuc.so.34"/>
-			<symlink overwrite="yes" link="${external.dep.CLASSLIB}/depends/libs/freebsd.x86/libicudata.so"
-				resource="${external.dep.CLASSLIB}/depends/libs/freebsd.x86/libicudata.so.34"/>
-		</select>
-		<select arch="em64t">
-			<symlink overwrite="yes" link="${external.dep.CLASSLIB}/depends/libs/freebsd.x86_64/libicuuc.so"
-				resource="${external.dep.CLASSLIB}/depends/libs/freebsd.x86_64/libicuuc.so.34"/>
-			<symlink overwrite="yes" link="${external.dep.CLASSLIB}/depends/libs/freebsd.x86_64/libicudata.so"
-				resource="${external.dep.CLASSLIB}/depends/libs/freebsd.x86_64/libicudata.so.34"/>
-		</select>
-		<select arch="ipf">
-			<symlink overwrite="yes" link="${external.dep.CLASSLIB}/depends/libs/freebsd.ia64/libicuuc.so"
-				resource="${external.dep.CLASSLIB}/depends/libs/freebsd.ia64/libicuuc.so.34"/>
-			<symlink overwrite="yes" link="${external.dep.CLASSLIB}/depends/libs/freebsd.ia64/libicudata.so"
-				resource="${external.dep.CLASSLIB}/depends/libs/freebsd.ia64/libicudata.so.34"/>
-		</select>
-	</select>
+        <fileset id="asm.fileset" dir="${build.vm.home}/vmcore">
+            <include name="src/util/ipf/base/*.asm" if="is.unix.ia64"/>
+            <include name="src/util/win/em64t/*.asm" if="is.windows.x86_64"/>
+        </fileset>
 
         <linker id="linker" extends="common.linker">
             <libset libs="${vm.port.lib}"
                     dir="${vm.port.libdir}" />
 
-            <select arch="ia32,em64t">
-                 <libset libs="${vm.encoder.lib}"
-                     dir="${vm.encoder.libdir}" />
-            </select>
+            <libset libs="${vm.encoder.lib}"
+                     dir="${vm.encoder.libdir}" unless="is.ia64"/>
 
             <libset libs="${extra.log4cxx.lib}"
                     dir="${extra.log4cxx.libdir}" />
@@ -353,65 +198,26 @@ Version: $Revision: 1.5.2.3 $
             <libset libs="${vm.port.lib}"
                     dir="${vm.port.libdir}" />
 
-            <select os="win">
-                <libset libs="${extra.zlib.lib}"
-                        dir="${extra.zlib.libdir}" />
+            <libset libs="${extra.zlib.lib}"
+                        dir="${extra.zlib.libdir}" if="is.windows"/>
 
-       	        <libset libs="icuuc"
-                        dir="${external.dep.CLASSLIB.libdir}" />			
-            </select>
+   	        <libset libs="icuuc"
+                        dir="${external.dep.CLASSLIB.libdir}" if="is.windows"/>
 
-            <select os="win">
-                <select arch="em64t">
-                    <linkerarg value="/DEF:${build.vm.home}/vmcore/src/harmonyvm64.def"/>
-                </select>
-                <select arch="ia32">
-                    <linkerarg value="/DEF:${build.vm.home}/vmcore/src/harmonyvm.def"/>
-                </select>
-                <select cfg="debug">
-                    <linkerarg value="/NODEFAULTLIB:libcmt.lib" />
-                    <linkerarg value="/NODEFAULTLIB:msvcrt.lib" />
-                </select>
-                <select arch="em64t" cfg="release">
-                    <linkerarg value="/NODEFAULTLIB:msvcrt.lib" />
-                </select>
-            </select>
+            <linkerarg value="/DEF:${build.vm.home}/vmcore/src/harmonyvm64.def" if="is.windows.x86_64"/>
+            <linkerarg value="/DEF:${build.vm.home}/vmcore/src/harmonyvm.def" if="is.windows.x86"/>
+            <linkerarg value="/NODEFAULTLIB:libcmt.lib" if="is.windows" unless="is.cfg.release"/>
+            <linkerarg value="/NODEFAULTLIB:msvcrt.lib" if="is.windows"/>
 
-            <select os="lnx">
-                <syslibset type="shared" libs="m,dl,stdc++,z,xml2,pthread,gcc_s,rt" /> 
-                <linkerarg value="--version-script=${build.vm.home}/vmcore/build/vmcore.exp" />
-		<select arch="ia32">
+            <linkerarg value="--version-script=${build.vm.home}/vmcore/build/vmcore.exp" if="is.unix"/>
 			<libset type="shared" libs="icuuc"
-                        	dir="${external.dep.CLASSLIB}/depends/libs/linux.x86" />
-		</select>
-		<select arch="em64t">
-			<libset type="shared" libs="icuuc"
-                        	dir="${external.dep.CLASSLIB}/depends/libs/linux.x86_64" />
-		</select>
-		<select arch="ipf">
-			<libset type="shared" libs="icuuc"
-                        	dir="${external.dep.CLASSLIB}/depends/libs/linux.ia64" />
-		</select>
-            </select>
-            <select os="freebsd">
-                <syslibset type="shared" libs="m,stdc++,z,pthread" /> 
-                <libset libs="xml2" dir="/usr/local/lib" />
-                <linkerarg value="--export-dynamic" />
-                <linkerarg value="--version-script=${build.vm.home}/vmcore/build/vmcore.exp" />
-		<select arch="ia32">
-			<libset type="shared" libs="icuuc"
-                        	dir="${external.dep.CLASSLIB}/depends/libs/freebsd.x86" />
-		</select>
-		<select arch="em64t">
-			<libset type="shared" libs="icuuc"
-                        	dir="${external.dep.CLASSLIB}/depends/libs/freebsd.x86_64" />
-		</select>
-		<select arch="ipf">
-			<libset type="shared" libs="icuuc"
-                        	dir="${external.dep.CLASSLIB}/depends/libs/freebsd.ia64" />
-		</select>
-            </select>
+                        	dir="${external.dep.CLASSLIB}/depends/libs/${hy.platform}" if="is.unix"/>
+            <syslibset type="shared" libs="m,dl,stdc++,z,xml2,pthread,gcc_s,rt" if="is.linux"/>
+            <syslibset type="shared" libs="m,stdc++,z,pthread" if="is.freebsd"/> 
+            <libset libs="xml2" dir="/usr/local/lib" if="is.freebsd"/>
+            <linkerarg value="--export-dynamic" if="is.freebsd"/>
         </linker>
+        
         <echo message="Copying files for internationalization..."/>
 
         <mkdir dir="${build.semi.dir}/vm/vmcore/_other"/> 

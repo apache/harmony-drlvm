@@ -26,7 +26,7 @@ Version: $Revision: 1.6.2.8 $
   -->
 
 <project name="vm.jitrino">
-    <target name="init" depends="common_vm">
+    <target name="init" depends="-init-win,-init-unix">
         <property name="build.depends" value="extra.apr,vm.vmcore,vm.encoder,vm.hythr" />
         <property name="outtype" value="shared" />
         <property name="libname" value="jitrino" />
@@ -46,7 +46,7 @@ Version: $Revision: 1.6.2.8 $
 
         <patternset id="java.classes.pattern" includes="empty_pattern"/>
 
-        <compiler id="cpp.compiler" extends="common.cpp.compiler">
+        <compiler id="cpp.compiler" extends="plaf.cpp.compiler">
             <fileset dir="${src}">
                 <include name="dynopt/*.cpp" />
                 <include name="main/*.cpp" />
@@ -57,19 +57,10 @@ Version: $Revision: 1.6.2.8 $
                 <include name="translator/*.cpp" />
                 <include name="translator/java/*.cpp" />
                 <include name="vm/*.cpp" />
-                <include name="codegenerator/*.cpp" />
 
-                <select arch="ipf">
-                    <include name="codegenerator/ipf/*.cpp" />
-                    <!-- <include name="codegenerator/ipf/msched/*.cpp" />
-                    <include name="codegenerator/ipf/msched/MachineModel/common/*.cpp" />
-                    <include name="codegenerator/ipf/msched/MachineModel/mckinley/*.cpp" /> -->
-                </select>
-
-                <select arch="ia32,em64t">
-                    <include name="codegenerator/ia32/*.cpp" />
-                    <include name="jet/*.cpp" />
-                </select>
+                <include name="codegenerator/ipf/*.cpp" if="is.ia64"/>
+                <include name="codegenerator/ia32/*.cpp" unless="is.ia64"/>
+                <include name="jet/*.cpp" unless="is.ia64"/>
             </fileset>
 
             <includepath>
@@ -85,83 +76,101 @@ Version: $Revision: 1.6.2.8 $
                     <include name="vm" />
                     <include name="codegenerator" />
 
-                    <select arch="ia32,em64t">
-                        <include name="codegenerator/ia32" />
-                        <include name="jet" />
-                    </select>
+                    <include name="codegenerator/ia32" unless="is.ia64"/>
+                    <include name="jet" unless="is.ia64"/>
 
-                    <select arch="ipf">
-                        <include name="codegenerator/ipf" />
-                        <include name="codegenerator/ipf/include" />
-                        <!-- <include name="codegenerator/ipf/msched" />
-                        <include name="codegenerator/ipf/msched/MachineModel/common" />
-                        <include name="codegenerator/ipf/msched/MachineModel/mckinley" /> -->
-                    </select>
+                    <include name="codegenerator/ipf" if="is.ia64"/>
+                    <include name="codegenerator/ipf/include" if="is.ia64"/>
                 </dirset>
             </includepath>
 
-            <select arch="ia32,em64t">
-                <includepath>
-                    <dirset dir="${build.vm.home}">
-                        <include name="port/src/encoder/ia32_em64t" />
-                    </dirset>
-                </includepath>
-            </select>
+            <includepath unless="is.ia64">
+                <dirset dir="${build.vm.home}">
+                    <include name="port/src/encoder/ia32_em64t" />
+                </dirset>
+            </includepath>
 
             <includepath>
                 <pathelement location="${extra.apr.includes}" />
                 <pathelement location="${build.vm.home}/include" />
                 <pathelement location="${build.vm.home}/vmcore/include" />
                 <pathelement location="${build.vm.home}/port/include" />
-
-                <select os="win">
-                    <pathelement location="${build.vm.home}/vmcore/src/util/win/include" />
-                </select>
-
-                <select osfamily="unix">
-                    <pathelement location="${build.vm.home}/vmcore/src/util/linux/include" />
-                </select>
             </includepath>
+            <includepath path="${build.vm.home}/vmcore/src/util/win/include" if="is.windows"/>
+            <includepath path="${build.vm.home}/vmcore/src/util/linux/include" if="is.unix"/>
 
             <defineset define="PROJECT_JITRINO" />
+            <defineset define="JIT_LOGS,JIT_STATS" if="is.cfg.debug" />
+            
+        </compiler>
+        
+        <linker name="${build.cxx}" id="linker">
+            <!--select os="win">
+                <select arch="ipf">
+                    <linkerarg value="/MACHINE:IA64" />
+                </select>
+
+                <select arch="em64t">
+                    <linkerarg value="/MACHINE:X64" />
+                </select>
+
+                <select arch="ia32">
+                    <linkerarg value="/MACHINE:X86" />
+                </select>
+
+                <linkerarg value="/DLL" />
+                <linkerarg value="/SUBSYSTEM:WINDOWS" />
+                <linkerarg value="/DEBUG" />
+                <linkerarg value="/NOLOGO" />
+                <linkerarg value="/FIXED:NO" />
+                
+                <linkerarg value="/OUT:${libdir}/" />
+                </select-->
+            <libset libs="${vm.vmcore.lib}" dir="${vm.vmcore.libdir}" if="is.windows"/>
+            <libset libs="${vm.encoder.lib}" dir="${vm.encoder.libdir}" if="is.windows"/>
+            <libset libs="${vm.hythr.lib}" dir="${vm.hythr.libdir}" if="is.windows"/>
+            
+            <linkerarg value="/OPT:REF" if="is.windows"/>
+
+            <linkerarg value="-shared" if="is.unix"/>
+            <linkerarg value="-lm" if="is.unix"/>
+            <linkerarg value="--version-script=${build.vm.home}/jitrino/build/jitrino.exp" if="is.unix"/>
+            <linkerarg value="-ldl" if="is.linux"/>
+        </linker>
+
+        <echo message="Copying the configuration jitrino files..."/>
+ 
+        <copy todir="${build.semi.dir}/vm/jitrino/_other" 
+              flatten="true" 
+              includeEmptyDirs="false">
+              <fileset dir="${build.VM.home}/jitrino/config">
+                   <include name="${build.arch}/**" />
+              </fileset>
+        </copy>
+    </target>
 
             <!-- windows specific -->
-            <select os="win">
+        <target name="-init-win" depends="common_vm" if="is.windows">
+            <compiler id="plaf.cpp.compiler" extends="common.cpp.compiler">
                 <compilerarg value="/Fo${build.semi.dir}/vm/jitrino/_obj/" />
 
                 <!-- _CRT_SECURE_NO_DEPRECATE added to suppress a huge amount of complaints from msvc em64t compiler -->
                 <defineset define="PLATFORM_NT,_WINDLL,_MBCS,_REENTRANT,__SMP__,WIN32,_WIN32,_CRT_SECURE_NO_DEPRECATE,_HAS_ITERATOR_DEBUGGING=0,_SECURE_SCL=0" />
 
-                <compilerarg value="/nologo" />
-                <compilerarg value="/EHsc" />
                 <compilerarg value="/TP" />
-                <compilerarg value="/Zi" />
                 <compilerarg value="/Zc:forScope" />
                 <compilerarg value="/WL" />
                 <compilerarg value="/W4" />
 <!--                <compilerarg value="/WX" /> -->
 
-                <select cfg="debug">
-                    <compilerarg value="/Od" />
-                    <compilerarg value="/Gm" />
-                    <compilerarg value="/RTC1" />
-                    <compilerarg value="/MTd" />
-                </select>
+                <compilerarg value="/Gm" if="is.cfg.debug"/>
+                <compilerarg value="/RTC1" if="is.cfg.debug"/>
 
-                <select cfg="release">
-                    <compilerarg value="/O2" />
-                    <compilerarg value="/Ot" />
-                    <compilerarg value="/MT" />
-                </select>
+                <compilerarg value="/Ot" if="is.cfg.release"/>
 
-                <select cxx="icl">
-                    <select cfg="release">
-                        <compilerarg value="/Qip" />
-                        <compilerarg value="/Qvec_report0" />
-                    </select>
-
-                    <compilerarg value="/Qww1,82,111,172,181,279,280,373,424,593,654,858" />
-                    <compilerarg value="/Qwd82,193,271,304,373,383,424,444,654,869,981,1125,1418,1419,1572,1683" />
+                <compilerarg value="/Qvec_report0" if="is.icl" unless="is.cfg.debug"/>
+                <compilerarg value="/Qww1,82,111,172,181,279,280,373,424,593,654,858" if="is.icl"/>
+                <compilerarg value="/Qwd82,193,271,304,373,383,424,444,654,869,981,1125,1418,1419,1572,1683" if="is.icl"/>
                     <!--
                       # /Qwd[tag,...] Disable the soft diagnostics that corresponds to tag. 
                       # /Qwr[tag,...] Override the severity of the soft diagnostics corresponding to tag and make it a remark. 
@@ -194,18 +203,14 @@ Version: $Revision: 1.6.2.8 $
                       # warning #1125: function "xxx" is hidden by "yyy" - virtual function override intended?
                       # warning #1572: floating-point equality and inequality comparisons are unreliable
                     -->
-                </select>
 
-                <select cxx="msvc">
-                    <compilerarg value="/wd4201" />
-                    <compilerarg value="/wd4244" />
-                    <compilerarg value="/wd4512" />
-                    <compilerarg value="/wd4702" />
-                    <compilerarg value="/wd4100" />
-                    <compilerarg value="/wd4127" />
-                    <select cfg="release">
-                        <compilerarg value="/wd4718" />
-                    </select>
+                <compilerarg value="/wd4201" if="is.msvc"/>
+                <compilerarg value="/wd4244" if="is.msvc"/>
+                <compilerarg value="/wd4512" if="is.msvc"/>
+                <compilerarg value="/wd4702" if="is.msvc"/>
+                <compilerarg value="/wd4100" if="is.msvc"/>
+                <compilerarg value="/wd4127" if="is.msvc"/>
+                <compilerarg value="/wd4718" if="is.msvc" unless="is.cfg.debug"/>
                     <!--
                       #4201 - W4, nonstandart extention - nameless struct or union
                       #4702 - W4, unreachable code (fired in STL's <list>)
@@ -219,127 +224,35 @@ Version: $Revision: 1.6.2.8 $
                       # the default name is the same for all input files (vc70.pdb) and 
                       # thus causes problems during parralel build.
                     -->
-                </select>
-            </select>
-
-            <!-- linux specific -->
-            <select osfamily="unix">
-                <defineset define="PLATFORM_POSIX,LINUX" />
-
-                <select cxx="gcc">
-                    <compilerarg value="-fmessage-length=0" />
-                    <compilerarg value="-Wall" />
-                    <compilerarg value="-Werror" />
-                </select>
+            </compiler>
+        </target>
+        
+        <target name="-init-unix" depends="common_vm" if="is.unix">
+            <compiler id="plaf.cpp.compiler" extends="common.cpp.compiler">
+                <compilerarg value="-fmessage-length=0" if="is.gcc"/>
+                <compilerarg value="-Wall" if="is.gcc"/>
+                <compilerarg value="-Werror" if="is.gcc"/>
 
                 <compilerarg value="-x" />
                 <compilerarg value="c++" />
                 <compilerarg value="-fPIC" />
                 <compilerarg value="-fno-exceptions" />
 
-                <select cxx="icc">
-                    <compilerarg value="-wd68" />
-                    <compilerarg value="-wd654" />
-                    <compilerarg value="-wd854" />
-                    <compilerarg value="-wd470" />
-                    <compilerarg value="-wd1572" />
-                    <compilerarg value="-wd1125" />
+                <compilerarg value="-wd68" if="is.icc"/>
+                <compilerarg value="-wd654" if="is.icc"/>
+                <compilerarg value="-wd854" if="is.icc"/>
+                <compilerarg value="-wd470" if="is.icc"/>
+                <compilerarg value="-wd1572" if="is.icc"/>
+                <compilerarg value="-wd1125" if="is.icc"/>
                     <!--                        
                       # 470 - 'qualified name is not allowed in member declaration'
                       # warning #1125: function "xxx" is hidden by "yyy"
                       - virtual function override intended 
                       # warning #1572: floating-point equality and inequality comparisons are unreliable
                     -->
-                </select>
 
-                <select cfg="debug">
-                    <compilerarg value="-g" />
-                    <compilerarg value="-O0" />
-                </select>
+                <compilerarg value="-O" if="is.unix" unless="is.cfg.debug"/>
+            </compiler>
+        </target>
 
-                <select cfg="release">
-                    <compilerarg value="-O" />
-                </select>
-            </select>
-
-            <!-- arch specific -->
-            <select arch="ia32">
-                <defineset define="_IA32_" />
-            </select>
-
-            <select arch="em64t">
-                <defineset define="_EM64T_" />
-                <defineset define="POINTER64" />
-                <select os="win">
-                    <compilerarg value="-D_WIN64" />
-                </select>
-            </select>
-
-            <select arch="ipf">
-                <defineset define="_IPF_" />
-                <defineset define="POINTER64" />
-                <select os="win">
-                    <compilerarg value="-D_WIN64" />
-                </select>
-            </select>
-
-            <!-- only in debug mode -->
-            <select cfg="debug">
-                <defineset define="_DEBUG,JIT_LOGS,JIT_STATS" />
-            </select>
-
-            <!-- only in release mode -->
-            <select cfg="release">
-                <defineset define="NDEBUG" />
-            </select>
-        </compiler>
-
-        <linker name="${build.cxx}" id="linker">
-            <select os="win">
-                <select arch="ipf">
-                    <linkerarg value="/MACHINE:IA64" />
-                </select>
-
-                <select arch="em64t">
-                    <linkerarg value="/MACHINE:X64" />
-                </select>
-
-                <select arch="ia32">
-                    <linkerarg value="/MACHINE:X86" />
-                </select>
-
-                <linkerarg value="/DLL" />
-                <linkerarg value="/SUBSYSTEM:WINDOWS" />
-                <linkerarg value="/DEBUG" />
-                <linkerarg value="/NOLOGO" />
-                <linkerarg value="/FIXED:NO" />
-                <linkerarg value="/OPT:REF" />
-                <linkerarg value="/OUT:${libdir}/" />
-
-                <libset libs="${vm.vmcore.lib}" dir="${vm.vmcore.libdir}" />
-                <libset libs="${vm.encoder.lib}" dir="${vm.encoder.libdir}" />
-                <libset libs="${vm.hythr.lib}" dir="${vm.hythr.libdir}" />
-
-            </select>
-
-            <select osfamily="unix">
-                <linkerarg value="-shared" />
-                <linkerarg value="-lm" />
-		<linkerarg value="--version-script=${build.vm.home}/jitrino/build/jitrino.exp" />
-            </select>
-            <select os="linux">
-                <linkerarg value="-ldl" />
-            </select>
-        </linker>
-
-        <echo message="Copying the configuration jitrino files..."/>
- 
-        <copy todir="${build.semi.dir}/vm/jitrino/_other" 
-              flatten="true" 
-              includeEmptyDirs="false">
-              <fileset dir="${build.VM.home}/jitrino/config">
-                   <include name="${build.arch}/**" />
-              </fileset>
-        </copy>
-    </target>
 </project>
