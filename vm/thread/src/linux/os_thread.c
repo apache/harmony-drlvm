@@ -31,7 +31,7 @@
 _syscall0(pid_t,gettid)
 pid_t gettid(void);
 #else
-pid_t gettid(void)
+static pid_t gettid(void)
 {
     return (pid_t)syscall(__NR_gettid);
 }

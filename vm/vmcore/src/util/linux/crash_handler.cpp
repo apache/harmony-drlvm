@@ -56,8 +56,15 @@ bool is_gdb_crash_handler_enabled()
     return get_boolean_property("vm.crash_handler", FALSE, VM_PROPERTIES);
 }
 
+#ifdef _syscall0
 _syscall0(pid_t, gettid)
 pid_t gettid(void);
+#else
+static pid_t gettid(void)
+{
+    return (pid_t)syscall(__NR_gettid);
+}
+#endif
 
 bool gdb_crash_handler()
 {
