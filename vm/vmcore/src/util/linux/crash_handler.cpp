@@ -20,7 +20,8 @@
  */
 
 #include <sys/types.h>
-#include <unistd.h>
+#include <linux/unistd.h>
+#include <errno.h>
 #include <stdio.h>
 #include <semaphore.h>
 
@@ -33,7 +34,6 @@ extern int main (int argc, char **argv, char **envp);
 #endif
 
 static char g_executable[1024]; // Executable file name
-static char g_strpid[128];      // Current pid as a string
 static sem_t g_sem_started;     // Prevent forking debugger more than once
 static bool g_prepared = false; // Flag is set if gdb crash handler is prepared
 static bool g_enabled = false;  // vm.crash_handler value is stored here
@@ -56,6 +56,8 @@ bool is_gdb_crash_handler_enabled()
     return get_boolean_property("vm.crash_handler", FALSE, VM_PROPERTIES);
 }
 
+_syscall0(pid_t, gettid)
+pid_t gettid(void);
 
 bool gdb_crash_handler()
 {
@@ -63,15 +65,19 @@ bool gdb_crash_handler()
         0 != sem_trywait(&g_sem_started)) // gdb was already started
         return false;
 
+    static const int tid_len = 10;
+    char tid[tid_len];
+    snprintf(tid, tid_len, "%d", gettid());
+
     if (fork() == 0)
     {
         fprintf(stderr, "----------------------------------------\n"
                         "gdb %s %s\n"
                         "----------------------------------------\n"
-            , g_executable, g_strpid);
+            , g_executable, tid);
         fflush(stderr);
 
-        execlp("gdb", "gdb", g_executable, g_strpid, NULL);
+        execlp("gdb", "gdb", g_executable, tid, NULL);
         perror("Can't run gdb");
     }
     else
@@ -111,7 +117,6 @@ int init_gdb_crash_handler()
         get_executable_name(g_executable, sizeof(g_executable)) != 0)
         return -1;
 
-    snprintf(g_strpid, sizeof(g_strpid), "%d", getpid());
     g_prepared = true;
 
     assert(VM_Global_State::loader_env);
