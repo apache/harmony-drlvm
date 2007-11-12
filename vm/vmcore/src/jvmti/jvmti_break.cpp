@@ -52,7 +52,7 @@ bool jvmti_process_breakpoint_event(TIEnv *env, const VMBreakPoint* bp, const PO
             << " :" << bp->location << " :" << bp->addr );
 
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
-    if (!ti->isEnabled() || ti->getPhase() != JVMTI_PHASE_LIVE)
+    if (ti->getPhase() != JVMTI_PHASE_LIVE)
         return false;
 
     jlocation location = bp->location;

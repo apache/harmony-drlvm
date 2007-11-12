@@ -262,9 +262,11 @@ Class* ClassLoader::DefineClass(Global_Env* env, const char* class_name,
 
     uint8 *redef_buf = NULL;
     int redef_buflen = 0;
-    jvmti_send_class_file_load_hook_event(env, this, class_name,
-        length, bytecode + offset,
-        &redef_buflen, &redef_buf);
+    if(jvmti_should_report_event(JVMTI_EVENT_CLASS_FILE_LOAD_HOOK)) {
+        jvmti_send_class_file_load_hook_event(env, this, class_name,
+            length, bytecode + offset,
+            &redef_buflen, &redef_buf);
+    }
     if(NULL != redef_buf)
     {
         bytecode = redef_buf;
@@ -325,7 +327,9 @@ Class* ClassLoader::DefineClass(Global_Env* env, const char* class_name,
 
     if(this != env->bootstrap_class_loader || !env->InBootstrap())
     {
-        jvmti_send_class_load_event(env, clss);
+        if(jvmti_should_report_event(JVMTI_EVENT_CLASS_LOAD)) {
+            jvmti_send_class_load_event(env, clss);
+        }
     }
     ++(env->total_loaded_class_count);
 

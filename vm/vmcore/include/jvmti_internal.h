@@ -150,7 +150,7 @@ class DebugUtilsTI {
         jint agent_counter;
         Lock_Manager TIenvs_lock;
         VMBreakPoints* vm_brpt;
-        hythread_tls_key_t TL_ti_enabled; //thread local TI flag
+        hythread_tls_key_t TL_ti_report; //thread local TI flag
 
         // TI event thread data
         vm_thread_t event_thread;
@@ -168,6 +168,10 @@ class DebugUtilsTI {
         Agent *getAgents();
         void setAgents(Agent *agent);
         bool isEnabled();
+        void addEventSubscriber(jvmtiEvent event_type);
+        void removeEventSubscriber(jvmtiEvent event_type);
+        bool hasSubscribersForEvent(jvmtiEvent event_type);
+        bool shouldReportEvent(jvmtiEvent event_type);
         void setEnabled();
         void setDisabled();
 
@@ -175,9 +179,9 @@ class DebugUtilsTI {
         void enableEventThreadCreation();
         void disableEventThreadCreation();
 
-        bool isLocallyEnabled();
-        void setLocallyEnabled();
-        void setLocallyDisabled();
+        bool shouldReportLocally();
+        void doNotReportLocally();
+        void reportLocally();
 
         jvmtiPhase getPhase()
         {
@@ -388,6 +392,7 @@ class DebugUtilsTI {
         bool single_step_enabled;
         bool cml_report_inlined;
         char method_entry_enabled_flag, method_exit_enabled_flag;
+        unsigned event_needed[TOTAL_EVENT_TYPE_NUM];
 }; /* end of class DebugUtilsTI */
 
 jvmtiError add_event_to_thread(jvmtiEnv *env, jvmtiEvent event_type, jthread event_thread);

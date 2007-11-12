@@ -174,7 +174,7 @@ void jvmti_clean_reclaimed_object_tags()
     while (NULL != ti_env)
     {
         next_env = ti_env->next;
-        bool send_event = ti_env->global_events[JVMTI_EVENT_OBJECT_FREE - JVMTI_MIN_EVENT_TYPE_VAL];
+        bool send_event = jvmti_should_report_event(JVMTI_EVENT_OBJECT_FREE);
 
         TITags* tags = ti_env->tags;
         if (tags != NULL) {

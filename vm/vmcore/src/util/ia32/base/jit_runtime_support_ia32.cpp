@@ -172,8 +172,9 @@ static void *getaddress__vm_checkcast_naked()
 
     compile_add_dynamic_generated_code_chunk("vm_rt_checkcast", stub, stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
+    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_rt_checkcast", stub, stub_size);
+    }
 
     DUMP_STUB(stub, "getaddress__vm_checkcast_naked", ss - stub);
 
@@ -297,8 +298,9 @@ static void *getaddress__vm_initialize_class_naked()
 
     compile_add_dynamic_generated_code_chunk("vm_initialize_class_naked", stub, stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
+    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_initialize_class_naked", stub, stub_size);
+    }
 
     DUMP_STUB(stub, "getaddress__vm_initialize_class_naked", ss - stub);
 
@@ -379,8 +381,9 @@ static void *generate_object_allocation_stub_with_thread_pointer(char *fast_obj_
 
     compile_add_dynamic_generated_code_chunk("object_allocation_stub_with_thread_pointer", stub, stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
+    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("object_allocation_stub_with_thread_pointer", stub, stub_size);
+    }
 
     DUMP_STUB(stub, stub_name, ss - stub);
 
@@ -451,8 +454,9 @@ static void* vm_aastore_array_index_out_of_bounds()
 
     compile_add_dynamic_generated_code_chunk("vm_aastore_nullpointer", stub, stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
+    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_aastore_nullpointer", stub, stub_size);
+    }
 
     DUMP_STUB(stub, "vm_aastore_array_index_out_of_bounds",  ss - stub);
 
@@ -484,8 +488,9 @@ static void* vm_aastore_arraystore()
 
     compile_add_dynamic_generated_code_chunk("vm_aastore_arraystore", stub, stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
+    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_aastore_arraystore", stub, stub_size);
+    }
 
     DUMP_STUB(stub, "vm_aastore_arraystore", ss - stub);
 
@@ -637,8 +642,9 @@ static void * gen_new_vector_stub(char *stub_name, char *fast_new_vector_proc, c
 
     compile_add_dynamic_generated_code_chunk("vm_new_vector_naked", stub, stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
+    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_new_vector_naked", stub, stub_size);
+    }
 
     DUMP_STUB(stub, stub_name, ss - stub);
 
@@ -732,8 +738,9 @@ static void *getaddress__vm_multianewarray_resolved_naked()
 
     compile_add_dynamic_generated_code_chunk("vm_multinewarray_resolved_naked", stub, stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
+    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_multinewarray_resolved_naked", stub, stub_size);
+    }
 
     DUMP_STUB(stub, "getaddress__vm_multianewarray_resolved_naked", ss - stub);
 
@@ -767,8 +774,9 @@ static void *getaddress__vm_instantiate_cp_string_naked()
 
     compile_add_dynamic_generated_code_chunk("vm_instantiate_cp_string_naked", stub, stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
+    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_instantiate_cp_string_naked", stub, stub_size);
+    }
 
     DUMP_STUB(stub, "getaddress__vm_instantiate_cp_string_naked", ss - stub);
 
@@ -840,8 +848,9 @@ void * getaddress__vm_get_interface_vtable_old_naked()  //wjw verify that this w
 
     compile_add_dynamic_generated_code_chunk("vm_get_interface_vtable_old_naked", stub, stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
+    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_get_interface_vtable_old_naked", stub, stub_size);
+    }
 
     DUMP_STUB(stub, "getaddress__vm_get_interface_vtable_old_naked", ss - stub);
 
@@ -882,8 +891,9 @@ static void* getaddress__setup_java_to_native_frame()
 
     compile_add_dynamic_generated_code_chunk("setup_java_to_native_frame", stub, stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
+    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("setup_java_to_native_frame", stub, stub_size);
+    }
 
     DUMP_STUB(stub, "getaddress__setup_java_to_native_frame", ss - stub);
 
@@ -922,8 +932,9 @@ static void* getaddress__pop_java_to_native_frame()
 
     compile_add_dynamic_generated_code_chunk("pop_java_to_native_frame", stub, stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
+    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("pop_java_to_native_frame", stub, stub_size);
+    }
 
     DUMP_STUB(stub, "getaddress__pop_java_to_native_frame", ss - stub);
 
@@ -979,8 +990,9 @@ void * getaddress__vm_throw_linking_exception_naked()
 
     compile_add_dynamic_generated_code_chunk("vm_throw_linking_exception_naked", stub, stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
+    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_throw_linking_exception_naked", stub, stub_size);
+    }
 
     DUMP_STUB(stub, "getaddress__vm_throw_linking_exception_naked", ss - stub);
 
@@ -1028,8 +1040,9 @@ void * getaddress__gc_write_barrier_fastcall()
 
     compile_add_dynamic_generated_code_chunk("gc_write_barrier_fastcall", stub, stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
+    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("gc_write_barrier_fastcall", stub, stub_size);
+    }
 
     DUMP_STUB(stub, "getaddress__gc_write_barrier_fastcall", ss - stub);
 
@@ -1076,8 +1089,9 @@ void * getaddress__vm_lrem_naked()
 
     compile_add_dynamic_generated_code_chunk("vm_lrem_naked", stub, stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
+    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_lrem_naked", stub, stub_size);
+    }
 
     DUMP_STUB(stub, "getaddress__vm_lrem_naked", ss - stub);
 
@@ -1123,8 +1137,9 @@ static void *getaddress__vm_ldiv_naked()
 
     compile_add_dynamic_generated_code_chunk("vm_ldiv_naked", stub, stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
+    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_ldiv_naked", stub, stub_size);
+    }
 
     DUMP_STUB(stub, "getaddress__vm_ldiv_naked", s - stub);
 

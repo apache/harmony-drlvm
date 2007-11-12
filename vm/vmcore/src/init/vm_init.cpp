@@ -578,9 +578,9 @@ static jint vm_create_jthread(jthread * thread_object, JNIEnv * jni_env, jobject
     
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     if (ti->isEnabled()) {
-        ti->setLocallyDisabled();//-----------------------------------V
+        ti->doNotReportLocally();//-----------------------------------V
         vm_execute_java_method_array((jmethodID) constructor, 0, args);
-        ti->setLocallyEnabled();//-----------------------------------^
+        ti->reportLocally();     //-----------------------------------^
     } else {
         vm_execute_java_method_array((jmethodID) constructor, 0, args);
     }

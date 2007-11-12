@@ -40,6 +40,7 @@
 #include "port_filepath.h"
 #include "port_dso.h"
 #include <apr_strings.h>
+#include <apr_atomic.h>
 
 #if defined(PLATFORM_NT) && !defined(_WIN64)
 #define AGENT_ONLOAD "_Agent_OnLoad@12"
@@ -337,8 +338,9 @@ DebugUtilsTI::DebugUtilsTI() :
     assert(res == JVMTI_ERROR_NONE);
     vm_brpt = new VMBreakPoints();
     assert(vm_brpt);
-    IDATA status = hythread_tls_alloc(&TL_ti_enabled);
+    IDATA status = hythread_tls_alloc(&TL_ti_report);
     assert(status == TM_ERROR_NONE);
+    memset(event_needed, 0, TOTAL_EVENT_TYPE_NUM*sizeof(unsigned));
 
     return;
 }
@@ -346,7 +348,7 @@ DebugUtilsTI::DebugUtilsTI() :
 DebugUtilsTI::~DebugUtilsTI()
 {
     ReleaseNotifyLists();
-    hythread_tls_free(TL_ti_enabled);
+    hythread_tls_free(TL_ti_report);
     delete vm_brpt;
     jvmti_destroy_event_thread();
     return;
@@ -717,23 +719,44 @@ void DebugUtilsTI::setAgents(Agent *agents) {
     this->agents = agents;
 }
 
-bool DebugUtilsTI::isLocallyEnabled() {
+bool DebugUtilsTI::shouldReportLocally() {
     //default value is that ti enabled on thread level
-    return hythread_tls_get(hythread_self(), this->TL_ti_enabled) == NULL;
+    return hythread_tls_get(hythread_self(), this->TL_ti_report) != NULL;
 }
 
-void DebugUtilsTI::setLocallyEnabled() {
+void DebugUtilsTI::doNotReportLocally() {
     //default value is that ti enabled on thread level
-    hythread_tls_set(hythread_self(), this->TL_ti_enabled, NULL);
+    hythread_tls_set(hythread_self(), this->TL_ti_report, NULL);
 }
 
-void DebugUtilsTI::setLocallyDisabled() {
-    hythread_tls_set(hythread_self(), this->TL_ti_enabled, this);
+void DebugUtilsTI::reportLocally() {
+    hythread_tls_set(hythread_self(), this->TL_ti_report, this);
 }
 
 bool DebugUtilsTI::isEnabled() {
-    return status && isLocallyEnabled();
+    return status;
 }
+
+void DebugUtilsTI::addEventSubscriber(jvmtiEvent event_type) {
+    apr_atomic_inc32((volatile apr_uint32_t*)&(event_needed[event_type - JVMTI_MIN_EVENT_TYPE_VAL]));
+}
+
+void DebugUtilsTI::removeEventSubscriber(jvmtiEvent event_type) {
+    apr_atomic_dec32((volatile apr_uint32_t*)&(event_needed[event_type - JVMTI_MIN_EVENT_TYPE_VAL]));
+}
+
+
+bool DebugUtilsTI::hasSubscribersForEvent(jvmtiEvent event_type) {
+    return event_needed[event_type - JVMTI_MIN_EVENT_TYPE_VAL] != 0;
+}
+
+
+bool DebugUtilsTI::shouldReportEvent(jvmtiEvent event_type) {
+    return isEnabled()
+        && hasSubscribersForEvent(event_type)
+        && shouldReportLocally();
+}
+
 
 void DebugUtilsTI::setEnabled() {
     this->status = true;

@@ -46,11 +46,13 @@ void InlineInfo::send_compiled_method_load_event(Method *method)
 {
     LMAutoUnlock au(& _lock);
 
-    for (iterator i = _entries.begin(); i != _entries.end(); i++) {
-        Entry& e = *i;
-        jvmti_send_region_compiled_method_load_event(e.method, e.codeSize,
-                e.codeAddr, e.mapLength, 
-                e.addrLocationMap, NULL);
+    if(jvmti_should_report_event(JVMTI_EVENT_COMPILED_METHOD_LOAD)) {
+        for (iterator i = _entries.begin(); i != _entries.end(); i++) {
+            Entry& e = *i;
+            jvmti_send_region_compiled_method_load_event(e.method, e.codeSize,
+                    e.codeAddr, e.mapLength, 
+                    e.addrLocationMap, NULL);
+        }
     }
 
 } // InlineInfo::send_compiled_method_load_event

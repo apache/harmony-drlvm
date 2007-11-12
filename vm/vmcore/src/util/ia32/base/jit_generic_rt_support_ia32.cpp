@@ -85,17 +85,16 @@ void * getaddress__vm_lshl_naked()
     ss = alu(ss, add_opc,  esp_opnd,  Imm_Opnd(12));
     Imm_Opnd imm(n);
     ss = ret(ss,  imm);
-    
+
     addr = stub;
     assert((ss - stub) <= stub_size);
 
-
     compile_add_dynamic_generated_code_chunk("vm_lshl_naked", stub, stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
+    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_lshl_naked", stub, stub_size);
+    }
 
-    
     DUMP_STUB(stub, "getaddress__vm_lshl_naked", ss - stub);
 
     return addr;
@@ -144,8 +143,9 @@ void * getaddress__vm_lshr_naked()
 
     compile_add_dynamic_generated_code_chunk("vm_lshr_naked", stub, stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
+    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_lshr_naked", stub, stub_size);
+    }
 
     DUMP_STUB(stub, "getaddress__vm_lshr_naked", ss - stub);
 
@@ -195,8 +195,9 @@ void * getaddress__vm_lushr_naked()
 
     compile_add_dynamic_generated_code_chunk("vm_lushr_naked", stub, stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
+    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_lushr_naked", stub, stub_size);
+    }
 
     DUMP_STUB(stub, "getaddress__vm_lushr_naked", ss - stub);
 
@@ -328,8 +329,9 @@ void * getaddress__vm_const_lrem_naked()
 
     compile_add_dynamic_generated_code_chunk("vm_const_lrem_naked", stub, stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
+    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_const_lrem_naked", stub, stub_size);
+    }
 
     DUMP_STUB(stub, "getaddress__vm_const_lrem_naked", ss - stub);
 
@@ -534,8 +536,9 @@ static void *getaddress__vm_const_ldiv_naked()
 
     compile_add_dynamic_generated_code_chunk("vm_const_ldiv_naked", stub, stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
+    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_const_ldiv_naked", stub, stub_size);
+    }
 
     DUMP_STUB(stub, "getaddress__vm_const_ldiv_naked", ss - stub);
 
@@ -611,8 +614,9 @@ void *getaddress__vm_d2i()
 
     compile_add_dynamic_generated_code_chunk("vm_d2i", stub, stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
+    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_d2i", stub, stub_size);
+    }
 
     DUMP_STUB(stub, "getaddress__vm_d2i", ss - stub);
 
@@ -666,8 +670,9 @@ void *getaddress__vm_d2l()
 
     compile_add_dynamic_generated_code_chunk("vm_d2l", stub, stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
+    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_d2l", stub, stub_size);
+    }
 
     DUMP_STUB(stub, "getaddress__vm_d2l", ss - stub);
 
@@ -788,8 +793,9 @@ void *getaddress__vm_f2i()
 
     compile_add_dynamic_generated_code_chunk("vm_f2i", stub, stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
+    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_f2i", stub, stub_size);
+    }
 
     DUMP_STUB(stub, "getaddress__vm_f2i", ss - stub);
 
@@ -842,8 +848,9 @@ static void *getaddress__vm_f2l()
 
     compile_add_dynamic_generated_code_chunk("vm_f2l", stub, stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
+    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_f2l", stub, stub_size);
+    }
 
     DUMP_STUB(stub, "getaddress__vm_f2l", ss - stub);
 
@@ -938,8 +945,9 @@ void *getaddress__vm_frem()
 
     compile_add_dynamic_generated_code_chunk("vm_frem", stub, stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
+    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_frem", stub, stub_size);
+    }
 
     DUMP_STUB(stub, "getaddress__vm_frem", ss - stub);
 
@@ -987,12 +995,13 @@ void *getaddress__vm_drem()
 
     compile_add_dynamic_generated_code_chunk("vm_drem", stub, stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
+    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_drem", stub, stub_size);
+    }
 
     DUMP_STUB(stub, "getaddress__vm_drem", ss - stub);
 
-    return addr;    
+    return addr;
 } //getaddress__vm_drem
 
 #ifdef VM_STATS // exclude remark in release mode (defined but not used)

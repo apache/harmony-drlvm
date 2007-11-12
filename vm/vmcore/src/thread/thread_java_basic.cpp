@@ -146,8 +146,10 @@ int HYTHREAD_PROC jthread_wrapper_start_proc(void *arg)
     status = hythread_global_unlock();
     assert(status == TM_ERROR_NONE);
 
-    // set JVMTI Thread Start event
-    jvmti_send_thread_start_end_event(vm_thread, 1);
+    // send JVMTI Thread Start event
+    if(jvmti_should_report_event(JVMTI_EVENT_THREAD_START)) {
+        jvmti_send_thread_start_end_event(vm_thread, 1);
+    }
 
     jvmtiStartFunction start_jvmti_proc = start_proc_data.proc;
     if (start_jvmti_proc != NULL) {
@@ -299,7 +301,9 @@ IDATA jthread_attach(JNIEnv *jni_env, jthread java_thread, jboolean daemon)
 
     // Send Thread Start event.
     assert(hythread_is_alive(native_thread));
-    jvmti_send_thread_start_end_event(vm_thread, 1);
+    if(jvmti_should_report_event(JVMTI_EVENT_THREAD_START)) {
+        jvmti_send_thread_start_end_event(vm_thread, 1);
+    }
     jthread_start_count();
 
     TRACE(("TM: Current thread attached to jthread=%p", java_thread));

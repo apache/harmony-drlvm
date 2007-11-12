@@ -63,9 +63,11 @@ NativeCodePtr LilCodeGenerator::compile(LilCodeStub* cs, PoolManager* code_pool)
     
     compile_add_dynamic_generated_code_chunk("unknown", stub, stub_size);
 
-    if (VM_Global_State::loader_env->TI->isEnabled())
+    if(jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED))
+    {
         jvmti_send_dynamic_code_generated_event("unknown", stub,
             (jint)stub_size);
+    }
 
     return stub;
 }

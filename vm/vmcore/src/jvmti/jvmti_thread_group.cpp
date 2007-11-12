@@ -226,14 +226,14 @@ jvmtiGetThreadGroupChildren(jvmtiEnv* env,
             "getActiveChildren","()[Ljava/lang/Object;");
     assert(method);
 
-    ti->setLocallyDisabled();//-----------------------------------V
+    ti->doNotReportLocally();   //------------------V
 
     // by contract this method returns Object[2] array.
     // First element is Object[] array of child Thread objects.
     // Second element is Object[] array of child ThreadGroup objects.
     jobjectArray result = jvmti_test_jenv->CallObjectMethod(group, method);
 
-    ti->setLocallyEnabled();//-----------------------------------^
+    ti->reportLocally();        //------------------^
 
     if (exn_raised())
         return JVMTI_ERROR_INTERNAL;

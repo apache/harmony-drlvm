@@ -105,7 +105,9 @@ stop_the_world_root_set_enumeration()
     thread_suspend_time = vm_time_end_hook(&_start_time, &_end_time);
     INFO2("tm.suspend","Thread suspension time: "<< thread_suspend_time <<" mksec");
 
-    jvmti_send_gc_start_event();
+    if(jvmti_should_report_event(JVMTI_EVENT_GARBAGE_COLLECTION_START)) {
+        jvmti_send_gc_start_event();
+    }
 
     if(gc_supports_class_unloading()) class_unloading_clear_mark_bits();
 
@@ -155,7 +157,9 @@ void vm_resume_threads_after()
 
     if(gc_supports_class_unloading()) class_unloading_start();
 
-    jvmti_send_gc_finish_event();
+    if(jvmti_should_report_event(JVMTI_EVENT_GARBAGE_COLLECTION_FINISH)) {
+        jvmti_send_gc_finish_event();
+    }
     jvmti_clean_reclaimed_object_tags();
 
     // Run through list of active threads and resume each one of them.

@@ -703,7 +703,9 @@ JIT_Result compile_do_compilation_jit(Method* method, JIT* jit)
     DebugUtilsTI *ti = vm_env->TI;
 
     // Call TI callbacks
-    if (ti->isEnabled() && ti->getPhase() == JVMTI_PHASE_LIVE) {
+    if (jvmti_should_report_event(JVMTI_EVENT_COMPILED_METHOD_LOAD)
+        && ti->getPhase() == JVMTI_PHASE_LIVE)
+    {
         jvmti_send_chunks_compiled_method_load_event(method);
     }
     return JIT_SUCCESS;
@@ -874,7 +876,9 @@ VMEXPORT void compiled_method_load(Method_Handle method, uint32 codeSize,
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
 
     // Call TI callbacks
-    if (ti->isEnabled() && ti->getPhase() == JVMTI_PHASE_LIVE) {
+    if (jvmti_should_report_event(JVMTI_EVENT_COMPILED_METHOD_LOAD)
+        && ti->getPhase() == JVMTI_PHASE_LIVE)
+    {
         jvmti_send_region_compiled_method_load_event(method, codeSize,
             codeAddr, mapLength, addrLocationMap, NULL);
     }

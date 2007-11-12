@@ -616,7 +616,7 @@ VMBreakPoints::process_native_breakpoint()
     // inside of callbacks
     InstructionDisassembler idisasm(*bp->disasm);
 
-    bool is_enabled = VM_Global_State::loader_env->TI->isLocallyEnabled();
+    bool is_enabled = VM_Global_State::loader_env->TI->shouldReportLocally();
     // if is_enabled is false then we should continue execution without
     // reporting breakpoint event
     for (unsigned priority = 0;
@@ -842,7 +842,7 @@ VMBreakPoints::process_interpreter_breakpoint(jmethodID method, jlocation locati
         << " :" << location );
 
     jbyte orig_byte = bp->saved_byte;
-    bool is_enabled = VM_Global_State::loader_env->TI->isLocallyEnabled();
+    bool is_enabled = VM_Global_State::loader_env->TI->shouldReportLocally();
     // if is_enabled is false then we should continue execution without
     // reporting breakpoint event
     for (unsigned priority = 0;

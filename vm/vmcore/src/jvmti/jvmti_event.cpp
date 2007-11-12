@@ -85,6 +85,9 @@ jvmtiError add_event_to_thread(jvmtiEnv *env, jvmtiEvent event_type, jthread eve
     hythread_t p_thread = jthread_get_native_thread(event_thread);
     TIEventThread *et = p_env->event_threads[event_type - JVMTI_MIN_EVENT_TYPE_VAL];
 
+    // protect event_threads collection
+    hymutex_lock(&(p_env->lock));
+
     // Find out if this environment is already registered on this thread on this event type
     while (NULL != et)
     {
@@ -99,9 +102,14 @@ jvmtiError add_event_to_thread(jvmtiEnv *env, jvmtiEvent event_type, jthread eve
         return errorCode;
     newet->thread = p_thread;
 
-    // FIXME: dynamic list modification without synchronization
+    // record event is needed
+    VM_Global_State::loader_env->TI->addEventSubscriber(event_type);
+
     newet->next = p_env->event_threads[event_type - JVMTI_MIN_EVENT_TYPE_VAL];
     p_env->event_threads[event_type - JVMTI_MIN_EVENT_TYPE_VAL] = newet;
+
+    // free environment lock
+    hymutex_unlock(&(p_env->lock));
     return JVMTI_ERROR_NONE;
 }
 
@@ -114,11 +122,15 @@ void remove_event_from_thread(jvmtiEnv *env, jvmtiEvent event_type, jthread even
     if (NULL == et)
         return;
 
-    // FIXME: dynamic list modification without synchronization
+    // protect event_threads collection
+    hymutex_lock(&(p_env->lock));
+
     if (et->thread == p_thread)
     {
+        VM_Global_State::loader_env->TI->removeEventSubscriber(event_type);
         p_env->event_threads[event_type - JVMTI_MIN_EVENT_TYPE_VAL] = et->next;
         _deallocate((unsigned char *)et);
+        hymutex_unlock(&(p_env->lock));
         return;
     }
 
@@ -127,25 +139,40 @@ void remove_event_from_thread(jvmtiEnv *env, jvmtiEvent event_type, jthread even
     {
         if (et->next->thread == p_thread)
         {
+            VM_Global_State::loader_env->TI->removeEventSubscriber(event_type);
             TIEventThread *oldet = et->next;
             et->next = oldet->next;
             _deallocate((unsigned char *)oldet);
+            hymutex_unlock(&(p_env->lock));
             return;
         }
         et = et->next;
     }
+
+    // release protection
+    hymutex_unlock(&(p_env->lock));
 }
 
 void add_event_to_global(jvmtiEnv *env, jvmtiEvent event_type)
 {
     TIEnv *p_env = (TIEnv *)env;
+    hymutex_lock(&(p_env->lock));
+    if(!p_env->global_events[event_type - JVMTI_MIN_EVENT_TYPE_VAL]) {
+        VM_Global_State::loader_env->TI->addEventSubscriber(event_type);
+    }
     p_env->global_events[event_type - JVMTI_MIN_EVENT_TYPE_VAL] = true;
+    hymutex_unlock(&(p_env->lock));
 }
 
 void remove_event_from_global(jvmtiEnv *env, jvmtiEvent event_type)
 {
     TIEnv *p_env = (TIEnv *)env;
+    hymutex_lock(&(p_env->lock));
+    if(p_env->global_events[event_type - JVMTI_MIN_EVENT_TYPE_VAL]) {
+        VM_Global_State::loader_env->TI->removeEventSubscriber(event_type);
+    }
     p_env->global_events[event_type - JVMTI_MIN_EVENT_TYPE_VAL] = false;
+    hymutex_unlock(&(p_env->lock));
 }
 
 // disable all events except VM_DEATH
@@ -181,14 +208,7 @@ static void disable_all_events(TIEnv* p_env)
  */
 jboolean event_enabled(jvmtiEvent event_type) {
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
-    if ( !ti->isEnabled() ) return false;
-
-    for (TIEnv * ti_env = ti -> getEnvironments(); NULL != ti_env; ti_env = ti_env -> next) {
-        if (ti_env->global_events[event_type - JVMTI_MIN_EVENT_TYPE_VAL]) return true;
-        if (ti_env->event_threads[event_type - JVMTI_MIN_EVENT_TYPE_VAL] != 0) return true;
-    }
-
-    return false;
+    return ti->isEnabled() && ti->hasSubscribersForEvent(event_type);
 }
 
 static inline bool
@@ -437,6 +457,10 @@ jvmtiSetEventNotificationMode(jvmtiEnv* env,
     return JVMTI_ERROR_NONE;
 }
 
+bool jvmti_should_report_event(jvmtiEvent event_type) {
+    return VM_Global_State::loader_env->TI->shouldReportEvent(event_type);
+}
+
 void jvmti_send_vm_start_event(Global_Env *env, JNIEnv *jni_env)
 {
     DebugUtilsTI *ti = env->TI;
@@ -445,6 +469,10 @@ void jvmti_send_vm_start_event(Global_Env *env, JNIEnv *jni_env)
 
     // Switch phase to VM_Start and sent VMStart event
     ti->nextPhase(JVMTI_PHASE_START);
+
+    if(!jvmti_should_report_event(JVMTI_EVENT_VM_START))
+        return;
+
     // Send VM_Start TI events
     TIEnv *ti_env = ti->getEnvironments();
     TIEnv *next_env;
@@ -466,13 +494,17 @@ void jvmti_send_vm_start_event(Global_Env *env, JNIEnv *jni_env)
     }
     // send notify events
     unsigned index;
-    for( index = 0; index < env->TI->GetNumberPendingNotifyLoadClass(); index++ ) {
-        Class *klass = env->TI->GetPendingNotifyLoadClass( index );
-        jvmti_send_class_load_event(env, klass);
+    if(jvmti_should_report_event(JVMTI_EVENT_CLASS_LOAD)) {
+        for( index = 0; index < env->TI->GetNumberPendingNotifyLoadClass(); index++ ) {
+            Class *klass = env->TI->GetPendingNotifyLoadClass( index );
+            jvmti_send_class_load_event(env, klass);
+        }
     }
-    for( index = 0; index < env->TI->GetNumberPendingNotifyPrepareClass(); index++ ) {
-        Class *klass = env->TI->GetPendingNotifyPrepareClass( index );
-        jvmti_send_class_prepare_event(klass);
+    if(jvmti_should_report_event(JVMTI_EVENT_CLASS_PREPARE)) {
+        for( index = 0; index < env->TI->GetNumberPendingNotifyPrepareClass(); index++ ) {
+            Class *klass = env->TI->GetPendingNotifyPrepareClass( index );
+            jvmti_send_class_prepare_event(klass);
+        }
     }
     env->TI->ReleaseNotifyLists();
 }
@@ -487,6 +519,10 @@ void jvmti_send_vm_init_event(Global_Env *env)
 
     // Switch phase to VM_Live and sent VMLive event
     ti->nextPhase(JVMTI_PHASE_LIVE);
+
+    if (!jvmti_should_report_event(JVMTI_EVENT_VM_INIT))
+        return;
+
     tmn_suspend_disable();
     ObjectHandle hThread = oh_allocate_local_handle();
     hThread->object = (Java_java_lang_Thread *)jthread_self()->object;
@@ -684,6 +720,9 @@ static jvmtiError generate_events_compiled_method_load(jvmtiEnv* env)
     if (!capa.can_generate_compiled_method_load_events)
         return JVMTI_ERROR_MUST_POSSESS_CAPABILITY;
 
+    if(!jvmti_should_report_event(JVMTI_EVENT_COMPILED_METHOD_LOAD))
+        return JVMTI_ERROR_NONE;
+
     ClassLoader::LockLoadersTable();
 
     /**
@@ -742,11 +781,13 @@ static jvmtiError generate_events_compiled_method_load(jvmtiEnv* env)
 
 static jvmtiError generate_events_dynamic_code_generated(jvmtiEnv* env)
 {
-    // FIXME: linked list usage without sync
-    for (DynamicCode *dcList = compile_get_dynamic_code_list();
-        NULL != dcList; dcList = dcList->next)
-        jvmti_send_dynamic_code_generated_event(dcList->name,
-            dcList->address, (jint)dcList->length);
+    if(jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
+        // FIXME: linked list usage without sync
+        for (DynamicCode *dcList = compile_get_dynamic_code_list();
+            NULL != dcList; dcList = dcList->next)
+            jvmti_send_dynamic_code_generated_event(dcList->name,
+                dcList->address, (jint)dcList->length);
+    }
 
     return JVMTI_ERROR_NONE;
 } // generate_events_dynamic_code_generated
@@ -800,7 +841,7 @@ jvmti_process_method_entry_event(jmethodID method) {
     SuspendDisabledChecker sdc;
 
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
-    if (!ti->isEnabled() )
+    if (!jvmti_should_report_event(JVMTI_EVENT_METHOD_ENTRY))
         return;
 
     if (JVMTI_PHASE_LIVE != ti->getPhase())
@@ -965,7 +1006,7 @@ jvmti_process_method_exit_event(jmethodID method,
     SuspendDisabledChecker sdc;
 
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
-    if (!ti->isEnabled() )
+    if (!jvmti_should_report_event(JVMTI_EVENT_METHOD_EXIT))
         return;
 
     if (JVMTI_PHASE_LIVE != ti->getPhase())
@@ -987,7 +1028,7 @@ jvmti_process_method_exception_exit_event(jmethodID method,
     SuspendDisabledChecker sdc;
 
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
-    if (!ti->isEnabled() )
+    if (!jvmti_should_report_event(JVMTI_EVENT_METHOD_EXIT))
         return;
 
     if (JVMTI_PHASE_LIVE != ti->getPhase())
@@ -1022,7 +1063,8 @@ jvmti_process_frame_pop_event(jvmtiEnv *jvmti_env, jmethodID method, jboolean wa
     assert(hythread_is_suspend_enabled());
 
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
-    if (!ti->isEnabled() ) return;
+    if (!jvmti_should_report_event(JVMTI_EVENT_FRAME_POP))
+        return;
 
     if (JVMTI_PHASE_LIVE != ti->getPhase())
         return;
@@ -1049,7 +1091,7 @@ jvmti_process_native_method_bind_event(jmethodID method, NativeCodePtr address, 
     SuspendEnabledChecker sec;
 
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
-    if( !ti->isEnabled() )
+    if(!jvmti_should_report_event(JVMTI_EVENT_NATIVE_METHOD_BIND))
         return;
 
     //Checking current phase
@@ -1113,7 +1155,7 @@ jvmti_process_native_method_bind_event(jmethodID method, NativeCodePtr address, 
 VMEXPORT void
 jvmti_process_single_step_event(jmethodID method, jlocation location) {
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
-    if ( !ti->isEnabled() ) return;
+    if (!ti->isEnabled() ) return;
 
     if (ti->getPhase() != JVMTI_PHASE_LIVE) return;
 
@@ -1180,10 +1222,10 @@ VMEXPORT void jvmti_process_field_access_event(Field_Handle field,
         object->object = managed_object;
     }
 
-    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
-    if (!ti->isEnabled() )
+    if (!jvmti_should_report_event(JVMTI_EVENT_FIELD_ACCESS))
         return;
 
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     if (JVMTI_PHASE_LIVE != ti->getPhase())
         return;
 
@@ -1253,7 +1295,7 @@ VMEXPORT void jvmti_process_field_modification_event(Field_Handle field,
     }
 
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
-    if (!ti->isEnabled() )
+    if (!jvmti_should_report_event(JVMTI_EVENT_FIELD_MODIFICATION))
         return;
 
     if (JVMTI_PHASE_LIVE != ti->getPhase())
@@ -1321,7 +1363,7 @@ static void jvmti_process_vm_object_alloc_event(ManagedObject** p_managed_object
     SuspendDisabledChecker sdc;
 
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
-    if (!ti->isEnabled() )
+    if (!jvmti_should_report_event(JVMTI_EVENT_VM_OBJECT_ALLOC))
         return;
 
     if (JVMTI_PHASE_LIVE != ti->getPhase())
@@ -1475,10 +1517,10 @@ void jvmti_interpreter_exception_event_callback_call(
 
     VM_thread *curr_thread = p_TLS_vmthread;
 
-    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
-    if (!ti->isEnabled())
+    if (!jvmti_should_report_event(JVMTI_EVENT_EXCEPTION))
         return;
 
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     if (JVMTI_PHASE_LIVE != ti->getPhase())
         return;
 
@@ -1520,10 +1562,10 @@ ManagedObject *jvmti_jit_exception_event_callback_call(ManagedObject *exn_object
     assert(exn_object);
     SuspendDisabledChecker sdc;
 
-    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
-    if (!ti->isEnabled())
+    if (!jvmti_should_report_event(JVMTI_EVENT_EXCEPTION))
         return exn_object;
 
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     if (JVMTI_PHASE_LIVE != ti->getPhase())
         return exn_object;
 
@@ -1645,11 +1687,11 @@ ManagedObject *jvmti_jit_exception_catch_event_callback_call(ManagedObject *exn_
     assert(!exn_raised());
     SuspendDisabledChecker sdc;
 
-    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
-    if (!ti->isEnabled())
+    if (!jvmti_should_report_event(JVMTI_EVENT_EXCEPTION_CATCH))
         return exn_object;
 
- if (JVMTI_PHASE_LIVE != ti->getPhase())
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
+    if (JVMTI_PHASE_LIVE != ti->getPhase())
         return exn_object;
 
     if (!ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_EXCEPTION_EVENT))
@@ -1680,10 +1722,10 @@ void jvmti_interpreter_exception_catch_event_callback_call(
     assert(!exn_raised());
     SuspendDisabledChecker sdc;
 
-    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
-    if (!ti->isEnabled())
+    if (!jvmti_should_report_event(JVMTI_EVENT_EXCEPTION_CATCH))
         return;
 
+    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     if (JVMTI_PHASE_LIVE != ti->getPhase())
         return;
 
@@ -1703,37 +1745,40 @@ void jvmti_send_contended_enter_or_entered_monitor_event(jobject obj,
         return;
     }
 
-    JNIEnv *jni_env = p_TLS_vmthread->jni_env;
-
-    tmn_suspend_disable();
     // Create local handles frame
     NativeObjectHandles lhs;
-    ObjectHandle hThread = oh_allocate_local_handle();
-    hThread->object = (Java_java_lang_Thread *)jthread_self()->object;
-    tmn_suspend_enable();
+    // ppervov: both hThread and jni_env are initialized lazily on the first use
+    ObjectHandle hThread = NULL;
+    JNIEnv* jni_env = NULL;
 
     TIEnv *ti_env = ti->getEnvironments();
     TIEnv *next_env;
+    jvmtiEvent enter_event_type = isEnter ?
+        JVMTI_EVENT_MONITOR_CONTENDED_ENTER
+        : JVMTI_EVENT_MONITOR_CONTENDED_ENTERED;
     while (NULL != ti_env)
     {
+        void* untyped_func = ti_env->get_event_callback(enter_event_type);
         next_env = ti_env->next;
-        if (isEnter && ti_env->global_events[JVMTI_EVENT_MONITOR_CONTENDED_ENTER -
-                JVMTI_MIN_EVENT_TYPE_VAL])
+        if(untyped_func != NULL
+            && ti_env->global_events[enter_event_type - JVMTI_MIN_EVENT_TYPE_VAL])
         {
-            jvmtiEventMonitorContendedEnter func = (jvmtiEventMonitorContendedEnter)
-                ti_env->get_event_callback(JVMTI_EVENT_MONITOR_CONTENDED_ENTER);
-            if (NULL != func)
-            {
-                func((jvmtiEnv*)ti_env, jni_env, (jthread)hThread, obj);
+            if(hThread == NULL) {
+                tmn_suspend_disable();
+                hThread = oh_allocate_local_handle();
+                hThread->object = (Java_java_lang_Thread *)jthread_self()->object;
+                tmn_suspend_enable();
+                jni_env = p_TLS_vmthread->jni_env;
             }
-        }
-        else if (! isEnter && ti_env->global_events[JVMTI_EVENT_MONITOR_CONTENDED_ENTERED -
-                JVMTI_MIN_EVENT_TYPE_VAL])
-        {
-            jvmtiEventMonitorContendedEntered func = (jvmtiEventMonitorContendedEntered)
-                ti_env->get_event_callback(JVMTI_EVENT_MONITOR_CONTENDED_ENTERED);
-            if (NULL != func)
-            {
+            if(isEnter) {
+                assert(enter_event_type == JVMTI_EVENT_MONITOR_CONTENDED_ENTER);
+                jvmtiEventMonitorContendedEnter func =
+                    (jvmtiEventMonitorContendedEnter)untyped_func;
+                func((jvmtiEnv*)ti_env, jni_env, (jthread)hThread, obj);
+            } else {
+                assert(enter_event_type == JVMTI_EVENT_MONITOR_CONTENDED_ENTERED);
+                jvmtiEventMonitorContendedEntered func =
+                    (jvmtiEventMonitorContendedEntered)untyped_func;
                 func((jvmtiEnv*)ti_env, jni_env, (jthread)hThread, obj);
             }
         }
@@ -2012,9 +2057,11 @@ static void process_jvmti_event(jvmtiEvent event_type, int per_thread, ...) {
     bool unwindable;
     jthrowable excn = NULL;
 
-    if (! ti->isEnabled()) return;
+    if (!jvmti_should_report_event(event_type))
+        return;
+
     unwindable = set_unwindable(false);
-    
+
     if (!unwindable) {
         if (excn = exn_get()) {
             exn_clear();
@@ -2035,9 +2082,8 @@ static void process_jvmti_event(jvmtiEvent event_type, int per_thread, ...) {
         if (callback_func) call_callback(event_type, jni_env, ti_env, callback_func, args);
         ti_env = next_env;
     }
-    
+
     assert(!exn_get());
-    
     if (excn) exn_raise_object(excn);
 
     set_unwindable(unwindable);
@@ -2243,9 +2289,8 @@ jvmti_process_data_dump_request()
 {
     assert(hythread_is_suspend_enabled());
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
-    if( !ti->isEnabled() ) {
+    if (!jvmti_should_report_event(JVMTI_EVENT_DATA_DUMP_REQUEST))
         return;
-    }
 
     //Checking current phase
     jvmtiPhase phase = ti->getPhase();

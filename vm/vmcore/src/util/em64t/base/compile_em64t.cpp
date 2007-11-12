@@ -287,7 +287,9 @@ static NativeCodePtr compile_get_compile_me_generic() {
     if (VM_Global_State::loader_env->TI->isEnabled())
     {
         jvmti_add_dynamic_generated_code_chunk("compile_me_generic", stub, STUB_SIZE);
-        jvmti_send_dynamic_code_generated_event("compile_me_generic", stub, STUB_SIZE);
+        if(jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
+            jvmti_send_dynamic_code_generated_event("compile_me_generic", stub, STUB_SIZE);
+        }
     }
 #endif
 
@@ -334,7 +336,9 @@ NativeCodePtr compile_gen_compile_me(Method_Handle method) {
         name = (char *)STD_MALLOC(sz);
         sprintf(name, "compileme.%s.%s%s", c, m, d);
         jvmti_add_dynamic_generated_code_chunk(name, stub, STUB_SIZE);
-        jvmti_send_dynamic_code_generated_event(name, stub, STUB_SIZE);
+        if(jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
+            jvmti_send_dynamic_code_generated_event(name, stub, STUB_SIZE);
+        }
     }
 #endif
 

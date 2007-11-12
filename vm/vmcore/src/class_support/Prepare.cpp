@@ -1268,7 +1268,9 @@ bool Class::prepare(Global_Env* env)
         {
             autoUnlocker.ForceUnlock();
             assert(hythread_is_suspend_enabled());
-            if (init_fields) {
+            if (init_fields
+                && jvmti_should_report_event(JVMTI_EVENT_CLASS_PREPARE))
+            {
                 jvmti_send_class_prepare_event(this);
             }
         }
@@ -1517,7 +1519,9 @@ bool Class::prepare(Global_Env* env)
     {
         autoUnlocker.ForceUnlock();
         assert(hythread_is_suspend_enabled());
-        jvmti_send_class_prepare_event(this);
+        if(jvmti_should_report_event(JVMTI_EVENT_CLASS_PREPARE)) {
+            jvmti_send_class_prepare_event(this);
+        }
     }
     TRACE2("classloader.prepare", "END class prepare, class name = " << m_name->bytes);
 

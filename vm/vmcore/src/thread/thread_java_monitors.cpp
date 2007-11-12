@@ -106,7 +106,9 @@ IDATA VMCALL jthread_monitor_enter(jobject monitor)
         enter_begin = apr_time_now();
         int disable_count = hythread_reset_suspend_disable();
         jthread_set_owned_monitor(monitor);
-        jvmti_send_contended_enter_or_entered_monitor_event(monitor, 1);
+        if(jvmti_should_report_event(JVMTI_EVENT_MONITOR_CONTENDED_ENTER)) {
+            jvmti_send_contended_enter_or_entered_monitor_event(monitor, 1);
+        }
         hythread_set_suspend_disable(disable_count);
     }
 
@@ -140,7 +142,9 @@ IDATA VMCALL jthread_monitor_enter(jobject monitor)
 contended_entered:
     if (ti_is_enabled()) {
         int disable_count = hythread_reset_suspend_disable();
-        jvmti_send_contended_enter_or_entered_monitor_event(monitor, 0);
+        if(jvmti_should_report_event(JVMTI_EVENT_MONITOR_CONTENDED_ENTERED)) {
+            jvmti_send_contended_enter_or_entered_monitor_event(monitor, 0);
+        }
         hythread_set_suspend_disable(disable_count);
         // should be moved to event handler
         jvmti_thread_t jvmti_thread =
@@ -314,8 +318,12 @@ jthread_monitor_timed_wait(jobject monitor, jlong millis, jint nanos)
         int disable_count = hythread_reset_suspend_disable();
         jthread_set_wait_monitor(monitor);
         jthread_set_owned_monitor(monitor);
-        jvmti_send_wait_monitor_event(monitor, (jlong) millis);
-        jvmti_send_contended_enter_or_entered_monitor_event(monitor, 1);
+        if(jvmti_should_report_event(JVMTI_EVENT_MONITOR_WAIT)) {
+            jvmti_send_wait_monitor_event(monitor, (jlong) millis);
+        }
+        if(jvmti_should_report_event(JVMTI_EVENT_MONITOR_CONTENDED_ENTER)) {
+            jvmti_send_contended_enter_or_entered_monitor_event(monitor, 1);
+        }
         hythread_set_suspend_disable(disable_count);
 
         // should be moved to event handler
@@ -357,9 +365,13 @@ jthread_monitor_timed_wait(jobject monitor, jlong millis, jint nanos)
     if (ti_is_enabled()) {
         jthread_add_owned_monitor(monitor);
         int disable_count = hythread_reset_suspend_disable();
-        jvmti_send_contended_enter_or_entered_monitor_event(monitor, 0);
-        jvmti_send_waited_monitor_event(monitor,
-            ((status == APR_TIMEUP) ? (jboolean) 1 : (jboolean) 0));
+        if(jvmti_should_report_event(JVMTI_EVENT_MONITOR_CONTENDED_ENTERED)) {
+            jvmti_send_contended_enter_or_entered_monitor_event(monitor, 0);
+        }
+        if(jvmti_should_report_event(JVMTI_EVENT_MONITOR_WAITED)) {
+            jvmti_send_waited_monitor_event(monitor,
+                ((status == APR_TIMEUP) ? (jboolean) 1 : (jboolean) 0));
+        }
         hythread_set_suspend_disable(disable_count);
         // should be moved to event handler
         jvmti_thread_t jvmti_thread =

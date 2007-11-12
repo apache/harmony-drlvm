@@ -228,6 +228,9 @@ jint vm_attach(JavaVM * java_vm, JNIEnv ** p_jni_env)
 
         vm_thread->jvmti_thread.jvmti_jit_breakpoints_handling_buffer =
             reinterpret_cast<jbyte *>(addr);
+
+        assert(VM_Global_State::loader_env->TI);
+        VM_Global_State::loader_env->TI->reportLocally();
     }
     ((hythread_t)vm_thread)->java_status = TM_STATUS_INITIALIZED;
 
@@ -248,7 +251,9 @@ jint vm_detach(jthread java_thread)
     assert(p_vm_thread);
 
     // Send Thread End event
-    jvmti_send_thread_start_end_event(p_vm_thread, 0);
+    if(jvmti_should_report_event(JVMTI_EVENT_THREAD_END)) {
+        jvmti_send_thread_start_end_event(p_vm_thread, 0);
+    }
 
     hythread_suspend_disable();
 

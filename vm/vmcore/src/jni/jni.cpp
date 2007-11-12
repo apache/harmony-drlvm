@@ -538,7 +538,9 @@ jint JNICALL JNI_CreateJavaVM(JavaVM ** p_vm, JNIEnv ** p_jni_env,
     jvmti_send_vm_init_event(vm_env);
 
     // Thread start event for the main thread should be sent after VMInit callback has finished.
-    jvmti_send_thread_start_end_event(p_TLS_vmthread, 1);
+    if (jvmti_should_report_event(JVMTI_EVENT_THREAD_START)) {
+        jvmti_send_thread_start_end_event(p_TLS_vmthread, 1);
+    }
 
     // Register created VM.
     APR_RING_INSERT_TAIL(&GLOBAL_VMS, java_vm, JavaVM_Internal, link);
@@ -1532,12 +1534,6 @@ static jint attach_current_thread(JavaVM * java_vm, void ** p_jni_env, void * ar
 
     // Now JVMTIThread keeps global reference. Discared temporary global reference.
     jni_env->DeleteGlobalRef(java_thread);
-
-    // Send thread start event.
-    // TODO: Thread start event should be sent before its initial method executes.
-    // 20061207: psrebriy: ThreadStart event is already started in
-    //                     jthread_attach function
-    // jvmti_send_thread_start_end_event(1);
 
     return status == TM_ERROR_NONE ? JNI_OK : JNI_ERR;
 }
