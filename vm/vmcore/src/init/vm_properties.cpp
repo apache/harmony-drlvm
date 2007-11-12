@@ -305,7 +305,7 @@ static void init_vm_properties(Properties & properties)
         properties.set_new("gc.dll", PORT_DSO_NAME(GC_DLL));
         properties.set_new("thread.soft_unreservation", "false");
 
-#ifdef POINTER64
+#ifdef REFS_USE_RUNTIME_SWITCH
         properties.set_new("vm.compress_references", "true");
 #endif
 

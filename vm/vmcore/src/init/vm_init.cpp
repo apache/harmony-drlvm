@@ -179,6 +179,44 @@ static jint process_properties_dlls(Global_Env * vm_env) {
 }
 
 /**
+ * Check compression modes and adjust if needed
+ */
+static jint process_compression_modes(Global_Env * vm_env)
+{
+#if !defined(POINTER64) || defined(REFS_USE_UNCOMPRESSED)
+        return JNI_OK;
+#else
+
+    if (!vm_env->VmProperties()->is_set("gc.ms") &&
+        !vm_env->VmProperties()->is_set("gc.mx"))
+    { // Heap size is not specified, use default compressed mode
+        return JNI_OK;
+    }
+
+    int64 ms = get_numerical_property("gc.ms", 0, VM_PROPERTIES);
+    int64 mx = get_numerical_property("gc.mx", 0, VM_PROPERTIES);
+    // Currently 4Gb is maximum for compressed mode
+    // If GC cannot allocate heap up to 4Gb, gc_init() will fail
+    int64 max_size = ((int64)4096)*1024*1024;
+
+#ifdef REFS_USE_COMPRESSED
+    if (ms >= max_size || mx >= max_size)
+    { // Heap is too large for compressed mode
+        LWARN(45, "ERROR: Heap size is too large for precompiled compressed mode.");
+        return JNI_ERR;
+    }
+#elif defined(REFS_USE_RUNTIME_SWITCH)
+    if (ms >= max_size || mx >= max_size)
+    { // Large heap; use uncompressed references
+        set_property("vm.compress_references", "false", VM_PROPERTIES);
+        vm_env->compress_references = false;
+        return JNI_OK;
+    }
+#endif // REFS_USE_RUNTIME_SWITCH
+#endif // !defined(POINTER64) || defined(REFS_USE_UNCOMPRESSED)
+}
+
+/**
  * Checks whether current platform is supported or not.
  */
 static jint check_platform() {
@@ -695,9 +733,13 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     parse_vm_arguments(vm_env);
 
     vm_env->verify = get_boolean_property("vm.use_verifier", TRUE, VM_PROPERTIES);
-#if defined(POINTER64) && defined(REFS_USE_RUNTIME_SWITCH)
+#ifdef REFS_USE_RUNTIME_SWITCH
     vm_env->compress_references = get_boolean_property("vm.compress_references", TRUE, VM_PROPERTIES);
 #endif
+
+    // Check compression modes and heap size
+    status = process_compression_modes(vm_env);
+    if (status != JNI_OK) return status;
 
     // "Tool Interface" enabling.
     vm_env->TI->setExecutionMode(vm_env);
@@ -739,6 +781,10 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     // vm_references_are_compressed returns current VM state, not potential
     // ability to support compressed mode
     // So, this check is turned off for now and it is FIXME
+    // 20071109 process_compression_modes() now automatically selects compression
+    // mode depending on heap size requested. If compressed mode is selected,
+    // check_compression() should check if other components support this mode,
+    // and either fail or switch to uncompressed mode
     //status = check_compression();
     //if (status != JNI_OK) return status;
 
