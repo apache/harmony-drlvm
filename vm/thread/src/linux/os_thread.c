@@ -184,6 +184,24 @@ static void init_thread_yield_other () {
 }
 
 /**
+ * Calculates absolute time in future for sem_timedwait timeout.
+ * @param ptime The pointer to time structure to fill
+ * @param delay Desired timeout in ns; not greater than 10^9 (1s)
+ */
+static inline __attribute__((always_inline))
+void get_exceed_time(struct timespec* ptime, long delay)
+{
+    clock_gettime(CLOCK_REALTIME, ptime);
+
+    ptime->tv_nsec += delay;
+    if (ptime->tv_nsec >= 1000000000L) // overflow
+    {
+        ptime->tv_nsec -= 1000000000L;
+        ++ptime->tv_sec;
+    }
+}
+
+/**
  * Sends a signal to a thread to make sure thread's write
  * buffers are flushed.
  */
@@ -192,8 +210,7 @@ void os_thread_yield_other(osthread_t os_thread) {
     struct timespec timeout;
     int r;
 
-    timeout.tv_sec = 0;
-    timeout.tv_nsec = 1000000;
+    get_exceed_time(&timeout, 1000000L);
 
     pthread_mutex_lock(&yield_other_mutex);
 
