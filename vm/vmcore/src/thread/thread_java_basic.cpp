@@ -404,7 +404,6 @@ IDATA jthread_vm_detach(vm_thread_t vm_thread)
 
     // Detach from VM.
     jobject java_thread = vm_thread->java_thread;
-    JNIEnv *jni_env = vm_thread->jni_env;
     jint status = vm_detach(java_thread);
     if (status != JNI_OK) {
         return TM_ERROR_INTERNAL;
@@ -417,7 +416,8 @@ IDATA jthread_vm_detach(vm_thread_t vm_thread)
     //}
 
     // Delete global reference to current thread object.
-    jni_env->DeleteGlobalRef(java_thread);
+    // jni_env is already deallocated in vm_detach.
+    DeleteGlobalRef(/*jni_env*/NULL, java_thread);
 
     // Decrease alive thread counter
     jthread_end_count();
