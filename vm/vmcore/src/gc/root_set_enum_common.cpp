@@ -118,6 +118,7 @@ static void vm_enumerate_class_static(Class* c)
 void vm_enumerate_static_fields()
 {
     TRACE2("enumeration", "vm_enumerate_static_fields()");
+    assert(!hythread_is_suspend_enabled());
     GlobalClassLoaderIterator ClIterator;
     Boolean do_class_unloading = gc_supports_class_unloading();
     ClassLoader *cl = ClIterator.first();

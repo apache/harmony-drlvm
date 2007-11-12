@@ -174,6 +174,7 @@ public:
         return klass?*klass:NULL;
     }
     void RemoveFromReported(const String* name){
+        assert(!hythread_is_suspend_enabled());
         if(m_reportedClasses->Lookup(name)) {
             m_reportedClasses->Remove(name);
         }

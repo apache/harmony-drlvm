@@ -510,6 +510,7 @@ void ClassLoader::gc_enumerate()
 void ClassLoader::ClearMarkBits()
 {
     TRACE2("classloader.unloading.clear", "Clearing mark bits");
+    assert(!hythread_is_suspend_enabled());
     LMAutoUnlock aulock( &(ClassLoader::m_tableLock) );
     ClassTable::iterator cti;
     for(unsigned i = 0; i < m_nextEntry; i++) {
@@ -698,6 +699,7 @@ Class* ClassLoader::StartLoadingClass(Global_Env* UNREF env, const String* class
 void ClassLoader::FailedLoadingClass(const String* className)
 {
     LOG2("classloader", "Failed loading class " << className << " with loader " << this);
+    tmn_suspend_disable();
     LMAutoUnlock aulock( &m_lock );
 
     LoadingClass* lc = m_loadingClasses->Lookup(className);
@@ -706,6 +708,8 @@ void ClassLoader::FailedLoadingClass(const String* className)
         RemoveLoadingClass(className, lc);
     }
     RemoveFromReported(className);
+    aulock.ForceUnlock();
+    tmn_suspend_enable();
 }
 
 
@@ -1714,6 +1718,7 @@ bool ClassLoader::InsertClass(Class* clss)
         }
     }
 
+    tmn_suspend_disable();
     LMAutoUnlock aulock(&m_lock);
     m_loadedClasses->Insert(clss->get_name(), clss);
     if (!IsBootstrap()){
@@ -1721,6 +1726,8 @@ bool ClassLoader::InsertClass(Class* clss)
     }
     
     m_initiatedClasses->Insert(clss->get_name(), clss);
+    aulock.ForceUnlock();
+    tmn_suspend_enable();
     return true;
 }
 
