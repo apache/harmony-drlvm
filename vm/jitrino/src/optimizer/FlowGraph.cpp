@@ -113,7 +113,7 @@ FlowGraph::tailDuplicate(IRManager& irm, Node* pred, Node* tail, DefUseBuilder& 
     return copy;
 }
 
-static Node* duplicateNode(IRManager& irm, Node *source, Node *before, OpndRenameTable *renameTable) {
+Node* FlowGraph::duplicateNode(IRManager& irm, Node *source, Node *before, OpndRenameTable *renameTable) {
     Node *newblock;
     LabelInst *first = (LabelInst*)source->getFirstInst();
     if(Log::isEnabled()) {
@@ -150,8 +150,9 @@ static Node* duplicateNode(IRManager& irm, Node *source, Node *before, OpndRenam
 }
 
 
-static Node* duplicateNode(IRManager& irm, Node *node, StlBitVector* nodesInRegion, 
-                           DefUseBuilder* defUses, OpndRenameTable* opndRenameTable) 
+Node* FlowGraph::duplicateNode(IRManager& irm, Node *node, StlBitVector* nodesInRegion, 
+                           DefUseBuilder* defUses, OpndRenameTable* opndRenameTable,
+                           NodeRenameTable* reverseNodeRenameTable) 
 {
     if(Log::isEnabled()) {
         Log::out() << "DUPLICATE NODE " << std::endl;
@@ -167,6 +168,7 @@ static Node* duplicateNode(IRManager& irm, Node *node, StlBitVector* nodesInRegi
     LabelInst* l = (LabelInst*)instFactory.clone(first,opndManager,opndRenameTable);
     newNode  = fg.createNode(node->getKind(), l);
     l->setState(first->getState());
+    reverseNodeRenameTable->setMapping(newNode, node);
 
     // Copy edges
     const Edges& outEdges = node->getOutEdges();
@@ -189,35 +191,62 @@ static Node* duplicateNode(IRManager& irm, Node *node, StlBitVector* nodesInRegi
             Log::out().flush();
         }
 
+        // Create clone inst, add to new node, and update defuse links.
+        Inst* newInst = instFactory.clone(inst,opndManager,opndRenameTable);
+        
+        // Special care required for SSA operands.
         Opnd* dst = inst->getDst();
         if(dst->isSsaOpnd()) {
-            assert(!dst->isSsaVarOpnd());
-
-            //
             // Determine if dst should be promoted to a var.
-            //
-            ConstInst* ci = inst->asConstInst();
-            VarOpnd* var = NULL;
-            DefUseLink* duLink = defUses->getDefUseLinks(inst);
-            for(; duLink != NULL; duLink = duLink->getNext()) {
+            Opnd* var = NULL;
+            SsaVarOpnd* srcVar1 = NULL;
+            SsaVarOpnd* srcVar2 = NULL;
+            DefUseLink* duLink = NULL;
+
+            for(duLink = defUses->getDefUseLinks(inst); duLink != NULL; duLink = duLink->getNext()) {
+                int index = duLink->getSrcIndex();
                 Inst* useInst = duLink->getUseInst();
+                Node* useNode = useInst->getNode();
+                assert(useNode != NULL);
+                
                 if(Log::isEnabled()) {
                     Log::out() << "Examine use: ";
                     useInst->print(Log::out());
                     Log::out() << std::endl;
                 }
-                Node* useNode = useInst->getNode();
-                assert(useNode != NULL);
-                if(!nodesInRegion->getBit(useNode->getId())) {
-                    //
-                    // Need to promote dst.
-                    //
+                
+                // No special actions for nodes to be clonned.
+                if (nodesInRegion->getBit(useNode->getId())) continue;
+
+                // Handle variables.
+                if (dst->isSsaVarOpnd()) {
+                    defUses->removeDefUse(inst, useInst, index);
+                    // Handle cyclic dependence.
+                    if (reverseNodeRenameTable->getMapping(useNode) != NULL) {
+                        // There is already phi insturction.
+                        // Just update source operand.
+                        useInst->setSrc(index, newInst->getDst());
+                        defUses->addDefUse(newInst, useInst, index);
+                        continue;
+                    }
+                    // Insert phi instruction.
+                    srcVar1 = inst->getDst()->asSsaVarOpnd();
+                    srcVar2 = newInst->getDst()->asSsaVarOpnd();
+                    StlBitVector visitedNodes = StlBitVector(irm.getMemoryManager(), fg.getMaxNodeId(), false); 
+                    Inst* phiInst = insertPhi(irm, nodesInRegion, reverseNodeRenameTable,
+                        visitedNodes, useNode, defUses, srcVar1, srcVar2);
+                    useInst->setSrc(index, phiInst->getDst());
+                    defUses->addDefUse(phiInst, useInst, index);                    
+                } else {
+                    assert(!dst->isVarOpnd() && !dst->isSsaVarOpnd());
+                    // Need to promote dst to variable.
                     if(Log::isEnabled()) {
                         Log::out() << "Patch use: ";
                         useInst->print(Log::out());
                         Log::out() << std::endl;
                     }
                     Inst* patchdef = NULL;
+                    ConstInst* ci = inst->asConstInst();
                     if(ci != NULL) {
                         MemoryManager mm("FlowGraph::duplicateNode.mm");
                         OpndRenameTable table(mm,1);
@@ -226,7 +255,12 @@ static Node* duplicateNode(IRManager& irm, Node *node, StlBitVector* nodesInRegi
                     } else {
                         if(var == NULL) {
                             var = opndManager.createVarOpnd(dst->getType(), false);
-                            Inst* stVar = instFactory.makeStVar(var, dst);
+                            if (irm.getInSsa()) {
+                                var = opndManager.createSsaVarOpnd(var->asVarOpnd());
+                            }
+
+                            Inst* stVar = irm.getInSsa() ? instFactory.makeStVar(var->asSsaVarOpnd(), dst)
+                                : instFactory.makeStVar(var->asVarOpnd(), dst);
                             if(inst->getOperation().canThrow()) {
                                 LabelInst* lblInst = instFactory.makeLabel();
                                 assert(inst->getBCOffset()!=ILLEGAL_BC_MAPPING_VALUE);
@@ -249,29 +283,27 @@ static Node* duplicateNode(IRManager& irm, Node *node, StlBitVector* nodesInRegi
                         }
 
                         Opnd* newUse = opndManager.createSsaTmpOpnd(dst->getType());
-                        patchdef = instFactory.makeLdVar(newUse, var);
+                        patchdef = irm.getInSsa() ?  instFactory.makeLdVar(newUse, var->asSsaVarOpnd())
+                            : instFactory.makeLdVar(newUse, var->asVarOpnd());
                     }
 
                     //
                     // Patch useInst to load from var.
                     //
-                    uint32 srcNum = duLink->getSrcIndex();
                     patchdef->insertBefore(useInst);
                     defUses->addUses(patchdef);
-                    useInst->setSrc(srcNum, patchdef->getDst());
+                    useInst->setSrc(index, patchdef->getDst());
 
                     //
                     // Update def-use chains.
                     //
-                    defUses->removeDefUse(inst, useInst, srcNum);
-                    defUses->addDefUse(patchdef, useInst, srcNum);
+                    defUses->removeDefUse(inst, useInst, index);
+                    defUses->addDefUse(patchdef, useInst, index);
                 }
             }
         }
-
-        // Create clone inst, add to new node, and update defuse links.
-        Inst* newInst = instFactory.clone(inst,opndManager,opndRenameTable);
-        newNode->appendInst(newInst);
+        
+        newNode->appendInst(newInst);        
         defUses->addUses(newInst);
     }
     if(Log::isEnabled()) {
@@ -281,15 +313,82 @@ static Node* duplicateNode(IRManager& irm, Node *node, StlBitVector* nodesInRegi
     return newNode;
 }
 
+Inst* FlowGraph::insertPhi(IRManager& irm, StlBitVector* nodesInRegion,
+                           NodeRenameTable* reverseNodeRenameTable,
+                           StlBitVector& visitedNodes,
+                           Node* useNode, DefUseBuilder* defUses,
+                           SsaVarOpnd* srcVar1, SsaVarOpnd* srcVar2) {
+    Inst* phiInst = NULL;
+    std::set<SsaVarOpnd*> phiOpnds;
+    
+    // Check if we already visited this node.
+    if (visitedNodes.getBit(useNode->getId())) {
+        return NULL;
+    }
+    
+    // Mark node as visited.
+    visitedNodes.setBit(useNode->getId(), true);
+    
+    // Find in values throug all eges.
+    const Edges& inEdges = useNode->getInEdges();
+    for (Edges::const_iterator it = inEdges.begin(), end = inEdges.end(); it != end; it++) {
+        Edge* inEdge = *it;
+        if (nodesInRegion->getBit(inEdge->getSourceNode()->getId())) {
+            phiOpnds.insert(phiOpnds.end(), srcVar1);
+            phiOpnds.insert(phiOpnds.end(), srcVar2);            
+        } else if (!reverseNodeRenameTable->getMapping(inEdge->getSourceNode())){
+            Inst* phi = insertPhi(irm, nodesInRegion, reverseNodeRenameTable,
+                visitedNodes, inEdge->getSourceNode(), defUses, srcVar1, srcVar2);
+            if (phi != NULL) {
+                phiOpnds.insert(phiOpnds.end(), phi->getDst()->asSsaVarOpnd());
+            }
+        }
+    }
+    
+    // Merge input values.
+    if (phiOpnds.size() == 1) {
+        phiInst = (*phiOpnds.begin())->getInst();
+    } else if (phiOpnds.size() > 1) {
+        Opnd** opnds = (Opnd**)irm.getMemoryManager().alloc(sizeof(Opnd*) * phiOpnds.size()); 
+        std::copy(phiOpnds.begin(), phiOpnds.end(), opnds);
+        phiInst = findPhi(useNode, opnds, phiOpnds.size());
+        if (phiInst == NULL) {
+            SsaVarOpnd* dst = irm.getOpndManager().createSsaVarOpnd(srcVar1->getVar());
+            phiInst = irm.getInstFactory().makePhi(dst, phiOpnds.size(), opnds);
+            useNode->prependInst(phiInst);
+            defUses->addUses(phiInst);
+        }
+    }
+    return phiInst;
+}
 
+Inst* FlowGraph::findPhi(Node* node, Opnd** opnds, int opndsCount) {
+    
+    for (Inst* inst = (Inst*)node->getFirstInst(); inst != NULL; inst = inst->getNextInst()) {        
+        if (inst->getOpcode() == Op_Phi && inst->getNumSrcOperands() == (uint32)opndsCount) {
+            for (int i = 0; i < opndsCount; i++) {
+                if (inst->getSrc(i) != opnds[i]) {
+                    break;
+                }
+                return inst;
+            }
+        }
+    }
+    return NULL;
+}
 
-static Node* _duplicateRegion(IRManager& irm, Node* node, Node* entry, StlBitVector& nodesInRegion, DefUseBuilder* defUses, NodeRenameTable* nodeRenameTable, OpndRenameTable* opndRenameTable) {
+Node* FlowGraph::_duplicateRegion(IRManager& irm, Node* node, Node* entry,
+                              StlBitVector& nodesInRegion,
+                              DefUseBuilder* defUses,
+                              NodeRenameTable* nodeRenameTable,
+                              NodeRenameTable* reverseNodeRenameTable,
+                              OpndRenameTable* opndRenameTable) {
     assert(nodesInRegion.getBit(node->getId()));
     Node* newNode = nodeRenameTable->getMapping(node);
     if(newNode != NULL)
         return newNode;
 
-    newNode = duplicateNode(irm, node, &nodesInRegion, defUses, opndRenameTable);
+    newNode = duplicateNode(irm, node, &nodesInRegion, defUses, opndRenameTable, reverseNodeRenameTable);
     nodeRenameTable->setMapping(node, newNode);
 
     ControlFlowGraph& fg = irm.getFlowGraph();
@@ -298,9 +397,13 @@ static Node* _duplicateRegion(IRManager& irm, Node* node, Node* entry, StlBitVec
     for(eiter = outEdges.begin(); eiter != outEdges.end(); ++eiter) {
         Edge* edge = *eiter;
         Node* succ = edge->getTargetNode();
-        if(succ != entry && nodesInRegion.getBit(succ->getId())) {
-            Node* newSucc = _duplicateRegion(irm, succ, entry, nodesInRegion, defUses, nodeRenameTable, opndRenameTable);
-            assert(newSucc != NULL);
+        if(nodesInRegion.getBit(succ->getId())) {
+            Node* newSucc = nodeRenameTable->getMapping(succ); 
+            if (newSucc == NULL) {
+                newSucc = _duplicateRegion(irm, succ, entry, nodesInRegion,
+                    defUses, nodeRenameTable, reverseNodeRenameTable, opndRenameTable);
+                assert(newSucc != NULL);
+            }
             fg.replaceEdgeTarget(newNode->findTargetEdge(succ), newSucc, true);
         }
     }    
@@ -309,8 +412,16 @@ static Node* _duplicateRegion(IRManager& irm, Node* node, Node* entry, StlBitVec
 }
 
 
-Node* FlowGraph::duplicateRegion(IRManager& irm, Node* entry, StlBitVector& nodesInRegion, DefUseBuilder& defUses, NodeRenameTable& nodeRenameTable, OpndRenameTable& opndRenameTable, double newEntryFreq) {
-    Node* newEntry = _duplicateRegion(irm, entry, entry, nodesInRegion, &defUses, &nodeRenameTable, &opndRenameTable);
+Node* FlowGraph::duplicateRegion(IRManager& irm, Node* entry,
+                                 StlBitVector& nodesInRegion,
+                                 DefUseBuilder& defUses,
+                                 NodeRenameTable& nodeRenameTable,                                 
+                                 OpndRenameTable& opndRenameTable,
+                                 double newEntryFreq) {
+    NodeRenameTable* reverseNodeRenameTable = new (irm.getMemoryManager()) 
+        NodeRenameTable(irm.getMemoryManager(), nodesInRegion.size());     
+    Node* newEntry = _duplicateRegion(irm, entry, entry, nodesInRegion,
+        &defUses, &nodeRenameTable, reverseNodeRenameTable, &opndRenameTable);
     if(newEntryFreq == 0) {
         return newEntry;
     }
@@ -330,8 +441,8 @@ Node* FlowGraph::duplicateRegion(IRManager& irm, Node* entry, StlBitVector& node
 Node* FlowGraph::duplicateRegion(IRManager& irm, Node* entry, StlBitVector& nodesInRegion, DefUseBuilder& defUses, double newEntryFreq) {
     MemoryManager dupMemManager("FlowGraph::duplicateRegion.dupMemManager");
     // prepare the hashtable for the operand rename translation
-    OpndRenameTable    *opndRenameTable = new (dupMemManager) OpndRenameTable(dupMemManager,10);
-    NodeRenameTable *nodeRenameTable = new (dupMemManager) NodeRenameTable(dupMemManager,10);
+    OpndRenameTable    *opndRenameTable = new (dupMemManager) OpndRenameTable(dupMemManager, nodesInRegion.size());
+    NodeRenameTable *nodeRenameTable = new (dupMemManager) NodeRenameTable(dupMemManager, nodesInRegion.size());
     return duplicateRegion(irm, entry, nodesInRegion, defUses, *nodeRenameTable, *opndRenameTable, newEntryFreq);
 }
 
@@ -679,7 +790,7 @@ static void _fixBranchTargets(Inst *newInst, NodeRenameTable *nodeRenameTable) {
 }
 
 // Finally inlining
-static bool _inlineFinally(IRManager& irm, Node *from, Node *to, Node *retTarget,
+bool FlowGraph::_inlineFinally(IRManager& irm, Node *from, Node *to, Node *retTarget,
                             NodeRenameTable *nodeRenameTable,
                             OpndRenameTable *opndRenameTable) {
     // if the node has been visited, return
@@ -721,7 +832,7 @@ static bool _inlineFinally(IRManager& irm, Node *from, Node *to, Node *retTarget
 }
 
 
-static bool inlineFinally(IRManager& irm, Node *block) {
+bool FlowGraph::inlineFinally(IRManager& irm, Node *block) {
     ControlFlowGraph& fg = irm.getFlowGraph();
     BranchInst* leaveInst  = (BranchInst*)block->getLastInst();
     Node *   retTarget  = leaveInst->getTargetLabel()->getNode();

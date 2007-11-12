@@ -384,8 +384,6 @@ void LoopBuilder::peelLoops(StlVector<Edge*>& loopEdgesIn) {
 
     // Set def-use chains
     MemoryManager peelmem("LoopBuilder::peelLoops.peelmem");
-    DefUseBuilder defUses(peelmem);
-    defUses.initialize(irManager.getFlowGraph());
 
     OpndManager& opndManager = irManager.getOpndManager();
     InstFactory& instFactory = irManager.getInstFactory();
@@ -461,6 +459,8 @@ void LoopBuilder::peelLoops(StlVector<Edge*>& loopEdgesIn) {
             Opcode op2 = ((Inst*)header->getLastInst())->getOpcode();
             if(flags.invert && (op1 != Op_Branch) && (op2 != Op_Branch)) {
                 if(isInversionCandidate(originalInvertedHeader, header, nodesInLoop, next, exit)) {
+                    DefUseBuilder defUses(peelmem);
+                    defUses.initialize(fg);
                     preheader = FlowGraph::tailDuplicate(irManager, preheader, header, defUses); 
                     tail = header;
                     header = next;
@@ -538,9 +538,17 @@ void LoopBuilder::peelLoops(StlVector<Edge*>& loopEdgesIn) {
                 // Peel the nodes
                 //
                 if(newTail != NULL) {
+                    DefUseBuilder defUses(peelmem);
+                    defUses.initialize(fg);
                     Edge* entryEdge = preheader->findTargetEdge(originalInvertedHeader);
                     double peeledFreq = preheader->getExecCount() * entryEdge->getEdgeProb(); 
                     Node* peeled = FlowGraph::duplicateRegion(irManager, originalInvertedHeader, nodesToPeel, defUses, peeledFreq);
+                    assert(peeled->getInDegree() <= 1);
+                    // Break cycle and link to original loop.
+                    if (peeled->getInDegree() == 1) {
+                        fg.replaceEdgeTarget(peeled->getInEdges().front(), header);
+                    }
+                    // Link duplicated region.
                     fg.replaceEdgeTarget(entryEdge, peeled);
                     if(newTail->findTargetEdge(header) == NULL) {
                         //

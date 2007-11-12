@@ -310,7 +310,7 @@ private:
 
 class OpndRenameTable : public HashTable<Opnd,Opnd> {
 public:
-    OpndRenameTable(MemoryManager& mm, uint32 size = 16, bool renameSSA = false): 
+    OpndRenameTable(MemoryManager& mm, uint32 size = 16, bool renameSSA = true): 
         HashTable<Opnd,Opnd>(mm,size) {renameSsaOpnd = renameSSA;}
     
     virtual ~OpndRenameTable() {}    

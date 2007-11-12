@@ -85,6 +85,29 @@ public:
 
     static void printDotFile(ControlFlowGraph& cfg, MethodDesc& methodDesc,const char *suffix);
 
+private:
+    static Node* duplicateNode(IRManager& irm, Node *source, Node *before, OpndRenameTable *renameTable);
+    static Node* duplicateNode(IRManager& irm, Node *node, StlBitVector* nodesInRegion, 
+                               DefUseBuilder* defUses, OpndRenameTable* opndRenameTable,
+                               NodeRenameTable* reverseNodeRenameTable); 
+    static Node* _duplicateRegion(IRManager& irm, Node* node, Node* entry,
+                                  StlBitVector& nodesInRegion,
+                                  DefUseBuilder* defUses,
+                                  NodeRenameTable* nodeRenameTable,
+                                  NodeRenameTable* reverseNodeRenameTable,
+                                  OpndRenameTable* opndRenameTable);
+
+    static Inst* insertPhi(IRManager& irm, StlBitVector* nodesInRegion,
+                           NodeRenameTable* reverseNodeRenameTable,
+                           StlBitVector& visitedNodes,
+                           Node* useNode, DefUseBuilder* defUses,
+                           SsaVarOpnd* srcVar1, SsaVarOpnd* srcVar2);
+    static Inst* findPhi(Node* node, Opnd** opnds, int opndsCount);
+    static bool _inlineFinally(IRManager& irm, Node *from, Node *to, Node *retTarget,
+                               NodeRenameTable *nodeRenameTable,
+                               OpndRenameTable *opndRenameTable);
+    static bool inlineFinally(IRManager& irm, Node *block);
+
 };
 
 class NodeRenameTable : public HashTable<Node,Node> {

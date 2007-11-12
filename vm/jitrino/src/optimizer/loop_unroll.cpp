@@ -687,14 +687,8 @@ static void doUnroll(MemoryManager& mm, IRManager& irm, const LoopUnrollInfo* in
         defUses.initialize(cfg);
         OpndRenameTable opndRenameTable(mm, maxNodeId); //todo: maxNodeId is overkill estimate here
         NodeRenameTable nodeRenameTable(mm, maxNodeId);
-        epilogueLoopHead = FlowGraph::duplicateRegion(irm, checkNode, nodesInLoop, defUses, nodeRenameTable, opndRenameTable);        
+        epilogueLoopHead = FlowGraph::duplicateRegion(irm, checkNode, nodesInLoop, defUses, nodeRenameTable, opndRenameTable);
         cfg.replaceEdgeTarget(origLoopExitEdge, epilogueLoopHead, true);
-
-        //backedge was not duplicated -> this is a feature (Loop.cpp depends on it), find using tailNode
-        Node* newTailNode = nodeRenameTable.getMapping(preCheckNode);
-        assert(newTailNode->getOutDegree() == 1 && newTailNode->getUnconditionalEdgeTarget() == checkNode);
-        Edge* backedge = newTailNode->getUnconditionalEdge();
-        cfg.replaceEdgeTarget(backedge, epilogueLoopHead, true);
     }
 
     //STEP 5: prepare unrolledLimitOpnd and replace it in original loop's check
@@ -708,11 +702,12 @@ static void doUnroll(MemoryManager& mm, IRManager& irm, const LoopUnrollInfo* in
         info->branchInst->setSrc(info->branchLimitOpndPos, unrolledLimitOpnd);
     }
 
+    DefUseBuilder defUses(mm);
+    defUses.initialize(cfg);
     //STEP 6: unroll original loop and remove all checks in duplicated bodies
     {
         Edge* backedge = preCheckNode->getUnconditionalEdge();
         for (int i=1;i<info->unrollCount;i++) {
-            DefUseBuilder defUses(mm);
             OpndRenameTable opndRenameTable(mm, maxNodeId);
             NodeRenameTable nodeRenameTable(mm, maxNodeId);
 
@@ -722,9 +717,7 @@ static void doUnroll(MemoryManager& mm, IRManager& irm, const LoopUnrollInfo* in
             Node* newTail = nodeRenameTable.getMapping(preCheckNode);
             assert(newTail->getOutDegree()==1 );
             backedge = newTail->getUnconditionalEdge();
-            if (i>1) {
-                cfg.replaceEdgeTarget(backedge, checkNode, true);
-            }
+            cfg.replaceEdgeTarget(backedge, checkNode, true);
             
             //remove check from duplicated code
             Node* duplicateCheckNode = nodeRenameTable.getMapping(checkNode);

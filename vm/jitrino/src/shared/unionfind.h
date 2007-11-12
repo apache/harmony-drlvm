@@ -43,7 +43,7 @@ public:
             aroot->parent = broot;
         } else {
             if (aroot->rank == broot->rank) {
-                broot->rank += 1;
+                aroot->rank += 1;
             }
             broot->parent = aroot;
         }
