@@ -56,9 +56,8 @@ class BranchTranslator : public SessionAction {
 static ActionFactory<BranchTranslator> _btr("btr");
 
 static Inst* findDefInstWithMove(Inst* currentInst, Opnd* opnd) {
-    bool var = opnd->getDefScope() != Opnd::DefScope_Temporary;
-    if (var) {
-        //process only moves in current block
+    if (opnd->getDefScope() != Opnd::DefScope_Temporary) {
+        //For variables with semi-temporary or global def scope process only moves in current block
         for (Inst* inst= currentInst->getPrevInst(); inst!=NULL; inst = inst->getPrevInst()) {
             Inst::Opnds defs(inst,Inst::OpndRole_Def|Inst::OpndRole_Explicit|Inst::OpndRole_Auxilary);
             if (defs.begin()!= defs.end()) {
@@ -74,12 +73,13 @@ static Inst* findDefInstWithMove(Inst* currentInst, Opnd* opnd) {
             
         }
         return NULL; //no more defs for this var/semitemporal in the block
+    } else {
+        Inst* inst = opnd->getDefiningInst();
+        if (!inst || inst->getMnemonic()!=Mnemonic_MOV) {
+            return NULL;
+        }
+        return inst;
     }
-    Inst* inst = opnd->getDefiningInst();
-    if (!inst || inst->getMnemonic()!=Mnemonic_MOV) {
-        return NULL;
-    }
-    return inst;
 }
 
 static Opnd * getMOVsChainSource(Inst* inst, Opnd * opnd) {
@@ -212,108 +212,111 @@ BranchTranslator::runImpl()
                         Opnd * cmpOp1 = cmpInst->getOpnd(uses.begin());
                         Opnd * cmpOp2 = cmpInst->getOpnd(uses.begin()+1);
 
-                        if (cmpOp1->getDefScope() == Opnd::DefScope_Temporary) {
-                            cmpOp1 = getMOVsChainSource(cmpInst, cmpOp1);
-                            if (cmpOp1->isPlacedIn(OpndKind_Imm)) {
-                                cmpOp2 = getMOVsChainSource(cmpInst, cmpOp2);
-                                if (cmpOp2->isPlacedIn(OpndKind_Imm)) { 
-                                    //Two constants are operands of CMP inst
-                                    irManager->resolveRuntimeInfo(cmpOp1);
-                                    irManager->resolveRuntimeInfo(cmpOp2);
-                                    int64 v1 = cmpOp1->getImmValue();
-                                    int64 v2 = cmpOp2->getImmValue();
-                                    //remove "dead" edges
-                                    if (branchDirection(v1,v2,cmpOp1->getSize(),condMnem)) {
-                                        irManager->getFlowGraph()->removeEdge(bb->getFalseEdge());
-                                    } else {
-                                        irManager->getFlowGraph()->removeEdge(bb->getTrueEdge());
-                                    }
-                                    //remove CMP and Jcc instructions
-                                    inst->unlink();
-                                    cmpInst->unlink();
-                                    continue;
-                                }
+                        Opnd * propogatedOp1 = getMOVsChainSource(cmpInst, cmpOp1);
+                        Opnd * propogatedOp2 = getMOVsChainSource(cmpInst, cmpOp2);
+
+                        if (propogatedOp1->isPlacedIn(OpndKind_Imm) && propogatedOp2->isPlacedIn(OpndKind_Imm)) {
+                            //If both operands are constants we can just remove the branch
+                            irManager->resolveRuntimeInfo(propogatedOp1);
+                            irManager->resolveRuntimeInfo(propogatedOp2);
+                            //remove "dead" edges
+                            if (branchDirection(propogatedOp1->getImmValue(), 
+                                    propogatedOp2->getImmValue(), propogatedOp1->getSize(),condMnem)) {
+                                irManager->getFlowGraph()->removeEdge(bb->getFalseEdge());
+                            } else {
+                                irManager->getFlowGraph()->removeEdge(bb->getTrueEdge());
                             }
-                        } 
-                        cmpOp1 = getMOVsChainSource(cmpInst, cmpOp1);
-                        if (cmpOp1->getDefScope() == Opnd::DefScope_Variable) {
-                            if(loopHeaders[bb])
-                                continue;
-                            cmpOp2 = getMOVsChainSource(cmpInst, cmpOp2);
-                            if (cmpOp2->isPlacedIn(OpndKind_Imm)) {
-                                if (cmpInst->getPrevInst()== NULL) { //no other side effects in node except branching
-                                    StlMap<Edge *, Opnd *> defInsts(irManager->getMemoryManager());
-                                    mapDefsPerEdge(defInsts, bb, cmpOp1);
-                                    for (StlMap<Edge *, Opnd *>::iterator eit = defInsts.begin(); eit != defInsts.end(); eit++) {
-                                        Edge * edge = eit->first;
-                                        Opnd * opnd = eit->second;
-                                        if (opnd == NULL || !opnd->isPlacedIn(OpndKind_Imm)) {
-                                            continue; //can't retarget this edge -> var is not a const
-                                        }
-                                        if (branchDirection(opnd->getImmValue(), cmpOp2->getImmValue(),cmpOp1->getSize(),condMnem)) {
-                                            irManager->getFlowGraph()->replaceEdgeTarget(edge, trueBB, true);
-                                        } else {
-                                            irManager->getFlowGraph()->replaceEdgeTarget(edge, falseBB, true);
-                                        }
-                                        for(Inst * copy = (Inst *)bb->getFirstInst();copy!=NULL; copy=copy->getNextInst()) {
-                                            if (copy != inst && copy !=cmpInst) {
-                                                Node * sourceBB = edge->getSourceNode();
-                                                Inst * lastInst = (Inst*)sourceBB->getLastInst();
-                                                Inst * newInst = copy->getKind() == Inst::Kind_I8PseudoInst?
-                                                    irManager->newI8PseudoInst(Mnemonic_MOV,1,copy->getOpnd(0),copy->getOpnd(1)):
-                                                    irManager->newCopyPseudoInst(Mnemonic_MOV,copy->getOpnd(0),copy->getOpnd(1));
-                                                if (lastInst->getKind()== Inst::Kind_BranchInst) {
-                                                    //WAS: sourceBB->prependInst(newInst, lastInst);
-                                                    //create new block instead of prepending to branchInst
-                                                    //some algorithms like I8Lowerer are very sensitive to CMP/JCC pattern
-                                                    //and fails if any inst is inserted between CMP and JCC
-                                                    irManager->getFlowGraph()->spliceBlockOnEdge(edge, newInst, true);
-                                                } else {
-                                                    sourceBB->appendInst(newInst);
-                                                }
+                            //remove CMP and Jcc instructions
+                            inst->unlink();
+                            cmpInst->unlink();
+                            continue;
+                        } else if (cmpOp1->getDefScope() != Opnd::DefScope_Temporary) {
+                            //The following optimizations works correctly only if variables 
+                            //propagation was done within single basic block (i.e. only for variables 
+                            //with semi-temporary or global def scope).
+                            if (propogatedOp1->getDefScope() == Opnd::DefScope_Variable 
+                                    && cmpOp2->isPlacedIn(OpndKind_Imm) && cmpInst->getPrevInst()== NULL) {
+                                //If first operand is variable and second is const and no side effects are 
+                                //done in the current basic block we still can try to make some optimizations.
+                                //All the assignments to first operands in previous block(s) are propagated
+                                //and in case if it was assigned to constant blocks are merged and conditional 
+                                //jump removed with single branch.
+                                if(loopHeaders[bb])
+                                    continue;
+
+                                assert(cmpOp1->getDefScope() != Opnd::DefScope_Temporary);
+                                StlMap<Edge *, Opnd *> defInsts(irManager->getMemoryManager());
+                                mapDefsPerEdge(defInsts, bb, propogatedOp1);
+                                for (StlMap<Edge *, Opnd *>::iterator eit = defInsts.begin(); eit != defInsts.end(); eit++) {
+                                    Edge * edge = eit->first;
+                                    Opnd * opnd = eit->second;
+                                    if (opnd == NULL || !opnd->isPlacedIn(OpndKind_Imm)) {
+                                        continue; //can't retarget this edge -> var is not a const
+                                    }
+                                    if (branchDirection(opnd->getImmValue(), cmpOp2->getImmValue(),cmpOp1->getSize(),condMnem)) {
+                                        irManager->getFlowGraph()->replaceEdgeTarget(edge, trueBB, true);
+                                    } else {
+                                        irManager->getFlowGraph()->replaceEdgeTarget(edge, falseBB, true);
+                                    }
+                                    for(Inst * copy = (Inst *)bb->getFirstInst();copy!=NULL; copy=copy->getNextInst()) {
+                                        if (copy != inst && copy !=cmpInst) {
+                                            Node * sourceBB = edge->getSourceNode();
+                                            Inst * lastInst = (Inst*)sourceBB->getLastInst();
+                                            Inst * newInst = copy->getKind() == Inst::Kind_I8PseudoInst?
+                                                irManager->newI8PseudoInst(Mnemonic_MOV,1,copy->getOpnd(0),copy->getOpnd(1)):
+                                                irManager->newCopyPseudoInst(Mnemonic_MOV,copy->getOpnd(0),copy->getOpnd(1));
+                                            if (lastInst->getKind()== Inst::Kind_BranchInst) {
+                                                //WAS: sourceBB->prependInst(newInst, lastInst);
+                                                //create new block instead of prepending to branchInst
+                                                //some algorithms like I8Lowerer are very sensitive to CMP/JCC pattern
+                                                //and fails if any inst is inserted between CMP and JCC
+                                                irManager->getFlowGraph()->spliceBlockOnEdge(edge, newInst, true);
+                                            } else {
+                                                sourceBB->appendInst(newInst);
                                             }
                                         }
                                     }
                                 }
-                            }
-                        } else if (cmpOp1->getDefScope() == Opnd::DefScope_SemiTemporary) {
-                            //TODO: merge DefScope_SemiTemporary & DefScope_Variable if-branches
+                            } else if (propogatedOp1->getDefScope() == Opnd::DefScope_SemiTemporary) {
+                                //TODO: merge DefScope_SemiTemporary & DefScope_Variable if-branches
 
-                            //try to reduce ObjMonitorEnter pattern
-                            Inst * defInst = cmpInst;
-                            bool stopSearch = false;
-                            //look for Mnemonic_SETcc def for cmpOp1 in the current block (it has SemiTemporary kind)
-                            while (1) {
-                                defInst = defInst->getPrevInst();
-                                if (defInst == NULL) {
-                                    break;
-                                }
-                                Inst::Opnds defs(defInst,Inst::OpndRole_Def|Inst::OpndRole_Explicit|Inst::OpndRole_Auxilary);
-                                for (Inst::Opnds::iterator ito = defs.begin(); ito != defs.end(); ito = defs.next(ito)){
-                                    Opnd * opnd = defInst->getOpnd(ito);
-                                    if (opnd == cmpOp1) {
-                                        Mnemonic mnem = getBaseConditionMnemonic(defInst->getMnemonic());
-                                        ConditionMnemonic cm = ConditionMnemonic(defInst->getMnemonic()-mnem);
-                                        if (mnem == Mnemonic_SETcc && cmpOp2->isPlacedIn(OpndKind_Imm) && cmpOp2->getImmValue() == 0) {
-                                            if(cm == (inst->getMnemonic()- getBaseConditionMnemonic(inst->getMnemonic()))) {
-                                                defInst->unlink();
-                                                cmpInst->unlink();
-                                                inst->unlink();
-                                                bb->appendInst(irManager->newBranchInst((Mnemonic)(Mnemonic_Jcc+reverseConditionMnemonic(cm)),((BranchInst*)inst)->getTrueTarget(),((BranchInst*)inst)->getFalseTarget()));
+                                assert(cmpOp1->getDefScope() != Opnd::DefScope_Temporary);
+                                //try to reduce ObjMonitorEnter pattern
+                                Inst * defInst = cmpInst;
+                                bool stopSearch = false;
+                                //look for Mnemonic_SETcc def for cmpOp1 in the current block (it has SemiTemporary kind)
+                                while (1) {
+                                    defInst = defInst->getPrevInst();
+                                    if (defInst == NULL) {
+                                        break;
+                                    }
+                                    Inst::Opnds defs(defInst,Inst::OpndRole_Def|Inst::OpndRole_Explicit|Inst::OpndRole_Auxilary);
+                                    for (Inst::Opnds::iterator ito = defs.begin(); ito != defs.end(); ito = defs.next(ito)){
+                                        Opnd * opnd = defInst->getOpnd(ito);
+                                        if (opnd == cmpOp1) {
+                                            Mnemonic mnem = getBaseConditionMnemonic(defInst->getMnemonic());
+                                            ConditionMnemonic cm = ConditionMnemonic(defInst->getMnemonic()-mnem);
+                                            if (mnem == Mnemonic_SETcc && cmpOp2->isPlacedIn(OpndKind_Imm) && cmpOp2->getImmValue() == 0) {
+                                                if(cm == (inst->getMnemonic()- getBaseConditionMnemonic(inst->getMnemonic()))) {
+                                                    defInst->unlink();
+                                                    cmpInst->unlink();
+                                                    inst->unlink();
+                                                    bb->appendInst(irManager->newBranchInst((Mnemonic)(Mnemonic_Jcc+reverseConditionMnemonic(cm)),((BranchInst*)inst)->getTrueTarget(),((BranchInst*)inst)->getFalseTarget()));
+                                                    stopSearch = true;
+                                                    break;
+                                                } 
+                                            } else {
                                                 stopSearch = true;
                                                 break;
-                                            } 
-                                        } else {
-                                            stopSearch = true;
-                                            break;
+                                            }
                                         }
                                     }
+                                    Inst::Opnds flags(defInst,Inst::OpndRole_Def|Inst::OpndRole_Implicit);
+                                    if (stopSearch || ((flags.begin() != flags.end()) && defInst->getOpnd(flags.begin())->getRegName() == RegName_EFLAGS))                                     
+                                        break;
                                 }
-                                Inst::Opnds flags(defInst,Inst::OpndRole_Def|Inst::OpndRole_Implicit);
-                                if (stopSearch || ((flags.begin() != flags.end()) && defInst->getOpnd(flags.begin())->getRegName() == RegName_EFLAGS))                                     
-                                    break;
+                                continue;
                             }
-                            continue;
                         }
                     }
                     //****end check for constants comparison****
