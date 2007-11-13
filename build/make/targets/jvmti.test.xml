@@ -142,6 +142,7 @@
                     <or>
                         <equals arg1="@{mode}" arg2="int" />
                         <isset property="is.x86"/>
+                        <isset property="is.x86_64"/>
                     </or>
                     <then>
                         <antcall target="run-jvmti-tests" > 
