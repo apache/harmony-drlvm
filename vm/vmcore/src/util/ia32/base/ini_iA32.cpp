@@ -55,6 +55,7 @@ typedef double (*DoubleFuncPtr)(uint32* args, int args_size, void* func);
 typedef ManagedObject* (*RefFuncPtr)(uint32* args, int args_size, void* func);
 typedef float (*FloatFuncPtr)(uint32* args, int args_size, void* func);
 typedef int32 (*IntFuncPtr)(uint32* args, int args_size, void* func);
+typedef int64 (*LongFuncPtr)(uint32* args, int args_size, void* func);
 
 static IntFuncPtr gen_invoke_managed_func() {
     static IntFuncPtr func = NULL;
@@ -275,7 +276,7 @@ JIT_execute_method_default(JIT_Handle jit, jmethodID methodID, jvalue *return_va
             break;
 
         case JAVA_TYPE_LONG:
-            resultPtr->j = ((IntFuncPtr)invoke_managed_func)(arg_words, argId, meth_addr);
+            resultPtr->j = ((LongFuncPtr)invoke_managed_func)(arg_words, argId, meth_addr);
             break;
 
         case JAVA_TYPE_DOUBLE:
