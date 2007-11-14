@@ -123,6 +123,18 @@ void CodeGen::gen_modification_watchpoint(JavaByteCodes opcode, jtype jt, Field_
     //JVMTI helper takes field handle, method handle, byte code location, pointer
     //to reference for fields or NULL for statics, pointer to field value
 
+#ifndef _EM64T_
+    // Workaround since do_mov do not put jlong on stack in gen_args on ia32
+    const CallSig cs_ti_fmodif(CCONV_HELPERS, jobj, jobj, i32, i32, jobj, jobj);
+    Val vlocation((jlong)m_pc);
+    Val vlocationHi((jlong)0);
+#else
+    const CallSig cs_ti_fmodif(CCONV_HELPERS, jobj, jobj, i64, jobj, jobj);
+    Val vlocation((jlong)m_pc);
+#endif
+
+    rlock(cs_ti_fmodif);
+
     AR fieldValBaseAr = valloc(jobj);
     Val fieldValPtr = Val(jobj, fieldValBaseAr);
     rlock(fieldValPtr);
@@ -141,17 +153,6 @@ void CodeGen::gen_modification_watchpoint(JavaByteCodes opcode, jtype jt, Field_
         Opnd stackTop(jobj, m_base, voff(m_stack.unused()));
         lea(fieldValPtr.as_opnd(), stackTop);
     }
-    runlock(fieldValPtr);
-
-#ifndef _EM64T_
-    // Workaround since do_mov do not put jlong on stack in gen_args on ia32
-    const CallSig cs_ti_fmodif(CCONV_HELPERS, jobj, jobj, i32, i32, jobj, jobj);
-    Val vlocation((jlong)m_pc);
-    Val vlocationHi((jlong)0);
-#else
-    const CallSig cs_ti_fmodif(CCONV_HELPERS, jobj, jobj, i64, jobj, jobj);
-    Val vlocation((jlong)m_pc);
-#endif
 
     Val vfield(jobj, fld);
     Val vmeth(jobj, m_method);
@@ -173,9 +174,10 @@ void CodeGen::gen_modification_watchpoint(JavaByteCodes opcode, jtype jt, Field_
     gen_gc_stack(-1, true);
 
     // 3. Call VM
-    rlock(cs_ti_fmodif);
     AR gr = valloc(jobj);
     call( is_set(DBG_CHECK_STACK), gr, rt_helper_ti_field_modification, cs_ti_fmodif, cs_ti_fmodif.count());
+
+    runlock(fieldValPtr);
     runlock(cs_ti_fmodif);
     
     //Restore operand stack state and scratch registers
