@@ -20,8 +20,12 @@
  */
 
 #include <sys/types.h>
+#if defined(LINUX)
 #include <linux/unistd.h>
 #include <errno.h>
+#else
+#include <unistd.h>
+#endif
 #include <stdio.h>
 #include <semaphore.h>
 
@@ -56,6 +60,7 @@ bool is_gdb_crash_handler_enabled()
     return get_boolean_property("vm.crash_handler", FALSE, VM_PROPERTIES);
 }
 
+#if defined(LINUX)
 #ifdef _syscall0
 _syscall0(pid_t, gettid)
 pid_t gettid(void);
@@ -64,6 +69,7 @@ static pid_t gettid(void)
 {
     return (pid_t)syscall(__NR_gettid);
 }
+#endif
 #endif
 
 bool gdb_crash_handler()
@@ -75,10 +81,10 @@ bool gdb_crash_handler()
     static const int tid_len = 10;
     char tid[tid_len];
     snprintf(tid, tid_len, "%d",
-#if defined(FREEBSD)
-        getpid()
-#else
+#if defined(LINUX)
         gettid()
+#else
+        getpid()
 #endif
 	);
 
