@@ -74,7 +74,13 @@ bool gdb_crash_handler()
 
     static const int tid_len = 10;
     char tid[tid_len];
-    snprintf(tid, tid_len, "%d", gettid());
+    snprintf(tid, tid_len, "%d",
+#if defined(FREEBSD)
+        getpid()
+#else
+        gettid()
+#endif
+	);
 
     if (fork() == 0)
     {
