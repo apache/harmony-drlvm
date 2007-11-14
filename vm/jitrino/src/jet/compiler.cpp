@@ -421,9 +421,6 @@ JIT_Result Compiler::compile(Compile_Handle ch, Method_Handle method,
     for (BBMAP::iterator i=m_bbs.begin(); i != m_bbs.end(); i++, c++) {
         m_bbStates[i->first] = &allStates[c];
     }
-    m_bbStates[0]->jframe.init(m_infoBlock.get_stack_max(),
-                                m_infoBlock.get_num_locals());
-    
     // Generate the whole code - will recursively generate all the 
     // reachable code, except the exception handlers ...
     comp_gen_code_bb(0);

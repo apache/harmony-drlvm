@@ -95,6 +95,8 @@ public:
      */
     void    init(unsigned stack_max, unsigned var_slots)
     {
+        assert(m_stack == NULL && m_vars == NULL);
+
         max_stack = stack_max;
         num_locals = var_slots;
         m_stack = new Val[max_stack+1];
