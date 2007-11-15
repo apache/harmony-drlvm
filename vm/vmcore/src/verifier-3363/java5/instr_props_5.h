@@ -100,12 +100,14 @@ namespace CPVerifier_5 {
         }
 
         //pass1: 00 - new (or dead code), 01 - parsed, 10 - middle of instruction, 11 - 'special' parsed (special == has stackmap)
+        //when we calculate stackmaps, we set lower bit to 1 after the first pass
         //set mask to 11
         void setMultiway(Address instr) {
             fill_mask(instr, 3);
         }
 
         //pass2: 01 - new, 11 - special, 00 - passed (or unused), 10 - special passed (or unused)
+        //when we calculate stackmaps: 01 - beginning of new or dead, 11 - special or middle, 00 passed, 10 special passed
         //for all instructions (except unuzed) returns 1 if it's 'passed' or 'special passed'
         //return 0 otherwise
         int isDataflowPassed(Address instr) {
@@ -122,6 +124,13 @@ namespace CPVerifier_5 {
             clear_mask(instr, 1);
         }
 
+        void touchDeadAndMiddles(Address instr) {
+            fill_mask(instr, 1);
+        }
+
+        int isDeadCodeStart(Address instr) { //dead block begins with 01, middles are 11, ends with 10 or 00
+            return (get_dirty_mask(instr) & 3) == 1;
+        }
     };
 } // namespace CPVerifier
 

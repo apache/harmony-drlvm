@@ -94,6 +94,10 @@ namespace CPVerifier {
             return get_type(type_name, (int)strlen(type_name) );
         }
 
+        SmConstant get_ref_type(const char *type_name) {
+            return get_ref_type(type_name, (int)strlen(type_name) );
+        }
+
         int mustbe_assignable(SmConstant from, SmConstant to);
         int ref_mustbe_assignable(SmConstant from, SmConstant to);
 

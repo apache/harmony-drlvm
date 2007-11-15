@@ -39,7 +39,9 @@ namespace CPVerifier_5 {
     class vf_Context_5 : public vf_Context_x<vf_Context_5, WorkmapElement, _WorkmapElement, StackmapElement> {
     public:
         vf_Context_5(SharedClasswideData &classwide) :
-          vf_Context_x<vf_Context_5, WorkmapElement, _WorkmapElement, StackmapElement>(classwide) {}
+          vf_Context_x<vf_Context_5, WorkmapElement, _WorkmapElement, StackmapElement>(classwide) {
+              stackmapattr_calculation = false;
+          }
 
           vf_Result verify_method(method_handler method);
     protected:
@@ -55,18 +57,30 @@ namespace CPVerifier_5 {
         //we would like to flush StackMapTable attribute from this method
         bool      stackmapattr_calculation;
 
+        void mark_stackmap_point(Address target) {
+            //in case we prepare for flushing stackmaptable attrribute
+            //make sure we avoid optimization and mark all targets as multiway
+            if( stackmapattr_calculation ) stack.push(target);
+        }
+
+        void touch_remaining_dead_code() {
+            if( stackmapattr_calculation ) {
+                for( Address i = 0; i < m_code_length; i++ ) {
+                    // for masks 00 set them to 01
+                    props.touchDeadAndMiddles(i);
+                }
+            }
+        }
+
         static const short MARK_SUBROUTINE_DONE = -1;
 
         //init method-wide data
-        void init(method_handler _m_method, bool _stackmapattr_calculation = 0) {
+        void init(method_handler _m_method) {
             vf_Context_x<vf_Context_5, WorkmapElement, _WorkmapElement, StackmapElement>::init(_m_method);
             stack.init();
             dead_code_stack.init();
 
             props.init(mem, m_code_length);
-
-            //we would like to flush StackMapTable attribute from this method
-            stackmapattr_calculation = _stackmapattr_calculation;
         }
 
         // load derived types previously stored for the given instruction

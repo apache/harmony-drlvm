@@ -18,6 +18,7 @@
  * @author Mikhail Loenko, Vladimir Molotkov
  */  
 
+#include "verifier.h"
 #include "context_5.h"
 namespace CPVerifier_5 {
 
@@ -112,6 +113,8 @@ namespace CPVerifier_5 {
                 if( target >= m_code_length || props.isOperand(target) ) {
                     return error(VF_ErrorBranch, "jump out of method or to the middle of an instruction");
                 }
+                
+                mark_stackmap_point(target);
 
                 if( instr_direct(pi, opcode, m_bytecode, instr) ) {
                     //TODO: though the spec does not require to check the dead code for correctness
@@ -141,6 +144,8 @@ namespace CPVerifier_5 {
                 Address target = instr + read_int32(m_bytecode + next_target_adr);
                 stack.push(target);
 
+                mark_stackmap_point(target);
+
                 // in tableswitch instruction target offsets are stored with shift = 4,
                 // in lookupswitch with shift = 8
                 int shift = (opcode == OP_TABLESWITCH) ? 4 : 8;
@@ -156,6 +161,7 @@ namespace CPVerifier_5 {
                     }
                     // process conditional jump target
                     stack.push(target);
+                    mark_stackmap_point(target);
                 }
 
                 return VF_OK;
@@ -454,6 +460,7 @@ namespace CPVerifier_5 {
             }
         } while (!stack.is_empty());
 
+        touch_remaining_dead_code();
 
 
         for( idx = 0; idx < m_handlecount; idx++ ) {
