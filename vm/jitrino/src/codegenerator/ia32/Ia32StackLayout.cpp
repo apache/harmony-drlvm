@@ -137,10 +137,17 @@ protected:
     StackInfo * stackInfo;
 
     MemoryManager memoryManager;
-
+    
+    static const int alignmentSequenceSize = 4; 
+    static Opnd::MemOpndAlignment const alignmentSequence[4];
 };
 
 static ActionFactory<StackLayouter> _stack("stack");
+Opnd::MemOpndAlignment const StackLayouter::alignmentSequence[] =
+    { Opnd::MemOpndAlignment_16, Opnd::MemOpndAlignment_8,
+      Opnd::MemOpndAlignment_4, Opnd::MemOpndAlignment_Any
+     };
+
 
 
 StackLayouter::StackLayouter ()
@@ -228,30 +235,28 @@ static void insertSOECheck(IRManager& irm, uint32 maxStackUsedByMethod) {
 
 void StackLayouter::runImpl()
 {
-    IRManager & irm=getIRManager();
+    stackInfo = new(irManager->getMemoryManager()) StackInfo(irManager->getMemoryManager());
+    irManager->setInfo(STACK_INFO_KEY, stackInfo);
 
-    stackInfo = new(irm.getMemoryManager()) StackInfo(irm.getMemoryManager());
-    irm.setInfo(STACK_INFO_KEY, stackInfo);
-
-    irm.calculateOpndStatistics();
+    irManager->calculateOpndStatistics();
 #ifdef _DEBUG
     checkUnassignedOpnds();
 #endif
-    irm.calculateTotalRegUsage(OpndKind_GPReg);
+    irManager->calculateTotalRegUsage(OpndKind_GPReg);
     createProlog();
     createEpilog();
-    uint32 maxStackDepth = irm.calculateStackDepth();
-    insertSOECheck(irm, maxStackDepth);
-    irm.layoutAliasOpnds();
+    uint32 maxStackDepth = irManager->calculateStackDepth();
+    insertSOECheck(*irManager, maxStackDepth);
+    irManager->layoutAliasOpnds();
 
     //fill StackInfo object
     stackInfo->frameSize = getFrameSize();
 
-    stackInfo->icalleeMask = irm.getCallingConvention()->getCalleeSavedRegs(OpndKind_GPReg).getMask() & irm.getTotalRegUsage(OpndKind_GPReg);
+    stackInfo->icalleeMask = irManager->getCallingConvention()->getCalleeSavedRegs(OpndKind_GPReg).getMask() & irManager->getTotalRegUsage(OpndKind_GPReg);
     stackInfo->icalleeOffset = getIntCalleeBase();
-    stackInfo->fcallee = irm.getCallingConvention()->getCalleeSavedRegs(OpndKind_FPReg).getMask();
+    stackInfo->fcallee = irManager->getCallingConvention()->getCalleeSavedRegs(OpndKind_FPReg).getMask();
     stackInfo->foffset = getFloatCalleeBase();
-    stackInfo->acallee = 0; //VSH: TODO - get rid off appl regs irm.getCallingConvention()->getCalleeSavedRegs(OpndKind_ApplicationReg);
+    stackInfo->acallee = 0; //VSH: TODO - get rid off appl regs irManager->getCallingConvention()->getCalleeSavedRegs(OpndKind_ApplicationReg);
     stackInfo->aoffset = getApplCalleeBase();
     stackInfo->localOffset = getLocalBase();
     stackInfo->eipOffset = getRetEIPBase();
@@ -270,21 +275,27 @@ void StackLayouter::checkUnassignedOpnds()
 void StackLayouter::createProlog()
 {
     const uint32 slotSize = sizeof(POINTER_SIZE_INT); 
-    const uint32 stackSizeAlignment = (STACK_ALIGNMENT == STACK_ALIGN_HALF16) ? STACK_ALIGN16 : STACK_ALIGNMENT; 
-    IRManager & irm = getIRManager();
-    EntryPointPseudoInst * entryPointInst = NULL;
+    EntryPointPseudoInst* entryPointInst = NULL;
+    const CallingConventionClient* cClient = NULL;
+    const CallingConvention* cConvention = NULL;
+    uint32 stackSizeAlignment = 0; 
     int offset = 0;
     
     entryPointInst = irManager->getEntryPointInst();
     assert(entryPointInst->getNode() == irManager->getFlowGraph()->getEntryNode());
+    cClient = &((const EntryPointPseudoInst*)entryPointInst)->getCallingConventionClient();
+    cConvention = cClient->getCallingConvention();
+    // Overal size of stack frame should preserve alignment available on method enter. 
+    stackSizeAlignment = (cConvention->getStackAlignment() == STACK_ALIGN_HALF16)
+        ? STACK_ALIGN16 : cConvention->getStackAlignment();
 
     // Create or reset displacements for stack memory operands.
-    for (uint32 i = 0; i < irm.getOpndCount(); i++) {
-        Opnd * opnd = irm.getOpnd(i);
+    for (uint32 i = 0; i < irManager->getOpndCount(); i++) {
+        Opnd * opnd = irManager->getOpnd(i);
         if (opnd->getRefCount() && opnd->getMemOpndKind() == MemOpndKind_StackAutoLayout) {
             Opnd * dispOpnd=opnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement);
             if (dispOpnd == NULL){
-                dispOpnd = irm.newImmOpnd(irm.getTypeManager().getInt32Type(), 0);
+                dispOpnd = irManager->newImmOpnd(irManager->getTypeManager().getInt32Type(), 0);
                 opnd->setMemOpndSubOpnd(MemOpndSubOpndKind_Displacement, dispOpnd);
             }
             dispOpnd->assignImmValue(0);
@@ -300,7 +311,7 @@ void StackLayouter::createProlog()
     // Assign displacements for input operands.
     if (entryPointInst) {
         const StlVector<CallingConventionClient::StackOpndInfo>& stackOpndInfos = 
-            ((const EntryPointPseudoInst*)entryPointInst)->getCallingConventionClient().getStackOpndInfos(Inst::OpndRole_Def);
+            cClient->getStackOpndInfos(Inst::OpndRole_Def);
 
         for (uint32 i = 0, n = (uint32)stackOpndInfos.size(); i < n; i++) {
             uint64 argOffset = stackOpndInfos[i].offset;
@@ -312,7 +323,7 @@ void StackLayouter::createProlog()
     inargEnd = offset;
     icalleeEnd = offset = 0;
 
-    uint32 calleeSavedRegs=irm.getCallingConvention()->getCalleeSavedRegs(OpndKind_GPReg).getMask();
+    uint32 calleeSavedRegs = cConvention->getCalleeSavedRegs(OpndKind_GPReg).getMask();
     uint32 usageRegMask = irManager->getTotalRegUsage(OpndKind_GPReg);
     Inst * lastPush = NULL;
     
@@ -324,7 +335,7 @@ void StackLayouter::createProlog()
 #endif
         uint32 mask = getRegMask((RegName)reg);
         if ((mask & calleeSavedRegs) && (usageRegMask & mask)) {
-            Inst * inst = irm.newInst(Mnemonic_PUSH, irm.getRegOpnd((RegName)reg));
+            Inst * inst = irManager->newInst(Mnemonic_PUSH, irManager->getRegOpnd((RegName)reg));
             if (!lastPush) {
                 lastPush = inst;
             }
@@ -333,31 +344,54 @@ void StackLayouter::createProlog()
         }
     }
     icalleeBase = fcalleeEnd = fcalleeBase = acalleeEnd = acalleeBase = localEnd = offset;
+    
+    // Align callee save area on maximum possible value:
+    //   - for STACK_ALIGN16 & STACK_ALIGN_HALF16 align on 16-bytes  
+    //   - for STACK_ALIGN4 align on 4-bytes
+    offset &= ~(stackSizeAlignment - 1);
+    
+    if (cConvention->getStackAlignment() == STACK_ALIGN_HALF16 &&
+        (offset & ~(STACK_ALIGN16 - 1)) == 0) {
+        // Need to align size of callee save area on half of 16-bytes
+        // thus resulting stack pointer will be 16-bytes aligned.
+        offset -= STACK_ALIGN_HALF16; 
+    }
 
     // Retrieve relations not earlier than all memory locations are assigned.
-    IRManager::AliasRelation * relations = new(irm.getMemoryManager()) IRManager::AliasRelation[irm.getOpndCount()];
-    irm.getAliasRelations(relations);
+    IRManager::AliasRelation * relations = new(irManager->getMemoryManager()) IRManager::AliasRelation[irManager->getOpndCount()];
+    irManager->getAliasRelations(relations);
 
     // Assign displacements for local variable operands.
-    for (uint32 i = 0; i < irm.getOpndCount(); i++) {
-        Opnd * opnd = irm.getOpnd(i);
-        if (opnd->getRefCount() == 0)
-            continue;
-        if(opnd->getMemOpndKind() == MemOpndKind_StackAutoLayout) {
-            Opnd * dispOpnd = opnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement);
-            if (dispOpnd->getImmValue() == 0) {
-                if (relations[opnd->getId()].outerOpnd == NULL) {
-                    uint32 cb = getByteSize(opnd->getSize());
-                    cb=(cb + slotSize - 1) & ~(slotSize - 1);
-                    offset -= cb;
-                    dispOpnd->assignImmValue(offset);
+    for (int j = 0; j <= alignmentSequenceSize; j++) {
+        for (uint32 i = 0; i < irManager->getOpndCount(); i++) {
+            Opnd * opnd = irManager->getOpnd(i);
+            Opnd::MemOpndAlignment currentAlignment = alignmentSequence[j];
+            if(opnd->getRefCount() != 0 
+                    && opnd->getMemOpndKind() == MemOpndKind_StackAutoLayout
+                    && opnd->getMemOpndAlignment() == currentAlignment) {
+                Opnd * dispOpnd = opnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement);
+                if (dispOpnd->getImmValue() == 0) {
+                    if (relations[opnd->getId()].outerOpnd == NULL) {
+                        if (currentAlignment == Opnd::MemOpndAlignment_Any) {
+                            uint32 cb = getByteSize(opnd->getSize());
+                            cb = (cb + (slotSize - 1)) & ~(slotSize - 1);
+                            offset -= cb;
+                        } else {
+                            // Make sure 
+                            assert((stackSizeAlignment % currentAlignment) == 0);
+                            // It just doesn't make sense to align on less than operand size.
+                            assert((uint32)currentAlignment >= getByteSize(opnd->getSize()));
+                            offset -= currentAlignment;
+                        }
+                        dispOpnd->assignImmValue(offset);
+                    }
                 }
             }
         }
     }
 
     // Align stack pointer. Local area should preserve alignment available on function enter.
-    offset = offset & ~(stackSizeAlignment - 1);
+    offset &= ~(stackSizeAlignment - 1);
 
     // Assert local area is properly aligned.
     assert((offset & (STACK_ALIGNMENT - 1)) == 0);    
@@ -365,7 +399,7 @@ void StackLayouter::createProlog()
     localBase = offset;
 
     if (localEnd>localBase) {
-        Inst* newIns = irm.newInst(Mnemonic_SUB, irm.getRegOpnd(STACK_REG), irm.newImmOpnd(irm.getTypeManager().getInt32Type(), localEnd - localBase));
+        Inst* newIns = irManager->newInst(Mnemonic_SUB, irManager->getRegOpnd(STACK_REG), irManager->newImmOpnd(irManager->getTypeManager().getInt32Type(), localEnd - localBase));
         newIns->insertAfter(lastPush ? lastPush : entryPointInst);
     }
 
@@ -373,20 +407,19 @@ void StackLayouter::createProlog()
 }       
 
 void StackLayouter::createEpilog()
-{ // Predeccessors of en and irm.isEpilog(en->pred)
-    IRManager & irm = getIRManager();
-    uint32 calleeSavedRegs = irm.getCallingConvention()->getCalleeSavedRegs(OpndKind_GPReg).getMask();
-    const Edges& inEdges = irm.getFlowGraph()->getExitNode()->getInEdges();
+{ // Predeccessors of en and irManager->isEpilog(en->pred)
+    uint32 calleeSavedRegs = irManager->getCallingConvention()->getCalleeSavedRegs(OpndKind_GPReg).getMask();
+    const Edges& inEdges = irManager->getFlowGraph()->getExitNode()->getInEdges();
     uint32 usageRegMask = irManager->getTotalRegUsage(OpndKind_GPReg);
     for (Edges::const_iterator ite = inEdges.begin(), ende = inEdges.end(); ite!=ende; ++ite) {
         Edge* edge = *ite;
-        if (irm.isEpilog(edge->getSourceNode())) {
+        if (irManager->isEpilog(edge->getSourceNode())) {
             Node * epilog = edge->getSourceNode();
             Inst * retInst = (Inst*)epilog->getLastInst();
             assert(retInst->hasKind(Inst::Kind_RetInst));
             if (localEnd > localBase) {
                 // Restore stack pointer.
-                Inst* newIns = irm.newInst(Mnemonic_ADD, irm.getRegOpnd(STACK_REG), irm.newImmOpnd(irm.getTypeManager().getInt32Type(), localEnd - localBase));
+                Inst* newIns = irManager->newInst(Mnemonic_ADD, irManager->getRegOpnd(STACK_REG), irManager->newImmOpnd(irManager->getTypeManager().getInt32Type(), localEnd - localBase));
                 newIns->insertBefore(retInst);
             }
 #ifdef _EM64T_
@@ -396,7 +429,7 @@ void StackLayouter::createEpilog()
 #endif
                 uint32 mask = getRegMask((RegName)reg);
                 if ((mask & calleeSavedRegs) &&  (usageRegMask & mask)) {
-                    Inst* newIns = irm.newInst(Mnemonic_POP, irm.getRegOpnd((RegName)reg));
+                    Inst* newIns = irManager->newInst(Mnemonic_POP, irManager->getRegOpnd((RegName)reg));
                     newIns->insertBefore(retInst);
                 }
             }

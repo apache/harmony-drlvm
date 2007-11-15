@@ -105,6 +105,13 @@ public:
         ConstraintKind_Current
     };
 
+    enum MemOpndAlignment{
+        MemOpndAlignment_Any    = 0,
+        MemOpndAlignment_4      = 4,
+        MemOpndAlignment_8      = 8,
+        MemOpndAlignment_16     = 16
+    };
+    
     //-------------------------------------------------------------------------
     /** class RuntimeInfo contains information allowing CG to determine operand value from the current runtime information
     Initially added to support AOT compiler the class is used to annotate operands with runtime info
@@ -231,6 +238,24 @@ public:
 
     void setMemOpndKind(MemOpndKind k){ memOpndKind=k; }
 
+    /**
+     * Returns alignment for the operand. It makes sense to query
+     * alignment for memory operands that have stack auto layout kind only.
+     * For all other operands MemOpndAlignment_Any will be returned.
+     */
+    MemOpndAlignment getMemOpndAlignment() {
+        return memOpndAlignment;
+    }
+    
+    /**
+     * Sets desirable memory operand alignment.
+     */
+    void setMemOpndAlignment(MemOpndAlignment alignment) {
+        // It makes sense to specify alignment for memory operands
+        // which have stack auto layout kind only.
+        memOpndAlignment = alignment;
+    }
+    
     /** 
      * Returns true if the operand IS assigned to a location defined by constraint.
      * The constraint can be either explicitly created or implicitly created from RegName values.
@@ -347,22 +372,28 @@ private:
 
     //-------------------------------------------------------------------------
     Opnd(uint32 _id, Type * t, Constraint c)
-        :id(_id), firstId(_id), type(t), memOpndKind(MemOpndKind_Null), 
+        :id(_id), firstId(_id), type(t), 
         defScope(DefScope_Null), definingInst(NULL), refCount(0),
-        segReg(RegName_Null), immValue(0), runtimeInfo(NULL)
-        { constraints[ConstraintKind_Initial]=constraints[ConstraintKind_Calculated]=c; }
+        segReg(RegName_Null), memOpndKind(MemOpndKind_Null),
+        memOpndAlignment(MemOpndAlignment_Any),
+        immValue(0), runtimeInfo(NULL) {
+            constraints[ConstraintKind_Initial]=constraints[ConstraintKind_Calculated]=c;
+        }
 
     //-------------------------------------------------------------------------
     uint32          id;
     uint32          firstId;
     Type     *      type;
-    MemOpndKind     memOpndKind;
     Constraint      constraints[ConstraintKind_Current];
 
     DefScope        defScope;
     Inst *          definingInst;
     uint32          refCount;
     RegName         segReg;
+
+    MemOpndKind         memOpndKind;
+    // Defines alignment for memory oprands that have stack auto layout kind.
+    MemOpndAlignment    memOpndAlignment;
 
     union{
         RegName     regName;

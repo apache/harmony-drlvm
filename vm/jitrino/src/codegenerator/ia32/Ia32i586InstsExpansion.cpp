@@ -191,7 +191,9 @@ void I586InstsExpansion::runImpl() {
                         
                         //create memory operand for the XMM register if it doesn't exist
                         if (!(*xmmMemOpsPtr)[regNum]  || (*xmmMemOpsPtr)[regNum]->getSize() != op1->getSize()) {
-                            (*xmmMemOpsPtr)[regNum] = irManager->newMemOpnd(fp0->getType(), MemOpndKind_StackAutoLayout, irManager->getRegOpnd(STACK_REG), 0);
+                            Opnd* opnd = irManager->newMemOpnd(fp0->getType(), MemOpndKind_StackAutoLayout, irManager->getRegOpnd(STACK_REG), 0);
+                            opnd->setMemOpndAlignment(Opnd::MemOpndAlignment_16);
+                            (*xmmMemOpsPtr)[regNum] = opnd; 
                         }
                         
                         //load zero

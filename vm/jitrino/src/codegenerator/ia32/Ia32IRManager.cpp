@@ -1147,21 +1147,26 @@ Inst * IRManager::newCopySequence(Opnd * targetBOpnd, Opnd * sourceBOpnd, uint32
         (targetKind==OpndKind_XMMReg||targetKind==OpndKind_Mem) && 
         (sourceKind==OpndKind_XMMReg||sourceKind==OpndKind_Mem)
     ){
+        targetOpnd->setMemOpndAlignment(Opnd::MemOpndAlignment_16);
+        sourceOpnd->setMemOpndAlignment(Opnd::MemOpndAlignment_16);
         if (sourceByteSize==4){
             return newInst(Mnemonic_MOVSS,targetOpnd, sourceOpnd);
         }else if (sourceByteSize==8){
             return newInst(Mnemonic_MOVSD,targetOpnd, sourceOpnd);
         }
     }else if (targetKind==OpndKind_FPReg && sourceKind==OpndKind_Mem){
+        sourceOpnd->setMemOpndAlignment(Opnd::MemOpndAlignment_16);
         return newInst(Mnemonic_FLD, targetOpnd, sourceOpnd);
     }else if (targetKind==OpndKind_Mem && sourceKind==OpndKind_FPReg){
+        targetOpnd->setMemOpndAlignment(Opnd::MemOpndAlignment_16);
         return newInst(Mnemonic_FSTP, targetOpnd, sourceOpnd);
     }else if (
         (targetKind==OpndKind_FPReg && sourceKind==OpndKind_XMMReg)||
         (targetKind==OpndKind_XMMReg && sourceKind==OpndKind_FPReg)
     ){
         Inst * instList=NULL;
-        Opnd * tmp = newMemOpnd(targetOpnd->getType(), MemOpndKind_StackAutoLayout, getRegOpnd(STACK_REG), 0); 
+        Opnd * tmp = newMemOpnd(targetOpnd->getType(), MemOpndKind_StackAutoLayout, getRegOpnd(STACK_REG), 0);
+        tmp->setMemOpndAlignment(Opnd::MemOpndAlignment_16);
         appendToInstList(instList, newCopySequence(tmp, sourceOpnd, regUsageMask));
         appendToInstList(instList, newCopySequence(targetOpnd, tmp, regUsageMask));
         return instList;
@@ -1727,27 +1732,16 @@ void IRManager::finalizeCallSites()
                     // Assert that shadow doesn't break stack alignment computed earlier.
                     assert((shadowSize & (STACK_ALIGNMENT - 1)) == 0);
                     Opnd::RuntimeInfo * rt = callInst->getRuntimeInfo();
-                    bool needShadow = false;
-                    if (rt) {
+                    //TODO (Low priority): Strictly speaking we should allocate shadow area for CDECL
+                    // calling convention. Currently it is used in one case only (see VM_RT_MULTIANEWARRAY_RESOLVED).
+                    // But this helper is not aware about shadow area.
+                    if (rt && cc == &CallingConvention_STDCALL) {
                         // Stack size for parameters: "number of entries is equal to 4 or the maximum number of parameters"
                         // See http://msdn2.microsoft.com/en-gb/library/ms794596.aspx for details.
                         // Shadow - is an area on stack reserved to map parameters passed with registers.
-                        needShadow = rt->getKind() == Opnd::RuntimeInfo::Kind_InternalHelperAddress;
-                        if (!needShadow && rt->getKind() == Opnd::RuntimeInfo::Kind_HelperAddress) {
-                                VM_RT_SUPPORT helperId = (VM_RT_SUPPORT)(POINTER_SIZE_INT)rt->getValue(0);
-                                // ABOUT: VM does not allocate shadow for most of the helpers
-                                // however some helpers are direct pointers to native functions.
-                                // TODO: create VM interface to get calling conventions for the helper
-                                // today  this knowledge is hardcoded here
-                                needShadow = helperId == VM_RT_GC_GET_TLS_BASE;
-                        }
-                    }
-                    if (needShadow) {                        
-                        // Arrange shadow area on the stack. 
                         shadowSize = 4 * sizeof(POINTER_SIZE_INT);
                         node->prependInst(newInst(Mnemonic_SUB, getRegOpnd(STACK_REG), newImmOpnd(typeManager.getInt32Type(), shadowSize)), inst);
                     }
-
 #endif
                     unsigned stackPopSize = cc->calleeRestoresStack() ? 0 : callInst->getArgStackDepth();
                     stackPopSize += shadowSize;

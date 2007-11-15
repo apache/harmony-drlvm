@@ -111,9 +111,9 @@ public:
     virtual bool    pushLastToFirst()const =0;
     
     /**
-     * Defines alignment of all arguments passed on the memmory stack plus return pointer.
+     * Defines stack pointer alignment on method enter.
      */
-    virtual uint32 getAlignment()const { return 0; }
+    virtual uint32 getStackAlignment()const { return 0; }
     
     /**
      * Maps a string representation of CallingConvention to the 
@@ -143,6 +143,7 @@ public:
     virtual Constraint  getCalleeSavedRegs(OpndKind regKind)const;
 #ifdef _EM64T_
     virtual bool    calleeRestoresStack()const{ return false; }
+    virtual uint32 getStackAlignment()const { return STACK_ALIGNMENT; }
 #else
     virtual bool    calleeRestoresStack()const{ return true; }
 #endif
@@ -162,7 +163,7 @@ class DRLCallingConventionIA32: public STDCALLCallingConvention
 public: 
     virtual ~DRLCallingConventionIA32() {}
     virtual bool    pushLastToFirst()const{ return false; }
-    virtual uint32 getAlignment()const { return STACK_ALIGNMENT; }
+    virtual uint32 getStackAlignment()const { return STACK_ALIGNMENT; }
 };
 
 /**
@@ -172,7 +173,7 @@ class DRLCallingConventionEM64T: public STDCALLCallingConvention
 {   
 public: 
     virtual ~DRLCallingConventionEM64T() {}
-    virtual uint32 getAlignment()const { return STACK_ALIGN16; }
+    virtual uint32 getStackAlignment()const { return STACK_ALIGNMENT; }
 };
 
 //========================================================================================
@@ -188,6 +189,7 @@ public:
 #ifdef _EM64T_
     virtual void    getOpndInfo(ArgKind kind, uint32 argCount, OpndInfo * infos)const;
     virtual bool    pushLastToFirst()const{ return true; }
+    virtual uint32 getStackAlignment()const { return STACK_ALIGNMENT; }
 #endif
 };
 

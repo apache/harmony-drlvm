@@ -1312,6 +1312,10 @@ int RegAlloc3::spillReg (Opndx& opndx)
     DBGOUT("  spilling " << *opndx.opnd << endl;)
     opnd->setCalculatedConstraint(initial);
     opnd->assignMemLocation(MemOpndKind_StackAutoLayout, irManager->getRegOpnd(STACK_REG), 0);
+    if (initial.getKind() == OpndKind_FPReg
+        || initial.getKind() == OpndKind_XMMReg) {
+        opnd->setMemOpndAlignment(Opnd::MemOpndAlignment_16);
+    }
 
     int inserted = 0;
 

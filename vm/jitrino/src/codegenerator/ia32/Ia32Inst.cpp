@@ -826,9 +826,10 @@ void CallingConventionClient::finalizeInfos(Inst::OpndRole role, CallingConventi
     if (argKind == CallingConvention::ArgKind_InArg) {
         // Compute stack alignment.
         unsigned stackOnEnterSize = stackOpndSize + sizeof(POINTER_SIZE_INT);
-        unsigned alignment = callingConvention->getAlignment();
+        unsigned alignment = (callingConvention->getStackAlignment() == STACK_ALIGN_HALF16)
+            ? STACK_ALIGN16 : callingConvention->getStackAlignment();
         
-        if (alignment != 0 && stackOnEnterSize & (alignment - 1)) {
+        if (alignment != 0 && (stackOnEnterSize & (alignment - 1))) {
             stackAlignmentSize = alignment - (stackOnEnterSize & (alignment - 1));
         }
     }
