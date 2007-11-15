@@ -270,8 +270,10 @@ void rt_enum(JIT_Handle jit, Method_Handle method,
 {
     if (!context->is_ip_past && !StaticConsts::g_jvmtiMode) {
         // The IP points directly to the instructions - this must be a 
-        // hardware NPE happened. Check the presumption:
-        assert(method_get_num_handlers(method) == 0);
+        // hardware NPE happened. 
+        // A special case is SOE, which is allowed to happen only at the method start.
+        // Check the presumptions:
+        assert(method_get_num_handlers(method) == 0 || rt_is_soe_area(jit, method, context));
 #ifdef _DEBUG
         bool sync = method_is_synchronized(method);
         bool inst = !method_is_static(method);
