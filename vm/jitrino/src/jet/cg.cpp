@@ -222,12 +222,11 @@ void CodeGen::gen_check_null(Val& obj, bool hw_ok)
             alu(alu_cmp, opnd, gr_null);
         }
         else {
-            assert(sizeof(void*)==4);
             assert(NULL_REF == 0);
             if (opnd.is_reg()) {
                 alu(alu_test, opnd, opnd);
-            }
-            else {
+            } else {
+                // There is no imm64 for cmp. But it is not a problem as we compare with zero.
                 alu(alu_cmp, opnd, Opnd((int)(int_ptr)NULL_REF));
             }
         }

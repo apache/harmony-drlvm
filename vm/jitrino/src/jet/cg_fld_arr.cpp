@@ -263,13 +263,6 @@ Opnd CodeGen::get_field_addr(const FieldOpInfo& fieldOp, jtype jt) {
 
 void CodeGen::do_field_op(const FieldOpInfo& fieldOp)
 {
-    // Presumption: we dont have compressed refs on IA32 and all other 
-    // (64bits) platforms have compressed refs. 
-    // is_ia32() check added below so on IA32 it becomes 'false' during the 
-    // compilation, without access to g_refs_squeeze in runtime.
-    assert(is_ia32() || g_refs_squeeze);
-
-
     jtype jt = to_jtype(class_get_cp_field_type(fieldOp.enclClass, fieldOp.cpIndex));
     
     const char* fieldDescName = const_pool_get_field_descriptor(fieldOp.enclClass, fieldOp.cpIndex);
@@ -301,8 +294,8 @@ void CodeGen::do_field_op(const FieldOpInfo& fieldOp)
             // pop out ref
             vpop();
         }
-        if (!is_ia32() && g_refs_squeeze && (jt == jobj || fieldIsMagic)) {
-            if (fieldIsMagic) {
+        if ( jt == jobj || fieldIsMagic ) {
+            if (fieldIsMagic || !g_refs_squeeze) {
                 AR gr_ref = valloc(jobj);
                 rlock(gr_ref);
                 Opnd obj(jobj, gr_ref);
@@ -310,6 +303,7 @@ void CodeGen::do_field_op(const FieldOpInfo& fieldOp)
                 runlock(gr_ref);
                 vpush(obj);
             } else {
+                assert(!is_ia32());
                 AR gr_base = valloc(jobj);
                 rlock(gr_base);
                 AR gr_ref = valloc(jobj);
@@ -372,13 +366,14 @@ void CodeGen::do_field_op(const FieldOpInfo& fieldOp)
                           where.index(), where.scale());
         mov(where32, Opnd(ref));
     }
-    else if (!is_ia32() && g_refs_squeeze && (jt == jobj || fieldIsMagic)) {
+    else if ( jt == jobj || fieldIsMagic ) {
         // have the reference on a register
         Val& s0 = vstack(0, true);
         rlock(s0);
-        if (fieldIsMagic) {
+        if (fieldIsMagic || !g_refs_squeeze) {
             mov(where, s0.as_opnd());
         } else {
+            assert(!is_ia32());
             // compress the reference
             AR tmp = valloc(jobj);
             void * inv_base = (void*)-(int_ptr)OBJ_BASE;
