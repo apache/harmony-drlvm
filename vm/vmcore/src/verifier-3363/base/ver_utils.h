@@ -72,10 +72,11 @@ namespace CPVerifier {
         vf_HashEntry_t *next;       // next hash entry
     };
 
+    template<typename T>
     class Stack {
     protected:
         int max_depth;
-        Address* stack;
+        T* stack;
         int depth;
 
     public:
@@ -88,16 +89,17 @@ namespace CPVerifier {
               tc_free(stack);
           }
 
-          void push(Address value) {
+          void push(T value) {
               if( depth == max_depth ) {
-                  max_depth += max_depth/2 + 32;
-                  stack = (Address*) tc_realloc(stack, sizeof(Address) * max_depth);
+                  assert(sizeof(T) < 4096);
+                  max_depth += 4096/sizeof(T);
+                  stack = (T*) tc_realloc(stack, sizeof(T) * max_depth);
               }
 
               stack[depth++] = value;
           }
 
-          Address pop() {
+          T pop() {
               assert(depth > 0);
               return stack[--depth];
           }
@@ -111,22 +113,23 @@ namespace CPVerifier {
           }
     };
 
-    class FastStack : Stack {
+    template<typename T>
+    class FastStack : Stack<T> {
     public:
         FastStack() : fdepth(0) 
         {}
 
-        void push(Address value) {
+        void push(T value) {
             if( fdepth < BUFSIZE ) {
                 buffer[fdepth++] = value;
             } else {
-                Stack::push(value);
+                Stack<T>::push(value);
             }
         }
 
-        Address pop() {
+        T pop() {
             assert(fdepth > 0);
-            return Stack::is_empty() ? buffer[--fdepth] : Stack::pop();
+            return Stack<T>::is_empty() ? buffer[--fdepth] : Stack<T>::pop();
         }
 
         bool is_empty() {
@@ -135,16 +138,35 @@ namespace CPVerifier {
 
         void init() {
             fdepth = 0;
-            Stack::init();
+            Stack<T>::init();
+        }
+
+        int get_depth() {
+            return fdepth < BUFSIZE ? fdepth : BUFSIZE + Stack<T>::depth;
+        }
+
+        T at(int d) {
+            assert(d < get_depth());
+            return d < BUFSIZE ? buffer[d] : Stack<T>::stack[d - BUFSIZE];
+        }
+
+        int instack(T other) {
+            for( int i = 0; i < fdepth; i++ ) {
+                if( buffer[i] == other ) return true;
+            }
+            for( int i = 0; i < Stack<T>::depth; i++ ) {
+                if( Stack<T>::stack[i] == other ) return true;
+            }
+            return false;
         }
 
     private:
         static const int BUFSIZE = 100;
         int fdepth;
-        Address buffer[BUFSIZE];
+        T buffer[BUFSIZE];
     };
 
-    class MarkableStack : public FastStack {
+    class MarkableStack : public FastStack<Address> {
         // contains the following entries:
         // <address, mark> no mask means zero mark
 

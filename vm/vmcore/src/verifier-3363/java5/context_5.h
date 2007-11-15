@@ -49,7 +49,7 @@ namespace CPVerifier_5 {
         // stack to push instructions like branch targets, etc to go thru the method. the stack is method-wide.
         MarkableStack stack;
 
-        FastStack dead_code_stack;
+        FastStack<Address> dead_code_stack;
         bool      dead_code_parsing;
 
         //we would like to flush StackMapTable attribute from this method
