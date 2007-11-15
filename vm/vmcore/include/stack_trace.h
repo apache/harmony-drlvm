@@ -87,11 +87,10 @@ extern "C" {
 VMEXPORT unsigned st_get_depth(VM_thread *p_vmthread);
 
 /**
- * Fills the stack trace frame at the given depth for the current thread.
+ * Fills the stack trace frame at the given relative depth for the current thread.
  *
- * @param[in]  depth - the zero-based depth of the frame or inlined method,
- *                     information about which will be stored at the given stack trace
- *                     frame, <i>stf</i>
+ * @param[in]  depth - relative depth of a frame or inlined method on the stack,
+ *                     topmost frame has zero depth.
  * @param[out] stf   - the pointer to the <code>StackTraceFrame</code> structure that needs
  *                     to be filled with the data on the frame or inlined method
  *                     corresponding to the given depth
@@ -135,7 +134,7 @@ VMEXPORT void st_get_trace(VM_thread *p_vmthread, unsigned* depth,
  *
  * @param[in]  method - the handle of the method information to identify the source file
  * @param[in]  ip     - the instruction pointer to identify the JIT and using the JIT line number
- * @param[in]  depth  - the inlined depth for inlined methods, starting from 0;
+ * @param[in]  depth  - the inlined depth for inlined methods;
  *                      (-1) for native methods and methods which were not inlined
  * @param[out] file   - the pointer to the file reference to be filled by this function
  * @param[out] line   - the pointer to the line number to be filled by this function

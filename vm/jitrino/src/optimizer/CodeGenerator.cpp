@@ -146,6 +146,7 @@ const InlineInfoMap::Entry* InlineInfoMap::getEntryWithMaxDepth(InlineInfoPtr pt
         header++;
         if (nativeOffset == nativeOffs) {
             Entry* e = (Entry*)((char*)ptr + entryOffset);
+            assert(e->getInlineDepth() > 1);
             return e;
         }
     }

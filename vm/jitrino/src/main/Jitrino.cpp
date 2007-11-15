@@ -286,21 +286,13 @@ Jitrino::GetInlineDepth(InlineInfoPtr ptr, uint32 offset)
 Method_Handle
 Jitrino::GetInlinedMethod(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth)
 {
-    //+1 here because VM counts inlined methods range like: [0...max_depth)
-    //where 0 is the first inlined frame.
-    //but Jitrino.OPT algorithm counts methods like [0...max_depth]
-    //where 0 is an original method
-    return runtimeInterface->getInlinedMethod(ptr, offset, inline_depth+1);
+    return runtimeInterface->getInlinedMethod(ptr, offset, inline_depth);
 }
 
 uint16
 Jitrino::GetInlinedBc(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth)
 {
-    //+1 here because VM counts inlined methods range like: [0...max_depth)
-    //where 0 is the first inlined frame.
-    //but Jitrino.OPT algorithm counts methods like [0...max_depth]
-    //where 0 is an original method
-    return runtimeInterface->getInlinedBc(ptr, offset, inline_depth + 1);
+    return runtimeInterface->getInlinedBc(ptr, offset, inline_depth);
 }
 
 bool

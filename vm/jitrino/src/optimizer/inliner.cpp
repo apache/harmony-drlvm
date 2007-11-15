@@ -525,18 +525,16 @@ Inliner::connectRegion(InlineNode* inlineNode) {
         entry->getFirstInst()->unlink(); 
         entry->prependInst(_instFactory.makeLabel());
 
-        uint16 bcOffset = inlineNode->getCallInst()->getBCOffset();
-        assert(bcOffset!=ILLEGAL_BC_MAPPING_VALUE);
+        uint16 callerOffset = inlineNode->getCallInst()->getBCOffset();
+        assert(callerOffset!=ILLEGAL_BC_MAPPING_VALUE);
         Inst* entryMarker =  obj ? _instFactory.makeMethodMarker(MethodMarkerInst::Entry, &methodDesc, obj)
             : _instFactory.makeMethodMarker(MethodMarkerInst::Entry, &methodDesc);
-        entryMarker->setBCOffset(bcOffset);
+        entryMarker->setBCOffset(callerOffset);
         entry->prependInst(entryMarker);
-
         Node* retNode = inlinedFlowGraph.getReturnNode();
         if (retNode) {
             Inst* exitMarker =  obj ? _instFactory.makeMethodMarker(MethodMarkerInst::Exit, &methodDesc, obj)
                 : _instFactory.makeMethodMarker(MethodMarkerInst::Exit,  &methodDesc);
-            exitMarker->setBCOffset(entryMarker->getBCOffset());
             retNode->appendInst(exitMarker);
         }
 
@@ -544,7 +542,6 @@ Inliner::connectRegion(InlineNode* inlineNode) {
         if (unwindNode) {
             Inst* exitMarker =  obj ? _instFactory.makeMethodMarker(MethodMarkerInst::Exit, &methodDesc, obj)
                 : _instFactory.makeMethodMarker(MethodMarkerInst::Exit,  &methodDesc);
-            exitMarker->setBCOffset(entryMarker->getBCOffset());
             unwindNode->appendInst(exitMarker);
         }
     }

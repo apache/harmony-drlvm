@@ -127,7 +127,9 @@ bool RuntimeInterface::getNativeLocationForBc(MethodDesc* method, uint16 bc_pc, 
 
 uint32  RuntimeInterface::getInlineDepth(InlineInfoPtr ptr, uint32 offset) {
     const InlineInfoMap::Entry* e = InlineInfoMap::getEntryWithMaxDepth(ptr, offset);
-    return e == NULL ? 0 : e->getInlineDepth();
+    // real instructions are recorded at an extra nested level to enclosing method
+    // but we need to count method marker entries only
+    return e == NULL ? 0 : e->getInlineDepth() - 1;
 }
 
 Method_Handle   RuntimeInterface::getInlinedMethod(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth) {
@@ -136,8 +138,26 @@ Method_Handle   RuntimeInterface::getInlinedMethod(InlineInfoPtr ptr, uint32 off
 }
 
 uint16 RuntimeInterface::getInlinedBc(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth) {
-    const InlineInfoMap::Entry* e = InlineInfoMap::getEntry(ptr, offset, inline_depth);
-    return e == NULL  ? 0 : e->bcOffset;
+    const InlineInfoMap::Entry* e = InlineInfoMap::getEntryWithMaxDepth(ptr, offset);
+    assert(inline_depth);
+
+    // Real instructions are recorded at a nested level to enclosing method
+    // and may happen on topmost entry only;
+    // otherwise we have a chain of inlined methods
+    // and each entry holds bcOffset of a call inst in parent method.
+    // In both cases needed bcOffset is stored in child entry
+    const InlineInfoMap::Entry* childCallee = e;
+    while (e) {
+        uint32 depth = e->getInlineDepth();
+        if (depth == inline_depth)
+        {
+            return childCallee->bcOffset;
+        }
+        childCallee = e;
+        e = e->parentEntry;
+    }
+
+    return 0;
 }
 
 

@@ -19,6 +19,10 @@
  * @version $Revision: 1.1.2.1.4.3 $
  */  
 
+#define LOG_DOMAIN "vm.stack"
+#include "cxxlog.h"
+#include "vm_log.h"
+
 #include "m2n.h"
 #include "stack_iterator.h"
 #include "stack_trace.h"
@@ -47,8 +51,6 @@ void get_file_and_line(Method_Handle mh, void *ip, bool is_ip_past,
         return;
     }
 
-    // inlined method will not have line numbers for now
-    // they are marked with zero ip address.
     if (ip == NULL) {
         return;
     }
@@ -65,6 +67,7 @@ void get_file_and_line(Method_Handle mh, void *ip, bool is_ip_past,
     POINTER_SIZE_INT eff_ip = (POINTER_SIZE_INT)ip -
                                 (is_ip_past ? callLength : 0);
 
+    uint32 offset = 0;
     if (depth < 0) // Not inlined method
     {
         if (cci->get_jit()->get_bc_location_for_native(
@@ -77,13 +80,15 @@ void get_file_and_line(Method_Handle mh, void *ip, bool is_ip_past,
 
         if (inl_info)
         {
-            uint32 offset = (uint32) ((POINTER_SIZE_INT)ip -
+            offset = (uint32) ((POINTER_SIZE_INT)ip -
                 (POINTER_SIZE_INT)cci->get_code_block_addr());
             bcOffset = cci->get_jit()->get_inlined_bc(inl_info, offset, depth);
         }
     }
 
     *line = method->get_line_number(bcOffset);
+    TRACE("Location of " << method << " at idepth=" << depth << " noff=" << offset
+        << " bc=" << bcOffset << " line=" << *line);
 #endif        
 }
 
@@ -108,6 +113,7 @@ bool st_get_frame(unsigned target_depth, StackTraceFrame* stf)
         return interpreter.interpreter_st_get_frame(target_depth, stf);
     }
 
+    TRACE("looking for frame: "<<target_depth);
     StackIterator* si = si_create_from_native();
     unsigned depth = 0;
     while (!si_is_past_end(si)) {
@@ -119,14 +125,19 @@ bool st_get_frame(unsigned target_depth, StackTraceFrame* stf)
                  (target_depth <= depth + inlined_depth) ) {
                 stf->ip = si_get_ip(si);
 
-                if (target_depth < depth + inlined_depth) {
+                if (target_depth != depth + inlined_depth) {
+                    assert(inlined_depth);
                     CodeChunkInfo* cci = si_get_code_chunk_info(si);
                     // FIXME64: no support for large methods
                     // with compiled code size greater than 4GB
                     uint32 offset = (uint32)((POINTER_SIZE_INT)stf->ip - (POINTER_SIZE_INT)cci->get_code_block_addr());
+                    stf->depth = inlined_depth - (target_depth - depth);
                     stf->method = cci->get_jit()->get_inlined_method(
-                            cci->get_inline_info(), offset, target_depth - depth);
-                    stf->depth = target_depth - depth;
+                            cci->get_inline_info(), offset, stf->depth);
+                    TRACE("found inlined frame: "<<stf->method << " at depth="<<stf->depth << " of "<< inlined_depth);
+                }
+                else {
+                    TRACE("found frame: "<<stf->method);
                 }
 
                 si_free(si);
@@ -181,22 +192,28 @@ void st_get_trace(VM_thread *p_vmthread, unsigned* res_depth, StackTraceFrame** 
                 stf->outdated_this = 0;
             } else {
                 JIT *jit = cci->get_jit();
-                uint32 inlined_depth = si_get_inline_depth(si);
-                // FIXME64: no support for large methods
-                // with compiled code greater than 4GB
-                uint32 offset = (uint32)((POINTER_SIZE_INT)ip - (POINTER_SIZE_INT)cci->get_code_block_addr());
-
-                for (uint32 i = 0; i < inlined_depth; i++) {
-                    stf->method = jit->get_inlined_method(cci->get_inline_info(), offset, i);
-                    stf->ip = ip;
-                    stf->depth = i;
-                    stf->outdated_this = get_this(jit, method, si);
-                    stf++;
-                    depth++;
+                if (cci->has_inline_info()) {
+                    // FIXME64: no support for large methods
+                    // with compiled code greater than 4GB
+                    uint32 offset = (uint32)((POINTER_SIZE_INT)ip - (POINTER_SIZE_INT)cci->get_code_block_addr());
+                    uint32 inlined_depth = jit->get_inline_depth(
+                        cci->get_inline_info(), offset);
+                    if (inlined_depth) {
+                        for (uint32 i = inlined_depth; i > 0; i--) {
+                            stf->method = jit->get_inlined_method(cci->get_inline_info(), offset, i);
+                            stf->ip = ip;
+                            stf->depth = i;
+                            TRACE("tracing inlined frame: "<<stf->method << " at depth="<<stf->depth);
+                            stf->outdated_this = get_this(jit, method, si);
+                            stf++;
+                            depth++;
+                        }
+                    }
                 }
                 stf->outdated_this = get_this(jit, method, si);
             }
             stf->method = method;
+            TRACE("tracing frame: "<<stf->method);
             stf->ip = ip;
             stf->depth = -1;
             stf++;
@@ -282,17 +299,19 @@ void st_print(FILE* f, hythread_t thread)
         if (m) {
             fprintf(f, "  [%p] %p(%c): ", vm_thread, si_get_ip(si), (si_is_native(si) ? 'n' : 'm'));
             CodeChunkInfo* cci = si_get_code_chunk_info(si);
-            if ( cci != NULL ) {
-                uint32 inlined_depth = si_get_inline_depth(si);
+            if (cci != NULL && cci->has_inline_info()) {
                 // FIXME64: no support for large methods
                 // with compiled code size greater than 4GB
                 uint32 offset = (uint32)((POINTER_SIZE_INT)si_get_ip(si) - (POINTER_SIZE_INT)cci->get_code_block_addr());
-                
-                for (uint32 i = 0; i < inlined_depth; i++) {
-                    Method *real_method = cci->get_jit()->get_inlined_method(cci->get_inline_info(), offset, i);
-                    fprintf(f, "%s.%s%s\n", class_get_name(method_get_class(real_method)), 
-                            method_get_name(real_method), method_get_descriptor(real_method));
-                    depth++;
+                uint32 inlined_depth = cci->get_jit()->get_inline_depth(
+                    cci->get_inline_info(), offset);
+                if (inlined_depth) {
+                    for (uint32 i = inlined_depth; i > 0; i--) {
+                        Method *real_method = cci->get_jit()->get_inlined_method(cci->get_inline_info(), offset, i);
+                        fprintf(f, "%s.%s%s\n", class_get_name(method_get_class(real_method)), 
+                                method_get_name(real_method), method_get_descriptor(real_method));
+                        depth++;
+                    }
                 }
             }
             fprintf(f, "%s.%s%s\n", class_get_name(method_get_class(m)), method_get_name(m), method_get_descriptor(m));

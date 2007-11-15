@@ -619,7 +619,7 @@ public:
         Method_Handle method;
 
         uint32 getInlineDepth() const { 
-            return (parentEntry == 0) ? 0 : 1 + parentEntry->getInlineDepth(); 
+            return (parentEntry == 0) ? 1 : 1 + parentEntry->getInlineDepth(); 
         }
     };
 

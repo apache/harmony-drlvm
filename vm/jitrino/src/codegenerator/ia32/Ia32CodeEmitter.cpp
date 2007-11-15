@@ -341,7 +341,7 @@ InlineInfoMap::Entry* CodeEmitter::processBlockOffsets(Node* node, InlineInfoMap
     for (Inst* inst = (Inst*)node->getFirstInst(); inst!=NULL; inst = inst->getNextInst()) {
         if (inst->getKind() == Inst::Kind_MethodEntryPseudoInst) {
             if (Log::isEnabled()) {
-                IRPrinter::printIndent(Log::out(), parentEntry ? parentEntry->getInlineDepth() + 1 : 0);
+                IRPrinter::printIndent(Log::out(), parentEntry ? parentEntry->getInlineDepth() + 1 : 1);
                 IRPrinter::printInst(Log::out(), inst);
                 Log::out()<<" bc offset="<<inst->getBCOffset()<<std::endl;
             }

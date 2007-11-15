@@ -192,11 +192,50 @@ JIT_get_root_set_for_thread_dump(JIT_Handle             jit,
                                   GC_Enumeration_Handle  enum_handle,
                                   JitFrameContext* context
                                   );
-
+/**
+ * Returns number of methods which were inlined at the specified location (zero if none)
+ * @param jit - a JIT which produced the code
+ * @param prt - corresponding inline info
+ * @param offset - offset in native code relative to code block start
+ */
 JITEXPORT uint32 
 JIT_get_inline_depth(JIT_Handle jit, 
                      InlineInfoPtr   ptr, 
                      uint32          offset);
+
+/**
+* Returns specified inlined method (null if not found).
+* The inlined methods are indexed as [max_depth..1], 
+* so the topmost method on the stack has maximum inline depth and
+* enclosing methods have descending indicies. 
+* Zero depth would mean nearest non-inlined method and should not be used here.
+* @param jit - a JIT which produced the code
+* @param prt - corresponding inline info
+* @param offset - offset in native code relative to code block start
+* @param inline_depth - index of the inlined method
+*/
+JITEXPORT Method_Handle
+JIT_get_inlined_method(JIT_Handle jit, 
+                       InlineInfoPtr ptr, 
+                       uint32 offset,
+                       uint32 inline_depth);
+
+/**
+* Returns bytecode offset at specified inlined method for the native code (zero if unknown).
+* The inlined methods are indexed as [max_depth..1], 
+* so the topmost method on the stack has maximum inline depth and
+* enclosing methods have descending indicies. 
+* Zero depth would mean nearest non-inlined method and should not be used here.
+* @param jit - a JIT which produced the code
+* @param prt - corresponding inline info
+* @param offset - offset in native code relative to code block start
+* @param inline_depth - index of the inlined method
+*/
+JITEXPORT uint16
+JIT_get_inlined_bc(JIT_Handle jit, 
+                   InlineInfoPtr ptr, 
+                   uint32 offset, 
+                   uint32 inline_depth);
 
 JITEXPORT Boolean
 JIT_can_enumerate(JIT_Handle        jit, 

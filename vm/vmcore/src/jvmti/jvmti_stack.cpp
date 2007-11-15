@@ -153,18 +153,20 @@ public:
         CodeChunkInfo *cci = si_get_code_chunk_info(si);
         JIT *jit = cci->get_jit();
 
+        uint16 bc;
         // inlined method frame
         if (0 != inlined_depth) {
             uint32 offset = (uint32) ((char*) ip -
                 (char*) cci->get_code_block_addr());
             method = jit->get_inlined_method(
-                cci->get_inline_info(), offset, inlined_num - inlined_depth);
+                cci->get_inline_info(), offset, inlined_depth);
+            bc = jit->get_inlined_bc(
+                cci->get_inline_info(), offset, inlined_depth);
+        } else {
+            OpenExeJpdaError UNREF result = jit->get_bc_location_for_native(
+                    method, ip, &bc);
+            assert(result == EXE_ERROR_NONE);
         }
-
-        uint16 bc;
-        OpenExeJpdaError UNREF result = jit->get_bc_location_for_native(
-                method, ip, &bc);
-        assert(result == EXE_ERROR_NONE);
 
         *p_method = (jmethodID) method;
         *p_location = (jlocation) bc;

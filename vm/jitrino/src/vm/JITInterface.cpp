@@ -419,6 +419,10 @@ JIT_get_inlined_method(JIT_Handle jit, InlineInfoPtr ptr, uint32 offset,
     if (Log::cat_rt()->isEnabled()) {
         Log::cat_rt()->out() << "GET_INLINED_METHOD()" << ::std::endl;
     }
+    if (0 == inline_depth) {
+        assert(0 && "misused inline_depth, must be [1..max_depth]");
+        return 0;
+    }
     return Jitrino::GetInlinedMethod(ptr, offset, inline_depth);
 }
 
@@ -428,6 +432,10 @@ JIT_get_inlined_bc(JIT_Handle jit, InlineInfoPtr ptr, uint32 offset, uint32 inli
 {
     if (Log::cat_rt()->isEnabled()) {
         Log::cat_rt()->out() << "GET_INLINED_BC()" << ::std::endl;
+    }
+    if (0 == inline_depth) {
+        assert(0 && "misused inline_depth, must be [1..max_depth]");
+        return 0;
     }
     return Jitrino::GetInlinedBc(ptr, offset, inline_depth);
 }
