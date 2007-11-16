@@ -51,9 +51,6 @@ namespace CPVerifier_5 {
         // stack to push instructions like branch targets, etc to go thru the method. the stack is method-wide.
         MarkableStack stack;
 
-        FastStack<Address> dead_code_stack;
-        bool      dead_code_parsing;
-
         //we would like to flush StackMapTable attribute from this method
         bool      stackmapattr_calculation;
 
@@ -63,23 +60,12 @@ namespace CPVerifier_5 {
             if( stackmapattr_calculation ) stack.push(target);
         }
 
-        void touch_remaining_dead_code() {
-            if( stackmapattr_calculation ) {
-                for( Address i = 0; i < m_code_length; i++ ) {
-                    // for masks 00 set them to 01
-                    props.touchDeadAndMiddles(i);
-                }
-            }
-        }
-
         static const short MARK_SUBROUTINE_DONE = -1;
 
         //init method-wide data
         void init(method_handler _m_method) {
             vf_Context_x<vf_Context_5, WorkmapElement, _WorkmapElement, StackmapElement>::init(_m_method);
             stack.init();
-            dead_code_stack.init();
-
             props.init(mem, m_code_length);
         }
 
@@ -179,7 +165,6 @@ namespace CPVerifier_5 {
             }
             return VF_OK;
         }
-
 
         ///////////////////////////////////  "VIRTUAL" METHODS /////////////////////////////////////////////
     public:

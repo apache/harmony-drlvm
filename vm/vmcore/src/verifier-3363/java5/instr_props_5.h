@@ -124,8 +124,13 @@ namespace CPVerifier_5 {
             clear_mask(instr, 1);
         }
 
-        void touchDeadAndMiddles(Address instr) {
-            fill_mask(instr, 1);
+        void pass2started(int stackmapattr_calculation, Address code_length) {
+            //touch dead and middles so that we can distinguish between two times passed and dead 
+            if( stackmapattr_calculation ) {
+                for( Address instr = 0; instr < code_length; instr++ ) {
+                    fill_mask(instr, 1);
+                }
+            }
         }
 
         int isDeadCodeStart(Address instr) { //dead block begins with 01, middles are 11, ends with 10 or 00

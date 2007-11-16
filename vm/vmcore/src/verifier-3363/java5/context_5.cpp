@@ -53,9 +53,7 @@ namespace CPVerifier_5 {
         while( instr < m_code_length ) {
             if( props.isParsePassed(instr) ) {
                 // more than one branch leads to this instruction
-                if( !dead_code_parsing ) {
-                    props.setMultiway(instr);
-                }
+                props.setMultiway(instr);
                 return VF_OK;
             }
 
@@ -117,11 +115,6 @@ namespace CPVerifier_5 {
                 mark_stackmap_point(target);
 
                 if( instr_direct(pi, opcode, m_bytecode, instr) ) {
-                    //TODO: though the spec does not require to check the dead code for correctness
-                    //RI seems to check it and some Harmony negative tests have broken dead code
-
-                    dead_code_stack.push(instr+instr_len);
-
                     instr = target; // it is not an if* - go to jump target
                 } else {
                     // process conditional jump target or jsr
@@ -131,8 +124,6 @@ namespace CPVerifier_5 {
                     instr += instr_len;
                 }
             } else if( instr_direct(pi, opcode, m_bytecode, instr) ) {
-                dead_code_stack.push(instr+instr_len);
-
                 // it is not a jump ==> it is return or throw or ret
                 return VF_OK;
             } else {
@@ -428,20 +419,16 @@ namespace CPVerifier_5 {
         unsigned short handler_pc;
         unsigned short handler_cp_index;
 
+        //check validness of try blocks
+        //TODO: is verifier the right place for that?
         for( idx = 0; idx < m_handlecount; idx++ ) {
-            method_get_exc_handler_info( m_method, idx, &start_pc, &end_pc,
-                &handler_pc, &handler_cp_index );
+            method_get_exc_handler_info( m_method, idx, &start_pc, &end_pc, &handler_pc, &handler_cp_index );
 
             if( start_pc >= end_pc || end_pc > m_code_length ) {
                 return error(VF_ErrorHandler, "start_pc >= end_pc OR end_pc > code_length");
             }
-            stack.push(handler_pc);
         }
 
-        //we have different slightly rules for processing dead and live code
-        //e.g. it's not a problem if dead code runs out of the method
-        //but we still have to verify it for corrupted instructions to follow RI
-        dead_code_parsing = 0;
         do {
             while( !stack.is_empty() ) {
                 vf_Result tcr = parse(stack.pop());
@@ -450,23 +437,32 @@ namespace CPVerifier_5 {
                 }
             }
 
-            dead_code_parsing = 1;
+            for( idx = 0; idx < m_handlecount; idx++ ) {
+                method_get_exc_handler_info( m_method, idx, &start_pc, &end_pc, &handler_pc, &handler_cp_index );
 
-            while( !dead_code_stack.is_empty() ) {
-                vf_Result tcr = parse(dead_code_stack.pop());
-                if( tcr != VF_OK ) {
-                    return tcr;
+                if( props.isParsePassed(handler_pc)) {
+                    props.setMultiway(handler_pc);
+                    continue;
+                }
+
+                if( props.isOperand(handler_pc) ) {
+                    return error(VF_ErrorCodeEnd, "handler_pc at the middle of an instruction");
+                }
+
+                for( Address i = start_pc + 1; i < end_pc; i++ ) {
+                    //check if there was a reachable code in try block
+                    if( props.isParsePassed(i) ) {
+                        //push handler if there was
+                        stack.push(handler_pc);
+                        break;
+                    }
                 }
             }
         } while (!stack.is_empty());
 
-        touch_remaining_dead_code();
-
-
         for( idx = 0; idx < m_handlecount; idx++ ) {
 
-            method_get_exc_handler_info( m_method, idx, &start_pc, &end_pc,
-                &handler_pc, &handler_cp_index );
+            method_get_exc_handler_info( m_method, idx, &start_pc, &end_pc, &handler_pc, &handler_cp_index );
 
             if( end_pc < m_code_length && props.isOperand(end_pc) || props.isOperand(start_pc) ) {
                 return error(VF_ErrorCodeEnd, "start_pc or end_pc are at the middle of an instruction");
@@ -489,6 +485,7 @@ namespace CPVerifier_5 {
 
         //////////////////////////// SECOND PASS /////////////////////////
         pass = 2;
+        props.pass2started(stackmapattr_calculation, m_code_length);
 
         stack.xPush(0);
         while( !stack.is_empty() ) {
