@@ -68,8 +68,11 @@
             <isset property="equinox.launcher"/>
         </condition>
 
-        <java fork="true" jvm="${test.jvm.exe}" jar="${eclipse.launcher.jar}" 
-            resultproperty="ehwa.result">
+        <java fork="true" 
+              jvm="${test.jvm.exe}" 
+              jar="${eclipse.launcher.jar}" 
+              dir="${ehwa.test.dir}"
+              resultproperty="ehwa.result">
             <jvmarg line="${ehwa.mode.switch} ${test.vmargs}" />
             <arg line="-application org.eclipse.test.uitestapplication"/>
             <arg line="-dev bin -consolelog"/>

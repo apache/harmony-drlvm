@@ -119,15 +119,26 @@ ${@{file}.content}
     
     <macrodef name="gen-test-report">
         <attribute name="dir" />
+        <attribute name="include" default="*.xml"/>
         <sequential>
             <if>
                 <not><isset property="skip.report"/></not>
                 <then>
+                    <fileset dir="@{dir}" id="@{dir}.full">
+                        <include name="@{include}" />
+                        <exclude name="TESTS-TestSuites.xml"/>
+                    </fileset>
+                    <fileset dir="@{dir}" id="@{dir}.short">
+                        <include name="@{include}" />
+                        <containsregexp expression='(errors|failures)=.[1-9]' />
+                        <exclude name="TESTS-TestSuites.xml"/>
+                    </fileset>
+                    <condition property="@{dir}.id" value="@{dir}.short" else="@{dir}.full">
+                        <isset property="short.report"/>
+                    </condition>
+                    
                     <junitreport todir="@{dir}">
-                        <fileset dir="@{dir}">
-                            <include name="*.xml" />
-                            <exclude name="TESTS-TestSuites.xml"/>
-                        </fileset>
+                        <fileset refid="${@{dir}.id}"/>
                         <report format="frames" todir="@{dir}/html" />
                     </junitreport>
                 </then>

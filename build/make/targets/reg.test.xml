@@ -16,7 +16,7 @@
      limitations under the License. -->
 <project name="REGRESSION TESTS">
     
-    <import file="${basedir}/targets/reg.test.run.xml"/>
+    <import file="reg.test.run.xml"/>
     
     <property name="reg.test.src" location="${basedir}/../../src/test/regression"/>
     <property name="reg.test.dir" location="${base.test.dir}/reg.tests"/>

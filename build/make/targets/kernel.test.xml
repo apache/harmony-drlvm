@@ -114,6 +114,7 @@
             haltonfailure="${test.failfast}"
             forkmode="${kernel.test.forkmode}" 
             timeout="${test.timeout}"
+            dir="${kernel.test.dir}"
             jvm="${test.jvm.exe}">
 
             <jvmarg line="${kernel.mode.switch} ${test.vmargs}" />

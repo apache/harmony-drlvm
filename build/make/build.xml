@@ -503,6 +503,7 @@
     
     <target name="hut.test" depends="init">
         <property name="hut.module" value="*"/>
+        <property name="test.vmargs" value=""/>
         <ant antfile="${external.dep.CLASSLIB}/build.xml" inheritAll="no">
             <target name="properties"/>
             <target name="test"/>
@@ -517,6 +518,7 @@
     <target name="test2" depends="init">
         <property file="test.properties"/>
         <property name="run.all.tests" value="true"/>
+        <property name="short.report" value="true"/>
         <mkdir dir="${base.test.dir}"/>
         <parallel threadsPerProcessor="1" failonany="no">
             <ant target="hut.test"      output="${base.test.dir}/hut.log"/>

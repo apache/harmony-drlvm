@@ -189,7 +189,7 @@
                         <var name="test.report" value="${smoke.test.dir}/reports/${class.name}_${mode.id}"/>
 
                         <java newenvironment="yes"
-                            dir="${test.jre.home}/bin"
+                            dir="${smoke.test.dir}"
                             classname="${class.name}"
                             fork="true"
                             jvm="${test.jvm.exe}"

@@ -111,6 +111,7 @@
                        failureproperty="${testname}.failed"
                        haltonfailure="${test.failfast}"
                        timeout="${test.timeout}"
+                       dir="${jvmti.test.dir}"
                        jvm="${test.jvm.exe}">
                     <jvmarg value="-agentpath:${jvmti.test.native.path}/${testname}/${shlib.prefix}${testname}${shlib.suffix}"/>
                     <jvmarg line="${mode.switch} ${test.vmargs}" />

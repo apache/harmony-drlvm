@@ -63,9 +63,7 @@
                     <then>
                         <!-- Launch the tests with a custom launchers 
                                                 placed near the tests -->
-                        <ant antfile="@{reg.test.2launch}/run.test.xml" 
-                            target="run-test" 
-                            inheritAll="true" inheritRefs="true"/>
+                        <ant antfile="@{reg.test.2launch}/run.test.xml" target="run-test"/>
                     </then>
                     <else>
                         <!-- Run standard JUnit tests -->
@@ -119,7 +117,7 @@
             <junit jvm="${test.jvm.exe}"
                    fork="yes"
                    printsummary="withOutAndErr"
-                   dir="${basedir}"
+                   dir="${reg.test.dir}"
                    failureproperty="reg.test.errors"
                    timeout="${reg.test.timeout}">
                 <jvmarg line="@{vmarg} ${test.vmargs}"/>
@@ -181,6 +179,7 @@
                   classname="@{test}"
                   resultproperty="@{test}.res.code"
                   output="${reg.test.dir}/reports/@{test}.txt"
+                  dir="${reg.test.dir}"
                   fork="yes"
                   timeout="${reg.test.timeout}">
                 <java-element/>
