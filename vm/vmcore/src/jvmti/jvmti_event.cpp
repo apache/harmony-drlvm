@@ -1006,7 +1006,9 @@ jvmti_process_method_exit_event(jmethodID method,
     SuspendDisabledChecker sdc;
 
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
-    if (!jvmti_should_report_event(JVMTI_EVENT_METHOD_EXIT))
+    // FRAME_POP events are emmited by METHOD_EXIT event processing code
+    if ( (! jvmti_should_report_event(JVMTI_EVENT_METHOD_EXIT)) && 
+        (! jvmti_should_report_event(JVMTI_EVENT_FRAME_POP)))
         return;
 
     if (JVMTI_PHASE_LIVE != ti->getPhase())
