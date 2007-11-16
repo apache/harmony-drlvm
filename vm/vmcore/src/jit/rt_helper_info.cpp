@@ -348,21 +348,21 @@ int vm_helper_get_numargs(VM_RT_SUPPORT id)
     }
 }
 
-Class* load_magic_helper_class(Global_Env * vm_env, const char * class_name) {
+static Class* load_magic_helper_class(Global_Env * vm_env, const char * class_name) {
     return vm_env->LoadCoreClass(class_name);
 }
 
-void init_magic_helper_class(Class* magic_helper_class){
+static void init_magic_helper_class(Class* magic_helper_class){
     tmn_suspend_disable();
     class_initialize(magic_helper_class);
 
-    if(exn_raised()){
-        DIE("Exception raised during "  << magic_helper_class->get_name()->bytes << " class initializing.");
+    if (exn_raised()){
+        DIE("Exception raised while initializing helper class "  << magic_helper_class->get_name()->bytes);
     }
     tmn_suspend_enable();
 }
 
-Method_Handle resolve_magic_helper(Global_Env * vm_env, 
+static Method_Handle resolve_magic_helper(Global_Env * vm_env, 
                                    const char* class_name, 
                                    const char* method_name, 
                                    const char* method_descr) {
