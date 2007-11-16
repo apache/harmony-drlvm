@@ -21,7 +21,14 @@
 package org.apache.harmony.drlvm;
 
 import org.vmmagic.unboxed.Address;
-
+/**
+    Core class for DRLVM's vmmagic based helpers.
+    Resolved and initilized during VM startup
+    
+    Note: All classes with vmmagic based helpers registred in VM are also resolved and initialized at VM startup
+    Note: If you need to initialize another DRLVM's specific utility class related to vmmagic infrastructure
+          refer to it from static section of this class: and it will also be automatically initialized
+*/
 public class VMHelper {
 
     private VMHelper() {}

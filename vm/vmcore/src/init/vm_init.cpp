@@ -40,6 +40,7 @@
 #include "interpreter.h"
 #include "em_intf.h"
 #include "dll_jit_intf.h"
+#include "jit_runtime_support.h"
 #include "jni_utils.h"
 #include "platform_lowlevel.h"
 #include "verify_stack_enumeration.h"
@@ -874,6 +875,11 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
 
     // We assume, that at this point VM supports exception objects creation.
     vm_env->ReadyForExceptions();
+
+    status = helper_magic_init(vm_env);
+    if(status != 0) {
+        return JNI_ERR;
+    }
 
     return JNI_OK;
 }

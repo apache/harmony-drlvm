@@ -28,34 +28,29 @@
 
 namespace Jitrino {
 
+class HelperConfig {
+public:
+    HelperConfig(VM_RT_SUPPORT id) : helperId(id), doInlining(true), hotnessPercentToInline(0) {}
+    VM_RT_SUPPORT helperId;
+    bool          doInlining;
+    uint32        hotnessPercentToInline;
+};    
+
 struct HelperInlinerFlags {
+    HelperInlinerFlags(MemoryManager& mm) 
+        : inlinerPipelineName(NULL), opcodeToHelperMapping(mm), helperConfigs(mm){}
+
     const char* inlinerPipelineName;
 
-    bool insertInitilizers;
-    bool doInlining;
-
-#define DECLARE_STANDARD_HELPER_FLAGS(name) \
-    bool  name##_doInlining;\
-    uint32   name##_hotnessPercentToInline;\
-    const char* name##_className;\
-    const char* name##_methodName;\
-    const char* name##_signature;\
-
-DECLARE_STANDARD_HELPER_FLAGS(newObj);
-DECLARE_STANDARD_HELPER_FLAGS(newArray);
-DECLARE_STANDARD_HELPER_FLAGS(objMonEnter);
-DECLARE_STANDARD_HELPER_FLAGS(objMonExit);
-DECLARE_STANDARD_HELPER_FLAGS(wb);
-DECLARE_STANDARD_HELPER_FLAGS(ldInterface);
-DECLARE_STANDARD_HELPER_FLAGS(checkCast);
-DECLARE_STANDARD_HELPER_FLAGS(instanceOf);
-    
+    StlMap<Opcode, VM_RT_SUPPORT> opcodeToHelperMapping;
+    StlMap<VM_RT_SUPPORT, HelperConfig*> helperConfigs;
 };
 
 class HelperInlinerAction: public Action {
 public:
-    HelperInlinerAction() {}
+    HelperInlinerAction() : flags(Jitrino::getGlobalMM()) {}
     void init();
+    void registerHelper(Opcode opcode, VM_RT_SUPPORT helperId);
     HelperInlinerFlags& getFlags() {return flags;}
 protected:
     HelperInlinerFlags flags;
@@ -65,59 +60,35 @@ DEFINE_SESSION_ACTION_WITH_ACTION(HelperInlinerSession, HelperInlinerAction, inl
 
 void HelperInlinerAction::init() {
     flags.inlinerPipelineName = getStringArg("pipeline", "inliner_pipeline");
-    flags.insertInitilizers = getBoolArg("insertInitilizers", false);
-    flags.doInlining = true;
     
-    
-#define READ_STANDARD_HELPER_FLAGS(name)\
-    flags.name##_doInlining = getBoolArg(#name, false);\
-    if (flags.name##_doInlining) {\
-    flags.name##_className = getStringArg(#name"_className", NULL);\
-    flags.name##_methodName = getStringArg(#name"_methodName", NULL);\
-    flags.name##_hotnessPercentToInline = getIntArg(#name"_hotnessPercent", 0);\
-        if (flags.name##_className == NULL || flags.name##_methodName == NULL) {\
-            if (Log::isEnabled()) {\
-                Log::out()<<"Invalid fast path helper name:"<<flags.name##_className<<"::"<<flags.name##_methodName<<std::endl;\
-            }\
-            flags.name##_doInlining = false;\
-        }\
-    }\
-    if (!flags.name##_doInlining){\
-        flags.name##_className = NULL;\
-        flags.name##_methodName = NULL;\
-    }\
-
-    READ_STANDARD_HELPER_FLAGS(newObj);
-    flags.newObj_signature = "(II)Lorg/vmmagic/unboxed/Address;";
-
-    READ_STANDARD_HELPER_FLAGS(newArray);
-    flags.newArray_signature = "(III)Lorg/vmmagic/unboxed/Address;";
-
-    READ_STANDARD_HELPER_FLAGS(objMonEnter);
-    flags.objMonEnter_signature = "(Ljava/lang/Object;)V";
-
-    READ_STANDARD_HELPER_FLAGS(objMonExit);
-    flags.objMonExit_signature = "(Ljava/lang/Object;)V";
-
-    READ_STANDARD_HELPER_FLAGS(wb);
-    flags.wb_signature = "(Lorg/vmmagic/unboxed/Address;Lorg/vmmagic/unboxed/Address;Lorg/vmmagic/unboxed/Address;)V";
-
-    READ_STANDARD_HELPER_FLAGS(ldInterface);
-    flags.ldInterface_signature = "(Ljava/lang/Object;Lorg/vmmagic/unboxed/Address;)Lorg/vmmagic/unboxed/Address;";
-    
-    READ_STANDARD_HELPER_FLAGS(checkCast);
-    flags.checkCast_signature = "(Ljava/lang/Object;Lorg/vmmagic/unboxed/Address;ZZZI)Ljava/lang/Object;";
-    
-    READ_STANDARD_HELPER_FLAGS(instanceOf);
-    flags.instanceOf_signature = "(Ljava/lang/Object;Lorg/vmmagic/unboxed/Address;ZZZI)Z";
+    registerHelper(Op_NewObj, VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE);
+    registerHelper(Op_NewArray, VM_RT_NEW_VECTOR_USING_VTABLE);
+    registerHelper(Op_TauMonitorEnter, VM_RT_MONITOR_ENTER_NON_NULL);
+    registerHelper(Op_TauMonitorExit, VM_RT_MONITOR_EXIT_NON_NULL);
+    registerHelper(Op_TauStRef, VM_RT_GC_HEAP_WRITE_REF);
+    registerHelper(Op_TauLdIntfcVTableAddr, VM_RT_GET_INTERFACE_VTABLE_VER0);
+    registerHelper(Op_TauCheckCast, VM_RT_CHECKCAST);
+    registerHelper(Op_TauInstanceOf, VM_RT_INSTANCEOF);
 }
 
+void HelperInlinerAction::registerHelper(Opcode opcode, VM_RT_SUPPORT helperId) {
+    MemoryManager& globalMM = getJITInstanceContext().getGlobalMemoryManager();
+    assert(flags.opcodeToHelperMapping.find(opcode)==flags.opcodeToHelperMapping.end()); 
+    flags.opcodeToHelperMapping[opcode] = helperId; 
+    if (flags.helperConfigs.find(helperId)== flags.helperConfigs.end()) {
+        std::string helperName = vm_helper_get_name(helperId);
+        HelperConfig* h = new (globalMM) HelperConfig(helperId);
+        h->doInlining = getBoolArg(helperName.c_str(), false);
+        h->hotnessPercentToInline = getIntArg((helperName + "_hotnessPercent").c_str(), 0);
+        flags.helperConfigs[helperId] = h; 
+    }
+}
 
 class HelperInliner {
 public:
-    HelperInliner(HelperInlinerSession* _sessionAction, MemoryManager& tmpMM, CompilationContext* _cc, Inst* _inst, uint32 _hotness)  
+    HelperInliner(HelperInlinerSession* _sessionAction, MemoryManager& tmpMM, CompilationContext* _cc, Inst* _inst, uint32 _hotness, MethodDesc* _helperMethod, VM_RT_SUPPORT _helperId)  
         : flags(((HelperInlinerAction*)_sessionAction->getAction())->getFlags()), localMM(tmpMM), 
-        cc(_cc), inst(_inst), session(_sessionAction), method(NULL)
+        cc(_cc), inst(_inst), session(_sessionAction), method(_helperMethod), helperId(_helperId)
     {
         hotness=_hotness;
         irm = cc->getHIRManager();
@@ -127,15 +98,15 @@ public:
         cfg = &irm->getFlowGraph();
     }
 
-    virtual ~HelperInliner(){};
-    
-    virtual void run()=0;
+    ~HelperInliner(){};
+
+    void run();
 
     uint32 hotness;
 
+    static MethodDesc* findHelperMethod(CompilationInterface* ci, VM_RT_SUPPORT helperId);
+
 protected:
-    MethodDesc* ensureClassIsResolvedAndInitialized(const char* className,  const char* methodName, const char* signature);
-    virtual void doInline() = 0;
     void inlineVMHelper(MethodCallInst* call);
     void finalizeCall(MethodCallInst* call);
 
@@ -145,46 +116,29 @@ protected:
     Inst* inst;
     HelperInlinerSession* session;
     MethodDesc*  method;
-    
-//these fields used by almost every subclass -> cache them
+    VM_RT_SUPPORT helperId;
+
+    //these fields used by almost every subclass -> cache them
     IRManager* irm;
     InstFactory* instFactory;
     OpndManager* opndManager;
     TypeManager* typeManager;
     ControlFlowGraph* cfg;
+private: 
+    void inline_NewObj();
+    void inline_NewArray();
+    void inline_TauLdIntfcVTableAddr();
+    void inline_TauCheckCast();
+    void inline_TauInstanceOf();
+    void inline_TauStRef();
+    void inline_TauMonitorEnter();
+    void inline_TauMonitorExit();
 };
 
 class HelperInlinerCompare {
 public:
     bool operator()(const HelperInliner* hi1, const HelperInliner* hi2) { return hi1->hotness < hi2->hotness; }
 };
-
-
-#define DECLARE_HELPER_INLINER(name, flagPrefix)\
-class name : public HelperInliner {\
-public:\
-    name (HelperInlinerSession* session, MemoryManager& tmpMM, CompilationContext* cc, Inst* inst, uint32 hotness)\
-        : HelperInliner(session, tmpMM, cc, inst, hotness){}\
-    \
-    virtual void run() { \
-        if (Log::isEnabled())  {\
-            Log::out() << "Processing inst:"; inst->print(Log::out()); Log::out()<<std::endl; \
-        }\
-        method = ensureClassIsResolvedAndInitialized(flags.flagPrefix##_className, flags.flagPrefix##_methodName, flags.flagPrefix##_signature);\
-        if (!method) return;\
-        doInline();\
-    }\
-    virtual void doInline();\
-};\
-
-DECLARE_HELPER_INLINER(NewObjHelperInliner, newObj)
-DECLARE_HELPER_INLINER(NewArrayHelperInliner, newArray)
-DECLARE_HELPER_INLINER(ObjMonitorEnterHelperInliner, objMonEnter)
-DECLARE_HELPER_INLINER(ObjMonitorExitHelperInliner, objMonExit)
-DECLARE_HELPER_INLINER(WriteBarrierHelperInliner, wb)
-DECLARE_HELPER_INLINER(LdInterfaceHelperInliner, ldInterface)
-DECLARE_HELPER_INLINER(CheckCastHelperInliner, checkCast)
-DECLARE_HELPER_INLINER(InstanceOfHelperInliner, instanceOf)
 
 void HelperInlinerSession::_run(IRManager& irm) {
     CompilationContext* cc = getCompilationContext();
@@ -202,6 +156,10 @@ void HelperInlinerSession::_run(IRManager& irm) {
     uint32 maxNodeCount = irm.getOptimizerFlags().hir_node_threshold;
     StlPriorityQueue<HelperInliner*, StlVector<HelperInliner*>, HelperInlinerCompare> *helperInlineCandidates = 
         new (tmpMM) StlPriorityQueue<HelperInliner*, StlVector<HelperInliner*>, HelperInlinerCompare>(tmpMM);
+
+    const StlMap<Opcode, VM_RT_SUPPORT>& opcodeToHelper = flags.opcodeToHelperMapping;
+    const StlMap<VM_RT_SUPPORT, HelperConfig*>& configs = flags.helperConfigs;
+
     const Nodes& nodes = fg.getNodesPostOrder();//process checking only reachable nodes.
     for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
         Node* node = *it;
@@ -211,49 +169,26 @@ void HelperInlinerSession::_run(IRManager& irm) {
         if (node->isBlockNode()) {
             for (Inst* inst = (Inst*)node->getFirstInst(); inst!=NULL; inst = inst->getNextInst()) {
                 Opcode opcode = inst->getOpcode();
-                switch(opcode) {
-                    case Op_NewObj:
-                        if (flags.newObj_doInlining && nodePercent >= flags.newObj_hotnessPercentToInline) {
-                            helperInlineCandidates->push(new (tmpMM) NewObjHelperInliner(this, tmpMM, cc, inst, nodePercent));
-                        }
-                        break;
-                    case Op_NewArray:
-                        if (flags.newArray_doInlining && nodePercent >= flags.newArray_hotnessPercentToInline) {
-                            helperInlineCandidates->push(new (tmpMM) NewArrayHelperInliner(this, tmpMM, cc, inst, nodePercent));
-                        }
-                        break;
-                    case Op_TauMonitorEnter:
-                        if (flags.objMonEnter_doInlining && nodePercent >= flags.objMonEnter_hotnessPercentToInline) {
-                            helperInlineCandidates->push(new (tmpMM) ObjMonitorEnterHelperInliner(this, tmpMM, cc, inst, nodePercent));
-                        }
-                        break;
-                    case Op_TauMonitorExit:
-                        if (flags.objMonExit_doInlining && nodePercent >= flags.objMonExit_hotnessPercentToInline) {
-                            helperInlineCandidates->push(new (tmpMM) ObjMonitorExitHelperInliner(this, tmpMM, cc, inst, nodePercent));
-                        }
-                        break;
-                    case Op_TauStRef:
-                        if (flags.wb_doInlining && nodePercent >= flags.wb_hotnessPercentToInline) {
-                            helperInlineCandidates->push(new (tmpMM) WriteBarrierHelperInliner(this, tmpMM, cc, inst, nodePercent));
-                        }
-                        break;
-                    case Op_TauLdIntfcVTableAddr:
-                        if (flags.ldInterface_doInlining && nodePercent >= flags.ldInterface_hotnessPercentToInline) {
-                            helperInlineCandidates->push(new (tmpMM) LdInterfaceHelperInliner(this, tmpMM, cc, inst, nodePercent));
-                        }
-                        break;
-                    case Op_TauCheckCast:
-                        if (flags.checkCast_doInlining && nodePercent >= flags.checkCast_hotnessPercentToInline) {
-                            helperInlineCandidates->push(new (tmpMM) CheckCastHelperInliner(this, tmpMM, cc, inst, nodePercent));
-                        }
-                        break;
-                    case Op_TauInstanceOf:
-                        if (flags.instanceOf_doInlining && nodePercent >= flags.instanceOf_hotnessPercentToInline) {
-                            helperInlineCandidates->push(new (tmpMM) InstanceOfHelperInliner(this, tmpMM, cc, inst, nodePercent));
-                        }
-                        break;
-                    default: break;
+                StlMap<Opcode, VM_RT_SUPPORT>::const_iterator o2h = opcodeToHelper.find(opcode);
+                if (o2h == opcodeToHelper.end()) {
+                    continue;
                 }
+                VM_RT_SUPPORT helperId = o2h->second;
+                StlMap<VM_RT_SUPPORT, HelperConfig*>::const_iterator iconf = configs.find(helperId);
+                if (iconf == configs.end()) {
+                    continue;
+                }
+                HelperConfig* config = iconf->second;
+                if (!config->doInlining || config->hotnessPercentToInline >= nodePercent) {
+                    continue;
+                }
+                MethodDesc* md = HelperInliner::findHelperMethod(cc->getVMCompilationInterface(), helperId);
+                if (md == NULL) {
+                    continue;
+                }
+                HelperInliner* inliner = new (tmpMM) HelperInliner(this, tmpMM, cc, inst, nodePercent, md, helperId);
+                
+                helperInlineCandidates->push(inliner);
             }
         }
     }
@@ -266,35 +201,39 @@ void HelperInlinerSession::_run(IRManager& irm) {
     }
 }
 
-
-MethodDesc* HelperInliner::ensureClassIsResolvedAndInitialized(const char* className, const char* methodName, const char* signature) 
-{
-    CompilationInterface* ci = cc->getVMCompilationInterface();
-    ObjectType* clazz = ci->resolveClassUsingBootstrapClassloader(className);
-    if (!clazz) {
-        if (Log::isEnabled()) Log::out()<<"Error: class not found:"<<className<<std::endl;
-        return NULL;
+void HelperInliner::run()  {
+    if (Log::isEnabled())  {
+        Log::out() << "Processing inst:"; inst->print(Log::out()); Log::out()<<std::endl; 
     }
-    //helper class is resolved here -> check if initialized
-    if (clazz->needsInitialization()) {
-        if (flags.insertInitilizers) {
-            instFactory->makeInitType(clazz)->insertBefore(inst);
-        }
-        return NULL;
+    assert(method);
+    switch(inst->getOpcode()) {
+        case Op_NewObj:                 inline_NewObj(); break;
+        case Op_NewArray:               inline_NewArray(); break;
+        case Op_TauLdIntfcVTableAddr:   inline_TauLdIntfcVTableAddr(); break;
+        case Op_TauCheckCast:           inline_TauCheckCast(); break;
+        case Op_TauInstanceOf:          inline_TauInstanceOf(); break;
+        case Op_TauStRef:               inline_TauStRef(); break;
+        case Op_TauMonitorEnter:        inline_TauMonitorEnter(); break;
+        case Op_TauMonitorExit:         inline_TauMonitorExit(); break;
+        default: assert(0);
     }
-    //helper class is initialized here -> inline it.
-    MethodDesc* method = ci->resolveMethod(clazz, methodName, signature);
-    if (!method) {
-        if (Log::isEnabled()) Log::out()<<"Error: method not found:"<<className<<"::"<<methodName<<signature<<std::endl;;
-        return NULL;
-    }
-    assert (method->isStatic());
-    return method;
-
 }
 
-typedef StlVector<MethodCallInst*> InlineVector;
-
+MethodDesc* HelperInliner::findHelperMethod(CompilationInterface* ci, VM_RT_SUPPORT helperId) 
+{
+    Method_Handle mh = vm_helper_get_magic_helper(helperId);
+    if (mh == NULL) {
+        if (Log::isEnabled()) Log::out()<<"WARN: helper's method is not resolved:"<<vm_helper_get_name(helperId)<<std::endl;
+        return NULL;
+    }
+    Class_Handle ch = method_get_class(mh);
+    if (!class_is_initialized(ch)) {
+        if (Log::isEnabled()) Log::out()<<"WARN: class is not initialized:"<<class_get_name(ch)<<std::endl;
+        return NULL;
+    }
+    MethodDesc* md = ci->getMethodDesc(mh);
+    return md;
+}
 
 void HelperInliner::inlineVMHelper(MethodCallInst* call) {
     if (Log::isEnabled()) {
@@ -329,7 +268,7 @@ void HelperInliner::finalizeCall(MethodCallInst* callInst) {
 
 
 
-void NewObjHelperInliner::doInline() {
+void HelperInliner::inline_NewObj() {
 #if defined (_IPF_)
     return;
 #else
@@ -386,7 +325,7 @@ void NewObjHelperInliner::doInline() {
 #endif
 }
 
-void NewArrayHelperInliner::doInline() {
+void HelperInliner::inline_NewArray() {
 #if defined (_IPF_)
     return;
 #else
@@ -444,7 +383,7 @@ void NewArrayHelperInliner::doInline() {
 }
 
 
-void ObjMonitorEnterHelperInliner::doInline() {
+void HelperInliner::inline_TauMonitorEnter() {
 #if defined (_IPF_)
     return;
 #else
@@ -480,7 +419,7 @@ void ObjMonitorEnterHelperInliner::doInline() {
 #endif
 }
 
-void ObjMonitorExitHelperInliner::doInline() {
+void HelperInliner::inline_TauMonitorExit() {
 #if defined (_IPF_)
     return;
 #else
@@ -504,7 +443,7 @@ void ObjMonitorExitHelperInliner::doInline() {
 #endif
 }
 
-void WriteBarrierHelperInliner::doInline() {
+void HelperInliner::inline_TauStRef() {
 #if defined  (_EM64T_) || defined (_IPF_)
     return;
 #else
@@ -548,7 +487,7 @@ void WriteBarrierHelperInliner::doInline() {
 #endif
 }
 
-void LdInterfaceHelperInliner::doInline() {
+void HelperInliner::inline_TauLdIntfcVTableAddr() {
 #if defined  (_EM64T_) || defined (_IPF_)
     return;
 #else
@@ -583,7 +522,7 @@ void LdInterfaceHelperInliner::doInline() {
 
 
 
-void CheckCastHelperInliner::doInline() {
+void HelperInliner::inline_TauCheckCast() {
 #if defined  (_EM64T_) || defined (_IPF_)
     return;
 #else
@@ -649,7 +588,7 @@ void CheckCastHelperInliner::doInline() {
 }
 
 
-void InstanceOfHelperInliner::doInline() {
+void HelperInliner::inline_TauInstanceOf() {
 #if defined  (_EM64T_) || defined (_IPF_)
     return;
 #else

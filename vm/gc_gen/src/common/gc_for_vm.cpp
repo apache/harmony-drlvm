@@ -22,6 +22,7 @@
 #include <cxxlog.h>
 #include "port_sysinfo.h"
 #include "vm_threads.h"
+#include "jit_runtime_support.h"
 #include "compressed_ref.h"
 
 #include "../gen/gen.h"
@@ -51,6 +52,13 @@ static void gc_get_system_info(GC *gc)
   gc->_num_processors = port_CPUs_number();
   gc->_system_alloc_unit = vm_get_system_alloc_unit();
   SPACE_ALLOC_UNIT = max(gc->_system_alloc_unit, GC_BLOCK_SIZE_BYTES);
+}
+
+static void init_gc_helpers()
+{
+    set_property("vm.component.classpath.gc_gen", "gc_gen.jar", VM_PROPERTIES);
+    vm_helper_register_magic_helper(VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE, "org/apache/harmony/drlvm/gc_gen/GCHelper", "alloc");
+    vm_helper_register_magic_helper(VM_RT_NEW_VECTOR_USING_VTABLE,  "org/apache/harmony/drlvm/gc_gen/GCHelper", "allocArray");
 }
 
 int gc_init() 
@@ -103,6 +111,8 @@ int gc_init()
   collector_initialize(gc);
   
   gc_init_heap_verification(gc);
+
+  init_gc_helpers();
   
   mutator_need_block = FALSE;
 

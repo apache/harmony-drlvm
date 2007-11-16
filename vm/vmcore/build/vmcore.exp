@@ -621,8 +621,10 @@ VMCORE_0.1 {
     vm_helper_get_by_name;
     vm_helper_get_calling_convention;
     vm_helper_get_interruptibility_kind;
+    vm_helper_get_magic_helper;
     vm_helper_get_name;
     vm_helper_get_numargs;
+    vm_helper_register_magic_helper;
     vm_hint_finalize;
     vm_instanceof_class;
     vm_iterate_object;

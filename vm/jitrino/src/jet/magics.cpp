@@ -76,7 +76,7 @@ static void vstack_replace_top_opnd(Compiler* c, jtype jt) {
         c->vpush(dst); //push result
     } else { // expansion
         assert(srcSize<dstSize);
-        c->do_mov(dst, src); //fill lower part -> dst
+        c->do_mov(dst, src, true); //fill lower part -> dst
         Opnd hi(jt, c->g_iconst_0); //fill hi part with 0
         c->vpop(); //pop old value
         c->vpush2(dst, hi); //push new value

@@ -28,6 +28,7 @@
 #include "open/vm_gc.h"
 #include "open/gc.h"
 #include "jit_intf.h"
+#include "jit_runtime_support.h"
 #include <assert.h>
 #include "gc_types.h"
 #include "cxxlog.h"
@@ -291,6 +292,13 @@ void init_mem() {
     assert(mark_bits != MEM_FAILURE);
 }
 
+static void init_gc_helpers()
+{
+    set_property("vm.component.classpath.gc_cc", "gc_cc.jar", VM_PROPERTIES);
+    vm_helper_register_magic_helper(VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE, "org/apache/harmony/drlvm/gc_cc/GCHelper", "alloc");
+    vm_helper_register_magic_helper(VM_RT_NEW_VECTOR_USING_VTABLE, "org/apache/harmony/drlvm/gc_cc/GCHelper", "allocArray");
+}
+
 int gc_init() {
     INFO2("gc.init", "GC init called\n");
 
@@ -310,6 +318,8 @@ int gc_init() {
     init_select_gc();
     gc_end = apr_time_now();
     timer_init();
+
+    init_gc_helpers();
 
     return JNI_OK;
 }

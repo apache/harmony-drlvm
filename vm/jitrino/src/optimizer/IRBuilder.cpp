@@ -1528,7 +1528,7 @@ IRBuilder::genReturn(Opnd* src, Type* retType) {
     if(Log::isEnabled()) {
         Type* srcType = src->getType();
         bool convOk = retType == srcType;
-        convOk = convOk || (retType->isObject() && srcType->isObject());
+        convOk = convOk || (retType->isObject() && (srcType->isObject() || srcType->isUnmanagedPtr()));
         if (!convOk){
             assert(!typeManager->isLazyResolutionMode());
             Log::out() << "ERROR   !!!!  IRBuilder: unimplemented: ret typecheck !!!\n";

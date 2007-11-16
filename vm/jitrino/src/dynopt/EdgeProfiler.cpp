@@ -287,7 +287,7 @@ static bool calculateProbsFromProfile(MemoryManager& mm, ControlFlowGraph& fg, c
         Edge* edge = *it;
         uint32 key = genKey(n, edge, bcLevelProfiling, debug);
         uint32* counterAddr = profile->getCounter(key);
-        assert(bcLevelProfiling || counterAddr!=NULL);
+        //assert(bcLevelProfiling || counterAddr!=NULL); -> TODO: hits in lazy resolution mode
         uint32 freq = 0;
         if (counterAddr == NULL) {
             if (!bcLevelProfiling) { //avoid crash, use static profiler for a method
