@@ -243,17 +243,13 @@ public abstract class AnnotatedElementTestFrame extends TestCase {
     }
     
     /**
-     * getAnnotations() should throw TypeNotPresentException
-     * for the element4.
+     * getAnnotations() should skip unresolved annotation
+     * thus should return empty array for the element4.
      */
     public void testGetAnnotations4() throws Throwable {
-        try {
-            getElement4().getAnnotations();
-            fail("Misconfigured test");
-        } catch (TypeNotPresentException tnpe) {
-            assertTrue("reported type name: " + tnpe.typeName(), 
-                    tnpe.typeName().matches("notfound.MissingAntn"));
-        }
+        Annotation[] an = getElement4().getAnnotations();
+        assertNotNull(an);
+        assertEquals(0, an.length);
     }
     
     /**

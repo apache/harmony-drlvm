@@ -124,6 +124,9 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMGenericsAndAnnotatio
         return NULL;
     }
 
+    // According to J2SE specification the 0-length array must be added for
+    // the parameter w/o annotation (still this no-annotation-parameter is not
+    // skipped from the resulted array).
     unsigned i;
     for (i = 0; i < param_num; ++i) {
         jobject element = get_annotations(jenv,
@@ -162,6 +165,7 @@ JNIEXPORT jobject JNICALL Java_org_apache_harmony_vm_VMGenericsAndAnnotations_ge
     if (value) {
         Class* antn_class = method->get_class();
         jthrowable error = NULL;
+        // FIXME need to clarify against JSR-175 spec which exception should be raised
         jobject jval = resolve_annotation_value(jenv, *value, antn_class, 
             method->get_name(), &error);
         if (!jval && error) {

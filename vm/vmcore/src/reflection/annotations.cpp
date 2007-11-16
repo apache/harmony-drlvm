@@ -46,42 +46,60 @@ jobjectArray get_annotations(JNIEnv* jenv, AnnotationTable* table, AnnotationTab
 
     unsigned num = table_num + inv_table_num;
 
+    // HARMONY-5086 resolution - because there can be annotations which can't
+    // be resolved (and must be just ignored) the size of result array is
+    // unknown actually, so temporary location is used.
+    jobject* tmp_array = (jobject*) malloc(sizeof(jobject) * num);
+    unsigned result_array_size = 0;
+    jobjectArray result_array = NULL;
+
+    jthrowable skip = NULL;
+    for (unsigned i = 0; i < table_num; i++) {
+        jobject element = resolve_annotation(jenv, table->table[i], clss, &skip);
+        if (exn_raised()) {
+            assert(!element);
+            goto bail;
+        } else if (!element) { 
+            // just skip unresolved annotation
+            continue;
+        }
+        tmp_array[result_array_size++] = element;
+    }
+    for (unsigned i = 0; i < inv_table_num; i++) {
+        jobject element = resolve_annotation(jenv, inv_table->table[i], clss, &skip);
+        if (exn_raised()) {
+            assert(!element);
+            goto bail;
+        } else if (!element) { 
+            // just skip unresolved annotation
+            continue;
+        }
+        tmp_array[result_array_size++] = element;
+   }
+
+    // copy resolved annotations to result java array
     static Class* antn_class;
-    if(antn_class == NULL) {
+
+    if (antn_class == NULL) {
         antn_class = jni_get_vm_env(jenv)->LoadCoreClass(
             "java/lang/annotation/Annotation");
     }
-
-    jobjectArray array = NewObjectArray(jenv, num, 
+    result_array = NewObjectArray(jenv, result_array_size, 
         struct_Class_to_java_lang_Class_Handle(antn_class), NULL);
 
-    if (!array) {
+    if (!result_array) {
         assert(exn_raised());
-        return NULL;
+        goto bail;
     }
 
-    unsigned i;
-    for (i = 0; i < table_num; ++i) {
-        jobject element = resolve_annotation(jenv, table->table[i], clss);
-        if (!element) {
-            assert(exn_raised());
-            return NULL;
-        } else {
-            SetObjectArrayElement(jenv, array, i, element);
-            assert(!exn_raised());
-        }
+    for (unsigned i = 0; i < result_array_size; i++) {
+        SetObjectArrayElement(jenv, result_array, i, tmp_array[i]);
+        assert(!exn_raised());
     }
-    for (i = table_num; i < num; ++i) {
-        jobject element = resolve_annotation(jenv, inv_table->table[i - table_num], clss);
-        if (!element) {
-            assert(exn_raised());
-            return NULL;
-        } else {
-            SetObjectArrayElement(jenv, array, i, element);
-            assert(!exn_raised());
-        }
-    }
-    return array;
+    
+bail:
+    free(tmp_array);
+    return result_array;
 }
 
 static Class* field_descriptor_to_type(JNIEnv* jenv, String* desc, Class* clss, 
@@ -124,8 +142,7 @@ static Class* field_descriptor_to_type(JNIEnv* jenv, String* desc, Class* clss,
 jobject resolve_annotation(JNIEnv* jenv, Annotation* antn, Class* clss, jthrowable* cause)
 {
     assert(antn);
-    // fail immediately if no annotation type found
-    Class* antn_type = field_descriptor_to_type(jenv, antn->type, clss);
+    Class* antn_type = field_descriptor_to_type(jenv, antn->type, clss, cause);
     if (!antn_type) {
         return NULL;
     }
@@ -192,6 +209,7 @@ static jobject process_enum_value(JNIEnv* jenv, AnnotationValue& value, Class* c
     TRACE("resolving enum type of annotation value : " << value.enum_const.type->bytes);
 
     // fail immediately if no enum type found
+    // FIXME this behaviour should be evaluated against JSR-175 spec
     Class* enum_type = field_descriptor_to_type(jenv, value.enum_const.type, clss);
     if (enum_type) {
         if (class_is_enum(enum_type)) {
@@ -296,6 +314,8 @@ static bool process_array_element(JNIEnv* jenv, AnnotationValue& value, Class* a
             ss << "Encountered value tag \'" << (char)value.tag 
                 << "\' does not match array type " << type->get_name()->bytes << "[]";
 
+            // FIXME should it be AnnotationFormatError??
+            // need to check with JSR-175 spec
             *cause = CreateNewThrowable(jenv, genv->java_lang_ArrayStoreException_Class, 
                 ss.str().c_str(), NULL);
         }
