@@ -449,7 +449,7 @@ namespace CPVerifier_5 {
                     return error(VF_ErrorCodeEnd, "handler_pc at the middle of an instruction");
                 }
 
-                for( Address i = start_pc + 1; i < end_pc; i++ ) {
+                for( Address i = start_pc; i < end_pc; i++ ) {
                     //check if there was a reachable code in try block
                     if( props.isParsePassed(i) ) {
                         //push handler if there was
