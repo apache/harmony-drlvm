@@ -214,6 +214,7 @@ static jint process_compression_modes(Global_Env * vm_env)
         return JNI_OK;
     }
 #endif // REFS_USE_RUNTIME_SWITCH
+    return JNI_OK;
 #endif // !defined(POINTER64) || defined(REFS_USE_UNCOMPRESSED)
 }
 
