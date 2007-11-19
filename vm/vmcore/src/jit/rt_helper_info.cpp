@@ -376,6 +376,15 @@ static Method_Handle resolve_magic_helper(Global_Env * vm_env,
 }
 
 jint helper_magic_init(Global_Env * vm_env){
+#ifdef _IPF_
+    bool vmmagics_supported = false;
+#else
+    bool vmmagics_supported = true;
+#endif
+    if (!vmmagics_supported) { //skip vmmagic initialization if the feature is not supported
+        return JNI_OK;
+    }
+
     //init VMHelper class - utility class for all VMHelpers
     Class* magic_helper_class = load_magic_helper_class(vm_env, "org/apache/harmony/drlvm/VMHelper");
     init_magic_helper_class(magic_helper_class);
