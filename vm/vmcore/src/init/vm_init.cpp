@@ -737,6 +737,11 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
 #ifdef REFS_USE_RUNTIME_SWITCH
     vm_env->compress_references = get_boolean_property("vm.compress_references", TRUE, VM_PROPERTIES);
 #endif
+    // use platform default values for field sorting and field compaction
+    // if these values are not specifed on command line
+    // see Global_Env::Global_Env for defaults
+    vm_env->sort_fields = get_boolean_property("vm.sort_fields", vm_env->sort_fields, VM_PROPERTIES);
+    vm_env->compact_fields = get_boolean_property("vm.compact_fields", vm_env->compact_fields, VM_PROPERTIES);
 
     // Check compression modes and heap size
     status = process_compression_modes(vm_env);

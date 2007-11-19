@@ -215,7 +215,7 @@ void Class::assign_offsets_to_instance_fields(Field** field_ptrs, bool do_field_
     // Try to align the first field on a 4 byte boundary. It might not be if
     // -compact_fields was specified on the command line. See whether there are
     // any short instance fields towards the end of the field array (since that
-    // is where -sort_fields puts them) and try to fill in some bytes before
+    // is where -XX:+vm.sort_fields puts them) and try to fill in some bytes before
     // the "first" field.
     if(VM_Global_State::loader_env->sort_fields
         && VM_Global_State::loader_env->compact_fields)
@@ -326,31 +326,23 @@ static bool is_greater(Field *f1, Field *f2, Class *clss, bool doing_instance_fl
 } //is_greater
 
 
-static int partition(Field *A[], int l, int r, Class *clss, bool doing_instance_flds) {
-    Field *v = A[(l+r)/2];
-    int i = l - 1;
-    int j = r + 1;
-    while (true) {
-        do {j = j - 1;} while (is_greater(v, A[j], clss, doing_instance_flds));
-        do {i = i + 1;} while (is_greater(A[i], v, clss, doing_instance_flds));
-        if (i < j) {
-            Field *tmp;
-            tmp = A[i];  A[i] = A[j];  A[j] = tmp;
-        } else
-            return j;
+// Sort in decending order by size
+static void bubbleSort(Field* field[], int l, int r, Class *clss, bool doing_instance_flds) {
+    bool isChanged = true;
+    Field *temp;
+
+    while(isChanged) {
+        isChanged = false;
+        for(int c = l; c <= r-1; c++) {
+            if ( is_greater(field[c+1], field[c], clss, doing_instance_flds) ) {
+                temp = field[c+1];
+                field[c+1] = field[c];
+                field[c] = temp;
+                isChanged = true;
+            }
+        }
     }
-} //partition
-
-
-// Sort in decreasing order by size
-static void qsort(Field *A[], int l, int r, Class *clss, bool doing_instance_flds) {
-    if (l < r) {
-        int q = partition(A, l, r, clss, doing_instance_flds);
-        qsort(A, l,   q, clss, doing_instance_flds);
-        qsort(A, q+1, r, clss, doing_instance_flds);
-    }
-} //qsort
-
+}
 
 void Class::assign_offsets_to_fields()
 {
@@ -359,7 +351,7 @@ void Class::assign_offsets_to_fields()
     bool do_field_sorting    = VM_Global_State::loader_env->sort_fields;
 
     // Create a temporary array of pointers to the class's fields. We do this to support sorting the fields
-    // by size if the command line option "-sort_fields" is given, and because elements of the clss->fields array
+    // by size if the command line option "-XX:+vm.sort_fields" is given, and because elements of the clss->fields array
     // cannot be rearranged without copying their entire Field structure.
     Field** field_ptrs = new Field*[m_num_fields];
     for(int i = 0; i < m_num_fields; i++) {
@@ -372,7 +364,7 @@ void Class::assign_offsets_to_fields()
         // Note: we must sort the instance fields separately from the static fields since for some classes the offsets
         // of statics can only be determined after the offsets of instance fields are found.
         if(do_field_sorting && (m_num_fields > 0)) {
-            qsort(field_ptrs, m_num_static_fields,
+            bubbleSort(field_ptrs, m_num_static_fields,
                 (m_num_fields - 1), this,
                 /*doing_instance_flds:*/ true);
         }
@@ -384,15 +376,12 @@ void Class::assign_offsets_to_fields()
 #ifdef DEBUG_FIELD_SORTING
         if (do_field_sorting) {
             printf("\nInstance fields for %s, size=%d\n", m_name->bytes, m_unpadded_instance_data_size);
-            if(m_super_class != NULL) {
-                printf("  super_class: %s\n", m_super_class->get_name()->bytes);
-            }
             for(int i = 0; i < m_num_fields; i++) {
                 Field* field = field_ptrs[i];
                 if(!field->is_static()) {
                     const String* typeDesc = field->get_descriptor();
                     int sz = field_size(field, this, /*doing_instance_flds:*/ true);
-                    printf("   %40s  %c %4d %4d\n", field->get_name()->bytes, typeDesc->bytes[0], sz, field->_offset);
+                    printf("   %40s  %c %4d %4d\n", field->get_name()->bytes, typeDesc->bytes[0], sz, field->get_offset());
                     fflush(stdout);
                 }
             }
@@ -405,20 +394,20 @@ void Class::assign_offsets_to_fields()
 
     // Sort the static fields by size before allocating their offsets.
     if(do_field_sorting && (m_num_static_fields > 0)) {
-        qsort(field_ptrs, 0, m_num_static_fields - 1,
+        bubbleSort(field_ptrs, 0, m_num_static_fields - 1,
             this, /*doing_instance_flds:*/ false);
     }
     assign_offsets_to_static_fields(field_ptrs, do_field_compaction);
 
 #ifdef DEBUG_FIELD_SORTING
     if (do_field_sorting) {
-        printf("Static fields for %s, size=%d\n", m_name->bytes, static_data_size);
+        printf("Static fields for %s, size=%d\n", m_name->bytes, m_static_data_size);
         for(int i = 0; i < m_num_fields; i++) {
             Field* field = field_ptrs[i];
             if(field->is_static()) {
                 const String *typeDesc = field->get_descriptor();
                 int sz = field_size(field, this, /*doing_instance_flds:*/ false);
-                printf("   %40s  %c %4d %4d\n", field->get_name()->bytes, typeDesc->bytes[0], sz, field->_offset);
+                printf("   %40s  %c %4d %4d\n", field->get_name()->bytes, typeDesc->bytes[0], sz, field->get_offset());
                 fflush(stdout);
             }
         }
