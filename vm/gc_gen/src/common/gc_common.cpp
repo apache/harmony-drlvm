@@ -62,6 +62,13 @@ extern Boolean JVMTI_HEAP_ITERATION ;
 extern Boolean IS_MOVE_COMPACT;
 extern Boolean USE_CONCURRENT_GC;
 
+#if defined(ALLOC_ZEROING) && defined(ALLOC_PREFETCH)
+POINTER_SIZE_INT PREFETCH_DISTANCE = 1024;
+POINTER_SIZE_INT ZEROING_SIZE = 256;
+POINTER_SIZE_INT PREFETCH_STRIDE = 64;
+Boolean PREFETCH_ENABLED = FALSE;
+#endif
+
 static int get_int_property(const char *property_name)
 {
     assert(property_name);
@@ -280,6 +287,33 @@ void gc_parse_options(GC* gc)
     USE_CONCURRENT_GC= get_boolean_property("gc.concurrent_gc");
   }
   
+#if defined(ALLOC_ZEROING) && defined(ALLOC_PREFETCH)
+  if(is_property_set("gc.prefetch",VM_PROPERTIES) ==1) {
+  	PREFETCH_ENABLED=get_boolean_property("gc.prefetch");
+  }
+
+  if(is_property_set("gc.prefetch_distance",VM_PROPERTIES)==1) {
+  	PREFETCH_DISTANCE = get_size_property("gc.prefetch_distance");
+  	if(!PREFETCH_ENABLED) {
+  		WARN2("gc.prefetch_distance","Warning: Prefetch distance set with Prefetch disabled!");
+  	}
+  }
+
+  if(is_property_set("gc.prefetch_stride",VM_PROPERTIES)==1) {
+	PREFETCH_STRIDE = get_size_property("gc.prefetch_stride");
+	if(!PREFETCH_ENABLED) {
+		WARN2("gc.prefetch_stride","Warning: Prefetch stride set  with Prefetch disabled!");
+	}	
+  }
+  
+  if(is_property_set("gc.zeroing_size",VM_PROPERTIES)==1) {
+  	ZEROING_SIZE = get_size_property("gc.zeroing_size");
+  	if(!PREFETCH_ENABLED) {
+  		WARN2("gc.zeroing_size","Warning: Zeroing size set with Prefetch disabled!");
+  	}	
+  }	 
+#endif
+
   return;
 }
 
@@ -403,4 +437,5 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
   INFO2("gc.process", "GC: GC end\n");
   return;
 }
+
 
