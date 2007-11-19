@@ -339,7 +339,7 @@ void gc_los_destruct(GC_Gen *gc)
 
 
 Boolean FORCE_FULL_COMPACT = FALSE;
-Boolean IGNORE_VTABLE_TRACING = TRUE;
+Boolean IGNORE_VTABLE_TRACING = FALSE;
 Boolean VTABLE_TRACING = FALSE;
 
 unsigned int gc_next_collection_kind(GC_Gen* gc)
