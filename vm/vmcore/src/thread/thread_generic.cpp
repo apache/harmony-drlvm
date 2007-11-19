@@ -264,7 +264,6 @@ jint vm_detach(jthread java_thread)
         // Notify GC about thread detaching.
         // FIXME - GC notify detach thread works for current thread only
         gc_thread_kill(&p_vm_thread->_gc_private_information);
-        assert(p_vm_thread->gc_frames == 0);
     }
 
 #ifdef PLATFORM_POSIX
