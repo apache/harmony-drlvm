@@ -33,6 +33,7 @@
 #include "PMF.h"
 #include "CompilationContext.h"
 #include "JITInstanceContext.h"
+#include "RuntimeInterface.h"
 
 #include "jit_export.h"
 #include "jit_export_jpda.h"
@@ -213,7 +214,7 @@ JIT_recompiled_method_callback(JIT_Handle jit,
                                void *callback_data)
 {
     MethodDesc methodDesc(recompiled_method, NULL);
-    bool res = Jitrino::RecompiledMethodEvent(&methodDesc,callback_data);
+    bool res = Jitrino::getRuntimeInterface()->recompiledMethodEvent(&methodDesc,callback_data);
     return (res ? TRUE : FALSE);
 }
 
@@ -372,7 +373,7 @@ JIT_unwind_stack_frame(JIT_Handle jit, Method_Handle method,
     }
 #endif
     MethodDesc methodDesc(method, jit);
-    Jitrino::UnwindStack(&methodDesc, context, context->is_ip_past == FALSE);
+    Jitrino::getRuntimeInterface()->unwindStack(&methodDesc, context, context->is_ip_past == FALSE);
 }
 
 extern "C"
@@ -397,7 +398,7 @@ JIT_get_root_set_from_stack_frame(JIT_Handle jit, Method_Handle method,
 
     MethodDesc methodDesc(method, jit);
     GCInterface gcInterface(enum_handle);
-    Jitrino::GetGCRootSet(&methodDesc, &gcInterface, context,
+    Jitrino::getRuntimeInterface()->getGCRootSet(&methodDesc, &gcInterface, context,
                           context->is_ip_past == FALSE);
 }
 
@@ -408,7 +409,7 @@ JIT_get_inline_depth(JIT_Handle jit, InlineInfoPtr ptr, uint32 offset)
     if (Log::cat_rt()->isEnabled()) {
         Log::cat_rt()->out() << "GET_INLINE_DEPTH()" << ::std::endl;
     }
-    return Jitrino::GetInlineDepth(ptr, offset);
+    return Jitrino::getRuntimeInterface()->getInlineDepth(ptr, offset);
 }
 
 extern "C"
@@ -423,7 +424,7 @@ JIT_get_inlined_method(JIT_Handle jit, InlineInfoPtr ptr, uint32 offset,
         assert(0 && "misused inline_depth, must be [1..max_depth]");
         return 0;
     }
-    return Jitrino::GetInlinedMethod(ptr, offset, inline_depth);
+    return Jitrino::getRuntimeInterface()->getInlinedMethod(ptr, offset, inline_depth);
 }
 
 extern "C"
@@ -437,7 +438,7 @@ JIT_get_inlined_bc(JIT_Handle jit, InlineInfoPtr ptr, uint32 offset, uint32 inli
         assert(0 && "misused inline_depth, must be [1..max_depth]");
         return 0;
     }
-    return Jitrino::GetInlinedBc(ptr, offset, inline_depth);
+    return Jitrino::getRuntimeInterface()->getInlinedBc(ptr, offset, inline_depth);
 }
 
 extern "C"
@@ -445,7 +446,7 @@ JITEXPORT Boolean
 JIT_can_enumerate(JIT_Handle jit, Method_Handle method, NativeCodePtr eip)
 {
     MethodDesc methodDesc(method, jit);
-    bool result = Jitrino::CanEnumerate(&methodDesc, eip);
+    bool result = Jitrino::getRuntimeInterface()->canEnumerate(&methodDesc, eip);
     return (result ? TRUE : FALSE);
 }
 
@@ -486,7 +487,7 @@ JIT_fix_handler_context(JIT_Handle jit, Method_Handle method,
 #endif
 
     MethodDesc methodDesc(method, jit);
-    Jitrino::FixHandlerContext(&methodDesc, context,
+    Jitrino::getRuntimeInterface()->fixHandlerContext(&methodDesc, context,
                                context->is_ip_past == FALSE);
 }
 
@@ -502,7 +503,7 @@ JIT_is_soe_area
     }
 #endif
     MethodDesc methodDesc(method, jit);
-    return Jitrino::IsSOEArea(&methodDesc, context, context->is_ip_past == FALSE);
+    return Jitrino::getRuntimeInterface()->isSOEArea(&methodDesc, context, context->is_ip_past == FALSE);
 }
 
 
@@ -517,7 +518,7 @@ JIT_get_address_of_this(JIT_Handle jit, Method_Handle method,
     }
 #endif
     MethodDesc methodDesc(method, jit);
-    return Jitrino::GetAddressOfThis(&methodDesc, context,
+    return Jitrino::getRuntimeInterface()->getAddressOfThis(&methodDesc, context,
                                      context->is_ip_past == FALSE);
 }
 
@@ -585,7 +586,7 @@ JIT_get_root_set_for_thread_dump(JIT_Handle jit, Method_Handle method,
     }
     MethodDesc methodDesc(method, jit);
     ThreadDumpEnumerator gcInterface;
-    Jitrino::GetGCRootSet(&methodDesc, &gcInterface, context,
+    Jitrino::getRuntimeInterface()->getGCRootSet(&methodDesc, &gcInterface, context,
                           context->is_ip_past == FALSE);
 }
 
@@ -609,7 +610,7 @@ get_native_location_for_bc(JIT_Handle jit, Method_Handle method,
     MethodDesc methDesc(method, jit);
     POINTER_SIZE_INT* ncAddr = (POINTER_SIZE_INT*) native_pc;
 
-    if (Jitrino::GetNativeLocationForBc(&methDesc, bc_pc, ncAddr)) {
+    if (Jitrino::getRuntimeInterface()->getNativeLocationForBc(&methDesc, bc_pc, ncAddr)) {
         return EXE_ERROR_NONE;
     }
     return EXE_ERROR_UNSUPPORTED;
@@ -629,7 +630,7 @@ get_bc_location_for_native(JIT_Handle jit, Method_Handle method,
 
     MethodDesc methDesc(method, jit);
     POINTER_SIZE_INT ncAddr = (POINTER_SIZE_INT) native_pc;
-    if (Jitrino::GetBcLocationForNative(&methDesc, ncAddr, bc_pc)) {
+    if (Jitrino::getRuntimeInterface()->getBcLocationForNative(&methDesc, ncAddr, bc_pc)) {
         return EXE_ERROR_NONE;
     }
     return EXE_ERROR_INVALID_LOCATION;

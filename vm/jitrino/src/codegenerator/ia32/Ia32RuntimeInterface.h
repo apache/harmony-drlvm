@@ -22,7 +22,7 @@
 #ifndef _IA32RUNTIMEINTERFACE_H_
 #define _IA32RUNTIMEINTERFACE_H_
 
-#include "CodeGenIntfc.h"
+#include "RuntimeInterface.h"
 namespace Jitrino
 {
 namespace Ia32{

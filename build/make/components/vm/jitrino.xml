@@ -57,6 +57,7 @@ Version: $Revision: 1.6.2.8 $
                 <include name="translator/*.cpp" />
                 <include name="translator/java/*.cpp" />
                 <include name="vm/*.cpp" />
+                <include name="codegenerator/*.cpp"/>
 
                 <include name="codegenerator/ipf/*.cpp" if="is.ia64"/>
                 <include name="codegenerator/ia32/*.cpp" unless="is.ia64"/>

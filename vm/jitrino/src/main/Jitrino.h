@@ -48,24 +48,8 @@ public:
     static bool Init(JIT_Handle jit, const char* name);
     static void DeInit(JIT_Handle jit);
     static bool  CompileMethod(CompilationContext* compilationContext);
-    static void  UnwindStack(MethodDesc* methodDesc, ::JitFrameContext* context, bool isFirst);
-    static void  GetGCRootSet(MethodDesc* methodDesc, GCInterface* gcInterface, const ::JitFrameContext* context, bool isFirst);
-    static bool  CanEnumerate(MethodDesc* methodDesc, NativeCodePtr eip);
-    static void  FixHandlerContext(MethodDesc* methodDesc, ::JitFrameContext* context, bool isFirst);
-    static void* GetAddressOfThis(MethodDesc* methodDesc, const ::JitFrameContext* context, bool isFirst);
-    static bool  IsSOEArea(MethodDesc* methodDesc, const ::JitFrameContext* context, bool isFirst);
-#ifdef USE_SECURITY_OBJECT
-    static void* GetAddressOfSecurityObject(MethodDesc* methodDesc, const ::JitFrameContext* context);
-#endif
-    static bool  RecompiledMethodEvent(MethodDesc * recompiledMethodDesc, void * data);
+    static RuntimeInterface* getRuntimeInterface() {return runtimeInterface;}
     static MemoryManager& getGlobalMM() { return *global_mm; }
-
-    static bool GetBcLocationForNative(MethodDesc* method, POINTER_SIZE_INT native_pc, uint16 *bc_pc);
-    static bool GetNativeLocationForBc(MethodDesc* method, uint16 bc_pc, POINTER_SIZE_INT *native_pc);
-
-    static uint32 GetInlineDepth(InlineInfoPtr ptr, uint32 offset);
-    static Method_Handle GetInlinedMethod(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth);
-    static uint16 GetInlinedBc(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth);
 
     enum Backend {
         CG_IPF,

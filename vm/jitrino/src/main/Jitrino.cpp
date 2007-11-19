@@ -21,12 +21,8 @@
  *
  */
 #include "Jitrino.h"
-#include "optimizer.h"
-#include "IRBuilder.h"
 #include "irmanager.h"
 #include "FlowGraph.h"
-#include "TranslatorIntfc.h"
-#include "CodeGenIntfc.h"
 #include "Log.h"
 #include "CountWriters.h"
 #include "XTimer.h"
@@ -262,83 +258,6 @@ bool Jitrino::CompileMethod(CompilationContext* cc) {
         success = compileMethod(cc);
     }
     return success;
-}
-
-void
-Jitrino::UnwindStack(MethodDesc* methodDesc, ::JitFrameContext* context, bool isFirst)
-{
-    runtimeInterface->unwindStack(methodDesc, context, isFirst);
-}
-
-void 
-Jitrino::GetGCRootSet(MethodDesc* methodDesc, GCInterface* gcInterface, 
-                      const ::JitFrameContext* context, bool isFirst)
-{
-    runtimeInterface->getGCRootSet(methodDesc, gcInterface, context, isFirst);
-}
-
-uint32
-Jitrino::GetInlineDepth(InlineInfoPtr ptr, uint32 offset)
-{
-    return runtimeInterface->getInlineDepth(ptr, offset);
-}
-
-Method_Handle
-Jitrino::GetInlinedMethod(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth)
-{
-    return runtimeInterface->getInlinedMethod(ptr, offset, inline_depth);
-}
-
-uint16
-Jitrino::GetInlinedBc(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth)
-{
-    return runtimeInterface->getInlinedBc(ptr, offset, inline_depth);
-}
-
-bool
-Jitrino::CanEnumerate(MethodDesc* methodDesc, NativeCodePtr eip)
-{
-    return runtimeInterface->canEnumerate(methodDesc, eip);
-}
-
-void
-Jitrino::FixHandlerContext(MethodDesc* methodDesc, ::JitFrameContext* context, bool isFirst)
-{
-    runtimeInterface->fixHandlerContext(methodDesc, context, isFirst);
-}
-
-void *
-Jitrino::GetAddressOfThis(MethodDesc* methodDesc, const ::JitFrameContext* context, bool isFirst) {
-    return runtimeInterface->getAddressOfThis(methodDesc, context, isFirst);
-}
-
-bool
-Jitrino::IsSOEArea(MethodDesc* methodDesc, const ::JitFrameContext* context, bool isFirst) {
-    return runtimeInterface->isSOEArea(methodDesc, context, isFirst);
-}
-
-
-#ifdef USE_SECURITY_OBJECT
-void *
-Jitrino::GetAddressOfSecurityObject(MethodDesc* methodDesc, const ::JitFrameContext* context) {
-    return runtimeInterface->getAddressOfSecurityObject(methodDesc, context);
-}
-#endif
-
-bool  
-Jitrino::RecompiledMethodEvent(MethodDesc *               recompiledMethodDesc, 
-                               void *                     data) {
-    return runtimeInterface->recompiledMethodEvent(recompiledMethodDesc, data);
-}
-
-bool 
-Jitrino::GetBcLocationForNative(MethodDesc* method, POINTER_SIZE_INT native_pc, uint16 *bc_pc) { 
-    return runtimeInterface->getBcLocationForNative(method, native_pc, bc_pc);
-}
-
-bool
-Jitrino::GetNativeLocationForBc(MethodDesc* method, uint16 bc_pc, POINTER_SIZE_INT *native_pc) { 
-    return runtimeInterface->getNativeLocationForBc(method, bc_pc, native_pc);
 }
 
 JITInstanceContext* Jitrino::getJITInstanceContext(JIT_Handle jitHandle) {

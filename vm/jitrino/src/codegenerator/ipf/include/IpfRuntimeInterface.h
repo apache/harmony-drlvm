@@ -23,7 +23,7 @@
 #ifndef IPFRUNTIMEINTERFACE_H_
 #define IPFRUNTIMEINTERFACE_H_
 
-#include "CodeGenIntfc.h"
+#include "RuntimeInterface.h"
 
 namespace Jitrino {
 namespace IPF {

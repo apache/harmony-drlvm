@@ -582,6 +582,12 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\CodeGenIntfc.h">
 			</File>
+			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\RuntimeInterface.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\RuntimeInterface.h">
+			</File>
 			<Filter
 				Name="ia32"
 				Filter="">
