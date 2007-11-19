@@ -8,3 +8,6 @@ java/lang/RuntimeAdditionalTest39.java
 java/lang/RuntimeAdditionalTest40.java
 java/lang/RuntimeAdditionalTest41.java
 java/lang/RuntimeAdditionalTest42.java
+
+# HARMONY-3953
+java/lang/ClassTestDesiredAssertionStatus.java

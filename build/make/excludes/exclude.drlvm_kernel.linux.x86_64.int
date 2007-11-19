@@ -15,3 +15,6 @@ java/lang/ClassGenericsTest4.java
 # Excluded because of HARMONY-4598
 java/lang/RuntimeTest.java
 java/lang/SystemExtensionTest.java
+
+# HARMONY-3953
+java/lang/ClassTestDesiredAssertionStatus.java

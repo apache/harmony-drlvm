@@ -9,3 +9,8 @@ java/lang/ClassGenericsTest4.java
 java/lang/ClassGenericsTest3.java
 java/lang/ClassGenericsTest5.java
 
+# HARMONY-3953
+java/lang/ClassTestDesiredAssertionStatus.java
+
+# HARMONY-3953
+java/lang/ClassTestDesiredAssertionStatus.java

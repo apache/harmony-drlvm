@@ -117,6 +117,7 @@
             dir="${kernel.test.dir}"
             jvm="${test.jvm.exe}">
 
+            <jvmarg line="-ea -esa" />
             <jvmarg line="${kernel.mode.switch} ${test.vmargs}" />
             <jvmarg value="-Dtest.resource.path=${test.resource.path}"/>
             <jvmarg value="-Xbootclasspath/a:${junit.jar}${path.separator}${test.class.path}" />
