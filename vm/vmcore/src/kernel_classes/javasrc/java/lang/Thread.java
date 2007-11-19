@@ -586,38 +586,28 @@ public class Thread implements Runnable {
     /**
      * @com.intel.drl.spec_ref
      */
-    public final void join() throws InterruptedException {
-        synchronized (lock) {
-            while (isAlive()) {
-                // 2000msec timeout added to provide graceful degradation
-                // in case there is a race condition where lock.wait somehow
-                // misses the "detach() lock.notifyAll()"
-                // Or, more likely, does not see this.isAlive = false 
-                // because this.isAlive is still stuck in a CPU's store buffer
-                // the only drawback is if there are 100's of threads doing join()'s
-                // and the overhead of the continual timeouts may be a problem
-                // Let's first see a big money workload that waits on 100's of threads
-                // simultaneously before we worry
-                lock.wait(2000);
-            }
+    public final synchronized void join() throws InterruptedException {
+        notifyAll();
+        while (isAlive()) {
+            wait();
         }
     }
 
     /**
      * @com.intel.drl.spec_ref
      */
-    public final void join(long millis) throws InterruptedException {
+    public final synchronized void join(long millis) throws InterruptedException {
         if (millis == 0) {
             join();
-            return;
-        }
-        
-        synchronized (lock) {
+        } else {
+            notifyAll();
             long end = System.currentTimeMillis() + millis;
             while(isAlive()) {
-            lock.wait(millis);
+                wait(millis);
                 millis = end - System.currentTimeMillis();
-                if (millis <= 0) return;
+                if (millis <= 0) {
+                   break;
+                }
             }
         }
     }
@@ -625,23 +615,21 @@ public class Thread implements Runnable {
     /**
      * @com.intel.drl.spec_ref
      */
-    public final void join(long millis, int nanos)
+    public final synchronized void join(long millis, int nanos)
         throws InterruptedException {
-        if (millis < 0 || nanos < 0 || nanos > 999999)
+        if (millis < 0 || nanos < 0 || nanos > 999999) {
             throw new IllegalArgumentException();
-
-        if (millis == 0 && nanos == 0) {
+        } else if (millis == 0 && nanos == 0) {
             join();
-            return;
-        }
-        
-        synchronized (lock) {
+        } else {
+            notifyAll();
             long end = System.nanoTime() + 1000000*millis + (long)nanos;
             long rest;
             while (isAlive()) {
-            lock.wait(millis, nanos);
+                wait(millis, nanos);
                 rest = end - System.nanoTime();
-                if (rest <= 0) return;
+                if (rest <= 0)
+                   break;
                 nanos  = (int)(rest % 1000000);
                 millis = rest / 1000000;
             }
@@ -792,9 +780,9 @@ public class Thread implements Runnable {
             }
         } finally {
             group.remove(this);
-            synchronized(lock) {
-                this.isAlive = false;
-                lock.notifyAll();
+            synchronized(this) {
+                isAlive = false;
+                notifyAll();
             }
         }
     }

@@ -469,22 +469,6 @@ static void stop_callback(void)
 
     // Does not return if the exception could be thrown straight away
     jthread_throw_exception_object(excn);
-
-    // getting here means top stack frame is non-unwindable.
-    if (hythread_get_state(native_thread) &
-            (TM_THREAD_STATE_SLEEPING | TM_THREAD_STATE_WAITING_WITH_TIMEOUT
-                | TM_THREAD_STATE_WAITING | TM_THREAD_STATE_IN_MONITOR_WAIT
-                | TM_THREAD_STATE_WAITING_INDEFINITELY | TM_THREAD_STATE_PARKED))
-    {
-        // This is needed for correct stopping of a thread blocked on monitor_wait.
-        // The thread needs some flag to exit its waiting loop.
-        // We piggy-back on interrupted status. A correct exception from TLS
-        // will be thrown because the check of exception status on leaving
-        // JNI frame comes before checking return status in Object.wait().
-        // Interrupted status will be cleared by function returning TM_ERROR_INTERRUPT.
-        // (though, in case of parked thread, it will not be cleared)
-        hythread_interrupt(native_thread);
-    }
 } // stop_callback
 
 /**
