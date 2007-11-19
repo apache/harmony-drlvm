@@ -684,7 +684,8 @@ void deflate_lock(hythread_monitor_t fat_monitor, hythread_thin_monitor_t *lockw
  * Enter locktable read section
  */
 static void locktable_reader_enter() {
-    hymutex_lock(&lock_table->mutex);
+    IDATA status = hymutex_lock(&lock_table->mutex);
+    assert(status == TM_ERROR_NONE);
 
     if (lock_table->state == HYTHREAD_LOCKTABLE_IDLE
         || (lock_table->state == HYTHREAD_LOCKTABLE_READING
@@ -694,19 +695,21 @@ static void locktable_reader_enter() {
         lock_table->readers_reading++;
     } else {
         lock_table->readers_waiting++;
-        hycond_wait(&lock_table->read, &lock_table->mutex);
+        hycond_wait_timed_raw(&lock_table->read, &lock_table->mutex, 0, 0);
 
         // We are asserting here that we exited wait with the correct state
         assert(lock_table->state == HYTHREAD_LOCKTABLE_READING);
     }
-    hymutex_unlock(&lock_table->mutex);        
+    status = hymutex_unlock(&lock_table->mutex);        
+    assert(status == TM_ERROR_NONE);
 }
 
 /*
  * Exit locktable read section
  */
 static void locktable_reader_exit() {
-    hymutex_lock(&lock_table->mutex);
+    IDATA status = hymutex_lock(&lock_table->mutex);
+    assert(status == TM_ERROR_NONE);
 
     lock_table->readers_reading--;
 
@@ -719,18 +722,20 @@ static void locktable_reader_exit() {
         }
     }
 
-    hymutex_unlock(&lock_table->mutex);        
-}    
+    status = hymutex_unlock(&lock_table->mutex);
+    assert(status == TM_ERROR_NONE);
+}
 
 /*
  * Enter locktable write section
  */
 static void locktable_writer_enter() {
-    hymutex_lock(&lock_table->mutex);
+    IDATA status = hymutex_lock(&lock_table->mutex);
+    assert(status == TM_ERROR_NONE);
 
     if (lock_table->state != HYTHREAD_LOCKTABLE_IDLE) {
         lock_table->writers_waiting++;
-        hycond_wait(&lock_table->write, &lock_table->mutex);
+        hycond_wait_timed_raw(&lock_table->write, &lock_table->mutex, 0, 0);
 
         // We are asserting here that we exited wait with the correct state
         assert(lock_table->state == HYTHREAD_LOCKTABLE_WRITING);
@@ -740,14 +745,16 @@ static void locktable_writer_enter() {
         lock_table->state = HYTHREAD_LOCKTABLE_WRITING;
     }        
 
-    hymutex_unlock(&lock_table->mutex);
+    status = hymutex_unlock(&lock_table->mutex);
+    assert(status == TM_ERROR_NONE);
 }
 
 /*
  * Exit locktable write section
  */
 static void locktable_writer_exit() {
-    hymutex_lock(&lock_table->mutex);
+    IDATA status = hymutex_lock(&lock_table->mutex);
+    assert(status == TM_ERROR_NONE);
 
     if (lock_table->readers_reading > 0) {
         lock_table->readers_reading = lock_table->readers_waiting;
@@ -760,7 +767,8 @@ static void locktable_writer_exit() {
         lock_table->state = HYTHREAD_LOCKTABLE_IDLE;
     }
 
-    hymutex_unlock(&lock_table->mutex);
+    status = hymutex_unlock(&lock_table->mutex);
+    assert(status == TM_ERROR_NONE);
 }
 
 
