@@ -129,7 +129,7 @@ void CodeGen::gen_multianewarray(Class_Handle enclClass, unsigned short cpIndex,
     rlock(klassVal); // to protect gr_ret while setting up helper args
 
     // note: need to restore the stack - the cdecl-like function
-    CallSig ci(CCONV_CDECL_IA32|CCONV_MEM|CCONV_L2R|CCONV_CALLER_POPS, args);
+    CallSig ci(CCONV_CDECL|CCONV_MEM|CCONV_L2R, args);
     unsigned stackFix = gen_stack_to_args(true, ci, 0, num_dims);
 
     runlock(klassVal);
