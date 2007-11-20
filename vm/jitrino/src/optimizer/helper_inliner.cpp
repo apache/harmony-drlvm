@@ -179,7 +179,7 @@ void HelperInlinerSession::_run(IRManager& irm) {
                     continue;
                 }
                 HelperConfig* config = iconf->second;
-                if (!config->doInlining || config->hotnessPercentToInline >= nodePercent) {
+                if (!config->doInlining || nodePercent < config->hotnessPercentToInline) {
                     continue;
                 }
                 MethodDesc* md = HelperInliner::findHelperMethod(cc->getVMCompilationInterface(), helperId);
