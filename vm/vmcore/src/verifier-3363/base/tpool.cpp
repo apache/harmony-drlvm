@@ -272,15 +272,14 @@ namespace CPVerifier {
         }
 
         if( referred == CLASS_NOT_LOADED ) {
-            //referred class can't be resolved ==> it's not a super class
-//#ifndef NDEBUG
-//            class_handler k = k_class;
-//            while(k) {
-//                assert(strcmp(class_get_name(k), expected_type->name));
-//                k = class_get_super_class(k);
-//            }
-//#endif
-            return false;
+            //referred class can't be resolved ==> still might be a super class
+            class_handler k = class_is_extending_class(k_class, expected_type->name);
+
+            if( k ) {
+                referred = k;
+            } else {
+                return false;
+            }
         }
 
         return !class_is_same_package(k_class, referred) && vf_is_extending(k_class, referred);

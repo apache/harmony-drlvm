@@ -171,15 +171,19 @@ class_get_array_element_class( class_handler klass )
 /**
  * Function checks if class extends current class with given name.
  */
-unsigned
-class_is_extending_class( class_handler klass, char *super_name )
+class_handler
+class_is_extending_class( class_handler klass, const char *super_name )
 {
     assert( klass );
     assert( super_name );
+
+    Global_Env *env = VM_Global_State::loader_env;
+    String *pooled_name = env->string_pool.lookup( super_name );
+
     for( Class *clss = (Class*)klass; clss; clss = clss->get_super_class() ) {
-        if( !strcmp( clss->get_name()->bytes, super_name ) ) {
+        if( clss->get_name() == pooled_name ) {
             // found class with given name
-            return 1;
+            return (class_handler)clss;
         }
     }
     return 0;

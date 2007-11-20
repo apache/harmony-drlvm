@@ -179,11 +179,11 @@ class_get_array_element_class( class_handler klass );
  * @param klass      - checked klass
  * @param super_name - parent class name
  * @return If given class extends current class with given name,
- *         function returns 1, else function returns 0.
+ *         function returns its class handler, else function returns 0.
  * @note Assertion is raised if <i>klass</i> or <i>super_name</i> are equal to null.
  */
-unsigned
-class_is_extending_class( class_handler klass, char *super_name );
+class_handler
+class_is_extending_class( class_handler klass, const char *super_name );
 
 /**
  * Function returns number of methods for current class.
