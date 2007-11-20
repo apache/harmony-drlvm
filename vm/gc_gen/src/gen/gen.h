@@ -57,6 +57,8 @@ struct Gen_Mode_Adaptor;
 
 typedef struct GC_Gen {
   /* <-- First couple of fields overloaded as GC */
+  // heap allocation bases for segmented heap
+  void* alloc_heap_start[3];
   void* heap_start;
   void* heap_end;
   POINTER_SIZE_INT reserved_heap_size;
@@ -199,5 +201,7 @@ void gc_gen_start_concurrent_mark(GC_Gen* gc);
 extern Boolean GEN_NONGEN_SWITCH ;
 
 #endif /* ifndef _GC_GEN_H_ */
+
+
 
 

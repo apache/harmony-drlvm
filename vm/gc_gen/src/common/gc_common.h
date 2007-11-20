@@ -402,6 +402,8 @@ struct Space_Tuner;
 struct Collection_Scheduler;
 
 typedef struct GC{
+//heap allocation bases for a segmented heap
+  void* alloc_heap_start[3];
   void* heap_start;
   void* heap_end;
   POINTER_SIZE_INT reserved_heap_size;

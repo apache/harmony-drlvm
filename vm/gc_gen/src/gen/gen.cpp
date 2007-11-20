@@ -123,6 +123,8 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
   void *reserved_base;
   void *reserved_end;
   void *nos_base;
+  // allocation base
+  void* alloc_reserved_base;
 
 #ifdef STATIC_NOS_MAPPING
 
@@ -136,20 +138,27 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
     DIE2("gc.base","Please not use static NOS mapping by undefining STATIC_NOS_MAPPING, or adjusting NOS_BOUNDARY value.");
     exit(0);
   }
+  //set the allocation heap base for the nos segment
+  gc_gen->alloc_heap_start[0] = nos_base;
   reserved_end = (void*)((POINTER_SIZE_INT)nos_base + nos_reserve_size);
   
   void *los_mos_base = (void*)((POINTER_SIZE_INT)nos_base - los_mos_reserve_size);
   assert(!((POINTER_SIZE_INT)los_mos_base % SPACE_ALLOC_UNIT));
-  reserved_base = vm_reserve_mem(los_mos_base, los_mos_reserve_size);
-  while( !reserved_base || reserved_base >= nos_base){
+  
+  alloc_reserved_base = vm_reserve_mem(los_mos_base, los_mos_reserve_size);
+  
+  while( !alloc_reserved_base || alloc_reserved_base >= nos_base){
     los_mos_base = (void*)((POINTER_SIZE_INT)los_mos_base - SPACE_ALLOC_UNIT);
     if(los_mos_base < RESERVE_BOTTOM){
       DIE2("gc.base","Static NOS mapping: Can't reserve memory at address"<<reserved_base<<" for specified size "<<los_mos_size);
       exit(0);      
     }
-    reserved_base = vm_reserve_mem(los_mos_base, los_mos_reserve_size);
+	
+    alloc_reserved_base = vm_reserve_mem(los_mos_base, los_mos_reserve_size);
   }
-
+	//set the allocation heap base for mos+los
+	gc_gen->alloc_heap_start[1] = alloc_reserved_base;
+	reserved_base = alloc_reserved_base;
 #else /* NON_STATIC_NOS_MAPPING */
 
   reserved_base = NULL;
@@ -166,13 +175,18 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
   
   if(reserved_base == NULL){
     Boolean max_size_reduced = FALSE;
-    reserved_base = vm_reserve_mem(NULL, max_heap_size + SPACE_ALLOC_UNIT);
-    while( !reserved_base ){
+	
+
+    alloc_reserved_base = vm_reserve_mem(NULL, max_heap_size + SPACE_ALLOC_UNIT);
+	
+    while( !alloc_reserved_base ){
       max_size_reduced = TRUE;
       max_heap_size -= SPACE_ALLOC_UNIT;
-      reserved_base = vm_reserve_mem(NULL, max_heap_size + SPACE_ALLOC_UNIT);
+	  
+      alloc_reserved_base = vm_reserve_mem(NULL, max_heap_size + SPACE_ALLOC_UNIT);
     }
-    
+	//set the allocation heap base for the contiguous heap
+    gc_gen->alloc_heap_start[0] = alloc_reserved_base;
     if(max_size_reduced){
       WARN2("gc.base","Max heap size: can't be reserved, reduced to "<< max_heap_size/MB<<" MB according to virtual memory limitation.");
     }
@@ -181,7 +195,8 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
       DIE2("gc.base","Heap size: invalid, please reimput a smaller \"ms\" paramenter!");
       exit(0);
     }
-    reserved_base = (void*)round_up_to_size((POINTER_SIZE_INT)reserved_base, SPACE_ALLOC_UNIT);
+	
+    reserved_base = (void*)round_up_to_size((POINTER_SIZE_INT)alloc_reserved_base, SPACE_ALLOC_UNIT);
     assert(!((POINTER_SIZE_INT)reserved_base % SPACE_ALLOC_UNIT));
   }
   
@@ -197,6 +212,8 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
   
   gc_gen->heap_start = reserved_base;
   gc_gen->heap_end = reserved_end;
+  
+  
 #ifdef STATIC_NOS_MAPPING
   gc_gen->reserved_heap_size = los_mos_reserve_size + nos_reserve_size;
 #else
@@ -245,23 +262,56 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
 void gc_gen_destruct(GC_Gen *gc_gen)
 {
   TRACE2("gc.process", "GC: GC_Gen heap destruct ......");
-  
+
+  POINTER_SIZE_INT unmap_size, mos_los_size;
+
+  unmap_size = 0;
+  mos_los_size = 0;
   Space *nos = gc_gen->nos;
   gc_nos_destruct(gc_gen);
-  vm_unmap_mem(nos->heap_start, space_committed_size(nos));
+
+  // if nos is statically mapped, unmap nos
+  #ifdef STATIC_NOS_MAPPING
+	vm_unmap_mem(gc_gen->alloc_heap_start[0], space_committed_size(nos));
+  #else
+	unmap_size = space_committed_size(nos);
+  #endif
   gc_gen->nos = NULL;
   
   Space *mos = gc_gen->mos;
   gc_mos_destruct(gc_gen);
-  vm_unmap_mem(mos->heap_start, space_committed_size(mos));
+  #ifndef STATIC_NOS_MAPPING
+	unmap_size = unmap_size + space_committed_size(mos);
+  #else
+	mos_los_size = space_committed_size(mos);
+  #endif
+
   gc_gen->mos = NULL;
   
   if(MAJOR_ALGO != MAJOR_MARK_SWEEP){
     Space *los = gc_gen->los;
     gc_los_destruct(gc_gen);
-    vm_unmap_mem(los->heap_start, space_committed_size(los));
+	//if nos is static mapped, unmap nos+los 
+	#ifdef STATIC_NOS_MAPPING
+		mos_los_size = mos_los_size + space_committed_size(los);
+		vm_unmap_mem(gc_gen->alloc_heap_start[1], mos_los_size);
+	#else
+		unmap_size = unmap_size + space_committed_size(los);
+	#endif
     gc_gen->los = NULL;
   }
+  else
+  {
+    // unmap the mos
+	#ifdef STATIC_NOS_MAPPING
+		vm_unmap_mem(gc_gen->alloc_heap_start[1], mos_los_size);
+	#endif
+  }
+
+ //unmap whole heap if nos is not statically mapped
+#ifndef STATIC_NOS_MAPPING
+  vm_unmap_mem(gc_gen->alloc_heap_start[0], unmap_size);
+#endif
 
 #ifdef GC_GEN_STATS
   gc_gen_stats_destruct(gc_gen);
@@ -951,4 +1001,6 @@ void gc_gen_wrapup_verbose(GC_Gen* gc)
     <<"\nGC: total appliction execution time: "<<stats->total_mutator_time<<"\n");
 #endif
 }
+
+
 

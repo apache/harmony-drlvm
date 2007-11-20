@@ -187,7 +187,8 @@ inline Boolean vm_unmap_mem(void* start, POINTER_SIZE_INT size)
   if(result == 0) result = TRUE;
   else result = FALSE;  
 #endif /* ifdef _WINDOWS_ else */
-
+//assert that memory was released
+  assert(result);
   return result;
 }
 
