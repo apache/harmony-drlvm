@@ -241,6 +241,7 @@ public:
            *        the list of opcodes for a given mnemonic.
            */
            char            last;
+           char            platf;
        };
    };
 public:

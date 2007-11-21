@@ -35,6 +35,7 @@
 #include "open/bytecodes.h"
 #include "cci.h"
 
+#include "ncai_internal.h"
 #include "jvmti_break_intf.h"
 #include "cci.h"
 
@@ -132,6 +133,12 @@ VMBreakPoints::get_next_intf(VMBreakInterface *intf)
     return intf->m_next;
 }
 
+VMBreakPoint*
+VMBreakPoints::get_next_breakpoint(VMBreakPoint* prev)
+{
+    return prev->next;
+}
+
 inline bool
 VMBreakPoints::check_insert_breakpoint(VMBreakPoint* bp)
 {
@@ -210,7 +217,6 @@ VMBreakPoints::insert_native_breakpoint(VMBreakPoint* bp)
 {
     LMAutoUnlock lock(get_lock());
 
-    assert(!interpreter_enabled());
     bool UNREF check = check_insert_breakpoint(bp);
     assert(check);
     if (bp->method != NULL)
@@ -314,7 +320,6 @@ VMBreakPoints::remove_native_breakpoint(VMBreakPoint* bp)
     assert(bp);
     assert(!bp->method || find_breakpoint(bp->method, bp->location));
     assert(bp->method || find_breakpoint(bp->addr));
-    assert(!interpreter_enabled());
 
     LMAutoUnlock lock(get_lock());
     remove_breakpoint(bp);
@@ -571,6 +576,21 @@ static char *gen_jump(char *code_addr, char *target_addr)
 #endif
 }
 
+VMLocalBreak*
+VMBreakPoints::find_thread_local_break(VM_thread* vmthread)
+{
+    assert(vmthread);
+    TRACE2( "jvmti.break", "Find local structure for thread: " << vmthread);
+
+    for (VMLocalBreak* cur = m_local; cur; cur = cur->next)
+    {
+        if (cur->vmthread == vmthread)
+            return cur;
+    }
+
+    return NULL;
+}
+
 void
 VMBreakPoints::process_native_breakpoint()
 {
@@ -627,6 +647,7 @@ VMBreakPoints::process_native_breakpoint()
         assert(!bp || bp->addr == addr);
         VMLocalBreak local;
         local.priority = priority;
+        local.vmthread = vm_thread;
         while( bp )
         {
             assert(bp->addr == addr);
@@ -644,6 +665,8 @@ VMBreakPoints::process_native_breakpoint()
                 {
                     local.intf = intf->m_next;
                     VMBreakPoint local_bp = *bp;
+                    local_bp.regs = regs;
+                    local.local_bp = &local_bp;
                     // Set local copy's pointer to local copy of disassembler
                     local_bp.disasm = &idisasm;
                     POINTER_SIZE_INT data = ref->data;
@@ -716,6 +739,7 @@ VMBreakPoints::process_native_breakpoint()
     switch(type)
     {
     case InstructionDisassembler::UNKNOWN:
+    case InstructionDisassembler::RET:
     {
         char *next_instruction = (char *)interrupted_instruction +
             instruction_length;
@@ -1065,7 +1089,6 @@ VMBreakPointRef*
 VMBreakInterface::add_reference(NativeCodePtr addr, POINTER_SIZE_INT data)
 {
     assert(addr);
-    assert(!interpreter_enabled());
 
     VMBreakPoints* vm_brpt = VM_Global_State::loader_env->TI->vm_brpt;
     LMAutoUnlock lock(vm_brpt->get_lock());
@@ -1275,9 +1298,12 @@ static bool set_native_breakpoint(VMBreakPoint* bp)
         assert(bp->disasm);
 
         // code instrumentation
-        jbyte* target_instruction = (jbyte*)bp->addr;
-        bp->saved_byte = *target_instruction;
-        *target_instruction = (jbyte)INSTRUMENTATION_BYTE;
+        if (ncai_read_memory(bp->addr, 1, &bp->saved_byte) != NCAI_ERROR_NONE)
+            return false;
+
+        unsigned char b = (unsigned char)INSTRUMENTATION_BYTE;
+        if (ncai_write_memory(bp->addr, 1, &b) != NCAI_ERROR_NONE)
+            return false;
     }
 
     return true;
@@ -1303,8 +1329,9 @@ static bool clear_native_breakpoint(VMBreakPoint* bp)
             << (bp->method ? method_get_name((Method*)bp->method) : "" )
             << (bp->method ? method_get_descriptor((Method*)bp->method) : "" )
             << " :" << bp->location << " :" << bp->addr);
-        jbyte* target_instruction = (jbyte*)bp->addr;
-        *target_instruction = bp->saved_byte;
+
+        if (ncai_write_memory(bp->addr, 1, &bp->saved_byte) != NCAI_ERROR_NONE)
+            return false;
     }
 
     delete bp->disasm;
@@ -1348,7 +1375,6 @@ bool jvmti_jit_breakpoint_handler(Registers *regs)
 #else
     NativeCodePtr native_location = (NativeCodePtr)regs->get_ip();
 #endif
-    ASSERT_NO_INTERPRETER;
 
     TRACE2("jvmti.break", "BREAKPOINT occured: " << native_location);
 
@@ -1359,6 +1385,38 @@ bool jvmti_jit_breakpoint_handler(Registers *regs)
     // Now it is necessary to set up a transition to
     // process_native_breakpoint_event from the exception/signal handler
     VM_thread *vm_thread = p_TLS_vmthread;
+
+#if 0
+    if (!vm_thread) // FIXME ?????
+    {
+        VMBreakPoints* vm_brpt = ti->vm_brpt;
+        vm_brpt->lock();
+
+        VMBreakPoint* bp;
+        for (unsigned priority = 0; priority < PRIORITY_NUMBER; priority++)
+        {
+            bp = vm_brpt->find_breakpoint(native_location);
+            assert(!bp || bp->addr == native_location);
+
+            while (bp)
+            {
+                VMBreakPoint* next_bp =
+                    vm_brpt->find_next_breakpoint(bp, native_location);
+
+                for (VMBreakInterface* intf = vm_brpt->get_first_intf(priority);
+                     intf; intf = vm_brpt->get_next_intf(intf))
+                {
+                    VMBreakPointRef* ref = intf->find_reference(bp);
+                    if (ref)
+                        intf->remove_reference(ref);
+                }
+                bp = next_bp;
+            }
+        }
+        vm_brpt->unlock();
+    }
+#endif
+
     // Store possibly corrected location
     regs->set_ip((void*)native_location);
     // Copy original registers to TLS

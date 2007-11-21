@@ -364,11 +364,15 @@ void Encoder::buildOGHolder(OpcodeGroupsHolder * mitem,
           register kind
     */
     for (unsigned i=0; !opcodes[i].last; i++) {
+        const OpcodeDesc* pOpcodeDesc = opcodes + i;
+        if (pOpcodeDesc->platf == OpcodeInfo::decoder) {
+            continue;
+        }
         //
         // fill out an OpcodeDesc for each given opcode
         //
         OpcodeDescription od;
-        initOD(od, opcodes + i);
+        initOD(od, pOpcodeDesc);
         //
         // try to find a group for the opcodeDesc in already filled groups
         //

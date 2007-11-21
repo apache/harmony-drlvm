@@ -42,7 +42,9 @@
 
 // Callbacks are called for interfaces according to its priority
 typedef enum {
-    PRIORITY_SINGLE_STEP_BREAKPOINT = 0,
+    PRIORITY_NCAI_STEP_BREAKPOINT = 0,
+    PRIORITY_SINGLE_STEP_BREAKPOINT,
+    PRIORITY_NCAI_BREAKPOINT,
     PRIORITY_SIMPLE_BREAKPOINT,
     PRIORITY_NUMBER
 } jvmti_BreakPriority;
@@ -58,6 +60,7 @@ struct VMBreakPoint
     jmethodID                method;
     jlocation                location;
     jbyte                    saved_byte;
+    Registers                regs;
 };
 
 // Breakpoint reference
@@ -75,6 +78,8 @@ struct VMLocalBreak
     VMBreakInterface *intf;
     VMLocalBreak* next;
     unsigned priority;
+    VM_thread* vmthread;
+    VMBreakPoint *local_bp;
 };
 
 // Pointer to interface callback function
@@ -136,9 +141,16 @@ public:
     VMBreakInterface* get_first_intf(unsigned priority) { return m_intf[priority]; }
     VMBreakInterface* get_next_intf(VMBreakInterface *intf);
 
+    // Breakpoints iterator
+    VMBreakPoint* get_first_breakpoint() { return m_break; }
+    VMBreakPoint* get_next_breakpoint(VMBreakPoint* prev);
+
     // General callback functions
     void  process_native_breakpoint();
     jbyte process_interpreter_breakpoint(jmethodID method, jlocation location);
+
+    // Find thread-local breakpoint information
+    VMLocalBreak* find_thread_local_break(VM_thread* vmthread);
 
 private:
     // Checks breakpoint before inserting

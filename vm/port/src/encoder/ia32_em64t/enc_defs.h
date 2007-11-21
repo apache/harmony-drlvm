@@ -466,11 +466,11 @@ Mnemonic_DEC,                           // Decrement by 1
 Mnemonic_DIVSD,                         // Divide Scalar Double-Precision Floating-Point Values
 Mnemonic_DIVSS,                         // Divide Scalar Single-Precision Floating-Point Values
 
-
 #ifdef _HAVE_MMX_
 Mnemonic_EMMS,                          // Empty MMX Technology State
 #endif
 
+Mnemonic_ENTER,                         // ENTER-Make Stack Frame for Procedure Parameters
 Mnemonic_FLDCW,                         // Load FPU control word
 Mnemonic_FADDP,                        
 Mnemonic_FLDZ,                        
@@ -528,6 +528,7 @@ Mnemonic_Jcc,                           // Jump if Condition Is Met
     CCM(J,NLE), CCM(J,G),
 Mnemonic_JMP,                           // Jump
 Mnemonic_LEA,                           // Load Effective Address
+Mnemonic_LEAVE,                         // High Level Procedure Exit
 Mnemonic_LOOP,                          // Loop according to ECX counter
 Mnemonic_LOOPE,                          // Loop according to ECX counter
 Mnemonic_LOOPNE, Mnemonic_LOOPNZ = Mnemonic_LOOPNE, // Loop according to ECX 

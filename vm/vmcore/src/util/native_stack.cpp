@@ -147,9 +147,15 @@ static int walk_native_stack_jit(Registers* pregs, VM_thread* pthread,
     if (code_type == VM_TYPE_JAVA)
     { // We must add dummy M2N frame to start SI iteration
         assert(pthread);
-        m2n_push_suspended_frame(pthread, pregs);
-        flag_dummy_frame = true;
         is_java = true;
+
+        M2nFrame* lm2n = m2n_get_last_frame(pthread);
+
+        if (!m2n_is_suspended_frame(lm2n) || m2n_get_ip(lm2n) != ip)
+        { // We should not push frame if it was pushed by breakpoint handler
+            m2n_push_suspended_frame(pthread, pregs);
+            flag_dummy_frame = true;
+        }
     }
 
     si = si_create_from_native(pthread);
@@ -358,6 +364,9 @@ static int walk_native_stack_pure(Registers* pregs,
         // Simply bp-based frame, let's unwind it
         if (native_is_frame_valid(modules, bp, sp))
         {
+            // Here must be special processing for breakpoint handler frames
+            // But it requires VM_thread structure attached to thread
+            // TODO: Investigate possibility
             native_unwind_bp_based_frame(bp, &ip, &bp, &sp);
         }
         else
@@ -423,7 +432,24 @@ static int walk_native_stack_interpreter(Registers* pregs, VM_thread* pthread,
 
         if (native_is_frame_valid(modules, bp, sp))
         { // Simply bp-based frame, let's unwind it
-            native_unwind_bp_based_frame(bp, &ip, &bp, &sp);
+            void *tmp_ip, *tmp_bp, *tmp_sp;
+            native_unwind_bp_based_frame(bp, &tmp_ip, &tmp_bp, &tmp_sp);
+
+            VMBreakPoints* vm_breaks = VM_Global_State::loader_env->TI->vm_brpt;
+            vm_breaks->lock();
+
+            if (native_is_ip_in_breakpoint_handler(tmp_ip))
+            {
+                native_unwind_interrupted_frame(&pthread->jvmti_thread, &ip, &bp, &sp);
+            }
+            else
+            {
+                ip = tmp_ip;
+                bp = tmp_bp;
+                sp = tmp_sp;
+            }
+
+            vm_breaks->unlock();
         }
         else
         { // Is not bp-based frame

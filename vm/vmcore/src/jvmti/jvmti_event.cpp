@@ -42,6 +42,7 @@
 #include "jvmti_break_intf.h"
 #include "stack_iterator.h"
 #include "m2n.h"
+#include "ncai_internal.h"
 
 /*
  * Set Event Callbacks
@@ -844,6 +845,9 @@ jvmti_process_method_entry_event(jmethodID method) {
     if (!jvmti_should_report_event(JVMTI_EVENT_METHOD_ENTRY))
         return;
 
+    // Report Metod Entry to NCAI
+    ncai_report_method_entry(method);
+
     if (JVMTI_PHASE_LIVE != ti->getPhase())
         return;
 
@@ -1032,6 +1036,9 @@ jvmti_process_method_exception_exit_event(jmethodID method,
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     if (!jvmti_should_report_event(JVMTI_EVENT_METHOD_EXIT))
         return;
+
+    // Report Metod Exit to NCAI
+    ncai_report_method_exit(method, was_popped_by_exception, ret_val);
 
     if (JVMTI_PHASE_LIVE != ti->getPhase())
         return;

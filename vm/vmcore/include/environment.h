@@ -31,6 +31,7 @@
 #include "vm_core_types.h"
 #include "object_handles.h"
 #include "jvmti_internal.h"
+#include "ncai_internal.h"
 #include "method_lookup.h"
 
 typedef struct NSOTableItem NSOTableItem;
@@ -46,6 +47,7 @@ struct Global_Env {
     BootstrapClassLoader*     bootstrap_class_loader;
     UserDefinedClassLoader*   system_class_loader;
     DebugUtilsTI*             TI;
+    GlobalNCAI*               NCAI;
     NSOTableItem*             nsoTable;
     void*                     portLib;  // Classlib's port library
     DynamicCode*              dcList;

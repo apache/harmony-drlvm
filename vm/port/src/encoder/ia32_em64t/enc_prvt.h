@@ -141,7 +141,7 @@ enum OpcodeByteKind {
 #define AX          {OpndKind_GPReg, OpndSize_16, RegName_AX}
 #define EAX         {OpndKind_GPReg, OpndSize_32, RegName_EAX}
 #ifdef _EM64T_
-    #define RAX     { OpndKind_GPReg, OpndSize_64, RegName_RAX }
+    #define RAX     {OpndKind_GPReg, OpndSize_64, RegName_RAX }
 #endif
 
 #define CL          {OpndKind_GPReg, OpndSize_8, RegName_CL}
@@ -192,8 +192,18 @@ enum OpcodeByteKind {
 #define imm16       {OpndKind_Imm, OpndSize_16, RegName_Null}
 #define imm32       {OpndKind_Imm, OpndSize_32, RegName_Null}
 #ifdef _EM64T_
-    #define imm64   { OpndKind_Imm, OpndSize_64, RegName_Null }
+    #define imm64   {OpndKind_Imm, OpndSize_64, RegName_Null }
 #endif
+
+//FIXME: moff-s are in fact memory refs, but presented as immediate.
+// Need to specify this in OpndDesc.
+#define moff8        {OpndKind_Imm, OpndSize_32, RegName_Null}
+#define moff16       {OpndKind_Imm, OpndSize_32, RegName_Null}
+#define moff32       {OpndKind_Imm, OpndSize_32, RegName_Null}
+#ifdef _EM64T_
+    #define moff64       {OpndKind_Imm, OpndSize_64, RegName_Null}
+#endif
+
 
 #define rel8        {OpndKind_Imm, OpndSize_8, RegName_Null}
 #define rel16       {OpndKind_Imm, OpndSize_16, RegName_Null}
@@ -262,7 +272,20 @@ struct ModRM
 * platform on which the opcode is applicable.
 */
 struct OpcodeInfo {
-    enum platform { all, em64t, ia32 };
+    enum platform {
+        /// an opcode is valid on all platforms
+        all,
+        // opcode is valid on IA-32 only
+        em64t,
+        // opcode is valid on Intel64 only
+        ia32,
+        // opcode is added for the sake of disassembling, should not be used in encoding
+        decoder,
+        // only appears in master table, replaced with 'decoder' in hashed version
+        decoder32,
+        // only appears in master table, replaced with 'decoder' in hashed version
+        decoder64,
+    };
     platform                        platf;
     unsigned                        opcode[4+1+1];
     EncoderBase::OpndDesc           opnds[3];
@@ -332,10 +355,10 @@ struct MnemonicInfo {
      * Array of opcodes.
      * The terminating opcode description always have OpcodeByteKind_LAST
      * at the opcodes[i].opcode[0].
-     * The size of '20' has nothing behind it, just counted the max 
-     * number of opcodes currently used.
+     * The size of '25' has nothing behind it, just counted the max
+     * number of opcodes currently used (MOV instruction).
      */
-    OpcodeInfo                              opcodes[20];
+    OpcodeInfo                              opcodes[25];
 };
 
 ENCODER_NAMESPACE_END

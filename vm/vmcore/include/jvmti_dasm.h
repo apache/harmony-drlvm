@@ -43,7 +43,8 @@ public:
         RELATIVE_COND_JUMP,
         RELATIVE_CALL,
         INDIRECT_JUMP,
-        INDIRECT_CALL
+        INDIRECT_CALL,
+        RET
     };
     /**
      * General-purpose registers set.

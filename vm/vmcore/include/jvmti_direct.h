@@ -44,6 +44,8 @@ struct TITags;
 // declared privately in jvmti_heap.h
 struct TIIterationState;
 
+struct NCAIEnv;
+
 /*
  * Type that describes TI environment created by GetEnv function
  */
@@ -64,6 +66,7 @@ struct TIEnv
     TITags* tags;
     TIIterationState* iteration_state;
     TIEnv* next;
+    NCAIEnv *ncai_env;
 
     bool global_events[TOTAL_EVENT_TYPE_NUM];
     TIEventThread *event_threads[TOTAL_EVENT_TYPE_NUM];

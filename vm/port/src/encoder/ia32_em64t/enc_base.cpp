@@ -366,10 +366,11 @@ char * EncoderBase::encode(char * stream, Mnemonic mn, const Operands& opnds)
     assert(inst.mn == mn);
     assert(len == (unsigned)(stream-saveStream));
     if (mn == Mnemonic_CALL || mn == Mnemonic_JMP || 
+        Mnemonic_RET == mn ||
         (Mnemonic_JO<=mn && mn<=Mnemonic_JG)) {
         assert(inst.argc == opnds.count());
         
-        InstructionDisassembler idi(saveStream, (unsigned char)0xCC);
+        InstructionDisassembler idi(saveStream);
         
         for (unsigned i=0; i<inst.argc; i++) {
             const EncoderBase::Operand& original = opnds[i];
@@ -378,12 +379,15 @@ char * EncoderBase::encode(char * stream, Mnemonic mn, const Operands& opnds)
             assert(original.size() == decoded.size());
             if (original.is_imm()) {
                 assert(original.imm() == decoded.imm());
-                assert(idi.get_opnd(0).kind == Kind_Imm);
+                assert(idi.get_opnd(0).kind == InstructionDisassembler::Kind_Imm);
                 if (mn == Mnemonic_CALL) {
                     assert(idi.get_type() == InstructionDisassembler::RELATIVE_CALL);
                 }
                 else if (mn == Mnemonic_JMP) {
                     assert(idi.get_type() == InstructionDisassembler::RELATIVE_JUMP);
+                }
+                else if (mn == Mnemonic_RET) {
+                    assert(idi.get_type() == InstructionDisassembler::RET);
                 }
                 else {
                     assert(idi.get_type() == InstructionDisassembler::RELATIVE_COND_JUMP);
@@ -394,7 +398,7 @@ char * EncoderBase::encode(char * stream, Mnemonic mn, const Operands& opnds)
                 assert(original.index() == decoded.index());
                 assert(original.scale() == decoded.scale());
                 assert(original.disp() == decoded.disp());
-                assert(idi.get_opnd(0).kind == Kind_Mem);
+                assert(idi.get_opnd(0).kind == InstructionDisassembler::Kind_Mem);
                 if (mn == Mnemonic_CALL) {
                     assert(idi.get_type() == InstructionDisassembler::INDIRECT_CALL);
                 }
@@ -408,7 +412,7 @@ char * EncoderBase::encode(char * stream, Mnemonic mn, const Operands& opnds)
             else {
                 assert(original.is_reg());
                 assert(original.reg() == decoded.reg());
-                assert(idi.get_opnd(0).kind == Kind_Reg);
+                assert(idi.get_opnd(0).kind == InstructionDisassembler::Kind_Reg);
                 if (mn == Mnemonic_CALL) {
                     assert(idi.get_type() == InstructionDisassembler::INDIRECT_CALL);
                 }
@@ -717,6 +721,9 @@ EncoderBase::lookup(Mnemonic mn, const Operands& opnds)
         bool found = false;
         for (idx=0; !odesc[idx].last; idx++) {
             const OpcodeDesc& opcode = odesc[idx];
+            if (opcode.platf == OpcodeInfo::decoder) {
+                continue;
+            }
             if (opcode.roles.count != opnds.count()) {
                 continue;
             }
@@ -728,6 +735,9 @@ EncoderBase::lookup(Mnemonic mn, const Operands& opnds)
         if (!found) {
             for (idx=0; !odesc[idx].last; idx++) {
                 const OpcodeDesc& opcode = odesc[idx];
+                if (opcode.platf == OpcodeInfo::decoder) {
+                    continue;
+                }
                 if (opcode.roles.count != opnds.count()) {
                     continue;
                 }
@@ -747,6 +757,7 @@ EncoderBase::lookup(Mnemonic mn, const Operands& opnds)
     const OpcodeDesc * odesc = &opcodes[mn][opcodeIndex];
     assert(!odesc->last);
     assert(odesc->roles.count == opnds.count());
+    assert(odesc->platf != OpcodeInfo::decoder);
 #if !defined(_EM64T_)
     // tuning was done for IA32 only, so no size restriction on EM64T
     //assert(sizeof(OpcodeDesc)==128);

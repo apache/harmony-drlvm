@@ -212,6 +212,7 @@ ready_for_exceptions(false)
     vm_state = VM_INITIALIZING;
 
     TI = new DebugUtilsTI; 
+    NCAI = new GlobalNCAI;
     vm_methods = new Method_Lookup_Table;
 
     nsoTable = nso_init_lookup_table(&string_pool);
@@ -232,6 +233,9 @@ Global_Env::~Global_Env()
 
     delete TI;
     TI = NULL;
+
+    delete NCAI;
+    NCAI = NULL;
 
     delete vm_methods;
     vm_methods = NULL;

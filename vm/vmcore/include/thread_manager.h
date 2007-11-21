@@ -33,6 +33,7 @@ extern "C"
 
 struct jvmti_frame_pop_listener;
 struct JVMTISingleStepState;
+struct NCAISingleStepState;
 struct ClassLoader;
 struct Registers;
 
@@ -110,6 +111,15 @@ struct JVMTIThread
     struct jvmti_frame_pop_listener *frame_pop_listener;
     struct JVMTISingleStepState *ss_state;
     struct Registers *jvmti_saved_exception_registers;
+
+    // Flag and restart address for memory access violation detection
+    int                               violation_flag;
+    void*                             violation_restart_address;
+
+    // Storage for NCAI Single Step data
+    struct NCAISingleStepState* ncai_ss;
+    // Is set when current thread is in NCAI handler
+    jboolean flag_ncai_handler;
 };
 
 struct VM_thread

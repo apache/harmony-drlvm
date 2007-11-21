@@ -255,7 +255,6 @@ StackIterator* si_create_from_native(VM_thread* thread)
 
 StackIterator* si_create_from_registers(Registers* regs, bool is_ip_past, M2nFrame* lm2nf)
 {
-    ASSERT_NO_INTERPRETER
     // Allocate iterator
     StackIterator* res = (StackIterator*)STD_MALLOC(sizeof(StackIterator));
     assert(res);

@@ -130,4 +130,15 @@ natives_lookup_method( NativeLibraryList libraries,
 void
 natives_describe_error(NativeLoadStatus error, char* buf, size_t buflen);
 
+
+/**
+ * Function detects if module is JNI library
+ *
+ * @param libname        - library name (full or relative)
+ *
+ * @return true if specified library was loaded already by natives support
+ */
+//
+bool natives_is_library_loaded_slow(const char* libname);
+
 #endif // _NATIVES_SUPPORT_LIB_H_

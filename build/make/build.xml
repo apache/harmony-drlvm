@@ -752,8 +752,10 @@ bootclasspath.100=vmmagic-20070207.jar
             <fileset dir="${build.VM.home}/include">
                 <include name="jni_types.h" />
                 <include name="jvmti_types.h" />
+                <include name="ncai_types.h" />
                 <include name="jni.h" />
                 <include name="jvmti.h" />
+                <include name="ncai.h" />
             </fileset>
         </copy>
     </target>

@@ -577,6 +577,18 @@ void stack_overflow_handler(int signum, siginfo_t* UNREF info, void* context)
 void null_java_reference_handler(int signum, siginfo_t* UNREF info, void* context)
 { 
     ucontext_t *uc = (ucontext_t *)context;
+    VM_thread *vm_thread = p_TLS_vmthread;
+    Registers regs;
+    UCONTEXT_TO_REGS(&regs, uc);
+
+    if (vm_thread && vm_thread->jvmti_thread.violation_flag)
+    {
+        vm_thread->jvmti_thread.violation_flag = 0;
+        regs.set_ip(vm_thread->jvmti_thread.violation_restart_address);
+        linux_regs_to_ucontext(uc, &regs);
+        return;
+    }
+
     Global_Env *env = VM_Global_State::loader_env;
 
     TRACE2("signals", "NPE or SOE detected at " << (void*)REGISTER_EIP);
@@ -593,8 +605,6 @@ void null_java_reference_handler(int signum, siginfo_t* UNREF info, void* contex
         }
     }
     fprintf(stderr, "SIGSEGV in VM code.\n");
-    Registers regs;
-    UCONTEXT_TO_REGS(&regs, uc);
 
     // setup default handler
     signal(signum, SIG_DFL);
@@ -646,7 +656,6 @@ void jvmti_jit_breakpoint_handler(int signum, siginfo_t* UNREF info, void* conte
     UCONTEXT_TO_REGS(&regs, uc);
     TRACE2("signals", "JVMTI breakpoint detected at " <<
         (void *)regs.eip);
-    assert(!interpreter_enabled());
 
     bool handled = jvmti_jit_breakpoint_handler(&regs);
     if (handled)
@@ -695,14 +704,17 @@ void general_signal_handler(int signum, siginfo_t* info, void* context)
     bool replaced = false;
     ucontext_t* uc = (ucontext_t *)context;
     uint32 saved_eip = (uint32)REGISTER_EIP;
-    uint32 new_eip = 0;
+    uint32 new_eip = saved_eip;
+    VM_thread* vm_thread = p_TLS_vmthread;
+    bool violation =
+        (signum == SIGSEGV) && vm_thread && vm_thread->jvmti_thread.violation_flag;
 
     // If exception is occured in processor instruction previously
     // instrumented by breakpoint, the actual exception address will reside
     // in jvmti_jit_breakpoints_handling_buffer
     // We should replace exception address with saved address of instruction
     uint32 break_buf =
-        (uint32)p_TLS_vmthread->jvmti_thread.jvmti_jit_breakpoints_handling_buffer;
+        (uint32)vm_thread->jvmti_thread.jvmti_jit_breakpoints_handling_buffer;
     if (saved_eip >= break_buf &&
         saved_eip < break_buf + TM_JVMTI_MAX_BUFFER_SIZE)
     {
@@ -710,9 +722,17 @@ void general_signal_handler(int signum, siginfo_t* info, void* context)
         assert(signum != SIGTRAP);
 
         replaced = true;
-        new_eip = (uint32)vm_get_ip_from_regs(p_TLS_vmthread);
+        new_eip = (uint32)vm_get_ip_from_regs(vm_thread);
         REGISTER_EIP = new_eip;
     }
+
+    // Pass exception to NCAI exception handler
+    bool is_handled = 0;
+    bool is_internal = (signum == SIGTRAP) || violation;
+    ncai_process_signal_event((NativeCodePtr)uc->uc_mcontext.gregs[REG_EIP],
+        (jint)signum, is_internal, &is_handled);
+    if (is_handled)
+        return;
 
     switch (signum)
     {
@@ -727,6 +747,12 @@ void general_signal_handler(int signum, siginfo_t* info, void* context)
         break;
     case SIGABRT:
         abort_handler(signum, info, context);
+        break;
+    case SIGINT:
+        vm_interrupt_handler(signum);
+        break;
+    case SIGQUIT:
+        vm_dump_handler(signum);
         break;
     default:
         // Unknown signal
@@ -762,8 +788,15 @@ void initialize_signals()
     sa.sa_sigaction = &general_signal_handler;
     sigaction(SIGFPE, &sa, NULL);
 
-    signal(SIGINT, (void (*)(int)) vm_interrupt_handler);
-    signal(SIGQUIT, (void (*)(int)) vm_dump_handler);
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_SIGINFO;
+    sa.sa_sigaction = &general_signal_handler;
+    sigaction(SIGINT, &sa, NULL);
+
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_SIGINFO;
+    sa.sa_sigaction = &general_signal_handler;
+    sigaction(SIGQUIT, &sa, NULL);
 
     /* install abort_handler to print out call stack on assertion failures */
     sigemptyset(&sa.sa_mask);

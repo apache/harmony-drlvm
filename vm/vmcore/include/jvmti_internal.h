@@ -414,6 +414,9 @@ void jvmti_set_single_step_breakpoints_for_method(DebugUtilsTI *ti,
     jvmti_thread_t jvmti_thread, Method* method);
 void jvmti_remove_single_step_breakpoints(DebugUtilsTI *ti, jvmti_thread_t jvmti_thread);
 
+// NCAI extension
+jvmtiError JNICALL jvmtiGetNCAIEnvironment(jvmtiEnv* jvmti_env, ...);
+
 // Object check functions
 Boolean is_valid_throwable_object(jthread thread);
 Boolean is_valid_thread_object(jthread thread);

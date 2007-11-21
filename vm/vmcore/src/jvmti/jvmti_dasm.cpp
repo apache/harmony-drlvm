@@ -191,6 +191,9 @@ void InstructionDisassembler::disasm(const NativeCodePtr addr,
             pidi->m_type = INDIRECT_JUMP;
         }
     }
+    else if (inst.mn == Mnemonic_RET) {
+        pidi->m_type = RET;
+    }
     else if (is_jcc(inst.mn)) {
         // relative Jcc is the only possible variant
         assert(pidi->m_argc == 1);
@@ -233,6 +236,14 @@ InstructionDisassembler::get_target_address_from_context(const Registers* pconte
         // can't happen for INDIRECT_xxx.
         assert(false);
         return NULL;
+#ifdef _IA32_
+    case RET:
+        {
+        const char* sp_value = get_reg_value(DISASM_REG_ESP, pcontext);
+        const char* retAddr = *(char**)sp_value;
+        return (NativeCodePtr)retAddr;
+        }
+#endif // _IA32_
     default:
         // This method should not be called for non-branch instructions.
         assert(false);

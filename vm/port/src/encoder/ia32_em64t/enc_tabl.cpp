@@ -345,10 +345,10 @@ END_MNEMONIC()
 
 #define DEFINE_ALU_OPCODES( opc_ext, opcode_starts_from, first_opcode, def_use ) \
 \
-/*  {OpcodeInfo::all,     {opcode_starts_from + 4, ib},           {AL,            imm8},  DU_U },\
-    {OpcodeInfo::all,     {opcode_starts_from + 5, iw},           {AX,            imm16}, DU_U },\
-    {OpcodeInfo::all,     {opcode_starts_from + 5, id},           {EAX,           imm32}, DU_U },\
-    {OpcodeInfo::em64t,   {REX_W, opcode_starts_from+5, id},              {RAX,           imm32}, DU_U },*/\
+    {OpcodeInfo::decoder,   {opcode_starts_from + 4, ib},           {AL,    imm8},  DU_U },\
+    {OpcodeInfo::decoder,   {Size16, opcode_starts_from + 5, iw},   {AX,    imm16}, DU_U },\
+    {OpcodeInfo::decoder,   {opcode_starts_from + 5, id},           {EAX,   imm32}, DU_U },\
+    {OpcodeInfo::decoder64, {REX_W, opcode_starts_from+5, id},      {RAX,   imm32}, DU_U },\
 \
     {OpcodeInfo::all,     {0x80, opc_ext, ib},          {r_m8,  imm8},  def_use },\
     {OpcodeInfo::all,     {Size16, 0x81, opc_ext, iw},  {r_m16, imm16}, def_use },\
@@ -995,8 +995,20 @@ BEGIN_OPCODES()
     {OpcodeInfo::all,   {Size16, 0xC7, _0}, {r_m16,imm16},  D_U },
     {OpcodeInfo::all,   {0xC7, _0},         {r_m32,imm32},  D_U },
     {OpcodeInfo::em64t, {REX_W, 0xC7, _0},  {r_m64,imm32},  D_U },
+
+    {OpcodeInfo::decoder,   {0xA0},         {AL,  moff8},  D_U },
+    {OpcodeInfo::decoder,   {Size16, 0xA1}, {AX,  moff16},  D_U },
+    {OpcodeInfo::decoder,   {0xA1},         {EAX, moff32},  D_U },
+    //{OpcodeInfo::decoder64,   {REX_W, 0xA1},  {RAX, moff64},  D_U },
+
+    {OpcodeInfo::decoder,   {0xA2},         {moff8, AL},  D_U },
+    {OpcodeInfo::decoder,   {Size16, 0xA3}, {moff16, AX},  D_U },
+    {OpcodeInfo::decoder,   {0xA3},         {moff32, EAX},  D_U },
+    //{OpcodeInfo::decoder64,   {REX_W, 0xA3},  {moff64, RAX},  D_U },
 END_OPCODES()
 END_MNEMONIC()
+
+
 
 BEGIN_MNEMONIC(XCHG, MF_NONE, DU_DU )
 BEGIN_OPCODES()
@@ -1291,12 +1303,12 @@ END_MNEMONIC()
 
 BEGIN_MNEMONIC(TEST, MF_AFFECTS_FLAGS, U_U)
 BEGIN_OPCODES()
-    /*
-    {OpcodeInfo::all,     {0xA8, ib},               { AL, imm8},    U_U },
-    {OpcodeInfo::all,     {0xA9, iw},               { AX, imm16},   U_U },
-    {OpcodeInfo::all,     {0xA9, id},               { EAX, imm32},  U_U },
-    {OpcodeInfo::em64t,   {REX_W, 0xA9, id},        { RAX, imm32},  U_U },
-    */
+
+    {OpcodeInfo::decoder,   {0xA8, ib},               { AL, imm8},    U_U },
+    {OpcodeInfo::decoder,   {0xA9, iw},               { AX, imm16},   U_U },
+    {OpcodeInfo::decoder,   {0xA9, id},               { EAX, imm32},  U_U },
+    {OpcodeInfo::decoder64, {REX_W, 0xA9, id},        { RAX, imm32},  U_U },
+
     {OpcodeInfo::all,   {0xF6, _0, ib},         {r_m8,imm8},   U_U },
 
     {OpcodeInfo::all,   {Size16, 0xF7, _0, iw}, {r_m16,imm16}, U_U },
@@ -1476,6 +1488,23 @@ END_MNEMONIC()
 //
 // ~String operations
 //
+
+//
+//Note: the instructions below added for the sake of disassembling routine.
+// They need to have flags, params and params usage to be defined more precisely.
+//
+BEGIN_MNEMONIC(LEAVE, MF_NONE, N)
+BEGIN_OPCODES()
+    {OpcodeInfo::decoder,     {0xC9},         {},       N },
+END_OPCODES()
+END_MNEMONIC()
+
+BEGIN_MNEMONIC(ENTER, MF_NONE, N)
+BEGIN_OPCODES()
+    {OpcodeInfo::decoder,     {0xC8, iw, ib},           {imm16, imm8},  N },
+END_OPCODES()
+END_MNEMONIC()
+
 };      // ~masterEncodingTable[]
 
 ENCODER_NAMESPACE_END
@@ -1536,9 +1565,18 @@ void EncoderBase::buildMnemonicDesc(const MnemonicInfo * minfo)
         odesc.last = 0;
 #ifdef _EM64T_
         if (oinfo.platf == OpcodeInfo::ia32) { continue; }
+        if (oinfo.platf == OpcodeInfo::decoder32) { continue; }
 #else
         if (oinfo.platf == OpcodeInfo::em64t) { continue; }
+        if (oinfo.platf == OpcodeInfo::decoder64) { continue; }
 #endif
+        if (oinfo.platf == OpcodeInfo::decoder64 ||
+            oinfo.platf == OpcodeInfo::decoder32) {
+             odesc.platf = OpcodeInfo::decoder;
+        }
+        else {
+            odesc.platf = (char)oinfo.platf;
+        }
         //
         // fill out opcodes
         //
@@ -1587,15 +1625,23 @@ void EncoderBase::buildMnemonicDesc(const MnemonicInfo * minfo)
         }
         // check imm
         if (oinfo.roles.count > 0 && 
-            oinfo.opnds[oinfo.roles.count-1].kind == OpndKind_Imm) {
-            // Example: CALL cd, PUSH imm32,
+            (oinfo.opnds[0].kind == OpndKind_Imm ||
+            oinfo.opnds[oinfo.roles.count-1].kind == OpndKind_Imm)) {
+            // Example: CALL cd, PUSH imm32 - they fit both opnds[0] and
+            // opnds[oinfo.roles.count-1].
+            // The A3 opcode fits only opnds[0] - it's currently have
+            // MOV imm32, EAX. Looks ridiculous, but this is how the
+            // moffset is currently implemented. Will need to fix together
+            // with other usages of moff.
             // adding fake /cd or fake /id
-            OpndSize sz = oinfo.opnds[oinfo.roles.count-1].size;
+            unsigned imm_opnd_index =
+                oinfo.opnds[0].kind == OpndKind_Imm ? 0 : oinfo.roles.count-1;
+            OpndSize sz = oinfo.opnds[imm_opnd_index].size;
             unsigned imm_encode, coff_encode;
             if (sz==OpndSize_8) {imm_encode = ib; coff_encode=cb; }
             else if (sz==OpndSize_16) {imm_encode = iw; coff_encode=cw;}
             else if (sz==OpndSize_32) {imm_encode = id; coff_encode=cd; }
-        else if (sz==OpndSize_64) {imm_encode = io; coff_encode=0xCC; }
+            else if (sz==OpndSize_64) {imm_encode = io; coff_encode=0xCC; }
             else { assert(false); imm_encode=0xCC; coff_encode=0xCC; }
             if (odesc.aux1 == 0) {
                 if (odesc.aux0==0) {
@@ -1622,6 +1668,12 @@ void EncoderBase::buildMnemonicDesc(const MnemonicInfo * minfo)
             if (odesc.opnds[1].reg != RegName_Null) {
                 ++odesc.first_opnd;
             }
+        }
+
+        if (odesc.platf == OpcodeInfo::decoder) {
+            // if the opcode is only for decoding info, then do not hash it.
+            ++oindex;
+            continue;
         }
        
         //

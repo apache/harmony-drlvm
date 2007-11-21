@@ -91,6 +91,12 @@ hythread_thin_monitor_get_owner
 hythread_native_resource_is_live
 hythread_reclaim_resources
 
+hythread_suspend_thread_native
+hythread_resume_thread_native
+hythread_get_suspend_count_native
+hythread_get_thread_context
+hythread_set_thread_context
+
 hysem_post
 hysem_wait
 hysem_destroy

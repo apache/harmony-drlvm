@@ -90,6 +90,7 @@ Version: $Revision: 1.5.2.3 $
                 <include name="jit/*.cpp" />
                 <include name="jni/*.cpp" />
                 <include name="jvmti/*.cpp" />
+                <include name="ncai/*.cpp" />
                 <include name="object/*.cpp" />
                 <include name="reflection/*.cpp" />
                 <include name="stack/*.cpp" />
@@ -122,6 +123,7 @@ Version: $Revision: 1.5.2.3 $
             <fileset dir="${build.vm.home}/vmcore/src">
                 <include name="thread/win/*.cpp" if="is.windows"/>
                 <include name="util/win/*.cpp" if="is.windows"/>
+                <include name="ncai/utils/*win.cpp" if="is.windows"/>
 
                 <include name="util/win/ia32/*.cpp" if="is.windows.x86"/>
                 <include name="util/win/em64t/*.cpp" if="is.windows.x86_64"/>
@@ -132,8 +134,13 @@ Version: $Revision: 1.5.2.3 $
                 <include name="util/ia32/**/*.cpp" if="is.x86"/>
                 <include name="util/em64t/**/*.cpp" if="is.x86_64"/>
 
+                <include name="ncai/utils/*ipf.cpp" if="is.ia64"/>
+                <include name="ncai/utils/*ia32.cpp" if="is.x86"/>
+                <include name="ncai/utils/*em64t.cpp" if="is.x86_64"/>
+
                 <include name="thread/linux/*.cpp" if="is.unix"/>
                 <include name="util/linux/*.cpp" if="is.unix"/>
+                <include name="ncai/utils/*linux.cpp" if="is.unix"/>
                 <exclude name="util/linux/signals_ia32.cpp" unless="is.unix.x86"/>
                 <exclude name="util/linux/signals_em64t.cpp" unless="is.unix.x86_64"/>
                 <exclude name="util/linux/signals_ipf.cpp" unless="is.unix.ia64"/>

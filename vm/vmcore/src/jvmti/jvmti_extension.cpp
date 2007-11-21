@@ -34,9 +34,45 @@ struct JvmtiExtension
     jvmtiExtensionFunctionInfo info;
 };
 
-static JvmtiExtension *jvmti_extension_list = NULL;
+static jvmtiParamInfo jvmtiGetNCAIEnvironmentParams[] =
+{
+    {
+        "ncai_env_ptr",
+        JVMTI_KIND_OUT,
+        JVMTI_TYPE_CVOID,
+        JNI_FALSE
+    },
+    {
+        "version",
+        JVMTI_KIND_IN,
+        JVMTI_TYPE_JINT,
+        JNI_FALSE
+    }
+};
 
-static const jint extensions_number = 0;
+static jvmtiError jvmtiGetNCAIEnvironmentErrors[] =
+{ // Universal errors are excluded according to specification
+    JVMTI_ERROR_NONE,
+};
+
+static JvmtiExtension jvmti_extension_list[] =
+{
+    {
+        NULL,
+        {
+            jvmtiGetNCAIEnvironment,
+            "org.apache.harmony.vm.GetExtensionEnv",
+            "Returns the reference to the NCAI function table",
+            sizeof(jvmtiGetNCAIEnvironmentParams) / sizeof(jvmtiParamInfo),
+            jvmtiGetNCAIEnvironmentParams,
+            sizeof(jvmtiGetNCAIEnvironmentErrors) / sizeof(jvmtiError),
+            jvmtiGetNCAIEnvironmentErrors
+        }
+    }
+
+};
+
+static const jint extensions_number = sizeof(jvmti_extension_list) / sizeof(JvmtiExtension);
 
 static void free_allocated_extension_array(jvmtiExtensionFunctionInfo *array,
                                            jint number)

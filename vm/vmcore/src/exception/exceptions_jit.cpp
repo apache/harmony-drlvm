@@ -607,6 +607,9 @@ void exn_athrow_regs(Registers * regs, Class_Handle exn_class, bool java_code, b
     si_copy_to_registers(si, regs);
 
     if (transfer_control) {
+        // Let NCAI to continue single stepping in exception handler
+        ncai_setup_signal_step(&vmthread->jvmti_thread, (NativeCodePtr)regs->get_ip());
+
         set_exception_object_internal(exn_obj);
         si_transfer_control(si);
         assert(!"si_transfer_control should not return");

@@ -22,6 +22,7 @@
 #include <open/types.h>
 #include <open/hythread_ext.h>
 #include <open/ti_thread.h>
+#include <open/ncai_thread.h>
 #include <apr_pools.h>
 #include <apr_thread_mutex.h>
 #include <apr_thread_cond.h>
@@ -316,6 +317,12 @@ int os_get_thread_times(osthread_t os_thread, int64* pkernel, int64* puser);
 
 int os_cond_timedwait(hycond_t *cond, hymutex_t *mutex, I_64 ms, IDATA nano);
 UDATA os_get_foreign_thread_stack_size();
+
+int os_thread_suspend(osthread_t thread);
+int os_thread_resume(osthread_t thread);
+int os_thread_get_suspend_count(osthread_t thread);
+int os_thread_get_context(osthread_t thread, os_thread_context_t *context);
+int os_thread_set_context(osthread_t thread, os_thread_context_t *context);
 
 #ifdef __cplusplus
 }

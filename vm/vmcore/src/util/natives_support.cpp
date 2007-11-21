@@ -34,6 +34,7 @@
 #include "lock_manager.h"
 #include "jni_direct.h" // FIXME ???? Can we use it here ????
 #include "open/vm_util.h"
+#include "port_filepath.h"
 
 #include "jni_types.h"
 #include "jni_utils.h"
@@ -195,6 +196,9 @@ static inline char *convert_to_lowercase(const char* name)
     return newCopy;
 }
 
+void ncai_library_load_callback(const char* name);
+void ncai_library_unload_callback(const char* name);
+
 // Function loads native library with a given name.
 NativeLibraryHandle
 natives_load_library(const char* library_name, bool* just_loaded,
@@ -282,6 +286,8 @@ natives_load_library(const char* library_name, bool* just_loaded,
     pinfo->next = jni_libs.lib_info_list;
     jni_libs.lib_info_list = pinfo;
 
+    ncai_library_load_callback(localLibName);
+
     jni_libs.lock._unlock();
 
     res = find_call_JNI_OnLoad(pinfo->handle); // What to do with result???
@@ -289,7 +295,7 @@ natives_load_library(const char* library_name, bool* just_loaded,
     *pstatus = APR_SUCCESS;
 
     returnCode = pinfo->handle;
-    
+
 NATIVES_LOAD_LIBRARY_EXIT :
 
 #ifdef PLATFORM_NT
@@ -330,6 +336,7 @@ natives_unload_library(NativeLibraryHandle library_handle)
             } else {
                 prev->next = lib->next;
             }
+            ncai_library_unload_callback(lib->name->bytes);
             natives_unload_library_internal(lib);
             jni_libs.lock._unlock();
             return;
@@ -708,3 +715,82 @@ natives_describe_error(NativeLoadStatus error, char* buf, size_t buflen)
 {
     apr_strerror(error, buf, buflen);
 } // natives_describe_error
+
+
+#ifdef PLATFORM_NT
+// Converts to lower case within given buffer
+void lowercase_buf(char* name)
+{
+    assert(name != NULL);
+
+    for(; *name; name++)
+    {
+        if (isalpha(*name) && !islower(*name)) {
+            *name = tolower(*name);
+        }
+    }
+}
+#endif // #ifdef PLATFORM_NT
+
+// Fills provided buffer with short file name
+// Returns pointer to buffer or NULL if file name is too long
+char* short_name(const char* name, char* buf)
+{
+    assert(name != NULL && buf != NULL);
+
+    const char* filepointer = strrchr(name, '/');
+
+    if (!filepointer)
+        filepointer = strrchr(name, '\\');
+
+    if (filepointer)
+    {
+        if (strlen(filepointer + 1) > _MAX_PATH)
+            return NULL;
+
+        strcpy(buf, filepointer + 1);
+    }
+    else
+    {
+        if (strlen(name) > _MAX_PATH)
+            return NULL;
+
+        strcpy(buf, name);
+    }
+
+#ifdef PLATFORM_NT
+    lowercase_buf(buf);
+#endif
+    return buf;
+}
+
+// Checks if given library was loaded already
+// Method is stupid and slow but it works for full and partial names
+bool natives_is_library_loaded_slow(const char* libname)
+{
+    char src_buf[_MAX_PATH + 1], cmp_buf[_MAX_PATH + 1];
+
+    if (short_name(libname, src_buf) == NULL)
+        return false; // Error case
+
+    bool result = false;
+
+    jni_libs.lock._lock();
+
+    for(NativeLibraryList lib = jni_libs.lib_info_list;
+        lib; lib = lib->next)
+    {
+        if (short_name(lib->name->bytes, cmp_buf) == NULL)
+            break; // Error case
+
+        if (0 == strcmp(src_buf, cmp_buf))
+        {
+            result = true;
+            break;
+        }
+    }
+
+    jni_libs.lock._unlock();
+    return result;
+}
+

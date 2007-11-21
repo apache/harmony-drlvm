@@ -316,11 +316,22 @@ LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception
     //  - other (internal VM error or debugger breakpoint)
     //    => delegate to default handler
 
+    // Pass exception to NCAI exception handler
+    bool is_continuable =
+        (nt_exception->ExceptionRecord->ExceptionFlags != EXCEPTION_NONCONTINUABLE);
+    bool is_handled = !is_continuable;
+    bool is_internal = (code == JVMTI_EXCEPTION_STATUS);
+    ncai_process_signal_event((NativeCodePtr)regs.get_ip(),
+        (jint)code, is_internal, &is_handled);
+    if (is_continuable && is_handled)
+        return EXCEPTION_CONTINUE_EXECUTION;
+
     // delegate "other" cases to crash handler
     // Crash handler shouls be invoked when VM_thread is not attached to VM
     // or exception has occured in native code and it's not STACK_OVERFLOW
-    if (!vmthread ||
-        (!in_java && code != STATUS_STACK_OVERFLOW))
+    if ((!vmthread ||
+        (!in_java && code != STATUS_STACK_OVERFLOW)) &&
+        code != JVMTI_EXCEPTION_STATUS)
     {
         LONG result = process_crash(nt_exception);
         regs.set_ip((void*)saved_eip);
@@ -332,7 +343,8 @@ LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception
         nt_exception->ExceptionRecord->ExceptionCode, regs.get_ip(), regs_get_sp(&regs)));
 
     // if HWE occured in java code, suspension should also have been disabled
-    assert(!in_java || !hythread_is_suspend_enabled());
+    bool ncai_enabled = GlobalNCAI::isEnabled();
+    assert(!in_java || !hythread_is_suspend_enabled() || ncai_enabled);
 
     Global_Env *env = VM_Global_State::loader_env;
     // the actual exception object will be created lazily,

@@ -284,6 +284,9 @@ jint JNICALL create_jvmti_environment(JavaVM *vm_ext, void **env, jint version)
                                           PRIORITY_SIMPLE_BREAKPOINT,
                                           interpreter_enabled());
 
+    // NCAI interface support
+    newenv->ncai_env = NULL; // GetNCAIEnvironment will allocate ncai_env
+
     LMAutoUnlock lock(&vm->vm_env->TI->TIenvs_lock);
     vm->vm_env->TI->addEnvironment(newenv);
     *env = newenv;
