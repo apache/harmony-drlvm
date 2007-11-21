@@ -26,7 +26,10 @@
 #include "../common/gc_metadata.h"
 
 #define ALLOC_ZEROING
+
+#ifndef _IPF_
 #define ALLOC_PREFETCH
+#endif
 
 #ifdef ALLOC_ZEROING
 #ifdef ALLOC_PREFETCH
@@ -34,18 +37,18 @@
 #ifdef _WINDOWS_
 #include <xmmintrin.h>
 #define prefetchnta(pref_addr)	_mm_prefetch((char*)(pref_addr), _MM_HINT_NTA )
-#else
+#else /* _WINDOWS_ */
 #define prefetchnta(pref_addr)  __asm__ ("prefetchnta (%0)"::"r"(pref_addr))
-#endif
+#endif /* !_WINDOWS_ */
 
 extern POINTER_SIZE_INT PREFETCH_DISTANCE;
 extern POINTER_SIZE_INT ZEROING_SIZE;
 extern POINTER_SIZE_INT PREFETCH_STRIDE;
 extern Boolean  PREFETCH_ENABLED;
-#else
+#else /* ALLOC_PREFETCH */
 #define ZEROING_SIZE	256
-#endif
-#endif
+#endif /* !ALLOC_PREFETCH */
+#endif /* ALLOC_ZEROING */
 
 extern POINTER_SIZE_INT tls_gc_offset;
 
@@ -98,7 +101,7 @@ FORCE_INLINE Partial_Reveal_Object* thread_local_alloc_zeroing(unsigned int size
   
 #ifdef ALLOC_PREFETCH  
   if(PREFETCH_ENABLED)  {
-    POINTER_SIZE_INT pre_addr = new_free, pref_stride= PREFETCH_STRIDE, pref_dist= new_ceiling + PREFETCH_DISTANCE;
+    POINTER_SIZE_INT pre_addr = new_free, pref_stride= PREFETCH_STRIDE, pref_dist= new_ceiling + PREFETCH_DISTANCE;    	
     do{
       prefetchnta(pre_addr);
       pre_addr += pref_stride;
