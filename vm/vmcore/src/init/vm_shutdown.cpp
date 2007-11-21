@@ -151,14 +151,24 @@ static void vm_shutdown_stop_java_threads(Global_Env * vm_env) {
     }
     hythread_iterator_release(&it);
 
-    TRACE2("shutdown", "joining threads");
-    // join running threads
-    // blocked and waiting threads won't be joined
+    TRACE2("shutdown", "waiting threads");
     for (int i = 0; i < size; i++) {
-        hythread_join_timed(running_threads[i], 100/size + 1, 0);
+        hythread_sleep(100);
     }
 
     TRACE2("shutdown", "cancelling threads");
+
+    JNIEnv *jni_env = jthread_self_vm_thread()->jni_env;
+    Class* klass = vm_env->java_lang_ThreadGroup_Class;
+    jobject class_handle = struct_Class_to_jclass(klass);
+    jfieldID lock_field_id = jni_env->GetStaticFieldID(class_handle, "lock",
+        "Ljava/lang/ThreadGroup$ThreadGroupLock;");
+    assert(lock_field_id);
+    jobject lock_field = jni_env->GetStaticObjectField(class_handle, lock_field_id);
+    assert(lock_field);
+    IDATA status = jthread_monitor_enter(lock_field);
+    assert(status == TM_ERROR_NONE);
+
     // forcedly kill remaining threads
     // There is a small chance that some of these threads are not in the point
     // safe for killing, e.g. in malloc()
@@ -174,6 +184,9 @@ static void vm_shutdown_stop_java_threads(Global_Env * vm_env) {
         }
     }
     hythread_iterator_release(&it);
+
+    status = jthread_monitor_exit(lock_field);
+    assert(status == TM_ERROR_NONE);
 
     TRACE2("shutdown", "shutting down threads complete");
 }
