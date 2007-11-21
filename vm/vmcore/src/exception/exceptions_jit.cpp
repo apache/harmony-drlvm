@@ -564,9 +564,13 @@ void exn_athrow_regs(Registers * regs, Class_Handle exn_class, bool java_code, b
     DebugUtilsTI* ti = VM_Global_State::loader_env->TI;
     VM_thread* vmthread = p_TLS_vmthread;
 
-    if (java_code) {
+    if (java_code)
         m2n_push_suspended_frame(vmthread, cur_m2nf, regs);
-    }
+    else
+        // Gregory -
+        // Initialize cur_m2nf pointer in case we've crashed in native code that is unwindable,
+	// e.g. in the code that sets non-unwindable state for the native code area
+        cur_m2nf = m2n_get_last_frame();
 
     BEGIN_RAISE_AREA;
 
