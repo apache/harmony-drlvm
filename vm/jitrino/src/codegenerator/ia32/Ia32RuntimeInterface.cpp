@@ -103,7 +103,7 @@ bool RuntimeInterface::getBcLocationForNative(MethodDesc* method, POINTER_SIZE_I
         return true;
     } 
     if (Log::isLogEnabled(LogStream::RT)) {
-        Log::log(LogStream::RT) << "Native code for method: "<<method->getName()<<" BC = " << bc_pc << " not found " << std::endl;
+        Log::log(LogStream::RT) << "Bytecode location for method: "<<method->getName()<<" IP = " << native_pc << " not found " << std::endl;
     }
     return false;
 }

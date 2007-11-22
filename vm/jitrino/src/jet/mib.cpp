@@ -142,7 +142,7 @@ unsigned MethodInfoBlock::get_pc(const char * ip) const
     }
     
     // Step 3.
-    // Find very first item in the range - this is the ûופךו of the bytecode 
+    // Find very first item in the range - this is the start of the bytecode 
     // instruction
     while (m && val == *(data+m-1)) {
         --m;
