@@ -134,6 +134,18 @@ osthread_t os_thread_current()
 }
 
 /**
+ * Not used on Linux
+ *
+ * @param os_thread     thread handle
+ *
+ * @return              0 on success, systerm error otherwise
+ */
+int os_thread_free(osthread_t os_thread)
+{
+    return 0;
+}
+
+/**
  * Joins the os thread.
  *
  * @param os_thread     thread handle

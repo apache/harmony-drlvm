@@ -594,7 +594,7 @@ IDATA VMCALL hythread_struct_init(hythread_t new_thread)
     IDATA status;
 
     assert(new_thread);
-    if (!new_thread->stacksize) {
+    if (!new_thread->os_handle) {
         // Create thread primitives
         status = hylatch_create(&new_thread->join_event, 1);
         assert(status == TM_ERROR_NONE);
@@ -605,6 +605,10 @@ IDATA VMCALL hythread_struct_init(hythread_t new_thread)
         status = hycond_create(&new_thread->condition);
         assert(status == TM_ERROR_NONE);
         new_thread->stacksize = os_get_foreign_thread_stack_size();
+    } else {
+        // This join should also delete thread OS handle
+        int result = os_thread_free(new_thread->os_handle);
+        assert(0 == result);
     }
 
     new_thread->os_handle  = (osthread_t)NULL;

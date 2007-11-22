@@ -84,6 +84,19 @@ osthread_t os_thread_current()
 }
 
 /**
+ * Free native thread handle
+ *
+ * @param os_thread     thread handle
+ *
+ * @return              0 on success, systerm error otherwise
+ */
+int os_thread_free(osthread_t os_thread)
+{
+    BOOL r = CloseHandle(os_thread);
+    return !r;
+}
+
+/**
  * Joins the os thread.
  *
  * @param os_thread     thread handle
