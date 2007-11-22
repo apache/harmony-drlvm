@@ -473,7 +473,7 @@
     <!-- Main target for building components -->
     <target name="build" depends="setup, init, set.target.to.build,
                                     process.components, fill.up.deploy,
-                                    deploy.canonical" />
+                                    deploy.canonical, deploy.relocate" />
 
     <target name="set.target.to.build">
         <property name="target" value="build" />
@@ -695,6 +695,30 @@
                 <include name="*.so.*" />
             </fileset>
         </chmod>
+    </target>
+
+    <!-- ==================================================================
+        relocate build for Windows
+      ================================================================== -->
+    <target name="deploy.relocate" if="is.windows">
+        <fileset dir="${build.deploy.dir}/jdk/jre/bin/" id="relocate.files">
+            <include name="**/*.dll" />
+        </fileset>
+
+        <pathconvert pathsep=" " property="relocate.files.all" refid="relocate.files" />
+
+        <exec executable="editbin">
+            <arg value="/LARGEADDRESSAWARE" />
+            <arg value="/BIND" />
+            <arg value="${build.deploy.dir}/jdk/jre/bin/java.exe" />
+        </exec>
+
+        <exec executable="editbin">
+            <arg value="/LARGEADDRESSAWARE" />
+            <arg value="/BIND" />
+            <arg value="/rebase:base=0x500000" />
+            <arg line="${relocate.files.all}" />
+        </exec>
     </target>
 
     <target name="deploy.antlr">
