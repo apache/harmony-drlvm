@@ -112,6 +112,7 @@ extern void trace_obj_in_gen_fw(Collector *collector, void *p_ref);
 extern void trace_obj_in_nongen_fw(Collector *collector, void *p_ref);
 extern void trace_obj_in_normal_marking(Collector *collector, void *p_obj);
 extern void trace_obj_in_fallback_marking(Collector *collector, void *p_ref);
+extern void trace_obj_in_ms_fallback_marking(Collector *collector, void *p_ref);
 extern void trace_obj_in_space_tune_marking(Collector *collector, void *p_obj);
 extern void trace_obj_in_ms_marking(Collector *collector, void *p_obj);
 
@@ -151,11 +152,14 @@ static inline void resurrect_obj_tree(Collector *collector, REF *p_ref)
       }
     } else if(gc_get_mos((GC_Gen*)gc)->collect_algorithm == MAJOR_MARK_SWEEP){
       trace_object = trace_obj_in_ms_marking;
-    } else {  
+    } else {
       trace_object = trace_obj_in_normal_marking;
     }
   } else if(gc_match_kind(gc, FALLBACK_COLLECTION)){
-    trace_object = trace_obj_in_fallback_marking;
+    if(gc_get_mos((GC_Gen*)gc)->collect_algorithm == MAJOR_MARK_SWEEP)
+      trace_object = trace_obj_in_ms_fallback_marking;
+    else
+      trace_object = trace_obj_in_fallback_marking;
   } else {
     assert(gc_match_kind(gc, MARK_SWEEP_GC));
     p_ref_or_obj = p_obj;
@@ -674,7 +678,7 @@ static inline void move_compaction_update_ref(GC *gc, REF *p_ref)
  * 1. ms with compaction
  * 2. ms as a mos collection algorithm
  */
-static inline void moving_mark_sweep_update_ref(GC *gc, REF *p_ref)
+static inline void moving_mark_sweep_update_ref(GC *gc, REF *p_ref, Boolean double_fix)
 {
   /* There are only two kinds of p_ref being added into finref_repset_pool:
    * 1. p_ref is in a vector block from one finref pool;
@@ -687,6 +691,14 @@ static inline void moving_mark_sweep_update_ref(GC *gc, REF *p_ref)
     Partial_Reveal_Object *p_old_ref = (Partial_Reveal_Object*)((POINTER_SIZE_INT)p_ref - offset);
     if(obj_is_fw_in_oi(p_old_ref)){
       Partial_Reveal_Object *p_new_ref = obj_get_fw_in_oi(p_old_ref);
+      /* Only major collection in MS Gen GC might need double_fix.
+       * Double fixing happens when both forwarding and compaction happen.
+       */
+      if(double_fix && obj_is_fw_in_oi(p_new_ref)){
+        assert(gc_get_mos((GC_Gen*)gc)->collect_algorithm == MAJOR_MARK_SWEEP);
+        p_new_ref = obj_get_fw_in_oi(p_new_ref);
+        assert(address_belongs_to_gc_heap(p_new_ref, gc));
+      }
       p_ref = (REF*)((POINTER_SIZE_INT)p_new_ref + offset);
     }
   }
@@ -697,13 +709,22 @@ static inline void moving_mark_sweep_update_ref(GC *gc, REF *p_ref)
    * so this assertion will fail.
    * But for sure p_obj here must be an one needing moving.
    */
-  write_slot(p_ref, obj_get_fw_in_oi(p_obj));
+  p_obj = obj_get_fw_in_oi(p_obj);
+  /* Only major collection in MS Gen GC might need double_fix.
+   * Double fixing happens when both forwarding and compaction happen.
+   */
+  if(double_fix && obj_is_fw_in_oi(p_obj)){
+    assert(gc_get_mos((GC_Gen*)gc)->collect_algorithm == MAJOR_MARK_SWEEP);
+    p_obj = obj_get_fw_in_oi(p_obj);
+    assert(address_belongs_to_gc_heap(p_obj, gc));
+  }
+  write_slot(p_ref, p_obj);
 }
 
 extern Boolean IS_MOVE_COMPACT;
 
 /* parameter pointer_addr_in_pool means it is p_ref or p_obj in pool */
-static void nondestructively_fix_finref_pool(GC *gc, Pool *pool, Boolean pointer_addr_in_pool)
+static void nondestructively_fix_finref_pool(GC *gc, Pool *pool, Boolean pointer_addr_in_pool, Boolean double_fix)
 {
   Finref_Metadata *metadata = gc->finref_metadata;
   REF *p_ref;
@@ -725,7 +746,7 @@ static void nondestructively_fix_finref_pool(GC *gc, Pool *pool, Boolean pointer
         move_compaction_update_ref(gc, p_ref);
       } else if(gc_match_kind(gc, MS_COMPACT_COLLECTION) || gc_get_mos((GC_Gen*)gc)->collect_algorithm==MAJOR_MARK_SWEEP){
         if(obj_is_fw_in_oi(p_obj))
-          moving_mark_sweep_update_ref(gc, p_ref);
+          moving_mark_sweep_update_ref(gc, p_ref, double_fix);
       } else {
         assert((obj_is_marked_in_vt(p_obj) && obj_is_fw_in_oi(p_obj)));
         write_slot(p_ref , obj_get_fw_in_oi(p_obj));
@@ -735,7 +756,7 @@ static void nondestructively_fix_finref_pool(GC *gc, Pool *pool, Boolean pointer
   }
 }
 
-void gc_update_finref_repointed_refs(GC *gc)
+void gc_update_finref_repointed_refs(GC *gc, Boolean double_fix)
 {
   assert(!gc_match_kind(gc, MINOR_COLLECTION));
   
@@ -743,10 +764,10 @@ void gc_update_finref_repointed_refs(GC *gc)
   Pool *repset_pool = metadata->repset_pool;
   Pool *fallback_ref_pool = metadata->fallback_ref_pool;
   
-  nondestructively_fix_finref_pool(gc, repset_pool, TRUE);
+  nondestructively_fix_finref_pool(gc, repset_pool, TRUE, double_fix);
   if(!pool_is_empty(fallback_ref_pool)){
     assert(IS_FALLBACK_COMPACTION);
-    nondestructively_fix_finref_pool(gc, fallback_ref_pool, FALSE);
+    nondestructively_fix_finref_pool(gc, fallback_ref_pool, FALSE, double_fix);
   }
 }
 
@@ -782,4 +803,6 @@ void gc_copy_finaliable_obj_to_rootset(GC *gc)
   finref_copy_pool(finalizable_obj_pool, finalizable_obj_pool_copy, gc);
   finref_copy_pool_to_rootset(gc, finalizable_obj_pool_copy);
 }
+
+
 

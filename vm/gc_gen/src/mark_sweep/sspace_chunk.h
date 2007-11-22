@@ -301,8 +301,9 @@ inline Chunk_Header *sspace_get_pfc(Sspace *sspace, unsigned int seg_index, unsi
 inline void sspace_put_pfc(Sspace *sspace, Chunk_Header *chunk)
 {
   unsigned int size = chunk->slot_size;
-  assert(chunk->base && chunk->alloc_num);
   assert(chunk && (size <= SUPER_OBJ_THRESHOLD));
+  assert(chunk->base && chunk->alloc_num);
+  assert(chunk->alloc_num < chunk->slot_num);
   assert(chunk->slot_index < chunk->slot_num);
   
   Size_Segment **size_segs = sspace->size_segments;
@@ -316,6 +317,20 @@ inline void sspace_put_pfc(Sspace *sspace, Chunk_Header *chunk)
     Pool *pfc_pool = sspace->pfc_pools[i][index];
     pool_put_entry(pfc_pool, chunk);
     return;
+  }
+}
+
+inline void sspace_rebuild_chunk_chain(Sspace *sspace)
+{
+  Chunk_Header_Basic *sspace_ceiling = (Chunk_Header_Basic*)space_heap_end((Space*)sspace);
+  Chunk_Header_Basic *prev_chunk = (Chunk_Header_Basic*)space_heap_start((Space*)sspace);
+  Chunk_Header_Basic *chunk = prev_chunk->adj_next;
+  prev_chunk->adj_prev = NULL;
+  
+  while(chunk < sspace_ceiling){
+    chunk->adj_prev = prev_chunk;
+    prev_chunk = chunk;
+    chunk = chunk->adj_next;
   }
 }
 
@@ -337,7 +352,6 @@ extern POINTER_SIZE_INT free_mem_in_sspace(Sspace *sspace, Boolean show_chunk_in
 
 extern void zeroing_free_chunk(Free_Chunk *chunk);
 
-extern void allocator_clear_local_chunks(Allocator *allocator, Boolean reuse_pfc);
 extern void gc_clear_collector_local_chunks(GC *gc);
 
 extern void sspace_collect_free_chunks_to_list(Sspace *sspace, Free_Chunk_List *list);

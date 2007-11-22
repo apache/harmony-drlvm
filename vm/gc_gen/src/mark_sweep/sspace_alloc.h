@@ -37,20 +37,6 @@ inline Boolean slot_is_alloc_in_table(POINTER_SIZE_INT *table, unsigned int slot
   return (Boolean)(table[word_index] & (cur_alloc_color << index_in_word));
 }
 
-#ifdef _DEBUG
-static Boolean slot_is_free_in_table(POINTER_SIZE_INT *table, unsigned int slot_index)
-{
-  assert(!slot_is_alloc_in_table(table, slot_index));
-  
-  unsigned int color_bits_index = slot_index * COLOR_BITS_PER_OBJ;
-  unsigned int word_index = color_bits_index / BITS_PER_WORD;
-  unsigned int index_in_word = color_bits_index % BITS_PER_WORD;
-  
-  return !(table[word_index] & cur_alloc_color << index_in_word);
-  
-}
-#endif
-
 inline unsigned int composed_slot_index(unsigned int word_index, unsigned int index_in_word)
 {
   unsigned int color_bits_index = word_index*BITS_PER_WORD + index_in_word;
@@ -177,9 +163,6 @@ inline void *alloc_in_chunk(Chunk_Header* &chunk)
   ++chunk->alloc_num;
   assert(chunk->base);
   void *p_obj = (void*)((POINTER_SIZE_INT)chunk->base + ((POINTER_SIZE_INT)chunk->slot_size * slot_index));
-#ifdef _DEBUG  
-  slot_is_free_in_table(table, slot_index);
-#endif
   alloc_slot_in_table(table, slot_index);
   if(chunk->status & CHUNK_NEED_ZEROING)
     memset(p_obj, 0, chunk->slot_size);
@@ -187,15 +170,15 @@ inline void *alloc_in_chunk(Chunk_Header* &chunk)
   sspace_verify_free_area((POINTER_SIZE_INT*)p_obj, chunk->slot_size);
 #endif
 
+  if(p_obj && gc_is_concurrent_mark_phase())
+    obj_mark_black_in_table((Partial_Reveal_Object*)p_obj, chunk->slot_size);
+
 #ifdef ENABLE_FRESH_CHUNK_ALLOC
   if(chunk->status & CHUNK_FRESH){
     ++slot_index;
     chunk->slot_index = (slot_index < chunk->slot_num) ? slot_index : MAX_SLOT_INDEX;
   } else
 #endif
-
-  if(p_obj && gc_is_concurrent_mark_phase()) obj_mark_black_in_table((Partial_Reveal_Object*)p_obj,chunk->slot_size);
-
     chunk->slot_index = next_free_slot_index_in_table(table, slot_index, chunk->slot_num);
   if(chunk->slot_index == MAX_SLOT_INDEX){
     chunk->status = CHUNK_USED | CHUNK_NORMAL;

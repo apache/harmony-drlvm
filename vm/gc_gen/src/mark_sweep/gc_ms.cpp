@@ -65,7 +65,11 @@ void gc_ms_reclaim_heap(GC_MS *gc)
 {
   if(verify_live_heap) gc_verify_heap((GC*)gc, TRUE);
   
-  sspace_collection(gc_ms_get_sspace(gc));
+  Sspace *sspace = gc_ms_get_sspace(gc);
+  
+  sspace_collection(sspace);
+  
+  sspace_reset_after_collection(sspace);
   
   if(verify_live_heap) gc_verify_heap((GC*)gc, FALSE);
 }

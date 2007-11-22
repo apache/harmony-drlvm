@@ -371,6 +371,8 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
     gc_finish_concurrent_mark(gc);
   }
   
+  gc->in_collection = TRUE;
+  
   /* this has to be done after all mutators are suspended */
   gc_reset_mutator_context(gc);
   
@@ -382,14 +384,7 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
   gc_ms_reclaim_heap((GC_MS*)gc);
 #endif
 
-  /* FIXME:: clear root set here to support verify. */
-#ifdef COMPRESS_REFERENCE
-  gc_set_pool_clear(gc->metadata->gc_uncompressed_rootset_pool);
-#endif
-
   gc_reset_interior_pointer_table();
-  
-  gc_metadata_verify(gc, FALSE);
   
   collection_end_time = time_now(); 
 
@@ -411,6 +406,11 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
     gc_start_concurrent_mark(gc);
 #endif
 
+  /* Clear rootset pools here rather than in each collection algorithm */
+  gc_clear_rootset(gc);
+  
+  gc_metadata_verify(gc, FALSE);
+  
   if(!IGNORE_FINREF ){
     INFO2("gc.process", "GC: finref process after collection ...\n");
     gc_put_finref_to_vm(gc);
@@ -431,6 +431,8 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
   if(USE_CONCURRENT_GC) gc_update_collection_scheduler(gc, mutator_time, mark_time);
   
   vm_reclaim_native_objs();
+  gc->in_collection = FALSE;
+  
   vm_resume_threads_after();
   assert(hythread_is_suspend_enabled());
   hythread_set_suspend_disable(disable_count);

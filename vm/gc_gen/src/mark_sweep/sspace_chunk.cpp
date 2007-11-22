@@ -16,6 +16,7 @@
  */
 
 #include "sspace_chunk.h"
+#include "sspace_verify.h"
 
 #define NUM_ALIGNED_FREE_CHUNK_BUCKET   (HYPER_OBJ_THRESHOLD >> NORMAL_CHUNK_SHIFT_COUNT)
 #define NUM_UNALIGNED_FREE_CHUNK_BUCKET (HYPER_OBJ_THRESHOLD >> CHUNK_GRANULARITY_BITS)
@@ -124,29 +125,11 @@ void sspace_clear_chunk_list(GC *gc)
     free_chunk_list_clear(&unaligned_free_chunk_lists[i]);
   
   free_chunk_list_clear(&hyper_free_chunk_list);
-
-#ifdef USE_MARK_SWEEP_GC
-  /* release local chunks of each mutator in unique mark-sweep GC */
-  Mutator *mutator = gc->mutator_list;
-  while(mutator){
-    allocator_clear_local_chunks((Allocator*)mutator, FALSE);
-    mutator = mutator->next;
-  }
-#endif
-}
-
-void gc_clear_collector_local_chunks(GC *gc)
-{
-  assert(gc_match_kind(gc, MAJOR_COLLECTION));
-  /* release local chunks of each collector in gen GC */
-  for(unsigned int i = gc->num_collectors; i--;){
-    allocator_clear_local_chunks((Allocator*)gc->collectors[i], TRUE);
-  }
 }
 
 /* Simply put the free chunk to the according list
  * Don't merge continuous free chunks
- * The merging job is taken by sweeping
+ * The merging job is executed in merging phase
  */
 static void list_put_free_chunk(Free_Chunk_List *list, Free_Chunk *chunk)
 {
@@ -163,6 +146,29 @@ static void list_put_free_chunk(Free_Chunk_List *list, Free_Chunk *chunk)
   assert(list->chunk_num < ~((unsigned int)0));
   ++list->chunk_num;
   unlock(list->lock);
+}
+/* The difference between this and the above normal one is this func needn't hold the list lock.
+ * This is for the calling in partitioning chunk functions.
+ * Please refer to the comments of sspace_get_hyper_free_chunk().
+ */
+static void list_put_hyper_free_chunk(Free_Chunk_List *list, Free_Chunk *chunk)
+{
+  chunk->status = CHUNK_FREE;
+  chunk->prev = NULL;
+
+  /* lock(list->lock);
+   * the list lock must have been held like in getting a free chunk and partitioning it
+   * or needn't be held like in sspace initialization and the merging phase
+   */
+  chunk->next = list->head;
+  if(list->head)
+    list->head->prev = chunk;
+  list->head = chunk;
+  if(!list->tail)
+    list->tail = chunk;
+  assert(list->chunk_num < ~((unsigned int)0));
+  ++list->chunk_num;
+  //unlock(list->lock);
 }
 
 static Free_Chunk *free_list_get_head(Free_Chunk_List *list)
@@ -189,14 +195,14 @@ void sspace_put_free_chunk(Sspace *sspace, Free_Chunk *chunk)
   assert(!(chunk_size % CHUNK_GRANULARITY));
   
   if(chunk_size > HYPER_OBJ_THRESHOLD)
-    list_put_free_chunk(sspace->hyper_free_chunk_list, chunk);
+    list_put_hyper_free_chunk(sspace->hyper_free_chunk_list, chunk);
   else if(!((POINTER_SIZE_INT)chunk & NORMAL_CHUNK_LOW_MASK) && !(chunk_size & NORMAL_CHUNK_LOW_MASK))
     list_put_free_chunk(&sspace->aligned_free_chunk_lists[ALIGNED_CHUNK_SIZE_TO_INDEX(chunk_size)], chunk);
   else
     list_put_free_chunk(&sspace->unaligned_free_chunk_lists[UNALIGNED_CHUNK_SIZE_TO_INDEX(chunk_size)], chunk);
 }
 
-static Free_Chunk *partition_normal_free_chunk(Sspace *sspace, Free_Chunk *chunk)
+static inline Free_Chunk *partition_normal_free_chunk(Sspace *sspace, Free_Chunk *chunk)
 {
   assert(CHUNK_SIZE(chunk) > NORMAL_CHUNK_SIZE_BYTES);
   
@@ -224,14 +230,18 @@ static Free_Chunk *partition_normal_free_chunk(Sspace *sspace, Free_Chunk *chunk
  * the first one's size is chunk_size
  * the second will be inserted into free chunk list according to its size
  */
-static void partition_abnormal_free_chunk(Sspace *sspace,Free_Chunk *chunk, unsigned int chunk_size)
+static inline Free_Chunk *partition_abnormal_free_chunk(Sspace *sspace,Free_Chunk *chunk, unsigned int chunk_size)
 {
   assert(CHUNK_SIZE(chunk) > chunk_size);
   
-  Free_Chunk *back_chunk = (Free_Chunk*)((POINTER_SIZE_INT)chunk + chunk_size);
-  back_chunk->adj_next = chunk->adj_next;
-  chunk->adj_next = (Chunk_Header_Basic*)back_chunk;
-  sspace_put_free_chunk(sspace, back_chunk);
+  Free_Chunk *new_chunk = (Free_Chunk*)((POINTER_SIZE_INT)chunk->adj_next - chunk_size);
+  assert(chunk < new_chunk);
+  
+  new_chunk->adj_next = chunk->adj_next;
+  chunk->adj_next = (Chunk_Header_Basic*)new_chunk;
+  sspace_put_free_chunk(sspace, chunk);
+  new_chunk->status = CHUNK_FREE;
+  return new_chunk;
 }
 
 Free_Chunk *sspace_get_normal_free_chunk(Sspace *sspace)
@@ -303,7 +313,7 @@ Free_Chunk *sspace_get_abnormal_free_chunk(Sspace *sspace, unsigned int chunk_si
       chunk = free_list_get_head(list);
     if(chunk){
       if(search_size > chunk_size)
-        partition_abnormal_free_chunk(sspace, chunk, chunk_size);
+        chunk = partition_abnormal_free_chunk(sspace, chunk, chunk_size);
       zeroing_free_chunk(chunk);
       return chunk;
     }
@@ -323,7 +333,7 @@ Free_Chunk *sspace_get_abnormal_free_chunk(Sspace *sspace, unsigned int chunk_si
       chunk = free_list_get_head(list);
     if(chunk){
       if(index > UNALIGNED_CHUNK_SIZE_TO_INDEX(chunk_size))
-        partition_abnormal_free_chunk(sspace, chunk, chunk_size);
+        chunk = partition_abnormal_free_chunk(sspace, chunk, chunk_size);
       zeroing_free_chunk(chunk);
       return chunk;
     }
@@ -340,6 +350,7 @@ Free_Chunk *sspace_get_hyper_free_chunk(Sspace *sspace, unsigned int chunk_size,
   
   Free_Chunk_List *list = sspace->hyper_free_chunk_list;
   lock(list->lock);
+  
   Free_Chunk *prev_chunk = NULL;
   Free_Chunk *chunk = list->head;
   while(chunk){
@@ -358,16 +369,29 @@ Free_Chunk *sspace_get_hyper_free_chunk(Sspace *sspace, unsigned int chunk_size,
     prev_chunk = chunk;
     chunk = chunk->next;
   }
-  unlock(list->lock);
+  
+  /* unlock(list->lock);
+   * We move this unlock to the end of this func for the following reason.
+   * A case might occur that two allocator are asking for a hyper chunk at the same time,
+   * and there is only one chunk in the list and it can satify the requirements of both of them.
+   * If allocator 1 gets the list lock first, it will get the unique chunk and releases the lock here.
+   * And then allocator 2 holds the list lock after allocator 1 releases it,
+   * it will found there is no hyper chunk in the list and return NULL.
+   * In fact the unique hyper chunk is large enough.
+   * If allocator 1 chops down one piece and put back the rest into the list, allocator 2 will be satisfied.
+   * So we will get a wrong info here if we release the lock here, which makes us invoke GC much earlier than needed.
+   */
   
   if(chunk){
     if(is_normal_chunk)
       chunk = partition_normal_free_chunk(sspace, chunk);
     else if(CHUNK_SIZE(chunk) > chunk_size)
-      partition_abnormal_free_chunk(sspace, chunk, chunk_size);
+      chunk = partition_abnormal_free_chunk(sspace, chunk, chunk_size);
     if(!is_normal_chunk)
       zeroing_free_chunk(chunk);
   }
+  
+  unlock(list->lock);
   
   return chunk;
 }

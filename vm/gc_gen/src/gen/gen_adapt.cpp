@@ -25,7 +25,7 @@
 
 #define NOS_COPY_RESERVE_DELTA (GC_BLOCK_SIZE_BYTES<<1)
 /*Tune this number in case that MOS could be too small, so as to avoid or put off fall back.*/
-#define GC_MOS_MIN_EXTRA_REMAIN_SIZE (36*MB)
+#define MOS_EXTRA_REMAIN_SIZE_TO_ANTI_FALLBACK (36*MB)
 
 struct Mspace;
 void mspace_set_expected_threshold_ratio(Mspace* mspace, float threshold_ratio);
@@ -246,11 +246,11 @@ static void gc_decide_next_collect(GC_Gen* gc, int64 pause_time)
       if(fspace->num_collections != 1) assert(minor_surviving_size == mspace->last_alloced_size);
   
       float k = Tslow * fspace->num_collections/fspace->time_collections;
-      float m = ((float)minor_surviving_size)*1.0f/((float)(SMax - GC_MOS_MIN_EXTRA_REMAIN_SIZE ));
+      float m = ((float)minor_surviving_size)*1.0f/((float)(SMax - MOS_EXTRA_REMAIN_SIZE_TO_ANTI_FALLBACK ));
       float free_ratio_threshold = mini_free_ratio(k, m);
 
-      if(SMax > GC_MOS_MIN_EXTRA_REMAIN_SIZE)
-        free_size_threshold = (POINTER_SIZE_INT)(free_ratio_threshold * (SMax - GC_MOS_MIN_EXTRA_REMAIN_SIZE ) + GC_MOS_MIN_EXTRA_REMAIN_SIZE );
+      if(SMax > MOS_EXTRA_REMAIN_SIZE_TO_ANTI_FALLBACK )
+        free_size_threshold = (POINTER_SIZE_INT)(free_ratio_threshold * (SMax - MOS_EXTRA_REMAIN_SIZE_TO_ANTI_FALLBACK  ) + MOS_EXTRA_REMAIN_SIZE_TO_ANTI_FALLBACK  );
       else
         free_size_threshold = (POINTER_SIZE_INT)(free_ratio_threshold * SMax);
 
@@ -310,9 +310,22 @@ Boolean gc_compute_new_space_size(GC_Gen* gc, POINTER_SIZE_INT* mos_size, POINTE
   /*If total free is smaller than one block, there is no room for us to adjust*/
   if(total_free < GC_BLOCK_SIZE_BYTES)  return FALSE;
 
-  /* predict NOS + NOS*ratio = total_free_size */
+  /*To reserve some MOS space to avoid fallback situation. 
+   *But we need ensure nos has at least one block.
+   *We have such fomula here:
+   *NOS_SIZE + NOS_SIZE * anti_fall_back_ratio + NOS_SIZE * survive_ratio = TOTAL_FREE*/
+  POINTER_SIZE_INT anti_fallback_size_in_mos;
+  float ratio_of_anti_fallback_size_to_nos = 0.25f;
   POINTER_SIZE_INT nos_reserve_size;
-  nos_reserve_size = (POINTER_SIZE_INT)(((float)total_free)/(1.0f + fspace->survive_ratio));
+  anti_fallback_size_in_mos = (POINTER_SIZE_INT)(((float)total_free * ratio_of_anti_fallback_size_to_nos)/(1.0f + ratio_of_anti_fallback_size_to_nos + fspace->survive_ratio));
+  if(anti_fallback_size_in_mos > MOS_EXTRA_REMAIN_SIZE_TO_ANTI_FALLBACK ){
+    /*If the computed anti_fallback_size_in_mos is too large, we reset it back to MOS_EXTRA_REMAIN_SIZE_TO_ANTI_FALLBACK .*/
+    anti_fallback_size_in_mos = MOS_EXTRA_REMAIN_SIZE_TO_ANTI_FALLBACK ;
+    /*Here, anti_fallback_size_in_mos must be smaller than TOTAL_FREE*/
+    nos_reserve_size = (POINTER_SIZE_INT)(((float)(total_free - anti_fallback_size_in_mos))/(1.0f + fspace->survive_ratio)); 
+  }else{
+    nos_reserve_size = (POINTER_SIZE_INT)(((float)total_free)/(1.0f + ratio_of_anti_fallback_size_to_nos + fspace->survive_ratio));
+  }
   /*NOS should not be zero, if there is only one block in non-los, i.e. in the former if sentence,
     *if total_free = GC_BLOCK_SIZE_BYTES, then the computed nos_reserve_size is between zero
     *and GC_BLOCK_SIZE_BYTES. In this case, we assign this block to NOS*/
@@ -321,16 +334,6 @@ Boolean gc_compute_new_space_size(GC_Gen* gc, POINTER_SIZE_INT* mos_size, POINTE
 #ifdef STATIC_NOS_MAPPING
   if(nos_reserve_size > fspace->reserved_heap_size) nos_reserve_size = fspace->reserved_heap_size;
 #endif  
-  /*To reserve some MOS space to avoid fallback situation. 
-   *But we need ensure nos has at least one block */
-  POINTER_SIZE_INT reserve_in_mos = GC_MOS_MIN_EXTRA_REMAIN_SIZE;
-  while (reserve_in_mos >= GC_BLOCK_SIZE_BYTES){
-    if(nos_reserve_size >= reserve_in_mos + GC_BLOCK_SIZE_BYTES){
-      nos_reserve_size -= reserve_in_mos;    
-      break;
-    }
-    reserve_in_mos >>= 1;
-  }
 
   new_nos_size = round_down_to_size((POINTER_SIZE_INT)nos_reserve_size, GC_BLOCK_SIZE_BYTES); 
 

@@ -29,6 +29,8 @@ struct Stealable_Stack;
 struct Chunk_Header;
 struct Free_Chunk_List;
 
+extern Boolean is_collector_local_alloc;
+
 #define NORMAL_SIZE_SEGMENT_GRANULARITY_BITS  8
 #define NORMAL_SIZE_SEGMENT_GRANULARITY (1 << NORMAL_SIZE_SEGMENT_GRANULARITY_BITS)
 #define NORMAL_SIZE_SEGMENT_NUM (GC_OBJ_SIZE_THRESHOLD / NORMAL_SIZE_SEGMENT_GRANULARITY)

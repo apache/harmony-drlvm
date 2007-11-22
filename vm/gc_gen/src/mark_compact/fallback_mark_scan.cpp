@@ -79,13 +79,12 @@ static void scan_object(Collector* collector, REF *p_ref)
   }
 
   /* scan non-array object */
-  int *offset_scanner = init_object_scanner(p_obj);
-  while (true) {
-    REF *p_ref = (REF*)offset_get_ref(offset_scanner, p_obj);
-    if (p_ref == NULL) break; /* terminating ref slot */
-  
+  unsigned int num_refs = object_ref_field_num(p_obj);
+  int *ref_iterator = object_ref_iterator_init(p_obj);
+            
+  for(unsigned int i=0; i<num_refs; i++){
+    REF* p_ref = object_ref_iterator_get(ref_iterator+i, p_obj);        
     scan_slot(collector, p_ref);
-    offset_scanner = offset_next_ref(offset_scanner);
   }
 
 #ifndef BUILD_IN_REFERENT
@@ -232,6 +231,9 @@ void fallback_clear_fwd_obj_oi_init(Collector* collector)
   fspace_block_iterate_init((Fspace*)((GC_Gen*)collector->gc)->nos);
 }
 #endif
+
+
+
 
 
 

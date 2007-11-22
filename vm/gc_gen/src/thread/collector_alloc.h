@@ -47,9 +47,14 @@ FORCE_INLINE Partial_Reveal_Object* collector_forward_object(Collector* collecto
   if(obj_is_set_hashcode) size += GC_OBJECT_ALIGNMENT;
 #endif
 
-  Partial_Reveal_Object* p_targ_obj = thread_local_alloc(size, (Allocator*)collector);
-  if(!p_targ_obj)
+  Partial_Reveal_Object* p_targ_obj = NULL;
+  if(is_collector_local_alloc){
+    p_targ_obj = thread_local_alloc(size, (Allocator*)collector);
+    if(!p_targ_obj)
+      p_targ_obj = (Partial_Reveal_Object*)mos_alloc(size, (Allocator*)collector);
+  } else {
     p_targ_obj = (Partial_Reveal_Object*)mos_alloc(size, (Allocator*)collector);
+  }
     
   if(p_targ_obj == NULL){
     /* failed to forward an obj */

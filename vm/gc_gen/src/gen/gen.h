@@ -57,13 +57,13 @@ struct Gen_Mode_Adaptor;
 
 typedef struct GC_Gen {
   /* <-- First couple of fields overloaded as GC */
-  // heap allocation bases for segmented heap
-  void* alloc_heap_start[3];
+  void* physical_start;
   void* heap_start;
   void* heap_end;
   POINTER_SIZE_INT reserved_heap_size;
   POINTER_SIZE_INT committed_heap_size;
   unsigned int num_collections;
+  Boolean in_collection;
   int64 time_collections;
   float survive_ratio;  
   
@@ -94,7 +94,7 @@ typedef struct GC_Gen {
 
   /* FIXME:: this is wrong! root_set belongs to mutator */
   Vector_Block* root_set;
-  Vector_Block* weak_root_set;
+  Vector_Block* weakroot_set;
   Vector_Block* uncompressed_root_set;
   
   //For_LOS_extend
@@ -134,7 +134,7 @@ void gc_gen_initialize(GC_Gen *gc, POINTER_SIZE_INT initial_heap_size, POINTER_S
 void gc_gen_destruct(GC_Gen *gc);
 void gc_gen_collection_verbose_info(GC_Gen *gc, int64 pause_time, int64 mutator_time);
 void gc_gen_space_verbose_info(GC_Gen *gc);
-void gc_gen_initial_verbose_info(GC_Gen *gc);
+void gc_gen_init_verbose(GC_Gen *gc);
 void gc_gen_wrapup_verbose(GC_Gen* gc);
                         
 inline POINTER_SIZE_INT gc_gen_free_memory_size(GC_Gen* gc)
@@ -201,7 +201,6 @@ void gc_gen_start_concurrent_mark(GC_Gen* gc);
 extern Boolean GEN_NONGEN_SWITCH ;
 
 #endif /* ifndef _GC_GEN_H_ */
-
 
 
 

@@ -72,8 +72,7 @@ static FORCE_INLINE void scan_object(Collector* collector, Partial_Reveal_Object
 
   }else{ /* scan non-array object */
     
-    unsigned int num_refs = object_ref_field_num(p_obj);
-    
+    unsigned int num_refs = object_ref_field_num(p_obj);    
     int* ref_iterator = object_ref_iterator_init(p_obj);
     
     for(unsigned int i=0; i<num_refs; i++){  

@@ -28,7 +28,6 @@
 #ifndef FORCE_INLINE
 #define FORCE_INLINE inline
 #endif
-
 /* CONST_MARK_BIT is used in mark_scan in vt, no matter MARK_BIT_FLIPPING used or not. 
    MARK_BIT_FLIPPING is used in oi for marking and forwarding in non-gen nursery forwarding
    (the marking is for those objects not in nos.)

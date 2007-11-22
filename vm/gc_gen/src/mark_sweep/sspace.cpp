@@ -121,27 +121,6 @@ void allocator_init_local_chunks(Allocator *allocator)
   allocator->local_chunks = local_chunks;
 }
 
-void allocator_clear_local_chunks(Allocator *allocator, Boolean reuse_pfc)
-{
-  Sspace *sspace = gc_get_sspace(allocator->gc);
-  Size_Segment **size_segs = sspace->size_segments;
-  Chunk_Header ***local_chunks = allocator->local_chunks;
-  
-  for(unsigned int i = SIZE_SEGMENT_NUM; i--;){
-    if(!size_segs[i]->local_alloc){
-      assert(!local_chunks[i]);
-      continue;
-    }
-    Chunk_Header **chunks = local_chunks[i];
-    assert(chunks);
-    for(unsigned int j = size_segs[i]->chunk_num; j--;){
-      if(chunks[j] && reuse_pfc)
-        sspace_put_pfc(sspace, chunks[j]);
-      chunks[j] = NULL;
-    }
-  }
-}
-
 void allocactor_destruct_local_chunks(Allocator *allocator)
 {
   Sspace *sspace = gc_get_sspace(allocator->gc);
@@ -173,12 +152,54 @@ void allocactor_destruct_local_chunks(Allocator *allocator)
   STD_FREE(local_chunks);
 }
 
+static void allocator_clear_local_chunks(Allocator *allocator)
+{
+  Sspace *sspace = gc_get_sspace(allocator->gc);
+  Size_Segment **size_segs = sspace->size_segments;
+  Chunk_Header ***local_chunks = allocator->local_chunks;
+  
+  for(unsigned int i = SIZE_SEGMENT_NUM; i--;){
+    if(!size_segs[i]->local_alloc){
+      assert(!local_chunks[i]);
+      continue;
+    }
+    Chunk_Header **chunks = local_chunks[i];
+    assert(chunks);
+    for(unsigned int j = size_segs[i]->chunk_num; j--;){
+      if(chunks[j])
+        sspace_put_pfc(sspace, chunks[j]);
+      chunks[j] = NULL;
+    }
+  }
+}
+
+static void gc_clear_mutator_local_chunks(GC *gc)
+{
+#ifdef USE_MARK_SWEEP_GC
+  /* release local chunks of each mutator in unique mark-sweep GC */
+  Mutator *mutator = gc->mutator_list;
+  while(mutator){
+    allocator_clear_local_chunks((Allocator*)mutator);
+    mutator = mutator->next;
+  }
+#endif
+}
+
+void gc_clear_collector_local_chunks(GC *gc)
+{
+  if(!gc_match_kind(gc, MAJOR_COLLECTION)) return;
+  /* release local chunks of each collector in gen GC */
+  for(unsigned int i = gc->num_collectors; i--;){
+    allocator_clear_local_chunks((Allocator*)gc->collectors[i]);
+  }
+}
+
 #ifdef USE_MARK_SWEEP_GC
 void sspace_set_space_statistic(Sspace *sspace)
 {
-  GC_MS* gc = (GC_MS*)sspace->gc;
+  GC_MS *gc = (GC_MS*)sspace->gc;
 
-  for(unsigned int i=0; i<gc->num_collectors; ++i){
+  for(unsigned int i = 0; i < gc->num_collectors; ++i){
     sspace->surviving_obj_num += gc->collectors[i]->live_obj_num;
     sspace->surviving_obj_size += gc->collectors[i]->live_obj_size;
   }
@@ -192,6 +213,9 @@ void sspace_collection(Sspace *sspace)
 {
   GC *gc = sspace->gc;
   sspace->num_collections++;
+  
+  gc_clear_mutator_local_chunks(gc);
+  gc_clear_collector_local_chunks(gc);
   
 #ifdef SSPACE_ALLOC_INFO
   sspace_alloc_info_summary();
@@ -207,7 +231,8 @@ void sspace_collection(Sspace *sspace)
   }
   if(sspace->need_compact || gc_match_kind(gc, MAJOR_COLLECTION))
     sspace->need_fix = TRUE;
-  //printf("\n\n>>>>>>>>%s>>>>>>>>>>>>\n\n", sspace->need_compact ? "SWEEP COMPACT" : "MARK SWEEP");
+
+  //printf("\n\n>>>>>>>>%s>>>>>>>>>>>>\n\n", sspace->need_compact ? "COMPACT" : "NO COMPACT");
 #ifdef SSPACE_VERIFY
   sspace_verify_before_collection(gc);
   sspace_verify_vtable_mark(gc);

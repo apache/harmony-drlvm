@@ -304,9 +304,9 @@ void nongen_forward_pool(Collector* collector)
       gc_update_weakref_ignore_finref(gc);
     }
 #endif
-  identify_dead_weak_roots(gc, gc->metadata->weak_roots_pool);
+  gc_identify_dead_weak_roots(gc);
   
-  gc_fix_rootset(collector);
+  gc_fix_rootset(collector, FALSE);
   
   TRACE2("gc.process", "GC: collector[0] finished");
 

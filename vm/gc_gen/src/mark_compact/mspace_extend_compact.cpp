@@ -161,15 +161,14 @@ inline void object_refix_ref_slots(Partial_Reveal_Object* p_obj, void *start_add
   }
 
   /* scan non-array object */
-  int *offset_scanner = init_object_scanner(p_obj);
-  while (true) {
-    REF* p_ref = (REF*)offset_get_ref(offset_scanner, p_obj);
-    if (p_ref == NULL) break; /* terminating ref slot */
-  
+  unsigned int num_refs = object_ref_field_num(p_obj);
+  int *ref_iterator = object_ref_iterator_init(p_obj);
+            
+  for(unsigned int i=0; i<num_refs; i++){
+    REF* p_ref = object_ref_iterator_get(ref_iterator+i, p_obj);        
     Partial_Reveal_Object*  p_element = read_slot(p_ref);
     if((p_element > start_address) && (p_element < end_address))
       write_slot(p_ref, (Partial_Reveal_Object*)((POINTER_SIZE_INT)p_element - addr_diff));
-    offset_scanner = offset_next_ref(offset_scanner);
   }
 
   return;
@@ -242,9 +241,9 @@ static void gc_refix_rootset(Collector *collector, void *start_address, void *en
 #endif
   
 #ifndef BUILD_IN_REFERENT
-  gc_update_finref_repointed_refs(gc);
+  gc_update_finref_repointed_refs(gc, FALSE);
 #endif
-  gc_reupdate_repointed_sets(gc, gc->metadata->weak_roots_pool, start_address, end_address, addr_diff);
+  gc_reupdate_repointed_sets(gc, gc->metadata->weakroot_pool, start_address, end_address, addr_diff);
 
   update_rootset_interior_pointer();
 }

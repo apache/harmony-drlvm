@@ -33,6 +33,9 @@ POINTER_SIZE_INT cur_mark_black_color = OBJ_COLOR_BLACK;
 
 static Chunk_Header_Basic *volatile next_chunk_for_fixing;
 
+
+/******************** General interfaces for Mark-Sweep-Compact ***********************/
+
 static void ops_color_flip(void)
 {
   POINTER_SIZE_INT temp = cur_alloc_color;
@@ -71,30 +74,26 @@ Chunk_Header_Basic *sspace_grab_next_chunk(Sspace *sspace, Chunk_Header_Basic *v
 }
 
 
-static void sspace_init_chunk_for_ref_fixing(Sspace *sspace)
-{
-  next_chunk_for_fixing = (Chunk_Header_Basic*)space_heap_start((Space*)sspace);
-  next_chunk_for_fixing->adj_prev = NULL;
-}
+/******************** Interfaces for Forwarding ***********************/
 
 static void nos_init_block_for_forwarding(GC_Gen *gc_gen)
 { blocked_space_block_iterator_init((Blocked_Space*)gc_get_nos(gc_gen)); }
 
 static inline void block_forward_live_objects(Collector *collector, Sspace *sspace, Block_Header *cur_block)
 {
-  void *start_pos;
-  Partial_Reveal_Object *p_obj = block_get_first_marked_object(cur_block, &start_pos);
+  Partial_Reveal_Object *p_obj = (Partial_Reveal_Object*)cur_block->base;
+  Partial_Reveal_Object *block_end = (Partial_Reveal_Object*)cur_block->free;
   
-  while(p_obj ){
-    assert(obj_is_marked_in_vt(p_obj));
+  for(; p_obj < block_end; p_obj = (Partial_Reveal_Object*)((POINTER_SIZE_INT)p_obj + vm_object_size(p_obj))){
+    if(!obj_is_marked_in_vt(p_obj)) continue;
+    
     obj_clear_dual_bits_in_vt(p_obj);
     Partial_Reveal_Object *p_target_obj = collector_forward_object(collector, p_obj); /* Could be implemented with a optimized function */
     if(!p_target_obj){
-      assert(collector->gc->collect_result == FALSE);
+      assert(collector->result == FALSE);
       printf("Out of mem in forwarding nos!\n");
       exit(0);
     }
-    p_obj = block_get_next_marked_object(cur_block, &start_pos);
   }
 }
 
@@ -110,7 +109,59 @@ static void collector_forward_nos_to_sspace(Collector *collector, Sspace *sspace
   }
 }
 
-static void normal_chunk_fix_repointed_refs(Chunk_Header *chunk)
+
+/******************** Interfaces for Ref Fixing ***********************/
+
+static void sspace_init_chunk_for_ref_fixing(Sspace *sspace)
+{
+  next_chunk_for_fixing = (Chunk_Header_Basic*)space_heap_start((Space*)sspace);
+  next_chunk_for_fixing->adj_prev = NULL;
+}
+
+static inline void slot_double_fix(REF *p_ref)
+{
+  Partial_Reveal_Object *p_obj = read_slot(p_ref);
+  if(!p_obj) return;
+  
+  if(obj_is_fw_in_oi(p_obj)){
+    p_obj = obj_get_fw_in_oi(p_obj);
+    assert(p_obj);
+    if(obj_is_fw_in_oi(p_obj)){
+      p_obj = obj_get_fw_in_oi(p_obj);
+      assert(p_obj);
+    }
+    write_slot(p_ref, p_obj);
+  }
+}
+
+static inline void object_double_fix_ref_slots(Partial_Reveal_Object *p_obj)
+{
+  if(!object_has_ref_field(p_obj)) return;
+  
+  /* scan array object */
+  if(object_is_array(p_obj)){
+    Partial_Reveal_Array *array = (Partial_Reveal_Array*)p_obj;
+    assert(!obj_is_primitive_array(p_obj));
+    
+    int32 array_length = array->array_len;
+    REF *p_refs = (REF*)((POINTER_SIZE_INT)array + (int)array_first_element_offset(array));
+    for(int i = 0; i < array_length; i++){
+      slot_double_fix(p_refs + i);
+    }
+    return;
+  }
+  
+  /* scan non-array object */
+  unsigned int num_refs = object_ref_field_num(p_obj);    
+  int* ref_iterator = object_ref_iterator_init(p_obj);
+    
+  for(unsigned int i=0; i<num_refs; i++){  
+    REF * p_ref = object_ref_iterator_get(ref_iterator+i, p_obj);  
+    slot_double_fix(p_ref);
+  }    
+}
+
+static void normal_chunk_fix_repointed_refs(Chunk_Header *chunk, Boolean double_fix)
 {
   /* Init field slot_index and depad the last index word in table for fixing */
   chunk->slot_index = 0;
@@ -128,7 +179,10 @@ static void normal_chunk_fix_repointed_refs(Chunk_Header *chunk)
     unsigned int slot_size = chunk->slot_size;
     Partial_Reveal_Object *p_obj = (Partial_Reveal_Object*)slot_index_to_addr(chunk, 0);
     for(unsigned int i = alloc_num; i--;){
-      object_fix_ref_slots(p_obj);
+      if(double_fix)
+        object_double_fix_ref_slots(p_obj);
+      else
+        object_fix_ref_slots(p_obj);
 #ifdef SSPACE_VERIFY
       sspace_verify_fix_in_compact();
 #endif
@@ -138,7 +192,10 @@ static void normal_chunk_fix_repointed_refs(Chunk_Header *chunk)
     while(alloc_num){
       Partial_Reveal_Object *p_obj = next_alloc_slot_in_chunk(chunk);
       assert(p_obj);
-      object_fix_ref_slots(p_obj);
+      if(double_fix)
+        object_double_fix_ref_slots(p_obj);
+      else
+        object_fix_ref_slots(p_obj);
 #ifdef SSPACE_VERIFY
       sspace_verify_fix_in_compact();
 #endif
@@ -152,28 +209,33 @@ static void normal_chunk_fix_repointed_refs(Chunk_Header *chunk)
   }
 }
 
-static void abnormal_chunk_fix_repointed_refs(Chunk_Header *chunk)
+static void abnormal_chunk_fix_repointed_refs(Chunk_Header *chunk, Boolean double_fix)
 {
-  object_fix_ref_slots((Partial_Reveal_Object*)chunk->base);
+  if(double_fix)
+    object_double_fix_ref_slots((Partial_Reveal_Object*)chunk->base);
+  else
+    object_fix_ref_slots((Partial_Reveal_Object*)chunk->base);
 #ifdef SSPACE_VERIFY
   sspace_verify_fix_in_compact();
 #endif
 }
 
-static void sspace_fix_repointed_refs(Collector *collector, Sspace *sspace)
+static void sspace_fix_repointed_refs(Collector *collector, Sspace *sspace, Boolean double_fix)
 {
   Chunk_Header_Basic *chunk = sspace_grab_next_chunk(sspace, &next_chunk_for_fixing, TRUE);
   
   while(chunk){
     if(chunk->status & CHUNK_NORMAL)
-      normal_chunk_fix_repointed_refs((Chunk_Header*)chunk);
+      normal_chunk_fix_repointed_refs((Chunk_Header*)chunk, double_fix);
     else if(chunk->status & CHUNK_ABNORMAL)
-      abnormal_chunk_fix_repointed_refs((Chunk_Header*)chunk);
+      abnormal_chunk_fix_repointed_refs((Chunk_Header*)chunk, double_fix);
     
     chunk = sspace_grab_next_chunk(sspace, &next_chunk_for_fixing, TRUE);
   }
 }
 
+
+/******************** Main body of Mark-Sweep-Compact ***********************/
 
 static volatile unsigned int num_marking_collectors = 0;
 static volatile unsigned int num_sweeping_collectors = 0;
@@ -194,11 +256,13 @@ void mark_sweep_sspace(Collector *collector)
   /* Pass 1: **************************************************
      Mark all live objects in heap ****************************/
   atomic_cas32(&num_marking_collectors, 0, num_active_collectors+1);
-  
-  if(gc_match_kind(gc, FALLBACK_COLLECTION))
-    sspace_fallback_mark_scan(collector, sspace);
-  else
-    sspace_mark_scan(collector, sspace);
+
+  if(!gc_mark_is_concurrent()){  
+    if(gc_match_kind(gc, FALLBACK_COLLECTION))
+      sspace_fallback_mark_scan(collector, sspace);
+    else
+      sspace_mark_scan(collector, sspace);
+  }
   
   unsigned int old_num = atomic_inc32(&num_marking_collectors);
   if( ++old_num == num_active_collectors ){
@@ -214,7 +278,7 @@ void mark_sweep_sspace(Collector *collector)
       gc_update_weakref_ignore_finref(gc);
     }
 #endif
-    identify_dead_weak_roots(gc, gc->metadata->weak_roots_pool);
+    gc_identify_dead_weak_roots(gc);
     gc_init_chunk_for_sweep(gc, sspace);
     /* let other collectors go */
     num_marking_collectors++;
@@ -233,17 +297,14 @@ void mark_sweep_sspace(Collector *collector)
     sspace_sweep_time(FALSE, sspace->need_compact);
 #endif
     ops_color_flip();
-#ifdef SSPACE_CHUNK_INFO
-    sspace_chunks_info(sspace, TRUE);
-#endif
 #ifdef SSPACE_VERIFY
     sspace_verify_after_sweep(gc);
 #endif
 
-    sspace_merge_free_chunks(gc, sspace);
-    
-    if(gc_match_kind(gc, MAJOR_COLLECTION))
+    if(gc_match_kind(gc, MAJOR_COLLECTION)){
+      sspace_merge_free_chunks(gc, sspace);
       nos_init_block_for_forwarding((GC_Gen*)gc);
+    }
     if(sspace->need_compact)
       sspace_init_pfc_pool_iterator(sspace);
     if(sspace->need_fix)
@@ -256,12 +317,17 @@ void mark_sweep_sspace(Collector *collector)
   /* Optional Pass: *******************************************
      Forward live obj in nos to mos (sspace) ******************/
   if(gc_match_kind(gc, MAJOR_COLLECTION)){
-    atomic_cas32( &num_forwarding_collectors, 0, num_active_collectors);
+    atomic_cas32( &num_forwarding_collectors, 0, num_active_collectors+1);
     
     collector_forward_nos_to_sspace(collector, sspace);
     
-    atomic_inc32(&num_forwarding_collectors);
-    while(num_forwarding_collectors != num_active_collectors);
+    old_num = atomic_inc32(&num_forwarding_collectors);
+    if( ++old_num == num_active_collectors ){
+      gc_clear_collector_local_chunks(gc);
+      num_forwarding_collectors++;
+    }
+    
+    while(num_forwarding_collectors != num_active_collectors + 1);
   }
   
   /* Optional Pass: *******************************************
@@ -274,7 +340,8 @@ void mark_sweep_sspace(Collector *collector)
     /* If we need forward nos to mos, i.e. in major collection, an extra fixing phase after compaction is needed. */
     old_num = atomic_inc32(&num_compacting_collectors);
     if( ++old_num == num_active_collectors ){
-      sspace_remerge_free_chunks(gc, sspace);
+      if(gc_match_kind(gc, MAJOR_COLLECTION))
+        sspace_remerge_free_chunks(gc, sspace);
       /* let other collectors go */
       num_compacting_collectors++;
     }
@@ -286,7 +353,12 @@ void mark_sweep_sspace(Collector *collector)
   if(sspace->need_fix){
     atomic_cas32( &num_fixing_collectors, 0, num_active_collectors);
     
-    sspace_fix_repointed_refs(collector, sspace);
+    /* When we forwarded nos AND compacted sspace,
+     * we need double fix object slots,
+     * because some objects are forwarded from nos to mos and compacted into another chunk afterwards.
+     */
+    Boolean double_fix = gc_match_kind(gc, MAJOR_COLLECTION) && sspace->need_compact;
+    sspace_fix_repointed_refs(collector, sspace, double_fix);
     
     atomic_inc32(&num_fixing_collectors);
     while(num_fixing_collectors != num_active_collectors);
@@ -298,20 +370,19 @@ void mark_sweep_sspace(Collector *collector)
   /* Leftover: *************************************************/
   
   if(sspace->need_fix){
-    gc_fix_rootset(collector);
+    Boolean double_fix = gc_match_kind(gc, MAJOR_COLLECTION) && sspace->need_compact;
+    gc_fix_rootset(collector, double_fix);
 #ifdef SSPACE_TIME
     sspace_fix_time(FALSE);
 #endif
   }
   
-  //gc->root_set = NULL;  // FIXME:: should be placed to a more appopriate place
-  gc_set_pool_clear(gc->metadata->gc_rootset_pool);
+  if(!gc_match_kind(gc, MAJOR_COLLECTION))
+    sspace_merge_free_chunks(gc, sspace);
+
 #ifdef USE_MARK_SWEEP_GC
   sspace_set_space_statistic(sspace);
 #endif 
-
-  if(gc_match_kind(gc, MAJOR_COLLECTION))
-    gc_clear_collector_local_chunks(gc);
 
 #ifdef SSPACE_VERIFY
   sspace_verify_after_collection(gc);

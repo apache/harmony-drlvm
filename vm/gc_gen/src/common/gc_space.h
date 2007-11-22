@@ -65,7 +65,7 @@ typedef struct Space{
 struct Allocator;
 typedef void *(*Space_Alloc_Func)(unsigned, Allocator *);
 
-inline POINTER_SIZE_INT space_committed_size(Space* space){ return space->committed_heap_size;}
+inline POINTER_SIZE_INT space_committed_size(Space* space){ return space ? space->committed_heap_size : 0; }
 inline void* space_heap_start(Space* space){ return space->heap_start; }
 inline void* space_heap_end(Space* space){ return space->heap_end; }
 

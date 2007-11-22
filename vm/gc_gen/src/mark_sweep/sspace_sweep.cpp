@@ -253,6 +253,13 @@ void sspace_remerge_free_chunks(GC *gc, Sspace *sspace)
   free_chunk_list.head = NULL;
   free_chunk_list.tail = NULL;
   
+  /* If a new chunk is partitioned from a bigger one in the forwarding phase,
+   * its adj_prev has not been set yet.
+   * And the adj_prev field of the chunk next to it will be wrong either.
+   * So a rebuilding operation is needed here.
+   */
+  sspace_rebuild_chunk_chain(sspace);
+  
   /* Collect free chunks from sspace free chunk lists to one list */
   sspace_collect_free_chunks_to_list(sspace, &free_chunk_list);
   

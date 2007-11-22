@@ -204,7 +204,7 @@ void move_compact_mspace(Collector* collector)
       gc_update_weakref_ignore_finref(gc);
     }
 #endif
-    identify_dead_weak_roots(gc, gc->metadata->weak_roots_pool);
+    gc_identify_dead_weak_roots(gc);
 
     /* let other collectors go */
     num_marking_collectors++; 
@@ -254,7 +254,7 @@ void move_compact_mspace(Collector* collector)
   if( ++old_num == num_active_collectors ){
     /* last collector's world here */
     lspace_fix_repointed_refs(collector, lspace);   
-    gc_fix_rootset(collector);
+    gc_fix_rootset(collector, FALSE);
     if(lspace->move_object)  lspace_sliding_compact(collector, lspace);    
     num_fixing_collectors++; 
   }
@@ -291,9 +291,6 @@ void move_compact_mspace(Collector* collector)
     TRACE2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]  finished");
     return;
   }
-
-  gc_set_pool_clear(gc->metadata->gc_rootset_pool);
-  gc_set_pool_clear(gc->metadata->weak_roots_pool);
   
   TRACE2("gc.process", "GC: collector[0]  finished");
   return;

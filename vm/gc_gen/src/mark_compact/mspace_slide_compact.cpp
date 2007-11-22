@@ -443,7 +443,7 @@ void slide_compact_mspace(Collector* collector)
       gc_update_weakref_ignore_finref(gc);
     }
 #endif
-    identify_dead_weak_roots(gc, gc->metadata->weak_roots_pool);
+    gc_identify_dead_weak_roots(gc);
 
     if( gc->tuner->kind != TRANS_NOTHING ) gc_compute_space_tune_size_after_marking(gc);
     assert(!(gc->tuner->tuning_size % GC_BLOCK_SIZE_BYTES));
@@ -504,7 +504,7 @@ void slide_compact_mspace(Collector* collector)
   /*last collector's world here */
   if( ++old_num == num_active_collectors ){
     lspace_fix_repointed_refs(collector, lspace);
-    gc_fix_rootset(collector);
+    gc_fix_rootset(collector, FALSE);
     gc_init_block_for_sliding_compact(gc, mspace);
     /*LOS_Shrink: This operation moves objects in LOS, and should be part of Pass 4
       *lspace_sliding_compact is not binded with los shrink, we could slide compact los individually.
@@ -575,9 +575,6 @@ void slide_compact_mspace(Collector* collector)
   
   /* Leftover: **************************************************
    */
-  
-  gc_set_pool_clear(gc->metadata->gc_rootset_pool);
-  gc_set_pool_clear(gc->metadata->weak_roots_pool);
   
   TRACE2("gc.process", "GC: collector[0]  finished");
   return;

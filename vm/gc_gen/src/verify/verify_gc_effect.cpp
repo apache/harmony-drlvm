@@ -321,8 +321,8 @@ void verifier_update_verify_info(Partial_Reveal_Object* p_obj, Heap_Verifier* he
   GC_MS* gc = (GC_MS*)heap_verifier->gc;
   if(!heap_verifier->is_before_gc){
     /*in GC_MS mark sweep algorithm, all live objects should be set their mark bit*/
-    assert(obj_is_alloc_color_in_table(p_obj));
-    if(!obj_is_alloc_color_in_table(p_obj))
+    assert(obj_is_alloc_in_color_table(p_obj));
+    if(!obj_is_alloc_in_color_table(p_obj))
       printf("\nERROR: obj after GC should be set its alloc color!\n");
   }else{
     //ynhe
@@ -550,5 +550,6 @@ void verifier_clear_gc_verification(Heap_Verifier* heap_verifier)
 
 void verifier_reset_hash_distance()
 { hash_obj_distance = 0;}
+
 
 

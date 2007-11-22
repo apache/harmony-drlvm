@@ -29,7 +29,7 @@ void sspace_decide_compaction_need(Sspace *sspace)
   float free_mem_ratio = (float)free_mem_size / sspace->committed_heap_size;
 
 #ifdef USE_MARK_SWEEP_GC
-  if((free_mem_ratio > SSPACE_COMPACT_RATIO) && (sspace->gc->cause != GC_CAUSE_RUNTIME_FORCE_GC)){
+  if(!gc_mark_is_concurrent() && (free_mem_ratio > SSPACE_COMPACT_RATIO) && (sspace->gc->cause != GC_CAUSE_RUNTIME_FORCE_GC)){
 #else
   if(gc_match_kind(sspace->gc, MAJOR_COLLECTION)){
 #endif
@@ -226,5 +226,6 @@ void sspace_compact(Collector *collector, Sspace *sspace)
     }
   }
 }
+
 
 

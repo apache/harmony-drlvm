@@ -77,7 +77,7 @@ void gc_metadata_initialize(GC* gc)
   gc_metadata.collector_remset_pool = sync_pool_create();
   gc_metadata.collector_repset_pool = sync_pool_create();
   gc_metadata.dirty_obj_snaptshot_pool = sync_pool_create();
-  gc_metadata.weak_roots_pool = sync_pool_create();
+  gc_metadata.weakroot_pool = sync_pool_create();
 #ifdef USE_32BITS_HASHCODE  
   gc_metadata.collector_hashcode_pool = sync_pool_create();
 #endif
@@ -100,7 +100,7 @@ void gc_metadata_destruct(GC* gc)
   sync_pool_destruct(metadata->collector_remset_pool);
   sync_pool_destruct(metadata->collector_repset_pool);
   sync_pool_destruct(metadata->dirty_obj_snaptshot_pool);
-  sync_pool_destruct(metadata->weak_roots_pool);
+  sync_pool_destruct(metadata->weakroot_pool);
 #ifdef USE_32BITS_HASHCODE  
   sync_pool_destruct(metadata->collector_hashcode_pool);
 #endif
@@ -168,7 +168,7 @@ Vector_Block* gc_metadata_extend(Pool* pool)
 
 extern Boolean IS_MOVE_COMPACT;
 
-static void gc_update_repointed_sets(GC* gc, Pool* pool)
+static void gc_update_repointed_sets(GC* gc, Pool* pool, Boolean double_fix)
 {
   GC_Metadata* metadata = gc->metadata;
   
@@ -200,8 +200,16 @@ static void gc_update_repointed_sets(GC* gc, Pool* pool)
            * In major collection condition obj_is_fw_in_oi(p_obj) can be omitted,
            * since those which can be scanned in MOS & NOS must have been set fw bit in oi.
            */
-          assert(address_belongs_to_gc_heap(obj_get_fw_in_oi(p_obj), gc));
-          write_slot(p_ref, obj_get_fw_in_oi(p_obj));
+          p_obj = obj_get_fw_in_oi(p_obj);
+          assert(address_belongs_to_gc_heap(p_obj, gc));
+          /* Only major collection in MS Gen GC might need double_fix.
+           * Double fixing happens when both forwarding and compaction happen.
+           */
+          if(double_fix && obj_is_fw_in_oi(p_obj)){
+            p_obj = obj_get_fw_in_oi(p_obj);
+            assert(address_belongs_to_gc_heap(p_obj, gc));
+          }
+          write_slot(p_ref, p_obj);
         }
       }
     }
@@ -211,22 +219,18 @@ static void gc_update_repointed_sets(GC* gc, Pool* pool)
   return;
 }
 
-void gc_fix_rootset(Collector* collector)
-{  
-  GC* gc = collector->gc;  
-  GC_Metadata* metadata = gc->metadata;
+void gc_fix_rootset(Collector* collector, Boolean double_fix)
+{
+  GC* gc = collector->gc;
 
-  gc_update_weak_roots_pool(gc);
+  gc_update_weak_roots(gc, double_fix);
 
   /* MINOR_COLLECTION doesn't need rootset update, but need reset */
   if( !gc_match_kind(gc, MINOR_COLLECTION)){
-    gc_update_repointed_sets(gc, metadata->gc_rootset_pool);
+    gc_update_repointed_sets(gc, gc->metadata->gc_rootset_pool, double_fix);
 #ifndef BUILD_IN_REFERENT
-    gc_update_finref_repointed_refs(gc);
+    gc_update_finref_repointed_refs(gc, double_fix);
 #endif
-  } else {
-    gc_set_pool_clear(metadata->gc_rootset_pool);
-    gc_set_pool_clear(metadata->weak_roots_pool);
   }
 
 #ifdef COMPRESS_REFERENCE
@@ -263,11 +267,11 @@ void gc_set_rootset(GC* gc)
      only after we know we are not going to fallback. */
     // gc->root_set = NULL;
 
-  if(vector_block_is_empty(gc->weak_root_set))
-    pool_put_entry(free_set_pool, gc->weak_root_set);
+  if(vector_block_is_empty(gc->weakroot_set))
+    pool_put_entry(free_set_pool, gc->weakroot_set);
   else
-    pool_put_entry(metadata->weak_roots_pool, gc->weak_root_set);
-  gc->weak_root_set = NULL;
+    pool_put_entry(metadata->weakroot_pool, gc->weakroot_set);
+  gc->weakroot_set = NULL;
   
   if(!gc_is_gen_mode()) return;
 
@@ -338,10 +342,10 @@ void gc_reset_rootset(GC* gc)
   gc->root_set = free_set_pool_get_entry(&gc_metadata);
   assert(vector_block_is_empty(gc->root_set));
 
-  assert(pool_is_empty(gc_metadata.weak_roots_pool));
-  assert(gc->weak_root_set == NULL);
-  gc->weak_root_set = free_set_pool_get_entry(&gc_metadata);
-  assert(vector_block_is_empty(gc->weak_root_set));
+  assert(pool_is_empty(gc_metadata.weakroot_pool));
+  assert(gc->weakroot_set == NULL);
+  gc->weakroot_set = free_set_pool_get_entry(&gc_metadata);
+  assert(vector_block_is_empty(gc->weakroot_set));
 
 #ifdef COMPRESS_REFERENCE
   assert(pool_is_empty(gc_metadata.gc_uncompressed_rootset_pool));
@@ -357,6 +361,7 @@ void gc_clear_rootset(GC* gc)
 {
   gc_reset_interior_pointer_table();
   gc_set_pool_clear(gc->metadata->gc_rootset_pool);
+  gc_set_pool_clear(gc->metadata->weakroot_pool);
 #ifdef COMPRESS_REFERENCE
   gc_set_pool_clear(gc->metadata->gc_uncompressed_rootset_pool);
 #endif
@@ -462,6 +467,7 @@ void gc_reset_snaptshot(GC* gc)
 
   
 }
+
 
 
 

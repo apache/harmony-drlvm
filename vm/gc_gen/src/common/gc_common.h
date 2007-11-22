@@ -224,19 +224,6 @@ inline int* object_ref_iterator_next(int* iterator)
   return iterator+1;
 }
 
-/* original design */
-inline int *init_object_scanner (Partial_Reveal_Object *obj) 
-{
-  GC_VTable_Info *gcvt = obj_get_gcvt(obj);  
-  return gcvt->gc_ref_offset_array;
-}
-
-inline void *offset_get_ref(int *offset, Partial_Reveal_Object *obj) 
-{    return (*offset == 0)? NULL: (void*)((Byte*) obj + *offset); }
-
-inline int *offset_next_ref (int *offset) 
-{  return offset + 1; }
-
 /****************************************/
 
 inline Boolean obj_is_marked_in_vt(Partial_Reveal_Object *obj) 
@@ -402,13 +389,13 @@ struct Space_Tuner;
 struct Collection_Scheduler;
 
 typedef struct GC{
-//heap allocation bases for a segmented heap
-  void* alloc_heap_start[3];
+  void* physical_start;
   void* heap_start;
   void* heap_end;
   POINTER_SIZE_INT reserved_heap_size;
   POINTER_SIZE_INT committed_heap_size;
   unsigned int num_collections;
+  Boolean in_collection;
   int64 time_collections;
   float survive_ratio;
   
@@ -439,7 +426,7 @@ typedef struct GC{
   
   /* FIXME:: this is wrong! root_set belongs to mutator */
   Vector_Block* root_set;
-  Vector_Block* weak_root_set;
+  Vector_Block* weakroot_set;
   Vector_Block* uncompressed_root_set;
 
   Space_Tuner* tuner;

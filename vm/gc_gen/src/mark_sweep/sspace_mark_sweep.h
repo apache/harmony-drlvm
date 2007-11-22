@@ -22,7 +22,7 @@
 #include "sspace_verify.h"
 
 #define PFC_REUSABLE_RATIO 0.1
-#define SSPACE_COMPACT_RATIO 0.15
+#define SSPACE_COMPACT_RATIO 0.06
 
 inline Boolean chunk_is_reusable(Chunk_Header *chunk)
 { return (float)(chunk->slot_num-chunk->alloc_num)/chunk->slot_num > PFC_REUSABLE_RATIO; }
@@ -316,20 +316,15 @@ inline Boolean obj_is_dirty_in_table(Partial_Reveal_Object *obj)
     return FALSE;
 }
 
-inline Boolean obj_is_alloc_color_in_table(Partial_Reveal_Object *obj)
+inline Boolean obj_is_alloc_in_color_table(Partial_Reveal_Object *obj)
 {
   POINTER_SIZE_INT *p_color_word;
   unsigned int index_in_word;
   p_color_word = get_color_word_in_table(obj, index_in_word);
   POINTER_SIZE_INT current_word = *p_color_word;
-  POINTER_SIZE_INT obj_alloc_color_bit_in_word = cur_alloc_color<< index_in_word;
+  POINTER_SIZE_INT obj_alloc_color_bit_in_word = cur_alloc_color << index_in_word;
   
-
-  if(current_word & obj_alloc_color_bit_in_word)
-    return TRUE;
-  else
-    return FALSE;
-
+  return (Boolean)(current_word & obj_alloc_color_bit_in_word);
 }
 
 inline Boolean obj_need_take_snaptshot(Partial_Reveal_Object *obj)

@@ -29,10 +29,28 @@ static FORCE_INLINE Boolean obj_mark_gray(Partial_Reveal_Object *obj)
 
 static FORCE_INLINE Boolean obj_mark_black(Partial_Reveal_Object *obj)
 {
-  if(obj_belongs_to_space(obj, (Space*)sspace_in_marking))
-    return obj_mark_black_in_table(obj);
-  else
+  if(obj_belongs_to_space(obj, (Space*)sspace_in_marking)){
+    Boolean marked_by_self = obj_mark_black_in_table(obj);
+
+#ifndef USE_MARK_SWEEP_GC
+    /* When fallback happens, some objects in MOS have their fw bit set, which is actually their mark bit in the last minor gc.
+     * If we don't clear it, some objects that didn't be moved will be mistaken for being moved in the coming fixing phase.
+     */
+    if(marked_by_self){
+      Obj_Info_Type oi = obj->obj_info;
+      Obj_Info_Type new_oi = oi & DUAL_MARKBITS_MASK;
+      while(new_oi != oi){
+        Obj_Info_Type temp = (Obj_Info_Type)atomic_cas32((volatile Obj_Info_Type*)get_obj_info_addr(obj), new_oi, oi);
+        if(temp == oi) break;
+        oi = obj->obj_info;
+        new_oi = oi & DUAL_MARKBITS_MASK;
+      }
+    }
+#endif
+    return marked_by_self;
+  } else {
     return obj_mark_in_vt(obj);
+  }
 }
 
 

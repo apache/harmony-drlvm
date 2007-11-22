@@ -22,6 +22,7 @@
 #include "../mark_sweep/gc_ms.h"
 #include "../mark_sweep/sspace_mark_sweep.h"
 
+
 inline Boolean obj_is_dead_in_gen_minor_gc(Partial_Reveal_Object *p_obj)
 {
   /*

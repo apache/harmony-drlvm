@@ -39,7 +39,7 @@ static void gc_slot_write_barrier(Managed_Object_Handle *p_slot,
     Mutator *mutator = (Mutator *)gc_get_tls();
     assert( addr_belongs_to_nos(p_target) && !addr_belongs_to_nos(p_slot)); 
             
-    mutator_remset_add_entry(mutator, (Partial_Reveal_Object**)p_slot);
+    mutator_remset_add_entry(mutator, (REF*)p_slot);
   }
   return;
 }
@@ -51,7 +51,7 @@ static void gc_object_write_barrier(Managed_Object_Handle p_object)
 
   Mutator *mutator = (Mutator *)gc_get_tls();
   
-  Partial_Reveal_Object **p_slot; 
+  REF* p_slot; 
   /* scan array object */
   if (object_is_array((Partial_Reveal_Object*)p_object)) {
     Partial_Reveal_Object* array = (Partial_Reveal_Object*)p_object;
@@ -59,8 +59,8 @@ static void gc_object_write_barrier(Managed_Object_Handle p_object)
     
     int32 array_length = vector_get_length((Vector_Handle) array);
     for (int i = 0; i < array_length; i++) {
-      p_slot = (Partial_Reveal_Object **)vector_get_element_address_ref((Vector_Handle) array, i);
-      if( *p_slot != NULL && addr_belongs_to_nos(*p_slot)){
+      p_slot = (REF*)vector_get_element_address_ref((Vector_Handle) array, i);
+      if( read_slot(p_slot) != NULL && addr_belongs_to_nos(read_slot(p_slot))){
         mutator_remset_add_entry(mutator, p_slot);
       }
     }   
@@ -69,14 +69,14 @@ static void gc_object_write_barrier(Managed_Object_Handle p_object)
 
   /* scan non-array object */
   Partial_Reveal_Object* p_obj =  (Partial_Reveal_Object*)p_object;   
-  int *offset_scanner = init_object_scanner(p_obj);
-  while (true) {
-    p_slot = (Partial_Reveal_Object**)offset_get_ref(offset_scanner, p_obj);
-    if (p_slot == NULL) break;  
-    if( addr_belongs_to_nos(*p_slot)){
+  unsigned int num_refs = object_ref_field_num(p_obj);
+  int *ref_iterator = object_ref_iterator_init(p_obj);
+            
+  for(unsigned int i=0; i<num_refs; i++){
+    p_slot = object_ref_iterator_get(ref_iterator+i, p_obj);        
+    if( addr_belongs_to_nos(read_slot(p_slot))){
       mutator_remset_add_entry(mutator, p_slot);
     }
-    offset_scanner = offset_next_ref(offset_scanner);
   }
 
   return;

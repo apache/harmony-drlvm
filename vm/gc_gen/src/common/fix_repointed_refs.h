@@ -74,13 +74,12 @@ inline void object_fix_ref_slots(Partial_Reveal_Object* p_obj)
   }
 
   /* scan non-array object */
-  int *offset_scanner = init_object_scanner(p_obj);
-  while (true) {
-    REF* p_ref = (REF*)offset_get_ref(offset_scanner, p_obj);
-    if (p_ref == NULL) break; /* terminating ref slot */
-  
-    slot_fix(p_ref);
-    offset_scanner = offset_next_ref(offset_scanner);
+  unsigned int num_refs = object_ref_field_num(p_obj);
+  int *ref_iterator = object_ref_iterator_init(p_obj);
+            
+  for(unsigned int i=0; i<num_refs; i++){
+     REF* p_ref = object_ref_iterator_get(ref_iterator+i, p_obj);        
+     slot_fix(p_ref);  
   }
 
   return;

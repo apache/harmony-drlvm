@@ -203,6 +203,8 @@ void *sspace_alloc(unsigned size, Allocator *allocator)
   p_obj = sspace_try_alloc(size, allocator);
   if(p_obj)  return p_obj;
   
+  if(allocator->gc->in_collection) return NULL;
+  
   vm_gc_lock_enum();
   /* after holding lock, try if other thread collected already */
   p_obj = sspace_try_alloc(size, allocator);

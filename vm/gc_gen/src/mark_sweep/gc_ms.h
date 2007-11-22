@@ -29,11 +29,13 @@ extern POINTER_SIZE_INT max_heap_size_bytes;
 
 typedef struct GC_MS {
   /* <-- First couple of fields overloaded as GC */
+  void* physical_start;
   void *heap_start;
   void *heap_end;
   POINTER_SIZE_INT reserved_heap_size;
   POINTER_SIZE_INT committed_heap_size;
   unsigned int num_collections;
+  Boolean in_collection;
   int64 time_collections;
   float survive_ratio;
   
@@ -64,6 +66,7 @@ typedef struct GC_MS {
   
   /* FIXME:: this is wrong! root_set belongs to mutator */
   Vector_Block *root_set;
+  Vector_Block *weakroot_set;
   Vector_Block *uncompressed_root_set;
   
   //For_LOS_extend

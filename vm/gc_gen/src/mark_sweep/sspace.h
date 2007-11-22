@@ -81,8 +81,6 @@ void sspace_reset_after_collection(Sspace *sspace);
 void *sspace_thread_local_alloc(unsigned size, Allocator *allocator);
 void *sspace_alloc(unsigned size, Allocator *allocator);
 
-void sspace_reset_for_allocation(Sspace *sspace);
-
 void sspace_collection(Sspace *sspace);
 
 void allocator_init_local_chunks(Allocator *allocator);

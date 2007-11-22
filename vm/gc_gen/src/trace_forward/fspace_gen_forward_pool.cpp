@@ -76,13 +76,12 @@ static FORCE_INLINE void scan_object(Collector* collector, Partial_Reveal_Object
   }
 
   /* scan non-array object */
-  int *offset_scanner = init_object_scanner(p_obj);
-  while (true) {
-    p_ref = (REF *)offset_get_ref(offset_scanner, p_obj);
-    if (p_ref == NULL) break;
-  
+  unsigned int num_refs = object_ref_field_num(p_obj);
+  int *ref_iterator = object_ref_iterator_init(p_obj);
+            
+  for(unsigned int i=0; i<num_refs; i++){
+    REF* p_ref = object_ref_iterator_get(ref_iterator+i, p_obj);        
     scan_slot(collector, p_ref);
-    offset_scanner = offset_next_ref(offset_scanner);
   }
 
 #ifndef BUILD_IN_REFERENT
@@ -350,9 +349,9 @@ void gen_forward_pool(Collector* collector)
       gc_update_weakref_ignore_finref(gc);
     }
 #endif
-  identify_dead_weak_roots(gc, gc->metadata->weak_roots_pool);
+  gc_identify_dead_weak_roots(gc);
   
-  gc_fix_rootset(collector);
+  gc_fix_rootset(collector, FALSE);
   
   TRACE2("gc.process", "GC: collector[0] finished");
 

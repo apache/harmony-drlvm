@@ -30,6 +30,7 @@
 unsigned int MINOR_COLLECTORS = 0;
 unsigned int MAJOR_COLLECTORS = 0;
 static volatile unsigned int live_collector_num = 0;
+Boolean is_collector_local_alloc = TRUE;
 
 void collector_restore_obj_info(Collector* collector)
 {

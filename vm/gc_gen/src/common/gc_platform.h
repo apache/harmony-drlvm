@@ -108,10 +108,14 @@ inline void* vm_thread_local()
 
 inline int vm_create_thread(int (*func)(void*), void *data)
 { 
-  hythread_t ret_thread = (hythread_t)STD_CALLOC(1, hythread_get_struct_size());;
+  hythread_t ret_thread = (hythread_t)STD_CALLOC(1,hythread_get_struct_size());
   assert(ret_thread);
-  return (int)hythread_create_ex(ret_thread, get_gc_thread_group(), 0, 0, NULL,
-                    (hythread_entrypoint_t)func, data);
+  
+  UDATA stacksize = 0;
+  UDATA priority = 5;
+  
+  return (int)hythread_create_ex(ret_thread, get_gc_thread_group(), stacksize, priority, NULL,
+                              (hythread_entrypoint_t)func, data);
 }
 
 inline void *atomic_casptr(volatile void **mem, void *with, const void *cmp) 
@@ -187,8 +191,8 @@ inline Boolean vm_unmap_mem(void* start, POINTER_SIZE_INT size)
   if(result == 0) result = TRUE;
   else result = FALSE;  
 #endif /* ifdef _WINDOWS_ else */
-//assert that memory was released
-  assert(result);
+
+  assert(result); /* expect that memory was really released */
   return result;
 }
 
