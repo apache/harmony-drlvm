@@ -39,8 +39,6 @@ public:
     virtual void  getGCRootSet(MethodDesc* methodDesc, GCInterface* gcInterface, 
         const ::JitFrameContext* context, bool isFirst) = 0;
 
-    virtual bool  canEnumerate(MethodDesc* methodDesc, NativeCodePtr eip) = 0;
-
     virtual void  fixHandlerContext(MethodDesc* methodDesc, ::JitFrameContext* context, bool isFirst) = 0;
 
     virtual void* getAddressOfThis(MethodDesc* methodDesc, const ::JitFrameContext* context, bool isFirst) = 0;
@@ -48,10 +46,6 @@ public:
 
     virtual bool getBcLocationForNative(MethodDesc* method, POINTER_SIZE_INT native_pc, uint16 *bc_pc) = 0;
     virtual bool getNativeLocationForBc(MethodDesc* method,  uint16 bc_pc, POINTER_SIZE_INT *native_pc) = 0;
-
-#ifdef USE_SECURITY_OBJECT
-    virtual void* getAddressOfSecurityObject(MethodDesc* methodDesc, const ::JitFrameContext* context) = 0;
-#endif
 
     virtual bool  recompiledMethodEvent(MethodDesc * methodDesc, void * data) = 0;
 

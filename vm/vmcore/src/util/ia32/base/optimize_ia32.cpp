@@ -473,18 +473,3 @@ void gen_native_arraycopy_fastpath(Emitter_Handle h, Method *method)
     assert((int)stub_length >= (s - stub));
     *(char **)h = s;
 } //jit_inline_native_array_copy_general
-
-
-#if defined (__INTEL_COMPILER)
-#pragma warning ( push )
-#pragma warning (disable:869)
-#endif
-
-int find_inline_native_method(const char* UNREF clss_name, const char* UNREF method_name,JIT_Result  (UNREF *&func)(Method& method, JIT_Flags flags))
-{
-    return -1 ;
-} //find_inline_native_method
-
-#if defined (__INTEL_COMPILER)
-#pragma warning ( pop )
-#endif

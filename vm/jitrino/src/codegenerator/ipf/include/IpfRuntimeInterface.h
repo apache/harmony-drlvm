@@ -35,13 +35,11 @@ namespace IPF {
 class RuntimeInterface : public ::Jitrino::RuntimeInterface {
 public:
     void           unwindStack(MethodDesc*, JitFrameContext*, bool) ;
-    bool           canEnumerate(MethodDesc*, NativeCodePtr);
     void           getGCRootSet(MethodDesc*, GCInterface*, const JitFrameContext*, bool);
     uint32         getInlineDepth(InlineInfoPtr, uint32);
     Method_Handle  getInlinedMethod(InlineInfoPtr, uint32, uint32);
     void           fixHandlerContext(MethodDesc*, JitFrameContext*, bool);
     void           *getAddressOfThis(MethodDesc*, const JitFrameContext*, bool);
-    void           *getAddressOfSecurityObject(MethodDesc*, const JitFrameContext*);
     bool           recompiledMethodEvent(MethodDesc*, void*);
     bool           getBcLocationForNative(MethodDesc*, uint64, uint16*);
     bool           getNativeLocationForBc(MethodDesc*, uint16, uint64*);

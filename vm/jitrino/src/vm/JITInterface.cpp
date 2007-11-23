@@ -162,25 +162,6 @@ JIT_profile_notification_callback(JIT_Handle jit, PC_Handle pc, Method_Handle mh
     } //opt does not support counters patching today.
 }
 
-
-extern "C"
-JITEXPORT void
-JIT_gc_start(JIT_Handle jit)
-{
-}
-
-extern "C"
-JITEXPORT void
-JIT_gc_end(JIT_Handle jit)
-{
-}
-
-extern "C"
-JITEXPORT void
-JIT_gc_object_died(JIT_Handle jit, void *java_ref)
-{
-}
-
 // Called if JIT registered itself to be notified when the class is extended
 // Returns TRUE if any code was modified and FALSE otherwise.
 extern "C"
@@ -222,25 +203,6 @@ JIT_recompiled_method_callback(JIT_Handle jit,
 ////////////////////////////////////////////////////////
 // Required functions.
 ////////////////////////////////////////////////////////
-
-extern "C"
-JITEXPORT JIT_Result
-JIT_gen_method_info(JIT_Handle jit, Compile_Handle compilation,
-                    Method_Handle method, JIT_Flags flags)
-{
-    assert(0);
-    return JIT_FAILURE;
-}
-
-
-extern "C"
-JITEXPORT JIT_Result
-JIT_compile_method(JIT_Handle jitHandle, Compile_Handle compilation,
-                   Method_Handle method, JIT_Flags flags)
-{
-    assert(0);
-    return JIT_FAILURE;
-}
 
 extern "C"
 JITEXPORT JIT_Result
@@ -442,32 +404,6 @@ JIT_get_inlined_bc(JIT_Handle jit, InlineInfoPtr ptr, uint32 offset, uint32 inli
 }
 
 extern "C"
-JITEXPORT Boolean
-JIT_can_enumerate(JIT_Handle jit, Method_Handle method, NativeCodePtr eip)
-{
-    MethodDesc methodDesc(method, jit);
-    bool result = Jitrino::getRuntimeInterface()->canEnumerate(&methodDesc, eip);
-    return (result ? TRUE : FALSE);
-}
-
-
-extern "C"
-JITEXPORT unsigned
-JIT_num_breakpoints(JIT_Handle jit, Method_Handle method, uint32 eip)
-{
-    assert(0);
-    return 0;
-}
-
-extern "C"
-JITEXPORT void
-JIT_get_breakpoints(JIT_Handle jit, Method_Handle method, uint32 *bp,
-                    ::JitFrameContext *context)
-{
-    assert(0);
-}
-
-extern "C"
 JITEXPORT void
 JIT_fix_handler_context(JIT_Handle jit, Method_Handle method,
                         ::JitFrameContext *context)
@@ -520,41 +456,6 @@ JIT_get_address_of_this(JIT_Handle jit, Method_Handle method,
     MethodDesc methodDesc(method, jit);
     return Jitrino::getRuntimeInterface()->getAddressOfThis(&methodDesc, context,
                                      context->is_ip_past == FALSE);
-}
-
-extern "C"
-JITEXPORT Boolean
-JIT_call_returns_a_reference(JIT_Handle jit, Method_Handle method,
-                             const ::JitFrameContext *context)
-{
-    assert(0);
-    return false;
-}
-
-extern "C"
-JITEXPORT int32
-JIT_get_break_point_offset(JIT_Handle jit, Compile_Handle compilation,
-                           Method_Handle meth, JIT_Flags flags,
-                           unsigned bc_location)
-{
-    assert(0);
-    return false;
-}
-
-extern "C"
-JITEXPORT void *
-JIT_get_address_of_var(JIT_Handle jit, ::JitFrameContext *context,
-                       Boolean is_first, unsigned var_no)
-{
-    assert(0);
-    return NULL;
-}
-
-extern "C"
-JITEXPORT void
-JIT_init_with_data(JIT_Handle jit, void *jit_data)
-{
-    // Ignore the message contained in jit_data
 }
 
 extern "C"

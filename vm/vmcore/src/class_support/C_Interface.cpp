@@ -2603,7 +2603,7 @@ void vm_patch_code_block(Byte *code_block, Byte *new_code, size_t size)
 // recompilation, the corresponding vtable entries will be updated, and the necessary
 // callbacks to JIT_recompiled_method_callback will be made. It is a requirement that
 // the method has not already been compiled by the given JIT; this means that multiple
-// instances of a JIT may need to be active at the same time. (See vm_clone_jit.)
+// instances of a JIT may need to be active at the same time. 
 void vm_recompile_method(JIT_Handle jit, Method_Handle method)
 {
     compile_do_compilation_jit((Method*) method, (JIT*) jit);

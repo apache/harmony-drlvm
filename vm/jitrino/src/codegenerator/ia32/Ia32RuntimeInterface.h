@@ -47,15 +47,11 @@ public:
     virtual void  getGCRootSet(MethodDesc* methodDesc, GCInterface* gcInterface, 
         const JitFrameContext* context, bool isFirst);
 
-    virtual bool  canEnumerate(MethodDesc* methodDesc, NativeCodePtr eip);
-
     virtual void  fixHandlerContext(MethodDesc* methodDesc, JitFrameContext* context, bool isFirst);
 
     virtual void* getAddressOfThis(MethodDesc* methodDesc, const JitFrameContext* context, bool isFirst);
 
     virtual bool isSOEArea(MethodDesc* methodDesc, const ::JitFrameContext* context, bool isFirst);
-
-    virtual void* getAddressOfSecurityObject(MethodDesc* methodDesc, const JitFrameContext* context) { assert(0); return NULL; }
 
     virtual bool  recompiledMethodEvent(MethodDesc * methodDesc, void * data);
 

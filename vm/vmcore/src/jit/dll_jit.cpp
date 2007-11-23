@@ -33,19 +33,12 @@
 Dll_JIT::Dll_JIT(const char *dll_filename) :
 _deinit(NULL),
 _next_command_line_argument(NULL),
-_gen_method_info(NULL),
-_compile_method(NULL),
 _compile_method_with_params(NULL),
 _unwind_stack_frame(NULL),
 _get_root_set_from_stack_frame(NULL),
 _get_root_set_for_thread_dump(NULL),
-_can_enumerate(NULL),
-_get_breakpoints(NULL),
 _fix_handler_context(NULL),
 _get_address_of_this(NULL),
-_call_returns_a_reference(NULL),
-_code_block_relocated(NULL),
-_thread_recompile_methods(NULL),
 _extended_class_callback(NULL),
 _overridden_method_callback(NULL),
 _recompiled_method_callback(NULL),
@@ -59,7 +52,6 @@ lib_handle(NULL)
 {
     apr_status_t stat;
     char buf[1024];
-    memset((void *) &jit_flags, 0, sizeof(JIT_Flags));
     apr_pool_create(&pool, 0);
     assert(pool);
     apr_dso_handle_t *handle;
@@ -119,10 +111,6 @@ lib_handle(NULL)
     GET_FUNCTION(fn, handle, "JIT_get_root_set_for_thread_dump");
     _get_root_set_for_thread_dump = (void (*)(JIT_Handle, Method_Handle, GC_Enumeration_Handle, const JitFrameContext *)) fn;
 
-    
-    GET_FUNCTION(fn, handle, "JIT_can_enumerate");
-    _can_enumerate = (Boolean (*)(JIT_Handle, Method_Handle, NativeCodePtr)) fn;
-
     GET_FUNCTION(fn, handle, "JIT_fix_handler_context");
     _fix_handler_context = (void (*)(JIT_Handle, Method_Handle, JitFrameContext *)) fn;
 
@@ -132,23 +120,11 @@ lib_handle(NULL)
     GET_OPTIONAL_FUNCTION(fn, handle, "JIT_is_soe_area");
     _is_soe_area = (Boolean (*)(JIT_Handle, Method_Handle, const JitFrameContext *)) fn;
 
-    GET_FUNCTION(fn, handle, "JIT_call_returns_a_reference");
-    _call_returns_a_reference = (Boolean (*)(JIT_Handle, Method_Handle, const JitFrameContext *)) fn;
-
-    GET_FUNCTION(fn, handle, "JIT_gen_method_info");
-    _gen_method_info = (JIT_Result (*)(JIT_Handle, Compile_Handle, Method_Handle, JIT_Flags)) fn;
-
-    GET_FUNCTION(fn, handle, "JIT_compile_method");
-    _compile_method = (JIT_Result (*)(JIT_Handle, Compile_Handle, Method_Handle, JIT_Flags)) fn;
-
     GET_FUNCTION(fn, handle, "JIT_compile_method_with_params");
     _compile_method_with_params = (JIT_Result (*)(JIT_Handle, Compile_Handle, Method_Handle, OpenMethodExecutionParams)) fn;
 
     GET_OPTIONAL_FUNCTION(fn, handle, "JIT_supports_compressed_references");
     _supports_compressed_references = (Boolean (*)(JIT_Handle)) fn;
-
-    GET_OPTIONAL_FUNCTION(fn, handle, "JIT_code_block_relocated");
-    _code_block_relocated = (Boolean (*)(JIT_Handle, Method_Handle, int, NativeCodePtr, NativeCodePtr)) fn;
 
     GET_OPTIONAL_FUNCTION(fn, handle, "JIT_execute_method");
     _execute_method = (void(*)(JIT_Handle, jmethodID, jvalue*, jvalue*)) fn;
@@ -171,26 +147,3 @@ lib_handle(NULL)
         _execute_method = JIT_execute_method_default;
     }
 }
-
-
-bool vm_is_a_jit_dll(const char *dll_filename)
-{    
-    apr_pool_t *pp;
-    apr_pool_create(&pp, 0);
-    apr_dso_handle_t *handle;
-    bool result = false;
-    if (apr_dso_load(&handle, dll_filename, pp) == APR_SUCCESS)
-    {
-        apr_dso_handle_sym_t tmp;
-        if (apr_dso_sym(&tmp, handle, "JIT_compile_method") == APR_SUCCESS) {
-            result = true;
-        }
-        apr_dso_unload(handle);
-    }
-    
-    apr_pool_destroy(pp);
-
-    return result;
-
-}
-

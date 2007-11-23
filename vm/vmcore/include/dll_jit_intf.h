@@ -28,9 +28,6 @@
 #include "jit_export_jpda.h"
 #include <apr_dso.h>
 
-bool vm_is_a_jit_dll(const char *dll_filename);
-
-
 class Dll_JIT: public JIT {
 
 public:
@@ -42,7 +39,7 @@ public:
     ~Dll_JIT() { 
         if (_deinit != NULL) _deinit(this); 
         if (pool != NULL) apr_pool_destroy(pool);
-        //XXX Alexey Varlamov 20050808 - nobody unloads library itself
+        //the library itself is unloaded by the pool destructor
     }
 
     void
@@ -52,27 +49,6 @@ public:
     {
         if (_next_command_line_argument != NULL)
             _next_command_line_argument(this, option, arg);
-    }
-
-
-    JIT_Result 
-    gen_method_info(Compile_Handle     compilation,
-                    Method_Handle      method,
-                    JIT_Flags          flags
-                    )
-    {   
-        return _gen_method_info(this, compilation, method, flags);
-    }
-
-    JIT_Result 
-    compile_method(Compile_Handle     compilation,
-                   Method_Handle      method,
-                   JIT_Flags          flags
-                   )
-    {
-        if (_compile_method == NULL)
-            return JIT_FAILURE;
-        return _compile_method(this, compilation, method, flags);
     }
 
     JIT_Result 
@@ -145,15 +121,6 @@ public:
         return 0;
     }
 
-    Boolean
-    can_enumerate(Method_Handle method,
-                  NativeCodePtr eip
-                  )
-    {
-        return _can_enumerate(this, method, eip);
-    }
-
-
     void
     fix_handler_context(Method_Handle      method,
                         JitFrameContext* context
@@ -182,21 +149,6 @@ public:
         return 0;
         
     }
-
-    Boolean
-    call_returns_a_reference(Method_Handle            method,
-                             const JitFrameContext* context
-                             )
-    {
-        return _call_returns_a_reference(this, method, context);
-    }
-
-   void thread_recompile_methods()
-   {
-       _thread_recompile_methods();
-   }
-
-
 
     Boolean
     extended_class_callback(Class_Handle  extended_class,
@@ -235,15 +187,6 @@ public:
     {
         if (_supports_compressed_references != NULL) {
             return _supports_compressed_references(this);
-        }
-        return FALSE;
-    }
-
-    Boolean code_block_relocated(Method_Handle method, int id, NativeCodePtr old_address, NativeCodePtr new_address)
-    {
-        if (_code_block_relocated != NULL)
-        {
-            return _code_block_relocated(this, method, id, old_address, new_address);
         }
         return FALSE;
     }
@@ -301,20 +244,6 @@ private:
                                    );
 
     JIT_Result 
-    (*_gen_method_info)(JIT_Handle jit,
-                        Compile_Handle     compilation,
-                        Method_Handle      method,
-                        JIT_Flags          flags
-                        );
-
-    JIT_Result 
-    (*_compile_method)(JIT_Handle jit,
-                       Compile_Handle     compilation,
-                       Method_Handle      method,
-                       JIT_Flags          flags
-                       );
-
-    JIT_Result 
     (*_compile_method_with_params)(JIT_Handle jit,
                                    Compile_Handle            compilation,
                                    Method_Handle             method,
@@ -359,19 +288,6 @@ private:
                             uint32         offset,
                             uint32         inline_depth);
 
-    Boolean
-    (*_can_enumerate)(JIT_Handle    jit,
-                      Method_Handle method,
-                      NativeCodePtr eip
-                      );
-
-    void
-    (*_get_breakpoints)(JIT_Handle         jit,
-                        Method_Handle      method,
-                        uint32            *bp,
-                        JitFrameContext   *context
-                        );
-
     void
     (*_fix_handler_context)(JIT_Handle         jit,
                             Method_Handle      method,
@@ -389,20 +305,6 @@ private:
         Method_Handle                           method,
         const JitFrameContext*                  context
         );
-
-    Boolean
-    (*_call_returns_a_reference)(JIT_Handle               jit,
-                                 Method_Handle            method,
-                                 const JitFrameContext*   context
-                                 );
-
-    Boolean
-    (*_code_block_relocated)(JIT_Handle jit, Method_Handle method, int id, NativeCodePtr old_address, NativeCodePtr new_address);
-
-
-    void *
-    (*_thread_recompile_methods)();
-
 
     Boolean
     (*_extended_class_callback)(JIT_Handle jit,

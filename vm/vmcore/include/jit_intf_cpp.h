@@ -41,8 +41,6 @@ class JIT {
 
 public:
 
-    JIT_Flags  jit_flags; // KEN fix later: if jit keeps jit_flags, there is no need to pass flags
-
     //
     // Gracefully terminate the JIT.
     //
@@ -62,15 +60,6 @@ public:
     virtual void 
     next_command_line_argument(const char *, const char *) {};
 
-
-    //
-    // The VM call into JIT to compile a method to generate method info
-    //
-    virtual JIT_Result 
-    gen_method_info(Compile_Handle      compilation,              // in
-                    Method_Handle       method,                   // in
-                    JIT_Flags           flags                     // in
-                    ) = 0;
     //
     // The VM call into JIT to compile a method.
     //
@@ -81,12 +70,6 @@ public:
     //                  that we want to unwind.
     // - flags       -- Currently unused.
     // 
-    virtual JIT_Result 
-    compile_method(Compile_Handle     compilation,   // in
-                   Method_Handle      method,        // in
-                   JIT_Flags          flags          // in
-                   ) = 0;
-
     virtual JIT_Result 
     compile_method_with_params(Compile_Handle            compilation,   // in
                                Method_Handle             method,        // in
@@ -160,12 +143,6 @@ public:
                        uint32         offset,
                        uint32         inline_depth) { return 0; }
 
-    virtual Boolean
-    can_enumerate(Method_Handle method,
-                  NativeCodePtr eip
-                  ) = 0;
-
-
 
     //
     // Called by the VM before control is transferred to an exception handler.
@@ -219,27 +196,6 @@ public:
         const JitFrameContext   *context              // in
         ) = 0;
 
-
-
-    //
-    // This function is called for a call site (ie with and eip pointing to
-    // the instruction following a call).
-    // Iff the function at this call site (be it a Java method or a runtime
-    // support function) returns a reference, the result is TRUE.
-    // This function is used during GC to decide if eax contains a reference
-    // and if it should be enumerated as part of the root set.
-    //
-    virtual Boolean
-    call_returns_a_reference(Method_Handle            method,              // in
-                             const JitFrameContext   *context              // in
-                             ) = 0;
-
-    //
-    // thread for triggering recompilation
-    //
-    virtual void 
-    thread_recompile_methods() = 0;
-
     // Patch the direct call address to new target.
     virtual void 
     rewrite_direct_call(int UNREF rewrite_type,
@@ -267,9 +223,6 @@ public:
     // during initialization in order to decide whether it should compress references.
     virtual Boolean 
     supports_compressed_references() = 0;
-
-    virtual Boolean
-    code_block_relocated(Method_Handle method, int id, NativeCodePtr old_address, NativeCodePtr new_address) = 0;
 
     /**
      * Execute java method from VM.

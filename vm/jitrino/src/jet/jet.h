@@ -222,14 +222,6 @@ bool supports_compresed_refs(void);
 
 /**
  * @brief Performs compilation of the method.
- * @returns \b true if the method was compiled, \b false otherwise
- * @deprecated Use compile_with_params instead.
- */
-JIT_Result compile(JIT_Handle jit, Compile_Handle compile,
-                   Method_Handle method, JIT_Flags flags);
-
-/**
- * @brief Performs compilation of the method.
  * 
  * Compiles the method with taking into account additional parameters 
  * (supposed to be use for JPDA purposes). 

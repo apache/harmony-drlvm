@@ -52,23 +52,6 @@ JITEXPORT void JIT_next_command_line_argument(JIT_Handle jit, const char *name, 
 // Required functions.
 ////////////////////////////////////////////////////////
 
-//
-// Flags passed from the VM to the JIT.
-//
-// Max 32 bits, so that it fits in one word.
-typedef
-struct JIT_Flags {
-
-    // The JIT should generate write barriers.
-    Boolean insert_write_barriers : 1;
-
-    // out of date flags -> to be removed
-    unsigned    opt_level : 4;
-    Boolean     dynamic_profile : 1;
-
-
-} JIT_Flags; //JIT_Flags
-
 /**
 * Elements of this struct correspond to certain requirements
 * of how a managed method is executed (what it additionally does
@@ -183,24 +166,6 @@ typedef struct OpenMethodExecutionParams {
 
 } OpenMethodExecutionParams;
 
-
-
-
-
-// This function is deprecated.
-JITEXPORT JIT_Result 
-JIT_gen_method_info(JIT_Handle jit, 
-                    Compile_Handle     compilation,
-                    Method_Handle      method,
-                    JIT_Flags          flags
-                    );
-
-JITEXPORT JIT_Result 
-JIT_compile_method(JIT_Handle jit,
-                   Compile_Handle     compilation, 
-                   Method_Handle      method,
-                   JIT_Flags          flags
-                   );
 
 /** 
     * Performs compilation of given method.

@@ -237,12 +237,6 @@ JIT_get_inlined_bc(JIT_Handle jit,
                    uint32 offset, 
                    uint32 inline_depth);
 
-JITEXPORT Boolean
-JIT_can_enumerate(JIT_Handle        jit, 
-                  Method_Handle     method,
-                  NativeCodePtr     eip
-                  );
-
 JITEXPORT void
 JIT_fix_handler_context(JIT_Handle         jit,
                         Method_Handle      method,
@@ -254,12 +248,6 @@ JIT_get_address_of_this(JIT_Handle               jit,
                         Method_Handle            method,
                         const JitFrameContext* context
                         );
-
-JITEXPORT Boolean
-JIT_call_returns_a_reference(JIT_Handle               jit,
-                             Method_Handle            method,
-                             const JitFrameContext* context
-                             );
 
 // end stack unwinding
 ///////////////////////////////////////////////////////
@@ -278,10 +266,6 @@ JIT_supports_compressed_references(JIT_Handle jit);
 
 // end compressed references
 ///////////////////////////////////////////////////////
-
-JITEXPORT Boolean
-JIT_code_block_relocated(JIT_Handle jit, Method_Handle method, int id, NativeCodePtr old_address, NativeCodePtr new_address);
-
 
 #ifdef __cplusplus
 }

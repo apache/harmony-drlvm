@@ -190,15 +190,6 @@ void vm_delete_all_jits()
 } //vm_delete_all_jits
 
 
-void vm_initialize_all_jits()
-{
-    JIT **jit;
-    for(jit = jit_compilers; *jit; jit++) {
-        (*jit)->jit_flags.insert_write_barriers = (gc_requires_barriers());
-    }
-} //vm_initialize_all_jits
-
-
 // end JIT management
 ////////////////////////////////////////////////////////////////////////
 

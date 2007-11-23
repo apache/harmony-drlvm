@@ -27,7 +27,6 @@ extern JIT *jit_compilers[];
 
 void vm_add_jit(JIT *jit);
 void vm_delete_all_jits();
-void vm_initialize_all_jits();
 
 /**
  * Protect arguments from GC.

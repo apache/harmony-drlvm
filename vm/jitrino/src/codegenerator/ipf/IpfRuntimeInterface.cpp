@@ -163,14 +163,6 @@ Method_Handle RuntimeInterface::getInlinedMethod(InlineInfoPtr ptr,
 
 //----------------------------------------------------------------------------------------//
 
-bool RuntimeInterface::canEnumerate(MethodDesc *methodDesc, NativeCodePtr eip) {
-
-    std::cout << "FIXME: IPF::RuntimeInterface::canEnumerate " << methodDesc->getName() << endl;
-    return true;
-}
-
-//----------------------------------------------------------------------------------------//
-
 void RuntimeInterface::fixHandlerContext(MethodDesc *methodDesc, JitFrameContext *context, bool isFirst) {
    //std::cout << "FIXME: IPF::RuntimeInterface::fixHandlerContext " << methodDesc->getName() << endl;
 }
@@ -184,16 +176,6 @@ void* RuntimeInterface::getAddressOfThis(MethodDesc              *methodDesc,
 //    cout << "IPF::RuntimeInterface::getAddressOfThis" << endl;
     assert(!methodDesc->isStatic());
     return jitFrameContext->p_gr[G_INARG_BASE];
-}
-
-//----------------------------------------------------------------------------------------//
-
-void* RuntimeInterface::getAddressOfSecurityObject(MethodDesc              *methodDesc, 
-                                                   const ::JitFrameContext *jitFrameContext) { 
-
-    std::cout << "FIXME: IPF::RuntimeInterface::getAddressOfSecurityObject " << methodDesc->getName() << endl;
-    assert(0); 
-    return NULL; 
 }
 
 //----------------------------------------------------------------------------------------//

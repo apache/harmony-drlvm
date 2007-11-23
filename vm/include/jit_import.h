@@ -86,8 +86,6 @@ VMEXPORT void vm_patch_code_block(Byte *code_block, Byte *new_code, size_t size)
  * callbacks to <code>JIT_recompiled_method_callback</code> will be made. It is a 
  * requirement that the method has not already been compiled by the given JIT; 
  * this means that multiple instances of a JIT may need to be active at the same time. 
- * 
- * @sa vm_clone_jit
  */
 
 VMEXPORT void vm_recompile_method(JIT_Handle jit, Method_Handle method);
@@ -99,14 +97,6 @@ VMEXPORT void vm_recompile_method(JIT_Handle jit, Method_Handle method);
  */
 
 VMEXPORT JIT_Result vm_compile_method(JIT_Handle jit, Method_Handle method);
-
-/** 
- * Creates and returns a new instance of the given JIT. The new JIT's 
- * implementation of <code>JIT_init_with_data</code> is invoked with the 
- * <code>jit_data</code> argument.
- */
-
-VMEXPORT JIT_Handle vm_clone_jit(JIT_Handle jit, void *jit_data);
 
 //@}
 /** @name Exception-related compile-time functions

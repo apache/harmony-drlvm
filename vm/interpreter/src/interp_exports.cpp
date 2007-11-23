@@ -40,13 +40,8 @@ extern "C" {
     EXPORT extern void JIT_unwind_stack_frame(JIT_Handle, Method_Handle, JitFrameContext *);
     EXPORT extern void JIT_get_root_set_from_stack_frame(JIT_Handle, Method_Handle, GC_Enumeration_Handle, JitFrameContext *);
     EXPORT extern void JIT_get_root_set_for_thread_dump(JIT_Handle, Method_Handle, GC_Enumeration_Handle, JitFrameContext *);
-    EXPORT extern Boolean JIT_can_enumerate(JIT_Handle, Method_Handle, NativeCodePtr);
     EXPORT extern void JIT_fix_handler_context(JIT_Handle, Method_Handle, JitFrameContext *);
     EXPORT extern void * JIT_get_address_of_this(JIT_Handle, Method_Handle, const JitFrameContext *);
-    EXPORT extern Boolean JIT_call_returns_a_reference(JIT_Handle, Method_Handle, const JitFrameContext *);
-    EXPORT extern JIT_Result JIT_gen_method_info(JIT_Handle,Compile_Handle, Method_Handle, JIT_Flags);
-    EXPORT extern JIT_Result JIT_compile_method(JIT_Handle,Compile_Handle, Method_Handle, JIT_Flags);
-    EXPORT extern void JIT_init_with_data(JIT_Handle, void *);
     EXPORT extern Boolean JIT_supports_compressed_references(JIT_Handle);
     EXPORT extern void JIT_execute_method(JIT_Handle,jmethodID method, jvalue *return_value, jvalue *args);
 }
@@ -54,12 +49,8 @@ extern "C" {
 EXPORT void JIT_unwind_stack_frame(JIT_Handle, Method_Handle, JitFrameContext *) { abort(); }
 EXPORT void JIT_get_root_set_from_stack_frame(JIT_Handle, Method_Handle, GC_Enumeration_Handle, JitFrameContext *) { abort(); }
 EXPORT void JIT_get_root_set_for_thread_dump(JIT_Handle, Method_Handle, GC_Enumeration_Handle, JitFrameContext *) {return;}
-EXPORT Boolean JIT_can_enumerate(JIT_Handle, Method_Handle, NativeCodePtr) { abort(); return true; }
 EXPORT void JIT_fix_handler_context(JIT_Handle, Method_Handle, JitFrameContext *) { abort(); }
 EXPORT void * JIT_get_address_of_this(JIT_Handle, Method_Handle, const JitFrameContext *) { abort(); return (void *)JIT_FAILURE;}
-EXPORT Boolean JIT_call_returns_a_reference(JIT_Handle, Method_Handle, const JitFrameContext *) { abort(); return true; }
-EXPORT JIT_Result JIT_gen_method_info(JIT_Handle,Compile_Handle, Method_Handle, JIT_Flags) { abort(); return JIT_FAILURE;}
-EXPORT void JIT_init_with_data(JIT_Handle, void *) { abort(); }
 
 
 struct StackTraceFrame;
@@ -146,11 +137,6 @@ EXPORT Boolean JIT_supports_compressed_references(JIT_Handle UNREF jh) {
 #else
     return true;
 #endif
-}
-
-EXPORT JIT_Result JIT_compile_method(JIT_Handle UNREF jh,Compile_Handle, Method_Handle, JIT_Flags) {
-   fprintf(stderr, "interpreter: Compile a method\n");
-   return JIT_FAILURE;
 }
 
 EXPORT JIT_Result JIT_compile_method_with_params(JIT_Handle UNREF jh,Compile_Handle, Method_Handle, OpenMethodExecutionParams) {

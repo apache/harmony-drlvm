@@ -558,12 +558,6 @@ void RuntimeInterface::getGCRootSet(MethodDesc* methodDesc, GCInterface* gcInter
     }
 }
 
-bool RuntimeInterface::canEnumerate(MethodDesc* methodDesc, NativeCodePtr eip) {  
-    assert(0); 
-    return FALSE;
-}
-
-
 void InfoBlockWriter::runImpl() {
     StackInfo * stackInfo = (StackInfo*)irManager->getInfo(STACK_INFO_KEY);
     assert(stackInfo != NULL);

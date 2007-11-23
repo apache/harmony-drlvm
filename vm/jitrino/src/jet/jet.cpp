@@ -505,14 +505,6 @@ OpenMethodExecutionParams get_exe_capabilities()
     return supported;
 }
 
-JIT_Result compile(JIT_Handle jitHandle, Compile_Handle ch, 
-                   Method_Handle method, JIT_Flags flags)
-{
-    // this function is obsolete
-    assert(false);
-    return JIT_FAILURE;
-}
-
 JIT_Result compile_with_params(JIT_Handle jit_handle, Compile_Handle ch, 
                                Method_Handle method, 
                                OpenMethodExecutionParams params)
@@ -784,17 +776,6 @@ void JIT_next_command_line_argument(JIT_Handle jit, const char *name,
 }
 
 
-extern "C" JITEXPORT
-JIT_Result JIT_compile_method(JIT_Handle jit, Compile_Handle ch,
-                              Method_Handle method,
-                              JIT_Flags flags)
-{
-    //Jitrino::CompilationContext ctx(jit, method);
-    //return Jitrino::Jet::compile(jit, ch, method, flags);
-    assert(false); // Obsolete
-    return JIT_FAILURE;
-}
-
 extern "C" JITEXPORT 
 JIT_Result JIT_compile_method_with_params(JIT_Handle jit, 
                                           Compile_Handle ch, 
@@ -828,29 +809,12 @@ JIT_Result JIT_compile_method_with_params(JIT_Handle jit,
 }
 
 /**
- * Noop.
- */
-extern "C" JITEXPORT
-void JIT_init_with_data(JIT_Handle jit, void *jit_data)
-{
-    // noop
-}
-
-/**
  * @see get_exe_capabilities
  */
 extern "C" JITEXPORT
 OpenMethodExecutionParams JIT_get_exe_capabilities(JIT_Handle jit)
 {
     return Jitrino::Jet::get_exe_capabilities();
-}
-
-extern "C" JITEXPORT
-JIT_Result JIT_gen_method_info(JIT_Handle jit, Compile_Handle compilation,
-                               Method_Handle method, JIT_Flags flags)
-{
-    assert(0);
-    return JIT_FAILURE;
 }
 
 
@@ -955,55 +919,6 @@ uint16 JIT_get_inlined_bc(JIT_Handle jit, InlineInfoPtr ptr,
     return 0;
 }
 
-extern "C" JITEXPORT
-Boolean JIT_can_enumerate(JIT_Handle jit, Method_Handle method,
-                          NativeCodePtr eip)
-{
-    return false;
-}
-
-
-extern "C" JITEXPORT
-unsigned JIT_num_breakpoints(JIT_Handle jit, Method_Handle method, uint32 eip)
-{
-    assert(false);
-    return 0;
-}
-
-extern "C" JITEXPORT
-void JIT_get_breakpoints(JIT_Handle jit, Method_Handle method, uint32 *bp,
-                         ::JitFrameContext *context)
-{
-    assert(false);
-}
-
-/**
- * @deprecated
- */
-extern "C" JITEXPORT
-Boolean JIT_call_returns_a_reference(JIT_Handle jit, Method_Handle method,
-                                     const ::JitFrameContext *context)
-{
-    assert(false);
-    return false;
-}
-
-extern "C" JITEXPORT
-int32 JIT_get_break_point_offset(JIT_Handle jit, Compile_Handle compilation,
-                                 Method_Handle meth, JIT_Flags flags,
-                                 unsigned bc_location)
-{
-    assert(false);
-    return false;
-}
-
-extern "C" JITEXPORT
-void * JIT_get_address_of_var(JIT_Handle jit, ::JitFrameContext *context,
-                              Boolean is_first, unsigned var_no)
-{
-    assert(false);
-    return NULL;
-}
 
 /**
  * @returns \b Whether Jitrino.JET support compressed references on current
