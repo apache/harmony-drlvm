@@ -58,6 +58,16 @@ IDATA VMCALL hythread_park(I_64 millis, IDATA nanos) {
      status = hycond_wait_interruptable(&t->condition, &t->mutex, millis, nanos);
      t->state &= ~TM_THREAD_STATE_PARKED;
 
+     if (t->request) {
+         int save_count;
+         hymutex_unlock(&t->mutex);
+         hythread_safe_point();
+         hythread_exception_safe_point();
+         save_count = hythread_reset_suspend_disable();
+         hymutex_lock(&t->mutex);
+         hythread_set_suspend_disable(save_count);
+     }
+
      //the status should be restored for j.u.c.LockSupport
      if (status == TM_ERROR_INTERRUPT) {
          t->state |= TM_THREAD_STATE_INTERRUPTED;

@@ -411,6 +411,11 @@ IDATA thread_sleep_impl(I_64 millis, IDATA nanos, IDATA interruptable) {
     thread->state &= ~TM_THREAD_STATE_SLEEPING;
     hymutex_unlock(&thread->mutex);
 
+    if (thread->request) {
+        hythread_safe_point();
+        hythread_exception_safe_point();
+    }
+
     return (status == TM_ERROR_INTERRUPT && interruptable) ? TM_ERROR_INTERRUPT : TM_ERROR_NONE;
 }
 
@@ -838,6 +843,21 @@ IDATA VMCALL hythread_set_thread_stop_callback(hythread_t thread,
     // so that it would eventually reach exception safepoint
     // and execute callback
     hysem_post(thread->resume_event);
+
+    if (thread->state &
+            (TM_THREAD_STATE_SLEEPING | TM_THREAD_STATE_WAITING_WITH_TIMEOUT
+                | TM_THREAD_STATE_WAITING | TM_THREAD_STATE_IN_MONITOR_WAIT
+                | TM_THREAD_STATE_WAITING_INDEFINITELY | TM_THREAD_STATE_PARKED))
+    {
+        // This is needed for correct stopping of a thread blocked on monitor_wait.
+        // The thread needs some flag to exit its waiting loop.
+        // We piggy-back on interrupted status. A correct exception from TLS
+        // will be thrown because the check of exception status on leaving
+        // JNI frame comes before checking return status in Object.wait().
+        // Interrupted status will be cleared by function returning TM_ERROR_INTERRUPT.
+        // (though, in case of parked thread, it will not be cleared)
+        hythread_interrupt(thread);
+    }
     return status;
 } // hythread_set_thread_stop_callback
 

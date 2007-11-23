@@ -587,7 +587,6 @@ public class Thread implements Runnable {
      * @com.intel.drl.spec_ref
      */
     public final synchronized void join() throws InterruptedException {
-        notifyAll();
         while (isAlive()) {
             wait();
         }
@@ -600,7 +599,6 @@ public class Thread implements Runnable {
         if (millis == 0) {
             join();
         } else {
-            notifyAll();
             long end = System.currentTimeMillis() + millis;
             while(isAlive()) {
                 wait(millis);
@@ -622,7 +620,6 @@ public class Thread implements Runnable {
         } else if (millis == 0 && nanos == 0) {
             join();
         } else {
-            notifyAll();
             long end = System.nanoTime() + 1000000*millis + (long)nanos;
             long rest;
             while (isAlive()) {
