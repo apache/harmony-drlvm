@@ -189,14 +189,15 @@ static void parse_method_string(MemoryManager& _mm, char *str, Method_Table::met
 // Returns true on success, false on failure
 bool Method_Table::read_method_table()
 {
-    char buf[1000];
+    const size_t max_size = 1000;
+    char buf[max_size];
     FILE *file = fopen(_method_file, "r");
     if (file == NULL)
     {
         fprintf(stderr, "Couldn't open method table file %s\n", _method_file);
         return false;
     }
-    while (fgets(buf, 1000, file) != NULL)
+    while (fgets(buf, max_size, file) != NULL)
     {
         // strip out any newline at the end
         int buflen = (int) strlen(buf);
@@ -226,22 +227,25 @@ static bool matches(Method_Table::method_record *test_entry,
 
 void Method_Table::init(const char *default_envvar, const char *envvarname)
 {
-
-    char *rangestr;
-
-    char *envvar = (char*)default_envvar;
-
-    if (envvar == NULL || envvar[0] == '\0')
+    if (default_envvar == NULL || default_envvar[0] == '\0')
     {
         return;
     }
-    // strip away double-quote characters
-    if (envvar[0] == '"')
-        envvar ++;
-    if (envvar[strlen(envvar)-1] == '"')
-        envvar[strlen(envvar)-1] = '\0';
+
+    char *rangestr;
+    char *envvar = strdup(_mm, default_envvar);
     
+   // strip away double-quote characters
+    if (envvar[0] == '"') {
+        envvar ++;
+    }
     int evlen = (int) strlen(envvar);
+    if (evlen > 0 && envvar[evlen-1] == '"') {
+        envvar[--evlen] = '\0';
+    }
+    if (evlen == 0) {
+        return;
+    }
     int i;
     for (i=evlen-1; i>=0; i--)
     {
