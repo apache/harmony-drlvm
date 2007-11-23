@@ -198,7 +198,7 @@ InstCodeSelector(CompilationInterface&          compIntfc,
   inArgPos(0),
   seenReturn(false),               switchSrcOpnd(NULL), 
   switchNumTargets(0), currPersistentId(),
-  currPredOpnd(NULL) 
+  currPredOpnd(NULL)
 {
 }
 
@@ -1292,21 +1292,44 @@ void InstCodeSelector::branch(CompareOp::Operators cmpOp,
     appendInsts(irManager.newBranchInst(getMnemonic(Mnemonic_Jcc, swapped?swapConditionMnemonic(cm):cm), NULL, NULL));
 }
 
+Opnd*
+InstCodeSelector::zeroForComparison(Opnd* target)
+{
+    POINTER_SIZE_INT zero = 0;
+    Type* type = target->getType();
+    if(irManager.refsAreCompressed() && type->isReference()) {
+        zero = (POINTER_SIZE_INT)VMInterface::getHeapBase();
+    }
+    if(zero != 0) {
+        return heapBaseOpnd(type,zero);
+    }
+    return NULL;
+}
+
+Opnd*
+InstCodeSelector::heapBaseOpnd(Type* type, POINTER_SIZE_INT heapBase) {
+#ifndef _EM64T_
+    assert(0); // not supposed to be used on ia32
+#endif
+    Opnd* heapBaseOpnd = NULL;
+    if((POINTER_SIZE_INT)heapBase == (uint32)heapBase) { // heap base fits into 32 bits
+        heapBaseOpnd = irManager.newImmOpnd(type, heapBase);
+    } else { // heapBase can not be an immediate at comparison
+        heapBaseOpnd = irManager.newOpnd(type);
+        // be careful here. if type == Int64 the immediate opnd is returned from copyOpnd.
+        // Make sure it is not a problem if you are removing the assert.
+        assert(type != typeManager.getInt64Type());
+        copyOpnd(heapBaseOpnd,irManager.newImmOpnd(typeManager.getInt64Type(), heapBase));
+    }
+    return heapBaseOpnd;
+}
 //_______________________________________________________________________________________________________________
 //  Branch if src is zero
 
-void InstCodeSelector::bzero(CompareZeroOp::Types opType,
-                                  CG_OpndHandle* src) 
+void InstCodeSelector::bzero(CompareZeroOp::Types opType, CG_OpndHandle* src) 
 {
-#ifdef _EM64T_
-    CompareOp::Types zeroType = getCompareOpTypesFromCompareZeroOpTypes(opType);
-    Opnd * op = (Opnd*) src;
-    cmpToEflags(CompareOp::Eq, 
-        zeroType, op, irManager.newImmOpnd(op->getType(),(zeroType == CompareOp::Ref) || (zeroType == CompareOp::CompRef) ? (POINTER_SIZE_INT)VMInterface::getHeapBase() : 0));
-#else
-    cmpToEflags(CompareOp::Eq, 
-        getCompareOpTypesFromCompareZeroOpTypes(opType), (Opnd*)src, 0);
-#endif
+    Opnd* zeroOp = zeroForComparison((Opnd*)src);
+    cmpToEflags(CompareOp::Eq, getCompareOpTypesFromCompareZeroOpTypes(opType), (Opnd*)src, zeroOp);
     //! branch true&false edges are added during genTrue|False edge calls
     appendInsts(irManager.newBranchInst(Mnemonic_JZ, NULL, NULL));
 }
@@ -1314,18 +1337,10 @@ void InstCodeSelector::bzero(CompareZeroOp::Types opType,
 //_______________________________________________________________________________________________________________
 //  Branch if src is not zero
 
-void InstCodeSelector::bnzero(CompareZeroOp::Types opType,
-                                              CG_OpndHandle* src) 
+void InstCodeSelector::bnzero(CompareZeroOp::Types opType, CG_OpndHandle* src) 
 {
-#ifdef _EM64T_
-    CompareOp::Types zeroType = getCompareOpTypesFromCompareZeroOpTypes(opType);
-    Opnd * op = (Opnd*) src;
-    cmpToEflags(CompareOp::Eq, 
-        zeroType, op, irManager.newImmOpnd(op->getType(),(zeroType == CompareOp::Ref) || (zeroType == CompareOp::CompRef) ? (POINTER_SIZE_INT)VMInterface::getHeapBase() : 0));
-#else
-    cmpToEflags(CompareOp::Eq, 
-        getCompareOpTypesFromCompareZeroOpTypes(opType), (Opnd*)src, 0);
-#endif
+    Opnd* zeroOp = zeroForComparison((Opnd*)src);
+    cmpToEflags(CompareOp::Eq, getCompareOpTypesFromCompareZeroOpTypes(opType), (Opnd*)src, zeroOp);
     //! branch true&false edges are added during genTrue|FalseEdge
     appendInsts(irManager.newBranchInst(Mnemonic_JNZ, NULL, NULL));
 }
@@ -1470,15 +1485,15 @@ CG_OpndHandle*    InstCodeSelector::ldc_d(double val)
 //  Load Null
 
 CG_OpndHandle*    InstCodeSelector::ldnull(bool compressed) {
-#ifndef _EM64T_
-    return irManager.newImmOpnd(typeManager.getNullObjectType(), 0);
-#else
     if (compressed) {
         return irManager.newImmOpnd(typeManager.getCompressedNullObjectType(), 0);
     } else {
-        return irManager.newImmOpnd(typeManager.getNullObjectType(), (POINTER_SIZE_INT)VMInterface::getHeapBase());
+        if (irManager.refsAreCompressed()) {
+            return irManager.newImmOpnd(typeManager.getNullObjectType(), (POINTER_SIZE_INT)VMInterface::getHeapBase());
+        } else {
+            return irManager.newImmOpnd(typeManager.getNullObjectType(), 0);
+        }
     }
-#endif
 }
 
 //_______________________________________________________________________________________________________________
@@ -1896,14 +1911,15 @@ CG_OpndHandle* InstCodeSelector::simpleLdInd(Type * dstType, Opnd * addr,
                                                 Opnd * offsetTau) 
 {
 #ifdef _EM64T_
-    if(memType > Type::Float && memType!=Type::UnmanagedPtr) {
+    if(irManager.refsAreCompressed() && memType > Type::Float && memType!=Type::UnmanagedPtr) {
         Opnd * opnd = irManager.newMemOpndAutoKind(typeManager.getInt32Type(), addr);
         Opnd * dst = irManager.newOpnd(typeManager.getInt64Type());
         // loading compressed 32-bit managed address, ensure zero-extention
         copyOpnd(dst, opnd, true);
         // uncompress
         Type* unmanagedPtrType = typeManager.getUnmanagedPtrType(typeManager.getInt8Type());
-        dst = simpleOp_I8(Mnemonic_ADD, dstType, dst, irManager.newImmOpnd(unmanagedPtrType, (POINTER_SIZE_INT)VMInterface::getHeapBase()));
+        Opnd* heapBase = heapBaseOpnd(unmanagedPtrType, (POINTER_SIZE_INT)VMInterface::getHeapBase());
+        dst = simpleOp_I8(Mnemonic_ADD, dstType, dst, heapBase);
         return dst;
     } 
     else 
@@ -1926,25 +1942,24 @@ void InstCodeSelector::simpleStInd(Opnd * addr,
                                       Opnd * baseTau,
                                       Opnd * offsetAndTypeTau) 
 {
-#ifndef _EM64T_
-    Opnd * dst = irManager.newMemOpndAutoKind(irManager.getTypeFromTag(memType), addr);
-    copyOpnd(dst, src);
-#else
-    if (src->getType()->isUnmanagedPtr()) {
-        assert(src->getType()->asPtrType()->getPointedToType()->isInt1());
-        Opnd* dst = irManager.newMemOpndAutoKind(irManager.getTypeFromTag(memType), addr);
-        copyOpnd(dst, src);
-    } else  if(memType > Type::Float) {
-        Opnd * heap_base = irManager.newImmOpnd(typeManager.getIntPtrType(), (POINTER_SIZE_INT)VMInterface::getHeapBase());
+#ifdef _EM64T_
+    // unmanaged pointers are never being compressed
+    // Actually, there is only one possible case caused by magics:
+    // unmanaged pointer to Int8
+    if(irManager.refsAreCompressed() && memType > Type::Float && !src->getType()->isUnmanagedPtr()) {
+        Type * unmanagedPtrType = typeManager.getUnmanagedPtrType(typeManager.getInt8Type());
+        Opnd * heap_base = heapBaseOpnd(unmanagedPtrType, (POINTER_SIZE_INT)VMInterface::getHeapBase());
         Opnd * compressed_src = irManager.newOpnd(typeManager.compressType(src->getType()));
         Opnd * opnd = irManager.newMemOpndAutoKind(typeManager.compressType(src->getType()), addr);
         appendInsts(irManager.newInstEx(Mnemonic_SUB, 1, compressed_src, src, heap_base));
         appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, opnd, compressed_src));
-    } else {
+    } else
+#endif
+    {
+        assert( !src->getType()->isUnmanagedPtr() || src->getType()->asPtrType()->getPointedToType()->isInt1());
         Opnd * dst = irManager.newMemOpndAutoKind(irManager.getTypeFromTag(memType), addr);
         copyOpnd(dst, src);
     }
-#endif
 } 
 
 //_______________________________________________________________________________________________________________
@@ -2199,32 +2214,42 @@ CG_OpndHandle* InstCodeSelector::ldRef(Type *dstType,
         // Similar function for literal constants is not ready.
         // TODO: rewrite this as soon as the helper for loading ref addr at compile time is ready.
 
-#ifdef _EM64T_
-        Opnd * base = irManager.newOpnd(irManager.getTypeFromTag(Type::Object));
-        copyOpnd(base, irManager.newImmOpnd(base->getType(), (POINTER_SIZE_INT)VMInterface::getHeapBase()));
-        Opnd * tmp = irManager.newImmOpnd(irManager.getTypeFromTag(Type::UInt64),
-                                          Opnd::RuntimeInfo::Kind_StringAddress,
-                                          enclosingMethod, (void*)(POINTER_SIZE_INT)refToken);
-        Opnd * ptr;
-        if  (uncompress) {
-            ptr = irManager.newOpnd(irManager.getTypeFromTag(Type::Object));
-            copyOpnd(ptr,tmp);
+        Type* objectType = irManager.getTypeFromTag(Type::Object);
+        if(irManager.refsAreCompressed()) {
+            Opnd * base = irManager.newOpnd(objectType);
+            copyOpnd(base, irManager.newImmOpnd(objectType, (POINTER_SIZE_INT)VMInterface::getHeapBase()));
+            Opnd * tmp = irManager.newImmOpnd(irManager.getTypeFromTag(Type::UInt64),
+                                              Opnd::RuntimeInfo::Kind_StringAddress,
+                                              enclosingMethod, (void*)(POINTER_SIZE_INT)refToken);
+            Opnd * ptr;
+            if  (uncompress) {
+                ptr = irManager.newOpnd(objectType);
+                copyOpnd(ptr,tmp);
+            } else {
+                ptr = simpleOp_I8(Mnemonic_ADD, objectType,base,tmp);
+            }
+            
+            Opnd* memOpnd = irManager.newMemOpnd(typeManager.getSystemStringType(), MemOpndKind_Heap,
+                                                 ptr, NULL, NULL, NULL); 
+            retOpnd = simpleOp_I8(Mnemonic_ADD, memOpnd->getType(), memOpnd, base);
         } else {
-            ptr = simpleOp_I8(Mnemonic_ADD, irManager.getTypeFromTag(Type::Object),base,tmp);
-        }
-        
-        Opnd* memOpnd = irManager.newMemOpnd(typeManager.getSystemStringType(), MemOpndKind_Heap,
-                                             ptr, NULL, NULL, NULL); 
-        retOpnd = simpleOp_I8(Mnemonic_ADD, memOpnd->getType(), memOpnd, base);
-
+#ifdef _EM64T_ // in uncompressed mode the ptr can be greater than MAX_INT32 so it can not be an immediate
+            Opnd * tmp = irManager.newImmOpnd(irManager.getTypeFromTag(Type::UInt64),
+                                              Opnd::RuntimeInfo::Kind_StringAddress,
+                                              enclosingMethod, (void*)(POINTER_SIZE_INT)refToken);
+            Opnd* ptr = irManager.newOpnd(objectType);
+    //        Opnd* ptr = irManager.newOpnd(typeManager.getUnmanagedPtrType(typeManager.getSystemStringType()));
+            copyOpnd(ptr,tmp);
+            Opnd* memOpnd = irManager.newMemOpnd(typeManager.getSystemStringType(), MemOpndKind_Heap,
+                                                 ptr, NULL, NULL,  NULL); 
 #else
-        Opnd* ptr = irManager.newImmOpnd(typeManager.getUnmanagedPtrType(typeManager.getSystemStringType()),
-                                         Opnd::RuntimeInfo::Kind_StringAddress,
-                                         enclosingMethod, (void*)(POINTER_SIZE_INT)refToken);
-        Opnd* memOpnd = irManager.newMemOpnd(typeManager.getSystemStringType(), MemOpndKind_Heap,
-                                             NULL, NULL, NULL,  ptr); 
-        copyOpnd(retOpnd, memOpnd);
+            Opnd* ptr = irManager.newImmOpnd(objectType, Opnd::RuntimeInfo::Kind_StringAddress,
+                                             enclosingMethod, (void*)(POINTER_SIZE_INT)refToken);
+            Opnd* memOpnd = irManager.newMemOpnd(typeManager.getSystemStringType(), MemOpndKind_Heap,
+                                                 NULL, NULL, NULL,  ptr); 
 #endif
+            copyOpnd(retOpnd, memOpnd);
+        }
     }
 
     return retOpnd;
@@ -2507,10 +2532,18 @@ CG_OpndHandle* InstCodeSelector::arraycopy(uint32          numArgs,
                  * So if type is object, it is actually compressed (32-bit sized).
                  * But IRManager::getTypeSize() "correctly" returns OpndSize_64.
                  */
-                if (!srcAddrType->getPointedToType()->isObject()) {
-                    appendInsts(irManager.newInst(Mnemonic_SHL, counter, irManager.newImmOpnd(counterType, (int32)1)));
+#ifdef _EM64T_
+                if (irManager.refsAreCompressed() && srcAddrType->getPointedToType()->isObject()) {
+                    mn = Mnemonic_MOVS32;
+                } else {
+                    mn = Mnemonic_MOVS64;
                 }
+#else
+                // there are no MOVSQ on ia32
+                assert(!srcAddrType->getPointedToType()->isObject());
+                appendInsts(irManager.newInst(Mnemonic_SHL, counter, irManager.newImmOpnd(counterType, (int32)1)));
                 mn = Mnemonic_MOVS32;
+#endif // _EM64T_
             }
             break;
         default: assert(0); mn = Mnemonic_MOVS32; break;

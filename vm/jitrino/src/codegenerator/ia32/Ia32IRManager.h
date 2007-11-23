@@ -468,6 +468,7 @@ public:
     void setVerificationLevel(uint32 v){ verificationLevel=v; }
     uint32 getVerificationLevel()const{ return verificationLevel; }
 
+    bool refsAreCompressed() {return refsCompressed;}
 protected:
 
     //control flow graph factory methods
@@ -519,6 +520,8 @@ protected:
     bool                            laidOut;
     void *                          codeStartAddr;
     CGFlags                         flags;
+
+    bool                            refsCompressed;
 };
 
 #define VERIFY_OUT(s) { if (Log::isEnabled()) Log::out() << s; std::cerr << s; }

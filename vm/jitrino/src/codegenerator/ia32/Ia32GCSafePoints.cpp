@@ -503,6 +503,7 @@ void GCSafePointsInfo::updatePairsOnInst(Inst* inst, GCSafePointPairs& res) {
             inst->getMnemonic() == Mnemonic_MOVS8         ||
             inst->getMnemonic() == Mnemonic_MOVS16        ||
             inst->getMnemonic() == Mnemonic_MOVS32        ||
+            inst->getMnemonic() == Mnemonic_MOVS64        ||
             inst->getMnemonic() == Mnemonic_CMPSB         ||
             inst->getMnemonic() == Mnemonic_CMPSW         ||
             inst->getMnemonic() == Mnemonic_CMPSD         ) {

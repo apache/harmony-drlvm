@@ -343,6 +343,11 @@ private:
     bool cmpToEflags(CompareOp::Operators cmpOp, CompareOp::Types opType,
                                     Opnd * src1, Opnd * src2
                                     );
+    // zero or HeapBase depending on compression mode
+    Opnd* zeroForComparison(Opnd* target);
+    // immediate or general opnd with heapBase value
+    Opnd* heapBaseOpnd(Type* type, POINTER_SIZE_INT heapBase);
+
     //
     // Enums
     //

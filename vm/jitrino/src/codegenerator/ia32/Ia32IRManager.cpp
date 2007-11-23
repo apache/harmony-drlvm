@@ -64,7 +64,8 @@ IRManager::IRManager(MemoryManager& memManager, TypeManager& tm, MethodDesc& md,
         opndId(0), instId(0),
         opnds(memManager), gpTotalRegUsage(0), entryPointInst(NULL), _hasLivenessInfo(false),
         internalHelperInfos(memManager), infoMap(memManager), verificationLevel(0),
-        hasCalls(false), hasNonExceptionCalls(false), laidOut(false), codeStartAddr(NULL)
+        hasCalls(false), hasNonExceptionCalls(false), laidOut(false), codeStartAddr(NULL),
+        refsCompressed(VMInterface::areReferencesCompressed())
 
 {  
     for (uint32 i=0; i<lengthof(regOpnds); i++) regOpnds[i]=NULL;
@@ -1898,13 +1899,23 @@ void IRManager::expandSystemExceptions(uint32 reservedForFlags)
                         assert(lastInst->getBCOffset()!=ILLEGAL_BC_MAPPING_VALUE);
                         throwInst->setBCOffset(lastInst->getBCOffset());
                         throwBasicBlock->appendInst(throwInst);
-#ifndef _EM64T_
-                        Inst* cmpInst = newInst(Mnemonic_CMP, opnd, newImmOpnd(opnd->getType(), 0));
+                        int64 zero = 0;
+                        if( refsCompressed && opnd->getType()->isReference() ) {
+                            assert(!Type::isCompressedReference(opnd->getType()->tag));
+                            zero = (int64)(POINTER_SIZE_INT)VMInterface::getHeapBase();
+                        }
+                        Opnd* zeroOpnd = NULL;
+                        if((POINTER_SIZE_INT)zero == (uint32)zero) { // heap base fits into 32 bits
+                            zeroOpnd = newImmOpnd(opnd->getType(), zero);
+                        } else { // zero can not be an immediate at comparison
+                            Opnd* zeroImm = newImmOpnd(typeManager.getIntPtrType(), zero);
+                            zeroOpnd = newOpnd(opnd->getType());
+                            Inst* copy = newCopyPseudoInst(Mnemonic_MOV, zeroOpnd, zeroImm);
+                            bb->appendInst(copy);
+                            copy->setBCOffset(lastInst->getBCOffset());
+                        }
+                        Inst* cmpInst = newInst(Mnemonic_CMP, opnd, zeroOpnd);
                         bb->appendInst(cmpInst);
-#else
-                        Inst* cmpInst = newInst(Mnemonic_CMP, opnd,newImmOpnd(opnd->getType(), (Type::isCompressedReference(opnd->getType()->tag) || !opnd->getType()->isReference())? 0: (POINTER_SIZE_INT)VMInterface::getHeapBase()));
-                        bb->appendInst(cmpInst);
-#endif
                         cmpInst->setBCOffset(lastInst->getBCOffset());
 
                         bb->appendInst(newBranchInst(Mnemonic_JZ, throwBasicBlock, oldTarget));
