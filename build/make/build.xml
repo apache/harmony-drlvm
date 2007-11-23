@@ -473,7 +473,7 @@
     <!-- Main target for building components -->
     <target name="build" depends="setup, init, set.target.to.build,
                                     process.components, fill.up.deploy,
-                                    deploy.canonical, deploy.relocate" />
+                                    deploy.relocate,deploy.canonical" />
 
     <target name="set.target.to.build">
         <property name="target" value="build" />
