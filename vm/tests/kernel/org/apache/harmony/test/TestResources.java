@@ -48,23 +48,27 @@ public class TestResources {
      */
     public static ClassLoader getLoader() {
         if (loader == null) {
-            URL url = null;
-            try {
-                String path = System.getProperty(RESOURCE_PATH, ".");
-                File f = new File(path);
-                if (f.exists()) {
-                    url = f.toURI().toURL();
-                } else {
-                    url = new URL(path);
-                }
-            } catch (MalformedURLException e) {
-                throw new RuntimeException(
-                        "Misconfigured path to test resources. "
-                                + "Please set correct value of system property: "
-                                + RESOURCE_PATH, e);
-            }
-            loader = URLClassLoader.newInstance(new URL[] { url });
+            loader = createLoader();
         }
         return loader;
+    }
+    
+    public static ClassLoader createLoader() {
+        URL url = null;
+        try {
+            String path = System.getProperty(RESOURCE_PATH, ".");
+            File f = new File(path);
+            if (f.exists()) {
+                url = f.toURI().toURL();
+            } else {
+                url = new URL(path);
+            }
+        } catch (MalformedURLException e) {
+            throw new RuntimeException(
+                    "Misconfigured path to test resources. "
+                            + "Please set correct value of system property: "
+                            + RESOURCE_PATH, e);
+        }
+        return URLClassLoader.newInstance(new URL[] { url });        
     }
 }

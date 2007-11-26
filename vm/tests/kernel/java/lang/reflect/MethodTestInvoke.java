@@ -26,6 +26,7 @@ import java.lang.reflect.Method;
 import org.apache.harmony.lang.C2;
 import org.apache.harmony.lang.ProtectedMethod;
 import org.apache.harmony.lang.ProtectedSuccessor;
+import org.apache.harmony.test.TestResources;
 
 import junit.framework.TestCase;
 
@@ -36,6 +37,26 @@ public class MethodTestInvoke extends TestCase {
     
     public static void doFail() {
         throw new MyException();
+    }
+
+    /**
+     * Regression test for HARMONY-5179.
+     */
+    public void testLoaderAccess() throws Throwable {
+        ClassLoader l1 = TestResources.createLoader();
+        ClassLoader l2 = TestResources.createLoader();
+        Class c1 = l1.loadClass("org.apache.harmony.lang.test.resource.DefaultMethodInvoker");
+        Class c2 = l2.loadClass("org.apache.harmony.lang.test.resource.DefaultMethodInvoker");
+        Method m1 = c1.getMethod("run", new Class[] {Method.class, Object.class, Object[].class}); 
+        Method m2 = c2.getMethod("dummy", new Class[] {});
+        try {
+            m1.setAccessible(true);
+            m1.invoke(null, new Object[] {m2, null, null});
+            fail("Access to package methods should be checked with runtime packages");
+        } catch (InvocationTargetException expected) {
+            Throwable cause = expected.getCause();
+            assertTrue("bad cause: " + cause, cause instanceof IllegalAccessException);
+        }
     }
     
     /**

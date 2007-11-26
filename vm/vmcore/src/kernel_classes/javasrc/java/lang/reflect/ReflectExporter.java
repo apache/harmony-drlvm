@@ -183,6 +183,9 @@ class ReflectExporter implements ReflectAccessor {
     }
 
     private boolean hasSamePackage(Class<?> class1, Class<?> class2) {
+        if (class1.getClassLoader() != class2.getClassLoader()) {
+            return false;
+        }
         final String pkg1 = class1.getName();
         final String pkg2 = class2.getName();
         int i1 = pkg1.lastIndexOf('.');
