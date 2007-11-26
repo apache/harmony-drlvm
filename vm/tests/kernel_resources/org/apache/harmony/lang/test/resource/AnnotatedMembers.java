@@ -16,6 +16,8 @@
  */
 package org.apache.harmony.lang.test.resource;
 
+import org.apache.harmony.lang.annotation.AllTypesAntn;
+
 /**
  * @author Alexey V. Varlamov
  * @version $Revision$
@@ -32,4 +34,7 @@ public abstract class AnnotatedMembers {
     
     @AnotherAntn
     public AnnotatedMembers() {}
+    
+    @AllTypesAntn(classValue=AnotherAntn.class)
+    public Object acme;
 }

@@ -87,10 +87,12 @@
     </target>
 
     <target name="compile-kernel-test">
-        <compile-java src="${kernel.test.javasrc}/../kernel_resources" 
-            dest="${test.resource.path}"/>
         <compile-java src="${kernel.test.javasrc}" 
             dest="${test.class.path}"/>
+        <compile-java src="${kernel.test.javasrc}/../kernel_resources" 
+            dest="${test.resource.path}">
+            <classpath path="${test.class.path}"/>
+        </compile-java>
         <delete quiet="true" dir="${test.class.path}/notfound" />
     </target>
     

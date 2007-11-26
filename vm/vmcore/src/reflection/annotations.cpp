@@ -182,7 +182,8 @@ jobject resolve_annotation(JNIEnv* jenv, Annotation* antn, Class* clss, jthrowab
             if (name) {
                 jobject element = NULL;
                 jthrowable error = NULL;
-                jobject value = resolve_annotation_value(jenv, antn->elements[i].value, antn_type, 
+                jobject value = resolve_annotation_value(jenv, clss, 
+                    antn->elements[i].value, antn_type, 
                     antn->elements[i].name, &error);
                 if (value) {
                     element = NewObject(jenv, jelc, element_ctor, name, value);
@@ -239,7 +240,8 @@ static jobject process_enum_value(JNIEnv* jenv, AnnotationValue& value, Class* c
     return NULL;
 }
 
-static bool process_array_element(JNIEnv* jenv, AnnotationValue& value, Class* antn_type, 
+static bool process_array_element(JNIEnv* jenv, Class* clss, 
+                                  AnnotationValue& value, Class* antn_type, 
                                   String* name, jthrowable* cause, 
                                   jarray array, unsigned idx, Class* type) 
 {
@@ -321,7 +323,7 @@ static bool process_array_element(JNIEnv* jenv, AnnotationValue& value, Class* a
         }
     default: 
         {
-            jobject jelement = resolve_annotation_value(jenv, value, antn_type, name, cause);
+            jobject jelement = resolve_annotation_value(jenv, clss, value, antn_type, name, cause);
             if (jelement) {
                 SetObjectArrayElement(jenv, array, idx, jelement);
                 if (exn_raised()) {
@@ -339,7 +341,8 @@ static bool process_array_element(JNIEnv* jenv, AnnotationValue& value, Class* a
 }
 
 
-jobject resolve_annotation_value(JNIEnv* jenv, AnnotationValue& value, Class* antn_type, 
+jobject resolve_annotation_value(JNIEnv* jenv, Class* clss, 
+                                 AnnotationValue& value, Class* antn_type, 
                                  String* name, jthrowable* cause)
 {
     TRACE("Resolving value of tag " << (char)value.tag);
@@ -368,15 +371,15 @@ jobject resolve_annotation_value(JNIEnv* jenv, AnnotationValue& value, Class* an
     case AVT_CLASS: 
         {
             // preserve failure if no Class value found
-            Class* type = field_descriptor_to_type(jenv, value.class_name, antn_type, cause);
+            Class* type = field_descriptor_to_type(jenv, value.class_name, clss, cause);
             return type ? struct_Class_to_java_lang_Class_Handle(type) : NULL;
         }
 
     case AVT_ANNOTN:
-        return resolve_annotation(jenv, value.nested, antn_type, cause);
+        return resolve_annotation(jenv, value.nested, clss, cause);
 
     case AVT_ENUM:
-        return process_enum_value(jenv, value, antn_type, name, cause);
+        return process_enum_value(jenv, value, clss, name, cause);
 
     case AVT_ARRAY:
         {
@@ -419,7 +422,8 @@ jobject resolve_annotation_value(JNIEnv* jenv, AnnotationValue& value, Class* an
             }
 
             for (i = 0; i < value.array.length; ++i) {
-                if (!process_array_element(jenv, value.array.items[i], antn_type, 
+                if (!process_array_element(jenv, clss,
+                    value.array.items[i], antn_type, 
                     name, cause, array, i, arr_type)) 
                 {
                     return NULL;

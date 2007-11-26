@@ -40,11 +40,13 @@ public class AnnotationLoaderTest extends TestCase {
     
     protected ClassLoader ld;
     protected Class<?> test;
+    protected Class<?> anotherAntnClass;
     
     @Override
     protected void setUp() throws Exception {
         ld = TestResources.getLoader();
         test = ld.loadClass("org.apache.harmony.lang.test.resource.AnnotatedMembers");
+        anotherAntnClass = ld.loadClass("org.apache.harmony.lang.test.resource.AnotherAntn");
     }
     
     /**
@@ -54,7 +56,7 @@ public class AnnotationLoaderTest extends TestCase {
         Annotation[] an = test.getAnnotations();
         assertNotNull(an);
         assertEquals("annotations num", 1, an.length);
-        assertEquals("the class annotation", "AnotherAntn", an[0].annotationType().getSimpleName());
+        assertEquals("the class annotation", anotherAntnClass, an[0].annotationType());
     }
 
     /**
@@ -121,4 +123,18 @@ public class AnnotationLoaderTest extends TestCase {
         assertEquals("annotations num", 1, an[0].length);
         assertEquals("the class annotation", "AnotherAntn", an[0][0].annotationType().getSimpleName());
     }
+    
+    /**
+     * HARMONY-5180 regression test.  
+     */
+    public void testMemberValue() throws Throwable {
+        Field f = test.getField("acme");
+        assertNotNull("field", f);
+        Annotation[] an = f.getAnnotations();
+        assertNotNull("annotations", an);
+        assertEquals("annotations num", 1, an.length);
+        assertEquals("the class annotation", AllTypesAntn.class, an[0].annotationType());
+        assertEquals("the class-member", anotherAntnClass, ((AllTypesAntn)an[0]).classValue());
+    }
+
 }

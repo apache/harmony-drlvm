@@ -166,7 +166,7 @@ JNIEXPORT jobject JNICALL Java_org_apache_harmony_vm_VMGenericsAndAnnotations_ge
         Class* antn_class = method->get_class();
         jthrowable error = NULL;
         // FIXME need to clarify against JSR-175 spec which exception should be raised
-        jobject jval = resolve_annotation_value(jenv, *value, antn_class, 
+        jobject jval = resolve_annotation_value(jenv, antn_class, *value, antn_class, 
             method->get_name(), &error);
         if (!jval && error) {
             assert(!exn_raised());
