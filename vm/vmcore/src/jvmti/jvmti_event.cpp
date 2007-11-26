@@ -471,29 +471,30 @@ void jvmti_send_vm_start_event(Global_Env *env, JNIEnv *jni_env)
     // Switch phase to VM_Start and sent VMStart event
     ti->nextPhase(JVMTI_PHASE_START);
 
-    if(!jvmti_should_report_event(JVMTI_EVENT_VM_START))
-        return;
-
-    // Send VM_Start TI events
-    TIEnv *ti_env = ti->getEnvironments();
-    TIEnv *next_env;
-    while (NULL != ti_env)
+    if(jvmti_should_report_event(JVMTI_EVENT_VM_START))
     {
-        next_env = ti_env->next;
-        if (ti_env->global_events[JVMTI_EVENT_VM_START - JVMTI_MIN_EVENT_TYPE_VAL])
+        // Send VM_Start TI events
+        TIEnv *ti_env = ti->getEnvironments();
+        TIEnv *next_env;
+        while (NULL != ti_env)
         {
-            jvmtiEventVMStart func = (jvmtiEventVMStart)ti_env->get_event_callback(JVMTI_EVENT_VM_START);
-            if (NULL != func)
+            next_env = ti_env->next;
+            if (ti_env->global_events[JVMTI_EVENT_VM_START - JVMTI_MIN_EVENT_TYPE_VAL])
             {
-                TRACE2("jvmti.event.vs", "Callback JVMTI_PHASE_START called");
-                func((jvmtiEnv*)ti_env, jni_env);
-                TRACE2("jvmti.event.vs", "Callback JVMTI_PHASE_START finished");
+                jvmtiEventVMStart func = (jvmtiEventVMStart)ti_env->get_event_callback(JVMTI_EVENT_VM_START);
+                if (NULL != func)
+                {
+                    TRACE2("jvmti.event.vs", "Callback JVMTI_PHASE_START called");
+                    func((jvmtiEnv*)ti_env, jni_env);
+                    TRACE2("jvmti.event.vs", "Callback JVMTI_PHASE_START finished");
+                }
             }
-        }
 
-        ti_env = next_env;
+            ti_env = next_env;
+        }
     }
-    // send notify events
+
+    // send pending notify events
     unsigned index;
     if(jvmti_should_report_event(JVMTI_EVENT_CLASS_LOAD)) {
         for( index = 0; index < env->TI->GetNumberPendingNotifyLoadClass(); index++ ) {
