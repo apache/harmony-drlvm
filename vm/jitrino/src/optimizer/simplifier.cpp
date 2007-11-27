@@ -4539,8 +4539,11 @@ Inst* Simplifier::simplifyJitHelperCall(JitHelperCallInst* inst) {
         case ClassGetFastCheckDepth:
             ch = getClassHandle(inst->getSrc(0));
             if (ch) {
-                assert(class_get_fast_instanceof_flag(ch));
-                res = genLdConstant((int32)class_get_depth(ch));
+                int depth = 0;
+                if (class_get_fast_instanceof_flag(ch)) {
+                    depth = (int32)class_get_depth(ch);
+                }
+                res = genLdConstant(depth);
             }
             break;
         default: break;
