@@ -28,8 +28,6 @@
 #include "Tree.h"
 #include "irmanager.h"
 
-#define PRAGMA_INLINE "org/vmmagic/pragma/Inline"
-
 namespace Jitrino {
 
 class MemoryManager;

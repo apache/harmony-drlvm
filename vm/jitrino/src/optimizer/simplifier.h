@@ -105,6 +105,9 @@ public:
                                          Opnd* tauTypesChecked,
                                          uint32 numArgs,
                                          Opnd** args);
+
+    Inst* simplifyJitHelperCall(JitHelperCallInst* inst);
+
     // loads
     Opnd* simplifyLdRef(Modifier mod, Type *dstType, 
                         uint32 token,
@@ -167,7 +170,7 @@ public:
 
     // tau operations
     Opnd* simplifyTauAnd(MultiSrcInst *tauAndInst);
-
+    
     Opnd* propagateCopy(Opnd*);
 
     static bool isNonNullObject(Opnd*);
@@ -490,7 +493,7 @@ public:
 
     Inst* caseIntrinsicCall(IntrinsicCallInst* inst) {return caseDefault(inst);}
 
-    Inst* caseJitHelperCall(JitHelperCallInst* inst) {return caseDefault(inst);}
+    Inst* caseJitHelperCall(JitHelperCallInst* inst) {return simplifyJitHelperCall(inst->asJitHelperCallInst());}
 
     Inst* caseVMHelperCall(VMHelperCallInst* inst) {return caseDefault(inst);}
 

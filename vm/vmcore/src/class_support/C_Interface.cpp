@@ -678,6 +678,12 @@ Boolean class_is_instanceof(Class_Handle s, Class_Handle t)
 
 
 
+unsigned class_get_array_element_size(Class_Handle ch) 
+{
+    assert(ch);
+    return ch->get_array_element_size();
+}
+
 Class_Handle class_get_array_element_class(Class_Handle cl)
 {
     assert(cl);

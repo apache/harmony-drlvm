@@ -277,7 +277,16 @@ enum JitHelperCallId {
     LockedCompareAndExchange,
     AddValueProfileValue,
     StringCompareTo,
-    StringRegionMatches
+    StringRegionMatches,
+    ClassIsArray,
+    ClassGetAllocationHandle,
+    ClassGetTypeSize,
+    ClassGetArrayElemSize,
+    ClassIsInterface,
+    ClassIsFinal,
+    ClassGetArrayClass,
+    ClassIsFinalizable,
+    ClassGetFastCheckDepth
 };
 
 enum Opcode {

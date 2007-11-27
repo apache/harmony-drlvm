@@ -103,22 +103,22 @@ SD2_OPT.useProfile=EDGE_PROF,VALUE_PROF
 -XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE=on
 -XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE_hotnessPercent=1
 
--XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_NEW_VECTOR_USING_VTABLE=on
+-XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_NEW_VECTOR_USING_VTABLE=off
 -XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_NEW_VECTOR_USING_VTABLE_hotnessPercent=1
 
--XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_MONITOR_ENTER_NON_NULL=on
+-XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_MONITOR_ENTER_NON_NULL=off
 -XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_MONITOR_ENTER_NON_NULL_hotnessPercent=1
 
--XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_MONITOR_EXIT_NON_NULL=on
+-XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_MONITOR_EXIT_NON_NULL=off
 -XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_MONITOR_EXIT_NON_NULL_hotnessPercent=1
 
--XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_GET_INTERFACE_VTABLE_VER0=on
+-XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_GET_INTERFACE_VTABLE_VER0=off
 -XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_GET_INTERFACE_VTABLE_VER0_hotnessPercent=1
 
--XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_CHECKCAST=on
+-XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_CHECKCAST=off
 -XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_CHECKCAST_hotnessPercent=1
 
--XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_INSTANCEOF=on
+-XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_INSTANCEOF=off
 -XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_INSTANCEOF_hotnessPercent=1
 
 -XX:jit.SD2_OPT.arg.codegen.dce1.early=yes

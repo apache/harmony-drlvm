@@ -26,13 +26,12 @@
 namespace Jitrino {
 
 bool VMMagicUtils::isVMMagicClass(const char* kname) {
-    static const char magicPackage[] = "org/vmmagic/unboxed/";
-    static const unsigned magicPackageLen = sizeof(magicPackage)-1;
+    static const unsigned magicPackageLen = sizeof(VMMAGIC_UNBOXED_PACKAGE_NAME)-1;
     bool res = false;
     if (*kname=='L') {
-        res = !strncmp(kname+1, magicPackage, magicPackageLen);
+        res = !strncmp(kname+1, VMMAGIC_UNBOXED_PACKAGE_NAME, magicPackageLen);
     } else {
-        res = !strncmp(kname, magicPackage, magicPackageLen);
+        res = !strncmp(kname, VMMAGIC_UNBOXED_PACKAGE_NAME, magicPackageLen);
     }
     return res;
 }

@@ -38,7 +38,7 @@ public class GCHelper {
 
 
     @Inline
-    public static Address alloc(int objSize, int allocationHandle) {
+    private static Address alloc(int objSize, int allocationHandle) {
         Address tlsAddr = VMHelper.getTlsBaseAddress();
 
         Address tlsFreeFieldAddr = tlsAddr.plus(TLS_CURRENT_OFFSET);
@@ -59,9 +59,19 @@ public class GCHelper {
     }
 
 
-    @Inline   
-    public static Address allocArray(int arrayLen, int elemSize, int allocationHandle) {
+    @Inline
+    public static Address alloc(Address classHandle) {
+        int objSize = VMHelper.getTypeSize(classHandle);
+        int allocationHandle = VMHelper.getAllocationHandle(classHandle);
+        return alloc(objSize, allocationHandle);
+    }
+
+    @Inline 
+    public static Address allocArray(Address elemClassHandle, int arrayLen) {
+        Address arrayClassHandle = VMHelper.getArrayClass(elemClassHandle);
+        int allocationHandle = VMHelper.getAllocationHandle(arrayClassHandle);
         if (arrayLen >= 0) {
+            int elemSize = VMHelper.getArrayElemSize(arrayClassHandle);
             int firstElementOffset = ARRAY_LEN_OFFSET + (elemSize==8?8:GC_ARRAY_MIN_FIRST_ELEM_FROM_LEN_OFFSET);
             int size = firstElementOffset + elemSize*arrayLen;
             size = (((size + (GC_OBJECT_ALIGNMENT - 1)) & (~(GC_OBJECT_ALIGNMENT - 1))));

@@ -44,10 +44,10 @@ typedef std::map<VM_RT_SUPPORT, JIT_RT_Function_Entry*> HelperInfoMap;
 static JIT_RT_Function_Entry _jit_rt_function_entries_base[] = {
     {VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE, "VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE",
             INTERRUPTIBLE_ALWAYS,              CALLING_CONVENTION_STDCALL,              2,
-            NULL,   NULL,   "(II)Lorg/vmmagic/unboxed/Address;",   NULL},
+            NULL,   NULL,   "(Lorg/vmmagic/unboxed/Address;)Lorg/vmmagic/unboxed/Address;",   NULL},
     {VM_RT_NEW_VECTOR_USING_VTABLE,            "VM_RT_NEW_VECTOR_USING_VTABLE",
             INTERRUPTIBLE_ALWAYS,              CALLING_CONVENTION_STDCALL,              2,
-            NULL,   NULL,   "(III)Lorg/vmmagic/unboxed/Address;",   NULL},
+            NULL,   NULL,   "(Lorg/vmmagic/unboxed/Address;I)Lorg/vmmagic/unboxed/Address;",   NULL},
     {VM_RT_MULTIANEWARRAY_RESOLVED,            "VM_RT_MULTIANEWARRAY_RESOLVED",
             INTERRUPTIBLE_ALWAYS,              CALLING_CONVENTION_CDECL,                8,
             NULL,   NULL,   NULL,   NULL},
@@ -113,12 +113,12 @@ static JIT_RT_Function_Entry _jit_rt_function_entries_base[] = {
     {VM_RT_CHECKCAST,                          "VM_RT_CHECKCAST",
             INTERRUPTIBLE_ALWAYS,              CALLING_CONVENTION_STDCALL,              2,
             "org/apache/harmony/drlvm/VMHelperFastPath",   "checkCast",
-            "(Ljava/lang/Object;Lorg/vmmagic/unboxed/Address;ZZZI)Ljava/lang/Object;",   NULL},
+            "(Lorg/vmmagic/unboxed/Address;Ljava/lang/Object;)Ljava/lang/Object;",   NULL},
 
     {VM_RT_INSTANCEOF,                         "VM_RT_INSTANCEOF",
             INTERRUPTIBLE_ALWAYS,              CALLING_CONVENTION_STDCALL,              2,
             "org/apache/harmony/drlvm/VMHelperFastPath",   "instanceOf",
-            "(Ljava/lang/Object;Lorg/vmmagic/unboxed/Address;ZZZI)Z",   NULL},
+            "(Lorg/vmmagic/unboxed/Address;Ljava/lang/Object;)Z",   NULL},
 
     {VM_RT_AASTORE,                            "VM_RT_AASTORE",
             INTERRUPTIBLE_ALWAYS,              CALLING_CONVENTION_STDCALL,              3,
@@ -131,7 +131,7 @@ static JIT_RT_Function_Entry _jit_rt_function_entries_base[] = {
     {VM_RT_GET_INTERFACE_VTABLE_VER0,          "VM_RT_GET_INTERFACE_VTABLE_VER0",
             INTERRUPTIBLE_ALWAYS,              CALLING_CONVENTION_STDCALL,              2,
             "org/apache/harmony/drlvm/VMHelperFastPath",   "getInterfaceVTable3",
-            "(Ljava/lang/Object;Lorg/vmmagic/unboxed/Address;)Lorg/vmmagic/unboxed/Address;",   NULL},
+            "(Lorg/vmmagic/unboxed/Address;Ljava/lang/Object;)Lorg/vmmagic/unboxed/Address;",   NULL},
 
     {VM_RT_INITIALIZE_CLASS,                   "VM_RT_INITIALIZE_CLASS",
             INTERRUPTIBLE_ALWAYS,              CALLING_CONVENTION_STDCALL,              1,

@@ -480,6 +480,22 @@ void JitHelperCallInst::handlePrintEscape(::std::ostream& os, char code) const {
         os << "StringCompareTo"; break;
     case StringRegionMatches:
         os << "StringRegionMatches"; break;
+    case ClassIsArray:
+        os << "ClassIsArray"; break;
+    case ClassGetAllocationHandle:
+        os << "ClassGetAllocationHandle"; break;
+    case ClassGetTypeSize:
+        os << "ClassGetTypeSize"; break;
+    case ClassGetArrayElemSize:
+        os << "ClassGetArrayElemSize"; break;
+    case ClassIsInterface:
+        os << "ClassIsInterface"; break;
+    case ClassIsFinal:
+        os << "ClassIsFinal"; break;
+    case ClassGetArrayClass:
+        os << "ClassGetArrayClass"; break;
+    case ClassGetFastCheckDepth:
+        os << "ClassGetFastCheckDepth"; break;
     default:
         assert(0); break;
         }
@@ -836,6 +852,13 @@ InstFactory::makeClone(ConstInst* inst,
     case Type::Double:
         newInst = makeConstInst(table.duplicate(opndManager, inst->getDst()),
                                 inst->getValue().d);
+        break;
+    case Type::UnmanagedPtr:
+        {
+            ConstInst::ConstValue v;
+            v.i8 = inst->getValue().i8;
+            newInst = makeConstInst(table.duplicate(opndManager, inst->getDst()), v);
+        }
         break;
     case Type::NullObject:
         newInst = makeConstInst(table.duplicate(opndManager, inst->getDst()));

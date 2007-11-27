@@ -35,6 +35,7 @@
 #include "StaticProfiler.h"
 #include "optimizer.h"
 #include "deadcodeeliminator.h"
+#include "VMMagic.h"
 
 namespace Jitrino {
 
@@ -154,7 +155,7 @@ Inliner::Inliner(SessionAction* argSource, MemoryManager& mm, IRManager& irm,
 
     _usesOptimisticBalancedSync = argSource->getBoolArg("sync_optimistic", false) ? argSource->getBoolArg("sync_optcatch", true) : false;
     
-    inlinePragma = irm.getCompilationInterface().resolveClassUsingBootstrapClassloader(PRAGMA_INLINE);
+    inlinePragma = irm.getCompilationInterface().resolveClassUsingBootstrapClassloader(PRAGMA_INLINE_TYPE_NAME);
 }
 
 int32 
@@ -865,8 +866,12 @@ Inliner::inlineRegion(InlineNode* inlineNode) {
         callNode->appendInst(_instFactory.makePseudoThrow());
         isPseudoThrowInserted = true;
     } else {
-        // Inlined graph has exception path so just remove original edge.
-        parentCFG.removeEdge(callNode->getExceptionEdge());
+        // Inlined graph has exception path -> remove original edge.
+        Edge* exceptionEdge = callNode->getExceptionEdge(); 
+        //exception edge can be NULL because the call inserted instead of the HIR inst is artificial
+        if (exceptionEdge) {
+            parentCFG.removeEdge(exceptionEdge);
+        }
     }
     callInst->unlink();
 }

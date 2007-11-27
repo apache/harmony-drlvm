@@ -4466,4 +4466,86 @@ SimplifierWithInstFactory::genThrowSystemException(CompilationInterface::SystemE
     insertInst(inst);
 }
 
+
+static Class_Handle getClassHandle(Opnd* opnd) {
+    //class handle can be: unmanaged ptr (from magics) or pointer_size_int const (int32 or int64) if loaded as a const
+    //assert(opnd->getType()->isUnmanagedPtr() || opnd->getType()->isInt4() || opnd->getType()->isInt8());
+    assert(opnd->getType()->isUnmanagedPtr());
+    Inst* inst = opnd->getInst();
+    Class_Handle ch = NULL;
+    if (inst->asConstInst() != NULL) {
+        ch = (Class_Handle)(POINTER_SIZE_INT)inst->asConstInst()->getValue().i8;
+    }
+    return ch;
+}
+
+Inst* Simplifier::simplifyJitHelperCall(JitHelperCallInst* inst) {
+    Inst* res = inst;
+    Class_Handle ch = NULL;
+    TypeManager& tm = irManager.getTypeManager();
+    switch(inst->getJitHelperId()) {
+        case ClassIsArray:
+            ch = getClassHandle(inst->getSrc(0));
+            if (ch) {
+                res = genLdConstant((int32)class_is_array(ch));
+            }
+            break;
+        case ClassGetAllocationHandle:
+            ch = getClassHandle(inst->getSrc(0));
+            if (ch) {
+                ConstInst::ConstValue v;
+                v.i8 = (POINTER_SIZE_SINT)class_get_allocation_handle(ch);
+                res = genLdConstant(tm.getUnmanagedPtrType(tm.getInt8Type()), v);
+            }
+            break;
+        case ClassGetTypeSize:
+            ch = getClassHandle(inst->getSrc(0));
+            if (ch) {
+                res = genLdConstant((int32)class_get_boxed_data_size(ch));
+            }
+            break;
+        case ClassGetArrayElemSize:
+            ch = getClassHandle(inst->getSrc(0));
+            if (ch) {
+                res = genLdConstant((int32)class_get_array_element_size(ch));
+            }
+            break;
+        case ClassIsInterface:
+            ch = getClassHandle(inst->getSrc(0));
+            if (ch) {
+                res = genLdConstant((int32)class_property_is_interface2(ch));
+            }
+            break;
+        case ClassIsFinal:
+            ch = getClassHandle(inst->getSrc(0));
+            if (ch) {
+                res = genLdConstant((int32)class_property_is_final(ch));
+            }
+            break;
+        case ClassGetArrayClass:
+            ch = getClassHandle(inst->getSrc(0));
+            if (ch) {
+                ConstInst::ConstValue v;
+                v.i8 = (POINTER_SIZE_SINT)class_get_array_of_class(ch);
+                res = genLdConstant(tm.getUnmanagedPtrType(tm.getInt8Type()), v);
+            }
+            break;
+        case ClassIsFinalizable:
+            ch = getClassHandle(inst->getSrc(0));
+            if (ch) {
+                res = genLdConstant((int32)class_is_finalizable(ch));
+            }
+            break;
+        case ClassGetFastCheckDepth:
+            ch = getClassHandle(inst->getSrc(0));
+            if (ch) {
+                assert(class_get_fast_instanceof_flag(ch));
+                res = genLdConstant((int32)class_get_depth(ch));
+            }
+            break;
+        default: break;
+    }
+    return res;
+}
+
 } //namespace Jitrino 

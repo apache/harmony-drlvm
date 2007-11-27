@@ -24,6 +24,12 @@
 #define _VMMAGIC_JITRINO_H_
 namespace Jitrino {
 
+#define VMHELPER_PACKAGE_NAME           "org/apache/harmony/drlvm/"
+#define VMMAGIC_UNBOXED_PACKAGE_NAME    "org/vmmagic/unboxed/"
+
+#define VMHELPER_TYPE_NAME              "org/apache/harmony/drlvm/VMHelper"
+#define PRAGMA_INLINE_TYPE_NAME         "org/vmmagic/pragma/Inline"
+
 class VMMagicUtils {
 public:
     // checks of class nams is vmmagic class

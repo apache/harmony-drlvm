@@ -668,6 +668,15 @@ MemoryOptInitWalker::applyToInst(Inst *i)
             case AddValueProfileValue:
             case StringCompareTo:
             case StringRegionMatches:
+            case ClassIsArray:
+            case ClassGetAllocationHandle:
+            case ClassGetTypeSize:
+            case ClassGetArrayElemSize:
+            case ClassIsInterface:
+            case ClassIsFinal:
+            case ClassGetArrayClass:
+            case ClassIsFinalizable:
+            case ClassGetFastCheckDepth:
                 break;
             default:
                 assert(0);

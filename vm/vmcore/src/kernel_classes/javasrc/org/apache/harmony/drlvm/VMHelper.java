@@ -31,11 +31,25 @@ import org.vmmagic.unboxed.Address;
 */
 public class VMHelper {
 
-    private VMHelper() {}
-    
+ 
+
+    //public constants
+
+    public static final int POINTER_TYPE_SIZE          = getPointerTypeSize();
+
+    public static final boolean COMPRESSED_REFS_MODE   = isCompressedRefsMode();
+
+    public static final boolean COMPRESSED_VTABLE_MODE = isCompressedVTableMode();
+
+    public static final long COMPRESSED_VTABLE_BASE_OFFSET    = getCompressedModeVTableBaseOffset();
+
+    public static final long COMPRESSED_REFS_OBJ_BASE_OFFSET  = getCompressedModeObjectBaseOffset();
 
 
-    public static Address getTlsBaseAddress() {fail(); return null;}
+
+
+
+    //Slow path versions of helpers
 
     //TODO: allocation handle is int only on 32bit OS or (64bit OS && compressed mode)
     public static Address newResolvedUsingAllocHandleAndSize(int objSize, int allocationHandle) {fail(); return null;}
@@ -55,14 +69,38 @@ public class VMHelper {
  
     public static boolean instanceOf(Object obj, Address castTypePtr) {fail(); return false;}
 
+
+
+    //utility magics supported by JIT
+
+    public static Address getTlsBaseAddress() {fail(); return null;}
+
+    public static boolean isArray(Address classHandle) {VMHelper.fail(); return false;}
+
+    public static boolean isInterface(Address classHandle) {VMHelper.fail(); return false;}
+
+    public static boolean isFinal(Address classHandle) {VMHelper.fail(); return false;}
+
+    public static Address getArrayClass(Address elemClassHandle)  {VMHelper.fail(); return null;}
+
+    public static int getAllocationHandle(Address classHandle) {VMHelper.fail(); return 0;}
+
+    public static int getTypeSize(Address classHandle) {VMHelper.fail(); return 0;}
+
+    public static int getArrayElemSize(Address arrayClassHandle) {VMHelper.fail(); return 0;}
+
+    public static int getFastTypeCheckDepth(Address classHandle) {VMHelper.fail(); return 0;}
+
+
+
     protected static void fail() {throw new RuntimeException("Not supported!");}
 
 
-    public static final int POINTER_TYPE_SIZE          = getPointerTypeSize();
-    public static final boolean COMPRESSED_REFS_MODE   = isCompressedRefsMode();
-    public static final boolean COMPRESSED_VTABLE_MODE = isCompressedVTableMode();
-    public static final long COMPRESSED_VTABLE_BASE_OFFSET    = getCompressedModeVTableBaseOffset();
-    public static final long COMPRESSED_REFS_OBJ_BASE_OFFSET  = getCompressedModeObjectBaseOffset();
+
+
+    // private area
+
+    private VMHelper() {}
 
     /** @return pointer-type size. 4 or 8 */
     private static native int getPointerTypeSize();

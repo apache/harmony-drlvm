@@ -55,7 +55,7 @@ public class VMHelperFastPath {
 //TODO: refactor code to use getVtableIntfTableOffset method (+ avoid extra comparisons while refactoring)
 
     @Inline
-    public static Address getInterfaceVTable3(Object obj, Address intfType)  {
+    public static Address getInterfaceVTable3(Address intfType, Object obj)  {
         Address vtableAddr = getVTableAddress(obj);
 
         Address inf0Type = vtableAddr.loadAddress(Offset.fromIntZeroExtend(CLASS_INF_TYPE_0_OFFSET));
@@ -77,7 +77,7 @@ public class VMHelperFastPath {
     }
 
     @Inline
-    public static Address getInterfaceVTable2(Object obj, Address intfType)  {
+    public static Address getInterfaceVTable2(Address intfType, Object obj)  {
         Address vtableAddr = getVTableAddress(obj);
 
         Address inf0Type = vtableAddr.loadAddress(Offset.fromIntZeroExtend(CLASS_INF_TYPE_0_OFFSET));
@@ -95,7 +95,7 @@ public class VMHelperFastPath {
     }
 
     @Inline
-    public static Address getInterfaceVTable1(Object obj, Address intfType)  {
+    public static Address getInterfaceVTable1(Address intfType, Object obj)  {
         Address vtableAddr = getVTableAddress(obj);
 
         Address inf0Type = vtableAddr.loadAddress(Offset.fromIntZeroExtend(CLASS_INF_TYPE_0_OFFSET));
@@ -108,11 +108,11 @@ public class VMHelperFastPath {
     }
 
     @Inline
-    public static boolean instanceOf(Object obj, Address castType, boolean isArray, boolean isInterface, boolean isFinalTypeCast, int fastCheckDepth) {
+    public static boolean instanceOf(Address castType, Object obj) {
         if (obj == null) {
             return false;
         }
-        if (isInterface) {
+        if (VMHelper.isInterface(castType)) {
             Address vtableAddr = getVTableAddress(obj);
 
             Address inf0Type = vtableAddr.loadAddress(Offset.fromIntZeroExtend(CLASS_INF_TYPE_0_OFFSET));
@@ -124,19 +124,22 @@ public class VMHelperFastPath {
             if (inf1Type.EQ(castType)) {
                 return true;
             }
-        } else if (!isArray && fastCheckDepth!=0) {
-            return fastClassInstanceOf(obj, castType, isFinalTypeCast, fastCheckDepth);
+        } else if (!VMHelper.isArray(castType)) {
+            int fastCheckDepth=VMHelper.getFastTypeCheckDepth(castType);
+            if (fastCheckDepth!=0)  {
+                return fastClassInstanceOf(obj, castType, fastCheckDepth);
+            }
         } 
         return VMHelper.instanceOf(obj, castType);
         
     }
 
     @Inline
-    public static Object checkCast(Object obj, Address castType, boolean isArray, boolean isInterface, boolean isFinalTypeCast, int fastCheckDepth) {
+    public static Object checkCast(Address castType, Object obj) {
         if (obj == null) {
             return obj;
         }
-        if (isInterface) {
+        if (VMHelper.isInterface(castType)) {
             Address vtableAddr = getVTableAddress(obj);
 
             Address inf0Type = vtableAddr.loadAddress(Offset.fromIntZeroExtend(CLASS_INF_TYPE_0_OFFSET));
@@ -148,21 +151,24 @@ public class VMHelperFastPath {
             if (inf1Type.EQ(castType)) {
                 return obj;
             }
-        } else if (!isArray && fastCheckDepth!=0 && fastClassInstanceOf(obj, castType, isFinalTypeCast, fastCheckDepth)) {
-            return obj;
+        } else if (!VMHelper.isArray(castType)) {
+            int fastCheckDepth=VMHelper.getFastTypeCheckDepth(castType);
+            if (fastCheckDepth!=0 && fastClassInstanceOf(obj, castType, fastCheckDepth)) {
+                return obj;
+            }
         } 
         return VMHelper.checkCast(obj, castType);
     }
 
     @Inline
-    public static boolean fastClassInstanceOf(Object obj, Address castType, boolean isFinalTypeCast, int fastCheckDepth) {
+    public static boolean fastClassInstanceOf(Object obj, Address castType, int fastCheckDepth) {
         Address objVtableAddr = getVTableAddress(obj);
         Address objClassType  = objVtableAddr.loadAddress(Offset.fromIntZeroExtend(VTABLE_CLASS_OFFSET));
 
         if (objClassType.EQ(castType)) {
             return true;
         }
-        if (isFinalTypeCast) {
+        if (VMHelper.isFinal(castType)) {
             return false;
         }
        

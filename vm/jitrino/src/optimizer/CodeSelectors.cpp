@@ -403,16 +403,18 @@ IntrinsicCallOp::Id _BlockCodeSelector::convertIntrinsicId(IntrinsicCallId callI
 
 JitHelperCallOp::Id _BlockCodeSelector::convertJitHelperId(JitHelperCallId callId) {
     switch(callId) {
-    case InitializeArray:           return JitHelperCallOp::InitializeArray;
-    case SaveThisState:             return JitHelperCallOp::SaveThisState;
-    case ReadThisState:             return JitHelperCallOp::ReadThisState;
-    case LockedCompareAndExchange:  return JitHelperCallOp::LockedCompareAndExchange;
-    case AddValueProfileValue:      return JitHelperCallOp::AddValueProfileValue;
-    case FillArrayWithConst:        return JitHelperCallOp::FillArrayWithConst;
-    case StringCompareTo:           return JitHelperCallOp::StringCompareTo;
-    case StringRegionMatches:       return JitHelperCallOp::StringRegionMatches;
+        case InitializeArray:           return JitHelperCallOp::InitializeArray;
+        case SaveThisState:             return JitHelperCallOp::SaveThisState;
+        case ReadThisState:             return JitHelperCallOp::ReadThisState;
+        case LockedCompareAndExchange:  return JitHelperCallOp::LockedCompareAndExchange;
+        case AddValueProfileValue:      return JitHelperCallOp::AddValueProfileValue;
+        case FillArrayWithConst:        return JitHelperCallOp::FillArrayWithConst;
+        case StringCompareTo:           return JitHelperCallOp::StringCompareTo;
+        case StringRegionMatches:       return JitHelperCallOp::StringRegionMatches;
+        default: break;
     }
-    assert(0);
+    crash("\n JIT helper in not supported in LIR : %d\n", callId);
+
     return JitHelperCallOp::InitializeArray; // to keep compiler quiet
 }
     

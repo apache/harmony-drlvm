@@ -325,6 +325,13 @@ VMEXPORT Boolean class_get_fast_instanceof_flag(Class_Handle cl);
  */
  VMEXPORT unsigned class_get_unboxed_data_offset(Class_Handle ch);
 
+
+ /**
+ * @return The size of array element for the given array class
+ */
+ VMEXPORT unsigned class_get_array_element_size(Class_Handle ch);
+
+
 /**
  * @return The class of the array element of the given class.
  *

@@ -92,9 +92,7 @@ static bool isVMHelperClass(const char* name) {
 #ifdef _IPF_
     return false;//natives are not tested on IPF.
 #else
-    static const char vmhelperPackage[] = "org/apache/harmony/drlvm/VMHelper";
-    
-    bool res =  !strcmp(name, vmhelperPackage);
+    bool res =  !strcmp(name, VMHELPER_TYPE_NAME);
     return res;
 #endif
 }
@@ -1536,10 +1534,13 @@ JavaByteCodeTranslator::invokevirtual(uint32 constPoolIndex) {
     Opnd** srcOpnds = popArgs(numArgs);
     Type* returnType = methodDesc->getReturnType();
 
-    if (VMMagicUtils::isVMMagicClass(methodDesc->getParentType()->getName())) {
-        genVMMagic(methodDesc->getName(), numArgs, srcOpnds, returnType);
+    const char* className = methodDesc->getParentType()->getName();
+    if (VMMagicUtils::isVMMagicClass(className)) {
+        UNUSED bool res = genVMMagic(methodDesc->getName(), numArgs, srcOpnds, returnType);
+        assert(res);
         return;
     }
+
     // callvirt can throw a null pointer exception
     Opnd *tauNullChecked = irBuilder.genTauCheckNull(srcOpnds[0]);
     Opnd* thisOpnd = srcOpnds[0];
@@ -2321,7 +2322,7 @@ JavaByteCodeTranslator::genInvokeStatic(MethodDesc * methodDesc,
         return;
     } else if (isVMHelperClass(kname) && !methodDesc->isNative()) {
         UNUSED bool res = genVMHelper(mname, numArgs, srcOpnds, returnType);
-        assert(res);
+            assert(res);
         return;
     }
     Opnd *tauNullChecked = irBuilder.genTauSafe(); // always safe, is a static method call
@@ -3534,9 +3535,10 @@ bool JavaByteCodeTranslator::genVMMagic(const char* mname, uint32 numArgs, Opnd 
     return false;
 }
 
-
 bool JavaByteCodeTranslator::genVMHelper(const char* mname, uint32 numArgs, Opnd **srcOpnds, Type *returnType) {
     Type* resType = VMMagicUtils::isVMMagicClass(returnType->getName()) ? convertVMMagicType2HIR(typeManager, returnType) : returnType;
+
+//VMHelper methods
 
     if (!strcmp(mname,"getTlsBaseAddress")) {
         assert(numArgs == 0);
@@ -3594,6 +3596,72 @@ bool JavaByteCodeTranslator::genVMHelper(const char* mname, uint32 numArgs, Opnd
     if (!strcmp(mname,"instanceOf")) {
         assert(numArgs == 2);
         Opnd* res = irBuilder.genVMHelperCall(VM_RT_INSTANCEOF, resType, numArgs, srcOpnds);
+        pushOpnd(res);
+        return true;
+    }
+
+
+    //no VMHelpers exist for these magics -> use internal JIT helpers
+
+    if (!strcmp(mname,"isArray")) {
+        assert(numArgs == 1 && srcOpnds[0]->getType()->isUnmanagedPtr());
+        Opnd* res = irBuilder.genJitHelperCall(ClassIsArray, resType, numArgs, srcOpnds);
+        pushOpnd(res);
+        return true;
+    }
+
+    if (!strcmp(mname,"getAllocationHandle")) {
+        assert(numArgs == 1 && srcOpnds[0]->getType()->isUnmanagedPtr());
+        Opnd* res = irBuilder.genJitHelperCall(ClassGetAllocationHandle, resType, numArgs, srcOpnds);
+        pushOpnd(res);
+        return true;
+    }
+
+    if (!strcmp(mname,"getTypeSize")) {
+        assert(numArgs == 1 && srcOpnds[0]->getType()->isUnmanagedPtr());
+        Opnd* res = irBuilder.genJitHelperCall(ClassGetTypeSize, resType, numArgs, srcOpnds);
+        pushOpnd(res);
+        return true;
+    }
+
+    if (!strcmp(mname,"getArrayElemSize")) {
+        assert(numArgs == 1 && srcOpnds[0]->getType()->isUnmanagedPtr());
+        Opnd* res = irBuilder.genJitHelperCall(ClassGetArrayElemSize, resType, numArgs, srcOpnds);
+        pushOpnd(res);
+        return true;
+    }
+
+    if (!strcmp(mname,"isInterface")) {
+        assert(numArgs == 1 && srcOpnds[0]->getType()->isUnmanagedPtr());
+        Opnd* res = irBuilder.genJitHelperCall(ClassIsInterface, resType, numArgs, srcOpnds);
+        pushOpnd(res);
+        return true;
+    }
+
+    if (!strcmp(mname,"isFinal")) {
+        assert(numArgs == 1 && srcOpnds[0]->getType()->isUnmanagedPtr());
+        Opnd* res = irBuilder.genJitHelperCall(ClassIsFinal, resType, numArgs, srcOpnds);
+        pushOpnd(res);
+        return true;
+    }
+
+    if (!strcmp(mname,"getArrayClass")) {
+        assert(numArgs == 1 && srcOpnds[0]->getType()->isUnmanagedPtr());
+        Opnd* res = irBuilder.genJitHelperCall(ClassGetArrayClass, resType, numArgs, srcOpnds);
+        pushOpnd(res);
+        return true;
+    }
+
+    if (!strcmp(mname,"isFinalizable")) {
+        assert(numArgs == 1 && srcOpnds[0]->getType()->isUnmanagedPtr());
+        Opnd* res = irBuilder.genJitHelperCall(ClassIsFinalizable, resType, numArgs, srcOpnds);
+        pushOpnd(res);
+        return true;
+    }
+
+    if (!strcmp(mname,"getFastTypeCheckDepth")) {
+        assert(numArgs == 1 && srcOpnds[0]->getType()->isUnmanagedPtr());
+        Opnd* res = irBuilder.genJitHelperCall(ClassGetFastCheckDepth, resType, numArgs, srcOpnds);
         pushOpnd(res);
         return true;
     }
