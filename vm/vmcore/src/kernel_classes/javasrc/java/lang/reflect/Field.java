@@ -403,9 +403,7 @@ public final class Field extends AccessibleObject implements Member {
     private Object checkSet(Class callerClass, Object obj)
         throws IllegalArgumentException, IllegalAccessException {
         obj = checkObject(getDeclaringClass(), getModifiers(), obj);
-        if (Modifier.isFinal(getModifiers())) {
-            // TODO perform this check for 1.5.0
-            // && !(isAccessible && obj != null)) {
+        if (Modifier.isFinal(getModifiers()) && !(isAccessible && obj != null)) {
             throw new IllegalAccessException(
                 "Can not assign new value to the field with final modifier");
         }

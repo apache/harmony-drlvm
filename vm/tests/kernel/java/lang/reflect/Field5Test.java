@@ -158,4 +158,51 @@ public class Field5Test extends AnnotatedElementTestFrame {
                 + " java.lang.reflect.AnnotatedField.buz",
                 s);
     }
+    
+    
+    public final int INSTANCE_I = 10;
+    
+    /**
+     * Regression test for HARMONY-4927
+     */    
+    public void testAccessFinalInstance() throws Throwable {
+        Field fi = this.getClass().getField("INSTANCE_I");
+        final Object oldVal = fi.get(this);
+        final Object newVal = new Integer(2134523);
+        
+        try {
+            fi.set(this, newVal);
+            fail("Should not modify final field");
+        } catch (IllegalAccessException expected) {
+            assertEquals(oldVal, fi.get(this));
+        }
+        
+        fi.setAccessible(true);
+        fi.set(this, newVal);        
+        assertEquals(newVal, fi.get(this));
+    }
+    
+    public static final int STATIC_I = 10;
+    
+    public void testAccessFinalStatic() throws Throwable {
+        Field fi = this.getClass().getField("STATIC_I");
+        final Object oldVal = fi.get(null);
+        final Object newVal = new Integer(2134523);
+        
+        try {
+            fi.set(null, newVal);
+            fail("Should not modify final field");
+        } catch (IllegalAccessException expected) {
+            assertEquals(oldVal, fi.get(null));
+        }
+        
+        try {
+            fi.setAccessible(true);
+            fi.set(this, newVal);        
+            fail("Should not modify final field");
+        } catch (IllegalAccessException expected) {
+            assertEquals(oldVal, fi.get(null));
+        }
+    }
+
 }
