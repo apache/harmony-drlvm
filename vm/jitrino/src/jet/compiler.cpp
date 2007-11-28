@@ -483,6 +483,7 @@ JIT_Result Compiler::compile(Compile_Handle ch, Method_Handle method,
                                                      CodeBlockHeatDefault,
                                                      0, CAA_Allocate);
         m_infoBlock.set_code_start(m_vmCode);
+        m_infoBlock.set_code_len(total_code_size);
     }
     //
     // Copy and reposition code from m_codeStream into the allocated buf.

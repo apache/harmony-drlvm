@@ -397,7 +397,13 @@ void rt_fix_handler_context(JIT_Handle jit, Method_Handle method,
     
     void *** pip = (void***)((char*)context + ip_off);
     char * where = (char*)**pip;
+#ifdef _DEBUG
     char * meth_start = infoBlock.get_code_start();
+    unsigned meth_len = infoBlock.get_code_len();
+    assert(meth_start <= where);
+    assert(where < meth_start + meth_len);
+#endif
+
     unsigned whereLen = (unsigned)(where - meth_start);
     if (whereLen<infoBlock.get_warmup_len()) {
         return;
@@ -497,7 +503,16 @@ void rt_native2bc(JIT_Handle jit, Method_Handle method, const void * ip,
 {
     char * pinfo = (char*)method_get_info_block_jit(method, jit);
     assert(MethodInfoBlock::is_valid_data(pinfo));
+
     MethodInfoBlock rtinfo(pinfo);
+#ifdef _DEBUG
+    char * where = (char*)ip;
+    char * meth_start = rtinfo.get_code_start();
+    unsigned meth_len = rtinfo.get_code_len();
+    assert(meth_start <= where);
+    assert(where < meth_start + meth_len);
+#endif
+
     *pbc_pc = (unsigned short)rtinfo.get_pc((char*)ip);
 
     if (rtinfo.get_flags() & DBG_TRACE_RT) {

@@ -33,9 +33,9 @@
 #include "encoder.h"
 
 #ifdef _WIN64
-const unsigned m2n_sizeof_m2n_frame = 112;
+const unsigned m2n_sizeof_m2n_frame = 120;
 #else
-const unsigned m2n_sizeof_m2n_frame = 96;
+const unsigned m2n_sizeof_m2n_frame = 104;
 #endif
 
 typedef struct M2nFrame M2nFrame;
@@ -59,6 +59,7 @@ struct M2nFrame {
     ObjectHandles *      local_object_handles;
     Method_Handle        method;
     frame_type           current_frame_type;
+    Registers*           pop_regs; // This is only for M2nFrames for suspended managed code (as against ones that call stubs and prepare jvmtiPopFrame)
     uint64               rbx;
     uint64               rbp;
 #ifdef _WIN64

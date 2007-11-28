@@ -98,6 +98,10 @@ unsigned MethodInfoBlock::get_pc(const char * ip) const
     int r = max_idx;
     int m = 0;
     const char * val = NULL;
+
+    assert(rt_header->code_start <= ip);
+    assert(ip < rt_header->code_start + rt_header->m_code_len);
+
     //
     // Step 1.
     // Find first element which is above or equal to the given IP.

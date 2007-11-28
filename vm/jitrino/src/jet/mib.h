@@ -274,6 +274,22 @@ public:
         return rt_header->code_start;
     }
 
+    /**
+     * @brief Sets size of native code, in bytes.
+     */
+    void set_code_len(unsigned len)
+    {
+        rt_header->m_code_len = len;
+    }
+    
+    /**
+     * @brief Returns size of native code, in bytes.
+     */
+    unsigned get_code_len(void)
+    {
+        return rt_header->m_code_len;
+    }
+
     void set_compile_params(const OpenMethodExecutionParams& compileParams)
     {
         rt_header->compileParams = compileParams;

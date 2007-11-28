@@ -273,7 +273,7 @@ char * m2n_gen_set_local_handles_imm(char * buf, unsigned bytes_to_m2n, const Im
 
 unsigned m2n_push_m2n_size(unsigned num_callee_saves,
                            unsigned num_std_need_to_save) {
-    return 82 - (5 * num_callee_saves) +
+    return 91 - (5 * num_callee_saves) +
             m2n_ts_to_register_size(num_std_need_to_save, 0);
 }
 
@@ -296,6 +296,10 @@ char * m2n_gen_push_m2n(char * buf, Method_Handle method,
             LcgEM64TContext::get_reg_from_map(LcgEM64TContext::GR_LOCALS_OFFSET + i),
             size_64);        
     }
+    // init pop_regs to null
+    bytes_to_m2n_top -= LcgEM64TContext::GR_SIZE;
+    buf = mov(buf, M_Base_Opnd(rsp_reg, bytes_to_m2n_top),
+        Imm_Opnd(size_32, 0), size_64);
     // store current_frame_type
     bytes_to_m2n_top -= LcgEM64TContext::GR_SIZE;
     assert(fit32(current_frame_type));
@@ -406,8 +410,8 @@ char * m2n_gen_pop_m2n(char * buf, bool handles, unsigned num_callee_saves,
     buf = mov(buf, r11_opnd, M_Base_Opnd(rsp_reg, bytes_to_m2n_bottom), size_64);
     bytes_to_m2n_bottom += LcgEM64TContext::GR_SIZE;
     buf = mov(buf, M_Base_Opnd(r11_reg, 0), r10_opnd, size_64);
-    // skip local_object_handles, method, current_frame_type
-    bytes_to_m2n_bottom += 3 * LcgEM64TContext::GR_SIZE;
+    // skip local_object_handles, method, current_frame_type, pop_regs
+    bytes_to_m2n_bottom += 4 * LcgEM64TContext::GR_SIZE;
 
     // restore part of callee-saves registers
     for (int i = LcgEM64TContext::MAX_GR_LOCALS - 1; i >= (int)num_callee_saves; i--) {
@@ -423,12 +427,11 @@ char * m2n_gen_pop_m2n(char * buf, bool handles, unsigned num_callee_saves,
 
 // returns pointer to the registers used for jvmti PopFrame
 Registers* get_pop_frame_registers(M2nFrame* m2nf) {
-    // Empty implementation
-    return NULL;
+    return m2nf->pop_regs;
 }
 
 // sets pointer to the registers used for jvmti PopFrame
 void set_pop_frame_registers(M2nFrame* m2nf, Registers* regs) {
-    // Empty implementation
+    m2nf->pop_regs = regs;
 }
 

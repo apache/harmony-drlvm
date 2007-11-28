@@ -56,10 +56,10 @@ void compile_protect_arguments(Method_Handle method, GcFrame * gc) {
     uint64 * const m2n_base_addr = (uint64 *)m2n_get_frame_base(m2n_get_last_frame());
      // 6(scratched registers on the stack)
     assert(m2n_get_size() % 8 == 0);
-    // 15 = 1(alignment) + n(fp) + n(gp) registers were preserved on the stack
+    // 14 = 0(alignment) + n(fp) + n(gp) registers were preserved on the stack
     uint64 * const inputs_addr = m2n_base_addr
             - (m2n_get_size() / 8) + 2
-            - 1 - MAX_GR - MAX_FR;
+            - MAX_GR - MAX_FR;
      // 1(return ip);
 #ifdef _WIN64
     // WIN64, reserve 4 words of shadow space
@@ -172,7 +172,7 @@ char * gen_convert_managed_to_unmanaged_null_em64t(char * ss,
 //    method handle
 
 // Stack size should be (% 8 == 0) but shouldn't be (% 16 == 0)
-const int ALIGNMENT = 8;
+const int ALIGNMENT = 0;
 
 const int32 gr_stack_size = (1 + MAX_GR)*GR_STACK_SIZE
         + SHADOW;

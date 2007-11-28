@@ -138,21 +138,7 @@ void jvmti_jit_do_pop_frame(){
     assert(0);
 }
 
-#elif defined _EM64T_
-
-void jvmti_jit_prepare_pop_frame(){
-    assert(0);
-}
-
-void jvmti_jit_complete_pop_frame(){
-    assert(0);
-}
-
-void jvmti_jit_do_pop_frame(){
-    assert(0);
-}
-
-#else // _IA32_
+#else // _IA32_ & _EM64T_
 
 // requires stack iterator and buffer to save intermediate information
 static void jvmti_jit_prepare_pop_frame(StackIterator* si, uint32* buf) {
@@ -191,57 +177,27 @@ static void jvmti_jit_prepare_pop_frame(StackIterator* si, uint32* buf) {
 
     // find correct ip and restore required registers context
     NativeCodePtr current_method_addr = NULL;
+    cci = si_get_code_chunk_info(si);
+    method = cci->get_method();
     NativeCodePtr ip = si_get_ip(si);
+    JIT *jit = cci->get_jit();
+
     TRACE(("PopFrame method %s.%s%s, set IP begin: %p",
         class_get_name(method_get_class(si_get_code_chunk_info(si)->get_method())),
         method_get_name(si_get_code_chunk_info(si)->get_method()),
         method_get_descriptor(si_get_code_chunk_info(si)->get_method()), ip ));
-    size_t ip_reduce;
 
-    // invoke static
-    if (is_method_static) {
-        ip_reduce = 6;
+    uint16 bcOffset;
+    NativeCodePtr bcip;
+    jit->fix_handler_context(method, si_get_jit_context(si));
+    jit->get_bc_location_for_native(method, (NativeCodePtr)((POINTER_SIZE_INT)ip - 1), &bcOffset);
+    jit->get_native_location_for_bc(method, bcOffset, &bcip);
+    si_set_ip(si, bcip, false);
 
-    // invoke interface
-    } else if (0xd0ff == (*((unsigned short*)(((char*)ip)-2)))) {
-        ip_reduce = 2;
-        current_method_addr = cci->get_code_block_addr();
-        *buf = (uint32)current_method_addr;
-        jitContext->p_eax = buf;
-
-    // invoke virtual and special
-    } else {
-        VTable_Handle vtable = class_get_vtable( method_class);
-        *buf = (uint32) vtable;
-        unsigned short code = (*((unsigned short*)(((char*)ip)-3)));
-
-        // invoke virtual
-        if (0x50ff == code) {
-            jitContext->p_eax = buf;
-            ip_reduce = 3;
-        } else if (0x51ff == code) {
-            jitContext->p_ecx = buf;
-            ip_reduce = 3;
-        } else if (0x52ff == code) {
-            jitContext->p_edx = buf;
-            ip_reduce = 3;
-        } else if (0x53ff == code) {
-            jitContext->p_ebx = buf;
-            ip_reduce = 3;
-
-        // invoke special
-        } else{
-            ip_reduce = 6;
-        }
-    }
-
-    // set correct ip
-    ip = (NativeCodePtr)(((char*)ip) - ip_reduce);
     TRACE(("PopFrame method %s.%s%s, set IP end: %p",
         class_get_name(method_get_class(si_get_code_chunk_info(si)->get_method())),
         method_get_name(si_get_code_chunk_info(si)->get_method()),
         method_get_descriptor(si_get_code_chunk_info(si)->get_method()), ip ));
-    si_set_ip(si, ip, false);
 }
 
 void jvmti_jit_prepare_pop_frame() {
@@ -263,38 +219,8 @@ void jvmti_jit_prepare_pop_frame() {
     jvmti_jit_prepare_pop_frame(si, &buf);
 
     // save regs value from jit context to m2n
-    JitFrameContext* jitContext = si_get_jit_context(si);
     Registers* regs = get_pop_frame_registers(top_frame);
-
-    regs->esp = jitContext->esp;
-    regs->eip = *(jitContext->p_eip);
-    regs->esi = *(jitContext->p_esi);
-    regs->edi = *(jitContext->p_edi);
-    regs->ebp = *(jitContext->p_ebp);
-
-    if (0 == jitContext->p_eax) {
-        regs->eax = 0;
-    } else {
-        regs->eax = *(jitContext->p_eax);
-    }
-
-    if (0 == jitContext->p_ebx) {
-        regs->ebx = 0;
-    } else {
-        regs->ebx = *(jitContext->p_ebx);
-    }
-
-    if (0 == jitContext->p_ecx) {
-        regs->ecx = 0;
-    } else {
-        regs->ecx = *(jitContext->p_ecx);
-    }
-
-    if (0 == jitContext->p_edx) {
-        regs->edx = 0;
-    } else {
-        regs->edx = *(jitContext->p_edx);
-    }
+    si_copy_to_registers(si, regs);
 
     // set pop done frame state
     m2n_set_frame_type(top_frame, frame_type(FRAME_POP_DONE | FRAME_MODIFIED_STACK));
