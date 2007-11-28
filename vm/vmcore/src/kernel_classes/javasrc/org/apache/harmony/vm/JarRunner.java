@@ -70,6 +70,7 @@ public class JarRunner {
         
         Class mainClass = Thread.currentThread().getContextClassLoader().loadClass(className);               
         Method mainMethod = mainClass.getMethod("main", args.getClass());
+        mainMethod.setAccessible(true);
 
         String newArgs[] = new String[args.length - 1];
         
@@ -80,3 +81,4 @@ public class JarRunner {
         mainMethod.invoke(null, (java.lang.Object) newArgs);
     }
 }
+
