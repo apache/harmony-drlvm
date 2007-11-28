@@ -79,7 +79,7 @@ static const jvmtiCapabilities jvmti_supported_jit_capabilities =
     1, // can_get_owned_monitor_info
     1, // can_get_current_contended_monitor
     1, // can_get_monitor_info
-    0, // can_pop_frame
+    1, // can_pop_frame
     0, // can_redefine_classes
     1, // can_signal_thread
     1, // can_get_source_file_name

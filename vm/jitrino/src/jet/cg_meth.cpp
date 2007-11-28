@@ -150,13 +150,13 @@ void Compiler::gen_prolog(void) {
 #ifdef _DEBUG
     // Fill the whole stack frame with a special value
     // -1 to avoid erasing retAddr
-    int num_words = frameSize/sizeof(int) - 1; 
-    AR ar = valloc(i32);
-    Opnd fill(i32, ar);
+    int num_words = frameSize/STACK_SLOT_SIZE- 1;
+    AR ar = valloc(iplatf);
+    Opnd fill(iplatf, ar);
     rlock(ar);
-    AR ridx = valloc(i32);
+    AR ridx = valloc(iplatf);
     runlock(ar);
-    Opnd idx(i32, ridx);
+    Opnd idx(iplatf, ridx);
     //
     // When filling up the frame, the regs context is destroyed - preserve
     // it.
@@ -165,10 +165,14 @@ void Compiler::gen_prolog(void) {
         push(idx);
     }
     //
+#ifdef _EM64T_
+    mov(fill, (unsigned long)0xDEADBEEFDEADBEEF);
+#else
     mov(fill, 0xDEADBEEF);
+#endif
     mov(idx, num_words);
     unsigned _loop = ipoff();
-    mov(Opnd(i32, sp, 0, ridx, 4), fill);
+    mov(Opnd(iplatf, sp, 0, ridx, STACK_SLOT_SIZE), fill);
     alu(alu_sub, idx, 1);
     unsigned br_off = br(nz, 0, 0);
     patch(br_off, ip(_loop));
@@ -230,8 +234,7 @@ void Compiler::gen_prolog(void) {
     //
     // reload input args into local vars
     //
-    
-    // an initial GC map for local variables which are copied from inputs
+        
     ::std::vector<unsigned> locals_map;
     locals_map.resize(words(m_ci.count()));
     // an initial GC map for input args
@@ -278,28 +281,24 @@ void Compiler::gen_prolog(void) {
                 // .. callee-saved GP regs or ..
                 regs_map |= 1<<ar_idx(m_ra[local]);
             }
-            else if (vis_arg(local) || storeWholeContext) {
+            else if (vis_arg(local)) {
                 // .. local vars that are kept on the input slots or
                 // when we need to keep input args valid during enumeration
                 // (for example for JVMTI PopFrame needs) ...
-                assert(m_ci.reg(i) == ar_x || storeWholeContext);
-                assert(0 == m_ci.off(i)%STACK_SLOT_SIZE);
-                int inVal = m_ci.off(i)/STACK_SLOT_SIZE;
-                // TODO: With storeWholeContext it only works with
-                // stack-based parameters. On Intel64 with register-based
-                // calling convention, need to track the registers that are
-                // spilled separately from spill area (see above how the
-                // storeWholeContext is processed).
+                assert(m_ci.reg(i) == ar_x);
+                assert(0 == (m_ci.off(i) % STACK_SLOT_SIZE));
+                int inVal = m_ci.off(i) / STACK_SLOT_SIZE;
                 args_map[word_no(inVal)] =
                             args_map[word_no(inVal)] | (1 <<bit_no(inVal));
-                if (storeWholeContext) {
+                if (g_jvmtiMode) {
                     // .. a 'regular' GC map for locals - must report
-                    // together with input args in case of storeWholeContext
+                    // together with input args in case of JVMTI
                     locals_map[word_no(local)] =
                                 locals_map[word_no(local)] | (1 <<bit_no(local));
                 }
             }
             else {
+                assert(m_ci.reg(i) != ar_x);
                 // .. a 'regular' GC map for locals.
                 locals_map[word_no(local)] = 
                             locals_map[word_no(local)] | (1 <<bit_no(local));
@@ -319,8 +318,8 @@ void Compiler::gen_prolog(void) {
             if (is_set(DBG_TRACE_CG)) {dbg(";;>~copy thizh\n");}
         }
         // If the local resides on the input arg, then no need to copy it 
-        // from input arg into the frame.
-        if (vis_arg(local)) {
+        // from input arg into the frame except JVMTI mode.
+        if (vis_arg(local) && !g_jvmtiMode) {
             if (is_wide(jt)) {
                 ++local;
             }
@@ -374,6 +373,7 @@ void Compiler::gen_prolog(void) {
     //
     // For other local variables, zero the GC map
     //
+
     unsigned locals_gc_size = words(m_infoBlock.get_num_locals());
     if (locals_gc_size != locals_map.size()) {
         if (is_set(DBG_TRACE_CG)) {dbg(";;>locals.gc_map\n");}
@@ -383,6 +383,7 @@ void Compiler::gen_prolog(void) {
             st4(reg.reg(), m_base, voff(m_stack.info_gc_locals()+i*sizeof(int)));
         }
     }
+    
     //
     // Store the GC map for input args
     //

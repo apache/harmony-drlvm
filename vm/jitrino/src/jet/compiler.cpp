@@ -719,10 +719,6 @@ void Compiler::comp_alloc_regs(void)
     if (g_jvmtiMode) {
         // Do not allocate regs. Only ensure the m_base will be saved.
         m_global_rusage.set(ar_idx(m_base));
-        // Make sure all method args get reloaded into local vars
-        for (unsigned i=0; i<m_argids.size(); i++) {
-            m_argids[i] = -1;
-        }
         return;
     }
     const unsigned vars = m_infoBlock.get_num_locals();

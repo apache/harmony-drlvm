@@ -527,12 +527,6 @@ void CodeGen::vpop2(Val* pop_lo, Val* pop_hi)
 
 bool CodeGen::vis_arg(unsigned local_idx) const
 {
-    // Under JVMTI - never use input args as locals. Doing this keeps us
-    // away from problems with rt_{get|set}_local_var which does not handle
-    // input args.
-    if (g_jvmtiMode) {
-        return false;
-    }
     if (local_idx >= m_argSlots)return false;
     int argid = m_argids[local_idx];
     if(argid == -1)             return false;
