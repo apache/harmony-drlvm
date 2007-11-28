@@ -180,6 +180,7 @@ public:
         }
     }
     bool InsertClass(Class* clss);
+    void InsertInitiatedClass(Class* clss);
     Class* AllocateAndReportInstance(const Global_Env* env, Class* klass);
     Class* NewClass(const Global_Env* env, const String* name);
     Package* ProvidePackage(Global_Env* env, const String *class_name, const char *jar);

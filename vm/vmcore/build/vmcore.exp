@@ -153,6 +153,7 @@ VMCORE_0.1 {
     is_warn_enabled;
     Java_java_lang_ClassLoader_defineClass0;
     Java_java_lang_ClassLoader_findLoadedClass;
+    Java_java_lang_ClassLoader_registerInitiatedClass;
     Java_java_lang_EMThreadSupport_getTimeout;
     Java_java_lang_EMThreadSupport_needProfilerThreadSupport;
     Java_java_lang_EMThreadSupport_onTimeout;

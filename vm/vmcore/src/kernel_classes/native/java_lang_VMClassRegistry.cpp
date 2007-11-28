@@ -117,6 +117,14 @@ JNIEXPORT jclass JNICALL Java_java_lang_ClassLoader_findLoadedClass
     return clss ? jni_class_from_handle(jenv, clss) : NULL; 
 }
 
+JNIEXPORT void JNICALL
+Java_java_lang_ClassLoader_registerInitiatedClass(JNIEnv* env, jobject loader, jclass clazz) {
+    ClassLoader* cl = class_loader_lookup(loader);
+    Class* clss = jclass_to_struct_Class(clazz);
+    cl->InsertInitiatedClass(clss);
+}
+
+
 /*
  * Class:     java_lang_VMClassRegistry
  * Method:    getClass

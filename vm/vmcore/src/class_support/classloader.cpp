@@ -1737,6 +1737,13 @@ bool ClassLoader::InsertClass(Class* clss)
     return true;
 }
 
+
+void ClassLoader::InsertInitiatedClass(Class* clss)
+{
+    LMAutoUnlock aulock(&m_lock);
+    m_initiatedClasses->Insert(clss->get_name(), clss);
+}
+
 void BootstrapClassLoader::ReportAndExit(const char* exnclass, std::stringstream& exnmsg) 
 {
     std::stringstream ss;

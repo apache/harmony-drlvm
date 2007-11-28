@@ -549,6 +549,12 @@ public abstract class ClassLoader {
     }
 
     /**
+     * Registers this class loader as initiating for a class
+     * Declared as package private to use it from java.lang.Class.forName
+     */
+    native void registerInitiatedClass(Class clazz);
+
+    /**
      * @com.intel.drl.spec_ref
      */
     protected synchronized Class<?> loadClass(String name, boolean resolve)
@@ -568,6 +574,15 @@ public abstract class ClassLoader {
             } else {
                 try {
                     clazz = parentClassLoader.loadClass(name);
+                    try {
+                        VMStack.getCallerClass(0)
+                            .asSubclass(ClassLoader.class);
+                    } catch(ClassCastException ex) {
+                        // caller class is not a subclass of java/lang/ClassLoader
+                        // so, register as initiating loader as we are called from
+                        // outside of ClassLoader delegation chain
+                        registerInitiatedClass(clazz);
+                    }
                 } catch (ClassNotFoundException e) {
                 }
             }
