@@ -226,307 +226,95 @@ void JNICALL SetObjectArrayElement(JNIEnv * jni_env,
 
 
 /////////////////////////////////////////////////////////////////////////////
-// begin New<Type>Array functions
+// begin New<PrimitiveType>Array functions
 
+static jobject NewPrimitiveArray(Class* clss, jsize length) {
+    assert(hythread_is_suspend_enabled());
+    if (exn_raised()) return NULL;
+
+    unsigned sz = clss->calculate_array_size(length);
+    if (sz == 0) return NULL;
+
+    tmn_suspend_disable();       //---------------------------------v
+    Vector_Handle array = gc_alloc(sz, clss->get_allocation_handle(),
+        vm_get_gc_thread_local());
+    if(NULL == array)
+    {
+        tmn_suspend_enable();
+        return NULL;
+    }
+
+    set_vector_length(array, length);
+
+#ifdef VM_STATS
+    clss->instance_allocated(sz);
+#endif //VM_STATS
+
+    ObjectHandle h = oh_allocate_local_handle();
+    h->object = (ManagedObject *)array;
+
+    tmn_suspend_enable();        //---------------------------------^
+
+    return (jobject)h;
+}
 
 
 jbooleanArray JNICALL NewBooleanArray(JNIEnv * jni_env, jsize length)
 {
     TRACE2("jni", "NewBooleanArray called");
-    assert(hythread_is_suspend_enabled());
-    
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (exn_raised()) return NULL;
-    
-    Class *clss = vm_env->ArrayOfBoolean_Class;    
-    unsigned sz = clss->calculate_array_size(length);
-    if (sz == 0) return NULL;
-
-    tmn_suspend_disable();       //---------------------------------v
-    ObjectHandle h = oh_allocate_local_handle();
-    Vector_Handle array = gc_alloc(sz, clss->get_allocation_handle(),
-        vm_get_gc_thread_local());
-    if(NULL == array)
-    {
-        tmn_suspend_enable();
-        return NULL;
-    }
-
-    set_vector_length(array, length);
-
-#ifdef VM_STATS
-    clss->instance_allocated(sz);
-#endif //VM_STATS
-
-    h->object = (ManagedObject *)array;
-
-    tmn_suspend_enable();        //---------------------------------^
-
-    return (jbooleanArray)h;
+    return (jbooleanArray)NewPrimitiveArray(jni_get_vm_env(jni_env)->ArrayOfBoolean_Class, length);
 } //NewBooleanArray
-
 
 
 jbyteArray JNICALL NewByteArray(JNIEnv * jni_env, jsize length)
 {
     TRACE2("jni", "NewByteArray called");
-    assert(hythread_is_suspend_enabled());
-        
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (exn_raised()) return NULL;
-    
-    Class *clss = vm_env->ArrayOfByte_Class;
-    unsigned sz = clss->calculate_array_size(length);
-    if (sz == 0) return NULL;
-
-    tmn_suspend_disable();       //---------------------------------v
-    ObjectHandle h = oh_allocate_local_handle();
-    Vector_Handle array = gc_alloc(sz, clss->get_allocation_handle(),
-        vm_get_gc_thread_local());
-    if (NULL == array)
-    {
-        tmn_suspend_enable();
-        return NULL;
-    }
-
-    set_vector_length(array, length);
-
-#ifdef VM_STATS
-    clss->instance_allocated(sz);
-#endif //VM_STATS
-
-    h->object = (ManagedObject *)array;
-
-    tmn_suspend_enable();        //---------------------------------^
-
-    return (jbyteArray)h;
+    return (jbyteArray)NewPrimitiveArray(jni_get_vm_env(jni_env)->ArrayOfByte_Class, length);
 } //NewByteArray
-
 
 
 jcharArray JNICALL NewCharArray(JNIEnv * jni_env, jsize length)
 {
     TRACE2("jni", "NewCharArray called");
-    assert(hythread_is_suspend_enabled());
-    
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (exn_raised()) return NULL;
-
-    Class *clss = vm_env->ArrayOfChar_Class;
-    unsigned sz = clss->calculate_array_size(length);
-    if (sz == 0) return NULL;
-
-    tmn_suspend_disable();       //---------------------------------v
-    ObjectHandle h = oh_allocate_local_handle();
-    Vector_Handle array = gc_alloc(sz, clss->get_allocation_handle(),
-        vm_get_gc_thread_local());
-    if(NULL == array)
-    {
-        tmn_suspend_enable();
-        return NULL;
-    }
-
-    set_vector_length(array, length);
-
-#ifdef VM_STATS
-    clss->instance_allocated(sz);
-#endif //VM_STATS
-
-    h->object = (ManagedObject *)array;
-
-    tmn_suspend_enable();        //---------------------------------^
-
-    return (jcharArray)h;
+    return (jcharArray)NewPrimitiveArray(jni_get_vm_env(jni_env)->ArrayOfChar_Class, length);
 } //NewCharArray
-
 
 
 jshortArray JNICALL NewShortArray(JNIEnv * jni_env, jsize length)
 {
     TRACE2("jni", "NewShortArray called");
-    assert(hythread_is_suspend_enabled());
-    
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (exn_raised()) return NULL;
-    
-    Class *clss = vm_env->ArrayOfShort_Class; 
-    unsigned sz = clss->calculate_array_size(length);
-    if (sz == 0) return NULL;
-
-    tmn_suspend_disable();       //---------------------------------v
-    ObjectHandle h = oh_allocate_local_handle();
-
-    Vector_Handle array = gc_alloc(sz, clss->get_allocation_handle(),
-        vm_get_gc_thread_local());
-    if (NULL == array)
-    {
-        tmn_suspend_enable();
-        return NULL;
-    }
-
-    set_vector_length(array, length);
-
-#ifdef VM_STATS
-    clss->instance_allocated(sz);
-#endif //VM_STATS
-
-    h->object = (ManagedObject *)array;
-
-    tmn_suspend_enable();        //---------------------------------^
-
-    return (jshortArray)h;
+    return (jshortArray)NewPrimitiveArray(jni_get_vm_env(jni_env)->ArrayOfShort_Class, length);
 } //NewShortArray
-
 
 
 jintArray JNICALL NewIntArray(JNIEnv * jni_env, jsize length)
 {
     TRACE2("jni", "NewIntArray called");
-    assert(hythread_is_suspend_enabled());
-        
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (exn_raised()) return NULL;
-    
-    Class *clss = vm_env->ArrayOfInt_Class;
-    unsigned sz = clss->calculate_array_size(length);
-    if (sz == 0) return NULL;
-
-    tmn_suspend_disable();       //---------------------------------v
-    ObjectHandle h = oh_allocate_local_handle();
-    Vector_Handle array = gc_alloc(sz, clss->get_allocation_handle(),
-        vm_get_gc_thread_local());
-    if (NULL == array)
-    {
-        tmn_suspend_enable();
-        return NULL;
-    }
-
-    set_vector_length(array, length);
-
-#ifdef VM_STATS
-    clss->instance_allocated(sz);
-#endif //VM_STATS
-
-    h->object = (ManagedObject *)array;
-
-    tmn_suspend_enable();        //---------------------------------^
-
-    return (jintArray)h;
+    return (jintArray)NewPrimitiveArray(jni_get_vm_env(jni_env)->ArrayOfInt_Class, length);
 } //NewIntArray
-
 
 
 jlongArray JNICALL NewLongArray(JNIEnv * jni_env, jsize length)
 {
     TRACE2("jni", "NewLongArray called");
-    assert(hythread_is_suspend_enabled());
-    
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (exn_raised()) return NULL;
-
-    Class *clss = vm_env->ArrayOfLong_Class;
-    unsigned sz = clss->calculate_array_size(length);
-    if (sz == 0) return NULL;
-
-    tmn_suspend_disable();       //---------------------------------v
-    ObjectHandle h = oh_allocate_local_handle();
-    Vector_Handle array = gc_alloc(sz, clss->get_allocation_handle(),
-        vm_get_gc_thread_local());
-    if (NULL == array)
-    {
-        tmn_suspend_enable();
-        return NULL;
-    }
-
-    set_vector_length(array, length);
-
-#ifdef VM_STATS
-    clss->instance_allocated(sz);
-#endif //VM_STATS
-
-    h->object = (ManagedObject *)array;
-
-    tmn_suspend_enable();        //---------------------------------^
-
-    return (jlongArray)h;
+    return (jlongArray)NewPrimitiveArray(jni_get_vm_env(jni_env)->ArrayOfLong_Class, length);
 } //NewLongArray
-
 
 
 jfloatArray JNICALL NewFloatArray(JNIEnv * jni_env, jsize length)
 {
     TRACE2("jni", "NewFloatArray called");
-    assert(hythread_is_suspend_enabled());
-    
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (exn_raised()) return NULL;
-    
-    Class *clss = vm_env->ArrayOfFloat_Class;
-    unsigned sz = clss->calculate_array_size(length);
-    if (sz == 0) return NULL;
-
-    tmn_suspend_disable();       //---------------------------------v
-    ObjectHandle h = oh_allocate_local_handle();
-    Vector_Handle array = gc_alloc(sz, clss->get_allocation_handle(),
-        vm_get_gc_thread_local());
-    if (NULL == array)
-    {
-        tmn_suspend_enable();
-        return NULL;
-    }
-
-    set_vector_length(array, length);
-
-#ifdef VM_STATS
-    clss->instance_allocated(sz);
-#endif //VM_STATS
-
-    h->object = (ManagedObject *)array;
-
-    tmn_suspend_enable();        //---------------------------------^
-
-    return (jfloatArray)h;
+    return (jfloatArray)NewPrimitiveArray(jni_get_vm_env(jni_env)->ArrayOfFloat_Class, length);
 } //NewFloatArray
-
 
 
 jdoubleArray JNICALL NewDoubleArray(JNIEnv * jni_env, jsize length)
 {
     TRACE2("jni", "NewDoubleArray called");
-    assert(hythread_is_suspend_enabled());
-    
-    Global_Env * vm_env = jni_get_vm_env(jni_env);
-    if (exn_raised()) return NULL;
-    
-    Class *clss = vm_env->ArrayOfDouble_Class;
-    unsigned sz = clss->calculate_array_size(length);
-    if (sz == 0) return NULL;
-
-    tmn_suspend_disable();       //---------------------------------v
-    ObjectHandle h = oh_allocate_local_handle();
-    Vector_Handle array = gc_alloc(sz, clss->get_allocation_handle(),
-        vm_get_gc_thread_local());
-    if (NULL == array)
-    {
-        tmn_suspend_enable();
-        return NULL;
-    }
-
-    set_vector_length(array, length);
-
-#ifdef VM_STATS
-    clss->instance_allocated(sz);
-#endif //VM_STATS
-
-    h->object = (ManagedObject *)array;
-
-    tmn_suspend_enable();        //---------------------------------^
-
-    return (jdoubleArray)h;
+    return (jdoubleArray)NewPrimitiveArray(jni_get_vm_env(jni_env)->ArrayOfDouble_Class, length);
 } //NewDoubleArray
 
-
-// end New<Type>Array functions
+// end New<PrimitiveType>Array functions
 /////////////////////////////////////////////////////////////////////////////
 
 

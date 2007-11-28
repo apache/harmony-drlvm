@@ -974,19 +974,18 @@ jobject JNICALL AllocObject(JNIEnv * jni_env,
         return NULL;
     }
 
-    tmn_suspend_disable();       //---------------------------------v
-    ObjectHandle new_handle = oh_allocate_local_handle();
+    tmn_suspend_disable();      //---------------------------------v
     ManagedObject *new_obj = (ManagedObject *)class_alloc_new_object(clss);
     if (new_obj == NULL) {
-        tmn_suspend_enable();
+        tmn_suspend_enable();   //---------------------------------^
         return NULL;
     }
+    ObjectHandle new_handle = oh_allocate_local_handle();
     new_handle->object = (ManagedObject *)new_obj;
-    tmn_suspend_enable();        //---------------------------------^
+    tmn_suspend_enable();       //---------------------------------^
 
     return (jobject)new_handle;
 } //AllocObject
-
 
 
 jobject JNICALL NewObject(JNIEnv * jni_env,
