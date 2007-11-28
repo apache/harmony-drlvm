@@ -78,12 +78,22 @@ void ThrowInstEliminator::eliminateThrowInst() {
 
         if (catch_node) {
             assert(catch_node->isCatchBlock());
-            // Found target block.
-            Node * target_node = catch_node;
-            if (catch_node->getSecondInst() == NULL) {
-                target_node = catch_node->getUnconditionalEdgeTarget();
-            }
             
+            // Find target block and catch instruction.
+            Node * target_node = catch_node;
+            Inst * catch_inst = NULL;
+            do {
+                for (Inst * i = (Inst *)target_node->getSecondInst(); i != NULL; i = i->getNextInst()) {
+                    if (i->getOpcode() == Op_Catch) {
+                        catch_inst = i;
+                        break;
+                    }
+                }
+            } while (catch_inst == NULL && (target_node = target_node->getUnconditionalEdgeTarget()) != NULL);
+
+            assert(target_node);
+            assert(catch_inst->getOpcode() == Op_Catch);
+
             if (Log::isEnabled()) {
                 Log::out() << "Trying to elimination ";
                 throw_inst->print(Log::out());
@@ -106,10 +116,6 @@ void ThrowInstEliminator::eliminateThrowInst() {
                 continue;
             }
 
-            Inst * catch_inst = (Inst *)target_node->getSecondInst();
-            while (catch_inst->getOpcode() != Op_Catch) {
-                catch_inst = (Inst*)catch_inst->next();
-            }
             Opnd * catch_opnd = catch_inst->getDst();
             VarOpnd * dst_var = NULL;
             Inst * st_inst = NULL;
