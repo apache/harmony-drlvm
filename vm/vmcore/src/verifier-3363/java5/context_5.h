@@ -124,7 +124,7 @@ namespace CPVerifier_5 {
 
         //First verification pass thru the method. checks that no jump outside the method or to the middle of instruction
         //checks that opcodes are valid
-        vf_Result parse(Address instr);
+        vf_Result parse(Address instr, int dead_code_parsing, FastStack<Address> *deadstack);
 
         //Second pass: dataflow of a piece of the method starting from the beginning or a branch target and finishing
         //on return, athrow or hitting previously passed instruction. 

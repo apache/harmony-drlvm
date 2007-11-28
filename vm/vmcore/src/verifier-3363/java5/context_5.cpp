@@ -44,7 +44,7 @@ namespace CPVerifier_5 {
     If it comes to a goto then it continues from the jump target
     */
 
-    vf_Result vf_Context_5::parse(Address instr) {
+    vf_Result vf_Context_5::parse(Address instr, int dead_code_parsing, FastStack<Address>* deadstack) {
         // instruction is out of the method or in the middle of another instruction
         if( instr > m_code_length || props.isOperand(instr) ) {
             return error(VF_ErrorCodeEnd, "jump to the middle of instruction or out of the method");
@@ -53,7 +53,9 @@ namespace CPVerifier_5 {
         while( instr < m_code_length ) {
             if( props.isParsePassed(instr) ) {
                 // more than one branch leads to this instruction
-                props.setMultiway(instr);
+                if( !dead_code_parsing ) {
+                    props.setMultiway(instr);
+                }
                 return VF_OK;
             }
 
@@ -115,6 +117,8 @@ namespace CPVerifier_5 {
                 mark_stackmap_point(target);
 
                 if( instr_direct(pi, opcode, m_bytecode, instr) ) {
+                    if( instr + instr_len < m_code_length ) deadstack->push(instr + instr_len);
+
                     instr = target; // it is not an if* - go to jump target
                 } else {
                     // process conditional jump target or jsr
@@ -125,6 +129,7 @@ namespace CPVerifier_5 {
                 }
             } else if( instr_direct(pi, opcode, m_bytecode, instr) ) {
                 // it is not a jump ==> it is return or throw or ret
+                if( instr + instr_len < m_code_length ) deadstack->push(instr + instr_len);
                 return VF_OK;
             } else {
                 assert( instr_is_switch(pi) );
@@ -155,6 +160,7 @@ namespace CPVerifier_5 {
                     mark_stackmap_point(target);
                 }
 
+                if( instr + instr_len < m_code_length ) deadstack->push(instr + instr_len);
                 return VF_OK;
             }
         }
@@ -429,9 +435,10 @@ namespace CPVerifier_5 {
             }
         }
 
+        FastStack<Address> deadstack;
         do {
             while( !stack.is_empty() ) {
-                vf_Result tcr = parse(stack.pop());
+                vf_Result tcr = parse(stack.pop(), false, &deadstack);
                 if( tcr != VF_OK ) {
                     return tcr;
                 }
@@ -459,6 +466,31 @@ namespace CPVerifier_5 {
                 }
             }
         } while (!stack.is_empty());
+
+        //parsing dead code: check that no invalid opcodes are there and no jumps to the middles of the instructions
+        //clean up the dead stack, (new pushs will go to the regular stack)
+        while( !deadstack.is_empty() ) {
+            vf_Result tcr = parse(deadstack.pop(), true, &stack);
+            if( tcr != VF_OK ) {
+                return tcr;
+            }
+        }
+
+        //put all handlers, even for the dead try blocks
+        for( idx = 0; idx < m_handlecount; idx++ ) {
+            method_get_exc_handler_info( m_method, idx, &start_pc, &end_pc, &handler_pc, &handler_cp_index );
+            stack.push(handler_pc);
+        }
+
+        //clean up the stack, (check jumps to the middle)
+        while( !stack.is_empty() ) {
+            vf_Result tcr = parse(stack.pop(), true, &stack);
+            if( tcr != VF_OK ) {
+                return tcr;
+            }
+        }
+        //end of dead code parsing
+
 
         for( idx = 0; idx < m_handlecount; idx++ ) {
 
