@@ -397,8 +397,9 @@ void rt_fix_handler_context(JIT_Handle jit, Method_Handle method,
     
     void *** pip = (void***)((char*)context + ip_off);
     char * where = (char*)**pip;
-#ifdef _DEBUG
     char * meth_start = infoBlock.get_code_start();
+
+#ifdef _DEBUG
     unsigned meth_len = infoBlock.get_code_len();
     assert(meth_start <= where);
     assert(where < meth_start + meth_len);
