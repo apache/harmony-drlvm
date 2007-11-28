@@ -92,7 +92,7 @@ public class GCHelper {
     public static boolean GEN_MODE = getGenMode();
 
     @Inline
-    public static void write_barrier_slot_rem(Address p_objBase, Address p_objSlot, Address p_target) {
+    public static void write_barrier_slot_rem(Address p_target, Address p_objSlot, Address p_objBase) {
       
        /* If the slot is in NOS or the target is not in NOS, we simply return*/
         if(p_objSlot.GE(NOS_BOUNDARY) || p_target.LT(NOS_BOUNDARY) || !GEN_MODE) {

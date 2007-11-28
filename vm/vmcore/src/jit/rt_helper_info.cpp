@@ -139,7 +139,7 @@ static JIT_RT_Function_Entry _jit_rt_function_entries_base[] = {
 
     {VM_RT_GC_HEAP_WRITE_REF,                  "VM_RT_GC_HEAP_WRITE_REF",
             INTERRUPTIBLE_NEVER,               CALLING_CONVENTION_CDECL,                3,
-            NULL,   NULL,   NULL,   NULL},
+            NULL,   NULL,  "(Lorg/vmmagic/unboxed/Address;Lorg/vmmagic/unboxed/Address;Lorg/vmmagic/unboxed/Address;)V", NULL},
     {VM_RT_GC_SAFE_POINT,                      "VM_RT_GC_SAFE_POINT",
             INTERRUPTIBLE_ALWAYS,              CALLING_CONVENTION_STDCALL,              0,
             NULL,   NULL,   NULL,   NULL},
