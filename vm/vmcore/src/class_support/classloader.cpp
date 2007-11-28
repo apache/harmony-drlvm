@@ -85,8 +85,14 @@ bool ClassLoader::Initialize( ManagedObject* loader )
     if(!m_javaTypes) return false;
 
     Global_Env *env = VM_Global_State::loader_env;
-    assert (env);
-    size_t code_pool_size = IsBootstrap() ? DEFAULT_BOOTSTRAP_JIT_CODE_POOL_SIZE : DEFAULT_CLASSLOADER_JIT_CODE_POOL_SIZE;
+    assert(env);
+
+    assert(env->bootstrap_code_pool_size);
+    assert(env->user_code_pool_size);
+    size_t code_pool_size = IsBootstrap()
+        ? env->bootstrap_code_pool_size
+        : env->user_code_pool_size;
+
     CodeMemoryManager = new PoolManager(code_pool_size, env->system_page_size, env->use_large_pages, true/*is_code*/, true/*is_resize_allowed*/);
     if(!CodeMemoryManager) return false;
 

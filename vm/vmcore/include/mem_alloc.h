@@ -25,12 +25,20 @@
 #include "jit_import.h"
 #include "port_vmem.h"
 
-#define DEFAULT_COMMOT_JIT_CODE_POOL_SIZE 32*1024  // pool is used for common stub code
-#define DEFAULT_COMMOT_VTABLE_POOL_SIZE_NO_RESIZE 8*1024*1024 // used for comressed VTable pointers
-#define DEFAULT_CLASSLOADER_VTABLE_POOL_SIZE 32*1024
-#define DEFAULT_CLASSLOADER_JIT_CODE_POOL_SIZE 64*1024
-#define DEFAULT_BOOTSTRAP_JIT_CODE_POOL_SIZE 256*1024  
-#define DEFAULT_VTABLE_POOL_SIZE   128*1024  
+#define KBYTE 1024
+#define MBYTE 1024*KBYTE
+#define GBYTE 1024*MBYTE
+
+// pool is used for common stub code
+#define DEFAULT_COMMOT_JIT_CODE_POOL_SIZE           256*KBYTE
+// used for comressed VTable pointers
+#define DEFAULT_COMMOT_VTABLE_POOL_SIZE_NO_RESIZE   8*MBYTE
+//used for uncompressed VTable pointers
+#define DEFAULT_VTABLE_POOL_SIZE                    256*KBYTE
+// used for compiled code of a user class loader
+#define DEFAULT_CLASSLOADER_JIT_CODE_POOL_SIZE      256*KBYTE
+// used for compiled code of the bootstrap class loader
+#define DEFAULT_BOOTSTRAP_JIT_CODE_POOL_SIZE        1*MBYTE
 
 #define MEMORY_UTILIZATION_LIMIT 15
 

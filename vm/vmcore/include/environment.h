@@ -46,6 +46,8 @@ struct Global_Env {
     apr_pool_t*               mem_pool; // memory pool
     BootstrapClassLoader*     bootstrap_class_loader;
     UserDefinedClassLoader*   system_class_loader;
+    size_t                    bootstrap_code_pool_size;
+    size_t                    user_code_pool_size;
     DebugUtilsTI*             TI;
     GlobalNCAI*               NCAI;
     NSOTableItem*             nsoTable;
@@ -323,10 +325,6 @@ struct Global_Env {
     }
 
 
-    /**
-     * Load a class via bootstrap classloader.
-     */
-
     int isVmInitializing() {
         return vm_state == VM_INITIALIZING;
     }
@@ -342,8 +340,6 @@ struct Global_Env {
     /**
      * Load a class via bootstrap classloader.
      */
-
-
     Class* LoadCoreClass(const String* name);
     Class* LoadCoreClass(const char* name);
 
@@ -353,7 +349,6 @@ struct Global_Env {
      * exception objects. I.e. all required classes (such as </code>java/lang/Trowable</code>)
      * are loaded.
      */
-
     void ReadyForExceptions()
     {
         ready_for_exceptions = true;
@@ -376,6 +371,8 @@ struct Global_Env {
     Properties* VmProperties() {
         return m_vm_properties;
     }
+
+    void init_pools();
 
 private:
     bool bootstrapping;
