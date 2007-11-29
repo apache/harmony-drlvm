@@ -574,14 +574,17 @@ public abstract class ClassLoader {
             } else {
                 try {
                     clazz = parentClassLoader.loadClass(name);
-                    try {
-                        VMStack.getCallerClass(0)
-                            .asSubclass(ClassLoader.class);
-                    } catch(ClassCastException ex) {
-                        // caller class is not a subclass of java/lang/ClassLoader
-                        // so, register as initiating loader as we are called from
-                        // outside of ClassLoader delegation chain
-                        registerInitiatedClass(clazz);
+                    if(clazz != null) {
+                        try {
+                            VMStack.getCallerClass(0)
+                                    .asSubclass(ClassLoader.class);
+                        } catch(ClassCastException ex) {
+                            // caller class is not a subclass of
+                            // java/lang/ClassLoader so register as
+                            // initiating loader as we are called from
+                            // outside of ClassLoader delegation chain
+                            registerInitiatedClass(clazz);
+                        }
                     }
                 } catch (ClassNotFoundException e) {
                 }

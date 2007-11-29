@@ -146,14 +146,14 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
                 clazz = classLoader.loadClass(name);
             }
         }
+        if(clazz == null) {
+            throw new ClassNotFoundException(name);
+        }
         if(classLoader != null && classLoader.findLoadedClass(name) == null) {
             // classloader overloads loadClass method though it is not
             // generally recommended
             // have to register initiating loader for clazz from here
             classLoader.registerInitiatedClass(clazz);
-        }
-        if(clazz == null) {
-            throw new ClassNotFoundException(name);
         }
         if (initialize) {
             VMClassRegistry.initializeClass(clazz);
