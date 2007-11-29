@@ -44,6 +44,7 @@
 #include "devirtualizer.h"
 
 #include "abcd/abcd.h"
+#include "dabce.h"
 
 #include "Jitrino.h"
 #include "codelowerer.h"
@@ -190,11 +191,15 @@ void OptInitAction::readFlags()
     optimizerFlags.loopBuilderFlags = new (mm) LoopBuilderFlags;
     memset(optimizerFlags.loopBuilderFlags, sizeof(LoopBuilderFlags), 0);
 
+    optimizerFlags.dabceFlags = new (mm) DynamicABCEFlags;
+    memset(optimizerFlags.dabceFlags, sizeof(DynamicABCEFlags), 0);
+
     Abcd::readFlags(this, optimizerFlags.abcdFlags);
     GlobalCodeMotion::readFlags(this, optimizerFlags.gcmFlags);
     MemoryOpt::readFlags(this, optimizerFlags.memOptFlags);
     SyncOpt::readFlags(this, optimizerFlags.syncOptFlags);
     LoopBuilder::readFlags(this, optimizerFlags.loopBuilderFlags);
+    DynamicABCE::readFlags(this, optimizerFlags.dabceFlags);
 }
 
 
@@ -224,6 +229,7 @@ void showFlags(std::ostream& os) {
     MemoryOpt::showFlags(os);
     SyncOpt::showFlags(os);
     LoopBuilder::showFlags(os);
+    DynamicABCE::showFlags(os);
 }
 
 } //namespace Jitrino 

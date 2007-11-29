@@ -33,6 +33,7 @@ struct AbcdFlags;
 struct GcmFlags;
 struct SyncOptFlags;
 struct LoopBuilderFlags;
+struct DynamicABCEFlags;
 
 struct OptimizerFlags {
     
@@ -114,7 +115,8 @@ struct OptimizerFlags {
     GcmFlags*               gcmFlags;
     MemoptFlags*            memOptFlags;
     SyncOptFlags*           syncOptFlags;
-    LoopBuilderFlags*       loopBuilderFlags;    
+    LoopBuilderFlags*       loopBuilderFlags;
+    DynamicABCEFlags*       dabceFlags;
 };
 
 } //namespace Jitrino 

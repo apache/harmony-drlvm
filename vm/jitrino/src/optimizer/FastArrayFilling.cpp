@@ -90,6 +90,8 @@ FastArrayFillPass::_run(IRManager& irManager)
     from HLO optimizations.
     */
 
+    const double FAIL_PROB = 10e-6; 
+        
     LoopTree * info = irManager.getLoopTree();
     if (!info->isValid()) {
         info->rebuild(false);
@@ -203,10 +205,14 @@ FastArrayFillPass::_run(IRManager& irManager)
                             inst->getSrc(1) == tmpIndex) 
                         {
                             arrayBase = inst->getSrc(0);
-                            inst = inst->getPrevInst();
-                            //check Label aka beginning of BB
-                            if (inst->getOpcode() == Op_Label) {
-                                found = true;
+                            Inst* tmpInst = arrayBase->getInst();
+                            if (tmpInst->getOpcode() == Op_LdArrayBaseAddr) {
+                                arrayRef = tmpInst->getSrc(0); 
+                                inst = inst->getPrevInst();
+                                //check Label aka beginning of BB
+                                if (inst->getOpcode() == Op_Label) {
+                                    found = true;
+                                }
                             }
                         } 
                     } 
@@ -246,26 +252,6 @@ FastArrayFillPass::_run(IRManager& irManager)
         }
 
         startNode = inEdge->getSourceNode();
-        inst = ((Inst *)startNode->getLastInst());
-        found = false;
-
-        //check StVar
-        if (inst->getOpcode() == Op_StVar && inst->getDst() == index) {
-            inst = inst->getPrevInst();
-            //check StInd
-            if (inst->getOpcode() == Op_TauStInd && inst->getSrc(0) == constValue && inst->getSrc(1) == arrayBase) {
-                inst = inst->getPrevInst();
-                //check LdBase
-                if (inst->getOpcode() == Op_LdArrayBaseAddr && inst->getDst() == arrayBase && inst->getPrevInst()->getOpcode() == Op_Label) {
-                    arrayRef = inst->getSrc(0);
-                    found = true;
-                }
-            }
-        }
-        if (!found) {
-            continue;
-        }
-
         startNode = startNode->getInEdges().front()->getSourceNode();
         inst = ((Inst *)startNode->getLastInst());
         found = false;
@@ -340,11 +326,12 @@ FastArrayFillPass::_run(IRManager& irManager)
         ControlFlowGraph& fg = irManager.getFlowGraph();
         Node * preheader = fg.splitNodeAtInstruction(inst, true, false, irManager.getInstFactory().makeLabel());
         Inst * cmp = irManager.getInstFactory().makeBranch(Cmp_NE_Un, arrayBound->getType()->tag, arrayBound, fillBound, (LabelInst *)preheader->getFirstInst());
+        startNode->findTargetEdge(preheader)->setEdgeProb(FAIL_PROB);
         startNode->appendInst(cmp);
 
         //create a node with some instructions to prepare variables for loop
         Node * prepNode = fg.createBlockNode(irManager.getInstFactory().makeLabel());
-        fg.addEdge(startNode,prepNode);
+        fg.addEdge(startNode,prepNode, 1.0 - FAIL_PROB);
         
         OpndManager& opndManager = irManager.getOpndManager();
 

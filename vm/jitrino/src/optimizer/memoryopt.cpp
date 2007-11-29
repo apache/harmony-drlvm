@@ -668,6 +668,7 @@ MemoryOptInitWalker::applyToInst(Inst *i)
             case AddValueProfileValue:
             case StringCompareTo:
             case StringRegionMatches:
+            case FillArrayWithConst: 
             case ClassIsArray:
             case ClassGetAllocationHandle:
             case ClassGetTypeSize:
