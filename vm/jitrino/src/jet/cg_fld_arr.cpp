@@ -294,7 +294,7 @@ void CodeGen::do_field_op(const FieldOpInfo& fieldOp)
             // pop out ref
             vpop();
         }
-        if ( jt == jobj || fieldIsMagic ) {
+        if ( !is_ia32() && (jt == jobj || fieldIsMagic) ) {
             if (fieldIsMagic || !g_refs_squeeze) {
                 AR gr_ref = valloc(jobj);
                 rlock(gr_ref);
@@ -366,7 +366,7 @@ void CodeGen::do_field_op(const FieldOpInfo& fieldOp)
                           where.index(), where.scale());
         mov(where32, Opnd(ref));
     }
-    else if ( jt == jobj || fieldIsMagic ) {
+    else if ( !is_ia32() && (jt == jobj || fieldIsMagic) ) {
         // have the reference on a register
         Val& s0 = vstack(0, true);
         rlock(s0);
