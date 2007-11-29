@@ -26,12 +26,6 @@
 #include <assert.h>
 #include "ver_utils.h"
 
-#ifdef WIN32
-#define intptr int64
-#else
-#define intptr long
-#endif
-
 namespace CPVerifier {
 
     //predefined verification types

@@ -26,12 +26,6 @@
 #include <assert.h>
 #include "../base/stackmap_x.h"
 
-#ifdef WIN32
-#define intptr int64
-#else
-#define intptr long
-#endif
-
 using namespace CPVerifier;
 
 namespace CPVerifier_5 {
@@ -149,7 +143,7 @@ namespace CPVerifier_5 {
         //return first IncomingType constraint
         IncomingType *firstIncoming() {
             //TODO: I have to store somewhere the "modified" bit. Sorry.
-            return (IncomingType*)( (intptr)incoming & ~3 );
+            return (IncomingType*)( (POINTER_SIZE_INT)incoming & ~3 );
         }
 
         //return first conatrint of any type except IncomingType
@@ -182,8 +176,8 @@ namespace CPVerifier_5 {
         void newIncomingType(Memory *mem, SmConstant value) {
             IncomingType *in = (IncomingType *)mem->malloc(sizeof(IncomingType));
 
-            intptr mask = (intptr)incoming & 3;
-            incoming = (IncomingType *) ((intptr)incoming & ~3);
+            POINTER_SIZE_INT mask = (POINTER_SIZE_INT)incoming & 3;
+            incoming = (IncomingType *) ((POINTER_SIZE_INT)incoming & ~3);
 
             in->nxt = value == SM_BOGUS ? 0 : incoming;
             //in->type = CT_INCOMING_VALUE;
@@ -191,7 +185,7 @@ namespace CPVerifier_5 {
 
             incoming = in;
 
-            incoming = (IncomingType *) ((intptr)incoming | mask);
+            incoming = (IncomingType *) ((POINTER_SIZE_INT)incoming | mask);
         }
 
         //add expected type with the 'value' value
@@ -223,19 +217,19 @@ namespace CPVerifier_5 {
         // return 'modified' flag for the stackmap. the flag is stored in the first bit of the 'incoming' pointer
         // "modified" is about subroutines: you have to track which locals were changed
         int isJsrModified() {
-            return (int)(intptr)incoming & 1;
+            return (int)(POINTER_SIZE_INT)incoming & 1;
         }
 
         //set 'modified' flag for the stackmap. the flag is stored in the first bit of the 'incoming' pointer
         // "modified" is about subroutines: you have to track which locals were changed
         void setJsrModified() {
-            incoming = (IncomingType *) ((intptr)incoming | 1);
+            incoming = (IncomingType *) ((POINTER_SIZE_INT)incoming | 1);
         }
 
         //clear 'modified' flag for the stackmap. the flag is stored in the first bit of the 'incoming' pointer
         // "modified" is about subroutines: you have to track which locals were changed
         void clearJsrModified() {
-            incoming = (IncomingType *) ((intptr)incoming & ~1);
+            incoming = (IncomingType *) ((POINTER_SIZE_INT)incoming & ~1);
         }
     };
 
@@ -252,7 +246,7 @@ namespace CPVerifier_5 {
         //is it a sub-definite (not constant) type?
         int isVariable() {
             assert(const_val != SM_NONE);
-            return !((intptr)var_ptr & 1);
+            return !((POINTER_SIZE_INT)var_ptr & 1);
         }
 
         //get value for the constant (known) verification type
@@ -262,7 +256,7 @@ namespace CPVerifier_5 {
 
         //get variable representing sub-definite verification type
         StackmapElement *getVariable() {
-            return (StackmapElement *) ((intptr)var_ptr & ~3);
+            return (StackmapElement *) ((POINTER_SIZE_INT)var_ptr & ~3);
         }
 
         //when we need to compae to some unmergable type we don;t need to interate thru the list
@@ -277,13 +271,13 @@ namespace CPVerifier_5 {
         //"modified" is about subroutines: you have to track which locals were changed
         //it's easier to think of all the constants as "modified"
         int isJsrModified() {
-            return (int)(intptr)var_ptr & 3;
+            return (int)(POINTER_SIZE_INT)var_ptr & 3;
         }
 
         // set 'modified' flag for the workmap element. the flag is stored in the second bit of the union
         void setJsrModified() {
             if( isVariable() ) {
-                var_ptr = (StackmapElement*)((intptr)var_ptr | 2);
+                var_ptr = (StackmapElement*)((POINTER_SIZE_INT)var_ptr | 2);
             }
         }
     };

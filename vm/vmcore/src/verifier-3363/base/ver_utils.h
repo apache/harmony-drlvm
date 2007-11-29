@@ -22,7 +22,7 @@
 #define __VER_UTILS_H_
 
 #include <assert.h>
-#include "clog.h"
+#include "open/types.h"
 #include <iostream>
 using namespace std;
 
