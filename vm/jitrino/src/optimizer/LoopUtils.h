@@ -78,6 +78,7 @@ public:
 protected:
     OpndLoopInfo(InductionDetector* id, SsaOpnd* opnd):
          mainOpnd(opnd), inductionDetector(id) {};
+    virtual ~OpndLoopInfo() {}
     
     SsaOpnd*            mainOpnd;
     InductionDetector*  inductionDetector;
@@ -165,6 +166,7 @@ protected:
         header(NULL), isPhiSplit(false) {
         base = (base == NULL) ? this : base;         
     }    
+    virtual ~InductiveOpndLoopInfo() {}
 
 private:   
     void findBoundInfo();
@@ -193,6 +195,7 @@ public:
     
 protected:
     InvariantOpndLoopInfo(InductionDetector* id, SsaOpnd* opnd): OpndLoopInfo(id, opnd) {}
+    virtual ~InvariantOpndLoopInfo() {}
 };
 
 class ConstOpndLoopInfo : public InvariantOpndLoopInfo {
@@ -206,6 +209,7 @@ public:
 protected:
     ConstOpndLoopInfo(InductionDetector* id, SsaOpnd* opnd, int32 val):
         InvariantOpndLoopInfo(id, opnd), value(val) {}
+    virtual ~ConstOpndLoopInfo() {}
 
 private:
     int32 value;
