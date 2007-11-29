@@ -54,7 +54,7 @@ struct TIEnv
     const ti_interface *functions;
 
     /// Lock used to protect TIEnv instance
-    hymutex_t lock;
+    hymutex_t environment_data_lock;
 
     JavaVM_Internal *vm;
     Agent *agent;

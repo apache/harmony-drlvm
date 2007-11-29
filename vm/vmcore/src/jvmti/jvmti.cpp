@@ -251,7 +251,8 @@ jint JNICALL create_jvmti_environment(JavaVM *vm_ext, void **env, jint version)
 
     memset(newenv, 0, sizeof(TIEnv));
 
-    IDATA error_code1 = hymutex_create(&newenv->lock, APR_THREAD_MUTEX_NESTED);
+    IDATA error_code1 = hymutex_create(&newenv->environment_data_lock,
+        APR_THREAD_MUTEX_NESTED);
     if (error_code1 != APR_SUCCESS)
     {
         _deallocate((unsigned char *)newenv);
@@ -262,7 +263,7 @@ jint JNICALL create_jvmti_environment(JavaVM *vm_ext, void **env, jint version)
     error_code = newenv->allocate_extension_event_callbacks_table();
     if (error_code != JVMTI_ERROR_NONE)
     {
-        hymutex_destroy(&newenv->lock);
+        hymutex_destroy(&newenv->environment_data_lock);
         _deallocate((unsigned char *)newenv);
         *env = NULL;
         return error_code;
