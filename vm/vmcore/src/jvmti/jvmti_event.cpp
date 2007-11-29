@@ -1171,7 +1171,7 @@ jvmti_process_native_method_bind_event(jmethodID method, NativeCodePtr address, 
 VMEXPORT void
 jvmti_process_single_step_event(jmethodID method, jlocation location) {
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
-    if (!ti->isEnabled() ) return;
+    if (! ti->shouldReportEvent(JVMTI_EVENT_SINGLE_STEP) ) return;
 
     if (ti->getPhase() != JVMTI_PHASE_LIVE) return;
 
