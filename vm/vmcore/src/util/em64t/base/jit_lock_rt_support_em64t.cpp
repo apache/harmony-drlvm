@@ -92,21 +92,26 @@ static char * gen_restore_monitor_enter(char *ss, char *patch_addr_null_arg)
     ss = branch8(ss, Condition_Z,  Imm_Opnd(size_8, 0));
     char *backpatch_address__null_pointer = ((char *)ss) - 1;
 
-    // Fast path
-    ss = push(ss, rdi_opnd);
-    ss = alu(ss, add_opc, rdi_opnd, Imm_Opnd(header_offset)); // pop parameters
-    ss = gen_monitorenter_fast_path_helper(ss, rdi_opnd);
-    ss = pop(ss, rdi_opnd);
+    // skip fast path if can_generate_monitor_events capability
+    // was requested, so all TI events will be generated
+    if (!VM_Global_State::loader_env->TI->get_global_capability(
+                DebugUtilsTI::TI_GC_ENABLE_MONITOR_EVENTS)) {
+        // Fast path
+        ss = push(ss, rdi_opnd);
+        ss = alu(ss, add_opc, rdi_opnd, Imm_Opnd(header_offset)); // pop parameters
+        ss = gen_monitorenter_fast_path_helper(ss, rdi_opnd);
+        ss = pop(ss, rdi_opnd);
 
-    ss = test(ss,  rax_opnd,   rax_opnd);
-    ss = branch8(ss, Condition_NZ,  Imm_Opnd(size_8, 0));
-    char *backpatch_address__fast_monitor_failed = ((char *)ss) - 1;
-    ss = ret(ss);
+        ss = test(ss,  rax_opnd,   rax_opnd);
+        ss = branch8(ss, Condition_NZ,  Imm_Opnd(size_8, 0));
+        char *backpatch_address__fast_monitor_failed = ((char *)ss) - 1;
+        ss = ret(ss);
+
+        offset = (int64)ss - (int64)backpatch_address__fast_monitor_failed - 1;
+        *backpatch_address__fast_monitor_failed = (char)offset;
+    }
 
     // Slow path: happens when the monitor is busy (contention case)
-    offset = (int64)ss - (int64)backpatch_address__fast_monitor_failed - 1;
-    *backpatch_address__fast_monitor_failed = (char)offset;
-
     ss = gen_setup_j2n_frame(ss);
 
     ss = call(ss, (char *)oh_convert_to_local_handle);
@@ -214,10 +219,22 @@ static char * gen_restore_monitor_exit(char *ss, char *patch_addr_null_arg)
     ss = branch8(ss, Condition_Z,  Imm_Opnd(size_8, 0));
     char *backpatch_address__null_pointer = ((char *)ss) - 1;
 
-    // Fast path only
-    ss = alu(ss, add_opc, rdi_opnd, Imm_Opnd(header_offset));
-    ss = gen_monitor_exit_helper(ss, rdi_opnd);
+    // skip fast path if can_generate_monitor_events capability
+    // was requested, so all TI events will be generated
+    if (!VM_Global_State::loader_env->TI->get_global_capability(
+                DebugUtilsTI::TI_GC_ENABLE_MONITOR_EVENTS)) {
+        // Fast path
+        ss = alu(ss, add_opc, rdi_opnd, Imm_Opnd(header_offset));
+        ss = gen_monitor_exit_helper(ss, rdi_opnd);
+    } else {
+        // Slow path
+        ss = gen_setup_j2n_frame(ss);
 
+        ss = call(ss, (char *)oh_convert_to_local_handle);
+        ss = gen_monitorexit_slow_path_helper(ss, rax_opnd);
+
+        ss = gen_pop_j2n_frame(ss);
+    }
     ss = test(ss,  rax_opnd,   rax_opnd);
     ss = branch8(ss, Condition_NZ,  Imm_Opnd(size_8, 0));
     char *backpatch_address__fast_monitor_failed = ((char *)ss) - 1;
