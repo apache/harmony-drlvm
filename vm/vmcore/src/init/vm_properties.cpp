@@ -65,8 +65,6 @@ static const char *api_dll_files[] =
     "hyarchive"
 };
 
-#define GC_DLL "gc_gen"
-
 /**
  *  Compose a string of file names each of them beginning with path,
  *  names separated by PORT_PATH_SEPARATOR.  If patch is NULL, no path
@@ -302,7 +300,6 @@ static void init_vm_properties(Properties & properties)
         properties.set_new("vm.jvmti.enabled", "false");
         properties.set_new("vm.jvmti.compiled_method_load.inlined", "false");
         properties.set_new("vm.bootclasspath.appendclasspath", "false");
-        properties.set_new("gc.dll", PORT_DSO_NAME(GC_DLL));
         properties.set_new("thread.soft_unreservation", "false");
 
 #ifdef REFS_USE_RUNTIME_SWITCH

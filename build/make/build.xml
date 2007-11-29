@@ -349,6 +349,10 @@
 
 
     <target name="init.compressed.mode">
+        <!-- Only uncompressed mode is allowed for x86 -->
+        <condition property="refs.comp.mode" value="REFS_USE_UNCOMPRESSED">
+            <isset property="is.x86" />
+        </condition>
         <!-- refs.comp.mode from command line -->
         <condition property="refs.comp.mode.tmp" value="${COMPRESSED_MODE}">
             <isset property="COMPRESSED_MODE" />
@@ -392,6 +396,7 @@
             <param name="cxx" expression="${build.cxx}" />
             <param name="hynosig" expression="${hy.no.sig}" />
             <param name="hylocalzlib" expression="${hy.local.zlib}" />
+            <param name="refsmode" expression="${refs.comp.mode}" />
         </xslt>
 
         <xmlproperty file="${build.semi.dir}/deploy.xml" keeproot="true" collapseAttributes="true" />

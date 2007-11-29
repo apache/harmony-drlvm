@@ -38,30 +38,30 @@ enum Hashcode_Kind{
 };
 
 inline Boolean obj_is_sethash_in_vt(Partial_Reveal_Object* p_obj){
-  return (Boolean)((POINTER_SIZE_INT)obj_get_vt_raw(p_obj) & HASHCODE_EXTENDED_VT_BIT);
+  return (((VT_SIZE_INT)obj_get_vt_raw(p_obj) & HASHCODE_EXTENDED_VT_BIT) != 0);
 }
 
 inline void obj_sethash_in_vt(Partial_Reveal_Object* p_obj){
   VT vt = obj_get_vt_raw(p_obj);
-  obj_set_vt(p_obj,(VT)((POINTER_SIZE_INT)vt | HASHCODE_EXTENDED_VT_BIT));
+  obj_set_vt(p_obj,(VT)((VT_SIZE_INT)vt | HASHCODE_EXTENDED_VT_BIT));
 }
 
 inline Boolean hashcode_is_set(Partial_Reveal_Object* p_obj)
 { 
   Obj_Info_Type obj_info = get_obj_info_raw(p_obj);
-  return obj_info & HASHCODE_SET_BIT;
+  return ((obj_info & HASHCODE_SET_BIT) != 0);
 }
 
 inline Boolean hashcode_is_attached(Partial_Reveal_Object* p_obj)
 { 
   Obj_Info_Type obj_info = get_obj_info_raw(p_obj);
-  return obj_info & HASHCODE_ATTACHED_BIT; 
+  return ((obj_info & HASHCODE_ATTACHED_BIT) != 0);
 }
 
 inline Boolean hashcode_is_buffered(Partial_Reveal_Object* p_obj)
 {
   Obj_Info_Type obj_info = get_obj_info_raw(p_obj);
-  return obj_info & HASHCODE_BUFFERED_BIT; 
+  return ((obj_info & HASHCODE_BUFFERED_BIT) != 0);
 }
 
 inline int hashcode_gen(void* addr)
@@ -294,7 +294,7 @@ inline Obj_Info_Type slide_compact_process_hashcode(Partial_Reveal_Object* p_obj
                                                 Hashcode_Buf* old_buf, Hashcode_Buf* new_buf)
 {
   Obj_Info_Type obj_info = get_obj_info(p_obj);
-  POINTER_SIZE_INT hashcode;
+  POINTER_SIZE_INT hashcode = 0;
 
   switch(obj_info & HASHCODE_MASK){
     case HASHCODE_SET_UNALLOCATED:

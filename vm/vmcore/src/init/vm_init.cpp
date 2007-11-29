@@ -120,6 +120,19 @@ void create_instance_for_class(Global_Env * vm_env, Class *clss)
     }
 } //create_instance_for_class
 
+
+#define GC_DLL_COMP   PORT_DSO_NAME("gc_gen")
+#define GC_DLL_UNCOMP PORT_DSO_NAME("gc_gen_uncomp")
+
+#if defined(REFS_USE_COMPRESSED)
+#define GC_DLL GC_DLL_COMP
+#elif defined(REFS_USE_UNCOMPRESSED)
+#define GC_DLL GC_DLL_UNCOMP
+#else // for REFS_USE_RUNTIME_SWITCH
+#define GC_DLL (vm_env->compress_references ? GC_DLL_COMP : GC_DLL_UNCOMP)
+#endif
+
+
 /**
  * Loads DLLs.
  */
@@ -154,12 +167,14 @@ static jint process_properties_dlls(Global_Env * vm_env) {
 
     /*
      * Preload <GC>.dll which is specified by 'gc.dll' property.
-     *
-     * According to current design (r552465) 'gc.dll' property
-     * is always set: in configuration file (by default), or it can
-     * be reset from command line...
+     * 'gc.dll' property is set when specified in command line.
+     * When undefined, set default gc
      */
 #ifndef USE_GC_STATIC
+    if (!vm_env->VmProperties()->is_set("gc.dll")) {
+        vm_env->VmProperties()->set_new("gc.dll", GC_DLL);
+    }
+
     char* gc_dll = vm_env->VmProperties()->get("gc.dll");
 
     if (!gc_dll) {

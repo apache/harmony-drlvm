@@ -51,10 +51,19 @@ Description of the product deploy folder.
         </jitrino>
         </select>
 
+        <select refsmode="REFS_USE_COMPRESSED,REFS_USE_RUNTIME_SWITCH">
         <gc_gen>
             <shared>bin/default:gc_gen</shared>
             <jar>bin/default:gc_gen</jar>
         </gc_gen>
+        </select>
+
+        <select refsmode="REFS_USE_UNCOMPRESSED,REFS_USE_RUNTIME_SWITCH">
+        <gc_gen_uncomp>
+            <shared>bin/default:gc_gen_uncomp</shared>
+            <jar>bin/default:gc_gen_uncomp</jar>
+        </gc_gen_uncomp>
+        </select>
 
         <gc_cc>
             <shared>bin/default:gc_cc</shared>

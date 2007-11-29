@@ -137,21 +137,19 @@ enum GC_CAUSE{
   GC_CAUSE_RUNTIME_FORCE_GC
 };
 
-/*Fixme: There is only compressed mode under em64t currently.*/
-#ifdef POINTER64
-  #define COMPRESS_REFERENCE
-#endif
 
 extern POINTER_SIZE_INT HEAP_NULL;
 
-#ifdef POINTER64
-  #ifdef COMPRESS_REFERENCE
+//#define COMPRESS_REFERENCE // Now passed from outside 
+
+#if !defined(POINTER64) && defined(COMPRESS_REFERENCE)
+#error "32-bit architecture does not support references compression"
+#endif
+
+#ifdef COMPRESS_REFERENCE
     #define REF uint32
-  #else
+#else
     #define REF Partial_Reveal_Object*
-  #endif
-#else/*ifdef POINTER64*/
-  #define REF Partial_Reveal_Object*
 #endif
 
 /////////////////////////////////////////////
@@ -161,17 +159,17 @@ FORCE_INLINE REF obj_ptr_to_ref(Partial_Reveal_Object *p_obj)
 {
 #ifdef COMPRESS_REFERENCE
   if(!p_obj){
-	  /*Fixme: em64t: vm performs a simple compress/uncompress machenism
-	   i.e. just add or minus HEAP_NULL to p_obj
-	   But in gc we distinguish zero from other p_obj
-	   Now only in prefetch next live object we can hit this point. */
+          /*Fixme: em64t: vm performs a simple compress/uncompress machenism
+           i.e. just add or minus HEAP_NULL to p_obj
+           But in gc we distinguish zero from other p_obj
+           Now only in prefetch next live object we can hit this point. */
     return (REF)0;
   }
   else
     return (REF) ((POINTER_SIZE_INT) p_obj - HEAP_NULL);
 #else
 
-	return (REF)p_obj;
+        return (REF)p_obj;
 
 #endif
 
@@ -187,7 +185,7 @@ FORCE_INLINE Partial_Reveal_Object *ref_to_obj_ptr(REF ref)
 
 #else
 
-	return (Partial_Reveal_Object *)ref;
+        return (Partial_Reveal_Object *)ref;
 
 #endif
 
@@ -227,35 +225,35 @@ inline int* object_ref_iterator_next(int* iterator)
 /****************************************/
 
 inline Boolean obj_is_marked_in_vt(Partial_Reveal_Object *obj) 
-{  return (Boolean)((POINTER_SIZE_INT)obj_get_vt_raw(obj) & CONST_MARK_BIT); }
+{  return (((VT_SIZE_INT)obj_get_vt_raw(obj) & CONST_MARK_BIT) != 0); }
 
 inline Boolean obj_mark_in_vt(Partial_Reveal_Object *obj) 
 {  
   VT vt = obj_get_vt_raw(obj);
-  if((POINTER_SIZE_INT)vt & CONST_MARK_BIT) return FALSE;
-  obj_set_vt(obj,  (VT)( (POINTER_SIZE_INT)vt | CONST_MARK_BIT ) );
+  if((VT_SIZE_INT)vt & CONST_MARK_BIT) return FALSE;
+  obj_set_vt(obj,  (VT)( (VT_SIZE_INT)vt | CONST_MARK_BIT ) );
   return TRUE;
 }
 
 inline void obj_unmark_in_vt(Partial_Reveal_Object *obj) 
 { 
   VT vt = obj_get_vt_raw(obj);
-  obj_set_vt(obj, (VT)((POINTER_SIZE_INT)vt & ~CONST_MARK_BIT));
+  obj_set_vt(obj, (VT)((VT_SIZE_INT)vt & ~CONST_MARK_BIT));
 }
 
 inline void obj_clear_dual_bits_in_vt(Partial_Reveal_Object* p_obj){
   VT vt = obj_get_vt_raw(p_obj);
-  obj_set_vt(p_obj,(VT)((POINTER_SIZE_INT)vt & DUAL_MARKBITS_MASK));
+  obj_set_vt(p_obj,(VT)((VT_SIZE_INT)vt & DUAL_MARKBITS_MASK));
 }
 
 inline Boolean obj_is_marked_or_fw_in_oi(Partial_Reveal_Object *obj)
-{ return get_obj_info_raw(obj) & DUAL_MARKBITS; }
+{ return ((get_obj_info_raw(obj) & DUAL_MARKBITS) != 0); }
 
 
 inline void obj_clear_dual_bits_in_oi(Partial_Reveal_Object *obj)
 {  
   Obj_Info_Type info = get_obj_info_raw(obj);
-  set_obj_info(obj, (unsigned int)info & DUAL_MARKBITS_MASK);
+  set_obj_info(obj, info & DUAL_MARKBITS_MASK);
 }
 
 /****************************************/
@@ -279,7 +277,7 @@ inline void obj_set_fw_in_oi(Partial_Reveal_Object *obj,void *dest)
 
 
 inline Boolean obj_is_marked_in_oi(Partial_Reveal_Object *obj) 
-{  return ( get_obj_info_raw(obj) & CONST_MARK_BIT ); }
+{  return ((get_obj_info_raw(obj) & CONST_MARK_BIT) != 0); }
 
 FORCE_INLINE Boolean obj_mark_in_oi(Partial_Reveal_Object *obj) 
 {  
@@ -295,7 +293,6 @@ inline void obj_unmark_in_oi(Partial_Reveal_Object *obj)
   Obj_Info_Type info = get_obj_info_raw(obj);
   info = info & ~CONST_MARK_BIT;
   set_obj_info(obj, info);
-  return;
 }
 
 /* **********************************  */
@@ -314,7 +311,7 @@ inline Partial_Reveal_Object *obj_get_fw_in_oi(Partial_Reveal_Object *obj)
 }
 
 inline Boolean obj_is_fw_in_oi(Partial_Reveal_Object *obj) 
-{  return (get_obj_info_raw(obj) & FLIP_FORWARD_BIT); }
+{  return ((get_obj_info_raw(obj) & FLIP_FORWARD_BIT) != 0); }
 
 inline void obj_set_fw_in_oi(Partial_Reveal_Object *obj, void *dest)
 { 
@@ -353,7 +350,7 @@ inline Boolean obj_unmark_in_oi(Partial_Reveal_Object* p_obj)
 inline Boolean obj_is_marked_in_oi(Partial_Reveal_Object* p_obj)
 {
   Obj_Info_Type info = get_obj_info_raw(p_obj);
-  return (info & FLIP_MARK_BIT);
+  return ((info & FLIP_MARK_BIT) != 0);
 }
 
 #endif /* MARK_BIT_FLIPPING */
@@ -361,7 +358,7 @@ inline Boolean obj_is_marked_in_oi(Partial_Reveal_Object* p_obj)
 inline Boolean obj_is_dirty_in_oi(Partial_Reveal_Object* p_obj)
 {
   Obj_Info_Type info = get_obj_info_raw(p_obj);
-  return (Boolean)(info & OBJ_DIRTY_BIT);
+  return ((info & OBJ_DIRTY_BIT) != 0);
 }
 
 inline Boolean obj_dirty_in_oi(Partial_Reveal_Object* p_obj)
@@ -370,7 +367,7 @@ inline Boolean obj_dirty_in_oi(Partial_Reveal_Object* p_obj)
   if( info & OBJ_DIRTY_BIT ) return FALSE;
   
   Obj_Info_Type new_info = info | OBJ_DIRTY_BIT;
-  while(info != atomic_cas32((volatile unsigned int *)get_obj_info_addr(p_obj),new_info, info)){
+  while(info != atomic_casptrsz((volatile POINTER_SIZE_INT*)get_obj_info_addr(p_obj), new_info, info)){
     info = get_obj_info_raw(p_obj);
     if( info & OBJ_DIRTY_BIT ) return FALSE;
     new_info =  info |OBJ_DIRTY_BIT;
@@ -493,11 +490,11 @@ extern Boolean NOS_PARTIAL_FORWARD;
   //#define NOS_BOUNDARY ((void*)0x2ea20000)  //this is for 512M
   #define NOS_BOUNDARY ((void*)0x40000000) //this is for 256M
 
-	#define nos_boundary NOS_BOUNDARY
+        #define nos_boundary NOS_BOUNDARY
 
 #else /* STATIC_NOS_MAPPING */
 
-	extern void* nos_boundary;
+        extern void* nos_boundary;
 
 #endif /* STATIC_NOS_MAPPING */
 

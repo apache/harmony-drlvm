@@ -32,6 +32,7 @@ Version: $Revision: 1.4.2.4 $
             <property  name="build.depends" value="vm.vmcore, 
                                                    vm.em, 
                                                    vm.gc_gen,
+                                                   vm.gc_gen_uncomp,
                                                    vm.gc_cc,
                                                    vm.vmi,
                                                    vm.interpreter,

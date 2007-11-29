@@ -142,17 +142,17 @@ inline Partial_Reveal_Object *obj_end_extend(Partial_Reveal_Object *obj)
 inline void obj_set_prefetched_next_pointer(Partial_Reveal_Object* obj, Partial_Reveal_Object* raw_prefetched_next){
   /*Fixme: em64t: This may be not necessary!*/
   if(raw_prefetched_next == 0){
-    *((REF*)obj + 1) = 0;
+    *((POINTER_SIZE_INT*)obj + 1) = 0;
     return;
   }
   REF ref = obj_ptr_to_ref(raw_prefetched_next);
-  *((REF*)obj + 1) = ref;
+  *( (REF*)((POINTER_SIZE_INT*)obj + 1) ) = ref;
 }
 
 inline  Partial_Reveal_Object* obj_get_prefetched_next_pointer(Partial_Reveal_Object* obj){
   /*Fixme: em64t: This may be not necessary!*/
   assert(obj);  
-  return read_slot( (REF*)obj + 1);
+  return read_slot( (REF*)((POINTER_SIZE_INT*)obj + 1) );
 }
 
 inline Partial_Reveal_Object *next_marked_obj_in_block(Partial_Reveal_Object *cur_obj, Partial_Reveal_Object *block_end)
@@ -354,6 +354,7 @@ inline int obj_lookup_hashcode_in_buf(Partial_Reveal_Object *p_obj)
 #endif
 
 #endif //#ifndef _BLOCK_H_
+
 
 
 

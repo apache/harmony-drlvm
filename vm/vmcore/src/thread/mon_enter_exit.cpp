@@ -144,11 +144,11 @@ static void vm_monitor_exit_default(ManagedObject *p_obj)
 }
 
 static uint32 vm_monitor_try_enter_default(ManagedObject *p_obj) {
-    return (uint32)hythread_thin_monitor_try_enter((hythread_thin_monitor_t *)((char *)p_obj+4));
+    return (uint32)hythread_thin_monitor_try_enter((hythread_thin_monitor_t *)p_obj->get_obj_info_addr());
 }
 
 static uint32 vm_monitor_try_exit_default(ManagedObject *p_obj) {
-    return (uint32)hythread_thin_monitor_exit((hythread_thin_monitor_t *)((char *)p_obj+4));
+    return (uint32)hythread_thin_monitor_exit((hythread_thin_monitor_t *)p_obj->get_obj_info_addr());
 }
 
 

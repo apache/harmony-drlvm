@@ -56,7 +56,11 @@ static void gc_get_system_info(GC *gc)
 
 static void init_gc_helpers()
 {
+#ifdef COMPRESS_REFERENCE
     set_property("vm.component.classpath.gc_gen", "gc_gen.jar", VM_PROPERTIES);
+#else
+    set_property("vm.component.classpath.gc_gen_uncomp", "gc_gen_uncomp.jar", VM_PROPERTIES);
+#endif
     vm_helper_register_magic_helper(VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE, "org/apache/harmony/drlvm/gc_gen/GCHelper", "alloc");
     vm_helper_register_magic_helper(VM_RT_NEW_VECTOR_USING_VTABLE,  "org/apache/harmony/drlvm/gc_gen/GCHelper", "allocArray");
     vm_helper_register_magic_helper(VM_RT_GC_HEAP_WRITE_REF,  "org/apache/harmony/drlvm/gc_gen/GCHelper", "write_barrier_slot_rem");
@@ -81,10 +85,12 @@ int gc_init()
 
   gc_parse_options(gc);
 
-  if(vm_vtable_pointers_are_compressed()) {
+// iberezhniuk: compile-time switching is now used in both VM and GC
+#ifdef COMPRESS_VTABLE
+  assert(vm_vtable_pointers_are_compressed());
     // ppervov: reference compression and vtable compression are orthogonal
-    vtable_base = vm_get_vtable_base();
-  }
+  vtable_base = vm_get_vtable_base();
+#endif
 
   gc_tls_init();
   
@@ -150,12 +156,14 @@ void gc_wrapup()
   INFO2("gc.process", "GC: end of GC wrapup\n");
 }
 
-#ifdef COMPRESS_REFERENCE
 Boolean gc_supports_compressed_references()
 {
+#ifdef COMPRESS_REFERENCE
   return TRUE;
-}
+#else
+  return FALSE;
 #endif
+}
 
 /* this interface need reconsidering. is_pinned is unused. */
 void gc_add_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinned) 
@@ -317,16 +325,17 @@ int32 gc_get_hashcode(Managed_Object_Handle p_object)
    if(!obj) return 0;
    assert(address_belongs_to_gc_heap(obj, p_global_gc));
    Obj_Info_Type info = get_obj_info_raw(obj);
-   int hash = info & GCGEN_HASH_MASK;
+   int hash = (int)(info & GCGEN_HASH_MASK);
    if (!hash) {
        hash = (int)((((POINTER_SIZE_INT)obj) >> 3) & GCGEN_HASH_MASK);
        if(!hash)  hash = (0x173 & GCGEN_HASH_MASK);
-       unsigned int new_info = (unsigned int)(info | hash);
+       POINTER_SIZE_INT new_info = info | hash;
        while (true) {
-         unsigned int temp = atomic_cas32((volatile unsigned int*)(&obj->obj_info), new_info, info);
+         Obj_Info_Type temp =
+           atomic_casptrsz((volatile POINTER_SIZE_INT*)(&obj->obj_info), new_info, info);
          if (temp == info) break;
          info = get_obj_info_raw(obj);
-         new_info = (unsigned int)(info | hash);
+         new_info = info | hash;
        }
    }
    return hash;
@@ -342,7 +351,7 @@ int32 gc_get_hashcode(Managed_Object_Handle p_object)
   if(!p_obj) return 0;
   assert(address_belongs_to_gc_heap(p_obj, p_global_gc));
   Obj_Info_Type info = get_obj_info_raw(p_obj);
-  unsigned int new_info = 0;
+  Obj_Info_Type new_info = 0;
   int hash;
   
   switch(info & HASHCODE_MASK){
@@ -356,12 +365,13 @@ int32 gc_get_hashcode(Managed_Object_Handle p_object)
       hash = hashcode_lookup(p_obj,info);
       break;
     case HASHCODE_UNSET:
-      new_info = (unsigned int)(info | HASHCODE_SET_BIT);
+      new_info = info | HASHCODE_SET_BIT;
       while (true) {
-        unsigned int temp = atomic_cas32((volatile unsigned int*)(&p_obj->obj_info), new_info, info);
+        Obj_Info_Type temp =
+          atomic_casptrsz((volatile POINTER_SIZE_INT*)(&p_obj->obj_info), new_info, info);
         if (temp == info) break;
         info = get_obj_info_raw(p_obj);
-        new_info =  (unsigned int)(info | HASHCODE_SET_BIT);
+        new_info = info | HASHCODE_SET_BIT;
       }
       hash = hashcode_gen((void*)p_obj);
       break;

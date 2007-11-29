@@ -273,7 +273,7 @@ void lspace_compute_object_target(Collector* collector, Lspace* lspace)
 
     if( obj_info != 0 ) {
       collector_remset_add_entry(collector, (Partial_Reveal_Object **)dest_addr);
-      collector_remset_add_entry(collector, (Partial_Reveal_Object **)(POINTER_SIZE_INT)obj_info);
+      collector_remset_add_entry(collector, (Partial_Reveal_Object **)obj_info);
     }
       
     obj_set_fw_in_oi(p_obj, dest_addr);
@@ -480,4 +480,5 @@ void lspace_sweep(Lspace* lspace)
   TRACE2("gc.process", "GC: end of lspace sweep algo ...\n");
   return;
 }
+
 

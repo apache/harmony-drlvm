@@ -40,7 +40,7 @@ static FORCE_INLINE Boolean obj_mark_black(Partial_Reveal_Object *obj)
       Obj_Info_Type oi = obj->obj_info;
       Obj_Info_Type new_oi = oi & DUAL_MARKBITS_MASK;
       while(new_oi != oi){
-        Obj_Info_Type temp = (Obj_Info_Type)atomic_cas32((volatile Obj_Info_Type*)get_obj_info_addr(obj), new_oi, oi);
+        Obj_Info_Type temp = atomic_casptrsz((volatile Obj_Info_Type*)get_obj_info_addr(obj), new_oi, oi);
         if(temp == oi) break;
         oi = obj->obj_info;
         new_oi = oi & DUAL_MARKBITS_MASK;

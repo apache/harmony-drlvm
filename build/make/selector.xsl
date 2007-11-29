@@ -33,6 +33,7 @@ Version: $Revision: 1.1.2.2 $
     <xsl:param name="cxx" />
     <xsl:param name="hynosig" />
     <xsl:param name="hylocalzlib" />
+    <xsl:param name="refsmode" />
 
     <xsl:template match="/">
         <xsl:apply-templates />
@@ -41,7 +42,7 @@ Version: $Revision: 1.1.2.2 $
     <!-- the  template prints the child of the select tag only if the
          select matches build configuration --> 
     <xsl:template match="select">
-        <xsl:if test="(contains(@hylocalzlib,$hylocalzlib) or not(@hylocalzlib)) and (contains(@hynosig,$hynosig) or not(@hynosig)) and (contains(@osfamily,$osfamily) or not(@osfamily))and (contains(@os,$os) or not(@os))and (contains(@cfg,$cfg) or not(@cfg)) and (contains(@arch,$arch) or not(@arch)) and (contains(concat(' ',@cxx), concat(' ',$cxx)) or not(@cxx))">
+        <xsl:if test="(contains(@hylocalzlib,$hylocalzlib) or not(@hylocalzlib)) and (contains(@hynosig,$hynosig) or not(@hynosig)) and (contains(@osfamily,$osfamily) or not(@osfamily))and (contains(@os,$os) or not(@os))and (contains(@cfg,$cfg) or not(@cfg)) and (contains(@arch,$arch) or not(@arch)) and (contains(concat(' ',@cxx), concat(' ',$cxx)) or not(@cxx)) and (contains(@refsmode,$refsmode) or not(@refsmode))">
             <xsl:apply-templates select="*" />
         </xsl:if>
     </xsl:template>

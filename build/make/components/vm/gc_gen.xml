@@ -27,7 +27,14 @@ Version: $Revision: 1.2 $
   -->
 
 <project name="vm.gc_gen">
-    <target name="init" depends="common_vm">
+    <!-- Do we need CG for compressed mode -->
+    <condition property="build.compressed.gc">
+        <not><!-- refs.comp.mode is not REFS_USE_UNCOMPRESSED for compressed and runtime switching modes -->
+            <equals arg1="${refs.comp.mode}" arg2="REFS_USE_UNCOMPRESSED" />
+        </not>
+    </condition>
+
+    <target name="init" depends="common_vm" if="build.compressed.gc">
         <property name="build.depends" value="extra.apr,vm.vmcore,vm.hythr,vm.kernel_classes" />
         <property name="outtype" value="shared" />
         <property name="libname" value="gc_gen" />
@@ -65,6 +72,7 @@ Version: $Revision: 1.2 $
             </fileset>
 
             <defineset define="BUILDING_GC" />
+            <defineset define="COMPRESS_REFERENCE" />
 
             <defineset define="_USRDLL" if="is.windows"/>
         </compiler>
