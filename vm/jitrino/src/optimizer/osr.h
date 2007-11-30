@@ -180,8 +180,8 @@ private:
         SsaOpnd* ssa;
 
         bool operator<(OldInst other) const {
-            return ((uint32) type + (int) var + (int) ssa) <
-            ((uint32) other.type + (int) other.var + (int) other.ssa);
+            return ((POINTER_SIZE_INT) type + (POINTER_SIZE_SINT) var + (POINTER_SIZE_SINT) ssa) <
+            ((POINTER_SIZE_INT) other.type + (POINTER_SIZE_SINT) other.var + (POINTER_SIZE_SINT) other.ssa);
         }
     };
 
