@@ -113,7 +113,7 @@ static JIT_RT_Function_Entry _jit_rt_function_entries_base[] = {
     {VM_RT_CHECKCAST,                          "VM_RT_CHECKCAST",
             INTERRUPTIBLE_ALWAYS,              CALLING_CONVENTION_STDCALL,              2,
             "org/apache/harmony/drlvm/VMHelperFastPath",   "checkCast",
-            "(Lorg/vmmagic/unboxed/Address;Ljava/lang/Object;)Ljava/lang/Object;",   NULL},
+            "(Lorg/vmmagic/unboxed/Address;Ljava/lang/Object;)V",   NULL},
 
     {VM_RT_INSTANCEOF,                         "VM_RT_INSTANCEOF",
             INTERRUPTIBLE_ALWAYS,              CALLING_CONVENTION_STDCALL,              2,

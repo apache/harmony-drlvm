@@ -20,7 +20,9 @@
 
 package org.apache.harmony.drlvm;
 
-import org.vmmagic.unboxed.Address;
+import org.vmmagic.unboxed.*;
+import org.vmmagic.pragma.*;
+
 /**
     Core class for DRLVM's vmmagic based helpers.
     Resolved and initilized during VM startup
@@ -45,6 +47,12 @@ public class VMHelper {
 
     public static final long COMPRESSED_REFS_OBJ_BASE_OFFSET  = getCompressedModeObjectBaseOffset();
 
+    public static final int OBJ_VTABLE_OFFSET = 0;
+
+    public static final int VTABLE_GCPRIVATE_OFFSET = 0;
+
+    public static final int OBJ_INFO_OFFSET = 4;
+
 
 
 
@@ -65,9 +73,10 @@ public class VMHelper {
 
     public static Address getInterfaceVTable(Object obj, Address intfTypePtr) {fail(); return null;}
  
-    public static Object checkCast(Object obj, Address castTypePtr) {fail(); return null;}
+    public static void checkCast(Object obj, Address castTypePtr) {fail();}
  
     public static boolean instanceOf(Object obj, Address castTypePtr) {fail(); return false;}
+
 
 
 
@@ -91,10 +100,23 @@ public class VMHelper {
 
     public static int getFastTypeCheckDepth(Address classHandle) {VMHelper.fail(); return 0;}
 
-
-
     protected static void fail() {throw new RuntimeException("Not supported!");}
 
+
+
+
+
+    //helpers implemented with magics
+
+    @Inline
+    public static Address getVTable(Object obj) {
+        Address objAddr = ObjectReference.fromObject(obj).toAddress();
+        if (COMPRESSED_VTABLE_MODE) {
+            int compressedAddr = objAddr.loadInt(Offset.fromIntZeroExtend(OBJ_VTABLE_OFFSET));
+            return Address.fromLong(compressedAddr + COMPRESSED_VTABLE_BASE_OFFSET);
+        } 
+        return objAddr.loadAddress(Offset.fromIntZeroExtend(OBJ_VTABLE_OFFSET));
+    }
 
 
 

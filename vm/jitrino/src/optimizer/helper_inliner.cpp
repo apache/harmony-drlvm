@@ -241,6 +241,12 @@ void HelperInliner::run()  {
     Opnd* instResOpnd = inst->getDst();
     Type* helperRetType = method->getReturnType();
     Type* instResType = instResOpnd->getType();
+    bool resIsTau = instResType && Type::isTau(instResType->tag);
+    if (resIsTau) {
+        assert(helperRetType->isVoid());
+        instResType = NULL;
+        instResOpnd = opndManager->getNullOpnd();
+    }
     bool needResConv = instResType && instResType->isObject() && helperRetType->isObject() && VMMagicUtils::isVMMagicClass(helperRetType->asObjectType()->getName());
     Opnd* helperResOpnd = !needResConv ? instResOpnd : opndManager->createSsaTmpOpnd(typeManager->getUnmanagedPtrType(typeManager->getInt8Type()));
     
@@ -255,16 +261,25 @@ void HelperInliner::run()  {
 
     finalizeCall(call); //make call last inst in a block
 
-    if (needResConv) {
+    if (needResConv || resIsTau) {
         //convert address type to managed object type
-        Edge* fallEdge= call->getNode()->getUnconditionalEdge();
+        Edge* fallEdge = call->getNode()->getUnconditionalEdge();
         assert(fallEdge && fallEdge->getTargetNode()->isBlockNode());
         Node* fallNode = fallEdge->getTargetNode();
         if (fallNode->getInDegree()>1) {
             fallNode = irm->getFlowGraph().spliceBlockOnEdge(fallEdge, instFactory->makeLabel());
         }
-        Modifier mod = Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No);
-        fallNode->prependInst(instFactory->makeConvUnmanaged(mod, Type::Object, instResOpnd, helperResOpnd));
+        if (needResConv) {
+            Modifier mod = Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No);
+            fallNode->prependInst(instFactory->makeConvUnmanaged(mod, Type::Object, instResOpnd, helperResOpnd));
+        } else {
+            assert(resIsTau);
+            Opnd* tauSafeOpnd2 = opndManager->createSsaTmpOpnd(typeManager->getTauType());
+            Inst* makeTau = instFactory->makeTauSafe(tauSafeOpnd2);
+            fallNode->prependInst(makeTau);
+            instFactory->makeCopy(inst->getDst(), tauSafeOpnd2)->insertAfter(makeTau);
+            
+        }
     }
 
     //Inline the call

@@ -135,29 +135,29 @@ public class VMHelperFastPath {
     }
 
     @Inline
-    public static Object checkCast(Address castType, Object obj) {
+    public static void checkCast(Address castType, Object obj) {
         if (obj == null) {
-            return obj;
+            return;
         }
         if (VMHelper.isInterface(castType)) {
             Address vtableAddr = getVTableAddress(obj);
 
             Address inf0Type = vtableAddr.loadAddress(Offset.fromIntZeroExtend(CLASS_INF_TYPE_0_OFFSET));
             if (inf0Type.EQ(castType)) {
-                return obj;
+                return;
             }
     
             Address inf1Type = vtableAddr.loadAddress(Offset.fromIntZeroExtend(CLASS_INF_TYPE_1_OFFSET));
             if (inf1Type.EQ(castType)) {
-                return obj;
+                return;
             }
         } else if (!VMHelper.isArray(castType)) {
             int fastCheckDepth=VMHelper.getFastTypeCheckDepth(castType);
             if (fastCheckDepth!=0 && fastClassInstanceOf(obj, castType, fastCheckDepth)) {
-                return obj;
+                return;
             }
         } 
-        return VMHelper.checkCast(obj, castType);
+        VMHelper.checkCast(obj, castType);
     }
 
     @Inline

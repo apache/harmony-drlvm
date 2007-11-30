@@ -3588,8 +3588,7 @@ bool JavaByteCodeTranslator::genVMHelper(const char* mname, uint32 numArgs, Opnd
 
     if (!strcmp(mname,"checkCast")) {
         assert(numArgs == 2);
-        Opnd* res = irBuilder.genVMHelperCall(VM_RT_CHECKCAST, resType, numArgs, srcOpnds);
-        pushOpnd(res);
+        irBuilder.genVMHelperCall(VM_RT_CHECKCAST, resType, numArgs, srcOpnds);
         return true;
     }
 
