@@ -24,7 +24,9 @@ CS_OPT.file=jitrino
 
 -XX:jit.CS_OPT.path=opt_init,lock_method,translator,optimizer,hir2lir,codegen,unlock_method
 
--XX:jit.CS_OPT.path.optimizer=ssa,devirt,hlo_api_magic,inline,purge,simplify,dce,uce,lazyexc,throwopt,hvn,simplify,dce,uce,escape,dce,uce,memopt,simplify,dce,uce,lower,statprof,unroll,ssa,simplify,dce,uce,dessa,statprof
+-XX:jit.CS_OPT.path.optimizer=ssa,devirt,hlo_api_magic,inline,purge,osr_path,simplify,dce,uce,lazyexc,throwopt,escape_path,dce,uce,memopt,simplify,dce,uce,lower,statprof,unroll,ssa,simplify,dce,uce,dessa,statprof
+-XX:jit.CS_OPT.path.osr_path=simplify,dce,uce,gcm,osr
+-XX:jit.CS_OPT.path.escape_path=hvn,simplify,dce,uce,escape
 -XX:jit.CS_OPT.path.codegen=bbp,btr,gcpoints,cafl,dce1,i8l,api_magic,early_prop,peephole,itrace-,native,constraints,dce2,regalloc,spillgen,copy,i586,layout,rce+,stack,break-,iprof-,peephole,emitter!,si_insts,gcmap,info
 -XX:jit.CS_OPT.path.dce1=cg_dce
 -XX:jit.CS_OPT.path.dce2=cg_dce
