@@ -1183,6 +1183,12 @@ BEGIN_OPCODES()
 END_OPCODES()
 END_MNEMONIC()
 
+BEGIN_MNEMONIC(PREFETCH, MF_NONE, U)
+BEGIN_OPCODES()
+{OpcodeInfo::all,   {0x0F, 0x18, _0},   {m8},         U },
+END_OPCODES()
+END_MNEMONIC()
+
 BEGIN_MNEMONIC(PUSH, MF_NONE, U )
 BEGIN_OPCODES()
     {OpcodeInfo::all,   {Size16, 0xFF, _6}, {r_m16},    U },
@@ -1414,10 +1420,10 @@ BEGIN_OPCODES()
 END_OPCODES()
 END_MNEMONIC()
 
-BEGIN_MNEMONIC(STOS, MF_AFFECTS_FLAGS, U_U)
+BEGIN_MNEMONIC(STOS, MF_AFFECTS_FLAGS, DU_DU_U)
 BEGIN_OPCODES()
-    {OpcodeInfo::all,   {0xAB},         {EDI, EAX},   U_U },
-    {OpcodeInfo::em64t, {REX_W, 0xAB},  {RDI, RAX},   U_U },
+    {OpcodeInfo::all,   {0xAB},         {EDI, ECX, EAX},   DU_DU_U },
+    {OpcodeInfo::em64t, {REX_W, 0xAB},  {RDI, RCX, RAX},   DU_DU_U },
 END_OPCODES()
 END_MNEMONIC()
 

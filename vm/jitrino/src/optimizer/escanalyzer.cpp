@@ -407,6 +407,8 @@ EscAnalyzer::instrExam(Node* node) {
             case Op_JitHelperCall:      // calljithelper
                 if (method_ea_level == 0) {
                     switch(inst->asJitHelperCallInst()->getJitHelperId()) {
+                        case Prefetch:
+                        case Memset0:
                         case InitializeArray:
                         case FillArrayWithConst:
                         case SaveThisState:
@@ -615,13 +617,13 @@ EscAnalyzer::instrExam(Node* node) {
 
             case Op_TauVirtualCall:  // callvirt
             case Op_IndirectCall:    // calli
-
+            
             case Op_TauStRef:  
             case Op_TauStField:     
             case Op_TauStElem:     
+            case Op_Prefetch:
             case Op_TauStStatic:
             case Op_Copy:       
-
             case Op_Box:
                 break;
 
@@ -3753,7 +3755,7 @@ EscAnalyzer::scanLocalObjects() {
                     os_sc << " null "; 
                     os_sc << std::endl;
                 } else {
-		            printCnGNode(stnode,os_sc); os_sc << std::endl;
+                    printCnGNode(stnode,os_sc); os_sc << std::endl;
                 }
             }
         }
@@ -3853,7 +3855,7 @@ EscAnalyzer::scanEscapedObjects() {
         if ((*it)->nodeType == NT_OBJECT 
             && getOutEscaped(*it) == 0 && !((*it)->nInst->getOpcode()==Op_LdRef)) {
             if ((*it)->nInst->getNode() == NULL && getEscState(*it)==NO_ESCAPE) {
-				continue;   // already scalarized
+                continue;   // already scalarized
             }
             ob_ref_type = (*it)->nodeRefType;   // object ref type
             if (ob_ref_type != NR_REF) {
@@ -3889,7 +3891,7 @@ EscAnalyzer::scanEscapedObjects() {
                     os_sc << " null "; 
                     os_sc << std::endl;
                 } else {
-		            printCnGNode(stnode,os_sc); os_sc << std::endl;
+                    printCnGNode(stnode,os_sc); os_sc << std::endl;
                 }
             }
 
@@ -5545,17 +5547,17 @@ EscAnalyzer::fixMethodEndInsts(uint32 ob_id) {
 
 EscAnalyzer::CnGNode* 
 EscAnalyzer::getLObj(CnGNode* vval) {
-	CnGNode* n = vval;
-	while (n->nodeType != NT_LDOBJ) {
-		if (n->nodeType!=NT_VARVAL)
-			return NULL;
-		if (n->outEdges == NULL)
-			return NULL;
-		if ((n->outEdges)->size()!=1)
-			return NULL;
-		n=(n->outEdges)->front()->cngNodeTo;
-	}
-	return n;
+    CnGNode* n = vval;
+    while (n->nodeType != NT_LDOBJ) {
+        if (n->nodeType!=NT_VARVAL)
+            return NULL;
+        if (n->outEdges == NULL)
+            return NULL;
+        if ((n->outEdges)->size()!=1)
+            return NULL;
+        n=(n->outEdges)->front()->cngNodeTo;
+    }
+    return n;
 } //getLObj(CnGNode* vval)
 
 
@@ -5879,4 +5881,6 @@ static bool isVMHelperCall(Inst* inst, VM_RT_SUPPORT id) {
 }
 
 } //namespace Jitrino 
+
+
 

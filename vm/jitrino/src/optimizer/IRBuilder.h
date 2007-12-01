@@ -374,7 +374,7 @@ public:
     Opnd*      genTauAnd(Opnd *src1, Opnd *src2);
 
     // UNUSED GEN
-    Opnd*      genPrefetch(Opnd* base, Opnd *offset, Opnd *hints);
+    void       genPrefetch(Opnd *addr); // prefetch
     Opnd*      genCopy(Opnd* src);
     Opnd*      genTauPi(Opnd* src, Opnd *tau, PiCondition *cond);
     // compressed reference instructions

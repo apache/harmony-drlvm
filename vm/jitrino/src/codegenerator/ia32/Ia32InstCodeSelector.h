@@ -260,7 +260,7 @@ public:
     void           initType(Type* type);
     CG_OpndHandle* catchException(Type * exceptionType);
     CG_OpndHandle* copy(CG_OpndHandle *src);
-    void           prefetch(CG_OpndHandle *src, uint32 offset, int hints);
+    void prefetch(CG_OpndHandle *addr);
 
     void pseudoInst();
 

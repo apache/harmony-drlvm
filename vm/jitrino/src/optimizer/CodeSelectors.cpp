@@ -403,6 +403,8 @@ IntrinsicCallOp::Id _BlockCodeSelector::convertIntrinsicId(IntrinsicCallId callI
 
 JitHelperCallOp::Id _BlockCodeSelector::convertJitHelperId(JitHelperCallId callId) {
     switch(callId) {
+        case Prefetch:           	return JitHelperCallOp::Prefetch;
+        case Memset0:           	return JitHelperCallOp::Memset0;
         case InitializeArray:           return JitHelperCallOp::InitializeArray;
         case SaveThisState:             return JitHelperCallOp::SaveThisState;
         case ReadThisState:             return JitHelperCallOp::ReadThisState;
@@ -1914,23 +1916,9 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback, I
             break;
         case Op_Prefetch:
             {
-                assert(inst->getNumSrcOperands() == 3);
-                Opnd* src1 = inst->getSrc(0);
-                Opnd* src2 = inst->getSrc(1);
-                Opnd* src3 = inst->getSrc(2);
-                assert(src3->getInst()->isConst());
-                uint32 hints = src3->getInst()->asConstInst()->getValue().i4;
-                CG_OpndHandle * src1Handle = getCGInst(src1);
-                uint32 offset = 0;
-                if (src2->getInst()->isConst()) {
-                    offset = src2->getInst()->asConstInst()->getValue().i4;
-                } else {
-                    // Generate an add instruction to add offset to src1
-                    assert(src2->getType()->isInt4());
-                    src1Handle = instructionCallback.addRef(RefArithmeticOp::I4,
-                        src1Handle,getCGInst(src2));
-                }
-                instructionCallback.prefetch(src1Handle, offset, hints);
+                assert(inst->getNumSrcOperands() == 1);
+                Opnd* addr= inst->getSrc(0);
+                instructionCallback.prefetch(getCGInst(addr));
             }
             break;
         case Op_TauPoint:

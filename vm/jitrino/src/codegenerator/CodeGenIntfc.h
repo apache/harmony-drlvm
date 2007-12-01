@@ -164,6 +164,8 @@ public:
 class JitHelperCallOp {
 public:
     enum Id {
+	Prefetch,
+	Memset0,
         InitializeArray,
         FillArrayWithConst,
         SaveThisState,
@@ -462,7 +464,7 @@ public:
     virtual void            copyValueObj(Type* objType, CG_OpndHandle *dstAddr, CG_OpndHandle *srcAddr) = 0;
     virtual CG_OpndHandle*  copy(CG_OpndHandle *src) = 0;
     virtual CG_OpndHandle*  catchException(Type * exceptionType) = 0;
-    virtual void            prefetch(CG_OpndHandle* refSrc, uint32 offset, int hints) = 0;
+    virtual void prefetch(CG_OpndHandle *addr) = 0;
 
     virtual void pseudoInst() = 0;
 

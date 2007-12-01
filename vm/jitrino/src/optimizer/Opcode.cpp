@@ -209,7 +209,7 @@ static OpcodeInfo opcodeTable[] = {
                                                                                                                        
     // Profile instrumentation instructions                   
     { Op_IncCounter,            true,  MB::None,          MK::None,                                  "inccounter",    "inccounter(%d)",               }, // Increment a profile counter by 1
-    { Op_Prefetch,              true,  MB::StoreOrSync,   MK::None,                                  "prefetch",      "prefetch  %0,%1,%2",            },
+    { Op_Prefetch,              true,  MB::StoreOrSync,   MK::None,                                  "prefetch",      "prefetch %0 ",            }, //StoreOrSync
 
     // Compressed Pointer instructions
     { Op_UncompressRef,         false, MB::Movable,       MK::None,                                  "uncmpref",               "uncmpref %s -) %l",      },

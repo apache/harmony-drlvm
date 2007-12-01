@@ -2640,6 +2640,58 @@ CG_OpndHandle* InstCodeSelector::callhelper(uint32              numArgs,
 {
     Opnd * dstOpnd=createResultOpnd(retType);
     switch(callId) {
+    case Prefetch:
+    {
+        assert (numArgs == 3);
+        Opnd* address = (Opnd*) args[0];
+        Opnd* distance = (Opnd*) args[1];    
+        Opnd* stride = (Opnd*) args[2];
+
+    	assert (distance->isPlacedIn(OpndKind_Imm) && stride->isPlacedIn(OpndKind_Imm));
+	int dist = distance->getImmValue();
+        int strd = stride->getImmValue();
+    
+    	for (int i=0; i< dist; i+=strd)
+    	{
+            Opnd* prefAddress = irManager.newMemOpnd(typeManager.getInt8Type(), address, 0, 0, irManager.newImmOpnd(typeManager.getInt32Type(), i));
+	    Inst* inst = irManager.newInst(Mnemonic_PREFETCH, prefAddress);
+            appendInsts(inst);
+        }
+        break;
+    }
+
+    case Memset0:
+    {
+        assert(numArgs == 2);
+        Opnd** opnds = (Opnd**)args;    
+        Opnd *addr = opnds[0];
+        Opnd *size = opnds[1];
+
+	RegName counterRegName = RegName_ECX;	
+	RegName dstRegName = RegName_EDI;
+	RegName zeroRegName = RegName_EAX;
+	
+	// prepare counter
+	Type* int32Type = typeManager.getInt32Type();
+	Opnd* counter = irManager.newRegOpnd(int32Type,counterRegName);
+	copyOpnd(counter,size);
+	appendInsts(irManager.newInst(Mnemonic_SHR, counter, irManager.newImmOpnd(int32Type,2)));
+
+	// prepare dst	
+	Opnd* dst = irManager.newRegOpnd(int32Type,dstRegName);
+	copyOpnd(dst, addr);
+	
+	// prepare zero
+	Opnd* eax = irManager.newRegOpnd(int32Type,zeroRegName);
+	//appendInsts(irManager.newInst(Mnemonic_XOR, eax, eax));
+	Opnd* zero = irManager.newImmOpnd(int32Type,0);
+	appendInsts(irManager.newInst(Mnemonic_MOV, eax, zero));
+	
+	Inst* storeInst = irManager.newInst(Mnemonic_STOS, dst, counter, eax);
+	storeInst->setPrefix(InstPrefix_REP);
+	appendInsts(storeInst);
+          break;
+    }
     case InitializeArray:
         assert(numArgs == 4);
         appendInsts(irManager.newInternalRuntimeHelperCallInst("initialize_array", numArgs, (Opnd**)args, dstOpnd));
@@ -3096,10 +3148,13 @@ CG_OpndHandle * InstCodeSelector::copy(CG_OpndHandle *src)
 
 
 //_______________________________________________________________________________________________________________
-//  Prefetch a cache line from [base + offset]
+//  Prefetch a cache line from [addr]
 
-void InstCodeSelector::prefetch(CG_OpndHandle* base, uint32 offset, int hints) 
+void InstCodeSelector::prefetch(CG_OpndHandle *addr) 
 {
+    Opnd *mem = irManager.newMemOpnd(typeManager.getInt8Type(), (Opnd*) addr, 0, 0, 0);
+    Inst* inst = irManager.newInst(Mnemonic_PREFETCH, mem);
+    appendInsts(inst);
 }
 
 //_______________________________________________________________________________________________________________

@@ -1724,6 +1724,10 @@ JavaByteCodeTranslator::new_(uint32 constPoolIndex) {
         }
         pushOpnd(irBuilder.genNewObjWithResolve(methodToCompile.getParentType()->asObjectType(), constPoolIndex));
     } else {
+#ifdef _DEBUG
+        const char* typeName = type->getName();
+        assert(!VMMagicUtils::isVMMagicClass(typeName));
+#endif
         pushOpnd(irBuilder.genNewObj(type));
     }
 }
@@ -3337,6 +3341,16 @@ bool JavaByteCodeTranslator::genVMMagic(const char* mname, uint32 numArgs, Opnd 
     }
 
     //
+    // prefetch
+    //
+    if (!strcmp(mname, "prefetch"))
+    {
+        Opnd* prefetchingAddress = arg0;
+        irBuilder.genPrefetch(prefetchingAddress);
+        return true;
+    }
+
+    //
     // fromXXX, toXXX - static creation from something
     //
     if (!strcmp(mname, "fromLong") 
@@ -3576,6 +3590,20 @@ bool JavaByteCodeTranslator::genVMHelper(const char* mname, uint32 numArgs, Opnd
     if (!strcmp(mname,"writeBarrier")) {
         assert(numArgs == 3);
         irBuilder.genVMHelperCall(VM_RT_GC_HEAP_WRITE_REF, resType, numArgs, srcOpnds);
+        return true;
+    }
+
+    if (!strcmp(mname, "memset0"))
+    {
+	assert(numArgs == 2);
+        irBuilder.genJitHelperCall(Memset0, resType, numArgs, srcOpnds);
+        return true;
+    }
+
+    if (!strcmp(mname, "prefetch"))
+    {
+        assert(numArgs == 3);
+        irBuilder.genJitHelperCall(Prefetch, resType, numArgs, srcOpnds);
         return true;
     }
 

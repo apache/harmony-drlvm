@@ -551,6 +551,7 @@ Mnemonic_NEG,                           // Two's Complement Negation
 Mnemonic_NOP,                           // No Operation
 Mnemonic_NOT,                           // One's Complement Negation
 Mnemonic_OR,                            // Logical Inclusive OR
+Mnemonic_PREFETCH,                      // prefetch
 
 #ifdef _HAVE_MMX_
     Mnemonic_PADDQ,                     // Add Packed Quadword Integers

@@ -1236,12 +1236,9 @@ IRBuilder::genLeave(LabelInst* label) {
     appendInst(instFactory->makeLeave(label));
 }
 
-Opnd*
-IRBuilder::genPrefetch(Opnd *base, Opnd *offset, Opnd *hints) {
-    Opnd *dst = createOpnd(typeManager->getVoidType());
-    appendInst(instFactory->makePrefetch(propagateCopy(base), propagateCopy(offset),
-                                        propagateCopy(hints)));
-    return dst;
+void
+IRBuilder::genPrefetch(Opnd *addr) {
+    appendInst(instFactory->makePrefetch(propagateCopy(addr)));
 }
 
 Opnd* IRBuilder::createTypeOpnd(ObjectType* type) {

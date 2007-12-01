@@ -270,6 +270,8 @@ enum IntrinsicCallId {
 };
 
 enum JitHelperCallId {
+    Prefetch,
+    Memset0,
     InitializeArray,
     FillArrayWithConst,
     SaveThisState, //todo: replace with GetTLS + offset sequence

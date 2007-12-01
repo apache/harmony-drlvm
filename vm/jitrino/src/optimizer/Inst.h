@@ -1274,7 +1274,7 @@ public:
 
     // profile counter increment
     Inst*    makeIncCounter(uint32 val);
-    Inst*    makePrefetch(Opnd *base, Opnd *offset, Opnd *hints);
+    Inst*    makePrefetch(Opnd* addr); // prefetch
 
     // compressed references
     Inst*    makeUncompressRef(Opnd* dst, Opnd* compref);
@@ -2039,4 +2039,5 @@ protected:
 } //namespace Jitrino 
 
 #endif // _INST_H_
+
 

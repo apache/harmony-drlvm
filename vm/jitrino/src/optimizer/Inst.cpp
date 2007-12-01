@@ -464,6 +464,10 @@ void JitHelperCallInst::handlePrintEscape(::std::ostream& os, char code) const {
     switch(code) {
     case 'd':
         switch(jitHelperId) {
+    case Prefetch:
+        os << "Prefetch"; break;
+    case Memset0:
+        os << "Memset0"; break;
     case InitializeArray:
         os << "InitializeArray"; break;
     case SaveThisState:
@@ -1973,11 +1977,8 @@ Inst* InstFactory::makeEndFilter() {
 Inst* InstFactory::makeEndCatch() {
     return makeInst(Op_EndCatch, Modifier(), Type::Void, OpndManager::getNullOpnd());
 }
-
-Inst* InstFactory::makePrefetch(Opnd *base, Opnd* offset, Opnd *hints) {
-    return makeMultiSrcInst(Op_Prefetch, Modifier(), Type::Void, 
-                            OpndManager::getNullOpnd(), 
-                            base, offset, hints);
+Inst* InstFactory::makePrefetch(Opnd* addr) {
+    return makeInst(Op_Prefetch, Modifier(), Type::Void, OpndManager::getNullOpnd(), addr);
 }
 
 Inst*

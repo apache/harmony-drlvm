@@ -661,6 +661,8 @@ MemoryOptInitWalker::applyToInst(Inst *i)
             JitHelperCallInst *jitcalli = i->asJitHelperCallInst();
             JitHelperCallId callId = jitcalli->getJitHelperId();
             switch (callId) {
+            case Prefetch:
+            case Memset0:
             case InitializeArray:
             case SaveThisState:
             case ReadThisState:

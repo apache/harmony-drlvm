@@ -581,7 +581,7 @@ Inliner::connectRegion(InlineNode* inlineNode) {
                     copy = _instFactory.makeCopy(dst, src);
                 } else {
                     Modifier mod = Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No);
-                    copy = _instFactory.makeConv(mod, dst->getType()->tag, dst, src);
+                    copy = _instFactory.makeConvUnmanaged(mod, dst->getType()->tag, dst, src);
                 }
                 copy->insertBefore(inst);
                 inst->unlink();
