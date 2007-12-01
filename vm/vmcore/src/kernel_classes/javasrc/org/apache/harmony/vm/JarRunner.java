@@ -21,6 +21,7 @@ import java.util.jar.Manifest;
 import java.util.jar.Attributes;
 
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 
 /**
  *  Small class to launch jars.  Used by VM for the 
@@ -70,6 +71,13 @@ public class JarRunner {
         
         Class mainClass = Thread.currentThread().getContextClassLoader().loadClass(className);               
         Method mainMethod = mainClass.getMethod("main", args.getClass());
+        
+        int mods = mainMethod.getModifiers();
+        if (!Modifier.isStatic(mods) 
+                || !Modifier.isPublic(mods) 
+                || mainMethod.getReturnType() != void.class) {
+            throw new NoSuchMethodError("method main must be public static void: " + mainMethod);
+        }
         mainMethod.setAccessible(true);
 
         String newArgs[] = new String[args.length - 1];
