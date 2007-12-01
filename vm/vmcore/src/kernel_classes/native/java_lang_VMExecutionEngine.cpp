@@ -50,7 +50,9 @@ JNIEXPORT void JNICALL Java_java_lang_VMExecutionEngine_exit
   (JNIEnv * jni_env, jclass, jint status, jboolean needFinalization, jobjectArray)
 {
     // ToDo: process jobjectArray
+    hythread_global_lock();
     _exit(status);
+    hythread_global_unlock();
 }
 
 /*
