@@ -240,8 +240,8 @@ assert(!is_unwindable());
 
 #define BEGIN_RAISE_AREA \
 { \
-if (is_unwindable()) exn_rethrow_if_pending();\
-bool unwindable = set_unwindable(false);
+bool unwindable = set_unwindable(false);\
+if (unwindable) exn_rethrow_if_pending();
 
 #define END_RAISE_AREA \
 if (unwindable) exn_rethrow_if_pending();\
@@ -270,9 +270,10 @@ void print_uncaught_exception_message(FILE *f, char* context_message, jthrowable
 void exn_rethrow();
 void exn_rethrow_if_pending();
 
-void set_guard_stack();
+bool set_guard_stack();
 void remove_guard_stack(vm_thread_t vm_thread);
 void init_stack_info();
+void* get_exception_catch_stack_addr(void* curr_ip);
 VMEXPORT size_t get_available_stack_size();
 VMEXPORT bool check_available_stack_size(size_t required_size);
 VMEXPORT size_t get_default_stack_size();

@@ -118,6 +118,17 @@ void exn_clear()
     tmn_suspend_disable_recursive();
     clear_exception_internal();
     tmn_suspend_enable_recursive();
+
+    // if quard stack should be restored - restores it
+    if (p_TLS_vmthread->restore_guard_page) {
+        bool result = set_guard_stack();
+
+        // if guard stack can't be restored raise SOE
+        if (result == false) {
+            Global_Env *env = VM_Global_State::loader_env;
+            exn_raise_by_class(env->java_lang_StackOverflowError_Class);
+        }
+    }
 }
 
 bool is_unwindable()
@@ -340,6 +351,8 @@ void exn_rethrow()
 
     assert(!hythread_is_suspend_enabled());
 
+    BEGIN_RAISE_AREA;
+
 #ifndef VM_LAZY_EXCEPTION
     ManagedObject *exn = get_exception_object_internal();
     assert(exn);
@@ -374,6 +387,8 @@ void exn_rethrow()
     }
 #endif
     DIE(("It's Unreachable place."));
+
+    END_RAISE_AREA;
 }   //exn_rethrow
 
 void exn_rethrow_if_pending()

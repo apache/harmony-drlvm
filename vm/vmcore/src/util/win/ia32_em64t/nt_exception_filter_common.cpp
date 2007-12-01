@@ -169,17 +169,24 @@ void init_stack_info() {
 #   endif
 }
 
-void set_guard_stack() {
+size_t get_mem_protect_stack_size() {
+    return 0x0100;
+}
+
+size_t get_restore_stack_size() {
+    return get_mem_protect_stack_size() + 0x0100;
+}
+
+bool set_guard_stack() {
     void* stack_addr = get_stack_addr();
     size_t stack_size = get_stack_size();
     size_t page_size = get_guard_page_size();
     size_t guard_stack_size = get_guard_stack_size();
   
-    //assert(((size_t)(&stack_addr)) > ((size_t)((char*)stack_addr - stack_size + 2 * page_size + guard_stack_size)));
-    if (((size_t)(&stack_addr)) < ((size_t)((char*)stack_addr - stack_size + 2 * page_size + guard_stack_size))) {
-        Global_Env *env = VM_Global_State::loader_env;
-        exn_raise_by_class(env->java_lang_StackOverflowError_Class);
-        return;
+    if (((size_t)(&stack_addr) - get_mem_protect_stack_size())
+            < ((size_t)((char*)stack_addr - stack_size 
+            + 2 * page_size + guard_stack_size))) {
+        return false;
     }
 
     if (!VirtualFree((char*)stack_addr - stack_size + page_size,
@@ -194,6 +201,8 @@ void set_guard_stack() {
         assert(0);
     }
     jthread_self_vm_thread_unsafe()->restore_guard_page = false;
+
+    return true;
 }
 
 void remove_guard_stack() {
@@ -255,10 +264,6 @@ bool check_available_stack_size(size_t required_size) {
     } else {
         return true;
     }
-}
-
-size_t get_restore_stack_size() {
-    return 0x0200;
 }
 
 bool check_stack_size_enough_for_exception_catch(void* sp) {

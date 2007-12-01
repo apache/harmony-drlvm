@@ -638,16 +638,38 @@ void exception_catch_callback() {
         regs = *(Registers*)thread->regs;
     }
 
-    if (p_TLS_vmthread->restore_guard_page) {
-        set_guard_stack();
-    }
-
     M2nFrame* m2n = (M2nFrame *) STD_ALLOCA(m2n_get_size());
     m2n_push_suspended_frame(thread, m2n, &regs);
     M2nFrame* prev_m2n = m2n_get_previous_frame(m2n);
 
     StackIterator *si =
         si_create_from_registers(&regs, false, prev_m2n);
+
+    // si_create_from_registers uses large stack space,
+    // so guard page restored after its invoke.
+    if (p_TLS_vmthread->restore_guard_page) {
+        bool result = set_guard_stack();
+
+        if (result == false) {
+            Global_Env *env = VM_Global_State::loader_env;
+
+            if (si_is_native(si)) {
+                m2n_set_last_frame(prev_m2n);
+
+                if ((interpreter_enabled() || (!prev_m2n) 
+                        || (m2n_get_frame_type(prev_m2n) & FRAME_NON_UNWINDABLE))) {
+                    exn_raise_by_class(env->java_lang_StackOverflowError_Class);
+                } else {
+                    si_free(si);
+                    exn_throw_by_class(env->java_lang_StackOverflowError_Class);
+                }
+            } else {
+                si_free(si);
+                exn_throw_by_class(env->java_lang_StackOverflowError_Class);
+            }
+        }
+    }
+
     si_transfer_control(si);
 }
 
@@ -661,16 +683,39 @@ void jvmti_exception_catch_callback() {
         regs = *(Registers*)thread->regs;
     }
 
-    if (p_TLS_vmthread->restore_guard_page) {
-        set_guard_stack();
-    }
-
     M2nFrame* m2n = (M2nFrame *) STD_ALLOCA(m2n_get_size());
     m2n_push_suspended_frame(thread, m2n, &regs);
     M2nFrame* prev_m2n = m2n_get_previous_frame(m2n);
 
     StackIterator *si =
         si_create_from_registers(&regs, false, prev_m2n);
+
+    // si_create_from_registers uses large stack space,
+    // so guard page restored after its invoke, 
+    // but befor ti agent callback invokation, 
+    // because it should work on protected page.
+    if (p_TLS_vmthread->restore_guard_page) {
+        bool result = set_guard_stack();
+
+        if (result == false) {
+            Global_Env *env = VM_Global_State::loader_env;
+
+            if (si_is_native(si)) {
+                m2n_set_last_frame(prev_m2n);
+
+                if ((interpreter_enabled() || (!prev_m2n) 
+                        || (m2n_get_frame_type(prev_m2n) & FRAME_NON_UNWINDABLE))) {
+                    exn_raise_by_class(env->java_lang_StackOverflowError_Class);
+                } else {
+                    si_free(si);
+                    exn_throw_by_class(env->java_lang_StackOverflowError_Class);
+                }
+            } else {
+                si_free(si);
+                exn_throw_by_class(env->java_lang_StackOverflowError_Class);
+            }
+        }
+    }
 
     if (!si_is_native(si))
     {
