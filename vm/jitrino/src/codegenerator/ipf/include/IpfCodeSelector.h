@@ -288,7 +288,7 @@ public:
     void          stValueObj(CG_OpndHandle*, CG_OpndHandle*)              { NOT_IMPLEMENTED_V("stValueObj") }
     void          initValueObj(Type*, CG_OpndHandle*)                     { NOT_IMPLEMENTED_V("initValueObj") }
     void          copyValueObj(Type*, CG_OpndHandle*, CG_OpndHandle*)     { NOT_IMPLEMENTED_V("copyValueObj") }
-    void          prefetch(CG_OpndHandle*, uint32, int)                   { NOT_IMPLEMENTED_V("prefetch") }
+    void          prefetch(CG_OpndHandle*)                                { NOT_IMPLEMENTED_V("prefetch") }
     void          jump()                                                  { NOT_IMPLEMENTED_V("jump") }
     void          throwLazyException(uint32, CG_OpndHandle**, MethodDesc*) { NOT_IMPLEMENTED_V("throwLazyException") }
     void          tau_stStatic(CG_OpndHandle*, FieldDesc*, Type::Tag, bool, CG_OpndHandle*) { NOT_IMPLEMENTED_V("tau_stStatic") } 
