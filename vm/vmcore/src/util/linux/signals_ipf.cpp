@@ -264,7 +264,7 @@ void init_stack_info() {
      */
 }
 
-void set_guard_stack() {
+bool set_guard_stack() {
     int err;
     
     char* stack_addr = (char*) get_stack_addr();
@@ -303,6 +303,7 @@ void set_guard_stack() {
     err = sigaltstack (&sigalt, NULL);
     assert(!err);
 
+    return true; //FIXME
 }
 
 size_t get_available_stack_size() {
