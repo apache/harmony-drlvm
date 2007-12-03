@@ -309,7 +309,8 @@ void st_print_stack_jit(VM_thread* thread,
                 (POINTER_SIZE_INT)cci->get_code_block_addr());
             bool is_ip_past = (frame_num != 0);
 
-            for (uint32 i = 0; i < inlined_depth; i++)
+            if (inlined_depth) {
+            for (uint32 i = inlined_depth; i > 0; i--)
             {
                 Method* inl_method = cci->get_jit()->get_inlined_method(
                                             cci->get_inline_info(), offset, i);
@@ -319,6 +320,7 @@ void st_print_stack_jit(VM_thread* thread,
 
                 if (frame_num < num_frames)
                     ++frame_num; // Go to the next native frame
+            }
             }
 
             st_get_java_method_info(&m, method, ip, is_ip_past, -1);
