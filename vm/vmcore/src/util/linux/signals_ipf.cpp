@@ -303,7 +303,7 @@ bool set_guard_stack() {
     err = sigaltstack (&sigalt, NULL);
     assert(!err);
 
-    return true; //FIXME
+    return true; //FIXME HARMONY-5157
 }
 
 size_t get_available_stack_size() {
