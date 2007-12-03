@@ -29,7 +29,6 @@
 #include "object_handles.h"
 #include "environment.h"
 #include "open/vm_util.h"
-#include "cxxlog.h"
 #include "thread_generic.h"
 #include "open/jthread.h"
 #include "suspend_checker.h"
@@ -38,6 +37,10 @@
 #include "jit_intf_cpp.h"
 #include "cci.h"
 #include "Class.h"
+
+#define LOG_DOMAIN "jvmti.locals"
+
+#include "cxxlog.h"
 
 /*
  * Local Variable functions:
@@ -137,6 +140,156 @@ GetLocal_checkArgs(jvmtiEnv* env,
     JIT *jit = cci->get_jit();                              \
     Method *method = cci->get_method();
 
+static bool is_valid_object(jvmtiEnv* env, jobject handle)
+{
+    SuspendEnabledChecker sec;
+
+    if (NULL == handle)
+        return true;
+
+    tmn_suspend_disable();
+
+    ManagedObject *obj = ((ObjectHandle) handle)->object;
+
+    if (obj < (ManagedObject *)VM_Global_State::loader_env->heap_base ||
+        obj > (ManagedObject *)VM_Global_State::loader_env->heap_end)
+    {
+        tmn_suspend_enable();
+        return false;
+    }
+
+    Class *clss = obj->vt()->clss;
+    ManagedObject *clsObj = struct_Class_to_java_lang_Class(clss);
+    // ppervov: FIXME: there is an assertion in the above function which
+    // is exactly the same as in the following if. So, this code will only
+    // work in release and just assert in debug.
+    if (clsObj->vt()->clss != VM_Global_State::loader_env->JavaLangClass_Class) {
+        tmn_suspend_enable();
+        return false;
+    }
+
+    tmn_suspend_enable();
+    return true;
+}
+
+/**
+ * General function to set value of local variable.
+ * @param var_type  type of the local variable
+ * @param p_value   pointer to the new variable value
+ */
+static jvmtiError set_local(jvmtiEnv* env,
+                            jthread thread,
+                            jint depth,
+                            jint slot,
+                            VM_Data_Type var_type,
+                            void* p_value)
+{
+    SuspendEnabledChecker sec;
+    /*
+     * Check given env & current phase.
+     */
+    jvmtiPhase phases[] = {JVMTI_PHASE_LIVE};
+
+    CHECK_EVERYTHING();
+
+    CHECK_CAPABILITY(can_access_local_variables);
+
+    // check error condition: JVMTI_ERROR_INVALID_THREAD
+    // check error condition: JVMTI_ERROR_THREAD_NOT_ALIVE
+    // check error condition: JVMTI_ERROR_ILLEGAL_ARGUMENT
+    jvmtiError err = GetLocal_checkArgs(env, &thread, depth, slot, p_value);
+    if (err != JVMTI_ERROR_NONE)
+        return err;
+
+    // check error condition: JVMTI_ERROR_INVALID_OBJECT
+    if (VM_DATA_TYPE_CLASS == var_type && ! is_valid_object(env, *(jobject*) p_value))
+        return JVMTI_ERROR_INVALID_OBJECT;
+
+    bool thread_suspended = false;
+    // Suspend thread before getting stacks
+    vm_thread_t vm_thread;
+    if (NULL != thread)
+    {
+        // Check that this thread is not current
+        vm_thread = jthread_get_vm_thread_ptr_safe(thread);
+        if (vm_thread != p_TLS_vmthread)
+        {
+            jthread_suspend(thread);
+            thread_suspended = true;
+        }
+    }
+    else
+        vm_thread = p_TLS_vmthread;
+
+    if (interpreter_enabled())
+    {
+        // TODO: check error condition: JVMTI_ERROR_INVALID_SLOT
+        // TODO: check error condition: JVMTI_ERROR_TYPE_MISMATCH
+        // TODO: check error condition: JVMTI_ERROR_OPAQUE_FRAME
+        // TODO: check error condition: JVMTI_ERROR_NO_MORE_FRAMES
+
+        switch (var_type) {
+            case VM_DATA_TYPE_CLASS:
+                err = interpreter.interpreter_ti_setObject(env, vm_thread,
+                        depth, slot, *(jobject*) p_value);
+                break;
+            case VM_DATA_TYPE_INT32:
+            case VM_DATA_TYPE_F4:
+                err = interpreter.interpreter_ti_setLocal32(env, vm_thread,
+                        depth, slot, *(int*) p_value);
+                break;
+            case VM_DATA_TYPE_INT64:
+            case VM_DATA_TYPE_F8:
+                err = interpreter.interpreter_ti_setLocal64(env, vm_thread,
+                        depth, slot, *(int64*) p_value);
+                break;
+            default:
+                DIE("Error: unrecognized local variable type");
+        }
+    }
+    else
+    {
+        GET_JIT_FRAME_CONTEXT;
+
+        tmn_suspend_disable();
+        OpenExeJpdaError result;
+
+        switch (var_type) {
+            case VM_DATA_TYPE_CLASS:
+                if (NULL != *(jobject*) p_value)
+                    result = jit->set_local_var(method, jfc, slot,
+                        VM_DATA_TYPE_CLASS, &(*(ObjectHandle*) p_value)->object);
+                else
+                {
+                    ManagedObject *n = (ManagedObject *)VM_Global_State::loader_env->managed_null;
+                    result = jit->set_local_var(method, jfc, slot,
+                        VM_DATA_TYPE_CLASS, &n);
+                }
+
+                break;
+            case VM_DATA_TYPE_INT32:
+            case VM_DATA_TYPE_F4:
+            case VM_DATA_TYPE_INT64:
+            case VM_DATA_TYPE_F8:
+                result = jit->set_local_var(method, jfc, slot, var_type,
+                        p_value);
+                break;
+            default:
+                DIE("Error: unrecognized local variable type");
+        }
+
+        si_free(si);
+        tmn_suspend_enable();
+
+        err = jvmti_translate_jit_error(result);
+    }
+
+    if (thread_suspended)
+        jthread_resume(thread);
+
+    return err;
+}
+
 jvmtiError JNICALL
 jvmtiGetLocalObject(jvmtiEnv* env,
                     jthread thread,
@@ -144,7 +297,7 @@ jvmtiGetLocalObject(jvmtiEnv* env,
                     jint slot,
                     jobject* value_ptr)
 {
-    TRACE2("jvmti.locals", "GetLocalObject called");
+    TRACE("GetLocalObject called");
     SuspendEnabledChecker sec;
     /*
      * Check given env & current phase.
@@ -225,7 +378,7 @@ jvmtiGetLocalInt(jvmtiEnv* env,
                  jint slot,
                  jint* value_ptr)
 {
-    TRACE2("jvmti.locals", "GetLocalInt called");
+    TRACE("GetLocalInt called");
     SuspendEnabledChecker sec;
     /*
      * Check given env & current phase.
@@ -293,7 +446,7 @@ jvmtiGetLocalLong(jvmtiEnv* env,
                   jint slot,
                   jlong* value_ptr)
 {
-    TRACE2("jvmti.locals", "GetLocalLong called");
+    TRACE("GetLocalLong called");
     SuspendEnabledChecker sec;
     /*
      * Check given env & current phase.
@@ -361,7 +514,7 @@ jvmtiGetLocalFloat(jvmtiEnv* env,
                    jint slot,
                    jfloat* value_ptr)
 {
-    TRACE2("jvmti.locals", "GetLocalFloat called");
+    TRACE("GetLocalFloat called");
     SuspendEnabledChecker sec;
     return jvmtiGetLocalInt(env, thread, depth, slot, (jint*)value_ptr);
 }
@@ -373,10 +526,12 @@ jvmtiGetLocalDouble(jvmtiEnv* env,
                     jint slot,
                     jdouble* value_ptr)
 {
-    TRACE2("jvmti.locals", "GetLocalDouble called");
+    TRACE("GetLocalDouble called");
     SuspendEnabledChecker sec;
     return jvmtiGetLocalLong(env, thread, depth, slot, (jlong*)value_ptr);
 }
+
+
 
 jvmtiError JNICALL
 jvmtiSetLocalObject(jvmtiEnv* env,
@@ -385,98 +540,9 @@ jvmtiSetLocalObject(jvmtiEnv* env,
                     jint slot,
                     jobject value)
 {
-    TRACE2("jvmti.locals", "SetLocalObject called");
-    SuspendEnabledChecker sec;
-    /*
-     * Check given env & current phase.
-     */
-    jvmtiPhase phases[] = {JVMTI_PHASE_LIVE};
+    TRACE("SetLocalObject called");
 
-    CHECK_EVERYTHING();
-
-    CHECK_CAPABILITY(can_access_local_variables);
-
-    // check error condition: JVMTI_ERROR_INVALID_THREAD
-    // check error condition: JVMTI_ERROR_THREAD_NOT_ALIVE
-    // check error condition: JVMTI_ERROR_ILLEGAL_ARGUMENT
-    jvmtiError err = GetLocal_checkArgs(env, &thread, depth, slot, &value);
-    if (err != JVMTI_ERROR_NONE)
-        return err;
-
-    // check error condition: JVMTI_ERROR_INVALID_OBJECT
-    if (value != 0) {
-        ObjectHandle handle = (ObjectHandle) value;
-        tmn_suspend_disable();
-        ManagedObject *obj = handle->object;
-
-        if (obj < (ManagedObject *)VM_Global_State::loader_env->heap_base ||
-            obj > (ManagedObject *)VM_Global_State::loader_env->heap_end)
-        {
-            tmn_suspend_enable();
-            return JVMTI_ERROR_INVALID_OBJECT;
-        }
-
-        Class *clss = obj->vt()->clss;
-        ManagedObject *clsObj = struct_Class_to_java_lang_Class(clss);
-        // ppervov: FIXME: there is an assertion in the above function which
-        // is exactly the same as in the following if. So, this code will only
-        // work in release and just assert in debug.
-        if (clsObj->vt()->clss != VM_Global_State::loader_env->JavaLangClass_Class) {
-            tmn_suspend_enable();
-            return JVMTI_ERROR_INVALID_OBJECT;
-        }
-        tmn_suspend_enable();
-    }
-
-    bool thread_suspended = false;
-    // Suspend thread before getting stacks
-    vm_thread_t vm_thread;
-    if (NULL != thread)
-    {
-        // Check that this thread is not current
-        vm_thread = jthread_get_vm_thread_ptr_safe(thread);
-        if (vm_thread != p_TLS_vmthread)
-        {
-            jthread_suspend(thread);
-            thread_suspended = true;
-        }
-    }
-    else
-        vm_thread = p_TLS_vmthread;
-
-    if (interpreter_enabled())
-        // TODO: check error condition: JVMTI_ERROR_INVALID_SLOT
-        // TODO: check error condition: JVMTI_ERROR_TYPE_MISMATCH
-        // TODO: check error condition: JVMTI_ERROR_OPAQUE_FRAME
-        // TODO: check error condition: JVMTI_ERROR_NO_MORE_FRAMES
-        err = interpreter.interpreter_ti_setObject(env,
-            vm_thread, depth, slot, value);
-    else
-    {
-        GET_JIT_FRAME_CONTEXT;
-
-        tmn_suspend_disable();
-        OpenExeJpdaError result;
-        if (NULL != value)
-            result = jit->set_local_var(method, jfc, slot,
-                VM_DATA_TYPE_CLASS, &value->object);
-        else
-        {
-            ManagedObject *n = (ManagedObject *)VM_Global_State::loader_env->managed_null;
-            result = jit->set_local_var(method, jfc, slot,
-                VM_DATA_TYPE_CLASS, &n);
-        }
-
-        si_free(si);
-        tmn_suspend_enable();
-
-        err = jvmti_translate_jit_error(result);
-    }
-
-    if (thread_suspended)
-        jthread_resume(thread);
-
-    return err;
+    return set_local(env, thread, depth, slot, VM_DATA_TYPE_CLASS, (void*) &value);
 }
 
 jvmtiError JNICALL
@@ -486,65 +552,9 @@ jvmtiSetLocalInt(jvmtiEnv* env,
                  jint slot,
                  jint value)
 {
-    TRACE2("jvmti.locals", "SetLocalInt called");
-    SuspendEnabledChecker sec;
-    /*
-     * Check given env & current phase.
-     */
-    jvmtiPhase phases[] = {JVMTI_PHASE_LIVE};
+    TRACE("SetLocalInt called");
 
-    CHECK_EVERYTHING();
-
-    CHECK_CAPABILITY(can_access_local_variables);
-
-    // check error condition: JVMTI_ERROR_INVALID_THREAD
-    // check error condition: JVMTI_ERROR_THREAD_NOT_ALIVE
-    // check error condition: JVMTI_ERROR_ILLEGAL_ARGUMENT
-    // check error condition: JVMTI_ERROR_NULL_POINTER
-    jvmtiError err = GetLocal_checkArgs(env, &thread, depth, slot, &value);
-    if (err != JVMTI_ERROR_NONE)
-        return err;
-
-    bool thread_suspended = false;
-    // Suspend thread before getting stacks
-    vm_thread_t vm_thread;
-    if (NULL != thread)
-    {
-        // Check that this thread is not current
-        vm_thread = jthread_get_vm_thread_ptr_safe(thread);
-        if (vm_thread != p_TLS_vmthread)
-        {
-            jthread_suspend(thread);
-            thread_suspended = true;
-        }
-    }
-    else
-        vm_thread = p_TLS_vmthread;
-
-    if (interpreter_enabled())
-        // check error condition: JVMTI_ERROR_INVALID_SLOT
-        // check error condition: JVMTI_ERROR_OPAQUE_FRAME
-        // check error condition: JVMTI_ERROR_NO_MORE_FRAMES
-        // TODO: check error condition: JVMTI_ERROR_TYPE_MISMATCH
-        err = interpreter.interpreter_ti_setLocal32(env,
-            vm_thread, depth, slot, value);
-    else
-    {
-        GET_JIT_FRAME_CONTEXT;
-
-        tmn_suspend_disable();
-        OpenExeJpdaError result = jit->set_local_var(method, jfc, slot,
-            VM_DATA_TYPE_INT32, &value);
-        si_free(si);
-        tmn_suspend_enable();
-
-        err = jvmti_translate_jit_error(result);
-    }
-
-    if (thread_suspended)
-        jthread_resume(thread);
-
-    return err;
+    return set_local(env, thread, depth, slot, VM_DATA_TYPE_INT32, (void*) &value);
 }
 
 jvmtiError JNICALL
@@ -554,65 +564,9 @@ jvmtiSetLocalLong(jvmtiEnv* env,
                   jint slot,
                   jlong value)
 {
-    TRACE2("jvmti.locals", "SetLocalLong called");
-    SuspendEnabledChecker sec;
-    /*
-     * Check given env & current phase.
-     */
-    jvmtiPhase phases[] = {JVMTI_PHASE_LIVE};
+    TRACE("SetLocalLong called");
 
-    CHECK_EVERYTHING();
-
-    CHECK_CAPABILITY(can_access_local_variables);
-
-    // check error condition: JVMTI_ERROR_INVALID_THREAD
-    // check error condition: JVMTI_ERROR_THREAD_NOT_ALIVE
-    // check error condition: JVMTI_ERROR_ILLEGAL_ARGUMENT
-    // check error condition: JVMTI_ERROR_NULL_POINTER
-    jvmtiError err = GetLocal_checkArgs(env, &thread, depth, slot, &value);
-    if (err != JVMTI_ERROR_NONE)
-        return err;
-
-    bool thread_suspended = false;
-    // Suspend thread before getting stacks
-    vm_thread_t vm_thread;
-    if (NULL != thread)
-    {
-        // Check that this thread is not current
-        vm_thread = jthread_get_vm_thread_ptr_safe(thread);
-        if (vm_thread != p_TLS_vmthread)
-        {
-            jthread_suspend(thread);
-            thread_suspended = true;
-        }
-    }
-    else
-        vm_thread = p_TLS_vmthread;
-
-    if (interpreter_enabled())
-        // check error condition: JVMTI_ERROR_INVALID_SLOT
-        // check error condition: JVMTI_ERROR_OPAQUE_FRAME
-        // check error condition: JVMTI_ERROR_NO_MORE_FRAMES
-        // TODO: check error condition: JVMTI_ERROR_TYPE_MISMATCH
-        err = interpreter.interpreter_ti_setLocal64(env,
-            vm_thread, depth, slot, value);
-    else
-    {
-        GET_JIT_FRAME_CONTEXT;
-
-        tmn_suspend_disable();
-        OpenExeJpdaError result = jit->set_local_var(method, jfc, slot,
-            VM_DATA_TYPE_INT64, &value);
-        si_free(si);
-        tmn_suspend_enable();
-
-        err = jvmti_translate_jit_error(result);
-    }
-
-    if (thread_suspended)
-        jthread_resume(thread);
-
-    return err;
+    return set_local(env, thread, depth, slot, VM_DATA_TYPE_INT64, (void*) &value);
 }
 
 jvmtiError JNICALL
@@ -622,10 +576,9 @@ jvmtiSetLocalFloat(jvmtiEnv* env,
                    jint slot,
                    jfloat value)
 {
-    TRACE2("jvmti.locals", "SetLocalFloat called");
-    SuspendEnabledChecker sec;
-    jint v = *(jint*)&value;
-    return jvmtiSetLocalInt(env, thread, depth, slot, v);
+    TRACE("SetLocalFloat called");
+
+    return set_local(env, thread, depth, slot, VM_DATA_TYPE_F4, (void*) &value);
 }
 
 jvmtiError JNICALL
@@ -635,8 +588,8 @@ jvmtiSetLocalDouble(jvmtiEnv* env,
                     jint slot,
                     jdouble value)
 {
-    TRACE2("jvmti.locals", "SetLocalDouble called");
-    SuspendEnabledChecker sec;
-    jlong v = *(jlong*)&value;
-    return jvmtiSetLocalLong(env, thread, depth, slot, v);
+    TRACE("SetLocalDouble called");
+
+    return set_local(env, thread, depth, slot, VM_DATA_TYPE_F8, (void*) &value);
 }
+
