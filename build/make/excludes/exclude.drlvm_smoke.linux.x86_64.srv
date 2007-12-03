@@ -18,9 +18,6 @@ exception/FinalizeStackTest.java
 # HARMONY-3010 HARMONY-4265 HARMONY-4292
 stress/Stack.java
 
-# HARMONY-3299 intermittent
-stress/Sync.java
-
 # HARMONY-3495 hangs intermittently
 gc/NPE.java
 
