@@ -2431,8 +2431,7 @@ bool PMF::PipelineIterator::next ()
         session->step = 0;
         session->~SessionAction();
         session = 0;
-        smm->~MemoryManager();
-
+		 delete smm;
     //  go to new session
         ++it;
     }

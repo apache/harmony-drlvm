@@ -26,6 +26,7 @@
 #include "Dominator.h"
 #include "StlPriorityQueue.h"
 #include "VMMagic.h"
+#include "FlowGraph.h"
 
 namespace Jitrino {
 
@@ -112,6 +113,7 @@ public:
 protected:
     void inlineVMHelper(MethodCallInst* call);
     void finalizeCall(MethodCallInst* call);
+    void fixInlineInfo(MethodCallInst* callInst);
 
     HelperInlinerFlags& flags;
     MemoryManager& localMM;
@@ -319,17 +321,139 @@ void HelperInliner::finalizeCall(MethodCallInst* callInst) {
 
     //every call must have exception edge -> add it
     if (callInst->getNode()->getExceptionEdge() == NULL) {
-        Node* node = callInst->getNode();
-        Node* dispatchNode = node->getUnconditionalEdgeTarget()->getExceptionEdgeTarget();
-        if (dispatchNode == NULL) {
-            dispatchNode = cfg->getUnwindNode();
-            if (dispatchNode==NULL) {
-                dispatchNode = cfg->createDispatchNode(instFactory->makeLabel());
-                cfg->setUnwindNode(dispatchNode);
-                cfg->addEdge(dispatchNode, cfg->getExitNode());
-            }
+        Node* dispatchNode = cfg->getUnwindNode();
+        if (dispatchNode==NULL) {
+            dispatchNode = cfg->createDispatchNode(instFactory->makeLabel());
+            cfg->setUnwindNode(dispatchNode);
+            cfg->addEdge(dispatchNode, cfg->getExitNode());
         }
-        cfg->addEdge(node, dispatchNode);
+        cfg->addEdge(callInst->getNode(), dispatchNode);
+        //fix inline info for this edge
+        fixInlineInfo(callInst);
     }
 }
+typedef StlVector<MethodMarkerInst*> Markers;
+
+static bool prepareMethodMarkersStack(Inst* stopInst, StlVector<bool>& flags, Markers& result, bool forward) {
+    Node* node = stopInst->getNode();
+    assert(flags[node->getId()]==false);
+    flags[node->getId()] = true;
+    const Edges& edges = node->getEdges(forward);
+    bool res = forward ? node->isExitNode() : ((Inst*)node->getFirstInst())->isMethodEntry();
+    for (Edges::const_iterator ite = edges.begin(), ende = edges.end(); ite!=ende; ++ite) {
+        Edge* e = *ite;
+        Node* nextNode = e->getNode(forward);
+        if (flags[nextNode->getId()]) {
+            continue;
+        }
+        res = prepareMethodMarkersStack((Inst*)(forward?nextNode->getFirstInst():nextNode->getLastInst()), flags, result, forward);
+        if (res) {
+            break;
+        }
+    }
+    if (!res) {
+        return false;
+    }
+    if (Log::isEnabled()) {
+        Log::out()<<"Path element :"; FlowGraph::printLabel(Log::out(), node); Log::out()<<std::endl;
+    }
+
+    //process insts in the current block: cache all non-paired markers, avoid caching paired insts
+    //processing is done in reverse order for 'forward' flag -> from the last inst up to the first when forward='true'
+    Inst* inst = (Inst*)(forward ? node->getLastInst() : node->getFirstInst());
+    for (;;inst = forward?inst->getPrevInst():inst->getNextInst()) {
+        if (inst->isMethodMarker()) {
+            MethodMarkerInst* markerInst = inst->asMethodMarkerInst();
+            MethodMarkerInst* pairInst = result.empty() ? (MethodMarkerInst*)NULL :*result.rbegin();
+            MethodDesc* pairDesc = pairInst ? pairInst->getMethodDesc() : NULL;
+            if (markerInst->getMethodDesc() == pairDesc && markerInst->isMethodEntryMarker() != pairInst->isMethodEntryMarker()) {
+                if( Log::isEnabled()) {
+                    Log::out()<<"POP: "; markerInst->print(Log::out()); Log::out()<<std::endl;
+                }
+                result.pop_back();
+            } else { 
+                if( Log::isEnabled()) {
+                    Log::out()<<"PUSH: "; markerInst->print(Log::out());Log::out()<<std::endl;
+                }
+                assert((forward && markerInst->isMethodExitMarker()) || (!forward && markerInst->isMethodEntryMarker()));
+                result.push_back(markerInst);
+            }
+        }
+        if (inst == stopInst) {
+            break;
+        }
+    }
+    return true;
+}
+
+void HelperInliner::fixInlineInfo(MethodCallInst* callInst) {
+    //the idea of algorithms: find all non-paired entry-markers on dispatch path
+    // and create new dispatch node with a list of exit-markers
+
+    if (Log::isEnabled()) {
+        Log::out()<<"Fixing inline info for inst:"; inst->print(Log::out()); Log::out()<<std::endl;
+    }
+    Edge* dispatchEdge = callInst->getNode()->getExceptionEdge();
+    assert(dispatchEdge);
+    Node* dispatchNode = dispatchEdge->getTargetNode();
+
+    Markers instsToEntry(localMM);
+    Markers instsToExit(localMM);
+    StlVector<bool> flags(localMM);
+    flags.resize(cfg->getMaxNodeId());
+
+    if (Log::isEnabled()) {
+        Log::out()<<"fixInlineInfo: calculating path to entry:"<<std::endl;
+    }
+    std::fill(flags.begin(), flags.end(), false);
+    prepareMethodMarkersStack(callInst, flags, instsToEntry, false);
+    // here instsToEntry contains entry markers in topological order: 1, 2, 3
+
+    if (Log::isEnabled()) {
+        Log::out()<<"fixInlineInfo: calculating path to exit:"<<std::endl;
+    }
+    std::fill(flags.begin(), flags.end(), false);
+    prepareMethodMarkersStack((Inst*)dispatchNode->getFirstInst(), flags, instsToExit, true);
+    // here instsToExit contains exit markers in postorder order: 3, 2, 1
+    std::reverse(instsToExit.begin(), instsToExit.end());
+    // here instsToExit contains exit markers in postorder order: 1, 2, 3
+
+
+    assert(instsToEntry.size() >= instsToExit.size());
+    if (instsToEntry.size() > instsToExit.size()) {
+        if (Log::isEnabled()) {
+            Log::out()<<"Insts to entry:"<<instsToEntry.size()<<" insts to exit:"<<instsToExit.size()<<std::endl;
+        }
+        Node* newDispatchNode = cfg->createDispatchNode(instFactory->makeLabel());
+        cfg->replaceEdgeTarget(dispatchEdge, newDispatchNode);
+        cfg->addEdge(newDispatchNode, dispatchNode);
+
+        size_t entrySize = instsToEntry.size();
+        size_t exitSize = instsToExit.size();
+        for(size_t i = 0; i < entrySize; i++) {
+            if (i>=exitSize) {
+                MethodMarkerInst* start = instsToEntry[i];
+                assert(start->isMethodEntryMarker());
+                MethodMarkerInst* end = (MethodMarkerInst*)instFactory->makeMethodMarker(MethodMarkerInst::Exit, start->getMethodDesc());    
+                if (Log::isEnabled()) {
+                    Log::out()<<"Creating pair for "; start->print(Log::out()); Log::out()<<" -> "; end->print(Log::out());Log::out()<<std::endl;
+                }
+                instsToExit.push_back(end);
+                newDispatchNode->prependInst(end);
+            }
+        }
+    } 
+#ifdef _DEBUG
+    assert(instsToEntry.size() == instsToExit.size());
+    size_t size = instsToEntry.size();
+    for(size_t i = 0; i < size; i++) {
+        MethodMarkerInst* start = instsToEntry[i];
+        MethodMarkerInst* end = instsToExit[i];
+        assert(start->isMethodEntryMarker());
+        assert(end->isMethodExitMarker());
+        assert(start->getMethodDesc() == end->getMethodDesc());
+    }
+#endif
+}
+
 }//namespace
