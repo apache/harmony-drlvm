@@ -297,6 +297,19 @@ Java_org_apache_harmony_drlvm_thread_ThreadHelper_getThreadIdOffset(JNIEnv *env,
     return (jint)hythread_get_thread_id_offset();
 }
 
+
+/*
+ * Class:     org_apache_harmony_drlvm_thread_ThreadHelper
+ * Method:    getLockWordOffset
+ * Signature: ()I
+ */
+VMEXPORT jint JNICALL
+Java_org_apache_harmony_drlvm_thread_ThreadHelper_getLockWordOffset(JNIEnv *env, jclass klass)
+{
+	unsigned offset = ManagedObject::header_offset();
+	return (jint)offset;
+}
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

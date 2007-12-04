@@ -67,7 +67,7 @@ VMCORE_0.1 {
     class_iterator_initialize;
     class_load_class_by_descriptor;
     class_load_class_by_name;
-    class_load_class_by_name_using_bootstrap_class_loader;
+    class_lookup_class_by_name_using_bootstrap_class_loader;
     class_loader_load_native_lib;
     class_loader_lookup;
     class_lookup_method_recursively;
@@ -272,6 +272,7 @@ VMCORE_0.1 {
     Java_java_util_concurrent_locks_LockSupport_parkUntil;
     Java_java_util_concurrent_locks_LockSupport_unpark;
     Java_org_apache_harmony_drlvm_thread_ThreadHelper_getThreadIdOffset;
+    Java_org_apache_harmony_drlvm_thread_ThreadHelper_getLockWordOffset;
     Java_org_apache_harmony_drlvm_VMHelperFastPath_getObjectVtableOffset;
     Java_org_apache_harmony_drlvm_VMHelperFastPath_getVtableClassOffset;
     Java_org_apache_harmony_drlvm_VMHelperFastPath_getVtableIntfTableOffset;

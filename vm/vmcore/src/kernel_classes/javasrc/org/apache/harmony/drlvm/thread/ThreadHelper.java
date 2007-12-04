@@ -28,9 +28,9 @@ public class ThreadHelper {
     public static final int HI_BITS = 0xffff0000;
     public static final int RECURSION_INC_IN_PLACE = 0x800;
     public static final int ZEROED_BITS_FOR_INITIAL_LOCK = 0xffff0400;
-    public static final int LOCK_WORD_OFFSET = 4;
 
-    public static final int TLS_THREAD_ID_OFFSET=getThreadIdOffset();
+    public static final int LOCK_WORD_OFFSET    = getLockWordOffset();
+    public static final int TLS_THREAD_ID_OFFSET= getThreadIdOffset();
 
     @Inline
     static int getThreadId() {
@@ -106,6 +106,7 @@ public class ThreadHelper {
     }
 
     private static native int getThreadIdOffset();
+    private static native int getLockWordOffset();
 }
 
 
