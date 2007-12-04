@@ -149,10 +149,12 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
         if(clazz == null) {
             throw new ClassNotFoundException(name);
         }
-        if(classLoader != null && classLoader.findLoadedClass(name) == null) {
-            // classloader overloads loadClass method though it is not
-            // generally recommended
-            // have to register initiating loader for clazz from here
+        if(classLoader != null) {
+            // Although class loader may have had a chance to register
+            // itself as initiating for requested class, there may occur
+            // a classloader which overloads loadClass method (though it is
+            // not recommended by J2SE specification).
+            // Try to register initiating loader for clazz from here again
             classLoader.registerInitiatedClass(clazz);
         }
         if (initialize) {
