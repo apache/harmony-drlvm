@@ -260,7 +260,14 @@ void GlobalCodeMotion::scheduleEarly(DominatorNode *domNode, Inst *i)
                     Log::out() << " is used by "; i->print(Log::out());
                     Log::out() << std::endl;
                 }
-                uses[srcInst].insert(i);
+                UsesMap::iterator it = uses.find(srcInst);
+                UsesSet* theSet = NULL; 
+                if (it == uses.end()) {
+                    theSet = new (mm) UsesSet(mm);
+                    it = uses.insert(::std::make_pair(srcInst, theSet)).first;
+                }
+                theSet = it->second;
+                theSet->insert(i);
             }
         }
 
@@ -312,7 +319,15 @@ void GlobalCodeMotion::scheduleEarly(DominatorNode *domNode, Inst *i)
                 Log::out() << ", which has early placement in "; FlowGraph::printLabel(Log::out(), srcInstEarliest);
                 Log::out() << std::endl;
             }
-            uses[srcInst].insert(i); // record the use while we're iterating.
+            // record the use while we're iterating.
+            UsesMap::iterator it = uses.find(srcInst);
+            UsesSet* theSet = NULL; 
+            if (it == uses.end()) {
+                theSet = new (mm) UsesSet(mm);
+                it = uses.insert(::std::make_pair(srcInst, theSet)).first;
+            }
+            theSet = it->second;
+            theSet->insert(i);
         }
         srcInstEarliest = currentEarliest;  // now is the latest placement of src insts
         // moving above catch inst may cause problems in code emitter
@@ -438,9 +453,17 @@ void GlobalCodeMotion::scheduleLate(DominatorNode *domNode, Inst *basei, Inst *i
 
     // schedule users
     DominatorNode *lca = 0;
-    UsesSet &users = uses[i];
-    UsesSet::iterator uiter = users.begin();
-    UsesSet::iterator uend = users.end();
+    UsesMap::iterator it = uses.find(i);
+    UsesSet* users = NULL;
+
+    if (it == uses.end()) {
+        users = new (mm) UsesSet(mm);
+        it = uses.insert(::std::make_pair(i, users)).first;
+    }
+
+    users = it->second;
+    UsesSet::iterator uiter = users->begin();
+    UsesSet::iterator uend = users->end();
 
     for ( ; uiter != uend; ++uiter) {
         Inst *useri = *uiter;

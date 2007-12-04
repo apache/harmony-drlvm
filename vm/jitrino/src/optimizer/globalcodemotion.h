@@ -86,8 +86,8 @@ private:
     StlHashMap<Inst*, DominatorNode *> latest;
     typedef StlHashSet<Inst *> VisitedSet;
     VisitedSet visited;
-    typedef ::std::set<Inst *> UsesSet;
-    typedef StlHashMap<Inst *, UsesSet> UsesMap;
+    typedef StlHashSet<Inst *> UsesSet;
+    typedef StlHashMap<Inst *, UsesSet*> UsesMap;
     UsesMap uses;
 
     void scheduleAllEarly();
