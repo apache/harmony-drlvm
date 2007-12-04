@@ -145,6 +145,7 @@ static Method* prepare_exc_creating(Class* exc_class, jvalue* args,
 
     if (!arg_obj) {
         exn_raise_object(VM_Global_State::loader_env->java_lang_OutOfMemoryError);
+        tmn_suspend_enable();
         return NULL;
     }
     jobject arg = oh_allocate_local_handle();

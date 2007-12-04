@@ -52,6 +52,8 @@
 #include "jni_utils.h"
 #include "mem_alloc.h"
 
+#include "port_sysencoding.h"
+
 unsigned ClassLoader::m_capacity = 0;
 unsigned ClassLoader::m_unloadedBytes = 0;
 unsigned ClassLoader::m_nextEntry = 0;
@@ -1025,10 +1027,10 @@ void ClassLoader::LoadNativeLibrary( const char *name )
     if( !handle || !just_loaded ) {
         // create error message
         char apr_error_message[1024];
-        natives_describe_error(status, apr_error_message, 
+        natives_describe_error(status, apr_error_message,
                 sizeof(apr_error_message));
 
-        std::stringstream message_stream;
+        std::stringstream UNREF message_stream;
         message_stream << "Failed loading library \"" << lib_name->bytes << "\": " 
                 << apr_error_message;
 
@@ -1036,11 +1038,21 @@ void ClassLoader::LoadNativeLibrary( const char *name )
         TRACE2("classloader.native", "Loader (" << this << ") native library: "
             << message_stream.str().c_str());
 
+        int converted_buffer_size =
+            port_get_utf8_converted_system_message_length(apr_error_message);
+        char *converted_error_message = (char *)STD_ALLOCA(converted_buffer_size);
+        port_convert_system_error_message_to_utf8(converted_error_message,
+            converted_buffer_size, apr_error_message);
+
+        std::stringstream converted_message_stream;
+        converted_message_stream << "Failed loading library \"" <<
+            lib_name->bytes << "\": " << converted_error_message;
+
         // unlock class loader
         cl_lock.ForceUnlock();
 
         // report exception
-        ReportException("java/lang/UnsatisfiedLinkError", message_stream);
+        ReportException("java/lang/UnsatisfiedLinkError", converted_message_stream);
         return;
     }
 
@@ -1937,7 +1949,11 @@ void ClassLoader::ReportException(const char* exn_name, std::stringstream& messa
 {
     // raise exception
     jthrowable exn = exn_create(exn_name, message_stream.str().c_str());
-    exn_raise_object(exn);
+    if (exn)
+        exn_raise_object(exn);
+    else
+        // Exception could have failed to be created, e.g. because of OOME
+        assert(exn_raised());
 }
 
 void BootstrapClassLoader::ReportException(const char* exn_name, std::stringstream& message_stream)
