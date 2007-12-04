@@ -27,9 +27,16 @@
     // VC++ 2005
     #include <intrin.h>
     #include <emmintrin.h>
-    #pragma intrinsic (_ReadWriteBarrier)
-    #pragma intrinsic (_WriteBarrier)
 #endif
+
+#if !defined(__INTEL_COMPILER)
+#   pragma intrinsic (_ReadWriteBarrier)
+#   pragma intrinsic (_WriteBarrier)
+#else
+#   define _ReadWriteBarrier __memory_barrier
+#   define _WriteBarrier __memory_barrier
+#endif
+
 
 void MemoryReadWriteBarrier() {
 #ifdef _EM64T_
@@ -43,19 +50,11 @@ void MemoryReadWriteBarrier() {
      */
     __asm {lock add [esp], 0 }
 #endif
-#ifdef __INTEL_COMPILER
-    __memory_barrier();
-#else
     _ReadWriteBarrier();
-#endif
 }
 
 void MemoryWriteBarrier() {
     _mm_sfence();
-#ifdef __INTEL_COMPILER
-    __memory_barrier();
-#else
     _WriteBarrier();
-#endif
 }
 

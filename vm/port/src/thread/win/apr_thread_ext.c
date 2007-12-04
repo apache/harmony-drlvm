@@ -33,7 +33,12 @@
     // VC++ 2005
     #include <intrin.h>
     #include <emmintrin.h>
-    #pragma intrinsic (_ReadWriteBarrier)
+#endif
+
+#if !defined(__INTEL_COMPILER)
+#   pragma intrinsic (_ReadWriteBarrier)
+#else
+#   define _ReadWriteBarrier __memory_barrier
 #endif
 
 
@@ -105,12 +110,7 @@ APR_DECLARE(void) apr_memory_rw_barrier() {
     __asm {lock add [esp], 0 }
 #endif
 
-#ifdef __INTEL_COMPILER
-    __memory_barrier();
-#else
     _ReadWriteBarrier();
-#endif
-
 }
 
 APR_DECLARE(apr_status_t) apr_thread_times(apr_thread_t *thread, 
