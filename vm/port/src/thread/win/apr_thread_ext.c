@@ -33,8 +33,9 @@
     // VC++ 2005
     #include <intrin.h>
     #include <emmintrin.h>
+    #pragma intrinsic (_ReadWriteBarrier)
 #endif
-#pragma intrinsic (_ReadWriteBarrier)
+
 
 APR_DECLARE(apr_status_t) apr_thread_set_priority(apr_thread_t *thread, 
                 apr_int32_t priority) 

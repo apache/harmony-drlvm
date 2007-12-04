@@ -2648,8 +2648,10 @@ CG_OpndHandle* InstCodeSelector::callhelper(uint32              numArgs,
         Opnd* stride = (Opnd*) args[2];
 
     	assert (distance->isPlacedIn(OpndKind_Imm) && stride->isPlacedIn(OpndKind_Imm));
-	int dist = distance->getImmValue();
-        int strd = stride->getImmValue();
+		assert(fits32(distance->getImmValue()));
+		assert(fits32(stride->getImmValue()));
+		int dist = (int)distance->getImmValue();
+        int strd = (int)stride->getImmValue();
     
     	for (int i=0; i< dist; i+=strd)
     	{

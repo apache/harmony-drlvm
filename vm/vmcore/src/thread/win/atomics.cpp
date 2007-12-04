@@ -27,9 +27,9 @@
     // VC++ 2005
     #include <intrin.h>
     #include <emmintrin.h>
+    #pragma intrinsic (_ReadWriteBarrier)
+    #pragma intrinsic (_WriteBarrier)
 #endif
-#pragma intrinsic (_ReadWriteBarrier)
-#pragma intrinsic (_WriteBarrier)
 
 void MemoryReadWriteBarrier() {
 #ifdef _EM64T_

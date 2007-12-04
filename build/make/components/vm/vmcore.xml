@@ -175,6 +175,8 @@ Version: $Revision: 1.5.2.3 $
                 </dirset>
             </includepath>
 
+            <compilerarg value="/Qwd94" if="is.icl"/>
+
             <defineset define="BUILDING_VM,GC_V4,USE_DLL_JIT,APR_DECLARE_STATIC" />
         </compiler>
 

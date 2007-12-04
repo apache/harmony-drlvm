@@ -1723,9 +1723,9 @@ void JavaLabelPrepass::genArrayStore(Type *type) {
 }
 
 void JavaLabelPrepass::genTypeArrayStore() {
-    UNUSED Type *type = popType().type;
+    popType();
     popAndCheck(int32Type);
-    type = popType().type;
+    UNUSED Type *type = popType().type;
     assert(type->isArrayType() || type->isNullObject() || type->isUnresolvedObject());
 }
 

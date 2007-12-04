@@ -21,10 +21,10 @@
 #include "object_layout.h"
 
 
-Global_Env *VM_Global_State::loader_env = 0;
+VMEXPORT Global_Env *VM_Global_State::loader_env = 0;
 
 // tag pointer is not allocated by default, enabled by TI
-bool ManagedObject::_tag_pointer = false;
+VMEXPORT bool ManagedObject::_tag_pointer = false;
 
 
 /////////////////////////////////////////////////////////////////

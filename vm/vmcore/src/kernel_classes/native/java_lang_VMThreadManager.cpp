@@ -149,7 +149,7 @@ JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_sleep
 JNIEXPORT jlong JNICALL Java_java_lang_VMThreadManager_init
   (JNIEnv *jenv, jclass clazz, jobject thread, jobject ref, jlong oldThread)
 {
-    return jthread_thread_init(jenv, thread, ref, (hythread_t)oldThread);
+    return jthread_thread_init(jenv, thread, ref, (hythread_t)(POINTER_SIZE_INT)oldThread);
 }
 
 /*
