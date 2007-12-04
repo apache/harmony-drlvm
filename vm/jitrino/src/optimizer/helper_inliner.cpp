@@ -143,7 +143,8 @@ void HelperInlinerSession::_run(IRManager& irm) {
     HelperInlinerFlags& flags = action->getFlags();
 
     if (flags.pragmaInlineType== NULL) {
-        flags.pragmaInlineType= cc->getVMCompilationInterface()->resolveClassUsingBootstrapClassloader(PRAGMA_INLINE_TYPE_NAME);
+        // Avoid class resolution during compilation. VMMagic package should be loaded & resolved at start up.
+        flags.pragmaInlineType= cc->getVMCompilationInterface()->findClassUsingBootstrapClassloader(PRAGMA_INLINE_TYPE_NAME);
         if (flags.pragmaInlineType == NULL) {
             Log::out()<<"Helpers inline pass failed! class not found: "<<PRAGMA_INLINE_TYPE_NAME<<std::endl;
             return;

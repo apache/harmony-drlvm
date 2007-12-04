@@ -54,6 +54,12 @@ public class VMHelper {
     public static final int OBJ_INFO_OFFSET = 4;
 
 
+    // Force loading of magic classes.
+    static {
+        try {
+            Class.forName(Inline.class.getName(), true, null);
+        } catch (ClassNotFoundException e) {}
+    }
 
 
 

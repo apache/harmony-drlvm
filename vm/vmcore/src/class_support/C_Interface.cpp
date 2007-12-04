@@ -991,11 +991,11 @@ class_load_class_by_name(const char *name,
 
 
 Class_Handle
-class_load_class_by_name_using_bootstrap_class_loader(const char *name)
+class_lookup_class_by_name_using_bootstrap_class_loader(const char *name)
 {
     Global_Env *env = VM_Global_State::loader_env;
     String *n = env->string_pool.lookup(name);
-    Class *clss = env->bootstrap_class_loader->LoadVerifyAndPrepareClass(env, n);
+    Class *clss = env->bootstrap_class_loader->LookupClass(n);
     return (Class_Handle)clss;
 } 
 

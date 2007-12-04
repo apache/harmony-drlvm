@@ -155,7 +155,8 @@ Inliner::Inliner(SessionAction* argSource, MemoryManager& mm, IRManager& irm,
 
     _usesOptimisticBalancedSync = argSource->getBoolArg("sync_optimistic", false) ? argSource->getBoolArg("sync_optcatch", true) : false;
     
-    inlinePragma = irm.getCompilationInterface().resolveClassUsingBootstrapClassloader(PRAGMA_INLINE_TYPE_NAME);
+    // Avoid class resolution during compilation. VMMagic package should be loaded & resolved at start up.  
+    inlinePragma = irm.getCompilationInterface().findClassUsingBootstrapClassloader(PRAGMA_INLINE_TYPE_NAME);
 }
 
 int32 
@@ -911,7 +912,7 @@ Inliner::getNextRegionToInline(CompilationContext& inlineCC) {
         call = ((Inst*)callNode->getLastInst())->asMethodCallInst();
         assert(call != NULL);
         methodDesc = call->getMethodDesc();
-        bool isPragmaInline = methodDesc->hasAnnotation(inlinePragma);;
+        bool isPragmaInline = inlinePragma != NULL && methodDesc->hasAnnotation(inlinePragma);;
 
         // If candidate would cause top level method to exceed size threshold, throw away.
         
@@ -955,7 +956,7 @@ InlineNode* Inliner::createInlineNode(CompilationContext& inlineCC, MethodCallIn
     MethodDesc *methodDesc = call->getMethodDesc();
     IRManager* inlinedIRM = new (_tmpMM) IRManager(_tmpMM, _toplevelIRM, *methodDesc, NULL);
     // Augment inline tree
-    bool forceInline = methodDesc->hasAnnotation(inlinePragma);
+    bool forceInline = inlinePragma != NULL && methodDesc->hasAnnotation(inlinePragma);
     InlineNode *inlineNode = new (_tmpMM) InlineNode(*inlinedIRM, call, call->getNode(), forceInline);
     
     inlineCC.setHIRManager(inlinedIRM);
@@ -993,7 +994,7 @@ Inliner::processDominatorNode(InlineNode *inlineNode, DominatorNode* dnode, Loop
             MethodDesc* methodDesc = call->getMethodDesc();
 
             Log::out() << "Considering inlining instruction I" << (int)call->getId() << ::std::endl;
-            if (methodDesc->hasAnnotation(inlinePragma)) {
+            if (inlinePragma != NULL && methodDesc->hasAnnotation(inlinePragma)) {
                 assert(!methodDesc->isSynchronized()); //not tested!
                 if (Log::isEnabled()) {
                     Log::out()<<"Found Inline pragma, adding to the queue:";call->print(Log::out());Log::out()<<std::endl;

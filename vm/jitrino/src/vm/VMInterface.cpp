@@ -629,8 +629,8 @@ void * VMInterface::getHeapCeiling() {
     return vm_heap_ceiling_address();
 }
 
-ObjectType * CompilationInterface::resolveClassUsingBootstrapClassloader( const char * klassName ) {
-    Class_Handle cls = class_load_class_by_name_using_bootstrap_class_loader(klassName);
+ObjectType * CompilationInterface::findClassUsingBootstrapClassloader( const char * klassName ) {
+    Class_Handle cls = class_lookup_class_by_name_using_bootstrap_class_loader(klassName);
     if( NULL == cls ) {
         return NULL;
     }

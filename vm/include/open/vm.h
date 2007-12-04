@@ -85,13 +85,12 @@ VMEXPORT Class_Handle get_system_class_class();
 VMEXPORT Class_Handle get_system_string_class();
 
 /** 
- * Loads a class of a given name. 
+ * Find already loaded class of a given name. 
  *
- * @return <code>NULL</code> if a class cannot be loaded.
+ * @return <code>NULL</code> if a class is not loaded.
  */
-
 VMEXPORT Class_Handle
-class_load_class_by_name_using_bootstrap_class_loader(const char *name);
+class_lookup_class_by_name_using_bootstrap_class_loader(const char *name);
 
 /** 
  * The following three functions will be eventually renamed to

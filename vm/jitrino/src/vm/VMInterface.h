@@ -332,12 +332,13 @@ public:
     MethodDesc* getMethodByName(Class_Handle enclClass, const char* name);
     
 
-    // resolve-by-name methods
     /**
-     * Resolve a system class by its name. 
-     * Returns NULL if no such class found.
+     * Returns a system class by its name or NULL if no such class found.
      */
-    ObjectType * resolveClassUsingBootstrapClassloader( const char * klassName );
+    ObjectType * findClassUsingBootstrapClassloader( const char * klassName );
+
+    // resolve-by-name methods
+    
     /**
      * Recursively looks up for a given method with a given signature in the given class.
      * Returns NULL if no such method found.
