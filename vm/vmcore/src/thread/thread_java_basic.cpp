@@ -67,7 +67,7 @@ int HYTHREAD_PROC jthread_wrapper_start_proc(void *arg)
     assert(status == TM_ERROR_NONE);
 
     // get native thread
-    hythread_t native_thread = start_proc_data.hy_data.thread;
+    hythread_t native_thread = start_proc_data.native_thread;
 
     // check hythread library state
     if (hythread_lib_state() != TM_LIBRARY_STATUS_INITIALIZED) {
@@ -99,7 +99,7 @@ int HYTHREAD_PROC jthread_wrapper_start_proc(void *arg)
     }
 
     // register to group and set ALIVE & RUNNABLE states
-    status = hythread_set_to_group(native_thread, start_proc_data.hy_data.group);
+    status = hythread_set_to_group(native_thread, get_java_thread_group());
     assert(status == TM_ERROR_NONE);
 
     // set hythread_self()
@@ -237,6 +237,7 @@ IDATA jthread_create_with_function(JNIEnv *jni_env,
         return TM_ERROR_OUT_OF_MEMORY;
     }
     *attrs = *given_attrs;
+    attrs->native_thread = native_thread;
 
     // Get JavaVM 
     IDATA status = jni_env->GetJavaVM(&attrs->java_vm);

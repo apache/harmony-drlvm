@@ -79,7 +79,6 @@ IDATA VMCALL hythread_create_ex(hythread_t new_thread,
 {
     int result;
     hythread_t self;
-    hythread_start_proc_data_t start_proc_data;
 
     assert(new_thread);
     hythread_struct_init(new_thread);
@@ -89,26 +88,25 @@ IDATA VMCALL hythread_create_ex(hythread_t new_thread,
     new_thread->priority = priority ? priority : HYTHREAD_PRIORITY_NORMAL;
     new_thread->stacksize = stacksize ? stacksize : TM_DEFAULT_STACKSIZE;
     
-    if (wrapper) {
-        assert(data);
-        start_proc_data = (hythread_start_proc_data_t)data;
-    } else {
+    if (!wrapper) {
+        hythread_start_proc_data_t start_proc_data;
+
         // No need to zero allocated memory because all fields are initilized below.
         start_proc_data =
             (hythread_start_proc_data_t) malloc(sizeof(hythread_start_proc_data));
         if (start_proc_data == NULL) {
             return TM_ERROR_OUT_OF_MEMORY;
         }
-    }
 
-    // Set up thread body procedure 
-    start_proc_data->thread = new_thread;
-    start_proc_data->group = group == NULL ? TM_DEFAULT_GROUP : group;
-    start_proc_data->proc = func;
-    start_proc_data->proc_args = data;
+        // Set up thread body procedure 
+        start_proc_data->thread = new_thread;
+        start_proc_data->group = group == NULL ? TM_DEFAULT_GROUP : group;
+        start_proc_data->proc = func;
+        start_proc_data->proc_args = data;
 
-    // Set wrapper procedure
-    if (!wrapper) {
+        data = (void*)start_proc_data;
+
+        // Set wrapper procedure
         wrapper = hythread_wrapper_start_proc;
     }
 
@@ -116,7 +114,7 @@ IDATA VMCALL hythread_create_ex(hythread_t new_thread,
     // until os_thread_create returned and initialized thread->os_handle properly.
     hythread_global_lock();
     result = os_thread_create(&new_thread->os_handle, new_thread->stacksize,
-            priority, wrapper, (void *)start_proc_data);
+            priority, wrapper, data);
     assert(/* error */ result || new_thread->os_handle /* or thread created ok */);
     hythread_global_unlock();
 

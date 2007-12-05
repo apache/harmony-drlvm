@@ -241,9 +241,9 @@ public:
 struct jthread_start_proc_data
 {
     /**
-     * HyThread library procedure data
+     * Native thread
      */
-    hythread_start_proc_data hy_data;
+    hythread_t native_thread;
 
     /**
      * Pointer to Java VM.
