@@ -190,7 +190,7 @@ void CodeGen::gen_instanceof_cast(JavaByteCodes opcode, Class_Handle enclClass, 
     if (resolve) {
         Class_Handle klass = resolve_class(m_compileHandle, enclClass, cpIdx);
         if (klass == NULL) {
-            assert(!lazy);
+            // resolution has failed
             gen_call_throw(ci_helper_linkerr, rt_helper_throw_linking_exc, 0, enclClass, cpIdx, opcode);
         }
         static const CallSig cs(CCONV_HELPERS, jobj, jobj);

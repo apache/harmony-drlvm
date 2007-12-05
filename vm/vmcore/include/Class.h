@@ -1239,6 +1239,15 @@ public:
         return m_num_dimensions;
     }
 
+    /** 
+     * Gets the base class of the array (for non-primitive arrays only).
+     * @return Class describing the base type of an array
+     * represented by this class.*/
+    Class* get_array_base_class() const {
+        assert(is_array());
+        return m_array_base_class;
+    }
+
     /** Gets the class of the array element.
      * @return Class describing the element of an array
      * represented by this class.*/

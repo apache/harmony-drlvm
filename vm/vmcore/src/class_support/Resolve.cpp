@@ -343,6 +343,12 @@ bool Class::can_access_inner_class(Global_Env* env, Class* inner_clss)
         // in the same runtime package. 
         if(m_package == inner_clss->m_package)
             return true;
+
+        // array type has the same access as base type
+        if (inner_clss->is_array()) {
+            inner_clss = inner_clss->get_array_base_class();
+        }
+        
         // Otherwise, when other_clss is not in the same package, 
         // inner_clss must be a superclass of other_clss.
         for(Class *decl_other_clss = this; decl_other_clss != NULL;)
