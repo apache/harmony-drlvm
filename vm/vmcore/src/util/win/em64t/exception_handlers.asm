@@ -4,6 +4,9 @@ EXTRN   vectored_exception_handler_internal:PROC
 PUBLIC  asm_c_exception_handler
 EXTRN   c_exception_handler:PROC
 
+PUBLIC  asm_process_native_breakpoint_event
+EXTRN   process_native_breakpoint_event:PROC
+
 _TEXT   SEGMENT
 
 vectored_exception_handler PROC
@@ -61,6 +64,18 @@ asm_c_exception_handler PROC
     ret
 
 asm_c_exception_handler ENDP
+
+asm_process_native_breakpoint_event PROC
+
+    pushfq
+    cld
+    sub     rsp, 32 ; allocate stack for 4 registers
+    call    process_native_breakpoint_event
+    add     rsp, 32
+    popfq
+    ret
+
+asm_process_native_breakpoint_event ENDP
 
 
 _TEXT   ENDS

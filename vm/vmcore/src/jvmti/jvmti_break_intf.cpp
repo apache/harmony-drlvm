@@ -1350,7 +1350,10 @@ void __cdecl process_native_breakpoint_event()
     ti->vm_brpt->process_native_breakpoint();
 }
 
-#if defined (_WIN32) && !defined(_EM64T_)
+#if defined (_WIN32)
+#if defined(_EM64T_)
+extern "C" void asm_process_native_breakpoint_event();
+#else
 static void __declspec(naked)
 asm_process_native_breakpoint_event()
 {
@@ -1365,6 +1368,7 @@ asm_process_native_breakpoint_event()
     ret
     }
 }
+#endif
 #endif // _WIN32
 
 bool jvmti_jit_breakpoint_handler(Registers *regs)
@@ -1422,7 +1426,7 @@ bool jvmti_jit_breakpoint_handler(Registers *regs)
     // Copy original registers to TLS
     vm_set_jvmti_saved_exception_registers(vm_thread, *regs);
     // Set return address for exception handler
-#if defined (PLATFORM_POSIX) || defined(_EM64T_)
+#if defined (PLATFORM_POSIX)
     regs->set_ip((void*)process_native_breakpoint_event);
 #else // PLATFORM_POSIX
     regs->set_ip((void*)asm_process_native_breakpoint_event);
