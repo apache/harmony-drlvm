@@ -61,6 +61,7 @@ void ref_enqueue_thread_init(JavaVM *java_vm, JNIEnv* jni_env)
     assert(status == TM_ERROR_NONE);
     
     ref_thread_info->thread_num = REF_ENQUEUE_THREAD_NUM;
+    ref_thread_info->end_waiting_num = 0;
     
     void **args = (void **)STD_MALLOC(sizeof(void *)*2);
     args[0] = (void *)java_vm;
