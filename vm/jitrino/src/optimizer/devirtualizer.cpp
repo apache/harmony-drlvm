@@ -453,11 +453,13 @@ Devirtualizer::guardCallsInBlock(IRManager& regionIRM, Node* node) {
             if (type->isNullObject()) { //NullObject type is not ObjectType instance, but Type instance
                 return;
             }
+            if (type->isUnresolvedType()) {
+                return;
+            }
             ObjectType* baseType = type->asObjectType();
             assert(baseType!=NULL);
             
-            assert(!baseType->isUnresolvedType());
-
+            
             ObjectType* devirtType = NULL;
             if (! ((_devirtInterfaceCalls && isIntfCall) || (_devirtVirtualCalls && !isIntfCall) ||
                    (baseType->isAbstract() && _devirtAbstractCalls))) {
