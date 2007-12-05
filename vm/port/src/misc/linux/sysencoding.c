@@ -28,4 +28,5 @@ void port_convert_system_error_message_to_utf8(char *converted_message,
     char *system_message)
 {
     strncpy(converted_message, system_message, buffer_size - 1);
+    converted_message[buffer_size - 1] = '\0';
 }
