@@ -75,6 +75,10 @@ public class VMHelper {
 
     public static void monitorExit(Object obj) {fail();}
 
+    public static void memset0(Address addr, int size) {fail();}
+
+    public static void prefetch(Address addr, int distance, int stride) {fail();}
+
     public static void writeBarrier(Address objBase, Address objSlot, Address source) {fail();}
 
     public static Address getInterfaceVTable(Object obj, Address intfTypePtr) {fail(); return null;}
@@ -145,4 +149,7 @@ public class VMHelper {
     /** @return object base offset if is in compressed-refs mode or -1*/
     private static native long getCompressedModeObjectBaseOffset();
 }
+
+
+
 

@@ -98,6 +98,7 @@ FORCE_INLINE Partial_Reveal_Object* thread_local_alloc_zeroing(unsigned int size
 
   POINTER_SIZE_INT new_ceiling;
   new_ceiling =  new_free + ZEROING_SIZE;
+  new_ceiling = new_ceiling - (new_ceiling & 63);
   
 #ifdef ALLOC_PREFETCH  
   if(PREFETCH_ENABLED)  {
@@ -169,8 +170,10 @@ FORCE_INLINE void allocator_init_free_block(Allocator* allocator, Block_Header* 
         }while(pre_addr< pref_dist);
     }
 #endif 
-    allocator->ceiling = (void*)((POINTER_SIZE_INT)new_free + ZEROING_SIZE);
-    memset(new_free, 0, ZEROING_SIZE);
+    POINTER_SIZE_INT new_ceiling = (POINTER_SIZE_INT)new_free + ZEROING_SIZE;
+    POINTER_SIZE_INT align = new_ceiling & 63;
+    allocator->ceiling = (void*)(new_ceiling - align);
+    memset(new_free, 0, ZEROING_SIZE - align);
 
 #endif /* #ifndef ALLOC_ZEROING */
 

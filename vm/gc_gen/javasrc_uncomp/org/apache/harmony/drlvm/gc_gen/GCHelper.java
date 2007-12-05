@@ -32,25 +32,62 @@ public class GCHelper {
     }
 
     public static final int TLS_GC_OFFSET = TLSGCOffset();
+    public static final int PREFETCH_DISTANCE = getPrefetchDist();    
+    public static final int ZEROING_SIZE = getZeroingSize();
+    public static final int PREFETCH_STRIDE = getPrefetchStride();
+
+    public static final int TLA_FREE_OFFSET = getTlaFreeOffset();
+    public static final int TLA_CEILING_OFFSET = getTlaCeilingOffset();
+    public static final int TLA_END_OFFSET = getTlaEndOffset();
+
+    public static final int LARGE_OBJECT_SIZE = getLargeObjectSize();
+    public static final boolean PREFETCH_ENABLED = isPrefetchEnabled();
+
 
     @Inline
     private static Address alloc(int objSize, int allocationHandle ) {
+
+	if (objSize > LARGE_OBJECT_SIZE) {
+	    return VMHelper.newResolvedUsingAllocHandleAndSize(objSize, allocationHandle);
+	}
 
         Address TLS_BASE = VMHelper.getTlsBaseAddress();
 
         Address allocator_addr = TLS_BASE.plus(TLS_GC_OFFSET);
         Address allocator = allocator_addr.loadAddress();
-        Address free_addr = allocator.plus(0);
+        Address free_addr = allocator.plus(TLA_FREE_OFFSET);
         Address free = free_addr.loadAddress();
-        Address ceiling = allocator.plus(4).loadAddress();
-        
+        Address ceiling_addr = allocator.plus(TLA_CEILING_OFFSET);
+        Address ceiling = ceiling_addr.loadAddress();
+
         Address new_free = free.plus(objSize);
 
         if (new_free.LE(ceiling)) {
             free_addr.store(new_free);
             free.store(allocationHandle);
             return free;
-        }
+        } else if (PREFETCH_ENABLED) {
+            Address end = allocator.plus(TLA_END_OFFSET).loadAddress();
+            if(new_free.LE(end)) {
+               // do prefetch from new_free to new_free + PREFETCH_DISTANCE + ZEROING_SIZE
+               VMHelper.prefetch(new_free, PREFETCH_DISTANCE + ZEROING_SIZE, PREFETCH_STRIDE);
+    
+               Address new_ceiling = new_free.plus(ZEROING_SIZE);
+	       // align ceiling to 64 bytes		
+	       int remainder = new_ceiling.toInt() & 63;
+	       new_ceiling = new_ceiling.minus(remainder);
+               if( !new_ceiling.LE(end) ){
+                   new_ceiling = end;
+               }
+
+               VMHelper.memset0(ceiling , new_ceiling.diff(ceiling).toInt());
+
+               ceiling_addr.store(new_ceiling);
+               free_addr.store(new_free);
+               free.store(allocationHandle);
+               return free;
+	    }
+	}    
                 
         return VMHelper.newResolvedUsingAllocHandleAndSize(objSize, allocationHandle);    
     }
@@ -64,7 +101,7 @@ public class GCHelper {
 
 
     private static final int ARRAY_LEN_OFFSET = 8;
-    private static final int GC_OBJECT_ALIGNMENT = 4;
+    private static final int GC_OBJECT_ALIGNMENT = getGCObjectAlignment();
 
     @Inline
     public static Address allocArray(Address elemClassHandle, int arrayLen) {
@@ -103,9 +140,22 @@ public class GCHelper {
         VMHelper.writeBarrier(p_objBase, p_objSlot, p_target);
     }
 
+    private static native boolean isPrefetchEnabled();
+    private static native int getLargeObjectSize();
+    private static native int getTlaFreeOffset(); 
+    private static native int getTlaCeilingOffset(); 
+    private static native int getTlaEndOffset(); 
+    private static native int getGCObjectAlignment(); 
+    private static native int getPrefetchDist(); 
+    private static native int getZeroingSize(); 
+    private static native int getPrefetchStride();
     private static native int helperCallback();
     private static native boolean getGenMode(); 
     private static native long getNosBoundary();    
     private static native int TLSGCOffset();
 }
+
+
+
+
 

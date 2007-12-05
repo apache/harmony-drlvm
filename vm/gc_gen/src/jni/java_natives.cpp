@@ -58,6 +58,48 @@ JNIEXPORT void JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_helperCall
     GCHelper_clss = *vm_class_ptr;
 }
 
+JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getPrefetchDist(JNIEnv *e, jclass c)
+{
+    return (jint)PREFETCH_DISTANCE;
+}
+
+JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getZeroingSize(JNIEnv *e, jclass c)
+{
+    return (jint)ZEROING_SIZE;
+}
+
+JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getPrefetchStride(JNIEnv *e, jclass c)
+{
+    return (jint)PREFETCH_STRIDE;
+}
+
+JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getTlaFreeOffset(JNIEnv *, jclass) {
+    Allocator allocator;
+    return (jint) ((POINTER_SIZE_INT)&allocator.free - (POINTER_SIZE_INT)&allocator);
+}
+
+JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getTlaCeilingOffset(JNIEnv *, jclass) {
+    Allocator allocator;
+    return (jint) ((POINTER_SIZE_INT)&allocator.ceiling - (POINTER_SIZE_INT)&allocator);
+}
+
+JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getTlaEndOffset(JNIEnv *, jclass) {
+    Allocator allocator;
+    return (jint) ((POINTER_SIZE_INT)&allocator.end - (POINTER_SIZE_INT)&allocator);
+}
+
+JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getGCObjectAlignment(JNIEnv *, jclass) {
+   return (jint) GC_OBJECT_ALIGNMENT;
+}
+
+JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getLargeObjectSize(JNIEnv *, jclass) {
+   return (jint) GC_OBJ_SIZE_THRESHOLD;
+}
+
+JNIEXPORT jboolean JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_isPrefetchEnabled(JNIEnv *, jclass) {
+   return (jboolean) PREFETCH_ENABLED;
+}
+
 #ifdef __cplusplus
 }
 #endif
