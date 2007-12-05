@@ -4,6 +4,15 @@ GC_GEN_0.1 {
     Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getGenMode;
     Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getNosBoundary;
     Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_helperCallback;
+    Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getPrefetchDist;
+    Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getZeroingSize;
+    Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getPrefetchStride;
+    Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getTlaFreeOffset;
+    Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getTlaCeilingOffset;
+    Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getTlaEndOffset;
+    Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getGCObjectAlignment;
+    Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getLargeObjectSize;
+    Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_isPrefetchEnabled;
     gc_add_compressed_root_set_entry;
     gc_add_root_set_entry;
     gc_add_root_set_entry_interior_pointer;
