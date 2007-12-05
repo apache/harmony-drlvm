@@ -47,8 +47,9 @@ bool RuntimeInterface::isSOEArea(MethodDesc* methodDesc, const ::JitFrameContext
 #endif
     StackInfo stackInfo;
     stackInfo.read(methodDesc, eip, isFirst);
+    assert(eip >= (POINTER_SIZE_INT)methodDesc->getCodeBlockAddress(0));
     POINTER_SIZE_INT eipOffset = eip - (POINTER_SIZE_INT)methodDesc->getCodeBlockAddress(0);
-    assert(fit32(eipOffset) && eipOffset >= 0);
+    assert(fit32(eipOffset));
     return eipOffset<=stackInfo.getSOECheckAreaOffset();
 }
 

@@ -179,8 +179,9 @@ void StackInfo::read(MethodDesc* pMethodDesc, POINTER_SIZE_INT eip, bool isFirst
         calleeSaveRegsMask = entry->info.calleeSaveRegs;
         stackDepth = entry->info.stackDepth;
     }else{
+        assert(eip >= (POINTER_SIZE_INT)pMethodDesc->getCodeBlockAddress(0));
         POINTER_SIZE_INT eipOffset = eip - (POINTER_SIZE_INT)pMethodDesc->getCodeBlockAddress(0);
-        assert(fit32(eipOffset) && eipOffset >= 0);
+        assert(fit32(eipOffset));
         if (eipOffset <= soeCheckAreaOffset) {
             stackDepth = 0; //0 depth -> stack overflow error
         } else {
