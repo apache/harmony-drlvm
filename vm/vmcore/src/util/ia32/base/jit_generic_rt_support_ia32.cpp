@@ -89,7 +89,7 @@ void * getaddress__vm_lshl_naked()
     addr = stub;
     assert((ss - stub) <= stub_size);
 
-    compile_add_dynamic_generated_code_chunk("vm_lshl_naked", stub, stub_size);
+    compile_add_dynamic_generated_code_chunk("vm_lshl_naked", false, stub, stub_size);
 
     if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_lshl_naked", stub, stub_size);
@@ -141,7 +141,7 @@ void * getaddress__vm_lshr_naked()
     addr = stub;
     assert((ss - stub) < stub_size);
 
-    compile_add_dynamic_generated_code_chunk("vm_lshr_naked", stub, stub_size);
+    compile_add_dynamic_generated_code_chunk("vm_lshr_naked", false, stub, stub_size);
 
     if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_lshr_naked", stub, stub_size);
@@ -193,7 +193,7 @@ void * getaddress__vm_lushr_naked()
     addr = stub;
     assert((ss - stub) <= stub_size);
 
-    compile_add_dynamic_generated_code_chunk("vm_lushr_naked", stub, stub_size);
+    compile_add_dynamic_generated_code_chunk("vm_lushr_naked", false, stub, stub_size);
 
     if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_lushr_naked", stub, stub_size);
@@ -327,7 +327,7 @@ void * getaddress__vm_const_lrem_naked()
     assert((ss - stub) <= stub_size);
     addr = stub;
 
-    compile_add_dynamic_generated_code_chunk("vm_const_lrem_naked", stub, stub_size);
+    compile_add_dynamic_generated_code_chunk("vm_const_lrem_naked", false, stub, stub_size);
 
     if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_const_lrem_naked", stub, stub_size);
@@ -534,7 +534,7 @@ static void *getaddress__vm_const_ldiv_naked()
     assert((ss - stub) <= stub_size);
     addr = stub;
 
-    compile_add_dynamic_generated_code_chunk("vm_const_ldiv_naked", stub, stub_size);
+    compile_add_dynamic_generated_code_chunk("vm_const_ldiv_naked", false, stub, stub_size);
 
     if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_const_ldiv_naked", stub, stub_size);
@@ -612,7 +612,7 @@ void *getaddress__vm_d2i()
     addr = stub;
     assert((ss - stub) <= stub_size);
 
-    compile_add_dynamic_generated_code_chunk("vm_d2i", stub, stub_size);
+    compile_add_dynamic_generated_code_chunk("vm_d2i", false, stub, stub_size);
 
     if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_d2i", stub, stub_size);
@@ -668,7 +668,7 @@ void *getaddress__vm_d2l()
     addr = stub;
     assert((ss - stub) <= stub_size);
 
-    compile_add_dynamic_generated_code_chunk("vm_d2l", stub, stub_size);
+    compile_add_dynamic_generated_code_chunk("vm_d2l", false, stub, stub_size);
 
     if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_d2l", stub, stub_size);
@@ -791,7 +791,7 @@ void *getaddress__vm_f2i()
     addr = stub;
     assert((ss - stub) <= stub_size);
 
-    compile_add_dynamic_generated_code_chunk("vm_f2i", stub, stub_size);
+    compile_add_dynamic_generated_code_chunk("vm_f2i", false, stub, stub_size);
 
     if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_f2i", stub, stub_size);
@@ -846,7 +846,7 @@ static void *getaddress__vm_f2l()
     addr = stub;
     assert((ss - stub) < stub_size);
 
-    compile_add_dynamic_generated_code_chunk("vm_f2l", stub, stub_size);
+    compile_add_dynamic_generated_code_chunk("vm_f2l", false, stub, stub_size);
 
     if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_f2l", stub, stub_size);
@@ -943,7 +943,7 @@ void *getaddress__vm_frem()
     addr = stub;
     assert((ss - stub) < stub_size);
 
-    compile_add_dynamic_generated_code_chunk("vm_frem", stub, stub_size);
+    compile_add_dynamic_generated_code_chunk("vm_frem", false, stub, stub_size);
 
     if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_frem", stub, stub_size);
@@ -993,7 +993,7 @@ void *getaddress__vm_drem()
     addr = stub;
     assert((ss - stub) < stub_size);
 
-    compile_add_dynamic_generated_code_chunk("vm_drem", stub, stub_size);
+    compile_add_dynamic_generated_code_chunk("vm_drem", false, stub, stub_size);
 
     if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_drem", stub, stub_size);

@@ -200,7 +200,7 @@ static NativeCodePtr compile_get_compile_me_generic() {
     
     assert(stub - (char *)addr <= STUB_SIZE);
 
-    compile_add_dynamic_generated_code_chunk("compile_me_generic", addr, STUB_SIZE);
+    compile_add_dynamic_generated_code_chunk("compile_me_generic", false, addr, STUB_SIZE);
 
     if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("compile_me_generic", addr, STUB_SIZE);
@@ -237,7 +237,7 @@ NativeCodePtr compile_gen_compile_me(Method_Handle method) {
     size_t sz = strlen(c)+strlen(m)+strlen(d)+12;
     name = (char *)STD_MALLOC(sz);
     sprintf(name, "compileme.%s.%s%s", c, m, d);
-    compile_add_dynamic_generated_code_chunk(name, addr, STUB_SIZE);
+    compile_add_dynamic_generated_code_chunk(name, true, addr, STUB_SIZE);
 
     if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event(name, addr, STUB_SIZE);

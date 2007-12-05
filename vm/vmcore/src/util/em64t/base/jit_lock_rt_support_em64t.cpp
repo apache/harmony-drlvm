@@ -160,7 +160,7 @@ void * getaddress__vm_monitor_enter_naked()
     addr = stub;
     assert((ss - stub) < stub_size);
 
-    compile_add_dynamic_generated_code_chunk("vm_monitor_enter_naked", stub, stub_size);
+    compile_add_dynamic_generated_code_chunk("vm_monitor_enter_naked", false, stub, stub_size);
 
     // Put TI support here
     DUMP_STUB(stub, "getaddress__vm_monitor_enter_naked", ss - stub);
@@ -195,7 +195,7 @@ void * getaddress__vm_monitor_enter_static_naked()
     addr = stub;
     assert((ss - stub) < stub_size);
 
-    compile_add_dynamic_generated_code_chunk("vm_monitor_enter_static_naked", stub, stub_size);
+    compile_add_dynamic_generated_code_chunk("vm_monitor_enter_static_naked", false, stub, stub_size);
 
     if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_monitor_enter_static_naked", stub, stub_size);
@@ -282,7 +282,7 @@ void * getaddress__vm_monitor_exit_naked()
     addr = stub;
     assert((ss - stub) < stub_size);
 
-    compile_add_dynamic_generated_code_chunk("vm_monitor_exit_naked", stub, stub_size);
+    compile_add_dynamic_generated_code_chunk("vm_monitor_exit_naked", false, stub, stub_size);
 
     if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_monitor_exit_naked", stub, stub_size);
@@ -317,7 +317,7 @@ void * getaddress__vm_monitor_exit_static_naked()
     addr = stub;
     assert((ss - stub) < stub_size);
 
-    compile_add_dynamic_generated_code_chunk("vm_monitor_exit_static_naked", stub, stub_size);
+    compile_add_dynamic_generated_code_chunk("vm_monitor_exit_static_naked", false, stub, stub_size);
 
     if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
         jvmti_send_dynamic_code_generated_event("vm_monitor_exit_static_naked", stub, stub_size);

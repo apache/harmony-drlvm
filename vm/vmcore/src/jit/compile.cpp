@@ -826,11 +826,13 @@ DynamicCode* compile_get_dynamic_code_list(void)
 }
 
 // Adding dynamic generated code info to global list
-void compile_add_dynamic_generated_code_chunk(const char* name, const void* address, size_t length)
+void compile_add_dynamic_generated_code_chunk(const char* name, bool free_name,
+    const void* address, size_t length)
 {
     DynamicCode *dc = (DynamicCode *)STD_MALLOC(sizeof(DynamicCode));
     assert(dc);
     dc->name = name;
+    dc->free_name = free_name;
     dc->address = address;
     dc->length = length;
 
@@ -847,6 +849,8 @@ void compile_clear_dynamic_code_list(DynamicCode* list)
     while (list)
     {
         DynamicCode* next = list->next;
+        if (list->free_name)
+            STD_FREE((void *)list->name);
         STD_FREE(list);
         list = next;
     }

@@ -217,7 +217,7 @@ static void* getaddress__setup_java_to_native_frame()
     assert((ss - stub) <= stub_size);
     addr = stub;
 
-    compile_add_dynamic_generated_code_chunk("setup_java_to_native_frame", stub, stub_size);
+    compile_add_dynamic_generated_code_chunk("setup_java_to_native_frame", false, stub, stub_size);
 
     // Put TI support here.
     DUMP_STUB(stub, "getaddress__setup_java_to_native_frame", ss - stub);
@@ -270,7 +270,7 @@ static void* getaddress__pop_java_to_native_frame()
     assert((ss - stub) <= stub_size);
     addr = stub;
 
-    compile_add_dynamic_generated_code_chunk("pop_java_to_native_frame", stub, stub_size);
+    compile_add_dynamic_generated_code_chunk("pop_java_to_native_frame", false, stub, stub_size);
 
     // Put TI support here.
     DUMP_STUB(stub, "getaddress__pop_java_to_native_frame", ss - stub);

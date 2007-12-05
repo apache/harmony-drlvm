@@ -283,15 +283,10 @@ static NativeCodePtr compile_get_compile_me_generic() {
     
     assert(stub - (char *)addr <= STUB_SIZE);
 
-#if 0
-    if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        jvmti_add_dynamic_generated_code_chunk("compile_me_generic", stub, STUB_SIZE);
-        if(jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
-            jvmti_send_dynamic_code_generated_event("compile_me_generic", stub, STUB_SIZE);
-        }
+    compile_add_dynamic_generated_code_chunk("compile_me_generic", false, addr, STUB_SIZE);
+    if(jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
+        jvmti_send_dynamic_code_generated_event("compile_me_generic", stub, STUB_SIZE);
     }
-#endif
 
     DUMP_STUB(addr, "compileme_generic", stub - (char *)addr);
 
@@ -325,23 +320,18 @@ NativeCodePtr compile_gen_compile_me(Method_Handle method) {
     assert(stub - (char *)addr <= STUB_SIZE);
 
 
-#if 0
-    if (VM_Global_State::loader_env->TI->isEnabled())
-    {
-        char * name;
-        const char * c = class_get_name(method_get_class(method));
-        const char * m = method_get_name(method);
-        const char * d = method_get_descriptor(method);
-        size_t sz = strlen(c)+strlen(m)+strlen(d)+12;
-        name = (char *)STD_MALLOC(sz);
-        sprintf(name, "compileme.%s.%s%s", c, m, d);
-        jvmti_add_dynamic_generated_code_chunk(name, stub, STUB_SIZE);
-        if(jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
-            jvmti_send_dynamic_code_generated_event(name, stub, STUB_SIZE);
-        }
-    }
-#endif
+    char * name;
+    const char * c = class_get_name(method_get_class(method));
+    const char * m = method_get_name(method);
+    const char * d = method_get_descriptor(method);
+    size_t sz = strlen(c)+strlen(m)+strlen(d)+12;
+    name = (char *)STD_MALLOC(sz);
+    sprintf(name, "compileme.%s.%s%s", c, m, d);
+    compile_add_dynamic_generated_code_chunk(name, true, addr, STUB_SIZE);
 
+    if(jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
+        jvmti_send_dynamic_code_generated_event(name, addr, STUB_SIZE);
+    }
 
 #ifndef NDEBUG
     static unsigned done = 0;
