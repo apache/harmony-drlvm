@@ -621,8 +621,8 @@ void SpillGen::runImpl()
                     break;
 
 #ifdef _DEBUG_SPILLGEN
-                if (log(LogStream::DBG).isEnabled())
-                    outInstxs(log(LogStream::DBG).out(), *this);
+                if (Log::isEnabled())
+                    outInstxs(Log::out(), *this);
 #endif
 
                 size_t x;
@@ -660,10 +660,10 @@ void SpillGen::runImpl()
     count_emits += emitted;
 
 #ifdef _DEBUG_SPILLGEN
-    log(LogStream::DBG) << endl << "Emitted movs :" << emitted << endl;
+    DBGOUT(endl << "Emitted movs :" << emitted << endl);
 
     if (fails)
-        log(LogStream::DBG) << endl << "FAILS: " << fails << endl;
+        DBGOUT(endl << "FAILS: " << fails << endl);
 #endif
 
     assert(fails == 0);
@@ -729,11 +729,10 @@ size_t SpillGen::pass0 ()
         instxp->regusage [i] = 0;
 
 #ifdef _DEBUG_SPILLGEN
-    log(LogStream::DBG) << endl << "BB#"<< bblock->getId();
+    DBGOUT(endl << "BB#"<< bblock->getId());
     if (!instxs.empty())
-        log(LogStream::DBG) << " [" << *(Inst*)bblock->getFirstInst() << " - " << *(Inst*)bblock->getLastInst() << "] ";
-    log(LogStream::DBG) << instxs.size() - 1
-                        << endl;
+        DBGOUT (" [" << *(Inst*)bblock->getFirstInst() << " - " << *(Inst*)bblock->getLastInst() << "] ");
+    DBGOUT(instxs.size() - 1 << endl);
 #endif
 
 //  calculate registers used at the block exit
@@ -1706,9 +1705,11 @@ RegName SpillGen::findEvict (RegMask usable, int idx, Instx* begx, Instx*& endx)
     if (evict == 0)
         return RegName_Null;
 
-    if (evict->endx->inst->hasKind(Inst::Kind_LocalControlTransferInst))
-        if (--(evict->endx) < evict->begx)
+    if (evict->endx->inst->hasKind(Inst::Kind_LocalControlTransferInst)) {
+        --(evict->endx);
+        if ((evict->endx < evict->begx) || (evict->endx < endx))
             return RegName_Null;
+    }
 
     if (endx > evict->endx)
         endx = evict->endx;
@@ -1880,6 +1881,7 @@ SpillGen::RegMask SpillGen::getRegMaskConstr (const Opnd* opnd, Constraint c) co
 } //namespace Ia32
 
 } //namespace Jitrino
+
 
 
 

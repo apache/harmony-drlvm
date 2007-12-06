@@ -335,8 +335,13 @@ void GlobalCodeMotion::scheduleEarly(DominatorNode *domNode, Inst *i)
         // find earliest intermediate basic block,  starting from the block containing i
         DominatorNode *instEarliest = domNode;
         for (currentEarliest = domNode; ; currentEarliest = currentEarliest->getParent()) {
-            Node *candidateNode = currentEarliest->getNode();
-            if (Log::isEnabled() ) {
+            if(currentEarliest==0){
+	    	break;
+	    }
+	
+	    Node *candidateNode = currentEarliest->getNode();
+	    
+	    if (Log::isEnabled() ) {
                 Log::out() << "  trying node "; FlowGraph::printLabel(Log::out(), candidateNode);
             }
             // intermediate basic blocks with catch labels are

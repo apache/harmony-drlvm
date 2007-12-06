@@ -582,7 +582,7 @@ SsaOpnd* OSR::apply(Type* type, Opcode opcode, Operation op,
                     SsaOpnd* opnd1, SsaOpnd* opnd2){
     findLeadingOpnd(opnd2->getInst(), opnd2);
     SsaOpnd* opnd2Leader = getLeadingOperand(opnd2);
-    if (opnd2 != 0) {
+    if (opnd2Leader!= 0) {
         opnd2 = opnd2Leader;
     }
 
