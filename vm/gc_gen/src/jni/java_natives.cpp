@@ -58,20 +58,55 @@ JNIEXPORT void JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_helperCall
     GCHelper_clss = *vm_class_ptr;
 }
 
-JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getPrefetchDist(JNIEnv *e, jclass c)
-{
-    return (jint)PREFETCH_DISTANCE;
-}
+#if !defined(_IPF_)
 
 JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getZeroingSize(JNIEnv *e, jclass c)
 {
     return (jint)ZEROING_SIZE;
 }
 
+JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getPrefetchDist(JNIEnv *e, jclass c)
+{
+    return (jint)PREFETCH_DISTANCE;
+}
+
 JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getPrefetchStride(JNIEnv *e, jclass c)
 {
     return (jint)PREFETCH_STRIDE;
 }
+
+JNIEXPORT jboolean JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_isPrefetchEnabled(JNIEnv *, jclass) {
+   return (jboolean) PREFETCH_ENABLED;
+}
+
+#else /* _IPF_ is defined*/
+/*
+ Alloc prefetch is disabled in GC code by default. Moreover, allocation helpers are not enabled as well.
+ So return zeroes for prefetch distance, prefetch stride and zeroing size here. 
+ Also isPrefetchEnabled returns JNI_FALSE. These defaults should be taken into account 
+ when enabling helpers on IPF.
+*/
+
+JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getZeroingSize(JNIEnv *e, jclass c)
+{
+    return 0;
+}
+
+JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getPrefetchDist(JNIEnv *e, jclass c)
+{
+    return 0;
+}
+
+JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getPrefetchStride(JNIEnv *e, jclass c)
+{
+    return 0;
+}
+
+JNIEXPORT jboolean JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_isPrefetchEnabled(JNIEnv *, jclass) {
+   return (jboolean) JNI_FALSE;
+}
+#endif /* _IPF_ */
+
 
 JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getTlaFreeOffset(JNIEnv *, jclass) {
     Allocator allocator;
@@ -94,10 +129,6 @@ JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getGCObjec
 
 JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getLargeObjectSize(JNIEnv *, jclass) {
    return (jint) GC_OBJ_SIZE_THRESHOLD;
-}
-
-JNIEXPORT jboolean JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_isPrefetchEnabled(JNIEnv *, jclass) {
-   return (jboolean) PREFETCH_ENABLED;
 }
 
 #ifdef __cplusplus
