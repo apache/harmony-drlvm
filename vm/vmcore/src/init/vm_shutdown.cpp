@@ -447,6 +447,8 @@ void vm_dump_handler(int UNREF x) {
             NULL, 0, 0, NULL, vm_dump_entry_point, (void *)vmBuf[i]);
         assert(hy_status == TM_ERROR_NONE);
     }
+    // set buf end marker
+    threadBuf[nVMs] = NULL;
 
     // spawn a new thread which will release resources.
     hy_status = hythread_create(NULL, 0, 0, 0,
