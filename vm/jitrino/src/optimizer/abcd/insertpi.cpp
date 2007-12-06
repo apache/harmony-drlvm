@@ -780,12 +780,7 @@ bool InsertPi::getAliases(Opnd *opnd, AbcdAliases *aliases, int64 addend)
         {
             Opnd *constOpnd = getConstantOpnd(inst->getSrc(1));
             if (constOpnd && (inst->getType() == Type::Int32)) {
-                Opnd *op0 = inst->getSrc(0);
                 Opnd *op1 = constOpnd;
-                // now op1 should be constant
-                // I assume we've done folding first
-                if( !(!getConstantOpnd(op0)) ) assert(0);
-                
                 Inst *inst1 = op1->getInst();
                 assert(inst1);
                 ConstInst *cinst1 = inst1->asConstInst();
