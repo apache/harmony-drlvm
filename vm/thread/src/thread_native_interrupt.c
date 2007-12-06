@@ -47,8 +47,9 @@ void VMCALL hythread_interrupt(hythread_t thread) {
 
     // If thread was doing any kind of wait, notify it.
     if (thread->state & (TM_THREAD_STATE_PARKED | TM_THREAD_STATE_SLEEPING)) {
-        if (thread->current_condition) {
-            status = hycond_notify_all(thread->current_condition);
+        hycond_t *condition = thread->current_condition;
+        if (condition) {
+            status = hycond_notify_all(condition);
             assert(status == TM_ERROR_NONE);
         }
     } else if (thread->state & TM_THREAD_STATE_IN_MONITOR_WAIT) {

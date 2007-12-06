@@ -496,6 +496,7 @@ void VMCALL hythread_cancel(hythread_t thread) {
     osthread_t os_handle = thread->os_handle;
     hythread_detach(thread);
     os_thread_cancel(os_handle);
+    os_thread_join(os_handle);
 }
 
 /** 

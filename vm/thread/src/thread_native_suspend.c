@@ -338,8 +338,7 @@ IDATA hythread_set_safepoint_callback(hythread_t thread,
     } else {
         // sent an interupt signal for waiting threads
         if (thread->current_condition) {
-            IDATA UNREF status = hycond_notify_all(thread->current_condition);
-            assert(status == TM_ERROR_NONE);
+            hythread_interrupt(thread);
         }
     }
     return TM_ERROR_NONE;

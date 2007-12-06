@@ -154,8 +154,13 @@ int os_thread_free(osthread_t os_thread)
  */
 int os_thread_join(osthread_t os_thread)
 {
-    void *status;
-    return pthread_join(os_thread, &status);
+    int error;
+
+    do {
+        // FIXME - somehow pthread_join returns before thread is terminated
+        error = pthread_join(os_thread, NULL);
+    } while (error != ESRCH && error != EINVAL && error != EDEADLK);
+    return 0;
 }
 
 /**

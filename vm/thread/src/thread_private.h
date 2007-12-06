@@ -313,6 +313,7 @@ osthread_t os_thread_current();
 int os_thread_cancel(osthread_t);
 int os_thread_free(osthread_t os_thread);
 void os_thread_exit(IDATA status);
+int os_thread_join(osthread_t os_thread);
 void os_thread_yield_other(osthread_t);
 int os_get_thread_times(osthread_t os_thread, int64* pkernel, int64* puser);
 
