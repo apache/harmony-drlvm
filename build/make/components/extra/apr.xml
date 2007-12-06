@@ -55,7 +55,7 @@ Version: $Revision: 1.4.2.5 $
         </condition>
     </target>
 
-    <target name="apr-configure" depends="-setup,-get-src" unless="apr-config-available" if="is.unix">
+    <target name="apr-configure" depends="-setup,-get-src" unless="is.apr.configured" if="is.unix">
             <exec executable="sh" dir="${src}">
                 <arg value="./configure" />
             </exec>
