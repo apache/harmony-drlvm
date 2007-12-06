@@ -57,6 +57,7 @@ void ThrowInstEliminator::eliminateThrowInst() {
     const Nodes& nodes = flowGraph.getNodes();
     StlVector<bool> visited_nodes(irManager.getMemoryManager(), flowGraph.getMaxNodeId(), false);
     StlVector<Inst *> pseudo_insts(irManager.getMemoryManager(), 10);
+    StlVector<Edge *> exception_edges(irManager.getMemoryManager());
     LoopTree * loop_tree = irManager.getLoopTree();    
     bool restore_ssa = false;
 
@@ -149,6 +150,10 @@ void ThrowInstEliminator::eliminateThrowInst() {
             // Add direct jump.
             flowGraph.addEdge(throw_node, target_node);
 
+            // Remember exception edge here to remove them all at once at the end.
+            // Removing exception edge right now will generate unreachable code.
+            exception_edges.push_back(throw_node->getExceptionEdge());
+
             // Add pseudo instructions from exeption path.            
             if (pseudo_insts.size() > 0) {
                 Node * pseudo_node = flowGraph.spliceBlockOnEdge(
@@ -206,6 +211,16 @@ void ThrowInstEliminator::eliminateThrowInst() {
     }
 
     if (restore_ssa) {
+        // Remove all remembered exception edges.
+        for (StlVector<Edge *>::iterator it = exception_edges.begin(); it != exception_edges.end(); it++) {
+            flowGraph.removeEdge(*it);
+        }
+
+        // Clean up dead code.
+        OptPass::dce(irManager);
+        OptPass::uce(irManager, false);
+
+        // Restrore SSA form.
         OptPass::computeDominators(irManager);
         DominatorTree* dominatorTree = irManager.getDominatorTree();
         
@@ -213,8 +228,9 @@ void ThrowInstEliminator::eliminateThrowInst() {
         SSABuilder ssaBuilder(opndManager, instFactory, frontier, &flowGraph, irManager.getOptimizerFlags());
         bool phiInserted = ssaBuilder.fixupVars(&flowGraph, irManager.getMethodDesc());
         irManager.setInSsa(true);
-        if (phiInserted)
+        if (phiInserted) {
             irManager.setSsaUpdated();
+        }
     }
 }
 

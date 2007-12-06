@@ -61,6 +61,8 @@ public:
     static void computeDominators(IRManager& irm);
     static void computeLoops(IRManager& irm, bool normalize = true);
     static void computeDominatorsAndLoops(IRManager& irm, bool normalizeLoops = true);
+    static void dce(IRManager& irm);
+    static void uce(IRManager& irm, bool fixup_ssa);
     static void fixupSsa(IRManager& irm);
     static void splitCriticalEdges(IRManager& irm);
     static bool isProfileConsistent(IRManager& irm);

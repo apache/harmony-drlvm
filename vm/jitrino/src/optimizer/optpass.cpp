@@ -31,6 +31,7 @@
 #include "optimizer.h"
 #include "FlowGraph.h"
 #include "StaticProfiler.h"
+#include "deadcodeeliminator.h"
 
 #ifdef _WIN32
   #define snprintf _snprintf
@@ -107,6 +108,22 @@ OptPass::computeDominatorsAndLoops(IRManager& irm, bool normalizeLoops) {
     computeDominators(irm);
     computeLoops(irm, normalizeLoops);
     computeDominators(irm);
+}
+
+void
+OptPass::dce(IRManager& irm) {
+    DeadCodeEliminator dce(irm);
+    dce.eliminateDeadCode(false);
+}
+
+void
+OptPass::uce(IRManager& irm, bool fixup_ssa) {
+    DeadCodeEliminator dce(irm);
+    dce.eliminateUnreachableCode();
+
+    if (irm.getInSsa() && fixup_ssa) {
+        OptPass::fixupSsa(irm);
+    }    
 }
 
 void
