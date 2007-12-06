@@ -126,7 +126,11 @@ jobject JNICALL GetObjectFieldOffset(JNIEnv* UNREF jni_env, jobject obj, jint of
     ManagedObject *val = get_raw_reference_pointer(field_addr);
     ObjectHandle new_handle = NULL; 
     if (val != NULL) {
-       new_handle = oh_allocate_local_handle();
+        new_handle = oh_allocate_local_handle_from_jni();
+        if (new_handle == NULL) {
+            tmn_suspend_enable();   //---------------------------------^
+            return NULL;
+        }
        new_handle->object = val;
     } 
 
@@ -777,8 +781,10 @@ jobject JNICALL GetStaticObjectField(JNIEnv * jni_env,
     // compress static fields.
     ManagedObject *val = get_raw_reference_pointer(field_addr);
     if (val != NULL) {
-       new_handle = oh_allocate_local_handle();
-       new_handle->object = val;
+        new_handle = oh_allocate_local_handle_from_jni();
+        if (new_handle != NULL) {
+            new_handle->object = val;
+        }
     } else {
         new_handle = NULL;
     }

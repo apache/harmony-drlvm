@@ -74,6 +74,7 @@ NativeCodePtr static get_ip_for_invoke_call_ip(VM_thread* thread,
 
     CodeChunkInfo *cci = si_get_code_chunk_info(si);
     JIT *jit = cci->get_jit();
+    si_free(si);
 
     NativeCodePtr next_ip;
     OpenExeJpdaError UNREF result = jit->get_native_location_for_bc(method,

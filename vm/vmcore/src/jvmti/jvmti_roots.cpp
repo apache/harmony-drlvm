@@ -314,7 +314,7 @@ void jitted_ti_enumerate_thread(jvmtiEnv *env, VM_thread *thread)
 {
     StackIterator* si;
     si = si_create_from_native(thread);
-    ti_enumerate_thread_stack((TIEnv*)env, si);    
+    ti_enumerate_thread_stack((TIEnv*)env, si);
 
     // Enumerate references associated with a thread that are not stored on the thread's stack.
     ti_enumerate_thread_not_on_stack((TIEnv*)env, thread);

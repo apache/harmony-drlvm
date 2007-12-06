@@ -52,11 +52,18 @@
 struct StackIterator;
 
 /**
- * Creates a new stack iterator for the given thread.
+ * Creates a new stack iterator for the current thread.
  *
  * @note The function assumes that the thread is currently in native code.
  */
 StackIterator* si_create_from_native();
+
+/**
+ * Filles a stack iterator structure for the current thread.
+ *
+ * @note The function assumes that the thread is currently in native code.
+ */
+void si_fill_from_native(StackIterator* si);
 
 /**
  * Creates a new stack iterator for the given thread.
@@ -72,6 +79,21 @@ StackIterator* si_create_from_native();
  * @note The function assumes that the given thread is currently in native code.
  */
 StackIterator* si_create_from_native(VM_thread* thread);
+
+/**
+ * Filles a stack iterator structure for the  given thread.
+ *
+ * The thread can run concurrently with the stack iterator,
+ * but it must not pop (return past) the most recent M2N frame when the iterator is called.
+ *
+ * Creation is not atomic with respect to pushing/popping of M2N frames.
+ * The client code must ensure that such operations are serialized.
+ *
+ * @param[in] thread - the pointer to the thread, the stack of which must be enumerated
+ *
+ * @note The function assumes that the given thread is currently in native code.
+ */
+void si_fill_from_native(StackIterator* si, VM_thread* thread);
 
 /**
  * Creates a new stack iterator for the suspended thread.
@@ -90,6 +112,29 @@ StackIterator* si_create_from_native(VM_thread* thread);
  * @note The function assumes that iterated thread is currently suspended from managed code.
  */
 StackIterator* si_create_from_registers(Registers* regs, bool is_ip_past, M2nFrame* m2nf);
+
+/**
+ * Filles a stack iterator structure for the suspended thread.
+ *
+ * The thread can run concurrently with the stack iterator,
+ * but it must not pop (return past) the most recent M2N frame when the iterator is called.
+ *
+ * Creation is not atomic with respect to pushing/popping of M2N frames.
+ * The client code must ensure that such operations are serialized.
+ *
+ * @param[in] regs        -  values of the registers at the point of suspension
+ * @param[in] is_ip_past  -  indicate is ip past or not
+ * @param[in] m2nf        -  the pointer to the M2N frame that must be the one immediately
+ *                           prior to the suspended frame
+ *
+ * @note The function assumes that iterated thread is currently suspended from managed code.
+ */
+void si_fill_from_registers(StackIterator* si, Registers* regs, bool is_ip_past, M2nFrame* lm2nf);
+
+/**
+ * Returns suze of stack iterator structure in bytes.
+ */
+size_t si_size();
 
 /**
  * Makes a copy of the given stack iterator.

@@ -828,8 +828,8 @@ VMBreakPoints::process_native_breakpoint()
     // transfers execution control to the instruction buffer to
     // execute the original instruction with the registers which it
     // had before breakpoint happened
-    StackIterator *si =
-        si_create_from_registers(&regs, false, m2n_get_previous_frame(m2nf));
+    StackIterator* si = (StackIterator*) STD_ALLOCA(si_size());
+    si_fill_from_registers(si, &regs, false, m2n_get_previous_frame(m2nf));
 
     si_set_ip(si, instruction_buffer, false);
     si_transfer_control(si);

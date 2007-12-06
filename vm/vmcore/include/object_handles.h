@@ -160,6 +160,8 @@ void oh_enumerate_global_handles();
 VMEXPORT // temporary solution for interpreter unplug
 ObjectHandle oh_allocate_local_handle();
 
+ObjectHandle oh_allocate_local_handle_from_jni();
+
 ObjectHandle oh_convert_to_local_handle(ManagedObject* pointer);
 ObjectHandle oh_copy_to_local_handle(ObjectHandle oh);
 

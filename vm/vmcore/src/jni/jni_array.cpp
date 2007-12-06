@@ -126,7 +126,11 @@ jarray JNICALL NewObjectArray(JNIEnv * jni_env,
         REFS_RUNTIME_SWITCH_ENDIF
     }
 
-    ObjectHandle new_handle = oh_allocate_local_handle();
+    ObjectHandle new_handle = oh_allocate_local_handle_from_jni();
+    if (new_handle == NULL) {
+        tmn_suspend_enable();   //---------------------------------^
+        return NULL;
+    }
     new_handle->object = (ManagedObject*)vector;
 
     tmn_suspend_enable();        //---------------------------------^
@@ -160,7 +164,11 @@ jobject JNICALL GetObjectArrayElement(JNIEnv * jni_env, jobjectArray array, jsiz
     ManagedObject *val = get_raw_reference_pointer((ManagedObject **)addr);
     ObjectHandle new_handle = NULL; 
     if (val != NULL) {
-       new_handle = oh_allocate_local_handle();
+        new_handle = oh_allocate_local_handle_from_jni();
+        if (new_handle == NULL) {
+            tmn_suspend_enable();   //---------------------------------^
+            return NULL;
+        }
        new_handle->object = val;
     } 
 
@@ -250,7 +258,11 @@ static jobject NewPrimitiveArray(Class* clss, jsize length) {
     clss->instance_allocated(sz);
 #endif //VM_STATS
 
-    ObjectHandle h = oh_allocate_local_handle();
+    ObjectHandle h = oh_allocate_local_handle_from_jni();
+    if (h == NULL) {
+        tmn_suspend_enable();   //---------------------------------^
+        return NULL;
+    }
     h->object = (ManagedObject *)array;
 
     tmn_suspend_enable();        //---------------------------------^

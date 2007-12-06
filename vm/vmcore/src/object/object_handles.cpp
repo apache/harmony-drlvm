@@ -25,6 +25,7 @@
 #include <stdlib.h>
 
 #include "environment.h"
+#include "exceptions.h"
 #include "open/gc.h"
 #include "lil.h"
 #include "lock_manager.h"
@@ -278,6 +279,11 @@ static ObjectHandlesNew* oh_add_new_handles(ObjectHandlesNew** hs)
     unsigned capacity = 10;
     unsigned size = sizeof(ObjectHandlesNew)+sizeof(ManagedObject*)*(capacity-1);
     ObjectHandlesNew* n = (ObjectHandlesNew*)STD_MALLOC(size);
+
+    if (n == NULL) {
+        return NULL;
+    }
+
     assert(n);
     memset(n, 0, size);
 #ifdef _IPF_
@@ -291,14 +297,22 @@ static ObjectHandlesNew* oh_add_new_handles(ObjectHandlesNew** hs)
     return n;
 }
 
-ObjectHandle oh_allocate_handle(ObjectHandles** hs)
+static ObjectHandle oh_allocate_handle(ObjectHandles** hs)
 {
     // the function should be called only from suspend disabled mode
     // as it is not gc safe.
     assert(!hythread_is_suspend_enabled());
     ObjectHandlesNew* cur = (ObjectHandlesNew*)*hs;
-    if (!cur || cur->size>=cur->capacity)
-        cur = oh_add_new_handles((ObjectHandlesNew**)hs);
+
+    if (!cur || cur->size>=cur->capacity) {
+        ObjectHandlesNew* new_handle_block = oh_add_new_handles((ObjectHandlesNew**)hs);
+
+        if (new_handle_block == NULL) {
+            return NULL;
+        }
+        assert(new_handle_block);
+        cur = new_handle_block;
+    }
     ObjectHandle h = (ObjectHandle)&cur->refs[cur->size];
     cur->size++;
     h->object = NULL;
@@ -346,7 +360,9 @@ NativeObjectHandles::~NativeObjectHandles()
 
 ObjectHandle NativeObjectHandles::allocate()
 {
-    return oh_allocate_handle(&handles);
+    ObjectHandle res = oh_allocate_handle(&handles);
+    assert(res);
+    return res;
 }
 
 void NativeObjectHandles::enumerate()
@@ -359,8 +375,7 @@ void NativeObjectHandles::enumerate()
 //////////////////////////////////////////////////////////////////////////
 // Local Handles
 
-VMEXPORT // temporary solution for interpreter unplug
-ObjectHandle oh_allocate_local_handle()
+static ObjectHandle oh_allocate_local_handle_internal()
 {
     assert(!hythread_is_suspend_enabled());
 
@@ -390,6 +405,23 @@ ObjectHandle oh_allocate_local_handle()
     }
     return res;
 }
+
+VMEXPORT // temporary solution for interpreter unplug
+ObjectHandle oh_allocate_local_handle() {
+    ObjectHandle res = oh_allocate_local_handle_internal();
+    assert(res);
+    return res;
+}
+
+ObjectHandle oh_allocate_local_handle_from_jni() {
+    ObjectHandle res = oh_allocate_local_handle_internal();
+
+    if (res == NULL) {
+        exn_raise_object(VM_Global_State::loader_env->java_lang_OutOfMemoryError);
+    }
+    return res;
+}
+
 
 ObjectHandle oh_convert_to_local_handle(ManagedObject* pointer) {
     assert(!hythread_is_suspend_enabled());

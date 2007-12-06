@@ -872,15 +872,14 @@ jobject JNICALL NewLocalRef(JNIEnv * jni_env, jobject ref)
     Global_Env * vm_env = jni_get_vm_env(jni_env);
     if (exn_raised() || ref == NULL) return NULL;
 
-    jobject new_ref = oh_copy_to_local_handle(ref);
+    tmn_suspend_disable();
+    jobject new_ref = oh_allocate_local_handle_from_jni();
 
-    if (NULL == new_ref) {
-        exn_raise_object(vm_env->java_lang_OutOfMemoryError);
-        return NULL;
+    if (NULL != new_ref) {
+        new_ref->object = ref->object;
+        TRACE2("jni", "NewLocalRef class = " << jobject_to_struct_Class(new_ref));
     }
-
-    TRACE2("jni", "NewLocalRef class = " << jobject_to_struct_Class(new_ref));
-
+    tmn_suspend_enable();   
     return new_ref;
 } //NewLocalRef
 
@@ -980,7 +979,11 @@ jobject JNICALL AllocObject(JNIEnv * jni_env,
         tmn_suspend_enable();   //---------------------------------^
         return NULL;
     }
-    ObjectHandle new_handle = oh_allocate_local_handle();
+    ObjectHandle new_handle = oh_allocate_local_handle_from_jni();
+    if (new_handle == NULL) {
+        tmn_suspend_enable();   //---------------------------------^
+        return NULL;
+    }
     new_handle->object = (ManagedObject *)new_obj;
     tmn_suspend_enable();       //---------------------------------^
 
@@ -1044,7 +1047,11 @@ jclass JNICALL GetObjectClass(JNIEnv * jni_env,
 
     tmn_suspend_disable();       //---------------------------------v
 
-    ObjectHandle new_handle = oh_allocate_local_handle();
+    ObjectHandle new_handle = oh_allocate_local_handle_from_jni();
+    if (new_handle == NULL) {
+        tmn_suspend_enable();   //---------------------------------^
+        return NULL;
+    }
     ManagedObject *jlo = h->object;
     assert(jlo);
     assert(jlo->vt());
@@ -1084,7 +1091,11 @@ check_is_jstring_class(jstring string)
 
     tmn_suspend_disable();       //---------------------------------v
 
-    ObjectHandle new_handle = oh_allocate_local_handle();
+    ObjectHandle new_handle = oh_allocate_local_handle_from_jni();
+    if (new_handle == NULL) {
+        tmn_suspend_enable();   //---------------------------------^
+        return NULL;
+    }
     ManagedObject *jlo = h->object;
     assert(jlo);
     assert(jlo->vt());

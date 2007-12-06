@@ -356,6 +356,16 @@ static transfer_control_stub_type gen_transfer_control_stub()
 //////////////////////////////////////////////////////////////////////////
 // Stack Iterator Interface
 
+StackIterator* si_create_from_native()
+{
+    return si_create_from_native(p_TLS_vmthread);
+}
+
+void si_fill_from_native(StackIterator* si)
+{
+    si_fill_from_native(si, p_TLS_vmthread);
+}
+
 StackIterator* si_create_from_native(VM_thread* thread)
 {
     // Allocate iterator
@@ -363,16 +373,18 @@ StackIterator* si_create_from_native(VM_thread* thread)
     assert(res);
 
     // Setup current frame
-    res->cci = NULL;
-    res->m2nfl = m2n_get_last_frame(thread);
-    res->ip = 0;
-    res->c.p_eip = &res->ip;
+    si_fill_from_native(res, thread);
     return res;
 }
 
-StackIterator* si_create_from_native()
-{
-    return si_create_from_native(p_TLS_vmthread);
+void si_fill_from_native(StackIterator* si, VM_thread * thread) {
+    memset(si, 0, sizeof(StackIterator));
+
+    // Setup current frame
+    si->cci = NULL;
+    si->m2nfl = m2n_get_last_frame(thread);
+    si->ip = 0;
+    si->c.p_eip = &si->ip;
 }
 
 /*
@@ -426,6 +438,15 @@ StackIterator* si_create_from_registers(Registers*, bool is_ip_past, M2nFrame*)
 {
     ABORT("Not implemented");
     return NULL;
+}
+
+void si_fill_from_registers(StackIterator* si, Registers*, bool is_ip_past, M2nFrame*)
+{
+    ABORT("Not implemented");
+}
+
+size_t si_size(){
+    return sizeof(StackIterator);
 }
 
 void si_transfer_all_preserved_registers(StackIterator* si)
@@ -557,7 +578,7 @@ void si_transfer_control(StackIterator* si)
     memcpy(&local_si, si, sizeof(StackIterator));
     if (si->c.p_eip == &si->ip)
         local_si.c.p_eip = &local_si.ip;
-    si_free(si);
+    //si_free(si);
 
     // 2. Set the M2nFrame list
     m2n_set_last_frame(local_si.m2nfl);

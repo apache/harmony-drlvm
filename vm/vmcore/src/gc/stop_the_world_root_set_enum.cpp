@@ -221,7 +221,6 @@ void vm_enumerate_thread(VM_thread *thread)
     vm_enumerate_root_set_single_thread_on_stack(si);    
     // Enumerate references associated with a thread that are not stored on the thread's stack.
     vm_enumerate_root_set_single_thread_not_on_stack(thread);
-    
 } //vm_enumerate_thread
 
 

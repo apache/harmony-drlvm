@@ -64,8 +64,10 @@ jobject jni_class_loader_from_handle(JNIEnv*, ClassLoaderHandle clh)
         hythread_suspend_enable();
         return NULL;
     }
-    ObjectHandle res = oh_allocate_local_handle();
-    res->object = obj;
+    ObjectHandle res = oh_allocate_local_handle_from_jni();
+    if (res) {
+        res->object = obj;
+    }
     hythread_suspend_enable();
     return (jobject)res;
 }
@@ -756,11 +758,15 @@ jobject CreateNewThrowable(JNIEnv* jenv, Class* clazz,
 jobject create_default_instance(Class* clss) 
 {    
     hythread_suspend_disable();
-    jobject h = oh_allocate_local_handle();
     ManagedObject *new_obj = class_alloc_new_object_and_run_default_constructor(clss);
     if (new_obj == NULL) {
         hythread_suspend_enable();
         assert(exn_raised());
+        return NULL;
+    }
+    jobject h = oh_allocate_local_handle_from_jni();
+    if (h == NULL) {
+        hythread_suspend_enable();
         return NULL;
     }
     h->object = new_obj;

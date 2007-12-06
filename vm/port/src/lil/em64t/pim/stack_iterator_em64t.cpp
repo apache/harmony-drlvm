@@ -315,18 +315,27 @@ StackIterator * si_create_from_native() {
     return si_create_from_native(p_TLS_vmthread);
 }
 
+void si_fill_from_native(StackIterator* si) {
+    si_fill_from_native(si, p_TLS_vmthread);
+}
+
+
 StackIterator * si_create_from_native(VM_thread * thread) {
     ASSERT_NO_INTERPRETER
     // Allocate iterator
     StackIterator * si = (StackIterator *)STD_MALLOC(sizeof(StackIterator));
+
+    si_fill_from_native(si, thread);
+    return si;
+}
+
+void si_fill_from_native(StackIterator* si, VM_thread * thread) {
     memset(si, 0, sizeof(StackIterator));
 
     si->cci = NULL;
     si->jit_frame_context.p_rip = &si->ip;
     si->m2n_frame = m2n_get_last_frame(thread);
     si->ip = 0;
-
-    return si;
 }
 
 StackIterator * si_create_from_registers(Registers * regs, bool is_ip_past,
@@ -334,6 +343,15 @@ StackIterator * si_create_from_registers(Registers * regs, bool is_ip_past,
     ASSERT_NO_INTERPRETER
     // Allocate iterator
     StackIterator * si = (StackIterator *)STD_MALLOC(sizeof(StackIterator));
+    assert(si);
+    
+    si_fill_from_registers(si, regs, is_ip_past, lm2nf);
+
+    return si;
+}
+
+void si_fill_from_registers(StackIterator* si, Registers* regs, bool is_ip_past, M2nFrame* lm2nf)
+{
     memset(si, 0, sizeof(StackIterator));
 
     Global_Env *env = VM_Global_State::loader_env;
@@ -344,8 +362,10 @@ StackIterator * si_create_from_registers(Registers * regs, bool is_ip_past,
     
     si->m2n_frame = lm2nf;
     si->ip = regs->rip;
+}
 
-    return si;
+size_t si_size(){
+    return sizeof(StackIterator);
 }
 
 // On EM64T all registers are preserved automatically, so this is a nop.
@@ -464,7 +484,7 @@ void si_transfer_control(StackIterator * si) {
     // 1. Copy si to stack
     StackIterator local_si;
     si_copy(&local_si, si);
-    si_free(si);
+    //si_free(si);
 
     // 2. Set the M2nFrame list
     m2n_set_last_frame(local_si.m2n_frame);

@@ -236,48 +236,70 @@ StackIterator* si_create_from_native()
     return si_create_from_native(p_TLS_vmthread);
 }
 
+void si_fill_from_native(StackIterator* si)
+{
+    si_fill_from_native(si, p_TLS_vmthread);
+}
+
 StackIterator* si_create_from_native(VM_thread* thread)
 {
     ASSERT_NO_INTERPRETER
     // Allocate iterator
     StackIterator* res = (StackIterator*)STD_MALLOC(sizeof(StackIterator));
     assert(res);
-    memset(res, 0, sizeof(StackIterator));
 
     // Setup current frame
-    res->cci = NULL;
-    res->m2nfl = m2n_get_last_frame(thread);
-    res->ip = 0;
-    res->c.p_eip = &res->ip;
+    si_fill_from_native(res, thread);
 
     return res;
 }
+
+void si_fill_from_native(StackIterator* si, VM_thread* thread)
+{
+    memset(si, 0, sizeof(StackIterator));
+
+    // Setup current frame
+    si->cci = NULL;
+    si->m2nfl = m2n_get_last_frame(thread);
+    si->ip = 0;
+    si->c.p_eip = &si->ip;
+}
+
 
 StackIterator* si_create_from_registers(Registers* regs, bool is_ip_past, M2nFrame* lm2nf)
 {
     // Allocate iterator
     StackIterator* res = (StackIterator*)STD_MALLOC(sizeof(StackIterator));
     assert(res);
-    memset(res, 0, sizeof(StackIterator));
+
+    si_fill_from_registers(res, regs, is_ip_past, lm2nf);
+
+    return res;
+}
+void si_fill_from_registers(StackIterator* si,Registers* regs, bool is_ip_past, M2nFrame* lm2nf)
+{
+    memset(si, 0, sizeof(StackIterator));
 
     // Setup current frame
     Global_Env *env = VM_Global_State::loader_env;
-    // It's possible that registers represent native code and res->cci==NULL
-    res->cci = env->vm_methods->find((NativeCodePtr)regs->eip, is_ip_past);
-    res->c.esp = regs->esp;
-    res->c.p_eip = &regs->eip;
-    res->c.p_ebp = &regs->ebp;
-    res->c.p_edi = &regs->edi;
-    res->c.p_esi = &regs->esi;
-    res->c.p_ebx = &regs->ebx;
-    res->c.p_eax = &regs->eax;
-    res->c.p_ecx = &regs->ecx;
-    res->c.p_edx = &regs->edx;
-    res->c.is_ip_past = is_ip_past;
-    res->c.eflags = regs->eflags;
-    res->m2nfl = lm2nf;
+    // It's possible that registers represent native code and si->cci==NULL
+    si->cci = env->vm_methods->find((NativeCodePtr)regs->eip, is_ip_past);
+    si->c.esp = regs->esp;
+    si->c.p_eip = &regs->eip;
+    si->c.p_ebp = &regs->ebp;
+    si->c.p_edi = &regs->edi;
+    si->c.p_esi = &regs->esi;
+    si->c.p_ebx = &regs->ebx;
+    si->c.p_eax = &regs->eax;
+    si->c.p_ecx = &regs->ecx;
+    si->c.p_edx = &regs->edx;
+    si->c.is_ip_past = is_ip_past;
+    si->c.eflags = regs->eflags;
+    si->m2nfl = lm2nf;
+}
 
-    return res;
+size_t si_size(){
+    return sizeof(StackIterator);
 }
 
 // On IA32 all registers are preserved automatically, so this is a nop.
@@ -473,7 +495,7 @@ void si_transfer_control(StackIterator* si)
 
     if (si->c.p_eip == &si->ip)
         local_si.c.p_eip = &local_si.ip;
-    si_free(si);
+    //si_free(si);
 
     // 2. Set the M2nFrame list
     m2n_set_last_frame(local_si.m2nfl);

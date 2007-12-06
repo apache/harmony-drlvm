@@ -203,7 +203,8 @@ static ManagedObject * exn_propagate_exception(
     assert(*exn_obj || exn_class);
 
     // Save the throw context
-    StackIterator *throw_si = si_dup(si);
+    StackIterator *throw_si = (StackIterator*) STD_ALLOCA(si_size());
+    memcpy(throw_si, si, si_size());
 
     // Skip first frame if it is an M2nFrame (which is always a transition from managed to the throw code).
     // The M2nFrame will be removed from the thread's M2nFrame list but transfer control or copy to registers.
@@ -375,7 +376,7 @@ static ManagedObject * exn_propagate_exception(
                     TRACE2("exn", ("setting return pointer to %d", exn_obj));
 
                     si_set_return_pointer(si, (void **) exn_obj);
-                    si_free(throw_si);
+                    //si_free(throw_si);
                     return NULL;
                 }
             }
@@ -410,7 +411,7 @@ static ManagedObject * exn_propagate_exception(
     // Reload exception object pointer because it could have
     // moved while calling JVMTI callback
     if (exn_raised()) {
-        si_free(throw_si);
+        //si_free(throw_si);
         return NULL;
     }
 
@@ -418,7 +419,7 @@ static ManagedObject * exn_propagate_exception(
         interrupted_method_jit, interrupted_method, interrupted_method_location,
         NULL, NULL, NULL);
 
-    si_free(throw_si);
+    //si_free(throw_si);
     return *exn_obj;
 }   //exn_propagate_exception
 
@@ -466,7 +467,8 @@ void exn_throw_for_JIT(ManagedObject* exn_obj, Class_Handle exn_class,
         exn_class = VM_Global_State::loader_env->java_lang_NullPointerException_Class;
     }
     ManagedObject* local_exn_obj = exn_obj;
-    StackIterator* si = si_create_from_native();
+    StackIterator* si = (StackIterator*) STD_ALLOCA(si_size());
+    si_fill_from_native(si);
 
     if (exn_raised()) {
         return;
@@ -493,7 +495,7 @@ void exn_throw_for_JIT(ManagedObject* exn_obj, Class_Handle exn_class,
         jit_exn_constr_args, vm_exn_constr_args);
 
     if (exn_raised()) {
-        si_free(si);
+        //si_free(si);
         return;
     }
 
@@ -574,7 +576,8 @@ void exn_athrow_regs(Registers * regs, Class_Handle exn_class, bool java_code, b
 
     BEGIN_RAISE_AREA;
 
-    si = si_create_from_native();
+    si = (StackIterator*) STD_ALLOCA(si_size());
+    si_fill_from_native(si);
     ManagedObject *local_exn_obj = NULL;
     exn_obj = exn_propagate_exception(si, &local_exn_obj, exn_class, NULL, NULL, NULL);
 
@@ -616,7 +619,7 @@ void exn_athrow_regs(Registers * regs, Class_Handle exn_class, bool java_code, b
     } 
 
     unw_m2nf = si_get_m2n(si);
-    si_free(si);
+    //si_free(si);
 
     END_RAISE_AREA;
 
@@ -642,8 +645,8 @@ void exception_catch_callback() {
     m2n_push_suspended_frame(thread, m2n, &regs);
     M2nFrame* prev_m2n = m2n_get_previous_frame(m2n);
 
-    StackIterator *si =
-        si_create_from_registers(&regs, false, prev_m2n);
+    StackIterator* si = (StackIterator*) STD_ALLOCA(si_size());
+    si_fill_from_registers(si, &regs, false, prev_m2n);
 
     // si_create_from_registers uses large stack space,
     // so guard page restored after its invoke.
@@ -660,11 +663,11 @@ void exception_catch_callback() {
                         || (m2n_get_frame_type(prev_m2n) & FRAME_NON_UNWINDABLE))) {
                     exn_raise_by_class(env->java_lang_StackOverflowError_Class);
                 } else {
-                    si_free(si);
+                    //si_free(si);
                     exn_throw_by_class(env->java_lang_StackOverflowError_Class);
                 }
             } else {
-                si_free(si);
+                //si_free(si);
                 exn_throw_by_class(env->java_lang_StackOverflowError_Class);
             }
         }
@@ -687,8 +690,8 @@ void jvmti_exception_catch_callback() {
     m2n_push_suspended_frame(thread, m2n, &regs);
     M2nFrame* prev_m2n = m2n_get_previous_frame(m2n);
 
-    StackIterator *si =
-        si_create_from_registers(&regs, false, prev_m2n);
+    StackIterator* si = (StackIterator*) STD_ALLOCA(si_size());
+    si_fill_from_registers(si, &regs, false, prev_m2n);
 
     // si_create_from_registers uses large stack space,
     // so guard page restored after its invoke, 
@@ -707,11 +710,11 @@ void jvmti_exception_catch_callback() {
                         || (m2n_get_frame_type(prev_m2n) & FRAME_NON_UNWINDABLE))) {
                     exn_raise_by_class(env->java_lang_StackOverflowError_Class);
                 } else {
-                    si_free(si);
+                    //si_free(si);
                     exn_throw_by_class(env->java_lang_StackOverflowError_Class);
                 }
             } else {
-                si_free(si);
+                //si_free(si);
                 exn_throw_by_class(env->java_lang_StackOverflowError_Class);
             }
         }

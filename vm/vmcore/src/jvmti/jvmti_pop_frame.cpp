@@ -221,6 +221,7 @@ void jvmti_jit_prepare_pop_frame() {
     // save regs value from jit context to m2n
     Registers* regs = get_pop_frame_registers(top_frame);
     si_copy_to_registers(si, regs);
+    si_free(si);
 
     // set pop done frame state
     m2n_set_frame_type(top_frame, frame_type(FRAME_POP_DONE | FRAME_MODIFIED_STACK));
@@ -269,7 +270,8 @@ void jvmti_jit_complete_pop_frame() {
     assert(FRAME_POP_DONE == (FRAME_POP_MASK & type));
 
     // create stack iterator from native
-    StackIterator* si = si_create_from_native();
+    StackIterator* si = (StackIterator*) STD_ALLOCA(si_size());
+    si_fill_from_native(si);
     si_transfer_all_preserved_registers(si);
 
     // pop native frame
@@ -296,7 +298,8 @@ void jvmti_jit_do_pop_frame() {
     assert(FRAME_POP_NOW == (FRAME_POP_MASK & type));
 
     // create stack iterator from native
-    StackIterator* si = si_create_from_native();
+    StackIterator* si = (StackIterator*) STD_ALLOCA(si_size());
+    si_fill_from_native(si);
     si_transfer_all_preserved_registers(si);
 
     // prepare pop frame - find regs values
