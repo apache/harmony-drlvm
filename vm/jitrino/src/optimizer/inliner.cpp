@@ -1181,9 +1181,9 @@ void Inliner::runInliner(MethodCallInst* call) {
     dce.eliminateUnreachableCode();
     assert(_toplevelIRM.getInSsa());
     OptPass::fixupSsa(_toplevelIRM);
-    if (isPseudoThrowInserted) {
+    /*if (isPseudoThrowInserted) {
         dce.removeExtraPseudoThrow();
-    }
+    }*/
 }
 
 void Inliner::compileAndConnectRegion(InlineNode* inlineNode, CompilationContext& inlineCC) {

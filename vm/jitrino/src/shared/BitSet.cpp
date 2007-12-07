@@ -58,6 +58,7 @@ static uint32 getNumBytes(uint32 setSize) {
 // Constructors
 //
 
+static uint32* stub=(uint32*)0xDEADBEEF;
 
 BitSet::BitSet(MemoryManager& memManager, uint32 size)
 :words(0), setSize(0), wordsCapacity(0), mm(memManager)
@@ -66,6 +67,8 @@ BitSet::BitSet(MemoryManager& memManager, uint32 size)
     {
         alloc(size);
         clear();
+    } else {
+        words = stub;
     }
 }
 

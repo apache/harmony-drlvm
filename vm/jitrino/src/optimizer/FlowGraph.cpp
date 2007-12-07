@@ -891,6 +891,82 @@ static void checkBCMapping(IRManager& irm) {
 #endif
 }
 
+static void normalizePseudoThrow(IRManager& irm) {
+//the main idea of the method: 
+//1. normalize loops -> make sure there is only one backedge
+//2. move pseudothrows to the source node of backedge
+
+    OptPass::computeLoops(irm, true);
+    LoopTree* lt = irm.getLoopTree();
+    if (!lt->hasLoops()) {
+        return;
+    }
+    ControlFlowGraph& cfg = irm.getFlowGraph();
+    const Nodes& nodes = cfg.getNodes();
+    MemoryManager tmpMM("normalizePseudoThrow");
+    StlMap<Node*, Node*> loopHeadToDispatchMap(tmpMM);
+    Edges backedges(tmpMM);
+    Edges edgesToRemove(tmpMM);
+    for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
+       Node* node = *it;
+        Node* head = lt->getLoopHeader(node, false);
+        if (head == NULL) {
+            continue;
+        }
+        const Edges& edges = node->getOutEdges();
+        bool isBackedgeSrc = false;
+        for (Edges::const_iterator ite = edges.begin(), ende = edges.end(); ite!=ende; ++ite) {
+            Edge* e = *ite;
+            if (lt->isBackEdge(e)) {
+                backedges.push_back(e);
+                isBackedgeSrc = true;
+                break;
+            }
+        }
+        Inst* i = (Inst*)node->getLastInst();
+        bool isPseudoThrow = i->getOpcode() == Op_PseudoThrow;
+        if (!isBackedgeSrc && isPseudoThrow) {
+            i->unlink();
+            Edge* exceptionEdge = node->getExceptionEdge();
+            Node* dispatch = exceptionEdge->getTargetNode();
+            while (lt->getLoopHeader(dispatch, false) == head) { //select dispatch that is out of the loop. Otherwise loop structure will be invalid
+                dispatch = dispatch->getExceptionEdgeTarget();
+                assert(dispatch);
+            }
+            loopHeadToDispatchMap[head] = dispatch;
+            edgesToRemove.push_back(exceptionEdge);
+        }
+    }
+    
+    for (Edges::const_iterator it = edgesToRemove.begin(), end = edgesToRemove.end(); it!=end; ++it) {
+        Edge* e = *it;
+        cfg.removeEdge(e);
+    }
+
+    for (Edges::const_iterator it = backedges.begin(), end = backedges.end(); it!=end; ++it) {
+        Edge* backedge = *it;
+        Node* node = backedge->getSourceNode();
+        Node* head = backedge->getTargetNode();
+        Inst* i = (Inst*)node->getLastInst();
+        bool isPseudoThrow = i->getOpcode() == Op_PseudoThrow;
+        if (isPseudoThrow || node->isCatchBlock()) {
+            continue;
+        }
+        Node* dispatch = node->getExceptionEdgeTarget();
+        if (!dispatch) {
+            StlMap<Node*, Node*>::const_iterator it2 = loopHeadToDispatchMap.find(head);
+            assert(it2!=loopHeadToDispatchMap.end());
+            dispatch = it2->second;
+        } else {
+            node = cfg.spliceBlockOnEdge(backedge, irm.getInstFactory().makeLabel());
+        }
+        Inst* pi = irm.getInstFactory().makePseudoThrow();
+        pi->setBCOffset(head->getLabelInst()->getBCOffset());
+        node->appendInst(pi);
+        cfg.addEdge(node, dispatch);
+    }
+}
+
 void FlowGraph::doTranslatorCleanupPhase(IRManager& irm) {
     uint32 id = irm.getCompilationContext()->getCurrentSessionNum();
     const char* stage = "trans_cleanup";
@@ -1073,15 +1149,16 @@ void FlowGraph::doTranslatorCleanupPhase(IRManager& irm) {
         }
     }
     // Remove extra PseudoThrow insts
-    DeadCodeEliminator dce(irm);
-    dce.removeExtraPseudoThrow();
+    normalizePseudoThrow(irm);
+//    DeadCodeEliminator dce(irm);
+//    dce.removeExtraPseudoThrow();
 
     //
     // a quick cleanup of unreachable and empty basic blocks
     //
     fg.purgeUnreachableNodes();
     fg.purgeEmptyNodes(false);
-
+    
     if (Log::isLogEnabled(LogStream::IRDUMP)) {
         LogStream& irdump = Log::log(LogStream::IRDUMP);
         Log::printStageEnd(irdump.out(), id, "TRANS", stage, stage);
