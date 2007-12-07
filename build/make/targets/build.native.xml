@@ -89,7 +89,7 @@
     <!-- compiles c sources ${c.compiler} must be set in the component descriptor 
                 to point what sources have to be compiled -->
     <target name="build.native.c" depends="build.native.init" if="have.to.rebuild">
-        <cc objdir="${build.dir}/_obj" debug="${build.is.debug}" runtime="static" multithreaded="true" subsystem="console">
+        <cc objdir="${build.dir}/_obj" debug="${build.is.debug}" runtime="dynamic" multithreaded="true" subsystem="console">
             <compiler refid="c.compiler" />
             <compilerarg value="/Zi" if="is.windows"/>
             <compilerarg value="/Fp${build.dir}/_obj\" if="is.windows"/>
@@ -104,7 +104,7 @@
     <!-- compiles cpp sources ${cpp.compiler} must be set in the component descriptor 
                 to point what sources have to be compiled -->
     <target name="build.native.cpp" depends="build.native.init" if="have.to.rebuild">
-        <cc objdir="${build.dir}/_obj" debug="${build.is.debug}" runtime="static" multithreaded="true"  subsystem="console">
+        <cc objdir="${build.dir}/_obj" debug="${build.is.debug}" runtime="dynamic" multithreaded="true"  subsystem="console">
             <compiler refid="cpp.compiler" />
             <compilerarg value="/Zi" if="is.windows"/>
             <compilerarg value="/Fp${build.dir}/_obj\" if="is.windows"/>
@@ -224,6 +224,14 @@
             <linkerarg value="/debug" if="need.pdb" />
             <linker refid="linker" />
             <fileset refid="link.fileset" />
+            <linkerarg value="/NODEFAULTLIB:libcmtd.lib" if="is.windows" unless="is.cfg.release"/>
+            <linkerarg value="/NODEFAULTLIB:msvcrt.lib" if="is.windows" unless="is.cfg.release"/>
+            <syslibset libs="msvcrtd" if="is.windows" unless="is.cfg.release"/>
+
+            <linkerarg value="/NODEFAULTLIB:libcmt.lib" if="is.windows" unless="is.cfg.debug"/>
+            <linkerarg value="/NODEFAULTLIB:msvcrtd.lib" if="is.windows" unless="is.cfg.debug"/>
+            <syslibset libs="msvcrt" if="is.windows" unless="is.cfg.debug"/>
+            
         </cc>
         <condition property="add.manifest">
             <and>
