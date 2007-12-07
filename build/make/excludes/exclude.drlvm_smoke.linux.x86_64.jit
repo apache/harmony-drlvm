@@ -9,9 +9,6 @@ perf/MultiThreadsSimple.java
 # fails on Ubuntu6 x86_64
 gc/Mark.java
 
-# HARMONY-2772 fails intermittently 
-stress/Mix.java
-
 # HARMONY-4265
 exception/FinalizeStackTest.java
 
