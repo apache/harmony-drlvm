@@ -110,6 +110,8 @@ struct OptimizerFlags {
     //classic_abcd
     bool dump_abcd_stats;
 
+    bool rept_aggressive;
+
 
     AbcdFlags*              abcdFlags;
     GcmFlags*               gcmFlags;

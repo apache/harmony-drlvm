@@ -72,7 +72,11 @@ SD2_OPT.useProfile=EDGE_PROF,VALUE_PROF
 
 -XX:jit.SD2_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
 
--XX:jit.SD2_OPT.path.optimizer=ssa,simplify,dce,uce,edge_annotate,devirt,hlo_api_magic,inline,purge,simplify,dce,uce,lazyexc,throwopt,so2-,hvn,simplify,dce,uce,escape,inline_helpers,purge,simplify,uce,dce,uce,dessa,statprof,peel,ssa,hvn,simplify,dce,uce,lower,dce,uce,statprof,unroll,ssa,simplify,dce,uce,memopt,reassoc,dce,uce,hvn,dce,uce,classic_abcd,dce,uce,gcm,dessa,fastArrayFill,statprof,markglobals
+-XX:jit.SD2_OPT.path.optimizer=ssa,simplify,dce,uce,edge_annotate,devirt,hlo_api_magic,inline,purge,simplify,dce,uce,lazyexc,throwopt,escape_path,inline_helpers,purge,simplify,uce,dce,uce,abce,lower,dce,uce,statprof,unroll,ssa,simplify,dce,uce,memopt,reassoc,dce,uce,hvn,dce,uce,gcm,dessa,statprof
+
+-XX:jit.SD2_OPT.path.escape_path=hvn,simplify,dce,uce,escape
+-XX:jit.SD2_OPT.path.abce=classic_abcd,dce,uce,dessa,statprof,peel,ssa,hvn,simplify,dce,uce,memopt,dce,uce,dessa,fastArrayFill,ssa,statprof,dabce,dce,uce
+
 -XX:jit.SD2_OPT.path.codegen=lock_method,bbp,btr,gcpoints,cafl,dce1,i8l,api_magic,early_prop,peephole,itrace-,native,cg_fastArrayFill,constraints,dce2,regalloc,spillgen,copy,i586,layout,rce+,stack,break-,iprof-,peephole,emitter!,si_insts,gcmap,info,unlock_method
 -XX:jit.SD2_OPT.path.dce1=cg_dce
 -XX:jit.SD2_OPT.path.dce2=cg_dce
@@ -128,27 +132,28 @@ SD2_OPT.useProfile=EDGE_PROF,VALUE_PROF
 #system properties
 -Djava.compiler=server
 
--XDjit.arg.optimizer.inline.growth_factor=210
--XDjit.arg.optimizer.inline.min_stop=280
--XDjit.arg.optimizer.inline.min_benefit_threshold=70
--XDjit.arg.optimizer.inline.inline_small_method_max_size=67
--XDjit.arg.optimizer.inline.inline_small_method_bonus=780
--XDjit.arg.optimizer.inline.medium_method_max_size=1200
--XDjit.arg.optimizer.inline.medium_method_bonus=770
--XDjit.arg.optimizer.inline.large_method_min_size=1360
--XDjit.arg.optimizer.inline.large_method_penalty=480
--XDjit.arg.optimizer.inline.loop_bonus=140
--XDjit.arg.optimizer.inline.leaf_bonus=2680
--XDjit.arg.optimizer.inline.synch_bonus=50
--XDjit.arg.optimizer.inline.recursion_penalty=730
--XDjit.arg.optimizer.inline.exact_single_parameter_bonus=120
--XDjit.arg.optimizer.inline.exact_all_parameter_bonus=170
--XDjit.arg.optimizer.inline.skip_exception_path=true
--XDjit.arg.optimizer.inline.connect_early=true
--XDjit.arg.optimizer.inline.skip_api_magics=true
--XDjit.arg.optimizer.inline.sync_optcatch=false
--XDjit.arg.optimizer.inline.sync_optimistic=true
+-XX:jit.arg.optimizer.inline.growth_factor=210
+-XX:jit.arg.optimizer.inline.min_stop=280
+-XX:jit.arg.optimizer.inline.min_benefit_threshold=70
+-XX:jit.arg.optimizer.inline.inline_small_method_max_size=67
+-XX:jit.arg.optimizer.inline.inline_small_method_bonus=780
+-XX:jit.arg.optimizer.inline.medium_method_max_size=1200
+-XX:jit.arg.optimizer.inline.medium_method_bonus=770
+-XX:jit.arg.optimizer.inline.large_method_min_size=1360
+-XX:jit.arg.optimizer.inline.large_method_penalty=480
+-XX:jit.arg.optimizer.inline.loop_bonus=140
+-XX:jit.arg.optimizer.inline.leaf_bonus=2680
+-XX:jit.arg.optimizer.inline.synch_bonus=50
+-XX:jit.arg.optimizer.inline.recursion_penalty=730
+-XX:jit.arg.optimizer.inline.exact_single_parameter_bonus=120
+-XX:jit.arg.optimizer.inline.exact_all_parameter_bonus=170
+-XX:jit.arg.optimizer.inline.skip_exception_path=true
+-XX:jit.arg.optimizer.inline.connect_early=true
+-XX:jit.arg.optimizer.inline.skip_api_magics=true
+-XX:jit.arg.optimizer.inline.sync_optcatch=false
+-XX:jit.arg.optimizer.inline.sync_optimistic=true
     
 
 -XX:jit.arg.lazyResolution=off
+-XX:jit.arg.opt_init.rept_aggressive=true
 

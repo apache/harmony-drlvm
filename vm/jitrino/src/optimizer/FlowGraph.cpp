@@ -1149,9 +1149,12 @@ void FlowGraph::doTranslatorCleanupPhase(IRManager& irm) {
         }
     }
     // Remove extra PseudoThrow insts
-    normalizePseudoThrow(irm);
-//    DeadCodeEliminator dce(irm);
-//    dce.removeExtraPseudoThrow();
+    if (irm.getOptimizerFlags().rept_aggressive) {
+        DeadCodeEliminator dce(irm);
+        dce.removeExtraPseudoThrow();
+    } else {
+        normalizePseudoThrow(irm);
+    }
 
     //
     // a quick cleanup of unreachable and empty basic blocks
