@@ -114,6 +114,7 @@ void notify_gc_end() {
 }
 
 void clear_thread_local_buffers() {
+    int disable_count = hythread_reset_suspend_disable();
     hythread_iterator_t it = hythread_iterator_create(0);
     int count = (int)hythread_iterator_size (it);
     for (int i = 0; i < count; i++){
@@ -124,6 +125,7 @@ void clear_thread_local_buffers() {
         info.set_tls_current_ceiling(0);
     }
     hythread_iterator_release(&it);
+    hythread_set_suspend_disable(disable_count);
 }
 
 static void enumerate_universe() {
@@ -310,7 +312,7 @@ unsigned char *full_gc(int size) {
 }
 
 static unsigned char*
-finish_slide_gc(int size, int stage) {
+finish_slide_gc(int size, int stage, int dis_count) {
     if (stage == 0) {
         gc_slide_process_special_references(soft_references);
         gc_slide_process_special_references(weak_references);
@@ -336,6 +338,7 @@ finish_slide_gc(int size, int stage) {
     unsigned char *res = try_alloc(size);
 
     vm_resume_threads_after();
+    hythread_set_suspend_disable(dis_count);
     notify_gc_end();
     TRACE2("gc.mem", "finish_slide_compact = " << res);
     return res;
@@ -351,8 +354,9 @@ unsigned char *slide_gc(int size) {
     gc_type = GC_SLIDE_COMPACT;
     gc_allocate_mark_bits();
 
+    int disable_count = hythread_reset_suspend_disable();
     TIME(enumerate_universe,());
-    return finish_slide_gc(size, 0);
+    return finish_slide_gc(size, 0, disable_count);
 }
 
 void transition_copy_to_sliding_compaction(fast_list<Slot,65536>& slots) {
@@ -371,11 +375,12 @@ unsigned char *copy_gc(int size) {
     pinned_areas_unsorted.clear();
     roots_clear();
 
+    int disable_count = hythread_reset_suspend_disable();
     gc_type = GC_COPY;
     TIME(enumerate_universe,());
 
     if (gc_type == GC_SLIDE_COMPACT) {
-        unsigned char *res = finish_slide_gc(size, 0);
+        unsigned char *res = finish_slide_gc(size, 0, disable_count);
         heap.Tcopy = (float) gc_time.dt();
         return res;
     }
@@ -384,7 +389,7 @@ unsigned char *copy_gc(int size) {
     process_special_roots(weak_roots);
     process_finalizable_objects();
     if (gc_type == GC_SLIDE_COMPACT) {
-        unsigned char *res = finish_slide_gc(size, 1);
+        unsigned char *res = finish_slide_gc(size, 1, disable_count);
         heap.Tcopy = (float) gc_time.dt();
         return res;
     }
@@ -404,6 +409,7 @@ unsigned char *copy_gc(int size) {
 
     unsigned char *res = try_alloc(size);
     vm_resume_threads_after();
+    hythread_set_suspend_disable(disable_count);
     notify_gc_end();
     TRACE2("gc.mem", "copy_gc = " << res);
     return res;
@@ -415,6 +421,7 @@ void force_gc() {
 
     roots_clear();
 
+    int disable_count = hythread_reset_suspend_disable();
     gc_type = GC_FORCED;
     TIME(enumerate_universe,());
     TIME(process_special_references,(soft_references));
@@ -433,6 +440,7 @@ void force_gc() {
     //clear_thread_local_buffers();
 
     TIME(vm_resume_threads_after,());
+    hythread_set_suspend_disable(disable_count);
     notify_gc_end();
 }
 

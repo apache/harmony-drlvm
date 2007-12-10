@@ -164,9 +164,14 @@ public:
 class Partial_Reveal_Object {
     private:
     Partial_Reveal_Object();
-    VT32 vt_raw;
-    unsigned info;
-    int array_len;
+    union {
+      VT32 vt_raw;
+      POINTER_SIZE_INT padding;
+    };
+    union {
+      unsigned info;
+      POINTER_SIZE_INT info_padding;
+    };
 
     public:
     VT32 &vt() { assert(/* alignment check */ !((POINTER_SIZE_INT)this & (GC_OBJECT_ALIGNMENT - 1))); return vt_raw; }
@@ -184,13 +189,6 @@ class Partial_Reveal_Object {
     }
 
     int array_length() { return ((VM_Vector*)this)->get_length(); }
-
-    Partial_Reveal_Object **get_array_elements(GC_VTable_Info *gcvt) {
-        assert(gcvt->is_array());
-        assert(gcvt->has_slots());
-        return (Partial_Reveal_Object**)
-            ((unsigned char*) this + (gcvt->flags() >> GC_VT_ARRAY_FIRST_SHIFT));
-    }
 
 #if _DEBUG
     void valid() {
@@ -378,4 +376,5 @@ static inline void clear_mem_for_heap_iteration(void *pos, size_t size) {}
 #endif
 
 #endif /* __GC_TYPES_H__ */
+
 

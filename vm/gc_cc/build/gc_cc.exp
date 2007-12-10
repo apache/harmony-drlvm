@@ -5,6 +5,8 @@ GC_CC_0.1 {
     gc_add_root_set_entry;
     gc_add_root_set_entry_interior_pointer;
     gc_add_weak_root_set_entry;
+    gc_add_compressed_root_set_entry;
+    gc_supports_compressed_references;
     gc_alloc;
     gc_alloc_fast;
     gc_alloc_pinned;

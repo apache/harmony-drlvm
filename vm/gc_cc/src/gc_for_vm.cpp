@@ -38,11 +38,13 @@ fast_list<Partial_Reveal_Object*, 1024> finalizible_objects;
 
 static unsigned int pending_finalizers_hint_counter = 0;
 
-#ifdef POINTER64
 GCExport Boolean gc_supports_compressed_references() {
-    return true;
-}
+#ifdef POINTER64
+  return true;
+#else
+  return false;
 #endif
+}
 
 GCExport void gc_write_barrier(Managed_Object_Handle p_base_of_obj_with_slot) {
     TRACE2("gc.wb", "gc_write_barrier");
@@ -568,4 +570,5 @@ void gc_iterate_heap() {
     }
 }
 #endif
+
 

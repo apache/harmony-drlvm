@@ -672,6 +672,9 @@ VMCORE_0.1 {
     apr_atomic_cas32;
     apr_time_now;
     apr_atomic_casptr;
+# Workaround for API used by GC_CC
+    apr_atomic_xchg32;
+    *MemoryPool*;
 # Workaround for ManagedObject::_tag_pointer used in interpreter
     *ManagedObject*;
 # Workaround for C++ functions unspecified in interface used by interpreter

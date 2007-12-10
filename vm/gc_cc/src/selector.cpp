@@ -303,7 +303,9 @@ void select_force_gc() {
         copy_gc(0);
     }
     vm_gc_unlock_enum();
+    hythread_suspend_disable();
     vm_hint_finalize();
+    hythread_suspend_enable();
 }
 
 void init_select_gc() {
