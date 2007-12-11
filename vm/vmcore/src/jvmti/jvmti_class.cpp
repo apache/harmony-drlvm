@@ -101,6 +101,7 @@ jvmtiGetLoadedClasses(jvmtiEnv* env,
     unsigned int cl_count;
     jvmtiError errorCode;
     ClassLoader* classloader;
+    ClassLoader *bootstrap;
 
     /*
      * Check given env & current phase.
@@ -114,11 +115,13 @@ jvmtiGetLoadedClasses(jvmtiEnv* env,
         return JVMTI_ERROR_NULL_POINTER;
     }
 
+    ClassLoader::LockLoadersTable();
     /**
      * Get the number of loaded classes by bootstrap loader
      */
-    ClassTable* tbl =
-        VM_Global_State::loader_env->bootstrap_class_loader->GetLoadedClasses();
+    bootstrap = VM_Global_State::loader_env->bootstrap_class_loader;
+    bootstrap->Lock();
+    ClassTable* tbl = bootstrap->GetLoadedClasses();
     count = tbl->GetItemCount();
 
     /**
@@ -128,6 +131,7 @@ jvmtiGetLoadedClasses(jvmtiEnv* env,
     for( index = 0; index < cl_count; index++ )
     {
         classloader = (ClassLoader::GetClassLoaderTable())[index];
+        classloader->Lock();
         tbl = classloader->GetLoadedClasses();
         ClassTable::iterator it;
         for(it = tbl->begin(); it != tbl->end(); it++)
@@ -146,6 +150,14 @@ jvmtiGetLoadedClasses(jvmtiEnv* env,
      */
     if (!count)
     {
+        for(index = 0; index < cl_count; index++)
+        {
+            classloader = (ClassLoader::GetClassLoaderTable())[index];
+            classloader->Unlock();
+        }
+        bootstrap->Unlock();
+        ClassLoader::UnlockLoadersTable();
+
         *classes = NULL;
         *classes_num = 0;
         return JVMTI_ERROR_NONE;
@@ -156,6 +168,13 @@ jvmtiGetLoadedClasses(jvmtiEnv* env,
      */
     errorCode = _allocate( (sizeof(jclass) * count), (unsigned char**) classes );
     if (errorCode != JVMTI_ERROR_NONE) {
+        for(index = 0; index < cl_count; index++)
+        {
+            classloader = (ClassLoader::GetClassLoaderTable())[index];
+            classloader->Unlock();
+        }
+        bootstrap->Unlock();
+        ClassLoader::UnlockLoadersTable();
         return errorCode;
     }
 
@@ -187,6 +206,7 @@ jvmtiGetLoadedClasses(jvmtiEnv* env,
             (*classes)[number++] = (jclass)new_handle;
         }
 
+        classloader->Unlock();
         /**
          * Get next class loader
          */
@@ -198,6 +218,7 @@ jvmtiGetLoadedClasses(jvmtiEnv* env,
     } while( true );
     assert( number == count );
 
+    ClassLoader::UnlockLoadersTable();
     /**
      * Set class number
      */
@@ -246,11 +267,13 @@ jvmtiGetClassLoaderClasses(jvmtiEnv* env,
         classloader = ClassLoader::FindByObject((((ObjectHandle)initiating_loader)->object));
     }
 
+    classloader->Lock();
     /**
      * Get the number of loaded classes
      */
     tbl = classloader->GetInitiatedClasses();
     if( !(count = tbl->GetItemCount()) ) {
+        classloader->Unlock();
         // no loaded classes
         *classes_ptr = NULL;
         *class_count_ptr = 0;
@@ -262,6 +285,7 @@ jvmtiGetClassLoaderClasses(jvmtiEnv* env,
      */
     errorCode = _allocate( (sizeof(jclass) * count), (unsigned char**)classes_ptr );
     if (errorCode != JVMTI_ERROR_NONE) {
+        classloader->Unlock();
         return errorCode;
     }
 
@@ -281,6 +305,7 @@ jvmtiGetClassLoaderClasses(jvmtiEnv* env,
     }
     assert( index == count );
 
+    classloader->Unlock();
     /**
      * Set class number
      */
