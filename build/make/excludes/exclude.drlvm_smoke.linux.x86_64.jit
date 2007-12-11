@@ -1,14 +1,6 @@
 Check.java
 PerfCheck.java
 
-# HARMONY-3338
-gc/LOS.java
-gc/MultiThreads.java
-perf/MultiThreadsSimple.java
-
-# fails on Ubuntu6 x86_64
-gc/Mark.java
-
 # HARMONY-4265
 exception/FinalizeStackTest.java
 
