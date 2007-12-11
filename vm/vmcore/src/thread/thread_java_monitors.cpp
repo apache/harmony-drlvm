@@ -214,6 +214,24 @@ IDATA VMCALL jthread_monitor_exit(jobject monitor)
 } // jthread_monitor_exit
 
 /**
+ * Completely releases the ownership over monitor.
+ *
+ * @param[in] monitor monitor
+ */
+IDATA VMCALL jthread_monitor_release(jobject monitor)
+{
+    assert(monitor);
+
+    hythread_suspend_disable();
+    hythread_thin_monitor_t *lockword = vm_object_get_lockword_addr(monitor);
+    IDATA status = hythread_thin_monitor_release(lockword);
+    assert(status == TM_ERROR_NONE);
+    hythread_suspend_enable();
+
+    return TM_ERROR_NONE;
+} // jthread_monitor_release
+
+/**
  * Notifies one thread waiting on the monitor.
  *
  * Only single thread waiting on the

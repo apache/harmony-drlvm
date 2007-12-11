@@ -54,6 +54,8 @@
     return JNI_ERR; \
 } \
 
+static jobject java_lang_ThreadGroup_lock_field;
+
 /**
  * Calls java.lang.System.execShutdownSequence() method.
  *
@@ -100,6 +102,9 @@ static void vm_shutdown_callback() {
     IDATA UNUSED status = jthread_detach(java_thread);
     assert(status == TM_ERROR_NONE);
 
+    status = jthread_monitor_release(java_lang_ThreadGroup_lock_field);
+    assert(status == TM_ERROR_NONE);
+
     hythread_exit(NULL);
 }
 
@@ -133,6 +138,17 @@ static void vm_shutdown_stop_java_threads(Global_Env * vm_env) {
 
     self = hythread_self();
 
+    // Get java.lang.ThreadGroup.lock field
+    JNIEnv *jni_env = jthread_self_vm_thread()->jni_env;
+    Class* klass = vm_env->java_lang_ThreadGroup_Class;
+    jobject class_handle = struct_Class_to_jclass(klass);
+    jfieldID lock_field_id = jni_env->GetStaticFieldID(class_handle, "lock",
+        "Ljava/lang/ThreadGroup$ThreadGroupLock;");
+    assert(lock_field_id);
+    java_lang_ThreadGroup_lock_field =
+        jni_env->GetStaticObjectField(class_handle, lock_field_id);
+    assert(java_lang_ThreadGroup_lock_field);
+
     // Collect running java threads.
     // Set callbacks to let threads exit
     TRACE2("shutdown", "stopping threads, self " << self);
@@ -158,15 +174,8 @@ static void vm_shutdown_stop_java_threads(Global_Env * vm_env) {
 
     TRACE2("shutdown", "cancelling threads");
 
-    JNIEnv *jni_env = jthread_self_vm_thread()->jni_env;
-    Class* klass = vm_env->java_lang_ThreadGroup_Class;
-    jobject class_handle = struct_Class_to_jclass(klass);
-    jfieldID lock_field_id = jni_env->GetStaticFieldID(class_handle, "lock",
-        "Ljava/lang/ThreadGroup$ThreadGroupLock;");
-    assert(lock_field_id);
-    jobject lock_field = jni_env->GetStaticObjectField(class_handle, lock_field_id);
-    assert(lock_field);
-    IDATA status = jthread_monitor_enter(lock_field);
+    // Grab java.lang.ThreadGroup.lock
+    IDATA status = jthread_monitor_enter(java_lang_ThreadGroup_lock_field);
     assert(status == TM_ERROR_NONE);
 
     // forcedly kill remaining threads
@@ -185,7 +194,8 @@ static void vm_shutdown_stop_java_threads(Global_Env * vm_env) {
     }
     hythread_iterator_release(&it);
 
-    status = jthread_monitor_exit(lock_field);
+    // release java.lang.ThreadGroup.lock
+    status = jthread_monitor_exit(java_lang_ThreadGroup_lock_field);
     assert(status == TM_ERROR_NONE);
 
     TRACE2("shutdown", "shutting down threads complete");

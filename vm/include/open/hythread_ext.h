@@ -549,6 +549,7 @@ IDATA VMCALL hythread_thin_monitor_create(hythread_thin_monitor_t *lockword);
 IDATA VMCALL hythread_thin_monitor_enter(hythread_thin_monitor_t *lockword);
 IDATA VMCALL hythread_thin_monitor_try_enter(hythread_thin_monitor_t *lockword);
 IDATA VMCALL hythread_thin_monitor_exit(hythread_thin_monitor_t *lockword);
+IDATA VMCALL hythread_thin_monitor_release(hythread_thin_monitor_t *lockword);
 IDATA VMCALL hythread_thin_monitor_wait(hythread_thin_monitor_t *lockword);
 IDATA VMCALL hythread_thin_monitor_wait_timed(hythread_thin_monitor_t *lockword_ptr, I_64 ms, IDATA nano);
 IDATA VMCALL hythread_thin_monitor_wait_interruptable(hythread_thin_monitor_t *lockword_ptr, I_64 ms, IDATA nano);

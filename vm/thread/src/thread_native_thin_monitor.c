@@ -468,6 +468,36 @@ IDATA VMCALL hythread_thin_monitor_exit(hythread_thin_monitor_t *lockword_ptr) {
     return TM_ERROR_ILLEGAL_STATE;
 }
 
+/**
+ * Completely releases the ownership over monitor.
+ */
+IDATA VMCALL hythread_thin_monitor_release(hythread_thin_monitor_t *lockword_ptr)
+{
+    IDATA status;
+    U_32 lockword = *lockword_ptr;
+    hythread_t self = hythread_self();
+
+    if (self != hythread_thin_monitor_get_owner(lockword_ptr)) {
+        // nothing to do, thread is not an owner of monitor
+        return TM_ERROR_NONE;
+    }
+    if (IS_FAT_LOCK(lockword)) {
+        // this is fat monitor
+        hythread_monitor_t monitor =
+            locktable_get_fat_monitor(FAT_LOCK_ID(lockword));
+        monitor->recursion_count = 0;
+        status = hymutex_unlock(&monitor->mutex);
+        assert(status == TM_ERROR_NONE);
+    } else {
+        // this is thin monitor
+        while (RECURSION(lockword)) {
+            RECURSION_DEC(lockword_ptr, lockword);
+            lockword = *lockword_ptr;
+        }
+        *lockword_ptr = lockword & 0xffff;
+    }
+    return TM_ERROR_NONE;
+}
 
 IDATA thin_monitor_wait_impl(hythread_thin_monitor_t *lockword_ptr, I_64 ms, IDATA nano, IDATA interruptable) {
     // get this thread

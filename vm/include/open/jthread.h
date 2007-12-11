@@ -139,6 +139,7 @@ VMEXPORT IDATA jthread_monitor_init(jobject mon);
 VMEXPORT IDATA jthread_monitor_enter(jobject mon);
 VMEXPORT IDATA jthread_monitor_try_enter(jobject mon);
 VMEXPORT IDATA jthread_monitor_exit(jobject mon);
+VMEXPORT IDATA jthread_monitor_release(jobject mon);
 VMEXPORT IDATA jthread_monitor_notify(jobject mon);
 VMEXPORT IDATA jthread_monitor_notify_all(jobject mon);
 VMEXPORT IDATA jthread_monitor_wait(jobject mon);
