@@ -908,7 +908,7 @@ static void normalizePseudoThrow(IRManager& irm) {
     Edges backedges(tmpMM);
     Edges edgesToRemove(tmpMM);
     for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
-       Node* node = *it;
+        Node* node = *it;
         Node* head = lt->getLoopHeader(node, false);
         if (head == NULL) {
             continue;
@@ -935,6 +935,16 @@ static void normalizePseudoThrow(IRManager& irm) {
             }
             loopHeadToDispatchMap[head] = dispatch;
             edgesToRemove.push_back(exceptionEdge);
+            if (node == head) {
+                Node* parentHead = lt->getLoopHeader(head, true);
+                if (parentHead && loopHeadToDispatchMap.find(parentHead) == loopHeadToDispatchMap.end()) {
+                    while (lt->getLoopHeader(dispatch, false) == parentHead) {
+                        dispatch = dispatch->getExceptionEdgeTarget();
+                        assert(dispatch);
+                    }
+                    loopHeadToDispatchMap[parentHead] = dispatch;
+                }
+            }
         }
     }
     
