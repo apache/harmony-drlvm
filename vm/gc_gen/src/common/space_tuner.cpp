@@ -206,14 +206,12 @@ static void gc_compute_live_object_size_after_marking(GC* gc, POINTER_SIZE_INT n
   
   //POINTER_SIZE_INT additional_non_los_size = ((collector_num * 2) << GC_BLOCK_SHIFT_COUNT) + (non_los_live_obj_size >> GC_BLOCK_SHIFT_COUNT) * (GC_OBJ_SIZE_THRESHOLD/4);
   double additional_non_los_size = 0;
-  for(unsigned int i = NORMAL_SIZE_SEGMENT_NUM; i--;){
+  for(unsigned int i = 0; i < NORMAL_SIZE_SEGMENT_NUM; i++;){
     additional_non_los_size += (double)segment_live_size[i] * SEGMENT_INDEX_TO_SIZE(i) / non_los_live_obj_size;
   }
   additional_non_los_size *= 1.2; // in case of some cases worse than average one
   POINTER_SIZE_INT non_los_live_block = non_los_live_obj_size / (GC_BLOCK_BODY_SIZE_BYTES-(POINTER_SIZE_INT)additional_non_los_size);
-  additional_non_los_size *= non_los_live_block + 1;
-  additional_non_los_size += collector_num << (GC_BLOCK_SHIFT_COUNT + 1);
-  non_los_live_obj_size = round_up_to_size(non_los_live_obj_size + (POINTER_SIZE_INT)additional_non_los_size, GC_BLOCK_SIZE_BYTES);
+  non_los_live_obj_size = (non_los_live_block << GC_BLOCK_SHIFT_COUNT);
   if(non_los_live_obj_size > non_los_size)
     non_los_live_obj_size = non_los_size;
 
