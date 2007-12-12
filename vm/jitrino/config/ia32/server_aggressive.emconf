@@ -72,8 +72,8 @@ SD2_OPT.useProfile=EDGE_PROF,VALUE_PROF
 
 -XX:jit.SD2_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
 
--XX:jit.SD2_OPT.path.optimizer=ssa,simplify,dce,uce,edge_annotate,devirt,hlo_api_magic,inline,purge,simplify,dce,uce,lazyexc,throwopt,escape_path,inline_helpers,purge,simplify,uce,dce,uce,abce,lower,dce,uce,statprof,unroll,ssa,simplify,dce,uce,memopt,reassoc,dce,uce,hvn,dce,uce,gcm,dessa,statprof
-
+-XX:jit.SD2_OPT.path.optimizer=ssa,simplify,dce,uce,edge_annotate,devirt,hlo_api_magic,inline,purge,osr_path,simplify,dce,uce,lazyexc,throwopt,escape_path,inline_helpers,purge,simplify,uce,dce,uce,abce,lower,dce,uce,statprof,unroll,ssa,simplify,dce,uce,memopt,reassoc,dce,uce,hvn,dce,uce,gcm,dessa,statprof,markglobals
+-XX:jit.SD2_OPT.path.osr_path=simplify,dce,uce,gcm,osr
 -XX:jit.SD2_OPT.path.escape_path=hvn,simplify,dce,uce,escape
 -XX:jit.SD2_OPT.path.abce=classic_abcd,dce,uce,dessa,statprof,peel,ssa,hvn,simplify,dce,uce,memopt,dce,uce,dessa,fastArrayFill,ssa,statprof,dabce,dce,uce
 
