@@ -413,6 +413,7 @@ Mnemonic_BSF,                           // Bit scan forward
 Mnemonic_BSR,                           // Bit scan reverse
 
 Mnemonic_CALL,                          // Call Procedure
+Mnemonic_CMC,                           // Complement Carry Flag
 Mnemonic_CWD, Mnemonic_CDQ=Mnemonic_CWD,// Convert Word to Doubleword/Convert Doubleword to Qua T dword
 Mnemonic_CMOVcc,                        // Conditional Move
     CCM(CMOV,O),

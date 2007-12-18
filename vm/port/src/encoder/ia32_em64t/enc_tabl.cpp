@@ -474,6 +474,12 @@ BEGIN_OPCODES()
 END_OPCODES()
 END_MNEMONIC()
 
+BEGIN_MNEMONIC(CMC, MF_USES_FLAGS|MF_AFFECTS_FLAGS, N)
+BEGIN_OPCODES()
+    {OpcodeInfo::decoder,     {0xF5},         {},     N },
+END_OPCODES()
+END_MNEMONIC()
+
 //TODO: Workaround. Actually, it's D_DU, but Jitrino's CG thinks it's D_U
 BEGIN_MNEMONIC(CDQ, MF_NONE, D_U )
 BEGIN_OPCODES()
@@ -1250,16 +1256,18 @@ DEFINE_SETcc_MNEMONIC(NLE)
 #define DEFINE_SHIFT_MNEMONIC(nam, slash_num, flags) \
 BEGIN_MNEMONIC(nam, flags, DU_U) \
 BEGIN_OPCODES()\
-/*  {OpcodeInfo::all,   {0xD0, slash_num},              {r_m8,  const_1},   DU_U },*/\
+    /* D0 & D1 opcodes are added w/o 2nd operand (1) because */\
+    /* they are used for decoding only so only instruction length is needed */\
+    {OpcodeInfo::decoder, {0xD0, slash_num},            {r_m8/*,const_1*/},   DU },\
     {OpcodeInfo::all,   {0xD2, slash_num},              {r_m8,  CL},        DU_U },\
     {OpcodeInfo::all,   {0xC0, slash_num, ib},          {r_m8,  imm8},      DU_U },\
 \
-/*  {OpcodeInfo::all,   {Size16, 0xD1, slash_num},      {r_m16, const_1},   DU_U },*/\
+    {OpcodeInfo::decoder, {Size16, 0xD1, slash_num},    {r_m16/*,const_1*/},  DU },\
     {OpcodeInfo::all,   {Size16, 0xD3, slash_num},      {r_m16, CL},        DU_U },\
     {OpcodeInfo::all,   {Size16, 0xC1, slash_num, ib},  {r_m16, imm8 },     DU_U },\
 \
-/*  {OpcodeInfo::all,   {0xD1, slash_num},              {r_m32, const_1},   DU_U },*/\
-/*  {OpcodeInfo::em64t, {REX_W, 0xD1, slash_num},       {r_m64, const_1},   DU_U },*/\
+    {OpcodeInfo::decoder,   {0xD1, slash_num},              {r_m32/*,const_1*/}, DU },\
+    {OpcodeInfo::decoder64, {REX_W, 0xD1, slash_num},       {r_m64/*,const_1*/}, DU },\
 \
     {OpcodeInfo::all,   {0xD3, slash_num},              {r_m32, CL},        DU_U },\
     {OpcodeInfo::em64t, {REX_W, 0xD3, slash_num},       {r_m64, CL},        DU_U },\
