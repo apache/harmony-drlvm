@@ -617,6 +617,9 @@ private:
         if (RegName_R8L <= reg && reg <= RegName_R15L) {
             return true;
         }
+        if (RegName_XMM8 <= reg && reg <= RegName_XMM15) {
+            return true;
+        }
         if (RegName_XMM8D <= reg && reg <= RegName_XMM15D) {
             return true;
         }

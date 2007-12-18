@@ -83,7 +83,13 @@ inline static void add_rm(EncoderBase::Operands & args, const RM_Opnd & rm, Opnd
 }
 
 inline static void add_xmm(EncoderBase::Operands & args, const XMM_Opnd & xmm, bool dbl) {
-    return args.add((RegName)( (dbl ? RegName_XMM0D : RegName_XMM0S) + xmm.get_idx()));
+    // Gregory -
+    // XMM registers indexes in Reg_No enum are shifted by xmm0_reg, their indexes
+    // don't start with 0, so it is necessary to subtract xmm0_reg index from
+    // xmm.get_idx() value
+    assert(xmm.get_idx() >= xmm0_reg);
+    return args.add((RegName)( (dbl ? RegName_XMM0D : RegName_XMM0S) + xmm.get_idx() -
+            xmm0_reg));
 }
 
 inline static void add_fp(EncoderBase::Operands & args, unsigned i, bool dbl) {
