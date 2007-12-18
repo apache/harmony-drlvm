@@ -306,7 +306,6 @@ bool DecoderBase::decodeModRM(const EncoderBase::OpcodeDesc& odesc,
     const ModRM& modrm = *(ModRM*)*pbuf;
     *pbuf += 1;
     
-    RegName reg = RegName_Null;
     RegName base = RegName_Null;
     RegName index = RegName_Null;
     int disp = 0;
@@ -318,10 +317,9 @@ bool DecoderBase::decodeModRM(const EncoderBase::OpcodeDesc& odesc,
         reg_size = OpndSize_64;
 #endif
 
-    reg = getRegName(OpndKind_GPReg, reg_size, EXTEND_REG(modrm.reg, r));
     if (modrm.mod == 3) {
         // we have only modrm. no sib, no disp.
-        reg = getRegName(OpndKind_GPReg, opndDesc.size, EXTEND_REG(modrm.rm, b));
+        RegName reg = getRegName(OpndKind_GPReg, opndDesc.size, EXTEND_REG(modrm.rm, b));
         opnd = EncoderBase::Operand(reg);
         return true;
     }
@@ -331,13 +329,17 @@ bool DecoderBase::decodeModRM(const EncoderBase::OpcodeDesc& odesc,
         // yes, we have SIB
         *pbuf += 1;
         scale = sib.scale == 0 ? 0 : (1<<sib.scale);
-        if (sib.index == 4) {
-            // no index
+        if (sib.index != 4) {
+			index = getRegName(OpndKind_GPReg, reg_size, EXTEND_REG(sib.index, x));
+        } else {
+            // (sib.index == 4) => no index
         }
-        else {
-            index = getRegName(OpndKind_GPReg, reg_size, EXTEND_REG(sib.index, x));
+
+        if (sib.base != 5 && modrm.mod != 0) {
+            base = getRegName(OpndKind_GPReg, reg_size, EXTEND_REG(sib.base, b));
+        } else {
+            // (sib.base == 5 && modrm.mod == 0) => no base
         }
-        base = getRegName(OpndKind_GPReg, reg_size, EXTEND_REG(sib.base, b));
     }
     else {
         if (modrm.mod != 0 || modrm.rm != 5) {
@@ -366,7 +368,8 @@ bool DecoderBase::decodeModRM(const EncoderBase::OpcodeDesc& odesc,
             *pbuf += 4;
         }
         else if (modrm.rm == 4 && sib.base == 5) {
-            // have to analyze sib, special case without EBP: have disp32+SI
+            // have disp32 with SI in sib
+            disp = *(int*)*pbuf;
             *pbuf += 4;
         }
     }
