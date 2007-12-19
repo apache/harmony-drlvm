@@ -526,7 +526,10 @@ void si_copy_to_registers(StackIterator * si, Registers * regs) {
 
 void si_set_callback(StackIterator* si, NativeCodePtr* callback) {
 #ifdef WIN32
-    const static uint64 red_zone_size = 0x00;
+    // Shadow memory to save 4 registers into stack,
+    // this is necessary for WIN64 calling conventions.
+    // NOTE: This file is used only for x86_64 architectures
+    const static uint64 red_zone_size = 0x28;
 #else
     const static uint64 red_zone_size = 0x88;
 #endif
