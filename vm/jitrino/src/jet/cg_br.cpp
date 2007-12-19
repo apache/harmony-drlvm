@@ -231,7 +231,7 @@ void Compiler::gen_switch(const JInst & jinst)
     // complex address form:
     //      [table + index*sizeof(void*) - low()*sizeof(void*)],
     // but only if low()*sizeof(void*) does fit into displacement ...
-    int tmp = -jinst.low()/sizeof(void*);
+    int tmp = -jinst.low();
     const int LO_BOUND = INT_MIN/(int)sizeof(void*);
     const int UP_BOUND = INT_MAX/(int)sizeof(void*);
     if (LO_BOUND<=tmp && tmp<=UP_BOUND) {
