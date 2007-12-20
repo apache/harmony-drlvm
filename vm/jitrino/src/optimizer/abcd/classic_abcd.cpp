@@ -551,6 +551,8 @@ void ClassicAbcd::markRedundantInstructions
                         }
                         Log::out() << "bound check!\n";
                     }
+                }else{
+                    updateOrInitValue(_redundantChecks, curr_inst, rtNONE_MASK);
                 }
             }
         }
