@@ -65,20 +65,9 @@
                     </fileset>
                 </cc>
 
-                <condition property="add.manifest">
-                    <and>
-                        <os family="windows" />
-                        <available file="${jvmti.test.native.path}/${outputdir}/${outputdir}${shlib.suffix}${manifest.suffix}" />
-                    </and>
-                </condition>
-
-                <antcall target="jvmti.embed.manifest" />
+                <embed-manifest lib="${jvmti.test.native.path}/${outputdir}/${outputdir}${shlib.suffix}" />
             </sequential>
         </for>
-    </target>
-
-    <target name="jvmti.embed.manifest" if="add.manifest">
-        <embed-manifest lib="${jvmti.test.native.path}/${outputdir}/${outputdir}${shlib.suffix}" />
     </target>
 
     <target name="pre-jvmti-test" depends="compile-jvmti-tests-java,

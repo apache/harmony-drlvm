@@ -164,20 +164,9 @@
                     <!--linkerarg value="-lstdc++" if="is.linux"/-->
                     <fileset file="@{nativefile}"/>
                 </cc>
-                <condition property="add.manifest">
-                    <and>
-                        <os family="windows" />
-                        <available file="${reg.test.native.path}/${outfile}${shlib.suffix}${manifest.suffix}" />
-                    </and>
-                </condition>
-
-                <antcall target="reg.embed.manifest" />
+                <embed-manifest lib="${reg.test.native.path}/${outfile}${shlib.suffix}" />
             </sequential>
         </for>
-    </target>
-
-    <target name="reg.embed.manifest" if="add.manifest">
-        <embed-manifest lib="${reg.test.native.path}/${outfile}${shlib.suffix}" />
     </target>
 
     <target name="reg.test" depends="compile-reg-tests-java, 

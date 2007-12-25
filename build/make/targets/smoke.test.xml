@@ -79,22 +79,11 @@
                     <fileset file="@{full.file.path}" />                    
                 </cc>
 
-                <condition property="add.manifest">
-                    <and>
-                        <os family="windows" />
-                        <available file="${smoke.test.native.path}/${outputdir}/${outputfile}${shlib.suffix}${manifest.suffix}" />
-                    </and>
-                </condition>
-
-                <antcall target="smoke.embed.manifest" />
+                <embed-manifest lib="${smoke.test.native.path}/${outputdir}/${outputfile}${shlib.suffix}" />
             </sequential>
         </for>
     </target>
 
-    <target name="smoke.embed.manifest" if="add.manifest">
-        <embed-manifest lib="${smoke.test.native.path}/${outputdir}/${outputfile}${shlib.suffix}" />
-    </target>
-    
     <target name="java_test_smoke">
         <mkdir dir="${smoke.test.dir}/reports" />
         <path id="java.class.path">
@@ -139,13 +128,11 @@
         
         <take-xlist name="exclude.file" file="./excludes/exclude.drlvm_smoke.${hy.platform}.${mode.id}"/>
 
-        <!-- TODO: to allow using package name for test.case, need to convert it to path
-        <propertyregex property="test.file" override="yes" global="true"
-            input="${test.case}" regexp="(\.|\\)" replace="/"/-->
+        <convert-test from="test.case" to="test.file"/>
         
         <fileset dir="${smoke.test.src}" id="smoke.run.set">
             <include name="**/*.java" unless="test.case"/>
-            <include name="${test.case}" if="test.case"/>
+            <include name="${test.file}" if="test.case"/>
             <excludesfile name="${exclude.file}" if="exclude.file" />
         </fileset>
         <pathconvert property="smoke.run.list" setonempty="no" refid="smoke.run.set"/>

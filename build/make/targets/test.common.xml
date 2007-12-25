@@ -52,15 +52,32 @@
     <macrodef name="embed-manifest">
         <attribute name="lib"/>
         <sequential>
-	        <echo message="Adding manifest to @{lib}" />
-	        <exec executable="mt.exe">
-	            <arg value="-nologo" />
-	            <arg value="-manifest" />
-	            <arg value="@{lib}${manifest.suffix}" />
-	            <arg value="-outputresource:@{lib};#2" />
-	        </exec>
+            <condition property="@{lib}.embed.manifest">
+                <and>
+                    <os family="windows" />
+                    <available file="@{lib}${manifest.suffix}" />
+                </and>
+            </condition>
+
+            <antcall target="-embed-manifest" >
+                <param name="lib" value="@{lib}"/>
+                <propertyset>
+                  <propertyref name="@{lib}.embed.manifest"/>
+                  <globmapper from="@{lib}.*" to="*"/>
+                </propertyset>
+            </antcall>
         </sequential>
     </macrodef>
+    
+    <target name="-embed-manifest" if="embed.manifest">
+        <echo message="Adding manifest to ${lib}" />
+        <exec executable="mt.exe">
+            <arg value="-nologo" />
+            <arg value="-manifest" />
+            <arg value="${lib}${manifest.suffix}" />
+            <arg value="-outputresource:${lib};#2" />
+        </exec>
+    </target>
 
     <macrodef name="ensure-resource">
         <attribute name="name"/>
