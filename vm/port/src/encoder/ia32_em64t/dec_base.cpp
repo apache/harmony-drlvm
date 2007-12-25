@@ -255,19 +255,39 @@ bool DecoderBase::try_mn(Mnemonic mn, const unsigned char ** pbuf, Inst * pinst)
 #endif
 
         *pbuf = save_pbuf;
-        if (opcode_len != 0) {
 #ifdef _EM64T_
-            // Match REX prefixes
-            if (((*pbuf)[0] & 0xf0) == 0x40 && opcode_ptr[0] == 0x48)
+        // Match REX prefixes
+        unsigned char rex_byte = (*pbuf)[0];
+        if ((rex_byte & 0xf0) == 0x40)
+        {
+            if ((rex_byte & 0x08) != 0)
             {
+                // Have REX.W
+                if (opcode_len > 0 && opcode_ptr[0] == 0x48)
+                {
+                    // Have REX.W in opcode. All mnemonics that allow
+                    // REX.W have to have specified it in opcode,
+                    // otherwise it is not allowed
+                    rex = *(Rex *)*pbuf;
+                    prex = &rex;
+                    (*pbuf)++;
+                    opcode_ptr++;
+                    opcode_len--;
+                }
+            }
+            else
+            {
+                // No REX.W, so it doesn't have to be in opcode. We
+                // have REX.B, REX.X, REX.R or their combination, but
+                // not in opcode, they may extend any part of the
+                // instruction
                 rex = *(Rex *)*pbuf;
                 prex = &rex;
                 (*pbuf)++;
-                opcode_ptr++;
-                opcode_len--;
             }
+        }
 #endif
-
+        if (opcode_len != 0) {
             if (memcmp(*pbuf, opcode_ptr, opcode_len)) {
                 continue;
             }

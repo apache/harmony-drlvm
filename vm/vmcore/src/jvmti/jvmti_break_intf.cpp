@@ -605,11 +605,21 @@ VMBreakPoints::process_native_breakpoint()
 
     TRACE2("jvmti.break", "Native breakpoint occured: " << addr);
 
+    M2nFrame* m2nf = m2n_push_suspended_frame(&regs);
+
     VMBreakPoint* bp = find_breakpoint(addr);
     if (NULL == bp) {
         // breakpoint could be deleted by another thread
+        assert(*((unsigned char *)addr) != INSTRUMENTATION_BYTE);
         unlock();
-        return;
+        // Transfer execution back to the original register
+        // context. In case the target location happens to be
+        // instrumented, it means that another breakpoint has been set
+        // there right after unlock was done.
+        StackIterator* si = (StackIterator*) STD_ALLOCA(si_size());
+        si_fill_from_registers(si, &regs, false, m2n_get_previous_frame(m2nf));
+
+        si_transfer_control(si);
     }
     assert(bp->addr == addr);
     TRACE2("jvmti.break", "Process native breakpoint: "
@@ -619,8 +629,6 @@ VMBreakPoints::process_native_breakpoint()
         << (bp->method ? method_get_name((Method*)bp->method) : "(nil)")
         << (bp->method ? method_get_descriptor((Method*)bp->method) : "")
         << " :" << bp->location << " :" << bp->addr);
-
-    M2nFrame* m2nf = m2n_push_suspended_frame(&regs);
 
     jbyte *instruction_buffer;
     BEGIN_RAISE_AREA;
