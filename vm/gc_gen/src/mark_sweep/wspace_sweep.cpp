@@ -15,16 +15,16 @@
  *  limitations under the License.
  */
 
-#include "sspace_chunk.h"
-#include "sspace_mark_sweep.h"
+#include "wspace_chunk.h"
+#include "wspace_mark_sweep.h"
 
 
 static Chunk_Header_Basic *volatile next_chunk_for_sweep;
 
 
-void gc_init_chunk_for_sweep(GC *gc, Sspace *sspace)
+void gc_init_chunk_for_sweep(GC *gc, Wspace *wspace)
 {
-  next_chunk_for_sweep = (Chunk_Header_Basic*)space_heap_start((Space*)sspace);
+  next_chunk_for_sweep = (Chunk_Header_Basic*)space_heap_start((Space*)wspace);
   next_chunk_for_sweep->adj_prev = NULL;
   
   unsigned int i = gc->num_collectors;
@@ -36,20 +36,11 @@ void gc_init_chunk_for_sweep(GC *gc, Sspace *sspace)
   }
 }
 
-static unsigned int word_set_bit_num(POINTER_SIZE_INT word)
-{
-  unsigned int count = 0;
-  
-  while(word){
-    word &= word - 1;
-    ++count;
-  }
-  return count;
-}
-
 void zeroing_free_chunk(Free_Chunk *chunk)
 {
-  assert(chunk->status == CHUNK_FREE);
+  //Modified this assertion for concurrent sweep
+  //assert(chunk->status == CHUNK_FREE);
+  assert(chunk->status & CHUNK_FREE);
   
   void *start = (void*)((POINTER_SIZE_INT)chunk + sizeof(Free_Chunk));
   POINTER_SIZE_INT size = CHUNK_SIZE(chunk) - sizeof(Free_Chunk);
@@ -123,7 +114,7 @@ static void zeroing_free_areas_in_pfc(Chunk_Header *chunk, unsigned int live_num
     memset((void*)base, 0, slot_size*free_slot_num);
 }
 
-static void collector_sweep_normal_chunk(Collector *collector, Sspace *sspace, Chunk_Header *chunk)
+static void collector_sweep_normal_chunk(Collector *collector, Wspace *wspace, Chunk_Header *chunk)
 {
   unsigned int slot_num = chunk->slot_num;
   unsigned int live_num = 0;
@@ -141,7 +132,7 @@ static void collector_sweep_normal_chunk(Collector *collector, Sspace *sspace, C
     }
   }
   assert(live_num <= slot_num);
-  chunk->alloc_num = live_num;
+  //chunk->alloc_num = live_num;
   collector->live_obj_size += live_num * chunk->slot_size;
   collector->live_obj_num += live_num;
 
@@ -149,52 +140,58 @@ static void collector_sweep_normal_chunk(Collector *collector, Sspace *sspace, C
     collector_add_free_chunk(collector, (Free_Chunk*)chunk);
   } else if(chunk_is_reusable(chunk)){  /* most objects in this chunk are swept, add chunk to pfc list*/
     chunk->alloc_num = live_num;
-    chunk_pad_last_index_word((Chunk_Header*)chunk, cur_mark_mask);
-    sspace_put_pfc(sspace, chunk);
+    //chunk_pad_last_index_word((Chunk_Header*)chunk, cur_mark_mask);
+    wspace_put_pfc(wspace, chunk);
+    assert(chunk->next != chunk);
+  }else{  /* the rest: chunks with free rate < PFC_REUSABLE_RATIO. we don't use them */
+    chunk->alloc_num = live_num;    
+    chunk->status = CHUNK_USED | CHUNK_NORMAL;
+    wspace_register_used_chunk(wspace,chunk);
   }
-  /* the rest: chunks with free rate < PFC_REUSABLE_RATIO. we don't use them */
 }
 
-static inline void collector_sweep_abnormal_chunk(Collector *collector, Sspace *sspace, Chunk_Header *chunk)
+static inline void collector_sweep_abnormal_chunk(Collector *collector, Wspace *wspace, Chunk_Header *chunk)
 {
-  assert(chunk->status == CHUNK_ABNORMAL);
+  assert(chunk->status & CHUNK_ABNORMAL);
   POINTER_SIZE_INT *table = chunk->table;
   table[0] &= cur_mark_mask;
   if(!table[0]){
     collector_add_free_chunk(collector, (Free_Chunk*)chunk);
   }
   else {
+    chunk->status = CHUNK_ABNORMAL| CHUNK_USED;
+    wspace_register_used_chunk(wspace,chunk);
     collector->live_obj_size += CHUNK_SIZE(chunk);
     collector->live_obj_num++;
   }
 }
 
-void sspace_sweep(Collector *collector, Sspace *sspace)
+void wspace_sweep(Collector *collector, Wspace *wspace)
 {
   Chunk_Header_Basic *chunk;
   collector->live_obj_size = 0;
   collector->live_obj_num = 0;
 
-  chunk = sspace_grab_next_chunk(sspace, &next_chunk_for_sweep, TRUE);
+  chunk = wspace_grab_next_chunk(wspace, &next_chunk_for_sweep, TRUE);
   while(chunk){
     /* chunk is free before GC */
     if(chunk->status == CHUNK_FREE){
       collector_add_free_chunk(collector, (Free_Chunk*)chunk);
     } else if(chunk->status & CHUNK_NORMAL){   /* chunk is used as a normal sized obj chunk */
-      collector_sweep_normal_chunk(collector, sspace, (Chunk_Header*)chunk);
+      collector_sweep_normal_chunk(collector, wspace, (Chunk_Header*)chunk);
     } else {  /* chunk is used as a super obj chunk */
-      collector_sweep_abnormal_chunk(collector, sspace, (Chunk_Header*)chunk);
+      collector_sweep_abnormal_chunk(collector, wspace, (Chunk_Header*)chunk);
     }
     
-    chunk = sspace_grab_next_chunk(sspace, &next_chunk_for_sweep, TRUE);
+    chunk = wspace_grab_next_chunk(wspace, &next_chunk_for_sweep, TRUE);
   }
 }
 
-/************ For merging free chunks in sspace ************/
+/************ For merging free chunks in wspace ************/
 
-static void merge_free_chunks_in_list(Sspace *sspace, Free_Chunk_List *list)
+static void merge_free_chunks_in_list(Wspace *wspace, Free_Chunk_List *list)
 {
-  Free_Chunk *sspace_ceiling = (Free_Chunk*)space_heap_end((Space*)sspace);
+  Free_Chunk *wspace_ceiling = (Free_Chunk*)space_heap_end((Space*)wspace);
   Free_Chunk *chunk = list->head;
   
   while(chunk){
@@ -215,24 +212,24 @@ static void merge_free_chunks_in_list(Sspace *sspace, Free_Chunk_List *list)
     }
     /* Check if the back adjcent chunks are free */
     Free_Chunk *back_chunk = (Free_Chunk*)chunk->adj_next;
-    while(back_chunk < sspace_ceiling && back_chunk->status == (CHUNK_FREE | CHUNK_TO_MERGE)){
+    while(back_chunk < wspace_ceiling && back_chunk->status == (CHUNK_FREE | CHUNK_TO_MERGE)){
       assert(chunk < back_chunk);
       /* Remove back_chunk from list */
       free_list_detach_chunk(list, back_chunk);
       back_chunk = (Free_Chunk*)back_chunk->adj_next;
       chunk->adj_next = (Chunk_Header_Basic*)back_chunk;
     }
-    if(back_chunk < sspace_ceiling)
+    if(back_chunk < wspace_ceiling)
       back_chunk->adj_prev = (Chunk_Header_Basic*)chunk;
     
     /* put the free chunk to the according free chunk list */
-    sspace_put_free_chunk(sspace, chunk);
+    wspace_put_free_chunk(wspace, chunk);
     
     chunk = list->head;
   }
 }
 
-void sspace_merge_free_chunks(GC *gc, Sspace *sspace)
+void wspace_merge_free_chunks(GC *gc, Wspace *wspace)
 {
   Free_Chunk_List free_chunk_list;
   free_chunk_list.head = NULL;
@@ -244,10 +241,10 @@ void sspace_merge_free_chunks(GC *gc, Sspace *sspace)
     move_free_chunks_between_lists(&free_chunk_list, list);
   }
   
-  merge_free_chunks_in_list(sspace, &free_chunk_list);
+  merge_free_chunks_in_list(wspace, &free_chunk_list);
 }
 
-void sspace_remerge_free_chunks(GC *gc, Sspace *sspace)
+void wspace_remerge_free_chunks(GC *gc, Wspace *wspace)
 {
   Free_Chunk_List free_chunk_list;
   free_chunk_list.head = NULL;
@@ -258,10 +255,10 @@ void sspace_remerge_free_chunks(GC *gc, Sspace *sspace)
    * And the adj_prev field of the chunk next to it will be wrong either.
    * So a rebuilding operation is needed here.
    */
-  sspace_rebuild_chunk_chain(sspace);
+  wspace_rebuild_chunk_chain(wspace);
   
-  /* Collect free chunks from sspace free chunk lists to one list */
-  sspace_collect_free_chunks_to_list(sspace, &free_chunk_list);
+  /* Collect free chunks from wspace free chunk lists to one list */
+  wspace_collect_free_chunks_to_list(wspace, &free_chunk_list);
   
   /* Collect free chunks from collectors to one list */
   for(unsigned int i=0; i<gc->num_collectors; ++i){
@@ -269,5 +266,5 @@ void sspace_remerge_free_chunks(GC *gc, Sspace *sspace)
     move_free_chunks_between_lists(&free_chunk_list, list);
   }
   
-  merge_free_chunks_in_list(sspace, &free_chunk_list);
+  merge_free_chunks_in_list(wspace, &free_chunk_list);
 }

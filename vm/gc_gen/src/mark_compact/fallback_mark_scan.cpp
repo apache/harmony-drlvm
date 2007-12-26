@@ -41,8 +41,8 @@ static void scan_object(Collector* collector, REF *p_ref)
   assert(p_obj);
   assert((((POINTER_SIZE_INT)p_obj) % GC_OBJECT_ALIGNMENT) == 0);
 
-  Partial_Reveal_VTable *vtable = uncompress_vt(obj_get_vt(p_obj));
-  if(VTABLE_TRACING)
+  Partial_Reveal_VTable *vtable = decode_vt(obj_get_vt(p_obj));
+  if(TRACE_JLC_VIA_VTABLE)
     if(!(vtable->vtmark & VT_FALLBACK_MARKED)) {
       vtable->vtmark |= VT_FALLBACK_MARKED;  //we need different marking for fallback compaction
       collector_tracestack_push(collector, &(vtable->jlC));
@@ -203,24 +203,42 @@ void trace_obj_in_fallback_marking(Collector *collector, void *p_ref)
 }
 
 #ifdef USE_32BITS_HASHCODE
+
+/* for semispace NOS, actually only the fromspace needs cleaning of oi. */
 void fallback_clear_fwd_obj_oi(Collector* collector)
 {
   GC* gc = collector->gc;
+  Blocked_Space* space = (Blocked_Space*)((GC_Gen*)gc)->nos;
+
   assert(gc_match_kind(gc, FALLBACK_COLLECTION));
 
   unsigned int num_active_collectors = gc->num_active_collectors;
   atomic_cas32( &num_finished_collectors, 0, num_active_collectors);
   
-  Block_Header* curr_block = fspace_get_next_block();
+  Block_Header* curr_block = blocked_space_block_iterator_next(space);
   while(curr_block){
     Partial_Reveal_Object* curr_obj = (Partial_Reveal_Object*) curr_block->base;
     while(curr_obj < curr_block->free){
+      unsigned int obj_size = vm_object_size(curr_obj);
+      /* forwarded object is dead object (after fallback marking),but we need know its size to iterate live object */
       if(obj_is_fw_in_oi(curr_obj)){
-        set_obj_info(curr_obj, (Obj_Info_Type)0);
+        if(obj_is_sethash_in_vt(curr_obj)){ 
+          /* this only happens in semispace GC, where an object with attached hashcode is forwarded.
+             This object should be in survivor_area, forwarded from fromspace in last minor collection. 
+             We restore its hashbits correctly in oi. */
+          set_obj_info(curr_obj, (Obj_Info_Type)HASHCODE_SET_ATTACHED);
+        }else{
+          set_obj_info(curr_obj, (Obj_Info_Type)0);
+        }
       }
-      curr_obj = (Partial_Reveal_Object*)((POINTER_SIZE_INT)curr_obj + vm_object_size(curr_obj));
+      /* if it's not forwared, it may still have hashcode attached if its in survivor_area. 
+         It's not forwarded because fallback happens before it's forwarded. */
+      if(hashcode_is_attached(curr_obj))
+        obj_size += GC_OBJECT_ALIGNMENT;
+      
+      curr_obj = (Partial_Reveal_Object*)((POINTER_SIZE_INT)curr_obj + obj_size);
     }
-    curr_block = fspace_get_next_block();
+    curr_block = blocked_space_block_iterator_next(space);
   }
   atomic_inc32(&num_finished_collectors);
   while(num_finished_collectors < num_active_collectors) ;
@@ -228,9 +246,13 @@ void fallback_clear_fwd_obj_oi(Collector* collector)
 
 void fallback_clear_fwd_obj_oi_init(Collector* collector)
 {
-  fspace_block_iterate_init((Fspace*)((GC_Gen*)collector->gc)->nos);
+  Blocked_Space* space = (Blocked_Space*)((GC_Gen*)collector->gc)->nos;
+  blocked_space_block_iterator_init(space); 
+    
 }
 #endif
+
+
 
 
 

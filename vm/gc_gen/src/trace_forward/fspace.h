@@ -40,6 +40,7 @@ Fspace *fspace_initialize(GC* gc, void* start, POINTER_SIZE_INT fspace_size, POI
 void fspace_destruct(Fspace *fspace);
 
 void* fspace_alloc(unsigned size, Allocator *allocator);
+Boolean fspace_alloc_block(Fspace* fspace, Allocator* allocator);
 
 void fspace_reset_after_collection(Fspace* fspace);
 
@@ -59,8 +60,4 @@ void nongen_forward_pool(Collector* collector);
 
 void fspace_collection(Fspace* fspace);
 
-#ifdef USE_32BITS_HASHCODE
-void fspace_block_iterate_init(Fspace* fspace);
-Block_Header* fspace_get_next_block();
-#endif
 #endif // _FROM_SPACE_H_

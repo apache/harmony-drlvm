@@ -25,7 +25,7 @@
 #include "../mark_compact/mspace.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 #include "../common/space_tuner.h"
-#include "../mark_sweep/sspace.h"
+#include "../mark_sweep/wspace.h"
 
 unsigned int MINOR_COLLECTORS = 0;
 unsigned int MAJOR_COLLECTORS = 0;
@@ -84,14 +84,6 @@ static void collector_reset_thread(Collector *collector)
   */
     
   GC_Metadata* metadata = collector->gc->metadata;
-
-/* TO_REMOVE
-
-  assert(collector->rep_set==NULL);
-  if( !gc_is_gen_mode() || !gc_match_kind(collector->gc, MINOR_COLLECTION)){
-    collector->rep_set = free_set_pool_get_entry(metadata);
-  }
-*/
   
   if(gc_is_gen_mode() && gc_match_kind(collector->gc, MINOR_COLLECTION) && NOS_PARTIAL_FORWARD){
     assert(collector->rem_set==NULL);
@@ -102,7 +94,7 @@ static void collector_reset_thread(Collector *collector)
   collector_reset_weakref_sets(collector);
 #endif
 
-#ifndef USE_MARK_SWEEP_GC
+#if !defined(USE_MARK_SWEEP_GC) && !defined(USE_UNIQUE_MOVE_COMPACT_GC)
   /*For LOS_Shrink and LOS_Extend*/
   if(gc_has_space_tuner(collector->gc) && collector->gc->tuner->kind != TRANS_NOTHING){
     collector->non_los_live_obj_size = 0;
@@ -157,7 +149,7 @@ static void assign_collector_with_task(GC* gc, TaskType task_func, Space* space)
   return;
 }
 
-static void wait_collection_finish(GC* gc)
+void wait_collection_finish(GC* gc)
 {
   unsigned int num_active_collectors = gc->num_active_collectors;
   for(unsigned int i=0; i<num_active_collectors; i++)
@@ -176,6 +168,7 @@ static int collector_thread_func(void *arg)
   while(true){
     /* Waiting for newly assigned task */
     collector_wait_for_task(collector); 
+    collector->collector_is_active = TRUE;
     
     /* waken up and check for new task */
     TaskType task_func = collector->task_func;
@@ -186,9 +179,13 @@ static int collector_thread_func(void *arg)
       
     task_func(collector);
 
-    alloc_context_reset((Allocator*)collector);
-
+   //conducted after collection to return last TLB in hand 
+   #if !defined(USE_MARK_SWEEP_GC) && !defined(USE_UNIQUE_MOVE_COMPACT_GC)
+    gc_reset_collector_alloc(collector->gc, collector);
+   #endif
     collector_notify_work_done(collector);
+    
+    collector->collector_is_active = FALSE;
   }
 
   return 0;
@@ -221,7 +218,6 @@ static void collector_terminate_thread(Collector* collector)
   while(old_live_collector_num == live_collector_num)
     vm_thread_yield(); /* give collector time to die */
   
-  delete collector->trace_stack;  
   return;
 }
 
@@ -232,14 +228,14 @@ static void collector_terminate_thread(Collector* collector)
 
 void collector_init_stats(Collector* collector)
 {
-#ifndef USE_MARK_SWEEP_GC
+#if !defined(USE_MARK_SWEEP_GC) && !defined(USE_UNIQUE_MOVE_COMPACT_GC)
   gc_gen_collector_stats_initialize(collector);
 #endif
 }
 
 void collector_destruct_stats(Collector* collector)
 {
-#ifndef USE_MARK_SWEEP_GC
+#if !defined(USE_MARK_SWEEP_GC) && !defined(USE_UNIQUE_MOVE_COMPACT_GC)
   gc_gen_collector_stats_destruct(collector);
 #endif
 }
@@ -256,8 +252,7 @@ void collector_destruct(GC* gc)
 #ifdef GC_GEN_STATS
     collector_destruct_stats(collector);
 #endif
-    STD_FREE(collector);
-   
+    gc_destruct_collector_alloc(gc, collector);   
   }
   assert(live_collector_num == 0);
   
@@ -288,13 +283,10 @@ void collector_initialize(GC* gc)
     /* FIXME:: thread_handle is for temporary control */
     collector->thread_handle = (VmThreadHandle)(POINTER_SIZE_INT)i;
     collector->gc = gc;
-    collector_init_thread(collector);
-
-#ifdef USE_MARK_SWEEP_GC
-    collector_init_free_chunk_list(collector);
-#else
-    gc_gen_hook_for_collector_init(collector);
-#endif
+    //init collector allocator (mainly for semi-space which has two target spaces)
+    gc_init_collector_alloc(gc, collector);
+    //init thread scheduling related stuff, creating collector thread
+    collector_init_thread(collector); 
 
 #ifdef GC_GEN_STATS
     collector_init_stats(collector);
@@ -316,3 +308,41 @@ void collector_execute_task(GC* gc, TaskType task_func, Space* space)
     
   return;
 }
+
+void collector_execute_task_concurrent(GC* gc, TaskType task_func, Space* space, unsigned int num_collectors)
+{
+  assign_collector_with_task(gc, task_func, space);
+
+  return;
+}
+
+void collector_release_weakref_sets(GC* gc, unsigned int num_collectors)
+{
+  Finref_Metadata *metadata = gc->finref_metadata;
+  unsigned int num_active_collectors = gc->num_active_collectors;
+  unsigned int i = 0;
+  for(; i<num_active_collectors; i++){
+    Collector* collector = gc->collectors[i];
+    pool_put_entry(metadata->free_pool, collector->softref_set);
+    pool_put_entry(metadata->free_pool, collector->weakref_set);
+    pool_put_entry(metadata->free_pool, collector->phanref_set);
+    collector->softref_set = NULL;
+    collector->weakref_set = NULL;
+    collector->phanref_set = NULL;
+  }
+}
+
+Boolean is_collector_finished(GC* gc)
+{
+  unsigned int num_active_collectors = gc->num_active_collectors;
+  unsigned int i = 0;
+  for(; i<num_active_collectors; i++){
+    Collector* collector = gc->collectors[i];
+    if(collector->collector_is_active){
+      return FALSE;
+    }
+  }
+  return TRUE;
+
+}
+

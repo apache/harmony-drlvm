@@ -58,76 +58,64 @@ JNIEXPORT void JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_helperCall
     GCHelper_clss = *vm_class_ptr;
 }
 
-#if !defined(_IPF_)
-
 JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getZeroingSize(JNIEnv *e, jclass c)
 {
+#if defined(ALLOC_ZEROING) && defined(ALLOC_PREFETCH)
     return (jint)ZEROING_SIZE;
+#else
+    return (jint)0;
+#endif
 }
 
 JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getPrefetchDist(JNIEnv *e, jclass c)
 {
+#if defined(ALLOC_ZEROING) && defined(ALLOC_PREFETCH)
     return (jint)PREFETCH_DISTANCE;
+#else
+    return (jint)0;
+#endif
 }
 
 JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getPrefetchStride(JNIEnv *e, jclass c)
 {
+#if defined(ALLOC_ZEROING) && defined(ALLOC_PREFETCH)
     return (jint)PREFETCH_STRIDE;
+#else
+    return (jint)0;
+#endif
 }
 
-JNIEXPORT jboolean JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_isPrefetchEnabled(JNIEnv *, jclass) {
+JNIEXPORT jboolean JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_isPrefetchEnabled(JNIEnv *, jclass) 
+{
+#if defined(ALLOC_ZEROING) && defined(ALLOC_PREFETCH)
    return (jboolean) PREFETCH_ENABLED;
+#else
+    return (jboolean)JNI_FALSE;
+#endif
 }
 
-#else /* _IPF_ is defined*/
-/*
- Alloc prefetch is disabled in GC code by default. Moreover, allocation helpers are not enabled as well.
- So return zeroes for prefetch distance, prefetch stride and zeroing size here. 
- Also isPrefetchEnabled returns JNI_FALSE. These defaults should be taken into account 
- when enabling helpers on IPF.
-*/
-
-JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getZeroingSize(JNIEnv *e, jclass c)
+JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getTlaFreeOffset(JNIEnv *, jclass) 
 {
-    return 0;
+    return (jint)((POINTER_SIZE_INT) &(((Allocator*)0)->free));
 }
 
-JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getPrefetchDist(JNIEnv *e, jclass c)
+JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getTlaCeilingOffset(JNIEnv *, jclass) 
 {
-    return 0;
+    return (jint)((POINTER_SIZE_INT) &(((Allocator*)0)->ceiling));
 }
 
-JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getPrefetchStride(JNIEnv *e, jclass c)
+JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getTlaEndOffset(JNIEnv *, jclass) 
 {
-    return 0;
+    return (jint)((POINTER_SIZE_INT) &(((Allocator*)0)->end));
 }
 
-JNIEXPORT jboolean JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_isPrefetchEnabled(JNIEnv *, jclass) {
-   return (jboolean) JNI_FALSE;
-}
-#endif /* _IPF_ */
-
-
-JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getTlaFreeOffset(JNIEnv *, jclass) {
-    Allocator allocator;
-    return (jint) ((POINTER_SIZE_INT)&allocator.free - (POINTER_SIZE_INT)&allocator);
-}
-
-JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getTlaCeilingOffset(JNIEnv *, jclass) {
-    Allocator allocator;
-    return (jint) ((POINTER_SIZE_INT)&allocator.ceiling - (POINTER_SIZE_INT)&allocator);
-}
-
-JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getTlaEndOffset(JNIEnv *, jclass) {
-    Allocator allocator;
-    return (jint) ((POINTER_SIZE_INT)&allocator.end - (POINTER_SIZE_INT)&allocator);
-}
-
-JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getGCObjectAlignment(JNIEnv *, jclass) {
+JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getGCObjectAlignment(JNIEnv *, jclass) 
+{
    return (jint) GC_OBJECT_ALIGNMENT;
 }
 
-JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getLargeObjectSize(JNIEnv *, jclass) {
+JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getLargeObjectSize(JNIEnv *, jclass) 
+{
    return (jint) GC_OBJ_SIZE_THRESHOLD;
 }
 

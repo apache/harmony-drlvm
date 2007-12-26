@@ -70,7 +70,9 @@ void gc_update_weak_roots(GC *gc, Boolean double_fix)
 
       if(IS_MOVE_COMPACT){
         assert(space_of_addr(gc, p_obj)->move_object);
-        *p_ref = ref_to_obj_ptr(obj_get_fw_in_table(p_obj));
+        *p_ref = obj_get_fw_in_table(p_obj);
+      } else if(gc_match_kind(gc, MC_COLLECTION)){
+        *p_ref = obj_get_fw_in_table(p_obj);
       } else if(gc_match_kind(gc, MS_COMPACT_COLLECTION) || gc_get_mos((GC_Gen*)gc)->collect_algorithm==MAJOR_MARK_SWEEP){
         if(obj_is_fw_in_oi(p_obj)){
           p_obj = obj_get_fw_in_oi(p_obj);

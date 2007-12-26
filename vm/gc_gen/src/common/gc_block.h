@@ -47,14 +47,23 @@ typedef struct Block_Header {
   void* ceiling;                    
   void* new_free; /* used only during compaction */
   unsigned int block_idx;           
+#ifdef USE_UNIQUE_MOVE_COMPACT_GC
+  unsigned int num_multi_block; /*number of block in large block*/
+#endif
   volatile unsigned int status;
+  
+  /* following three fields are used only in parallel sliding compaction */
   volatile unsigned int dest_counter;
+  Partial_Reveal_Object* src;
+  Partial_Reveal_Object* next_src;
+
 #ifdef USE_32BITS_HASHCODE
   Hashcode_Buf* hashcode_buf; /*hash code entry list*/
 #endif
-  Partial_Reveal_Object* src;
-  Partial_Reveal_Object* next_src;
   Block_Header* next;
+#ifdef USE_UNIQUE_MOVE_COMPACT_GC
+  Block_Header* next_large_block; /*used to link free super large block in gc_mc*/
+#endif
   POINTER_SIZE_INT table[1]; /* entry num == OFFSET_TABLE_SIZE_WORDS */
 }Block_Header;
 
@@ -95,12 +104,18 @@ so we must have some other methods to compute block end.*/
 #define ADDRESS_OFFSET_TO_BLOCK_HEADER(addr) ((unsigned int)((POINTER_SIZE_INT)addr&GC_BLOCK_LOW_MASK))
 #define ADDRESS_OFFSET_IN_BLOCK_BODY(addr) ((unsigned int)(ADDRESS_OFFSET_TO_BLOCK_HEADER(addr)- GC_BLOCK_HEADER_SIZE_BYTES))
 
+#ifdef USE_UNIQUE_MOVE_COMPACT_GC
+#define NUM_BLOCKS_PER_LARGE_OBJECT(size) (((size)+GC_BLOCK_HEADER_SIZE_BYTES+ GC_BLOCK_SIZE_BYTES-1)/GC_BLOCK_SIZE_BYTES)
+#endif
 inline void block_init(Block_Header* block)
 {
   block->free = (void*)((POINTER_SIZE_INT)block + GC_BLOCK_HEADER_SIZE_BYTES);
   block->ceiling = (void*)((POINTER_SIZE_INT)block + GC_BLOCK_SIZE_BYTES); 
   block->base = block->free;
   block->new_free = block->free;
+#ifdef USE_UNIQUE_MOVE_COMPACT_GC
+  block->num_multi_block = 0;
+#endif
   block->status = BLOCK_FREE;
   block->dest_counter = 0;
   block->src = NULL;
@@ -139,20 +154,46 @@ inline Partial_Reveal_Object *obj_end_extend(Partial_Reveal_Object *obj)
 }
 #endif
 
-inline void obj_set_prefetched_next_pointer(Partial_Reveal_Object* obj, Partial_Reveal_Object* raw_prefetched_next){
-  /*Fixme: em64t: This may be not necessary!*/
-  if(raw_prefetched_next == 0){
-    *((POINTER_SIZE_INT*)obj + 1) = 0;
-    return;
-  }
-  REF ref = obj_ptr_to_ref(raw_prefetched_next);
-  *( (REF*)((POINTER_SIZE_INT*)obj + 1) ) = ref;
+/*FIXME: We use native pointer and put into oi, assuming VT and OI takes two POINTER_SIZE_INTs. 
+         This is untrue if:
+         1. compressed_ref && compressed_vt (vt and oi: 32bit. this can be true when heap<4G in 64bit machine)
+         Fortunately, current real design gives both vt (padded) and oi 64 bit even in this case.
+         
+         This is true in 64bit machine if either vt or oi is not compressed: 
+         2. compressed_ref && ! compressed_vt (vt: 64bit, oi: 64bit)
+         3. !compressed_ref && ! compressed_vt (vt: 64bit, oi: 64bit)
+         4. !compressed_ref && compressed_vt (with padded vt) (vt: 64bit, oi: 64bit) 
+
+  When compressed_ref is true, REF is 32bit. It doesn't work in case of 2.         
+  So we always use native pointer for both. 
+  If case 1 design is changed in future to use 32bit for both, we need reconsider.
+  
+  Use REF here has another implication. Since it's a random number, can have 1 in LSBs, which might be confused as FWD_BIT or MARK_BIT.
+  We need ensure that, if we use REF, we never check this prefetch pointer for FWD_BIT or MARK_BIT.
+  
+*/
+
+inline void obj_set_prefetched_next_pointer(Partial_Reveal_Object* p_obj, Partial_Reveal_Object* raw_prefetched_next)
+{
+  Partial_Reveal_Object** p_ref = (Partial_Reveal_Object**)p_obj + 1;
+  *p_ref = raw_prefetched_next;
+
+/* see comments above. 
+  REF* p_ref = (REF*)p_obj + 1;
+  write_slot(p_ref, raw_prefetched_next);
+*/
 }
 
-inline  Partial_Reveal_Object* obj_get_prefetched_next_pointer(Partial_Reveal_Object* obj){
-  /*Fixme: em64t: This may be not necessary!*/
-  assert(obj);  
-  return read_slot( (REF*)((POINTER_SIZE_INT*)obj + 1) );
+inline  Partial_Reveal_Object* obj_get_prefetched_next_pointer(Partial_Reveal_Object* p_obj)
+{
+  assert(p_obj);  
+  Partial_Reveal_Object** p_ref = (Partial_Reveal_Object**)p_obj + 1;
+  return *p_ref;
+
+/* see comments above. 
+  REF* p_ref = (REF*)p_obj + 1;
+  return read_slot(p_ref);
+*/
 }
 
 inline Partial_Reveal_Object *next_marked_obj_in_block(Partial_Reveal_Object *cur_obj, Partial_Reveal_Object *block_end)
@@ -166,158 +207,13 @@ inline Partial_Reveal_Object *next_marked_obj_in_block(Partial_Reveal_Object *cu
   return NULL;
 }
 
-#ifdef USE_32BITS_HASHCODE
-inline Partial_Reveal_Object* block_get_first_marked_object_extend(Block_Header* block, void** start_pos)
-{
-  Partial_Reveal_Object* cur_obj = (Partial_Reveal_Object*)block->base;
-  Partial_Reveal_Object* block_end = (Partial_Reveal_Object*)block->free;
-
-  Partial_Reveal_Object* first_marked_obj = next_marked_obj_in_block(cur_obj, block_end);
-  if(!first_marked_obj)
-    return NULL;
-
-  *start_pos = obj_end_extend(first_marked_obj);
-  
-  return first_marked_obj;
-}
-#endif
-
-inline Partial_Reveal_Object* block_get_first_marked_object(Block_Header* block, void** start_pos)
-{
-  Partial_Reveal_Object* cur_obj = (Partial_Reveal_Object*)block->base;
-  Partial_Reveal_Object* block_end = (Partial_Reveal_Object*)block->free;
-
-  Partial_Reveal_Object* first_marked_obj = next_marked_obj_in_block(cur_obj, block_end);
-  if(!first_marked_obj)
-    return NULL;
-  
-  *start_pos = obj_end(first_marked_obj);
-  
-  return first_marked_obj;
-}
-
-inline Partial_Reveal_Object* block_get_next_marked_object(Block_Header* block, void** start_pos)
-{
-  Partial_Reveal_Object* cur_obj = *(Partial_Reveal_Object**)start_pos;
-  Partial_Reveal_Object* block_end = (Partial_Reveal_Object*)block->free;
-
-  Partial_Reveal_Object* next_marked_obj = next_marked_obj_in_block(cur_obj, block_end);
-  if(!next_marked_obj)
-    return NULL;
-  
-  *start_pos = obj_end(next_marked_obj);
-  
-  return next_marked_obj;
-}
-
-inline Partial_Reveal_Object *block_get_first_marked_obj_prefetch_next(Block_Header *block, void **start_pos)
-{
-  Partial_Reveal_Object *cur_obj = (Partial_Reveal_Object *)block->base;
-  Partial_Reveal_Object *block_end = (Partial_Reveal_Object *)block->free;
-  
-  Partial_Reveal_Object *first_marked_obj = next_marked_obj_in_block(cur_obj, block_end);
-  if(!first_marked_obj)
-    return NULL;
-  
-  Partial_Reveal_Object *next_obj = obj_end(first_marked_obj);
-  *start_pos = next_obj;
-  
-  if(next_obj >= block_end)
-    return first_marked_obj;
-  
-  Partial_Reveal_Object *next_marked_obj = next_marked_obj_in_block(next_obj, block_end);
-  
-  if(next_marked_obj){
-    if(next_marked_obj != next_obj)
-      obj_set_prefetched_next_pointer(next_obj, next_marked_obj);
-  } else {
-      obj_set_prefetched_next_pointer(next_obj, 0);
-  }
-  return first_marked_obj;
-}
-
-inline Partial_Reveal_Object *block_get_first_marked_obj_after_prefetch(Block_Header *block, void **start_pos)
-{
-#ifdef USE_32BITS_HASHCODE
-  return block_get_first_marked_object_extend(block, start_pos);
-#else
-  return block_get_first_marked_object(block, start_pos);
-#endif
-}
-
-inline Partial_Reveal_Object *block_get_next_marked_obj_prefetch_next(Block_Header *block, void **start_pos)
-{
-  Partial_Reveal_Object *cur_obj = *(Partial_Reveal_Object **)start_pos;
-  Partial_Reveal_Object *block_end = (Partial_Reveal_Object *)block->free;
-
-  if(cur_obj >= block_end)
-    return NULL;
-  
-  Partial_Reveal_Object *cur_marked_obj;
-  
-  if(obj_is_marked_in_vt(cur_obj))
-    cur_marked_obj = cur_obj;
-  else
-    cur_marked_obj = (Partial_Reveal_Object *)obj_get_prefetched_next_pointer(cur_obj);
-
-  if(!cur_marked_obj)
-    return NULL;
-  
-  Partial_Reveal_Object *next_obj = obj_end(cur_marked_obj);
-  *start_pos = next_obj;
-  
-  if(next_obj >= block_end)
-    return cur_marked_obj;
-  
-  Partial_Reveal_Object *next_marked_obj = next_marked_obj_in_block(next_obj, block_end);
-  
-  if(next_marked_obj){
-    if(next_marked_obj != next_obj)
-      obj_set_prefetched_next_pointer(next_obj, next_marked_obj);
-  } else {
-      obj_set_prefetched_next_pointer(next_obj, 0);
-  }
-  
-  return cur_marked_obj;  
-}
-
-inline Partial_Reveal_Object *block_get_next_marked_obj_after_prefetch(Block_Header *block, void **start_pos)
-{
-  Partial_Reveal_Object *cur_obj = (Partial_Reveal_Object *)(*start_pos);
-  Partial_Reveal_Object *block_end = (Partial_Reveal_Object *)block->free;
-
-  if(cur_obj >= block_end)
-    return NULL;
-  
-  Partial_Reveal_Object *cur_marked_obj;
-  
-  if(obj_is_marked_in_vt(cur_obj) || obj_is_fw_in_oi(cur_obj))
-    cur_marked_obj = cur_obj;
-  else
-    cur_marked_obj = obj_get_prefetched_next_pointer(cur_obj);
-  
-  if(!cur_marked_obj)
-    return NULL;
-  
-#ifdef USE_32BITS_HASHCODE  
-  Partial_Reveal_Object *next_obj = obj_end_extend(cur_marked_obj);  
-#else
-  Partial_Reveal_Object *next_obj = obj_end(cur_marked_obj);
-#endif
-
-  *start_pos = next_obj;
-  
-  return cur_marked_obj;
-}
-
-inline REF obj_get_fw_in_table(Partial_Reveal_Object *p_obj)
+inline Partial_Reveal_Object* obj_get_fw_in_table(Partial_Reveal_Object *p_obj)
 {
   /* only for inter-sector compaction */
   unsigned int index    = OBJECT_INDEX_TO_OFFSET_TABLE(p_obj);
   Block_Header *curr_block = GC_BLOCK_HEADER(p_obj);
   Partial_Reveal_Object* new_addr = (Partial_Reveal_Object *)(((POINTER_SIZE_INT)p_obj) - curr_block->table[index]);
-  REF new_ref = obj_ptr_to_ref(new_addr);
-  return new_ref;
+  return new_addr;
 }
 
 inline void block_clear_table(Block_Header* block)
@@ -328,6 +224,19 @@ inline void block_clear_table(Block_Header* block)
 }
 
 #ifdef USE_32BITS_HASHCODE
+Partial_Reveal_Object* block_get_first_marked_object_extend(Block_Header* block, void** start_pos);
+#endif
+
+Partial_Reveal_Object* block_get_first_marked_object(Block_Header* block, void** start_pos);
+Partial_Reveal_Object* block_get_next_marked_object(Block_Header* block, void** start_pos);
+Partial_Reveal_Object *block_get_first_marked_obj_prefetch_next(Block_Header *block, void **start_pos);
+Partial_Reveal_Object *block_get_first_marked_obj_after_prefetch(Block_Header *block, void **start_pos);
+Partial_Reveal_Object *block_get_next_marked_obj_prefetch_next(Block_Header *block, void **start_pos);
+Partial_Reveal_Object *block_get_next_marked_obj_after_prefetch(Block_Header *block, void **start_pos);
+
+
+/* <-- blocked_space hashcode_buf ops */
+#ifdef USE_32BITS_HASHCODE  
 inline Hashcode_Buf* block_set_hashcode_buf(Block_Header *block, Hashcode_Buf* new_hashcode_buf)
 {
   Hashcode_Buf* old_hashcode_buf = block->hashcode_buf;
@@ -351,9 +260,13 @@ inline int obj_lookup_hashcode_in_buf(Partial_Reveal_Object *p_obj)
   Hashcode_Buf* hashcode_buf = block_get_hashcode_buf(GC_BLOCK_HEADER(p_obj));
   return hashcode_buf_lookup(p_obj,hashcode_buf);
 }
-#endif
+
+#endif //#ifdef USE_32BITS_HASHCODE  
+/* blocked_space hashcode_buf ops --> */
 
 #endif //#ifndef _BLOCK_H_
+
+
 
 
 

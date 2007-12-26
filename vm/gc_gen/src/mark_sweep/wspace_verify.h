@@ -26,28 +26,28 @@
 //#define SSPACE_ALLOC_INFO
 //#define SSPACE_TIME
 
-struct Sspace;
+struct Wspace;
 
-void sspace_verify_init(GC *gc);
-void sspace_verify_alloc(void *addr, unsigned int size);
-void sspace_verify_vtable_mark(GC *gc);
-void sspace_record_mark(void *addr, unsigned int size);
-void sspace_modify_mark_in_compact(void *new_addr, void *old_addr, unsigned int size);
-void sspace_verify_fix_in_compact(void);
-void sspace_verify_free_area(POINTER_SIZE_INT *start, POINTER_SIZE_INT size);
-void sspace_verify_before_collection(GC *gc);
-void sspace_verify_after_sweep(GC *gc);
-void sspace_verify_after_collection(GC *gc);
+void wspace_verify_init(GC *gc);
+void wspace_verify_alloc(void *addr, unsigned int size);
+void wspace_verify_vtable_mark(GC *gc);
+void wspace_record_mark(void *addr, unsigned int size);
+void wspace_modify_mark_in_compact(void *new_addr, void *old_addr, unsigned int size);
+void wspace_verify_fix_in_compact(void);
+void wspace_verify_free_area(POINTER_SIZE_INT *start, POINTER_SIZE_INT size);
+void wspace_verify_before_collection(GC *gc);
+void wspace_verify_after_sweep(GC *gc);
+void wspace_verify_after_collection(GC *gc);
 
-void sspace_chunks_info(Sspace *sspace, Boolean show_info);
-void sspace_alloc_info(unsigned int size);
-void sspace_alloc_info_summary(void);
+void wspace_chunks_info(Wspace *wspace, Boolean show_info);
+void wspace_alloc_info(unsigned int size);
+void wspace_alloc_info_summary(void);
 
-void sspace_gc_time(GC *gc, Boolean before_gc);
-void sspace_mark_time(Boolean before_mark);
-void sspace_sweep_time(Boolean before_sweep, Boolean sspace_need_compact);
-void sspace_compact_time(Boolean before_compact);
-void sspace_fix_time(Boolean before_fix);
-void sspace_merge_time(Boolean before_merge);
+void wspace_gc_time(GC *gc, Boolean before_gc);
+void wspace_mark_time(Boolean before_mark);
+void wspace_sweep_time(Boolean before_sweep, Boolean wspace_need_compact);
+void wspace_compact_time(Boolean before_compact);
+void wspace_fix_time(Boolean before_fix);
+void wspace_merge_time(Boolean before_merge);
 
 #endif // _SSPACE_VERIFY_H_

@@ -38,6 +38,10 @@
 
 #include "../gen/gc_for_barrier.h"
 
+/* 
+#define USE_MARK_SWEEP_GC  //define it to only use Mark-Sweep GC (no NOS, no LOS).
+*/
+//#define USE_UNIQUE_MOVE_COMPACT_GC //define it to only use Move-Compact GC (no NOS, no LOS).
 #define GC_GEN_STATS
 #define null 0
 
@@ -77,6 +81,7 @@
 
 #define USE_32BITS_HASHCODE
 
+/* define it to use only mark-sweep GC for entire heap management */
 //#define USE_MARK_SWEEP_GC
 
 typedef void (*TaskType)(void*);
@@ -84,17 +89,15 @@ typedef void (*TaskType)(void*);
 enum Collection_Algorithm{
   COLLECTION_ALGOR_NIL,
   
-  /*minor nongen collection*/
+  MINOR_GEN_FORWARD_POOL,
   MINOR_NONGEN_FORWARD_POOL,
   
-  /* minor gen collection */
-  MINOR_GEN_FORWARD_POOL,
+  MINOR_GEN_SEMISPACE_POOL,
+  MINOR_NONGEN_SEMISPACE_POOL,  
   
-  /* major collection */
   MAJOR_COMPACT_SLIDE,
   MAJOR_COMPACT_MOVE,
-  MAJOR_MARK_SWEEP
-  
+  MAJOR_MARK_SWEEP  
 };
 
 /* Possible combinations:
@@ -110,6 +113,7 @@ enum Collection_Kind {
   /* Two main kinds: generational GC and mark-sweep GC; this is decided at compiling time */
   GEN_GC = 0x1,
   MARK_SWEEP_GC = 0x2,
+  MOVE_COMPACT_NO_LOS = 0x4,
   /* Mask of bits standing for two basic kinds */
   GC_BASIC_KIND_MASK = ~(unsigned int)0x7,
   
@@ -124,7 +128,8 @@ enum Collection_Kind {
   
   /* Sub-kinds of mark-sweep GC use the 12~15th LSB */
   MS_COLLECTION = 0x1002,  /* 0x1000 & MARK_SWEEP_GC */
-  MS_COMPACT_COLLECTION = 0x2002  /* 0x2000 & MARK_SWEEP_GC */
+  MS_COMPACT_COLLECTION = 0x2002,  /* 0x2000 & MARK_SWEEP_GC */
+  MC_COLLECTION = 0x1004
 };
 
 extern Boolean IS_FALLBACK_COMPACTION;  /* only for mark/fw bits debugging purpose */
@@ -133,7 +138,8 @@ enum GC_CAUSE{
   GC_CAUSE_NIL,
   GC_CAUSE_NOS_IS_FULL,
   GC_CAUSE_LOS_IS_FULL,
-  GC_CAUSE_SSPACE_IS_FULL,
+  GC_CAUSE_COS_IS_FULL,
+  GC_CAUSE_WSPACE_IS_FULL,
   GC_CAUSE_RUNTIME_FORCE_GC
 };
 
@@ -375,6 +381,20 @@ inline Boolean obj_dirty_in_oi(Partial_Reveal_Object* p_obj)
   return TRUE;
 }
 
+extern volatile Boolean obj_alloced_live;
+inline Boolean is_obj_alloced_live()
+{ return obj_alloced_live;  }
+
+inline void gc_enable_alloc_obj_live()
+{ 
+  obj_alloced_live = TRUE;  
+}
+
+inline void gc_disenable_alloc_obj_live()
+{ 
+  obj_alloced_live = FALSE; 
+}
+
 /* all GCs inherit this GC structure */
 struct Marker;
 struct Mutator;
@@ -433,7 +453,8 @@ typedef struct GC{
 
   SpinLock concurrent_mark_lock;
   SpinLock enumerate_rootset_lock;
-
+  SpinLock concurrent_sweep_lock;
+  
   
   /* system info */
   unsigned int _system_alloc_unit;
@@ -456,6 +477,8 @@ inline Boolean address_belongs_to_gc_heap(void* addr, GC* gc)
   return (addr >= gc_heap_base(gc) && addr < gc_heap_ceiling(gc));
 }
 
+Boolean obj_belongs_to_gc_heap(Partial_Reveal_Object* p_obj);
+
 /* gc must match exactly that kind if returning TRUE */
 inline Boolean gc_match_kind(GC *gc, unsigned int kind)
 {
@@ -472,10 +495,15 @@ inline Boolean gc_match_either_kind(GC *gc, unsigned int multi_kinds)
   return (Boolean)(gc->collect_kind & multi_kinds);
 }
 
+inline void gc_reset_collector_state(GC* gc)
+{ gc->num_active_collectors = 0;}
+
 inline unsigned int gc_get_processor_num(GC* gc) { return gc->_num_processors; }
 
 void gc_parse_options(GC* gc);
 void gc_reclaim_heap(GC* gc, unsigned int gc_cause);
+void gc_prepare_rootset(GC* gc);
+
 
 int64 get_collection_end_time();
 
@@ -498,6 +526,10 @@ extern Boolean NOS_PARTIAL_FORWARD;
 
 #endif /* STATIC_NOS_MAPPING */
 
+void gc_init_collector_alloc(GC* gc, Collector* collector);
+void gc_reset_collector_alloc(GC* gc, Collector* collector);
+void gc_destruct_collector_alloc(GC* gc, Collector* collector);
+
 FORCE_INLINE Boolean addr_belongs_to_nos(void* addr)
 { return addr >= nos_boundary; }
 
@@ -513,5 +545,5 @@ extern Boolean* p_global_lspace_move_obj;
 inline Boolean obj_is_moved(Partial_Reveal_Object* p_obj)
 {  return ((p_obj >= los_boundary) || (*p_global_lspace_move_obj)); }
 
-extern Boolean VTABLE_TRACING;
+extern Boolean TRACE_JLC_VIA_VTABLE;
 #endif //_GC_COMMON_H_

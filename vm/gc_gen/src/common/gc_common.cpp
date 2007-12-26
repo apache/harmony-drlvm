@@ -43,8 +43,6 @@ extern POINTER_SIZE_INT MIN_NOS_SIZE;
 extern POINTER_SIZE_INT INIT_LOS_SIZE;
 
 extern Boolean FORCE_FULL_COMPACT;
-extern Boolean MINOR_ALGORITHM;
-extern Boolean MAJOR_ALGORITHM;
 
 extern unsigned int NUM_MARKERS;
 extern unsigned int NUM_COLLECTORS;
@@ -91,7 +89,7 @@ static Boolean get_boolean_property(const char *property_name)
   assert(property_name);
   char *value = get_property(property_name, VM_PROPERTIES);
   if (NULL == value){
-    DIE2("gc.base","Warning: property value "<<property_name<<"is not set!");
+    DIE2("gc.base","Warning: property value "<<property_name<<" is not set!");
     exit(0);
   }
   
@@ -110,7 +108,7 @@ static Boolean get_boolean_property(const char *property_name)
   {
     return_value = TRUE;
   }else{
-    DIE2("gc.base","Warning: property value "<<property_name<<"is not set!");
+    DIE2("gc.base","Warning: property value "<<property_name<<" is not set! Use upper case?");
     exit(0);
   }
     
@@ -284,19 +282,56 @@ void gc_parse_options(GC* gc)
   }
 
   if (is_property_set("gc.concurrent_gc", VM_PROPERTIES) == 1){
-    USE_CONCURRENT_GC= get_boolean_property("gc.concurrent_gc");
+    Boolean use_all_concurrent_phase= get_boolean_property("gc.concurrent_gc");
+    if(use_all_concurrent_phase){
+      USE_CONCURRENT_ENUMERATION = TRUE;
+      USE_CONCURRENT_MARK = TRUE;
+      USE_CONCURRENT_SWEEP = TRUE;
+      gc->generate_barrier = TRUE;
+    }
+  }
+
+  if (is_property_set("gc.concurrent_enumeration", VM_PROPERTIES) == 1){
+    USE_CONCURRENT_ENUMERATION= get_boolean_property("gc.concurrent_enumeration");
+    if(USE_CONCURRENT_ENUMERATION){
+      USE_CONCURRENT_GC = TRUE;      
+      gc->generate_barrier = TRUE;
+    }
+  }
+
+  if (is_property_set("gc.concurrent_mark", VM_PROPERTIES) == 1){
+    USE_CONCURRENT_MARK= get_boolean_property("gc.concurrent_mark");
+    if(USE_CONCURRENT_MARK){
+      USE_CONCURRENT_GC = TRUE;      
+      gc->generate_barrier = TRUE;
+    }
+  }
+
+  if (is_property_set("gc.concurrent_sweep", VM_PROPERTIES) == 1){
+    USE_CONCURRENT_SWEEP= get_boolean_property("gc.concurrent_sweep");
+    if(USE_CONCURRENT_SWEEP){
+      USE_CONCURRENT_GC = TRUE;
+    }
+  }
+
+  char* concurrent_algo = NULL;
+  
+  if (is_property_set("gc.concurrent_algorithm", VM_PROPERTIES) == 1) {
+    concurrent_algo = get_property("gc.concurrent_algorithm", VM_PROPERTIES);
   }
   
+  gc_decide_concurrent_algorithm(gc, concurrent_algo);
+
 #if defined(ALLOC_ZEROING) && defined(ALLOC_PREFETCH)
   if(is_property_set("gc.prefetch",VM_PROPERTIES) ==1) {
-  	PREFETCH_ENABLED=get_boolean_property("gc.prefetch");
+    PREFETCH_ENABLED=get_boolean_property("gc.prefetch");
   }
 
   if(is_property_set("gc.prefetch_distance",VM_PROPERTIES)==1) {
   	PREFETCH_DISTANCE = get_size_property("gc.prefetch_distance");
   	if(!PREFETCH_ENABLED) {
-  		WARN2("gc.prefetch_distance","Warning: Prefetch distance set with Prefetch disabled!");
-  	}
+      WARN2("gc.prefetch_distance","Warning: Prefetch distance set with Prefetch disabled!");
+    }
   }
 
   if(is_property_set("gc.prefetch_stride",VM_PROPERTIES)==1) {
@@ -319,9 +354,32 @@ void gc_parse_options(GC* gc)
 
 void gc_assign_free_area_to_mutators(GC* gc)
 {
-#ifndef USE_MARK_SWEEP_GC
+#if !defined(USE_MARK_SWEEP_GC) && !defined(USE_UNIQUE_MOVE_COMPACT_GC)
   gc_gen_assign_free_area_to_mutators((GC_Gen*)gc);
 #endif
+}
+
+void gc_init_collector_alloc(GC* gc, Collector* collector)
+{
+#ifndef USE_MARK_SWEEP_GC
+  gc_gen_init_collector_alloc((GC_Gen*)gc, collector);
+#else    
+  gc_init_collector_free_chunk_list(collector);
+#endif
+}
+
+void gc_reset_collector_alloc(GC* gc, Collector* collector)
+{
+#if !defined(USE_MARK_SWEEP_GC) && !defined(USE_UNIQUE_MOVE_COMPACT_GC)
+  gc_gen_reset_collector_alloc((GC_Gen*)gc, collector);
+#endif    
+}
+
+void gc_destruct_collector_alloc(GC* gc, Collector* collector)
+{
+#ifndef USE_MARK_SWEEP_GC
+  gc_gen_destruct_collector_alloc((GC_Gen*)gc, collector);
+#endif    
 }
 
 void gc_copy_interior_pointer_table_to_rootset();
@@ -332,6 +390,27 @@ static int64 collection_end_time = time_now();
 
 int64 get_collection_end_time()
 { return collection_end_time; }
+
+void gc_prepare_rootset(GC* gc)
+{
+  if(!USE_CONCURRENT_GC){
+    gc_metadata_verify(gc, TRUE);
+#ifndef BUILD_IN_REFERENT
+    gc_finref_metadata_verify((GC*)gc, TRUE);
+#endif
+  }
+
+  /* Stop the threads and collect the roots. */
+  lock(gc->enumerate_rootset_lock);
+  INFO2("gc.process", "GC: stop the threads and enumerate rootset ...\n");
+  gc_clear_rootset(gc);
+  gc_reset_rootset(gc);
+  vm_enumerate_root_set_all_threads();
+  gc_copy_interior_pointer_table_to_rootset();
+  gc_set_rootset(gc);
+  unlock(gc->enumerate_rootset_lock);
+
+}
 
 void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
 {
@@ -367,28 +446,33 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
   gc_set_rootset(gc);
   unlock(gc->enumerate_rootset_lock);
   
-  if(USE_CONCURRENT_GC && gc_mark_is_concurrent()){
-    gc_finish_concurrent_mark(gc);
-  }
+  if(USE_CONCURRENT_GC && gc_sweep_is_concurrent()){
+    if(gc_is_concurrent_sweep_phase())
+      gc_finish_concurrent_sweep(gc);
+  }else{
+    if(USE_CONCURRENT_GC && gc_is_concurrent_mark_phase()){
+      gc_finish_concurrent_mark(gc, TRUE);
+    }  
   
-  gc->in_collection = TRUE;
-  
-  /* this has to be done after all mutators are suspended */
-  gc_reset_mutator_context(gc);
-  
-  if(!IGNORE_FINREF ) gc_set_obj_with_fin(gc);
+    gc->in_collection = TRUE;
+    
+    /* this has to be done after all mutators are suspended */
+    gc_reset_mutator_context(gc);
+    
+    if(!IGNORE_FINREF ) gc_set_obj_with_fin(gc);
 
-#ifndef USE_MARK_SWEEP_GC
-  gc_gen_reclaim_heap((GC_Gen*)gc, collection_start_time);
+#if defined(USE_MARK_SWEEP_GC)
+    gc_ms_reclaim_heap((GC_MS*)gc);
+#elif defined(USE_UNIQUE_MOVE_COMPACT_GC)
+    gc_mc_reclaim_heap((GC_MC*)gc);
 #else
-  gc_ms_reclaim_heap((GC_MS*)gc);
+    gc_gen_reclaim_heap((GC_Gen*)gc, collection_start_time);
 #endif
+  }
 
-  gc_reset_interior_pointer_table();
-  
   collection_end_time = time_now(); 
 
-#ifndef USE_MARK_SWEEP_GC
+#if !defined(USE_MARK_SWEEP_GC)&&!defined(USE_UNIQUE_MOVE_COMPACT_GC)
   gc_gen_collection_verbose_info((GC_Gen*)gc, collection_end_time - collection_start_time, mutator_time);
   gc_gen_space_verbose_info((GC_Gen*)gc);
 #endif
@@ -397,11 +481,15 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
   
   int64 mark_time = 0;
   if(USE_CONCURRENT_GC && gc_mark_is_concurrent()){
-    gc_reset_concurrent_mark(gc);
     mark_time = gc_get_concurrent_mark_time(gc);
+    gc_reset_concurrent_mark(gc);
+   }
+
+  if(USE_CONCURRENT_GC && gc_sweep_is_concurrent()){
+    gc_reset_concurrent_sweep(gc);
   }
 
-#ifndef USE_MARK_SWEEP_GC
+#if !defined(USE_MARK_SWEEP_GC)&&!defined(USE_UNIQUE_MOVE_COMPACT_GC)
   if(USE_CONCURRENT_GC && gc_need_start_concurrent_mark(gc))
     gc_start_concurrent_mark(gc);
 #endif
@@ -432,6 +520,10 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
   
   vm_reclaim_native_objs();
   gc->in_collection = FALSE;
+
+  gc_reset_collector_state(gc);
+
+  gc_clear_dirty_set(gc);
   
   vm_resume_threads_after();
   assert(hythread_is_suspend_enabled());
@@ -439,5 +531,7 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
   INFO2("gc.process", "GC: GC end\n");
   return;
 }
+
+
 
 

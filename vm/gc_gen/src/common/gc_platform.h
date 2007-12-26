@@ -55,13 +55,11 @@ extern char* large_page_hint;
 
 #ifdef _WINDOWS_
 #define FORCE_INLINE __forceinline   
-#else 
-
-#ifdef __linux__
+#elif defined (__linux__)
 #define FORCE_INLINE inline  __attribute__((always_inline))
-#endif
-
-#endif
+#else 
+#define FORCE_INLINE inline
+#endif /* _WINDOWS_ */
 
 #define ABS_DIFF(x, y) (((x)>(y))?((x)-(y)):((y)-(x)))
 #define USEC_PER_SEC INT64_C(1000000)
@@ -116,6 +114,11 @@ inline int vm_create_thread(int (*func)(void*), void *data)
   
   return (int)hythread_create_ex(ret_thread, get_gc_thread_group(), stacksize, priority, NULL,
                               (hythread_entrypoint_t)func, data);
+}
+
+inline int vm_thread_is_suspend_enable()
+{
+  return hythread_is_suspend_enabled();
 }
 
 inline void *atomic_casptr(volatile void **mem, void *with, const void *cmp) 

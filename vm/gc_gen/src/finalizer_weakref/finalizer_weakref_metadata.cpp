@@ -188,7 +188,7 @@ void gc_set_obj_with_fin(GC *gc)
   Mutator *mutator = gc->mutator_list;
   while(mutator){
     pool_put_entry(obj_with_fin_pool, mutator->obj_with_fin);
-    mutator->obj_with_fin = NULL;
+    mutator->obj_with_fin = finref_get_free_block(gc);
     mutator = mutator->next;
   }
 }
@@ -216,15 +216,27 @@ void gc_set_weakref_sets(GC *gc)
   for(unsigned int i = 0; i < num_active_collectors; i++)
   {
     Collector *collector = gc->collectors[i];
-    pool_put_entry(metadata->softref_pool, collector->softref_set);
-    pool_put_entry(metadata->weakref_pool, collector->weakref_set);
-    pool_put_entry(metadata->phanref_pool, collector->phanref_set);
+    if(!vector_block_is_empty(collector->softref_set))
+      pool_put_entry(metadata->softref_pool, collector->softref_set);
+    else
+      pool_put_entry(metadata->free_pool, collector->softref_set);
+    
+    if(!vector_block_is_empty(collector->weakref_set))
+      pool_put_entry(metadata->weakref_pool, collector->weakref_set);
+    else
+      pool_put_entry(metadata->free_pool, collector->weakref_set);
+      
+    if(!vector_block_is_empty(collector->phanref_set))
+      pool_put_entry(metadata->phanref_pool, collector->phanref_set);
+    else
+      pool_put_entry(metadata->free_pool, collector->phanref_set);
+      
     collector->softref_set = NULL;
     collector->weakref_set= NULL;
     collector->phanref_set= NULL;
   }
   
-  if(gc_mark_is_concurrent()){
+  if(gc_mark_is_concurrent() && !gc_sweep_is_concurrent()){
     unsigned int num_active_markers = gc->num_active_markers;
     for(unsigned int i = 0; i < num_active_markers; i++)
     {
@@ -274,7 +286,7 @@ void gc_reset_finref_metadata(GC *gc)
   metadata->obj_with_fin_pool = finalizable_obj_pool;
   metadata->finalizable_obj_pool = obj_with_fin_pool;
   
-  gc_reset_obj_with_fin(gc);
+  //gc_reset_obj_with_fin(gc);
 }
 
 
@@ -428,4 +440,6 @@ Boolean finref_copy_pool(Pool *src_pool, Pool *dest_pool, GC *gc)
   }
  return TRUE;
 }
+
+
 

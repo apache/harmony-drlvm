@@ -42,12 +42,15 @@ POINTER_SIZE_INT INIT_LOS_SIZE = 0;
 POINTER_SIZE_INT MIN_NOS_SIZE = 0;
 POINTER_SIZE_INT MAX_NOS_SIZE = 0;
 
-static unsigned int MINOR_ALGO = 0;
+/* should clean up */
+unsigned int MINOR_ALGO = 0;
 static unsigned int MAJOR_ALGO = 0;
 
 Boolean GEN_NONGEN_SWITCH = FALSE;
 
 Boolean JVMTI_HEAP_ITERATION = true;
+
+Boolean gen_mode;
 
 #ifndef STATIC_NOS_MAPPING
 void* nos_boundary;
@@ -288,16 +291,23 @@ void gc_set_nos(GC_Gen *gc, Space *nos){ gc->nos = nos; }
 void gc_set_mos(GC_Gen *gc, Space *mos){ gc->mos = mos; }
 void gc_set_los(GC_Gen *gc, Space *los){ gc->los = los; }
 
+Space_Alloc_Func nos_alloc;
 Space_Alloc_Func mos_alloc;
-//void* mos_alloc(unsigned size, Allocator *allocator){return mspace_alloc(size, allocator);}
-void* nos_alloc(unsigned size, Allocator *allocator){return fspace_alloc(size, allocator);}
 Space_Alloc_Func los_alloc;
-//void* los_alloc(unsigned size, Allocator *allocator){return lspace_alloc(size, allocator);}
+
 void* los_try_alloc(POINTER_SIZE_INT size, GC* gc){  return lspace_try_alloc((Lspace*)((GC_Gen*)gc)->los, size); }
 
 void gc_nos_initialize(GC_Gen *gc, void *start, POINTER_SIZE_INT nos_size, POINTER_SIZE_INT commit_size)
 {
-  Space *nos = (Space*)fspace_initialize((GC*)gc, start, nos_size, commit_size);
+  Space *nos;
+  if(MINOR_ALGO == MINOR_NONGEN_SEMISPACE_POOL){
+    nos = (Space*)sspace_initialize((GC*)gc, start, nos_size, commit_size);
+    nos_alloc = sspace_alloc;
+  }else{
+    nos = (Space*)fspace_initialize((GC*)gc, start, nos_size, commit_size);
+    nos_alloc = fspace_alloc;
+  }
+  
   gc_set_nos(gc, nos);
   nos->collect_algorithm = MINOR_ALGO;
 }
@@ -309,8 +319,8 @@ void gc_mos_initialize(GC_Gen *gc, void *start, POINTER_SIZE_INT mos_size, POINT
 {
   Space *mos;
   if(MAJOR_ALGO == MAJOR_MARK_SWEEP){
-    mos = (Space*)sspace_initialize((GC*)gc, start, mos_size, commit_size);
-    mos_alloc = sspace_alloc;
+    mos = (Space*)wspace_initialize((GC*)gc, start, mos_size, commit_size);
+    mos_alloc = wspace_alloc;
   } else {
     mos = (Space*)mspace_initialize((GC*)gc, start, mos_size, commit_size);
     mos_alloc = mspace_alloc;
@@ -322,7 +332,7 @@ void gc_mos_initialize(GC_Gen *gc, void *start, POINTER_SIZE_INT mos_size, POINT
 void gc_mos_destruct(GC_Gen *gc)
 {
   if(MAJOR_ALGO == MAJOR_MARK_SWEEP)
-    sspace_destruct((Sspace*)gc->mos);
+    wspace_destruct((Wspace*)gc->mos);
   else
     mspace_destruct((Mspace*)gc->mos);
 }
@@ -333,7 +343,7 @@ void gc_los_initialize(GC_Gen *gc, void *start, POINTER_SIZE_INT los_size)
   if(MAJOR_ALGO == MAJOR_MARK_SWEEP){
     assert(los_size == 0);
     los = NULL;
-    los_alloc = sspace_alloc;
+    los_alloc = wspace_alloc;
   } else {
     los = (Space*)lspace_initialize((GC*)gc, start, los_size);
     los_alloc = lspace_alloc;
@@ -350,7 +360,7 @@ void gc_los_destruct(GC_Gen *gc)
 
 Boolean FORCE_FULL_COMPACT = FALSE;
 Boolean IGNORE_VTABLE_TRACING = FALSE;
-Boolean VTABLE_TRACING = FALSE;
+Boolean TRACE_JLC_VIA_VTABLE = FALSE;
 
 unsigned int gc_next_collection_kind(GC_Gen* gc)
 {
@@ -365,19 +375,20 @@ void gc_decide_collection_kind(GC_Gen* gc, unsigned int cause)
 {
   /* this is for debugging. */
   gc->last_collect_kind = gc->collect_kind;
-  
+#if defined(USE_MARK_SWEEP_GC)
+  gc->collect_kind = MS_COLLECTION;
+#elif defined(USE_UNIQUE_MOVE_COMPACT_GC)
+  gc->collect_kind = MC_COLLECTION;
+#else
   if(gc->force_major_collect || cause== GC_CAUSE_LOS_IS_FULL || FORCE_FULL_COMPACT)
     gc->collect_kind = NORMAL_MAJOR_COLLECTION;
   else
     gc->collect_kind = MINOR_COLLECTION;
     
   if(IGNORE_VTABLE_TRACING || (gc->collect_kind == MINOR_COLLECTION))
-    VTABLE_TRACING = FALSE;
+    TRACE_JLC_VIA_VTABLE = FALSE;
   else
-    VTABLE_TRACING = TRUE;
-
-#ifdef USE_MARK_SWEEP_GC
-  gc->collect_kind = MS_COLLECTION;
+    TRACE_JLC_VIA_VTABLE = TRUE;
 #endif
   return;
 }
@@ -399,7 +410,11 @@ void gc_decide_collection_algorithm(GC_Gen* gc, char* minor_algo, char* major_al
       MINOR_ALGO = MINOR_GEN_FORWARD_POOL;
       gc_enable_gen_mode();
     
-    }else{
+    }else if(!strcmp(minor_algo, "MINOR_NONGEN_SEMISPACE_POOL")){
+      MINOR_ALGO = MINOR_NONGEN_SEMISPACE_POOL;
+      gc_disable_gen_mode();
+    
+    }else {
       WARN2("gc.base","\nWarning: GC algorithm setting incorrect. Will use default value.\n");
     
     }
@@ -430,6 +445,18 @@ void gc_decide_collection_algorithm(GC_Gen* gc, char* minor_algo, char* major_al
   
 }
 
+static Boolean nos_alloc_block(Space* space, Allocator* allocator)
+{
+  Boolean result;
+  if(MINOR_ALGO == MINOR_NONGEN_SEMISPACE_POOL)
+    result = sspace_alloc_block((Sspace*)space, allocator); 
+  else
+    result = fspace_alloc_block((Fspace*)space, allocator);   
+ 
+  return result;   
+}
+
+/* assign a free area to the mutator who triggers the collection */
 void gc_gen_assign_free_area_to_mutators(GC_Gen* gc)
 {
   if(gc->cause == GC_CAUSE_LOS_IS_FULL){
@@ -438,14 +465,15 @@ void gc_gen_assign_free_area_to_mutators(GC_Gen* gc)
     los->failure_size = 0;
      
   }else{ 
-    Blocked_Space* nos = (Blocked_Space*)gc->nos;
-    if(nos->num_managed_blocks == 0) return;
-
-    Mutator *mutator = (Mutator *)gc_get_tls();   
-    allocator_init_free_block((Allocator*)mutator, (Block_Header*)nos->blocks);
-    nos->free_block_idx++;
+    /* it is possible that NOS has no free block,
+       because MOS takes all space after fallback or LOS extension.
+       Allocator should be cleared. */
+    Allocator *allocator = (Allocator *)gc_get_tls();   
+    Boolean ok = nos_alloc_block(gc->nos, allocator);
+    /* we don't care about the return value. If no block available, that means,
+       first allocation after mutator resumption will probably trigger OOME. */
   }
-    
+
   return;     
 }
 
@@ -554,12 +582,17 @@ void gc_gen_start_concurrent_mark(GC_Gen* gc)
 }
 
 static inline void nos_collection(Space *nos)
-{ fspace_collection((Fspace*)nos); }
+{ 
+  if(MINOR_ALGO == MINOR_NONGEN_SEMISPACE_POOL)
+    sspace_collection((Sspace*)nos); 
+  else
+    fspace_collection((Fspace*)nos); 
+}
 
 static inline void mos_collection(Space *mos)
 {
   if(MAJOR_ALGO == MAJOR_MARK_SWEEP)
-    sspace_collection((Sspace*)mos);
+    wspace_collection((Wspace*)mos);
   else
     mspace_collection((Mspace*)mos);
 }
@@ -623,10 +656,19 @@ static void gc_gen_update_space_info_after_gc(GC_Gen *gc)
     }
   }
 }
-
+ 
 static void nos_reset_after_collection(Space *nos)
 {
-  fspace_reset_after_collection((Fspace*)nos);
+  if(MINOR_ALGO == MINOR_NONGEN_SEMISPACE_POOL)
+    sspace_reset_after_collection((Sspace*)nos);
+  else
+    fspace_reset_after_collection((Fspace*)nos);
+}
+
+static void nos_prepare_for_collection(Space *nos)
+{
+  if(MINOR_ALGO == MINOR_NONGEN_SEMISPACE_POOL)
+    sspace_prepare_for_collection((Sspace*)nos);
 }
 
 static void mos_reset_after_collection(Space *mos)
@@ -634,7 +676,7 @@ static void mos_reset_after_collection(Space *mos)
   if(MAJOR_ALGO != MAJOR_MARK_SWEEP)
     mspace_reset_after_collection((Mspace*)mos);
   else
-    sspace_reset_after_collection((Sspace*)mos);
+    wspace_reset_after_collection((Wspace*)mos);
 }
 
 Boolean IS_FALLBACK_COMPACTION = FALSE; /* only for debugging, don't use it. */
@@ -662,7 +704,9 @@ void gc_gen_reclaim_heap(GC_Gen *gc, int64 gc_start_time)
   gc_gen_stats_reset_before_collection(gc);
   gc_gen_collector_stats_reset(gc);
 #endif
-  
+
+  nos_prepare_for_collection(nos);
+
   if(gc_match_kind((GC*)gc, MINOR_COLLECTION)){
 
     INFO2("gc.process", "GC: start minor collection ...\n");
@@ -747,6 +791,7 @@ void gc_gen_reclaim_heap(GC_Gen *gc, int64 gc_start_time)
     
     if(MAJOR_ALGO != MAJOR_MARK_SWEEP)
       los->move_object = TRUE;
+
     mos_collection(mos); /* collect both mos and nos */
     los_collection(los);
     if(MAJOR_ALGO != MAJOR_MARK_SWEEP)
@@ -778,7 +823,7 @@ void gc_gen_reclaim_heap(GC_Gen *gc, int64 gc_start_time)
   
   assert(MAJOR_ALGO == MAJOR_MARK_SWEEP || !los->move_object);
   
-  if(MAJOR_ALGO != MAJOR_MARK_SWEEP){
+  if(MAJOR_ALGO != MAJOR_MARK_SWEEP && MINOR_ALGO != MINOR_NONGEN_SEMISPACE_POOL){
     gc_gen_adjust_heap_size(gc);
     
     int64 pause_time = time_now() - gc_start_time;
@@ -860,14 +905,6 @@ void gc_gen_iterate_heap(GC_Gen *gc)
       unsigned int obj_size = (unsigned int)ALIGN_UP_TO_KILO(vm_object_size((Partial_Reveal_Object *)lspace_obj)+hash_extend_size);
       lspace_obj = lspace_obj + obj_size;
     }
-  }
-}
-
-void gc_gen_hook_for_collector_init(Collector *collector)
-{
-  if(MAJOR_ALGO == MAJOR_MARK_SWEEP){
-    allocator_init_local_chunks((Allocator*)collector);
-    collector_init_free_chunk_list(collector);
   }
 }
 
@@ -960,6 +997,43 @@ void gc_gen_wrapup_verbose(GC_Gen* gc)
     <<"\nGC: total collection time: "<<stats->total_pause_time
     <<"\nGC: total appliction execution time: "<<stats->total_mutator_time<<"\n");
 #endif
+}
+
+/* init collector alloc_space */
+void gc_gen_init_collector_alloc(GC_Gen* gc, Collector* collector)
+{
+  if(MAJOR_ALGO == MAJOR_MARK_SWEEP){
+    allocator_init_local_chunks((Allocator*)collector);
+    gc_init_collector_free_chunk_list(collector);
+  }
+
+  Allocator* allocator = (Allocator*)collector;
+  
+  if( MINOR_ALGO == MINOR_NONGEN_SEMISPACE_POOL || MINOR_ALGO == MINOR_GEN_SEMISPACE_POOL){
+    allocator->alloc_space = gc->nos; 
+    /* init backup allocator */
+    unsigned int size = sizeof(Allocator);
+    allocator = (Allocator*)STD_MALLOC(size);  //assign its alloc_space below.
+    memset(allocator, 0, size);  
+    collector->backup_allocator = allocator;
+  }
+    
+  allocator->alloc_space = gc->mos;
+}
+
+void gc_gen_reset_collector_alloc(GC_Gen* gc, Collector* collector)
+{
+  alloc_context_reset((Allocator*)collector);
+  if( MINOR_ALGO == MINOR_NONGEN_SEMISPACE_POOL || MINOR_ALGO == MINOR_GEN_SEMISPACE_POOL){
+    alloc_context_reset(collector->backup_allocator);
+  }      
+}
+
+void gc_gen_destruct_collector_alloc(GC_Gen* gc, Collector* collector)
+{
+  if( MINOR_ALGO == MINOR_NONGEN_SEMISPACE_POOL || MINOR_ALGO == MINOR_GEN_SEMISPACE_POOL){
+    STD_FREE(collector->backup_allocator);  
+  }
 }
 
 

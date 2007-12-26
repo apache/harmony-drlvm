@@ -76,7 +76,7 @@ void gc_metadata_initialize(GC* gc)
   gc_metadata.mutator_remset_pool = sync_pool_create();
   gc_metadata.collector_remset_pool = sync_pool_create();
   gc_metadata.collector_repset_pool = sync_pool_create();
-  gc_metadata.dirty_obj_snaptshot_pool = sync_pool_create();
+  gc_metadata.gc_dirty_set_pool = sync_pool_create();
   gc_metadata.weakroot_pool = sync_pool_create();
 #ifdef USE_32BITS_HASHCODE  
   gc_metadata.collector_hashcode_pool = sync_pool_create();
@@ -99,7 +99,7 @@ void gc_metadata_destruct(GC* gc)
   sync_pool_destruct(metadata->mutator_remset_pool);
   sync_pool_destruct(metadata->collector_remset_pool);
   sync_pool_destruct(metadata->collector_repset_pool);
-  sync_pool_destruct(metadata->dirty_obj_snaptshot_pool);
+  sync_pool_destruct(metadata->gc_dirty_set_pool);
   sync_pool_destruct(metadata->weakroot_pool);
 #ifdef USE_32BITS_HASHCODE  
   sync_pool_destruct(metadata->collector_hashcode_pool);
@@ -188,10 +188,17 @@ static void gc_update_repointed_sets(GC* gc, Pool* pool, Boolean double_fix)
       //if(obj_is_moved(p_obj)) 
         /*Fixme: los_boundery ruined the modularity of gc_common.h*/
         if(p_obj < los_boundary){
-          write_slot(p_ref, obj_get_fw_in_oi(p_obj));
+          p_obj = obj_get_fw_in_oi(p_obj);
         }else{
-          *p_ref = obj_get_fw_in_table(p_obj);
+          p_obj = obj_get_fw_in_table(p_obj);
         }
+
+        write_slot(p_ref, p_obj);
+        
+      }else if(gc_match_kind(gc, MC_COLLECTION)){
+        p_obj = obj_get_fw_in_table(p_obj);
+        write_slot(p_ref, p_obj);
+        
       }else{
         if(obj_is_fw_in_oi(p_obj)){
           /* Condition obj_is_moved(p_obj) is for preventing mistaking previous mark bit of large obj as fw bit when fallback happens.
@@ -415,52 +422,51 @@ void gc_metadata_verify(GC* gc, Boolean is_before_gc)
 Boolean obj_is_mark_black_in_table(Partial_Reveal_Object* p_obj);
 #endif
 
-void gc_reset_snaptshot(GC* gc)
+void gc_reset_dirty_set(GC* gc)
 {
   GC_Metadata* metadata = gc->metadata;
 
-  /*reset mutator local snapshot block*/
   Mutator *mutator = gc->mutator_list;
   while (mutator) {
-    Vector_Block* local_snapshot = mutator->dirty_obj_snapshot;
-    assert(local_snapshot);
-    if(!vector_block_is_empty(local_snapshot)){
+    Vector_Block* local_dirty_set = mutator->dirty_set;
+    assert(local_dirty_set);
+    if(!vector_block_is_empty(local_dirty_set)){
 #ifdef _DEBUG
-      POINTER_SIZE_INT* iter = vector_block_iterator_init(local_snapshot);
-      while(!vector_block_iterator_end(local_snapshot,iter)){
+      POINTER_SIZE_INT* iter = vector_block_iterator_init(local_dirty_set);
+      while(!vector_block_iterator_end(local_dirty_set,iter)){
         Partial_Reveal_Object* p_obj = (Partial_Reveal_Object*) *iter;
-        iter = vector_block_iterator_advance(local_snapshot, iter);
+        iter = vector_block_iterator_advance(local_dirty_set, iter);
 #ifdef USE_MARK_SWEEP_GC
         assert(obj_is_mark_black_in_table(p_obj));
 #endif
       }
 #endif
-      vector_block_clear(mutator->dirty_obj_snapshot);
+      vector_block_clear(mutator->dirty_set);
     }
     mutator = mutator->next;
   }
 
-  /*reset global snapshot pool*/
-  Pool* global_snapshot = metadata->dirty_obj_snaptshot_pool;
+  /*reset global dirty set pool*/
+  Pool* global_dirty_set_pool = metadata->gc_dirty_set_pool;
 
-  if(!pool_is_empty(global_snapshot)){
-    Vector_Block* snapshot_block = pool_get_entry(global_snapshot);
-    while(snapshot_block != NULL){
-      if(!vector_block_is_empty(snapshot_block)){
+  if(!pool_is_empty(global_dirty_set_pool)){
+    Vector_Block* dirty_set = pool_get_entry(global_dirty_set_pool);
+    while(dirty_set != NULL){
+      if(!vector_block_is_empty(dirty_set)){
 #ifdef _DEBUG
-        POINTER_SIZE_INT* iter = vector_block_iterator_init(snapshot_block);
-        while(!vector_block_iterator_end(snapshot_block,iter)){
+        POINTER_SIZE_INT* iter = vector_block_iterator_init(dirty_set);
+        while(!vector_block_iterator_end(dirty_set,iter)){
           Partial_Reveal_Object* p_obj = (Partial_Reveal_Object*) *iter;          
-          iter = vector_block_iterator_advance(snapshot_block, iter);
+          iter = vector_block_iterator_advance(dirty_set, iter);
 #ifdef USE_MARK_SWEEP_GC
           assert(obj_is_mark_black_in_table(p_obj));
 #endif
         }
 #endif
       }
-      vector_block_clear(snapshot_block);
-      pool_put_entry(metadata->free_set_pool,snapshot_block);
-      snapshot_block = pool_get_entry(global_snapshot);
+      vector_block_clear(dirty_set);
+      pool_put_entry(metadata->free_set_pool,dirty_set);
+      dirty_set = pool_get_entry(global_dirty_set_pool);
     }
   }
 
@@ -468,8 +474,39 @@ void gc_reset_snaptshot(GC* gc)
   
 }
 
+void gc_prepare_dirty_set(GC* gc)
+{
+  GC_Metadata* metadata = gc->metadata;
+  Pool* gc_dirty_set_pool = metadata->gc_dirty_set_pool;
 
+  lock(gc->mutator_list_lock);
+  
+  Mutator *mutator = gc->mutator_list;
+  while (mutator) {
+    //FIXME: temproray solution for mostly concurrent.
+    lock(mutator->dirty_set_lock);
+    pool_put_entry(gc_dirty_set_pool, mutator->dirty_set);
+    mutator->dirty_set = free_set_pool_get_entry(metadata);    
+    unlock(mutator->dirty_set_lock);
+    mutator = mutator->next;
+  }
+  unlock(gc->mutator_list_lock);
+}
 
+void gc_clear_dirty_set(GC* gc)
+{
+  gc_prepare_dirty_set(gc);
+
+  GC_Metadata* metadata = gc->metadata;
+
+  Vector_Block* dirty_set = pool_get_entry(metadata->gc_dirty_set_pool);
+
+  while(dirty_set){
+    vector_block_clear(dirty_set);
+    pool_put_entry(metadata->free_set_pool, dirty_set);
+    dirty_set = pool_get_entry(metadata->gc_dirty_set_pool);
+  }
+}
 
 
 

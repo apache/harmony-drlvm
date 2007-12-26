@@ -15,15 +15,15 @@
  *  limitations under the License.
  */
 
-#include "sspace_mark_sweep.h"
+#include "wspace_mark_sweep.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 
-static Sspace *sspace_in_fallback_marking;
+static Wspace *wspace_in_fallback_marking;
 
 
 static FORCE_INLINE Boolean obj_mark_black(Partial_Reveal_Object *obj)
 {
-  if(obj_belongs_to_space(obj, (Space*)sspace_in_fallback_marking)){
+  if(obj_belongs_to_space(obj, (Space*)wspace_in_fallback_marking)){
     Boolean marked_by_self = obj_mark_black_in_table(obj);
 
 #ifndef USE_MARK_SWEEP_GC
@@ -128,11 +128,11 @@ static void trace_object(Collector *collector, REF *p_ref)
 /* for marking phase termination detection */
 static volatile unsigned int num_finished_collectors = 0;
 
-void sspace_fallback_mark_scan(Collector *collector, Sspace *sspace)
+void wspace_fallback_mark_scan(Collector *collector, Wspace *wspace)
 {
   GC *gc = collector->gc;
   GC_Metadata *metadata = gc->metadata;
-  sspace_in_fallback_marking = sspace;
+  wspace_in_fallback_marking = wspace;
   
   /* reset the num_finished_collectors to be 0 by one collector. This is necessary for the barrier later. */
   unsigned int num_active_collectors = gc->num_active_collectors;

@@ -18,7 +18,7 @@
 #include "verifier_common.h"
 #include "verify_gc_effect.h"
 #ifdef USE_MARK_SWEEP_GC
-#include "../mark_sweep/sspace_mark_sweep.h"
+#include "../mark_sweep/wspace_mark_sweep.h"
 #endif
 
 static POINTER_SIZE_INT hash_obj_distance = 0;
@@ -325,7 +325,6 @@ void verifier_update_verify_info(Partial_Reveal_Object* p_obj, Heap_Verifier* he
     if(!obj_is_alloc_in_color_table(p_obj))
       printf("\nERROR: obj after GC should be set its alloc color!\n");
   }else{
-    //ynhe
     if(gc_mark_is_concurrent())
       assert(obj_is_mark_black_in_table(p_obj));
   }
@@ -550,6 +549,8 @@ void verifier_clear_gc_verification(Heap_Verifier* heap_verifier)
 
 void verifier_reset_hash_distance()
 { hash_obj_distance = 0;}
+
+
 
 
 

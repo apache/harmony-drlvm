@@ -31,6 +31,7 @@
 #include "../common/space_tuner.h"
 #include "../common/compressed_ref.h"
 #include "../common/object_status.h"
+#include "../common/gc_concurrent.h"
 
 Boolean IGNORE_FINREF = FALSE;
 Boolean DURING_RESURRECTION = FALSE;
@@ -115,6 +116,7 @@ extern void trace_obj_in_fallback_marking(Collector *collector, void *p_ref);
 extern void trace_obj_in_ms_fallback_marking(Collector *collector, void *p_ref);
 extern void trace_obj_in_space_tune_marking(Collector *collector, void *p_obj);
 extern void trace_obj_in_ms_marking(Collector *collector, void *p_obj);
+extern void trace_obj_in_ms_concurrent_mark(Collector *collector, void *p_obj);
 
 
 typedef void (* Trace_Object_Func)(Collector *collector, void *p_ref_or_obj);
@@ -163,7 +165,10 @@ static inline void resurrect_obj_tree(Collector *collector, REF *p_ref)
   } else {
     assert(gc_match_kind(gc, MARK_SWEEP_GC));
     p_ref_or_obj = p_obj;
-    trace_object = trace_obj_in_ms_marking;
+    if(!gc_mark_is_concurrent())
+      trace_object = trace_obj_in_ms_marking;
+    else
+      trace_object = trace_obj_in_ms_concurrent_mark;
   }
   
   collector->trace_stack = free_task_pool_get_entry(metadata);
@@ -662,16 +667,18 @@ static inline void move_compaction_update_ref(GC *gc, REF *p_ref)
   if(address_belongs_to_gc_heap(p_ref, gc) && (p_ref >= los_boundary)){
     unsigned int offset = get_gc_referent_offset();
     Partial_Reveal_Object *p_old_ref = (Partial_Reveal_Object*)((POINTER_SIZE_INT)p_ref - offset);
-    Partial_Reveal_Object *p_new_ref = ref_to_obj_ptr(obj_get_fw_in_table(p_old_ref));
+    Partial_Reveal_Object *p_new_ref = obj_get_fw_in_table(p_old_ref);
     p_ref = (REF*)((POINTER_SIZE_INT)p_new_ref + offset);
   }
   Partial_Reveal_Object *p_obj = read_slot(p_ref);
   assert(space_of_addr(gc, p_obj)->move_object);
   
   if(p_obj < los_boundary)
-    write_slot(p_ref, obj_get_fw_in_oi(p_obj));
+    p_obj = obj_get_fw_in_oi(p_obj);
   else
-    *p_ref = obj_get_fw_in_table(p_obj);
+    p_obj = obj_get_fw_in_table(p_obj);
+
+  write_slot(p_ref, p_obj);
 }
 
 /* In two cases mark-sweep needs fixing repointed refs:
@@ -803,6 +810,8 @@ void gc_copy_finaliable_obj_to_rootset(GC *gc)
   finref_copy_pool(finalizable_obj_pool, finalizable_obj_pool_copy, gc);
   finref_copy_pool_to_rootset(gc, finalizable_obj_pool_copy);
 }
+
+
 
 
 

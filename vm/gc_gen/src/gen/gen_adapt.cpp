@@ -376,15 +376,15 @@ void gc_gen_adapt(GC_Gen* gc, int64 pause_time)
   }else if ( new_nos_size >= curr_nos_size ){
     INFO2("gc.process", "GC: gc_gen space adjustment after GC["<<gc->num_collections<<"] ...");
     POINTER_SIZE_INT adapt_size = new_nos_size - curr_nos_size;
-    INFO2("gc.space", "GC: Space Adapt:  nos  --->  mos  ("
+    INFO2("gc.space", "GC: Space Adapt:  mos  --->  nos  ("
       <<verbose_print_size(adapt_size)
-      <<" size was transfered from nos to mos)\n"); 
+      <<" size was transferred from mos to nos)\n"); 
   } else {
     INFO2("gc.process", "GC: gc_gen space adjustment after GC["<<gc->num_collections<<"] ...");
     POINTER_SIZE_INT  adapt_size = curr_nos_size - new_nos_size;
-    INFO2("gc.space", "GC: Space Adapt:  mos  --->  nos  ("
+    INFO2("gc.space", "GC: Space Adapt:  nos  --->  mos  ("
       <<verbose_print_size(adapt_size)
-      <<" size was transfered from mos to nos)\n"); 
+      <<" size was transferred from nos to mos)\n"); 
   }
 
   /* below are ajustment */  
@@ -449,13 +449,13 @@ void gc_gen_adapt(GC_Gen* gc, int64 pause_time)
     POINTER_SIZE_INT adapt_size = new_nos_size - curr_nos_size;
     INFO2("gc.space", "GC: Space Adapt:  mos  --->  nos  ("
       <<verbose_print_size(adapt_size)
-      <<" size was transfered from mos to nos)\n"); 
+      <<" size was transferred from mos to nos)\n"); 
   } else {
     INFO2("gc.process", "GC: gc_gen space adjustment after GC["<<gc->num_collections<<"] ...\n");
     POINTER_SIZE_INT  adapt_size = curr_nos_size - new_nos_size;
     INFO2("gc.space", "GC: Space Adapt:  nos  --->  mos  ("
       <<verbose_print_size(adapt_size)
-      <<" size was transfered from nos to mos)\n"); 
+      <<" size was transferred from nos to mos)\n"); 
   }
   
   POINTER_SIZE_INT used_mos_size = blocked_space_used_mem_size((Blocked_Space*)mspace);

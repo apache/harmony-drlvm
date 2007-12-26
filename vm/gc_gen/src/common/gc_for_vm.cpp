@@ -63,7 +63,6 @@ static void init_gc_helpers()
 #endif
     vm_helper_register_magic_helper(VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE, "org/apache/harmony/drlvm/gc_gen/GCHelper", "alloc");
     vm_helper_register_magic_helper(VM_RT_NEW_VECTOR_USING_VTABLE,  "org/apache/harmony/drlvm/gc_gen/GCHelper", "allocArray");
-    vm_helper_register_magic_helper(VM_RT_GC_HEAP_WRITE_REF,  "org/apache/harmony/drlvm/gc_gen/GCHelper", "write_barrier_slot_rem");
 }
 
 int gc_init() 
@@ -73,10 +72,12 @@ int gc_init()
 
   vm_gc_lock_init();
 
-#ifndef USE_MARK_SWEEP_GC
-  unsigned int gc_struct_size = sizeof(GC_Gen);
+#if defined(USE_MARK_SWEEP_GC)
+unsigned int gc_struct_size = sizeof(GC_MS);
+#elif defined(USE_UNIQUE_MOVE_COMPACT_GC)
+unsigned int gc_struct_size = sizeof(GC_MC);
 #else
-  unsigned int gc_struct_size = sizeof(GC_MS);
+unsigned int gc_struct_size = sizeof(GC_Gen);
 #endif
   GC* gc = (GC*)STD_MALLOC(gc_struct_size);
   assert(gc);
@@ -85,10 +86,16 @@ int gc_init()
 
   gc_parse_options(gc);
 
-// iberezhniuk: compile-time switching is now used in both VM and GC
+#ifdef BUILD_IN_REFERENT
+   if( ! IGNORE_FINREF){
+     INFO2(" gc.init" , "finref must be ignored, since BUILD_IN_REFERENT is defined." );
+     IGNORE_FINREF = TRUE;
+   }
+#endif 
+
+/* VT pointer compression is a compile-time option, reference compression and vtable compression are orthogonal */
 #ifdef COMPRESS_VTABLE
   assert(vm_vtable_pointers_are_compressed());
-    // ppervov: reference compression and vtable compression are orthogonal
   vtable_base = vm_get_vtable_base();
 #endif
 
@@ -98,10 +105,12 @@ int gc_init()
   
   gc_metadata_initialize(gc); /* root set and mark stack */
 
-#ifndef USE_MARK_SWEEP_GC
-  gc_gen_initialize((GC_Gen*)gc, min_heap_size_bytes, max_heap_size_bytes);
-#else
+#if defined(USE_MARK_SWEEP_GC)
   gc_ms_initialize((GC_MS*)gc, min_heap_size_bytes, max_heap_size_bytes);
+#elif defined(USE_UNIQUE_MOVE_COMPACT_GC)
+  gc_mc_initialize((GC_MC*)gc, min_heap_size_bytes, max_heap_size_bytes);
+#else
+  gc_gen_initialize((GC_Gen*)gc, min_heap_size_bytes, max_heap_size_bytes);
 #endif
   
   set_native_finalizer_thread_flag(!IGNORE_FINREF);
@@ -132,11 +141,13 @@ void gc_wrapup()
   INFO2("gc.process", "GC: call GC wrapup ....");
   GC* gc =  p_global_gc;
 
-#ifndef USE_MARK_SWEEP_GC
+#if defined(USE_MARK_SWEEP_GC)
+ gc_ms_destruct((GC_MS*)gc);
+#elif defined(USE_UNIQUE_MOVE_COMPACT_GC)
+ gc_mc_destruct((GC_MC*)gc);
+#else
   gc_gen_wrapup_verbose((GC_Gen*)gc);
   gc_gen_destruct((GC_Gen*)gc);
-#else
-  gc_ms_destruct((GC_MS*)gc);
 #endif
 
   gc_metadata_destruct(gc); /* root set and mark stack */
@@ -205,7 +216,7 @@ void gc_add_compressed_root_set_entry(REF* ref, Boolean is_pinned)
 
 Boolean gc_supports_class_unloading()
 {
-  return VTABLE_TRACING;
+  return TRACE_JLC_VIA_VTABLE;
 }
 
 void gc_add_weak_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinned, Boolean is_short_weak)
@@ -253,29 +264,35 @@ void gc_thread_kill(void* gc_info)
 
 int64 gc_free_memory()
 {
-#ifndef USE_MARK_SWEEP_GC
-  return (int64)gc_gen_free_memory_size((GC_Gen*)p_global_gc);
-#else
+#if defined(USE_MARK_SWEEP_GC)
   return (int64)gc_ms_free_memory_size((GC_MS*)p_global_gc);
+#elif defined(USE_UNIQUE_MOVE_COMPACT_GC)
+  return (int64)gc_mc_free_memory_size((GC_MC*)p_global_gc);
+#else
+  return (int64)gc_gen_free_memory_size((GC_Gen*)p_global_gc);
 #endif
 }
 
 /* java heap size.*/
 int64 gc_total_memory() 
 {
-#ifndef USE_MARK_SWEEP_GC
-  return (int64)((POINTER_SIZE_INT)gc_gen_total_memory_size((GC_Gen*)p_global_gc));
-#else
+#if defined(USE_MARK_SWEEP_GC)
   return (int64)((POINTER_SIZE_INT)gc_ms_total_memory_size((GC_MS*)p_global_gc));
+#elif defined(USE_UNIQUE_MOVE_COMPACT_GC)
+  return (int64)((POINTER_SIZE_INT)gc_mc_total_memory_size((GC_MC*)p_global_gc));
+#else
+  return (int64)((POINTER_SIZE_INT)gc_gen_total_memory_size((GC_Gen*)p_global_gc));
 #endif
 }
 
 int64 gc_max_memory() 
 {
-#ifndef USE_MARK_SWEEP_GC
-  return (int64)((POINTER_SIZE_INT)gc_gen_total_memory_size((GC_Gen*)p_global_gc));
+#if defined(USE_MARK_SWEEP_GC)
+    return (int64)((POINTER_SIZE_INT)gc_ms_total_memory_size((GC_MS*)p_global_gc));
+#elif defined(USE_UNIQUE_MOVE_COMPACT_GC)
+    return (int64)((POINTER_SIZE_INT)gc_mc_total_memory_size((GC_MC*)p_global_gc));
 #else
-  return (int64)((POINTER_SIZE_INT)gc_ms_total_memory_size((GC_MS*)p_global_gc));
+    return (int64)((POINTER_SIZE_INT)gc_gen_total_memory_size((GC_Gen*)p_global_gc));
 #endif
 }
 
@@ -343,7 +360,7 @@ int32 gc_get_hashcode(Managed_Object_Handle p_object)
 #else //USE_32BITS_HASHCODE
 int32 gc_get_hashcode(Managed_Object_Handle p_object)
 {
-#ifdef USE_MARK_SWEEP_GC
+#if defined(USE_MARK_SWEEP_GC) || defined(USE_UNIQUE_MOVE_COMPACT_GC)
   return (int32)0;//p_object;
 #endif
 
@@ -403,10 +420,12 @@ void gc_iterate_heap() {
     // data structures in not consistent for heap iteration
     if (!JVMTI_HEAP_ITERATION) return;
 
-#ifndef USE_MARK_SWEEP_GC
-    gc_gen_iterate_heap((GC_Gen *)p_global_gc);
+#if defined(USE_MARK_SWEEP_GC)
+  gc_ms_iterate_heap((GC_MS*)p_global_gc);
+#elif defined(USE_UNIQUE_MOVE_COMPACT_GC)
+  gc_mc_iterate_heap((GC_MC*)p_global_gc);
 #else
-    gc_ms_iterate_heap((GC_MS*)p_global_gc);
+  gc_gen_iterate_heap((GC_Gen *)p_global_gc);
 #endif
 }
 
@@ -419,3 +438,9 @@ Boolean gc_clear_mutator_block_flag()
   mutator_need_block = FALSE;
   return old_flag;
 }
+
+Boolean obj_belongs_to_gc_heap(Partial_Reveal_Object* p_obj)
+{
+  return address_belongs_to_gc_heap(p_obj, p_global_gc);  
+}
+

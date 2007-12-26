@@ -27,14 +27,6 @@ Boolean NOS_PARTIAL_FORWARD = FALSE;
 Boolean forward_first_half;
 void* object_forwarding_boundary=NULL;
 
-static void fspace_destruct_blocks(Fspace* fspace)
-{   
-#ifdef USE_32BITS_HASHCODE
-  space_desturct_blocks((Blocked_Space*)fspace);
-#endif
-  return;
-}
-
 struct GC_Gen;
 void gc_set_nos(GC_Gen* gc, Space* space);
 
@@ -101,7 +93,10 @@ Fspace *fspace_initialize(GC* gc, void* start, POINTER_SIZE_INT fspace_size, POI
 
 void fspace_destruct(Fspace *fspace) 
 {
-  fspace_destruct_blocks(fspace);
+#ifdef USE_32BITS_HASHCODE
+  space_desturct_blocks((Blocked_Space*)fspace);
+#endif
+
   STD_FREE(fspace);   
 }
 
@@ -119,7 +114,7 @@ void fspace_reset_after_collection(Fspace* fspace)
     fspace->free_block_idx = first_idx;
     fspace->ceiling_block_idx = first_idx + fspace->num_managed_blocks - 1;  
     forward_first_half = TRUE; /* only useful for not-FORWARD_ALL*/
-	fspace->num_used_blocks = 0;
+    fspace->num_used_blocks = 0;
   
   }else{    
     if(forward_first_half){
@@ -163,31 +158,6 @@ void fspace_reset_after_collection(Fspace* fspace)
   
   return;
 }
-
-#ifdef USE_32BITS_HASHCODE
-Block_Header* fspace_next_block;
-
-void fspace_block_iterate_init(Fspace* fspace)
-{
-  fspace_next_block = (Block_Header*) fspace->blocks;
-}
-
-Block_Header* fspace_get_next_block()
-{
-  Block_Header* curr_block = (Block_Header*) fspace_next_block;
-  while(fspace_next_block != NULL){
-    Block_Header* next_block = curr_block->next;
-
-    Block_Header* temp = (Block_Header*)atomic_casptr((volatile void**)&fspace_next_block, next_block, curr_block);
-    if(temp != curr_block){
-      curr_block = (Block_Header*) fspace_next_block;
-      continue;
-    }
-    return curr_block;
-  }
-  return NULL;
-}
-#endif
 
 void collector_execute_task(GC* gc, TaskType task_func, Space* space);
 

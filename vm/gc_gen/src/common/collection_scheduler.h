@@ -41,8 +41,11 @@ void collection_scheduler_initialize(GC* gc);
 void collection_scheduler_destruct(GC* gc);
 
 void gc_update_collection_scheduler(GC* gc, int64 mutator_time, int64 mark_time);
+Boolean gc_try_schedule_collection(GC* gc, unsigned int gc_cause);
 Boolean gc_need_start_concurrent_mark(GC* gc);
 
 
 #endif
+
+
 

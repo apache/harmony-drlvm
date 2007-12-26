@@ -55,8 +55,8 @@ static FORCE_INLINE void scan_object(Collector* collector, Partial_Reveal_Object
   vm_notify_obj_alive( (void *)p_obj);
   assert((((POINTER_SIZE_INT)p_obj) % GC_OBJECT_ALIGNMENT) == 0);
 
-  Partial_Reveal_VTable *vtable = uncompress_vt(obj_get_vt(p_obj));
-  if(VTABLE_TRACING)
+  Partial_Reveal_VTable *vtable = decode_vt(obj_get_vt(p_obj));
+  if(TRACE_JLC_VIA_VTABLE)
     if(vtable->vtmark == VT_UNMARKED) {
       vtable->vtmark = VT_MARKED;
       if(obj_mark_in_vt(vtable->jlC))

@@ -15,9 +15,9 @@
  *  limitations under the License.
  */
 
-#include "sspace_verify.h"
-#include "sspace_chunk.h"
-#include "sspace_mark_sweep.h"
+#include "wspace_verify.h"
+#include "wspace_chunk.h"
+#include "wspace_mark_sweep.h"
 #include "../utils/vector_block.h"
 #include "gc_ms.h"
 #include "../gen/gen.h"
@@ -47,12 +47,12 @@ static volatile POINTER_SIZE_INT alloc_obj_num = 0;
 static volatile POINTER_SIZE_INT live_obj_in_mark = 0;
 static volatile POINTER_SIZE_INT live_obj_in_fix = 0;
 
-void sspace_verify_init(GC *gc)
+void wspace_verify_init(GC *gc)
 {
   gc_in_verify = gc;
   
-  Sspace *sspace = gc_get_sspace(gc);
-  POINTER_SIZE_INT space_size = space_committed_size((Space*)sspace);
+  Wspace *wspace = gc_get_wspace(gc);
+  POINTER_SIZE_INT space_size = space_committed_size((Space*)wspace);
   card_num = space_size >> VERIFY_CARD_SIZE_BYTES_SHIFT;
   POINTER_SIZE_INT cards_size = sizeof(Verify_Card) * card_num;
   
@@ -119,7 +119,7 @@ static void verify_card_get_block(Verify_Card *card)
   unlock(card->lock);
 }
 
-void sspace_verify_alloc(void *addr, unsigned int size)
+void wspace_verify_alloc(void *addr, unsigned int size)
 {
   assert(address_belongs_to_gc_heap(addr, gc_in_verify));
   atomic_inc32(&alloc_obj_num);
@@ -157,7 +157,7 @@ static Boolean obj_position_is_correct(void *addr, unsigned int size)
   return TRUE;
 }
 
-static void sspace_verify_weakref(Partial_Reveal_Object *p_obj)
+static void wspace_verify_weakref(Partial_Reveal_Object *p_obj)
 {
   WeakReferenceType type = special_reference_type(p_obj);
   if(type == NOT_REFERENCE) return;
@@ -168,8 +168,8 @@ static void sspace_verify_weakref(Partial_Reveal_Object *p_obj)
   
   unsigned int size = vm_object_size(p_referent);
   if(size <= SUPER_OBJ_THRESHOLD){
-    Sspace *sspace = gc_get_sspace(gc_in_verify);
-    Size_Segment *size_seg = sspace_get_size_seg(sspace, size);
+    Wspace *wspace = gc_get_wspace(gc_in_verify);
+    Size_Segment *size_seg = wspace_get_size_seg(wspace, size);
     size = NORMAL_SIZE_ROUNDUP(size, size_seg);
   }
   
@@ -188,8 +188,8 @@ static void mark_card_add_entry(void *addr, unsigned int size)
   Vector_Block *block = card->block;
   
   if(size <= SUPER_OBJ_THRESHOLD){
-    Sspace *sspace = gc_get_sspace(gc_in_verify);
-    Size_Segment *size_seg = sspace_get_size_seg(sspace, size);
+    Wspace *wspace = gc_get_wspace(gc_in_verify);
+    Size_Segment *size_seg = wspace_get_size_seg(wspace, size);
     size = NORMAL_SIZE_ROUNDUP(size, size_seg);
   }
   
@@ -208,7 +208,7 @@ static void mark_card_add_entry(void *addr, unsigned int size)
 }
 
 /* size is real size of obj */
-void sspace_record_mark(void *addr, unsigned int size)
+void wspace_record_mark(void *addr, unsigned int size)
 {
   atomic_inc32(&live_obj_in_mark);
   mark_card_add_entry(addr, size);
@@ -239,7 +239,7 @@ static void verify_mark(void *addr, unsigned int size, Boolean destructively)
   assert(p_addr < block->tail);
 }
 
-void sspace_modify_mark_in_compact(void *new_addr, void *old_addr, unsigned int size)
+void wspace_modify_mark_in_compact(void *new_addr, void *old_addr, unsigned int size)
 {
   /* Verify the old addr and remove it in the according mark card */
   verify_mark(old_addr, size, TRUE);
@@ -247,7 +247,7 @@ void sspace_modify_mark_in_compact(void *new_addr, void *old_addr, unsigned int 
   mark_card_add_entry(new_addr, size);
 }
 
-void sspace_verify_fix_in_compact(void)
+void wspace_verify_fix_in_compact(void)
 {
   atomic_inc32(&live_obj_in_fix);
 }
@@ -290,7 +290,7 @@ static void summarize_sweep_verify(GC *gc)
   printf("Live obj in sweeping: %d\n", live_obj_num);
 }
 
-void sspace_verify_free_area(POINTER_SIZE_INT *start, POINTER_SIZE_INT size)
+void wspace_verify_free_area(POINTER_SIZE_INT *start, POINTER_SIZE_INT size)
 {
   POINTER_SIZE_INT *p_value = start;
   
@@ -300,13 +300,13 @@ void sspace_verify_free_area(POINTER_SIZE_INT *start, POINTER_SIZE_INT size)
     assert(!*p_value++);
 }
 
-static POINTER_SIZE_INT sspace_live_obj_num(Sspace *sspace, Boolean gc_finished)
+static POINTER_SIZE_INT wspace_live_obj_num(Wspace *wspace, Boolean gc_finished)
 {
-  Chunk_Header *chunk = (Chunk_Header*)space_heap_start((Space*)sspace);
-  Chunk_Header *sspace_ceiling = (Chunk_Header*)space_heap_end((Space*)sspace);
+  Chunk_Header *chunk = (Chunk_Header*)space_heap_start((Space*)wspace);
+  Chunk_Header *wspace_ceiling = (Chunk_Header*)space_heap_end((Space*)wspace);
   POINTER_SIZE_INT live_num = 0;
   
-  for(; chunk < sspace_ceiling; chunk = (Chunk_Header*)CHUNK_END(chunk)){
+  for(; chunk < wspace_ceiling; chunk = (Chunk_Header*)CHUNK_END(chunk)){
     /* chunk is free before GC */
     if(chunk->status & CHUNK_FREE){
       assert((gc_finished && chunk->status==CHUNK_FREE)
@@ -334,8 +334,8 @@ static POINTER_SIZE_INT sspace_live_obj_num(Sspace *sspace, Boolean gc_finished)
         ++live_num_in_chunk;
         verify_mark(p_obj, chunk->slot_size, gc_finished);
         if(gc_finished){
-          sspace_verify_alloc(p_obj, chunk->slot_size);
-          sspace_verify_weakref((Partial_Reveal_Object*)p_obj);
+          wspace_verify_alloc(p_obj, chunk->slot_size);
+          wspace_verify_weakref((Partial_Reveal_Object*)p_obj);
         }
       }
     }
@@ -347,8 +347,8 @@ static POINTER_SIZE_INT sspace_live_obj_num(Sspace *sspace, Boolean gc_finished)
 
 static void allocator_verify_local_chunks(Allocator *allocator)
 {
-  Sspace *sspace = gc_get_sspace(allocator->gc);
-  Size_Segment **size_segs = sspace->size_segments;
+  Wspace *wspace = gc_get_wspace(allocator->gc);
+  Size_Segment **size_segs = wspace->size_segments;
   Chunk_Header ***local_chunks = allocator->local_chunks;
   
   for(unsigned int i = SIZE_SEGMENT_NUM; i--;){
@@ -380,46 +380,46 @@ static void gc_verify_allocator_local_chunks(GC *gc)
     }
 }
 
-void sspace_verify_before_collection(GC *gc)
+void wspace_verify_before_collection(GC *gc)
 {
   printf("Allocated obj: %d\n", alloc_obj_num);
   alloc_obj_num = 0;
 }
 
-void sspace_verify_after_sweep(GC *gc)
+void wspace_verify_after_sweep(GC *gc)
 {
   printf("Live obj in marking: %d\n", live_obj_in_mark);
   live_obj_in_mark = 0;
   
   summarize_sweep_verify(gc);
   
-  Sspace *sspace = gc_get_sspace(gc);
-  POINTER_SIZE_INT total_live_obj = sspace_live_obj_num(sspace, FALSE);
+  Wspace *wspace = gc_get_wspace(gc);
+  POINTER_SIZE_INT total_live_obj = wspace_live_obj_num(wspace, FALSE);
   printf("Live obj after sweep: %d\n", total_live_obj);
 }
 
-void sspace_verify_after_collection(GC *gc)
+void wspace_verify_after_collection(GC *gc)
 {
   printf("Live obj in fixing: %d\n", live_obj_in_fix);
   live_obj_in_fix = 0;
   
   clear_alloc_cards();
   
-  Sspace *sspace = gc_get_sspace(gc);
-  POINTER_SIZE_INT total_live_obj = sspace_live_obj_num(sspace, TRUE);
+  Wspace *wspace = gc_get_wspace(gc);
+  POINTER_SIZE_INT total_live_obj = wspace_live_obj_num(wspace, TRUE);
   printf("Live obj after collection: %d\n", total_live_obj);
   check_and_clear_mark_cards();
   gc_verify_allocator_local_chunks(gc);
 }
 
 /*
-void sspace_verify_super_obj(GC *gc)
+void wspace_verify_super_obj(GC *gc)
 {
-  Sspace *sspace = gc_get_sspace(gc);
-  Chunk_Header *chunk = (Chunk_Header*)space_heap_start((Space*)sspace);
-  Chunk_Header *sspace_ceiling = (Chunk_Header*)space_heap_end((Space*)sspace);
+  Wspace *wspace = gc_get_wspace(gc);
+  Chunk_Header *chunk = (Chunk_Header*)space_heap_start((Space*)wspace);
+  Chunk_Header *wspace_ceiling = (Chunk_Header*)space_heap_end((Space*)wspace);
   
-  for(; chunk < sspace_ceiling; chunk = (Chunk_Header*)CHUNK_END(chunk)){
+  for(; chunk < wspace_ceiling; chunk = (Chunk_Header*)CHUNK_END(chunk)){
     if(chunk->status & CHUNK_ABNORMAL){
       assert(chunk->status == CHUNK_ABNORMAL);
       assert(chunk->slot_size > SUPER_OBJ_THRESHOLD);
@@ -432,9 +432,9 @@ void sspace_verify_super_obj(GC *gc)
 */
 
 
-/* sspace verify marking with vtable marking in advance */
+/* wspace verify marking with vtable marking in advance */
 
-Sspace *sspace_in_verifier;
+Wspace *wspace_in_verifier;
 static Pool *trace_pool = NULL;
 static Vector_Block *trace_stack = NULL;
 POINTER_SIZE_INT live_obj_in_verify_marking = 0;
@@ -466,7 +466,7 @@ static FORCE_INLINE void scan_slot(GC *gc, REF *p_ref)
   Partial_Reveal_Object *p_obj = read_slot(p_ref);
   if( p_obj == NULL) return;
   
-  if(obj_belongs_to_space(p_obj, (Space*)sspace_in_verifier) && obj_mark_in_vtable(gc, p_obj))
+  if(obj_belongs_to_space(p_obj, (Space*)wspace_in_verifier) && obj_mark_in_vtable(gc, p_obj))
     tracestack_push(p_obj);
   
   return;
@@ -514,9 +514,9 @@ static void trace_object(GC *gc, Partial_Reveal_Object *p_obj)
   }
 }
 
-void sspace_verify_vtable_mark(GC *gc)
+void wspace_verify_vtable_mark(GC *gc)
 {
-  sspace_in_verifier = gc_get_sspace(gc);
+  wspace_in_verifier = gc_get_wspace(gc);
   GC_Metadata *metadata = gc->metadata;
   Pool *rootset_pool = metadata->gc_rootset_pool;
   
@@ -534,7 +534,7 @@ void sspace_verify_vtable_mark(GC *gc)
       
       Partial_Reveal_Object *p_obj = read_slot(p_ref);
       assert(p_obj!=NULL);
-      if(obj_belongs_to_space(p_obj, (Space*)sspace_in_verifier) && obj_mark_in_vtable(gc, p_obj))
+      if(obj_belongs_to_space(p_obj, (Space*)wspace_in_verifier) && obj_mark_in_vtable(gc, p_obj))
         tracestack_push(p_obj);
     }
     root_set = pool_iterator_next(metadata->gc_rootset_pool);
@@ -594,7 +594,7 @@ static uint64 compact_start_time;
 static uint64 fix_start_time;
 static uint64 merge_start_time;
 
-void sspace_gc_time(GC *gc, Boolean before_gc)
+void wspace_gc_time(GC *gc, Boolean before_gc)
 {
   if(before_gc){
     gc_start_time = tsc();
@@ -606,7 +606,7 @@ void sspace_gc_time(GC *gc, Boolean before_gc)
   }
 }
 
-void sspace_mark_time(Boolean before_mark)
+void wspace_mark_time(Boolean before_mark)
 {
   assert(before_mark == FALSE);
   if(before_mark){
@@ -619,7 +619,7 @@ void sspace_mark_time(Boolean before_mark)
   }
 }
 
-void sspace_sweep_time(Boolean before_sweep, Boolean sspace_need_compact)
+void wspace_sweep_time(Boolean before_sweep, Boolean wspace_need_compact)
 {
   assert(before_sweep == FALSE);
   if(before_sweep){
@@ -628,14 +628,14 @@ void sspace_sweep_time(Boolean before_sweep, Boolean sspace_need_compact)
     uint64 end_time = tsc();
     assert(end_time > sweep_start_time);
     printf("\nSweep time: %dms\n", (end_time-sweep_start_time) / CPU_HZ);
-    if(sspace_need_compact)
+    if(wspace_need_compact)
       compact_start_time = end_time;
     else
       merge_start_time = end_time;
   }
 }
 
-void sspace_compact_time(Boolean before_compact)
+void wspace_compact_time(Boolean before_compact)
 {
   assert(before_compact == FALSE);
   if(before_compact){
@@ -648,7 +648,7 @@ void sspace_compact_time(Boolean before_compact)
   }
 }
 
-void sspace_fix_time(Boolean before_fix)
+void wspace_fix_time(Boolean before_fix)
 {
   assert(before_fix == FALSE);
   if(before_fix){
@@ -661,7 +661,7 @@ void sspace_fix_time(Boolean before_fix)
   }
 }
 
-void sspace_merge_time(Boolean before_merge)
+void wspace_merge_time(Boolean before_merge)
 {
   assert(before_merge == FALSE);
   if(before_merge){

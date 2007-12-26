@@ -25,9 +25,6 @@
 #include "open/types.h"
 #include "gc_platform.h"
 
-#ifndef FORCE_INLINE
-#define FORCE_INLINE inline
-#endif
 /* CONST_MARK_BIT is used in mark_scan in vt, no matter MARK_BIT_FLIPPING used or not. 
    MARK_BIT_FLIPPING is used in oi for marking and forwarding in non-gen nursery forwarding
    (the marking is for those objects not in nos.)
@@ -158,23 +155,23 @@ typedef struct Partial_Reveal_Array {
 extern POINTER_SIZE_INT vtable_base;
 
 #ifdef COMPRESS_VTABLE
-FORCE_INLINE VT compress_vt(Partial_Reveal_VTable* vt)
+FORCE_INLINE VT encode_vt(Partial_Reveal_VTable* vt)
 {
   assert(vt);
   return (VT)((POINTER_SIZE_INT)vt - vtable_base);
 }
 
-FORCE_INLINE Partial_Reveal_VTable* uncompress_vt(VT vt)
+FORCE_INLINE Partial_Reveal_VTable* decode_vt(VT vt)
 {
   assert(vt);
   return (Partial_Reveal_VTable*)((POINTER_SIZE_INT)vt + vtable_base);
 }
 #else/*ifdef COMPRESS_VTABLE*/
 
-FORCE_INLINE VT compress_vt(Partial_Reveal_VTable* vt)
+FORCE_INLINE VT encode_vt(Partial_Reveal_VTable* vt)
 {  return (VT)vt; }
 
-FORCE_INLINE Partial_Reveal_VTable* uncompress_vt(VT vt)
+FORCE_INLINE Partial_Reveal_VTable* decode_vt(VT vt)
 {  return (Partial_Reveal_VTable*) vt;  }
 #endif
 
@@ -226,13 +223,13 @@ FORCE_INLINE void vtable_set_gcvt(Partial_Reveal_VTable *vt, GC_VTable_Info *new
 
 FORCE_INLINE GC_VTable_Info *obj_get_gcvt_raw(Partial_Reveal_Object *obj) 
 {
-  Partial_Reveal_VTable *vtable = uncompress_vt(obj_get_vt(obj));
+  Partial_Reveal_VTable *vtable = decode_vt(obj_get_vt(obj));
   return vtable_get_gcvt_raw(vtable);
 }
 
 FORCE_INLINE GC_VTable_Info *obj_get_gcvt(Partial_Reveal_Object *obj) 
 {
-  Partial_Reveal_VTable* vtable = uncompress_vt(obj_get_vt(obj) );
+  Partial_Reveal_VTable* vtable = decode_vt(obj_get_vt(obj) );
   return vtable_get_gcvt(vtable);
 }
 
@@ -244,7 +241,7 @@ FORCE_INLINE Boolean object_has_ref_field(Partial_Reveal_Object *obj)
 
 FORCE_INLINE Boolean object_has_ref_field_before_scan(Partial_Reveal_Object *obj) 
 {
-  Partial_Reveal_VTable *vt = uncompress_vt(obj_get_vt_raw(obj));
+  Partial_Reveal_VTable *vt = decode_vt(obj_get_vt_raw(obj));
   GC_VTable_Info *gcvt = vtable_get_gcvt_raw(vt);
   return (Boolean)((POINTER_SIZE_INT)gcvt & GC_CLASS_FLAG_REFS);
 }
@@ -313,6 +310,8 @@ FORCE_INLINE Boolean type_has_finalizer(Partial_Reveal_VTable *vt)
 }
 
 #endif //#ifndef _GC_TYPES_H_
+
+
 
 
 

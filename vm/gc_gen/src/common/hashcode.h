@@ -287,93 +287,8 @@ inline void hashcode_buf_refresh_new_entry(Hashcode_Buf* hashcode_buf, POINTER_S
   return;
 }
 
-void collector_hashcodeset_add_entry(Collector* collector, Partial_Reveal_Object** p_ref);
+int obj_lookup_hashcode_in_buf(Partial_Reveal_Object *p_obj);
 
-inline Obj_Info_Type slide_compact_process_hashcode(Partial_Reveal_Object* p_obj, void* dest_addr, 
-                                                unsigned int* p_obj_size, Collector* collector, 
-                                                Hashcode_Buf* old_buf, Hashcode_Buf* new_buf)
-{
-  Obj_Info_Type obj_info = get_obj_info(p_obj);
-  POINTER_SIZE_INT hashcode = 0;
-
-  switch(obj_info & HASHCODE_MASK){
-    case HASHCODE_SET_UNALLOCATED:
-      if((POINTER_SIZE_INT)dest_addr != (POINTER_SIZE_INT)p_obj){
-        *p_obj_size += GC_OBJECT_ALIGNMENT; 
-        obj_info = obj_info | HASHCODE_ATTACHED_BIT;
-        *(int*) &hashcode = hashcode_gen(p_obj);
-        POINTER_SIZE_INT obj_end_pos = (POINTER_SIZE_INT)dest_addr + vm_object_size(p_obj);
-        collector_hashcodeset_add_entry(collector, (Partial_Reveal_Object**)obj_end_pos);
-        collector_hashcodeset_add_entry(collector, (Partial_Reveal_Object**)hashcode);
-      } 
-      break;
-      
-    case HASHCODE_SET_ATTACHED:
-      obj_sethash_in_vt(p_obj);
-      break;
-      
-    case HASHCODE_SET_BUFFERED:
-      *(int*) &hashcode = hashcode_buf_lookup(p_obj, old_buf);
-      if((POINTER_SIZE_INT)dest_addr != (POINTER_SIZE_INT)p_obj){
-        *p_obj_size += GC_OBJECT_ALIGNMENT; 
-        obj_info = obj_info & ~HASHCODE_BUFFERED_BIT;
-        obj_info = obj_info | HASHCODE_ATTACHED_BIT;
-        POINTER_SIZE_INT obj_end_pos = (POINTER_SIZE_INT)dest_addr + vm_object_size(p_obj);
-        collector_hashcodeset_add_entry(collector, (Partial_Reveal_Object**)obj_end_pos);
-        collector_hashcodeset_add_entry(collector, (Partial_Reveal_Object**)hashcode);
-      }else{
-        hashcode_buf_add((Partial_Reveal_Object*)dest_addr, *(int*) &hashcode, new_buf);          
-      }
-      break;
-      
-    case HASHCODE_UNSET:
-      break;
-      
-    default:
-      assert(0);
-  
-  }
-  return obj_info;
-}
-
-inline void move_compact_process_hashcode(Partial_Reveal_Object* p_obj,Hashcode_Buf* old_buf,  
-                                           Hashcode_Buf* new_buf)
-{
-  if(hashcode_is_set(p_obj) && !hashcode_is_attached(p_obj)){
-    int hashcode;
-    if(hashcode_is_buffered(p_obj)){
-      /*already buffered objects;*/
-      hashcode = hashcode_buf_lookup(p_obj, old_buf);
-      hashcode_buf_add(p_obj, hashcode, new_buf);
-    }else{
-      /*objects need buffering.*/
-      hashcode = hashcode_gen(p_obj);
-      hashcode_buf_add(p_obj, hashcode, new_buf);
-      Obj_Info_Type oi = get_obj_info_raw(p_obj);
-      set_obj_info(p_obj, oi | HASHCODE_BUFFERED_BIT);
-    }
-  }
-}
-
-inline Obj_Info_Type trace_forward_process_hashcode(Partial_Reveal_Object* p_obj, Partial_Reveal_Object* p_old_obj,
-                                                    Obj_Info_Type oi, unsigned int p_obj_size)
-{
-    oi  |= HASHCODE_ATTACHED_BIT;
-    *(int *)(((char*)p_obj) + p_obj_size - GC_OBJECT_ALIGNMENT) = hashcode_gen(p_old_obj);
-    assert(vm_object_size(p_obj) != 0);
-    return oi;
-}
-
-inline void precompute_hashcode_extend_size(Partial_Reveal_Object* p_obj, void* dest_addr,
-                                               unsigned int * obj_size_precompute)
-{
-  if(hashcode_is_set(p_obj) && !hashcode_is_attached(p_obj)){ 
-    if((POINTER_SIZE_INT)dest_addr != (POINTER_SIZE_INT)p_obj)
-        *obj_size_precompute += GC_OBJECT_ALIGNMENT;
-  }
-}
-
-inline int obj_lookup_hashcode_in_buf(Partial_Reveal_Object *p_obj);
 inline int hashcode_lookup(Partial_Reveal_Object* p_obj,Obj_Info_Type obj_info)
 {
   int hash;
@@ -386,4 +301,29 @@ inline int hashcode_lookup(Partial_Reveal_Object* p_obj,Obj_Info_Type obj_info)
   }
   return hash;
 }
+
+inline void precompute_hashcode_extend_size(Partial_Reveal_Object* p_obj, void* targ_addr,
+                                               unsigned int * obj_size_precompute)
+{
+  if(hashcode_is_set(p_obj) && !hashcode_is_attached(p_obj)){ 
+    if((POINTER_SIZE_INT)targ_addr != (POINTER_SIZE_INT)p_obj)
+        *obj_size_precompute += GC_OBJECT_ALIGNMENT;
+  }
+}
+
+inline Obj_Info_Type forward_obj_attach_hashcode(Partial_Reveal_Object* p_targ_obj, Partial_Reveal_Object* p_obj,
+                                                    Obj_Info_Type oi, unsigned int p_obj_size)
+{
+    oi  |= HASHCODE_ATTACHED_BIT;
+    *(int *)(((char*)p_targ_obj) + p_obj_size) = hashcode_gen(p_obj);
+    return oi;
+}
+
+Obj_Info_Type slide_compact_process_hashcode(Partial_Reveal_Object* p_obj, void* dest_addr, 
+                                                unsigned int* p_obj_size, Collector* collector, 
+                                                Hashcode_Buf* old_buf, Hashcode_Buf* new_buf);
+
+void move_compact_process_hashcode(Partial_Reveal_Object* p_obj,Hashcode_Buf* old_buf,  
+                                           Hashcode_Buf* new_buf);
+
 #endif //_HASHCODE_H_

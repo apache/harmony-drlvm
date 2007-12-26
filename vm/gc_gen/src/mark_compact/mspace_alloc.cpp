@@ -43,20 +43,16 @@ static Boolean mspace_alloc_block(Mspace* mspace, Allocator* allocator)
     return TRUE;
   }
 
-  /* Mspace is out, a collection should be triggered. It can be caused by mutator allocation
-     And it can be caused by collector allocation during nos forwarding. */
+  /* Mspace is out. If it's caused by mutator, a collection should be triggered. 
+     If it's caused by collector, a fallback should be triggered. */
   return FALSE;
   
 }
 
-struct GC_Gen;
-Space* gc_get_mos(GC_Gen* gc);
 void* mspace_alloc(unsigned int size, Allocator* allocator)
 {
   void *p_return = NULL;
- 
-  Mspace* mspace = (Mspace*)gc_get_mos((GC_Gen*)allocator->gc);
-  
+   
   /* All chunks of data requested need to be multiples of GC_OBJECT_ALIGNMENT */
   assert((size % GC_OBJECT_ALIGNMENT) == 0);
   assert( size <= GC_OBJ_SIZE_THRESHOLD );
@@ -66,7 +62,8 @@ void* mspace_alloc(unsigned int size, Allocator* allocator)
   if(p_return) return p_return;
   
   /* grab a new block */
-  Boolean ok = mspace_alloc_block(mspace, allocator);
+   Mspace* mspace = (Mspace*)allocator->alloc_space;;
+   Boolean ok = mspace_alloc_block(mspace, allocator);
   if(!ok) return NULL; 
   
   p_return = thread_local_alloc(size, allocator);
@@ -74,5 +71,7 @@ void* mspace_alloc(unsigned int size, Allocator* allocator)
     
   return p_return;
 }
+
+
 
 

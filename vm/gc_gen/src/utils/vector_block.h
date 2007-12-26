@@ -88,6 +88,20 @@ inline POINTER_SIZE_INT vector_block_get_entry(Vector_Block* block)
 #endif
   return value;
 }
+inline void vector_block_add_entry_to_index(Vector_Block* block, unsigned int index, POINTER_SIZE_INT value)
+{
+#ifdef _DEBUG 
+  assert(index < VECTOR_BLOCK_ENTRY_NUM);
+#endif
+  block->entries[index] = value;
+}
+inline POINTER_SIZE_INT vector_block_get_entry_from_index(Vector_Block* block, unsigned int index)
+{
+#ifdef _DEBUG 
+  assert(index < VECTOR_BLOCK_ENTRY_NUM);
+#endif
+  return block->entries[index];
+}
 
 #define VECTOR_BLOCK_SHARE_BIT 0x01
 #define VECTOR_BLOCK_FULL_BIT  0x02

@@ -22,6 +22,7 @@
 #include "../thread/collector_alloc.h"
 #include "../thread/mutator.h"
 #include "../common/gc_common.h"
+#include "../common/gc_concurrent.h"
 
 /*
  * The sweep space accomodates objects collected by mark-sweep
@@ -30,7 +31,7 @@
 struct Size_Segment;
 struct Free_Chunk_List;
 
-typedef struct Sspace {
+typedef struct Wspace {
   /* <-- first couple of fields are overloadded as Space */
   void *heap_start;
   void *heap_end;
@@ -63,37 +64,41 @@ typedef struct Sspace {
   Boolean need_fix;   /* There are repointed ref needing fixing */
   Size_Segment **size_segments;
   Pool ***pfc_pools;
+  Pool ***pfc_pools_backup;
+  Pool* used_chunk_pool;
+  Pool* unreusable_normal_chunk_pool;
+  Pool* live_abnormal_chunk_pool;
   Free_Chunk_List *aligned_free_chunk_lists;
   Free_Chunk_List *unaligned_free_chunk_lists;
   Free_Chunk_List *hyper_free_chunk_list;
   POINTER_SIZE_INT surviving_obj_num;
   POINTER_SIZE_INT surviving_obj_size;
-} Sspace;
+} Wspace;
 
 #ifdef USE_MARK_SWEEP_GC
-void sspace_set_space_statistic(Sspace *sspace);
+void wspace_set_space_statistic(Wspace *wspace);
 #endif
 
-Sspace *sspace_initialize(GC *gc, void *start, POINTER_SIZE_INT sspace_size, POINTER_SIZE_INT commit_size);
-void sspace_destruct(Sspace *sspace);
-void sspace_reset_after_collection(Sspace *sspace);
+Wspace *wspace_initialize(GC *gc, void *start, POINTER_SIZE_INT wspace_size, POINTER_SIZE_INT commit_size);
+void wspace_destruct(Wspace *wspace);
+void wspace_reset_after_collection(Wspace *wspace);
 
-void *sspace_thread_local_alloc(unsigned size, Allocator *allocator);
-void *sspace_alloc(unsigned size, Allocator *allocator);
+void *wspace_thread_local_alloc(unsigned size, Allocator *allocator);
+void *wspace_alloc(unsigned size, Allocator *allocator);
 
-void sspace_collection(Sspace *sspace);
+void wspace_collection(Wspace *wspace);
 
 void allocator_init_local_chunks(Allocator *allocator);
 void allocactor_destruct_local_chunks(Allocator *allocator);
-void collector_init_free_chunk_list(Collector *collector);
+void gc_init_collector_free_chunk_list(Collector *collector);
 
-POINTER_SIZE_INT sspace_free_memory_size(Sspace *sspace);
+POINTER_SIZE_INT wspace_free_memory_size(Wspace *wspace);
 
 
 #ifndef USE_MARK_SWEEP_GC
-#define gc_get_sspace(gc) ((Sspace*)gc_get_mos((GC_Gen*)(gc)))
+#define gc_get_wspace(gc) ((Wspace*)gc_get_mos((GC_Gen*)(gc)))
 #else
-#define gc_get_sspace(gc) (gc_ms_get_sspace((GC_MS*)(gc)));
+#define gc_get_wspace(gc) (gc_ms_get_wspace((GC_MS*)(gc)))
 #endif
 
 #endif // _SWEEP_SPACE_H_

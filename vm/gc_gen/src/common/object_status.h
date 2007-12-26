@@ -20,7 +20,7 @@
 
 #include "../gen/gen.h"
 #include "../mark_sweep/gc_ms.h"
-#include "../mark_sweep/sspace_mark_sweep.h"
+#include "../mark_sweep/wspace_mark_sweep.h"
 
 
 inline Boolean obj_is_dead_in_gen_minor_gc(Partial_Reveal_Object *p_obj)
@@ -59,12 +59,22 @@ inline Boolean obj_is_dead_in_mark_sweep_gc(Partial_Reveal_Object *p_obj)
 }
 #endif
 
+#ifdef USE_UNIQUE_MOVE_COMPACT_GC
+inline Boolean obj_is_dead_in_move_compact_no_los_gc(Partial_Reveal_Object *p_obj)
+{
+  return !obj_is_marked_in_vt(p_obj);
+}
+#endif
 inline Boolean gc_obj_is_dead(GC *gc, Partial_Reveal_Object *p_obj)
 {
   assert(p_obj);
 
 #ifdef USE_MARK_SWEEP_GC
   return obj_is_dead_in_mark_sweep_gc(p_obj);
+#endif
+
+#ifdef USE_UNIQUE_MOVE_COMPACT_GC
+	return obj_is_dead_in_move_compact_no_los_gc(p_obj);
 #endif
 
   if(gc_match_kind(gc, MINOR_COLLECTION)){
@@ -89,10 +99,14 @@ inline Boolean obj_need_move(GC *gc, Partial_Reveal_Object *p_obj)
   /* assert(!gc_obj_is_dead(gc, p_obj)); commented out for weakroot */
 
 #ifdef USE_MARK_SWEEP_GC
-  Sspace *sspace = gc_ms_get_sspace((GC_MS*)gc);
-  return sspace->move_object;
+  Wspace *wspace = gc_ms_get_wspace((GC_MS*)gc);
+  return wspace->move_object;
 #endif
 
+#ifdef USE_UNIQUE_MOVE_COMPACT_GC
+  Cspace *cspace = gc_mc_get_cspace((GC_MC*)gc);
+  return cspace->move_object;
+#endif
   if(gc_is_gen_mode() && gc_match_kind(gc, MINOR_COLLECTION))
     return fspace_obj_to_be_forwarded(p_obj);
   

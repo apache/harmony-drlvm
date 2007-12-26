@@ -30,6 +30,8 @@
 
 //#define GC_OBJ_SIZE_STATISTIC
 
+volatile Boolean obj_alloced_live = FALSE;
+
 #ifdef GC_OBJ_SIZE_STATISTIC
 #define GC_OBJ_SIZE_STA_MAX 256*KB
 unsigned int obj_size_distribution_map[GC_OBJ_SIZE_STA_MAX>>10];
@@ -68,7 +70,7 @@ Managed_Object_Handle gc_alloc(unsigned size, Allocation_Handle ah, void *unused
   size = (size & NEXT_TO_HIGH_BIT_CLEAR_MASK);
   
   Allocator* allocator = (Allocator*)gc_get_tls();
-  Boolean type_has_fin = type_has_finalizer((Partial_Reveal_VTable*)uncompress_vt((VT)ah));
+  Boolean type_has_fin = type_has_finalizer((Partial_Reveal_VTable*)decode_vt((VT)ah));
   
   if(type_has_fin && !IGNORE_FINREF && mutator_need_block)
     vm_heavy_finalizer_block_mutator();
@@ -77,7 +79,11 @@ Managed_Object_Handle gc_alloc(unsigned size, Allocation_Handle ah, void *unused
   gc_alloc_statistic_obj_distrubution(size);
 #endif
 
-#ifndef USE_MARK_SWEEP_GC
+#if defined(USE_MARK_SWEEP_GC)
+  p_obj = (Managed_Object_Handle)gc_ms_alloc(size, allocator);
+#elif defined(USE_UNIQUE_MOVE_COMPACT_GC)
+  p_obj = (Managed_Object_Handle)gc_mc_alloc(size, allocator);
+#else
   if ( size > GC_OBJ_SIZE_THRESHOLD ){
     p_obj = (Managed_Object_Handle)los_alloc(size, allocator);
 #ifdef GC_GEN_STATS
@@ -90,8 +96,6 @@ Managed_Object_Handle gc_alloc(unsigned size, Allocation_Handle ah, void *unused
   }else{
       p_obj = (Managed_Object_Handle)nos_alloc(size, allocator);
   }
-#else
-  p_obj = (Managed_Object_Handle)gc_ms_alloc(size, allocator);
 #endif
 
   if( p_obj == NULL )
@@ -114,7 +118,7 @@ Managed_Object_Handle gc_alloc_fast (unsigned size, Allocation_Handle ah, void *
   assert((size % GC_OBJECT_ALIGNMENT) == 0);
   assert(ah);
   
-  if(type_has_finalizer((Partial_Reveal_VTable *) uncompress_vt((VT)ah)))
+  if(type_has_finalizer((Partial_Reveal_VTable *) decode_vt((VT)ah)))
     return NULL;
 
 #ifdef GC_OBJ_SIZE_STATISTIC
@@ -128,10 +132,12 @@ Managed_Object_Handle gc_alloc_fast (unsigned size, Allocation_Handle ah, void *
  
   /* Try to allocate an object from the current Thread Local Block */
   Managed_Object_Handle p_obj;
-#ifndef USE_MARK_SWEEP_GC
-  p_obj = (Managed_Object_Handle)thread_local_alloc(size, allocator);
-#else
+#if defined(USE_MARK_SWEEP_GC)
   p_obj = (Managed_Object_Handle)gc_ms_fast_alloc(size, allocator);
+#elif defined(USE_UNIQUE_MOVE_COMPACT_GC)
+  p_obj = (Managed_Object_Handle)gc_mc_fast_alloc(size, allocator);
+#else
+  p_obj = (Managed_Object_Handle)thread_local_alloc(size, allocator);
 #endif
   if(p_obj == NULL) return NULL;
 

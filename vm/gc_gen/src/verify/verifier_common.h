@@ -23,12 +23,13 @@
 #include "../common/gc_space.h"
 #include "../gen/gen.h"
 #include "../mark_sweep/gc_ms.h"
+#include "../semi_space/sspace.h"
 #include "../common/space_tuner.h"
 #ifdef USE_32BITS_HASHCODE
 #include "../common/hashcode.h"
 #endif
 #ifdef USE_MARK_SWEEP_GC
-#include "../mark_sweep/sspace_mark_sweep.h"
+#include "../mark_sweep/wspace_mark_sweep.h"
 #endif
 #include "../common/gc_concurrent.h"
 
@@ -116,10 +117,8 @@ inline void verify_live_object_slot(REF* p_ref, Heap_Verifier* heap_verifier)
   assert(address_belongs_to_gc_heap(read_slot(p_ref), (GC*)heap_verifier->gc));
   Partial_Reveal_Object* UNUSED p_obj = read_slot(p_ref);
   assert(p_obj);
-  assert(uncompress_vt(obj_get_vt(p_obj)));
-  assert(!address_belongs_to_gc_heap(uncompress_vt(obj_get_vt(p_obj)), (GC*)heap_verifier->gc));
-
-//ynhe
+  assert(decode_vt(obj_get_vt(p_obj)));
+  assert(!address_belongs_to_gc_heap(decode_vt(obj_get_vt(p_obj)), (GC*)heap_verifier->gc));
 
 #ifdef USE_MARK_SWEEP_GC
   GC_MS* gc = (GC_MS*)heap_verifier->gc;
@@ -129,7 +128,6 @@ inline void verify_live_object_slot(REF* p_ref, Heap_Verifier* heap_verifier)
     if(!obj_is_alloc_in_color_table(p_obj))
       printf("\nERROR: obj after GC should be set its alloc color!\n");
   }else{
-    //ynhe
     if(gc_mark_is_concurrent())
       assert(obj_is_mark_black_in_table(p_obj));
   }
@@ -148,7 +146,9 @@ inline void verify_object_header(Partial_Reveal_Object* p_obj, Heap_Verifier* he
   assert(address_belongs_to_gc_heap(p_obj, (GC*)heap_verifier->gc));
 
   assert(obj_get_vt(p_obj));
-  assert(!address_belongs_to_gc_heap(uncompress_vt(obj_get_vt(p_obj)), (GC*)heap_verifier->gc));
+
+  /*FIXME:: should add more sanity checks, such as vt->gcvt->class... */
+  assert(!address_belongs_to_gc_heap(decode_vt(obj_get_vt(p_obj)), (GC*)heap_verifier->gc));
 }
 
 

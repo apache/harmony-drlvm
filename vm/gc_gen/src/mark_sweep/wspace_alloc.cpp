@@ -15,12 +15,13 @@
  *  limitations under the License.
  */
 
-#include "sspace.h"
-#include "sspace_chunk.h"
-//#include "sspace_mark_sweep.h"
-#include "sspace_alloc.h"
+#include "wspace.h"
+#include "wspace_chunk.h"
+//#include "wspace_mark_sweep.h"
+#include "wspace_alloc.h"
 #include "gc_ms.h"
 #include "../gen/gen.h"
+#include "../common/gc_concurrent.h"
 
 
 /* Only used in pfc_set_slot_index() */
@@ -37,7 +38,7 @@ inline unsigned int first_free_index_in_color_word(POINTER_SIZE_INT word, POINTE
 /* Given an index word in table, set pfc's slot_index
  * The value of argument alloc_color can be cur_alloc_color or cur_mark_color.
  * It depends on in which phase this func is called.
- * In sweeping phase, sspace has been marked but alloc and mark colors have not been flipped,
+ * In sweeping phase, wspace has been marked but alloc and mark colors have not been flipped,
  * so we have to use cur_mark_color as alloc_color.
  * In compaction phase, two colors have been flipped, so we use cur_alloc_color.
  */
@@ -62,50 +63,65 @@ void pfc_reset_slot_index(Chunk_Header *chunk)
   }
 }
 
-/* Alloc small without-fin object in sspace without getting new free chunk */
-void *sspace_thread_local_alloc(unsigned size, Allocator *allocator)
+/* Alloc small without-fin object in wspace without getting new free chunk */
+void *wspace_thread_local_alloc(unsigned size, Allocator *allocator)
 {
   if(size > LARGE_OBJ_THRESHOLD) return NULL;
   
-  Sspace *sspace = gc_get_sspace(allocator->gc);
+  Wspace *wspace = gc_get_wspace(allocator->gc);
   
   /* Flexible alloc mechanism:
-  Size_Segment *size_seg = sspace_get_size_seg(sspace, size);
+  Size_Segment *size_seg = wspace_get_size_seg(wspace, size);
   unsigned int seg_index = size_seg->seg_index;
   */
   unsigned int seg_index = (size-GC_OBJECT_ALIGNMENT) / MEDIUM_OBJ_THRESHOLD;
   assert(seg_index <= 2);
-  Size_Segment *size_seg = sspace->size_segments[seg_index];
+  Size_Segment *size_seg = wspace->size_segments[seg_index];
   assert(size_seg->local_alloc);
   
   size = (unsigned int)NORMAL_SIZE_ROUNDUP(size, size_seg);
   unsigned int index = NORMAL_SIZE_TO_INDEX(size, size_seg);
   
   Chunk_Header **chunks = allocator->local_chunks[seg_index];
-  Chunk_Header *chunk = chunks[index];
+  Chunk_Header *chunk = chunks[index];  
   if(!chunk){
-    chunk = sspace_get_pfc(sspace, seg_index, index);
-    //if(!chunk) chunk = sspace_steal_pfc(sspace, seg_index, index);
+    mutator_post_signal((Mutator*) allocator,DISABLE_COLLECTOR_SWEEP_LOCAL_CHUNKS);
+    
+    chunk = wspace_get_pfc(wspace, seg_index, index);
+    //if(!chunk) chunk = wspace_steal_pfc(wspace, seg_index, index);
     if(!chunk) return NULL;
     chunk->status |= CHUNK_IN_USE;
     chunks[index] = chunk;
+    
+    mutator_post_signal((Mutator*) allocator,ENABLE_COLLECTOR_SWEEP_LOCAL_CHUNKS);
   }
   void *p_obj = alloc_in_chunk(chunks[index]);
+
+  if(chunk->slot_index == MAX_SLOT_INDEX){
+    chunk->status = CHUNK_USED | CHUNK_NORMAL;
+    /*register to used chunk list.*/
+    wspace_register_used_chunk(wspace,chunk);
+    chunks[index] = NULL;
+    chunk = NULL;
+  }
+  
+  assert(!chunk || chunk->slot_index <= chunk->alloc_num);
+  assert(!chunk || chunk->slot_index < chunk->slot_num);
   assert(p_obj);
 
 #ifdef SSPACE_ALLOC_INFO
-  sspace_alloc_info(size);
+  wspace_alloc_info(size);
 #endif
 #ifdef SSPACE_VERIFY
-  sspace_verify_alloc(p_obj, size);
+  wspace_verify_alloc(p_obj, size);
 #endif
 
   return p_obj;
 }
 
-static void *sspace_alloc_normal_obj(Sspace *sspace, unsigned size, Allocator *allocator)
+static void *wspace_alloc_normal_obj(Wspace *wspace, unsigned size, Allocator *allocator)
 {
-  Size_Segment *size_seg = sspace_get_size_seg(sspace, size);
+  Size_Segment *size_seg = wspace_get_size_seg(wspace, size);
   unsigned int seg_index = size_seg->seg_index;
   
   size = (unsigned int)NORMAL_SIZE_ROUNDUP(size, size_seg);
@@ -118,41 +134,70 @@ static void *sspace_alloc_normal_obj(Sspace *sspace, unsigned size, Allocator *a
     Chunk_Header **chunks = allocator->local_chunks[seg_index];
     chunk = chunks[index];
     if(!chunk){
-      chunk = sspace_get_pfc(sspace, seg_index, index);
+      mutator_post_signal((Mutator*) allocator,DISABLE_COLLECTOR_SWEEP_LOCAL_CHUNKS);
+      chunk = wspace_get_pfc(wspace, seg_index, index);
       if(!chunk){
-        chunk = (Chunk_Header*)sspace_get_normal_free_chunk(sspace);
+        chunk = (Chunk_Header*)wspace_get_normal_free_chunk(wspace);
         if(chunk) normal_chunk_init(chunk, size);
       }
-      //if(!chunk) chunk = sspace_steal_pfc(sspace, seg_index, index);
+      //if(!chunk) chunk = wspace_steal_pfc(wspace, seg_index, index);
       if(!chunk) return NULL;
       chunk->status |= CHUNK_IN_USE;
       chunks[index] = chunk;
-    }
+      mutator_post_signal((Mutator*) allocator,ENABLE_COLLECTOR_SWEEP_LOCAL_CHUNKS);
+    }    
+    
     p_obj = alloc_in_chunk(chunks[index]);
+    
+    if(chunk->slot_index == MAX_SLOT_INDEX){
+      chunk->status = CHUNK_USED | CHUNK_NORMAL;
+      /*register to used chunk list.*/
+      wspace_register_used_chunk(wspace,chunk);
+      chunks[index] = NULL;
+    }
+    
   } else {
-    if(gc_need_start_concurrent_mark(allocator->gc))
-      gc_start_concurrent_mark(allocator->gc);
-    chunk = sspace_get_pfc(sspace, seg_index, index);
+    gc_try_schedule_collection(allocator->gc, GC_CAUSE_NIL);
+
+    mutator_post_signal((Mutator*) allocator,DISABLE_COLLECTOR_SWEEP_GLOBAL_CHUNKS);
+
+    if(USE_CONCURRENT_SWEEP){
+      while(gc_is_sweeping_global_normal_chunk()){
+        mutator_post_signal((Mutator*) allocator,ENABLE_COLLECTOR_SWEEP_GLOBAL_CHUNKS);
+      }  
+    }
+
+    chunk = wspace_get_pfc(wspace, seg_index, index);
     if(!chunk){
-      chunk = (Chunk_Header*)sspace_get_normal_free_chunk(sspace);
+      chunk = (Chunk_Header*)wspace_get_normal_free_chunk(wspace);
       if(chunk) normal_chunk_init(chunk, size);
     }
-    //if(!chunk) chunk = sspace_steal_pfc(sspace, seg_index, index);
+    //if(!chunk) chunk = wspace_steal_pfc(wspace, seg_index, index);
     if(!chunk) return NULL;
     p_obj = alloc_in_chunk(chunk);
-    if(chunk)
-      sspace_put_pfc(sspace, chunk);
+
+    if(chunk->slot_index == MAX_SLOT_INDEX){
+      chunk->status = CHUNK_USED | CHUNK_NORMAL;
+      /*register to used chunk list.*/
+      wspace_register_used_chunk(wspace,chunk);
+      chunk = NULL;
+    }
+    
+    if(chunk){
+      wspace_put_pfc(wspace, chunk);
+    }
+    
+    mutator_post_signal((Mutator*) allocator,ENABLE_COLLECTOR_SWEEP_GLOBAL_CHUNKS);
   }
   
   return p_obj;
 }
 
-static void *sspace_alloc_super_obj(Sspace *sspace, unsigned size, Allocator *allocator)
+static void *wspace_alloc_super_obj(Wspace *wspace, unsigned size, Allocator *allocator)
 {
   assert(size > SUPER_OBJ_THRESHOLD);
 
-  if(gc_need_start_concurrent_mark(allocator->gc))
-    gc_start_concurrent_mark(allocator->gc);
+  gc_try_schedule_collection(allocator->gc, GC_CAUSE_NIL);
 
   unsigned int chunk_size = SUPER_SIZE_ROUNDUP(size);
   assert(chunk_size > SUPER_OBJ_THRESHOLD);
@@ -160,66 +205,77 @@ static void *sspace_alloc_super_obj(Sspace *sspace, unsigned size, Allocator *al
   
   Chunk_Header *chunk;
   if(chunk_size <= HYPER_OBJ_THRESHOLD)
-    chunk = (Chunk_Header*)sspace_get_abnormal_free_chunk(sspace, chunk_size);
+    chunk = (Chunk_Header*)wspace_get_abnormal_free_chunk(wspace, chunk_size);
   else
-    chunk = (Chunk_Header*)sspace_get_hyper_free_chunk(sspace, chunk_size, FALSE);
+    chunk = (Chunk_Header*)wspace_get_hyper_free_chunk(wspace, chunk_size, FALSE);
   
   if(!chunk) return NULL;
   abnormal_chunk_init(chunk, chunk_size, size);
-  chunk->table[0] = cur_alloc_color;
+  if(is_obj_alloced_live()){
+    chunk->table[0] |= cur_mark_black_color  ;
+  } 
+  //FIXME: Need barrier here.   
+  //apr_memory_rw_barrier();
+  
+  chunk->table[0] |= cur_alloc_color;
   set_super_obj_mask(chunk->base);
+  assert(chunk->status == CHUNK_ABNORMAL);
+  chunk->status = CHUNK_ABNORMAL| CHUNK_USED;
+  wspace_register_used_chunk(wspace, chunk);
   assert(get_obj_info_raw((Partial_Reveal_Object*)chunk->base) & SUPER_OBJ_MASK);
-  //printf("Obj: %x  size: %x\t", (POINTER_SIZE_INT)chunk->base, size);
   return chunk->base;
 }
 
-static void *sspace_try_alloc(unsigned size, Allocator *allocator)
+static void *wspace_try_alloc(unsigned size, Allocator *allocator)
 {
-  Sspace *sspace = gc_get_sspace(allocator->gc);
+  Wspace *wspace = gc_get_wspace(allocator->gc);
   void *p_obj = NULL;
   
   if(size <= SUPER_OBJ_THRESHOLD)
-    p_obj = sspace_alloc_normal_obj(sspace, size, allocator);
+    p_obj = wspace_alloc_normal_obj(wspace, size, allocator);
   else
-    p_obj = sspace_alloc_super_obj(sspace, size, allocator);
+    p_obj = wspace_alloc_super_obj(wspace, size, allocator);
 
 #ifdef SSPACE_ALLOC_INFO
-  if(p_obj) sspace_alloc_info(size);
+  if(p_obj) wspace_alloc_info(size);
 #endif
 #ifdef SSPACE_VERIFY
-  if(p_obj) sspace_verify_alloc(p_obj, size);
+  if(p_obj) wspace_verify_alloc(p_obj, size);
 #endif
 
-  if(p_obj && gc_is_concurrent_mark_phase()) obj_mark_black_in_table((Partial_Reveal_Object*)p_obj,size);
+#ifdef WSPACE_CONCURRENT_GC_STATS
+  if(p_obj && gc_is_concurrent_mark_phase()) ((Partial_Reveal_Object*)p_obj)->obj_info |= NEW_OBJ_MASK;
+#endif
+
   return p_obj;
 }
 
 /* FIXME:: the collection should be seperated from the alloation */
-void *sspace_alloc(unsigned size, Allocator *allocator)
+void *wspace_alloc(unsigned size, Allocator *allocator)
 {
   void *p_obj = NULL;
   
   /* First, try to allocate object from TLB (thread local chunk) */
-  p_obj = sspace_try_alloc(size, allocator);
+  p_obj = wspace_try_alloc(size, allocator);
   if(p_obj)  return p_obj;
   
   if(allocator->gc->in_collection) return NULL;
   
   vm_gc_lock_enum();
   /* after holding lock, try if other thread collected already */
-  p_obj = sspace_try_alloc(size, allocator);
+  p_obj = wspace_try_alloc(size, allocator);
   if(p_obj){
     vm_gc_unlock_enum();
     return p_obj;
   }
-  gc_reclaim_heap(allocator->gc, GC_CAUSE_SSPACE_IS_FULL);
+  gc_reclaim_heap(allocator->gc, GC_CAUSE_WSPACE_IS_FULL);
   vm_gc_unlock_enum();
 
 #ifdef SSPACE_CHUNK_INFO
   printf("Failure size: %x\n", size);
 #endif
 
-  p_obj = sspace_try_alloc(size, allocator);
+  p_obj = wspace_try_alloc(size, allocator);
   
   return p_obj;
 }

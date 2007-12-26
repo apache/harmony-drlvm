@@ -25,10 +25,15 @@
 
 #include "../common/gc_common.h"
 #include "../thread/gc_thread.h"
+
 #include "../trace_forward/fspace.h"
+#include "../semi_space/sspace.h"
+
 #include "../mark_compact/mspace.h"
 #include "../los/lspace.h"
-#include "../mark_sweep/sspace.h"
+
+#include "../mark_sweep/wspace.h"
+
 #include "../finalizer_weakref/finalizer_weakref_metadata.h"
 
 #ifdef GC_GEN_STATS
@@ -105,6 +110,7 @@ typedef struct GC_Gen {
 
   SpinLock concurrent_mark_lock;
   SpinLock enumerate_rootset_lock;
+  SpinLock concurrent_sweep_lock;
 
   
   /* system info */
@@ -165,7 +171,7 @@ inline Space* space_of_addr(GC* gc, void* addr)
 }
 
 extern Space_Alloc_Func mos_alloc;
-void* nos_alloc(unsigned size, Allocator *allocator);
+extern Space_Alloc_Func nos_alloc;
 extern Space_Alloc_Func los_alloc;
 void* los_try_alloc(POINTER_SIZE_INT size, GC* gc);
 
@@ -186,6 +192,9 @@ void gc_gen_adapt(GC_Gen* gc, int64 pause_time);
 void gc_gen_reclaim_heap(GC_Gen* gc, int64 gc_start_time);
 
 void gc_gen_assign_free_area_to_mutators(GC_Gen* gc);
+void gc_gen_init_collector_alloc(GC_Gen* gc, Collector* collector);
+void gc_gen_reset_collector_alloc(GC_Gen* gc, Collector* collector);
+void gc_gen_destruct_collector_alloc(GC_Gen* gc, Collector* collector);
 
 void gc_gen_adjust_heap_size(GC_Gen* gc, int64 pause_time);
 
@@ -201,6 +210,8 @@ void gc_gen_start_concurrent_mark(GC_Gen* gc);
 extern Boolean GEN_NONGEN_SWITCH ;
 
 #endif /* ifndef _GC_GEN_H_ */
+
+
 
 
 

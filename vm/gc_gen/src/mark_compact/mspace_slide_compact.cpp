@@ -20,14 +20,12 @@
  */
 
 #include "mspace_collect_compact.h"
-#include "../trace_forward/fspace.h"
 #include "../los/lspace.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 
 #ifdef GC_GEN_STATS
 #include "../gen/gen_stats.h"
 #endif
-
 
 struct GC_Gen;
 Space* gc_get_nos(GC_Gen* gc);
@@ -116,7 +114,7 @@ static void mspace_compute_object_target(Collector* collector, Mspace* mspace)
 
       if( obj_info != 0 ) {
         collector_remset_add_entry(collector, (Partial_Reveal_Object **)dest_addr);
-        collector_remset_add_entry(collector, (Partial_Reveal_Object **)obj_info);
+        collector_remset_add_entry(collector, (Partial_Reveal_Object **)(POINTER_SIZE_INT)obj_info);
       }
       
       obj_set_fw_in_oi(p_obj, dest_addr);
@@ -376,7 +374,7 @@ static void mspace_sliding_compact(Collector* collector, Mspace* mspace)
       assert(obj_is_marked_in_vt(p_obj));
 #ifdef USE_32BITS_HASHCODE
       obj_clear_dual_bits_in_vt(p_obj);
- #else
+#else
       obj_unmark_in_vt(p_obj);
 #endif
 
@@ -411,7 +409,6 @@ void slide_compact_mspace(Collector* collector)
 {
   GC* gc = collector->gc;
   Mspace* mspace = (Mspace*)gc_get_mos((GC_Gen*)gc);
-  Fspace* fspace = (Fspace*)gc_get_nos((GC_Gen*)gc);
   Lspace* lspace = (Lspace*)gc_get_los((GC_Gen*)gc);
   
   unsigned int num_active_collectors = gc->num_active_collectors;
@@ -421,7 +418,7 @@ void slide_compact_mspace(Collector* collector)
     *have references  that are going to be repointed.
     */
 
-  TRACE2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]: pass1: mark live objects in heap ...");
+  TRACE2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]: pass1: marking...");
 
   unsigned int old_num = atomic_cas32( &num_marking_collectors, 0, num_active_collectors+1);
 
@@ -435,6 +432,7 @@ void slide_compact_mspace(Collector* collector)
 
    /* last collector's world here */
   if( ++old_num == num_active_collectors ){
+
     if(!IGNORE_FINREF )
       collector_identify_finref(collector);
 #ifndef BUILD_IN_REFERENT
@@ -461,24 +459,24 @@ void slide_compact_mspace(Collector* collector)
   }
   while(num_marking_collectors != num_active_collectors + 1);
 
-  TRACE2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]:  finish pass1");
+  TRACE2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]:  finish pass1 and start pass2: relocating mos&nos...");
 
   /* Pass 2: **************************************************
      assign target addresses for all to-be-moved objects */
+
   atomic_cas32( &num_repointing_collectors, 0, num_active_collectors+1);
 
 #ifdef USE_32BITS_HASHCODE
   if(gc_match_kind(gc, FALLBACK_COLLECTION))
     fallback_clear_fwd_obj_oi(collector);
 #endif
-  TRACE2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]: pass2: computer target addresses for to-be-moved objects in mos and nos ...");
   mspace_compute_object_target(collector, mspace);
   
   old_num = atomic_inc32(&num_repointing_collectors);
   /*last collector's world here*/
   if( ++old_num == num_active_collectors ){
     if(lspace->move_object) {
-      TRACE2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]: pass2: computer target addresses for to-be-moved objects in los ...");
+      TRACE2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]: pass2: relocating los ...");
       lspace_compute_object_target(collector, lspace);
     }
     gc->collect_result = gc_collection_result(gc);
@@ -492,12 +490,11 @@ void slide_compact_mspace(Collector* collector)
   }
   while(num_repointing_collectors != num_active_collectors + 1);
   if(!gc->collect_result) return;
-  TRACE2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]: finish pass2");
+  TRACE2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]: finish pass2 and start pass3: repointing...");
 
   /* Pass 3: **************************************************
     *update all references whose objects are to be moved
     */
-  TRACE2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]: pass3: update all references ...");
   old_num = atomic_cas32( &num_fixing_collectors, 0, num_active_collectors+1);
   mspace_fix_repointed_refs(collector, mspace);
   old_num = atomic_inc32(&num_fixing_collectors);
@@ -520,12 +517,10 @@ void slide_compact_mspace(Collector* collector)
   }
   while(num_fixing_collectors != num_active_collectors + 1);
 
-  TRACE2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]: finish pass3");
+  TRACE2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]: finish pass3 and start pass4: moving...");
 
   /* Pass 4: **************************************************
      move objects                                             */
-
-  TRACE2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]: pass4: move objects to target address ...");
 
   atomic_cas32( &num_moving_collectors, 0, num_active_collectors);
   
@@ -534,12 +529,11 @@ void slide_compact_mspace(Collector* collector)
   atomic_inc32(&num_moving_collectors);
   while(num_moving_collectors != num_active_collectors);
 
-  TRACE2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]: finish pass4");
+  TRACE2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]: finish pass4 and start pass 5: restoring obj_info...");
 
   /* Pass 5: **************************************************
      restore obj_info                                         */
 
-  TRACE2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]: pass5: restore obj_info ...");
   atomic_cas32( &num_restoring_collectors, 0, num_active_collectors+1);
   
   collector_restore_obj_info(collector);
@@ -557,7 +551,8 @@ void slide_compact_mspace(Collector* collector)
   while(num_restoring_collectors != num_active_collectors + 1);
 
   /* Dealing with out of memory in mspace */
-  if(mspace->free_block_idx > fspace->first_block_idx){
+  void* mspace_border = &mspace->blocks[mspace->free_block_idx - mspace->first_block_idx];
+  if( mspace_border > nos_boundary){
     atomic_cas32( &num_extending_collectors, 0, num_active_collectors);
     
     mspace_extend_compact(collector);
@@ -566,16 +561,7 @@ void slide_compact_mspace(Collector* collector)
     while(num_extending_collectors != num_active_collectors);
   }
 
-  TRACE2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]: finish pass5 ...");
+  TRACE2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]: finish pass5 and done.");
 
-  if( (POINTER_SIZE_INT)collector->thread_handle != 0 ){
-    TRACE2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]  finished");
-    return;
-  }
-  
-  /* Leftover: **************************************************
-   */
-  
-  TRACE2("gc.process", "GC: collector[0]  finished");
   return;
 }

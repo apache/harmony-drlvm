@@ -15,85 +15,85 @@
  *  limitations under the License.
  */
 
-#include "sspace.h"
-#include "sspace_chunk.h"
-#include "sspace_verify.h"
+#include "wspace.h"
+#include "wspace_chunk.h"
+#include "wspace_verify.h"
 #include "gc_ms.h"
 #include "../gen/gen.h"
 
 struct GC_Gen;
 
-Sspace *sspace_initialize(GC *gc, void *start, POINTER_SIZE_INT sspace_size, POINTER_SIZE_INT commit_size)
+Wspace *wspace_initialize(GC *gc, void *start, POINTER_SIZE_INT wspace_size, POINTER_SIZE_INT commit_size)
 {
-  /* With sspace in the heap, the heap must be composed of a single sspace or a sspace and a NOS.
-   * In either case, the reserved size and committed size of sspace must be the same.
-   * Because sspace has only mark-sweep collection, it is not possible to shrink sspace.
+  /* With wspace in the heap, the heap must be composed of a single wspace or a wspace and a NOS.
+   * In either case, the reserved size and committed size of wspace must be the same.
+   * Because wspace has only mark-sweep collection, it is not possible to shrink wspace.
    * So there is no need to use dynamic space resizing.
    */
-  assert(sspace_size == commit_size);
+  assert(wspace_size == commit_size);
   
-  Sspace *sspace = (Sspace*)STD_MALLOC(sizeof(Sspace));
-  assert(sspace);
-  memset(sspace, 0, sizeof(Sspace));
+  Wspace *wspace = (Wspace*)STD_MALLOC(sizeof(Wspace));
+  assert(wspace);
+  memset(wspace, 0, sizeof(Wspace));
   
-  sspace->reserved_heap_size = sspace_size;
+  wspace->reserved_heap_size = wspace_size;
   
   void *reserved_base = start;
   
-  /* commit sspace mem */
+  /* commit wspace mem */
   if(!large_page_hint)
     vm_commit_mem(reserved_base, commit_size);
   memset(reserved_base, 0, commit_size);
-  sspace->committed_heap_size = commit_size;
+  wspace->committed_heap_size = commit_size;
   
-  sspace->heap_start = reserved_base;
-  sspace->heap_end = (void *)((POINTER_SIZE_INT)reserved_base + sspace_size);
+  wspace->heap_start = reserved_base;
+  wspace->heap_end = (void *)((POINTER_SIZE_INT)reserved_base + wspace_size);
     
-  sspace->num_collections = 0;
-  sspace->time_collections = 0;
-  sspace->survive_ratio = 0.2f;
+  wspace->num_collections = 0;
+  wspace->time_collections = 0;
+  wspace->survive_ratio = 0.2f;
 
-  sspace->move_object = FALSE;
-  sspace->gc = gc;
+  wspace->move_object = FALSE;
+  wspace->gc = gc;
   
-  sspace_init_chunks(sspace);
+  wspace_init_chunks(wspace);
 
-  sspace->space_statistic = (Space_Statistics*)STD_MALLOC(sizeof(Space_Statistics));
-  assert(sspace->space_statistic);
-  memset(sspace->space_statistic, 0, sizeof(Space_Statistics));
+  wspace->space_statistic = (Space_Statistics*)STD_MALLOC(sizeof(Space_Statistics));
+  assert(wspace->space_statistic);
+  memset(wspace->space_statistic, 0, sizeof(Space_Statistics));
 
 #ifdef USE_MARK_SWEEP_GC
-  gc_ms_set_sspace((GC_MS*)gc, sspace);
+  gc_ms_set_wspace((GC_MS*)gc, wspace);
 #else
-  gc_set_mos((GC_Gen*)gc, (Space*)sspace);
+  gc_set_mos((GC_Gen*)gc, (Space*)wspace);
 #endif
 
 #ifdef SSPACE_VERIFY
-  sspace_verify_init(gc);
+  wspace_verify_init(gc);
 #endif
-  return sspace;
+  return wspace;
 }
 
-static void sspace_destruct_chunks(Sspace *sspace) { return; }
+static void wspace_destruct_chunks(Wspace *wspace) { return; }
 
-void sspace_destruct(Sspace *sspace)
+void wspace_destruct(Wspace *wspace)
 {
   //FIXME:: when map the to-half, the decommission start address should change
-  sspace_destruct_chunks(sspace);
-  STD_FREE(sspace);
+  wspace_destruct_chunks(wspace);
+  STD_FREE(wspace);
 }
 
-void sspace_reset_after_collection(Sspace *sspace)
+void wspace_reset_after_collection(Wspace *wspace)
 {
-  sspace->move_object = FALSE;
-  sspace->need_compact = FALSE;
-  sspace->need_fix = FALSE;
+  wspace->move_object = FALSE;
+  wspace->need_compact = FALSE;
+  wspace->need_fix = FALSE;
 }
 
 void allocator_init_local_chunks(Allocator *allocator)
 {
-  Sspace *sspace = gc_get_sspace(allocator->gc);
-  Size_Segment **size_segs = sspace->size_segments;
+  Wspace *wspace = gc_get_wspace(allocator->gc);
+  Size_Segment **size_segs = wspace->size_segments;
   
   /* Alloc mem for size segments (Chunk_Header**) */
   unsigned int seg_size = sizeof(Chunk_Header**) * SIZE_SEGMENT_NUM;
@@ -123,8 +123,8 @@ void allocator_init_local_chunks(Allocator *allocator)
 
 void allocactor_destruct_local_chunks(Allocator *allocator)
 {
-  Sspace *sspace = gc_get_sspace(allocator->gc);
-  Size_Segment **size_segs = sspace->size_segments;
+  Wspace *wspace = gc_get_wspace(allocator->gc);
+  Size_Segment **size_segs = wspace->size_segments;
   Chunk_Header ***local_chunks = allocator->local_chunks;
   Chunk_Header **chunk_ptrs = NULL;
   unsigned int chunk_ptr_num = 0;
@@ -142,7 +142,7 @@ void allocactor_destruct_local_chunks(Allocator *allocator)
   /* Put local pfc to the according pools */
   for(unsigned int i = 0; i < chunk_ptr_num; ++i){
     if(chunk_ptrs[i])
-      sspace_put_pfc(sspace, chunk_ptrs[i]);
+      wspace_put_pfc(wspace, chunk_ptrs[i]);
   }
   
   /* Free mem for local chunk pointers */
@@ -154,8 +154,8 @@ void allocactor_destruct_local_chunks(Allocator *allocator)
 
 static void allocator_clear_local_chunks(Allocator *allocator)
 {
-  Sspace *sspace = gc_get_sspace(allocator->gc);
-  Size_Segment **size_segs = sspace->size_segments;
+  Wspace *wspace = gc_get_wspace(allocator->gc);
+  Size_Segment **size_segs = wspace->size_segments;
   Chunk_Header ***local_chunks = allocator->local_chunks;
   
   for(unsigned int i = SIZE_SEGMENT_NUM; i--;){
@@ -167,7 +167,7 @@ static void allocator_clear_local_chunks(Allocator *allocator)
     assert(chunks);
     for(unsigned int j = size_segs[i]->chunk_num; j--;){
       if(chunks[j])
-        sspace_put_pfc(sspace, chunks[j]);
+        wspace_put_pfc(wspace, chunks[j]);
       chunks[j] = NULL;
     }
   }
@@ -195,64 +195,66 @@ void gc_clear_collector_local_chunks(GC *gc)
 }
 
 #ifdef USE_MARK_SWEEP_GC
-void sspace_set_space_statistic(Sspace *sspace)
+void wspace_set_space_statistic(Wspace *wspace)
 {
-  GC_MS *gc = (GC_MS*)sspace->gc;
+  GC_MS *gc = (GC_MS*)wspace->gc;
 
   for(unsigned int i = 0; i < gc->num_collectors; ++i){
-    sspace->surviving_obj_num += gc->collectors[i]->live_obj_num;
-    sspace->surviving_obj_size += gc->collectors[i]->live_obj_size;
+    wspace->surviving_obj_num += gc->collectors[i]->live_obj_num;
+    wspace->surviving_obj_size += gc->collectors[i]->live_obj_size;
   }
 }
 #endif
 
-extern void sspace_decide_compaction_need(Sspace *sspace);
-extern void mark_sweep_sspace(Collector *collector);
+extern void wspace_decide_compaction_need(Wspace *wspace);
+extern void mark_sweep_wspace(Collector *collector);
 
-void sspace_collection(Sspace *sspace) 
+void wspace_collection(Wspace *wspace) 
 {
-  GC *gc = sspace->gc;
-  sspace->num_collections++;
+  GC *gc = wspace->gc;
+  wspace->num_collections++;
   
   gc_clear_mutator_local_chunks(gc);
   gc_clear_collector_local_chunks(gc);
   
 #ifdef SSPACE_ALLOC_INFO
-  sspace_alloc_info_summary();
+  wspace_alloc_info_summary();
 #endif
 #ifdef SSPACE_CHUNK_INFO
-  sspace_chunks_info(sspace, FALSE);
+  wspace_chunks_info(wspace, FALSE);
 #endif
+  wspace_clear_used_chunk_pool(wspace);
 
-  sspace_decide_compaction_need(sspace);
-  if(sspace->need_compact && gc_match_kind(gc, MARK_SWEEP_GC)){
+
+  wspace_decide_compaction_need(wspace);
+  if(wspace->need_compact && gc_match_kind(gc, MARK_SWEEP_GC)){
     assert(gc_match_kind(gc, MS_COLLECTION));
     gc->collect_kind = MS_COMPACT_COLLECTION;
   }
-  if(sspace->need_compact || gc_match_kind(gc, MAJOR_COLLECTION))
-    sspace->need_fix = TRUE;
+  if(wspace->need_compact || gc_match_kind(gc, MAJOR_COLLECTION))
+    wspace->need_fix = TRUE;
 
-  //printf("\n\n>>>>>>>>%s>>>>>>>>>>>>\n\n", sspace->need_compact ? "COMPACT" : "NO COMPACT");
+  //printf("\n\n>>>>>>>>%s>>>>>>>>>>>>\n\n", wspace->need_compact ? "COMPACT" : "NO COMPACT");
 #ifdef SSPACE_VERIFY
-  sspace_verify_before_collection(gc);
-  sspace_verify_vtable_mark(gc);
+  wspace_verify_before_collection(gc);
+  wspace_verify_vtable_mark(gc);
 #endif
 
 #ifdef SSPACE_TIME
-  sspace_gc_time(gc, TRUE);
+  wspace_gc_time(gc, TRUE);
 #endif
 
   pool_iterator_init(gc->metadata->gc_rootset_pool);
-  sspace_clear_chunk_list(gc);
+  wspace_clear_chunk_list(wspace);
   
-  collector_execute_task(gc, (TaskType)mark_sweep_sspace, (Space*)sspace);
+  collector_execute_task(gc, (TaskType)mark_sweep_wspace, (Space*)wspace);
 
 #ifdef SSPACE_TIME
-  sspace_gc_time(gc, FALSE);
+  wspace_gc_time(gc, FALSE);
 #endif
 
 #ifdef SSPACE_CHUNK_INFO
-  sspace_chunks_info(sspace, FALSE);
+  wspace_chunks_info(wspace, FALSE);
 #endif
 
 }

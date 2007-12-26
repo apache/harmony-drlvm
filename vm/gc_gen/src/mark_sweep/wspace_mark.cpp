@@ -15,13 +15,13 @@
  *  limitations under the License.
  */
 
-#include "sspace_mark_sweep.h"
+#include "wspace_mark_sweep.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 
-static Sspace *sspace_in_marking;
+static Wspace *wspace_in_marking;
 static FORCE_INLINE Boolean obj_mark_gray(Partial_Reveal_Object *obj)
 {
-  if(obj_belongs_to_space(obj, (Space*)sspace_in_marking))
+  if(obj_belongs_to_space(obj, (Space*)wspace_in_marking))
     return obj_mark_gray_in_table(obj);
   else
     return obj_mark_in_vt(obj);
@@ -29,7 +29,7 @@ static FORCE_INLINE Boolean obj_mark_gray(Partial_Reveal_Object *obj)
 
 static FORCE_INLINE Boolean obj_mark_black(Partial_Reveal_Object *obj)
 {
-  if(obj_belongs_to_space(obj, (Space*)sspace_in_marking)){
+  if(obj_belongs_to_space(obj, (Space*)wspace_in_marking)){
     Boolean marked_by_self = obj_mark_black_in_table(obj);
 
 #ifndef USE_MARK_SWEEP_GC
@@ -83,8 +83,8 @@ static FORCE_INLINE void scan_object(Collector *collector, Partial_Reveal_Object
 {
   assert((((POINTER_SIZE_INT)p_obj) % GC_OBJECT_ALIGNMENT) == 0);
   
-  Partial_Reveal_VTable *vtable = uncompress_vt(obj_get_vt(p_obj));
-  if(VTABLE_TRACING)
+  Partial_Reveal_VTable *vtable = decode_vt(obj_get_vt(p_obj));
+  if(TRACE_JLC_VIA_VTABLE)
     if(vtable->vtmark == VT_UNMARKED) {
       vtable->vtmark = VT_MARKED;
       if(obj_mark_black(vtable->jlC))
@@ -153,11 +153,11 @@ static void trace_object(Collector *collector, Partial_Reveal_Object *p_obj)
 /* for marking phase termination detection */
 static volatile unsigned int num_finished_collectors = 0;
 
-void sspace_mark_scan(Collector *collector, Sspace *sspace)
+void wspace_mark_scan(Collector *collector, Wspace *wspace)
 {
   GC *gc = collector->gc;
   GC_Metadata *metadata = gc->metadata;
-  sspace_in_marking = sspace;
+  wspace_in_marking = wspace;
   
   /* reset the num_finished_collectors to be 0 by one collector. This is necessary for the barrier later. */
   unsigned int num_active_collectors = gc->num_active_collectors;

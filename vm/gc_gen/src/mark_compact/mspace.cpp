@@ -21,16 +21,6 @@
 
 #include "mspace.h"
 
-#include "../common/gc_space.h"
-
-static void mspace_destruct_blocks(Mspace* mspace)
-{   
-#ifdef USE_32BITS_HASHCODE
-  space_desturct_blocks((Blocked_Space*)mspace);
-#endif
-  return;
-}
-
 struct GC_Gen;
 extern void gc_set_mos(GC_Gen* gc, Space* space);
 extern Space* gc_get_nos(GC_Gen* gc);
@@ -95,8 +85,10 @@ Mspace *mspace_initialize(GC* gc, void* start, POINTER_SIZE_INT mspace_size, POI
 
 void mspace_destruct(Mspace* mspace)
 {
-  //FIXME:: when map the to-half, the decommission start address should change
-  mspace_destruct_blocks(mspace);
+    //FIXME:: when map the to-half, the decommission start address should change
+#ifdef USE_32BITS_HASHCODE
+  space_desturct_blocks((Blocked_Space*)mspace);
+#endif
   STD_FREE(mspace);  
 }
 
@@ -180,4 +172,6 @@ float mspace_get_expected_threshold_ratio(Mspace* mspace)
 {
     return mspace->expected_threshold_ratio;
 }
+
+
 

@@ -20,7 +20,7 @@
 
 #ifdef USE_MARK_SWEEP_GC
 
-#include "sspace.h"
+#include "wspace.h"
 
 
 /* heap size limit is not interesting. only for manual tuning purpose */
@@ -77,35 +77,37 @@ typedef struct GC_MS {
 
   SpinLock concurrent_mark_lock;
   SpinLock enumerate_rootset_lock;
+  SpinLock concurrent_sweep_lock;
+  
   /* system info */
   unsigned int _system_alloc_unit;
   unsigned int _machine_page_size_bytes;
   unsigned int _num_processors;
   /* END of GC --> */
   
-  Sspace *sspace;
+  Wspace *wspace;
   
 } GC_MS;
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
 inline void *gc_ms_fast_alloc(unsigned size, Allocator *allocator)
-{ return sspace_thread_local_alloc(size, allocator); }
+{ return wspace_thread_local_alloc(size, allocator); }
 
 inline void *gc_ms_alloc(unsigned size, Allocator *allocator)
-{ return sspace_alloc(size, allocator); }
+{ return wspace_alloc(size, allocator); }
 
-inline Sspace *gc_ms_get_sspace(GC_MS *gc)
-{ return gc->sspace; }
+inline Wspace *gc_ms_get_wspace(GC_MS *gc)
+{ return gc->wspace; }
 
-inline void gc_ms_set_sspace(GC_MS *gc, Sspace *sspace)
-{ gc->sspace = sspace; }
+inline void gc_ms_set_wspace(GC_MS *gc, Wspace *wspace)
+{ gc->wspace = wspace; }
 
 inline POINTER_SIZE_INT gc_ms_free_memory_size(GC_MS *gc)
-{ return sspace_free_memory_size(gc_ms_get_sspace(gc)); }
+{ return wspace_free_memory_size(gc_ms_get_wspace(gc)); }
 
 inline POINTER_SIZE_INT gc_ms_total_memory_size(GC_MS *gc)
-{ return space_committed_size((Space*)gc_ms_get_sspace(gc)); }
+{ return space_committed_size((Space*)gc_ms_get_wspace(gc)); }
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -117,6 +119,11 @@ void gc_ms_iterate_heap(GC_MS *gc);
 void gc_ms_start_concurrent_mark(GC_MS* gc);
 void gc_ms_start_concurrent_mark(GC_MS* gc, unsigned int num_markers);
 void gc_ms_update_space_statistics(GC_MS* gc);
+void gc_ms_start_concurrent_sweep(GC_MS* gc, unsigned int num_collectors);
+void gc_ms_start_most_concurrent_mark(GC_MS* gc, unsigned int num_markers);
+void gc_ms_start_final_mark_after_concurrent(GC_MS* gc, unsigned int num_markers);
+
+
 
 #endif // USE_MARK_SWEEP_GC
 

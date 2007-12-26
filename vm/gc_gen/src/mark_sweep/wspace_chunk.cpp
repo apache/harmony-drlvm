@@ -14,16 +14,15 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
-#include "sspace_chunk.h"
-#include "sspace_verify.h"
-
-#define NUM_ALIGNED_FREE_CHUNK_BUCKET   (HYPER_OBJ_THRESHOLD >> NORMAL_CHUNK_SHIFT_COUNT)
-#define NUM_UNALIGNED_FREE_CHUNK_BUCKET (HYPER_OBJ_THRESHOLD >> CHUNK_GRANULARITY_BITS)
+#include "gc_ms.h"
+#include "wspace.h"
+#include "wspace_chunk.h"
+#include "wspace_verify.h"
 
 /* PFC stands for partially free chunk */
 static Size_Segment *size_segments[SIZE_SEGMENT_NUM];
 static Pool **pfc_pools[SIZE_SEGMENT_NUM];
+static Pool **pfc_pools_backup[SIZE_SEGMENT_NUM];
 static Boolean  *pfc_steal_flags[SIZE_SEGMENT_NUM];
 
 static Free_Chunk_List  aligned_free_chunk_lists[NUM_ALIGNED_FREE_CHUNK_BUCKET];
@@ -43,7 +42,7 @@ static void init_size_segment(Size_Segment *seg, unsigned int size_min, unsigned
   seg->gran_high_mask = ~seg->gran_low_mask;
 }
 
-void sspace_init_chunks(Sspace *sspace)
+void wspace_init_chunks(Wspace *wspace)
 {
   unsigned int i, j;
   
@@ -60,9 +59,11 @@ void sspace_init_chunks(Sspace *sspace)
   /* Init partially free chunk pools */
   for(i = SIZE_SEGMENT_NUM; i--;){
     pfc_pools[i] = (Pool**)STD_MALLOC(sizeof(Pool*) * size_segments[i]->chunk_num);
+    pfc_pools_backup[i] = (Pool**)STD_MALLOC(sizeof(Pool*) * size_segments[i]->chunk_num);
     pfc_steal_flags[i] = (Boolean*)STD_MALLOC(sizeof(Boolean) * size_segments[i]->chunk_num);
     for(j=size_segments[i]->chunk_num; j--;){
       pfc_pools[i][j] = sync_pool_create();
+      pfc_pools_backup[i][j] = sync_pool_create();
       pfc_steal_flags[i][j] = FALSE;
     }
   }
@@ -78,18 +79,22 @@ void sspace_init_chunks(Sspace *sspace)
   /* Init super free chunk lists */
   free_chunk_list_init(&hyper_free_chunk_list);
   
-  sspace->size_segments = size_segments;
-  sspace->pfc_pools = pfc_pools;
-  sspace->aligned_free_chunk_lists = aligned_free_chunk_lists;
-  sspace->unaligned_free_chunk_lists = unaligned_free_chunk_lists;
-  sspace->hyper_free_chunk_list = &hyper_free_chunk_list;
+  wspace->size_segments = size_segments;
+  wspace->pfc_pools = pfc_pools;
+  wspace->pfc_pools_backup = pfc_pools_backup;
+  wspace->used_chunk_pool = sync_pool_create();
+  wspace->unreusable_normal_chunk_pool = sync_pool_create();
+  wspace->live_abnormal_chunk_pool = sync_pool_create();
+  wspace->aligned_free_chunk_lists = aligned_free_chunk_lists;
+  wspace->unaligned_free_chunk_lists = unaligned_free_chunk_lists;
+  wspace->hyper_free_chunk_list = &hyper_free_chunk_list;
   
   /* Init the first free chunk: from heap start to heap end */
-  Free_Chunk *free_chunk = (Free_Chunk*)sspace->heap_start;
-  free_chunk->adj_next = (Chunk_Header_Basic*)sspace->heap_end;
-  POINTER_SIZE_INT chunk_size = sspace->reserved_heap_size;
+  Free_Chunk *free_chunk = (Free_Chunk*)wspace->heap_start;
+  free_chunk->adj_next = (Chunk_Header_Basic*)wspace->heap_end;
+  POINTER_SIZE_INT chunk_size = wspace->reserved_heap_size;
   assert(chunk_size > CHUNK_GRANULARITY && !(chunk_size % CHUNK_GRANULARITY));
-  sspace_put_free_chunk(sspace, free_chunk);
+  wspace_put_free_chunk(wspace, free_chunk);
 }
 
 static void pfc_pool_set_steal_flag(Pool *pool, unsigned int steal_threshold, Boolean &steal_flag)
@@ -104,15 +109,26 @@ static void pfc_pool_set_steal_flag(Pool *pool, unsigned int steal_threshold, Bo
   steal_flag = steal_threshold ? FALSE : TRUE;
 }
 
-void sspace_clear_chunk_list(GC *gc)
+void wspace_clear_chunk_list(Wspace* wspace)
 {
   unsigned int i, j;
+  GC* gc = wspace->gc;
   unsigned int collector_num = gc->num_collectors;
   unsigned int steal_threshold = collector_num << PFC_STEAL_THRESHOLD;
   
+  Pool*** pfc_pools = wspace->pfc_pools;
   for(i = SIZE_SEGMENT_NUM; i--;){
     for(j = size_segments[i]->chunk_num; j--;){
       Pool *pool = pfc_pools[i][j];
+      pfc_pool_set_steal_flag(pool, steal_threshold, pfc_steal_flags[i][j]);
+      pool_empty(pool);
+    }
+  }
+  
+  Pool*** pfc_pools_backup = wspace->pfc_pools_backup;
+  for(i = SIZE_SEGMENT_NUM; i--;){
+    for(j = size_segments[i]->chunk_num; j--;){
+      Pool *pool = pfc_pools_backup[i][j];
       pfc_pool_set_steal_flag(pool, steal_threshold, pfc_steal_flags[i][j]);
       pool_empty(pool);
     }
@@ -147,9 +163,50 @@ static void list_put_free_chunk(Free_Chunk_List *list, Free_Chunk *chunk)
   ++list->chunk_num;
   unlock(list->lock);
 }
+
+static void list_put_free_chunk_to_head(Free_Chunk_List *list, Free_Chunk *chunk)
+{
+  
+  chunk->status = CHUNK_FREE;
+  chunk->prev = NULL;
+  chunk->next = NULL;
+
+  lock(list->lock);
+  chunk->next = list->head;
+  if(list->head)
+    list->head->prev = chunk;
+  list->head = chunk;
+  if(!list->tail)
+    list->tail = chunk;
+  assert(list->chunk_num < ~((unsigned int)0));
+  ++list->chunk_num;
+  unlock(list->lock);
+}
+
+static void list_put_free_chunk_to_tail(Free_Chunk_List *list, Free_Chunk *chunk)
+{
+  //modified for concurrent sweep.
+  //chunk->status = CHUNK_FREE;
+  chunk->prev = NULL;
+  chunk->next = NULL;
+
+  lock(list->lock);
+  chunk->prev = list->tail;
+  if(list->head)
+    list->tail->next = chunk;
+  list->tail = chunk;
+  if(!list->head)
+    list->head = chunk;
+  assert(list->chunk_num < ~((unsigned int)0));
+  ++list->chunk_num;
+  unlock(list->lock);
+}
+
+
+
 /* The difference between this and the above normal one is this func needn't hold the list lock.
  * This is for the calling in partitioning chunk functions.
- * Please refer to the comments of sspace_get_hyper_free_chunk().
+ * Please refer to the comments of wspace_get_hyper_free_chunk().
  */
 static void list_put_hyper_free_chunk(Free_Chunk_List *list, Free_Chunk *chunk)
 {
@@ -158,7 +215,7 @@ static void list_put_hyper_free_chunk(Free_Chunk_List *list, Free_Chunk *chunk)
 
   /* lock(list->lock);
    * the list lock must have been held like in getting a free chunk and partitioning it
-   * or needn't be held like in sspace initialization and the merging phase
+   * or needn't be held like in wspace initialization and the merging phase
    */
   chunk->next = list->head;
   if(list->head)
@@ -170,6 +227,39 @@ static void list_put_hyper_free_chunk(Free_Chunk_List *list, Free_Chunk *chunk)
   ++list->chunk_num;
   //unlock(list->lock);
 }
+
+static void list_put_hyper_free_chunk_to_head(Free_Chunk_List *list, Free_Chunk *chunk)
+{
+  chunk->status = CHUNK_FREE;
+  chunk->prev = NULL;
+
+  chunk->next = list->head;
+  if(list->head)
+    list->head->prev = chunk;
+  list->head = chunk;
+  if(!list->tail)
+    list->tail = chunk;
+  assert(list->chunk_num < ~((unsigned int)0));
+  ++list->chunk_num;
+}
+
+static void list_put_hyper_free_chunk_to_tail(Free_Chunk_List *list, Free_Chunk *chunk)
+{
+  //modified for concurrent sweep.
+  //chunk->status = CHUNK_FREE;
+  chunk->next = NULL;
+
+  chunk->prev = list->tail;
+  if(list->tail)
+    list->tail->next = chunk;
+  list->tail = chunk;
+  if(!list->head)
+    list->head = chunk;
+  assert(list->chunk_num < ~((unsigned int)0));
+  ++list->chunk_num;
+}
+
+
 
 static Free_Chunk *free_list_get_head(Free_Chunk_List *list)
 {
@@ -183,26 +273,59 @@ static Free_Chunk *free_list_get_head(Free_Chunk_List *list)
       list->tail = NULL;
     assert(list->chunk_num);
     --list->chunk_num;
-    assert(chunk->status == CHUNK_FREE);
+    //assert(chunk->status == CHUNK_FREE);
+    assert(chunk->status & CHUNK_FREE);
   }
   unlock(list->lock);
   return chunk;
 }
 
-void sspace_put_free_chunk(Sspace *sspace, Free_Chunk *chunk)
+void wspace_put_free_chunk(Wspace *wspace, Free_Chunk *chunk)
 {
   POINTER_SIZE_INT chunk_size = CHUNK_SIZE(chunk);
   assert(!(chunk_size % CHUNK_GRANULARITY));
   
   if(chunk_size > HYPER_OBJ_THRESHOLD)
-    list_put_hyper_free_chunk(sspace->hyper_free_chunk_list, chunk);
+    list_put_hyper_free_chunk(wspace->hyper_free_chunk_list, chunk);
   else if(!((POINTER_SIZE_INT)chunk & NORMAL_CHUNK_LOW_MASK) && !(chunk_size & NORMAL_CHUNK_LOW_MASK))
-    list_put_free_chunk(&sspace->aligned_free_chunk_lists[ALIGNED_CHUNK_SIZE_TO_INDEX(chunk_size)], chunk);
+    list_put_free_chunk(&wspace->aligned_free_chunk_lists[ALIGNED_CHUNK_SIZE_TO_INDEX(chunk_size)], chunk);
   else
-    list_put_free_chunk(&sspace->unaligned_free_chunk_lists[UNALIGNED_CHUNK_SIZE_TO_INDEX(chunk_size)], chunk);
+    list_put_free_chunk(&wspace->unaligned_free_chunk_lists[UNALIGNED_CHUNK_SIZE_TO_INDEX(chunk_size)], chunk);
 }
 
-static inline Free_Chunk *partition_normal_free_chunk(Sspace *sspace, Free_Chunk *chunk)
+void wspace_put_free_chunk_to_head(Wspace *wspace, Free_Chunk *chunk)
+{
+  POINTER_SIZE_INT chunk_size = CHUNK_SIZE(chunk);
+  assert(!(chunk_size % CHUNK_GRANULARITY));
+  
+  if(chunk_size > HYPER_OBJ_THRESHOLD){
+    lock(wspace->hyper_free_chunk_list->lock);
+    list_put_hyper_free_chunk_to_head(wspace->hyper_free_chunk_list, chunk);
+    unlock(wspace->hyper_free_chunk_list->lock);
+  }else if(!((POINTER_SIZE_INT)chunk & NORMAL_CHUNK_LOW_MASK) && !(chunk_size & NORMAL_CHUNK_LOW_MASK))
+    list_put_free_chunk_to_head(&wspace->aligned_free_chunk_lists[ALIGNED_CHUNK_SIZE_TO_INDEX(chunk_size)], chunk);
+  else
+    list_put_free_chunk_to_head(&wspace->unaligned_free_chunk_lists[UNALIGNED_CHUNK_SIZE_TO_INDEX(chunk_size)], chunk);
+
+}
+
+void wspace_put_free_chunk_to_tail(Wspace *wspace, Free_Chunk *chunk)
+{
+  POINTER_SIZE_INT chunk_size = CHUNK_SIZE(chunk);
+  assert(!(chunk_size % CHUNK_GRANULARITY));
+  
+  if(chunk_size > HYPER_OBJ_THRESHOLD){
+    lock(wspace->hyper_free_chunk_list->lock);
+    list_put_hyper_free_chunk_to_tail(wspace->hyper_free_chunk_list, chunk);
+    unlock(wspace->hyper_free_chunk_list->lock);
+  }else if(!((POINTER_SIZE_INT)chunk & NORMAL_CHUNK_LOW_MASK) && !(chunk_size & NORMAL_CHUNK_LOW_MASK))
+    list_put_free_chunk_to_tail(&wspace->aligned_free_chunk_lists[ALIGNED_CHUNK_SIZE_TO_INDEX(chunk_size)], chunk);
+  else
+    list_put_free_chunk_to_tail(&wspace->unaligned_free_chunk_lists[UNALIGNED_CHUNK_SIZE_TO_INDEX(chunk_size)], chunk);
+
+}
+
+static inline Free_Chunk *partition_normal_free_chunk(Wspace *wspace, Free_Chunk *chunk)
 {
   assert(CHUNK_SIZE(chunk) > NORMAL_CHUNK_SIZE_BYTES);
   
@@ -212,14 +335,14 @@ static inline Free_Chunk *partition_normal_free_chunk(Sspace *sspace, Free_Chunk
   if(chunk != normal_chunk){
     assert(chunk < normal_chunk);
     chunk->adj_next = (Chunk_Header_Basic*)normal_chunk;
-    sspace_put_free_chunk(sspace, chunk);
+    wspace_put_free_chunk(wspace, chunk);
   }
   normal_chunk->adj_next = (Chunk_Header_Basic*)((POINTER_SIZE_INT)normal_chunk + NORMAL_CHUNK_SIZE_BYTES);
   if(normal_chunk->adj_next != adj_next){
     assert(normal_chunk->adj_next < adj_next);
     Free_Chunk *back_chunk = (Free_Chunk*)normal_chunk->adj_next;
     back_chunk->adj_next = adj_next;
-    sspace_put_free_chunk(sspace, back_chunk);
+    wspace_put_free_chunk(wspace, back_chunk);
   }
   
   normal_chunk->status = CHUNK_FREE;
@@ -230,7 +353,7 @@ static inline Free_Chunk *partition_normal_free_chunk(Sspace *sspace, Free_Chunk
  * the first one's size is chunk_size
  * the second will be inserted into free chunk list according to its size
  */
-static inline Free_Chunk *partition_abnormal_free_chunk(Sspace *sspace,Free_Chunk *chunk, unsigned int chunk_size)
+static inline Free_Chunk *partition_abnormal_free_chunk(Wspace *wspace,Free_Chunk *chunk, unsigned int chunk_size)
 {
   assert(CHUNK_SIZE(chunk) > chunk_size);
   
@@ -239,15 +362,15 @@ static inline Free_Chunk *partition_abnormal_free_chunk(Sspace *sspace,Free_Chun
   
   new_chunk->adj_next = chunk->adj_next;
   chunk->adj_next = (Chunk_Header_Basic*)new_chunk;
-  sspace_put_free_chunk(sspace, chunk);
+  wspace_put_free_chunk(wspace, chunk);
   new_chunk->status = CHUNK_FREE;
   return new_chunk;
 }
 
-Free_Chunk *sspace_get_normal_free_chunk(Sspace *sspace)
+Free_Chunk *wspace_get_normal_free_chunk(Wspace *wspace)
 {
-  Free_Chunk_List *aligned_lists = sspace->aligned_free_chunk_lists;
-  Free_Chunk_List *unaligned_lists = sspace->unaligned_free_chunk_lists;
+  Free_Chunk_List *aligned_lists = wspace->aligned_free_chunk_lists;
+  Free_Chunk_List *unaligned_lists = wspace->unaligned_free_chunk_lists;
   Free_Chunk_List *list = NULL;
   Free_Chunk *chunk = NULL;
   
@@ -259,7 +382,7 @@ Free_Chunk *sspace_get_normal_free_chunk(Sspace *sspace)
       chunk = free_list_get_head(list);
     if(chunk){
       if(CHUNK_SIZE(chunk) > NORMAL_CHUNK_SIZE_BYTES)
-        chunk = partition_normal_free_chunk(sspace, chunk);
+        chunk = partition_normal_free_chunk(wspace, chunk);
       //zeroing_free_chunk(chunk);
       return chunk;
     }
@@ -277,7 +400,7 @@ Free_Chunk *sspace_get_normal_free_chunk(Sspace *sspace)
     if(list->head)
       chunk = free_list_get_head(list);
     if(chunk){
-      chunk = partition_normal_free_chunk(sspace, chunk);
+      chunk = partition_normal_free_chunk(wspace, chunk);
       assert(!((POINTER_SIZE_INT)chunk & NORMAL_CHUNK_LOW_MASK));
       //zeroing_free_chunk(chunk);
       return chunk;
@@ -287,19 +410,19 @@ Free_Chunk *sspace_get_normal_free_chunk(Sspace *sspace)
   assert(!chunk);
   
   /* search in the hyper free chunk list */
-  chunk = sspace_get_hyper_free_chunk(sspace, NORMAL_CHUNK_SIZE_BYTES, TRUE);
+  chunk = wspace_get_hyper_free_chunk(wspace, NORMAL_CHUNK_SIZE_BYTES, TRUE);
   assert(!((POINTER_SIZE_INT)chunk & NORMAL_CHUNK_LOW_MASK));
   
   return chunk;
 }
 
-Free_Chunk *sspace_get_abnormal_free_chunk(Sspace *sspace, unsigned int chunk_size)
+Free_Chunk *wspace_get_abnormal_free_chunk(Wspace *wspace, unsigned int chunk_size)
 {
   assert(chunk_size > CHUNK_GRANULARITY);
   assert(!(chunk_size % CHUNK_GRANULARITY));
   assert(chunk_size <= HYPER_OBJ_THRESHOLD);
   
-  Free_Chunk_List *unaligned_lists = sspace->unaligned_free_chunk_lists;
+  Free_Chunk_List *unaligned_lists = wspace->unaligned_free_chunk_lists;
   Free_Chunk_List *list = NULL;
   Free_Chunk *chunk = NULL;
   unsigned int index = 0;
@@ -313,7 +436,7 @@ Free_Chunk *sspace_get_abnormal_free_chunk(Sspace *sspace, unsigned int chunk_si
       chunk = free_list_get_head(list);
     if(chunk){
       if(search_size > chunk_size)
-        chunk = partition_abnormal_free_chunk(sspace, chunk, chunk_size);
+        chunk = partition_abnormal_free_chunk(wspace, chunk, chunk_size);
       zeroing_free_chunk(chunk);
       return chunk;
     }
@@ -322,7 +445,7 @@ Free_Chunk *sspace_get_abnormal_free_chunk(Sspace *sspace, unsigned int chunk_si
   assert(!chunk);
   
   /* search in the hyper free chunk list */
-  chunk = sspace_get_hyper_free_chunk(sspace, chunk_size, FALSE);
+  chunk = wspace_get_hyper_free_chunk(wspace, chunk_size, FALSE);
   if(chunk) return chunk;
   
   /* Search again in abnormal chunk lists */
@@ -333,7 +456,7 @@ Free_Chunk *sspace_get_abnormal_free_chunk(Sspace *sspace, unsigned int chunk_si
       chunk = free_list_get_head(list);
     if(chunk){
       if(index > UNALIGNED_CHUNK_SIZE_TO_INDEX(chunk_size))
-        chunk = partition_abnormal_free_chunk(sspace, chunk, chunk_size);
+        chunk = partition_abnormal_free_chunk(wspace, chunk, chunk_size);
       zeroing_free_chunk(chunk);
       return chunk;
     }
@@ -343,12 +466,12 @@ Free_Chunk *sspace_get_abnormal_free_chunk(Sspace *sspace, unsigned int chunk_si
   return chunk;
 }
 
-Free_Chunk *sspace_get_hyper_free_chunk(Sspace *sspace, unsigned int chunk_size, Boolean is_normal_chunk)
+Free_Chunk *wspace_get_hyper_free_chunk(Wspace *wspace, unsigned int chunk_size, Boolean is_normal_chunk)
 {
   assert(chunk_size >= CHUNK_GRANULARITY);
   assert(!(chunk_size % CHUNK_GRANULARITY));
   
-  Free_Chunk_List *list = sspace->hyper_free_chunk_list;
+  Free_Chunk_List *list = wspace->hyper_free_chunk_list;
   lock(list->lock);
   
   Free_Chunk *prev_chunk = NULL;
@@ -384,9 +507,9 @@ Free_Chunk *sspace_get_hyper_free_chunk(Sspace *sspace, unsigned int chunk_size,
   
   if(chunk){
     if(is_normal_chunk)
-      chunk = partition_normal_free_chunk(sspace, chunk);
+      chunk = partition_normal_free_chunk(wspace, chunk);
     else if(CHUNK_SIZE(chunk) > chunk_size)
-      chunk = partition_abnormal_free_chunk(sspace, chunk, chunk_size);
+      chunk = partition_abnormal_free_chunk(wspace, chunk, chunk_size);
     if(!is_normal_chunk)
       zeroing_free_chunk(chunk);
   }
@@ -396,17 +519,17 @@ Free_Chunk *sspace_get_hyper_free_chunk(Sspace *sspace, unsigned int chunk_size,
   return chunk;
 }
 
-void sspace_collect_free_chunks_to_list(Sspace *sspace, Free_Chunk_List *list)
+void wspace_collect_free_chunks_to_list(Wspace *wspace, Free_Chunk_List *list)
 {
   unsigned int i;
   
   for(i = NUM_ALIGNED_FREE_CHUNK_BUCKET; i--;)
-    move_free_chunks_between_lists(list, &sspace->aligned_free_chunk_lists[i]);
+    move_free_chunks_between_lists(list, &wspace->aligned_free_chunk_lists[i]);
   
   for(i = NUM_UNALIGNED_FREE_CHUNK_BUCKET; i--;)
-    move_free_chunks_between_lists(list, &sspace->unaligned_free_chunk_lists[i]);
+    move_free_chunks_between_lists(list, &wspace->unaligned_free_chunk_lists[i]);
   
-  move_free_chunks_between_lists(list, sspace->hyper_free_chunk_list);
+  move_free_chunks_between_lists(list, wspace->hyper_free_chunk_list);
   
   Free_Chunk *chunk = list->head;
   while(chunk){
@@ -424,15 +547,23 @@ typedef struct PFC_Pool_Iterator {
 
 static PFC_Pool_Iterator pfc_pool_iterator;
 
-void sspace_init_pfc_pool_iterator(Sspace *sspace)
+void wspace_init_pfc_pool_iterator(Wspace *wspace)
 {
   assert(pfc_pool_iterator.lock == FREE_LOCK);
   pfc_pool_iterator.seg_index = 0;
   pfc_pool_iterator.chunk_index = 0;
 }
 
-Pool *sspace_grab_next_pfc_pool(Sspace *sspace)
+void wspace_exchange_pfc_pool(Wspace *wspace)
 {
+  Pool*** empty_pfc_pools = wspace->pfc_pools;
+  wspace->pfc_pools = wspace->pfc_pools_backup;
+  wspace->pfc_pools_backup = empty_pfc_pools;
+}
+
+Pool *wspace_grab_next_pfc_pool(Wspace *wspace)
+{
+  Pool*** pfc_pools = wspace->pfc_pools;
   Pool *pfc_pool = NULL;
   
   lock(pfc_pool_iterator.lock);
@@ -452,24 +583,24 @@ Pool *sspace_grab_next_pfc_pool(Sspace *sspace)
 
 #define min_value(x, y) (((x) < (y)) ? (x) : (y))
 
-Chunk_Header *sspace_steal_pfc(Sspace *sspace, unsigned int seg_index, unsigned int index)
+Chunk_Header *wspace_steal_pfc(Wspace *wspace, unsigned int seg_index, unsigned int index)
 {
-  Size_Segment *size_seg = sspace->size_segments[seg_index];
+  Size_Segment *size_seg = wspace->size_segments[seg_index];
   Chunk_Header *pfc = NULL;
   unsigned int max_index = min_value(index + PFC_STEAL_NUM + 1, size_seg->chunk_num);
   ++index;
   for(; index < max_index; ++index){
     if(!pfc_steal_flags[seg_index][index]) continue;
-    pfc = sspace_get_pfc(sspace, seg_index, index);
+    pfc = wspace_get_pfc(wspace, seg_index, index);
     if(pfc) return pfc;
   }
   return NULL;
 }
 
-static POINTER_SIZE_INT free_mem_in_pfc_pools(Sspace *sspace, Boolean show_chunk_info)
+static POINTER_SIZE_INT free_mem_in_pfc_pools(Wspace *wspace, Boolean show_chunk_info)
 {
-  Size_Segment **size_segs = sspace->size_segments;
-  Pool ***pfc_pools = sspace->pfc_pools;
+  Size_Segment **size_segs = wspace->size_segments;
+  Pool ***pfc_pools = wspace->pfc_pools;
   POINTER_SIZE_INT free_mem_size = 0;
   
   for(unsigned int i = 0; i < SIZE_SEGMENT_NUM; ++i){
@@ -496,14 +627,14 @@ static POINTER_SIZE_INT free_mem_in_pfc_pools(Sspace *sspace, Boolean show_chunk
         printf("Size: %x\tchunk num: %d\tLive Ratio: %f\n", NORMAL_INDEX_TO_SIZE(j, size_segs[i]), chunk_num, (float)alloc_num/total_slot_num);
 #endif
       free_mem_size += NORMAL_INDEX_TO_SIZE(j, size_segs[i]) * (total_slot_num-alloc_num);
-      assert(free_mem_size < sspace->committed_heap_size);
+      assert(free_mem_size < wspace->committed_heap_size);
     }
   }
   
   return free_mem_size;
 }
 
-static POINTER_SIZE_INT free_mem_in_free_lists(Sspace *sspace, Free_Chunk_List *lists, unsigned int list_num, Boolean show_chunk_info)
+static POINTER_SIZE_INT free_mem_in_free_lists(Wspace *wspace, Free_Chunk_List *lists, unsigned int list_num, Boolean show_chunk_info)
 {
   POINTER_SIZE_INT free_mem_size = 0;
   
@@ -519,7 +650,7 @@ static POINTER_SIZE_INT free_mem_in_free_lists(Sspace *sspace, Free_Chunk_List *
       chunk = chunk->next;
     }
     free_mem_size += chunk_size * chunk_num;
-    assert(free_mem_size < sspace->committed_heap_size);
+    assert(free_mem_size < wspace->committed_heap_size);
 #ifdef SSPACE_CHUNK_INFO
     if(show_chunk_info)
       printf("Free Size: %x\tnum: %d\n", chunk_size, chunk_num);
@@ -529,11 +660,11 @@ static POINTER_SIZE_INT free_mem_in_free_lists(Sspace *sspace, Free_Chunk_List *
   return free_mem_size;
 }
 
-static POINTER_SIZE_INT free_mem_in_hyper_free_list(Sspace *sspace, Boolean show_chunk_info)
+static POINTER_SIZE_INT free_mem_in_hyper_free_list(Wspace *wspace, Boolean show_chunk_info)
 {
   POINTER_SIZE_INT free_mem_size = 0;
   
-  Free_Chunk_List *list = sspace->hyper_free_chunk_list;
+  Free_Chunk_List *list = wspace->hyper_free_chunk_list;
   Free_Chunk *chunk = list->head;
   while(chunk){
 #ifdef SSPACE_CHUNK_INFO
@@ -541,14 +672,14 @@ static POINTER_SIZE_INT free_mem_in_hyper_free_list(Sspace *sspace, Boolean show
       printf("Size: %x\n", CHUNK_SIZE(chunk));
 #endif
     free_mem_size += CHUNK_SIZE(chunk);
-    assert(free_mem_size < sspace->committed_heap_size);
+    assert(free_mem_size <= wspace->committed_heap_size);
     chunk = chunk->next;
   }
   
   return free_mem_size;
 }
 
-POINTER_SIZE_INT free_mem_in_sspace(Sspace *sspace, Boolean show_chunk_info)
+POINTER_SIZE_INT free_mem_in_wspace(Wspace *wspace, Boolean show_chunk_info)
 {
   POINTER_SIZE_INT free_mem_size = 0;
 
@@ -556,63 +687,63 @@ POINTER_SIZE_INT free_mem_in_sspace(Sspace *sspace, Boolean show_chunk_info)
   if(show_chunk_info)
     printf("\n\nPFC INFO:\n\n");
 #endif
-  free_mem_size += free_mem_in_pfc_pools(sspace, show_chunk_info);
+  free_mem_size += free_mem_in_pfc_pools(wspace, show_chunk_info);
 
 #ifdef SSPACE_CHUNK_INFO
   if(show_chunk_info)
     printf("\n\nALIGNED FREE CHUNK INFO:\n\n");
 #endif
-  free_mem_size += free_mem_in_free_lists(sspace, aligned_free_chunk_lists, NUM_ALIGNED_FREE_CHUNK_BUCKET, show_chunk_info);
+  free_mem_size += free_mem_in_free_lists(wspace, aligned_free_chunk_lists, NUM_ALIGNED_FREE_CHUNK_BUCKET, show_chunk_info);
 
 #ifdef SSPACE_CHUNK_INFO
   if(show_chunk_info)
     printf("\n\nUNALIGNED FREE CHUNK INFO:\n\n");
 #endif
-  free_mem_size += free_mem_in_free_lists(sspace, unaligned_free_chunk_lists, NUM_UNALIGNED_FREE_CHUNK_BUCKET, show_chunk_info);
+  free_mem_size += free_mem_in_free_lists(wspace, unaligned_free_chunk_lists, NUM_UNALIGNED_FREE_CHUNK_BUCKET, show_chunk_info);
 
 #ifdef SSPACE_CHUNK_INFO
   if(show_chunk_info)
     printf("\n\nSUPER FREE CHUNK INFO:\n\n");
 #endif
-  free_mem_size += free_mem_in_hyper_free_list(sspace, show_chunk_info);
+  free_mem_size += free_mem_in_hyper_free_list(wspace, show_chunk_info);
   
   return free_mem_size;
 }
 
 
 #ifdef SSPACE_CHUNK_INFO
-void sspace_chunks_info(Sspace *sspace, Boolean show_info)
+void wspace_chunks_info(Wspace *wspace, Boolean show_info)
 {
   if(!show_info) return;
   
-  POINTER_SIZE_INT free_mem_size = free_mem_in_sspace(sspace, TRUE);
+  POINTER_SIZE_INT free_mem_size = free_mem_in_wspace(wspace, TRUE);
   
-  float free_mem_ratio = (float)free_mem_size / sspace->committed_heap_size;
+  float free_mem_ratio = (float)free_mem_size / wspace->committed_heap_size;
   printf("\n\nFree mem ratio: %f\n\n", free_mem_ratio);
 }
 #endif
 
 
 /* Because this computation doesn't use lock, its result is not accurate. And it is enough. */
-POINTER_SIZE_INT sspace_free_memory_size(Sspace *sspace)
+POINTER_SIZE_INT wspace_free_memory_size(Wspace *wspace)
 {
   POINTER_SIZE_INT free_size = 0;
   
   vm_gc_lock_enum();
   /*
   for(unsigned int i=NUM_ALIGNED_FREE_CHUNK_BUCKET; i--;)
-    free_size += NORMAL_CHUNK_SIZE_BYTES * (i+1) * sspace->aligned_free_chunk_lists[i].chunk_num;
+    free_size += NORMAL_CHUNK_SIZE_BYTES * (i+1) * wspace->aligned_free_chunk_lists[i].chunk_num;
   
   for(unsigned int i=NUM_UNALIGNED_FREE_CHUNK_BUCKET; i--;)
-    free_size += CHUNK_GRANULARITY * (i+1) * sspace->unaligned_free_chunk_lists[i].chunk_num;
+    free_size += CHUNK_GRANULARITY * (i+1) * wspace->unaligned_free_chunk_lists[i].chunk_num;
   
-  Free_Chunk *hyper_chunk = sspace->hyper_free_chunk_list->head;
+  Free_Chunk *hyper_chunk = wspace->hyper_free_chunk_list->head;
   while(hyper_chunk){
     free_size += CHUNK_SIZE(hyper_chunk);
     hyper_chunk = hyper_chunk->next;
   }
   */
-  free_size = free_mem_in_sspace(sspace, FALSE);
+  free_size = free_mem_in_wspace(wspace, FALSE);
   vm_gc_unlock_enum();
   
   return free_size;
@@ -637,7 +768,7 @@ volatile unsigned int large_obj_num[LARGE_OBJ_ARRAY_NUM];
 volatile unsigned int super_obj_num[SUPER_OBJ_ARRAY_NUM];
 volatile unsigned int hyper_obj_num;
 
-void sspace_alloc_info(unsigned int size)
+void wspace_alloc_info(unsigned int size)
 {
   if(size <= MEDIUM_THRESHOLD)
     atomic_inc32(&small_obj_num[(size>>2)-1]);
@@ -651,7 +782,7 @@ void sspace_alloc_info(unsigned int size)
     atomic_inc32(&hyper_obj_num);
 }
 
-void sspace_alloc_info_summary(void)
+void wspace_alloc_info_summary(void)
 {
   unsigned int i;
   
@@ -685,3 +816,98 @@ void sspace_alloc_info_summary(void)
 }
 
 #endif
+
+#ifdef SSPACE_USE_FASTDIV
+
+static int total_malloc_bytes = 0;
+static char *cur_free_ptr = NULL;
+static int cur_free_bytes = 0;
+
+void *malloc_wrapper(int size)
+{
+	massert(size > 0);
+	if(!cur_free_ptr) {
+		cur_free_bytes = INIT_ALLOC_SIZE;
+		cur_free_ptr = (char*) STD_MALLOC(cur_free_bytes);
+	}
+	
+	massert(cur_free_bytes >= size);
+	
+	total_malloc_bytes += size;
+	cur_free_bytes -= size;
+	
+	void * ret = cur_free_ptr;
+	cur_free_ptr += size;
+	return ret;
+}
+
+void free_wrapper(int size)
+{
+	massert(size > 0);
+	massert(cur_free_ptr);
+	massert(total_malloc_bytes >= size);
+	cur_free_bytes += size;
+	total_malloc_bytes -= size;
+	cur_free_ptr -= size;
+}
+
+unsigned int *shift_table;
+unsigned short *compact_table[MAX_SLOT_SIZE_AFTER_SHIFTING];
+unsigned int mask[MAX_SLOT_SIZE_AFTER_SHIFTING];
+static int already_inited = 0;
+void fastdiv_init()
+{
+	if(already_inited) return;
+	already_inited = 1;
+	
+	int i;
+	int shift_table_size = (MAX_SLOT_SIZE + 1) * sizeof shift_table[0];
+	shift_table = (unsigned int *)malloc_wrapper(shift_table_size);
+	memset(shift_table, 0x00, shift_table_size) ;
+	for(i = MAX_SLOT_SIZE + 1;i--;) {
+		shift_table[i] = 0;
+		int v = i;
+		while(v && !(v & 1)) {
+			v >>= 1;
+			shift_table[i]++;
+		}
+	}
+
+	memset(compact_table, 0x00, sizeof compact_table);
+	memset(mask, 0x00, sizeof mask);
+	for(i = 1;i < 32;i += 2) {
+		int cur = 1;
+		unsigned short *p = NULL;
+		while(1) {
+			p = (unsigned short*)malloc_wrapper(cur * sizeof p[0]);
+			memset(p, 0xff, cur * sizeof p[0]);
+			int j;
+			for(j = 0; j <= MAX_ADDR_OFFSET;j += i) {
+				int pos = j & (cur - 1);
+				if(p[pos] == 0xffff) {
+					p[pos] = j / i;
+				}else {
+					break;
+				}
+			}
+			if(j <= MAX_ADDR_OFFSET) {
+				free_wrapper(cur * sizeof p[0]);
+				cur <<= 1;
+				p = NULL;
+			}else {
+				break;
+			}
+		}
+		massert(p);
+		mask[i] = cur - 1;
+		while(cur && p[cur - 1] == 0xffff) {
+			free_wrapper(sizeof p[0]);
+			cur--;
+		}
+		compact_table[i] = p;
+	}
+}
+
+#endif
+
+

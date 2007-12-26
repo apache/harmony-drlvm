@@ -31,8 +31,8 @@
 #define ALLOC_PREFETCH
 #endif
 
-#ifdef ALLOC_ZEROING
-#ifdef ALLOC_PREFETCH
+#ifdef ALLOC_ZEROING  /* ----------------- */
+#ifdef ALLOC_PREFETCH /* vvvvvvvvvvvvvvvv  */
 
 #ifdef _WINDOWS_
 #include <xmmintrin.h>
@@ -45,10 +45,10 @@ extern POINTER_SIZE_INT PREFETCH_DISTANCE;
 extern POINTER_SIZE_INT ZEROING_SIZE;
 extern POINTER_SIZE_INT PREFETCH_STRIDE;
 extern Boolean  PREFETCH_ENABLED;
-#else /* ALLOC_PREFETCH */
+#else /* ALLOC_PREFETCH  ^^^^^^^^^^^^^^^^ */
 #define ZEROING_SIZE	256
 #endif /* !ALLOC_PREFETCH */
-#endif /* ALLOC_ZEROING */
+#endif /* ALLOC_ZEROING  ----------------- */
 
 extern POINTER_SIZE_INT tls_gc_offset;
 
@@ -74,6 +74,7 @@ typedef struct Allocator{
   Space* alloc_space;
   GC   *gc;
   VmThreadHandle thread_handle;   /* This thread; */
+  unsigned int handshake_signal; /*Handshake is used in concurrent GC.*/
 }Allocator;
 
 inline void thread_local_unalloc(unsigned int size, Allocator* allocator)
@@ -150,7 +151,9 @@ FORCE_INLINE void allocator_init_free_block(Allocator* allocator, Block_Header* 
 {
     assert(alloc_block->status == BLOCK_FREE);
     alloc_block->status = BLOCK_IN_USE;
-
+#ifdef USE_UNIQUE_MOVE_COMPACT_GC
+    alloc_block->num_multi_block = 0;
+#endif
     /* set allocation context */
     void* new_free = alloc_block->free;
     allocator->free = new_free;
@@ -186,7 +189,8 @@ FORCE_INLINE void allocator_init_free_block(Allocator* allocator, Block_Header* 
 inline void alloc_context_reset(Allocator* allocator)
 {
   Block_Header* block = (Block_Header*)allocator->alloc_block;
-  /* it can be NULL if GC happens before the mutator resumes, or called by collector */
+  /* it can be NULL when GC happens before the mutator resumes (the memory is run out by other mutators),
+     or the function is called by collector after it finishes collection, before sleeps waiting for new task */
   if( block != NULL ){
     assert(block->status == BLOCK_IN_USE);
     block->free = allocator->free;
@@ -194,9 +198,9 @@ inline void alloc_context_reset(Allocator* allocator)
     allocator->alloc_block = NULL;
   }
 
-   allocator->free = NULL;
-   allocator->ceiling = NULL;
-   allocator->end = NULL;
+  allocator->free = NULL;
+  allocator->ceiling = NULL;
+  allocator->end = NULL;
 
   return;
 }

@@ -18,8 +18,8 @@
 #ifndef _SSPACE_ALLOC_H_
 #define _SSPACE_ALLOC_H_
 
-#include "sspace_chunk.h"
-#include "sspace_mark_sweep.h"
+#include "wspace_chunk.h"
+#include "wspace_mark_sweep.h"
 #include "../common/gc_concurrent.h"
 #include "../common/collection_scheduler.h"
 
@@ -75,7 +75,7 @@ inline unsigned int next_free_slot_index_in_table(POINTER_SIZE_INT *table, unsig
   unsigned int index_in_word = color_bits_index % BITS_PER_WORD;
   
   for(; word_index <= max_word_index; ++word_index, index_in_word = 0){
-    if(table[word_index] == cur_alloc_mask)
+    if((table[word_index] & cur_alloc_mask) == cur_alloc_mask)
       continue;
     index_in_word = next_free_index_in_color_word(table[word_index], index_in_word);
     if(index_in_word != MAX_SLOT_INDEX){
@@ -87,7 +87,7 @@ inline unsigned int next_free_slot_index_in_table(POINTER_SIZE_INT *table, unsig
   return MAX_SLOT_INDEX;
 }
 
-/* Only used in sspace compaction after sweeping now */
+/* Only used in wspace compaction after sweeping now */
 inline unsigned int next_alloc_slot_index_in_table(POINTER_SIZE_INT *table, unsigned int slot_index, unsigned int slot_num)
 {
   unsigned int max_word_index = ((slot_num-1) * COLOR_BITS_PER_OBJ) / BITS_PER_WORD;
@@ -141,8 +141,27 @@ inline void alloc_slot_in_table(POINTER_SIZE_INT *table, unsigned int slot_index
   unsigned int color_bits_index = slot_index * COLOR_BITS_PER_OBJ;
   unsigned int word_index = color_bits_index / BITS_PER_WORD;
   unsigned int index_in_word = color_bits_index % BITS_PER_WORD;
+    
+  volatile POINTER_SIZE_INT *p_color_word = &table[word_index];
+  assert(p_color_word);
   
-  table[word_index] |= cur_alloc_color << index_in_word;
+  POINTER_SIZE_INT mark_alloc_color = cur_alloc_color << index_in_word;
+  
+  POINTER_SIZE_INT old_word = *p_color_word;  
+  
+  POINTER_SIZE_INT new_word = old_word | mark_alloc_color;
+  while(new_word != old_word) {
+    POINTER_SIZE_INT temp = (POINTER_SIZE_INT)atomic_casptr((volatile void**)p_color_word, (void*)new_word, (void*)old_word);
+    if(temp == old_word){
+      return; /*returning true does not mean it's marked by this thread. */
+    }
+    old_word = *p_color_word;
+    assert(!slot_is_alloc_in_table(table, slot_index));
+    
+    new_word = old_word | mark_alloc_color;
+  }
+  return;
+  
 }
 
 /* We don't enable fresh chunk alloc for now,
@@ -163,15 +182,20 @@ inline void *alloc_in_chunk(Chunk_Header* &chunk)
   ++chunk->alloc_num;
   assert(chunk->base);
   void *p_obj = (void*)((POINTER_SIZE_INT)chunk->base + ((POINTER_SIZE_INT)chunk->slot_size * slot_index));
+
+  /*mark black is placed here because of race condition between ops color flip. */
+  if(p_obj && is_obj_alloced_live())
+    obj_mark_black_in_table((Partial_Reveal_Object*)p_obj, chunk->slot_size);
+  
+  //FIXME: Need barrier here.
+  //apr_memory_rw_barrier();
+  
   alloc_slot_in_table(table, slot_index);
   if(chunk->status & CHUNK_NEED_ZEROING)
     memset(p_obj, 0, chunk->slot_size);
 #ifdef SSPACE_VERIFY
-  sspace_verify_free_area((POINTER_SIZE_INT*)p_obj, chunk->slot_size);
+  wspace_verify_free_area((POINTER_SIZE_INT*)p_obj, chunk->slot_size);
 #endif
-
-  if(p_obj && gc_is_concurrent_mark_phase())
-    obj_mark_black_in_table((Partial_Reveal_Object*)p_obj, chunk->slot_size);
 
 #ifdef ENABLE_FRESH_CHUNK_ALLOC
   if(chunk->status & CHUNK_FRESH){
@@ -179,13 +203,10 @@ inline void *alloc_in_chunk(Chunk_Header* &chunk)
     chunk->slot_index = (slot_index < chunk->slot_num) ? slot_index : MAX_SLOT_INDEX;
   } else
 #endif
-    chunk->slot_index = next_free_slot_index_in_table(table, slot_index, chunk->slot_num);
-  if(chunk->slot_index == MAX_SLOT_INDEX){
-    chunk->status = CHUNK_USED | CHUNK_NORMAL;
-    chunk = NULL;
-  }
-  
-  assert(!chunk || chunk->slot_index < chunk->slot_num);
+
+  chunk->slot_index = next_free_slot_index_in_table(table, slot_index, chunk->slot_num);
+
+  if(chunk->alloc_num == chunk->slot_num) chunk->slot_index = MAX_SLOT_INDEX;  
   return p_obj;
 }
 

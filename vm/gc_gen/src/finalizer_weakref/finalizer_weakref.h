@@ -64,6 +64,7 @@ inline void scan_weak_reference(Collector *collector, Partial_Reveal_Object *p_o
   REF *p_referent_field = obj_get_referent_field(p_obj);
   REF p_referent = *p_referent_field;
   if (!p_referent) return;
+
   if(DURING_RESURRECTION){
     write_slot(p_referent_field, NULL);
     return;
@@ -86,6 +87,19 @@ inline void scan_weak_reference(Collector *collector, Partial_Reveal_Object *p_o
       break;
   }
 }
+
+inline void scan_weak_reference_direct(Collector *collector, Partial_Reveal_Object *p_obj, Scan_Slot_Func scan_slot)
+{
+  WeakReferenceType type = special_reference_type(p_obj);
+  if(type == NOT_REFERENCE)
+    return;
+  REF *p_referent_field = obj_get_referent_field(p_obj);
+  REF p_referent = *p_referent_field;
+  if (!p_referent) return;
+
+  scan_slot(collector, p_referent_field);
+}
+
 
 extern void gc_update_weakref_ignore_finref(GC *gc);
 extern void collector_identify_finref(Collector *collector);

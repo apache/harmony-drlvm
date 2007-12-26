@@ -43,14 +43,18 @@ typedef struct Collector{
   void *ceiling;
   void *end;
   void *alloc_block;
-  Chunk_Header ***local_chunks;
+  Chunk_Header ***local_chunks; /* this is for MARK-SWEEP GC */
   Space* alloc_space;
   GC* gc;
   VmThreadHandle thread_handle;   /* This thread; */
+  unsigned int handshake_signal; /*Handshake is used in concurrent GC.*/
   /* End of Allocator --> */
 
   /* FIXME:: for testing */
   Space* collect_space;
+  
+  /* backup allocator in case there are two target copy spaces, such as semispace GC */
+  Allocator* backup_allocator;
 
   Vector_Block *trace_stack;
   
@@ -77,10 +81,13 @@ typedef struct Collector{
   
   void(*task_func)(void*) ;   /* current task */
   
+  /* following three fields are to support LOS extension: to estimate MOS size */
   POINTER_SIZE_INT non_los_live_obj_size;
   POINTER_SIZE_INT los_live_obj_size;
   POINTER_SIZE_INT segment_live_size[NORMAL_SIZE_SEGMENT_NUM];
   unsigned int result;
+
+  Boolean collector_is_active;
 
   /*for collect statistics info*/
 #ifdef GC_GEN_STATS
@@ -95,6 +102,8 @@ void collector_initialize(GC* gc);
 void collector_reset(GC* gc);
 
 void collector_execute_task(GC* gc, TaskType task_func, Space* space);
+void collector_execute_task_concurrent(GC* gc, TaskType task_func, Space* space, unsigned int num_collectors);
+void collector_release_weakref_sets(GC* gc, unsigned int num_collectors);
 
 void collector_restore_obj_info(Collector* collector);
 #ifdef USE_32BITS_HASHCODE
@@ -104,6 +113,9 @@ void collector_attach_hashcode(Collector *collector);
 #ifndef USE_MARK_SWEEP_GC
 void gc_gen_hook_for_collector_init(Collector *collector);
 #endif
+
+Boolean is_collector_finished(GC* gc);
+void wait_collection_finish(GC* gc);
 
 inline Boolean gc_collection_result(GC* gc)
 {

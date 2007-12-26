@@ -85,10 +85,11 @@ Boolean verify_rootset_slot(REF* p_ref, Heap_Verifier* heap_verifier)
 {
   Partial_Reveal_Object* p_obj = read_slot(p_ref);
   assert(address_belongs_to_gc_heap(p_obj,heap_verifier->gc));
-#ifndef USE_MARK_SWEEP_GC
+#if !defined(USE_MARK_SWEEP_GC) && !defined(USE_UNIQUE_MOVE_COMPACT_GC)
   GC_Gen* gc    = (GC_Gen*)heap_verifier->gc;
   Space* mspace = gc_get_mos(gc);
   Space* lspace  = gc_get_los(gc);
+  Space* nos = gc_get_nos(gc);
 
   if(p_obj == NULL){
     if(gc_match_kind((GC*)gc, MAJOR_COLLECTION) ||(!heap_verifier->gc_is_gen_mode && !NOS_PARTIAL_FORWARD)){
@@ -115,7 +116,7 @@ Boolean verify_rootset_slot(REF* p_ref, Heap_Verifier* heap_verifier)
       assert(0);
       return FALSE;
     }
-#ifndef USE_MARK_SWEEP_GC
+#if !defined(USE_MARK_SWEEP_GC) && !defined(USE_UNIQUE_MOVE_COMPACT_GC)
   }else{
     if(heap_verifier->gc_verifier->is_before_fallback_collection){
       if(!address_belongs_to_gc_heap(p_obj, heap_verifier->gc)){
@@ -127,8 +128,16 @@ Boolean verify_rootset_slot(REF* p_ref, Heap_Verifier* heap_verifier)
     }
 
     if(!address_belongs_to_space(p_obj, mspace) && !address_belongs_to_space(p_obj, lspace) && !NOS_PARTIAL_FORWARD){
+      if( nos->collect_algorithm == MINOR_NONGEN_SEMISPACE_POOL){
+        if( obj_belongs_to_survivor_area((Sspace*)nos, p_obj)) return TRUE;
+        else{
+          printf("\nERROR: obj referenced by rootset is not in survivor_area after semispace GC!\n");
+          assert(0);
+        }
+      }
+      
+      printf("\nERROR: obj referenced by rootset is in NOS after GC!\n");
       assert(0);
-      printf("\nERROR: obj referenced by rootset is in nos after GC!\n");
       return FALSE;
    }
   }
@@ -260,5 +269,7 @@ void verifier_hashcode_log(GC_Verifier* gc_verifier)
 {
     printf(" %-14s:    %-7s |   Before %10d   |   After %10d   |\n", "hashcode", "NUM", gc_verifier->num_hash_before_gc, gc_verifier->num_hash_after_gc);
 }
+
+
 
 

@@ -19,7 +19,7 @@
 #define _MARKER_H_
 
 #include "../common/gc_space.h"
-#include "../mark_sweep/sspace_chunk.h"
+#include "../mark_sweep/wspace_chunk.h"
 
 typedef struct Marker{
   /* <-- first couple of fields are overloaded as Allocator */
@@ -31,6 +31,7 @@ typedef struct Marker{
   Space* alloc_space;
   GC* gc;
   VmThreadHandle thread_handle;   /* This thread; */
+  unsigned int handshake_signal; /*Handshake is used in concurrent GC.*/
   /* End of Allocator --> */
 
   /* FIXME:: for testing */
@@ -66,11 +67,13 @@ typedef struct Marker{
   POINTER_SIZE_INT segment_live_size[NORMAL_SIZE_SEGMENT_NUM];
   unsigned int result;
 
+  Boolean marker_is_active;
+
   VmEventHandle markroot_finished_event;
 
-  Boolean marker_is_active;
   int64 time_mark;
-  Marker* next; 
+  Marker* next;
+  unsigned int num_dirty_slots_traced;
 } Marker;
 
 typedef Marker* Marker_List;
@@ -92,4 +95,6 @@ Boolean is_mark_finished(GC* gc);
 
 
 #endif //_MARKER_H_
+
+
 

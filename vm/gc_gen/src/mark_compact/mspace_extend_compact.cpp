@@ -15,10 +15,6 @@
  *  limitations under the License.
  */
 
-/**
- * @author Chunrong Lai, 2006/12/25
- */
-
 #include "mspace_collect_compact.h"
 #include "../trace_forward/fspace.h"
 #include "../los/lspace.h"
@@ -45,11 +41,11 @@ static void set_first_and_end_block_to_move(Collector *collector, unsigned int m
     first_block_to_move = nos_start_block;
 }
 
-static POINTER_SIZE_INT fspace_shrink(Fspace *fspace)
+static POINTER_SIZE_INT nspace_shrink(Fspace *nspace)
 {
-  void *committed_nos_end = (void *)((POINTER_SIZE_INT)space_heap_start((Space *)fspace) + fspace->committed_heap_size);
+  void *committed_nos_end = (void *)((POINTER_SIZE_INT)space_heap_start((Space *)nspace) + nspace->committed_heap_size);
   
-  POINTER_SIZE_INT nos_used_size = (POINTER_SIZE_INT)nos_first_free_block - (POINTER_SIZE_INT)fspace->heap_start;
+  POINTER_SIZE_INT nos_used_size = (POINTER_SIZE_INT)nos_first_free_block - (POINTER_SIZE_INT)nspace->heap_start;
   POINTER_SIZE_INT nos_free_size = (POINTER_SIZE_INT)committed_nos_end - (POINTER_SIZE_INT)nos_first_free_block;
   POINTER_SIZE_INT decommit_size = (nos_used_size <= nos_free_size) ? nos_used_size : nos_free_size;
   assert(decommit_size);
@@ -64,26 +60,26 @@ static POINTER_SIZE_INT fspace_shrink(Fspace *fspace)
   Boolean result = vm_decommit_mem(decommit_base, decommit_size);
   assert(result == TRUE);
   
-  fspace->committed_heap_size = (POINTER_SIZE_INT)decommit_base - (POINTER_SIZE_INT)fspace->heap_start;
-  fspace->num_managed_blocks = (unsigned int)(fspace->committed_heap_size >> GC_BLOCK_SHIFT_COUNT);
+  nspace->committed_heap_size = (POINTER_SIZE_INT)decommit_base - (POINTER_SIZE_INT)nspace->heap_start;
+  nspace->num_managed_blocks = (unsigned int)(nspace->committed_heap_size >> GC_BLOCK_SHIFT_COUNT);
   
-  Block_Header *new_last_block = (Block_Header *)&fspace->blocks[fspace->num_managed_blocks - 1];
-  fspace->ceiling_block_idx = new_last_block->block_idx;
+  Block_Header *new_last_block = (Block_Header *)&nspace->blocks[nspace->num_managed_blocks - 1];
+  nspace->ceiling_block_idx = new_last_block->block_idx;
   new_last_block->next = NULL;
   
   return decommit_size;
 }
 
-static void link_mspace_extended_blocks(Mspace *mspace, Fspace *fspace)
+static void link_mspace_extended_blocks(Mspace *mspace, Fspace *nspace)
 {
   Block_Header *old_last_mos_block = (Block_Header *)(mos_first_new_block -1);
   old_last_mos_block->next = (Block_Header *)mos_first_new_block;
   void *new_committed_mos_end = (void *)((POINTER_SIZE_INT)space_heap_start((Space *)mspace) + mspace->committed_heap_size); 
   Block_Header *new_last_mos_block = (Block_Header *)((Block *)new_committed_mos_end -1);
-  new_last_mos_block->next = (Block_Header *)space_heap_start((Space *)fspace);
+  new_last_mos_block->next = (Block_Header *)space_heap_start((Space *)nspace);
 }
 
-static Block *mspace_extend_without_link(Mspace *mspace, Fspace *fspace, unsigned int commit_size)
+static Block *mspace_extend_without_link(Mspace *mspace, Fspace *nspace, unsigned int commit_size)
 {
   assert(commit_size && !(commit_size % GC_BLOCK_SIZE_BYTES));
   
@@ -267,11 +263,14 @@ static void move_compacted_blocks_to_mspace(Collector *collector, unsigned int a
 static volatile unsigned int num_space_changing_collectors = 0;
 
 #ifndef STATIC_NOS_MAPPING
+
+/* FIXME:: this is a sequential process, the atomic parallel constructs should be removed. 
+   Better to call this function in the sequential region of last phase. */
 void mspace_extend_compact(Collector *collector)
 {
   GC_Gen *gc_gen = (GC_Gen *)collector->gc;
-  Mspace *mspace = (Mspace *)gc_gen->mos;
-  Fspace *fspace = (Fspace *)gc_gen->nos;
+  Blocked_Space *mspace = (Blocked_Space *)gc_gen->mos;
+  Blocked_Space *nspace = (Blocked_Space *)gc_gen->nos;
 
   /*For_LOS adaptive: when doing EXTEND_COLLECTION, mspace->survive_ratio should not be updated in gc_decide_next_collect( )*/
   gc_gen->collect_kind |= EXTEND_COLLECTION;
@@ -281,18 +280,20 @@ void mspace_extend_compact(Collector *collector)
   atomic_cas32( &num_space_changing_collectors, 0, num_active_collectors + 1);
   old_num = atomic_inc32(&num_space_changing_collectors);
   if( ++old_num == num_active_collectors ){
-     Block *old_nos_boundary = fspace->blocks;
+     if(NOS_SIZE) /* when NOS_SIZE is speficied, it can't be shrunk. */
+       WARN2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]: MOS is overflowed, have to reduce NOS size.");
+     Block *old_nos_boundary = nspace->blocks;
      nos_boundary = &mspace->blocks[mspace->free_block_idx - mspace->first_block_idx];
-     if(fspace->num_managed_blocks != 0)
+     if(nspace->num_managed_blocks != 0) /* FIXME:: why can it be 0 here?? */
        assert(nos_boundary > old_nos_boundary);
      POINTER_SIZE_INT mem_change_size = ((Block *)nos_boundary - old_nos_boundary) << GC_BLOCK_SHIFT_COUNT;
-     fspace->heap_start = nos_boundary;
-     fspace->blocks = (Block *)nos_boundary;
-     fspace->committed_heap_size -= mem_change_size;
-     fspace->num_managed_blocks = (unsigned int)(fspace->committed_heap_size >> GC_BLOCK_SHIFT_COUNT);
-     fspace->num_total_blocks = fspace->num_managed_blocks;
-     fspace->first_block_idx = mspace->free_block_idx;
-     fspace->free_block_idx = fspace->first_block_idx;
+     nspace->heap_start = nos_boundary;
+     nspace->blocks = (Block *)nos_boundary;
+     nspace->committed_heap_size -= mem_change_size;
+     nspace->num_managed_blocks = (unsigned int)(nspace->committed_heap_size >> GC_BLOCK_SHIFT_COUNT);
+     nspace->num_total_blocks = nspace->num_managed_blocks;
+     nspace->first_block_idx = mspace->free_block_idx;
+     nspace->free_block_idx = nspace->first_block_idx;
      
      mspace->heap_end = nos_boundary;
      mspace->committed_heap_size += mem_change_size;
@@ -315,7 +316,7 @@ void mspace_extend_compact(Collector *collector)
 {
   GC_Gen *gc_gen = (GC_Gen *)collector->gc;
   Mspace *mspace = gc_gen->mos;
-  Fspace *fspace = gc_gen->nos;
+  Fspace *nspace = gc_gen->nos;
   Lspace *lspace = gc_gen->los;
 
   /*For_LOS adaptive: when doing EXTEND_COLLECTION, mspace->survive_ratio should not be updated in gc_decide_next_collect( )*/
@@ -324,7 +325,7 @@ void mspace_extend_compact(Collector *collector)
   unsigned int num_active_collectors = gc_gen->num_active_collectors;
   unsigned int old_num;
   
-  Block *nos_first_block = fspace->blocks;
+  Block *nos_first_block = nspace->blocks;
   nos_first_free_block = &mspace->blocks[mspace->free_block_idx - mspace->first_block_idx];
   assert(nos_first_free_block > nos_first_block);
   
@@ -333,8 +334,8 @@ void mspace_extend_compact(Collector *collector)
     atomic_cas32( &num_space_changing_collectors, 0, num_active_collectors + 1);
     old_num = atomic_inc32(&num_space_changing_collectors);
     if( old_num == 0 ){
-      unsigned int mem_changed_size = fspace_shrink(fspace);
-      mos_first_new_block = mspace_extend_without_link(mspace, fspace, mem_changed_size);
+      unsigned int mem_changed_size = nspace_shrink(nspace);
+      mos_first_new_block = mspace_extend_without_link(mspace, nspace, mem_changed_size);
       
       set_first_and_end_block_to_move(collector, mem_changed_size);
       //mspace_block_iter_init_for_extension(mspace, (Block_Header *)first_block_to_move);
@@ -353,7 +354,7 @@ void mspace_extend_compact(Collector *collector)
       /* init the iterator: prepare for refixing */
       lspace_refix_repointed_refs(collector, lspace, (void *)first_block_to_move, (void *)nos_first_free_block, (first_block_to_move - mos_first_new_block) << GC_BLOCK_SHIFT_COUNT);
       gc_refix_rootset(collector, (void *)first_block_to_move, (void *)nos_first_free_block, (first_block_to_move - mos_first_new_block) << GC_BLOCK_SHIFT_COUNT);
-      link_mspace_extended_blocks(mspace, fspace);
+      link_mspace_extended_blocks(mspace, nspace);
       mspace_block_iter_init_for_extension(mspace, (Block_Header *)first_block_to_move);
       num_refixing_collectors++;
     }

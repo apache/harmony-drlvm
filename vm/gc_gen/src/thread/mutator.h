@@ -37,12 +37,17 @@ typedef struct Mutator {
   Space* alloc_space;
   GC* gc;
   VmThreadHandle thread_handle;   /* This thread; */
+  volatile unsigned int handshake_signal; /*Handshake is used in concurrent GC.*/
+  
   /* END of Allocator --> */
   
   Vector_Block* rem_set;
   Vector_Block* obj_with_fin;
   Mutator* next;  /* The gc info area associated with the next active thread. */
-  Vector_Block* dirty_obj_snapshot;
+  Vector_Block* dirty_set;
+  SpinLock dirty_set_lock;
+  unsigned int dirty_obj_slot_num; //only ON_THE_FLY
+  unsigned int dirty_obj_num; //concurrent mark  
 } Mutator;
 
 void mutator_initialize(GC* gc, void* tls_gc_info);
@@ -52,6 +57,19 @@ void mutator_reset(GC *gc);
 void gc_reset_mutator_context(GC* gc);
 void gc_prepare_mutator_remset(GC* gc);
 
-Boolean gc_local_snapshot_is_empty(GC* gc);
-Vector_Block* gc_get_local_snapshot(GC* gc, unsigned int shared_id);
+Boolean gc_local_dirtyset_is_empty(GC* gc);
+Vector_Block* gc_get_local_dirty_set(GC* gc, unsigned int shared_id);
+
+inline void mutator_post_signal(Mutator* mutator, unsigned int handshake_signal)
+{ 
+  //FIXME: Need barrier here.
+  //apr_memory_rw_barrier();
+  mutator->handshake_signal = handshake_signal; 
+  //apr_memory_rw_barrier();
+}
+
+inline void wait_mutator_signal(Mutator* mutator, unsigned int handshake_signal)
+{ while(mutator->handshake_signal == handshake_signal); }
+
+
 #endif /*ifndef _MUTATOR_H_ */

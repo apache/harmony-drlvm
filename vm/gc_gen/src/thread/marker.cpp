@@ -198,6 +198,7 @@ void marker_reset_thread(Marker* marker)
 
 void assign_marker_with_task(GC* gc, TaskType task_func, Space* space)
 {
+  gc->num_active_markers = gc->num_markers;
   for(unsigned int i=0; i<gc->num_markers; i++)
   {
     Marker* marker = gc->markers[i];
@@ -216,7 +217,8 @@ void assign_marker_with_task(GC* gc, TaskType task_func, Space* space, unsigned 
   gc->num_active_markers += num_markers;
   for(; i < gc->num_active_markers; i++)
   {
-    printf("start mark thread %d \n", i);
+    //printf("start mark thread %d \n", i);
+    
     Marker* marker = gc->markers[i];
     
     marker_reset_thread(marker);
@@ -227,16 +229,9 @@ void assign_marker_with_task(GC* gc, TaskType task_func, Space* space, unsigned 
   return;
 }
 
-void marker_execute_task(GC* gc, TaskType task_func, Space* space)
-{
-  assign_marker_with_task(gc, task_func, space);
-  wait_mark_finish(gc);    
-  return;
-}
-
 void wait_mark_root_finish(GC* gc)
 {
-  unsigned int num_marker = gc->num_markers;
+  unsigned int num_marker = gc->num_active_markers;
   for(unsigned int i=0; i<num_marker; i++)
   {
     Marker* marker = gc->markers[i];
@@ -257,6 +252,14 @@ void wait_mark_root_finish(GC* gc, unsigned int num_markers)
   return;
 }
 
+void marker_execute_task(GC* gc, TaskType task_func, Space* space)
+{
+  assign_marker_with_task(gc, task_func, space);  
+  wait_mark_root_finish(gc);
+  wait_mark_finish(gc);    
+  return;
+}
+
 void marker_execute_task_concurrent(GC* gc, TaskType task_func, Space* space)
 {
   assign_marker_with_task(gc, task_func, space);
@@ -273,4 +276,6 @@ void marker_execute_task_concurrent(GC* gc, TaskType task_func, Space* space, un
   wait_mark_root_finish(gc, num_markers);
   return;
 }
+
+
 
