@@ -33,6 +33,7 @@
 #include "cxxlog.h"
 #include "open/ti_thread.h"
 #include "suspend_checker.h"
+#include "exceptions.h"
 
 
 /*
@@ -117,7 +118,10 @@ jvmtiRawMonitorWait(jvmtiEnv* env,
                     jrawMonitorID monitor,
                     jlong millis)
 {
-    return (jvmtiError)jthread_raw_monitor_wait(monitor, millis);
+    jvmtiError res = (jvmtiError)jthread_raw_monitor_wait(monitor, millis);
+    if (exn_raised() && res == JVMTI_ERROR_INTERRUPT)
+        return JVMTI_ERROR_NONE;
+    return res;
 } // jvmtiRawMonitorWait
 
 
