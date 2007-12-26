@@ -418,6 +418,7 @@ VMCORE_0.1 {
     jthread_get_thread_user_cpu_time;
     jthread_get_thread_waited_time;
     jthread_get_thread_waited_times_count;
+    jthread_get_tm_data;
     jthread_get_total_started_thread_count;
     jthread_get_vm_thread_ptr_safe;
     jthread_get_waited_count;
@@ -461,6 +462,7 @@ VMCORE_0.1 {
     jthread_set_priority;
     jthread_set_thread_contention_monitoring_enabled;
     jthread_set_thread_cpu_time_enabled;
+    jthread_set_tm_data;
     jthread_sleep;
     jthread_stop;
     jthread_suspend;
@@ -631,8 +633,6 @@ VMCORE_0.1 {
     vm_hint_finalize;
     vm_instanceof_class;
     vm_iterate_object;
-    vm_jthread_get_tm_data;
-    vm_jthread_set_tm_data;
     vm_load_jit;
     vm_managed_calling_convention;
     vm_max_fast_instanceof_depth;

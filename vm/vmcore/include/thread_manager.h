@@ -169,11 +169,17 @@ public:
     struct ClassLoader *onload_caller;
 
     /**
-    * Flag to detect if a class is not found on bootclasspath,
-    * as opposed to linkage errors.
-    * Used for implementing default delegation model.
-    */
+     * Flag to detect if a class is not found on bootclasspath,
+     * as opposed to linkage errors.
+     * Used for implementing default delegation model.
+     */
     unsigned char class_not_found;
+
+    /**
+     * Flag to detect if a thread is suspend.
+     * Used for serialization Java suspend.
+     */
+    unsigned char suspend_flag;
 
     // In case exception is thrown, Exception object is put here
     volatile struct Exception thread_exception;
@@ -293,7 +299,7 @@ VMEXPORT jint vm_attach(JavaVM * java_vm, JNIEnv ** p_jni_env);
 /**
  * Frees java related resources before thread exit.
  */
-VMEXPORT jint vm_detach(jthread java_thread);
+VMEXPORT jint vm_detach(jobject java_thread);
 
 /**
  * Stores a pointer to TM-specific data in the <code>java.lang.Thread</code> object.
@@ -305,7 +311,7 @@ VMEXPORT jint vm_detach(jthread java_thread);
  *                        is going to be used for data storage
  * @param[in] data_ptr  - a pointer to data to be stored
  */
-VMEXPORT void vm_jthread_set_tm_data(jthread thread, void *data_ptr);
+VMEXPORT void jthread_set_tm_data(jobject thread, void *data_ptr);
 
 /**
  * Retrieves TM-specific data from the <code>java.lang.Thread</code> object.
@@ -315,7 +321,7 @@ VMEXPORT void vm_jthread_set_tm_data(jthread thread, void *data_ptr);
  * @return TM-specific data previously stored, or <code>NULL</code>,
  *         if there are none.
  */
-VMEXPORT hythread_t vm_jthread_get_tm_data(jthread thread);
+VMEXPORT void* jthread_get_tm_data(jobject thread);
 
 /**
  * <code>vm_objects_are_equal<br>
@@ -365,6 +371,29 @@ hy_inline vm_thread_t jthread_get_vm_thread_unsafe(hythread_t native)
     return (native && native->java_status != TM_STATUS_WITHOUT_JAVA)
             ? ((vm_thread_t)native) : NULL;
 } // jthread_get_vm_thread_unsafe
+
+/**
+ * Gets native thread associated with a given Java thread.
+ * @return native thread
+ */
+hy_inline hythread_t jthread_get_native_thread(jobject java_thread)
+{
+    assert(java_thread);
+    return (hythread_t)jthread_get_tm_data(java_thread);
+} // jthread_get_native_thread
+
+/**
+ * Gets VM_thread associated with a given Java thread.
+ * @return pointer to VM_thread or NULL
+ */
+hy_inline vm_thread_t jthread_get_vm_thread_from_java(jobject java_thread)
+{
+    vm_thread_t vm_thread;
+    assert(java_thread);
+    vm_thread = (vm_thread_t)jthread_get_tm_data(java_thread);
+    return (vm_thread && ((hythread_t)vm_thread)->java_status == TM_STATUS_INITIALIZED)
+            ? vm_thread : NULL;
+} // jthread_get_vm_thread_from_java
 
 #ifdef __cplusplus
 }

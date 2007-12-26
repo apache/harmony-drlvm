@@ -106,7 +106,7 @@ void VMCALL hythread_safe_point()
  */
 void VMCALL hythread_safe_point_other(hythread_t thread)
 {
-    thread_safe_point_impl(tm_self_tls);
+    thread_safe_point_impl(thread);
 }
 
 
@@ -152,16 +152,21 @@ static void thread_safe_point_impl(hythread_t thread)
  * Calling wait_safe_region_event() could be called
  * to wait for safe region or safe point.
  */
-static void send_suspend_request(hythread_t thread)
+void VMCALL hythread_send_suspend_request(hythread_t thread)
 {
     // increment suspend count
     apr_atomic_inc32(&thread->suspend_count);
     apr_atomic_inc32(&thread->request);
+
+    if (thread != hythread_self()) {
+        // notify target thread about suspend request change
+        hythread_yield_other(thread);
+    }
 }
 
 /**
  * Waits until a given thread reaches a safe region.
- * The method is called after send_suspend_request() function
+ * The method is called after hythread_send_suspend_request() function
  * as the second part of suspension.
  */
 static IDATA wait_safe_region_event(hythread_t thread)
@@ -201,7 +206,7 @@ void VMCALL hythread_suspend()
 {
     hythread_t self = tm_self_tls;
 
-    send_suspend_request(self);
+    hythread_send_suspend_request(self);
 
     hymutex_lock(&self->mutex);
     self->state |= TM_THREAD_STATE_SUSPENDED;
@@ -250,7 +255,7 @@ IDATA VMCALL hythread_suspend_other(hythread_t thread)
     }
 
     // suspend another thread
-    send_suspend_request(thread);
+    hythread_send_suspend_request(thread);
     if (wait_safe_region_event(thread) != TM_ERROR_NONE) {
         hythread_resume(thread);
         return TM_ERROR_EBUSY;
@@ -377,7 +382,7 @@ IDATA VMCALL hythread_suspend_all(hythread_iterator_t* iter_ptr,
     iter = hythread_iterator_create(group);
     while ((next = hythread_iterator_next(&iter)) != NULL) {
         if (next != self) {
-            send_suspend_request(next);
+            hythread_send_suspend_request(next);
         }
     }
     hythread_iterator_reset(&iter);

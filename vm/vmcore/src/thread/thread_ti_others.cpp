@@ -105,9 +105,9 @@ void jthread_set_thread_contention_monitoring_enabled(jboolean flag)
 JVMTILocalStorage *jthread_get_jvmti_local_storage(jthread java_thread)
 {
     assert(java_thread);
-    hythread_t native_thread = vm_jthread_get_tm_data(java_thread);
-    assert(native_thread);
-    jvmti_thread_t jvmti_thread = jthread_get_jvmti_thread(native_thread);
+    vm_thread_t vm_thread = jthread_get_vm_thread_from_java(java_thread);
+    assert(vm_thread);
+    jvmti_thread_t jvmti_thread = &vm_thread->jvmti_thread;
     assert(jvmti_thread);
     return &jvmti_thread->jvmti_local_storage;
 } // jthread_get_jvmti_local_storage

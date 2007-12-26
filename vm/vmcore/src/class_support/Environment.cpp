@@ -142,6 +142,7 @@ ready_for_exceptions(false)
     p_handle_lock = new Lock_Manager();
     p_method_call_lock = new Lock_Manager();
     p_dclist_lock = new Lock_Manager();
+    p_suspend_lock = new Lock_Manager();
 
     //
     // preloaded classes
@@ -247,6 +248,7 @@ Global_Env::~Global_Env()
     delete p_handle_lock;
     delete p_method_call_lock;
     delete p_dclist_lock;
+    delete p_suspend_lock;
 
     // Unload jit instances.
     vm_delete_all_jits();

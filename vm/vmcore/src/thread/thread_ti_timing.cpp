@@ -44,9 +44,9 @@ jthread_get_thread_blocked_time(jthread java_thread, jlong * nanos_ptr)
 {
     assert(java_thread);
     assert(nanos_ptr);
-    hythread_t native_thread = vm_jthread_get_tm_data(java_thread);
-    assert(native_thread);
-    jvmti_thread_t jvmti_thread = jthread_get_jvmti_thread(native_thread);
+    vm_thread_t vm_thread = jthread_get_vm_thread_from_java(java_thread);
+    assert(vm_thread);
+    jvmti_thread_t jvmti_thread = &vm_thread->jvmti_thread;
     if (jvmti_thread)
         *nanos_ptr = jvmti_thread->blocked_time;
 	else
@@ -67,7 +67,7 @@ jthread_get_thread_cpu_time(jthread java_thread, jlong * nanos_ptr)
 
     assert(nanos_ptr);
     hythread_t native_thread = (NULL == java_thread)
-        ? hythread_self() : vm_jthread_get_tm_data(java_thread);
+        ? hythread_self() : jthread_get_native_thread(java_thread);
     assert(native_thread);
     return hythread_get_thread_times(native_thread, &kernel_time,
                                      nanos_ptr);
@@ -94,14 +94,14 @@ jthread_get_thread_user_cpu_time(jthread java_thread, jlong * nanos_ptr)
 {
     assert(nanos_ptr);
     assert(java_thread);
-    hythread_t native_thread = vm_jthread_get_tm_data(java_thread);
+    hythread_t native_thread = jthread_get_native_thread(java_thread);
     assert(native_thread);
 
     int64 kernel_time;
     int64 user_time;
     IDATA status = hythread_get_thread_times(native_thread,
                         &kernel_time, &user_time);
-    assert(status != TM_ERROR_NONE);
+    assert(status == TM_ERROR_NONE);
     *nanos_ptr = user_time;
     return TM_ERROR_NONE;
 } // jthread_get_thread_user_cpu_time
@@ -117,9 +117,9 @@ jthread_get_thread_waited_time(jthread java_thread, jlong * nanos_ptr)
 {
     assert(java_thread);
     assert(nanos_ptr);
-    hythread_t native_thread = vm_jthread_get_tm_data(java_thread);
-    assert(native_thread);
-    jvmti_thread_t jvmti_thread = jthread_get_jvmti_thread(native_thread);
+    vm_thread_t vm_thread = jthread_get_vm_thread_from_java(java_thread);
+    assert(vm_thread);
+    jvmti_thread_t jvmti_thread = &vm_thread->jvmti_thread;
     if (jvmti_thread)
         *nanos_ptr = jvmti_thread->waited_time;
 	else

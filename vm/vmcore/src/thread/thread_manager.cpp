@@ -96,6 +96,15 @@ void jthread_deallocate_vm_thread_pool(vm_thread_t vm_thread)
     // Destroy current VM_thread pool.
     apr_pool_destroy(vm_thread->pool);
 
+    // resume thread if it was suspended
+    // dead thread resume has no affect
+    Lock_Manager *suspend_lock = VM_Global_State::loader_env->p_suspend_lock;
+    suspend_lock->_lock();
+    if (vm_thread->suspend_flag) {
+        hythread_resume((hythread_t)vm_thread);
+    }
+    suspend_lock->_unlock();
+
     // zero VM_thread structure
     memset(&vm_thread->java_thread, 0,
         sizeof(VM_thread) - offsetof(VM_thread, java_thread));
@@ -218,51 +227,43 @@ extern "C" char *vm_get_object_class_name(void *ptr)
     return (char *) (((ManagedObject *) ptr)->vt()->clss->get_name()->bytes);
 }
 
-hythread_t vm_jthread_get_tm_data(jthread thread)
+void* jthread_get_tm_data(jobject thread)
 {
     static int offset = -1;
-    Class *clazz;
-    Field *field;
-    ManagedObject *thread_obj;
-    Byte *java_ref;
-    POINTER_SIZE_INT val;
 
-    hythread_suspend_disable();
-
-    thread_obj = ((ObjectHandle) thread)->object;
-    if (offset == -1) {
-        clazz = thread_obj->vt()->clss;
-        field = class_lookup_field_recursive(clazz, "vm_thread", "J");
-        offset = field->get_offset();
-    }
-    java_ref = (Byte *) thread_obj;
-    val = *(POINTER_SIZE_INT *) (java_ref + offset);
-
-    hythread_suspend_enable();
-
-    return (hythread_t) val;
-}
-
-void vm_jthread_set_tm_data(jthread thread, void *val)
-{
     hythread_suspend_disable();
 
     ManagedObject *thread_obj = ((ObjectHandle) thread)->object;
-
-    // offset 0 has an virtual table of object,
-    // thus field "vm_thread" cannot have such offset value
-    static unsigned offset = 0;
-    if (!offset) {
+    if (offset == -1) {
         Class *clazz = thread_obj->vt()->clss;
         Field *field = class_lookup_field_recursive(clazz, "vm_thread", "J");
         offset = field->get_offset();
     }
+    Byte *java_ref = (Byte *) thread_obj;
+    void **val = (void**)(java_ref + offset);
 
+    hythread_suspend_enable();
+
+    return *val;
+} // jthread_get_tm_data
+
+void jthread_set_tm_data(jobject thread, void *val)
+{
+    static unsigned offset = -1;
+
+    hythread_suspend_disable();
+
+    ManagedObject *thread_obj = ((ObjectHandle) thread)->object;
+    if (offset == -1) {
+        Class *clazz = thread_obj->vt()->clss;
+        Field *field = class_lookup_field_recursive(clazz, "vm_thread", "J");
+        offset = field->get_offset();
+    }
     Byte *java_ref = (Byte *) thread_obj;
     *(jlong *) (java_ref + offset) = (jlong) (POINTER_SIZE_INT) val;
 
     hythread_suspend_enable();
-}
+} // jthread_set_tm_data
 
 int vm_objects_are_equal(jobject obj1, jobject obj2)
 {

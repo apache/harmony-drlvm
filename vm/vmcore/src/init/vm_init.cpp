@@ -703,6 +703,7 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     vm_env = java_vm->vm_env;
 
     vm_thread_t main_thread = jthread_allocate_thread();
+    assert(main_thread);
     if (hythread_attach_ex((hythread_t)main_thread, NULL, NULL) != TM_ERROR_NONE) {
         return JNI_ERR;
     }

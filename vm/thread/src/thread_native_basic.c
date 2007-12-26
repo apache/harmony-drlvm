@@ -166,13 +166,20 @@ IDATA hythread_attach_ex(hythread_t new_thread,
                          hythread_group_t group)
 {
     IDATA status;
+    hythread_t self = hythread_self();
 
     assert(new_thread);
 
     hythread_struct_init(new_thread);
     assert(lib == NULL);
+
     new_thread->library = TM_LIBRARY;
-    new_thread->os_handle = os_thread_current();
+    if (self) {
+        // to avoid creating multiple OS handle
+        new_thread->os_handle = self->os_handle;
+    } else {
+        new_thread->os_handle = os_thread_current();
+    }
     assert(new_thread->os_handle);
 
     TRACE(("TM: native attached: native: %p ", new_thread));
@@ -182,6 +189,11 @@ IDATA hythread_attach_ex(hythread_t new_thread,
     hythread_set_self(new_thread);
     assert(new_thread == hythread_self());
 
+    if (self) {
+        // remove old attached thread
+        hythread_remove_from_group(self);
+        self->thread_id = new_thread->thread_id;
+    }
     return status;
 }
 
@@ -203,24 +215,22 @@ IDATA hythread_attach_ex(hythread_t new_thread,
  * @see hythread_detach
  */
 IDATA VMCALL hythread_attach(hythread_t *handle) {
-    IDATA status;
-    hythread_t self;
+    hythread_t thread;
+    IDATA status = TM_ERROR_NONE;
+    hythread_t self = hythread_self();
 
-    hythread_t thread = (hythread_t)calloc(1, hythread_get_struct_size());
-    assert(thread);
+    if (self) {
+        // thread is already attached, nothing to do
+        thread = self;
+    } else {
+        // create thread
+        thread = (hythread_t)calloc(1, hythread_get_struct_size());
+        assert(thread);
+        // attach thread
+        status = hythread_attach_ex(thread, NULL, NULL);
+    }
     if (handle) {
         *handle = thread;
-    }
-
-    // get current thread
-    self = hythread_self();
-
-    // attach thread
-    status = hythread_attach_ex(thread, NULL, NULL);
-
-    // restore current thread
-    if (self) {
-        hythread_set_self(self);
     }
     return status;
 }
@@ -264,20 +274,7 @@ void VMCALL hythread_detach_ex(hythread_t thread)
     assert(thread);
 
     // Detach if thread is attached to group.
-    if (thread->group) {
-        // The thread can be detached from the other thread in case
-        // of forceful termination by hythread_cancel(), but thread
-        // local storage can be zeroed only for current thread.
-        if (thread == hythread_self() ) {
-            hythread_set_self(NULL);
-        }
-        fast_thread_array[thread->thread_id] = NULL;
-
-        thread->prev->next = thread->next;
-        thread->next->prev = thread->prev;
-        thread->group->threads_count--;
-        thread->group = NULL;
-    }
+    hythread_remove_from_group(thread);
 
     // Send join event to those threads who called join on this thread.
     status = hylatch_count_down(thread->join_event);
@@ -331,8 +328,16 @@ IDATA VMCALL hythread_join_interruptable(hythread_t t, I_64 millis, IDATA nanos)
  * @return none
  */
 void VMCALL hythread_yield() {
-    //apr_thread_yield returns void 
     apr_thread_yield();
+}
+
+/**
+ * Yield the processor for another thread.
+ *
+ * @return none
+ */
+void VMCALL hythread_yield_other(hythread_t thread) {
+    os_thread_yield_other(thread->os_handle);
 }
 
 /** 
@@ -583,6 +588,39 @@ IDATA VMCALL hythread_set_to_group(hythread_t thread, hythread_group_t group) {
     hymutex_lock(&thread->mutex);
     thread->state |= TM_THREAD_STATE_ALIVE | TM_THREAD_STATE_RUNNABLE;
     hymutex_unlock(&thread->mutex);
+
+    status = hythread_global_unlock();
+    assert(status == TM_ERROR_NONE);
+
+    return TM_ERROR_NONE;
+}
+
+/**
+ * Detach thread from group if it is attached to.
+ */
+IDATA VMCALL hythread_remove_from_group(hythread_t thread)
+{
+    IDATA status;
+
+    if (!thread->group) {
+        return TM_ERROR_NONE;
+    }
+
+    status = hythread_global_lock();
+    assert(status == TM_ERROR_NONE);
+
+    // The thread can be detached from the other thread in case
+    // of forceful termination by hythread_cancel(), but thread
+    // local storage can be zeroed only for current thread.
+    if (thread == hythread_self() ) {
+        hythread_set_self(NULL);
+    }
+    fast_thread_array[thread->thread_id] = NULL;
+
+    thread->prev->next = thread->next;
+    thread->next->prev = thread->prev;
+    thread->group->threads_count--;
+    thread->group = NULL;
 
     status = hythread_global_unlock();
     assert(status == TM_ERROR_NONE);

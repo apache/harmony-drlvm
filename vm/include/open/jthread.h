@@ -86,8 +86,6 @@ VMEXPORT jthread jthread_get_thread(jlong thread_id);
  */
 //@{
 
-
-VMEXPORT hythread_t  jthread_get_native_thread(jthread thread);
 VMEXPORT jthread jthread_get_java_thread(hythread_t thread);
 
 
@@ -160,10 +158,10 @@ VMEXPORT IDATA jthread_park_until(jlong milis);
  */
 //@{
 
-VMEXPORT IDATA jthread_suspend(jthread thread);
-VMEXPORT IDATA jthread_suspend_all(jvmtiError* results, jint count, const jthread* thread_list);
-VMEXPORT IDATA jthread_resume(jthread thread);
-VMEXPORT IDATA jthread_resume_all(jvmtiError* results, jint count, const jthread* thread_list);
+VMEXPORT IDATA jthread_suspend(jobject thread);
+VMEXPORT IDATA jthread_suspend_all(jvmtiError* results, jint count, const jobject* thread_list);
+VMEXPORT IDATA jthread_resume(jobject thread);
+VMEXPORT IDATA jthread_resume_all(jvmtiError* results, jint count, const jobject* thread_list);
 VMEXPORT IDATA jthread_cancel_all();
 
 #ifdef __cplusplus

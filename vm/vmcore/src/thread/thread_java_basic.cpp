@@ -223,7 +223,7 @@ IDATA jthread_create_with_function(JNIEnv *jni_env,
     if (jni_env == NULL || java_thread == NULL || given_attrs == NULL) {
         return TM_ERROR_NULL_POINTER;
     }
-    hythread_t native_thread = vm_jthread_get_tm_data(java_thread);
+    hythread_t native_thread = jthread_get_native_thread(java_thread);
     assert(native_thread);
 
     vm_thread_t vm_thread = jthread_get_vm_thread_unsafe(native_thread);
@@ -441,7 +441,7 @@ jthread_associate_native_and_java_thread(JNIEnv * jni_env,
         (weak_ref) ? jni_env->NewGlobalRef(weak_ref) : NULL;
 
     // Associate java thread with native thread      
-    vm_jthread_set_tm_data(java_thread, vm_thread);
+    jthread_set_tm_data(java_thread, vm_thread);
 
     return TM_ERROR_NONE;
 } // jthread_associate_native_and_java_thread
@@ -482,9 +482,7 @@ static void stop_callback(void)
 IDATA jthread_stop(jthread java_thread)
 {
     assert(java_thread);
-    hythread_t native_thread = vm_jthread_get_tm_data(java_thread);
-    assert(native_thread);
-    vm_thread_t vm_thread = jthread_get_vm_thread(native_thread);
+    vm_thread_t vm_thread = (vm_thread_t)jthread_get_tm_data(java_thread);
     assert(vm_thread);
     JNIEnv *env = vm_thread->jni_env;
     assert(env);
@@ -506,9 +504,7 @@ IDATA jthread_stop(jthread java_thread)
 IDATA jthread_exception_stop(jthread java_thread, jobject excn)
 {
     assert(java_thread);
-    hythread_t native_thread = vm_jthread_get_tm_data(java_thread);
-    assert(native_thread);
-    vm_thread_t vm_thread = jthread_get_vm_thread(native_thread);
+    vm_thread_t vm_thread = jthread_get_vm_thread_from_java(java_thread);
     assert(vm_thread);
 
     // Install safepoint callback that would throw exception
@@ -516,7 +512,7 @@ IDATA jthread_exception_stop(jthread java_thread, jobject excn)
     assert(env);
     vm_thread->stop_exception = env->NewGlobalRef(excn);
 
-    return hythread_set_thread_stop_callback(native_thread, stop_callback);
+    return hythread_set_thread_stop_callback((hythread_t)vm_thread, stop_callback);
 } // jthread_exception_stop
 
 /**
@@ -619,17 +615,6 @@ jthread jthread_get_thread(jlong thread_id)
     assert(java_thread);
     return java_thread;
 } // jthread_get_thread
-
-/**
- * Returns native thread associated with the given Java <code>thread</code>.
- *
- * @return native thread
- */
-hythread_t jthread_get_native_thread(jthread thread)
-{
-    assert(thread);
-    return vm_jthread_get_tm_data(thread);
-} // jthread_get_native_thread
 
 /**
  * Returns Java thread associated with the given native <code>thread</code>.

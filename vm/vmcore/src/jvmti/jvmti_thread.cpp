@@ -197,8 +197,6 @@ jvmtiSuspendThread(jvmtiEnv* env,
     if (state & JVMTI_THREAD_STATE_SUSPENDED)
         return JVMTI_ERROR_THREAD_SUSPENDED;
 
-
-
     return (jvmtiError)jthread_suspend(thread);
 }
 

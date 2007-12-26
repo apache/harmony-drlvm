@@ -241,7 +241,7 @@ jint vm_attach(JavaVM * java_vm, JNIEnv ** p_jni_env)
 /**
  * Detaches current thread from VM.
  */
-jint vm_detach(jthread java_thread)
+jint vm_detach(jobject java_thread)
 {
     assert(hythread_is_suspend_enabled());
 

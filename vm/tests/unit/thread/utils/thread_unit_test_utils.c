@@ -238,7 +238,7 @@ void tested_threads_run_common(jvmtiStartFunction run_method_param){
         tts->attrs.arg = tts;
         tf_assert_same_v(jthread_create_with_function(jni_env, tts->java_thread, &tts->attrs), TM_ERROR_NONE);
         tested_thread_wait_started(tts);
-        tts->native_thread = (hythread_t) vm_jthread_get_tm_data(tts->java_thread);
+        tts->native_thread = jthread_get_native_thread(tts->java_thread);
     }
 }
 
@@ -336,10 +336,10 @@ int check_structure(tested_thread_sturct_t *tts){
     jvmti_thread_t jvmti_thread;
     hythread_t hythread;
 
-    hythread = (hythread_t) vm_jthread_get_tm_data(java_thread);
-    tf_assert_same(hythread, tts->native_thread);
-    vm_thread = jthread_get_vm_thread(hythread);
+    vm_thread = jthread_get_vm_thread_from_java(java_thread);
     tf_assert(vm_thread);
+    hythread = (hythread_t)vm_thread;
+    tf_assert_same(hythread, tts->native_thread);
     jvmti_thread = &(vm_thread->jvmti_thread);
     tf_assert(jvmti_thread);
     return TEST_PASSED;

@@ -58,7 +58,7 @@ int test_jthread_get_all_threads(void) {
         tts->attrs.arg = tts;
         tf_assert_same(jthread_create_with_function(jni_env, tts->java_thread, &tts->attrs), TM_ERROR_NONE);
         tested_thread_wait_started(tts);
-        tts->native_thread = (hythread_t) vm_jthread_get_tm_data(tts->java_thread);
+        tts->native_thread = jthread_get_native_thread(tts->java_thread);
         check_tested_thread_phase(tts, TT_PHASE_RUNNING);
         tf_assert_same(jthread_get_thread_count(&thread_count), TM_ERROR_NONE);
         tf_assert_same(jthread_get_all_threads(&threads, &all_threads_count), TM_ERROR_NONE);

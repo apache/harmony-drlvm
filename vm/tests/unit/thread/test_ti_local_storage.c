@@ -35,14 +35,14 @@ int test_jthread_set_and_get_local_storage(void)
     
     reset_tested_thread_iterator(&tts);
     while (next_tested_thread(&tts)) {
-        hythread = vm_jthread_get_tm_data(tts->java_thread);
+        hythread = jthread_get_native_thread(tts->java_thread);
         tf_assert(hythread);
         tf_assert_same(hythread_tls_set(hythread, TEST_TLS_KEY, tts),
                        TM_ERROR_NONE);
     }
     reset_tested_thread_iterator(&tts);
     while (next_tested_thread(&tts)) {
-        hythread = vm_jthread_get_tm_data(tts->java_thread);
+        hythread = jthread_get_native_thread(tts->java_thread);
         tf_assert(hythread);
         data = hythread_tls_get(hythread, TEST_TLS_KEY);
         tf_assert_same(data, tts);

@@ -422,11 +422,13 @@ IDATA VMCALL hythread_create_ex(hythread_t new_thread, hythread_group_t group, U
 IDATA VMCALL hythread_attach_ex(hythread_t new_handle, hythread_library_t lib, hythread_group_t group);
 void VMCALL hythread_detach_ex(hythread_t thread);
 IDATA VMCALL hythread_set_to_group(hythread_t thread, hythread_group_t group);
+IDATA VMCALL hythread_remove_from_group(hythread_t thread);
 void VMCALL hythread_set_self(hythread_t thread);
 UDATA VMCALL hythread_clear_interrupted_other(hythread_t thread);
 IDATA VMCALL hythread_join(hythread_t t);
 IDATA VMCALL hythread_join_timed(hythread_t t, I_64 millis, IDATA nanos);
 IDATA VMCALL hythread_join_interruptable(hythread_t t, I_64 millis, IDATA nanos);
+void VMCALL hythread_yield_other(hythread_t thread);
 IDATA VMCALL hythread_get_self_id();
 IDATA VMCALL hythread_get_id(hythread_t t);
 hythread_t VMCALL hythread_get_thread(IDATA id);
@@ -486,6 +488,7 @@ hy_inline void VMCALL hythread_suspend_disable();
 void hythread_safe_point();
 void hythread_safe_point_other(hythread_t thread);
 void VMCALL hythread_exception_safe_point();
+void VMCALL hythread_send_suspend_request(hythread_t thread);
 IDATA VMCALL hythread_suspend_other(hythread_t thread);
 
 IDATA VMCALL hythread_set_safepoint_callback(hythread_t thread, hythread_event_callback_proc callback);

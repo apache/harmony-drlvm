@@ -282,12 +282,14 @@ IDATA VMCALL jthread_get_jvmti_state(jthread java_thread, jint * state)
     assert(state);
     assert(java_thread);
 
+    hythread_t native_thread = jthread_get_native_thread(java_thread);
+    vm_thread_t vm_thread = jthread_get_vm_thread(native_thread);
     *state = 0;
-    hythread_t native_thread = vm_jthread_get_tm_data(java_thread);
     if (!native_thread) {
         // Not started yet
         return TM_ERROR_NONE;
     }
+
     if (hythread_is_alive(native_thread)) {
         *state |= JVMTI_THREAD_STATE_ALIVE;
     }
@@ -315,9 +317,6 @@ IDATA VMCALL jthread_get_jvmti_state(jthread java_thread, jint * state)
     if (hythread_is_parked(native_thread)) {
         *state |= JVMTI_THREAD_STATE_PARKED;
     }
-    if (hythread_is_suspended(native_thread)) {
-        *state |= JVMTI_THREAD_STATE_SUSPENDED;
-    }
     if (hythread_interrupted(native_thread)) {
         *state |= JVMTI_THREAD_STATE_INTERRUPTED;
     }
@@ -326,6 +325,9 @@ IDATA VMCALL jthread_get_jvmti_state(jthread java_thread, jint * state)
     }
     if (hythread_is_terminated(native_thread)) {
         *state |= JVMTI_THREAD_STATE_TERMINATED;
+    }
+    if (vm_thread && vm_thread->suspend_flag) {
+        *state |= JVMTI_THREAD_STATE_SUSPENDED;
     }
 
     return TM_ERROR_NONE;
@@ -362,8 +364,9 @@ IDATA VMCALL
 jthread_get_contended_monitor(jthread java_thread, jobject * monitor)
 {
     assert(java_thread);
-    hythread_t native_thread = vm_jthread_get_tm_data(java_thread);
-    jvmti_thread_t jvmti_thread = jthread_get_jvmti_thread(native_thread);
+    vm_thread_t vm_thread = jthread_get_vm_thread_from_java(java_thread);
+    assert(vm_thread);
+    jvmti_thread_t jvmti_thread = &vm_thread->jvmti_thread;
     if (jvmti_thread)
         *monitor = jvmti_thread->contended_monitor;
 	else
@@ -381,8 +384,9 @@ jthread_get_contended_monitor(jthread java_thread, jobject * monitor)
 IDATA VMCALL jthread_get_wait_monitor(jthread java_thread, jobject * monitor)
 {
     assert(java_thread);
-    hythread_t native_thread = vm_jthread_get_tm_data(java_thread);
-    jvmti_thread_t jvmti_thread = jthread_get_jvmti_thread(native_thread);
+    vm_thread_t vm_thread = jthread_get_vm_thread_from_java(java_thread);
+    assert(vm_thread);
+    jvmti_thread_t jvmti_thread = &vm_thread->jvmti_thread;
     if (jvmti_thread)
         *monitor = jvmti_thread->wait_monitor;
 	else
@@ -430,7 +434,7 @@ IDATA VMCALL jthread_get_lock_recursion(jobject monitor, jthread owner)
 {
     assert(monitor);
 
-    hythread_t given_thread = owner ? vm_jthread_get_tm_data(owner) : NULL;
+    hythread_t given_thread = owner ? jthread_get_native_thread(owner) : NULL;
 
     hythread_suspend_disable();
     hythread_thin_monitor_t *lockword = vm_object_get_lockword_addr(monitor);
@@ -468,8 +472,10 @@ jthread_get_owned_monitors(jthread java_thread,
     if (status != TM_ERROR_NONE) {
         return status;
     }
-    hythread_t native_thread = vm_jthread_get_tm_data(java_thread);
-    jvmti_thread_t jvmti_thread = jthread_get_jvmti_thread(native_thread);
+    assert(java_thread);
+    vm_thread_t vm_thread = jthread_get_vm_thread_from_java(java_thread);
+    assert(vm_thread);
+    jvmti_thread_t jvmti_thread = &vm_thread->jvmti_thread;
     if (!jvmti_thread)
 	{
         status = hythread_global_unlock();

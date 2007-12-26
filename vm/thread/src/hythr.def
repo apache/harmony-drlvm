@@ -23,6 +23,7 @@ hythread_set_self
 hythread_self_slow
 hythread_tls_free
 hythread_yield
+hythread_yield_other
 hythread_suspend
 hythread_interrupt
 hythread_tls_set
@@ -67,6 +68,7 @@ hythread_suspend_disable
 hythread_exception_safe_point
 hythread_safe_point
 hythread_safe_point_other
+hythread_send_suspend_request
 hythread_suspend_other
 hythread_set_safepoint_callback
 hythread_suspend_all

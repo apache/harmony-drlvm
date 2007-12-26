@@ -226,7 +226,7 @@ JNIEXPORT jboolean JNICALL Java_java_lang_VMThreadManager_isAlive
 {
     hythread_t tm_native_thread;
 
-    tm_native_thread = (hythread_t )vm_jthread_get_tm_data((jthread)thread);
+    tm_native_thread = jthread_get_native_thread(thread);
     assert(tm_native_thread);
     return hythread_is_alive(tm_native_thread) ? 1 : 0;
 }
@@ -249,12 +249,19 @@ JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_join
  * Signature: (Ljava/lang/Thread;)I
  */
 JNIEXPORT jint JNICALL Java_java_lang_VMThreadManager_getState
-  (JNIEnv * UNREF jenv, jclass clazz, jobject jthread)
+  (JNIEnv * UNREF jenv, jclass clazz, jobject java_thread)
 {
-    hythread_t tm_native_thread = jthread_get_native_thread(jthread);
-    IDATA retval = hythread_get_state(tm_native_thread);
+    jint state;
+    assert(java_thread);
+    jthread_get_jvmti_state(java_thread, &state);
 
-    return retval;
+    // FIXME - need to set WAITING state instead
+    hythread_t native_thread = jthread_get_native_thread(java_thread);
+    assert(native_thread);
+    if (hythread_is_parked(native_thread)) {
+        state |= TM_THREAD_STATE_PARKED;
+    }
+    return state;
 }
 
 
