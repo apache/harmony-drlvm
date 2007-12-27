@@ -16,8 +16,9 @@
  */
 
 #include "thread_manager.h"
-#include "testframe.h"
 #include <open/hythread_ext.h>
+#include "testframe.h"
+#include "thread_unit_test_utils.h"
 
 #define NMB 5
 
@@ -73,14 +74,14 @@ int test_wait_signal(void){
         status = hythread_monitor_exit(monitor);
         tf_assert_same(status, TM_ERROR_NONE);
 
-        hythread_sleep(100);
+        hythread_sleep(SLEEP_TIME);
     }
     status = hythread_monitor_exit(monitor);
 
 
     // Send one signal per tested thread
     for (i = 0; i < NMB; i++){
-        jthread_sleep(100, 0);
+        hythread_sleep(SLEEP_TIME);
 
         status = hythread_monitor_enter(monitor);
         tf_assert_same(status, TM_ERROR_NONE);
@@ -92,8 +93,7 @@ int test_wait_signal(void){
         tf_assert_same(status, TM_ERROR_NONE);
     }
     for (i = 0; i < NMB; i++){
-        hythread_sleep(100);
-        hythread_join(threads[i]);
+        test_thread_join(threads[i], i);
     }
     return 0;
 }

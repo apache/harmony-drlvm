@@ -16,8 +16,9 @@
  */
 
 #include <stdio.h>
-#include "testframe.h"
 #include <open/hythread_ext.h>
+#include "testframe.h"
+#include "thread_unit_test_utils.h"
 
 int start_proc(void *);
 /*
@@ -143,7 +144,7 @@ int test_hythread_thin_monitor_enter_contended(void){
     status = hythread_thin_monitor_exit(&lockword_ptr);
     tf_assert_same(status, TM_ERROR_NONE);
     hythread_suspend_enable();
-    hythread_join(thread);
+    test_thread_join(thread, 1);
     
     tf_assert_same((IDATA)args[1], 1);
     hythread_suspend_disable();
@@ -162,7 +163,7 @@ int test_hythread_thin_monitor_enter_contended(void){
     hythread_suspend_enable();
     tf_assert_same(status, TM_ERROR_NONE);
 
-    hythread_join(thread);
+    test_thread_join(thread, 1);
     
     tf_assert_same((IDATA)args[1], 1);
 

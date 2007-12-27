@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <open/hythread_ext.h>
 #include "testframe.h"
+#include "thread_unit_test_utils.h"
 #include "thread_manager.h"
 
 int started_thread_count;
@@ -85,8 +86,7 @@ int test_hythread_thread_suspend(void){
     // resume thread
     hythread_resume(thread);
 
-    status = hythread_join(thread);
-    tf_assert_same(status, TM_ERROR_NONE);
+    test_thread_join(thread, 1);
     
     tf_assert_same((IDATA)args[2], 1);
 
@@ -170,8 +170,7 @@ int test_hythread_thread_suspend_all(void)
     log_info("resume all suspended threads");
 
     for(i = 0; i < THREAD_COUNT; i++) {
-        status = hythread_join(thread_list[i]);
-        tf_assert_same(status, TM_ERROR_NONE);
+        test_thread_join(thread_list[i], i);
         log_info("%d thread is terminated", i + 1);
     }
 

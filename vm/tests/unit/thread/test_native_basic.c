@@ -17,48 +17,88 @@
 
 #include <stdio.h>
 #include "testframe.h"
+#include "thread_unit_test_utils.h"
 #include "thread_manager.h"
 
-int start_proc(void *);
-int start_proc_empty(void *);
+
+typedef struct proc_param {
+    hythread_group_t group;
+    UDATA stacksize;
+    jint priority;
+    hylatch_t start;
+    hylatch_t end;
+} proc_param;
+
+
+static int start_proc(void *args) {
+    proc_param *attrs = (proc_param *)args;
+    tf_assert_same(hythread_get_priority(hythread_self()), attrs->priority);
+    tf_assert_same(hythread_self()->group, attrs->group);
+    hylatch_count_down(attrs->end);
+    return 0;
+} // start_proc
+
+static int start_proc_empty(void *args) {
+    proc_param *attrs = (proc_param *)args;
+    hylatch_count_down(attrs->start);
+    hylatch_wait(attrs->end);
+    return 0;
+} // start_proc_empty
+
 
 int test_hythread_self_base(void) {
     hythread_t thread;
-    //check that this thread is attached(tm_init called)
-    ////
+
+    // check that this thread is attached to VM
     tf_assert(thread = hythread_self());
-   
-    return 0; 
-}
+
+    return 0;
+} // test_hythread_self_base
 
 /*
- * Test tm_create(..)
- */
-int test_hythread_create(void){
-    void **args; 
+* Test tm_create(..)
+*/
+int test_hythread_create(void) {
+    proc_param *args;
     hythread_t thread;
-    IDATA res;
-    
-    args = (void**)calloc(2, sizeof(void *));
-    
-    hythread_group_create((hythread_group_t *)&args[0]); 
-    
-    args[1] = calloc(1, sizeof(struct jthread_start_proc_data));
-    ((jthread_start_proc_data_t)args[1])->stacksize = 1024000;
-    ((jthread_start_proc_data_t)args[1])->priority  = 1;
-    
+    IDATA status;
+
+    args = (proc_param*)calloc(1, sizeof(proc_param));
+    tf_assert(args && "alloc proc_params failed");
+
+    status = hythread_group_create(&args->group);
+    tf_assert(status == TM_ERROR_NONE && "thread group creation failed");
+
+    status = hylatch_create(&args->end, 1);
+    tf_assert(status == TM_ERROR_NONE && "latch creation failed");
+
+    args->priority  = 1;
+
     thread = (hythread_t)calloc(1, hythread_get_struct_size());
     assert(thread);
-    res = hythread_create_ex(thread, args[0], 1024000, 1, NULL,
-        (hythread_entrypoint_t)start_proc, args);
-    tf_assert(res == TM_ERROR_NONE && "thread creation failed");
+    status = hythread_create_ex(thread, args->group, 1024000, 1, NULL,
+        (hythread_entrypoint_t)start_proc, (void*)args);
+    tf_assert(status == TM_ERROR_NONE && "thread creation failed");
 
-    res = hythread_join(thread);
-    tf_assert(res == TM_ERROR_NONE && "thread join failed");
+    // Wait util tested thread have finished.
+    status = hylatch_wait(args->end);
+    tf_assert(status == TM_ERROR_NONE && "thread finished failed");
+
+    status = hylatch_destroy(args->end);
+    tf_assert(status == TM_ERROR_NONE && "latch destroy failed");
+
+    hythread_sleep(SLEEP_TIME);
+    hythread_group_release(args->group);
+
+    free(args);
+
     return TEST_PASSED;
 }
 
-// Waits until count of running threads in specified group reaches 'count' or less
+/**
+* Waits until count of running threads in specified group
+* reaches 'count' or less
+*/
 static void wait_for_all_treads_are_terminated(hythread_group_t group, int count)
 {
     int max_tries = 1000; // Maximum count of iterations
@@ -70,8 +110,7 @@ static void wait_for_all_treads_are_terminated(hythread_group_t group, int count
 
         hythread_iterator_t iterator = hythread_iterator_create(group);
 
-        while(hythread_iterator_has_next(iterator))
-        {
+        while(hythread_iterator_has_next(iterator)) {
             thread = hythread_iterator_next(&iterator);
 
             if (!hythread_is_terminated(thread))
@@ -83,155 +122,202 @@ static void wait_for_all_treads_are_terminated(hythread_group_t group, int count
         if (n <= count)
             break;
 
-        hythread_sleep(1); // 1ms
+        hythread_yield();
     }
 
-    hythread_sleep(100);// 0.1s to let system threads finish their work
-}
-
-hylatch_t start;
-hylatch_t end;
+    // 0.1s to let system threads finish their work
+    hythread_sleep(100);
+} // wait_for_all_treads_are_terminated
 
 int test_hythread_iterator(void) {
-    hythread_group_t group = NULL;
+    int i;
+    const int n = 100;
+    IDATA status;
+    proc_param *args;
     hythread_t thread = NULL;
     hythread_iterator_t iterator;
-    const int n = 100;
-    int i;
 
-    hythread_group_create(&group);
-    hylatch_create(&start, n);
-    hylatch_create(&end, 1);
+    args = (proc_param*)calloc(1, sizeof(proc_param));
+    tf_assert(args && "alloc proc_params failed");
+
+    status = hythread_group_create(&args->group);
+    tf_assert(status == TM_ERROR_NONE && "create group failed");
+
+    status = hylatch_create(&args->start, n);
+    tf_assert(status == TM_ERROR_NONE && "latch creation failed");
+
+    status = hylatch_create(&args->end, 1);
+    tf_assert(status == TM_ERROR_NONE && "latch creation failed");
 
     for (i = 0; i < n; i++) {
-        IDATA status;
         thread = (hythread_t)calloc(1, hythread_get_struct_size());
         assert(thread);
-        status = hythread_create_ex(thread, group, 0, 0, NULL,
-            (hythread_entrypoint_t)start_proc_empty, NULL);
-        tf_assert_same(status, TM_ERROR_NONE);
+        status = hythread_create_ex(thread, args->group, 0, 0, NULL,
+            (hythread_entrypoint_t)start_proc_empty, (void*)args);
+        tf_assert(status == TM_ERROR_NONE && "test thread creation failed");
     }
 
     // Wait util all threads have started.
-    hylatch_wait(start);
-    iterator = hythread_iterator_create(group);
-    // Notify all threads
-    hylatch_count_down(end);
+    status = hylatch_wait(args->start);
+    tf_assert(status == TM_ERROR_NONE && "start waiting failed");
+
+    iterator = hythread_iterator_create(args->group);
+    tf_assert(iterator && "interator creation failed");
 
     printf ("iterator size: %d\n", (int)hythread_iterator_size(iterator));
-    tf_assert(hythread_iterator_size(iterator) == n);
+    tf_assert(hythread_iterator_size(iterator) == n && "iterator size");
+
     i = 0;
     while(hythread_iterator_has_next(iterator)) {
         i++;
         thread = hythread_iterator_next(&iterator);
-        tf_assert(hythread_is_alive(thread));
+        tf_assert(hythread_is_alive(thread) && "thread is not alive!");
     }
 
-    tf_assert(i == n);
+    tf_assert(i == n && "wrong number of tested threads");
 
-    hythread_iterator_release(&iterator);
+    status = hythread_iterator_release(&iterator);
+    tf_assert(status == TM_ERROR_NONE && "release iterator failed");
 
-    wait_for_all_treads_are_terminated(group, i - n);
+    // Notify all threads
+    status = hylatch_count_down(args->end);
+    tf_assert(status == TM_ERROR_NONE && "all threads notify failed");
 
-    return 0;
-}
+    wait_for_all_treads_are_terminated(args->group, i - n);
+
+    status = hylatch_destroy(args->start);
+    tf_assert(status == TM_ERROR_NONE && "start latch destroy failed");
+
+    status = hylatch_destroy(args->end);
+    tf_assert(status == TM_ERROR_NONE && "end latch destroy failed");
+
+    hythread_sleep(SLEEP_TIME);
+    hythread_group_release(args->group);
+
+    free(args);
+
+    return TEST_PASSED;
+} // test_hythread_iterator
 
 int test_hythread_iterator_default(void) {
+    int i;
+    const int n = 100;
+    IDATA status;
+    proc_param *args;
     hythread_t thread = NULL;
     hythread_iterator_t iterator;
-    const int n = 100;
-    int i;
 
-    hylatch_create(&start, n);
-    hylatch_create(&end, 1);
+    args = (proc_param*)calloc(1, sizeof(proc_param));
+    tf_assert(args && "alloc proc_params failed");
+
+    status = hylatch_create(&args->start, n);
+    tf_assert(status == TM_ERROR_NONE && "latch creation failed");
+
+    status = hylatch_create(&args->end, 1);
+    tf_assert(status == TM_ERROR_NONE && "latch creation failed");
 
     for (i = 0; i < n; i++) {
-        IDATA status;
         status = hythread_create(NULL, 0, 0, 0,
-            (hythread_entrypoint_t)start_proc_empty, NULL);
-        tf_assert_same(status, TM_ERROR_NONE);
+            (hythread_entrypoint_t)start_proc_empty, (void*)args);
+        tf_assert(status == TM_ERROR_NONE && "test thread creation failed");
     }
 
     // Wait util all threads have started.
-    hylatch_wait(start);
-    iterator = hythread_iterator_create(NULL);
-    // Notify all threads
-    hylatch_count_down(end);
+    status = hylatch_wait(args->start);
+    tf_assert(status == TM_ERROR_NONE && "start waiting failed");
 
-    printf("default group iterator: %d\n", (int)hythread_iterator_size(iterator));
-    tf_assert(hythread_iterator_size(iterator) >= n);
+    iterator = hythread_iterator_create(args->group);
+    tf_assert(iterator && "interator creation failed");
+
+    printf ("default group iterator size: %d\n", (int)hythread_iterator_size(iterator));
+    tf_assert(hythread_iterator_size(iterator) >= n && "iterator size");
+
     i = 0;
     while(hythread_iterator_has_next(iterator)) {
-        i++;
         thread = hythread_iterator_next(&iterator);
+        if (hythread_is_alive(thread)) {
+            i++;
+        }
     }
+    tf_assert(i >= n && "wrong number of tested threads");
 
-    tf_assert(i >= n);
+    status = hythread_iterator_release(&iterator);
+    tf_assert(status == TM_ERROR_NONE && "release iterator failed");
 
-    hythread_iterator_release(&iterator);
+    // Notify all threads
+    status = hylatch_count_down(args->end);
+    tf_assert(status == TM_ERROR_NONE && "all threads notify failed");
 
     wait_for_all_treads_are_terminated(NULL, i - n);
 
-    return 0;
-}
+    status = hylatch_destroy(args->start);
+    tf_assert(status == TM_ERROR_NONE && "start latch destroy failed");
 
+    status = hylatch_destroy(args->end);
+    tf_assert(status == TM_ERROR_NONE && "end latch destroy failed");
 
+    free(args);
+
+    return TEST_PASSED;
+} // test_hythread_iterator_default
 
 /*
- * Test tm_create(..)
- */
+* Test tm_create(..)
+*/
 int test_hythread_create_many(void){
-    void **args; 
-    hythread_t thread = NULL;
-    hythread_group_t group = NULL;
-    IDATA res;
-    int i = 10;
-    
-    hythread_group_create(&group);
-    while(i--) {
-        args = (void**)calloc(2, sizeof(void *));
-    
-        args[0] = group; 
-        
-        args[1] = calloc(1, sizeof(struct jthread_start_proc_data));
-        ((jthread_start_proc_data_t)args[1])->stacksize = 1024000;
-        ((jthread_start_proc_data_t)args[1])->priority  = 1;
-        
+    int i;
+    const int n = 10;
+    IDATA status;
+    proc_param *args;
+    hythread_t thread;
+
+    args = (proc_param*)calloc(1, sizeof(proc_param));
+    tf_assert(args && "alloc proc_params failed");
+
+    status = hythread_group_create(&args->group);
+    tf_assert(status == TM_ERROR_NONE && "create group failed");
+
+    status = hylatch_create(&args->start, n);
+    tf_assert(status == TM_ERROR_NONE && "latch creation failed");
+
+    status = hylatch_create(&args->end, 1);
+    tf_assert(status == TM_ERROR_NONE && "latch creation failed");
+
+    for (i = 0; i < n; i++) {
         thread = (hythread_t)calloc(1, hythread_get_struct_size());
         assert(thread);
-        res = hythread_create_ex(thread, group, 1024000, 1, NULL,
-            (hythread_entrypoint_t)start_proc, args);
-        tf_assert(res == TM_ERROR_NONE && "thread creation failed");
-        res = hythread_join(thread);
-        tf_assert(res == TM_ERROR_NONE && "thread join failed");
+        status = hythread_create_ex(thread, args->group, 0, 0, NULL,
+            (hythread_entrypoint_t)start_proc_empty, (void*)args);
+        tf_assert(status == TM_ERROR_NONE && "test thread creation failed");
     }
 
-    //check thread structures:
-    //1. thread get group
-    //2. check that group contains 10 threads
-    //NOTE: native structures should not be freed untill tm_thread_destroy method
-    ////
-    
-    //1.group
-    ////
-    tf_assert(group);
-    //tf_assert(group->threads_count == 0);
+    // Wait util all threads have started.
+    status = hylatch_wait(args->start);
+    tf_assert(status == TM_ERROR_NONE && "start waiting failed");
 
-    return 0;
-}
+    // huck to get group_count from hythread_group_t structure
+    i = hythread_iterator_size((hythread_iterator_t)thread);
+    tf_assert(i == n && "incorrect threads count");
 
-int start_proc(void *args) {
-    void** attrs = (void **)args; 
-    tf_assert_same(hythread_get_priority(hythread_self()), ((jthread_start_proc_data_t)attrs[1])->priority);
-    tf_assert_same(((HyThread_public*)hythread_self())->group, attrs[0]);
-    return 0;
-}
+    // Notify all threads
+    status = hylatch_count_down(args->end);
+    tf_assert(status == TM_ERROR_NONE && "all threads notify failed");
 
-int start_proc_empty(void *args) {
-    hylatch_count_down(start);
-    hylatch_wait(end);
-    return 0;
-}
+    wait_for_all_treads_are_terminated(args->group, i - n);
+
+    status = hylatch_destroy(args->start);
+    tf_assert(status == TM_ERROR_NONE && "start latch destroy failed");
+
+    status = hylatch_destroy(args->end);
+    tf_assert(status == TM_ERROR_NONE && "end latch destroy failed");
+
+    hythread_sleep(SLEEP_TIME);
+    hythread_group_release(args->group);
+
+    free(args);
+
+    return TEST_PASSED;
+} // test_hythread_create_many
 
 TEST_LIST_START
     TEST(test_hythread_self_base)

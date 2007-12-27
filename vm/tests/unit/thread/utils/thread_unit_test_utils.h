@@ -113,6 +113,7 @@ void tested_thread_wait_started(tested_thread_sturct_t *tts);
 void tested_thread_wait_running(tested_thread_sturct_t *tts);
 void tested_thread_wait_ended(tested_thread_sturct_t *tts);
 void tested_thread_wait_dead(tested_thread_sturct_t *tts);
+void test_thread_join(hythread_t native_thread, int index);
 
 int compare_threads(jthread *threads, int thread_nmb, int compare_from_end);
 int compare_pointer_sets(void ** set_a, void ** set_b, int nmb);

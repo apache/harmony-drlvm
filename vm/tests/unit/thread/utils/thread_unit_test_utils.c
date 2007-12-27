@@ -393,14 +393,21 @@ void tested_thread_wait_ended(tested_thread_sturct_t *tts) {
 }
 
 void tested_thread_wait_dead(tested_thread_sturct_t *tts) {
-    int i;
-     
-    i = 0;
-    while (hythread_join_timed(tts->native_thread, MAX_TIME_TO_WAIT, 0) == TM_ERROR_TIMEOUT) {
-        i++;
-        printf("Thread %i isn't dead after %i milliseconds", 
-            tts->my_index, (i * MAX_TIME_TO_WAIT));
-    }
+    test_thread_join(tts->native_thread, tts->my_index);
+}
+
+void test_thread_join(hythread_t native_thread, int index) {
+    int i = 0;
+    do {
+        hythread_sleep(SLEEP_TIME);
+        if(!hythread_is_alive(native_thread)) {
+            break;
+        }
+        if ((i % (MAX_TIME_TO_WAIT / SLEEP_TIME)) == 0) {
+            printf("Thread %i isn't dead after %i milliseconds",
+                index, (++i * SLEEP_TIME));
+        }
+    } while(1);
 }
 
 int compare_threads(jthread *threads, int thread_nmb, int compare_from_end) {
