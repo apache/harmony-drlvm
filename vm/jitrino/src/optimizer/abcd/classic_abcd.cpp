@@ -446,7 +446,7 @@ void BuildInequalityGraphWalker::addPiEdgesSingleProblem
         IOpndProxy* c_opnd = new (mm) 
             IOpndProxy((int32)non_inf_bound.getConst(), _const_id_counter++);
         _igraph->addOpnd(c_opnd);
-        addDistanceSingleProblem(c_opnd /* to */, dst, 0, lower_problem);
+        addDistanceSingleProblem(dst /* to */, c_opnd, 0, lower_problem);
     }
 }
 //------------------------------------------------------------------------------
