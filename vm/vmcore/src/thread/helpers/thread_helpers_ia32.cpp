@@ -27,6 +27,9 @@
 #include <open/hythread_ext.h>
 #include <open/thread_helpers.h>
 #include "open/jthread.h"
+#include "object_handles.h"
+#include "port_malloc.h"
+#include "m2n.h"
 
 #include <assert.h>
 
@@ -152,6 +155,26 @@ char* gen_monitorenter_fast_path_helper(char *ss, const R_Opnd & input_param1) {
     return ss;
 }
 
+static IDATA rt_jthread_monitor_enter(ManagedObject*  monitor) {
+    const unsigned handles_size = (unsigned)(sizeof(ObjectHandlesNew)+sizeof(ManagedObject*)*4);
+    ObjectHandlesNew* handels = (ObjectHandlesNew *)STD_ALLOCA(handles_size);
+    handels->capacity = 4;
+    handels->size = 0;
+    handels->next = NULL;
+
+    m2n_set_local_handles(m2n_get_last_frame(), (ObjectHandles *) handels);
+
+    ObjectHandle monitorJavaObj = oh_allocate_local_handle();
+    monitorJavaObj->object = monitor;
+
+    IDATA result = jthread_monitor_enter(monitorJavaObj);
+
+    free_local_object_handles2(m2n_get_local_handles(m2n_get_last_frame()));
+    m2n_set_local_handles(m2n_get_last_frame(), NULL);
+
+    return result;
+}
+
 /**
   *  Generates slow path of monitor enter.
   *  This code could block on monitor and contains safepoint.
@@ -169,7 +192,7 @@ char* gen_monitorenter_slow_path_helper(char *ss, const R_Opnd & input_param1) {
     }
 
     ss = push(ss, eax_opnd); // push the address of the handle
-    ss = call(ss, (char *)jthread_monitor_enter);
+    ss = call(ss, (char *)rt_jthread_monitor_enter);
     ss = alu(ss, add_opc, esp_opnd, Imm_Opnd(4)); // pop parameters
     return ss;
 }

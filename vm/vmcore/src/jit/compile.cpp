@@ -783,6 +783,10 @@ NativeCodePtr compile_me(Method* method)
     GcFrame gc;
     compile_protect_arguments(method, &gc);
 
+    if (exn_raised()) {
+        return NULL;
+     }
+
     tmn_suspend_enable();
     if (method->is_abstract()) { 
         compile_raise_exception("java/lang/AbstractMethodError", "", method); 

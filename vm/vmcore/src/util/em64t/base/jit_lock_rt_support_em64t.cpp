@@ -113,10 +113,7 @@ static char * gen_restore_monitor_enter(char *ss, char *patch_addr_null_arg)
 
     // Slow path: happens when the monitor is busy (contention case)
     ss = gen_setup_j2n_frame(ss);
-
-    ss = call(ss, (char *)oh_convert_to_local_handle);
-    ss = gen_monitorenter_slow_path_helper(ss, rax_opnd);
-
+    ss = gen_monitorenter_slow_path_helper(ss, rdi_opnd);
     ss = gen_pop_j2n_frame(ss);
 
     ss = ret(ss);

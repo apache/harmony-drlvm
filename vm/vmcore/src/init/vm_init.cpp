@@ -468,6 +468,8 @@ static jint preload_classes(Global_Env * vm_env) {
         preload_class(vm_env, "java/lang/Thread");
     vm_env->java_lang_ThreadGroup_Class =
         preload_class(vm_env, "java/lang/ThreadGroup");
+    vm_env->java_util_LinkedList_Class =
+        preload_class(vm_env, "java/util/LinkedList");
     vm_env->java_util_Date_Class = 
         preload_class(vm_env, "java/util/Date");
     vm_env->java_util_Properties_Class = 
@@ -870,8 +872,50 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
 
     hythread_suspend_enable();
 
+    Method * m;
+
+    // pre compile detach and all includes
+    if (!interpreter_enabled()) {
+        m = vm_env->java_lang_Thread_Class->lookup_method(
+            vm_env->Detach_String, vm_env->DetachDescriptor_String);
+        assert(m);
+        vm_env->em_interface->CompileMethod(m);
+
+        m = vm_env->java_lang_Thread_Class->lookup_method(
+            vm_env->GetUncaughtExceptionHandler_String,
+            vm_env->GetUncaughtExceptionHandlerDescriptor_String);
+        assert(m);
+        vm_env->em_interface->CompileMethod(m);
+
+        m = vm_env->java_lang_ThreadGroup_Class->lookup_method(
+            vm_env->UncaughtException_String, vm_env->UncaughtExceptionDescriptor_String);
+        assert(m);
+        vm_env->em_interface->CompileMethod(m);
+
+        m = vm_env->java_lang_Thread_Class->lookup_method(
+            vm_env->GetDefaultUncaughtExceptionHandler_String,
+            vm_env->GetDefaultUncaughtExceptionHandlerDescriptor_String);
+        assert(m);
+        vm_env->em_interface->CompileMethod(m);
+
+        m = vm_env->java_lang_Thread_Class->lookup_method(
+            vm_env->GetName_String, vm_env->GetNameDescriptor_String);
+        assert(m);
+        vm_env->em_interface->CompileMethod(m);
+
+        m = vm_env->java_lang_ThreadGroup_Class->lookup_method(
+            vm_env->Remove_String, vm_env->RemoveDescriptor_String);
+        assert(m);
+        vm_env->em_interface->CompileMethod(m);
+
+        m = vm_env->java_util_LinkedList_Class->lookup_method(
+            vm_env->LLRemove_String, vm_env->LLRemoveDescriptor_String);
+        assert(m);
+        vm_env->em_interface->CompileMethod(m);
+    }
+
     // Mark j.l.Throwable() constructor as a side effects free.
-    Method * m = vm_env->java_lang_Throwable_Class->lookup_method(
+    m = vm_env->java_lang_Throwable_Class->lookup_method(
         vm_env->Init_String, vm_env->VoidVoidDescriptor_String);
     assert(m);
     m->set_side_effects(MSE_False);

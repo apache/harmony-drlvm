@@ -72,7 +72,13 @@ void compile_protect_arguments(Method_Handle method, GcFrame * gc) {
 
     assert(!hythread_is_suspend_enabled());
     Method_Signature_Handle msh = method_get_signature(method);
-    
+
+    if (msh == NULL) {
+        return;
+    }
+
+    assert(msh);
+
     unsigned num_gp_used = 0;
 #ifdef _WIN64
 #define num_fp_used num_gp_used

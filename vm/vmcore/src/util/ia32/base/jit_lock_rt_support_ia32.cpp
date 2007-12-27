@@ -107,20 +107,16 @@ static char * gen_restore_monitor_enter(char *ss, char *patch_addr_null_arg)
         char *backpatch_address__fast_monitor_failed = ((char *)ss) - 1;
         ss = ret(ss,  Imm_Opnd(4));
 
-        // Slow path: happens when the monitor is busy (contention case)
         offset = (signed)ss - (signed)backpatch_address__fast_monitor_failed - 1;
         *backpatch_address__fast_monitor_failed = (char)offset;
     }
 
+    // Slow path: happens when the monitor is busy (contention case)
     ss = gen_setup_j2n_frame(ss);
-    ss = push(ss,  M_Base_Opnd(esp_reg, m2n_sizeof_m2n_frame));
- 
-    ss = call(ss, (char *)oh_convert_to_local_handle);
-    ss = alu(ss, add_opc, esp_opnd, Imm_Opnd(4)); // pop parameters
-
+    ss = mov(ss, eax_opnd,  M_Base_Opnd(esp_reg, m2n_sizeof_m2n_frame));
     ss = gen_monitorenter_slow_path_helper(ss, eax_opnd);
-  
     ss = gen_pop_j2n_frame(ss);
+
     ss = ret(ss,  Imm_Opnd(4));
 
     // Handle NPE here

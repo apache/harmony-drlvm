@@ -1736,6 +1736,13 @@ Method_Signature_Handle method_get_signature(Method_Handle mh)
     Method_Signature *ms = m->get_method_sig();
     if(!ms) {
         ms = new Method_Signature();
+
+        if (ms == NULL) {
+            exn_raise_object(VM_Global_State::loader_env->java_lang_OutOfMemoryError);
+            return NULL;
+        }
+
+        assert(ms);
         ms->initialize_from_method(m);
         m->set_method_sig(ms);
     }

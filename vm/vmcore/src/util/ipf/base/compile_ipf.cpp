@@ -372,6 +372,12 @@ static void protect_value_type(Class_Handle c, uint64* start, GcFrame* gc) {
 void compile_protect_arguments(Method_Handle method, GcFrame* gc) {
     assert(!hythread_is_suspend_enabled());
     Method_Signature_Handle msh = method_get_signature(method);
+
+    if (msh == NULL) {
+        return;
+    }
+
+    assert(msh);
     unsigned num_args = method_args_get_number(msh);
     M2nFrame* m2nf = m2n_get_last_frame();
 

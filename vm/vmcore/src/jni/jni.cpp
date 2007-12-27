@@ -829,12 +829,17 @@ jobject JNICALL NewGlobalRef(JNIEnv * jni_env, jobject obj)
     
     if (exn_raised() || !obj) return NULL;
 
-    if(!obj) {
-        return 0;
+    if(obj == NULL) {
+        return NULL;
     }
 
     assert(hythread_is_suspend_enabled());
-    ObjectHandle new_handle = oh_allocate_global_handle();
+    ObjectHandle new_handle = oh_allocate_global_handle_from_jni();
+
+    if (new_handle == NULL) {
+        return NULL;
+    }
+
     ObjectHandle old_handle = (ObjectHandle)obj;
 
     tmn_suspend_disable();       //---------------------------------v

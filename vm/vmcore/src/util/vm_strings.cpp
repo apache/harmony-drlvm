@@ -267,7 +267,7 @@ static void string_create(unsigned unicode_length, bool eight_bit, ManagedObject
     VTable *jls_vtable = VM_Global_State::loader_env->JavaLangString_VTable;
 
     assert(!hythread_is_suspend_enabled());
-    GcFrame gc(2);
+    GcFrame gc;
     gc.add_object((ManagedObject**)&array);
 
     ManagedObject* jls = (ManagedObject*)class_alloc_new_object_using_vtable(jls_vtable);

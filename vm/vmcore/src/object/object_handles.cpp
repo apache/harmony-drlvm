@@ -52,36 +52,17 @@ static ObjectHandlesOld* oh_allocate_object_handle();
 //////////////////////////////////////////////////////////////////////////
 // GC native interface
 
-// A GcFrameNode contains capacity elements which can hold either objects references or managed pointers.
-// The objects come first, ie, from index 0 to obj_size-1
-// The managed pointers come last, ie, from index obj_size to obj_size+mp_size-1
-// Inv: obj_size+mp_size<=capacity
-struct GcFrameNode {
-    unsigned obj_size, mp_size, capacity;
-    GcFrameNode* next;
-    void** elements[1];  // Objects go first, then managed pointers
-};
-
-static GcFrameNode* gc_frame_node_new(unsigned capacity)
-{
-    assert(capacity>0);
-    GcFrameNode* n = (GcFrameNode*)STD_MALLOC(sizeof(GcFrameNode)+(capacity-1)*sizeof(void**));
-    assert(n);
-    n->capacity = capacity;
-    n->obj_size = 0;
-    n->mp_size = 0;
-    n->next = NULL;
-    return n;
-}
-
-GcFrame::GcFrame(unsigned size_hint)
+GcFrame::GcFrame()
 {
     assert(!hythread_is_suspend_enabled());
 
-    if (size_hint>0)
-        nodes = gc_frame_node_new(size_hint);
-    else
-        nodes = NULL;
+    nodes = &firstSetOfNodes;
+
+    nodes->capacity = GC_FRAME_DEFAULT_SIZE;
+    nodes->obj_size = 0;
+    nodes->mp_size = 0;
+    nodes->next = NULL;
+
     next = (GcFrame*)p_TLS_vmthread->gc_frames;
     p_TLS_vmthread->gc_frames = this;
 }
@@ -95,7 +76,7 @@ GcFrame::~GcFrame()
     next = NULL;
     GcFrameNode* c;
     GcFrameNode* n;
-    for(c=nodes; c; c=n) {
+    for(c=nodes; c->next; c=n) {
         n = c->next;
         STD_FREE(c);
     }
@@ -149,7 +130,11 @@ void GcFrame::enumerate()
 void GcFrame::ensure_capacity()
 {
     if (!nodes || nodes->obj_size+nodes->mp_size >= nodes->capacity) {
-        GcFrameNode* n = gc_frame_node_new(10);
+        GcFrameNode* n = (GcFrameNode*)STD_MALLOC(sizeof(GcFrameNode));
+        assert(n);
+        n->capacity = GC_FRAME_DEFAULT_SIZE;
+        n->obj_size = 0;
+        n->mp_size = 0;
         n->next = nodes;
         nodes = n;
     }
@@ -207,12 +192,17 @@ object_is_valid(ObjectHandle oh) {
 
 static ObjectHandlesOld* global_object_handles = NULL;
 
-ObjectHandle oh_allocate_global_handle()
+static ObjectHandle oh_allocate_global_handle_internal()
 {
     Global_Env * vm_env = VM_Global_State::loader_env;
 
     // Allocate and init handle
     ObjectHandlesOld* h = oh_allocate_object_handle(); //(ObjectHandlesOld*)m_malloc(sizeof(ObjectHandlesOld));
+
+    if (h == NULL)  {
+        return NULL;
+    }
+
     h->handle.object = NULL;
     h->allocated_on_the_stack = false;
     
@@ -228,6 +218,23 @@ ObjectHandle oh_allocate_global_handle()
     hythread_suspend_enable(); //--------------------------------------------^^^
     return &h->handle;
 } //vm_create_global_object_handle
+
+ObjectHandle oh_allocate_global_handle()
+{
+    ObjectHandle res = oh_allocate_global_handle_internal();
+    assert(res);
+    return res;
+}
+
+ObjectHandle oh_allocate_global_handle_from_jni()
+{
+    ObjectHandle res = oh_allocate_global_handle_internal();
+
+    if (res == NULL) {
+        exn_raise_object(VM_Global_State::loader_env->java_lang_OutOfMemoryError);
+    }
+    return res;
+}
 
 static bool UNUSED is_global_handle(ObjectHandle handle)
 {
@@ -269,6 +276,11 @@ void oh_enumerate_global_handles()
 static ObjectHandlesOld* oh_allocate_object_handle()
 {
     ObjectHandlesOld* h = (ObjectHandlesOld*)STD_MALLOC(sizeof(ObjectHandlesOld));
+
+    if (h == NULL)  {
+        return NULL;
+    }
+
     assert(h);
     memset(h, 0, sizeof(ObjectHandlesOld));
     return h;
@@ -361,6 +373,9 @@ NativeObjectHandles::~NativeObjectHandles()
 ObjectHandle NativeObjectHandles::allocate()
 {
     ObjectHandle res = oh_allocate_handle(&handles);
+    if (res == NULL) {
+        printf("GBPLTW");
+    }
     assert(res);
     return res;
 }

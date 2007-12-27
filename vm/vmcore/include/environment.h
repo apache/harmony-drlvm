@@ -143,6 +143,21 @@ struct Global_Env {
     String* Clonable_String;
     String* Serializable_String;
 
+    String* Detach_String;
+    String* DetachDescriptor_String;
+    String* GetUncaughtExceptionHandler_String;
+    String* GetUncaughtExceptionHandlerDescriptor_String;
+    String* UncaughtException_String;
+    String* UncaughtExceptionDescriptor_String;
+    String* GetDefaultUncaughtExceptionHandler_String;
+    String* GetDefaultUncaughtExceptionHandlerDescriptor_String;
+    String* GetName_String;
+    String* GetNameDescriptor_String;
+    String* Remove_String;
+    String* RemoveDescriptor_String;
+    String* LLRemove_String;
+    String* LLRemoveDescriptor_String;
+
     String* JavaLangReflectMethod_String;
     String* JavaLangNullPointerException_String;
     String* JavaLangUnsatisfiedLinkError_String;
@@ -228,6 +243,7 @@ struct Global_Env {
     Class* java_lang_Cloneable_Class;
     Class* java_lang_Thread_Class;
     Class* java_lang_ThreadGroup_Class;
+    Class* java_util_LinkedList_Class;
     Class* java_util_Date_Class;
     Class* java_util_Properties_Class;
     Class* java_lang_Runtime_Class; 

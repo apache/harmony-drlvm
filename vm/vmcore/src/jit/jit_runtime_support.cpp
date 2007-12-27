@@ -194,6 +194,10 @@ static NativeCodePtr rth_get_lil_ldc_ref(int* dyn_count)
     static NativeCodePtr addr = NULL;
 
     if (!addr) {
+        const unsigned cap_off = (unsigned)(POINTER_SIZE_INT)&((ObjectHandlesNew*)0)->capacity;
+        const POINTER_SIZE_INT next_off = (POINTER_SIZE_INT)&((ObjectHandlesNew*)0)->next;
+        const unsigned handles_size = (unsigned)(sizeof(ObjectHandlesNew)+sizeof(ManagedObject*)*16);
+        const unsigned cap_and_size = (unsigned)((0<<16) | 16);
         ManagedObject* (*p_instantiate_ref)(Class*,unsigned) = rth_ldc_ref_helper;
         LilCodeStub* cs = lil_parse_code_stub("entry 0:stdcall:pint,g4:ref;");
         assert(cs);
@@ -201,7 +205,8 @@ static NativeCodePtr rth_get_lil_ldc_ref(int* dyn_count)
             cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
             assert(cs);
         }
-        cs = lil_parse_onto_end(cs,
+#ifdef _IPF_
+         cs = lil_parse_onto_end(cs,
             "push_m2n 0, %0i;"
             "in2out platform:ref;"
             "call %1i;"
@@ -209,6 +214,22 @@ static NativeCodePtr rth_get_lil_ldc_ref(int* dyn_count)
             "ret;",
             (POINTER_SIZE_INT)FRAME_POPABLE,
             p_instantiate_ref);
+#else
+        cs = lil_parse_onto_end(cs,
+            "push_m2n 0, %0i, handles;"
+            "locals 1;"
+            "alloc l0, %1i;"
+            "st[l0+%2i:g4], %3i;"
+            "st[l0+%4i:pint], 0;"
+            "handles=l0;"
+            "in2out platform:ref;"
+            "call %5i;"
+            "pop_m2n;"
+            "ret;",
+            (POINTER_SIZE_INT)FRAME_POPABLE,
+            handles_size, cap_off, cap_and_size, next_off,
+            p_instantiate_ref);
+#endif
         assert(cs && lil_is_valid(cs));
         addr = LilCodeGenerator::get_platform()->compile(cs);
 
@@ -1787,6 +1808,11 @@ static NativeCodePtr rth_get_lil_stub_withresolve(int * dyn_count, f_resolve foo
 {
     LilCodeStub* cs = NULL;
     const char* in2out = NULL;
+    const unsigned cap_off = (unsigned)(POINTER_SIZE_INT)&((ObjectHandlesNew*)0)->capacity;
+    const POINTER_SIZE_INT next_off = (POINTER_SIZE_INT)&((ObjectHandlesNew*)0)->next;
+    const unsigned handles_size = (unsigned)(sizeof(ObjectHandlesNew)+sizeof(ManagedObject*)*8);
+    const unsigned cap_and_size = (unsigned)((0<<16) | 8);
+
     if (type == ResolveResType_Unmanaged) {
         cs = lil_parse_code_stub("entry 0:stdcall:pint,pint:pint;");
         in2out = "in2out platform:pint;";
@@ -1800,8 +1826,21 @@ static NativeCodePtr rth_get_lil_stub_withresolve(int * dyn_count, f_resolve foo
         cs = lil_parse_onto_end(cs, "inc [%0i:pint];", dyn_count);
         assert(cs);
     }
-
+#ifdef _IPF_
     cs = lil_parse_onto_end(cs, "push_m2n 0, %0i;", (POINTER_SIZE_INT)(FRAME_POPABLE));
+#else
+    cs = lil_parse_onto_end(cs, "push_m2n 0, %0i, handles;", (POINTER_SIZE_INT)(FRAME_POPABLE));
+    assert(cs);
+    cs = lil_parse_onto_end(cs,
+        "locals 1;"
+        "alloc l0, %0i;"
+        "st[l0+%1i:g4], %2i;"
+        "st[l0+%3i:pint], 0;"
+        "handles=l0;",
+        handles_size,
+        cap_off, cap_and_size,
+        next_off);
+#endif
     assert(cs);
     cs = lil_parse_onto_end(cs, in2out);
     assert(cs);
@@ -1826,6 +1865,11 @@ static NativeCodePtr rth_get_lil_stub_withresolve(int * dyn_count, f_resolve_man
 {
     LilCodeStub* cs = NULL;
     const char* in2out = NULL;
+    const unsigned cap_off = (unsigned)(POINTER_SIZE_INT)&((ObjectHandlesNew*)0)->capacity;
+    const POINTER_SIZE_INT next_off = (POINTER_SIZE_INT)&((ObjectHandlesNew*)0)->next;
+    const unsigned handles_size = (unsigned)(sizeof(ObjectHandlesNew)+sizeof(ManagedObject*)*8);
+    const unsigned cap_and_size = (unsigned)((0<<16) | 8);
+
     if (type == ResolveResType_Unmanaged) {
         cs = lil_parse_code_stub("entry 0:stdcall:pint,pint,ref:pint;");
         in2out = "in2out platform:pint;";
@@ -1841,7 +1885,21 @@ static NativeCodePtr rth_get_lil_stub_withresolve(int * dyn_count, f_resolve_man
         assert(cs);
     }
 
+#ifdef _IPF_
     cs = lil_parse_onto_end(cs, "push_m2n 0, %0i;", (POINTER_SIZE_INT)(FRAME_POPABLE));
+#else
+    cs = lil_parse_onto_end(cs, "push_m2n 0, %0i, handles;", (POINTER_SIZE_INT)(FRAME_POPABLE));
+    assert(cs);
+    cs = lil_parse_onto_end(cs,
+        "locals 1;"
+        "alloc l0, %0i;"
+        "st[l0+%1i:g4], %2i;"
+        "st[l0+%3i:pint], 0;"
+        "handles=l0;",
+        handles_size,
+        cap_off, cap_and_size,
+        next_off);
+#endif
     assert(cs);
     cs = lil_parse_onto_end(cs, in2out);
     assert(cs);
@@ -1865,6 +1923,11 @@ static NativeCodePtr rth_get_lil_stub_withresolve(int * dyn_count, f_resolve_int
 {
     LilCodeStub* cs = NULL;
     const char* in2out = NULL;
+    const unsigned cap_off = (unsigned)(POINTER_SIZE_INT)&((ObjectHandlesNew*)0)->capacity;
+    const POINTER_SIZE_INT next_off = (POINTER_SIZE_INT)&((ObjectHandlesNew*)0)->next;
+    const unsigned handles_size = (unsigned)(sizeof(ObjectHandlesNew)+sizeof(ManagedObject*)*8);
+    const unsigned cap_and_size = (unsigned)((0<<16) | 8);
+
     if (type == ResolveResType_Unmanaged) {
         cs = lil_parse_code_stub("entry 0:stdcall:pint,pint,pint:pint;");
         in2out = "in2out platform:pint;";
@@ -1880,7 +1943,21 @@ static NativeCodePtr rth_get_lil_stub_withresolve(int * dyn_count, f_resolve_int
         assert(cs);
     }
 
+#ifdef _IPF_
     cs = lil_parse_onto_end(cs, "push_m2n 0, %0i;", (POINTER_SIZE_INT)(FRAME_POPABLE));
+#else
+    cs = lil_parse_onto_end(cs, "push_m2n 0, %0i, handles;", (POINTER_SIZE_INT)(FRAME_POPABLE));
+    assert(cs);
+    cs = lil_parse_onto_end(cs,
+        "locals 1;"
+        "alloc l0, %0i;"
+        "st[l0+%1i:g4], %2i;"
+        "st[l0+%3i:pint], 0;"
+        "handles=l0;",
+        handles_size,
+        cap_off, cap_and_size,
+        next_off);
+#endif
     assert(cs);
     cs = lil_parse_onto_end(cs, in2out);
     assert(cs);

@@ -94,6 +94,21 @@ ready_for_exceptions(false)
     EnqueueName_String = string_pool.lookup("enqueue");
     Clonable_String = string_pool.lookup("java/lang/Cloneable");
     Serializable_String = string_pool.lookup("java/io/Serializable");
+    
+    Detach_String = string_pool.lookup("detach");
+    DetachDescriptor_String = string_pool.lookup("(Ljava/lang/Throwable;)V");
+    GetUncaughtExceptionHandler_String = string_pool.lookup("getUncaughtExceptionHandler");
+    GetUncaughtExceptionHandlerDescriptor_String = string_pool.lookup("()Ljava/lang/Thread$UncaughtExceptionHandler;");
+    UncaughtException_String = string_pool.lookup("uncaughtException");
+    UncaughtExceptionDescriptor_String = string_pool.lookup("(Ljava/lang/Thread;Ljava/lang/Throwable;)V");
+    GetDefaultUncaughtExceptionHandler_String = string_pool.lookup("getDefaultUncaughtExceptionHandler");
+    GetDefaultUncaughtExceptionHandlerDescriptor_String = string_pool.lookup("()Ljava/lang/Thread$UncaughtExceptionHandler;");
+    GetName_String = string_pool.lookup("getName");
+    GetNameDescriptor_String = string_pool.lookup("()Ljava/lang/String;");
+    Remove_String = string_pool.lookup("remove");
+    RemoveDescriptor_String = string_pool.lookup("(Ljava/lang/Thread;)V");
+    LLRemove_String = string_pool.lookup("remove");
+    LLRemoveDescriptor_String = string_pool.lookup("(Ljava/lang/Object;)Z");
 
     Length_String = string_pool.lookup("length");
     LoadClass_String = string_pool.lookup("loadClass");

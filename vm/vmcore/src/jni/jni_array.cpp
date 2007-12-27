@@ -362,6 +362,11 @@ jboolean *JNICALL GetBooleanArrayElements(JNIEnv * jni_env,
     } else {
         jboolean *primitive_array = (jboolean *)STD_MALLOC(sizeof(jboolean) * length);
 
+        if (primitive_array == NULL) {
+            exn_raise_by_name("java/lang/OutOfMemoryError");
+            return NULL;
+        }
+
         tmn_suspend_disable();       //---------------------------------v
 
         Vector_Handle java_array = (Vector_Handle)h->object;
@@ -404,6 +409,11 @@ jbyte *JNICALL GetByteArrayElements(JNIEnv * jni_env,
         return (jbyte *)get_vector_element_address_int8(java_array, 0);
     } else {
         jbyte *primitive_array = (jbyte *)STD_MALLOC(sizeof(jbyte) * length);
+
+        if (primitive_array == NULL) {
+            exn_raise_by_name("java/lang/OutOfMemoryError");
+            return NULL;
+        }
 
         tmn_suspend_disable();       //---------------------------------v
 
@@ -448,6 +458,11 @@ jchar *JNICALL GetCharArrayElements(JNIEnv * jni_env,
     } else {
         jchar *primitive_array = (jchar *)STD_MALLOC(sizeof(jchar) * length);
 
+        if (primitive_array == NULL) {
+            exn_raise_by_name("java/lang/OutOfMemoryError");
+            return NULL;
+        }
+
         tmn_suspend_disable();       //---------------------------------v
 
         Vector_Handle java_array = (Vector_Handle)h->object;
@@ -490,6 +505,11 @@ jshort *JNICALL GetShortArrayElements(JNIEnv * jni_env,
         return (jshort *)get_vector_element_address_int16(java_array, 0);
     } else {
         jshort *primitive_array = (jshort *)STD_MALLOC(sizeof(jshort) * length);
+
+        if (primitive_array == NULL) {
+            exn_raise_by_name("java/lang/OutOfMemoryError");
+            return NULL;
+        }
 
         tmn_suspend_disable();       //---------------------------------v
 
@@ -535,6 +555,11 @@ jint *JNICALL GetIntArrayElements(JNIEnv * jni_env,
 
         jint *primitive_array = (jint *)STD_MALLOC(sizeof(jint) * length);
 
+        if (primitive_array == NULL) {
+            exn_raise_by_name("java/lang/OutOfMemoryError");
+            return NULL;
+        }
+
         tmn_suspend_disable();       //---------------------------------v
 
         Vector_Handle java_array = (Vector_Handle)h->object;
@@ -577,6 +602,11 @@ jlong *JNICALL GetLongArrayElements(JNIEnv * jni_env,
         return (jlong *)get_vector_element_address_int64(java_array, 0);
     } else {
         jlong *primitive_array = (jlong *)STD_MALLOC(sizeof(jlong) * length);
+
+        if (primitive_array == NULL) {
+            exn_raise_by_name("java/lang/OutOfMemoryError");
+            return NULL;
+        }
 
         tmn_suspend_disable();       //---------------------------------v
 
@@ -622,6 +652,11 @@ jfloat *JNICALL GetFloatArrayElements(JNIEnv * jni_env,
 
         jfloat *primitive_array = (jfloat *)STD_MALLOC(sizeof(jfloat) * length);
 
+        if (primitive_array == NULL) {
+            exn_raise_by_name("java/lang/OutOfMemoryError");
+            return NULL;
+        }
+
         tmn_suspend_disable();       //---------------------------------v
 
         Vector_Handle java_array = (Vector_Handle)h->object;
@@ -664,6 +699,11 @@ jdouble *JNICALL GetDoubleArrayElements(JNIEnv * jni_env,
         return (jdouble *)get_vector_element_address_f64(java_array, 0);
     } else {
         jdouble *primitive_array = (jdouble *)STD_MALLOC(sizeof(jdouble) * length);
+
+        if (primitive_array == NULL) {
+            exn_raise_by_name("java/lang/OutOfMemoryError");
+            return NULL;
+        }
 
         tmn_suspend_disable();       //---------------------------------v
 

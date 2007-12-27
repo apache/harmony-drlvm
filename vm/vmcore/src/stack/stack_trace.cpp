@@ -95,7 +95,9 @@ void get_file_and_line(Method_Handle mh, void *ip, bool is_ip_past,
 unsigned st_get_depth(VM_thread *p_vmthread)
 {
     ASSERT_NO_INTERPRETER
-    StackIterator* si = si_create_from_native(p_vmthread);
+    StackIterator* si = (StackIterator*) STD_ALLOCA(si_size());
+    si_fill_from_native(si, p_vmthread);
+
     unsigned depth = 0;
     while (!si_is_past_end(si)) {
         if (si_get_method(si)) {
@@ -103,7 +105,6 @@ unsigned st_get_depth(VM_thread *p_vmthread)
         }
         si_goto_previous(si);
     }
-    si_free(si);
     return depth;
 }
 
@@ -176,6 +177,14 @@ void st_get_trace(VM_thread *p_vmthread, unsigned* res_depth, StackTraceFrame** 
 
     unsigned depth = st_get_depth(p_vmthread);
     StackTraceFrame* stf = st_alloc_frames(depth);
+
+    if (stf == NULL) {
+        *res_depth = depth;
+        *stfs = NULL;
+        tmn_suspend_enable();
+        return;
+    }
+
     assert(stf);
     *res_depth = depth;
     *stfs = stf;

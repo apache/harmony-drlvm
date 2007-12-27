@@ -47,9 +47,10 @@
  * during garbage collection. Note, GC suspension must be disabled when created or deleting
  * a frame and when adding objects or managed pointers.
  */
+#define GC_FRAME_DEFAULT_SIZE 10
 class GcFrame {
 public:
-    GcFrame(unsigned size_hint = 0);
+    GcFrame();
     ~GcFrame();
 
     void add_object(ManagedObject**);
@@ -60,7 +61,17 @@ public:
 
 private:
     void ensure_capacity();
-    struct GcFrameNode* nodes;
+
+    // A GcFrameNode contains capacity elements which can hold either objects references or managed pointers.
+    // The objects come first, ie, from index 0 to obj_size-1
+    // The managed pointers come last, ie, from index obj_size to obj_size+mp_size-1
+    // Inv: obj_size+mp_size<=capacity
+    struct GcFrameNode {
+        unsigned obj_size, mp_size, capacity;
+        GcFrameNode* next;
+        void** elements[GC_FRAME_DEFAULT_SIZE];  // Objects go several first, then managed pointers
+    } firstSetOfNodes;
+    GcFrameNode* nodes;
     GcFrame* next;
 };
 
@@ -139,6 +150,7 @@ object_is_valid(ObjectHandle);
  * Creates global handle, which needs to be explicitly freed.
  */
 ObjectHandle oh_allocate_global_handle();
+ObjectHandle oh_allocate_global_handle_from_jni();
 /**
  * Frees global handle.
  */

@@ -312,6 +312,10 @@ IDATA hythread_thin_monitor_try_enter(hythread_thin_monitor_t *lockword_ptr) {
         if (RECURSION(lockword) == MAX_RECURSION) {
             //inflate lock in case of recursion overflow
             fat_monitor = hythread_inflate_lock(lockword_ptr);
+
+            if (fat_monitor == NULL) {
+                return TM_ERROR_OUT_OF_MEMORY; 
+            }
             return hythread_monitor_try_enter(fat_monitor);
             //break FAT_LOCK;
         } else {
@@ -427,7 +431,11 @@ IDATA hythread_thin_monitor_enter(hythread_thin_monitor_t *lockword_ptr) {
         return TM_ERROR_NONE;
     }
     TRACE(("inflate_contended  thin_lcok%d\n", ++inflate_contended));   
-    hythread_inflate_lock(lockword_ptr);
+    fat_monitor = hythread_inflate_lock(lockword_ptr);
+
+    if (fat_monitor == NULL) {
+        return TM_ERROR_OUT_OF_MEMORY; 
+    }
     return TM_ERROR_NONE;
 }
 
@@ -514,6 +522,9 @@ IDATA thin_monitor_wait_impl(hythread_thin_monitor_t *lockword_ptr, I_64 ms, IDA
         TRACE(("inflate_wait%d\n", ++inflate_waited));  
         // if it is not a thin lock, inflate it
         fat_monitor = hythread_inflate_lock(lockword_ptr);
+        if (fat_monitor == NULL) {
+            return TM_ERROR_OUT_OF_MEMORY; 
+        }
     } else {
         // otherwise, get the appropriate fat lock
         fat_monitor = locktable_get_fat_monitor(FAT_LOCK_ID(lockword));
@@ -667,7 +678,10 @@ hythread_monitor_t VMCALL hythread_inflate_lock(hythread_thin_monitor_t *lockwor
 
     TRACE (("inflation begin for %x thread: %d", lockword, tm_self_tls->thread_id));
     status = hythread_monitor_init(&fat_monitor, 0); // allocate fat fat_monitor    
-    assert(status == TM_ERROR_NONE);  
+    //assert(status == TM_ERROR_NONE);  
+    if (status != TM_ERROR_NONE) {
+        return NULL;
+    } 
     status = hythread_monitor_enter(fat_monitor);
     if (status != TM_ERROR_NONE) {
         return NULL;

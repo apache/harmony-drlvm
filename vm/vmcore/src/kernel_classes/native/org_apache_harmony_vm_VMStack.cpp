@@ -250,9 +250,16 @@ Java_java_security_AccessController_getStackDomains(JNIEnv *jenv, jclass UNREF)
 JNIEXPORT jobject JNICALL Java_org_apache_harmony_vm_VMStack_getStackState
   (JNIEnv *jenv, jclass)
 {
+    assert(hythread_is_suspend_enabled());
     unsigned size;
     StackTraceFrame* frames;
     st_get_trace(get_thread_ptr(), &size, &frames);
+
+    if (frames == NULL) {
+        exn_raise_object(VM_Global_State::loader_env->java_lang_OutOfMemoryError);
+        return 0;
+    }
+    assert(frames);
     unsigned data_size = size * sizeof(StackTraceFrame);
 
     // pack trace into long[] array
