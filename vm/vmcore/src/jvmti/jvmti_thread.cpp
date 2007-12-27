@@ -587,8 +587,25 @@ jvmtiGetOwnedMonitorInfo(jvmtiEnv* env,
         return JVMTI_ERROR_THREAD_NOT_ALIVE;
     }
 
+    bool thread_suspended = false;
+    // Gregory -
+    // There is a race condition. If target thread is not suspended,
+    // it may exit some of its owned monitors which leads to incorrect
+    // references in the array.
+    vm_thread_t vm_thread = jthread_get_vm_thread_ptr_safe(thread);
+    // Check that this thread is not current
+    if (vm_thread != p_TLS_vmthread)
+    {
+        IDATA UNREF status = hythread_suspend_other((hythread_t)vm_thread);
+        assert(TM_ERROR_NONE == status);
+        thread_suspended = true;
+    }
+
     IDATA UNUSED status = jthread_get_owned_monitors(thread, owned_monitor_count_ptr, owned_monitors_ptr);
     assert(status == TM_ERROR_NONE);
+
+    if (thread_suspended)
+        hythread_resume((hythread_t)vm_thread);
 
     return JVMTI_ERROR_NONE;
 }

@@ -489,11 +489,24 @@ jthread_get_owned_monitors(jthread java_thread,
         hythread_global_unlock();
         return TM_ERROR_OUT_OF_MEMORY;
     }
+
+    tmn_suspend_disable();
     for (int i = 0; i < jvmti_thread->owned_monitors_nmb; i++) {
+        jobject new_ref = oh_allocate_local_handle_from_jni();
+
+        if (NULL != new_ref)
+            new_ref->object = jvmti_thread->owned_monitors[i]->object;
+        else
+        {
+            tmn_suspend_enable();   
+            hythread_global_unlock();
+            return TM_ERROR_OUT_OF_MEMORY;
+        }
         // change the order of reported monitors to be compliant with RI
-        monitors[jvmti_thread->owned_monitors_nmb - 1 - i] =
-                jvmti_thread->owned_monitors[i];
+        monitors[jvmti_thread->owned_monitors_nmb - 1 - i] = new_ref;
     }
+    tmn_suspend_enable();   
+
     *monitors_ptr = monitors;
     *monitor_count_ptr = jvmti_thread->owned_monitors_nmb;
 
