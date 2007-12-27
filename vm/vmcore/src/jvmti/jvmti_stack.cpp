@@ -303,13 +303,15 @@ jvmtiGetStackTrace(jvmtiEnv* env,
             // to avoid suspension of each other due to race condition
             // get global thread lock as it's done in hythread_suspend_all().
             IDATA UNREF status = hythread_global_lock();
-            assert(0 == status);
+            assert(TM_ERROR_NONE == status);
 
-            jthread_suspend(thread);
+            status = hythread_suspend_other((hythread_t)vm_thread);
+            assert(TM_ERROR_NONE == status);
+
             thread_suspended = true;
 
             status = hythread_global_unlock();
-            assert(0 == status);
+            assert(TM_ERROR_NONE == status);
         }
     }
     else
@@ -322,7 +324,7 @@ jvmtiGetStackTrace(jvmtiEnv* env,
         err = get_stack_trace_jit(vm_thread, start_depth, max_frame_count, frame_buffer, count_ptr);
 
     if (thread_suspended)
-        jthread_resume(thread);
+        hythread_resume((hythread_t)vm_thread);
 
     return err;
 } // jvmtiGetStackTrace
@@ -473,25 +475,17 @@ jvmtiGetThreadListStackTraces(jvmtiEnv* env,
        return res;
 
     int i;
-    jthread currentThread = getCurrentThread();
+    vm_thread_t self = jthread_self_vm_thread();
     // stopping all threads
     for(i = 0; i < count; i++) {
         // FIXME: thread can be dead at this time
         // event handler for thread death should block thread death
         // until the function end.
         info[i].thread = threads[i];
-        res = jvmtiGetThreadState(env, threads[i], &info[i].state);
-
-        if (JVMTI_ERROR_NONE != res) {
-            _deallocate((unsigned char *) info);
-            return res;
-        }
-
-        // FIXME: suspended thread might be resumed in other jvmti thread?
-        if (info[i].state != JVMTI_THREAD_STATE_SUSPENDED) {
-            if (IsSameObject(p_TLS_vmthread->jni_env, currentThread, threads[i]))
-                continue;
-            jthread_suspend(threads[i]);
+        vm_thread_t vm_thread = jthread_get_vm_thread_ptr_safe(threads[i]);
+        if (self != vm_thread) {
+            IDATA UNREF status = hythread_suspend_other((hythread_t)vm_thread);
+            assert(TM_ERROR_NONE == status);
         }
     }
 
@@ -513,8 +507,10 @@ jvmtiGetThreadListStackTraces(jvmtiEnv* env,
 
     // unsuspend suspended threads.
     for(i = 0; i < count; i++) {
-        if (info[i].state != JVMTI_THREAD_STATE_SUSPENDED)
-            jthread_resume(threads[i]);
+        vm_thread_t vm_thread = jthread_get_vm_thread_ptr_safe(threads[i]);
+        if (self != vm_thread) {
+            hythread_resume((hythread_t)vm_thread);
+        }
     }
 
     if (JVMTI_ERROR_NONE != res)
@@ -579,7 +575,8 @@ jvmtiGetFrameCount(jvmtiEnv* env,
         vm_thread = jthread_get_vm_thread_ptr_safe(thread);
         if (vm_thread != p_TLS_vmthread)
         {
-            jthread_suspend(thread);
+            IDATA UNREF status = hythread_suspend_other((hythread_t)vm_thread);
+            assert(TM_ERROR_NONE == status);
             thread_suspended = true;
         }
     }
@@ -598,7 +595,7 @@ jvmtiGetFrameCount(jvmtiEnv* env,
     }
 
     if (thread_suspended)
-        jthread_resume(thread);
+        hythread_resume((hythread_t)vm_thread);
 
     return errStack;
 } // jvmtiGetFrameCount
@@ -748,7 +745,8 @@ jvmtiGetFrameLocation(jvmtiEnv* env,
         vm_thread = jthread_get_vm_thread_ptr_safe(thread);
         if (vm_thread != p_TLS_vmthread)
         {
-            jthread_suspend(thread);
+            IDATA UNREF status = hythread_suspend_other((hythread_t)vm_thread);
+            assert(TM_ERROR_NONE == status);
             thread_suspended = true;
         }
     }
@@ -776,7 +774,7 @@ jvmtiGetFrameLocation(jvmtiEnv* env,
     }
 
     if (thread_suspended)
-        jthread_resume(thread);
+        hythread_resume((hythread_t)vm_thread);
 
     return errStack;
 } // jvmtiGetFrameLocation

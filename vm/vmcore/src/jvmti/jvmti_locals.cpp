@@ -122,7 +122,7 @@ GetLocal_checkArgs(jvmtiEnv* env,
     if (si_is_past_end(si))                                 \
     {                                                       \
         if (thread_suspended)                               \
-            jthread_resume(thread);                         \
+            hythread_resume((hythread_t)vm_thread);         \
         si_free(si);                                        \
         return JVMTI_ERROR_NO_MORE_FRAMES;                  \
     }                                                       \
@@ -130,7 +130,7 @@ GetLocal_checkArgs(jvmtiEnv* env,
     if (si_is_native(si))                                   \
     {                                                       \
         if (thread_suspended)                               \
-            jthread_resume(thread);                         \
+            hythread_resume((hythread_t)vm_thread);         \
         si_free(si);                                        \
         return JVMTI_ERROR_OPAQUE_FRAME;                    \
     }                                                       \
@@ -214,7 +214,8 @@ static jvmtiError set_local(jvmtiEnv* env,
         vm_thread = jthread_get_vm_thread_ptr_safe(thread);
         if (vm_thread != p_TLS_vmthread)
         {
-            jthread_suspend(thread);
+            IDATA UNREF status = hythread_suspend_other((hythread_t)vm_thread);
+            assert(TM_ERROR_NONE == status);
             thread_suspended = true;
         }
     }
@@ -285,7 +286,7 @@ static jvmtiError set_local(jvmtiEnv* env,
     }
 
     if (thread_suspended)
-        jthread_resume(thread);
+        hythread_resume((hythread_t)vm_thread);
 
     return err;
 }
@@ -325,7 +326,8 @@ jvmtiGetLocalObject(jvmtiEnv* env,
         vm_thread = jthread_get_vm_thread_ptr_safe(thread);
         if (vm_thread != p_TLS_vmthread)
         {
-            jthread_suspend(thread);
+            IDATA UNREF status = hythread_suspend_other((hythread_t)vm_thread);
+            assert(TM_ERROR_NONE == status);
             thread_suspended = true;
         }
     }
@@ -366,7 +368,7 @@ jvmtiGetLocalObject(jvmtiEnv* env,
     }
 
     if (thread_suspended)
-        jthread_resume(thread);
+        hythread_resume((hythread_t)vm_thread);
 
     return err;
 }
@@ -406,7 +408,8 @@ jvmtiGetLocalInt(jvmtiEnv* env,
         vm_thread = jthread_get_vm_thread_ptr_safe(thread);
         if (vm_thread != p_TLS_vmthread)
         {
-            jthread_suspend(thread);
+            IDATA UNREF status = hythread_suspend_other((hythread_t)vm_thread);
+            assert(TM_ERROR_NONE == status);
             thread_suspended = true;
         }
     }
@@ -434,7 +437,7 @@ jvmtiGetLocalInt(jvmtiEnv* env,
     }
 
     if (thread_suspended)
-        jthread_resume(thread);
+        hythread_resume((hythread_t)vm_thread);
 
     return err;
 }
@@ -474,7 +477,8 @@ jvmtiGetLocalLong(jvmtiEnv* env,
         vm_thread = jthread_get_vm_thread_ptr_safe(thread);
         if (vm_thread != p_TLS_vmthread)
         {
-            jthread_suspend(thread);
+            IDATA UNREF status = hythread_suspend_other((hythread_t)vm_thread);
+            assert(TM_ERROR_NONE == status);
             thread_suspended = true;
         }
     }
@@ -502,7 +506,7 @@ jvmtiGetLocalLong(jvmtiEnv* env,
     }
 
     if (thread_suspended)
-        jthread_resume(thread);
+        hythread_resume((hythread_t)vm_thread);
 
     return err;
 }
