@@ -508,5 +508,8 @@ void gc_clear_dirty_set(GC* gc)
   }
 }
 
+void free_set_pool_put_entry(Vector_Block* block, GC_Metadata *metadata)
+{ pool_put_entry(metadata->free_set_pool, block); }
+
 
 

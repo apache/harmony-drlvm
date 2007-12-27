@@ -109,10 +109,7 @@ inline Vector_Block *free_set_pool_get_entry(GC_Metadata *metadata)
   return block;
 }
 
-#ifdef USE_32BITS_HASHCODE
-inline void free_set_pool_put_entry(Vector_Block* block, GC_Metadata *metadata)
-{ pool_put_entry(metadata->free_set_pool, block); }
-#endif
+void free_set_pool_put_entry(Vector_Block* block, GC_Metadata *metadata);
 
 inline Vector_Block *free_task_pool_get_entry(GC_Metadata *metadata)
 {
