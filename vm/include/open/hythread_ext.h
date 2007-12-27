@@ -309,11 +309,6 @@ typedef struct HyThread {
     hycond_t condition;
 
     /**
-     * Event reserved for threads that invoke join.
-     */
-    hylatch_t join_event;
-
-    /**
      * Current conditional variable thread is waiting on (used for interrupting)
      */
     hycond_t *current_condition;
@@ -425,9 +420,6 @@ IDATA VMCALL hythread_set_to_group(hythread_t thread, hythread_group_t group);
 IDATA VMCALL hythread_remove_from_group(hythread_t thread);
 void VMCALL hythread_set_self(hythread_t thread);
 UDATA VMCALL hythread_clear_interrupted_other(hythread_t thread);
-IDATA VMCALL hythread_join(hythread_t t);
-IDATA VMCALL hythread_join_timed(hythread_t t, I_64 millis, IDATA nanos);
-IDATA VMCALL hythread_join_interruptable(hythread_t t, I_64 millis, IDATA nanos);
 void VMCALL hythread_yield_other(hythread_t thread);
 IDATA VMCALL hythread_get_self_id();
 IDATA VMCALL hythread_get_id(hythread_t t);

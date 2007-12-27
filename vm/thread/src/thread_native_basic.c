@@ -276,50 +276,12 @@ void VMCALL hythread_detach_ex(hythread_t thread)
     // Detach if thread is attached to group.
     hythread_remove_from_group(thread);
 
-    // Send join event to those threads who called join on this thread.
-    status = hylatch_count_down(thread->join_event);
-    assert(status == TM_ERROR_NONE);
-
     // FIXME - uncomment after TM state transition complete
     // release thread data
     //hythread_struct_release(thread);
     
     status = hythread_global_unlock();
     assert(status == TM_ERROR_NONE);
-}
-
-/**
- * Waits until the selected thread finishes execution.
- *
- * @param[in] t thread to join
- */
-IDATA VMCALL hythread_join(hythread_t t) { 
-    return hylatch_wait(t->join_event);
-}
-/**
- * Waits until the selected thread finishes with specific timeout.
- *
- * @param[in] t a thread to wait for
- * @param[in] millis timeout in milliseconds to wait
- * @param[in] nanos timeout in nanoseconds to wait
- * @return TM_THREAD_TIMEOUT or 0 in case thread
- * was successfully joined.
- */
-IDATA VMCALL hythread_join_timed(hythread_t t, I_64 millis, IDATA nanos) { 
-    return hylatch_wait_timed(t->join_event, millis, nanos);
-}
-
-/**
- * Waits until the selected thread finishes with specific timeout.
- *
- * @param[in] t a thread to wait for
- * @param[in] millis timeout in milliseconds to wait
- * @param[in] nanos timeout in nanoseconds to wait
- * @return TM_THREAD_TIMEOUT or TM_THREAD_INTERRUPTED or 0 in case thread
- * was successfully joined.
- */
-IDATA VMCALL hythread_join_interruptable(hythread_t t, I_64 millis, IDATA nanos) { 
-    return hylatch_wait_interruptable(t->join_event, millis, nanos);
 }
 
 /**
@@ -638,8 +600,6 @@ IDATA VMCALL hythread_struct_init(hythread_t new_thread)
     assert(new_thread);
     if (!new_thread->os_handle) {
         // Create thread primitives
-        status = hylatch_create(&new_thread->join_event, 1);
-        assert(status == TM_ERROR_NONE);
         status = hysem_create(&new_thread->resume_event, 0, 1);
         assert(status == TM_ERROR_NONE);
         status = hymutex_create(&new_thread->mutex, TM_MUTEX_NESTED);
@@ -666,8 +626,6 @@ IDATA VMCALL hythread_struct_init(hythread_t new_thread)
     new_thread->state = TM_THREAD_STATE_NEW;
     hymutex_unlock(&new_thread->mutex);
 
-    status = hylatch_set(new_thread->join_event, 1);
-    assert(status == TM_ERROR_NONE);
     status = hysem_set(new_thread->resume_event, 0);
     assert(status == TM_ERROR_NONE);
 
@@ -683,9 +641,7 @@ IDATA VMCALL hythread_struct_release(hythread_t thread)
 
     assert(thread);
 
-    // Eelease thread primitives
-    status = hylatch_destroy(thread->join_event);
-    assert(status == TM_ERROR_NONE);
+    // Release thread primitives
     status = hysem_destroy(thread->resume_event);
     assert(status == TM_ERROR_NONE);
     status = hymutex_destroy(&thread->mutex);
