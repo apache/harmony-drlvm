@@ -772,6 +772,7 @@ void Class::assign_offsets_to_methods(Global_Env* env)
                                     "An attempt is made to override final method "
                                     << m->get_class()->get_name()->bytes << "."
                                     << m->get_name()->bytes << m->get_descriptor()->bytes);
+                                m_state = ST_Error;
                                 return;
                             }
                         }
