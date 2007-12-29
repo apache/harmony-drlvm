@@ -43,15 +43,25 @@
 #include <apr_atomic.h>
 
 #if defined(PLATFORM_NT) && !defined(_WIN64)
-#define AGENT_ONLOAD "_Agent_OnLoad@12"
-#define AGENT_ONUNLOAD "_Agent_OnUnload@4"
-#define JVM_ONLOAD "_JVM_OnLoad@12"
-#define JVM_ONUNLOAD "_JVM_OnUnLoad@4"
+#define AGENT_ONLOAD1 "_Agent_OnLoad@12"
+#define AGENT_ONUNLOAD1 "_Agent_OnUnload@4"
+#define JVM_ONLOAD1 "_JVM_OnLoad@12"
+#define JVM_ONUNLOAD1 "_JVM_OnUnLoad@4"
+
+#define AGENT_ONLOAD2 "Agent_OnLoad"
+#define AGENT_ONUNLOAD2 "Agent_OnUnload"
+#define JVM_ONLOAD2 "JVM_OnLoad"
+#define JVM_ONUNLOAD2 "JVM_OnUnLoad"
 #else
-#define AGENT_ONLOAD "Agent_OnLoad"
-#define AGENT_ONUNLOAD "Agent_OnUnload"
-#define JVM_ONLOAD "JVM_OnLoad"
-#define JVM_ONUNLOAD "JVM_OnUnLoad"
+#define AGENT_ONLOAD1 "Agent_OnLoad"
+#define AGENT_ONUNLOAD1 "Agent_OnUnload"
+#define JVM_ONLOAD1 "JVM_OnLoad"
+#define JVM_ONUNLOAD1 "JVM_OnUnLoad"
+
+#define AGENT_ONLOAD2 NULL
+#define AGENT_ONUNLOAD2 NULL
+#define JVM_ONLOAD2 NULL
+#define JVM_ONUNLOAD2 NULL
 #endif
 
 static void JNICALL jvmtiUnimpStub(JNIEnv*);
@@ -450,18 +460,22 @@ bool open_agent_library(Agent *agent, const char *lib_name, bool print_error)
         return true;
 }
 
-bool find_agent_onload_function(Agent *agent, const char *function_name)
+bool find_agent_onload_function(Agent *agent, const char *function_name1, const char *function_name2)
 {
     apr_dso_handle_sym_t handle = 0;
-    apr_status_t status = apr_dso_sym(&handle, agent->agentLib, function_name);
+    apr_status_t status = apr_dso_sym(&handle, agent->agentLib, function_name1);
+    if (handle == 0 && function_name2 != NULL)
+        status = apr_dso_sym(&handle, agent->agentLib, function_name2);
     agent->Agent_OnLoad_func = (f_Agent_OnLoad)handle;
     return status == APR_SUCCESS;
 }
 
-bool find_agent_onunload_function(Agent *agent, const char *function_name)
+bool find_agent_onunload_function(Agent *agent, const char *function_name1, const char *function_name2)
 {
     apr_dso_handle_sym_t handle = 0;
-    apr_status_t status = apr_dso_sym(&handle, agent->agentLib, function_name);
+    apr_status_t status = apr_dso_sym(&handle, agent->agentLib, function_name1);
+    if (handle == 0 && function_name2 != NULL)
+        status = apr_dso_sym(&handle, agent->agentLib, function_name2);
     agent->Agent_OnUnLoad_func = (f_Agent_OnUnLoad)handle;
     return status == APR_SUCCESS;
 }
@@ -473,8 +487,7 @@ jint load_agentpath(Agent *agent, const char *str, JavaVM_Internal *vm)
     if (!open_agent_library(agent, lib_name, true))
         return -1;
 
-    const char *callback = AGENT_ONLOAD, *callback_unload = AGENT_ONUNLOAD;
-    if (!find_agent_onload_function(agent, callback))
+    if (!find_agent_onload_function(agent, AGENT_ONLOAD1, AGENT_ONLOAD2))
     {
         char buf[256];
         LWARN(33, "No agent entry function found in library {0} : {1}" << lib_name
@@ -491,7 +504,7 @@ jint load_agentpath(Agent *agent, const char *str, JavaVM_Internal *vm)
         TRACE2("jvmti", "Calling onload in lib " << lib_name << " with options " << agent_options);
     }
 #endif
-    find_agent_onunload_function(agent, callback_unload);
+    find_agent_onunload_function(agent, AGENT_ONUNLOAD1, AGENT_ONUNLOAD2);
     assert(agent->Agent_OnLoad_func);
     jint result = agent->Agent_OnLoad_func(vm, agent_options, NULL);
     if (0 != result)
@@ -537,9 +550,7 @@ jint load_agentlib(Agent *agent, const char *str, JavaVM_Internal *vm)
         path = path1;
     }
 
-    const char *callback = AGENT_ONLOAD, *callback_unload = AGENT_ONUNLOAD;
-
-    if (!find_agent_onload_function(agent, callback))
+    if (!find_agent_onload_function(agent, AGENT_ONLOAD1, AGENT_ONLOAD2))
     {
         char buf[256];
         LWARN(33, "No agent entry function found in library {0} : {1}" << path
@@ -556,7 +567,7 @@ jint load_agentlib(Agent *agent, const char *str, JavaVM_Internal *vm)
         TRACE2("jvmti", "Calling onload in lib " << path << " with options " << agent_options);
     }
 #endif
-    find_agent_onunload_function(agent, callback_unload);
+    find_agent_onunload_function(agent, AGENT_ONUNLOAD1, AGENT_ONUNLOAD2);
     assert(agent->Agent_OnLoad_func);
     jint result = agent->Agent_OnLoad_func(vm, agent_options, NULL);
     if (0 != result)
@@ -588,12 +599,9 @@ jint load_xrun(Agent *agent, const char *str, JavaVM_Internal *vm)
         path = path1;
     }
 
-    const char *callback1 = AGENT_ONLOAD, *callback1_unload = AGENT_ONUNLOAD;
-    const char *callback2 = JVM_ONLOAD, *callback2_unload = JVM_ONUNLOAD;
-
-    if (!find_agent_onload_function(agent, callback1))
+    if (!find_agent_onload_function(agent, AGENT_ONLOAD1, AGENT_ONLOAD2))
     {
-        if (!find_agent_onload_function(agent, callback2))
+        if (!find_agent_onload_function(agent, JVM_ONLOAD1, JVM_ONLOAD2))
         {
             char buf[256];
             LWARN(33, "No agent entry function found in library {0} : {1}" << path 
@@ -601,10 +609,10 @@ jint load_xrun(Agent *agent, const char *str, JavaVM_Internal *vm)
             return -1;
         }
         else
-            find_agent_onunload_function(agent, callback2_unload);
+            find_agent_onunload_function(agent, JVM_ONUNLOAD1, JVM_ONUNLOAD2);
     }
     else
-        find_agent_onunload_function(agent, callback1_unload);
+        find_agent_onunload_function(agent, AGENT_ONUNLOAD1, AGENT_ONUNLOAD2);
 #ifdef _DEBUG
     if (NULL == agent_options)
     {
