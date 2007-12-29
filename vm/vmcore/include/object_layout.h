@@ -224,25 +224,33 @@ typedef struct ManagedObject {
     uint32 vt_offset;
     POINTER_SIZE_INT padding;
     };
-    POINTER_SIZE_INT obj_info;
+    union {
+    uint32 obj_info;
+    POINTER_SIZE_INT padding2;
+    };
+
     VTable *vt_unsafe() { return (VTable*)(vt_offset + vm_get_vtable_base()); }
     VTable *vt() { assert(vt_offset); return vt_unsafe(); }
     static VTable *allocation_handle_to_vtable(Allocation_Handle ah) {
         return (VTable *) ((POINTER_SIZE_INT)ah + vm_get_vtable_base());
     }
-    static unsigned header_offset() { return sizeof(POINTER_SIZE_INT); }
     static bool are_vtable_pointers_compressed() { return true; }
 #else // USE_COMPRESSED_VTABLE_POINTERS
     VTable *vt_raw;
-    POINTER_SIZE_INT obj_info;
+    union {
+    uint32 obj_info;
+    POINTER_SIZE_INT padding;
+    };
     VTable *vt_unsafe() { return vt_raw; }
     VTable *vt() { assert(vt_raw); return vt_unsafe(); }
     static VTable *allocation_handle_to_vtable(Allocation_Handle ah) {
         return (VTable *) ah;
     }
-    static unsigned header_offset() { return sizeof(VTable *); }
     static bool are_vtable_pointers_compressed() { return false; }
 #endif // USE_COMPRESSED_VTABLE_POINTERS
+
+    static unsigned header_offset() { return (unsigned)(POINTER_SIZE_INT)(&((ManagedObject*)NULL)->obj_info); }
+
     /// returns the size of constant object header part (vt pointer and obj_info)
     static size_t get_constant_header_size() { return sizeof(ManagedObject); }
     /// returns the size of object header including dynamically enabled fields.
@@ -250,10 +258,10 @@ typedef struct ManagedObject {
         return get_constant_header_size() + (_tag_pointer ? sizeof(void*) : 0); 
     }
 
-    POINTER_SIZE_INT get_obj_info() { return obj_info; }
-    void set_obj_info(POINTER_SIZE_INT value) { obj_info = value; }
-    POINTER_SIZE_INT* get_obj_info_addr() {
-        return (POINTER_SIZE_INT*)((char*)this + header_offset());
+    uint32 get_obj_info() { return obj_info; }
+    void set_obj_info(uint32 value) { obj_info = value; }
+    uint32* get_obj_info_addr() {
+        return (uint32*)((char*)this + header_offset());
     }
 
     /**
@@ -324,5 +332,6 @@ typedef struct VM_Vector
 #endif
 
 #endif // _OBJECT_LAYOUT_H_
+
 
 

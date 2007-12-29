@@ -128,7 +128,11 @@ inline POINTER_SIZE_INT atomic_casptrsz(volatile POINTER_SIZE_INT* mem,
                                         POINTER_SIZE_INT swap, 
                                         POINTER_SIZE_INT cmp)
 {
-  return (POINTER_SIZE_INT)apr_atomic_casptr((volatile void **)mem, (void*)swap, (void*)cmp);
+#ifdef POINTER64
+  return port_atomic_cas64(mem, swap, cmp);
+#else
+  return apr_atomic_cas32(mem, swap, cmp);
+#endif
 }
 
 inline uint32 atomic_cas32(volatile apr_uint32_t *mem,
