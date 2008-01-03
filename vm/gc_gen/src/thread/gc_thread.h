@@ -46,7 +46,7 @@ extern POINTER_SIZE_INT ZEROING_SIZE;
 extern POINTER_SIZE_INT PREFETCH_STRIDE;
 extern Boolean  PREFETCH_ENABLED;
 #else /* ALLOC_PREFETCH  ^^^^^^^^^^^^^^^^ */
-#define ZEROING_SIZE	256
+#define ZEROING_SIZE	2*KB
 #endif /* !ALLOC_PREFETCH */
 #endif /* ALLOC_ZEROING  ----------------- */
 
