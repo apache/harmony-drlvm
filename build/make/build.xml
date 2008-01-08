@@ -245,6 +245,20 @@
                 <isset property="is.ia64"/>
             </and>
         </condition>
+
+        <property name="hy.no.sig" value="false" />
+        <condition property="hy.skip.sig" value="true">
+            <not>
+                <equals arg1="${hy.no.sig}" arg2="false" />
+            </not>
+        </condition>
+
+        <property name="hy.local.zlib" value="false" />
+        <condition property="hy.skip.zlib" value="true">
+            <not>
+                <equals arg1="${hy.local.zlib}" arg2="false" />
+            </not>
+        </condition>
     </target>
 
     <!-- initialization target specific for unix -->

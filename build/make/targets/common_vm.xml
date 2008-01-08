@@ -107,7 +107,7 @@
             <compilerarg value="/Qip" if="is.icl"/>
 
             <defineset define="HY_NO_SIG" if="hy.skip.sig"/>
-            <defineset define="HY_LOCAL_ZLIB" unless="hy.skip.zip.api"/>
+            <defineset define="HY_LOCAL_ZLIB" if="hy.skip.zlib"/>
 
         </compiler>
 
