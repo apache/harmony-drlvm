@@ -149,6 +149,7 @@ Version: $Revision: 1.5.2.3 $
                 <exclude name="util/linux/signals_ia32.cpp" unless="is.unix.x86"/>
                 <exclude name="util/linux/signals_em64t.cpp" unless="is.unix.x86_64"/>
                 <exclude name="util/linux/signals_ipf.cpp" unless="is.unix.ia64"/>
+                <include name="util/linux/ia32_em64t/*.cpp" if="is.unix" unless="is.ia64"/>
             </fileset>
 
             <includepath path="${extra.zlib.includes}" if="is.windows"/>

@@ -75,7 +75,7 @@
 
 #include <semaphore.h>
 
-void linux_ucontext_to_regs(Registers* regs, ucontext_t* uc)
+void ucontext_to_regs(Registers* regs, ucontext_t* uc)
 {
     memcpy(regs->gr, uc->uc_mcontext.sc_gr, sizeof(regs->gr));
     memcpy(regs->fp, uc->uc_mcontext.sc_fr, sizeof(regs->fp));
@@ -88,7 +88,7 @@ void linux_ucontext_to_regs(Registers* regs, ucontext_t* uc)
     regs->ip    = uc->uc_mcontext.sc_ip;
 }
 
-void linux_regs_to_ucontext(ucontext_t* uc, Registers* regs)
+void regs_to_ucontext(ucontext_t* uc, Registers* regs)
 {
     memcpy(uc->uc_mcontext.sc_gr, regs->gr, sizeof(regs->gr));
     memcpy(uc->uc_mcontext.sc_fr, regs->fp, sizeof(regs->fp));
@@ -129,7 +129,7 @@ void abort_handler (int signum, siginfo_t* info, void* context) {
     fprintf(stderr, "SIGABRT in VM code.\n");
     Registers regs;
     ucontext_t *uc = (ucontext_t *)context;
-    linux_ucontext_to_regs(&regs, uc);
+    ucontext_to_regs(&regs, uc);
     
     // setup default handler
     signal(signum, SIG_DFL);
@@ -169,7 +169,7 @@ void null_java_divide_by_zero_handler(int signum, siginfo_t* UNREF info, void* c
 
     fprintf(stderr, "SIGFPE in VM code.\n");
     Registers regs;
-    linux_ucontext_to_regs(&regs, uc);
+    ucontext_to_regs(&regs, uc);
 
     // setup default handler
     signal(signum, SIG_DFL);
@@ -453,7 +453,7 @@ void null_java_reference_handler(int signum, siginfo_t* UNREF info, void* contex
     }
     fprintf(stderr, "SIGSEGV in VM code.\n");
     Registers regs;
-    linux_ucontext_to_regs(&regs, uc);
+    ucontext_to_regs(&regs, uc);
 
     // setup default handler
     signal(signum, SIG_DFL);

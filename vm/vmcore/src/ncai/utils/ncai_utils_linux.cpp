@@ -6,8 +6,8 @@
 #include "open/ncai_thread.h"
 #include "ncai_internal.h"
 
-void linux_ucontext_to_regs(Registers* regs, ucontext_t *uc);
-void linux_regs_to_ucontext(ucontext_t *uc, Registers* regs);
+void ucontext_to_regs(Registers* regs, ucontext_t *uc);
+void regs_to_ucontext(ucontext_t *uc, Registers* regs);
 
 bool ncai_get_generic_registers(hythread_t thread, Registers* regs)
 {
@@ -20,6 +20,6 @@ bool ncai_get_generic_registers(hythread_t thread, Registers* regs)
     if (status != TM_ERROR_NONE)
         return false;
 
-    linux_ucontext_to_regs(regs, &uc);
+    ucontext_to_regs(regs, &uc);
     return true;
 }
