@@ -49,8 +49,13 @@ Version: $Revision: 1.5.2.3 $
     </target>
 
     <target name="-init-unix" if="is.unix">
+        <!-- These links should really be removed by the clean target but this
+             is a workaround for a debian packaging problem.  It should
+             be fixed properly then the icu4c libs are moved from classlib. -->
+        <delete file="${external.dep.CLASSLIB}/depends/libs/${hy.platform}/libicuuc.so" />
         <symlink overwrite="yes" link="${external.dep.CLASSLIB}/depends/libs/${hy.platform}/libicuuc.so"
             resource="${external.dep.CLASSLIB}/depends/libs/${hy.platform}/libicuuc.so.34"/>
+        <delete file="${external.dep.CLASSLIB}/depends/libs/${hy.platform}/libicudata.so" />
         <symlink overwrite="yes" link="${external.dep.CLASSLIB}/depends/libs/${hy.platform}/libicudata.so"
             resource="${external.dep.CLASSLIB}/depends/libs/${hy.platform}/libicudata.so.34"/>
     </target>
