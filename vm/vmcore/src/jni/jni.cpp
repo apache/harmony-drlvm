@@ -882,9 +882,15 @@ jobject JNICALL NewLocalRef(JNIEnv * jni_env, jobject ref)
 
     if (NULL != new_ref) {
         new_ref->object = ref->object;
+        tmn_suspend_enable();
+        // Gregory -
+        // The following TRACE2 requires suspend to be enabled!
         TRACE2("jni", "NewLocalRef class = " << jobject_to_struct_Class(new_ref));
     }
-    tmn_suspend_enable();   
+    else
+    {
+        tmn_suspend_enable();
+    }
     return new_ref;
 } //NewLocalRef
 
