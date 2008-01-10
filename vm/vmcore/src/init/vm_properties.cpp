@@ -303,7 +303,7 @@ static void init_vm_properties(Properties & properties)
         properties.set_new("thread.soft_unreservation", "false");
 
 #ifdef REFS_USE_RUNTIME_SWITCH
-        properties.set_new("vm.compress_references", "true");
+        properties.set_new("vm.compress_references", "false");
 #endif
 
         int n_api_dll_files = sizeof(api_dll_files) / sizeof(char *);
