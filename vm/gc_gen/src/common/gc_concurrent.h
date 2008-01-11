@@ -35,10 +35,13 @@ enum HANDSHAKE_SINGAL{
 
   
   ENABLE_COLLECTOR_SWEEP_GLOBAL_CHUNKS = 0x03,
-  DISABLE_COLLECTOR_SWEEP_GLOBAL_CHUNKS = 0x04
-//  /*collector to mutator*/
-//  ENABLE_MUTATOR_ALLOC_BARRIER = 0x03,
-//  DISABLE_MUTATOR_ALLOC_BARRIER = 0x04
+  DISABLE_COLLECTOR_SWEEP_GLOBAL_CHUNKS = 0x04,
+
+  MUTATOR_ENTER_BARRIER = 0x05,
+  MUTATOR_EXIT_BARRIER = 0x06,
+
+  MUTATOR_ENTER_ALLOCATION_MARK = 0x07,
+  MUTATOR_EXIT_ALLOCATION_MARK = 0x08
 };
 
 extern Boolean USE_CONCURRENT_GC;
@@ -78,7 +81,7 @@ inline void gc_mark_set_concurrent()
 
 inline void gc_mark_unset_concurrent()
 {
-  gc_disenable_alloc_obj_live();
+  gc_disable_alloc_obj_live();
   mark_is_concurrent = FALSE;
 }
 
@@ -125,13 +128,13 @@ inline void gc_set_concurrent_status(GC*gc, unsigned int status)
 
   gc->gc_concurrent_status = status;
   switch(status){
-    case GC_CONCURRENT_MARK_PHASE:  
-      concurrent_mark_phase = TRUE;
+    case GC_CONCURRENT_MARK_PHASE: 
       gc_mark_set_concurrent();
+      concurrent_mark_phase = TRUE;
       break;
     case GC_CONCURRENT_SWEEP_PHASE:
-      concurrent_sweep_phase = TRUE;
       gc_sweep_set_concurrent();
+      concurrent_sweep_phase = TRUE;
       break;
     default:
       assert(!concurrent_mark_phase && !concurrent_sweep_phase);

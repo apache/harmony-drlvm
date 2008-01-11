@@ -63,16 +63,16 @@ void gc_set_rootset(GC* gc);
 void gc_reset_rootset(GC* gc);
 void gc_clear_rootset(GC* gc);
 void gc_fix_rootset(Collector* collector, Boolean double_fix);
+
 void gc_clear_remset(GC* gc);
+
+void gc_prepare_dirty_set(GC* gc);
 void gc_reset_dirty_set(GC* gc);
+void gc_clear_dirty_set(GC* gc);
 
 void gc_identify_dead_weak_roots(GC *gc);
 void gc_update_weak_roots(GC *gc, Boolean double_fix);
 
-void gc_clear_remset(GC* gc);
-void gc_clear_dirty_set(GC* gc);
-
-void gc_prepare_dirty_set(GC* gc);
 
 inline void  gc_task_pool_clear(Pool* task_pool)
 {

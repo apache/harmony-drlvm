@@ -15,18 +15,24 @@
  *  limitations under the License.
  */
 
-#ifndef _VERIFY_LIVE_HEAP_H_
-#define _VERIFY_LIVE_HEAP_H_
+#include "../gen/gen.h"
 
-#include "../common/gc_common.h"
+static void blocked_space_clear_info(Blocked_Space* space)
+{  
+  for(unsigned int i=0; i < space->num_managed_blocks; i++){
+    Block_Header* block = (Block_Header*)&(space->blocks[i]);
+    block->num_live_objs = 0;
+  }
+  return;
+}
 
-extern Boolean verify_live_heap;
+void verifier_cleanup_block_info(GC* gc)
+{
+  Blocked_Space* space = (Blocked_Space*)gc_get_mos((GC_Gen*)gc);
+  blocked_space_clear_info(space);  
 
-void gc_init_heap_verification(GC* gc);
-void gc_terminate_heap_verification(GC* gc);
-void gc_verify_heap(GC* gc, Boolean is_before_gc);
+  space = (Blocked_Space*)gc_get_nos((GC_Gen*)gc);
+  blocked_space_clear_info(space);  
 
-void event_mutator_allocate_newobj(Partial_Reveal_Object* p_newobj, POINTER_SIZE_INT size, VT vt_raw);
-void event_gc_collect_kind_changed(GC* gc);
-
-#endif
+  return;
+}

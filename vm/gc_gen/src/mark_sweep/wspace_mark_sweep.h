@@ -430,12 +430,11 @@ inline void ops_color_flip(void)
 {
   POINTER_SIZE_INT temp = cur_alloc_color;
   cur_alloc_color = cur_mark_black_color;
-  //FIXME: Need barrier here.
-  //apr_memory_rw_barrier();
+  mem_fence();
   cur_mark_black_color = temp;
   cur_alloc_mask = (~cur_alloc_mask) & FLIP_COLOR_MASK_IN_TABLE;
   cur_mark_mask = (~cur_mark_mask) & FLIP_COLOR_MASK_IN_TABLE;
-  //printf("color flip\n");
+  TRACE2("gc.con","color bit flips");
 }
 
 extern void wspace_mark_scan(Collector *collector, Wspace *wspace);

@@ -100,6 +100,14 @@ inline void scan_weak_reference_direct(Collector *collector, Partial_Reveal_Obje
   scan_slot(collector, p_referent_field);
 }
 
+inline Boolean is_reference_obj(Partial_Reveal_Object *p_obj)
+{
+  WeakReferenceType type = special_reference_type(p_obj);
+  if(type == NOT_REFERENCE)
+    return FALSE;
+  else
+    return TRUE;
+}
 
 extern void gc_update_weakref_ignore_finref(GC *gc);
 extern void collector_identify_finref(Collector *collector);

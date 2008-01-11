@@ -45,6 +45,31 @@ void space_desturct_blocks(Blocked_Space* space)
   }
 }
 
+#ifndef STATIC_NOS_MAPPING
+void blocked_space_adjust(Blocked_Space* space, void* new_space_start, POINTER_SIZE_INT new_space_size)
+{    
+  space->heap_start = new_space_start;
+  space->blocks = (Block*)new_space_start;
+  space->committed_heap_size = new_space_size;
+  space->reserved_heap_size = new_space_size;
+  space->num_managed_blocks = (unsigned int)(new_space_size >> GC_BLOCK_SHIFT_COUNT);
+  space->num_total_blocks = space->num_managed_blocks;
+  space->first_block_idx = ((Block_Header*)new_space_start)->block_idx;
+  space->ceiling_block_idx = space->first_block_idx + space->num_managed_blocks - 1;
+ 	space->num_used_blocks = 0;
+
+  void* new_space_end = (void*)((POINTER_SIZE_INT)new_space_start + new_space_size);
+  space->heap_end = new_space_end;
+
+  /* we can't set free_block_idx here! because the adjusted space might have some used block inside. 
+     e.g., when it's used to adjust MOS after a collection.
+  space->free_block_idx = space->first_block_idx;
+  */
+  
+  return;
+}
+#endif /* #ifndef STATIC_NOS_MAPPING */
+
 void blocked_space_shrink(Blocked_Space* space, unsigned int changed_size)
 {
   unsigned int block_dec_count = changed_size >> GC_BLOCK_SHIFT_COUNT;

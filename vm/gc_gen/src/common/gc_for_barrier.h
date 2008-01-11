@@ -39,34 +39,5 @@ inline void gc_set_barrier_function(unsigned int wb_function)
 {
   write_barrier_function = wb_function;
 }
-
-extern Boolean gen_mode;
-
-inline Boolean gc_is_gen_mode()
-{  return gen_mode; }
-
-inline void gc_enable_gen_mode()
-{  
-  gen_mode = TRUE;
-  gc_set_barrier_function(WRITE_BARRIER_REM_SOURCE_REF);
-  HelperClass_set_GenMode(TRUE);
-}
-
-inline void gc_disable_gen_mode()
-{  
-  gen_mode = FALSE; 
-  gc_set_barrier_function(WRITE_BARRIER_REM_NIL);
-  HelperClass_set_GenMode(FALSE);
-}
-
-inline void gc_set_gen_mode(Boolean status)
-{
-  gen_mode = status; 
-  if(gen_mode) 
-    gc_set_barrier_function(WRITE_BARRIER_REM_SOURCE_REF);
-  HelperClass_set_GenMode(status);   
-}
 #endif /* _GC_FOR_BARRIER_H_ */
-
-
 

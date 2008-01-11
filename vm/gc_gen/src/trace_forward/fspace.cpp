@@ -20,15 +20,11 @@
  */
 
 #include "fspace.h"
-#include "../gen/gen.h"
 
 Boolean NOS_PARTIAL_FORWARD = FALSE;
 
 Boolean forward_first_half;
 void* object_forwarding_boundary=NULL;
-
-struct GC_Gen;
-void gc_set_nos(GC_Gen* gc, Space* space);
 
 Fspace *fspace_initialize(GC* gc, void* start, POINTER_SIZE_INT fspace_size, POINTER_SIZE_INT commit_size) 
 {    
@@ -51,7 +47,7 @@ Fspace *fspace_initialize(GC* gc, void* start, POINTER_SIZE_INT fspace_size, POI
 
 #ifdef STATIC_NOS_MAPPING
   fspace->heap_end = (void *)((POINTER_SIZE_INT)reserved_base + fspace->reserved_heap_size);
-#else /* for dynamic mapping, nos->heap_end is gc->heap_end */
+#else /* for dynamic mapping, fspace->heap_end is gc->heap_end */
   fspace->heap_end = (void *)((POINTER_SIZE_INT)reserved_base + fspace->committed_heap_size);
 #endif
 
@@ -150,7 +146,7 @@ void fspace_reset_after_collection(Fspace* fspace)
   /* For los extension
    * num_managed_blocks of fspace might be 0.
    * In this case, the last block we found is mos' last block.
-   * And this implementation depends on the fact that mos and nos are continuous.
+   * And this implementation depends on the fact that mos and fspace are continuous.
    */
   int last_block_index = fspace->num_managed_blocks - 1;
   Block_Header *fspace_last_block = (Block_Header*)&fspace->blocks[last_block_index];
@@ -158,6 +154,23 @@ void fspace_reset_after_collection(Fspace* fspace)
   
   return;
 }
+
+#ifndef STATIC_NOS_MAPPING
+void* fspace_heap_start_adjust(Fspace* fspace, void* new_space_start, POINTER_SIZE_INT new_space_size)
+{
+
+  blocked_space_adjust((Blocked_Space*)fspace, new_space_start, new_space_size);
+  
+  fspace->free_block_idx = fspace->first_block_idx;
+
+  if( NOS_PARTIAL_FORWARD )
+    object_forwarding_boundary = (void*)&fspace->blocks[fspace->num_managed_blocks >>1];
+  else
+    object_forwarding_boundary = (void*)&fspace->blocks[fspace->num_managed_blocks];
+ 
+  return new_space_start; 
+}
+#endif
 
 void collector_execute_task(GC* gc, TaskType task_func, Space* space);
 

@@ -106,25 +106,25 @@ Boolean sync_queue_pull(Sync_Queue* queue, unsigned int * pvalue)
 
     if( QLINK_VAL(head) == QLINK_VAL(queue->head)){
       if( head.ptr== tail.ptr )
-      	if( next.ptr == NULL )
-        return FALSE;
-      	else{
-        tmp1.ptr = next.ptr;
-        tmp1.count = tail.count+1;
-        atomic_cas64(QLINK_PTR(queue->tail), QLINK_VAL(tail), QLINK_VAL(tmp1));
-      	}
+        if( next.ptr == NULL )
+          return FALSE;
+        else{
+          tmp1.ptr = next.ptr;
+          tmp1.count = tail.count+1;
+          atomic_cas64(QLINK_PTR(queue->tail), QLINK_VAL(tail), QLINK_VAL(tmp1));
+        }
       else{
         *pvalue = next.ptr->value;
         tmp1.ptr = next.ptr;
         tmp1.count = head.count+1;
-        QLINK_VAL(tmp2) =	atomic_cas64(QLINK_PTR(queue->head), QLINK_VAL(head), QLINK_VAL(tmp1));
+        QLINK_VAL(tmp2) =  atomic_cas64(QLINK_PTR(queue->head), QLINK_VAL(head), QLINK_VAL(tmp1));
         if( QLINK_VAL(tmp2) == QLINK_VAL(tmp1))
           break;
-        }
+      }
     }
   }
   free( head.ptr );
   return TRUE;
 }
-	
+  
 #endif /* _SYNC_QUEUE_H_ */

@@ -442,4 +442,3 @@ Boolean finref_copy_pool(Pool *src_pool, Pool *dest_pool, GC *gc)
 }
 
 
-

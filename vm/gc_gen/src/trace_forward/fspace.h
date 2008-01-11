@@ -39,6 +39,16 @@ typedef Blocked_Space Fspace;
 Fspace *fspace_initialize(GC* gc, void* start, POINTER_SIZE_INT fspace_size, POINTER_SIZE_INT commit_size);
 void fspace_destruct(Fspace *fspace);
 
+inline POINTER_SIZE_INT fspace_free_space_size(Fspace* nos)
+{ return blocked_space_free_mem_size((Blocked_Space*)nos);}
+
+inline POINTER_SIZE_INT fspace_used_space_size(Fspace* nos)
+{ return blocked_space_used_mem_size((Blocked_Space*)nos);}
+
+#ifndef STATIC_NOS_MAPPING
+void* fspace_heap_start_adjust(Fspace* fspace, void* new_heap_start, POINTER_SIZE_INT new_heap_size);
+#endif
+
 void* fspace_alloc(unsigned size, Allocator *allocator);
 Boolean fspace_alloc_block(Fspace* fspace, Allocator* allocator);
 

@@ -109,9 +109,8 @@ void mspace_reset_after_collection(Mspace* mspace)
     block->src = NULL;
     block->next_src = NULL;
     assert(!block->dest_counter);
-
     if(i >= new_num_used){
-      block->status = BLOCK_FREE; 
+      block->status = BLOCK_FREE;
       block->free = GC_BLOCK_BODY(block);
     }
   }
@@ -172,6 +171,5 @@ float mspace_get_expected_threshold_ratio(Mspace* mspace)
 {
     return mspace->expected_threshold_ratio;
 }
-
 
 

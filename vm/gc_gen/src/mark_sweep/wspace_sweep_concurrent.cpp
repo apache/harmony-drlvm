@@ -339,7 +339,6 @@ void wspace_sweep_concurrent(Collector* collector)
       /*grab more pfc pools*/
       pfc_pool = wspace_grab_next_pfc_pool(wspace);
     }
-    gc_unset_sweeping_global_normal_chunk();
     
     /*4. Check the used list again.*/
     chunk_to_sweep = chunk_pool_get_chunk(used_chunk_pool);
@@ -350,6 +349,8 @@ void wspace_sweep_concurrent(Collector* collector)
 
     /*5. Switch the PFC backup list to PFC list.*/
     wspace_exchange_pfc_pool(wspace);
+    
+    gc_unset_sweeping_global_normal_chunk();
 
     /*6. Put back live abnormal chunk and normal unreusable chunk*/
     Chunk_Header* used_abnormal_chunk = wspace_get_live_abnormal_chunk(wspace);
@@ -379,4 +380,5 @@ void wspace_sweep_concurrent(Collector* collector)
   }
   while(num_sweeping_collectors != num_active_collectors + 1);
 }
+
 

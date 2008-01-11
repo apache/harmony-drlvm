@@ -825,30 +825,30 @@ static int cur_free_bytes = 0;
 
 void *malloc_wrapper(int size)
 {
-	massert(size > 0);
-	if(!cur_free_ptr) {
-		cur_free_bytes = INIT_ALLOC_SIZE;
-		cur_free_ptr = (char*) STD_MALLOC(cur_free_bytes);
-	}
-	
-	massert(cur_free_bytes >= size);
-	
-	total_malloc_bytes += size;
-	cur_free_bytes -= size;
-	
-	void * ret = cur_free_ptr;
-	cur_free_ptr += size;
-	return ret;
+  massert(size > 0);
+  if(!cur_free_ptr) {
+    cur_free_bytes = INIT_ALLOC_SIZE;
+    cur_free_ptr = (char*) STD_MALLOC(cur_free_bytes);
+  }
+  
+  massert(cur_free_bytes >= size);
+  
+  total_malloc_bytes += size;
+  cur_free_bytes -= size;
+  
+  void * ret = cur_free_ptr;
+  cur_free_ptr += size;
+  return ret;
 }
 
 void free_wrapper(int size)
 {
-	massert(size > 0);
-	massert(cur_free_ptr);
-	massert(total_malloc_bytes >= size);
-	cur_free_bytes += size;
-	total_malloc_bytes -= size;
-	cur_free_ptr -= size;
+  massert(size > 0);
+  massert(cur_free_ptr);
+  massert(total_malloc_bytes >= size);
+  cur_free_bytes += size;
+  total_malloc_bytes -= size;
+  cur_free_ptr -= size;
 }
 
 unsigned int *shift_table;
@@ -857,57 +857,58 @@ unsigned int mask[MAX_SLOT_SIZE_AFTER_SHIFTING];
 static int already_inited = 0;
 void fastdiv_init()
 {
-	if(already_inited) return;
-	already_inited = 1;
-	
-	int i;
-	int shift_table_size = (MAX_SLOT_SIZE + 1) * sizeof shift_table[0];
-	shift_table = (unsigned int *)malloc_wrapper(shift_table_size);
-	memset(shift_table, 0x00, shift_table_size) ;
-	for(i = MAX_SLOT_SIZE + 1;i--;) {
-		shift_table[i] = 0;
-		int v = i;
-		while(v && !(v & 1)) {
-			v >>= 1;
-			shift_table[i]++;
-		}
-	}
+  if(already_inited) return;
+  already_inited = 1;
+  
+  int i;
+  int shift_table_size = (MAX_SLOT_SIZE + 1) * sizeof shift_table[0];
+  shift_table = (unsigned int *)malloc_wrapper(shift_table_size);
+  memset(shift_table, 0x00, shift_table_size) ;
+  for(i = MAX_SLOT_SIZE + 1;i--;) {
+    shift_table[i] = 0;
+    int v = i;
+    while(v && !(v & 1)) {
+      v >>= 1;
+      shift_table[i]++;
+    }
+  }
 
-	memset(compact_table, 0x00, sizeof compact_table);
-	memset(mask, 0x00, sizeof mask);
-	for(i = 1;i < 32;i += 2) {
-		int cur = 1;
-		unsigned short *p = NULL;
-		while(1) {
-			p = (unsigned short*)malloc_wrapper(cur * sizeof p[0]);
-			memset(p, 0xff, cur * sizeof p[0]);
-			int j;
-			for(j = 0; j <= MAX_ADDR_OFFSET;j += i) {
-				int pos = j & (cur - 1);
-				if(p[pos] == 0xffff) {
-					p[pos] = j / i;
-				}else {
-					break;
-				}
-			}
-			if(j <= MAX_ADDR_OFFSET) {
-				free_wrapper(cur * sizeof p[0]);
-				cur <<= 1;
-				p = NULL;
-			}else {
-				break;
-			}
-		}
-		massert(p);
-		mask[i] = cur - 1;
-		while(cur && p[cur - 1] == 0xffff) {
-			free_wrapper(sizeof p[0]);
-			cur--;
-		}
-		compact_table[i] = p;
-	}
+  memset(compact_table, 0x00, sizeof compact_table);
+  memset(mask, 0x00, sizeof mask);
+  for(i = 1;i < 32;i += 2) {
+    int cur = 1;
+    unsigned short *p = NULL;
+    while(1) {
+      p = (unsigned short*)malloc_wrapper(cur * sizeof p[0]);
+      memset(p, 0xff, cur * sizeof p[0]);
+      int j;
+      for(j = 0; j <= MAX_ADDR_OFFSET;j += i) {
+        int pos = j & (cur - 1);
+        if(p[pos] == 0xffff) {
+          p[pos] = j / i;
+        }else {
+          break;
+        }
+      }
+      if(j <= MAX_ADDR_OFFSET) {
+        free_wrapper(cur * sizeof p[0]);
+        cur <<= 1;
+        p = NULL;
+      }else {
+        break;
+      }
+    }
+    massert(p);
+    mask[i] = cur - 1;
+    while(cur && p[cur - 1] == 0xffff) {
+      free_wrapper(sizeof p[0]);
+      cur--;
+    }
+    compact_table[i] = p;
+  }
 }
 
 #endif
+
 
 

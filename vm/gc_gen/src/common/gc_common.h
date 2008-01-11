@@ -36,7 +36,7 @@
 #include "gc_for_class.h"
 #include "gc_platform.h"
 
-#include "../gen/gc_for_barrier.h"
+#include "../common/gc_for_barrier.h"
 
 /* 
 #define USE_MARK_SWEEP_GC  //define it to only use Mark-Sweep GC (no NOS, no LOS).
@@ -174,11 +174,8 @@ FORCE_INLINE REF obj_ptr_to_ref(Partial_Reveal_Object *p_obj)
   else
     return (REF) ((POINTER_SIZE_INT) p_obj - HEAP_NULL);
 #else
-
-        return (REF)p_obj;
-
+    return (REF)p_obj;
 #endif
-
 }
 
 FORCE_INLINE Partial_Reveal_Object *ref_to_obj_ptr(REF ref)
@@ -190,9 +187,7 @@ FORCE_INLINE Partial_Reveal_Object *ref_to_obj_ptr(REF ref)
   return (Partial_Reveal_Object *)(HEAP_NULL + ref);
 
 #else
-
-        return (Partial_Reveal_Object *)ref;
-
+  return (Partial_Reveal_Object *)ref;
 #endif
 
 }
@@ -272,7 +267,7 @@ inline Partial_Reveal_Object *obj_get_fw_in_oi(Partial_Reveal_Object *obj)
 }
 
 inline Boolean obj_is_fw_in_oi(Partial_Reveal_Object *obj) 
-{  return (get_obj_info_raw(obj) & CONST_FORWARD_BIT); }
+{  return (Boolean)(get_obj_info_raw(obj) & CONST_FORWARD_BIT); }
 
 inline void obj_set_fw_in_oi(Partial_Reveal_Object *obj,void *dest)
 {  
@@ -348,7 +343,7 @@ inline Boolean obj_mark_in_oi(Partial_Reveal_Object* p_obj)
 inline Boolean obj_unmark_in_oi(Partial_Reveal_Object* p_obj)
 {
   Obj_Info_Type info = get_obj_info_raw(p_obj);
-  info = info & DUAL_MARKBITS_MASK;
+  info = info & ~FLIP_MARK_BIT;
   set_obj_info(p_obj, info);
   return TRUE;
 }
@@ -361,6 +356,7 @@ inline Boolean obj_is_marked_in_oi(Partial_Reveal_Object* p_obj)
 
 #endif /* MARK_BIT_FLIPPING */
 
+/********************* for concurrent GC *******************************/
 inline Boolean obj_is_dirty_in_oi(Partial_Reveal_Object* p_obj)
 {
   Obj_Info_Type info = get_obj_info_raw(p_obj);
@@ -390,11 +386,31 @@ inline void gc_enable_alloc_obj_live()
   obj_alloced_live = TRUE;  
 }
 
-inline void gc_disenable_alloc_obj_live()
+inline void gc_disable_alloc_obj_live()
 { 
   obj_alloced_live = FALSE; 
 }
 
+/***************************************************************/
+
+inline Boolean obj_is_survivor(Partial_Reveal_Object* p_obj)
+{
+  return get_obj_info_raw(p_obj) & OBJ_AGE_BIT;
+}
+
+inline void obj_set_age_bit(Partial_Reveal_Object* p_obj)
+{
+  Obj_Info_Type oi = get_obj_info_raw(p_obj);
+  return set_obj_info( p_obj, oi |OBJ_AGE_BIT) ;
+}
+
+inline void obj_clear_age_bit(Partial_Reveal_Object* p_obj)
+{
+  Obj_Info_Type oi = get_obj_info_raw(p_obj);
+  return set_obj_info( p_obj, oi & ~OBJ_AGE_BIT) ;
+}
+
+/***************************************************************/
 /* all GCs inherit this GC structure */
 struct Marker;
 struct Mutator;
@@ -454,7 +470,7 @@ typedef struct GC{
   SpinLock concurrent_mark_lock;
   SpinLock enumerate_rootset_lock;
   SpinLock concurrent_sweep_lock;
-  
+  SpinLock collection_scheduler_lock;
   
   /* system info */
   unsigned int _system_alloc_unit;
@@ -494,9 +510,6 @@ inline Boolean gc_match_either_kind(GC *gc, unsigned int multi_kinds)
   assert(gc->collect_kind && multi_kinds);
   return (Boolean)(gc->collect_kind & multi_kinds);
 }
-
-inline void gc_reset_collector_state(GC* gc)
-{ gc->num_active_collectors = 0;}
 
 inline unsigned int gc_get_processor_num(GC* gc) { return gc->_num_processors; }
 
@@ -546,4 +559,5 @@ inline Boolean obj_is_moved(Partial_Reveal_Object* p_obj)
 {  return ((p_obj >= los_boundary) || (*p_global_lspace_move_obj)); }
 
 extern Boolean TRACE_JLC_VIA_VTABLE;
+
 #endif //_GC_COMMON_H_

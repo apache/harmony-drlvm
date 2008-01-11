@@ -136,7 +136,7 @@ inline void clear_free_slot_in_table(POINTER_SIZE_INT *table, unsigned int ceili
 
 inline void alloc_slot_in_table(POINTER_SIZE_INT *table, unsigned int slot_index)
 {
-  assert(!slot_is_alloc_in_table(table, slot_index));
+  //assert(!slot_is_alloc_in_table(table, slot_index));
   
   unsigned int color_bits_index = slot_index * COLOR_BITS_PER_OBJ;
   unsigned int word_index = color_bits_index / BITS_PER_WORD;
@@ -156,6 +156,7 @@ inline void alloc_slot_in_table(POINTER_SIZE_INT *table, unsigned int slot_index
       return; /*returning true does not mean it's marked by this thread. */
     }
     old_word = *p_color_word;
+    //FIXME: this assertion is too strong here because of concurrent sweeping.
     assert(!slot_is_alloc_in_table(table, slot_index));
     
     new_word = old_word | mark_alloc_color;
@@ -187,8 +188,7 @@ inline void *alloc_in_chunk(Chunk_Header* &chunk)
   if(p_obj && is_obj_alloced_live())
     obj_mark_black_in_table((Partial_Reveal_Object*)p_obj, chunk->slot_size);
   
-  //FIXME: Need barrier here.
-  //apr_memory_rw_barrier();
+  mem_fence();
   
   alloc_slot_in_table(table, slot_index);
   if(chunk->status & CHUNK_NEED_ZEROING)

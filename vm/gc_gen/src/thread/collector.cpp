@@ -85,9 +85,11 @@ static void collector_reset_thread(Collector *collector)
     
   GC_Metadata* metadata = collector->gc->metadata;
   
-  if(gc_is_gen_mode() && gc_match_kind(collector->gc, MINOR_COLLECTION) && NOS_PARTIAL_FORWARD){
-    assert(collector->rem_set==NULL);
-    collector->rem_set = free_set_pool_get_entry(metadata);
+  if(gc_is_gen_mode() && gc_match_kind(collector->gc, MINOR_COLLECTION)){
+    if( NOS_PARTIAL_FORWARD || MINOR_ALGO == MINOR_GEN_SEMISPACE_POOL ){
+      assert(collector->rem_set==NULL);
+      collector->rem_set = free_set_pool_get_entry(metadata);
+    }
   }
   
 #ifndef BUILD_IN_REFERENT
@@ -309,6 +311,8 @@ void collector_execute_task(GC* gc, TaskType task_func, Space* space)
   return;
 }
 
+/* FIXME:: unimplemented. the design intention for this API is to lauch specified num of collectors. There might be already
+   some collectors running. The specified num would be additional num. */
 void collector_execute_task_concurrent(GC* gc, TaskType task_func, Space* space, unsigned int num_collectors)
 {
   assign_collector_with_task(gc, task_func, space);
@@ -345,4 +349,5 @@ Boolean is_collector_finished(GC* gc)
   return TRUE;
 
 }
+
 

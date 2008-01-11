@@ -118,7 +118,7 @@ inline int vm_create_thread(int (*func)(void*), void *data)
 
 inline int vm_thread_is_suspend_enable()
 {
-  return hythread_is_suspend_enabled();
+  return (int)hythread_is_suspend_enabled();
 }
 
 inline void *atomic_casptr(volatile void **mem, void *with, const void *cmp) 
@@ -128,6 +128,7 @@ inline POINTER_SIZE_INT atomic_casptrsz(volatile POINTER_SIZE_INT* mem,
                                         POINTER_SIZE_INT swap, 
                                         POINTER_SIZE_INT cmp)
 {
+  // we can't use apr_atomic_casptr, which can't work correctly in 64bit machine. 
 #ifdef POINTER64
   return port_atomic_cas64(mem, swap, cmp);
 #else
@@ -135,25 +136,19 @@ inline POINTER_SIZE_INT atomic_casptrsz(volatile POINTER_SIZE_INT* mem,
 #endif
 }
 
-inline uint32 atomic_cas32(volatile apr_uint32_t *mem,
+inline uint32 atomic_cas32(volatile unsigned int *mem,
                                            apr_uint32_t swap,
                                            apr_uint32_t cmp) 
 {  return (uint32)apr_atomic_cas32(mem, swap, cmp); }
 
-inline uint32 atomic_inc32(volatile apr_uint32_t *mem)
+inline uint32 atomic_inc32(volatile unsigned int *mem)
 {  return (uint32)apr_atomic_inc32(mem); }
 
-inline uint32 atomic_dec32(volatile apr_uint32_t *mem)
+inline uint32 atomic_dec32(volatile unsigned int  *mem)
 {  return (uint32)apr_atomic_dec32(mem); }
 
-inline uint32 atomic_add32(volatile apr_uint32_t *mem, apr_uint32_t val) 
+inline uint32 atomic_add32(volatile unsigned int  *mem, unsigned int  val) 
 {  return (uint32)apr_atomic_add32(mem, val); }
-
-inline Boolean pool_create(apr_pool_t **newpool, apr_pool_t *parent) 
-{  return (Boolean)apr_pool_create(newpool, parent);}
-
-inline void pool_destroy(apr_pool_t *p) 
-{  apr_pool_destroy(p); }
 
 #ifndef _WINDOWS_
 #include <sys/mman.h>
@@ -268,6 +263,12 @@ inline Boolean vm_decommit_mem(void* start, POINTER_SIZE_INT size)
 #endif /* ifdef _WINDOWS_ else */
 
   return result;
+}
+
+inline void mem_fence()
+{
+  //FIXME: enable mem fence.
+  //apr_memory_rw_barrier(); 
 }
 
 inline int64 time_now() 

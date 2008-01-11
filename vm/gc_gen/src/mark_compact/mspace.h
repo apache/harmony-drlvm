@@ -74,6 +74,12 @@ typedef struct Mspace{
 Mspace *mspace_initialize(GC* gc, void* reserved_base, POINTER_SIZE_INT mspace_size, POINTER_SIZE_INT commit_size);
 void mspace_destruct(Mspace* mspace);
 
+inline POINTER_SIZE_INT mspace_free_space_size(Mspace* mos)
+{ return blocked_space_free_mem_size((Blocked_Space*)mos);}
+
+inline POINTER_SIZE_INT mspace_used_space_size(Mspace* mos)
+{ return blocked_space_used_mem_size((Blocked_Space*)mos);}
+
 void* mspace_alloc(unsigned size, Allocator *allocator);
 void mspace_collection(Mspace* mspace);
 void mspace_reset_after_collection(Mspace* mspace);

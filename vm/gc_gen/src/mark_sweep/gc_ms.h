@@ -78,6 +78,7 @@ typedef struct GC_MS {
   SpinLock concurrent_mark_lock;
   SpinLock enumerate_rootset_lock;
   SpinLock concurrent_sweep_lock;
+  SpinLock collection_scheduler_lock;
   
   /* system info */
   unsigned int _system_alloc_unit;

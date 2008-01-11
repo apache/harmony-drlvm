@@ -38,7 +38,7 @@ typedef struct Mutator {
   GC* gc;
   VmThreadHandle thread_handle;   /* This thread; */
   volatile unsigned int handshake_signal; /*Handshake is used in concurrent GC.*/
-  
+  unsigned int num_alloc_blocks; /* the number of allocated blocks since last collection. */
   /* END of Allocator --> */
   
   Vector_Block* rem_set;
@@ -63,9 +63,9 @@ Vector_Block* gc_get_local_dirty_set(GC* gc, unsigned int shared_id);
 inline void mutator_post_signal(Mutator* mutator, unsigned int handshake_signal)
 { 
   //FIXME: Need barrier here.
-  //apr_memory_rw_barrier();
+  mem_fence();
   mutator->handshake_signal = handshake_signal; 
-  //apr_memory_rw_barrier();
+  mem_fence();
 }
 
 inline void wait_mutator_signal(Mutator* mutator, unsigned int handshake_signal)

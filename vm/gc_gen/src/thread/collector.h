@@ -48,6 +48,7 @@ typedef struct Collector{
   GC* gc;
   VmThreadHandle thread_handle;   /* This thread; */
   unsigned int handshake_signal; /*Handshake is used in concurrent GC.*/
+  unsigned int num_alloc_blocks; /* the number of allocated blocks in this collection. */
   /* End of Allocator --> */
 
   /* FIXME:: for testing */

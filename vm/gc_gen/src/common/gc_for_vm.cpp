@@ -27,6 +27,7 @@
 
 #include "../gen/gen.h"
 #include "../mark_sweep/gc_ms.h"
+#include "../move_compact/gc_mc.h"
 #include "interior_pointer.h"
 #include "../thread/marker.h"
 #include "../thread/collector.h"
@@ -443,4 +444,5 @@ Boolean obj_belongs_to_gc_heap(Partial_Reveal_Object* p_obj)
 {
   return address_belongs_to_gc_heap(p_obj, p_global_gc);  
 }
+
 

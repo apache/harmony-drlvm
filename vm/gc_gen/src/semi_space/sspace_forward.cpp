@@ -15,41 +15,36 @@
  *  limitations under the License.
  */
 
-/**
- * @author Xiao-Feng Li, 2006/10/05
- */
+#include "sspace.h"
 
-#include "mspace.h"
-
-static Boolean mspace_alloc_block(Mspace* mspace, Allocator* allocator)
+static Boolean semispace_alloc_block(Sspace* sspace, Allocator* allocator)
 {
   alloc_context_reset(allocator);
 
   /* now try to get a new block */
-  unsigned int old_free_idx = mspace->free_block_idx;
+  unsigned int old_free_idx = sspace->free_block_idx;
   unsigned int new_free_idx = old_free_idx+1;
-  while( old_free_idx <= mspace->ceiling_block_idx ){   
-    unsigned int allocated_idx = atomic_cas32(&mspace->free_block_idx, new_free_idx, old_free_idx);
+  while( old_free_idx <= sspace->ceiling_block_idx ){   
+    unsigned int allocated_idx = atomic_cas32(&sspace->free_block_idx, new_free_idx, old_free_idx);
     if(allocated_idx != old_free_idx){
-      old_free_idx = mspace->free_block_idx;
+      old_free_idx = sspace->free_block_idx;
       new_free_idx = old_free_idx+1;
       continue;
     }
     /* ok, got one */
-    Block_Header* alloc_block = (Block_Header*)&(mspace->blocks[allocated_idx - mspace->first_block_idx]);
+    Block_Header* alloc_block = (Block_Header*)&(sspace->blocks[allocated_idx - sspace->first_block_idx]);
 
     allocator_init_free_block(allocator, alloc_block);
 
     return TRUE;
   }
 
-  /* Mspace is out. If it's caused by mutator, a collection should be triggered. 
-     If it's caused by collector, a fallback should be triggered. */
+  /* semispace is out, a fallback should be triggered */
   return FALSE;
   
 }
 
-void* mspace_alloc(unsigned int size, Allocator* allocator)
+void* semispace_alloc(unsigned int size, Allocator* allocator)
 {
   void *p_return = NULL;
    
@@ -62,8 +57,8 @@ void* mspace_alloc(unsigned int size, Allocator* allocator)
   if(p_return) return p_return;
   
   /* grab a new block */
-   Mspace* mspace = (Mspace*)allocator->alloc_space;;
-   Boolean ok = mspace_alloc_block(mspace, allocator);
+  Sspace* sspace = (Sspace*)allocator->alloc_space;
+  Boolean ok = semispace_alloc_block(sspace, allocator);
   if(!ok) return NULL; 
   
   p_return = thread_local_alloc(size, allocator);
@@ -71,6 +66,3 @@ void* mspace_alloc(unsigned int size, Allocator* allocator)
     
   return p_return;
 }
-
-
-

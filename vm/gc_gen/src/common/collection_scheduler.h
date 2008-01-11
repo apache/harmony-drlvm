@@ -27,7 +27,11 @@ typedef struct Collection_Scheduler {
   /*mark schedule */
   int64 time_delay_to_start_mark;
   
-  /**/
+  int64 last_mutator_time;
+  int64 last_collector_time;
+
+  unsigned int last_marker_num;
+
   unsigned int num_slot_in_window;
   unsigned int last_slot_index_in_window;
   
@@ -43,9 +47,9 @@ void collection_scheduler_destruct(GC* gc);
 void gc_update_collection_scheduler(GC* gc, int64 mutator_time, int64 mark_time);
 Boolean gc_try_schedule_collection(GC* gc, unsigned int gc_cause);
 Boolean gc_need_start_concurrent_mark(GC* gc);
+unsigned int gc_decide_marker_number(GC* gc);
 
 
 #endif
-
 
 

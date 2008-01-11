@@ -31,7 +31,7 @@ inline unsigned int word_get_first_set_lsb(POINTER_SIZE_INT target_word)
 
 #if defined(_IPF_) || defined(_WIN64)
     while( ! (target_word & ((POINTER_SIZE_INT)1 << bit_offset)) ){
-    	bit_offset++;
+      bit_offset++;
     }
 #else /* !_IPF_ && !_WIN64 */
 #ifdef PLATFORM_POSIX  /* linux X86 32/64 */

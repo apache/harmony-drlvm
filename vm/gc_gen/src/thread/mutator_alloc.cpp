@@ -22,6 +22,7 @@
 #include "gc_thread.h"
 #include "../gen/gen.h"
 #include "../mark_sweep/gc_ms.h"
+#include "../move_compact/gc_mc.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 
 #ifdef GC_GEN_STATS

@@ -95,7 +95,10 @@ void *wspace_thread_local_alloc(unsigned size, Allocator *allocator)
     
     mutator_post_signal((Mutator*) allocator,ENABLE_COLLECTOR_SWEEP_LOCAL_CHUNKS);
   }
+  
+  mutator_post_signal((Mutator*) allocator,MUTATOR_ENTER_ALLOCATION_MARK);
   void *p_obj = alloc_in_chunk(chunks[index]);
+  mutator_post_signal((Mutator*) allocator,MUTATOR_EXIT_ALLOCATION_MARK);
 
   if(chunk->slot_index == MAX_SLOT_INDEX){
     chunk->status = CHUNK_USED | CHUNK_NORMAL;
@@ -147,7 +150,9 @@ static void *wspace_alloc_normal_obj(Wspace *wspace, unsigned size, Allocator *a
       mutator_post_signal((Mutator*) allocator,ENABLE_COLLECTOR_SWEEP_LOCAL_CHUNKS);
     }    
     
+    mutator_post_signal((Mutator*) allocator,MUTATOR_ENTER_ALLOCATION_MARK);
     p_obj = alloc_in_chunk(chunks[index]);
+    mutator_post_signal((Mutator*) allocator,MUTATOR_EXIT_ALLOCATION_MARK);
     
     if(chunk->slot_index == MAX_SLOT_INDEX){
       chunk->status = CHUNK_USED | CHUNK_NORMAL;
@@ -211,11 +216,13 @@ static void *wspace_alloc_super_obj(Wspace *wspace, unsigned size, Allocator *al
   
   if(!chunk) return NULL;
   abnormal_chunk_init(chunk, chunk_size, size);
+  
+  mutator_post_signal((Mutator*) allocator,MUTATOR_ENTER_ALLOCATION_MARK);  
   if(is_obj_alloced_live()){
     chunk->table[0] |= cur_mark_black_color  ;
   } 
-  //FIXME: Need barrier here.   
-  //apr_memory_rw_barrier();
+  mutator_post_signal((Mutator*) allocator,MUTATOR_EXIT_ALLOCATION_MARK);
+  mem_fence();
   
   chunk->table[0] |= cur_alloc_color;
   set_super_obj_mask(chunk->base);

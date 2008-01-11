@@ -15,32 +15,24 @@
  *  limitations under the License.
  */
 
-/**
- * @author Xiao-Feng Li, 2006/10/05
- */
+#include "sspace.h"
 
-#include "fspace.h"
-#include "../common/gc_concurrent.h"
-#include "../common/collection_scheduler.h"
-
-Boolean fspace_alloc_block(Fspace* fspace, Allocator* allocator)
+Boolean sspace_alloc_block(Sspace* sspace, Allocator* allocator)
 {    
   alloc_context_reset(allocator);
-
+  
   /* now try to get a new block */
-  unsigned int old_free_idx = fspace->free_block_idx;
-  unsigned int new_free_idx = old_free_idx+1;
-  while(old_free_idx <= fspace->ceiling_block_idx){   
-    unsigned int allocated_idx = atomic_cas32(&fspace->free_block_idx, new_free_idx, old_free_idx);
-    if(allocated_idx != old_free_idx){     /* if failed */  
-      old_free_idx = fspace->free_block_idx;
-      new_free_idx = old_free_idx+1;
+  Block_Header* old_free_blk = sspace->cur_free_block;
+    
+  while(old_free_blk != NULL){   
+    Block_Header* new_free_blk = old_free_blk->next;
+    Block_Header* allocated_blk = (Block_Header*)atomic_casptr((volatile void**)&sspace->cur_free_block, new_free_blk, old_free_blk);
+    if(allocated_blk != old_free_blk){     /* if failed */  
+      old_free_blk = sspace->cur_free_block;
       continue;
     }
-    /* ok, got one */
-    Block_Header* alloc_block = (Block_Header*)&(fspace->blocks[allocated_idx - fspace->first_block_idx]);
-    
-    allocator_init_free_block(allocator, alloc_block);
+    /* ok, got one */    
+    allocator_init_free_block(allocator, allocated_blk);
 
     return TRUE;
   }
@@ -49,11 +41,7 @@ Boolean fspace_alloc_block(Fspace* fspace, Allocator* allocator)
   
 }
 
-/* FIXME:: the collection should be separated from the allocation */
-#ifdef GC_GEN_STATS
-#include "../gen/gen_stats.h"
-#endif
-void* fspace_alloc(unsigned size, Allocator *allocator) 
+void* sspace_alloc(unsigned size, Allocator *allocator) 
 {
   void*  p_return = NULL;
 
@@ -61,21 +49,14 @@ void* fspace_alloc(unsigned size, Allocator *allocator)
   p_return = thread_local_alloc(size, allocator);
   if (p_return)  return p_return;
 
-  gc_try_schedule_collection(allocator->gc, GC_CAUSE_NIL);
-
   /* ran out local block, grab a new one*/  
-  Fspace* fspace = (Fspace*)allocator->alloc_space;
+  Sspace* sspace = (Sspace*)allocator->alloc_space;
   int attempts = 0;
-  while( !fspace_alloc_block(fspace, allocator)){
+  while( !sspace_alloc_block(sspace, allocator)){
     vm_gc_lock_enum();
     /* after holding lock, try if other thread collected already */
-    if ( !blocked_space_has_free_block((Blocked_Space*)fspace) ) {  
+    if ( !sspace_has_free_block(sspace) ) {  
         if(attempts < 2) {
-#ifdef GC_GEN_STATS
-        GC_Gen* gc = (GC_Gen*)allocator->gc;
-        GC_Gen_Stats* stats = gc->stats;
-        gc_gen_update_nos_alloc_obj_stats(stats, fspace->committed_heap_size);
-#endif
           gc_reclaim_heap(allocator->gc, GC_CAUSE_NOS_IS_FULL); 
           if(allocator->alloc_block){
             vm_gc_unlock_enum();  
@@ -84,7 +65,7 @@ void* fspace_alloc(unsigned size, Allocator *allocator)
           
           attempts++;
           
-        }else{
+        }else{  /* no free block after "attempts" collections */
           vm_gc_unlock_enum();  
           return NULL;
         }
@@ -97,5 +78,4 @@ void* fspace_alloc(unsigned size, Allocator *allocator)
   return p_return;
   
 }
-
 

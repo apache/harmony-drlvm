@@ -88,8 +88,14 @@ void verify_heap_before_gc(GC* gc)
 
 }
 
+void verifier_cleanup_block_info(GC* gc);
+extern unsigned int MAJOR_ALGO;
+
 void verify_heap_after_gc(GC* gc)
 {
+  if(MAJOR_ALGO != MAJOR_MARK_SWEEP)
+    verifier_cleanup_block_info(gc);
+      
   if(need_scan_live_objs(heap_verifier))
     (*heap_verifier->live_obj_scanner)(heap_verifier);
   if(need_verify_gc_effect(heap_verifier))
@@ -145,31 +151,5 @@ void event_mutator_allocate_newobj(Partial_Reveal_Object* p_newobj, POINTER_SIZE
 
 Heap_Verifier* get_heap_verifier()
 { return heap_verifier; }
-
-/* this is tempoprarily used to check the rootset sanity after fallback mark-scan */
-void gc_verify_rootset(GC* gc)
-{
-  Heap_Verifier_Metadata* verifier_metadata = heap_verifier->heap_verifier_metadata;
-  Pool* root_set_pool = verifier_metadata->root_set_pool;
-
-  pool_iterator_init(root_set_pool);
-  Vector_Block* root_set = pool_iterator_next(root_set_pool);
-  
-  while(root_set){
-    POINTER_SIZE_INT* iter = vector_block_iterator_init(root_set);
-    while(!vector_block_iterator_end(root_set,iter)){
-      REF* p_ref = (REF* )*iter;
-      iter = vector_block_iterator_advance(root_set,iter);
-      Partial_Reveal_Object* p_obj = read_slot(p_ref);
-      if(obj_belongs_to_nos(p_obj)){
-        assert(!obj_is_fw_in_oi(p_obj));
-      }
-      verify_object_header(p_obj, heap_verifier);      
-    } 
-    root_set = pool_iterator_next(root_set_pool);
-  }
-  return;
-}
-
 
 

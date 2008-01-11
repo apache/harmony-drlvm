@@ -26,6 +26,7 @@
 #include "../finalizer_weakref/finalizer_weakref.h"
 #include "../gen/gen.h"
 #include "../mark_sweep/gc_ms.h"
+#include "../move_compact/gc_mc.h"
 #include "../common/space_tuner.h"
 #include "interior_pointer.h"
 #include "collection_scheduler.h"
@@ -41,6 +42,8 @@ extern char* GC_VERIFY;
 extern POINTER_SIZE_INT NOS_SIZE;
 extern POINTER_SIZE_INT MIN_NOS_SIZE;
 extern POINTER_SIZE_INT INIT_LOS_SIZE;
+extern POINTER_SIZE_INT TOSPACE_SIZE;
+extern POINTER_SIZE_INT MOS_RESERVE_SIZE;
 
 extern Boolean FORCE_FULL_COMPACT;
 
@@ -59,13 +62,6 @@ extern Boolean JVMTI_HEAP_ITERATION ;
 
 extern Boolean IS_MOVE_COMPACT;
 extern Boolean USE_CONCURRENT_GC;
-
-#if defined(ALLOC_ZEROING) && defined(ALLOC_PREFETCH)
-POINTER_SIZE_INT PREFETCH_DISTANCE = 1024;
-POINTER_SIZE_INT ZEROING_SIZE = 256;
-POINTER_SIZE_INT PREFETCH_STRIDE = 64;
-Boolean PREFETCH_ENABLED = FALSE;
-#endif
 
 static int get_int_property(const char *property_name)
 {
@@ -240,6 +236,14 @@ void gc_parse_options(GC* gc)
     gc->generate_barrier = generate_barrier || gc->generate_barrier;
   }
 
+  if (is_property_set("gc.tospace_size", VM_PROPERTIES) == 1) {
+    TOSPACE_SIZE = get_size_property("gc.tospace_size");
+  }
+
+  if (is_property_set("gc.mos_reserve_size", VM_PROPERTIES) == 1) {
+    MOS_RESERVE_SIZE = get_size_property("gc.mos_reserve_size");
+  }
+
   if (is_property_set("gc.nos_partial_forward", VM_PROPERTIES) == 1) {
     NOS_PARTIAL_FORWARD = get_boolean_property("gc.nos_partial_forward");
   }
@@ -328,25 +332,25 @@ void gc_parse_options(GC* gc)
   }
 
   if(is_property_set("gc.prefetch_distance",VM_PROPERTIES)==1) {
-  	PREFETCH_DISTANCE = get_size_property("gc.prefetch_distance");
-  	if(!PREFETCH_ENABLED) {
+    PREFETCH_DISTANCE = get_size_property("gc.prefetch_distance");
+    if(!PREFETCH_ENABLED) {
       WARN2("gc.prefetch_distance","Warning: Prefetch distance set with Prefetch disabled!");
     }
   }
 
   if(is_property_set("gc.prefetch_stride",VM_PROPERTIES)==1) {
-	PREFETCH_STRIDE = get_size_property("gc.prefetch_stride");
-	if(!PREFETCH_ENABLED) {
-		WARN2("gc.prefetch_stride","Warning: Prefetch stride set  with Prefetch disabled!");
-	}	
+    PREFETCH_STRIDE = get_size_property("gc.prefetch_stride");
+    if(!PREFETCH_ENABLED) {
+      WARN2("gc.prefetch_stride","Warning: Prefetch stride set  with Prefetch disabled!");
+    }  
   }
   
   if(is_property_set("gc.zeroing_size",VM_PROPERTIES)==1) {
-  	ZEROING_SIZE = get_size_property("gc.zeroing_size");
-  	if(!PREFETCH_ENABLED) {
-  		WARN2("gc.zeroing_size","Warning: Zeroing size set with Prefetch disabled!");
-  	}	
-  }	 
+    ZEROING_SIZE = get_size_property("gc.zeroing_size");
+    if(!PREFETCH_ENABLED) {
+      WARN2("gc.zeroing_size","Warning: Zeroing size set with Prefetch disabled!");
+    }  
+  }   
 #endif
 
   return;
@@ -418,7 +422,7 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
   
   collection_start_time = time_now();
   int64 mutator_time = collection_start_time - collection_end_time;
-  
+
   /* FIXME:: before mutators suspended, the ops below should be very careful
      to avoid racing with mutators. */
   gc->num_collections++;
@@ -521,17 +525,16 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
   vm_reclaim_native_objs();
   gc->in_collection = FALSE;
 
-  gc_reset_collector_state(gc);
-
   gc_clear_dirty_set(gc);
   
   vm_resume_threads_after();
   assert(hythread_is_suspend_enabled());
   hythread_set_suspend_disable(disable_count);
   INFO2("gc.process", "GC: GC end\n");
+  int64 pause_time = time_now()-collection_start_time;
+  INFO2("gc.con","pause time:  "<<((unsigned int)(pause_time>>10))<<"  ms \n");
   return;
 }
-
 
 
 

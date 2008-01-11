@@ -24,6 +24,7 @@
 #include "gc_for_barrier.h"
 #include "../mark_sweep/wspace_mark_sweep.h"
 #include "../common/gc_concurrent.h"
+#include "../finalizer_weakref/finalizer_weakref.h"
 
 
 /* All the write barrier interfaces need cleanup */
@@ -129,9 +130,16 @@ static void write_barrier_rem_obj_snapshot(Managed_Object_Handle p_obj_holding_r
         if (obj_to_snapshot != NULL)  
           mutator_dirtyset_add_entry(mutator, obj_to_snapshot);
       }
+
+      if(is_reference_obj(p_obj)){
+        REF* p_referent_field = obj_get_referent_field(p_obj);
+        obj_to_snapshot = (Partial_Reveal_Object*)read_slot(p_referent_field);
+        if (obj_to_snapshot != NULL)  
+          mutator_dirtyset_add_entry(mutator, obj_to_snapshot);
+      }
     }
-    obj_dirty_in_table((Partial_Reveal_Object *) p_obj_holding_ref);
     obj_mark_black_in_table((Partial_Reveal_Object *) p_obj_holding_ref);
+    obj_dirty_in_table((Partial_Reveal_Object *) p_obj_holding_ref);
   }
 }
 
@@ -157,9 +165,10 @@ void gc_heap_wrote_object (Managed_Object_Handle p_obj_written)
       we treat it as an new object. It has already been marked when dest object was created.
       We use WRITE_BARRIER_REM_SOURCE_OBJ function here to debug.
     */  
+  Mutator *mutator = (Mutator *)gc_get_tls();  
+  mutator_post_signal(mutator,MUTATOR_ENTER_BARRIER);
 
   if(WRITE_BARRIER_REM_SOURCE_OBJ == write_barrier_function){
-    Mutator *mutator = (Mutator *)gc_get_tls();  
     lock(mutator->dirty_set_lock);
     
     obj_dirty_in_table((Partial_Reveal_Object *) p_obj_written);
@@ -167,6 +176,7 @@ void gc_heap_wrote_object (Managed_Object_Handle p_obj_written)
     
     unlock(mutator->dirty_set_lock);
   }
+  mutator_post_signal(mutator,MUTATOR_EXIT_BARRIER);
 
   if( !gc_is_gen_mode() ) return;
   if( object_has_ref_field((Partial_Reveal_Object*)p_obj_written)){
@@ -178,6 +188,9 @@ void gc_heap_wrote_object (Managed_Object_Handle p_obj_written)
 /* FIXME:: this is not the right interface for write barrier */
 void gc_heap_slot_write_ref (Managed_Object_Handle p_obj_holding_ref,Managed_Object_Handle *p_slot, Managed_Object_Handle p_target)
 { 
+  Mutator *mutator = (Mutator *)gc_get_tls();  
+  mutator_post_signal(mutator,MUTATOR_ENTER_BARRIER);
+
   switch(write_barrier_function){
     case WRITE_BARRIER_REM_NIL:
       *p_slot = p_target;
@@ -202,6 +215,9 @@ void gc_heap_slot_write_ref (Managed_Object_Handle p_obj_holding_ref,Managed_Obj
       assert(0);
       return;
   }
+
+  mutator_post_signal(mutator,MUTATOR_EXIT_BARRIER);
+  return;
 }
 
 /* this is used for global object update, e.g., strings. */

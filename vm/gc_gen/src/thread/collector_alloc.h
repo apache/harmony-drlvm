@@ -29,6 +29,8 @@
 #endif
 
 #include "../semi_space/sspace.h"
+#include "../gen/gen.h"
+
 
 extern Space_Alloc_Func mos_alloc;
 
@@ -63,7 +65,7 @@ FORCE_INLINE Partial_Reveal_Object* collector_forward_object(Collector* collecto
   Allocator* allocator = (Allocator*)collector;
   
   /* can also use collector->collect_space->collect_algorithm */
-  if( MINOR_ALGO == MINOR_NONGEN_SEMISPACE_POOL){
+  if( MINOR_ALGO == MINOR_NONGEN_SEMISPACE_POOL || MINOR_ALGO == MINOR_GEN_SEMISPACE_POOL){
 
     p_targ_obj = (Partial_Reveal_Object*)semispace_forward_obj(p_obj, size, allocator);
     if( !p_targ_obj )
@@ -110,19 +112,32 @@ FORCE_INLINE Partial_Reveal_Object* collector_forward_object(Collector* collecto
 
   memcpy(p_targ_obj, p_obj, size);  //copy once. 
 
-  /* restore oi, which currently is the forwarding pointer. 
-     for semispace GC, p_targ_obj is still in NOS, we should clear its oi mark_bits. */
-  if( obj_belongs_to_nos(p_targ_obj) || gc_is_gen_mode() )
-    /* we need clear the bit to give a clean status (it's possibly unclean due to partial forwarding) */
-    set_obj_info(p_targ_obj, oi&DUAL_MARKBITS_MASK);
-  else{
+
+  /* restore oi, which currently is the forwarding pointer. */ 
+  if( obj_belongs_to_nos(p_targ_obj)){
+    /* for semispace GC, if p_targ_obj is still in NOS, we should clear its oi mark_bits.
+       we use age bit to represent the obj is in survivor_area. We will clear the bit when the
+       obj is forwarded to MOS. So the bit is exactly the same meaning as in survivor area. */
+    oi = oi | OBJ_AGE_BIT;
+  
+  }else{ /* obj forwarded to mos */
+    /* this is only useful for semispace GC. When an object is forwarded to MOS from survivor
+       area, its age bit should be cleared. We clear it anyway to save the condition checks. */
+    oi = oi & ~OBJ_AGE_BIT;
+
+    if(gc_is_gen_mode()){
+      /* we need clear the bit to give a clean status (it's possibly unclean due to partial forwarding) */   
+      oi = oi & DUAL_MARKBITS_MASK;
 #ifdef MARK_BIT_FLIPPING 
-  /* we mark it to make the object look like other original live objects in MOS */
-    set_obj_info(p_targ_obj, oi|FLIP_MARK_BIT);
-#else 
-    set_obj_info(p_targ_obj, oi);  
+    }else{
+      /* we mark it to make the object look like other original live objects in MOS */
+      oi = oi|FLIP_MARK_BIT;
 #endif // MARK_BIT_FLIPPING 
-  }
+    }
+  
+  }/* obj forwarded to mos */
+  
+  set_obj_info(p_targ_obj, oi); 
   
 #ifdef USE_32BITS_HASHCODE
   if(obj_hashcode_attached){

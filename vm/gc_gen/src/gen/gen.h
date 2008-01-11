@@ -25,14 +25,7 @@
 
 #include "../common/gc_common.h"
 #include "../thread/gc_thread.h"
-
-#include "../trace_forward/fspace.h"
-#include "../semi_space/sspace.h"
-
-#include "../mark_compact/mspace.h"
-#include "../los/lspace.h"
-
-#include "../mark_sweep/wspace.h"
+#include "../common/gc_for_barrier.h"
 
 #include "../finalizer_weakref/finalizer_weakref_metadata.h"
 
@@ -40,12 +33,33 @@
 struct GC_Gen_Stats;
 #endif
 
-enum Write_Barrier_Kind{
-  WRITE_BARRIER_NIL,  
-  WRITE_BARRIER_SLOT,  
-  WRITE_BARRIER_OBJECT,
-  WRITE_BARRIER_UPDATE      
-}; 
+extern Boolean gen_mode;
+
+inline Boolean gc_is_gen_mode()
+{  return gen_mode; }
+
+inline void gc_enable_gen_mode()
+{  
+  gen_mode = TRUE;
+  gc_set_barrier_function(WRITE_BARRIER_REM_SOURCE_REF);
+  HelperClass_set_GenMode(TRUE);
+}
+
+inline void gc_disable_gen_mode()
+{  
+  gen_mode = FALSE; 
+  gc_set_barrier_function(WRITE_BARRIER_REM_NIL);
+  HelperClass_set_GenMode(FALSE);
+}
+
+inline void gc_set_gen_mode(Boolean status)
+{
+  gen_mode = status; 
+  if(gen_mode) 
+    gc_set_barrier_function(WRITE_BARRIER_REM_SOURCE_REF);
+  HelperClass_set_GenMode(status);   
+}
+
 
 /* some globals */
 extern POINTER_SIZE_INT NOS_SIZE;
@@ -57,6 +71,12 @@ extern POINTER_SIZE_INT max_heap_size_bytes;
 /* fspace size is variable, adjusted adaptively within the range */
 extern POINTER_SIZE_INT min_nos_size_bytes;
 extern POINTER_SIZE_INT max_nos_size_bytes;
+
+#include "../trace_forward/fspace.h"
+#include "../semi_space/sspace.h"
+#include "../mark_compact/mspace.h"
+#include "../los/lspace.h"
+#include "../mark_sweep/wspace.h"
 
 struct Gen_Mode_Adaptor;
 
@@ -111,6 +131,7 @@ typedef struct GC_Gen {
   SpinLock concurrent_mark_lock;
   SpinLock enumerate_rootset_lock;
   SpinLock concurrent_sweep_lock;
+  SpinLock collection_scheduler_lock;
 
   
   /* system info */
@@ -209,8 +230,16 @@ void gc_gen_start_concurrent_mark(GC_Gen* gc);
 
 extern Boolean GEN_NONGEN_SWITCH ;
 
-#endif /* ifndef _GC_GEN_H_ */
+POINTER_SIZE_INT mos_free_space_size(Space* mos);
+POINTER_SIZE_INT nos_free_space_size(Space* nos);
+POINTER_SIZE_INT mos_used_space_size(Space* mos);
+POINTER_SIZE_INT nos_used_space_size(Space* nos);
 
+#ifndef STATIC_NOS_MAPPING
+void* nos_space_adjust(Space* space, void* new_nos_boundary, POINTER_SIZE_INT new_nos_size);
+#endif
+
+#endif /* ifndef _GC_GEN_H_ */
 
 
 

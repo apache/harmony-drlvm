@@ -25,6 +25,12 @@ static hythread_tls_key_t tls_gc_key;
 POINTER_SIZE_INT tls_gc_offset;
 hythread_group_t gc_thread_group = NULL;
 
+#if defined(ALLOC_ZEROING) && defined(ALLOC_PREFETCH)
+POINTER_SIZE_INT PREFETCH_DISTANCE = 1024;
+POINTER_SIZE_INT ZEROING_SIZE = 2*KB;
+POINTER_SIZE_INT PREFETCH_STRIDE = 64;
+Boolean PREFETCH_ENABLED = FALSE;
+#endif
 
 void gc_tls_init()
 {

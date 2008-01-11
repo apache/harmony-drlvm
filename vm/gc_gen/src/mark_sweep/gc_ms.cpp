@@ -100,15 +100,27 @@ void gc_ms_start_final_mark_after_concurrent(GC_MS* gc, unsigned int num_markers
   marker_execute_task((GC*)gc,(TaskType)wspace_mark_scan_mostly_concurrent,(Space*)gc->wspace);
 }
 
+/*FIXME: move this function out of this file.*/
+void gc_check_mutator_allocation(GC* gc)
+{
+  lock(gc->mutator_list_lock);     // vvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 
+  Mutator *mutator = gc->mutator_list;
+  while(mutator){
+    wait_mutator_signal(mutator, MUTATOR_ENTER_ALLOCATION_MARK);
+    mutator = mutator->next;
+  }
+
+  unlock(gc->mutator_list_lock);
+}
 
 void wspace_sweep_concurrent(Collector* collector);
 void gc_ms_start_concurrent_sweep(GC_MS* gc, unsigned int num_collectors)
 {
   ops_color_flip();
-  //FIXME: Need barrier here.
-  //apr_memory_rw_barrier();
-  gc_disenable_alloc_obj_live();
+  mem_fence();
+  gc_disable_alloc_obj_live();
+  gc_check_mutator_allocation((GC*)gc);
   wspace_init_pfc_pool_iterator(gc->wspace);
   
   collector_execute_task_concurrent((GC*)gc, (TaskType)wspace_sweep_concurrent, (Space*)gc->wspace, num_collectors);

@@ -51,6 +51,8 @@ typedef struct Block_Header {
   unsigned int num_multi_block; /*number of block in large block*/
 #endif
   volatile unsigned int status;
+
+  volatile unsigned int num_live_objs; /* for verification debugging */
   
   /* following three fields are used only in parallel sliding compaction */
   volatile unsigned int dest_counter;
@@ -123,6 +125,16 @@ inline void block_init(Block_Header* block)
 #ifdef USE_32BITS_HASHCODE
   block->hashcode_buf = hashcode_buf_create(); 
 #endif
+}
+
+inline void block_reset(Block_Header* block)
+{
+  if(block->status == BLOCK_FREE) return;
+  block->src = NULL;
+  block->next_src = NULL;
+  assert(!block->dest_counter);
+  block->status = BLOCK_FREE; 
+  block->free = block->base;
 }
 
 inline void block_destruct(Block_Header* block)
@@ -265,7 +277,6 @@ inline int obj_lookup_hashcode_in_buf(Partial_Reveal_Object *p_obj)
 /* blocked_space hashcode_buf ops --> */
 
 #endif //#ifndef _BLOCK_H_
-
 
 
 

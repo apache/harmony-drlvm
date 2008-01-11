@@ -79,7 +79,7 @@ void update_rootset_interior_pointer()
     void** root_slot = entry_traverser->slot;
     Partial_Reveal_Object* root_base = (Partial_Reveal_Object*)entry_traverser->base;
     unsigned int root_offset = entry_traverser->offset;
-    void *new_slot_contents = (void *)((Byte*)root_base + root_offset);	
+    void *new_slot_contents = (void *)((Byte*)root_base + root_offset);  
     *root_slot = new_slot_contents;
   }
   //can not reset the table here, for the rootset may be updated multi times
@@ -90,6 +90,7 @@ void gc_reset_interior_pointer_table()
   interior_pointer_num_count = 0;
   //this function is for the case of out of memory which need to call update_rootset_interior_pointer multi-times
 }
+
 
 
 

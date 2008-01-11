@@ -36,12 +36,15 @@ Space* gc_get_nos(GC_Gen* gc);
 Space* gc_get_mos(GC_Gen* gc);
 Space* gc_get_los(GC_Gen* gc);
 
+extern Boolean verify_live_heap;
+volatile unsigned int debug_num_compact_blocks;
+
 static void mspace_move_objects(Collector* collector, Mspace* mspace) 
 {
   Block_Header* curr_block = collector->cur_compact_block;
   Block_Header* dest_block = collector->cur_target_block;
   Block_Header *local_last_dest = dest_block;
-  
+
   void* dest_sector_addr = dest_block->base;
   Boolean is_fallback = gc_match_kind(collector->gc, FALLBACK_COLLECTION);
   
@@ -55,7 +58,15 @@ static void mspace_move_objects(Collector* collector, Mspace* mspace)
   GC_Gen_Collector_Stats* stats = (GC_Gen_Collector_Stats*)collector->stats;
 #endif
 
+  unsigned int debug_num_live_obj = 0;
+
   while( curr_block ){
+
+    if(verify_live_heap){ 
+      atomic_inc32(&debug_num_compact_blocks);
+      debug_num_live_obj = 0;
+    }
+    
     void* start_pos;
     Partial_Reveal_Object* p_obj = block_get_first_marked_object(curr_block, &start_pos);
 
@@ -63,6 +74,7 @@ static void mspace_move_objects(Collector* collector, Mspace* mspace)
  #ifdef USE_32BITS_HASHCODE      
       hashcode_buf_clear(curr_block->hashcode_buf);
  #endif
+      assert(!verify_live_heap ||debug_num_live_obj == curr_block->num_live_objs);
       curr_block = mspace_get_next_compact_block(collector, mspace);
       continue;    
     }
@@ -71,9 +83,11 @@ static void mspace_move_objects(Collector* collector, Mspace* mspace)
     void* src_sector_addr = p_obj;
           
     while( p_obj ){
+
+      debug_num_live_obj++;
       assert( obj_is_marked_in_vt(p_obj));
       /* we don't check if it's set, since only remaining objs from last NOS partial collection need it. */
-      obj_unmark_in_oi(p_obj); 
+      obj_clear_dual_bits_in_oi(p_obj); 
 
 #ifdef GC_GEN_STATS
       gc_gen_collector_update_moved_nos_mos_obj_stats_major(stats, vm_object_size(p_obj));
@@ -119,9 +133,11 @@ static void mspace_move_objects(Collector* collector, Mspace* mspace)
       /* current sector is done, let's move it. */
       POINTER_SIZE_INT sector_distance = (POINTER_SIZE_INT)src_sector_addr - (POINTER_SIZE_INT)dest_sector_addr;
       assert((sector_distance % GC_OBJECT_ALIGNMENT) == 0);
+      /* if sector_distance is zero, we don't do anything. But since block stable is never cleaned, we have to set 0 to it. */
       curr_block->table[curr_sector] = sector_distance;
 
-      memmove(dest_sector_addr, src_sector_addr, curr_sector_size);
+      if(sector_distance != 0) 
+        memmove(dest_sector_addr, src_sector_addr, curr_sector_size);
 
 #ifdef USE_32BITS_HASHCODE
       hashcode_buf_refresh_new_entry(new_hashcode_buf, sector_distance);
@@ -134,8 +150,10 @@ static void mspace_move_objects(Collector* collector, Mspace* mspace)
 #ifdef USE_32BITS_HASHCODE      
     hashcode_buf_clear(curr_block->hashcode_buf);
  #endif    
+    assert(!verify_live_heap ||debug_num_live_obj == curr_block->num_live_objs);
     curr_block = mspace_get_next_compact_block(collector, mspace);
   }
+    
   dest_block->new_free = dest_sector_addr;
   collector->cur_target_block = local_last_dest;
  
@@ -172,8 +190,8 @@ void move_compact_mspace(Collector* collector)
 {
   GC* gc = collector->gc;
   Mspace* mspace = (Mspace*)gc_get_mos((GC_Gen*)gc);
-  Fspace* fspace = (Fspace*)gc_get_nos((GC_Gen*)gc);
   Lspace* lspace = (Lspace*)gc_get_los((GC_Gen*)gc);
+  Blocked_Space* nos = (Blocked_Space*)gc_get_nos((GC_Gen*)gc);
   
   unsigned int num_active_collectors = gc->num_active_collectors;
   
@@ -205,7 +223,7 @@ void move_compact_mspace(Collector* collector)
     }
 #endif
     gc_identify_dead_weak_roots(gc);
-
+    debug_num_compact_blocks = 0;
     /* let other collectors go */
     num_marking_collectors++; 
   }
@@ -225,13 +243,20 @@ void move_compact_mspace(Collector* collector)
   old_num = atomic_inc32(&num_moving_collectors);
   if( ++old_num == num_active_collectors ){
     /* single thread world */
-    if(lspace->move_object) lspace_compute_object_target(collector, lspace);    
+    if(lspace->move_object) 
+      lspace_compute_object_target(collector, lspace);    
+    
     gc->collect_result = gc_collection_result(gc);
     if(!gc->collect_result){
       num_moving_collectors++; 
       return;
     }
- 
+    
+    if(verify_live_heap){
+      assert( debug_num_compact_blocks == mspace->num_managed_blocks + nos->num_managed_blocks );	
+      debug_num_compact_blocks = 0;
+    }
+
     gc_reset_block_for_collectors(gc, mspace);
     blocked_space_block_iterator_init((Blocked_Space*)mspace);
     num_moving_collectors++; 
@@ -256,6 +281,7 @@ void move_compact_mspace(Collector* collector)
     lspace_fix_repointed_refs(collector, lspace);   
     gc_fix_rootset(collector, FALSE);
     if(lspace->move_object)  lspace_sliding_compact(collector, lspace);    
+    
     num_fixing_collectors++; 
   }
   while(num_fixing_collectors != num_active_collectors + 1);
@@ -263,7 +289,8 @@ void move_compact_mspace(Collector* collector)
   TRACE2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]:  finish pass3");
 
   /* Pass 4: **************************************************
-     restore obj_info                                         */
+     restore obj_info . Actually only LOS needs it.   Since oi is recorded for new address, so the restoration
+     doesn't need to to specify space. */
 
   TRACE2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]: pass4: restore obj_info ...");
 
@@ -276,7 +303,7 @@ void move_compact_mspace(Collector* collector)
   while(num_restoring_collectors != num_active_collectors);
 
    /* Dealing with out of memory in mspace */  
-  if(mspace->free_block_idx > fspace->first_block_idx){    
+  if(mspace->free_block_idx > nos->first_block_idx){    
      atomic_cas32( &num_extending_collectors, 0, num_active_collectors);        
      mspace_extend_compact(collector);        
      atomic_inc32(&num_extending_collectors);    

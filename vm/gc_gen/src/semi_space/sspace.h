@@ -65,8 +65,8 @@ typedef struct Sspace{
   
   Block_Header* cur_free_block;
   unsigned int tospace_first_idx;
-  void* survivor_area_top;
-  void* survivor_area_bottom;
+  void* survivor_area_end;
+  void* survivor_area_start;
 
 }Sspace;
 
@@ -85,6 +85,9 @@ void* semispace_alloc(unsigned int size, Allocator* allocator);
 void nongen_ss_pool(Collector* collector);
 void gen_ss_pool(Collector* collector);
 
+POINTER_SIZE_INT sspace_free_space_size(Sspace* nos);
+POINTER_SIZE_INT sspace_used_space_size(Sspace* nos);
+
 FORCE_INLINE Boolean sspace_has_free_block(Sspace* sspace)
 {
   return (sspace->cur_free_block != NULL);
@@ -92,8 +95,14 @@ FORCE_INLINE Boolean sspace_has_free_block(Sspace* sspace)
 
 FORCE_INLINE Boolean obj_belongs_to_survivor_area(Sspace* sspace, Partial_Reveal_Object* p_obj)
 {
-  return (p_obj >= sspace->survivor_area_bottom && 
-                          p_obj < sspace->survivor_area_top);
+  return (p_obj >= sspace->survivor_area_start && 
+                          p_obj < sspace->survivor_area_end);
+}
+
+FORCE_INLINE Boolean obj_to_be_forwarded(Sspace* sspace, Partial_Reveal_Object* p_obj)
+{
+  assert( obj_belongs_to_survivor_area(sspace, p_obj)?obj_is_survivor(p_obj):!obj_is_survivor(p_obj));
+  return obj_is_survivor(p_obj);
 }
 
 /* treat semispace alloc as thread local alloc. If it fails or p_obj is old, forward it to MOS */
@@ -102,10 +111,28 @@ FORCE_INLINE void* semispace_forward_obj(Partial_Reveal_Object* p_obj, unsigned 
   void* p_targ_obj = NULL;
   Sspace* sspace = (Sspace*)allocator->alloc_space;
   
-  if( !obj_belongs_to_survivor_area(sspace, p_obj) )
+  if( obj_to_be_forwarded(sspace, p_obj) ) 
+    return NULL;
+    
+  p_targ_obj = thread_local_alloc(size, allocator);
+  if(!p_targ_obj)
     p_targ_obj = semispace_alloc(size, allocator);           
   
   return p_targ_obj;
+}
+
+#ifndef STATIC_NOS_MAPPING
+void* sspace_heap_start_adjust(Sspace* sspace, void* new_heap_start, POINTER_SIZE_INT new_heap_size);
+#endif /* #ifndef STATIC_NOS_MAPPING  */
+
+inline POINTER_SIZE_INT sspace_tospace_size(Sspace* space)
+{
+  return blocked_space_free_mem_size((Blocked_Space*)space);
+}
+
+inline POINTER_SIZE_INT sspace_survivor_area_size(Sspace* space)
+{
+  return (POINTER_SIZE_INT)space->survivor_area_end - (POINTER_SIZE_INT)space->survivor_area_start;
 }
 
 #endif // _FROM_SPACE_H_

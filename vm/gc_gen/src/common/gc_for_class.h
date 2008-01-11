@@ -67,6 +67,8 @@
 
 #define OBJ_DIRTY_BIT 0x20
 
+#define OBJ_AGE_BIT 0x40
+
 #ifdef POINTER64 // Like in VM
   #define COMPRESS_VTABLE
 #endif
@@ -310,7 +312,6 @@ FORCE_INLINE Boolean type_has_finalizer(Partial_Reveal_VTable *vt)
 }
 
 #endif //#ifndef _GC_TYPES_H_
-
 
 
 

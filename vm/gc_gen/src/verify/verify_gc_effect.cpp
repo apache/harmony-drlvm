@@ -304,8 +304,8 @@ void verifier_update_verify_info(Partial_Reveal_Object* p_obj, Heap_Verifier* he
 
   if(!gc_verifier->is_before_fallback_collection && gc_verifier->gc_collect_kind == MINOR_COLLECTION){
     if(!heap_verifier->is_before_gc){
-      assert(!obj_belongs_to_space(p_obj, nspace) ||!fspace_object_was_forwarded(p_obj, (Fspace*)nspace, heap_verifier));
-      if(obj_belongs_to_space(p_obj, nspace) && fspace_object_was_forwarded(p_obj, (Fspace*)nspace, heap_verifier)){
+      assert(!obj_belongs_to_space(p_obj, nspace) || !fspace_object_was_forwarded(p_obj, (Fspace*)nspace, heap_verifier) || obj_belongs_to_survivor_area((Sspace*)nspace, p_obj));
+      if(obj_belongs_to_space(p_obj, nspace) && fspace_object_was_forwarded(p_obj, (Fspace*)nspace, heap_verifier) && !obj_belongs_to_survivor_area((Sspace*)nspace, p_obj) ){
         gc_verifier->is_verification_passed = FALSE;
       }
     }
@@ -446,6 +446,21 @@ void verify_gc_effect(Heap_Verifier* heap_verifier)
 {
   GC_Verifier* gc_verifier = heap_verifier->gc_verifier;
   
+  Heap_Verifier_Metadata* verifier_metadata = heap_verifier->heap_verifier_metadata;
+  Pool* free_pool = verifier_metadata->free_set_pool;
+
+  Boolean passed = verifier_compare_objs_pools(verifier_metadata->objects_pool_before_gc, 
+                    verifier_metadata->objects_pool_after_gc , free_pool, compare_live_obj_inform);
+  if(!passed)     gc_verifier->is_verification_passed = FALSE;
+#ifndef BUILD_IN_REFERENT
+  passed = verifier_compare_objs_pools(verifier_metadata->resurrect_objects_pool_before_gc, 
+                    verifier_metadata->resurrect_objects_pool_after_gc , free_pool, compare_live_obj_inform);
+  if(!passed)     gc_verifier->is_verification_passed = FALSE;
+#endif
+  passed = verifier_compare_objs_pools(verifier_metadata->hashcode_pool_before_gc, 
+                    verifier_metadata->hashcode_pool_after_gc , free_pool, compare_obj_hash_inform);
+  if(!passed)     gc_verifier->is_verification_passed = FALSE;
+
   if(gc_verifier->num_live_objects_before_gc != gc_verifier->num_live_objects_after_gc){
     gc_verifier->is_verification_passed = FALSE;
     printf("\nERROR: live objects number error!\n");
@@ -478,20 +493,6 @@ void verify_gc_effect(Heap_Verifier* heap_verifier)
     gc_verifier->is_verification_passed = FALSE;
   }
 
-  Heap_Verifier_Metadata* verifier_metadata = heap_verifier->heap_verifier_metadata;
-  Pool* free_pool = verifier_metadata->free_set_pool;
-
-  Boolean passed = verifier_compare_objs_pools(verifier_metadata->objects_pool_before_gc, 
-                    verifier_metadata->objects_pool_after_gc , free_pool, compare_live_obj_inform);
-  if(!passed)     gc_verifier->is_verification_passed = FALSE;
-#ifndef BUILD_IN_REFERENT
-  passed = verifier_compare_objs_pools(verifier_metadata->resurrect_objects_pool_before_gc, 
-                    verifier_metadata->resurrect_objects_pool_after_gc , free_pool, compare_live_obj_inform);
-  if(!passed)     gc_verifier->is_verification_passed = FALSE;
-#endif
-  passed = verifier_compare_objs_pools(verifier_metadata->hashcode_pool_before_gc, 
-                    verifier_metadata->hashcode_pool_after_gc , free_pool, compare_obj_hash_inform);
-  if(!passed)     gc_verifier->is_verification_passed = FALSE;
 }
 
 
@@ -549,7 +550,6 @@ void verifier_clear_gc_verification(Heap_Verifier* heap_verifier)
 
 void verifier_reset_hash_distance()
 { hash_obj_distance = 0;}
-
 
 
 

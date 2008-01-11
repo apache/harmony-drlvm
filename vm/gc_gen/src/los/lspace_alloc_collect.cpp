@@ -245,7 +245,7 @@ void lspace_compute_object_target(Collector* collector, Lspace* lspace)
   void* dest_addr = lspace->heap_start;
   unsigned int iterate_index = 0;
   Partial_Reveal_Object* p_obj = lspace_get_first_marked_object(lspace, &iterate_index);
-  
+  	
   assert(!collector->rem_set);
   collector->rem_set = free_set_pool_get_entry(collector->gc->metadata);
 #ifdef USE_32BITS_HASHCODE  
@@ -256,6 +256,7 @@ void lspace_compute_object_target(Collector* collector, Lspace* lspace)
   GC_Gen_Collector_Stats* stats = (GC_Gen_Collector_Stats*)collector->stats;
 #endif
   while( p_obj ){
+   
     assert( obj_is_marked_in_vt(p_obj));
     unsigned int obj_size = vm_object_size(p_obj);
 #ifdef GC_GEN_STATS
@@ -478,7 +479,6 @@ void lspace_sweep(Lspace* lspace)
   TRACE2("gc.process", "GC: end of lspace sweep algo ...\n");
   return;
 }
-
 
 
 

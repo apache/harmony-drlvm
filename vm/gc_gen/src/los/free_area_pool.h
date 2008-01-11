@@ -38,7 +38,7 @@ typedef struct Lockable_Bidir_List{
   Bidir_List* next;
   Bidir_List* prev;
   /* END of Bidir_List --> */
-  SpinLock lock;	
+  SpinLock lock;  
 }Lockable_Bidir_List;
 
 typedef struct Free_Area{
@@ -120,7 +120,7 @@ inline void free_pool_remove_area(Free_Area_Pool* pool, Free_Area* free_area)
   /* set bit flag of the list */
   Bidir_List* list = (Bidir_List*)&(pool->sized_area_list[index]);
   if(list->next == list){
-  	pool_list_clear_flag(pool, index);		
+    pool_list_clear_flag(pool, index);    
   }
 }
 

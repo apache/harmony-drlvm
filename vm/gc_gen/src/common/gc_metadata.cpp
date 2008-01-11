@@ -25,6 +25,7 @@
 #include "gc_block.h"
 #include "compressed_ref.h"
 #include "../utils/sync_stack.h"
+#include "../gen/gen.h"
 
 #define GC_METADATA_SIZE_BYTES (1*MB)
 #define GC_METADATA_EXTEND_SIZE_BYTES (1*MB)
@@ -379,7 +380,8 @@ void gc_clear_rootset(GC* gc)
 void gc_clear_remset(GC* gc)
 {
   assert(gc->root_set != NULL);
-
+  /* rootset pool has some entries that are actually remset, because all the remsets are put into rootset pool 
+     before the collection. gc->root_set is a pointer pointing to the boundary between remset and rootset in the pool */
   Pool* pool = gc_metadata.gc_rootset_pool;    
   Vector_Block* rem_set = pool_get_entry(pool);
   while(rem_set != gc->root_set){
@@ -391,6 +393,25 @@ void gc_clear_remset(GC* gc)
   assert(rem_set == gc->root_set);
   /* put back root set */
   pool_put_entry(pool, rem_set);
+  
+  /* put back last remset block of each collector (saved in the minor collection before fallback) */  
+  unsigned int num_active_collectors = gc->num_active_collectors;
+  for(unsigned int i=0; i<num_active_collectors; i++)
+  {
+    Collector* collector = gc->collectors[i];
+    assert(collector->rem_set != NULL);
+    pool_put_entry(gc_metadata.collector_remset_pool, collector->rem_set);
+    collector->rem_set = NULL;
+  }
+  
+  /* cleanup remset pool */  
+  pool = gc_metadata.collector_remset_pool;  
+  rem_set = pool_get_entry(pool);
+  while(rem_set){
+    vector_block_clear(rem_set);
+    pool_put_entry(gc_metadata.free_set_pool, rem_set);
+    rem_set = pool_get_entry(pool);
+  }
     
   return;
 } 
@@ -510,6 +531,4 @@ void gc_clear_dirty_set(GC* gc)
 
 void free_set_pool_put_entry(Vector_Block* block, GC_Metadata *metadata)
 { pool_put_entry(metadata->free_set_pool, block); }
-
-
 

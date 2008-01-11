@@ -125,8 +125,8 @@ typedef struct Blocked_Space {
 }Blocked_Space;
 
 inline Boolean blocked_space_has_free_block(Blocked_Space *space){ return space->free_block_idx <= space->ceiling_block_idx; }
-inline unsigned int blocked_space_free_mem_size(Blocked_Space *space){ return GC_BLOCK_SIZE_BYTES * (space->ceiling_block_idx - space->free_block_idx + 1);  }
-inline Boolean blocked_space_used_mem_size(Blocked_Space *space){ return GC_BLOCK_SIZE_BYTES * (space->free_block_idx - space->first_block_idx); }
+inline unsigned int blocked_space_free_mem_size(Blocked_Space *space){ return (space->ceiling_block_idx - space->free_block_idx + 1) << GC_BLOCK_SHIFT_COUNT;  }
+inline Boolean blocked_space_used_mem_size(Blocked_Space *space){ return (space->free_block_idx - space->first_block_idx) << GC_BLOCK_SHIFT_COUNT; }
 
 void space_init_blocks(Blocked_Space* space);
 void space_desturct_blocks(Blocked_Space* space);
@@ -138,5 +138,9 @@ void blocked_space_block_iterator_init(Blocked_Space *space);
 void blocked_space_block_iterator_init_free(Blocked_Space *space);
 Block_Header *blocked_space_block_iterator_get(Blocked_Space *space);
 Block_Header *blocked_space_block_iterator_next(Blocked_Space *space);
+
+#ifndef STATIC_NOS_MAPPING
+void blocked_space_adjust(Blocked_Space* space, void* new_space_start, POINTER_SIZE_INT new_space_size);
+#endif
 
 #endif //#ifndef _GC_SPACE_H_

@@ -31,11 +31,15 @@ typedef struct Marker{
   Space* alloc_space;
   GC* gc;
   VmThreadHandle thread_handle;   /* This thread; */
-  unsigned int handshake_signal; /*Handshake is used in concurrent GC.*/
+  unsigned int handshake_signal; /*Handshake is used in concurrent GC.*/  
+  unsigned int num_alloc_blocks; /* the number of allocated blocks in this collection. */
   /* End of Allocator --> */
 
   /* FIXME:: for testing */
   Space* mark_space;
+  
+  /* backup allocator in case there are two target copy spaces, such as semispace GC */
+  Allocator* backup_allocator;
 
   Vector_Block *trace_stack;
   
@@ -95,6 +99,5 @@ Boolean is_mark_finished(GC* gc);
 
 
 #endif //_MARKER_H_
-
 
 

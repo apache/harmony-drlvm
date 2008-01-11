@@ -39,22 +39,22 @@ extern void fastdiv_init(void);
 
 inline int fastdiv_div(int x, int y)
 {
-	massert(x % y == 0);
-	massert(0 <= y && y <= 1024);
-	massert(y % 4 == 0);
-	massert(y <= 128 || y % 8 == 0);
-	massert(y <= 256 || y % 128 == 0);
-	massert(x <= (1 << 16));
+  massert(x % y == 0);
+  massert(0 <= y && y <= 1024);
+  massert(y % 4 == 0);
+  massert(y <= 128 || y % 8 == 0);
+  massert(y <= 256 || y % 128 == 0);
+  massert(x <= (1 << 16));
 
-	int s = shift_table[y];
-	massert(s >= 2);
-	x >>= s;
-	y >>= s;
+  int s = shift_table[y];
+  massert(s >= 2);
+  x >>= s;
+  y >>= s;
 
-	massert(x >= 0 && x <= 16 * (1 << 10));
-	massert(y <= 32 && y % 2);
+  massert(x >= 0 && x <= 16 * (1 << 10));
+  massert(y <= 32 && y % 2);
 
-	return (int)compact_table[y][x & mask[y]];
+  return (int)compact_table[y][x & mask[y]];
 }
 #else
 #define fastdiv_div(x,y) ((x) / (y))

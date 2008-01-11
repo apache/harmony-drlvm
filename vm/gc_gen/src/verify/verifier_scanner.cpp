@@ -36,6 +36,7 @@ static FORCE_INLINE void scan_slot(Heap_Verifier* heap_verifier, REF*p_ref)
 static FORCE_INLINE void scan_object(Heap_Verifier* heap_verifier, Partial_Reveal_Object *p_obj) 
 {
   GC_Verifier* gc_verifier = heap_verifier->gc_verifier;
+
 #if !defined(USE_MARK_SWEEP_GC) && !defined(USE_UNIQUE_MOVE_COMPACT_GC)
   if(gc_verifier->is_before_fallback_collection) {
     if(obj_belongs_to_nos(p_obj) && obj_is_fw_in_oi(p_obj)){
@@ -45,8 +46,17 @@ static FORCE_INLINE void scan_object(Heap_Verifier* heap_verifier, Partial_Revea
     }
   }
 #endif
+  
   if(!obj_mark_in_vt(p_obj)) return;
- 
+
+   extern unsigned int MAJOR_ALGO;
+  if( MAJOR_ALGO != MAJOR_MARK_SWEEP && p_obj >= los_boundary ){
+    Block_Header* block = GC_BLOCK_HEADER(p_obj);
+    if( heap_verifier->is_before_gc)  block->num_live_objs++;
+    /* we can't set block->num_live_objs = 0 if !is_before_gc, because the some blocks may be freed hence not
+        visited after GC. So we should reset it in GC space reset functions. */
+  }
+
   verify_object_header(p_obj, heap_verifier); 
   verifier_update_verify_info(p_obj, heap_verifier);
 
@@ -216,13 +226,13 @@ void verifier_scan_resurrect_objects(Heap_Verifier* heap_verifier)
     verifier_copy_pool(verifier_metadata->obj_with_fin_pool, gc->finref_metadata->obj_with_fin_pool);
     verifier_trace_objsets(heap_verifier, verifier_metadata->obj_with_fin_pool);
   }else{
-	  if(!heap_verifier->gc_verifier->is_before_fallback_collection){
+    if(!heap_verifier->gc_verifier->is_before_fallback_collection){
       verify_live_finalizable_obj(heap_verifier, gc->finref_metadata->obj_with_fin_pool);
       verifier_copy_pool_reverse_order(verifier_metadata->finalizable_obj_pool, gc->finref_metadata->finalizable_obj_pool);
       verifier_trace_objsets(heap_verifier, verifier_metadata->finalizable_obj_pool);
       verifier_clear_pool(verifier_metadata->finalizable_obj_pool, heap_verifier->heap_verifier_metadata->free_set_pool, FALSE);
     }else{
-      verifier_trace_objsets(heap_verifier, verifier_metadata->obj_with_fin_pool );	
+      verifier_trace_objsets(heap_verifier, verifier_metadata->obj_with_fin_pool );  
     }
     verifier_clear_pool(verifier_metadata->obj_with_fin_pool, heap_verifier->heap_verifier_metadata->free_set_pool, FALSE);
   }
@@ -431,7 +441,6 @@ void verifier_init_object_scanner(Heap_Verifier* heap_verifier)
   heap_verifier->live_obj_scanner = verifier_scan_live_objects;
   heap_verifier->all_obj_scanner   = verifier_scan_all_objects;
 }
-
 
 
 

@@ -36,7 +36,7 @@
 
 #ifdef _WINDOWS_
 #include <xmmintrin.h>
-#define prefetchnta(pref_addr)	_mm_prefetch((char*)(pref_addr), _MM_HINT_NTA )
+#define prefetchnta(pref_addr)  _mm_prefetch((char*)(pref_addr), _MM_HINT_NTA )
 #else /* _WINDOWS_ */
 #define prefetchnta(pref_addr)  __asm__ ("prefetchnta (%0)"::"r"(pref_addr))
 #endif /* !_WINDOWS_ */
@@ -46,7 +46,7 @@ extern POINTER_SIZE_INT ZEROING_SIZE;
 extern POINTER_SIZE_INT PREFETCH_STRIDE;
 extern Boolean  PREFETCH_ENABLED;
 #else /* ALLOC_PREFETCH  ^^^^^^^^^^^^^^^^ */
-#define ZEROING_SIZE	2*KB
+#define ZEROING_SIZE  2*KB
 #endif /* !ALLOC_PREFETCH */
 #endif /* ALLOC_ZEROING  ----------------- */
 
@@ -75,6 +75,8 @@ typedef struct Allocator{
   GC   *gc;
   VmThreadHandle thread_handle;   /* This thread; */
   unsigned int handshake_signal; /*Handshake is used in concurrent GC.*/
+  /* the number of allocated blocks. For collector, it reflects the load balance; for mutator, it reflects mutator activities. */
+  unsigned int num_alloc_blocks; 
 }Allocator;
 
 inline void thread_local_unalloc(unsigned int size, Allocator* allocator)
@@ -103,7 +105,7 @@ FORCE_INLINE Partial_Reveal_Object* thread_local_alloc_zeroing(unsigned int size
   
 #ifdef ALLOC_PREFETCH  
   if(PREFETCH_ENABLED)  {
-    POINTER_SIZE_INT pre_addr = new_free, pref_stride= PREFETCH_STRIDE, pref_dist= new_ceiling + PREFETCH_DISTANCE;    	
+    POINTER_SIZE_INT pre_addr = new_free, pref_stride= PREFETCH_STRIDE, pref_dist= new_ceiling + PREFETCH_DISTANCE;      
     do{
       prefetchnta(pre_addr);
       pre_addr += pref_stride;
@@ -166,7 +168,7 @@ FORCE_INLINE void allocator_init_free_block(Allocator* allocator, Block_Header* 
 #else
 #ifdef ALLOC_PREFETCH
     if(PREFETCH_ENABLED) {
-    	POINTER_SIZE_INT pre_addr = (POINTER_SIZE_INT) new_free, pref_stride= PREFETCH_STRIDE, pref_dist= pre_addr + PREFETCH_DISTANCE;    	
+      POINTER_SIZE_INT pre_addr = (POINTER_SIZE_INT) new_free, pref_stride= PREFETCH_STRIDE, pref_dist= pre_addr + PREFETCH_DISTANCE;      
         do{
             prefetchnta(pre_addr);
             pre_addr += pref_stride;

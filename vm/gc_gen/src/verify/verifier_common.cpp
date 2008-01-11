@@ -128,18 +128,17 @@ Boolean verify_rootset_slot(REF* p_ref, Heap_Verifier* heap_verifier)
     }
 
     if(!address_belongs_to_space(p_obj, mspace) && !address_belongs_to_space(p_obj, lspace) && !NOS_PARTIAL_FORWARD){
-      if( nos->collect_algorithm == MINOR_NONGEN_SEMISPACE_POOL){
-        if( obj_belongs_to_survivor_area((Sspace*)nos, p_obj)) return TRUE;
-        else{
-          printf("\nERROR: obj referenced by rootset is not in survivor_area after semispace GC!\n");
-          assert(0);
+      if( gc_match_kind((GC*)gc, MINOR_COLLECTION)){
+        if( nos->collect_algorithm == MINOR_NONGEN_SEMISPACE_POOL || nos->collect_algorithm == MINOR_GEN_SEMISPACE_POOL){
+          if( obj_belongs_to_survivor_area((Sspace*)nos, p_obj)) 
+            return TRUE;            
         }
       }
       
       printf("\nERROR: obj referenced by rootset is in NOS after GC!\n");
       assert(0);
       return FALSE;
-   }
+    }
   }
 #endif
   return TRUE;
@@ -269,7 +268,6 @@ void verifier_hashcode_log(GC_Verifier* gc_verifier)
 {
     printf(" %-14s:    %-7s |   Before %10d   |   After %10d   |\n", "hashcode", "NUM", gc_verifier->num_hash_before_gc, gc_verifier->num_hash_after_gc);
 }
-
 
 
 

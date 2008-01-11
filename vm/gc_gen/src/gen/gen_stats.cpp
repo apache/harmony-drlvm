@@ -22,6 +22,8 @@
 #include "gen.h"
 #include "gen_stats.h"
 
+Boolean gc_profile = FALSE;
+
 void gc_gen_stats_initialize(GC_Gen* gc)
 {
   GC_Gen_Stats* stats = (GC_Gen_Stats*)STD_MALLOC(sizeof(GC_Gen_Stats));
@@ -71,7 +73,7 @@ void gc_gen_stats_update_after_collection(GC_Gen* gc)
       gc_gen_stats->nos_surviving_obj_size_minor += collector_stats->nos_obj_size_moved_minor;
     }
 
-    gc_gen_stats->nos_surviving_ration_minor = ((float)gc_gen_stats->nos_surviving_obj_size_minor)/gc->nos->committed_heap_size;
+    gc_gen_stats->nos_surviving_ratio_minor = ((float)gc_gen_stats->nos_surviving_obj_size_minor)/gc->nos->committed_heap_size;
 
   }else{
 
@@ -91,7 +93,7 @@ void gc_gen_stats_update_after_collection(GC_Gen* gc)
   }
 
   if (is_los_collected) {
-    gc_gen_stats->los_surviving_ration = ((float)gc_gen_stats->los_suviving_obj_size)/gc->los->committed_heap_size;
+    gc_gen_stats->los_surviving_ratio = ((float)gc_gen_stats->los_suviving_obj_size)/gc->los->committed_heap_size;
   }
 }
 
@@ -104,7 +106,7 @@ void gc_gen_stats_verbose(GC_Gen* gc)
       <<"\nGC: collection algo: "<<((stats->nos_collection_algo_minor==MINOR_NONGEN_FORWARD_POOL)?"nongen forward":"gen forward")
       <<"\nGC: num surviving objs: "<<stats->nos_surviving_obj_num_minor
       <<"\nGC: size surviving objs: "<<verbose_print_size(stats->nos_surviving_obj_size_minor)
-      <<"\nGC: surviving ratio: "<<(int)(stats->nos_surviving_ration_minor*100)<<"%\n");
+      <<"\nGC: surviving ratio: "<<(int)(stats->nos_surviving_ratio_minor*100)<<"%\n");
   }else{
     TRACE2("gc.space", "GC: Mspace Collection stats: "
       <<"\nGC: collection algo: "<<((stats->nos_mos_collection_algo_major==MAJOR_COMPACT_SLIDE)?"slide compact":"move compact")
@@ -118,7 +120,7 @@ void gc_gen_stats_verbose(GC_Gen* gc)
       <<"\nGC: collection algo: "<<((stats->los_collection_algo==MAJOR_COMPACT_SLIDE)?"slide compact":"mark sweep")
       <<"\nGC: num surviving objs: "<<stats->los_suviving_obj_num
       <<"\nGC: size surviving objs: "<<verbose_print_size(stats->los_suviving_obj_size)
-      <<"\nGC: surviving ratio: "<<(int)(stats->los_surviving_ration*100)<<"%\n");
+      <<"\nGC: surviving ratio: "<<(int)(stats->los_surviving_ratio*100)<<"%\n");
   }
 
 }

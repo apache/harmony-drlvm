@@ -25,7 +25,7 @@
 #include "interior_pointer.h"
 #include "collection_scheduler.h"
 #include "gc_concurrent.h"
-#include "../gen/gc_for_barrier.h"
+#include "../common/gc_for_barrier.h"
 
 Boolean USE_CONCURRENT_GC           = FALSE;
 Boolean USE_CONCURRENT_ENUMERATION  = FALSE;
@@ -60,16 +60,31 @@ static void gc_check_concurrent_mark(GC* gc)
   }
 }
 
+void gc_check_mutator_barrier(GC* gc){
+  lock(gc->mutator_list_lock);    
+
+  Mutator *mutator = gc->mutator_list;
+  while(mutator){
+    wait_mutator_signal(mutator, MUTATOR_ENTER_BARRIER);
+    mutator = mutator->next;
+  }
+
+  unlock(gc->mutator_list_lock);
+}
+
 static void gc_wait_concurrent_mark_finish(GC* gc)
 {
   wait_mark_finish(gc);
   gc_set_barrier_function(WRITE_BARRIER_REM_NIL);
+  mem_fence();
+  gc_check_mutator_barrier(gc);
   gc_set_concurrent_status(gc,GC_CONCURRENT_STATUS_NIL);
 }
 
 void gc_start_concurrent_mark(GC* gc)
 {
   int disable_count;
+  unsigned int num_marker;
   
   if(!try_lock(gc->concurrent_mark_lock) || gc_mark_is_concurrent()) return;
     
@@ -92,6 +107,8 @@ void gc_start_concurrent_mark(GC* gc)
   gc_set_concurrent_status(gc, GC_CONCURRENT_MARK_PHASE);
 
   gc_decide_collection_kind((GC_Gen*)gc, GC_CAUSE_NIL);
+
+  num_marker = gc_decide_marker_number(gc);
   
   /*start concurrent mark*/
 #ifndef USE_MARK_SWEEP_GC
@@ -99,13 +116,16 @@ void gc_start_concurrent_mark(GC* gc)
 #else
   if(gc_concurrent_match_algorithm(OTF_REM_OBJ_SNAPSHOT_ALGO)){
     gc_set_barrier_function(WRITE_BARRIER_REM_OBJ_SNAPSHOT);
-    gc_ms_start_concurrent_mark((GC_MS*)gc, MIN_NUM_MARKERS);
+    gc_check_mutator_barrier(gc);
+    gc_ms_start_concurrent_mark((GC_MS*)gc, num_marker);
   }else if(gc_concurrent_match_algorithm(MOSTLY_CONCURRENT_ALGO)){
     gc_set_barrier_function(WRITE_BARRIER_REM_SOURCE_OBJ);
-    gc_ms_start_most_concurrent_mark((GC_MS*)gc, MIN_NUM_MARKERS);
+    gc_check_mutator_barrier(gc);
+    gc_ms_start_most_concurrent_mark((GC_MS*)gc, num_marker);
   }else if(gc_concurrent_match_algorithm(OTF_REM_NEW_TARGET_ALGO)){  
     gc_set_barrier_function(WRITE_BARRIER_REM_OLD_VAR);
-    gc_ms_start_concurrent_mark((GC_MS*)gc, MIN_NUM_MARKERS);
+    gc_check_mutator_barrier(gc);
+    gc_ms_start_concurrent_mark((GC_MS*)gc, num_marker);
   }
 #endif
 
@@ -294,8 +314,6 @@ void gc_reset_after_concurrent_collection(GC* gc)
 
   vm_reclaim_native_objs();
   gc->in_collection = FALSE;
-
-  gc_reset_collector_state(gc);
   
   if(USE_CONCURRENT_GC && gc_mark_is_concurrent()){
     gc_reset_concurrent_mark(gc);    
@@ -323,5 +341,4 @@ void gc_decide_concurrent_algorithm(GC* gc, char* concurrent_algo)
     }
   }
 }
-
 

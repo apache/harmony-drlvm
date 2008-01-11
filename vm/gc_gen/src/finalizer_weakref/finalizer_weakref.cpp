@@ -814,4 +814,3 @@ void gc_copy_finaliable_obj_to_rootset(GC *gc)
 
 
 
-

@@ -132,21 +132,32 @@ void allocactor_destruct_local_chunks(Allocator *allocator)
   /* Find local chunk pointers' head and their number */
   for(unsigned int i = 0; i < SIZE_SEGMENT_NUM; ++i){
     if(size_segs[i]->local_alloc){
-      chunk_ptr_num += size_segs[i]->chunk_num;
+      chunk_ptr_num = size_segs[i]->chunk_num;
       assert(local_chunks[i]);
-      if(!chunk_ptrs)
+      if(!chunk_ptrs){
         chunk_ptrs = local_chunks[i];
+
+  
+        /* Put local pfc to the according pools */
+        for(unsigned int i = 0; i < chunk_ptr_num; ++i){
+          if(chunk_ptrs[i]){
+            if(!USE_CONCURRENT_GC){
+              wspace_put_pfc(wspace, chunk_ptrs[i]);
+            }else{
+              Chunk_Header* chunk_to_rem = chunk_ptrs[i];
+              chunk_to_rem->status = CHUNK_USED | CHUNK_NORMAL;
+              wspace_register_used_chunk(wspace, chunk_to_rem);
+            }
+          }
+        }
+        
+        /* Free mem for local chunk pointers */
+        STD_FREE(chunk_ptrs);
+        chunk_ptrs = NULL;
+      }
     }
   }
   
-  /* Put local pfc to the according pools */
-  for(unsigned int i = 0; i < chunk_ptr_num; ++i){
-    if(chunk_ptrs[i])
-      wspace_put_pfc(wspace, chunk_ptrs[i]);
-  }
-  
-  /* Free mem for local chunk pointers */
-  STD_FREE(chunk_ptrs);
   
   /* Free mem for size segments (Chunk_Header**) */
   STD_FREE(local_chunks);

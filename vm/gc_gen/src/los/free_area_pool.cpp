@@ -61,7 +61,7 @@ Free_Area* free_pool_find_size_area(Free_Area_Pool* pool, POINTER_SIZE_INT size)
   
   /* Else, for last bucket MAX_LIST_INDEX, we must traverse it */
   while(  area != (Free_Area*)list ){
-    if(area->size >= size)	return area;
+    if(area->size >= size)  return area;
     area = (Free_Area*)(area->next);
   }
   

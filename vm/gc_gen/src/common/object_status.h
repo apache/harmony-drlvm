@@ -20,6 +20,7 @@
 
 #include "../gen/gen.h"
 #include "../mark_sweep/gc_ms.h"
+#include "../move_compact/gc_mc.h"
 #include "../mark_sweep/wspace_mark_sweep.h"
 
 
@@ -74,7 +75,7 @@ inline Boolean gc_obj_is_dead(GC *gc, Partial_Reveal_Object *p_obj)
 #endif
 
 #ifdef USE_UNIQUE_MOVE_COMPACT_GC
-	return obj_is_dead_in_move_compact_no_los_gc(p_obj);
+  return obj_is_dead_in_move_compact_no_los_gc(p_obj);
 #endif
 
   if(gc_match_kind(gc, MINOR_COLLECTION)){
