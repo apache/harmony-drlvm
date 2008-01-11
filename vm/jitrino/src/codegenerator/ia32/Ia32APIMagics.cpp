@@ -84,6 +84,7 @@ DECLARE_HELPER_INLINER(Long_numberOfLeadingZeros_Handler_x_J_x_I);
 DECLARE_HELPER_INLINER(Long_numberOfTrailingZeros_Handler_x_J_x_I);
 DECLARE_HELPER_INLINER(String_compareTo_Handler_x_String_x_I);
 DECLARE_HELPER_INLINER(String_regionMatches_Handler_x_I_x_String_x_I_x_I_x_Z);
+DECLARE_HELPER_INLINER(String_indexOf_Handler_x_String_x_I_x_I);
 
 void APIMagicsHandlerSession::runImpl() {
     CompilationContext* cc = getCompilationContext();
@@ -135,6 +136,9 @@ void APIMagicsHandlerSession::runImpl() {
                         } else if( strcmp((char*)ri->getValue(0),"String_regionMatches")==0 ) {
                             if(getBoolArg("String_regionMatches_as_magic", true))
                                 handlers.push_back(new (tmpMM) String_regionMatches_Handler_x_I_x_String_x_I_x_I_x_Z(irm, callInst, NULL));
+                        } else if( strcmp((char*)ri->getValue(0),"String_indexOf")==0 ) {
+                            if(getBoolArg("String_indexOf_as_magic", true))
+                                handlers.push_back(new (tmpMM) String_indexOf_Handler_x_String_x_I_x_I(irm, callInst, NULL));
                         }
                     }
                 }
@@ -495,8 +499,205 @@ void String_regionMatches_Handler_x_I_x_String_x_I_x_I_x_Z::run() {
     callInst->unlink();
 }
 
-// this intends for indexes and counters conversion
-// ATTENTION !!! Zero Extention is used for this
+void String_indexOf_Handler_x_String_x_I_x_I::run() {
+
+    Node* callInstNode = callInst->getNode();
+    Node* nextNode = NULL;
+
+    if(callInst == callInstNode->getLastInst()) {
+        nextNode = callInstNode->getUnconditionalEdgeTarget();
+        assert(nextNode!=NULL);
+    } else {
+        nextNode = irm->getFlowGraph()->splitNodeAtInstruction(callInst, true, true, NULL);
+    }
+    cfg->removeEdge(callInstNode->getUnconditionalEdge());
+
+    // arguments of the call are already prepared by respective HLO pass
+    // they are not the strings but 'value' arrays
+    Opnd* thisArr = getCallSrc(callInst, 0);
+    Opnd* thisOffset = getCallSrc(callInst, 1);
+    Opnd* thisLen = getCallSrc(callInst, 2);
+    Opnd* trgtArr = getCallSrc(callInst, 3);
+    Opnd* trgtOffset = getCallSrc(callInst, 4);
+    Opnd* trgtLen = getCallSrc(callInst, 5);
+    Opnd* start = getCallSrc(callInst, 6);
+    Opnd* res = getCallDst(callInst);
+
+#ifdef _EM64T_
+    Type*   counterType = irm->getTypeManager().getInt64Type();
+    Constraint regConstr(OpndKind_GPReg, OpndSize_64);
+#else
+    Type*   counterType = irm->getTypeManager().getInt32Type();
+    Constraint regConstr(OpndKind_GPReg, OpndSize_32);
+#endif
+    Constraint reg16Constr(OpndKind_GPReg, OpndSize_16);
+
+    Opnd* zero = irm->newImmOpnd(counterType, 0);
+
+    Node* mainNode = irm->getFlowGraph()->createBlockNode();
+    
+    Node* mainLoop = irm->getFlowGraph()->createBlockNode();
+    Node* mainLoop2 = irm->getFlowGraph()->createBlockNode();
+    Node* mainLoop3 = irm->getFlowGraph()->createBlockNode();
+    Node* nestedLoop = irm->getFlowGraph()->createBlockNode();
+    Node* nestedLoop2 = irm->getFlowGraph()->createBlockNode();
+    Node* nestedLoop3 = irm->getFlowGraph()->createBlockNode();
+    Node* mainLoopEnd = irm->getFlowGraph()->createBlockNode();
+
+    Node* returnStart = irm->getFlowGraph()->createBlockNode();
+    Node* returnIndex = irm->getFlowGraph()->createBlockNode();
+    Node* returnMinusOne = irm->getFlowGraph()->createBlockNode();
+
+    irm->getFlowGraph()->addEdge(mainNode, mainLoop);
+
+    irm->getFlowGraph()->addEdge(mainLoop, mainLoop2, 0.9);
+    irm->getFlowGraph()->addEdge(mainLoop, returnMinusOne, 0.1);
+    irm->getFlowGraph()->addEdge(mainLoop2, mainLoop3, 0.1);
+    irm->getFlowGraph()->addEdge(mainLoop2, mainLoopEnd, 0.9);
+    irm->getFlowGraph()->addEdge(mainLoop3, nestedLoop);
+    irm->getFlowGraph()->addEdge(nestedLoop, returnIndex, 0.1);
+    irm->getFlowGraph()->addEdge(nestedLoop, nestedLoop2, 0.9);
+    irm->getFlowGraph()->addEdge(nestedLoop2, mainLoopEnd, 0.8);
+    irm->getFlowGraph()->addEdge(nestedLoop2, nestedLoop3, 0.2);
+    irm->getFlowGraph()->addEdge(nestedLoop3, nestedLoop);
+    irm->getFlowGraph()->addEdge(mainLoopEnd, mainLoop);
+    
+    irm->getFlowGraph()->addEdge(returnStart, nextNode);
+    irm->getFlowGraph()->addEdge(returnMinusOne, nextNode);
+    irm->getFlowGraph()->addEdge(returnIndex, nextNode);
+
+    Opnd* subLen = irm->newOpnd(counterType, regConstr);
+
+    bool startIsZero = true;
+    if ( !(start->isPlacedIn(OpndKind_Imm) && start->getImmValue() == 0) )
+        startIsZero = false;
+
+    if ( !start->isPlacedIn(OpndKind_Imm) )
+    {
+        Node* startLessThanZero = irm->getFlowGraph()->createBlockNode();
+        Node* subLenCheck = irm->getFlowGraph()->createBlockNode();
+        Node* startCheck = irm->getFlowGraph()->createBlockNode();
+
+        irm->getFlowGraph()->addEdge(callInstNode, startLessThanZero, 0);
+        irm->getFlowGraph()->addEdge(callInstNode, subLenCheck, 1);
+        irm->getFlowGraph()->addEdge(startLessThanZero, subLenCheck);
+        irm->getFlowGraph()->addEdge(subLenCheck, startCheck, 0);
+        irm->getFlowGraph()->addEdge(subLenCheck, mainNode, 1);
+        irm->getFlowGraph()->addEdge(startCheck, returnMinusOne, 0);
+        irm->getFlowGraph()->addEdge(startCheck, returnStart, 1);
+
+        callInstNode->appendInst(irm->newInst(Mnemonic_CMP, start, zero)); // cmp start, 0
+        callInstNode->appendInst(irm->newBranchInst(Mnemonic_JL, startLessThanZero, subLenCheck)); // jl startLessThanZero
+
+        startLessThanZero->appendInst(irm->newInst(Mnemonic_MOV, start, zero)); // mov start, 0
+
+        // saving subString.length on register
+        subLenCheck->appendInst(irm->newCopyPseudoInst(Mnemonic_MOV, subLen, trgtLen)); // mov subLen, subString.count
+        subLenCheck->appendInst(irm->newInst(Mnemonic_CMP, subLen, zero)); // cmp subLen, 0
+        subLenCheck->appendInst(irm->newBranchInst(Mnemonic_JE, startCheck, mainNode)); // je startCheck
+
+        startCheck->appendInst(irm->newInst(Mnemonic_CMP, start, thisLen)); // cmp start, this.count
+        startCheck->appendInst(irm->newBranchInst(Mnemonic_JG, returnMinusOne, returnStart)); // jg returnMinusOne
+    }
+    else // removing unnecessary checks
+    {
+        int64 val = start->getImmValue();
+        if (val <0)
+        {
+            start = zero;
+            val = 0;
+        }
+
+        // saving subString.length on register
+        callInstNode->appendInst(irm->newCopyPseudoInst(Mnemonic_MOV, subLen, trgtLen)); // mov subLen, subString.count
+        callInstNode->appendInst(irm->newInst(Mnemonic_CMP, subLen, zero)); // cmp subLen, 0
+
+        if (val != 0)
+        {
+            Node* startCheck = irm->getFlowGraph()->createBlockNode();
+            
+            irm->getFlowGraph()->addEdge(callInstNode, mainNode, 1);
+            irm->getFlowGraph()->addEdge(callInstNode, startCheck, 0);
+            irm->getFlowGraph()->addEdge(startCheck, returnMinusOne, 0);
+            irm->getFlowGraph()->addEdge(startCheck, returnStart, 1);
+
+            callInstNode->appendInst(irm->newBranchInst(Mnemonic_JE, startCheck, mainNode)); // je startCheck
+
+            startCheck->appendInst(irm->newInst(Mnemonic_CMP, thisLen, start)); // cmp this.count, start
+            startCheck->appendInst(irm->newBranchInst(Mnemonic_JL, returnMinusOne, returnStart)); // jl returnMinusOne
+        }
+        else
+        {
+            irm->getFlowGraph()->addEdge(callInstNode, mainNode, 1);
+            irm->getFlowGraph()->addEdge(callInstNode, returnStart, 0);
+            callInstNode->appendInst(irm->newBranchInst(Mnemonic_JE, returnStart, mainNode)); // je returnStart
+        }
+    }
+
+    // prepare this position
+    Opnd* offset = irm->newOpnd(counterType, regConstr);
+    mainNode->appendInst(irm->newCopyPseudoInst(Mnemonic_MOV, offset, thisOffset)); // mov offset, this.offset
+    if (!startIsZero)
+        mainNode->appendInst(irm->newInst(Mnemonic_ADD, offset, start)); // add offset, start
+    Opnd* thisAddrReg = addElemIndexWithLEA(thisArr, offset, mainNode); // lea edi, [this.value + offset*sizeof(char) + 12]
+
+    // prepare trgt position
+    Opnd* trgtAddrReg = addElemIndexWithLEA(trgtArr, trgtOffset, mainNode);  // lea esi, [subString.value + subString.offset*sizeof(char) + 12]
+    
+    // lastIndex = this.count - subString.count - start
+    Opnd* lastIndex = irm->newOpnd(counterType, regConstr);
+    mainNode->appendInst(irm->newCopyPseudoInst(Mnemonic_MOV, lastIndex, thisLen)); // mov lastIndex, this.count
+    mainNode->appendInst(irm->newInst(Mnemonic_SUB, lastIndex, subLen)); // sub lastIndex, subLen
+    if (!startIsZero)
+        mainNode->appendInst(irm->newInst(Mnemonic_SUB, lastIndex, start)); // sub lastIndex, start
+   
+    //save subString's first char
+    Opnd* firstChar = irm->newOpnd(irm->getTypeManager().getCharType(), reg16Constr);
+    mainNode->appendInst(irm->newInst(Mnemonic_MOV, firstChar, irm->newMemOpnd(irm->getTypeManager().getCharType(), trgtAddrReg, 0, 0, 0))); // mov firstChar, word ptr [esi]
+
+     // preparing main loop iterator
+    Opnd* mainLoopIter = irm->newOpnd(counterType, regConstr);
+    mainNode->appendInst(irm->newInst(Mnemonic_MOV, mainLoopIter, zero)); // mov mainLoopIter, 0
+
+    //*****************************************************************************************************
+
+    // main loop
+    mainLoop->appendInst(irm->newInst(Mnemonic_CMP, mainLoopIter, lastIndex)); // cmp mainLoopIter, lastIndex
+    mainLoop->appendInst(irm->newBranchInst(Mnemonic_JG, returnMinusOne, mainLoop2)); // jg returnMinusOne
+
+    Opnd* currentChar = irm->newMemOpnd(irm->getTypeManager().getCharType(), thisAddrReg, 0, 0, 0);
+    mainLoop2->appendInst(irm->newInst(Mnemonic_CMP, currentChar, firstChar)); // cmp word ptr [edi], firstChar
+    mainLoop2->appendInst(irm->newBranchInst(Mnemonic_JNE, mainLoopEnd, mainLoop3)); // jne mainLoopEnd
+
+    // preparing nested loop iterator
+    Opnd* nestedLoopIter = irm->newOpnd(counterType, regConstr);
+    mainLoop3->appendInst(irm->newInst(Mnemonic_MOV, nestedLoopIter, irm->newImmOpnd(counterType, 1))); // mov nestedLoopIter, 1
+
+    nestedLoop->appendInst(irm->newInst(Mnemonic_CMP, nestedLoopIter, subLen)); // cmp nestedLoopIter, subLen
+    nestedLoop->appendInst(irm->newBranchInst(Mnemonic_JGE, returnIndex, nestedLoop2)); // jge returnIndex
+
+    Opnd* tmp = irm->newRegOpnd(irm->getTypeManager().getCharType(), RegName_DX);
+    nestedLoop2->appendInst(irm->newInst(Mnemonic_MOV, tmp, irm->newMemOpnd(irm->getTypeManager().getCharType(), thisAddrReg, nestedLoopIter, irm->newImmOpnd(counterType, 2), 0))); // mov tmp, [edi + 2*nestedLoopIter]
+    nestedLoop2->appendInst(irm->newInst(Mnemonic_CMP, tmp, irm->newMemOpnd(irm->getTypeManager().getCharType(), trgtAddrReg, nestedLoopIter, irm->newImmOpnd(counterType, 2), 0))); // cmp tmp, [esi + 2*nestedLoopIter]
+    nestedLoop2->appendInst(irm->newBranchInst(Mnemonic_JNE, mainLoopEnd, nestedLoop3)); // jne mainLoopEnd
+    
+    nestedLoop3->appendInst(irm->newInst(Mnemonic_ADD, nestedLoopIter, irm->newImmOpnd(counterType, 1))); // add nestedLoopIter, 1
+    
+    mainLoopEnd->appendInst(irm->newInst(Mnemonic_ADD, mainLoopIter, irm->newImmOpnd(counterType, 1))); // add mainLoopIter, 1
+    mainLoopEnd->appendInst(irm->newInst(Mnemonic_ADD, thisAddrReg, irm->newImmOpnd(counterType, 2))); // add edi, 2
+
+    returnMinusOne->appendInst(irm->newInst(Mnemonic_MOV, res, irm->newImmOpnd(res->getType(), -1)));
+    
+    returnStart->appendInst(irm->newInst(Mnemonic_MOV, res, start));
+
+    returnIndex->appendInst(irm->newInst(Mnemonic_MOV, res, mainLoopIter));
+
+    if (!startIsZero)
+        returnIndex->appendInst(irm->newInst(Mnemonic_ADD, res, start));
+
+    callInst->unlink();
+}
+
 void  APIMagicHandler::convertIntToInt(Opnd* dst, Opnd* src, Node* node) 
 {
     Type* dstType = dst->getType();
@@ -558,5 +759,8 @@ Opnd*  APIMagicHandler::addElemIndexWithLEA(Opnd* array, Opnd* index, Node* node
     return dst;
 }
 
+
 }} //namespace
+
+
 

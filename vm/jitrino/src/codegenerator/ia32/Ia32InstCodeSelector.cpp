@@ -180,6 +180,7 @@ void InstCodeSelector::onCFGInit(IRManager& irManager)
     irManager.registerInternalHelperInfo("fill_array_with_const", IRManager::InternalHelperInfo((void*)&fill_array_with_const,&CallingConvention_STDCALL));
     irManager.registerInternalHelperInfo("String_compareTo", IRManager::InternalHelperInfo(NULL,&CallingConvention_STDCALL));
     irManager.registerInternalHelperInfo("String_regionMatches", IRManager::InternalHelperInfo(NULL,&CallingConvention_STDCALL));
+    irManager.registerInternalHelperInfo("String_indexOf", IRManager::InternalHelperInfo(NULL,&CallingConvention_STDCALL));
 }
 
 //_______________________________________________________________________________________________________________
@@ -2458,7 +2459,7 @@ CG_OpndHandle* InstCodeSelector::call(uint32          numArgs,
                                          CG_OpndHandle** args, 
                                          Type*           retType,
                                          MethodDesc *    desc)
-{
+{    
     return tau_call(numArgs, args, retType, desc, getTauUnsafe(), getTauUnsafe());
 }
 
@@ -2571,6 +2572,7 @@ CG_OpndHandle* InstCodeSelector::tau_call(uint32          numArgs,
     // does not fit into 32 bits). If on EM64T we set IntPtrType for target address here constraint resolver work makes all
     // calls a register-form ones. (Even for those with a short offset). But immediate calls are faster and takes
     // less space. We should keep them when it is possible.
+
     Opnd * target=irManager.newImmOpnd(typeManager.getInt32Type(), Opnd::RuntimeInfo::Kind_MethodDirectAddr, desc);
     Opnd * retOpnd=createResultOpnd(retType);
     CallInst * callInst=irManager.newCallInst(target, irManager.getDefaultManagedCallingConvention(), 
@@ -2695,9 +2697,11 @@ CG_OpndHandle* InstCodeSelector::callhelper(uint32              numArgs,
           break;
     }
     case InitializeArray:
+    {
         assert(numArgs == 4);
         appendInsts(irManager.newInternalRuntimeHelperCallInst("initialize_array", numArgs, (Opnd**)args, dstOpnd));
           break;
+    }
     case SaveThisState:
     {
         assert(numArgs == 1);
@@ -2782,11 +2786,20 @@ CG_OpndHandle* InstCodeSelector::callhelper(uint32              numArgs,
     }
     case StringRegionMatches:
     {
+        //printf("%d \n", callId);
         assert(numArgs == 5);
         Opnd * newArgs[5] = {(Opnd *)args[0], (Opnd *)args[1], (Opnd *)args[2], (Opnd *)args[3], (Opnd *)args[4]};
         appendInsts(irManager.newInternalRuntimeHelperCallInst("String_regionMatches", numArgs, newArgs, dstOpnd));
         break;
     }
+    case StringIndexOf:
+    {
+        assert(numArgs == 7);
+        Opnd * newArgs[7] = {(Opnd *)args[0], (Opnd *)args[1], (Opnd *)args[2], (Opnd *)args[3], (Opnd *)args[4], (Opnd *)args[5], (Opnd *)args[6]};
+        appendInsts(irManager.newInternalRuntimeHelperCallInst("String_indexOf", numArgs, newArgs, dstOpnd));
+        break;
+    }
+
     default:
     {
         assert(0);

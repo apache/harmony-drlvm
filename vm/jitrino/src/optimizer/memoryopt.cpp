@@ -669,6 +669,7 @@ MemoryOptInitWalker::applyToInst(Inst *i)
             case LockedCompareAndExchange:
             case AddValueProfileValue:
             case StringCompareTo:
+	    case StringIndexOf:
             case StringRegionMatches:
             case FillArrayWithConst: 
             case ClassIsArray:

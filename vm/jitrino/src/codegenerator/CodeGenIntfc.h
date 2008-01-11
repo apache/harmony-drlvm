@@ -173,7 +173,8 @@ public:
         LockedCompareAndExchange,
         AddValueProfileValue,
         StringCompareTo,
-        StringRegionMatches
+        StringRegionMatches,
+        StringIndexOf
     };
 };
 

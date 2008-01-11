@@ -482,6 +482,8 @@ void JitHelperCallInst::handlePrintEscape(::std::ostream& os, char code) const {
         os << "FillArrayWithConst"; break;
     case StringCompareTo:
         os << "StringCompareTo"; break;
+    case StringIndexOf:
+        os << "StringIndexOf"; break;
     case StringRegionMatches:
         os << "StringRegionMatches"; break;
     case ClassIsArray:
@@ -2069,6 +2071,7 @@ InstFactory::makeJitHelperCall(Opnd* dst, JitHelperCallId id, uint32 numArgs, Op
     Modifier mod;
     switch(id) {
         case StringCompareTo:
+        case StringIndexOf:
         case StringRegionMatches:
             mod = Modifier(Exception_Never);
             break;

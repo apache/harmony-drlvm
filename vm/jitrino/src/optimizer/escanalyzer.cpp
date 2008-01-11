@@ -416,6 +416,7 @@ EscAnalyzer::instrExam(Node* node) {
                         case LockedCompareAndExchange:
                         case AddValueProfileValue:
                         case StringCompareTo:
+                        case StringIndexOf:
                         case StringRegionMatches:
                         case ClassIsArray:
                         case ClassGetAllocationHandle:
@@ -5881,6 +5882,9 @@ static bool isVMHelperCall(Inst* inst, VM_RT_SUPPORT id) {
 }
 
 } //namespace Jitrino 
+
+
+
 
 
 

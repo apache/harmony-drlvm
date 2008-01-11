@@ -280,6 +280,7 @@ enum JitHelperCallId {
     AddValueProfileValue,
     StringCompareTo,
     StringRegionMatches,
+    StringIndexOf,
     ClassIsArray,
     ClassGetAllocationHandle,
     ClassGetTypeSize,

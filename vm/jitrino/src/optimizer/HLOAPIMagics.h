@@ -128,6 +128,7 @@ public:\
 
 DECLARE_HLO_MAGIC_INLINER(String_compareTo_HLO_Handler);
 DECLARE_HLO_MAGIC_INLINER(String_regionMatches_HLO_Handler);
+DECLARE_HLO_MAGIC_INLINER(String_indexOf_HLO_Handler);
 
 DEFINE_SESSION_ACTION(HLOAPIMagicSession, hlo_api_magic, "APIMagics HLO Pass")
 
@@ -159,6 +160,9 @@ HLOAPIMagicSession::_run(IRManager& irm)
                     } else if (!strcmp(methodName, "regionMatches") && !strcmp(signature, "(ILjava/lang/String;II)Z")) {
                         if(getBoolArg("String_regionMatches_as_magic", true))
                             handlers.push_back(new (mm) String_regionMatches_HLO_Handler(callInst));
+                    } else if (!strcmp(methodName, "indexOf") && !strcmp(signature, "(Ljava/lang/String;I)I")) {
+                        if(getBoolArg("String_indexOf_as_magic", false))
+                            handlers.push_back(new (mm) String_indexOf_HLO_Handler(callInst));
                     }
                 }
             }

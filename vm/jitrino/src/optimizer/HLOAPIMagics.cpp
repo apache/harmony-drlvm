@@ -241,6 +241,100 @@ String_regionMatches_HLO_Handler::run()
     cfg.orderNodes(true);
 }
 
+void
+String_indexOf_HLO_Handler::run()
+{
+    IRManager*          irm         = builder->getIRManager();
+    InstFactory&        instFactory = builder->getInstFactory();
+    ControlFlowGraph&   cfg         = builder->getControlFlowGraph();
+
+    Node* firstNode = callInst->getNode();
+    Node* lastNode = cfg.splitNodeAtInstruction(callInst, true, true, instFactory.makeLabel());
+    Node* dispatch = firstNode->getExceptionEdgeTarget();
+    assert(dispatch);
+    callInst->unlink();
+    cfg.removeEdge(firstNode->findEdge(true, lastNode));
+
+    builder->setCurrentBCOffset(callInst->getBCOffset());
+    
+    // the fist two are tau operands
+    Opnd* dst     = callInst->getDst();
+    Opnd* thisStr = callInst->getSrc(2);
+    Opnd* trgtStr = callInst->getSrc(3);
+    Opnd* start = callInst->getSrc(4);
+    
+    Class_Handle string = (Class_Handle)VMInterface::getSystemStringVMTypeHandle();
+    FieldDesc* fieldCountDesc = irm->getCompilationInterface().getFieldByName(string,"count");
+    assert(fieldCountDesc);
+    FieldDesc* fieldValueDesc = irm->getCompilationInterface().getFieldByName(string,"value");
+    assert(fieldValueDesc);
+    FieldDesc* offsetDesc = irm->getCompilationInterface().getFieldByName(string,"offset");
+    assert(offsetDesc);
+
+    // gen at the end of first node
+    builder->setCurrentNode(firstNode);
+    Opnd *tauThisNullChecked = builder->genTauCheckNull(thisStr);
+
+    // node
+    builder->genFallthroughNode(dispatch);
+    Opnd *tauThisInRange = builder->genTauHasType(thisStr, fieldCountDesc->getParentType());
+
+    Opnd *tauTrgtNullChecked = builder->genTauCheckNull(trgtStr);
+
+    // node
+    builder->genFallthroughNode();
+    Opnd* imm128 = builder->genLdConstant(128);
+    Opnd* imm64 = builder->genLdConstant(64);
+    Opnd *tauTrgtInRange = builder->genTauHasType(trgtStr, fieldCountDesc->getParentType());
+
+    // node
+    builder->genFallthroughNode(dispatch);
+
+    // prefetch String objects
+    Opnd * voidDst = builder->createOpnd(irm->getTypeManager().getVoidType());
+    Opnd* prefetchThis[] = {thisStr, imm128, imm64};
+    builder->appendInst(instFactory.makeJitHelperCall(voidDst, Prefetch, 3, prefetchThis));
+
+    // node
+    builder->genFallthroughNode(dispatch);
+    
+    Opnd* prefetchTrgt[] = {trgtStr, imm128, imm64};
+    builder->appendInst(instFactory.makeJitHelperCall(voidDst, Prefetch, 3, prefetchTrgt));
+
+    Opnd* thisLength = builder->genLdField(fieldCountDesc, thisStr, tauThisNullChecked, tauThisInRange);
+    Opnd* trgtLength = builder->genLdField(fieldCountDesc, trgtStr, tauTrgtNullChecked, tauTrgtInRange);
+    
+    Opnd* thisOffset = builder->genLdField(offsetDesc, thisStr, tauThisNullChecked, tauThisInRange);
+    Opnd* trgtOffset = builder->genLdField(offsetDesc, trgtStr, tauTrgtNullChecked, tauTrgtInRange);
+
+    Opnd* thisValue = builder->genLdField(fieldValueDesc, thisStr, tauThisNullChecked, tauThisInRange);
+    Opnd* trgtValue = builder->genLdField(fieldValueDesc, trgtStr, tauTrgtNullChecked, tauTrgtInRange);
+
+    // node
+    builder->genFallthroughNode(dispatch);
+
+    // prefetch character arrays
+    Opnd* prefetchThisValue[] = {thisValue, imm128, imm64};
+    builder->appendInst(instFactory.makeJitHelperCall(voidDst, Prefetch, 3, prefetchThisValue));
+
+    // node
+    builder->genFallthroughNode(dispatch);
+    
+    Opnd* prefetchTrgtValue[] = {trgtValue, imm128, imm64};
+    builder->appendInst(instFactory.makeJitHelperCall(voidDst, Prefetch, 3, prefetchTrgtValue));
+
+    // node
+    builder->genFallthroughNode(dispatch);
+
+    Opnd* opnds[] = {thisValue, thisOffset, thisLength, trgtValue, trgtOffset, trgtLength, start};
+    // This helper call will be processed in Ia32ApiMagics pass
+    builder->appendInst(instFactory.makeJitHelperCall(dst, StringIndexOf, 7, opnds));
+
+    builder->genEdgeFromCurrent(lastNode);
+
+    cfg.orderNodes(true);
+}
+
 Node*
 HLOAPIMagicIRBuilder::genNodeAfter(Node* srcNode, LabelInst* label, Node* dispatch) {
     currentNode = cfg.createBlockNode(label);
@@ -299,8 +393,6 @@ HLOAPIMagicIRBuilder::genLdField(FieldDesc* fieldDesc, Opnd* base,
                                               tauBaseNonNull, tauAddressInRange));
     return fieldVal;
 }
-
-
 
 Opnd*
 HLOAPIMagicIRBuilder::createOpnd(Type* type) {

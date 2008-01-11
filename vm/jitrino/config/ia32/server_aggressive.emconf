@@ -81,6 +81,9 @@ SD2_OPT.useProfile=EDGE_PROF,VALUE_PROF
 -XX:jit.SD2_OPT.path.dce1=cg_dce
 -XX:jit.SD2_OPT.path.dce2=cg_dce
 
+
+-XX:jit.SD2_OPT.arg.String_indexOf_as_magic=true
+
 #devirt configuration
 -XX:jit.SD2_OPT.arg.optimizer.devirt.devirt_intf_calls=true
 -XX:jit.SD2_OPT.arg.optimizer.devirt.devirt_abstract_calls=true

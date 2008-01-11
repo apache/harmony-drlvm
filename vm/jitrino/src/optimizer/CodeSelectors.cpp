@@ -413,6 +413,7 @@ JitHelperCallOp::Id _BlockCodeSelector::convertJitHelperId(JitHelperCallId callI
         case FillArrayWithConst:        return JitHelperCallOp::FillArrayWithConst;
         case StringCompareTo:           return JitHelperCallOp::StringCompareTo;
         case StringRegionMatches:       return JitHelperCallOp::StringRegionMatches;
+        case StringIndexOf:             return JitHelperCallOp::StringIndexOf;
         default: break;
     }
     crash("\n JIT helper in not supported in LIR : %d\n", callId);
