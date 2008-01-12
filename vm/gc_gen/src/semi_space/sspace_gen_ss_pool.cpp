@@ -290,7 +290,7 @@ void gen_ss_pool(Collector* collector)
   Sspace* sspace = (Sspace*)collector->collect_space;
   unsigned int sspace_first_idx = sspace->first_block_idx;
   tospace_start = (void*)&(sspace->blocks[sspace->tospace_first_idx - sspace_first_idx]);
-  tospace_end = (void*)&(sspace->blocks[sspace->ceiling_block_idx - sspace_first_idx]);
+  tospace_end = (void*)&(sspace->blocks[sspace->ceiling_block_idx - sspace_first_idx + 1]);
 
   collector_trace_rootsets(collector);
   
