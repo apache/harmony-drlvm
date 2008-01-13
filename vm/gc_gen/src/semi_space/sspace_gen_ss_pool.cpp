@@ -87,7 +87,7 @@ static FORCE_INLINE void scan_object(Collector* collector, Partial_Reveal_Object
   return;
 }
 
-/* NOTE:: At this point, p_ref can be in anywhere like root, and other spaces, but *p_ref must be in fspace, 
+/* NOTE:: At this point, p_ref can be in anywhere like root, and other spaces, but *p_ref must be in sspace, 
    since only slot which points to object in fspace could be added into TraceStack.
    The problem is the *p_ref may be forwarded already so that, when we come here we find it's pointing to tospace.
    We will simply return for that case. It might be forwarded due to:
@@ -102,7 +102,9 @@ static FORCE_INLINE void forward_object(Collector *collector, REF *p_ref)
   GC* gc = collector->gc;
   Partial_Reveal_Object *p_obj = read_slot(p_ref);
 
-  if(!obj_belongs_to_nos(p_obj)) return; 
+  /* p_obj can also be in tospace because this p_ref is a redundant one in mutator remset. 
+     We don't rem p_ref because it was remembered in first time it's met. */   
+  if(!obj_belongs_to_nos(p_obj) || obj_belongs_to_tospace(p_obj)) return; 
 
   Partial_Reveal_Object* p_target_obj = NULL;
   Boolean to_rem_slot = FALSE;
@@ -114,20 +116,12 @@ static FORCE_INLINE void forward_object(Collector *collector, REF *p_ref)
 
     /* check if the target obj stays in NOS, and p_ref from MOS. If yes, rem p_ref. */
     if(obj_is_survivor(p_target_obj))
-      to_rem_slot = TRUE;
+      if( !addr_belongs_to_nos(p_ref) && address_belongs_to_gc_heap(p_ref, gc))
+        collector_remset_add_entry(collector, ( Partial_Reveal_Object**) p_ref); 
 
-  }else if( obj_belongs_to_tospace(p_obj)){
-    /* if p_obj the new copy in tospace, rem p_ref if it's from MOS */   
-    to_rem_slot = TRUE; 
+    return; 
   }  
-  
-  if( to_rem_slot == TRUE ){
-    if( !addr_belongs_to_nos(p_ref) && address_belongs_to_gc_heap(p_ref, gc))
-      collector_remset_add_entry(collector, ( Partial_Reveal_Object**) p_ref); 
     
-    return;
-  }  
-  
   /* following is the logic for forwarding */  
   p_target_obj = collector_forward_object(collector, p_obj);
   
