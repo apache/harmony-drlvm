@@ -73,24 +73,6 @@ bool get_all_native_modules(native_module_t** list_ptr, int* count_ptr)
     return true;
 }
 
-void clear_native_modules(native_module_t** list_ptr)
-{
-    native_module_t* cur = *list_ptr;
-
-    while (cur)
-    {
-        native_module_t* next = cur->next;
-
-        if (cur->filename)
-            STD_FREE(cur->filename);
-
-        STD_FREE(cur);
-        cur = next;
-    }
-
-    *list_ptr = NULL;
-}
-
 native_module_t* fill_module(MODULEENTRY32 src)
 {
     native_module_t* module =
@@ -111,10 +93,19 @@ native_module_t* fill_module(MODULEENTRY32 src)
     strlwr(module->filename);
 
     module->seg_count = 1;
-    module->segments[0].type = SEGMENT_TYPE_UNKNOWN;
     module->segments[0].base = src.modBaseAddr;
     module->segments[0].size = (size_t)src.modBaseSize;
     module->next = NULL;
+
+    MEMORY_BASIC_INFORMATION mem_info;
+    VirtualQuery(src.modBaseAddr, &mem_info, sizeof(mem_info));
+
+    if ((mem_info.Protect & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY)) != 0)
+        module->segments[0].type = SEGMENT_TYPE_CODE;
+    else if ((mem_info.Protect & (PAGE_READWRITE | PAGE_READONLY)) != 0)
+        module->segments[0].type = SEGMENT_TYPE_DATA;
+    else
+        module->segments[0].type = SEGMENT_TYPE_UNKNOWN;
 
     return module;
 }

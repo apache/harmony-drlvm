@@ -492,6 +492,14 @@ static void abort_handler (int signum, siginfo_t* UNREF info, void* context)
     general_crash_handler(signum, &regs, "SIGABRT");
 }
 
+static void process_crash(Registers* regs)
+{
+    // Print register info
+    print_state(regs);
+    // print stack trace
+    sd_print_stack(regs);
+}
+
 static void general_crash_handler(int signum, Registers* regs, const char* message)
 {
     // setup default handler
@@ -502,8 +510,7 @@ static void general_crash_handler(int signum, Registers* regs, const char* messa
     if (!is_gdb_crash_handler_enabled() ||
         !gdb_crash_handler())
     {
-        // print stack trace
-        st_print_stack(regs);
+        process_crash(regs);
     }
 }
 

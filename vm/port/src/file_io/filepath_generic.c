@@ -14,45 +14,21 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Evgueni Brevnov
- * @version $Revision: 1.1.2.1.4.3 $
- */  
 
-#include <stdio.h>
-#include <signal.h>
-#include <pthread.h>
-#include <unistd.h>
-#include <sys/time.h>
-#include <assert.h>
-#include <errno.h>
+#include <string.h>
+#include "port_filepath.h"
 
-#include "port_malloc.h"
-#include "platform_lowlevel.h"
+APR_DECLARE(const char*) port_filepath_basename(const char* filepath)
+{
+    char* separator;
 
-#ifndef __SMP__
-#error
--- recompile with -D__SMP__
-#endif
+    if (!filepath || !*filepath)
+        return filepath;
 
-#ifndef _REENTRANT
-#error
--- recompile with -D_REENTRANT
-#endif
+    separator = strrchr(filepath, PORT_FILE_SEPARATOR);
 
-#ifndef __SIGRTMIN
-#else
-#if __SIGRTMAX - __SIGRTMIN >= 3
-// good, this will work. java dbg, also vm can use SIGUSR1, SIGUSR2
-#else
-#error
--- must be using an old version of pthreads
--- which uses SIGUSR1, SIGUSR2 (which conflicts with the java app debugger and vm)
-#endif
-#endif
+    if (!separator && (PORT_FILE_SEPARATOR != '/'))
+        separator = strrchr(filepath, '/');
 
-#ifdef LINUX
-#ifdef _syscall0
-_syscall0(pid_t, gettid)
-#endif
-#endif
+    return separator ? (separator + 1) : filepath;
+}

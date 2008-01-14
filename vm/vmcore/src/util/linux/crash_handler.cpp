@@ -20,16 +20,12 @@
  */
 
 #include <sys/types.h>
-#if defined(LINUX)
-#include <linux/unistd.h>
-#include <errno.h>
-#else
 #include <unistd.h>
-#endif
 #include <stdio.h>
 #include <semaphore.h>
 
 #include "environment.h"
+#include "platform_lowlevel.h"
 
 #include "crash_handler.h"
 #if defined(FREEBSD)
@@ -60,18 +56,6 @@ bool is_gdb_crash_handler_enabled()
     return get_boolean_property("vm.crash_handler", FALSE, VM_PROPERTIES);
 }
 
-#if defined(LINUX)
-#ifdef _syscall0
-_syscall0(pid_t, gettid)
-pid_t gettid(void);
-#else
-static pid_t gettid(void)
-{
-    return (pid_t)syscall(__NR_gettid);
-}
-#endif
-#endif
-
 bool gdb_crash_handler()
 {
     if (!g_prepared ||
@@ -80,13 +64,7 @@ bool gdb_crash_handler()
 
     static const int tid_len = 10;
     char tid[tid_len];
-    snprintf(tid, tid_len, "%d",
-#if defined(LINUX)
-        gettid()
-#else
-        getpid()
-#endif
-	);
+    snprintf(tid, tid_len, "%d", gettid());
 
     if (fork() == 0)
     {

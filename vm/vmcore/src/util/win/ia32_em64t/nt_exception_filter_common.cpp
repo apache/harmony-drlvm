@@ -47,7 +47,7 @@ static void print_callstack(LPEXCEPTION_POINTERS nt_exception) {
     PCONTEXT context = nt_exception->ContextRecord;
     Registers regs;
     nt_to_vm_context(context, &regs);
-    st_print_stack(&regs);
+    sd_print_stack(&regs);
 }
 
 

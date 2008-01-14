@@ -55,25 +55,6 @@ void dump_native_modules(native_module_t* modules, FILE *out);
 void clear_native_modules(native_module_t**);
 native_module_t* find_native_module(native_module_t* modules, void* code_ptr);
 
-#ifdef PLATFORM_POSIX
-typedef struct _raw_module raw_module;
-
-// Structure to accumulate several segments for the same module
-struct _raw_module
-{
-    void*               start;
-    void*               end;
-    bool                acc_r;
-    bool                acc_x;
-    char*               name;
-    raw_module*         next;
-};
-
-void native_clear_raw_list(raw_module*);
-raw_module* native_add_raw_segment(raw_module*, void*, void*, char, char);
-native_module_t* native_fill_module(raw_module*, size_t);
-#endif // PLATFORM_POSIX
-
 
 #ifdef __cplusplus
 }

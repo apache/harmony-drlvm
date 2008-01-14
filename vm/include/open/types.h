@@ -132,7 +132,7 @@ typedef signed int int32;
 /**
  * The integer datatypes on the platform that can hold a pointer.
  */
- #ifdef POINTER64
+#ifdef POINTER64
 #define POINTER_SIZE_INT uint64
 #define POINTER_SIZE_SINT int64
 #ifdef PLATFORM_NT
@@ -140,10 +140,12 @@ typedef signed int int32;
 #else 
 #define PI_FMT "ll"
 #endif
+#define W_PI_FMT "016"PI_FMT
 #else
 #define POINTER_SIZE_INT uint32
 #define POINTER_SIZE_SINT int32
 #define PI_FMT ""
+#define W_PI_FMT "08"PI_FMT
 #endif // POINTER64
 
 /**

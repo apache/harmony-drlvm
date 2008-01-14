@@ -138,7 +138,7 @@ void abort_handler (int signum, siginfo_t* info, void* context) {
         !gdb_crash_handler())
     {
         // print stack trace
-        st_print_stack(&regs);
+        sd_print_stack(&regs);
     }
 }
 
@@ -178,7 +178,7 @@ void null_java_divide_by_zero_handler(int signum, siginfo_t* UNREF info, void* c
         !gdb_crash_handler())
     {
         // print stack trace
-        st_print_stack(&regs);
+        sd_print_stack(&regs);
     }
 }
 
@@ -462,7 +462,7 @@ void null_java_reference_handler(int signum, siginfo_t* UNREF info, void* contex
         !gdb_crash_handler())
     {
         // print stack trace
-        st_print_stack(&regs);
+        sd_print_stack(&regs);
     }
 }
 

@@ -101,5 +101,6 @@ inline size_t get_restore_stack_size() {
 void ucontext_to_regs(Registers* regs, ucontext_t *uc);
 void regs_to_ucontext(ucontext_t *uc, Registers* regs);
 
+void print_state(Registers* regs);
 
 #endif // _SIGNALS_COMMON_H_

@@ -19,10 +19,10 @@
  * @version $Revision$
  */  
 
-#include "stack_dump.h"
-#include "native_stack.h"
+#include <ctype.h>
 #include "vm_threads.h"
 #include "port_malloc.h"
+#include "port_dso.h"
 #include "jit_intf_cpp.h"
 #include "Class.h"
 #include "class_member.h"
@@ -30,221 +30,142 @@
 #include "interpreter_exports.h"
 #include "cci.h"
 #include "m2n.h"
-#include <ctype.h>
+#include "native_stack.h"
+#include "native_modules.h"
+#include "natives_support.h"
 
-#ifdef PLATFORM_NT
-
-#ifndef NO_DBGHELP
-#include <dbghelp.h>
-#pragma comment(linker, "/defaultlib:dbghelp.lib")
-#endif
-
-#else
-#include <unistd.h>
-#endif
-
-#ifdef POINTER64
-#define W_PI_FMT "016"PI_FMT
-#else
-#define W_PI_FMT "08"PI_FMT
-#endif
+#include "stack_dump.h"
 
 
-// Symbolic method info: method name, source file name and a line number of an instruction within the method
-struct MethodInfo {
-    char* method_name;
-    char* file_name;
-    int line;
-};
+static native_module_t* g_modules = NULL;
 
-#ifdef PLATFORM_POSIX
-
-/**
- * Find a module which a given IP address belongs to.
- * Returns module file name and offset of an IP address from beginnig of the segment (used in addr2line tool)
- */
-static char* get_module(native_module_t* info, jint num_modules, void* ip, POINTER_SIZE_INT* offset) {
-
-    for (int i = 0; i < num_modules; i++, info = info->next) {
-        for (int j = 0; j < info->seg_count; j++) {
-            if (info->segments[j].type != SEGMENT_TYPE_DATA) {
-                if ( (POINTER_SIZE_INT) info->segments[j].base <= (POINTER_SIZE_INT) ip &&
-                    (POINTER_SIZE_INT) ip < (POINTER_SIZE_INT) info->segments[j].base + info->segments[j].size) {
-
-                    *offset = (strstr(info->filename, ".so") == NULL) ? // Executable
-                                (POINTER_SIZE_INT)ip :
-                                (POINTER_SIZE_INT)ip - (POINTER_SIZE_INT)info->segments[j].base;
-
-                    return info->filename;
-                }
-            }
-        }
-    }
-    return NULL;
-}
-#endif
-
-static void st_get_c_method_info(MethodInfo* info, void* ip) {
-    info->method_name = NULL;
-    info->file_name = NULL;
-    info->line = -1;
-#ifdef PLATFORM_NT
-#ifndef NO_DBGHELP
-    if (!SymInitialize(GetCurrentProcess(), NULL, true)) {
-        return;
-    }
-    BYTE smBuf[sizeof(SYMBOL_INFO) + 2048];
-    PSYMBOL_INFO pSymb = (PSYMBOL_INFO)smBuf;
-    pSymb->SizeOfStruct = sizeof(smBuf);
-    pSymb->MaxNameLen = 2048;
-    DWORD64 funcDispl;
-    if(SymFromAddr(GetCurrentProcess(), (DWORD64)ip, &funcDispl, pSymb)) {
-        info->method_name = (char*) STD_MALLOC(strlen(pSymb->Name) + 1);
-        strcpy(info->method_name, pSymb->Name);        
-    }
-    DWORD lineOffset;
-    IMAGEHLP_LINE lineInfo;
-    if (SymGetLineFromAddr(GetCurrentProcess(), (DWORD)ip, &lineOffset, &lineInfo)) {
-        info->line = lineInfo.LineNumber;
-        info->file_name = (char*) STD_MALLOC(strlen(lineInfo.FileName) + 1);
-        strcpy(info->file_name, lineInfo.FileName);
-
-    }
-#else
-    return;
-#endif
-#else // PLATFORM_NT
-    jint num_modules;
-    native_module_t* modules;
-    if (!get_all_native_modules(&modules, &num_modules)) {
-        fprintf(stderr, "Warning: Cannot get modules info, no symbolic information will be provided\n");
-        return;
-    }
-    
-    POINTER_SIZE_INT offset;
-    char* module = get_module(modules, num_modules, ip, &offset);
-    if (module) {
-        int po[2];
-        pipe(po);
-
-        char ip_str[20];
-        sprintf(ip_str, "0x%"PI_FMT"x\n", offset);
-
-        if (!fork()) {
-            close(po[0]);
-            dup2(po[1], 1);
-            execlp("addr2line", "addr2line", "-f", "-e", module, "-C", ip_str, NULL);
-            fprintf(stderr, "Warning: Cannot run addr2line. No symbolic information will be available\n");
-            printf("??\n??:0\n"); // Emulate addr2line output
-            exit(-1);
-        } else {
-            close(po[1]);
-            char buf[256];
-            int status;
-            wait(&status);
-            int count = read(po[0], buf, 255);
-            close(po[0]);
-            if (count >= 0) {
-                while (isspace(buf[count-1])) {
-                    count--;
-                }
-                buf[count] = '\0';
-                int i = 0;
-                for (; i < count; i++) {
-                    if (buf[i] == '\n') { // Function name is limited by '\n'
-                        buf[i] = '\0';
-                        info->method_name = (char*) STD_MALLOC(strlen(buf) + 1);
-                        strcpy(info->method_name, buf);
-                        break;
-                    }
-                }
-                char* fn = buf + i + 1;
-                for (; i < count && buf[i] != ':'; i++) // File name and line number are separated by ':'
-                    ;
-                buf[i] = '\0';
-                info->file_name = (char*) STD_MALLOC(strlen(fn) + 1);
-                strcpy(info->file_name, fn);
-                char* line = buf + i + 1;
-                info->line = atoi(line);
-                if (info->line == 0) {
-                    info->line = -1;
-                }
-            } else {
-                fprintf(stderr, "read() failed during execution of addr2line\n");
-            }
-        }
-    }
-#endif
-}
-
-static char* construct_java_method_name(Method* m)
+// Is called to fill modules list (should be called under lock)
+static void sd_fill_modules()
 {
-    if (!m)
-        return NULL;
+    if (g_modules)
+        clear_native_modules(&g_modules);
 
-    const char* mname = m->get_name()->bytes;
-    size_t mlen = m->get_name()->len;
+    int count;
+    bool res = get_all_native_modules(&g_modules, &count);
+    assert(res && g_modules && count);
+}
+
+#ifdef SD_UPDATE_MODULES
+// Is called to update modules info
+void sd_update_modules()
+{
+    hymutex_t* sd_lock;
+    bool res = sd_initialize(&sd_lock);
+
+    if (!res)
+        return;
+
+    hymutex_lock(sd_lock);
+    sd_fill_modules();
+    hymutex_unlock(sd_lock);
+}
+#endif // SD_UPDATE_MODULES
+
+
+static char* sd_construct_java_method_name(Method* m, char* buf)
+{
+    if (!m || !buf)
+    {
+        *buf = 0;
+        return NULL;
+    }
+
+    char* ptr = buf;
+
+    const char* err_str = "<--Truncated: too long name";
+    size_t err_len = strlen(err_str);
+
+    size_t remain = SD_MNAME_LENGTH - 1;
     const char* cname = m->get_class()->get_name()->bytes;
     size_t clen = m->get_class()->get_name()->len;
+    const char* mname = m->get_name()->bytes;
+    size_t mlen = m->get_name()->len;
     const char* descr = m->get_descriptor()->bytes;
     size_t dlen = m->get_descriptor()->len;
-    
-    char* method_name = (char*)STD_MALLOC(mlen + clen + dlen + 2);
-    if (!method_name)
-        return NULL;
 
-    char* ptr = method_name;
+    if (clen + 1 > remain)
+    {
+        size_t len = remain - err_len;
+        memcpy(ptr, cname, len);
+        strcpy(ptr + len, err_str);
+        return buf;
+    }
+
     memcpy(ptr, cname, clen);
     ptr += clen;
     *ptr++ = '.';
+    remain -= clen + 1;
+
+    if (mlen > remain)
+    {
+        if (remain > err_len)
+            memcpy(ptr, mname, remain - err_len);
+
+        strcpy(ptr + remain - err_len, err_str);
+        return buf;
+    }
+
     memcpy(ptr, mname, mlen);
     ptr += mlen;
-    memcpy(ptr, descr, dlen);
-    ptr[dlen] = '\0';
+    remain -= mlen;
 
-    return method_name;
+    if (dlen > remain)
+    {
+        if (remain > err_len)
+            memcpy(ptr, descr, remain - err_len);
+
+        strcpy(ptr + remain - err_len, err_str);
+        return buf;
+    }
+
+    strcpy(ptr, descr);
+    return buf;
 }
 
-static void st_get_java_method_info(MethodInfo* info, Method* m, void* ip,
+static void sd_get_java_method_info(MethodInfo* info, Method* m, void* ip,
                                     bool is_ip_past, int inl_depth)
 {
-    info->method_name = NULL;
-    info->file_name = NULL;
+    *info->method_name = 0;
+    *info->file_name = 0;
     info->line = -1;
 
     if (!m || !method_get_class(m))
         return;
 
-    info->method_name = construct_java_method_name(m);
+    if (!sd_construct_java_method_name(m, info->method_name))
+        return;
+
     const char* fname = NULL;
     get_file_and_line(m, ip, is_ip_past, inl_depth, &fname, &info->line);
 
     if (fname)
     {
-        size_t fsize = strlen(fname) + 1;
-        info->file_name = (char*)STD_MALLOC(fsize);
-        if (info->file_name)
-            memcpy(info->file_name, fname, fsize);
+        if (strlen(fname) >= sizeof(info->file_name))
+        {
+            memcpy(info->file_name, fname, sizeof(info->file_name));
+            info->file_name[sizeof(info->file_name) - 1] = 0;
+        }
+        else
+            strcpy(info->file_name, fname);
     }
 }
 
-static void st_print_line(int count, MethodInfo* m) {
+static void sd_print_line(int count, MethodInfo* m) {
 
     fprintf(stderr, "%3d: %s (%s:%d)\n",
         count,
-        m->method_name ? m->method_name : "??",
-        m->file_name ? m->file_name : "??",
+        *m->method_name ? m->method_name : "??",
+        *m->file_name ? m->file_name : "??",
         m->line);
-
-    if (m->method_name)
-        STD_FREE(m->method_name);
-
-    if (m->file_name)
-        STD_FREE(m->file_name);
 }
 
 
-void st_print_stack_jit(VM_thread* thread,
+static void sd_print_stack_jit(VM_thread* thread,
                         native_frame_t* frames, jint num_frames)
 {
     jint frame_num = 0;
@@ -256,7 +177,7 @@ void st_print_stack_jit(VM_thread* thread,
 
     while ((si && !si_is_past_end(si)) || frame_num < num_frames)
     {
-        MethodInfo m = {NULL, NULL, 0};
+        MethodInfo m;
 
         if (frame_num < num_frames && frames[frame_num].java_depth < 0)
         {
@@ -269,8 +190,9 @@ void st_print_stack_jit(VM_thread* thread,
             }
 
             // pure native frame
-            st_get_c_method_info(&m, frames[frame_num].ip);
-            st_print_line(count++, &m);
+            native_module_t* module = find_native_module(g_modules, frames[frame_num].ip);
+            sd_get_c_method_info(&m, module, frames[frame_num].ip);
+            sd_print_line(count++, &m);
             ++frame_num;
             continue;
         }
@@ -285,8 +207,9 @@ void st_print_stack_jit(VM_thread* thread,
         if (si_is_native(si) && frame_num < num_frames)
         {
             // Print information from native stack trace for JNI frames
-            st_get_c_method_info(&m, frames[frame_num].ip);
-            st_print_line(count, &m);
+            native_module_t* module = find_native_module(g_modules, frames[frame_num].ip);
+            sd_get_c_method_info(&m, module, frames[frame_num].ip);
+            sd_print_line(count, &m);
         }
         else if (si_is_native(si) && frame_num >= num_frames)
         {
@@ -294,8 +217,8 @@ void st_print_stack_jit(VM_thread* thread,
             // when native stack trace is not available
             Method* method = m2n_get_method(si_get_m2n(si));
             void* ip = m2n_get_ip(si_get_m2n(si));
-            st_get_java_method_info(&m, method, ip, false, -1);
-            st_print_line(count, &m);
+            sd_get_java_method_info(&m, method, ip, false, -1);
+            sd_print_line(count, &m);
         }
         else // !si_is_native(si)
         {
@@ -309,22 +232,23 @@ void st_print_stack_jit(VM_thread* thread,
                 (POINTER_SIZE_INT)cci->get_code_block_addr());
             bool is_ip_past = (frame_num != 0);
 
-            if (inlined_depth) {
-            for (uint32 i = inlined_depth; i > 0; i--)
+            if (inlined_depth)
             {
-                Method* inl_method = cci->get_jit()->get_inlined_method(
+                for (uint32 i = inlined_depth; i > 0; i--)
+                {
+                    Method* inl_method = cci->get_jit()->get_inlined_method(
                                             cci->get_inline_info(), offset, i);
 
-                st_get_java_method_info(&m, inl_method, ip, is_ip_past, i);
-                st_print_line(count++, &m);
+                    sd_get_java_method_info(&m, inl_method, ip, is_ip_past, i);
+                    sd_print_line(count++, &m);
 
-                if (frame_num < num_frames)
-                    ++frame_num; // Go to the next native frame
-            }
+                    if (frame_num < num_frames)
+                        ++frame_num; // Go to the next native frame
+                }
             }
 
-            st_get_java_method_info(&m, method, ip, is_ip_past, -1);
-            st_print_line(count, &m);
+            sd_get_java_method_info(&m, method, ip, is_ip_past, -1);
+            sd_print_line(count, &m);
         }
 
         ++count;
@@ -338,7 +262,7 @@ void st_print_stack_jit(VM_thread* thread,
         si_free(si);
 }
 
-void st_print_stack_interpreter(VM_thread* thread,
+static void sd_print_stack_interpreter(VM_thread* thread,
     native_frame_t* frames, jint num_frames)
 {
     FrameHandle* frame = interpreter.interpreter_get_last_frame(thread);
@@ -347,12 +271,13 @@ void st_print_stack_interpreter(VM_thread* thread,
 
     while (frame || frame_num < num_frames)
     {
-        MethodInfo m = {NULL, NULL, 0};
+        MethodInfo m;
 
         if (frame_num < num_frames && frames[frame_num].java_depth < 0)
         { // pure native frame
-            st_get_c_method_info(&m, frames[frame_num].ip);
-            st_print_line(count++, &m);
+            native_module_t* module = find_native_module(g_modules, frames[frame_num].ip);
+            sd_get_c_method_info(&m, module, frames[frame_num].ip);
+            sd_print_line(count++, &m);
             ++frame_num;
             continue;
         }
@@ -367,8 +292,9 @@ void st_print_stack_interpreter(VM_thread* thread,
         if (frame_num < num_frames &&
             (!method || method_is_native(method)))
         {
-            st_get_c_method_info(&m, frames[frame_num].ip);
-            st_print_line(count, &m);
+            native_module_t* module = find_native_module(g_modules, frames[frame_num].ip);
+            sd_get_c_method_info(&m, module, frames[frame_num].ip);
+            sd_print_line(count, &m);
         }
 
         // Print information about method from iterator
@@ -376,8 +302,8 @@ void st_print_stack_interpreter(VM_thread* thread,
         if (method &&
             (!method_is_native(method) || frame_num >= num_frames))
         {
-            st_get_java_method_info(&m, method, (void*)bc_ptr, false, -1);
-            st_print_line(count, &m);
+            sd_get_java_method_info(&m, method, (void*)bc_ptr, false, -1);
+            sd_print_line(count, &m);
         }
 
         ++count;
@@ -388,17 +314,130 @@ void st_print_stack_interpreter(VM_thread* thread,
     }
 }
 
-void st_print_stack(Registers* regs)
+const char* sd_get_module_type(const char* short_name)
 {
+    char name[256];
+
+    if (strlen(short_name) > 255)
+        return "Too long short name";
+
+    strcpy(name, short_name);
+    char* dot = strchr(name, '.');
+
+    // Strip suffix/extension
+    if (dot)
+        *dot = 0;
+
+    // Strip prefix
+    char* nameptr = name;
+
+    if (!memcmp(short_name, PORT_DSO_PREFIX, strlen(PORT_DSO_PREFIX)))
+        nameptr += strlen(PORT_DSO_PREFIX);
+
+    char* vm_modules[] = {"java", "em", "encoder", "gc_gen", "gc_gen_uncomp", "gc_cc",
+        "harmonyvm", "hythr", "interpreter", "jitrino", "vmi"};
+
+    for (size_t i = 0; i < sizeof(vm_modules)/sizeof(vm_modules[0]); i++)
+    {
+        if (!strcmp_case(name, vm_modules[i]))
+            return "VM native code";
+    }
+
+    if (natives_is_library_loaded_slow(short_name))
+        return "JNI native library";
+
+    return "Unknown/system native module";
+}
+
+
+static void sd_print_modules_info(Registers* regs)
+{
+#ifndef SD_UPDATE_MODULES
+    sd_fill_modules(); // Fill modules table if needed
+#endif
+
+    native_module_t* module = find_native_module(g_modules, (void*)regs->get_ip());
+    sd_parse_module_info(module, (void*)regs->get_ip());
+
+    fprintf(stderr, "\nLoaded modules:\n\n");
+    dump_native_modules(g_modules, stderr);
+}
+
+
+static void sd_print_threads_info(VM_thread* cur_thread)
+{
+    if (!cur_thread)
+        fprintf(stderr, "\nCurrent thread is not attached to VM, ID: %d\n", sd_get_cur_tid());
+
+    fprintf(stderr, "\nVM attached threads:\n\n");
+
+    hythread_iterator_t it = hythread_iterator_create(NULL);
+    int count = (int)hythread_iterator_size (it);
+
+    for (int i = 0; i < count; i++)
+    {
+        hythread_t thread = hythread_iterator_next(&it);
+        VM_thread* vm_thread = jthread_get_vm_thread(thread);
+
+        if (!vm_thread)
+            continue;
+
+        jthread java_thread = jthread_get_java_thread(thread);
+        JNIEnv* jni_env = vm_thread->jni_env;
+        jstring name;
+        char* java_name = NULL;
+
+        if (java_thread)
+        {
+            jclass cl = GetObjectClass(jni_env, java_thread);
+            jmethodID id = jni_env->GetMethodID(cl, "getName","()Ljava/lang/String;");
+            name = jni_env->CallObjectMethod(java_thread, id);
+            java_name = (char*)jni_env->GetStringUTFChars(name, NULL);
+        }
+
+        fprintf(stderr, "%s[%p]  '%s'\n",
+                (cur_thread && vm_thread == cur_thread) ? "--->" : "    ",
+                thread->os_handle,
+                java_name ? java_name : "");
+
+        if (java_thread)
+            jni_env->ReleaseStringUTFChars(name, java_name);
+
+    }
+
+    hythread_iterator_release(&it);
+}
+
+
+void sd_print_stack(Registers* regs)
+{
+    hymutex_t* sd_lock;
+
+    // Enable suspend to allow working with threads
+    int disable_count = hythread_reset_suspend_disable();
+    // Acquire global lock to print threads list and stop other crashed threads
+    hythread_global_lock();
+
+    if (!sd_initialize(&sd_lock))
+        return;
+
+    hymutex_lock(sd_lock);
+
+    VM_thread* thread = get_thread_ptr(); // Can be NULL for pure native thread
+    native_frame_t* frames = NULL;
+
+    // Print crashed modile info and whole list of modules
+    sd_print_modules_info(regs);
+
+    // Print threads info
+    sd_print_threads_info(thread);
+
     // We are trying to get native stack trace using walk_native_stack_registers
     // function and get corresponding Java methods for stack trace from
     // JIT/interpreter stack iterator.
     // When native stack trace is not complete (for example, when
     // walk_native_stack_registers cannot unwind frames in release build),
     // we will use JIT/interpreter stack iterator to complete stack trace.
-
-    VM_thread* thread = get_thread_ptr(); // Can be NULL for pure native thread
-    native_frame_t* frames = NULL;
 
     jint num_frames =
         walk_native_stack_registers(regs, thread, -1, NULL);
@@ -411,13 +450,19 @@ void st_print_stack(Registers* regs)
     else
         num_frames = 0; // Consider native stack trace empty
 
-   fprintf(stderr, "Stack trace:\n");
+    fprintf(stderr, "\nStack trace:\n");
 
     if(interpreter_enabled() && thread)
-        st_print_stack_interpreter(thread, frames, num_frames);
+        sd_print_stack_interpreter(thread, frames, num_frames);
     else // It should be used also for threads without VM_thread structure
-        st_print_stack_jit(thread, frames, num_frames);
+        sd_print_stack_jit(thread, frames, num_frames);
 
-  fprintf(stderr, "<end of stack trace>\n");
-  fflush(stderr);
+    fprintf(stderr, "<end of stack trace>\n");
+    fflush(stderr);
+
+    // Do not unlock to prevent other threads from printing crash stack
+    //hymutex_unlock(sd_lock);
+
+    hythread_global_unlock();
+    hythread_set_suspend_disable(disable_count);
 }

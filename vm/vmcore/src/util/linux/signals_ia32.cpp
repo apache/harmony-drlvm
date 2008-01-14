@@ -17,6 +17,7 @@
 
 
 #include <sys/ucontext.h>
+#include <stdio.h>
 #include "vm_core_types.h"
 #include "signals_common.h"
 
@@ -82,3 +83,14 @@ void regs_to_ucontext(ucontext_t *uc, Registers* regs)
 #else
 #error need to add correct mcontext_t lookup for registers
 #endif
+
+void print_state(Registers* regs)
+{
+    fprintf(stderr, "Registers:\n");
+    fprintf(stderr, "    EAX: 0x%08x, EBX: 0x%08x, ECX: 0x%08x, EDX: 0x%08x\n",
+        regs->eax, regs->ebx, regs->ecx, regs->edx);
+    fprintf(stderr, "    ESI: 0x%08x, EDI: 0x%08x, ESP: 0x%08x, EBP: 0x%08x\n",
+        regs->esi, regs->edi, regs->esp, regs->ebp);
+    fprintf(stderr, "    EIP: 0x%08x\n", regs->eip);
+}
+

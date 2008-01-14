@@ -29,6 +29,14 @@ static ncaiError ncai_alloc_module(ncaiModule* dest);
 static void ncai_dealloc_module(ncaiModule module);
 
 
+#ifdef PLATFORM_POSIX
+#include <strings.h>
+#define strcmp_case strcasecmp
+#else // Win
+#define strcmp_case _stricmp
+#endif
+
+
 ncaiError JNICALL
 ncaiGetAllLoadedModules (ncaiEnv *env,
         jint *count_ptr,
@@ -156,11 +164,11 @@ static ncaiError ncai_get_module_info(ncaiModule module, ncaiModuleInfo *info_pt
 static void ncai_identify_module_is_VM(ncaiModule module)
 {
     char* vm_modules[] = {"java", "vmcore", "harmonyvm", "em", "interpreter",
-        "gc", "gc_cc", "VMI", "vmi", "encoder", "jitrino", "hythr"};
+        "gc_gen", "gc_gen_uncomp", "gc_cc", "vmi", "encoder", "jitrino", "hythr"};
 
     for (size_t i = 0; i < sizeof(vm_modules)/sizeof(vm_modules[0]); i++)
     {
-        if(strcmp(module->info->name, vm_modules[i]) == 0)
+        if(strcmp_case(module->info->name, vm_modules[i]) == 0)
         {
             module->info->kind = NCAI_MODULE_VM_INTERNAL;
             return;
@@ -368,6 +376,9 @@ static ncaiError ncai_get_all_modules(ncaiModule* list, int* retCount)
 
     for (native_module_t* cur = modules; cur; cur = cur->next)
     {
+        if (!cur->filename)
+            continue;
+
         ncaiError error = ncai_add_module(list, cur);
 
         if (error != NCAI_ERROR_NONE)

@@ -39,6 +39,8 @@
 #include "jni_types.h"
 #include "jni_utils.h"
 
+#include "stack_dump.h" // To update modules list on library load (in debug)
+
 #define LOG_DOMAIN "natives"
 #include "cxxlog.h"
 
@@ -295,6 +297,8 @@ natives_load_library(const char* library_name, bool* just_loaded,
     *pstatus = APR_SUCCESS;
 
     returnCode = pinfo->handle;
+
+    sd_update_modules(); // Updates modules list for crash handling (in debug)
 
 NATIVES_LOAD_LIBRARY_EXIT :
 
@@ -738,25 +742,15 @@ char* short_name(const char* name, char* buf)
 {
     assert(name != NULL && buf != NULL);
 
-    const char* filepointer = strrchr(name, '/');
+    const char* filepointer = port_filepath_basename(name);
 
     if (!filepointer)
-        filepointer = strrchr(name, '\\');
+        return NULL;
 
-    if (filepointer)
-    {
-        if (strlen(filepointer + 1) > _MAX_PATH)
-            return NULL;
+    if (strlen(filepointer) > _MAX_PATH)
+        return NULL;
 
-        strcpy(buf, filepointer + 1);
-    }
-    else
-    {
-        if (strlen(name) > _MAX_PATH)
-            return NULL;
-
-        strcpy(buf, name);
-    }
+    strcpy(buf, filepointer);
 
 #ifdef PLATFORM_NT
     lowercase_buf(buf);

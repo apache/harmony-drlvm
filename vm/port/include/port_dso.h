@@ -51,10 +51,14 @@ extern "C" {
 #endif
 
 #ifdef PLATFORM_POSIX
-#   define PORT_DSO_NAME(name) "lib" name ".so"
+#   define PORT_DSO_PREFIX "lib"
+#   define PORT_DSO_EXT ".so"
 #elif PLATFORM_NT
-#   define PORT_DSO_NAME(name) name ".dll"
+#   define PORT_DSO_PREFIX ""
+#   define PORT_DSO_EXT ".dll"
 #endif
+
+#define PORT_DSO_NAME(name) PORT_DSO_PREFIX name PORT_DSO_EXT
 
 /**
  * @defgroup dso_modes Shared library binding modes

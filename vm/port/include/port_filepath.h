@@ -94,6 +94,15 @@ APR_DECLARE(char *) port_filepath_merge(const char* root,
 APR_DECLARE(char*) port_filepath_canonical(const char* original,
                                       apr_pool_t* pool);
 
+/**
+* Finds short file name in the specified filepath.
+* Returns the pointer to short file name in the source string.
+* If source filepath contains no path separators, returns filepath pointer itself.
+* @param root  - the beginning of the file path
+* @return The pointer to short file name.
+*/
+APR_DECLARE(const char*) port_filepath_basename(const char* filepath);
+
 /** @} */
 
 

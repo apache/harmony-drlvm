@@ -15,7 +15,9 @@
  *  limitations under the License.
  */
 
+#include "open/types.h"
 #include "native_modules.h"
+#include "port_malloc.h"
 
 native_module_t* find_native_module(native_module_t* modules, void* code_ptr)
 {
@@ -38,13 +40,35 @@ void dump_native_modules(native_module_t* modules, FILE *out)
 {
     for (native_module_t* module = modules; module; module = module->next)
     {
+        if (!module->filename)
+            continue;
+
         fprintf(out, "%s:\n", module->filename);
 
         for (size_t i = 0; i < module->seg_count; i++)
         {
-            char* base = (char*)module->segments[i].base;
+            size_t base = (size_t)module->segments[i].base;
 
-            fprintf(out, "\t%p:%p\n", base, base + module->segments[i].size);
+            fprintf(out, "\t0x%"W_PI_FMT"x:0x%"W_PI_FMT"x\n",
+                    base, base + module->segments[i].size);
         }
     }
+}
+
+void clear_native_modules(native_module_t** list_ptr)
+{
+    native_module_t* cur = *list_ptr;
+
+    while (cur)
+    {
+        native_module_t* next = cur->next;
+
+        if (cur->filename)
+            STD_FREE(cur->filename);
+
+        STD_FREE(cur);
+        cur = next;
+    }
+
+    *list_ptr = NULL;
 }

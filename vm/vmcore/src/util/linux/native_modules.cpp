@@ -29,23 +29,23 @@
 #include "native_modules.h"
 
 
-void clear_native_modules(native_module_t** list_ptr)
+typedef struct _raw_module raw_module;
+
+// Structure to accumulate several segments for the same module
+struct _raw_module
 {
-    native_module_t* cur = *list_ptr;
+    void*               start;
+    void*               end;
+    bool                acc_r;
+    bool                acc_x;
+    char*               name;
+    raw_module*         next;
+};
 
-    while (cur)
-    {
-        native_module_t* next = cur->next;
+void native_clear_raw_list(raw_module*);
+raw_module* native_add_raw_segment(raw_module*, void*, void*, char, char);
+native_module_t* native_fill_module(raw_module*, size_t);
 
-        if (cur->filename)
-            STD_FREE(cur->filename);
-
-        STD_FREE(cur);
-        cur = next;
-    }
-
-    *list_ptr = NULL;
-}
 
 void native_clear_raw_list(raw_module* list)
 {
@@ -150,10 +150,14 @@ bool get_all_native_modules(native_module_t** list_ptr, int* count_ptr)
         int res = sscanf(buf, "%" PI_FMT "x-%" PI_FMT "x %c%*c%c%*c %*" PI_FMT "x %*02x:%*02x %*u %s",
             &start, &end, &acc_r, &acc_x, filename);
 
-        if (res < 5)
+        if (res < 4)
             continue;
 
-        if (module.name == NULL || // First module, first record
+        if (res < 5)
+            *filename = 0;
+
+        if (module.name == NULL || // First module, or single memory region
+            !(*filename)        || // Single memory region
             strcmp(module.name, filename) != 0) // Next module
         {
             if (segment_count) // Add previous module
@@ -173,16 +177,21 @@ bool get_all_native_modules(native_module_t** list_ptr, int* count_ptr)
                 cur_next_ptr = &filled->next;
             }
 
-            module.name = (char*)STD_MALLOC(strlen(filename) + 1);
-            if (module.name == NULL)
+            if (*filename)
             {
-                native_clear_raw_list(&module);
-                clear_native_modules(list_ptr);
-                fclose(file);
-                return false;
-            }
+                module.name = (char*)STD_MALLOC(strlen(filename) + 1);
+                if (module.name == NULL)
+                {
+                    native_clear_raw_list(&module);
+                    clear_native_modules(list_ptr);
+                    fclose(file);
+                    return false;
+                }
 
-            strcpy(module.name, filename);
+                strcpy(module.name, filename);
+            }
+            else
+                module.name = NULL;
 
             // Store new module information
             module.start = (void*)start;
