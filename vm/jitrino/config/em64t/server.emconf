@@ -13,7 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#EM configuration for 'server' mode of Jitrino
+# EM configuration for 'server' mode of Jitrino
+#
+# When changing configuration for SD2_OPT JIT, do not forget to reflect the same
+#   changes for SS_OPT JIT in server_static.emconf (used for debugging purposes)
+#
+# rules for server -> server_static conversion
+#     JET_CLINIT -> SS_OPT
+#     inline_helpers -> inline_helpers-
+#     edge_annotate -> statprof
+
 chains=chain1,chain2
 chain1.jits=JET_CLINIT
 chain2.jits=SD1_OPT,SD2_OPT
@@ -68,7 +77,6 @@ SD2_OPT.useProfile=EDGE_PROF,VALUE_PROF
 #enable profiling of all virtual calls
 -XX:jit.SD1_OPT.arg.optimizer.vp_instrument.profile_abstract=true
 
-
 -XX:jit.SD2_OPT.path.optimizer=ssa,simplify,dce,uce,devirt_virtual,edge_annotate,unguard,devirt_intf,hlo_api_magic,inline,purge,osr_path-,escape_path,dce,uce,hvn,dce,uce,inline_helpers,purge,simplify,uce,dce,uce,abce,lower,dce,uce,memopt,reassoc,dce,uce,hvn,dce,uce,gcm,dessa,statprof
 -XX:jit.SD2_OPT.path.osr_path=simplify,dce,uce,gcm,osr
 -XX:jit.SD2_OPT.path.escape_path=hvn,simplify,dce,uce,escape
@@ -89,13 +97,13 @@ SD2_OPT.useProfile=EDGE_PROF,VALUE_PROF
 -XX:jit.SD2_OPT.SD2_OPT_inliner_pipeline.path=ssa,simplify,dce,uce,devirt_virtual,edge_annotate,unguard,devirt_intf,hlo_api_magic
 -XX:jit.SD2_OPT.arg.optimizer.inline.pipeline=SD2_OPT_inliner_pipeline
 -XX:jit.SD2_OPT.arg.optimizer.inline.connect_early=false
+
 #devirt configuration for inliner pipeline
 -XX:jit.SD2_OPT.SD2_OPT_inliner_pipeline.path.devirt_virtual=devirt
 -XX:jit.SD2_OPT.SD2_OPT_inliner_pipeline.path.devirt_intf=devirt
 -XX:jit.SD2_OPT.SD2_OPT_inliner_pipeline.arg.devirt_intf.devirt_intf_calls=true
 -XX:jit.SD2_OPT.SD2_OPT_inliner_pipeline.arg.devirt_intf.devirt_abstract_calls=true
 -XX:jit.SD2_OPT.SD2_OPT_inliner_pipeline.arg.devirt_intf.devirt_virtual_calls=false
-
 
 #helper inliner configuration
 -XX:jit.SD2_OPT.SD2_OPT_helper_inliner_pipeline.filter=-
@@ -122,7 +130,6 @@ SD2_OPT.useProfile=EDGE_PROF,VALUE_PROF
 
 -XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_INSTANCEOF=off
 -XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_INSTANCEOF_hotnessPercent=1
-
 
 -XX:jit.SD2_OPT.arg.codegen.dce1.early=yes
 -XX:jit.arg.codegen.emitter.align=0

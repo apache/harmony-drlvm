@@ -19,28 +19,72 @@ chains=chain1
 chain1.jits=SS_OPT
 SS_OPT.file=jitrino
 
+#register allocator configuration
+-XDjit.RA2.filter=-
+-XDjit.RA2.path=bp_regalloc1,bp_regalloc2
+-XDjit.RA2.path.bp_regalloc1=bp_regalloc
+-XDjit.RA2.path.bp_regalloc2=bp_regalloc
+-XDjit.RA2.arg.bp_regalloc1.regs=ALL_GP
+-XDjit.RA2.arg.bp_regalloc2.regs=ALL_XMM
+-XDjit.RA3.filter=-
+-XDjit.RA3.path=webmaker,cg_regalloc
+-XDjit.RA3.arg.webmaker.calc=true
 
-# Options to be passed to JIT
-
--XX:jit.SS_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
-
--XX:jit.SS_OPT.path.optimizer=ssa,simplify,dce,uce,statprof,devirt,hlo_api_magic,inline,purge,osr_path-,simplify,dce,uce,hvn,dce,uce,dessa,statprof,peel,ssa,hvn,simplify,dce,uce,lower,dce,uce,memopt,reassoc,dce,uce,hvn,dce,uce,classic_abcd,dce,uce,gcm,dessa,statprof
+-XX:jit.SS_OPT.path.optimizer=ssa,simplify,dce,uce,statprof,devirt_virtual,unguard,devirt_intf,hlo_api_magic,inline,purge,osr_path-,escape_path,dce,uce,hvn,dce,uce,inline_helpers-,purge,simplify,uce,dce,uce,abce,lower,dce,uce,memopt,reassoc,dce,uce,hvn,dce,uce,gcm,dessa,statprof
 -XX:jit.SS_OPT.path.osr_path=simplify,dce,uce,gcm,osr
--XX:jit.SS_OPT.path.codegen=lock_method,bbp,gcpoints,cafl,dce1,i8l-,api_magic,early_prop-,itrace-,native,constraints,dce2,regalloc,spillgen,layout,copy,rce-,stack,break-,iprof-,emitter!,si_insts,gcmap,info,unlock_method
+-XX:jit.SS_OPT.path.escape_path=hvn,simplify,dce,uce,escape
+-XX:jit.SS_OPT.path.abce=classic_abcd,dce,uce,dessa,statprof,peel,ssa,hvn,simplify,dce,uce,memopt,dce,uce,dessa,fastArrayFill,ssa,statprof,dabce,dce,uce
+-XX:jit.SS_OPT.path.codegen=lock_method,bbp,gcpoints,cafl,dce1,i8l-,api_magic,early_prop-,itrace-,native,cg_fastArrayFill,constraints,dce2,regalloc,spillgen,layout,copy,rce-,stack,break-,iprof-,emitter!,si_insts,gcmap,info,unlock_method
 -XX:jit.SS_OPT.path.dce1=cg_dce
 -XX:jit.SS_OPT.path.dce2=cg_dce
--XX:jit.SS_OPT.path.regalloc=bp_regalloc1,bp_regalloc2
--XX:jit.SS_OPT.path.bp_regalloc1=bp_regalloc
--XX:jit.SS_OPT.path.bp_regalloc2=bp_regalloc
+
+#devirt configuration
+-XX:jit.SS_OPT.path.devirt_virtual=devirt
+-XX:jit.SS_OPT.path.devirt_intf=devirt
+-XX:jit.SS_OPT.arg.optimizer.devirt_intf.devirt_intf_calls=true
+-XX:jit.SS_OPT.arg.optimizer.devirt_intf.devirt_abstract_calls=true
+-XX:jit.SS_OPT.arg.optimizer.devirt_intf.devirt_virtual_calls=false
 
 #inliner configuration
 -XX:jit.SS_OPT.SS_OPT_inliner_pipeline.filter=-
--XX:jit.SS_OPT.SS_OPT_inliner_pipeline.path=ssa,simplify,dce,uce,statprof,devirt,hlo_api_magic
+-XX:jit.SS_OPT.SS_OPT_inliner_pipeline.path=ssa,simplify,dce,uce,statprof,devirt_virtual,unguard,devirt_intf,hlo_api_magic
 -XX:jit.SS_OPT.arg.optimizer.inline.pipeline=SS_OPT_inliner_pipeline
+-XX:jit.SS_OPT.arg.optimizer.inline.connect_early=false
+
+#devirt configuration for inliner pipeline
+-XX:jit.SS_OPT.SS_OPT_inliner_pipeline.path.devirt_virtual=devirt
+-XX:jit.SS_OPT.SS_OPT_inliner_pipeline.path.devirt_intf=devirt
+-XX:jit.SS_OPT.SS_OPT_inliner_pipeline.arg.devirt_intf.devirt_intf_calls=true
+-XX:jit.SS_OPT.SS_OPT_inliner_pipeline.arg.devirt_intf.devirt_abstract_calls=true
+-XX:jit.SS_OPT.SS_OPT_inliner_pipeline.arg.devirt_intf.devirt_virtual_calls=false
+
+#helper inliner configuration
+-XX:jit.SS_OPT.SS_OPT_helper_inliner_pipeline.filter=-
+-XX:jit.SS_OPT.SS_OPT_helper_inliner_pipeline.path=ssa
+-XX:jit.SS_OPT.arg.optimizer.inline_helpers.pipeline=SS_OPT_helper_inliner_pipeline
+
+-XX:jit.SS_OPT.arg.optimizer.inline_helpers.VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE=off
+-XX:jit.SS_OPT.arg.optimizer.inline_helpers.VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE_hotnessPercent=1
+
+-XX:jit.SS_OPT.arg.optimizer.inline_helpers.VM_RT_NEW_VECTOR_USING_VTABLE=off
+-XX:jit.SS_OPT.arg.optimizer.inline_helpers.VM_RT_NEW_VECTOR_USING_VTABLE_hotnessPercent=1
+
+-XX:jit.SS_OPT.arg.optimizer.inline_helpers.VM_RT_MONITOR_ENTER_NON_NULL=on
+-XX:jit.SS_OPT.arg.optimizer.inline_helpers.VM_RT_MONITOR_ENTER_NON_NULL_hotnessPercent=1
+
+-XX:jit.SS_OPT.arg.optimizer.inline_helpers.VM_RT_MONITOR_EXIT_NON_NULL=on
+-XX:jit.SS_OPT.arg.optimizer.inline_helpers.VM_RT_MONITOR_EXIT_NON_NULL_hotnessPercent=1
+
+-XX:jit.SS_OPT.arg.optimizer.inline_helpers.VM_RT_GET_INTERFACE_VTABLE_VER0=off
+-XX:jit.SS_OPT.arg.optimizer.inline_helpers.VM_RT_GET_INTERFACE_VTABLE_VER0_hotnessPercent=1
+
+-XX:jit.SS_OPT.arg.optimizer.inline_helpers.VM_RT_CHECKCAST=off
+-XX:jit.SS_OPT.arg.optimizer.inline_helpers.VM_RT_CHECKCAST_hotnessPercent=1
+
+-XX:jit.SS_OPT.arg.optimizer.inline_helpers.VM_RT_INSTANCEOF=off
+-XX:jit.SS_OPT.arg.optimizer.inline_helpers.VM_RT_INSTANCEOF_hotnessPercent=1
 
 -XX:jit.SS_OPT.arg.codegen.dce1.early=yes
--XX:jit.SS_OPT.arg.codegen.regalloc.bp_regalloc1.regs=ALL_GP
--XX:jit.SS_OPT.arg.codegen.regalloc.bp_regalloc2.regs=ALL_XMM
 -XX:jit.arg.codegen.emitter.align=0
 
 #system properties
