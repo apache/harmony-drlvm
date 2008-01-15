@@ -126,7 +126,7 @@ ready_for_exceptions(false)
     use_lil_stubs = true;
 #ifdef REFS_USE_RUNTIME_SWITCH
 #ifdef POINTER64
-    compress_references = false;
+    compress_references = true;
 #else // POINTER64
     compress_references = false;
 #endif // POINTER64
