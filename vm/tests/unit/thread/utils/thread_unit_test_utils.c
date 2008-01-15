@@ -350,7 +350,8 @@ int check_phase(tested_thread_sturct_t *tts, int phase) {
     tf_assert(tts->phase != TT_PHASE_ERROR);
     if (phase == TT_PHASE_ANY) {
         tf_assert(tts->phase != TT_PHASE_NONE);
-    } else {
+    } else if (tts->phase != phase) {
+        log_info("Expected phase %d, but got %d", phase, tts->phase);
         tf_assert_same(tts->phase, phase);
     }
     return TEST_PASSED;
@@ -386,7 +387,7 @@ void tested_thread_wait_ended(tested_thread_sturct_t *tts) {
     i = 0;
     while (hysem_wait_timed(tts->ended, MAX_TIME_TO_WAIT, 0) == TM_ERROR_TIMEOUT) {
         i++;
-        printf("Thread %i hasn't ended for %i milliseconds", 
+        log_info("Thread %i hasn't ended for %i milliseconds",
             tts->my_index, (i * MAX_TIME_TO_WAIT));
     }
     hysem_post(tts->ended);
@@ -403,7 +404,7 @@ void test_thread_join(hythread_t native_thread, int index) {
         if(!hythread_is_alive(native_thread)) {
             break;
         }
-        if ((i % (MAX_TIME_TO_WAIT / SLEEP_TIME)) == 0) {
+        if (!i && (i % (MAX_TIME_TO_WAIT / SLEEP_TIME)) == 0) {
             printf("Thread %i isn't dead after %i milliseconds",
                 index, (++i * SLEEP_TIME));
         }

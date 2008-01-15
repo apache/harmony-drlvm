@@ -32,7 +32,12 @@ void JNICALL run_for_test_jthread_park_unpark(jvmtiEnv * jvmti_env, JNIEnv * jni
     tts->phase = TT_PHASE_PARKED;
     tested_thread_started(tts);
     status = jthread_park();
-    tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_RUNNING : TT_PHASE_ERROR);
+    if (status != TM_ERROR_NONE) {
+        log_info("Test status is %d, but expected %d", status, TM_ERROR_NONE);
+        tts->phase = TT_PHASE_ERROR;
+    } else {
+        tts->phase = TT_PHASE_RUNNING;
+    }
     tested_thread_wait_for_stop_request(tts);
     tts->phase = TT_PHASE_DEAD;
     tested_thread_ended(tts);
@@ -93,7 +98,12 @@ void JNICALL run_for_test_jthread_park_interrupt(jvmtiEnv * jvmti_env, JNIEnv * 
     tts->phase = TT_PHASE_PARKED;
     tested_thread_started(tts);
     status = jthread_park();
-    tts->phase = (status == TM_ERROR_INTERRUPT ? TT_PHASE_RUNNING : TT_PHASE_ERROR);
+    if (status != TM_ERROR_INTERRUPT) {
+        log_info("Test status is %d, but expected %d", status, TM_ERROR_INTERRUPT);
+        tts->phase = TT_PHASE_ERROR;
+    } else {
+        tts->phase = TT_PHASE_RUNNING;
+    }
     tested_thread_wait_for_stop_request(tts);
     tts->phase = TT_PHASE_DEAD;
     tested_thread_ended(tts);
@@ -103,7 +113,7 @@ int test_jthread_park_interrupt(void) {
 
     tested_thread_sturct_t *tts;
     tested_thread_sturct_t *parked_tts;
-    int i;
+    int count;
     int parked_nmb;
 
     // Initialize tts structures and run all tested threads
@@ -111,9 +121,17 @@ int test_jthread_park_interrupt(void) {
 
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
+        count = 0;
+        while (!hythread_is_parked(tts->native_thread)) {
+            // wait until the state is changed
+            hythread_sleep(SLEEP_TIME);
+            if (tts->phase == TT_PHASE_ERROR || ++count > (MAX_TIME_TO_WAIT/SLEEP_TIME)) {
+                tf_fail("thread failed to change state on PARKED");
+            }
+        }
         check_tested_thread_phase(tts, TT_PHASE_PARKED);
     }
-    for (i = 0; i <= MAX_TESTED_THREAD_NUMBER; i++){
+    for (count = 0; count <= MAX_TESTED_THREAD_NUMBER; count++){
 
         parked_nmb = 0;
         parked_tts = NULL;
@@ -127,7 +145,7 @@ int test_jthread_park_interrupt(void) {
                 tf_assert_same(tts->phase, TT_PHASE_RUNNING);
             }
         }
-        if (MAX_TESTED_THREAD_NUMBER - parked_nmb - i != 0){
+        if (MAX_TESTED_THREAD_NUMBER - parked_nmb - count != 0){
             tf_fail("Wrong number of parked threads");
         }
         if (parked_nmb > 0){
@@ -152,8 +170,13 @@ void JNICALL run_for_test_jthread_timed_park(jvmtiEnv * jvmti_env, JNIEnv * jni_
     
     tts->phase = TT_PHASE_PARKED;
     tested_thread_started(tts);
-    status = jthread_timed_park(50, 0);
-    tts->phase = (status == TM_ERROR_TIMEOUT ? TT_PHASE_RUNNING : TT_PHASE_ERROR);
+    status = jthread_timed_park(SLEEP_TIME/2, 0);
+    if (status != TM_ERROR_TIMEOUT) {
+        log_info("Test status is %d, but expected %d", status, TM_ERROR_TIMEOUT);
+        tts->phase = TT_PHASE_ERROR;
+    } else {
+        tts->phase = TT_PHASE_RUNNING;
+    }
     tested_thread_wait_for_stop_request(tts);
     tts->phase = TT_PHASE_DEAD;
     tested_thread_ended(tts);

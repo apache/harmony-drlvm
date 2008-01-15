@@ -23,115 +23,110 @@
 #include <open/hythread_ext.h>
 #include <open/ti_thread.h>
 
-int helper_hythread_cpu_timing(void);
-
-/*
- * CPU timing
- */
-
-int test_jthread_get_thread_cpu_time(void) {
-
-    log_info("NO IMPLEMENTTATION TO TEST");
-    return TEST_FAILED;
-    return helper_hythread_cpu_timing();
-}
-
-int test_jthread_get_thread_user_cpu_time(void) {
-
-    log_info("NO IMPLEMENTTATION TO TEST");
-    return TEST_FAILED;
-    return helper_hythread_cpu_timing();
-}
-
-int test_jthread_get_thread_blocked_time(void) {
-
-    log_info("NO IMPLEMENTTATION TO TEST");
-    return TEST_FAILED;
-    return helper_hythread_cpu_timing();
-}
-
-int test_jthread_get_thread_waited_time(void) {
-
-    log_info("NO IMPLEMENTTATION TO TEST");
-    return TEST_FAILED;
-    return helper_hythread_cpu_timing();
-}
-
-int test_jthread_get_thread_cpu_timer_info(void) {
-
-    log_info("NO IMPLEMENTTATION TO TEST");
-    return TEST_FAILED;
-    return helper_hythread_cpu_timing();
-}
-
-void JNICALL run_for_helper_hythread_cpu_timing(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
-
+void JNICALL run_for_helper_get_timing(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args)
+{
     tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
     int num = 0;
-    
+    jobject monitor = tts->monitor;
+    IDATA status;
+
     tts->phase = TT_PHASE_RUNNING;
     tested_thread_started(tts);
-    while(tested_thread_wait_for_stop_request_timed(tts, SLEEP_TIME) == TM_ERROR_TIMEOUT) {
+    while(tested_thread_wait_for_stop_request_timed(tts, 1) == TM_ERROR_TIMEOUT) {
+        status = jthread_monitor_enter(monitor);
+        if (status != TM_ERROR_NONE){
+            tts->phase = TT_PHASE_ERROR;
+            tested_thread_ended(tts);
+            return;
+        }
+        status = jthread_monitor_timed_wait(monitor, 0, 100);
+        if (status != TM_ERROR_TIMEOUT) {
+            tts->phase = TT_PHASE_ERROR;
+            jthread_monitor_exit(monitor);
+            break;
+        }
+        status = jthread_monitor_exit(monitor);
+        if (status != TM_ERROR_NONE) {
+            tts->phase = TT_PHASE_ERROR;
+            break;
+        }
         ++num;
+        hythread_yield();
     }
+    log_info("Thread %d cycle times: %d", tts->my_index, num);
     tts->phase = TT_PHASE_DEAD;
     tested_thread_ended(tts);
-}
+} // run_for_helper_get_timing
 
-int helper_hythread_cpu_timing(void) {
-
+int test_jthread_get_timing(void)
+{
     tested_thread_sturct_t *tts;
     jlong cpu_time;
     jlong user_cpu_time;
     jlong blocked_time;
     jlong waited_time;
-    jvmtiTimerInfo timer_info;
-
-    log_info("NO IMPLEMENTATION TO TEST");
-    return TEST_FAILED;
 
     // Initialize tts structures and run all tested threads
-    tested_threads_run(run_for_helper_hythread_cpu_timing);
+    tested_threads_run(run_for_helper_get_timing);
+
+    hythread_sleep(MAX_TIME_TO_WAIT/20);
     
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
-        tested_thread_send_stop_request(tts);
-        tested_thread_wait_ended(tts);
-        check_tested_thread_phase(tts, TT_PHASE_DEAD);
 
         tf_assert_same(jthread_get_thread_cpu_time(tts->java_thread, &cpu_time), TM_ERROR_NONE);
         tf_assert_same(jthread_get_thread_user_cpu_time(tts->java_thread, &user_cpu_time), TM_ERROR_NONE);
         tf_assert_same(jthread_get_thread_blocked_time(tts->java_thread, &blocked_time), TM_ERROR_NONE);
         tf_assert_same(jthread_get_thread_waited_time(tts->java_thread, &waited_time), TM_ERROR_NONE);
-        tf_assert_same(jthread_get_thread_cpu_timer_info(&timer_info), TM_ERROR_NONE);
         
-        tf_assert(user_cpu_time > 0);
-        /*
-        printf("=================================================== %08x\n", cpu_time);
-        printf("cpu_time = %i \n", cpu_time);
-        printf("user_cpu_time = %i \n", user_cpu_time);
-        printf("blocked_time = %i \n", blocked_time);
-        printf("waited_time = %i \n", waited_time);
-        printf("cpu_time = %i \n", cpu_time);
 
-        printf("jvmtiTimerInfo :\n");
-        printf("max_value = %i \n", timer_info.max_value);
-        printf("may_skip_forward = %i \n", timer_info.may_skip_forward);
-        printf("may_skip_backward = %i \n", timer_info.may_skip_backward);
-        printf("kind = %i \n", timer_info.kind);
-        */
+        log_info("Thread %d:", tts->my_index);
+        if (cpu_time/1000000) {
+            log_info("cpu_time = %.1f s", (float)cpu_time/1000000);
+        } else if(cpu_time/1000) {
+            log_info("cpu_time = %.1f ms", (float)cpu_time/1000);
+        } else {
+            log_info("cpu_time = %d ns", cpu_time);
+        }
+
+        if (user_cpu_time/1000000) {
+            log_info("user_cpu_time = %.1f s", (float)user_cpu_time/1000000);
+        } else if(user_cpu_time/1000) {
+            log_info("user_cpu_time = %.1f ms", (float)user_cpu_time/1000);
+        } else {
+            log_info("user_cpu_time = %d ns", user_cpu_time);
+        }
+
+        if (blocked_time/1000000) {
+            log_info("blocked_time = %.1f s", (float)blocked_time/1000000);
+        } else if (blocked_time/1000) {
+            log_info("blocked_time = %.1f ms", (float)blocked_time/1000);
+        } else {
+            log_info("blocked_time = %d ns", blocked_time);
+        }
+
+        if (waited_time/1000000) {
+            log_info("waited_time = %.1f s\n", (float)waited_time/1000000);
+        } else if (waited_time/1000) {
+            log_info("waited_time = %.1f ms\n", (float)waited_time/1000);
+        } else {
+            log_info("waited_time = %d ns\n", waited_time);
+        }
+    }
+
+    reset_tested_thread_iterator(&tts);
+    while(next_tested_thread(&tts)) {
+        tested_thread_send_stop_request(tts);
+        tested_thread_wait_ended(tts);
+        check_tested_thread_phase(tts, TT_PHASE_DEAD);
     }
 
     // Terminate all threads and clear tts structures
     tested_threads_destroy();
 
     return TEST_PASSED;
-}
+} // test_jthread_get_timing
 
 TEST_LIST_START
-    //TEST(test_jthread_get_thread_cpu_time)
-    //TEST(test_jthread_get_thread_user_cpu_time)
-    //TEST(test_jthread_get_thread_waited_time)
-    //TEST(test_jthread_get_thread_blocked_time)
-    //TEST(test_jthread_get_thread_cpu_timer_info)
+    TEST(test_jthread_get_timing)
 TEST_LIST_END;

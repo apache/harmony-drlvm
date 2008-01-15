@@ -15,91 +15,51 @@
  *  limitations under the License.
  */
 
-
 #include <stdio.h>
 #include "testframe.h"
 #include "thread_unit_test_utils.h"
 #include <open/jthread.h>
 #include <open/ti_thread.h>
 
-int test_jthread_raw_monitor_destroy(void);
-int helper_jthread_raw_monitor_enter_exit(void);
-int helper_jthread_raw_monitor_try_enter(void);
-int helper_jthread_raw_wait_notify(void);
-int helper_jthread_raw_wait_notify_all(void);
+static hysem_t mon_enter;
 
-/*
- * Raw monitors 
+/**
+ * Raw monitor TODO:
+ *
+ * - Init raw monitor and not init
+ * - jthread_raw_monitor_exit() without jthread_raw_monitor_enter()
  */
 
-int test_jthread_raw_monitor_create(void) {
-
-    return test_jthread_raw_monitor_destroy();
-}
-
-int test_jthread_raw_monitor_destroy(void) {
-
+/**
+ * Test jthread_raw_monitor_create()
+ * Test jthread_raw_monitor_destroy()
+ */
+int test_jthread_raw_monitor_create_destroy(void)
+{
+    IDATA status;
     jrawMonitorID raw_monitor;
-    IDATA status; 
 
     status = jthread_raw_monitor_create(&raw_monitor);
-    if (status != TM_ERROR_NONE){
+    if (status != TM_ERROR_NONE) {
         return TEST_FAILED;
     }
     status = jthread_raw_monitor_destroy(raw_monitor);
-    if (status != TM_ERROR_NONE){
+    if (status != TM_ERROR_NONE) {
         return TEST_FAILED;
     }
     return TEST_PASSED;
-}
+} // test_jthread_raw_monitor_create_destroy
 
-int test_jthread_raw_monitor_enter(void) {
-
-    return helper_jthread_raw_monitor_enter_exit();
-}
-
-int test_jthread_raw_monitor_try_enter(void) {
-
-    return helper_jthread_raw_monitor_try_enter();
-}
-
-int test_jthread_raw_monitor_exit(void) {
-
-    return helper_jthread_raw_monitor_enter_exit();
-}
-
-int test_jthread_raw_notify(void) {
-
-    return helper_jthread_raw_wait_notify();
-}
-
-int test_jthread_raw_notify_all(void) {
-
-    return helper_jthread_raw_wait_notify_all();
-}
-
-int test_jthread_raw_wait(void) {
-
-    return helper_jthread_raw_wait_notify();
-}
-
-/*
- * ------------------------ HELPERS -----------------------
+/**
+ * Test jthread_raw_monitor_enter()
+ * Test jthread_raw_monitor_exit()
  */
-
-hysem_t mon_enter;
-/*
- * Test jthread_raw_monitor_enter(...)
- * Test jthread_raw_monitor_exit(...)
- */
-//?????????????????????????????? jthread_raw_monitor_init and not init
-//?????????????????????????????? jthread_raw_monitor_exit without enter
-void JNICALL run_for_helper_jthread_raw_monitor_enter_exit(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
+void JNICALL run_for_test_jthread_raw_monitor_enter_exit(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
 
     tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
     jrawMonitorID monitor = tts->raw_monitor;
     IDATA status;
-    
+
     tts->phase = TT_PHASE_WAITING_ON_MONITOR;
     tested_thread_started(tts);
     status = jthread_raw_monitor_enter(monitor);
@@ -112,40 +72,40 @@ void JNICALL run_for_helper_jthread_raw_monitor_enter_exit(jvmtiEnv * jvmti_env,
     // End critical section
     tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_DEAD : TT_PHASE_ERROR);
     tested_thread_ended(tts);
-}
+} // run_for_test_jthread_raw_monitor_enter_exit
 
-int helper_jthread_raw_monitor_enter_exit(void) {
+int test_jthread_raw_monitor_enter_exit(void) {
 
     tested_thread_sturct_t *tts;
     tested_thread_sturct_t *critical_tts;
     int i;
     int waiting_on_monitor_nmb;
 
-    hysem_create(&mon_enter, 0, 1);
+    tf_assert_same(hysem_create(&mon_enter, 0, 1), TM_ERROR_NONE);
 
     // Initialize tts structures and run all tested threads
-    tested_threads_run(run_for_helper_jthread_raw_monitor_enter_exit);
+    tested_threads_run(run_for_test_jthread_raw_monitor_enter_exit);
 
-    for (i = 0; i < MAX_TESTED_THREAD_NUMBER; i++){
-
+    for (i = 0; i < MAX_TESTED_THREAD_NUMBER; i++) {
         waiting_on_monitor_nmb = 0;
         critical_tts = NULL;
 
-        hysem_wait(mon_enter);
+        tf_assert_same(hysem_wait(mon_enter), TM_ERROR_NONE);
 
         reset_tested_thread_iterator(&tts);
         while(next_tested_thread(&tts)){
-            if (tts->phase == TT_PHASE_IN_CRITICAL_SECTON){
+            if (tts->phase == TT_PHASE_IN_CRITICAL_SECTON) {
                 tf_assert(critical_tts == NULL); // error if two threads in critical section
                 critical_tts = tts;
-            } else if (tts->phase == TT_PHASE_WAITING_ON_MONITOR){
+            } else if (tts->phase == TT_PHASE_WAITING_ON_MONITOR) {
                 waiting_on_monitor_nmb++;
             }
         }
         tf_assert(critical_tts); // thread in critical section found
-        if (MAX_TESTED_THREAD_NUMBER - waiting_on_monitor_nmb - i != 1){
+        if (MAX_TESTED_THREAD_NUMBER - waiting_on_monitor_nmb - i != 1) {
             tf_fail("Wrong number waiting on monitor threads");
         }
+        log_info("Thread %d grabbed monitor", critical_tts->my_index);
         tested_thread_send_stop_request(critical_tts);
         tested_thread_wait_ended(critical_tts);
         check_tested_thread_phase(critical_tts, TT_PHASE_DEAD);
@@ -153,20 +113,22 @@ int helper_jthread_raw_monitor_enter_exit(void) {
     // Terminate all threads and clear tts structures
     tested_threads_destroy();
 
-    return TEST_PASSED;
-}
+    tf_assert_same(hysem_destroy(mon_enter), TM_ERROR_NONE);
 
-/*
- * Test jthread_raw_wait(...)
- * Test jthread_raw_notify(...)
+    return TEST_PASSED;
+} // test_jthread_raw_monitor_enter_exit
+
+/**
+ * Test jthread_raw_wait()
+ * Test jthread_raw_notify()
  */
-void JNICALL run_for_helper_jthread_raw_wait_notify(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
+void JNICALL run_for_test_jthread_raw_wait_notify(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
 
     tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
     jrawMonitorID monitor = tts->raw_monitor;
     IDATA status;
     int64 msec = 1000000;
-    
+
     status = jthread_raw_monitor_enter(monitor);
     if (status != TM_ERROR_NONE){
         tts->phase = TT_PHASE_ERROR;
@@ -184,28 +146,39 @@ void JNICALL run_for_helper_jthread_raw_wait_notify(jvmtiEnv * jvmti_env, JNIEnv
     // End critical section
     tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_DEAD : TT_PHASE_ERROR);
     tested_thread_ended(tts);
-}
+} // run_for_test_jthread_raw_wait_notify
 
-int helper_jthread_raw_wait_notify(void) {
-
+int test_jthread_raw_notify(void)
+{
+    int i;
+    int count;
+    int waiting_on_wait_nmb;
     tested_thread_sturct_t *tts;
     tested_thread_sturct_t *critical_tts;
     jrawMonitorID monitor;
-    int i;
-    int waiting_on_wait_nmb;
 
-    hysem_create(&mon_enter, 0, 1);
+    tf_assert_same(hysem_create(&mon_enter, 0, 1), TM_ERROR_NONE);
 
     // Initialize tts structures and run all tested threads
-    tested_threads_run(run_for_helper_jthread_raw_wait_notify);
+    tested_threads_run(run_for_test_jthread_raw_wait_notify);
+
+    monitor = get_tts(0)->raw_monitor;
 
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
-        monitor = tts->raw_monitor; // the same for all tts
-        check_tested_thread_phase(tts, TT_PHASE_WAITING_ON_WAIT);       
+        count = 0;
+        while (!hythread_is_waiting(tts->native_thread)) {
+            // wait until the state is changed
+            hythread_sleep(SLEEP_TIME);
+            if (tts->phase == TT_PHASE_ERROR || ++count > (MAX_TIME_TO_WAIT/SLEEP_TIME)) {
+                tf_fail("thread failed to change state on WAITING");
+            }
+        }
+        check_tested_thread_phase(tts, TT_PHASE_WAITING_ON_WAIT);
+        log_info("Thread %d is waiting.", tts->my_index);
     }
-    for (i = 0; i < MAX_TESTED_THREAD_NUMBER; i++){
 
+    for (i = 0; i < MAX_TESTED_THREAD_NUMBER; i++) {
         waiting_on_wait_nmb = 0;
         critical_tts = NULL;
 
@@ -213,8 +186,13 @@ int helper_jthread_raw_wait_notify(void) {
         while(next_tested_thread(&tts)){
             tf_assert(tts->phase != TT_PHASE_IN_CRITICAL_SECTON);
         }
+        log_info("Notify tested threads");
+        tf_assert_same(jthread_raw_monitor_enter(monitor), TM_ERROR_NONE);
         tf_assert_same(jthread_raw_monitor_notify(monitor), TM_ERROR_NONE);
-        hysem_wait(mon_enter);
+        tf_assert_same(jthread_raw_monitor_exit(monitor), TM_ERROR_NONE);
+
+        tf_assert_same(hysem_wait(mon_enter), TM_ERROR_NONE);
+
         reset_tested_thread_iterator(&tts);
         while(next_tested_thread(&tts)){
             if (tts->phase == TT_PHASE_IN_CRITICAL_SECTON){
@@ -228,6 +206,7 @@ int helper_jthread_raw_wait_notify(void) {
         if (MAX_TESTED_THREAD_NUMBER - waiting_on_wait_nmb - i != 1){
             tf_fail("Wrong number waiting on monitor threads");
         }
+        log_info("Thread %d was notified", critical_tts->my_index);
         tested_thread_send_stop_request(critical_tts);
         tested_thread_wait_ended(critical_tts);
         check_tested_thread_phase(critical_tts, TT_PHASE_DEAD);
@@ -235,42 +214,56 @@ int helper_jthread_raw_wait_notify(void) {
     // Terminate all threads and clear tts structures
     tested_threads_destroy();
 
+    tf_assert_same(hysem_destroy(mon_enter), TM_ERROR_NONE);
+
     return TEST_PASSED;
-}
+} // test_jthread_raw_notify
 
-/*
- * Test jthread_raw_wait(...)
- * Test jthread_raw_notify_all(...)
+/**
+ * Test jthread_raw_wait()
+ * Test jthread_raw_notify_all()
  */
-
-int helper_jthread_raw_wait_notify_all(void) {
-
+int test_jthread_raw_notify_all(void)
+{
+    int i;
+    int count;
+    int waiting_on_wait_nmb;
     tested_thread_sturct_t *tts;
     tested_thread_sturct_t *critical_tts;
     jrawMonitorID monitor;
-    int i;
-    int waiting_on_wait_nmb;
 
-    hysem_create(&mon_enter, 0, 1);
+    tf_assert_same(hysem_create(&mon_enter, 0, 1), TM_ERROR_NONE);
 
     // Initialize tts structures and run all tested threads
-    tested_threads_run(run_for_helper_jthread_raw_wait_notify);
+    tested_threads_run(run_for_test_jthread_raw_wait_notify);
+
+    monitor = get_tts(0)->raw_monitor;
 
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
-        monitor = tts->raw_monitor;
-        check_tested_thread_phase(tts, TT_PHASE_WAITING_ON_WAIT);       
+        count = 0;
+        while (!hythread_is_waiting(tts->native_thread)) {
+            // wait until the state is changed
+            hythread_sleep(SLEEP_TIME);
+            if (tts->phase == TT_PHASE_ERROR || ++count > (MAX_TIME_TO_WAIT/SLEEP_TIME)) {
+                tf_fail("thread failed to change state on WAITING");
+            }
+        }
+        check_tested_thread_phase(tts, TT_PHASE_WAITING_ON_WAIT);
+        log_info("Thread %d is waiting.", tts->my_index);
     }
+
+    log_info("Notify all tested threads");
     tf_assert_same(jthread_raw_monitor_enter(monitor), TM_ERROR_NONE);
     tf_assert_same(jthread_raw_monitor_notify_all(monitor), TM_ERROR_NONE);
-    tf_assert_same(jthread_raw_monitor_enter(monitor), TM_ERROR_NONE);
+    tf_assert_same(jthread_raw_monitor_exit(monitor), TM_ERROR_NONE);
 
     for (i = 0; i < MAX_TESTED_THREAD_NUMBER; i++){
 
         waiting_on_wait_nmb = 0;
         critical_tts = NULL;
 
-        hysem_wait(mon_enter);
+        tf_assert_same(hysem_wait(mon_enter), TM_ERROR_NONE);
 
         reset_tested_thread_iterator(&tts);
         while(next_tested_thread(&tts)){
@@ -285,6 +278,7 @@ int helper_jthread_raw_wait_notify_all(void) {
         if (MAX_TESTED_THREAD_NUMBER - waiting_on_wait_nmb - i != 1){
             tf_fail("Wrong number waiting on monitor threads");
         }
+        log_info("Thread %d was notified", critical_tts->my_index);
         tested_thread_send_stop_request(critical_tts);
         tested_thread_wait_ended(critical_tts);
         check_tested_thread_phase(critical_tts, TT_PHASE_DEAD);
@@ -292,15 +286,17 @@ int helper_jthread_raw_wait_notify_all(void) {
     // Terminate all threads and clear tts structures
     tested_threads_destroy();
 
+    tf_assert_same(hysem_destroy(mon_enter), TM_ERROR_NONE);
+
     return TEST_PASSED;
-}
+} // test_jthread_raw_notify_all
 
-void JNICALL run_for_helper_jthread_raw_monitor_try_enter(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
-
+void JNICALL run_for_test_jthread_raw_monitor_try_enter(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args)
+{
     tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
     jrawMonitorID monitor = tts->raw_monitor;
     IDATA status;
-    
+
     tts->phase = TT_PHASE_WAITING_ON_MONITOR;
     tested_thread_started(tts);
     status = jthread_raw_monitor_try_enter(monitor);
@@ -316,26 +312,26 @@ void JNICALL run_for_helper_jthread_raw_monitor_try_enter(jvmtiEnv * jvmti_env, 
     // End critical section
     tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_DEAD : TT_PHASE_ERROR);
     tested_thread_ended(tts);
-}
+} // run_for_test_jthread_raw_monitor_try_enter
 
-int helper_jthread_raw_monitor_try_enter(void) {
-
+int test_jthread_raw_monitor_try_enter(void)
+{
     tested_thread_sturct_t *tts;
     tested_thread_sturct_t *critical_tts;
     int i;
     int waiting_on_monitor_nmb;
 
-    hysem_create(&mon_enter, 0, 1);
+    tf_assert_same(hysem_create(&mon_enter, 0, 1), TM_ERROR_NONE);
 
     // Initialize tts structures and run all tested threads
-    tested_threads_run(run_for_helper_jthread_raw_monitor_try_enter);
+    tested_threads_run(run_for_test_jthread_raw_monitor_try_enter);
 
     for (i = 0; i < MAX_TESTED_THREAD_NUMBER; i++){
 
         waiting_on_monitor_nmb = 0;
         critical_tts = NULL;
 
-        hysem_wait(mon_enter);
+        tf_assert_same(hysem_wait(mon_enter), TM_ERROR_NONE);
 
         reset_tested_thread_iterator(&tts);
         while(next_tested_thread(&tts)){
@@ -350,6 +346,7 @@ int helper_jthread_raw_monitor_try_enter(void) {
         if (MAX_TESTED_THREAD_NUMBER - waiting_on_monitor_nmb - i != 1){
             tf_fail("Wrong number waiting on monitor threads");
         }
+        log_info("Thread %d grabbed monitor", critical_tts->my_index);
         tested_thread_send_stop_request(critical_tts);
         tested_thread_wait_ended(critical_tts);
         check_tested_thread_phase(critical_tts, TT_PHASE_DEAD);
@@ -357,16 +354,15 @@ int helper_jthread_raw_monitor_try_enter(void) {
     // Terminate all threads and clear tts structures
     tested_threads_destroy();
 
+    tf_assert_same(hysem_destroy(mon_enter), TM_ERROR_NONE);
+
     return TEST_PASSED;
-}
+} // test_jthread_raw_monitor_try_enter
 
 TEST_LIST_START
-    TEST(test_jthread_raw_monitor_create)
-    TEST(test_jthread_raw_monitor_destroy)
-    TEST(test_jthread_raw_monitor_enter)
+    TEST(test_jthread_raw_monitor_create_destroy)
+    TEST(test_jthread_raw_monitor_enter_exit)
     TEST(test_jthread_raw_monitor_try_enter)
-    TEST(test_jthread_raw_monitor_exit)
-    //TEST(test_jthread_raw_notify)
-    //TEST(test_jthread_raw_notify_all)
-    //TEST(test_jthread_raw_wait)
+    TEST(test_jthread_raw_notify)
+    TEST(test_jthread_raw_notify_all)
 TEST_LIST_END;

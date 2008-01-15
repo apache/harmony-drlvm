@@ -23,36 +23,19 @@
 #include <open/hythread_ext.h>
 #include <open/ti_thread.h>
 
-int helper_get_reset_peak_count(void);
-/*
- * Test jthread_reset_peak_thread_count(...)
+/**
+ * Test jthread_get_peak_thread_count()
+ * Test jthread_reset_peak_thread_count()
  */
-int test_jthread_reset_peak_thread_count(void) {
-
-    log_info("NO IMPLEMENTTATION TO TEST");
-    return TEST_FAILED;
-    return helper_get_reset_peak_count();
-}
-
-/*
- * Test jthread_get_peak_thread_count(...)
- */
-int test_jthread_get_peak_thread_count(void) {
-
-    log_info("NO IMPLEMENTTATION TO TEST");
-    return TEST_FAILED;
-    return helper_get_reset_peak_count();
-}
-
-void JNICALL run_for_helper_get_reset_peak_count(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
+void JNICALL run_for_test_get_reset_peak_count(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args)
+{
 
     tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
     IDATA status;
     int num = 0;
     
-    status = jthread_reset_peak_thread_count();
     tts->peak_count = 0;
-    tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_RUNNING : TT_PHASE_ERROR);
+    tts->phase = TT_PHASE_RUNNING;
     tested_thread_started(tts);
     while(tested_thread_wait_for_stop_request_timed(tts, SLEEP_TIME) == TM_ERROR_TIMEOUT) {
         ++num;
@@ -60,31 +43,40 @@ void JNICALL run_for_helper_get_reset_peak_count(jvmtiEnv * jvmti_env, JNIEnv * 
     status = jthread_get_peak_thread_count(&tts->peak_count);
     tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_DEAD : TT_PHASE_ERROR);
     tested_thread_ended(tts);
-}
+} // run_for_test_get_reset_peak_count
 
-int helper_get_reset_peak_count(void) {
-
+int test_get_get_reset_peak_count(void)
+{
+    jint peak_count;
     tested_thread_sturct_t *tts;
 
+    tf_assert_same(jthread_reset_peak_thread_count(), TM_ERROR_NONE);
+    tf_assert_same(jthread_get_peak_thread_count(&peak_count), TM_ERROR_NONE);
+    log_info("Initial peak_count = %d", peak_count);
+
     // Initialize tts structures and run all tested threads
-    tested_threads_run(run_for_helper_get_reset_peak_count);
-    
+    tested_threads_run(run_for_test_get_reset_peak_count);
+
     reset_tested_thread_iterator(&tts);
-    while(next_tested_thread(&tts)){
+    while(next_tested_thread(&tts)) {
+        while(tts->phase != TT_PHASE_RUNNING) {
+            hythread_sleep(SLEEP_TIME);
+        }
+        check_tested_thread_phase(tts, TT_PHASE_RUNNING);
         tested_thread_send_stop_request(tts);
         tested_thread_wait_ended(tts);
         check_tested_thread_phase(tts, TT_PHASE_DEAD);
-        printf("peak_count = %i \n", tts->peak_count);
-        tf_assert(tts->peak_count > 0);
+        log_info("Thread %d peak_count = %d", tts->my_index, tts->peak_count);
+        tf_assert(tts->peak_count > peak_count);
+        tf_assert_same(jthread_reset_peak_thread_count(), TM_ERROR_NONE);
     }
 
     // Terminate all threads and clear tts structures
     tested_threads_destroy();
 
     return TEST_PASSED;
-}
+} // test_get_get_reset_peak_count
 
 TEST_LIST_START
-    //TEST(test_jthread_reset_peak_thread_count)
-    //TEST(test_jthread_get_peak_thread_count)
+    TEST(test_get_get_reset_peak_count)
 TEST_LIST_END;

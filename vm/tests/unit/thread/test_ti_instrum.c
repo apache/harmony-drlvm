@@ -21,27 +21,25 @@
 #include <open/jthread.h>
 #include <open/ti_thread.h>
 
-hysem_t mon_enter;
+static hysem_t mon_enter;
 
-/*
- * Test jthread_get_all_threads(...)
+/**
+ * Test jthread_get_all_threads()
+ * Test jthread_get_thread_count()
  */
-int test_jthread_get_all_threads(void) {
-
+int test_jthread_get_all_threads(void)
+{
     tested_thread_sturct_t *tts;
-    jint all_threads_count = 99;
-    jint thread_count = 99;
+    jint all_threads_count;
+    jint thread_count;
     jint initial_thread_count;
     jint initial_all_threads_count;
     jthread *threads = NULL;
     int i;
     JNIEnv * jni_env = jthread_get_JNI_env(jthread_self());
 
-    // TODO: unsafe .... need to find another way of synchronization
-    hythread_sleep(1000);
-    
-    jthread_get_thread_count(&initial_thread_count);
-    jthread_get_all_threads(&threads, &initial_all_threads_count);
+    tf_assert_same(jthread_get_thread_count(&initial_thread_count), TM_ERROR_NONE);
+    tf_assert_same(jthread_get_all_threads(&threads, &initial_all_threads_count), TM_ERROR_NONE);
 
     // Initialize tts structures
     tested_threads_init(TTS_INIT_COMMON_MONITOR);
@@ -51,6 +49,7 @@ int test_jthread_get_all_threads(void) {
     tf_assert_same(thread_count, initial_thread_count);
     tf_assert_same(all_threads_count, initial_all_threads_count);
     tf_assert_not_null(threads);
+
     i = 0;
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
@@ -72,25 +71,17 @@ int test_jthread_get_all_threads(void) {
     tested_threads_destroy();
 
     return TEST_PASSED;
-}
+} // test_jthread_get_all_threads
 
 /*
- * Test jthread_get_thread_count(...)
- */
-int test_jthread_get_thread_count(void) {
-
-    return test_jthread_get_all_threads();
-}
-
-/*
- * Test get_blocked_count(...)
+ * Test jthread_get_blocked_count()
  */
 void JNICALL run_for_test_jthread_get_blocked_count(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
 
     tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
     jobject monitor = tts->monitor;
     IDATA status;
-    
+
     tts->phase = TT_PHASE_WAITING_ON_MONITOR;
     tested_thread_started(tts);
     status = jthread_monitor_enter(monitor);
@@ -103,16 +94,16 @@ void JNICALL run_for_test_jthread_get_blocked_count(jvmtiEnv * jvmti_env, JNIEnv
     // End critical section
     tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_DEAD : TT_PHASE_ERROR);
     tested_thread_ended(tts);
-}
+} // run_for_test_jthread_get_blocked_count
 
-int test_jthread_get_blocked_count(void) {
-
+int test_jthread_get_blocked_count(void)
+{
     tested_thread_sturct_t *tts;
     tested_thread_sturct_t *critical_tts;
     int i;
     int waiting_on_monitor_nmb;
 
-    hysem_create(&mon_enter, 0, 1);
+    tf_assert_same(hysem_create(&mon_enter, 0, 1), TM_ERROR_NONE);
 
     // Initialize tts structures and run all tested threads
     tested_threads_run(run_for_test_jthread_get_blocked_count);
@@ -120,11 +111,9 @@ int test_jthread_get_blocked_count(void) {
     for (i = 0; i < MAX_TESTED_THREAD_NUMBER; i++){
         int cycles = MAX_TIME_TO_WAIT / CLICK_TIME_MSEC;
 
-        waiting_on_monitor_nmb = 0;
+        tf_assert_same(hysem_wait(mon_enter), TM_ERROR_NONE);
+
         critical_tts = NULL;
-
-        hysem_wait(mon_enter);
-
         reset_tested_thread_iterator(&tts);
         while(next_tested_thread(&tts)){
             if (tts->phase == TT_PHASE_IN_CRITICAL_SECTON){
@@ -132,6 +121,8 @@ int test_jthread_get_blocked_count(void) {
                 critical_tts = tts;
             }
         }
+
+        waiting_on_monitor_nmb = 0;
         while ((MAX_TESTED_THREAD_NUMBER - i > waiting_on_monitor_nmb + 1) && (cycles-- > 0)) {
             tf_assert_same(jthread_get_blocked_count(&waiting_on_monitor_nmb), TM_ERROR_NONE);
             sleep_a_click();
@@ -147,122 +138,172 @@ int test_jthread_get_blocked_count(void) {
     tested_threads_destroy();
 
     return TEST_PASSED;
-}
+} // test_jthread_get_blocked_count
 
 /*
- * Test jthread_get_deadlocked_threads(...)
+ * Test jthread_get_deadlocked_threads()
  */
-void JNICALL run_for_test_jthread_get_deadlocked_threads(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
-
+void JNICALL run_for_test_jthread_get_deadlocked_threads(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args)
+{
     tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
     IDATA status = TM_ERROR_NONE;
-    
-    if (tts->my_index < 2){
-        status = jthread_monitor_enter(tts->monitor);
-    }
+
+    tts->phase =  TT_PHASE_WAITING_ON_MONITOR;
+    status = jthread_monitor_enter(tts->monitor);
 
     tts->phase = TT_PHASE_RUNNING;
     tested_thread_started(tts);
     tested_thread_wait_for_stop_request(tts);
-    if (tts->my_index == 0){
-        status = jthread_monitor_enter(get_tts(1)->monitor);
-    } else if (tts->my_index == 1){
-        status = jthread_monitor_enter(get_tts(0)->monitor);
-    }
+    tts->phase =  TT_PHASE_WAITING_ON_MONITOR;
+    status = jthread_monitor_enter(
+        get_tts(MAX_TESTED_THREAD_NUMBER - (tts->my_index + 1))->monitor);
     tts->phase = status == TM_ERROR_NONE ? TT_PHASE_DEAD : TT_PHASE_ERROR;
     tested_thread_ended(tts);
-}
+} // run_for_test_jthread_get_deadlocked_threads
 
-int test_jthread_get_deadlocked_threads(void) {
-
+int test_jthread_get_deadlocked_threads(void)
+{
     tested_thread_sturct_t * tts;
     jthread *thread_list;
     int dead_list_count;
     jthread *dead_list;
-    int i = 0;
-
-    thread_list =
-        (jthread*)calloc(MAX_TESTED_THREAD_NUMBER, sizeof(int));
+    int count;
 
     // Initialize tts structures and run all tested threads
     tested_threads_run_with_different_monitors(run_for_test_jthread_get_deadlocked_threads);
 
+    thread_list =
+        (jthread*)calloc(MAX_TESTED_THREAD_NUMBER, sizeof(jthread*));
+    tf_assert(thread_list && "failed to alloc memory");
+
     reset_tested_thread_iterator(&tts);
-    while(next_tested_thread(&tts)){
-        thread_list[i] = tts->java_thread;
-        i++;
+    while(next_tested_thread(&tts)) {
+        thread_list[tts->my_index] = tts->java_thread;
     }
     tf_assert_same(jthread_get_deadlocked_threads(thread_list, MAX_TESTED_THREAD_NUMBER,
                                                   &dead_list, &dead_list_count), TM_ERROR_NONE);
     tf_assert_same(dead_list_count, 0);
 
-    tested_thread_send_stop_request(get_tts(0));
-    tested_thread_send_stop_request(get_tts(1));
+    reset_tested_thread_iterator(&tts);
+    while(next_tested_thread(&tts)) {
+        tested_thread_send_stop_request(tts);
+    }
 
-    // TODO: unsafe .... need to find another way of synchronization
-    hythread_sleep(5000);
+    reset_tested_thread_iterator(&tts);
+    while(next_tested_thread(&tts)) {
+        count = 0;
+        if ((MAX_TESTED_THREAD_NUMBER % 2)
+            && (tts->my_index == MAX_TESTED_THREAD_NUMBER / 2))
+        {
+            while (hythread_is_alive(tts->native_thread)) {
+                // wait until the state is changed
+                hythread_sleep(SLEEP_TIME);
+                if (tts->phase == TT_PHASE_ERROR || ++count > (MAX_TIME_TO_WAIT/SLEEP_TIME)) {
+                    tf_fail("thread failed to change state on WAITING");
+                }
+            }
+            log_info("Thread %d is dead", tts->my_index);
+            check_tested_thread_phase(tts, TT_PHASE_DEAD);
+            thread_list[tts->my_index] = jthread_self();
+        } else {
+            while (!hythread_is_blocked_on_monitor_enter(tts->native_thread)) {
+                // wait until the state is changed
+                hythread_sleep(SLEEP_TIME);
+                if (tts->phase == TT_PHASE_ERROR || ++count > (MAX_TIME_TO_WAIT/SLEEP_TIME)) {
+                    tf_fail("thread failed to change state on WAITING");
+                }
+            }
+            log_info("Thread %d is blocked on monitor", tts->my_index);
+            check_tested_thread_phase(tts, TT_PHASE_WAITING_ON_MONITOR);
+        }
+    }
+
     tf_assert_same(jthread_get_deadlocked_threads(thread_list, MAX_TESTED_THREAD_NUMBER,
-                                                  &dead_list, &dead_list_count), TM_ERROR_NONE);
-    tf_assert_same(dead_list_count, 2);
+        &dead_list, &dead_list_count), TM_ERROR_NONE);
+    log_info("Deadlocked thread numbre is %d", dead_list_count);
+    tf_assert_same(dead_list_count,
+        ((MAX_TESTED_THREAD_NUMBER % 2)
+        ? MAX_TESTED_THREAD_NUMBER - 1 : MAX_TESTED_THREAD_NUMBER));
 
-    tf_assert_same(jthread_monitor_exit(get_tts(0)->java_thread), TM_ERROR_NONE);
-    tf_assert_same(jthread_monitor_exit(get_tts(1)->java_thread), TM_ERROR_NONE);
+    count = 0;
+    reset_tested_thread_iterator(&tts);
+    while(next_tested_thread(&tts)) {
+        if ((MAX_TESTED_THREAD_NUMBER % 2)
+            && (tts->my_index == MAX_TESTED_THREAD_NUMBER / 2))
+        {
+            continue;
+        } else {
+            tf_assert_same(dead_list[count++], tts->java_thread);
+            log_info("Thread %d is deadlocked", tts->my_index);
+            hythread_set_state(tts->native_thread, TM_THREAD_STATE_TERMINATED);
+            hythread_cancel(tts->native_thread);
+        }
+    }
 
      // Terminate all threads and clear tts structures
     tested_threads_destroy();
-    
+
     return TEST_PASSED;
-}
+} // test_jthread_get_deadlocked_threads
 
-/*
- * Test get_wated_count(...)
+/**
+ * Test jthread_get_waited_count()
  */
-void JNICALL run_for_test_jthread_get_waited_count(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args){
-
+void JNICALL run_for_test_jthread_get_waited_count(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args)
+{
     tested_thread_sturct_t * tts = (tested_thread_sturct_t *) args;
     jobject monitor = tts->monitor;
     IDATA status;
-    
+
     tts->phase = TT_PHASE_RUNNING;
     tested_thread_started(tts);
+    // Enter critical section
     status = jthread_monitor_enter(monitor);
-    tested_thread_wait_for_stop_request(tts);
     tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_WAITING_ON_WAIT : TT_PHASE_ERROR);
+    // Wait on monitor
     status = jthread_monitor_wait(monitor);
     if (status != TM_ERROR_NONE){
         tts->phase = TT_PHASE_ERROR;
+        jthread_monitor_exit(monitor);
         tested_thread_ended(tts);
         return;
     }
+    // Exit critical section
     status = jthread_monitor_exit(monitor);
 
-    // End critical section
     tts->phase = (status == TM_ERROR_NONE ? TT_PHASE_DEAD : TT_PHASE_ERROR);
     tested_thread_ended(tts);
-}
+} // run_for_test_jthread_get_waited_count
 
-int test_jthread_get_waited_count(void) {
-
-    int i;
+int test_jthread_get_waited_count(void)
+{
+    int count;
     int waiting_nmb;
     jobject monitor;
+    tested_thread_sturct_t * tts;
 
     // Initialize tts structures and run all tested threads
     tested_threads_run(run_for_test_jthread_get_waited_count);
 
-    for (i = 0; i < MAX_TESTED_THREAD_NUMBER; i++){
-
-        waiting_nmb = 0;
-
-        tf_assert_same(jthread_get_waited_count(&waiting_nmb), TM_ERROR_NONE);
-        if (waiting_nmb != i){
-            tf_fail("Wrong number waiting on monitor threads");
+    reset_tested_thread_iterator(&tts);
+    while(next_tested_thread(&tts)){
+        count = 0;
+        while (!hythread_is_waiting(tts->native_thread)) {
+            // wait until the state is changed
+            hythread_sleep(SLEEP_TIME);
+            if (tts->phase == TT_PHASE_ERROR || ++count > (MAX_TIME_TO_WAIT/SLEEP_TIME)) {
+                tf_fail("thread failed to change state on WAITING");
+            }
         }
-        tested_thread_send_stop_request(get_tts(i));
-        // TODO: unsafe .... need to find another way of synchronization
-        hythread_sleep(1000);
-        check_tested_thread_phase(get_tts(i), TT_PHASE_WAITING_ON_WAIT);
+        check_tested_thread_phase(tts, TT_PHASE_WAITING_ON_WAIT);
+        log_info("Thread %d is waiting.", tts->my_index);
     }
+
+    tf_assert_same(jthread_get_waited_count(&waiting_nmb), TM_ERROR_NONE);
+    log_info("Waiting threads count is %d", waiting_nmb);
+    tf_assert_same(waiting_nmb, MAX_TESTED_THREAD_NUMBER);
+
+    log_info("Release all threads");
     monitor = get_tts(0)->monitor;
     tf_assert_same(jthread_monitor_enter(monitor), TM_ERROR_NONE);
     tf_assert_same(jthread_monitor_notify_all(monitor), TM_ERROR_NONE);
@@ -272,12 +313,11 @@ int test_jthread_get_waited_count(void) {
     tested_threads_destroy();
 
     return TEST_PASSED;
-}
+} // test_jthread_get_waited_count
 
 TEST_LIST_START
     TEST(test_jthread_get_all_threads)
-    TEST(test_jthread_get_thread_count)
     TEST(test_jthread_get_blocked_count)
-    //TEST(test_jthread_get_deadlocked_threads)
-    //TEST(test_jthread_get_waited_count)
+    TEST(test_jthread_get_deadlocked_threads)
+    TEST(test_jthread_get_waited_count)
 TEST_LIST_END;
