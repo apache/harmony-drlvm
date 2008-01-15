@@ -56,9 +56,7 @@
         <mkdir dir="${cunit.obj.dir}" />
         <mkdir dir="${cunit.bin.dir}" />
 
-        <compiler name="${build.cxx}" id="cunit.test.compiler" extends="common.c.compiler">
-            <defineset define="APR_DECLARE_STATIC, BUILDING_VM"/>
-        </compiler>
+        <compiler name="${build.cxx}" id="cunit.test.compiler" extends="common.c.compiler" />
        
         <!-- Compiling cunit tests and framework -->
         <echo message="Compiling tests and framework..." />
