@@ -360,28 +360,86 @@ void VMCALL hythread_set_self(hythread_t  thread) {
 
 IDATA thread_sleep_impl(I_64 millis, IDATA nanos, IDATA interruptable) {
     IDATA status;
-    
-    hythread_t thread = tm_self_tls;
-    
+    IDATA result;
+    hythread_t self;
+    hythread_monitor_t mon;
+
     if (nanos == 0 && millis == 0) {
         hythread_yield();
         return TM_ERROR_NONE;
-    }         
-    // Report error in case current thread is not attached
-    if (!thread) return TM_ERROR_UNATTACHED_THREAD;
-    
-    hymutex_lock(&thread->mutex);
-    thread->state |= TM_THREAD_STATE_SLEEPING;
-    status = condvar_wait_impl(&thread->condition, &thread->mutex, millis, nanos, interruptable);
-    thread->state &= ~TM_THREAD_STATE_SLEEPING;
-    hymutex_unlock(&thread->mutex);
+    }
+    if (!(self = hythread_self())) {
+        // Report error in case current thread is not attached
+        return TM_ERROR_UNATTACHED_THREAD;
+    }
 
-    if (thread->request) {
+    // Grab thread monitor
+    mon = self->monitor;
+    status = hythread_monitor_enter(mon);
+    assert(status == TM_ERROR_NONE);
+    assert(mon->recursion_count == 0);
+    mon->owner = NULL;
+    mon->wait_count++;
+
+    // Set thread state
+    status = hymutex_lock(&self->mutex);
+    assert(status == TM_ERROR_NONE);
+    self->waited_monitor = mon;
+    self->state |= TM_THREAD_STATE_SLEEPING;
+    status = hymutex_unlock(&self->mutex);
+    assert(status == TM_ERROR_NONE);
+
+    do {
+        apr_time_t start;
+        assert(mon->notify_count >= 0);
+        assert(mon->notify_count < mon->wait_count);
+        start = apr_time_now();
+
+        result = condvar_wait_impl(&mon->condition, &mon->mutex, millis, nanos, interruptable);
+        if (result != TM_ERROR_NONE) {
+            break;
+        }
+        // we should not change millis and nanos if both are 0 (meaning "no timeout")
+        if (millis || nanos) {
+            apr_interval_time_t elapsed = apr_time_now() - start;
+            nanos -= (IDATA)((elapsed % 1000) * 1000);
+            if (nanos < 0) {
+                millis -= elapsed/1000 + 1;
+                nanos += 1000000;
+            } else {
+                millis -= elapsed/1000;
+            }
+            if (millis < 0) {
+                assert(status == TM_ERROR_NONE);
+                status = TM_ERROR_TIMEOUT;
+                break;
+            }
+            assert(0 <= nanos && nanos < 1000000);
+        }
+    } while(1);
+
+    // Restore thread state
+    status = hymutex_lock(&self->mutex);
+    assert(status == TM_ERROR_NONE);
+    self->state &= ~TM_THREAD_STATE_SLEEPING;
+    self->waited_monitor = NULL;
+    status = hymutex_unlock(&self->mutex);
+    assert(status == TM_ERROR_NONE);
+
+    // Release thread monitor
+    mon->wait_count--;
+    mon->owner = self;
+    assert(mon->notify_count <= mon->wait_count);
+    status = hythread_monitor_exit(mon);
+    assert(status == TM_ERROR_NONE);
+
+    if (self->request) {
         hythread_safe_point();
         hythread_exception_safe_point();
     }
 
-    return (status == TM_ERROR_INTERRUPT && interruptable) ? TM_ERROR_INTERRUPT : TM_ERROR_NONE;
+    return (result == TM_ERROR_INTERRUPT && interruptable)
+        ? TM_ERROR_INTERRUPT : TM_ERROR_NONE;
 }
 
 /** 
@@ -595,32 +653,47 @@ IDATA VMCALL hythread_remove_from_group(hythread_t thread)
  */
 IDATA VMCALL hythread_struct_init(hythread_t new_thread) 
 {
+    char jstatus;
     IDATA status;
 
     assert(new_thread);
+    jstatus = new_thread->java_status;
     if (!new_thread->os_handle) {
-        // Create thread primitives
+        // new thread, create thread primitives
+        memset(new_thread, 0, sizeof(HyThread));
         status = hysem_create(&new_thread->resume_event, 0, 1);
         assert(status == TM_ERROR_NONE);
         status = hymutex_create(&new_thread->mutex, TM_MUTEX_NESTED);
         assert(status == TM_ERROR_NONE);
-        status = hycond_create(&new_thread->condition);
+        status = hythread_monitor_init(&new_thread->monitor, 0);
         assert(status == TM_ERROR_NONE);
-        new_thread->stacksize = os_get_foreign_thread_stack_size();
     } else {
-        // This join should also delete thread OS handle
-        int result = os_thread_free(new_thread->os_handle);
+        // old thread, reset structure
+        int result;
+        hysem_t resume;
+        hymutex_t mutex;
+        hythread_monitor_t monitor;
+
+        // release thread OS handle
+        result = os_thread_free(new_thread->os_handle);
         assert(0 == result);
+
+        resume = new_thread->resume_event;
+        mutex = new_thread->mutex;
+        monitor = new_thread->monitor;
+
+        // zero new thread
+        memset(new_thread, 0, sizeof(HyThread));
+
+        new_thread->resume_event = resume;
+        new_thread->mutex = mutex;
+        new_thread->monitor = monitor;
     }
+    assert(new_thread->os_handle == NULL);
 
-    new_thread->os_handle  = (osthread_t)NULL;
+    new_thread->java_status = jstatus;
     new_thread->priority   = HYTHREAD_PRIORITY_NORMAL;
-
-    // Suspension reset
-    new_thread->request = 0;
-    new_thread->suspend_count = 0;
-    new_thread->disable_count = 0;
-    new_thread->safepoint_callback = NULL;
+    new_thread->stacksize = os_get_foreign_thread_stack_size();
 
     hymutex_lock(&new_thread->mutex);
     new_thread->state = TM_THREAD_STATE_NEW;
@@ -646,7 +719,7 @@ IDATA VMCALL hythread_struct_release(hythread_t thread)
     assert(status == TM_ERROR_NONE);
     status = hymutex_destroy(&thread->mutex);
     assert(status == TM_ERROR_NONE);
-    status = hycond_destroy(&thread->condition);
+    status = hythread_monitor_destroy(thread->monitor);
     assert(status == TM_ERROR_NONE);
 
     memset(thread, 0, hythread_get_struct_size());
@@ -734,9 +807,7 @@ static int HYTHREAD_PROC hythread_wrapper_start_proc(void *arg) {
 
     // set TERMINATED state
     hymutex_lock(&thread->mutex);
-    // FIXME - remove INTERRUPTED state after TM state transition complete
-    thread->state = TM_THREAD_STATE_TERMINATED
-        | (TM_THREAD_STATE_INTERRUPTED & thread->state);
+    thread->state = TM_THREAD_STATE_TERMINATED;
     hymutex_unlock(&thread->mutex);
 
     // detach and free thread

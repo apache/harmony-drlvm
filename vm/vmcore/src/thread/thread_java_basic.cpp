@@ -175,14 +175,7 @@ int HYTHREAD_PROC jthread_wrapper_start_proc(void *arg)
     assert(status == TM_ERROR_NONE);
 
     // set TERMINATED thread
-    status = hythread_thread_lock(native_thread);
-    assert(status == TM_ERROR_NONE);
-    // FIXME - remove INTERRUPTED state after TM state transition complete
-    IDATA state = hythread_get_state(native_thread);
-    status = hythread_set_state(native_thread,
-        TM_THREAD_STATE_TERMINATED | (TM_THREAD_STATE_INTERRUPTED & state));
-    assert(status == TM_ERROR_NONE);
-    status = hythread_thread_unlock(native_thread);
+    status = hythread_set_state(native_thread, TM_THREAD_STATE_TERMINATED);
     assert(status == TM_ERROR_NONE);
 
     TRACE(("TM: Java thread finished: id=%d OS_handle=%p",

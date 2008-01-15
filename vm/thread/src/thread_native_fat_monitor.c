@@ -175,7 +175,6 @@ IDATA monitor_wait_impl(hythread_monitor_t mon_ptr, I_64 ms, IDATA nano, IDATA i
     mon_ptr->recursion_count =0;
     mon_ptr->wait_count++;
     hymutex_lock(&self->mutex);
-    self->current_condition = &mon_ptr->condition;
     self->state |= TM_THREAD_STATE_IN_MONITOR_WAIT;
     self->waited_monitor = mon_ptr;
     hymutex_unlock(&self->mutex);
@@ -186,9 +185,7 @@ IDATA monitor_wait_impl(hythread_monitor_t mon_ptr, I_64 ms, IDATA nano, IDATA i
         assert(mon_ptr->notify_count < mon_ptr->wait_count);
         start = apr_time_now();
         status = condvar_wait_impl(&mon_ptr->condition, &mon_ptr->mutex, ms, nano, interruptable);
-        if (status != TM_ERROR_NONE
-            || mon_ptr->notify_count || hythread_interrupted(self))
-        {
+        if (status != TM_ERROR_NONE || mon_ptr->notify_count) {
             break;
         }
         // we should not change ms and nano if both are 0 (meaning "no timeout")
@@ -211,20 +208,18 @@ IDATA monitor_wait_impl(hythread_monitor_t mon_ptr, I_64 ms, IDATA nano, IDATA i
         }
     } while (1);
 
-    // consume the notify_count unless we got an error
-    // or were interrupted
+    // consume the notify_count unless we got an error (or were interrupted)
     if (mon_ptr->notify_count > 0
-        && ((status == TM_ERROR_NONE && !hythread_interrupted(self))
-            || mon_ptr->notify_count == mon_ptr->wait_count))
+        && (status == TM_ERROR_NONE || mon_ptr->notify_count == mon_ptr->wait_count))
     {
         mon_ptr->notify_count--;
     }
 
     hymutex_lock(&self->mutex);
     self->state &= ~TM_THREAD_STATE_IN_MONITOR_WAIT;
-    self->current_condition = NULL;
     self->waited_monitor = NULL;
     hymutex_unlock(&self->mutex);
+
     mon_ptr->wait_count--;
     assert(mon_ptr->notify_count <= mon_ptr->wait_count);
 
@@ -342,33 +337,6 @@ IDATA VMCALL hythread_monitor_notify_all(hythread_monitor_t mon_ptr) {
 
 
 /**
- * Interrupt thread that is waiting on monitor
- *
- * A thread is considered to be waiting on the monitor if
- * it is currently blocked while executing hythread_monitor_wait on 
- * the monitor.
- *
- * @param[in] mon_ptr a monitor owned by thread to be interrupted
- * @param[in] thread  thread to be interrupted
- * @return  0 once the monitor has been signaled<br>HYTHREAD_ILLEGAL_MONITOR_STATE if the current thread does not own the monitor
- *
- * @see hythread_monitor_notify, hythread_monitor_notify_all, hythread_monitor_enter, hythread_monitor_wait
- */
-IDATA VMCALL hythread_monitor_interrupt_wait(hythread_monitor_t mon_ptr,
-                                             hythread_t thread)
-{
-    if (mon_ptr->owner != tm_self_tls) {
-        return TM_ERROR_ILLEGAL_STATE;
-    }
-    // While waiting on monitor, thread state TM_THREAD_STATE_INTERRUPTED
-    // could already clear if condition was notified by another thread,
-    // so thread state TM_THREAD_STATE_INTERRUPTED check is illegal here.
-    // Just notify condition.
-    return hycond_notify_all(&mon_ptr->condition);
-}
-
-
-/**
  * Notify a single thread waiting on a monitor.
  *
  * A thread is considered to be waiting on the monitor if
@@ -386,7 +354,7 @@ IDATA VMCALL hythread_monitor_notify(hythread_monitor_t mon_ptr) {
         return TM_ERROR_ILLEGAL_STATE;
     }
     if (mon_ptr->notify_count < mon_ptr->wait_count)
-        mon_ptr->notify_count += 1;
+        mon_ptr->notify_count++;
     return hycond_notify(&mon_ptr->condition);
 }
 

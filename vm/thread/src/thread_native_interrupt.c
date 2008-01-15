@@ -20,10 +20,22 @@
  * @brief Hythread interruption related functions
  */
 
-#include "thread_private.h"
 #include <open/hythread_ext.h>
+#include <apr_atomic.h>
+#include "thread_private.h"
 
-static IDATA HYTHREAD_PROC interrupter_thread_function(void *args);
+static IDATA HYTHREAD_PROC hythread_interrupter(void *args)
+{
+    IDATA status;
+    hythread_monitor_t mon = (hythread_monitor_t)args;
+
+    status = hythread_monitor_enter(mon);
+    assert(status == TM_ERROR_NONE);
+    status = hycond_notify_all(&mon->condition);
+    assert(status == TM_ERROR_NONE);
+    hythread_exit(mon);
+    return 0;
+}
 
 /** 
  * Interrupt a thread.
@@ -37,89 +49,59 @@ static IDATA HYTHREAD_PROC interrupter_thread_function(void *args);
  */
 void VMCALL hythread_interrupt(hythread_t thread) {
     IDATA status;
-    hymutex_lock(&thread->mutex);
-    thread->state |= TM_THREAD_STATE_INTERRUPTED;
-    
-    if (thread == tm_self_tls) {
-        hymutex_unlock(&thread->mutex);
-        return;
-    }
+    hythread_monitor_t mon;
 
-    // If thread was doing any kind of wait, notify it.
-    if (thread->state & (TM_THREAD_STATE_PARKED | TM_THREAD_STATE_SLEEPING)) {
-        hycond_t *condition = thread->current_condition;
-        if (condition) {
-            status = hycond_notify_all(condition);
+    apr_atomic_set32(&thread->interrupted, TRUE);
+
+    mon = thread->waited_monitor;
+    if (mon) {
+        // If thread was doing any kind of wait, notify it.
+        if (hythread_monitor_try_enter(mon) == TM_ERROR_NONE) {
+            status = hycond_notify_all(&mon->condition);
             assert(status == TM_ERROR_NONE);
-        }
-    } else if (thread->state & TM_THREAD_STATE_IN_MONITOR_WAIT) {
-        if (thread->current_condition && (hythread_monitor_try_enter(thread->waited_monitor) == TM_ERROR_NONE)) {
-            hythread_monitor_interrupt_wait(thread->waited_monitor, thread);
-            hythread_monitor_exit(thread->waited_monitor);
+            status = hythread_monitor_exit(mon);
+            assert(status == TM_ERROR_NONE);
         } else {
-            hythread_t interrupt_thread = NULL;
-            status = hythread_create(&interrupt_thread, 0, 0, 0,
-                interrupter_thread_function, (void *)thread);
+            status = hythread_create(NULL, 0, 0, 0,
+                hythread_interrupter, (void *)mon);
             assert (status == TM_ERROR_NONE);
         }
     }
-    hymutex_unlock(&thread->mutex);
-}
-
-static IDATA HYTHREAD_PROC interrupter_thread_function(void *args) {
-    hythread_t thread = (hythread_t)args; 
-    hythread_monitor_t monitor = NULL;
-    hymutex_lock(&thread->mutex);
-
-    if (thread->waited_monitor) {
-        monitor = thread->waited_monitor;
-    } else {
-        hymutex_unlock(&thread->mutex);
-        hythread_exit(NULL);
-        return 0; 
-    } 
-
-    hymutex_unlock(&thread->mutex);
-
-    hythread_monitor_enter(monitor);
-    hythread_monitor_interrupt_wait(monitor, thread);
-
-    hythread_exit(monitor);
-    return 0;
-}
+} // hythread_interrupt
 
 /** 
- *  Returns interrupted status and clear interrupted flag.
+ * Returns interrupted status and clear interrupted flag.
  *
  * @param[in] thread where to clear interrupt flag
  * @returns TM_ERROR_INTERRUPT if thread was interrupted, TM_ERROR_NONE otherwise
+ * @see java.lang.Thread.interrupted()
  */
 UDATA VMCALL hythread_clear_interrupted_other(hythread_t thread) {
     int interrupted;
-    hymutex_lock(&thread->mutex);
-    interrupted = thread->state & TM_THREAD_STATE_INTERRUPTED;
-    thread->state &= ~TM_THREAD_STATE_INTERRUPTED;
-    hymutex_unlock(&thread->mutex);
+    assert(thread);
+    interrupted = thread->interrupted;
+    apr_atomic_set32(&thread->interrupted, FALSE);
     return interrupted ? TM_ERROR_INTERRUPT : TM_ERROR_NONE;
-}
+} // hythread_clear_interrupted_other
 
 /**
  * Clear the interrupted flag of the current thread and return its previous value.
  * 
  * @return  previous value of interrupted flag: non-zero if the thread had been interrupted.
+ * @see java.lang.Thread.interrupted()
  */
 UDATA VMCALL hythread_clear_interrupted() {
     return hythread_clear_interrupted_other(tm_self_tls);
-}
+} // hythread_clear_interrupted
 
 /**
  * Return the value of a thread's interrupted flag.
  * 
  * @param[in] thread thread to be queried
  * @return 0 if not interrupted, non-zero if interrupted
+ * @see java.lang.Thread.isInterrupted()
  */
 UDATA VMCALL hythread_interrupted(hythread_t thread) {
-    int interrupted = thread->state & TM_THREAD_STATE_INTERRUPTED;
-    return interrupted?TM_ERROR_INTERRUPT:TM_ERROR_NONE;
-}
+    return thread->interrupted ? TM_ERROR_INTERRUPT : TM_ERROR_NONE;
+} // hythread_interrupted
 

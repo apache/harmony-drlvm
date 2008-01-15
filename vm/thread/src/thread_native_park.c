@@ -21,8 +21,8 @@
  */
 
 #include <open/hythread_ext.h>
+#include <apr_atomic.h>
 #include "thread_private.h"
-
 
 /**
  * 'Park' the current thread. 
@@ -42,39 +42,67 @@
  * @see hythread_unpark
  */
 IDATA VMCALL hythread_park(I_64 millis, IDATA nanos) {
-     IDATA status = 0;
-     hythread_t t = tm_self_tls;     
-     assert(t);
+    IDATA status;
+    IDATA result = TM_ERROR_NONE;
+    hythread_t self = hythread_self();
+    hythread_monitor_t mon;
+    assert(self);
 
-     hymutex_lock(&t->mutex);
+    // Grab thread monitor
+    mon = self->monitor;
+    status = hythread_monitor_enter(mon);
+    assert(status == TM_ERROR_NONE);
+    assert(mon->recursion_count == 0);
+    mon->owner = NULL;
+    mon->wait_count++;
 
-     if (t->state & TM_THREAD_STATE_UNPARKED) {
-        t->state &= ~TM_THREAD_STATE_UNPARKED;
-        hymutex_unlock(&t->mutex);
-        return (t->state & TM_THREAD_STATE_INTERRUPTED) ? TM_ERROR_INTERRUPT : TM_ERROR_NONE;
-     }
+    // Set thread state
+    status = hymutex_lock(&self->mutex);
+    assert(status == TM_ERROR_NONE);
+    self->waited_monitor = mon;
+    if (!(self->state & TM_THREAD_STATE_UNPARKED)) {
+        // if thread is not unparked stop the current thread from executing
+        self->state |= TM_THREAD_STATE_PARKED;
+        status = hymutex_unlock(&self->mutex);
+        assert(status == TM_ERROR_NONE);
 
-     t->state |= TM_THREAD_STATE_PARKED;
-     status = hycond_wait_interruptable(&t->condition, &t->mutex, millis, nanos);
-     t->state &= ~TM_THREAD_STATE_PARKED;
+        do {
+            result = condvar_wait_impl(&mon->condition, &mon->mutex,
+                millis, nanos, WAIT_INTERRUPTABLE);
+            if (result != TM_ERROR_NONE
+                || (self->state & TM_THREAD_STATE_PARKED) == 0)
+            {
+                break;
+            }
+        } while (1);
 
-     if (t->request) {
-         int save_count;
-         hymutex_unlock(&t->mutex);
-         hythread_safe_point();
-         hythread_exception_safe_point();
-         save_count = hythread_reset_suspend_disable();
-         hymutex_lock(&t->mutex);
-         hythread_set_suspend_disable(save_count);
-     }
+        // Restore thread state
+        status = hymutex_lock(&self->mutex);
+        assert(status == TM_ERROR_NONE);
+    }
+    self->state &= ~TM_THREAD_STATE_PARKED;
+    self->waited_monitor = NULL;
+    status = hymutex_unlock(&self->mutex);
+    assert(status == TM_ERROR_NONE);
 
-     //the status should be restored for j.u.c.LockSupport
-     if (status == TM_ERROR_INTERRUPT) {
-         t->state |= TM_THREAD_STATE_INTERRUPTED;
-     }
+    // Release thread monitor
+    mon->wait_count--;
+    mon->owner = self;
+    assert(mon->notify_count <= mon->wait_count);
+    status = hythread_monitor_exit(mon);
+    assert(status == TM_ERROR_NONE);
 
-     hymutex_unlock(&t->mutex);
-     return status;
+    if (self->request) {
+        hythread_safe_point();
+        hythread_exception_safe_point();
+    }
+
+    // the status should be restored for j.u.c.LockSupport
+    if (result == TM_ERROR_INTERRUPT) {
+        apr_atomic_set32(&self->interrupted, TRUE);
+    }
+
+    return result;
 }
 
 /**
@@ -89,18 +117,30 @@ IDATA VMCALL hythread_park(I_64 millis, IDATA nanos) {
  * @see hythread_park
  */
 void VMCALL hythread_unpark(hythread_t thread) {
-    if (thread ==  NULL) {
+    IDATA status;
+    hythread_monitor_t mon;
+    if (thread == NULL) {
         return;
     }
-    
-    hymutex_lock(&thread->mutex);
+
+    status = hymutex_lock(&thread->mutex);
+    assert(status == TM_ERROR_NONE);
 
     if (thread->state & TM_THREAD_STATE_PARKED) {
-        thread->state &= ~TM_THREAD_STATE_PARKED;
-        hycond_notify_all(&thread->condition);
+        mon = thread->waited_monitor;
+        assert(mon);
+        // Notify parked thread
+        status = hymutex_lock(&mon->mutex);
+        assert(status == TM_ERROR_NONE);
+        status = hycond_notify_all(&mon->condition);
+        assert(status == TM_ERROR_NONE);
+        status = hymutex_unlock(&mon->mutex);
+        assert(status == TM_ERROR_NONE);
     } else {
         thread->state |= TM_THREAD_STATE_UNPARKED;
     }
 
-    hymutex_unlock(&thread->mutex);
+    thread->state &= ~TM_THREAD_STATE_PARKED;
+    status = hymutex_unlock(&thread->mutex);
+    assert(status == TM_ERROR_NONE);
 }

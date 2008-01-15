@@ -21,8 +21,8 @@
  */
 
 #include "thread_private.h"
+#include <apr_atomic.h>
 #include <open/hythread_ext.h>
-
 
 /** @name Conditional variable
  */
@@ -37,32 +37,31 @@ IDATA condvar_wait_impl(hycond_t *cond, hymutex_t *mutex, I_64 ms, IDATA nano, I
     hythread_t self;
     
     self = tm_self_tls;
-    
-    // Store provided cond into current thread cond
-    self->current_condition = interruptable ? cond : NULL;
 
     // check interrupted flag
-    if (interruptable && (self->state & TM_THREAD_STATE_INTERRUPTED)) {
+    if (interruptable && self->interrupted) {
         // clean interrupted flag
-        hymutex_lock(&self->mutex);
-        self->state &= ~TM_THREAD_STATE_INTERRUPTED;
-        hymutex_unlock(&self->mutex);
+        IDATA status = hythread_clear_interrupted_other(self);
+        assert(status == TM_ERROR_INTERRUPT);
         return TM_ERROR_INTERRUPT;
     }
+
+    // Store provided cond into current thread cond
+    self->current_condition = interruptable ? cond : NULL;
 
     disable_count = hythread_reset_suspend_disable();
 
     r = os_cond_timedwait(cond, mutex, ms, nano);
 
     hythread_set_suspend_disable(disable_count);
+
     self->current_condition = NULL;
    
     // check interrupted flag
-    if (interruptable &&  (self->state & TM_THREAD_STATE_INTERRUPTED)) {
+    if (interruptable &&  self->interrupted) {
         // clean interrupted flag
-        hymutex_lock(&self->mutex);
-        self->state &= (~TM_THREAD_STATE_INTERRUPTED);
-        hymutex_unlock(&self->mutex);
+        IDATA status = hythread_clear_interrupted_other(self);
+        assert(status == TM_ERROR_INTERRUPT);
         return TM_ERROR_INTERRUPT;
     }
 

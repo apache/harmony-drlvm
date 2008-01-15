@@ -342,7 +342,7 @@ IDATA hythread_set_safepoint_callback(hythread_t thread,
         hythread_exception_safe_point();
     } else {
         // sent an interupt signal for waiting threads
-        if (thread->current_condition) {
+        if (thread->current_condition || thread->waited_monitor) {
             hythread_interrupt(thread);
         }
     }
