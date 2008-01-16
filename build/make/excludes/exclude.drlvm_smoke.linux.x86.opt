@@ -10,6 +10,3 @@ stress/Stack.java
 # HARMONY-3917
 gc/PhantomReferenceTest.java
 gc/WeakReferenceTest.java
-
-# HARMONY-3639
-thread/ManyThreadsTest.java

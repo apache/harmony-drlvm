@@ -16,8 +16,6 @@ perf/MultiThreadsSimple.java
 
 # HARMONY-3878
 gc/NPE.java
-# HARMONY-3639
-thread/ManyThreadsTest.java
 
 #################################
 ######## to be analyzed #########
