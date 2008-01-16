@@ -30,6 +30,8 @@ SS_OPT.file=jitrino
 -XDjit.RA3.path=webmaker,cg_regalloc
 -XDjit.RA3.arg.webmaker.calc=true
 
+-XX:jit.SS_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
+
 -XX:jit.SS_OPT.path.optimizer=ssa,simplify,dce,uce,statprof,devirt_virtual,unguard,devirt_intf,hlo_api_magic,inline,purge,osr_path-,escape_path,dce,uce,hvn,dce,uce,inline_helpers-,purge,simplify,uce,dce,uce,abce,lower,dce,uce,memopt,reassoc,dce,uce,hvn,dce,uce,gcm,dessa,statprof
 -XX:jit.SS_OPT.path.osr_path=simplify,dce,uce,gcm,osr
 -XX:jit.SS_OPT.path.escape_path=hvn,simplify,dce,uce,escape
