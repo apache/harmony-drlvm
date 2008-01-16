@@ -203,10 +203,6 @@ void HelperInlinerSession::_run(IRManager& irm) {
 }
 
 void HelperInliner::run()  {
-#ifdef _EM64T_
-    assert(VMInterface::areReferencesCompressed());
-#endif
-
     if (Log::isEnabled())  {
         Log::out() << "Processing inst:"; inst->print(Log::out()); Log::out()<<std::endl; 
     }
