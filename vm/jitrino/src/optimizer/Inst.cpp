@@ -1855,8 +1855,8 @@ Inst* InstFactory::makeConvZE(Modifier mod, Type::Tag toType, Opnd* dst, Opnd* s
 }
 
 Inst* InstFactory::makeConvUnmanaged(Modifier mod, Type::Tag toType, Opnd* dst, Opnd* src) {
-    assert ((dst->getType()->isUnmanagedPtr() && src->getType()->isObject()) 
-        || (dst->getType()->isObject() && src->getType()->isUnmanagedPtr())); 
+    assert ((dst->getType()->isUnmanagedPtr() && (src->getType()->isObject() || src->getType()->isManagedPtr()))
+        || ((dst->getType()->isObject() || dst->getType()->isManagedPtr())) && src->getType()->isUnmanagedPtr()); 
     return makeInst(Op_ConvUnmanaged, mod, toType, dst, src);
 }
 

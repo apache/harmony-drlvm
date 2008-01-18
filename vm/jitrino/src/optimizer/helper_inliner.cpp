@@ -208,7 +208,7 @@ void HelperInliner::run()  {
     }
     assert(method);
 
-    //Convert all inst params info helper params
+    //Convert all inst params into helper params
     uint32 numHelperArgs = method->getNumParams();
     uint32 numInstArgs = inst->getNumSrcOperands();
     Opnd** helperArgs =new (irm->getMemoryManager()) Opnd*[numHelperArgs];
@@ -227,11 +227,26 @@ void HelperInliner::run()  {
     }
     for (uint32 i = 0; i < numInstArgs; i++) {
         Opnd* instArg = inst->getSrc(i);
-        if (instArg->getType()->tag == Type::Tau) { //TODO: what to do with taus?
+        if (instArg->getType()->tag == Type::Tau) {
             continue;
         }
         assert(currentHelperArg < numHelperArgs);
-        helperArgs[currentHelperArg] = instArg;
+        Type* helperArgType = method->getParamType(currentHelperArg);
+        Type* instArgType = instArg->getType();
+        assert(instArgType->isNumeric() == helperArgType->isNumeric());
+
+        bool needObjToMagicConversion = (instArgType->isObject() || instArgType->isManagedPtr()) 
+                && helperArgType->isNamedType() && VMMagicUtils::isVMMagicClass(helperArgType->asNamedType()->getName());
+
+        Opnd* helperArg = instArg;
+        if (needObjToMagicConversion) {
+            Type* dstType = typeManager->getUnmanagedPtrType(typeManager->getInt8Type()); //TODO: use convertVMMagicType2HIR here from translator
+            helperArg = opndManager->createSsaTmpOpnd(dstType);
+            Modifier mod = Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No);
+            instFactory->makeConvUnmanaged(mod, dstType->tag, helperArg, instArg)->insertBefore(inst);
+        }
+        helperArgs[currentHelperArg] = helperArg;
+        currentHelperArg++;
     }
     assert(helperArgs[numHelperArgs-1]!=NULL);
 
