@@ -83,24 +83,30 @@ public class RuntimeTest extends TestCase {
      *  
      */
     public void test_freeMemory() {
-        /**/System.out.println("test_freeMemory");
+        Runtime.getRuntime().gc();
         long r1 = Runtime.getRuntime().freeMemory();
-        assertTrue("Runtime.freeMemory method must not return negative value!",
+        assertTrue("Runtime.freeMemory() returned negative value: " + r1,
                 r1 >= 0);
+        if (r1 < 500000) {
+            // low memory condition, 
+            // avoid false alarm if indicator is too coarse-grained 
+            return;
+        }
+        int probe = 0;
         try {
             String stmp = "";
-            for (int ind = 0; ind < 100; ind++) {
+            for (int ind = 0; ind < 300; ind++) {
                 stmp += "0123456789";
             }
-            while (true) {
-                stmp += stmp;
-                if (r1 > Runtime.getRuntime().freeMemory())
-                    break;
-
+            String inc = stmp;
+            probe = stmp.length();
+            while (r1 <= Runtime.getRuntime().freeMemory()) {
+                stmp += inc;
+                probe = stmp.length();
             }
         } catch (OutOfMemoryError e) {
-            fail("Runtime.freeMemory method should be sensitive to huge "
-                    + "memory allocating!");
+            fail("Runtime.freeMemory() failed to detect " + probe
+                    + " memory reduction from " + r1);
         }
     }
 
