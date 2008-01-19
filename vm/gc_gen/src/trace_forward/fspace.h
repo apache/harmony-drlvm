@@ -29,6 +29,9 @@
  * In our Gen GC, not all live objects are copied to tspace space, the newer baby will
  * still be preserved in  fspace, that means to give them time to die. 
  */
+#ifdef PREFETCH_SUPPORTED
+extern Boolean mark_prefetch;
+#endif
 
 extern Boolean forward_first_half;
 /* boundary splitting fspace into forwarding part and remaining part */

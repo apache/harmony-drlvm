@@ -305,14 +305,34 @@ void gc_set_rootset(GC* gc)
   assert(gc_match_either_kind(gc, MINOR_COLLECTION|NORMAL_MAJOR_COLLECTION));
   if( gc_match_kind(gc, NORMAL_MAJOR_COLLECTION )){
     /* all the remsets are useless now */
-    /* clean and put back mutator remsets */  
+    /* clean and put back mutator remsets */
+#ifdef USE_REM_SLOTS  
     root_set = pool_get_entry( mutator_remset_pool );
     while(root_set){
         vector_block_clear(root_set);
         pool_put_entry(free_set_pool, root_set);
         root_set = pool_get_entry( mutator_remset_pool );
     }
-  
+#else
+    Vector_Block* rem_set = pool_get_entry(mutator_remset_pool);
+    
+    while(rem_set){
+      POINTER_SIZE_INT* iter = vector_block_iterator_init(rem_set);
+      while(!vector_block_iterator_end(rem_set,iter)){
+        Partial_Reveal_Object* p_obj_holding_ref = (Partial_Reveal_Object*)*iter;
+        iter = vector_block_iterator_advance(rem_set,iter);
+        
+        assert( !obj_belongs_to_nos(p_obj_holding_ref));
+        assert( obj_is_remembered(p_obj_holding_ref));
+        obj_clear_rem_bit(p_obj_holding_ref);
+      } 
+      vector_block_clear(rem_set);
+      pool_put_entry(free_set_pool, rem_set);      
+      rem_set = pool_get_entry(metadata->mutator_remset_pool);
+    }
+    
+#endif /* ifdef USE_REM_SLOTS else */  
+
     /* clean and put back collector remsets */  
     root_set = pool_get_entry( collector_remset_pool );
     while(root_set){
@@ -322,12 +342,45 @@ void gc_set_rootset(GC* gc)
     }
 
   }else{ /* generational MINOR_COLLECTION */
+
     /* all the remsets are put into the shared pool */
+#ifdef USE_REM_SLOTS
     root_set = pool_get_entry( mutator_remset_pool );
     while(root_set){
         pool_put_entry(gc_rootset_pool, root_set);
         root_set = pool_get_entry( mutator_remset_pool );
     }
+#else /* USE_REM_OBJS */
+    /* scan mutator remembered objects, and put the p_refs to collector_remset_pool if they
+       hold references to NOS. The pool will be moved to rootset_pool next. */
+    
+    void allocator_object_write_barrier(Partial_Reveal_Object* p_object, Collector* allocator); 
+    /* temporarily use collector[0]'s rem_set for the moving. Hope to be parallelized in future. */
+    Collector* collector = gc->collectors[0];
+    collector->rem_set = free_set_pool_get_entry(metadata);
+
+    Vector_Block* rem_set = pool_get_entry(mutator_remset_pool);
+    
+    while(rem_set){
+      POINTER_SIZE_INT* iter = vector_block_iterator_init(rem_set);
+      while(!vector_block_iterator_end(rem_set,iter)){
+        Partial_Reveal_Object* p_obj_holding_ref = (Partial_Reveal_Object*)*iter;
+        iter = vector_block_iterator_advance(rem_set,iter);
+        
+        assert( !obj_belongs_to_nos(p_obj_holding_ref));
+        assert( obj_is_remembered(p_obj_holding_ref));
+        obj_clear_rem_bit(p_obj_holding_ref);
+        allocator_object_write_barrier(p_obj_holding_ref, collector);  
+      } 
+      vector_block_clear(rem_set);
+      pool_put_entry(free_set_pool, rem_set);      
+      rem_set = pool_get_entry(metadata->mutator_remset_pool);
+    }
+    
+   pool_put_entry(collector_remset_pool, collector->rem_set);
+   collector->rem_set = NULL;
+    
+#endif /* ifdef USE_REM_SLOTS else */
   
     /* put back collector remsets */  
     root_set = pool_get_entry( collector_remset_pool );
@@ -379,9 +432,12 @@ void gc_clear_rootset(GC* gc)
 
 void gc_clear_remset(GC* gc)
 {
-  assert(gc->root_set != NULL);
+  /* this function clears all the remset before fallback */
+  assert(gc_match_kind(gc, FALLBACK_COLLECTION));
+  
   /* rootset pool has some entries that are actually remset, because all the remsets are put into rootset pool 
      before the collection. gc->root_set is a pointer pointing to the boundary between remset and rootset in the pool */
+  assert(gc->root_set != NULL);
   Pool* pool = gc_metadata.gc_rootset_pool;    
   Vector_Block* rem_set = pool_get_entry(pool);
   while(rem_set != gc->root_set){
@@ -396,16 +452,16 @@ void gc_clear_remset(GC* gc)
   
   /* put back last remset block of each collector (saved in the minor collection before fallback) */  
   unsigned int num_active_collectors = gc->num_active_collectors;
+  pool = gc_metadata.collector_remset_pool;
   for(unsigned int i=0; i<num_active_collectors; i++)
   {
     Collector* collector = gc->collectors[i];
     assert(collector->rem_set != NULL);
-    pool_put_entry(gc_metadata.collector_remset_pool, collector->rem_set);
+    pool_put_entry(pool, collector->rem_set);
     collector->rem_set = NULL;
   }
   
   /* cleanup remset pool */  
-  pool = gc_metadata.collector_remset_pool;  
   rem_set = pool_get_entry(pool);
   while(rem_set){
     vector_block_clear(rem_set);
@@ -416,6 +472,8 @@ void gc_clear_remset(GC* gc)
   return;
 } 
 
+//#include <hash_set>
+/* FIXME:: should better move to verifier dir */
 extern Boolean verify_live_heap;
 void gc_metadata_verify(GC* gc, Boolean is_before_gc)
 {
@@ -424,16 +482,84 @@ void gc_metadata_verify(GC* gc, Boolean is_before_gc)
   assert(pool_is_empty(metadata->collector_repset_pool));
   assert(pool_is_empty(metadata->mark_task_pool));
   
-  if(!is_before_gc || !gc_is_gen_mode())
+  if(!is_before_gc || !gc_is_gen_mode()){
     assert(pool_is_empty(metadata->mutator_remset_pool));
-  
-  if(!gc_is_gen_mode()){
-    /* FIXME:: even for gen gc, it should be empty if NOS is forwarding_all */  
-    assert(pool_is_empty(metadata->collector_remset_pool));
+  }else if(gc_is_gen_mode() && verify_live_heap ){
+    unsigned int remset_size = pool_size(metadata->mutator_remset_pool);
+    printf("Size of mutator remset pool %s: %d\n", is_before_gc?"before GC":"after GC", remset_size);   
+/*  
+      using namespace stdext;
+      hash_set<Partial_Reveal_Object**> pref_hash;
+      unsigned int num_rem_slots = 0;
+      unsigned int num_ref_to_nos = 0;
+
+      pool_iterator_init(metadata->mutator_remset_pool);
+      Vector_Block* rem_set = pool_iterator_next(metadata->mutator_remset_pool);
+      while(rem_set){
+        POINTER_SIZE_INT* iter = vector_block_iterator_init(rem_set);
+        while(!vector_block_iterator_end(rem_set,iter)){
+          Partial_Reveal_Object** p_ref = (Partial_Reveal_Object **)*iter;
+          iter = vector_block_iterator_advance(rem_set,iter);
+
+          pref_hash.insert(p_ref);
+          num_rem_slots ++; 
+#ifdef USE_REM_SLOTS
+          Partial_Reveal_Object *p_obj = *p_ref;
+          if( p_obj && addr_belongs_to_nos(p_obj))
+            num_ref_to_nos++;
+#endif
+          if(addr_belongs_to_nos(p_ref)){
+            printf("wrong remset value!!!\n");
+          }
+        } 
+        rem_set = pool_iterator_next(metadata->mutator_remset_pool);
+      }
+      printf("pref hashset size is %d\n", pref_hash.size());
+      printf("Num of rem slots: %d, refs to NOS: %d\n", num_rem_slots, num_ref_to_nos);
+*/
   }
+
+  if(!gc_is_gen_mode()){
+    assert(pool_is_empty(metadata->collector_remset_pool));
+  }else if( verify_live_heap){
+    unsigned int remset_size = pool_size(metadata->collector_remset_pool);
+    printf("Size of collector remset pool %s: %d\n", is_before_gc?"before GC":"after GC", remset_size);
+/*    
+    if(!is_before_gc){ 
+ 
+      using namespace stdext;
+      hash_set<Partial_Reveal_Object**> pref_hash;
+      
+      unsigned int num_rem_slots = 0;
+      pool_iterator_init(metadata->collector_remset_pool);
+      Vector_Block* rem_set = pool_iterator_next(metadata->collector_remset_pool);
+      while(rem_set){
+        POINTER_SIZE_INT* iter = vector_block_iterator_init(rem_set);
+        while(!vector_block_iterator_end(rem_set,iter)){
+          Partial_Reveal_Object** p_ref = (Partial_Reveal_Object **)*iter;
+          iter = vector_block_iterator_advance(rem_set,iter);
+
+          pref_hash.insert(p_ref);
+          num_rem_slots ++; 
+          Partial_Reveal_Object *p_obj = *p_ref;
+          assert( obj_is_survivor(p_obj));
+          assert( addr_belongs_to_nos(p_obj) && !addr_belongs_to_nos(p_ref));
+          if( !obj_is_survivor(p_obj) || !addr_belongs_to_nos(p_obj) || addr_belongs_to_nos(p_ref)){
+            printf("wrong remset value!!!\n");
+          }
+        } 
+        rem_set = pool_iterator_next(metadata->collector_remset_pool);
+      }
+      printf("pref hashset size is %d\n", pref_hash.size());
+      printf("Num of rem slots: %d\n", num_rem_slots);
+  
+    }
+*/
+  }/* if verify_live_heap */
 
   if(verify_live_heap ){
     unsigned int free_pool_size = pool_size(metadata->free_set_pool);
+    printf("Size of free pool %s: %d\n\n\n", is_before_gc?"before GC":"after GC", free_pool_size); 
   }
   
   return;  
@@ -531,4 +657,5 @@ void gc_clear_dirty_set(GC* gc)
 
 void free_set_pool_put_entry(Vector_Block* block, GC_Metadata *metadata)
 { pool_put_entry(metadata->free_set_pool, block); }
+
 

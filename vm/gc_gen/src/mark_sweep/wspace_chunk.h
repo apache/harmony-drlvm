@@ -20,7 +20,7 @@
 
 #include "wspace.h"
 
-//#define SSPACE_USE_FASTDIV
+#define SSPACE_USE_FASTDIV
 #ifdef SSPACE_USE_FASTDIV
 #if 0
 #define massert(x) do { if(!(x)) { printf("%s:%s, , Assertion %s failed\n", __FILE__, __LINE__, #x); exit(1); }} while(0) 
@@ -109,8 +109,14 @@ typedef struct Chunk_Header {
 #define ABNORMAL_CHUNK_HEADER(addr) ((Chunk_Header*)((POINTER_SIZE_INT)addr & CHUNK_GRANULARITY_HIGH_MASK))
 
 #define MAX_SLOT_INDEX 0xFFffFFff
-#define COLOR_BITS_PER_OBJ 4   // should be powers of 2
-#define SLOT_NUM_PER_WORD_IN_TABLE  (BITS_PER_WORD /COLOR_BITS_PER_OBJ)
+//#define COLOR_BITS_PER_OBJ              4   // should be powers of 2
+#define COLOR_BITS_PER_OBJ_SHIT     2 // COLOR_BITS_PER_OBJ = 1 << COLOR_BITS_PER_OBJ_SHIT
+#define COLOR_BITS_PER_OBJ          (1<<COLOR_BITS_PER_OBJ_SHIT)
+
+//#define SLOT_NUM_PER_WORD_IN_TABLE  (BITS_PER_WORD /COLOR_BITS_PER_OBJ)
+#define SLOT_NUM_PER_WORD_SHIT      (BIT_SHIFT_TO_BITS_PER_WORD - COLOR_BITS_PER_OBJ_SHIT)
+#define SLOT_NUM_PER_WORD_IN_TABLE  (1<<SLOT_NUM_PER_WORD_SHIT)
+
 
 /* Two equations:
  * 1. CHUNK_HEADER_VARS_SIZE_BYTES + NORMAL_CHUNK_TABLE_SIZE_BYTES + slot_size*NORMAL_CHUNK_SLOT_NUM = NORMAL_CHUNK_SIZE_BYTES

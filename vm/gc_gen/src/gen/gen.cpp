@@ -255,24 +255,27 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
 void gc_gen_destruct(GC_Gen *gc_gen)
 {
   TRACE2("gc.process", "GC: GC_Gen heap destruct ......");
+
+   /* We cannot use reserve_heap_size because perhaps only part of it is committed. */
+  int mos_size = space_committed_size((Space*)gc_gen->mos);
+  int nos_size = space_committed_size((Space*)gc_gen->nos);
+  int los_size = 0;
   
   gc_nos_destruct(gc_gen);
   gc_mos_destruct(gc_gen);
-  POINTER_SIZE_INT los_size = 0;
+
   if(MAJOR_ALGO != MAJOR_MARK_SWEEP){
-    los_size = space_committed_size((Space*)gc_gen->los);
+    los_size = (int)space_committed_size((Space*)gc_gen->los);
     gc_los_destruct(gc_gen);
   }
 
+
 #ifndef STATIC_NOS_MAPPING
-  /* without static mapping, the heap is release as a whole. 
-     We cannot use reserve_heap_size because perhaps only part of it is committed.  */
-  vm_unmap_mem(gc_gen->physical_start, gc_gen_total_memory_size(gc_gen));
+  /* without static mapping, the heap is release as a whole.  */
+  vm_unmap_mem(gc_gen->physical_start, mos_size + nos_size + los_size);
 
 #else  /* otherwise, release the spaces separately */
 
-  int mos_size = space_committed_size((Space*)gc_gen->mos);
-  int nos_size = space_committed_size((Space*)gc_gen->nos);
   vm_unmap_mem(gc_gen->physical_start, los_size + mos_size);  /* los+mos */
   vm_unmap_mem(nos_boundary, nos_size);  /* nos */
 
@@ -315,7 +318,12 @@ void gc_nos_initialize(GC_Gen *gc, void *start, POINTER_SIZE_INT nos_size, POINT
 }
 
 void gc_nos_destruct(GC_Gen *gc)
-{ fspace_destruct((Fspace*)gc->nos); }
+{ 
+  if(MINOR_ALGO == MINOR_NONGEN_SEMISPACE_POOL || MINOR_ALGO == MINOR_GEN_SEMISPACE_POOL)
+    sspace_destruct((Sspace*)gc->nos);
+  else
+    fspace_destruct((Fspace*)gc->nos); 
+}
 
 void gc_mos_initialize(GC_Gen *gc, void *start, POINTER_SIZE_INT mos_size, POINTER_SIZE_INT commit_size)
 {
@@ -422,7 +430,8 @@ void gc_decide_collection_algorithm(GC_Gen* gc, char* minor_algo, char* major_al
 
     }else {
       WARN2("gc.base","\nWarning: GC algorithm setting incorrect. Will use default value.\n");
-    
+      MINOR_ALGO = MINOR_NONGEN_FORWARD_POOL;      
+      gc_disable_gen_mode();    
     }
   }
   
@@ -443,6 +452,7 @@ void gc_decide_collection_algorithm(GC_Gen* gc, char* minor_algo, char* major_al
       is_collector_local_alloc = FALSE;
     }else{
      WARN2("gc.base","\nWarning: GC algorithm setting incorrect. Will use default value.\n");
+      MAJOR_ALGO = MAJOR_COMPACT_MOVE;
       
     }
   }
@@ -775,10 +785,7 @@ void gc_gen_reclaim_heap(GC_Gen *gc, int64 gc_start_time)
   if(gc->collect_result == FALSE && gc_match_kind((GC*)gc, MINOR_COLLECTION)){
     
     INFO2("gc.process", "GC: Minor collection failed, transform to fallback collection ...");
-    
-    if(gc_is_gen_mode()) 
-      gc_clear_remset((GC*)gc);
-    
+        
     /* runout mos in minor collection */
     if(MAJOR_ALGO != MAJOR_MARK_SWEEP){
       assert(((Blocked_Space*)mos)->free_block_idx == ((Blocked_Space*)mos)->ceiling_block_idx + 1);
@@ -794,6 +801,9 @@ void gc_gen_reclaim_heap(GC_Gen *gc, int64 gc_start_time)
     gc_gen_stats_reset_before_collection((GC_Gen*)gc);
     gc_gen_collector_stats_reset((GC_Gen*)gc);
 #endif
+
+    if(gc_is_gen_mode()) 
+      gc_clear_remset((GC*)gc);
 
     if(verify_live_heap && (MAJOR_ALGO != MAJOR_MARK_SWEEP))
       event_gc_collect_kind_changed((GC*)gc);

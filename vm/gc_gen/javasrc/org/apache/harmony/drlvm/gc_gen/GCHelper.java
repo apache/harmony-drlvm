@@ -71,12 +71,11 @@ public class GCHelper {
             if(new_free.LE(end)) {
                // do prefetch from new_free to new_free + PREFETCH_DISTANCE + ZEROING_SIZE
                VMHelper.prefetch(new_free, PREFETCH_DISTANCE + ZEROING_SIZE, PREFETCH_STRIDE);
-
+    
                Address new_ceiling = new_free.plus(ZEROING_SIZE);
 	       // align ceiling to 64 bytes		
 	       int remainder = new_ceiling.toInt() & 63;
 	       new_ceiling = new_ceiling.minus(remainder);
-
                if( !new_ceiling.LE(end) ){
                    new_ceiling = end;
                }
@@ -137,7 +136,13 @@ public class GCHelper {
             p_objSlot.store(p_target);
             return;
         }
-
+        Address p_obj_info = p_objBase.plus(4);
+        int obj_info = p_obj_info.loadInt();
+        if((obj_info & 0x80) != 0){
+            p_objSlot.store(p_target);
+            return;
+        }
+         
         VMHelper.writeBarrier(p_objBase, p_objSlot, p_target);
     }
 
@@ -155,6 +160,7 @@ public class GCHelper {
     private static native long getNosBoundary();    
     private static native int TLSGCOffset();
 }
+
 
 
 

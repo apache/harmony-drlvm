@@ -131,7 +131,9 @@ void sspace_destruct(Sspace *sspace)
 #ifdef USE_32BITS_HASHCODE
   space_desturct_blocks((Blocked_Space*)sspace);
 #endif
+  /* we don't free the real space here, the heap will be freed altogether */
   STD_FREE(sspace);   
+  sspace = NULL;
 }
 
 POINTER_SIZE_INT sspace_free_space_size(Sspace* nos)

@@ -26,7 +26,7 @@ void* nos_space_adjust(Space* nos, void* new_nos_boundary, POINTER_SIZE_INT new_
 {
   if(nos->collect_algorithm == MINOR_NONGEN_SEMISPACE_POOL || nos->collect_algorithm == MINOR_GEN_SEMISPACE_POOL)
     return sspace_heap_start_adjust((Sspace*)nos, new_nos_boundary, new_nos_size);
-  else if( nos->collect_algorithm == MINOR_NONGEN_FORWARD_POOL )
+  else if( nos->collect_algorithm == MINOR_NONGEN_FORWARD_POOL || nos->collect_algorithm == MINOR_GEN_FORWARD_POOL )
     return fspace_heap_start_adjust((Fspace*)nos, new_nos_boundary, new_nos_size);  
   
   assert(0);
@@ -49,7 +49,7 @@ POINTER_SIZE_INT nos_free_space_size(Space* nos)
   POINTER_SIZE_INT free_size = 0;
   if(nos->collect_algorithm == MINOR_NONGEN_SEMISPACE_POOL || nos->collect_algorithm == MINOR_GEN_SEMISPACE_POOL)
     return sspace_free_space_size((Sspace*)nos);
-  else if( nos->collect_algorithm == MINOR_NONGEN_FORWARD_POOL )
+  else if( nos->collect_algorithm == MINOR_NONGEN_FORWARD_POOL || nos->collect_algorithm == MINOR_GEN_FORWARD_POOL)
     return fspace_free_space_size((Fspace*)nos);
 
   assert(0);
@@ -72,7 +72,7 @@ POINTER_SIZE_INT nos_used_space_size(Space* nos)
   POINTER_SIZE_INT free_size = 0;
   if(nos->collect_algorithm == MINOR_NONGEN_SEMISPACE_POOL || nos->collect_algorithm == MINOR_GEN_SEMISPACE_POOL)
     return sspace_used_space_size((Sspace*)nos);
-  else if( nos->collect_algorithm == MINOR_NONGEN_FORWARD_POOL )
+  else if( nos->collect_algorithm == MINOR_NONGEN_FORWARD_POOL || nos->collect_algorithm == MINOR_GEN_FORWARD_POOL)
     return fspace_used_space_size((Fspace*)nos);
 
   assert(0);

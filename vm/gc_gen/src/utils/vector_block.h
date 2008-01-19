@@ -245,6 +245,11 @@ inline POINTER_SIZE_INT vector_stack_pop(Vector_Block* block)
   return value;
 }
 
+inline POINTER_SIZE_INT vector_stack_read(Vector_Block* block, int idx)
+{
+	return block->head[idx];
+}
+
 inline void vector_block_integrity_check(Vector_Block* block)
 {
   POINTER_SIZE_INT* iter = vector_block_iterator_init(block);

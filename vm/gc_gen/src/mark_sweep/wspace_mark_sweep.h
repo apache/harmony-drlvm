@@ -80,13 +80,14 @@ FORCE_INLINE POINTER_SIZE_INT *get_color_word_in_table(Partial_Reveal_Object *ob
     chunk = NORMAL_CHUNK_HEADER(obj);
     index = slot_addr_to_index(chunk, obj);
   }
-  unsigned int word_index = index / SLOT_NUM_PER_WORD_IN_TABLE;
-  index_in_word = COLOR_BITS_PER_OBJ * (index % SLOT_NUM_PER_WORD_IN_TABLE);
-  //unsigned int word_index = index >> 3;
-  //index_in_word = COLOR_BITS_PER_OBJ * (index & (((unsigned int)(SLOT_NUM_PER_WORD_IN_TABLE-1))));
+  //unsigned int word_index = index / SLOT_NUM_PER_WORD_IN_TABLE;
+  //index_in_word = COLOR_BITS_PER_OBJ * (index % SLOT_NUM_PER_WORD_IN_TABLE);
+  unsigned int word_index = index >> SLOT_NUM_PER_WORD_SHIT;
+  index_in_word = COLOR_BITS_PER_OBJ * (index & (((unsigned int)(SLOT_NUM_PER_WORD_IN_TABLE-1))));
   
   return &chunk->table[word_index];
 }
+
 FORCE_INLINE POINTER_SIZE_INT *get_color_word_in_table(Partial_Reveal_Object *obj, unsigned int &index_in_word, unsigned int size)
 {
   Chunk_Header *chunk;
@@ -99,7 +100,7 @@ FORCE_INLINE POINTER_SIZE_INT *get_color_word_in_table(Partial_Reveal_Object *ob
     chunk = NORMAL_CHUNK_HEADER(obj);
     index = slot_addr_to_index(chunk, obj);
   }
-  unsigned int word_index = index >> 3;
+  unsigned int word_index = index >> SLOT_NUM_PER_WORD_SHIT;
   index_in_word = COLOR_BITS_PER_OBJ * (index & (((unsigned int)(SLOT_NUM_PER_WORD_IN_TABLE-1))));
   
   return &chunk->table[word_index];

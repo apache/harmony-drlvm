@@ -39,5 +39,7 @@ inline void gc_set_barrier_function(unsigned int wb_function)
 {
   write_barrier_function = wb_function;
 }
+
 #endif /* _GC_FOR_BARRIER_H_ */
+
 

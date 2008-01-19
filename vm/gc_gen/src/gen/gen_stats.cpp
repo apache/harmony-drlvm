@@ -29,7 +29,7 @@ void gc_gen_stats_initialize(GC_Gen* gc)
   GC_Gen_Stats* stats = (GC_Gen_Stats*)STD_MALLOC(sizeof(GC_Gen_Stats));
 
   memset(stats, 0, sizeof(GC_Gen_Stats));
-  stats->is_los_collected = false;
+  stats->is_los_collected = FALSE;
 
   gc->stats = stats; 
 }

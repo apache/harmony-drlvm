@@ -31,8 +31,74 @@
 
 volatile unsigned int write_barrier_function;
 
+void allocator_object_write_barrier(Partial_Reveal_Object* p_object, Collector* allocator) 
+{
+  if( addr_belongs_to_nos(p_object)) return;
+
+  REF* p_slot; 
+  /* scan array object */
+  if (object_is_array((Partial_Reveal_Object*)p_object)) {
+    Partial_Reveal_Object* array = p_object;
+    assert(!obj_is_primitive_array(array));
+
+    int32 array_length = vector_get_length((Vector_Handle) array);
+    for (int i = 0; i < array_length; i++) {
+      p_slot = (REF *)vector_get_element_address_ref((Vector_Handle)array, i);
+      if( read_slot(p_slot) != NULL && addr_belongs_to_nos(read_slot(p_slot))){
+        collector_remset_add_entry(allocator, (Partial_Reveal_Object**)p_slot);
+      }
+    }   
+    return;
+  }
+
+  /* scan non-array object */
+  Partial_Reveal_Object* p_obj =  (Partial_Reveal_Object*)p_object;   
+  unsigned int num_refs = object_ref_field_num(p_obj);
+  int *ref_iterator = object_ref_iterator_init(p_obj);
+            
+  for(unsigned int i=0; i<num_refs; i++){
+    p_slot = object_ref_iterator_get(ref_iterator+i, p_obj);        
+    if( addr_belongs_to_nos(read_slot(p_slot))){
+      collector_remset_add_entry(allocator, (Partial_Reveal_Object**)p_slot);
+    }
+  }
+
+  return;
+}
+
+static void mutator_rem_obj(Managed_Object_Handle p_obj_written)
+{
+  if( obj_is_remembered((Partial_Reveal_Object*)p_obj_written))
+    return;
+
+  Partial_Reveal_Object* p_obj = (Partial_Reveal_Object*)p_obj_written;
+  Obj_Info_Type info = get_obj_info_raw(p_obj);
+  Obj_Info_Type new_info = info | OBJ_REM_BIT;
+  while ( info != new_info) {
+    Obj_Info_Type temp =
+      atomic_casptrsz((volatile POINTER_SIZE_INT*)get_obj_info_addr(p_obj), new_info, info);
+    if (temp == info) break;
+    info = get_obj_info_raw(p_obj);
+    new_info = info | OBJ_REM_BIT;
+  }
+  if(info == new_info) return; /* remembered by other */
+    
+  Mutator *mutator = (Mutator *)gc_get_tls();            
+  mutator_remset_add_entry(mutator, (REF*)p_obj);
+  return;
+}
+
+static void gen_write_barrier_rem_obj(Managed_Object_Handle p_obj_holding_ref, 
+                      Managed_Object_Handle p_target) 
+{
+  if(p_target >= nos_boundary && p_obj_holding_ref < nos_boundary)
+    mutator_rem_obj(p_obj_holding_ref);
+
+  return;
+}
+
 /* The implementations are only temporary */
-static void write_barrier_rem_source_slot(Managed_Object_Handle *p_slot, 
+static void gen_write_barrier_rem_slot(Managed_Object_Handle *p_slot, 
                       Managed_Object_Handle p_target) 
 {
   if(p_target >= nos_boundary && p_slot < nos_boundary){
@@ -178,11 +244,18 @@ void gc_heap_wrote_object (Managed_Object_Handle p_obj_written)
   }
   mutator_post_signal(mutator,MUTATOR_EXIT_BARRIER);
 
-  if( !gc_is_gen_mode() ) return;
-  if( object_has_ref_field((Partial_Reveal_Object*)p_obj_written)){
-    /* for array copy and object clone */
-    gc_object_write_barrier(p_obj_written); 
-  }
+  if( !gc_is_gen_mode() || !object_has_ref_field((Partial_Reveal_Object*)p_obj_written)) 
+    return;
+
+  /* for array copy and object clone */
+#ifdef USE_REM_SLOTS
+  gc_object_write_barrier(p_obj_written); 
+#else
+  if( p_obj_written >= nos_boundary ) return;
+
+  mutator_rem_obj( p_obj_written );  
+#endif 
+  return;
 }
 
 /* FIXME:: this is not the right interface for write barrier */
@@ -197,7 +270,11 @@ void gc_heap_slot_write_ref (Managed_Object_Handle p_obj_holding_ref,Managed_Obj
       break;
     case WRITE_BARRIER_REM_SOURCE_REF:
       *p_slot = p_target;
-      write_barrier_rem_source_slot(p_slot, p_target); 
+#ifdef USE_REM_SLOTS
+      gen_write_barrier_rem_slot(p_slot, p_target); 
+#else /* USE_REM_OBJS */
+      gen_write_barrier_rem_obj(p_obj_holding_ref, p_target);
+#endif
       break;      
     case WRITE_BARRIER_REM_SOURCE_OBJ:
       *p_slot = p_target;

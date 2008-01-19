@@ -138,10 +138,9 @@ inline void alloc_slot_in_table(POINTER_SIZE_INT *table, unsigned int slot_index
 {
   //assert(!slot_is_alloc_in_table(table, slot_index));
   
-  unsigned int color_bits_index = slot_index * COLOR_BITS_PER_OBJ;
-  unsigned int word_index = color_bits_index / BITS_PER_WORD;
-  unsigned int index_in_word = color_bits_index % BITS_PER_WORD;
-    
+  unsigned int color_bits_index = slot_index << COLOR_BITS_PER_OBJ_SHIT;
+  unsigned int word_index = color_bits_index >> BIT_SHIFT_TO_BITS_PER_WORD;
+  unsigned int index_in_word = color_bits_index & (((unsigned int)(BITS_PER_WORD-1)));
   volatile POINTER_SIZE_INT *p_color_word = &table[word_index];
   assert(p_color_word);
   

@@ -92,7 +92,6 @@ inline Boolean gc_obj_is_dead(GC *gc, Partial_Reveal_Object *p_obj)
 
 inline Boolean fspace_obj_to_be_forwarded(Partial_Reveal_Object *p_obj)
 {
-  if(!obj_belongs_to_nos(p_obj)) return FALSE;
   return forward_first_half ? (p_obj < object_forwarding_boundary) : (p_obj>=object_forwarding_boundary);
 }
 inline Boolean obj_need_move(GC *gc, Partial_Reveal_Object *p_obj)
@@ -108,8 +107,13 @@ inline Boolean obj_need_move(GC *gc, Partial_Reveal_Object *p_obj)
   Cspace *cspace = gc_mc_get_cspace((GC_MC*)gc);
   return cspace->move_object;
 #endif
-  if(gc_is_gen_mode() && gc_match_kind(gc, MINOR_COLLECTION))
-    return fspace_obj_to_be_forwarded(p_obj);
+  if(gc_match_kind(gc, MINOR_COLLECTION)){
+    if(!obj_belongs_to_nos(p_obj)) return FALSE;
+    if(MINOR_ALGO == MINOR_NONGEN_SEMISPACE_POOL || MINOR_ALGO == MINOR_GEN_SEMISPACE_POOL)
+      return TRUE;
+    else if(gc_is_gen_mode())
+      return fspace_obj_to_be_forwarded(p_obj);
+  }
   
   Space *space = space_of_addr(gc, p_obj);
   return space->move_object;

@@ -157,7 +157,7 @@ void gc_update_collection_scheduler(GC* gc, int64 time_mutator, int64 time_mark)
       if(gc_concurrent_match_algorithm(OTF_REM_OBJ_SNAPSHOT_ALGO)||gc_concurrent_match_algorithm(OTF_REM_NEW_TARGET_ALGO)){
         collection_scheduler->time_delay_to_start_mark = (int64)((time_alloc_expected - time_trace_expected)*0.65);
       }else if(gc_concurrent_match_algorithm(MOSTLY_CONCURRENT_ALGO)){
-        collection_scheduler->time_delay_to_start_mark = (int64)(time_mutator* 0.6);
+        collection_scheduler->time_delay_to_start_mark = (int64)(time_mutator* 0.5);
       }
       
     }else{
@@ -190,18 +190,19 @@ unsigned int gc_decide_marker_number(GC* gc)
 
     if(num_active_marker == 0) num_active_marker = 1;
 
-    if(c_time > m_time || (float)d_time > (m_time - c_time) * 0.75){      
+    if((c_time + d_time) > m_time || (float)d_time < (m_time * 0.25)){      
       INFO2("gc.con","[Concurrent GC] increase marker number.");
       num_active_marker ++;
       if(num_active_marker > gc->num_markers) num_active_marker = gc->num_markers;
-    }else if((float)d_time < (m_time - c_time) * 0.25){
+    }else if((float)d_time > (m_time * 0.6)){
       INFO2("gc.con","[Concurrent GC] decrease marker number.");
       num_active_marker --;
       if(num_active_marker == 0)  num_active_marker = 1;
     }
+    
+    INFO2("gc.con","[Concurrent GC] ctime  "<<(unsigned)(c_time>>10)<<"  mtime  "<<(unsigned)(m_time>>10)<<"  dtime  "<<(unsigned)(d_time>>10));
+    INFO2("gc.con","[Concurrent GC] marker num : "<<num_active_marker<<" ");
   }
-  
-  INFO2("gc.con","[Concurrent GC] marker num : "<<num_active_marker<<" ");
 
   
   collection_scheduler->last_marker_num = num_active_marker;
@@ -221,10 +222,12 @@ Boolean gc_try_schedule_collection(GC* gc, unsigned int gc_cause)
   }
   
   if(gc_need_start_concurrent_mark(gc)){
-    vm_gc_lock_enum();
-    INFO2("gc.con", "\nCon GC: concurrent mark start ...\n");
+    vm_gc_lock_enum();    
+    int64 pause_start = time_now();
+    INFO2("gc.con", "[Concurrent GC] concurrent mark start ...\n");
     gc_start_concurrent_mark(gc);
     vm_gc_unlock_enum();
+    INFO2("gc.con","[Concurrent GC] pause time of concurrent enumeration:  "<<((unsigned int)((time_now()-pause_start)>>10))<<"  ms \n");
     unlock(gc->collection_scheduler_lock);
     return TRUE;
   }
@@ -237,13 +240,15 @@ Boolean gc_try_schedule_collection(GC* gc, unsigned int gc_cause)
   }
 
   if(gc_need_reset_status(gc)){
+    int64 pause_start = time_now();
     vm_gc_lock_enum();
     int disable_count = hythread_reset_suspend_disable();    
     gc_prepare_rootset(gc);
     gc_reset_after_concurrent_collection(gc);
-    vm_resume_threads_after();    
+    vm_resume_threads_after();
     hythread_set_suspend_disable(disable_count);
     vm_gc_unlock_enum();
+    INFO2("gc.con","[Concurrent GC] pause time after concurrent GC:  "<<((unsigned int)((time_now()-pause_start)>>10))<<"  ms \n");
     unlock(gc->collection_scheduler_lock);
     return TRUE;
   }

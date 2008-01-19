@@ -351,9 +351,7 @@ extern unsigned int mspace_free_block_idx;
 static void mspace_sliding_compact(Collector* collector, Mspace* mspace)
 {
   void *start_pos;
-  Block_Header *nos_fw_start_block = (Block_Header *)&mspace->blocks[mspace_free_block_idx - mspace->first_block_idx];
-  Boolean is_fallback = gc_match_kind(collector->gc, FALLBACK_COLLECTION);
-  
+    
   while(Partial_Reveal_Object *p_obj = get_next_first_src_obj(mspace)){
     Block_Header *src_block = GC_BLOCK_HEADER(p_obj);
     assert(src_block->dest_counter);

@@ -328,7 +328,7 @@ void gc_parse_options(GC* gc)
 
 #if defined(ALLOC_ZEROING) && defined(ALLOC_PREFETCH)
   if(is_property_set("gc.prefetch",VM_PROPERTIES) ==1) {
-    PREFETCH_ENABLED=get_boolean_property("gc.prefetch");
+    PREFETCH_ENABLED = get_boolean_property("gc.prefetch");
   }
 
   if(is_property_set("gc.prefetch_distance",VM_PROPERTIES)==1) {
@@ -347,10 +347,13 @@ void gc_parse_options(GC* gc)
   
   if(is_property_set("gc.zeroing_size",VM_PROPERTIES)==1) {
     ZEROING_SIZE = get_size_property("gc.zeroing_size");
-    if(!PREFETCH_ENABLED) {
-      WARN2("gc.zeroing_size","Warning: Zeroing size set with Prefetch disabled!");
-    }  
   }   
+#endif
+
+#ifdef PREFETCH_SUPPORTED
+  if(is_property_set("gc.mark_prefetch",VM_PROPERTIES) ==1) {
+    mark_prefetch = get_boolean_property("gc.mark_prefetch");
+  }  
 #endif
 
   return;
@@ -397,13 +400,6 @@ int64 get_collection_end_time()
 
 void gc_prepare_rootset(GC* gc)
 {
-  if(!USE_CONCURRENT_GC){
-    gc_metadata_verify(gc, TRUE);
-#ifndef BUILD_IN_REFERENT
-    gc_finref_metadata_verify((GC*)gc, TRUE);
-#endif
-  }
-
   /* Stop the threads and collect the roots. */
   lock(gc->enumerate_rootset_lock);
   INFO2("gc.process", "GC: stop the threads and enumerate rootset ...\n");
@@ -439,16 +435,9 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
     gc_finref_metadata_verify((GC*)gc, TRUE);
 #endif
   }
-  /* Stop the threads and collect the roots. */
-  lock(gc->enumerate_rootset_lock);
-  INFO2("gc.process", "GC: stop the threads and enumerate rootset ...\n");
-  gc_clear_rootset(gc);
-  gc_reset_rootset(gc);
   int disable_count = hythread_reset_suspend_disable();
-  vm_enumerate_root_set_all_threads();
-  gc_copy_interior_pointer_table_to_rootset();
-  gc_set_rootset(gc);
-  unlock(gc->enumerate_rootset_lock);
+  /* Stop the threads and collect the roots. */
+  gc_prepare_rootset(gc);
   
   if(USE_CONCURRENT_GC && gc_sweep_is_concurrent()){
     if(gc_is_concurrent_sweep_phase())
@@ -535,6 +524,7 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
   INFO2("gc.con","pause time:  "<<((unsigned int)(pause_time>>10))<<"  ms \n");
   return;
 }
+
 
 
 

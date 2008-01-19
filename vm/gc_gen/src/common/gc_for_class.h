@@ -67,7 +67,11 @@
 
 #define OBJ_DIRTY_BIT 0x20
 
+/* used by semispace GC to indicate the object is a survivor in NOS */
 #define OBJ_AGE_BIT 0x40
+
+/* used by generational GC to indicate the object has been remembered */
+#define OBJ_REM_BIT 0x80
 
 #ifdef POINTER64 // Like in VM
   #define COMPRESS_VTABLE

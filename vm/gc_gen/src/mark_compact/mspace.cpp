@@ -89,7 +89,10 @@ void mspace_destruct(Mspace* mspace)
 #ifdef USE_32BITS_HASHCODE
   space_desturct_blocks((Blocked_Space*)mspace);
 #endif
+
+  /* we don't free the real space here, the heap will be freed altogether */
   STD_FREE(mspace);  
+  mspace = NULL;
 }
 
 void mspace_reset_after_collection(Mspace* mspace)

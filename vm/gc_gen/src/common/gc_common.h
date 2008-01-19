@@ -395,7 +395,7 @@ inline void gc_disable_alloc_obj_live()
 
 inline Boolean obj_is_survivor(Partial_Reveal_Object* p_obj)
 {
-  return get_obj_info_raw(p_obj) & OBJ_AGE_BIT;
+  return (Boolean)(get_obj_info_raw(p_obj) & OBJ_AGE_BIT);
 }
 
 inline void obj_set_age_bit(Partial_Reveal_Object* p_obj)
@@ -411,6 +411,26 @@ inline void obj_clear_age_bit(Partial_Reveal_Object* p_obj)
 }
 
 /***************************************************************/
+
+inline Boolean obj_is_remembered(Partial_Reveal_Object* p_obj)
+{
+  return (Boolean)(get_obj_info_raw(p_obj) & OBJ_REM_BIT);
+}
+
+inline void obj_set_rem_bit(Partial_Reveal_Object* p_obj)
+{
+  Obj_Info_Type oi = get_obj_info_raw(p_obj);
+  return set_obj_info( p_obj, oi |OBJ_REM_BIT) ;
+}
+
+inline void obj_clear_rem_bit(Partial_Reveal_Object* p_obj)
+{
+  Obj_Info_Type oi = get_obj_info_raw(p_obj);
+  return set_obj_info( p_obj, oi & ~OBJ_REM_BIT) ;
+}
+
+/***************************************************************/
+
 /* all GCs inherit this GC structure */
 struct Marker;
 struct Mutator;

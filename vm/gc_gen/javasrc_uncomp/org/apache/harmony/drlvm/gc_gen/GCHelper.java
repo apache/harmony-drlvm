@@ -136,7 +136,13 @@ public class GCHelper {
             p_objSlot.store(p_target);
             return;
         }
-
+        Address p_obj_info = p_objBase.plus(4);
+        int obj_info = p_obj_info.loadInt();
+        if((obj_info & 0x80) != 0){
+            p_objSlot.store(p_target);
+            return;
+        }
+         
         VMHelper.writeBarrier(p_objBase, p_objSlot, p_target);
     }
 
@@ -154,6 +160,7 @@ public class GCHelper {
     private static native long getNosBoundary();    
     private static native int TLSGCOffset();
 }
+
 
 
 

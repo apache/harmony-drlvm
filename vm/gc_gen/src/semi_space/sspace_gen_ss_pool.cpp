@@ -143,9 +143,11 @@ static FORCE_INLINE void forward_object(Collector *collector, REF *p_ref)
   }else{  /* otherwise, we successfully forwarded */
 
 #ifdef GC_GEN_STATS
+  if(gc_profile){
     GC_Gen_Collector_Stats* stats = (GC_Gen_Collector_Stats*)collector->stats;
     gc_gen_collector_update_marked_nos_obj_stats_minor(stats);
     gc_gen_collector_update_moved_nos_obj_stats_minor(stats, vm_object_size(p_obj));
+  }
 #endif
 
     scan_object(collector, p_target_obj);

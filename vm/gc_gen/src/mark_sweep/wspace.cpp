@@ -80,7 +80,10 @@ void wspace_destruct(Wspace *wspace)
 {
   //FIXME:: when map the to-half, the decommission start address should change
   wspace_destruct_chunks(wspace);
+
+  /* we don't free the real space here, the heap will be freed altogether */
   STD_FREE(wspace);
+  wspace = NULL;
 }
 
 void wspace_reset_after_collection(Wspace *wspace)

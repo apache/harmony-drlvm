@@ -53,13 +53,33 @@ extern char* large_page_hint;
 
 #endif //_DEBUG
 
+#ifndef _IPF_
+#define PREFETCH_SUPPORTED
+#endif
+
 #ifdef _WINDOWS_
 #define FORCE_INLINE __forceinline   
+
+#ifdef PREFETCH_SUPPORTED
+#include <xmmintrin.h>
+#define prefetchnta(pref_addr)	_mm_prefetch((char*)(pref_addr), _MM_HINT_NTA )
+#endif /*ALLOC_PREFETCH*/
+
 #elif defined (__linux__)
 #define FORCE_INLINE inline  __attribute__((always_inline))
+
+#ifdef PREFETCH_SUPPORTED
+#define prefetchnta(pref_addr)  __asm__ ("prefetchnta (%0)"::"r"(pref_addr))
+#endif /*PREFETCH_SUPPORTED*/
 #else 
 #define FORCE_INLINE inline
 #endif /* _WINDOWS_ */
+
+#ifdef PREFETCH_SUPPORTED
+#define PREFETCH prefetchnta
+#else
+#define PREFETCH(x) 
+#endif
 
 #define ABS_DIFF(x, y) (((x)>(y))?((x)-(y)):((y)-(x)))
 #define USEC_PER_SEC INT64_C(1000000)

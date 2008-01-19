@@ -21,6 +21,10 @@
 
 #include "fspace.h"
 
+#ifdef PREFETCH_SUPPORTED
+Boolean mark_prefetch = FALSE;
+#endif
+
 Boolean NOS_PARTIAL_FORWARD = FALSE;
 
 Boolean forward_first_half;
@@ -92,8 +96,9 @@ void fspace_destruct(Fspace *fspace)
 #ifdef USE_32BITS_HASHCODE
   space_desturct_blocks((Blocked_Space*)fspace);
 #endif
-
+  /* we don't free the real space here, the heap will be freed altogether */
   STD_FREE(fspace);   
+  fspace = NULL;
 }
 
 void fspace_reset_after_collection(Fspace* fspace)
@@ -174,9 +179,6 @@ void* fspace_heap_start_adjust(Fspace* fspace, void* new_space_start, POINTER_SI
 
 void collector_execute_task(GC* gc, TaskType task_func, Space* space);
 
-unsigned int mspace_free_block_idx;
-
-
 #ifdef GC_GEN_STATS
 #include "../gen/gen_stats.h"
 #endif
@@ -187,7 +189,6 @@ void fspace_collection(Fspace *fspace)
   fspace->num_collections++;  
 
   GC* gc = fspace->gc;
-  mspace_free_block_idx = ((Blocked_Space*)((GC_Gen*)gc)->mos)->free_block_idx;
 
   if(gc_is_gen_mode()){
     fspace->collect_algorithm = MINOR_GEN_FORWARD_POOL;

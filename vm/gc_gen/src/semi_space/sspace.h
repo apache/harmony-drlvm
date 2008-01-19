@@ -99,10 +99,15 @@ FORCE_INLINE Boolean obj_belongs_to_survivor_area(Sspace* sspace, Partial_Reveal
                           p_obj < sspace->survivor_area_end);
 }
 
-FORCE_INLINE Boolean obj_to_be_forwarded(Sspace* sspace, Partial_Reveal_Object* p_obj)
+/* to be forwarded to MOS or was forwarded by other thread */
+FORCE_INLINE Boolean obj_be_forwarded(Sspace* sspace, Partial_Reveal_Object* p_obj)
 {
-  assert( obj_belongs_to_survivor_area(sspace, p_obj)?obj_is_survivor(p_obj):!obj_is_survivor(p_obj));
-  return obj_is_survivor(p_obj);
+  /* NOTE:: Tricky! When the thread checks, the oi could be set a forward address by another thread. */
+  Obj_Info_Type oi = get_obj_info_raw(p_obj);
+  Boolean be_forwarded = (Boolean)(oi & (FORWARD_BIT|OBJ_AGE_BIT));
+  assert( obj_belongs_to_survivor_area(sspace, p_obj)? be_forwarded:1);
+    
+  return be_forwarded;
 }
 
 /* treat semispace alloc as thread local alloc. If it fails or p_obj is old, forward it to MOS */
@@ -111,7 +116,9 @@ FORCE_INLINE void* semispace_forward_obj(Partial_Reveal_Object* p_obj, unsigned 
   void* p_targ_obj = NULL;
   Sspace* sspace = (Sspace*)allocator->alloc_space;
   
-  if( obj_to_be_forwarded(sspace, p_obj) ) 
+  /* this object should be forward to MOS, or is already forwarded by other thread (to either MOS or Tospace. 
+     In any case, we don't need to allocate it in tospace now. */
+  if( obj_be_forwarded(sspace, p_obj) ) 
     return NULL;
     
   p_targ_obj = thread_local_alloc(size, allocator);
