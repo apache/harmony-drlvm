@@ -580,7 +580,6 @@ void OSR::insertInst(Inst* inst, Inst* place){
 
 SsaOpnd* OSR::apply(Type* type, Opcode opcode, Operation op,
                     SsaOpnd* opnd1, SsaOpnd* opnd2){
-    findLeadingOpnd(opnd2->getInst(), opnd2);
     SsaOpnd* opnd2Leader = getLeadingOperand(opnd2);
     if (opnd2Leader!= 0) {
         opnd2 = opnd2Leader;
@@ -627,8 +626,14 @@ SsaOpnd* OSR::apply(Type* type, Opcode opcode, Operation op,
     }
     return result;
 }
+Inst* OSR::findInsertionPlace(SsaOpnd* opnd1, SsaOpnd* opnd2){
 
-Inst* OSR::findInsertionPlace(SsaOpnd* opnd2, SsaOpnd* opnd1){
+    findLeadingOpnd(opnd2->getInst(), opnd2);
+    SsaOpnd* opnd2Leader = getLeadingOperand(opnd2);
+    if (opnd2Leader!= 0) {
+      opnd2 = opnd2Leader;
+    }
+
     Inst* opnd1inst = opnd1->getInst();
     Inst* opnd2inst = opnd2->getInst();
     Node* block1 = opnd1inst->getNode();
