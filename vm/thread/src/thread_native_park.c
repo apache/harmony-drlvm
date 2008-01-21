@@ -127,8 +127,12 @@ void VMCALL hythread_unpark(hythread_t thread) {
     assert(status == TM_ERROR_NONE);
 
     if (thread->state & TM_THREAD_STATE_PARKED) {
+        thread->state &= ~TM_THREAD_STATE_PARKED;
         mon = thread->waited_monitor;
         assert(mon);
+        status = hymutex_unlock(&thread->mutex);
+        assert(status == TM_ERROR_NONE);
+
         // Notify parked thread
         status = hymutex_lock(&mon->mutex);
         assert(status == TM_ERROR_NONE);
@@ -138,9 +142,7 @@ void VMCALL hythread_unpark(hythread_t thread) {
         assert(status == TM_ERROR_NONE);
     } else {
         thread->state |= TM_THREAD_STATE_UNPARKED;
+        status = hymutex_unlock(&thread->mutex);
+        assert(status == TM_ERROR_NONE);
     }
-
-    thread->state &= ~TM_THREAD_STATE_PARKED;
-    status = hymutex_unlock(&thread->mutex);
-    assert(status == TM_ERROR_NONE);
 }
