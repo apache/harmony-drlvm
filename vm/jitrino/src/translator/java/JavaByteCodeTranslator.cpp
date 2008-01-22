@@ -1645,8 +1645,8 @@ JavaByteCodeTranslator::invokestatic(uint32 constPoolIndex) {
     //
     //  Try some optimizations for System::arraycopy(...), Min, Max, Abs...
     //
-    if (!compilationInterface.needWriteBarriers()    //genArrayCopyRepMove is not ready to work in WB mode
-        && translationFlags.genArrayCopyRepMove == true 
+
+    if (translationFlags.genArrayCopyRepMove == true 
         && genArrayCopyRepMove(methodDesc,numArgs,srcOpnds)) {
         return;
     } else if (translationFlags.genArrayCopy == true &&
@@ -2361,7 +2361,8 @@ JavaByteCodeTranslator::methodIsArraycopy(MethodDesc * methodDesc) {
 bool
 JavaByteCodeTranslator::arraycopyOptimizable(MethodDesc * methodDesc, 
                                              uint32       numArgs,
-                                             Opnd **      srcOpnds) {
+                                             Opnd **      srcOpnds,
+                                             bool         usingWriteBarriers) {
 
     //
     //  an ArrayStoreException is thrown and the destination is not modified: 
@@ -2385,32 +2386,56 @@ JavaByteCodeTranslator::arraycopyOptimizable(MethodDesc * methodDesc,
            srcOpnds[3]->getType()->isInt4() && // 3 - dstPos
            srcOpnds[4]->getType()->isInt4());  // 4 - length
 
-    bool throwsASE = false;
     bool srcIsArray = srcType->isArray() && !srcType->isUnresolvedType();
     bool dstIsArray = dstType->isArray() && !dstType->isUnresolvedType();
-    ArrayType* srcAsArrayType = srcType->asArrayType();
-    ArrayType* dstAsArrayType = dstType->asArrayType();
-    bool srcIsArrOfPrimitive = srcIsArray && VMInterface::isArrayOfPrimitiveElements(srcAsArrayType->getVMTypeHandle());
-    bool dstIsArrOfPrimitive = dstIsArray && VMInterface::isArrayOfPrimitiveElements(dstAsArrayType->getVMTypeHandle());
-    if ( !(srcIsArray && dstIsArray) ) {
-         throwsASE = true;
-    } else if ( srcIsArrOfPrimitive ) {
-        if( !dstIsArrOfPrimitive || srcType != dstType )
-            throwsASE = true;
-    } else if( dstIsArrOfPrimitive ) {
-         throwsASE = true;
-    } else { // the both are of objects
-        // Here is some inaccuracy. If src is a subclass of dst there is no ASE for sure.
-        // If it is not, we should check the assignability of each element being copied.
-        // To avoid this we just reject the inlining of System::arraycopy call in this case.
-        NamedType* srcElemType = srcAsArrayType->getElementType();
-        NamedType* dstElemType = dstAsArrayType->getElementType();
-        throwsASE = srcElemType->getVMTypeHandle() != dstElemType->getVMTypeHandle();
+
+    bool isOptimizable = true;
+
+    if ( srcIsArray && dstIsArray )  {
+        // these are arrays        
+
+        ArrayType* srcAsArrayType = srcType->asArrayType();
+        ArrayType* dstAsArrayType = dstType->asArrayType();
+        bool srcIsArrOfPrimitive = srcIsArray && VMInterface::isArrayOfPrimitiveElements(srcAsArrayType->getVMTypeHandle());
+        bool dstIsArrOfPrimitive = dstIsArray && VMInterface::isArrayOfPrimitiveElements(dstAsArrayType->getVMTypeHandle());
+
+        // are these primitive or reference arrays?
+        if ( srcIsArrOfPrimitive && dstIsArrOfPrimitive ) {
+            // both arrays are primitive
+
+            // if we are dealing with different primitive type arrays, reject optimization
+            // TODO: is that really necessary?
+            isOptimizable = (srcType == dstType); 
+
+        } else if ( srcIsArrOfPrimitive ^ dstIsArrOfPrimitive ) {
+            // arrays are mixed primitive and reference types
+            // reject optimization
+            isOptimizable = false;
+
+        } else {
+            // both arrays are reference
+
+            // if write barriers are enabled, reject optimization
+            // if not, check the types
+            if ( usingWriteBarriers && compilationInterface.needWriteBarriers() ) { 
+                isOptimizable = false;
+            } else {
+                // Here is some inaccuracy. If src is a subclass of dst there is no ASE for sure.
+                // If it is not, we should check the assignability of each element being copied.
+                // To avoid this we just reject the inlining of System::arraycopy call in this case.
+                NamedType* srcElemType = srcAsArrayType->getElementType();
+                NamedType* dstElemType = dstAsArrayType->getElementType();
+                isOptimizable = (srcElemType->getVMTypeHandle() == dstElemType->getVMTypeHandle());
+            }
+
+        }
+
+    } else {
+        // source or destination are not arrays
+        isOptimizable = false;
     }
-    if ( throwsASE )
-        return false;
-    else
-        return true;
+
+    return isOptimizable;
 }
 
 bool
@@ -2419,7 +2444,7 @@ JavaByteCodeTranslator::genArrayCopyRepMove(MethodDesc * methodDesc,
                                             Opnd **      srcOpnds) {
 
     if( !methodIsArraycopy(methodDesc) ||
-        !arraycopyOptimizable(methodDesc,numArgs,srcOpnds) )
+        !arraycopyOptimizable(methodDesc,numArgs,srcOpnds,true) )
     {
         // reject the inlining of System::arraycopy call
         return false;
@@ -2573,7 +2598,7 @@ JavaByteCodeTranslator::genArrayCopy(MethodDesc * methodDesc,
                                      Opnd **      srcOpnds) {
 
     if( !methodIsArraycopy(methodDesc) ||
-        !arraycopyOptimizable(methodDesc,numArgs,srcOpnds) )
+        !arraycopyOptimizable(methodDesc,numArgs,srcOpnds,false) )
     {
         // reject the inlining of System::arraycopy call
         return false;
