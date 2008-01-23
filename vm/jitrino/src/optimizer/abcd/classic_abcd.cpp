@@ -253,6 +253,11 @@ void BuildInequalityGraphWalker::startNode(DominatorNode *domNode)
 }
 //------------------------------------------------------------------------------
 
+bool isIntOrLong(Type* t) {
+    return t->isInt4() || t->isInt8();
+}
+//------------------------------------------------------------------------------
+
 void BuildInequalityGraphWalker::applyToInst(Inst* inst)
 {
     assert(inst);
@@ -292,6 +297,25 @@ void BuildInequalityGraphWalker::applyToInst(Inst* inst)
             proxy_dst = addOldOrCreateOpnd(inst->getDst());
             addDistance(proxy_dst, findProxy(inst->getSrc(0)), 0, 
                         false /* negate */);
+        }
+            break;
+        case Op_Conv:
+        {
+            // adding conversions int<->long as zero-length edges to the
+            // inequality graph. This is a small enhancement to the paper's
+            // algorithm, but it is safe. The proof is as follows: if we ensure
+            // that a value of type 'long' is in good bounds for array access,
+            // then is is proven to be not outside bounds for type 'int'
+            Opnd* src = inst->getSrc(0);
+            Opnd* dst = inst->getDst();
+            if ( isIntOrLong(src->getType()) &&
+                 isIntOrLong(dst->getType()) ) {
+                proxy_dst = addOldOrCreateOpnd(inst->getDst());
+                addDistance(proxy_dst, findProxy(inst->getSrc(0)), 0, 
+                            false /* negate */);
+            }else{
+                addOldOrCreateOpnd(inst->getDst())->setUnconstrained(true);
+            }
         }
             break;
         case Op_Add:
