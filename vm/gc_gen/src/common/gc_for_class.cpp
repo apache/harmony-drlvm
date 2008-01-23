@@ -50,8 +50,7 @@ void gc_set_prop_reference(GC_VTable_Info *gcvt, WeakReferenceType type)
 
 
 /* A comparison function for qsort() called below to order offset slots. */
-static int
-intcompare(const void *vi, const void *vj)
+static int intcompare(const void *vi, const void *vj)
 {
   const int *i = (const int *) vi;
   const int *j = (const int *) vj;
@@ -106,7 +105,7 @@ static void build_ref_offset_array(Class_Handle ch, GC_VTable_Info *gcvt)
     if(field_is_reference(fh)) {
       int offset = field_get_offset(fh);
 #ifndef BUILD_IN_REFERENT
-      if(is_reference && offset == gc_referent_offset) continue;
+      if(is_reference && (offset == gc_referent_offset)) continue;
 #endif
       *new_ref_array = field_get_offset(fh);
       new_ref_array++;

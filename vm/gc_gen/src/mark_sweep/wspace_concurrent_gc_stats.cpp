@@ -199,4 +199,3 @@ void wspace_clear_heap(GC* gc)
 }
 #endif
 
-

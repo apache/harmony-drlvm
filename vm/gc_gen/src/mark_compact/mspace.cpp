@@ -91,6 +91,7 @@ void mspace_destruct(Mspace* mspace)
 #endif
 
   /* we don't free the real space here, the heap will be freed altogether */
+  STD_FREE(mspace->space_statistic);
   STD_FREE(mspace);  
   mspace = NULL;
 }
@@ -174,5 +175,4 @@ float mspace_get_expected_threshold_ratio(Mspace* mspace)
 {
     return mspace->expected_threshold_ratio;
 }
-
 

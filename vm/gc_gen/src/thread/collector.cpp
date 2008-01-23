@@ -350,4 +350,3 @@ Boolean is_collector_finished(GC* gc)
 
 }
 
-

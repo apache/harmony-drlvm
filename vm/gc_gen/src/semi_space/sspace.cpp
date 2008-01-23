@@ -50,7 +50,6 @@ static unsigned int sspace_compute_num_tospace_blocks(Sspace* sspace)
 
 static void sspace_config_after_clean(Sspace* sspace)
 {
-  
   unsigned int num_tospace_blocks = sspace_compute_num_tospace_blocks(sspace);
   unsigned int num_fromspace_blocks = sspace->num_managed_blocks - num_tospace_blocks;
   unsigned int sspace_first_idx = sspace->first_block_idx;
@@ -148,7 +147,7 @@ POINTER_SIZE_INT sspace_free_space_size(Sspace* nos)
     cur_free_block = cur_free_block->next;  
   }
   fromspace_free_size = num_free_blocks << GC_BLOCK_SHIFT_COUNT;
-  
+ 
   return tospace_free_size + fromspace_free_size;
 }
 
@@ -160,6 +159,9 @@ POINTER_SIZE_INT sspace_used_space_size(Sspace* nos)
 /* adjust the next pointer of block to point correctly to its adjacent next */
 void sspace_prepare_for_collection(Sspace* sspace)
 {  
+  if(sspace->num_managed_blocks == 0)
+    return;
+  
   unsigned int tospace_first_idx = sspace->tospace_first_idx;
   unsigned int sspace_last_idx = sspace->first_block_idx + sspace->num_managed_blocks - 1;
 
@@ -196,14 +198,25 @@ void sspace_prepare_for_collection(Sspace* sspace)
 
 void sspace_reset_after_collection(Sspace* sspace)
 { 
+  /* the space is zero size after major (or variant) collection. No need
+     to reset its tospace and fromspace, but still we still set its allocation
+     pointer to NULL so that nothing can be allocated. And we need set 
+     num_used_blocks to 0 in case GC need the data for space tuning whatever. */
+  if(sspace->num_managed_blocks == 0) {
+    sspace->cur_free_block = NULL;
+    sspace->num_used_blocks = 0;
+    return;
+  }
+  
   Block* blocks = (Block*)sspace->blocks;
- 
    /* During LOS extension, NOS last block points back to MOS first block, so that,
      the first couple blocks of MOS are compacted to NOS end. We need reset the NOS last block next pointer.
      This is needed for next collection. And it's needed for from-space setup, 
-     so that the last block of from-space points to NULL. 
-   */
-  Block_Header *sspace_last_block = (Block_Header*)&blocks[sspace->num_managed_blocks - 1];
+     so that the last block of from-space points to NULL. */
+  Block_Header *sspace_last_block = (Block_Header*)((Block*)sspace->heap_end - 1);
+
+  assert(sspace_last_block);
+
   sspace_last_block->next = NULL;
 
   unsigned int sspace_first_idx = sspace->first_block_idx;
@@ -219,7 +232,7 @@ void sspace_reset_after_collection(Sspace* sspace)
       Block_Header* block = (Block_Header*)&(blocks[i - sspace_first_idx]);
       block_reset(block);
     }
-  
+
     return;          
   }
 

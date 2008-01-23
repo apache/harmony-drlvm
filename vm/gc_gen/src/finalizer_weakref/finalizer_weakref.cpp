@@ -111,6 +111,8 @@ static void identify_finalizable_objects(Collector *collector)
 
 extern void trace_obj_in_gen_fw(Collector *collector, void *p_ref);
 extern void trace_obj_in_nongen_fw(Collector *collector, void *p_ref);
+extern void trace_obj_in_gen_ss(Collector *collector, void *p_ref);
+extern void trace_obj_in_nongen_ss(Collector *collector, void *p_ref);
 extern void trace_obj_in_normal_marking(Collector *collector, void *p_obj);
 extern void trace_obj_in_fallback_marking(Collector *collector, void *p_ref);
 extern void trace_obj_in_ms_fallback_marking(Collector *collector, void *p_ref);
@@ -134,10 +136,21 @@ static inline void resurrect_obj_tree(Collector *collector, REF *p_ref)
   
   /* set trace_object() function */
   if(gc_match_kind(gc, MINOR_COLLECTION)){
-    if(gc_is_gen_mode())
-      trace_object = trace_obj_in_gen_fw;
-    else
+    switch( MINOR_ALGO ){
+    case MINOR_NONGEN_FORWARD_POOL:
       trace_object = trace_obj_in_nongen_fw;
+      break;
+    case MINOR_GEN_FORWARD_POOL:
+      trace_object = trace_obj_in_gen_fw;
+      break;
+    case MINOR_NONGEN_SEMISPACE_POOL:
+      trace_object = trace_obj_in_nongen_ss;
+      break;
+    case MINOR_GEN_SEMISPACE_POOL:
+      trace_object = trace_obj_in_gen_ss;
+      break;
+    default: assert(0);
+    }
   } else if(gc_match_kind(gc, NORMAL_MAJOR_COLLECTION)){
     p_ref_or_obj = p_obj;
     if(gc_has_space_tuner(gc) && (gc->tuner->kind != TRANS_NOTHING)){
@@ -260,6 +273,7 @@ static void identify_dead_refs(GC *gc, Pool *pool)
 {
   if(gc_match_either_kind(gc, MAJOR_COLLECTION|MS_COMPACT_COLLECTION))
     finref_reset_repset(gc);
+
   pool_iterator_init(pool);
   Vector_Block *block = pool_iterator_next(pool);
   while(block){
@@ -271,9 +285,13 @@ static void identify_dead_refs(GC *gc, Pool *pool)
       REF *p_referent_field = obj_get_referent_field(p_obj);
       if(IS_FALLBACK_COMPACTION)
         fallback_update_fw_ref(p_referent_field);
+        
       Partial_Reveal_Object *p_referent = read_slot(p_referent_field);
       
-      if(!p_referent){  // referent field has been cleared
+      if(!p_referent){  
+        /* referent field has been cleared. I forgot why we set p_ref with NULL here. 
+           I guess it's because this ref_obj was processed in abother p_ref already, so
+           there is no need to keep same ref_obj in this p_ref. */
         *p_ref = (REF)NULL;
         continue;
       }
@@ -281,16 +299,27 @@ static void identify_dead_refs(GC *gc, Pool *pool)
         if(obj_need_move(gc, p_referent)){
           if(gc_match_kind(gc, MINOR_COLLECTION)){
             assert(obj_is_fw_in_oi(p_referent));
-            write_slot(p_referent_field, (obj_get_fw_in_oi(p_referent)));
+            Partial_Reveal_Object* p_new_referent = obj_get_fw_in_oi(p_referent);
+            write_slot(p_referent_field, p_new_referent);
+            /* if it's gen mode, and referent stays in NOS, we need keep p_referent_field in collector remset.
+               This leads to the ref obj live even it is actually only weakly-reachable in next gen-mode collection. 
+               This simplifies the design. Otherwise, we need remember the refobj in MOS seperately and process them seperately. */
+            if(gc_is_gen_mode())
+              if(addr_belongs_to_nos(p_new_referent) && !addr_belongs_to_nos(p_obj))
+                collector_remset_add_entry(gc->collectors[0], ( Partial_Reveal_Object**)p_referent_field); 
+
           } else if(!gc_match_kind(gc, MS_COLLECTION)){
             finref_repset_add_entry(gc, p_referent_field);
           }
         }
         *p_ref = (REF)NULL;
-        continue;
+      }else{
+	      /* else, the referent is dead (weakly reachable), clear the referent field */
+	      *p_referent_field = (REF)NULL; 
+	      /* for dead referent, p_ref is not set NULL. p_ref keeps the ref object, which
+	         will be moved to VM for enqueueing. */
       }
-      *p_referent_field = (REF)NULL; /* referent is weakly reachable: clear the referent field */
-    }
+    }/* for each ref object */
     
     block = pool_iterator_next(pool);
   }
@@ -355,7 +384,12 @@ static void identify_dead_phanrefs(Collector *collector)
         if(obj_need_move(gc, p_referent))
           if(gc_match_kind(gc, MINOR_COLLECTION)){
             assert(obj_is_fw_in_oi(p_referent));
-            write_slot(p_referent_field, (obj_get_fw_in_oi(p_referent)));
+            Partial_Reveal_Object* p_new_referent = obj_get_fw_in_oi(p_referent);
+            write_slot(p_referent_field, p_new_referent);
+            if(gc_is_gen_mode())
+              if(addr_belongs_to_nos(p_new_referent) && !addr_belongs_to_nos(p_obj))
+                collector_remset_add_entry(gc->collectors[0], ( Partial_Reveal_Object**)p_referent_field); 
+
           } else if(!gc_match_kind(gc, MS_COLLECTION)){
             finref_repset_add_entry(gc, p_referent_field);
           }
@@ -458,9 +492,11 @@ static void finalizable_objs_fallback(GC *gc)
       REF *p_ref = (REF*)iter;
       Partial_Reveal_Object *p_obj = read_slot(p_ref);
       assert(p_obj);
-      /* Perhaps obj has been resurrected by previous resurrections */
+      /* Perhaps obj has been resurrected by previous resurrections. If the fin-obj was resurrected, we need put it back to obj_with_fin pool.
+         For minor collection, the resurrected obj was forwarded, so we need use the new copy.*/
       if(!gc_obj_is_dead(gc, p_obj) && obj_belongs_to_nos(p_obj)){
-        if(!gc_is_gen_mode() || fspace_obj_to_be_forwarded(p_obj)){
+        /* Even in NOS, not all live objects are forwarded due to the partial-forward algortihm */ 
+        if(!NOS_PARTIAL_FORWARD || fspace_obj_to_be_forwarded(p_obj)){
           write_slot(p_ref , obj_get_fw_in_oi(p_obj));
           p_obj = read_slot(p_ref);
         }
@@ -626,7 +662,12 @@ static void update_referent_field_ignore_finref(GC *gc, Pool *pool)
         if(obj_need_move(gc, p_referent))
           if(gc_match_kind(gc, MINOR_COLLECTION)){
             assert(obj_is_fw_in_oi(p_referent));
-            write_slot(p_referent_field , obj_get_fw_in_oi(p_referent));
+            Partial_Reveal_Object* p_new_referent = obj_get_fw_in_oi(p_referent);
+            write_slot(p_referent_field, p_new_referent);
+            if(gc_is_gen_mode())
+              if(addr_belongs_to_nos(p_new_referent) && !addr_belongs_to_nos(p_obj))
+                collector_remset_add_entry(gc->collectors[0], ( Partial_Reveal_Object**)p_referent_field); 
+
           } else {
             finref_repset_add_entry(gc, p_referent_field);
           }
@@ -810,7 +851,6 @@ void gc_copy_finaliable_obj_to_rootset(GC *gc)
   finref_copy_pool(finalizable_obj_pool, finalizable_obj_pool_copy, gc);
   finref_copy_pool_to_rootset(gc, finalizable_obj_pool_copy);
 }
-
 
 
 

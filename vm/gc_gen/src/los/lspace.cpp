@@ -77,6 +77,7 @@ Lspace *lspace_initialize(GC* gc, void* start, POINTER_SIZE_INT lspace_size)
 void lspace_destruct(Lspace* lspace)
 {
   /* we don't free the real space here, the heap will be freed altogether */
+  STD_FREE(lspace->free_pool);
   STD_FREE(lspace);
   lspace = NULL;
   return;
@@ -129,5 +130,4 @@ POINTER_SIZE_INT lspace_get_failure_size(Lspace* lspace)
 {
   return lspace->failure_size;
 }
-
 

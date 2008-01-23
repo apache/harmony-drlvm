@@ -52,4 +52,3 @@ unsigned int gc_decide_marker_number(GC* gc);
 
 #endif
 
-

@@ -68,7 +68,7 @@ static FORCE_INLINE void scan_object(Collector* collector, Partial_Reveal_Object
       p_ref= (REF *)vector_get_element_address_ref((Vector_Handle) array, i);
       scan_slot(collector, p_ref);
     }   
-    return;
+    return; /* array can't be a reference object, directly return. */
   }
 
   /* scan non-array object */
@@ -103,7 +103,13 @@ static FORCE_INLINE void forward_object(Collector *collector, REF *p_ref)
   Partial_Reveal_Object *p_obj = read_slot(p_ref);
 
   /* p_obj can also be in tospace because this p_ref is a redundant one in mutator remset. 
-     We don't rem p_ref because it was remembered in first time it's met. */   
+     We don't rem p_ref because it was remembered in first time it's met. 
+     FIXME:: the situation obj_belongs_to_tospace() should never be true if we
+     remember object rather than slot. Currently, mutator remembers objects, and
+     collector remembers slots. Although collectors remember slots, we are sure 
+     there are no chances to have repetitive p_ref because an object is scanned only
+     when it is marked or forwarded atomically, hence only one collector has chance
+     to do the scanning. */   
   if(!obj_belongs_to_nos(p_obj) || obj_belongs_to_tospace(p_obj)) return; 
 
   Partial_Reveal_Object* p_target_obj = NULL;
@@ -295,7 +301,7 @@ void gen_ss_pool(Collector* collector)
     TRACE2("gc.process", "GC: collector["<<(POINTER_SIZE_INT)collector->thread_handle<<"] finished");
     return;
   }
-
+  /* single collector world */
   gc->collect_result = gc_collection_result(gc);
   if(!gc->collect_result){
 #ifndef BUILD_IN_REFERENT

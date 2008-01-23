@@ -553,4 +553,3 @@ void verifier_reset_hash_distance()
 
 
 
-

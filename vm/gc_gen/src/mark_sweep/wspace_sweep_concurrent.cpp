@@ -381,4 +381,3 @@ void wspace_sweep_concurrent(Collector* collector)
   while(num_sweeping_collectors != num_active_collectors + 1);
 }
 
-

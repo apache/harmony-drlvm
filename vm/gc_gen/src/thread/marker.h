@@ -100,4 +100,3 @@ Boolean is_mark_finished(GC* gc);
 
 #endif //_MARKER_H_
 
-

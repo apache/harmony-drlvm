@@ -110,7 +110,8 @@ void mutator_destruct(GC* gc, void *unused_gc_information)
     }
   }
   unlock(mutator->dirty_set_lock);
-  //gc_set_tls(NULL);
+  STD_FREE(mutator);
+  gc_set_tls(NULL);
   
   return;
 }
@@ -171,6 +172,5 @@ Vector_Block* gc_get_local_dirty_set(GC* gc, unsigned int shared_id)
   unlock(gc->mutator_list_lock); 
   return NULL;
 }
-
 
 

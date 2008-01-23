@@ -341,4 +341,3 @@ void gc_decide_concurrent_algorithm(GC* gc, char* concurrent_algo)
     }
   }
 }
-

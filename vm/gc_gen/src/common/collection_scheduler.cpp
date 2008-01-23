@@ -257,4 +257,3 @@ Boolean gc_try_schedule_collection(GC* gc, unsigned int gc_cause)
 
 }
 
-

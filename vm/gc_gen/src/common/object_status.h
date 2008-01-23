@@ -31,8 +31,10 @@ inline Boolean obj_is_dead_in_gen_minor_gc(Partial_Reveal_Object *p_obj)
    * With this kind of switch dead objects in MOS & LOS may be set the mark or fw bit in oi.
    * The second condition is for supporting partially forwarding NOS.
    * In partially forwarding situation live objects in the non-forwarding half NOS will only be marked but not forwarded.
+   * FIXME:: new implementation of partial forwarding does not use MARK_BIT for non-fw objects. 
+   * so I changed the original  obj_is_marked_or_fw_in_oi(p_obj) to obj_is_fw_in_oi(p_obj).
    */
-  return obj_belongs_to_nos(p_obj) && !obj_is_marked_or_fw_in_oi(p_obj);
+  return obj_belongs_to_nos(p_obj) && !obj_is_fw_in_oi(p_obj);
 }
 
 inline Boolean obj_is_dead_in_nongen_minor_gc(Partial_Reveal_Object *p_obj)

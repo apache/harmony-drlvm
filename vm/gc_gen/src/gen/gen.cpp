@@ -1068,4 +1068,3 @@ void gc_gen_destruct_collector_alloc(GC_Gen* gc, Collector* collector)
     STD_FREE(collector->backup_allocator);  
   }
 }
-

@@ -152,4 +152,3 @@ void event_mutator_allocate_newobj(Partial_Reveal_Object* p_newobj, POINTER_SIZE
 Heap_Verifier* get_heap_verifier()
 { return heap_verifier; }
 
-

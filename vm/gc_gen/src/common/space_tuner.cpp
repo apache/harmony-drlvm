@@ -537,4 +537,3 @@ void gc_space_tuner_release_fake_blocks_for_los_shrink(GC* gc)
   return;
 }
 
-

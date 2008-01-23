@@ -163,6 +163,8 @@ void gc_wrapup()
     gc_terminate_heap_verification(gc);
   }
 
+  STD_FREE(gc->tuner);
+  
   STD_FREE(p_global_gc);
 
   p_global_gc = NULL;
@@ -445,5 +447,4 @@ Boolean obj_belongs_to_gc_heap(Partial_Reveal_Object* p_obj)
 {
   return address_belongs_to_gc_heap(p_obj, p_global_gc);  
 }
-
 

@@ -284,7 +284,7 @@ void mspace_extend_compact(Collector *collector)
        WARN2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]: MOS is overflowed, have to reduce NOS size.");
      Block *old_nos_boundary = nspace->blocks;
      nos_boundary = &mspace->blocks[mspace->free_block_idx - mspace->first_block_idx];
-     if(nspace->num_managed_blocks != 0) /* FIXME:: why can it be 0 here?? */
+     if(nspace->num_managed_blocks != 0) /* FIXME:: why can it be 0 here?? Because mspace extend can't happen is NOS is zero size */
        assert(nos_boundary > old_nos_boundary);
      POINTER_SIZE_INT mem_change_size = ((Block *)nos_boundary - old_nos_boundary) << GC_BLOCK_SHIFT_COUNT;
      nspace->heap_start = nos_boundary;

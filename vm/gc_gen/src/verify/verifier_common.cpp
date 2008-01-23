@@ -270,4 +270,3 @@ void verifier_hashcode_log(GC_Verifier* gc_verifier)
 }
 
 
-

@@ -324,4 +324,3 @@ FORCE_INLINE Boolean type_has_finalizer(Partial_Reveal_VTable *vt)
 
 
 
-
