@@ -31,7 +31,7 @@ Obj_Info_Type slide_compact_process_hashcode(Partial_Reveal_Object* p_obj, void*
       if((POINTER_SIZE_INT)dest_addr != (POINTER_SIZE_INT)p_obj){
         *p_obj_size += GC_OBJECT_ALIGNMENT; 
         obj_info = obj_info | HASHCODE_ATTACHED_BIT;
-        *(int*) &hashcode = hashcode_gen(p_obj);
+        hashcode = (POINTER_SIZE_INT)hashcode_gen(p_obj);
         POINTER_SIZE_INT obj_end_pos = (POINTER_SIZE_INT)dest_addr + vm_object_size(p_obj);
         collector_hashcodeset_add_entry(collector, (Partial_Reveal_Object**)obj_end_pos);
         collector_hashcodeset_add_entry(collector, (Partial_Reveal_Object**)hashcode);
@@ -43,7 +43,7 @@ Obj_Info_Type slide_compact_process_hashcode(Partial_Reveal_Object* p_obj, void*
       break;
       
     case HASHCODE_SET_BUFFERED:
-      *(int*) &hashcode = hashcode_buf_lookup(p_obj, old_buf);
+      hashcode = (POINTER_SIZE_INT)hashcode_buf_lookup(p_obj, old_buf);
       if((POINTER_SIZE_INT)dest_addr != (POINTER_SIZE_INT)p_obj){
         *p_obj_size += GC_OBJECT_ALIGNMENT; 
         obj_info = obj_info & ~HASHCODE_BUFFERED_BIT;
@@ -52,7 +52,7 @@ Obj_Info_Type slide_compact_process_hashcode(Partial_Reveal_Object* p_obj, void*
         collector_hashcodeset_add_entry(collector, (Partial_Reveal_Object**)obj_end_pos);
         collector_hashcodeset_add_entry(collector, (Partial_Reveal_Object**)hashcode);
       }else{
-        hashcode_buf_add((Partial_Reveal_Object*)dest_addr, *(int*) &hashcode, new_buf);          
+        hashcode_buf_add((Partial_Reveal_Object*)dest_addr, (int32)hashcode, new_buf);          
       }
       break;
       
@@ -86,6 +86,7 @@ void move_compact_process_hashcode(Partial_Reveal_Object* p_obj,Hashcode_Buf* ol
 }
 
 /* processing of hashcode in different GC algorithms --> */
+
 
 
 

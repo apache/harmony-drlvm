@@ -152,7 +152,7 @@ inline int hashcode_buf_lookup(Partial_Reveal_Object* p_obj,Hashcode_Buf* hashco
         POINTER_SIZE_INT hashcode = (POINTER_SIZE_INT)*iter;
         iter = vector_block_iterator_advance(curr_block, iter);
         unlock(hashcode_buf->lock);
-        return *(int*)&hashcode;
+        return (int)hashcode;
       }
     }
   }
@@ -167,7 +167,7 @@ inline void hashcode_buf_add(Partial_Reveal_Object* p_obj, int32 hashcode, Hashc
   Vector_Block* tail_block = (Vector_Block*)seq_list_end_node(list);
   vector_block_add_entry(tail_block, (POINTER_SIZE_INT) p_obj);
   POINTER_SIZE_INT hashcode_var = 0;
-  *(int*) &hashcode_var = hashcode;
+  hashcode_var = (POINTER_SIZE_INT)hashcode;
   vector_block_add_entry(tail_block, hashcode_var);
 
   if(!vector_block_is_full(tail_block)) return;
@@ -236,7 +236,7 @@ inline void hashcode_buf_transfer_new_entry(Hashcode_Buf* old_buf, Hashcode_Buf*
     iter =vector_block_iterator_advance(first_block, iter);
     POINTER_SIZE_INT hashcode = (POINTER_SIZE_INT)*iter;
     iter =vector_block_iterator_advance(first_block, iter);
-    hashcode_buf_add(p_obj, *(int*) &hashcode, new_buf);
+    hashcode_buf_add(p_obj, (int32)hashcode, new_buf);
   }
   first_block->tail = old_buf->checkpoint;
 
@@ -251,7 +251,7 @@ inline void hashcode_buf_transfer_new_entry(Hashcode_Buf* old_buf, Hashcode_Buf*
       POINTER_SIZE_INT hashcode = (POINTER_SIZE_INT)*iter;
       iter =vector_block_iterator_advance(curr_block, iter);
 
-      hashcode_buf_add(p_obj, *(int*) &hashcode, new_buf);
+      hashcode_buf_add(p_obj, (int32)hashcode, new_buf);
     }
     hashcode_buf_remove(old_buf, curr_block);
   } 
