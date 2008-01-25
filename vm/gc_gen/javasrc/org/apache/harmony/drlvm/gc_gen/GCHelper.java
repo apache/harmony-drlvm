@@ -27,8 +27,12 @@ import org.vmmagic.pragma.*;
 public class GCHelper {
 
     static {
-      System.loadLibrary("gc_gen");
-      helperCallback();
+        if (VMHelper.COMPRESSED_REFS_MODE) {
+            System.loadLibrary("gc_gen");
+        } else {
+            System.loadLibrary("gc_gen_uncomp");
+        }
+        helperCallback();
     }
 
     public static final int TLS_GC_OFFSET = TLSGCOffset();

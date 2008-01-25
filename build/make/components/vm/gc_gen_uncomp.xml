@@ -102,7 +102,7 @@ Version: $Revision: 1.2 $
         <property name="build.java.depends" value=""/>
 
         <property name="java.source.dir"
-                  location="${build.vm.home}/gc_gen/javasrc_uncomp"/>
+                  location="${build.vm.home}/gc_gen/javasrc"/>
 
         <path id="java.class.path">
             <pathelement location="${java.build.dir}"/>
@@ -112,8 +112,8 @@ Version: $Revision: 1.2 $
             <fileset dir="${build.VMMAGIC.home}" includes="vmmagic-20070207.jar" />
         </path>
 
-        <property name="jarname" value="gc_gen_uncomp.jar"/>
-        <property name="srcjarname" value="gc_gen_uncomp-src.jar"/>
+        <property name="jarname" value="gc_gen.jar"/>
+        <property name="srcjarname" value="gc_gen-src.jar"/>
 
     </target>
 </project>

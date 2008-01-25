@@ -57,11 +57,8 @@ static void gc_get_system_info(GC *gc)
 
 static void init_gc_helpers()
 {
-#ifdef COMPRESS_REFERENCE
     set_property("vm.component.classpath.gc_gen", "gc_gen.jar", VM_PROPERTIES);
-#else
-    set_property("vm.component.classpath.gc_gen_uncomp", "gc_gen_uncomp.jar", VM_PROPERTIES);
-#endif
+
     vm_helper_register_magic_helper(VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE, "org/apache/harmony/drlvm/gc_gen/GCHelper", "alloc");
     vm_helper_register_magic_helper(VM_RT_NEW_VECTOR_USING_VTABLE,  "org/apache/harmony/drlvm/gc_gen/GCHelper", "allocArray");
     vm_helper_register_magic_helper(VM_RT_GC_HEAP_WRITE_REF,  "org/apache/harmony/drlvm/gc_gen/GCHelper", "write_barrier_slot_rem");
