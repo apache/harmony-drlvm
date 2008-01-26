@@ -78,16 +78,21 @@ bool MTable::addMethodFilter(const std::string& configLine) {
         }
     } else {
         std::string className, methodName, signature;
-        size_t classEndPos=filterString.find("::");
+        size_t separatorWidth=1;
+        size_t classEndPos = filterString.find(".");
+        if (classEndPos == std::string::npos) {
+            separatorWidth = 2;
+            classEndPos = filterString.find("::");
+        }
         if (classEndPos == std::string::npos) {
             className = filterString;
         } else {
             className = filterString.substr(0, classEndPos);
-            size_t methodEndPos = filterString.find("(", classEndPos+2);
+            size_t methodEndPos = filterString.find("(", classEndPos+separatorWidth);
             if (methodEndPos==std::string::npos) {
-                methodName = filterString.substr(classEndPos+2);
+                methodName = filterString.substr(classEndPos+separatorWidth);
             } else {
-                methodName = filterString.substr(classEndPos+2, methodEndPos - (classEndPos+2));
+                methodName = filterString.substr(classEndPos+separatorWidth, methodEndPos - (classEndPos+separatorWidth));
                 signature = filterString.substr(methodEndPos);
             }
         }

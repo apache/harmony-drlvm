@@ -23,7 +23,7 @@ chain2.jits=JET_DPGO,CD_OPT
 # JET_CLINIT compiles only <clinit> methods, all other methods compiled with JET_DPGO 
 # which does entry/backedge instrumentation
 
-chain1.filter=+::<clinit>
+chain1.filter=+.<clinit>
 chain1.filter=-
 
 JET_CLINIT.file=jitrino

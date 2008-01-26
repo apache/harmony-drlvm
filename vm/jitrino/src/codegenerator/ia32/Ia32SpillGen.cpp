@@ -1184,6 +1184,7 @@ bool SpillGen::tryRepair (Opline& opline, Constraint c)
     for (Inst::Opnds::iterator it = opnds.begin(); it != opnds.end(); it = opnds.next(it), ++itx)
     {
         ox = inst->getOpnd(it);
+        RegMask oxMask = ox->getConstraint(Opnd::ConstraintKind_Initial).getMask();
 
         RegMask rm = getRegMaskConstr(ox, cr);
         if ((mk & rm) != 0)
@@ -1195,7 +1196,7 @@ bool SpillGen::tryRepair (Opline& opline, Constraint c)
             unsigned mask = (1<<inst->getOpndCount())-1;
             Constraint cx = ((Inst*)inst)->getConstraint(it, mask, OpndSize_Default);
             RegMask used = usedRegs(opline.instx, opline.idx, need_load);
-            RegMask usable = (cx  & registers[opline.idx]).getMask() & ~mk;
+            RegMask usable = (cx  & registers[opline.idx]).getMask() & ~mk & oxMask;
             if ((usable & ~used) != 0)
             {
                 rx = findFree(usable & ~used, opline.idx, opline.instx);

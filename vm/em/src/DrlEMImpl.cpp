@@ -549,7 +549,7 @@ JIT_Result DrlEMImpl::compileMethod(Method_Handle mh) {
                     signature = method_get_descriptor(mh);
                     std::ostringstream msg;
                     msg <<"EM: compile start:["<<step->jitName.c_str()<<" n="<<n<<"] "
-                        <<className<<"::"<<methodName<<signature;
+                        <<className<<"."<<methodName<<signature;
                     INFO2(step->catName.c_str(), msg.str().c_str());
                 }
 
@@ -558,7 +558,7 @@ JIT_Result DrlEMImpl::compileMethod(Method_Handle mh) {
                 if (step->loggingEnabled) {
                     std::ostringstream msg;
                     msg << "EM: compile done:["<<step->jitName.c_str()<<" n="<<n<<": "
-                        <<(res ==JIT_SUCCESS ? "OK" : "FAILED")<<"] "<<className<<"::"<<methodName<<signature;
+                        <<(res ==JIT_SUCCESS ? "OK" : "FAILED")<<"] "<<className<<"."<<methodName<<signature;
                     INFO2(step->catName.c_str(), msg.str().c_str());
                 }
 
@@ -785,7 +785,7 @@ void DrlEMImpl::methodProfileIsReady(MethodProfile* mp) {
                         signature = method_get_descriptor(mp->mh);
                         std::ostringstream msg;
                         msg <<"EM: recompile start:["<<nextStep->jitName.c_str()<<" n="<<n<<"] "
-                            <<className<<"::"<<methodName<<signature;
+                            <<className<<"."<<methodName<<signature;
                         INFO2(nextStep->catName.c_str(), msg.str().c_str());
                     } 
 
@@ -794,7 +794,7 @@ void DrlEMImpl::methodProfileIsReady(MethodProfile* mp) {
                     if (nextStep->loggingEnabled) {
                         std::ostringstream msg;
                         msg << "EM: recompile done:["<<nextStep->jitName.c_str()<<" n="<<n<<": "
-                            <<(res ==JIT_SUCCESS ? "OK" : "FAILED")<<"] "<<className<<"::"<<methodName<<signature;
+                            <<(res ==JIT_SUCCESS ? "OK" : "FAILED")<<"] "<<className<<"."<<methodName<<signature;
                         INFO2(nextStep->catName.c_str(), msg.str().c_str());
                     }
 

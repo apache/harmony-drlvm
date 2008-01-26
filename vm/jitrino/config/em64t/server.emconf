@@ -27,7 +27,7 @@ chains=chain1,chain2
 chain1.jits=JET_CLINIT
 chain2.jits=SD1_OPT,SD2_OPT
 
-chain1.filter=+::<clinit>
+chain1.filter=+.<clinit>
 chain1.filter=-
 
 JET_CLINIT.file=jitrino
