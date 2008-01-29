@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--
+    Licensed to the Apache Software Foundation (ASF) under one or more
+    contributor license agreements.  See the NOTICE file distributed with
+    this work for additional information regarding copyright ownership.
+    The ASF licenses this file to You under the Apache License, Version 2.0
+    (the "License"); you may not use this file except in compliance with
+    the License.  You may obtain a copy of the License at
+  
+       http://www.apache.org/licenses/LICENSE-2.0
+  
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+
+<project name="log4cxx" default="build">
+    
+    <property name="component" value="log4cxx"/>
+    <import file="../build-native.xml"/>
+
+    <target name="fetch-depends">
+        <ant antfile="${common.resources}/make/svn.xml" target="fetch-svn">
+            <property name="dependency" value="log4cxx"/>
+        </ant>
+    </target>
+
+    <target name="check-depends">
+        <ant antfile="${common.resources}/make/svn.xml" target="check-svn">
+            <property name="dependency" value="log4cxx"/>
+        </ant>
+    </target>
+
+    <target name="setup" depends="check-depends">
+        <property name="log4cxx.src" location="${log4cxx.svn.dir}"/>
+        <property name="log4cxx.include" location="${drlvm.include.dir}"/>
+        <condition property="config.available" value="true">
+            <and>
+                <available file="${log4cxx.include}/log4cxx/log4cxx.h" />
+                <available file="${log4cxx.include}/log4cxx/private/log4cxx_private.h" />
+            </and>
+        </condition>
+    </target>
+
+    <target name="configure" depends="setup" unless="config.available">
+        <condition property="plaf.ext" value=".hw" else=".h.in">
+            <isset property="is.windows"/>
+        </condition>
+        <mkdir dir="${log4cxx.include}" />
+        <copy todir="${log4cxx.include}" failonerror="true">
+            <fileset dir="${log4cxx.src}/include">
+                <include name="**/*.h"/>
+                <include name="**/*${plaf.ext}"/>
+            </fileset>
+        </copy>
+        <property name="includes" location="${log4cxx.include}" />
+        
+        <copy tofile="${includes}/log4cxx/log4cxx.h" file="${includes}/log4cxx/log4cxx${plaf.ext}" />
+        <copy tofile="${includes}/log4cxx/private/log4cxx_private.h" file="${includes}/log4cxx/private/log4cxx_private${plaf.ext}" />
+
+        <property name="logchar_is_utf8" value="0" />
+        <property name="has.wchar_t" value="1" />
+        <property name="logchar_is_cfstring" value="0" />
+        <property name="logchar_is_wchar" value="1" />
+
+        <replace file="${includes}/log4cxx/log4cxx.h"> 
+            <replacefilter token="@LOGCHAR_IS_CFSTRING@" value="${logchar_is_cfstring}" />
+            <replacefilter token="@LOGCHAR_IS_UTF8@" value="${logchar_is_utf8}" />
+            <replacefilter token="@LOGCHAR_IS_WCHAR@" value="${logchar_is_wchar}" />
+        </replace>
+        <replaceregexp file="${includes}/log4cxx/log4cxx.h" match="#define LOG4CXX_HAS_WCHAR_T.*" replace="#define LOG4CXX_HAS_WCHAR_T ${has.wchar_t}" />
+    </target>
+
+    <target name="build" depends="configure, setup-native-build">
+        <init-native/>
+        <make-native libname="log4cxx" type="static">
+            <includepath>
+                <pathelement location="${drlvm.include.dir}" />
+            </includepath>
+            <includepath path="/usr/include/libxml2" if="is.unix"/>
+            
+            <fileset dir="${log4cxx.src}/src">
+                <include name="*.cpp" />
+            </fileset>
+            
+            <defineset define="APR_DECLARE_EXPORT,APU_DECLARE_EXPORT,LOG4CXX_STATIC,LOG4CXX"/>
+            <defineset define="_USRDLL,DLL_EXPORTS,WIN32" if="is.windows"/>
+            <!--defineset define="STDC_HEADERS" if="is.unix"/-->
+            <!--defineset define="FREEBSD" if="is.freebsd"/-->
+            <compilerarg value="-fPIC" if="is.unix" unless="is.x86"/>
+            <compilerarg value="/EHsc" if="is.windows"/>
+        </make-native>
+    </target>
+    
+    <target name="clean" >
+        <clean-native/>
+    </target>
+
+</project>

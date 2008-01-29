@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--
+    Licensed to the Apache Software Foundation (ASF) under one or more
+    contributor license agreements.  See the NOTICE file distributed with
+    this work for additional information regarding copyright ownership.
+    The ASF licenses this file to You under the Apache License, Version 2.0
+    (the "License"); you may not use this file except in compliance with
+    the License.  You may obtain a copy of the License at
+  
+       http://www.apache.org/licenses/LICENSE-2.0
+  
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+
+<project name="aprutil-dep" default="build">
+
+    <property name="component" value="aprutil"/>
+    <import file="../build-native.xml"/>
+    
+    <target name="fetch-depends">
+        <fetch dep="aprutil.src.tgz"/>
+        <fetch dep="apriconv.src.tgz"/>
+    </target>
+
+    <target name="check-depends">
+        <check-one-file dest="${aprutil.src.tgz}" src="${aprutil.src.tgz.url}"/>
+        <check-one-file dest="${apriconv.src.tgz}" src="${apriconv.src.tgz.url}"/>
+    </target>
+
+    <target name="get-src" depends="-setup" unless="is.aprutil.configured">
+        <check-one-file dest="${aprutil.src.tgz}" src="${aprutil.src.tgz.url}"/>
+        <check-one-file dest="${apriconv.src.tgz}" src="${apriconv.src.tgz.url}"/>
+        
+        <mkdir dir="${aprutil.src}/.." />
+        <untar src="${aprutil.src.tgz}" dest="${aprutil.src}/.." compression="gzip"/>
+        <move tofile="${aprutil.src}" file="${aprutil.src}/../${aprutil.src.rootdir}"/>
+
+        <untar src="${apriconv.src.tgz}" dest="${aprutil.src}/.." compression="gzip">
+            <patternset includes="*/include/apr_iconv.h"/>
+        </untar>
+        <copy file="${aprutil.src}/../${apriconv.src.rootdir}/include/apr_iconv.h" 
+            todir="${drlvm.include.dir}"/>
+    </target>
+
+    <target name="-setup">
+        <property name="aprutil.src" location="${drlvm.semi.dir}/aprutil/src" />
+        <property name="includes" location="${aprutil.src}/include" />
+        <condition property="is.aprutil.configured" value="true">
+            <and>
+                <available file="${includes}/apu.h" />
+                <available file="${includes}/private/apu_config.h" />
+                <available file="${aprutil.src}/xml/expat/lib/expat.h" />
+                <available file="${aprutil.src}/xml/expat/config.h" />
+                <available file="${drlvm.include.dir}/apr_iconv.h" />
+            </and>
+        </condition>
+    </target>
+
+    <target name="-configure-unix" unless="is.aprutil.configured" if="is.unix">
+        <chmod perm="+x">
+            <fileset dir="${aprutil.src}/build">
+                <include name="**/*" />
+            </fileset>
+            <fileset dir="${aprutil.src}">
+                <include name="*" />
+            </fileset>
+            <fileset dir="${aprutil.src}/xml/expat">
+                <include name="**/*" />
+            </fileset>
+        </chmod>
+
+        <exec executable="sh" dir="${aprutil.src}">
+            <arg value="./buildconf" />
+            <arg value="--with-apr=${drlvm.semi.dir}/apr/src" />
+        </exec>
+        <exec executable="sh" dir="${aprutil.src}">
+            <arg value="./configure" />
+            <arg value="--with-apr=${drlvm.semi.dir}/apr/src" />
+            <arg value="CC=${hy.cpp.compiler}" />
+        </exec>
+        <exec executable="sh" dir="${aprutil.src}/xml/expat">
+            <arg value="./configure" />
+            <arg value="CC=${hy.cpp.compiler}" />
+        </exec>
+    </target>
+    
+    <target name="-configure-win" unless="is.aprutil.configured" if="is.windows">
+        <copy tofile="${includes}/apu.h" file="${includes}/apu.hw" />
+        <copy tofile="${includes}/private/apu_config.h" file="${includes}/private/apu_config.hw" />
+        <copy tofile="${aprutil.src}/xml/expat/lib/expat.h" file="${aprutil.src}/xml/expat/lib/expat.h.in" />
+        <copy tofile="${aprutil.src}/xml/expat/config.h" file="${aprutil.src}/xml/expat/lib/winconfig.h" />
+    </target>
+            
+    <target name="configure" depends="get-src,-configure-win,-configure-unix">
+        <replace file="${aprutil.src}/xml/expat/lib/xmlparse.c">
+            <replacefilter token="XML_MAJOR_VERSION" value="1" />
+            <replacefilter token="XML_MINOR_VERSION" value="95" />
+            <replacefilter token="XML_MICRO_VERSION" value="1" />
+            <replacefilter token="VERSION" value='"expat_1.95.1"' />
+        </replace>
+    </target>
+    
+    <target name="build" depends="configure, setup-native-build">
+        <mkdir dir="${drlvm.include.dir}" />
+        <copy todir="${drlvm.include.dir}">
+            <fileset dir="${aprutil.src}/include" 
+                includes="apr_xlate.h apr_xml.h apu.h" />
+        </copy>
+
+        <init-native />
+        <make-native libname="aprutil-1" type="static">
+            <includepath>
+                <pathelement location="${drlvm.include.dir}" />
+                <dirset dir="${aprutil.src}">
+                    <include name="include" />
+                    <include name="include/private" />
+                    <include name="xml/expat/lib" />
+                    <include name="xml/expat" />
+                </dirset>
+            </includepath>
+            <fileset dir="${aprutil.src}">
+                <include name="xml/apr_xml.c" />
+                <include name="xlate/xlate.c" />
+            </fileset>
+            <fileset dir="${aprutil.src}/xml/expat/lib" includes="xmlparse.c xmlrole.c xmltok.c" />
+
+            <defineset define="APR_DECLARE_EXPORT,APU_DECLARE_EXPORT,API_DECLARE_EXPORT" />
+            <defineset define="WIN32,_WINDOWS" if="is.windows"/>
+            <defineset define="_HAVE_CONFIG_H _REENTRANT _GNU_SOURCE" if="is.unix"/>
+            <defineset>
+                <define name="APU_HAVE_APR_ICONV" value="0" if="is.unix"/>
+            </defineset>
+            <compilerarg value="-fPIC" if="is.unix" unless="is.x86"/>
+        </make-native>
+    </target>
+
+    <target name="clean" >
+        <clean-native component="aprutil"/>
+    </target>
+
+</project>
