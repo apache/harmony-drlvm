@@ -491,6 +491,9 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      *         done
      */
     private int enumerate(Thread[] list, int offset, boolean recurse) {
+        if (list.length == 0) {
+            return 0;
+        }
         List groupsCopy = null;  // a copy of subgroups list
         List threadsCopy = null; // a copy of threads list
         synchronized (lock) {
