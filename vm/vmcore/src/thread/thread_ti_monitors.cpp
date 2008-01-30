@@ -297,42 +297,10 @@ IDATA VMCALL jthread_raw_monitor_wait(jrawMonitorID mon_ptr, I_64 millis)
     if (!monitor) {
         return TM_ERROR_INVALID_MONITOR;
     }
-
-    hythread_t native_thread = hythread_self();
-    IDATA hy_status = hythread_thread_lock(native_thread);
-    assert(hy_status == TM_ERROR_NONE);
-    IDATA state = hythread_get_state(native_thread);
-    state &= ~TM_THREAD_STATE_RUNNABLE;
-    state |= TM_THREAD_STATE_WAITING | TM_THREAD_STATE_IN_MONITOR_WAIT;
-    if (millis > 0) {
-        state |= TM_THREAD_STATE_WAITING_WITH_TIMEOUT;
-    }
-    else {
-        state |= TM_THREAD_STATE_WAITING_INDEFINITELY;
-    }
-    hy_status = hythread_set_state(native_thread, state);
-    assert(hy_status == TM_ERROR_NONE);
-    hythread_thread_unlock(native_thread);
-
-    IDATA status = hythread_monitor_wait_interruptable(monitor, millis, 0);
-
-    hy_status = hythread_thread_lock(native_thread);
-    assert(hy_status == TM_ERROR_NONE);
-    state = hythread_get_state(native_thread);
-    if (millis > 0) {
-        state &= ~TM_THREAD_STATE_WAITING_WITH_TIMEOUT;
-    }
-    else {
-        state &= ~TM_THREAD_STATE_WAITING_INDEFINITELY;
-    }
-    state &= ~(TM_THREAD_STATE_WAITING | TM_THREAD_STATE_IN_MONITOR_WAIT);
-    state |= TM_THREAD_STATE_RUNNABLE;
-    hy_status = hythread_set_state(native_thread, state);
-    assert(hy_status == TM_ERROR_NONE);
-    hy_status = hythread_thread_unlock(native_thread);
-    assert(hy_status == TM_ERROR_NONE);
-
-    return status;
+    // JDWP agent expects RawMonitor waiting thread has RUNNABLE state.
+    // That why no Java thread state change is done here.
+    // RI behaviour confirms this assumption.
+    return hythread_monitor_wait_interruptable(monitor, millis, 0);
 } // jthread_raw_monitor_wait
 
 /**

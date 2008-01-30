@@ -167,7 +167,7 @@ int test_jthread_raw_notify(void)
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
         count = 0;
-        while (!hythread_is_waiting(tts->native_thread)) {
+        while (tts->phase != TT_PHASE_WAITING_ON_WAIT) {
             // wait until the state is changed
             hythread_sleep(SLEEP_TIME);
             if (tts->phase == TT_PHASE_ERROR || ++count > (MAX_TIME_TO_WAIT/SLEEP_TIME)) {
@@ -242,7 +242,7 @@ int test_jthread_raw_notify_all(void)
     reset_tested_thread_iterator(&tts);
     while(next_tested_thread(&tts)){
         count = 0;
-        while (!hythread_is_waiting(tts->native_thread)) {
+        while (tts->phase != TT_PHASE_WAITING_ON_WAIT) {
             // wait until the state is changed
             hythread_sleep(SLEEP_TIME);
             if (tts->phase == TT_PHASE_ERROR || ++count > (MAX_TIME_TO_WAIT/SLEEP_TIME)) {
