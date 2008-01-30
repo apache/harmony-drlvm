@@ -41,7 +41,8 @@
     
     <target name="-check-setup">
         <available file="${drlvm.include.dir}/unicode" property="icu4c.hdr.available"/>
-        <available file="${shlib.prefix}icuuc${shlib.suffix}" property="icu4c.lib.available"/>
+        <available file="${drlvm.shlib.dir}/${linklib.prefix}icuuc${linklib.suffix}" 
+            property="icu4c.lib.available"/>
         <condition property="setup.complete">
             <and>
                 <isset property="icu4c.hdr.available"/>
@@ -66,7 +67,7 @@
             </patternset>
         </unzip>
         <check-one-link message="" src="${drlvm.shlib.dir}/${icuuc.linkname}"
-            dest="${drlvm.shlib.dir}/${shlib.prefix}icuuc${shlib.suffix}"/>
+            dest="${drlvm.shlib.dir}/${linklib.prefix}icuuc${linklib.suffix}"/>
     </target>
 
     <target name="-check-setup-win" if="is.windows">
