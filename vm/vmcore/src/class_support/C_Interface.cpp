@@ -927,6 +927,9 @@ const void *class_get_const_addr(Class_Handle cl, unsigned index)
 } //class_get_const_addr
 
 
+void* method_get_native_func_addr(Method_Handle method) {
+    return (void*)classloader_find_native(method);
+}
 
 Arg_List_Iterator method_get_argument_list(Method_Handle m)
 {

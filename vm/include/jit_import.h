@@ -28,6 +28,7 @@
 #include "open/types.h"
 #include "open/vm.h"
 #include "jit_import_rt.h"
+#include "vm_core_types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -582,6 +583,15 @@ VMEXPORT VM_Data_Type class_get_cp_field_type(Class_Handle src_class,
  */
 
 VMEXPORT const void  *class_get_const_addr(Class_Handle ch, unsigned idx);
+
+/**
+* Looks for a method in native libraries of a class loader.
+*
+* @param[in] method - a searching native-method structure
+* @return The pointer to found a native function.
+* @note The function raises <code>UnsatisfiedLinkError</code> with a method name
+*       in an exception message, if the specified method is not found.*/
+VMEXPORT void* method_get_native_func_addr(Method_Handle method);
 
 /**
  * @return The JIT handle for a the current compilation. 

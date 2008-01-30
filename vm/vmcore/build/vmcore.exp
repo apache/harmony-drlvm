@@ -508,6 +508,7 @@ VMCORE_0.1 {
     method_get_max_stack;
     method_get_method_jit;
     method_get_name;
+    method_get_native_func_addr;
     method_get_next_method_jit;
     method_get_num_handlers;
     method_get_offset;

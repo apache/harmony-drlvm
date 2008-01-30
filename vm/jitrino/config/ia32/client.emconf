@@ -54,7 +54,7 @@ EB_PROF.tbsInitialTimeout=0
 -XX:jit.CD_OPT.path=opt_init,lock_method,translator,optimizer,hir2lir,codegen,unlock_method
 
 -XX:jit.CD_OPT.path.optimizer=ssa,devirt,hlo_api_magic,inline,purge,simplify,dce,uce,lazyexc,throwopt,memopt,simplify,dce,uce,lower,statprof,unroll,ssa,simplify,dce,uce,dessa,statprof
--XX:jit.CD_OPT.path.codegen=bbp,btr,gcpoints,cafl,dce1,i8l,api_magic,early_prop,peephole,itrace-,native,constraints,dce2,regalloc,spillgen,copy,i586,layout,rce+,stack,break-,iprof-,peephole,emitter!,si_insts,gcmap,info
+-XX:jit.CD_OPT.path.codegen=bbp,btr,gcpoints,cafl,dce1,i8l,api_magic,light_jni-,early_prop,peephole,itrace-,native,constraints,dce2,regalloc,spillgen,copy,i586,layout,rce+,stack,break-,iprof-,peephole,emitter!,si_insts,gcmap,info
 -XX:jit.CD_OPT.path.dce1=cg_dce
 -XX:jit.CD_OPT.path.dce2=cg_dce
 -XX:jit.CD_OPT.path.regalloc=bp_regalloc1,bp_regalloc2
