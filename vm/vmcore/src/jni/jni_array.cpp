@@ -67,6 +67,8 @@ jarray JNICALL NewObjectArray(JNIEnv * jni_env,
     ObjectHandle elem_handle = (ObjectHandle)initialElement;
 
     Class* clss = jclass_to_struct_Class(elementClass);
+    if (!ensure_initialised(jni_env, clss))
+        return NULL;
 
     Class *arr_clss = (Class *)class_get_array_of_class(clss);
 
