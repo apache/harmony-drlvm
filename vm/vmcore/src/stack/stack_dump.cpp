@@ -26,6 +26,7 @@
 #include "jit_intf_cpp.h"
 #include "Class.h"
 #include "class_member.h"
+#include "exceptions.h"
 #include "stack_trace.h"
 #include "interpreter_exports.h"
 #include "cci.h"
@@ -401,25 +402,26 @@ static void sd_print_threads_info(VM_thread* cur_thread)
 
         jthread java_thread = jthread_get_java_thread(thread);
         JNIEnv* jni_env = vm_thread->jni_env;
-        jstring name;
-        char* java_name = NULL;
 
         if (java_thread)
         {
             jclass cl = GetObjectClass(jni_env, java_thread);
             jmethodID id = jni_env->GetMethodID(cl, "getName","()Ljava/lang/String;");
-            name = jni_env->CallObjectMethod(java_thread, id);
-            java_name = (char*)jni_env->GetStringUTFChars(name, NULL);
-        }
+            jstring name = jni_env->CallObjectMethod(java_thread, id);
+            char* java_name = (char*)jni_env->GetStringUTFChars(name, NULL);
 
-        fprintf(stderr, "%s[%p]  '%s'\n",
-                (cur_thread && vm_thread == cur_thread) ? "--->" : "    ",
-                thread->os_handle,
-                java_name ? java_name : "");
+            fprintf(stderr, "%s[%p]  '%s'\n",
+                    (cur_thread && vm_thread == cur_thread) ? "--->" : "    ",
+                    thread->os_handle, java_name);
 
-        if (java_thread)
             jni_env->ReleaseStringUTFChars(name, java_name);
-
+        }
+        else
+        {
+            fprintf(stderr, "%s[%p]\n",
+                    (cur_thread && vm_thread == cur_thread) ? "--->" : "    ",
+                    thread->os_handle);
+        }
     }
 
     hythread_iterator_release(&it);
@@ -439,6 +441,7 @@ void sd_print_stack(Registers* regs)
         return;
 
     hymutex_lock(sd_lock);
+    bool unwindable = set_unwindable(false); // To call Java code
 
     // Print register info
     print_reg_state(regs);
@@ -485,6 +488,8 @@ void sd_print_stack(Registers* regs)
 
     fprintf(stderr, "<end of stack trace>\n");
     fflush(stderr);
+
+    set_unwindable(unwindable);
 
     // Do not unlock to prevent other threads from printing crash stack
     //hymutex_unlock(sd_lock);
