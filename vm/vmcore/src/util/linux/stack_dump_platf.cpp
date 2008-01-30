@@ -15,12 +15,13 @@
  *  limitations under the License.
  */
 
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <sys/types.h>
-#include <sys/wait.h>
 
 #include "open/hythread_ext.h"
 #include "native_stack.h"
@@ -30,6 +31,8 @@
 
 
 static hymutex_t g_lock;
+static const char* g_curdir = NULL;
+static const char* g_cmdline = NULL;
 
 
 bool sd_initialize(hymutex_t** p_lock)
@@ -83,7 +86,7 @@ void sd_parse_module_info(native_module_t* module, void* ip)
 
     if (!module)
     { // Unknown address
-        fprintf(stderr, "Unknown address 0x%"W_PI_FMT"X\n",
+        fprintf(stderr, "Unknown address 0x%"W_PI_FMT"\n",
                 (POINTER_SIZE_INT)ip);
         return;
     }
@@ -92,7 +95,7 @@ void sd_parse_module_info(native_module_t* module, void* ip)
 
     if (!module->filename)
     {
-        fprintf(stderr, "Unknown memory region 0x%"W_PI_FMT"X:0x%"W_PI_FMT"X%s\n",
+        fprintf(stderr, "Unknown memory region 0x%"W_PI_FMT":0x%"W_PI_FMT"%s\n",
                 (size_t)segment->base, (size_t)segment->base + segment->size,
                 (segment->type == SEGMENT_TYPE_CODE) ? "" : " without execution rights");
         return;
@@ -100,7 +103,7 @@ void sd_parse_module_info(native_module_t* module, void* ip)
 
     if (sd_is_predefined_name(module->filename))
     { // Special memory region
-        fprintf(stderr, "%s memory region 0x%"W_PI_FMT"X:0x%"W_PI_FMT"X%s\n",
+        fprintf(stderr, "%s memory region 0x%"W_PI_FMT":0x%"W_PI_FMT"%s\n",
                 module->filename,
                 (size_t)segment->base, (size_t)segment->base + segment->size,
                 (segment->type == SEGMENT_TYPE_CODE) ? "" : " without execution rights");
@@ -201,4 +204,62 @@ void sd_get_c_method_info(MethodInfo* info, native_module_t* module, void* ip)
 int sd_get_cur_tid()
 {
     return gettid();
+}
+
+void sd_init_crash_handler()
+{
+    // Get current directory
+    char buf[PATH_MAX + 1];
+    char* cwd = getcwd(buf, sizeof(buf));
+
+    if (cwd)
+    {
+        cwd = (char*)STD_MALLOC(strlen(cwd) + 1);
+        g_curdir = cwd;
+        if (cwd)
+            strcpy(cwd, buf);
+    }
+
+    // Get command line
+    sprintf(buf, "/proc/%d/cmdline", getpid());
+    int file = open(buf, O_RDONLY);
+
+    if (file > 0)
+    {
+        size_t size = 0;
+        char rdbuf[256];
+        ssize_t rd;
+        do
+        {
+            rd = read(file, rdbuf, sizeof(rdbuf));
+            size += (rd > 0) ? rd : 0;
+        } while (rd == sizeof(rdbuf));
+
+        if (size)
+        {
+            char* cmd = (char*)STD_MALLOC(size + 1);
+            g_cmdline = cmd;
+            if (cmd)
+            {
+                cmd[size + 1] = '\0';
+                lseek(file, 0, SEEK_SET);
+                read(file, cmd, size);
+            }
+        }
+        close(file);
+    }
+}
+
+void sd_print_cwdcmdenv()
+{
+    fprintf(stderr, "\nWorking directory:\n%s\n", g_curdir ? g_curdir : "'null'");
+
+    fprintf(stderr, "\nCommand line:\n");
+    for (const char* ptr = g_cmdline; *ptr; ptr += strlen(ptr) + 1)
+        fprintf(stderr, "%s ", ptr);
+    fprintf(stderr, "\n");
+
+    fprintf(stderr, "\nEnvironment variables:\n");
+    for (char** env = environ; *env; ++env)
+        fprintf(stderr, "%s\n", *env);
 }

@@ -44,11 +44,10 @@ extern "C" {
 /**
  * Determines the absolute path of the executing process.
  * @param[out] self_name - the pointer to the requested path string
- * @param pool           - a pool to allocate return buffer
  * @return <code>APR_SUCCESS</code> if OK; otherwise, an error code.
+ * @note The value returned can be freed by <code>STD_FREE</code> macro.
  */
-APR_DECLARE(apr_status_t) port_executable_name(char** self_name,
-                                   apr_pool_t* pool);
+APR_DECLARE(apr_status_t) port_executable_name(char** self_name);
 
 /**
 * Returns the number of processors in the system.

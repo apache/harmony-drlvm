@@ -19,6 +19,7 @@
  * @version $Revision: 1.1.2.1 $
  */
 
+#include <string.h>
 #include "lock_manager.h"
 #include "method_lookup.h"
 #include "m2n.h"
@@ -78,20 +79,44 @@ bool native_is_ip_in_modules(native_module_t* modules, void* ip)
     return false;
 }
 
-bool native_is_ip_stub(void* ip)
+static DynamicCode* native_find_stub(void* ip)
 {
-    // Synchronizing access to dynamic code list
-    LMAutoUnlock dcll(VM_Global_State::loader_env->p_dclist_lock);
-
     for (DynamicCode *dcList = compile_get_dynamic_code_list();
          NULL != dcList; dcList = dcList->next)
     {
         if (ip >= dcList->address &&
             ip < (void*)((POINTER_SIZE_INT)dcList->address + dcList->length))
-            return true;
+            return dcList;
     }
 
-    return false;
+    return NULL;
+}
+
+char* native_get_stub_name(void* ip, char* buf, size_t buflen)
+{
+    // Synchronizing access to dynamic code list
+    LMAutoUnlock dcll(VM_Global_State::loader_env->p_dclist_lock);
+
+    if (!buf || buflen == 0)
+        return NULL;
+
+    DynamicCode* code = native_find_stub(ip);
+
+    if (!code || !code->name)
+        return NULL;
+
+    strncpy(buf, code->name, buflen);
+    buf[buflen - 1] = '\0';
+
+    return buf;
+}
+
+bool native_is_ip_stub(void* ip)
+{
+    // Synchronizing access to dynamic code list
+    LMAutoUnlock dcll(VM_Global_State::loader_env->p_dclist_lock);
+
+    return (native_find_stub(ip) != NULL);
 }
 
 static bool native_is_ip_in_breakpoint_handler(void* ip)

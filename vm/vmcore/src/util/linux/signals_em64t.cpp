@@ -91,25 +91,3 @@ void regs_push_param(Registers* pregs, POINTER_SIZE_INT param, int num)
         return;
     }
 }
-
-void print_state(Registers* regs)
-{
-    fprintf(stderr, "Registers:\n");
-    fprintf(stderr, "    RAX: 0x%016llx, RBX: 0x%016llx\n",
-        regs->rax, regs->rbx);
-    fprintf(stderr, "    RCX: 0x%016llx, RDX: 0x%016llx\n",
-        regs->rcx, regs->rdx);
-    fprintf(stderr, "    RSI: 0x%016llx, RDI: 0x%016llx\n",
-        regs->rsi, regs->rdi);
-    fprintf(stderr, "    RSP: 0x%016llx, RBP: 0x%016llx\n",
-        regs->rsp, regs->rbp);
-    fprintf(stderr, "    R8 : 0x%016llx, R9 : 0x%016llx\n",
-        regs->r8,  regs->r9);
-    fprintf(stderr, "    R10: 0x%016llx, R11: 0x%016llx\n",
-        regs->r10, regs->r11);
-    fprintf(stderr, "    R12: 0x%016llx, R13: 0x%016llx\n",
-        regs->r12, regs->r13);
-    fprintf(stderr, "    R14: 0x%016llx, R15: 0x%016llx\n",
-        regs->r14, regs->r15);
-    fprintf(stderr, "    RIP: 0x%016llx\n", regs->rip);
-}

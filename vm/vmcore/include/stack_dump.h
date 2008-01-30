@@ -59,7 +59,6 @@ struct MethodInfo {
 };
 
 
-
 /**
  * Prints a stack trace using given register context for current thread
  */
@@ -77,6 +76,8 @@ bool sd_initialize(hymutex_t** p_lock);
 void sd_parse_module_info(native_module_t* module, void* ip);
 void sd_get_c_method_info(MethodInfo* info, native_module_t* module, void* ip);
 int sd_get_cur_tid();
+void sd_init_crash_handler();
+void sd_print_cwdcmdenv();
 
 // general functions to call from platform-dependent code
 const char* sd_get_module_type(const char* short_name);

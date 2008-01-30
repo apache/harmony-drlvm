@@ -22,6 +22,8 @@
 #ifndef _CRASH_HANDLER_H
 #define _CRASH_HANDLER_H
 
+#include "vm_core_types.h"
+
 /**
  * \file
  * Provides definition needed to install gdb crash handler.
@@ -39,13 +41,13 @@ bool is_gdb_crash_handler_enabled();
  *
  * @return 0 on success or negative value on failure
  */
-int init_gdb_crash_handler();
+void init_gdb_crash_handler();
 
 /**
  * Invokes gdb.
  *
  * @return true on success or false on failure
  */
-bool gdb_crash_handler();
+bool gdb_crash_handler(Registers* regs);
 
 #endif // _CRASH_HANDLER_H

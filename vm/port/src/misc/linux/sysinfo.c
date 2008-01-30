@@ -24,33 +24,53 @@
 #include <sys/utsname.h>
 #include <limits.h>
 #include <errno.h>
+#include "port_malloc.h"
 #include "port_sysinfo.h"
 #include <apr_strings.h>
 #if defined(FREEBSD)
+#define _GNU_SOURCE
 #include <dlfcn.h>
 extern int main (int argc, char **argv, char **envp);
 #endif
 
-APR_DECLARE(apr_status_t) port_executable_name(char** self_name,
-								   apr_pool_t* pool) {
+APR_DECLARE(apr_status_t) port_executable_name(char** self_name) {
+
+    char* buf;
 
 #if defined(FREEBSD)
-        Dl_info info;
-        if (dladdr( (const void*)&main, &info) == 0) {
-                return APR_ENOENT;
-        }
-        char* buf = apr_pstrdup(pool, info.dli_fname);
-#else
-	char* buf = apr_palloc(pool, PATH_MAX + 1); 
-	int n = readlink("/proc/self/exe", buf, PATH_MAX);
-	if (n == -1) {
-		return apr_get_os_error();
-	}
-	buf[n] = '\0';
-#endif
-	*self_name = buf;
+    Dl_info info;
 
-	return APR_SUCCESS;
+    if (dladdr( (const void*)&main, &info) == 0) {
+        return APR_ENOENT;
+    }
+
+    buf = (char*)STD_MALLOC(strlen(info.dli_fname) + 1);
+
+    if (!buf)
+        return APR_ENOMEM;
+
+    strcpy(buf, info.dli_fname);
+#else
+    char tmpbuf[PATH_MAX + 1];
+
+    int n = readlink("/proc/self/exe", tmpbuf, PATH_MAX);
+
+    if (n == -1) {
+        return apr_get_os_error();
+    }
+
+    tmpbuf[n] = '\0';
+
+    buf = (char*)STD_MALLOC(n + 1);
+
+    if (!buf)
+        return APR_ENOMEM;
+
+    strcpy(buf, tmpbuf);
+#endif
+
+    *self_name = buf;
+    return APR_SUCCESS;
 }
 
 APR_DECLARE(int) port_CPUs_number(void) {

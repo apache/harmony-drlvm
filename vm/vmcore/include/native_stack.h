@@ -57,6 +57,7 @@ bool native_unwind_special(native_module_t* modules,
 void native_unwind_interrupted_frame(jvmti_thread_t thread, void** p_ip, void** p_bp, void** p_sp);
 bool native_is_ip_in_modules(native_module_t* modules, void* ip);
 bool native_is_ip_stub(void* ip);
+char* native_get_stub_name(void* ip, char* buf, size_t buflen);
 
 
 #ifdef __cplusplus

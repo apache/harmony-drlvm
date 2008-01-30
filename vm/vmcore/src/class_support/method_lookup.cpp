@@ -460,6 +460,19 @@ CodeChunkInfo *Method_Lookup_Table::get(unsigned i) {
 
 
 
+CodeChunkInfo* vm_find_method(void *addr)
+{
+    Global_Env *env = VM_Global_State::loader_env;
+
+    if (NULL == env || NULL == env->vm_methods)
+        return NULL;
+
+    return env->vm_methods->find(addr);
+
+} //vm_identify_eip
+
+
+
 VM_Code_Type vm_identify_eip(void *addr)
 {
     Global_Env *env = VM_Global_State::loader_env;

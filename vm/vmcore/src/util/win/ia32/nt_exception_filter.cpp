@@ -50,23 +50,6 @@ void vm_to_nt_context(Registers* regs, PCONTEXT context)
     context->EFlags = regs->eflags;
 }
 
-void print_state(LPEXCEPTION_POINTERS nt_exception, const char *msg)
-{
-    if (msg != 0)
-        fprintf(stderr, "Windows reported exception: %s\n", msg);
-    else
-        fprintf(stderr, "Windows reported exception: 0x%x\n", nt_exception->ExceptionRecord->ExceptionCode);
-
-    fprintf(stderr, "Registers:\n");
-    fprintf(stderr, "    EAX: 0x%08x, EBX: 0x%08x, ECX: 0x%08x, EDX: 0x%08x\n",
-        nt_exception->ContextRecord->Eax, nt_exception->ContextRecord->Ebx,
-        nt_exception->ContextRecord->Ecx, nt_exception->ContextRecord->Edx);
-    fprintf(stderr, "    ESI: 0x%08x, EDI: 0x%08x, ESP: 0x%08x, EBP: 0x%08x\n",
-        nt_exception->ContextRecord->Esi, nt_exception->ContextRecord->Edi,
-        nt_exception->ContextRecord->Esp, nt_exception->ContextRecord->Ebp);
-    fprintf(stderr, "    EIP: 0x%08x\n", nt_exception->ContextRecord->Eip);
-}
-
 LONG __declspec(naked) NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_exception)
 {
     __asm {

@@ -140,12 +140,12 @@ typedef signed int int32;
 #else 
 #define PI_FMT "ll"
 #endif
-#define W_PI_FMT "016"PI_FMT
+#define W_PI_FMT "016"PI_FMT"x"
 #else
 #define POINTER_SIZE_INT uint32
 #define POINTER_SIZE_SINT int32
 #define PI_FMT ""
-#define W_PI_FMT "08"PI_FMT
+#define W_PI_FMT "08"PI_FMT"x"
 #endif // POINTER64
 
 /**

@@ -24,16 +24,15 @@
 #include <stdio.h>
 #include <semaphore.h>
 
+#include "vm_core_types.h"
 #include "environment.h"
+#include "port_sysinfo.h"
 #include "platform_lowlevel.h"
+#include "exception_filter.h"
 
 #include "crash_handler.h"
-#if defined(FREEBSD)
-#include <dlfcn.h>
-extern int main (int argc, char **argv, char **envp);
-#endif
 
-static char g_executable[1024]; // Executable file name
+static char* g_executable = NULL;// Executable file name
 static sem_t g_sem_started;     // Prevent forking debugger more than once
 static bool g_prepared = false; // Flag is set if gdb crash handler is prepared
 static bool g_enabled = false;  // vm.crash_handler value is stored here
@@ -47,20 +46,18 @@ static bool g_enabled = false;  // vm.crash_handler value is stored here
 
 bool is_gdb_crash_handler_enabled()
 {
-    if (!g_prepared)
-        return false;
-
-    if (VM_Global_State::loader_env == NULL)
-        return g_enabled;
-
-    return get_boolean_property("vm.crash_handler", FALSE, VM_PROPERTIES);
+    return (g_prepared && g_enabled);
 }
 
-bool gdb_crash_handler()
+bool gdb_crash_handler(Registers* regs)
 {
-    if (!g_prepared ||
+    if (!g_prepared || !g_enabled ||
+        !g_executable ||
         0 != sem_trywait(&g_sem_started)) // gdb was already started
         return false;
+
+    // Print register info
+    print_reg_state(regs);
 
     static const int tid_len = 10;
     char tid[tid_len];
@@ -87,35 +84,28 @@ bool gdb_crash_handler()
 #pragma warning ( pop )
 #endif
 
-int get_executable_name(char executable[], int len) {
-#if defined(FREEBSD)
-    Dl_info info;
-    if (dladdr( (const void*)&main, &info) == 0) {
+static int get_executable_name()
+{
+    if (port_executable_name(&g_executable) != 0)
         return -1;
-    }
-    strncpy(executable, info.dli_fname, len);
-    executable[len] = '\0';
-    return 0;
-#else
-    int n = readlink("/proc/self/exe", executable, len);
-    if (n == -1) {
-        perror("Can't determine executable name");
-        return -1;
-    }
-    executable[n] = '\0';
-    return 0;
-#endif
+
+    return g_executable ? 0 : -1;
 }
 
 
-int init_gdb_crash_handler()
+void init_gdb_crash_handler()
 {
     if (sem_init(&g_sem_started, 0, 1) != 0 ||
-        get_executable_name(g_executable, sizeof(g_executable)) != 0)
-        return -1;
+        get_executable_name() != 0)
+    {
+        g_prepared = false;
+        return;
+    }
+
+    if (!VM_Global_State::loader_env)
+        g_enabled = true;
+    else
+        g_enabled = get_boolean_property("vm.crash_handler", FALSE, VM_PROPERTIES);
 
     g_prepared = true;
-
-    assert(VM_Global_State::loader_env);
-    g_enabled = get_boolean_property("vm.crash_handler", FALSE, VM_PROPERTIES);
 }

@@ -33,6 +33,7 @@
 #include "init.h"
 #include "platform_utils.h"
 #include "open/vm_util.h"
+#include "stack_dump.h"
 #include "exception_filter.h"
 
 BOOL ctrl_handler(DWORD ctrlType) 
@@ -63,6 +64,9 @@ void initialize_signals(){
     TRACE2("signals", "Adding vectored exception handler...");
     veh = AddVectoredExceptionHandler(0, vectored_exception_handler);
     assert(veh);
+
+    // Prepare general crash handler
+    sd_init_crash_handler();
 }
 
 void shutdown_signals() {

@@ -54,7 +54,7 @@ void __cdecl exception_catch_callback_wrapper();
 
 
 // Prints register state
-void print_state(LPEXCEPTION_POINTERS nt_exception, const char *msg);
+void print_reg_state(Registers* regs);
 
 // Conversion from NT context to VM Registers structure and visa versa
 void nt_to_vm_context(PCONTEXT context, Registers* regs);

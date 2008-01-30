@@ -27,6 +27,9 @@
 
 
 static hymutex_t g_lock;
+static const char* g_curdir = NULL;
+static const char* g_cmdline = NULL;
+static const char* g_environ = NULL;
 
 #ifndef NO_DBGHELP
 typedef BOOL (WINAPI *SymFromAddr_type)
@@ -119,7 +122,7 @@ void sd_parse_module_info(native_module_t* module, void* ip)
 
         if (!module->filename)
         { // We should not reach this code
-            fprintf(stderr, "Unknown memory region 0x%"W_PI_FMT"X:0x%"W_PI_FMT"X%s\n",
+            fprintf(stderr, "Unknown memory region 0x%"W_PI_FMT":0x%"W_PI_FMT"%s\n",
                     (size_t)segment->base, (size_t)segment->base + segment->size,
                     (segment->type == SEGMENT_TYPE_CODE) ? "" : " without execution rights");
             return;
@@ -141,7 +144,7 @@ void sd_parse_module_info(native_module_t* module, void* ip)
     region_size = (size_t)mem_info.RegionSize;
     end_addr = start_addr + region_size;
 
-    fprintf(stderr, "Memory region 0x%"W_PI_FMT"X:0x%"W_PI_FMT"X %s\n",
+    fprintf(stderr, "Memory region 0x%"W_PI_FMT":0x%"W_PI_FMT" %s\n",
                 start_addr, end_addr, sd_get_region_access_info(&mem_info));
 }
 
@@ -202,4 +205,64 @@ void sd_get_c_method_info(MethodInfo* info, native_module_t* UNREF module, void*
 int sd_get_cur_tid()
 {
     return GetCurrentThreadId();
+}
+
+void sd_init_crash_handler()
+{
+    // Get current directory
+    DWORD required = GetCurrentDirectory(0, NULL);
+    char* ptr = (char*)STD_MALLOC(required);
+
+    if (ptr)
+    {
+        GetCurrentDirectory(required, ptr);
+        g_curdir = ptr;
+    }
+
+    // Get command line
+    LPTSTR cmdline = GetCommandLine();
+    ptr = (char*)STD_MALLOC(strlen(cmdline) + 1);
+    strcpy(ptr, cmdline);
+    g_cmdline = ptr;
+
+    // Get environment
+    LPVOID env_block = GetEnvironmentStrings();
+
+    if (!env_block)
+        return;
+
+    size_t total_len = 1;
+    ptr = (char*)env_block;
+
+    while (*ptr)
+    {
+        total_len += strlen(ptr) + 1;
+        ptr += strlen(ptr) + 1;
+    }
+
+    ptr = (char*)STD_MALLOC(total_len);
+
+    if (ptr)
+    {
+        memcpy(ptr, env_block, total_len);
+        g_environ = ptr;
+    }
+
+    FreeEnvironmentStrings((char*)env_block);
+}
+
+void sd_print_cwdcmdenv()
+{
+    fprintf(stderr, "\nWorking directory:\n%s\n", g_curdir ? g_curdir : "'null'");
+    fprintf(stderr, "\nCommand line:\n%s\n", g_cmdline);
+
+    fprintf(stderr, "\nEnvironment variables:\n");
+
+    const char* penv = (char*)g_environ;
+
+    while (*penv)
+    {
+        fprintf(stderr, "%s\n", penv);
+        penv += strlen(penv) + 1;
+    }
 }

@@ -33,6 +33,7 @@
 #include "native_stack.h"
 #include "native_modules.h"
 #include "natives_support.h"
+#include "exception_filter.h"
 
 #include "stack_dump.h"
 
@@ -43,7 +44,7 @@ static native_module_t* g_modules = NULL;
 static void sd_fill_modules()
 {
     if (g_modules)
-        clear_native_modules(&g_modules);
+        return;
 
     int count;
     bool res = get_all_native_modules(&g_modules, &count);
@@ -61,7 +62,14 @@ void sd_update_modules()
         return;
 
     hymutex_lock(sd_lock);
-    sd_fill_modules();
+
+    if (g_modules)
+        clear_native_modules(&g_modules);
+
+    int count;
+    res = get_all_native_modules(&g_modules, &count);
+    assert(res && g_modules && count);
+
     hymutex_unlock(sd_lock);
 }
 #endif // SD_UPDATE_MODULES
@@ -178,20 +186,26 @@ static void sd_print_stack_jit(VM_thread* thread,
     while ((si && !si_is_past_end(si)) || frame_num < num_frames)
     {
         MethodInfo m;
+        void* cur_ip = frames[frame_num].ip;
 
         if (frame_num < num_frames && frames[frame_num].java_depth < 0)
         {
-            if (native_is_ip_stub(frames[frame_num].ip)) // Generated stub
+            if (native_is_ip_stub(cur_ip)) // Generated stub
             {
-                fprintf(stderr, "%3d: 0x%"W_PI_FMT"X  <Generated stub>\n",
-                    count++, (POINTER_SIZE_INT)frames[frame_num].ip);
+                char buf[81];
+                char* stub_name =
+                    native_get_stub_name(cur_ip, buf, sizeof(buf));
+
+                fprintf(stderr, "%3d: 0x%"W_PI_FMT": stub '%s'\n",
+                    count++, (POINTER_SIZE_INT)cur_ip,
+                    stub_name ? stub_name : "??");
                 ++frame_num;
                 continue;
             }
 
             // pure native frame
-            native_module_t* module = find_native_module(g_modules, frames[frame_num].ip);
-            sd_get_c_method_info(&m, module, frames[frame_num].ip);
+            native_module_t* module = find_native_module(g_modules, cur_ip);
+            sd_get_c_method_info(&m, module, cur_ip);
             sd_print_line(count++, &m);
             ++frame_num;
             continue;
@@ -207,8 +221,8 @@ static void sd_print_stack_jit(VM_thread* thread,
         if (si_is_native(si) && frame_num < num_frames)
         {
             // Print information from native stack trace for JNI frames
-            native_module_t* module = find_native_module(g_modules, frames[frame_num].ip);
-            sd_get_c_method_info(&m, module, frames[frame_num].ip);
+            native_module_t* module = find_native_module(g_modules, cur_ip);
+            sd_get_c_method_info(&m, module, cur_ip);
             sd_print_line(count, &m);
         }
         else if (si_is_native(si) && frame_num >= num_frames)
@@ -350,15 +364,18 @@ const char* sd_get_module_type(const char* short_name)
 }
 
 
-static void sd_print_modules_info(Registers* regs)
+static void sd_print_module_info(Registers* regs)
 {
-#ifndef SD_UPDATE_MODULES
+#ifdef SD_UPDATE_MODULES
     sd_fill_modules(); // Fill modules table if needed
 #endif
 
     native_module_t* module = find_native_module(g_modules, (void*)regs->get_ip());
     sd_parse_module_info(module, (void*)regs->get_ip());
+}
 
+static void sd_print_modules()
+{
     fprintf(stderr, "\nLoaded modules:\n\n");
     dump_native_modules(g_modules, stderr);
 }
@@ -423,11 +440,20 @@ void sd_print_stack(Registers* regs)
 
     hymutex_lock(sd_lock);
 
+    // Print register info
+    print_reg_state(regs);
+
+    // Print crashed modile info
+    sd_print_module_info(regs);
+
+    // Print program environment info
+    sd_print_cwdcmdenv();
+
+    // Print the whole list of modules
+    sd_print_modules();
+
     VM_thread* thread = get_thread_ptr(); // Can be NULL for pure native thread
     native_frame_t* frames = NULL;
-
-    // Print crashed modile info and whole list of modules
-    sd_print_modules_info(regs);
 
     // Print threads info
     sd_print_threads_info(thread);

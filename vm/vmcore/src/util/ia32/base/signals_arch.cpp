@@ -14,14 +14,16 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Evgueni Brevnov
- * @version $Revision: 1.1.2.1.4.3 $
- */  
 
+#include <stdio.h>
 #include "vm_core_types.h"
 
-/**
- * For using in crash handlers
- */
-void print_reg_state(Registers* regs);
+void print_reg_state(Registers* regs)
+{
+    fprintf(stderr, "Registers:\n");
+    fprintf(stderr, "    EAX: 0x%"W_PI_FMT", EBX: 0x%"W_PI_FMT", ECX: 0x%"W_PI_FMT", EDX: 0x%"W_PI_FMT"\n",
+        regs->eax, regs->ebx, regs->ecx, regs->edx);
+    fprintf(stderr, "    ESI: 0x%"W_PI_FMT", EDI: 0x%"W_PI_FMT", ESP: 0x%"W_PI_FMT", EBP: 0x%"W_PI_FMT"\n",
+        regs->esi, regs->edi, regs->esp, regs->ebp);
+    fprintf(stderr, "    EIP: 0x%"W_PI_FMT"\n", regs->eip);
+}

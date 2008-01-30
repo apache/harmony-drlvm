@@ -135,7 +135,7 @@ void abort_handler (int signum, siginfo_t* info, void* context) {
     signal(signum, SIG_DFL);
 
     if (!is_gdb_crash_handler_enabled() ||
-        !gdb_crash_handler())
+        !gdb_crash_handler(&regs))
     {
         // print stack trace
         sd_print_stack(&regs);
@@ -175,7 +175,7 @@ void null_java_divide_by_zero_handler(int signum, siginfo_t* UNREF info, void* c
     signal(signum, SIG_DFL);
 
     if (!is_gdb_crash_handler_enabled() ||
-        !gdb_crash_handler())
+        !gdb_crash_handler(&regs))
     {
         // print stack trace
         sd_print_stack(&regs);
@@ -459,7 +459,7 @@ void null_java_reference_handler(int signum, siginfo_t* UNREF info, void* contex
     signal(signum, SIG_DFL);
 
     if (!is_gdb_crash_handler_enabled() ||
-        !gdb_crash_handler())
+        !gdb_crash_handler(&regs))
     {
         // print stack trace
         sd_print_stack(&regs);
@@ -491,6 +491,9 @@ void initialize_signals() {
 
     // Prepare gdb crash handler
     init_gdb_crash_handler();
+
+    // Prepare general crash handler
+    sd_init_crash_handler();
 
 } //initialize_signals
 

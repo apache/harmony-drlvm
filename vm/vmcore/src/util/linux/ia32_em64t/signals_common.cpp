@@ -74,7 +74,7 @@ static void general_crash_handler(int signum, Registers* regs, const char* messa
 
 
 extern "C" {
-static void __attribute__ ((used, cdecl)) c_exception_handler(Class* exn_class, bool java_code) {
+static void DECL_CHANDLER c_exception_handler(Class* exn_class, bool java_code) {
     // this exception handler is executed *after* NT exception handler returned
     DebugUtilsTI* ti = VM_Global_State::loader_env->TI;
     // Create local copy for registers because registers in TLS can be changed
@@ -494,8 +494,6 @@ static void abort_handler (int signum, siginfo_t* UNREF info, void* context)
 
 static void process_crash(Registers* regs)
 {
-    // Print register info
-    print_state(regs);
     // print stack trace
     sd_print_stack(regs);
 }
@@ -508,7 +506,7 @@ static void general_crash_handler(int signum, Registers* regs, const char* messa
     fprintf(stderr, "Signal is reported: %s\n", message);
 
     if (!is_gdb_crash_handler_enabled() ||
-        !gdb_crash_handler())
+        !gdb_crash_handler(regs))
     {
         process_crash(regs);
     }
@@ -622,6 +620,9 @@ void initialize_signals()
 
     // Prepare gdb crash handler
     init_gdb_crash_handler();
+
+    // Prepare general crash handler
+    sd_init_crash_handler();
 
 } //initialize_signals
 

@@ -49,7 +49,7 @@ void dump_native_modules(native_module_t* modules, FILE *out)
         {
             size_t base = (size_t)module->segments[i].base;
 
-            fprintf(out, "\t0x%"W_PI_FMT"x:0x%"W_PI_FMT"x\n",
+            fprintf(out, "\t0x%"W_PI_FMT":0x%"W_PI_FMT"\n",
                     base, base + module->segments[i].size);
         }
     }

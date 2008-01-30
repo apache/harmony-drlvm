@@ -43,29 +43,19 @@
 #error Unknown value of INSTRUMENTATION_BYTE
 #endif
 
-static void print_callstack(LPEXCEPTION_POINTERS nt_exception) {
-    PCONTEXT context = nt_exception->ContextRecord;
-    Registers regs;
-    nt_to_vm_context(context, &regs);
-    sd_print_stack(&regs);
-}
 
-
-static LONG process_crash(LPEXCEPTION_POINTERS nt_exception, const char* msg = NULL)
+static LONG process_crash(Registers* regs, DWORD ExceptionCode)
 {
 static DWORD saved_eip_index = TlsAlloc();
 static BOOL UNREF tmp_init = TlsSetValue(saved_eip_index, (LPVOID)0);
 
-    Registers regs;
-    nt_to_vm_context(nt_exception->ContextRecord, &regs);
-
     // Check crash location to prevent infinite recursion
-    if (regs.get_ip() == (void*)TlsGetValue(saved_eip_index))
+    if (regs->get_ip() == (void*)TlsGetValue(saved_eip_index))
         return EXCEPTION_CONTINUE_SEARCH;
     // Store registers to compare IP in future
-    TlsSetValue(saved_eip_index, (LPVOID)regs.get_ip());
+    TlsSetValue(saved_eip_index, (LPVOID)regs->get_ip());
 
-    switch (nt_exception->ExceptionRecord->ExceptionCode)
+    switch (ExceptionCode)
     {
     case EXCEPTION_DATATYPE_MISALIGNMENT:
     case EXCEPTION_ILLEGAL_INSTRUCTION:
@@ -88,8 +78,10 @@ static BOOL UNREF tmp_init = TlsSetValue(saved_eip_index, (LPVOID)0);
         get_boolean_property("vm.assert_dialog", TRUE, VM_PROPERTIES))
         return EXCEPTION_CONTINUE_SEARCH;
 
-    print_state(nt_exception, msg);
-    print_callstack(nt_exception);
+    // Report crash
+    fprintf(stderr, "Windows reported exception: 0x%x\n", ExceptionCode);
+
+    sd_print_stack(regs);
     LOGGER_EXIT(-1);
     return EXCEPTION_CONTINUE_EXECUTION;
 }
@@ -338,7 +330,7 @@ LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception
         (!in_java && code != STATUS_STACK_OVERFLOW)) &&
         code != JVMTI_EXCEPTION_STATUS)
     {
-        LONG result = process_crash(nt_exception);
+        LONG result = process_crash(&regs, code);
         regs.set_ip((void*)saved_eip);
         vm_to_nt_context(&regs, context);
         return result;
@@ -420,7 +412,7 @@ LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception
         }
     default:
         // unexpected hardware exception occured in java code
-        LONG result = process_crash(nt_exception);
+        LONG result = process_crash(&regs, code);
         regs.set_ip((void*)saved_eip);
         vm_to_nt_context(&regs, context);
         return result;

@@ -52,6 +52,8 @@ inline size_t get_restore_stack_size() {
     return get_mem_protect_stack_size() + 0x0400;
 }
 
+#define DECL_CHANDLER __attribute__ ((used))
+
 // ^^^^^^^^ EM64T ^^^^^^^^
 #else // #ifdef _EM64T_
 // vvvvvvvv IA-32 vvvvvvvv
@@ -83,6 +85,8 @@ inline size_t get_restore_stack_size() {
     return get_mem_protect_stack_size() + 0x0100;
 }
 
+#define DECL_CHANDLER __attribute__ ((used, cdecl))
+
 // ^^^^^^^^ IA-32 ^^^^^^^^
 #endif // #ifdef _EM64T_
 
@@ -101,6 +105,5 @@ inline size_t get_restore_stack_size() {
 void ucontext_to_regs(Registers* regs, ucontext_t *uc);
 void regs_to_ucontext(ucontext_t *uc, Registers* regs);
 
-void print_state(Registers* regs);
 
 #endif // _SIGNALS_COMMON_H_

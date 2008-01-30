@@ -26,8 +26,9 @@
 #include <apr_strings.h>
 #include <apr_env.h>
 
-#include "port_dso.h"
+#include "port_malloc.h"
 #include "port_sysinfo.h"
+#include "port_dso.h"
 
 struct apr_dso_handle_t {
 	apr_pool_t *pool;
@@ -36,48 +37,53 @@ struct apr_dso_handle_t {
 };
 
 APR_DECLARE(apr_status_t) port_dso_load_ex(apr_dso_handle_t** handle,
-									  const char* path,
-									  uint32 mode,
-									  apr_pool_t* pool){
-	/*
-	* FIXME Windows does not support lazy dll resolution a la Linux's RTLD_LAZY.
-	* Proper support for it requires hacking of APR DSO functions. 
-	* Just ignore the <code>mode<code> param for now.
-	*/
+                                           const char* path,
+                                           uint32 mode,
+                                           apr_pool_t* pool){
+    /*
+    * FIXME Windows does not support lazy dll resolution a la Linux's RTLD_LAZY.
+    * Proper support for it requires hacking of APR DSO functions. 
+    * Just ignore the <code>mode<code> param for now.
+    */
 
     /*if (mode == PORT_DSO_DEFAULT || !path) {*/
-    	char *self_path;
-		if (!path) {
-			port_executable_name(&self_path, pool);
-			return apr_dso_load(handle, (const char*)self_path, pool);
-		}
+        char *self_path;
+        apr_status_t res;
 
-		return apr_dso_load(handle, path, pool);
-	/*} else {
-		HINSTANCE native_handle = NULL;
-		DWORD flag = (mode & PORT_DSO_BIND_DEFER) ? 
-			(DONT_RESOLVE_DLL_REFERENCES) : (0);
-		char *cp = apr_pstrdup(pool, path);
-		char *p = cp;
-		while ((p = strchr(p, '/')) != NULL) {
-			*p = '\\';
-		}
+        if (!path) {
+            port_executable_name(&self_path);
+            res = apr_dso_load(handle, (const char*)self_path, pool);
+            STD_FREE(self_path);
+            return res;
+        }
 
-		native_handle = LoadLibraryEx(cp, NULL, flag);
-		*handle = apr_palloc(pool, sizeof(apr_dso_handle_t));
-		if (native_handle == 0) {
-			native_handle = LoadLibraryEx(cp, NULL, flag | LOAD_WITH_ALTERED_SEARCH_PATH);
-			if (native_handle == 0) {
-				DWORD sys_err = apr_get_os_error();
-				(*handle)->error = sys_err;
-				return sys_err;
-			}
-		}
-		(*handle)->handle = native_handle;
-		(*handle)->pool = pool;
-		(*handle)->error = APR_SUCCESS;
-		return APR_SUCCESS;
-	}*/
+        return apr_dso_load(handle, path, pool);
+
+    /*} else {
+        HINSTANCE native_handle = NULL;
+        DWORD flag = (mode & PORT_DSO_BIND_DEFER) ? 
+            (DONT_RESOLVE_DLL_REFERENCES) : (0);
+        char *cp = apr_pstrdup(pool, path);
+        char *p = cp;
+        while ((p = strchr(p, '/')) != NULL) {
+            *p = '\\';
+        }
+
+        native_handle = LoadLibraryEx(cp, NULL, flag);
+        *handle = apr_palloc(pool, sizeof(apr_dso_handle_t));
+        if (native_handle == 0) {
+            native_handle = LoadLibraryEx(cp, NULL, flag | LOAD_WITH_ALTERED_SEARCH_PATH);
+            if (native_handle == 0) {
+                DWORD sys_err = apr_get_os_error();
+                (*handle)->error = sys_err;
+                return sys_err;
+            }
+        }
+        (*handle)->handle = native_handle;
+        (*handle)->pool = pool;
+        (*handle)->error = APR_SUCCESS;
+        return APR_SUCCESS;
+    }*/
 }
  
 APR_DECLARE(apr_status_t) port_dso_search_path(char** path,

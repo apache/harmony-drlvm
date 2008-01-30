@@ -156,9 +156,10 @@ static void init_java_properties(Properties & properties)
     // java.home initialization, try to find absolute location of the executable and set
     // java.home to the parent directory.
     char *launcher_dir;
-    if (port_executable_name(&launcher_dir, prop_pool) != APR_SUCCESS) {
+    if (port_executable_name(&launcher_dir) != APR_SUCCESS) {
         LDIE(13, "Failed to find executable location");
     }
+    STD_FREE(launcher_dir);
 
     properties.set_new("java.vm.specification.version", "1.0");
     properties.set_new("java.vm.specification.vendor", "Sun Microsystems Inc.");
