@@ -34,6 +34,9 @@
         <mkdir dir="${apr.src}/.." />
         <untar src="${apr.src.tgz}" dest="${apr.src}/.." compression="gzip"/>
         <move tofile="${apr.src}" file="${apr.src}/../${apr.src.rootdir}"/>
+        <copy todir="${apr.src}" overwrite="true">
+            <fileset dir="${drlvm.base.dir}/make/resources/patches/apr"/>
+        </copy>
     </target>
 
     <target name="-setup">
