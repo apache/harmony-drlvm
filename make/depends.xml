@@ -23,6 +23,22 @@
     <target name="check">
         <check-one-file dest="${cpptasks.jar}" src="${cpptasks.url}"/>
         <poll-modules target="check-depends" dir="${dd.basedir}"/>
+        <fail>
+            <condition>
+                <not>
+                    <and>
+                    <available file="${hy.hdk}/include"/>
+                    <available file="${hy.hdk}/lib"/>
+                    </and>
+                </not>
+            </condition>
+...
+
+Missing dependency: pre-built class library (or HDK)
+at ${hy.hdk}. 
+You may point to the correct location via "hy.hdk" property:
+"ant -Dhy.hdk=a-hdk-root"
+        </fail>
     </target>
         
     <target name="fetch">

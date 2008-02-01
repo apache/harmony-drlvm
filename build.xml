@@ -31,7 +31,7 @@ Usage:
 
   ant build
     Compiles the java and native code to produce a jre in
-    "build/deploy/jdk/jre".
+    "deploy/jdk/jre".
     It is possible to build an individual component via 
     corresponding targets.
 
@@ -65,7 +65,7 @@ Usage:
     licensed under terms other than the Apache License v2.
 
   ant drlvm-echo echo debug-echo
-    Display the common properties that are use in the ant build files.
+    Display the common properties that are used in the ant build files.
 
         </echo>
     </target>
@@ -80,7 +80,7 @@ Usage:
 
     <target name="rebuild" depends="clean,build"
         description="Performs a full build - that is 'clean' then 'build'" />
-	
+
     <target name="build" 
         depends="drlvm-echo, setup,
         interpreter,
@@ -207,14 +207,7 @@ Usage:
         </replace>
         <fixcrlf srcDir="${drlvm.deploy.dir}/jdk/jre/" includes="readme.txt" />
         
-        <chmod perm="755">
-            <fileset dir="${drlvm.deploy.dir}/jdk/jre/bin">
-                <include name="java" />
-                <include name="javaw" />
-                <include name="*.so" />
-                <include name="*.so.*" />
-            </fileset>
-        </chmod>
+        <chmod file="${drlvm.deploy.dir}/jdk/jre/bin/java*" perm="ugo+x" />
     </target>
     
 
@@ -224,12 +217,13 @@ Usage:
       there's a predicable place to find the output 
       ================================================================== -->
     <target name="deploy-canonical" if="deploy.canonical.flag">
-        <property name="canonical.deploy.dir" location="${drlvm.base.dir}/build/deploy" />
+        <property name="canonical.deploy.dir" location="${drlvm.base.dir}/deploy" />
         <delete dir="${canonical.deploy.dir}" failonerror="false" />
         <mkdir dir="${canonical.deploy.dir}" />
         <copy todir="${canonical.deploy.dir}">
             <fileset dir="${drlvm.deploy.dir}"/>
         </copy>
+        <chmod file="${canonical.deploy.dir}/jdk/jre/bin/java*" perm="ugo+x" />
     </target>
 
     <!-- ==================================================================
