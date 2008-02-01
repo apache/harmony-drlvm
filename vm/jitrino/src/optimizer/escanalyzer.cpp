@@ -341,6 +341,7 @@ EscAnalyzer::instrExam(Node* node) {
                 break;
 
             case Op_Conv:     // conv
+            case Op_ConvUnmanaged:
                 if (inst->getDst()->getType()->isObject()) {
                     type=inst->getDst()->getType();
                     assert(findCnGNode_op(inst->getDst()->getId())==NULL);

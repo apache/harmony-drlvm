@@ -848,6 +848,7 @@ void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth, unsigned short
             mov(cs_vtbl.get(0), thiz.as_opnd());
         }
         gen_call_vm(cs_vtbl, rt_helper_get_vtable, 1, klass);
+
         //
         // Method's vtable is in gr_ret now, prepare stack
         //

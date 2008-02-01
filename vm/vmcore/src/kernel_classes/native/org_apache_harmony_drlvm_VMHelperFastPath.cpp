@@ -23,10 +23,6 @@
 #include "open/vm.h"
 #include <assert.h>
 
-JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_VMHelperFastPath_getObjectVtableOffset(JNIEnv *e, jclass c)
-{
-    return object_get_vtable_offset();
-}
 
 JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_VMHelperFastPath_getVtableIntfTypeOffset(JNIEnv *e, jclass c, jint i)
 {
@@ -57,10 +53,6 @@ JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_VMHelperFastPath_getVtableI
 #endif
 }
 
-JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_VMHelperFastPath_getVtableClassOffset(JNIEnv *e, jclass c)
-{
-    return static_cast<jint>(reinterpret_cast<jlong>(&((VTable*)0)->clss));
-}
 
 JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_VMHelperFastPath_getVtableSuperclassesOffset(JNIEnv *e, jclass c)
 {

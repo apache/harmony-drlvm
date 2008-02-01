@@ -35,6 +35,7 @@
 #include "deadcodeeliminator.h"
 #include "TranslatorIntfc.h"
 #include "LoopTree.h"
+#include "inliner.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -1158,6 +1159,7 @@ void FlowGraph::doTranslatorCleanupPhase(IRManager& irm) {
             }
         }
     }
+    
     // Remove extra PseudoThrow insts
     if (irm.getOptimizerFlags().rept_aggressive) {
         DeadCodeEliminator dce(irm);
@@ -1166,19 +1168,29 @@ void FlowGraph::doTranslatorCleanupPhase(IRManager& irm) {
         normalizePseudoThrow(irm);
     }
 
+
+    //process all methods marked with @Inline pragma
+    if (Log::isLogEnabled(LogStream::IRDUMP)) {
+        LogStream& irdump = Log::log(LogStream::IRDUMP);
+        Log::printIRDumpBegin(irdump.out(), id, stage, "before_pragma_inline");
+        printHIR(irdump.out(), irm.getFlowGraph(), irm.getMethodDesc());
+        Log::printIRDumpEnd(irdump.out(), id, stage, "before_pragma_inline");
+    }
+    Inliner::processInlinePragmas(irm);
+
+
     //
     // a quick cleanup of unreachable and empty basic blocks
     //
     fg.purgeUnreachableNodes();
     fg.purgeEmptyNodes(false);
-    
+
     if (Log::isLogEnabled(LogStream::IRDUMP)) {
         LogStream& irdump = Log::log(LogStream::IRDUMP);
         Log::printStageEnd(irdump.out(), id, "TRANS", stage, stage);
     }
+
 }
-
-
 
 void FlowGraph::printHIR(std::ostream& os, ControlFlowGraph& fg, MethodDesc& methodDesc) {
     const char* methodName = methodDesc.getName();

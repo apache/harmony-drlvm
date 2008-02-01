@@ -59,3 +59,22 @@ JNIEXPORT jlong JNICALL Java_org_apache_harmony_drlvm_VMHelper_getCompressedMode
         return -1;
     }
 }
+
+JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_VMHelper_getObjectVtableOffset(JNIEnv *e, jclass c)
+{
+    return object_get_vtable_offset();
+}
+
+JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_VMHelper_getClassJLCHanldeOffset(JNIEnv *e, jclass c)
+{
+   return (jint)Class::get_offset_of_jlc_handle();
+}
+
+JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_VMHelper_getVtableClassOffset(JNIEnv *e, jclass c)
+{
+    return static_cast<jint>(reinterpret_cast<jlong>(&((VTable*)0)->clss));
+}
+
+
+
+

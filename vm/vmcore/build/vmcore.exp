@@ -205,7 +205,7 @@ VMCORE_0.1 {
     Java_java_lang_System_setErrUnsecure;
     Java_java_lang_System_setInUnsecure;
     Java_java_lang_System_setOutUnsecure;
-    Java_java_lang_VMClassRegistry_getClass;
+    Java_java_lang_VMClassRegistry_getClassNative;
     Java_java_lang_VMClassRegistry_getClassLoader0;
     Java_java_lang_VMClassRegistry_getComponentType;
     Java_java_lang_VMClassRegistry_getDeclaredClasses;
@@ -273,8 +273,6 @@ VMCORE_0.1 {
     Java_java_util_concurrent_locks_LockSupport_unpark;
     Java_org_apache_harmony_drlvm_thread_ThreadHelper_getThreadIdOffset;
     Java_org_apache_harmony_drlvm_thread_ThreadHelper_getLockWordOffset;
-    Java_org_apache_harmony_drlvm_VMHelperFastPath_getObjectVtableOffset;
-    Java_org_apache_harmony_drlvm_VMHelperFastPath_getVtableClassOffset;
     Java_org_apache_harmony_drlvm_VMHelperFastPath_getVtableIntfTableOffset;
     Java_org_apache_harmony_drlvm_VMHelperFastPath_getVtableIntfTypeOffset;
     Java_org_apache_harmony_drlvm_VMHelperFastPath_getVtableSuperclassesOffset;
@@ -283,6 +281,9 @@ VMCORE_0.1 {
     Java_org_apache_harmony_drlvm_VMHelper_getPointerTypeSize;
     Java_org_apache_harmony_drlvm_VMHelper_isCompressedRefsMode;
     Java_org_apache_harmony_drlvm_VMHelper_isCompressedVTableMode;
+    Java_org_apache_harmony_drlvm_VMHelper_getObjectVtableOffset;
+    Java_org_apache_harmony_drlvm_VMHelper_getVtableClassOffset;
+    Java_org_apache_harmony_drlvm_VMHelper_getClassJLCHanldeOffset;
     Java_org_apache_harmony_kernel_vm_VM_getClassLoader;
     Java_org_apache_harmony_lang_management_ClassLoadingMXBeanImpl_getLoadedClassCountImpl;
     Java_org_apache_harmony_lang_management_ClassLoadingMXBeanImpl_getTotalLoadedClassCountImpl;

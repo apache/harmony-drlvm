@@ -25,6 +25,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Member;
+import org.apache.harmony.drlvm.VMHelper;
 
 
 /**
@@ -103,7 +104,15 @@ final class VMClassRegistry
      * {@link Object#getClass() Object.getClass()} method.
      * @api2vm
      */
-    static native Class<? extends Object> getClass(Object obj);
+    static native Class<? extends Object> getClassNative(Object obj);
+
+    static Class<? extends Object> getClass(Object obj) {
+        if (VMHelper.isVMMagicPackageSupported()) {
+            return (Class<? extends Object>)VMHelper.getManagedClass(obj).toObjectReference().toObject();
+        }
+        return getClassNative(obj);
+    }
+
 
     /**
      * This method satisfies the requirements of the specification for the

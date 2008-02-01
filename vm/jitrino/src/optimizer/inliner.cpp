@@ -67,8 +67,6 @@ namespace Jitrino {
 #define INLINE_EXACT_ALL_BONUS 0
 #define INLINE_SKIP_EXCEPTION_PATH false
 
-#define PRAGMA_INLINE_BENEFIT (2*1000*1000*1000)
-
 DEFINE_SESSION_ACTION(InlinePass, inline, "Method Inlining");
 
 Inliner::Inliner(SessionAction* argSource, MemoryManager& mm, IRManager& irm, 
@@ -80,7 +78,7 @@ Inliner::Inliner(SessionAction* argSource, MemoryManager& mm, IRManager& irm,
       _inlineCandidates(mm), _initByteSize(irm.getMethodDesc().getByteCodeSize()), 
       _currentByteSize(irm.getMethodDesc().getByteCodeSize()), 
       _inlineTree(new (mm) InlineNode(irm, 0, 0)),
-      translatorAction(NULL), inlinePragma(NULL), 
+      translatorAction(NULL), 
       usePriorityQueue(_usePriorityQueue), inlinerPipelineName(inlinePipeline),
       connectEarly(true), isPseudoThrowInserted(false)
 {
@@ -158,9 +156,6 @@ Inliner::Inliner(SessionAction* argSource, MemoryManager& mm, IRManager& irm,
     }
 
     _usesOptimisticBalancedSync = argSource->getBoolArg("sync_optimistic", false) ? argSource->getBoolArg("sync_optcatch", true) : false;
-    
-    // Avoid class resolution during compilation. VMMagic package should be loaded & resolved at start up.  
-    inlinePragma = irm.getCompilationInterface().findClassUsingBootstrapClassloader(PRAGMA_INLINE_TYPE_NAME);
 }
 
 int32 
@@ -172,11 +167,6 @@ Inliner::computeInlineBenefit(Node* node, MethodDesc& methodDesc, InlineNode* pa
         Log::out() << "Computing Inline benefit for "
                                << methodDesc.getParentType()->getName()
                                << "." << methodDesc.getName() << ::std::endl;
-    }
-    if (inlinePragma!=NULL && methodDesc.hasAnnotation(inlinePragma)) {
-        //methods marked with inline pragma processed separately and are always inlined
-        //regardless of it benefits and size limitations.
-        assert(0);
     }
     if (_inlineBonusMethodTable!=NULL && _inlineBonusMethodTable->accept_this_method(methodDesc)) {
         benefit+=1000;
@@ -834,7 +824,7 @@ Inliner::inlineRegion(InlineNode* inlineNode) {
         scaleBlockCounts(callNode, inlinedIRM);
     }
     
-    // Update priority queue with calls in this region and check @Inline pragmas
+    // Update priority queue with calls in this region
     processRegion(inlineNode, dtree, ltree);
     
     // If top level flowgraph 
@@ -916,7 +906,6 @@ Inliner::getNextRegionToInline(CompilationContext& inlineCC) {
         call = ((Inst*)callNode->getLastInst())->asMethodCallInst();
         assert(call != NULL);
         methodDesc = call->getMethodDesc();
-        bool isPragmaInline = inlinePragma != NULL && methodDesc->hasAnnotation(inlinePragma);;
 
         // If candidate would cause top level method to exceed size threshold, throw away.
         
@@ -924,7 +913,7 @@ Inliner::getNextRegionToInline(CompilationContext& inlineCC) {
         methodByteSize = (methodByteSize <= CALL_COST) ? 1 : methodByteSize-CALL_COST;
         newByteSize = _currentByteSize + methodByteSize;
         double factor = ((double) newByteSize) / ((double) _initByteSize);
-        if(isPragmaInline || newByteSize < _minInlineStop || factor <= _maxInlineGrowthFactor || (methodByteSize < _inlineSmallMaxByteSize)) {
+        if(newByteSize < _minInlineStop || factor <= _maxInlineGrowthFactor || (methodByteSize < _inlineSmallMaxByteSize)) {
             found = true;
         } else {
             Log::out() << "Skip inlining " << methodDesc->getParentType()->getName() << "." << methodDesc->getName() << ::std::endl;
@@ -959,9 +948,7 @@ Inliner::getNextRegionToInline(CompilationContext& inlineCC) {
 InlineNode* Inliner::createInlineNode(CompilationContext& inlineCC, MethodCallInst* call) {
     MethodDesc *methodDesc = call->getMethodDesc();
     IRManager* inlinedIRM = new (_tmpMM) IRManager(_tmpMM, _toplevelIRM, *methodDesc, NULL);
-    // Augment inline tree
-    bool forceInline = inlinePragma != NULL && methodDesc->hasAnnotation(inlinePragma);
-    InlineNode *inlineNode = new (_tmpMM) InlineNode(*inlinedIRM, call, call->getNode(), forceInline);
+    InlineNode *inlineNode = new (_tmpMM) InlineNode(*inlinedIRM, call, call->getNode(), false);
     
     inlineCC.setHIRManager(inlinedIRM);
     
@@ -998,19 +985,12 @@ Inliner::processDominatorNode(InlineNode *inlineNode, DominatorNode* dnode, Loop
             MethodDesc* methodDesc = call->getMethodDesc();
 
             Log::out() << "Considering inlining instruction I" << (int)call->getId() << ::std::endl;
-            if (inlinePragma != NULL && methodDesc->hasAnnotation(inlinePragma)) {
-                assert(!methodDesc->isSynchronized()); //not tested!
-                if (Log::isEnabled()) {
-                    Log::out()<<"Found Inline pragma, adding to the queue:";call->print(Log::out());Log::out()<<std::endl;
-                }
-                _inlineCandidates.push(CallSite(PRAGMA_INLINE_BENEFIT, node, inlineNode));
-            } else if (usePriorityQueue && canInlineInto(*methodDesc)) {
+            if (usePriorityQueue && canInlineInto(*methodDesc)) {
                 uint32 size = methodDesc->getByteCodeSize();
                 int32 benefit = computeInlineBenefit(node, *methodDesc, inlineNode, ltree->getLoopDepth(node));
                 assert(size > 0);
                 Log::out() << "Inline benefit " << methodDesc->getParentType()->getName() << "." << methodDesc->getName() << " == " << (int) benefit << ::std::endl;
                 if(0 < size && benefit > _minBenefitThreshold) {
-                    assert(benefit < PRAGMA_INLINE_BENEFIT);
                     // Inline candidate
                     Log::out() << "Add to queue" << std::endl;
                     _inlineCandidates.push(CallSite(benefit, node, inlineNode));
@@ -1173,20 +1153,22 @@ void Inliner::runInliner(MethodCallInst* call) {
         }
         //inline current region
         inlineRegion(regionNode);
-        // Limit inlining by node count. All @Inline methods still must be inlined.
-        if (!regionNode->isForced() && _toplevelIRM.getFlowGraph().getNodeCount() > _inlineMaxNodeThreshold) {
+        // Limit inlining by node count. 
+        if (_toplevelIRM.getFlowGraph().getNodeCount() > _inlineMaxNodeThreshold) {
             break;
         }
     } while (true);
 
 
     // Clean up phase.
-    DeadCodeEliminator dce(_toplevelIRM);
-    dce.eliminateUnreachableCode();
-    assert(_toplevelIRM.getInSsa());
-    OptPass::fixupSsa(_toplevelIRM);
-    if (isPseudoThrowInserted && _toplevelIRM.getOptimizerFlags().rept_aggressive) {
-        dce.removeExtraPseudoThrow();
+    if (_toplevelIRM.getInSsa()) {
+        DeadCodeEliminator dce(_toplevelIRM);
+        dce.eliminateUnreachableCode();
+        assert(_toplevelIRM.getInSsa());
+        OptPass::fixupSsa(_toplevelIRM);
+        if (isPseudoThrowInserted && _toplevelIRM.getOptimizerFlags().rept_aggressive) {
+            dce.removeExtraPseudoThrow();
+        }
     }
 }
 
@@ -1202,10 +1184,12 @@ void Inliner::compileAndConnectRegion(InlineNode* inlineNode, CompilationContext
         }
 
         // Optimize inlined region before splicing
-        CompilationContext* topCC = regionManager.getCompilationContext();
-        inlineCC.stageId = topCC->stageId;
-        Inliner::runInlinerPipeline(inlineCC, inlinerPipelineName);
-        topCC->stageId = inlineCC.stageId;
+        if (inlinerPipelineName!=NULL) {
+            CompilationContext* topCC = regionManager.getCompilationContext();
+            inlineCC.stageId = topCC->stageId;
+            Inliner::runInlinerPipeline(inlineCC, inlinerPipelineName);
+            topCC->stageId = inlineCC.stageId;
+        }
 
         // Splice into flow graph and find next region.
         if(!connectEarly) {
@@ -1213,6 +1197,46 @@ void Inliner::compileAndConnectRegion(InlineNode* inlineNode, CompilationContext
         }
         OptPass::computeDominatorsAndLoops(regionManager);
     } 
+}
+
+void Inliner::processInlinePragmas(IRManager& irm) {
+    // VMMagic package should be loaded & resolved at start up.  
+    NamedType* inlinePragma = irm.getCompilationInterface().findClassUsingBootstrapClassloader(PRAGMA_INLINE_TYPE_NAME);
+    if (inlinePragma == NULL) {
+        if (Log::isEnabled()) {
+            Log::out()<<"@Inline is not resolved. Skipping @Inline check."<<std::endl;
+        }
+        return; //pragma inline is not resolved -> nothing to check
+    }
+
+    MemoryManager tmpMM("processInlinePragmas");
+    Inliner inliner(irm.getCompilationContext()->getCurrentSessionAction(), tmpMM, irm, false, false, NULL);
+    StlVector<MethodCallInst*> callsToInline(tmpMM);
+
+    //find all methods with @Inline
+    const Nodes& nodes = irm.getFlowGraph().getNodes();
+    for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
+        Node* node = *it;
+        for (Inst* inst = (Inst*)node->getFirstInst(); inst!=NULL; inst = inst->getNextInst()) {
+            if (!inst->isMethodCall()) {
+                continue;
+            }
+            MethodCallInst* mci = inst->asMethodCallInst();
+            MethodDesc* md = mci->getMethodDesc();
+            if (md != NULL && md->hasAnnotation(inlinePragma)) {
+                callsToInline.push_back(mci);
+                if (Log::isEnabled()) {
+                    Log::out()<<"found @Inline :";mci->print(Log::out()); Log::out()<<std::endl;
+                }
+            }
+        }
+    }
+
+    //now inline all all @Inline methods found 
+    for(StlVector<MethodCallInst*>::const_iterator it = callsToInline.begin(), end = callsToInline.end(); it!=end; ++it) {
+        MethodCallInst* call = *it;
+        inliner.runInliner(call);
+    }
 }
 
 void InlinePass::_run(IRManager& irm) {

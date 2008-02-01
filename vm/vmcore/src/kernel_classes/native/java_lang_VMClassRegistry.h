@@ -45,10 +45,10 @@ Java_java_lang_VMClassRegistry_loadBootstrapClass(JNIEnv *, jclass,
     jstring);
 
 /*
- * Method: java.lang.VMClassRegistry.getClass(Ljava/lang/Object;)Ljava/lang/Class;
+ * Method: java.lang.VMClassRegistry.getClassNative(Ljava/lang/Object;)Ljava/lang/Class;
  */
 JNIEXPORT jclass JNICALL
-Java_java_lang_VMClassRegistry_getClass(JNIEnv *, jclass, 
+Java_java_lang_VMClassRegistry_getClassNative(JNIEnv *, jclass, 
     jobject);
 
 /*

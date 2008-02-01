@@ -2325,9 +2325,10 @@ JavaByteCodeTranslator::genInvokeStatic(MethodDesc * methodDesc,
         assert(res);
         return;
     } else if (isVMHelperClass(kname) && !methodDesc->isNative()) {
-        UNUSED bool res = genVMHelper(mname, numArgs, srcOpnds, returnType);
-            assert(res);
-        return;
+        bool res = genVMHelper(mname, numArgs, srcOpnds, returnType);
+        if (res) {
+            return;
+        }
     }
     Opnd *tauNullChecked = irBuilder.genTauSafe(); // always safe, is a static method call
     Type* resType = returnType;
@@ -3714,6 +3715,15 @@ bool JavaByteCodeTranslator::genVMHelper(const char* mname, uint32 numArgs, Opnd
     if (!strcmp(mname,"getFastTypeCheckDepth")) {
         assert(numArgs == 1 && srcOpnds[0]->getType()->isUnmanagedPtr());
         Opnd* res = irBuilder.genJitHelperCall(ClassGetFastCheckDepth, resType, numArgs, srcOpnds);
+        pushOpnd(res);
+        return true;
+    }
+
+    if (!strcmp(mname,"isVMMagicPackageSupported")) {
+        assert(numArgs == 0);
+        ObjectType* base = compilationInterface.findClassUsingBootstrapClassloader(VMHELPER_TYPE_NAME);
+        int ready = base!=NULL && !base->needsInitialization() ? 1 : 0;
+        Opnd* res = irBuilder.genLdConstant((int32)ready);
         pushOpnd(res);
         return true;
     }

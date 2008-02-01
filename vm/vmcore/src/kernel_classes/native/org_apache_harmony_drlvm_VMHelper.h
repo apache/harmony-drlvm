@@ -47,6 +47,17 @@ JNIEXPORT jlong JNICALL Java_org_apache_harmony_drlvm_VMHelper_getCompressedMode
   (JNIEnv *, jclass);
 
 
+JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_VMHelper_getObjectVtableOffset
+  (JNIEnv *, jclass);
+
+
+JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_VMHelper_getClassJLCHanldeOffset
+  (JNIEnv *, jclass);
+
+JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_VMHelper_getVtableClassOffset
+  (JNIEnv *, jclass);
+
+
 #ifdef __cplusplus
 }
 #endif

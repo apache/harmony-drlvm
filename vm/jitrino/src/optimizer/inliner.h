@@ -60,21 +60,19 @@ private:
 class InlineNode : public TreeNode {
 public:
     InlineNode(IRManager& irm, Inst *callInst, Node *callNode, bool forced = false)
-        : _irm(irm), _callInst(callInst), _callNode(callNode), _forceInline(forced) {}
+        : _irm(irm), _callInst(callInst), _callNode(callNode) {}
     InlineNode* getChild()    {return (InlineNode*) child;}
     InlineNode* getSiblings() {return (InlineNode*) siblings;}
     InlineNode* getParent()   {return (InlineNode*) parent;}
     IRManager&  getIRManager()      { return _irm; }
     Inst*       getCallInst() { return _callInst; }
     Node*       getCallNode() { return _callNode; }
-    bool        isForced() { return _forceInline; }
     void print(::std::ostream& os);
     void printTag(::std::ostream& os);
 private:
     IRManager&  _irm;
     Inst*       _callInst;
     Node*       _callNode;
-    bool        _forceInline;
 };
 
 class InlineTree : public Tree {
@@ -124,6 +122,11 @@ public:
     void runInliner(MethodCallInst* call);
 
     void setConnectEarly(bool early) {connectEarly = early;}
+
+    /** Inlines all methods annotated with @Inline. 
+        Does not run any pipeline for inlined methods
+    */
+    static void processInlinePragmas(IRManager& irm);
 
 private:
 
@@ -206,7 +209,6 @@ private:
     bool isBCmapRequired;
     void* bc2HIRMapHandler;
     TranslatorAction* translatorAction;
-    NamedType* inlinePragma;
     bool usePriorityQueue;
     const char* inlinerPipelineName;
     bool connectEarly;

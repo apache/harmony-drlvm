@@ -28,13 +28,6 @@ extern "C" {
 #endif
 
 
-/*
- * Class:     org_apache_harmony_drlvm_VMHelperFastPath
- * Method:    getObjectVtableOffset
- * Signature: ()I
- */
-JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_VMHelperFastPath_getObjectVtableOffset
-  (JNIEnv *, jclass);
 
 /*
  * Class:     org_apache_harmony_drlvm_VMHelperFastPath
@@ -51,14 +44,6 @@ JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_VMHelperFastPath_getVtableI
  */
 JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_VMHelperFastPath_getVtableIntfTableOffset
   (JNIEnv *, jclass, jint);
-
-/*
- * Class:     org_apache_harmony_drlvm_VMHelperFastPath
- * Method:    getVtableClassOffset
- * Signature: ()I
- */
-JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_VMHelperFastPath_getVtableClassOffset
-  (JNIEnv *, jclass);
 
 /*
  * Class:     org_apache_harmony_drlvm_VMHelperFastPath

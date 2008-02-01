@@ -130,7 +130,7 @@ Java_java_lang_ClassLoader_registerInitiatedClass(JNIEnv* env, jobject loader, j
  * Method:    getClass
  * Signature: (Ljava/lang/Object;)Ljava/lang/Class;
  */
-JNIEXPORT jclass JNICALL Java_java_lang_VMClassRegistry_getClass
+JNIEXPORT jclass JNICALL Java_java_lang_VMClassRegistry_getClassNative
   (JNIEnv *jenv, jclass, jobject jobj)
 {
     // use JNI API function

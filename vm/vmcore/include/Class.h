@@ -1168,7 +1168,7 @@ public:
     unsigned get_number_of_virtual_method_entries() const {
         return m_num_virtual_method_entries;
     }
-
+   
     /** Gets the first subclass for Class Hierarchy Analysis.
      * @return The first subclass.*/
     Class* get_first_child() const { return m_cha_first_child; }
@@ -1230,6 +1230,13 @@ public:
         Class* dummy = NULL;
         assert(sizeof(dummy->m_array_element_class) == sizeof(void*));
         return (size_t)((char*)(&dummy->m_array_element_class) - (char*)dummy);
+    }
+
+    /** Gets an offset of <code>m_class_handle</code> in the class.
+     * @note It used by VMHelper class*/
+    static size_t get_offset_of_jlc_handle () {
+        Class* dummy=NULL;       
+        return (size_t)((char*)(&dummy->m_class_handle) - (char*)dummy);
     }
 
     /** Gets the number of array dimensions.

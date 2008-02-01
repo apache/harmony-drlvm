@@ -47,20 +47,19 @@ public class VMHelper {
 
     public static final long COMPRESSED_REFS_OBJ_BASE_OFFSET  = getCompressedModeObjectBaseOffset();
 
-    public static final int OBJ_VTABLE_OFFSET = 0;
+    public static final int OBJ_VTABLE_OFFSET = getObjectVtableOffset();
 
     public static final int VTABLE_GCPRIVATE_OFFSET = 0;
 
+    public static final int VTABLE_CLASS_OFFSET = getVtableClassOffset();
+
     public static final int OBJ_INFO_OFFSET = 4;
 
+    public static final int CLASS_JLC_HANDLE_OFFSET = getClassJLCHanldeOffset();
 
-    // Force loading of magic classes.
-    static {
-        try {
-            Class.forName(Inline.class.getName(), true, null);
-        } catch (ClassNotFoundException e) {}
-    }
 
+    // preload @Inline vmmagic class
+    static final Class pragmaInline = org.vmmagic.pragma.Inline.class;
 
 
     //Slow path versions of helpers
@@ -91,6 +90,8 @@ public class VMHelper {
 
 
     //utility magics supported by JIT
+
+    public static boolean isVMMagicPackageSupported() {return false;}
 
     public static Address getTlsBaseAddress() {fail(); return null;}
 
@@ -129,10 +130,28 @@ public class VMHelper {
     }
 
 
+    @Inline
+    public static Address getNativeClass(Object obj) {                
+        Address nativeClass = getVTable(obj).loadAddress(Offset.fromIntZeroExtend(VTABLE_CLASS_OFFSET));                
+        return nativeClass;
+    }
+    
+    @Inline
+    public static Address getManagedClass(Object obj) {                
+        //accessing to ManagedObject** m_class_handle field + 1 dereference in Class.h
+        Address moAddr = getNativeClass(obj).loadAddress(Offset.fromIntZeroExtend(CLASS_JLC_HANDLE_OFFSET)).loadAddress();                 
+        return moAddr;
+    } 
+
+
+
 
     // private area
 
     private VMHelper() {}
+
+    /** @return vtable offset in managed object structure */
+    private static native int getObjectVtableOffset();
 
     /** @return pointer-type size. 4 or 8 */
     private static native int getPointerTypeSize();
@@ -148,6 +167,13 @@ public class VMHelper {
 
     /** @return object base offset if is in compressed-refs mode or -1*/
     private static native long getCompressedModeObjectBaseOffset();
+
+    /** @return native Class* struct offset in vtable*/
+    private static native int getVtableClassOffset();
+
+    /** @return managed object field offset in vtable*/
+    private static native int getClassJLCHanldeOffset();
+
 }
 
 
