@@ -1418,7 +1418,6 @@ EscAnalyzer::setCreatedObjectStates() {
                         } else {
                             Log::out() << "    isNative: true" << std::endl;
                         }
-                        
                     }
                     if (verboseLog) {
                         Log::out() <<"--setSt 1:  nodeId " <<(*it)->cngNodeId<<"  opId "<<(*it)->opndId <<" state ";
@@ -2218,14 +2217,8 @@ EscAnalyzer::printCnGNodes(const char* text,::std::ostream& os) {
             Inst* inst = ((Opnd*)(*it)->refObj)->getInst();
             inst->print(os);
             if (inst->getOpcode()==Op_IndirectMemoryCall) {
-                MethodDesc* md;
-                if (inst->getSrc(0)->getInst()->getOpcode()== Op_LdVar) {
-                    md = inst->getSrc(0)->getType()->asMethodPtrType()->getMethodDesc();
-                } else {
-                    md = inst->getSrc(0)->getInst()->asMethodInst()->getMethodDesc();
-                }
-                os << std::endl; os << "                                ";
-                md->printFullName(os);
+                os << std::endl; os << "  ";
+                printCallMethodName(inst, os); 
             }
         }
         if ((*it)->nodeType & NT_ACTARG) {    //node of actual method parameter
@@ -2234,7 +2227,7 @@ EscAnalyzer::printCnGNodes(const char* text,::std::ostream& os) {
         }
         if ((*it)->nodeType & NT_STFLD) {    //field node 
             Inst* inst = (Inst*)(*it)->refObj;
-            inst->print(Log::out());
+            inst->print(os);
         }
         os << std::endl;
     }
@@ -2405,14 +2398,9 @@ EscAnalyzer::printCnGNodeRefs(CnGNode* cgn, std::string text,::std::ostream& os)
     if (cgn->nodeType==NT_RETVAL) {
         inst = cgn->nInst;
         if (inst->getOpcode()==Op_IndirectMemoryCall) {
-            MethodDesc* md;
-            if (inst->getSrc(0)->getInst()->getOpcode()== Op_LdVar) {
-                md = inst->getSrc(0)->getType()->asMethodPtrType()->getMethodDesc();
-            } else {
-                md = inst->getSrc(0)->getInst()->asMethodInst()->getMethodDesc();
-            }
-            os << text << "  ";         
-            md->printFullName(os); os << std::endl;
+            os << text << "  ";
+            printCallMethodName(inst, os); 
+            os << std::endl;
         }
     }
     if (cgn->nodeType==NT_LDOBJ && getEscState(cgn)!=GLOBAL_ESCAPE) {
@@ -2422,6 +2410,32 @@ EscAnalyzer::printCnGNodeRefs(CnGNode* cgn, std::string text,::std::ostream& os)
     }
 }  // printCnGNodeRefs(CnGNode* cgn, std::string text,::std::ostream& os) 
 
+
+void
+EscAnalyzer::printCallMethodName(Inst* inst, ::std::ostream& os) {
+    assert(inst);
+    Opnd* zeroOpnd = inst->getSrc(0);
+    Inst* srcInst = zeroOpnd->getInst();
+    if (srcInst->getOpcode()== Op_LdVar) {
+        MethodDesc* md = zeroOpnd->getType()->asMethodPtrType()->getMethodDesc();
+        md->printFullName(os);
+    } else if (inst->isMethod()) {
+        MethodDesc* md = inst->asMethodInst()->getMethodDesc();
+        md->printFullName(os);
+    } else if (srcInst->isMethod()) {
+        // Op_TauLdVirtFunAddrSlot
+        MethodDesc* md = srcInst->asMethodInst()->getMethodDesc();
+        md->printFullName(os);
+    } else if (srcInst->isVMHelperCallInst()) {
+        // A dst operand from VMHelperCallInst might also be srcInst for
+        // IndirectMemoryCall (for example, lazy resolution helper).
+        // There is no MethodDesc to print for such calls.
+        os << "some vmhelper";
+    } else {
+        assert(0);
+    }
+    os << std::endl;
+}  // printCallMethodName(Inst* inst, std::string text,::std::ostream& os)
 
 void
 EscAnalyzer::lObjectHistory(Inst* inst,std::string text,::std::ostream& os) {
@@ -2444,13 +2458,9 @@ EscAnalyzer::lObjectHistory(Inst* inst,std::string text,::std::ostream& os) {
             }
         }
         if (inst->getOpcode()==Op_IndirectMemoryCall) {
-            MethodDesc* md;
-            if (inst->getSrc(0)->getInst()->getOpcode()== Op_LdVar) {
-                md = inst->getSrc(0)->getType()->asMethodPtrType()->getMethodDesc();
-            } else {
-                md = inst->getSrc(0)->getInst()->asMethodInst()->getMethodDesc();
-            }
-            os << text << "  "; md->printFullName(os); os << std::endl;
+            os << text << "  ";
+            printCallMethodName(inst, os); 
+            os << std::endl;
         }
         return;
     }
@@ -2578,15 +2588,9 @@ EscAnalyzer::printOriginObjects(Inst* inst, bool all, std::string text) {
             }
         }
         if (inst->getOpcode()==Op_IndirectMemoryCall) {
-            MethodDesc* md;
-            if (inst->getSrc(0)->getInst()->getOpcode()== Op_LdVar) {
-                md = inst->getSrc(0)->getType()->asMethodPtrType()->getMethodDesc();
-            } else {
-                md = inst->getSrc(0)->getInst()->asMethodInst()->getMethodDesc();
-            }
             if (verboseLog) {
                 Log::out() << text << "  "; 
-                md->printFullName(Log::out() ); 
+                printCallMethodName(inst, Log::out()); 
                 Log::out() << std::endl;
             }
         }
@@ -3980,8 +3984,6 @@ void
 EscAnalyzer::doLOScalarReplacement(ObjIds* loids) {
     ObjIds::iterator lo_it;
     CnGNode* onode;
-    Inst* inst;
-    Inst* st_inst;
     Insts::iterator it3;
     OpndManager& _opndManager = irManager.getOpndManager();
     InstFactory& _instFactory = irManager.getInstFactory();
@@ -3991,7 +3993,7 @@ EscAnalyzer::doLOScalarReplacement(ObjIds* loids) {
 
     if (loids == NULL)
         return;
-    if (loids->size() == 0)       
+    if (loids->size() == 0)
         return;
     for (lo_it=loids->begin(); lo_it!=loids->end(); lo_it++) {
         onode = findCnGNode_op(*lo_it);
@@ -4038,62 +4040,43 @@ EscAnalyzer::doLOScalarReplacement(ObjIds* loids) {
                 if (sco->ls_insts->size()==0) {
                     continue;
                 }
-                bool do_fld_sc = false;
-                for (it3 = sco->ls_insts->begin(); it3 != sco->ls_insts->end( ); it3++ ) {
-                    if ((*it3)->getOpcode() == Op_TauLdInd) {
-                        do_fld_sc = true;
-                        break;
-                    }
+                Type* fl_type = NULL;
+                Type* fl_type1 = NULL;
+                Inst* ii = sco->ls_insts->front();
+                if (ii->getOpcode()==Op_TauStInd) {
+                    fl_type1 = ii->getSrc(1)->getType()->asPtrType()->getPointedToType();
+                    fl_type = ii->getSrc(0)->getType();
+                } else {
+                    fl_type1 = ii->getSrc(0)->getType()->asPtrType()->getPointedToType();
+                    fl_type = ii->getDst()->getType();
                 }
-                if (do_fld_sc) {
-                    Type* fl_type = NULL;
-                    Type* fl_type1 = NULL;
-                    Inst* ii = sco->ls_insts->front();
-                    if (ii->getOpcode()==Op_TauStInd) {
-                        fl_type1 = ii->getSrc(1)->getType()->asPtrType()->getPointedToType();
-                        fl_type = ii->getSrc(0)->getType();
-                    } else {
-                        fl_type1 = ii->getSrc(0)->getType()->asPtrType()->getPointedToType();
-                        fl_type = ii->getDst()->getType();
-                    }
-                    VarOpnd* fl_var_opnd = _opndManager.createVarOpnd(fl_type, false);
-                    SsaTmpOpnd* fl_init_opnd = _opndManager.createSsaTmpOpnd(fl_type);
-                    Inst* ld_init_val_inst = NULL;
-                    sco->fldVarOpnd = fl_var_opnd;
+                VarOpnd* fl_var_opnd = _opndManager.createVarOpnd(fl_type, false);
+                SsaTmpOpnd* fl_init_opnd = _opndManager.createSsaTmpOpnd(fl_type);
+                Inst* ld_init_val_inst = NULL;
+                sco->fldVarOpnd = fl_var_opnd;
 
-                    if (verboseLog) {
-                        os_sc<<" PointedType "; fl_type1->print(os_sc); os_sc <<std::endl;
-                        os_sc<<" OperandType "; fl_type->print(os_sc); os_sc <<std::endl;
-                    }
-                    if (fl_type->isReference()) {
-                        ld_init_val_inst = _instFactory.makeLdNull(fl_init_opnd);
-                    } else {
-                        ld_init_val_inst = _instFactory.makeLdConst(fl_init_opnd, 0);
-                    }
+                if (verboseLog) {
+                    os_sc<<" PointedType "; fl_type1->print(os_sc); os_sc <<std::endl;
+                    os_sc<<" OperandType "; fl_type->print(os_sc); os_sc <<std::endl;
+                }
+                if (fl_type->isReference()) {
+                    ld_init_val_inst = _instFactory.makeLdNull(fl_init_opnd);
+                } else {
+                    ld_init_val_inst = _instFactory.makeLdConst(fl_init_opnd, 0);
+                }
 
-                    scalarizeOFldUsage(sco);
-                    if (verboseLog) {
-                        os_sc << "++++ old newobj added fld_var: before"  << std::endl;
-                        FlowGraph::print(os_sc,onode->nInst->getNode());
-                        os_sc << "++++ old newobj: before end"  << std::endl;
-                    }
-                    ld_init_val_inst->insertBefore(onode->nInst);
-                    _instFactory.makeStVar(fl_var_opnd,fl_init_opnd)->insertBefore(onode->nInst);
-                    if (verboseLog) {
-                        os_sc << "++++ old newobj added fld_var: after"  << std::endl;
-                        FlowGraph::print(os_sc,onode->nInst->getNode());
-                        os_sc << "++++ old newobj: after end"  << std::endl;
-                    }        
-                } else { // there was no ldind instructions
-                    for (it3 = sco->ls_insts->begin(); it3 != sco->ls_insts->end( ); it3++ ) {
-                        st_inst = *it3;
-                        removeInst(st_inst);
-                        removeInst(inst=st_inst->getSrc(1)->getInst());
-                        removeInst(inst=inst->getSrc(0)->getInst());
-                        if (inst->getOpcode() == Op_LdArrayBaseAddr) {
-                            removeInst(inst->getSrc(0)->getInst()); 
-                        }
-                    }
+                scalarizeOFldUsage(sco);
+                if (verboseLog) {
+                    os_sc << "++++ old newobj added fld_var: before"  << std::endl;
+                    FlowGraph::print(os_sc,onode->nInst->getNode());
+                    os_sc << "++++ old newobj: before end"  << std::endl;
+                }
+                ld_init_val_inst->insertBefore(onode->nInst);
+                _instFactory.makeStVar(fl_var_opnd,fl_init_opnd)->insertBefore(onode->nInst);
+                if (verboseLog) {
+                    os_sc << "++++ old newobj added fld_var: after"  << std::endl;
+                    FlowGraph::print(os_sc,onode->nInst->getNode());
+                    os_sc << "++++ old newobj: after end"  << std::endl;
                 }
             }
         }
@@ -4102,14 +4085,14 @@ EscAnalyzer::doLOScalarReplacement(ObjIds* loids) {
             if (verboseLog) {
                 os_sc << "++++ old newobj removed: before"  << std::endl;
                 FlowGraph::print(os_sc,no_node);
-                os_sc << "++++ old newobj: after end"  << std::endl;
-            }        
+                os_sc << "++++ old newobj: before end"  << std::endl;
+            }
             removeInst(onode->nInst);
             if (verboseLog) {
                 os_sc << "++++ old newobj removed: after"  << std::endl;
                 FlowGraph::print(os_sc,no_node);
                 os_sc << "++++ old newobj: after end"  << std::endl;
-            }        
+            }
         }
     }
 } // doLOScalarReplacement(ObjIds* loids)
@@ -4134,7 +4117,7 @@ EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
 
     if (loids == NULL)
         return;
-    if (loids->size() == 0)       
+    if (loids->size() == 0)
         return;
     for (lo_it=loids->begin(); lo_it!=loids->end(); lo_it++) {
         onode = findCnGNode_op(*lo_it);
@@ -4729,12 +4712,7 @@ EscAnalyzer::checkTauOpnd(Inst* tau_inst) {
                         os_sc << "      "; FlowGraph::printLabel(os_sc,inst->getNode()); 
                         os_sc << "  "; inst->print(os_sc); os_sc << std::endl; 
                         if (opcode == Op_IndirectMemoryCall || opcode == Op_DirectCall) {
-                            MethodDesc* md = getMD(inst);
-                            if (md->isNative())
-                                os_sc << "            native " << std::endl;
-                            if (opcode==Op_IndirectMemoryCall) {
-                                os_sc << "        ";md->printFullName(os_sc); os_sc << std::endl;
-                            }
+                            printCallMethodName(inst, os_sc);
                         }
                     }
                     if (opcode == Op_IndirectMemoryCall || opcode == Op_DirectCall) {
@@ -4803,12 +4781,7 @@ EscAnalyzer::checkOpndUsage(uint32 lobjid) {
                         os_sc << "    "; FlowGraph::printLabel(os_sc,inst->getNode()); 
                         os_sc << "  "; inst->print(os_sc); os_sc << std::endl; 
                         if (opcode == Op_IndirectMemoryCall || opcode == Op_DirectCall) {
-                            MethodDesc* md = getMD(inst);
-                            if (md->isNative())
-                                os_sc << "            native " << std::endl;
-                            if (opcode==Op_IndirectMemoryCall) {
-                                os_sc << "        ";md->printFullName(os_sc); os_sc << std::endl;
-                            }
+                            printCallMethodName(inst, os_sc);
                         }
                     }
                     if (opcode != Op_LdFieldAddr && opcode != Op_LdArrayBaseAddr && 
@@ -4970,8 +4943,7 @@ EscAnalyzer::checkCnGtoScalarize(CnGNode* scnode, bool check_loc) {
                     os_sc << std::endl << "    ";
                     ii->print(os_sc); os_sc << std::endl;
                     if (ii->getOpcode()==Op_IndirectMemoryCall) {
-                        MethodDesc* md = getMD(ii);
-                        os_sc<<"    ";md->printFullName(os_sc);os_sc << std::endl;
+                        printCallMethodName(ii, os_sc);
                     }
                 }
             }
@@ -5444,7 +5416,7 @@ EscAnalyzer::restoreEOCreation(Insts* vc_insts, ScObjFlds* scObjFlds, VarOpnd* o
                 fg.addEdge(node_after1,node_after);
             }
         }
-        
+
         node_obj1=fg.splitNodeAtInstruction(newobj,splitAfter,false, _instFactory.makeLabel());
         fg.addEdge(node_obj,dispatchNode);
 
@@ -5495,23 +5467,6 @@ EscAnalyzer::removeInst(Inst* reminst) {
     }
 } // removeInst(Inst* reminst)
 
-
-MethodDesc* 
-EscAnalyzer::getMD(Inst* inst) {
-    MethodDesc* md;
-    if (inst->getOpcode()==Op_DirectCall)
-        return inst->asMethodCallInst()->getMethodDesc();
-    if (inst->getOpcode()!=Op_IndirectMemoryCall)
-        return NULL;
-    if (inst->getSrc(0)->getInst()->getOpcode()== Op_LdVar) {
-        md = inst->getSrc(0)->getType()->asMethodPtrType()->getMethodDesc();
-    } else {
-        md = inst->getSrc(0)->getInst()->asMethodInst()->getMethodDesc();
-    }
-    return md;
-}
-
-
 void 
 EscAnalyzer::fixMethodEndInsts(uint32 ob_id) {
     Insts::iterator itmei;
@@ -5521,7 +5476,7 @@ EscAnalyzer::fixMethodEndInsts(uint32 ob_id) {
         Inst* mei = *itmei;
         uint32 i = 0;
         uint32 nsrc = mei->getNumSrcOperands();
-        
+
         if (nsrc == 0)
             continue;
         Opnd* o = mei->getSrc(i);
@@ -5612,7 +5567,7 @@ EscAnalyzer::checkVVarSrcs(Inst* inst) {
             break;
         }
     }
-    
+
     if (inst->getOpcode()==Op_DirectCall || inst->getOpcode()==Op_IndirectMemoryCall) {
         return false;
     }
@@ -5671,7 +5626,7 @@ EscAnalyzer::checkObjectType(const char* otn) {
         || (strcmp(otn,"java/lang/Long$valueOfCache") == 0)
         || (strcmp(otn,"java/lang/Character$valueOfCache") == 0) ) {
         return true;
-    } 
+    }
     return false;
 }
 

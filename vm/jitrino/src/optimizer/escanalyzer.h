@@ -461,6 +461,13 @@ private:
     void printCnGNode(CnGNode* cgn,::std::ostream& os);
 
 /**
+* Outputs method name information into the specified log. 
+* @param inst - call instruction,
+* @param os - log stream
+*/
+void printCallMethodName(Inst* inst, ::std::ostream& os);
+
+/**
  * Creates string representing CnG node type. 
  * @param cgn - connection graph node.
  * @return srting representing CnG node type.
@@ -927,14 +934,6 @@ private:
  * @param reminst - removed instruction.
  */
     void removeInst(Inst* reminst);
-
-/**
- * Returns MethodDesc* for Op_IndirectMemoryCall and Op_DirectCall instructions.
- * @param inst - call instruction.
- * @return MethodDesc for <code>Op_IndirectMemoryCall</code> and <code>Op_DirectCall</code>; 
- *         <code>NULL<code> otherwise.
- */
-    MethodDesc* getMD(Inst* inst);
 
 /**
  * Replaces first source operand of Op_MethodEnd instruction by NULL

@@ -706,8 +706,6 @@ LogStreams::LogStreams (MemoryManager& mm_, PMF& pmf_, int t)
 
 LogStreams::~LogStreams ()
 {
-    assert(depth == 0);
-
     LogStream* lsp;
     for (size_t sx = 0; sx != nbos; ++sx)
         if ((lsp = streams[sx])->enabled)
