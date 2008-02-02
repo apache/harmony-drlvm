@@ -42,34 +42,103 @@ struct Simple_TNV_Table
     uint32 frequency;
 };
 
+class TNVTableManager {
+public:
+    typedef struct Simple_TNV_Table TableT;
+    typedef POINTER_SIZE_INT ValueT;
+    typedef VPInstructionProfileData VPData;
+    TNVTableManager(uint32 steady_size, uint32 clear_size,
+            uint32 clear_interval) :
+        steadySize(steady_size),
+        clearSize(clear_size),
+        clearInterval(clear_interval)
+    {}
+
+    VPInstructionProfileData* createProfileData();
+
+    // finds a given value in TNV table, returns the index, (-1) if not found
+    int32 find(TableT* where, ValueT value_to_search, uint32 size);
+
+    // clearSize elements are cleared from the top
+    void clearTopElements(TableT* where);
+
+    // returns the index of the minimum element
+    int32 findMinIdx(TableT* where, uint32 size);
+
+    // returns the maximum value in a given steady TNV table
+    ValueT findMax(TableT* TNV_where);
+
+    // adds value to method profile with appropriate locking of the methProfile
+    virtual void addNewValue(ValueMethodProfile* methProfile,
+            VPData* instProfile, ValueT curr_value) = 0;
+
+    // flush num_times_profiled data back to the TNV table
+    //     note: unsynchronized method - must be called from synchronized ones
+    void flushLastValueCounter(VPData* instProfile);
+
+    void dumpValues(VPInstructionProfileData* data, std::ostream& os);
+
+protected:
+    virtual void insert(TableT* where, TableT* clear_part,
+            ValueT value_to_insert, uint32 times_met) = 0;
+
+    const uint32 steadySize, clearSize, clearInterval;
+};
+
+class TNVTableDividedManager : public TNVTableManager {
+public:
+    // c-tor
+    TNVTableDividedManager(uint32 steady_size, uint32 clear_size,
+            uint32 clear_interval) :
+        TNVTableManager(steady_size, clear_size, clear_interval)
+    {}
+
+    virtual void addNewValue(ValueMethodProfile* methProfile,
+            VPData* instProfile, ValueT curr_value);
+
+protected:
+    virtual void insert(TableT* where, TableT* clear_part,
+            ValueT value_to_insert, uint32 times_met);
+};
+
+class TNVTableFirstNManager : public TNVTableManager {
+public:
+    // c-tor
+    TNVTableFirstNManager(uint32 steady_size, uint32 clear_size,
+            uint32 clear_interval) :
+        TNVTableManager(steady_size, clear_size, clear_interval)
+    {}
+
+    virtual void addNewValue(ValueMethodProfile* methProfile,
+            VPData* instProfile, ValueT curr_value);
+
+private:
+    void insert(TableT* where, TableT* clear_part,
+            ValueT value_to_insert, uint32 times_met);
+
+};
+
 class ValueProfileCollector : public ProfileCollector {
 public:
     enum algotypes {TNV_DIVIDED, TNV_FIRST_N};
-    uint32 TNV_steady_size;
-    uint32 TNV_clear_size;
-    uint32 clear_interval;
-    algotypes TNV_algo_type;
-public:
+
     ValueProfileCollector(EM_PC_Interface* em, const std::string& name, JIT_Handle genJit,
                                                 uint32 _TNV_steady_size, uint32 _TNV_clear_size,
                                                 uint32 _clear_interval, algotypes _TNV_algo_type);
+
     virtual TbsEMClient* getTbsEmClient() const {return (NULL);}
     virtual ~ValueProfileCollector();
     MethodProfile* getMethodProfile(Method_Handle mh) const ;
     ValueMethodProfile* createProfile(Method_Handle mh, uint32 numkeys, uint32 keys[]);
-    
-    int32  search_in_tnv_table (struct Simple_TNV_Table * TNV_where, POINTER_SIZE_INT value_to_search, uint32 number_of_objects);
-    int32  min_in_tnv (struct Simple_TNV_Table * TNV_where, uint32 number_of_objects);
-    void insert_into_tnv_table (struct Simple_TNV_Table* TNV_table, struct Simple_TNV_Table* TNV_clear_part, POINTER_SIZE_INT value_to_insert, uint32 times_met);
-    POINTER_SIZE_INT find_max(struct Simple_TNV_Table* TNV_where);
-    void simple_tnv_clear (struct Simple_TNV_Table* TNV_where);
 
+    TNVTableManager* getTnvMgr() { return tnvTableManager; }
 private:
     std::string catName;
     bool   loggingEnabled;
     typedef std::map<Method_Handle, ValueMethodProfile*> ValueProfilesMap;
     ValueProfilesMap profilesByMethod;
     mutable hymutex_t profilesLock;
+    TNVTableManager* tnvTableManager;
 };
 
 class VPInstructionProfileData
@@ -78,7 +147,11 @@ public:
     struct Simple_TNV_Table* TNV_Table;
     struct Simple_TNV_Table * TNV_clear_part;
 public:
-    VPInstructionProfileData() : last_value(TNV_DEFAULT_CLEAR_VALUE), num_times_profiled(0), profile_tick(0) {}
+    VPInstructionProfileData() :
+        last_value(TNV_DEFAULT_CLEAR_VALUE),
+        num_times_profiled(0),
+        profile_tick(0)
+    {}
 public:
     POINTER_SIZE_INT last_value;
     uint32 num_times_profiled;
@@ -88,7 +161,7 @@ public:
 typedef std::map<uint32, VPInstructionProfileData*> VPDataMap;
 class ValueMethodProfile : public MethodProfile {
 public:
-    VPDataMap ValueMap;
+    VPDataMap ValueMap; // TODO: make it private
 public:
     ValueMethodProfile(ValueProfileCollector* pc, Method_Handle mh);
     ~ValueMethodProfile();
@@ -98,8 +171,6 @@ public:
     void addNewValue(uint32 instructionKey, POINTER_SIZE_INT valueToAdd);
     POINTER_SIZE_INT getResult(uint32 instructionKey);
 private:
-    // unsynchronized method - must be called from synchronized ones
-    void flushInstProfile(VPInstructionProfileData* instProfile);
     ValueProfileCollector* getVPC() const;
 
     hymutex_t lock;

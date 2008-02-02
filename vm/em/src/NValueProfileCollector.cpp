@@ -16,12 +16,11 @@
 */
 /**
 * @author Yuri Kashnikov
-* @version $Revision$
-*/
-/*
-        The idea of advanced Top-N-Value (with steady and clear parts, and clear interval)
-        from <"Value profiling and optimization", B.Calder, P.Feller, Journal of Instruction-Level Parallelism, 1999>
-
+*
+* The idea of advanced Top-N-Value (with steady and clear parts, and clear
+* interval) from <"Value profiling and optimization", B.Calder, P.Feller,
+* Journal of Instruction-Level Parallelism, 1999>
+*
 */
 #include "NValueProfileCollector.h"
 
@@ -32,116 +31,249 @@
 
 #define LOG_DOMAIN "em"
 
-void ValueProfileCollector::simple_tnv_clear (struct Simple_TNV_Table * TNV_where)
+VPInstructionProfileData* TNVTableManager::createProfileData()
 {
-    uint32 temp_index;
-    for (temp_index = 0; temp_index < TNV_clear_size; temp_index++)
-        TNV_where[temp_index].frequency = TNV_DEFAULT_CLEAR_VALUE; 
-}
-
-int32 ValueProfileCollector::min_in_tnv (struct Simple_TNV_Table * TNV_where, uint32 number_of_objects)
-{
-    uint32 temp_index;
-    uint32 temp_min_index = 0;
-    uint32 temp_min = TNV_where[temp_min_index].frequency;
-    for (temp_index = 0; temp_index < number_of_objects; temp_index++){
-        if (TNV_where[temp_index].frequency == TNV_DEFAULT_CLEAR_VALUE)
-            return (temp_index); 
-        if (TNV_where[temp_index].frequency < temp_min){
-            temp_min = TNV_where[temp_index].frequency;
-            temp_min_index = temp_index;
+    VPInstructionProfileData* data = new VPInstructionProfileData();
+    data->TNV_Table =  new (struct Simple_TNV_Table[steadySize]);
+    for (uint32 i = 0; i < steadySize; i++) {
+        (data->TNV_Table[i]).frequency = 0;
+        (data->TNV_Table[i]).value = 0;
+    }
+    if (clearSize > 0) {
+        data->TNV_clear_part = new (struct Simple_TNV_Table[clearSize]);
+        for (uint32 i = 0; i < clearSize; i++) {
+            (data->TNV_clear_part[i]).frequency = 0;
+            (data->TNV_clear_part[i]).value = 0;
         }
     }
-    return (temp_min_index);    
+    return data;
 }
 
-int32 ValueProfileCollector::search_in_tnv_table (struct Simple_TNV_Table * TNV_where, POINTER_SIZE_INT value_to_search, uint32 number_of_objects)
+int32 TNVTableManager::find(TableT* where, ValueT value_to_search, uint32 size)
 {
     uint32 search_index;
-    for (search_index = 0; search_index < number_of_objects; search_index++){
-        if (TNV_where[search_index].value == value_to_search)
+    for (search_index = 0; search_index < size; search_index++){
+        if (where[search_index].value == value_to_search)
             return (search_index);
     }
     return (-1);
 }
 
-void ValueProfileCollector::insert_into_tnv_table (struct Simple_TNV_Table* TNV_table, struct Simple_TNV_Table* TNV_clear_part, POINTER_SIZE_INT value_to_insert, uint32 times_met)
+void TNVTableManager::clearTopElements(TableT* where)
 {
-    uint32 insert_index, temp_min_index;
-    POINTER_SIZE_INT temp_min_value;
-    uint32 temp_min_freq;
-    insert_index = search_in_tnv_table(TNV_table, value_to_insert, TNV_steady_size);
-    if ((insert_index != -1)  && (TNV_table[insert_index].frequency != TNV_DEFAULT_CLEAR_VALUE)){
-        TNV_table[insert_index].frequency += times_met;
-    } else if ((TNV_algo_type == TNV_FIRST_N) || (TNV_algo_type != TNV_DIVIDED)){
-        insert_index = min_in_tnv(TNV_table, TNV_steady_size);
-        if (times_met > TNV_table[insert_index].frequency){
-            TNV_table[insert_index].value = value_to_insert;
-            TNV_table[insert_index].frequency = times_met;
+    uint32 temp_index;
+    for (temp_index = 0; temp_index < clearSize; temp_index++) {
+        where[temp_index].frequency = TNV_DEFAULT_CLEAR_VALUE;
+    }
+}
+
+int32 TNVTableManager::findMinIdx(TableT* where, uint32 size)
+{
+    uint32 temp_index;
+    uint32 temp_min_index = 0;
+    uint32 temp_min = where[temp_min_index].frequency;
+    for (temp_index = 0; temp_index < size; temp_index++){
+        if (where[temp_index].frequency == TNV_DEFAULT_CLEAR_VALUE) {
+            return (temp_index); 
         }
-    } else if (TNV_algo_type == TNV_DIVIDED) {
-        insert_index = search_in_tnv_table(TNV_clear_part, value_to_insert, TNV_clear_size);
+        if (where[temp_index].frequency < temp_min){
+            temp_min = where[temp_index].frequency;
+            temp_min_index = temp_index;
+        }
+    }
+    return (temp_min_index);
+}
+
+TNVTableManager::ValueT TNVTableManager::findMax(TableT *where)
+{
+    ValueT max_value = 0;
+    uint32 temp_index, temp_max_frequency = 0;
+    for (temp_index = 0; temp_index < steadySize; temp_index++) {
+        TableT *current_tbl = &(where[temp_index]);
+        if (current_tbl->frequency > temp_max_frequency){
+            temp_max_frequency = current_tbl->frequency;
+            max_value = current_tbl->value;
+        }
+    }
+    return (max_value);
+}
+
+void TNVTableManager::flushLastValueCounter(VPData *instProfile)
+{
+    POINTER_SIZE_INT last_value = instProfile->last_value;
+    uint32* num_times_profiled = &(instProfile->num_times_profiled);
+    struct Simple_TNV_Table* clear_part = instProfile->TNV_clear_part;
+    struct Simple_TNV_Table* steady_part = instProfile->TNV_Table;
+
+    insert(steady_part, clear_part, last_value, *num_times_profiled);
+
+    *num_times_profiled = 0;
+}
+
+void TNVTableManager::dumpValues
+    (VPInstructionProfileData* data, std::ostream& os)
+{
+    os << ", num_times_profiled: " << data->num_times_profiled 
+        << ", profile_tick: " << data->profile_tick << std::endl;
+    struct Simple_TNV_Table * TNV_steady_part = data->TNV_Table;
+    if (TNV_steady_part != NULL) {
+        uint32 size = steadySize;
+        os << "= TNV_steady_part, size = " << size << std::endl;
+        for (uint32 i = 0; i < size; i++) {
+            os << "== Frequency: " << TNV_steady_part[i].frequency << " = Value: ";
+            POINTER_SIZE_INT value = TNV_steady_part[i].value;
+            if (value != 0) {
+                os << class_get_name(vtable_get_class((VTable_Handle)value));
+            } else {
+                os << "NULL";
+            }
+            os << " ==" << std::endl;
+        }
+    }
+    struct Simple_TNV_Table * TNV_clear_part = data->TNV_clear_part;
+    if (TNV_clear_part != NULL) {
+        uint32 size = clearSize;
+        os << "= TNV_clear_part, size = " << size << std::endl;
+        for (uint32 i = 0; i < size; i++) {
+            os << "== " << TNV_clear_part[i].frequency << " = Value: ";
+            POINTER_SIZE_INT value = TNV_clear_part[i].value;
+            if (value != 0) {
+                os << class_get_name(vtable_get_class((VTable_Handle)value));
+            } else {
+                os << "NULL";
+            }
+            os << " ==" << std::endl;
+        }
+    }
+}
+//------------------------------------------------------------------------------
+
+void TNVTableFirstNManager::insert(TableT* where, TableT* clear_part,
+        ValueT value_to_insert, uint32 times_met)
+{
+    uint32 insert_index = find(where, value_to_insert, steadySize);
+    if ((insert_index != -1) &&
+        (where[insert_index].frequency != TNV_DEFAULT_CLEAR_VALUE)){
+        where[insert_index].frequency += times_met;
+    } else {
+        insert_index = findMinIdx(where, steadySize);
+        if (times_met > where[insert_index].frequency){
+            where[insert_index].value = value_to_insert;
+            where[insert_index].frequency = times_met;
+        }
+    }
+}
+
+void TNVTableFirstNManager::addNewValue(ValueMethodProfile* methProfile,
+            VPData* instProfile, ValueT curr_value)
+{
+    // TODO(egor):
+    // 1. options to enable/disable locking
+    // 2. flagged locking
+    methProfile->lockProfile();
+    ValueT* last_value = &(instProfile->last_value);
+    uint32* num_times_profiled = &(instProfile->num_times_profiled);
+    if (curr_value == *last_value){
+        (*num_times_profiled)++;
+    } else {
+        struct Simple_TNV_Table* clear_part = instProfile->TNV_clear_part;
+        struct Simple_TNV_Table* steady_part = instProfile->TNV_Table;
+        flushLastValueCounter(instProfile);
+        *num_times_profiled = 1;
+        insert(steady_part, clear_part, curr_value, *num_times_profiled);
+        *last_value = curr_value;
+    }
+    methProfile->unlockProfile();
+}
+//------------------------------------------------------------------------------
+
+void TNVTableDividedManager::insert(TableT* where, TableT* clear_part,
+        ValueT value_to_insert, uint32 times_met)
+{
+    uint32 insert_index = find(where, value_to_insert, steadySize);
+    if ((insert_index != -1) &&
+        (where[insert_index].frequency != TNV_DEFAULT_CLEAR_VALUE)){
+        where[insert_index].frequency += times_met;
+    }else{
+        ValueT temp_min_value;
+        uint32 temp_min_index, temp_min_freq;
+        insert_index = find(clear_part, value_to_insert, clearSize);
         if (insert_index != -1){
-            TNV_clear_part[insert_index].frequency = TNV_clear_part[insert_index].frequency + times_met;
-            temp_min_index = min_in_tnv(TNV_table, TNV_steady_size);
-            if (TNV_clear_part[insert_index].frequency > TNV_table[temp_min_index].frequency){
-                temp_min_value = TNV_table[temp_min_index].value;
-                temp_min_freq = TNV_table[temp_min_index].frequency;
-                TNV_table[temp_min_index].value = TNV_clear_part[insert_index].value;
-                TNV_table[temp_min_index].frequency = TNV_clear_part[insert_index].frequency;
-                TNV_clear_part[insert_index].frequency = TNV_DEFAULT_CLEAR_VALUE;
-                temp_min_index = min_in_tnv(TNV_clear_part, TNV_clear_size);
-                if (temp_min_freq > TNV_clear_part[temp_min_index].frequency){
-                    TNV_clear_part[temp_min_index].value = temp_min_value;
-                    TNV_clear_part[temp_min_index].frequency = temp_min_freq;
+            clear_part[insert_index].frequency = clear_part[insert_index].frequency + times_met;
+            temp_min_index = findMinIdx(where, steadySize);
+            if (clear_part[insert_index].frequency > where[temp_min_index].frequency){
+                temp_min_value = where[temp_min_index].value;
+                temp_min_freq = where[temp_min_index].frequency;
+                where[temp_min_index].value = clear_part[insert_index].value;
+                where[temp_min_index].frequency = clear_part[insert_index].frequency;
+                clear_part[insert_index].frequency = TNV_DEFAULT_CLEAR_VALUE;
+                temp_min_index = findMinIdx(clear_part, clearSize);
+                if (temp_min_freq > clear_part[temp_min_index].frequency){
+                    clear_part[temp_min_index].value = temp_min_value;
+                    clear_part[temp_min_index].frequency = temp_min_freq;
                 }
             }
-        }
-        else {
-            temp_min_index = min_in_tnv(TNV_table, TNV_steady_size);
-            if (times_met > TNV_table[temp_min_index].frequency)
+        } else {
+            temp_min_index = findMinIdx(where, steadySize);
+            if (times_met > where[temp_min_index].frequency)
             {
-                temp_min_value = TNV_table[temp_min_index].value;
-                temp_min_freq = TNV_table[temp_min_index].frequency;
-                TNV_table[temp_min_index].value = value_to_insert;
-                TNV_table[temp_min_index].frequency = times_met;
-                temp_min_index = min_in_tnv(TNV_clear_part, TNV_clear_size);
-                if (temp_min_freq > TNV_clear_part[temp_min_index].frequency)
+                temp_min_value = where[temp_min_index].value;
+                temp_min_freq = where[temp_min_index].frequency;
+                where[temp_min_index].value = value_to_insert;
+                where[temp_min_index].frequency = times_met;
+                temp_min_index = findMinIdx(clear_part, clearSize);
+                if (temp_min_freq > clear_part[temp_min_index].frequency)
                 {
-                    TNV_clear_part[temp_min_index].value = temp_min_value;
-                    TNV_clear_part[temp_min_index].frequency = temp_min_freq;
+                    clear_part[temp_min_index].value = temp_min_value;
+                    clear_part[temp_min_index].frequency = temp_min_freq;
                 }
-            }
-            else {
-                temp_min_index = min_in_tnv(TNV_clear_part, TNV_clear_size);
-                if (times_met > TNV_clear_part[temp_min_index].frequency){
-                    TNV_clear_part[temp_min_index].value = value_to_insert;
-                    TNV_clear_part[temp_min_index].frequency = times_met;
+            } else {
+                temp_min_index = findMinIdx(clear_part, clearSize);
+                if (times_met > clear_part[temp_min_index].frequency){
+                    clear_part[temp_min_index].value = value_to_insert;
+                    clear_part[temp_min_index].frequency = times_met;
                 }
             }
         }
     }
 }
 
-ValueMethodProfile* ValueProfileCollector::createProfile(Method_Handle mh, uint32 numkeys, uint32 keys[])
+void TNVTableDividedManager::addNewValue(ValueMethodProfile* methProfile,
+            VPData* instProfile, ValueT curr_value)
+{
+    methProfile->lockProfile();
+    struct Simple_TNV_Table* clear_part = instProfile->TNV_clear_part;
+    uint32* profile_tick = &(instProfile->profile_tick);
+    if (*profile_tick == clearInterval){
+        *profile_tick = 0;
+        clearTopElements(clear_part);
+    }
+    (*profile_tick)++;
+
+    ValueT* last_value = &(instProfile->last_value);
+    uint32* num_times_profiled = &(instProfile->num_times_profiled);
+    if (curr_value == *last_value){
+        (*num_times_profiled)++;
+    } else {
+        flushLastValueCounter(instProfile);
+        *num_times_profiled = 1;
+        struct Simple_TNV_Table* steady_part = instProfile->TNV_Table;
+        insert(steady_part, clear_part, curr_value, *num_times_profiled);
+        *last_value = curr_value;
+    }
+    methProfile->unlockProfile();
+}
+//------------------------------------------------------------------------------
+
+ValueMethodProfile* ValueProfileCollector::createProfile
+    (Method_Handle mh, uint32 numkeys, uint32 keys[])
 {
     hymutex_lock(&profilesLock);
     ValueMethodProfile* profile = new ValueMethodProfile(this, mh);
     // Allocate space for value maps
     for (uint32 index = 0; index < numkeys; index++){
-        VPInstructionProfileData* profileData = new VPInstructionProfileData();
-        profileData->TNV_Table =  new (struct Simple_TNV_Table[TNV_steady_size]);
-        for (uint32 i = 0; i < TNV_steady_size; i++) {
-            (profileData->TNV_Table[i]).frequency = 0;
-            (profileData->TNV_Table[i]).value = 0;
-        }
-        if (TNV_clear_size > 0) {
-            profileData->TNV_clear_part = new (struct Simple_TNV_Table[TNV_clear_size]);
-            for (uint32 i = 0; i < TNV_clear_size; i++) {
-                (profileData->TNV_clear_part[i]).frequency = 0;
-                (profileData->TNV_clear_part[i]).value = 0;
-            }
-        }
+        VPInstructionProfileData* profileData =
+            getTnvMgr()->createProfileData();
         uint32 key = keys[index];
         (profile->ValueMap)[key] = profileData;
     }
@@ -151,29 +283,19 @@ ValueMethodProfile* ValueProfileCollector::createProfile(Method_Handle mh, uint3
     return profile;
 }
 
-POINTER_SIZE_INT ValueProfileCollector::find_max(Simple_TNV_Table *TNV_where)
-{
-    POINTER_SIZE_INT max_value = 0;
-    uint32 temp_index, temp_max_frequency = 0;
-    for (temp_index = 0; temp_index < TNV_steady_size; temp_index++) {
-        Simple_TNV_Table *TNV_current = &(TNV_where[temp_index]);
-        if (TNV_current->frequency > temp_max_frequency){
-            temp_max_frequency = TNV_current->frequency;
-            max_value = TNV_current->value;
-        }
-    }
-    return (max_value);
-}
-
 ValueProfileCollector::ValueProfileCollector(EM_PC_Interface* em, const std::string& name, JIT_Handle genJit, 
                                              uint32 _TNV_steady_size, uint32 _TNV_clear_size,
                                              uint32 _clear_interval, algotypes _TNV_algo_type)
-                                           : ProfileCollector(em, name, EM_PCTYPE_VALUE, genJit), 
-                                             TNV_steady_size(_TNV_steady_size), TNV_clear_size(_TNV_clear_size),
-                                             clear_interval(_clear_interval), TNV_algo_type(_TNV_algo_type)
-
+                                           : ProfileCollector(em, name, EM_PCTYPE_VALUE, genJit)
 {
     hymutex_create(&profilesLock, TM_MUTEX_NESTED);
+    if (_TNV_algo_type == TNV_DIVIDED) {
+        tnvTableManager = new TNVTableDividedManager
+            (_TNV_steady_size, _TNV_clear_size, _clear_interval);
+    }else if (_TNV_algo_type == TNV_FIRST_N) {
+        tnvTableManager = new TNVTableFirstNManager
+            (_TNV_steady_size, _TNV_clear_size, _clear_interval);
+    }
     catName = std::string(LOG_DOMAIN) + ".profiler." + name;
     loggingEnabled =  is_info_enabled(LOG_DOMAIN) ||  is_info_enabled(catName.c_str());
     if (loggingEnabled) {
@@ -191,8 +313,22 @@ ValueProfileCollector::~ValueProfileCollector()
         ValueMethodProfile* profile = it->second;
         delete profile;
     }
+    delete tnvTableManager;
     hymutex_destroy(&profilesLock);
 }
+
+MethodProfile* ValueProfileCollector::getMethodProfile(Method_Handle mh) const
+{
+    MethodProfile* res = NULL;
+    hymutex_lock(&profilesLock);
+    ValueProfilesMap::const_iterator it = profilesByMethod.find(mh);
+    if (it != profilesByMethod.end()) {
+        res =  it->second;
+    }
+    hymutex_unlock(&profilesLock);
+    return res;
+}
+//------------------------------------------------------------------------------
 
 ValueMethodProfile::ValueMethodProfile(ValueProfileCollector* pc, Method_Handle mh)
     : MethodProfile(pc, mh)
@@ -205,37 +341,14 @@ ValueMethodProfile::~ValueMethodProfile()
     hymutex_destroy(&lock);
 }
 
-void ValueMethodProfile::addNewValue(uint32 instructionKey, POINTER_SIZE_INT valueToAdd)
+void ValueMethodProfile::addNewValue
+    (uint32 instructionKey, POINTER_SIZE_INT valueToAdd)
 {
-    POINTER_SIZE_INT curr_value = valueToAdd;
-    lockProfile();
     VPDataMap::const_iterator it =  ValueMap.find(instructionKey);
     assert(it != ValueMap.end());
-    VPInstructionProfileData* _temp_vp = it->second;
-    POINTER_SIZE_INT* last_value = &(_temp_vp->last_value);
-    uint32* profile_tick = &(_temp_vp->profile_tick);
-    uint32* num_times_profiled = &(_temp_vp->num_times_profiled);
-    struct Simple_TNV_Table* TNV_clear_part = _temp_vp->TNV_clear_part;
-    struct Simple_TNV_Table* TNV_steady_part = _temp_vp->TNV_Table;
-    if ( getVPC()->TNV_algo_type == ValueProfileCollector::TNV_DIVIDED){
-        if (*profile_tick == getVPC()->clear_interval){
-            *profile_tick = 0;
-            getVPC()->simple_tnv_clear(TNV_clear_part);
-        }
-        (*profile_tick)++;
-    }
-    if (curr_value == *last_value){
-        (*num_times_profiled)++;
-    }
-    else {
-        flushInstProfile(_temp_vp);
-        *num_times_profiled = 1;
-        getVPC()->insert_into_tnv_table (TNV_steady_part, TNV_clear_part, valueToAdd, *num_times_profiled);
-        *last_value = curr_value;
-    }
-    unlockProfile();
-}
 
+    getVPC()->getTnvMgr()->addNewValue(this, it->second, valueToAdd);
+}
 
 POINTER_SIZE_INT ValueMethodProfile::getResult(uint32 instructionKey)
 {
@@ -251,20 +364,10 @@ POINTER_SIZE_INT ValueMethodProfile::getResult(uint32 instructionKey)
         unlockProfile();
         return 0;
     }
-    flushInstProfile(_temp_vp);
-    POINTER_SIZE_INT result = getVPC()->find_max(_temp_vp->TNV_Table);
+    getVPC()->getTnvMgr()->flushLastValueCounter(_temp_vp);
+    POINTER_SIZE_INT result = getVPC()->getTnvMgr()->findMax(_temp_vp->TNV_Table);
     unlockProfile();
     return result; 
-}
-
-void ValueMethodProfile::flushInstProfile(VPInstructionProfileData* instProfile)
-{
-    POINTER_SIZE_INT last_value = instProfile->last_value;
-    uint32* num_times_profiled = &(instProfile->num_times_profiled);
-    struct Simple_TNV_Table* TNV_clear_part = instProfile->TNV_clear_part;
-    struct Simple_TNV_Table* TNV_steady_part = instProfile->TNV_Table;
-    getVPC()->insert_into_tnv_table (TNV_steady_part, TNV_clear_part, last_value, *num_times_profiled);
-    *num_times_profiled = 0;
 }
 
 void ValueMethodProfile::dumpValues(std::ostream& os)
@@ -276,38 +379,9 @@ void ValueMethodProfile::dumpValues(std::ostream& os)
     for (mapIter = ValueMap.begin(); mapIter != ValueMap.end(); mapIter++) {
         os << "=== Instruction key: " << mapIter->first;
         VPInstructionProfileData* _temp_vp = mapIter->second;
-        flushInstProfile(_temp_vp);
-        os << ", num_times_profiled: " << _temp_vp->num_times_profiled << ", profile_tick: " << _temp_vp->profile_tick << std::endl;
-        struct Simple_TNV_Table * TNV_steady_part = _temp_vp->TNV_Table;
-        if (TNV_steady_part != NULL) {
-            uint32 size = ((ValueProfileCollector*)pc)->TNV_steady_size;
-            os << "= TNV_steady_part, size = " << size << std::endl;
-            for (uint32 i = 0; i < size; i++) {
-                os << "== Frequency: " << TNV_steady_part[i].frequency << " = Value: ";
-                POINTER_SIZE_INT value = TNV_steady_part[i].value;
-                if (value != 0) {
-                    os << class_get_name(vtable_get_class((VTable_Handle)value));
-                } else {
-                    os << "NULL";
-                }
-                os << " ==" << std::endl;
-            }
-        }
-        struct Simple_TNV_Table * TNV_clear_part = _temp_vp->TNV_clear_part;
-        if (TNV_clear_part != NULL) {
-            uint32 size = ((ValueProfileCollector*)pc)->TNV_clear_size;
-            os << "= TNV_clear_part, size = " << size << std::endl;
-            for (uint32 i = 0; i < size; i++) {
-                os << "== " << TNV_clear_part[i].frequency << " = Value: ";
-                POINTER_SIZE_INT value = TNV_clear_part[i].value;
-                if (value != 0) {
-                    os << class_get_name(vtable_get_class((VTable_Handle)value));
-                } else {
-                    os << "NULL";
-                }
-                os << " ==" << std::endl;
-            }
-        }
+        TNVTableManager* tnvMgr = getVPC()->getTnvMgr();
+        tnvMgr->flushLastValueCounter(_temp_vp);
+        tnvMgr->dumpValues(_temp_vp, os);
     }
     unlockProfile();
     os << "====== End of dump ======================" << std::endl;
@@ -317,23 +391,9 @@ ValueProfileCollector* ValueMethodProfile::getVPC() const {
     assert(pc->type == EM_PCTYPE_VALUE);
     return ((ValueProfileCollector*)pc);
 }
+//------------------------------------------------------------------------------
 
-
-MethodProfile* ValueProfileCollector::getMethodProfile(Method_Handle mh) const
-{
-    MethodProfile* res = NULL;
-    hymutex_lock(&profilesLock);
-    ValueProfilesMap::const_iterator it = profilesByMethod.find(mh);
-    if (it != profilesByMethod.end()) {
-        res =  it->second;
-    }
-    hymutex_unlock(&profilesLock);
-    return res;
-}
-
-
-
-POINTER_SIZE_INT value_profiler_get_top_value (Method_Profile_Handle mph, uint32 instructionKey)
+POINTER_SIZE_INT value_profiler_get_top_value(Method_Profile_Handle mph, uint32 instructionKey)
 {
     assert(mph != NULL);
     MethodProfile* mp = (MethodProfile*)mph;
@@ -342,7 +402,7 @@ POINTER_SIZE_INT value_profiler_get_top_value (Method_Profile_Handle mph, uint32
     return vmp->getResult(instructionKey);
 }
 
-void value_profiler_add_value (Method_Profile_Handle mph, uint32 instructionKey, POINTER_SIZE_INT valueToAdd)
+void value_profiler_add_value(Method_Profile_Handle mph, uint32 instructionKey, POINTER_SIZE_INT valueToAdd)
 {
     assert(mph != NULL);
     MethodProfile* mp = (MethodProfile*)mph;
