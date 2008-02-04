@@ -61,7 +61,7 @@
         </path>
         
         <compiler id="cpp.compiler" extends="common.cpp.compiler">
-            <includepath refid="gc.includes"/>
+            <includepath><path refid="gc.includes"/></includepath>
             <fileset dir="${vm.home}/gc_gen/src">
                 <selector refid="gc.depends"/>
                 <include name="common/*.cpp" />

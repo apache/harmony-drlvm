@@ -64,7 +64,7 @@
         </compile-asm>
         
         <compile-cc>
-            <includepath refid="port.includes"/>
+            <includepath><path refid="port.includes"/></includepath>
 
             <defineset define="APR_DECLARE_EXPORT" />
             <defineset define="BUILDING_VM" />

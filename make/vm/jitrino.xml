@@ -56,7 +56,7 @@
 
         <compile-cc>
             <compiler id="cpp.compiler" extends="plaf.cpp.compiler">
-                <includepath refid="jit.includes"/>
+                <includepath><path refid="jit.includes"/></includepath>
                 <fileset dir="${vm.home}/jitrino/src">
                     <selector refid="jit.depends"/>
                     <include name="dynopt/*.cpp" />

@@ -25,6 +25,7 @@
         <attribute name="dest"/>
         <element name="javac-elements" implicit="yes" optional="yes"/>
         <sequential>
+            <ensure-javac/>
             <mkdir dir="@{dest}" />
             <hy.javac srcdir="@{src}" destdir="@{dest}" >
                 <include name="**/*.java"/>

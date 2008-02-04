@@ -131,7 +131,7 @@
 
         <compile-cc>
         <compiler id="cpp.compiler" extends="common.cpp.compiler">
-            <includepath refid="vmcore.includes"/>
+            <includepath><path refid="vmcore.includes"/></includepath>
             <fileset dir="${vm.home}/vmcore/src">
                 <selector refid="vmcore.depends"/>
                 <include name="class_support/*.cpp" />

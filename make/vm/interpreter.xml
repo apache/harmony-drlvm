@@ -64,7 +64,7 @@
 
         <compile-cc>
         <compiler id="cpp.compiler" extends="common.cpp.compiler">
-            <includepath refid="int.includes"/>
+            <includepath><path refid="int.includes"/></includepath>
             <fileset dir="${vm.home}/interpreter/src">
                 <selector refid="int.depends"/>
                 <include name="*.cpp" />
