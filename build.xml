@@ -82,7 +82,8 @@ Usage:
         description="Performs a full build - that is 'clean' then 'build'" />
 
     <target name="build" 
-        depends="drlvm-echo, setup,
+        depends="drlvm-echo, -auto-fetch,
+        setup,
         interpreter,
         kernel,
         em,
@@ -94,6 +95,10 @@ Usage:
         deploy-relocate,
         deploy-canonical"
         description="Compiles the java and native code to produce a jdk">
+    </target>
+    
+    <target name="-auto-fetch" if="auto.fetch">
+        <antcall target="fetch-depends"/>
     </target>
 
     <target name="clean" depends="" 
