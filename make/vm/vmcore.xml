@@ -152,8 +152,6 @@
                 <include name="thread/helpers/thread_helpers_em64t.cpp" if="is.x86_64"/>
                 <include name="thread/helpers/thread_helpers_ipf.cpp" if="is.ia64"/>
                 <include name="util/*.cpp" />
-                <include name="verifier/*.cpp" if="use_original_verifier"/>
-                <include name="verifier-3363/*/*.cpp" unless="use_original_verifier"/>
             </fileset>
 
             <fileset dir="${vm.home}/vmcore/src/kernel_classes/native">
@@ -211,7 +209,7 @@
         
         <link-lib name="harmonyvm" type="shared">
             <linker id="linker" extends="common.linker">
-                <libset libs="port,encoder,log4cxx,aprutil-1,apr-1"
+                <libset libs="port,encoder,verifier,log4cxx,aprutil-1,apr-1"
                     dir="${drlvm.lib.dir}" />
                 <libset libs="hythr" dir="${drlvm.shlib.dir}" />
                 <libset libs="icuuc" dir="${drlvm.shlib.dir}"/>

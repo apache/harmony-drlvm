@@ -129,7 +129,11 @@ Usage:
         <ant antfile="make/vm/hythr.xml"/>
     </target>
 
-    <target name="vmcore" depends="encoder, port, hythr">
+    <target name="verifier">
+        <ant antfile="make/vm/verifier.xml"/>
+    </target>
+
+    <target name="vmcore" depends="encoder, port, hythr, verifier">
         <ant antfile="make/vm/vmcore.xml"/>
     </target>
 
