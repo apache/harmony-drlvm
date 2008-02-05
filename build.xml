@@ -91,6 +91,7 @@ Usage:
         jitrino,
         gc_cc,
         gc_gen,
+        verifier-ext,
         deploy,
         deploy-relocate,
         deploy-canonical"
@@ -131,6 +132,10 @@ Usage:
 
     <target name="verifier">
         <ant antfile="make/vm/verifier.xml"/>
+    </target>
+
+    <target name="verifier-ext" description="Build extentions library for verifier">
+        <ant antfile="make/vm/verifier-ext.xml"/>
     </target>
 
     <target name="vmcore" depends="encoder, port, hythr, verifier">
