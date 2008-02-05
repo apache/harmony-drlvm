@@ -403,7 +403,7 @@ static void sd_print_threads_info(VM_thread* cur_thread)
         jthread java_thread = jthread_get_java_thread(thread);
         JNIEnv* jni_env = vm_thread->jni_env;
 
-        if (java_thread)
+        if (cur_thread && java_thread)
         {
             jclass cl = GetObjectClass(jni_env, java_thread);
             jmethodID id = jni_env->GetMethodID(cl, "getName","()Ljava/lang/String;");
@@ -431,9 +431,15 @@ static void sd_print_threads_info(VM_thread* cur_thread)
 void sd_print_stack(Registers* regs)
 {
     hymutex_t* sd_lock;
+    int disable_count;
+    bool unwindable;
+
+    VM_thread* thread = get_thread_ptr(); // Can be NULL for pure native thread
 
     // Enable suspend to allow working with threads
-    int disable_count = hythread_reset_suspend_disable();
+    if (thread)
+        disable_count = hythread_reset_suspend_disable();
+
     // Acquire global lock to print threads list and stop other crashed threads
     hythread_global_lock();
 
@@ -441,7 +447,8 @@ void sd_print_stack(Registers* regs)
         return;
 
     hymutex_lock(sd_lock);
-    bool unwindable = set_unwindable(false); // To call Java code
+    if (thread)
+        unwindable = set_unwindable(false); // To call Java code
 
     // Print register info
     print_reg_state(regs);
@@ -455,7 +462,6 @@ void sd_print_stack(Registers* regs)
     // Print the whole list of modules
     sd_print_modules();
 
-    VM_thread* thread = get_thread_ptr(); // Can be NULL for pure native thread
     native_frame_t* frames = NULL;
 
     // Print threads info
@@ -489,11 +495,13 @@ void sd_print_stack(Registers* regs)
     fprintf(stderr, "<end of stack trace>\n");
     fflush(stderr);
 
-    set_unwindable(unwindable);
+    if (thread)
+        set_unwindable(unwindable);
 
     // Do not unlock to prevent other threads from printing crash stack
     //hymutex_unlock(sd_lock);
 
     hythread_global_unlock();
-    hythread_set_suspend_disable(disable_count);
+    if (thread)
+        hythread_set_suspend_disable(disable_count);
 }

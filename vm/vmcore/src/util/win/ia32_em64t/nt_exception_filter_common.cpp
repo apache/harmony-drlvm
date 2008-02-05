@@ -281,7 +281,7 @@ LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception
 
     bool in_java = false;
 
-    if (vmthread && (&vmthread->jvmti_thread))
+    if (vmthread)
     {
         // If exception is occured in processor instruction previously
         // instrumented by breakpoint, the actual exception address will reside

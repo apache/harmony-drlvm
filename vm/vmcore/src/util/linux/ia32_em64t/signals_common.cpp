@@ -70,7 +70,7 @@
 #include "signals_common.h"
 
 
-static void general_crash_handler(int signum, Registers* regs, const char* message);
+static void general_crash_handler(int signum, Registers* regs);
 
 
 extern "C" {
@@ -436,7 +436,7 @@ static void null_java_reference_handler(int signum, siginfo_t* UNREF info, void*
         }
     }
 
-    general_crash_handler(signum, &regs, "SIGSEGV");
+    general_crash_handler(signum, &regs);
 }
 
 
@@ -457,7 +457,7 @@ static void null_java_divide_by_zero_handler(int signum, siginfo_t* UNREF info, 
 
     Registers regs;
     ucontext_to_regs(&regs, uc);
-    general_crash_handler(signum, &regs, "SIGFPE");
+    general_crash_handler(signum, &regs);
 }
 
 static void jvmti_jit_breakpoint_handler(int signum, siginfo_t* UNREF info, void* context)
@@ -478,7 +478,7 @@ static void jvmti_jit_breakpoint_handler(int signum, siginfo_t* UNREF info, void
         }
     }
 
-    general_crash_handler(signum, &regs, "SIGTRAP");
+    general_crash_handler(signum, &regs);
 }
 
 /**
@@ -489,7 +489,7 @@ static void abort_handler (int signum, siginfo_t* UNREF info, void* context)
 {
     Registers regs;
     ucontext_to_regs(&regs, (ucontext_t *)context);
-    general_crash_handler(signum, &regs, "SIGABRT");
+    general_crash_handler(signum, &regs);
 }
 
 static void process_crash(Registers* regs)
@@ -498,12 +498,39 @@ static void process_crash(Registers* regs)
     sd_print_stack(regs);
 }
 
-static void general_crash_handler(int signum, Registers* regs, const char* message)
+struct sig_name_t
+{
+    int    num;
+    char*  name;
+};
+
+static sig_name_t sig_names[] =
+{
+    {SIGTRAP, "SIGTRAP"},
+    {SIGSEGV, "SIGSEGV"},
+    {SIGFPE,  "SIGFPE" },
+    {SIGABRT, "SIGABRT"},
+    {SIGINT,  "SIGINT" },
+    {SIGQUIT, "SIGQUIT"}
+};
+
+static const char* get_sig_name(int signum)
+{
+    for (int i = 0; i < sizeof(sig_names)/sizeof(sig_names[0]); i++)
+    {
+        if (signum == sig_names[i].num)
+            return sig_names[i].name;
+    }
+
+    return "unregistered";
+}
+
+static void general_crash_handler(int signum, Registers* regs)
 {
     // setup default handler
     signal(signum, SIG_DFL);
     // Print message
-    fprintf(stderr, "Signal is reported: %s\n", message);
+    fprintf(stderr, "Signal %d is reported: %s\n", signum, get_sig_name(signum));
 
     if (!is_gdb_crash_handler_enabled() ||
         !gdb_crash_handler(regs))
@@ -516,36 +543,57 @@ static void general_signal_handler(int signum, siginfo_t* info, void* context)
 {
     bool replaced = false;
     ucontext_t* uc = (ucontext_t *)context;
-    POINTER_SIZE_INT saved_eip = (POINTER_SIZE_INT)UC_IP(uc);
-    POINTER_SIZE_INT new_eip = saved_eip;
     VM_thread* vm_thread = p_TLS_vmthread;
     bool violation =
         (signum == SIGSEGV) && vm_thread && vm_thread->jvmti_thread.violation_flag;
 
-    // If exception is occured in processor instruction previously
-    // instrumented by breakpoint, the actual exception address will reside
-    // in jvmti_jit_breakpoints_handling_buffer
-    // We should replace exception address with saved address of instruction
-    POINTER_SIZE_INT break_buf =
-        (POINTER_SIZE_INT)vm_thread->jvmti_thread.jvmti_jit_breakpoints_handling_buffer;
-    if (saved_eip >= break_buf &&
-        saved_eip < break_buf + TM_JVMTI_MAX_BUFFER_SIZE)
-    {
-        // Breakpoints should not occur in breakpoint buffer
-        assert(signum != SIGTRAP);
+    Registers regs;
+    ucontext_to_regs(&regs, uc);
+    void* saved_ip = regs.get_ip();
+    void* new_ip = saved_ip;
+    bool in_java = false;
 
-        replaced = true;
-        new_eip = (POINTER_SIZE_INT)vm_get_ip_from_regs(vm_thread);
-        UC_IP(uc) = new_eip;
+    if (vm_thread)
+    {
+        // If exception is occured in processor instruction previously
+        // instrumented by breakpoint, the actual exception address will reside
+        // in jvmti_jit_breakpoints_handling_buffer
+        // We should replace exception address with saved address of instruction
+        POINTER_SIZE_INT break_buf =
+            (POINTER_SIZE_INT)vm_thread->jvmti_thread.jvmti_jit_breakpoints_handling_buffer;
+        if ((POINTER_SIZE_INT)saved_ip >= break_buf &&
+            (POINTER_SIZE_INT)saved_ip < break_buf + TM_JVMTI_MAX_BUFFER_SIZE)
+        {
+            // Breakpoints should not occur in breakpoint buffer
+            assert(signum != SIGTRAP);
+
+            replaced = true;
+            new_ip = vm_get_ip_from_regs(vm_thread);
+            regs.set_ip(new_ip);
+            regs_to_ucontext(uc, &regs);
+        }
+
+        in_java = (vm_identify_eip(regs.get_ip()) == VM_TYPE_JAVA);
     }
 
     // Pass exception to NCAI exception handler
     bool is_handled = 0;
     bool is_internal = (signum == SIGTRAP) || violation;
-    ncai_process_signal_event((NativeCodePtr)UC_IP(uc),
+    ncai_process_signal_event((NativeCodePtr)regs.get_ip(),
                                 (jint)signum, is_internal, &is_handled);
     if (is_handled)
         return;
+
+    // delegate evident cases to crash handler
+    if ((!vm_thread ||
+        (!in_java && signum != SIGSEGV)) &&
+        signum != SIGTRAP && signum != SIGINT && signum != SIGQUIT)
+    {
+        general_crash_handler(signum, &regs);
+        regs.set_ip(saved_ip);
+        regs_to_ucontext(uc, &regs);
+        return;
+    }
 
     switch (signum)
     {
@@ -573,12 +621,14 @@ static void general_signal_handler(int signum, siginfo_t* info, void* context)
         break;
     }
 
-    // If EIP was not changed in specific handler to start another handler,
-    // we should restore original EIP, if it's nesessary
-    if (replaced &&
-        UC_IP(uc) == new_eip)
+    ucontext_to_regs(&regs, uc);
+
+    // If IP was not changed in specific handler to start another handler,
+    // we should restore original IP, if it's nesessary
+    if (replaced && regs.get_ip() == new_ip)
     {
-        UC_IP(uc) = saved_eip;
+        regs.set_ip((void*)saved_ip);
+        regs_to_ucontext(uc, &regs);
     }
 }
 
