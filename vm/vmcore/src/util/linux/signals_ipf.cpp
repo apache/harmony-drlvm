@@ -434,7 +434,18 @@ void null_java_reference_handler(int signum, siginfo_t* UNREF info, void* contex
 { 
     ucontext_t *uc = (ucontext_t *)context;
     Global_Env *env = VM_Global_State::loader_env;
+    Registers regs;
+    ucontext_to_regs(&regs, uc);
 
+    if (!p_TLS_vmthread)
+    {
+        if (!is_gdb_crash_handler_enabled() ||
+            !gdb_crash_handler(&regs))
+        {
+            // print stack trace
+            sd_print_stack(&regs);
+        }
+    }
 
     /* Will not compile on IPF:
      TRACE2("signals", "NPE or SOE detected at " <<
@@ -452,8 +463,6 @@ void null_java_reference_handler(int signum, siginfo_t* UNREF info, void* contex
         }
     }
     fprintf(stderr, "SIGSEGV in VM code.\n");
-    Registers regs;
-    ucontext_to_regs(&regs, uc);
 
     // setup default handler
     signal(signum, SIG_DFL);

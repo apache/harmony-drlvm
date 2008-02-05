@@ -24,7 +24,6 @@
 void native_get_frame_info(Registers* regs, void** ip, void** bp, void** sp)
 {
     // FIXME: not implemented
-    abort();
 }
 
 bool native_unwind_bp_based_frame(void* frame, void** ip, void** bp, void** sp)
