@@ -49,8 +49,6 @@
 
 #include <errno.h>
 
-extern int errno;
-
 static void Error (char *lpszMess, JNIEnv *env, jlongArray la) 
 { 
    jboolean jb = true;
