@@ -20,6 +20,9 @@
  */
 package java.lang;
 
+import org.apache.harmony.drlvm.VMHelper;
+import org.apache.harmony.drlvm.thread.ThreadHelper;
+
 /**
  * Provides the methods to interact with VM Thread Manager that are used by
  * {@link java.lang.Thread Thread} class and {@link java.lang.Object Object}
@@ -86,7 +89,14 @@ final class VMThreadManager {
      * thread and hasn't been initialized yet.
      * @api2vm
      */
-    static native Thread currentThread();
+    public static native Thread currentThreadNative();
+
+    static Thread currentThread() {
+        if (VMHelper.isVMMagicPackageSupported()) {
+            return ThreadHelper.getCurrentThread();
+        }
+        return currentThreadNative();
+    }
 
     /**
      * This method satisfies the requirements of the specification for the

@@ -246,7 +246,7 @@ VMCORE_0.1 {
     Java_java_lang_VMMemoryManager_getMaxMemory;
     Java_java_lang_VMMemoryManager_getTotalMemory;
     Java_java_lang_VMMemoryManager_runGC;
-    Java_java_lang_VMThreadManager_currentThread;
+    Java_java_lang_VMThreadManager_currentThreadNative;
     Java_java_lang_VMThreadManager_getState;
     Java_java_lang_VMThreadManager_holdsLock;
     Java_java_lang_VMThreadManager_init;
@@ -273,6 +273,7 @@ VMCORE_0.1 {
     Java_java_util_concurrent_locks_LockSupport_unpark;
     Java_org_apache_harmony_drlvm_thread_ThreadHelper_getThreadIdOffset;
     Java_org_apache_harmony_drlvm_thread_ThreadHelper_getLockWordOffset;
+    Java_org_apache_harmony_drlvm_thread_ThreadHelper_getThreadJavaObjectOffset;
     Java_org_apache_harmony_drlvm_VMHelperFastPath_getVtableIntfTableOffset;
     Java_org_apache_harmony_drlvm_VMHelperFastPath_getVtableIntfTypeOffset;
     Java_org_apache_harmony_drlvm_VMHelperFastPath_getVtableSuperclassesOffset;

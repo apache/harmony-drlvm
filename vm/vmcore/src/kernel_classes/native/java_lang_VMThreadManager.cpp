@@ -33,10 +33,10 @@
 
 /*
  * Class:     java_lang_VMThreadManager
- * Method:    currentThread
+ * Method:    currentThreadNative
  * Signature: ()Ljava/lang/Thread;
  */
-JNIEXPORT jobject JNICALL Java_java_lang_VMThreadManager_currentThread
+JNIEXPORT jobject JNICALL Java_java_lang_VMThreadManager_currentThreadNative
   (JNIEnv * UNREF jenv, jclass clazz)
 {
     return jthread_self();

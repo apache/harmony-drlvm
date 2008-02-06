@@ -37,9 +37,9 @@ extern "C" {
 /* Native methods */
 
 /*
- * Method: java.lang.VMThreadManager.currentThread()Ljava/lang/Thread;
+ * Method: java.lang.VMThreadManager.currentThreadNative()Ljava/lang/Thread;
  */
-JNIEXPORT jobject JNICALL Java_java_lang_VMThreadManager_currentThread
+JNIEXPORT jobject JNICALL Java_java_lang_VMThreadManager_currentThreadNative
     (JNIEnv *, jclass);
 
 /*

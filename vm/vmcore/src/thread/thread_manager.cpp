@@ -311,6 +311,18 @@ Java_org_apache_harmony_drlvm_thread_ThreadHelper_getLockWordOffset(JNIEnv *env,
 	return (jint)offset;
 }
 
+/*
+ * Class:     org_apache_harmony_drlvm_thread_ThreadHelper
+ * Method:    getThreadJavaObjectOffset
+ * Signature: ()I
+ */
+VMEXPORT jint JNICALL
+Java_org_apache_harmony_drlvm_thread_ThreadHelper_getThreadJavaObjectOffset(JNIEnv *env, jclass klass)
+{
+    vm_thread_t vm_thread = NULL;
+    return (jint)(POINTER_SIZE_INT)&vm_thread->java_thread;
+}
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

@@ -56,11 +56,11 @@ public class VMHelper {
     public static final int OBJ_INFO_OFFSET = 4;
 
     public static final int CLASS_JLC_HANDLE_OFFSET = getClassJLCHanldeOffset();
-
-
+    
     // preload @Inline vmmagic class
     static final Class pragmaInline = org.vmmagic.pragma.Inline.class;
-
+    static final Class threadHelper = org.apache.harmony.drlvm.thread.ThreadHelper.class;
+    static final Class vmFastPathes = org.apache.harmony.drlvm.VMHelperFastPath.class;
 
     //Slow path versions of helpers
 

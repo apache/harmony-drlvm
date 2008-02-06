@@ -31,12 +31,24 @@ public class ThreadHelper {
 
     public static final int LOCK_WORD_OFFSET    = getLockWordOffset();
     public static final int TLS_THREAD_ID_OFFSET= getThreadIdOffset();
+    public static final int THREAD_JAVA_OBJECT_OFFSET = getThreadJavaObjectOffset();
 
     @Inline
     static int getThreadId() {
         Address tlsAddr = VMHelper.getTlsBaseAddress();
         Address tlsThreadIdFieldAddr = tlsAddr.plus(TLS_THREAD_ID_OFFSET);
         return tlsThreadIdFieldAddr.loadInt();
+    }
+
+    @Inline
+    public static Thread getCurrentThread() {
+        Address tlsThread = VMHelper.getTlsBaseAddress();
+        Address javaObjectPtr = tlsThread.plus(THREAD_JAVA_OBJECT_OFFSET).loadAddress();
+        if (javaObjectPtr.isZero()) {
+            return null;
+        } else {
+            return (Thread)javaObjectPtr.loadAddress().toObjectReference().toObject();
+        }
     }
 
     @Inline
@@ -107,6 +119,7 @@ public class ThreadHelper {
 
     private static native int getThreadIdOffset();
     private static native int getLockWordOffset();
+    private static native int getThreadJavaObjectOffset();
 }
 
 
