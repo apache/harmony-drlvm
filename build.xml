@@ -203,6 +203,15 @@ Usage:
             </fileset>
         </copy>
 
+        <!-- a trick to drop duplicated dependencies -->
+        <delete quiet="yes">
+            <fileset dir="${drlvm.bin.dir}" includes="*" excludes="*hythr*">
+                <not>
+                    <different targetdir="${drlvm.deploy.dir}/jdk/jre/bin"/>
+                </not>
+            </fileset>
+        </delete>
+        
         <!-- launcher should use our hythr -->
         <copy todir="${drlvm.deploy.dir}/jdk/jre/bin">
             <fileset dir="${drlvm.bin.dir}">
