@@ -52,7 +52,7 @@
  */
 
 // Boolean, uint8, int8, uint16, int16, uint32, int32, uint64, int64,
-// POINTER_SIZED_INT
+// POINTER_SIZE_INT
 
 // We can't use bool in non-C++ code
 #ifndef TRUE
