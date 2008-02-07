@@ -1105,7 +1105,7 @@ check_is_jstring_class(jstring string)
     ObjectHandle new_handle = oh_allocate_local_handle_from_jni();
     if (new_handle == NULL) {
         tmn_suspend_enable();   //---------------------------------^
-        return NULL;
+        return false;
     }
     ManagedObject *jlo = h->object;
     assert(jlo);
