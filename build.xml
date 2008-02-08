@@ -255,6 +255,8 @@ Usage:
     <target name="deploy-relocate" if="is.windows">
         <fileset dir="${drlvm.deploy.dir}/jdk/jre/bin/" id="relocate.files">
             <include name="**/*.dll" />
+            <!-- Ignore ICUInterface34 stub from classlib -->
+            <exclude name="ICUInterface34.dll" />
         </fileset>
 
         <pathconvert pathsep=" " property="relocate.files.all" refid="relocate.files" />
