@@ -34,6 +34,10 @@
                 </fileset>
             </compiler>
         </make-native>
+
+        <mkdir dir="${drlvm.deploy.dir}/jdk/lib" />
+        <move file="${drlvm.lib.dir}/${lib.prefix}verifier-ext${lib.suffix}" 
+              todir="${drlvm.deploy.dir}/jdk/lib" />
     </target>
     
     <target name="clean" >
