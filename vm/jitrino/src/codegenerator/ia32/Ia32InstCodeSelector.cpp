@@ -2189,7 +2189,8 @@ CG_OpndHandle* InstCodeSelector::ldRef(Type *dstType,
     assert(dstType->isSystemString() || dstType->isSystemClass());
     Opnd * retOpnd=irManager.newOpnd(dstType);
 
-    if (codeSelector.methodCodeSelector.slowLdString || dstType->isSystemClass()) {
+    if (codeSelector.methodCodeSelector.slowLdString || dstType->isSystemClass() ||
+        *((POINTER_SIZE_INT *) compilationInterface.getStringInternAddr(enclosingMethod, refToken)) == 0) {
         NamedType * parentType=enclosingMethod->getParentType();
     #ifdef _EM64T_
         Opnd * tp = irManager.getRegOpnd(RegName_RDI);

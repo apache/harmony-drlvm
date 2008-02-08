@@ -211,7 +211,7 @@ void HelperInliner::run()  {
     //Convert all inst params into helper params
     uint32 numHelperArgs = method->getNumParams();
     uint32 numInstArgs = inst->getNumSrcOperands();
-    Opnd** helperArgs =new (irm->getMemoryManager()) Opnd*[numHelperArgs];
+    Opnd** helperArgs = new (irm->getMemoryManager()) Opnd*[numHelperArgs];
 #ifdef _DEBUG
     std::fill(helperArgs, helperArgs + numHelperArgs, (Opnd*)NULL);
 #endif
@@ -224,7 +224,24 @@ void HelperInliner::run()  {
         ldconst->insertBefore(inst);
         helperArgs[currentHelperArg] = typeOpnd;
         currentHelperArg++;
+    } else if (inst->isToken()) {
+        TokenInst* tokenInst = inst->asTokenInst();
+        MethodDesc* methDesc = tokenInst->getEnclosingMethod();
+        uint32 cpIndex = tokenInst->getToken();
+        Opnd* classHandleOpnd = opndManager->createSsaTmpOpnd(typeManager->getUnmanagedPtrType(typeManager->getIntPtrType()));
+        Opnd* cpIndexOpnd = opndManager->createSsaTmpOpnd(typeManager->getUInt32Type());
+        Inst* ldMethDesc = instFactory->makeLdConst(classHandleOpnd, (POINTER_SIZE_SINT)methDesc->getParentHandle());
+        Inst* ldCpIndex = instFactory->makeLdConst(cpIndexOpnd, (int32)cpIndex);
+        
+        ldMethDesc->insertBefore(inst);
+        helperArgs[currentHelperArg] = classHandleOpnd;
+        currentHelperArg++;
+        
+        ldCpIndex->insertBefore(inst);
+         helperArgs[currentHelperArg] = cpIndexOpnd;
+        currentHelperArg++;                
     }
+    
     for (uint32 i = 0; i < numInstArgs; i++) {
         Opnd* instArg = inst->getSrc(i);
         if (instArg->getType()->tag == Type::Tau) {

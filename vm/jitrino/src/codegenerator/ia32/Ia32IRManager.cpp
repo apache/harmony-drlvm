@@ -2026,7 +2026,7 @@ void IRManager::resolveRuntimeInfo(Opnd* opnd) const {
             {
             MethodDesc*  mDesc = (MethodDesc*)info->getValue(0);
             uint32 token = (uint32)(POINTER_SIZE_INT)info->getValue(1);
-            value = (POINTER_SIZE_INT) compilationInterface.loadStringObject(mDesc,token);
+            value = (POINTER_SIZE_INT) compilationInterface.getStringInternAddr(mDesc,token);
             }break;
         case Opnd::RuntimeInfo::Kind_StaticFieldAddress:
             /** The value of the operand is [0]->FieldDesc::getAddress() */

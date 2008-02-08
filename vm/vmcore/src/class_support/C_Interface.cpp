@@ -798,36 +798,9 @@ void *class_get_const_string_intern_addr(Class_Handle cl, unsigned index)
     String* str = cl->get_constant_pool().get_string(index);
     assert(str);
 
-    bool must_instantiate;
-    REFS_RUNTIME_SWITCH_IF
-#ifdef REFS_RUNTIME_OR_COMPRESSED
-        must_instantiate = (str->intern.compressed_ref == 0 /*NULL*/);
-#endif // REFS_RUNTIME_OR_COMPRESSED
-    REFS_RUNTIME_SWITCH_ELSE
-#ifdef REFS_RUNTIME_OR_UNCOMPRESSED
-        must_instantiate = (str->intern.raw_ref == NULL);
-#endif // REFS_RUNTIME_OR_UNCOMPRESSED
-    REFS_RUNTIME_SWITCH_ENDIF
+    assert((void *)(&(str->intern.raw_ref)) == (void *)(&(str->intern.compressed_ref))); 
+    return &(str->intern.raw_ref);
 
-    if (must_instantiate) {
-        BEGIN_RAISE_AREA;
-        // vm_instantiate_cp_string_resolved assumes that GC is disabled
-        tmn_suspend_disable();
-        // Discard the result. We are only interested in the side-effect of setting str->intern.
-        vm_instantiate_cp_string_resolved(str);
-        tmn_suspend_enable();
-        END_RAISE_AREA;
-    }
-
-    REFS_RUNTIME_SWITCH_IF
-#ifdef REFS_RUNTIME_OR_COMPRESSED
-        return &(str->intern.compressed_ref);
-#endif // REFS_RUNTIME_OR_COMPRESSED
-    REFS_RUNTIME_SWITCH_ELSE
-#ifdef REFS_RUNTIME_OR_UNCOMPRESSED
-        return &(str->intern.raw_ref);
-#endif // REFS_RUNTIME_OR_UNCOMPRESSED
-    REFS_RUNTIME_SWITCH_ENDIF
 } //class_get_const_string_intern_addr
 
 

@@ -352,7 +352,7 @@ public:
 
     ClassHierarchyMethodIterator* getClassHierarchyMethodIterator(ObjectType* baseType, MethodDesc* methodDesc);
 
-    void*        loadStringObject(MethodDesc* enclosingMethodDesc, uint32 stringToken);
+    void*        getStringInternAddr(MethodDesc* enclosingMethodDesc, uint32 stringToken);
     Type*        getConstantType(MethodDesc* enclosingMethodDesc, uint32 constantToken);
     const void*  getConstantValue(MethodDesc* enclosingMethodDesc, uint32 constantToken);
     const char*  getSignatureString(MethodDesc* enclosingMethodDesc, uint32 methodToken);

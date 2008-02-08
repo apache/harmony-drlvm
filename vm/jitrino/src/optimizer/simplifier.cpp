@@ -4495,7 +4495,8 @@ Inst* Simplifier::simplifyJitHelperCall(JitHelperCallInst* inst) {
             if (ch) {
                 ConstInst::ConstValue v;
                 v.i8 = (POINTER_SIZE_SINT)class_get_allocation_handle(ch);
-                res = genLdConstant(tm.getUnmanagedPtrType(tm.getInt8Type()), v);
+                res = genLdConstant(tm.getInt32Type(), v);
+                assert((sizeof(void*) == 4) && "TODO fix allocation helper on 64 bit");
             }
             break;
         case ClassGetTypeSize:

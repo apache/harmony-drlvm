@@ -1420,6 +1420,7 @@ AliasRep AliasManager::getReference(Opnd *addr)
     case Op_ConvZE:
     case Op_ConvUnmanaged:
     case Op_TauLdInd: // the result of static field load
+    case Op_LdConstant:
         break;
     case Op_VMHelperCall:
         {

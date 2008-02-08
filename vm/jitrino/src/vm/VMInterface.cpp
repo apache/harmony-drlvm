@@ -545,7 +545,7 @@ CompilationInterface::compileMethod(MethodDesc *method) {
 
 
 void* 
-CompilationInterface::loadStringObject(MethodDesc* enclosingMethodDesc,
+CompilationInterface::getStringInternAddr(MethodDesc* enclosingMethodDesc,
                                                 uint32 stringToken) {
     Class_Handle enclosingDrlVMClass = enclosingMethodDesc->getParentHandle();
     return class_get_const_string_intern_addr(enclosingDrlVMClass,stringToken);
