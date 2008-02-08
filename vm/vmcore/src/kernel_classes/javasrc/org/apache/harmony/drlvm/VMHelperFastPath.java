@@ -42,6 +42,17 @@ class VMHelperFastPath {
 
     @Inline
     public static Address getInterfaceVTable3(Address intfType, Object obj)  {
+        
+        //Returning zero address if the object is null 
+        //is safe in terms of preserving program semantics(the exception will be generated on the first method invocation) and
+        //allows profitable code transformations such as hoisting vm helper outside the loop body.
+        //This is our current convention which touches all variants of this helper, 
+        //If it changes, all variants must be fixed. 
+            
+        if(obj==null){
+                return Address.zero();
+        }
+            
         Address vtableAddr = VMHelper.getVTable(obj);
 
         Address inf0Type = vtableAddr.loadAddress(Offset.fromIntZeroExtend(CLASS_INF_TYPE_0_OFFSET));

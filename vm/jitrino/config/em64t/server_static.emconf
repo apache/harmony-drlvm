@@ -32,7 +32,7 @@ SS_OPT.file=jitrino
 
 -XX:jit.SS_OPT.path=opt_init,translator,optimizer,hir2lir,codegen
 
--XX:jit.SS_OPT.path.optimizer=ssa,simplify,dce,uce,statprof,devirt_virtual,unguard,devirt_intf,hlo_api_magic,inline,purge,simplify,dce,uce,osr_path-,escape_path,dce,uce,hvn,dce,uce,inline_helpers-,purge,simplify,uce,dce,uce,abce,lower,dce,uce,memopt,reassoc,dce,uce,hvn,dce,uce,gcm,dessa,statprof
+-XX:jit.SS_OPT.path.optimizer=ssa,simplify,dce,uce,statprof,devirt_virtual,unguard,devirt_intf,hlo_api_magic,inline,purge,simplify,dce,uce,osr_path,escape_path,dce,uce,hvn,dce,uce,inline_helpers-,purge,simplify,uce,dce,uce,abce,lower,dce,uce,memopt,reassoc,dce,uce,hvn,dce,uce,gcm,dessa,statprof
 -XX:jit.SS_OPT.path.osr_path=gcm,osr,simplify,dce,uce
 -XX:jit.SS_OPT.path.escape_path=hvn,simplify,dce,uce,escape
 -XX:jit.SS_OPT.path.abce=classic_abcd,dce,uce,dessa,statprof,peel,ssa,hvn,simplify,dce,uce,memopt,dce,uce,dessa,fastArrayFill,ssa,statprof,dabce,dce,uce

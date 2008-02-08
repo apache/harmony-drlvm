@@ -2223,7 +2223,15 @@ static void *rth_invokeinterface_addr_withresolve(Class_Handle klass, unsigned c
 
     Global_Env* env = VM_Global_State::loader_env;
     if (obj == NULL) {
-        exn_throw_by_class(env->java_lang_NullPointerException_Class);
+
+    //Returning zero address and not generating NPE if the object is null 
+    //is safe in terms of preserving program semantics(the exception will be generated 
+    //on the first method invocation) and
+    //allows profitable code transformations such as hoisting vm helper outside the loop body 
+    //This is our current convention which touches all variants of this helper, 
+    //If it changes, all variants must be fixed. 
+            
+        //exn_throw_by_class(env->java_lang_NullPointerException_Class);
         return NULL;
     }
 
