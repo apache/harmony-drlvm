@@ -23,7 +23,6 @@
 namespace Jitrino {
 namespace Ia32 {
 
-
 class PeepHoleOpt;
 static const char* help = 
 "Performs simple local (per-BB) or per-Inst optimizations.\n"
@@ -84,6 +83,7 @@ private:
     //
     // 
     //
+    Changed handleInst_MOV(Inst* inst);
     Changed handleInst_Call(Inst* inst);
     Changed handleInst_HelperCall(Inst* inst, const  Opnd::RuntimeInfo* ri);
     Changed handleInst_Convert_F2I_D2I(Inst* inst);
@@ -92,6 +92,8 @@ private:
     Changed handleInst_SSEMov(Inst* inst);
     Changed handleInst_SSEXor(Inst* inst);
     Changed handleInst_CMP(Inst* inst);
+	Changed handleInst_SETcc(Inst* inst);
+
     //
     // Helpers
     //
@@ -180,16 +182,20 @@ PeepHoleOpt::Changed PeepHoleOpt::handleInst(Inst* inst)
 {
     PeepHoleOpt::Changed temp;
 
-    if (inst->hasKind(Inst::Kind_PseudoInst)) {
+    if (inst->hasKind(Inst::Kind_PseudoInst) && inst->getKind() != Inst::Kind_CopyPseudoInst) {
         return Changed_Nothing;
     }
 
     Mnemonic mnemonic = inst->getMnemonic();
     switch(mnemonic) {
+    case Mnemonic_MOV:
+        return handleInst_MOV(inst);
     case Mnemonic_CALL:
         return handleInst_Call(inst);
     case Mnemonic_ADD:
+    case Mnemonic_ADC:
     case Mnemonic_SUB:
+    case Mnemonic_SBB:
     case Mnemonic_NOT:
     case Mnemonic_AND:
     case Mnemonic_OR:
@@ -203,6 +209,11 @@ PeepHoleOpt::Changed PeepHoleOpt::handleInst(Inst* inst)
     } else {
         return temp;
     }
+    case Mnemonic_SETG:
+    case Mnemonic_SETE:
+    case Mnemonic_SETNE:
+    case Mnemonic_SETL:
+		return handleInst_SETcc(inst);
     case Mnemonic_IMUL:
     case Mnemonic_MUL:
         return handleInst_MUL(inst);
@@ -414,6 +425,186 @@ static int getMaxBit(uint32 val) {
     return i;
 }
 
+PeepHoleOpt::Changed PeepHoleOpt::handleInst_MOV(Inst* inst)
+{
+    Node* node = inst->getNode();
+    if (((BasicBlock*)node)->getLayoutSucc() == NULL)
+    {
+        Inst *next = inst->getNextInst();
+
+        Node *currNode = node;
+        bool methodMarkerOccur = false;
+        MethodMarkerPseudoInst* methodMarker = NULL;
+        // ignoring instructions that have no effect and saving method markers to correct them during optimizations
+        while (next == NULL || next->getKind() == Inst::Kind_MethodEndPseudoInst || next->getMnemonic() == Mnemonic_JMP)
+        {
+            if (next == NULL)
+            {
+                currNode = currNode->getOutEdge(Edge::Kind_Unconditional)->getTargetNode();
+                if (currNode->getKind() == Node::Kind_Exit)
+                    return Changed_Nothing;
+                next = (Inst*) currNode->getFirstInst();
+            }
+            else
+            {
+                if (next->getKind() == Inst::Kind_MethodEndPseudoInst)
+                {
+                    //max 1 saved method marker
+                    if (methodMarkerOccur)
+                    {
+                        return Changed_Nothing;
+                    }
+                    methodMarker = (MethodMarkerPseudoInst*)next;
+                    methodMarkerOccur = true;
+                }
+                next = next->getNextInst();
+            }
+        }
+
+        Inst *jump = next->getNextInst();
+
+
+        bool step1 = true;
+        currNode = node;
+        while (currNode != next->getNode())
+        {
+            currNode = currNode->getOutEdge(Edge::Kind_Unconditional)->getTargetNode();
+            if (currNode->getInDegree()!=1)
+            {
+                step1 = false;
+                break;
+            }
+        }
+
+        // step1:
+        // ---------------------------------------------
+        // MOV opnd, opnd2             MOV opnd3, opnd2
+        // MOV opnd3, opnd      ->
+        // ---------------------------------------------
+        // nb: applicable if opnd will not be used further
+        if (step1 && next->getMnemonic() == Mnemonic_MOV)
+        {
+            Opnd *movopnd1, *movopnd2, *nextmovopnd1, *nextmovopnd2;
+            if (inst->getKind() == Inst::Kind_CopyPseudoInst)
+            {
+                movopnd1 = inst->getOpnd(0);
+                movopnd2 = inst->getOpnd(1);
+            }
+            else
+            {
+                Inst::Opnds movuses(inst, Inst::OpndRole_Explicit|Inst::OpndRole_Use);
+                Inst::Opnds movdefs(inst, Inst::OpndRole_Explicit|Inst::OpndRole_Def);
+                movopnd1 = inst->getOpnd(movdefs.begin());
+                movopnd2 = inst->getOpnd(movuses.begin());
+            }
+            if (next->getKind() == Inst::Kind_CopyPseudoInst)
+            {
+                nextmovopnd1 = next->getOpnd(0);
+                nextmovopnd2 = next->getOpnd(1);
+            }
+            else
+            {
+                Inst::Opnds nextmovuses(next, Inst::OpndRole_Explicit|Inst::OpndRole_Use);
+                Inst::Opnds nextmovdefs(next, Inst::OpndRole_Explicit|Inst::OpndRole_Def);
+                nextmovopnd1 = next->getOpnd(nextmovdefs.begin());
+                nextmovopnd2 = next->getOpnd(nextmovuses.begin());
+            }
+            if (movopnd1->getId() == nextmovopnd2->getId() && 
+                !isMem(movopnd2) && !isMem(nextmovopnd1) &&
+                !isMem(movopnd1)
+                )
+            {
+                BitSet ls(irManager->getMemoryManager(), irManager->getOpndCount());
+                irManager->updateLivenessInfo();
+                irManager->getLiveAtExit(next->getNode(), ls);
+                for (Inst* i = (Inst*)next->getNode()->getLastInst(); i!=next; i = i->getPrevInst()) {
+                    irManager->updateLiveness(i, ls);
+                }
+                bool dstNotUsed = !ls.getBit(movopnd1->getId());
+                if (dstNotUsed)
+                {
+                    irManager->newInst(Mnemonic_MOV, nextmovopnd1, movopnd2)->insertAfter(inst);
+                    inst->unlink();
+                    next->unlink();
+                    return Changed_Node;
+                }
+            }
+        }
+
+        // step2:
+        // --------------------------------------------------------------
+        // MOV opnd, 0/1                Jmp smwh/BB1            Jmp smwh/BB1
+        // CMP opnd, 0           ->     CMP opnd, 0     v
+        // Jcc smwh                     Jcc smwh
+        // BB1:                         BB1:
+        // --------------------------------------------------------------
+        // nb: applicable if opnd will not be used further
+        if (next->getMnemonic() == Mnemonic_CMP && jump!= NULL && (jump->getMnemonic() == Mnemonic_JE ||
+            jump->getMnemonic() == Mnemonic_JNE))
+        {
+            Opnd *movopnd1, *movopnd2;
+            if (inst->getKind() == Inst::Kind_CopyPseudoInst)
+            {
+                movopnd1 = inst->getOpnd(0);
+                movopnd2 = inst->getOpnd(1);
+            }
+            else
+            {
+                Inst::Opnds movuses(inst, Inst::OpndRole_Explicit|Inst::OpndRole_Use);
+                Inst::Opnds movdefs(inst, Inst::OpndRole_Explicit|Inst::OpndRole_Def);
+                movopnd1 = inst->getOpnd(movdefs.begin());
+                movopnd2 = inst->getOpnd(movuses.begin());
+            }
+            Inst::Opnds cmpuses(next, Inst::OpndRole_Explicit|Inst::OpndRole_Use);
+            Opnd* cmpopnd1 = next->getOpnd(cmpuses.begin());
+            Opnd* cmpopnd2 = next->getOpnd(cmpuses.next(cmpuses.begin()));
+            
+            if (isImm(movopnd2) && (movopnd2->getImmValue() == 0 || movopnd2->getImmValue() == 1) &&
+                movopnd1->getId() == cmpopnd1->getId() &&
+                isImm(cmpopnd2) && cmpopnd2->getImmValue() == 0)
+            {
+                BitSet ls(irManager->getMemoryManager(), irManager->getOpndCount());
+                irManager->updateLivenessInfo();
+                irManager->getLiveAtExit(jump->getNode(), ls);
+                bool opndNotUsed = !ls.getBit(movopnd1->getId());
+                if (opndNotUsed)
+                {
+                    ControlFlowGraph* cfg = irManager->getFlowGraph();
+                    Node* destination = ((BranchInst*)jump)->getTrueTarget();
+                    if ((jump->getMnemonic() == Mnemonic_JNE || movopnd2->getImmValue() == 1) && !(jump->getMnemonic() == Mnemonic_JNE && movopnd2->getImmValue() == 1))
+                    {
+                        destination = ((BranchInst*)jump)->getFalseTarget();
+                    }
+                    if (node->getId() != next->getNode()->getId())
+                    {
+                        if (methodMarkerOccur)
+                        {
+                            inst->getNode()->appendInst(irManager->newMethodEndPseudoInst(methodMarker->getMethodDesc()));
+                        }
+                        inst->unlink();
+                        Edge *outEdge = node->getOutEdge(Edge::Kind_Unconditional);
+                        cfg->replaceEdgeTarget(outEdge, destination, true);
+                        cfg->purgeUnreachableNodes(); // previous successor may become unreachable
+                    }
+                    else
+                    {
+                        cfg->removeEdge(node->getOutEdge(Edge::Kind_True));
+                        cfg->removeEdge(node->getOutEdge(Edge::Kind_False));
+                        cfg->addEdge(node, destination);
+                        inst->unlink();
+                        next->unlink();
+                        jump->unlink();
+                    }
+
+                    return Changed_Node;
+                }
+            }
+        }
+    }
+    return Changed_Nothing;
+}
+
+
 PeepHoleOpt::Changed PeepHoleOpt::handleInst_CMP(Inst* inst) {
     assert(inst->getMnemonic()==Mnemonic_CMP);
     
@@ -499,70 +690,286 @@ PeepHoleOpt::Changed PeepHoleOpt::handleInst_ALU(Inst* inst)
     
     // Only these mnemonics have the majestic name of ALUs.
     assert(mnemonic == Mnemonic_ADD || mnemonic == Mnemonic_SUB ||
+           mnemonic == Mnemonic_ADC || mnemonic == Mnemonic_SBB ||
            mnemonic == Mnemonic_OR || mnemonic == Mnemonic_XOR ||
-           mnemonic == Mnemonic_AND || 
+           mnemonic == Mnemonic_AND ||
            mnemonic == Mnemonic_CMP || mnemonic == Mnemonic_TEST);
-
     
-    if (mnemonic == Mnemonic_AND && inst->getForm() == Inst::Form_Extended) {
+    if (mnemonic == Mnemonic_AND)
+    {
         Inst::Opnds defs(inst, Inst::OpndRole_Explicit|Inst::OpndRole_Def);
         Opnd* dst = inst->getOpnd(defs.begin());
         Inst::Opnds uses(inst, Inst::OpndRole_Explicit|Inst::OpndRole_Use);
         Opnd* src1= inst->getOpnd(uses.begin());
         Opnd* src2= inst->getOpnd(uses.next(uses.begin()));
-        if (!isImm(src2) && isImm(src1)) {
-            Opnd* tmp = src1; src1 = src2; src2 = tmp;
-        }
-        if (isImm32(src2)) {
-            Inst* nextInst = inst->getNextInst();
-            bool dstIsNotUsed = dst->getRefCount() == 1;
-            bool removeNextInst = false;
-            if (dst->getRefCount()==2 && nextInst!=NULL && nextInst->getMnemonic() == Mnemonic_CMP) {
-                Inst::Opnds cmp_uses(nextInst, Inst::OpndRole_Explicit|Inst::OpndRole_Use);
-                Opnd* cmp_src1= nextInst->getOpnd(cmp_uses.begin());
-                Opnd* cmp_src2= nextInst->getOpnd(cmp_uses.next(cmp_uses.begin()));
-                if (cmp_src1 == dst && isImm(cmp_src2) && cmp_src2->getImmValue() == 0) {
-                    removeNextInst = true;
-                    dstIsNotUsed = true;
-                }
+
+        Opnd *newopnd2;
+        // test can work only with operands having equal sizes
+        if (isImm(src2) && src2->getSize() != src1->getSize())
+            newopnd2 = irManager->newImmOpnd(src1->getType(), src2->getImmValue());
+        else
+            newopnd2 = src2;
+        if (!isMem(dst) && !isMem(src1) && !isMem(src2))
+        {
+            BitSet ls(irManager->getMemoryManager(), irManager->getOpndCount());
+            irManager->updateLivenessInfo();
+            irManager->getLiveAtExit(inst->getNode(), ls);
+            for (Inst* i = (Inst*)inst->getNode()->getLastInst(); i!=inst; i = i->getPrevInst()) {
+                irManager->updateLiveness(i, ls);
             }
-            if (dstIsNotUsed) {            
-                if (Log::isEnabled()) Log::out()<<"I"<<inst->getId()<<" replacing AND with TEST"<<std::endl;
-                irManager->newInst(Mnemonic_TEST, src1, src2)->insertBefore(inst);
-                if (removeNextInst) {
-                    nextInst->unlink();
-                }
+            bool dstNotUsed = !ls.getBit(dst->getId());
+            if (dstNotUsed)
+            {
+                // what: AND opnd1, opnd2 => TEST opnd1, opnd2
+                // nb: applicable if opnd1 will not be used further
+                
+                if (inst->getForm() == Inst::Form_Extended)
+                    irManager->newInstEx(Mnemonic_TEST, 0, src1, newopnd2)->insertAfter(inst);
+                else
+                    irManager->newInst(Mnemonic_TEST, src1, newopnd2)->insertAfter(inst);
                 inst->unlink();
                 return Changed_Inst;
             }
         }
     }
-
-    
-    // Only process simple variants: ALU opcodes that either define flags 
-    //and use 2 operands, or simply use 2 operands
-    unsigned leftIndex = 0;
-    if (isReg(inst->getOpnd(leftIndex), RegName_EFLAGS)) {
-        ++leftIndex;
-    }
-    
-    const unsigned rightIndex = leftIndex + 1;
-    
-    Opnd* left = inst->getOpnd(leftIndex);
-    Opnd* right = inst->getOpnd(rightIndex);
-    
-    if (mnemonic != Mnemonic_TEST && 
-        isReg(left) && isImm32(right) && fitsImm8(right)) {
-        /* what: OPERATION reg, imm32 => OPERATION reg, imm8
-           why: shorter instruction
-           nb: applicable for all ALUs, but TEST
-        */
-        right = convertImmToImm8(right);
-        replaceOpnd(inst, rightIndex, right);
-        return Changed_Opnd;
-    }
-
     return Changed_Nothing;
+}
+
+PeepHoleOpt::Changed PeepHoleOpt::handleInst_SETcc(Inst* inst)
+{
+    if (((BasicBlock*)inst->getNode())->getLayoutSucc() == NULL)
+    {
+        Mnemonic mn = inst->getMnemonic();
+        
+        Inst* prev = inst->getPrevInst();
+        Inst *next = inst->getNextInst();
+
+        Node *currNode = inst->getNode();
+        bool methodMarkerOccur = false;
+        MethodMarkerPseudoInst* methodMarker = NULL;
+        // ignoring instructions that have no effect and saving method markers to correct them during optimizations
+        while (next == NULL || next->getKind() == Inst::Kind_MethodEndPseudoInst || next->getMnemonic() == Mnemonic_JMP)
+        {
+            if (next == NULL)
+            {
+                currNode = currNode->getOutEdge(Edge::Kind_Unconditional)->getTargetNode();
+                if (currNode->getKind() == Node::Kind_Exit)
+                    return Changed_Nothing;
+                next = (Inst*) currNode->getFirstInst();
+            }
+            else
+            {
+                if (next->getKind() == Inst::Kind_MethodEndPseudoInst)
+                {
+                    //max 1 saved method marker
+                    if (methodMarkerOccur)
+                    {
+                        return Changed_Nothing;
+                    }
+                    methodMarker = (MethodMarkerPseudoInst*)next;
+                    methodMarkerOccur = true;
+                }
+                next = next->getNextInst();
+            }
+        }
+
+        Inst *next2 = next->getNextInst();
+
+        bool step1 = true;
+        currNode = inst->getNode();
+        while (currNode != next->getNode())
+        {
+            currNode = currNode->getOutEdge(Edge::Kind_Unconditional)->getTargetNode();
+            if (currNode->getInDegree()!=1)
+            {
+                step1 = false;
+                break;
+            }
+        }
+
+        // step1:
+        // ------------------------------------------
+        // MOV opnd, 0                  MOV opnd2, 0
+        // SETcc opnd           ->      SETcc opnd2
+        // MOV opnd2, opnd
+        // ------------------------------------------
+        // nb: applicable if opnd will not be used further
+        if (step1 && prev!= NULL && prev->getMnemonic() == Mnemonic_MOV &&
+            next!= NULL && next->getMnemonic() == Mnemonic_MOV)
+        {
+            Opnd *prevopnd1, *prevopnd2, *nextopnd1, *nextopnd2, *setopnd;
+            if (prev->getKind() == Inst::Kind_CopyPseudoInst)
+            {
+                prevopnd1 = prev->getOpnd(0);
+                prevopnd2 = prev->getOpnd(1);
+            }
+            else
+            {
+                Inst::Opnds prevuses(prev, Inst::OpndRole_Explicit|Inst::OpndRole_Use);
+                Inst::Opnds prevdefs(prev, Inst::OpndRole_Explicit|Inst::OpndRole_Def);
+                prevopnd1 = prev->getOpnd(prevdefs.begin());
+                prevopnd2 = prev->getOpnd(prevuses.begin());
+            }
+            if (next->getKind() == Inst::Kind_CopyPseudoInst)
+            {
+                nextopnd1 = next->getOpnd(0);
+                nextopnd2 = next->getOpnd(1);
+            }
+            else
+            {
+                Inst::Opnds nextuses(next, Inst::OpndRole_Explicit|Inst::OpndRole_Use);
+                Inst::Opnds nextdefs(next, Inst::OpndRole_Explicit|Inst::OpndRole_Def);
+                nextopnd1 = next->getOpnd(nextdefs.begin());
+                nextopnd2 = next->getOpnd(nextuses.begin());
+            }
+            Inst::Opnds setdefs(inst, Inst::OpndRole_Explicit|Inst::OpndRole_Def);
+            setopnd = inst->getOpnd(setdefs.begin());
+
+            if (isReg(nextopnd1) &&
+                prevopnd1->getId() == setopnd->getId() &&
+                setopnd->getId() == nextopnd2->getId() &&
+                isImm(prevopnd2) && prevopnd2->getImmValue() == 0
+                )
+            {
+                BitSet ls(irManager->getMemoryManager(), irManager->getOpndCount());
+                irManager->updateLivenessInfo();
+                irManager->getLiveAtExit(next->getNode(), ls);
+                for (Inst* i = (Inst*)next->getNode()->getLastInst(); i!=next; i = i->getPrevInst()) {
+                    irManager->updateLiveness(i, ls);
+                }
+                bool opndNotUsed = !ls.getBit(setopnd->getId());
+                if (opndNotUsed)
+                {
+                    if (nextopnd1->getRegName() != RegName_Null &&
+                        Constraint::getAliasRegName(nextopnd1->getRegName(), OpndSize_8) == RegName_Null)
+                    {
+                        nextopnd1->assignRegName(setopnd->getRegName());
+                    }
+                    irManager->newInst(Mnemonic_MOV, nextopnd1, prevopnd2)->insertBefore(inst);
+                    irManager->newInst(mn, nextopnd1)->insertBefore(inst);
+                    prev->unlink();
+                    inst->unlink();
+                    next->unlink();
+                    return Changed_Node;
+                }
+            }
+        }
+
+        // step2:
+        // --------------------------------------------------------------
+        // MOV opnd, 0                  Jcc smwh                Jcc smwh
+        // SETcc opnd           ->      BB1:            v       BB1:
+        // CMP opnd, 0                  ...
+        // Jcc smwh                     CMP opnd, 0
+        // BB1:                         Jcc smwh
+        // --------------------------------------------------------------
+        // nb: applicable if opnd will not be used further
+        // nb: conditions of new jumps are calculated from conditions of old jump and set instructions
+	    if (prev!= NULL && prev->getMnemonic() == Mnemonic_MOV &&
+            next!= NULL && (next->getMnemonic() == Mnemonic_CMP || next->getMnemonic() == Mnemonic_TEST) &&
+            next2!= NULL && (next2->getMnemonic() == Mnemonic_JG || next2->getMnemonic() == Mnemonic_JE || next2->getMnemonic() == Mnemonic_JNE) )
+	    {
+            Opnd* movopnd1;
+            Opnd* movopnd2;
+            if (prev->getKind() == Inst::Kind_CopyPseudoInst)
+            {
+                movopnd1 = prev->getOpnd(0);
+                movopnd2 = prev->getOpnd(1);
+            }
+            else
+            {
+                Inst::Opnds movuses(prev, Inst::OpndRole_Explicit|Inst::OpndRole_Use);
+                Inst::Opnds movdefs(prev, Inst::OpndRole_Explicit|Inst::OpndRole_Def);
+                movopnd1 = prev->getOpnd(movdefs.begin());
+                movopnd2 = prev->getOpnd(movuses.begin());
+            }
+            Inst::Opnds cmpuses(next, Inst::OpndRole_Explicit|Inst::OpndRole_Use);
+            Opnd* cmpopnd1 = next->getOpnd(cmpuses.begin());
+            Opnd* cmpopnd2 = next->getOpnd(cmpuses.next(cmpuses.begin()));
+
+            if (
+                isImm(movopnd2) && movopnd2->getImmValue() == 0 &&
+                movopnd1->getId() == cmpopnd1->getId() &&
+                //case CMP:
+                (next->getMnemonic() != Mnemonic_CMP || isImm(cmpopnd2) && cmpopnd2->getImmValue() == 0) &&
+                //case TEST:
+                (next->getMnemonic() != Mnemonic_TEST || cmpopnd1->getId() == cmpopnd2->getId())
+                )
+            {
+                BitSet ls(irManager->getMemoryManager(), irManager->getOpndCount());
+                irManager->updateLivenessInfo();
+                irManager->getLiveAtExit(next2->getNode(), ls);
+                bool opndNotUsed = !ls.getBit(movopnd1->getId());
+                if (opndNotUsed)
+                {
+                    BranchInst* br = (BranchInst*) next2;
+
+                    Mnemonic newjumpmn = Mnemonic_JZ;
+                    if (next2->getMnemonic() == Mnemonic_JE)
+                    {
+                        switch (mn)
+                        {
+                        case Mnemonic_SETG:
+                            newjumpmn = Mnemonic_JLE; break;
+                        case Mnemonic_SETE:
+                            newjumpmn = Mnemonic_JNE; break;
+                        case Mnemonic_SETL:
+                            newjumpmn = Mnemonic_JGE; break;
+                        case Mnemonic_SETNE:
+                            newjumpmn = Mnemonic_JE; break;
+                        default:
+                            assert(0); break;
+                        }
+                    }
+                    else
+                    {
+                        switch (mn)
+                        {
+                        case Mnemonic_SETG:
+                            newjumpmn = Mnemonic_JG; break;
+                        case Mnemonic_SETE:
+                            newjumpmn = Mnemonic_JE; break;
+                        case Mnemonic_SETL:
+                            newjumpmn = Mnemonic_JL; break;
+                        case Mnemonic_SETNE:
+                            newjumpmn = Mnemonic_JNE; break;
+                        default:
+                            assert(0); break;
+                        }
+                    }
+
+                    if (inst->getNode()->getId() != next->getNode()->getId())
+                    {
+                        ControlFlowGraph* cfg = irManager->getFlowGraph();
+                        cfg->removeEdge(inst->getNode()->getOutEdge(Edge::Kind_Unconditional));
+
+                        double trueEdgeProb = next2->getNode()->getOutEdge(Edge::Kind_True)->getEdgeProb();
+                        double falseEdgeProb = next2->getNode()->getOutEdge(Edge::Kind_False)->getEdgeProb();
+                        cfg->addEdge(inst->getNode(), br->getTrueTarget(), trueEdgeProb);
+                        cfg->addEdge(inst->getNode(), br->getFalseTarget(), falseEdgeProb);
+                        irManager->newBranchInst(newjumpmn, br->getTrueTarget(), br->getFalseTarget())->insertAfter(inst);
+                        if (methodMarkerOccur)
+                        {
+                            inst->getNode()->appendInst(irManager->newMethodEndPseudoInst(methodMarker->getMethodDesc()));
+                        }
+		                prev->unlink();
+		                inst->unlink();
+                        cfg->purgeUnreachableNodes();
+                    }
+                    else
+                    {
+                        irManager->newBranchInst(newjumpmn, br->getTrueTarget(), br->getFalseTarget())->insertAfter(next2);
+                        prev->unlink();
+		                inst->unlink();
+		                next->unlink();
+                        next2->unlink();
+                    }
+		            return Changed_Node;
+                }// endif opndNotUsed
+            }
+        }
+    }
+	return Changed_Nothing;
 }
 
 PeepHoleOpt::Changed PeepHoleOpt::handleInst_SSEMov(Inst* inst)
@@ -677,3 +1084,4 @@ PeepHoleOpt::Changed PeepHoleOpt::handleInst_SSEXor(Inst* inst)
 }
 
 }}; // ~namespace Jitrino::Ia32
+
