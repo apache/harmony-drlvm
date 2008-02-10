@@ -16,7 +16,6 @@
  */
 /**
 * @author Mikhail Y. Fursov
-* @version $Revision: 1.1.2.2.4.3 $
 */
 
 #include "DrlEMImpl.h"
@@ -637,22 +636,44 @@ ProfileCollector* DrlEMImpl::createProfileCollector(const std::string& profilerN
             pc = new EBProfileCollector(this, profilerName, step->jit, ebMode, eThreshold, bThreshold, tbsInitialTimeout, tbsTimeout);
         }
     } else if (profilerType == VALUE_PROFILER_STR) {
+        typedef ValueProfileCollector VPC;
         int vpSteadySize = 4, vpClearSize = 0, vpClearInterval = 0;
         std::string vpalgo = getParam(config, profilerName+".vpalgo");
-        ValueProfileCollector::algotypes vpMode = ValueProfileCollector::TNV_FIRST_N;
+        VPC::algotypes vpMode = VPC::TNV_FIRST_N;
         if (vpalgo == "TNV_DIVIDED") {
-            vpMode = ValueProfileCollector::TNV_DIVIDED;    
+            vpMode = VPC::TNV_DIVIDED;
         } else if (vpalgo != "TNV_FIRST_N") {
             LECHO(10, "EM: unsupported value profiler algotype");
             return NULL;
         }
+
+        std::string strategy = getParam(config, profilerName+".updateStrategy");
+        ProfileUpdateStrategy updateStrategy = UPDATE_LOCKED;
+        if (strategy == "FLAGGED_ALL") {
+            updateStrategy = UPDATE_FLAGGED_ALL;
+        }else if (strategy == "FLAGGED_INSERT") {
+            updateStrategy = UPDATE_FLAGGED_INSERT;
+        }else if (strategy == "UNSAFE") {
+            updateStrategy = UPDATE_UNSAFE;
+        }else if (strategy != "LOCKED") {
+            LECHO(10, "EM: unsupported value profiler updateStrategy");
+            return NULL;
+        }
+
+        if (vpMode != VPC::TNV_FIRST_N && updateStrategy != UPDATE_LOCKED) {
+            LECHO(10, "EM: unsupported value profiler combination of "
+                    "vpalgo and updateStrategy, only TNV_FIRST_N vpalgo "
+                    "curretly sypports other than LOCKED strategy");
+            return NULL;
+        }
+
         bool ok = false;
         vpSteadySize = toNum(getParam(config, profilerName+".vpSteadySize"), &ok);
         if (!ok) {
             LECHO(9, "EM: illegal '{0}' value" << "SteadySize");
             return NULL;
         }
-        if (vpMode == ValueProfileCollector::TNV_DIVIDED) {
+        if (vpMode == VPC::TNV_DIVIDED) {
             vpClearSize = toNum(getParam(config, profilerName+".vpClearSize"), &ok);
             if (!ok) {
                 LECHO(9, "EM: illegal '{0}' value" << "ClearSize");
@@ -664,7 +685,8 @@ ProfileCollector* DrlEMImpl::createProfileCollector(const std::string& profilerN
                 return NULL;
             }
         }
-        pc = new ValueProfileCollector(this, profilerName, step->jit, vpSteadySize, vpClearSize, vpClearInterval, vpMode);
+        pc = new ValueProfileCollector(this, profilerName, step->jit, vpSteadySize,
+                vpClearSize, vpClearInterval, vpMode, updateStrategy);
     }
     return pc;
 }

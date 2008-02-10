@@ -42,16 +42,36 @@ struct Simple_TNV_Table
     uint32 frequency;
 };
 
+enum ProfileUpdateStrategy {
+
+    // Lock when restructuring the TNV table (inserting). Trivial counter
+    // increments might not be locked (in current implementation they are not
+    // locked for FirstN table management only)
+    UPDATE_LOCKED,
+
+    // When a new value is added to TNV all simultaneous updates to the table
+    // are skipped
+    UPDATE_FLAGGED_ALL,
+
+    // Only simultaneous inserts to table are skipped, counter updates are
+    // processed unsafely
+    UPDATE_FLAGGED_INSERT,
+
+    // Completely insafe updates of the TNV table (use with care)
+    UPDATE_UNSAFE
+};
+
 class TNVTableManager {
 public:
     typedef struct Simple_TNV_Table TableT;
     typedef POINTER_SIZE_INT ValueT;
     typedef VPInstructionProfileData VPData;
     TNVTableManager(uint32 steady_size, uint32 clear_size,
-            uint32 clear_interval) :
+            uint32 clear_interval, ProfileUpdateStrategy update_strategy) :
         steadySize(steady_size),
         clearSize(clear_size),
-        clearInterval(clear_interval)
+        clearInterval(clear_interval),
+        updateStrategy(update_strategy)
     {}
 
     VPInstructionProfileData* createProfileData();
@@ -83,14 +103,15 @@ protected:
             ValueT value_to_insert, uint32 times_met) = 0;
 
     const uint32 steadySize, clearSize, clearInterval;
+    const ProfileUpdateStrategy updateStrategy;
 };
 
 class TNVTableDividedManager : public TNVTableManager {
 public:
     // c-tor
     TNVTableDividedManager(uint32 steady_size, uint32 clear_size,
-            uint32 clear_interval) :
-        TNVTableManager(steady_size, clear_size, clear_interval)
+            uint32 clear_interval, ProfileUpdateStrategy us) :
+        TNVTableManager(steady_size, clear_size, clear_interval, us)
     {}
 
     virtual void addNewValue(ValueMethodProfile* methProfile,
@@ -105,8 +126,8 @@ class TNVTableFirstNManager : public TNVTableManager {
 public:
     // c-tor
     TNVTableFirstNManager(uint32 steady_size, uint32 clear_size,
-            uint32 clear_interval) :
-        TNVTableManager(steady_size, clear_size, clear_interval)
+            uint32 clear_interval, ProfileUpdateStrategy us) :
+        TNVTableManager(steady_size, clear_size, clear_interval, us)
     {}
 
     virtual void addNewValue(ValueMethodProfile* methProfile,
@@ -120,11 +141,15 @@ private:
 
 class ValueProfileCollector : public ProfileCollector {
 public:
-    enum algotypes {TNV_DIVIDED, TNV_FIRST_N};
+    enum algotypes {
+        TNV_DIVIDED,
+        TNV_FIRST_N
+    };
 
     ValueProfileCollector(EM_PC_Interface* em, const std::string& name, JIT_Handle genJit,
                                                 uint32 _TNV_steady_size, uint32 _TNV_clear_size,
-                                                uint32 _clear_interval, algotypes _TNV_algo_type);
+                                                uint32 _clear_interval, algotypes _TNV_algo_type,
+                                                ProfileUpdateStrategy update_strategy);
 
     virtual TbsEMClient* getTbsEmClient() const {return (NULL);}
     virtual ~ValueProfileCollector();
@@ -139,6 +164,7 @@ private:
     ValueProfilesMap profilesByMethod;
     mutable hymutex_t profilesLock;
     TNVTableManager* tnvTableManager;
+    ProfileUpdateStrategy updateStrategy;
 };
 
 class VPInstructionProfileData
@@ -161,8 +187,6 @@ public:
 typedef std::map<uint32, VPInstructionProfileData*> VPDataMap;
 class ValueMethodProfile : public MethodProfile {
 public:
-    VPDataMap ValueMap; // TODO: make it private
-public:
     ValueMethodProfile(ValueProfileCollector* pc, Method_Handle mh);
     ~ValueMethodProfile();
     void lockProfile() {hymutex_lock(&lock);}
@@ -170,10 +194,22 @@ public:
     void dumpValues(std::ostream& os);
     void addNewValue(uint32 instructionKey, POINTER_SIZE_INT valueToAdd);
     POINTER_SIZE_INT getResult(uint32 instructionKey);
+
+    // UpatingState is used to implement UPDATE_FLAGGED_* strategies.
+    //     (updatingState == 1) when method profile is being updated to skip
+    //         concurrent modifications.
+    //     (updatingState == 0) when profile is open for modifications.
+    uint8* getUpdatingStatePtr() { return &updatingState; }
 private:
     ValueProfileCollector* getVPC() const;
 
+    friend class ValueProfileCollector;
+    VPDataMap ValueMap;
+
+    // The lock and the atomically modified updatingState flag operate per
+    // method to allow simultaneous updates for distinct methods.
     hymutex_t lock;
+    uint8 updatingState;
 };
 
 POINTER_SIZE_INT value_profiler_get_top_value (Method_Profile_Handle mph, uint32 instructionKey);

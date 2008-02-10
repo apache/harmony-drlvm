@@ -29,6 +29,9 @@
 #include "cxxlog.h"
 #include <sstream>
 
+#include "port_threadunsafe.h"
+#include "port_atomic.h"
+
 #define LOG_DOMAIN "em"
 
 VPInstructionProfileData* TNVTableManager::createProfileData()
@@ -167,23 +170,45 @@ void TNVTableFirstNManager::insert(TableT* where, TableT* clear_part,
 void TNVTableFirstNManager::addNewValue(ValueMethodProfile* methProfile,
             VPData* instProfile, ValueT curr_value)
 {
-    // TODO(egor):
-    // 1. options to enable/disable locking
-    // 2. flagged locking
-    methProfile->lockProfile();
+    uint8* updating_ptr = methProfile->getUpdatingStatePtr();
+    if (updateStrategy == UPDATE_FLAGGED_ALL) {
+        // Checking a flag and modifying it atomically must be faster than
+        // locking because it skips simultaneous updates. Faster but sacrifices
+        // profile precision.
+        if (port_atomic_cas8(updating_ptr, 1, 0) != 0) {
+            return;
+        }
+    }
+    UNSAFE_REGION_START
     ValueT* last_value = &(instProfile->last_value);
     uint32* num_times_profiled = &(instProfile->num_times_profiled);
     if (curr_value == *last_value){
+        // We increment the counter safely only with UPDATE_FLAGGED_ALL
         (*num_times_profiled)++;
     } else {
+        if (updateStrategy == UPDATE_LOCKED) {
+            methProfile->lockProfile();
+        }else if (updateStrategy == UPDATE_FLAGGED_INSERT) {
+            if (port_atomic_cas8(updating_ptr, 1, 0) != 0) {
+                return;
+            }
+        }
         struct Simple_TNV_Table* clear_part = instProfile->TNV_clear_part;
         struct Simple_TNV_Table* steady_part = instProfile->TNV_Table;
         flushLastValueCounter(instProfile);
         *num_times_profiled = 1;
         insert(steady_part, clear_part, curr_value, *num_times_profiled);
         *last_value = curr_value;
+        if (updateStrategy == UPDATE_LOCKED) {
+            methProfile->unlockProfile();
+        }else if (updateStrategy == UPDATE_FLAGGED_INSERT) {
+            *updating_ptr = 0;
+        }
     }
-    methProfile->unlockProfile();
+    UNSAFE_REGION_END
+    if (updateStrategy == UPDATE_FLAGGED_ALL) {
+        *updating_ptr = 0;
+    }
 }
 //------------------------------------------------------------------------------
 
@@ -285,16 +310,18 @@ ValueMethodProfile* ValueProfileCollector::createProfile
 
 ValueProfileCollector::ValueProfileCollector(EM_PC_Interface* em, const std::string& name, JIT_Handle genJit, 
                                              uint32 _TNV_steady_size, uint32 _TNV_clear_size,
-                                             uint32 _clear_interval, algotypes _TNV_algo_type)
-                                           : ProfileCollector(em, name, EM_PCTYPE_VALUE, genJit)
+                                             uint32 _clear_interval, algotypes _TNV_algo_type,
+                                             ProfileUpdateStrategy update_strategy)
+                                           : ProfileCollector(em, name, EM_PCTYPE_VALUE, genJit),
+                                             updateStrategy(update_strategy)
 {
     hymutex_create(&profilesLock, TM_MUTEX_NESTED);
     if (_TNV_algo_type == TNV_DIVIDED) {
         tnvTableManager = new TNVTableDividedManager
-            (_TNV_steady_size, _TNV_clear_size, _clear_interval);
+            (_TNV_steady_size, _TNV_clear_size, _clear_interval, update_strategy);
     }else if (_TNV_algo_type == TNV_FIRST_N) {
         tnvTableManager = new TNVTableFirstNManager
-            (_TNV_steady_size, _TNV_clear_size, _clear_interval);
+            (_TNV_steady_size, _TNV_clear_size, _clear_interval, update_strategy);
     }
     catName = std::string(LOG_DOMAIN) + ".profiler." + name;
     loggingEnabled =  is_info_enabled(LOG_DOMAIN) ||  is_info_enabled(catName.c_str());
@@ -331,7 +358,7 @@ MethodProfile* ValueProfileCollector::getMethodProfile(Method_Handle mh) const
 //------------------------------------------------------------------------------
 
 ValueMethodProfile::ValueMethodProfile(ValueProfileCollector* pc, Method_Handle mh)
-    : MethodProfile(pc, mh)
+    : MethodProfile(pc, mh), updatingState(0)
 {
     hymutex_create(&lock, TM_MUTEX_DEFAULT);
 }
