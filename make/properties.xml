@@ -21,6 +21,8 @@
     
     <property name="drlvm.base.dir" location="${prop.imported.basedir}/.." />
     <property name="hy.test.vm.name" value="drl"/>
+
+    <property environment="env" />
     
     <!-- pick up cfg from command line or env -->
     <condition property="hy.cfg" value="${BUILD_CFG}">
