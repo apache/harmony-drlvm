@@ -20,24 +20,23 @@
  * @brief Hythread park/unpark related functions
  */
 
-#include <open/hythread_ext.h>
 #include <apr_atomic.h>
+#include <open/hythread_ext.h>
 #include "thread_private.h"
 
 /**
- * 'Park' the current thread. 
- * 
- * Stop the current thread from executing until it is unparked, interrupted, or the specified timeout elapses.
- * 
+ * Parks the current thread.
+ *
+ * Stop the current thread from executing until it is unparked,
+ * interrupted, or the specified timeout elapses.
+ *
  * Unlike wait or sleep, the interrupted flag is NOT cleared by this API.
  *
  * @param[in] millis
- * @param[in] nanos 
- * 
- * @return 0 if the thread is unparked
- * HYTHREAD_INTERRUPTED if the thread was interrupted while parked<br>
- * HYTHREAD_PRIORITY_INTERRUPTED if the thread was priority interrupted while parked<br>
- * HYTHREAD_TIMED_OUT if the timeout expired<br>
+ * @param[in] nanos
+ *
+ * @return 0 - if the thread is unparked<br>
+ *         TM_ERROR_INTERRUPT if the thread was interrupted while parked<br>
  *
  * @see hythread_unpark
  */
@@ -66,21 +65,14 @@ IDATA VMCALL hythread_park(I_64 millis, IDATA nanos) {
         status = hymutex_unlock(&self->mutex);
         assert(status == TM_ERROR_NONE);
 
-        do {
-            result = condvar_wait_impl(&mon->condition, &mon->mutex,
+        result = condvar_wait_impl(&mon->condition, &mon->mutex,
                 millis, nanos, WAIT_INTERRUPTABLE);
-            if (result != TM_ERROR_NONE
-                || (self->state & TM_THREAD_STATE_PARKED) == 0)
-            {
-                break;
-            }
-        } while (1);
 
         // Restore thread state
         status = hymutex_lock(&self->mutex);
         assert(status == TM_ERROR_NONE);
     }
-    self->state &= ~TM_THREAD_STATE_PARKED;
+    self->state &= ~(TM_THREAD_STATE_PARKED|TM_THREAD_STATE_UNPARKED);
     self->waited_monitor = NULL;
     status = hymutex_unlock(&self->mutex);
     assert(status == TM_ERROR_NONE);
@@ -106,13 +98,14 @@ IDATA VMCALL hythread_park(I_64 millis, IDATA nanos) {
 }
 
 /**
- * 'Unpark' the specified thread. 
+ * Unparks the specified thread.
  * 
  * If the thread is parked, it will return from park.
  * If the thread is not parked, its 'UNPARKED' flag will be set, and it will return
  * immediately the next time it is parked.
  *
- * Note that unparks are not counted. Unparking a thread once is the same as unparking it n times.
+ * Note that unparks are not counted. Unparking a thread once is the same as unparking
+ * it n times.
  * 
  * @see hythread_park
  */
