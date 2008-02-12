@@ -115,7 +115,6 @@ static void si_unwind_from_m2n(StackIterator* si, bool over_popped = true)
         si->c.p_esi = &m2nfl->esi;
         si->c.p_ebx = &m2nfl->ebx;
         si->c.p_ebp = &m2nfl->ebp;
-        si->c.p_eip = &m2nfl->eip;
     }
 }
 

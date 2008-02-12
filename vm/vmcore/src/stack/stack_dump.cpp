@@ -474,26 +474,31 @@ void sd_print_stack(Registers* regs)
     // walk_native_stack_registers cannot unwind frames in release build),
     // we will use JIT/interpreter stack iterator to complete stack trace.
 
-    jint num_frames =
-        walk_native_stack_registers(regs, thread, -1, NULL);
+    WalkContext context;
+    
+    if (native_init_walk_context(&context, g_modules, regs))
+    {
+        jint num_frames =
+            walk_native_stack_registers(&context, regs, thread, -1, NULL);
 
-    if (num_frames)
-        frames = (native_frame_t*)STD_ALLOCA(sizeof(native_frame_t)*num_frames);
+        if (num_frames)
+            frames = (native_frame_t*)STD_ALLOCA(sizeof(native_frame_t)*num_frames);
 
-    if (num_frames && frames)
-        walk_native_stack_registers(regs, thread, num_frames, frames);
-    else
-        num_frames = 0; // Consider native stack trace empty
+        if (num_frames && frames)
+            walk_native_stack_registers(&context, regs, thread, num_frames, frames);
+        else
+            num_frames = 0; // Consider native stack trace empty
 
-    fprintf(stderr, "\nStack trace:\n");
+        fprintf(stderr, "\nStack trace:\n");
 
-    if(interpreter_enabled() && thread)
-        sd_print_stack_interpreter(thread, frames, num_frames);
-    else // It should be used also for threads without VM_thread structure
-        sd_print_stack_jit(thread, frames, num_frames);
+        if (interpreter_enabled() && thread)
+            sd_print_stack_interpreter(thread, frames, num_frames);
+        else // It should be used also for threads without VM_thread structure
+            sd_print_stack_jit(thread, frames, num_frames);
 
-    fprintf(stderr, "<end of stack trace>\n");
-    fflush(stderr);
+        fprintf(stderr, "<end of stack trace>\n");
+        fflush(stderr);
+    }
 
     if (thread)
         set_unwindable(unwindable);

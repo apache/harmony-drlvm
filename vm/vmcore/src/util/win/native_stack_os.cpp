@@ -14,33 +14,40 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/**
- * @author Ilya Berezhniuk
- * @version $Revision: 1.1.2.1 $
- */
 
+
+#include "native_modules.h"
 #include "native_stack.h"
 
 
-bool native_is_frame_exists(WalkContext* UNREF context, Registers* UNREF regs)
+bool native_is_in_code(WalkContext* context, void* ip)
 {
-    return false;
+    if (!ip)
+        return false;
+
+    MEMORY_BASIC_INFORMATION mem_info;
+
+    if (VirtualQuery(ip, &mem_info, sizeof(mem_info)) == 0)
+        return false;
+
+    if (mem_info.State != MEM_COMMIT)
+        return false;
+
+    return ((mem_info.Protect & (PAGE_EXECUTE | PAGE_EXECUTE_READ |
+                    PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY)) != 0);
 }
 
-bool native_unwind_stack_frame(WalkContext* UNREF context, Registers* UNREF regs)
+bool native_get_stack_range(WalkContext* context, Registers* regs, native_segment_t* seg)
 {
-    return false;
-}
+    MEMORY_BASIC_INFORMATION mem_info;
 
-void native_get_regs_from_jit_context(JitFrameContext* UNREF jfc, Registers* UNREF regs)
-{
-}
+    if (VirtualQuery(regs->get_sp(), &mem_info, sizeof(mem_info)) == 0)
+        return false;
 
-bool native_unwind_special(WalkContext* UNREF context, Registers* UNREF regs)
-{
-    return false;
-}
+    if (mem_info.State != MEM_COMMIT)
+        return false;
 
-void native_fill_frame_info(Registers* UNREF regs, native_frame_t* UNREF frame, jint UNREF jdepth)
-{
+    seg->base = mem_info.BaseAddress;
+    seg->size = mem_info.RegionSize;
+    return true;
 }

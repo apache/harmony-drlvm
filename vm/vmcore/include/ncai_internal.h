@@ -28,9 +28,6 @@ typedef struct _NcaiRegisterTableItem
 extern NcaiRegisterTableItem g_ncai_reg_table[];
 
 
-int walk_native_stack(hythread_t thread,
-    VM_thread* pthread, int max_depth, ncaiFrameInfo* frame_info);
-
 void clean_all_modules(ncaiModule* pmodules);
 void ncai_library_load_callback(const char* name);
 void ncai_library_unload_callback(const char* name);

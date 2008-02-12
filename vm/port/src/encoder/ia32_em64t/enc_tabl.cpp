@@ -470,7 +470,7 @@ BEGIN_MNEMONIC(CALL, MF_NONE, U )
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0xE8, cd},        {rel32},     U },
     {OpcodeInfo::ia32,    {0xFF, _2},        {r_m32},     U },
-    {OpcodeInfo::em64t,   {REX_W, 0xFF, _2}, {r_m64},     U },
+    {OpcodeInfo::em64t,   {0xFF, _2},        {r_m64},     U },
 END_OPCODES()
 END_MNEMONIC()
 

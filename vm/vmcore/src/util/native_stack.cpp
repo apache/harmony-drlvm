@@ -33,51 +33,8 @@
 #include "native_stack.h"
 
 
-
-// Global lock used for locking module list access
-static Lock_Manager g_list_lock;
-
-
 //////////////////////////////////////////////////////////////////////////////
 /// Helper functions
-
-static bool get_modules(native_module_t** pmodules)
-{
-    assert(pmodules);
-
-    if (*pmodules != NULL)
-        return true;
-
-    int mod_count;
-    native_module_t* mod_list = NULL;
-
-    LMAutoUnlock aulock(&g_list_lock);
-
-    bool result = get_all_native_modules(&mod_list, &mod_count);
-
-    if (!result)
-        return false;
-
-    *pmodules = mod_list;
-    return true;
-}
-
-bool native_is_ip_in_modules(native_module_t* modules, void* ip)
-{
-    for (native_module_t* module = modules; module; module = module->next)
-    {
-        for (size_t i = 0; i < module->seg_count; i++)
-        {
-            char* base = (char*)module->segments[i].base;
-
-            if (ip >= base &&
-                ip < (base + module->segments[i].size))
-                return true;
-        }
-    }
-
-    return false;
-}
 
 static DynamicCode* native_find_stub(void* ip)
 {
@@ -111,6 +68,12 @@ char* native_get_stub_name(void* ip, char* buf, size_t buflen)
     return buf;
 }
 
+bool native_is_in_stack(WalkContext* context, void* sp)
+{
+    return (sp >= context->stack.base &&
+            sp < (char*)context->stack.base + context->stack.size);
+}
+
 bool native_is_ip_stub(void* ip)
 {
     // Synchronizing access to dynamic code list
@@ -131,54 +94,108 @@ static bool native_is_ip_in_breakpoint_handler(void* ip)
 //////////////////////////////////////////////////////////////////////////////
 //
 
-static int walk_native_stack_jit(Registers* pregs, VM_thread* pthread,
-    int max_depth, native_frame_t* frame_array);
-static int walk_native_stack_pure(Registers* pregs,
-    int max_depth, native_frame_t* frame_array);
-static int walk_native_stack_interpreter(Registers* pregs, VM_thread* pthread,
-    int max_depth, native_frame_t* frame_array);
-
-int walk_native_stack_registers(Registers* pregs,
-    VM_thread* pthread, int max_depth, native_frame_t* frame_array)
+bool native_init_walk_context(WalkContext* context, native_module_t* modules, Registers* regs)
 {
-    if (pthread == NULL) // Pure native thread
-        return walk_native_stack_pure(pregs, max_depth, frame_array);
+    if (!context)
+        return false;
 
-    if (interpreter_enabled())
-        return walk_native_stack_interpreter(pregs, pthread, max_depth, frame_array);
+    if (!modules)
+    {
+        int mod_count;
+        native_module_t* mod_list = NULL;
 
-    return walk_native_stack_jit(pregs, pthread, max_depth, frame_array);
+        if (!get_all_native_modules(&mod_list, &mod_count))
+            return false;
+
+        context->clean_modules = true;
+        context->modules = mod_list;
+    }
+    else
+    {
+        context->clean_modules = false;
+        context->modules = modules;
+    }
+
+    if (!native_get_stack_range(context, regs, &context->stack))
+    {
+        if (context->clean_modules)
+            clear_native_modules(&context->modules);
+        return false;
+    }
+
+    return true;
+}
+
+void native_clean_walk_context(WalkContext* context)
+{
+    if (!context)
+        return;
+
+    if (context->modules && context->clean_modules)
+    {
+        clear_native_modules(&context->modules);
+    }
+
+    context->modules = NULL;
 }
 
 
-static int walk_native_stack_jit(Registers* pregs, VM_thread* pthread,
+static int walk_native_stack_jit(
+    WalkContext* context,
+    Registers* pregs, VM_thread* pthread,
+    int max_depth, native_frame_t* frame_array);
+static int walk_native_stack_pure(
+    WalkContext* context, Registers* pregs,
+    int max_depth, native_frame_t* frame_array);
+static int walk_native_stack_interpreter(
+    WalkContext* context,
+    Registers* pregs, VM_thread* pthread,
+    int max_depth, native_frame_t* frame_array);
+
+int walk_native_stack_registers(WalkContext* context, Registers* pregs,
+    VM_thread* pthread, int max_depth, native_frame_t* frame_array)
+{
+    if (pthread == NULL) // Pure native thread
+        return walk_native_stack_pure(context, pregs, max_depth, frame_array);
+
+    if (interpreter_enabled())
+        return walk_native_stack_interpreter(context, pregs,
+                                            pthread, max_depth, frame_array);
+
+    return walk_native_stack_jit(context, pregs, pthread, max_depth, frame_array);
+    return 0;
+}
+
+
+static int walk_native_stack_jit(
+    WalkContext* context,
+    Registers* pregs, VM_thread* pthread,
     int max_depth, native_frame_t* frame_array)
 {
-    // These vars store current frame context for each iteration
-    void *ip, *bp, *sp;
-    // To translate platform-dependant info; we will use ip from here
-    native_get_frame_info(pregs, &ip, &bp, &sp);
+    // Register context for current frame
+    Registers regs = *pregs;
 
     int frame_count = 0;
     
     // Search for method containing corresponding address
-    VM_Code_Type code_type = vm_identify_eip(ip);
+    VM_Code_Type code_type = vm_identify_eip(regs.get_ip());
     bool flag_dummy_frame = false;
     jint java_depth = 0;
     StackIterator* si = NULL;
     bool is_java = false;
-    native_module_t* modules = NULL;
 
     if (code_type == VM_TYPE_JAVA)
     { // We must add dummy M2N frame to start SI iteration
-        assert(pthread);
+        if (!pthread)
+            return 0;
+
         is_java = true;
 
         M2nFrame* lm2n = m2n_get_last_frame(pthread);
 
-        if (!m2n_is_suspended_frame(lm2n) || m2n_get_ip(lm2n) != ip)
+        if (!m2n_is_suspended_frame(lm2n) || m2n_get_ip(lm2n) != regs.get_ip())
         { // We should not push frame if it was pushed by breakpoint handler
-            m2n_push_suspended_frame(pthread, pregs);
+            m2n_push_suspended_frame(pthread, &regs);
             flag_dummy_frame = true;
         }
     }
@@ -206,12 +223,8 @@ static int walk_native_stack_jit(Registers* pregs, VM_thread* pthread,
 
         if (frame_array)
         { // If frames requested, store current frame
-            frame_array[frame_count].java_depth =
-                is_java ? java_depth : -1;
-
-            frame_array[frame_count].ip = ip;
-            frame_array[frame_count].frame = bp;
-            frame_array[frame_count].stack = sp;
+            native_fill_frame_info(&regs, &frame_array[frame_count],
+                is_java ? java_depth : -1);
         }
 
         ++frame_count;
@@ -221,7 +234,8 @@ static int walk_native_stack_jit(Registers* pregs, VM_thread* pthread,
         if (is_java) //code_type == VM_TYPE_JAVA
         { // Go to previous frame using StackIterator
             cci = si_get_code_chunk_info(si);
-            assert(cci); // Java method should contain cci
+            if (!cci) // Java method should contain cci
+                break;
 
             // if (inline_index < 0) we have new si
             // (inline_index < inline_count) we must process inline
@@ -246,22 +260,22 @@ static int walk_native_stack_jit(Registers* pregs, VM_thread* pthread,
                 inline_index = -1;
                 // Go to previous stack frame from StackIterator
                 si_goto_previous(si);
-                native_get_ip_bp_from_si_jit_context(si, &ip, &bp);//???
-                native_get_sp_from_si_jit_context(si, &sp);
+                native_get_regs_from_jit_context(si_get_jit_context(si), &regs);
             }
 
-            code_type = vm_identify_eip(ip);
+            code_type = vm_identify_eip(regs.get_ip());
             is_java = (code_type == VM_TYPE_JAVA);
             continue;
         }
 // ^^ Java ^^
 /////////////////////////
 // vv Native vv
-        is_stub = native_is_ip_stub(ip);
+        is_stub = native_is_ip_stub(regs.get_ip());
 
         if (is_stub)
         { // Native stub, previous frame is Java frame
-            assert(si_is_native(si));
+            if (!si_is_native(si))
+                break;
 
             if (si_get_method(si)) // Frame represents JNI frame
             {
@@ -278,60 +292,38 @@ static int walk_native_stack_jit(Registers* pregs, VM_thread* pthread,
             // Ge to previous stack frame from StackIterator
             si_goto_previous(si);
             // Let's get context from si
-            native_get_ip_bp_from_si_jit_context(si, &ip, &bp);
-            native_get_sp_from_si_jit_context(si, &sp);
+            native_get_regs_from_jit_context(si_get_jit_context(si), &regs);
         }
         else
         {
-            if (!modules && !get_modules(&modules))
-                break;
+            Registers tmp_regs = regs;
 
-            if (native_is_frame_valid(modules, bp, sp))
-            { // Simply bp-based frame, let's unwind it
-                void *tmp_ip, *tmp_bp, *tmp_sp;
-                native_unwind_bp_based_frame(bp, &tmp_ip, &tmp_bp, &tmp_sp);
-
-                VMBreakPoints* vm_breaks = VM_Global_State::loader_env->TI->vm_brpt;
-                vm_breaks->lock();
-
-                if (native_is_ip_in_breakpoint_handler(tmp_ip))
-                {
-                    native_unwind_interrupted_frame(&pthread->jvmti_thread, &ip, &bp, &sp);
-                    flag_breakpoint = true;
-                }
-                else
-                {
-                    ip = tmp_ip;
-                    bp = tmp_bp;
-                    sp = tmp_sp;
-                }
-
-                vm_breaks->unlock();
+            if (native_is_frame_exists(context, &tmp_regs))
+            { // Stack frame (x86)
+                if (!native_unwind_stack_frame(context, &tmp_regs))
+                    break;
             }
             else
-            { // Is not bp-based frame
-                if (frame_count == 1)
-                { // For first frame, test special unwinding possibility
-                    special_count = native_test_unwind_special(modules, sp);
-                    if (special_count <= 0)
-                        ip = NULL;
-                }
-
-                if (frame_count <= special_count)
-                { // Specially unwind first native frames
-                    bool res = native_unwind_special(modules,
-                                        sp, &ip, &sp, &bp,
-                                        frame_count == special_count);
-
-                    if (!res)
-                        break; // Unwinding failed
-                }
-                else
-                    break; // There is another invalid frame in the stack
+            { // Stack frame does not exist, try using heuristics
+                if (!native_unwind_special(context, &tmp_regs))
+                    break;
             }
+
+            VMBreakPoints* vm_breaks = VM_Global_State::loader_env->TI->vm_brpt;
+            vm_breaks->lock();
+
+            if (native_is_ip_in_breakpoint_handler(tmp_regs.get_ip()))
+            {
+                regs = *pthread->jvmti_thread.jvmti_saved_exception_registers;
+                flag_breakpoint = true;
+            }
+            else
+                regs = tmp_regs;
+
+            vm_breaks->unlock();
         }
             
-        code_type = vm_identify_eip(ip);
+        code_type = vm_identify_eip(regs.get_ip());
         is_java = (code_type == VM_TYPE_JAVA);
 
         // If we've reached Java without native stub (or breakpoint handler frame)
@@ -355,18 +347,16 @@ static int walk_native_stack_jit(Registers* pregs, VM_thread* pthread,
 }
 
 
-static int walk_native_stack_pure(Registers* pregs,
+static int walk_native_stack_pure(
+    WalkContext* context, Registers* pregs,
     int max_depth, native_frame_t* frame_array)
 {
-    // These vars store current frame context for each iteration
-    void *ip, *bp, *sp;
-    // To translate platform-dependant info; we will use ip from here
-    native_get_frame_info(pregs, &ip, &bp, &sp);
-    assert(vm_identify_eip(ip) != VM_TYPE_JAVA);
+    // Register context for current frame
+    Registers regs = *pregs;
+    if (vm_identify_eip(regs.get_ip()) == VM_TYPE_JAVA)
+        return 0;
 
     int frame_count = 0;
-    int special_count = 0;
-    native_module_t* modules = NULL;
 
     while (1)
     {
@@ -375,40 +365,22 @@ static int walk_native_stack_pure(Registers* pregs,
 
         if (frame_array)
         { // If frames requested, store current frame
-            frame_array[frame_count].java_depth = -1;
-            frame_array[frame_count].ip = ip;
-            frame_array[frame_count].frame = bp;
-            frame_array[frame_count].stack = sp;
+            native_fill_frame_info(&regs, &frame_array[frame_count], -1);
         }
 
         ++frame_count;
 
-        if (!modules && !get_modules(&modules))
-            break;
-
-        // Simply bp-based frame, let's unwind it
-        if (native_is_frame_valid(modules, bp, sp))
-        {
+        if (native_is_frame_exists(context, &regs))
+        { // Stack frame (x86)
             // Here must be special processing for breakpoint handler frames
             // But it requires VM_thread structure attached to thread
             // TODO: Investigate possibility
-            native_unwind_bp_based_frame(bp, &ip, &bp, &sp);
+            if (!native_unwind_stack_frame(context, &regs))
+                break;
         }
         else
-        { // Wrong frame
-            if (frame_count == 1)
-            { // For first frame, test special unwinding possibility
-                special_count = native_test_unwind_special(modules, sp);
-                if (special_count <= 0)
-                    break;
-            }
-
-            if (frame_count <= special_count)
-            { // Specially unwind first native frames
-                native_unwind_special(modules, sp, &ip, &sp, &bp,
-                                    frame_count == special_count);
-            }
-            else // There is another invalid frame in the stack
+        { // Stack frame does not exist, try using heuristics
+            if (!native_unwind_special(context, &regs))
                 break;
         }
     }
@@ -417,13 +389,13 @@ static int walk_native_stack_pure(Registers* pregs,
 }
 
 
-static int walk_native_stack_interpreter(Registers* pregs, VM_thread* pthread,
+static int walk_native_stack_interpreter(
+    WalkContext* context,
+    Registers* pregs, VM_thread* pthread,
     int max_depth, native_frame_t* frame_array)
 {
-    // These vars store current frame context for each iteration
-    void *ip, *bp, *sp;
-    // To translate platform-dependant info; we will use ip from here
-    native_get_frame_info(pregs, &ip, &bp, &sp);
+    // Register context for current frame
+    Registers regs = *pregs;
 
     assert(pthread);
     FrameHandle* last_frame = interpreter.interpreter_get_last_frame(pthread);
@@ -431,8 +403,6 @@ static int walk_native_stack_interpreter(Registers* pregs, VM_thread* pthread,
 
     int frame_count = 0;
     jint java_depth = 0;
-    int special_count = 0;
-    native_module_t* modules = NULL;
 
     while (1)
     {
@@ -441,60 +411,37 @@ static int walk_native_stack_interpreter(Registers* pregs, VM_thread* pthread,
 
         if (frame_array)
         { // If frames requested, store current frame
-            frame_array[frame_count].java_depth = -1;
-            frame_array[frame_count].ip = ip;
-            frame_array[frame_count].frame = bp;
-            frame_array[frame_count].stack = sp;
+            native_fill_frame_info(&regs, &frame_array[frame_count], -1);
         }
 
         ++frame_count;
 
         // Store previous value to identify frame range later
-        void* prev_sp = sp;
+        void* prev_sp = regs.get_sp();
+        Registers tmp_regs = regs;
 
-        if (!modules && !get_modules(&modules))
-            break;
-
-        if (native_is_frame_valid(modules, bp, sp))
-        { // Simply bp-based frame, let's unwind it
-            void *tmp_ip, *tmp_bp, *tmp_sp;
-            native_unwind_bp_based_frame(bp, &tmp_ip, &tmp_bp, &tmp_sp);
-
-            VMBreakPoints* vm_breaks = VM_Global_State::loader_env->TI->vm_brpt;
-            vm_breaks->lock();
-
-            if (native_is_ip_in_breakpoint_handler(tmp_ip))
-            {
-                native_unwind_interrupted_frame(&pthread->jvmti_thread, &ip, &bp, &sp);
-            }
-            else
-            {
-                ip = tmp_ip;
-                bp = tmp_bp;
-                sp = tmp_sp;
-            }
-
-            vm_breaks->unlock();
+        if (native_is_frame_exists(context, &tmp_regs))
+        { // Stack frame (x86)
+            if (!native_unwind_stack_frame(context, &tmp_regs))
+                break;
         }
         else
-        { // Is not bp-based frame
-            if (frame_count == 1)
-            { // For first frame, test special unwinding possibility
-                special_count = native_test_unwind_special(modules, sp);
-                if (special_count <= 0)
-                    break;
-            }
-
-            if (frame_count <= special_count)
-            { // Specially unwind first native frames
-                native_unwind_special(modules, sp, &ip, &sp, &bp,
-                                    frame_count == special_count);
-            }
-            else
-                break; // There is another invalid frame in the stack
+        { // Stack frame does not exist, try using heuristics
+            if (!native_unwind_special(context, &tmp_regs))
+                break;
         }
 
-        bool is_java = interpreter.is_frame_in_native_frame(frame, prev_sp, sp);
+        VMBreakPoints* vm_breaks = VM_Global_State::loader_env->TI->vm_brpt;
+        vm_breaks->lock();
+
+        if (native_is_ip_in_breakpoint_handler(tmp_regs.get_ip()))
+            regs = *pthread->jvmti_thread.jvmti_saved_exception_registers;
+        else
+            regs = tmp_regs;
+
+        vm_breaks->unlock();
+
+        bool is_java = interpreter.is_frame_in_native_frame(frame, prev_sp, regs.get_sp());
 
         if (is_java)
         {

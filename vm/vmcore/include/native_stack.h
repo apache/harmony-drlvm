@@ -38,26 +38,33 @@ typedef struct {
     void*   stack;
 } native_frame_t;
 
+typedef struct WalkContext {
+    native_module_t*    modules;
+    bool                clean_modules;
+    native_segment_t    stack;
+} WalkContext;
+
 
 // If frame_array is NULL, only returns real frame count
-int walk_native_stack_registers(Registers* pregs,
+int walk_native_stack_registers(WalkContext* context, Registers* pregs,
     VM_thread* pthread, int max_depth, native_frame_t* frame_array);
+
+bool native_init_walk_context(WalkContext* context, native_module_t* modules, Registers* regs);
+void native_clean_walk_context(WalkContext* context);
 
 //////////////////////////////////////////////////////////////////////////////
 // Interchange between platform-dependent and general functions
-void native_get_frame_info(Registers* regs, void** ip, void** bp, void** sp);
-bool native_unwind_bp_based_frame(void* frame, void** ip, void** bp, void** sp);
-void native_get_ip_bp_from_si_jit_context(StackIterator* si, void** ip, void** bp);
-void native_get_sp_from_si_jit_context(StackIterator* si, void** sp);
-bool native_is_out_of_stack(void* value);
-bool native_is_frame_valid(native_module_t* modules, void* bp, void* sp);
-int native_test_unwind_special(native_module_t* modules, void* sp);
-bool native_unwind_special(native_module_t* modules,
-                void* stack, void** ip, void** sp, void** bp, bool is_last);
-void native_unwind_interrupted_frame(jvmti_thread_t thread, void** p_ip, void** p_bp, void** p_sp);
-bool native_is_ip_in_modules(native_module_t* modules, void* ip);
+
+bool native_unwind_stack_frame(WalkContext* context, Registers* regs);
+void native_get_regs_from_jit_context(JitFrameContext* jfc, Registers* regs);
+bool native_get_stack_range(WalkContext* context, Registers* regs, native_segment_t* seg);
+bool native_is_frame_exists(WalkContext* context, Registers* regs);
+bool native_unwind_special(WalkContext* context, Registers* regs);
+bool native_is_in_code(WalkContext* context, void* ip);
+bool native_is_in_stack(WalkContext* context, void* sp);
 bool native_is_ip_stub(void* ip);
 char* native_get_stub_name(void* ip, char* buf, size_t buflen);
+void native_fill_frame_info(Registers* regs, native_frame_t* frame, jint jdepth);
 
 
 #ifdef __cplusplus

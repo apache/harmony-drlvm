@@ -69,9 +69,11 @@ struct Registers {
     uint64 *bsp;
     uint64 ip;
 
-    void reset_ip() { ip = 0; }
+    void  reset_ip() { ip = 0; }
     void* get_ip() { return (void*)ip; }
-    void set_ip(void* src_ip) { ip = (uint64)src_ip; }
+    void  set_ip(void* src_ip) { ip = (uint64)src_ip; }
+    void* get_sp() { return (void*)bsp; }
+    void  set_sp(void* src_sp) { }
 }; //Registers
 
 #else  // !_IPF_
@@ -101,9 +103,11 @@ struct Registers {
 
     uint32 eflags;
 
-    void reset_ip() { rip = 0; }
+    void  reset_ip() { rip = 0; }
     void* get_ip() { return (void*)rip; }
-    void set_ip(void* src_ip) { rip = (uint64)src_ip; }
+    void  set_ip(void* src_ip) { rip = (uint64)src_ip; }
+    void* get_sp() { return (void*)rsp; }
+    void  set_sp(void* src_sp) { rsp = (uint64)src_sp; }
 }; //Registers
 
 #else // ! _EM64T_
@@ -120,9 +124,11 @@ struct Registers {
     uint32 eip;
     uint32 eflags;
 
-    void reset_ip() { eip = 0; }
+    void  reset_ip() { eip = 0; }
     void* get_ip() { return (void*)eip; }
-    void set_ip(void* src_ip) { eip = (uint32)src_ip; }
+    void  set_ip(void* src_ip) { eip = (uint32)src_ip; }
+    void* get_sp() { return (void*)esp; }
+    void  set_sp(void* src_sp) { esp = (uint32)src_sp; }
 }; //Registers
 
 #endif // _EM64T_

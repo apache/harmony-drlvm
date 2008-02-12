@@ -20,176 +20,141 @@
  */
 
 #include "method_lookup.h"
+#include "dec_base.h"
+#include "native_modules.h"
 #include "native_stack.h"
 
-void native_get_frame_info(Registers* regs, void** ip, void** bp, void** sp)
-{
-    *ip = (void*)regs->eip;
-    *bp = (void*)regs->ebp;
-    *sp = (void*)regs->esp;
-}
 
-bool native_unwind_bp_based_frame(void* frame, void** ip, void** bp, void** sp)
-{
-    void** frame_ptr = (void**)frame;
-
-    *ip = frame_ptr[1];
-    *bp = frame_ptr[0];
-    // FIXME - wrong value, we cannot get sp anyhow
-    *sp = (void*)((POINTER_SIZE_INT)frame + 2*sizeof(void*));
-
-    return (*bp != NULL && *ip != NULL);
-}
-
-void native_get_ip_bp_from_si_jit_context(StackIterator* si, void** ip, void** bp)
-{
-    JitFrameContext* jfc = si_get_jit_context(si);
-    *ip = (void*)*jfc->p_eip;
-    *bp = (void*)*jfc->p_ebp;
-}
-
-void native_get_sp_from_si_jit_context(StackIterator* si, void** sp)
-{
-    *sp = (void*)si_get_jit_context(si)->esp;
-}
-
-bool native_is_out_of_stack(void* value)
-{
-    // FIXME: Invalid criterion
-    return (value < (void*)0x10000) || (value > (void*)0xC0000000);
-}
-
-bool native_is_frame_valid(native_module_t* modules, void* bp, void* sp)
+bool native_is_frame_exists(WalkContext* context, Registers* regs)
 {
     // Check for frame layout and stack values
-    if ((bp < sp) || native_is_out_of_stack(bp))
+    if ((regs->ebp < regs->esp) || !native_is_in_stack(context, (void*)regs->ebp))
         return false; // Invalid frame
 
-    void** dw_ptr = (void**)bp;
-    void* ret_ip = *(dw_ptr + 1); // Return address for frame
+    void** frame_ptr = (void**)regs->ebp;
+    void* eip = frame_ptr[1]; // Return address
 
     // Check return address for meaning
-    if (!native_is_ip_in_modules(modules, ret_ip) && !native_is_ip_stub(ret_ip))
-        return false;
+    return (native_is_in_code(context, eip) || native_is_ip_stub(eip));
+}
 
+bool native_unwind_stack_frame(WalkContext* context, Registers* regs)
+{
+    void** frame = (void**)regs->ebp;
+
+    void* ebp = frame[0];
+    void* eip = frame[1];
+//    void* esp = (void*)(frame + 2);
+    void* esp = &frame[2];
+
+
+    if (native_is_in_stack(context, esp) &&
+        (native_is_in_code(context, eip) || native_is_ip_stub(eip)))
+    {
+        regs->ebp = (uint32)ebp;
+        regs->esp = (uint32)esp;
+        regs->eip = (uint32)eip;
+        return true;
+    }
+
+    return false;
+}
+
+void native_get_regs_from_jit_context(JitFrameContext* jfc, Registers* regs)
+{
+    regs->eip = *jfc->p_eip;
+    regs->ebp = *jfc->p_ebp;
+    regs->esp = jfc->esp;
+}
+
+static bool fill_regs_from_sp(WalkContext* context, Registers* regs, void** sp)
+{
+    regs->esp = (uint32)(sp + 1);
+    regs->eip = (uint32)*sp;
+    regs->ebp = native_is_in_stack(context, sp[-1]) ? (uint32)sp[-1] : regs->esp;
     return true;
 }
 
-// Searches for correct return address in the stack
-// Returns stack address pointing to return address
-static void** native_search_special_frame(native_module_t* modules, void* sp)
+static unsigned native_dec_instr(WalkContext* context, void* addr, void** target)
 {
-// Max search depth for return address
-#define MAX_SPECIAL_DEPTH 0x40
+    Inst inst;
 
-    POINTER_SIZE_INT sp_begin = (POINTER_SIZE_INT)sp;
-    for (POINTER_SIZE_INT sp_int = sp_begin;
-         sp_int < sp_begin + MAX_SPECIAL_DEPTH;
-         sp_int +=2) // 2 is minimum stack item for ia32
-    {
-        void** sp_pointer = (void**)sp_int;
+    if (!native_is_in_code(context, addr))
+        return 0;
 
-        if (native_is_ip_in_modules(modules, *sp_pointer))
-            return sp_pointer;
-    }
+    uint32 len = DecoderBase::decode(addr, &inst);
 
-    return NULL;
+    if (len == 0 ||
+        inst.mn != Mnemonic_CALL ||
+        inst.argc != 1)
+        return 0;
+
+    if (target && inst.operands[0].is_imm())
+        *target = (void*)((uint32)addr + len + inst.operands[0].imm());
+
+    return len;
 }
 
-// Tests if stack contains non-BP-based frames on top
-int native_test_unwind_special(native_module_t* modules, void* sp)
+static bool native_check_caller(WalkContext* context, Registers* regs, void** sp)
 {
-#define MAX_SPECIAL_COUNT 16
-
-#if (!defined PLATFORM_POSIX)
-    return -1; // Because we cannot identify executable code on Windows
-#endif
-
-    if (modules == NULL)
-        return false;
-
-    int count = 0;
-    void** sp_pointer = (void**)sp;
-
-    do
-    {
-        if (native_is_ip_stub(sp_pointer[-1]))
-            break; // We've found JNI stub
-
-        // We've reached Java without native stub
-        if (vm_identify_eip(sp_pointer[-1]) == VM_TYPE_JAVA)
-            break;
-
-        void** next_sp = native_search_special_frame(modules, sp_pointer);
-
-        if (next_sp == NULL)
-            break; // We cannot unwind anymore
-
-        if (count > 0 &&                     // Check BP-frame for upper frames
-            sp_pointer[-2] >= sp_pointer &&  // Correct frame layout
-            sp_pointer[-2] == next_sp - 1 && // is BP saved correctly
-            next_sp[-1] >= next_sp + 1)      // Correct next frame layout
-        {
-            break;
-        }
-
-        sp_pointer = next_sp + 1;
-
-    } while (++count <= MAX_SPECIAL_COUNT);
-
-    return count;
-}
-
-// Tries to unwind non-BP-based frame
-bool native_unwind_special(native_module_t* modules,
-    void* stack, void** ip, void** sp, void** bp, bool is_last)
-{
-    if (modules == NULL)
-    {
-        *ip = NULL;
-        return false;
-    }
-
-    void** found = NULL;
-
-    POINTER_SIZE_INT sp_begin = (POINTER_SIZE_INT)stack;
-    for (POINTER_SIZE_INT sp_int = sp_begin;
-         sp_int < sp_begin + MAX_SPECIAL_DEPTH;
-         sp_int +=2) // 2 is minimum stack item for ia32
-    {
-        void** sp_pointer = (void**)sp_int;
-
-        if (native_is_ip_in_modules(modules, *sp_pointer))
-        {
-            found = sp_pointer;
-            break;
-        }
-    }
-
-    if (!found)
-    {
-        *ip = NULL;
-        return false;
-    }
-
-    *ip = *found;
-    *sp = found + 1;
+    void* target = NULL;
+    char* ptr = (char*)*sp;
     
-    if (is_last && !native_is_ip_stub(*ip))
-        *bp = found[-1];
-    else
-        *bp = *sp;
+    if (native_dec_instr(context, ptr - 2, &target) == 2 || // CALL r/m32 w/o SIB w/o disp
+        native_dec_instr(context, ptr - 3, &target) == 3 || // CALL r/m32 w/ SIB w/o disp
+        native_dec_instr(context, ptr - 4, &target) == 4 || // CALL r/m32 w/ SIB w/ disp8
+        native_dec_instr(context, ptr - 5, &target) == 5 || // CALL rel32
+        native_dec_instr(context, ptr - 6, &target) == 6 || // CALL r/m32 w/o SIB w/ disp32
+        native_dec_instr(context, ptr - 7, &target) == 7 || // CALL r/m32 w/ SIB w/ disp32
+        native_dec_instr(context, ptr - 8, &target) == 8)   // CALL r/m32 w/ SIB w/ disp32 + Seg prefix
+    {
+        if (!target)
+            return true;
 
-    return true;
+        native_module_t* cur_module =
+            find_native_module(context->modules, regs->get_ip());
+        native_module_t* found_module =
+            find_native_module(context->modules, target);
+
+        return (cur_module == found_module);
+    }
+
+    return false;
 }
 
-void native_unwind_interrupted_frame(jvmti_thread_t thread, void** p_ip, void** p_bp, void** p_sp)
+
+// Max search depth for return address
+#define MAX_SPECIAL_DEPTH 0x400
+#define NATIVE_STRICT_UNWINDING 1
+
+bool native_unwind_special(WalkContext* context, Registers* regs)
 {
-    if (!thread) {
-        return;
+    for (void** cur_sp = (void**)regs->esp;
+         (char*)cur_sp < ((char*)regs->esp + MAX_SPECIAL_DEPTH) && native_is_in_stack(context, cur_sp);
+         ++cur_sp)
+    {
+        if (!native_is_in_code(context, *cur_sp))
+            continue;
+
+#if (!NATIVE_STRICT_UNWINDING)
+        return fill_regs_from_sp(context, regs, cur_sp);
+#else
+        if (native_check_caller(context, regs, cur_sp))
+            return fill_regs_from_sp(context, regs, cur_sp);
+#endif
     }
-    Registers* pregs = (Registers*)(thread->jvmti_saved_exception_registers);
-    *p_ip = (void*)pregs->eip;
-    *p_bp = (void*)pregs->ebp;
-    *p_sp = (void*)pregs->esp;
+
+    return false;
+}
+
+void native_fill_frame_info(Registers* regs, native_frame_t* frame, jint jdepth)
+{
+    frame->java_depth = jdepth;
+
+    if (!regs)
+        return;
+
+    frame->ip = (void*)regs->eip;
+    frame->frame = (void*)regs->ebp;
+    frame->stack = (void*)regs->esp;
 }

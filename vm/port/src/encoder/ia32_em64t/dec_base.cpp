@@ -74,7 +74,7 @@ unsigned DecoderBase::decode(const void * addr, Inst * pinst)
 
     if (is_prefix(bytes)) {
         // More than 4 prefixes together ?
-        assert(false);
+//        assert(false);
         return 0;
     }
     
@@ -96,7 +96,7 @@ unsigned DecoderBase::decode(const void * addr, Inst * pinst)
         }
     }
     if (!found) {
-        assert(false);
+//        assert(false);
         return 0;
     }
     tmp.size = (unsigned)(bytes-(const unsigned char*)addr);
@@ -167,7 +167,7 @@ bool DecoderBase::decode_aux(const EncoderBase::OpcodeDesc& odesc, unsigned aux,
         }
         return true;
     case OpcodeByteKind_cw:
-        assert(false); // not an error, but not expected in current env
+//        assert(false); // not an error, but not expected in current env
         break;
     case OpcodeByteKind_cd:
         {
@@ -231,11 +231,11 @@ bool DecoderBase::decode_aux(const EncoderBase::OpcodeDesc& odesc, unsigned aux,
             return true;
         }
     case OpcodeByteKind_ZeroOpcodeByte: // cant be here
-        assert(false);
+//        assert(false);
         break;
     default:
         // unknown kind ? how comes ?
-        assert(false);
+//        assert(false);
         break;
     }
     return false;
