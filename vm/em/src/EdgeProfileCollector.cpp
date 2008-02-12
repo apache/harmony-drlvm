@@ -135,9 +135,7 @@ uint32* EdgeMethodProfile::getCounter( uint32 key ) const
 {
     //log2 search
     EdgeMap::const_iterator it = lower_bound(cntMap.begin(), cntMap.end(), key);
-    assert(it!=cntMap.end());
-    uint32 val = *it;
-    if (val!=key) {
+    if (it == cntMap.end() || *it != key) {
         return NULL;
     }
     uint32 idx = (uint32)(it - cntMap.begin());
