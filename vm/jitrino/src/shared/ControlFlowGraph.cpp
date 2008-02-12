@@ -442,12 +442,12 @@ bool ControlFlowGraph::isEdgeProfileConsistent(bool checkEdgeProbs, bool checkEx
 
 // this utility splits a node at a particular instruction, leaving the instruction in the
 // same node and moving all insts (before inst : splitAfter=false/after inst : splitAfter=true 
-// to the newly created note
+// to the newly created node
 // returns the new node created
 Node* ControlFlowGraph::splitNodeAtInstruction(CFGInst *inst, bool splitAfter, bool keepDispatch, CFGInst* labelInst) {
     Node *node = inst->getNode();
     Node* dispatchNode = keepDispatch ? node->getExceptionEdgeTarget() : NULL;
-    Node* newNode =  splitNode(node, splitAfter, labelInst);
+    Node* newNode =  splitNode(node, true, labelInst);
     if (inst == node->getLastInst()) {
         assert(!splitAfter || (node->getOutDegree() == 1 && node->getUnconditionalEdge()!=NULL)
             || (node->getOutDegree()==2 && node->getExceptionEdgeTarget()!=NULL));
@@ -827,11 +827,11 @@ Node* ControlFlowGraph::splitNode(Node* node, bool newBlockAtEnd, CFGInst* inst)
     assert(node->isBlockNode());
     Node* newNode = createBlockNode(inst);
     if(newBlockAtEnd) {
-        // move edges
+        // move out edges
         moveOutEdges(node, newNode);
         addEdge(node, newNode);
     } else { // new block at beginning
-        // move edges
+        // move in edges
         moveInEdges(node, newNode);
         addEdge(newNode, node);
     }

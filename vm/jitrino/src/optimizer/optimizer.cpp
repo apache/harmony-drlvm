@@ -176,8 +176,6 @@ void OptInitAction::readFlags()
     //classic_abcd
     optimizerFlags.dump_abcd_stats = getBoolArg("dump_abcd_stats", false);
 
-    optimizerFlags.rept_aggressive= getBoolArg("rept_aggressive", true);
-
     optimizerFlags.abcdFlags = new (mm) AbcdFlags;
     memset(optimizerFlags.abcdFlags, sizeof(AbcdFlags), 0);
 

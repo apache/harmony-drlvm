@@ -142,25 +142,24 @@ void LoopNode::clear() {
      child = NULL;
 }
 
-void LoopNode::backwardMarkNode(Node* node) {
-    if(node->getTraversalNum() > loopTree->fg->getTraversalNum()) {
+void LoopNode::backwardMarkNode(Node* node, DominatorTree* dom) {
+    if (node->getTraversalNum() > loopTree->fg->getTraversalNum()) {
         return;
     }
 
-    markNode(node);
-
-    const Edges& inEdges = node->getInEdges();
-    for(Edges::const_iterator eiter = inEdges.begin(); eiter != inEdges.end(); ++eiter) {
-        Edge* e = *eiter;
-        backwardMarkNode(e->getSourceNode());
-    }
-}
-
-void LoopNode::markNode(Node* node) {
     assert(node->getTraversalNum() == loopTree->fg->getTraversalNum());
     loopTree->headerMap[node->getDfNum()] = this;
     nodesInLoop.push_back(node);
     node->setTraversalNum(node->getTraversalNum()+1);
+
+    const Edges& inEdges = node->getInEdges();
+    for(Edges::const_iterator eiter = inEdges.begin(); eiter != inEdges.end(); ++eiter) {
+        Edge* e = *eiter;
+        Node* srcNode = e->getSourceNode();
+        if (dom->dominates(header, srcNode)) {
+            backwardMarkNode(srcNode, dom);
+        }
+    }
 }
 
 // 
@@ -170,16 +169,10 @@ void LoopNode::markNodesOfLoop() {
     DominatorTree* dom = loopTree->fg->getDominatorTree();
     assert(dom->isValid());
 
-    markNode(header);
-    // starting backward traversal
-    const Edges& inEdges = header->getInEdges();
-    for (Edges::const_iterator ite = inEdges.begin(), ende = inEdges.end(); ite!=ende; ++ite) {
-        Edge* edge = *ite;
-        Node* tail = edge->getSourceNode();
-        if (dom->dominates(header, tail)) {
-              backwardMarkNode(tail);          
-        }
-    }
+    assert(header->getTraversalNum() == loopTree->fg->getTraversalNum()); 
+    backwardMarkNode(header, dom);
+    
+    //restore traversal nums
     uint32 fgTraversalNum = loopTree->fg->getTraversalNum();
     for (Nodes::const_iterator it = nodesInLoop.begin(), end = nodesInLoop.end(); it!=end; ++it) {
         Node* node = *it;
@@ -228,19 +221,21 @@ Edge* LoopTree::coalesceEdges(Edges& edges) {
 
 
 
-void LoopTree::rebuild(bool doNormalization) {
+void LoopTree::rebuild(bool doNormalization, bool ignoreUnreachable) {
     if (isValid() && (!doNormalization || normalized)) {
         return;
     }
+    assert(!(ignoreUnreachable && doNormalization)); //incompatible modes.
+
     normalized = false;
 
     DominatorTree* dom = fg->getDominatorTree();
     if ( dom==NULL || !dom->isValid()) {
         DominatorBuilder db;
-        dom = db.computeDominators(mm, fg, false, false);
+        dom = db.computeDominators(mm, fg, false, ignoreUnreachable);
         fg->setDominatorTree(dom);
     }
-    
+
     headers.clear();
     findLoopHeaders(headers);
 
@@ -255,9 +250,9 @@ void LoopTree::rebuild(bool doNormalization) {
     }
 
     if (isValid()) {
-        return; // double check after normalization
+        return; // double check after normalization -> if already normalized and valid -> return
     }
-    
+
     //cleanup
     headerMap.clear();
     ((LoopNode*)root)->clear();
@@ -266,9 +261,9 @@ void LoopTree::rebuild(bool doNormalization) {
     headerMap.resize(numBlocks); 
 
     formLoopHierarchy(headers);
-    
+
     computeOrder(); // compute pre/post nums for loop nodes
-    
+
     traversalNum = fg->getTraversalNum();
 }
 
@@ -281,7 +276,11 @@ bool LoopTree::isLoopHeader(const Node* node) const {
 
 LoopNode* LoopTree::getLoopNode(const Node* node, bool containingLoop) const {
     assert(isValid());
-    LoopNode* loop = headerMap[node->getDfNum()];
+    uint32 df = node->getDfNum();
+    if (df >= headerMap.size()) {
+        return NULL; //invalid DF can be caused by unreachable node
+    }
+    LoopNode* loop = headerMap[df];
     if (loop == NULL) {
         return NULL;
     }

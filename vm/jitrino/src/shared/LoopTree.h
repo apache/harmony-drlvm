@@ -63,8 +63,7 @@ private:
     LoopNode(MemoryManager& mm, LoopTree* lt, Node* hd)  : loopTree(lt), header(hd), nodesInLoop(mm){}
 
     void markNodesOfLoop();
-    void markNode(Node* node);
-    void backwardMarkNode(Node* currentTail);
+    void backwardMarkNode(Node* currentTail, DominatorTree* dom);
     void clear();
 
     LoopTree* loopTree;
@@ -80,7 +79,7 @@ public:
     LoopTree(MemoryManager& mm, ControlFlowGraph* f, EdgeCoalescerCallback* coalesceCallback = NULL); 
 
     // rebuilds loop tree if needed.
-    void rebuild(bool doNormalization);
+    void rebuild(bool doNormalization, bool ignoreUnreachable = false);
 
     bool hasLoops() const { assert(isValid()); return ((LoopNode*)root)->getChild()!=NULL;} //root node is artificial
 

@@ -1707,6 +1707,10 @@ protected:
         assert(currentPreNumber == currentPostNumber);
         if (isForward) {
             nodeCount = currentPreNumber;
+        } else {
+            // getNodesDFS changes traversalNum for nodes. But traversalNum assumes direct traversal.
+            // so drop the ordering number here to force CFG recompute ordering before using node->traversalNum values again
+            lastOrderingTraversalNumber = lastModifiedTraversalNumber-1;
         }
     }
     
@@ -1798,9 +1802,9 @@ protected:
     /// The given field is assigned to the <code>traversalNumber</code> value every time the profile information is recalculated.
     uint32 lastProfileUpdateTraversalNumber;
 
-    /// The temporaty field used by ordering algorithms.
+    /// The temporary field used by ordering algorithms.
     uint32 currentPreNumber;
-    /// The temporaty field used by ordering algorithms.
+    /// The temporary field used by ordering algorithms.
     uint32 currentPostNumber;
 
     /// Tells whether the graph is annotated with the edge profile.

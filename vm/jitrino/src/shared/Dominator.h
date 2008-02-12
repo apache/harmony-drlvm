@@ -70,8 +70,12 @@ public:
 
     // Returns the immediate (post)dominator of n.  Return NULL if no nodes (post)dominate n.
     Node* getIdom(Node* n)    {
-        DominatorNode* idom = getDominatorNode(n)->getParent();
-        return (idom == NULL) ? NULL : idom->getNode();
+        DominatorNode* ndom = getDominatorNode(n);
+        if (ndom == NULL) { //unreachable node -> have no dominator info
+            return NULL;
+        }
+        DominatorNode* pdom = ndom->getParent();
+        return (pdom == NULL) ? NULL : pdom->getNode();
     }
 
     // Returns the dominator tree node associated with this CFG node.

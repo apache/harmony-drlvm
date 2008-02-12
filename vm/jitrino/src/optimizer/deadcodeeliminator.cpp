@@ -32,6 +32,8 @@
 #include "optimizer.h"
 #include "XTimer.h"
 #include "PMFAction.h"
+#include "Dominator.h"
+#include "FlowGraph.h"
 
 namespace Jitrino {
 
@@ -44,7 +46,16 @@ void
 DeadCodeEliminationPass::_run(IRManager& irm){
     DeadCodeEliminator dce(irm);
     {
+        //create loops mapping to be able to fix infinite loops after the optimization
+        MemoryManager tmpMM("HashValueNumberingPass::_run");
+        InfiniteLoopsInfo loopsMapping(tmpMM);
+        DeadCodeEliminator::createLoop2DispatchMapping(irm.getFlowGraph(), loopsMapping);
+
+        //perform optimization
         dce.eliminateDeadCode(false);
+
+        //fix infinite loops if found
+        DeadCodeEliminator::fixInfiniteLoops(irm, loopsMapping);
     }
 }
 
@@ -1191,5 +1202,114 @@ DeadCodeEliminator::markEssentialPseudoThrows(LoopNode* loopNode, BitSet& essent
     }
     return;
 }
+
+void DeadCodeEliminator::createLoop2DispatchMapping(ControlFlowGraph& cfg, InfiniteLoopsInfo& info) {
+    LoopTree* lt = cfg.getLoopTree();
+    if (!lt->isValid()) {
+        lt->rebuild(false, true);
+    }
+    info.hasLoops = lt->hasLoops();
+    if (!info.hasLoops) {
+        return;
+    }
+
+    //algorithm: 
+    //for every loop find ANY node in a loop with dispatch edge that leads out of the loop
+    //add the dispatch node to the mapping. Add nothing if dispatch is unwind
+    //ANY dispatch is suitable to be used for infinite loop, because the point of interruption of infinite loop is undefined.
+    const Nodes& nodes = cfg.getNodes();
+    for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
+        Node* node = *it;
+        if (lt->getLoopDepth(node) == 0) {
+            continue;
+        }
+        Edge* exceptionEdge = node->getExceptionEdge();
+        if (exceptionEdge == NULL) {
+            continue;
+        }
+        Node* dispatch = exceptionEdge->getTargetNode();
+        Node* loopHead = lt->getLoopHeader(node, false);
+        while (dispatch && lt->getLoopHeader(dispatch, false) == loopHead) {
+            dispatch = dispatch->getExceptionEdgeTarget();
+        }
+        if (dispatch) {
+            info.map[loopHead] = dispatch;
+        }
+    }
+}
+
+void DeadCodeEliminator::fixInfiniteLoops(IRManager& irm, const InfiniteLoopsInfo& info) {
+    if (!info.hasLoops) {
+        return;
+    }
+    //Find infinite loops and use mapping provided to add pseudoThrows.
+    //To find infinite loops use dominator trees: 
+    //    LoopHead == dominates on incoming edge source. 
+    //    Infinite loop == LoopHead with no paths to Exit node: when Exit node does not postdominate on LoopHead
+    if (Log::isEnabled()) {
+        Log::out()<<"Performing infinite loops check "<<std::endl;
+    }
+
+    ControlFlowGraph& cfg = irm.getFlowGraph();
+    MemoryManager tmpMM("fixInfiniteLoops");
+    OptPass::computeDominators(irm);
+    DominatorTree* dom = irm.getDominatorTree();
+    DominatorBuilder db;
+    DominatorTree* postDom = db.computeDominators(tmpMM, &cfg, true, true);
+
+    Node* exitNode = cfg.getExitNode();
+    Nodes infiniteLoopHeads(tmpMM);
+
+    //searching for infinite loops
+    Nodes nodes(tmpMM);
+    cfg.getNodes(nodes);
+    for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
+        Node* node = *it;
+        if (postDom->dominates(exitNode, node)) { //the node is reachable from Exit node
+            continue;
+        }
+        //ok, this is dead code or endless loop -> check if this is a loop
+        const Edges& inEdges = node->getInEdges();
+        for (Edges::const_iterator eit = inEdges.begin(), eend = inEdges.end(); eit !=eend; eit++) {
+            Edge* edge = *eit;
+            Node* srcNode = edge->getSourceNode();
+            if (dom->dominates(node, srcNode)) { //ok, this is loop head
+                infiniteLoopHeads.push_back(node);
+                break;
+            }
+        }
+    }
+    
+    //fixing infinite loops
+    for (Nodes::const_iterator it = infiniteLoopHeads.begin(), end = infiniteLoopHeads.end(); it!=end; ++it) {
+        Node* node = *it;
+        Node* dispatch = NULL;
+        StlMap<Node*, Node*>::const_iterator mit = info.map.find(node);
+        if (mit!=info.map.end()) {
+            dispatch = mit->second;
+        } else {
+            dispatch = cfg.getUnwindNode();
+            if (dispatch == NULL) {
+                dispatch = cfg.createDispatchNode(irm.getInstFactory().makeLabel());
+                cfg.addEdge(dispatch, exitNode);
+                cfg.setUnwindNode(dispatch);
+            }
+        }
+        assert(dispatch!=NULL);
+        cfg.splitNodeAtInstruction(node->getFirstInst(), true, false, irm.getInstFactory().makeLabel());
+        node->appendInst(irm.getInstFactory().makePseudoThrow());
+        cfg.addEdge(node, dispatch);
+        if (Log::isEnabled()) {
+            Log::out() <<"  Found infinite loop: node:";FlowGraph::print(Log::out(), node); Log::out()<<std::endl;
+            Log::out() <<"      connecting loop to :";FlowGraph::print(Log::out(), dispatch); Log::out()<<std::endl;
+        }
+    }
+    
+    if (Log::isEnabled()) {
+        Log::out()<<"Infinite loops check finished."<<std::endl;
+    }
+
+}
+
 
 } //namespace Jitrino 

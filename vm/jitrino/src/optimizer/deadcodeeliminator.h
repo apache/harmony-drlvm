@@ -37,6 +37,18 @@ class ControlFlowGraph;
 class Node;
 class BitSet;
 
+///the structure that holds info to fix infinite loops.
+class InfiniteLoopsInfo {
+public:
+    InfiniteLoopsInfo(MemoryManager& mm) : map(mm), hasLoops(false) {}
+    
+    ///loop header to dispatch node mapping
+    StlMap<Node*, Node*> map;
+    
+    ////caches if cfg has loops
+    bool hasLoops;
+};
+
 class DeadCodeEliminator {
 public:
     DeadCodeEliminator(IRManager& irm);
@@ -45,6 +57,13 @@ public:
     static Opnd* copyPropagate(Opnd*);
     bool eliminateUnreachableCode(); // returns true if any node is eliminated
     void removeExtraPseudoThrow();
+    
+    ///creates a mapping of loop-header to dispatch nodes that can be used later to fix infinite loops
+    static void createLoop2DispatchMapping(ControlFlowGraph& cfg, InfiniteLoopsInfo& info);
+
+    ///looks for infinite loops in code and adds pseudothrow inst using dispatch node provided by 'info' 
+    static void fixInfiniteLoops(IRManager& irm, const InfiniteLoopsInfo& info);
+
 private:
     void sweepInst(Node* node, Inst* inst, BitSet& usefulInstSet, BitSet& usefulVarSet, uint8 *usedInstWidth, uint32 minInstId, uint32 maxInstId, bool canRemoveStvars);
     void sweepInst1(Node* node, Inst* inst, BitSet& usefulInstSet, BitSet& usefulVarSet,

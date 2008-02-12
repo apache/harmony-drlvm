@@ -155,7 +155,12 @@ DominatorTree::DominatorTree(MemoryManager& mm,
 bool DominatorTree::dominates(Node* a, Node* b) {
     assert(a != NULL && b != NULL);
     assert(a->getId() < numNodes && b->getId() < numNodes);
-    return a==b || isAncestor(tree[a->getId()], tree[b->getId()]);
+    DominatorNode* na = tree[a->getId()];
+    DominatorNode* nb = tree[b->getId()];
+    if (na == NULL || nb == NULL) {
+        return false;
+    }
+    return a==b || isAncestor(na, nb);
 }
 
 

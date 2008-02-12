@@ -48,8 +48,18 @@ HashValueNumberingPass::_run(IRManager& irm) {
     computeDominators(irm);
     DominatorTree* dominatorTree = irm.getDominatorTree();
     assert(dominatorTree && dominatorTree->isValid());
+
+    //create loops mapping to be able to fix infinite loops after the optimization
+    MemoryManager tmpMM("HashValueNumberingPass::_run");
+    InfiniteLoopsInfo loopsMapping(tmpMM);
+    DeadCodeEliminator::createLoop2DispatchMapping(irm.getFlowGraph(), loopsMapping);
+
+    //do the optimizations
     HashValueNumberer valueNumberer(irm, *dominatorTree);
     valueNumberer.doValueNumbering();
+
+    //fix infinite loops if found
+    DeadCodeEliminator::fixInfiniteLoops(irm, loopsMapping);
 }
 
 class SparseCseMap : public SparseScopedMap<CSEHashKey, Inst *> {
