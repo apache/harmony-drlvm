@@ -75,6 +75,7 @@ bool sd_initialize(hymutex_t** p_lock)
 
         if (hdbghelp)
         {
+            SymSetOptions(SYMOPT_LOAD_LINES);
             g_SymFromAddr = (SymFromAddr_type)::GetProcAddress(hdbghelp, "SymFromAddr");
             g_SymGetLineFromAddr64 = (SymGetLineFromAddr64_type)::GetProcAddress(hdbghelp, "SymGetLineFromAddr64");
             g_SymGetLineFromAddr = (SymGetLineFromAddr_type)::GetProcAddress(hdbghelp, "SymGetLineFromAddr");
@@ -176,6 +177,8 @@ void sd_get_c_method_info(MethodInfo* info, native_module_t* UNREF module, void*
     {
         DWORD offset;
         IMAGEHLP_LINE64 lineinfo;
+        lineinfo.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
+
         if (g_SymGetLineFromAddr64(GetCurrentProcess(),
                                    (DWORD64)(POINTER_SIZE_INT)ip,
                                    &offset, &lineinfo))
@@ -190,6 +193,8 @@ void sd_get_c_method_info(MethodInfo* info, native_module_t* UNREF module, void*
     {
         DWORD offset;
         IMAGEHLP_LINE lineinfo;
+        lineinfo.SizeOfStruct = sizeof(IMAGEHLP_LINE);
+
         if (g_SymGetLineFromAddr(GetCurrentProcess(),
                                  (DWORD)(POINTER_SIZE_INT)ip,
                                  &offset, &lineinfo))
