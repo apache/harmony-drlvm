@@ -2,8 +2,8 @@
          Apache Harmony DRLVM
 ======================================
 
-DRLVM is one of the virtual machines of the Apache Harmony 
-project. It contains: 
+DRLVM is one of the virtual machines of the Apache Harmony project. 
+It contains: 
  
     - VM (VM Core)
     - GC
@@ -14,40 +14,22 @@ project. It contains:
 
 See http://wiki.apache.org/harmony for a definition of these components.
 
-At the time of original initial donation it could do the following with
-Harmony classes:
-
-    - Run Eclipse, version 3.1.1: create, edit, compile, and launch Java* applications
-    - Provide a self-hosting development environment: the JRE can build itself
- 
-The supported configurations are Windows* IA-32 and Linux* IA-32. 
-
- 
-0. QUICK START
---------------
-
-For prerequisites and instructions on how to build DRLVM, refer to 
-Getting Started for Contributors 
-[http://harmony.apache.org/quickhelp_contributors.html]. 
+The currently supported configurations are Windows* x86, x86_64 and Linux* x86, x86_64, ia64.
 
   
 1. DRLVM SOURCE TREE CONTENTS
 -----------------------------
  
-This source tree consists of the source files, the building environment,
-and the smoke tests source files for lightweight testing of the
-DRLVM.
+This source tree consists of the source files, the building scripts,
+and the tests source files for integrity testing of the DRLVM.
 
 The structure is as follows: 
 
- <EXTRACT_DIR>/trunk/
+ <EXTRACT_DIR>
         |
-        +---build          - Files required to build the contribution
+        +---make           - Files required to build the contribution
         |      
         \---vm             - VM source files
-            |
-            +- MMTk        - Garbage collector written in Java that is well recognized in 
-            |                the JVM research community
             |
             +- doc         - DRLVM Developer's Guide and Getting Started guide
             |
@@ -58,8 +40,6 @@ The structure is as follows:
             |
             +- gc_gen      - Generational garbage collector
             |
-            +- gcv4        - Mark-compact garbage collector
-            |
             +- include     - Set of header files containing external specification
             |                and inter-component interfaces
             |
@@ -67,9 +47,7 @@ The structure is as follows:
             |
             +- jitrino     - Just-in-time Compiler component
             |
-            +- launcher    - Main function responsible for starting the VM as an application
-            |
-            +- port        - OS and platform porting layer component that, together with
+            +- port        - OS and platform porting layer component which, together with
             |                APR, provides an unified interface to low-level system routines 
             |                across different platforms
             |
@@ -86,101 +64,106 @@ The structure is as follows:
             +- vmi         - Component responsible for compatibility with the Harmony class
             |                libraries 
             |
-            \- vmstart     - Partial implementation of the invocation API for starting
-                             the VM as a dynamic library  
+            \- vmstart     - Partial implementation of the component manager for handling 
+                             VM components as pluggable modules 
  
  
 2. TOOLS AND ENVIRONMENT VARIABLES REQUIRED FOR THE BUILD
 ---------------------------------------------------------
+In order to build the source code, it is necessary to configure the following tools 
+in the user environment. That is, the working environment should be such that the PATH 
+environment variable contains all of the directories where the executables of
+the tools listed below are located and that all of those executables can be 
+successfully invoked from the command line. On Windows, this typically implies
+that the build is started from Visual Studio Command Prompt console window.
 
-For detailed information on tools and environment variabled required for the build, refer to  
-to Getting Started for Contributors
-[http://harmony.apache.org/quickhelp_contributors.html].
 
+* C++ compiler - on Windows, the Microsoft(R) 32-bit C/C++ Compiler and on
+               Linux, the GNU project C/C++ Compiler.
+
+* Java compiler - By default, the build scripts are setup to use the Eclipse
+                  compiler (ECJ). The ECJ needs to be in the Ant class path
+                  to execute correctly.
+                  
+* Apache Ant - A Java based build tool. See http://ant.apache.org/.
+               It's suggested that the ANT_OPTS environment variable be set
+               to a value of "-Xms256M -Xmx512M" while running the build scripts
+               for Harmony.
+
+* Doxygen - the open source documentation system for a variety of programming 
+            languages including C, C++ and Java.
+            See http://www.doxygen.org
+            
+
+The top-level Ant script <EXTRACT_DIR>/build.xml has a default target 
+which builds both the Java source and C++ source files. It is expected
+therefore that, at a minimum, a C++ compiler and a Java compiler be available.
+Doxygen is only necessary if generation of HTML documentation from the
+source code is to be carried out by invoking Ant with the "doc" target on
+the <EXTRACT_DIR>/build.xml script. As a convenience, pre-generated
+HTML files are already stored in subversion.
+
+2.1 DRLVM DEPENDENCIES
+----------------------
+The DRLVM depends on common_resources module of Apache Harmony for managing 
+external dependencies. Further, it needs either HDK or Harmony class library 
+to build against and comprise a complete workable JRE.
+You can separately obtain those modules, refer to Getting Started page on 
+Apache Harmony site [http://harmony.apache.org/quickhelp_contributors.html].
+ 
+Also, there are external resources required for building DRLVM: 
+zlib, apr-1.2.6, log4cxx, cpptasks-1.b04, etc. 
+This list can change as DRLVM is being developed, so the best way to resolve 
+external dependencies is to let the build download them:
+$ ant fetch-depends
+
+By default DRLVM assumes federated build layout, as described on the 
+aforementioned Getting Started page. That is, common_resources and classlib 
+modules reside in the same parent directory as DRLVM's <EXTRACT_DIR>, 
+w/o extra "trunk" levels inside. 
+You may override default locations via the following build arguments:
+-Dcommon.resources.loc=<common_resources-location>
+-Dhy.hdk=<unpacked-HDK-location>
+-Dexternal.dep.CLASSLIB.loc=<classlib-location>
+For example, run this command to check if all build prerequisites are met:
+$ ant -Dcommon.resources.loc=<path> -Dhy.hdk=<path> check-depends
 
 3. BUILDING VM
 --------------
 
-The current section contains the description of the resulting 
-source tree after the build and gives details on supplementary 
-tasks related to the build. 
-
-For detailed instructions on how to build DRLVM, 
-refer to Getting Started for Contributors
-[http://harmony.apache.org/quickhelp_contributors.html].
+The simplest way to get started is to change directory into <EXTRACT_DIR> and
+then type "ant" to run Apache Ant against the default target of the build.xml
+file. Provided that the required compilers are available and configured properly, 
+Ant will proceed to compile all the DRLVM source code.
+Build mode (release/debug) is controlled with "hy.cfg" property, default is debug.
+E.g. type to build in release mode:
+$ ant -Dhy.cfg=release
 
 The build produces a set of .jar files, native libraries, and
-support files that constitute the executable JRE. These files 
-are placed in the following directory tree structure:
+support files that constitute the executable JRE. Also, it imports required
+supplementary binaries from the pre-built classlib. The complete workable JRE 
+is placed in the following directory tree structure:
 
-./build/${OS}_ia32_${CXX}_${BUILD_CFG}
-    |
-    \---deploy
-          |
-          \---jre
-               |
-               +---bin
-               |    |
-               |    +--- java.exe      (if Windows*)
-               |    +--- *.dll         (if Windows*)
-               |    +--- *.pdb         (if Windows*)
-               |    +--- java.bat      (if Windows*)
-               |    +--- eclipse.bat   (if Windows*)
-               |    |
-               |    +--- java          (if Linux*)
-               |    +--- *.so          (if Linux*)
-               |    +--- *.a           (if Linux*)
-               |    +--- java.sh       (if Linux*)
-               |    +--- eclipse.sh    (if Linux*)
-               |    |
-               |    \--- Hello.class
-               |
-               +---doc
-               |    |
-               |    +--- DeveloperGuide.htm
-               |    +--- GettingStarted.htm
-               |    +--- drl.css
-               |    \--- images
-               |          |
-               |          \--- *.gif
-               |
-               +---lib
-               |    |
-               |    +--- org.apache.harmony.eclipse.jdt.launching_1.0.0.jar
-               |    +--- boot
-               |          |
-               |          +--- archive.jar
-               |          +--- bcprov-jdk14-129.jar
-               |          +--- beans.jar
-               |          +--- bootclasspath.properties
-               |          +--- crypto.jar
-               |          +--- icu4j_3_4.jar
-               |          +--- icu4jni-3.4.jar
-               |          +--- kernel.jar
-               |          +--- logging.jar
-               |          +--- luni.jar
-               |          +--- math.jar
-               |          +--- nio.jar
-               |          +--- nio_char.jar
-               |          +--- regex.jar
-               |          +--- resolver.jar
-               |          +--- security.jar
-               |          +--- serializer.jar
-               |          +--- sql.jar
-               |          +--- text.jar
-               |          +--- x_net.jar
-               |          +--- xalan.jar
-               |          +--- xercesImpl.jar
-               |          +--- xml-apis.jar
-               | 
-               +---include
-               |    |
-               |    +--- jni.h
-               |    +--- jni_types.h
-               |    +--- jvmti.h
-               |    \--- jvmti_types.h
-               |
-               \--- README.txt
+./build/${OS}_${CPU_arch}_${CXX}_${BUILD_CFG}
+       \---deploy
+             |
+             \---jdk
+                  |
+                  \---jre
+                  |     |
+                  |     +---bin           <- classlibrary native code & launcher
+                  |     |   |
+                  |     |   +---default   <- DRLVM binaries
+                  |     |
+                  |     \---lib
+                  |         |
+                  |         +---boot      <- common JARs for bootclasspath
+                  |         | 
+                  |         +---ext       <- extensions directory
+                  |         |
+                  |         \---security
+                  |
+                  +---include             <- JNI & JVMTI headers
 
               
 You can now run DRLVM on the command line or under Eclipse*. For details on 
@@ -189,54 +172,17 @@ how to run the VM under Eclipse*, see Getting Started with DRLVM,
 
  3.1 Build the selected components. 
      
-      You can build any component indicated in the file
-     ./build/make/deploy.xml.
-    
- 3.2 Clean up the previously built code by executing one of the following:
-    
-      On  Windows*:     | On Linux*:
-      ------------------+---------------
-      build.bat clean   | build.sh clean 
- 
- 3.3 Update the network resources as required. 
-    
-      The build uses external resources from a network, such as APR or Harmony classes.
-      These are downloaded and stored locally during the first launch of the build. 
+If you're developing only particular component of DRLVM, it is possible to 
+optimize recompilation time and re-build just that component invoking 
+particular ant script. For example, do clean rebuild of GCv5:
+$ ant -f make/vm/gc_gen.xml clean build
+Another example, perform incremental build of Jitrino:
+$ ant -f make/vm/jitrino.xml
 
-      3.3.1 Change the resource location settings by editing the property file:
-       
-             On  Windows*:            | On Linux*:
-            --------------------------+--------------------------
-            build\make\win.properties | build/make/lnx.properties              
-
-            Example:
-            The build searches for the Eclipse* archive in its default location on the web:
-            remote.ECLIPSE.archieve=http://eclipse.objectweb.org/downloads/drops/R-3.1.1-200509290840/eclipse-SDK-3.1.1-win32.zip
-            You can specify the Eclipse* installation directory by setting the ECLIPSE_HOME 
-            environment variable.  
-       
-      3.3.2 Update the local version of external resources.
-    
-            To download a fresh copy of the external resources, type the following:
-
-      
-            On Windows*:        | On Linux*:
-            --------------------+----------------
-            build.bat update    | build.sh update
-     
-            External resources are stored in the directory:
-      
-            build/pre-copied
-      
-      
- 3.4 Clean up the local copy of the external resources by executing the following:
-      
-     On Windows*:             | On Linux*:
-     -------------------------+----------------------
-     build.bat clean.update   | build.sh clean.update
-              
-     NOTE: Because you have executed the target 'update' previously, 
-     this ./build.sh  takes the locally stored resources for building. 
+However this way works only if you did not modify any of component's dependencies. 
+E.g. if you modified encoder or vmcore while developing Jitrino, you'd want to rebuild 
+Jitrino and everything it depends upon:
+$ ant jitrino
 
 4. RUNNING DRLVM WITH EXTERNAL CLASS LIBRARIES
 ----------------------------------------------
@@ -252,25 +198,31 @@ To run DRLVM with third-party external class libraries, do the following:
 
 3. Add external library class directories or .jar files into the -Xbootclasspath option. 
 
-   Example:
-   ij -Xbootclasspath/p:c:\external_library\lib\classes.jar MyApp
+Example:
+$ java -Xbootclasspath/p:c:\external_library\lib\classes.jar MyApp
  
 
 5. BUILDING AND RUNNING TESTS
 -----------------------------
 
-To build and run the DRLVM tests, execute the following command:
+DRLVM provides a fair amount of functional and unit tests, you can build and run 
+them all with the following command:
+$ ant smoke.test kernel.test cunit.test jvmti.test reg.test hut.test ehwa.test 
+The test binaries and run results are placed in "tests" directory tree
+nearby "deploy" one:
+./build/${OS}_${CPU_arch}_${CXX}_${BUILD_CFG}/tests
 
-   On Windows*:    |  On Linux*:
-   ----------------+----------------
-   build.bat test  |  build.sh test
+For convenience, build also provides aggregative test targets, which run most of the 
+tests with a single command:
+$ ant test
+$ ant test2
 
-
-The test classes are placed in
-<EXTRACT_DIR>/Harmony/make/%BUILD_CFG%_Windows_ia32_%NATIVE_COMPILER%/semis/vm/test/classes.
-The test results are placed in
-<EXTRACT_DIR>/Harmony/make/%BUILD_CFG%_Windows_ia32_%NATIVE_COMPILER%/semis/vm/test/report.
-
+Common flags supported by all test suites:
+* test.mode - list of predefined VM modes to test (see make/test.properties). 
+              "jit,opt,int" by default. Does not affect HUT, cunit and reg tests 
+* test.case - name of a single specific test to run
+* test.jvm.exe - location of external JVM to be tested 
+ 
 
 6. TROUBLESHOOTING
 -------------------
