@@ -44,10 +44,14 @@ struct Simple_TNV_Table
 
 enum ProfileUpdateStrategy {
 
+    // Lock when modifying the TNV table, even trivial counter increments.
+    // This mode is only one that guarantees accurate profiling.
+    UPDATE_LOCKED,
+
     // Lock when restructuring the TNV table (inserting). Trivial counter
     // increments might not be locked (in current implementation they are not
     // locked for FirstN table management only)
-    UPDATE_LOCKED,
+    UPDATE_LOCKED_INSERT,
 
     // When a new value is added to TNV all simultaneous updates to the table
     // are skipped

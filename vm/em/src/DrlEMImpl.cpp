@@ -655,6 +655,8 @@ ProfileCollector* DrlEMImpl::createProfileCollector(const std::string& profilerN
             updateStrategy = UPDATE_FLAGGED_INSERT;
         }else if (strategy == "UNSAFE") {
             updateStrategy = UPDATE_UNSAFE;
+        }else if (strategy == "LOCKED_INSERT") {
+            updateStrategy = UPDATE_LOCKED_INSERT;
         }else if (strategy != "LOCKED") {
             LECHO(10, "EM: unsupported value profiler updateStrategy");
             return NULL;

@@ -171,7 +171,9 @@ void TNVTableFirstNManager::addNewValue(ValueMethodProfile* methProfile,
             VPData* instProfile, ValueT curr_value)
 {
     uint8* updating_ptr = methProfile->getUpdatingStatePtr();
-    if (updateStrategy == UPDATE_FLAGGED_ALL) {
+    if (updateStrategy == UPDATE_LOCKED) {
+        methProfile->lockProfile();
+    } else if (updateStrategy == UPDATE_FLAGGED_ALL) {
         // Checking a flag and modifying it atomically must be faster than
         // locking because it skips simultaneous updates. Faster but sacrifices
         // profile precision.
@@ -183,10 +185,11 @@ void TNVTableFirstNManager::addNewValue(ValueMethodProfile* methProfile,
     ValueT* last_value = &(instProfile->last_value);
     uint32* num_times_profiled = &(instProfile->num_times_profiled);
     if (curr_value == *last_value){
-        // We increment the counter safely only with UPDATE_FLAGGED_ALL
+        // We increment the counter safely with UPDATE_FLAGGED_ALL and
+        // UPDATE_LOCKED
         (*num_times_profiled)++;
     } else {
-        if (updateStrategy == UPDATE_LOCKED) {
+        if (updateStrategy == UPDATE_LOCKED_INSERT) {
             methProfile->lockProfile();
         }else if (updateStrategy == UPDATE_FLAGGED_INSERT) {
             if (port_atomic_cas8(updating_ptr, 1, 0) != 0) {
@@ -199,14 +202,16 @@ void TNVTableFirstNManager::addNewValue(ValueMethodProfile* methProfile,
         *num_times_profiled = 1;
         insert(steady_part, clear_part, curr_value, *num_times_profiled);
         *last_value = curr_value;
-        if (updateStrategy == UPDATE_LOCKED) {
+        if (updateStrategy == UPDATE_LOCKED_INSERT) {
             methProfile->unlockProfile();
         }else if (updateStrategy == UPDATE_FLAGGED_INSERT) {
             *updating_ptr = 0;
         }
     }
     UNSAFE_REGION_END
-    if (updateStrategy == UPDATE_FLAGGED_ALL) {
+    if (updateStrategy == UPDATE_LOCKED) {
+        methProfile->unlockProfile();
+    } else if (updateStrategy == UPDATE_FLAGGED_ALL) {
         *updating_ptr = 0;
     }
 }
