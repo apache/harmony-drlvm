@@ -30,7 +30,7 @@
     <property file="${tc.imported.basedir}/../test.properties"/>
     
     <property name="test.home" location="${vm.home}/tests"/>
-    <property name="excludes.dir" location="${drlvm.base.dir}/build/make/excludes"/>
+    <property name="excludes.dir" location="${test.home}/excludes"/>
     
     <target name="check-depends">
         <check-one-file dest="${ant-contrib.jar}" src="${ant-contrib.url}"/>
