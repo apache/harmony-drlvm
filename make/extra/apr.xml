@@ -54,7 +54,7 @@
             </fileset>
         </chmod>
 
-        <exec executable="sh" dir="${apr.src}">
+        <exec executable="sh" dir="${apr.src}" failonerror="true">
             <arg value="./configure" />
         </exec>
         <replace file="${apr.src}/include/apr.h">
@@ -77,7 +77,7 @@
 
     <target name="-make-apr-unix" if="is.unix" depends="apr-configure">
         <!-- simply invoke make to let it build as the APR people suggest  -->
-        <exec executable="make" dir="${apr.src}"/>
+        <exec executable="make" dir="${apr.src}" failonerror="true"/>
     	<copy file="${apr.src}/.libs/libapr-1.a" todir="${drlvm.lib.dir}" />
     </target>
     
