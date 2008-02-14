@@ -183,7 +183,7 @@ Usage:
                 <include name="**" if="import.hdk"/>
                 <include name="jdk/jre/**" unless="import.hdk"/>
                 <exclude name="jdk/jre/bin/default/**" unless="import.hdk"/>
-                <exclude name="bin/*hythr*" unless="import.hdk"/>
+                <exclude name="jdk/jre/bin/*hythr*" unless="import.hdk"/>
             </fileset>
         </copy>
     </target>
@@ -213,7 +213,7 @@ Usage:
         </delete>
         
         <!-- launcher should use our hythr -->
-        <copy todir="${drlvm.deploy.dir}/jdk/jre/bin">
+        <copy todir="${drlvm.deploy.dir}/jdk/jre/bin" overwrite="yes">
             <fileset dir="${drlvm.bin.dir}">
                 <include name="*hythr*"/>
             </fileset>
