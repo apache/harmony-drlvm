@@ -178,7 +178,7 @@
                 <condition property="component.need.pdb">
                     <and>
                         <isset property="is.windows"/>
-                        <equals arg1="@{type}" arg2="dynamic"/>
+                        <equals arg1="@{type}" arg2="shared"/>
                     </and>
                 </condition>
     
