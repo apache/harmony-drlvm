@@ -31,10 +31,9 @@
             </includepath>
             <compiler extends="common.cpp.compiler">
                 <fileset dir="${vm.home}/vmcore/src">
-                    <include name="verifier/*.cpp" if="use_original_verifier"/>
-                    <include name="verifier-3363/base/*.cpp" unless="use_original_verifier"/>
-                    <include name="verifier-3363/java5/*.cpp" unless="use_original_verifier"/>
-                    <include name="verifier-3363/java6/*.cpp" unless="use_original_verifier"/>
+                    <include name="verifier-3363/base/*.cpp" />
+                    <include name="verifier-3363/java5/*.cpp" />
+                    <include name="verifier-3363/java6/*.cpp" />
                 </fileset>
             </compiler>
         </make-native>

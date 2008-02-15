@@ -89,7 +89,6 @@ Usage:
         em,
         vmi,
         jitrino,
-        gc_cc,
         gc_gen,
         verifier-ext,
         deploy,
@@ -160,10 +159,6 @@ Usage:
 
     <target name="jitrino" depends="vmcore">
         <ant antfile="make/vm/jitrino.xml"/>
-    </target>
-
-    <target name="gc_cc" depends="vmcore,kernel">
-        <ant antfile="make/vm/gc_cc.xml"/>
     </target>
 
     <target name="gc_gen" depends="vmcore,kernel">
