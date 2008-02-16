@@ -330,12 +330,9 @@ bool DecoderBase::decodeModRM(const EncoderBase::OpcodeDesc& odesc,
     RegName index = RegName_Null;
     int disp = 0;
     unsigned scale = 0; 
-    OpndSize reg_size = OpndSize_32;
 
-#ifdef _EM64T_
-    if (NULL != rex && 0 != rex->w)
-        reg_size = OpndSize_64;
-#endif
+    // On x86_64 all mnemonics that allow REX.W have REX.W in opcode.
+    // Therefore REX.W is simply ignored, and opndDesc.size is used
 
     if (modrm.mod == 3) {
         // we have only modrm. no sib, no disp.
@@ -350,20 +347,20 @@ bool DecoderBase::decodeModRM(const EncoderBase::OpcodeDesc& odesc,
         *pbuf += 1;
         scale = sib.scale == 0 ? 0 : (1<<sib.scale);
         if (sib.index != 4) {
-			index = getRegName(OpndKind_GPReg, reg_size, EXTEND_REG(sib.index, x));
+			index = getRegName(OpndKind_GPReg, opndDesc.size, EXTEND_REG(sib.index, x));
         } else {
             // (sib.index == 4) => no index
         }
 
         if (sib.base != 5 && modrm.mod != 0) {
-            base = getRegName(OpndKind_GPReg, reg_size, EXTEND_REG(sib.base, b));
+            base = getRegName(OpndKind_GPReg, opndDesc.size, EXTEND_REG(sib.base, b));
         } else {
             // (sib.base == 5 && modrm.mod == 0) => no base
         }
     }
     else {
         if (modrm.mod != 0 || modrm.rm != 5) {
-            base = getRegName(OpndKind_GPReg, reg_size, EXTEND_REG(modrm.rm, b));
+            base = getRegName(OpndKind_GPReg, opndDesc.size, EXTEND_REG(modrm.rm, b));
         }
         else {
             // mod=0 && rm == 5 => only disp32
