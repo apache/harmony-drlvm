@@ -4,3 +4,6 @@ H1859
 H4265
 # Test crashes on SOE
 H4292
+# The bug is not fixed yet as shown by CC and JIRA status
+H5206
+
