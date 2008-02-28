@@ -48,15 +48,15 @@
 
                 <include name="vmcore/src/util/ipf/include" if="is.ia64"/>
                 <include name="vmcore/src/util/ipf/base_natives" if="is.ia64"/>
-                <include name="port/src/lil/ipf/pim/include" if="is.ia64"/>
+                <include name="vmcore/src/lil/ipf/include" if="is.ia64"/>
 
                 <include name="vmcore/src/util/ia32/base_natives" if="is.x86"/>
                 <include name="port/src/encoder/ia32_em64t" if="is.x86"/>
-                <include name="port/src/lil/ia32/pim/include" if="is.x86"/>
+                <include name="vmcore/src/lil/ia32/include" if="is.x86"/>
 
                 <include name="vmcore/src/util/em64t/base_natives" if="is.x86_64"/>
                 <include name="port/src/encoder/ia32_em64t" if="is.x86_64"/>
-                <include name="port/src/lil/em64t/pim/include" if="is.x86_64"/>
+                <include name="vmcore/src/lil/em64t/include" if="is.x86_64"/>
             </dirset>
         </path>
         <depend-includes paths="int.includes"/>

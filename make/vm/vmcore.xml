@@ -116,15 +116,15 @@
 
                 <include name="vmcore/src/util/ipf/include" if="is.ia64"/>
                 <include name="vmcore/src/util/ipf/base_natives" if="is.ia64"/>
-                <include name="port/src/lil/ipf/pim/include" if="is.ia64"/>
+                <include name="vmcore/src/lil/ipf/include" if="is.ia64"/>
 
                 <include name="vmcore/src/util/ia32/base_natives" if="is.x86"/>
                 <include name="port/src/encoder/ia32_em64t" if="is.x86"/>
-                <include name="port/src/lil/ia32/pim/include" if="is.x86"/>
+                <include name="vmcore/src/lil/ia32/include" if="is.x86"/>
 
                 <include name="vmcore/src/util/em64t/base_natives" if="is.x86_64"/>
                 <include name="port/src/encoder/ia32_em64t" if="is.x86_64"/>
-                <include name="port/src/lil/em64t/pim/include" if="is.x86_64"/>
+                <include name="vmcore/src/lil/em64t/include" if="is.x86_64"/>
             </dirset>
         </path>
         <depend-includes paths="vmcore.includes"/>
@@ -153,6 +153,8 @@
                 <include name="thread/helpers/thread_helpers_em64t.cpp" if="is.x86_64"/>
                 <include name="thread/helpers/thread_helpers_ipf.cpp" if="is.ia64"/>
                 <include name="util/*.cpp" />
+                <include name="lil/*.cpp" />
+                <include name="lil/stack_iterator/*.cpp" />
             </fileset>
 
             <fileset dir="${vm.home}/vmcore/src/kernel_classes/native">
@@ -166,13 +168,7 @@
 
             <fileset dir="${vm.home}">
                 <selector refid="vmcore.depends"/>
-                <include name="port/src/lil/*.cpp" />
-                <include name="port/src/lil/pim/*.cpp" />
                 <include name="vmstart/src/compmgr/*.cpp" />
-
-                <include name="port/src/lil/ipf/pim/*.cpp" if="is.ia64"/>
-                <include name="port/src/lil/ia32/pim/*.cpp" if="is.x86"/>
-                <include name="port/src/lil/em64t/pim/*.cpp" if="is.x86_64"/>
             </fileset>
 
             <fileset dir="${vm.home}/vmcore/src">
@@ -201,6 +197,10 @@
                 <exclude name="util/linux/signals_em64t.cpp" unless="is.unix.x86_64"/>
                 <exclude name="util/linux/signals_ipf.cpp" unless="is.unix.ia64"/>
                 <include name="util/linux/ia32_em64t/*.cpp" if="is.unix" unless="is.ia64"/>
+
+                <include name="lil/ipf/*.cpp" if="is.ia64"/>
+                <include name="lil/ia32/*.cpp" if="is.x86"/>
+                <include name="lil/em64t/*.cpp" if="is.x86_64"/>
             </fileset>
 
             <compilerarg value="/Qwd94" if="is.icl"/>
