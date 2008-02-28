@@ -135,12 +135,18 @@
             <apply executable="${hy.asm.compiler}" 
                 dir="${component.obj.dir}"
                 dest="${component.obj.dir}"
-                parallel="true" skipemptyfilesets="on" verbose="no">
+                parallel="true" skipemptyfilesets="on" verbose="no" failonerror="true">
                 <arg line="${asm.flags}" />
-                <chainedmapper>
-                    <flattenmapper/>
-                    <globmapper from="*.asm" to="*${object.suffix}"/>
-                </chainedmapper>
+                <compositemapper>
+                    <chainedmapper>
+                        <flattenmapper/>
+                        <globmapper from="*.asm" to="*${object.suffix}"/>
+                    </chainedmapper>
+                    <chainedmapper>
+                        <flattenmapper/>
+                        <globmapper from="*.s" to="*${object.suffix}"/>
+                    </chainedmapper>
+                </compositemapper>
             </apply>
         </presetdef>
 
