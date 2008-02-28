@@ -31,6 +31,10 @@
 // Windows specific
 #include <string>
 #include <excpt.h>
+#ifndef NO_DBGHELP
+#include <dbghelp.h>
+#pragma comment(linker, "/defaultlib:dbghelp.lib")
+#endif
 
 #include "exception_filter.h"
 
@@ -44,7 +48,69 @@
 #endif
 
 
-static LONG process_crash(Registers* regs, DWORD ExceptionCode)
+#ifndef NO_DBGHELP
+typedef BOOL (WINAPI *MiniDumpWriteDump_type)
+   (HANDLE          hProcess,
+    DWORD           ProcessId,
+    HANDLE          hFile,
+    MINIDUMP_TYPE   DumpType,
+    PMINIDUMP_EXCEPTION_INFORMATION   ExceptionParam,
+    PMINIDUMP_USER_STREAM_INFORMATION UserStreamParam,
+    PMINIDUMP_CALLBACK_INFORMATION    CallbackParam);
+#endif // #ifndef NO_DBGHELP
+
+
+static void create_minidump(LPEXCEPTION_POINTERS exp)
+{
+#ifndef NO_DBGHELP
+    MINIDUMP_EXCEPTION_INFORMATION mei = {GetCurrentThreadId(), exp, TRUE};
+    MiniDumpWriteDump_type mdwd = NULL;
+
+    HMODULE hdbghelp = ::LoadLibrary("dbghelp");
+
+    if (hdbghelp)
+        mdwd = (MiniDumpWriteDump_type)::GetProcAddress(hdbghelp, "MiniDumpWriteDump");
+
+    if (!mdwd)
+    {
+        fprintf(stderr, "Failed to open DbgHelp library");
+        return;
+    }
+
+    char filename[24];
+    sprintf(filename, "minidump_%d.dmp", GetCurrentProcessId());
+
+    HANDLE file = CreateFile(filename, GENERIC_WRITE, 0, 0,
+                                CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+
+    if (file == INVALID_HANDLE_VALUE)
+    {
+        fprintf(stderr, "Failed to create minidump file: %s", filename);
+        return;
+    }
+
+    SymInitialize(GetCurrentProcess(), NULL, TRUE);
+
+    BOOL res = mdwd(GetCurrentProcess(), GetCurrentProcessId(),
+                                file, MiniDumpNormal, &mei, 0, 0);
+
+    if (!res)
+    {
+        fprintf(stderr, "Failed to create minidump");
+    }
+    else
+    {
+        char dir[_MAX_PATH];
+        GetCurrentDirectory(_MAX_PATH, dir);
+        fprintf(stderr, "Minidump is generated:\n%s\\%s", dir, filename);
+    }
+
+    CloseHandle(file);
+#endif // #ifndef NO_DBGHELP
+}
+
+
+static LONG process_crash(Registers* regs, LPEXCEPTION_POINTERS exp, DWORD ExceptionCode)
 {
 static DWORD saved_eip_index = TlsAlloc();
 static BOOL UNREF tmp_init = TlsSetValue(saved_eip_index, (LPVOID)0);
@@ -82,6 +148,7 @@ static BOOL UNREF tmp_init = TlsSetValue(saved_eip_index, (LPVOID)0);
     fprintf(stderr, "Windows reported exception: 0x%x\n", ExceptionCode);
 
     sd_print_stack(regs);
+    create_minidump(exp);
     LOGGER_EXIT(-1);
     return EXCEPTION_CONTINUE_EXECUTION;
 }
@@ -152,7 +219,7 @@ void init_stack_info() {
 
     //this code in future should be used on both platforms x86-32 and x86-64
 #   ifdef _EM64T_
-    ULONG guard_stack_size_param = common_guard_stack_size;
+    ULONG guard_stack_size_param = (ULONG)common_guard_stack_size;
 
     if (!SetThreadStackGuarantee(&guard_stack_size_param)) {
         // should be successful always
@@ -223,7 +290,7 @@ void remove_guard_stack(vm_thread_t vm_thread) {
 size_t get_available_stack_size() {
     char* stack_addr = (char*) get_stack_addr();
     size_t used_stack_size = ((size_t)stack_addr) - ((size_t)(&stack_addr));
-    int available_stack_size;
+    size_t available_stack_size;
 
     if (!p_TLS_vmthread->restore_guard_page) {
         available_stack_size = get_stack_size() - used_stack_size
@@ -330,7 +397,7 @@ LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception
         (!in_java && code != STATUS_STACK_OVERFLOW)) &&
         code != JVMTI_EXCEPTION_STATUS)
     {
-        LONG result = process_crash(&regs, code);
+        LONG result = process_crash(&regs, nt_exception, code);
         regs.set_ip((void*)saved_eip);
         vm_to_nt_context(&regs, context);
         return result;
@@ -412,7 +479,7 @@ LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception
         }
     default:
         // unexpected hardware exception occured in java code
-        LONG result = process_crash(&regs, code);
+        LONG result = process_crash(&regs, nt_exception, code);
         regs.set_ip((void*)saved_eip);
         vm_to_nt_context(&regs, context);
         return result;
