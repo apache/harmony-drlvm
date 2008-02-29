@@ -1072,7 +1072,7 @@ protected:
      *
      * Normally, arguments are specified as 
      *
-     * '-Djit.\<JIT_NAME\>.arg.\<key\>=value'
+     * '-XX:jit.\<JIT_NAME\>.arg.\<key\>=value'
      *
      * Implemented though Jitrino's PMF, refer to PMF docs for more info.
      * @note The old-fashion -Xjit options are not processed by this method.
