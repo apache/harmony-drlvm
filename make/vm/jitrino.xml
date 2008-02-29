@@ -18,7 +18,11 @@
     
     <property name="component" value="jitrino"/>
     <import file="common-vm.xml"/>
-    
+
+    <target name="clean" >
+        <clean-native />
+    </target>
+ 
     <target name="build" depends="-init-win,-init-unix">
         <init-native/>
         
