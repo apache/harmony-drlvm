@@ -4487,14 +4487,14 @@ Inst* Simplifier::simplifyJitHelperCall(JitHelperCallInst* inst) {
         case ClassIsArray:
             ch = getClassHandle(inst->getSrc(0));
             if (ch) {
-                res = genLdConstant((int32)class_is_array(ch));
+                res = genLdConstant((int32)VMInterface::isArrayType(ch));
             }
             break;
         case ClassGetAllocationHandle:
             ch = getClassHandle(inst->getSrc(0));
             if (ch) {
                 ConstInst::ConstValue v;
-                v.i8 = (POINTER_SIZE_SINT)class_get_allocation_handle(ch);
+                v.i8 = (POINTER_SIZE_SINT)VMInterface::getAllocationHandle(ch);
                 res = genLdConstant(tm.getInt32Type(), v);
                 assert((sizeof(void*) == 4) && "TODO fix allocation helper on 64 bit");
             }
@@ -4502,47 +4502,47 @@ Inst* Simplifier::simplifyJitHelperCall(JitHelperCallInst* inst) {
         case ClassGetTypeSize:
             ch = getClassHandle(inst->getSrc(0));
             if (ch) {
-                res = genLdConstant((int32)class_get_boxed_data_size(ch));
+                res = genLdConstant((int32)VMInterface::getObjectSize(ch));
             }
             break;
         case ClassGetArrayElemSize:
             ch = getClassHandle(inst->getSrc(0));
             if (ch) {
-                res = genLdConstant((int32)class_get_array_element_size(ch));
+                res = genLdConstant((int32)VMInterface::getArrayElemSize(ch));
             }
             break;
         case ClassIsInterface:
             ch = getClassHandle(inst->getSrc(0));
             if (ch) {
-                res = genLdConstant((int32)class_property_is_interface2(ch));
+                res = genLdConstant((int32)VMInterface::isInterfaceType(ch));
             }
             break;
         case ClassIsFinal:
             ch = getClassHandle(inst->getSrc(0));
             if (ch) {
-                res = genLdConstant((int32)class_property_is_final(ch));
+                res = genLdConstant((int32)VMInterface::isFinalType(ch));
             }
             break;
         case ClassGetArrayClass:
             ch = getClassHandle(inst->getSrc(0));
             if (ch) {
                 ConstInst::ConstValue v;
-                v.i8 = (POINTER_SIZE_SINT)class_get_array_of_class(ch);
+                v.i8 = (POINTER_SIZE_SINT)VMInterface::getArrayVMTypeHandle(ch, false);
                 res = genLdConstant(tm.getUnmanagedPtrType(tm.getInt8Type()), v);
             }
             break;
         case ClassIsFinalizable:
             ch = getClassHandle(inst->getSrc(0));
             if (ch) {
-                res = genLdConstant((int32)class_is_finalizable(ch));
+                res = genLdConstant((int32)VMInterface::isFinalizable(ch));
             }
             break;
         case ClassGetFastCheckDepth:
             ch = getClassHandle(inst->getSrc(0));
             if (ch) {
                 int depth = 0;
-                if (class_get_fast_instanceof_flag(ch)) {
-                    depth = (int32)class_get_depth(ch);
+                if (VMInterface::getClassFastInstanceOfFlag(ch)) {
+                    depth = (int32)VMInterface::getClassDepth(ch);
                 }
                 res = genLdConstant(depth);
             }

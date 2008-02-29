@@ -78,8 +78,7 @@ extern "C"
 JITEXPORT void
 JIT_init(JIT_Handle jit, const char* name)
 {
-    std::string initMessage = std::string("Initializing Jitrino.") + name +
-                              " -> ";
+    std::string initMessage = std::string("Initializing Jitrino.") + name + " -> ";
     std::string mode = "OPT";
 #ifdef USE_FAST_PATH
     if (JITInstanceContext::isNameReservedForJet(name)) mode = "JET";
@@ -87,19 +86,6 @@ JIT_init(JIT_Handle jit, const char* name)
     initMessage = initMessage + mode + " compiler mode";
     INFO(initMessage.c_str());
     Jitrino::Init(jit, name);
-
-#if defined (PLATFORM_NT) && defined (_DEBUG)
-    if (!get_boolean_property("vm.assert_dialog", TRUE, VM_PROPERTIES))
-    {
-        _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
-        _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDOUT);
-        _CrtSetReportMode(_CRT_ERROR,  _CRTDBG_MODE_FILE);
-        _CrtSetReportFile(_CRT_ERROR,  _CRTDBG_FILE_STDOUT);
-        _CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_FILE);
-        _CrtSetReportFile(_CRT_WARN, _CRTDBG_FILE_STDOUT);
-        _set_error_mode(_OUT_TO_STDERR);
-    }
-#endif
 
 #ifdef USE_FAST_PATH
     Jet::setup(jit, name);
@@ -211,8 +197,7 @@ JIT_compile_method_with_params(JIT_Handle jit, Compile_Handle compilation,
                                OpenMethodExecutionParams compilation_params)
 {
     MemoryManager memManager("JIT_compile_method.memManager");
-    JIT_Handle jitHandle = method_get_JIT_id(compilation);
-    JITInstanceContext* jitContext = Jitrino::getJITInstanceContext(jitHandle);
+    JITInstanceContext* jitContext = Jitrino::getJITInstanceContext(jit);
     assert(jitContext!= NULL);
 
     TypeManager typeManager(memManager); typeManager.init();
@@ -241,7 +226,7 @@ JIT_compile_method_with_params(JIT_Handle jit, Compile_Handle compilation,
              << jitContext->getJITName() << "." << pipename
              << "\tstart "
              << methodTypeName << "." << methodName << methodSig
-             << "\tbyte code size=" <<  method_get_byte_code_size(method_handle)
+             << "\tbyte code size=" <<  md->getByteCodeSize()
              << std::endl;
     }
 #ifdef _DEBUG
@@ -252,7 +237,7 @@ JIT_compile_method_with_params(JIT_Handle jit, Compile_Handle compilation,
  
 #ifdef USE_FAST_PATH
     if (isJET(jit))
-        result = Jet::compile_with_params(jitHandle, compilation, method_handle,
+        result = Jet::compile_with_params(jit, compilation, method_handle,
                                         compilation_params);
     else 
 #endif  // USE_FAST_PATH
@@ -270,8 +255,8 @@ JIT_compile_method_with_params(JIT_Handle jit, Compile_Handle compilation,
              //<< methodTypeName << "." << methodName << methodSig;
 
         if (result == JIT_SUCCESS) {
-            unsigned size = method_get_code_block_size_jit(method_handle, jit);
-            Byte *  start = size ? method_get_code_block_addr_jit(method_handle, jit) : 0;
+            unsigned size = md->getCodeBlockSize(0);
+            Byte *  start = size ? md->getCodeBlockAddress(0) : 0;
             info << "\tnative code size=" << size
                  << " code range=[" << (void*)start << "," << (void*)(start+size) << "]";
         }
@@ -323,9 +308,7 @@ JIT_unwind_stack_frame(JIT_Handle jit, Method_Handle method,
 {
 #ifdef _DEBUG
     if(Log::cat_rt()->isEnabled())
-        Log::cat_rt()->out() << "UNWIND_STACK_FRAME(" <<
-        class_get_name(method_get_class(method)) << "." <<
-        method_get_name(method) << ")" << ::std::endl;
+        Log::cat_rt()->out() << "UNWIND_STACK_FRAME(" << method << ")" << ::std::endl;
 #endif
 
 #ifdef USE_FAST_PATH
@@ -346,9 +329,7 @@ JIT_get_root_set_from_stack_frame(JIT_Handle jit, Method_Handle method,
 {
 #ifdef _DEBUG
     if(Log::cat_rt()->isEnabled())
-        Log::cat_rt()->out() << "GET_ROOT_SET_FROM_STACK_FRAME(" <<
-        class_get_name(method_get_class(method)) << "." <<
-        method_get_name(method) << ")" << ::std::endl;
+        Log::cat_rt()->out() << "GET_ROOT_SET_FROM_STACK_FRAME(" << method << ")" << ::std::endl;
 #endif
 
 #ifdef USE_FAST_PATH
@@ -410,9 +391,7 @@ JIT_fix_handler_context(JIT_Handle jit, Method_Handle method,
 {
 #ifdef _DEBUG
     if(Log::cat_rt()->isEnabled())
-        Log::cat_rt()->out() << "FIX_HANDLER_CONTEXT(" <<
-        class_get_name(method_get_class(method)) << "."
-        << method_get_name(method) << ")" << ::std::endl;
+        Log::cat_rt()->out() << "FIX_HANDLER_CONTEXT(" << method << ")" << ::std::endl;
 #endif
 
 #ifdef USE_FAST_PATH
@@ -462,16 +441,11 @@ extern "C"
 JITEXPORT Boolean
 JIT_supports_compressed_references(JIT_Handle jit)
 {
-#ifdef USE_FAST_PATH
-    if (isJET(jit)) {
 #ifdef _EM64T_
         return true;
 #else
         return false;
 #endif
-    }
-#endif
-    return (vm_references_are_compressed() != 0);
 }
 
 extern "C"
@@ -481,9 +455,7 @@ JIT_get_root_set_for_thread_dump(JIT_Handle jit, Method_Handle method,
                                  ::JitFrameContext *context)
 {
     if(Log::cat_rt()->isEnabled()) {
-        Log::cat_rt()->out() << "GET_ROOT_SET_FROM_STACK_FRAME(" << 
-        class_get_name(method_get_class(method)) << "." << 
-        method_get_name(method) << ")" << ::std::endl;
+        Log::cat_rt()->out() << "GET_ROOT_SET_FROM_STACK_FRAME(" << method << ")" << ::std::endl;
     }
     MethodDesc methodDesc(method, jit);
     ThreadDumpEnumerator gcInterface;

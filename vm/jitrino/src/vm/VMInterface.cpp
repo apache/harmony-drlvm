@@ -86,6 +86,16 @@ VMInterface::flagTLSThreadStateOffset() {
     return (uint32)offset;
 }
 
+int32
+VMInterface::getTLSBaseOffset() {
+    return (int32) hythread_get_hythread_offset_in_tls();
+}
+
+bool
+VMInterface::useFastTLSAccess() {
+    return 0 != hythread_uses_fast_tls();
+}
+
 //////////////////////////////////////////////////////////////////////////////
 ///////////////////////// VMTypeManager /////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
@@ -213,6 +223,11 @@ VMInterface::isSubClassOf(void* vmTypeHandle1,void* vmTypeHandle2) {
     }
     return class_is_instanceof((Class_Handle) vmTypeHandle1,(Class_Handle) vmTypeHandle2)?true:false;
 }    
+
+uint32
+VMInterface::getArrayElemSize(void * vmTypeHandle) {
+    return class_get_array_element_size((Class_Handle) vmTypeHandle);
+}
 
 uint32
 VMInterface::getObjectSize(void * vmTypeHandle) {
@@ -490,6 +505,12 @@ CompilationInterface::getTypeFromDrlVMTypeHandle(Type_Info_Handle typeHandle) {
         assert(0);
     }
     return type;
+}
+
+MethodDesc*
+CompilationInterface::getMagicHelper(VM_RT_SUPPORT id){
+    Method_Handle mh = vm_helper_get_magic_helper(id);
+    return mh ? getMethodDesc(mh) : NULL;
 }
 
 const char*
@@ -916,5 +937,49 @@ CompilationInterface::getFieldType(Class_Handle enclClass, uint32 cpIndex) {
     return NULL;
 }
 
+const char* 
+CompilationInterface::getMethodName(Class_Handle enclClass, uint32 cpIndex) {
+    return const_pool_get_method_name(enclClass, cpIndex);
+}
+
+const char* 
+CompilationInterface::getMethodClassName(Class_Handle enclClass, uint32 cpIndex) {
+    return const_pool_get_method_class_name(enclClass, cpIndex);
+}
+
+const char* 
+CompilationInterface::getFieldSignature(Class_Handle enclClass, uint32 cpIndex) {
+    return const_pool_get_field_descriptor(enclClass, cpIndex);
+}
+
+::std::ostream& operator<<(::std::ostream& os, Method_Handle method) { 
+    os << class_get_name(method_get_class(method)) << "." 
+        << method_get_name(method) << method_get_descriptor(method);
+    return os;
+}
+
+VMPropertyIterator::VMPropertyIterator(
+    MemoryManager& mm, const char* prefix): mm(mm), key(NULL), value(NULL), iterator(0)
+{
+    keys = get_properties_keys_staring_with(prefix, VM_PROPERTIES);
+}
+
+VMPropertyIterator::~VMPropertyIterator() {
+    destroy_properties_keys(keys);
+}
+
+bool 
+VMPropertyIterator::isOver() const {
+    return keys[iterator] ? false : true;
+}
+
+void 
+VMPropertyIterator::next() {
+    assert(!isOver());
+    key = mm.copy(keys[iterator]);
+    char* nval = get_property(keys[iterator++], VM_PROPERTIES);
+    value = mm.copy(nval);
+    destroy_property_value(nval);
+}
 
 } //namespace Jitrino

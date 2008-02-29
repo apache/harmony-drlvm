@@ -19,7 +19,7 @@
  * @version $Revision$
  */
 
-
+#include "VMInterface.h"
 #include "PMF.h"
 #include "PMFAction.h"
 #include "FixFileName.h"
@@ -1357,18 +1357,11 @@ void PMF::processCmd (const char* ptr)
 
 void PMF::processVMProperties ()
 {
-    char** keys = get_properties_keys(VM_PROPERTIES);
-    int i = 0;
-    while (keys[i] != NULL) {
-        if (strncmp("jit.", keys[i], 4) == 0)
-        {
-            char* value = get_property(keys[i], VM_PROPERTIES);
-            processCmd(keys[i] + 4, value);
-            destroy_property_value(value);
-        }
-        i++;
+    VMPropertyIterator it(mm, "jit.");
+    while(!it.isOver()) {
+        it.next();
+        processCmd(it.getKey() + 4, it.getValue());
     }
-    destroy_properties_keys(keys);
 }
 
 

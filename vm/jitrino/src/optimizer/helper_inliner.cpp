@@ -79,7 +79,7 @@ void HelperInlinerAction::registerHelper(Opcode opcode, VM_RT_SUPPORT helperId) 
     assert(flags.opcodeToHelperMapping.find(opcode)==flags.opcodeToHelperMapping.end()); 
     flags.opcodeToHelperMapping[opcode] = helperId; 
     if (flags.helperConfigs.find(helperId)== flags.helperConfigs.end()) {
-        std::string helperName = vm_helper_get_name(helperId);
+        std::string helperName = CompilationInterface::getRuntimeHelperName(helperId);
         HelperConfig* h = new (globalMM) HelperConfig(helperId);
         h->doInlining = getBoolArg(helperName.c_str(), false);
         h->hotnessPercentToInline = getIntArg((helperName + "_hotnessPercent").c_str(), 0);
@@ -319,17 +319,18 @@ void HelperInliner::run()  {
 
 MethodDesc* HelperInliner::findHelperMethod(CompilationInterface* ci, VM_RT_SUPPORT helperId) 
 {
-    Method_Handle mh = vm_helper_get_magic_helper(helperId);
-    if (mh == NULL) {
-        if (Log::isEnabled()) Log::out()<<"WARN: helper's method is not resolved:"<<vm_helper_get_name(helperId)<<std::endl;
+    MethodDesc* md = ci->getMagicHelper(helperId);
+    if (md == NULL) {
+        if (Log::isEnabled()) Log::out()<<"WARN: helper's method is not resolved:"<<CompilationInterface::getRuntimeHelperName(helperId)<<std::endl;
         return NULL;
     }
-    Class_Handle ch = method_get_class(mh);
-    if (!class_is_initialized(ch)) {
-        if (Log::isEnabled()) Log::out()<<"WARN: class is not initialized:"<<class_get_name(ch)<<std::endl;
+    
+    Class_Handle ch = md->getParentHandle();
+    if (!VMInterface::isInitialized(ch)) {
+        if (Log::isEnabled()) Log::out()<<"WARN: class is not initialized:"<<VMInterface::getTypeName(ch)<<std::endl;
         return NULL;
     }
-    MethodDesc* md = ci->getMethodDesc(mh);
+    
     return md;
 }
 

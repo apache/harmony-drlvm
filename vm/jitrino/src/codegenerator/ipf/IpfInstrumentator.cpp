@@ -23,7 +23,7 @@
 
 #include "IpfInstrumentator.h"
 #include "IpfIrPrinter.h"
-#include "open/vm.h"
+#include "VMInterface.h"
 #include <fstream>
 
 namespace Jitrino {
@@ -141,29 +141,20 @@ void Instrumentator::genNativeCall(uint64 funcDescPtr, InstVector &insts) {
 //----------------------------------------------------------------------------------------//
 
 void Instrumentator::methodStart(Method_Handle methodHandle) {
-
     ofstream rtLog;
     rtLog.open("rt.log", ios::out | ios::app);
 
-    rtLog << "Start ";
-    rtLog << class_get_name(method_get_class(methodHandle));
-    rtLog << "." << method_get_name(methodHandle);
-    rtLog << method_get_descriptor(methodHandle) << endl;
+    rtLog << "Start " << methodHandle << endl;
     rtLog.close();
 }
 
 //----------------------------------------------------------------------------------------//
 
 void Instrumentator::methodEnd(Method_Handle methodHandle) {
-
     ofstream rtLog;
     rtLog.open("rt.log", ios::out | ios::app);
     
-    rtLog << "End   ";
-    rtLog << class_get_name(method_get_class(methodHandle));
-    rtLog << "." << method_get_name(methodHandle);
-    rtLog << method_get_descriptor(methodHandle) << endl;
-    rtLog.close();
+    rtLog << "End   " << methodHandle << endl;
 }
 
 } // IPF

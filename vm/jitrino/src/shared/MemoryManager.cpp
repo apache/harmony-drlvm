@@ -247,6 +247,14 @@ void *MemoryManager::alloc(size_t size)
     return (void*)mem;
 }
 
+char* 
+MemoryManager::copy(const char* str) {
+    if (!str) return NULL;
+    size_t len = strlen(str);
+    char* cp = (char*)alloc(len + 1);
+    return strcpy(cp, str);
+}
+
 } //namespace Jitrino 
 
 #ifdef DEBUG_MEMORY_MANAGER

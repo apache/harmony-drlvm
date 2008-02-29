@@ -38,6 +38,7 @@ public:
     virtual ~MemoryManager();
     void *alloc(size_t size);
     size_t bytes_allocated() { return _bytes_allocated; }
+    char* copy(const char* str);
 protected:
     MemoryManager(const MemoryManager&) {assert(0);}
     MemoryManager& operator=(const MemoryManager&) {assert(0); return *this;}

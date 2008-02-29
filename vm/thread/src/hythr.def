@@ -43,6 +43,7 @@ hythread_get_priority
 hythread_tls_get
 hythread_tls_get_request_offset
 hythread_tls_get_offset
+hythread_get_hythread_offset_in_tls
 hythread_get_struct_size
 hythread_global_lock
 hythread_global_unlock

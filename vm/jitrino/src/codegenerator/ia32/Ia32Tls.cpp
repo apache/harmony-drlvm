@@ -25,7 +25,7 @@
 
 
 #include "Ia32Tls.h"
-#include <open/hythread_ext.h>
+#include "VMInterface.h"
 
 namespace Jitrino {
 namespace Ia32 {
@@ -78,7 +78,7 @@ Opnd* createTlsBaseLoadGeneric(IRManager& irManager, Node* ctrlNode, Type* tlsBa
 
 Opnd* createTlsBaseLoadWin(IRManager& irManager, Node* ctrlNode, Type* tlsBaseType)
 {
-    if (!hythread_uses_fast_tls()) {
+    if (!VMInterface::useFastTLSAccess()) {
         return createTlsBaseLoadGeneric(irManager, ctrlNode, tlsBaseType);
     }
     // HYTHR's structure is stored in TIB's free offset aka [fs:0x14]
@@ -90,7 +90,7 @@ Opnd* createTlsBaseLoadWin(IRManager& irManager, Node* ctrlNode, Type* tlsBaseTy
 
 Opnd* createTlsBaseLoadLin(IRManager& irManager, Node* ctrlNode, Type* tlsBaseType)
 {
-    if (!hythread_uses_fast_tls()) {
+    if (!VMInterface::useFastTLSAccess()) {
         return createTlsBaseLoadGeneric(irManager, ctrlNode, tlsBaseType);
     }
 
@@ -102,7 +102,7 @@ Opnd* createTlsBaseLoadLin(IRManager& irManager, Node* ctrlNode, Type* tlsBaseTy
         tlsBase = hythread_t
     */
 
-    int threadOffset = hythread_get_hythread_offset_in_tls();
+    int threadOffset = VMInterface::getTLSBaseOffset();
     Opnd* pTib;
 #if defined(_EM64T_)
     pTib = irManager.newMemOpnd(tlsBaseType, MemOpndKind_Any, NULL, 0, RegName_FS);

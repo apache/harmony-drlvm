@@ -108,7 +108,7 @@ static bool isUnmanagedFieldPtr(Opnd* opnd) {
         return false;
     }
     field = (FieldDesc*)info->getValue(0);
-    return field_is_magic(field->getFieldHandle());
+    return field->isMagic();
 }
 
 static void checkManaged2UnmanagedConv(IRManager& irm, Opnd* opnd) {
@@ -519,13 +519,6 @@ void RuntimeInterface::getGCRootSet(MethodDesc* methodDesc, GCInterface* gcInter
                                    const JitFrameContext* context, bool isFirst)
 {  
     AutoTimer tm(enumerateTimer);
-
-/*    Class_Handle parentClassHandle = method_get_class(((DrlVMMethodDesc*)methodDesc)->getDrlVMMethod());
-    const char* methodName = methodDesc->getName();
-    const char* className = class_get_name(parentClassHandle);
-    const char* methodSignature = methodDesc->getSignatureString();
-    printf("enumerate: %s::%s %s ip=%d\n", className, methodName, methodSignature, *context->p_eip);
-*/
 
     // Compute stack information
     uint32 stackInfoSize = (uint32)StackInfo::getByteSize(methodDesc);

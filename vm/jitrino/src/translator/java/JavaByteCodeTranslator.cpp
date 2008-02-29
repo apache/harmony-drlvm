@@ -757,11 +757,12 @@ JavaByteCodeTranslator::getstatic(uint32 constPoolIndex) {
             pushOpnd(irBuilder.genLdStatic(fieldType, field));
         }
     } else {
+        //field is not resolved or not static
         if (!typeManager.isLazyResolutionMode()) {
             // generate helper call for throwing respective exception
             linkingException(constPoolIndex, OPCODE_GETSTATIC);
         }
-        const char* fieldTypeName = const_pool_get_field_descriptor(methodToCompile.getParentHandle(), constPoolIndex);
+        const char* fieldTypeName = CompilationInterface::getFieldSignature(methodToCompile.getParentHandle(), constPoolIndex);
         bool fieldIsMagic = VMMagicUtils::isVMMagicClass(fieldTypeName);
         Type* fieldType = fieldIsMagic ? convertVMMagicType2HIR(typeManager, fieldTypeName) 
                                        : compilationInterface.getFieldType(methodToCompile.getParentHandle(), constPoolIndex);
@@ -782,11 +783,12 @@ JavaByteCodeTranslator::putstatic(uint32 constPoolIndex) {
         }
         irBuilder.genStStatic(fieldType,field,popOpnd());
     } else {
+        //field is not resolved or not static
         if (!typeManager.isLazyResolutionMode()) {
             // generate helper call for throwing respective exception
             linkingException(constPoolIndex, OPCODE_PUTSTATIC);
         }
-        const char* fieldTypeName = const_pool_get_field_descriptor(methodToCompile.getParentHandle(), constPoolIndex);
+        const char* fieldTypeName = CompilationInterface::getFieldSignature(methodToCompile.getParentHandle(), constPoolIndex);
         bool fieldIsMagic = VMMagicUtils::isVMMagicClass(fieldTypeName);
         Type* fieldType = fieldIsMagic ? convertVMMagicType2HIR(typeManager, fieldTypeName) 
                                        : compilationInterface.getFieldType(methodToCompile.getParentHandle(), constPoolIndex);
@@ -1493,8 +1495,8 @@ void JavaByteCodeTranslator::genCallWithResolve(JavaByteCodes bc, unsigned cpInd
     
 
     if (bc != OPCODE_INVOKEINTERFACE) {
-        const char* kname = const_pool_get_method_class_name(methodToCompile.getParentHandle(), cpIndex);
-        const char* mname = const_pool_get_method_name(methodToCompile.getParentHandle(), cpIndex);
+        const char* kname = CompilationInterface::getMethodClassName(methodToCompile.getParentHandle(), cpIndex);
+        const char* mname = CompilationInterface::getMethodName(methodToCompile.getParentHandle(), cpIndex);
         if (VMMagicUtils::isVMMagicClass(kname)) {
             assert(bc == OPCODE_INVOKESTATIC || bc == OPCODE_INVOKEVIRTUAL);
             UNUSED bool res = genVMMagic(mname, numArgs, args, returnType);    

@@ -70,6 +70,7 @@ public:
     static void*       getAllocationHandle(void* vmTypeHandle);
     static bool        isSubClassOf(void* vmTypeHandle1,void* vmTypeHandle2);
     static uint32      getArrayElemOffset(void* vmElemTypeHandle,bool isUnboxed);
+    static uint32      getArrayElemSize(void * vmTypeHandle);
     static uint32      getObjectSize(void * vmTypeHandle);
     static uint32      getArrayLengthOffset();
 
@@ -78,6 +79,8 @@ public:
 
     static uint32      flagTLSSuspendRequestOffset();
     static uint32      flagTLSThreadStateOffset();
+    static int32       getTLSBaseOffset();
+    static bool        useFastTLSAccess();
 
 
     // returns true if vtable pointers are compressed
@@ -156,6 +159,7 @@ public:
         bool          isInitOnly() const     {return field_is_final(drlField)?true:false;}    
         // accesses to field cannot be reordered or CSEed
         bool          isVolatile() const    {return field_is_volatile(drlField)?true:false;}
+        bool          isMagic() const    {return field_is_magic(drlField)?true:false;}
         Type*         getFieldType();
         uint32        getOffset() const; // for non-static fields
         void*         getAddress() const    {return field_get_address(drlField);} // for static fields
@@ -308,7 +312,7 @@ public:
     bool        mayBeInterruptible(VM_RT_SUPPORT id);
     void*       getRuntimeHelperAddress(VM_RT_SUPPORT);
     void*       getRuntimeHelperAddressForType(VM_RT_SUPPORT, Type*);
-
+    MethodDesc* getMagicHelper(VM_RT_SUPPORT);
 
     Type*      getFieldType(Class_Handle enclClass, uint32 cpIndex);
 
@@ -319,6 +323,9 @@ public:
     NamedType* resolveNamedType(Class_Handle enclClass, uint32 cpIndex);
 
 
+    static const char* getMethodName(Class_Handle enclClass, uint32 cpIndex);
+    static const char* getMethodClassName(Class_Handle enclClass, uint32 cpIndex);
+    static const char* getFieldSignature(Class_Handle enclClass, uint32 cpIndex);
 
     MethodDesc* getStaticMethod(Class_Handle enclClass, uint32 cpIndex);
     MethodDesc* getVirtualMethod(Class_Handle enclClass, uint32 cpIndex);
@@ -537,6 +544,24 @@ inline ::std::ostream& operator<<(::std::ostream& os, const PersistentInstructio
         << (unsigned int) pid.getLocalInstructionId(); 
     return os;
 }
+
+::std::ostream& operator<<(::std::ostream& os, Method_Handle mh);
+
+class VMPropertyIterator {
+public:
+    VMPropertyIterator(MemoryManager& m, const char* prefix);
+    ~VMPropertyIterator();
+    bool isOver() const;
+    void next();
+    char* getKey() const { return key; }
+    char* getValue() const { return value; }
+private:
+    MemoryManager& mm;
+    char* key;
+    char* value;
+    char** keys;
+    size_t iterator;
+};
 
 } //namespace Jitrino 
 
