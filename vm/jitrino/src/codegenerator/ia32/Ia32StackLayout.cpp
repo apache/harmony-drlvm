@@ -285,7 +285,7 @@ void StackLayouter::createProlog()
     assert(entryPointInst->getNode() == irManager->getFlowGraph()->getEntryNode());
     cClient = &((const EntryPointPseudoInst*)entryPointInst)->getCallingConventionClient();
     cConvention = cClient->getCallingConvention();
-    // Overal size of stack frame should preserve alignment available on method enter. 
+    // Overall size of stack frame should preserve alignment available on method enter. 
     stackSizeAlignment = (cConvention->getStackAlignment() == STACK_ALIGN_HALF16)
         ? STACK_ALIGN16 : cConvention->getStackAlignment();
 

@@ -300,6 +300,16 @@ void SimpleStackOpndCoalescer::addReplacement(Opnd * dstOpnd, Opnd * srcOpnd)
 void SimpleStackOpndCoalescer::removeInsts()
 {
     uint32 opndCount = irManager.getOpndCount();
+    
+    // Exclude aliased memory locations from the optimization
+    // example: if for "mov arg1, arg0"  both args are on stack but arg0 is placed in incoming args stack area 
+    // and arg1 in locals stack area -> we must not remove this copy. 
+    // Reasons: opnds order rearrangement due to different CC, stackdepth adjustment for all stackautolayout opnds in emmiter.
+
+    IRManager::AliasRelation * relations = new (memoryManager) IRManager::AliasRelation[opndCount];
+    irManager.getAliasRelations(relations);
+
+
     replacementsAdded = 0;
     opndReplacements.resize(opndCount);
     for (uint32 i = 0; i < opndCount; i++)
@@ -307,7 +317,20 @@ void SimpleStackOpndCoalescer::removeInsts()
     for (uint32 i = 0; i < candidateInsts.size(); i++){
         int adj;
         Inst * inst = candidateInsts[i].inst;
+        if (Log::isEnabled()) {
+            Log::out()<<"SimpleStackOpndCoalescer: optimizing inst: I"; 
+            IRPrinter::printInst(Log::out(), inst);Log::out()<<std::endl;;
+        }
         Opnd * dstOpnd = inst->getOpnd(0), * srcOpnd = inst->getOpnd(1);
+        
+        if (relations[dstOpnd->getId()].outerOpnd!=NULL) { //no not optimize aliased opnds
+            if (Log::isEnabled()) {
+                Log::out()<<"SimpleStackOpndCoalescer: memory aliasing found for dstOpnd: ";
+                IRPrinter::printOpnd(Log::out(),dstOpnd); Log::out()<<" skipping optimization"<<std::endl;
+            }
+            continue;
+        }
+
         if (opndReplacements[dstOpnd->getId()] != NULL){
             dstOpnd = opndReplacements[dstOpnd->getId()];
             assert(opndReplacements[dstOpnd->getId()] == NULL);

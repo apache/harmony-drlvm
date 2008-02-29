@@ -303,20 +303,66 @@ Opnd * InstCodeSelector::convertIntToInt(Opnd * srcOpnd, Type * dstType, Opnd * 
 Opnd * InstCodeSelector::convertIntToFp(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd)
 {
     assert(srcOpnd->getType()->isInteger() && dstType->isFP());
-    OpndSize srcSize=srcOpnd->getSize();
-    if (dstOpnd==NULL)
+    if (dstOpnd==NULL) {
         dstOpnd=irManager.newOpnd(dstType);
-    const char * helperName;
-    if (srcSize<=OpndSize_32){
-        if (srcSize<OpndSize_32)
-            srcOpnd=convert(srcOpnd, typeManager.getInt32Type());
-        helperName=dstType->isSingle()?"convI4F4":"convI4F8";
-    }else{
-        assert(srcSize==OpndSize_64);
-        helperName=dstType->isSingle()?"convI8F4":"convI8F8";
     }
-    Opnd * args[] = {srcOpnd};
-    appendInsts(irManager.newInternalRuntimeHelperCallInst(helperName, 1, args, dstOpnd));
+    OpndSize srcSize = srcOpnd->getSize();
+    OpndSize dstSize = dstOpnd->getSize();
+
+    if (srcSize<OpndSize_32) {
+        srcOpnd=convert(srcOpnd, typeManager.getInt32Type());
+        srcSize = srcOpnd->getSize();
+    }
+    assert(srcSize == OpndSize_32 || srcSize == OpndSize_64);
+
+    bool useHelpers = codeSelector.getFlags().useInternalHelpersForInteger2FloatConv; 
+    if (!useHelpers) { //use SSE
+        if (srcSize == OpndSize_32) {
+            Inst* convInst = irManager.newInst(dstSize == OpndSize_32 ? Mnemonic_CVTSI2SS : Mnemonic_CVTSI2SD, dstOpnd, srcOpnd);            
+            appendInsts(convInst);
+        } else { 
+            //use FPU to convert long to float/double on IA32 platform
+#ifdef _EM64T_
+            Opnd* int64Opnd = srcOpnd;
+#else  //32 bit mode - use memory aliasing for 64bit opnd
+            //copy i8 to stack first
+            Opnd* i8onStackOpnd = irManager.newMemOpnd(srcOpnd->getType(), MemOpndKind_StackAutoLayout, irManager.getRegOpnd(STACK_REG));
+            Inst* copyInst = irManager.newI8PseudoInst(Mnemonic_MOV, 1, i8onStackOpnd, srcOpnd);
+            appendInsts(copyInst);
+
+            //Alias i8onStackOpnd memory location with new opnd that is not affected by i8lowerer and keeps int64 type until emitter
+            Opnd* int64Opnd = irManager.newMemOpnd(srcOpnd->getType(), MemOpndKind_StackAutoLayout, irManager.getRegOpnd(STACK_REG));
+            Opnd * args[] = {i8onStackOpnd};
+            Inst* memAliasInst = irManager.newAliasPseudoInst(int64Opnd, 1, args);
+            appendInsts(memAliasInst);
+#endif
+
+            //load float value to FP0
+            Opnd* fpResOpnd = irManager.newOpnd(irManager.getTypeManager().getDoubleType());
+            Inst* convInst = irManager.newInst(Mnemonic_FILD, fpResOpnd, int64Opnd);            
+            appendInsts(convInst);
+
+            //copy from FP0 to SSE
+            if (dstType->isDouble()) {
+                Inst* copy2SSEInst = irManager.newCopySequence(Mnemonic_MOV, dstOpnd, fpResOpnd);
+                appendInsts(copy2SSEInst);
+            } else {
+                assert(dstSize == OpndSize_32);
+                convertFpToFp(fpResOpnd, dstType, dstOpnd);
+            }
+        }
+    }
+
+    if (useHelpers) {
+        const char * helperName;
+        if (srcSize == OpndSize_32) {
+            helperName=dstType->isSingle()?"convI4F4":"convI4F8";
+        } else {
+            helperName=dstType->isSingle()?"convI8F4":"convI8F8";
+        }
+        Opnd * args[] = {srcOpnd};
+        appendInsts(irManager.newInternalRuntimeHelperCallInst(helperName, 1, args, dstOpnd));
+    }
     return dstOpnd;
 }
 
@@ -2189,7 +2235,7 @@ CG_OpndHandle* InstCodeSelector::ldRef(Type *dstType,
     assert(dstType->isSystemString() || dstType->isSystemClass());
     Opnd * retOpnd=irManager.newOpnd(dstType);
 
-    if (codeSelector.methodCodeSelector.slowLdString || dstType->isSystemClass() ||
+    if (codeSelector.getFlags().slowLdString || dstType->isSystemClass() ||
         *((POINTER_SIZE_INT *) compilationInterface.getStringInternAddr(enclosingMethod, refToken)) == 0) {
         NamedType * parentType=enclosingMethod->getParentType();
     #ifdef _EM64T_

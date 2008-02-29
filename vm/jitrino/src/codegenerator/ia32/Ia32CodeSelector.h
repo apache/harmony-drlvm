@@ -50,6 +50,20 @@ class Inst;
 
 class MethodCodeSelector;
 
+class CodeSelectionFlags {
+public:
+    CodeSelectionFlags() {
+        useInternalHelpersForInteger2FloatConv = false;
+        slowLdString = false;
+    }
+
+    bool useInternalHelpersForInteger2FloatConv;
+    bool slowLdString; 
+
+};
+
+
+
 //========================================================================================================
 //  Cfg code selector -- builds IA32 flow graph with instructions
 //========================================================================================================
@@ -64,7 +78,7 @@ public:
     //
     //  CFGCodeSelector::Callback methods
     //
-    CfgCodeSelector(CompilationInterface& compIntfc,
+    CfgCodeSelector(::Jitrino::SessionAction* sa, CompilationInterface& compIntfc,
                          MethodCodeSelector& methodCodeSel, 
                          MemoryManager& codeSelectorMM, uint32 nNodes, 
                          IRManager& irM);
@@ -107,6 +121,8 @@ public:
 
     //    Callbacks for the instruction code selector
     void    methodHasCalls(bool nonExceptionCall);
+
+    const CodeSelectionFlags& getFlags() const {return flags;}
 private:
     //
     //    Methods
@@ -132,6 +148,7 @@ private:
 
     Opnd *                  returnOperand;
 
+    CodeSelectionFlags      flags;
 
     friend class InstCodeSelector;
 };
@@ -149,11 +166,11 @@ drives IR lowering for a whole method
 
 class MethodCodeSelector : public ::Jitrino::MethodCodeSelector::Callback {
 public:
-    MethodCodeSelector(CompilationInterface&    compIntfc,
+    MethodCodeSelector(::Jitrino::SessionAction* sa, 
+                            CompilationInterface&    compIntfc,
                             MemoryManager&      irMM,
                             MemoryManager&      codeSelectorMM,
-                            IRManager&          irM,
-                            bool                slowLoadString = false);
+                            IRManager&          irM);
      
 
       void                genVars(uint32 numVars, ::Jitrino::VarCodeSelector& varCodeSelector);
@@ -170,6 +187,7 @@ private:
     //
     //    Fields
     //
+    ::Jitrino::SessionAction* sa;
     int                 numVarOpnds;
     CompilationInterface& compilationInterface;
     MemoryManager&      irMemManager;           // for data live after code selection
@@ -179,8 +197,6 @@ private:
     MethodDesc *        methodDesc;
 
     EdgeMethodProfile*  edgeProfile;
-
-    bool                slowLdString; // 'false' by default
 
     friend class CFGCodeSelector;
     friend class VarGenerator;

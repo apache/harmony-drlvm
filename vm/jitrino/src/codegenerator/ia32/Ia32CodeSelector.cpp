@@ -46,12 +46,13 @@ CountTime     fixNodeInfoTimer("ia32::selector::fixNodeInfo");
 //_______________________________________________________________________________________________
 /**  Construct CFG builder */
 
-CfgCodeSelector::CfgCodeSelector(CompilationInterface&      compIntfc,
-                                            MethodCodeSelector& methodCodeSel,
-                                            MemoryManager&          codeSelectorMM, 
-                                            uint32                  nNodes, 
-                                            IRManager&          irM
-                                        )
+CfgCodeSelector::CfgCodeSelector(::Jitrino::SessionAction* sa, 
+                                 CompilationInterface&      compIntfc,
+                                 MethodCodeSelector& methodCodeSel,
+                                 MemoryManager&          codeSelectorMM, 
+                                 uint32                  nNodes, 
+                                 IRManager&          irM
+                                 )
     : numNodes(nNodes), nextNodeId(0), compilationInterface(compIntfc), methodCodeSelector(methodCodeSel),
       irMemManager(irM.getMemoryManager()), 
       codeSelectorMemManager(codeSelectorMM),  irManager(irM),
@@ -64,6 +65,8 @@ CfgCodeSelector::CfgCodeSelector(CompilationInterface&      compIntfc,
         nodes[i] = NULL;
 
     InstCodeSelector::onCFGInit(irManager);
+    flags.useInternalHelpersForInteger2FloatConv = sa->getBoolArg("useInternalHelpersForInteger2FloatConv", false);
+    flags.slowLdString = sa->getBoolArg("SlowLdString", false); 
 }
 
 //_______________________________________________________________________________________________
@@ -471,17 +474,17 @@ void MethodCodeSelector::genHeapBase()
 //_______________________________________________________________________________________________
 /** Generate control flow graph */
 
-MethodCodeSelector::MethodCodeSelector(CompilationInterface& compIntfc,
+MethodCodeSelector::MethodCodeSelector(
+                    ::Jitrino::SessionAction* _sa, 
+                    CompilationInterface& compIntfc,
                    MemoryManager&          irMM,
                    MemoryManager&          codeSelectorMM,
-                   IRManager&              irM,
-                   bool                    slowLoadString)
-: compilationInterface(compIntfc),
+                   IRManager&              irM)
+: sa(_sa), compilationInterface(compIntfc),
 irMemManager(irMM), codeSelectorMemManager(codeSelectorMM),
 irManager(irM),
 methodDesc(NULL),
-edgeProfile(NULL),
-slowLdString(slowLoadString)
+edgeProfile(NULL)
 {  
     ProfilingInterface* pi = irManager.getProfilingInterface();
     if (pi!=NULL && pi->isProfilingEnabled(ProfileType_Edge, JITProfilingRole_GEN)) {
@@ -497,9 +500,8 @@ void MethodCodeSelector::genCFG(uint32 numNodes, CFGCodeSelector& codeSelector,
     ControlFlowGraph* fg = irManager.getFlowGraph();
     fg->setEdgeProfile(useEdgeProfile);
 
-    CfgCodeSelector cfgCodeSelector(compilationInterface, *this,
-                        codeSelectorMemManager,numNodes,
-                        irManager);
+    CfgCodeSelector cfgCodeSelector(sa, compilationInterface, *this,
+                        codeSelectorMemManager,numNodes, irManager);
     { 
         AutoTimer tm(selectionTimer); 
         if( NULL == irManager.getEntryPointInst() ) {

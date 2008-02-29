@@ -739,6 +739,7 @@ END_MNEMONIC()
 
 BEGIN_MNEMONIC(FILD, MF_NONE, D_U )
 BEGIN_OPCODES()
+    {OpcodeInfo::all, {0xDB, _0}, {FP0S, m32},    D_U },
     {OpcodeInfo::all, {0xDF, _5}, {FP0D, m64},    D_U },
 END_OPCODES()
 END_MNEMONIC()
