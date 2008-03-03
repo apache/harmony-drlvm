@@ -42,18 +42,9 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-#ifdef __cplusplus
-#define INLINE inline
-#else 
-#ifdef WIN32
-#define INLINE __forceinline
-#else 
-#define INLINE static
-#endif
-#endif
 
  
- #if defined(_IPF_) || defined(DOXYGEN)
+#if defined(_IPF_) || defined(DOXYGEN)
 
 /**
 * The atomic compare and exchange operation on <code>uint8</code>.
@@ -98,7 +89,7 @@ APR_DECLARE(uint64) port_atomic_cas64(volatile uint64 * data,
 
 #elif defined(WIN32) && !defined(_WIN64)
 
-INLINE uint8 port_atomic_cas8(volatile uint8 * data , uint8 value, uint8 comp) {
+PORT_INLINE uint8 port_atomic_cas8(volatile uint8 * data , uint8 value, uint8 comp) {
     __asm {
         mov al,  comp
         mov dl,  value
@@ -109,7 +100,7 @@ INLINE uint8 port_atomic_cas8(volatile uint8 * data , uint8 value, uint8 comp) {
     return comp;
 }
 
-INLINE uint16 port_atomic_cas16(volatile uint16 * data , uint16 value, uint16 comp) {
+PORT_INLINE uint16 port_atomic_cas16(volatile uint16 * data , uint16 value, uint16 comp) {
     __asm {
         mov ax,  comp
         mov dx,  value
@@ -120,7 +111,7 @@ INLINE uint16 port_atomic_cas16(volatile uint16 * data , uint16 value, uint16 co
     return comp;
 }
 
-INLINE uint64 port_atomic_cas64(volatile uint64 * data , uint64 value, uint64 comp) {
+PORT_INLINE uint64 port_atomic_cas64(volatile uint64 * data , uint64 value, uint64 comp) {
     __asm {
         lea esi, comp
         mov eax, [esi]
@@ -145,16 +136,16 @@ INLINE uint64 port_atomic_cas64(volatile uint64 * data , uint64 value, uint64 co
 #pragma intrinsic(_InterlockedCompareExchange16)
 #pragma intrinsic(_InterlockedCompareExchange64)
 
-INLINE uint8 port_atomic_cas8(volatile uint8 * data, 
+PORT_INLINE uint8 port_atomic_cas8(volatile uint8 * data, 
                                                uint8 value, uint8 comp);
 
-INLINE uint16 port_atomic_cas16(volatile uint16 * data, 
+PORT_INLINE uint16 port_atomic_cas16(volatile uint16 * data, 
                                                  uint16 value, uint16 comp)
 {
     return _InterlockedCompareExchange16((volatile SHORT *)data, value, comp);
 }    
 
-INLINE uint64 port_atomic_cas64(volatile uint64 * data, 
+PORT_INLINE uint64 port_atomic_cas64(volatile uint64 * data, 
                                                  uint64 value, uint64 comp)
 {
     return _InterlockedCompareExchange64((volatile LONG64 *)data, value, comp);
@@ -163,7 +154,7 @@ INLINE uint64 port_atomic_cas64(volatile uint64 * data,
 
 #elif defined (PLATFORM_POSIX)  
 
-INLINE uint8 port_atomic_cas8(volatile uint8 * data , uint8 value, uint8 comp) {
+PORT_INLINE uint8 port_atomic_cas8(volatile uint8 * data , uint8 value, uint8 comp) {
 #if defined(_IA32_) || defined(_EM64T_)
     __asm__ __volatile__(
         "lock cmpxchgb %1, (%2)"
@@ -176,7 +167,7 @@ INLINE uint8 port_atomic_cas8(volatile uint8 * data , uint8 value, uint8 comp) {
 #endif
 }
 
-INLINE uint16 port_atomic_cas16(volatile uint16 * data , uint16 value, uint16 comp) {
+PORT_INLINE uint16 port_atomic_cas16(volatile uint16 * data , uint16 value, uint16 comp) {
     uint16 ret;
 #if defined(_IA32_) || defined(_EM64T_)
     __asm__ __volatile__(
@@ -191,7 +182,7 @@ INLINE uint16 port_atomic_cas16(volatile uint16 * data , uint16 value, uint16 co
 #endif
 }
 
-INLINE uint64 port_atomic_cas64(volatile uint64 * data , uint64 value, uint64 comp) {
+PORT_INLINE uint64 port_atomic_cas64(volatile uint64 * data , uint64 value, uint64 comp) {
 #if defined(_IA32_)
     __asm__ __volatile__(
         "push %%ebx;\n\t"
@@ -224,7 +215,7 @@ INLINE uint64 port_atomic_cas64(volatile uint64 * data , uint64 value, uint64 co
 #endif
 }
 
-INLINE void * port_atomic_compare_exchange_pointer(volatile void ** data, void * value, const void * comp) {
+PORT_INLINE void * port_atomic_compare_exchange_pointer(volatile void ** data, void * value, const void * comp) {
 #if defined(_IA32_)
     //return (void *) port_atomic_compare_exchange32((uint32 *)data, (uint32)value, (uint32)comp);
     uint32 Exchange = (uint32)value;

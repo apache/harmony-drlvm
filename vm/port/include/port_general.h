@@ -32,4 +32,24 @@
 #endif /* __cplusplus */
 #endif /* NULL */
 
+
+#ifdef __cplusplus
+#define PORT_INLINE inline
+#else // !__cplusplus
+
+#ifdef WIN32
+#define PORT_INLINE __inline
+#else // !WIN32
+
+#ifdef __linux__
+#define PORT_INLINE inline  __attribute__((always_inline))
+#else // !__linux__
+#define PORT_INLINE static
+#endif // __linux__
+
+#endif // WIN32
+
+#endif // __cplusplus
+
+
 #endif /* _PORT_GENERAL_H_ */

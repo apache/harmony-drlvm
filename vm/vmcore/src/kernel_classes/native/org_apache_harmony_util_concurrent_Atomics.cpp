@@ -22,6 +22,7 @@
 #include "jni.h"
 #include "jni_direct.h"
 #include "atomics.h"
+#include "port_barriers.h"
 #include "org_apache_harmony_util_concurrent_Atomics.h"
 
 JNIEXPORT jint JNICALL Java_org_apache_harmony_util_concurrent_Atomics_arrayBaseOffset
@@ -47,7 +48,7 @@ Java_org_apache_harmony_util_concurrent_Atomics_setIntVolatile__Ljava_lang_Objec
     jobject obj, jlong offset, jint value)
 {
     SetIntFieldOffset(env, obj, (jint)offset, value);
-    MemoryReadWriteBarrier();
+    port_rw_barrier();
 }
 
 
@@ -55,7 +56,7 @@ JNIEXPORT jint JNICALL
 Java_org_apache_harmony_util_concurrent_Atomics_getIntVolatile__Ljava_lang_Object_2J(JNIEnv * env, jclass self, 
     jobject obj, jlong offset)
 {
-    MemoryReadWriteBarrier();
+    port_rw_barrier();
     return GetIntFieldOffset(env, obj, (jint)offset);
 }
 
@@ -64,7 +65,7 @@ Java_org_apache_harmony_util_concurrent_Atomics_setLongVolatile__Ljava_lang_Obje
     jobject obj, jlong offset, jlong value)
 {
     SetLongFieldOffset(env, obj, (jint)offset, value);
-    MemoryReadWriteBarrier();
+    port_rw_barrier();
 }
 
 
@@ -72,7 +73,7 @@ JNIEXPORT jlong JNICALL
 Java_org_apache_harmony_util_concurrent_Atomics_getLongVolatile__Ljava_lang_Object_2J(JNIEnv * env, jclass self, 
     jobject obj, jlong offset)
 {
-    MemoryReadWriteBarrier();
+    port_rw_barrier();
     return GetLongFieldOffset(env, obj, (jint)offset);
 }
 
@@ -81,7 +82,7 @@ Java_org_apache_harmony_util_concurrent_Atomics_setObjectVolatile__Ljava_lang_Ob
     jobject obj, jlong offset, jobject value)
 {
     SetObjectFieldOffset(env, obj, (jint)offset, value);
-    MemoryReadWriteBarrier();
+    port_rw_barrier();
 }
 
 
@@ -89,7 +90,7 @@ JNIEXPORT jobject JNICALL
 Java_org_apache_harmony_util_concurrent_Atomics_getObjectVolatile__Ljava_lang_Object_2J(JNIEnv * env, jclass self, 
     jobject obj, jlong offset)
 {
-    MemoryReadWriteBarrier();
+    port_rw_barrier();
     return GetObjectFieldOffset(env, obj, (jint)offset);
 }
 

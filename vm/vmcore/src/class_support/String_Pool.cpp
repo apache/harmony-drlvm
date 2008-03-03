@@ -32,7 +32,7 @@
 #include "platform_lowlevel.h"
 #include "String_Pool.h"
 #include "environment.h"
-#include "atomics.h"
+#include "port_barriers.h"
 #include "vm_strings.h"
 #include "vm_stats.h"
 #include "ini.h"
@@ -254,7 +254,7 @@ String * String_Pool::lookup(const char *s, size_t len, POINTER_SIZE_INT raw_has
     // We need ordering of writes here as we use the collection without lock.
     // Entry's next pointer should be updated before we update head reference.
     cur_entry = new(mem) Entry(s, len, 0);
-    MemoryWriteBarrier();
+    port_write_barrier();
     *last_entry = cur_entry;
 
     unlock_pool();
@@ -310,9 +310,9 @@ void String_Pool::register_interned_string(String * str) {
         Interned_Strings * new_elem = (Interned_Strings *)memory_pool.alloc(sizeof(Interned_Strings));
         memset(new_elem, 0, sizeof(Interned_Strings));
         current_interned->next = new_elem;
-        MemoryWriteBarrier();
+        port_write_barrier();
         current_interned = new_elem;
-        MemoryWriteBarrier();
+        port_write_barrier();
         local_current_interned->free_slot++;
     } else {
         UNSAFE_REGION_START

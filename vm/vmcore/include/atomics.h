@@ -50,7 +50,4 @@ JNIEXPORT jboolean compareAndSetLongArray
 
 JNIEXPORT jboolean vmSupportsCAS8();
 
-void MemoryReadWriteBarrier();
-
-void MemoryWriteBarrier();
 #endif // _ATOMICS_H_

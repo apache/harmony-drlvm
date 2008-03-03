@@ -30,7 +30,7 @@
 #include "nogc.h"
 #include "open/vm_util.h"
 #include "jit_intf_cpp.h"
-#include "atomics.h"
+#include "port_barriers.h"
 #include "cci.h"
 
 #ifdef _IPF_
@@ -412,13 +412,13 @@ CodeChunkInfo *Method::get_chunk_info_mt(JIT *jit, int id)
         jit_info->_next = _jits;
         // Write barrier is needed as we use
         // unlocked fast access to the collection
-        MemoryWriteBarrier();
+        port_write_barrier();
         _jits = jit_info;
     } else {
         jit_info->_next = _jits->_next;
         // Write barrier is needed as we use
         // unlocked fast access to the collection
-        MemoryWriteBarrier();
+        port_write_barrier();
         _jits->_next = jit_info;
     }
     unlock();
@@ -459,7 +459,7 @@ void *Method::allocate_JIT_data_block(size_t size, JIT *jit, size_t alignment)
         jit_info = create_code_chunk_info_mt();
         jit_info->set_jit(jit);
         jit_info->_next = _jits;
-        MemoryWriteBarrier();
+        port_write_barrier();
         _jits = jit_info;
         block->next = jit_info->_data_blocks;
         jit_info->_data_blocks = block;
