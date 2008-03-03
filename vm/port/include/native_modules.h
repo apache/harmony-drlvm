@@ -22,11 +22,10 @@
 #ifndef _NATIVE_MODULES_H_
 #define _NATIVE_MODULES_H_
 
+#include <stddef.h>
 #include <stdio.h>
+#include "open/types.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 typedef enum {
     SEGMENT_TYPE_UNKNOWN,
@@ -50,10 +49,40 @@ struct native_module_t {
 };
 
 
-bool get_all_native_modules(native_module_t**, int*);
-void dump_native_modules(native_module_t* modules, FILE *out);
-void clear_native_modules(native_module_t**);
-native_module_t* find_native_module(native_module_t* modules, void* code_ptr);
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
+/**
+* Returns the list of modules loaded to the current process.
+* Module includes one or more segments of type <code>native_segment_t</code>.
+* @param list_ptr  - an address of modules list pointer to fill
+* @param count_ptr - count of modules in the returned list
+* @return <code>TRUE</code> if OK; FALSE if error occured.
+*/
+Boolean port_get_all_modules(native_module_t** list_ptr, int* count_ptr);
+
+/**
+* Dumps the list of modules loaded to the current process..
+* @param modules  - pointer to the list of modules to dump.
+* @param out      - stream for printing the dump.
+*/
+void port_dump_modules(native_module_t* modules, FILE *out);
+
+/**
+* Clears the list of modules passed, writes NULL to the poiner.
+* @param modules  - pointer to the list of modules to clear.
+*/
+void port_clear_modules(native_module_t** list_ptr);
+
+/**
+* Searches for the specific address in the list of modules.
+* @param modules   - pointer to the list of modules to inspect.
+* @param code_ptr  - the address to look for.
+* @return <code>native_module_t</code> pointer if OK; otherwise, NULL.
+*/
+native_module_t* port_find_module(native_module_t* modules, void* code_ptr);
 
 
 #ifdef __cplusplus

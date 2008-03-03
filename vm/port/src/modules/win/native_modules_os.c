@@ -27,7 +27,7 @@
 
 static native_module_t* fill_module(MODULEENTRY32 src);
 
-bool get_all_native_modules(native_module_t** list_ptr, int* count_ptr)
+Boolean port_get_all_modules(native_module_t** list_ptr, int* count_ptr)
 {
     HANDLE hModuleSnap = INVALID_HANDLE_VALUE; 
     MODULEENTRY32 module; 
@@ -38,7 +38,7 @@ bool get_all_native_modules(native_module_t** list_ptr, int* count_ptr)
         CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, GetCurrentProcessId());
 
     if (hModuleSnap == INVALID_HANDLE_VALUE)
-        return false;
+        return FALSE;
 
     *list_ptr = NULL;
 
@@ -47,7 +47,7 @@ bool get_all_native_modules(native_module_t** list_ptr, int* count_ptr)
     if ( !Module32First(hModuleSnap, &module) )
     {
         CloseHandle(hModuleSnap);
-        return false;
+        return FALSE;
     }
 
     do
@@ -57,8 +57,8 @@ bool get_all_native_modules(native_module_t** list_ptr, int* count_ptr)
         if (!filled)
         {
             CloseHandle(hModuleSnap);
-            clear_native_modules(list_ptr);
-            return false;
+            port_clear_modules(list_ptr);
+            return FALSE;
         }
 
         *cur_next_ptr = filled;
@@ -70,18 +70,20 @@ bool get_all_native_modules(native_module_t** list_ptr, int* count_ptr)
     CloseHandle(hModuleSnap);
     *count_ptr = count;
 
-    return true;
+    return TRUE;
 }
 
 native_module_t* fill_module(MODULEENTRY32 src)
 {
+    MEMORY_BASIC_INFORMATION mem_info;
+    size_t path_size = strlen(src.szExePath) + 1;
+
     native_module_t* module =
         (native_module_t*)STD_MALLOC(sizeof(native_module_t));
 
     if (module == NULL)
         return NULL;
 
-    size_t path_size = strlen(src.szExePath) + 1;
     module->filename = (char*)STD_MALLOC(path_size);
     if (module->filename == NULL)
     {
@@ -97,7 +99,6 @@ native_module_t* fill_module(MODULEENTRY32 src)
     module->segments[0].size = (size_t)src.modBaseSize;
     module->next = NULL;
 
-    MEMORY_BASIC_INFORMATION mem_info;
     VirtualQuery(src.modBaseAddr, &mem_info, sizeof(mem_info));
 
     if ((mem_info.Protect & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY)) != 0)

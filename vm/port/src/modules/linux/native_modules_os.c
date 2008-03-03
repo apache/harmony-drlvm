@@ -19,11 +19,11 @@
  * @version $Revision: 1.1.2.1 $
  */
 
+#include <limits.h>
 #include <stdio.h>
 #include <memory.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include "platform_lowlevel.h"
 #include "open/types.h"
 #include "port_malloc.h"
 #include "native_modules.h"
@@ -36,8 +36,8 @@ struct _raw_module
 {
     void*               start;
     void*               end;
-    bool                acc_r;
-    bool                acc_x;
+    Boolean             acc_r;
+    Boolean             acc_x;
     char*               name;
     raw_module*         next;
 };
@@ -49,10 +49,12 @@ native_module_t* native_fill_module(raw_module*, size_t);
 
 void native_clear_raw_list(raw_module* list)
 {
+    raw_module* cur;
+
     if (list->name)
         STD_FREE(list->name);
 
-    raw_module* cur = list->next;
+    cur = list->next;
 
     while (cur)
     {
@@ -88,6 +90,8 @@ raw_module* native_add_raw_segment(raw_module* last,
 
 native_module_t* native_fill_module(raw_module* rawModule, size_t count)
 {
+    size_t i;
+
     native_module_t* module =
         (native_module_t*)STD_MALLOC(sizeof(native_module_t) + sizeof(native_segment_t)*(count - 1));
 
@@ -99,7 +103,7 @@ native_module_t* native_fill_module(raw_module* rawModule, size_t count)
     rawModule->name = NULL;
     module->next = NULL;
 
-    for (size_t i = 0; i < count; i++)
+    for (i = 0; i < count; i++)
     {
         if (rawModule->acc_x)
             module->segments[i].type = SEGMENT_TYPE_CODE;
@@ -119,28 +123,34 @@ native_module_t* native_fill_module(raw_module* rawModule, size_t count)
     return module;
 }
 
-bool get_all_native_modules(native_module_t** list_ptr, int* count_ptr)
+Boolean port_get_all_modules(native_module_t** list_ptr, int* count_ptr)
 {
-    char buf[_MAX_PATH];
-
-    if (list_ptr == NULL || count_ptr == NULL)
-        return false;
-
-    pid_t pid = getpid();
-    sprintf(buf, "/proc/%d/maps", pid);
-
-    FILE* file = fopen(buf, "rt");
-    if (!file)
-        return false;
+    char buf[PATH_MAX];
+    pid_t pid;
+    FILE* file;
 
     POINTER_SIZE_INT start, end;
     char acc_r, acc_x;
-    char filename[_MAX_PATH];
+    char filename[PATH_MAX];
     raw_module module; // First raw module
     raw_module* lastseg = &module; // Address of last filled segment
-    size_t segment_count = 0;
-    int module_count = 0;
-    native_module_t** cur_next_ptr = list_ptr;
+    size_t segment_count;
+    int module_count;
+    native_module_t** cur_next_ptr;
+
+    if (list_ptr == NULL || count_ptr == NULL)
+        return FALSE;
+
+    pid = getpid();
+    sprintf(buf, "/proc/%d/maps", pid);
+
+    file = fopen(buf, "rt");
+    if (!file)
+        return FALSE;
+
+    segment_count = 0;
+    module_count = 0;
+    cur_next_ptr = list_ptr;
     module.name = NULL;
     module.next = NULL;
     *list_ptr = NULL;
@@ -168,9 +178,9 @@ bool get_all_native_modules(native_module_t** list_ptr, int* count_ptr)
                 if (!filled)
                 {
                     native_clear_raw_list(&module);
-                    clear_native_modules(list_ptr);
+                    port_clear_modules(list_ptr);
                     fclose(file);
-                    return false;
+                    return FALSE;
                 }
 
                 *cur_next_ptr = filled;
@@ -183,9 +193,9 @@ bool get_all_native_modules(native_module_t** list_ptr, int* count_ptr)
                 if (module.name == NULL)
                 {
                     native_clear_raw_list(&module);
-                    clear_native_modules(list_ptr);
+                    port_clear_modules(list_ptr);
                     fclose(file);
-                    return false;
+                    return FALSE;
                 }
 
                 strcpy(module.name, filename);
@@ -212,9 +222,9 @@ bool get_all_native_modules(native_module_t** list_ptr, int* count_ptr)
             if (lastseg == NULL)
             {
                 native_clear_raw_list(&module);
-                clear_native_modules(list_ptr);
+                port_clear_modules(list_ptr);
                 fclose(file);
-                return false;
+                return FALSE;
             }
 
             ++segment_count;
@@ -228,9 +238,9 @@ bool get_all_native_modules(native_module_t** list_ptr, int* count_ptr)
         if (!filled)
         {
             native_clear_raw_list(&module);
-            clear_native_modules(list_ptr);
+            port_clear_modules(list_ptr);
             fclose(file);
-            return false;
+            return FALSE;
         }
 
         *cur_next_ptr = filled;
@@ -240,5 +250,5 @@ bool get_all_native_modules(native_module_t** list_ptr, int* count_ptr)
     fclose(file);
 
     *count_ptr = module_count;
-    return true;
+    return TRUE;
 }

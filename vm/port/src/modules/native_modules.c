@@ -15,19 +15,25 @@
  *  limitations under the License.
  */
 
+#include <stdio.h>
 #include "open/types.h"
-#include "native_modules.h"
 #include "port_malloc.h"
+#include "native_modules.h"
 
-native_module_t* find_native_module(native_module_t* modules, void* code_ptr)
+
+native_module_t* port_find_module(native_module_t* modules, void* code_ptr)
 {
-    for (native_module_t* module = modules; NULL != module;
-            module = module->next) {
-        for (size_t s = 0; s < module->seg_count; s++) {
-            void* base = module->segments[s].base;
+    native_module_t* module;
+    size_t s;
+
+    for (module = modules; NULL != module; module = module->next)
+    {
+        for (s = 0; s < module->seg_count; s++)
+        {
+            char* base = module->segments[s].base;
             size_t size = module->segments[s].size;
 
-            if (code_ptr >= base && code_ptr < (char*) base + size)
+            if ((char*)code_ptr >= base && (char*)code_ptr < base + size)
                 return module;
         }
     }
@@ -36,16 +42,19 @@ native_module_t* find_native_module(native_module_t* modules, void* code_ptr)
     return NULL;
 }
 
-void dump_native_modules(native_module_t* modules, FILE *out)
+void port_dump_modules(native_module_t* modules, FILE *out)
 {
-    for (native_module_t* module = modules; module; module = module->next)
+    native_module_t* module;
+    size_t i;
+
+    for (module = modules; module; module = module->next)
     {
         if (!module->filename)
             continue;
 
         fprintf(out, "%s:\n", module->filename);
 
-        for (size_t i = 0; i < module->seg_count; i++)
+        for (i = 0; i < module->seg_count; i++)
         {
             size_t base = (size_t)module->segments[i].base;
 
@@ -55,7 +64,7 @@ void dump_native_modules(native_module_t* modules, FILE *out)
     }
 }
 
-void clear_native_modules(native_module_t** list_ptr)
+void port_clear_modules(native_module_t** list_ptr)
 {
     native_module_t* cur = *list_ptr;
 
