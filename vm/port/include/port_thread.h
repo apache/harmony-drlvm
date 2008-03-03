@@ -14,31 +14,39 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+
+#ifndef _PORT_THREAD_H_
+#define _PORT_THREAD_H_
+
 /**
- * @author Andrey Chernyshev
- * @version $Revision$
+ * @file port_thread.h
+ * @brief PORT thread support
  */
 
 
-#ifndef APR_EXT_H
-#define APR_EXT_H
 
-#include <apr.h>
-#include <apr_errno.h>
-#include <apr_thread_proc.h>
-#include <apr_portable.h>
+/* To skip platform_types.h inclusion */
+typedef struct Registers Registers;
 
-APR_DECLARE(apr_status_t) apr_thread_set_priority(apr_thread_t *thread, apr_int32_t priority);
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
 
-APR_DECLARE(void) apr_memory_rw_barrier();
 
-APR_DECLARE(apr_status_t) apr_thread_yield_other(apr_thread_t *thread);
+/** @name Threads manipulation and information
+ */
+//@{
 
-APR_DECLARE(apr_status_t) apr_thread_times(apr_thread_t *thread, 
-                                apr_time_t * kernel_time, apr_time_t * user_time);
 
-APR_DECLARE(apr_status_t) apr_thread_cancel(apr_thread_t *thread);
+/* Transfer control to specified register context */
+void transfer_to_regs(Registers* regs);
 
-APR_DECLARE(apr_status_t) apr_get_thread_time(apr_thread_t *thread, apr_int64_t* nanos_ptr);
 
-#endif  /* APR_EXT_H */
+
+//@}
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif  /* _PORT_THREAD_H_ */
