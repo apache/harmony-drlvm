@@ -23,10 +23,8 @@
  * @file Interface to signal handling and crash handling functions.
  */
 
-#include "open/types.h"
-// FIXME: needed for Register structure. Should be changed to another
-// header when Registers defition is moved to.
-#include "vm_core_types.h"
+#include "open/platform_types.h"
+#include "port_frame_info.h"
 
 #ifdef __cplusplus
 extern "C"
@@ -119,12 +117,15 @@ typedef struct
  * @param registrations - Pointer to an array of
  * <code>port_signal_handler_registration structures.
  * @param count - number of signal registrations. Zero is allowed
+ * @param unwind_callback - VM function for unwinding compiled
+ * stack frames.
  * @return <code>TRUE</code> if initalization is successful.
  * <code>FALSE</code> if initialization failed.
  */
 Boolean port_init_crash_handler(
     port_signal_handler_registration *registrations,
-    unsigned count);
+    unsigned count
+    port_unwind_compiled_frame unwind_callback);
 
 /**
  * Crash handler output flags.
