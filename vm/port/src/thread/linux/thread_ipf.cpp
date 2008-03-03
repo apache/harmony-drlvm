@@ -14,42 +14,17 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
-* @author Alexey V. Varlamov
-* @version $Revision: 1.1.2.1.4.3 $
-*/  
 
-#ifndef _PORT_GENERAL_H_
-#define _PORT_GENERAL_H_
-
-#include <apr.h>
-
-#ifndef NULL
-#ifdef __cplusplus
-#   define NULL (0)
-#else
-#   define NULL ((void *)0)
-#endif /* __cplusplus */
-#endif /* NULL */
+#include <assert.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include "open/platform_types.h"
 
 
-#ifdef __cplusplus
-#define PORT_INLINE inline
-#else // !__cplusplus
-
-#ifdef WIN32
-#define PORT_INLINE __forceinline
-#else // !WIN32
-
-#ifdef __linux__
-#define PORT_INLINE static  __attribute__((always_inline))
-#else // !__linux__
-#define PORT_INLINE static
-#endif // __linux__
-
-#endif // WIN32
-
-#endif // __cplusplus
-
-
-#endif /* _PORT_GENERAL_H_ */
+void transfer_to_regs(Registers* regs)
+{
+    // FIXME: not implemented
+    fprintf(stderr, "FIXME: transfer_to_regs: not implemented\n");
+    assert(0);
+    abort();
+}

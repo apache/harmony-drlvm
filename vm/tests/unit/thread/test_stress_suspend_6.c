@@ -15,7 +15,7 @@
 *  limitations under the License.
 */
 
-#include <apr_thread_ext.h>
+#include <port_barriers.h>
 #include <port_sysinfo.h>
 #include <open/hythread.h>
 #include <open/hythread_ext.h>
@@ -46,7 +46,7 @@ hy_inline void test_hythread_suspend_disable()
     assert(((HyThread_public *)thread)->group == get_java_thread_group());
 
     ((HyThread_public *)thread)->disable_count++;
-    //apr_memory_rw_barrier();
+    //port_rw_barrier();
 
     if (thread->request && thread->disable_count == 1) {
         // enter to safe point if suspend request was set

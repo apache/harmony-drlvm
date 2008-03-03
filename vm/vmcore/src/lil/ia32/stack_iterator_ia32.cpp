@@ -134,7 +134,7 @@ static transfer_control_stub_type gen_transfer_control_stub()
         return addr;
     }
 
-    const int stub_size = 0x4d;
+    const int stub_size = 0x48;
     char *stub = (char *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_COLD, CAA_Allocate);
 #ifdef _DEBUG
     memset(stub, 0xcc /*int 3*/, stub_size);
@@ -168,11 +168,10 @@ static transfer_control_stub_type gen_transfer_control_stub()
     ss = get_reg(ss, &eax_opnd, eax_reg, edx_reg, (unsigned)&((StackIterator*)0)->c.p_eax);
     ss = get_reg(ss, &ebx_opnd, ebx_reg, edx_reg, (unsigned)&((StackIterator*)0)->c.p_ebx);
 
-    ss = mov(ss, ecx_opnd,  M_Base_Opnd(edx_reg, (unsigned)&((StackIterator*)0)->c.eflags));
+    ss = movzx(ss, ecx_opnd,  M_Base_Opnd(edx_reg, (unsigned)&((StackIterator*)0)->c.eflags), size_8);
     ss = test(ss, ecx_opnd, ecx_opnd);
     ss = branch8(ss, Condition_Z,  Imm_Opnd(size_8, 0));
     char* patch_offset = ((char *)ss) - 1; // Store location for jump patch
-    ss = alu(ss, and_opc, ecx_opnd, Imm_Opnd(size_32, 0xff));
     ss = push(ss,  ecx_opnd);
     *ss++ = (char)0x9D; // POPFD
     // Patch conditional jump
@@ -208,7 +207,7 @@ static transfer_control_stub_type gen_transfer_control_stub()
         mov         eax,dword ptr [eax]
         mov         ebx,dword ptr [edx+18h]
         mov         ebx,dword ptr [ebx]
-        mov         ecx,dword ptr [edx+28h]
+        movzx       ecx,byte ptr [edx+28h]
         test        ecx,ecx
         je          _label_
         push        ecx

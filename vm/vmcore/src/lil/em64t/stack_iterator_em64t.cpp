@@ -177,7 +177,7 @@ static transfer_control_stub_type gen_transfer_control_stub()
         return addr;
     }
 
-    const int STUB_SIZE = 247;
+    const int STUB_SIZE = 239;
     char * stub = (char *)malloc_fixed_code_for_jit(STUB_SIZE,
         DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_COLD, CAA_Allocate);
     char * ss = stub;
@@ -225,14 +225,12 @@ static transfer_control_stub_type gen_transfer_control_stub()
     ss = get_reg(ss, rax_opnd, rdx_reg, CONTEXT_OFFSET(p_rax), true);
 
     // Restore processor flags
-    ss = alu(ss, xor_opc, rcx_opnd,  rcx_opnd);
-    ss = mov(ss, rcx_opnd,  M_Base_Opnd(rdx_reg, CONTEXT_OFFSET(eflags)), size_8);
+    ss = movzx(ss, rcx_opnd,  M_Base_Opnd(rdx_reg, CONTEXT_OFFSET(eflags)), size_8);
     ss = test(ss, rcx_opnd, rcx_opnd);
     ss = branch8(ss, Condition_Z,  Imm_Opnd(size_8, 0));
     char* patch_offset = ((char*)ss) - 1; // Store location for jump patch
-    ss = alu(ss, and_opc, rcx_opnd, Imm_Opnd(size_32, 0xff));
     ss = push(ss,  rcx_opnd);
-    *ss++ = (char)0x9D; // POPFD
+    *ss++ = (char)0x9D; // POPFQ
     // Patch conditional jump
     POINTER_SIZE_SINT offset =
         (POINTER_SIZE_SINT)ss - (POINTER_SIZE_SINT)patch_offset - 1;
@@ -277,8 +275,7 @@ __label11__
         je          __label12__
         mov         rax,qword ptr [rax]
 __label12__
-        xor         rcx,rcx
-        mov         ecx,dword ptr [rdx+90h]
+        movzx       rcx,byte ptr [rdx+90h]
         test        rcx,rcx
         je          __label13__
         push        rcx

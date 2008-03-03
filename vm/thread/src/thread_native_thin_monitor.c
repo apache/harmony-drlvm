@@ -27,6 +27,7 @@
 #include "thread_private.h"
 #include <apr_atomic.h>
 #include <port_atomic.h>
+#include "port_barriers.h"
 
 /** @name Thin monitors support. Implement thin-fat scheme.
  */
@@ -94,7 +95,7 @@ void set_fat_lock_id(hythread_thin_monitor_t *lockword_ptr, IDATA monitor_id) {
     lockword&=0x7FF;
     lockword|=(monitor_id << 11) | 0x80000000;
     *lockword_ptr=lockword;
-    apr_memory_rw_barrier();
+    port_rw_barrier();
 }
 
 IDATA get_fat_lock_id(hythread_thin_monitor_t *lockword_ptr) {

@@ -24,7 +24,6 @@
 #include <open/hythread_ext.h>
 #include <open/jthread.h>
 #include "vm_threads.h"
-#include "apr_thread_ext.h"
 
 #define THREAD_CPU_TIME_SUPPORTED 1
 

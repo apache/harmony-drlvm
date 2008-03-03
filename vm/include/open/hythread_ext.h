@@ -133,7 +133,7 @@ extern "C" {
 #include <apr_portable.h>
 
 #include <assert.h>
-#include "apr_thread_ext.h"
+#include "port_barriers.h"
 
 //@{
 /**
@@ -641,7 +641,7 @@ hy_inline void VMCALL hythread_suspend_disable()
     thread = tm_self_tls;
     ((HyThread_public *)thread)->disable_count++;
 
-    //apr_memory_rw_barrier();
+    //port_rw_barrier();
 
     if (((HyThread_public *)thread)->request && 
 	((HyThread_public *)thread)->disable_count == 1) {

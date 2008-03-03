@@ -26,6 +26,7 @@
 #include <open/hythread_ext.h>
 #include "thread_private.h"
 #include <apr_atomic.h>
+#include "port_barriers.h"
 
 static void thread_safe_point_impl(hythread_t thread);
 
@@ -126,7 +127,7 @@ static void thread_safe_point_impl(hythread_t thread)
     // set disable count to 0 (safe region value)
     gc_disable_count = thread->disable_count;
     thread->disable_count = 0;
-    apr_memory_rw_barrier();
+    port_rw_barrier();
 
     do {
         TRACE(("safe point enter: thread: %p, suspend_count: %d, request: %d",
@@ -464,7 +465,7 @@ void VMCALL hythread_set_suspend_disable(int count)
     assert(count >= 0);
     self->disable_count = count;
 
-    apr_memory_rw_barrier();
+    port_rw_barrier();
 
     if (count && self->suspend_count) {
         thread_safe_point_impl(self);

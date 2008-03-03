@@ -30,7 +30,6 @@
 #include <apr_portable.h>
 
 #include <assert.h>
-#include "apr_thread_ext.h"
 
 #ifdef __linux__
 #include <pthread.h>

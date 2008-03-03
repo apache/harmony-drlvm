@@ -54,6 +54,7 @@
             <include name="modules/*.c"/>
             <include name="modules/linux/*.c" if="is.unix"/>
             <include name="modules/win/*.c" if="is.windows"/>
+            <include name="thread/linux/*ipf.cpp" if="is.unix.ia64"/>
         </patternset>
 
         <depend-includes paths="port.includes"/>
@@ -65,6 +66,10 @@
                 <include name="atomic/win/*.asm" if="is.windows.x86_64"/>
                 <include name="atomic/linux_ipf/port_atomic_asm.asm" if="is.unix.ia64"/>
                 <include name="barriers/linux_ipf/port_barriers.asm" if="is.unix.ia64"/>
+                <include name="thread/win/thread_asm_ia32.asm" if="is.windows.x86"/>
+                <include name="thread/win/thread_asm_em64t.asm" if="is.windows.x86_64"/>
+                <include name="thread/linux/thread_asm_ia32.s" if="is.unix.x86"/>
+                <include name="thread/linux/thread_asm_em64t.s" if="is.unix.x86_64"/>
             </fileset>
         </compile-asm>
         

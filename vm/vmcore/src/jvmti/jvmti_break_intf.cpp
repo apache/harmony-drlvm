@@ -38,6 +38,7 @@
 #include "ncai_internal.h"
 #include "jvmti_break_intf.h"
 #include "cci.h"
+#include "port_thread.h"
 
 
 #if (defined _IA32_) || (defined _EM64T_)
@@ -616,10 +617,8 @@ VMBreakPoints::process_native_breakpoint()
         // context. In case the target location happens to be
         // instrumented, it means that another breakpoint has been set
         // there right after unlock was done.
-        StackIterator* si = (StackIterator*) STD_ALLOCA(si_size());
-        si_fill_from_registers(si, &regs, false, m2n_get_previous_frame(m2nf));
-
-        si_transfer_control(si);
+        m2n_set_last_frame(m2n_get_previous_frame(m2nf));
+        transfer_to_regs(&regs);
     }
     assert(bp->addr == addr);
     TRACE2("jvmti.break", "Process native breakpoint: "
@@ -836,11 +835,9 @@ VMBreakPoints::process_native_breakpoint()
     // transfers execution control to the instruction buffer to
     // execute the original instruction with the registers which it
     // had before breakpoint happened
-    StackIterator* si = (StackIterator*) STD_ALLOCA(si_size());
-    si_fill_from_registers(si, &regs, false, m2n_get_previous_frame(m2nf));
-
-    si_set_ip(si, instruction_buffer, false);
-    si_transfer_control(si);
+    m2n_set_last_frame(m2n_get_previous_frame(m2nf));
+    regs.set_ip(instruction_buffer);
+    transfer_to_regs(&regs);
 #else
     // PLATFORM dependent code
     abort();
