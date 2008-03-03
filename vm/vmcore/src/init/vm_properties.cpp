@@ -118,10 +118,10 @@ static char* get_module_filename(void* code_ptr)
     }
     return apr_pstrdup(prop_pool, info.dli_fname);
 #else
-    if (! get_all_native_modules(&modules, &modules_count))
+    if (! port_get_all_modules(&modules, &modules_count))
         return NULL;
 
-    native_module_t* module = find_native_module(modules, code_ptr);
+    native_module_t* module = port_find_module(modules, code_ptr);
 
     char* filename = NULL;
 
@@ -129,7 +129,7 @@ static char* get_module_filename(void* code_ptr)
         filename = apr_pstrdup(prop_pool, module->filename);
     }
 
-    clear_native_modules(&modules);
+    port_clear_modules(&modules);
 
     return filename;
 #endif

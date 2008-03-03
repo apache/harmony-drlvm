@@ -112,9 +112,9 @@ static bool native_check_caller(WalkContext* context, Registers* regs, void** sp
             return true;
 
         native_module_t* cur_module =
-            find_native_module(context->modules, regs->get_ip());
+            port_find_module(context->modules, regs->get_ip());
         native_module_t* found_module =
-            find_native_module(context->modules, target);
+            port_find_module(context->modules, target);
 
         return (cur_module == found_module);
     }

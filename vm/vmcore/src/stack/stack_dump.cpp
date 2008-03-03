@@ -48,7 +48,7 @@ static void sd_fill_modules()
         return;
 
     int count;
-    bool res = get_all_native_modules(&g_modules, &count);
+    bool res = port_get_all_modules(&g_modules, &count);
     assert(res && g_modules && count);
 }
 
@@ -65,10 +65,10 @@ void sd_update_modules()
     hymutex_lock(sd_lock);
 
     if (g_modules)
-        clear_native_modules(&g_modules);
+        port_clear_modules(&g_modules);
 
     int count;
-    res = get_all_native_modules(&g_modules, &count);
+    res = port_get_all_modules(&g_modules, &count);
     assert(res && g_modules && count);
 
     hymutex_unlock(sd_lock);
@@ -205,7 +205,7 @@ static void sd_print_stack_jit(VM_thread* thread,
             }
 
             // pure native frame
-            native_module_t* module = find_native_module(g_modules, cur_ip);
+            native_module_t* module = port_find_module(g_modules, cur_ip);
             sd_get_c_method_info(&m, module, cur_ip);
             sd_print_line(count++, &m);
             ++frame_num;
@@ -222,7 +222,7 @@ static void sd_print_stack_jit(VM_thread* thread,
         if (si_is_native(si) && frame_num < num_frames)
         {
             // Print information from native stack trace for JNI frames
-            native_module_t* module = find_native_module(g_modules, cur_ip);
+            native_module_t* module = port_find_module(g_modules, cur_ip);
             sd_get_c_method_info(&m, module, cur_ip);
             sd_print_line(count, &m);
         }
@@ -290,7 +290,7 @@ static void sd_print_stack_interpreter(VM_thread* thread,
 
         if (frame_num < num_frames && frames[frame_num].java_depth < 0)
         { // pure native frame
-            native_module_t* module = find_native_module(g_modules, frames[frame_num].ip);
+            native_module_t* module = port_find_module(g_modules, frames[frame_num].ip);
             sd_get_c_method_info(&m, module, frames[frame_num].ip);
             sd_print_line(count++, &m);
             ++frame_num;
@@ -307,7 +307,7 @@ static void sd_print_stack_interpreter(VM_thread* thread,
         if (frame_num < num_frames &&
             (!method || method_is_native(method)))
         {
-            native_module_t* module = find_native_module(g_modules, frames[frame_num].ip);
+            native_module_t* module = port_find_module(g_modules, frames[frame_num].ip);
             sd_get_c_method_info(&m, module, frames[frame_num].ip);
             sd_print_line(count, &m);
         }
@@ -371,14 +371,14 @@ static void sd_print_module_info(Registers* regs)
     sd_fill_modules(); // Fill modules table if needed
 #endif
 
-    native_module_t* module = find_native_module(g_modules, (void*)regs->get_ip());
+    native_module_t* module = port_find_module(g_modules, (void*)regs->get_ip());
     sd_parse_module_info(module, (void*)regs->get_ip());
 }
 
 static void sd_print_modules()
 {
     fprintf(stderr, "\nLoaded modules:\n\n");
-    dump_native_modules(g_modules, stderr);
+    port_dump_modules(g_modules, stderr);
 }
 
 

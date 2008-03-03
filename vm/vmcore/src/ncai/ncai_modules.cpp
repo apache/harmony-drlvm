@@ -369,7 +369,7 @@ static ncaiError ncai_get_all_modules(ncaiModule* list, int* retCount)
 
     ncai_set_global_list_modules_dead(*list);
 
-    bool result = get_all_native_modules(&modules, &mod_count);
+    bool result = port_get_all_modules(&modules, &mod_count);
 
     if (!result)
         return NCAI_ERROR_INTERNAL;
@@ -383,12 +383,12 @@ static ncaiError ncai_get_all_modules(ncaiModule* list, int* retCount)
 
         if (error != NCAI_ERROR_NONE)
         {
-            clear_native_modules(&modules);
+            port_clear_modules(&modules);
             return error;
         }
     }
 
-    clear_native_modules(&modules);
+    port_clear_modules(&modules);
     ncai_clean_dead_modules_from_global_list(list);
     ncai_mark_JNI_modules(*list);
 

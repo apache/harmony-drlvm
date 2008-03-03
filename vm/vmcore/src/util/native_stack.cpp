@@ -104,7 +104,7 @@ bool native_init_walk_context(WalkContext* context, native_module_t* modules, Re
         int mod_count;
         native_module_t* mod_list = NULL;
 
-        if (!get_all_native_modules(&mod_list, &mod_count))
+        if (!port_get_all_modules(&mod_list, &mod_count))
             return false;
 
         context->clean_modules = true;
@@ -119,7 +119,7 @@ bool native_init_walk_context(WalkContext* context, native_module_t* modules, Re
     if (!native_get_stack_range(context, regs, &context->stack))
     {
         if (context->clean_modules)
-            clear_native_modules(&context->modules);
+            port_clear_modules(&context->modules);
         return false;
     }
 
@@ -133,7 +133,7 @@ void native_clean_walk_context(WalkContext* context)
 
     if (context->modules && context->clean_modules)
     {
-        clear_native_modules(&context->modules);
+        port_clear_modules(&context->modules);
     }
 
     context->modules = NULL;

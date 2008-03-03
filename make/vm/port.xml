@@ -50,6 +50,10 @@
             <include name="vmem/win/*.c" if="is.windows"/>
             <include name="thread/win/*.c" if="is.windows"/>
             <include name="file_io/*.c"/>
+
+            <include name="modules/*.c"/>
+            <include name="modules/linux/*.c" if="is.unix"/>
+            <include name="modules/win/*.c" if="is.windows"/>
         </patternset>
 
         <depend-includes paths="port.includes"/>
@@ -60,6 +64,7 @@
             <fileset id="port.asm" dir="${vm.home}/port/src">
                 <include name="atomic/win/*.asm" if="is.windows.x86_64"/>
                 <include name="atomic/linux_ipf/port_atomic_asm.asm" if="is.unix.ia64"/>
+                <include name="barriers/linux_ipf/port_barriers.asm" if="is.unix.ia64"/>
             </fileset>
         </compile-asm>
         
