@@ -363,13 +363,21 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getStackTrace
     StackTraceFrame* frames = (StackTraceFrame*) array_data;
     unsigned size = jenv->GetArrayLength(array) * 8 / sizeof(StackTraceFrame);
 
-    static Method_Handle fillInStackTrace = class_lookup_method(
-        genv->java_lang_Throwable_Class,
-            "fillInStackTrace", "()Ljava/lang/Throwable;");
+    static Method_Handle fillInStackTrace = NULL;
+    if (!fillInStackTrace) {
+        fillInStackTrace =
+            class_lookup_method(genv->java_lang_Throwable_Class,
+                "fillInStackTrace", "()Ljava/lang/Throwable;");
+        assert(fillInStackTrace);
+    }
 
-    static Method_Handle threadRunImpl = class_lookup_method(
-        genv->java_lang_Thread_Class,
-            "runImpl", "()V");
+    static Method_Handle threadRunImpl = NULL;
+    if (!threadRunImpl) {
+        threadRunImpl =
+            class_lookup_method(genv->java_lang_Thread_Class,
+                "runImpl", "()V");
+        assert(threadRunImpl);
+    }
 
     unsigned skip;
 
