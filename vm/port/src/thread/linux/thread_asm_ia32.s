@@ -46,11 +46,14 @@ port_transfer_to_regs:
     movl    %ebx, (%ecx)     // new EIP -> (new ESP - 4) (as return address)
     movl    0x00(%edx), %eax // EAX field
     movl    0x04(%edx), %ebx // EBX field
-    movzbl  0x24(%edx), %ecx // (EFLAGS & 0xff) -> ECX
+    movzwl  0x24(%edx), %ecx // (word)EFLAGS -> ECX
     test    %ecx, %ecx
     je      _label_
-    push    %ecx             // restore EFLAGS
-    popfl
+    pushfl
+    andl    $0x003F7202, (%esp)
+    andl    $0x00000CD5, %ecx
+    orl     %ecx, (%esp)
+    popfl                    // restore EFLAGS
 _label_:
     movl    0x08(%edx), %ecx // ECX field
     movl    0x0C(%edx), %edx // EDX field

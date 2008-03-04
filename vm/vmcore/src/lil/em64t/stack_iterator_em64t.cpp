@@ -169,6 +169,11 @@ typedef void (* transfer_control_stub_type)(StackIterator *);
 #define CONTEXT_OFFSET(_field_) \
     ((int64)&((StackIterator*)0)->jit_frame_context._field_)
 
+// Clear OF, DF, TF, SF, ZF, AF, PF, CF, do not touch reserved bits
+#define FLG_CLEAR_MASK ((unsigned)0x003F7202)
+// Set OF, DF, SF, ZF, AF, PF, CF
+#define FLG_SET_MASK ((unsigned)0x00000CD5)
+
 static transfer_control_stub_type gen_transfer_control_stub()
 {
     static transfer_control_stub_type addr = NULL;
@@ -177,7 +182,7 @@ static transfer_control_stub_type gen_transfer_control_stub()
         return addr;
     }
 
-    const int STUB_SIZE = 239;
+    const int STUB_SIZE = 255;
     char * stub = (char *)malloc_fixed_code_for_jit(STUB_SIZE,
         DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_COLD, CAA_Allocate);
     char * ss = stub;
@@ -225,11 +230,15 @@ static transfer_control_stub_type gen_transfer_control_stub()
     ss = get_reg(ss, rax_opnd, rdx_reg, CONTEXT_OFFSET(p_rax), true);
 
     // Restore processor flags
-    ss = movzx(ss, rcx_opnd,  M_Base_Opnd(rdx_reg, CONTEXT_OFFSET(eflags)), size_8);
+    ss = movzx(ss, rcx_opnd,  M_Base_Opnd(rdx_reg, CONTEXT_OFFSET(eflags)), size_16);
     ss = test(ss, rcx_opnd, rcx_opnd);
     ss = branch8(ss, Condition_Z,  Imm_Opnd(size_8, 0));
     char* patch_offset = ((char*)ss) - 1; // Store location for jump patch
-    ss = push(ss,  rcx_opnd);
+    *ss++ = (char)0x9C; // PUSHFQ
+    M_Base_Opnd sflags(rsp_reg, 0);
+    ss = alu(ss, and_opc, sflags, Imm_Opnd(size_32,FLG_CLEAR_MASK), size_32);
+    ss = alu(ss, and_opc, rcx_opnd, Imm_Opnd(size_32,FLG_SET_MASK), size_32);
+    ss = alu(ss, or_opc, sflags, rcx_opnd, size_32);
     *ss++ = (char)0x9D; // POPFQ
     // Patch conditional jump
     POINTER_SIZE_SINT offset =
@@ -275,10 +284,13 @@ __label11__
         je          __label12__
         mov         rax,qword ptr [rax]
 __label12__
-        movzx       rcx,byte ptr [rdx+90h]
+        movzx       rcx,word ptr [rdx+90h]
         test        rcx,rcx
         je          __label13__
-        push        rcx
+        pushfq
+        and         dword ptr [rsp], 0x003F7202
+        and         ecx, 0x00000CD5
+        or          dword ptr [esp], ecx
         popfq
 __label13__
         mov         rcx,qword ptr [rdx+50h]

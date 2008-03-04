@@ -127,6 +127,14 @@ static char* get_reg(char* ss, R_Opnd* dst, Reg_No dst_reg, Reg_No si_ptr_var, u
 
 typedef void (__cdecl *transfer_control_stub_type)(StackIterator*);
 
+#define CONTEXT_OFFSET(_field_) \
+    ((unsigned)&((StackIterator*)0)->c._field_)
+
+// Clear OF, DF, TF, SF, ZF, AF, PF, CF, do not touch reserved bits
+#define FLG_CLEAR_MASK ((unsigned)0x003F7202)
+// Set OF, DF, SF, ZF, AF, PF, CF
+#define FLG_SET_MASK ((unsigned)0x00000CD5)
+
 static transfer_control_stub_type gen_transfer_control_stub()
 {
     static transfer_control_stub_type addr = NULL;
@@ -134,7 +142,7 @@ static transfer_control_stub_type gen_transfer_control_stub()
         return addr;
     }
 
-    const int stub_size = 0x48;
+    const int stub_size = 0x57;
     char *stub = (char *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_COLD, CAA_Allocate);
 #ifdef _DEBUG
     memset(stub, 0xcc /*int 3*/, stub_size);
@@ -150,36 +158,40 @@ static transfer_control_stub_type gen_transfer_control_stub()
     M_Base_Opnd m1(esp_reg, 4);
     ss = mov(ss,  edx_opnd,  m1);
 
-    ss = get_reg(ss, &ebx_opnd, ebx_reg, edx_reg, (unsigned)&((StackIterator*)0)->c.p_eip);
+    ss = get_reg(ss, &ebx_opnd, ebx_reg, edx_reg, CONTEXT_OFFSET(p_eip));
 
-    M_Base_Opnd m2(edx_reg, (int)&((StackIterator*)0)->c.esp);
+    M_Base_Opnd m2(edx_reg, CONTEXT_OFFSET(esp));
     ss = mov(ss,  ecx_opnd,  m2);
 
     ss = alu(ss, sub_opc, ecx_opnd, Imm_Opnd(4));
     ss = mov(ss,  m1,  ecx_opnd);
 
-    ss = get_reg(ss, &esi_opnd, esi_reg, edx_reg, (unsigned)&((StackIterator*)0)->c.p_esi);
-    ss = get_reg(ss, &edi_opnd, edi_reg, edx_reg, (unsigned)&((StackIterator*)0)->c.p_edi);
-    ss = get_reg(ss, &ebp_opnd, ebp_reg, edx_reg, (unsigned)&((StackIterator*)0)->c.p_ebp);
+    ss = get_reg(ss, &esi_opnd, esi_reg, edx_reg, CONTEXT_OFFSET(p_esi));
+    ss = get_reg(ss, &edi_opnd, edi_reg, edx_reg, CONTEXT_OFFSET(p_edi));
+    ss = get_reg(ss, &ebp_opnd, ebp_reg, edx_reg, CONTEXT_OFFSET(p_ebp));
 
     M_Base_Opnd m3(ecx_reg, 0);
     ss = mov(ss,  m3,  ebx_opnd);
 
-    ss = get_reg(ss, &eax_opnd, eax_reg, edx_reg, (unsigned)&((StackIterator*)0)->c.p_eax);
-    ss = get_reg(ss, &ebx_opnd, ebx_reg, edx_reg, (unsigned)&((StackIterator*)0)->c.p_ebx);
+    ss = get_reg(ss, &eax_opnd, eax_reg, edx_reg, CONTEXT_OFFSET(p_eax));
+    ss = get_reg(ss, &ebx_opnd, ebx_reg, edx_reg, CONTEXT_OFFSET(p_ebx));
 
-    ss = movzx(ss, ecx_opnd,  M_Base_Opnd(edx_reg, (unsigned)&((StackIterator*)0)->c.eflags), size_8);
+    ss = mov(ss, ecx_opnd,  M_Base_Opnd(edx_reg, CONTEXT_OFFSET(eflags)));
     ss = test(ss, ecx_opnd, ecx_opnd);
     ss = branch8(ss, Condition_Z,  Imm_Opnd(size_8, 0));
     char* patch_offset = ((char *)ss) - 1; // Store location for jump patch
-    ss = push(ss,  ecx_opnd);
+    *ss++ = (char)0x9C; // PUSHFD
+    M_Base_Opnd m4(esp_reg, 0);
+    ss = alu(ss, and_opc, m4, Imm_Opnd(FLG_CLEAR_MASK));
+    ss = alu(ss, and_opc, ecx_opnd, Imm_Opnd(FLG_SET_MASK));
+    ss = alu(ss, or_opc, m4, ecx_opnd);
     *ss++ = (char)0x9D; // POPFD
     // Patch conditional jump
     signed offset = (signed)ss - (signed)patch_offset - 1;
     *patch_offset = (char)offset;
 
-    ss = get_reg(ss, &ecx_opnd, ecx_reg, edx_reg, (unsigned)&((StackIterator*)0)->c.p_ecx);
-    ss = get_reg(ss, &edx_opnd, edx_reg, edx_reg, (unsigned)&((StackIterator*)0)->c.p_edx);
+    ss = get_reg(ss, &ecx_opnd, ecx_reg, edx_reg, CONTEXT_OFFSET(p_ecx));
+    ss = get_reg(ss, &edx_opnd, edx_reg, edx_reg, CONTEXT_OFFSET(p_edx));
 
     ss = mov(ss,  esp_opnd,  m1);
     ss = ret(ss);
@@ -210,7 +222,10 @@ static transfer_control_stub_type gen_transfer_control_stub()
         movzx       ecx,byte ptr [edx+28h]
         test        ecx,ecx
         je          _label_
-        push        ecx
+        pushfd
+        and         dword ptr [esp], 0x003F7202
+        and         ecx, 0x00000CD5
+        or          dword ptr [esp], ecx
         popfd
 _label_:
         mov         ecx,dword ptr [edx+20h]

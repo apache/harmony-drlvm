@@ -68,11 +68,14 @@ port_transfer_to_regs PROC
     mov     qword ptr [rax-88h],rcx  ; (new RIP) -> [(new RSP) - 128 - 8]
     mov     rax, qword ptr [rdx+40h] ; RAX field
 
-    movzx   rcx,  byte ptr [rdx+88h] ; (EFLAGS & 0xff) -> RCX
+    movzx   rcx, word ptr [rdx+88h]  ; (word)EFLAGS -> RCX
     test    rcx, rcx
     je      __skipefl__
-    push    rcx
-    popfq
+    pushfq
+    and     dword ptr [rsp], 003F7202h ; Clear OF, DF, TF, SF, ZF, AF, PF, CF
+    and     ecx, 00000CD5h           ; Clear all except OF, DF, SF, ZF, AF, PF, CF
+    or      dword ptr [rsp], ecx
+    popfq                            ; restore RFLAGS
 __skipefl__:
 
     mov     rcx, qword ptr [rdx+48h] ; RCX field

@@ -48,11 +48,14 @@ port_transfer_to_regs PROC
     mov     dword ptr [ecx], ebx     ; new EIP -> (new ESP - 4) (as return address)
     mov     eax, dword ptr [edx+00h] ; EAX field
     mov     ebx, dword ptr [edx+04h] ; EBX field
-    movzx   ecx,  byte ptr [edx+24h] ; (EFLAGS & 0xff) -> ECX
+    movzx   ecx, word ptr [edx+24h]  ; (word)EFLAGS -> ECX
     test    ecx, ecx
     je      _label_
-    push    ecx                      ; restore EFLAGS
-    popfd
+    pushfd
+    and     dword ptr [esp], 003F7202h ; Clear OF, DF, TF, SF, ZF, AF, PF, CF
+    and     ecx, 00000CD5h           ; Clear all except OF, DF, SF, ZF, AF, PF, CF
+    or      dword ptr [esp], ecx
+    popfd                            ; restore EFLAGS
 _label_:
     mov     ecx, dword ptr [edx+08h] ; ECX field
     mov     edx, dword ptr [edx+0Ch] ; EDX field

@@ -67,11 +67,14 @@ port_transfer_to_regs:
     movq    %rcx, -0x88(%rax)// (new RIP) -> [(new RSP) - 128 - 8]
     movq    0x40(%rdx), %rax // RAX field
 
-    movzbq  0x88(%rdx), %rcx // (EFLAGS & 0xff) -> RCX
+    movzwq  0x88(%rdx), %rcx // (word)EFLAGS -> RCX
     test    %rcx, %rcx
     je      __skipefl__
-    push    %rcx
-    popfq
+    pushfq
+    andl    $0x003F7202, (%rsp) // Clear OF, DF, TF, SF, ZF, AF, PF, CF
+    andl    $0x00000CD5, %ecx   // Clear all except OF, DF, SF, ZF, AF, PF, CF
+    orl     %ecx, (%rsp)
+    popfq                    // restore RFLAGS
 __skipefl__:
 
     movq    0x48(%rdx), %rcx // RCX field
