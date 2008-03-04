@@ -32,7 +32,7 @@
 // pool is used for common stub code
 #define DEFAULT_COMMOT_JIT_CODE_POOL_SIZE           256*KBYTE
 // used for comressed VTable pointers
-#define DEFAULT_COMMOT_VTABLE_POOL_SIZE_NO_RESIZE   16*MBYTE
+#define DEFAULT_COMMOT_VTABLE_POOL_SIZE_NO_RESIZE   8*MBYTE
 //used for uncompressed VTable pointers
 #define DEFAULT_VTABLE_POOL_SIZE                    256*KBYTE
 // used for compiled code of a user class loader
