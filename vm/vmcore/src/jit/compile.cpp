@@ -795,17 +795,7 @@ NativeCodePtr compile_me(Method* method)
     }
 
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
-#ifdef _EM64T_
-    // Workaround for bug HARMONY-5322, on x86_64 lazy resoluton is not
-    // implemented, so no Java execution should be seen from compilation
-    if (ti->isEnabled())
-        ti->doNotReportLocally();
-#endif
     JIT_Result res = compile_do_compilation(method);
-#ifdef _EM64T_
-    if (ti->isEnabled())
-        ti->reportLocally();
-#endif
 
     if (res != JIT_SUCCESS) {
         INFO2("compile", "Cannot compile " << method);
