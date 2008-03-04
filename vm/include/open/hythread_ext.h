@@ -153,10 +153,17 @@ extern "C" {
 #include "hycond_win.h"
 #endif // _WIN32
 
-#if defined(__linux__) || defined(FREEBSD) 
+#if defined(__linux__) || defined(FREEBSD)
+
+#include <sys/ucontext.h>
 #define osthread_t pthread_t
+#define thread_context_t ucontext_t
+
 #elif _WIN32
+
 #define osthread_t HANDLE
+#define thread_context_t CONTEXT
+
 #else // !_WIN32 && !__linux__
 #error "threading is only supported on __linux__ or _WIN32"
 #endif // !_WIN32 && !__linux__

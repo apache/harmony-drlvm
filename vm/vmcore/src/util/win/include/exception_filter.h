@@ -36,17 +36,12 @@ LONG NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_exception);
 LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception);
 
 // Function to throw exception
-void __cdecl c_exception_handler(Class* exn_class, bool in_java);
-// Assembler wrapper for c_exception_handler; is used to clear direction flag
-void asm_c_exception_handler(Class *exn_class, bool in_java);
+void __cdecl c_exception_handler(Registers* regs, Class* exn_class, bool in_java);
 
 // exception catch callback to restore stack after Stack Overflow Error
 void __cdecl exception_catch_callback_wrapper();
 // exception catch support for JVMTI
- void __cdecl jvmti_exception_catch_callback_wrapper();
-// Assembler wrappers; are used to restore registers
-//void asm_exception_catch_callback(); // Declared in exceptions_jit.h
-//void asm_jvmti_exception_catch_callback(); // Declared in exceptions_jit.h
+void __cdecl jvmti_exception_catch_callback_wrapper();
 
 #ifdef __cplusplus
 } // extern "C"
@@ -55,15 +50,6 @@ void __cdecl exception_catch_callback_wrapper();
 
 // Prints register state
 void print_reg_state(Registers* regs);
-
-// Conversion from NT context to VM Registers structure and visa versa
-void nt_to_vm_context(PCONTEXT context, Registers* regs);
-void vm_to_nt_context(Registers* regs, PCONTEXT context);
-
-// Fuctions to manipulate with Registers structure
-void* regs_get_sp(Registers* pregs);
-void regs_push_param(Registers* pregs, POINTER_SIZE_INT param, int num);
-void regs_push_return_address(Registers* pregs, void* ret_addr);
 
 
 #endif // nt_exception_filter_h

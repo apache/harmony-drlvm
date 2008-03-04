@@ -146,7 +146,7 @@ public:
     VMBreakPoint* get_next_breakpoint(VMBreakPoint* prev);
 
     // General callback functions
-    void  process_native_breakpoint();
+    void  process_native_breakpoint(Registers* regs);
     jbyte process_interpreter_breakpoint(jmethodID method, jlocation location);
 
     // Find thread-local breakpoint information
@@ -186,8 +186,6 @@ public:
 
     // Basic operations
 
-    // 'data' must be allocated with JVMTI Allocate (or internal _allocate)
-    // Users must not deallocate 'data', it will be deallocated by 'remove'
     VMBreakPointRef* add_reference(jmethodID method, jlocation location, POINTER_SIZE_INT data);
     // To specify address explicitly
     VMBreakPointRef* add_reference(jmethodID method, jlocation location,
@@ -231,7 +229,7 @@ private:
 };
 
 // Address of this function is used for stack unwinding througn breakpoint
-extern "C" void __cdecl process_native_breakpoint_event();
+extern "C" void __cdecl process_native_breakpoint_event(Registers* regs);
 
 // Callback function for native breakpoint processing
 bool jvmti_jit_breakpoint_handler(Registers *regs);

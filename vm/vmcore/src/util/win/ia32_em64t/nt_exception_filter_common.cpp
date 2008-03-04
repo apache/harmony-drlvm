@@ -27,6 +27,7 @@
 #include "jvmti_break_intf.h"
 #include "m2n.h"
 #include "open/hythread_ext.h"
+#include "port_thread.h"
 
 // Windows specific
 #include <string>
@@ -334,6 +335,7 @@ bool check_stack_size_enough_for_exception_catch(void* sp) {
     return get_restore_stack_size() < available_stack_size;
 }
 
+
 LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception)
 {
     DWORD code = nt_exception->ExceptionRecord->ExceptionCode;
@@ -343,7 +345,7 @@ LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception
     VM_thread* vmthread = p_TLS_vmthread;
 
     // Convert NT context to Registers
-    nt_to_vm_context(context, &regs);
+    port_thread_context_to_regs(&regs, context);
     POINTER_SIZE_INT saved_eip = (POINTER_SIZE_INT)regs.get_ip();
 
     bool in_java = false;
@@ -361,7 +363,7 @@ LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception
         {
             flag_replaced = true;
             regs.set_ip(vm_get_ip_from_regs(vmthread));
-            vm_to_nt_context(&regs, context);
+            port_thread_regs_to_context(context, &regs);
         }
 
         in_java = (vm_identify_eip(regs.get_ip()) == VM_TYPE_JAVA);
@@ -399,12 +401,12 @@ LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception
     {
         LONG result = process_crash(&regs, nt_exception, code);
         regs.set_ip((void*)saved_eip);
-        vm_to_nt_context(&regs, context);
+        port_thread_regs_to_context(context, &regs);
         return result;
     }
 
     TRACE2("signals", ("VEH received an exception: code = %x, ip = %p, sp = %p",
-        nt_exception->ExceptionRecord->ExceptionCode, regs.get_ip(), regs_get_sp(&regs)));
+        nt_exception->ExceptionRecord->ExceptionCode, regs.get_ip(), regs.get_sp()));
 
     // if HWE occured in java code, suspension should also have been disabled
     bool ncai_enabled = GlobalNCAI::isEnabled();
@@ -421,7 +423,7 @@ LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception
         {
             TRACE2("signals",
                 ("StackOverflowError detected at ip = %p, esp = %p",
-                 regs.get_ip(), regs_get_sp(&regs)));
+                 regs.get_ip(), regs.get_sp()));
 
             vmthread->restore_guard_page = true;
             exn_class = env->java_lang_StackOverflowError_Class;
@@ -440,7 +442,7 @@ LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception
                 // Mark raised exception in TLS and resume execution
                 exn_raise_by_class(env->java_lang_StackOverflowError_Class);
                 regs.set_ip((void*)saved_eip);
-                vm_to_nt_context(&regs, context);
+                port_thread_regs_to_context(context, &regs);
                 return EXCEPTION_CONTINUE_EXECUTION;
             }
         }
@@ -471,7 +473,7 @@ LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception
             bool handled = jvmti_jit_breakpoint_handler(&regs);
             if (handled)
             {
-                vm_to_nt_context(&regs, context);
+                port_thread_regs_to_context(context, &regs);
                 return EXCEPTION_CONTINUE_EXECUTION;
             }
             else
@@ -481,7 +483,7 @@ LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception
         // unexpected hardware exception occured in java code
         LONG result = process_crash(&regs, nt_exception, code);
         regs.set_ip((void*)saved_eip);
-        vm_to_nt_context(&regs, context);
+        port_thread_regs_to_context(context, &regs);
         return result;
     }
 
@@ -497,40 +499,30 @@ LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception
     // into thread-local registers snapshot
     vm_set_exception_registers(vmthread, regs);
 
-    // __cdecl <=> push parameters in the reversed order
-    // push in_java argument onto stack
-    regs_push_param(&regs, in_java, 1/*2nd arg */);
-    // push the exn_class argument onto stack
     assert(exn_class);
-    regs_push_param(&regs, (POINTER_SIZE_INT)exn_class, 0/* 1st arg */);
-    // imitate return IP on stack
-    regs_push_return_address(&regs, NULL);
-
-    // set up the real exception handler address
-    regs.set_ip(asm_c_exception_handler);
+    // Set up parameters and registers for C handler
+    port_set_longjump_regs(c_exception_handler, &regs,
+                            3, &regs, exn_class, (POINTER_SIZE_INT)in_java);
     // Store changes into NT context
-    vm_to_nt_context(&regs, context);
+    port_thread_regs_to_context(context, &regs);
 
     // exit NT exception handler and transfer
     // control to VM exception handler
     return EXCEPTION_CONTINUE_EXECUTION;
 }
 
-void __cdecl c_exception_handler(Class* exn_class, bool in_java)
+void __cdecl c_exception_handler(Registers* regs, Class* exn_class, bool in_java)
 {
     // this exception handler is executed *after* NT exception handler returned
     DebugUtilsTI* ti = VM_Global_State::loader_env->TI;
     // Create local copy for registers because registers in TLS can be changed
-    Registers regs = {0};
     VM_thread *thread = p_TLS_vmthread;
     assert(thread);
-    if (thread->regs) {
-        regs = *(Registers*)thread->regs;
-    }
+    assert(exn_class);
 
     TRACE2("signals", ("should throw exception %p at IP=%p, SP=%p",
-                exn_class, regs.get_ip(), regs_get_sp(&regs)));
-    exn_athrow_regs(&regs, exn_class, in_java, true);
+                exn_class, regs->get_ip(), regs->get_sp()));
+    exn_athrow_regs(regs, exn_class, in_java, true);
 
     assert(!"si_transfer_control should not return");
 }

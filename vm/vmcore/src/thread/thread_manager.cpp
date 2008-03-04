@@ -166,7 +166,7 @@ vm_thread_t jthread_allocate_thread()
  * Sets resisters to JVMTI thread
  */
 void vm_set_jvmti_saved_exception_registers(vm_thread_t vm_thread,
-                                            Registers & regs)
+                                            Registers* regs)
 {
     assert(vm_thread);
     jvmti_thread_t jvmti_thread = &vm_thread->jvmti_thread;
@@ -175,7 +175,7 @@ void vm_set_jvmti_saved_exception_registers(vm_thread_t vm_thread,
             (Registers*)STD_MALLOC(sizeof(Registers));
         assert(jvmti_thread->jvmti_saved_exception_registers);
     }
-    *(jvmti_thread->jvmti_saved_exception_registers) = regs;
+    *(jvmti_thread->jvmti_saved_exception_registers) = *regs;
 } // vm_set_jvmti_saved_exception_registers
 
 /**

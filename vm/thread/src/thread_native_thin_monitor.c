@@ -24,10 +24,11 @@
 #define LOG_DOMAIN "tm.locks"
 
 #include <open/hythread_ext.h>
-#include "thread_private.h"
 #include <apr_atomic.h>
 #include <port_atomic.h>
 #include "port_barriers.h"
+#include "port_thread.h"
+#include "thread_private.h"
 
 /** @name Thin monitors support. Implement thin-fat scheme.
  */
@@ -240,7 +241,7 @@ IDATA VMCALL hythread_unreserve_lock(hythread_thin_monitor_t *lockword_ptr) {
 
     // resume owner
     if (owner) {
-        os_thread_yield_other(owner->os_handle);
+        port_thread_yield_other(owner->os_handle);
         hythread_resume(owner);
     }
 

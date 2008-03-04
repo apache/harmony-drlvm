@@ -12,6 +12,7 @@
 #include "thread_private.h"
 #include <open/ncai_thread.h>
 #include <open/jthread.h>
+#include "port_thread.h"
 
 
 /**
@@ -29,7 +30,7 @@ IDATA VMCALL hythread_suspend_thread_native(hythread_t thread)
 
     assert(thread->os_handle);
 
-    return os_thread_suspend(thread->os_handle);
+    return port_thread_suspend(thread->os_handle);
 }
 
 /**
@@ -47,7 +48,7 @@ IDATA VMCALL hythread_resume_thread_native(hythread_t thread)
 
     assert(thread->os_handle);
 
-    return os_thread_resume(thread->os_handle);
+    return port_thread_resume(thread->os_handle);
 }
 
 /**
@@ -66,7 +67,7 @@ int VMCALL hythread_get_suspend_count_native(hythread_t thread)
 
     assert(thread->os_handle);
 
-    return os_thread_get_suspend_count(thread->os_handle);
+    return port_thread_get_suspend_count(thread->os_handle);
 }
 
 /**
@@ -75,7 +76,7 @@ int VMCALL hythread_get_suspend_count_native(hythread_t thread)
  * @param[in] thread to get context.
  * @param[out] pointer to context structure.
  */
-IDATA VMCALL hythread_get_thread_context(hythread_t thread, os_thread_context_t* pcontext)
+IDATA VMCALL hythread_get_thread_context(hythread_t thread, thread_context_t* pcontext)
 {
     if (pcontext == NULL || thread == NULL)
         return TM_ERROR_NULL_POINTER;
@@ -85,7 +86,7 @@ IDATA VMCALL hythread_get_thread_context(hythread_t thread, os_thread_context_t*
 
     assert(thread->os_handle);
 
-    return os_thread_get_context(thread->os_handle, pcontext);
+    return port_thread_get_context(thread->os_handle, pcontext);
 }
 
 /**
@@ -94,7 +95,7 @@ IDATA VMCALL hythread_get_thread_context(hythread_t thread, os_thread_context_t*
  * @param[in] thread to set context.
  * @param[in] pointer to context structure.
  */
-IDATA VMCALL hythread_set_thread_context(hythread_t thread, os_thread_context_t* pcontext)
+IDATA VMCALL hythread_set_thread_context(hythread_t thread, thread_context_t* pcontext)
 {
     if (pcontext == NULL || thread == NULL)
         return TM_ERROR_NULL_POINTER;
@@ -104,5 +105,5 @@ IDATA VMCALL hythread_set_thread_context(hythread_t thread, os_thread_context_t*
 
     assert(thread->os_handle);
 
-    return os_thread_get_context(thread->os_handle, pcontext);
+    return port_thread_get_context(thread->os_handle, pcontext);
 }

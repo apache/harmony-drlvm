@@ -29,23 +29,6 @@
 #ifdef _EM64T_
 // vvvvvvvv EM64T vvvvvvvv
 
-// Prototype: POINTER_SIZE_INT& UC_IP(ucontext_t* uc)
-#define UC_IP(uc) (uc->uc_mcontext.gregs[REG_RIP])
-
-inline void add_red_zone(Registers* pregs) {pregs->rsp -= 0x80;}
-
-void regs_push_param(Registers* pregs, POINTER_SIZE_INT param, int UNREF num);
-
-inline void regs_push_return_address(Registers* pregs, void* ret_addr) {
-    pregs->rsp = pregs->rsp - 8;
-    *((void**)pregs->rsp) = ret_addr;
-}
-
-inline void regs_align_stack(Registers* pregs) {
-    pregs->rsp = pregs->rsp - 8;
-    *((void**)pregs->rsp) = 0;
-}
-
 inline size_t get_mem_protect_stack_size() { return 0x0400; }
 
 inline size_t get_restore_stack_size() {
@@ -57,27 +40,6 @@ inline size_t get_restore_stack_size() {
 // ^^^^^^^^ EM64T ^^^^^^^^
 #else // #ifdef _EM64T_
 // vvvvvvvv IA-32 vvvvvvvv
-
-#if defined(LINUX)
-// Prototype: POINTER_SIZE_INT& UC_IP(ucontext_t* uc)
-#define UC_IP(uc) (uc->uc_mcontext.gregs[REG_EIP])
-#elif defined(FREEBSD)
-#define UC_IP(uc) (uc->uc_mcontext.mc_eip)
-#endif
-
-inline void add_red_zone(Registers* pregs) {}
-
-inline void regs_push_param(Registers* pregs, POINTER_SIZE_INT param, int UNREF num) {
-    pregs->esp = pregs->esp - 4;
-    *((uint32*)pregs->esp) = param;
-}
-
-inline void regs_push_return_address(Registers* pregs, void* ret_addr) {
-    pregs->esp = pregs->esp - 4;
-    *((void**)pregs->esp) = ret_addr;
-}
-
-inline void regs_align_stack(Registers* pregs) {}
 
 inline size_t get_mem_protect_stack_size() { return 0x0100; }
 
@@ -99,11 +61,6 @@ inline size_t get_restore_stack_size() {
 #define STACK_MMAP_ATTRS \
     (MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS | MAP_GROWSDOWN)
 #endif
-
-
-
-void ucontext_to_regs(Registers* regs, ucontext_t *uc);
-void regs_to_ucontext(ucontext_t *uc, Registers* regs);
 
 
 #endif // _SIGNALS_COMMON_H_

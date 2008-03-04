@@ -180,7 +180,7 @@ static void ncai_registers_to_context(NcaiRegisters* pregs, CONTEXT* pcontext)
 
 bool ncai_get_register_value(hythread_t thread, jint reg_number, void* buf_ptr)
 {
-    os_thread_context_t context;
+    thread_context_t context;
     IDATA status = hythread_get_thread_context(thread, &context);
 
     if (status != TM_ERROR_NONE)
@@ -199,7 +199,7 @@ bool ncai_get_register_value(hythread_t thread, jint reg_number, void* buf_ptr)
 
 bool ncai_set_register_value(hythread_t thread, jint reg_number, void* buf_ptr)
 {
-    os_thread_context_t context;
+    thread_context_t context;
     IDATA status = hythread_get_thread_context(thread, &context);
 
     if (status != TM_ERROR_NONE)
@@ -222,7 +222,7 @@ bool ncai_set_register_value(hythread_t thread, jint reg_number, void* buf_ptr)
 
 void* ncai_get_instruction_pointer(hythread_t thread)
 {
-    os_thread_context_t context;
+    thread_context_t context;
     IDATA status = hythread_get_thread_context(thread, &context);
 
     if (status != TM_ERROR_NONE)

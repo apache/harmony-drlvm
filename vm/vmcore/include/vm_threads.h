@@ -79,7 +79,7 @@ void jthread_end_count();
 jint jthread_allocate_vm_thread_pool(JavaVM * java_vm, vm_thread_t vm_thread);
 void jthread_deallocate_vm_thread_pool(vm_thread_t vm_thread);
 vm_thread_t jthread_allocate_thread();
-void vm_set_jvmti_saved_exception_registers(vm_thread_t vm_thread, Registers & regs);
+void vm_set_jvmti_saved_exception_registers(vm_thread_t vm_thread, Registers* regs);
 void vm_set_exception_registers(vm_thread_t vm_thread, Registers & regs);
 void *vm_get_ip_from_regs(vm_thread_t vm_thread);
 void vm_reset_ip_from_regs(vm_thread_t vm_thread);

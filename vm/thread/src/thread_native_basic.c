@@ -35,6 +35,7 @@
 
 #include <apr_atomic.h>
 #include <open/hythread_ext.h>
+#include "port_thread.h"
 #include "thread_private.h"
 
 extern hythread_group_t TM_DEFAULT_GROUP;
@@ -299,7 +300,7 @@ void VMCALL hythread_yield() {
  * @return none
  */
 void VMCALL hythread_yield_other(hythread_t thread) {
-    os_thread_yield_other(thread->os_handle);
+    port_thread_yield_other(thread->os_handle);
 }
 
 /** 
@@ -520,7 +521,7 @@ IDATA VMCALL hythread_get_group(hythread_group_t *group, hythread_t thread) {
 void VMCALL hythread_cancel(hythread_t thread) {
     osthread_t os_handle = thread->os_handle;
     hythread_detach(thread);
-    os_thread_cancel(os_handle);
+    port_thread_cancel(os_handle);
     os_thread_join(os_handle);
 }
 

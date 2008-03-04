@@ -41,11 +41,11 @@
 // uint32 eflags;; 88h
 // };
 //
-// void transfer_to_regs(Registers* regs)
+// void port_transfer_to_regs(Registers* regs)
 
-.globl transfer_to_regs
-	.type	transfer_to_regs, @function
-transfer_to_regs:
+.globl port_transfer_to_regs
+	.type	port_transfer_to_regs, @function
+port_transfer_to_regs:
     movq    %rdi, %rdx // regs pointer (1st param - RDI) -> RDX
 
     movq    0x08(%rdx), %rbp // RBP field
@@ -80,3 +80,38 @@ __skipefl__:
     movq    (%rsp), %rsp     // load new RSP
     jmpq    * -0x88(%rsp)    // JMP to new RIP
 
+
+// void port_longjump_stub(void)
+//
+// after returning from the called function, RSP points to the 2 argument
+// slots in the stack. Saved Registers structure pointer is (RSP + 48)
+//
+// | interrupted |
+// |  program    | <- RSP where the program was interrupted by signal
+// |-------------|
+// | 0x80 bytes  | <- 'red zone' - we will not change it
+// |-------------|
+// | return addr |
+// | from stub   | <- for using in port_transfer_to_regs as [(new RSP) - 128 - 8]
+// |-------------|
+// |    saved    |
+// |  Registers  | <- to restore register context
+// |-------------|
+// | [alignment] | <- align Regs pointer to 16-bytes boundary
+// |-------------|
+// |  pointer to |
+// |  saved Regs | <- (RSP + 128)
+//                // |-------------|
+//                // | 0x80 bytes  | <- 'red zone'
+// |-------------|
+// | return addr |
+// |  from 'fn'  | <- address to return to the port_longjump_stub
+// |-------------|
+
+.globl port_longjump_stub
+	.type	port_longjump_stub, @function
+port_longjump_stub:
+//    movq    128(%rsp), %rcx // load RCX with the address of saved Registers
+    movq    (%rsp), %rcx // load RCX with the address of saved Registers
+    callq   port_transfer_to_regs   // restore context
+    ret                             // dummy RET - unreachable

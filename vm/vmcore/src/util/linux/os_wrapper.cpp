@@ -50,9 +50,3 @@
 -- which uses SIGUSR1, SIGUSR2 (which conflicts with the java app debugger and vm)
 #endif
 #endif
-
-#ifdef LINUX
-#ifdef _syscall0
-_syscall0(pid_t, gettid)
-#endif
-#endif

@@ -82,11 +82,15 @@ bool native_is_ip_stub(void* ip)
     return (native_find_stub(ip) != NULL);
 }
 
+/*
+Now the technique for calling C handler from a signal/exception context
+guarantees that all needed return addresses are present in stack, so
+there is no need in special processing
 static bool native_is_ip_in_breakpoint_handler(void* ip)
 {
     return (ip >= &process_native_breakpoint_event &&
             ip < &jvmti_jit_breakpoint_handler);
-}
+}*/
 /// Helper functions
 //////////////////////////////////////////////////////////////////////////////
 
@@ -311,13 +315,16 @@ static int walk_native_stack_jit(
 
             VMBreakPoints* vm_breaks = VM_Global_State::loader_env->TI->vm_brpt;
             vm_breaks->lock();
-
+/*
+Now the technique for calling C handler from a signal/exception context
+guarantees that all needed return addresses are present in stack, so
+there is no need in special processing
             if (native_is_ip_in_breakpoint_handler(tmp_regs.get_ip()))
             {
                 regs = *pthread->jvmti_thread.jvmti_saved_exception_registers;
                 flag_breakpoint = true;
             }
-            else
+            else*/
                 regs = tmp_regs;
 
             vm_breaks->unlock();
@@ -433,10 +440,13 @@ static int walk_native_stack_interpreter(
 
         VMBreakPoints* vm_breaks = VM_Global_State::loader_env->TI->vm_brpt;
         vm_breaks->lock();
-
+/*
+Now the technique for calling C handler from a signal/exception context
+guarantees that all needed return addresses are present in stack, so
+there is no need in special processing
         if (native_is_ip_in_breakpoint_handler(tmp_regs.get_ip()))
             regs = *pthread->jvmti_thread.jvmti_saved_exception_registers;
-        else
+        else*/
             regs = tmp_regs;
 
         vm_breaks->unlock();

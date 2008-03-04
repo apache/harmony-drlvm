@@ -41,11 +41,11 @@ _TEXT   SEGMENT
 ; uint32 eflags;; 88h
 ; };
 ;
-; void transfer_to_regs(Registers* regs)
+; void port_transfer_to_regs(Registers* regs)
 
-PUBLIC  transfer_to_regs
+PUBLIC  port_transfer_to_regs
 
-transfer_to_regs PROC
+port_transfer_to_regs PROC
 
     mov     rdx, rcx ; regs pointer (1st param - RCX) -> RDX
 
@@ -81,7 +81,48 @@ __skipefl__:
     mov     rsp, qword ptr [rsp]     ; load new RSP
     jmp     qword ptr [rsp-88h]      ; JMP to new RIP
 
-transfer_to_regs ENDP
+port_transfer_to_regs ENDP
+
+
+; void port_longjump_stub(void)
+;
+; after returning from the called function, RSP points to the 2 argument
+; slots in the stack. Saved Registers structure pointer is (RSP + 48)
+;
+; | interrupted |
+; |  program    | <- RSP where the program was interrupted by exception
+; |-------------|
+; | 0x80 bytes  | <- preserved stack area - we will not change it
+; |-------------|
+; | return addr |
+; | from stub   | <- for using in port_transfer_to_regs as [(new RSP) - 128 - 8]
+; |-------------|
+; |    saved    |
+; |  Registers  | <- to restore register context
+; |-------------|
+; | [alignment] | <- align Regs pointer to 16-bytes boundary
+; |-------------|
+; |  pointer to |
+; |  saved Regs | <- (RSP + 48)
+; |-------------|
+; |    arg 5    | <- present even if not used
+; |-------------|
+; |    arg 4    | <- present even if not used
+; |-------------|
+; |  32 bytes   | <- 'red zone' for argument registers flushing
+; |-------------|
+; | return addr |
+; |  from 'fn'  | <- address to return to the port_longjump_stub
+; |-------------|
+
+PUBLIC  port_longjump_stub
+
+port_longjump_stub PROC
+
+    mov     rcx, qword ptr [rsp + 48] ; load RCX with the address of saved Registers
+    call    port_transfer_to_regs   ; restore context
+    ret                             ; dummy RET - unreachable
+port_longjump_stub ENDP
 
 
 _TEXT   ENDS

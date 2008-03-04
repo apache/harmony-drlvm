@@ -29,6 +29,7 @@
 #include "port_sysinfo.h"
 #include "platform_lowlevel.h"
 #include "exception_filter.h"
+#include "port_thread.h"
 
 #include "crash_handler.h"
 

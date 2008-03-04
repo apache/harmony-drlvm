@@ -593,20 +593,18 @@ VMBreakPoints::find_thread_local_break(VM_thread* vmthread)
 }
 
 void
-VMBreakPoints::process_native_breakpoint()
+VMBreakPoints::process_native_breakpoint(Registers* regs)
 {
 #if (defined _IA32_) || (defined _EM64T_)
     // When we get here we know already that breakpoint occurred in JITted code,
     // JVMTI handles it, and registers context is saved for us in TLS
     VM_thread *vm_thread = p_TLS_vmthread;
     lock();
-    Registers regs = 
-        *(Registers*)vm_thread->jvmti_thread.jvmti_saved_exception_registers;
-    NativeCodePtr addr = (NativeCodePtr)regs.get_ip();
+    NativeCodePtr addr = (NativeCodePtr)regs->get_ip();
 
     TRACE2("jvmti.break", "Native breakpoint occured: " << addr);
 
-    M2nFrame* m2nf = m2n_push_suspended_frame(&regs);
+    M2nFrame* m2nf = m2n_push_suspended_frame(regs);
 
     VMBreakPoint* bp = find_breakpoint(addr);
     if (NULL == bp) {
@@ -618,7 +616,7 @@ VMBreakPoints::process_native_breakpoint()
         // instrumented, it means that another breakpoint has been set
         // there right after unlock was done.
         m2n_set_last_frame(m2n_get_previous_frame(m2nf));
-        transfer_to_regs(&regs);
+        return;
     }
     assert(bp->addr == addr);
     TRACE2("jvmti.break", "Process native breakpoint: "
@@ -628,6 +626,9 @@ VMBreakPoints::process_native_breakpoint()
         << (bp->method ? method_get_name((Method*)bp->method) : "(nil)")
         << (bp->method ? method_get_descriptor((Method*)bp->method) : "")
         << " :" << bp->location << " :" << bp->addr);
+
+    // Save registers in TLS - mainly for single stepping in virtual methods
+    vm_set_jvmti_saved_exception_registers(vm_thread, regs);
 
     jbyte *instruction_buffer;
     BEGIN_RAISE_AREA;
@@ -672,7 +673,7 @@ VMBreakPoints::process_native_breakpoint()
                 {
                     local.intf = intf->m_next;
                     VMBreakPoint local_bp = *bp;
-                    local_bp.regs = regs;
+                    local_bp.regs = *regs;
                     local.local_bp = &local_bp;
                     // Set local copy's pointer to local copy of disassembler
                     local_bp.disasm = &idisasm;
@@ -724,10 +725,6 @@ VMBreakPoints::process_native_breakpoint()
         }
     }
 
-    // Registers in TLS can be changed in user callbacks
-    // It should be restored to keep original address of instrumented instruction
-    // Exception/signal handlers use it when HWE occurs in instruction buffer
-    vm_set_jvmti_saved_exception_registers(vm_thread, regs);
     unlock();
 
     // Now we need to return back to normal code execution, it is
@@ -807,7 +804,7 @@ VMBreakPoints::process_native_breakpoint()
     }
     case InstructionDisassembler::INDIRECT_JUMP:
     {
-        char *jump_target = (char *)idisasm.get_target_address_from_context(&regs);
+        char *jump_target = (char *)idisasm.get_target_address_from_context(regs);
 
         // Create JMP to the absolute address which conditional jump
         // had in the execution buffer
@@ -817,7 +814,7 @@ VMBreakPoints::process_native_breakpoint()
     case InstructionDisassembler::INDIRECT_CALL:
     {
         jbyte *next_instruction = interrupted_instruction + instruction_length;
-        char *jump_target = (char *)idisasm.get_target_address_from_context(&regs);
+        char *jump_target = (char *)idisasm.get_target_address_from_context(regs);
         char *code = (char *)instruction_buffer;
 
         // Push "return address" to the $next_instruction
@@ -836,8 +833,8 @@ VMBreakPoints::process_native_breakpoint()
     // execute the original instruction with the registers which it
     // had before breakpoint happened
     m2n_set_last_frame(m2n_get_previous_frame(m2nf));
-    regs.set_ip(instruction_buffer);
-    transfer_to_regs(&regs);
+    regs->set_ip(instruction_buffer);
+    return; // We'll go to updated regs
 #else
     // PLATFORM dependent code
     abort();
@@ -1349,41 +1346,16 @@ static bool clear_native_breakpoint(VMBreakPoint* bp)
 //////////////////////////////////////////////////////////////////////////////
 
 
-void __cdecl process_native_breakpoint_event()
+void __cdecl process_native_breakpoint_event(Registers* regs)
 {
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
-    ti->vm_brpt->process_native_breakpoint();
+    ti->vm_brpt->process_native_breakpoint(regs);
 }
 
-#if defined (_WIN32)
-#if defined(_EM64T_)
-extern "C" void asm_process_native_breakpoint_event();
-#else
-static void __declspec(naked)
-asm_process_native_breakpoint_event()
-{
-    __asm {
-    push    ebp
-    mov     ebp,esp
-    pushfd
-    cld
-    call    process_native_breakpoint_event
-    popfd
-    pop     ebp
-    ret
-    }
-}
-#endif
-#endif // _WIN32
 
 bool jvmti_jit_breakpoint_handler(Registers *regs)
 {
-#if PLATFORM_POSIX && INSTRUMENTATION_BYTE == INSTRUMENTATION_BYTE_INT3
-    // Int3 exception address points to the instruction after it
-    NativeCodePtr native_location = (NativeCodePtr)(((POINTER_SIZE_INT)regs->get_ip()) - 1);
-#else
     NativeCodePtr native_location = (NativeCodePtr)regs->get_ip();
-#endif
 
     TRACE2("jvmti.break", "BREAKPOINT occured: " << native_location);
 
@@ -1426,16 +1398,8 @@ bool jvmti_jit_breakpoint_handler(Registers *regs)
     }
 #endif
 
-    // Store possibly corrected location
-    regs->set_ip((void*)native_location);
-    // Copy original registers to TLS
-    vm_set_jvmti_saved_exception_registers(vm_thread, *regs);
-    // Set return address for exception handler
-#if defined (PLATFORM_POSIX)
-    regs->set_ip((void*)process_native_breakpoint_event);
-#else // PLATFORM_POSIX
-    regs->set_ip((void*)asm_process_native_breakpoint_event);
-#endif //PLATFORM_POSIX
+    NativeCodePtr callback = (NativeCodePtr)process_native_breakpoint_event;
+    port_set_longjump_regs(callback, regs, 1, regs);
 
     return true;
 }

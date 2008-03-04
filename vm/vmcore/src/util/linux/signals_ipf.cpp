@@ -75,33 +75,6 @@
 
 #include <semaphore.h>
 
-void ucontext_to_regs(Registers* regs, ucontext_t* uc)
-{
-    memcpy(regs->gr, uc->uc_mcontext.sc_gr, sizeof(regs->gr));
-    memcpy(regs->fp, uc->uc_mcontext.sc_fr, sizeof(regs->fp));
-    memcpy(regs->br, uc->uc_mcontext.sc_br, sizeof(regs->br));
-
-    regs->preds = uc->uc_mcontext.sc_pr;
-    regs->nats  = uc->uc_mcontext.sc_ar_rnat;
-    regs->pfs   = uc->uc_mcontext.sc_ar_pfs;
-    regs->bsp   = (uint64*)uc->uc_mcontext.sc_ar_bsp;
-    regs->ip    = uc->uc_mcontext.sc_ip;
-}
-
-void regs_to_ucontext(ucontext_t* uc, Registers* regs)
-{
-    memcpy(uc->uc_mcontext.sc_gr, regs->gr, sizeof(regs->gr));
-    memcpy(uc->uc_mcontext.sc_fr, regs->fp, sizeof(regs->fp));
-    memcpy(uc->uc_mcontext.sc_br, regs->br, sizeof(regs->br));
-
-    uc->uc_mcontext.sc_pr      = regs->preds;
-    uc->uc_mcontext.sc_ar_rnat = regs->nats;
-    uc->uc_mcontext.sc_ar_pfs  = regs->pfs;
-    uc->uc_mcontext.sc_ar_bsp  = (uint64)regs->bsp;
-    uc->uc_mcontext.sc_ip      = regs->ip;
-}
-
-
 void asm_exception_catch_callback() {
     // FIXME: not implemented
     fprintf(stderr, "FIXME: asm_jvmti_exception_catch_callback: not implemented\n");
@@ -129,7 +102,7 @@ void abort_handler (int signum, siginfo_t* info, void* context) {
     fprintf(stderr, "SIGABRT in VM code.\n");
     Registers regs;
     ucontext_t *uc = (ucontext_t *)context;
-    ucontext_to_regs(&regs, uc);
+    port_thread_context_to_regs(&regs, uc);
     
     // setup default handler
     signal(signum, SIG_DFL);
@@ -169,7 +142,7 @@ void null_java_divide_by_zero_handler(int signum, siginfo_t* UNREF info, void* c
 
     fprintf(stderr, "SIGFPE in VM code.\n");
     Registers regs;
-    ucontext_to_regs(&regs, uc);
+    port_thread_context_to_regs(&regs, uc);
 
     // setup default handler
     signal(signum, SIG_DFL);
@@ -435,7 +408,7 @@ void null_java_reference_handler(int signum, siginfo_t* UNREF info, void* contex
     ucontext_t *uc = (ucontext_t *)context;
     Global_Env *env = VM_Global_State::loader_env;
     Registers regs;
-    ucontext_to_regs(&regs, uc);
+    port_thread_context_to_regs(&regs, uc);
 
     if (!p_TLS_vmthread)
     {

@@ -27,6 +27,7 @@
 #include "native_stack.h"
 #include "port_filepath.h"
 #include "port_dso.h"
+#include "port_thread.h"
 #include "stack_dump.h"
 
 

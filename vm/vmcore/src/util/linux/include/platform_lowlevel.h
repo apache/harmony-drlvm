@@ -50,25 +50,6 @@ extern "C" {
 #define _MAX_PATH PATH_MAX
 
 
-#if defined(LINUX)
-
-#include <sys/types.h>
-#include <linux/unistd.h>
-#include <errno.h>
-
-#ifdef _syscall0
-pid_t gettid(void);
-#else // _syscall0
-#include <sys/syscall.h>
-#include <unistd.h>
-#define gettid() ((pid_t)syscall(__NR_gettid))
-#endif
-
-#else // !LINUX
-#define gettid() getpid()
-#endif
-
-
 #ifdef __cplusplus
 }
 #endif

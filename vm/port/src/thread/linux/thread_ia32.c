@@ -16,14 +16,14 @@
  */
 
 
+#define  _GNU_SOURCE
 #include <sys/ucontext.h>
-#include <stdio.h>
-#include "vm_core_types.h"
-#include "signals_common.h"
+#include <stdarg.h>
+#include "port_thread.h"
 
 
 #if defined(LINUX)
-void ucontext_to_regs(Registers* regs, ucontext_t *uc)
+void port_thread_context_to_regs(Registers* regs, ucontext_t *uc)
 {
     regs->eax = uc->uc_mcontext.gregs[REG_EAX];
     regs->ecx = uc->uc_mcontext.gregs[REG_ECX];
@@ -37,7 +37,7 @@ void ucontext_to_regs(Registers* regs, ucontext_t *uc)
     regs->eflags = uc->uc_mcontext.gregs[REG_EFL];
 }
 
-void regs_to_ucontext(ucontext_t *uc, Registers* regs)
+void port_thread_regs_to_context(ucontext_t *uc, Registers* regs)
 {
     uc->uc_mcontext.gregs[REG_EAX] = regs->eax;
     uc->uc_mcontext.gregs[REG_ECX] = regs->ecx;
@@ -52,7 +52,7 @@ void regs_to_ucontext(ucontext_t *uc, Registers* regs)
 }
 
 #elif defined(FREEBSD)
-void ucontext_to_regs(Registers* regs, ucontext_t *uc)
+void port_thread_context_to_regs(Registers* regs, ucontext_t *uc)
 {
     regs->eax = uc->uc_mcontext.mc_eax;
     regs->ecx = uc->uc_mcontext.mc_ecx;
@@ -66,7 +66,7 @@ void ucontext_to_regs(Registers* regs, ucontext_t *uc)
     regs->eflags = uc->uc_mcontext.mc_eflags;
 }
 
-void regs_to_ucontext(ucontext_t *uc, Registers* regs)
+void port_thread_regs_to_context(ucontext_t *uc, Registers* regs)
 {
     uc->uc_mcontext.mc_eax = regs->eax;
     uc->uc_mcontext.mc_ecx = regs->ecx;
@@ -83,3 +83,88 @@ void regs_to_ucontext(ucontext_t *uc, Registers* regs)
 #else
 #error need to add correct mcontext_t lookup for registers
 #endif
+
+
+void port_longjump_stub(void);
+#define DIR_FLAG ((uint32)0x00000400)
+
+void port_set_longjump_regs(void* fn, Registers* regs, int num, ...)
+{
+    void** sp;
+    va_list ap;
+    int i;
+    size_t rcount =
+        (sizeof(Registers) + sizeof(void*) - 1) / sizeof(void*);
+
+    if (!regs)
+        return;
+
+    sp = (void**)regs->esp - 1;
+    *sp = (void*)regs->eip;
+    sp = sp - rcount - 1;
+    *((Registers*)(sp + 1)) = *regs;
+    *sp = (void*)(sp + 1);
+    regs->ebp = (uint32)sp;
+
+    sp = sp - num - 1;
+
+    va_start(ap, num);
+
+    for (i = 1; i <= num; i = i + 1)
+    {
+        void* arg = va_arg(ap, void*);
+
+        if (i == 1 && arg == regs)
+            sp[i] = *((void**)regs->ebp); /* Replace 1st arg */
+        else
+            sp[i] = arg;
+    }
+
+    *sp = (void*)&port_longjump_stub;
+    regs->esp = (uint32)sp;
+    regs->eip = (uint32)fn;
+    regs->eflags = regs->eflags & ~DIR_FLAG;
+}
+
+void port_transfer_to_function(void* fn, Registers* pregs, int num, ...)
+{
+    void** sp;
+    va_list ap;
+    int i;
+    size_t rcount =
+        (sizeof(Registers) + sizeof(void*) - 1) / sizeof(void*);
+    Registers regs;
+
+    if (!pregs)
+        return;
+
+    regs = *pregs;
+
+    sp = (void**)regs.esp - 1;
+    *sp = (void*)regs.eip;
+    sp = sp - rcount - 1;
+    *((Registers*)(sp + 1)) = regs;
+    *sp = (void*)(sp + 1);
+    regs.ebp = (uint32)sp;
+
+    sp = sp - num - 1;
+
+    va_start(ap, num);
+
+    for (i = 1; i <= num; i = i + 1)
+    {
+        void* arg = va_arg(ap, void*);
+
+        if (i == 1 && arg == pregs)
+            sp[i] = *((void**)regs.ebp); /* Replace 1st arg */
+        else
+            sp[i] = arg;
+    }
+
+    *sp = (void*)&port_longjump_stub;
+    regs.esp = (uint32)sp;
+    regs.eip = (uint32)fn;
+    regs.eflags = regs.eflags & ~DIR_FLAG;
+
+    port_transfer_to_regs(&regs);
+}

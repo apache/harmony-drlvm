@@ -31,11 +31,11 @@ _TEXT   SEGMENT PARA USE32 PUBLIC 'CODE'
 ; uint32 eflags; +24
 ; };
 ;
-; void transfer_to_regs(Registers* regs)
+; void port_transfer_to_regs(Registers* regs)
 
-PUBLIC  transfer_to_regs
+PUBLIC  port_transfer_to_regs
 
-transfer_to_regs PROC
+port_transfer_to_regs PROC
 
     mov     edx, dword ptr [esp+04h] ; store regs pointer to EDX
     mov     ebx, dword ptr [edx+20h] ; EIP field -> EBX
@@ -59,7 +59,44 @@ _label_:
     mov     esp, dword ptr [esp+04h] ; ((new ESP - 4) -> ESP
     ret                              ; JMP by RET
 
-transfer_to_regs ENDP
+port_transfer_to_regs ENDP
+
+
+; void port_longjump_stub(void)
+;
+; after returning from the called function, EBP points to the pointer
+; to saved Registers structure
+;
+; | interrupted |
+; |  program    | <- ESP where the program was interrupted by exception
+; |-------------|
+; | return addr |
+; | from stub   | <- for using in port_transfer_to_regs
+; |-------------|
+; |    saved    |
+; |  Registers  | <- to restore register context
+; |-------------|
+; |  pointer to |
+; |  saved Regs | <- EBP
+; |-------------|
+; |  arg 5      | <-
+; |-------------|   |
+; ...............    - arguments for 'fn'
+; |-------------|   |
+; |  arg 0      | <-
+; |-------------|
+; | return addr |
+; |  from 'fn'  | <- address to return to the port_longjump_stub
+; |-------------|
+
+PUBLIC  port_longjump_stub
+
+port_longjump_stub PROC
+
+    mov     esp, ebp    ; ESP now points to the address of saved Registers
+    call    port_transfer_to_regs   ; restore context
+    ret                             ; dummy RET - unreachable
+port_longjump_stub ENDP
 
 
 _TEXT   ENDS

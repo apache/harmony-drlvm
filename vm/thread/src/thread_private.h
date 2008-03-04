@@ -309,21 +309,14 @@ int os_thread_create(osthread_t* phandle, UDATA stacksize, UDATA priority,
         hythread_wrapper_t func, void *data);
 int os_thread_set_priority(osthread_t thread, int priority);
 osthread_t os_thread_current();
-int os_thread_cancel(osthread_t);
 int os_thread_free(osthread_t os_thread);
 void os_thread_exit(IDATA status);
 int os_thread_join(osthread_t os_thread);
-void os_thread_yield_other(osthread_t);
 int os_get_thread_times(osthread_t os_thread, int64* pkernel, int64* puser);
 
 int os_cond_timedwait(hycond_t *cond, hymutex_t *mutex, I_64 ms, IDATA nano);
 UDATA os_get_foreign_thread_stack_size();
 
-int os_thread_suspend(osthread_t thread);
-int os_thread_resume(osthread_t thread);
-int os_thread_get_suspend_count(osthread_t thread);
-int os_thread_get_context(osthread_t thread, os_thread_context_t *context);
-int os_thread_set_context(osthread_t thread, os_thread_context_t *context);
 
 #ifdef __cplusplus
 }

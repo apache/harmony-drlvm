@@ -30,11 +30,11 @@
 // uint32 eflags; +24
 // };
 //
-// void transfer_to_regs(Registers* regs)
+// void port_transfer_to_regs(Registers* regs)
 
-.globl transfer_to_regs
-	.type	transfer_to_regs, @function
-transfer_to_regs:
+.globl port_transfer_to_regs
+	.type	port_transfer_to_regs, @function
+port_transfer_to_regs:
     movl    0x04(%esp), %edx // store regs pointer to EDX
     movl    0x20(%edx), %ebx // EIP field -> EBX
     movl    0x1C(%edx), %ecx // ESP field
@@ -56,3 +56,38 @@ _label_:
     movl    0x0C(%edx), %edx // EDX field
     movl    0x04(%esp), %esp // ((new ESP - 4) -> ESP
     ret                      // JMP by RET
+
+
+// void port_longjump_stub(void)
+//
+// after returning from the called function, EBP points to the pointer
+// to saved Registers structure
+//
+// | interrupted |
+// |  program    | <- ESP where the program was interrupted by signal
+// |-------------|
+// | return addr |
+// | from stub   | <- for using in port_transfer_to_regs
+// |-------------|
+// |    saved    |
+// |  Registers  | <- to restore register context
+// |-------------|
+// |  pointer to |
+// |  saved Regs | <- EBP
+// |-------------|
+// |  arg 5      | <-
+// |-------------|   |
+// ...............    - arguments for 'fn'
+// |-------------|   |
+// |  arg 0      | <-
+// |-------------|
+// | return addr |
+// |  from 'fn'  | <- address to return to the port_longjump_stub
+// |-------------|
+
+.globl port_longjump_stub
+	.type	port_longjump_stub, @function
+port_longjump_stub:
+    movl    %ebp, %esp    // ESP now points to the address of saved Registers
+    call    port_transfer_to_regs   // restore context
+    ret                             // dummy RET - unreachable

@@ -33,16 +33,7 @@
 
 #include "jvmti_types.h"
 #include "hythread_ext.h"
-
-
-#ifdef WIN32
-/* Thread context definition for Windows */
-typedef CONTEXT  os_thread_context_t;
-#else
-/* Thread context definition for UNIX-like systems */
-#include <sys/ucontext.h>
-typedef ucontext_t  os_thread_context_t;
-#endif
+#include "port_thread.h"
 
 
 #ifdef __cplusplus
@@ -62,9 +53,9 @@ extern HY_CFUNC int VMCALL
 hythread_get_suspend_count_native PROTOTYPE((hythread_t thread));
 
 extern HY_CFUNC IDATA VMCALL
-hythread_get_thread_context PROTOTYPE((hythread_t thread, os_thread_context_t* pcontext));
+hythread_get_thread_context PROTOTYPE((hythread_t thread, thread_context_t* pcontext));
 extern HY_CFUNC IDATA VMCALL
-hythread_set_thread_context PROTOTYPE((hythread_t thread, os_thread_context_t* pcontext));
+hythread_set_thread_context PROTOTYPE((hythread_t thread, thread_context_t* pcontext));
 
 //@}
 
