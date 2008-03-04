@@ -968,18 +968,16 @@ VMPropertyIterator::~VMPropertyIterator() {
     destroy_properties_keys(keys);
 }
 
-bool 
-VMPropertyIterator::isOver() const {
-    return keys[iterator] ? false : true;
-}
-
-void 
+bool
 VMPropertyIterator::next() {
-    assert(!isOver());
+    if (!keys[iterator]) {
+        return false;
+    }
     key = mm.copy(keys[iterator]);
     char* nval = get_property(keys[iterator++], VM_PROPERTIES);
     value = mm.copy(nval);
     destroy_property_value(nval);
+    return true;
 }
 
 } //namespace Jitrino

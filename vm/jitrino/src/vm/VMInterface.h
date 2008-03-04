@@ -551,8 +551,7 @@ class VMPropertyIterator {
 public:
     VMPropertyIterator(MemoryManager& m, const char* prefix);
     ~VMPropertyIterator();
-    bool isOver() const;
-    void next();
+    bool next();
     char* getKey() const { return key; }
     char* getValue() const { return value; }
 private:

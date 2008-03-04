@@ -1357,9 +1357,7 @@ void PMF::processCmd (const char* ptr)
 
 void PMF::processVMProperties ()
 {
-    VMPropertyIterator it(mm, "jit.");
-    while(!it.isOver()) {
-        it.next();
+    for (VMPropertyIterator it(mm, "jit."); it.next();) {
         processCmd(it.getKey() + 4, it.getValue());
     }
 }
