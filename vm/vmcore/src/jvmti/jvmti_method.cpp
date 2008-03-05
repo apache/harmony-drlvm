@@ -30,6 +30,7 @@
 #include "object_handles.h"
 #include "jvmti_utils.h"
 #include "cxxlog.h"
+#include "vm_log.h"
 
 #include "jvmti_interface.h"
 #include "suspend_checker.h"
@@ -117,7 +118,7 @@ jvmtiGetMethodDeclaringClass(jvmtiEnv* env,
                              jmethodID method,
                              jclass* declaring_class_ptr)
 {
-    TRACE2("jvmti.method", "GetMethodDeclaringClass called");
+    TRACE2("jvmti.method", "GetMethodDeclaringClass called for " << method);
     SuspendEnabledChecker sec;
     /*
      * Check given env & current phase.
@@ -559,7 +560,7 @@ jvmtiIsMethodNative(jvmtiEnv* env,
                     jmethodID method,
                     jboolean* is_native_ptr)
 {
-    TRACE2("jvmti.method", "IsMethodNative called");
+    TRACE2("jvmti.method", "IsMethodNative called for " << method);
     SuspendEnabledChecker sec;
     /*
      * Check given env & current phase.
@@ -582,6 +583,7 @@ jvmtiIsMethodNative(jvmtiEnv* env,
     }
 
     *is_native_ptr = (jboolean)(reinterpret_cast<Method*>(method)->is_native()?JNI_TRUE:JNI_FALSE);
+    TRACE2("jvmti.method", "IsMethodNative(" << method << ") = " << *is_native_ptr);
 
     return JVMTI_ERROR_NONE;
 }
@@ -644,7 +646,7 @@ jvmtiIsMethodObsolete(jvmtiEnv* env,
                       jmethodID method,
                       jboolean* is_obsolete_ptr)
 {
-    TRACE2("jvmti.method", "IsMethodObsolete called");
+    TRACE2("jvmti.method", "IsMethodObsolete called for " << method);
     SuspendEnabledChecker sec;
     /*
      * Check given env & current phase.
@@ -671,6 +673,7 @@ jvmtiIsMethodObsolete(jvmtiEnv* env,
      */
     *is_obsolete_ptr = JNI_FALSE;
 
+    TRACE2("jvmti.method", "IsMethodObsolete(" << method << ") = " << *is_obsolete_ptr);
     return JVMTI_ERROR_NONE;
 } // jvmtiIsMethodObsolete
 

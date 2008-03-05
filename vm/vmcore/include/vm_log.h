@@ -35,8 +35,8 @@
  */
 
 /**
-* The convenience method for logging VM Strings.
-*/
+ * The convenience method for logging VM Strings.
+ */
 inline LoggerString& operator<<(LoggerString& log, const String* str) {
     if (str) {
         log << str->bytes; 
@@ -59,8 +59,24 @@ inline LoggerString& operator<<(LoggerString& log, const Class* clss) {
 }
 
 /**
-* The convenience method for logging Method instances.
-*/
+ * The convenience method for logging jboolean values.
+ */
+inline LoggerString& operator<<(LoggerString& log, const jboolean b) {
+    if (b == JNI_FALSE) {
+        log << "false";
+    } else if (b == JNI_TRUE) {
+        log << "true";
+    } else {
+        log << "(jboolean) " << ((unsigned) b);
+    }
+
+    return log;
+}
+
+
+/**
+ * The convenience method for logging Method handles.
+ */
 inline LoggerString& operator<<(LoggerString& log, const Class_Member* m) {
     if (m) {
         log << m->get_class() << "."
@@ -74,8 +90,15 @@ inline LoggerString& operator<<(LoggerString& log, const Class_Member* m) {
 }
 
 /**
-* The convenience method for logging managed objects.
-*/
+ * The convenience method for logging JNI method IDs.
+ */
+inline LoggerString& operator<<(LoggerString& log, const jmethodID m) {
+    return log << reinterpret_cast<const Method*>(m);
+}
+
+/**
+ * The convenience method for logging managed objects.
+ */
 inline LoggerString& operator<<(LoggerString& log, /*const*/ ManagedObject* object) {
     assert(!hythread_is_suspend_enabled());
     if (object) {
@@ -87,8 +110,8 @@ inline LoggerString& operator<<(LoggerString& log, /*const*/ ManagedObject* obje
 }
 
 /**
-* The convenience method for logging JNI object handles.
-*/
+ * The convenience method for logging JNI object handles.
+ */
 inline LoggerString& operator<<(LoggerString& log, const jobject jobj) {
     hythread_suspend_disable();
     if (jobj) {
