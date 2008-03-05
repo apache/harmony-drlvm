@@ -78,7 +78,7 @@
     <target name="compile-reg-tests-java"
             depends="compile-reg-tests-prepare, compile-reg-tests-j">
         <basename file="${vmmagic}" property="vmmagic.basename"/>
-        <property name="vmmagic.dep" location="${test.jre.home}/lib/boot/${vmmagic.basename}"/>
+        <property name="vmmagic.dep" location="${test.jre.home}/bin/default/${vmmagic.basename}"/>
         <ensure-resource name="vmmagic.dep"/>
         <compile-java src="${reg.test.src}" dest="${reg.test.class.path}">
             <depend targetdir="${reg.test.class.path}">

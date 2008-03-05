@@ -47,6 +47,7 @@
 #include "port_filepath.h"
 #include <apr_file_io.h>
 #include <apr_file_info.h>
+#include <apr_mmap.h>
 
 #include "jarfile_util.h"
 #include "jni_utils.h"
@@ -1135,12 +1136,11 @@ BootstrapClassLoader::SetClasspathFromString(char* bcp,
     assert(bcp);
 
     // set bootclasspath elements
-    const char separator[2] = {PORT_PATH_SEPARATOR, 0};
-    char *path_name = strtok(bcp, separator);
+    char *path_name = strtok(bcp, PORT_PATH_SEPARATOR_STR);
     while (path_name)
     {
         SetBCPElement(path_name, tmp_pool);
-        path_name = strtok(NULL, separator);
+        path_name = strtok(NULL, PORT_PATH_SEPARATOR_STR);
     }
 
     return;
@@ -1341,17 +1341,207 @@ static char* bootstrap_components_classpath(Global_Env *vm_env) {
 }
 
 
+static int calculate_subst_len(const char* value,
+                             const char* subst, const int subst_len,
+                             const char* substby, const int substby_len)
+{
+    int len = strlen(value);
+    for(; *value; value++) {
+        if(*value != '%') {
+            continue;
+        }
+        if(strstr(value, subst) == value) {
+            len += substby_len - subst_len;
+            value += subst_len - 1; // -1 to cover ++ in loop
+            break;
+        }
+    }
+    return len;
+}
+
+
+static void fillin_with_subst(char* bootClassPath, const char* path_elem,
+                              const int max_len,
+                              const char* subst, const int subst_len,
+                              const char* substby, const int substby_len)
+{
+    int pos = strlen(bootClassPath);
+    for(; *path_elem; path_elem++) {
+        assert(pos < max_len);
+        if(*path_elem != '%') {
+            // just copy a char
+            bootClassPath[pos] = *path_elem;
+            pos++;
+            continue;
+        }
+        if (strstr(path_elem, subst) == path_elem) {
+            // make substitution
+            strcat(bootClassPath, substby);
+            // -1 for next iteration of outer loop
+            path_elem += subst_len - 1;
+            pos += substby_len;
+        }
+    }
+    bootClassPath[pos] = '\0';
+}
+
+
+static char* construct_kernel_BCP(const char* vm_dir, Properties& props)
+{
+    static const char* subst_item = "%LAUNCHER_HOME%/%VM_DIR%";
+    static const int subst_len = 24;
+    int subst_value_len = strlen(vm_dir);
+
+    char** keys = props.get_keys();
+    char** cur_key = keys;
+    int bcpVmLen = 0, bcpElemId;
+    while(*cur_key) {
+        char* value = props.get(*cur_key);
+        if(sscanf(*cur_key, "bootclasspath.kernel.%d",
+                &bcpElemId) == 1)
+        {
+            bcpVmLen +=
+                calculate_subst_len(value, subst_item, subst_len, vm_dir, subst_value_len)
+                + strlen(PORT_PATH_SEPARATOR_STR);
+        }
+        props.destroy(value);
+        cur_key++;
+    }
+
+    char* bootClassPath = NULL;
+    if(bcpVmLen != 0) {
+        bootClassPath = (char*)STD_MALLOC(bcpVmLen);
+        bootClassPath[0] = '\0';
+        cur_key = keys;
+        for(int l = 0; *cur_key; cur_key++)
+        {
+            char* value = props.get(*cur_key);
+            if(sscanf(*cur_key, "bootclasspath.kernel.%d",
+                    &bcpElemId) == 1)
+            {
+                if(l++ != 0) {
+                    strcat(bootClassPath, PORT_PATH_SEPARATOR_STR);
+                }
+                // fill in with substitution
+                fillin_with_subst(bootClassPath, value, bcpVmLen,
+                    subst_item, subst_len, vm_dir, subst_value_len);
+            }
+            props.destroy(value);
+        }
+    }
+
+    props.destroy(keys);
+
+    return bootClassPath;
+}
+
+
+static void load_properties(const char* path, const char* name, Properties& props)
+{
+    apr_pool_t* tmp_pool;
+    apr_pool_create(&tmp_pool, NULL);
+    char* propfile_name =
+        (char*)apr_palloc(tmp_pool, strlen(path) + strlen(name)
+            + strlen("/.properties\0"));
+    // the last strlen is for path separator, properties file extension, and terminating zero
+    strcpy(propfile_name, path);
+    strcat(propfile_name, PORT_FILE_SEPARATOR_STR);
+    strcat(propfile_name, name);
+    strcat(propfile_name, ".properties" );
+
+    apr_file_t* propfile;
+    apr_status_t status =
+        apr_file_open(&propfile, propfile_name, APR_READ, APR_OS_DEFAULT, tmp_pool);
+    assert(!status);
+
+    apr_off_t size = 0;
+    status = apr_file_seek(propfile, APR_END, &size);
+    assert(!status);
+
+    apr_mmap_t* mmap_pf;
+    status = apr_mmap_create(&mmap_pf, propfile, 0, (apr_size_t)size,
+        APR_MMAP_READ, tmp_pool);
+    assert(!status);
+
+    char* pf_data = (char*)mmap_pf->mm;
+
+    int line_len = 0;
+    char* line_start = pf_data;
+    char* line_end;
+    int key_len = 0, value_len = 0;
+    char* key_holder = (char*)STD_MALLOC(key_len);
+    char* value_holder = (char*)STD_MALLOC(value_len);
+    for(int i = 0; i < size; i++, pf_data++) {
+        if(*pf_data == 0xA || *pf_data == 0xD) {
+            line_len = pf_data - line_start;
+            if(line_len == 0) {
+                line_start = pf_data + 1;
+                continue;
+            }
+            if(*line_start != '#') {
+                line_end = pf_data - 1;
+                // process key=value
+                char* delim = line_start;
+                for(; delim <= line_end && *delim != '='; delim++);
+                if(delim <= line_end) {
+                    int cur_key_len = delim - line_start;
+                    if(key_len < cur_key_len) {
+                        key_len = cur_key_len + 1;
+                        key_holder = (char*)STD_REALLOC(key_holder, key_len);
+                    }
+                    strncpy(key_holder, line_start, cur_key_len);
+                    key_holder[cur_key_len] = '\0';
+                    delim++; // move delimeter to point at the beginning of value
+                    char* value_end = delim;
+                    // limit value by either line_end of start of comment
+                    for(; value_end <= line_end && *value_end != '#'; value_end++);
+                    int cur_value_len = value_end - delim;
+                    if(value_len < cur_value_len) {
+                        value_len = cur_value_len + 1;
+                        value_holder = (char*)STD_REALLOC(value_holder, value_len);
+                    }
+                    strncpy(value_holder, delim, cur_value_len);
+                    value_holder[cur_value_len] = '\0';
+                    props.set(key_holder, value_holder);
+                } // else the line is malformed and we just skip it
+            }
+            // go to next line
+            line_start = pf_data + 1;
+        }
+    }
+
+    STD_FREE(key_holder);
+    STD_FREE(value_holder);
+    apr_mmap_delete(mmap_pf);
+    apr_file_close(propfile);
+    apr_pool_destroy(tmp_pool);
+}
+
+static char* get_kernel_path(Global_Env* env) {
+    char *vmdir = env->JavaProperties()->get(O_A_H_VM_VMDIR);
+    assert(vmdir);
+
+    Properties hyvmprops;
+    load_properties(vmdir, "harmonyvm", hyvmprops);
+
+    char* kernel_bcp = construct_kernel_BCP(vmdir, hyvmprops);
+
+    env->JavaProperties()->destroy(vmdir);
+
+    return kernel_bcp;
+}
+
+
 bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
 {
-    // init bootstrap class loader
+    // init common class loader internals
     ClassLoader::Initialize();
 
     // get list of natives libraries
     char *lib_list = m_env->VmProperties()->get("vm.other_natives_dlls");
              
     // separate natives libraries
-    const char separator[2] = {PORT_PATH_SEPARATOR, 0};
-    char *lib_name = strtok( lib_list, separator );
+    char *lib_name = strtok( lib_list, PORT_PATH_SEPARATOR_STR );
 
     while( lib_name != NULL )
     {
@@ -1359,106 +1549,93 @@ bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
         LoadNativeLibrary( lib_name );
 
         // find next library
-        lib_name = strtok( NULL, separator );
+        lib_name = strtok( NULL, PORT_PATH_SEPARATOR_STR );
     }
     m_env->VmProperties()->destroy(lib_list);
 
     /*
-     *  at this point, LUNI is loaded, so we can use the boot classpath
-     *  generated there to set vm.boot.class.path since we didn't do
-     *  it before.  We need  to add on the kernel.jar 
-     *  and magics support jars (if any).
-     *  note that parse_arguments.cpp defers any override, append or 
-     *  prepend here, storing everything as properties.
+     * At this point, LUNI is loaded, so we can use the boot class path
+     * generated there to set vm.boot.class.path since we didn't do
+     * it before.  We also need to add what is listed in harmonyvm.properties
+     * DRLVM properties file.
+     * NOTE: parse_arguments.cpp defers any override, append or prepend here,
+     * storing everything as properties.
      */
-     
-    /*
-     * start with the boot classpath. If overridden, just use that as the basis
-     * and otherwise, construct from o.a.h.b.c.p + o.a.h.vm.vmdir to add 
-     * the kernel
-     */
-     
-    /* strdup so that it's freeable w/o extra logic */
-    char *temp = m_env->VmProperties()->get(XBOOTCLASSPATH);
-    char *bcp_value = (temp ? strdup(temp) : NULL);
-    m_env->VmProperties()->destroy(temp);
-        
-    if (bcp_value == NULL) { 
-        
-        /* not overridden, so lets build, adding the kernel to what luni made for us */
-        
-        char *kernel_dir_path = m_env->JavaProperties()->get(O_A_H_VM_VMDIR);
 
+
+    char* xbcp = m_env->VmProperties()->get(XBOOTCLASSPATH);
+    char* prepend = m_env->VmProperties()->get(XBOOTCLASSPATH_P);
+    char* append = m_env->VmProperties()->get(XBOOTCLASSPATH_A);
+
+    size_t bcp_p_len = (prepend ? strlen(prepend) + strlen(PORT_PATH_SEPARATOR_STR) : 0);
+    size_t bcp_a_len = (append ? strlen(PORT_PATH_SEPARATOR_STR) + strlen(append) : 0);
+    char* vmboot = NULL;
+    // If boot classpath is overridden, just use that value.
+    if(xbcp) {
+        vmboot = (char*)STD_MALLOC(strlen(xbcp) + bcp_a_len + bcp_p_len + 1);
+        strcpy(vmboot + bcp_p_len, xbcp);
+        m_env->VmProperties()->destroy(xbcp);
+    }
+
+    if(vmboot == NULL) { 
+        // Not overridden, so lets build
+        // First, helper jars
         char* comp_path = bootstrap_components_classpath(m_env);
-        char *kernel_path = (char *) malloc(strlen(kernel_dir_path) 
-                                        + strlen(PORT_FILE_SEPARATOR_STR) 
-                                        + strlen(KERNEL_JAR) + strlen(PORT_PATH_SEPARATOR_STR)
-                                        + (comp_path ? strlen(comp_path) : 0)
-                                        + 1 );
-
-        strcpy(kernel_path, kernel_dir_path);
-        strcat(kernel_path, PORT_FILE_SEPARATOR_STR);
-        strcat(kernel_path, KERNEL_JAR);
-        strcat(kernel_path, PORT_PATH_SEPARATOR_STR);
-        m_env->JavaProperties()->destroy(kernel_dir_path);
-        if (comp_path) {
-            strcat(kernel_path, comp_path);
-            STD_FREE(comp_path);
-        }
-
+        // Second, read in harmonyvm.properties
+        char* kernel_bcp = get_kernel_path(m_env);
+        // Third, what is provided by LUNI as class library classes
         char *luni_path = m_env->JavaProperties()->get(O_A_H_BOOT_CLASS_PATH);
 
-        char *vmboot = (char *) malloc(strlen(luni_path == NULL ? "" : luni_path) 
-                                + strlen(kernel_path) + 1);
+        vmboot = (char*)STD_MALLOC(
+            bcp_p_len
+            + (comp_path ? strlen(comp_path) : 0)
+            + strlen(kernel_bcp)
+            + (luni_path ? strlen(PORT_PATH_SEPARATOR_STR) + strlen(luni_path) : 0)
+            + bcp_a_len
+            + 1);
+        char* vmboot_start = vmboot + bcp_p_len;
+        *vmboot = '\0'; // make allocated buffer look like a C-string
+        *vmboot_start = '\0';
 
-        strcpy(vmboot, kernel_path);
+        if(comp_path != NULL) {
+            strcpy(vmboot_start, comp_path);
+            STD_FREE(comp_path);
+        }
+        strcat(vmboot_start, kernel_bcp);
+        STD_FREE(kernel_bcp);
+
         if(luni_path != NULL) {
-            strcat(vmboot, luni_path);
+            strcat(vmboot_start, PORT_PATH_SEPARATOR_STR);
+            strcat(vmboot_start, luni_path);
             m_env->JavaProperties()->destroy(luni_path);
         }
-
-        free(kernel_path);
-        bcp_value = vmboot;
     }
 
     /*
      *  now if there a pre or post bootclasspath, add those
      */
 
-    char *prepend = m_env->VmProperties()->get(XBOOTCLASSPATH_P);
-    char *append = m_env->VmProperties()->get(XBOOTCLASSPATH_A);
-
     if (prepend || append) {
-        char *temp = (char *) malloc(strlen(bcp_value) 
-                                    + (prepend ? strlen(prepend) + strlen(PORT_PATH_SEPARATOR_STR) : 0 )
-                                    + (append  ? strlen(append) + strlen(PORT_PATH_SEPARATOR_STR) : 0 ) + 1);
-
-        if (prepend) { 
-            strcpy(temp, prepend);
-            strcat(temp, PORT_PATH_SEPARATOR_STR);
-            strcat(temp, bcp_value);
-        } else {
-            strcpy(temp, bcp_value);
+        if (prepend) {
+            strcpy(vmboot, prepend);
+            vmboot[bcp_p_len-1] = PORT_PATH_SEPARATOR;
+            m_env->VmProperties()->destroy(prepend);
         }
 
         if (append) {
-            strcat(temp, PORT_PATH_SEPARATOR_STR);
-            strcat(temp, append);
+            strcat(vmboot, PORT_PATH_SEPARATOR_STR);
+            strcat(vmboot, append);
+            m_env->VmProperties()->destroy(append);
         }
-
-        free(bcp_value);
-        bcp_value = temp;
     }
-    m_env->VmProperties()->destroy(prepend);
-    m_env->VmProperties()->destroy(append);
+
     /*
      *  set VM_BOOT_CLASS_PATH and SUN_BOOT_CLASS_PATH for any code 
      *  that needs it
      */
-
-    m_env->VmProperties()->set(VM_BOOT_CLASS_PATH, bcp_value);
-    m_env->JavaProperties()->set(VM_BOOT_CLASS_PATH, bcp_value);
-    m_env->JavaProperties()->set(SUN_BOOT_CLASS_PATH, bcp_value);
+    m_env->VmProperties()->set(VM_BOOT_CLASS_PATH, vmboot);
+    m_env->JavaProperties()->set(VM_BOOT_CLASS_PATH, vmboot);
+    m_env->JavaProperties()->set(SUN_BOOT_CLASS_PATH, vmboot);
 
     // create temp pool for apr functions
     apr_pool_t *tmp_pool;
@@ -1466,8 +1643,8 @@ bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
 
     // create a bootclasspath collection
 
-    SetClasspathFromString(bcp_value, tmp_pool);
-    free(bcp_value);
+    SetClasspathFromString(vmboot, tmp_pool);
+    STD_FREE(vmboot);
 
     // check if vm.bootclasspath.appendclasspath property is set to true
     if( TRUE == get_boolean_property("vm.bootclasspath.appendclasspath", FALSE, VM_PROPERTIES) ) {
@@ -1477,8 +1654,8 @@ bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
         m_env->JavaProperties()->destroy(cp);
     }
 
-    // get a classpath from archive files manifest and
-    // set into bootclasspath collection
+    // get a classpath from archive files manifests and
+    // set into boot class path collection
     for( BCPElement* element = m_BCPElements.m_first;
          element;
          element = element->m_next )

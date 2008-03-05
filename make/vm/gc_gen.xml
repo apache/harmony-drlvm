@@ -32,6 +32,7 @@
             manifest="${vm.home}/gc_gen/resource/MANIFEST.MF">
             <classpath>
                 <fileset dir="${drlvm.deploy.dir}/jdk/jre/lib/boot" includes="*.jar" />
+                <fileset dir="${drlvm.deploy.dir}/jdk/jre/bin/default" includes="vmmagic*.jar" />
                 <pathelement location="${drlvm.bin.dir}/kernel.jar"/>
             </classpath>
         </make-java>

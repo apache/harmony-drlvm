@@ -52,31 +52,4 @@
             </jar>
         </sequential>
     </macrodef>
-    
-    <macrodef name="add-bcp-entry">
-        <attribute name="name"/>
-        <attribute name="ordinal"/>
-        <sequential>
-            <loadfile srcFile="${drlvm.deploy.dir}/jdk/jre/lib/boot/bootclasspath.properties" property="boot.jar.@{name}" />
-            <condition property="@{name}.is.bcp">
-                <contains string="${boot.jar.@{name}}" substring="=@{name}"/>
-            </condition>
-            <antcall target="-patch-bcp-properties">
-                <param name="bcp.patch.ordinal" value="@{ordinal}"/>
-                <param name="bcp.patch.name" value="@{name}"/>
-                <propertyset>
-                  <propertyref name="@{name}.is.bcp"/>
-                  <globmapper from="@{name}.is.bcp" to="bcp.is.patched"/>
-                </propertyset>
-            </antcall>
-        </sequential>
-    </macrodef>
-
-    <target name="-patch-bcp-properties" unless="bcp.is.patched">
-        <concat append="true" destfile="${drlvm.deploy.dir}/jdk/jre/lib/boot/bootclasspath.properties"
-            >bootclasspath.${bcp.patch.ordinal}=${bcp.patch.name}
-        </concat>
-        <fixcrlf srcdir="${drlvm.deploy.dir}/jdk/jre/lib/boot" includes="bootclasspath.properties"/>
-    </target>
-
 </project>

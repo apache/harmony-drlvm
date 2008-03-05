@@ -32,10 +32,10 @@
     
     <target name="check-setup">
         <basename file="${vmmagic}" property="vmmagic.basename"/>
-        <available file="${drlvm.deploy.dir}/jdk/jre/lib/boot/${vmmagic.basename}" 
+        <available file="${drlvm.deploy.dir}/jdk/jre/bin/default/${vmmagic.basename}" 
             property="vmmagic.available"/>
         <basename file="${antlr}" property="antlr.basename"/>
-        <available file="${drlvm.deploy.dir}/jdk/jre/lib/boot/${antlr.basename}" 
+        <available file="${drlvm.deploy.dir}/jdk/jre/bin/default/${antlr.basename}" 
             property="antlr.available"/>
         <condition property="setup.complete">
             <and>
@@ -48,10 +48,8 @@
     <target name="setup" depends="check-setup" unless="setup.complete">
         <check-one-file dest="${antlr}" src="${antlr.url}"/>
         <check-one-file dest="${vmmagic}" src="${vmmagic.url}"/>
-        <copy todir="${drlvm.deploy.dir}/jdk/jre/lib/boot" file="${vmmagic}"/>
-        <add-bcp-entry name="vmmagic-20070207.jar" ordinal="100"/>
-        <copy todir="${drlvm.deploy.dir}/jdk/jre/lib/boot" file="${antlr}"/>
-        <add-bcp-entry name="antlr-2.7.5.jar" ordinal="101"/>
+        <copy todir="${drlvm.deploy.dir}/jdk/jre/bin/default" file="${vmmagic}"/>
+        <copy todir="${drlvm.deploy.dir}/jdk/jre/bin/default" file="${antlr}"/>
     </target>
 
     <target name="build" depends="setup">
@@ -60,6 +58,8 @@
             manifest="${vm.home}/vmcore/src/kernel_classes/resource/MANIFEST.MF">
             <classpath>
                 <fileset dir="${drlvm.deploy.dir}/jdk/jre/lib/boot" includes="*.jar" />
+                <fileset dir="${drlvm.deploy.dir}/jdk/jre/bin/default" includes="vmmagic*.jar" />
+                <fileset dir="${drlvm.deploy.dir}/jdk/jre/bin/default" includes="antlr*.jar" />
             </classpath>
     
             <!-- 
