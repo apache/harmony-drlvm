@@ -1166,29 +1166,27 @@ inline void BootstrapClassLoader::SetBCPElement(const char *path, apr_pool_t *tm
         return;
     }
 
-    // allocate and set a new bootsclasspath element
     element = (BCPElement*)apr_palloc(pool, sizeof(BCPElement) );
     element->m_path = new_path;
     element->m_next = NULL;
-
-    // check if it is a archive file
-    if( file_is_archive(new_path->bytes) ) {
-        // create and parse a new archive file structure
-        element->m_isJarFile = true;
-        void* mem_JarFile = apr_palloc(pool, sizeof(JarFile) );
-        element->m_jar = new (mem_JarFile) JarFile();
-        if( element->m_jar && element->m_jar->Parse(new_path->bytes) ) {
-            TRACE2("classloader.jar", "opened archive: " << new_path );
-        } else {
-            if( element->m_jar ) {
-                element->m_jar->~JarFile();
-            }
-            return;
+    element->m_isJarFile = file_is_archive(new_path->bytes);
+    if(element->m_isJarFile) {
+        JarEntryCache* jec = NULL;
+        if(m_env->use_common_jar_cache
+            &&m_BCPElements.m_last
+            && m_BCPElements.m_last->m_isJarFile)
+        {
+            // if previous boot class path element is jar, reuse the same cache
+            jec = m_BCPElements.m_last->m_jar->GetCache();
         }
-    } else {
-        element->m_isJarFile = false;
+        void* mem_JarFile = apr_palloc(pool, sizeof(JarFile));
+        element->m_jar = new (mem_JarFile) JarFile(jec);
+
+        if(element->m_jar && element->m_jar->Parse(new_path->bytes)) {
+            TRACE2("classloader.jar", "opened archive: " << new_path );
+        }
     }
-    
+
     // insert element into collection
     if( NULL == m_BCPElements.m_first ) {
         m_BCPElements.m_first = element;
@@ -2059,7 +2057,7 @@ Class* BootstrapClassLoader::LoadFromClassFile(const String* dir_name,
     Class* clss = DefineClass(m_env, class_name->bytes, buf, 0,
         (unsigned)buf_len);
     if(clss) {
-        clss->set_class_file_name(m_env->string_pool.lookup(full_name));
+        clss->set_class_file_name(m_env->string_pool.lookup(full_name)->bytes);
     }
     STD_FREE(buf);
     apr_pool_destroy(local_pool);
@@ -2071,6 +2069,12 @@ Class* BootstrapClassLoader::LoadFromJarFile( JarFile* jar_file,
     const char* class_name_in_jar, const String* class_name, bool* not_found)
 {
     assert(!exn_raised());
+
+    if(jar_file->HasSharedCache()) {
+        // class was looked up earlier
+        *not_found = true;
+        return NULL;
+    }
 
     // find archive entry in archive file
     *not_found = false;
@@ -2086,7 +2090,7 @@ Class* BootstrapClassLoader::LoadFromJarFile( JarFile* jar_file,
     unsigned char* buffer = (unsigned char*)STD_MALLOC(size);
     // FIXME: check that memory was allocated
 
-    if(!entry->GetContent(buffer, jar_file)) {
+    if(!entry->GetContent(buffer)) {
         // cannot unpack entry
         *not_found = true;
         STD_FREE(buffer);
@@ -2094,13 +2098,13 @@ Class* BootstrapClassLoader::LoadFromJarFile( JarFile* jar_file,
     }
 
     // create package information with jar source
-    ProvidePackage(m_env, class_name, jar_file->GetName());
+    ProvidePackage(m_env, class_name, JarFile::GetJar(entry->GetJarIndex())->GetName());
 
     // define class
     Class *clss = DefineClass(m_env, class_name->bytes, buffer, 0, size, NULL);
     if(clss) {
         // set class file name
-        clss->set_class_file_name(m_env->string_pool.lookup(jar_file->GetName()));
+        clss->set_class_file_name(JarFile::GetJar(entry->GetJarIndex())->GetName());
     }
 
     STD_FREE(buffer);

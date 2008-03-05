@@ -46,11 +46,14 @@ void JarEntry::ConstructFixed( const unsigned char* stream )
         ((unsigned int)stream[44]<<16) + ((unsigned int)stream[45]<<24);
 }
 
-std::vector<std::string> JarFile::m_jars = std::vector<std::string>();
 
-bool JarEntry::GetContent( unsigned char* content, JarFile *jf ) const
+std::vector<JarFile*> JarFile::m_jars = std::vector<JarFile*>();
+
+
+bool JarEntry::GetContent(unsigned char* content) const
 {
     // length of content should be enough for storing m_size_uncompressed bytes
+    JarFile* jf = JarFile::GetJar(m_jarFileIdx);
     int inFile = jf->jfh;
     // gregory - It is necessary to lock per jar file because the file
     // handle is global to all threads, and file operations like seek,
@@ -152,13 +155,13 @@ bool JarFile::Parse( const char* fileName )
     jfh = fp;
     if( fp == -1 ) return false;
 
-    m_jars.push_back(fileName);
-    JarEntry je;
-    m_jarFileIdx = je.m_jarFileIdx = (int)(m_jars.size() - 1);
+    m_name = fileName;
 
     struct stat fs;
     if(stat(fileName, &fs) == -1) return false;
     unsigned long fsize = fs.st_size;
+
+    m_jars.push_back(this);
 
     int cd_size = fsize < 67000 ? fsize : 67000;
     lseek(fp, -cd_size, SEEK_END);
@@ -166,6 +169,9 @@ bool JarFile::Parse( const char* fileName )
     long off = read(fp, buf, cd_size) - 22; // 22 - EOD size
     long offsetCD; // start of the Central Dir
     int number; // number of entries
+
+    JarEntry je;
+    je.m_jarFileIdx = (int)(m_jars.size() - 1);
 
     while (1){
         if (je.IsPK(buf + off)){
@@ -178,6 +184,14 @@ bool JarFile::Parse( const char* fileName )
         }
         if (--off < 0)
             return false;
+    }
+
+    m_manifest = new Manifest();
+    if(!m_manifest) return false;
+
+    if(m_ownCache) {
+        void* jec_mem = pool.alloc(sizeof(JarEntryCache));
+        m_entries = new (jec_mem) JarEntryCache();
     }
 
     lseek(fp, offsetCD, SEEK_SET);
@@ -195,18 +209,23 @@ bool JarFile::Parse( const char* fileName )
         strncpy(je.m_fileName, (const char *)buf + off + JAR_DIRECTORYENTRY_LEN, je.m_nameLength );
         je.m_fileName[je.m_nameLength] = '\0';
         je.m_contentOffset = je.m_relOffset + JarEntry::sizeFixed + je.m_nameLength + je.m_extraLength;
-        m_entries.insert(make_pair(GetHashValue(je.m_fileName), je));
+        if(!strcmp(je.m_fileName, "META-INF/MANIFEST.MF")) {
+            // parse manifest
+            if(!m_manifest->Parse(&je)) return false;
+            if(!(*m_manifest)) {
+                delete m_manifest;
+                return false;
+            }
+        } else {
+            // Insertion in common cache preserves the order of inserted
+            // elements with the same hash value, so lookup will return
+            // the first occurrence. Although more memory is spent here,
+            // we do not need to lookup on each entry.
+            m_entries->Insert(je);
+        }
         off += JAR_DIRECTORYENTRY_LEN + je.m_nameLength + je.m_extraLength;
     }
     STD_FREE(buf);
-
-    // read and parse manifest from archive
-    m_manifest = new Manifest( this );
-    if( !m_manifest ) return false;
-    if( !(*m_manifest) ) {
-        delete m_manifest;
-        return false;
-    }
 
     return true;
 }

@@ -94,6 +94,8 @@ const unsigned int JAR_DIRECTORYENTRY_LEN = 46;
 
 typedef long JarCompressedOffset;
 
+class JarFile;
+
 class JarEntry
 {
     unsigned short m_version;
@@ -109,7 +111,6 @@ class JarEntry
 
 protected:
     JarCompressedOffset m_contentOffset;
-//    std::string m_jarFileName;
     int m_jarFileIdx;
 
 public:
@@ -121,9 +122,11 @@ public:
     // returns decompressed content in provided buffer;
     // buffer must have at least GetContentSize() bytes length
     // NB! upon erroneous return from GetContent user cannot rely on buffer content
-    bool GetContent( unsigned char* content, JarFile *jf ) const;
+    bool GetContent(unsigned char* content) const;
     // construct fixed part of JarEntryHeader class from input stream
     void ConstructFixed( const unsigned char* stream );
+    // returns index of containing jar file
+    int GetJarIndex() const { return m_jarFileIdx; }
     // verify that "stream" starts with JAR_DIRECTORYENTRY_MAGIC signature
     static bool IsDirEntryMagic( const unsigned char* stream ){
         return (0x01 == stream[0]) && (0x02 == stream[1]);
@@ -143,34 +146,14 @@ public:
 
 protected:
     friend class JarFile;
+    friend class JarEntryCache;
 }; // class JarEntry
 
 
-class JarFile
-{
-    int m_jarFileIdx;
+class JarEntryCache {
+private:
     std::multimap<int, JarEntry> m_entries;
-    Manifest* m_manifest;
-    tl::MemoryPool pool;
 
-    // list of the jar files
-    static std::vector<std::string> m_jars;
-
-public:
-    JarFile() : m_manifest(NULL), jfh(0) {}
-    JarFile( const JarFile& jf ) : jfh(0) {
-        m_jarFileIdx = jf.m_jarFileIdx;
-        m_entries = jf.m_entries;
-        m_manifest = new Manifest( &jf );
-    }
-    ~JarFile() {
-        if (jfh != 0) close(jfh);
-        jfh = 0;
-        if( m_manifest ) delete m_manifest;
-        m_manifest = NULL;
-    }
-    // parses JAR file and stores its structure inside
-    bool Parse( const char* filename );
     // get string hash value
     inline int GetHashValue( const char* je_name ) const{
         // hash fuction is taken from String_Pool class
@@ -188,7 +171,13 @@ public:
         hash = (h1 + (h2 << 8)) & 0x7fffffff;
         return hash;
     }
-    // looks up JAR entry in stored jar structure
+
+public:
+    // inserts new entry in this cache
+    void Insert(JarEntry& je) {
+        m_entries.insert(std::make_pair(GetHashValue(je.m_fileName), je));
+    }
+    // looks up JAR entry in this cache
     const JarEntry* Lookup( const char* je_name ) const {
         const int hash = GetHashValue(je_name);
         std::multimap<int, JarEntry>::const_iterator it = m_entries.find(hash);
@@ -211,10 +200,56 @@ public:
 
         return NULL;
     }
+};
+
+
+class JarFile
+{
+    const char* m_name;
+    JarEntryCache* m_entries;
+    bool m_ownCache;
+    Manifest* m_manifest;
+    tl::MemoryPool pool;
+
+    // list of the jar files
+    static std::vector<JarFile*> m_jars;
+
+public:
+    JarFile(JarEntryCache* jec = NULL)
+        : m_name(NULL), m_entries(jec), m_ownCache(jec == NULL), m_manifest(NULL), jfh(0) {}
+    JarFile( const JarFile& jf ) : jfh(0) {
+        m_name = jf.m_name;
+        m_entries = jf.m_entries;
+        m_manifest = new Manifest(jf.m_manifest);
+    }
+    ~JarFile() {
+        if(m_ownCache)
+            m_entries->~JarEntryCache();
+        m_ownCache = false;
+        m_entries = NULL;
+        if (jfh != 0) close(jfh);
+        jfh = 0;
+        if( m_manifest ) delete m_manifest;
+        m_manifest = NULL;
+    }
+    // parses JAR file and stores its structure inside
+    bool Parse( const char* filename );
+    // returns entry cache (either shared or owned)
+    JarEntryCache* GetCache() { return m_entries; }
+    // returns if this JarFile owns entry cache it holds
+    bool HasSharedCache() { return !m_ownCache; }
+    const JarEntry* Lookup( const char* je_name ) const {
+        return m_entries->Lookup(je_name);
+    }
     // returns manifest from parsed jar archive
-    Manifest* Get_Manifest() { return m_manifest; }
+    Manifest* GetManifest() { return m_manifest; }
     // returns JAR file name
-    const char* GetName() { return m_jars[m_jarFileIdx].c_str(); }
+    const char* GetName() { return m_name; }
+
+    // Return jar from jars array
+    static JarFile* GetJar(int idx) {
+        return m_jars[idx];
+    }
 
     // handle of the jar file
     int jfh;

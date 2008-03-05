@@ -105,7 +105,8 @@ void Class::init_internals(const Global_Env* env, const String* name, ClassLoade
 
     m_const_pool.init();
 
-    m_class_file_name = m_src_file_name = NULL;
+    m_class_file_name = NULL;
+    m_src_file_name = NULL;
 
     m_state = ST_Start;
 

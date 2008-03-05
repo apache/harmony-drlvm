@@ -826,7 +826,7 @@ private:
     int m_is_suitable_for_fast_instanceof;
 
     // string name of file from which this class has been loaded
-    const String* m_class_file_name;
+    const char* m_class_file_name;
     // string name of source java file from which this class has been compiled
     const String* m_src_file_name;
 
@@ -1538,7 +1538,7 @@ public:
      * or to be removed altogether, if possible.
      * Sets the name of a file from which the given class has been loaded.
      * @param[in] cf_name - a class-file name*/
-    void set_class_file_name(const String* cf_name) {
+    void set_class_file_name(const char* cf_name) {
         assert(cf_name);
         m_class_file_name = cf_name;
     }

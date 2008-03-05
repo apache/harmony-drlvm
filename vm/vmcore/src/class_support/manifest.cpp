@@ -76,32 +76,25 @@ static inline long cut_continuation_separators(char* manifest)
     return (long)(dst - manifest);
 }
 
-Manifest::Manifest( const JarFile* jf )
+
+bool Manifest::Parse(const JarEntry* manifestJe)
 {
+    assert(manifestJe != NULL);
     m_parsed = false;
-    const JarEntry* manifestJe;
     char* manifest;
     long manifestSize;
-    
-    manifestJe = jf->Lookup( "META-INF/MANIFEST.MF" );
-    if( !manifestJe ) {
-        // no manifest in JAR
-        m_parsed = true;
-        return;
-    }
-    
+
     manifestSize = manifestJe->GetContentSize();
     if( !manifestSize ) {
-        return;
+        return false;
     }
     manifest = new char[manifestSize + 1];
     if( !manifest ) {
-        return;
+        return false;
     }
-    if( !manifestJe->GetContent( reinterpret_cast<unsigned char*>(manifest),
-            const_cast<JarFile *>(jf) ) ) {
+    if(!manifestJe->GetContent(reinterpret_cast<unsigned char*>(manifest))) {
         delete[] manifest;
-        return;
+        return false;
     }
     manifest[manifestSize] = '\0';
 
@@ -169,6 +162,7 @@ Manifest::Manifest( const JarFile* jf )
     delete[] manifest;
 
     m_parsed = true;
+    return true;
 }
 
 

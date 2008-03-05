@@ -62,7 +62,7 @@ inline const char* archive_get_manifest_attr(JarFile *jarfl, const char *manifes
     assert(jarfl);
 
     // get archive manifest
-    Manifest *manifest = jarfl->Get_Manifest();
+    Manifest *manifest = jarfl->GetManifest();
     if(!manifest) {
         return NULL;
     }

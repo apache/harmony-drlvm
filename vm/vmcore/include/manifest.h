@@ -23,6 +23,7 @@
 
 #include "properties.h"
 
+class JarEntry;
 class JarFile;
 
 class Manifest
@@ -30,9 +31,11 @@ class Manifest
     Properties m_main;
     bool m_parsed;
 public:
-    Manifest( const JarFile* jf );
+    Manifest() {}
+    Manifest(const Manifest* mnf);
     ~Manifest();
 
+    bool Parse(const JarEntry* mje);
     Properties* GetMainProperties() { return &m_main; }
     bool operator! () { return !m_parsed; }
 

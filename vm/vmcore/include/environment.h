@@ -90,6 +90,13 @@ struct Global_Env {
     Lock_Manager *p_suspend_lock;
 
     /**
+     * If set to true, DLRVM will store JARs which are adjacent in boot class path
+     * into single jar entry cache. This will optimize lookups on class loading
+     * with bootstrap class loader.
+     */
+    bool use_common_jar_cache;
+
+    /**
      * If set to true by the <code>-compact_fields</code> command-line option,
      * the VM will not pad out fields of less than 32 bits to four bytes.
      * However, fields will still be aligned to a natural boundary,
