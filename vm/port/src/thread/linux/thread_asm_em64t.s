@@ -114,7 +114,7 @@ __skipefl__:
 .globl port_longjump_stub
 	.type	port_longjump_stub, @function
 port_longjump_stub:
-//    movq    128(%rsp), %rcx // load RCX with the address of saved Registers
-    movq    (%rsp), %rcx // load RCX with the address of saved Registers
+//    movq    128(%rsp), %rdi // load RDI with the address of saved Registers
+    movq    (%rsp), %rdi // load RDI with the address of saved Registers
     callq   port_transfer_to_regs   // restore context
     ret                             // dummy RET - unreachable
