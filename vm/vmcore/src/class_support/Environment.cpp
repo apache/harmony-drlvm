@@ -34,8 +34,7 @@
 #include "compile.h"
 #include "component_manager.h"
 
-
-Global_Env::Global_Env(apr_pool_t * pool):
+Global_Env::Global_Env(apr_pool_t * pool, size_t string_pool_size):
 mem_pool(pool),
 bootstrap_class_loader(NULL),
 system_class_loader(NULL),
@@ -45,6 +44,7 @@ portLib(NULL),
 dcList(NULL),
 assert_reg(NULL),
 vm_methods(NULL),
+string_pool(string_pool_size),
 total_loaded_class_count(0),
 unloaded_class_count(0),
 class_loading_verbose(false),
@@ -304,45 +304,50 @@ Class* Global_Env::LoadCoreClass(const char* s)
     return LoadCoreClass(this->string_pool.lookup(s));
 }
 
-static size_t parse_pool_size(const char* name, size_t default_size) {
+size_t parse_size(const char* value) {
+    size_t size = atol(value);
+    int sizeModifier = tolower(value[strlen(value) - 1]);
+
+    size_t modifier;
+    switch(sizeModifier) {
+        case 'k': modifier = 1024; break;
+        case 'm': modifier = 1024 * 1024; break;
+        default: modifier = 1; break;
+    }
+
+    return size * modifier;
+}
+
+static size_t parse_size_prop(const char* name, size_t default_size) {
     if(!is_property_set(name, VM_PROPERTIES)) {
         return default_size;
     }
 
     char* value = get_property(name, VM_PROPERTIES);
-    size_t size = atol(value);
-    int sizeModifier = tolower(value[strlen(value) - 1]);
+    size_t size = parse_size(value);
     destroy_property_value(value);
-
-    size_t modifier;
-    switch(sizeModifier) {
-        case 'k': modifier = 1024; break;
-        case 'm': modifier = 1024*1024; break;
-        default: modifier = 1; break;
-    }
-
-    return size*modifier;
+    return size;
 }
 
 void Global_Env::init_pools() {
     size_t pool_size;
 
-    pool_size = parse_pool_size("vm.code_pool_size.stubs", DEFAULT_COMMOT_JIT_CODE_POOL_SIZE);
+    pool_size = parse_size_prop("vm.code_pool_size.stubs", DEFAULT_JIT_CODE_POOL_SIZE);
     assert(pool_size);
     GlobalCodeMemoryManager = new PoolManager(pool_size, system_page_size, use_large_pages, 
         true/*is_code*/, true/*is_resize_allowed*/);
 
     bool compress_vtables = vm_vtable_pointers_are_compressed();
-    pool_size = parse_pool_size("vm.vtable_pool_size",
-        compress_vtables?DEFAULT_COMMOT_VTABLE_POOL_SIZE_NO_RESIZE:DEFAULT_VTABLE_POOL_SIZE);
+    pool_size = parse_size_prop("vm.vtable_pool_size",
+        compress_vtables?DEFAULT_VTABLE_POOL_SIZE_NO_RESIZE : DEFAULT_VTABLE_POOL_SIZE);
     assert(pool_size);
     VTableMemoryManager = new PoolManager(pool_size, system_page_size, use_large_pages, 
         false/*is_code*/, !compress_vtables/*is_resize_allowed*/);
 
-    bootstrap_code_pool_size = pool_size = parse_pool_size("vm.code_pool_size.bootstrap_loader",
+    bootstrap_code_pool_size = pool_size = parse_size_prop("vm.code_pool_size.bootstrap_loader",
         DEFAULT_BOOTSTRAP_JIT_CODE_POOL_SIZE);
     assert(pool_size);
-    user_code_pool_size = pool_size = parse_pool_size("vm.code_pool_size.user_loader",
+    user_code_pool_size = pool_size = parse_size_prop("vm.code_pool_size.user_loader",
         DEFAULT_CLASSLOADER_JIT_CODE_POOL_SIZE);
     assert(pool_size);
 }

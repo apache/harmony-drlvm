@@ -323,7 +323,7 @@ struct Global_Env {
     OpenInstanceHandle em_instance;
     OpenEmVmHandle em_interface;
 
-    Global_Env(apr_pool_t * pool);
+    Global_Env(apr_pool_t *pool, size_t string_pool_size);
     ~Global_Env();
 
     void * operator new(size_t size, apr_pool_t * pool) {
@@ -404,5 +404,11 @@ private:
     Properties* m_java_properties;
     Properties* m_vm_properties;
 };
+
+/**
+ * Parses a size string, e. g. <num>, <num>k, <num>m.
+ * @return size in bytes, or 0 if parsing failed
+ */
+size_t parse_size(const char* value);
 
 #endif // _ENVIRONMENT_H

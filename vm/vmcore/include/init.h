@@ -25,13 +25,26 @@ jint vm_attach_internal(JNIEnv ** p_jni_env, jthread * java_thread,
                         char * name, jboolean daemon);
 jint vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments);
 jint vm_init2(JNIEnv * jni_env);
+/**
+ * The method is called from both paths of VM shutdown, namely during <code>DestroyJavaVM</code> and
+ * <code>System.exit</code> right after <code>java.lang.System.execShutdownSequence</code> completion.
+ * @see java.lang.System.execShutdownSequence
+ */
+void exec_native_shutdown_sequence();
 jint vm_destroy(JavaVM_Internal * java_vm, jthread java_thread);
 void vm_interrupt_handler(int);
 void vm_dump_handler(int);
 
 void initialize_vm_cmd_state(Global_Env *p_env, JavaVMInitArgs* arguments);
 void set_log_levels_from_cmd(JavaVMInitArgs* vm_arguments);
-void parse_vm_arguments(Global_Env *p_env);
+/**
+ * Parses string pool size required for environment initialization.
+ */
+void parse_vm_arguments1(JavaVMInitArgs *vm_args, size_t *string_pool_size);
+/**
+ * Collects all arguments in VM properties.
+ */
+void parse_vm_arguments2(Global_Env *p_env);
 void* get_portlib_for_logger(Global_Env *p_env);
 void parse_jit_arguments(JavaVMInitArgs* vm_arguments);
 void print_generic_help();

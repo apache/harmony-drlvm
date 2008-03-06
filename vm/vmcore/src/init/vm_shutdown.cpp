@@ -202,6 +202,16 @@ static void vm_shutdown_stop_java_threads(Global_Env * vm_env) {
 }
 
 /**
+ * A native analogue of <code>java.lang.System.execShutdownSequence</code>.
+ */
+void exec_native_shutdown_sequence() {
+    // print out gathered data
+#ifdef VM_STATS
+    VM_Statistics::get_vm_stats().print();
+#endif
+}
+
+/**
  * Waits until all non-daemon threads finish their execution,
  * initiates VM shutdown sequence and stops running threads if any.
  *
@@ -225,17 +235,13 @@ jint vm_destroy(JavaVM_Internal * java_vm, jthread java_thread)
         return JNI_ERR;
     }
 
-    // Print out gathered data.
-#ifdef VM_STATS
-    VM_Statistics::get_vm_stats().print();
-#endif
-
     // Remember thread's uncaught exception if any.
     uncaught_exception = jni_env->ExceptionOccurred();
     jni_env->ExceptionClear();
 
     // Execute pending shutdown hooks & finalizers
     status = exec_shutdown_sequence(jni_env);
+    exec_native_shutdown_sequence();
     if (status != JNI_OK) return (jint)status;
     
     if(get_native_finalizer_thread_flag())
@@ -322,6 +328,7 @@ static IDATA vm_interrupt_entry_point(void * data) {
     jint status = AttachCurrentThread(java_vm, (void **)&jni_env, &vm_args);
     if (status == JNI_OK) {
         exec_shutdown_sequence(jni_env);
+        exec_native_shutdown_sequence();
         DetachCurrentThread(java_vm);
     }
 

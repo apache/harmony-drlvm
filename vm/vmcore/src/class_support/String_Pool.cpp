@@ -69,8 +69,9 @@ String_Pool::Entry::Entry(const char * s, size_t len, Entry *n) : next(n) {
 } //String_Pool::Entry::Entry
 
 
-String_Pool::String_Pool() {
-    unsigned size = sizeof(Entry*) * STRING_TABLE_SIZE;
+String_Pool::String_Pool(size_t sp_size) {
+    string_pool_size = sp_size;
+    size_t size = sizeof(Entry*) * sp_size;
     table = (Entry **)memory_pool.alloc(size);
     memset(table, 0, size);
     
@@ -205,7 +206,7 @@ String * String_Pool::lookup(const char *s, size_t len, POINTER_SIZE_INT raw_has
     ++key_stats->num_lookup;
 #endif
 
-    int hash = (int)(raw_hash % STRING_TABLE_SIZE);
+    int hash = (int)(raw_hash % string_pool_size);
 
     // search bucket for string, no lock
     for (Entry *e = table[hash]; e != NULL; e = e->next) {

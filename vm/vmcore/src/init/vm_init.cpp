@@ -750,7 +750,7 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
 
     tm_properties->use_soft_unreservation = get_boolean_property("thread.soft_unreservation", FALSE, VM_PROPERTIES);
 
-    parse_vm_arguments(vm_env);
+    parse_vm_arguments2(vm_env);
 
     vm_env->verify = get_boolean_property("vm.use_verifier", TRUE, VM_PROPERTIES);
 #ifdef REFS_USE_RUNTIME_SWITCH

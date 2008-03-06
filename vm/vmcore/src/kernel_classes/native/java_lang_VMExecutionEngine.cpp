@@ -16,7 +16,7 @@
  */
 
 /**
- * @file jjava_lang_VMExecutionEngine.cpp
+ * @file java_lang_VMExecutionEngine.cpp
  *
  * This file is a part of kernel class natives VM core component.
  * It contains implementation for native methods of 
@@ -49,6 +49,8 @@
 JNIEXPORT void JNICALL Java_java_lang_VMExecutionEngine_exit
   (JNIEnv * jni_env, jclass, jint status, jboolean needFinalization, jobjectArray)
 {
+    exec_native_shutdown_sequence();
+
     // ToDo: process jobjectArray
     hythread_global_lock();
     _exit(status);

@@ -481,8 +481,12 @@ jint JNICALL JNI_CreateJavaVM(JavaVM ** p_vm, JNIEnv ** p_jni_env,
         goto done;
     }
 
+    // Get a string pool size.
+    size_t string_pool_size;
+    parse_vm_arguments1(vm_args, &string_pool_size);
+
     // Create Global_Env.
-    vm_env = new(vm_global_pool) Global_Env(vm_global_pool);
+    vm_env = new(vm_global_pool) Global_Env(vm_global_pool, string_pool_size);
     if (vm_env == NULL) {
         status = JNI_ENOMEM;
         goto done;

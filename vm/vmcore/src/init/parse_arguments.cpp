@@ -70,6 +70,8 @@ extern unsigned long    btb_interval;
 #define LECHO_VERSION LECHO(32, VERSION << VERSION_SVN_TAG << __DATE__ << VERSION_OS \
         << VERSION_ARCH << VERSION_COMPILER << VERSION_DEBUG_STRING)
 #define LECHO_VM_VERSION LECHO(33, VM_VERSION)
+#define STRING_POOL_SIZE_OPT "-XX:vm.stringPoolSize="
+
 extern bool dump_stubs;
 extern bool parallel_jit;
 extern const char * dump_file_name;
@@ -148,7 +150,24 @@ void* get_portlib_for_logger(Global_Env *p_env) {
     return NULL;
 }
 
-void parse_vm_arguments(Global_Env *p_env)
+void parse_vm_arguments1(JavaVMInitArgs *vm_args, size_t *p_string_pool_size)
+{
+    *p_string_pool_size = DEFAULT_STRING_TABLE_SIZE;
+    for (int i = 0; i < vm_args->nOptions; i++) {
+        const char* option = vm_args->options[i].optionString;
+        if (begins_with(option, STRING_POOL_SIZE_OPT)) {
+            const char* arg = option + strlen(STRING_POOL_SIZE_OPT);
+            *p_string_pool_size = parse_size(arg);
+            if (0 == *p_string_pool_size) {
+                LECHO(34, "Negative or invalid string pool size. A default value is used, " << DEFAULT_STRING_TABLE_SIZE << " bytes.");
+                *p_string_pool_size = DEFAULT_STRING_TABLE_SIZE;
+            }
+            TRACE2("init", "string_pool_size = " << *p_string_pool_size);
+        }
+    }
+} // parse_vm_arguments1
+
+void parse_vm_arguments2(Global_Env *p_env)
 {
     bool version_printed = false;
 #ifdef _DEBUG
@@ -268,7 +287,7 @@ void parse_vm_arguments(Global_Env *p_env)
             // cut -Xms || -ms
             const char* arg = option + (begins_with(option, "-ms") ? 3 : 4);
             TRACE2("init", "gc.ms = " << arg);
-            if (atoi(arg) == 0) {
+            if (atoi(arg) <= 0) {
                 LECHO(34, "Negative or invalid heap size. Default value will be used!");
             }
             p_env->VmProperties()->set("gc.ms", arg);
@@ -277,18 +296,21 @@ void parse_vm_arguments(Global_Env *p_env)
             // cut -Xmx
             const char* arg = option + (begins_with(option, "-mx") ? 3 : 4);
             TRACE2("init", "gc.mx = " << arg);
-            if (atoi(arg) == 0) {
+            if (atoi(arg) <= 0) {
                 LECHO(34, "Negative or invalid heap size. Default value will be used!");
             }
             p_env->VmProperties()->set("gc.mx", arg);
         } else if (begins_with(option, "-Xss")) {
             const char* arg = option + 4;
             TRACE2("init", "thread.stacksize = " << arg);
-            if (atoi(arg) == 0) {
+            if (atoi(arg) <= 0) {
                 LECHO(34, "Negative or invalid stack size. Default value will be used!");
             }
             p_env->VmProperties()->set("thread.stacksize", arg);
-	}	  
+    	}	  
+        else if (begins_with(option, STRING_POOL_SIZE_OPT)) {
+            // the pool is already created
+        }
         else if (begins_with(option, "-agentlib:")) {
             p_env->TI->addAgent(option);
         }
@@ -404,7 +426,6 @@ void parse_vm_arguments(Global_Env *p_env)
                     p_env->assert_reg->enable_system = false;
                 }
         }
-
         else {
             LECHO(30, "Unknown option {0}" << option);
             USE_JAVA_HELP;
@@ -413,7 +434,7 @@ void parse_vm_arguments(Global_Env *p_env)
     } // for
 
     apr_pool_destroy(pool);
-} //parse_vm_arguments
+} //parse_vm_arguments2
 
 void parse_jit_arguments(JavaVMInitArgs* vm_arguments)
 {
@@ -518,9 +539,8 @@ void set_log_levels_from_cmd(JavaVMInitArgs* vm_arguments)
 
         if (begins_with(option, "-verbose")) {
             /*
-            * -verbose[:class|:gc|:jni]
-            * Set specification log filters.
-            */
+             * -verbose[:class|:gc|:jni] set specification log filters.
+             */
             char* next_sym = option + 8;
             if (*next_sym == '\0') {
                 set_threshold(util::CLASS_LOGGER, INFO);

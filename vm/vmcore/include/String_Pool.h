@@ -49,7 +49,7 @@ struct String
 
 class String_Pool {
 public:
-    String_Pool();
+    String_Pool(size_t st_size);
 
     // lookup string in string table & insert if not found
     String * lookup(const char *str);
@@ -68,8 +68,16 @@ public:
     void lock_pool();
     void unlock_pool();
 
+#ifdef VM_STATS
+    friend class VM_Statistics;
+public:
+    apr_hash_t * string_stat;
+    unsigned num_ambiguity;
+#endif
+
 private:
-    enum { STRING_TABLE_SIZE = 44449, INTERNED_STRING_ARRAY_SIZE = STRING_TABLE_SIZE / 10 };
+    enum { INTERNED_STRING_ARRAY_SIZE = 32768 };
+    size_t string_pool_size;
 
     class Entry {
     public:
@@ -108,10 +116,7 @@ private:
     POINTER_SIZE_INT hash_it(const char * str, size_t len);
     String * lookup(const char *str, size_t len, POINTER_SIZE_INT hash);
     void register_interned_string(String * str);
-    private:
     POINTER_SIZE_INT hash_it_unaligned(const char * str, size_t len);
-    public:
-    
     // memory pool
     tl::MemoryPool      memory_pool;    
     // table of string entries
@@ -130,12 +135,6 @@ private:
     // The protocol is simple and the lock is local to this string pool.
     volatile POINTER_SIZE_INT string_pool_lock; // 1 is locked, 0 is unlocked
 
-#ifdef VM_STATS
-    friend class VM_Statistics;
-public:
-    apr_hash_t * string_stat;
-    unsigned num_ambiguity;
-#endif
 };
 
 #endif // _STRING_POOL_H_

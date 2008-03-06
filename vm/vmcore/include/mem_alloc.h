@@ -30,15 +30,17 @@
 #define GBYTE 1024*MBYTE
 
 // pool is used for common stub code
-#define DEFAULT_COMMOT_JIT_CODE_POOL_SIZE           256*KBYTE
-// used for comressed VTable pointers
-#define DEFAULT_COMMOT_VTABLE_POOL_SIZE_NO_RESIZE   8*MBYTE
-//used for uncompressed VTable pointers
+#define DEFAULT_JIT_CODE_POOL_SIZE                  256*KBYTE
+// used for compressed VTable pointers
+#define DEFAULT_VTABLE_POOL_SIZE_NO_RESIZE          8*MBYTE
+// used for uncompressed VTable pointers
 #define DEFAULT_VTABLE_POOL_SIZE                    256*KBYTE
 // used for compiled code of a user class loader
 #define DEFAULT_CLASSLOADER_JIT_CODE_POOL_SIZE      256*KBYTE
 // used for compiled code of the bootstrap class loader
 #define DEFAULT_BOOTSTRAP_JIT_CODE_POOL_SIZE        1*MBYTE
+// used for a string pool
+#define DEFAULT_STRING_TABLE_SIZE                   262143
 
 #define MEMORY_UTILIZATION_LIMIT 15
 

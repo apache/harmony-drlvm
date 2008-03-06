@@ -525,7 +525,7 @@ void VM_Statistics::print_rt_function_stats()
 
 void VM_Statistics::print_string_pool_stats() {
     printf("\nBegin: Virtual Machine String Pool Statistics\n");
-    //printf("\tname\ttotal lookups\ttotal collisions\n");
+    printf("\tname\ttotal lookups\ttotal collisions\n");
     unsigned long num_lookup_total = 0;
     unsigned long num_lookup_collision_total = 0;
     String_Pool & string_pool = VM_Global_State::loader_env->string_pool;
@@ -810,15 +810,11 @@ void VM_Statistics::print()
     printf("%11" FMT64 "u ::::total_memory_allocated\n",     total_memory_allocated);
     printf("%11" FMT64 "u ::::total_memory_used\n",     total_memory_used);
     printf("%11" FMT64 "u ::::number_memorymanager_created\n",     number_memorymanager_created);
-#ifdef VM_STATS    
-    fflush(stdout);
 
     print_rt_function_stats();
-
     print_string_pool_stats();
-#endif // VM_STATS
-
     printf("==== end VM statistics\n");
+    fflush(stdout);
 } //VM_Statistics::print
 
 #endif //VM_STATS
