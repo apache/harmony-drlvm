@@ -40,20 +40,6 @@ typedef const void *Arg_List_Iter;
 #include "jit_export.h"
 #include "jit_import.h"
 
-//
-// The implementation of those types is private to the VM.
-// The JIT uses them as handles.
-//
-
-
-typedef
-enum Method_Side_Effects {
-    MSE_Unknown,
-    MSE_True,
-    MSE_False,
-    MSE_True_Null_Param
-} Method_Side_Effects; //Method_Side_Effects
-
 
 //////////////// begin C interface
 //
@@ -289,18 +275,6 @@ VMEXPORT void core_free(void*);
 
 // Deprecated.  Please use vector_first_element_offset instead.
 //VMEXPORT int get_array_offset(Java_Type element_type);
-
-/**
- * One entry of correspondence table between native addresses and bytecode
- * locations.
- */
-struct AddrLocation {
-    /** Native code address. */
-    void* start_addr;
-
-    /** Bytecode location. */
-    uint16 location;
-};
 
 /**
  * Adds information about inlined method.

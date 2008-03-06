@@ -14,11 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Alexei Fedotov
- * @version $Revision: 1.1.2.1.4.3 $
- */  
-
 
 //
 // These are the functions that a JIT built as a DLL must export for
@@ -28,103 +23,13 @@
 #ifndef _JIT_EXPORT_RT_H
 #define _JIT_EXPORT_RT_H
 
-
 #include "open/types.h"
-#include "jit_export.h"
+#include "open/rt_types.h"
+#include "open/em.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
-
-
-
-///////////////////////////////////////////////////////
-// begin Frame Contexts for JITs
-
-#ifdef _IPF_
-
-// Note that the code in transfer context is very depend upon the ordering of fields in this structure.
-// Be very careful in changing this structure.
-typedef
-struct JitFrameContext {
-    uint64 *p_ar_pfs;
-    uint64 *p_eip;
-    uint64 sp;
-    uint64 *p_gr[128];
-    uint64 *p_fp[128];
-    uint64 preds;
-    uint64 *p_br[8];
-    uint64 nats_lo;
-    uint64 nats_hi;
-    Boolean is_ip_past;
-    uint64 ar_fpsr;
-    uint64 ar_unat;
-    uint64 ar_lc;
-} JitFrameContext; //JitFrameContext
-
-#elif defined _EM64T_
-
-typedef
-struct JitFrameContext {
-    uint64   rsp;
-    uint64 * p_rbp;
-    uint64 * p_rip;
-
-    // Callee-saved registers
-    uint64 * p_rbx;
-    uint64 * p_r12;
-    uint64 * p_r13;
-    uint64 * p_r14;
-    uint64 * p_r15;
-    
-    // The scratch registers are currently only valid during GC enumeration.
-    uint64 * p_rax;
-    uint64 * p_rcx;
-    uint64 * p_rdx;
-    uint64 * p_rsi;
-    uint64 * p_rdi;
-    uint64 * p_r8;
-    uint64 * p_r9;
-    uint64 * p_r10;
-    uint64 * p_r11;
-
-    // To restore processor flags during transfer
-    uint32 eflags;
-
-    Boolean is_ip_past;
-} JitFrameContext;
-
-#else // "_IA32_"
-
-typedef
-struct JitFrameContext {
-    uint32 esp;
-    uint32 *p_ebp;
-    uint32 *p_eip;
-
-    // Callee-saved registers
-    uint32 *p_edi;
-    uint32 *p_esi;
-    uint32 *p_ebx;
-
-    // The scratch registers are currently only valid during GC enumeration.
-    uint32 *p_eax;
-    uint32 *p_ecx;
-    uint32 *p_edx;
-
-    // To restore processor flags during transfer
-    uint32 eflags;
-
-    Boolean is_ip_past;
-} JitFrameContext;
-
-#endif // "_IA32_"
-
-typedef void * InlineInfoPtr;
-
-// end Frame Contexts for JITs
-///////////////////////////////////////////////////////
-
 
 
 ///////////////////////////////////////////////////////

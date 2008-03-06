@@ -298,25 +298,6 @@ VMEXPORT Byte *method_allocate_jit_data_block(Method_Handle method,
 #define CODE_BLOCK_HEAT_MAX 20
 
 /**
- * @sa method_allocate_code_block
- */
-
-typedef enum Code_Allocation_ActionEnum {
-    CAA_Simulate,
-    CAA_Allocate
-}Code_Allocation_Action;
-
-//
-// Code block heat - used when a method is split into hot and cold parts
-//
-typedef enum {
-    CodeBlockHeatMin,
-    CodeBlockHeatDefault,
-    CodeBlockHeatMax
-} CodeBlockHeat;
- 
-
-/**
  * This function allows allocation of multiple chunks of code with different
  * heat values. The JIT is responsible for specifying ids that are unique
  * within the same method.
