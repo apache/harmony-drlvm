@@ -59,12 +59,14 @@
         <unzip src="${icudll}" dest="${drlvm.bin.dir}">
             <patternset> 
                 <exclude name="*${linklib.suffix}" unless="shlib.is.linklib"/>
+                <exclude name="*ICUInterface*" />
             </patternset>
         </unzip>
         <unzip src="${icudll}" dest="${drlvm.lib.dir}">
             <patternset> 
                 <include name="*${linklib.suffix}" unless="shlib.is.linklib"/>
                 <exclude name="*" if="shlib.is.linklib"/>
+                <exclude name="*ICUInterface*" />
             </patternset>
         </unzip>
         <check-one-link message="" src="${drlvm.shlib.dir}/${icuuc.linkname}"
