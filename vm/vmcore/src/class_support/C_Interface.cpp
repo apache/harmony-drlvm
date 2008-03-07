@@ -2403,10 +2403,25 @@ void vm_gc_lock_init()
 
 void vm_gc_lock_enum()
 {
-    int disable_count = hythread_reset_suspend_disable();
-    IDATA UNUSED status = hymutex_lock(&vm_gc_lock);
-    assert(status == TM_ERROR_NONE);
-    hythread_set_suspend_disable(disable_count);
+    hythread_t self = tm_self_tls;
+    int disable_count = self->disable_count;
+    self->disable_count = 0;
+
+    while (true) {
+        IDATA UNUSED status = hymutex_lock(&vm_gc_lock);
+        assert(status == TM_ERROR_NONE);
+
+        self->disable_count = disable_count;
+        if (disable_count && self->suspend_count) {
+            status = hymutex_unlock(&vm_gc_lock);
+            assert(status == TM_ERROR_NONE);
+
+            self->disable_count = 0;
+            hythread_safe_point_other(self);
+        } else {
+            break;
+        }
+    }
 } // vm_gc_lock_enum
 
 void vm_gc_unlock_enum()

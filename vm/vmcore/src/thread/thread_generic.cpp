@@ -255,8 +255,6 @@ jint vm_detach(jobject java_thread)
         jvmti_send_thread_start_end_event(p_vm_thread, 0);
     }
 
-    hythread_suspend_disable();
-
     // change java_status for native thread
     native_thread->java_status = TM_STATUS_ALLOCATED;
 
@@ -282,8 +280,6 @@ jint vm_detach(jobject java_thread)
 
     // Destroy current VM_thread pool and zero VM_thread structure
     jthread_deallocate_vm_thread_pool(p_vm_thread);
-
-    hythread_suspend_enable();
 
     return JNI_OK;
 }
