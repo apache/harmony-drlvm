@@ -102,7 +102,7 @@ PROTOTYPE_WITH_NAME(bool        , field_is_final, (Field_Handle fh));
 PROTOTYPE_WITH_NAME(bool        , field_is_magic, (Field_Handle fh)); //Boolean field_is_magic(Field_Handle fh);
 PROTOTYPE_WITH_NAME(bool        , field_is_private, (Field_Handle fh));
 PROTOTYPE_WITH_NAME(bool        , field_is_static, (Field_Handle fh));
-PROTOTYPE_WITH_NAME(bool        , field_is_volatile, (Field_Handle fh));
+PROTOTYPE_WITH_NAME(Boolean     , field_is_volatile, (Field_Handle fh));
 
 //Method
 

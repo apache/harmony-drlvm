@@ -155,7 +155,7 @@ JIT_Result Compiler::compile(Compile_Handle ch, Method_Handle method,
     // Process args, update flags if necessary
     //
     if (!get_bool_arg("bbp", true)) {
-        compile_flags &= JMF_BBPOLLING;
+        compile_flags &= ~JMF_BBPOLLING;
     }
 #ifndef _EM64T_    
     m_lazy_resolution  = get_bool_arg("lazyResolution", true);

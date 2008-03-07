@@ -94,12 +94,12 @@ static COND flip(COND cond)
 
 void Compiler::gen_goto(unsigned target)
 {
-    gen_bb_leave(target);
     if (target <= m_pc) {
         // Back branch
         gen_prof_be();
         gen_gc_safe_point();
     }
+    gen_bb_leave(target);
     br(cond_none, target, m_bbinfo->start);
 }
 
