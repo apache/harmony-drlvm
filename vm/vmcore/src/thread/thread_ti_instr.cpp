@@ -364,13 +364,16 @@ IDATA VMCALL
 jthread_get_contended_monitor(jthread java_thread, jobject * monitor)
 {
     assert(java_thread);
+    assert(monitor);
+    *monitor = NULL;
     vm_thread_t vm_thread = jthread_get_vm_thread_from_java(java_thread);
-    assert(vm_thread);
+    if (!vm_thread) {
+        return TM_ERROR_NONE;
+    }
     jvmti_thread_t jvmti_thread = &vm_thread->jvmti_thread;
-    if (jvmti_thread)
+    if (jvmti_thread) {
         *monitor = jvmti_thread->contended_monitor;
-	else
-		*monitor = NULL;
+    }
     return TM_ERROR_NONE;
 } // jthread_get_contended_monitor
 
@@ -384,13 +387,16 @@ jthread_get_contended_monitor(jthread java_thread, jobject * monitor)
 IDATA VMCALL jthread_get_wait_monitor(jthread java_thread, jobject * monitor)
 {
     assert(java_thread);
+    assert(monitor);
+    *monitor = NULL;
     vm_thread_t vm_thread = jthread_get_vm_thread_from_java(java_thread);
-    assert(vm_thread);
+    if (!vm_thread) {
+        return TM_ERROR_NONE;
+    }
     jvmti_thread_t jvmti_thread = &vm_thread->jvmti_thread;
-    if (jvmti_thread)
+    if (jvmti_thread) {
         *monitor = jvmti_thread->wait_monitor;
-	else
-		*monitor = NULL;
+    }
     return TM_ERROR_NONE;
 } // jthread_get_wait_monitor
 
@@ -407,19 +413,23 @@ IDATA VMCALL jthread_get_lock_owner(jobject monitor, jthread * lock_owner)
     assert(monitor);
     assert(lock_owner);
 
+    *lock_owner = NULL;
+    IDATA status = TM_ERROR_NONE;
+
     hythread_suspend_disable();
     hythread_thin_monitor_t *lockword = vm_object_get_lockword_addr(monitor);
     hythread_t native_thread = hythread_thin_monitor_get_owner(lockword);
-    if (!native_thread) {
-        *lock_owner = NULL;
-    } else {
+    if (native_thread) {
         vm_thread_t vm_thread = jthread_get_vm_thread(native_thread);
-        assert(vm_thread);
-        *lock_owner = vm_thread->java_thread;
+        if (vm_thread) {
+            *lock_owner = vm_thread->java_thread;
+        } else {
+            status = TM_ERROR_ILLEGAL_STATE;
+        }
     }
     hythread_suspend_enable();
 
-    return TM_ERROR_NONE;
+    return status;
 } // jthread_get_lock_owner
 
 /**
@@ -472,9 +482,11 @@ jthread_get_owned_monitors(jthread java_thread,
     if (status != TM_ERROR_NONE) {
         return status;
     }
-    assert(java_thread);
     vm_thread_t vm_thread = jthread_get_vm_thread_from_java(java_thread);
-    assert(vm_thread);
+    if (!vm_thread) {
+        status = hythread_global_unlock();
+        return status;
+    }
     jvmti_thread_t jvmti_thread = &vm_thread->jvmti_thread;
     if (!jvmti_thread)
 	{
