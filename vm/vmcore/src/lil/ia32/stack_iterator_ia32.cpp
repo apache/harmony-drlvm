@@ -25,7 +25,6 @@
 #include "m2n.h"
 #include "m2n_ia32_internal.h"
 #include "nogc.h"
-#include "method_lookup.h"
 #include "stack_iterator.h"
 #include "vm_stats.h"
 #include "open/types.h"
@@ -296,7 +295,12 @@ void si_fill_from_registers(StackIterator* si,Registers* regs, bool is_ip_past, 
     // Setup current frame
     Global_Env *env = VM_Global_State::loader_env;
     // It's possible that registers represent native code and si->cci==NULL
-    si->cci = env->vm_methods->find((NativeCodePtr)regs->eip, is_ip_past);
+    Method_Handle m = env->em_interface->LookupCodeChunk(
+        reinterpret_cast<void *>(regs->eip), is_ip_past,
+        NULL, NULL, reinterpret_cast<void **>(&si->cci));
+    if (NULL == m)
+        si->cci = NULL;
+
     si->c.esp = regs->esp;
     si->c.p_eip = &regs->eip;
     si->c.p_ebp = &regs->ebp;
@@ -345,7 +349,12 @@ void si_goto_previous(StackIterator* si, bool over_popped)
         si_unwind_from_m2n(si, over_popped);
     }
     Global_Env *vm_env = VM_Global_State::loader_env;
-    si->cci = vm_env->vm_methods->find(si_get_ip(si), si_get_jit_context(si)->is_ip_past);
+    Method_Handle m = vm_env->em_interface->LookupCodeChunk(si_get_ip(si),
+        si_get_jit_context(si)->is_ip_past, NULL, NULL,
+        reinterpret_cast<void **>(&si->cci));
+    if (NULL == m)
+        si->cci = NULL;
+
     if (si->cci) {
         TRACE2("si", ("si_goto_previous to ip = %p (%s%s)",
             (void*)si_get_ip(si),

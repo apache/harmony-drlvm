@@ -25,7 +25,6 @@
 #include "apr_strings.h"
 #include "lock_manager.h"
 #include "classloader.h"
-#include "method_lookup.h"
 #include "exceptions.h"
 #include "native_overrides.h"
 #include "jit_intf_cpp.h"

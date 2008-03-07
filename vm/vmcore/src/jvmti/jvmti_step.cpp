@@ -27,7 +27,6 @@
 #include "jit_intf_cpp.h"
 #include "stack_iterator.h"
 #include "interpreter.h"
-#include "method_lookup.h"
 #include "cci.h"
 #include "open/bytecodes.h"
 #include "open/jthread.h"
@@ -527,11 +526,12 @@ static void jvmti_start_single_step_in_virtual_method(DebugUtilsTI *ti, const VM
     // this is method resolution or compilation stub. Nothing shold be
     // done. Breakpoint will be inserted once the method is compiled.
     NativeCodePtr ip = disasm->get_target_address_from_context(&regs);
-    CodeChunkInfo *cci = vm_env->vm_methods->find(ip);
-    if (NULL != cci)
+    Method_Handle mh = vm_env->em_interface->LookupCodeChunk(ip, FALSE,
+        NULL, NULL, NULL);
+    if (NULL != mh)
     {
         // Compiled method, set bytecode in it
-        method = cci->get_method();
+        method = reinterpret_cast<Method *>(mh);
         assert(method->get_state() == Method::ST_Compiled);
     }
     else
@@ -609,7 +609,7 @@ static void jvmti_start_single_step_in_virtual_method(DebugUtilsTI *ti, const VM
             method = (Method *)((POINTER_SIZE_INT)stub_op.imm);
         }
     }
-#endif
+#endif // #if 0
 
     TRACE2("jvmti.break.ss", "Removing VIRTUAL single step breakpoint: " << bp->addr);
 

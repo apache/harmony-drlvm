@@ -24,6 +24,7 @@
 
 #include "MTable.h"
 #include "DrlProfileCollectionFramework.h"
+#include "method_lookup.h"
 #include "open/em.h"
 #include "open/vm_util.h"
 #include "open/em_profile_access.h"
@@ -92,6 +93,11 @@ public:
     virtual void deinit();
     virtual void executeMethod(jmethodID meth, jvalue  *return_value, jvalue *args);
     virtual JIT_Result compileMethod(Method_Handle method_handle);
+    virtual void registerCodeChunk(Method_Handle method_handle, void *code_addr,
+        size_t size, void *data);
+    virtual Method_Handle lookupCodeChunk(void *addr, Boolean is_ip_past,
+        void **code_addr, size_t *size, void **data);
+    virtual Boolean unregisterCodeChunk(void *addr);
     virtual unsigned int getNumProfilerThreads() const { return tbsClients.empty() ? 0 : 1;}
 
     virtual void classloaderUnloadingCallback(ClassLoaderHandle class_handle); 
@@ -133,6 +139,8 @@ private:
     
     hymutex_t recompilationLock;
     std::set<Method_Profile_Handle> methodsInRecompile;
+
+    Method_Lookup_Table method_lookup_table;
 };
 
 #endif

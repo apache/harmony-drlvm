@@ -8,7 +8,6 @@
 //#include "m2n_ia32_internal.h"
 #include <open/ncai_thread.h>
 #include "jit_export_rt.h"
-#include "method_lookup.h"
 
 #include "ncai_internal.h"
 

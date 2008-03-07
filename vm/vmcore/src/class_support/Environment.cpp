@@ -43,7 +43,6 @@ nsoTable(NULL),
 portLib(NULL),
 dcList(NULL),
 assert_reg(NULL),
-vm_methods(NULL),
 string_pool(string_pool_size),
 total_loaded_class_count(0),
 unloaded_class_count(0),
@@ -153,7 +152,6 @@ ready_for_exceptions(false)
     // initialize critical sections
     p_jit_a_method_lock = new Lock_Manager();
     p_vtable_patch_lock = new Lock_Manager();
-    p_meth_addr_table_lock = new Lock_Manager();
     p_handle_lock = new Lock_Manager();
     p_method_call_lock = new Lock_Manager();
     p_dclist_lock = new Lock_Manager();
@@ -218,7 +216,6 @@ ready_for_exceptions(false)
 
     TI = new DebugUtilsTI; 
     NCAI = new GlobalNCAI;
-    vm_methods = new Method_Lookup_Table;
 
     nsoTable = nso_init_lookup_table(&string_pool);
 
@@ -242,9 +239,6 @@ Global_Env::~Global_Env()
     delete NCAI;
     NCAI = NULL;
 
-    delete vm_methods;
-    vm_methods = NULL;
-
     delete m_java_properties;
     m_java_properties = NULL;
     delete m_vm_properties;
@@ -259,7 +253,6 @@ Global_Env::~Global_Env()
     // uninitialize critical sections
     delete p_jit_a_method_lock;
     delete p_vtable_patch_lock;
-    delete p_meth_addr_table_lock;
     delete p_handle_lock;
     delete p_method_call_lock;
     delete p_dclist_lock;

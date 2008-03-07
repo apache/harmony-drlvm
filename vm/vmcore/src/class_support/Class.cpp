@@ -655,9 +655,12 @@ void Method::MethodClearInternals()
 {
     CodeChunkInfo *jit_info;
     for (jit_info = _jits;  jit_info;  jit_info = jit_info->_next) {
-        VM_Global_State::loader_env->vm_methods->remove(jit_info);
+        Boolean result = VM_Global_State::loader_env->em_interface->UnregisterCodeChunk(
+            jit_info->get_code_block_addr());
+        assert(TRUE == result);
         // ensure that jit_info was deleted
-        assert (!VM_Global_State::loader_env->vm_methods->find(jit_info->get_code_block_addr()));
+        assert (VM_Global_State::loader_env->em_interface->LookupCodeChunk(
+                jit_info->get_code_block_addr(), FALSE, NULL, NULL, NULL) == NULL);
 
         for(unsigned k = 0; k < jit_info->_num_target_exception_handlers; k++) {
             delete jit_info->_target_exception_handlers[k];

@@ -49,6 +49,25 @@ CompileMethod(Method_Handle method_handle)
     return DrlEMFactory::getEMInstance()->compileMethod(method_handle);
 }
 
+static void RegisterCodeChunk(Method_Handle method_handle, void *code_addr,
+    size_t size, void *data)
+{
+    return DrlEMFactory::getEMInstance()->registerCodeChunk(method_handle, code_addr,
+        size, data);
+}
+
+static Method_Handle LookupCodeChunk(void *addr, Boolean is_ip_past, void **code_addr,
+    size_t *size, void **data)
+{
+    return DrlEMFactory::getEMInstance()->lookupCodeChunk(addr, is_ip_past,
+        code_addr, size, data);
+}
+
+static Boolean UnregisterCodeChunk(void *addr)
+{
+    return DrlEMFactory::getEMInstance()->unregisterCodeChunk(addr);
+}
+
 static void
 ProfilerThreadTimeout() 
 {
@@ -178,6 +197,9 @@ int EmInitialize(OpenComponentHandle* p_component,
     _OpenEmVm* vm_intf = (_OpenEmVm*) apr_palloc(pool, sizeof(_OpenEmVm));
     vm_intf->ExecuteMethod = ExecuteMethod;
     vm_intf->CompileMethod = CompileMethod;
+    vm_intf->RegisterCodeChunk = RegisterCodeChunk;
+    vm_intf->LookupCodeChunk = LookupCodeChunk;
+    vm_intf->UnregisterCodeChunk = UnregisterCodeChunk;
     vm_intf->ProfilerThreadTimeout = ProfilerThreadTimeout;
     vm_intf->ClassloaderUnloadingCallback = ClassloaderUnloadingCallback;
 

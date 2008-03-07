@@ -26,7 +26,6 @@
 #include "Class.h"
 #include "classloader.h"
 #include "environment.h"
-#include "method_lookup.h"
 #include "nogc.h"
 #include "open/vm_util.h"
 #include "jit_intf_cpp.h"
@@ -313,7 +312,7 @@ void *Method::allocate_code_block_mt(size_t size, size_t alignment, JIT *jit, un
     unlock();
 
     Global_Env *env = VM_Global_State::loader_env;
-    env->vm_methods->add(jit_info); // Method table is thread safe
+    env->em_interface->RegisterCodeChunk(this, addr, size, jit_info); // Method table is thread safe
     return addr;
 } // Method::allocate_code_block
 

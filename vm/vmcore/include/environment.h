@@ -32,7 +32,6 @@
 #include "object_handles.h"
 #include "jvmti_internal.h"
 #include "ncai_internal.h"
-#include "method_lookup.h"
 
 typedef struct NSOTableItem NSOTableItem;
 typedef struct DynamicCode DynamicCode;
@@ -57,7 +56,6 @@ struct Global_Env {
     PoolManager*              GlobalCodeMemoryManager;
     PoolManager*              VTableMemoryManager;
 
-    Method_Lookup_Table*      vm_methods;
     hythread_library_t        hythread_lib;
     String_Pool               string_pool;  // string table
     JavaVMInitArgs            vm_arguments;
@@ -83,7 +81,6 @@ struct Global_Env {
     
     Lock_Manager *p_jit_a_method_lock;
     Lock_Manager *p_vtable_patch_lock;
-    Lock_Manager *p_meth_addr_table_lock;
     Lock_Manager *p_method_call_lock;
     Lock_Manager *p_handle_lock;
     Lock_Manager *p_dclist_lock;

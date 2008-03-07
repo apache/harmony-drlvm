@@ -21,7 +21,6 @@
 
 #include <string.h>
 #include "lock_manager.h"
-#include "method_lookup.h"
 #include "m2n.h"
 #include "stack_trace.h"
 #include "interpreter.h"

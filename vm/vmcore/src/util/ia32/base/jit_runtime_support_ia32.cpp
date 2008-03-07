@@ -44,7 +44,6 @@ using namespace std;
 #include "ini.h"
 #include "nogc.h"
 #include "compile.h"
-#include "method_lookup.h"
 #include "exceptions.h"
 #include "exceptions_jit.h"
 #include "sync_bits.h"

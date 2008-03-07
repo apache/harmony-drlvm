@@ -37,7 +37,6 @@ using namespace std;
 #include "Class.h"
 #include "type.h"
 #include "environment.h"
-#include "method_lookup.h"
 #include "stack_iterator.h"
 #include "m2n.h"
 #include "../m2n_ia32_internal.h"

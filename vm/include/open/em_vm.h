@@ -26,7 +26,8 @@
  * EM interface exposed to VM.
  *
  * VM uses the given interface to ask EM to execute and/or compile a method
- * or to notify EM on profiler thread events.
+ * or to notify EM on profiler thread events. Compiled methods lookup table
+ * also resides in EM.
  */
  
 #include "open/types.h"
@@ -73,6 +74,54 @@ extern "C" {
    * @param[in] method_handle - the handle of the method to compile
    */
         JIT_Result (*CompileMethod) (Method_Handle method_handle);
+
+  /**
+   * Registers a code chunk in EM for later possible lookup by IP in code
+   *
+   * EM implements method lookup by IP. All code chunks allocated by
+   * VM as responses for JIT helper call to method_allocate_code_block
+   * helper. To register a code chunk this function is called by VM.
+   *
+   * @param[in] method_handler - the handler of the method that
+   * occupies this code chunk.
+   * @param[in] code_addr - address of the code.
+   * @param[in] size - size of the code chunk in bytes.
+   * @param[in] data - pointer to additional data associated with code chunk,
+   * may be NULL if VM is not interested in storing any data.
+   */
+        void (*RegisterCodeChunk) (Method_Handle method_handle, void *code_addr,
+            size_t size, void *data);
+
+  /**
+   * Lookup code chunk by IP
+   *
+   * Return code chunk registered by RegisterCodeChunk if <code>addr</code>
+   * pointer points inside of it.
+   *
+   * @param[in] addr - IP address to use to lookup code chunk.
+   * @param[in] is_ip_past - <code>TRUE</code> if IP points to an instruction
+   * after call, <code>FALSE</code> otherwise
+   * @param[out] code_addr - start address of found code chunk, if NULL,
+   * argument is not filled.
+   * @param[out] size - size of found code chunk in bytes, if NULL,
+   * argument is not filled.
+   * @param[out] data - additional data that was specified to store with code
+   * chunk. If NULL, argument is not filled.
+   * @return the handle of the method that occupies found code chunk. NULL if
+   * no method is found.
+   */
+        Method_Handle (*LookupCodeChunk) (void *addr, Boolean is_ip_past,
+            void **code_addr, size_t *size, void **data);
+
+  /**
+   * Removes registered code chunk from the lookup table.
+   *
+   * @param[in] addr - Any IP address that points to the code region
+   * of the method.
+   * @return <code>TRUE</code> if removal was successful, <code>FALSE</code>
+   * otherwise, e.g. if code chunk was not found.
+   */
+        Boolean (*UnregisterCodeChunk) (void *addr);
 
   /** 
    * The method is used to callback EM from the profiler thread supported

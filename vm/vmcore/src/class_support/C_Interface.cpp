@@ -25,7 +25,6 @@
 #include "classloader.h"
 #include "lock_manager.h"
 #include "compile.h"
-#include "method_lookup.h"
 #include "vm_arrays.h"
 #include "vm_strings.h"
 #include "properties.h"
@@ -342,7 +341,11 @@ method_allocate_code_block(Method_Handle m,
 void method_set_relocatable(Method_Handle m, JIT_Handle j, NativeCodePtr code_address, Boolean is_relocatable)
 {
     Global_Env *env = VM_Global_State::loader_env;
-    CodeChunkInfo *cci = env->vm_methods->find(code_address);
+    CodeChunkInfo *cci;
+    Method_Handle method = env->em_interface->LookupCodeChunk(code_address, FALSE,
+        NULL, NULL, reinterpret_cast<void **>(&cci));
+    assert(method);
+    assert(method == m);
     assert(cci);
     assert(cci->get_jit() == j);
     assert(cci->get_method() == m);
@@ -535,28 +538,6 @@ void method_set_inline_assumption(Compile_Handle h,
     callee_method->set_inline_assumption(jit, caller_method);
 } //method_set_inline_assumption
 
-
-
-Method_Iterator method_get_first_method_jit(JIT_Handle j)
-{
-    Global_Env *env = VM_Global_State::loader_env;
-    return env->vm_methods->get_first_method_jit((JIT *)j);
-} //method_get_first_method_jit
-
-
-
-Method_Iterator method_get_next_method_jit(Method_Iterator i)
-{
-    Global_Env *env = VM_Global_State::loader_env;
-    return env->vm_methods->get_next_method_jit((CodeChunkInfo *)i);
-} //method_get_next_method_jit
-
-
-
-Method_Handle method_get_method_jit(Method_Iterator i)
-{
-    return ((CodeChunkInfo *)i)->get_method();
-} //method_get_method_jit
 
 const char* class_get_name(Class_Handle cl)
 {

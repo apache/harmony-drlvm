@@ -26,7 +26,6 @@
 
 #include "environment.h"
 #include "open/vm_util.h"
-#include "method_lookup.h"
 #include "jit_runtime_support.h"
 #include "simplehashtable.h"
 #include "mem_alloc.h"
@@ -584,7 +583,9 @@ void VM_Statistics::print()
         print_methods();
     }
 
-    env->vm_methods->print_stats();
+    // Gregory -
+    // Code moved to EM, no longer accessible through standard interface
+    //    env->vm_methods->print_stats();
 
     printf("%11" FMT64 "u ::::Number of native methods\n", num_native_methods);
     printf("%11" FMT64 "u ::::Number of Java methods\n",   num_java_methods);

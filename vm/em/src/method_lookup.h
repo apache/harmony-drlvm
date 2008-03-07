@@ -23,20 +23,29 @@
 #ifndef _METHOD_LOOKUP_H_
 #define _METHOD_LOOKUP_H_
 
-#include "Class.h"
+#include "open/em.h"
+#include "open/hythread_ext.h"
 
+class Method_Lookup_Table;
 
-enum VM_Code_Type {
-    VM_TYPE_JAVA,
-    VM_TYPE_NATIVE_STUB,
-    VM_TYPE_UNKNOWN
+class Method_Code
+{
+private:
+friend class Method_Lookup_Table;
+
+    Method_Code(Method_Handle mh, void *ca, size_t s, void *d) :
+        method(mh),
+        code_addr(ca),
+        size(s),
+        data(d)
+    {
+    }
+
+    Method_Handle method;
+    void *code_addr;
+    size_t size;
+    void *data;
 };
-
-
-VM_Code_Type vm_identify_eip(void *addr);
-VM_Code_Type vm_identify_eip_deadlock_free(void *addr);
-
-
 
 class Method_Lookup_Table
 {
@@ -44,28 +53,24 @@ public:
     Method_Lookup_Table();
     ~Method_Lookup_Table();
 
-    unsigned       size()           { return _next_free_entry; }
+    void add(Method_Handle method_handle, void *code_addr,
+        size_t size, void *data);
+    Method_Handle find(void *ip, Boolean is_ip_past, void **code_addr, size_t *size,
+        void **data);
+    Boolean remove(void *code_addr);
 
-    CodeChunkInfo *get(unsigned i);
-    void           add(CodeChunkInfo *m);
-    void           remove(CodeChunkInfo *m);
+private:
+    void add(Method_Code *m);
+    Method_Code *find(void *addr, Boolean is_ip_past);
+
+    unsigned       size()           { return _next_free_entry; }
+    Method_Code    *get(unsigned i);
 
     // Resembles add, but appends the new entry m at the end of the table. The new entry must have a starting address above all entries
     // in the table. This method does not acquire p_meth_addr_table_lock, so insertion must be protected by another lock or scheme.
-    void           append_unlocked(CodeChunkInfo *m);
-
-    VMEXPORT CodeChunkInfo *find(void *addr, bool is_ip_past = false);
-    CodeChunkInfo *find_deadlock_free(void *addr);
+    void           append_unlocked(Method_Code *m);
 
     void           unload_all();
-
-    // An iterator for methods compiled by the specific JIT.
-    CodeChunkInfo *get_first_method_jit(JIT *jit);
-    CodeChunkInfo *get_next_method_jit(CodeChunkInfo *prev_info);
-
-    // An iterator for all methods regardless of which JIT compiled them.
-    CodeChunkInfo *get_first_code_info();
-    CodeChunkInfo *get_next_code_info(CodeChunkInfo *prev_info);
 
 #ifdef _DEBUG
     void           dump();
@@ -75,15 +80,35 @@ public:
 #ifdef VM_STATS
     void           print_stats();
 #endif
+    void table_lock()
+    {
+        UNREF UDATA r = hymutex_lock(&lock);
+        assert(TM_ERROR_NONE == r);
+    }
 
-private:
+    void table_unlock()
+    {
+        UNREF UDATA r = hymutex_unlock(&lock);
+        assert(TM_ERROR_NONE == r);
+    }
+
+    // An iterator for methods compiled by the specific JIT.
+    Method_Code *get_first_method_jit(JIT_Handle *jit);
+    Method_Code *get_next_method_jit(Method_Code *prev_info);
+
+    // An iterator for all methods regardless of which JIT compiled them.
+    Method_Code *get_first_code_info();
+    Method_Code *get_next_code_info(Method_Code *prev_info);
+
+    Method_Code *find_deadlock_free(void *addr);
     void           reallocate(unsigned new_capacity);
     unsigned       find_index(void *addr);
 
     unsigned        _capacity;
     unsigned        _next_free_entry;
-    CodeChunkInfo **_table;
-    CodeChunkInfo **_cache;
+    Method_Code **_table;
+    Method_Code **_cache;
+    hymutex_t lock;
 }; //class Method_Lookup_Table
 
 

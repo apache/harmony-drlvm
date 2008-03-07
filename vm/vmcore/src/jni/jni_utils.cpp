@@ -36,7 +36,6 @@
 #include "properties.h"
 #include "environment.h"
 #include "exceptions.h"
-#include "method_lookup.h"
 #include "nogc.h"
 #include "m2n.h"
 

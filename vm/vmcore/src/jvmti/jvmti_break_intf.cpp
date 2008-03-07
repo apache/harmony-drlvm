@@ -28,7 +28,6 @@
 #include "interpreter.h"
 #include "interpreter_exports.h"
 #include "jit_intf_cpp.h"
-#include "method_lookup.h"
 #include "exceptions.h"
 #include "m2n.h"
 #include "stack_iterator.h"

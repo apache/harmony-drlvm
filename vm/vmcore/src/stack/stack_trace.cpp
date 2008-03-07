@@ -29,7 +29,6 @@
 #include "interpreter.h"
 #include "jit_intf_cpp.h"
 #include "environment.h"
-#include "method_lookup.h"
 #include "cci.h"
 #include "class_member.h"
 #include "open/hythread.h"
@@ -61,7 +60,11 @@ void get_file_and_line(Method_Handle mh, void *ip, bool is_ip_past,
     POINTER_SIZE_INT callLength = 5;
 
     Global_Env * vm_env = VM_Global_State::loader_env;
-    CodeChunkInfo* cci = vm_env->vm_methods->find(ip, is_ip_past);
+
+    CodeChunkInfo* cci;
+    Method_Handle m = vm_env->em_interface->LookupCodeChunk(ip, is_ip_past,
+        NULL, NULL, reinterpret_cast<void **>(&cci));
+    assert(NULL != m);
     assert(cci);
 
     POINTER_SIZE_INT eff_ip = (POINTER_SIZE_INT)ip -

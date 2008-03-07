@@ -19,6 +19,7 @@
 #define _VM_TYPES_H_
 
 #include "platform_types.h"
+#include <stddef.h>
 
 
 /**

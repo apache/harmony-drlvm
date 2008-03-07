@@ -161,4 +161,29 @@ DynamicCode* compile_get_dynamic_code_list(void);
 void compile_add_dynamic_generated_code_chunk(const char* name, bool free_name, const void* address, size_t length);
 void compile_clear_dynamic_code_list(DynamicCode* list);
 
+
+enum VM_Code_Type {
+    VM_TYPE_JAVA,
+    VM_TYPE_UNKNOWN
+};
+
+/**
+ * Quick inline to call EM lookup and find a compiled method type
+ */
+static inline VM_Code_Type vm_identify_eip(void *addr)
+{
+    Global_Env *env = VM_Global_State::loader_env;
+    if (NULL == env || NULL == env->em_interface)
+        return VM_TYPE_UNKNOWN;
+
+    Method_Handle m = env->em_interface->LookupCodeChunk(addr, FALSE,
+        NULL, NULL, NULL);
+
+    if (m == NULL)
+        return VM_TYPE_UNKNOWN;
+    else
+        return VM_TYPE_JAVA;
+} //vm_identify_eip
+
+
 #endif

@@ -19,7 +19,6 @@
  * @version $Revision: 1.1.2.1 $
  */
 
-#include "method_lookup.h"
 #include "dec_base.h"
 #include "native_modules.h"
 #include "native_stack.h"

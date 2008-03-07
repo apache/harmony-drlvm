@@ -48,7 +48,6 @@ using namespace std;
 #include "lil.h"
 #include "lil_code_generator.h"
 #include "m2n.h"
-#include "method_lookup.h"
 #include "object_layout.h"
 #include "object_handles.h"
 #include "vm_arrays.h"

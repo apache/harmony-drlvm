@@ -102,7 +102,7 @@ libHandle(_libHandle)
 
 
 //todo!! replace inlined strings with defines!!
-DrlEMImpl::DrlEMImpl() : jh(NULL), _execute_method(NULL) {
+DrlEMImpl::DrlEMImpl() : jh(NULL), _execute_method(NULL), method_lookup_table() {
     nMethodsCompiled=0;
     nMethodsRecompiled=0;
     tick=0;
@@ -867,7 +867,6 @@ void DrlEMImpl::tbsTimeout() {
     tick++;
 }
 
-
 int DrlEMImpl::getTbsTimeout() const {
     return 100;
 }   
@@ -878,3 +877,19 @@ void DrlEMImpl::classloaderUnloadingCallback(ClassLoaderHandle class_handle) {
     //notify every profile collector about classloader unloading
 }
 
+void DrlEMImpl::registerCodeChunk(Method_Handle method_handle, void *code_addr,
+    size_t size, void *data)
+{
+    method_lookup_table.add(method_handle, code_addr, size, data);
+}
+
+Method_Handle DrlEMImpl::lookupCodeChunk(void *ip, Boolean is_ip_past,
+    void **code_addr, size_t *size, void **data)
+{
+    return method_lookup_table.find(ip, is_ip_past, code_addr, size, data);
+}
+
+Boolean DrlEMImpl::unregisterCodeChunk(void *addr)
+{
+    return method_lookup_table.remove(addr);
+}
