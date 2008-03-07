@@ -27,6 +27,7 @@
 #include "m2n.h"
 #include "open/hythread_ext.h"
 #include "port_thread.h"
+#include "compile.h"
 
 // Windows specific
 #include <string>
