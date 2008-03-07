@@ -41,7 +41,6 @@ using namespace std;
 #include "open/types.h"
 #include "Class.h"
 #include "environment.h"
-#include "method_lookup.h"
 #include "m2n.h"
 #include "../m2n_ipf_internal.h"
 #include "exceptions.h"

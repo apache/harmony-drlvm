@@ -35,7 +35,6 @@ using namespace std;
 #include "jit_intf_cpp.h"
 #include "m2n.h"
 #include "m2n_ipf_internal.h"
-#include "method_lookup.h"
 #include "nogc.h"
 #include "vm_ipf.h"
 #include "vm_threads.h"
@@ -492,7 +491,11 @@ void si_goto_previous(StackIterator* si, bool over_popped)
     }
     Global_Env *env = VM_Global_State::loader_env;
     si->c.is_ip_past = TRUE;
-    si->cci = env->vm_methods->find(si_get_ip(si));
+    Method_Handle m = env->em_interface->LookupCodeChunk(
+        si_get_ip(si), FALSE,
+        NULL, NULL, reinterpret_cast<void **>(&si->cci));
+    if (NULL == m)
+        si->cci = NULL;
     si_unwind_bsp(si);
     si_setup_stacked_registers(si);
 }

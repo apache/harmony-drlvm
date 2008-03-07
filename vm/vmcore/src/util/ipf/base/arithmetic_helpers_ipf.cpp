@@ -35,7 +35,6 @@ using namespace std;
 #include "open/types.h"
 #include "Class.h"
 #include "environment.h"
-#include "method_lookup.h"
 #include "exceptions.h"
 #include "open/gc.h" 
 #include "ini.h"

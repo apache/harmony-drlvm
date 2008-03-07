@@ -33,7 +33,6 @@ using namespace std;
 #include "jit_runtime_support.h"
 #include "Class.h"
 #include "environment.h"
-#include "method_lookup.h"
 #include "m2n.h"
 #include "../m2n_ipf_internal.h"
 #include "object_layout.h"

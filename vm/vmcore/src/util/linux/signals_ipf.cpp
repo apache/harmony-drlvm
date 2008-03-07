@@ -47,7 +47,6 @@
 
 #include <pthread.h>
 #include <sys/time.h>
-#include "method_lookup.h"
 
 #include "Class.h"
 #include "environment.h"
