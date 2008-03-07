@@ -17,7 +17,6 @@
 
 
 #include "clog.h"
-#include "method_lookup.h"
 #include "Environment.h"
 #include "exceptions.h"
 #include "exceptions_jit.h"
