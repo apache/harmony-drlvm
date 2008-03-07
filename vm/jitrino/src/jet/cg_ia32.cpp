@@ -28,7 +28,6 @@
 #include <assert.h>
 #include <stdlib.h>
 
-#include <jit_import.h>
 #include "enc_ia32.h"
 
 /**

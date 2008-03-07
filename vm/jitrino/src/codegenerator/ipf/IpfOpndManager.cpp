@@ -249,7 +249,7 @@ OpndManager::OpndManager(MemoryManager &mm, CompilationInterface &compilationInt
     containCall = false;
 
     refsCompressed       = VMInterface::areReferencesCompressed();
-    vtablePtrsCompressed = VMInterface::areVTablePtrsCompressed();
+    vtablePtrsCompressed = VMInterface::isVTableCompressed();
     heapBase             = NULL;
     heapBaseImm          = NULL;
     vtableBase           = NULL;

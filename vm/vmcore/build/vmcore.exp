@@ -142,6 +142,7 @@ VMCORE_0.1 {
     get_system_object_class;
     get_system_string_class;
     get_thread_ptr;
+    get_vm_interface;
     initialize_arg_list_iterator;
     init_log_system;
     is_enabled;

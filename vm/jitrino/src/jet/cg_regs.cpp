@@ -22,7 +22,6 @@
 #include <open/vm.h>
 #include "trace.h"
 
-#include "jit_intf.h"
 /**
  * @file
  * @brief Registers manipulation routines and operand stack mimics.

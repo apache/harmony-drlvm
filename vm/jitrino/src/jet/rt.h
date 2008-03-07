@@ -27,7 +27,7 @@
 #define __RT_H_INCLUDED__
 
 #include "enc.h"
-#include "jit_export_rt.h" // for JitFrameContext
+#include "open/rt_types.h"
 
 namespace Jitrino {
 namespace Jet {

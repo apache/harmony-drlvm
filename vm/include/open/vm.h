@@ -62,6 +62,11 @@ typedef struct ChaMethodIterator {
 
 
 /**
+ * Dynamic interface adaptor, should return specific API by its name.
+ */
+VMEXPORT void* get_vm_interface(const char*);
+
+/**
  * Begin class-related functions.
  */
 
@@ -946,7 +951,6 @@ VMEXPORT int array_first_element_offset(VM_Data_Type element_type);
  * Assume that the elements are boxed. Byte offset.
  */ 
 VMEXPORT int vector_first_element_offset_class_handle(Class_Handle element_type);
-VMEXPORT int vector_first_element_offset_vtable_handle(VTable_Handle element_type);
 
 /**
  * Deprecated. Please use <code>vector_first_element_offset_class_handle</code> instead.
@@ -1044,13 +1048,6 @@ VMEXPORT char *method_sig_get_string(Method_Signature_Handle msh);
  * Free a string buffer returned by <code>method_sig_get_string</code>.
  */
 VMEXPORT void free_string_buffer(char *buffer);
-
-
-
-typedef enum {
-    VM_PROPERTIES  = 0,
-    JAVA_PROPERTIES = 1
-} PropertyTable;
 
 /**
  * Sets the property for <code>table_number</code> property table. <code>NULL</code> value is supported.

@@ -28,7 +28,7 @@
 #define __MIB_H_INCLUDED__
 
 #include "enc.h"
-#include "jit_export.h"
+#include "open/rt_types.h"
 
 namespace Jitrino {
 namespace Jet {

@@ -35,6 +35,8 @@
 extern "C" {
 #endif
 
+typedef void* (*vm_adaptor_t)(const char * name);
+
   /** 
    * Initializes JIT. 
    *
@@ -45,7 +47,7 @@ extern "C" {
    * @param[in] name  - the persistent JIT name that the compiler uses to separate 
    *                    its configuration settings from the ones of other JITs 
    */
-JITEXPORT void JIT_init(JIT_Handle jit, const char* name);
+JITEXPORT void JIT_init(JIT_Handle jit, const char* name, vm_adaptor_t adaptor);
 
   /**  
    * De-initializes JIT.

@@ -224,7 +224,6 @@ public:
     virtual Type*             getNonValueSupertype() {return this;}
     
     virtual const char*    getName();
-    virtual const char* getNameQualifier() {return "";}
     const char*    getPrintString() {return getPrintString(tag);}
 
     static bool isTau(Tag tag) {
@@ -505,7 +504,6 @@ public:
     NamedType* asNamedType() { return this; }
     bool needsInitialization();
     bool isFinalizable();
-    bool isBeforeFieldInit();
     bool isLikelyExceptionType();
     bool isNamedType() {return true;}
     //
@@ -533,7 +531,7 @@ public:
     virtual ~UserValueType() {}
 
     virtual const char* getName();
-    virtual const char* getNameQualifier();
+
     //
     // returns size & alignment of the un-boxed value
     //
@@ -571,7 +569,7 @@ public:
     virtual bool isSealed()    {return isFinalClass();}
     ObjectType*     getSuperType();
     const    char*    getName();
-    const    char*    getNameQualifier();
+
     bool getFastInstanceOfFlag();
     int getClassDepth();
     virtual bool    isUnresolvedType() {return isUnresolvedObject() || isUnresolvedArray();}

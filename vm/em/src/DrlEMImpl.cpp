@@ -378,8 +378,10 @@ bool DrlEMImpl::initJIT(const std::string& libName, apr_dso_handle_t* libHandle,
         LECHO(2, "EM: Not a JIT shared lib: '{0}'" << libName.c_str());
         return false;
     }
-    void (*_init)(JIT_Handle, const char*) = (void (*)(JIT_Handle, const char*)) fn;
-    _init(step.jit, step.jitName.c_str());
+
+    void (*_init)(JIT_Handle, const char*, vm_adaptor_t) = 
+        (void (*)(JIT_Handle, const char*, vm_adaptor_t)) fn;
+    _init(step.jit, step.jitName.c_str(), get_vm_interface);
 
     bool pcEnabled = false;
     if (apr_dso_sym(&fn, libHandle, "JIT_set_profile_access_interface") == APR_SUCCESS) {

@@ -209,7 +209,7 @@ void LightJNISession::runImpl() {
 
 //        printf("optimize %s::%s %s\n", md->getParentType()->getName(), md->getName(), md->getSignatureString());
 
-        void* tmpPoint = method_get_native_func_addr(md->getMethodHandle());
+        void* tmpPoint = md->getNativeAddress();
         Opnd* tmpZero = lirm->newImmOpnd(lirm->getTypeManager().getIntPtrType(), 0);
         uint32 tmpNumArgs = callInst->getOpndCount();
         CallInst* newCallInst = NULL;

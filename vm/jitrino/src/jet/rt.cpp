@@ -28,7 +28,6 @@
 
 #include "jet.h"
 
-#include "jit_import.h"
 #include "jit_intf.h"
 
 #include "port_threadunsafe.h"

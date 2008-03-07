@@ -746,7 +746,7 @@ using Jitrino::LogStreams;
  * @see setup
  */
 extern "C" JITEXPORT
-void JIT_init(JIT_Handle jit, const char* name)
+void JIT_init(JIT_Handle jit, const char* name, vm_adaptor_t adaptor)
 {
     JITInstanceContext* jic = 
                 new(g_mm) JITInstanceContext(g_mm, jit, name);

@@ -19,10 +19,9 @@
 #define _VMINTERFACE_H_
 
 #include <ostream>
-#include "open/em.h"
 #include "open/types.h"
-#include "jit_runtime_support.h"
-#include "jit_intf.h"
+#include "open/ee_em_intf.h"
+#include "open/vm_interface.h"
 
 namespace Jitrino {
 
@@ -48,7 +47,6 @@ public:
     static void*       getSystemStringVMTypeHandle();
     static void*       getArrayVMTypeHandle(void* elemVMTypeHandle,bool isUnboxed);
     static const char* getTypeName(void* vmTypeHandle);
-    static const char* getTypeNameQualifier(void* vmTypeHandle);
     static void*       getSuperTypeVMTypeHandle(void* vmTypeHandle);
     static void*       getArrayElemVMTypeHandle(void* vmTypeHandle);
     static bool        isArrayType(void* vmTypeHandle);
@@ -61,7 +59,6 @@ public:
     static bool        isAbstractType(void* vmTypeHandle);
     static bool        needsInitialization(void* vmTypeHandle);
     static bool        isFinalizable(void* vmTypeHandle);
-    static bool        isBeforeFieldInit(void* vmTypeHandle);
     static bool        getClassFastInstanceOfFlag(void* vmTypeHandle);
     static int         getClassDepth(void* vmTypeHandle);
     static bool        isInitialized(void* vmTypeHandle);
@@ -84,7 +81,7 @@ public:
 
 
     // returns true if vtable pointers are compressed
-    static bool          areVTablePtrsCompressed() {return vm_vtable_pointers_are_compressed();}
+    static bool          isVTableCompressed();
 
     // returns size of vtable pointer (currently 4 if compressed and 8 otherwise)
     //static uint32      getVTablePtrSize() {return vm_get_vtable_ptr_size();}
@@ -92,10 +89,10 @@ public:
     // returns the offset of an object's virtual table
     static uint32      getVTableOffset();
     // returns the base for all vtables (addend to compressed vtable pointer)
-    static uint64      getVTableBase() {return vm_get_vtable_base();}
+    static uint64      getVTableBase();
 
     // returns true if instance fields that are references are compressed
-    static bool        areReferencesCompressed() {return vm_references_are_compressed();}
+    static bool        areReferencesCompressed();
 
     //
     // returns the base for the heap (addend to compressed heap references)
@@ -105,6 +102,12 @@ public:
 
 
     static void        rewriteCodeBlock(Byte* codeBlock, Byte*  newCode, size_t size);
+
+	static bool setVmAdapter(vm_adaptor_t vm);
+	static bool isValidFeature(const char* id);
+
+protected:
+	static vm_adaptor_t vm;
 };
 
 
@@ -145,24 +148,24 @@ public:
     FieldDesc(Field_Handle field, CompilationInterface* ci, uint32 id) 
         : TypeMemberDesc(id, ci), drlField(field) {} 
 
-        const char*   getName() const       {return field_get_name(drlField);}
-        const char*   getSignatureString() const {return field_get_descriptor(drlField); }
+        const char*   getName() const;
+        const char*   getSignatureString() const;
         void          printFullName(::std::ostream &os);
         Class_Handle  getParentHandle() const;
-        bool          isPrivate() const     {return field_is_private(drlField)?true:false;}
-        bool          isStatic() const      {return field_is_static(drlField)?true:false;}
+        bool          isPrivate() const;
+        bool          isStatic() const;
         //
         // this field is constant after it is initialized
         // can only be mutated by constructor (instance fields) or
         // type initializer (static fields)
         //
-        bool          isInitOnly() const     {return field_is_final(drlField)?true:false;}    
+        bool          isInitOnly() const;
         // accesses to field cannot be reordered or CSEed
-        bool          isVolatile() const    {return field_is_volatile(drlField)?true:false;}
-        bool          isMagic() const    {return field_is_magic(drlField)?true:false;}
+        bool          isVolatile() const;
+        bool          isMagic() const;
         Type*         getFieldType();
         uint32        getOffset() const; // for non-static fields
-        void*         getAddress() const    {return field_get_address(drlField);} // for static fields
+        void*         getAddress() const; // for static fields
         Field_Handle  getFieldHandle() const  {return drlField; }
 
 private:
@@ -172,44 +175,37 @@ private:
 ///Method representation for resolved methods
 class MethodDesc : public TypeMemberDesc {
 public:
-    MethodDesc(Method_Handle m, JIT_Handle jit, CompilationInterface* ci = NULL, uint32 id = 0)
-        : TypeMemberDesc(id, ci), drlMethod(m),
-        methodSig(method_get_signature(m)),
-        handleMap(NULL),
-        jitHandle(jit){}
+    MethodDesc(Method_Handle m, JIT_Handle jit, CompilationInterface* ci = NULL, uint32 id = 0);
 
-        const char*  getName() const        {return method_get_name(drlMethod);}
-        const char*  getSignatureString() const {return method_get_descriptor(drlMethod); }
+        const char*  getName() const;
+        const char*  getSignatureString() const;
         void         printFullName(::std::ostream& os);
         Class_Handle getParentHandle() const;
 
-        bool         isPrivate() const      {return method_is_private(drlMethod)?true:false;}
-        bool         isStatic() const       {return method_is_static(drlMethod)?true:false;}
-        bool         isInstance() const     {return method_is_static(drlMethod)?false:true;}
-        bool         isNative() const       {return method_is_native(drlMethod)?true:false;}
-        bool         isSynchronized() const {return method_is_synchronized(drlMethod)?true:false;}
+        bool         isPrivate() const;
+        bool         isStatic() const;
+        bool         isInstance() const;
+        bool         isNative() const;
+        bool         isSynchronized() const;
         bool         isNoInlining() const;
-        bool         isFinal() const        {return method_is_final(drlMethod)?true:false;}
-        bool         isVirtual() const      {return isInstance() && !isPrivate();}
-        bool         isAbstract() const     {return method_is_abstract(drlMethod)?true:false;}
+        bool         isFinal() const;
+        bool         isVirtual() const;
+        bool         isAbstract() const;
         // FP strict
-        bool         isStrict() const       {return method_is_strict(drlMethod)?true:false;}
-        bool         isRequireSecObject(); //FIXME drop???
-        bool         isClassInitializer() const {return strcmp(getName(), "<clinit>") == 0; }
-        bool         isInstanceInitializer() const {return strcmp(getName(), "<init>") == 0; }
+        bool         isStrict() const;
+        bool         isClassInitializer() const;
+        bool         isInstanceInitializer() const;
 
         //
         // Method info
         //
 
-        const Byte*  getByteCodes() const   {return method_get_byte_code_addr(drlMethod);}
-        uint32       getByteCodeSize() const {return (uint32) method_get_byte_code_size(drlMethod);}
-        uint16       getMaxStack() const    {return (uint16) method_get_max_stack(drlMethod);}
-        uint32       getNumHandlers() const {return method_get_num_handlers(drlMethod);}
+        const Byte*  getByteCodes() const;
+        uint32       getByteCodeSize() const;
+        uint16       getMaxStack() const;
+        uint32       getNumHandlers() const;
         void getHandlerInfo(unsigned index, unsigned* beginOffset, 
             unsigned* endOffset, unsigned* handlerOffset, unsigned* handlerClassIndex) const;
-        uint32       getNumThrows() const {return method_number_throws(drlMethod);}
-        NamedType*   getThrowType(uint32 i);
         bool         hasAnnotation(NamedType* type) const;
 
         //
@@ -239,11 +235,12 @@ public:
         //
         // DRL kernel
         //
-        bool         isOverridden() const   {return method_is_overridden(drlMethod)?true:false;}
-        uint32       getOffset() const      {return method_get_offset(drlMethod);}
-        void*        getIndirectAddress() const {return method_get_indirect_address(drlMethod);}
+        bool         isOverridden() const;
+        uint32       getOffset() const;
+        void*        getIndirectAddress() const;
+        void*        getNativeAddress() const;
 
-        uint32    getNumVars() const        {return method_vars_get_number(drlMethod);}
+        uint32    getNumVars() const;
 
         Method_Handle    getMethodHandle() const   {return drlMethod;}
 
@@ -262,19 +259,6 @@ private:
     Method_Signature_Handle  methodSig;
     void* handleMap;
     JIT_Handle                  jitHandle;
-};
-
-class ClassHierarchyMethodIterator {
-public:
-    ClassHierarchyMethodIterator(CompilationInterface& compilationInterface, ObjectType* objType, MethodDesc* methodDesc);
-    bool isValid() const { return valid; }
-    bool hasNext() const;
-    MethodDesc* getNext();
-
-private:
-    CompilationInterface& compilationInterface;
-    bool valid;
-    ChaMethodIterator iterator;
 };
 
 enum ResolveNewCheck{ResolveNewCheck_NoCheck, ResolveNewCheck_DoCheck};
@@ -357,7 +341,6 @@ public:
     // superclass of ch that overrides mh.
     MethodDesc* getOverriddenMethod(NamedType *type, MethodDesc * methodDesc);
 
-    ClassHierarchyMethodIterator* getClassHierarchyMethodIterator(ObjectType* baseType, MethodDesc* methodDesc);
 
     void*        getStringInternAddr(MethodDesc* enclosingMethodDesc, uint32 stringToken);
     Type*        getConstantType(MethodDesc* enclosingMethodDesc, uint32 constantToken);
@@ -479,17 +462,11 @@ public:
     GCInterface(GC_Enumeration_Handle gcHandle) : gcHandle(gcHandle) {}
     virtual ~GCInterface() {}
 
-    virtual void enumerateRootReference(void** reference) {
-        vm_enumerate_root_reference(reference, FALSE);
-    }
+    virtual void enumerateRootReference(void** reference);
 
-    virtual void enumerateCompressedRootReference(uint32* reference) {
-        vm_enumerate_compressed_root_reference(reference, FALSE);
-    }
+    virtual void enumerateCompressedRootReference(uint32* reference);
 
-    virtual void enumerateRootManagedReference(void** slotReference, int slotOffset) {
-        vm_enumerate_root_interior_pointer(slotReference, slotOffset, FALSE);
-    }
+    virtual void enumerateRootManagedReference(void** slotReference, int slotOffset);
 
 private:
     GC_Enumeration_Handle gcHandle;
@@ -500,17 +477,11 @@ class ThreadDumpEnumerator : public GCInterface {
 public:
     ThreadDumpEnumerator() : GCInterface(NULL) {}
 
-    virtual void enumerateRootReference(void** reference) {
-        vm_check_if_monitor(reference, 0, 0, 0, FALSE, 1);
-    }
+    virtual void enumerateRootReference(void** reference);
 
-    virtual void enumerateCompressedRootReference(uint32* reference) {
-        vm_check_if_monitor(0, 0, reference, 0, FALSE, 2);
-    }
+    virtual void enumerateCompressedRootReference(uint32* reference);
 
-    virtual void enumerateRootManagedReference(void** slotReference, int slotOffset) {
-        vm_check_if_monitor(slotReference, 0, 0, slotOffset, FALSE, 3);
-    }
+    virtual void enumerateRootManagedReference(void** slotReference, int slotOffset);
 };
 
 //

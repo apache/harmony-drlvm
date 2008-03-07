@@ -1464,16 +1464,11 @@ int vector_first_element_offset(VM_Data_Type element_type)
 
 
 
-int vector_first_element_offset_class_handle(Class_Handle UNREF element_type)
+int vector_first_element_offset_class_handle(Class_Handle element_type)
 {
-    return VM_VECTOR_FIRST_ELEM_OFFSET_REF;
-} //vector_first_element_offset_class_handle
-
-int vector_first_element_offset_vtable_handle(VTable_Handle UNREF element_type)
-{
-    return VM_VECTOR_FIRST_ELEM_OFFSET_REF;
-} //vector_first_element_offset_class_handle
-
+    return vector_first_element_offset_unboxed(element_type);
+    //return VM_VECTOR_FIRST_ELEM_OFFSET_REF;
+}
 
 Boolean method_is_java(Method_Handle mh)
 {

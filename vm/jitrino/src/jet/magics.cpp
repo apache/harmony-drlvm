@@ -28,7 +28,6 @@
 #include "enc.h"
 
 #include "open/vm.h"
-#include "jit_import.h"
 #include "jit_intf.h"
 #include "VMMagic.h"
 

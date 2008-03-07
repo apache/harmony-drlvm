@@ -76,7 +76,7 @@ static bool isJET(JIT_Handle jit)
 // Called once at the end of the constructor.
 extern "C"
 JITEXPORT void
-JIT_init(JIT_Handle jit, const char* name)
+JIT_init(JIT_Handle jit, const char* name, vm_adaptor_t adaptor)
 {
     std::string initMessage = std::string("Initializing Jitrino.") + name + " -> ";
     std::string mode = "OPT";
@@ -85,6 +85,9 @@ JIT_init(JIT_Handle jit, const char* name)
 #endif 
     initMessage = initMessage + mode + " compiler mode";
     INFO(initMessage.c_str());
+
+    VMInterface::setVmAdapter(adaptor);
+
     Jitrino::Init(jit, name);
 
 #ifdef USE_FAST_PATH

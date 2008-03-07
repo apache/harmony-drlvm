@@ -114,10 +114,11 @@ typedef void *Managed_Object_Handle;
 
 typedef void *GC_Enumeration_Handle;
 
-/**
- * For disable warnings in release version.
- * warning type: warning: unused variable <type_of variable> <variable>
- */
+//tmp location
+typedef enum {
+    VM_PROPERTIES  = 0,
+    JAVA_PROPERTIES = 1
+    } PropertyTable;
 
 
 #endif //!_VM_TYPES_H_

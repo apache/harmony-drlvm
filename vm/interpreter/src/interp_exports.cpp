@@ -35,7 +35,7 @@ typedef void *GC_Enumeration_Handle;
 #endif
 
 extern "C" {
-    extern void EXPORT JIT_init(JIT_Handle h, const char* name);
+    extern void EXPORT JIT_init(JIT_Handle h, const char* name, vm_adaptor_t adaptor);
     EXPORT extern void JIT_deinit(JIT_Handle h);
     EXPORT extern void JIT_unwind_stack_frame(JIT_Handle, Method_Handle, JitFrameContext *);
     EXPORT extern void JIT_get_root_set_from_stack_frame(JIT_Handle, Method_Handle, GC_Enumeration_Handle, JitFrameContext *);
@@ -90,7 +90,7 @@ extern Method_Handle interpreter_get_frame_method(FrameHandle* frame);
 extern uint8* interpreter_get_frame_bytecode_ptr(FrameHandle* frame);
 extern bool is_frame_in_native_frame(FrameHandle* frame, void* begin, void* end);
 
-void EXPORT JIT_init(JIT_Handle UNREF h, const char* UNREF name) {
+void EXPORT JIT_init(JIT_Handle UNREF h, const char* UNREF name, vm_adaptor_t adaptor) {
     Interpreter *interpreter = interpreter_table();
 
     interpreter->interpreter_st_get_frame = &interpreter_st_get_frame;

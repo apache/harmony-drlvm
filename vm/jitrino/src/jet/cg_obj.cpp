@@ -28,7 +28,8 @@
 #include <assert.h>
 #include <stdlib.h>
 
-#include <jit_import.h>
+#include "jit_import.h"
+#include "jit_intf.h"
 
 /**
  * @file

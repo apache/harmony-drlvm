@@ -26,6 +26,8 @@
  
 #include "cg.h"
 #include <open/vm.h>
+#include <jit_intf.h>
+
 #include "trace.h"
 #include "VMMagic.h"
 

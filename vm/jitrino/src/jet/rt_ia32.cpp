@@ -19,7 +19,7 @@
  * @version $Revision$
  */
 #include "enc_ia32.h"
-#include "jit_export_rt.h"
+#include "open/rt_types.h"
 /**
  * @file
  * @brief Implementation of runtime support routines specific for IA-32

@@ -31,7 +31,7 @@
 #include "rt.h"
 #include "cg.h"
 
-#include <jit_export.h>
+#include "open/rt_types.h"
 
 #include <assert.h>
 #include <vector>

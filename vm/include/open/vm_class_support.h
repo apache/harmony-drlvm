@@ -297,12 +297,6 @@ int vector_first_element_offset_class_handle(Class_Handle element_type);
 
 /**
  * Return the offset to the first element of the vector of the given type.
- * Assume that the elements are boxed. Byte offset.
- */
-int vector_first_element_offset_vtable_handle(VTable_Handle element_type);
-
-/**
- * Return the offset to the first element of the vector of the given type.
  * This function is provided for the cases when the class handle of the
  * element is not available.
  */

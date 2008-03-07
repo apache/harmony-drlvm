@@ -28,7 +28,7 @@
 #define __TRACE_H_INCLUDED__
 
 #include "mib.h"
-#include "jit_export_rt.h" // for JitFrameContext
+#include "open/rt_types.h"
 
 #include <string>
 using std::string;

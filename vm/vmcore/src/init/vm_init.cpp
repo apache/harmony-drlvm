@@ -120,6 +120,104 @@ void create_instance_for_class(Global_Env * vm_env, Class *clss)
     }
 } //create_instance_for_class
 
+// VM adapter part
+
+static apr_dso_handle_t* get_harmonyvm_handle(){
+    apr_dso_handle_t* descriptor;
+    apr_pool_t* pool;
+    int ret = apr_pool_create(&pool, NULL);
+    assert(APR_SUCCESS == ret);
+    ret = apr_dso_load(&descriptor, PORT_DSO_NAME("harmonyvm"), pool);
+    assert(APR_SUCCESS == ret);
+    return descriptor;
+}
+
+extern "C" VMEXPORT 
+void* get_vm_interface(const char* func_name){
+    static apr_dso_handle_t* descriptor = get_harmonyvm_handle();
+    void* p_func = NULL;
+    int ret = apr_dso_sym((apr_dso_handle_sym_t*) &p_func, descriptor, func_name);
+
+    //assert(APR_SUCCESS == ret);
+
+    //FIXME: temporary solution, should be fixed in next patch
+    if (p_func) {
+        return p_func;
+        
+    } else if (strcmp(func_name,"class_is_support_fast_instanceof") == 0) {
+        return (void*)class_get_fast_instanceof_flag;
+    } else if (strcmp(func_name,"class_is_final") == 0) {
+        return (void*)class_property_is_final;
+    } else if (strcmp(func_name,"class_is_throwable") == 0) {
+        return (void*)class_hint_is_exceptiontype;
+    } else if (strcmp(func_name,"class_is_interface") == 0) {
+        return (void*)class_property_is_interface2;
+    } else if (strcmp(func_name,"class_is_abstract") == 0) {
+        return (void*)class_property_is_abstract;
+    } else if (strcmp(func_name,"class_cp_get_field_type") == 0) {
+        return (void*)class_get_cp_field_type;
+    } else if (strcmp(func_name,"class_cp_get_entry_signature") == 0) {
+        return (void*)class_get_cp_entry_signature;
+    } else if (strcmp(func_name,"class_cp_get_method_class_name") == 0) {
+        return (void*)const_pool_get_method_class_name;
+    } else if (strcmp(func_name,"class_cp_get_method_name") == 0) {
+        return (void*)const_pool_get_method_name;
+    } else if (strcmp(func_name,"class_cp_is_entry_resolved") == 0) {
+        return (void*)class_is_cp_entry_resolved;
+    } else if (strcmp(func_name,"class_cp_get_class_name") == 0) {
+        return (void*)const_pool_get_class_name;
+    } else if (strcmp(func_name,"field_get_type_info") == 0) {
+        return (void*)field_get_type_info_of_field_value;
+    } else if (strcmp(func_name,"method_get_overridden_method") == 0) {
+        return (void*)method_find_overridden_method;
+    } else if (strcmp(func_name,"vector_get_first_element_offset") == 0) {
+        return (void*)vector_first_element_offset_class_handle;
+    } else if (strcmp(func_name,"vector_get_length_offset") == 0) {
+        return (void*)vector_length_offset;
+    } else if (strcmp(func_name,"vm_tls_alloc") == 0) {
+        return (void*)hythread_tls_alloc;
+    } else if (strcmp(func_name,"vm_tls_get_offset") == 0) {
+        return (void*)hythread_tls_get_offset;
+    } else if (strcmp(func_name,"vm_tls_get_request_offset") == 0) {
+        return (void*)hythread_tls_get_request_offset;
+    } else if (strcmp(func_name,"vm_tls_is_fast") == 0) {
+        return (void*)hythread_uses_fast_tls;
+    } else if (strcmp(func_name,"vm_get_tls_offset_in_segment") == 0) {
+        return (void*)hythread_get_hythread_offset_in_tls;
+    } else if (strcmp(func_name,"vm_get_system_object_class") == 0) {
+        return (void*)get_system_object_class;
+    } else if (strcmp(func_name,"vm_get_system_class_class") == 0) {
+        return (void*)get_system_class_class;
+    } else if (strcmp(func_name,"vm_get_system_string_class") == 0) {
+        return (void*)get_system_string_class;
+    } else if (strcmp(func_name,"vm_get_heap_base_address") == 0) {
+        return (void*)vm_heap_base_address;
+    } else if (strcmp(func_name,"vm_get_heap_ceiling_address") == 0) {
+        return (void*)vm_heap_ceiling_address;
+    } else if (strcmp(func_name,"vm_is_heap_compressed") == 0) {
+        return (void*)vm_references_are_compressed;
+    } else if (strcmp(func_name,"vm_is_vtable_compressed") == 0) {
+        return (void*)vm_vtable_pointers_are_compressed;
+    } else if (strcmp(func_name,"vm_compiled_method_load") == 0) {
+        return (void*)compiled_method_load;
+    } else if (strcmp(func_name,"vm_properties_destroy_keys") == 0) {
+        return (void*)destroy_properties_keys;
+    } else if (strcmp(func_name,"vm_properties_destroy_value") == 0) {
+        return (void*)destroy_property_value;
+    } else if (strcmp(func_name,"vm_properties_get_keys") == 0) {
+        return (void*)get_properties_keys;
+    } else if (strcmp(func_name,"vm_properties_get_keys_starting_with") == 0) {
+        return (void*)get_properties_keys_staring_with;
+    } else if (strcmp(func_name,"vm_properties_get_value") == 0) {
+        return (void*)get_property;
+    } else if (strcmp(func_name,"vm_helper_get_addr") == 0) {
+        return (void*)vm_get_rt_support_addr;
+    } else if (strcmp(func_name,"vm_helper_get_addr_optimized") == 0) {
+        return (void*)vm_get_rt_support_addr_optimized;
+    } else {
+        return NULL;
+    }
+}
 
 #define GC_DLL_COMP   PORT_DSO_NAME("gc_gen")
 #define GC_DLL_UNCOMP PORT_DSO_NAME("gc_gen_uncomp")
@@ -151,7 +249,7 @@ static jint process_properties_dlls(Global_Env * vm_env) {
         LWARN(13, "Cannot load EM component from {0}" << dll);
         return status;
     }
-    
+
     status = vm_env->cm->CreateInstance(&(vm_env->em_instance), "em");
     if (status != JNI_OK) {
         LWARN(14, "Cannot instantiate EM");

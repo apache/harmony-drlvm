@@ -680,10 +680,6 @@ NamedType::isFinalizable() {
     return VMInterface::isFinalizable(vmTypeHandle);
 }
 
-bool    
-NamedType::isBeforeFieldInit() {
-    return VMInterface::isBeforeFieldInit(vmTypeHandle);
-}
 
 bool    
 NamedType::isLikelyExceptionType() {
@@ -821,14 +817,6 @@ ObjectType::getName() {
     return VMInterface::getTypeName(vmTypeHandle);
 }
 
-const char* 
-ObjectType::getNameQualifier() {
-    if (isUnresolvedObject()) {
-        return ""; //package name
-    }
-    return VMInterface::getTypeNameQualifier(vmTypeHandle);
-}
-
 bool 
 ObjectType::getFastInstanceOfFlag() {
     if (isUnresolvedType()) {
@@ -902,11 +890,6 @@ Type::getName() {
 const char* 
 UserValueType::getName() {
     return VMInterface::getTypeName(vmTypeHandle);
-}
-
-const char* 
-UserValueType::getNameQualifier() {
-    return VMInterface::getTypeNameQualifier(vmTypeHandle);
 }
 
 //-----------------------------------------------------------------------------

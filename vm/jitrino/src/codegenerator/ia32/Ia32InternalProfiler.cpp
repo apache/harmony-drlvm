@@ -105,13 +105,12 @@ struct Filter {
         FilterAttr<bool>                                    isClassInitializer;
         FilterAttr<bool>                                    isInstanceInitializer;
         FilterAttr<bool>                                    isStrict;
-        FilterAttr<bool>                                    isRequireSecObject;
         FilterAttr<bool>                                    isInitLocals;
         FilterAttr<bool>                                    isOverridden;
 
         StlMap<int, OpndFilter> operandFilters;
 
-        Filter() : isInitialized(false), isNegative(false), isOR(false), mnemonic(Mnemonic_NULL), operandNumber(-1), rtKind(Opnd::RuntimeInfo::Kind_Null), rtHelperID(VM_RT_UNKNOWN), rtIntHelperName("none"), isNative(false), isStatic(false), isSynchronized(false), isNoInlining(false), isInstance(false), isFinal(false), isVirtual(false), isAbstract(false), isClassInitializer(false), isInstanceInitializer(false), isStrict(false), isRequireSecObject(false), isInitLocals(false), isOverridden(false), operandFilters(Jitrino::getGlobalMM()) {}
+        Filter() : isInitialized(false), isNegative(false), isOR(false), mnemonic(Mnemonic_NULL), operandNumber(-1), rtKind(Opnd::RuntimeInfo::Kind_Null), rtHelperID(VM_RT_UNKNOWN), rtIntHelperName("none"), isNative(false), isStatic(false), isSynchronized(false), isNoInlining(false), isInstance(false), isFinal(false), isVirtual(false), isAbstract(false), isClassInitializer(false), isInstanceInitializer(false), isStrict(false), isInitLocals(false), isOverridden(false), operandFilters(Jitrino::getGlobalMM()) {}
 
         Filter& operator=(const Filter& c) {
             Filter& f = *this;
@@ -134,7 +133,6 @@ struct Filter {
             f.isClassInitializer      =  c.isClassInitializer;        
             f.isInstanceInitializer   =  c.isInstanceInitializer;     
             f.isStrict                =  c.isStrict;                  
-            f.isRequireSecObject      =  c.isRequireSecObject;        
             f.isInitLocals            =  c.isInitLocals;              
             f.isOverridden            =  c.isOverridden;              
 
@@ -496,15 +494,6 @@ void InternalProfilerAct::readConfig(Config * config) {
                             config->counters[num].filter.isInitialized=true;
                             config->counters[num].filter.isStrict.value=(std::string(val) == "true")? true : false;
                             config->counters[num].filter.isStrict.isInitialized=true;
-                        }
-                    } else if ((int)line.find(".isRequireSecObject") != -1) {
-                        char * val = (char *)std::strstr(line.c_str(),"=")+1;
-                        if ((std::string(val) == "true") && (std::strstr(line.c_str(), "IsNegative"))) {
-                            config->counters[num].filter.isRequireSecObject.isNegative=true;
-                        } else {
-                            config->counters[num].filter.isInitialized=true;
-                            config->counters[num].filter.isRequireSecObject.value=(std::string(val) == "true")? true : false;
-                            config->counters[num].filter.isRequireSecObject.isInitialized=true;
                         }
                     } else if ((int)line.find(".isInitLocals") != -1) {
                         char * val = (char *)std::strstr(line.c_str(),"=")+1;
@@ -952,18 +941,6 @@ bool InternalProfiler::passFilter(Inst * inst, Filter& filter) {
             return false;
         res = filter.isStrict.value == ((MethodDesc *)rt->getValue(0))->isStrict();
         if(filter.isStrict.isNegative)
-            res = !res;
-
-        if(filter.isOR && res)
-            return true;
-        if(!(filter.isOR || res))
-            return false;
-    }
-    if(filter.isRequireSecObject.isInitialized) {
-        if(!rt || ((rt->getKind() != Opnd::RuntimeInfo::Kind_MethodDirectAddr) && (rt->getKind() != Opnd::RuntimeInfo::Kind_MethodDirectAddr)))
-            return false;
-        res = filter.isRequireSecObject.value == ((MethodDesc *)rt->getValue(0))->isRequireSecObject();
-        if(filter.isRequireSecObject.isNegative)
             res = !res;
 
         if(filter.isOR && res)
