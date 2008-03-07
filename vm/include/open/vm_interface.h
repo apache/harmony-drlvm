@@ -24,9 +24,11 @@
 #include "open/rt_helpers.h"
 #include "open/em.h"
 
-//#define PROTOTYPE_WITH_NAME(return_type, func_name, prototype) \
-//        typedef return_type (*func_name##_t)prototype;\
-//        const char* func_name##_s = #func_name
+/*
+#define PROTOTYPE_WITH_NAME(return_type, func_name, prototype) \
+        typedef return_type (*func_name##_t)prototype;\
+        const char* func_name##_s = #func_name
+*/
 
 #define PROTOTYPE_WITH_NAME(return_type, func_name, prototype) \
     typedef return_type (*func_name##_t)prototype
