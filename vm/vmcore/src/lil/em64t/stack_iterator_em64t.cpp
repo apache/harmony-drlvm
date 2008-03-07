@@ -367,7 +367,7 @@ void si_fill_from_registers(StackIterator* si, Registers* regs, bool is_ip_past,
     // It's possible that registers represent native code and res->cci==NULL
 
     Method_Handle m = env->em_interface->LookupCodeChunk(
-        reinterpret_cast<void *>(regs->eip), is_ip_past,
+        reinterpret_cast<void *>(regs->rip), is_ip_past,
         NULL, NULL, reinterpret_cast<void **>(&si->cci));
     if (NULL == m)
         si->cci = NULL;
