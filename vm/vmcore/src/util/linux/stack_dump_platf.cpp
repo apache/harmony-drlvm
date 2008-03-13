@@ -242,7 +242,7 @@ void sd_init_crash_handler()
             g_cmdline = cmd;
             if (cmd)
             {
-                cmd[size + 1] = '\0';
+                cmd[size] = '\0';
                 lseek(file, 0, SEEK_SET);
                 read(file, cmd, size);
             }
