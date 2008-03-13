@@ -619,9 +619,8 @@ VMCORE_0.1 {
     vm_gc_lock_init;
     vm_gc_unlock_enum;
     vm_get_gc_thread_local;
-    vm_get_rt_support_addr;
-    vm_get_rt_support_addr_optimized;
-    vm_get_rt_support_stub;
+    vm_helper_get_addr;
+    vm_helper_get_addr_optimized;
     vm_get_vtable_base;
     vm_get_vtable_ptr_size;
     vm_heap_base_address;
