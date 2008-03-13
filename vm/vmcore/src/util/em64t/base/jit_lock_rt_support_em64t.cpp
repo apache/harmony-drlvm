@@ -41,6 +41,7 @@
 #include "object_handles.h"
 #include "Class.h"
 #include "jit_runtime_support.h"
+#include "internal_jit_intf.h"
 
 #include "mon_enter_exit.h"
 #include "exceptions.h"
@@ -56,8 +57,6 @@
 char * gen_convert_managed_to_unmanaged_null_em64t(char * ss,
                                                   const R_Opnd & input_param1);
 #define INPUT_ARG_OFFSET 8
-char * gen_setup_j2n_frame(char * s);
-char * gen_pop_j2n_frame(char * s);
 
 
 // patch_addr_null_arg_ptr is the address of a variable holding the

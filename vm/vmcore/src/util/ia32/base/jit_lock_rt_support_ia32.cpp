@@ -43,6 +43,7 @@ using namespace std;
 #include "object_handles.h"
 #include "Class.h"
 #include "jit_runtime_support.h"
+#include "internal_jit_intf.h"
 
 #include "dump.h"
 #include "vm_stats.h"
@@ -52,9 +53,6 @@ char * gen_convert_managed_to_unmanaged_null_ia32(char * ss,
                                                   unsigned stack_pointer_offset);
 
 #define INPUT_ARG_OFFSET 4
-char * gen_setup_j2n_frame(char * s);
-char * gen_pop_j2n_frame(char * s);
-
 
 
 // patch_addr_null_arg_ptr is the address of a variable holding the

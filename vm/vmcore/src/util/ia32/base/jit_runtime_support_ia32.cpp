@@ -900,7 +900,7 @@ static void* getaddress__setup_java_to_native_frame()
 } //getaddress__setup_java_to_native_frame
 
 
-VMEXPORT char *gen_setup_j2n_frame(char *s)
+char *gen_setup_j2n_frame(char *s)
 {
     s = call(s, (char *)getaddress__setup_java_to_native_frame() );
     return s;
@@ -941,7 +941,7 @@ static void* getaddress__pop_java_to_native_frame()
 } //getaddress__pop_java_to_native_frame
 
 
-VMEXPORT char *gen_pop_j2n_frame(char *s)
+char *gen_pop_j2n_frame(char *s)
 {
     s = call(s, (char *)getaddress__pop_java_to_native_frame() );
     return s;
