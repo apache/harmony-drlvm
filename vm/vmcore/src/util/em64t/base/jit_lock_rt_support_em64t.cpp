@@ -27,7 +27,7 @@
 
 #include "open/hythread_ext.h"
 #include "open/jthread.h"
-#include "open/thread_helpers.h"
+#include "thread_helpers.h"
 
 #include "open/vm_util.h"
 #include "encoder.h"

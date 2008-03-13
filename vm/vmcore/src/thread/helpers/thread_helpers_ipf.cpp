@@ -21,7 +21,7 @@
  */
 
 #include <open/hythread_ext.h>
-#include <open/thread_helpers.h>
+#include <thread_helpers.h>
 #include "open/jthread.h"
 
 #include <assert.h>

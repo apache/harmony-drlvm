@@ -37,7 +37,7 @@ using namespace std;
 #include "mon_enter_exit.h"
 #include "vm_threads.h"
 
-#include "open/thread_helpers.h"
+#include "thread_helpers.h"
 
 #include "vm_arrays.h"
 #include "vm_strings.h"

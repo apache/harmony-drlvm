@@ -47,7 +47,7 @@ using namespace std;
 #include "lock_manager.h"
 #include "thread_manager.h"
 #include "thread_generic.h"
-#include "open/thread_helpers.h"
+#include "thread_helpers.h"
 #include "open/jthread.h"
 
 #include "vm_threads.h"
