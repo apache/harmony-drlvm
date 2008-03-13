@@ -250,10 +250,6 @@ PROTOTYPE_WITH_NAME(void        , vm_compiled_method_load,
                     void* compileInfo,
                     Method_Handle outer_method));//compiled_method_load
 
-PROTOTYPE_WITH_NAME(void *      , vm_helper_get_addr, (VM_RT_SUPPORT id));//void * vm_get_rt_support_addr(VM_RT_SUPPORT id)
-PROTOTYPE_WITH_NAME(void *      , vm_helper_get_addr_optimized, (VM_RT_SUPPORT id, Class_Handle ch));//void * vm_get_rt_support_addr_optimized(VM_RT_SUPPORT id, Class_Handle ch)
-
-
 
 /////////////////////////// temporary ///////////////////////////
 //VTable

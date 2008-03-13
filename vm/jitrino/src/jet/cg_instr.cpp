@@ -356,7 +356,7 @@ void CodeGen::gen_write_barrier(JavaByteCodes opcode, Field_Handle fieldHandle, 
     //(object written to, slot written to, value written to slot)
     static const CallSig wb4c_sig(CCONV_CDECL, jobj, jobj, jobj);
     //static char* wb4c_helper = xxx_gc_heap_slot_write_ref
-    static char* wb4c_helper = (char*)vm_get_rt_support_addr(VM_RT_GC_HEAP_WRITE_REF);
+    static char* wb4c_helper = (char*)vm_helper_get_addr(VM_RT_GC_HEAP_WRITE_REF);
 
     if (doGenWB4C && (NULL == wb4c_helper)) {
         // WB4C requested, but VM knows nothing about such helper

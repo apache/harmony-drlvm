@@ -1462,11 +1462,11 @@ void Compiler::initStatics(void)
     // Collect addresses of runtime helpers
     //
     rt_helper_init_class = 
-                (char*)vm_get_rt_support_addr(VM_RT_INITIALIZE_CLASS);
+                (char*)vm_helper_get_addr(VM_RT_INITIALIZE_CLASS);
     rt_helper_ldc_string =
-                (char*)vm_get_rt_support_addr(VM_RT_LDC_STRING);
+                (char*)vm_helper_get_addr(VM_RT_LDC_STRING);
     rt_helper_new = 
-     (char*)vm_get_rt_support_addr(VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE);
+     (char*)vm_helper_get_addr(VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE);
 
     g_refs_squeeze = vm_references_are_compressed();
     g_vtbl_squeeze = vm_vtable_pointers_are_compressed();
@@ -1477,79 +1477,79 @@ void Compiler::initStatics(void)
     g_jvmtiMode = (bool)get_boolean_property("vm.jvmti.enabled", false, VM_PROPERTIES);
     
     rt_helper_monitor_enter = 
-                (char*)vm_get_rt_support_addr(VM_RT_MONITOR_ENTER);
+                (char*)vm_helper_get_addr(VM_RT_MONITOR_ENTER);
     rt_helper_monitor_exit  = 
-                (char*)vm_get_rt_support_addr(VM_RT_MONITOR_EXIT);
+                (char*)vm_helper_get_addr(VM_RT_MONITOR_EXIT);
     rt_helper_monitor_enter_static = 
-                (char*)vm_get_rt_support_addr(VM_RT_MONITOR_ENTER_STATIC);
+                (char*)vm_helper_get_addr(VM_RT_MONITOR_ENTER_STATIC);
     rt_helper_monitor_exit_static = 
-                (char*)vm_get_rt_support_addr(VM_RT_MONITOR_EXIT_STATIC);
+                (char*)vm_helper_get_addr(VM_RT_MONITOR_EXIT_STATIC);
     
     rt_helper_new_array = 
-                (char*)vm_get_rt_support_addr(VM_RT_NEW_VECTOR_USING_VTABLE);
-    rt_helper_aastore = (char*)vm_get_rt_support_addr(VM_RT_AASTORE);
+                (char*)vm_helper_get_addr(VM_RT_NEW_VECTOR_USING_VTABLE);
+    rt_helper_aastore = (char*)vm_helper_get_addr(VM_RT_AASTORE);
     
     rt_helper_get_vtable = 
-              (char*)vm_get_rt_support_addr(VM_RT_GET_INTERFACE_VTABLE_VER0);
+              (char*)vm_helper_get_addr(VM_RT_GET_INTERFACE_VTABLE_VER0);
 
     rt_helper_throw_npe = 
-                (char*)vm_get_rt_support_addr(VM_RT_NULL_PTR_EXCEPTION);
+                (char*)vm_helper_get_addr(VM_RT_NULL_PTR_EXCEPTION);
 
     rt_helper_throw = 
-                (char*)vm_get_rt_support_addr(VM_RT_THROW);
+                (char*)vm_helper_get_addr(VM_RT_THROW);
     rt_helper_throw_out_of_bounds = 
-                (char*)vm_get_rt_support_addr(VM_RT_IDX_OUT_OF_BOUNDS);
+                (char*)vm_helper_get_addr(VM_RT_IDX_OUT_OF_BOUNDS);
     rt_helper_throw_linking_exc = 
-                (char*)vm_get_rt_support_addr(VM_RT_THROW_LINKING_EXCEPTION);
+                (char*)vm_helper_get_addr(VM_RT_THROW_LINKING_EXCEPTION);
     rt_helper_throw_div_by_zero_exc = 
-                (char*)vm_get_rt_support_addr(VM_RT_DIVIDE_BY_ZERO_EXCEPTION);
+                (char*)vm_helper_get_addr(VM_RT_DIVIDE_BY_ZERO_EXCEPTION);
 
     rt_helper_checkcast = 
-                (char*)vm_get_rt_support_addr(VM_RT_CHECKCAST);
+                (char*)vm_helper_get_addr(VM_RT_CHECKCAST);
     rt_helper_instanceof = 
-                (char*)vm_get_rt_support_addr(VM_RT_INSTANCEOF);
+                (char*)vm_helper_get_addr(VM_RT_INSTANCEOF);
 
     rt_helper_multinewarray = 
-                (char*)vm_get_rt_support_addr(VM_RT_MULTIANEWARRAY_RESOLVED);
+                (char*)vm_helper_get_addr(VM_RT_MULTIANEWARRAY_RESOLVED);
 
     rt_helper_gc_safepoint = 
-                (char*)vm_get_rt_support_addr(VM_RT_GC_SAFE_POINT);
+                (char*)vm_helper_get_addr(VM_RT_GC_SAFE_POINT);
     rt_helper_get_tls_base_ptr= 
-                (char*)vm_get_rt_support_addr(VM_RT_GC_GET_TLS_BASE);
+                (char*)vm_helper_get_addr(VM_RT_GC_GET_TLS_BASE);
 
     rt_helper_new_withresolve =
-                    (char*)vm_get_rt_support_addr(VM_RT_NEWOBJ_WITHRESOLVE);
+                    (char*)vm_helper_get_addr(VM_RT_NEWOBJ_WITHRESOLVE);
     rt_helper_new_array_withresolve =
-        (char*)vm_get_rt_support_addr(VM_RT_NEWARRAY_WITHRESOLVE);
+        (char*)vm_helper_get_addr(VM_RT_NEWARRAY_WITHRESOLVE);
     rt_helper_get_class_withresolve =
-        (char*)vm_get_rt_support_addr(VM_RT_INITIALIZE_CLASS_WITHRESOLVE);
+        (char*)vm_helper_get_addr(VM_RT_INITIALIZE_CLASS_WITHRESOLVE);
     rt_helper_checkcast_withresolve =
-                    (char*)vm_get_rt_support_addr(VM_RT_CHECKCAST_WITHRESOLVE);
+                    (char*)vm_helper_get_addr(VM_RT_CHECKCAST_WITHRESOLVE);
     rt_helper_instanceof_withresolve =
-                    (char*)vm_get_rt_support_addr(VM_RT_INSTANCEOF_WITHRESOLVE);
+                    (char*)vm_helper_get_addr(VM_RT_INSTANCEOF_WITHRESOLVE);
     rt_helper_field_get_offset_withresolve =
-                    (char*)vm_get_rt_support_addr(VM_RT_GET_NONSTATIC_FIELD_OFFSET_WITHRESOLVE);
+                    (char*)vm_helper_get_addr(VM_RT_GET_NONSTATIC_FIELD_OFFSET_WITHRESOLVE);
     rt_helper_field_get_address_withresolve = 
-                    (char*)vm_get_rt_support_addr(VM_RT_GET_STATIC_FIELD_ADDR_WITHRESOLVE);
+                    (char*)vm_helper_get_addr(VM_RT_GET_STATIC_FIELD_ADDR_WITHRESOLVE);
     rt_helper_get_invokevirtual_addr_withresolve = 
-                (char*)vm_get_rt_support_addr(VM_RT_GET_INVOKEVIRTUAL_ADDR_WITHRESOLVE);
+                (char*)vm_helper_get_addr(VM_RT_GET_INVOKEVIRTUAL_ADDR_WITHRESOLVE);
     rt_helper_get_invokespecial_addr_withresolve = 
-                    (char*)vm_get_rt_support_addr(VM_RT_GET_INVOKE_SPECIAL_ADDR_WITHRESOLVE);
+                    (char*)vm_helper_get_addr(VM_RT_GET_INVOKE_SPECIAL_ADDR_WITHRESOLVE);
     rt_helper_get_invokestatic_addr_withresolve = 
-                    (char*)vm_get_rt_support_addr(VM_RT_GET_INVOKESTATIC_ADDR_WITHRESOLVE);
+                    (char*)vm_helper_get_addr(VM_RT_GET_INVOKESTATIC_ADDR_WITHRESOLVE);
     rt_helper_get_invokeinterface_addr_withresolve = 
-                    (char*)vm_get_rt_support_addr(VM_RT_GET_INVOKEINTERFACE_ADDR_WITHRESOLVE);
+                    (char*)vm_helper_get_addr(VM_RT_GET_INVOKEINTERFACE_ADDR_WITHRESOLVE);
 
     //
     rt_helper_ti_method_enter = 
-            (char*)vm_get_rt_support_addr(VM_RT_JVMTI_METHOD_ENTER_CALLBACK);
+            (char*)vm_helper_get_addr(VM_RT_JVMTI_METHOD_ENTER_CALLBACK);
     rt_helper_ti_method_exit = 
-            (char*)vm_get_rt_support_addr(VM_RT_JVMTI_METHOD_EXIT_CALLBACK);
+            (char*)vm_helper_get_addr(VM_RT_JVMTI_METHOD_EXIT_CALLBACK);
 
     rt_helper_ti_field_access =
-            (char*)vm_get_rt_support_addr(VM_RT_JVMTI_FIELD_ACCESS_CALLBACK);
+            (char*)vm_helper_get_addr(VM_RT_JVMTI_FIELD_ACCESS_CALLBACK);
     rt_helper_ti_field_modification =
-            (char*)vm_get_rt_support_addr(VM_RT_JVMTI_FIELD_MODIFICATION_CALLBACK);;
+            (char*)vm_helper_get_addr(VM_RT_JVMTI_FIELD_MODIFICATION_CALLBACK);;
 
 
     //

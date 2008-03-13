@@ -300,7 +300,7 @@ void * getaddress__vm_monitor_enter_static_naked();
 void * getaddress__vm_monitor_exit_naked();
 void * getaddress__vm_monitor_exit_static_naked();
 
-void * vm_get_rt_support_addr(VM_RT_SUPPORT f) {
+void * vm_helper_get_addr(VM_RT_SUPPORT f) {
 
 #ifdef VM_STATS
     VM_Statistics::get_vm_stats().rt_function_requests.add((void *)f, 1, NULL);
@@ -356,6 +356,6 @@ void * vm_get_rt_support_addr(VM_RT_SUPPORT f) {
     }
 }
 
-void * vm_get_rt_support_addr_optimized(VM_RT_SUPPORT f, Class_Handle UNREF c) {
-    return vm_get_rt_support_addr(f);
+void * vm_helper_get_addr_optimized(VM_RT_SUPPORT f, Class_Handle UNREF c) {
+    return vm_helper_get_addr(f);
 }

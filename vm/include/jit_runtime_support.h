@@ -32,15 +32,15 @@ extern "C" {
 #endif
 
 
-DECLARE_OPEN(void *, vm_get_rt_support_addr, (VM_RT_SUPPORT f));
+DECLARE_OPEN(void *, vm_helper_get_addr, (VM_RT_SUPPORT f));
 
 
 /**
  * Temporary interface addition
- * same as <code>vm_get_rt_support_addr</code>, but tries to optimize the stubs it creates,
+ * same as <code>vm_helper_get_addr</code>, but tries to optimize the stubs it creates,
  * by specializing them.
  */
-DECLARE_OPEN(void *, vm_get_rt_support_addr_optimized, (VM_RT_SUPPORT f, Class_Handle c));
+DECLARE_OPEN(void *, vm_helper_get_addr_optimized, (VM_RT_SUPPORT f, Class_Handle c));
 
 /**
  *  Checks if helper is a suspension point

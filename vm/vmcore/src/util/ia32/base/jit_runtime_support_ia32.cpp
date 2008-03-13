@@ -1168,7 +1168,7 @@ void * getaddress__vm_monitor_exit_naked();
   * Returns fast monitor exit static function.
   */
 void * getaddress__vm_monitor_exit_static_naked();
-void *vm_get_rt_support_addr(VM_RT_SUPPORT f)
+void *vm_helper_get_addr(VM_RT_SUPPORT f)
 {
 #ifdef VM_STATS
     register_request_for_rt_function(f);
@@ -1269,7 +1269,7 @@ void *vm_get_rt_support_addr(VM_RT_SUPPORT f)
         ABORT("Unexpected helper id");
         return 0;
     }
-} //vm_get_rt_support_addr
+} //vm_helper_get_addr
 
 
 
@@ -1281,28 +1281,28 @@ void *vm_get_rt_support_addr(VM_RT_SUPPORT f)
 
 
 /* ? 03/07/30: temporary interface change!!! */
-void *vm_get_rt_support_addr_optimized(VM_RT_SUPPORT f, Class_Handle c) {
+void *vm_helper_get_addr_optimized(VM_RT_SUPPORT f, Class_Handle c) {
     Class *clss = (Class*) c;
     if (clss == NULL)
     {
-        return vm_get_rt_support_addr(f);
+        return vm_helper_get_addr(f);
     }
 
     switch (f) {
     case VM_RT_CHECKCAST:
-            return vm_get_rt_support_addr(f);
+            return vm_helper_get_addr(f);
         // break; // remark #111: statement is unreachable
     case VM_RT_INSTANCEOF:
-            return vm_get_rt_support_addr(f);
+            return vm_helper_get_addr(f);
         // break;// remark #111: statement is unreachable
     case VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE:
         if (class_is_finalizable(c))
             return getaddress__vm_alloc_java_object_resolved_using_vtable_and_size_naked();
         else
-            return vm_get_rt_support_addr(f);
+            return vm_helper_get_addr(f);
         // break;// remark #111: statement is unreachable
     default:
-        return vm_get_rt_support_addr(f);
+        return vm_helper_get_addr(f);
         // break;// remark #111: statement is unreachable
     }
 }

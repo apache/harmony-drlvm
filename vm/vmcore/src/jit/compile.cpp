@@ -291,14 +291,14 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
                                     "o0=%0i;"
                                     "call %1i;",
                                     clss,
-                                    lil_npc_to_fp(vm_get_rt_support_addr(VM_RT_MONITOR_ENTER_STATIC)));
+                                    lil_npc_to_fp(vm_helper_get_addr(VM_RT_MONITOR_ENTER_STATIC)));
             assert(cs);
         } else {
             cs = lil_parse_onto_end(cs,
                                     "out stdcall:ref:void;"
                                     "o0=i0;"
                                     "call %0i;",
-                                    lil_npc_to_fp(vm_get_rt_support_addr(VM_RT_MONITOR_ENTER)));
+                                    lil_npc_to_fp(vm_helper_get_addr(VM_RT_MONITOR_ENTER)));
             assert(cs);
         }
     }
@@ -457,13 +457,13 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
                 "o0=%0i;"
                 "call %1i;",
                 clss,
-                lil_npc_to_fp(vm_get_rt_support_addr(VM_RT_MONITOR_EXIT_STATIC)));
+                lil_npc_to_fp(vm_helper_get_addr(VM_RT_MONITOR_EXIT_STATIC)));
         } else {
             cs = lil_parse_onto_end(cs,
                 "ld l0,[l0+%0i:ref];"
                 "out stdcall:ref:void; o0=l0; call %1i;",
                 oh_get_handle_offset(0),
-                lil_npc_to_fp(vm_get_rt_support_addr(VM_RT_MONITOR_EXIT)));
+                lil_npc_to_fp(vm_helper_get_addr(VM_RT_MONITOR_EXIT)));
         }
         assert(cs);
     }

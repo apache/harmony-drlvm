@@ -210,10 +210,6 @@ void* get_vm_interface(const char* func_name){
         return (void*)get_properties_keys_staring_with;
     } else if (strcmp(func_name,"vm_properties_get_value") == 0) {
         return (void*)get_property;
-    } else if (strcmp(func_name,"vm_helper_get_addr") == 0) {
-        return (void*)vm_get_rt_support_addr;
-    } else if (strcmp(func_name,"vm_helper_get_addr_optimized") == 0) {
-        return (void*)vm_get_rt_support_addr_optimized;
     } else {
         return NULL;
     }

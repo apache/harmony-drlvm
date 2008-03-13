@@ -2569,7 +2569,7 @@ static void register_rt_support_addr_request(VM_RT_SUPPORT f) {
 
 
 
-void *vm_get_rt_support_addr(VM_RT_SUPPORT f)
+void *vm_helper_get_addr(VM_RT_SUPPORT f)
 {
     bool dereference_fptr = true;
     void *fptr = (void*)unimplemented_rt_support_func; // gashiman - added type conversion
@@ -2722,7 +2722,7 @@ void *vm_get_rt_support_addr(VM_RT_SUPPORT f)
         dereference_fptr = false;
         break;
     default:
-        printf("vm_get_rt_support_addr: unimplemented function on IPF: f=%d\n", f);
+        printf("vm_helper_get_addr: unimplemented function on IPF: f=%d\n", f);
         break;
     }
     assert(fptr);
@@ -2744,14 +2744,14 @@ void *vm_get_rt_support_addr(VM_RT_SUPPORT f)
     } else
 #endif // VM_STATS
     return helper;
-} //vm_get_rt_support_addr
+} //vm_helper_get_addr
 
 /* 03/07/30: temporary interface change!!! */
-void *vm_get_rt_support_addr_optimized(VM_RT_SUPPORT f, Class_Handle c) {
+void *vm_helper_get_addr_optimized(VM_RT_SUPPORT f, Class_Handle c) {
     Class *clss = (Class*) c;
     if (clss == NULL)
     {
-        return vm_get_rt_support_addr(f);
+        return vm_helper_get_addr(f);
     }
 
     switch (f) {
@@ -2759,10 +2759,10 @@ void *vm_get_rt_support_addr_optimized(VM_RT_SUPPORT f, Class_Handle c) {
         if (class_is_finalizable(c))
             return get_vm_rt_new_resolved_using_vtable_address_and_size(false); // false == inline if possible (i.e., don't inline!)
         else
-            return vm_get_rt_support_addr(f);
+            return vm_helper_get_addr(f);
         break;
     default:
-        return vm_get_rt_support_addr(f);
+        return vm_helper_get_addr(f);
         break;
     }
 }
