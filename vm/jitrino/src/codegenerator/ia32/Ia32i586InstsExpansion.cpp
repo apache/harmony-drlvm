@@ -36,7 +36,7 @@ namespace Ia32{
 //========================================================================================
 //========================================================================================
 /**
-    class I586InstsExpansion translated SSE instructions to corresponding x87 instructions 
+    I586InstsExpansion translates SSE2 instructions and newer to the corresponding SSE and x87 instructions 
     and SETcc and CMOVcc instructions to branches
 */
 class I586InstsExpansion : public SessionAction {
@@ -92,6 +92,8 @@ bool I586InstsExpansion::isSSE(Mnemonic mn, Mnemonic &fMnem1, Mnemonic &fMnem2) 
         case Mnemonic_UCOMISS:
         case Mnemonic_CVTTSS2SI:
         case Mnemonic_CVTTSD2SI:
+        case Mnemonic_CVTSI2SS:
+        case Mnemonic_CVTSI2SD:
             return true;
         default:
             return false;

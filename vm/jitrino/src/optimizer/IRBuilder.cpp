@@ -312,21 +312,26 @@ void IRBuilder::invalid() {
     assert(0);
 }
 
-Inst* IRBuilder::appendInst(Inst* inst) {
-    assert(currentLabel);
-    inst->setBCOffset((uint16)offset);
-    Node* node = currentLabel->getNode();
-
-    assert(currentLabel->getBCOffset()!=ILLEGAL_BC_MAPPING_VALUE || node->isEmpty());
-    if (node->isEmpty() && currentLabel->getBCOffset()==ILLEGAL_BC_MAPPING_VALUE) {
+void IRBuilder::updateCurrentLabelBcOffset() {
+    assert(currentLabel!=NULL);
+    if (currentLabel->getBCOffset()==ILLEGAL_BC_MAPPING_VALUE) {
+        assert(currentLabel->getNode() == NULL || currentLabel->getNode()->isEmpty());
         currentLabel->setBCOffset((uint16)offset);
     }
+}
+
+
+Inst* IRBuilder::appendInst(Inst* inst) {
+    updateCurrentLabelBcOffset();
     assert(currentLabel->getBCOffset()!=ILLEGAL_BC_MAPPING_VALUE);
+
+    inst->setBCOffset((uint16)offset);
+    Node* node = currentLabel->getNode();
 
     node->appendInst(inst);
     if(Log::isEnabled()) {
         inst->print(Log::out());
-        Log::out() << ::std::endl;
+        Log::out() << std::endl;
         Log::out().flush();
     }
     return inst;
@@ -339,24 +344,29 @@ void IRBuilder::killCSE() {
 void IRBuilder::genLabel(LabelInst* labelInst) {
     cseHashTable->kill();
     currentLabel = labelInst;
+    updateCurrentLabelBcOffset();
+
     if(Log::isEnabled()) {
         currentLabel->print(Log::out());
-        Log::out() << ::std::endl;
+        Log::out() << std::endl;
         Log::out().flush();
     }
 }
 
 void IRBuilder::genFallThroughLabel(LabelInst* labelInst) {
     currentLabel = labelInst;
+    updateCurrentLabelBcOffset();
+
     if(Log::isEnabled()) {
         currentLabel->print(Log::out());
-        Log::out() << ::std::endl;
+        Log::out() << std::endl;
         Log::out().flush();
     }
 }
 
 LabelInst* IRBuilder::createLabel() {
     currentLabel = (LabelInst*)instFactory->makeLabel();
+    updateCurrentLabelBcOffset();
     return currentLabel;
 }
 
@@ -367,16 +377,15 @@ void IRBuilder::createLabels(uint32 numLabels, LabelInst** labels) {
 }
 
 LabelInst* IRBuilder::genMethodEntryLabel(MethodDesc* methodDesc) {
-    LabelInst* labelInst = instFactory->makeMethodEntryLabel(methodDesc);
-    currentLabel = labelInst;
-    labelInst->setBCOffset(0);
+    currentLabel = instFactory->makeMethodEntryLabel(methodDesc);
+    currentLabel->setBCOffset(0);
 
     if(Log::isEnabled()) {
         currentLabel->print(Log::out());
-        Log::out() << ::std::endl;
+        Log::out() << std::endl;
         Log::out().flush();
     }
-    return labelInst;
+    return currentLabel;
 }
 
 // compute instructions

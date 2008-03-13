@@ -396,6 +396,8 @@ public:
 private:
 
     void readFlagsFromCommandLine(SessionAction* argSource, const char* argPrefix);
+    void updateCurrentLabelBcOffset();
+
 
 private:
     //
