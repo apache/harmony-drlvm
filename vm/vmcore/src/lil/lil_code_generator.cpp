@@ -25,7 +25,6 @@
 #include "environment.h"
 #include "compile.h"
 
-#include "jit_intf.h"
 #include "lil.h"
 #include "lil_code_generator.h"
 

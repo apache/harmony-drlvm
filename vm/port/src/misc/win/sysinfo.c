@@ -15,11 +15,12 @@
  *  limitations under the License.
  */
 
+#include "port_malloc.h"
+#include "port_sysinfo.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <windows.h>
-#include "port_malloc.h"
-#include "port_sysinfo.h"
 
 APR_DECLARE(int) port_CPUs_number() {
 	SYSTEM_INFO sys_info;

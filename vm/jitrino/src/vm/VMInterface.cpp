@@ -20,13 +20,22 @@
 #include <iostream>
 #include <assert.h>
 
-#include "Type.h"
+#include "mkernel.h"
+
+#define DYNAMIC_OPEN
 #include "VMInterface.h"
+#include "open/vm_interface.h"
+#include "open/vm_type_access.h"
+#include "jit_import_rt.h"
+#include "jit_runtime_support.h"
+
+#include "Type.h"
+
 #include "CompilationContext.h"
 #include "Log.h"
 #include "JITInstanceContext.h"
 #include "PlatformDependant.h"
-#include "mkernel.h"
+
 #include "VMMagic.h"
 
 namespace Jitrino {
@@ -1381,7 +1390,7 @@ void GCInterface::enumerateCompressedRootReference(uint32* reference) {
     vm_enumerate_compressed_root_reference(reference, FALSE);
 }
 
-void GCInterface::enumerateRootManagedReference(void** slotReference, int slotOffset) {
+void GCInterface::enumerateRootManagedReference(void** slotReference, size_t slotOffset) {
     vm_enumerate_root_interior_pointer(slotReference, slotOffset, FALSE);
 }
 
@@ -1393,7 +1402,7 @@ void ThreadDumpEnumerator::enumerateCompressedRootReference(uint32* reference) {
     //vm_check_if_monitor(0, 0, reference, 0, FALSE, 2);
 }
 
-void ThreadDumpEnumerator::enumerateRootManagedReference(void** slotReference, int slotOffset) {
+void ThreadDumpEnumerator::enumerateRootManagedReference(void** slotReference, size_t slotOffset) {
     //vm_check_if_monitor(slotReference, 0, 0, slotOffset, FALSE, 3);
 }
 

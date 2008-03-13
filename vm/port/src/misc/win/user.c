@@ -19,11 +19,12 @@
 * @version $Revision: 1.1.2.1.4.3 $
 */  
 
+#include "port_sysinfo.h"
+
 #include <stdio.h>
 #include <windows.h>
 #include <lmcons.h>
 #include <userenv.h>
-#include "port_sysinfo.h"
 
 APR_DECLARE(apr_status_t) port_user_name(char** account,
 							 apr_pool_t* pool){

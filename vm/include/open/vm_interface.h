@@ -24,12 +24,6 @@
 #include "open/rt_helpers.h"
 #include "open/em.h"
 
-/*
-#define PROTOTYPE_WITH_NAME(return_type, func_name, prototype) \
-        typedef return_type (*func_name##_t)prototype;\
-        const char* func_name##_s = #func_name
-*/
-
 #define PROTOTYPE_WITH_NAME(return_type, func_name, prototype) \
     typedef return_type (*func_name##_t)prototype
 
@@ -207,20 +201,6 @@ PROTOTYPE_WITH_NAME(Field_Handle, resolve_static_field,
 
 //Type Info
 
-PROTOTYPE_WITH_NAME(Type_Info_Handle, type_info_create_from_java_descriptor, (ClassLoaderHandle cl, const char* typeName));
-
-PROTOTYPE_WITH_NAME(const char* , type_info_get_type_name, (Type_Info_Handle tih));
-PROTOTYPE_WITH_NAME(Class_Handle, type_info_get_class, (Type_Info_Handle tih));
-PROTOTYPE_WITH_NAME(Class_Handle, type_info_get_class_no_exn, (Type_Info_Handle tih));
-PROTOTYPE_WITH_NAME(uint32      , type_info_get_num_array_dimensions, (Type_Info_Handle tih));
-PROTOTYPE_WITH_NAME(Type_Info_Handle, type_info_get_type_info, (Type_Info_Handle tih));
-
-PROTOTYPE_WITH_NAME(bool        , type_info_is_void, (Type_Info_Handle tih));
-PROTOTYPE_WITH_NAME(bool        , type_info_is_reference, (Type_Info_Handle tih));
-PROTOTYPE_WITH_NAME(bool        , type_info_is_resolved, (Type_Info_Handle tih));
-PROTOTYPE_WITH_NAME(bool        , type_info_is_primitive, (Type_Info_Handle tih));
-PROTOTYPE_WITH_NAME(bool        , type_info_is_vector, (Type_Info_Handle tih));
-
 //Vector
 PROTOTYPE_WITH_NAME(int         , vector_get_first_element_offset, (Class_Handle element_type)); //vector_first_element_offset_class_handle
 PROTOTYPE_WITH_NAME(int         , vector_get_length_offset, ()); //vector_length_offset
@@ -272,18 +252,13 @@ PROTOTYPE_WITH_NAME(void        , vm_compiled_method_load,
 
 PROTOTYPE_WITH_NAME(void *      , vm_helper_get_addr, (VM_RT_SUPPORT id));//void * vm_get_rt_support_addr(VM_RT_SUPPORT id)
 PROTOTYPE_WITH_NAME(void *      , vm_helper_get_addr_optimized, (VM_RT_SUPPORT id, Class_Handle ch));//void * vm_get_rt_support_addr_optimized(VM_RT_SUPPORT id, Class_Handle ch)
-PROTOTYPE_WITH_NAME(VM_RT_SUPPORT, vm_helper_get_by_name,(const char* name));
-PROTOTYPE_WITH_NAME(HELPER_CALLING_CONVENTION, vm_helper_get_calling_convention,(VM_RT_SUPPORT id));
-PROTOTYPE_WITH_NAME(HELPER_INTERRUPTIBILITY_KIND, vm_helper_get_interruptibility_kind, (VM_RT_SUPPORT id));
-PROTOTYPE_WITH_NAME(Method_Handle, vm_helper_get_magic_helper, (VM_RT_SUPPORT id));
-PROTOTYPE_WITH_NAME(const char* , vm_helper_get_name, (VM_RT_SUPPORT id));
 
+
+
+/////////////////////////// temporary ///////////////////////////
 //VTable
 PROTOTYPE_WITH_NAME(Class_Handle , vtable_get_class, (VTable_Handle vh));
 
 
-PROTOTYPE_WITH_NAME(void, vm_enumerate_root_reference, (Managed_Object_Handle *ref, Boolean is_pinned));
-PROTOTYPE_WITH_NAME(void, vm_enumerate_compressed_root_reference, (uint32 *ref, Boolean is_pinned));
-PROTOTYPE_WITH_NAME(void, vm_enumerate_root_interior_pointer,(void **slot, int offset, Boolean is_pinned));
 
 #endif // _VM_INTERFACE_H

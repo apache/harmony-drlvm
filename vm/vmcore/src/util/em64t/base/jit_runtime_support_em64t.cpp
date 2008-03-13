@@ -43,6 +43,7 @@
 #include "dump.h"
 #include "exceptions.h"
 #include "jit_runtime_support_common.h"
+#include "internal_jit_intf.h"
 
 /**
  * Generic allocation routine.

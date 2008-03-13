@@ -20,8 +20,10 @@
 
 #include <ostream>
 #include "open/types.h"
+#include "open/rt_types.h"
+#include "open/rt_helpers.h"
+#include "open/em.h"
 #include "open/ee_em_intf.h"
-#include "open/vm_interface.h"
 
 namespace Jitrino {
 
@@ -466,7 +468,7 @@ public:
 
     virtual void enumerateCompressedRootReference(uint32* reference);
 
-    virtual void enumerateRootManagedReference(void** slotReference, int slotOffset);
+    virtual void enumerateRootManagedReference(void** slotReference, size_t slotOffset);
 
 private:
     GC_Enumeration_Handle gcHandle;
@@ -481,7 +483,7 @@ public:
 
     virtual void enumerateCompressedRootReference(uint32* reference);
 
-    virtual void enumerateRootManagedReference(void** slotReference, int slotOffset);
+    virtual void enumerateRootManagedReference(void** slotReference, size_t slotOffset);
 };
 
 //

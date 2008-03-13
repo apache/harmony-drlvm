@@ -287,17 +287,6 @@ VMEXPORT Byte *method_allocate_jit_data_block(Method_Handle method,
 
 
 /**
- * The following values should be used as the "heat" argument for 
- * calls like  
- * <code>malloc_fixed_code_for_jit()</code>.
- * FIXME merge with CodeBlockHeat enumeration
- */
-
-#define CODE_BLOCK_HEAT_COLD 0
-#define CODE_BLOCK_HEAT_DEFAULT 1
-#define CODE_BLOCK_HEAT_MAX 20
-
-/**
  * This function allows allocation of multiple chunks of code with different
  * heat values. The JIT is responsible for specifying ids that are unique
  * within the same method.

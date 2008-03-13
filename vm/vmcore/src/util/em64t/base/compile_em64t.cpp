@@ -20,12 +20,14 @@
  */  
 
 #include "open/types.h"
+#include "open/vm_type_access.h"
 #include "open/vm_util.h"
 #include "environment.h"
 #include "encoder.h"
 #include "object_handles.h"
 #include "vm_threads.h"
 #include "compile.h"
+#include "internal_jit_intf.h"
 
 #include "nogc.h"
 #include "m2n.h"

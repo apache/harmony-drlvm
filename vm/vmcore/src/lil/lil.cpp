@@ -37,6 +37,7 @@ using namespace std;
 #include "lil.h"
 #include "open/types.h"
 #include "open/vm.h"
+#include "open/vm_type_access.h"
 #include "nogc.h"
 
 // Forward decs of local functions
@@ -322,7 +323,6 @@ static bool lil_parse_type(const char** src, LilType* t, bool ret)
 
 static LilType type_info_to_lil_type(Type_Info_Handle tih, bool handles)
 {
-    extern Boolean type_info_is_managed_pointer(Type_Info_Handle tih);
     if (type_info_is_managed_pointer(tih)) {
         return LT_PInt;
     }

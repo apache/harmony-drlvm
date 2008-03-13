@@ -56,8 +56,10 @@ void td_attach_thread(void (*printer) (FILE *), FILE * out);
 
 VMEXPORT void vm_check_if_monitor(void **reference,
                                   void **base_reference,
-                                  uint32 * compressed_reference,
-                                  int slotOffset, Boolean pinned, int type)
+                                  U_32 *compressed_reference, 
+                                  size_t  slotOffset, 
+                                  BOOLEAN pinned,
+                                  U_32    type)
 {
 }
 

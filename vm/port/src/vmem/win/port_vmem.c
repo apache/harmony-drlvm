@@ -19,13 +19,14 @@
  * @version $Revision: 1.1.2.1.4.4 $
  */  
 
-#include <windows.h>
-#include <psapi.h>
 #include "port_vmem.h"
 
 #undef LOG_DOMAIN
 #define LOG_DOMAIN "port.vmem"
 #include "clog.h"
+
+#include <windows.h>
+#include <psapi.h>
 
 #ifdef __cplusplus
 extern "C" {

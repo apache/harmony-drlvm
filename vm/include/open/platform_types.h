@@ -19,6 +19,7 @@
 #define _PLATFORM_TYPES_H_
 
 #include "common.h"
+#include "hycomp.h"
 
 #define MAX_UINT32 0xffffffff
 /**

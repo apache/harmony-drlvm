@@ -19,10 +19,11 @@
 * @version $Revision$
 */  
 
+#include "port_timer.h"
+
 #include <time.h>
 #include <windows.h>
 
-#include "port_timer.h"
 
 #undef LOG_DOMAIN
 #define LOG_DOMAIN "port.timer"

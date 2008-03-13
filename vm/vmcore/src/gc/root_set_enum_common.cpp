@@ -171,7 +171,7 @@ static void check_ref(void** ref)
 #endif // _DEBUG
 
 void 
-vm_enumerate_root_reference(void **ref, Boolean is_pinned)
+vm_enumerate_root_reference(void **ref, BOOLEAN is_pinned)
 {
     TRACE2("vm.enum", "vm_enumerate_root_reference(" 
             << ref << " -> " << *ref << ")");
@@ -179,12 +179,12 @@ vm_enumerate_root_reference(void **ref, Boolean is_pinned)
     check_ref(ref);
 #endif // _DEBUG
 
-    gc_add_root_set_entry((Managed_Object_Handle *)ref, is_pinned);
+    gc_add_root_set_entry((Managed_Object_Handle *)ref, (Boolean)is_pinned);
 } //vm_enumerate_root_reference
 
 
 void 
-vm_enumerate_weak_root_reference(void **ref, Boolean is_pinned)
+vm_enumerate_weak_root_reference(void **ref, BOOLEAN is_pinned)
 {
     TRACE2("vm.enum", "vm_enumerate_weak_root_reference(" 
             << ref << " -> " << *ref << ")");
@@ -192,12 +192,12 @@ vm_enumerate_weak_root_reference(void **ref, Boolean is_pinned)
     check_ref(ref);
 #endif // _DEBUG
 
-    gc_add_weak_root_set_entry((Managed_Object_Handle *)ref, is_pinned, FALSE);
+    gc_add_weak_root_set_entry((Managed_Object_Handle *)ref, (Boolean)is_pinned, FALSE);
 } //vm_enumerate_weak_root_reference
 
 
 // Resembles vm_enumerate_root_reference() but is passed the address of a uint32 slot containing a compressed reference.
-VMEXPORT void vm_enumerate_compressed_root_reference(uint32 *ref, Boolean is_pinned)
+VMEXPORT void vm_enumerate_compressed_root_reference(U_32 *ref, BOOLEAN is_pinned)
 {
     assert(REFS_IS_COMPRESSED_MODE);
 
@@ -213,7 +213,7 @@ VMEXPORT void vm_enumerate_compressed_root_reference(uint32 *ref, Boolean is_pin
 #endif // REFS_USE_UNCOMPRESSED
 #endif // _DEBUG
 
-    gc_add_compressed_root_set_entry(ref, is_pinned);
+    gc_add_compressed_root_set_entry(ref, (Boolean)is_pinned);
 } //vm_enumerate_compressed_root_reference
 
 
@@ -221,16 +221,11 @@ VMEXPORT void vm_enumerate_compressed_root_reference(uint32 *ref, Boolean is_pin
 // This is the main function used to enumerate interior pointers by the JITS.
 // It is part of the JIT-VM interface and is currently used only by IPF Java JITs.
 void 
-vm_enumerate_root_interior_pointer(void **slot, int offset, Boolean is_pinned)
+vm_enumerate_root_interior_pointer(void **slot, size_t offset, BOOLEAN is_pinned)
 {
-    gc_add_root_set_entry_interior_pointer(slot, offset, is_pinned);
+    assert(((IDATA)offset)>=0);
+    gc_add_root_set_entry_interior_pointer(slot, (int)offset, (Boolean)is_pinned);
 } //vm_enumerate_root_interior_pointer
-
-void vm_enumerate_root_interior_pointer_with_base(void **slot_root, void **slot_base, Boolean is_pinned)
-{
-    int offset = (int)(POINTER_SIZE_INT)(*((Byte**)slot_root)-*((Byte**)slot_base));
-    gc_add_root_set_entry_interior_pointer(slot_root, offset, is_pinned);
-}
 
 void 
 vm_enumerate_root_set_global_refs()

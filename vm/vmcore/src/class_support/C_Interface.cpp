@@ -32,9 +32,12 @@
 #include "open/hythread_ext.h"
 #include "thread_manager.h"
 #include "cci.h"
+#include "nogc.h"
 
 #include "class_interface.h"
 #include "Package.h"
+
+#include "open/vm_type_access.h"
 
 Boolean class_property_is_final(Class_Handle cl) {
     assert(cl);
@@ -1914,15 +1917,6 @@ Type_Info_Handle method_ret_type_get_type_info(Method_Signature_Handle msh)
 
 
 
-Boolean type_info_is_managed_pointer(Type_Info_Handle tih)
-{
-    assert(tih);
-    TypeDesc* td = (TypeDesc*)tih;
-    assert(td);
-    return td->is_managed_pointer();
-} //type_info_is_managed_pointer
-
-
 Boolean method_vars_is_managed_pointer(Method_Handle mh, unsigned idx)
 {
     assert(mh);
@@ -1963,204 +1957,6 @@ Boolean method_ret_type_is_managed_pointer(Method_Signature_Handle msh)
 
 
 
-VM_Data_Type type_info_get_type(Type_Info_Handle tih)
-{
-    assert(tih);
-    TypeDesc* td = (TypeDesc*)tih;
-    switch (td->get_kind()) {
-    case K_S1:               return VM_DATA_TYPE_INT8;
-    case K_S2:               return VM_DATA_TYPE_INT16;
-    case K_S4:               return VM_DATA_TYPE_INT32;
-    case K_S8:               return VM_DATA_TYPE_INT64;
-    case K_Sp:               return VM_DATA_TYPE_INTPTR;
-    case K_U1:               return VM_DATA_TYPE_UINT8;
-    case K_U2:               return VM_DATA_TYPE_UINT16;
-    case K_U4:               return VM_DATA_TYPE_UINT32;
-    case K_U8:               return VM_DATA_TYPE_UINT64;
-    case K_Up:               return VM_DATA_TYPE_UINTPTR;
-    case K_F4:               return VM_DATA_TYPE_F4;
-    case K_F8:               return VM_DATA_TYPE_F8;
-    case K_Char:             return VM_DATA_TYPE_CHAR;
-    case K_Boolean:          return VM_DATA_TYPE_BOOLEAN;
-    case K_Void:             return VM_DATA_TYPE_VOID;
-    case K_Object:           return VM_DATA_TYPE_CLASS;
-    case K_Vector:           return VM_DATA_TYPE_ARRAY;
-    case K_UnboxedValue:     return VM_DATA_TYPE_VALUE;
-    case K_UnmanagedPointer: return VM_DATA_TYPE_UP;
-    case K_ManagedPointer:   return VM_DATA_TYPE_MP;
-    // The rest are not implemented in the VM_Data_Type scheme
-    case K_Array:
-    case K_MethodPointer:
-    case K_TypedRef:
-    default:
-        ABORT("Invalid vm data type");
-        return VM_DATA_TYPE_INVALID;
-    }
-} //type_info_get_type
-
-
-
-Boolean type_info_is_reference(Type_Info_Handle tih)
-{
-    TypeDesc* td = (TypeDesc*)tih;
-    assert(td);
-    return td->get_kind()==K_Object;
-} //type_info_is_reference
-
-
-
-Boolean type_info_is_unboxed(Type_Info_Handle tih)
-{
-    TypeDesc* td = (TypeDesc*)tih;
-    assert(td);
-    return td->is_unboxed_value();
-} //type_info_is_unboxed
-
-
-
-Boolean type_info_is_unmanaged_pointer(Type_Info_Handle tih)
-{
-    TypeDesc* td = (TypeDesc*)tih;
-    assert(td);
-    return td->is_unmanaged_pointer();
-} //type_info_is_unmanaged_pointer
-
-
-
-Boolean type_info_is_void(Type_Info_Handle tih)
-{
-    TypeDesc* td = (TypeDesc*)tih;
-    assert(td);
-    return td->get_kind()==K_Void;
-} //type_info_is_void
-
-
-
-Boolean type_info_is_method_pointer(Type_Info_Handle tih)
-{
-    TypeDesc* td = (TypeDesc*)tih;
-    assert(td);
-    return td->is_method_pointer();
-} //type_info_is_method_pointer
-
-
-
-Boolean type_info_is_vector(Type_Info_Handle tih)
-{
-    TypeDesc* td = (TypeDesc*)tih;
-    assert(td);
-    return td->is_vector();
-} //type_info_is_vector
-
-
-
-Boolean type_info_is_general_array(Type_Info_Handle tih)
-{
-    TypeDesc* td = (TypeDesc*)tih;
-    assert(td);
-    return td->is_array() && !td->is_vector();
-} //type_info_is_general_array
-
-
-
-Boolean type_info_is_primitive(Type_Info_Handle tih)
-{
-    TypeDesc* td = (TypeDesc*)tih;
-    assert(td);
-    return td->is_primitive();
-} //type_info_is_primitive
-
-
-const char* type_info_get_type_name(Type_Info_Handle tih) {
-    TypeDesc* td = (TypeDesc*)tih;
-    assert(td);
-    return td->get_type_name()->bytes;
-}
-
-Class_Handle type_info_get_class(Type_Info_Handle tih)
-{
-    TypeDesc* td = (TypeDesc*)tih;
-    assert(td);
-    Class* c = td->load_type_desc();
-    if(!c) return NULL;
-    if(!c->verify(VM_Global_State::loader_env)) return NULL;
-    if(!c->prepare(VM_Global_State::loader_env)) return NULL;
-    return c;
-} //type_info_get_class
-
-Class_Handle type_info_get_class_no_exn(Type_Info_Handle tih)
-{
-    // Store raised exception
-    jthrowable exc_object = exn_get();
-    // Workaround to let JIT invoke class loader even if exception is pending
-    exn_clear();
-    Class_Handle ch = type_info_get_class(tih);
-    // To clear exn_class if set
-    exn_clear();
-    // Restore saved exception
-    if (exc_object)
-        exn_raise_object(exc_object);
-
-    return ch;
-} // type_info_get_class_no_exn
-
-Method_Signature_Handle type_info_get_method_sig(Type_Info_Handle UNREF tih)
-{
-    ABORT("Not implemented");
-    return 0;
-} //type_info_get_method_sig
-
-
-
-Type_Info_Handle type_info_get_type_info(Type_Info_Handle tih)
-{
-    TypeDesc* td = (TypeDesc*)tih;
-    assert(td);
-    switch (td->get_kind()) {
-    case K_Vector:
-    case K_Array:
-        return td->get_element_type();
-    case K_ManagedPointer:
-    case K_UnmanagedPointer:
-        return td->get_pointed_to_type();
-    default:
-        ABORT("Unexpected kind");
-        return 0;
-    }
-} //type_info_get_type_info
-
-uint32 type_info_get_num_array_dimensions(Type_Info_Handle tih) {
-    TypeDesc* td = (TypeDesc*)tih;
-    if (td->get_kind() == K_Vector) {
-        const String* name = td->get_type_name();
-        uint32 res = 0;
-        if (name == NULL) {
-            res = 1 + type_info_get_num_array_dimensions(td->get_element_type());
-        } else {
-            res = countLeadingChars(name->bytes, '[');
-        }
-        assert(res<=255);
-        return res;
-    }
-    return 0;
-}
-
-Boolean type_info_is_resolved(Type_Info_Handle tih) {
-    TypeDesc* td = (TypeDesc*)tih;
-    switch (td->get_kind()) {
-        case K_Vector:
-            if (td->get_element_type()->is_primitive()) {
-                return true;
-            }
-            return type_info_is_resolved(td->get_element_type());
-        case K_Object:
-                return td->is_loaded();
-        default:
-            ABORT("Unexpected kind");
-            return 0;
-    }
-}
-
 
 void free_string_buffer(char *buffer)
 {
@@ -2186,12 +1982,6 @@ Type_Info_Handle class_get_element_type_info(Class_Handle ch)
     assert(td);
     return td;
 } //class_get_element_type_info
-
-
-Type_Info_Handle type_info_create_from_java_descriptor(ClassLoaderHandle cl, const char* typeName) {
-    return type_desc_create_from_java_descriptor(typeName, cl);
-}
-
 
 /////////////////////////////////////////////////////
 // New GC stuff

@@ -474,7 +474,7 @@ void GCSafePoint::enumerate(GCInterface* gcInterface, const JitFrameContext* con
             char* mptrAddr = *(char**)valPtrAddr;
             GCMap::checkObject(tm, mptrAddr - offset);
 #endif
-            gcInterface->enumerateRootManagedReference((void**)valPtrAddr, offset);
+            gcInterface->enumerateRootManagedReference((void**)valPtrAddr, (size_t)offset);
         }
     }
 }

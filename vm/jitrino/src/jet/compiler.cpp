@@ -31,6 +31,7 @@
 
 #include "open/vm.h"
 #include "open/hythread_ext.h"
+#include "open/vm_type_access.h"
 #include "jit_import.h"
 #include "jit_runtime_support.h"
 #include "jit_intf.h"

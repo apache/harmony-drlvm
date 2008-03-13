@@ -21,6 +21,7 @@
 #include "Class.h"
 #include "environment.h"
 #include "exceptions.h"
+#include "init.h"
 #include <map>
 
 #ifndef _WIN32
@@ -32,7 +33,7 @@ struct JIT_RT_Function_Entry {
     const char    *name;
     HELPER_INTERRUPTIBILITY_KIND i_kind;
     HELPER_CALLING_CONVENTION cc_kind;
-    int            number_of_args;
+    U_32           number_of_args;
     const char    *magic_class_name;
     const char    *magic_method_name;
     const char    *magic_method_descr;
@@ -335,8 +336,7 @@ HELPER_CALLING_CONVENTION vm_helper_get_calling_convention(VM_RT_SUPPORT id)
     }
 }
 
-VMEXPORT 
-int vm_helper_get_numargs(VM_RT_SUPPORT id)
+U_32 vm_helper_get_numargs(VM_RT_SUPPORT id)
 {
     HelperInfoMap::const_iterator it = helper_map->find(id);
     if (helper_map->end() != it) {

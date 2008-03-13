@@ -19,7 +19,7 @@
  * @version $Revision$
  */
 #include "compiler.h"
-#include <open/vm.h>
+//#include <open/vm.h>
 #include "trace.h"
 
 /**

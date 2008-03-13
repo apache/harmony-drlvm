@@ -35,6 +35,7 @@
 #include "exceptions.h"
 #include "primitives_support.h"
 #include "vm_log.h"
+#include "open/vm_type_access.h"
 
 jobjectArray get_annotations(JNIEnv* jenv, AnnotationTable* table, AnnotationTable* inv_table, Class* clss) 
 {

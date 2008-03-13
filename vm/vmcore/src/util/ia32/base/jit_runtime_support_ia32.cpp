@@ -1307,35 +1307,6 @@ void *vm_get_rt_support_addr_optimized(VM_RT_SUPPORT f, Class_Handle c) {
     }
 }
 
-
-// instead of returning a stub address, this support function returns
-// parsed LIL code.
-// May return NULL if the stub requested should not be inlined
-VMEXPORT LilCodeStub *vm_get_rt_support_stub(VM_RT_SUPPORT f, Class_Handle c) {
-    Class *clss = (Class *) c;
-
-    switch (f) {
-    case VM_RT_CHECKCAST:
-    {
-        if (!clss->get_fast_instanceof_flag())
-            return NULL;
-
-        return gen_lil_typecheck_stub_specialized(true, true, clss);
-    }
-    case VM_RT_INSTANCEOF:
-    {
-        if (!clss->get_fast_instanceof_flag())
-            return NULL;
-
-        return gen_lil_typecheck_stub_specialized(false, true, clss);
-    }
-    default:
-        ABORT("Unexpected helper");
-        return NULL;
-    }
-}
-
-
 /*
  * LIL inlining code - end
  **************************************************/

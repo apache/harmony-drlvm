@@ -33,6 +33,7 @@ using namespace std;
 
 #include "lock_manager.h"
 #include "open/types.h"
+#include "open/vm_type_access.h"
 
 #include "Class.h"
 #include "type.h"

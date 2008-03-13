@@ -19,9 +19,10 @@
 * @version $Revision: 1.1.2.1.4.4 $
 */
 
+#include "port_sysinfo.h"
+
 #include <windows.h>
 #include <apr_strings.h>
-#include "port_sysinfo.h"
 
 typedef struct {
 	const char* javaId;

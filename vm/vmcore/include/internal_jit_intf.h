@@ -23,9 +23,11 @@
 
 #ifndef _INTERNAL_JIT_INTF_H_
 #define _INTERNAL_JIT_INTF_H_
+
 #include "open/types.h"
+#include "open/rt_helpers.h"
 
-
+NativeCodePtr rth_get_lil_helper(VM_RT_SUPPORT f);
 VMEXPORT char *gen_setup_j2n_frame(char *s);
 VMEXPORT char *gen_pop_j2n_frame(char *s);
 

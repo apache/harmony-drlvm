@@ -156,7 +156,15 @@ typedef char I_8;
 #define PVMCALL VMCALL *
 
 #if defined(LINUX) || defined(FREEBSD)
-#define BOOLEAN UDATA
+    typedef U_32 BOOLEAN;
+#elif defined(_WIN32)
+#   if _MSC_VER >= 1300 || __INTEL_COMPILER
+// <winsock2.h> must be included before <windows.h> to avoid 
+// compile-time errors with winsock.h. For more details, see:
+// http://www.microsoft.com/msdownload/platformsdk/sdkupdate/2600.2180.7/contents.htm
+#       include <winsock2.h>
+#   endif
+#   include <windows.h>
 #endif
 
 #if !defined(HYCONST64)

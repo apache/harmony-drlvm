@@ -28,13 +28,21 @@
 #ifndef _NOGC_H_
 #define _NOGC_H_
 
-#include "jit_import.h" // for the definition of Code_Allocation_Action
+#include <stdlib.h>
+#include "open/rt_types.h" // for the definition of Code_Allocation_Action
 
 #ifdef _IPF_
 #define DEFAULT_CODE_ALIGNMENT 32
 #else // !_IPF_
 #define DEFAULT_CODE_ALIGNMENT 16
 #endif // !_IPF_
+
+/*
+* FIXME merge with CodeBlockHeat enumeration
+*/
+#define CODE_BLOCK_HEAT_COLD 0
+#define CODE_BLOCK_HEAT_DEFAULT 1
+#define CODE_BLOCK_HEAT_MAX 20
 
 void *malloc_fixed_code_for_jit(size_t size, size_t alignment, unsigned heat, Code_Allocation_Action action);
 

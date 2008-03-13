@@ -278,7 +278,8 @@ void RuntimeInterface::reportMptr(int32 mptr, int32 base) {
 
     uint64 *u1    = (uint64 *)basePtr;
     uint64 *u2    = (uint64 *)mptrPtr;
-    int    offset = *u2 - *u1;
+    assert(*u2 >= *u1);
+    size_t offset = *u2 - *u1;
 //    cout << "  report mptr: " << - (mptr+1) << flush; 
 //    cout << " " << u2 << flush;
 //    cout << " " << hex << *u2 << dec << flush;

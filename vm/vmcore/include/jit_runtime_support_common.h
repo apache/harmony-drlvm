@@ -85,17 +85,4 @@ Vector_Handle vm_rt_new_vector_using_vtable_and_thread_pointer(
  */
 LilCodeStub *gen_lil_typecheck_stub(bool is_checkcast);
  
-/**
- * Creates a <code>SPECIALIZED LIL</code> code stub for checkcast or instance of
- * it assumes that the class is suitable for fast instanceof checks.
- *
- * @return Different fast stub for every class. <code>will_inline</code>
- *         is set to <code>TRUE</code>, if this stub will be inlined in a JIT,
- *         and <code>FALSE</code>, if it will be passed to a code generator
- *         (this is due to the slightly different treatment of exceptions).
- */
-LilCodeStub *gen_lil_typecheck_stub_specialized(bool is_checkcast,
-                                                bool will_inline,
-                                                Class *superclass);
-
 #endif

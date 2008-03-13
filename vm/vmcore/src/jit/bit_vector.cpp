@@ -27,7 +27,6 @@
 using namespace std;
 
 #include <stdio.h>
-#include "jit_intf.h"
 #include "bit_vector.h"
 
 /* 

@@ -31,6 +31,8 @@
 #include "reflection.h"
 #include "port_malloc.h"
 
+#include "open/vm_type_access.h"
+
 #include "exceptions.h"
 #include "heap.h"
 #include "primitives_support.h"

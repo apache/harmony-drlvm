@@ -15,6 +15,17 @@
  *  limitations under the License.
  */
 
+#if defined(DYNAMIC_OPEN)
+#   define DECLARE_OPEN(return_type, func_name, prototype) \
+    typedef return_type (*func_name##_t)prototype
+#   define GET_INTERFACE(get_adapter, func_name) \
+    (func_name##_t)get_adapter(#func_name)
+#else
+#   define DECLARE_OPEN(return_type, func_name, prototype) \
+    VMEXPORT return_type func_name prototype
+#endif
+
+
 // excluding remarks: 
 #if defined (__INTEL_COMPILER)
 #pragma warning (disable:1684) // conversion from pointer to same-sized integral type (potential portability problem)

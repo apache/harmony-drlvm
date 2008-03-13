@@ -29,12 +29,10 @@
 
 #ifdef __cplusplus
 extern "C" {
-#endif // __cplusplus
+#endif
 
 
-NativeCodePtr rth_get_lil_helper(VM_RT_SUPPORT f);
-
-VMEXPORT void *vm_get_rt_support_addr(VM_RT_SUPPORT f);
+DECLARE_OPEN(void *, vm_get_rt_support_addr, (VM_RT_SUPPORT f));
 
 
 /**
@@ -42,52 +40,38 @@ VMEXPORT void *vm_get_rt_support_addr(VM_RT_SUPPORT f);
  * same as <code>vm_get_rt_support_addr</code>, but tries to optimize the stubs it creates,
  * by specializing them.
  */
-VMEXPORT void *vm_get_rt_support_addr_optimized(VM_RT_SUPPORT f, Class_Handle c);
-
-/**
- * Instead of returning a stub address, this support function returns
- * parsed LIL code.
- */
- typedef struct LilCodeStub LilCodeStub;
-VMEXPORT LilCodeStub *vm_get_rt_support_stub(VM_RT_SUPPORT f, Class_Handle c);
-
+DECLARE_OPEN(void *, vm_get_rt_support_addr_optimized, (VM_RT_SUPPORT f, Class_Handle c));
 
 /**
  *  Checks if helper is a suspension point
  */
-VMEXPORT HELPER_INTERRUPTIBILITY_KIND vm_helper_get_interruptibility_kind(VM_RT_SUPPORT f);
+DECLARE_OPEN(HELPER_INTERRUPTIBILITY_KIND, vm_helper_get_interruptibility_kind, (VM_RT_SUPPORT f));
 
-VMEXPORT HELPER_CALLING_CONVENTION vm_helper_get_calling_convention(VM_RT_SUPPORT f);
-VMEXPORT const char* vm_helper_get_name(VM_RT_SUPPORT id);
+DECLARE_OPEN(HELPER_CALLING_CONVENTION, vm_helper_get_calling_convention, (VM_RT_SUPPORT f));
+DECLARE_OPEN(const char*, vm_helper_get_name, (VM_RT_SUPPORT id));
 
 /**
  * Returns number of helper arguments.
  * Intended primarily for debugging.
  */
-VMEXPORT int vm_helper_get_numargs(VM_RT_SUPPORT id);
+DECLARE_OPEN(U_32, vm_helper_get_numargs, (VM_RT_SUPPORT id));
 
 /**
 * Returns Id of runtime helper by its string representation. 
 * Name comparison is case-insensitive.
 * If the helperName is unknown, then VM_RT_UNKNOWN is returned.
 */
-VMEXPORT VM_RT_SUPPORT vm_helper_get_by_name(const char* name);
+DECLARE_OPEN(VM_RT_SUPPORT, vm_helper_get_by_name, (const char* name));
 
-#ifndef Global_Env
-struct Global_Env;
-#endif
 
-jint helper_magic_init(Global_Env * vm_env);
-
-VMEXPORT jint vm_helper_register_magic_helper(VM_RT_SUPPORT id, 
+DECLARE_OPEN(jint, vm_helper_register_magic_helper, (VM_RT_SUPPORT id, 
                                    const char* class_name, 
-                                   const char* method_name);
+                                   const char* method_name));
 
-VMEXPORT Method_Handle vm_helper_get_magic_helper(VM_RT_SUPPORT id);
+DECLARE_OPEN(Method_Handle, vm_helper_get_magic_helper, (VM_RT_SUPPORT id));
 
 #ifdef __cplusplus
 }
 #endif // __cplusplus
-
 
 #endif // !_JIT_RUNTIME_SUPPORT_H_

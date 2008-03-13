@@ -19,6 +19,10 @@
 * @version $Revision: 1.1.2.1.4.3 $
 */  
 
+#include "port_malloc.h"
+#include "port_sysinfo.h"
+#include "port_dso.h"
+
 #include <windows.h>
 #include <string.h>
 
@@ -26,9 +30,6 @@
 #include <apr_strings.h>
 #include <apr_env.h>
 
-#include "port_malloc.h"
-#include "port_sysinfo.h"
-#include "port_dso.h"
 
 struct apr_dso_handle_t {
 	apr_pool_t *pool;
