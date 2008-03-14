@@ -38,18 +38,20 @@
 #include "Package.h"
 
 #include "open/vm_type_access.h"
+#include "open/vm_class_info.h"
+#include "jit_intf.h"
 
-Boolean class_property_is_final(Class_Handle cl) {
+Boolean class_is_final(Class_Handle cl) {
     assert(cl);
     return cl->is_final();
 }
 
-Boolean class_property_is_abstract(Class_Handle cl) {
+Boolean class_is_abstract(Class_Handle cl) {
     assert(cl);
     return cl->is_abstract();
 }
 
-Boolean class_property_is_interface2(Class_Handle cl) {
+BOOLEAN class_is_interface(Class_Handle cl) {
     assert(cl);
     return cl->is_interface();
 }
@@ -69,7 +71,7 @@ static uint32 countLeadingChars(const char* str, char c) {
     return n;
 }
  
-VMEXPORT uint32 class_get_num_array_dimensions(Class_Handle cl, unsigned short cpIndex) {
+U_32 class_cp_get_num_array_dimensions(Class_Handle cl, U_16 cpIndex) {
     ConstantPool& cp  = cl->get_constant_pool();
     unsigned char tag = cp.get_tag(cpIndex);
     char c = '[';
@@ -80,7 +82,7 @@ VMEXPORT uint32 class_get_num_array_dimensions(Class_Handle cl, unsigned short c
             return countLeadingChars(str, c);
         }
         case CONSTANT_Fieldref: {
-            const char* str = class_get_cp_entry_signature(cl, cpIndex);
+            const char* str = class_cp_get_entry_signature(cl, cpIndex);
             return countLeadingChars(str, c);
         }
         default:
@@ -501,15 +503,6 @@ Boolean method_is_overridden(Method_Handle m)
 } //method_is_overridden
 
 
-
-Boolean method_uses_fastcall(Method_Handle m)
-{
-    assert(m);
-    return FALSE;
-} //method_uses_fastcall
-
-
-
 Boolean method_is_fake(Method_Handle m)
 {
     assert(m);
@@ -525,21 +518,6 @@ JIT_Handle method_get_JIT_id(Compile_Handle h)
     return ch->jit;
 } //method_get_JIT_id
 
-
-
-void method_set_inline_assumption(Compile_Handle h,
-                                  Method_Handle caller,
-                                  Method_Handle callee)
-{
-    assert(h);
-    assert(caller);
-    assert(callee);
-    Compilation_Handle* ch = (Compilation_Handle*)h;
-    JIT *jit = ch->jit;
-    Method *caller_method = (Method *)caller;
-    Method *callee_method = (Method *)callee;
-    callee_method->set_inline_assumption(jit, caller_method);
-} //method_set_inline_assumption
 
 
 const char* class_get_name(Class_Handle cl)
@@ -599,16 +577,6 @@ Boolean class_needs_initialization(Class_Handle ch)
     assert(ch);
     return !ch->is_initialized();
 } //class_needs_initialization
-
-
-
-Boolean class_has_non_default_finalizer(Class_Handle cl)
-{
-    assert(cl);
-    return cl->has_finalizer();
-} //class_has_non_default_finalizer
-
-
 
 Class_Handle class_get_super_class(Class_Handle cl)
 {
@@ -764,7 +732,7 @@ const char* class_get_source_file_name(Class_Handle cl)
 } // class_get_source_file_name
 
 
-const char* class_get_const_string(Class_Handle cl, unsigned index)
+const char* class_cp_get_const_string(Class_Handle cl, U_16 index)
 {
     assert(cl);
     return cl->get_constant_pool().get_string_chars(index);
@@ -775,7 +743,7 @@ const char* class_get_const_string(Class_Handle cl, unsigned index)
 // Returns the address where the interned version of the string is stored: this will be the address
 // of a slot containing a Java_java_lang_String* or a uint32 compressed reference. Also interns the
 // string so that the JIT can load a reference to the interned string without checking if it is null.
-void *class_get_const_string_intern_addr(Class_Handle cl, unsigned index)
+const void *class_get_const_string_intern_addr(Class_Handle cl, U_16 index)
 {
     assert(cl);
     Global_Env* env = VM_Global_State::loader_env;
@@ -788,7 +756,7 @@ void *class_get_const_string_intern_addr(Class_Handle cl, unsigned index)
 } //class_get_const_string_intern_addr
 
 
-const char* class_get_cp_entry_signature(Class_Handle src_class, unsigned short index)
+const char* class_cp_get_entry_signature(Class_Handle src_class, U_16 index)
 {
     Class* clss = (Class*)src_class;
     ConstantPool& cp = src_class->get_constant_pool();
@@ -800,14 +768,14 @@ const char* class_get_cp_entry_signature(Class_Handle src_class, unsigned short 
     index = cp.get_ref_name_and_type_index(index);
     index = cp.get_name_and_type_descriptor_index(index);
     return cp.get_utf8_chars(index);
-} // class_get_cp_entry_signature
+} // class_cp_get_entry_signature
 
 
-VM_Data_Type class_get_cp_field_type(Class_Handle src_class, unsigned short cp_index)
+VM_Data_Type class_cp_get_field_type(Class_Handle src_class, U_16 cp_index)
 {
     assert(src_class->get_constant_pool().is_fieldref(cp_index));
 
-    char class_id = (class_get_cp_entry_signature(src_class, cp_index))[0];
+    char class_id = (class_cp_get_entry_signature(src_class, cp_index))[0];
     switch(class_id)
     {
     case VM_DATA_TYPE_BOOLEAN:
@@ -833,10 +801,10 @@ VM_Data_Type class_get_cp_field_type(Class_Handle src_class, unsigned short cp_i
         ABORT("Unknown vm data type");
     }
     return VM_DATA_TYPE_INVALID;
-} // class_get_cp_field_type
+} // class_cp_get_field_type
 
 
-VM_Data_Type class_get_const_type(Class_Handle cl, unsigned index)
+VM_Data_Type class_cp_get_const_type(Class_Handle cl, U_16 index)
 {
     assert(cl);
     Java_Type jt = JAVA_TYPE_INVALID;
@@ -873,15 +841,15 @@ VM_Data_Type class_get_const_type(Class_Handle cl, unsigned index)
     }
 
     return (VM_Data_Type)jt;
-} //class_get_const_type
+} //class_cp_get_const_type
 
 
 
-const void *class_get_const_addr(Class_Handle cl, unsigned index)
+const void *class_cp_get_const_addr(Class_Handle cl, U_16 index)
 {
     assert(cl);
     return cl->get_constant_pool().get_address_of_constant(index);
-} //class_get_const_addr
+} //class_cp_get_const_addr
 
 
 void* method_get_native_func_addr(Method_Handle method) {
@@ -1066,7 +1034,7 @@ Class_Handle class_find_class_from_loader(ClassLoaderHandle loader, const char* 
 // The following do not cause constant pools to be resolve, if they are not
 // resolved already
 //
-const char* const_pool_get_field_name(Class_Handle cl, unsigned index)
+const char* class_cp_get_field_name(Class_Handle cl, U_16 index)
 {
     assert(cl);
     ConstantPool& const_pool = cl->get_constant_pool();
@@ -1077,11 +1045,11 @@ const char* const_pool_get_field_name(Class_Handle cl, unsigned index)
     index = const_pool.get_ref_name_and_type_index(index);
     index = const_pool.get_name_and_type_name_index(index);
     return const_pool.get_utf8_chars(index);
-} // const_pool_get_field_name
+} // class_cp_get_field_name
 
 
 
-const char* const_pool_get_field_class_name(Class_Handle cl, unsigned index)
+const char* class_cp_get_field_class_name(Class_Handle cl, U_16 index)
 {
     assert(cl);
     ConstantPool& const_pool = cl->get_constant_pool();
@@ -1090,12 +1058,12 @@ const char* const_pool_get_field_class_name(Class_Handle cl, unsigned index)
         return 0;
     }
     index = const_pool.get_ref_class_index(index);
-    return const_pool_get_class_name(cl, index);
-} //const_pool_get_field_class_name
+    return class_cp_get_class_name(cl, index);
+} //class_cp_get_field_class_name
 
 
 
-const char* const_pool_get_field_descriptor(Class_Handle cl, unsigned index)
+const char* class_cp_get_field_descriptor(Class_Handle cl, U_16 index)
 {
     assert(cl);
     ConstantPool& const_pool = cl->get_constant_pool();
@@ -1106,11 +1074,11 @@ const char* const_pool_get_field_descriptor(Class_Handle cl, unsigned index)
     index = const_pool.get_ref_name_and_type_index(index);
     index = const_pool.get_name_and_type_descriptor_index(index);
     return const_pool.get_utf8_chars(index);
-} // const_pool_get_field_descriptor
+} // class_cp_get_field_descriptor
 
 
 
-const char* const_pool_get_method_name(Class_Handle cl, unsigned index)
+const char* class_cp_get_method_name(Class_Handle cl, U_16 index)
 {
     assert(cl);
     ConstantPool& const_pool = cl->get_constant_pool();
@@ -1121,11 +1089,11 @@ const char* const_pool_get_method_name(Class_Handle cl, unsigned index)
     index = const_pool.get_ref_name_and_type_index(index);
     index = const_pool.get_name_and_type_name_index(index);
     return const_pool.get_utf8_chars(index);
-} // const_pool_get_method_name
+} // class_cp_get_method_name
 
 
 
-const char *const_pool_get_method_class_name(Class_Handle cl, unsigned index)
+const char *class_cp_get_method_class_name(Class_Handle cl, U_16 index)
 {
     assert(cl);
     ConstantPool& const_pool = cl->get_constant_pool();
@@ -1134,12 +1102,12 @@ const char *const_pool_get_method_class_name(Class_Handle cl, unsigned index)
         return 0;
     }
     index = const_pool.get_ref_class_index(index);
-    return const_pool_get_class_name(cl,index);
-} //const_pool_get_method_class_name
+    return class_cp_get_class_name(cl,index);
+} //class_cp_get_method_class_name
 
 
 
-const char* const_pool_get_interface_method_name(Class_Handle cl, unsigned index)
+const char* class_cp_get_interface_method_name(Class_Handle cl, U_16 index)
 {
     assert(cl);
     ConstantPool& const_pool = cl->get_constant_pool();
@@ -1150,11 +1118,11 @@ const char* const_pool_get_interface_method_name(Class_Handle cl, unsigned index
     index = const_pool.get_ref_name_and_type_index(index);
     index = const_pool.get_name_and_type_name_index(index);
     return const_pool.get_utf8_chars(index);
-} // const_pool_get_interface_method_name
+} // class_cp_get_interface_method_name
 
 
 
-const char* const_pool_get_interface_method_class_name(Class_Handle cl, unsigned index)
+const char* class_cp_get_interface_method_class_name(Class_Handle cl, U_16 index)
 {
     assert(cl);
     ConstantPool& const_pool = cl->get_constant_pool();
@@ -1163,12 +1131,12 @@ const char* const_pool_get_interface_method_class_name(Class_Handle cl, unsigned
         return 0;
     }
     index = const_pool.get_ref_class_index(index);
-    return const_pool_get_class_name(cl,index);
-} //const_pool_get_interface_method_class_name
+    return class_cp_get_class_name(cl,index);
+} //class_cp_get_interface_method_class_name
 
 
 
-const char* const_pool_get_method_descriptor(Class_Handle cl, unsigned index)
+const char* class_cp_get_method_descriptor(Class_Handle cl, U_16 index)
 {
     assert(cl);
     ConstantPool& const_pool = cl->get_constant_pool();
@@ -1179,11 +1147,11 @@ const char* const_pool_get_method_descriptor(Class_Handle cl, unsigned index)
     index = const_pool.get_ref_name_and_type_index(index);
     index = const_pool.get_name_and_type_descriptor_index(index);
     return const_pool.get_utf8_chars(index);
-} // const_pool_get_method_descriptor
+} // class_cp_get_method_descriptor
 
 
 
-const char* const_pool_get_interface_method_descriptor(Class_Handle cl, unsigned index)
+const char* class_cp_get_interface_method_descriptor(Class_Handle cl, U_16 index)
 {
     assert(cl);
     ConstantPool& const_pool = cl->get_constant_pool();
@@ -1194,11 +1162,11 @@ const char* const_pool_get_interface_method_descriptor(Class_Handle cl, unsigned
     index = const_pool.get_ref_name_and_type_index(index);
     index = const_pool.get_name_and_type_descriptor_index(index);
     return const_pool.get_utf8_chars(index);
-} // const_pool_get_interface_method_descriptor
+} // class_cp_get_interface_method_descriptor
 
 
 
-const char* const_pool_get_class_name(Class_Handle cl, unsigned index)
+const char* class_cp_get_class_name(Class_Handle cl, U_16 index)
 {
     assert(cl);
     ConstantPool& const_pool = cl->get_constant_pool();
@@ -1207,7 +1175,7 @@ const char* const_pool_get_class_name(Class_Handle cl, unsigned index)
         return 0;
     }
     return const_pool.get_utf8_chars(const_pool.get_class_name_index(index));
-} // const_pool_get_class_name
+} // class_cp_get_class_name
 
 
 unsigned method_number_throws(Method_Handle m)
@@ -1318,24 +1286,6 @@ struct ChList {
 
 static ChList* chs = NULL;
 
-Compile_Handle jit_get_comp_handle(JIT_Handle j)
-{
-    for (ChList *c = chs;  c != NULL;  c = c->next) {
-        if (c->jit == j) {
-            return (Compile_Handle)(&c->ch);
-        }
-    }
-    ChList* n = (ChList*)STD_MALLOC(sizeof(ChList));
-    assert(n);
-    n->jit = j;
-    n->ch.env = VM_Global_State::loader_env;
-    n->ch.jit = (JIT*)j;
-    n->next = chs;
-    chs = n;
-    return &n->ch;
-} //jit_get_comp_handle
-
-
 
 int object_get_vtable_offset()
 {
@@ -1390,16 +1340,6 @@ Boolean field_is_literal(Field_Handle fh)
     Field *f = (Field *)fh;
     return f->get_const_value_index() != 0;
 } //field_is_literal
-
-
-
-Boolean class_is_before_field_init(Class_Handle ch)
-{
-    assert(ch);
-    return FALSE;
-} //class_is_before_field_init
-
-
 
 
 int vector_first_element_offset_unboxed(Class_Handle element_type)
@@ -1470,14 +1410,6 @@ Boolean class_is_valuetype(Class_Handle ch)
     assert(ch);
     return class_is_primitive(ch);
 } //class_is_valuetype
-
-
-#ifdef COMPACT_FIELD
-Boolean class_is_compact_field()
-{
-    return Class::compact_fields && Class::sort_fields ;
-}
-#endif
 
 Boolean class_is_enum(Class_Handle ch)
 {
@@ -1833,7 +1765,7 @@ Class_Handle field_get_class_of_field_value(Field_Handle fh)
 Boolean field_is_reference(Field_Handle fh)
 {
     assert((Field *)fh);
-    Java_Type typ = field_get_type(fh);
+    Java_Type typ = fh->get_java_type();
     return (typ == JAVA_TYPE_CLASS || typ == JAVA_TYPE_ARRAY);
 } //field_is_reference
 
@@ -2008,11 +1940,12 @@ Boolean class_is_pinned(Class_Handle ch)
 } // class_is_pinned
 
 
-Boolean class_is_finalizable(Class_Handle ch)
+BOOLEAN class_is_finalizable(Class_Handle ch)
 {
     assert(ch);
-    return (ch->get_vtable()->class_properties & CL_PROP_FINALIZABLE_MASK) != 0
-        ? TRUE : FALSE;
+    assert(ch->has_finalizer() == 
+        ((ch->get_vtable()->class_properties & CL_PROP_FINALIZABLE_MASK) != 0));
+    return ch->has_finalizer() ? TRUE : FALSE;
 } // class_is_finalizable
 
 WeakReferenceType class_is_reference(Class_Handle clss)
@@ -2149,13 +2082,6 @@ Method_Handle method_find_overridden_method(Class_Handle ch, Method_Handle mh)
     }
     return m;
 } //method_find_overridden_method
-
-
-
-void core_free(void* p)
-{
-    STD_FREE(p);
-}
 
 
 

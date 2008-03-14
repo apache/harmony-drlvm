@@ -28,6 +28,7 @@
 #include <assert.h>
 #include <stdlib.h>
 
+#include <open/vm_class_info.h>
 #include <jit_import.h>
 
 /**
@@ -40,10 +41,10 @@ namespace Jet {
 
 void CodeGen::gen_ldc(void)
 {
-    jtype jtyp = to_jtype(class_get_const_type(
+    jtype jtyp = to_jtype(class_cp_get_const_type(
                                 m_klass, (unsigned short)m_curr_inst->op0));
     if (jtyp != jobj) { // if not loading String
-        const void * p = class_get_const_addr(m_klass, m_curr_inst->op0);
+        const void * p = class_cp_get_const_addr(m_klass, m_curr_inst->op0);
         assert(p);
         if (jtyp == dbl64 || jtyp == flt32) {
             gen_push(jtyp, p);

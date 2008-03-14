@@ -102,6 +102,7 @@
 #include "interpreter.h"
 
 #include "open/bytecodes.h"
+#include "open/vm_class_info.h"
 #include "open/vm_util.h"
 
 
@@ -968,9 +969,9 @@ Class_Handle resolve_class(Compile_Handle h,
     return c->_resolve_class(compile_handle_to_environment(h), index);
 } //resolve_class
 
-Boolean class_is_cp_entry_resolved(Compile_Handle ch, Class_Handle clazz, unsigned cp_index) {
+BOOLEAN class_cp_is_entry_resolved(Class_Handle clazz, U_16 cp_index) {
     ConstantPool& cp = clazz->get_constant_pool();
-    Boolean res = cp.is_entry_resolved(cp_index);
+    bool res = cp.is_entry_resolved(cp_index);
     if (!res) {
         unsigned char tag = cp.get_tag(cp_index);
         //during the loading of a class not all items in it's constant pool are updated

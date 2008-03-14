@@ -124,7 +124,7 @@ class_is_instanceof(Open_Class_Handle klass, Open_Class_Handle super_klass);
  * @return <code>TRUE</code> for an abstract class; otherwise, <code>FALSE</code>.
  *
  * @note An assertion is raised if <i>klass</i> equals to <code>NULL</code>.
- * @note Replaces the class_property_is_abstract function.
+ * @note Replaces the class_is_abstract function.
  */
 Boolean
 class_is_abstract(Open_Class_Handle klass);
@@ -137,7 +137,7 @@ class_is_abstract(Open_Class_Handle klass);
  * @return <code>TRUE</code> for an interface class; otherwise, <code>FALSE</code>.
  *
  * @note An assertion is raised if <i>klass</i> equals to <code>NULL</code>.
- * @note Replaces functions class_is_interface_ and class_property_is_interface2.
+ * @note Replaces functions class_is_interface_ and class_is_interface2.
  */
 Boolean
 class_is_interface(Open_Class_Handle klass);
@@ -150,7 +150,7 @@ class_is_interface(Open_Class_Handle klass);
  * @return <code>TRUE</code> for a final class; otherwise, <code>FALSE</code>.
  *
  * @note An assertion is raised if <i>klass</i> equals to <code>NULL</code>.
- * @note Replaces functions class_is_final_ and class_property_is_final.
+ * @note Replaces functions class_is_final_ and class_is_final.
  */
 Boolean
 class_is_final(Open_Class_Handle klass);
@@ -432,7 +432,7 @@ class_get_package_name(Open_Class_Handle klass);
  *            </ol>
  */
 const void*
-class_get_const_addr(Open_Class_Handle klass, unsigned short index);
+class_cp_get_const_addr(Open_Class_Handle klass, unsigned short index);
 
 /**
  * Returns the type of the compile-time constant.
@@ -443,7 +443,7 @@ class_get_const_addr(Open_Class_Handle klass, unsigned short index);
  * @return The type of a compile-time constant.
  */
 VM_Data_Type
-class_get_const_type(Open_Class_Handle klass, unsigned short index);
+class_cp_get_const_type(Open_Class_Handle klass, unsigned short index);
 
 /**
  * Returns the address of the interned version of the string. 
@@ -483,7 +483,7 @@ class_get_cp_entry_descriptor(Open_Class_Handle klass, unsigned short cp_index);
  * @return The data type for the field in the constant pool entry.
  */
 VM_Data_Type
-class_get_cp_field_type(Open_Class_Handle klass, unsigned short cp_index);
+class_cp_get_field_type(Open_Class_Handle klass, unsigned short cp_index);
 
 /**
  * Initializes the <i>iterator</i> to iterate over all classes that
@@ -530,7 +530,7 @@ void class_iterator_advance(ChaClassIterator* iterator);
  *
  * @return The descriptor for the method.
  *
- * @note Replaces the const_pool_get_method_descriptor function.
+ * @note Replaces the class_cp_get_method_descriptor function.
  */
 const char*
 class_get_cp_method_descriptor(Open_Class_Handle klass, unsigned short index);
@@ -543,7 +543,7 @@ class_get_cp_method_descriptor(Open_Class_Handle klass, unsigned short index);
  *
  * @return  The descriptor for the field.
  *
- * @note Replaces the const_pool_get_field_descriptor function.
+ * @note Replaces the class_cp_get_field_descriptor function.
  */
 const char*
 class_get_cp_field_descriptor(Open_Class_Handle klass, unsigned short index);

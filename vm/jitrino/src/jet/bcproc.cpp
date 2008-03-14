@@ -22,6 +22,7 @@
 #include "trace.h"
 #include "stats.h"
 
+#include "open/vm_class_info.h"
 #include "jit_import.h"
 #include "jit_intf.h"
 
@@ -391,7 +392,7 @@ void Compiler::handle_ik_meth(const JInst& jinst) {
         Method_Handle meth = NULL;
         unsigned short cpIndex = (unsigned short)jinst.op0;
         bool lazy = m_lazy_resolution;
-        bool resolve = !lazy || class_is_cp_entry_resolved(m_compileHandle, m_klass, cpIndex);
+        bool resolve = !lazy || class_cp_is_entry_resolved(m_klass, cpIndex);
         if (!resolve) {
             assert(lazy);
             gen_invoke(opkod, NULL, cpIndex, args, retType);
@@ -421,11 +422,10 @@ void Compiler::handle_ik_meth(const JInst& jinst) {
             // which tries to resolve 
             //  'org/eclipse/core/resources/IProject::equals (Ljava/lang/Object;)Z'
             meth = resolve_interface_method(m_compileHandle, m_klass, jinst.op0);
-            //assert(class_property_is_interface2(method_get_class(meth)));
             //
             //*** workaround here:
             if (meth != NULL && 
-                !class_property_is_interface2(method_get_class(meth))) {
+                !class_is_interface(method_get_class(meth))) {
                 opkod = OPCODE_INVOKEVIRTUAL;
             }
         }

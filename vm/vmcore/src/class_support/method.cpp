@@ -52,6 +52,9 @@ Arg_List_Iterator initialize_arg_list_iterator(const char *descr)
     return descr + 1;
 } //initialize_iterator
 
+Arg_List_Iterator Method::get_argument_list() {
+    return initialize_arg_list_iterator(_descriptor->bytes);
+}
 
 
 Java_Type curr_arg(Arg_List_Iterator it)

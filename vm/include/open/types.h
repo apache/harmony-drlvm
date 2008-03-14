@@ -55,25 +55,6 @@ enum VM_Data_Type {
     VM_DATA_TYPE_END     = ')'         // For the iterator
 } VM_Data_Type; //VM_Data_Type
 
-/**
- * (? 20030317) These defines are deprecated.
- * Use <code>VM_Data_Type</code> in all new code.
- */
-#define Java_Type           VM_Data_Type
-#define JAVA_TYPE_BYTE      VM_DATA_TYPE_INT8
-#define JAVA_TYPE_CHAR      VM_DATA_TYPE_CHAR
-#define JAVA_TYPE_DOUBLE    VM_DATA_TYPE_F8
-#define JAVA_TYPE_FLOAT     VM_DATA_TYPE_F4
-#define JAVA_TYPE_INT       VM_DATA_TYPE_INT32
-#define JAVA_TYPE_LONG      VM_DATA_TYPE_INT64
-#define JAVA_TYPE_SHORT     VM_DATA_TYPE_INT16
-#define JAVA_TYPE_BOOLEAN   VM_DATA_TYPE_BOOLEAN
-#define JAVA_TYPE_CLASS     VM_DATA_TYPE_CLASS
-#define JAVA_TYPE_ARRAY     VM_DATA_TYPE_ARRAY
-#define JAVA_TYPE_VOID      VM_DATA_TYPE_VOID
-#define JAVA_TYPE_STRING    VM_DATA_TYPE_STRING
-#define JAVA_TYPE_INVALID   VM_DATA_TYPE_INVALID
-#define JAVA_TYPE_END       VM_DATA_TYPE_END
 
 /**
  * Handles for Various VM Structures.

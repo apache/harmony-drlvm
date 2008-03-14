@@ -19,7 +19,7 @@
 
 #include "annotation.h"
 #include "Class.h"
-#include "jit_intf.h"
+#include "vm_java_support.h"
 
 struct String;
 class ByteReader;
@@ -488,9 +488,7 @@ public:
     unsigned get_max_locals()                      { return _max_locals; }
 
     // Returns an iterator for the argument list.
-    Arg_List_Iterator get_argument_list() {
-        return initialize_arg_list_iterator(_descriptor->bytes);
-    }
+    Arg_List_Iterator get_argument_list();
 
     // Returns number of bytes of arguments pushed on the stack.
     // This value depends on the descriptor and the calling convention.

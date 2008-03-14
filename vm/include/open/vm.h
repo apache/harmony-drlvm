@@ -106,9 +106,9 @@ class_lookup_class_by_name_using_bootstrap_class_loader(const char *name);
  * with the names of some internal macros.
  */
 
-VMEXPORT Boolean class_property_is_final(Class_Handle ch);
-VMEXPORT Boolean class_property_is_abstract(Class_Handle ch);
-VMEXPORT Boolean class_property_is_interface2(Class_Handle ch);
+VMEXPORT Boolean class_is_final(Class_Handle ch);
+VMEXPORT Boolean class_is_abstract(Class_Handle ch);
+VMEXPORT BOOLEAN class_is_interface(Class_Handle ch);
 
 /**
  * @return <code>TRUE</code> if the class is likely to be used as an exception object.
@@ -299,7 +299,7 @@ VMEXPORT Boolean class_get_fast_instanceof_flag(Class_Handle cl);
 /**
  * @return <code>TRUE</code> if the class has a non-trivial finalizer.
  */
- VMEXPORT Boolean class_is_finalizable(Class_Handle ch);
+ VMEXPORT BOOLEAN class_is_finalizable(Class_Handle ch);
 
 /**
  * This exactly what I want.
@@ -548,13 +548,6 @@ field_get_track_modification_flag(Field_Handle field, char** address,
 ////
 // begin method-related functions.
 ////
-
-/**
- * @return <code>TRUE</code> if this a Java method. Every Java JIT must call this
- *         function before compiling a method and return <code>JIT_FAILURE</code> if
- *         <code>method_is_java</code> returned <code>FALSE</code>.
- */ 
-VMEXPORT Boolean method_is_java(Method_Handle mh);
 
 /**
  * @return The method name.

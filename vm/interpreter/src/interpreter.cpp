@@ -17,7 +17,7 @@
 #include "interpreter.h"
 #include "interpreter_exports.h"
 #include "interpreter_imports.h"
-
+#include "open/vm_class_info.h"
 #include <math.h>
 
 #include "exceptions.h"
@@ -977,7 +977,7 @@ ldc(StackFrame& frame, uint32 index) {
             DEBUG_BYTECODE("#" << dec << (int)index << " Float: " << cp.get_float(index));
             break;
         case CONSTANT_Class:
-            DEBUG_BYTECODE("#" << dec << (int)index << " Class: \"" << const_pool_get_class_name(clazz, index) << "\"");
+            DEBUG_BYTECODE("#" << dec << (int)index << " Class: \"" << class_cp_get_class_name(clazz, index) << "\"");
             break;
         default:
             DEBUG_BYTECODE("#" << dec << (int)index << " Unknown type = " << cp.get_tag(index));
@@ -3117,7 +3117,7 @@ interpreter_execute_method(
         frame.locals(pos++).ref = ref;
     }
 
-    Arg_List_Iterator iter = method->get_argument_list();
+    Arg_List_Iterator iter = method_get_argument_list(method);
 
     Java_Type typ;
     DEBUG("\targs types = ");

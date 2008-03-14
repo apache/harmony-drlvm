@@ -49,8 +49,9 @@
 #include "slot.h"
 #include "classpath_const.h"
 #include "finalize.h"
+#include "jit_intf.h"
 
-#ifdef PLATFORM_NT
+#ifdef _WIN32
 // 20040427 Used to turn on heap checking on every allocation
 #include <crtdbg.h>
 #endif
@@ -147,25 +148,11 @@ void* get_vm_interface(const char* func_name){
     } else if (strcmp(func_name,"class_is_support_fast_instanceof") == 0) {
         return (void*)class_get_fast_instanceof_flag;
     } else if (strcmp(func_name,"class_is_final") == 0) {
-        return (void*)class_property_is_final;
+        return (void*)class_is_final;
     } else if (strcmp(func_name,"class_is_throwable") == 0) {
         return (void*)class_hint_is_exceptiontype;
-    } else if (strcmp(func_name,"class_is_interface") == 0) {
-        return (void*)class_property_is_interface2;
     } else if (strcmp(func_name,"class_is_abstract") == 0) {
-        return (void*)class_property_is_abstract;
-    } else if (strcmp(func_name,"class_cp_get_field_type") == 0) {
-        return (void*)class_get_cp_field_type;
-    } else if (strcmp(func_name,"class_cp_get_entry_signature") == 0) {
-        return (void*)class_get_cp_entry_signature;
-    } else if (strcmp(func_name,"class_cp_get_method_class_name") == 0) {
-        return (void*)const_pool_get_method_class_name;
-    } else if (strcmp(func_name,"class_cp_get_method_name") == 0) {
-        return (void*)const_pool_get_method_name;
-    } else if (strcmp(func_name,"class_cp_is_entry_resolved") == 0) {
-        return (void*)class_is_cp_entry_resolved;
-    } else if (strcmp(func_name,"class_cp_get_class_name") == 0) {
-        return (void*)const_pool_get_class_name;
+        return (void*)class_is_abstract;
     } else if (strcmp(func_name,"field_get_type_info") == 0) {
         return (void*)field_get_type_info_of_field_value;
     } else if (strcmp(func_name,"method_get_overridden_method") == 0) {

@@ -26,6 +26,7 @@
 
 #include <sstream>
 
+#include "open/vm_class_info.h"
 #include "Class.h"
 #include "classloader.h"
 #include "environment.h"
@@ -905,7 +906,7 @@ String* Class::get_simple_name()
             if(m_enclosing_class_index) 
             {
                 const char* enclosing_name =
-                    const_pool_get_class_name(this, m_enclosing_class_index);
+                    class_cp_get_class_name(this, m_enclosing_class_index);
                 start = fn + strlen(enclosing_name);
                 while (*start == '$' || isdigit(*start)) start++;
             } 

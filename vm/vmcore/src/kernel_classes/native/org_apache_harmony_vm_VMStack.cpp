@@ -148,7 +148,7 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getClasses
     jarray arr = jenv->NewObjectArray(length, ste, NULL);
     if (arr == NULL) {
         // OutOfMemoryError
-        core_free(frames);
+        STD_FREE(frames);
         assert(hythread_is_suspend_enabled());
         return NULL;
     }
@@ -169,7 +169,7 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getClasses
         i++;
     }
 
-    core_free(frames);
+    STD_FREE(frames);
     assert(hythread_is_suspend_enabled());
     return arr;
 }
@@ -238,7 +238,7 @@ Java_java_security_AccessController_getStackDomains(JNIEnv *jenv, jclass UNREF)
         // OutOfMemoryError
         assert(exn_raised());
     }
-    core_free(frames);
+    STD_FREE(frames);
     return arr;
 }
 
@@ -277,7 +277,7 @@ JNIEXPORT jobject JNICALL Java_org_apache_harmony_vm_VMStack_getStackState
     memcpy(array_data, frames, data_size);
     jenv->ReleaseLongArrayElements(array, array_data, 0);
 
-    core_free(frames);
+    STD_FREE(frames);
 
     return array;
 } // Java_org_apache_harmony_vm_VMStack_getStackState
@@ -614,6 +614,6 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getThreadStack
 
         jenv->SetObjectArrayElement(arr, i, obj);
     }
-    core_free(frames);
+    STD_FREE(frames);
     return arr;
 }

@@ -28,6 +28,7 @@
 #include <assert.h>
 #include <stdlib.h>
 
+#include "open/vm_class_info.h"
 #include "jit_import.h"
 #include "jit_intf.h"
 
@@ -42,7 +43,7 @@ namespace Jet {
 void CodeGen::gen_new_array(Class_Handle enclClass, unsigned cpIndex) 
 {
     bool lazy = m_lazy_resolution;
-    bool resolve = !lazy || class_is_cp_entry_resolved(m_compileHandle, enclClass, cpIndex);
+    bool resolve = !lazy || class_cp_is_entry_resolved(enclClass, cpIndex);
     if (resolve) {
         Allocation_Handle ah = 0;
         Class_Handle klass = resolve_class(m_compileHandle, enclClass,  cpIndex);
@@ -116,7 +117,7 @@ void CodeGen::gen_multianewarray(Class_Handle enclClass, unsigned short cpIndex,
     Val klassVal;
 
     bool lazy = m_lazy_resolution;
-    bool resolve = !lazy || class_is_cp_entry_resolved(m_compileHandle, enclClass, cpIndex);
+    bool resolve = !lazy || class_cp_is_entry_resolved(enclClass, cpIndex);
     if(!resolve) {
         assert(lazy);
         static CallSig ci_get_class_withresolve(CCONV_HELPERS, iplatf, i32);
@@ -158,7 +159,7 @@ void CodeGen::gen_multianewarray(Class_Handle enclClass, unsigned short cpIndex,
 void CodeGen::gen_new(Class_Handle enclClass, unsigned short cpIndex)
 {
     bool lazy = m_lazy_resolution;
-    bool resolve = !lazy || class_is_cp_entry_resolved(m_compileHandle, enclClass, cpIndex);
+    bool resolve = !lazy || class_cp_is_entry_resolved(enclClass, cpIndex);
     if (resolve) {
         Class_Handle klass = resolve_class_new(m_compileHandle, enclClass, cpIndex);
         if (klass == NULL) {
@@ -187,7 +188,7 @@ void CodeGen::gen_instanceof_cast(JavaByteCodes opcode, Class_Handle enclClass, 
 {
     assert (opcode == OPCODE_INSTANCEOF || opcode == OPCODE_CHECKCAST);
     bool lazy = m_lazy_resolution;
-    bool resolve  = !lazy || class_is_cp_entry_resolved(m_compileHandle, enclClass, cpIdx);
+    bool resolve  = !lazy || class_cp_is_entry_resolved(enclClass, cpIdx);
     if (resolve) {
         Class_Handle klass = resolve_class(m_compileHandle, enclClass, cpIdx);
         if (klass == NULL) {

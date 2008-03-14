@@ -344,7 +344,7 @@ public:
     MethodDesc* getOverriddenMethod(NamedType *type, MethodDesc * methodDesc);
 
 
-    void*        getStringInternAddr(MethodDesc* enclosingMethodDesc, uint32 stringToken);
+    const void*  getStringInternAddr(MethodDesc* enclosingMethodDesc, uint32 stringToken);
     Type*        getConstantType(MethodDesc* enclosingMethodDesc, uint32 constantToken);
     const void*  getConstantValue(MethodDesc* enclosingMethodDesc, uint32 constantToken);
     const char*  getSignatureString(MethodDesc* enclosingMethodDesc, uint32 methodToken);

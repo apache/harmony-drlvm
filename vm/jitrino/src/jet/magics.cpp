@@ -27,6 +27,7 @@
 #include "enc_defs.h"
 #include "enc.h"
 
+#include "open/vm_class_info.h"
 #include "open/vm.h"
 #include "jit_intf.h"
 #include "VMMagic.h"
@@ -94,14 +95,14 @@ bool Compiler::gen_magic(void)
         return false;
     }
     
-    const char* kname = const_pool_get_method_class_name(m_klass, (unsigned short)jinst.op0);
+    const char* kname = class_cp_get_method_class_name(m_klass, (unsigned short)jinst.op0);
 
     if (!VMMagicUtils::isVMMagicClass(kname)) {
         return false;
     }
     // This is a magic -> transform it
 
-    const char* mname = const_pool_get_method_name(m_klass, (unsigned short)jinst.op0);
+    const char* mname = class_cp_get_method_name(m_klass, (unsigned short)jinst.op0);
 
     jtype magicType = iplatf;
 

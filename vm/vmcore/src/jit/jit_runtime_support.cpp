@@ -3065,11 +3065,6 @@ Boolean class_is_subtype_fast(VTable *sub, Class *super)
 } // class_is_subtype_fast
 
 
-Boolean vm_instanceof_class(Class *s, Class *t) {
-    return s->is_instanceof(t);
-}
-
-
 // Returns TRUE if "s" represents a class that is a subtype of "t",
 // according to the Java instanceof rules.
 //

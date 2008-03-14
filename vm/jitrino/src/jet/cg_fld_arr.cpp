@@ -26,6 +26,7 @@
  
 #include "cg.h"
 #include <open/vm.h>
+#include <open/vm_class_info.h>
 #include <jit_intf.h>
 
 #include "trace.h"
@@ -204,7 +205,7 @@ void CodeGen::gen_field_op(JavaByteCodes opcode,  Class_Handle enclClass, unsign
     bool needJVMTI = compilation_params.exe_notify_field_modification 
                     || compilation_params.exe_notify_field_access;
     bool lazy = m_lazy_resolution && !needJVMTI; // JVMTI field access helpers are not ready for lazy resolution mode
-    bool resolve = !lazy || class_is_cp_entry_resolved(m_compileHandle, enclClass, cpIndex);
+    bool resolve = !lazy || class_cp_is_entry_resolved(enclClass, cpIndex);
     if (resolve) {
         if (!fieldOp.isStatic()) {
             fieldOp.fld = resolve_nonstatic_field(m_compileHandle, enclClass, cpIndex, fieldOp.isPut());
@@ -265,9 +266,9 @@ Opnd CodeGen::get_field_addr(const FieldOpInfo& fieldOp, jtype jt) {
 
 void CodeGen::do_field_op(const FieldOpInfo& fieldOp)
 {
-    jtype jt = to_jtype(class_get_cp_field_type(fieldOp.enclClass, fieldOp.cpIndex));
+    jtype jt = to_jtype(class_cp_get_field_type(fieldOp.enclClass, fieldOp.cpIndex));
     
-    const char* fieldDescName = const_pool_get_field_descriptor(fieldOp.enclClass, fieldOp.cpIndex);
+    const char* fieldDescName = class_cp_get_field_descriptor(fieldOp.enclClass, fieldOp.cpIndex);
     bool fieldIsMagic = VMMagicUtils::isVMMagicClass(fieldDescName);
     if (fieldIsMagic) {
         jt = iplatf;

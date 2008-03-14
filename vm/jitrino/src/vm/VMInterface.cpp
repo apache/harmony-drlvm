@@ -24,6 +24,7 @@
 
 #define DYNAMIC_OPEN
 #include "VMInterface.h"
+#include "open/vm_class_info.h"
 #include "open/vm_interface.h"
 #include "open/vm_type_access.h"
 #include "jit_import_rt.h"
@@ -56,21 +57,21 @@ static  class_get_depth_t  class_get_depth = 0;
 static  class_get_vtable_t  class_get_vtable = 0;
 static  class_get_allocation_handle_t  class_get_allocation_handle = 0;
 static  class_get_boxed_data_size_t  class_get_boxed_data_size = 0;
-static  class_get_num_array_dimensions_t class_get_num_array_dimensions = 0;
+static  class_cp_get_num_array_dimensions_t class_cp_get_num_array_dimensions = 0;
 static  class_get_class_of_primitive_type_t  class_get_class_of_primitive_type = 0;
 static  class_get_const_string_intern_addr_t class_get_const_string_intern_addr = 0;
-static  class_get_const_type_t class_get_const_type = 0;
-static  class_get_const_addr_t class_get_const_addr = 0;
+static  class_cp_get_const_type_t class_cp_get_const_type = 0;
+static  class_cp_get_const_addr_t class_cp_get_const_addr = 0;
 static  class_get_method_by_name_t class_get_method_by_name = 0;
 static  class_get_field_by_name_t class_get_field_by_name = 0;
 static  class_get_class_loader_t  class_get_class_loader = 0;
 
 static  class_is_array_t  class_is_array = 0;
 static  class_is_enum_t  class_is_enum = 0;
-static  class_is_final_t  class_is_final = 0; //class_property_is_final
+static  class_is_final_t  class_is_final = 0; //class_is_final
 static  class_is_throwable_t  class_is_throwable = 0; //class_hint_is_exceptiontype
-static  class_is_interface_t  class_is_interface = 0; //class_property_is_interface2
-static  class_is_abstract_t  class_is_abstract = 0; //class_property_is_abstract
+static  class_is_interface_t  class_is_interface = 0; //class_is_interface2
+static  class_is_abstract_t  class_is_abstract = 0; //class_is_abstract
 static  class_is_initialized_t  class_is_initialized = 0; //class_needs_initialization && class_is_initialized()
 static  class_is_finalizable_t  class_is_finalizable = 0;
 static  class_is_instanceof_t class_is_instanceof = 0;
@@ -81,12 +82,12 @@ static  class_lookup_class_by_name_using_bootstrap_class_loader_t  class_lookup_
 static  class_lookup_method_recursively_t class_lookup_method_recursively = 0;
 
 // Const Pool
-static  class_cp_get_field_type_t class_cp_get_field_type = 0;// VM_Data_Type class_get_cp_field_type(Class_Handle src_class, unsigned short cp_index);
-static  class_cp_get_entry_signature_t class_cp_get_entry_signature = 0;//const char*  class_get_cp_entry_signature(Class_Handle src_class, unsigned short index); ? const char*  const_pool_get_field_descriptor(Class_Handle cl, unsigned index);
-static  class_cp_is_entry_resolved_t class_cp_is_entry_resolved = 0;//bool class_is_cp_entry_resolved(Compile_Handle ch, Class_Handle clazz, unsigned cp_index);
-static  class_cp_get_class_name_t class_cp_get_class_name =0;//const char* const_pool_get_class_name(Class_Handle cl, unsigned index);
-static  class_cp_get_method_class_name_t class_cp_get_method_class_name = 0;//const char *const_pool_get_method_class_name(Class_Handle cl, unsigned index);
-static  class_cp_get_method_name_t class_cp_get_method_name = 0;//const char* const_pool_get_method_name(Class_Handle cl, unsigned index);
+static  class_cp_get_field_type_t class_cp_get_field_type = 0;// VM_Data_Type class_cp_get_field_type(Class_Handle src_class, unsigned short cp_index);
+static  class_cp_get_entry_signature_t class_cp_get_entry_signature = 0;//const char*  class_cp_get_entry_signature(Class_Handle src_class, unsigned short index); ? const char*  class_cp_get_field_descriptor(Class_Handle cl, unsigned index);
+static  class_cp_is_entry_resolved_t class_cp_is_entry_resolved = 0;//bool class_cp_is_entry_resolved(Compile_Handle ch, Class_Handle clazz, unsigned cp_index);
+static  class_cp_get_class_name_t class_cp_get_class_name =0;//const char* class_cp_get_class_name(Class_Handle cl, unsigned index);
+static  class_cp_get_method_class_name_t class_cp_get_method_class_name = 0;//const char *class_cp_get_method_class_name(Class_Handle cl, unsigned index);
+static  class_cp_get_method_name_t class_cp_get_method_name = 0;//const char* class_cp_get_method_name(Class_Handle cl, unsigned index);
 
 
 //Field
@@ -250,11 +251,11 @@ static vm_enumerate_root_interior_pointer_t vm_enumerate_root_interior_pointer =
         class_get_vtable = GET_INTERFACE(vm, class_get_vtable);
         class_get_allocation_handle = GET_INTERFACE(vm, class_get_allocation_handle);
         class_get_boxed_data_size = GET_INTERFACE(vm, class_get_boxed_data_size);
-        class_get_num_array_dimensions = GET_INTERFACE(vm, class_get_num_array_dimensions);
+        class_cp_get_num_array_dimensions = GET_INTERFACE(vm, class_cp_get_num_array_dimensions);
         class_get_class_of_primitive_type = GET_INTERFACE(vm, class_get_class_of_primitive_type);
         class_get_const_string_intern_addr = GET_INTERFACE(vm, class_get_const_string_intern_addr);
-        class_get_const_type = GET_INTERFACE(vm, class_get_const_type);
-        class_get_const_addr = GET_INTERFACE(vm, class_get_const_addr);
+        class_cp_get_const_type = GET_INTERFACE(vm, class_cp_get_const_type);
+        class_cp_get_const_addr = GET_INTERFACE(vm, class_cp_get_const_addr);
         class_get_method_by_name = GET_INTERFACE(vm, class_get_method_by_name);
         class_get_field_by_name = GET_INTERFACE(vm, class_get_field_by_name);
         class_get_class_loader = GET_INTERFACE(vm, class_get_class_loader);
@@ -982,7 +983,7 @@ CompilationInterface::compileMethod(MethodDesc *method) {
 
 
 
-void* 
+const void* 
 CompilationInterface::getStringInternAddr(MethodDesc* enclosingMethodDesc,
                                                 uint32 stringToken) {
     Class_Handle enclosingDrlVMClass = enclosingMethodDesc->getParentHandle();
@@ -993,14 +994,14 @@ Type*
 CompilationInterface::getConstantType(MethodDesc* enclosingMethodDesc,
                                          uint32 constantToken) {
     Class_Handle enclosingDrlVMClass = enclosingMethodDesc->getParentHandle();
-    Java_Type drlType = (Java_Type)class_get_const_type(enclosingDrlVMClass,constantToken);
+    VM_Data_Type drlType = class_cp_get_const_type(enclosingDrlVMClass,constantToken);
     switch (drlType) {
-    case JAVA_TYPE_STRING:   return typeManager.getSystemStringType(); 
-    case JAVA_TYPE_CLASS:    return typeManager.getSystemClassType(); 
-    case JAVA_TYPE_DOUBLE:   return typeManager.getDoubleType();
-    case JAVA_TYPE_FLOAT:    return typeManager.getSingleType();
-    case JAVA_TYPE_INT:      return typeManager.getInt32Type();
-    case JAVA_TYPE_LONG:     return typeManager.getInt64Type();
+    case VM_DATA_TYPE_STRING:   return typeManager.getSystemStringType(); 
+    case VM_DATA_TYPE_CLASS:    return typeManager.getSystemClassType(); 
+    case VM_DATA_TYPE_F8:   return typeManager.getDoubleType();
+    case VM_DATA_TYPE_F4:    return typeManager.getSingleType();
+    case VM_DATA_TYPE_INT32:      return typeManager.getInt32Type();
+    case VM_DATA_TYPE_INT64:     return typeManager.getInt64Type();
     default: assert(0);
     }
     assert(0);
@@ -1011,7 +1012,7 @@ const void*
 CompilationInterface::getConstantValue(MethodDesc* enclosingMethodDesc,
                                           uint32 constantToken) {
     Class_Handle enclosingDrlVMClass = enclosingMethodDesc->getParentHandle();
-    return class_get_const_addr(enclosingDrlVMClass,constantToken);
+    return class_cp_get_const_addr(enclosingDrlVMClass,constantToken);
 }
 
 MethodDesc*
@@ -1169,7 +1170,7 @@ MethodDesc*     CompilationInterface::getMethodDesc(Method_Handle method) {
 
 
 static uint32 getArrayDims(Class_Handle cl, uint32 cpIndex) {
-    return class_get_num_array_dimensions(cl, (unsigned short)cpIndex);
+    return class_cp_get_num_array_dimensions(cl, (unsigned short)cpIndex);
 }
 
 static NamedType* getUnresolvedType(TypeManager& typeManager, Class_Handle enclClass, uint32 cpIndex) {
@@ -1196,7 +1197,7 @@ NamedType* CompilationInterface::resolveNamedType(Class_Handle enclClass, uint32
 
 NamedType* CompilationInterface::getNamedType(Class_Handle enclClass, uint32 cpIndex, ResolveNewCheck checkNew) {
     Class_Handle ch = NULL;
-    if (typeManager.isLazyResolutionMode() && !class_cp_is_entry_resolved(compileHandle, enclClass, cpIndex)) {
+    if (typeManager.isLazyResolutionMode() && !class_cp_is_entry_resolved(enclClass, cpIndex)) {
         const char* className = class_cp_get_class_name(enclClass, cpIndex);
         bool forceResolve = VMMagicUtils::isVMMagicClass(className);
         if (!forceResolve) {
@@ -1227,7 +1228,7 @@ MethodDesc*
 CompilationInterface::getSpecialMethod(Class_Handle enclClass, uint32 cpIndex) {
     Method_Handle res = NULL;
     bool lazy = typeManager.isLazyResolutionMode();
-    if (!lazy || class_cp_is_entry_resolved(compileHandle, enclClass, cpIndex)) {
+    if (!lazy || class_cp_is_entry_resolved(enclClass, cpIndex)) {
         res =  resolve_special_method(compileHandle,enclClass, cpIndex);
     }
     if (!res) return NULL;
@@ -1238,7 +1239,7 @@ MethodDesc*
 CompilationInterface::getInterfaceMethod(Class_Handle enclClass, uint32 cpIndex) {
     Method_Handle res = NULL;
     bool lazy = typeManager.isLazyResolutionMode();
-    if (!lazy || class_cp_is_entry_resolved(compileHandle, enclClass, cpIndex)) {
+    if (!lazy || class_cp_is_entry_resolved(enclClass, cpIndex)) {
         res =  resolve_interface_method(compileHandle,enclClass, cpIndex);
     }
     if (!res) return NULL;
@@ -1249,7 +1250,7 @@ MethodDesc*
 CompilationInterface::getStaticMethod(Class_Handle enclClass, uint32 cpIndex) {
     Method_Handle res = NULL;
     bool lazy = typeManager.isLazyResolutionMode();
-    if (!lazy || class_cp_is_entry_resolved(compileHandle, enclClass, cpIndex)) {
+    if (!lazy || class_cp_is_entry_resolved(enclClass, cpIndex)) {
         res =  resolve_static_method(compileHandle,enclClass, cpIndex);
     }
     if (!res) return NULL;
@@ -1260,7 +1261,7 @@ MethodDesc*
 CompilationInterface::getVirtualMethod(Class_Handle enclClass, uint32 cpIndex) {
     Method_Handle res = NULL;
     bool lazy = typeManager.isLazyResolutionMode();
-    if (!lazy || class_cp_is_entry_resolved(compileHandle, enclClass, cpIndex)) {
+    if (!lazy || class_cp_is_entry_resolved(enclClass, cpIndex)) {
         res =  resolve_virtual_method(compileHandle,enclClass, cpIndex);
     }
     if (!res) return NULL;
@@ -1272,7 +1273,7 @@ FieldDesc*
 CompilationInterface::getNonStaticField(Class_Handle enclClass, uint32 cpIndex, bool putfield) {
     Field_Handle res = NULL;
     bool lazy = typeManager.isLazyResolutionMode();
-    if (!lazy || class_cp_is_entry_resolved(compileHandle, enclClass, cpIndex)) {
+    if (!lazy || class_cp_is_entry_resolved(enclClass, cpIndex)) {
         res = resolve_nonstatic_field(compileHandle, enclClass, cpIndex, putfield);
     }
     if (!res) {
@@ -1286,7 +1287,7 @@ FieldDesc*
 CompilationInterface::getStaticField(Class_Handle enclClass, uint32 cpIndex, bool putfield) {
     Field_Handle res = NULL;
     bool lazy = typeManager.isLazyResolutionMode();
-    if (!lazy || class_cp_is_entry_resolved(compileHandle, enclClass, cpIndex)) {
+    if (!lazy || class_cp_is_entry_resolved(enclClass, cpIndex)) {
         res = resolve_static_field(compileHandle, enclClass, cpIndex, putfield);
     }
     if (!res) {
@@ -1310,20 +1311,20 @@ CompilationInterface::getFieldByName(Class_Handle enclClass, const char* name) {
 
 Type*
 CompilationInterface::getFieldType(Class_Handle enclClass, uint32 cpIndex) {
-    Java_Type drlType = (Java_Type)class_cp_get_field_type(enclClass, (unsigned short)cpIndex);
+    VM_Data_Type drlType = class_cp_get_field_type(enclClass, (unsigned short)cpIndex);
     bool lazy = typeManager.isLazyResolutionMode();
     switch (drlType) {
-        case JAVA_TYPE_BOOLEAN:  return typeManager.getBooleanType();
-        case JAVA_TYPE_CHAR:     return typeManager.getCharType();
-        case JAVA_TYPE_BYTE:     return typeManager.getInt8Type();
-        case JAVA_TYPE_SHORT:    return typeManager.getInt16Type();
-        case JAVA_TYPE_INT:      return typeManager.getInt32Type();
-        case JAVA_TYPE_LONG:     return typeManager.getInt64Type();
-        case JAVA_TYPE_DOUBLE:   return typeManager.getDoubleType();
-        case JAVA_TYPE_FLOAT:    return typeManager.getSingleType();
-        case JAVA_TYPE_ARRAY:
+        case VM_DATA_TYPE_BOOLEAN:  return typeManager.getBooleanType();
+        case VM_DATA_TYPE_CHAR:     return typeManager.getCharType();
+        case VM_DATA_TYPE_INT8:     return typeManager.getInt8Type();
+        case VM_DATA_TYPE_INT16:    return typeManager.getInt16Type();
+        case VM_DATA_TYPE_INT32:      return typeManager.getInt32Type();
+        case VM_DATA_TYPE_INT64:     return typeManager.getInt64Type();
+        case VM_DATA_TYPE_F8:   return typeManager.getDoubleType();
+        case VM_DATA_TYPE_F4:    return typeManager.getSingleType();
+        case VM_DATA_TYPE_ARRAY:
         
-        case JAVA_TYPE_CLASS:    
+        case VM_DATA_TYPE_CLASS:    
                 if (lazy) {
                     const char* fieldTypeName = class_cp_get_entry_signature(enclClass, cpIndex);
                     assert(fieldTypeName);
@@ -1331,8 +1332,8 @@ CompilationInterface::getFieldType(Class_Handle enclClass, uint32 cpIndex) {
                 } 
                 return typeManager.getUnresolvedObjectType();
 
-        case JAVA_TYPE_VOID:     // class_get_cp_field_type can't return VOID
-        case JAVA_TYPE_STRING:   // class_get_cp_field_type can't return STRING
+        case VM_DATA_TYPE_VOID:     // class_cp_get_field_type can't return VOID
+        case VM_DATA_TYPE_STRING:   // class_cp_get_field_type can't return STRING
         default: assert(0);
     }
     assert(0);

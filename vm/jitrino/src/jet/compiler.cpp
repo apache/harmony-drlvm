@@ -29,6 +29,7 @@
 #include <stdlib.h>
 #endif
 
+#include "open/vm_class_info.h"
 #include "open/vm.h"
 #include "open/hythread_ext.h"
 #include "open/vm_type_access.h"
@@ -1272,7 +1273,7 @@ void Compiler::comp_set_ehandlers(void)
 void Compiler::get_args_info(bool is_static, unsigned cp_idx, 
                              ::std::vector<jtype>& args, jtype * retType)
 {
-    const char * cpentry = class_get_cp_entry_signature(m_klass, 
+    const char * cpentry = class_cp_get_entry_signature(m_klass, 
                                                         (short)cp_idx);
     // expecting an empty vector
     assert(args.size() == 0);

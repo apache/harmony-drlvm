@@ -27,7 +27,7 @@
 #include "interp_native.h"
 #include "interp_defs.h"
 #include "ini.h"
-#include "open/jthread.h"
+//#include "open/jthread.h"
 
 using namespace std;
 
