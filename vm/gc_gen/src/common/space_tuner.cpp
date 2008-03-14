@@ -96,7 +96,7 @@ extern POINTER_SIZE_INT min_none_los_size_bytes;
   * Else, we call the marking function for space tuning.  */
 void gc_compute_space_tune_size_before_marking(GC* gc)
 {
-  if(gc_match_kind(gc, MINOR_COLLECTION))  return;
+  if(collect_is_minor())  return;
   
   gc_decide_space_tune(gc);
   
@@ -204,13 +204,14 @@ static void gc_compute_live_object_size_after_marking(GC* gc, POINTER_SIZE_INT n
     memset(collector->segment_live_size, 0, sizeof(POINTER_SIZE_INT) * NORMAL_SIZE_SEGMENT_NUM);
   }
   
-  //POINTER_SIZE_INT additional_non_los_size = ((collector_num * 2) << GC_BLOCK_SHIFT_COUNT) + (non_los_live_obj_size >> GC_BLOCK_SHIFT_COUNT) * (GC_OBJ_SIZE_THRESHOLD/4);
+  //POINTER_SIZE_INT additional_non_los_size = ((collector_num * 2) << GC_BLOCK_SHIFT_COUNT) + (non_los_live_obj_size >> GC_BLOCK_SHIFT_COUNT) * (GC_LOS_OBJ_SIZE_THRESHOLD/4);
   double additional_non_los_size = 0;
   for(unsigned int i = 0; i < NORMAL_SIZE_SEGMENT_NUM; i++) {
     additional_non_los_size += (double)segment_live_size[i] * SEGMENT_INDEX_TO_SIZE(i) / non_los_live_obj_size;
   }
   additional_non_los_size *= 1.2; // in case of some cases worse than average one
   POINTER_SIZE_INT non_los_live_block = non_los_live_obj_size / (GC_BLOCK_BODY_SIZE_BYTES-(POINTER_SIZE_INT)additional_non_los_size);
+  non_los_live_block += collector_num << 2;
   non_los_live_obj_size = (non_los_live_block << GC_BLOCK_SHIFT_COUNT);
   if(non_los_live_obj_size > non_los_size)
     non_los_live_obj_size = non_los_size;
@@ -264,7 +265,7 @@ static void compute_space_tune_size_for_force_tune(GC *gc, POINTER_SIZE_INT max_
       assert(max_heap_size_bytes >= gc->committed_heap_size);
       POINTER_SIZE_INT extend_heap_size = 0;
       POINTER_SIZE_INT potential_max_tuning_size = max_tuning_size + max_heap_size_bytes - gc->committed_heap_size;
-      potential_max_tuning_size -= LOS_HEAD_RESERVE_FOR_HEAP_NULL;
+      potential_max_tuning_size -= LOS_HEAD_RESERVE_FOR_HEAP_BASE;
 
       //debug_adjust
       assert(!(potential_max_tuning_size % SPACE_ALLOC_UNIT));
@@ -438,7 +439,7 @@ void gc_compute_space_tune_size_after_marking(GC *gc)
 void  gc_space_tuner_reset(GC* gc)
 {
   Space_Tuner* tuner = gc->tuner;
-  if( gc_match_kind(gc, MAJOR_COLLECTION)){
+  if( collect_is_major()){
     /*Clear the fields every major collection except the wast area statistic.*/
     tuner->tuning_size = 0;
     tuner->interim_blocks = NULL;
@@ -536,4 +537,6 @@ void gc_space_tuner_release_fake_blocks_for_los_shrink(GC* gc)
   STD_FREE(tuner->interim_blocks);
   return;
 }
+
+
 

@@ -28,7 +28,7 @@
 #ifdef USE_32BITS_HASHCODE
 #include "../common/hashcode.h"
 #endif
-#ifdef USE_MARK_SWEEP_GC
+#ifdef USE_UNIQUE_MARK_SWEEP_GC
 #include "../mark_sweep/wspace_mark_sweep.h"
 #endif
 #include "../common/gc_concurrent.h"
@@ -120,7 +120,7 @@ inline void verify_live_object_slot(REF* p_ref, Heap_Verifier* heap_verifier)
   assert(decode_vt(obj_get_vt(p_obj)));
   assert(!address_belongs_to_gc_heap(decode_vt(obj_get_vt(p_obj)), (GC*)heap_verifier->gc));
 
-#ifdef USE_MARK_SWEEP_GC
+#ifdef USE_UNIQUE_MARK_SWEEP_GC
   GC_MS* gc = (GC_MS*)heap_verifier->gc;
   if(!heap_verifier->is_before_gc){
     /*in GC_MS mark sweep algorithm, all live objects should be set their mark bit*/

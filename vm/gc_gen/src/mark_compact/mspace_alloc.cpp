@@ -55,7 +55,7 @@ void* mspace_alloc(unsigned int size, Allocator* allocator)
    
   /* All chunks of data requested need to be multiples of GC_OBJECT_ALIGNMENT */
   assert((size % GC_OBJECT_ALIGNMENT) == 0);
-  assert( size <= GC_OBJ_SIZE_THRESHOLD );
+  assert( size <= GC_LOS_OBJ_SIZE_THRESHOLD );
 
   /* check if collector local alloc block is ok. If not, grab a new block */
   p_return = thread_local_alloc(size, allocator);
@@ -71,5 +71,7 @@ void* mspace_alloc(unsigned int size, Allocator* allocator)
     
   return p_return;
 }
+
+
 
 

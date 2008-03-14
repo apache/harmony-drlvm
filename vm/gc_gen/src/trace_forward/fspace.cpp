@@ -106,11 +106,10 @@ void fspace_reset_after_collection(Fspace* fspace)
   unsigned int first_idx = fspace->first_block_idx;
   unsigned int marked_start_idx = 0; //was for oi markbit reset, now useless
   unsigned int marked_last_idx = 0;
-  Boolean is_major_collection = gc_match_kind(fspace->gc, MAJOR_COLLECTION);
-  Boolean gen_mode = gc_is_gen_mode();
+  Boolean is_major_collection = collect_is_major();
   
   if(  is_major_collection || 
-         NOS_PARTIAL_FORWARD == FALSE || !gen_mode)            
+         NOS_PARTIAL_FORWARD == FALSE || !gc_is_gen_mode())            
   {
     fspace->free_block_idx = first_idx;
     fspace->ceiling_block_idx = first_idx + fspace->num_managed_blocks - 1;  
@@ -189,45 +188,24 @@ void fspace_collection(Fspace *fspace)
   fspace->num_collections++;  
 
   GC* gc = fspace->gc;
-
-  if(gc_is_gen_mode()){
-    fspace->collect_algorithm = MINOR_GEN_FORWARD_POOL;
-  }else{
-    fspace->collect_algorithm = MINOR_NONGEN_FORWARD_POOL;
-  }
   
   /* we should not destruct rootset structure in case we need fall back */
   pool_iterator_init(gc->metadata->gc_rootset_pool);
 
-  switch(fspace->collect_algorithm){
-
+  if( !gc_is_gen_mode() ){
 #ifdef MARK_BIT_FLIPPING
 
-    case MINOR_NONGEN_FORWARD_POOL:
-      TRACE2("gc.process", "GC: nongen_forward_pool algo start ... \n");
-      collector_execute_task(gc, (TaskType)nongen_forward_pool, (Space*)fspace);
-      TRACE2("gc.process", "\nGC: end of nongen forward algo ... \n");
-#ifdef GC_GEN_STATS
-      gc_gen_stats_set_nos_algo((GC_Gen*)gc, MINOR_NONGEN_FORWARD_POOL);
-#endif
-      break;
-
-#endif /*#ifdef MARK_BIT_FLIPPING */
-
-    case MINOR_GEN_FORWARD_POOL:
-      TRACE2("gc.process", "gen_forward_pool algo start ... \n");
-      collector_execute_task(gc, (TaskType)gen_forward_pool, (Space*)fspace);
-      TRACE2("gc.process", "\nGC: end of gen forward algo ... \n");
-#ifdef GC_GEN_STATS
-      gc_gen_stats_set_nos_algo((GC_Gen*)gc, MINOR_NONGEN_FORWARD_POOL);
-#endif
-      break;
-    
-    default:
-      DIE2("gc.collection","Specified minor collection algorithm doesn't exist!");
-      exit(0);
-      break;
-  }
+    TRACE2("gc.process", "GC: nongenerational forward algo start ... \n");
+    collector_execute_task(gc, (TaskType)nongen_forward_pool, (Space*)fspace);
+    TRACE2("gc.process", "\nGC: end of nongen forward algo ... \n");
+#else
+    assert(0);  
+#endif /*#ifdef MARK_BIT_FLIPPING #else */
+  }else{
+    TRACE2("gc.process", "generational forward algo start ... \n");
+    collector_execute_task(gc, (TaskType)gen_forward_pool, (Space*)fspace);
+    TRACE2("gc.process", "\nGC: end of gen forward algo ... \n");
+  }    
   
   return; 
 }

@@ -29,11 +29,9 @@ struct Stealable_Stack;
 struct Chunk_Header;
 struct Free_Chunk_List;
 
-extern Boolean is_collector_local_alloc;
-
 #define NORMAL_SIZE_SEGMENT_GRANULARITY_BITS  8
 #define NORMAL_SIZE_SEGMENT_GRANULARITY (1 << NORMAL_SIZE_SEGMENT_GRANULARITY_BITS)
-#define NORMAL_SIZE_SEGMENT_NUM (GC_OBJ_SIZE_THRESHOLD / NORMAL_SIZE_SEGMENT_GRANULARITY)
+#define NORMAL_SIZE_SEGMENT_NUM (GC_LOS_OBJ_SIZE_THRESHOLD / NORMAL_SIZE_SEGMENT_GRANULARITY)
 #define SIZE_TO_SEGMENT_INDEX(size) ((((size) + NORMAL_SIZE_SEGMENT_GRANULARITY-1) >> NORMAL_SIZE_SEGMENT_GRANULARITY_BITS) - 1)
 #define SEGMENT_INDEX_TO_SIZE(index)  (((index)+1) << NORMAL_SIZE_SEGMENT_GRANULARITY_BITS)
 
@@ -49,6 +47,8 @@ typedef struct Collector{
   VmThreadHandle thread_handle;   /* This thread; */
   unsigned int handshake_signal; /*Handshake is used in concurrent GC.*/
   unsigned int num_alloc_blocks; /* the number of allocated blocks in this collection. */
+  int64 time_measurement_start;
+  int64 time_measurement_end;
   /* End of Allocator --> */
 
   /* FIXME:: for testing */
@@ -111,12 +111,13 @@ void collector_restore_obj_info(Collector* collector);
 void collector_attach_hashcode(Collector *collector);
 #endif
 
-#ifndef USE_MARK_SWEEP_GC
+#ifndef USE_UNIQUE_MARK_SWEEP_GC
 void gc_gen_hook_for_collector_init(Collector *collector);
 #endif
 
 Boolean is_collector_finished(GC* gc);
 void wait_collection_finish(GC* gc);
+int64 gc_get_collector_time(GC* gc);
 
 inline Boolean gc_collection_result(GC* gc)
 {

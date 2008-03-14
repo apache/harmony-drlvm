@@ -27,6 +27,8 @@ static volatile Block *mos_first_new_block = NULL;
 static volatile Block *nos_first_free_block = NULL;
 static volatile Block *first_block_to_move = NULL;
 
+Boolean mos_extended = FALSE;
+
 static void set_first_and_end_block_to_move(Collector *collector, unsigned int mem_changed_size)
 {
   GC_Gen *gc_gen = (GC_Gen *)collector->gc;
@@ -205,7 +207,7 @@ static void lspace_refix_repointed_refs(Collector* collector, Lspace* lspace, vo
 static void gc_reupdate_repointed_sets(GC* gc, Pool* pool, void *start_address, void *end_address, unsigned int addr_diff)
 {
   GC_Metadata *metadata = gc->metadata;
-  assert(gc_match_kind(gc, EXTEND_COLLECTION));
+  assert(mos_extended);
   
   pool_iterator_init(pool);
 
@@ -227,8 +229,8 @@ static void gc_refix_rootset(Collector *collector, void *start_address, void *en
   GC *gc = collector->gc;  
   GC_Metadata *metadata = gc->metadata;
 
-  /* only for MAJOR_COLLECTION and FALLBACK_COLLECTION */
-  assert(gc_match_kind(gc, EXTEND_COLLECTION));
+  /* only for ALGO_MAJOR and ALGO_MAJOR_FALLBACK */
+  assert(mos_extended);
   
   gc_reupdate_repointed_sets(gc, metadata->gc_rootset_pool, start_address, end_address, addr_diff);
 
@@ -272,8 +274,8 @@ void mspace_extend_compact(Collector *collector)
   Blocked_Space *mspace = (Blocked_Space *)gc_gen->mos;
   Blocked_Space *nspace = (Blocked_Space *)gc_gen->nos;
 
-  /*For_LOS adaptive: when doing EXTEND_COLLECTION, mspace->survive_ratio should not be updated in gc_decide_next_collect( )*/
-  gc_gen->collect_kind |= EXTEND_COLLECTION;
+  /*For_LOS adaptive: when doing ALGO_MAJOR_EXTEND, mspace->survive_ratio should not be updated in gc_decide_next_collect( )*/
+  mos_extended = TRUE;
   
   unsigned int num_active_collectors = gc_gen->num_active_collectors;
   unsigned int old_num;
@@ -319,8 +321,8 @@ void mspace_extend_compact(Collector *collector)
   Fspace *nspace = gc_gen->nos;
   Lspace *lspace = gc_gen->los;
 
-  /*For_LOS adaptive: when doing EXTEND_COLLECTION, mspace->survive_ratio should not be updated in gc_decide_next_collect( )*/
-  gc_gen->collect_kind |= EXTEND_COLLECTION;
+  /*For_LOS adaptive: when doing ALGO_MAJOR_EXTEND, mspace->survive_ratio should not be updated in gc_decide_next_collect()*/
+  mos_extended = TRUE;
   
   unsigned int num_active_collectors = gc_gen->num_active_collectors;
   unsigned int old_num;

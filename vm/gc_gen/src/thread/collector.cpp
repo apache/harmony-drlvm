@@ -30,7 +30,6 @@
 unsigned int MINOR_COLLECTORS = 0;
 unsigned int MAJOR_COLLECTORS = 0;
 static volatile unsigned int live_collector_num = 0;
-Boolean is_collector_local_alloc = TRUE;
 
 void collector_restore_obj_info(Collector* collector)
 {
@@ -85,8 +84,8 @@ static void collector_reset_thread(Collector *collector)
     
   GC_Metadata* metadata = collector->gc->metadata;
   
-  if(gc_is_gen_mode() && gc_match_kind(collector->gc, MINOR_COLLECTION)){
-    if( NOS_PARTIAL_FORWARD || MINOR_ALGO == MINOR_GEN_SEMISPACE_POOL ){
+  if(gc_is_gen_mode() && collect_is_minor()){
+    if( NOS_PARTIAL_FORWARD || minor_is_semispace() ){
       assert(collector->rem_set==NULL);
       collector->rem_set = free_set_pool_get_entry(metadata);
     }
@@ -96,7 +95,7 @@ static void collector_reset_thread(Collector *collector)
   collector_reset_weakref_sets(collector);
 #endif
 
-#if !defined(USE_MARK_SWEEP_GC) && !defined(USE_UNIQUE_MOVE_COMPACT_GC)
+#if !defined(USE_UNIQUE_MARK_SWEEP_GC) && !defined(USE_UNIQUE_MOVE_COMPACT_GC)
   /*For LOS_Shrink and LOS_Extend*/
   if(gc_has_space_tuner(collector->gc) && collector->gc->tuner->kind != TRANS_NOTHING){
     collector->non_los_live_obj_size = 0;
@@ -131,9 +130,9 @@ static void collector_notify_work_done(Collector *collector)
 static void assign_collector_with_task(GC* gc, TaskType task_func, Space* space)
 {
   /* FIXME:: to adaptively identify the num_collectors_to_activate */
-  if( MINOR_COLLECTORS && gc_match_kind(gc, MINOR_COLLECTION)){
+  if( MINOR_COLLECTORS && collect_is_minor()){
     gc->num_active_collectors = MINOR_COLLECTORS;
-  }else if ( MAJOR_COLLECTORS && gc_match_kind(gc, MAJOR_COLLECTION)){
+  }else if ( MAJOR_COLLECTORS && collect_is_major()){
     gc->num_active_collectors = MAJOR_COLLECTORS;
   }else{
     gc->num_active_collectors = gc->num_collectors;
@@ -182,7 +181,7 @@ static int collector_thread_func(void *arg)
     task_func(collector);
 
    //conducted after collection to return last TLB in hand 
-   #if !defined(USE_MARK_SWEEP_GC) && !defined(USE_UNIQUE_MOVE_COMPACT_GC)
+   #if !defined(USE_UNIQUE_MARK_SWEEP_GC) && !defined(USE_UNIQUE_MOVE_COMPACT_GC)
     gc_reset_collector_alloc(collector->gc, collector);
    #endif
     collector_notify_work_done(collector);
@@ -230,14 +229,14 @@ static void collector_terminate_thread(Collector* collector)
 
 void collector_init_stats(Collector* collector)
 {
-#if !defined(USE_MARK_SWEEP_GC) && !defined(USE_UNIQUE_MOVE_COMPACT_GC)
+#if !defined(USE_UNIQUE_MARK_SWEEP_GC) && !defined(USE_UNIQUE_MOVE_COMPACT_GC)
   gc_gen_collector_stats_initialize(collector);
 #endif
 }
 
 void collector_destruct_stats(Collector* collector)
 {
-#if !defined(USE_MARK_SWEEP_GC) && !defined(USE_UNIQUE_MOVE_COMPACT_GC)
+#if !defined(USE_UNIQUE_MARK_SWEEP_GC) && !defined(USE_UNIQUE_MOVE_COMPACT_GC)
   gc_gen_collector_stats_destruct(collector);
 #endif
 }
@@ -349,4 +348,20 @@ Boolean is_collector_finished(GC* gc)
   return TRUE;
 
 }
+
+int64 gc_get_collector_time(GC* gc)
+{
+  int64 time_collector = 0;
+  unsigned int num_active_collectors = gc->num_active_collectors;
+  unsigned int i = 0;
+  for(; i<num_active_collectors; i++){
+    Collector* collector = gc->collectors[i];
+    int64 time_measured = collector->time_measurement_end - collector->time_measurement_start;
+    if(time_measured > time_collector)
+      time_collector = time_measured;
+  }
+  return time_collector;
+}
+
+
 

@@ -30,14 +30,6 @@
 #include "../gen/gen_stats.h"
 #endif
 
-static void* tospace_start;
-static void* tospace_end;
-
-static Boolean obj_belongs_to_tospace(Partial_Reveal_Object* p_obj)
-{
-  return ( p_obj >= tospace_start && p_obj < tospace_end );
-}
-
 static FORCE_INLINE void scan_slot(Collector *collector, REF *p_ref) 
 {
   Partial_Reveal_Object *p_obj = read_slot(p_ref);
@@ -121,7 +113,7 @@ static FORCE_INLINE void forward_object(Collector *collector, REF *p_ref)
     write_slot(p_ref, p_target_obj);
 
     /* check if the target obj stays in NOS, and p_ref from MOS. If yes, rem p_ref. */
-    if(obj_is_survivor(p_target_obj))
+    if(obj_belongs_to_tospace(p_target_obj))
       if( !addr_belongs_to_nos(p_ref) && address_belongs_to_gc_heap(p_ref, gc))
         collector_remset_add_entry(collector, ( Partial_Reveal_Object**) p_ref); 
 
@@ -163,7 +155,7 @@ static FORCE_INLINE void forward_object(Collector *collector, REF *p_ref)
   write_slot(p_ref, p_target_obj);
   
   /* check if the target obj stays in NOS, and p_ref from MOS. If yes, rem p_ref. */
-  if(obj_is_survivor(p_target_obj)){
+  if(obj_belongs_to_tospace(p_target_obj)){
     if( !addr_belongs_to_nos(p_ref) && address_belongs_to_gc_heap(p_ref, gc))
       collector_remset_add_entry(collector, ( Partial_Reveal_Object**) p_ref); 
   }
@@ -178,10 +170,18 @@ static void trace_object(Collector *collector, REF *p_ref)
   Vector_Block* trace_stack = (Vector_Block*)collector->trace_stack;
   while( !vector_stack_is_empty(trace_stack)){
     p_ref = (REF *)vector_stack_pop(trace_stack); 
+#ifdef PREFETCH_SUPPORTED
+    /* DO PREFETCH */
+   if(mark_prefetch) {
+     if(!vector_stack_is_empty(trace_stack)) {
+        REF *pref = (REF*)vector_stack_read(trace_stack, 0);
+        PREFETCH( read_slot(pref) );
+     }
+   }
+#endif
     forward_object(collector, p_ref);
     trace_stack = (Vector_Block*)collector->trace_stack;
   }
-    
   return; 
 }
  
@@ -246,6 +246,15 @@ retry:
       REF *p_ref = (REF *)*iter;
       iter = vector_block_iterator_advance(trace_task,iter);
       assert(*p_ref); /* a task can't be NULL, it was checked before put into the task stack */
+#ifdef PREFETCH_SUPPORTED      
+      /* DO PREFETCH */  
+      if( mark_prefetch ) {    
+        if(!vector_block_iterator_end(trace_task, iter)) {
+      	  REF *pref= (REF*) *iter;
+      	  PREFETCH( read_slot(pref));
+        }	
+      }
+#endif            
       /* in sequential version, we only trace same object once, but we were using a local hashset for that,
          which couldn't catch the repetition between multiple collectors. This is subject to more study. */
    

@@ -17,7 +17,7 @@
 
 #include "verifier_common.h"
 #include "verify_gc_effect.h"
-#ifdef USE_MARK_SWEEP_GC
+#ifdef USE_UNIQUE_MARK_SWEEP_GC
 #include "../mark_sweep/wspace_mark_sweep.h"
 #endif
 
@@ -103,6 +103,7 @@ void* verifier_copy_obj_information(Partial_Reveal_Object* p_obj)
     assert(p_obj_information);
     p_obj_information->vt_raw = obj_get_vt_raw(p_obj);
     p_obj_information->address = p_obj;
+    p_obj_information->obj_info=get_obj_info_raw(p_obj)& OBJ_INFO_MASK;
     return (void*) p_obj_information;
   }else{
     REF *p_ref;
@@ -113,7 +114,8 @@ void* verifier_copy_obj_information(Partial_Reveal_Object* p_obj)
 
       p_obj_information->vt_raw = obj_get_vt_raw(p_obj);
       p_obj_information->address = p_obj;
-
+      p_obj_information->obj_info=get_obj_info_raw(p_obj)& OBJ_INFO_MASK;
+      
       p_ref = (REF *)((POINTER_SIZE_INT)array + (int)array_first_element_offset(array));
 
       unsigned int i = 0;
@@ -128,6 +130,7 @@ void* verifier_copy_obj_information(Partial_Reveal_Object* p_obj)
       
       p_obj_information->vt_raw = obj_get_vt_raw(p_obj);
       p_obj_information->address = p_obj;
+      p_obj_information->obj_info=get_obj_info_raw(p_obj)& OBJ_INFO_MASK;
 
       int* ref_iterator = object_ref_iterator_init(p_obj);
       
@@ -147,7 +150,7 @@ static Boolean fspace_object_was_forwarded(Partial_Reveal_Object *p_obj, Fspace 
   GC_Verifier* gc_verifier = heap_verifier->gc_verifier;
   assert(obj_belongs_to_space(p_obj, (Space*)fspace));
   unsigned int forwarded_first_part;
-  if(!(gc_verifier->gc_collect_kind == MINOR_COLLECTION) || !NOS_PARTIAL_FORWARD || heap_verifier->gc_is_gen_mode)
+  if(!verifier_collect_is_minor(gc_verifier) || !NOS_PARTIAL_FORWARD || heap_verifier->gc_is_gen_mode)
     forwarded_first_part = true;
   else
     forwarded_first_part = forward_first_half^1;
@@ -296,13 +299,13 @@ void verifier_update_verify_info(Partial_Reveal_Object* p_obj, Heap_Verifier* he
   Heap_Verifier_Metadata* verifier_metadata = heap_verifier->heap_verifier_metadata;
   GC_Verifier* gc_verifier = heap_verifier->gc_verifier;
 
-#ifndef USE_MARK_SWEEP_GC
+#ifndef USE_UNIQUE_MARK_SWEEP_GC
   GC_Gen* gc = (GC_Gen*)heap_verifier->gc;
   Space* mspace = gc_get_mos(gc);
   Space* nspace = gc_get_nos(gc);
   Space* lspace  = gc_get_los(gc);
 
-  if(!gc_verifier->is_before_fallback_collection && gc_verifier->gc_collect_kind == MINOR_COLLECTION){
+  if(!gc_verifier->is_before_fallback_collection && verifier_collect_is_minor(gc_verifier)){
     if(!heap_verifier->is_before_gc){
       assert(!obj_belongs_to_space(p_obj, nspace) || !fspace_object_was_forwarded(p_obj, (Fspace*)nspace, heap_verifier) || obj_belongs_to_survivor_area((Sspace*)nspace, p_obj));
       if(obj_belongs_to_space(p_obj, nspace) && fspace_object_was_forwarded(p_obj, (Fspace*)nspace, heap_verifier) && !obj_belongs_to_survivor_area((Sspace*)nspace, p_obj) ){
@@ -376,12 +379,24 @@ Boolean compare_live_obj_inform(POINTER_SIZE_INT* obj_container1,POINTER_SIZE_IN
 {
   Live_Object_Inform* obj_inform_1 = (Live_Object_Inform*)*obj_container1;
   Live_Object_Inform* obj_inform_2 = (Live_Object_Inform*)*obj_container2;
+  Boolean ret=TRUE;
+  
   if(((POINTER_SIZE_INT)obj_inform_1->vt_raw) == ((POINTER_SIZE_INT)obj_inform_2->vt_raw)){
+    if(obj_inform_1->obj_info != obj_inform_2->obj_info) {
+    	assert(0);
+    	ret = FALSE;
+        goto free_ref;
+    }
     /*FIXME: erase live object information in compare_function. */
     if( object_has_ref_field((Partial_Reveal_Object*)obj_inform_1) ){
       Live_Object_Ref_Slot_Inform* obj_ref_inform_1 = (Live_Object_Ref_Slot_Inform*)obj_inform_1;
       Live_Object_Ref_Slot_Inform* obj_ref_inform_2 = (Live_Object_Ref_Slot_Inform*)obj_inform_2;
-      
+     
+     if(obj_ref_inform_1->obj_info != obj_ref_inform_2->obj_info) {
+    	assert(0);
+    	ret = FALSE;
+    	goto free_ref;
+    } 
       if (object_is_array((Partial_Reveal_Object*)obj_ref_inform_1)){
         Partial_Reveal_Array* array = (Partial_Reveal_Array*)obj_ref_inform_2->address;
         unsigned int array_length = array->array_len;
@@ -389,10 +404,9 @@ Boolean compare_live_obj_inform(POINTER_SIZE_INT* obj_container1,POINTER_SIZE_IN
         unsigned int i = 0;
         for(; i<array_length;i++){
           if((POINTER_SIZE_INT)obj_ref_inform_1->ref_slot[i] != (POINTER_SIZE_INT)obj_ref_inform_2->ref_slot[i]){
-            assert(0);
-            STD_FREE(obj_ref_inform_1);
-            STD_FREE(obj_ref_inform_1);
-            return FALSE;
+	    assert(0);
+	    ret = FALSE;
+	    goto free_ref;
           }
         }
       }else{
@@ -403,27 +417,21 @@ Boolean compare_live_obj_inform(POINTER_SIZE_INT* obj_container1,POINTER_SIZE_IN
         for(; i<num_refs; i++){  
           if((POINTER_SIZE_INT)obj_ref_inform_1->ref_slot[i] != (POINTER_SIZE_INT)obj_ref_inform_2->ref_slot[i]){
             assert(0);
-            STD_FREE(obj_ref_inform_1);
-            STD_FREE(obj_ref_inform_1);
-            return FALSE;
+            ret = FALSE;
+            goto free_ref;
           }
         }
 
       }
-      
-      STD_FREE(obj_ref_inform_1);
-      STD_FREE(obj_ref_inform_2);
-    }else{
-      STD_FREE(obj_inform_1);
-      STD_FREE(obj_inform_2);
-    }  
-    return TRUE;
+    }    
   }else{ 
-    assert(0);
-    STD_FREE(obj_inform_1);
-    STD_FREE(obj_inform_2);
-    return FALSE;
+    assert(0); 
+    ret = FALSE;
   }
+free_ref:
+  STD_FREE(obj_inform_1);
+  STD_FREE(obj_inform_2);
+  return ret;
 }
 
 Boolean compare_obj_hash_inform(POINTER_SIZE_INT* container1,POINTER_SIZE_INT* container2)
@@ -550,6 +558,8 @@ void verifier_clear_gc_verification(Heap_Verifier* heap_verifier)
 
 void verifier_reset_hash_distance()
 { hash_obj_distance = 0;}
+
+
 
 
 

@@ -277,3 +277,19 @@ void marker_execute_task_concurrent(GC* gc, TaskType task_func, Space* space, un
   return;
 }
 
+int64 gc_get_marker_time(GC* gc)
+{
+  int64 time_marker = 0;
+  unsigned int num_active_markers = gc->num_active_markers;
+  unsigned int i = 0;
+  for(; i<num_active_markers; i++){
+    Marker* marker = gc->markers[i];
+    int64 time_measured = marker->time_measurement_end - marker->time_measurement_start;
+    if(time_measured > time_marker)
+      time_marker = time_measured;
+  }
+  return time_marker;
+}
+
+
+

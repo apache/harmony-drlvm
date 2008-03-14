@@ -31,6 +31,8 @@ typedef struct Space_Statistics{
   POINTER_SIZE_INT size_live_obj;
   POINTER_SIZE_INT size_free_space;
   POINTER_SIZE_INT last_size_free_space;
+  POINTER_SIZE_INT size_new_obj;
+  float space_utilization_ratio;
 }Space_Statistics;
 
 struct GC;

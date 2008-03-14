@@ -91,6 +91,7 @@ extern Boolean finref_copy_pool(Pool* src_pool, Pool* dest_pool, GC* gc);
 
 
 extern void gc_clear_weakref_pools(GC *gc);
+extern void gc_clear_finref_repset_pool(GC* gc);
 
 extern Vector_Block *finref_metadata_extend(void);
 /* Every place requesting a free vector block in finref should call this function */

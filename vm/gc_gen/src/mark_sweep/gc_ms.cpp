@@ -17,8 +17,6 @@
 
 #include "../common/gc_common.h"
 
-#ifdef USE_MARK_SWEEP_GC
-
 #include "gc_ms.h"
 #include "wspace_mark_sweep.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
@@ -29,6 +27,13 @@
 #include "../common/hashcode.h"
 #endif
 
+GC* gc_ms_create()
+{
+  GC* gc = (GC*)STD_MALLOC(sizeof(GC_MS));  
+  assert(gc);
+  memset(gc, 0, sizeof(GC_MS));
+  return gc;
+}
 
 void gc_ms_initialize(GC_MS *gc_ms, POINTER_SIZE_INT min_heap_size, POINTER_SIZE_INT max_heap_size)
 {
@@ -43,7 +48,7 @@ void gc_ms_initialize(GC_MS *gc_ms, POINTER_SIZE_INT min_heap_size, POINTER_SIZE
   wspace_base = vm_reserve_mem(0, max_heap_size);
   wspace_initialize((GC*)gc_ms, wspace_base, max_heap_size, max_heap_size);
   
-  HEAP_NULL = (POINTER_SIZE_INT)wspace_base;
+  HEAP_BASE = (POINTER_SIZE_INT)wspace_base;
   
   gc_ms->heap_start = wspace_base;
   gc_ms->heap_end = (void*)((POINTER_SIZE_INT)wspace_base + max_heap_size);
@@ -138,7 +143,8 @@ void gc_ms_start_concurrent_mark(GC_MS* gc)
 void gc_ms_update_space_statistics(GC_MS* gc)
 {
   POINTER_SIZE_INT num_live_obj = 0;
-  POINTER_SIZE_INT size_live_obj = 0;
+  POINTER_SIZE_INT size_live_obj = 0;  
+  POINTER_SIZE_INT new_obj_size = 0;
   
   Space_Statistics* wspace_stat = gc->wspace->space_statistic;
 
@@ -151,14 +157,33 @@ void gc_ms_update_space_statistics(GC_MS* gc)
     size_live_obj += collector->live_obj_size;
   }
 
+  lock(gc->mutator_list_lock);
+  Mutator* mutator = gc->mutator_list;
+  while (mutator) {
+    new_obj_size += mutator->new_obj_size;
+    mutator->new_obj_size = 0;
+    mutator = mutator->next;
+  }  
+  unlock(gc->mutator_list_lock);
+
+  wspace_stat->size_new_obj += new_obj_size;
+  
   wspace_stat->num_live_obj = num_live_obj;
   wspace_stat->size_live_obj = size_live_obj;  
   wspace_stat->last_size_free_space = wspace_stat->size_free_space;
-  wspace_stat->size_free_space = gc->committed_heap_size - size_live_obj;/*TODO:inaccurate value.*/
+  wspace_stat->size_free_space = gc->committed_heap_size - size_live_obj;/*TODO:inaccurate value.*/  
+  wspace_stat->space_utilization_ratio = (float)wspace_stat->size_new_obj / wspace_stat->last_size_free_space;;
+}
+
+void gc_ms_reset_space_statistics(GC_MS* gc)
+{
+  Space_Statistics* wspace_stat = gc->wspace->space_statistic;
+  wspace_stat->size_new_obj = 0;
+  wspace_stat->num_live_obj = 0;
+  wspace_stat->size_live_obj = 0;
+  wspace_stat->space_utilization_ratio = 0;
 }
 
 void gc_ms_iterate_heap(GC_MS *gc)
 {
 }
-
-#endif // USE_MARK_SWEEP_GC

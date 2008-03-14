@@ -61,7 +61,7 @@ inline Free_Area* free_area_new(void* start, POINTER_SIZE_INT size)
   area->next = area->prev = (Bidir_List*)area;
   area->size = size;
   
-  if( size < GC_OBJ_SIZE_THRESHOLD) return NULL;
+  if( size < GC_LOS_OBJ_SIZE_THRESHOLD) return NULL;
   else return area;
 }
 
@@ -92,7 +92,7 @@ inline unsigned int pool_list_get_next_flag(Free_Area_Pool* pool, unsigned int s
 
 inline unsigned int pool_list_index_with_size(POINTER_SIZE_INT size)
 {
-  assert(size >= GC_OBJ_SIZE_THRESHOLD);
+  assert(size >= GC_LOS_OBJ_SIZE_THRESHOLD);
   
   unsigned int index;
   index = (unsigned int) (size >> BIT_SHIFT_TO_KILO);
@@ -102,7 +102,7 @@ inline unsigned int pool_list_index_with_size(POINTER_SIZE_INT size)
 
 inline Free_Area* free_pool_add_area(Free_Area_Pool* pool, Free_Area* free_area)
 {
-  assert( free_area->size >= GC_OBJ_SIZE_THRESHOLD);
+  assert( free_area->size >= GC_LOS_OBJ_SIZE_THRESHOLD);
   
   unsigned int index = pool_list_index_with_size(free_area->size);
   bidir_list_add_item((Bidir_List*)&(pool->sized_area_list[index]), (Bidir_List*)free_area);

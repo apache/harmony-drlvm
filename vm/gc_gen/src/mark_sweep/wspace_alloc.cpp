@@ -222,7 +222,7 @@ static void *wspace_alloc_super_obj(Wspace *wspace, unsigned size, Allocator *al
     chunk->table[0] |= cur_mark_black_color  ;
   } 
   mutator_post_signal((Mutator*) allocator,MUTATOR_EXIT_ALLOCATION_MARK);
-  mem_fence();
+  //mem_fence();
   
   chunk->table[0] |= cur_alloc_color;
   set_super_obj_mask(chunk->base);
@@ -254,6 +254,8 @@ static void *wspace_try_alloc(unsigned size, Allocator *allocator)
   if(p_obj && gc_is_concurrent_mark_phase()) ((Partial_Reveal_Object*)p_obj)->obj_info |= NEW_OBJ_MASK;
 #endif
 
+  if(p_obj) ((Mutator*)allocator)->new_obj_size += size;
+  
   return p_obj;
 }
 
@@ -264,7 +266,10 @@ void *wspace_alloc(unsigned size, Allocator *allocator)
   
   /* First, try to allocate object from TLB (thread local chunk) */
   p_obj = wspace_try_alloc(size, allocator);
-  if(p_obj)  return p_obj;
+  if(p_obj){
+    ((Mutator*)allocator)->new_obj_size += size;
+    return p_obj;
+  }
   
   if(allocator->gc->in_collection) return NULL;
   
@@ -273,9 +278,10 @@ void *wspace_alloc(unsigned size, Allocator *allocator)
   p_obj = wspace_try_alloc(size, allocator);
   if(p_obj){
     vm_gc_unlock_enum();
+    ((Mutator*)allocator)->new_obj_size += size;
     return p_obj;
   }
-  gc_reclaim_heap(allocator->gc, GC_CAUSE_WSPACE_IS_FULL);
+  gc_reclaim_heap(allocator->gc, GC_CAUSE_MOS_IS_FULL);
   vm_gc_unlock_enum();
 
 #ifdef SSPACE_CHUNK_INFO
@@ -283,6 +289,8 @@ void *wspace_alloc(unsigned size, Allocator *allocator)
 #endif
 
   p_obj = wspace_try_alloc(size, allocator);
+  
+  if(p_obj) ((Mutator*)allocator)->new_obj_size += size;
   
   return p_obj;
 }

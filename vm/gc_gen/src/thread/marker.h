@@ -33,6 +33,8 @@ typedef struct Marker{
   VmThreadHandle thread_handle;   /* This thread; */
   unsigned int handshake_signal; /*Handshake is used in concurrent GC.*/  
   unsigned int num_alloc_blocks; /* the number of allocated blocks in this collection. */
+  int64 time_measurement_start;
+  int64 time_measurement_end;
   /* End of Allocator --> */
 
   /* FIXME:: for testing */
@@ -95,8 +97,9 @@ void marker_execute_task_concurrent(GC* gc, TaskType task_func, Space* space);
 void marker_notify_mark_root_done(Marker* marker);
 void wait_mark_finish(GC* gc);
 Boolean is_mark_finished(GC* gc);
-
-
+int64 gc_get_marker_time(GC* gc);
 
 #endif //_MARKER_H_
+
+
 

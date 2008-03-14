@@ -187,7 +187,7 @@ inline void *alloc_in_chunk(Chunk_Header* &chunk)
   if(p_obj && is_obj_alloced_live())
     obj_mark_black_in_table((Partial_Reveal_Object*)p_obj, chunk->slot_size);
   
-  mem_fence();
+  //mem_fence();
   
   alloc_slot_in_table(table, slot_index);
   if(chunk->status & CHUNK_NEED_ZEROING)

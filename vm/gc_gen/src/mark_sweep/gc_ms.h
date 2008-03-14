@@ -18,8 +18,6 @@
 #ifndef _GC_MS_H_
 #define _GC_MS_H_
 
-#ifdef USE_MARK_SWEEP_GC
-
 #include "wspace.h"
 
 
@@ -123,9 +121,6 @@ void gc_ms_update_space_statistics(GC_MS* gc);
 void gc_ms_start_concurrent_sweep(GC_MS* gc, unsigned int num_collectors);
 void gc_ms_start_most_concurrent_mark(GC_MS* gc, unsigned int num_markers);
 void gc_ms_start_final_mark_after_concurrent(GC_MS* gc, unsigned int num_markers);
-
-
-
-#endif // USE_MARK_SWEEP_GC
+void gc_ms_reset_space_statistics(GC_MS* gc);
 
 #endif // _GC_MS_H_

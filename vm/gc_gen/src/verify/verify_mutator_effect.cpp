@@ -330,7 +330,7 @@ void verifier_reset_wb_verifier(Heap_Verifier* heap_verifier)
 void verifier_mark_wb_slots(Heap_Verifier* heap_verifier)
 {
   GC_Gen* gc = (GC_Gen*)(heap_verifier->gc);
-  if(gc_match_kind((GC*)gc, MAJOR_COLLECTION) ||!gc_is_gen_mode()) return;
+  if(collect_is_major() ||!gc_is_gen_mode()) return;
 
   GC_Metadata*gc_metadata = gc->metadata;
   Space* nspace  = gc_get_nos(gc);
@@ -363,7 +363,7 @@ void verifier_mark_wb_slots(Heap_Verifier* heap_verifier)
 void verify_write_barrier(REF* p_ref, Heap_Verifier* heap_verifier)
 {
   GC_Gen* gc    = (GC_Gen*)heap_verifier->gc;
-  if(gc_match_kind((GC*)gc, MAJOR_COLLECTION) ||!gc_is_gen_mode()) return;
+  if(collect_is_major() ||!gc_is_gen_mode()) return;
   
   Space* nspace  = gc_get_nos(gc);
   assert(address_belongs_to_gc_heap((void*)p_ref, (GC *) gc));
@@ -432,6 +432,8 @@ void verify_mutator_effect(Heap_Verifier* heap_verifier)
   if(heap_verifier->need_verify_allocation)  verify_allocation(heap_verifier);
 }
  
+
+
 
 
 

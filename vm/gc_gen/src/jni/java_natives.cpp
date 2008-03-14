@@ -116,7 +116,7 @@ JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getGCObjec
 
 JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getLargeObjectSize(JNIEnv *, jclass) 
 {
-   return (jint) GC_OBJ_SIZE_THRESHOLD;
+   return (jint) GC_LOS_OBJ_SIZE_THRESHOLD;
 }
 
 #ifdef __cplusplus

@@ -37,7 +37,7 @@ static FORCE_INLINE void scan_object(Heap_Verifier* heap_verifier, Partial_Revea
 {
   GC_Verifier* gc_verifier = heap_verifier->gc_verifier;
 
-#if !defined(USE_MARK_SWEEP_GC) && !defined(USE_UNIQUE_MOVE_COMPACT_GC)
+#if !defined(USE_UNIQUE_MARK_SWEEP_GC) && !defined(USE_UNIQUE_MOVE_COMPACT_GC)
   if(gc_verifier->is_before_fallback_collection) {
     if(obj_belongs_to_nos(p_obj) && obj_is_fw_in_oi(p_obj)){
       assert(obj_get_vt(p_obj) == obj_get_vt(obj_get_fw_in_oi(p_obj)));
@@ -49,8 +49,7 @@ static FORCE_INLINE void scan_object(Heap_Verifier* heap_verifier, Partial_Revea
   
   if(!obj_mark_in_vt(p_obj)) return;
 
-   extern unsigned int MAJOR_ALGO;
-  if( MAJOR_ALGO != MAJOR_MARK_SWEEP && p_obj >= los_boundary ){
+  if( !major_is_marksweep() && p_obj >= los_boundary ){
     Block_Header* block = GC_BLOCK_HEADER(p_obj);
     if( heap_verifier->is_before_gc)  block->num_live_objs++;
     /* we can't set block->num_live_objs = 0 if !is_before_gc, because the some blocks may be freed hence not
@@ -87,7 +86,7 @@ static FORCE_INLINE void scan_object(Heap_Verifier* heap_verifier, Partial_Revea
 
 #ifndef BUILD_IN_REFERENT
      WeakReferenceType type = special_reference_type(p_obj);
-    if(type == SOFT_REFERENCE && verifier_get_gc_collect_kind(heap_verifier->gc_verifier) == MINOR_COLLECTION){
+    if(type == SOFT_REFERENCE && verifier_collect_is_minor(gc_verifier)){
       p_ref = obj_get_referent_field(p_obj);
       scan_slot(heap_verifier, p_ref);
     } 
@@ -300,7 +299,7 @@ static FORCE_INLINE void verifier_scan_object_slots(Partial_Reveal_Object *p_obj
     WeakReferenceType type = special_reference_type(p_obj);
     if(type == NOT_REFERENCE) return;
     
-    //if(type != SOFT_REFERENCE && verifier_get_gc_collect_kind(heap_verifier) == MINOR_COLLECTION){
+    //if(type != SOFT_REFERENCE && verifier_collect_is_minor(heap_verifier->gc_verifier)){
     {
       p_ref = obj_get_referent_field(p_obj);
       verify_write_barrier(p_ref, heap_verifier);
@@ -374,7 +373,7 @@ void verifier_scan_los_objects(Space* lspace, Heap_Verifier* heap_verifier)
 
 void verifier_scan_all_objects(Heap_Verifier* heap_verifier)
 {
-#if !defined(USE_MARK_SWEEP_GC) && !defined(USE_UNIQUE_MOVE_COMPACT_GC)
+#if !defined(USE_UNIQUE_MARK_SWEEP_GC) && !defined(USE_UNIQUE_MOVE_COMPACT_GC)
   GC_Gen* gc       = (GC_Gen*)heap_verifier->gc;
   Space* fspace     = gc_get_nos(gc);
   Space* mspace   = gc_get_mos(gc);
@@ -422,7 +421,7 @@ void verifier_scan_los_unreachable_objects(Space* lspace, Heap_Verifier* heap_ve
 
 void verifier_scan_unreachable_objects(Heap_Verifier* heap_verifier)
 {
-#if !defined(USE_MARK_SWEEP_GC) && !defined(USE_UNIQUE_MOVE_COMPACT_GC)
+#if !defined(USE_UNIQUE_MARK_SWEEP_GC) && !defined(USE_UNIQUE_MOVE_COMPACT_GC)
   if(heap_verifier->is_before_gc) return;
   GC_Gen* gc       = (GC_Gen*)heap_verifier->gc;  
   Space* mspace   = gc_get_mos(gc);
@@ -441,5 +440,7 @@ void verifier_init_object_scanner(Heap_Verifier* heap_verifier)
   heap_verifier->live_obj_scanner = verifier_scan_live_objects;
   heap_verifier->all_obj_scanner   = verifier_scan_all_objects;
 }
+
+
 
 

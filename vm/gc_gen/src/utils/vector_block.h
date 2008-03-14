@@ -88,14 +88,14 @@ inline POINTER_SIZE_INT vector_block_get_entry(Vector_Block* block)
 #endif
   return value;
 }
-inline void vector_block_add_entry_to_index(Vector_Block* block, unsigned int index, POINTER_SIZE_INT value)
+inline void vector_block_set_at_index(Vector_Block* block, unsigned int index, POINTER_SIZE_INT value)
 {
 #ifdef _DEBUG 
   assert(index < VECTOR_BLOCK_ENTRY_NUM);
 #endif
   block->entries[index] = value;
 }
-inline POINTER_SIZE_INT vector_block_get_entry_from_index(Vector_Block* block, unsigned int index)
+inline POINTER_SIZE_INT vector_block_get_at_index(Vector_Block* block, unsigned int index)
 {
 #ifdef _DEBUG 
   assert(index < VECTOR_BLOCK_ENTRY_NUM);
@@ -185,6 +185,13 @@ inline void vector_block_clear(Vector_Block* block)
 #ifdef _DEBUG
   memset(block->entries, 0, (POINTER_SIZE_INT)block->heap_end - (POINTER_SIZE_INT)block->entries);
 #endif
+}
+
+inline void vector_block_set_zero(Vector_Block* block)
+{
+  block->head = (POINTER_SIZE_INT*)block->entries;
+  block->tail = (POINTER_SIZE_INT*)block->entries;
+  memset(block->entries, 0, (POINTER_SIZE_INT)block->heap_end - (POINTER_SIZE_INT)block->entries);
 }
 
 /* Below is for sequential local access */

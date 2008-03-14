@@ -50,10 +50,10 @@ void HelperClass_set_GenMode(Boolean status)
   
   //"org.apache.harmony.drlvm.gc_gen.GCHelper" 
   jclass GCHelper = jni_env->FindClass("GCHelper");
-  jfieldID gen_mode = jni_env->GetStaticFieldID(GCHelper, "GEN_MODE", "Z");
-  assert(gen_mode);
+  jfieldID gen_mode_field = jni_env->GetStaticFieldID(GCHelper, "GEN_MODE", "Z");
+  assert(gen_mode_field);
   
-  jni_env->SetStaticBooleanField(GCHelper, gen_mode, status?JNI_TRUE:JNI_FALSE);
+  jni_env->SetStaticBooleanField(GCHelper, gen_mode_field, status?JNI_TRUE:JNI_FALSE);
   
   hythread_suspend_disable();
 */  

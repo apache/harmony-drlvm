@@ -19,6 +19,8 @@
 #include "sspace.h"
 
 POINTER_SIZE_INT TOSPACE_SIZE = 0;
+void* tospace_start;
+void* tospace_end;
 
 static unsigned int sspace_compute_num_tospace_blocks(Sspace* sspace)
 {
@@ -221,7 +223,7 @@ void sspace_reset_after_collection(Sspace* sspace)
 
   unsigned int sspace_first_idx = sspace->first_block_idx;
 
-  Boolean is_major_collection = gc_match_kind(sspace->gc, MAJOR_COLLECTION);
+  Boolean is_major_collection = collect_is_major();
 
   if( is_major_collection ){ 
     /* prepare for from-space, first half */
@@ -337,7 +339,7 @@ void* sspace_heap_start_adjust(Sspace* sspace, void* new_space_start, POINTER_SI
      It's troublesome to do config again after minor collection. */
 
   /* major collection leaves no survivor area in nos */
-  if( gc_match_kind(gc, MAJOR_COLLECTION)){
+  if( collect_is_major()){
     /* retore the fromspace last block next pointer. It was set a moment ago in sspace_reset_after_collection. */
     Block_Header* block_before_survivor_area = (Block_Header*)((Block*)(sspace->survivor_area_start) - 1);
     block_before_survivor_area->next = (Block_Header*)(sspace->survivor_area_start);
@@ -385,40 +387,25 @@ void sspace_collection(Sspace *sspace)
 {
   sspace->num_collections++;  
 
-  if(gc_is_gen_mode()){
-    sspace->collect_algorithm = MINOR_GEN_SEMISPACE_POOL;
-  }else{
-    sspace->collect_algorithm = MINOR_NONGEN_SEMISPACE_POOL;
-  }
-
   GC* gc = sspace->gc;
   
   /* we should not destruct rootset structure in case we need fall back */
   pool_iterator_init(gc->metadata->gc_rootset_pool);
 
-  switch(sspace->collect_algorithm){
-
+  if(!gc_is_gen_mode()){
 #ifdef MARK_BIT_FLIPPING
+    TRACE2("gc.process", "GC: nongenerational semispace algo start ... \n");
+    collector_execute_task(gc, (TaskType)nongen_ss_pool, (Space*)sspace);
+    TRACE2("gc.process", "\nGC: end of nongen semispace pool algo ... \n");
+#else
+    assert(0);
+#endif /*#ifdef MARK_BIT_FLIPPING #else */
 
-    case MINOR_NONGEN_SEMISPACE_POOL:
-      TRACE2("gc.process", "GC: nongen_semispace_pool algo start ... \n");
-      collector_execute_task(gc, (TaskType)nongen_ss_pool, (Space*)sspace);
-      TRACE2("gc.process", "\nGC: end of nongen semispace pool algo ... \n");
-      break;
-
-#endif /*#ifdef MARK_BIT_FLIPPING */
-
-    case MINOR_GEN_SEMISPACE_POOL:
-      TRACE2("gc.process", "gen_semispace_pool algo start ... \n");
-      collector_execute_task(gc, (TaskType)gen_ss_pool, (Space*)sspace);
-      TRACE2("gc.process", "\nGC: end of gen semispace pool algo ... \n");
-      break;
-    
-    default:
-      DIE2("gc.collection","Specified minor collection algorithm doesn't exist!");
-      exit(0);
-      break;
-  }
+  }else{
+    TRACE2("gc.process", "generational semispace algo start ... \n");
+    collector_execute_task(gc, (TaskType)gen_ss_pool, (Space*)sspace);
+    TRACE2("gc.process", "\nGC: end of gen semispace pool algo ... \n");
+  }    
   
   return; 
 }

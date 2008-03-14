@@ -32,7 +32,7 @@ static FORCE_INLINE Boolean obj_mark_black(Partial_Reveal_Object *obj)
   if(obj_belongs_to_space(obj, (Space*)wspace_in_marking)){
     Boolean marked_by_self = obj_mark_black_in_table(obj);
 
-#ifndef USE_MARK_SWEEP_GC
+#ifndef USE_UNIQUE_MARK_SWEEP_GC
     /* When fallback happens, some objects in MOS have their fw bit set, which is actually their mark bit in the last minor gc.
      * If we don't clear it, some objects that didn't be moved will be mistaken for being moved in the coming fixing phase.
      */
@@ -115,8 +115,12 @@ static FORCE_INLINE void scan_object(Collector *collector, Partial_Reveal_Object
     scan_slot(collector, p_ref);
   }
 
+    if(!IGNORE_FINREF )
+      scan_weak_reference(collector, p_obj, scan_slot);
 #ifndef BUILD_IN_REFERENT
-  scan_weak_reference(collector, p_obj, scan_slot);
+    else {
+      scan_weak_reference_direct(collector, p_obj, scan_slot);
+    }
 #endif
 
 }
@@ -176,7 +180,7 @@ void wspace_mark_scan(Collector *collector, Wspace *wspace)
       iter = vector_block_iterator_advance(root_set,iter);
       
       Partial_Reveal_Object *p_obj = read_slot(p_ref);
-      /* root ref can't be NULL, (remset may have NULL ref entry, but this function is only for MAJOR_COLLECTION */
+      /* root ref can't be NULL, (remset may have NULL ref entry, but this function is only for ALGO_MAJOR */
       assert(p_obj != NULL);
       /* we have to mark the object before putting it into marktask, because
          it is possible to have two slots containing a same object. They will

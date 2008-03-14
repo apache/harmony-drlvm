@@ -22,8 +22,6 @@
 #include "mspace_collect_compact.h"
 
 
-Boolean IS_MOVE_COMPACT;
-
 struct GC_Gen;
 Space* gc_get_nos(GC_Gen* gc);
 
@@ -267,69 +265,35 @@ void mspace_collection(Mspace* mspace)
 
   pool_iterator_init(gc->metadata->gc_rootset_pool);
 
-  /* dual mark bits will consume two bits in obj info, that makes current 
-     header hashbits only 5 bits. That's not enough. We implement on-demend
-     hash field allocation in obj during moving. move_compact doesn't support it.
-     Dual mark bits is used for MINOR_NONGEN_FORWARD algorithm */
-
   //For_LOS_extend
   if(gc->tuner->kind != TRANS_NOTHING){
+    major_set_compact_slide();
+  }else if (collect_is_fallback()){
+    major_set_compact_slide();
+  }else{
+    major_set_compact_move();    
+  }
 
+  if(major_is_compact_slide()){
+  
     TRACE2("gc.process", "GC: slide compact algo start ... \n");
     collector_execute_task(gc, (TaskType)slide_compact_mspace, (Space*)mspace);
     TRACE2("gc.process", "\nGC: end of slide compact algo ... \n");
-
-#ifdef GC_GEN_STATS
-    gc_gen_stats_set_mos_algo((GC_Gen*)gc, MAJOR_COMPACT_SLIDE);
-#endif
-
-  }else if (gc_match_kind(gc, FALLBACK_COLLECTION)){
-
-    TRACE2("gc.process", "GC: slide compact algo start ... \n");
-    collector_execute_task(gc, (TaskType)slide_compact_mspace, (Space*)mspace);  
-    TRACE2("gc.process", "\nGC: end of slide compact algo ... \n");
-
-#ifdef GC_GEN_STATS
-    gc_gen_stats_set_los_collected_flag((GC_Gen*)gc, true);
-    gc_gen_stats_set_mos_algo((GC_Gen*)gc, MAJOR_COMPACT_SLIDE);
-#endif
-    //IS_MOVE_COMPACT = TRUE;
-    //collector_execute_task(gc, (TaskType)move_compact_mspace, (Space*)mspace);
-    //IS_MOVE_COMPACT = FALSE;
-  }else{
-
-    switch(mspace->collect_algorithm){
-      case MAJOR_COMPACT_SLIDE:
-        TRACE2("gc.process", "GC: slide compact algo start ... \n");
-        collector_execute_task(gc, (TaskType)slide_compact_mspace, (Space*)mspace);
-        TRACE2("gc.process", "\nGC: end of slide compact algo ... \n");
-#ifdef GC_GEN_STATS
-        gc_gen_stats_set_los_collected_flag((GC_Gen*)gc, true);
-        gc_gen_stats_set_mos_algo((GC_Gen*)gc, MAJOR_COMPACT_SLIDE);
-#endif
-        break;
-        
-      case MAJOR_COMPACT_MOVE:
-        IS_MOVE_COMPACT = TRUE;
-        
-        TRACE2("gc.process", "GC: move compact algo start ... \n");
-        collector_execute_task(gc, (TaskType)move_compact_mspace, (Space*)mspace);
-        TRACE2("gc.process", "\nGC: end of move compact algo ... \n");
-        IS_MOVE_COMPACT = FALSE;
-#ifdef GC_GEN_STATS
-        gc_gen_stats_set_mos_algo((GC_Gen*)gc, MAJOR_COMPACT_MOVE);
-#endif
-        break;
   
-      default:
-        DIE2("gc.collect", "The speficied major collection algorithm doesn't exist!");
-        exit(0);
-        break;
-    }
+  }else if( major_is_compact_move()){      
+    
+    TRACE2("gc.process", "GC: move compact algo start ... \n");
+    collector_execute_task(gc, (TaskType)move_compact_mspace, (Space*)mspace);
+    TRACE2("gc.process", "\nGC: end of move compact algo ... \n");
 
-  }  
+  }else{
+    DIE2("gc.collect", "The speficied major collection algorithm doesn't exist!");
+    exit(0);
+  }
 
   return;  
 } 
+
+
 
 

@@ -22,7 +22,7 @@
 #include "wspace_verify.h"
 
 #define PFC_REUSABLE_RATIO 0.1
-#define SSPACE_COMPACT_RATIO 0.06
+#define WSPACE_COMPACT_RATIO 0.06
 
 inline Boolean chunk_is_reusable(Chunk_Header *chunk)
 { return (float)(chunk->slot_num-chunk->alloc_num)/chunk->slot_num > PFC_REUSABLE_RATIO; }
@@ -431,7 +431,7 @@ inline void ops_color_flip(void)
 {
   POINTER_SIZE_INT temp = cur_alloc_color;
   cur_alloc_color = cur_mark_black_color;
-  mem_fence();
+  //mem_fence();
   cur_mark_black_color = temp;
   cur_alloc_mask = (~cur_alloc_mask) & FLIP_COLOR_MASK_IN_TABLE;
   cur_mark_mask = (~cur_mark_mask) & FLIP_COLOR_MASK_IN_TABLE;

@@ -120,7 +120,7 @@ void mark_scan_heap_for_fallback(Collector* collector)
   GC_Gen_Collector_Stats* stats = (GC_Gen_Collector_Stats*)collector->stats;
 #endif
   
-  assert(gc_match_kind(gc, FALLBACK_COLLECTION));
+  assert(collect_is_fallback());
 
   /* reset the num_finished_collectors to be 0 by one collector. This is necessary for the barrier later. */
   unsigned int num_active_collectors = gc->num_active_collectors;
@@ -138,7 +138,7 @@ void mark_scan_heap_for_fallback(Collector* collector)
       REF *p_ref = (REF *)*iter;
       iter = vector_block_iterator_advance(root_set,iter);
 
-      /* root ref can't be NULL, (remset may have NULL ref entry, but this function is only for MAJOR_COLLECTION */
+      /* root ref can't be NULL, (remset may have NULL ref entry, but this function is only for ALGO_MAJOR */
       assert(*p_ref);
       
       collector_tracestack_push(collector, p_ref);
@@ -210,7 +210,7 @@ void fallback_clear_fwd_obj_oi(Collector* collector)
   GC* gc = collector->gc;
   Blocked_Space* space = (Blocked_Space*)((GC_Gen*)gc)->nos;
 
-  assert(gc_match_kind(gc, FALLBACK_COLLECTION));
+  assert(collect_is_fallback());
 
   unsigned int num_active_collectors = gc->num_active_collectors;
   atomic_cas32( &num_finished_collectors, 0, num_active_collectors);
@@ -251,6 +251,8 @@ void fallback_clear_fwd_obj_oi_init(Collector* collector)
     
 }
 #endif
+
+
 
 
 

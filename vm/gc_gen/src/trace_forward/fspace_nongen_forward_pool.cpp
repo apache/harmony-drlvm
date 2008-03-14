@@ -40,21 +40,10 @@ static FORCE_INLINE void scan_slot(Collector *collector, REF *p_ref)
   return;
 }
 
-/* forward declaration */
-static void forward_jlc_instance(Collector* collector, Partial_Reveal_Object *p_obj);
-
 static FORCE_INLINE void scan_object(Collector* collector, Partial_Reveal_Object *p_obj) 
 {
   assert((((POINTER_SIZE_INT)p_obj) % GC_OBJECT_ALIGNMENT) == 0);
-  
-  Partial_Reveal_VTable *vtable = decode_vt(obj_get_vt(p_obj));
-  if(TRACE_JLC_VIA_VTABLE){
-    if(vtable->vtmark == VT_UNMARKED) {
-      vtable->vtmark = VT_MARKED;
-      forward_jlc_instance(collector, vtable->jlC);
-    }
-  }
-    
+      
   if (!object_has_ref_field_before_scan(p_obj)) return;
     
   REF *p_ref;
@@ -143,34 +132,6 @@ static FORCE_INLINE void forward_object(Collector* collector, REF *p_ref)
 #endif
   write_slot(p_ref, p_target_obj);
 
-  scan_object(collector, p_target_obj); 
-  return;
-}
-
-/*
- Forward the vtable->jlc and trace the forwarded object. 
- But do not update the vtable->jlc but leave them for weakroots updating
- We probably do not need this function if we do not perform class unloading in minor collections. 
- That means all the weakroots to jlc instances are treated as strong roots.
-*/
-static void forward_jlc_instance(Collector* collector, Partial_Reveal_Object *p_obj) 
-{
-  if(!obj_belongs_to_nos(p_obj)){
-    if(obj_mark_in_oi(p_obj))
-      scan_object(collector, p_obj);
-    return;
-  }
-
-  /* following is the logic for forwarding */  
-  Partial_Reveal_Object* p_target_obj = collector_forward_object(collector, p_obj);
-  if( p_target_obj == NULL ){
-    if(collector->result == FALSE ){
-      vector_stack_clear(collector->trace_stack);
-      return; /* FIXME: the failure result is not propagated back to GC */
-    }
-    assert(obj_get_fw_in_oi(p_obj));
-    return;
-  }
   scan_object(collector, p_target_obj); 
   return;
 }

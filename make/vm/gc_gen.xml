@@ -59,6 +59,21 @@
                 <include name="vmcore/src/util/win/include" if="is.windows"/>
                 <include name="vmcore/src/util/linux/include" if="is.unix"/>
             </dirset>
+            <dirset dir="${vm.home}/gc_gen/src">
+            	<include name="common" />
+                <include name="gen" />
+                <include name="mark_compact" />
+                <include name="mark_sweep" />
+                <include name="move_compact" />
+                <include name="semi_space" />
+                <include name="los" />
+                <include name="thread" />
+                <include name="trace_forward" />
+                <include name="utils" />
+                <include name="jni" />
+                <include name="verify" />
+                <include name="finalizer_weakref" />
+            </dirset>
         </path>
         
         <compiler id="cpp.compiler" extends="common.cpp.compiler">
@@ -69,6 +84,7 @@
                 <include name="gen/*.cpp" />
                 <include name="mark_compact/*.cpp" />
                 <include name="mark_sweep/*.cpp" />
+                <include name="move_compact/*.cpp" />
                 <include name="semi_space/*.cpp" />
                 <include name="los/*.cpp" />
                 <include name="thread/*.cpp" />

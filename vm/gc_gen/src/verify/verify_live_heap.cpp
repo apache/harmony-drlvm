@@ -69,7 +69,7 @@ void gc_terminate_heap_verification(GC* gc)
 
 void verify_heap_before_gc(GC* gc)
 {
-  verifier_set_gc_collect_kind(heap_verifier->gc_verifier, gc->collect_kind);  
+  verifier_set_gc_collect_kind(heap_verifier->gc_verifier, GC_PROP);  
   verifier_set_gen_mode(heap_verifier);
   verifier_reset_mutator_verification(heap_verifier);
   verifier_reset_gc_verification(heap_verifier);
@@ -89,11 +89,10 @@ void verify_heap_before_gc(GC* gc)
 }
 
 void verifier_cleanup_block_info(GC* gc);
-extern unsigned int MAJOR_ALGO;
 
 void verify_heap_after_gc(GC* gc)
 {
-  if(MAJOR_ALGO != MAJOR_MARK_SWEEP)
+  if(!major_is_marksweep())
     verifier_cleanup_block_info(gc);
       
   if(need_scan_live_objs(heap_verifier))
@@ -121,7 +120,7 @@ void gc_verify_heap(GC* gc, Boolean is_before_gc)
 void event_gc_collect_kind_changed(GC* gc)
 {
   /*GC collection kind were changed from normal MINOR or MAJOR  to FALLBACK MAJOR*/
-  assert(gc_match_kind(gc, FALLBACK_COLLECTION));
+  assert(collect_is_fallback());
   if(!heap_verifier->need_verify_gc) return;
   
   /*finish the fallbacked gc verify*/
@@ -136,7 +135,7 @@ void event_gc_collect_kind_changed(GC* gc)
   /*start fallback major gc verify */
   heap_verifier->is_before_gc = TRUE;
   verifier_set_fallback_collection(heap_verifier->gc_verifier, TRUE);  
-  verifier_set_gc_collect_kind(heap_verifier->gc_verifier, gc->collect_kind);
+  verifier_set_gc_collect_kind(heap_verifier->gc_verifier, GC_PROP);
   verifier_set_gen_mode(heap_verifier);
   verifier_reset_gc_verification(heap_verifier);
 
@@ -151,4 +150,6 @@ void event_mutator_allocate_newobj(Partial_Reveal_Object* p_newobj, POINTER_SIZE
 
 Heap_Verifier* get_heap_verifier()
 { return heap_verifier; }
+
+
 

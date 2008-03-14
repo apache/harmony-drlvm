@@ -19,6 +19,8 @@
 #define _SEMI_SPACE_H_
 
 #include "../thread/gc_thread.h"
+extern void* tospace_start;
+extern void* tospace_end;
 
 typedef struct Sspace{
   /* <-- first couple of fields are overloadded as Space */
@@ -93,6 +95,11 @@ FORCE_INLINE Boolean sspace_has_free_block(Sspace* sspace)
   return (sspace->cur_free_block != NULL);
 }
 
+FORCE_INLINE Boolean obj_belongs_to_tospace(Partial_Reveal_Object* p_obj)
+{
+  return ( p_obj >= tospace_start && p_obj < tospace_end );
+}
+
 FORCE_INLINE Boolean obj_belongs_to_survivor_area(Sspace* sspace, Partial_Reveal_Object* p_obj)
 {
   return (p_obj >= sspace->survivor_area_start && 
@@ -111,7 +118,7 @@ FORCE_INLINE Boolean obj_be_forwarded(Sspace* sspace, Partial_Reveal_Object* p_o
 }
 
 /* treat semispace alloc as thread local alloc. If it fails or p_obj is old, forward it to MOS */
-FORCE_INLINE void* semispace_forward_obj(Partial_Reveal_Object* p_obj, unsigned int size, Allocator* allocator)
+FORCE_INLINE void* semispace_copy_object(Partial_Reveal_Object* p_obj, unsigned int size, Allocator* allocator)
 {
   void* p_targ_obj = NULL;
   Sspace* sspace = (Sspace*)allocator->alloc_space;

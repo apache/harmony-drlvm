@@ -25,6 +25,7 @@
 #include "port_vmem.h"
 #include "port_atomic.h"
 #include "port_malloc.h"
+#include "port_barriers.h"
 
 #include <assert.h>
 
@@ -79,6 +80,10 @@ extern char* large_page_hint;
 #define PREFETCH prefetchnta
 #else
 #define PREFETCH(x) 
+#endif
+
+#ifdef PREFETCH_SUPPORTED
+extern Boolean mark_prefetch;
 #endif
 
 #define ABS_DIFF(x, y) (((x)>(y))?((x)-(y)):((y)-(x)))
@@ -287,8 +292,7 @@ inline Boolean vm_decommit_mem(void* start, POINTER_SIZE_INT size)
 
 inline void mem_fence()
 {
-  //FIXME: enable mem fence.
-  //apr_memory_rw_barrier(); 
+  port_rw_barrier(); 
 }
 
 inline int64 time_now() 

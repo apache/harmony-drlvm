@@ -24,9 +24,9 @@
 #ifndef STATIC_NOS_MAPPING
 void* nos_space_adjust(Space* nos, void* new_nos_boundary, POINTER_SIZE_INT new_nos_size)
 {
-  if(nos->collect_algorithm == MINOR_NONGEN_SEMISPACE_POOL || nos->collect_algorithm == MINOR_GEN_SEMISPACE_POOL)
+  if(minor_is_semispace())
     return sspace_heap_start_adjust((Sspace*)nos, new_nos_boundary, new_nos_size);
-  else if( nos->collect_algorithm == MINOR_NONGEN_FORWARD_POOL || nos->collect_algorithm == MINOR_GEN_FORWARD_POOL )
+  else if(minor_is_forward())
     return fspace_heap_start_adjust((Fspace*)nos, new_nos_boundary, new_nos_size);  
   
   assert(0);
@@ -37,7 +37,7 @@ void* nos_space_adjust(Space* nos, void* new_nos_boundary, POINTER_SIZE_INT new_
 POINTER_SIZE_INT mos_free_space_size(Space* mos)
 {
   POINTER_SIZE_INT free_size = 0;
-  if( mos->collect_algorithm != MAJOR_MARK_SWEEP )
+  if( !major_is_marksweep())
     return mspace_free_space_size((Mspace*)mos);
 
   assert(0);
@@ -47,9 +47,9 @@ POINTER_SIZE_INT mos_free_space_size(Space* mos)
 POINTER_SIZE_INT nos_free_space_size(Space* nos)
 {
   POINTER_SIZE_INT free_size = 0;
-  if(nos->collect_algorithm == MINOR_NONGEN_SEMISPACE_POOL || nos->collect_algorithm == MINOR_GEN_SEMISPACE_POOL)
+  if(minor_is_semispace())
     return sspace_free_space_size((Sspace*)nos);
-  else if( nos->collect_algorithm == MINOR_NONGEN_FORWARD_POOL || nos->collect_algorithm == MINOR_GEN_FORWARD_POOL)
+  else if( minor_is_forward())
     return fspace_free_space_size((Fspace*)nos);
 
   assert(0);
@@ -60,7 +60,7 @@ POINTER_SIZE_INT nos_free_space_size(Space* nos)
 POINTER_SIZE_INT mos_used_space_size(Space* mos)
 {
   POINTER_SIZE_INT free_size = 0;
-  if( mos->collect_algorithm != MAJOR_MARK_SWEEP )
+  if( !major_is_marksweep() )
     return mspace_used_space_size((Mspace*)mos);
 
   assert(0);
@@ -70,9 +70,9 @@ POINTER_SIZE_INT mos_used_space_size(Space* mos)
 POINTER_SIZE_INT nos_used_space_size(Space* nos)
 {
   POINTER_SIZE_INT free_size = 0;
-  if(nos->collect_algorithm == MINOR_NONGEN_SEMISPACE_POOL || nos->collect_algorithm == MINOR_GEN_SEMISPACE_POOL)
+  if(minor_is_semispace())
     return sspace_used_space_size((Sspace*)nos);
-  else if( nos->collect_algorithm == MINOR_NONGEN_FORWARD_POOL || nos->collect_algorithm == MINOR_GEN_FORWARD_POOL)
+  else if( minor_is_forward())
     return fspace_used_space_size((Fspace*)nos);
 
   assert(0);

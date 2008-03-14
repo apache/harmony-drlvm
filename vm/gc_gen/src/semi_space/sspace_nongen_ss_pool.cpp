@@ -87,6 +87,8 @@ static FORCE_INLINE void forward_object(Collector* collector, REF *p_ref)
   GC* gc = collector->gc;
   Partial_Reveal_Object *p_obj = read_slot(p_ref);
 
+  if(obj_belongs_to_tospace(p_obj)) return;
+    
   if(!obj_belongs_to_nos(p_obj)){
     if(obj_mark_in_oi(p_obj)){
 #ifdef GC_GEN_STATS
@@ -150,6 +152,15 @@ static void trace_object(Collector *collector, REF *p_ref)
   Vector_Block* trace_stack = (Vector_Block*)collector->trace_stack;
   while( !vector_stack_is_empty(trace_stack)){
     p_ref = (REF *)vector_stack_pop(trace_stack); 
+#ifdef PREFETCH_SUPPORTED
+    /* DO PREFETCH */
+   if(mark_prefetch) {
+     if(!vector_stack_is_empty(trace_stack)) {
+        REF *pref = (REF*)vector_stack_read(trace_stack, 0);
+        PREFETCH( read_slot(pref) );
+     }
+   }
+#endif    
     forward_object(collector, p_ref);
     trace_stack = (Vector_Block*)collector->trace_stack;
   }
@@ -213,6 +224,15 @@ retry:
     while(!vector_block_iterator_end(trace_task,iter)){
       REF *p_ref = (REF *)*iter;
       iter = vector_block_iterator_advance(trace_task, iter);
+#ifdef PREFETCH_SUPPORTED
+      /* DO PREFETCH */
+      if( mark_prefetch ) {    
+        if(!vector_block_iterator_end(trace_task, iter)) {
+      	  REF *pref= (REF*) *iter;
+      	  PREFETCH( read_slot(pref));
+        }	
+      }
+#endif      
       trace_object(collector, p_ref);
       
       if(collector->result == FALSE)  break; /* force return */
@@ -255,6 +275,11 @@ retry:
 void nongen_ss_pool(Collector* collector) 
 {  
   GC* gc = collector->gc;
+
+  Sspace* sspace = (Sspace*)collector->collect_space;
+  unsigned int sspace_first_idx = sspace->first_block_idx;
+  tospace_start = (void*)&(sspace->blocks[sspace->tospace_first_idx - sspace_first_idx]);
+  tospace_end = (void*)&(sspace->blocks[sspace->ceiling_block_idx - sspace_first_idx + 1]);
   
   collector_trace_rootsets(collector);  
   /* the rest work is not enough for parallelization, so let only one thread go */

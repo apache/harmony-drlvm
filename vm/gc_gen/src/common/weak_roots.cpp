@@ -32,9 +32,9 @@ void gc_identify_dead_weak_roots(GC *gc)
       if(!p_obj){  // reference has been cleared
         continue;
       }
-      if(IS_FALLBACK_COMPACTION) {
+      assert(p_obj->vt_raw);
+      if(collect_is_fallback()) {
           if(obj_belongs_to_nos(p_obj) && obj_is_fw_in_oi(p_obj)){
-             //this is unreachable for VTable->jlc(p_obj), but needed by general weak roots
              assert(!obj_is_marked_in_vt(p_obj));
              assert(obj_get_vt(p_obj) == obj_get_vt(obj_get_fw_in_oi(p_obj)));
              p_obj = obj_get_fw_in_oi(p_obj);
@@ -47,8 +47,6 @@ void gc_identify_dead_weak_roots(GC *gc)
     }
   }
 }
-
-extern Boolean IS_MOVE_COMPACT;
 
 /* parameter pointer_addr_in_pool means it is p_ref or p_obj in pool */
 void gc_update_weak_roots(GC *gc, Boolean double_fix)
@@ -67,29 +65,33 @@ void gc_update_weak_roots(GC *gc, Boolean double_fix)
       if(!p_obj || !obj_need_move(gc, p_obj)){  // reference has been cleared or not moved
         continue;
       }
+      /* following code knows p_obj's space is movable. So mark-sweep is not considered below. */
+      if( collect_is_compact_move()){ /* move-compact uses offset table */
+        if( gc_has_los() && p_obj < los_boundary){
+            p_obj = obj_get_fw_in_oi(p_obj);
+        }else{ /* this is the case with unique move_compact */
+            p_obj = obj_get_fw_in_table(p_obj);
+        }
 
-      if(IS_MOVE_COMPACT){
-        assert(space_of_addr(gc, p_obj)->move_object);
-        *p_ref = obj_get_fw_in_table(p_obj);
-      } else if(gc_match_kind(gc, MC_COLLECTION)){
-        *p_ref = obj_get_fw_in_table(p_obj);
-      } else if(gc_match_kind(gc, MS_COMPACT_COLLECTION) || gc_get_mos((GC_Gen*)gc)->collect_algorithm==MAJOR_MARK_SWEEP){
+      } else if(collect_is_ms_compact()){ 
+        /* ms-compact does not move all live objects, and sometimes need double-fix */
         if(obj_is_fw_in_oi(p_obj)){
           p_obj = obj_get_fw_in_oi(p_obj);
           /* Only major collection in MS Gen GC might need double_fix.
            * Double fixing happens when both forwarding and compaction happen.
            */
           if(double_fix && obj_is_fw_in_oi(p_obj)){
-            assert(gc_get_mos((GC_Gen*)gc)->collect_algorithm == MAJOR_MARK_SWEEP);
+            assert(major_is_marksweep());
             p_obj = obj_get_fw_in_oi(p_obj);
             assert(address_belongs_to_gc_heap(p_obj, gc));
           }
-          *p_ref = p_obj;
         }
-      } else {
+      } else { /* minor collection or slide major compaction */
         assert(obj_is_fw_in_oi(p_obj));
-        *p_ref = obj_get_fw_in_oi(p_obj);
+        p_obj = obj_get_fw_in_oi(p_obj);
       }
+      
+      *p_ref = p_obj;
     }
   }
 }

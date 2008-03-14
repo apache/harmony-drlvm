@@ -158,7 +158,7 @@ static void mspace_fix_repointed_refs(Collector *collector, Mspace *mspace)
 {
   Block_Header *curr_block = blocked_space_block_iterator_next((Blocked_Space*)mspace);
   
-  /* for MAJOR_COLLECTION, we must iterate over all compact blocks */
+  /* for ALGO_MAJOR, we must iterate over all compact blocks */
   while( curr_block){
     block_fix_ref_after_repointing(curr_block); 
     curr_block = blocked_space_block_iterator_next((Blocked_Space*)mspace);
@@ -420,7 +420,7 @@ void slide_compact_mspace(Collector* collector)
 
   unsigned int old_num = atomic_cas32( &num_marking_collectors, 0, num_active_collectors+1);
 
-  if(gc_match_kind(gc, FALLBACK_COLLECTION))
+  if(collect_is_fallback())
     mark_scan_heap_for_fallback(collector);
   else if(gc->tuner->kind != TRANS_NOTHING)
     mark_scan_heap_for_space_tune(collector);
@@ -447,7 +447,7 @@ void slide_compact_mspace(Collector* collector)
     gc_init_block_for_collectors(gc, mspace);
     
 #ifdef USE_32BITS_HASHCODE
-    if(gc_match_kind(gc, FALLBACK_COLLECTION))
+    if(collect_is_fallback())
       fallback_clear_fwd_obj_oi_init(collector);
 #endif
 
@@ -465,7 +465,7 @@ void slide_compact_mspace(Collector* collector)
   atomic_cas32( &num_repointing_collectors, 0, num_active_collectors+1);
 
 #ifdef USE_32BITS_HASHCODE
-  if(gc_match_kind(gc, FALLBACK_COLLECTION))
+  if(collect_is_fallback())
     fallback_clear_fwd_obj_oi(collector);
 #endif
   mspace_compute_object_target(collector, mspace);

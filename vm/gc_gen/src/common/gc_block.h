@@ -47,9 +47,7 @@ typedef struct Block_Header {
   void* ceiling;                    
   void* new_free; /* used only during compaction */
   unsigned int block_idx;           
-#ifdef USE_UNIQUE_MOVE_COMPACT_GC
-  unsigned int num_multi_block; /*number of block in large block*/
-#endif
+  unsigned int num_multi_block; /* number of blocks in large block */
   volatile unsigned int status;
 
   volatile unsigned int num_live_objs; /* for verification debugging */
@@ -63,9 +61,6 @@ typedef struct Block_Header {
   Hashcode_Buf* hashcode_buf; /*hash code entry list*/
 #endif
   Block_Header* next;
-#ifdef USE_UNIQUE_MOVE_COMPACT_GC
-  Block_Header* next_large_block; /*used to link free super large block in gc_mc*/
-#endif
   POINTER_SIZE_INT table[1]; /* entry num == OFFSET_TABLE_SIZE_WORDS */
 }Block_Header;
 
@@ -106,18 +101,15 @@ so we must have some other methods to compute block end.*/
 #define ADDRESS_OFFSET_TO_BLOCK_HEADER(addr) ((unsigned int)((POINTER_SIZE_INT)addr&GC_BLOCK_LOW_MASK))
 #define ADDRESS_OFFSET_IN_BLOCK_BODY(addr) ((unsigned int)(ADDRESS_OFFSET_TO_BLOCK_HEADER(addr)- GC_BLOCK_HEADER_SIZE_BYTES))
 
-#ifdef USE_UNIQUE_MOVE_COMPACT_GC
-#define NUM_BLOCKS_PER_LARGE_OBJECT(size) (((size)+GC_BLOCK_HEADER_SIZE_BYTES+ GC_BLOCK_SIZE_BYTES-1)/GC_BLOCK_SIZE_BYTES)
-#endif
+#define NUM_BLOCKS_IN_LARGE_BLOCK_FOR_SIZE(size) ((unsigned int)(((size)+ GC_BLOCK_HEADER_SIZE_BYTES + GC_BLOCK_SIZE_BYTES - 1)>>GC_BLOCK_SHIFT_COUNT))
+
 inline void block_init(Block_Header* block)
 {
   block->free = (void*)((POINTER_SIZE_INT)block + GC_BLOCK_HEADER_SIZE_BYTES);
   block->ceiling = (void*)((POINTER_SIZE_INT)block + GC_BLOCK_SIZE_BYTES); 
   block->base = block->free;
   block->new_free = block->free;
-#ifdef USE_UNIQUE_MOVE_COMPACT_GC
   block->num_multi_block = 0;
-#endif
   block->status = BLOCK_FREE;
   block->dest_counter = 0;
   block->src = NULL;
@@ -278,6 +270,8 @@ inline int obj_lookup_hashcode_in_buf(Partial_Reveal_Object *p_obj)
 /* blocked_space hashcode_buf ops --> */
 
 #endif //#ifndef _BLOCK_H_
+
+
 
 
 

@@ -85,14 +85,14 @@ Boolean verify_rootset_slot(REF* p_ref, Heap_Verifier* heap_verifier)
 {
   Partial_Reveal_Object* p_obj = read_slot(p_ref);
   assert(address_belongs_to_gc_heap(p_obj,heap_verifier->gc));
-#if !defined(USE_MARK_SWEEP_GC) && !defined(USE_UNIQUE_MOVE_COMPACT_GC)
+#if !defined(USE_UNIQUE_MARK_SWEEP_GC) && !defined(USE_UNIQUE_MOVE_COMPACT_GC)
   GC_Gen* gc    = (GC_Gen*)heap_verifier->gc;
   Space* mspace = gc_get_mos(gc);
   Space* lspace  = gc_get_los(gc);
   Space* nos = gc_get_nos(gc);
 
   if(p_obj == NULL){
-    if(gc_match_kind((GC*)gc, MAJOR_COLLECTION) ||(!heap_verifier->gc_is_gen_mode && !NOS_PARTIAL_FORWARD)){
+    if(collect_is_major() ||(!heap_verifier->gc_is_gen_mode && !NOS_PARTIAL_FORWARD)){
       assert(0);
       return FALSE;
     }else{
@@ -116,7 +116,7 @@ Boolean verify_rootset_slot(REF* p_ref, Heap_Verifier* heap_verifier)
       assert(0);
       return FALSE;
     }
-#if !defined(USE_MARK_SWEEP_GC) && !defined(USE_UNIQUE_MOVE_COMPACT_GC)
+#if !defined(USE_UNIQUE_MARK_SWEEP_GC) && !defined(USE_UNIQUE_MOVE_COMPACT_GC)
   }else{
     if(heap_verifier->gc_verifier->is_before_fallback_collection){
       if(!address_belongs_to_gc_heap(p_obj, heap_verifier->gc)){
@@ -128,8 +128,8 @@ Boolean verify_rootset_slot(REF* p_ref, Heap_Verifier* heap_verifier)
     }
 
     if(!address_belongs_to_space(p_obj, mspace) && !address_belongs_to_space(p_obj, lspace) && !NOS_PARTIAL_FORWARD){
-      if( gc_match_kind((GC*)gc, MINOR_COLLECTION)){
-        if( nos->collect_algorithm == MINOR_NONGEN_SEMISPACE_POOL || nos->collect_algorithm == MINOR_GEN_SEMISPACE_POOL){
+      if( collect_is_minor()){
+        if( minor_is_semispace()){
           if( obj_belongs_to_survivor_area((Sspace*)nos, p_obj)) 
             return TRUE;            
         }
@@ -218,17 +218,15 @@ void verifier_collect_kind_log(Heap_Verifier* heap_verifier)
 {
   GC* gc = heap_verifier->gc;
   char* gc_kind;
-  if(gc_match_kind(gc, MINOR_COLLECTION)){ 
+  if(collect_is_minor()){ 
     gc_kind = " minor collection.";
-  }else if(gc_match_kind(gc, FALLBACK_COLLECTION)){ 
+  }else if(collect_is_fallback()){ 
     gc_kind = " fallback collection.";
-  }else if(gc_match_kind(gc, EXTEND_COLLECTION)){ 
-    gc_kind = " extend collection.";
-  }else if(gc_match_kind(gc, NORMAL_MAJOR_COLLECTION)){ 
+  }else if(collect_is_major_normal()){ 
     if(gc->tuner->kind == TRANS_NOTHING)  gc_kind = "major collection (normal)";
     else if(gc->tuner->kind == TRANS_FROM_LOS_TO_MOS) gc_kind = "major collection (LOS shrink)";
     else if(gc->tuner->kind == TRANS_FROM_MOS_TO_LOS) gc_kind = "major collection (LOS extend)";
-  }else if(gc_match_kind(gc, MARK_SWEEP_GC)){
+  }else if(major_is_marksweep()){
     gc_kind = " mark sweep collection.";
   }
   printf(" GC_kind: %s\n", gc_kind);
@@ -268,5 +266,7 @@ void verifier_hashcode_log(GC_Verifier* gc_verifier)
 {
     printf(" %-14s:    %-7s |   Before %10d   |   After %10d   |\n", "hashcode", "NUM", gc_verifier->num_hash_before_gc, gc_verifier->num_hash_after_gc);
 }
+
+
 
 

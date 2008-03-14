@@ -115,7 +115,7 @@ void wspace_mark_scan_concurrent(Marker* marker)
       iter = vector_block_iterator_advance(root_set,iter);
       
       Partial_Reveal_Object *p_obj = read_slot(p_ref);
-      /* root ref can't be NULL, (remset may have NULL ref entry, but this function is only for MAJOR_COLLECTION */
+      /* root ref can't be NULL, (remset may have NULL ref entry, but this function is only for ALGO_MAJOR */
       assert(p_obj!=NULL);
       assert(address_belongs_to_gc_heap(p_obj, gc));
       if(obj_mark_gray_in_table(p_obj))
@@ -195,11 +195,18 @@ retry:
            */
       if(local_dirty_set != NULL){
         atomic_inc32(&num_active_markers);
-        while(!vector_block_is_empty(local_dirty_set) || !vector_block_not_full_set_unshared(local_dirty_set)){
-          Partial_Reveal_Object* p_obj = (Partial_Reveal_Object*) vector_block_get_entry(local_dirty_set);        
-          if(obj_mark_gray_in_table(p_obj)) 
-            collector_tracestack_push((Collector*)marker, p_obj);
-        }
+        do{        
+          while(!vector_block_is_empty(local_dirty_set)){ //|| !vector_block_not_full_set_unshared(local_dirty_set)){
+            Partial_Reveal_Object* p_obj = (Partial_Reveal_Object*) vector_block_get_entry(local_dirty_set);
+            if(!obj_belongs_to_gc_heap(p_obj)) {
+              assert(0);
+            }
+            
+            if(obj_mark_gray_in_table(p_obj)){ 
+              collector_tracestack_push((Collector*)marker, p_obj);
+            }
+          }
+        }while(!vector_block_not_full_set_unshared(local_dirty_set) && !vector_block_is_empty(local_dirty_set));
         goto retry;
       }
     }
@@ -223,4 +230,6 @@ void trace_obj_in_ms_concurrent_mark(Collector *collector, void *p_obj)
   obj_mark_gray_in_table((Partial_Reveal_Object*)p_obj);
   trace_object((Marker*)collector, (Partial_Reveal_Object *)p_obj);
 }
+
+
 

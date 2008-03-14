@@ -14,3 +14,12 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+ 
+#include "gc_common.h"
+#include "gc_mc.h"
+
+GC* gc_mc_create()
+{
+  assert(0);
+  return NULL;
+}

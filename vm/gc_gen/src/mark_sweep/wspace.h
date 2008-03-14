@@ -75,7 +75,7 @@ typedef struct Wspace {
   POINTER_SIZE_INT surviving_obj_size;
 } Wspace;
 
-#ifdef USE_MARK_SWEEP_GC
+#ifdef USE_UNIQUE_MARK_SWEEP_GC
 void wspace_set_space_statistic(Wspace *wspace);
 #endif
 
@@ -91,11 +91,12 @@ void wspace_collection(Wspace *wspace);
 void allocator_init_local_chunks(Allocator *allocator);
 void allocactor_destruct_local_chunks(Allocator *allocator);
 void gc_init_collector_free_chunk_list(Collector *collector);
+void allocator_register_new_obj_size(Allocator *allocator);
 
 POINTER_SIZE_INT wspace_free_memory_size(Wspace *wspace);
 
 
-#ifndef USE_MARK_SWEEP_GC
+#ifndef USE_UNIQUE_MARK_SWEEP_GC
 #define gc_get_wspace(gc) ((Wspace*)gc_get_mos((GC_Gen*)(gc)))
 #else
 #define gc_get_wspace(gc) (gc_ms_get_wspace((GC_MS*)(gc)))

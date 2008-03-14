@@ -80,24 +80,32 @@ Managed_Object_Handle gc_alloc(unsigned size, Allocation_Handle ah, void *unused
   gc_alloc_statistic_obj_distrubution(size);
 #endif
 
-#if defined(USE_MARK_SWEEP_GC)
+#if defined(USE_UNIQUE_MARK_SWEEP_GC)
+
   p_obj = (Managed_Object_Handle)gc_ms_alloc(size, allocator);
+
 #elif defined(USE_UNIQUE_MOVE_COMPACT_GC)
+
   p_obj = (Managed_Object_Handle)gc_mc_alloc(size, allocator);
+
 #else
-  if ( size > GC_OBJ_SIZE_THRESHOLD ){
+
+  if ( size > GC_LOS_OBJ_SIZE_THRESHOLD ){
     p_obj = (Managed_Object_Handle)los_alloc(size, allocator);
+
 #ifdef GC_GEN_STATS
     if (p_obj != NULL){
       GC_Gen* gc = (GC_Gen*)allocator->gc;
       gc->stats->obj_num_los_alloc++;
       gc->stats->total_size_los_alloc += size;
     }
-#endif
+#endif /* #ifdef GC_GEN_STATS */
+
   }else{
       p_obj = (Managed_Object_Handle)nos_alloc(size, allocator);
   }
-#endif
+
+#endif /* defined(USE_UNIQUE_MARK_SWEEP_GC) else */
 
   if( p_obj == NULL )
     return NULL;
@@ -125,21 +133,28 @@ Managed_Object_Handle gc_alloc_fast (unsigned size, Allocation_Handle ah, void *
 #ifdef GC_OBJ_SIZE_STATISTIC
   gc_alloc_statistic_obj_distrubution(size);
 #endif
-  
-  /* object shoud be handled specially */
-  if ( size > GC_OBJ_SIZE_THRESHOLD ) return NULL;
- 
+   
   Allocator* allocator = (Allocator*)gc_get_tls();
  
   /* Try to allocate an object from the current Thread Local Block */
   Managed_Object_Handle p_obj;
-#if defined(USE_MARK_SWEEP_GC)
+
+#if defined(USE_UNIQUE_MARK_SWEEP_GC)
+
   p_obj = (Managed_Object_Handle)gc_ms_fast_alloc(size, allocator);
+
 #elif defined(USE_UNIQUE_MOVE_COMPACT_GC)
-  p_obj = (Managed_Object_Handle)gc_mc_fast_alloc(size, allocator);
-#else
+
+  if ( size > GC_LARGE_OBJ_SIZE_THRESHOLD ) return NULL;
   p_obj = (Managed_Object_Handle)thread_local_alloc(size, allocator);
+
+#else
+  /* object shoud be handled specially */
+  if ( size > GC_LOS_OBJ_SIZE_THRESHOLD ) return NULL;
+  p_obj = (Managed_Object_Handle)thread_local_alloc(size, allocator);
+
 #endif
+
   if(p_obj == NULL) return NULL;
 
   assert((((POINTER_SIZE_INT)p_obj) % GC_OBJECT_ALIGNMENT) == 0);

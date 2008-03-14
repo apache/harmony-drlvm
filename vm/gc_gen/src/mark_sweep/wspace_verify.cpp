@@ -366,7 +366,7 @@ static void allocator_verify_local_chunks(Allocator *allocator)
 
 static void gc_verify_allocator_local_chunks(GC *gc)
 {
-  if(gc_match_kind(gc, MARK_SWEEP_GC)){
+  if(major_is_marksweep()){
     Mutator *mutator = gc->mutator_list;
     while(mutator){
       allocator_verify_local_chunks((Allocator*)mutator);
@@ -374,7 +374,7 @@ static void gc_verify_allocator_local_chunks(GC *gc)
     }
   }
   
-  if(gc_match_kind(gc, MAJOR_COLLECTION))
+  if(collect_is_major())
     for(unsigned int i = gc->num_collectors; i--;){
       allocator_verify_local_chunks((Allocator*)gc->collectors[i]);
     }

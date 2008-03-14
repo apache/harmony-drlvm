@@ -45,7 +45,7 @@ static void gc_check_concurrent_mark(GC* gc)
 {
   if(!is_mark_finished(gc)){
     lock(gc->concurrent_mark_lock);
-#ifndef USE_MARK_SWEEP_GC
+#ifndef USE_UNIQUE_MARK_SWEEP_GC
     gc_gen_start_concurrent_mark((GC_Gen*)gc);
 #else
     if(gc_concurrent_match_algorithm(OTF_REM_OBJ_SNAPSHOT_ALGO)){
@@ -76,7 +76,7 @@ static void gc_wait_concurrent_mark_finish(GC* gc)
 {
   wait_mark_finish(gc);
   gc_set_barrier_function(WRITE_BARRIER_REM_NIL);
-  mem_fence();
+  //mem_fence(); we do not need memory fence here.
   gc_check_mutator_barrier(gc);
   gc_set_concurrent_status(gc,GC_CONCURRENT_STATUS_NIL);
 }
@@ -106,12 +106,14 @@ void gc_start_concurrent_mark(GC* gc)
   }
   gc_set_concurrent_status(gc, GC_CONCURRENT_MARK_PHASE);
 
-  gc_decide_collection_kind((GC_Gen*)gc, GC_CAUSE_NIL);
+#ifndef USE_UNIQUE_MARK_SWEEP_GC
+  gc_decide_collection_kind((GC*)gc, GC_CAUSE_NIL);
+#endif
 
   num_marker = gc_decide_marker_number(gc);
   
   /*start concurrent mark*/
-#ifndef USE_MARK_SWEEP_GC
+#ifndef USE_UNIQUE_MARK_SWEEP_GC
   gc_gen_start_concurrent_mark((GC_Gen*)gc);
 #else
   if(gc_concurrent_match_algorithm(OTF_REM_OBJ_SNAPSHOT_ALGO)){
@@ -150,21 +152,35 @@ void gc_finish_concurrent_mark(GC* gc, Boolean is_STW)
     wspace_mark_scan_mostly_concurrent_terminate();
   
   gc_wait_concurrent_mark_finish(gc);
+
+  int disable_count;   
+  if(!is_STW){
+    /*suspend the mutators.*/   
+    lock(gc->enumerate_rootset_lock);    
+    gc_clear_rootset(gc);
+    gc_metadata_verify(gc, TRUE);
+    gc_reset_rootset(gc);    
+    disable_count = hythread_reset_suspend_disable();
+    vm_enumerate_root_set_all_threads();
+    gc_copy_interior_pointer_table_to_rootset();
+    gc_set_rootset(gc); 
+  }
+
   
   if(gc_concurrent_match_algorithm(MOSTLY_CONCURRENT_ALGO)){
     /*If gc use mostly concurrent algorithm, there's a final marking pause. 
           Suspend the mutators once again and finish the marking phase.*/
-    int disable_count;   
-    if(!is_STW){
-      /*suspend the mutators.*/   
-      lock(gc->enumerate_rootset_lock);
-      gc_metadata_verify(gc, TRUE);
-      gc_reset_rootset(gc);    
-      disable_count = hythread_reset_suspend_disable();
-      vm_enumerate_root_set_all_threads();
-      gc_copy_interior_pointer_table_to_rootset();
-      gc_set_rootset(gc); 
-    }
+//    int disable_count;   
+//    if(!is_STW){
+//      /*suspend the mutators.*/   
+//      lock(gc->enumerate_rootset_lock);
+//      gc_metadata_verify(gc, TRUE);
+//      gc_reset_rootset(gc);    
+//      disable_count = hythread_reset_suspend_disable();
+//      vm_enumerate_root_set_all_threads();
+//      gc_copy_interior_pointer_table_to_rootset();
+//      gc_set_rootset(gc); 
+//    }
 
     /*prepare dirty object*/
     gc_prepare_dirty_set(gc);
@@ -172,7 +188,7 @@ void gc_finish_concurrent_mark(GC* gc, Boolean is_STW)
     gc_set_weakref_sets(gc);
         
     /*start STW mark*/
-#ifndef USE_MARK_SWEEP_GC
+#ifndef USE_UNIQUE_MARK_SWEEP_GC
     assert(0);
 #else
     gc_ms_start_final_mark_after_concurrent((GC_MS*)gc, MIN_NUM_MARKERS);
@@ -180,13 +196,22 @@ void gc_finish_concurrent_mark(GC* gc, Boolean is_STW)
     
     wspace_mark_scan_mostly_concurrent_reset();
     gc_clear_dirty_set(gc);
-    if(!is_STW){
-      unlock(gc->enumerate_rootset_lock);
-      vm_resume_threads_after();    
-      assert(hythread_is_suspend_enabled());
-      hythread_set_suspend_disable(disable_count);
-    }
+//    if(!is_STW){
+//      unlock(gc->enumerate_rootset_lock);
+//      vm_resume_threads_after();    
+//      assert(hythread_is_suspend_enabled());
+//      hythread_set_suspend_disable(disable_count);
+//    }
   }
+
+  
+  if(!is_STW){    
+    unlock(gc->enumerate_rootset_lock);
+    vm_resume_threads_after();    
+    assert(hythread_is_suspend_enabled());
+    hythread_set_suspend_disable(disable_count);
+  }
+  
   gc_reset_dirty_set(gc);
 }
 
@@ -237,7 +262,7 @@ void gc_start_concurrent_sweep(GC* gc)
   gc_identify_dead_weak_roots(gc);
   
   /*start concurrent mark*/
-#ifndef USE_MARK_SWEEP_GC
+#ifndef USE_UNIQUE_MARK_SWEEP_GC
   assert(0);
 #else
   gc_ms_start_concurrent_sweep((GC_MS*)gc, MIN_NUM_MARKERS);
@@ -288,6 +313,10 @@ void gc_check_concurrent_phase(GC * gc)
 
 void gc_reset_after_concurrent_collection(GC* gc)
 {
+
+  int64 mutator_time = gc_get_mutator_time(gc);
+  int64 collection_time = gc_get_collector_time(gc) + gc_get_marker_time(gc);
+
   /*FIXME: enable concurrent GEN mode.*/
   gc_reset_interior_pointer_table();
   if(gc_is_gen_mode()) gc_prepare_mutator_remset(gc);
@@ -302,13 +331,16 @@ void gc_reset_after_concurrent_collection(GC* gc)
     gc_activate_finref_threads((GC*)gc);
 #ifndef BUILD_IN_REFERENT
   } else {
-    gc_clear_weakref_pools(gc);
+    gc_clear_weakref_pools(gc);    
+    gc_clear_finref_repset_pool(gc);
 #endif
   }
 
-#ifdef USE_MARK_SWEEP_GC
+#ifdef USE_UNIQUE_MARK_SWEEP_GC
   gc_ms_update_space_statistics((GC_MS*)gc);
 #endif
+
+  gc_reset_collector_state(gc);
 
   gc_clear_dirty_set(gc);
 
@@ -322,9 +354,15 @@ void gc_reset_after_concurrent_collection(GC* gc)
   if(USE_CONCURRENT_GC && gc_sweep_is_concurrent()){
     gc_reset_concurrent_sweep(gc);
   }
+  
+  gc_update_collection_scheduler(gc, mutator_time, collection_time);
+
+#ifdef USE_UNIQUE_MARK_SWEEP_GC
+  gc_ms_reset_space_statistics((GC_MS*)gc);
+#endif
 }
 
-void gc_decide_concurrent_algorithm(GC* gc, char* concurrent_algo)
+void gc_decide_concurrent_algorithm(char* concurrent_algo)
 {
   if(!concurrent_algo){
     CONCURRENT_ALGO = OTF_REM_OBJ_SNAPSHOT_ALGO;

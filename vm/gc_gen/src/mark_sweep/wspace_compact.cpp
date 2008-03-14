@@ -28,10 +28,10 @@ void wspace_decide_compaction_need(Wspace *wspace)
   POINTER_SIZE_INT free_mem_size = free_mem_in_wspace(wspace, FALSE);
   float free_mem_ratio = (float)free_mem_size / wspace->committed_heap_size;
 
-#ifdef USE_MARK_SWEEP_GC
-  if(!gc_mark_is_concurrent() && (free_mem_ratio > SSPACE_COMPACT_RATIO) && (wspace->gc->cause != GC_CAUSE_RUNTIME_FORCE_GC)){
+#ifdef USE_UNIQUE_MARK_SWEEP_GC
+  if(!gc_mark_is_concurrent() && (free_mem_ratio > WSPACE_COMPACT_RATIO) && (wspace->gc->cause != GC_CAUSE_RUNTIME_FORCE_GC)){
 #else
-  if(gc_match_kind(wspace->gc, MAJOR_COLLECTION)){
+  if(collect_is_major()){
 #endif
     wspace->need_compact = wspace->move_object = TRUE;
   } else {
@@ -156,7 +156,7 @@ static inline Chunk_Header *get_most_free_chunk(Chunk_Header **least_free_chunk,
   return result;
 }
 
-static inline void move_obj_between_chunks(Chunk_Header **dest_ptr, Chunk_Header *src)
+static inline void move_obj_between_chunks(Wspace *wspace, Chunk_Header **dest_ptr, Chunk_Header *src)
 {
   Chunk_Header *dest = *dest_ptr;
   assert(dest->slot_size == src->slot_size);
@@ -170,7 +170,8 @@ static inline void move_obj_between_chunks(Chunk_Header **dest_ptr, Chunk_Header
     void *target = alloc_in_chunk(dest);
 
     if(dest->slot_index == MAX_SLOT_INDEX){
-      dest->status = CHUNK_USED | CHUNK_NORMAL;
+      dest->status = CHUNK_USED | CHUNK_NORMAL;      
+      wspace_register_used_chunk(wspace,dest);
       dest = NULL;
     }
     
@@ -209,8 +210,8 @@ void wspace_compact(Collector *collector, Wspace *wspace)
     while(dest && src){
       if(src_is_new)
         src->slot_index = 0;
-      chunk_depad_last_index_word(src);
-      move_obj_between_chunks(&dest, src);
+      //chunk_depad_last_index_word(src);
+      move_obj_between_chunks(wspace, &dest, src);
       if(!dest)
         dest = get_least_free_chunk(&least_free_chunk, &most_free_chunk);
       if(!src->alloc_num){
@@ -232,6 +233,8 @@ void wspace_compact(Collector *collector, Wspace *wspace)
     }
   }
 }
+
+
 
 
 

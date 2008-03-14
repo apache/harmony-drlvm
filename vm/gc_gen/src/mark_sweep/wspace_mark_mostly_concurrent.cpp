@@ -126,7 +126,7 @@ void wspace_mark_scan_mostly_concurrent(Marker* marker)
       iter = vector_block_iterator_advance(root_set,iter);
       
       Partial_Reveal_Object *p_obj = read_slot(p_ref);
-      /* root ref can't be NULL, (remset may have NULL ref entry, but this function is only for MAJOR_COLLECTION */
+      /* root ref can't be NULL, (remset may have NULL ref entry, but this function is only for ALGO_MAJOR */
       assert(p_obj!=NULL);
       assert(address_belongs_to_gc_heap(p_obj, gc));
       if(obj_mark_gray_in_table(p_obj))
@@ -223,4 +223,6 @@ void trace_obj_in_ms_mostly_concurrent_mark(Collector *collector, void *p_obj)
   obj_mark_gray_in_table((Partial_Reveal_Object*)p_obj);
   trace_object((Marker*)collector, (Partial_Reveal_Object *)p_obj);
 }
+
+
 

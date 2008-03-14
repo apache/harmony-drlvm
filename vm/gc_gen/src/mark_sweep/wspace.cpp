@@ -61,8 +61,9 @@ Wspace *wspace_initialize(GC *gc, void *start, POINTER_SIZE_INT wspace_size, POI
   wspace->space_statistic = (Space_Statistics*)STD_MALLOC(sizeof(Space_Statistics));
   assert(wspace->space_statistic);
   memset(wspace->space_statistic, 0, sizeof(Space_Statistics));
+  wspace->space_statistic->size_free_space = commit_size;
 
-#ifdef USE_MARK_SWEEP_GC
+#ifdef USE_UNIQUE_MARK_SWEEP_GC
   gc_ms_set_wspace((GC_MS*)gc, wspace);
 #else
   gc_set_mos((GC_Gen*)gc, (Space*)wspace);
@@ -124,6 +125,15 @@ void allocator_init_local_chunks(Allocator *allocator)
   allocator->local_chunks = local_chunks;
 }
 
+void allocator_register_new_obj_size(Allocator *allocator)
+{
+  Mutator* mutator = (Mutator*)allocator;
+  Wspace *wspace = gc_get_wspace(allocator->gc);
+  Space_Statistics* space_stat = wspace->space_statistic;
+  space_stat->size_new_obj += mutator->new_obj_size;
+}
+
+
 void allocactor_destruct_local_chunks(Allocator *allocator)
 {
   Wspace *wspace = gc_get_wspace(allocator->gc);
@@ -140,28 +150,26 @@ void allocactor_destruct_local_chunks(Allocator *allocator)
       if(!chunk_ptrs){
         chunk_ptrs = local_chunks[i];
 
-  
         /* Put local pfc to the according pools */
-        for(unsigned int i = 0; i < chunk_ptr_num; ++i){
-          if(chunk_ptrs[i]){
+        for(unsigned int j = 0; j < chunk_ptr_num; ++j){
+          if(chunk_ptrs[j]){
             if(!USE_CONCURRENT_GC){
-              wspace_put_pfc(wspace, chunk_ptrs[i]);
+              wspace_put_pfc(wspace, chunk_ptrs[j]);
             }else{
-              Chunk_Header* chunk_to_rem = chunk_ptrs[i];
+              Chunk_Header* chunk_to_rem = chunk_ptrs[j];
               chunk_to_rem->status = CHUNK_USED | CHUNK_NORMAL;
               wspace_register_used_chunk(wspace, chunk_to_rem);
             }
           }
         }
-        
-        /* Free mem for local chunk pointers */
-        STD_FREE(chunk_ptrs);
+
         chunk_ptrs = NULL;
       }
     }
   }
   
-  
+  /* Free mem for local chunk pointers */  
+  STD_FREE(*local_chunks);
   /* Free mem for size segments (Chunk_Header**) */
   STD_FREE(local_chunks);
 }
@@ -189,7 +197,7 @@ static void allocator_clear_local_chunks(Allocator *allocator)
 
 static void gc_clear_mutator_local_chunks(GC *gc)
 {
-#ifdef USE_MARK_SWEEP_GC
+#ifdef USE_UNIQUE_MARK_SWEEP_GC
   /* release local chunks of each mutator in unique mark-sweep GC */
   Mutator *mutator = gc->mutator_list;
   while(mutator){
@@ -201,14 +209,14 @@ static void gc_clear_mutator_local_chunks(GC *gc)
 
 void gc_clear_collector_local_chunks(GC *gc)
 {
-  if(!gc_match_kind(gc, MAJOR_COLLECTION)) return;
+  if(!collect_is_major()) return;
   /* release local chunks of each collector in gen GC */
   for(unsigned int i = gc->num_collectors; i--;){
     allocator_clear_local_chunks((Allocator*)gc->collectors[i]);
   }
 }
 
-#ifdef USE_MARK_SWEEP_GC
+#ifdef USE_UNIQUE_MARK_SWEEP_GC
 void wspace_set_space_statistic(Wspace *wspace)
 {
   GC_MS *gc = (GC_MS*)wspace->gc;
@@ -241,11 +249,11 @@ void wspace_collection(Wspace *wspace)
 
 
   wspace_decide_compaction_need(wspace);
-  if(wspace->need_compact && gc_match_kind(gc, MARK_SWEEP_GC)){
-    assert(gc_match_kind(gc, MS_COLLECTION));
-    gc->collect_kind = MS_COMPACT_COLLECTION;
+  if(wspace->need_compact && major_is_marksweep()){
+    assert(!collect_move_object());
+    GC_PROP |= ALGO_MS_COMPACT;
   }
-  if(wspace->need_compact || gc_match_kind(gc, MAJOR_COLLECTION))
+  if(wspace->need_compact || collect_is_major())
     wspace->need_fix = TRUE;
 
   //printf("\n\n>>>>>>>>%s>>>>>>>>>>>>\n\n", wspace->need_compact ? "COMPACT" : "NO COMPACT");
@@ -263,6 +271,9 @@ void wspace_collection(Wspace *wspace)
   
   collector_execute_task(gc, (TaskType)mark_sweep_wspace, (Space*)wspace);
 
+  /* set the collection type back to ms_normal in case it's ms_compact */
+  collect_set_ms_normal();
+  
 #ifdef SSPACE_TIME
   wspace_gc_time(gc, FALSE);
 #endif

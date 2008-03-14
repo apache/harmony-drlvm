@@ -155,7 +155,7 @@ void mark_scan_heap_for_space_tune(Collector *collector)
       iter = vector_block_iterator_advance(root_set,iter);
 
       Partial_Reveal_Object *p_obj = read_slot(p_ref);
-      /* root ref can't be NULL, (remset may have NULL ref entry, but this function is only for MAJOR_COLLECTION */
+      /* root ref can't be NULL, (remset may have NULL ref entry, but this function is only for ALGO_MAJOR */
       assert(p_obj!=NULL);
       /* we have to mark the object before put it into marktask, because
          it is possible to have two slots containing a same object. They will

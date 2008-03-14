@@ -35,14 +35,19 @@
 
 #include "gc_for_class.h"
 #include "gc_platform.h"
+#include "gc_properties.h"
 
 #include "../common/gc_for_barrier.h"
 
 /* 
-#define USE_MARK_SWEEP_GC  //define it to only use Mark-Sweep GC (no NOS, no LOS).
+#define USE_UNIQUE_MARK_SWEEP_GC  //define it to only use Mark-Sweep GC (no NOS, no LOS).
+#define USE_UNIQUE_MOVE_COMPACT_GC //define it to only use Move-Compact GC (no NOS, no LOS).
 */
-//#define USE_UNIQUE_MOVE_COMPACT_GC //define it to only use Move-Compact GC (no NOS, no LOS).
+
 #define GC_GEN_STATS
+#define USE_32BITS_HASHCODE
+#define GC_LOS_OBJ_SIZE_THRESHOLD (5*KB)
+
 #define null 0
 
 #define KB  (1<<10)
@@ -77,76 +82,11 @@
 #define BYTES_OF_POINTER_SIZE_INT (sizeof(POINTER_SIZE_INT))
 #define BIT_SHIFT_TO_BYTES_OF_POINTER_SIZE_INT ((sizeof(POINTER_SIZE_INT)==4)? 2: 3)
 
-#define GC_OBJ_SIZE_THRESHOLD (5*KB)
-
-#define USE_32BITS_HASHCODE
-
-/* define it to use only mark-sweep GC for entire heap management */
-//#define USE_MARK_SWEEP_GC
-
 typedef void (*TaskType)(void*);
 
-enum Collection_Algorithm{
-  COLLECTION_ALGOR_NIL,
-  
-  MINOR_GEN_FORWARD_POOL,
-  MINOR_NONGEN_FORWARD_POOL,
-  
-  MINOR_GEN_SEMISPACE_POOL,
-  MINOR_NONGEN_SEMISPACE_POOL,  
-  
-  MAJOR_COMPACT_SLIDE,
-  MAJOR_COMPACT_MOVE,
-  MAJOR_MARK_SWEEP  
-};
+extern POINTER_SIZE_INT HEAP_BASE;
 
-/* Possible combinations:
- * MINOR_COLLECTION
- * NORMAL_MAJOR_COLLECTION
- * FALLBACK_COLLECTION
- * NORMAL_MAJOR_COLLECTION | EXTEND_COLLECTION
- * FALLBACK_COLLECTION | EXTEND_COLLECTION
- * MS_COLLECTION
- * MS_COMPACT_COLLECTION
- */
-enum Collection_Kind {
-  /* Two main kinds: generational GC and mark-sweep GC; this is decided at compiling time */
-  GEN_GC = 0x1,
-  MARK_SWEEP_GC = 0x2,
-  MOVE_COMPACT_NO_LOS = 0x4,
-  /* Mask of bits standing for two basic kinds */
-  GC_BASIC_KIND_MASK = ~(unsigned int)0x7,
-  
-  /* Sub-kinds of generational GC use the 4~7th LSB */
-  MINOR_COLLECTION = 0x11,  /* 0x10 & GEN_GC */
-  MAJOR_COLLECTION = 0x21,  /* 0x20 & GEN_GC */
-  
-  /* Sub-kinds of major collection use the 8~11th LSB */
-  NORMAL_MAJOR_COLLECTION = 0x121,  /* 0x100 & MAJOR_COLLECTION */
-  FALLBACK_COLLECTION = 0x221,  /* 0x200 & MAJOR_COLLECTION */
-  EXTEND_COLLECTION = 0x421,  /* 0x400 & MAJOR_COLLECTION */
-  
-  /* Sub-kinds of mark-sweep GC use the 12~15th LSB */
-  MS_COLLECTION = 0x1002,  /* 0x1000 & MARK_SWEEP_GC */
-  MS_COMPACT_COLLECTION = 0x2002,  /* 0x2000 & MARK_SWEEP_GC */
-  MC_COLLECTION = 0x1004
-};
-
-extern Boolean IS_FALLBACK_COMPACTION;  /* only for mark/fw bits debugging purpose */
-
-enum GC_CAUSE{
-  GC_CAUSE_NIL,
-  GC_CAUSE_NOS_IS_FULL,
-  GC_CAUSE_LOS_IS_FULL,
-  GC_CAUSE_COS_IS_FULL,
-  GC_CAUSE_WSPACE_IS_FULL,
-  GC_CAUSE_RUNTIME_FORCE_GC
-};
-
-
-extern POINTER_SIZE_INT HEAP_NULL;
-
-//#define COMPRESS_REFERENCE // Now passed from outside 
+//#define COMPRESS_REFERENCE // Now it's a VM-wide macro, defined in build file 
 
 #if !defined(POINTER64) && defined(COMPRESS_REFERENCE)
 #error "32-bit architecture does not support references compression"
@@ -166,13 +106,13 @@ FORCE_INLINE REF obj_ptr_to_ref(Partial_Reveal_Object *p_obj)
 #ifdef COMPRESS_REFERENCE
   if(!p_obj){
           /*Fixme: em64t: vm performs a simple compress/uncompress machenism
-           i.e. just add or minus HEAP_NULL to p_obj
+           i.e. just add or minus HEAP_BASE to p_obj
            But in gc we distinguish zero from other p_obj
            Now only in prefetch next live object we can hit this point. */
     return (REF)0;
   }
   else
-    return (REF) ((POINTER_SIZE_INT) p_obj - HEAP_NULL);
+    return (REF) ((POINTER_SIZE_INT) p_obj - HEAP_BASE);
 #else
     return (REF)p_obj;
 #endif
@@ -184,7 +124,7 @@ FORCE_INLINE Partial_Reveal_Object *ref_to_obj_ptr(REF ref)
   if(!ref){
     return NULL; 
   }
-  return (Partial_Reveal_Object *)(HEAP_NULL + ref);
+  return (Partial_Reveal_Object *)(HEAP_BASE + ref);
 
 #else
   return (Partial_Reveal_Object *)ref;
@@ -316,7 +256,7 @@ inline Boolean obj_is_fw_in_oi(Partial_Reveal_Object *obj)
 
 inline void obj_set_fw_in_oi(Partial_Reveal_Object *obj, void *dest)
 { 
-  assert(IS_FALLBACK_COMPACTION || (!(get_obj_info_raw(obj) & FLIP_FORWARD_BIT))); 
+  assert(collect_is_fallback() || (!(get_obj_info_raw(obj) & FLIP_FORWARD_BIT))); 
   /* This assert should always exist except it's fall back compaction. In fall-back compaction
      an object can be marked in last time minor collection, which is exactly this time's fw bit,
      because the failed minor collection flipped the bits. */
@@ -499,6 +439,14 @@ typedef struct GC{
 
 }GC;
 
+
+inline Boolean collect_last_is_minor(GC* gc)
+{
+  return (Boolean)((gc->last_collect_kind & ALGO_MAJOR) == 0);
+}
+
+/* ============================================================================ */
+
 void mark_scan_pool(Collector* collector);
 
 inline void mark_scan_heap(Collector* collector)
@@ -515,30 +463,17 @@ inline Boolean address_belongs_to_gc_heap(void* addr, GC* gc)
 
 Boolean obj_belongs_to_gc_heap(Partial_Reveal_Object* p_obj);
 
-/* gc must match exactly that kind if returning TRUE */
-inline Boolean gc_match_kind(GC *gc, unsigned int kind)
-{
-  assert(gc->collect_kind && kind);
-  return (Boolean)((gc->collect_kind & kind) == kind);
-}
-/* multi_kinds is a combination of multi collect kinds
- * gc must match one of them.
- */
-inline Boolean gc_match_either_kind(GC *gc, unsigned int multi_kinds)
-{
-  multi_kinds &= GC_BASIC_KIND_MASK;
-  assert(gc->collect_kind && multi_kinds);
-  return (Boolean)(gc->collect_kind & multi_kinds);
-}
+inline void gc_reset_collector_state(GC* gc){ gc->num_active_collectors = 0;}
 
 inline unsigned int gc_get_processor_num(GC* gc) { return gc->_num_processors; }
 
-void gc_parse_options(GC* gc);
+GC* gc_parse_options();
 void gc_reclaim_heap(GC* gc, unsigned int gc_cause);
 void gc_prepare_rootset(GC* gc);
 
 
 int64 get_collection_end_time();
+void set_collection_end_time();
 
 /* generational GC related */
 
@@ -562,6 +497,7 @@ extern Boolean NOS_PARTIAL_FORWARD;
 void gc_init_collector_alloc(GC* gc, Collector* collector);
 void gc_reset_collector_alloc(GC* gc, Collector* collector);
 void gc_destruct_collector_alloc(GC* gc, Collector* collector);
+void gc_decide_collection_kind(GC* gc, unsigned int cause);
 
 FORCE_INLINE Boolean addr_belongs_to_nos(void* addr)
 { return addr >= nos_boundary; }

@@ -27,7 +27,7 @@
 
 #define ALLOC_ZEROING
 
-#ifndef _IPF_
+#ifdef PREFETCH_SUPPORTED
 #define ALLOC_PREFETCH
 #endif
 
@@ -68,7 +68,10 @@ typedef struct Allocator{
   VmThreadHandle thread_handle;   /* This thread; */
   unsigned int handshake_signal; /*Handshake is used in concurrent GC.*/
   /* the number of allocated blocks. For collector, it reflects the load balance; for mutator, it reflects mutator activities. */
-  unsigned int num_alloc_blocks; 
+  unsigned int num_alloc_blocks;
+  /* Time measurment. For collector, it's used to collect collection time; for mutator, it's used to collect mutator time.  */
+  int64 time_measurement_start;
+  int64 time_measurement_end;
 }Allocator;
 
 inline void thread_local_unalloc(unsigned int size, Allocator* allocator)

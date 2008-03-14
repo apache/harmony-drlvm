@@ -154,7 +154,7 @@ void gc_finish_concurrent_sweep(GC * gc);
 void gc_reset_after_concurrent_collection(GC* gc);
 void gc_check_concurrent_phase(GC * gc);
 
-void gc_decide_concurrent_algorithm(GC* gc, char* concurrent_algo);
+void gc_decide_concurrent_algorithm(char* concurrent_algo);
 
 void gc_reset_concurrent_sweep(GC* gc);
 

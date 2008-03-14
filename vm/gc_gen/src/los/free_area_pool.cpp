@@ -41,7 +41,7 @@ void free_area_pool_reset(Free_Area_Pool* pool)
 
 Free_Area* free_pool_find_size_area(Free_Area_Pool* pool, POINTER_SIZE_INT size)
 {
-  assert(size >= GC_OBJ_SIZE_THRESHOLD);
+  assert(size >= GC_LOS_OBJ_SIZE_THRESHOLD);
   
   size = ALIGN_UP_TO_KILO(size);
   unsigned int index = pool_list_index_with_size(size);

@@ -149,13 +149,20 @@ static inline void object_double_fix_ref_slots(Partial_Reveal_Object *p_obj)
     REF * p_ref = object_ref_iterator_get(ref_iterator+i, p_obj);  
     slot_double_fix(p_ref);
   }    
+  
+#ifndef BUILD_IN_REFERENT
+    if(IGNORE_FINREF && is_reference_obj(p_obj)) {
+      REF* p_ref = obj_get_referent_field(p_obj);
+      slot_double_fix(p_ref);
+    }
+#endif
 }
 
 static void normal_chunk_fix_repointed_refs(Chunk_Header *chunk, Boolean double_fix)
 {
   /* Init field slot_index and depad the last index word in table for fixing */
   chunk->slot_index = 0;
-  chunk_depad_last_index_word(chunk);
+  //chunk_depad_last_index_word(chunk);
   
   unsigned int alloc_num = chunk->alloc_num;
   assert(alloc_num);
@@ -238,7 +245,7 @@ void mark_sweep_wspace(Collector *collector)
   GC *gc = collector->gc;
   Wspace *wspace = gc_get_wspace(gc);
   Space *nos = NULL;
-  if(gc_match_kind(gc, MAJOR_COLLECTION))
+  if(collect_is_major())
     nos = gc_get_nos((GC_Gen*)gc);
   
   unsigned int num_active_collectors = gc->num_active_collectors;
@@ -248,7 +255,7 @@ void mark_sweep_wspace(Collector *collector)
   atomic_cas32(&num_marking_collectors, 0, num_active_collectors+1);
 
   if(!gc_mark_is_concurrent()){  
-    if(gc_match_kind(gc, FALLBACK_COLLECTION))
+    if(collect_is_fallback())
       wspace_fallback_mark_scan(collector, wspace);
     else
       wspace_mark_scan(collector, wspace);
@@ -291,7 +298,7 @@ void mark_sweep_wspace(Collector *collector)
     wspace_verify_after_sweep(gc);
 #endif
 
-    if(gc_match_kind(gc, MAJOR_COLLECTION)){
+    if(collect_is_major()){
       wspace_merge_free_chunks(gc, wspace);
       nos_init_block_for_forwarding((GC_Gen*)gc);
     }
@@ -306,7 +313,7 @@ void mark_sweep_wspace(Collector *collector)
   
   /* Optional Pass: *******************************************
      Forward live obj in nos to mos (wspace) ******************/
-  if(gc_match_kind(gc, MAJOR_COLLECTION)){
+  if(collect_is_major()){
     atomic_cas32( &num_forwarding_collectors, 0, num_active_collectors+1);
     
     collector_forward_nos_to_wspace(collector, wspace);
@@ -330,7 +337,7 @@ void mark_sweep_wspace(Collector *collector)
     /* If we need forward nos to mos, i.e. in major collection, an extra fixing phase after compaction is needed. */
     old_num = atomic_inc32(&num_compacting_collectors);
     if( ++old_num == num_active_collectors ){
-      if(gc_match_kind(gc, MAJOR_COLLECTION))
+      if(collect_is_major())
         wspace_remerge_free_chunks(gc, wspace);
       /* let other collectors go */
       num_compacting_collectors++;
@@ -347,7 +354,7 @@ void mark_sweep_wspace(Collector *collector)
      * we need double fix object slots,
      * because some objects are forwarded from nos to mos and compacted into another chunk afterwards.
      */
-    Boolean double_fix = gc_match_kind(gc, MAJOR_COLLECTION) && wspace->need_compact;
+    Boolean double_fix = collect_is_major() && wspace->need_compact;
     wspace_fix_repointed_refs(collector, wspace, double_fix);
     
     atomic_inc32(&num_fixing_collectors);
@@ -360,17 +367,17 @@ void mark_sweep_wspace(Collector *collector)
   /* Leftover: *************************************************/
   
   if(wspace->need_fix){
-    Boolean double_fix = gc_match_kind(gc, MAJOR_COLLECTION) && wspace->need_compact;
+    Boolean double_fix = collect_is_major() && wspace->need_compact;
     gc_fix_rootset(collector, double_fix);
 #ifdef SSPACE_TIME
     wspace_fix_time(FALSE);
 #endif
   }
   
-  if(!gc_match_kind(gc, MAJOR_COLLECTION))
+  if(!collect_is_major())
     wspace_merge_free_chunks(gc, wspace);
 
-#ifdef USE_MARK_SWEEP_GC
+#ifdef USE_UNIQUE_MARK_SWEEP_GC
   wspace_set_space_statistic(wspace);
 #endif 
 

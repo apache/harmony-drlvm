@@ -261,8 +261,8 @@ void gc_heap_wrote_object (Managed_Object_Handle p_obj_written)
 /* FIXME:: this is not the right interface for write barrier */
 void gc_heap_slot_write_ref (Managed_Object_Handle p_obj_holding_ref,Managed_Object_Handle *p_slot, Managed_Object_Handle p_target)
 { 
-  Mutator *mutator = (Mutator *)gc_get_tls();  
-  mutator_post_signal(mutator,MUTATOR_ENTER_BARRIER);
+  //Mutator *mutator = (Mutator *)gc_get_tls();  
+  //mutator_post_signal(mutator,MUTATOR_ENTER_BARRIER);
 
   switch(write_barrier_function){
     case WRITE_BARRIER_REM_NIL:
@@ -293,7 +293,7 @@ void gc_heap_slot_write_ref (Managed_Object_Handle p_obj_holding_ref,Managed_Obj
       return;
   }
 
-  mutator_post_signal(mutator,MUTATOR_EXIT_BARRIER);
+  //mutator_post_signal(mutator,MUTATOR_EXIT_BARRIER);
   return;
 }
 

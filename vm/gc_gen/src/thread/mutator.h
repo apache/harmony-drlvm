@@ -39,6 +39,8 @@ typedef struct Mutator {
   VmThreadHandle thread_handle;   /* This thread; */
   volatile unsigned int handshake_signal; /*Handshake is used in concurrent GC.*/
   unsigned int num_alloc_blocks; /* the number of allocated blocks since last collection. */
+  int64 time_measurement_start;
+  int64 time_measurement_end;
   /* END of Allocator --> */
   
   Vector_Block* rem_set;
@@ -48,6 +50,7 @@ typedef struct Mutator {
   SpinLock dirty_set_lock;
   unsigned int dirty_obj_slot_num; //only ON_THE_FLY
   unsigned int dirty_obj_num; //concurrent mark  
+  POINTER_SIZE_INT new_obj_size;
 } Mutator;
 
 void mutator_initialize(GC* gc, void* tls_gc_info);
@@ -59,6 +62,8 @@ void gc_prepare_mutator_remset(GC* gc);
 
 Boolean gc_local_dirtyset_is_empty(GC* gc);
 Vector_Block* gc_get_local_dirty_set(GC* gc, unsigned int shared_id);
+void gc_start_mutator_time_measurement(GC* gc);
+int64 gc_get_mutator_time(GC* gc);
 
 inline void mutator_post_signal(Mutator* mutator, unsigned int handshake_signal)
 { 

@@ -46,7 +46,7 @@ static void mspace_move_objects(Collector* collector, Mspace* mspace)
   Block_Header *local_last_dest = dest_block;
 
   void* dest_sector_addr = dest_block->base;
-  Boolean is_fallback = gc_match_kind(collector->gc, FALLBACK_COLLECTION);
+  Boolean is_fallback = collect_is_fallback();
   
 #ifdef USE_32BITS_HASHCODE
   Hashcode_Buf* old_hashcode_buf = NULL;
@@ -83,10 +83,9 @@ static void mspace_move_objects(Collector* collector, Mspace* mspace)
     void* src_sector_addr = p_obj;
           
     while( p_obj ){
-
       debug_num_live_obj++;
       assert( obj_is_marked_in_vt(p_obj));
-      /* we don't check if it's set, since only remaining objs from last NOS partial collection need it. */
+      /* we don't check if it's set, since only non-forwarded objs from last NOS partial-forward collection need it. */
       obj_clear_dual_bits_in_oi(p_obj); 
 
 #ifdef GC_GEN_STATS
@@ -125,7 +124,7 @@ static void mspace_move_objects(Collector* collector, Mspace* mspace)
         
       assert(((POINTER_SIZE_INT)dest_sector_addr + curr_sector_size) <= block_end );
 
-      /* check if current sector has no more sector. If not, loop back. FIXME:: we should add a condition for block check */      
+      /* check if next live object is out of current sector. If not, loop back to continue within this sector. FIXME:: we should add a condition for block check (?) */      
       p_obj =  block_get_next_marked_object(curr_block, &start_pos);
       if ((p_obj != NULL) && (OBJECT_INDEX_TO_OFFSET_TABLE(p_obj) == curr_sector))
         continue;
@@ -133,7 +132,7 @@ static void mspace_move_objects(Collector* collector, Mspace* mspace)
       /* current sector is done, let's move it. */
       POINTER_SIZE_INT sector_distance = (POINTER_SIZE_INT)src_sector_addr - (POINTER_SIZE_INT)dest_sector_addr;
       assert((sector_distance % GC_OBJECT_ALIGNMENT) == 0);
-      /* if sector_distance is zero, we don't do anything. But since block stable is never cleaned, we have to set 0 to it. */
+      /* if sector_distance is zero, we don't do anything. But since block offset table is never cleaned, we have to set 0 to it. */
       curr_block->table[curr_sector] = sector_distance;
 
       if(sector_distance != 0) 
@@ -203,7 +202,7 @@ void move_compact_mspace(Collector* collector)
 
   unsigned int old_num = atomic_cas32( &num_marking_collectors, 0, num_active_collectors+1);
 
-  if(!gc_match_kind(gc, FALLBACK_COLLECTION))
+  if(!collect_is_fallback())
        mark_scan_heap(collector);  
   else
        mark_scan_heap_for_fallback(collector);

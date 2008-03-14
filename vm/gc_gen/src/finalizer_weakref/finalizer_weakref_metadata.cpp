@@ -426,6 +426,11 @@ void gc_clear_weakref_pools(GC *gc)
   finref_metadata_clear_pool(gc->finref_metadata->phanref_pool);
 }
 
+void gc_clear_finref_repset_pool(GC* gc)
+{
+  finref_metadata_clear_pool(gc->finref_metadata->repset_pool);
+}
+
 Boolean finref_copy_pool(Pool *src_pool, Pool *dest_pool, GC *gc)
 {
   Vector_Block *dest_block = finref_get_free_block(gc);
@@ -440,4 +445,6 @@ Boolean finref_copy_pool(Pool *src_pool, Pool *dest_pool, GC *gc)
   }
  return TRUE;
 }
+
+
 

@@ -103,14 +103,14 @@ void gc_gen_mode_adapt(GC_Gen* gc, int64 pause_time)
   POINTER_SIZE_INT nos_free_size = blocked_space_free_mem_size(nos);
   POINTER_SIZE_INT total_free_size = mos_free_size  + nos_free_size;
   
-  if(gc_match_kind((GC*)gc, MAJOR_COLLECTION)) {
+  if(collect_is_major()) {
     assert(!gc_is_gen_mode());
     
     if(gen_mode_adaptor->major_survive_ratio_threshold != 0 && mos->survive_ratio > gen_mode_adaptor->major_survive_ratio_threshold){    
       if(gen_mode_adaptor->major_repeat_count > MAX_MAJOR_REPEAT_COUNT ){
         gc->force_gen_mode = TRUE;
-        gc_enable_gen_mode();
-        gc->force_major_collect = FALSE;
+        gc_set_gen_mode(TRUE);
+        gc->next_collect_force_major = FALSE;
         return;
       }else{
         gen_mode_adaptor->major_repeat_count++;
@@ -121,7 +121,7 @@ void gc_gen_mode_adapt(GC_Gen* gc, int64 pause_time)
     
   }else{
     /*compute throughput*/
-    if(gc->last_collect_kind != MINOR_COLLECTION){
+    if(!collect_last_is_minor((GC*)gc)){
       gen_mode_adaptor->nongen_minor_throughput = 1.0f;
     }
     if(gc->force_gen_mode){
@@ -141,7 +141,7 @@ void gc_gen_mode_adapt(GC_Gen* gc, int64 pause_time)
    }
 
     if(gen_mode_adaptor->nongen_minor_throughput <=  gen_mode_adaptor->gen_minor_throughput ){
-      if( gc->last_collect_kind != MINOR_COLLECTION ){
+      if( !collect_last_is_minor((GC*)gc) ){
         gen_mode_adaptor->major_survive_ratio_threshold = mos->survive_ratio;
       }else if( !gc->force_gen_mode ){
         gc->force_gen_mode = TRUE;
@@ -149,18 +149,18 @@ void gc_gen_mode_adapt(GC_Gen* gc, int64 pause_time)
       } 
     }
 
-    if(gc->force_major_collect && !gc->force_gen_mode){
-        gc->force_major_collect = FALSE;
+    if(gc->next_collect_force_major && !gc->force_gen_mode){
+        gc->next_collect_force_major = FALSE;
         gc->force_gen_mode = TRUE;
         gen_mode_adaptor->gen_mode_trial_count = 2;
-    }else if(gc->last_collect_kind != MINOR_COLLECTION && gc->force_gen_mode){
+    }else if( collect_last_is_minor((GC*)gc) && gc->force_gen_mode){
        gen_mode_adaptor->gen_mode_trial_count = MAX_INT32;
     }
 
     if(gc->force_gen_mode && (total_free_size <= ((float)min_nos_size_bytes) * 1.3 )){
         gc->force_gen_mode = FALSE;
-        gc_disable_gen_mode();
-        gc->force_major_collect = TRUE;
+        gc_set_gen_mode(FALSE);
+        gc->next_collect_force_major = TRUE;
         gen_mode_adaptor->gen_mode_trial_count = 0;
         return;
     }
@@ -170,17 +170,17 @@ void gc_gen_mode_adapt(GC_Gen* gc, int64 pause_time)
 
       gen_mode_adaptor->gen_mode_trial_count --;
       if( gen_mode_adaptor->gen_mode_trial_count >= 0){
-        gc_enable_gen_mode();
+        gc_set_gen_mode(TRUE);
         return;
       }
           
       gc->force_gen_mode = FALSE;
-      gc->force_major_collect = TRUE;    
+      gc->next_collect_force_major = TRUE;    
       gen_mode_adaptor->gen_mode_trial_count = 0;
     }
   }
   
-  gc_disable_gen_mode();
+  gc_set_gen_mode(FALSE);
   return;
 }
 
@@ -206,31 +206,35 @@ static void gc_decide_next_collect(GC_Gen* gc, int64 pause_time)
   POINTER_SIZE_INT nos_free_size = space_committed_size(nos);  
 
   POINTER_SIZE_INT total_free_size = mos_free_size  + nos_free_size;
-  if(gc_match_kind((GC*)gc, MAJOR_COLLECTION)) gc->force_gen_mode = FALSE;
+  if(collect_is_major()) gc->force_gen_mode = FALSE;
   if(!gc->force_gen_mode){
     /*Major collection:*/
-    if(gc_match_kind((GC*)gc, MAJOR_COLLECTION)){
+    if(collect_is_major()){
       mos->time_collections += pause_time;
   
       Tslow = (float)pause_time;
       SMax = total_free_size;
       /*If fall back happens, and nos_boundary reaches heap_ceiling, then we force major.*/
       if( nos_free_size == 0)
-        gc->force_major_collect = TRUE;
-      else gc->force_major_collect = FALSE;
+        gc->next_collect_force_major = TRUE;
+      else gc->next_collect_force_major = FALSE;
       
-      /*If major is caused by LOS, or collection kind is EXTEND_COLLECTION, all survive ratio is not updated.*/
-      if((gc->cause != GC_CAUSE_LOS_IS_FULL) && (!gc_match_kind((GC*)gc, EXTEND_COLLECTION))){
+      /*If major is caused by LOS, or collection kind is ALGO_MAJOR_EXTEND, all survive ratio is not updated.*/
+      extern Boolean mos_extended;
+      if((gc->cause != GC_CAUSE_LOS_IS_FULL) && !mos_extended ){
         survive_ratio = (float)mos->period_surviving_size/(float)mos->committed_heap_size;
         mos->survive_ratio = survive_ratio;
       }
+      /* why do I set it FALSE here? because here is the only place where it's used. */
+      mos_extended = FALSE;
+      
       /*If there is no minor collection at all, we must give mos expected threshold a reasonable value.*/
       if((gc->tuner->kind != TRANS_NOTHING) && (nos->num_collections == 0))
         mspace_set_expected_threshold_ratio((Mspace *)mos, 0.5f);
       /*If this major is caused by fall back compaction, we must give nos->survive_ratio 
         *a conservative and reasonable number to avoid next fall back.
         *In fallback compaction, the survive_ratio of mos must be 1.*/
-      if(gc_match_kind((GC*)gc, FALLBACK_COLLECTION)) nos->survive_ratio = 1;
+      if(collect_is_fallback()) nos->survive_ratio = 1;
 
     }
     /*Minor collection:*/    
@@ -250,7 +254,7 @@ static void gc_decide_next_collect(GC_Gen* gc, int64 pause_time)
       POINTER_SIZE_INT minor_surviving_size = last_total_free_size - total_free_size;
       /*If the first GC is caused by LOS, mos->last_alloced_size should be smaller than this minor_surviving_size
         *Because the last_total_free_size is not accurate.*/
-      extern unsigned int MINOR_ALGO;
+
       if(nos->num_collections != 1){
       	assert(minor_surviving_size == mos->last_alloced_size);
       }
@@ -267,8 +271,8 @@ static void gc_decide_next_collect(GC_Gen* gc, int64 pause_time)
       /* FIXME: if the total free size is lesser than threshold, the time point might be too late!
        * Have a try to test whether the backup solution is better for specjbb.
        */
-      //   if ((mos_free_size + nos_free_size + minor_surviving_size) < free_size_threshold) gc->force_major_collect = TRUE;  
-      if ((mos_free_size + nos_free_size)< free_size_threshold) gc->force_major_collect = TRUE;
+      //   if ((mos_free_size + nos_free_size + minor_surviving_size) < free_size_threshold) gc->next_collect_force_major = TRUE;  
+      if ((mos_free_size + nos_free_size)< free_size_threshold) gc->next_collect_force_major = TRUE;
   
       survive_ratio = (float)minor_surviving_size/(float)space_committed_size((Space*)nos);
       nos->survive_ratio = survive_ratio;
@@ -314,7 +318,7 @@ Boolean gc_compute_new_space_size(GC_Gen* gc, POINTER_SIZE_INT* mos_size, POINTE
     total_size = max_heap_size_bytes - space_committed_size(los);
 #else
     POINTER_SIZE_INT curr_heap_commit_end = 
-                              (POINTER_SIZE_INT)gc->heap_start + LOS_HEAD_RESERVE_FOR_HEAP_NULL + gc->committed_heap_size;
+                              (POINTER_SIZE_INT)gc->heap_start + LOS_HEAD_RESERVE_FOR_HEAP_BASE + gc->committed_heap_size;
     assert(curr_heap_commit_end > (POINTER_SIZE_INT)mos->heap_start);
     total_size = curr_heap_commit_end - (POINTER_SIZE_INT)mos->heap_start;
 #endif
@@ -408,7 +412,7 @@ void gc_gen_adapt(GC_Gen* gc, int64 pause_time)
 
   /* below are ajustment */  
   POINTER_SIZE_INT curr_heap_commit_end = 
-                             (POINTER_SIZE_INT)gc->heap_start + LOS_HEAD_RESERVE_FOR_HEAP_NULL + gc->committed_heap_size;
+                             (POINTER_SIZE_INT)gc->heap_start + LOS_HEAD_RESERVE_FOR_HEAP_BASE + gc->committed_heap_size;
   
   void* new_nos_boundary = (void*)(curr_heap_commit_end - new_nos_size);
 

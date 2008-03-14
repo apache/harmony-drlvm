@@ -58,7 +58,6 @@ static void gc_get_system_info(GC *gc)
 static void init_gc_helpers()
 {
     set_property("vm.component.classpath.gc_gen", "gc_gen.jar", VM_PROPERTIES);
-
     vm_helper_register_magic_helper(VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE, "org/apache/harmony/drlvm/gc_gen/GCHelper", "alloc");
     vm_helper_register_magic_helper(VM_RT_NEW_VECTOR_USING_VTABLE,  "org/apache/harmony/drlvm/gc_gen/GCHelper", "allocArray");
     vm_helper_register_magic_helper(VM_RT_GC_HEAP_WRITE_REF,  "org/apache/harmony/drlvm/gc_gen/GCHelper", "write_barrier_slot_rem");
@@ -71,19 +70,10 @@ int gc_init()
 
   vm_gc_lock_init();
 
-#if defined(USE_MARK_SWEEP_GC)
-unsigned int gc_struct_size = sizeof(GC_MS);
-#elif defined(USE_UNIQUE_MOVE_COMPACT_GC)
-unsigned int gc_struct_size = sizeof(GC_MC);
-#else
-unsigned int gc_struct_size = sizeof(GC_Gen);
-#endif
-  GC* gc = (GC*)STD_MALLOC(gc_struct_size);
+  GC* gc = gc_parse_options();
   assert(gc);
-  memset(gc, 0, sizeof(GC));  
-  p_global_gc = gc;
 
-  gc_parse_options(gc);
+  p_global_gc = gc;
 
 #ifdef BUILD_IN_REFERENT
    if( ! IGNORE_FINREF){
@@ -104,7 +94,7 @@ unsigned int gc_struct_size = sizeof(GC_Gen);
   
   gc_metadata_initialize(gc); /* root set and mark stack */
 
-#if defined(USE_MARK_SWEEP_GC)
+#if defined(USE_UNIQUE_MARK_SWEEP_GC)
   gc_ms_initialize((GC_MS*)gc, min_heap_size_bytes, max_heap_size_bytes);
 #elif defined(USE_UNIQUE_MOVE_COMPACT_GC)
   gc_mc_initialize((GC_MC*)gc, min_heap_size_bytes, max_heap_size_bytes);
@@ -140,7 +130,7 @@ void gc_wrapup()
   INFO2("gc.process", "GC: call GC wrapup ....");
   GC* gc =  p_global_gc;
 
-#if defined(USE_MARK_SWEEP_GC)
+#if defined(USE_UNIQUE_MARK_SWEEP_GC)
  gc_ms_destruct((GC_MS*)gc);
 #elif defined(USE_UNIQUE_MOVE_COMPACT_GC)
  gc_mc_destruct((GC_MC*)gc);
@@ -186,7 +176,7 @@ void gc_add_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinned)
      FIXME:: nos_boundary is a static field in GCHelper.java for fast write barrier, not a real object reference 
      this should be fixed that magic Address field should not be enumerated. */
 #ifdef COMPRESS_REFERENCE
-  if (p_obj == (Partial_Reveal_Object*)HEAP_NULL || p_obj == NULL || p_obj == nos_boundary ) return;
+  if (p_obj == (Partial_Reveal_Object*)HEAP_BASE || p_obj == NULL || p_obj == nos_boundary ) return;
 #else
   if (p_obj == NULL || p_obj == nos_boundary ) return;
 #endif  
@@ -229,7 +219,7 @@ void gc_add_weak_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinned, B
      FIXME:: nos_boundary is a static field in GCHelper.java for fast write barrier, not a real object reference
      this should be fixed that magic Address field should not be enumerated. */
 #ifdef COMPRESS_REFERENCE
-  if (p_obj == (Partial_Reveal_Object*)HEAP_NULL || p_obj == NULL || p_obj == nos_boundary ) return;
+  if (p_obj == (Partial_Reveal_Object*)HEAP_BASE || p_obj == NULL || p_obj == nos_boundary ) return;
 #else
   if (p_obj == NULL || p_obj == nos_boundary ) return;
 #endif
@@ -265,7 +255,7 @@ void gc_thread_kill(void* gc_info)
 
 int64 gc_free_memory()
 {
-#if defined(USE_MARK_SWEEP_GC)
+#if defined(USE_UNIQUE_MARK_SWEEP_GC)
   return (int64)gc_ms_free_memory_size((GC_MS*)p_global_gc);
 #elif defined(USE_UNIQUE_MOVE_COMPACT_GC)
   return (int64)gc_mc_free_memory_size((GC_MC*)p_global_gc);
@@ -277,7 +267,7 @@ int64 gc_free_memory()
 /* java heap size.*/
 int64 gc_total_memory() 
 {
-#if defined(USE_MARK_SWEEP_GC)
+#if defined(USE_UNIQUE_MARK_SWEEP_GC)
   return (int64)((POINTER_SIZE_INT)gc_ms_total_memory_size((GC_MS*)p_global_gc));
 #elif defined(USE_UNIQUE_MOVE_COMPACT_GC)
   return (int64)((POINTER_SIZE_INT)gc_mc_total_memory_size((GC_MC*)p_global_gc));
@@ -288,7 +278,7 @@ int64 gc_total_memory()
 
 int64 gc_max_memory() 
 {
-#if defined(USE_MARK_SWEEP_GC)
+#if defined(USE_UNIQUE_MARK_SWEEP_GC)
     return (int64)((POINTER_SIZE_INT)gc_ms_total_memory_size((GC_MS*)p_global_gc));
 #elif defined(USE_UNIQUE_MOVE_COMPACT_GC)
     return (int64)((POINTER_SIZE_INT)gc_mc_total_memory_size((GC_MC*)p_global_gc));
@@ -361,7 +351,7 @@ int32 gc_get_hashcode(Managed_Object_Handle p_object)
 #else //USE_32BITS_HASHCODE
 int32 gc_get_hashcode(Managed_Object_Handle p_object)
 {
-#if defined(USE_MARK_SWEEP_GC) || defined(USE_UNIQUE_MOVE_COMPACT_GC)
+#if defined(USE_UNIQUE_MARK_SWEEP_GC) || defined(USE_UNIQUE_MOVE_COMPACT_GC)
   return (int32)0;//p_object;
 #endif
 
@@ -421,7 +411,7 @@ void gc_iterate_heap() {
     // data structures in not consistent for heap iteration
     if (!JVMTI_HEAP_ITERATION) return;
 
-#if defined(USE_MARK_SWEEP_GC)
+#if defined(USE_UNIQUE_MARK_SWEEP_GC)
   gc_ms_iterate_heap((GC_MS*)p_global_gc);
 #elif defined(USE_UNIQUE_MOVE_COMPACT_GC)
   gc_mc_iterate_heap((GC_MC*)p_global_gc);
@@ -444,4 +434,6 @@ Boolean obj_belongs_to_gc_heap(Partial_Reveal_Object* p_obj)
 {
   return address_belongs_to_gc_heap(p_obj, p_global_gc);  
 }
+
+
 

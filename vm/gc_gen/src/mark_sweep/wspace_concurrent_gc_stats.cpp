@@ -30,7 +30,7 @@ static void wspace_init_chunk_for_scanning(Wspace *wspace)
 static void normal_chunk_scanning(Chunk_Header *chunk)
 {
   chunk->slot_index = 0;
-  chunk_depad_last_index_word(chunk);
+  //chunk_depad_last_index_word(chunk);
   
   unsigned int alloc_num = chunk->alloc_num;
   assert(alloc_num);
@@ -139,7 +139,7 @@ void wspace_scan_heap(GC* gc)
 static void normal_chunk_clear(Chunk_Header *chunk)
 {
   chunk->slot_index = 0;
-  chunk_depad_last_index_word(chunk);
+  //chunk_depad_last_index_word(chunk);
   
   unsigned int alloc_num = chunk->alloc_num;
   assert(alloc_num);
@@ -198,4 +198,6 @@ void wspace_clear_heap(GC* gc)
 
 }
 #endif
+
+
 

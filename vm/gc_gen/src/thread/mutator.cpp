@@ -21,6 +21,7 @@
 
 #include "mutator.h"
 #include "../trace_forward/fspace.h"
+#include "../mark_sweep/gc_ms.h"
 #include "../mark_sweep/wspace.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 
@@ -45,7 +46,7 @@ void mutator_initialize(GC* gc, void *unused_gc_information)
   else
     mutator->obj_with_fin = NULL;
 
-#ifdef USE_MARK_SWEEP_GC
+#ifdef USE_UNIQUE_MARK_SWEEP_GC
   allocator_init_local_chunks((Allocator*)mutator);
 #endif
   
@@ -54,7 +55,8 @@ void mutator_initialize(GC* gc, void *unused_gc_information)
   mutator->next = (Mutator *)gc->mutator_list;
   gc->mutator_list = mutator;
   gc->num_mutators++;
-
+  /*Begin to measure the mutator thread execution time. */
+  mutator->time_measurement_start = time_now();
   unlock(gc->mutator_list_lock); // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   
   gc_set_tls(mutator);
@@ -72,8 +74,9 @@ void mutator_destruct(GC* gc, void *unused_gc_information)
 
   lock(gc->mutator_list_lock);     // vvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 
-#ifdef USE_MARK_SWEEP_GC
+#ifdef USE_UNIQUE_MARK_SWEEP_GC
     allocactor_destruct_local_chunks((Allocator*)mutator);
+    allocator_register_new_obj_size((Allocator*)mutator);
 #endif
 
   volatile Mutator *temp = gc->mutator_list;
@@ -172,5 +175,36 @@ Vector_Block* gc_get_local_dirty_set(GC* gc, unsigned int shared_id)
   unlock(gc->mutator_list_lock); 
   return NULL;
 }
+
+void gc_start_mutator_time_measurement(GC* gc)
+{
+  lock(gc->mutator_list_lock);
+  Mutator* mutator = gc->mutator_list;
+  while (mutator) {
+    mutator->time_measurement_start = time_now();
+    mutator = mutator->next;
+  }  
+  unlock(gc->mutator_list_lock);
+}
+
+int64 gc_get_mutator_time(GC* gc)
+{
+  int64 time_mutator = 0;
+  lock(gc->mutator_list_lock);
+  Mutator* mutator = gc->mutator_list;
+  while (mutator) {
+#ifdef _DEBUG
+    mutator->time_measurement_end = time_now();
+#endif
+    int64 time_measured = time_now() - mutator->time_measurement_start;
+    if(time_measured > time_mutator){
+      time_mutator = time_measured;
+    }
+    mutator = mutator->next;
+  }  
+  unlock(gc->mutator_list_lock);
+  return time_mutator;
+}
+
 
 

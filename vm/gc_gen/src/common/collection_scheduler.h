@@ -37,6 +37,7 @@ typedef struct Collection_Scheduler {
   
   float alloc_rate_window[STATISTICS_SAMPLING_WINDOW_SIZE];
   float trace_rate_window[STATISTICS_SAMPLING_WINDOW_SIZE];
+  float space_utilization_rate[STATISTICS_SAMPLING_WINDOW_SIZE];
   POINTER_SIZE_INT num_obj_traced_window[STATISTICS_SAMPLING_WINDOW_SIZE];
   POINTER_SIZE_INT size_alloced_window[STATISTICS_SAMPLING_WINDOW_SIZE];
 } Collection_Scheduler;
@@ -51,4 +52,6 @@ unsigned int gc_decide_marker_number(GC* gc);
 
 
 #endif
+
+
 

@@ -33,33 +33,7 @@
 struct GC_Gen_Stats;
 #endif
 
-extern Boolean gen_mode;
-
-inline Boolean gc_is_gen_mode()
-{  return gen_mode; }
-
-inline void gc_enable_gen_mode()
-{  
-  gen_mode = TRUE;
-  gc_set_barrier_function(WRITE_BARRIER_REM_SOURCE_REF);
-  HelperClass_set_GenMode(TRUE);
-}
-
-inline void gc_disable_gen_mode()
-{  
-  gen_mode = FALSE; 
-  gc_set_barrier_function(WRITE_BARRIER_REM_NIL);
-  HelperClass_set_GenMode(FALSE);
-}
-
-inline void gc_set_gen_mode(Boolean status)
-{
-  gen_mode = status; 
-  if(gen_mode) 
-    gc_set_barrier_function(WRITE_BARRIER_REM_SOURCE_REF);
-  HelperClass_set_GenMode(status);   
-}
-
+void gc_set_gen_mode(Boolean status);
 
 /* some globals */
 extern POINTER_SIZE_INT NOS_SIZE;
@@ -145,7 +119,7 @@ typedef struct GC_Gen {
   Space *mos;
   Space *los;
       
-  Boolean force_major_collect;
+  Boolean next_collect_force_major;
   Gen_Mode_Adaptor* gen_mode_adaptor;
   Boolean force_gen_mode;
 
@@ -164,16 +138,6 @@ void gc_gen_space_verbose_info(GC_Gen *gc);
 void gc_gen_init_verbose(GC_Gen *gc);
 void gc_gen_wrapup_verbose(GC_Gen* gc);
                         
-inline POINTER_SIZE_INT gc_gen_free_memory_size(GC_Gen* gc)
-{  return blocked_space_free_mem_size((Blocked_Space*)gc->nos) +
-          blocked_space_free_mem_size((Blocked_Space*)gc->mos) +
-          lspace_free_memory_size((Lspace*)gc->los);  }
-                    
-inline POINTER_SIZE_INT gc_gen_total_memory_size(GC_Gen* gc)
-{  return space_committed_size((Space*)gc->nos) +
-          space_committed_size((Space*)gc->mos) +
-          lspace_committed_size((Lspace*)gc->los);  }
-
 /////////////////////////////////////////////////////////////////////////////////////////
 
 void gc_nos_initialize(GC_Gen *gc, void *start, POINTER_SIZE_INT nos_size, POINTER_SIZE_INT commit_size);
@@ -204,9 +168,8 @@ void gc_set_nos(GC_Gen* gc, Space* nos);
 void gc_set_mos(GC_Gen* gc, Space* mos);
 void gc_set_los(GC_Gen* gc, Space* los);
 
-void gc_decide_collection_algorithm(GC_Gen* gc, char* minor_algo, char* major_algo);
-void gc_decide_collection_kind(GC_Gen* gc, unsigned int cause);
-unsigned int gc_next_collection_kind(GC_Gen* gc);
+GC* gc_gen_decide_collection_algo(char* minor_algo, char* major_algo, Boolean has_los);
+void gc_gen_decide_collection_kind(GC_Gen* gc, unsigned int cause);
 
 void gc_gen_adapt(GC_Gen* gc, int64 pause_time);
 
@@ -235,11 +198,23 @@ POINTER_SIZE_INT nos_free_space_size(Space* nos);
 POINTER_SIZE_INT mos_used_space_size(Space* mos);
 POINTER_SIZE_INT nos_used_space_size(Space* nos);
 
+inline POINTER_SIZE_INT gc_gen_free_memory_size(GC_Gen* gc)
+{  return nos_free_space_size((Space*)gc->nos) +
+          blocked_space_free_mem_size((Blocked_Space*)gc->mos) +
+          lspace_free_memory_size((Lspace*)gc->los);  }
+                    
+inline POINTER_SIZE_INT gc_gen_total_memory_size(GC_Gen* gc)
+{  return space_committed_size((Space*)gc->nos) +
+          space_committed_size((Space*)gc->mos) +
+          lspace_committed_size((Lspace*)gc->los);  }
+
 #ifndef STATIC_NOS_MAPPING
 void* nos_space_adjust(Space* space, void* new_nos_boundary, POINTER_SIZE_INT new_nos_size);
 #endif
 
 #endif /* ifndef _GC_GEN_H_ */
+
+
 
 
 

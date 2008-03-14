@@ -56,7 +56,7 @@ Boolean obtain_lock_memory_priv()
 Boolean release_lock_memory_priv()
 {
   HANDLE process = GetCurrentProcess();
-  return set_privilege(process, SE_LOCK_MEMORY_NAME, TRUE);
+  return set_privilege(process, SE_LOCK_MEMORY_NAME, FALSE);
 }
 
 void* alloc_large_pages(size_t size, const char* hint)

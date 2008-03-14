@@ -242,7 +242,7 @@ static void allocator_sweep_local_chunks(Allocator *allocator)
 
 static void gc_sweep_mutator_local_chunks(GC *gc)
 {
-#ifdef USE_MARK_SWEEP_GC
+#ifdef USE_UNIQUE_MARK_SWEEP_GC
   lock(gc->mutator_list_lock);     // vvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 
   /* release local chunks of each mutator in unique mark-sweep GC */
@@ -280,6 +280,7 @@ static volatile unsigned int num_sweeping_collectors = 0;
   */
 void wspace_sweep_concurrent(Collector* collector)
 {
+  collector->time_measurement_start = time_now();
   GC *gc = collector->gc;
   Wspace *wspace = gc_get_wspace(gc);
 
@@ -378,6 +379,9 @@ void wspace_sweep_concurrent(Collector* collector)
     /* let other collectors go */
     num_sweeping_collectors++;
   }
-  while(num_sweeping_collectors != num_active_collectors + 1);
+  while(num_sweeping_collectors != num_active_collectors + 1);  
+  collector->time_measurement_end = time_now();
 }
+
+
 

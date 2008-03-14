@@ -24,7 +24,7 @@
 
 #include "gc_common.h"
 #include "compressed_ref.h"
-extern Boolean IS_MOVE_COMPACT;
+#include "../finalizer_weakref/finalizer_weakref.h"
 extern void* los_boundary;
 
 inline void slot_fix(REF* p_ref)
@@ -40,7 +40,7 @@ inline void slot_fix(REF* p_ref)
   
 #endif
 
-  if(IS_MOVE_COMPACT){
+  if(collect_is_compact_move()){
     /* This condition is removed because we do los sliding compaction at every major compaction after add los minor sweep. */
     //if(obj_is_moved(p_obj)) 
     /*Fixme: los_boundery ruined the modularity of gc_common.h*/
@@ -93,6 +93,13 @@ inline void object_fix_ref_slots(Partial_Reveal_Object* p_obj)
      REF* p_ref = object_ref_iterator_get(ref_iterator+i, p_obj);        
      slot_fix(p_ref);  
   }
+
+#ifndef BUILD_IN_REFERENT
+  if(IGNORE_FINREF && is_reference_obj(p_obj)) {
+    REF* p_ref = obj_get_referent_field(p_obj);
+    slot_fix(p_ref);
+  }
+#endif
 
   return;
 }

@@ -167,13 +167,10 @@ Vector_Block* gc_metadata_extend(Pool* pool)
   return block;
 }
 
-extern Boolean IS_MOVE_COMPACT;
-
 static void gc_update_repointed_sets(GC* gc, Pool* pool, Boolean double_fix)
 {
   GC_Metadata* metadata = gc->metadata;
   
-  /* NOTE:: this is destructive to the root sets. */
   pool_iterator_init(pool);
   Vector_Block* root_set = pool_iterator_next(pool);
 
@@ -184,23 +181,19 @@ static void gc_update_repointed_sets(GC* gc, Pool* pool, Boolean double_fix)
       iter = vector_block_iterator_advance(root_set,iter);
 
       Partial_Reveal_Object* p_obj = read_slot(p_ref);
-      if(IS_MOVE_COMPACT){
-      /*This condition is removed because we do los sliding compaction at every major compaction after add los minor sweep.*/
-      //if(obj_is_moved(p_obj)) 
-        /*Fixme: los_boundery ruined the modularity of gc_common.h*/
-        if(p_obj < los_boundary){
-          p_obj = obj_get_fw_in_oi(p_obj);
-        }else{
-          p_obj = obj_get_fw_in_table(p_obj);
+      if( collect_is_compact_move()){ /* move-compact uses offset table */
+          /*This condition is removed because we do los sliding compaction at every major compaction after add los minor sweep.*/
+          //if(obj_is_moved(p_obj)) 
+          /*Fixme: los_boundery ruined the modularity of gc_common.h*/
+        if( gc_has_los() && p_obj < los_boundary){
+            p_obj = obj_get_fw_in_oi(p_obj);
+        }else{ /* this is the case with unique move_compact */
+            p_obj = obj_get_fw_in_table(p_obj);
         }
 
         write_slot(p_ref, p_obj);
-        
-      }else if(gc_match_kind(gc, MC_COLLECTION)){
-        p_obj = obj_get_fw_in_table(p_obj);
-        write_slot(p_ref, p_obj);
-        
-      }else{
+
+      }else{ /* this is the case of non-move-compact major collection, such as slide-compact and mark-sweep */
         if(obj_is_fw_in_oi(p_obj)){
           /* Condition obj_is_moved(p_obj) is for preventing mistaking previous mark bit of large obj as fw bit when fallback happens.
            * Because until fallback happens, perhaps the large obj hasn't been marked. So its mark bit remains as the last time.
@@ -218,11 +211,12 @@ static void gc_update_repointed_sets(GC* gc, Pool* pool, Boolean double_fix)
             assert(address_belongs_to_gc_heap(p_obj, gc));
           }
           write_slot(p_ref, p_obj);
-        }
-      }
-    }
+        } /* obj is forwarded */
+      } /* collect is not move-compact */
+        
+    } /* while root_set has entry */
     root_set = pool_iterator_next(pool);
-  } 
+  } /* while pool has root_set */
   
   return;
 }
@@ -233,8 +227,8 @@ void gc_fix_rootset(Collector* collector, Boolean double_fix)
 
   gc_update_weak_roots(gc, double_fix);
 
-  /* MINOR_COLLECTION doesn't need rootset update, but need reset */
-  if( !gc_match_kind(gc, MINOR_COLLECTION)){
+  /* ALGO_MINOR doesn't need rootset update, but need reset */
+  if( !collect_is_minor()){
     gc_update_repointed_sets(gc, gc->metadata->gc_rootset_pool, double_fix);
 #ifndef BUILD_IN_REFERENT
     gc_update_finref_repointed_refs(gc, double_fix);
@@ -302,8 +296,8 @@ void gc_set_rootset(GC* gc)
     collector->rem_set = NULL;
   }
   
-  assert(gc_match_either_kind(gc, MINOR_COLLECTION|NORMAL_MAJOR_COLLECTION));
-  if( gc_match_kind(gc, NORMAL_MAJOR_COLLECTION )){
+  assert( collect_is_major_normal() || collect_is_minor());
+  if( collect_is_major_normal() ){
     /* all the remsets are useless now */
     /* clean and put back mutator remsets */
 #ifdef USE_REM_SLOTS  
@@ -341,7 +335,7 @@ void gc_set_rootset(GC* gc)
         root_set = pool_get_entry( collector_remset_pool );
     }
 
-  }else{ /* generational MINOR_COLLECTION */
+  }else{ /* generational ALGO_MINOR */
 
     /* all the remsets are put into the shared pool */
 #ifdef USE_REM_SLOTS
@@ -433,7 +427,7 @@ void gc_clear_rootset(GC* gc)
 void gc_clear_remset(GC* gc)
 {
   /* this function clears all the remset before fallback */
-  assert(gc_match_kind(gc, FALLBACK_COLLECTION));
+  assert(collect_is_fallback());
   
   /* rootset pool has some entries that are actually remset, because all the remsets are put into rootset pool 
      before the collection. gc->root_set is a pointer pointing to the boundary between remset and rootset in the pool */
@@ -583,7 +577,7 @@ void gc_reset_dirty_set(GC* gc)
       while(!vector_block_iterator_end(local_dirty_set,iter)){
         Partial_Reveal_Object* p_obj = (Partial_Reveal_Object*) *iter;
         iter = vector_block_iterator_advance(local_dirty_set, iter);
-#ifdef USE_MARK_SWEEP_GC
+#ifdef USE_UNIQUE_MARK_SWEEP_GC
         assert(obj_is_mark_black_in_table(p_obj));
 #endif
       }
@@ -605,7 +599,7 @@ void gc_reset_dirty_set(GC* gc)
         while(!vector_block_iterator_end(dirty_set,iter)){
           Partial_Reveal_Object* p_obj = (Partial_Reveal_Object*) *iter;          
           iter = vector_block_iterator_advance(dirty_set, iter);
-#ifdef USE_MARK_SWEEP_GC
+#ifdef USE_UNIQUE_MARK_SWEEP_GC
           assert(obj_is_mark_black_in_table(p_obj));
 #endif
         }
@@ -657,4 +651,6 @@ void gc_clear_dirty_set(GC* gc)
 
 void free_set_pool_put_entry(Vector_Block* block, GC_Metadata *metadata)
 { pool_put_entry(metadata->free_set_pool, block); }
+
+
 

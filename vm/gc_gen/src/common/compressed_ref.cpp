@@ -32,7 +32,7 @@ typedef struct Uncompressed_Root{
 }Compressed_Root;
 
 POINTER_SIZE_INT vtable_base = 0;
-POINTER_SIZE_INT HEAP_NULL = 0;
+POINTER_SIZE_INT HEAP_BASE = 0;
 
 void gc_set_uncompressed_rootset(GC *gc)
 {
@@ -69,5 +69,7 @@ void gc_fix_uncompressed_rootset(GC *gc)
     }
   }
 }
+
+
 
 

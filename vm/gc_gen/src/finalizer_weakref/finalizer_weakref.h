@@ -71,7 +71,7 @@ inline void scan_weak_reference(Collector *collector, Partial_Reveal_Object *p_o
   }
   switch(type){
     case SOFT_REFERENCE :
-      if(gc_match_kind(collector->gc, MINOR_COLLECTION))
+      if(collect_is_minor())
         scan_slot(collector, p_referent_field);
       else
         collector_add_softref(collector, p_obj);

@@ -43,7 +43,7 @@ void gc_gen_stats_reset_before_collection(GC_Gen* gc)
 {
   GC_Gen_Stats* stats = gc->stats;
 
-  if(gc_match_kind((GC*)gc, MINOR_COLLECTION)){
+  if(collect_is_minor()){
     stats->nos_surviving_obj_num_minor = 0;
     stats->nos_surviving_obj_size_minor = 0;
     stats->los_suviving_obj_num = 0;
@@ -65,7 +65,7 @@ void gc_gen_stats_update_after_collection(GC_Gen* gc)
   GC_Gen_Collector_Stats* collector_stats;
   Boolean is_los_collected = gc_gen_stats->is_los_collected;
 
-  if(gc_match_kind((GC*)gc, MINOR_COLLECTION)) {
+  if(collect_is_minor()) {
 
     for (unsigned int i=0; i<gc->num_active_collectors; i++) {
       collector_stats = (GC_Gen_Collector_Stats*)collector[i]->stats;
@@ -101,15 +101,16 @@ void gc_gen_stats_verbose(GC_Gen* gc)
 {
   GC_Gen_Stats* stats = gc->stats;
   Boolean is_los_collected = stats->is_los_collected;
-  if (gc_match_kind((GC*)gc, MINOR_COLLECTION)){
-    TRACE2("gc.space", "GC: Fspace Collection stats: "
-      <<"\nGC: collection algo: "<<((stats->nos_collection_algo_minor==MINOR_NONGEN_FORWARD_POOL)?"nongen forward":"gen forward")
-      <<"\nGC: num surviving objs: "<<stats->nos_surviving_obj_num_minor
-      <<"\nGC: size surviving objs: "<<verbose_print_size(stats->nos_surviving_obj_size_minor)
-      <<"\nGC: surviving ratio: "<<(int)(stats->nos_surviving_ratio_minor*100)<<"%\n");
+  if (collect_is_minor()){
+    TRACE2("gc.space", "GC: NOS Collection stats: "
+      <<"\nGC: " << (gc_is_gen_mode()?"generational":"nongenerational")
+      <<"\nGC: collection algo: " << (minor_is_semispace()?"semi-space":"partial-forward")
+      <<"\nGC: num surviving objs: " << stats->nos_surviving_obj_num_minor
+      <<"\nGC: size surviving objs: " << verbose_print_size(stats->nos_surviving_obj_size_minor)
+      <<"\nGC: surviving ratio: " << (int)(stats->nos_surviving_ratio_minor*100) << "%\n");
   }else{
-    TRACE2("gc.space", "GC: Mspace Collection stats: "
-      <<"\nGC: collection algo: "<<((stats->nos_mos_collection_algo_major==MAJOR_COMPACT_SLIDE)?"slide compact":"move compact")
+    TRACE2("gc.space", "GC: MOS Collection stats: "
+      <<"\nGC: collection algo: " << (major_is_marksweep()?"mark-sweep":"slide compact")
       <<"\nGC: num surviving objs: "<<stats->nos_mos_suviving_obj_num_major
       <<"\nGC: size surviving objs: "<<verbose_print_size(stats->nos_mos_suviving_obj_size_major)
       <<"\nGC: surviving ratio: "<<(int)(stats->nos_mos_suviving_ratio_major*100)<<"%\n");
@@ -117,7 +118,7 @@ void gc_gen_stats_verbose(GC_Gen* gc)
 
   if(stats->is_los_collected) { /*if los is collected, need to output los related info*/
     TRACE2("gc.space", "GC: Lspace Collection stats: "
-      <<"\nGC: collection algo: "<<((stats->los_collection_algo==MAJOR_COMPACT_SLIDE)?"slide compact":"mark sweep")
+      <<"\nGC: collection algo: "<<(collect_is_major()?"slide compact":"mark sweep")
       <<"\nGC: num surviving objs: "<<stats->los_suviving_obj_num
       <<"\nGC: size surviving objs: "<<verbose_print_size(stats->los_suviving_obj_size)
       <<"\nGC: surviving ratio: "<<(int)(stats->los_surviving_ratio*100)<<"%\n");

@@ -49,9 +49,9 @@ void fallback_clear_fwd_obj_oi(Collector* collector);
 void fallback_clear_fwd_obj_oi_init(Collector* collector);
 #endif
 
-extern Boolean IS_MOVE_COMPACT;
-
 #endif /* _MSPACE_COLLECT_COMPACT_H_ */
+
+
 
 
 

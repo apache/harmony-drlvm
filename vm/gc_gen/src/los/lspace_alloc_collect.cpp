@@ -66,7 +66,7 @@ static void* free_pool_former_lists_atomic_take_area_piece(Free_Area_Pool* pool,
     /*if the list head is not NULL, it definitely satisfies the request. */   
     remain_size = free_area->size - alloc_size;
     assert(remain_size >= 0);
-    if( remain_size >= GC_OBJ_SIZE_THRESHOLD){
+    if( remain_size >= GC_LOS_OBJ_SIZE_THRESHOLD){
         new_list_nr = pool_list_index_with_size(remain_size);
         p_result = (void*)((POINTER_SIZE_INT)free_area + remain_size);
         if(new_list_nr == list_hint){
@@ -89,7 +89,7 @@ static void* free_pool_former_lists_atomic_take_area_piece(Free_Area_Pool* pool,
         free_pool_unlock_nr_list(pool, list_hint);
         p_result = (void*)((POINTER_SIZE_INT)free_area + remain_size);
         if(remain_size > 0){
-            assert((remain_size >= KB) && (remain_size < GC_OBJ_SIZE_THRESHOLD));
+            assert((remain_size >= KB) && (remain_size < GC_LOS_OBJ_SIZE_THRESHOLD));
             free_area->size = remain_size;
         }
         return p_result;
@@ -118,7 +118,7 @@ static void* free_pool_last_list_atomic_take_area_piece(Free_Area_Pool* pool, PO
     free_area = (Free_Area*)(head->next);
     while(  free_area != (Free_Area*)head ){
         remain_size = free_area->size - alloc_size;
-        if( remain_size >= GC_OBJ_SIZE_THRESHOLD){
+        if( remain_size >= GC_LOS_OBJ_SIZE_THRESHOLD){
             new_list_nr = pool_list_index_with_size(remain_size);
             p_result = (void*)((POINTER_SIZE_INT)free_area + remain_size);
             if(new_list_nr == MAX_LIST_INDEX){
@@ -141,7 +141,7 @@ static void* free_pool_last_list_atomic_take_area_piece(Free_Area_Pool* pool, PO
             free_pool_unlock_nr_list(pool, MAX_LIST_INDEX);
             p_result = (void*)((POINTER_SIZE_INT)free_area + remain_size);
             if(remain_size > 0){
-                assert((remain_size >= KB) && (remain_size < GC_OBJ_SIZE_THRESHOLD));
+                assert((remain_size >= KB) && (remain_size < GC_LOS_OBJ_SIZE_THRESHOLD));
                 free_area->size = remain_size;
             }
             return p_result;
@@ -343,7 +343,7 @@ void lspace_reset_for_slide(Lspace* lspace)
         assert(!(tuner->tuning_size % GC_BLOCK_SIZE_BYTES));
         new_fa_size = (POINTER_SIZE_INT)lspace->scompact_fa_end - (POINTER_SIZE_INT)lspace->scompact_fa_start + tuner->tuning_size;
         Free_Area* fa = free_area_new(lspace->scompact_fa_start,  new_fa_size);
-        if(new_fa_size >= GC_OBJ_SIZE_THRESHOLD) free_pool_add_area(lspace->free_pool, fa);
+        if(new_fa_size >= GC_LOS_OBJ_SIZE_THRESHOLD) free_pool_add_area(lspace->free_pool, fa);
         lspace->committed_heap_size += trans_size;
         break;
       }
@@ -358,7 +358,7 @@ void lspace_reset_for_slide(Lspace* lspace)
         assert((POINTER_SIZE_INT)lspace->scompact_fa_end > (POINTER_SIZE_INT)lspace->scompact_fa_start + tuner->tuning_size);
         new_fa_size = (POINTER_SIZE_INT)lspace->scompact_fa_end - (POINTER_SIZE_INT)lspace->scompact_fa_start - tuner->tuning_size;
         Free_Area* fa = free_area_new(lspace->scompact_fa_start,  new_fa_size);
-        if(new_fa_size >= GC_OBJ_SIZE_THRESHOLD) free_pool_add_area(lspace->free_pool, fa);
+        if(new_fa_size >= GC_LOS_OBJ_SIZE_THRESHOLD) free_pool_add_area(lspace->free_pool, fa);
         break;
       }
       default:{
@@ -368,7 +368,7 @@ void lspace_reset_for_slide(Lspace* lspace)
         new_fa_size = (POINTER_SIZE_INT)lspace->scompact_fa_end - (POINTER_SIZE_INT)lspace->scompact_fa_start;
         if(new_fa_size == 0) break;
         Free_Area* fa = free_area_new(lspace->scompact_fa_start,  new_fa_size);
-        if(new_fa_size >= GC_OBJ_SIZE_THRESHOLD) free_pool_add_area(lspace->free_pool, fa);
+        if(new_fa_size >= GC_LOS_OBJ_SIZE_THRESHOLD) free_pool_add_area(lspace->free_pool, fa);
         break;
       }
     }
@@ -479,5 +479,7 @@ void lspace_sweep(Lspace* lspace)
   TRACE2("gc.process", "GC: end of lspace sweep algo ...\n");
   return;
 }
+
+
 
 

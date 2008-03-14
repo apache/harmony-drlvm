@@ -55,7 +55,7 @@ inline Boolean obj_is_dead_in_compact_major_gc(Partial_Reveal_Object *p_obj)
   return !obj_is_marked_in_vt(p_obj);
 }
 
-#ifdef USE_MARK_SWEEP_GC
+#ifdef USE_UNIQUE_MARK_SWEEP_GC
 inline Boolean obj_is_dead_in_mark_sweep_gc(Partial_Reveal_Object *p_obj)
 {
   return !obj_is_mark_black_in_table(p_obj);
@@ -72,7 +72,7 @@ inline Boolean gc_obj_is_dead(GC *gc, Partial_Reveal_Object *p_obj)
 {
   assert(p_obj);
 
-#ifdef USE_MARK_SWEEP_GC
+#ifdef USE_UNIQUE_MARK_SWEEP_GC
   return obj_is_dead_in_mark_sweep_gc(p_obj);
 #endif
 
@@ -80,12 +80,12 @@ inline Boolean gc_obj_is_dead(GC *gc, Partial_Reveal_Object *p_obj)
   return obj_is_dead_in_move_compact_no_los_gc(p_obj);
 #endif
 
-  if(gc_match_kind(gc, MINOR_COLLECTION)){
+  if(collect_is_minor()){
     if(gc_is_gen_mode())
       return obj_is_dead_in_gen_minor_gc(p_obj);
     else
       return obj_is_dead_in_nongen_minor_gc(p_obj);
-  } else if(gc_get_mos((GC_Gen*)gc)->collect_algorithm == MAJOR_MARK_SWEEP){
+  } else if(major_is_marksweep()){
     return obj_is_dead_in_sweep_major_gc(p_obj);
   } else {
     return obj_is_dead_in_compact_major_gc(p_obj);
@@ -100,7 +100,7 @@ inline Boolean obj_need_move(GC *gc, Partial_Reveal_Object *p_obj)
 {
   /* assert(!gc_obj_is_dead(gc, p_obj)); commented out for weakroot */
 
-#ifdef USE_MARK_SWEEP_GC
+#ifdef USE_UNIQUE_MARK_SWEEP_GC
   Wspace *wspace = gc_ms_get_wspace((GC_MS*)gc);
   return wspace->move_object;
 #endif
@@ -109,9 +109,9 @@ inline Boolean obj_need_move(GC *gc, Partial_Reveal_Object *p_obj)
   Cspace *cspace = gc_mc_get_cspace((GC_MC*)gc);
   return cspace->move_object;
 #endif
-  if(gc_match_kind(gc, MINOR_COLLECTION)){
+  if(collect_is_minor()){
     if(!obj_belongs_to_nos(p_obj)) return FALSE;
-    if(MINOR_ALGO == MINOR_NONGEN_SEMISPACE_POOL || MINOR_ALGO == MINOR_GEN_SEMISPACE_POOL)
+    if(minor_is_semispace())
       return TRUE;
     else if(gc_is_gen_mode())
       return fspace_obj_to_be_forwarded(p_obj);

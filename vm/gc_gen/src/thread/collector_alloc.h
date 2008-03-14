@@ -34,10 +34,7 @@
 
 extern Space_Alloc_Func mos_alloc;
 
-//FIXME: MINOR_ALGO is static
-extern unsigned int MINOR_ALGO;
-
-/* NOS forward obj to other space in MINOR_COLLECTION */
+/* NOS forward obj to other space in ALGO_MINOR */
 FORCE_INLINE Partial_Reveal_Object* collector_forward_object(Collector* collector, Partial_Reveal_Object* p_obj)
 {
   Obj_Info_Type oi = get_obj_info_raw(p_obj);
@@ -65,18 +62,16 @@ FORCE_INLINE Partial_Reveal_Object* collector_forward_object(Collector* collecto
   Allocator* allocator = (Allocator*)collector;
   
   /* can also use collector->collect_space->collect_algorithm */
-  if( MINOR_ALGO == MINOR_NONGEN_SEMISPACE_POOL || MINOR_ALGO == MINOR_GEN_SEMISPACE_POOL){
+  if( minor_is_semispace()){
 
-    p_targ_obj = (Partial_Reveal_Object*)semispace_forward_obj(p_obj, size, allocator);
+    p_targ_obj = (Partial_Reveal_Object*)semispace_copy_object(p_obj, size, allocator);
     if( !p_targ_obj )
       allocator = ((Collector*)collector)->backup_allocator;
 
-  }else{ /* other non-ss algorithms. FIXME:: I am going to remove this branch if it has no perf impact. */
-    
-    if(is_collector_local_alloc){  /* try local alloc first if collector supports it. Marksweep doesn't. */
-      p_targ_obj = thread_local_alloc(size, allocator);
-    }
-  }
+  } /*
+  else{ // other non-ss algorithms. can do thread_local_alloc here to speedup. I removed it for simplicity.  
+     if(support thread local alloc in MOS) p_targ_obj = thread_local_alloc(size, allocator);
+  }*/
     
   if(!p_targ_obj){
     p_targ_obj = (Partial_Reveal_Object*)mos_alloc(size, allocator);
@@ -85,7 +80,7 @@ FORCE_INLINE Partial_Reveal_Object* collector_forward_object(Collector* collecto
   if(p_targ_obj == NULL){
     /* failed to forward an obj */
     collector->result = FALSE;
-    TRACE2("gc.collect", "failed to forward an obj, minor collection failed.");
+    TRACE2("gc.collect", "failed to forward an object, minor collection failed.");
     return NULL;
   }
     
