@@ -43,8 +43,9 @@ class I586InstsExpansion : public SessionAction {
 
     void runImpl();
 
-    //return true if instruction is SSE, assign corresponding mnemonics if arithmetic operation
-    bool isSSE(Mnemonic mn, Mnemonic &fMnem1, Mnemonic &fMnem2);
+
+    void lowerToX87();
+    void lowerToSSE();
 
     uint32 getNeedInfo()const{ return 0; }
     uint32 getSideEffects()const{ return hasSideEffects ? SideEffect_InvalidatesLivenessInfo: 0; }
@@ -59,28 +60,31 @@ public:
 
 static ActionFactory<I586InstsExpansion> _i586("i586");
 
-bool I586InstsExpansion::isSSE(Mnemonic mn, Mnemonic &fMnem1, Mnemonic &fMnem2) {
+
+
+
+//NOTE: today the following methods contains info only for mnemonics used in CG. 
+//TODO: update them to have all mnemonics from Architecture Manual or add this info to Encoder
+static bool isSSE2OrNewer(Mnemonic mn) {
+    switch (mn) {
+        case Mnemonic_MOVAPD:
+            return true;
+        default:
+            return false;
+    }
+}
+
+//return true if instruction is SSE or newer
+static bool isSSEOrNewer(Mnemonic mn) {
     switch (mn) {
         case Mnemonic_ADDSS:
         case Mnemonic_ADDSD:
-            fMnem1 = Mnemonic_FADDP;
-            fMnem2 = Mnemonic_FADD;
-            return true;
         case Mnemonic_SUBSS:
         case Mnemonic_SUBSD:
-            fMnem1 = Mnemonic_FSUBP;
-            fMnem2 = Mnemonic_FSUB;
-            return true;
         case Mnemonic_MULSS:
         case Mnemonic_MULSD:
-            fMnem1 = Mnemonic_FMULP;
-            fMnem2 = Mnemonic_FMUL;
-            return true;
         case Mnemonic_DIVSS:
         case Mnemonic_DIVSD:
-            fMnem1 = Mnemonic_FDIVP;
-            fMnem2 = Mnemonic_FDIV;
-            return true;
         case Mnemonic_XORPD:
         case Mnemonic_XORPS:
         case Mnemonic_PXOR:
@@ -96,20 +100,94 @@ bool I586InstsExpansion::isSSE(Mnemonic mn, Mnemonic &fMnem1, Mnemonic &fMnem2) 
         case Mnemonic_CVTSI2SD:
             return true;
         default:
-            return false;
+            return isSSE2OrNewer(mn);
     }
 }
 
+static void mapToX87(Mnemonic mn, Mnemonic &fMnem1, Mnemonic &fMnem2) {
+    switch (mn) {
+        case Mnemonic_ADDSS:
+        case Mnemonic_ADDSD:
+            fMnem1 = Mnemonic_FADDP;
+            fMnem2 = Mnemonic_FADD;
+            return;
+        case Mnemonic_SUBSS:
+        case Mnemonic_SUBSD:
+            fMnem1 = Mnemonic_FSUBP;
+            fMnem2 = Mnemonic_FSUB;
+            return;
+        case Mnemonic_MULSS:
+        case Mnemonic_MULSD:
+            fMnem1 = Mnemonic_FMULP;
+            fMnem2 = Mnemonic_FMUL;
+            return;
+        case Mnemonic_DIVSS:
+        case Mnemonic_DIVSD:
+            fMnem1 = Mnemonic_FDIVP;
+            fMnem2 = Mnemonic_FDIV;
+            return;
+        default:
+            return;
+    }
+}
+
+enum FPUMode {
+    FPUMode_X87     = 1,
+    FPUMode_SSE     = 2,
+    FPUMode_SSE2    = 3
+};
+
 void I586InstsExpansion::runImpl() {
-    bool hasSSE2 = CPUID::isSSE2Supported();
-    bool force = getBoolArg("force", false);
-    bool skip = hasSSE2 && !force;
+    FPUMode mode = CPUID::isSSE2Supported() ? FPUMode_SSE2 : FPUMode_SSE;
+
+    const char* modeStr = getArg("mode");
+    if (modeStr!=NULL && !strcmp(modeStr, "sse")) {
+        mode = FPUMode_SSE;
+    } else if (modeStr!=NULL && !strcmp(modeStr, "x87")) {
+        mode = FPUMode_X87;
+    }
+
     if (Log::isEnabled()) {
-        Log::out()<<"hasSSE2:"<<hasSSE2<<" force:"<<force<<" skipping:"<<skip<<std::endl; 
+        Log::out()<<"has sse2:" << CPUID::isSSE2Supported() << " mode:"<<(int)mode<<std::endl; 
     }
-    if (skip) {
-        return;
+
+    switch(mode) {
+        case FPUMode_X87:
+            lowerToX87();
+            return;
+        case FPUMode_SSE:
+            lowerToSSE();
+            return;
+        case FPUMode_SSE2:
+            //do nothing;
+            break;
+        default: assert(0);
     }
+}
+
+void I586InstsExpansion::lowerToSSE() {
+    const Nodes& nodes = irManager->getFlowGraph()->getNodes();
+    for (Nodes::const_iterator cit = nodes.begin(); cit != nodes.end(); ++cit) {
+        Node* node = *cit;
+        if (!node->isBlockNode()) {
+            continue;
+        }
+        for(Inst * inst = (Inst *)node->getFirstInst(); inst != NULL; ) {
+            Mnemonic mn = inst->getMnemonic();
+            if (!isSSE2OrNewer(mn)) {
+                continue;
+            }
+            //Mode is not implemented for a SSE2 and newer systems.
+            //Must never hit for SSE-only hardware.
+            assert(0); 
+
+        }
+    }
+}
+
+
+void I586InstsExpansion::lowerToX87() {
+    //check if to use FPU mode. Otherwise SSE1 insts will be allowed
     irManager->updateLivenessInfo();
     hasSideEffects = true;
 
@@ -141,9 +219,9 @@ void I586InstsExpansion::runImpl() {
         for(Inst * inst = (Inst *)node->getFirstInst(); inst != NULL; ) {
             Inst * tmpInst = inst->getNextInst();
             Mnemonic mn = inst->getMnemonic();
+            
             Mnemonic fMnem1 = Mnemonic_NULL, fMnem2 = Mnemonic_NULL;
-
-            if (!isSSE(mn, fMnem1, fMnem2)) {
+            if (!isSSEOrNewer(mn)) {
                 //check all other instruction for XMM registers operands
                 Inst::Opnds xmms(inst, Inst::OpndRole_Explicit|Inst::OpndRole_UseDef);
                 for (Inst::Opnds::iterator it = xmms.begin(); it != xmms.end(); it = xmms.next(it)) {
@@ -156,7 +234,10 @@ void I586InstsExpansion::runImpl() {
                 inst = tmpInst;
                 continue;
             }
-            
+
+            mapToX87(mn, fMnem1, fMnem2);
+
+
             Opnd * fp0;
             Opnd * fp1;
 

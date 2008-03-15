@@ -1153,7 +1153,12 @@ Inst * IRManager::newCopySequence(Opnd * targetBOpnd, Opnd * sourceBOpnd, uint32
         if (sourceByteSize==4){
             return newInst(Mnemonic_MOVSS,targetOpnd, sourceOpnd);
         }else if (sourceByteSize==8){
-            return newInst(Mnemonic_MOVSD,targetOpnd, sourceOpnd);
+            bool regsOnly = targetKind==OpndKind_XMMReg && sourceKind==OpndKind_XMMReg;
+            if (regsOnly && CPUID::isSSE2Supported()) {
+                return newInst(Mnemonic_MOVAPD, targetOpnd, sourceOpnd);
+            } else  {
+                return newInst(Mnemonic_MOVSD, targetOpnd, sourceOpnd);
+            }
         }
     }else if (targetKind==OpndKind_FPReg && sourceKind==OpndKind_Mem){
         sourceOpnd->setMemOpndAlignment(Opnd::MemOpndAlignment_16);

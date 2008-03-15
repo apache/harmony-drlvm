@@ -1094,6 +1094,14 @@ END_OPCODES()
 END_MNEMONIC()
 
 
+BEGIN_MNEMONIC(MOVAPD, MF_NONE, D_U )
+BEGIN_OPCODES()
+    {OpcodeInfo::all, {0x66, 0x0F, 0x28, _r},   {xmm64, xmm_m64},   D_U },
+    {OpcodeInfo::all, {0x66, 0x0F, 0x29, _r},   {xmm_m64, xmm64},   D_U },
+END_OPCODES()
+END_MNEMONIC()
+
+
 BEGIN_MNEMONIC(MOVSD, MF_NONE, D_U )
 BEGIN_OPCODES()
     {OpcodeInfo::all, {0xF2, 0x0F, 0x10, _r},   {xmm64, xmm_m64},   D_U },

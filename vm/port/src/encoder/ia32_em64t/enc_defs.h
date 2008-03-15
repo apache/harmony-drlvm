@@ -541,6 +541,7 @@ Mnemonic_MOVQ,                          // Move Quadword
 // MOVS is a special case: see encoding table for more details,
 Mnemonic_MOVS8, Mnemonic_MOVS16, Mnemonic_MOVS32, Mnemonic_MOVS64,
 //
+Mnemonic_MOVAPD,                         // Move Scalar Double-Precision Floating-Point Value
 Mnemonic_MOVSD,                         // Move Scalar Double-Precision Floating-Point Value
 Mnemonic_MOVSS,                         // Move Scalar Single-Precision Floating-Point Values
 Mnemonic_MOVSX,                         // Move with Sign-Extension
