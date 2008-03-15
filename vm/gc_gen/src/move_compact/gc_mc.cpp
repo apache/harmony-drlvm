@@ -15,7 +15,6 @@
  *  limitations under the License.
  */
  
-#include "gc_common.h"
 #include "gc_mc.h"
 
 GC* gc_mc_create()
