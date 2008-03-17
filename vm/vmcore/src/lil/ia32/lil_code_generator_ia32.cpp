@@ -1400,9 +1400,20 @@ public:
     {
         adjust_stack_for_return();
         unsigned sz = sig_size_on_stack(ctxt.entry_sig);
+        LilCc cc = lil_sig_get_cc(ctxt.entry_sig);
+        LilType type = lil_sig_get_ret_type(ctxt.entry_sig);
+        
+        if (cc == LCC_Managed && (type == LT_F4 || type == LT_F8)) {
+            // Managed calling convention uses XMM to return floating point values on IA32.
+            // So we need to copy return value from FPU stack to XMM.
+            int disp = (type == LT_F8) ? -8 : -4;
+            M_Opnd memloc(esp_reg, disp);
+            *buf = fst(*buf, memloc, (type == LT_F8), true);
+            *buf = sse_mov(*buf, xmm0_reg, memloc, (type == LT_F8));
+        }
         
         if (ctxt.entry_cc.callee_pop) {
-            if (lil_sig_get_cc(ctxt.entry_sig) == LCC_Managed) {
+            if (cc == LCC_Managed) {
                 // Managed calling convention assumes callee responsibility to 
                 // handle alignment properly. Assuming that arguments were aligned, 
                 // size of input arguments plus return pointer on the stack also should be aligned

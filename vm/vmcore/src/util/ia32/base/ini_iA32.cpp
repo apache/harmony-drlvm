@@ -51,19 +51,13 @@ using namespace std;
 
 #include "dump.h"
 
-typedef double (*DoubleFuncPtr)(uint32* args, int args_size, void* func);
 typedef ManagedObject* (*RefFuncPtr)(uint32* args, int args_size, void* func);
-typedef float (*FloatFuncPtr)(uint32* args, int args_size, void* func);
 typedef int32 (*IntFuncPtr)(uint32* args, int args_size, void* func);
 typedef int64 (*LongFuncPtr)(uint32* args, int args_size, void* func);
+typedef float (*FloatFuncPtr)(uint32* args, int args_size, void* func);
+typedef double (*DoubleFuncPtr)(uint32* args, int args_size, void* func);
 
-static IntFuncPtr gen_invoke_managed_func() {
-    static IntFuncPtr func = NULL;
-    
-    if (func) {
-        return func;
-    }
-
+static char* gen_invoke_common_managed_func(char* stub) {
     // Defines stack alignment on managed function enter.
     const int32 STACK_ALIGNMENT = MANAGED_STACK_ALIGNMENT;
     const int32 STACK_ALIGNMENT_MASK = ~(STACK_ALIGNMENT - 1);
@@ -78,18 +72,9 @@ static IntFuncPtr gen_invoke_managed_func() {
     const int32 STACK_FUNC_OFFSET = 16;
     const int32 STACK_CALLEE_SAVED_OFFSET = -12;
     
-    const int STUB_SIZE = 124;
-    char * stub = (char *) malloc_fixed_code_for_jit(STUB_SIZE,
-        DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_DEFAULT, CAA_Allocate);
-#ifdef _DEBUG
-    memset(stub, 0xcc /*int 3*/, STUB_SIZE);
-#endif
-    
     tl::MemoryPool pool;
     LilCguLabelAddresses labels(&pool, stub);
     
-    func = (IntFuncPtr) stub;
-
     // Initialize ebp-based stack frame.
     stub = push(stub, ebp_opnd);
     stub = mov(stub, ebp_opnd, esp_opnd);
@@ -143,13 +128,86 @@ static IntFuncPtr gen_invoke_managed_func() {
     
     // Leave current frame.
     stub = pop(stub, ebp_opnd);
+
+    return stub;
+}
+
+static IntFuncPtr gen_invoke_int_managed_func() {
+    static IntFuncPtr func = NULL;
+    
+    if (func) {
+        return func;
+    }
+
+    const int STUB_SIZE = 124;
+    
+    char * stub = (char *) malloc_fixed_code_for_jit(STUB_SIZE,
+        DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_DEFAULT, CAA_Allocate);
+
+    func = (IntFuncPtr) stub;
+    stub = gen_invoke_common_managed_func(stub);
+        
     stub = ret(stub);
     
     assert(stub - (char *)func <= STUB_SIZE);
 
-    DUMP_STUB(func, "invoke_managed_func", stub - (char *)func);
-
+    DUMP_STUB(func, "invoke_int_managed_func", stub - (char *)func);
     return func;
+}
+
+static FloatFuncPtr gen_invoke_float_managed_func() {
+    static FloatFuncPtr func = NULL;
+    
+    if (func) {
+        return func;
+    }
+
+    const int STUB_SIZE = 132;
+    
+    char * stub = (char *) malloc_fixed_code_for_jit(STUB_SIZE,
+        DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_DEFAULT, CAA_Allocate);
+
+    func = (FloatFuncPtr) stub;
+    stub = gen_invoke_common_managed_func(stub);
+
+    // Put return value on FPU stack.
+    M_Opnd memloc(esp_reg, -4);
+    stub = sse_mov(stub, memloc, xmm0_opnd, false);
+    stub = fld(stub, memloc, false);
+    stub = ret(stub);
+    
+    assert(stub - (char *)func <= STUB_SIZE);
+
+    DUMP_STUB(func, "invoke_float_managed_func", stub - (char *)func);
+    return func;    
+}
+
+static DoubleFuncPtr gen_invoke_double_managed_func() {
+    static DoubleFuncPtr func = NULL;
+    
+    if (func) {
+        return func;
+    }
+
+    const int STUB_SIZE = 132;
+    
+    char * stub = (char *) malloc_fixed_code_for_jit(STUB_SIZE,
+        DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_DEFAULT, CAA_Allocate);
+
+    func = (DoubleFuncPtr) stub;
+    stub = gen_invoke_common_managed_func(stub);
+
+    // Put return value on FPU stack.
+    M_Opnd memloc(esp_reg, -8);
+    stub = sse_mov(stub, memloc, xmm0_opnd, true);
+    stub = fld(stub, memloc, true);
+    stub = ret(stub);
+    
+    assert(stub - (char *)func <= STUB_SIZE);
+
+    DUMP_STUB(func, "invoke_double_managed_func", stub - (char *)func);
+    return func;
+    
 }
 
 void
@@ -162,8 +220,6 @@ JIT_execute_method_default(JIT_Handle jit, jmethodID methodID, jvalue *return_va
     //printf("execute: push: prev = 0x%p, curr=0x%p\n", lastFrame, &lastFrame);
 
 //    fprintf(stderr, "Not implemented\n");
-
-    static const IntFuncPtr invoke_managed_func = gen_invoke_managed_func();
 
     Method *method = (Method*) methodID;
     TRACE("enter method "
@@ -242,11 +298,14 @@ JIT_execute_method_default(JIT_Handle jit, jmethodID methodID, jvalue *return_va
     arg_words += argId;
     argId = sz - argId;
 
+    static const IntFuncPtr invoke_managed_func = gen_invoke_int_managed_func();
+    static const FloatFuncPtr invoke_float_managed_func = gen_invoke_float_managed_func();
+    static const DoubleFuncPtr invoke_double_managed_func = gen_invoke_double_managed_func();
+
     switch(ret_type) {
         case JAVA_TYPE_VOID:
             invoke_managed_func(arg_words, argId, meth_addr);
             break;
-
         case JAVA_TYPE_CLASS:
         case JAVA_TYPE_ARRAY:
         case JAVA_TYPE_STRING:
@@ -268,11 +327,11 @@ JIT_execute_method_default(JIT_Handle jit, jmethodID methodID, jvalue *return_va
         case JAVA_TYPE_CHAR:
         case JAVA_TYPE_SHORT:
         case JAVA_TYPE_INT:
-            resultPtr->i = ((IntFuncPtr)invoke_managed_func)(arg_words, argId, meth_addr);
+            resultPtr->i = invoke_managed_func(arg_words, argId, meth_addr);
             break;
 
         case JAVA_TYPE_FLOAT:
-            resultPtr->f = ((FloatFuncPtr)invoke_managed_func)(arg_words, argId, meth_addr);
+            resultPtr->f = invoke_float_managed_func(arg_words, argId, meth_addr);
             break;
 
         case JAVA_TYPE_LONG:
@@ -280,7 +339,7 @@ JIT_execute_method_default(JIT_Handle jit, jmethodID methodID, jvalue *return_va
             break;
 
         case JAVA_TYPE_DOUBLE:
-            resultPtr->d = ((DoubleFuncPtr)invoke_managed_func)(arg_words, argId, meth_addr);
+            resultPtr->d = invoke_double_managed_func(arg_words, argId, meth_addr);
             break;
 
         default:

@@ -286,9 +286,6 @@ inline bool fits32(const void* addr)
  * The type index is unique only within the given group of registers and 
  * lies in the range of [gr_idx(gr0); gr_idx(gr0+gr_total-1)] for gr 
  * registers and [fr_idx(fr0); fr_idx(fr0+fr_total-1)], inclusive.
- *
- * @note On IA-32, fr_ret is treated in a special way - see
- * Encoder class description.
  * 
  */
 enum AR {
@@ -313,14 +310,7 @@ enum AR {
     //
     // Specials
     //
-#ifdef _EM64T_
-    fr_ret = fr0,
-#else
-    fr_ret,
-#endif
-    gr_ret = gr0,
-    //
-    //
+    fp0, // top FPU stacked register
     //
 #ifdef _EM64T_
     gr_num=15,      /// not including sp
@@ -340,7 +330,7 @@ enum AR {
  */
 inline bool is_f(AR ar)
 {
-    return (fr0 <= ar && ar < (fr0+gr_total));
+    return (fr0 <= ar && ar < (fr0+fr_total));
 }
 
 /**
@@ -420,12 +410,6 @@ inline unsigned gr_idx(AR gr)
  */
 inline unsigned ar_idx(AR ar)
 {
-#ifdef _IA32_
-    if (ar == fr_ret) {
-        // fake usage of fr0
-        ar = fr0;
-    }
-#endif
     assert(ar-gr0 < ar_total);
     return ar-gr0;
 }
@@ -824,12 +808,10 @@ private:
  *  - (all) 'PUSH fr' is emulated as 
  *  'sub sp, num_of_slots_for(dbl64) ; mov [sp], fr'. 'POP fr' is emulated 
  *  the same way.
- *  - (IA-32)fr_ret is 'virtual' register and is treated in a special way -
- *  all IA-32 calling conventions use FPU stack to return float point 
- *  values, so only 'mov/ld fr_ret, mem' and 'mov/st mem, fr_ret' are 
+ *  - (IA-32) Only 'mov/ld fp0, mem' and 'mov/st mem, fp0' are 
  *  allowed. In this case, FST/FLD instructions are generated. \b NOTE: 
  *  this simulation is only done in #fld and #fst methods, you can \b not
- *  do #mov with fr_ret. This limitation is intentional, to remove 
+ *  do #mov with fp0. This limitation is intentional, to remove 
  *  additional check and branch from the hot exectuion path in #mov.
  * 
  * call() operation is made indirect only (trough a GR register). This is 
@@ -1076,7 +1058,7 @@ public:
      * Loads from memory into the specified register.
      *
      * Just a wrapper around mov().
-     * @note On IA32 fr_ret loads are threated in a special way.
+     * @note On IA32 fp0 loads are threated in a special way.
      */
     void ld(jtype jt, AR ar, AR base, int disp=0, AR index = ar_x, 
             unsigned scale=0)
@@ -1106,7 +1088,7 @@ public:
      * Loads from memory into the specified FR register.
      *
      * Just a wrapper around mov().
-     * @note On IA32 fr_ret loads are threated in a special way.
+     * @note On IA32 fp0 loads are threated in a special way.
      */
     void fld(jtype jt, AR ar, AR base, int disp=0, AR index = ar_x, 
              unsigned scale=0);
@@ -1114,7 +1096,7 @@ public:
      * Stores from the specified FR register into memory .
      *
      * Just a wrapper around mov().
-     * @note On IA32 fr_ret stores are threated in a special way.
+     * @note On IA32 fp0 stores are threated in a special way.
      */
     void fst(jtype jt, AR ar, AR base, int disp=0, AR index = gr_x, 
              unsigned scale=0);

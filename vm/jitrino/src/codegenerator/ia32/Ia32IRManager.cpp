@@ -1267,11 +1267,13 @@ const CallingConvention * IRManager::getCallingConvention(VM_RT_SUPPORT helperId
     HELPER_CALLING_CONVENTION callConv = compilationInterface.getRuntimeHelperCallingConvention(helperId);
     switch (callConv){
         case CALLING_CONVENTION_DRL:
-            return &CallingConvention_DRL;
+            return &CallingConvention_Managed;
         case CALLING_CONVENTION_STDCALL:
             return &CallingConvention_STDCALL;
         case CALLING_CONVENTION_CDECL:
             return &CallingConvention_CDECL;
+        case CALLING_CONVENTION_MULTIARRAY:
+            return &CallingConvention_MultiArray;
         default:
             assert(0);
             return NULL;
@@ -1281,7 +1283,7 @@ const CallingConvention * IRManager::getCallingConvention(VM_RT_SUPPORT helperId
 //_________________________________________________________________________________________________
 const CallingConvention * IRManager::getCallingConvention(MethodDesc * methodDesc)const
 {
-    return &CallingConvention_DRL;
+    return &CallingConvention_Managed;
 }
 
 //_________________________________________________________________________________________________

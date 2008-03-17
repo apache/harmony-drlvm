@@ -1035,7 +1035,8 @@ bool Compiler::comp_gen_insts(unsigned pc, unsigned parentPC,
         // That's why the exception object acts like a return value - for 
         // example on IA32 it's in EAX.
         //
-        gen_save_ret(jobj);
+        static const CallSig cs(CCONV_MANAGED, jobj);
+        gen_save_ret(cs);
     }
     
     if (is_set(DBG_TRACE_CG)) {

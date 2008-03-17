@@ -294,7 +294,7 @@ private:
     /**
      * @brief Generates method's epilogue (on RETURN instructions) code.
      */
-    void gen_return(jtype retType);
+    void gen_return(const CallSig& cs);
     
     /**
      * @brief Prepares BBState as it was left by gen_bb_leave().

@@ -50,7 +50,7 @@ static JIT_RT_Function_Entry _jit_rt_function_entries_base[] = {
             INTERRUPTIBLE_ALWAYS,              CALLING_CONVENTION_STDCALL,              2,
             NULL,   NULL,   "(Lorg/vmmagic/unboxed/Address;I)Lorg/vmmagic/unboxed/Address;",   NULL},
     {VM_RT_MULTIANEWARRAY_RESOLVED,            "VM_RT_MULTIANEWARRAY_RESOLVED",
-            INTERRUPTIBLE_ALWAYS,              CALLING_CONVENTION_CDECL,                8,
+            INTERRUPTIBLE_ALWAYS,              CALLING_CONVENTION_MULTIARRAY,           8,
             NULL,   NULL,   NULL,   NULL},
     {VM_RT_LDC_STRING,                         "VM_RT_LDC_STRING",
             INTERRUPTIBLE_ALWAYS,              CALLING_CONVENTION_STDCALL,              2,

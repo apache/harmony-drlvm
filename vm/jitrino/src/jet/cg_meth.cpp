@@ -44,7 +44,7 @@ namespace Jet {
 /**
  * CallSig for monitor_enter and monitor_exit helpers.
  */
-static CallSig cs_mon(CCONV_HELPERS, jobj);
+static const CallSig cs_mon(CCONV_HELPERS, jvoid, jobj);
 
 
 void Compiler::gen_prolog(void) {
@@ -515,7 +515,7 @@ void Compiler::gen_prolog(void) {
         alu(alu_cmp, mem, Opnd(0));
         unsigned br_off = br(z, 0, 0, taken);
         
-        static const CallSig cs_ti_menter(CCONV_HELPERS, jobj);
+        static const CallSig cs_ti_menter(CCONV_HELPERS, jvoid, jobj);
         gen_call_vm(cs_ti_menter, rt_helper_ti_method_enter, 0, m_method);
         
         patch(br_off, ip());
@@ -552,8 +552,9 @@ void Compiler::gen_prolog(void) {
     }
 }
 
-void Compiler::gen_return(jtype retType)
+void Compiler::gen_return(const CallSig& cs)
 {
+    jtype retType = cs.ret_jt(); 
     if (is_set(DBG_TRACE_EE)) {
         gen_dbg_rt(true, "exiting : %s", meth_fname());
     }
@@ -608,7 +609,7 @@ void Compiler::gen_return(jtype retType)
     if (compilation_params.exe_notify_method_exit) {
 
         // JVMTI helper takes pointer to return value and method handle
-        const CallSig cs_ti_mexit(CCONV_HELPERS, jobj, jobj);
+        static const CallSig cs_ti_mexit(CCONV_HELPERS, jvoid, jobj, jobj);
         // The call is a bit unusual, and is processed as follows:
         // we load an address of the top of the operand stack into 
         // a temporary register, and then pass this value as pointer
@@ -649,26 +650,28 @@ void Compiler::gen_return(jtype retType)
         patch(br_off, ip());
     }
 
+    AR out_reg = cs.ret_reg(0); 
     if (is_f(retType)) {
-#ifdef _IA32_
-        // On IA-32 always swap to memory first, then upload into FPU
-        vswap(0);
-        ld(retType, fr_ret, m_base, vstack_off(0));
-#else
-        // Make sure the item is not immediate
-        Val op = vstack(0, vis_imm(0));
-        if (!op.is_reg() || op.reg() != fr_ret) {
-            Opnd ret(retType, fr_ret);
+        if (out_reg == fp0) {
+            // On IA-32 always swap to memory first, then upload into FPU
+            vswap(0);
+            ld(retType, out_reg, m_base, vstack_off(0));
+        } else {
+            // Make sure the item is not immediate
+            Val op = vstack(0, vis_imm(0));
+            if (!op.is_reg() || op.reg() != out_reg) {
+                Opnd ret(retType, out_reg);
             mov(ret, op.as_opnd());
+            }
         }
-#endif
     }
     else if (is_big(retType)) {
 #ifdef _IA32_
         vswap(0);
         vswap(1);
-        ld4(eax.reg(), m_base, vstack_off(0));
-        ld4(edx.reg(), m_base, vstack_off(1));
+        AR out_reg1 = cs.ret_reg(1); 
+        ld4(out_reg, m_base, vstack_off(0));
+        ld4(out_reg1, m_base, vstack_off(1));
 #else
         assert(false && "Unexpected case - 'big' type on EM64T");
 #endif
@@ -676,8 +679,8 @@ void Compiler::gen_return(jtype retType)
     }
     else if (retType != jvoid) {
         Val& op = vstack(0);
-        if (!op.is_reg() || op.reg() != gr_ret) {
-            Opnd ret(retType, gr_ret);
+        if (!op.is_reg() || op.reg() != out_reg) {
+            Opnd ret(retType, out_reg);
             mov(ret, op.as_opnd());
         }
     }
@@ -740,7 +743,7 @@ void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth, unsigned short
 
     const JInst& jinst = *m_curr_inst;
     
-    CallSig cs(CCONV_MANAGED, args);
+    CallSig cs(CCONV_MANAGED, retType, args);
     for (unsigned i=0; i<cs.count(); i++) {
         AR ar = cs.reg(i);
         if (ar == ar_x) continue;
@@ -759,7 +762,7 @@ void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth, unsigned short
         runlock(cs); // due to gen_stack_to_args()
         gen_gc_stack(-1, true);
         if (retType != jvoid) {
-            gen_save_ret(retType);
+            gen_save_ret(cs);
         }
         if (stackFix != 0) {
             alu(alu_sub, sp, stackFix);
@@ -799,16 +802,18 @@ void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth, unsigned short
     if (meth == NULL) {
         //lazy resolution mode: get method addr and call it.
         assert(m_lazy_resolution);
+        AR gr_ret = ar_x;
         //1. get method address
         if (opcod == OPCODE_INVOKESTATIC || opcod == OPCODE_INVOKESPECIAL) {
-            static const CallSig cs_get_is_addr(CCONV_HELPERS, iplatf, i32);
+            static const CallSig cs_get_is_addr(CCONV_HELPERS, iplatf, iplatf, i32);
             char* helper = opcod == OPCODE_INVOKESTATIC ?  rt_helper_get_invokestatic_addr_withresolve :
                                                            rt_helper_get_invokespecial_addr_withresolve;
             gen_call_vm(cs_get_is_addr, helper, 0, m_klass, cpIndex);
             runlock(cs_get_is_addr);
+            gr_ret = cs_get_is_addr.ret_reg(0);
         } else {
             assert(opcod == OPCODE_INVOKEVIRTUAL || opcod == OPCODE_INVOKEINTERFACE);
-            static const CallSig cs_get_iv_addr(CCONV_HELPERS, iplatf, i32, jobj);
+            static const CallSig cs_get_iv_addr(CCONV_HELPERS, iplatf, iplatf, i32, jobj);
             char * helper = opcod == OPCODE_INVOKEVIRTUAL ? rt_helper_get_invokevirtual_addr_withresolve : 
                                                             rt_helper_get_invokeinterface_addr_withresolve;
             // setup constant parameters first,
@@ -817,6 +822,7 @@ void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth, unsigned short
             gen_args(cs_get_iv_addr, 0, &vclass, &vcpIdx, &thiz);
             gen_call_vm(cs_get_iv_addr, helper, 3);
             runlock(cs_get_iv_addr);
+            gr_ret = cs_get_iv_addr.ret_reg(0);
         } 
         rlock(gr_ret); //WARN: call addr is in gr_ret -> lock it
 
@@ -833,7 +839,7 @@ void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth, unsigned short
     else if (opcod == OPCODE_INVOKEINTERFACE) {
         // if it's INVOKEINTERFACE, then first resolve it
         Class_Handle klass = method_get_class(meth);
-        const CallSig cs_vtbl(CCONV_HELPERS, jobj, jobj);
+        const CallSig cs_vtbl(CCONV_HELPERS, iplatf, jobj, jobj);
         // Prepare args for ldInterface helper
         if (cs_vtbl.reg(0) == gr_x) {
             assert(cs_vtbl.size() != 0);
@@ -848,7 +854,7 @@ void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth, unsigned short
             mov(cs_vtbl.get(0), thiz.as_opnd());
         }
         gen_call_vm(cs_vtbl, rt_helper_get_vtable, 1, klass);
-
+        AR gr_ret = cs_vtbl.ret_reg(0);
         //
         // Method's vtable is in gr_ret now, prepare stack
         //
@@ -902,7 +908,7 @@ void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth, unsigned short
     runlock(cs);
     
     if (retType != jvoid) {
-        gen_save_ret(retType);
+        gen_save_ret(cs);
     }
     if (stackFix != 0) {
         alu(alu_sub, sp, stackFix);
@@ -939,10 +945,11 @@ void CodeGen::gen_args(const CallSig& cs, unsigned idx, const Val * parg0,
     }
 }
 
-void CodeGen::gen_save_ret(jtype jt)
+void CodeGen::gen_save_ret(const CallSig& cs)
 {
+    jtype jt = cs.ret_jt();
     assert(jt != jvoid);
-    AR ar = is_f(jt) ? fr_ret : gr_ret;
+    AR ar = cs.ret_reg(0);
     if (jt==i8) {
         sx1(Opnd(i32, ar), Opnd(jt,ar));
         jt = i32;
@@ -956,7 +963,7 @@ void CodeGen::gen_save_ret(jtype jt)
         jt = i32;
     }
 #ifdef _IA32_
-    if(ar == fr_ret) {
+    if(ar == fp0) {
         // Cant use vstack_off right here, as the item is not yet pushed.
         unsigned slot = m_jframe->size();
         if (is_wide(jt)) {
@@ -964,13 +971,12 @@ void CodeGen::gen_save_ret(jtype jt)
         }
         vpush(Val(jt, m_base, voff(m_stack.stack_slot(slot))));
         //
-        st(jt, fr_ret, m_base, vstack_off(0));
+        st(jt, fp0, m_base, vstack_off(0));
     }
     else if (is_big(jt)) {
         assert(jt==i64);
-        static const AR eax = virt(RegName_EAX);
-        static const AR edx = virt(RegName_EDX);
-        vpush2(Val(jt, eax), Val(jt, edx));
+        AR ar1 = cs.ret_reg(1);
+        vpush2(Val(jt, ar), Val(jt, ar1));
     }
     else
 #endif
@@ -985,7 +991,7 @@ void CodeGen::gen_save_ret(jtype jt)
         AR gtmp = gr0;
         //ld(jobj, gtmp, bp, m_stack.stack_slot(m_jframe->depth2slot(0)));
         Opnd tmp(jt, gtmp);
-        mov(tmp, Opnd(jt, gr_ret));
+        mov(tmp, Opnd(jt, ar));
         if (cs_trace_arg.reg(0) != gr_x)  { 
             if (cs_trace_arg.size() != 0) {
                 alu(alu_sub, sp, cs_trace_arg.size());

@@ -78,7 +78,9 @@ RegName devirt(AR ar, jtype jt)
             reg = getRegName(OpndKind_XMMReg, 
                             jt == jvoid ? OpndSize_64 : to_size(jt), idx);
         }
-        else {
+        else if (ar == fp0) {
+            reg = RegName_FP0;
+        } else {
             assert(idx<COUNTOF(reg_map));
             reg = reg_map[idx];
         
@@ -467,11 +469,6 @@ bool Encoder::is_callee_save_impl(AR gr)
 
 string Encoder::to_str_impl(AR ar)
 {
-#ifdef _IA32_
-    if (ar == fr_ret) {
-        return "ST(0)";
-    }
-#endif
     RegName reg = devirt(ar);
     return getRegNameString(reg);
 }
@@ -606,9 +603,7 @@ void Encoder::mov_impl(const Opnd& _op0, const Opnd& _op1)
 #endif    
     EncoderBase::Operands args;
 
-#ifdef _IA32_
-    assert(_op0.reg() != fr_ret && _op1.reg() != fr_ret);
-#endif
+    assert(_op0.reg() != fp0 && _op1.reg() != fp0);
     assert(is_f(_op0.jt()) == is_f(_op1.jt()));
     
 #ifdef _EM64T_
@@ -906,17 +901,13 @@ void Encoder::fld_impl(jtype jt, AR op0, AR base, int disp, AR index, unsigned s
     EncoderBase::Operands args;
     Mnemonic mn = jt == dbl64 ? Mnemonic_MOVSD : Mnemonic_MOVSS;
     OpndSize sz = jt == dbl64 ? OpndSize_64 : OpndSize_32;
-#ifdef _EM64T_
-    args.add(devirt(op0, jt));
-#else
-    if (op0 == fr_ret) {
+    if (op0 == fp0) {
         mn = Mnemonic_FLD;
         args.add(jt == dbl64 ? RegName_FP0D : RegName_FP0S);
     }
     else {
         args.add(devirt(op0, jt));
     }
-#endif
     args.add(EncoderBase::Operand(sz, devirt(base), devirt(index), scale, disp));
     ip(EncoderBase::encode(ip(), mn, args));
 }
@@ -928,17 +919,13 @@ void Encoder::fst_impl(jtype jt, AR op0, AR base, int disp, AR index,
     OpndSize sz = jt == dbl64 ? OpndSize_64 : OpndSize_32;
     Mnemonic mn = jt == dbl64 ? Mnemonic_MOVSD : Mnemonic_MOVSS;
     args.add(EncoderBase::Operand(sz, devirt(base), devirt(index), scale, disp));
-#ifdef _EM64T_
-    args.add(devirt(op0, jt));
-#else
-    if (op0 == fr_ret) {
+    if (op0 == fp0) {
         mn = Mnemonic_FSTP;
         args.add(jt == dbl64 ? RegName_FP0D : RegName_FP0S);
     }
     else {
         args.add(devirt(op0, jt));
     }
-#endif
     ip(EncoderBase::encode(ip(), mn, args));
 }
 

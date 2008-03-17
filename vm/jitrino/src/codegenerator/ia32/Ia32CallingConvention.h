@@ -63,14 +63,14 @@ namespace Ia32{
 //========================================================================================
 // class CallingConvention
 //========================================================================================
+
 /**
-Interface CallingConvention describes a particular calling convention.
-
-As calling convention rules can be more or less formally defined, 
-it is worth to define this entity as a separate class or interface
-Implementers of this interface are used as arguments to some IRManager methods 
-
-*/
+ * Interface CallingConvention describes a particular calling convention.
+ * 
+ * As calling convention rules can be more or less formally defined,
+ * it is worth to define this entity as a separate class or interface
+ * Implementers of this interface are used as arguments to some IRManager methods 
+ */
 class CallingConvention
 {   
 public: 
@@ -129,79 +129,117 @@ typedef StlVector<const CallingConvention *> CallingConventionVector;
 
 
 //========================================================================================
-// class STDCALLCallingConvention
+// STDCALLCallingConvention
 //========================================================================================
-/** Implementation of CallingConvention for the STDCALL calling convention
-*/
 
-class STDCALLCallingConvention: public CallingConvention
+/**
+ * Implementation of CallingConvention for the STDCALL calling convention
+ */
+class STDCALLCallingConventionIA32: public CallingConvention
 {   
 public: 
     
-    virtual ~STDCALLCallingConvention() {}
-    virtual void    getOpndInfo(ArgKind kind, uint32 argCount, OpndInfo * infos)const;
-    virtual Constraint  getCalleeSavedRegs(OpndKind regKind)const;
-#ifdef _EM64T_
-    virtual bool    calleeRestoresStack()const{ return false; }
-    virtual uint32 getStackAlignment()const { return STACK_ALIGNMENT; }
-#else
-    virtual bool    calleeRestoresStack()const{ return true; }
-#endif
-    virtual bool    pushLastToFirst()const{ return true; }
+    virtual             ~STDCALLCallingConventionIA32() {}
+    virtual void        getOpndInfo(ArgKind kind, uint32 argCount, OpndInfo * infos) const;
+    virtual Constraint  getCalleeSavedRegs(OpndKind regKind) const;
+    virtual bool        calleeRestoresStack() const{ return true; }
+    virtual bool        pushLastToFirst() const { return true; }
+
+};
+
+class STDCALLCallingConventionEM64T: public CallingConvention
+{   
+public: 
+    
+    virtual             ~STDCALLCallingConventionEM64T() {}
+    virtual void        getOpndInfo(ArgKind kind, uint32 argCount, OpndInfo * infos) const;
+    virtual Constraint  getCalleeSavedRegs(OpndKind regKind) const;
+    virtual bool        calleeRestoresStack() const { return false; }
+    virtual uint32      getStackAlignment() const { return STACK_ALIGNMENT; }
+    virtual bool        pushLastToFirst() const { return true; }
 
 };
 
 //========================================================================================
-// class DRLCallingConvention
+// CDECL CallingConvention
 //========================================================================================
 
 /**
- * Implementation of CallingConvention for the DRL IA32 calling convention
+ * Implementation of CallingConvention for the CDECL calling convention
  */
-class DRLCallingConventionIA32: public STDCALLCallingConvention
+class CDECLCallingConventionIA32: public STDCALLCallingConventionIA32
 {   
 public: 
-    virtual ~DRLCallingConventionIA32() {}
-    virtual bool    pushLastToFirst()const{ return false; }
-    virtual uint32 getStackAlignment()const { return STACK_ALIGNMENT; }
+    virtual         ~CDECLCallingConventionIA32() {}
+    virtual bool    calleeRestoresStack() const { return false; }
 };
+
+class CDECLCallingConventionEM64T: public STDCALLCallingConventionEM64T
+{   
+public: 
+    virtual         ~CDECLCallingConventionEM64T() {}
+};
+
+//========================================================================================
+//  Managed CallingConvention
+//========================================================================================
 
 /**
- * Implementation of CallingConvention for the DRL EM64T calling convention
+ * Implementation of CallingConvention for the Managed calling convention
  */
-class DRLCallingConventionEM64T: public STDCALLCallingConvention
+class ManagedCallingConventionIA32: public STDCALLCallingConventionIA32
 {   
 public: 
-    virtual ~DRLCallingConventionEM64T() {}
-    virtual uint32 getStackAlignment()const { return STACK_ALIGNMENT; }
+    virtual         ~ManagedCallingConventionIA32() {}
+    virtual void    getOpndInfo(ArgKind kind, uint32 argCount, OpndInfo * infos) const;
+    virtual bool    pushLastToFirst( ) const { return false; }
+    virtual uint32  getStackAlignment() const { return STACK_ALIGNMENT; }
 };
 
-//========================================================================================
-// class CDECLCallingConvention
-//========================================================================================
-/** Implementation of CallingConvention for the CDECL calling convention
-*/
-class CDECLCallingConvention: public STDCALLCallingConvention
+class ManagedCallingConventionEM64T: public STDCALLCallingConventionEM64T
 {   
 public: 
-    virtual ~CDECLCallingConvention() {}
-    virtual bool    calleeRestoresStack()const{ return false; }
-#ifdef _EM64T_
-    virtual void    getOpndInfo(ArgKind kind, uint32 argCount, OpndInfo * infos)const;
-    virtual bool    pushLastToFirst()const{ return true; }
-    virtual uint32 getStackAlignment()const { return STACK_ALIGNMENT; }
-#endif
+    virtual         ~ManagedCallingConventionEM64T() {}
+};
+
+
+//========================================================================================
+//  MultiArray CallingConvention
+//========================================================================================
+
+/**
+ * Special calling convention for multi-array creation.
+ * It's CDECL like but always passes arguments through the stack. 
+ */
+class MultiArrayCallingConventionIA32: public CDECLCallingConventionIA32
+{
+public:
+    virtual         ~MultiArrayCallingConventionIA32() {}
+};
+
+class MultiArrayCallingConventionEM64T: public CDECLCallingConventionEM64T
+{
+public:
+    virtual         ~MultiArrayCallingConventionEM64T() {}    
+    virtual void    getOpndInfo(ArgKind kind, uint32 argCount, OpndInfo * infos) const;
 };
 
 #ifdef _EM64T_
-typedef DRLCallingConventionEM64T   DRLCallingConvention;
+typedef STDCALLCallingConventionEM64T       STDCALLCallingConvention;
+typedef CDECLCallingConventionEM64T         CDECLCallingConvention;
+typedef ManagedCallingConventionEM64T       ManagedCallingConvention;
+typedef MultiArrayCallingConventionEM64T    MultiArrayCallingConvention;
 #else
-typedef DRLCallingConventionIA32    DRLCallingConvention;
+typedef STDCALLCallingConventionIA32        STDCALLCallingConvention;
+typedef CDECLCallingConventionIA32          CDECLCallingConvention;
+typedef ManagedCallingConventionIA32        ManagedCallingConvention;
+typedef MultiArrayCallingConventionIA32     MultiArrayCallingConvention;
 #endif
 
 extern STDCALLCallingConvention     CallingConvention_STDCALL;
-extern DRLCallingConvention         CallingConvention_DRL;
 extern CDECLCallingConvention       CallingConvention_CDECL;
+extern ManagedCallingConvention     CallingConvention_Managed;
+extern MultiArrayCallingConvention  CallingConvention_MultiArray;
 
 }; // namespace Ia32
 }

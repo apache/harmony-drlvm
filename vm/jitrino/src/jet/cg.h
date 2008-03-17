@@ -324,17 +324,18 @@ public:
     void gen_athrow(void);
     
     /**
-     * @brief Update BBState and pushes the given jtype on operand stack,
-     * as if the code just executed a call that returned the given jtype.
+     * @brief Update BBState and pushes return value on operand stack,
+     * as if the code just executed a call that returned the given value.
      * 
      * The item location is set according to the calling convention on 
      * which registers to use to return value of the given type.
      *
      * On IA-32 (where the float/double are returned through FPU) the 
      * item is spilled (code is generated to do so) into memory first.
-     * @param jtyp - type of the value 'returned'
+     * @param cs - calling signature descrubing the method to push return
+     *             value for.
      */
-    void gen_save_ret(jtype jtyp);
+    void gen_save_ret(const CallSig& cs);
     
     /**
      * @brief Generates code to call one of the throw_ helpers.

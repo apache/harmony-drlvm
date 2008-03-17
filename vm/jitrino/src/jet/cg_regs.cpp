@@ -693,14 +693,14 @@ void Compiler::gen_bb_leave(unsigned to)
         // if top of the stack is currently not on the gr_ret, then 
         // force it to be there
         Val& ev = m_jframe->dip(0);
-        if (!ev.is_reg() || ev.reg() != gr_ret) {
+        if (!ev.is_reg() || ev.reg() != gr0) {
             // locals were just spilled and no other stack items left
-            // therefore gr_ret must be unused, simply load the Exception
-            assert(rrefs(gr_ret) == 0);
-            Opnd reg(ev.jt(), gr_ret);
+            // therefore gr0 must be unused, simply load the Exception
+            assert(rrefs(gr0) == 0);
+            Opnd reg(ev.jt(), gr0);
             do_mov(reg, ev.as_opnd());
             rfree(ev);
-            ev.to_reg(gr_ret);
+            ev.to_reg(gr0);
             rref(ev);
         }
     }
@@ -717,8 +717,8 @@ void Compiler::gen_bb_enter(void)
         assert(m_jframe->size() == 1);
         Val& s = m_jframe->dip(0);
         if (!s.is_reg()) {
-            rref(gr_ret);
-            s = Val(jobj, gr_ret);
+            rref(gr0);
+            s = Val(jobj, gr0);
             // We're entering exception handler - that do not have 'direct'
             // (non exception) ways in it - the object on the top of the 
             // stack is exception and is guaranteed to be non-null.
@@ -727,7 +727,7 @@ void Compiler::gen_bb_enter(void)
             }
         }
         else {
-            assert(s.reg() == gr_ret);
+            assert(s.reg() == gr0);
         }
     }
     // We always process 0th BB as multiref BB - see also gen_prolog() 
@@ -767,7 +767,7 @@ void Compiler::gen_bb_enter(void)
     for (unsigned i=0; i<m_jframe->size(); i++) {
         Val& s = m_jframe->dip(i);
         if (i==0 && bbinfo.ehandler) {
-            assert(s.is_reg() && s.reg() == gr_ret); 
+            assert(s.is_reg() && s.reg() == gr0); 
         }
         else {
             s = Val(s.jt(), m_base, vstack_off(i));

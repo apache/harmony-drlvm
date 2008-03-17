@@ -440,24 +440,36 @@ void Compiler::handle_ik_meth(const JInst& jinst) {
         return;
     }
     switch(jinst.opcode) {
-    case OPCODE_IRETURN:
-        gen_return(i32);
+    case OPCODE_IRETURN: {
+        static const CallSig cs(CCONV_MANAGED, i32);
+        gen_return(cs);
         break;
-    case OPCODE_LRETURN:
-        gen_return(i64);
+    }
+    case OPCODE_LRETURN: {
+        static const CallSig cs(CCONV_MANAGED, i64);
+        gen_return(cs);
         break;
-    case OPCODE_FRETURN:
-        gen_return(flt32);
+    }
+    case OPCODE_FRETURN: {
+        static const CallSig cs(CCONV_MANAGED, flt32);
+        gen_return(cs);
         break;
-    case OPCODE_DRETURN:
-        gen_return(dbl64);
+    }
+    case OPCODE_DRETURN: {
+        static const CallSig cs(CCONV_MANAGED, dbl64);
+        gen_return(cs);
         break;
-    case OPCODE_ARETURN:
-        gen_return(jobj);
+    }
+    case OPCODE_ARETURN: {
+        static const CallSig cs(CCONV_MANAGED, jobj);
+        gen_return(cs);
         break;
-    case OPCODE_RETURN:
-        gen_return(jvoid);   
+    }
+    case OPCODE_RETURN: {
+        static const CallSig cs(CCONV_MANAGED, jvoid);
+        gen_return(cs);   
         break;
+    }
     default: assert(false);   break;
     };
 }

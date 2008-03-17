@@ -29,15 +29,31 @@
 namespace Jitrino {
 namespace Jet {
 
-const CallSig helper_v(CCONV_HELPERS);
-const CallSig platform_v(CCONV_HELPERS);
+const CallSig helper_v(CCONV_HELPERS, jvoid);
+const CallSig platform_v(CCONV_HELPERS, iplatf);
 
-void CallSig::init(void)
+void CallSig::init()
 {
     unsigned num = (unsigned)m_args.size();
     m_data.resize(num);
     unsigned fps = 0, gps = 0;
 
+    // Assign return value
+    m_ret_reg[0] = -1;
+    m_ret_reg[1] = -1;
+    if (is_f(m_ret_jt)) {
+        if (m_cc & CCONV_RETURN_FP_THROUGH_FPU) {
+            m_ret_reg[0] = fp0;
+        } else {
+            m_ret_reg[0] = fr0;
+        }
+    } else if (m_ret_jt != jvoid) {
+        m_ret_reg[0] = gr0;
+        if (is_wide(m_ret_jt)) {
+            m_ret_reg[1] = gr3;
+        }
+    }
+    
     //
     // Assign registers
     //

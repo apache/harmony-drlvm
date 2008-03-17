@@ -191,11 +191,9 @@ string Encoder::to_str(AR ar, bool platf)
     if (ar == sp) {
         return "sp";
     }
-#ifdef _IA32_
-    if (ar == fr_ret) {
-        return "fr_ret";
+    if (ar == fp0) {
+        return "fp0";
     }
-#endif
     if (platf) {
         return to_str_impl(ar);
     }

@@ -51,11 +51,6 @@ namespace Jet {
 #define CCONV_CALLER_POPS           (0x00000002)
 
 /**
- * @brief All args go though memory.
- */
-#define CCONV_MEM                   (0x00000020)
-
-/**
  * @brief When entering a function, obey the (sp)%%4 == 0 rule.
  */
 #define CCONV_STACK_ALIGN4          (0x00000004)
@@ -72,20 +67,29 @@ namespace Jet {
 #define CCONV_STACK_ALIGN16         (0x00000010)
 
 /**
- * Mask to extract stack alignment form calling convention.
+ * @brief Mask to extract stack alignment form calling convention.
  */
 #define CCONV_STACK_ALIGN_MASK      (CCONV_STACK_ALIGN4 | CCONV_STACK_ALIGN_HALF16 | CCONV_STACK_ALIGN16)
 
+/**
+ * @brief All args go though memory.
+ */
+#define CCONV_MEM                   (0x00000020)
+
+/**
+ * @brief Use FPU register stack to return floating point, xmm0 otherwise.
+ */
+#define CCONV_RETURN_FP_THROUGH_FPU (0x00000040)
 
 /**
  * @brief IA-32's stdcall convention.
  */
-#define CCONV_STDCALL_IA32     (CCONV_MEM)
+#define CCONV_STDCALL_IA32     (CCONV_MEM | CCONV_RETURN_FP_THROUGH_FPU)
 
 /**
  * @brief IA-32's cdecl convention.
  */
-#define CCONV_CDECL_IA32       (CCONV_CALLER_POPS | CCONV_MEM)
+#define CCONV_CDECL_IA32       (CCONV_CALLER_POPS | CCONV_MEM | CCONV_RETURN_FP_THROUGH_FPU)
 
 #ifdef _EM64T_
     /**
@@ -122,7 +126,7 @@ namespace Jet {
  * @brief A special case - VM's helper MULTIANEWARRAY always has cdecl-like
  *        convention.
  */
-#define CCONV_MULTIANEWARRAY   CCONV_CDECL_IA32
+#define CCONV_MULTIANEWARRAY    CCONV_CDECL_IA32
 
 #ifdef _EM64T_
     /**
@@ -133,7 +137,7 @@ namespace Jet {
     #define CCONV_MANAGED   CCONV_MANAGED_IA32
 #endif
 
-#define CCONV_HELPERS   CCONV_STDCALL
+#define CCONV_HELPERS       CCONV_STDCALL
 
 ///@}   // ~JET_CCONV
 
@@ -192,11 +196,12 @@ public:
     /**
      * @brief Initializes CallSig object with the given arg types.
      */
-    CallSig(unsigned cc, 
+    CallSig(unsigned cc, jtype ret = jvoid, 
             jtype arg0=jvoid, jtype arg1=jvoid, jtype arg2=jvoid,
             jtype arg3=jvoid, jtype arg4=jvoid, jtype arg5=jvoid)
     {
         m_cc = cc;
+        m_ret_jt = ret;
         if (arg0 != jvoid)  { m_args.push_back(arg0); }
         if (arg1 != jvoid)  { m_args.push_back(arg1); }
         if (arg2 != jvoid)  { m_args.push_back(arg2); }
@@ -232,8 +237,9 @@ public:
      * @brief Constructs and initializes CallSig object with the given 
      *        calling convention and list of args types.
      */
-    CallSig(unsigned cc, const vector<jtype>& args)
+    CallSig(unsigned cc, const jtype ret, const vector<jtype>& args)
     {
+        m_ret_jt = ret;
         init(cc, args);
     }
     
@@ -302,6 +308,22 @@ public:
     }
     
     /**
+     * @params i slot number. For example on IA32 ret_reg(0) is eax, ret_reg(1) is edx.
+     * @returns register which holds return value, or ar_x
+     *          of the value comes through the memory.
+     */
+    AR ret_reg(unsigned i) const
+    { 
+        assert(i < 2);
+        return (m_ret_reg[i] <= 0) ? ar_x : (AR)m_ret_reg[i];
+    }
+    
+    /**
+     * @returns type of return value.
+     */
+    jtype ret_jt() const { return m_ret_jt; }
+    
+    /**
      * @returns Offset (in bytes) from #sp of the given argument, or -1 if 
      *          the argument is passed on register.
      */
@@ -366,7 +388,7 @@ private:
      *
      * Counts args offsets and required stack size.
      */
-    void init(void);
+    void init();
     /**
      * @brief An info about argument types.
      */
@@ -399,6 +421,11 @@ private:
      *        CallSig object.
      */
     unsigned                m_cc;
+    /**
+     * @brief              
+     */
+    int                     m_ret_reg[2];
+    jtype                   m_ret_jt;
 };
 
 /**

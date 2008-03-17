@@ -260,7 +260,7 @@ public:
 
     const CallingConvention * getCallingConvention(MethodDesc * methodDesc)const;
 
-    const CallingConvention * getDefaultManagedCallingConvention() const { return &CallingConvention_DRL; }
+    const CallingConvention * getDefaultManagedCallingConvention() const { return &CallingConvention_Managed; }
 
     EntryPointPseudoInst * getEntryPointInst()const { return entryPointInst; }
 
