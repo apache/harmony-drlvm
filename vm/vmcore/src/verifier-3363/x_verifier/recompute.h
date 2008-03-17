@@ -137,7 +137,7 @@ namespace CPVerifier_5 {
 
     struct RefInfo {
         union {
-            SmConstant *subcls;
+            SmConstant *supercls;
             unsigned    mask;
         };
 
@@ -158,22 +158,22 @@ namespace CPVerifier_5 {
         }
 
         int is_interface() {
-            return !subcls;
+            return !supercls;
         }
 
         void set_interface() {
-            subcls = 0;
+            supercls = 0;
             *((SmConstant*)&mask) = SM_NONE;
         }
 
-        SmConstant *subclasses() {
+        SmConstant *superclasses() {
             //always return valis pointer
-            return subcls ? subcls : (SmConstant*)&mask;
+            return supercls ? supercls : (SmConstant*)&mask;
         }
 
-        void set_subclasses(SmConstant *s) {
+        void set_superclasses(SmConstant *s) {
             mask = 0; //just in case
-            subcls = s;
+            supercls = s;
         }
     };
 
@@ -358,23 +358,17 @@ namespace CPVerifier_5 {
 
             parseTrustedData(from); // it may change class_handler for 'to'
 
-            class_handler f = tpool.sm_get_handler(from);
-            assert(f);
             class_handler t = tpool.sm_get_handler(to);
             assert(t);
 
-            if( f != CLASS_NOT_LOADED ) {
-                return t != CLASS_NOT_LOADED && vf_is_extending(f, t);
-            }
-
-            for( SmConstant *sm = parsedTrustedData[from.getReferenceIdx()].subclasses(); *sm != SM_NONE; sm++ ) {
+            for( SmConstant *sm = parsedTrustedData[from.getReferenceIdx()].superclasses(); *sm != SM_NONE; sm++ ) {
                 if( *sm == to ) {
                     return true;
                 }
 
                 if( t != CLASS_NOT_LOADED ) {
-                    class_handler f1 = tpool.sm_get_handler(*sm);
-                    if( f1 != CLASS_NOT_LOADED && vf_is_extending(f1, t) ) return true;
+                    class_handler f = tpool.sm_get_handler(*sm);
+                    if( f != CLASS_NOT_LOADED && vf_is_extending(f, t) ) return true;
                 }                
             }
             return false;
@@ -396,20 +390,6 @@ namespace CPVerifier_5 {
                 }
             }
             return true;
-        }
-
-        SmConstant sm_get_super(SmConstant value) {
-            class_handler h = tpool.sm_get_handler(value);
-            assert(h && h!= CLASS_NOT_LOADED);
-            h = class_get_super_class(h);
-            if( h ) {
-                SmConstant sup = tpool.get_ref_type( class_get_name(h));
-                vf_ValidType *s = tpool.getVaildType(sup.getReferenceIdx());
-                s->cls = h;
-
-                return sup;
-            }
-            return SM_NONE;
         }
 
         int is_arc(Constraint *c) {

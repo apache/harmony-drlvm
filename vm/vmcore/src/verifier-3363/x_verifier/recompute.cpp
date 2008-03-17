@@ -279,7 +279,6 @@ vf_Result vf_Context_5e::mantain_node_consistency(StackmapElement *el) {
 
     //MORE THAN ONE incoming element exists
 
-    SmConstant any_resolved = SM_NONE;
     int array_of_primitive_exists = false;
     int assignable_from_object_exists = false;
 
@@ -288,7 +287,6 @@ vf_Result vf_Context_5e::mantain_node_consistency(StackmapElement *el) {
 
     //first we remove NULLs from incoming values, check whether non-references exist among incomings
     //see arrays and compare their dimensions, see if there is Object or arrays of Object among incoming
-    //and see if any resolved type exist among incomings
     for( IncomingType *inc = el->firstIncoming(); inc; inc = inc->next() ) {
         //we don't use isNonMergeable() here since there are different merging rules for Java5 and Java6
         if( inc->value == SM_NULL ) {
@@ -312,11 +310,6 @@ vf_Result vf_Context_5e::mantain_node_consistency(StackmapElement *el) {
                 array_of_primitive_exists = true;
             } else {
                 assignable_from_object_exists |= isObjectOrInterface(z);
-
-                //remember any resolved type if it exists
-                if( any_resolved == SM_NONE && (tpool.sm_get_handler(z) != CLASS_NOT_LOADED) ) {
-                    any_resolved = z;
-                }
             }
         }
     }
@@ -356,97 +349,43 @@ vf_Result vf_Context_5e::mantain_node_consistency(StackmapElement *el) {
     }
 
 
-    //if there is a resolved type then solution for this element is 
-    //a super class of the resolved class or the resolved class itself
-    if( any_resolved != SM_NONE ) {
-        
-        IncomingType *inc = el->firstIncoming();
-        tryResolve(inc->value);
+    //now we need to create a set of possible stackmap solutions
+    //S={s_i} so that each s_i is a super class of each incoming and a sub class of each expected value
+    SmConstant sm_value = el->firstIncoming()->value;
+    SmConstant z = get_zerodim(sm_value);
 
-        SmConstant general_type = any_resolved;
-        for (; general_type != tpool.sm_get_const_object(); general_type = sm_get_super(general_type) ) {
-            //we don't reinitialize 'inc' since all previous are assignable to a sub class 
-            //of 'general_type' and thus to 'general_type' as well
-            for( ; inc; inc = inc->next() ) {
-                if( !knownly_assignable( get_zerodim(inc->value), general_type) ) {
+    parseTrustedData(z);
+    int possible_stackmap_cnt = 0;
+    for( SmConstant *sm = parsedTrustedData[z.getReferenceIdx()].superclasses(); *sm != SM_NONE; sm++ ) {
+        sm_value = get_ref_array(min_arr_dims, *sm);
+        if( check_possible_stackmap(el, sm_value) ) {
+            ((StackmapElement_Ex*)el)->newStackmapAttrCnstr(&mem, sm_value);
+            possible_stackmap_cnt++;
+        }
+    }
+
+    if( !possible_stackmap_cnt ) {
+        return error(VF_ErrorInternal, "not enough data to build stackmaptable attr: need to load more classes");
+    }
+
+    //now we reduce the set by eliminating those classes that have subclasses in this set
+    if( possible_stackmap_cnt > 1 ) {
+        for( StackmapAttrCnstr* sm1 = ((StackmapElement_Ex*)el)->firstStackmapAttrCnstr(); sm1; sm1 = sm1->next() ) {
+            for( StackmapAttrCnstr* sm2 = sm1->next(); sm2; sm2 = sm2->next() ) {
+
+                if( knownly_assignable(sm1->value, sm2->value) ) {
+                    //remove this stackmap element, since its subclass exists in the set
+                    ((StackmapElement_Ex*)el)->removeOther(sm2);
                     break;
                 }
-            }
 
-            if( !inc ) { //all are assignable
-                break;
-            }
-        }
-        SmConstant found_solution = get_ref_array(min_arr_dims, general_type);
-
-        //we COULD use TRUSTED_DATA to compute solution of this mode
-        //here we validate solution to report the error sooner
-        for( ExpectedType *exp = el->firstExpected(); exp; exp = exp->next() ) {
-            if( !knownly_assignable(found_solution, exp->value) ) {
-                return error(VF_ErrorInternal, "not enough data to build stackmaptable attr: need to load more classes");
-            }
-        }
-
-        //now each incoming type s assignable to general_type
-        ((StackmapElement_Ex*)el)->newStackmapAttrCnstr(&mem, found_solution);
-    } else {
-        //now we need to create a set of possible stackmap solutions
-        //S={s_i} so that each s_i is a super class of each incoming and a sub class of each expected value
-        SmConstant sm_value = el->firstIncoming()->value;
-        SmConstant z = get_zerodim(sm_value);
-
-        parseTrustedData(z);
-
-        if( tpool.sm_get_handler(z) != CLASS_NOT_LOADED ) {
-            assert(tpool.sm_get_handler(z));
-
-            while( z != SM_NONE ) {
-                sm_value = get_ref_array(min_arr_dims, z);
-                if( check_possible_stackmap(el, sm_value) ) {
-                    ((StackmapElement_Ex*)el)->newStackmapAttrCnstr(&mem, sm_value);
-                    //we don't put those classes that have subclasses in this set ==> break
+                if( knownly_assignable(sm2->value, sm1->value) ) {
+                    //replace sm1 with sm2 and remove original sm2 
+                    //i.e. remove sm1 actually, since its subclass exists in the set
+                    sm1->value = sm2->value; 
+                    assert(sm1->depth == sm2->depth);
+                    ((StackmapElement_Ex*)el)->removeOther(sm2);
                     break;
-                }
-                z = sm_get_super(z);
-            }
-
-            if( z == SM_NONE ) {
-                return error(VF_ErrorInternal, "not enough data to build stackmaptable attr: need to load more classes");
-            }
-        } else {
-            int possible_stackmap_cnt = 0;
-            for( SmConstant *sm = parsedTrustedData[z.getReferenceIdx()].subclasses(); *sm != SM_NONE; sm++ ) {
-                sm_value = get_ref_array(min_arr_dims, *sm);
-                if( check_possible_stackmap(el, sm_value) ) {
-                    ((StackmapElement_Ex*)el)->newStackmapAttrCnstr(&mem, sm_value);
-                    possible_stackmap_cnt++;
-                }
-            }
-
-            if( !possible_stackmap_cnt ) {
-                return error(VF_ErrorInternal, "not enough data to build stackmaptable attr: need to load more classes");
-            }
-
-            //now we reduce the set by eliminating those classes that have subclasses in this set
-            if( possible_stackmap_cnt > 1 ) {
-                for( StackmapAttrCnstr* sm1 = ((StackmapElement_Ex*)el)->firstStackmapAttrCnstr(); sm1; sm1 = sm1->next() ) {
-                    for( StackmapAttrCnstr* sm2 = sm1->next(); sm2; sm2 = sm2->next() ) {
-
-                        if( knownly_assignable(sm1->value, sm2->value) ) {
-                            //remove this stackmap element, since its subclass exists in the set
-                            ((StackmapElement_Ex*)el)->removeOther(sm2);
-                            break;
-                        }
-
-                        if( knownly_assignable(sm2->value, sm1->value) ) {
-                            //replace sm1 with sm2 and remove original sm2 
-                            //i.e. remove sm1 actually, since its subclass exists in the set
-                            sm1->value = sm2->value; 
-                            assert(sm1->depth == sm2->depth);
-                            ((StackmapElement_Ex*)el)->removeOther(sm2);
-                            break;
-                        }
-                    }
                 }
             }
         }
@@ -494,7 +433,7 @@ vf_Result vf_Context_5e::arc_consistensy_in_node(StackmapElement *el, int depth)
                         knownly_assignable(sm2->value, sm_this->value, adjacent->type == CTX_REVERSED_ARRAY2REF);
 
                     if( valid_arc_found ) {
-                        //stackmap has a subclass in a branch target ==> this arc is OK, check next one
+                        //stackmap has a superclass in a branch target ==> this arc is OK, check next one
                         possible_stackmap_cnt++;
                         break;
                     }
@@ -613,6 +552,8 @@ void vf_Context_5e::parseTrustedData(SmConstant value, int knownly_interface) {
     }
     parsedTrustedData[idx].set_being_calculated();
 
+    SmConstant sup = SM_NONE;
+
     vf_ValidType *t = tpool.getVaildType(idx);
     if( !t->cls ) {
         t->cls = vf_resolve_class(k_class, t->name, false);
@@ -622,14 +563,29 @@ void vf_Context_5e::parseTrustedData(SmConstant value, int knownly_interface) {
     if( t->cls != CLASS_NOT_LOADED ) {
         if( class_is_interface_(t->cls) ) {
             parsedTrustedData[idx].set_interface();
-        } else {
-            SmConstant* subcls = (SmConstant*)mem.malloc(2*sizeof(SmConstant));
-            subcls[0] = value;
-            subcls[1] = SM_NONE;
-            
-            parsedTrustedData[idx].set_subclasses(subcls);
+            return;
         }
-        return;
+        class_handler h_sup = class_get_super_class(t->cls);
+        if( h_sup ) {
+            sup = tpool.get_ref_type( class_get_name(h_sup));
+            int sup_idx = sup.getReferenceIdx();
+            vf_ValidType *sup_type = tpool.getVaildType(sup_idx);
+
+            if( sup_type->cls == CLASS_NOT_LOADED ) {
+                //classloader delegation model is broken
+                if( sup_idx < parsedDataSz && parsedTrustedData[sup_idx].is_calculated() ) {
+                    parsedTrustedData[sup_idx].init();
+                }
+            }
+                
+            sup_type->cls = h_sup;
+            parseTrustedData( sup );
+        }            
+    } else {
+        if( value != tpool.sm_get_const_object() ) {
+            sup = tpool.sm_get_const_object();
+            parseTrustedData( sup );
+        }
     }
 
     int c;
@@ -640,11 +596,17 @@ void vf_Context_5e::parseTrustedData(SmConstant value, int knownly_interface) {
     }
 
     class_stack.init();
-    class_stack.push(tpool.sm_get_const_object());
     class_stack.push(value);
+
+    if( sup != SM_NONE ) { //i.e. value != java/lang/Object
+        for( SmConstant *sm = parsedTrustedData[sup.getReferenceIdx()].superclasses(); *sm != SM_NONE; sm++ ) {
+            if( !class_stack.instack(*sm) ) class_stack.push(*sm);
+        }
+    }
+
     for( c = 0; c < trustedPairsCnt; c++ ) {
         if( trustedPairs[c].from == value ) {
-            for( SmConstant *sm = parsedTrustedData[trustedPairs[c].to.getReferenceIdx()].subclasses(); *sm != SM_NONE; sm++ ) {
+            for( SmConstant *sm = parsedTrustedData[trustedPairs[c].to.getReferenceIdx()].superclasses(); *sm != SM_NONE; sm++ ) {
                 if( !class_stack.instack(*sm) ) class_stack.push(*sm);
             }
         }
@@ -653,12 +615,12 @@ void vf_Context_5e::parseTrustedData(SmConstant value, int knownly_interface) {
     if( parsedTrustedData[idx].is_interface() ) {
         while ( !class_stack.is_empty() ) parsedTrustedData[class_stack.pop().getReferenceIdx()].set_interface();
     } else {
-        SmConstant* subcls = (SmConstant*)mem.malloc((class_stack.get_depth()+1)*sizeof(SmConstant));
+        SmConstant* supercls = (SmConstant*)mem.malloc((class_stack.get_depth()+1)*sizeof(SmConstant));
 
-        parsedTrustedData[idx].set_subclasses(subcls);
+        parsedTrustedData[idx].set_superclasses(supercls);
         int i = 0;
-        while ( !class_stack.is_empty() ) subcls[i++] = class_stack.pop();
-        subcls[i] = SM_NONE;
+        while ( !class_stack.is_empty() ) supercls[i++] = class_stack.pop();
+        supercls[i] = SM_NONE;
     }
 }
 
@@ -680,36 +642,6 @@ void vf_Context_5e::parseTrustedPairs() {
         tryResolve(trustedPairs[i].to);
 
         i++;
-    }
-
-    //find all classes that are subclasses of the loaded classes but due to broken 
-    //delegation model in classloaders are not loaded (this is necessary because
-    //we don't check against trusted pairs when we check assignability and 'from' is loaded
-    int changed;
-    do {
-        changed = false;
-        for( i = 0; i < trustedPairsCnt; i++ ) {
-            class_handler from_cls = tpool.sm_get_handler(trustedPairs[i].from);
-
-            if( from_cls != CLASS_NOT_LOADED && 
-                tpool.sm_get_handler(trustedPairs[i].to) == CLASS_NOT_LOADED ) 
-            {
-                class_handler to_cls = class_is_extending_class(from_cls, tpool.sm_get_refname(trustedPairs[i].to));
-
-                if( to_cls ) {
-                    tpool.getVaildType(trustedPairs[i].to.getReferenceIdx())->cls = to_cls;
-                    changed = true;
-                }
-            }
-        }
-    } while (changed);
-
-    for( i = 0; i < trustedPairsCnt; i++ ) {
-        if( tpool.sm_get_handler(trustedPairs[i].from) != CLASS_NOT_LOADED && 
-            tpool.sm_get_handler(trustedPairs[i].to) == CLASS_NOT_LOADED ) 
-        {
-            parseTrustedData(trustedPairs[i].to, true);
-        }
     }
 
     tryResolve(tpool.sm_get_const_object());
