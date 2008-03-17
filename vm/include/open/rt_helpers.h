@@ -601,9 +601,6 @@ enum VM_RT_SUPPORT {
     // Conversions
 
 
-    VM_RT_LSHL=910,
-    VM_RT_LSHR=911,
-    VM_RT_LUSHR=912,
     /**
      * @param The parameters are the following:
      * (new version)
@@ -616,26 +613,9 @@ enum VM_RT_SUPPORT {
      */
 
 
-    VM_RT_LMUL=920,
-#ifdef VM_LONG_OPT
-    VM_RT_LMUL_CONST_MULTIPLIER=921,
-#endif
-    VM_RT_LREM=922,
-    VM_RT_LDIV=923,
-    VM_RT_ULDIV=924,
-    VM_RT_CONST_LDIV=925,
-    VM_RT_CONST_LREM=926,
-    // Long arithmetic
-
-    VM_RT_IMUL=930,
-    VM_RT_IREM=931,
-    VM_RT_IDIV=932,
-    // Int arithmetic
 
     VM_RT_FREM=940,
-    VM_RT_FDIV=941,
     VM_RT_DREM=942,
-    VM_RT_DDIV=943,
     // Float/double arithmetic
 
     VM_RT_CHAR_ARRAYCOPY_NO_EXC=950,
@@ -675,17 +655,6 @@ enum VM_RT_SUPPORT {
  * See also <code>VM_RT_NEW_RESOLVED_USING_VTABLE</code>.
  */
     VM_RT_NEW_VECTOR=1001,
-/**
- * @param The parameters are the following:
- *        arg\ Vector length
- *        arg\ Class handle of the vector class
- *
- * @return Reference to the new object
- *
- * Create a vector (zero-based, one dimensional array)
- * of the given type. See also <code>VM_RT_NEW_VECTOR_USING_VTABLE</code>.
- */
-    VM_RT_WRITE_BARRIER_FASTCALL=1002
 /**
  * @param The parameters are the following:
  *        arg\ Address of a memory location being written to

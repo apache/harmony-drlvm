@@ -81,23 +81,11 @@ void gen_convert_unmanaged_to_managed_null_ipf(Emitter_Handle emitter,
 
 ///////// begin arithmetic helpers
 
-int32 vm_rt_imul(int32 a, int32 b);
-int64 vm_rt_lmul(int64 a, int64 b);
-int32 vm_rt_irem(int32 a, int32 b);
-int64 vm_rt_lrem(int64 a, int64 b);
-int32 vm_rt_idiv(int32 a, int32 b);
-int64 vm_rt_ldiv(int64 a, int64 b);
 float vm_rt_frem(float a, float b);
-float vm_rt_fdiv(float a, float b);
 double vm_rt_drem(double a, double b);
-double vm_rt_ddiv(double a, double b);
 int32 vm_rt_f2i(float f);
 int64 vm_rt_f2l(float f);
 void *get_vm_rt_int_div_address_compactor(void *func, char *stub_name);
-void *get_vm_rt_lrem_address();
-void *get_vm_rt_ldiv_address();
-void *get_vm_rt_irem_address();
-void *get_vm_rt_idiv_address();
 
 ///////// end arithmetic helpers
 
@@ -2395,16 +2383,6 @@ static void *get_chararraycopy_compactor()
 }
 
 
-static void *get_fdiv_compactor()
-{
-    static void *addr = NULL;
-    if (addr == NULL)
-        addr = create_direct_helper_call_wrapper((void **)vm_rt_fdiv, 2, "fdiv_wrapper_compactor");
-    // maybe it should take 0 arguments since both are floating point
-    return addr;
-}
-
-
 static void *get_frem_compactor()
 {
     static void *addr = NULL;
@@ -2443,25 +2421,6 @@ static void *get_f2l_compactor()
     // maybe it should take 0 arguments it is floating point
     return addr;
 }
-
-
-static void *get_lmul_compactor()
-{
-    static void *addr = NULL;
-    if (addr == NULL)
-        addr = create_direct_helper_call_wrapper((void **)vm_rt_lmul, 2, "lmul_wrapper_compactor");
-    return addr;
-}
-
-
-static void *get_imul_compactor()
-{
-    static void *addr = NULL;
-    if (addr == NULL)
-        addr = create_direct_helper_call_wrapper((void **)vm_rt_imul, 2, "imul_wrapper_compactor");
-    return addr;
-}
-
 
 
 #ifdef VM_STATS
@@ -2637,44 +2596,12 @@ void *vm_helper_get_addr(VM_RT_SUPPORT f)
         fptr = get_f2l_compactor();
         dereference_fptr = false;
         break;
-    case VM_RT_LMUL:
-        fptr = get_lmul_compactor();
-        dereference_fptr = false;
-        break;
-    case VM_RT_LREM:
-        fptr = get_vm_rt_lrem_address();
-        dereference_fptr = false;
-        break;
-    case VM_RT_LDIV:
-        fptr = get_vm_rt_ldiv_address();
-        dereference_fptr = false;
-        break;
-    case VM_RT_IMUL:
-        fptr = get_imul_compactor();
-        dereference_fptr = false;
-        break;
-    case VM_RT_IREM:
-        fptr = get_vm_rt_irem_address();
-        dereference_fptr = false;
-        break;
-    case VM_RT_IDIV:
-        fptr = get_vm_rt_idiv_address();
-        dereference_fptr = false;
-        break;
     case VM_RT_FREM:
         fptr = get_frem_compactor();
         dereference_fptr = false;
         break;
-    case VM_RT_FDIV:
-        fptr = get_fdiv_compactor();
-        dereference_fptr = false;
-        break;
     case VM_RT_DREM:
         fptr = get_drem_compactor();
-        dereference_fptr = false;
-        break;
-    case VM_RT_DDIV:
-        fptr = get_fdiv_compactor();
         dereference_fptr = false;
         break;
     case VM_RT_CHECKCAST:

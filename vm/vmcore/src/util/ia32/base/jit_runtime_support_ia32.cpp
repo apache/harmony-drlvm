@@ -999,157 +999,6 @@ void * getaddress__vm_throw_linking_exception_naked()
 } //getaddress__vm_throw_linking_exception_naked
 
 
-
-// 20030321 This JIT support routine expects to be called directly from managed code. 
-void * getaddress__gc_write_barrier_fastcall()
-{
-    static void *addr = 0;
-    if (addr) {
-        return addr;
-    }
-
-    const int stub_size = 11;
-    char *stub = (char *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_MAX/2, CAA_Allocate);
-#ifdef _DEBUG
-    memset(stub, 0xcc /*int 3*/, stub_size);
-#endif
-    char *ss = stub;
-
-    ss = push(ss,  ecx_opnd);
-
-#ifdef REFS_RUNTIME_OR_COMPRESSED
-    REFS_RUNTIME_SWITCH_IF
-        // 20030321 Convert a null reference in %ecx from a managed (heap_base) to an unmanaged null (0/NULL). 
-        ss = test(ss,  ecx_opnd,  Imm_Opnd((unsigned)VM_Global_State::loader_env->managed_null));
-        ss = branch8(ss, Condition_NE,  Imm_Opnd(size_8, 0));  // branch around mov 0
-        char *backpatch_address__not_managed_null = ((char *)ss) - 1;
-        ss = mov(ss,  ecx_opnd,  Imm_Opnd(0));
-        signed offset = (signed)ss - (signed)backpatch_address__not_managed_null - 1;
-        *backpatch_address__not_managed_null = (char)offset;
-    REFS_RUNTIME_SWITCH_ENDIF
-#endif // REFS_RUNTIME_OR_UNCOMPRESSED
-
-    ss = call(ss, (char *)gc_write_barrier);
-    ss = alu(ss, add_opc,  esp_opnd,  Imm_Opnd(4));
-
-    ss = ret(ss);
-
-    addr = stub;
-    assert((ss - stub) < stub_size);
-
-    compile_add_dynamic_generated_code_chunk("gc_write_barrier_fastcall", false, stub, stub_size);
-
-    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
-        jvmti_send_dynamic_code_generated_event("gc_write_barrier_fastcall", stub, stub_size);
-    }
-
-    DUMP_STUB(stub, "getaddress__gc_write_barrier_fastcall", ss - stub);
-
-    return addr;
-} //getaddress__gc_write_barrier_fastcall
-
-
-static int64 __stdcall vm_lrem(int64 m, int64 n);
-
-static int64 __stdcall vm_lrem(int64 m, int64 n)
-{
-    assert(!hythread_is_suspend_enabled());
-    return m % n;
-} //vm_lrem
-
-
-void * getaddress__vm_lrem_naked()
-{
-    static void *addr = 0;
-    if (addr) {
-        return addr;
-    }
-
-    const int stub_size = 25;
-    char *stub = (char *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_DEFAULT, CAA_Allocate);
-#ifdef _DEBUG
-    memset(stub, 0xcc /*int 3*/, stub_size);
-#endif
-    char *ss = stub;
-    ss = mov(ss,  eax_opnd,  M_Base_Opnd(esp_reg, +12) );
-    ss = alu(ss, or_opc,  eax_opnd,  M_Base_Opnd(esp_reg, +16));
-    ss = branch8(ss, Condition_Z,  Imm_Opnd(size_8, 0));
-    char *backpatch_address__divide_by_zero = ((char *)ss) - 1;
- 
-    ss = jump(ss, (char *)vm_lrem);
-
-    signed offset = (signed)ss - (signed)backpatch_address__divide_by_zero - 1;
-    *backpatch_address__divide_by_zero = (char)offset;
-
-    ss = gen_setup_j2n_frame(ss);
-    ss = call(ss, (char *)vm_throw_java_lang_ArithmeticException);
-    assert((ss - stub) <= stub_size);
-    addr = stub;
-
-    compile_add_dynamic_generated_code_chunk("vm_lrem_naked", false, stub, stub_size);
-
-    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
-        jvmti_send_dynamic_code_generated_event("vm_lrem_naked", stub, stub_size);
-    }
-
-    DUMP_STUB(stub, "getaddress__vm_lrem_naked", ss - stub);
-
-    return addr;
-} //getaddress__vm_lrem_naked
-
-
-static int64 __stdcall vm_ldiv(int64 m, int64 n);
-
-static int64 __stdcall vm_ldiv(int64 m, int64 n)
-{
-    assert(!hythread_is_suspend_enabled());
-    assert(n);
-    return m / n;
-} //vm_ldiv
-
-
-static void *getaddress__vm_ldiv_naked()
-{
-    static void *addr = 0;
-    if(addr) {
-        return addr;
-    }
-
-    const int stub_size = 25;
-    char *stub = (char *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_DEFAULT, CAA_Allocate);
-#ifdef _DEBUG
-    memset(stub, 0x90, stub_size);   // nop
-#endif
-    char *s = stub;
-    s = mov(s,  eax_opnd,  M_Base_Opnd(esp_reg, 12));
-    s = alu(s, or_opc,  eax_opnd,  M_Base_Opnd(esp_reg, 16));
-    s = branch8(s, Condition_E,  Imm_Opnd(size_8, 5));  // skip 5 bytes over the next instruction
-    s = jump32(s,  Imm_Opnd((((uint32)vm_ldiv) - ((uint32)s)) - 5));
-
-    s = gen_setup_j2n_frame(s);
-
-    s = call(s, (char *)vm_throw_java_lang_ArithmeticException);
-
-
-    assert((s - stub) <= stub_size);
-    addr = stub;
-
-    compile_add_dynamic_generated_code_chunk("vm_ldiv_naked", false, stub, stub_size);
-
-    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
-        jvmti_send_dynamic_code_generated_event("vm_ldiv_naked", stub, stub_size);
-    }
-
-    DUMP_STUB(stub, "getaddress__vm_ldiv_naked", s - stub);
-
-    return addr;
-} //getaddress__vm_ldiv_naked
-
-
-
-
-
-
 #ifdef VM_STATS
 
 static void register_request_for_rt_function(VM_RT_SUPPORT f) {
@@ -1207,9 +1056,6 @@ void *vm_helper_get_addr(VM_RT_SUPPORT f)
         }
     case VM_RT_AASTORE_TEST:
         return (void *)vm_aastore_test;
-    case VM_RT_WRITE_BARRIER_FASTCALL:
-        return getaddress__gc_write_barrier_fastcall();
-
     case VM_RT_CHECKCAST:
         return getaddress__vm_checkcast_naked();
 
@@ -1237,30 +1083,12 @@ void *vm_helper_get_addr(VM_RT_SUPPORT f)
     case VM_RT_THROW_LINKING_EXCEPTION:
         return getaddress__vm_throw_linking_exception_naked();
 
-    case VM_RT_LREM:
-        return getaddress__vm_lrem_naked();
-    case VM_RT_LDIV:
-        return getaddress__vm_ldiv_naked();
-
     case VM_RT_F2I:
     case VM_RT_F2L:
     case VM_RT_D2I:
     case VM_RT_D2L:
-    case VM_RT_LSHL:
-    case VM_RT_LSHR:
-    case VM_RT_LUSHR:
     case VM_RT_FREM:
     case VM_RT_DREM:
-    case VM_RT_LMUL:
-#ifdef VM_LONG_OPT
-    case VM_RT_LMUL_CONST_MULTIPLIER:
-#endif
-    case VM_RT_CONST_LDIV:
-    case VM_RT_CONST_LREM:
-    case VM_RT_DDIV:
-    case VM_RT_IMUL:
-    case VM_RT_IDIV:
-    case VM_RT_IREM:
     case VM_RT_CHAR_ARRAYCOPY_NO_EXC:
         return get_generic_rt_support_addr_ia32(f);
     case VM_RT_GC_HEAP_WRITE_REF:
