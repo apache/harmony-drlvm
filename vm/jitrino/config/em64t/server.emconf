@@ -78,7 +78,7 @@ SD2_OPT.useProfile=EDGE_PROF,VALUE_PROF
 #enable profiling of all virtual calls
 -XX:jit.SD1_OPT.arg.optimizer.vp_instrument.profile_abstract=true
 
--XX:jit.SD2_OPT.path.optimizer=ssa,simplify,dce,uce,devirt_virtual,edge_annotate,unguard,devirt_intf,hlo_api_magic,inline,purge,simplify,dce,uce,osr_path,escape_path,dce,uce,hvn,dce,uce,inline_helpers,purge,simplify,uce,dce,uce,abce,lower,dce,uce,memopt,reassoc,dce,uce,hvn,dce,uce,gcm,dessa,statprof
+-XX:jit.SD2_OPT.path.optimizer=ssa,simplify,dce,uce,devirt_virtual,edge_annotate,unguard,devirt_intf,hlo_api_magic,inline,purge,simplify,dce,uce,osr_path,escape_path,dce,uce,hvn,dce,uce,inline_helpers,purge,simplify,uce,dce,uce,abce,lower,dce,uce,memopt,dce,uce,hvn,dce,uce,gcm,dessa,statprof
 -XX:jit.SD2_OPT.path.osr_path=gcm,osr,simplify,dce,uce
 -XX:jit.SD2_OPT.path.escape_path=hvn,simplify,dce,uce,escape
 -XX:jit.SD2_OPT.path.abce=classic_abcd,dce,uce,dessa,statprof,peel,ssa,hvn,simplify,dce,uce,memopt,dce,uce,dessa,fastArrayFill,ssa,statprof,dabce,dce,uce
