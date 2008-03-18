@@ -39,6 +39,7 @@ using namespace std;
 #include "cxxlog.h"
 
 #include "open/types.h"
+#include "open/vm_type_access.h"
 #include "Class.h"
 #include "environment.h"
 #include "m2n.h"

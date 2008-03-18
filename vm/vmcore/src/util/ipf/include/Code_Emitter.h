@@ -29,6 +29,7 @@
 #include "open/types.h"
 #include "Emitter_IR.h"
 #include "log_macro.h"
+#include "vm_java_support.h"
 
 typedef Encoder_Instr_IR   Instr_IR;
 typedef Encoder_Bundle_IR  Bundle_IR;

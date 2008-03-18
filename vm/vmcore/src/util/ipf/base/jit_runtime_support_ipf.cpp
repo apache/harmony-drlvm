@@ -73,6 +73,7 @@ using namespace std;
 
 #include "dump.h"
 #include "vm_stats.h"
+#include "internal_jit_intf.h"
 
 void gen_convert_managed_to_unmanaged_null_ipf(Emitter_Handle emitter,
                                                unsigned reg);

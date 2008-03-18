@@ -238,7 +238,8 @@ typedef float ESSINGLE;
 #define CLEAR_U64(u64)  (u64 = (U_64)0)
 #define LOW_LONG(l) (*((U_32 *) &(l)))
 #define HIGH_LONG(l)  (*(((U_32 *) &(l)) + 1))
-#define I8(x)       ((I_8) (x))
+//conflicts with many IPF-related names
+//#define I8(x)       ((I_8) (x))
 #define I8P(x)      ((I_8 *) (x))
 #define U16(x)      ((U_16) (x))
 #define I16(x)      ((I_16) (x))
