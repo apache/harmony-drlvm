@@ -671,6 +671,7 @@ VMCORE_0.1 {
     apr_atomic_cas32;
     apr_time_now;
     apr_atomic_casptr;
+    port_rw_barrier;
 # Workaround for API used by GC_CC
     apr_atomic_xchg32;
     *MemoryPool*;
