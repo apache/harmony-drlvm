@@ -19,11 +19,7 @@
 #include <assert.h>
 #include <string.h>
 // offsetof macro
-#if defined(WIN32)
 #include <stddef.h>
-#else
-#include <objalloc.h>
-#endif
 
 #include "port_malloc.h"
 #include "port_unwind.h"
