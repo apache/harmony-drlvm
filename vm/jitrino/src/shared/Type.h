@@ -369,6 +369,22 @@ public:
 
     uint32 getId() { return id; }
 
+    // This is for switching integer types depending on the size
+#ifdef POINTER64
+    static bool isIntegerOf4Signed(Tag tag)    { return tag == Int32; }
+    static bool isIntegerOf4Unsigned(Tag tag)  { return tag == UInt32; }
+    static bool isIntegerOf8Signed(Tag tag)    { return tag == Int64  || tag == IntPtr; }
+    static bool isIntegerOf8Unsigned(Tag tag)  { return tag == UInt64 || tag == UIntPtr; }
+#else
+    static bool isIntegerOf4Signed(Tag tag)    { return tag == Int32  || tag == IntPtr; }
+    static bool isIntegerOf4Unsigned(Tag tag)  { return tag == UInt32 || tag == UIntPtr; }
+    static bool isIntegerOf8Signed(Tag tag)    { return tag == Int64; }
+    static bool isIntegerOf8Unsigned(Tag tag)  { return tag == UInt64; }
+#endif
+    static bool isIntegerOf4Bytes(Tag tag) { return isIntegerOf4Signed(tag) || isIntegerOf4Unsigned(tag); }
+    static bool isIntegerOf8Bytes(Tag tag) { return isIntegerOf8Signed(tag) || isIntegerOf8Unsigned(tag); }
+    
+
 protected:
     virtual bool    _isFinalClass()    {return false;}
     

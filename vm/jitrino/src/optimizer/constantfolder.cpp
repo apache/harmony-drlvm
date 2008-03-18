@@ -549,118 +549,114 @@ bool ConstantFolder::foldConv(Type::Tag fromType, Type::Tag toType, Modifier mod
     bool ovfm = (mod.getOverflowModifier()!=Overflow_None);
     switch (toType) {
     case Type::Int32:
-        switch (fromType) {
-        case Type::Int32:
-            res.i4 = src.i4; return true;
-        case Type::UInt32:
-            res.i4 = src.i4;
-            if (ovfm && (src.i4 < 0)) return false;
-            return true;
-        case Type::Int64:
-            res.i4 = CAST(int32, src.i8); 
-            if (ovfm && (src.i8 != CAST(int64, res.i4))) return false;
-            return true;
-        case Type::UInt64:
-            res.i4 = CAST(int32, CAST(uint64, src.i8)); 
-            if (ovfm && (CAST(uint64, src.i8) != CAST(uint64, res.i4))) return false;
-            return true;
-        case Type::Single:
+#ifndef PONTER64
+    case Type::IntPtr:
+#endif
+        if (Type::isInteger(fromType)) {
+            if (Type::isIntegerOf4Signed(fromType)) {
+                res.i4 = src.i4; return true;
+            } else if (Type::isIntegerOf4Unsigned(fromType)) {
+                res.i4 = src.i4; 
+                if (ovfm && (src.i4 < 0)) return false;
+                return true;
+            } else if (Type::isIntegerOf8Signed(fromType)) {
+                res.i4 = CAST(int32, src.i8);
+                if (ovfm && (src.i8 != CAST(int64, res.i4))) return false;
+                return true;
+            } else if (Type::isIntegerOf8Unsigned(fromType)) {
+                res.i4 = CAST(int32, CAST(uint64, src.i8));
+                if (ovfm && (CAST(uint64, src.i8) != CAST(uint64, res.i4))) return false;
+                return true;
+            }
+            assert(0);
+        } else if (fromType == Type::Single) {
             res.i4 = float2int<int32, float>(src.s); 
             if (ovfm && (src.s != CAST(float, res.i4))) return false;
             return true;
-        case Type::Double:
+        } else if (fromType == Type::Double) {
             res.i4 = float2int<int32, double>(src.d);
             if (ovfm && (src.d != CAST(double, res.i4))) return false;
             return true;
-        case Type::Float: 
-        default:
-            break;
         }
         break;
     case Type::UInt32:
-        switch (fromType) {
-        case Type::Int32:
-            if (ovfm && (src.i4 < 0)) return false;
-            res.i4 = src.i4; return true;
-        case Type::UInt32:
-            res.i4 = src.i4; return true;
-        case Type::Int64:
-            res.i4 = CAST(int32, CAST(uint32, src.i8));
-            if (ovfm && (src.i8 != CAST(int64, CAST(uint32, res.i4)))) return false;
-            return true;
-        case Type::UInt64:
-            res.i4 = CAST(int32, CAST(uint32, CAST(uint64, src.i8)));
-            if (ovfm && (CAST(uint64, src.i8) != CAST(uint64, CAST(uint32, res.i4))))
-                return false;
-            return true;
-        case Type::Single:
+#ifndef PONTER64
+    case Type::UIntPtr:
+#endif
+        if (Type::isInteger(fromType)) {
+            if (Type::isIntegerOf4Bytes(fromType)) {
+                res.i4 = src.i4; return true;
+            } else if (Type::isIntegerOf8Signed(fromType)) {
+                res.i4 = CAST(int32, CAST(uint32, src.i8));
+                if (ovfm && (src.i8 != CAST(int64, CAST(uint32, res.i4)))) return false;
+                return true;
+            } else if (Type::isIntegerOf8Unsigned(fromType)) {
+                res.i4 = CAST(int32, CAST(uint32, CAST(uint64, src.i8)));
+                if (ovfm && (CAST(uint64, src.i8) != CAST(uint64, CAST(uint32, res.i4)))) return false;
+                return true;
+            }
+            assert(0);
+        } else if (fromType == Type::Single) {
             res.i4 = float2uint<uint32, float>(src.s);
             if (ovfm && (src.s != CAST(float, CAST(uint32, res.i4)))) return false;
             return true;
-        case Type::Double:
+        } else if (fromType == Type::Double) {
             res.i4 = float2uint<uint32, double>(src.d);
             if (ovfm && (src.d != CAST(double, CAST(uint32, res.i4)))) return false;
             return true;
-        case Type::Float:
-        default:
-            break;
         }
         break;
     case Type::Int64:
-        if (ovfm) { assert(mod.getOverflowModifier()==Overflow_Signed); };
-        switch (fromType) {
-        case Type::Int32:
-            res.i8 = src.i4; return true;
-        case Type::UInt32:
-            res.i8 = CAST(uint32, src.i4); 
-            if (ovfm && (src.i4 < 0)) return false;
-            return true;
-        case Type::Int64:
-            res.i8 = src.i8; return true;
-        case Type::UInt64:
-            res.i8 = src.i8; 
-            if (ovfm && (src.i8 < 0)) return false;
-            return true;
-        case Type::Single:
+#ifdef PONTER64
+    case Type::IntPtr:
+#endif
+        assert(!ovfm || mod.getOverflowModifier()==Overflow_Signed);
+        if (Type::isInteger(fromType)) {
+            if (Type::isIntegerOf4Signed(fromType)) {
+                res.i8 = src.i4; return true;
+            } else if (Type::isIntegerOf4Unsigned(fromType)) {
+                res.i8 = CAST(uint32, src.i4); 
+                if (ovfm && (src.i4 < 0)) return false;
+                return true;
+            } else if (Type::isIntegerOf8Signed(fromType)) {
+                res.i8 = src.i8; return true;
+            } else if (Type::isIntegerOf8Unsigned(fromType)) {
+                res.i8 = src.i8; 
+                if (ovfm && (src.i8 < 0)) return false;
+                return true;
+            }
+            assert(0);
+        } else if (fromType == Type::Single) {
             res.i8 = float2int<int64, float>(src.s); 
             if (ovfm && (src.s != CAST(float, res.i8))) return false;
             return true;
-        case Type::Double:
+        } else if (fromType == Type::Double) {
             res.i8 = float2int<int64, double>(src.d);
             if (ovfm && (src.d != CAST(double, res.i8))) return false;
             return true;
-        case Type::Float: 
-        default:
-            break;
         }
         break;
     case Type::UInt64:
-        if (ovfm) { assert(mod.getOverflowModifier()==Overflow_Unsigned); };
-        switch (fromType) {
-        case Type::Int32:
-            res.i8 = CAST(uint64, CAST(uint32, src.i4));
-            if (ovfm && (src.i4 < 0)) return false;
-            return true;
-        case Type::UInt32:
-            res.i8 = CAST(uint64, CAST(uint32, src.i4)); return true;
-        case Type::Int64:
-            res.i8 = src.i8;
-            if (ovfm && (src.i8 < 0)) return false;
-            return true;
-        case Type::UInt64:
-            if (ovfm && (src.i8 < 0)) return false;
-            res.i8 = src.i8; return true;
-        case Type::Single:
-            res.i8 = float2uint<uint64, float>(src.s);
-            if (ovfm) {
-                return false; 
+#ifdef PONTER64
+    case Type::UIntPtr:
+#endif
+        assert(!ovfm || mod.getOverflowModifier()==Overflow_Unsigned);
+        if (Type::isInteger(fromType)) {
+            if (Type::isIntegerOf4Signed(fromType)) {
+                res.i8 = CAST(uint64, CAST(uint32, src.i4));
+                if (ovfm && (src.i4 < 0)) return false;
+                return true;
+            } else if (Type::isIntegerOf4Unsigned(fromType)) {
+                res.i8 = CAST(uint64, CAST(uint32, src.i4)); return true;
+            } else if (Type::isIntegerOf8Bytes(fromType)) {
+                res.i8 = src.i8; return true;
             }
+        } else if (fromType == Type::Single) {
+            res.i8 = float2uint<uint64, float>(src.s);
+            if (ovfm) return false; 
             return true;
-        case Type::Double:
-            return false; 
-        case Type::Float: 
-        default:
-            break;
+        } else if (fromType == Type::Double) {
+            return false;
         }
         break;
     case Type::Single:
@@ -703,6 +699,16 @@ bool ConstantFolder::foldConv(Type::Tag fromType, Type::Tag toType, Modifier mod
         case Type::Float: 
         default:
             break;
+        }
+        break;
+    case Type::UnmanagedPtr:
+        // Let's accept the conversion from properly sized integer
+#ifdef PONTER64
+        if (Type::isIntegerOf8Bytes(fromType)) {
+#else
+        if (Type::isIntegerOf4Bytes(fromType)) {
+#endif
+            return true;
         }
         break;
     default:

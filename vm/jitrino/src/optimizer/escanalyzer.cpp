@@ -356,13 +356,16 @@ EscAnalyzer::instrExam(Node* node) {
                 break;
             case Op_TauLdInd:        // ldind
                 {
+                    Opnd* src = inst->getSrc(0);
+                    if(src->getType()->isUnmanagedPtr())
+                        break; // skip load from unmanaged source
                     type = inst->getDst()->getType();
                     if (type->isReference()) {   //isObject()) {
                         assert(findCnGNode_op(inst->getDst()->getId())==NULL);
                         cgnode = addCnGNode_op(inst,type,NT_LDOBJ);
                         exam2Insts->push_back(inst);
                     }
-                    if (inst->getSrc(0)->getInst()->getOpcode()==Op_LdStaticAddr)
+                    if (src->getInst()->getOpcode()==Op_LdStaticAddr)
                         break;
                     if (type->isValue()) {
                         assert(findCnGNode_op(inst->getDst()->getId())==NULL);

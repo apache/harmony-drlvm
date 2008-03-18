@@ -1795,6 +1795,21 @@ Simplifier::simplifyConvZE(Type* dstType,
                          Modifier ovfmod,
                          Opnd* src) 
 {
+    // get rid of redundant conversion
+    Inst *opndInst = src->getInst();
+    if (toType == opndInst->getType() && (dstType == src->getType())) {
+        return src;
+    }
+    ConstInst *cinst = opndInst->asConstInst();
+    if (cinst) {
+        ConstInst::ConstValue srcval = cinst->getValue();
+        ConstInst::ConstValue res;
+        Type::Tag fromType = opndInst->getType();
+        if (ConstantFolder::foldConv(fromType, toType, ovfmod, srcval, res)) {
+            if (dstType->tag == toType) 
+                return genLdConstant(dstType, res)->getDst();
+        }
+    }
     return NULL;
 }
 
@@ -1804,6 +1819,21 @@ Simplifier::simplifyConvUnmanaged(Type* dstType,
                          Modifier ovfmod,
                          Opnd* src) 
 {
+    // get rid of redundant conversion
+    Inst *opndInst = src->getInst();
+    if (toType == opndInst->getType() && (dstType == src->getType())) {
+        return src;
+    }
+    ConstInst *cinst = opndInst->asConstInst();
+    if (cinst) {
+        ConstInst::ConstValue srcval = cinst->getValue();
+        ConstInst::ConstValue res;
+        Type::Tag fromType = opndInst->getType();
+        if (ConstantFolder::foldConv(fromType, toType, ovfmod, srcval, res)) {
+            if (dstType->tag == toType) 
+                return genLdConstant(dstType, res)->getDst();
+        }
+    }
     return NULL;
 }
 
@@ -3127,8 +3157,9 @@ Simplifier::simplifyTauArrayLen(Type* dstType, Type::Tag type, Opnd* base,
 Opnd*
 Simplifier::simplifyAddScaledIndex(Opnd* base, Opnd* index) {
     ConstInst* constIndexInst = index->getInst()->asConstInst();
-    if ((constIndexInst != NULL) && (index->getType()->tag == Type::Int32)) {
-        if (constIndexInst->getValue().i4 == 0)
+    if ( constIndexInst != NULL ) {
+        assert(index->getType()->isInteger());
+        if (constIndexInst->getValue().i8 == 0)
             return base;
     }
     return NULL;
