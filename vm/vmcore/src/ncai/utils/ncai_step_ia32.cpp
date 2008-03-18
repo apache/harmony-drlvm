@@ -5,6 +5,7 @@
 
 #define LOG_DOMAIN "ncai.step"
 #include "cxxlog.h"
+#include "port_crash_handler.h"
 #include "jvmti_break_intf.h"
 
 #include "ncai_utils.h"
@@ -301,10 +302,9 @@ static bool ncai_fill_jump_targets(void* cur, InstructionDisassembler* pdasm,
 static InstructionDisassembler* get_local_disasm(void* addr)
 {
     VMBreakPoints* vm_brpt = VM_Global_State::loader_env->TI->vm_brpt;
-    uint8* bptr = (uint8*)addr;
     InstructionDisassembler* pdasm;
 
-    if (*bptr == INSTRUMENTATION_BYTE)
+    if (port_is_breakpoint_set(addr))
     { // Address was instrumented by another thread or by breakpoint
         VMBreakPoint* bp = vm_brpt->find_breakpoint(addr);
         assert(bp && bp->disasm);

@@ -18,7 +18,7 @@
 #include <stdio.h>
 #include "open/types.h"
 #include "port_malloc.h"
-#include "native_modules.h"
+#include "port_modules.h"
 
 
 native_module_t* port_find_module(native_module_t* modules, void* code_ptr)

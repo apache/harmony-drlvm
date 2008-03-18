@@ -24,9 +24,10 @@
 #define LOG_DOMAIN "tm.suspend"
 
 #include <open/hythread_ext.h>
-#include "thread_private.h"
 #include <apr_atomic.h>
 #include "port_barriers.h"
+#include "port_mutex.h"
+#include "thread_private.h"
 
 static void thread_safe_point_impl(hythread_t thread);
 
@@ -190,9 +191,9 @@ static IDATA wait_safe_region_event(hythread_t thread)
     TRACE(("suspend wait exit safe region thread: "
            "%p, suspend_count: %d, request: %d",
            thread, thread->suspend_count, thread->request));
-    hymutex_lock(&thread->mutex);
+    port_mutex_lock(&thread->mutex);
     thread->state |= TM_THREAD_STATE_SUSPENDED;
-    hymutex_unlock(&thread->mutex);
+    port_mutex_unlock(&thread->mutex);
     return TM_ERROR_NONE;
 }
 
@@ -209,9 +210,9 @@ void VMCALL hythread_suspend()
 
     hythread_send_suspend_request(self);
 
-    hymutex_lock(&self->mutex);
+    port_mutex_lock(&self->mutex);
     self->state |= TM_THREAD_STATE_SUSPENDED;
-    hymutex_unlock(&self->mutex);
+    port_mutex_unlock(&self->mutex);
 
     thread_safe_point_impl(self);
 }
@@ -302,9 +303,9 @@ void VMCALL hythread_resume(hythread_t thread)
     }
 
     // change thread state
-    hymutex_lock(&thread->mutex);
+    port_mutex_lock(&thread->mutex);
     thread->state &= ~TM_THREAD_STATE_SUSPENDED;
-    hymutex_unlock(&thread->mutex);
+    port_mutex_unlock(&thread->mutex);
 
     TRACE(("sent resume, self: %p, thread: %p, "
            "suspend_count: %d, request: %d", self, thread,

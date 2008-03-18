@@ -57,7 +57,7 @@ bool Class::verify(const Global_Env * env)
     /**
      * Verify class
      */
-    if (is_enabled == TRUE && !is_interface()
+    if (is_enabled == 1 && !is_interface()
         && (is_bootstrap == FALSE || is_forced == TRUE)) {
         char *error;
         vf_Result result =

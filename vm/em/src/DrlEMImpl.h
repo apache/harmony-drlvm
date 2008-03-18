@@ -137,7 +137,7 @@ private:
 
     uint32 tick;
     
-    hymutex_t recompilationLock;
+    osmutex_t recompilationLock;
     std::set<Method_Profile_Handle> methodsInRecompile;
 
     Method_Lookup_Table method_lookup_table;

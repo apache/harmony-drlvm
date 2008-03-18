@@ -15,7 +15,7 @@
  *  limitations under the License.
  */
 
-#ifdef _PORT_FRAME_INFO_
+#ifndef _PORT_FRAME_INFO_
 #define _PORT_FRAME_INFO_
 
 #include "open/platform_types.h"
@@ -32,19 +32,19 @@ typedef struct {
     /**
      * Method class name executed at specified stack frame
      */
-    char *method_class_name;
+    const char *method_class_name;
     /**
      * Method name executed at specified stack frame
      */
-    char *method_name;
+    const char *method_name;
     /**
      * Method signature executed at specified stack frame
      */
-    char *method_signature;
+    const char *method_signature;
     /**
      * Method source file executed at specified stack frame
      */
-    char *source_file_name;
+    const char *source_file_name;
     /**
      * Source line number
      */
@@ -75,8 +75,8 @@ typedef struct {
  * allocated in frame_info->iteration_state. Zero if unwinding is
  * successful and -1 if unwinding is not successful.
  */
-typedef int (port_unwind_compiled_frame *)(Registers *regs,
+typedef int (*port_unwind_compiled_frame)(Registers *regs,
     port_stack_frame_info *frame_info);
 
-#endif // _PORT_FRAME_INFO_
+#endif /* _PORT_FRAME_INFO_ */
 

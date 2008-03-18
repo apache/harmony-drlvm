@@ -25,6 +25,7 @@
 
 #include "open/em.h"
 #include "open/hythread_ext.h"
+#include "port_mutex.h"
 
 class Method_Lookup_Table;
 
@@ -82,13 +83,13 @@ private:
 #endif
     void table_lock()
     {
-        UNREF UDATA r = hymutex_lock(&lock);
+        UNREF UDATA r = port_mutex_lock(&lock);
         assert(TM_ERROR_NONE == r);
     }
 
     void table_unlock()
     {
-        UNREF UDATA r = hymutex_unlock(&lock);
+        UNREF UDATA r = port_mutex_unlock(&lock);
         assert(TM_ERROR_NONE == r);
     }
 
@@ -108,7 +109,7 @@ private:
     unsigned        _next_free_entry;
     Method_Code **_table;
     Method_Code **_cache;
-    hymutex_t lock;
+    osmutex_t lock;
 }; //class Method_Lookup_Table
 
 

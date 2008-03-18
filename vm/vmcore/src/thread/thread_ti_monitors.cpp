@@ -21,6 +21,7 @@
  */
 
 #include <open/hythread_ext.h>
+#include "port_mutex.h"
 #include "vm_threads.h"
 
 typedef struct ResizableArrayEntry *array_entry_t;
@@ -120,7 +121,7 @@ static void * array_get(array_t arr, UDATA index)
 } // array_get
 
 static array_t jvmti_monitor_table = 0;
-static hymutex_t jvmti_monitor_table_lock;
+static osmutex_t jvmti_monitor_table_lock;
 
 static IDATA jthread_init_jvmti_monitor_table()
 {
@@ -133,7 +134,7 @@ static IDATA jthread_init_jvmti_monitor_table()
             hythread_global_unlock();
             return TM_ERROR_OUT_OF_MEMORY;
         }
-        status = hymutex_create(&jvmti_monitor_table_lock, TM_MUTEX_NESTED);
+        status = port_mutex_create(&jvmti_monitor_table_lock, APR_THREAD_MUTEX_NESTED);
         if (status != TM_ERROR_NONE) {
             hythread_global_unlock();
             return status;
@@ -171,17 +172,17 @@ IDATA VMCALL jthread_raw_monitor_create(jrawMonitorID * mon_ptr)
         }
     }
 
-    status = hymutex_lock(&jvmti_monitor_table_lock);
+    status = port_mutex_lock(&jvmti_monitor_table_lock);
     if (status != TM_ERROR_NONE) {
         return status;
     }
     *mon_ptr = (jrawMonitorID)array_add(jvmti_monitor_table, monitor);
     if (!(*mon_ptr)) {
-        hymutex_unlock(&jvmti_monitor_table_lock);
+        port_mutex_unlock(&jvmti_monitor_table_lock);
         return TM_ERROR_OUT_OF_MEMORY;
     }
 
-    status = hymutex_unlock(&jvmti_monitor_table_lock);
+    status = port_mutex_unlock(&jvmti_monitor_table_lock);
     return status;
 } // jthread_raw_monitor_create
 
@@ -206,12 +207,12 @@ IDATA VMCALL jthread_raw_monitor_destroy(jrawMonitorID mon_ptr)
         }
     }
 
-    IDATA status = hymutex_lock(&jvmti_monitor_table_lock);
+    IDATA status = port_mutex_lock(&jvmti_monitor_table_lock);
     if (status != TM_ERROR_NONE) {
         return status;
     }
     array_delete(jvmti_monitor_table, (UDATA) mon_ptr);
-    status = hymutex_unlock(&jvmti_monitor_table_lock);
+    status = port_mutex_unlock(&jvmti_monitor_table_lock);
     return status;
 } // jthread_raw_monitor_destroy
 

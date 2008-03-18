@@ -26,6 +26,7 @@
  */
 
 #include <open/hythread_ext.h>
+#include "port_mutex.h"
 #include "thread_private.h"
 
 /**
@@ -43,7 +44,7 @@ IDATA VMCALL hysem_create(hysem_t *sem, UDATA initial_count, UDATA max_count) {
     if (l == NULL) {
         return TM_ERROR_OUT_OF_MEMORY;
     }
-    r = hymutex_create(&l->mutex, TM_MUTEX_DEFAULT);
+    r = port_mutex_create(&l->mutex, APR_THREAD_MUTEX_DEFAULT);
     if (r) goto cleanup;
     r = hycond_create(&l->condition);
     if (r) goto cleanup;
@@ -62,7 +63,7 @@ cleanup:
 IDATA sem_wait_impl(hysem_t sem, I_64 ms, IDATA nano, IDATA interruptable) {
     IDATA status;
         
-    status = hymutex_lock(&sem->mutex);
+    status = port_mutex_lock(&sem->mutex);
     if (status != TM_ERROR_NONE) return status;
     //printf("wait %x %d\n", sem, sem->count);
     //fflush(NULL);
@@ -70,7 +71,7 @@ IDATA sem_wait_impl(hysem_t sem, I_64 ms, IDATA nano, IDATA interruptable) {
         status = condvar_wait_impl(&sem->condition, &sem->mutex, ms, nano, interruptable);
         //check interruption and timeout
         if (status != TM_ERROR_NONE) {
-            hymutex_unlock(&sem->mutex);
+            port_mutex_unlock(&sem->mutex);
             return status;
         }
 
@@ -79,14 +80,14 @@ IDATA sem_wait_impl(hysem_t sem, I_64 ms, IDATA nano, IDATA interruptable) {
     //should we check here if timeout is not supposed to happen
     if (sem->count == 0 /*&& (ms || nano)*/) {
         if (ms || nano) {
-            hymutex_unlock(&sem->mutex);
+            port_mutex_unlock(&sem->mutex);
             return TM_ERROR_TIMEOUT;
         } else {
             assert(0);
         }
     }
     sem->count--;
-    status = hymutex_unlock(&sem->mutex);
+    status = port_mutex_unlock(&sem->mutex);
     if (status != TM_ERROR_NONE) return status;
 
     return TM_ERROR_NONE;
@@ -150,10 +151,10 @@ IDATA VMCALL hysem_post(hysem_t sem) {
     IDATA status;
     //printf("post %x %d\n", sem, sem->count);
     //fflush(NULL);
-    status = hymutex_lock(&sem->mutex);
+    status = port_mutex_lock(&sem->mutex);
     if (status != TM_ERROR_NONE) return status;
     if (sem->count >= sem->max_count) {
-        hymutex_unlock(&sem->mutex);
+        port_mutex_unlock(&sem->mutex);
         //printf("illegal state %d : %d \n", sem->count, sem->max_count);
         //fflush(NULL);
         return TM_ERROR_ILLEGAL_STATE;
@@ -163,7 +164,7 @@ IDATA VMCALL hysem_post(hysem_t sem) {
         hycond_notify(&sem->condition);
     }
             
-    status = hymutex_unlock(&sem->mutex);
+    status = port_mutex_unlock(&sem->mutex);
     if (status != TM_ERROR_NONE) return status;
     return TM_ERROR_NONE;
 }
@@ -177,10 +178,10 @@ IDATA VMCALL hysem_post(hysem_t sem) {
 IDATA VMCALL hysem_set(hysem_t sem, IDATA count) {
     IDATA status;
     
-    status = hymutex_lock(&sem->mutex);
+    status = port_mutex_lock(&sem->mutex);
     if (status != TM_ERROR_NONE) return status;
     if (count > sem->max_count) {
-        hymutex_unlock(&sem->mutex);
+        port_mutex_unlock(&sem->mutex);
         if (status != TM_ERROR_NONE) return status;
         return TM_ERROR_ILLEGAL_STATE;
     }
@@ -188,11 +189,11 @@ IDATA VMCALL hysem_set(hysem_t sem, IDATA count) {
     if (count > 0) {
         status = hycond_notify_all(&sem->condition); 
         if (status != TM_ERROR_NONE) {
-            hymutex_unlock(&sem->mutex);
+            port_mutex_unlock(&sem->mutex);
             return status;
         }
     }
-    status = hymutex_unlock(&sem->mutex);
+    status = port_mutex_unlock(&sem->mutex);
     if (status != TM_ERROR_NONE) return status;
 
     return TM_ERROR_NONE;       
@@ -207,10 +208,10 @@ IDATA VMCALL hysem_set(hysem_t sem, IDATA count) {
 IDATA VMCALL hysem_getvalue(IDATA *count, hysem_t sem) {
     IDATA status;
     
-    status = hymutex_lock(&sem->mutex);
+    status = port_mutex_lock(&sem->mutex);
     if (status != TM_ERROR_NONE) return status;
     *count = sem->count;
-    status = hymutex_unlock(&sem->mutex);
+    status = port_mutex_unlock(&sem->mutex);
     if (status != TM_ERROR_NONE) return status;
 
     return TM_ERROR_NONE;      
@@ -229,7 +230,7 @@ IDATA VMCALL hysem_getvalue(IDATA *count, hysem_t sem) {
  * @see hysem_init, hysem_wait, hysem_post
  */
 IDATA VMCALL hysem_destroy(hysem_t sem) {
-    IDATA status = hymutex_destroy(&sem->mutex);
+    IDATA status = port_mutex_destroy(&sem->mutex);
     status |= hycond_destroy(&sem->condition);
     free(sem);
     return status;

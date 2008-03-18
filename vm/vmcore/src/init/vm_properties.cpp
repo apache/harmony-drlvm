@@ -27,7 +27,7 @@
 #include "properties.h"
 #include "vm_properties.h"
 #include "init.h"
-#include "native_modules.h"
+#include "port_modules.h"
 #if defined(FREEBSD)
 #include <dlfcn.h>
 #endif

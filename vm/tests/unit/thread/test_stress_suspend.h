@@ -20,6 +20,7 @@
 #include <open/hythread_ext.h>
 #include <apr_atomic.h>
 #include <open/types.h>
+#include "port_mutex.h"
 #include "thread_manager.h"
 #include "testframe.h"
 #include "thread_unit_test_utils.h"
@@ -48,8 +49,8 @@ static uint32 test_waste_time(uint32 count);
 
 static hylatch_t wait_threads;
 static hylatch_t start;
-static hymutex_t gc_lock;
-static hymutex_t suspend_lock;
+static osmutex_t gc_lock;
+static osmutex_t suspend_lock;
 static char stop = 0;
 static char failed = 0;
 static uint64 cycle_count = 0;
@@ -80,7 +81,7 @@ int test_function(void)
     tf_exp_assert(status == TM_ERROR_NONE);
     status = hylatch_create(&start, 1);
     tf_exp_assert(status == TM_ERROR_NONE);
-    status = hymutex_create(&gc_lock, TM_MUTEX_NESTED);
+    status = port_mutex_create(&gc_lock, APR_THREAD_MUTEX_NESTED);
     tf_exp_assert(status == TM_ERROR_NONE);
 
     // start tested thread
@@ -333,13 +334,13 @@ static IDATA HYTHREAD_PROC test_gc_request_thread_proc(void *args)
 
         count = cycle_count;
 
-        status = hymutex_lock(&gc_lock);
+        status = port_mutex_lock(&gc_lock);
         tf_exp_assert(status == TM_ERROR_NONE);
 
         test_requestor_heap_access();
         tf_exp_assert(status == TM_ERROR_NONE);
 
-        status = hymutex_unlock(&gc_lock);
+        status = port_mutex_unlock(&gc_lock);
         tf_exp_assert(status == TM_ERROR_NONE);
 
         xx += test_waste_time(RAND());

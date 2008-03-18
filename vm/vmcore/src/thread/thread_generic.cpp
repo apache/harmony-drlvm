@@ -62,7 +62,6 @@ using namespace std;
 #include "m2n.h"
 #include "exceptions.h"
 #include "jit_intf.h"
-#include "exception_filter.h"
 #include "vm_threads.h"
 #include "jni_utils.h"
 #include "object.h"

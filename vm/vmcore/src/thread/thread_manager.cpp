@@ -192,7 +192,7 @@ void vm_set_exception_registers(vm_thread_t vm_thread, Registers & regs)
 } // vm_set_exception_registers
 
 /**
- * Gets IP from exception registers
+ * Gets IP from exception registers for current thread
  */
 void *vm_get_ip_from_regs(vm_thread_t vm_thread)
 {

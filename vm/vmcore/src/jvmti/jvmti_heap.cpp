@@ -23,6 +23,7 @@
  */
 
 #include "cxxlog.h"
+#include "port_mutex.h"
 
 #include "jvmti_direct.h"
 #include "jvmti_utils.h"
@@ -124,11 +125,11 @@ jvmtiSetTag(jvmtiEnv* env,
         return JVMTI_ERROR_INVALID_OBJECT;
 
     if (ti_env->tags == NULL) {
-        hymutex_lock(&ti_env->environment_data_lock);
+        port_mutex_lock(&ti_env->environment_data_lock);
         if (ti_env->tags == NULL) {
             ti_env->tags = new TITags;
         }
-        hymutex_unlock(&ti_env->environment_data_lock);
+        port_mutex_unlock(&ti_env->environment_data_lock);
     }
 
     if (ti_env->tags == NULL) {

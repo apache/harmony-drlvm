@@ -62,6 +62,7 @@
 #ifndef FALSE
 #define FALSE 0
 #endif
+
 typedef unsigned Boolean;
 
 typedef unsigned char    Byte;

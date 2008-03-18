@@ -20,6 +20,7 @@
  */
 
 #include <apr_atomic.h>
+#include "port_mutex.h"
 #include "ref_enqueue_thread.h"
 #include "finalize.h"
 #include "vm_threads.h"
@@ -57,7 +58,7 @@ void ref_enqueue_thread_init(JavaVM *java_vm, JNIEnv* jni_env)
     
     status = hycond_create(&ref_thread_info->end_cond);
     assert(status == TM_ERROR_NONE);
-    status = hymutex_create(&ref_thread_info->end_mutex, TM_MUTEX_DEFAULT);
+    status = port_mutex_create(&ref_thread_info->end_mutex, APR_THREAD_MUTEX_DEFAULT);
     assert(status == TM_ERROR_NONE);
     
     ref_thread_info->thread_num = REF_ENQUEUE_THREAD_NUM;
@@ -89,19 +90,19 @@ static uint32 atomic_dec32(volatile apr_uint32_t *mem)
 
 void wait_native_ref_thread_detached(void)
 {
-    hymutex_lock(&ref_thread_info->end_mutex);
+    port_mutex_lock(&ref_thread_info->end_mutex);
     while(ref_thread_info->thread_num){
         atomic_inc32(&ref_thread_info->end_waiting_num);
         IDATA status = hycond_wait_timed(&ref_thread_info->end_cond, &ref_thread_info->end_mutex, (I_64)1000, 0);
         atomic_dec32(&ref_thread_info->end_waiting_num);
         if(status != TM_ERROR_NONE) break;
     }
-    hymutex_unlock(&ref_thread_info->end_mutex);
+    port_mutex_unlock(&ref_thread_info->end_mutex);
 }
 
 static void wait_ref_enqueue_end(void)
 {
-    hymutex_lock(&ref_thread_info->end_mutex);
+    port_mutex_lock(&ref_thread_info->end_mutex);
     unsigned int ref_num = vm_get_references_quantity();
     do {
         unsigned int wait_time = ref_num + 100;
@@ -111,7 +112,7 @@ static void wait_ref_enqueue_end(void)
         if(status != TM_ERROR_NONE) break;
         ref_num = vm_get_references_quantity();
     } while(ref_num);
-    hymutex_unlock(&ref_thread_info->end_mutex);
+    port_mutex_unlock(&ref_thread_info->end_mutex);
 }
 
 void activate_ref_enqueue_thread(Boolean wait)

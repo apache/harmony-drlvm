@@ -25,6 +25,7 @@
 #include <assert.h>
 #include "cxxlog.h"
 #include <sstream>
+#include "port_mutex.h"
 
 #define LOG_DOMAIN "em"
 
@@ -95,7 +96,7 @@ EdgeProfileCollector::EdgeProfileCollector(EM_PC_Interface* em, const std::strin
                                            : ProfileCollector(em, name, EM_PCTYPE_EDGE, genJit), initialTimeout(_initialTimeout), 
                                            timeout(_timeout),eThreshold(_eThreshold), bThreshold(_bThreshold)
 {
-    hymutex_create(&profilesLock, TM_MUTEX_NESTED);
+    port_mutex_create(&profilesLock, APR_THREAD_MUTEX_NESTED);
     catName = std::string(LOG_DOMAIN) + ".profiler." + name;
     loggingEnabled =  is_info_enabled(LOG_DOMAIN) ||  is_info_enabled(catName.c_str());
     if (loggingEnabled) {
@@ -113,19 +114,19 @@ EdgeProfileCollector::~EdgeProfileCollector()
         EdgeMethodProfile* profile = it->second;
         delete profile;
     }
-    hymutex_destroy(&profilesLock);
+    port_mutex_destroy(&profilesLock);
 }
 
 
 MethodProfile* EdgeProfileCollector::getMethodProfile(Method_Handle mh) const
 {
-    hymutex_lock(&profilesLock);
+    port_mutex_lock(&profilesLock);
     MethodProfile* res = NULL;
     EdgeProfilesMap::const_iterator it = profilesByMethod.find(mh);
     if (it != profilesByMethod.end()) {
         res = it->second;    
     }
-    hymutex_unlock(&profilesLock);
+    port_mutex_unlock(&profilesLock);
     return res;
 }
 
@@ -177,7 +178,7 @@ EdgeMethodProfile* EdgeProfileCollector::createProfile( Method_Handle mh,
                                                         uint32* counterKeys,
                                                         uint32 checkSum)
 {
-    hymutex_lock(&profilesLock);
+    port_mutex_lock(&profilesLock);
 
     EdgeMethodProfile* profile = new EdgeMethodProfile(this, mh);
 
@@ -193,7 +194,7 @@ EdgeMethodProfile* EdgeProfileCollector::createProfile( Method_Handle mh,
     profilesByMethod[mh] = profile;
     newProfiles.push_back(profile);
 
-    hymutex_unlock(&profilesLock);
+    port_mutex_unlock(&profilesLock);
 
     return profile;
 }
@@ -234,10 +235,10 @@ static void logReadyProfile(const std::string& catName, const std::string& profi
 
 void EdgeProfileCollector::onTimeout() {
     if(!newProfiles.empty()) {
-        hymutex_lock(&profilesLock);
+        port_mutex_lock(&profilesLock);
         greenProfiles.insert(greenProfiles.end(), newProfiles.begin(), newProfiles.end());
         newProfiles.clear();
-        hymutex_unlock(&profilesLock);
+        port_mutex_unlock(&profilesLock);
     }
 
     if (!unloadedMethodProfiles.empty()) {
@@ -255,10 +256,10 @@ void EdgeProfileCollector::onTimeout() {
     }
 
     if (!tmpProfiles.empty()) {
-        hymutex_lock(&profilesLock);
+        port_mutex_lock(&profilesLock);
         std::remove(greenProfiles.begin(), greenProfiles.end(), (EdgeMethodProfile*)NULL);
         greenProfiles.resize(greenProfiles.size() - tmpProfiles.size());
-        hymutex_unlock(&profilesLock);
+        port_mutex_unlock(&profilesLock);
         for (EdgeProfiles::iterator it = tmpProfiles.begin(), end = tmpProfiles.end(); it!=end; ++it) {
             EdgeMethodProfile* profile = *it;
             if (loggingEnabled) {
@@ -298,11 +299,11 @@ static void addProfilesForClassloader(ClassLoaderHandle h, EdgeProfiles& from, E
 }
 
 void EdgeProfileCollector::classloaderUnloadingCallback(ClassLoaderHandle h) {
-    hymutex_lock(&profilesLock);
+    port_mutex_lock(&profilesLock);
 
     //can't modify profiles map in async mode here -> it could be iterated by the checker thread without lock
     addProfilesForClassloader(h, greenProfiles, unloadedMethodProfiles);
     addProfilesForClassloader(h, newProfiles, unloadedMethodProfiles);
 
-    hymutex_unlock(&profilesLock);
+    port_mutex_unlock(&profilesLock);
 }

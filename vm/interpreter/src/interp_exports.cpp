@@ -122,13 +122,6 @@ void EXPORT JIT_init(JIT_Handle UNREF h, const char* UNREF name, vm_adaptor_t ad
     interpreter->interpreter_ti_notify_frame_pop = &interpreter_ti_notify_frame_pop;
     interpreter->interpreter_ti_pop_frame = &interpreter_ti_pop_frame;
     interpreter->stack_dump = &stack_dump;
-
-#if defined (PLATFORM_NT) && defined (_DEBUG)
-    if (!get_boolean_property("vm.assert_dialog", TRUE, VM_PROPERTIES))
-    {
-        disable_assert_dialogs();
-    }
-#endif
 }
 
 EXPORT Boolean JIT_supports_compressed_references(JIT_Handle UNREF jh) {

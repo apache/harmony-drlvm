@@ -38,6 +38,7 @@
 #include "jvmti_break_intf.h"
 #include "cci.h"
 #include "port_thread.h"
+#include "port_crash_handler.h"
 
 
 #if (defined _IA32_) || (defined _EM64T_)
@@ -608,7 +609,7 @@ VMBreakPoints::process_native_breakpoint(Registers* regs)
     VMBreakPoint* bp = find_breakpoint(addr);
     if (NULL == bp) {
         // breakpoint could be deleted by another thread
-        assert(*((unsigned char *)addr) != INSTRUMENTATION_BYTE);
+        assert(!port_is_breakpoint_set(addr));
         unlock();
         // Transfer execution back to the original register
         // context. In case the target location happens to be
@@ -1299,11 +1300,7 @@ static bool set_native_breakpoint(VMBreakPoint* bp)
         assert(bp->disasm);
 
         // code instrumentation
-        if (ncai_read_memory(bp->addr, 1, &bp->saved_byte) != NCAI_ERROR_NONE)
-            return false;
-
-        unsigned char b = (unsigned char)INSTRUMENTATION_BYTE;
-        if (ncai_write_memory(bp->addr, 1, &b) != NCAI_ERROR_NONE)
+        if (port_set_breakpoint(bp->addr, (unsigned char*)&bp->saved_byte) != 0)
             return false;
     }
 
@@ -1331,7 +1328,7 @@ static bool clear_native_breakpoint(VMBreakPoint* bp)
             << (bp->method ? method_get_descriptor((Method*)bp->method) : "" )
             << " :" << bp->location << " :" << bp->addr);
 
-        if (ncai_write_memory(bp->addr, 1, &bp->saved_byte) != NCAI_ERROR_NONE)
+        if (port_clear_breakpoint(bp->addr, bp->saved_byte) != 0)
             return false;
     }
 
@@ -1343,13 +1340,6 @@ static bool clear_native_breakpoint(VMBreakPoint* bp)
 //////////////////////////////////////////////////////////////////////////////
 // Native breakpoints
 //////////////////////////////////////////////////////////////////////////////
-
-
-void __cdecl process_native_breakpoint_event(Registers* regs)
-{
-    DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
-    ti->vm_brpt->process_native_breakpoint(regs);
-}
 
 
 bool jvmti_jit_breakpoint_handler(Registers *regs)
@@ -1397,9 +1387,7 @@ bool jvmti_jit_breakpoint_handler(Registers *regs)
     }
 #endif
 
-    NativeCodePtr callback = (NativeCodePtr)process_native_breakpoint_event;
-    port_set_longjump_regs(callback, regs, 1, regs);
-
+    ti->vm_brpt->process_native_breakpoint(regs);
     return true;
 }
 

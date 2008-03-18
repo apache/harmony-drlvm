@@ -143,12 +143,12 @@ extern "C" {
 
 #if defined(LINUX) || defined(FREEBSD)
 #include <pthread.h>
-#define hymutex_t pthread_mutex_t
+#define osmutex_t pthread_mutex_t
 #define hycond_t pthread_cond_t
 #endif // LINUX || FREEBSD
 
 #ifdef _WIN32
-#define hymutex_t CRITICAL_SECTION
+#define osmutex_t CRITICAL_SECTION
 #define hycond_t struct HyCond
 #include "hycond_win.h"
 #endif // _WIN32
@@ -308,7 +308,7 @@ typedef struct HyThread {
     /**
      * Thread local lock, used to serialize thread state;
      */
-    hymutex_t mutex;
+    osmutex_t mutex;
 
     /**
      * Monitor used to implement wait function for sleep/park;
@@ -473,10 +473,10 @@ IDATA VMCALL hythread_decrease_nondaemon_threads_count(hythread_t thread, IDATA 
 //@{
 
 IDATA VMCALL hycond_create (hycond_t *cond);
-IDATA VMCALL hycond_wait (hycond_t *cond, hymutex_t *mutex);
-IDATA VMCALL hycond_wait_timed (hycond_t *cond, hymutex_t *mutex, I_64 millis, IDATA nanos);
-IDATA VMCALL hycond_wait_timed_raw(hycond_t * cond, hymutex_t * mutex, I_64 ms, IDATA nano);
-IDATA VMCALL hycond_wait_interruptable (hycond_t *cond, hymutex_t *mutex, I_64 millis, IDATA nanos);
+IDATA VMCALL hycond_wait (hycond_t *cond, osmutex_t *mutex);
+IDATA VMCALL hycond_wait_timed (hycond_t *cond, osmutex_t *mutex, I_64 millis, IDATA nanos);
+IDATA VMCALL hycond_wait_timed_raw(hycond_t * cond, osmutex_t * mutex, I_64 ms, IDATA nano);
+IDATA VMCALL hycond_wait_interruptable (hycond_t *cond, osmutex_t *mutex, I_64 millis, IDATA nanos);
 IDATA VMCALL hycond_notify (hycond_t *cond);
 IDATA VMCALL hycond_notify_all (hycond_t *cond);
 IDATA VMCALL hycond_destroy (hycond_t *cond);
@@ -535,17 +535,6 @@ IDATA VMCALL hysem_wait_timed(hysem_t sem, I_64 ms, IDATA nano);
 IDATA VMCALL hysem_wait_interruptable(hysem_t sem, I_64 ms, IDATA nano);
 IDATA VMCALL hysem_getvalue(IDATA *count, hysem_t sem);
 IDATA hysem_set(hysem_t sem, IDATA count);
-
-//@}
-/** @name Mutex
- */
-//@{
-
-IDATA hymutex_create (hymutex_t *mutex, UDATA flags);
-IDATA hymutex_lock(hymutex_t *mutex);
-IDATA hymutex_trylock (hymutex_t *mutex);
-IDATA hymutex_unlock (hymutex_t *mutex);
-IDATA hymutex_destroy (hymutex_t *mutex);
 
 //@}
 /** @name Thin monitors support
@@ -706,10 +695,6 @@ hy_inline void VMCALL hythread_suspend_disable()
 // 0x00400000   Thread is in native code. That is a native method is running which
 //              has not called back into the VM or Java programming language code.
 #define TM_THREAD_STATE_IN_NATIVE                JVMTI_THREAD_STATE_IN_NATIVE
-
-#define TM_MUTEX_DEFAULT  0   
-#define TM_MUTEX_NESTED   1  
-#define TM_MUTEX_UNNESTED 2 
 
 #define WAIT_INTERRUPTABLE    1
 #define WAIT_NONINTERRUPTABLE 0

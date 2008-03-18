@@ -20,37 +20,38 @@
  */  
 
 
+#include "port_mutex.h"
 #include "lock_manager.h"
 #include "vm_threads.h"
 #include "exceptions.h"
 
 Lock_Manager::Lock_Manager()
 {
-    UNREF IDATA stat = hymutex_create (&lock, TM_MUTEX_NESTED);
+    UNREF IDATA stat = port_mutex_create (&lock, APR_THREAD_MUTEX_NESTED);
     assert(stat==TM_ERROR_NONE);
 }
 
 Lock_Manager::~Lock_Manager()
 {
-    UNREF IDATA stat = hymutex_destroy (&lock);
+    UNREF IDATA stat = port_mutex_destroy (&lock);
     assert(stat==TM_ERROR_NONE);
 }
 
 void Lock_Manager::_lock()
 {
-    UNREF IDATA stat = hymutex_lock(&lock);
+    UNREF IDATA stat = port_mutex_lock(&lock);
     assert(stat==TM_ERROR_NONE);
 }
 
 bool Lock_Manager::_tryLock()
 {     
-    IDATA stat = hymutex_trylock(&lock);
+    IDATA stat = port_mutex_trylock(&lock);
     return stat==TM_ERROR_NONE;    
 }
 
 void Lock_Manager::_unlock()
 {
-    UNREF IDATA stat = hymutex_unlock(&lock);
+    UNREF IDATA stat = port_mutex_unlock(&lock);
     assert(stat==TM_ERROR_NONE);
 }
 
@@ -93,6 +94,6 @@ void Lock_Manager::_unlock_enum_or_null()
 
 bool Lock_Manager::_lock_enum_or_null(bool UNREF return_null_on_fail)
 {
-    IDATA stat = hymutex_lock(&lock);
+    IDATA stat = port_mutex_lock(&lock);
     return stat==TM_ERROR_NONE;
 }

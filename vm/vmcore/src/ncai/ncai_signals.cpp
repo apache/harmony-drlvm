@@ -8,10 +8,27 @@
 #include "suspend_checker.h"
 #include "jvmti_internal.h"
 #include "environment.h"
+#include "port_crash_handler.h"
 
 #include "ncai_utils.h"
 #include "ncai_direct.h"
 #include "ncai_internal.h"
+
+
+struct st_signal_info
+{
+    jint    signal;
+    char*   name;
+    size_t  name_size;
+};
+
+static size_t ncai_get_signal_count();
+static st_signal_info* find_signal(jint sig);
+static jint ncai_get_min_signal();
+static jint ncai_get_max_signal();
+static char* ncai_get_signal_name(jint signal);
+static size_t ncai_get_signal_name_size(jint signal);
+bool ncai_is_signal_in_range(jint signal);
 
 
 ncaiError JNICALL
@@ -130,4 +147,89 @@ void ncai_process_signal_event(NativeCodePtr addr,
             }
         }
     }
+}
+
+
+
+#define STR_AND_SIZE(_x_) _x_, (strlen(_x_) + 1)
+
+static st_signal_info sig_table[] = {
+    {PORT_SIGNAL_GPF,           STR_AND_SIZE("PORT_SIGNAL_GPF")},
+    {PORT_SIGNAL_STACK_OVERFLOW,STR_AND_SIZE("PORT_SIGNAL_STACK_OVERFLOW")},
+    {PORT_SIGNAL_ABORT,         STR_AND_SIZE("PORT_SIGNAL_ABORT")},
+    {PORT_SIGNAL_QUIT,          STR_AND_SIZE("PORT_SIGNAL_QUIT")},
+    {PORT_SIGNAL_CTRL_BREAK,    STR_AND_SIZE("PORT_SIGNAL_CTRL_BREAK")},
+    {PORT_SIGNAL_CTRL_C,        STR_AND_SIZE("PORT_SIGNAL_CTRL_C")},
+    {PORT_SIGNAL_BREAKPOINT,    STR_AND_SIZE("PORT_SIGNAL_BREAKPOINT")},
+    {PORT_SIGNAL_ARITHMETIC,    STR_AND_SIZE("PORT_SIGNAL_ARITHMETIC")},
+};
+
+static size_t ncai_get_signal_count()
+{
+    return sizeof(sig_table)/sizeof(sig_table[0]);
+}
+
+static st_signal_info* find_signal(jint sig)
+{
+    for (size_t i = 0; i < ncai_get_signal_count(); i++)
+    {
+        if (sig_table[i].signal == sig)
+            return &sig_table[i];
+    }
+
+    return NULL;
+}
+
+static jint ncai_get_min_signal()
+{
+    static int min_sig_value = sig_table[1].signal;
+
+    if (min_sig_value != sig_table[1].signal)
+        return min_sig_value;
+
+    min_sig_value = sig_table[0].signal;
+
+    for (size_t i = 1; i < ncai_get_signal_count(); i++)
+    {
+        if (sig_table[i].signal < min_sig_value)
+            min_sig_value = sig_table[i].signal;
+    }
+
+    return min_sig_value;
+}
+
+static jint ncai_get_max_signal()
+{
+    static int max_sig_value = -1;
+
+    if (max_sig_value != -1)
+        return max_sig_value;
+
+    max_sig_value = sig_table[0].signal;
+
+    for (size_t i = 1; i < ncai_get_signal_count(); i++)
+    {
+        if (sig_table[i].signal > max_sig_value)
+            max_sig_value = sig_table[i].signal;
+    }
+
+    return max_sig_value;
+}
+
+static char* ncai_get_signal_name(jint signal)
+{
+    st_signal_info* psig = find_signal(signal);
+    return psig ? psig->name : NULL;
+}
+
+static size_t ncai_get_signal_name_size(jint signal)
+{
+    st_signal_info* psig = find_signal(signal);
+    return psig ? psig->name_size : 0;
+}
+
+bool ncai_is_signal_in_range(jint signal)
+{
+    return (signal >= ncai_get_min_signal() ||
+            signal <= ncai_get_max_signal());
 }

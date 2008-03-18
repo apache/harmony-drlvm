@@ -27,6 +27,7 @@
 #undef LOG_DOMAIN
 #define LOG_DOMAIN "tm.locks"
 #include <open/hythread_ext.h>
+#include "port_mutex.h"
 #include "thread_private.h"
 
 /**
@@ -50,7 +51,7 @@ IDATA VMCALL hythread_monitor_init_with_name(hythread_monitor_t *mon_ptr, UDATA 
     if (mon == NULL) {
         return TM_ERROR_OUT_OF_MEMORY;
     }
-    r = hymutex_create(&mon->mutex, TM_MUTEX_NESTED);
+    r = port_mutex_create(&mon->mutex, APR_THREAD_MUTEX_NESTED);
     if (r) {
         goto cleanup;
     }
@@ -87,7 +88,7 @@ IDATA VMCALL hythread_monitor_enter(hythread_monitor_t mon_ptr) {
     IDATA status;
     hythread_t  self = tm_self_tls;
     if (mon_ptr->owner != self) {
-        status = hymutex_lock(&mon_ptr->mutex);
+        status = port_mutex_lock(&mon_ptr->mutex);
         mon_ptr->owner = self;
         assert(status == TM_ERROR_NONE);
     } else {
@@ -115,7 +116,7 @@ IDATA VMCALL hythread_monitor_try_enter(hythread_monitor_t mon_ptr) {
     IDATA status;
     hythread_t self = tm_self_tls;
     if (mon_ptr->owner != self) {
-        status = hymutex_trylock(&mon_ptr->mutex);
+        status = port_mutex_trylock(&mon_ptr->mutex);
         if (status == TM_ERROR_NONE) {
             mon_ptr->owner = tm_self_tls;
         }
@@ -149,7 +150,7 @@ IDATA VMCALL hythread_monitor_exit(hythread_monitor_t mon_ptr) {
     }
     if (mon_ptr->recursion_count == 0) {
         mon_ptr->owner = NULL;
-        status = hymutex_unlock(&mon_ptr->mutex);
+        status = port_mutex_unlock(&mon_ptr->mutex);
     } else {
         mon_ptr->recursion_count--;
     }
@@ -174,10 +175,10 @@ IDATA monitor_wait_impl(hythread_monitor_t mon_ptr, I_64 ms, IDATA nano, IDATA i
     mon_ptr->owner = NULL;
     mon_ptr->recursion_count =0;
     mon_ptr->wait_count++;
-    hymutex_lock(&self->mutex);
+    port_mutex_lock(&self->mutex);
     self->state |= TM_THREAD_STATE_IN_MONITOR_WAIT;
     self->waited_monitor = mon_ptr;
-    hymutex_unlock(&self->mutex);
+    port_mutex_unlock(&self->mutex);
 
     do {
         apr_time_t start;
@@ -215,21 +216,21 @@ IDATA monitor_wait_impl(hythread_monitor_t mon_ptr, I_64 ms, IDATA nano, IDATA i
         mon_ptr->notify_count--;
     }
 
-    hymutex_lock(&self->mutex);
+    port_mutex_lock(&self->mutex);
     self->state &= ~TM_THREAD_STATE_IN_MONITOR_WAIT;
     self->waited_monitor = NULL;
-    hymutex_unlock(&self->mutex);
+    port_mutex_unlock(&self->mutex);
 
     mon_ptr->wait_count--;
     assert(mon_ptr->notify_count <= mon_ptr->wait_count);
 
     if (self->request) {
         int save_count;
-        hymutex_unlock(&mon_ptr->mutex);
+        port_mutex_unlock(&mon_ptr->mutex);
         hythread_safe_point();
         hythread_exception_safe_point();
         save_count = hythread_reset_suspend_disable();
-        hymutex_lock(&mon_ptr->mutex);
+        port_mutex_lock(&mon_ptr->mutex);
         hythread_set_suspend_disable(save_count);
     }
 
@@ -378,7 +379,7 @@ IDATA VMCALL hythread_monitor_destroy(hythread_monitor_t monitor) {
         return TM_ERROR_ILLEGAL_STATE;
     }
 
-    hymutex_destroy(&monitor->mutex);
+    port_mutex_destroy(&monitor->mutex);
     hycond_destroy(&monitor->condition);
     free(monitor);
     return TM_ERROR_NONE;

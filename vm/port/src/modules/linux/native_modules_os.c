@@ -26,7 +26,7 @@
 #include <unistd.h>
 #include "open/types.h"
 #include "port_malloc.h"
-#include "native_modules.h"
+#include "port_modules.h"
 
 
 typedef struct _raw_module raw_module;

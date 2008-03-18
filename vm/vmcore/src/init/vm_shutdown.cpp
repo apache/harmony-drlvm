@@ -37,6 +37,7 @@
 #include "thread_dump.h"
 #include "interpreter.h"
 #include "finalize.h"
+#include "signals.h"
 
 #define LOG_DOMAIN "vm.core.shutdown"
 #include "cxxlog.h"
@@ -286,8 +287,7 @@ jint vm_destroy(JavaVM_Internal * java_vm, jthread java_thread)
         return JNI_ERR;
 
     // Shutdown signals
-    extern void shutdown_signals();
-    shutdown_signals();
+    vm_shutdown_signals();
 
     // Block thread creation.
     // TODO: investigate how to achieve that with ThreadManager
@@ -379,7 +379,7 @@ static IDATA vm_dump_entry_point(void * data) {
  * Current process received an interruption signal (Ctrl+C pressed).
  * Shutdown all running VMs and terminate the process.
  */
-void vm_interrupt_handler(int UNREF x) {
+void vm_interrupt_handler() {
     int nVMs;
     IDATA status = JNI_GetCreatedJavaVMs(NULL, 0, &nVMs);
     assert(nVMs <= 1);
@@ -421,10 +421,10 @@ void vm_interrupt_handler(int UNREF x) {
 }
 
 /**
- * Current process received an ??? signal (Ctrl+Break pressed).
+ * Current process received an SIGQUIT signal (Linux) or Ctrl+Break (Windows).
  * Prints java stack traces for each VM running in the current process.
  */
-void vm_dump_handler(int UNREF x) {
+void vm_dump_handler() {
     int nVMs;
     jint status = JNI_GetCreatedJavaVMs(NULL, 0, &nVMs);
     assert(nVMs <= 1);

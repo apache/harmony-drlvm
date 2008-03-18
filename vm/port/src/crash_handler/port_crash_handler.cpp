@@ -16,15 +16,22 @@
  */
 
 #include <assert.h>
+#include <stdlib.h>
+#include "port_malloc.h"
+#include "port_mutex.h"
+#include "stack_dump.h"
+#include "signals_internal.h"
 #include "port_crash_handler.h"
 
-static port_signal_handler signal_callbacks[PORT_SIGNAL_MAX] =
+static port_signal_handler signal_callbacks[] =
 {
     NULL, // PORT_SIGNAL_GPF
     NULL, // PORT_SIGNAL_STACK_OVERFLOW
     NULL, // PORT_SIGNAL_ABORT
-    NULL, // PORT_SIGNAL_TRAP
-    NULL, // PORT_SIGNAL_PRIV_INSTR
+    NULL, // PORT_SIGNAL_QUIT
+    NULL, // PORT_SIGNAL_CTRL_BREAK
+    NULL, // PORT_SIGNAL_CTRL_C
+    NULL, // PORT_SIGNAL_BREAKPOINT
     NULL  // PORT_SIGNAL_ARITHMETIC
 };
 
@@ -36,32 +43,70 @@ struct crash_additional_actions
 
 static crash_additional_actions *crash_actions = NULL;
 
-static unisigned crash_output_flags;
+static unsigned crash_output_flags;
 
-Boolean port_init_crash_handler(port_signal_handler_registration *registrations,
-    unsigned count)
+static osmutex_t g_mutex;
+
+static port_unwind_compiled_frame g_unwind_callback = NULL;
+
+
+Boolean port_init_crash_handler(
+    port_signal_handler_registration *registrations,
+    unsigned count,
+    port_unwind_compiled_frame unwind_callback)
 {
-    if (initialize_signals() == FALSE)
+    if (initialize_signals() != 0)
         return FALSE;
 
-    for (int iii = 0; iii < count; iii++)
+	if (init_private_tls_data() != 0)
+	    return FALSE;
+
+    port_mutex_create(&g_mutex, APR_THREAD_MUTEX_NESTED);
+
+    sd_init_crash_handler();
+
+    for (unsigned iii = 0; iii < count; iii++)
     {
-        assert(registrations[iii]->signum >= PORT_SIGNAL_MIN);
-        assert(registrations[iii]->signum <= PORT_SIGNAL_MAX);
-        signal_callbacks[registrations[iii]->signum] = registrations[iii]->callback;
+        assert(registrations[iii].signum >= PORT_SIGNAL_MIN);
+        assert(registrations[iii].signum <= PORT_SIGNAL_MAX);
+        signal_callbacks[registrations[iii].signum] = registrations[iii].callback;
     }
+
+    g_unwind_callback = unwind_callback;
 
     return TRUE;
 }
 
-void port_crash_handler_set_flags(port_crash_handler_flags flags)
+unsigned port_crash_handler_get_capabilities()
+{
+    // Return the features we currently support
+    return (port_crash_handler_flags)
+           (PORT_CRASH_CALL_DEBUGGER |
+            PORT_CRASH_DUMP_TO_STDERR |
+            PORT_CRASH_STACK_DUMP |
+            PORT_CRASH_DUMP_ALL_THREADS |
+            PORT_CRASH_PRINT_COMMAND_LINE |
+            PORT_CRASH_PRINT_ENVIRONMENT |
+            PORT_CRASH_PRINT_MODULES |
+            PORT_CRASH_PRINT_REGISTERS |
+            PORT_CRASH_DUMP_PROCESS_CORE);
+
+}
+
+void port_crash_handler_set_flags(unsigned flags)
 {
     crash_output_flags = flags;
 }
 
+unsigned port_crash_handler_get_flags()
+{
+    return crash_output_flags;
+}
+
 Boolean port_crash_handler_add_action(port_crash_handler_action action)
 {
-    crash_additional_actions *a = STD_MALLOC(sizeof(crash_additional_actions));
+    crash_additional_actions *a =
+        (crash_additional_actions*)STD_MALLOC(sizeof(crash_additional_actions));
     if (NULL == a)
         return FALSE;
 
@@ -73,8 +118,11 @@ Boolean port_crash_handler_add_action(port_crash_handler_action action)
 
 Boolean port_shutdown_crash_handler()
 {
-    if (shutdown_signals() == FALSE)
+    if (shutdown_signals() != 0)
         return FALSE;
+
+	if (free_private_tls_data() != 0)
+	    return FALSE;
 
     for (crash_additional_actions *a = crash_actions; NULL != a;)
     {
@@ -83,5 +131,48 @@ Boolean port_shutdown_crash_handler()
         a = next;
     }
 
+    sd_cleanup_crash_handler();
+
+    port_mutex_destroy(&g_mutex);
+
     return TRUE;
+}
+
+/* Returns 0  when execution should be continued with (updated) Registers
+   Returns 1  when crash occured and process should invoke a debugger
+   Returns -1 when crash occured and process should be terminated */
+int port_process_signal(port_sigtype signum, Registers *regs, void* fault_addr, Boolean iscrash)
+{
+    if (!iscrash)
+    {
+        assert(signum >= PORT_SIGNAL_MIN);
+        assert(signum <= PORT_SIGNAL_MAX);
+
+        if (signal_callbacks[signum] != NULL)
+        {
+            Boolean cres = signal_callbacks[signum](signum, regs, fault_addr);
+
+            if (cres) // signal was processed
+                return 0;
+        }
+    }
+
+    // CRASH
+    port_mutex_lock(&g_mutex);
+
+    sd_print_crash_info(signum, regs, g_unwind_callback);
+
+    for (crash_additional_actions* action = crash_actions;
+         action; action = action->next)
+    {
+        action->action(signum, regs, fault_addr);
+    }
+
+    if ((crash_output_flags & PORT_CRASH_CALL_DEBUGGER) != 0)
+    {
+        port_mutex_unlock(&g_mutex);
+        return 1;
+    }
+
+    return -1;
 }

@@ -31,8 +31,6 @@
 #include "../../../arch/ipf/include/vm_ipf.h"
 
 
-#include "exception_filter.h"
-
 // Afremov Pavel 20050117 
 #include "../m2n_ipf_internal.h"
 

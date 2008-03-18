@@ -15,7 +15,7 @@
  *  limitations under the License.
  */
 
-#ifdef _PORT_CRASH_HANDLER_
+#ifndef _PORT_CRASH_HANDLER_
 #define _PORT_CRASH_HANDLER_
 
 
@@ -27,7 +27,7 @@
 #include "port_frame_info.h"
 
 #ifdef __cplusplus
-extern "C"
+extern "C" {
 #endif
 
 /**
@@ -38,7 +38,7 @@ typedef enum
     /**
      * General protection fault, e.g. SIGSEGV on unix.
      */
-    PORT_SIGNAL_GPF,
+    PORT_SIGNAL_GPF = 0,
     /**
      * Special type of GPF when crash happens because of stack
      * overflow. It can be handled on the same stack because guard
@@ -50,19 +50,30 @@ typedef enum
      */
     PORT_SIGNAL_ABORT,
     /**
-     * Process executed a trap, e.g. INT3 on x86.
+     * Ctrl-\ combination was pressed.
      */
-    PORT_SIGNAL_TRAP,
+    PORT_SIGNAL_QUIT,
     /**
-     * Process executed a privileged instruction (only on Windows),
-     * e.g. CLI.
+     * Ctrl-Break combination was pressed.
      */
-    PORT_SIGNAL_PRIV_INSTR,
+    PORT_SIGNAL_CTRL_BREAK,
+    /**
+     * Ctrl-C combination was pressed.
+     */
+    PORT_SIGNAL_CTRL_C,
+    /**
+     * Process met a breakpoint set with port_set_breakpoint().
+     */
+    PORT_SIGNAL_BREAKPOINT,
     /**
      * Process encountered an arithmeric error, e.g. division by
      * zero.
      */
     PORT_SIGNAL_ARITHMETIC,
+    /**
+     * Unknown signal - does not have a handler.
+     */
+    PORT_SIGNAL_UNKNOWN,
     /**
      * Maximum identifier for signal type
      */
@@ -83,13 +94,15 @@ typedef enum
  * @param signum - signal that in the thread.
  * @param regs - platform dependent register context of the process at
  * signal point.
+ * @param fault_addr - fault address.
  * @return <code>TRUE</code> if signal is handled by the process and
  * execution should continue. <code>FALSE</code> if signal is not handled
  * by the process and crash handler should execute crash sequence.
  */
-typedef Boolean (port_signal_handler *)(
+typedef Boolean (*port_signal_handler)(
     port_sigtype signum,
-    Registers *regs);
+    Registers *regs,
+    void* fault_addr);
 
 /**
  * Signal callback registration information.
@@ -124,7 +137,7 @@ typedef struct
  */
 Boolean port_init_crash_handler(
     port_signal_handler_registration *registrations,
-    unsigned count
+    unsigned count,
     port_unwind_compiled_frame unwind_callback);
 
 /**
@@ -178,19 +191,28 @@ typedef enum
     /**
      * Crash handler should create a core/mini dump of program state.
      */
-    PORT_CRASH_DUMP_PROCESS_CORE = 0x400
+    PORT_CRASH_DUMP_PROCESS_CORE = 0x0400
 } port_crash_handler_flags;
+
+/**
+ * Returns supported features from the list of crash handler flags.
+ * When unsupported feature is requested, port_crash_handler_set_flags
+ * does not fail.
+ *
+ * @returns  supported crash handler features.
+ */
+unsigned port_crash_handler_get_capabilities();
 
 /**
  * Set crash handler output flags. Default mode is <code>
  * PORT_CRASH_DUMP_TO_STDERR |
  * PORT_CRASH_STACK_DUMP | PORT_CRASH_PRINT_COMMAND_LINE |
  * PORT_CRASH_PRINT_ENVIRONMENT | PORT_CRASH_PRINT_MODULES |
- * PORT_CRASH_PRINT_REGISTERS | PORT_CRASH_PRINT_THREADS_LIST</code>.
+ * PORT_CRASH_PRINT_REGISTERS</code>.
  *
  * @param flags - crash handler output flags.
  */
-void port_crash_handler_set_flags(port_crash_handler_flags flags);
+void port_crash_handler_set_flags(unsigned flags);
 
 /**
  * Callback function that is called at the end of shutdown sequence.
@@ -201,8 +223,12 @@ void port_crash_handler_set_flags(port_crash_handler_flags flags);
  * @param signum - signal that in the thread.
  * @param regs - platform dependent register context of the process at
  * signal point.
+ * @param fault_addr - fault address.
  */
-typedef void (port_crash_handler_action *)(port_sigtype signum, Registers *regs);
+typedef void (*port_crash_handler_action)(
+    port_sigtype signum,
+    Registers *regs,
+    void* fault_addr);
 
 /**
  * Add an action to be done at the end of crash sequence. Actions may
@@ -231,8 +257,39 @@ Boolean port_crash_handler_add_action(port_crash_handler_action action);
  */
 Boolean port_shutdown_crash_handler();
 
+
+/**
+* Instruments specified location to produce PORT_SIGNAL_BREAKPOINT event.
+* @param [in] addr  - memory location to instrument.
+* @param [out] prev - address to store previous value of the instrumented byte.
+* @return <code>0</code> if OK; nonzero if the location is already
+* instrumented or if an error occured.
+* @note Caller should keep store previous byte to restore
+* the location in future.
+*/
+int port_set_breakpoint(void* addr, unsigned char* prev);
+
+/**
+* Restores original byte in the location previously instrumented
+* with port_set_breakpoint.
+* @param [in] addr  - memory location to deinstrument.
+* @param [in] prev  - previous byte to restore.
+* @return <code>0</code> if OK; nonzero if the location was not
+* instrumented yet or if an error occured.
+*/
+int port_clear_breakpoint(void* addr, unsigned char prev);
+
+/**
+* Checks if the location is instrumented.
+* @param [in] addr  - memory location to deinstrument.
+* @return <code>TRUE</code> if instrumented; FALSE otherwise.
+*/
+Boolean port_is_breakpoint_set(void* addr);
+
+
+
 #ifdef __cplusplus
 }
 #endif
 
-#endif // _PORT_CRASH_HANDLER_
+#endif /* _PORT_CRASH_HANDLER_ */

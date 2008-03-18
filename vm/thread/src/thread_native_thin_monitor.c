@@ -28,6 +28,7 @@
 #include <port_atomic.h>
 #include "port_barriers.h"
 #include "port_thread.h"
+#include "port_mutex.h"
 #include "thread_private.h"
 
 /** @name Thin monitors support. Implement thin-fat scheme.
@@ -133,7 +134,7 @@ int res_lock_count = 0;
 
 #ifdef LOCK_RESERVATION
 
-extern hymutex_t TM_LOCK;
+extern osmutex_t TM_LOCK;
 /*
  * Unreserves the lock already owned by this thread
  */
@@ -172,7 +173,7 @@ IDATA VMCALL hythread_unreserve_lock(hythread_thin_monitor_t *lockword_ptr) {
 
     // trylock used to prevent cyclic suspend deadlock
     // the java_monitor_enter calls safe_point between attempts.
-    /*status = hymutex_trylock(&TM_LOCK);
+    /*status = port_mutex_trylock(&TM_LOCK);
       if (status !=TM_ERROR_NONE) {
       return status;
       }*/
@@ -184,7 +185,7 @@ IDATA VMCALL hythread_unreserve_lock(hythread_thin_monitor_t *lockword_ptr) {
     owner = hythread_get_thread(lock_id);
     TRACE(("Unreserved other %d \n", ++unreserve_count/*, vm_get_object_class_name(lockword_ptr-1)*/));
     if (!IS_RESERVED(lockword) || IS_FAT_LOCK(lockword)) {
-        // hymutex_unlock(&TM_LOCK);
+        // port_mutex_unlock(&TM_LOCK);
         return TM_ERROR_NONE;
     }
     // suspend owner 
@@ -245,7 +246,7 @@ IDATA VMCALL hythread_unreserve_lock(hythread_thin_monitor_t *lockword_ptr) {
         hythread_resume(owner);
     }
 
-    /* status = hymutex_unlock(&TM_LOCK);*/
+    /* status = port_mutex_unlock(&TM_LOCK);*/
 
     // Gregory - This lock, right after it was unreserved, may be
     // inflated by another thread and therefore instead of recursion
@@ -496,7 +497,7 @@ IDATA VMCALL hythread_thin_monitor_release(hythread_thin_monitor_t *lockword_ptr
         hythread_monitor_t monitor =
             locktable_get_fat_monitor(FAT_LOCK_ID(lockword));
         monitor->recursion_count = 0;
-        status = hymutex_unlock(&monitor->mutex);
+        status = port_mutex_unlock(&monitor->mutex);
         assert(status == TM_ERROR_NONE);
     } else {
         // this is thin monitor
@@ -730,7 +731,7 @@ void deflate_lock(hythread_monitor_t fat_monitor, hythread_thin_monitor_t *lockw
  * Enter locktable read section
  */
 static void locktable_reader_enter() {
-    IDATA status = hymutex_lock(&lock_table->mutex);
+    IDATA status = port_mutex_lock(&lock_table->mutex);
     assert(status == TM_ERROR_NONE);
 
     if (lock_table->state == HYTHREAD_LOCKTABLE_IDLE
@@ -746,7 +747,7 @@ static void locktable_reader_enter() {
         // We are asserting here that we exited wait with the correct state
         assert(lock_table->state == HYTHREAD_LOCKTABLE_READING);
     }
-    status = hymutex_unlock(&lock_table->mutex);        
+    status = port_mutex_unlock(&lock_table->mutex);
     assert(status == TM_ERROR_NONE);
 }
 
@@ -754,7 +755,7 @@ static void locktable_reader_enter() {
  * Exit locktable read section
  */
 static void locktable_reader_exit() {
-    IDATA status = hymutex_lock(&lock_table->mutex);
+    IDATA status = port_mutex_lock(&lock_table->mutex);
     assert(status == TM_ERROR_NONE);
 
     lock_table->readers_reading--;
@@ -768,7 +769,7 @@ static void locktable_reader_exit() {
         }
     }
 
-    status = hymutex_unlock(&lock_table->mutex);
+    status = port_mutex_unlock(&lock_table->mutex);
     assert(status == TM_ERROR_NONE);
 }
 
@@ -776,7 +777,7 @@ static void locktable_reader_exit() {
  * Enter locktable write section
  */
 static void locktable_writer_enter() {
-    IDATA status = hymutex_lock(&lock_table->mutex);
+    IDATA status = port_mutex_lock(&lock_table->mutex);
     assert(status == TM_ERROR_NONE);
 
     if (lock_table->state != HYTHREAD_LOCKTABLE_IDLE) {
@@ -791,7 +792,7 @@ static void locktable_writer_enter() {
         lock_table->state = HYTHREAD_LOCKTABLE_WRITING;
     }        
 
-    status = hymutex_unlock(&lock_table->mutex);
+    status = port_mutex_unlock(&lock_table->mutex);
     assert(status == TM_ERROR_NONE);
 }
 
@@ -799,7 +800,7 @@ static void locktable_writer_enter() {
  * Exit locktable write section
  */
 static void locktable_writer_exit() {
-    IDATA status = hymutex_lock(&lock_table->mutex);
+    IDATA status = port_mutex_lock(&lock_table->mutex);
     assert(status == TM_ERROR_NONE);
 
     if (lock_table->readers_reading > 0) {
@@ -813,7 +814,7 @@ static void locktable_writer_exit() {
         lock_table->state = HYTHREAD_LOCKTABLE_IDLE;
     }
 
-    status = hymutex_unlock(&lock_table->mutex);
+    status = port_mutex_unlock(&lock_table->mutex);
     assert(status == TM_ERROR_NONE);
 }
 

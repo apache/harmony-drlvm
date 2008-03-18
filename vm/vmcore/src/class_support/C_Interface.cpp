@@ -30,6 +30,7 @@
 #include "properties.h"
 
 #include "open/hythread_ext.h"
+#include "port_mutex.h"
 #include "thread_manager.h"
 #include "cci.h"
 #include "nogc.h"
@@ -2109,11 +2110,11 @@ unsigned vm_vector_size(Class_Handle vector_class, int length)
     return vector_class->calculate_array_size(length);
 } // vm_vector_size
 
-static hymutex_t vm_gc_lock;
+static osmutex_t vm_gc_lock;
 
 void vm_gc_lock_init()
 {
-    IDATA UNUSED status = hymutex_create(&vm_gc_lock, TM_MUTEX_NESTED);
+    IDATA UNUSED status = port_mutex_create(&vm_gc_lock, APR_THREAD_MUTEX_NESTED);
     assert(status == TM_ERROR_NONE);
 } // vm_gc_lock_init
 
@@ -2124,12 +2125,12 @@ void vm_gc_lock_enum()
     self->disable_count = 0;
 
     while (true) {
-        IDATA UNUSED status = hymutex_lock(&vm_gc_lock);
+        IDATA UNUSED status = port_mutex_lock(&vm_gc_lock);
         assert(status == TM_ERROR_NONE);
 
         self->disable_count = disable_count;
         if (disable_count && self->suspend_count) {
-            status = hymutex_unlock(&vm_gc_lock);
+            status = port_mutex_unlock(&vm_gc_lock);
             assert(status == TM_ERROR_NONE);
 
             self->disable_count = 0;
@@ -2142,7 +2143,7 @@ void vm_gc_lock_enum()
 
 void vm_gc_unlock_enum()
 {
-    IDATA UNUSED status = hymutex_unlock(&vm_gc_lock);
+    IDATA UNUSED status = port_mutex_unlock(&vm_gc_lock);
     assert(status == TM_ERROR_NONE);
 } // vm_gc_unlock_enum
 

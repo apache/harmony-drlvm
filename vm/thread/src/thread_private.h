@@ -78,7 +78,7 @@ extern int16 tm_tls_size;
 
 typedef struct HyThreadLibrary {
     IDATA a;
-    hymutex_t TM_LOCK;
+    osmutex_t TM_LOCK;
     IDATA     nondaemon_thread_count;
     hycond_t  nondaemon_thread_cond;
 } HyThreadLibrary;
@@ -137,7 +137,7 @@ typedef struct HyThreadGroup {
 typedef struct HyThreadMonitor {
     
     /// Monitor mutex.
-    hymutex_t mutex;
+    osmutex_t mutex;
 
     /// Monitor condition varibale.
     hycond_t condition;
@@ -183,7 +183,7 @@ typedef struct HyLatch {
     /**
      * Mutex associated with the latch data.
      */
-    hymutex_t mutex;  
+    osmutex_t mutex;
     
 } HyLatch;
 
@@ -211,7 +211,7 @@ typedef struct HySemaphore {
     /**
      * Mutex associated with the semaphore data.
      */
-    hymutex_t mutex;         
+    osmutex_t mutex;
 } HySemaphore;
 
   
@@ -231,7 +231,7 @@ typedef struct HyFatLockTable {
     hythread_monitor_t* tables[HY_MAX_FAT_TABLES];
     
     // mutex guarding locktable
-    hymutex_t mutex;
+    osmutex_t mutex;
     hycond_t read;
     hycond_t write;
     
@@ -297,7 +297,7 @@ IDATA acquire_start_lock(void);
 IDATA release_start_lock(void);
 
 IDATA thread_sleep_impl(I_64 millis, IDATA nanos, IDATA interruptable);
-IDATA condvar_wait_impl(hycond_t *cond, hymutex_t *mutex, I_64 ms, IDATA nano, IDATA interruptable);
+IDATA condvar_wait_impl(hycond_t *cond, osmutex_t *mutex, I_64 ms, IDATA nano, IDATA interruptable);
 IDATA monitor_wait_impl(hythread_monitor_t mon_ptr, I_64 ms, IDATA nano, IDATA interruptable);
 IDATA thin_monitor_wait_impl(hythread_thin_monitor_t *lockword_ptr, I_64 ms, IDATA nano, IDATA interruptable);
 IDATA sem_wait_impl(hysem_t sem, I_64 ms, IDATA nano, IDATA interruptable);
@@ -314,7 +314,7 @@ void os_thread_exit(IDATA status);
 int os_thread_join(osthread_t os_thread);
 int os_get_thread_times(osthread_t os_thread, int64* pkernel, int64* puser);
 
-int os_cond_timedwait(hycond_t *cond, hymutex_t *mutex, I_64 ms, IDATA nano);
+int os_cond_timedwait(hycond_t *cond, osmutex_t *mutex, I_64 ms, IDATA nano);
 UDATA os_get_foreign_thread_stack_size();
 
 

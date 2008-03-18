@@ -190,12 +190,6 @@ typedef char I_8;
 
 #endif
 
-#if !defined(FALSE)
-#define FALSE   ((BOOLEAN) 0)
-#if !defined(TRUE)
-#define TRUE    ((BOOLEAN) (!FALSE))
-#endif
-#endif
 
 #if !defined(NULL)
 #if defined(__cplusplus)

@@ -24,6 +24,7 @@
 
 #define LOG_DOMAIN "jvmti"
 #include "cxxlog.h"
+#include "port_mutex.h"
 
 #include "open/gc.h"
 #include "jvmti_direct.h"
@@ -87,14 +88,14 @@ jvmtiError add_event_to_thread(jvmtiEnv *env, jvmtiEvent event_type, jthread eve
     TIEventThread *et = p_env->event_threads[event_type - JVMTI_MIN_EVENT_TYPE_VAL];
 
     // protect event_threads collection
-    hymutex_lock(&(p_env->environment_data_lock));
+    port_mutex_lock(&(p_env->environment_data_lock));
 
     // Find out if this environment is already registered on this thread on this event type
     while (NULL != et)
     {
         if (et->thread == p_thread)
         {
-            hymutex_unlock(&(p_env->environment_data_lock));
+            port_mutex_unlock(&(p_env->environment_data_lock));
             return JVMTI_ERROR_NONE;
         }
         et = et->next;
@@ -104,7 +105,7 @@ jvmtiError add_event_to_thread(jvmtiEnv *env, jvmtiEvent event_type, jthread eve
     jvmtiError errorCode = _allocate(sizeof(TIEventThread), (unsigned char **)&newet);
     if (JVMTI_ERROR_NONE != errorCode)
     {
-        hymutex_unlock(&(p_env->environment_data_lock));
+        port_mutex_unlock(&(p_env->environment_data_lock));
         return errorCode;
     }
     newet->thread = p_thread;
@@ -116,7 +117,7 @@ jvmtiError add_event_to_thread(jvmtiEnv *env, jvmtiEvent event_type, jthread eve
     p_env->event_threads[event_type - JVMTI_MIN_EVENT_TYPE_VAL] = newet;
 
     // free environment lock
-    hymutex_unlock(&(p_env->environment_data_lock));
+    port_mutex_unlock(&(p_env->environment_data_lock));
     return JVMTI_ERROR_NONE;
 }
 
@@ -130,14 +131,14 @@ void remove_event_from_thread(jvmtiEnv *env, jvmtiEvent event_type, jthread even
         return;
 
     // protect event_threads collection
-    hymutex_lock(&(p_env->environment_data_lock));
+    port_mutex_lock(&(p_env->environment_data_lock));
 
     if (et->thread == p_thread)
     {
         VM_Global_State::loader_env->TI->removeEventSubscriber(event_type);
         p_env->event_threads[event_type - JVMTI_MIN_EVENT_TYPE_VAL] = et->next;
         _deallocate((unsigned char *)et);
-        hymutex_unlock(&(p_env->environment_data_lock));
+        port_mutex_unlock(&(p_env->environment_data_lock));
         return;
     }
 
@@ -150,36 +151,36 @@ void remove_event_from_thread(jvmtiEnv *env, jvmtiEvent event_type, jthread even
             TIEventThread *oldet = et->next;
             et->next = oldet->next;
             _deallocate((unsigned char *)oldet);
-            hymutex_unlock(&(p_env->environment_data_lock));
+            port_mutex_unlock(&(p_env->environment_data_lock));
             return;
         }
         et = et->next;
     }
 
     // release protection
-    hymutex_unlock(&(p_env->environment_data_lock));
+    port_mutex_unlock(&(p_env->environment_data_lock));
 }
 
 void add_event_to_global(jvmtiEnv *env, jvmtiEvent event_type)
 {
     TIEnv *p_env = (TIEnv *)env;
-    hymutex_lock(&(p_env->environment_data_lock));
+    port_mutex_lock(&(p_env->environment_data_lock));
     if(!p_env->global_events[event_type - JVMTI_MIN_EVENT_TYPE_VAL]) {
         VM_Global_State::loader_env->TI->addEventSubscriber(event_type);
     }
     p_env->global_events[event_type - JVMTI_MIN_EVENT_TYPE_VAL] = true;
-    hymutex_unlock(&(p_env->environment_data_lock));
+    port_mutex_unlock(&(p_env->environment_data_lock));
 }
 
 void remove_event_from_global(jvmtiEnv *env, jvmtiEvent event_type)
 {
     TIEnv *p_env = (TIEnv *)env;
-    hymutex_lock(&(p_env->environment_data_lock));
+    port_mutex_lock(&(p_env->environment_data_lock));
     if(p_env->global_events[event_type - JVMTI_MIN_EVENT_TYPE_VAL]) {
         VM_Global_State::loader_env->TI->removeEventSubscriber(event_type);
     }
     p_env->global_events[event_type - JVMTI_MIN_EVENT_TYPE_VAL] = false;
-    hymutex_unlock(&(p_env->environment_data_lock));
+    port_mutex_unlock(&(p_env->environment_data_lock));
 }
 
 // disable all events except VM_DEATH
@@ -2363,17 +2364,17 @@ jvmti_event_thread_function(void *args)
     assert(hythread_is_suspend_enabled());
 
     // create wait loop environment
-    hymutex_t event_mutex;
-    UNREF IDATA stat = hymutex_create(&event_mutex, TM_MUTEX_NESTED);
+    osmutex_t event_mutex;
+    UNREF IDATA stat = port_mutex_create(&event_mutex, APR_THREAD_MUTEX_NESTED);
     assert(stat == TM_ERROR_NONE);
     stat = hycond_create(&ti->event_cond);
     assert(stat == TM_ERROR_NONE);
 
     // event thread loop
     while(true) {
-        hymutex_lock(&event_mutex);
+        port_mutex_lock(&event_mutex);
         hycond_wait(&ti->event_cond, &event_mutex);
-        hymutex_unlock(&event_mutex);
+        port_mutex_unlock(&event_mutex);
 
         if(!ti->event_thread) {
             // event thread is NULL,
@@ -2386,7 +2387,7 @@ jvmti_event_thread_function(void *args)
     }
 
     // release wait loop environment
-    stat = hymutex_destroy(&event_mutex);
+    stat = port_mutex_destroy(&event_mutex);
     assert(stat == TM_ERROR_NONE);
     stat = hycond_destroy(&ti->event_cond);
     assert(stat == TM_ERROR_NONE);

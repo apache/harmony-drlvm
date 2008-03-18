@@ -42,8 +42,6 @@ void* ncai_get_instruction_pointer(hythread_t thread);
 // These functions are differ for various operating systems
 bool ncai_get_generic_registers(hythread_t handle, Registers* regs);
 char* ncai_parse_module_name(char* filepath);
-ncaiError ncai_read_memory(void* addr, size_t size, void* buf);
-ncaiError ncai_write_memory(void* addr, size_t size, void* buf);
 
 
 struct VMBreakPoint;
@@ -120,13 +118,6 @@ void ncai_report_method_entry(jmethodID method);
 void ncai_report_method_exit(jmethodID method, jboolean exc_popped, jvalue ret_val);
 void ncai_step_native_method_entry(Method* m);
 void ncai_step_native_method_exit(Method* m);
-
-
-// Platform-dependant Signal functions
-size_t ncai_get_signal_count();
-bool ncai_is_signal_in_range(jint signal);
-char* ncai_get_signal_name(jint signal);
-size_t ncai_get_signal_name_size(jint signal);
 
 // Allows to get modules without providing NCAI environment
 ncaiError ncai_get_all_loaded_modules(ncaiEnv *env,

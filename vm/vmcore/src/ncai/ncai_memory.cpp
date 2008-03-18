@@ -4,6 +4,7 @@
  */
 #define LOG_DOMAIN "ncai.memory"
 #include "cxxlog.h"
+#include "port_memaccess.h"
 #include "jvmti_break_intf.h"
 #include "environment.h"
 #include "jvmti_internal.h"
@@ -36,10 +37,10 @@ ncaiError JNICALL ncaiReadMemory(ncaiEnv* env,
     if (!env)
         return NCAI_ERROR_INVALID_ENVIRONMENT;
 
-    ncaiError err = ncai_read_memory(addr, size, buf);
+    int err = port_read_memory(addr, size, buf);
 
-    if (err != NCAI_ERROR_NONE)
-        return err;
+    if (err != 0)
+        return NCAI_ERROR_ACCESS_DENIED;
 
     // Restore bytes changed by JVMTI/NCAI breakpoints
     VMBreakPoints* vm_breaks = VM_Global_State::loader_env->TI->vm_brpt;
@@ -86,7 +87,12 @@ ncaiError JNICALL ncaiWriteMemory(ncaiEnv* env,
 
     // Simple case: there are no breakpoints in specified address range
     if (rewrite_count == 0)
-        return ncai_write_memory(addr, size, buf);
+    {
+        if (port_write_memory(addr, size, buf) == 0)
+            return NCAI_ERROR_NONE;
+        else
+            return NCAI_ERROR_ACCESS_DENIED;
+    }
 
     // Allocate array for address sorting
     RewriteArray rwa;
@@ -114,7 +120,7 @@ ncaiError JNICALL ncaiWriteMemory(ncaiEnv* env,
     assert(cur_bla);
     jbyte* cbuf = (jbyte*)buf;
     jbyte* cur_addr = (jbyte*)addr;
-    ncaiError err = NCAI_ERROR_NONE;
+    int err = 0;
 
     while (remain)
     {
@@ -123,9 +129,9 @@ ncaiError JNICALL ncaiWriteMemory(ncaiEnv* env,
             size_t offset = (size_t)cur_addr - (size_t)addr;
             size_t chunk_size = cur_bla ? ((jbyte*)cur_bla->bp->addr - cur_addr)
                                         : (end_addr - cur_addr);
-            err = ncai_write_memory(cur_addr, chunk_size, cbuf + offset);
+            err = port_write_memory(cur_addr, chunk_size, cbuf + offset);
 
-            if (err != NCAI_ERROR_NONE)
+            if (err != 0)
                 break;
 
             cur_addr += chunk_size;
@@ -145,7 +151,7 @@ ncaiError JNICALL ncaiWriteMemory(ncaiEnv* env,
     }
 
     STD_FREE(rwa.array);
-    return err;
+    return (err == 0) ? NCAI_ERROR_NONE : NCAI_ERROR_ACCESS_DENIED;
 }
 
 // Adding sorted item into rewrite list

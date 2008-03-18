@@ -122,11 +122,6 @@ hysem_wait_timed
 hysem_wait_interruptable
 hysem_getvalue
 hysem_set
-hymutex_create
-hymutex_lock
-hymutex_trylock
-hymutex_unlock
-hymutex_destroy
 
 hythread_is_alive
 hythread_is_terminated

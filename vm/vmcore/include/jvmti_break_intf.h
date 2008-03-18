@@ -30,15 +30,6 @@
 #include "lock_manager.h"
 #include "environment.h"
 
-#define INSTRUMENTATION_BYTE_HLT 0xf4 // HLT instruction
-#define INSTRUMENTATION_BYTE_CLI 0xfa // CLI instruction
-#define INSTRUMENTATION_BYTE_INT3 0xcc // INT 3 instruction
-
-#ifdef PLATFORM_NT
-#define INSTRUMENTATION_BYTE INSTRUMENTATION_BYTE_CLI
-#else
-#define INSTRUMENTATION_BYTE INSTRUMENTATION_BYTE_INT3
-#endif
 
 // Callbacks are called for interfaces according to its priority
 typedef enum {

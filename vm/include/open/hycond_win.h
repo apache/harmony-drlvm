@@ -46,7 +46,7 @@ struct waiting_node {
 struct HyCond {
     // Synchronization is necessary because signal() caller is not required
     // to hold mutex associated with the condition variable.
-    hymutex_t queue_mutex;
+    osmutex_t queue_mutex;
     // head-tail marker node
     struct waiting_node dummy_node;
 };

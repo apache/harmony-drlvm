@@ -22,6 +22,7 @@
  * JVMTI capability API
  */
 
+#include "port_mutex.h"
 #include "jvmti_direct.h"
 #include "jvmti_utils.h"
 #include "jvmti_tags.h"
@@ -446,13 +447,13 @@ jvmtiRelinquishCapabilities(jvmtiEnv* env,
     if (removed_caps.can_tag_objects) {
         // clear tags on relinquishing can_tag_objects capability
         ti_env = reinterpret_cast<TIEnv *>(env);
-        hymutex_lock(&ti_env->environment_data_lock);
+        port_mutex_lock(&ti_env->environment_data_lock);
         if (ti_env->tags) {
             ti_env->tags->clear();
             delete ti_env->tags;
             ti_env->tags = NULL;
         }
-        hymutex_unlock(&ti_env->environment_data_lock);
+        port_mutex_unlock(&ti_env->environment_data_lock);
 
         ti->reset_global_capability(DebugUtilsTI::TI_GC_ENABLE_TAG_OBJECTS);
     }

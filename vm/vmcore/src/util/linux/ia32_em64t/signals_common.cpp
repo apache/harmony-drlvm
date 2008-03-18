@@ -15,25 +15,8 @@
  *  limitations under the License.
  */
 
-#define LOG_DOMAIN "signals"
-#include "cxxlog.h"
-
 #include <sys/mman.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <sys/syscall.h>
-#include <stdio.h>
-#include <iostream>
-#include <fstream>
-#include <string.h>
-#include <assert.h>
-#include <errno.h>
-
 #include <sys/ucontext.h>
-#include <sys/wait.h>
-
-
 #undef __USE_XOPEN
 #include <signal.h>
 
@@ -42,78 +25,18 @@
 #include <pthread_np.h>
 #endif
 #include <sys/time.h>
-#include "port_thread.h"
 
+#define LOG_DOMAIN "signals"
+#include "cxxlog.h"
+#include "open/platform_types.h"
 #include "Class.h"
+#include "interpreter.h"
 #include "environment.h"
-
-#include "open/gc.h"
-
-#include "init.h"
 #include "exceptions.h"
 #include "exceptions_jit.h"
-#include "vm_threads.h"
-#include "open/vm_util.h"
-#include "compile.h"
-#include "vm_stats.h"
-#include "sync_bits.h"
-
-#include "object_generic.h"
-#include "thread_manager.h"
-
-#include "exception_filter.h"
-#include "interpreter.h"
-#include "crash_handler.h"
-#include "stack_dump.h"
-#include "jvmti_break_intf.h"
-
 #include "signals_common.h"
+#include "signals.h"
 
-
-static void general_crash_handler(int signum, Registers* regs);
-
-
-extern "C" {
-static void DECL_CHANDLER c_exception_handler(Registers* regs, Class* exn_class, bool java_code) {
-    // this exception handler is executed *after* NT exception handler returned
-    DebugUtilsTI* ti = VM_Global_State::loader_env->TI;
-    // Create local copy for registers because registers in TLS can be changed
-    VM_thread *thread = p_TLS_vmthread;
-    assert(thread);
-    assert(exn_class);
-
-    exn_athrow_regs(regs, exn_class, java_code, true);
-}
-}
-
-static void throw_from_sigcontext(Registers* regs, Class* exc_clss)
-{
-    DebugUtilsTI* ti = VM_Global_State::loader_env->TI;
-    bool java_code = (vm_identify_eip((void*)regs->get_ip()) == VM_TYPE_JAVA);
-    VM_thread* vmthread = p_TLS_vmthread;
-
-    vm_set_exception_registers(vmthread, *regs);
-
-    assert(exc_clss);
-
-    NativeCodePtr callback = (NativeCodePtr) c_exception_handler;
-    // Set up parameters and registers
-    port_set_longjump_regs(callback, regs,
-                            3, regs, exc_clss, (POINTER_SIZE_INT)java_code);
-}
-
-static bool java_throw_from_sigcontext(Registers* regs, Class* exc_clss)
-{
-    ASSERT_NO_INTERPRETER;
-    void* ip = regs->get_ip();
-    VM_Code_Type vmct = vm_identify_eip(ip);
-    if(vmct != VM_TYPE_JAVA) {
-        return false;
-    }
-
-    throw_from_sigcontext(regs, exc_clss);
-    return true;
-}
 
 /*
  * Information about stack
@@ -153,11 +76,11 @@ inline size_t find_stack_size() {
 }
 #endif
 
-inline size_t find_guard_stack_size() {
+static inline size_t find_guard_stack_size() {
     return 64*1024;
 }
 
-inline size_t find_guard_page_size() {
+static inline size_t find_guard_page_size() {
     int err;
     size_t guard_size;
     pthread_attr_t pthread_attr;
@@ -172,19 +95,19 @@ inline size_t find_guard_page_size() {
 static size_t common_guard_stack_size;
 static size_t common_guard_page_size;
 
-inline void* get_stack_addr() {
+static inline void* get_stack_addr() {
     return jthread_self_vm_thread_unsafe()->stack_addr;
 }
 
-inline size_t get_stack_size() {
+static inline size_t get_stack_size() {
     return jthread_self_vm_thread_unsafe()->stack_size;
 }
 
-inline size_t get_guard_stack_size() {
+static inline size_t get_guard_stack_size() {
     return common_guard_stack_size;
 }
 
-inline size_t get_guard_page_size() {
+static inline size_t get_guard_page_size() {
     return common_guard_page_size;
 }
 
@@ -361,288 +284,104 @@ static bool check_stack_overflow(Registers* regs, void* fault_addr) {
 }
 
 
-
-static void stack_overflow_handler(Registers* regs)
+Boolean stack_overflow_handler(port_sigtype UNREF signum, Registers* regs, void* fault_addr)
 {
-    Global_Env *env = VM_Global_State::loader_env;
+    TRACE2("signals", ("SOE detected at ip=%p, sp=%p",
+                            regs->get_ip(), regs->get_sp()));
 
-    vm_thread_t vm_thread = p_TLS_vmthread;
-    remove_guard_stack(vm_thread);
-    vm_thread->restore_guard_page = true;
+    vm_thread_t vmthread = get_thread_ptr();
+    Global_Env* env = VM_Global_State::loader_env;
+    void* saved_ip = regs->get_ip();
+    void* new_ip = NULL;
 
-    if (java_throw_from_sigcontext(
-                regs, env->java_lang_StackOverflowError_Class)) {
-        return;
-    } else {
-        if (is_unwindable()) {
-            if (hythread_is_suspend_enabled()) {
-                tmn_suspend_disable();
-            }
-            throw_from_sigcontext(
-                regs, env->java_lang_StackOverflowError_Class);
-        } else {
-            exn_raise_by_class(env->java_lang_StackOverflowError_Class);
-        }
-    }
-}
-
-
-static void null_java_reference_handler(int signum, Registers* regs, void* fault_addr)
-{
-    VM_thread *vm_thread = p_TLS_vmthread;
-
-    if (vm_thread && vm_thread->jvmti_thread.violation_flag)
+    if (is_in_ti_handler(vmthread, saved_ip))
     {
-        vm_thread->jvmti_thread.violation_flag = 0;
-        regs->set_ip(vm_thread->jvmti_thread.violation_restart_address);
-        return;
+        new_ip = vm_get_ip_from_regs(vmthread);
+        regs->set_ip(new_ip);
     }
 
-    Global_Env *env = VM_Global_State::loader_env;
+    if (!vmthread || env == NULL)
+        return FALSE; // Crash
 
-    TRACE2("signals", "NPE or SOE detected at " << regs->get_ip());
-
-    if (check_stack_overflow(regs, fault_addr)) {
-        stack_overflow_handler(regs);
-        return;
-    }
-
-    if (!interpreter_enabled()) {
-        if (java_throw_from_sigcontext(
-                    regs, env->java_lang_NullPointerException_Class)) {
-            return;
-        }
-    }
-
-    general_crash_handler(signum, regs);
-}
-
-
-static void null_java_divide_by_zero_handler(int signum, Registers* regs, void* UNREF fault_addr)
-{
-    Global_Env *env = VM_Global_State::loader_env;
-
-    TRACE2("signals",
-           "ArithmeticException detected at " << regs->get_ip());
-
-    if (!interpreter_enabled()) {
-        if (java_throw_from_sigcontext(
-                    regs, env->java_lang_ArithmeticException_Class)) {
-            return;
-        }
-    }
-
-    general_crash_handler(signum, regs);
-}
-
-static void jvmti_jit_breakpoint_handler(int signum, Registers* regs, void* UNREF fault_addr)
-{
-    TRACE2("signals", "JVMTI breakpoint detected at " << (void*)regs->get_ip());
-
-    if (!interpreter_enabled())
-    {
-        regs->set_ip((void*)((POINTER_SIZE_INT)regs->get_ip() - 1));
-        bool handled = jvmti_jit_breakpoint_handler(regs);
-        if (handled)
-            return;
-    }
-
-    general_crash_handler(signum, regs);
-}
-
-/**
- * Print out the call stack of the aborted thread.
- * @note call stacks may be used for debugging
- */
-static void abort_handler(int signum, Registers* regs, void* UNREF fault_addr)
-{
-    general_crash_handler(signum, regs);
-}
-
-static void process_crash(Registers* regs)
-{
-    // print stack trace
-    sd_print_stack(regs);
-}
-
-struct sig_name_t
-{
-    int    num;
-    char*  name;
-};
-
-static sig_name_t sig_names[] =
-{
-    {SIGTRAP, "SIGTRAP"},
-    {SIGSEGV, "SIGSEGV"},
-    {SIGFPE,  "SIGFPE" },
-    {SIGABRT, "SIGABRT"},
-    {SIGINT,  "SIGINT" },
-    {SIGQUIT, "SIGQUIT"}
-};
-
-static const char* get_sig_name(int signum)
-{
-    for (int i = 0; i < sizeof(sig_names)/sizeof(sig_names[0]); i++)
-    {
-        if (signum == sig_names[i].num)
-            return sig_names[i].name;
-    }
-
-    return "unregistered";
-}
-
-static void general_crash_handler(int signum, Registers* regs)
-{
-    // setup default handler
-    signal(signum, SIG_DFL);
-    // Print message
-    fprintf(stderr, "Signal %d is reported: %s\n", signum, get_sig_name(signum));
-
-    if (!is_gdb_crash_handler_enabled() ||
-        !gdb_crash_handler(regs))
-    {
-        NativeCodePtr callback = (NativeCodePtr)process_crash;
-        port_set_longjump_regs(callback, regs, 1, regs);
-    }
-}
-
-static void general_signal_handler(int signum, siginfo_t* info, void* context)
-{
-    bool replaced = false;
-    ucontext_t* uc = (ucontext_t *)context;
-    void* fault_addr = info->si_addr;
-    VM_thread* vm_thread = p_TLS_vmthread;
-    bool violation =
-        (signum == SIGSEGV) && vm_thread && vm_thread->jvmti_thread.violation_flag;
-
-    Registers regs;
-    port_thread_context_to_regs(&regs, uc);
-    void* saved_ip = regs.get_ip();
-    void* new_ip = saved_ip;
-    bool in_java = false;
-
-    if (vm_thread)
-    {
-        // If exception is occured in processor instruction previously
-        // instrumented by breakpoint, the actual exception address will reside
-        // in jvmti_jit_breakpoints_handling_buffer
-        // We should replace exception address with saved address of instruction
-        POINTER_SIZE_INT break_buf =
-            (POINTER_SIZE_INT)vm_thread->jvmti_thread.jvmti_jit_breakpoints_handling_buffer;
-        if ((POINTER_SIZE_INT)saved_ip >= break_buf &&
-            (POINTER_SIZE_INT)saved_ip < break_buf + TM_JVMTI_MAX_BUFFER_SIZE)
-        {
-            // Breakpoints should not occur in breakpoint buffer
-            assert(signum != SIGTRAP);
-
-            replaced = true;
-            new_ip = vm_get_ip_from_regs(vm_thread);
-            regs.set_ip(new_ip);
-            port_thread_regs_to_context(uc, &regs);
-        }
-
-        in_java = (vm_identify_eip(regs.get_ip()) == VM_TYPE_JAVA);
-    }
+    remove_guard_stack(vmthread);
+    vmthread->restore_guard_page = true;
 
     // Pass exception to NCAI exception handler
     bool is_handled = 0;
-    bool is_internal = (signum == SIGTRAP) || violation;
-    ncai_process_signal_event((NativeCodePtr)regs.get_ip(),
-                                (jint)signum, is_internal, &is_handled);
+    ncai_process_signal_event((NativeCodePtr)regs->get_ip(),
+                                (jint)signum, false, &is_handled);
     if (is_handled)
-        return;
-
-    // delegate evident cases to crash handler
-    if ((!vm_thread ||
-        (!in_java && signum != SIGSEGV)) &&
-        signum != SIGTRAP && signum != SIGINT && signum != SIGQUIT)
     {
-        regs.set_ip(saved_ip);
-        general_crash_handler(signum, &regs);
-        port_thread_regs_to_context(uc, &regs);
-        return;
+        if (new_ip)
+            regs->set_ip(saved_ip);
+        return TRUE;
     }
 
-    switch (signum)
+    Class* exn_class = env->java_lang_StackOverflowError_Class;
+
+    if (is_in_java(regs))
     {
-    case SIGTRAP:
-        jvmti_jit_breakpoint_handler(signum, &regs, fault_addr);
-        break;
-    case SIGSEGV:
-        null_java_reference_handler(signum, &regs, fault_addr);
-        break;
-    case SIGFPE:
-        null_java_divide_by_zero_handler(signum, &regs, fault_addr);
-        break;
-    case SIGABRT:
-        abort_handler(signum, &regs, fault_addr);
-        break;
-    case SIGINT:
-        vm_interrupt_handler(signum);
-        break;
-    case SIGQUIT:
-        vm_dump_handler(signum);
-        break;
-    default:
-        // Unknown signal
-        assert(0);
-        break;
+        signal_throw_java_exception(regs, exn_class);
+    }
+    else if (is_unwindable())
+    {
+        if (hythread_is_suspend_enabled())
+            hythread_suspend_disable();
+        signal_throw_exception(regs, exn_class);
+    } else {
+        exn_raise_by_class(exn_class);
     }
 
-    // If IP was not changed in specific handler to start another handler,
-    // we should restore original IP, if it's nesessary
-    if (replaced && regs.get_ip() == new_ip)
-        regs.set_ip((void*)saved_ip);
+    if (new_ip && regs->get_ip() == new_ip)
+        regs->set_ip(saved_ip);
 
-    // Update OS context
-    port_thread_regs_to_context(uc, &regs);
+    return TRUE;
 }
 
-void initialize_signals()
+Boolean null_reference_handler(port_sigtype UNREF signum, Registers* regs, void* fault_addr)
 {
-    struct sigaction sa;
+    TRACE2("signals", "NPE detected at " << regs->get_ip());
 
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_SIGINFO;
-    sa.sa_sigaction = &general_signal_handler;
-    sigaction(SIGTRAP, &sa, NULL);
+    vm_thread_t vmthread = get_thread_ptr();
+    Global_Env* env = VM_Global_State::loader_env;
+    void* saved_ip = regs->get_ip();
+    void* new_ip = NULL;
 
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_SIGINFO | SA_ONSTACK;;
-    sa.sa_sigaction = &general_signal_handler;
-    sigaction(SIGSEGV, &sa, NULL);
+    if (is_in_ti_handler(vmthread, saved_ip))
+    {
+        new_ip = vm_get_ip_from_regs(vmthread);
+        regs->set_ip(new_ip);
+    }
 
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_SIGINFO;
-    sa.sa_sigaction = &general_signal_handler;
-    sigaction(SIGFPE, &sa, NULL);
+    if (check_stack_overflow(regs, fault_addr))
+    {
+        Boolean result = stack_overflow_handler(signum, regs, fault_addr);
 
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_SIGINFO;
-    sa.sa_sigaction = &general_signal_handler;
-    sigaction(SIGINT, &sa, NULL);
+        if (new_ip && regs->get_ip() == new_ip)
+            regs->set_ip(saved_ip);
 
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_SIGINFO;
-    sa.sa_sigaction = &general_signal_handler;
-    sigaction(SIGQUIT, &sa, NULL);
+        return result;
+    }
 
-    /* install abort_handler to print out call stack on assertion failures */
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_SIGINFO;
-    sa.sa_sigaction = &general_signal_handler;
-    sigaction( SIGABRT, &sa, NULL);
-    /* abort_handler installed */
+    if (!vmthread || env == NULL ||
+        !is_in_java(regs) || interpreter_enabled())
+        return FALSE; // Crash
 
-    // Prepare gdb crash handler
-    init_gdb_crash_handler();
+    // Pass exception to NCAI exception handler
+    bool is_handled = 0;
+    ncai_process_signal_event((NativeCodePtr)regs->get_ip(),
+                                (jint)signum, false, &is_handled);
+    if (is_handled)
+    {
+        if (new_ip)
+            regs->set_ip(saved_ip);
+        return TRUE;
+    }
 
-    // Prepare general crash handler
-    sd_init_crash_handler();
+    signal_throw_java_exception(regs, env->java_lang_NullPointerException_Class);
 
-} //initialize_signals
+    if (new_ip && regs->get_ip() == new_ip)
+        regs->set_ip(saved_ip);
 
-void shutdown_signals() {
-    //FIXME: should be defined in future
-} //shutdown_signals
+    return TRUE;
+}

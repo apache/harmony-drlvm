@@ -50,6 +50,7 @@
 #include "classpath_const.h"
 #include "finalize.h"
 #include "jit_intf.h"
+#include "signals.h"
 
 #ifdef _WIN32
 // 20040427 Used to turn on heap checking on every allocation
@@ -861,11 +862,6 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     vm_env->pin_interned_strings = 
         (bool)get_boolean_property("vm.pin_interned_strings", FALSE, VM_PROPERTIES);
 
-    if (!get_boolean_property("vm.assert_dialog", TRUE, VM_PROPERTIES)) {
-        TRACE("disabling assertion dialogs");
-        disable_assert_dialogs();
-    }
-
     initialize_verify_stack_enumeration();
 
     /*    END: Property processing.    */
@@ -901,8 +897,8 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     status = natives_init();
     if (status != JNI_OK) return status;
 
-    extern void initialize_signals();
-    initialize_signals(); 
+    if (vm_initialize_signals() != 0)
+        return JNI_ERR;
 
     status = vm_attach(java_vm, &jni_env);
     if (status != JNI_OK) return status;

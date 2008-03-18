@@ -18,9 +18,6 @@
 #ifndef _SIGNALS_COMMON_H_
 #define _SIGNALS_COMMON_H_
 
-#include <sys/ucontext.h>
-#include "vm_core_types.h"
-
 
 #ifdef _IPF_
 #error IPF architecture is not adopted for unified signal handling

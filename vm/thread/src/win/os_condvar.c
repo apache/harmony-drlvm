@@ -23,6 +23,7 @@
  */
 
 #include <open/hythread_ext.h>
+#include "port_mutex.h"
 #include "thread_private.h"
 
 static void _enqueue (hycond_t *cond, struct waiting_node *node)
@@ -65,7 +66,7 @@ static struct waiting_node * _dequeue (hycond_t *cond)
  * This function does not implement interruptability and thread state
  * functionality, thus the caller of this function have to handle it.
  */
-int os_cond_timedwait(hycond_t *cond, hymutex_t *mutex, I_64 ms, IDATA nano)
+int os_cond_timedwait(hycond_t *cond, osmutex_t *mutex, I_64 ms, IDATA nano)
 {
     int r = 0;
     struct waiting_node node;
@@ -79,12 +80,12 @@ int os_cond_timedwait(hycond_t *cond, hymutex_t *mutex, I_64 ms, IDATA nano)
 
     // NULL attributes, manual reset, initially unsignalled, NULL name
     node.event = CreateEvent(NULL, TRUE, FALSE, NULL);
-    hymutex_lock(&cond->queue_mutex);
+    port_mutex_lock(&cond->queue_mutex);
     _enqueue(cond, &node);
-    hymutex_unlock(&cond->queue_mutex);
+    port_mutex_unlock(&cond->queue_mutex);
 
     // release mutex and wait for signal
-    hymutex_unlock(mutex);
+    port_mutex_unlock(mutex);
 
     res = WaitForSingleObject(node.event, timeout);
     if (res != WAIT_OBJECT_0) {
@@ -95,12 +96,12 @@ int os_cond_timedwait(hycond_t *cond, hymutex_t *mutex, I_64 ms, IDATA nano)
     }
 
     // re-acquire mutex associated with condition variable
-    hymutex_lock(mutex);
+    port_mutex_lock(mutex);
 
-    hymutex_lock(&cond->queue_mutex);
+    port_mutex_lock(&cond->queue_mutex);
     _remove_from_queue(cond, &node);
     CloseHandle(node.event);
-    hymutex_unlock(&cond->queue_mutex);
+    port_mutex_unlock(&cond->queue_mutex);
 
     return r;
 }
@@ -117,7 +118,7 @@ int os_cond_timedwait(hycond_t *cond, hymutex_t *mutex, I_64 ms, IDATA nano)
  */
 IDATA VMCALL hycond_create (hycond_t *cond) {
     cond->dummy_node.next = cond->dummy_node.prev = &cond->dummy_node;
-    hymutex_create(&cond->queue_mutex, APR_THREAD_MUTEX_NESTED);
+    port_mutex_create(&cond->queue_mutex, APR_THREAD_MUTEX_NESTED);
     return 0;
 }
 
@@ -133,7 +134,7 @@ IDATA VMCALL hycond_notify (hycond_t *cond) {
     DWORD res;
     struct waiting_node *node;
 
-    hymutex_lock(&cond->queue_mutex);
+    port_mutex_lock(&cond->queue_mutex);
     node = _dequeue(cond);
     if (node != NULL) {
         res = SetEvent(node->event);
@@ -141,7 +142,7 @@ IDATA VMCALL hycond_notify (hycond_t *cond) {
              r = (int)GetLastError();
         }
     }
-    hymutex_unlock(&cond->queue_mutex);
+    port_mutex_unlock(&cond->queue_mutex);
     return r;
 }
 
@@ -156,14 +157,14 @@ IDATA VMCALL hycond_notify_all (hycond_t *cond) {
     DWORD res;
     struct waiting_node *node;
 
-    hymutex_lock(&cond->queue_mutex);
+    port_mutex_lock(&cond->queue_mutex);
     for (node = _dequeue(cond); node != NULL; node = _dequeue(cond)) {
         res = SetEvent(node->event);
         if (res == 0) {
             r = GetLastError();
         }
     }
-    hymutex_unlock(&cond->queue_mutex);
+    port_mutex_unlock(&cond->queue_mutex);
     return r;
 }
 
@@ -176,7 +177,7 @@ IDATA VMCALL hycond_notify_all (hycond_t *cond) {
 IDATA VMCALL hycond_destroy (hycond_t *cond) {
     assert(cond->dummy_node.next == &cond->dummy_node
             && "destroying condition variable with active waiters");
-    return hymutex_destroy(&cond->queue_mutex);
+    return port_mutex_destroy(&cond->queue_mutex);
 }
 
 //@}

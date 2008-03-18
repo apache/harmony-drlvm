@@ -25,13 +25,6 @@
 #include <limits.h>
 //#include <ctype.h>
 
-inline void disable_assert_dialogs() {
-    /* NOP on Linux */
-}
-
-inline void debug_break() {
-    abort();
-}
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -46,8 +39,6 @@ extern "C" {
 
 #define dllexport
 #define __declspec(junk)
-
-#define _MAX_PATH PATH_MAX
 
 
 #ifdef __cplusplus

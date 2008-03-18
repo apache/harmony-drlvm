@@ -153,14 +153,14 @@ static ncaiError walk_native_stack(hythread_t thread,
         vm_thread = jthread_get_vm_thread(thread);
     }
 
-    WalkContext context;
-    if (!native_init_walk_context(&context, NULL, &regs))
+    UnwindContext context;
+    if (!port_init_unwind_context(&context, NULL, &regs))
         return NCAI_ERROR_INTERNAL;
 
     *pcount = walk_native_stack_registers(&context, &regs,
                     vm_thread, max_depth, frame_array);
 
-    native_clean_walk_context(&context);
+    port_clean_unwind_context(&context);
 
     return NCAI_ERROR_NONE;
 }

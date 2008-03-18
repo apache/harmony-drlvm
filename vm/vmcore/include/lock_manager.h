@@ -50,7 +50,7 @@ public:
     bool _lock_enum_or_null (bool return_null_on_fail);
 
 private:
-    hymutex_t    lock;
+    osmutex_t    lock;
 };
 
 

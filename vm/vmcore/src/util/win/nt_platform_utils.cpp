@@ -33,48 +33,6 @@
 #include "init.h"
 #include "platform_utils.h"
 #include "open/vm_util.h"
-#include "stack_dump.h"
-#include "exception_filter.h"
-
-BOOL ctrl_handler(DWORD ctrlType) 
-{
-    switch (ctrlType) 
-    { 
-    case CTRL_BREAK_EVENT:
-      vm_dump_handler(0);
-      return TRUE; 
-    case CTRL_C_EVENT: 
-    case CTRL_CLOSE_EVENT:
-    case CTRL_LOGOFF_EVENT:
-    case CTRL_SHUTDOWN_EVENT:
-        vm_interrupt_handler(0);
-        return TRUE; 
-    } 
-    return FALSE; 
-} 
-
-static PVOID veh = NULL;
-
-void initialize_signals(){
-    TRACE2("signals", "Setting console control handle...");
-    BOOL ok = SetConsoleCtrlHandler( (PHANDLER_ROUTINE) ctrl_handler, TRUE); 
-    assert(ok);
-
-    // add VEH to catch NPE's from bytecode
-    TRACE2("signals", "Adding vectored exception handler...");
-    veh = AddVectoredExceptionHandler(0, vectored_exception_handler);
-    assert(veh);
-
-    // Prepare general crash handler
-    sd_init_crash_handler();
-}
-
-void shutdown_signals() {
-    TRACE2("signals", "Removing vectored exception handler...");
-    ULONG res;
-    res = RemoveVectoredExceptionHandler(veh);
-    assert(res);
-} //shutdown_signals
 
 //The following is for socket error handling
 const char *sock_errstr[] = { 

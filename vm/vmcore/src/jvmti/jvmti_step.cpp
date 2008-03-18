@@ -19,6 +19,7 @@
  * @version $Revision: $
  */
 
+#include "port_crash_handler.h"
 #include "jvmti.h"
 #include "Class.h"
 #include "cxxlog.h"
@@ -104,8 +105,7 @@ NativeCodePtr static get_ip_for_invoke_call_ip(VM_thread* thread,
         // Another thread could have instrumented this location for
         // prediction of invokevirtual or invokeinterface, so it is
         // necessary to check that location may be instrumented
-        uint8 b = *((uint8 *)ip);
-        if (b == INSTRUMENTATION_BYTE)
+        if (port_is_breakpoint_set(ip))
         {
             bp = vm_brpt->find_breakpoint(ip);
             assert(bp);

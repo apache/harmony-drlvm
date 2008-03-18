@@ -165,8 +165,6 @@ void gc_set_gen_mode(Boolean status);
 GC* gc_parse_options() 
 {
   TRACE2("gc.process", "GC: parse options ...\n");
-  if (!get_boolean_property("vm.assert_dialog", TRUE, VM_PROPERTIES))
-    disable_assert_dialogs();
 
   GC* gc;
   

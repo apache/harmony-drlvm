@@ -24,6 +24,7 @@
 #define LOG_DOMAIN "tm.init"
 
 #include <open/hythread_ext.h>
+#include "port_mutex.h"
 #include "thread_private.h"
 
 //global constants:
@@ -38,7 +39,7 @@ apr_pool_t *TM_POOL = NULL;
 apr_threadkey_t *TM_THREAD_KEY;
 
 //Thread manager global lock
-hymutex_t TM_START_LOCK;
+osmutex_t TM_START_LOCK;
 static int hythread_library_state = TM_LIBRARY_STATUS_NOT_INITIALIZED;
 #define GLOBAL_MONITOR_NAME "global_monitor"
 hythread_monitor_t p_global_monitor;
@@ -145,9 +146,9 @@ void VMCALL hythread_init(hythread_library_t lib) {
     apr_status = apr_threadkey_private_create(&TM_THREAD_KEY, NULL, TM_POOL);
     assert(apr_status == APR_SUCCESS);
     
-    status = hymutex_create(&lib->TM_LOCK, TM_MUTEX_NESTED);
+    status = port_mutex_create(&lib->TM_LOCK, APR_THREAD_MUTEX_NESTED);
     assert(status == TM_ERROR_NONE);
-    status = hymutex_create(&TM_START_LOCK, TM_MUTEX_NESTED);
+    status = port_mutex_create(&TM_START_LOCK, APR_THREAD_MUTEX_NESTED);
     assert(status == TM_ERROR_NONE);
      
     status = init_group_list();
@@ -210,7 +211,7 @@ void VMCALL hythread_lib_lock(hythread_t self) {
     IDATA status;
     
     assert(self == hythread_self());
-    status = hymutex_lock(&self->library->TM_LOCK);
+    status = port_mutex_lock(&self->library->TM_LOCK);
     assert(status == TM_ERROR_NONE);
 }
 
@@ -223,7 +224,7 @@ void VMCALL hythread_lib_unlock(hythread_t self) {
     IDATA status;
 
     assert(self == hythread_self());
-    status = hymutex_unlock(&self->library->TM_LOCK);
+    status = port_mutex_unlock(&self->library->TM_LOCK);
     assert(status == TM_ERROR_NONE);
 }
 
@@ -239,7 +240,7 @@ IDATA VMCALL hythread_global_lock() {
     // we need not care about suspension if the thread
     // is not even attached to hythread
     if (self == NULL) {
-        return hymutex_lock(&TM_LIBRARY->TM_LOCK);
+        return port_mutex_lock(&TM_LIBRARY->TM_LOCK);
     }
 
     // disable_count must be 0 on potentially
@@ -247,7 +248,7 @@ IDATA VMCALL hythread_global_lock() {
     // meaning that the thread is safe for suspension
     assert(hythread_is_suspend_enabled());
 
-    status = hymutex_lock(&TM_LIBRARY->TM_LOCK);
+    status = port_mutex_lock(&TM_LIBRARY->TM_LOCK);
     assert(status == TM_ERROR_NONE);
 
     // make sure we do not get a global thread lock
@@ -255,10 +256,10 @@ IDATA VMCALL hythread_global_lock() {
     while (self->suspend_count) {
         // give up global thread lock before safepoint,
         // because this thread can be suspended at a safepoint
-        status = hymutex_unlock(&TM_LIBRARY->TM_LOCK);
+        status = port_mutex_unlock(&TM_LIBRARY->TM_LOCK);
         assert(status == TM_ERROR_NONE);
         hythread_safe_point();
-        status = hymutex_lock(&TM_LIBRARY->TM_LOCK);
+        status = port_mutex_lock(&TM_LIBRARY->TM_LOCK);
         assert(status == TM_ERROR_NONE);
     }
     return TM_ERROR_NONE;
@@ -271,7 +272,7 @@ IDATA VMCALL hythread_global_lock() {
 IDATA VMCALL hythread_global_unlock() {
     IDATA status;
     assert(!hythread_self() || hythread_is_suspend_enabled());
-    status = hymutex_unlock(&TM_LIBRARY->TM_LOCK);
+    status = port_mutex_unlock(&TM_LIBRARY->TM_LOCK);
     assert(status == TM_ERROR_NONE);
     return TM_ERROR_NONE;
 }
@@ -309,7 +310,7 @@ static IDATA init_group_list() {
     assert (lock_table->tables[0]);
     assert (lock_table->live_objs);
     
-    if (hymutex_create(&lock_table->mutex, APR_THREAD_MUTEX_NESTED)) {
+    if (port_mutex_create(&lock_table->mutex, APR_THREAD_MUTEX_NESTED)) {
         return TM_ERROR_OUT_OF_MEMORY;
     }
 
@@ -357,7 +358,7 @@ static IDATA destroy_group_list() {
         free(lock_table->tables[i]);
     }
 
-    hymutex_destroy(&lock_table->mutex);
+    port_mutex_destroy(&lock_table->mutex);
     hycond_destroy(&lock_table->write);
     hycond_destroy(&lock_table->read);
     
@@ -370,11 +371,11 @@ static IDATA destroy_group_list() {
 }
 
 IDATA acquire_start_lock() {
-    return hymutex_lock(&TM_START_LOCK);
+    return port_mutex_lock(&TM_START_LOCK);
 }
 
 IDATA release_start_lock() {
-    return hymutex_unlock(&TM_START_LOCK);
+    return port_mutex_unlock(&TM_START_LOCK);
 }
 
 /*

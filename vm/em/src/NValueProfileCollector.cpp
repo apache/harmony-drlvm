@@ -298,7 +298,7 @@ void TNVTableDividedManager::addNewValue(ValueMethodProfile* methProfile,
 ValueMethodProfile* ValueProfileCollector::createProfile
     (Method_Handle mh, uint32 numkeys, uint32 keys[])
 {
-    hymutex_lock(&profilesLock);
+    port_mutex_lock(&profilesLock);
     ValueMethodProfile* profile = new ValueMethodProfile(this, mh);
     // Allocate space for value maps
     for (uint32 index = 0; index < numkeys; index++){
@@ -309,7 +309,7 @@ ValueMethodProfile* ValueProfileCollector::createProfile
     }
     assert(profilesByMethod.find(mh) == profilesByMethod.end());
     profilesByMethod[mh] = profile;
-    hymutex_unlock(&profilesLock);
+    port_mutex_unlock(&profilesLock);
     return profile;
 }
 
@@ -320,7 +320,7 @@ ValueProfileCollector::ValueProfileCollector(EM_PC_Interface* em, const std::str
                                            : ProfileCollector(em, name, EM_PCTYPE_VALUE, genJit),
                                              updateStrategy(update_strategy)
 {
-    hymutex_create(&profilesLock, TM_MUTEX_NESTED);
+    port_mutex_create(&profilesLock, APR_THREAD_MUTEX_NESTED);
     if (_TNV_algo_type == TNV_DIVIDED) {
         tnvTableManager = new TNVTableDividedManager
             (_TNV_steady_size, _TNV_clear_size, _clear_interval, update_strategy);
@@ -346,18 +346,18 @@ ValueProfileCollector::~ValueProfileCollector()
         delete profile;
     }
     delete tnvTableManager;
-    hymutex_destroy(&profilesLock);
+    port_mutex_destroy(&profilesLock);
 }
 
 MethodProfile* ValueProfileCollector::getMethodProfile(Method_Handle mh) const
 {
     MethodProfile* res = NULL;
-    hymutex_lock(&profilesLock);
+    port_mutex_lock(&profilesLock);
     ValueProfilesMap::const_iterator it = profilesByMethod.find(mh);
     if (it != profilesByMethod.end()) {
         res =  it->second;
     }
-    hymutex_unlock(&profilesLock);
+    port_mutex_unlock(&profilesLock);
     return res;
 }
 //------------------------------------------------------------------------------
@@ -365,12 +365,12 @@ MethodProfile* ValueProfileCollector::getMethodProfile(Method_Handle mh) const
 ValueMethodProfile::ValueMethodProfile(ValueProfileCollector* pc, Method_Handle mh)
     : MethodProfile(pc, mh), updatingState(0)
 {
-    hymutex_create(&lock, TM_MUTEX_DEFAULT);
+    port_mutex_create(&lock, APR_THREAD_MUTEX_DEFAULT);
 }
 
 ValueMethodProfile::~ValueMethodProfile()
 {
-    hymutex_destroy(&lock);
+    port_mutex_destroy(&lock);
 }
 
 void ValueMethodProfile::addNewValue

@@ -11,7 +11,7 @@
 #include "cxxlog.h"
 #include "environment.h"
 #include "natives_support.h"
-#include "native_modules.h"
+#include "port_modules.h"
 #include "open/hythread_ext.h"
 #include "ncai_utils.h"
 #include "ncai_direct.h"
@@ -459,7 +459,7 @@ char* short_name(const char* name, char* buf);
 static bool
 compare_modules_by_short_name(ncaiModule module, const char* sh_name)
 {
-    char buf[_MAX_PATH + 1];
+    char buf[PORT_PATH_MAX + 1];
 
     if (short_name(module->info->filename, buf) == NULL)
         return false; // Error case
@@ -471,7 +471,7 @@ compare_modules_by_short_name(ncaiModule module, const char* sh_name)
 // Must be called under modules lock
 static ncaiModule find_module_by_name(ncaiModule modules, const char* name)
 {
-    char name_buf[_MAX_PATH + 1];
+    char name_buf[PORT_PATH_MAX + 1];
 
     if (short_name(name, name_buf) == NULL)
         return NULL;

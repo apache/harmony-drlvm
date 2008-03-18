@@ -50,7 +50,7 @@ Method_Lookup_Table::Method_Lookup_Table()
     assert (_cache);
     memset(_cache, 0, (EIP_CACHE_SIZE * sizeof(Method_Code *)));
     reallocate(511);
-    hymutex_create(&lock, TM_MUTEX_NESTED);
+    port_mutex_create(&lock, APR_THREAD_MUTEX_NESTED);
 } //Method_Lookup_Table::Method_Lookup_Table
 
 
@@ -63,7 +63,7 @@ Method_Lookup_Table::~Method_Lookup_Table()
     if (_cache != NULL) {
         STD_FREE((void*)_cache);
     }
-    hymutex_destroy(&lock);
+    port_mutex_destroy(&lock);
 } //Method_Lookup_Table::~Method_Lookup_Table
 
 
@@ -278,7 +278,7 @@ Method_Code *Method_Lookup_Table::find(void *addr, Boolean is_ip_past)
 
 Method_Code *Method_Lookup_Table::find_deadlock_free(void *addr)
 {
-    bool ok = hymutex_trylock(&lock) == TM_ERROR_NONE;             // vvv
+    bool ok = port_mutex_trylock(&lock) == TM_ERROR_NONE;             // vvv
     if (ok) {
         // We acquired the lock.  Can use the fast lookup.
         Method_Code *m = find(addr, FALSE);

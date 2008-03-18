@@ -19,6 +19,7 @@
  * @author Li-Gang Wang, 2006/11/15
  */
 
+#include "port_mutex.h"
 #include "finalizer_thread.h"
 #include "ref_enqueue_thread.h"
 #include "finalize.h"
@@ -95,12 +96,12 @@ void finalizer_threads_init(JavaVM *java_vm, JNIEnv *jni_env)
     
     status = hycond_create(&fin_thread_info->end_cond);
     assert(status == TM_ERROR_NONE);
-    status = hymutex_create(&fin_thread_info->end_mutex, TM_MUTEX_DEFAULT);
+    status = port_mutex_create(&fin_thread_info->end_mutex, APR_THREAD_MUTEX_DEFAULT);
     assert(status == TM_ERROR_NONE);
     
     status = hycond_create(&fin_thread_info->mutator_block_cond);
     assert(status == TM_ERROR_NONE);
-    status = hymutex_create(&fin_thread_info->mutator_block_mutex, TM_MUTEX_DEFAULT);
+    status = port_mutex_create(&fin_thread_info->mutator_block_mutex, APR_THREAD_MUTEX_DEFAULT);
     assert(status == TM_ERROR_NONE);
     
     fin_thread_info->thread_ids =
@@ -137,14 +138,14 @@ void finalizer_shutdown(Boolean start_finalization_on_exit)
 
 void wait_native_fin_threads_detached(void)
 {
-    hymutex_lock(&fin_thread_info->end_mutex);
+    port_mutex_lock(&fin_thread_info->end_mutex);
     while(fin_thread_info->thread_num){
         atomic_inc32(&fin_thread_info->end_waiting_num);
         IDATA status = hycond_wait_timed(&fin_thread_info->end_cond, &fin_thread_info->end_mutex, (I_64)1000, 0);
         atomic_dec32(&fin_thread_info->end_waiting_num);
         if(status != TM_ERROR_NONE) break;
     }
-    hymutex_unlock(&fin_thread_info->end_mutex);
+    port_mutex_unlock(&fin_thread_info->end_mutex);
 }
 
 /* Restrict waiting time; Unit: msec */
@@ -157,7 +158,7 @@ static unsigned int restrict_wait_time(unsigned int wait_time, unsigned int max_
 
 static void wait_finalization_end(Boolean must_wait)
 {
-    hymutex_lock(&fin_thread_info->end_mutex);
+    port_mutex_lock(&fin_thread_info->end_mutex);
     unsigned int fin_obj_num = vm_get_finalizable_objects_quantity();
     while(fin_thread_info->working_thread_num || fin_obj_num){
         unsigned int wait_time = restrict_wait_time((fin_obj_num + 100)<<1, FIN_MAX_WAIT_TIME << 7);
@@ -173,7 +174,7 @@ static void wait_finalization_end(Boolean must_wait)
         }
         fin_obj_num = temp;     
     }
-    hymutex_unlock(&fin_thread_info->end_mutex);
+    port_mutex_unlock(&fin_thread_info->end_mutex);
 }
 
 void activate_finalizer_threads(Boolean wait)
@@ -268,13 +269,13 @@ void vm_heavy_finalizer_block_mutator(void)
     if(self_is_finalizer_thread())
         return;
     
-    hymutex_lock(&fin_thread_info->mutator_block_mutex);
+    port_mutex_lock(&fin_thread_info->mutator_block_mutex);
     unsigned int fin_obj_num = vm_get_finalizable_objects_quantity();
     fin_obj_num = fin_obj_num >> (MUTATOR_BLOCK_THRESHOLD_BITS + cpu_num_bits);
     unsigned int wait_time = restrict_wait_time(fin_obj_num, FIN_MAX_WAIT_TIME);
     if(fin_obj_num)
         IDATA status = hycond_wait_timed_raw(&fin_thread_info->mutator_block_cond, &fin_thread_info->mutator_block_mutex, wait_time, 0);
-    hymutex_unlock(&fin_thread_info->mutator_block_mutex);
+    port_mutex_unlock(&fin_thread_info->mutator_block_mutex);
 }
 
 void vm_heavy_finalizer_resume_mutator(void)

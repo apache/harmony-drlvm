@@ -29,6 +29,9 @@
             <dirset dir="${vm.home}">
                 <include name="include" />
                 <include name="port/include" />
+                <include name="port/src/signals/include" />
+                <include name="port/src/crash_handler/include" />
+                <include name="port/src/encoder/ia32_em64t" unless="is.ia64"/>
             </dirset>
             <pathelement location="${drlvm.include.dir}"/>
             <pathelement location="${hy.hdk}/include" />
@@ -75,6 +78,9 @@
                 <include name="thread/win/thread_asm_em64t.asm" if="is.windows.x86_64"/>
                 <include name="thread/linux/thread_asm_ia32.s" if="is.unix.x86"/>
                 <include name="thread/linux/thread_asm_em64t.s" if="is.unix.x86_64"/>
+                <include name="memaccess/linux/memaccess_ia32.s" if="is.unix.x86"/>
+                <include name="memaccess/linux/memaccess_em64t.s" if="is.unix.x86_64"/>
+                <include name="signals/win/signals_em64t.asm" if="is.windows.x86_64"/>
             </fileset>
         </compile-asm>
         
@@ -97,6 +103,23 @@
                     <include name="logger/**.cpp" />
                     <include name="tl/*.cpp" />
                     <include name="time/*.cpp" />
+
+                    <include name="crash_handler/*.cpp"/>
+                    <include name="crash_handler/linux/*.cpp" if="is.unix"/>
+                    <include name="crash_handler/win/*.cpp" if="is.windows"/>
+                    <include name="crash_handler/ia32/*.cpp" if="is.x86"/>
+                    <include name="crash_handler/em64t/*.cpp" if="is.x86_64"/>
+                    <include name="crash_handler/ipf/*.cpp" if="is.ia64"/>
+
+                    <include name="memaccess/win/memaccess.cpp" if="is.windows"/>
+                    <include name="memaccess/linux/memaccess.cpp" if="is.unix" unless="is.ia64"/>
+                    <include name="memaccess/linux/*ipf.cpp" if="is.unix.ia64"/>
+
+                    <include name="signals/*.cpp"/>
+                    <include name="signals/linux/*common.cpp" if="is.unix" unless="is.ia64"/>
+                    <include name="signals/linux/*ipf.cpp" if="is.unix.ia64"/>
+                    <include name="signals/win/*common.cpp" if="is.windows"/>
+                    <include name="signals/win/*ia32.cpp" if="is.windows.x86"/>
                 </fileset>
 
                 <compilerarg value="/EHsc" if="is.windows"/>
@@ -104,7 +127,11 @@
             </compiler>
         </compile-cc>
         
-        <link-lib name="port" type="static"/>
+        <link-lib name="port" type="static">
+            <linker id="linker" extends="common.linker">
+                <libset libs="encoder" dir="${drlvm.lib.dir}" />
+            </linker>
+        </link-lib>
     </target>
     
     <target name="clean" >

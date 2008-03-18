@@ -31,7 +31,7 @@
 /**
  * Waits on a conditional, handling interruptions and thread state.
  */
-IDATA condvar_wait_impl(hycond_t *cond, hymutex_t *mutex, I_64 ms, IDATA nano, IDATA interruptable) {
+IDATA condvar_wait_impl(hycond_t *cond, osmutex_t *mutex, I_64 ms, IDATA nano, IDATA interruptable) {
     int r;
     int disable_count;
     hythread_t self;
@@ -77,7 +77,7 @@ IDATA condvar_wait_impl(hycond_t *cond, hymutex_t *mutex, I_64 ms, IDATA nano, I
  * @return  
  *      TM_NO_ERROR on success 
  */
-IDATA VMCALL hycond_wait(hycond_t *cond, hymutex_t *mutex) {
+IDATA VMCALL hycond_wait(hycond_t *cond, osmutex_t *mutex) {
     return condvar_wait_impl(cond, mutex, 0, 0, WAIT_NONINTERRUPTABLE);
 }
 
@@ -93,7 +93,7 @@ IDATA VMCALL hycond_wait(hycond_t *cond, hymutex_t *mutex) {
  * @return  
  *      TM_NO_ERROR on success 
  */
-IDATA VMCALL hycond_wait_timed(hycond_t *cond, hymutex_t *mutex, I_64 ms, IDATA nano) {
+IDATA VMCALL hycond_wait_timed(hycond_t *cond, osmutex_t *mutex, I_64 ms, IDATA nano) {
     return condvar_wait_impl(cond, mutex, ms, nano, WAIT_NONINTERRUPTABLE);
 }
 
@@ -102,7 +102,7 @@ IDATA VMCALL hycond_wait_timed(hycond_t *cond, hymutex_t *mutex, I_64 ms, IDATA 
  * Directly using OS interfaces.
  * This function does not implement interruptability and thread state functionality.
  */
-IDATA VMCALL hycond_wait_timed_raw(hycond_t *cond, hymutex_t *mutex, I_64 ms, IDATA nano) {
+IDATA VMCALL hycond_wait_timed_raw(hycond_t *cond, osmutex_t *mutex, I_64 ms, IDATA nano) {
     return os_cond_timedwait(cond, mutex, ms, nano);
 }
 
@@ -119,7 +119,7 @@ IDATA VMCALL hycond_wait_timed_raw(hycond_t *cond, hymutex_t *mutex, I_64 ms, ID
  *      TM_NO_ERROR on success 
  *      TM_THREAD_INTERRUPTED in case thread was interrupted during wait.
  */
-IDATA VMCALL hycond_wait_interruptable(hycond_t *cond, hymutex_t *mutex, I_64 ms, IDATA nano) {
+IDATA VMCALL hycond_wait_interruptable(hycond_t *cond, osmutex_t *mutex, I_64 ms, IDATA nano) {
     return condvar_wait_impl(cond, mutex, ms, nano, WAIT_INTERRUPTABLE);
 }
 

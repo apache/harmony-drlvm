@@ -23,7 +23,7 @@
 #define NMB 5
 
 hythread_monitor_t monitor;
-hymutex_t *mutex;
+osmutex_t *mutex;
 hycond_t  *condvar;
 int waiting_count;
 

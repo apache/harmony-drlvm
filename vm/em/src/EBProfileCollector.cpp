@@ -26,6 +26,7 @@
 
 #include "cxxlog.h"
 #include <sstream>
+#include "port_mutex.h"
 
 #define LOG_DOMAIN "em"
 
@@ -52,7 +53,7 @@ EBProfileCollector::EBProfileCollector(EM_PC_Interface* em, const std::string& n
         INFO2(catName.c_str(), msg.str().c_str());
     }
 
-    hymutex_create(&profilesLock, TM_MUTEX_NESTED);
+    port_mutex_create(&profilesLock, APR_THREAD_MUTEX_NESTED);
 }
 
 Method_Profile_Handle eb_profiler_create_profile(PC_Handle ph, Method_Handle mh) {
@@ -112,24 +113,24 @@ EBProfileCollector::~EBProfileCollector() {
         delete profile;
     }
 
-    hymutex_destroy(&profilesLock);
+    port_mutex_destroy(&profilesLock);
 }
 
 MethodProfile* EBProfileCollector::getMethodProfile(Method_Handle mh) const {
-    hymutex_lock(&profilesLock);
+    port_mutex_lock(&profilesLock);
     MethodProfile* res = NULL;
     EBProfilesMap::const_iterator it = profilesByMethod.find(mh);
     if (it != profilesByMethod.end()) {
         res = it->second;
     }
-    hymutex_unlock(&profilesLock);
+    port_mutex_unlock(&profilesLock);
     return res;
 }
 
 EBMethodProfile* EBProfileCollector::createProfile(Method_Handle mh) {
     EBMethodProfile* profile = new EBMethodProfile(this, mh);
 
-    hymutex_lock(&profilesLock);
+    port_mutex_lock(&profilesLock);
 
     assert(profilesByMethod.find(mh) == profilesByMethod.end());
     profilesByMethod[mh] = profile;
@@ -138,7 +139,7 @@ EBMethodProfile* EBProfileCollector::createProfile(Method_Handle mh) {
         newProfiles.push_back(profile);
     }
 
-    hymutex_unlock(&profilesLock);
+    port_mutex_unlock(&profilesLock);
 
     return profile;
 }
@@ -159,10 +160,10 @@ static void logReadyProfile(const std::string& catName, const std::string& profi
 void EBProfileCollector::onTimeout() {
     assert(mode == EB_PCMODE_ASYNC);
     if(!newProfiles.empty()) {
-        hymutex_lock(&profilesLock);
+        port_mutex_lock(&profilesLock);
         greenProfiles.insert(greenProfiles.end(), newProfiles.begin(), newProfiles.end());
         newProfiles.clear();
-        hymutex_unlock(&profilesLock);
+        port_mutex_unlock(&profilesLock);
     }
 
     if (!unloadedMethodProfiles.empty()) {
@@ -177,10 +178,10 @@ void EBProfileCollector::onTimeout() {
         }
     }
     if (!tmpProfiles.empty()) {
-        hymutex_lock(&profilesLock);
+        port_mutex_lock(&profilesLock);
         std::remove(greenProfiles.begin(), greenProfiles.end(), (EBMethodProfile*)NULL);
         greenProfiles.resize(greenProfiles.size() - tmpProfiles.size());
-        hymutex_unlock(&profilesLock);
+        port_mutex_unlock(&profilesLock);
         for (EBProfiles::iterator it = tmpProfiles.begin(), end = tmpProfiles.end(); it!=end; ++it) {
             EBMethodProfile* profile = *it;
             if (loggingEnabled) {
@@ -236,7 +237,7 @@ void EBProfileCollector::cleanUnloadedProfiles(bool removeFromGreen) {
 }
 
 void EBProfileCollector::classloaderUnloadingCallback(ClassLoaderHandle h) {
-    hymutex_lock(&profilesLock);
+    port_mutex_lock(&profilesLock);
     
     //can't modify profiles map in async mode here -> it could be iterated by the checker thread without lock
     bool erase = mode != EB_PCMODE_ASYNC;
@@ -247,5 +248,5 @@ void EBProfileCollector::classloaderUnloadingCallback(ClassLoaderHandle h) {
         cleanUnloadedProfiles(false);
     }
 
-    hymutex_unlock(&profilesLock);
+    port_mutex_unlock(&profilesLock);
 }

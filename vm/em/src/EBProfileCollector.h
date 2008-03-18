@@ -97,7 +97,7 @@ private:
 
     EBProfiles unloadedMethodProfiles;
 
-    mutable hymutex_t profilesLock;
+    mutable osmutex_t profilesLock;
 };
 
 class EBMethodProfile : public MethodProfile {

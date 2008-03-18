@@ -39,8 +39,6 @@
 #include "jni_types.h"
 #include "jni_utils.h"
 
-#include "stack_dump.h" // To update modules list on library load (in debug)
-
 #define LOG_DOMAIN "natives"
 #include "cxxlog.h"
 
@@ -297,8 +295,6 @@ natives_load_library(const char* library_name, bool* just_loaded,
     *pstatus = APR_SUCCESS;
 
     returnCode = pinfo->handle;
-
-    sd_update_modules(); // Updates modules list for crash handling (in debug)
 
 NATIVES_LOAD_LIBRARY_EXIT :
 
@@ -747,7 +743,7 @@ char* short_name(const char* name, char* buf)
     if (!filepointer)
         return NULL;
 
-    if (strlen(filepointer) > _MAX_PATH)
+    if (strlen(filepointer) > PORT_PATH_MAX)
         return NULL;
 
     strcpy(buf, filepointer);
@@ -762,7 +758,7 @@ char* short_name(const char* name, char* buf)
 // Method is stupid and slow but it works for full and partial names
 bool natives_is_library_loaded_slow(const char* libname)
 {
-    char src_buf[_MAX_PATH + 1], cmp_buf[_MAX_PATH + 1];
+    char src_buf[PORT_PATH_MAX + 1], cmp_buf[PORT_PATH_MAX + 1];
 
     if (short_name(libname, src_buf) == NULL)
         return false; // Error case

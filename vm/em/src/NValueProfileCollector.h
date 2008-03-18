@@ -27,6 +27,7 @@
 #define _VALUE_PROFILE_COLLECTOR_H_
 
 #include "DrlProfileCollectionFramework.h"
+#include "port_mutex.h"
 #include "open/vm_util.h"
 
 #include <map>
@@ -166,7 +167,7 @@ private:
     bool   loggingEnabled;
     typedef std::map<Method_Handle, ValueMethodProfile*> ValueProfilesMap;
     ValueProfilesMap profilesByMethod;
-    mutable hymutex_t profilesLock;
+    mutable osmutex_t profilesLock;
     TNVTableManager* tnvTableManager;
     ProfileUpdateStrategy updateStrategy;
 };
@@ -193,8 +194,8 @@ class ValueMethodProfile : public MethodProfile {
 public:
     ValueMethodProfile(ValueProfileCollector* pc, Method_Handle mh);
     ~ValueMethodProfile();
-    void lockProfile() {hymutex_lock(&lock);}
-    void unlockProfile() {hymutex_unlock(&lock);}
+    void lockProfile() {port_mutex_lock(&lock);}
+    void unlockProfile() {port_mutex_unlock(&lock);}
     void dumpValues(std::ostream& os);
     void addNewValue(uint32 instructionKey, POINTER_SIZE_INT valueToAdd);
     POINTER_SIZE_INT getResult(uint32 instructionKey);
@@ -212,7 +213,7 @@ private:
 
     // The lock and the atomically modified updatingState flag operate per
     // method to allow simultaneous updates for distinct methods.
-    hymutex_t lock;
+    osmutex_t lock;
     uint8 updatingState;
 };
 

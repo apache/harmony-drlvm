@@ -20,11 +20,12 @@
  */
 
 #include "port_malloc.h"
-#include "native_modules.h"
+#include "port_modules.h"
 
 #include <memory.h>
 #include <Windows.h>
 #include <Tlhelp32.h>
+
 
 static native_module_t* fill_module(MODULEENTRY32 src);
 

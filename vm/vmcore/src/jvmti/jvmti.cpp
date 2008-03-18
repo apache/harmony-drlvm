@@ -39,6 +39,7 @@
 
 #include "port_filepath.h"
 #include "port_dso.h"
+#include "port_mutex.h"
 #include <apr_strings.h>
 #include <apr_atomic.h>
 
@@ -261,7 +262,7 @@ jint JNICALL create_jvmti_environment(JavaVM *vm_ext, void **env, jint version)
 
     memset(newenv, 0, sizeof(TIEnv));
 
-    IDATA error_code1 = hymutex_create(&newenv->environment_data_lock,
+    IDATA error_code1 = port_mutex_create(&newenv->environment_data_lock,
         APR_THREAD_MUTEX_NESTED);
     if (error_code1 != APR_SUCCESS)
     {
@@ -273,7 +274,7 @@ jint JNICALL create_jvmti_environment(JavaVM *vm_ext, void **env, jint version)
     error_code = newenv->allocate_extension_event_callbacks_table();
     if (error_code != JVMTI_ERROR_NONE)
     {
-        hymutex_destroy(&newenv->environment_data_lock);
+        port_mutex_destroy(&newenv->environment_data_lock);
         _deallocate((unsigned char *)newenv);
         *env = NULL;
         return error_code;

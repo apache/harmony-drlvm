@@ -37,6 +37,7 @@
 #include <sstream>
 #include <fstream>
 #include "port_threadunsafe.h"
+#include "port_mutex.h"
 
 #define LOG_DOMAIN "em"
 
@@ -106,13 +107,13 @@ DrlEMImpl::DrlEMImpl() : jh(NULL), _execute_method(NULL), method_lookup_table() 
     nMethodsCompiled=0;
     nMethodsRecompiled=0;
     tick=0;
-    hymutex_create(&recompilationLock, TM_MUTEX_NESTED);
+    port_mutex_create(&recompilationLock, APR_THREAD_MUTEX_NESTED);
     initProfileAccess();
 }
 
 DrlEMImpl::~DrlEMImpl() {
     deallocateResources();
-    hymutex_destroy(&recompilationLock);
+    port_mutex_destroy(&recompilationLock);
 }
 
 void DrlEMImpl::initProfileAccess() {
@@ -352,10 +353,6 @@ std::string DrlEMImpl::readConfiguration() {
 
 bool DrlEMImpl::init() {
     _execute_method = JIT_execute_method_default;
-
-    if (!get_boolean_property("vm.assert_dialog", TRUE, VM_PROPERTIES)) {
-        disable_assert_dialogs();
-    }
 
     std::string config = readConfiguration();
     if (!config.empty()) {
@@ -775,16 +772,16 @@ bool DrlEMImpl::initProfileCollectors(RChain* chain, const std::string& config) 
 
 void DrlEMImpl::methodProfileIsReady(MethodProfile* mp) {
     
-    hymutex_lock(&recompilationLock);
+    port_mutex_lock(&recompilationLock);
     if (methodsInRecompile.find((Method_Profile_Handle)mp)!=methodsInRecompile.end()) {
         //method is already recompiling by another thread or by this thread(recursion)
-        hymutex_unlock(&recompilationLock);
+        port_mutex_unlock(&recompilationLock);
         return;
     }
     
     methodsInRecompile.insert((Method_Profile_Handle)mp);
     nMethodsRecompiled++;
-    hymutex_unlock(&recompilationLock);
+    port_mutex_unlock(&recompilationLock);
 
     const char* methodName = NULL;
     const char* className = NULL;
@@ -828,9 +825,9 @@ void DrlEMImpl::methodProfileIsReady(MethodProfile* mp) {
             }
         }
     }
-    hymutex_lock(&recompilationLock);
+    port_mutex_lock(&recompilationLock);
     methodsInRecompile.erase((Method_Profile_Handle)mp);
-    hymutex_unlock(&recompilationLock);
+    port_mutex_unlock(&recompilationLock);
 }
 
 ProfileCollector* DrlEMImpl::getProfileCollector(EM_PCTYPE type, JIT_Handle jh, EM_JIT_PC_Role jitRole) const {

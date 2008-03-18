@@ -23,9 +23,10 @@
  * @brief PORT thread support
  */
 
-/* For osthread_t and thread_context_t types */
+/* osthread_t and thread_context_t types, and proper windows.h inclusion */
 #include "open/hythread_ext.h"
 
+#include "port_general.h"
 
 /* Thread context definition for UNIX-like systems */
 #if defined(LINUX) || defined(FREEBSD) 
@@ -61,9 +62,18 @@ extern "C" {
  */
 //@{
 
+PORT_INLINE int port_gettid()
+{
+#ifdef PLATFORM_POSIX
+    return gettid();
+#else
+    return (int)GetCurrentThreadId();
+#endif
+}
 
 void port_thread_yield_other(osthread_t thread);
 int port_thread_cancel(osthread_t os_thread);
+
 
 int port_thread_suspend(osthread_t thread);
 int port_thread_resume(osthread_t thread);

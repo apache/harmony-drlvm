@@ -22,6 +22,7 @@
 
 #include <apr_atomic.h>
 #include <open/hythread_ext.h>
+#include "port_mutex.h"
 #include "thread_private.h"
 
 /**
@@ -56,25 +57,25 @@ IDATA VMCALL hythread_park(I_64 millis, IDATA nanos) {
     mon->wait_count++;
 
     // Set thread state
-    status = hymutex_lock(&self->mutex);
+    status = port_mutex_lock(&self->mutex);
     assert(status == TM_ERROR_NONE);
     self->waited_monitor = mon;
     if (!(self->state & TM_THREAD_STATE_UNPARKED)) {
         // if thread is not unparked stop the current thread from executing
         self->state |= TM_THREAD_STATE_PARKED;
-        status = hymutex_unlock(&self->mutex);
+        status = port_mutex_unlock(&self->mutex);
         assert(status == TM_ERROR_NONE);
 
         result = condvar_wait_impl(&mon->condition, &mon->mutex,
                 millis, nanos, WAIT_INTERRUPTABLE);
 
         // Restore thread state
-        status = hymutex_lock(&self->mutex);
+        status = port_mutex_lock(&self->mutex);
         assert(status == TM_ERROR_NONE);
     }
     self->state &= ~(TM_THREAD_STATE_PARKED|TM_THREAD_STATE_UNPARKED);
     self->waited_monitor = NULL;
-    status = hymutex_unlock(&self->mutex);
+    status = port_mutex_unlock(&self->mutex);
     assert(status == TM_ERROR_NONE);
 
     // Release thread monitor
@@ -116,26 +117,26 @@ void VMCALL hythread_unpark(hythread_t thread) {
         return;
     }
 
-    status = hymutex_lock(&thread->mutex);
+    status = port_mutex_lock(&thread->mutex);
     assert(status == TM_ERROR_NONE);
 
     if (thread->state & TM_THREAD_STATE_PARKED) {
         thread->state &= ~TM_THREAD_STATE_PARKED;
         mon = thread->waited_monitor;
         assert(mon);
-        status = hymutex_unlock(&thread->mutex);
+        status = port_mutex_unlock(&thread->mutex);
         assert(status == TM_ERROR_NONE);
 
         // Notify parked thread
-        status = hymutex_lock(&mon->mutex);
+        status = port_mutex_lock(&mon->mutex);
         assert(status == TM_ERROR_NONE);
         status = hycond_notify_all(&mon->condition);
         assert(status == TM_ERROR_NONE);
-        status = hymutex_unlock(&mon->mutex);
+        status = port_mutex_unlock(&mon->mutex);
         assert(status == TM_ERROR_NONE);
     } else {
         thread->state |= TM_THREAD_STATE_UNPARKED;
-        status = hymutex_unlock(&thread->mutex);
+        status = port_mutex_unlock(&thread->mutex);
         assert(status == TM_ERROR_NONE);
     }
 }

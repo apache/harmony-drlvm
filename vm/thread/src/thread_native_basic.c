@@ -36,6 +36,7 @@
 #include <apr_atomic.h>
 #include <open/hythread_ext.h>
 #include "port_thread.h"
+#include "port_mutex.h"
 #include "thread_private.h"
 
 extern hythread_group_t TM_DEFAULT_GROUP;
@@ -383,11 +384,11 @@ IDATA thread_sleep_impl(I_64 millis, IDATA nanos, IDATA interruptable) {
     mon->wait_count++;
 
     // Set thread state
-    status = hymutex_lock(&self->mutex);
+    status = port_mutex_lock(&self->mutex);
     assert(status == TM_ERROR_NONE);
     self->waited_monitor = mon;
     self->state |= TM_THREAD_STATE_SLEEPING;
-    status = hymutex_unlock(&self->mutex);
+    status = port_mutex_unlock(&self->mutex);
     assert(status == TM_ERROR_NONE);
 
     do {
@@ -420,11 +421,11 @@ IDATA thread_sleep_impl(I_64 millis, IDATA nanos, IDATA interruptable) {
     } while(1);
 
     // Restore thread state
-    status = hymutex_lock(&self->mutex);
+    status = port_mutex_lock(&self->mutex);
     assert(status == TM_ERROR_NONE);
     self->state &= ~TM_THREAD_STATE_SLEEPING;
     self->waited_monitor = NULL;
-    status = hymutex_unlock(&self->mutex);
+    status = port_mutex_unlock(&self->mutex);
     assert(status == TM_ERROR_NONE);
 
     // Release thread monitor
@@ -606,9 +607,9 @@ IDATA VMCALL hythread_set_to_group(hythread_t thread, hythread_group_t group) {
     thread->prev = prev;
     prev->next = cur->prev = thread;
 
-    hymutex_lock(&thread->mutex);
+    port_mutex_lock(&thread->mutex);
     thread->state |= TM_THREAD_STATE_ALIVE | TM_THREAD_STATE_RUNNABLE;
-    hymutex_unlock(&thread->mutex);
+    port_mutex_unlock(&thread->mutex);
 
     status = hythread_global_unlock();
     assert(status == TM_ERROR_NONE);
@@ -664,7 +665,7 @@ IDATA VMCALL hythread_struct_init(hythread_t new_thread)
         memset(new_thread, 0, sizeof(HyThread));
         status = hysem_create(&new_thread->resume_event, 0, 1);
         assert(status == TM_ERROR_NONE);
-        status = hymutex_create(&new_thread->mutex, TM_MUTEX_NESTED);
+        status = port_mutex_create(&new_thread->mutex, APR_THREAD_MUTEX_NESTED);
         assert(status == TM_ERROR_NONE);
         status = hythread_monitor_init(&new_thread->monitor, 0);
         assert(status == TM_ERROR_NONE);
@@ -672,7 +673,7 @@ IDATA VMCALL hythread_struct_init(hythread_t new_thread)
         // old thread, reset structure
         int result;
         hysem_t resume;
-        hymutex_t mutex;
+        osmutex_t mutex;
         hythread_monitor_t monitor;
 
         // release thread OS handle
@@ -696,9 +697,9 @@ IDATA VMCALL hythread_struct_init(hythread_t new_thread)
     new_thread->priority   = HYTHREAD_PRIORITY_NORMAL;
     new_thread->stacksize = os_get_foreign_thread_stack_size();
 
-    hymutex_lock(&new_thread->mutex);
+    port_mutex_lock(&new_thread->mutex);
     new_thread->state = TM_THREAD_STATE_NEW;
-    hymutex_unlock(&new_thread->mutex);
+    port_mutex_unlock(&new_thread->mutex);
 
     status = hysem_set(new_thread->resume_event, 0);
     assert(status == TM_ERROR_NONE);
@@ -718,7 +719,7 @@ IDATA VMCALL hythread_struct_release(hythread_t thread)
     // Release thread primitives
     status = hysem_destroy(thread->resume_event);
     assert(status == TM_ERROR_NONE);
-    status = hymutex_destroy(&thread->mutex);
+    status = port_mutex_destroy(&thread->mutex);
     assert(status == TM_ERROR_NONE);
     status = hythread_monitor_destroy(thread->monitor);
     assert(status == TM_ERROR_NONE);
@@ -756,9 +757,9 @@ static int HYTHREAD_PROC hythread_wrapper_start_proc(void *arg) {
     // check hythread library state
     if (hythread_lib_state() != TM_LIBRARY_STATUS_INITIALIZED) {
         // set TERMINATED state
-        hymutex_lock(&thread->mutex);
+        port_mutex_lock(&thread->mutex);
         thread->state = TM_THREAD_STATE_TERMINATED;
-        hymutex_unlock(&thread->mutex);
+        port_mutex_unlock(&thread->mutex);
 
         // set hythread_self()
         hythread_set_self(thread);
@@ -807,9 +808,9 @@ static int HYTHREAD_PROC hythread_wrapper_start_proc(void *arg) {
     assert(status == TM_ERROR_NONE);
 
     // set TERMINATED state
-    hymutex_lock(&thread->mutex);
+    port_mutex_lock(&thread->mutex);
     thread->state = TM_THREAD_STATE_TERMINATED;
-    hymutex_unlock(&thread->mutex);
+    port_mutex_unlock(&thread->mutex);
 
     // detach and free thread
     hythread_detach(thread);
@@ -854,28 +855,28 @@ UDATA hythread_get_thread_stacksize(hythread_t thread) {
 
 IDATA VMCALL hythread_thread_lock(hythread_t thread) {
     assert(thread);
-    return hymutex_lock(&thread->mutex);
+    return port_mutex_lock(&thread->mutex);
 } // hythread_thread_lock
 
 IDATA VMCALL hythread_thread_unlock(hythread_t thread) {
     assert(thread);
-    return hymutex_unlock(&thread->mutex);
+    return port_mutex_unlock(&thread->mutex);
 } // hythread_thread_unlock
 
 IDATA VMCALL hythread_get_state(hythread_t thread) {
     IDATA state;
     assert(thread);
-    hymutex_lock(&thread->mutex);
+    port_mutex_lock(&thread->mutex);
     state = thread->state;
-    hymutex_unlock(&thread->mutex);
+    port_mutex_unlock(&thread->mutex);
     return state;
 } // hythread_get_state
 
 IDATA VMCALL hythread_set_state(hythread_t thread, IDATA state) {
     assert(thread);
-    hymutex_lock(&thread->mutex);
+    port_mutex_lock(&thread->mutex);
     thread->state = state;
-    hymutex_unlock(&thread->mutex);
+    port_mutex_unlock(&thread->mutex);
     return TM_ERROR_NONE;
 } // hythread_set_state
 
@@ -934,7 +935,7 @@ IDATA VMCALL hythread_wait_for_nondaemon_threads(hythread_t thread, IDATA thread
     assert(thread);
     lib = thread->library;
 
-    status = hymutex_lock(&lib->TM_LOCK);
+    status = port_mutex_lock(&lib->TM_LOCK);
     if (status != TM_ERROR_NONE) {
         return status;
     }
@@ -948,37 +949,37 @@ IDATA VMCALL hythread_wait_for_nondaemon_threads(hythread_t thread, IDATA thread
                lib->nondaemon_thread_count));
 
         if (status != TM_ERROR_NONE) {
-            hymutex_unlock(&lib->TM_LOCK);
+            port_mutex_unlock(&lib->TM_LOCK);
             return status;
         }
     }
 
-    status = hymutex_unlock(&lib->TM_LOCK);
+    status = port_mutex_unlock(&lib->TM_LOCK);
     return status;
 } // hythread_wait_for_nondaemon_threads
 
 IDATA VMCALL hythread_increase_nondaemon_threads_count(hythread_t thread)
 {
     hythread_library_t lib = thread->library;
-    IDATA status = hymutex_lock(&lib->TM_LOCK);
+    IDATA status = port_mutex_lock(&lib->TM_LOCK);
     if (status != TM_ERROR_NONE) {
         return status;
     }
     lib->nondaemon_thread_count++;
-    status = hymutex_unlock(&lib->TM_LOCK);
+    status = port_mutex_unlock(&lib->TM_LOCK);
     return status;
 } // hythread_increase_nondaemon_threads_count_in_library
 
 IDATA VMCALL hythread_decrease_nondaemon_threads_count(hythread_t thread, IDATA threads_to_keep)
 {
     hythread_library_t lib = thread->library;
-    IDATA status = hymutex_lock(&lib->TM_LOCK);
+    IDATA status = port_mutex_lock(&lib->TM_LOCK);
     if (status != TM_ERROR_NONE) {
         return status;
     }
 
     if (lib->nondaemon_thread_count <= 0) {
-        status = hymutex_unlock(&lib->TM_LOCK);
+        status = port_mutex_unlock(&lib->TM_LOCK);
         if (status != TM_ERROR_NONE) {
             return status;
         }
@@ -994,12 +995,12 @@ IDATA VMCALL hythread_decrease_nondaemon_threads_count(hythread_t thread, IDATA 
         TRACE(("TM: nondaemons all dead, thread: %p count: %d\n", thread,
                lib->nondaemon_thread_count));
         if (status != TM_ERROR_NONE) {
-            hymutex_unlock(&lib->TM_LOCK);
+            port_mutex_unlock(&lib->TM_LOCK);
             return status;
         }
     }
 
-    status = hymutex_unlock(&lib->TM_LOCK);
+    status = port_mutex_unlock(&lib->TM_LOCK);
     return status;
 } // hythread_countdown_nondaemon_threads
 

@@ -23,6 +23,7 @@
 #define _PORT_GENERAL_H_
 
 #include <apr.h>
+#include <stdlib.h>
 
 #ifndef NULL
 #ifdef __cplusplus
@@ -32,24 +33,30 @@
 #endif /* __cplusplus */
 #endif /* NULL */
 
+#ifdef WIN32
+#define PORT_PATH_MAX _MAX_PATH
+#else /* !WIN32 */
+#define PORT_PATH_MAX PATH_MAX
+#endif
+
 
 #ifdef __cplusplus
 #define PORT_INLINE inline
-#else // !__cplusplus
+#else /* !__cplusplus */
 
 #ifdef WIN32
 #define PORT_INLINE __forceinline
-#else // !WIN32
+#else /* !WIN32 */
 
 #ifdef __linux__
 #define PORT_INLINE static  __attribute__((always_inline))
-#else // !__linux__
+#else /* !__linux__ */
 #define PORT_INLINE static
-#endif // __linux__
+#endif /* __linux__ */
 
-#endif // WIN32
+#endif /* WIN32 */
 
-#endif // __cplusplus
+#endif /* __cplusplus */
 
 
 #endif /* _PORT_GENERAL_H_ */

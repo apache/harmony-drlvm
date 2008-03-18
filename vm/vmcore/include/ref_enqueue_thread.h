@@ -38,7 +38,7 @@ typedef struct Ref_Enqueue_Thread_Info {
     
     /* Using pair of cond and mutex rather than sem is because the waiting thread num is not constant */
     hycond_t end_cond;      // ref enqueue end condition variable
-    hymutex_t end_mutex;    // ref enqueue end mutex
+    osmutex_t end_mutex;    // ref enqueue end mutex
     
     Boolean shutdown;
     volatile unsigned int thread_num;

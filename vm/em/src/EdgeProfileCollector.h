@@ -71,7 +71,7 @@ private:
     EdgeProfiles newProfiles;
     EdgeProfiles tmpProfiles;
     EdgeProfiles unloadedMethodProfiles;
-    mutable hymutex_t profilesLock;
+    mutable osmutex_t profilesLock;
 };
 
 class EdgeMethodProfile : public MethodProfile {

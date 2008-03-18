@@ -34,7 +34,7 @@
  * This function does not implement interruptability and thread state
  * functionality, thus the caller of this function have to handle it.
  */
-int os_cond_timedwait(hycond_t *cond, hymutex_t *mutex, I_64 ms, IDATA nano)
+int os_cond_timedwait(hycond_t *cond, osmutex_t *mutex, I_64 ms, IDATA nano)
 {
     int r = 0;
 
