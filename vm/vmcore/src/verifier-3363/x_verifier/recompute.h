@@ -15,7 +15,7 @@
  *  limitations under the License.
  */
 /** 
- * @author Mikhail Loenko, Vladimir Molotkov
+ * @author Mikhail Loenko
  */  
 
 #ifndef __RECOMPUTE_H__

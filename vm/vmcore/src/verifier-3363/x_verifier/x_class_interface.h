@@ -15,7 +15,7 @@
  *  limitations under the License.
  */
 /** 
- * @author Mikhail Loenko, Vladimir Molotkov
+ * @author Mikhail Loenko
  */  
 
 #ifndef __X_CLASS_INTERFACE_H__
