@@ -401,7 +401,7 @@ namespace CPVerifier_5 {
         }
 
         int is_reversed_arc(Constraint *c) {
-            return c->type == CTX_REVERSED_GENERIC || c->type == CTX_REVERSED_ARRAY2REF;
+            return (ConstraintType_Ex)c->type == CTX_REVERSED_GENERIC || (ConstraintType_Ex)c->type == CTX_REVERSED_ARRAY2REF;
         }
 
 

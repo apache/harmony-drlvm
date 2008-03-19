@@ -37,7 +37,7 @@ static char err_message[5000];
 
 void vf_Context_5e::writeStackMapFrame( Address instr )
 {
-    assert(instr != -1 || 1 + lastInstr < instr );
+    assert(instr < m_code_length || 1 + lastInstr < instr );
     uint32 offset = lastInstr == -1 ? instr : instr - lastInstr - 1;
     lastInstr = instr;
 

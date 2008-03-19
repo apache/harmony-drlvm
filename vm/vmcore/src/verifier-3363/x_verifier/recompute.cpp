@@ -101,6 +101,7 @@ vf_Result vf_Context_5e::recompute_stackmaptable( method_handler method ) {
                 return tcr;
             }
             entryNo++;
+            assert(instr == head->instr);
             writeStackMapFrame(head->instr);
 
             /////////////////////////////////
@@ -430,7 +431,7 @@ vf_Result vf_Context_5e::arc_consistensy_in_node(StackmapElement *el, int depth)
 
                     int valid_arc_found = is_direct_arc(adjacent) ? 
                         knownly_assignable(sm_this->value, sm2->value, adjacent->type == CT_ARRAY2REF) :
-                        knownly_assignable(sm2->value, sm_this->value, adjacent->type == CTX_REVERSED_ARRAY2REF);
+                        knownly_assignable(sm2->value, sm_this->value, (int)adjacent->type == (int)CTX_REVERSED_ARRAY2REF);
 
                     if( valid_arc_found ) {
                         //stackmap has a superclass in a branch target ==> this arc is OK, check next one
