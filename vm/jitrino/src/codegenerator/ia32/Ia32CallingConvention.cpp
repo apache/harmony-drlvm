@@ -124,7 +124,12 @@ void STDCALLCallingConventionEM64T::getOpndInfo(ArgKind kind, uint32 count, Opnd
 {
     if (kind == ArgKind_InArg) {
         uint32 gpreg = 0;
-        uint32 fpreg = 0;
+#ifdef _WIN64
+    #define fpreg gpreg
+#else
+    uint32 fpreg = 0;
+#endif
+
         for (uint32 i=0; i<count; i++){
     
             Type::Tag typeTag=(Type::Tag)infos[i].typeTag;
