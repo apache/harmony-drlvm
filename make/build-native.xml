@@ -242,7 +242,7 @@
         <macrodef name="depend-includes">
             <attribute name="paths"/>
             <sequential>
-                <pathconvert property="@{paths}.files" refid="@{paths}" pathsep="/*.h ">
+                <pathconvert property="@{paths}.files" refid="@{paths}" pathsep="/**/*.h ">
                     <map from="${vm.home}${file.separator}" to=""/>
                 </pathconvert>
                 <uptodate property="@{paths}.uptodate" targetfile="${component.bin.dir}/history.xml">
