@@ -24,49 +24,6 @@
 #include "native_unwind.h"
 
 
-bool native_is_frame_exists(UnwindContext* context, Registers* regs)
-{
-    // Check for frame layout and stack values
-    if ((regs->rbp < regs->rsp) || !native_is_in_stack(context, (void*)regs->rbp))
-        return false; // Invalid frame
-
-    void** frame_ptr = (void**)regs->rbp;
-    void* rip = frame_ptr[1]; // Return address
-
-    // Check return address for meaning
-    return (native_is_in_code(context, rip));
-}
-
-bool native_unwind_stack_frame(UnwindContext* context, Registers* regs)
-{
-    void** frame = (void**)regs->rbp;
-
-    void* rbp = frame[0];
-    void* rip = frame[1];
-//    void* rsp = (void*)(frame + 2);
-    void* rsp = &frame[2];
-
-
-    if (native_is_in_stack(context, rsp) &&
-        (native_is_in_code(context, rip)))
-    {
-        regs->rbp = (uint64)rbp;
-        regs->rsp = (uint64)rsp;
-        regs->rip = (uint64)rip;
-        return true;
-    }
-
-    return false;
-}
-
-static bool fill_regs_from_sp(UnwindContext* context, Registers* regs, void** sp)
-{
-    regs->rsp = (uint64)(sp + 1);
-    regs->rip = (uint64)*sp;
-    regs->rbp = native_is_in_stack(context, sp[-1]) ? (uint64)sp[-1] : regs->rsp;
-    return true;
-}
-
 static unsigned native_dec_instr(UnwindContext* context, void* addr, void** target)
 {
     Inst inst;
@@ -112,6 +69,49 @@ static bool native_check_caller(UnwindContext* context, Registers* regs, void** 
     }
 
     return false;
+}
+
+bool native_is_frame_exists(UnwindContext* context, Registers* regs)
+{
+    // Check for frame layout and stack values
+    if ((regs->rbp < regs->rsp) || !native_is_in_stack(context, (void*)regs->rbp))
+        return false; // Invalid frame
+
+    void** frame_ptr = (void**)regs->rbp;
+    void* rip = frame_ptr[1]; // Return address
+
+    // Check return address for meaning
+    return (native_is_in_code(context, rip) && native_check_caller(context, regs, frame_ptr + 1));
+}
+
+bool native_unwind_stack_frame(UnwindContext* context, Registers* regs)
+{
+    void** frame = (void**)regs->rbp;
+
+    void* rbp = frame[0];
+    void* rip = frame[1];
+//    void* rsp = (void*)(frame + 2);
+    void* rsp = &frame[2];
+
+
+    if (native_is_in_stack(context, rsp) &&
+        (native_is_in_code(context, rip)))
+    {
+        regs->rbp = (uint64)rbp;
+        regs->rsp = (uint64)rsp;
+        regs->rip = (uint64)rip;
+        return true;
+    }
+
+    return false;
+}
+
+static bool fill_regs_from_sp(UnwindContext* context, Registers* regs, void** sp)
+{
+    regs->rsp = (uint64)(sp + 1);
+    regs->rip = (uint64)*sp;
+    regs->rbp = native_is_in_stack(context, sp[-1]) ? (uint64)sp[-1] : regs->rsp;
+    return true;
 }
 
 

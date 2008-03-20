@@ -87,11 +87,11 @@ void port_clean_unwind_context(UnwindContext* context)
 
 bool port_unwind_frame(UnwindContext* context, Registers* regs)
 {
-//    if (native_is_frame_exists(context, regs))
-//    { // Stack frame (x86)
-//        return native_unwind_stack_frame(context, regs);
-//    }
-//    else
+    if (native_is_frame_exists(context, regs))
+    { // Stack frame (x86)
+        return native_unwind_stack_frame(context, regs);
+    }
+    else
     { // Stack frame does not exist, try using heuristics
         return native_unwind_special(context, regs);
     }
