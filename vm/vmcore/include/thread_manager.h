@@ -125,17 +125,12 @@ struct JVMTIThread
 struct VM_thread
 {
     /**
-     * Native thread which is associated with VM_thread
+     * Native thread which is associated with <code>VM_thread</code>
+     * The fields of <code>HyThread</code> sub-structure should not be used in VM directly
+     * An address of <code>hy_thread</code> field should be used instead
+     * as an argument for <code>hythread*</code> functions.
      */
-#ifdef __cplusplus
-private:
-#endif // __cplusplus
-
     struct HyThread hy_thread;
-
-#ifdef __cplusplus
-public:
-#endif // __cplusplus
 
     /**
      * Thread reference object to corresponding java.lang.ThreadWeakRef instance
