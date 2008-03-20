@@ -18,7 +18,7 @@
 #ifndef _VM_TYPES_H_
 #define _VM_TYPES_H_
 
-#include "platform_types.h"
+#include "open/platform_types.h"
 #include <stddef.h>
 
 

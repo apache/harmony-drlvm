@@ -22,14 +22,6 @@
 #include "port_thread.h"
 
 
-void port_transfer_to_regs(Registers* regs)
-{
-    // FIXME: not implemented
-    fprintf(stderr, "FIXME: port_transfer_to_regs: not implemented\n");
-    assert(0);
-    abort();
-}
-
 void port_thread_context_to_regs(Registers* regs, ucontext_t* uc)
 {
     memcpy(regs->gr, uc->uc_mcontext.sc_gr, sizeof(regs->gr));
@@ -54,20 +46,4 @@ void port_thread_regs_to_context(ucontext_t* uc, Registers* regs)
     uc->uc_mcontext.sc_ar_pfs  = regs->pfs;
     uc->uc_mcontext.sc_ar_bsp  = (uint64)regs->bsp;
     uc->uc_mcontext.sc_ip      = regs->ip;
-}
-
-void port_set_longjump_regs(void* fn, Registers* regs, int num, ...)
-{
-    // FIXME: not implemented
-    fprintf(stderr, "FIXME: port_set_longjump_regs: not implemented\n");
-    assert(0);
-    abort();
-}
-
-void port_transfer_to_function(void* fn, Registers* pregs, int num, ...)
-{
-    // FIXME: not implemented
-    fprintf(stderr, "FIXME: port_transfer_to_function: not implemented\n");
-    assert(0);
-    abort();
 }

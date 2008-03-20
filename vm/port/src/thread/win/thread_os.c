@@ -16,7 +16,7 @@
  */
 
 
-#include <apr_atomic.h>
+#include <port_atomic.h>
 #include "port_thread.h"
 
 
@@ -297,13 +297,13 @@ int port_thread_set_context(osthread_t thread, thread_context_t *context)
 
 static int suspend_init_lock()
 {
-    static uint32 initialized = 0;
+    static uint16 initialized = 0;
 
     if (!initialized)
     {
         // Critical section should be initialized only once,
         // do nothing in case someone else already initialized it.
-        if (apr_atomic_cas32((volatile uint32*)&initialized, 1, 0) == 0)
+        if (port_atomic_cas16((volatile uint16*)&initialized, 1, 0) == 0)
             InitializeCriticalSectionAndSpinCount(&g_crit_section, 400);
     }
 

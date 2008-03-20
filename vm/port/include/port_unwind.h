@@ -18,6 +18,7 @@
 #ifndef __PORT_UNWIND_H__
 #define __PORT_UNWIND_H__
 
+#include "port_general.h"
 #include "port_modules.h"
 
 typedef struct UnwindContext {
@@ -31,10 +32,10 @@ extern "C" {
 #endif
 
 
-bool port_init_unwind_context(UnwindContext* context, native_module_t* modules, Registers* regs);
-void port_clean_unwind_context(UnwindContext* context);
+VMEXPORT bool port_init_unwind_context(UnwindContext* context, native_module_t* modules, Registers* regs);
+VMEXPORT void port_clean_unwind_context(UnwindContext* context);
 
-bool port_unwind_frame(UnwindContext* context, Registers* regs);
+VMEXPORT bool port_unwind_frame(UnwindContext* context, Registers* regs);
 
 
 #ifdef __cplusplus

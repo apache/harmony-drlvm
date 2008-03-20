@@ -29,14 +29,11 @@
             <dirset dir="${vm.home}">
                 <include name="include" />
                 <include name="port/include" />
-                <include name="port/src/signals/include" />
-                <include name="port/src/crash_handler/include" />
-                <include name="port/src/encoder/ia32_em64t" unless="is.ia64"/>
             </dirset>
             <pathelement location="${drlvm.include.dir}"/>
             <pathelement location="${hy.hdk}/include" />
         </path>
-        <patternset id="port.src">
+        <patternset id="port.src.c">
             <include name="disasm/linux/*.c" if="is.unix"/>
             <include name="file_io/linux/*.c" if="is.unix"/>
             <include name="misc/linux/*.c" if="is.unix"/>
@@ -52,17 +49,19 @@
             <include name="vmem/win/*.c" if="is.windows"/>
             <include name="file_io/*.c"/>
 
-            <include name="modules/*.c"/>
-            <include name="modules/linux/*.c" if="is.unix"/>
-            <include name="modules/win/*.c" if="is.windows"/>
-
-            <include name="thread/linux/*_os.c" if="is.unix"/>
+            <include name="thread/linux/thread_os.c" if="is.unix"/>
             <include name="thread/linux/*ia32.c" if="is.unix.x86"/>
             <include name="thread/linux/*em64t.c" if="is.unix.x86_64"/>
             <include name="thread/linux/*ipf.c" if="is.unix.ia64"/>
-            <include name="thread/win/*_os.c" if="is.windows"/>
+            <include name="thread/win/thread_os.c" if="is.windows"/>
             <include name="thread/win/*ia32.c" if="is.windows.x86"/>
             <include name="thread/win/*em64t.c" if="is.windows.x86_64"/>
+        </patternset>
+
+        <patternset id="port.src.cpp">
+            <include name="logger/**.cpp" />
+            <include name="tl/*.cpp" />
+            <include name="time/*.cpp" />
         </patternset>
 
         <depend-includes paths="port.includes"/>
@@ -74,13 +73,6 @@
                 <include name="atomic/win/*.asm" if="is.windows.x86_64"/>
                 <include name="atomic/linux_ipf/port_atomic_asm.asm" if="is.unix.ia64"/>
                 <include name="barriers/linux_ipf/port_barriers.asm" if="is.unix.ia64"/>
-                <include name="thread/win/thread_asm_ia32.asm" if="is.windows.x86"/>
-                <include name="thread/win/thread_asm_em64t.asm" if="is.windows.x86_64"/>
-                <include name="thread/linux/thread_asm_ia32.s" if="is.unix.x86"/>
-                <include name="thread/linux/thread_asm_em64t.s" if="is.unix.x86_64"/>
-                <include name="memaccess/linux/memaccess_ia32.s" if="is.unix.x86"/>
-                <include name="memaccess/linux/memaccess_em64t.s" if="is.unix.x86_64"/>
-                <include name="signals/win/signals_em64t.asm" if="is.windows.x86_64"/>
             </fileset>
         </compile-asm>
         
@@ -92,34 +84,15 @@
 
             <compiler id="c.compiler" extends="common.c.compiler">
                 <fileset dir="${vm.home}/port/src" >
-                    <patternset refid="port.src"/>
+                    <patternset refid="port.src.c"/>
                     <selector refid="port.depends.c"/>
                 </fileset>
             </compiler>
 
             <compiler id="cpp.compiler" extends="common.cpp.compiler">
-                <fileset dir="${vm.home}/port/src">
+                <fileset dir="${vm.home}/port/src" >
+                    <patternset refid="port.src.cpp"/>
                     <selector refid="port.depends.cpp"/>
-                    <include name="logger/**.cpp" />
-                    <include name="tl/*.cpp" />
-                    <include name="time/*.cpp" />
-
-                    <include name="crash_handler/*.cpp"/>
-                    <include name="crash_handler/linux/*.cpp" if="is.unix"/>
-                    <include name="crash_handler/win/*.cpp" if="is.windows"/>
-                    <include name="crash_handler/ia32/*.cpp" if="is.x86"/>
-                    <include name="crash_handler/em64t/*.cpp" if="is.x86_64"/>
-                    <include name="crash_handler/ipf/*.cpp" if="is.ia64"/>
-
-                    <include name="memaccess/win/memaccess.cpp" if="is.windows"/>
-                    <include name="memaccess/linux/memaccess.cpp" if="is.unix" unless="is.ia64"/>
-                    <include name="memaccess/linux/*ipf.cpp" if="is.unix.ia64"/>
-
-                    <include name="signals/*.cpp"/>
-                    <include name="signals/linux/*common.cpp" if="is.unix" unless="is.ia64"/>
-                    <include name="signals/linux/*ipf.cpp" if="is.unix.ia64"/>
-                    <include name="signals/win/*common.cpp" if="is.windows"/>
-                    <include name="signals/win/*ia32.cpp" if="is.windows.x86"/>
                 </fileset>
 
                 <compilerarg value="/EHsc" if="is.windows"/>

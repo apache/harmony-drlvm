@@ -98,6 +98,6 @@ bool init_gdb_crash_handler()
 
 void cleanup_gdb_crash_handler()
 {
-    STD_FREE(g_executable);
+//    STD_FREE(g_executable);
     g_prepared = false;
 }

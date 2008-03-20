@@ -14,46 +14,60 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
+/**
 * @author Alexey V. Varlamov
 * @version $Revision: 1.1.2.1.4.3 $
-*/  
+*/
 
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/utsname.h>
 #include <limits.h>
 #include <errno.h>
+#include "port_malloc.h"
 #include "port_sysinfo.h"
-#include <apr_strings.h>
-
-APR_DECLARE(int) port_CPUs_number(void) {
-	return (int)sysconf(_SC_NPROCESSORS_CONF);
-}
-
-/**
-* Returns OS name and version.
-*/
-APR_DECLARE(apr_status_t) port_OS_name_version(char** os_name, char** os_ver, 
-								   apr_pool_t* pool){
-
-	struct utsname sys_info;
-	int ret = uname(&sys_info);
-	if (-1 == ret) {
-		return apr_get_os_error();
-	}
-	*os_name = apr_pstrdup(pool, sys_info.sysname);
-	*os_ver = apr_pstrdup(pool, sys_info.release);
-
-	return APR_SUCCESS;
-}
-
-APR_DECLARE(const char *) port_CPU_architecture(void){
-#if defined(_IPF_)
-	return "ia64";
-#elif defined (_EM64T_)
-    return "x86_64";
-#else
-    return "x86";
+#if defined(FREEBSD)
+#define _GNU_SOURCE
+#include <dlfcn.h>
+extern int main (int argc, char **argv, char **envp);
 #endif
+
+APR_DECLARE(apr_status_t) port_executable_name(char** self_name) {
+
+    char* buf;
+
+#if defined(FREEBSD)
+    Dl_info info;
+
+    if (dladdr( (const void*)&main, &info) == 0) {
+        return APR_ENOENT;
+    }
+
+    buf = (char*)STD_MALLOC(strlen(info.dli_fname) + 1);
+
+    if (!buf)
+        return APR_ENOMEM;
+
+    strcpy(buf, info.dli_fname);
+#else
+    char tmpbuf[PATH_MAX + 1];
+
+    int n = readlink("/proc/self/exe", tmpbuf, PATH_MAX);
+
+    if (n == -1) {
+        return apr_get_os_error();
+    }
+
+    tmpbuf[n] = '\0';
+
+    buf = (char*)STD_MALLOC(n + 1);
+
+    if (!buf)
+        return APR_ENOMEM;
+
+    strcpy(buf, tmpbuf);
+#endif
+
+    *self_name = buf;
+    return APR_SUCCESS;
 }

@@ -85,53 +85,6 @@ int port_thread_set_context(osthread_t thread, thread_context_t* pcontext);
 void port_thread_context_to_regs(Registers* regs, thread_context_t* context);
 void port_thread_regs_to_context(thread_context_t* context, Registers* regs);
 
-/* Transfer control to specified register context */
-void port_transfer_to_regs(Registers* regs);
-
-/**
-* Prepares 'Registers' structure and stack area pointed in for calling
-* 'fn' function with a set of arguments provided in variable args list.
-* THe 'fn' function is called through a special stub function with
-* preserving 'red zone' on Linux and clearing direction flag on Windows.
-* After returning from 'fn' and stub, processor registers are restored
-* with a values provided in 'regs' argument.
-* The function can be used to prepare register context for transfering
-* a control to a signal/exception handling function out of the OS handler.
-*
-* When the first argument passed to 'fn' is the same 'regs' pointer, its
-* value is substituted with the pointer stored 'Registers' structure used
-* to restore register context. If 'fn' function modifies the context
-* pointed by the first argument, these changes will take effect after
-* returning from 'fn'.
-*
-* The stub for calling 'fn' is written in assembler language; 'Registers'
-* fields and size are hardcoded. It would be better to rewrite it using
-* encoder in future, to keep control on 'Registers' structure and size.
-*
-* @param [in] fn    - the address of the function to be called
-* @param [in] regs  - the register context
-* @param [in] num   - the number of parameters passed to the 'fn' function
-*                     in the variable args list (6 args at maximum)
-* @param [in] ...   - the parameters for 'fn'; should all be void* or of
-*                     the same size (pointer-sized)
-*/
-void port_set_longjump_regs(void* fn, Registers* regs, int num, ...);
-
-/**
-* The same as 'port_set_longjump_regs', but transfers a control to the
-* prepared registers context by itself.
-* Actually it's a combination of 'port_set_longjump_regs' and
-* 'port_transfer_to_regs' functions, but 'regs' fields are kept unchanged.
-*
-* @param [in] fn    - the address of the function to be called
-* @param [in] regs  - the register context
-* @param [in] num   - the number of parameters passed to the 'fn' function
-*                     in the variable args list (6 args at maximum)
-* @param [in] ...   - the parameters for 'fn'; should all be void* or of
-*                     the same size (pointer-sized)
-*/
-void port_transfer_to_function(void* fn, Registers* regs, int num, ...);
-
 
 
 //@}

@@ -109,22 +109,26 @@ Usage:
     <!-- ================================================================
             build individual components
          ================================================================-->
-    
+
     <target name="build-extra" depends=""
         description="Compiles external dependencies">
         <ant antfile="make/extra/apr.xml"/>
         <ant antfile="make/extra/aprutil.xml"/>
         <ant antfile="make/extra/log4cxx.xml"/>
     </target>
-    
+
     <target name="encoder">
         <ant antfile="make/vm/encoder.xml"/>
     </target>
-    
+
     <target name="port" depends="build-extra">
         <ant antfile="make/vm/port.xml"/>
     </target>
-    
+
+    <target name="port_ch" depends="port">
+        <ant antfile="make/vm/port_ch.xml"/>
+    </target>
+
     <target name="hythr" depends="port">
         <ant antfile="make/vm/hythr.xml"/>
     </target>
@@ -137,7 +141,7 @@ Usage:
         <ant antfile="make/vm/verifier-ext.xml"/>
     </target>
 
-    <target name="vmcore" depends="encoder, port, hythr, verifier">
+    <target name="vmcore" depends="encoder, port, port_ch, hythr, verifier">
         <ant antfile="make/vm/vmcore.xml"/>
     </target>
 
@@ -148,7 +152,7 @@ Usage:
     <target name="interpreter" depends="vmcore">
         <ant antfile="make/vm/interpreter.xml"/>
     </target>
-    
+
     <target name="kernel">
         <ant antfile="make/vm/kernel.xml"/>
     </target>
@@ -164,7 +168,7 @@ Usage:
     <target name="gc_gen" depends="vmcore,kernel">
         <ant antfile="make/vm/gc_gen.xml"/>
     </target>
-    
+
 
     <!-- ================================================================
             import the deploy stuff from hdk / classlib

@@ -135,7 +135,7 @@ typedef struct
  * @return <code>TRUE</code> if initalization is successful.
  * <code>FALSE</code> if initialization failed.
  */
-Boolean port_init_crash_handler(
+VMEXPORT Boolean port_init_crash_handler(
     port_signal_handler_registration *registrations,
     unsigned count,
     port_unwind_compiled_frame unwind_callback);
@@ -201,7 +201,7 @@ typedef enum
  *
  * @returns  supported crash handler features.
  */
-unsigned port_crash_handler_get_capabilities();
+VMEXPORT unsigned port_crash_handler_get_capabilities();
 
 /**
  * Set crash handler output flags. Default mode is <code>
@@ -212,7 +212,7 @@ unsigned port_crash_handler_get_capabilities();
  *
  * @param flags - crash handler output flags.
  */
-void port_crash_handler_set_flags(unsigned flags);
+VMEXPORT void port_crash_handler_set_flags(unsigned flags);
 
 /**
  * Callback function that is called at the end of shutdown sequence.
@@ -243,7 +243,7 @@ typedef void (*port_crash_handler_action)(
  * <code>FALSE</code> if action was not added because no memory could
  * be allocated.
  */
-Boolean port_crash_handler_add_action(port_crash_handler_action action);
+VMEXPORT Boolean port_crash_handler_add_action(port_crash_handler_action action);
 
 /**
  * Shutdown signals and crash handler. All signals are assigned their
@@ -255,7 +255,7 @@ Boolean port_crash_handler_add_action(port_crash_handler_action action);
  * @return <code>TRUE</code> if shutdown is
  * successful. <code>FALSE</code> if shutdown failed.
  */
-Boolean port_shutdown_crash_handler();
+VMEXPORT Boolean port_shutdown_crash_handler();
 
 
 /**
@@ -267,7 +267,7 @@ Boolean port_shutdown_crash_handler();
 * @note Caller should keep store previous byte to restore
 * the location in future.
 */
-int port_set_breakpoint(void* addr, unsigned char* prev);
+VMEXPORT int port_set_breakpoint(void* addr, unsigned char* prev);
 
 /**
 * Restores original byte in the location previously instrumented
@@ -277,14 +277,14 @@ int port_set_breakpoint(void* addr, unsigned char* prev);
 * @return <code>0</code> if OK; nonzero if the location was not
 * instrumented yet or if an error occured.
 */
-int port_clear_breakpoint(void* addr, unsigned char prev);
+VMEXPORT int port_clear_breakpoint(void* addr, unsigned char prev);
 
 /**
 * Checks if the location is instrumented.
 * @param [in] addr  - memory location to deinstrument.
 * @return <code>TRUE</code> if instrumented; FALSE otherwise.
 */
-Boolean port_is_breakpoint_set(void* addr);
+VMEXPORT Boolean port_is_breakpoint_set(void* addr);
 
 
 

@@ -20,23 +20,6 @@
 #include <stdarg.h>
 
 
-LONG __declspec(naked) NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_exception)
-{
-    __asm {
-    push    ebp
-    mov     ebp,esp
-    pushfd
-    cld
-    mov     eax, [ebp + 8]
-    push    eax
-    call    vectored_exception_handler_internal
-    popfd
-    pop     ebp
-    ret     4
-    }
-}
-
-
 extern "C" void port_longjump_stub(void);
 #define DIR_FLAG ((uint32)0x00000400)
 
@@ -45,36 +28,52 @@ void port_set_longjump_regs(void* fn, Registers* regs, int num, ...)
     void** sp;
     va_list ap;
     int i;
+    size_t align;
+    void** p_pregs;
     size_t rcount =
         (sizeof(Registers) + sizeof(void*) - 1) / sizeof(void*);
 
     if (!regs)
         return;
 
-    sp = (void**)regs->esp - 1;
-    *sp = (void*)regs->eip;
-    sp = sp - rcount - 1;
-    *((Registers*)(sp + 1)) = *regs;
-    *sp = (void*)(sp + 1);
-    regs->ebp = (uint32)sp;
+    sp = (void**)regs->rsp - 16 - 1; /* preserve 128-bytes area */
+    *sp = (void*)regs->rip;
+    align = !((rcount & 1) ^ (((uint64)sp & sizeof(void*)) != 0));
+    p_pregs = sp - rcount - align - 1;
+    sp = sp - rcount;
+    *((Registers*)sp) = *regs;
+    *p_pregs = (void*)sp;
 
-    sp = sp - num - 1;
+    sp = p_pregs - 6 - 1;
 
     va_start(ap, num);
 
-    for (i = 1; i <= num; i = i + 1)
+    if (num > 0)
     {
         void* arg = va_arg(ap, void*);
-
-        if (i == 1 && arg == regs)
-            sp[i] = *((void**)regs->ebp); /* Replace 1st arg */
+        if (arg == regs)
+            regs->rcx = (uint64)(*p_pregs); /* Replace 1st arg */
         else
-            sp[i] = arg;
+            regs->rcx = (uint64)arg;
+    }
+
+    if (num > 1)
+        regs->rdx = (uint64)va_arg(ap, void*);
+
+    if (num > 2)
+        regs->r8 = (uint64)va_arg(ap, void*);
+
+    if (num > 3)
+        regs->r9 = (uint64)va_arg(ap, void*);
+
+    for (i = 5; i <= num; i = i + 1)
+    {
+        sp[i] = va_arg(ap, void*);
     }
 
     *sp = (void*)&port_longjump_stub;
-    regs->esp = (uint32)sp;
-    regs->eip = (uint32)fn;
+    regs->rsp = (uint64)sp;
+    regs->rip = (uint64)fn;
     regs->eflags = regs->eflags & ~DIR_FLAG;
 }
 
@@ -83,6 +82,8 @@ void port_transfer_to_function(void* fn, Registers* pregs, int num, ...)
     void** sp;
     va_list ap;
     int i;
+    size_t align;
+    void** p_pregs;
     size_t rcount =
         (sizeof(Registers) + sizeof(void*) - 1) / sizeof(void*);
     Registers regs;
@@ -92,30 +93,44 @@ void port_transfer_to_function(void* fn, Registers* pregs, int num, ...)
 
     regs = *pregs;
 
-    sp = (void**)regs.esp - 1;
-    *sp = (void*)regs.eip;
-    sp = sp - rcount - 1;
-    *((Registers*)(sp + 1)) = regs;
-    *sp = (void*)(sp + 1);
-    regs.ebp = (uint32)sp;
+    sp = (void**)regs.rsp - 16 - 1; /* preserve 128-bytes area */
+    *sp = (void*)regs.rip;
+    align = !((rcount & 1) ^ (((uint64)sp & sizeof(void*)) != 0));
+    p_pregs = sp - rcount - align - 1;
+    sp = sp - rcount;
+    *((Registers*)sp) = regs;
+    *p_pregs = (void*)sp;
 
-    sp = sp - num - 1;
+    sp = p_pregs - 6 - 1;
 
     va_start(ap, num);
 
-    for (i = 1; i <= num; i = i + 1)
+    if (num > 0)
     {
         void* arg = va_arg(ap, void*);
-
-        if (i == 1 && arg == pregs)
-            sp[i] = *((void**)regs.ebp); /* Replace 1st arg */
+        if (arg == pregs)
+            regs.rcx = (uint64)(*p_pregs); /* Replace 1st arg */
         else
-            sp[i] = arg;
+            regs.rcx = (uint64)arg;
+    }
+
+    if (num > 1)
+        regs.rdx = (uint64)va_arg(ap, void*);
+
+    if (num > 2)
+        regs.r8 = (uint64)va_arg(ap, void*);
+
+    if (num > 3)
+        regs.r9 = (uint64)va_arg(ap, void*);
+
+    for (i = 5; i <= num; i = i + 1)
+    {
+        sp[i] = va_arg(ap, void*);
     }
 
     *sp = (void*)&port_longjump_stub;
-    regs.esp = (uint32)sp;
-    regs.eip = (uint32)fn;
+    regs.rsp = (uint64)sp;
+    regs.rip = (uint64)fn;
     regs.eflags = regs.eflags & ~DIR_FLAG;
 
     port_transfer_to_regs(&regs);

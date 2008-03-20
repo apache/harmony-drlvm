@@ -96,21 +96,6 @@ APR_DECLARE(apr_status_t) port_OS_name_version(char** os_name, char** os_ver,
 	return APR_SUCCESS;
 }
 
-APR_DECLARE(apr_status_t) port_executable_name(char** self_name){
-
-    char buf[_MAX_PATH*2]; /*XXX result in TCHARs */
-    int len = GetModuleFileName(0, buf, _MAX_PATH);
-    if (0 == len) {
-        return apr_get_os_error();
-    }
-
-    *self_name = STD_MALLOC(strlen(buf) + 1);
-    if (*self_name)
-        strcpy(*self_name, buf);
-
-    return APR_SUCCESS;
-}
-
 APR_DECLARE(const char *) port_CPU_architecture(void){
 #if defined(_IPF_)
 	return "ia64";

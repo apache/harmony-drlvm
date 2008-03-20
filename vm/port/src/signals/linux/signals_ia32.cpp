@@ -15,26 +15,9 @@
  *  limitations under the License.
  */
 
-#include "signals_internal.h"
-#define ANSI
+
 #include <stdarg.h>
-
-
-LONG __declspec(naked) NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_exception)
-{
-    __asm {
-    push    ebp
-    mov     ebp,esp
-    pushfd
-    cld
-    mov     eax, [ebp + 8]
-    push    eax
-    call    vectored_exception_handler_internal
-    popfd
-    pop     ebp
-    ret     4
-    }
-}
+#include "signals_internal.h"
 
 
 extern "C" void port_longjump_stub(void);

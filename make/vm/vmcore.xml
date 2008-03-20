@@ -217,7 +217,8 @@
                 <libset libs="hythr" dir="${drlvm.shlib.dir}" />
                 <libset libs="icuuc" dir="${drlvm.shlib.dir}"/>
                 <libset libs="zdll" dir="${drlvm.lib.dir}" if="is.windows"/>
-    
+                <libset libs="ch" dir="${drlvm.shlib.dir}" />
+
                 <linkerarg value="/DEF:${vm.home}/vmcore/src/harmonyvm64.def" if="is.windows.x86_64"/>
                 <linkerarg value="/DEF:${vm.home}/vmcore/src/harmonyvm.def" if="is.windows.x86"/>
                 <linkerarg value="--version-script=${vm.home}/vmcore/build/vmcore.exp" if="is.unix"/>

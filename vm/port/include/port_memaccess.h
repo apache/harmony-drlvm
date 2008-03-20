@@ -20,6 +20,7 @@
 
 #include <stddef.h>
 #include "open/platform_types.h"
+#include "port_general.h"
 
 
 #ifdef __cplusplus
@@ -34,7 +35,7 @@ extern "C" {
 * @param buf    - buffer to read to.
 * @return <code>0</code> if OK; nonzero if an error occured.
 */
-int port_read_memory(void* addr, size_t size, void* buf);
+VMEXPORT int port_read_memory(void* addr, size_t size, void* buf);
 
 /**
 * Tries to write specified number of bytes from buffer to given address.
@@ -43,7 +44,7 @@ int port_read_memory(void* addr, size_t size, void* buf);
 * @param buf    - buffer to write from.
 * @return <code>0</code> if OK; nonzero if an error occured.
 */
-int port_write_memory(void* addr, size_t size, void* buf);
+VMEXPORT int port_write_memory(void* addr, size_t size, void* buf);
 
 
 #ifdef __cplusplus

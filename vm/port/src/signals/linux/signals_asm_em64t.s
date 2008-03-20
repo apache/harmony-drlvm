@@ -41,11 +41,11 @@
 // uint32 eflags;; 88h
 // };
 //
-// void port_transfer_to_regs(Registers* regs)
+// void port_transfer_to_regs_asm(Registers* regs)
 
-.globl port_transfer_to_regs
-	.type	port_transfer_to_regs, @function
-port_transfer_to_regs:
+.globl port_transfer_to_regs_asm
+       .type   port_transfer_to_regs_asm, @function
+port_transfer_to_regs_asm:
     movq    %rdi, %rdx // regs pointer (1st param - RDI) -> RDX
 
     movq    0x08(%rdx), %rbp // RBP field
@@ -116,5 +116,5 @@ __skipefl__:
 port_longjump_stub:
 //    movq    128(%rsp), %rdi // load RDI with the address of saved Registers
     movq    (%rsp), %rdi // load RDI with the address of saved Registers
-    callq   port_transfer_to_regs   // restore context
+    callq   port_transfer_to_regs_asm // restore context
     ret                             // dummy RET - unreachable

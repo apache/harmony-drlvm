@@ -15,35 +15,24 @@
  *  limitations under the License.
  */
 
-#include "port_thread.h"
-#define ANSI
-#include <stdarg.h>
+#include "port_malloc.h"
+#include "port_sysinfo.h"
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <windows.h>
 
-void port_thread_context_to_regs(Registers* regs, PCONTEXT context)
-{
-    regs->eax = context->Eax;
-    regs->ecx = context->Ecx;
-    regs->edx = context->Edx;
-    regs->edi = context->Edi;
-    regs->esi = context->Esi;
-    regs->ebx = context->Ebx;
-    regs->ebp = context->Ebp;
-    regs->eip = context->Eip;
-    regs->esp = context->Esp;
-    regs->eflags = context->EFlags;
-}
+APR_DECLARE(apr_status_t) port_executable_name(char** self_name){
 
-void port_thread_regs_to_context(PCONTEXT context, Registers* regs)
-{
-    context->Esp = regs->esp;
-    context->Eip = regs->eip;
-    context->Ebp = regs->ebp;
-    context->Ebx = regs->ebx;
-    context->Esi = regs->esi;
-    context->Edi = regs->edi;
-    context->Eax = regs->eax;
-    context->Ecx = regs->ecx;
-    context->Edx = regs->edx;
-    context->EFlags = regs->eflags;
+    char buf[_MAX_PATH*2]; /*XXX result in TCHARs */
+    int len = GetModuleFileName(0, buf, _MAX_PATH);
+    if (0 == len) {
+        return apr_get_os_error();
+    }
+
+    *self_name = STD_MALLOC(strlen(buf) + 1);
+    if (*self_name)
+        strcpy(*self_name, buf);
+
+    return APR_SUCCESS;
 }
