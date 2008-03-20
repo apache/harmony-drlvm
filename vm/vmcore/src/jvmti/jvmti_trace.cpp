@@ -22,6 +22,7 @@
 #include "cxxlog.h"
 
 #include "open/gc.h"
+#include "open/vm_field_access.h"
 #include "slot.h"
 
 // VM internal headers

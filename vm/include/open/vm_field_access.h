@@ -21,6 +21,14 @@
 #ifndef _VM_FIELD_ACCESS_H
 #define _VM_FIELD_ACCESS_H
 
+#include "common.h"
+#include "hycomp.h"
+#include "types.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * @file
  * Part of Class Support interface related to retrieving different
@@ -34,8 +42,7 @@
  *
  * @return The name of the field.
  */
-const char*
-field_get_name(Open_Field_Handle field);
+DECLARE_OPEN(const char*, field_get_name, (Field_Handle field));
 
 /**
  * Returns the field <i>descriptor</i>.
@@ -47,8 +54,7 @@ field_get_name(Open_Field_Handle field);
  *
  * @return The field descriptor.
  */
-const char*
-field_get_descriptor(Open_Field_Handle field);
+DECLARE_OPEN(const char*, field_get_descriptor, (Field_Handle field));
 
 /**
  * Returns the class that defined the given field.
@@ -57,8 +63,7 @@ field_get_descriptor(Open_Field_Handle field);
  *
  * @return The class that defined the field.
  */
-Open_Class_Handle
-field_get_class(Open_Field_Handle field);
+DECLARE_OPEN(Class_Handle, field_get_class, (Field_Handle field));
 
 /**
  * Returns the address of the given static field.
@@ -67,8 +72,7 @@ field_get_class(Open_Field_Handle field);
  *
  * @return The address of the static field.
  */
-void*
-field_get_address(Open_Field_Handle field);
+DECLARE_OPEN(void*, field_get_address, (Field_Handle field));
 
 /**
  * Returns the offset to the given instance field.
@@ -77,8 +81,7 @@ field_get_address(Open_Field_Handle field);
  *
  * @return The offset to the instance field.
  */
-unsigned
-field_get_offset(Open_Field_Handle field);
+DECLARE_OPEN(unsigned, field_get_offset, (Field_Handle field));
 
 /**
  * Returns the type info that represents the type of the field.
@@ -86,11 +89,8 @@ field_get_offset(Open_Field_Handle field);
  * @param field - the field handle
  *
  * @return Type information.
- *
- * @note Replaces field_get_type_info_of_field_value. 
  */
-Open_Type_Info_Handle
-field_get_type_info_of_field_type(Open_Field_Handle field);
+DECLARE_OPEN(Type_Info_Handle, field_get_type_info, (Field_Handle field));
 
 /**
  * Returns the class that represents the type of the field.
@@ -98,11 +98,8 @@ field_get_type_info_of_field_type(Open_Field_Handle field);
  * @param field - the field handle
  *
  * @return the class that represents the type of the field.
- *
- * @note Replaces field_get_class_of_field_value.
  */
-Open_Class_Handle
-field_get_class_of_field_type(Open_Field_Handle field);
+DECLARE_OPEN(Class_Handle, field_get_class_of_field_type, (Field_Handle field));
 
 /**
  *  Checks whether the field is final.
@@ -113,8 +110,7 @@ field_get_class_of_field_type(Open_Field_Handle field);
  *
  * #note Extended
  */
-Boolean
-field_is_final(Open_Field_Handle field);
+DECLARE_OPEN(BOOLEAN, field_is_final, (Field_Handle field));
 
 /**
  *  Checks whether the field is static.
@@ -125,8 +121,7 @@ field_is_final(Open_Field_Handle field);
  *
  * @ingroup Extended 
  */
-Boolean
-field_is_static(Open_Field_Handle field);
+DECLARE_OPEN(BOOLEAN, field_is_static, (Field_Handle field));
 
 /**
  *  Checks whether the field is private.
@@ -137,8 +132,7 @@ field_is_static(Open_Field_Handle field);
  *
  * @ingroup Extended 
  */
-Boolean
-field_is_private(Open_Field_Handle field);
+DECLARE_OPEN(BOOLEAN, field_is_private, (Field_Handle field));
 
 /**
  *  Checks whether the field is public.
@@ -149,8 +143,7 @@ field_is_private(Open_Field_Handle field);
  *
  * @ingroup Extended 
  */
-Boolean
-field_is_public(Open_Field_Handle field);
+DECLARE_OPEN(BOOLEAN, field_is_public, (Field_Handle field));
 
 /**
  *  Checks whether the field is volatile.
@@ -161,8 +154,18 @@ field_is_public(Open_Field_Handle field);
  *
  * @ingroup Extended 
  */
-Boolean
-field_is_volatile(Open_Field_Handle field);
+DECLARE_OPEN(BOOLEAN, field_is_volatile, (Field_Handle field));
+
+/**
+ *  Checks whether the field is reference field.
+ *
+ * @param field - the field handle
+ *
+ * @return <code>TRUE</code> if the field is reference.
+ *
+ * #note Extended
+ */
+DECLARE_OPEN(BOOLEAN, field_is_reference, (Field_Handle field));
 
 /**
  *  Checks whether the field is literal.
@@ -171,8 +174,7 @@ field_is_volatile(Open_Field_Handle field);
  *
  * @return <code>TRUE</code> if the field is literal.
  */
-Boolean
-field_is_literal(Open_Field_Handle field);
+DECLARE_OPEN(BOOLEAN, field_is_literal, (Field_Handle field));
 
 /**
  *  Checks whether the field is injected.
@@ -181,7 +183,39 @@ field_is_literal(Open_Field_Handle field);
  *
  * @return <code>TRUE</code> if the field is injected; otherwise, <code>FALSE</code>. 
  */
-Boolean
-field_is_injected(Open_Field_Handle field);
+DECLARE_OPEN(BOOLEAN, field_is_injected, (Field_Handle field));
+
+/**
+ * @return <code>TRUE</code> if the field is a magic type field
+ *
+ * This function doesn't cause resolution of the class of the field.
+ */
+DECLARE_OPEN(BOOLEAN, field_is_magic, (Field_Handle fh));
+
+/**
+ * @return The address and bit mask, for the flag which determine whether field
+ *         access event should be sent. JIT may use the following expression to
+ *         determine if specified field access should be tracked:
+ *         ( **address & *mask != 0 )
+ *
+ * @param field         - handle of the field
+ * @param[out] address  - pointer to the address of the byte which contains the flag
+ * @param[out] mask     - pointer to the bit mask of the flag
+ */
+DECLARE_OPEN(void, field_get_track_access_flag, (Field_Handle field, char** address, char* mask));
+
+/**
+ * @return the address and bit mask, for the flag which determine whether field
+ *         modification event should be sent. JIT may use the following expression to
+ *         determine if specified field modification should be tracked:
+ *         ( **address & *mask != 0 )
+ *
+ * @param field         - handle of the field
+ * @param[out] address  - pointer to the address of the byte which contains the flag
+ * @param[out] mask     - pointer to the bit mask of the flag
+ */
+DECLARE_OPEN(void, field_get_track_modification_flag, (Field_Handle field, char** address, char* mask));
+
+}
 
 #endif // _VM_FIELD_ACCESS_H

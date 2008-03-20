@@ -27,6 +27,7 @@
 #include "open/vm_class_info.h"
 #include "open/vm_interface.h"
 #include "open/vm_type_access.h"
+#include "open/vm_field_access.h"
 #include "jit_import_rt.h"
 #include "jit_runtime_support.h"
 
@@ -97,7 +98,7 @@ static  field_get_class_t  field_get_class = 0;
 static  field_get_descriptor_t field_get_descriptor = 0;
 static  field_get_name_t field_get_name = 0;
 static  field_get_offset_t  field_get_offset = 0;
-static  field_get_type_info_t  field_get_type_info = 0; //field_get_type_info_of_field_value
+static  field_get_type_info_t  field_get_type_info = 0;
 static  field_is_final_t  field_is_final = 0;
 static  field_is_magic_t  field_is_magic = 0; //Boolean field_is_magic(Field_Handle fh);
 static  field_is_private_t  field_is_private = 0;

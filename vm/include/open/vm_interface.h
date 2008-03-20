@@ -72,21 +72,6 @@ PROTOTYPE_WITH_NAME(Method_Handle, class_lookup_method_recursively,
                     const char *name,
                     const char *descr));
 
-
-//Field
-
-PROTOTYPE_WITH_NAME(void*       , field_get_address, (Field_Handle fh));
-PROTOTYPE_WITH_NAME(Class_Handle, field_get_class, (Field_Handle fh));
-PROTOTYPE_WITH_NAME(const char* , field_get_descriptor, (Field_Handle fh));
-PROTOTYPE_WITH_NAME(const char* , field_get_name, (Field_Handle fh));
-PROTOTYPE_WITH_NAME(unsigned    , field_get_offset, (Field_Handle fh));
-PROTOTYPE_WITH_NAME(Type_Info_Handle, field_get_type_info, (Field_Handle fh)); //field_get_type_info_of_field_value
-PROTOTYPE_WITH_NAME(Boolean     , field_is_final, (Field_Handle fh));
-PROTOTYPE_WITH_NAME(Boolean     , field_is_magic, (Field_Handle fh)); //Boolean field_is_magic(Field_Handle fh);
-PROTOTYPE_WITH_NAME(Boolean     , field_is_private, (Field_Handle fh));
-PROTOTYPE_WITH_NAME(Boolean     , field_is_static, (Field_Handle fh));
-PROTOTYPE_WITH_NAME(Boolean     , field_is_volatile, (Field_Handle fh));
-
 //Method
 
 PROTOTYPE_WITH_NAME(Method_Handle, method_get_overridden_method, (Class_Handle ch, Method_Handle mh));//method_find_overridden_method

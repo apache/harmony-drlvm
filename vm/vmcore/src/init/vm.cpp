@@ -25,25 +25,3 @@ VMEXPORT Global_Env *VM_Global_State::loader_env = 0;
 
 // tag pointer is not allocated by default, enabled by TI
 VMEXPORT bool ManagedObject::_tag_pointer = false;
-
-
-/////////////////////////////////////////////////////////////////
-// begin Class
-/////////////////////////////////////////////////////////////////
-
-
-Field* class_resolve_nonstatic_field(Class* clss, unsigned cp_index)
-{
-    Compilation_Handle ch;
-    ch.env = VM_Global_State::loader_env;
-    ch.jit = NULL;
-    Field_Handle fh = resolve_field(&ch, (Class_Handle)clss, cp_index);
-    if(!fh || field_is_static(fh))
-        return NULL;
-    return fh;
-} // class_resolve_nonstatic_field
-
-
-/////////////////////////////////////////////////////////////////
-// end Class
-/////////////////////////////////////////////////////////////////

@@ -32,6 +32,7 @@
 #include "port_malloc.h"
 
 #include "open/vm_type_access.h"
+#include "open/vm_field_access.h"
 
 #include "exceptions.h"
 #include "heap.h"

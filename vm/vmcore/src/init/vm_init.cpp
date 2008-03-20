@@ -154,8 +154,6 @@ void* get_vm_interface(const char* func_name){
         return (void*)class_hint_is_exceptiontype;
     } else if (strcmp(func_name,"class_is_abstract") == 0) {
         return (void*)class_is_abstract;
-    } else if (strcmp(func_name,"field_get_type_info") == 0) {
-        return (void*)field_get_type_info_of_field_value;
     } else if (strcmp(func_name,"method_get_overridden_method") == 0) {
         return (void*)method_find_overridden_method;
     } else if (strcmp(func_name,"vector_get_first_element_offset") == 0) {

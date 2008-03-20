@@ -18,6 +18,7 @@
 #include "interpreter_exports.h"
 #include "interpreter_imports.h"
 #include "open/vm_class_info.h"
+#include "open/vm_field_access.h"
 #include <math.h>
 
 #include "exceptions.h"

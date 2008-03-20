@@ -17,6 +17,7 @@
 #ifndef _VM_TYPE_ACCESS_H
 #define _VM_TYPE_ACCESS_H
 
+#include "common.h"
 #include "types.h"
 /**
  * @file

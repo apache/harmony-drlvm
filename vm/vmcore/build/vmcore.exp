@@ -95,7 +95,7 @@ VMCORE_0.1 {
     destroy_property_value;
     field_get_address;
     field_get_class;
-    field_get_class_of_field_value;
+    field_get_class_of_field_type;
     field_get_descriptor;
     field_get_flags;
     field_get_name;
@@ -103,7 +103,7 @@ VMCORE_0.1 {
     field_get_track_access_flag;
     field_get_track_modification_flag;
     field_get_type;
-    field_get_type_info_of_field_value;
+    field_get_type_info;
     field_is_enumerable_reference;
     field_is_final;
     field_is_injected;

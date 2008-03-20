@@ -25,6 +25,7 @@
  
 #include "cg.h"
 #include "trace.h"
+#include "open/vm_field_access.h"
 #include "jit_runtime_support.h"
 #include "jit_intf.h"
 

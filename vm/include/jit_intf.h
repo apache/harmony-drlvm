@@ -112,11 +112,6 @@ resolve_class_new(Compile_Handle h, Class_Handle c, unsigned index);
 VMEXPORT Class_Handle 
 resolve_class(Compile_Handle h, Class_Handle c, unsigned index);
 
-//
-// Field
-//
-VMEXPORT Boolean      field_is_public(Field_Handle f);
-VMEXPORT Boolean      field_is_injected(Field_Handle f);
 VMEXPORT Boolean      method_is_public(Method_Handle m);
 VMEXPORT unsigned     method_get_max_locals(Method_Handle m);
 VMEXPORT Boolean      method_is_fake(Method_Handle m);

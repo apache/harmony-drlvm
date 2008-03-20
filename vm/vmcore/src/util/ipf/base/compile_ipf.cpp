@@ -340,7 +340,7 @@ static void protect_value_type(Class_Handle c, uint64* start, GcFrame* gc) {
     unsigned num_fields = class_num_instance_fields_recursive(c);
     for(unsigned i=0; i<num_fields; i++) {
         Field_Handle f = class_get_instance_field_recursive(c, i);
-        Type_Info_Handle ftih = field_get_type_info_of_field_value(f);
+        Type_Info_Handle ftih = field_get_type_info(f);
         unsigned offset = 0;
         // field_get_offset_unboxed asserts 0 anyway
         switch (type_info_get_type(ftih)) {

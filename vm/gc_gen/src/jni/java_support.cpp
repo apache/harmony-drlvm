@@ -21,6 +21,7 @@
 
 #include <string.h>
 #include <jni.h>
+#include "open/vm_field_access.h"
 #include "jit_intf.h"
 #include "java_support.h"
 

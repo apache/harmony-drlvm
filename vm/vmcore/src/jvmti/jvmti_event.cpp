@@ -1252,7 +1252,7 @@ VMEXPORT void jvmti_process_field_access_event(Field_Handle field,
     tmn_suspend_enable();
 
     // get field class
-    //Type_Info_Handle field_type = field_get_type_info_of_field_value(field);
+    //Type_Info_Handle field_type = field_get_type_info(field);
     //Class_Handle clss = type_info_get_class(field_type);
     //ASSERT(clss, "Can't get class handle for field type.");
     //jclass field_klass = struct_Class_to_java_lang_Class_Handle(clss);
@@ -1324,7 +1324,7 @@ VMEXPORT void jvmti_process_field_modification_event(Field_Handle field,
     // get field class
     tmn_suspend_enable();
 
-    //Type_Info_Handle field_type = field_get_type_info_of_field_value(field);
+    //Type_Info_Handle field_type = field_get_type_info(field);
     //Class_Handle clss = type_info_get_class(field_type);
     //ASSERT(clss, "Can't get class handle for field type.");
     //jclass field_klass = struct_Class_to_java_lang_Class_Handle(clss);

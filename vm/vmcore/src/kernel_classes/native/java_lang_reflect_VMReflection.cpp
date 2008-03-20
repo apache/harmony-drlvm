@@ -31,6 +31,7 @@
 #include "cxxlog.h"
 
 #include "reflection.h"
+#include "open/vm_field_access.h"
 #include "environment.h"
 #include "exceptions.h"
 #include "vm_strings.h"
@@ -91,7 +92,7 @@ JNIEXPORT jclass JNICALL Java_java_lang_reflect_VMReflection_getFieldType
   (JNIEnv *jenv, jclass, jlong member)
 {
     Field_Handle fh = (Field_Handle) ((POINTER_SIZE_INT) member);
-    Type_Info_Handle fti = field_get_type_info_of_field_value(fh);
+    Type_Info_Handle fti = field_get_type_info(fh);
     return descriptor_to_jclass(fti);
 }
 

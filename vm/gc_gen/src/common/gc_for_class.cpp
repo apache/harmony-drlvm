@@ -20,6 +20,7 @@
  */
 
 #include "gc_common.h"
+#include "open/vm_field_access.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 
 /* Setter functions for the gc class property field. */

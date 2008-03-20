@@ -39,6 +39,7 @@
 #include "Package.h"
 
 #include "open/vm_type_access.h"
+#include "open/vm_field_access.h"
 #include "open/vm_class_info.h"
 #include "jit_intf.h"
 
@@ -67,7 +68,7 @@ Boolean class_is_array(Class_Handle cl) {
 static uint32 countLeadingChars(const char* str, char c) {
     uint32 n=0;
     while (str[n]==c) {
-        n++;                
+        n++;
     }
     return n;
 }
@@ -104,41 +105,41 @@ Boolean     method_is_abstract(Method_Handle m) {
 
 
 
-Boolean field_is_static(Field_Handle f)
+BOOLEAN field_is_static(Field_Handle f)
 {
     assert(f);
-    return ((Field *)f)->is_static();
+    return f->is_static();
 }
 
 
 
-Boolean field_is_final(Field_Handle f)
+BOOLEAN field_is_final(Field_Handle f)
 {
     assert(f);
-    return ((Field *)f)->is_final();
+    return f->is_final();
 }
 
 
-Boolean field_is_volatile(Field_Handle f)
+BOOLEAN field_is_volatile(Field_Handle f)
 {
     assert(f);
-    return ((Field *)f)->is_volatile();
-}
-
-
-
-Boolean field_is_private(Field_Handle f)
-{
-    assert(f);
-    return ((Field *)f)->is_private();
+    return f->is_volatile();
 }
 
 
 
-Boolean field_is_public(Field_Handle f)
+BOOLEAN field_is_private(Field_Handle f)
 {
     assert(f);
-    return ((Field*)f)->is_public();
+    return f->is_private();
+}
+
+
+
+BOOLEAN field_is_public(Field_Handle f)
+{
+    assert(f);
+    return f->is_public();
 }
 
 
@@ -146,8 +147,8 @@ Boolean field_is_public(Field_Handle f)
 unsigned field_get_offset(Field_Handle f)
 {
     assert(f);
-    assert(!((Field *)f)->is_static());
-    return ((Field *)f)->get_offset();
+    assert(!f->is_static());
+    return f->get_offset();
 } //field_get_offset
 
 
@@ -164,7 +165,7 @@ void* field_get_address(Field_Handle f)
 const char* field_get_name(Field_Handle f)
 {
     assert(f);
-    return ((Field *)f)->get_name()->bytes;
+    return f->get_name()->bytes;
 }
 
 
@@ -172,15 +173,15 @@ const char* field_get_name(Field_Handle f)
 const char* field_get_descriptor(Field_Handle f)
 {
     assert(f);
-    return ((Field *)f)->get_descriptor()->bytes;
+    return f->get_descriptor()->bytes;
 }
 
 
 
-Java_Type   field_get_type(Field_Handle f)
+Java_Type field_get_type(Field_Handle f)
 {
     assert(f);
-    return ((Field *)f)->get_java_type();
+    return f->get_java_type();
 } // field_get_type
 
 
@@ -188,7 +189,7 @@ Java_Type   field_get_type(Field_Handle f)
 unsigned field_get_flags(Field_Handle f)
 {
     assert(f);
-    return ((Field *)f)->get_access_flags();
+    return f->get_access_flags();
 }
 
 
@@ -196,19 +197,19 @@ unsigned field_get_flags(Field_Handle f)
 Class_Handle field_get_class(Field_Handle f)
 {
     assert(f);
-    return ((Field *)f)->get_class();
+    return f->get_class();
 } //field_get_class
 
 void field_get_track_access_flag(Field_Handle f, char** address,
                                  char* mask)
 {
-    return ((Field *)f)->get_track_access_flag(address, mask);
+    return f->get_track_access_flag(address, mask);
 }
 
 void field_get_track_modification_flag(Field_Handle f, char** address,
                                  char* mask)
 {
-    return ((Field *)f)->get_track_modification_flag(address, mask);
+    return f->get_track_modification_flag(address, mask);
 }
 
 Boolean method_is_static(Method_Handle m)
@@ -225,8 +226,6 @@ Boolean method_is_final(Method_Handle m)
 }
 
 
-
-
 Boolean method_is_synchronized(Method_Handle m)
 {
     assert(m);
@@ -234,12 +233,12 @@ Boolean method_is_synchronized(Method_Handle m)
 } //method_is_synchronized
 
 
-
 Boolean method_is_private(Method_Handle m)
 {
     assert(m);
     return ((Method *)m)->is_private();
 } //method_is_private
+
 
 Boolean method_is_public(Method_Handle m)
 {
@@ -253,8 +252,6 @@ Boolean method_is_strict(Method_Handle m)
     assert(m);
     return ((Method *)m)->is_strict();
 } // method_is_strict
-
-
 
 
 Boolean method_is_native(Method_Handle m)
@@ -271,14 +268,11 @@ Byte *method_allocate_info_block(Method_Handle m, JIT_Handle j, size_t size)
 } //method_allocate_info_block
 
 
-
 Byte *method_allocate_jit_data_block(Method_Handle m, JIT_Handle j, size_t size, size_t alignment)
 {
     assert(m);
     return (Byte *)((Method *)m)->allocate_JIT_data_block(size, (JIT *)j, alignment);
 } //method_allocate_jit_data_block
-
-
 
 
 Byte *method_get_info_block_jit(Method_Handle m, JIT_Handle j)
@@ -897,6 +891,17 @@ Class_Handle resolve_class_from_constant_pool(Class_Handle c_handle, unsigned in
 }
 
 
+Field* class_resolve_nonstatic_field(Class* clss, unsigned cp_index)
+{
+    Compilation_Handle ch;
+    ch.env = VM_Global_State::loader_env;
+    ch.jit = NULL;
+    Field_Handle fh = resolve_field(&ch, (Class_Handle)clss, cp_index);
+    if(!fh || field_is_static(fh))
+        return NULL;
+    return fh;
+} // class_resolve_nonstatic_field
+
 
 ClassLoaderHandle
 class_get_class_loader(Class_Handle ch)
@@ -1335,7 +1340,7 @@ Class_Handle get_system_string_class()
 
 
 
-Boolean field_is_literal(Field_Handle fh)
+BOOLEAN field_is_literal(Field_Handle fh)
 {
     assert(fh);
     Field *f = (Field *)fh;
@@ -1477,16 +1482,6 @@ Class_Handle class_get_array_of_unboxed(Class_Handle ch)
         return 0;
     }
 } //class_get_array_of_unboxed
-
-
-
-
-Boolean field_is_unmanaged_static(Field_Handle fh)
-{
-    assert(fh);
-    return FALSE;
-} //field_is_unmanaged_static
-
 
 
 Boolean class_is_primitive(Class_Handle ch)
@@ -1749,7 +1744,7 @@ Method_Handle class_get_method(Class_Handle ch, unsigned index)
 
 
 // -gc magic needs this to do the recursive load.
-Class_Handle field_get_class_of_field_value(Field_Handle fh)
+Class_Handle field_get_class_of_field_type(Field_Handle fh)
 {
     assert(hythread_is_suspend_enabled());
     assert(fh);
@@ -1760,17 +1755,17 @@ Class_Handle field_get_class_of_field_value(Field_Handle fh)
     if(!ch->prepare(VM_Global_State::loader_env))
         return NULL;
     return ch;
-} //field_get_class_of_field_value
+} // field_get_class_of_field_type
 
 
-Boolean field_is_reference(Field_Handle fh)
+BOOLEAN field_is_reference(Field_Handle fh)
 {
     assert((Field *)fh);
     Java_Type typ = fh->get_java_type();
     return (typ == JAVA_TYPE_CLASS || typ == JAVA_TYPE_ARRAY);
 } //field_is_reference
 
-Boolean field_is_magic(Field_Handle fh)
+BOOLEAN field_is_magic(Field_Handle fh)
 {
     assert((Field *)fh);
     
@@ -1785,7 +1780,7 @@ Boolean field_is_enumerable_reference(Field_Handle fh)
 } //field_is_enumerable_reference
 
 
-Boolean field_is_injected(Field_Handle f)
+BOOLEAN field_is_injected(Field_Handle f)
 {
     assert(f);
     return ((Field*)f)->is_injected();
@@ -1897,14 +1892,14 @@ void free_string_buffer(char *buffer)
 } //free_string_buffer
 
 
-Type_Info_Handle field_get_type_info_of_field_value(Field_Handle fh)
+Type_Info_Handle field_get_type_info(Field_Handle fh)
 {
     assert(fh);
     Field *field = (Field *)fh;
     TypeDesc* td = field->get_field_type_desc();
     assert(td);
     return td;
-} //field_get_type_info_of_field_value
+} // field_get_type_info
 
 
 
