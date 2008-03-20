@@ -40,6 +40,7 @@ using namespace std;
 
 #include "open/types.h"
 #include "open/vm_type_access.h"
+#include "open/vm_field_access.h"
 #include "Class.h"
 #include "environment.h"
 #include "m2n.h"
