@@ -54,15 +54,15 @@ char* gen_hythread_self_helper(char *ss) {
 #   else
         unsigned offset = hythread_get_hythread_offset_in_tls();
         // gs register uses for tls acces on linux x86-32
-        //ss = mov(ss,  edx_opnd,  M_Base_Opnd(gs_reg, 0x00));
+        //ss = mov(ss,  eax_opnd,  M_Base_Opnd(gs_reg, 0x00));
         *ss++ = (char)0x65;
         *ss++ = (char)0x8b;
-        *ss++ = (char)0x15;
+        *ss++ = (char)0x05;
         *ss++ = (char)0x00;
         *ss++ = (char)0x00;
         *ss++ = (char)0x00;
         *ss++ = (char)0x00;
-        ss = mov(ss,  eax_opnd,  M_Base_Opnd(edx_reg, offset));
+        ss = mov(ss,  eax_opnd,  M_Base_Opnd(eax_reg, offset));
 #   endif
 #else
     ss = call(ss, (char *)hythread_self);
