@@ -427,7 +427,7 @@ GC* gc_gen_decide_collection_algo(char* minor_algo, char* major_algo, Boolean ha
     }
   }
   if(!minor_algo || use_default)
-    GC_PROP |= ALGO_COPY_FORWARD;
+    GC_PROP |= ALGO_COPY_SEMISPACE;
   
 
   use_default = FALSE;
