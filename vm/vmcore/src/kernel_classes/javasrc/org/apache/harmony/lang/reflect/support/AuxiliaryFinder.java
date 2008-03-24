@@ -18,6 +18,7 @@
 package org.apache.harmony.lang.reflect.support;
 
 import java.lang.reflect.GenericDeclaration;
+import java.lang.reflect.Member;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Constructor;
@@ -56,7 +57,7 @@ public final class AuxiliaryFinder {
      */
     public static Class findGenericClassDeclarationForParameterizedType(InterimParameterizedType fldType, Object startPoint) throws ClassNotFoundException {
         Class klass = null;
-        if((klass = verifyParameterizedType(fldType, startPoint)) != null) return klass;
+        if ((klass = verifyParameterizedType(fldType, startPoint)) != null) return klass;
 //############################################################################################################################################
 // The below fragment seems not to work after verifyParameterizedType implementation and the just above code line insertion
 // but it should be retained until being 100% aware (just though the incorrect basing on $ is used here):
@@ -65,14 +66,14 @@ public final class AuxiliaryFinder {
         String binaryClassName = null;
         String tmp = fldType.rawType.classTypeName.substring(1).replace('/', '.'); // cut the first "L" (reference symbol) and change "/" by "."
         int ind;
-        if((ind = tmp.lastIndexOf('$')) != -1) {
+        if ((ind = tmp.lastIndexOf('$')) != -1) {
             binaryClassName = tmp.substring(ind + 1);
         } else {
             binaryClassName = tmp;
         }
         while (ownerType != null && ownerType instanceof InterimParameterizedType) {
             tmp = ((InterimParameterizedType)ownerType).rawType.classTypeName.substring(1).replace('/', '.'); // cut the first "L" (reference symbol) and change "/" by "."
-            if((ind = tmp.lastIndexOf('$')) != -1) {
+            if ((ind = tmp.lastIndexOf('$')) != -1) {
                 tmp = tmp.substring(ind + 1);
             } else {
             }
@@ -90,6 +91,26 @@ public final class AuxiliaryFinder {
 //FRAGMENT FINISH ^
 //############################################################################################################################################
     }
+
+    /**
+     * This auxiliary method returns true if the particular type variable
+     * is defined in the specified generic declaration.
+     * 
+     * @param typeVariableName a name of a type variable.
+     * @param declaration a generic declaration to check.
+     * @return true if the specified declaration defines the specified type variable, false otherwise.
+     */
+    private static boolean hasGenericDeclaration(String typeVariableName, GenericDeclaration declaration) {
+        TypeVariable[] vars = declaration.getTypeParameters();
+        if (vars != null) {
+            for (TypeVariable var : vars) {
+                if (var.getName().equals(typeVariableName)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
     
     /**
      * This method returns generic declaration where a type variable is defined in.
@@ -101,86 +122,63 @@ public final class AuxiliaryFinder {
      *         if a generic declaration for this type variable does not exist at all.
      */
     public static GenericDeclaration findGenericDeclarationForTypeVariable(String typeVariableName, Object startPoint) {
-        // XXX: redesign after debugging to join all the common places below:
-        if (startPoint instanceof Field) {
-            Class klass = ((Field)startPoint).getDeclaringClass();
-            TypeVariable va[] = klass.getTypeParameters();
-            if (va != null) {
-                for(int i = 0; i < va.length; i++){
-                    if(va[i].getName().equals(typeVariableName)){
-                        return (GenericDeclaration) klass;
-                    }
-                }
-            } else {
-                while (klass != null) {
-                    klass = klass.getDeclaringClass();
-                    va = klass.getTypeParameters();
-                    if (va != null) {
-                        for(int i = 0; i < va.length; i++){
-                            if(va[i].getName().equals(typeVariableName)) {
-                                return (GenericDeclaration) klass;
-                            }
-                        }
-                    }
-                }
-                return null;
-            }
-        } else if (startPoint instanceof Method || startPoint instanceof Constructor) {
-            TypeVariable va[] = (startPoint instanceof Method ? (Method)startPoint : (Constructor)startPoint).getTypeParameters();
-            if (va != null) {
-                for(int i = 0; i < va.length; i++){
-                    if(va[i].getName().equals(typeVariableName)){
+        if (startPoint instanceof Class || startPoint instanceof Member) {
+            Class klass;
+            if (startPoint instanceof Class) {
+                klass = (Class) startPoint;
+            } else { // Member: Field, Method or Constructor
+                if (!(startPoint instanceof Field)) { // Method or Constructor
+                    if (hasGenericDeclaration(typeVariableName, (GenericDeclaration) startPoint)) {
                         return (GenericDeclaration) startPoint;
                     }
                 }
-            } else {
-                Class klass = (startPoint instanceof Method) ? ((Method)startPoint).getDeclaringClass() : ((Constructor)startPoint).getDeclaringClass();
-                va = klass.getTypeParameters();
-                if (va != null) {
-                    for(int i = 0; i < va.length; i++){
-                        if(va[i].getName().equals(typeVariableName)){
-                            return (GenericDeclaration) klass;
-                        }
-                    }
-                } else {
-                    while (klass != null) {
-                        klass = klass.getDeclaringClass();
-                        va = klass.getTypeParameters();
-                        if (va != null) {
-                            for(int i = 0; i < va.length; i++){
-                                if(va[i].getName().equals(typeVariableName)){
-                                    return (GenericDeclaration) klass;
-                                }
-                            }
-                        }
-                    }
-                    return null;
-                }
+                klass = ((Member) startPoint).getDeclaringClass();
             }
-        } else if (startPoint instanceof Class) {
-            Class klass = (Class)startPoint;
-            TypeVariable va[] = klass.getTypeParameters();
-            if (va != null) {
-                for(int i = 0; i < va.length; i++){
-                    if(va[i].getName().equals(typeVariableName)){
-                        return (GenericDeclaration) klass;
-                    }
+            while (klass != null) {
+                if (hasGenericDeclaration(typeVariableName, klass)) {
+                    return klass;
                 }
-            } else {
-                while (klass != null) {
-                    klass = klass.getDeclaringClass();
-                    va = klass.getTypeParameters();
-                    if (va != null) {
-                        for(int i = 0; i < va.length; i++){
-                            if(va[i].getName().equals(typeVariableName)){
-                                return (GenericDeclaration) klass;
-                            }
-                        }
-                    }
-                }
-                return null;
+                klass = klass.getDeclaringClass();
             }
         } 
+        return null;
+    }
+
+    /**
+     * This auxiliary method returns TypeVariable corresponding to the name
+     * of type variable in the specified declaration.
+     * 
+     * @param typeVariableName a name of a type variable.
+     * @param declaration a generic declaration to check.
+     * @return the found type variable.
+     */
+    private static TypeVariable findTypeVariableInDeclaration(String typeVariableName, GenericDeclaration declaration) {
+        TypeVariable variable = TypeVariableRepository.findTypeVariable(typeVariableName, declaration);
+        if (variable != null) return variable;
+        TypeVariable[] vars = declaration.getTypeParameters();
+        if (vars != null) {
+            for (TypeVariable var : vars) {
+                if (var.getName().equals(typeVariableName)) {
+                    /*
+                     * Yes, it may be very inefficient now (for example, getTypeParameters()
+                     * invokation above can just registry a TV but we need to recheck it in
+                     * this line) but after all the TV-repository's functionality implementation
+                     * it will be time to improvement.
+                     * So, it was placed in repository just after an TV-instance creation but
+                     * then it was removed (since we did not find it into the invoking method
+                     * of this method look there at line with
+                     * TypeVariableRepository.findTypeVariable(...) method invokation and also
+                     * we did not find it in just above if-condition).
+                     * As a consequence, we should reregistry it again as long as it become
+                     * so popular again.
+                     */
+                    if (TypeVariableRepository.findTypeVariable(typeVariableName, declaration) == null) {
+                        TypeVariableRepository.registerTypeVariable(var, typeVariableName, declaration);
+                    }
+                    return var;
+                }
+            }
+        }
         return null;
     }
         
@@ -193,162 +191,24 @@ public final class AuxiliaryFinder {
      * @return the found type variable.
      */
     public static TypeVariable findTypeVariable(String typeVariableName, Object startPoint) {
-        // XXX: redesign after debugging to join all the common places below:
-        if (startPoint instanceof Field) {
-            Class klass = ((Field)startPoint).getDeclaringClass();
-            TypeVariable va[] = klass.getTypeParameters();
-            if (va != null) {
-                for(int i = 0; i < va.length; i++){
-                    if(va[i].getName().equals(typeVariableName)){
-                        /**/if (TypeVariableRepository.findTypeVariable(typeVariableName, klass) == null) { // Yes, it may be very inefficient now (for example, klass.getTypeParameters() invokation above can just registry a TV but we need to recheck it in this line) but 
-                        /**/                                                                                     // after all the TV-repository's functionality implementation
-                        /**/                                                                                     // it will be time to improvement.
-                        /**/    TypeVariableRepository.registerTypeVariable(va[i], typeVariableName, klass); // So, it was placed in repository just after an TV-instance creation but then 
-                        /**/                                                                                      // it was removed (since we did not find it into the invoking method of this method look there at line with 
-                        /**/                                                                                      // TypeVariableRepository.findTypeVariable(...) method invokation and also we did not find it in just above if-condition).
-                        /**/                                                                                      // As a consequence, we should reregistry it again as long as it become so popular again
-                        /**/}
-                        return va[i];
-                    }
+        typeVariableName = transform(typeVariableName); // Is it needed at all?
+        if (startPoint instanceof Class || startPoint instanceof Member) {
+            Class klass;
+            TypeVariable ret;
+            if (startPoint instanceof Class) {
+                klass = (Class) startPoint;
+            } else { // Member: Field, Method or Constructor
+                if (!(startPoint instanceof Field)) { // Method or Constructor
+                    ret = findTypeVariableInDeclaration(typeVariableName, (GenericDeclaration) startPoint);
+                    if (ret != null) return ret;
                 }
+                klass = ((Member) startPoint).getDeclaringClass();
             }
-                while (klass != null) {
-                    klass = klass.getDeclaringClass();
-                    /**/java.lang.reflect.TypeVariable variable = TypeVariableRepository.findTypeVariable(typeVariableName, klass);
-                    /**/if (variable != null) {
-                    /**/    return variable;
-                    /**/}
-                    va = klass.getTypeParameters();
-                    if (va != null) {
-                        for(int i = 0; i < va.length; i++){
-                            if(va[i].getName().equals(typeVariableName)) {
-                                /**/if (TypeVariableRepository.findTypeVariable(typeVariableName, klass) == null) { // Yes, it may be very inefficient now (for example, klass.getTypeParameters() invokation above can just registry a TV but we need to recheck it in this line) but 
-                                /**/                                                                                     // after all the TV-repository's functionality implementation
-                                /**/                                                                                     // it will be time to improvement.
-                                /**/    TypeVariableRepository.registerTypeVariable(va[i], typeVariableName, klass); // So, it was placed in repository just after an TV-instance creation but then 
-                                /**/                                                                                      // it was removed (since we did not find it into the invoking method of this method look there at line with 
-                                /**/                                                                                      // TypeVariableRepository.findTypeVariable(...) method invokation and also we did not find it in just above if-condition).
-                                /**/                                                                                      // As a consequence, we should reregistry it again as long as it become so popular again
-                                /**/}
-                                return va[i];
-                            }
-                        }
-                    }
-                }
-                return null;
-        } else if (startPoint instanceof Method || startPoint instanceof Constructor) {
-            TypeVariable va[];
-            if (startPoint instanceof Method) {
-                va = ((Method)startPoint).getTypeParameters();
-            } else {
-                va = ((Constructor)startPoint).getTypeParameters();
+            while (klass != null) {
+                ret = findTypeVariableInDeclaration(typeVariableName, klass);
+                if (ret != null) return ret;
+                klass = klass.getDeclaringClass();
             }
-            if (va != null) {
-                for(int i = 0; i < va.length; i++){
-                    if(va[i].getName().equals(transform(typeVariableName))){
-                        /**/if (TypeVariableRepository.findTypeVariable(typeVariableName, startPoint) == null) { // Yes, it may be very inefficient now (for example, ((Constructor/Method)startPoint).getTypeParameters() invokation above can just registry a TV but we need to recheck it in this line) but 
-                        /**/                                                                                          // after all the TV-repository's functionality implementation
-                        /**/                                                                                          // it will be time to improvement.
-                        /**/    TypeVariableRepository.registerTypeVariable(va[i], typeVariableName, startPoint); // So, it was placed in repository just after an TV-instance creation but then 
-                        /**/                                                                                           // it was removed (since we did not find it into the invoking method of this method look there at line with 
-                        /**/                                                                                           // TypeVariableRepository.findTypeVariable(...) method invokation and also we did not find it in just above if-condition).
-                        /**/                                                                                           // As a consequence, we should reregistry it again as long as it become so popular again
-                        /**/}
-                        return va[i];
-                    }
-                }
-            }
-                Class klass = (startPoint instanceof Method) ? ((Method)startPoint).getDeclaringClass() : ((Constructor)startPoint).getDeclaringClass();
-                if (startPoint instanceof Method) {
-                    klass = ((Method)startPoint).getDeclaringClass();
-                } else {
-                    klass = ((Constructor)startPoint).getDeclaringClass();
-                }
-                /**/java.lang.reflect.TypeVariable variable = TypeVariableRepository.findTypeVariable(typeVariableName, klass);
-                /**/if (variable != null) {
-                /**/    return variable;
-                /**/}
-                va = klass.getTypeParameters();
-                if (va != null) {
-                    for(int i = 0; i < va.length; i++){
-                        if(va[i].getName().equals(transform(typeVariableName))){
-                            /**/if (TypeVariableRepository.findTypeVariable(typeVariableName, klass) == null) { // Yes, it may be very inefficient now (for example, klass.getTypeParameters() invokation above can just registry a TV but we need to recheck it in this line) but 
-                            /**/                                                                                     // after all the TV-repository's functionality implementation
-                            /**/                                                                                     // it will be time to improvement.
-                            /**/    TypeVariableRepository.registerTypeVariable(va[i], typeVariableName, klass); // So, it was placed in repository just after an TV-instance creation but then 
-                            /**/                                                                                      // it was removed (since we did not find it into the invoking method of this method look there at line with 
-                            /**/                                                                                      // TypeVariableRepository.findTypeVariable(...) method invokation and also we did not find it in just above if-condition).
-                            /**/                                                                                      // As a consequence, we should reregistry it again as long as it become so popular again
-                            /**/}
-                            return va[i];
-                        }
-                    }
-                }
-                    while (klass != null) {
-                        klass = klass.getDeclaringClass();
-                        /**/variable = TypeVariableRepository.findTypeVariable(typeVariableName, klass);
-                        /**/if (variable != null) {
-                        /**/    return variable;
-                        /**/}
-                        va = klass.getTypeParameters();
-                        if (va != null) {
-                            for(int i = 0; i < va.length; i++){
-                                if(va[i].getName().equals(transform(typeVariableName))){
-                                    /**/if (TypeVariableRepository.findTypeVariable(typeVariableName, klass) == null) { // Yes, it may be very inefficient now (for example, klass.getTypeParameters() invokation above can just registry a TV but we need to recheck it in this line) but 
-                                    /**/                                                                                     // after all the TV-repository's functionality implementation
-                                    /**/                                                                                     // it will be time to improvement.
-                                    /**/    TypeVariableRepository.registerTypeVariable(va[i], typeVariableName, klass); // So, it was placed in repository just after an TV-instance creation but then 
-                                    /**/                                                                                      // it was removed (since we did not find it into the invoking method of this method look there at line with 
-                                    /**/                                                                                      // TypeVariableRepository.findTypeVariable(...) method invokation and also we did not find it in just above if-condition).
-                                    /**/                                                                                      // As a consequence, we should reregistry it again as long as it become so popular again
-                                    /**/}
-                                    return va[i];
-                                }
-                            }
-                        }
-                    }
-                    return null;
-        } else if (startPoint instanceof Class) {
-            Class klass = (Class)startPoint;
-            TypeVariable va[] = klass.getTypeParameters();
-            if (va != null) {
-                for(int i = 0; i < va.length; i++){
-                    if(va[i].getName().equals(typeVariableName)){
-                        /**/if (TypeVariableRepository.findTypeVariable(typeVariableName, klass) == null) { // Yes, it may be very inefficient now (for example, klass.getTypeParameters() invokation above can just registry a TV but we need to recheck it in this line) but 
-                        /**/                                                                                     // after all the TV-repository's functionality implementation
-                        /**/                                                                                     // it will be time to improvement.
-                        /**/    TypeVariableRepository.registerTypeVariable(va[i], typeVariableName, klass); // So, it was placed in repository just after an TV-instance creation but then 
-                        /**/                                                                                      // it was removed (since we did not find it into the invoking method of this method look there at line with 
-                        /**/                                                                                      // TypeVariableRepository.findTypeVariable(...) method invokation and also we did not find it in just above if-condition).
-                        /**/                                                                                      // As a consequence, we should reregistry it again as long as it become so popular again
-                        /**/}
-                        return va[i];
-                    }
-                }
-            }
-                while ((klass = klass.getDeclaringClass()) != null) {
-                    /**/java.lang.reflect.TypeVariable variable = TypeVariableRepository.findTypeVariable(typeVariableName, klass);
-                    /**/if (variable != null) {
-                    /**/    return variable;
-                    /**/}
-                    va = klass.getTypeParameters();
-                    if (va != null) {
-                        for(int i = 0; i < va.length; i++){
-                            if(va[i].getName().equals(typeVariableName)){
-                                /**/if (TypeVariableRepository.findTypeVariable(typeVariableName, klass) == null) { // Yes, it may be very inefficient now (for example, klass.getTypeParameters() invokation above can just registry a TV but we need to recheck it in this line) but 
-                                /**/                                                                                     // after all the TV-repository's functionality implementation
-                                /**/                                                                                     // it will be time to improvement.
-                                /**/    TypeVariableRepository.registerTypeVariable(va[i], typeVariableName, klass); // So, it was placed in repository just after an TV-instance creation but then 
-                                /**/                                                                                      // it was removed (since we did not find it into the invoking method of this method look there at line with 
-                                /**/                                                                                      // TypeVariableRepository.findTypeVariable(...) method invokation and also we did not find it in just above if-condition).
-                                /**/                                                                                      // As a consequence, we should reregistry it again as long as it become so popular again
-                                /**/}
-                                return va[i];
-                            }
-                        }
-                    }
-                }
-                return null;
         } 
         return null;
     }
@@ -368,7 +228,7 @@ public final class AuxiliaryFinder {
             if (Integer.parseInt(di1.substring(0, 1), 16) < 0xE) { // range 0x0080 - 0x07ff , for example: \0ce\091
                 res = res + new String(new char[]{(char)(((Integer.parseInt(di1, 16)&0x1f)<<6)+(Integer.parseInt(di2, 16)&0x3f))});
                 return res + transform(ini.substring(ind+8));
-            } else if (Integer.parseInt(di1.substring(0, 1), 16) < 0xd800 || Integer.parseInt(di1.substring(0, 1), 16) > 0xdfff){ // range 0x0800 - 0xffff , for example: \0ef\0bf\08f
+            } else if (Integer.parseInt(di1.substring(0, 1), 16) < 0xd800 || Integer.parseInt(di1.substring(0, 1), 16) > 0xdfff) { // range 0x0800 - 0xffff , for example: \0ef\0bf\08f
                 di3 = ini.substring(ind+10, ind+10+2); // to ommit the following \0
                 res = res + new String(new char[]{(char)(((Integer.parseInt(di1, 16)&0xf)<<12)+((Integer.parseInt(di2, 16)&0x3f)<<6)+(Integer.parseInt(di3, 16)&0x3f))});
                 return res + transform(ini.substring(ind+12));
@@ -392,20 +252,20 @@ public final class AuxiliaryFinder {
             return klass; // has been verified
         }
         
-        if(!klass.isLocalClass() && !klass.isMemberClass()){
+        if (!klass.isLocalClass() && !klass.isMemberClass()) {
             return klass;
         }
         String snm = klass.getSimpleName(); // It must not be anonymous because it is the parameterised one.
         int i = fldType.rawType.classTypeName.lastIndexOf("$"+snm);
-        if(i == -1){
+        if (i == -1) {
             return klass;
         }
         String rtnm = fldType.rawType.classTypeName.substring(0, i);
         InterimParameterizedType newPT = null;
         
         if (fldType.ownerType == null) {
-            try{
-                if (AuxiliaryLoader.findClass(rtnm.substring(1).replace('/', '.'), startPoint) != null){
+            try {
+                if (AuxiliaryLoader.findClass(rtnm.substring(1).replace('/', '.'), startPoint) != null) {
                     // telescoping a final unit:
                     InterimClassType newCT = new InterimClassType();
                     newCT.classTypeName = rtnm;
@@ -417,8 +277,8 @@ public final class AuxiliaryFinder {
             return klass;
         } else {
             if (!rtnm.equals((fldType.ownerType instanceof InterimParameterizedType ? ((InterimParameterizedType)fldType.ownerType).rawType.classTypeName : ((InterimClassType)fldType.ownerType).classTypeName))) {
-                try{
-                    if (AuxiliaryLoader.findClass(rtnm.substring(1).replace('/', '.'), startPoint) != null){
+                try {
+                    if (AuxiliaryLoader.findClass(rtnm.substring(1).replace('/', '.'), startPoint) != null) {
                         // telescoping an intermediate unit:
                         newPT = new InterimParameterizedType();
 /* ### */                        newPT.signature = fldType.signature.substring(0, fldType.signature.lastIndexOf("$"+snm)); //XXX: ???
