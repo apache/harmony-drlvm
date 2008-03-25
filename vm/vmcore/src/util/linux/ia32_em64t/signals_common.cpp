@@ -353,10 +353,10 @@ Boolean null_reference_handler(port_sigtype UNREF signum, Registers* regs, void*
         regs->set_ip(new_ip);
     }
 
-    if (!vmthread || env == NULL ||
-        !is_in_java(regs) || interpreter_enabled())
+    if (!vmthread || env == NULL)
         return FALSE; // Crash
 
+    // Stack overflow can occur in native code as well as in interpreter
     if (check_stack_overflow(regs, fault_addr))
     {
         Boolean result = stack_overflow_handler(signum, regs, fault_addr);
@@ -366,6 +366,9 @@ Boolean null_reference_handler(port_sigtype UNREF signum, Registers* regs, void*
 
         return result;
     }
+
+    if (!is_in_java(regs) || interpreter_enabled())
+        return FALSE; // Crash
 
     // Pass exception to NCAI exception handler
     bool is_handled = 0;

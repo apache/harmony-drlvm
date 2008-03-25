@@ -15,6 +15,8 @@
  *  limitations under the License.
  */
 
+#include <sys/mman.h>
+#include <limits.h>
 #include <unistd.h>
 #undef __USE_XOPEN
 #include <signal.h>
@@ -38,6 +40,41 @@ int free_private_tls_data()
     return (pthread_key_delete(port_tls_key) == 0) ? 0 : -1;
 }
 
+
+// Because application can set up some protected area in stack region,
+// we need to re-enable access to this area because we need to operate
+// with the original stack of the thread
+// Application should take care of restoring this protected area after
+// signal processing
+// FIXME This is workaround only; it also can break crash processing for SIGSEGV
+// Ideally all the functionality on guard pages should be in Port.
+// Unfortunately, it can involve thread creation in Port, additional
+// thread wrapper, and moving general TLS operations to Port, so
+// it's postponed
+static void clear_stack_protection(Registers* regs, void* fault_addr)
+{
+    if (!fault_addr) // is not SO
+        return;
+
+    size_t fault = (size_t)fault_addr;
+    size_t sp = (size_t)regs->get_sp();
+    size_t diff = (fault > sp) ? (fault - sp) : (sp - fault);
+    size_t page_size = (size_t)sysconf(_SC_PAGE_SIZE);
+
+    if (diff > page_size)
+        return; // Most probably is not SO
+
+    size_t start = sp & ~(page_size - 1);
+    size_t size = page_size;
+
+    if (sp - start < 0x400)
+    {
+        start -= page_size;
+        size += page_size;
+    }
+
+    int res = mprotect((void*)start, size, PROT_READ | PROT_WRITE);
+}
 
 static void c_handler(Registers* pregs, size_t signum, void* fault_addr)
 { // this exception handler is executed *after* VEH handler returned
@@ -101,6 +138,10 @@ static void general_signal_handler(int signum, siginfo_t* info, void* context)
     Registers regs;
     // Convert OS context to Registers
     port_thread_context_to_regs(&regs, (ucontext_t*)context);
+
+    if (signum == SIGSEGV)
+        clear_stack_protection(&regs, info->si_addr);
+
     // Prepare registers for transfering control out of signal handler
     void* callback = (void*)&c_handler;
     port_set_longjump_regs(callback, &regs, 3,
