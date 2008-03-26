@@ -1344,7 +1344,7 @@ static int calculate_subst_len(const char* value,
                              const char* subst, const int subst_len,
                              const char* substby, const int substby_len)
 {
-    int len = strlen(value);
+    int len = (int) strlen(value);
     for(; *value; value++) {
         if(*value != '%') {
             continue;
@@ -1364,7 +1364,7 @@ static void fillin_with_subst(char* bootClassPath, const char* path_elem,
                               const char* subst, const int subst_len,
                               const char* substby, const int substby_len)
 {
-    int pos = strlen(bootClassPath);
+    int pos = (int) strlen(bootClassPath);
     for(; *path_elem; path_elem++) {
         assert(pos < max_len);
         if(*path_elem != '%') {
@@ -1389,7 +1389,7 @@ static char* construct_kernel_BCP(const char* vm_dir, Properties& props)
 {
     static const char* subst_item = "%LAUNCHER_HOME%/%VM_DIR%";
     static const int subst_len = 24;
-    int subst_value_len = strlen(vm_dir);
+    int subst_value_len = (int) strlen(vm_dir);
 
     char** keys = props.get_keys();
     char** cur_key = keys;
@@ -1401,7 +1401,7 @@ static char* construct_kernel_BCP(const char* vm_dir, Properties& props)
         {
             bcpVmLen +=
                 calculate_subst_len(value, subst_item, subst_len, vm_dir, subst_value_len)
-                + strlen(PORT_PATH_SEPARATOR_STR);
+                + ((int) strlen(PORT_PATH_SEPARATOR_STR));
         }
         props.destroy(value);
         cur_key++;
@@ -1472,7 +1472,7 @@ static void load_properties(const char* path, const char* name, Properties& prop
     char* value_holder = (char*)STD_MALLOC(value_len);
     for(int i = 0; i < size; i++, pf_data++) {
         if(*pf_data == 0xA || *pf_data == 0xD) {
-            line_len = pf_data - line_start;
+            line_len = (int) (pf_data - line_start);
             if(line_len == 0) {
                 line_start = pf_data + 1;
                 continue;
@@ -1483,7 +1483,7 @@ static void load_properties(const char* path, const char* name, Properties& prop
                 char* delim = line_start;
                 for(; delim <= line_end && *delim != '='; delim++);
                 if(delim <= line_end) {
-                    int cur_key_len = delim - line_start;
+                    int cur_key_len = (int) (delim - line_start);
                     if(key_len < cur_key_len) {
                         key_len = cur_key_len + 1;
                         key_holder = (char*)STD_REALLOC(key_holder, key_len);
@@ -1494,7 +1494,7 @@ static void load_properties(const char* path, const char* name, Properties& prop
                     char* value_end = delim;
                     // limit value by either line_end of start of comment
                     for(; value_end <= line_end && *value_end != '#'; value_end++);
-                    int cur_value_len = value_end - delim;
+                    int cur_value_len = (int) (value_end - delim);
                     if(value_len < cur_value_len) {
                         value_len = cur_value_len + 1;
                         value_holder = (char*)STD_REALLOC(value_holder, value_len);
