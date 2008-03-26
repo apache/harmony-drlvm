@@ -17,6 +17,12 @@
 
 #include "gc_common.h"
 
+/* FIXME:: need refactoring this function to distribute the options 
+   interpretation to their respective modules. */
+
+/* for ALLOC_PREFETCH related micro definition */
+#include "../thread/gc_thread.h" 
+
 extern char* GC_VERIFY;
 extern POINTER_SIZE_INT NOS_SIZE;
 extern POINTER_SIZE_INT MIN_NOS_SIZE;
