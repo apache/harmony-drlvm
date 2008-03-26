@@ -23,6 +23,7 @@
 #include "cxxlog.h"
 
 #include "root_set_enum_internal.h"
+#include "GlobalClassLoaderIterator.h"
 #include <apr_time.h>
 #include "unloading.h"
 #include "thread_manager.h"
@@ -149,12 +150,42 @@ vm_enumerate_root_set_all_threads()
     assert(!hythread_is_suspend_enabled());
 } //vm_enumerate_root_set_all_threads
 
+void vm_update_jlc_for_class_unloading()
+{
+    TRACE2("classloader.unloading", "update jlc from Vtables");
+    GlobalClassLoaderIterator ClIterator;
+    ClassLoader *cl = ClIterator.first();
+    while(cl) {
+        GlobalClassLoaderIterator::ClassIterator itc;
+        GlobalClassLoaderIterator::ReportedClasses RepClasses = cl->GetReportedClasses();
+        Class* c;
+        for (itc = RepClasses->begin(); itc != RepClasses->end(); itc++)
+        {
+          c = itc->second;
+          assert(c);
+          if(c->get_vtable())
+            c->get_vtable()->jlC = *(c->get_class_handle());
+        }
+        ClassTable::iterator itl;
+        ClassTable* p_loadedClasses = cl->GetLoadedClasses();
+        if (!cl->IsBootstrap())
+          for (itl = p_loadedClasses->begin(); itl != p_loadedClasses->end(); itl++)
+          {
+            c = itl->second;
+            assert(c);
+            if(c->get_vtable())
+              c->get_vtable()->jlC = *(c->get_class_handle());
+          }
+        cl = ClIterator.next();
+   }
+}
 
 // Called after GC from VM side....We need to restart all the mutators.
 void vm_resume_threads_after()
 {
     TRACE2("vm.gc", "vm_resume_threads_after()");
 
+    vm_update_jlc_for_class_unloading();
     if(gc_supports_class_unloading()) class_unloading_start();
 
     if(jvmti_should_report_event(JVMTI_EVENT_GARBAGE_COLLECTION_FINISH)) {

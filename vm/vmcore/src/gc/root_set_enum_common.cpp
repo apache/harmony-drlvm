@@ -79,8 +79,6 @@ static void vm_enumerate_jlc(Class* c, bool b_weak = false)
     else {
         vm_enumerate_weak_root_reference((void**)c->get_class_handle(), FALSE);
     }
-    if(c->get_vtable())
-      vm_enumerate_weak_root_reference((void**)&(c->get_vtable()->jlC), FALSE);
 }
 
 static void vm_enumerate_class_static(Class* c)
