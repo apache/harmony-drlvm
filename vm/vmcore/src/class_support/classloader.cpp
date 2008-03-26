@@ -1182,7 +1182,8 @@ inline void BootstrapClassLoader::SetBCPElement(const char *path, apr_pool_t *tm
         void* mem_JarFile = apr_palloc(pool, sizeof(JarFile));
         element->m_jar = new (mem_JarFile) JarFile(jec);
 
-        if(element->m_jar && element->m_jar->Parse(new_path->bytes)) {
+        if(element->m_jar && element->m_jar->Parse(new_path->bytes, m_env->map_bootsrtap_jars))
+        {
             TRACE2("classloader.jar", "opened archive: " << new_path );
         }
     }

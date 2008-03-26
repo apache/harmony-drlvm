@@ -33,6 +33,7 @@
 #else
 #include <io.h>
 #endif
+#include "apr_mmap.h"
 
 #include "properties.h"
 #include "manifest.h"
@@ -209,31 +210,39 @@ class JarFile
     JarEntryCache* m_entries;
     bool m_ownCache;
     Manifest* m_manifest;
-    tl::MemoryPool pool;
+    tl::MemoryPool m_pool;
+    // handle of the jar file
+    int m_file_handle;
+    // associated lock
+    Lock_Manager m_lock;
+    // should jar support use mmap instead of open/read
+    bool m_use_mmap;
+    // apr pool to use with mmap
+    apr_pool_t* m_mappool;
+    // apr file object for mapping
+    apr_file_t* m_jarfile;
+    // memory location for jar
+    apr_mmap_t* m_mmap;
 
     // list of the jar files
     static std::vector<JarFile*> m_jars;
 
 public:
     JarFile(JarEntryCache* jec = NULL)
-        : m_name(NULL), m_entries(jec), m_ownCache(jec == NULL), m_manifest(NULL), jfh(0) {}
-    JarFile( const JarFile& jf ) : jfh(0) {
-        m_name = jf.m_name;
-        m_entries = jf.m_entries;
-        m_manifest = new Manifest(jf.m_manifest);
-    }
+        : m_name(NULL), m_entries(jec), m_ownCache(jec == NULL), m_manifest(NULL), m_file_handle(0),
+          m_use_mmap(false), m_mmap(NULL) {}
     ~JarFile() {
         if(m_ownCache)
             m_entries->~JarEntryCache();
         m_ownCache = false;
         m_entries = NULL;
-        if (jfh != 0) close(jfh);
-        jfh = 0;
+        if (m_file_handle != 0) close(m_file_handle);
+        m_file_handle = 0;
         if( m_manifest ) delete m_manifest;
         m_manifest = NULL;
     }
     // parses JAR file and stores its structure inside
-    bool Parse( const char* filename );
+    bool Parse( const char* filename, bool do_map );
     // returns entry cache (either shared or owned)
     JarEntryCache* GetCache() { return m_entries; }
     // returns if this JarFile owns entry cache it holds
@@ -241,6 +250,7 @@ public:
     const JarEntry* Lookup( const char* je_name ) const {
         return m_entries->Lookup(je_name);
     }
+    bool ReadEntry(unsigned char* buf, long entry_offset, int entry_length);
     // returns manifest from parsed jar archive
     Manifest* GetManifest() { return m_manifest; }
     // returns JAR file name
@@ -250,10 +260,6 @@ public:
     static JarFile* GetJar(int idx) {
         return m_jars[idx];
     }
-
-    // handle of the jar file
-    int jfh;
-    Lock_Manager lock;
 }; // class JarFile
 
 

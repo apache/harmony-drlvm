@@ -842,6 +842,7 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     vm_env->sort_fields = get_boolean_property("vm.sort_fields", vm_env->sort_fields, VM_PROPERTIES);
     vm_env->compact_fields = get_boolean_property("vm.compact_fields", vm_env->compact_fields, VM_PROPERTIES);
     vm_env->use_common_jar_cache = get_boolean_property("vm.common_jar_cache", TRUE, VM_PROPERTIES);
+    vm_env->map_bootsrtap_jars = get_boolean_property("vm.map_bootstrap_jars", FALSE, VM_PROPERTIES);
 
     vm_env->init_pools();
 

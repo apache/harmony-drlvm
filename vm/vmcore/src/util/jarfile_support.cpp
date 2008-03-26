@@ -54,19 +54,11 @@ bool JarEntry::GetContent(unsigned char* content) const
 {
     // length of content should be enough for storing m_size_uncompressed bytes
     JarFile* jf = JarFile::GetJar(m_jarFileIdx);
-    int inFile = jf->jfh;
-    // gregory - It is necessary to lock per jar file because the file
-    // handle is global to all threads, and file operations like seek,
-    // read, etc may be confused when many threads operate on the same
-    // jar file
-    LMAutoUnlock lock(&jf->lock);
-
-    if( lseek( inFile, m_contentOffset, SEEK_SET ) == -1 ) return false;
 
     switch( m_method )
     {
     case JAR_FILE_STORED:
-        return ( read( inFile, content, m_sizeCompressed ) == m_sizeCompressed );
+        return jf->ReadEntry(content, m_contentOffset, m_sizeCompressed);
     case JAR_FILE_SHRUNK:
         printf( "Found SHRUNK content. No support as of yet.\n" );
         return false;
@@ -96,7 +88,7 @@ bool JarEntry::GetContent(unsigned char* content) const
         {
             unsigned char* data = (unsigned char*)STD_MALLOC(m_sizeCompressed + 1);
             // FIXME: check that memory was allocated
-            if( read( inFile, data, m_sizeCompressed ) < m_sizeCompressed ) {
+            if(!jf->ReadEntry(data, m_contentOffset, m_sizeCompressed)) {
                 STD_FREE(data);
                 return false;
             }
@@ -121,6 +113,8 @@ bool JarEntry::GetContent(unsigned char* content) const
             infRes = inflate( &inf, Z_FINISH );
             STD_FREE(data);
             if( infRes != Z_STREAM_END ) {
+                // FIXME: this is broken stream actually
+                // and breaking will result in "Invalid class magic" later on
                 break;
             }
             infRes = inflateEnd( &inf );
@@ -145,30 +139,59 @@ bool JarEntry::GetContent(unsigned char* content) const
 #pragma warning( disable: 4786 ) // identifier was truncated to 255 characters in the browser information
 #endif
 
-bool JarFile::Parse( const char* fileName )
+bool JarFile::Parse( const char* fileName, bool do_map )
 {
-    int flags = O_RDONLY;
-#ifndef PLATFORM_POSIX
-    flags |= O_BINARY;
-#endif
-    int fp = open( fileName, flags, 0 );
-    jfh = fp;
-    if( fp == -1 ) return false;
+    int fp;
+    long off;
+    unsigned char* buf;
+    unsigned long fsize = 0;
 
+    m_use_mmap = do_map;
     m_name = fileName;
 
-    struct stat fs;
-    if(stat(fileName, &fs) == -1) return false;
-    unsigned long fsize = fs.st_size;
+    if(!m_use_mmap) {
+        int flags = O_RDONLY;
+#ifndef PLATFORM_POSIX
+        flags |= O_BINARY;
+#endif
+        fp = open( fileName, flags, 0 );
+        if( fp == -1 ) return false;
 
-    m_jars.push_back(this);
+        m_file_handle = fp;
 
-    int cd_size = fsize < 67000 ? fsize : 67000;
-    lseek(fp, -cd_size, SEEK_END);
-    unsigned char *buf = (unsigned char *)STD_ALLOCA(cd_size);
-    long off = read(fp, buf, cd_size) - 22; // 22 - EOD size
+        struct stat fs;
+        if(stat(fileName, &fs) == -1) return false;
+        fsize = fs.st_size;
+
+        int cd_size = fsize < 67000 ? fsize : 67000;
+        lseek(fp, -cd_size, SEEK_END);
+        buf = (unsigned char*)STD_ALLOCA(cd_size);
+        off = read(fp, buf, cd_size) - 22; // 22 - EOD size
+    } else {
+        apr_pool_create(&m_mappool, NULL);
+
+        apr_status_t status =
+            apr_file_open(&m_jarfile, fileName, APR_READ, APR_OS_DEFAULT, m_mappool);
+        assert(!status);
+
+        apr_off_t _fsize = 0;
+        status = apr_file_seek(m_jarfile, APR_END, &_fsize);
+        assert(!status);
+        fsize = (unsigned long)_fsize;
+
+        status = apr_mmap_create(&m_mmap, m_jarfile, 0, (apr_size_t)fsize,
+            APR_MMAP_READ, m_mappool);
+        assert(!status);
+
+        int cd_size = fsize < 67000 ? fsize : 67000;
+        off = cd_size - 22;
+        buf = (unsigned char*)m_mmap->mm + fsize - cd_size;
+    }
+
     long offsetCD; // start of the Central Dir
     int number; // number of entries
+
+    m_jars.push_back(this);
 
     JarEntry je;
     je.m_jarFileIdx = (int)(m_jars.size() - 1);
@@ -186,18 +209,19 @@ bool JarFile::Parse( const char* fileName )
             return false;
     }
 
-    m_manifest = new Manifest();
-    if(!m_manifest) return false;
-
     if(m_ownCache) {
-        void* jec_mem = pool.alloc(sizeof(JarEntryCache));
+        void* jec_mem = m_pool.alloc(sizeof(JarEntryCache));
         m_entries = new (jec_mem) JarEntryCache();
     }
 
-    lseek(fp, offsetCD, SEEK_SET);
+    if(!m_use_mmap) {
+        lseek(fp, offsetCD, SEEK_SET);
 
-    buf = (unsigned char *)STD_MALLOC(fsize - offsetCD);
-    fsize = read(fp, buf, fsize - offsetCD);
+        buf = (unsigned char *)STD_MALLOC(fsize - offsetCD);
+        fsize = read(fp, buf, fsize - offsetCD);
+    } else {
+        buf = (unsigned char*)m_mmap->mm + offsetCD;
+    }
 
     off = 0;
     for (int i = 0; i < number; i++){
@@ -205,14 +229,15 @@ bool JarFile::Parse( const char* fileName )
             return false;
 
         je.ConstructFixed(buf + off);
-        je.m_fileName = (char *)pool.alloc(je.m_nameLength + 1);
+        je.m_fileName = (char *)m_pool.alloc(je.m_nameLength + 1);
         strncpy(je.m_fileName, (const char *)buf + off + JAR_DIRECTORYENTRY_LEN, je.m_nameLength );
         je.m_fileName[je.m_nameLength] = '\0';
         je.m_contentOffset = je.m_relOffset + JarEntry::sizeFixed + je.m_nameLength + je.m_extraLength;
         if(!strcmp(je.m_fileName, "META-INF/MANIFEST.MF")) {
             // parse manifest
-            if(!m_manifest->Parse(&je)) return false;
-            if(!(*m_manifest)) {
+            m_manifest = new Manifest();
+            if(!m_manifest) return false;
+            if(!m_manifest->Parse(&je) || !(*m_manifest)) {
                 delete m_manifest;
                 return false;
             }
@@ -225,7 +250,29 @@ bool JarFile::Parse( const char* fileName )
         }
         off += JAR_DIRECTORYENTRY_LEN + je.m_nameLength + je.m_extraLength;
     }
-    STD_FREE(buf);
+    if(!m_use_mmap) {
+        STD_FREE(buf);
+    }
+
+    return true;
+}
+
+
+bool JarFile::ReadEntry(unsigned char* buf, long entry_offset, int entry_length)
+{
+    if(!m_use_mmap) {
+        // gregory - It is necessary to lock per jar file because the file
+        // handle is global to all threads, and file operations like seek,
+        // read, etc may be confused when many threads operate on the same
+        // jar file
+        LMAutoUnlock llock(&m_lock);
+
+        if(lseek(m_file_handle, entry_offset, SEEK_SET) == -1) return false;
+
+        if(read(m_file_handle, buf, entry_length) < entry_length) return false;
+    } else {
+        memcpy(buf, (char*)m_mmap->mm + entry_offset, entry_length*sizeof(char));
+    }
 
     return true;
 }

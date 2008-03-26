@@ -94,6 +94,12 @@ struct Global_Env {
     bool use_common_jar_cache;
 
     /**
+     * If set to true, jar files are mapped into memory instead of reading
+     * them from disk.
+     */
+    bool map_bootsrtap_jars;
+
+    /**
      * If set to true by the <code>-compact_fields</code> command-line option,
      * the VM will not pad out fields of less than 32 bits to four bytes.
      * However, fields will still be aligned to a natural boundary,
