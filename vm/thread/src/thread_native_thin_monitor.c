@@ -193,18 +193,19 @@ IDATA VMCALL hythread_unreserve_lock(hythread_thin_monitor_t *lockword_ptr) {
         assert(owner);
         assert(hythread_get_id(owner) == lock_id);
         assert(owner != hythread_self());
-        if(owner->state& 
-                          ( TM_THREAD_STATE_TERMINATED|
-                            TM_THREAD_STATE_WAITING|
-        		    TM_THREAD_STATE_WAITING_INDEFINITELY|
-        		    TM_THREAD_STATE_WAITING_WITH_TIMEOUT|
-        		    TM_THREAD_STATE_SLEEPING|
-        		    TM_THREAD_STATE_SUSPENDED|
-        		    TM_THREAD_STATE_IN_MONITOR_WAIT )
-        ) {
+        if(owner->state
+                & (TM_THREAD_STATE_TERMINATED
+                    | TM_THREAD_STATE_WAITING
+                    | TM_THREAD_STATE_WAITING_INDEFINITELY
+                    | TM_THREAD_STATE_WAITING_WITH_TIMEOUT
+                    | TM_THREAD_STATE_SLEEPING
+                    | TM_THREAD_STATE_PARKED
+                    | TM_THREAD_STATE_SUSPENDED
+                    | TM_THREAD_STATE_IN_MONITOR_WAIT))
+        {
             append = 0;
         } else {
-           append = RESERVED_BITMASK;
+            append = RESERVED_BITMASK;
         }
 
         status=hythread_suspend_other(owner);
@@ -389,7 +390,6 @@ IDATA hythread_thin_monitor_try_enter(hythread_thin_monitor_t *lockword_ptr) {
 #endif //SPIN_COUNT
                     return status;
                 }
-                assert(!IS_RESERVED(*lockword_ptr));
                 return hythread_thin_monitor_try_enter(lockword_ptr);
             }
 #endif 
