@@ -30,6 +30,13 @@
  * @defgroup port_barriers Memory read/write barriers
  */
 
+#ifdef _WIN32
+#   if (_MSC_VER >= 1400)
+#       include <intrin.h>
+#       include <emmintrin.h>
+#   endif
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -93,10 +100,6 @@ PORT_INLINE void port_write_barrier(void)
     void _WriteBarrier(void);
     void _mm_mfence(void);
     void _mm_sfence(void);
-#else
-    /* VC++ 2005 */
-    #include <intrin.h>
-    #include <emmintrin.h>
 #endif
 
 #if !defined(__INTEL_COMPILER)

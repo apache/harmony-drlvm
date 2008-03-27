@@ -18,6 +18,12 @@
 #if !defined(HYTHREAD_H)
 #define HYTHREAD_H
 
+#ifdef _WIN32
+#   if (_MSC_VER >= 1400)
+#       include <intrin.h>
+#   endif
+#endif
+
 #if defined(__cplusplus)
 extern "C" {
 #endif
@@ -26,14 +32,6 @@ extern "C" {
 
 #include <stddef.h>
 #include "hycomp.h"
-
-
-#ifdef _WIN32
-#   if (_MSC_VER >= 1400)
-#       include <intrin.h>
-#   endif
-#endif
-
 
 /* 
  * Idea behind these declarations is to make some functions static inlined for 
@@ -544,4 +542,5 @@ hythread_tls_get(hythread_t thread, hythread_tls_key_t key) {
 #endif
 
 #endif /* HYTHREAD_H */
+
 

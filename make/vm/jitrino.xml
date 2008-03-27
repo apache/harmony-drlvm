@@ -108,7 +108,7 @@
         <target name="-init-win" depends="-common-vm" if="is.windows">
             <compiler id="plaf.cpp.compiler" extends="common.cpp.compiler">
                 <!-- _CRT_SECURE_NO_DEPRECATE added to suppress a huge amount of complaints from msvc em64t compiler -->
-                <defineset define="_MBCS,_REENTRANT,__SMP__,_CRT_SECURE_NO_DEPRECATE,_HAS_ITERATOR_DEBUGGING=0,_SECURE_SCL=0" />
+                <defineset define="_MBCS,_REENTRANT,__SMP__,_HAS_ITERATOR_DEBUGGING=0,_SECURE_SCL=0" />
 
                 <compilerarg value="/TP" />
                 <compilerarg value="/Zc:forScope" />

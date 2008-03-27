@@ -103,6 +103,8 @@
             <defineset define="HY_NO_SIG" if="hy.skip.sig"/>
             <defineset define="HY_LOCAL_ZLIB" if="hy.skip.zlib"/>
 
+            <compilerarg value="/wd4996" if="is.windows" />
+
         </compiler>
 
         <compiler id="common.cpp.compiler" name="${hy.cpp.compiler}" extends="common.compiler">

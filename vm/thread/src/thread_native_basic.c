@@ -336,7 +336,7 @@ hythread_t hythread_self_slow() {
 void VMCALL hythread_set_self(hythread_t thread) {
 #ifndef _WIN64
 #   if (_MSC_VER >= 1400)
-        __writefsdword(offsetof(NT_TIB, ArbitraryUserPointer), thread);
+        __writefsdword(offsetof(NT_TIB, ArbitraryUserPointer), (unsigned long)thread);
 #   else
         _asm{
             mov eax, thread

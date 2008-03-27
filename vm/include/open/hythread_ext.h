@@ -118,12 +118,11 @@ e between safe point function call overhead and suspension time overhead.
 #define HYTHREAD_EXT_H
 
 #include "open/types.h"
+#include "open/hythread.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif
-
-#include "open/hythread.h"
 
 #include <open/types.h>
 #include <apr_pools.h>
