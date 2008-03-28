@@ -17,9 +17,12 @@
 
 
 #include <crtdbg.h>
+#include <process.h>
+#include <signal.h>
 #include "open/platform_types.h"
 #include "open/hythread_ext.h"
 #include "port_malloc.h"
+#include "port_mutex.h"
 
 #include "port_crash_handler.h"
 #include "stack_dump.h"
@@ -36,6 +39,19 @@
 
 
 port_tls_key_t port_tls_key = TLS_OUT_OF_INDEXES;
+
+typedef void (__cdecl *sigh_t)(int); // Signal handler type
+
+static PVOID veh = NULL;
+static sigh_t prev_sig = (sigh_t)SIG_ERR;
+// Mutex to protect access to the global data
+static osmutex_t g_mutex;
+// The global data protected by the mutex
+static int report_modes[4];
+static _HFILE report_files[3];
+//--------
+static bool asserts_disabled = false;
+
 
 int init_private_tls_data()
 {
@@ -70,6 +86,10 @@ static void c_handler(Registers* pregs,
         result = port_process_signal(PORT_SIGNAL_GPF, pregs, fault_addr, iscrash);
         break;
     case STATUS_INTEGER_DIVIDE_BY_ZERO:
+    case EXCEPTION_FLT_DIVIDE_BY_ZERO:
+    case EXCEPTION_FLT_OVERFLOW:
+    case EXCEPTION_FLT_UNDERFLOW:
+    case EXCEPTION_INT_OVERFLOW:
         result = port_process_signal(PORT_SIGNAL_ARITHMETIC, pregs, fault_addr, iscrash);
         break;
     case JVMTI_EXCEPTION_STATUS:
@@ -100,12 +120,12 @@ static void c_handler(Registers* pregs,
         if ((port_crash_handler_get_flags() & PORT_CRASH_DUMP_PROCESS_CORE) != 0)
             tlsdata->produce_core = TRUE;
         if (result > 0)
-            tlsdata->assert_dialog = TRUE;
+            tlsdata->debugger = TRUE;
 
         return; // To produce exception again
     }
 
-    ExitProcess((UINT)-1);
+    _exit(-1);
 }
 
 void prepare_assert_dialog(Registers* regs)
@@ -128,11 +148,11 @@ LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception
         {
             tlsdata->produce_core = FALSE;
             create_minidump(nt_exception);
-            if (!tlsdata->assert_dialog)
-                ExitProcess((UINT)-1);
+            if (!tlsdata->debugger)
+                _exit(-1);
         }
 
-        if (tlsdata->assert_dialog)
+        if (tlsdata->debugger)
         {
             // Go to handler to restore CRT/VEH settings and crash once again
             port_set_longjump_regs(&prepare_assert_dialog, &regs, 1, &regs);
@@ -145,11 +165,8 @@ LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception
     {
     case STATUS_STACK_OVERFLOW:
     case STATUS_ACCESS_VIOLATION:
-    case STATUS_INTEGER_DIVIDE_BY_ZERO:
     case JVMTI_EXCEPTION_STATUS:
-    case EXCEPTION_DATATYPE_MISALIGNMENT:
-    case EXCEPTION_ILLEGAL_INSTRUCTION:
-    case EXCEPTION_PRIV_INSTRUCTION:
+    case STATUS_INTEGER_DIVIDE_BY_ZERO:
     case EXCEPTION_FLT_DIVIDE_BY_ZERO:
     case EXCEPTION_FLT_OVERFLOW:
     case EXCEPTION_FLT_UNDERFLOW:
@@ -197,8 +214,6 @@ BOOL ctrl_handler(DWORD ctrlType)
     return FALSE;
 }
 
-static int report_modes[4];
-static _HFILE report_files[3];
 
 static void disable_assert_dialogs()
 {
@@ -226,10 +241,74 @@ static void restore_assert_dialogs()
 #endif // _DEBUG
 }
 
-static PVOID veh = NULL;
+static void show_debugger_dialog()
+{
+    int result = MessageBox(NULL,
+                    "ABORT handler has requested to call the debugger\n\n"
+                    "Press Retry to attach to the debugger\n"
+                    "Press Cancel to terminate the application",
+                    "Crash Handler",
+                    MB_RETRYCANCEL | MB_ICONHAND | MB_SETFOREGROUND | MB_TASKMODAL);
+
+    if (result == IDCANCEL)
+    {
+        _exit(3);
+        return;
+    }
+
+    port_win_dbg_break(); // Call the debugger
+}
+
+static void __cdecl sigabrt_handler(int signum)
+{
+    int result = port_process_signal(PORT_SIGNAL_ABORT, NULL, NULL, FALSE);
+    // There no reason for checking for 0 - abort() will do _exit(3) anyway
+//    if (result == 0)
+//        return;
+
+    shutdown_signals(); // Remove handlers
+
+    if (result > 0) // Assert dialog
+        show_debugger_dialog();
+
+    _exit(3);
+}
+
+static void __cdecl final_sigabrt_handler(int signum)
+{
+    _exit(3);
+}
+
+void sig_process_crash_flags_change(unsigned added, unsigned removed)
+{
+    apr_status_t aprarr = port_mutex_lock(&g_mutex);
+    if (aprarr != APR_SUCCESS)
+        return;
+
+    if ((added & PORT_CRASH_CALL_DEBUGGER) != 0 && asserts_disabled)
+    {
+        restore_assert_dialogs();
+        asserts_disabled = false;
+        signal(SIGABRT, (sigh_t)final_sigabrt_handler);
+    }
+
+    if ((removed & PORT_CRASH_CALL_DEBUGGER) != 0 && !asserts_disabled)
+    {
+        disable_assert_dialogs();
+        asserts_disabled = true;
+        signal(SIGABRT, (sigh_t)sigabrt_handler);
+    }
+
+    port_mutex_unlock(&g_mutex);
+}
 
 int initialize_signals()
 {
+    apr_status_t aprerr = port_mutex_create(&g_mutex, APR_THREAD_MUTEX_NESTED);
+
+    if (aprerr != APR_SUCCESS)
+        return -1;
+
     BOOL ok = SetConsoleCtrlHandler((PHANDLER_ROUTINE)ctrl_handler, TRUE);
 
     if (!ok)
@@ -241,15 +320,28 @@ int initialize_signals()
     if (!veh)
         return -1;
 
+    prev_sig = signal(SIGABRT, (sigh_t)sigabrt_handler);
+
+    if (prev_sig == SIG_ERR)
+        return -1;
+
     disable_assert_dialogs();
+    asserts_disabled = true;
 
     return 0;
 }
 
 int shutdown_signals()
 {
-    ULONG res;
-    res = RemoveVectoredExceptionHandler(veh);
+    if (asserts_disabled)
+    {
+        restore_assert_dialogs();
+        asserts_disabled = false;
+    }
+
+    signal(SIGABRT, prev_sig);
+
+    ULONG res = RemoveVectoredExceptionHandler(veh);
 
     if (!res)
         return -1;
@@ -259,7 +351,6 @@ int shutdown_signals()
     if (!ok)
         return -1;
 
-    restore_assert_dialogs();
-
+    port_mutex_destroy(&g_mutex);
     return 0;
 } //shutdown_signals

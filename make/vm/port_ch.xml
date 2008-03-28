@@ -120,6 +120,7 @@
 
                 <linkerarg value="--version-script=${vm.home}/port/build/ch.exp" if="is.unix"/>
 
+                <syslibset type="shared" libs="user32" if="is.windows"/>
                 <syslibset type="shared" libs="dl,stdc++,pthread,rt" if="is.linux"/>
                 <syslibset type="shared" libs="stdc++,pthread" if="is.freebsd"/>
                 <linkerarg value="--export-dynamic" if="is.freebsd"/>

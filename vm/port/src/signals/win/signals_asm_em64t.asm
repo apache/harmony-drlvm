@@ -25,6 +25,15 @@ vectored_exception_handler PROC
 vectored_exception_handler ENDP
 
 
+PUBLIC  port_win_dbg_break
+
+port_win_dbg_break PROC
+;void __declspec(naked) __cdecl port_win_dbg_break()
+    int 3
+    ret
+port_win_dbg_break ENDP
+
+
 ; struct Registers {
 ; uint64 rsp;   ; 00h
 ; uint64 rbp;   ; 08h

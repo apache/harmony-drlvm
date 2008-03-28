@@ -23,6 +23,7 @@
 
 #include "open/platform_types.h"
 #include "port_crash_handler.h"
+#include "port_malloc.h"
 #include "stack_dump.h"
 #include "../linux/include/gdb_crash_handler.h"
 #include "signals_internal.h"
@@ -77,18 +78,8 @@ static void clear_stack_protection(Registers* regs, void* fault_addr)
 }
 
 static void c_handler(Registers* pregs, size_t signum, void* fault_addr)
-{ // this exception handler is executed *after* VEH handler returned
+{ // this exception handler is executed *after* OS signal handler returned
     int result;
-    Registers regs = *pregs;
-
-    // Check if SIGSEGV is produced by port_read/write_memory
-    port_tls_data* tlsdata = get_private_tls_data();
-    if (tlsdata && tlsdata->violation_flag)
-    {
-        tlsdata->violation_flag = 0;
-        pregs->set_ip(tlsdata->restart_address);
-        return;
-    }
 
     switch ((int)signum)
     {
@@ -109,6 +100,9 @@ static void c_handler(Registers* pregs, size_t signum, void* fault_addr)
     case SIGQUIT:
         result = port_process_signal(PORT_SIGNAL_QUIT, pregs, fault_addr, FALSE);
         break;
+    case SIGABRT:
+        result = port_process_signal(PORT_SIGNAL_ABORT, NULL, fault_addr, FALSE);
+        break;
     default:
         result = port_process_signal(PORT_SIGNAL_UNKNOWN, pregs, fault_addr, TRUE);
     }
@@ -117,10 +111,18 @@ static void c_handler(Registers* pregs, size_t signum, void* fault_addr)
         return;
 
     // We've got a crash
-    if (result > 0)
-    { // result > 0 - invoke debugger
-        bool result = gdb_crash_handler(&regs);
-        // Continue with exiting process if not sucessful...
+    if (result > 0) // invoke debugger
+    { // Prepare second catch of signal to attach GDB from signal handler
+        port_tls_data* tlsdata = get_private_tls_data();
+        if (!tlsdata)
+        {   // STD_MALLOC can be harmful here
+            tlsdata = (port_tls_data*)STD_MALLOC(sizeof(port_tls_data));
+            memset(tlsdata, 0, sizeof(port_tls_data));
+            set_private_tls_data(tlsdata);
+        }
+
+        tlsdata->debugger = TRUE;
+        return; // To produce signal again
     }
 
     // result < 0 - exit process
@@ -129,6 +131,7 @@ static void c_handler(Registers* pregs, size_t signum, void* fault_addr)
         signal(signum, SIG_DFL); // setup default handler
         return;
     }
+
     // No core needed - simply terminate
     _exit(-1);
 }
@@ -136,16 +139,45 @@ static void c_handler(Registers* pregs, size_t signum, void* fault_addr)
 static void general_signal_handler(int signum, siginfo_t* info, void* context)
 {
     Registers regs;
+
+    if (!context)
+        return;
+
     // Convert OS context to Registers
     port_thread_context_to_regs(&regs, (ucontext_t*)context);
+
+    // Check if SIGSEGV is produced by port_read/write_memory
+    port_tls_data* tlsdata = get_private_tls_data();
+    if (tlsdata && tlsdata->violation_flag)
+    {
+        tlsdata->violation_flag = 0;
+        regs.set_ip(tlsdata->restart_address);
+        return;
+    }
+
+    if (tlsdata && tlsdata->debugger)
+    {
+        bool result = gdb_crash_handler(&regs);
+        _exit(-1); // Exit process if not sucessful...
+    }
+
+    if (signum == SIGABRT && // SIGABRT can't be trown again from c_handler
+        (port_crash_handler_get_flags() & PORT_CRASH_CALL_DEBUGGER) != 0)
+    { // So attaching GDB right here
+        bool result = gdb_crash_handler(&regs);
+        _exit(-1); // Exit process if not sucessful...
+    }
 
     if (signum == SIGSEGV)
         clear_stack_protection(&regs, info->si_addr);
 
     // Prepare registers for transfering control out of signal handler
     void* callback = (void*)&c_handler;
+    void* fault_addr = info ? info->si_addr : NULL;
+
     port_set_longjump_regs(callback, &regs, 3,
-                            &regs, (void*)(size_t)signum, info->si_addr);
+                            &regs, (void*)(size_t)signum, fault_addr);
+
     // Convert prepared Registers back to OS context
     port_thread_regs_to_context((ucontext_t*)context, &regs);
     // Return from signal handler to go to C handler
@@ -218,3 +250,8 @@ int shutdown_signals()
     restore_signals();
     return 0;
 } //shutdown_signals
+
+void sig_process_crash_flags_change(unsigned added, unsigned removed)
+{
+// Still empty on Linux
+}

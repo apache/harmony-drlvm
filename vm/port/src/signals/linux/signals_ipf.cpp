@@ -62,7 +62,7 @@ static void general_signal_handler(int signum, siginfo_t* info, void* context)
     // Convert OS context to Registers
     port_thread_context_to_regs(&regs, (ucontext_t*)context);
 
-    void* fault_addr = info->si_addr;
+    void* fault_addr = info ? info->si_addr : NULL;
     int result;
 
     switch ((int)signum)
@@ -83,6 +83,9 @@ static void general_signal_handler(int signum, siginfo_t* info, void* context)
         break;
     case SIGQUIT:
         result = port_process_signal(PORT_SIGNAL_QUIT, &regs, fault_addr, FALSE);
+        break;
+    case SIGABRT:
+        result = port_process_signal(PORT_SIGNAL_ABORT, NULL, fault_addr, FALSE);
         break;
     default:
         result = port_process_signal(PORT_SIGNAL_UNKNOWN, &regs, fault_addr, TRUE);
@@ -177,6 +180,11 @@ int shutdown_signals() {
     restore_signals();
     return 0;
 } //shutdown_signals
+
+void sig_process_crash_flags_change(unsigned added, unsigned removed)
+{
+// Still empty on Linux
+}
 
 #if 0
 

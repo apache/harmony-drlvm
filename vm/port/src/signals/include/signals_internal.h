@@ -36,10 +36,8 @@ typedef struct
     void*   restart_address;
 #endif /* UNIX */
 
-#ifdef WIN32
-    Boolean assert_dialog;
-#endif
-
+    /* Flag to indicate that debugger should be attached right in OS handler */
+    Boolean debugger;
     /* Flag to produce minidump/core on the second exception catch */
     Boolean   produce_core;
 
@@ -129,13 +127,15 @@ void port_set_longjump_regs(void* fn, Registers* regs, int num, ...);
 */
 void port_transfer_to_function(void* fn, Registers* regs, int num, ...);
 
+/* The function called to adjust signals processing upon flags change */
+void sig_process_crash_flags_change(unsigned added, unsigned removed);
 
 
 #define INSTRUMENTATION_BYTE_HLT 0xf4 // HLT instruction
 #define INSTRUMENTATION_BYTE_CLI 0xfa // CLI instruction
 #define INSTRUMENTATION_BYTE_INT3 0xcc // INT 3 instruction
 
-#ifdef WINNT
+#ifdef WIN32
 #define INSTRUMENTATION_BYTE INSTRUMENTATION_BYTE_CLI
 #else
 #define INSTRUMENTATION_BYTE INSTRUMENTATION_BYTE_INT3
@@ -152,6 +152,8 @@ LONG NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_exception);
 
 /* Internal exception handler */
 LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception);
+
+void __cdecl port_win_dbg_break(void);
 
 #else /* UNIX */
 

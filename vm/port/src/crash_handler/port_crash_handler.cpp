@@ -43,7 +43,7 @@ struct crash_additional_actions
 
 static crash_additional_actions *crash_actions = NULL;
 
-static unsigned crash_output_flags;
+static unsigned crash_output_flags = 0;
 
 static osmutex_t g_mutex;
 
@@ -74,6 +74,15 @@ Boolean port_init_crash_handler(
 
     g_unwind_callback = unwind_callback;
 
+    // Set default flags
+    port_crash_handler_set_flags(
+        PORT_CRASH_DUMP_TO_STDERR |
+        PORT_CRASH_STACK_DUMP |
+        PORT_CRASH_PRINT_COMMAND_LINE |
+        PORT_CRASH_PRINT_ENVIRONMENT |
+        PORT_CRASH_PRINT_MODULES |
+        PORT_CRASH_PRINT_REGISTERS);
+
     return TRUE;
 }
 
@@ -90,12 +99,16 @@ unsigned port_crash_handler_get_capabilities()
             PORT_CRASH_PRINT_MODULES |
             PORT_CRASH_PRINT_REGISTERS |
             PORT_CRASH_DUMP_PROCESS_CORE);
-
 }
 
 void port_crash_handler_set_flags(unsigned flags)
 {
-    crash_output_flags = flags;
+    unsigned new_flags = flags & port_crash_handler_get_capabilities();
+
+    sig_process_crash_flags_change(new_flags & ~crash_output_flags,
+                                   crash_output_flags & ~new_flags);
+
+    crash_output_flags = new_flags;
 }
 
 unsigned port_crash_handler_get_flags()

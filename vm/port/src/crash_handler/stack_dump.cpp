@@ -117,7 +117,7 @@ static void sd_print_stack(Registers* regs, port_unwind_compiled_frame unwind)
 {
     if (!regs)
     {
-        fprintf(stderr, "No stack trace due to registers info absence\n");
+        fprintf(stderr, "\nNo stack trace due to registers info absence\n");
         return;
     }
 
