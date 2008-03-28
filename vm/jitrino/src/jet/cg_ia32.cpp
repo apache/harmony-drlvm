@@ -18,6 +18,7 @@
  * @author Alexander Astapchuk
  * @version $Revision$
  */
+#include "open/vm_method_access.h"
 #include "compiler.h"
 #include "trace.h"
 

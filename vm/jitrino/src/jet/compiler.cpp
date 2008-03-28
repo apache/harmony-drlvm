@@ -29,10 +29,11 @@
 #include <stdlib.h>
 #endif
 
-#include "open/vm_class_info.h"
 #include "open/vm.h"
 #include "open/hythread_ext.h"
+#include "open/vm_class_info.h"
 #include "open/vm_type_access.h"
+#include "open/vm_method_access.h"
 #include "jit_import.h"
 #include "jit_runtime_support.h"
 #include "jit_intf.h"
@@ -335,9 +336,9 @@ JIT_Result Compiler::compile(Compile_Handle ch, Method_Handle method,
     }
 
     m_max_native_stack_depth = 0;
-    m_bc = (unsigned char*)method_get_byte_code_addr(m_method);
-    unsigned bc_size = (unsigned)method_get_byte_code_size(m_method);
-    unsigned num_locals = method_vars_get_number(m_method);
+    m_bc = method_get_bytecode(m_method);
+    unsigned bc_size = (unsigned)method_get_bytecode_length(m_method);
+    unsigned num_locals = method_get_max_locals(m_method);
     unsigned max_stack = method_get_max_stack(m_method);
     
     // Input arguments
@@ -1201,13 +1202,13 @@ void Compiler::comp_layout_code(unsigned prolog_ipoff, unsigned prolog_size)
 
 bool Compiler::comp_resolve_ehandlers(void)
 {
-    unsigned num_handlers = method_get_num_handlers(m_method);
+    unsigned num_handlers = method_get_exc_handler_number(m_method);
     m_handlers.resize(num_handlers);
 
     bool eh_ok = true;
     for (unsigned i=0; i<num_handlers; i++) {
         unsigned regStart, regEnd, handlerStart, klassType;
-        method_get_handler_info(m_method, i,
+        method_get_exc_handler_info(m_method, i,
                                 &regStart, &regEnd, &handlerStart,
                                 &klassType);
         HandlerInfo& hi = m_handlers[i];

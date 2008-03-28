@@ -341,7 +341,7 @@ public:
     // Class type is a subclass of ch=mh->getParentType()  The function returns
     // a method description for a method overriding mh in type or in the closest
     // superclass of ch that overrides mh.
-    MethodDesc* getOverriddenMethod(NamedType *type, MethodDesc * methodDesc);
+    MethodDesc* getOverridingMethod(NamedType *type, MethodDesc * methodDesc);
 
 
     const void*  getStringInternAddr(MethodDesc* enclosingMethodDesc, uint32 stringToken);

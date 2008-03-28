@@ -40,6 +40,7 @@
 
 #include "open/vm_type_access.h"
 #include "open/vm_field_access.h"
+#include "open/vm_method_access.h"
 #include "open/vm_class_info.h"
 #include "jit_intf.h"
 
@@ -98,9 +99,9 @@ const char* class_get_package_name(Class_Handle cl) {
     return cl->get_package()->get_name()->bytes;
 }
 
-Boolean     method_is_abstract(Method_Handle m) {
+BOOLEAN method_is_abstract(Method_Handle m) {
     assert(m);
-    return ((Method*)m)->is_abstract();
+    return m->is_abstract();
 } // method_is_abstract
 
 
@@ -212,56 +213,49 @@ void field_get_track_modification_flag(Field_Handle f, char** address,
     return f->get_track_modification_flag(address, mask);
 }
 
-Boolean method_is_static(Method_Handle m)
+BOOLEAN method_is_static(Method_Handle m)
 {
     assert(m);
-    return ((Method *)m)->is_static();
-}
+    return m->is_static();
+} // method_is_static
 
 
-Boolean method_is_final(Method_Handle m)
+BOOLEAN method_is_final(Method_Handle m)
 {
     assert(m);
-    return ((Method *)m)->is_final();
-}
+    return m->is_final();
+} // method_is_final
 
 
-Boolean method_is_synchronized(Method_Handle m)
+BOOLEAN method_is_synchronized(Method_Handle m)
 {
     assert(m);
-    return ((Method *)m)->is_synchronized();
-} //method_is_synchronized
+    return m->is_synchronized();
+} // method_is_synchronized
 
 
-Boolean method_is_private(Method_Handle m)
+BOOLEAN method_is_private(Method_Handle m)
 {
     assert(m);
-    return ((Method *)m)->is_private();
-} //method_is_private
+    return m->is_private();
+} // method_is_private
 
 
-Boolean method_is_public(Method_Handle m)
+BOOLEAN method_is_strict(Method_Handle m)
 {
     assert(m);
-    return ((Method *)m)->is_public();
-}
-
-
-Boolean method_is_strict(Method_Handle m)
-{
-    assert(m);
-    return ((Method *)m)->is_strict();
+    return m->is_strict();
 } // method_is_strict
 
 
-Boolean method_is_native(Method_Handle m)
+BOOLEAN method_is_native(Method_Handle m)
 {
     assert(m);
-    return ((Method *)m)->is_native();
+    return m->is_native();
 } // method_is_native
 
 
-Byte *method_allocate_info_block(Method_Handle m, JIT_Handle j, size_t size)
+Byte* method_allocate_info_block(Method_Handle m, JIT_Handle j, size_t size)
 {
     assert(m);
     return (Byte *)((Method *)m)->allocate_jit_info_block(size, (JIT *)j);
@@ -337,25 +331,7 @@ method_allocate_code_block(Method_Handle m,
 } // method_allocate_code_block
 
 
-
-void method_set_relocatable(Method_Handle m, JIT_Handle j, NativeCodePtr code_address, Boolean is_relocatable)
-{
-    Global_Env *env = VM_Global_State::loader_env;
-    CodeChunkInfo *cci;
-    Method_Handle method = env->em_interface->LookupCodeChunk(code_address, FALSE,
-        NULL, NULL, reinterpret_cast<void **>(&cci));
-    assert(method);
-    assert(method == m);
-    assert(cci);
-    assert(cci->get_jit() == j);
-    assert(cci->get_method() == m);
-    cci->set_relocatable(is_relocatable);
-} //method_set_relocatable
-
-
-
-
-Byte *method_get_code_block_addr_jit(Method_Handle m, JIT_Handle j)
+Byte* method_get_code_block_jit(Method_Handle m, JIT_Handle j)
 {
     assert(m);
     return method_get_code_block_addr_jit_new(m, j, 0);
@@ -376,9 +352,9 @@ Byte *method_get_code_block_addr_jit_new(Method_Handle method,
                                          int id)
 {
     assert(method);
-    CodeChunkInfo *jit_info = ((Method *)method)->get_chunk_info_no_create_mt((JIT *)j, id);
+    CodeChunkInfo* jit_info = method->get_chunk_info_no_create_mt((JIT *)j, id);
     assert(jit_info);
-    return (Byte *)jit_info->get_code_block_addr();
+    return (Byte*)jit_info->get_code_block_addr();
 } //method_get_code_block_addr_jit_new
 
 
@@ -393,65 +369,55 @@ unsigned method_get_code_block_size_jit_new(Method_Handle method,
 } //method_get_code_block_size_jit_new
 
 
-const Byte *method_get_byte_code_addr(Method_Handle m)
+const Byte* method_get_bytecode(Method_Handle m)
 {
     assert(m);
-    return ((Method *)m)->get_byte_code_addr();
+    return m->get_byte_code_addr();
 }
 
 
 
-size_t method_get_byte_code_size(Method_Handle m)
+uint32
+method_get_bytecode_length(Method_Handle m)
 {
     assert(m);
-    return ((Method *)m)->get_byte_code_size();
+    return m->get_byte_code_size();
 }
 
 
 
-unsigned method_get_max_locals(Method_Handle m)
+uint32 method_get_max_locals(Method_Handle m)
 {
     assert(m);
-    return ((Method *)m)->get_max_locals();
+    return m->get_max_locals();
 }
 
 
-
-unsigned method_get_max_stack(Method_Handle m)
+uint16 method_get_max_stack(Method_Handle m)
 {
     assert(m);
-    return ((Method *)m)->get_max_stack();
+    return m->get_max_stack();
 }
-
-
-
-unsigned    method_get_flags(Method_Handle m)
-{
-    assert(m);
-    return ((Method *)m)->get_access_flags();
-}
-
 
 
 unsigned    method_get_offset(Method_Handle m)
 {
     assert(m);
-    return ((Method *)m)->get_offset();
+    return m->get_offset();
 }
-
 
 
 void *method_get_indirect_address(Method_Handle m)
 {
     assert(m);
-    return ((Method *)m)->get_indirect_address();
+    return m->get_indirect_address();
 } //method_get_indirect_address
 
 const char *
 method_get_name(Method_Handle m)
 {
     assert(m);
-    return ((Method *)m)->get_name()->bytes;
+    return m->get_name()->bytes;
 }
 
 
@@ -459,7 +425,7 @@ method_get_name(Method_Handle m)
 const char* method_get_descriptor(Method_Handle m)
 {
     assert(m);
-    return ((Method *)m)->get_descriptor()->bytes;
+    return m->get_descriptor()->bytes;
 }
 
 
@@ -467,43 +433,35 @@ const char* method_get_descriptor(Method_Handle m)
 Class_Handle method_get_class(Method_Handle m)
 {
     assert(m);
-    return ((Method *)m)->get_class();
+    return m->get_class();
 }
 
 void method_lock(Method_Handle m)
 {
     assert(m);
-    return ((Method *)m)->lock();
+    return m->lock();
 }
 
 void method_unlock(Method_Handle m)
 {
     assert(m);
-    return ((Method *)m)->unlock();
+    return m->unlock();
 }
 
 
 Java_Type method_get_return_type(Method_Handle m)
 {
     assert(m);
-    return ((Method *)m)->get_return_java_type();
+    return m->get_return_java_type();
 }
 
 
 
-Boolean method_is_overridden(Method_Handle m)
+BOOLEAN method_is_overridden(Method_Handle m)
 {
     assert(m);
-    return ((Method *)m)->is_overridden();
-} //method_is_overridden
-
-
-Boolean method_is_fake(Method_Handle m)
-{
-    assert(m);
-    return ((Method *)m)->is_fake_method();
-} //method_is_fake
-
+    return m->is_overridden();
+} // method_is_overridden
 
 
 JIT_Handle method_get_JIT_id(Compile_Handle h)
@@ -1184,12 +1142,6 @@ const char* class_cp_get_class_name(Class_Handle cl, U_16 index)
 } // class_cp_get_class_name
 
 
-unsigned method_number_throws(Method_Handle m)
-{
-    assert(m);
-    return ((Method*)m)->num_exceptions_method_can_throw();
-}
-
 Class_Handle method_get_throws(Method_Handle mh, unsigned idx)
 {
     assert(hythread_is_suspend_enabled());
@@ -1205,23 +1157,23 @@ Class_Handle method_get_throws(Method_Handle mh, unsigned idx)
     return c;
 }
 
-unsigned method_get_num_handlers(Method_Handle m)
+
+uint16 method_get_exc_handler_number(Method_Handle m)
 {
     assert(m);
-    return ((Method *)m)->num_bc_exception_handlers();
-} //method_get_num_handlers
+    return m->num_bc_exception_handlers();
+} // method_get_exc_handler_number
 
 
-
-void method_get_handler_info(Method_Handle m,
-                                    unsigned handler_id,
-                                    unsigned *begin_offset,
-                                    unsigned *end_offset,
-                                    unsigned *handler_offset,
-                                    unsigned *handler_cpindex)
+void method_get_exc_handler_info(Method_Handle m,
+                                 uint32 handler_id,
+                                 uint32* begin_offset,
+                                 uint32* end_offset,
+                                 uint32* handler_offset,
+                                 uint32* handler_cpindex)
 {
     assert(m);
-    Handler *h = ((Method *)m)->get_bc_exception_handler_info(handler_id);
+    Handler* h = m->get_bc_exception_handler_info(handler_id);
     *begin_offset    = h->get_start_pc();
     *end_offset      = h->get_end_pc();
     *handler_offset  = h->get_handler_pc();
@@ -1305,9 +1257,6 @@ int object_get_vtable_offset()
 ////////////////////////////////////////////////////////////
 // begin declarations
 
-
-// Returns the number of local variables defined for the method.
-VMEXPORT unsigned method_vars_get_number(Method_Handle mh);
 
 VMEXPORT Class_Handle class_get_class_of_primitive_type(VM_Data_Type ch);
 
@@ -1527,18 +1476,9 @@ VM_Data_Type class_get_primitive_type_of_class(Class_Handle ch)
 } //class_get_primitive_type_of_class
 
 
-unsigned method_vars_get_number(Method_Handle mh)
-{
-    assert(mh);
-    Method *m = (Method *)mh;
-    return m->get_max_locals();
-} //method_vars_get_number
-
-
-
 // Returns the number of arguments defined for the method.
 // This number includes the this pointer (if present).
-unsigned method_args_get_number(Method_Signature_Handle mh)
+unsigned char method_args_get_number(Method_Signature_Handle mh)
 {
     assert(mh);
     Method_Signature *ms = (Method_Signature *)mh;
@@ -1546,7 +1486,7 @@ unsigned method_args_get_number(Method_Signature_Handle mh)
     Method *m = ms->method;
     assert(m);
     return m->get_num_args();
-} //method_args_get_number
+} // method_args_get_number
 
 
 // 20020303 At the moment we resolve the return type eagerly, but
@@ -1630,17 +1570,7 @@ Method_Signature_Handle method_get_signature(Method_Handle mh)
         m->set_method_sig(ms);
     }
     return ms;
-} //method_get_signature
-
-
-
-
-Boolean method_args_has_this(Method_Signature_Handle msh)
-{
-    assert(msh);
-    Method_Signature *ms = (Method_Signature *)msh;
-    return !ms->method->is_static();
-} //method_args_has_this
+} // method_get_signature
 
 
 unsigned class_number_fields(Class_Handle ch)
@@ -1808,19 +1738,6 @@ struct GC_VTable {
 /////////////////////////////////////////////////////////////////////
 //  New signature stuff
 
-
-
-
-Type_Info_Handle method_vars_get_type_info(Method_Handle mh,
-                                           unsigned UNREF idx)
-{
-    assert(mh);
-    // Always NULL for Java.
-    return 0;
-} //method_vars_get_type_info
-
-
-
 Type_Info_Handle method_args_get_type_info(Method_Signature_Handle msh,
                                            unsigned idx)
 {
@@ -1842,48 +1759,6 @@ Type_Info_Handle method_ret_type_get_type_info(Method_Signature_Handle msh)
     Method_Signature *ms = (Method_Signature *)msh;
     return ms->return_type_desc;
 } //method_ret_type_get_type_info
-
-
-
-Boolean method_vars_is_managed_pointer(Method_Handle mh, unsigned idx)
-{
-    assert(mh);
-    Type_Info_Handle tih = method_vars_get_type_info(mh, idx);
-    TypeDesc* td = (TypeDesc*)tih;
-    assert(td);
-    return td->is_managed_pointer();
-} //method_vars_is_managed_pointer
-
-
-Boolean method_vars_is_pinned(Method_Handle mh, unsigned UNREF idx)
-{
-    assert(mh);
-    // 20030626 This is wrong, but equivalent to the existing code when I wrote this.
-    return FALSE;
-} //method_vars_is_pinned
-
-
-Boolean method_args_is_managed_pointer(Method_Signature_Handle msh, unsigned idx)
-{
-    assert(msh);
-    Type_Info_Handle tih = method_args_get_type_info(msh, idx);
-    TypeDesc* td = (TypeDesc*)tih;
-    assert(td);
-    return td->is_managed_pointer();
-} //method_args_is_managed_pointer
-
-
-
-Boolean method_ret_type_is_managed_pointer(Method_Signature_Handle msh)
-{
-    assert(msh);
-    Type_Info_Handle tih = method_ret_type_get_type_info(msh);
-    TypeDesc* td = (TypeDesc*)tih;
-    assert(td);
-    return td->is_managed_pointer();
-} //method_ret_type_is_managed_pointer
-
-
 
 
 void free_string_buffer(char *buffer)
@@ -2022,7 +1897,7 @@ static struct {
 
 static unsigned no_inlining_table_count = sizeof(no_inlining_table)/sizeof(no_inlining_table[0]);
 
-Boolean method_is_no_inlining(Method_Handle mh)
+BOOLEAN method_is_no_inlining(Method_Handle mh)
 {
     assert(mh);
     const char* c = class_get_name(method_get_class(mh));
@@ -2034,16 +1909,7 @@ Boolean method_is_no_inlining(Method_Handle mh)
             strcmp(d, no_inlining_table[i].d)==0)
             return TRUE;
     return FALSE;
-} //method_is_no_inlining
-
-
-
-Boolean method_is_require_security_object(Method_Handle mh)
-{
-    assert(mh);
-    return FALSE;
-} //method_is_require_security_object
-
+} // method_is_no_inlining
 
 
 #define QUAL_NAME_BUFF_SIZE 128
@@ -2051,7 +1917,7 @@ Boolean method_is_require_security_object(Method_Handle mh)
 // Class ch is a subclass of method_get_class(mh).  The function returns a method handle
 // for an accessible method overriding mh in ch or in its closest superclass that overrides mh.
 // Class ch must be a class not an interface.
-Method_Handle method_find_overridden_method(Class_Handle ch, Method_Handle mh)
+Method_Handle method_get_overriding_method(Class_Handle ch, Method_Handle mh)
 {
     assert(ch);
     assert(mh);
@@ -2077,7 +1943,7 @@ Method_Handle method_find_overridden_method(Class_Handle ch, Method_Handle mh)
         }
     }
     return m;
-} //method_find_overridden_method
+} // method_get_overriding_method
 
 
 
@@ -2360,76 +2226,6 @@ void class_iterator_advance(ChaClassIterator* chaClassIterator)
     chaClassIterator->_current = next;
 } // class_iterator_advance
 
-
-Boolean method_iterator_initialize(ChaMethodIterator *chaClassIterator, Method_Handle method, Class_Handle root_class)
-{
-    assert(method);
-    chaClassIterator->_current = NULL;
-    class_iterator_initialize(&chaClassIterator->_class_iter, root_class);
-    chaClassIterator->_method = method;
-
-    // Don't support static methods for now, since the Signature of a method
-    // doesn't distinguish between static and non-static.
-    if (method_is_static(method))
-    {
-        return (chaClassIterator->_class_iter._is_valid = FALSE);
-    }
-
-    // If the root_class contains the method, then start the iteration at
-    // root_class.  Otherwise, advance the iterator to the first class that
-    // contains the method.
-    Method *m = class_lookup_method_recursive((Class *) root_class, ((Method *) method)->get_name(), ((Method *) method)->get_descriptor());
-    if (m == NULL)
-    {
-        method_iterator_advance(chaClassIterator);
-    }
-    else
-    {
-        chaClassIterator->_current = (Method_Handle) m;
-    }
-
-    return chaClassIterator->_class_iter._is_valid;
-} // method_iterator_initialize
-
-
-Method_Handle method_iterator_get_current(const ChaMethodIterator *chaClassIterator)
-{
-    return (chaClassIterator->_class_iter._is_valid ? chaClassIterator->_current : NULL);
-} // method_iterator_get_current
-
-
-void method_iterator_advance(ChaMethodIterator *chaClassIterator)
-{
-    if (!chaClassIterator->_class_iter._is_valid)
-        return;
-    if (chaClassIterator->_class_iter._current == NULL)
-        return;
-
-    // Move the class iterator forward until a class is found that
-    // implements the method, such that the method handle's class
-    // is equal to the current class of the iterator.
-    Method *m = (Method *) chaClassIterator->_method;
-    const String *name = m->get_name();
-    const String *desc = m->get_descriptor();
-    while (true)
-    {
-        class_iterator_advance(&chaClassIterator->_class_iter);
-        Class *c = (Class *) class_iterator_get_current(&chaClassIterator->_class_iter);
-        if (c == NULL)
-        {
-            chaClassIterator->_current = NULL;
-            return;
-        }
-        Method *next = c->lookup_method(name, desc);
-        if (next != NULL && next->get_class() == c)
-        {
-            chaClassIterator->_current = (Method_Handle) next;
-            return;
-        }
-    }
-} // method_iterator_advance
-
-
 CallingConvention vm_managed_calling_convention()
 {
     return CC_Vm;
@@ -2668,7 +2464,7 @@ static Annotation* lookup_annotation(AnnotationTable* table, Class* owner, Class
 }
 
 
-Boolean method_has_annotation(Method_Handle target, Class_Handle antn_type) {
+BOOLEAN method_has_annotation(Method_Handle target, Class_Handle antn_type) {
     assert(target);
     assert(antn_type);
     if (target->get_declared_annotations()) {

@@ -388,7 +388,7 @@ method_get_descriptor( method_handler method );
  * @note Assertion is raised if method is equal to null.
  */
 unsigned
-method_get_code_length( method_handler method );
+method_get_bytecode_length( method_handler method );
 
 /**
  * Function returns method bytecode array.

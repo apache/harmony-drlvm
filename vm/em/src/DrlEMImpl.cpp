@@ -27,6 +27,7 @@
 #include "jit_import.h"
 #include "em_intf.h"
 #include "open/vm.h"
+#include "open/vm_method_access.h"
 #include "ini.h"
 #include "cxxlog.h"
 

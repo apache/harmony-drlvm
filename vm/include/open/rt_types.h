@@ -235,6 +235,11 @@ typedef struct OpenMethodExecutionParams {
 
 typedef void * InlineInfoPtr;
 typedef void * Compile_Handle; //deprecated??
+  /**
+   * The handle to the JIT instance. 
+   */
+typedef void *JIT_Handle;
+
 
 typedef
     enum Method_Side_Effects {

@@ -292,18 +292,18 @@ private:
 class Handler {
 public:
     Handler();
-    bool parse(Class* clss, unsigned code_length, ByteReader &cfs, Method* method);
-    uint32 get_start_pc() {return _start_pc;}
-    uint32 get_end_pc() {return _end_pc;}
-    uint32 get_handler_pc() {return _handler_pc;}
-    uint32 get_catch_type_index() {return _catch_type_index;}
+    bool parse(Class* clss, unsigned code_length, ByteReader& cfs, Method* method);
+    uint16 get_start_pc() {return _start_pc;}
+    uint16 get_end_pc() {return _end_pc;}
+    uint16 get_handler_pc() {return _handler_pc;}
+    uint16 get_catch_type_index() {return _catch_type_index;}
 
 private:
-    uint32 _start_pc;
-    uint32 _end_pc;
-    uint32 _handler_pc;
-    uint32 _catch_type_index;
-    String *_catch_type;
+    uint16 _start_pc;
+    uint16 _end_pc;
+    uint16 _handler_pc;
+    uint16 _catch_type_index;
+    String* _catch_type;
 }; //Handler
 
 

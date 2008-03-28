@@ -34,14 +34,12 @@ extern "C" {
 #define OPEN_EM "em"
 #define OPEN_EM_VERSION "1.0"
 
+#include "rt_types.h"
+
   /**
    * The handle to the EM instance. 
    */
 typedef void *EM_Handle;
-  /**
-   * The handle to the JIT instance. 
-   */
-typedef void *JIT_Handle;
   /** 
    * The handle to the profile collector instance. 
    */

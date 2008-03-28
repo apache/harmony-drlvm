@@ -36,6 +36,7 @@
 
 #include "dump.h"
 #include "port_threadunsafe.h"
+#include "open/vm_method_access.h"
 
 // Invariants:
 //   Native frames:

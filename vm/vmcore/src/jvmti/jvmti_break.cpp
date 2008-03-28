@@ -22,6 +22,7 @@
  * JVMTI API for working with breakpoints
  */
 
+#include "open/vm_method_access.h"
 #include "jvmti_direct.h"
 #include "jvmti_utils.h"
 #include "jvmti_internal.h"

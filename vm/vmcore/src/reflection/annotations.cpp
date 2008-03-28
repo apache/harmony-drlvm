@@ -25,6 +25,7 @@
 #include <sstream>
 #include <assert.h>
 
+#include "open/vm_method_access.h"
 #include "Class.h"
 #include "annotations.h"
 #include "jni.h"

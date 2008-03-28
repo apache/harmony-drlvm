@@ -28,6 +28,7 @@
 
 #include <vector>
 
+#include "open/vm_method_access.h"
 #include "open/jthread.h"
 #include "stack_trace.h"
 #include "jni_direct.h"

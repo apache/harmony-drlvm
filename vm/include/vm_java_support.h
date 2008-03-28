@@ -59,8 +59,6 @@ VMEXPORT Arg_List_Iterator  advance_arg_iterator(Arg_List_Iterator iter);
 
 VMEXPORT unsigned     class_number_implements(Class_Handle ch);
 VMEXPORT Class_Handle class_get_implements(Class_Handle ch, unsigned idx);
-VMEXPORT unsigned     method_number_throws(Method_Handle m);
-VMEXPORT Class_Handle method_get_throws(Method_Handle m, unsigned idx);
 
 /**
 * @return <code>TRUE</code> if this a Java method. Every Java JIT must call this
@@ -69,7 +67,6 @@ VMEXPORT Class_Handle method_get_throws(Method_Handle m, unsigned idx);
 */ 
 VMEXPORT Boolean method_is_java(Method_Handle mh);
 VMEXPORT unsigned     field_get_flags(Field_Handle f);
-VMEXPORT unsigned     method_get_flags(Method_Handle m);
 VMEXPORT unsigned     class_get_flags(Class_Handle cl);
 
 void

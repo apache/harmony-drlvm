@@ -23,6 +23,7 @@
   * @file
   * @brief Contains platform-independent routines for runtime support.
   */
+#include "open/vm_method_access.h"
 #include "compiler.h"
 #include "trace.h"
 
@@ -272,7 +273,7 @@ void rt_enum(JIT_Handle jit, Method_Handle method,
         // hardware NPE happened. 
         // A special case is SOE, which is allowed to happen only at the method start.
         // Check the presumptions:
-        assert(method_get_num_handlers(method) == 0 || rt_is_soe_area(jit, method, context));
+        assert(method_get_exc_handler_number(method) == 0 || rt_is_soe_area(jit, method, context));
 #ifdef _DEBUG
         bool sync = method_is_synchronized(method);
         bool inst = !method_is_static(method);
@@ -639,7 +640,7 @@ void rt_profile_notification_callback(JIT_Handle jit, PC_Handle pch, Method_Hand
        //next instruction
        //2. Replace all the remaining bytes of counter instruction with nops
        //3. Atomically replace jump with 2 nops
-       Byte* methodAddr = method_get_code_block_addr_jit(mh, jit);
+       Byte* methodAddr = method_get_code_block_jit(mh, jit);
        for (uint32 i = 0 ; i<infoBlock.num_profiler_counters; i++) {
            uint32 offsetInfo = infoBlock.profiler_counters_map[i];
            uint32 codeOffset = ProfileCounterInfo::getInstOffset(offsetInfo);

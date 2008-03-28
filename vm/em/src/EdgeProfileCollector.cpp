@@ -21,13 +21,15 @@
 
 #include "EdgeProfileCollector.h"
 
+#define LOG_DOMAIN "em"
+#include "cxxlog.h"
+
 #include <algorithm>
 #include <assert.h>
-#include "cxxlog.h"
 #include <sstream>
+#include "open/vm_method_access.h"
 #include "port_mutex.h"
 
-#define LOG_DOMAIN "em"
 
 Method_Profile_Handle edge_profiler_create_profile( PC_Handle ph,
                                                     Method_Handle mh,

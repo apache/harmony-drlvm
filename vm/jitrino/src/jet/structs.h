@@ -34,6 +34,7 @@
 #include "jframe.h"
 #include "open/vm.h"
 #include "jit_import.h"
+#include "open/vm_method_access.h"
 
 namespace Jitrino {
 namespace Jet {
@@ -544,7 +545,7 @@ struct MethInfo
     /** Returns number of exception handlers in the method. */
     unsigned meth_num_handlers(void) const
     {
-        return method_get_num_handlers(m_method);
+        return method_get_exc_handler_number(m_method);
     }
     
     /** Tests whether the method is synchronized. */

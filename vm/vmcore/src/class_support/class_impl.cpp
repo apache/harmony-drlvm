@@ -393,12 +393,12 @@ method_get_descriptor( method_handler hmethod )
  * Function returns method code length.
  */
 unsigned
-method_get_code_length( method_handler hmethod )
+method_get_bytecode_length( method_handler hmethod )
 {
     assert( hmethod );
     Method *method = (Method*)hmethod;
     return method->get_byte_code_size();
-} // method_get_code_length
+} // method_get_bytecode_length
 
 /**
  * Function returns method bytecode array.

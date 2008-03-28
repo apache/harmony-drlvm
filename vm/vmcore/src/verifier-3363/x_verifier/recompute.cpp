@@ -65,7 +65,7 @@ vf_Result vf_Context_5e::recompute_stackmaptable( method_handler method ) {
     written_stackmap = 0;
 
     //nothing to verify
-    if( !method_get_code_length( method ) ) {
+    if( !method_get_bytecode_length( method ) ) {
         return VF_OK;
     }
 

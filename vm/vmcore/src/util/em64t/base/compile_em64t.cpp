@@ -21,6 +21,7 @@
 
 #include "open/types.h"
 #include "open/vm_type_access.h"
+#include "open/vm_method_access.h"
 #include "open/vm_util.h"
 #include "environment.h"
 #include "encoder.h"

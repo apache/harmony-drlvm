@@ -1556,10 +1556,10 @@ JavaByteCodeTranslator::invokevirtual(uint32 constPoolIndex) {
         Type* type = thisOpnd->getType();
         if (!type->isNullObject() && !type->isUnresolvedType() && !type->isInterface()) {
             // needs to refine the method descriptor before doing any optimization
-            MethodDesc *overridden = compilationInterface.getOverriddenMethod(
+            MethodDesc *overriding = compilationInterface.getOverridingMethod(
                                      (NamedType*)type,methodDesc);
-            if (overridden && overridden != methodDesc) {
-                methodDesc = overridden;
+            if (overriding && overriding != methodDesc) {
+                methodDesc = overriding;
             }
         }
     }
@@ -1687,10 +1687,10 @@ JavaByteCodeTranslator::invokeinterface(uint32 constPoolIndex,uint32 count) {
         Type * type = thisOpnd->getType();
         if (!type->isNullObject() && !type->isUnresolvedObject() && !type->isInterface()) {
             // need to refine the method descriptor before doing any optimization
-            MethodDesc *overridden = compilationInterface.getOverriddenMethod(
+            MethodDesc *overriding = compilationInterface.getOverridingMethod(
                                   (NamedType*)type,methodDesc);
-            if (overridden && overridden != methodDesc && !overridden->getParentType()->isInterface()) {
-                methodDesc = overridden;
+            if (overriding && overriding != methodDesc && !overriding->getParentType()->isInterface()) {
+                methodDesc = overriding;
             }
         }
     }

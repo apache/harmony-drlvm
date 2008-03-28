@@ -24,6 +24,7 @@
 
 #define LOG_DOMAIN "jvmti.stack"
 
+#include "open/vm_method_access.h"
 #include "jvmti_direct.h"
 #include "jvmti_utils.h"
 #include "interpreter_exports.h"

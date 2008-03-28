@@ -22,6 +22,7 @@
 #include "MTable.h"
 #include <assert.h>
 #include <algorithm>
+#include "open/vm_method_access.h"
 #include "jit_import.h"
 
 MTable::~MTable() {
@@ -156,7 +157,7 @@ bool MTable::NumRangeMethodFilter::matchMethod(const MTable::MethodInfo& mInfo) 
 
 
 bool MTable::BCSizeMethodFilter::matchMethod(const MTable::MethodInfo& mInfo) const  {
-    size_t size = method_get_byte_code_size(mInfo.mh);
+    size_t size = method_get_bytecode_length(mInfo.mh);
     bool matched = size >=start && size<=end;
     return matched;
 }

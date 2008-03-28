@@ -26,6 +26,7 @@
 #include "cxxlog.h"
 #include "port_mutex.h"
 
+#include "open/vm_method_access.h"
 #include "open/gc.h"
 #include "jvmti_direct.h"
 #include "jvmti_internal.h"

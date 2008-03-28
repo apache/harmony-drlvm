@@ -125,7 +125,7 @@ public:
      * For debugging only.
      *
      * The code must be already generated and available for VM - 
-     * \b method_get_code_block_addr_jit is used to obtain the code.
+     * \b method_get_code_block_jit is used to obtain the code.
      */
     void dbg_dump_code_bc(const char * code, unsigned codeLen);
     /**

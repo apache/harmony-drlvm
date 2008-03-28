@@ -25,9 +25,10 @@
 #define DYNAMIC_OPEN
 #include "VMInterface.h"
 #include "open/vm_class_info.h"
-#include "open/vm_interface.h"
 #include "open/vm_type_access.h"
 #include "open/vm_field_access.h"
+#include "open/vm_method_access.h"
+#include "open/vm_interface.h"
 #include "jit_import_rt.h"
 #include "jit_runtime_support.h"
 
@@ -107,25 +108,25 @@ static  field_is_volatile_t  field_is_volatile = 0;
 
 //Method
 
-static  method_get_overridden_method_t method_get_overridden_method = 0;//method_find_overridden_method
+static  method_get_overriding_method_t method_get_overriding_method = 0;
 static  method_get_info_block_jit_t method_get_info_block_jit = 0;
 static  method_get_info_block_size_jit_t method_get_info_block_size_jit = 0;
 static  method_get_name_t method_get_name = 0;
 static  method_get_descriptor_t method_get_descriptor = 0;
-static  method_get_byte_code_addr_t method_get_byte_code_addr = 0;
-static  method_get_byte_code_size_t  method_get_byte_code_size = 0;
+static  method_get_bytecode_t method_get_bytecode = 0;
+static  method_get_bytecode_length_t  method_get_bytecode_length = 0;
 static  method_get_max_stack_t  method_get_max_stack = 0;
-static  method_get_num_handlers_t  method_get_num_handlers = 0;
+static  method_get_exc_handler_number_t  method_get_exc_handler_number = 0;
 static  method_get_offset_t  method_get_offset = 0;
 static  method_get_indirect_address_t  method_get_indirect_address = 0;
 static  method_get_native_func_addr_t  method_get_native_func_addr = 0;
-static  method_vars_get_number_t  method_vars_get_number = 0;
+static  method_get_max_locals_t  method_get_max_locals = 0;
 static  method_args_get_number_t  method_args_get_number = 0;
 static  method_args_get_type_info_t method_args_get_type_info = 0;
 static  method_ret_type_get_type_info_t  method_ret_type_get_type_info = 0;
 static  method_get_signature_t method_get_signature = 0;
 static  method_get_class_t  method_get_class = 0;
-static  method_get_handler_info_t method_get_handler_info = 0;
+static  method_get_exc_handler_info_t method_get_exc_handler_info = 0;
 static  method_get_code_block_addr_jit_new_t method_get_code_block_addr_jit_new = 0;
 static  method_get_code_block_size_jit_new_t method_get_code_block_size_jit_new = 0;
 static  method_get_side_effects_t  method_get_side_effects = 0;
@@ -301,25 +302,25 @@ static vm_enumerate_root_interior_pointer_t vm_enumerate_root_interior_pointer =
 
         //Method
 
-        method_get_overridden_method = GET_INTERFACE(vm, method_get_overridden_method);
+        method_get_overriding_method = GET_INTERFACE(vm, method_get_overriding_method);
         method_get_info_block_jit = GET_INTERFACE(vm, method_get_info_block_jit);
         method_get_info_block_size_jit = GET_INTERFACE(vm, method_get_info_block_size_jit);
         method_get_name = GET_INTERFACE(vm, method_get_name);
         method_get_descriptor = GET_INTERFACE(vm, method_get_descriptor);
-        method_get_byte_code_addr = GET_INTERFACE(vm, method_get_byte_code_addr);
-        method_get_byte_code_size = GET_INTERFACE(vm, method_get_byte_code_size);
+        method_get_bytecode = GET_INTERFACE(vm, method_get_bytecode);
+        method_get_bytecode_length = GET_INTERFACE(vm, method_get_bytecode_length);
         method_get_max_stack = GET_INTERFACE(vm, method_get_max_stack);
-        method_get_num_handlers = GET_INTERFACE(vm, method_get_num_handlers);
+        method_get_exc_handler_number = GET_INTERFACE(vm, method_get_exc_handler_number);
         method_get_offset = GET_INTERFACE(vm, method_get_offset);
         method_get_indirect_address = GET_INTERFACE(vm, method_get_indirect_address);
         method_get_native_func_addr = GET_INTERFACE(vm, method_get_native_func_addr);
-        method_vars_get_number = GET_INTERFACE(vm, method_vars_get_number);
+        method_get_max_locals = GET_INTERFACE(vm, method_get_max_locals);
         method_args_get_number = GET_INTERFACE(vm, method_args_get_number);
         method_args_get_type_info = GET_INTERFACE(vm, method_args_get_type_info);
         method_ret_type_get_type_info = GET_INTERFACE(vm, method_ret_type_get_type_info);
         method_get_signature = GET_INTERFACE(vm, method_get_signature);
         method_get_class = GET_INTERFACE(vm, method_get_class);
-        method_get_handler_info = GET_INTERFACE(vm, method_get_handler_info);
+        method_get_exc_handler_info = GET_INTERFACE(vm, method_get_exc_handler_info);
         method_get_code_block_addr_jit_new = GET_INTERFACE(vm, method_get_code_block_addr_jit_new);
         method_get_code_block_size_jit_new = GET_INTERFACE(vm, method_get_code_block_size_jit_new);
         method_get_side_effects = GET_INTERFACE(vm, method_get_side_effects);
@@ -709,16 +710,16 @@ bool         MethodDesc::isInstanceInitializer() const {return strcmp(getName(),
 // Method info
 //
 
-const Byte*  MethodDesc::getByteCodes() const   {return method_get_byte_code_addr(drlMethod);}
-uint32       MethodDesc::getByteCodeSize() const {return (uint32) method_get_byte_code_size(drlMethod);}
+const Byte*  MethodDesc::getByteCodes() const   {return method_get_bytecode(drlMethod);}
+uint32       MethodDesc::getByteCodeSize() const {return (uint32) method_get_bytecode_length(drlMethod);}
 uint16       MethodDesc::getMaxStack() const    {return (uint16) method_get_max_stack(drlMethod);}
-uint32       MethodDesc::getNumHandlers() const {return method_get_num_handlers(drlMethod);}
+uint32       MethodDesc::getNumHandlers() const {return method_get_exc_handler_number(drlMethod);}
 bool         MethodDesc::isOverridden() const   {return method_is_overridden(drlMethod)?true:false;}
 uint32       MethodDesc::getOffset() const      {return method_get_offset(drlMethod);}
 void*        MethodDesc::getIndirectAddress() const {return method_get_indirect_address(drlMethod);}
 void*        MethodDesc::getNativeAddress() const {return method_get_native_func_addr(drlMethod);}
 
-uint32    MethodDesc::getNumVars() const        {return method_vars_get_number(drlMethod);}
+uint32    MethodDesc::getNumVars() const        {return method_get_max_locals(drlMethod);}
 
 uint32    
 MethodDesc::getNumParams() const {
@@ -742,7 +743,7 @@ Class_Handle MethodDesc::getParentHandle() const {
 }
 
 void MethodDesc::getHandlerInfo(unsigned index, unsigned* beginOffset, unsigned* endOffset, unsigned* handlerOffset, unsigned* handlerClassIndex) const {
-    method_get_handler_info(drlMethod,index,beginOffset,endOffset,handlerOffset,handlerClassIndex);
+    method_get_exc_handler_info(drlMethod,index,beginOffset,endOffset,handlerOffset,handlerClassIndex);
 }
 
 // accessors for method info, code and data
@@ -1017,11 +1018,11 @@ CompilationInterface::getConstantValue(MethodDesc* enclosingMethodDesc,
 }
 
 MethodDesc*
-CompilationInterface::getOverriddenMethod(NamedType* type, MethodDesc *methodDesc) {
+CompilationInterface::getOverridingMethod(NamedType* type, MethodDesc *methodDesc) {
     if (type->isUnresolvedType()) {
         return NULL;
     }
-    Method_Handle m = method_get_overridden_method((Class_Handle) type->getVMTypeHandle(),
+    Method_Handle m = method_get_overriding_method((Class_Handle) type->getVMTypeHandle(),
                          methodDesc->getMethodHandle());
     if (!m)
         return NULL;

@@ -25,6 +25,7 @@
 
 #include <sstream>
 
+#include "open/vm_method_access.h"
 #include "classloader.h"
 #include "object_layout.h"
 #include "String_Pool.h"

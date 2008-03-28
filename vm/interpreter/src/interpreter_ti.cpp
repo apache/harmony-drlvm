@@ -24,6 +24,7 @@
 #include "interp_defs.h"
 #include "interp_native.h"
 #include "open/vm_field_access.h"
+#include "open/vm_method_access.h"
 #include "port_malloc.h"
 
 #include "thread_generic.h"

@@ -23,6 +23,7 @@
 #define LOG_DOMAIN "jni"
 #include "cxxlog.h"
 
+#include "open/vm_method_access.h"
 #include "Class.h"
 #include "classloader.h"
 #include "ini.h"

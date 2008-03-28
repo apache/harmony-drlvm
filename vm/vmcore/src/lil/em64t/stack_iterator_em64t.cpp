@@ -21,6 +21,7 @@
 
 #include <string.h>
 
+#include "open/vm_method_access.h"
 #include "environment.h"
 #include "stack_iterator.h"
 #include "vm_threads.h"

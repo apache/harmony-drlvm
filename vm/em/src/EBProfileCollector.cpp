@@ -24,11 +24,12 @@
 #include <algorithm>
 #include <assert.h>
 
-#include "cxxlog.h"
-#include <sstream>
-#include "port_mutex.h"
-
 #define LOG_DOMAIN "em"
+#include "cxxlog.h"
+
+#include <sstream>
+#include "open/vm_method_access.h"
+#include "port_mutex.h"
 
 
 EBProfileCollector::EBProfileCollector(EM_PC_Interface* em, const std::string& name, JIT_Handle genJit, 

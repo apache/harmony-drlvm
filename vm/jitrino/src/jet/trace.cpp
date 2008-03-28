@@ -471,7 +471,7 @@ void Compiler::dbg_trace_comp_start(void)
     dbg("start |%5d| %s::%s | bc.size=%d | %s\n",
         m_methID,
         class_get_name(m_klass), method_get_name(m_method),
-        method_get_byte_code_size(m_method),
+        method_get_bytecode_length(m_method),
         method_get_descriptor(m_method));
 }
 
@@ -485,7 +485,7 @@ void Compiler::dbg_trace_comp_end(bool success, const char * reason)
         
     if (success) {
         unsigned size = method_get_code_block_size_jit(m_method, m_hjit);
-        void * start = size ? method_get_code_block_addr_jit(m_method, m_hjit) : NULL;
+        void * start = size ? method_get_code_block_jit(m_method, m_hjit) : NULL;
 
         dbg("code.begin=%p | code.end=%p | code.size=%d",
              start, (char*)start + size, size);

@@ -131,6 +131,7 @@
  * 
  */
 
+#include "open/vm_method_access.h"
 #include "jet.h"
 #include "compiler.h"
 #include "stats.h"

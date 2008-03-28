@@ -20,6 +20,7 @@
  */  
 #include "interpreter.h"
 
+#include "open/vm_method_access.h"
 #include "interp_native.h"
 #include "interp_defs.h"
 #include "stack_trace.h"

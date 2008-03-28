@@ -691,7 +691,7 @@ IDATA VMCALL hythread_struct_init(hythread_t new_thread)
         new_thread->mutex = mutex;
         new_thread->monitor = monitor;
     }
-    assert(new_thread->os_handle == NULL);
+    assert(new_thread->os_handle == 0);
 
     new_thread->java_status = jstatus;
     new_thread->priority   = HYTHREAD_PRIORITY_NORMAL;

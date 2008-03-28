@@ -31,6 +31,7 @@
 #include "cci.h"
 #include "open/bytecodes.h"
 #include "open/jthread.h"
+#include "open/vm_method_access.h"
 #include "jvmti_break_intf.h"
 #include "jni_utils.h"
 

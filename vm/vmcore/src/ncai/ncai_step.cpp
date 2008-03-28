@@ -5,6 +5,7 @@
 
 #define LOG_DOMAIN "ncai.step"
 #include "cxxlog.h"
+#include "open/vm_method_access.h"
 #include "suspend_checker.h"
 #include "jvmti_break_intf.h"
 #include "classloader.h"

@@ -3536,7 +3536,7 @@ Simplifier::simplifyTauLdVirtFunAddrSlot(Opnd* vtable, Opnd *tauVtableHasMethod,
     }
     if (baseType != NULL) {
         MethodDesc* newMethodDesc =
-            irManager.getCompilationInterface().getOverriddenMethod((NamedType*)baseType, methodDesc);
+            irManager.getCompilationInterface().getOverridingMethod((NamedType*)baseType, methodDesc);
         if (newMethodDesc) {
             // change to ldvirtfunaddrslot of newMethodDesc
             return genLdFunAddrSlot(newMethodDesc)->getDst();
@@ -3576,7 +3576,7 @@ Simplifier::simplifyTauVirtualCall(MethodDesc* methodDesc,
     //
     if (isExactType(args[0]) || methodDesc->isFinal() || methodDesc->isPrivate()) {
         if(isExactType(args[0]) && !args[0]->getType()->isInterface()) {
-            methodDesc = irManager.getCompilationInterface().getOverriddenMethod(
+            methodDesc = irManager.getCompilationInterface().getOverridingMethod(
                     (NamedType*) args[0]->getType(), methodDesc);
         }
         if (methodDesc == NULL || methodDesc->getParentType()->isValue()) {

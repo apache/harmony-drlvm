@@ -32,12 +32,14 @@
 
 #include "reflection.h"
 #include "open/vm_field_access.h"
+#include "open/vm_method_access.h"
 #include "environment.h"
 #include "exceptions.h"
 #include "vm_strings.h"
 #include "primitives_support.h"
 #include "jni_utils.h"
 #include "Class.h"
+#include "classloader.h"
 
 #include "java_lang_VMClassRegistry.h"
 #include "java_lang_reflect_VMReflection.h"
@@ -50,7 +52,7 @@ JNIEXPORT jobjectArray JNICALL Java_java_lang_reflect_VMReflection_getExceptionT
         VM_Global_State::loader_env->JavaLangClass_Class);
 
     // Create and fill exceptions array
-    int n_exceptions = method_number_throws(method);
+    int n_exceptions = method->num_exceptions_method_can_throw();
     jobjectArray exceptionTypes = NewObjectArray(jenv, n_exceptions, jlc_class, NULL);
 
     if (!exceptionTypes) {
@@ -58,9 +60,10 @@ JNIEXPORT jobjectArray JNICALL Java_java_lang_reflect_VMReflection_getExceptionT
         return NULL;
     }
 
-    int i = 0;
-    for (; i < n_exceptions; i++) {
-        Class_Handle exclass = method_get_throws(method, i);
+    for (int i = 0; i < n_exceptions; i++) {
+        Class_Handle exclass = method->get_class()->get_class_loader()->
+            LoadVerifyAndPrepareClass(VM_Global_State::loader_env, method->get_exception_name(i));
+
         if (!exclass) {
             assert(exn_raised());
             return NULL;

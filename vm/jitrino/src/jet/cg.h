@@ -1189,7 +1189,7 @@ protected:
     /**
      * @brief The byte code of the method being compiled.
      */
-    unsigned char * m_bc;
+    const unsigned char* m_bc;
 
     JFrame *    m_jframe;
     /**

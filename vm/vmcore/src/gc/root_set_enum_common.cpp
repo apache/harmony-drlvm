@@ -30,6 +30,7 @@
 #include "m2n.h"
 #include "open/vm_util.h"
 #include "open/gc.h"
+#include "open/vm_method_access.h"
 #include "finalize.h"
 #include "cci.h"
 

@@ -24,6 +24,8 @@
  */
 
 #include "cxxlog.h"
+
+#include "open/vm_method_access.h"
 #include "environment.h"
 #include "interpreter.h"
 #include "interpreter_exports.h"

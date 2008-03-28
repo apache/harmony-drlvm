@@ -497,7 +497,7 @@ Devirtualizer::guardCallsInBlock(IRManager& regionIRM, Node* node) {
                 } else {
                     NamedType* methodType = origMethodDesc->getParentType();
                     if (_typeManager.isSubClassOf(baseType, methodType)) {
-                        candidateMeth = regionIRM.getCompilationInterface().getOverriddenMethod(baseType, origMethodDesc);
+                        candidateMeth = regionIRM.getCompilationInterface().getOverridingMethod(baseType, origMethodDesc);
                         if (candidateMeth) {
                             jitrino_assert(origMethodDesc->getParentType()->isClass());
                             methodInst->setMethodDesc(candidateMeth);

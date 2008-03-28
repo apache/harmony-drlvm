@@ -38,6 +38,7 @@ using namespace std;
 #include "open/types.h"
 #include "open/vm.h"
 #include "open/vm_type_access.h"
+#include "open/vm_method_access.h"
 #include "nogc.h"
 
 // Forward decs of local functions

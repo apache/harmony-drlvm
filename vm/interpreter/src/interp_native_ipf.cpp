@@ -28,6 +28,7 @@
 #include "interp_defs.h"
 #include "ini.h"
 #include "open/jthread.h"
+#include "open/vm_method_access.h"
 
 
 

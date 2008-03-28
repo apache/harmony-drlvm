@@ -107,7 +107,7 @@ Arg_List_Iterator advance_arg_iterator(Arg_List_Iterator it)
     return iter;
 } //advance_arg_iterator
 
-Class_Handle method_get_return_type_class(Method_Handle m)
+static Class_Handle method_get_return_type_class(Method_Handle m)
 {
     assert(hythread_is_suspend_enabled());
     Method *method = (Method *)m;

@@ -23,6 +23,7 @@
 
 #include "jvmti_direct.h"
 #include "jvmti_interface.h"
+#include "open/vm_method_access.h"
 #include "exceptions.h"
 #include "environment.h"
 #include "open/jthread.h"

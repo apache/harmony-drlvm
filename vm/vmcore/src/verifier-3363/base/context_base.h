@@ -182,7 +182,7 @@ namespace CPVerifier {
             m_method = _m_method;
             m_max_locals = method_get_max_local( m_method );
             m_max_stack = method_get_max_stack( m_method );
-            m_code_length = method_get_code_length( m_method );
+            m_code_length = method_get_bytecode_length( m_method );
             m_handlecount = method_get_exc_handler_number( m_method );
             m_bytecode = method_get_bytecode( m_method );
 

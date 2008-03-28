@@ -112,21 +112,6 @@ resolve_class_new(Compile_Handle h, Class_Handle c, unsigned index);
 VMEXPORT Class_Handle 
 resolve_class(Compile_Handle h, Class_Handle c, unsigned index);
 
-VMEXPORT Boolean      method_is_public(Method_Handle m);
-VMEXPORT unsigned     method_get_max_locals(Method_Handle m);
-VMEXPORT Boolean      method_is_fake(Method_Handle m);
-
-
-VMEXPORT Method_Side_Effects method_get_side_effects(Method_Handle m);
-VMEXPORT void method_set_side_effects(Method_Handle m, Method_Side_Effects mse);
-
-
-VMEXPORT Class_Handle method_get_return_type_class(Method_Handle m);
-
-
-VMEXPORT Boolean method_has_annotation(Method_Handle target, Class_Handle antn_type);
-
-
 VMEXPORT unsigned     class_number_fields(Class_Handle ch);
 VMEXPORT Field_Handle class_get_field(Class_Handle ch, unsigned idx);
 VMEXPORT int          class_get_super_offset();

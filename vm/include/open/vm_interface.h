@@ -74,29 +74,6 @@ PROTOTYPE_WITH_NAME(Method_Handle, class_lookup_method_recursively,
 
 //Method
 
-PROTOTYPE_WITH_NAME(Method_Handle, method_get_overridden_method, (Class_Handle ch, Method_Handle mh));//method_find_overridden_method
-PROTOTYPE_WITH_NAME(Byte*       , method_get_info_block_jit, (Method_Handle m, JIT_Handle j));
-PROTOTYPE_WITH_NAME(unsigned    , method_get_info_block_size_jit, (Method_Handle m, JIT_Handle j));
-PROTOTYPE_WITH_NAME(const char* , method_get_name, (Method_Handle mh));
-PROTOTYPE_WITH_NAME(const char* , method_get_descriptor, (Method_Handle mh));
-PROTOTYPE_WITH_NAME(const Byte* , method_get_byte_code_addr, (Method_Handle mh));
-PROTOTYPE_WITH_NAME(uint32      , method_get_byte_code_size, (Method_Handle mh));
-PROTOTYPE_WITH_NAME(uint16      , method_get_max_stack, (Method_Handle mh));
-PROTOTYPE_WITH_NAME(uint32      , method_get_num_handlers, (Method_Handle mh));
-PROTOTYPE_WITH_NAME(uint32      , method_get_offset, (Method_Handle mh));
-PROTOTYPE_WITH_NAME(void*       , method_get_indirect_address, (Method_Handle mh));
-PROTOTYPE_WITH_NAME(void*       , method_get_native_func_addr, (Method_Handle mh));
-PROTOTYPE_WITH_NAME(uint32      , method_vars_get_number, (Method_Handle mh));
-PROTOTYPE_WITH_NAME(unsigned    , method_args_get_number, (Method_Signature_Handle mh));
-PROTOTYPE_WITH_NAME(Type_Info_Handle, method_args_get_type_info, (Method_Signature_Handle msh, unsigned idx));
-PROTOTYPE_WITH_NAME(Type_Info_Handle, method_ret_type_get_type_info, (Method_Signature_Handle msh));
-PROTOTYPE_WITH_NAME(Method_Signature_Handle, method_get_signature, (Method_Handle mh));
-PROTOTYPE_WITH_NAME(Class_Handle, method_get_class, (Method_Handle mh));
-PROTOTYPE_WITH_NAME(void        , method_get_handler_info,
-                   (Method_Handle mh, 
-                    unsigned handler_id, unsigned *begin_offset,
-                    unsigned *end_offset, unsigned *handler_offset,
-                    unsigned *handler_cpindex));
 PROTOTYPE_WITH_NAME(Byte*       , method_get_code_block_addr_jit_new,
                    (Method_Handle mh, 
                     JIT_Handle j,
@@ -105,55 +82,9 @@ PROTOTYPE_WITH_NAME(unsigned    , method_get_code_block_size_jit_new,
                    (Method_Handle nh,
                     JIT_Handle j,
                     int id));
-PROTOTYPE_WITH_NAME(Method_Side_Effects, method_get_side_effects, (Method_Handle mh));
-
-PROTOTYPE_WITH_NAME(Boolean        , method_has_annotation, (Method_Handle mh, Class_Handle antn_type));
-PROTOTYPE_WITH_NAME(Boolean        , method_is_private, (Method_Handle mh));
-PROTOTYPE_WITH_NAME(Boolean        , method_is_static, (Method_Handle mh));
-PROTOTYPE_WITH_NAME(Boolean        , method_is_native, (Method_Handle mh));
-PROTOTYPE_WITH_NAME(Boolean        , method_is_synchronized, (Method_Handle mh));
-PROTOTYPE_WITH_NAME(Boolean        , method_is_final, (Method_Handle mh));
-PROTOTYPE_WITH_NAME(Boolean        , method_is_abstract, (Method_Handle mh));
-PROTOTYPE_WITH_NAME(Boolean        , method_is_strict, (Method_Handle mh));
-PROTOTYPE_WITH_NAME(Boolean        , method_is_overridden, (Method_Handle mh));
-PROTOTYPE_WITH_NAME(Boolean        , method_is_no_inlining, (Method_Handle mh));
-
-
-PROTOTYPE_WITH_NAME(void        , method_set_side_effects, (Method_Handle mh, Method_Side_Effects mse));
-PROTOTYPE_WITH_NAME(void        , method_set_num_target_handlers,
-                   (Method_Handle mh,
-                    JIT_Handle j,
-                    unsigned num_handlers));
-PROTOTYPE_WITH_NAME(void        , method_set_target_handler_info,
-                   (Method_Handle mh,
-                    JIT_Handle j,
-                    unsigned eh_number,
-                    void *start_ip,
-                    void *end_ip,
-                    void *handler_ip,
-                    Class_Handle catch_cl,
-                    Boolean exc_obj_is_dead));
-
-
-PROTOTYPE_WITH_NAME(void        , method_lock, (Method_Handle m));
-PROTOTYPE_WITH_NAME(void        , method_unlock, (Method_Handle m));
-
-PROTOTYPE_WITH_NAME(Byte*       , method_allocate_code_block,
-                   (Method_Handle m,
-                    JIT_Handle j,
-                    size_t size,
-                    size_t alignment,
-                    CodeBlockHeat heat,
-                    int id,
-                    Code_Allocation_Action action));
-PROTOTYPE_WITH_NAME(Byte*       , method_allocate_data_block, (Method_Handle m, JIT_Handle j, size_t size, size_t alignment));
-PROTOTYPE_WITH_NAME(Byte*       , method_allocate_info_block, (Method_Handle m, JIT_Handle j, size_t size));
-PROTOTYPE_WITH_NAME(Byte*       , method_allocate_jit_data_block, (Method_Handle m, JIT_Handle j, size_t size, size_t alignment));
-
 
 //Object
 PROTOTYPE_WITH_NAME(int         , object_get_vtable_offset, ());
-
 
 //Resolve
 PROTOTYPE_WITH_NAME(Class_Handle, resolve_class, (Compile_Handle h, Class_Handle c, unsigned index));

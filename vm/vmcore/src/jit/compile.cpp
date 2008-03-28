@@ -23,6 +23,7 @@
 #include "vm_log.h"
 
 #include "open/vm_type_access.h"
+#include "open/vm_method_access.h"
 
 #include "apr_strings.h"
 #include "lock_manager.h"

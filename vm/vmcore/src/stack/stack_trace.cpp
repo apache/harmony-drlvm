@@ -23,6 +23,7 @@
 #include "cxxlog.h"
 #include "vm_log.h"
 
+#include "open/vm_method_access.h"
 #include "m2n.h"
 #include "stack_iterator.h"
 #include "stack_trace.h"

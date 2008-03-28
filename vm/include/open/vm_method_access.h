@@ -21,6 +21,15 @@
 #ifndef _VM_METHOD_ACCESS_H
 #define _VM_METHOD_ACCESS_H
 
+#include "common.h"
+#include "platform_types.h"
+#include "types.h"
+#include "rt_types.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * @file
  * Part of Class Support interface related to retrieving different
@@ -34,10 +43,9 @@
  *
  * @return Method name bytes.
  *
- * @note An assertion is raised if <i>method</i> equals to <code>NULL</code>. 
+ * @note An assertion is raised if <i>method</i> equals to <code>NULL</code>.
  */
-const char*
-method_get_name(Open_Method_Handle method);
+DECLARE_OPEN(const char*, method_get_name, (Method_Handle method));
 
 /**
  * Returns the method descriptor.
@@ -46,10 +54,9 @@ method_get_name(Open_Method_Handle method);
  *
  * @return Method descriptor bytes.
  *
- * @note An assertion is raised if <i>method</i> equals to <code>NULL</code>. 
+ * @note An assertion is raised if <i>method</i> equals to <code>NULL</code>.
  */
-const char*
-method_get_descriptor(Open_Method_Handle method);
+DECLARE_OPEN(const char*, method_get_descriptor, (Method_Handle method));
 
 /**
  * Returns the signature that can be used to iterate over the agruments of the given method
@@ -61,8 +68,7 @@ method_get_descriptor(Open_Method_Handle method);
  *
  * @note An assertion is raised if <i>method</i> equals to <code>NULL</code>. 
  */
-Method_Signature_Handle
-method_get_signature(Method_Handle method);
+DECLARE_OPEN(Method_Signature_Handle, method_get_signature, (Method_Handle method));
 
 /**
  * Returns the class where the given method is declared.
@@ -73,32 +79,21 @@ method_get_signature(Method_Handle method);
  *
  * @note An assertion is raised if <i>method</i> equals to <code>NULL</code>. 
  */
-Open_Class_Handle
-method_get_class(Open_Method_Handle method);
+DECLARE_OPEN(Class_Handle, method_get_class, (Method_Handle method));
 
 /**
- * Returns access flags for the given method.
+ * Acquires lock associated with a method
  *
  * @param method - the method handle
- *
- * @return Access flags.
- *
- * @note An assertion is raised if <i>method</i> equals to <code>NULL</code>. 
- */
-unsigned short
-method_get_flags(Open_Method_Handle method);
+*/
+DECLARE_OPEN(void, method_lock, (Method_Handle method));
 
 /**
- * Checks whether the given method is protected.
+ * Releases lock associated with a method
  *
  * @param method - the method handle
- *
- * @return <code>TRUE</code> if the given method is protected; otherwise, <code>FALSE</code>.
- *
- * @note An assertion is raised if <i>method</i> equals to <code>NULL</code>. 
- **/
-unsigned
-method_is_protected(Open_Method_Handle method);
+*/
+DECLARE_OPEN(void, method_unlock, (Method_Handle method));
 
 /**
  *  Checks whether the given method is private.
@@ -110,21 +105,7 @@ method_is_protected(Open_Method_Handle method);
  * @note An assertion is raised if <i>method</i> equals to <code>NULL</code>. 
  * @ingroup Extended 
  */
-Boolean
-method_is_private(Open_Method_Handle method);
-
-/**
- *  Checks whether the given method is public.
- *
- * @param method - the method handle
- *
- * @return <code>TRUE</code> if the given method is public; otherwise, <code>FALSE</code>.
- *
- * @note An assertion is raised if <i>method</i> equals to <code>NULL</code>. 
- * @ingroup Extended
- */
-Boolean
-method_is_public(Open_Method_Handle method);
+DECLARE_OPEN(BOOLEAN, method_is_private, (Method_Handle method));
 
 /**
  *  Checks whether the given method is static.
@@ -133,11 +114,10 @@ method_is_public(Open_Method_Handle method);
  *
  * @return <code>TRUE</code> if the given method is static; otherwise, <code>FALSE</code>.
  *
- * @note An assertion is raised if <i>method</i> equals to <code>NULL</code>. 
- * @ingroup Extended 
+ * @note An assertion is raised if <i>method</i> equals to <code>NULL</code>.
+ * @ingroup Extended
  */
-Boolean
-method_is_static(Open_Method_Handle method);
+DECLARE_OPEN(BOOLEAN, method_is_static, (Method_Handle method));
 
 /**
  *  Checks whether the given method is native.
@@ -149,8 +129,7 @@ method_is_static(Open_Method_Handle method);
  * @note An assertion is raised if <i>method</i> equals to <code>NULL</code>. 
 * @ingroup Extended 
  */
-Boolean
-method_is_native(Open_Method_Handle method);
+DECLARE_OPEN(BOOLEAN, method_is_native, (Method_Handle method));
 
 /**
  *  Checks whether the given method is synchronized.
@@ -162,8 +141,7 @@ method_is_native(Open_Method_Handle method);
  * @note An assertion is raised if <i>method</i> equals to <code>NULL</code>. 
 * @ingroup Extended 
  */
-Boolean
-method_is_synchronized(Open_Method_Handle method);
+DECLARE_OPEN(BOOLEAN, method_is_synchronized, (Method_Handle method));
 
 /**
  *  Checks whether the given method is final.
@@ -175,8 +153,7 @@ method_is_synchronized(Open_Method_Handle method);
  * @note An assertion is raised if <i>method</i> equals to <code>NULL</code>. 
 * @ingroup Extended 
  */
-Boolean
-method_is_final(Open_Method_Handle method);
+DECLARE_OPEN(BOOLEAN, method_is_final, (Method_Handle method));
 
 /**
  *  Checks whether the given method is abstract.
@@ -188,8 +165,7 @@ method_is_final(Open_Method_Handle method);
  * @note An assertion is raised if <i>method</i> equals to <code>NULL</code>. 
 * @ingroup Extended 
  */
-Boolean
-method_is_abstract(Open_Method_Handle method);
+DECLARE_OPEN(BOOLEAN, method_is_abstract, (Method_Handle method));
 
 /**
  *  Checks whether the given method is strict.
@@ -203,10 +179,9 @@ method_is_abstract(Open_Method_Handle method);
  *                the Java* method and <code>FALSE</code> if otherwise.
  *
  * @note An assertion is raised if <i>method</i> equals to <code>NULL</code>. 
-* @ingroup Extended 
+ * @ingroup Extended
  */
-Boolean
-method_is_strict(Open_Method_Handle method);
+DECLARE_OPEN(BOOLEAN, method_is_strict, (Method_Handle method));
 
 /**
  *  Checks whether the given method has been overridden in a subclass.
@@ -219,33 +194,12 @@ method_is_strict(Open_Method_Handle method);
  *
  * @note If this function returns <code>FALSE</code>, loading the subclass later 
  *             in the execution of the program may invalidate this condition.
-*              If a JIT compiler uses this function to perform  unconditional inlining, 
-                the compiler must be prepared to patch the code later. 
-*
+ *              If a JIT compiler uses this function to perform  unconditional inlining, 
+ *              the compiler must be prepared to patch the code later. 
+ *
  * @see vm_register_jit_overridden_method_callback
  */
-Boolean
-method_is_overridden(Open_Method_Handle method);
-
-/**
- * Checks whether the method is the <init> method for the class. 
- *
- * @param method - the method handle
- *
- * @return <code>TRUE</code> if the method is the <init> method; otherwise, <code>FALSE</code>.
- */
-Boolean
-method_is_init(Open_Method_Handle method);
-
-/**
- * Checks whether the method is the <clinit> method for the class. 
- *
- * @param method - the method handle
- *
- * @return <code>TRUE</code> if the method is the <clinit> method for the class; otherwise, <code>FALSE</code>.
- */
-Boolean
-method_is_clinit(Open_Method_Handle method);
+DECLARE_OPEN(BOOLEAN, method_is_overridden, (Method_Handle method));
 
 /**
  * Checks whether the JIT compiler is allowed to in-line the method.
@@ -261,13 +215,17 @@ method_is_clinit(Open_Method_Handle method);
  * @note An assertion is raised if <i>method</i> equals to <code>NULL</code>. 
  * @note Always <code>FALSE</code> for Java*.
  */
-Boolean
-method_is_no_inlining(Open_Method_Handle method);
+DECLARE_OPEN(BOOLEAN, method_is_no_inlining, (Method_Handle method));
+
+/**
+ * FIXME: NOCOMMENT
+ */
+DECLARE_OPEN(BOOLEAN, method_has_annotation, (Method_Handle mh, Class_Handle antn_type));
 
 /**
  * Retrieves potential side effects of the given method. 
  *
- * @param m - handle for the method, for which side effects are retrieved
+ * @param method - handle for the method, for which side effects are retrieved
  *
  * @return Enumeration value which corresponds to side effects method may have.
  * One of:
@@ -276,7 +234,7 @@ method_is_no_inlining(Open_Method_Handle method);
  *      MSE_False           - method does not have side effects
  *      MSE_True_Null_Param - 
  */
-VMEXPORT Method_Side_Effects method_get_side_effects(Open_Method_Handle m);
+DECLARE_OPEN(Method_Side_Effects, method_get_side_effects, (Method_Handle method));
 
 /**
  * Sets potential side effects of the given method. 
@@ -284,7 +242,7 @@ VMEXPORT Method_Side_Effects method_get_side_effects(Open_Method_Handle m);
  * @param m - method handle for which side effects are set
  * @param mse - side effect of this method (see method_get_side_effects for details)
  */
-VMEXPORT void method_set_side_effects(Open_Method_Handle m, Method_Side_Effects mse);
+DECLARE_OPEN(void, method_set_side_effects, (Method_Handle m, Method_Side_Effects mse));
 
 /**
  * Sets the number of exception handlers in the code generated by the JIT compiler 
@@ -297,25 +255,17 @@ VMEXPORT void method_set_side_effects(Open_Method_Handle m, Method_Side_Effects 
  * @note The JIT compiler must then call the <i>method_set_target_handler_info</i> function
  *             for each of the <i>num_handlers</i> exception handlers.
  */
-void
-method_set_num_target_handlers(Open_Method_Handle method,
-                               Open_JIT_Handle jit,
-                               unsigned short num_handlers);
+DECLARE_OPEN(void, method_set_num_target_handlers,
+    (Method_Handle method, JIT_Handle jit, unsigned num_handlers));
 
 /**
- *  Checks whether the local variable is pinned.
- *
- * @param method    - method handle
- * @param index     - the local variable index
- *
- * @return <i>TRUE</i> if the local variable is pinned; otherwise, <code>FALSE</code>.
- *
- * @note Replaces the method_vars_is_pinned function.
-* @ingroup Extended 
-* @note Not used.
+ * Set the information about an exception handler in the code generated by
+ * the JIT.
  */
-Boolean
-method_local_is_pinned(Open_Method_Handle method, unsigned short index);
+DECLARE_OPEN(void, method_set_target_handler_info,
+    (Method_Handle method, JIT_Handle j, unsigned eh_number,
+     void* start_ip, void* end_ip, void* handler_ip,
+     Class_Handle catch_cl, Boolean exc_obj_is_dead));
 
 /**
  * Returns the handle for an accessible method overriding <i>method</i> in <i>klass</i> 
@@ -326,24 +276,8 @@ method_local_is_pinned(Open_Method_Handle method, unsigned short index);
  *
  * @return The method handle for an accessible method overriding <i>method</i>; otherwise, <code>FALSE</code>.
  */
-Open_Method_Handle
-method_find_overridden_method(Open_Class_Handle klass,
-                              Open_Method_Handle method);
-
-/**
- * Returns type information of the local variable.
- *
- * @param method    - the method handle
- * @param index     - the local variable number
- *
- * @return The type information of the local variable.
- *
- * @note Because local variables are not typed in Java*, this function
- *             always returns <code>NULL</code> for Java* methods.
- * @note Replaces the method_vars_get_type_info function. 
- */
-Open_Type_Info_Handle
-method_local_get_type_info(Open_Method_Handle method, unsigned short index);
+DECLARE_OPEN(Method_Handle, method_get_overriding_method,
+    (Class_Handle klass, Method_Handle method));
 
 /**
  * Returns the number of arguments defined for the method.
@@ -353,72 +287,7 @@ method_local_get_type_info(Open_Method_Handle method, unsigned short index);
  *
  * @return The number of arguments defined for the method.
  */
-unsigned char
-method_args_get_number(Method_Signature_Handle method_signature);
-
-/**
- * Initializes the ChaMethodIterator <i>iterator</i> to iterate over all
- * methods that match the method signature and descend from <i>klass</i>
- * (including <i>klass</i> itself).
- *
- * @param iterator  - the class iterator
- * @param method    - the method handle
- * @param klass     - the class handle
- *
- * @return <code>TRUE</code> if iteration is supported over <i>klass</i>,
- *                <code>FALSE</code> if it is not.
- *
- * @note Reference to internal type ChaMethodIterator.
- */
-Boolean
-method_iterator_initialize(ChaMethodIterator* iterator,
-                           Open_Method_Handle method,
-                           Open_Class_Handle klass);
-
-/**
- * Advances the iterator.
- *
- * @param iterator  - class iterator
- *
- * @note Reference to internal type ChaMethodIterator.
- */
-void
-method_iterator_advance(ChaMethodIterator* iterator);
-
-/**
- * Returns the current method of the iterator.
- *
- * @param iterator  - the class iterator
- *
- * @return The current method of the iterator or <code>NULL</code> if no more methods are left.
- *
- * @note Reference to the internal type <i>ChaMethodIterator</i>.
- */
-Method_Handle
-method_iterator_get_current(ChaMethodIterator* iterator);
-
-/**
- * Returns the number of exceptions that the given method can throw.
- *
- * @param method    - the method handle
- *
- * @return The number of exceptions.
- *
- * @note Replaces method_number_throws function.
- */
-unsigned short
-method_get_num_throws(Open_Method_Handle method);
-
-/**
- * Returns the exception class a given method can throw.
- *
- * @param method    - the method handle
- * @param index     - the exception number
- *
- * @return the exception class a given method can throw.
- */
-Open_Class_Handle
-method_get_throws(Open_Method_Handle method, unsigned short index);
+DECLARE_OPEN(unsigned char, method_args_get_number, (Method_Signature_Handle method_signature));
 
 /**
  * Returns the number of method exception handlers.
@@ -430,30 +299,25 @@ method_get_throws(Open_Method_Handle method, unsigned short index);
  * @note An assertion is raised if method equals to <code>NULL</code>. 
  * @note Replaces method_get_num_handlers function.
  */
-unsigned short
-method_get_exc_handler_number(Open_Method_Handle method);
+DECLARE_OPEN(uint16, method_get_exc_handler_number, (Method_Handle method));
 
 /**
  * Obtains the method exception handle information.
  *
- * @param method         - the method handle
- * @param index            - the exception handle index number
- * @param start_pc       - the resulting pointer to the exception handle start program count
- * @param end_pc         - the resulting pointer to the exception handle end program count
- * @param handler_pc  - the resulting pointer to the exception handle program count
- * @param catch_type  - the resulting pointer to the constant pool entry index
+ * @param method     - the method handle
+ * @param index      - the exception handle index number
+ * @param start_pc   - the resulting pointer to the exception handle start program count
+ * @param end_pc     - the resulting pointer to the exception handle end program count
+ * @param handler_pc - the resulting pointer to the exception handle program count
+ * @param catch_type - the resulting pointer to the constant pool entry index
  *
  * @note An assertion is raised if <i>method</i> equals to <code>NULL</code> or
  *             if the exception handle index is out of range or if any pointer equals to <code>NULL</code>. 
  * @note Replaces the method_get_handler_info function.
  */
-void
-method_get_exc_handler_info(Open_Method_Handle method,
-                            unsigned short index,
-                            unsigned short* start_pc,
-                            unsigned short* end_pc,
-                            unsigned short* handler_pc,
-                            unsigned short* catch_type);
+DECLARE_OPEN(void, method_get_exc_handler_info,
+    (Method_Handle method, uint32 index,
+     uint32* start_pc, uint32* end_pc, uint32* handler_pc, uint32* catch_type));
 
 /**
  * Returns type information for the return value.
@@ -462,19 +326,8 @@ method_get_exc_handler_info(Open_Method_Handle method,
  *
  * @return The type information for the return value.
  */
-Type_Info_Handle
-method_ret_type_get_type_info(Method_Signature_Handle method_signature);
-
-/**
- *  Checks whether the given argument is a managed pointer.
- *
- * @param method_signature  - the method signature handle
- * @param index             - the argument index
- *
- * @return <code>TRUE</code> if the argument is a managed pointer; otherwise, <code>FALSE</code>.
- */
-Boolean
-method_args_is_managed_pointer(Method_Signature_Handle method_signature, unsigned index);
+DECLARE_OPEN(Type_Info_Handle, method_ret_type_get_type_info,
+    (Method_Signature_Handle method_signature));
 
 /**
  * Returns type information for the given argument.
@@ -484,8 +337,8 @@ method_args_is_managed_pointer(Method_Signature_Handle method_signature, unsigne
  *
  * @return Type information for the argument.
  */
-Type_Info_Handle
-method_args_get_type_info(Method_Signature_Handle method_signature, unsigned index);
+DECLARE_OPEN(Type_Info_Handle, method_args_get_type_info,
+    (Method_Signature_Handle method_signature, unsigned index));
 
 /**
  * Returns the method bytecode size.
@@ -493,11 +346,8 @@ method_args_get_type_info(Method_Signature_Handle method_signature, unsigned ind
  * @param method - the method handle
  *
  * @return The method bytecode size.
- *
- * @note Replaces the method_get_code_length function.
  */
-jint
-method_get_bytecode_size(Open_Method_Handle method);
+DECLARE_OPEN(uint32, method_get_bytecode_length, (Method_Handle method));
 
 /**
  * Returns the method bytecode array.
@@ -508,10 +358,8 @@ method_get_bytecode_size(Open_Method_Handle method);
  *
  * @note An assertion is raised if the method equals to <code>NULL</code>. 
  * @note Reference to type <i>Byte</i>.
- * @note Replaces the method_get_bytecode function.
  */
-const char*
-method_get_bytecode_addr(Open_Method_Handle method);
+DECLARE_OPEN(const Byte*, method_get_bytecode, (Method_Handle method));
 
 /**
  * Returns the maximum number of local variables for the given method.
@@ -523,8 +371,7 @@ method_get_bytecode_addr(Open_Method_Handle method);
  * @note An assertion is raised if the method equals to <code>NULL</code>. 
  * @note Replaces functions method_get_max_local and method_vars_get_number.
  */
-jint
-method_get_max_locals(Open_Method_Handle method);
+DECLARE_OPEN(uint32, method_get_max_locals, (Method_Handle method));
 
 /**
  * Returns the maximum stack depth for the given method.
@@ -535,8 +382,7 @@ method_get_max_locals(Open_Method_Handle method);
  *
  * @note An assertion is raised if <i>method</i> equals to <code>NULL</code>. 
  */
-jint
-method_get_max_stack(Open_Method_Handle method);
+DECLARE_OPEN(uint16, method_get_max_stack, (Method_Handle method));
 
 /**
  * Returns the offset from the start of the vtable to the entry for the given method
@@ -545,8 +391,7 @@ method_get_max_stack(Open_Method_Handle method);
  *
  * @return The offset from the start of the vtable to the entry for the method, in bytes. 
  */
-unsigned
-method_get_offset(Open_Method_Handle method);
+DECLARE_OPEN(unsigned, method_get_offset, (Method_Handle method));
 
 /**
  * Gets the address of the code pointer for the given method.
@@ -560,8 +405,16 @@ method_get_offset(Open_Method_Handle method);
  *
  *  @see vm_register_jit_recompiled_method_callback
  */
-Open_Native_Code_Ptr
-method_get_indirect_address(Open_Method_Handle method);
+DECLARE_OPEN(void*, method_get_indirect_address, (Method_Handle method));
+
+/**
+* Looks for a method in native libraries of a class loader.
+*
+* @param[in] method - a searching native-method structure
+* @return The pointer to found a native function.
+* @note The function raises <code>UnsatisfiedLinkError</code> with a method name
+*       in an exception message, if the specified method is not found.*/
+DECLARE_OPEN(void*, method_get_native_func_addr, (Method_Handle method));
 
 /**
  * Allocates an information block for the given method.
@@ -580,25 +433,104 @@ method_get_indirect_address(Open_Method_Handle method);
  *
  * @see method_allocate_data_block
  */
-Byte*
-method_allocate_info_block(Open_Method_Handle method,
-                           JIT_Handle jit,
-                           size_t size);
+DECLARE_OPEN(Byte*, method_allocate_info_block,
+    (Method_Handle method, JIT_Handle jit, size_t size));
 
 /**
- * Retrieves the memory block allocated earlier by the
- * <i>method_allocate_data_block</i> function.
-* The pair of parameters <method, jit> uniquely identifies the JIT compiler information block.
+ * Allocates the "read-write" data block for the given method.
+ *
+ * This block is intended for data that may be required during program execution, 
+ * for example, tables for switch statements. This block cannot be retrieved later. 
+ *
+ * Separation of data allocated by <i>method_allocate_data_block</i> and
+ * <i>method_allocate_info_block</i> may help improve locality of references
+ * to data accessed during execution of compiled code and data accessed during
+ * stack unwinding.
  *
  * @param method    - the method handle
  * @param jit       - the JIT handle
+ * @param size      - the size of the allocated code block
+ * @param alignment - the memory block aligment
  *
  * @return The pointer to the allocated data block.
  *
  * @note Reference to type <i>Byte</i>.
+ * @note FIXME This has to go to the compilation infrastructure interface.
+ *
+ * @see method_allocate_info_block
  */
-Byte*
-method_get_data_block_jit(Method_Handle method, JIT_Handle jit);
+DECLARE_OPEN(Byte*, method_allocate_data_block,
+    (Method_Handle method, JIT_Handle jit, size_t size, size_t alignment));
+
+/**
+ * Allocated a "read-only" data block.
+ *
+ * This function is deprecated. In all new code, use
+ * method_allocate_data_block() only.  At some point, we will revisit
+ * this interface to have more control over the layout of various
+ * memory blocks allocated by the VM.
+ */
+DECLARE_OPEN(Byte*, method_allocate_jit_data_block,
+    (Method_Handle method, JIT_Handle jit, size_t size, size_t alignment));
+
+/**
+ * Enables allocation of multiple chunks of code with different heat values. 
+ * 
+ * The JIT compiler is responsible for specifying  unique IDs of code chunks within one method.
+ * The first instruction of the chunk with id=0 is the entry point of the method.
+ *
+ * @param method    - the method handle
+ * @param jit       - the JIT handle
+ * @param size      - the size of the allocated code block
+ * @param alignment - the memory block aligment
+ * @param heat      - ?
+ * @param id        - code chunk id
+ * @param action    - the resulting return action
+ *
+ * @return The pointer to the allocated code block with the following specifics: 
+ *                 <ul>
+ *                     <li>If the CAA_Allocate argument is specified, memory is allocated and the function returns the pointer
+ *                          to this memory.
+ *                     <li>If the CAA_Simulate argument is specified, no memory is allocated and the function returns the address 
+ *                         that would have been allocated if CAA_Allocate was specified and all the other arguments were the same. 
+ *                 </ul>
+ *                 The function may also return <code>NULL</code> when CAA_Simulate is specified. For example, this may happen
+ *                 when multiple heat values are mapped to the same code pool or when the specified size require a new code pool.
+ *
+ * @note FIXME This has to go to the compilation infrastructure interface. 
+ */
+DECLARE_OPEN(Byte*, method_allocate_code_block,
+    (Method_Handle method, JIT_Handle jit, size_t size, size_t alignment,
+     CodeBlockHeat heat, int id, Code_Allocation_Action action));
+
+/**
+ * Retrieve the memory block allocated earlier by
+ * method_allocate_code_block().
+ * A triple <method, jit, id> uniquely identifies a code block.
+ *
+ * @param method - the method handle
+ * @param j - the JIT handle
+ * @param id - code block ID
+ *
+ * @return address of the requested code block
+ */
+DECLARE_OPEN(Byte*, method_get_code_block_jit,
+    (Method_Handle method, JIT_Handle j));/*, int id));*/
+
+/**
+ * Get the size of the memory block allocated earlier by
+ * method_allocate_code_block().
+ * A triple <method, jit, id> uniquely identifies a code block.
+ *
+ * @param method - the method handle
+ * @param j - the JIT handle
+ * @param id - code block ID
+ *
+ * @return size of the requested code block
+ */
+DECLARE_OPEN(unsigned, method_get_code_block_size_jit,
+    (Method_Handle method, JIT_Handle j));/*, int id));*/
+
 
 /**
  * Retrieves the memory block allocated earlier by the
@@ -612,7 +544,16 @@ method_get_data_block_jit(Method_Handle method, JIT_Handle jit);
  *
  * @note Reference to type <i>Byte</i>.
  */
-Byte*
-method_get_info_block_jit(Method_Handle method, JIT_Handle jit);
+DECLARE_OPEN(Byte*, method_get_info_block_jit, (Method_Handle method, JIT_Handle jit));
+
+/**
+ * Get the size of the memory block allocated earlier by
+ * method_allocate_info_block().
+ *
+ * FIXME: NOCOMMENT
+ */
+DECLARE_OPEN(unsigned, method_get_info_block_size_jit, (Method_Handle method, JIT_Handle jit));
+
+}
 
 #endif // _VM_METHOD_ACCESS_H

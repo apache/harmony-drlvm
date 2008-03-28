@@ -38,6 +38,7 @@
 
 #include "ini.h"
 #include "nogc.h"
+#include "open/vm_method_access.h"
 
 
 static Method* lookup_method_init(Class* clss, const char* descr)
