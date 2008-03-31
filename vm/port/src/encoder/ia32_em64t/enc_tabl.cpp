@@ -741,6 +741,7 @@ BEGIN_MNEMONIC(FILD, MF_NONE, D_U )
 BEGIN_OPCODES()
     {OpcodeInfo::all, {0xDB, _0}, {FP0S, m32},    D_U },
     {OpcodeInfo::all, {0xDF, _5}, {FP0D, m64},    D_U },
+    {OpcodeInfo::all, {0xDB, _0}, {FP0S, m32},    D_U },
 END_OPCODES()
 END_MNEMONIC()
 
@@ -1301,6 +1302,7 @@ DEFINE_SHIFT_MNEMONIC(SAR, _7, MF_AFFECTS_FLAGS)
 BEGIN_MNEMONIC(SHLD, MF_AFFECTS_FLAGS, N)
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0x0F, 0xA5},   {r_m32, r32, ECX}, DU_DU_U },
+    {OpcodeInfo::all,     {0x0F, 0xA4},   {r_m32, r32, imm8}, DU_DU_U },
 END_OPCODES()
 END_MNEMONIC()
 
@@ -1440,6 +1442,7 @@ END_MNEMONIC()
 BEGIN_MNEMONIC(STOS, MF_AFFECTS_FLAGS, DU_DU_U)
 BEGIN_OPCODES()
     {OpcodeInfo::all,   {0xAB},         {EDI, ECX, EAX},   DU_DU_U },
+    {OpcodeInfo::all,   {0xAA},         {EDI, ECX, AL},    DU_DU_U },
     {OpcodeInfo::em64t, {REX_W, 0xAB},  {RDI, RCX, RAX},   DU_DU_U },
 END_OPCODES()
 END_MNEMONIC()

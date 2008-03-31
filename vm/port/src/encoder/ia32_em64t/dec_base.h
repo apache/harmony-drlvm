@@ -44,16 +44,39 @@ using namespace enc_ia32;
 struct Inst {
     Inst() {
         mn = Mnemonic_Null;
+        prefc = 0;
         size = 0;
         flags = 0;
         //offset = 0;
         //direct_addr = NULL;
         argc = 0;
+        for(int i = 0; i < 4; ++i)
+        {
+            pref[i] = InstPrefix_Null;
+        }
     }
     /**
      * Mnemonic of the instruction.s
      */
     Mnemonic mn;
+    /**
+     * Enumerating of indexes in the pref array.
+     */
+    enum PrefGroups
+    {
+        Group1 = 0,
+        Group2,
+        Group3,
+        Group4
+    };
+    /**
+     * Number of prefixes (1 byte each).
+     */
+    unsigned int prefc;
+    /**
+     * Instruction prefixes. Prefix should be placed here according to its group.
+     */
+    InstPrefix pref[4];
     /**
      * Size, in bytes, of the instruction.
      */
@@ -98,7 +121,7 @@ private:
         unsigned aux, const unsigned char ** pbuf, 
         Inst * pinst, const Rex *rex);
     static bool try_mn(Mnemonic mn, const unsigned char ** pbuf, Inst * pinst);
-
+    static unsigned int fill_prefs( const unsigned char * bytes, Inst * pinst);
     static bool is_prefix(const unsigned char * bytes);
 };
 

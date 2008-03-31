@@ -56,6 +56,71 @@ bool DecoderBase::is_prefix(const unsigned char * bytes)
     return false;
 }
 
+unsigned int DecoderBase::fill_prefs(const unsigned char * bytes, Inst * pinst)
+{
+    const unsigned char * my_bytes = bytes;
+
+    while( 1 )
+    {
+        unsigned char by1 = *my_bytes;
+        unsigned char by2 = *(my_bytes + 1);
+        Inst::PrefGroups where;
+
+        switch( by1 )
+        {
+        case InstPrefix_REPNE:
+        case InstPrefix_REP:
+        {
+            if( 0x0F == by2)
+            {
+                return pinst->prefc;
+            }
+        }
+        case InstPrefix_LOCK:
+        {
+            where = Inst::Group1;
+            break;
+        }
+        case InstPrefix_CS:
+        case InstPrefix_SS:
+        case InstPrefix_DS:
+        case InstPrefix_ES:
+        case InstPrefix_FS:
+        case InstPrefix_GS:
+//      case InstPrefix_HintTaken: the same as CS override
+//      case InstPrefix_HintNotTaken: the same as DS override
+        {
+            where = Inst::Group2;
+            break;
+        }
+        case InstPrefix_OpndSize:
+        {
+            if( 0x0F == by2)
+            {
+                return pinst->prefc;
+            }
+            where = Inst::Group3;
+            break;
+        }
+        case InstPrefix_AddrSize:
+        {
+            where = Inst::Group4;
+            break;
+        }
+        default:
+        {
+            return pinst->prefc;
+        }
+        }
+        assert( InstPrefix_Null == pinst->pref[where] ); //only one prefix in each group 
+        pinst->pref[where] = (InstPrefix)by1;
+        assert( pinst->prefc < 4 ); //no more than 4 prefixes
+        pinst->prefc++;
+        ++my_bytes;
+    }
+}
+
+
 
 unsigned DecoderBase::decode(const void * addr, Inst * pinst)
 {
@@ -64,14 +129,8 @@ unsigned DecoderBase::decode(const void * addr, Inst * pinst)
     //assert( *(unsigned char*)addr != 0x66);
     
     const unsigned char * bytes = (unsigned char*)addr;
-    // Check prefix first
-    for (unsigned i=0; i<4; i++) {
-        if (!is_prefix(bytes)) {
-            break;
-        }
-        ++bytes;
-    }
 
+    bytes += fill_prefs(bytes, &tmp); 
     if (is_prefix(bytes)) {
         // More than 4 prefixes together ?
 //        assert(false);
@@ -154,6 +213,30 @@ bool DecoderBase::decode_aux(const EncoderBase::OpcodeDesc& odesc, unsigned aux,
             if (regid>7) {
                 return false;
             }
+            OpndSize opnd_size;
+            switch(kind)
+            {
+            case OpcodeByteKind_rb:
+            {
+                opnd_size = OpndSize_8;
+                break;
+            }
+            case OpcodeByteKind_rw:
+            {
+                opnd_size = OpndSize_16;
+                break;
+            }
+            case OpcodeByteKind_rd:
+            {
+                opnd_size = OpndSize_32;
+                break;
+            }
+            default:
+                assert( false );
+            }
+            opnd = EncoderBase::Operand( getRegName(OpndKind_GPReg, opnd_size, regid) );
+
+            ++pinst->argc;
             ++*pbuf;
             return true;
         }
@@ -347,7 +430,7 @@ bool DecoderBase::decodeModRM(const EncoderBase::OpcodeDesc& odesc,
         *pbuf += 1;
         scale = sib.scale == 0 ? 0 : (1<<sib.scale);
         if (sib.index != 4) {
-			index = getRegName(OpndKind_GPReg, opndDesc.size, EXTEND_REG(sib.index, x));
+            index = getRegName(OpndKind_GPReg, opndDesc.size, EXTEND_REG(sib.index, x));
         } else {
             // (sib.index == 4) => no index
         }
