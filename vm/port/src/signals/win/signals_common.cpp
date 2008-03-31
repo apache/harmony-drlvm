@@ -164,13 +164,24 @@ LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception
     switch (nt_exception->ExceptionRecord->ExceptionCode)
     {
     case STATUS_STACK_OVERFLOW:
+        if (!sd_is_handler_registered(PORT_SIGNAL_STACK_OVERFLOW))
+            return EXCEPTION_CONTINUE_SEARCH;
+        break;
     case STATUS_ACCESS_VIOLATION:
+        if (!sd_is_handler_registered(PORT_SIGNAL_GPF))
+            return EXCEPTION_CONTINUE_SEARCH;
+        break;
     case JVMTI_EXCEPTION_STATUS:
+        if (!sd_is_handler_registered(PORT_SIGNAL_BREAKPOINT))
+            return EXCEPTION_CONTINUE_SEARCH;
+        break;
     case STATUS_INTEGER_DIVIDE_BY_ZERO:
     case EXCEPTION_FLT_DIVIDE_BY_ZERO:
     case EXCEPTION_FLT_OVERFLOW:
     case EXCEPTION_FLT_UNDERFLOW:
     case EXCEPTION_INT_OVERFLOW:
+        if (!sd_is_handler_registered(PORT_SIGNAL_ARITHMETIC))
+            return EXCEPTION_CONTINUE_SEARCH;
         break;
     default:
         return EXCEPTION_CONTINUE_SEARCH;
@@ -194,6 +205,9 @@ BOOL ctrl_handler(DWORD ctrlType)
     switch (ctrlType)
     {
     case CTRL_BREAK_EVENT:
+        if (!sd_is_handler_registered(PORT_SIGNAL_CTRL_BREAK))
+            return FALSE;
+
         result = port_process_signal(PORT_SIGNAL_CTRL_BREAK, NULL, NULL, FALSE);
         if (result == 0)
             return TRUE;
@@ -204,6 +218,9 @@ BOOL ctrl_handler(DWORD ctrlType)
     case CTRL_CLOSE_EVENT:
     case CTRL_LOGOFF_EVENT:
     case CTRL_SHUTDOWN_EVENT:
+        if (!sd_is_handler_registered(PORT_SIGNAL_CTRL_C))
+            return FALSE;
+
         result = port_process_signal(PORT_SIGNAL_CTRL_C, NULL, NULL, FALSE);
         if (result == 0)
             return TRUE;

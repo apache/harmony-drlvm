@@ -65,6 +65,10 @@ int port_process_signal(port_sigtype signum, Registers *regs, void* fault_addr, 
 void create_minidump(LPEXCEPTION_POINTERS exp);
 #endif
 
+
+Boolean sd_is_handler_registered(port_sigtype signum);
+
+
 #ifdef __cplusplus
 }
 #endif

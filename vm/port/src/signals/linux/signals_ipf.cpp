@@ -118,18 +118,19 @@ static void general_signal_handler(int signum, siginfo_t* info, void* context)
 struct sig_reg
 {
     int signal;
+    port_sigtype port_sig;
     int flags;
     bool set_up;
 };
 
 static sig_reg signals_used[] =
 {
-    { SIGTRAP, SA_SIGINFO, false },
-    { SIGSEGV, SA_SIGINFO | SA_ONSTACK, false },
-    { SIGFPE,  SA_SIGINFO, false },
-    { SIGINT,  SA_SIGINFO, false },
-    { SIGQUIT, SA_SIGINFO, false },
-    { SIGABRT, SA_SIGINFO, false }
+    { SIGTRAP, PORT_SIGNAL_BREAKPOINT, SA_SIGINFO, false },
+    { SIGSEGV, PORT_SIGNAL_GPF,        SA_SIGINFO | SA_ONSTACK, false },
+    { SIGFPE,  PORT_SIGNAL_ARITHMETIC, SA_SIGINFO, false },
+    { SIGINT,  PORT_SIGNAL_CTRL_C,     SA_SIGINFO, false },
+    { SIGQUIT, PORT_SIGNAL_QUIT,       SA_SIGINFO, false },
+    { SIGABRT, PORT_SIGNAL_ABORT,      SA_SIGINFO, false }
 };
 
 static struct sigaction old_actions[sizeof(signals_used)/sizeof(signals_used[0])];
@@ -153,6 +154,9 @@ int initialize_signals()
 
     for (size_t i = 0; i < sizeof(signals_used)/sizeof(signals_used[0]); i++)
     {
+        if (!sd_is_handler_registered(signals_used[i].port_sig))
+            continue;
+
         sigemptyset(&sa.sa_mask);
         sa.sa_flags = signals_used[i].flags;
         sa.sa_sigaction = &general_signal_handler;
@@ -162,6 +166,8 @@ int initialize_signals()
             restore_signals();
             return -1;
         }
+
+        signals_used[i].set_up = true;
     }
 
     // Prepare gdb crash handler

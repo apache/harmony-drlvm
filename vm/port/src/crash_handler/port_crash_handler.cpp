@@ -23,7 +23,7 @@
 #include "signals_internal.h"
 #include "port_crash_handler.h"
 
-static port_signal_handler signal_callbacks[] =
+port_signal_handler signal_callbacks[] =
 {
     NULL, // PORT_SIGNAL_GPF
     NULL, // PORT_SIGNAL_STACK_OVERFLOW
@@ -55,15 +55,11 @@ Boolean port_init_crash_handler(
     unsigned count,
     port_unwind_compiled_frame unwind_callback)
 {
-    if (initialize_signals() != 0)
+    if (port_mutex_create(&g_mutex, APR_THREAD_MUTEX_NESTED) != APR_SUCCESS)
         return FALSE;
 
 	if (init_private_tls_data() != 0)
 	    return FALSE;
-
-    port_mutex_create(&g_mutex, APR_THREAD_MUTEX_NESTED);
-
-    sd_init_crash_handler();
 
     for (unsigned iii = 0; iii < count; iii++)
     {
@@ -71,6 +67,12 @@ Boolean port_init_crash_handler(
         assert(registrations[iii].signum <= PORT_SIGNAL_MAX);
         signal_callbacks[registrations[iii].signum] = registrations[iii].callback;
     }
+
+    // initialize_signals needs to know what handlers are registered
+    if (initialize_signals() != 0)
+        return FALSE;
+
+    sd_init_crash_handler();
 
     g_unwind_callback = unwind_callback;
 
@@ -158,12 +160,14 @@ int port_process_signal(port_sigtype signum, Registers *regs, void* fault_addr, 
 {
     if (!iscrash)
     {
-        assert(signum >= PORT_SIGNAL_MIN);
-        assert(signum <= PORT_SIGNAL_MAX);
+        if (signum < PORT_SIGNAL_MIN ||
+            signum > PORT_SIGNAL_MAX)
+            return 0;
 
         if (signal_callbacks[signum] != NULL)
         {
-            Boolean cres = signal_callbacks[signum](signum, regs, fault_addr);
+            Boolean cres =
+                signal_callbacks[signum](signum, regs, fault_addr);
 
             if (cres) // signal was processed
                 return 0;
@@ -188,4 +192,9 @@ int port_process_signal(port_sigtype signum, Registers *regs, void* fault_addr, 
     }
 
     return -1;
+}
+
+Boolean sd_is_handler_registered(port_sigtype signum)
+{
+    return signal_callbacks[signum] != NULL;
 }
