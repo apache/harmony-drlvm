@@ -19,11 +19,11 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\util\ia32\base_natives&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\util\win\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\lil\ia32\pim\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\encoder\ia32_em64t&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\zlib\include&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\apr\include\apr-1&quot;;&quot;$(ProjectDir)\..\..\..\..\..\working_classlib\deploy\include\icu4c&quot;"
-				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;BUILDING_VM;GC_V4;USE_DLL_JIT;APR_DECLARE_STATIC;PLATFORM_NT;_WIN32_WINNT=0x0501;_IA32_"
+				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\windows_x86_msvc_debug\deploy\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\encoder\ia32_em64t&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\lil\ia32\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\util\ia32\base_natives&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\util\win\include&quot;"
+				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;REFS_USE_UNCOMPRESSED;VM_STATS;_IA32_;PLATFORM_NT;BUILDING_VM;APR_DECLARE_STATIC;_WIN32_WINNT=0x0501"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
-				RuntimeLibrary="1"
+				RuntimeLibrary="3"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				Detect64BitPortabilityProblems="FALSE"
@@ -32,14 +32,15 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="port.lib apr-1.lib aprutil-1.lib zdll.lib log4cxx.lib hythr.lib advapi32.lib odbc32.lib userenv.lib ws2_32.lib mswsock.lib icuuc.lib psapi.lib"
+				AdditionalDependencies="log4cxx.lib aprutil-1.lib apr-1.lib icuuc.lib zdll.lib MsWSock.lib Psapi.lib userenv.lib AdvAPI32.lib WS2_32.lib"
 				OutputFile="$(OutDir)/harmonyvm.dll"
 				LinkIncremental="2"
-				AdditionalLibraryDirectories="&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\vm\port\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\apr\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\aprutil\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\zlib\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\log4cxx\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\vm\hythr\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\vm\jthread\_bin&quot;;&quot;$(ProjectDir)\..\..\..\..\..\working_classlib\deploy\lib&quot;"
+				AdditionalLibraryDirectories="&quot;$(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\lib&quot;;&quot;$(ProjectDir)\..\..\..\..\..\working_classlib\deploy\lib&quot;"
+				IgnoreDefaultLibraryNames="libcmt.lib msvcrtd.lib"
 				ModuleDefinitionFile="$(ProjectDir)\..\..\..\..\vm\vmcore\src\harmonyvm.def"
 				GenerateDebugInformation="TRUE"
 				ProgramDatabaseFile="$(OutDir)/harmonyvm.pdb"
-				SubSystem="2"
+				SubSystem="1"
 				ImportLibrary="$(OutDir)/harmonyvm.lib"
 				TargetMachine="1"/>
 			<Tool
@@ -47,9 +48,10 @@
 			<Tool
 				Name="VCPostBuildEventTool"
 				Description="       ... Copying files to bin/default folder ...."
-				CommandLine="copy $(OutDir)\harmonyvm.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
-copy $(OutDir)\harmonyvm.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
-copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
+				CommandLine="copy $(OutDir)\harmonyvm.dll $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
+copy $(OutDir)\harmonyvm.pdb $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
+copy $(OutDir)\harmonyvm.exp $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\lib
+copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\lib
 "/>
 			<Tool
 				Name="VCPreBuildEventTool"/>
@@ -76,9 +78,9 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 			CharacterSet="2">
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\util\ia32\base_natives&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\util\win\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\lil\ia32\pim\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\encoder\ia32_em64t&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\zlib\include&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\apr\include\apr-1&quot;;&quot;$(ProjectDir)\..\..\..\..\..\working_classlib\deploy\include\icu4c&quot;"
-				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;BUILDING_VM;GC_V4;USE_DLL_JIT;APR_DECLARE_STATIC;PLATFORM_NT;_WIN32_WINNT=0x0501;_IA32_"
-				RuntimeLibrary="0"
+				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\windows_x86_msvc_debug\deploy\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\encoder\ia32_em64t&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\lil\ia32\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\util\ia32\base_natives&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\util\win\include&quot;"
+				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;REFS_USE_UNCOMPRESSED;VM_STATS;_IA32_;PLATFORM_NT;BUILDING_VM;APR_DECLARE_STATIC;_WIN32_WINNT=0x0501"
+				RuntimeLibrary="2"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				Detect64BitPortabilityProblems="FALSE"
@@ -87,14 +89,16 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="port.lib apr-1.lib aprutil-1.lib zdll.lib log4cxx.lib hythr.lib advapi32.lib odbc32.lib userenv.lib ws2_32.lib mswsock.lib icuuc.lib psapi.lib"
+				AdditionalDependencies="log4cxx.lib aprutil-1.lib apr-1.lib icuuc.lib zdll.lib MsWSock.lib Psapi.lib userenv.lib AdvAPI32.lib WS2_32.lib"
 				OutputFile="$(OutDir)/harmonyvm.dll"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\vm\port\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\apr\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\aprutil\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\zlib\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\log4cxx\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\vm\hythr\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\vm\jthread\_bin&quot;;&quot;$(ProjectDir)\..\..\..\..\..\working_classlib\deploy\lib&quot;"
+				SuppressStartupBanner="TRUE"
+				AdditionalLibraryDirectories="&quot;$(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\lib&quot;;&quot;$(ProjectDir)\..\..\..\..\..\working_classlib\deploy\lib&quot;"
+				IgnoreDefaultLibraryNames="libcmt.lib;msvcrtd.lib"
 				ModuleDefinitionFile="$(ProjectDir)\..\..\..\..\vm\vmcore\src\harmonyvm.def"
-				GenerateDebugInformation="TRUE"
+				GenerateDebugInformation="FALSE"
 				ProgramDatabaseFile="$(OutDir)/harmonyvm.pdb"
-				SubSystem="2"
+				SubSystem="1"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
 				ImportLibrary="$(OutDir)/harmonyvm.lib"
@@ -104,9 +108,10 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 			<Tool
 				Name="VCPostBuildEventTool"
 				Description="       ... Copying files to bin/default folder ...."
-				CommandLine="copy $(OutDir)\harmonyvm.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
-copy $(OutDir)\harmonyvm.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
-copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
+				CommandLine="copy $(OutDir)\harmonyvm.dll $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
+copy $(OutDir)\harmonyvm.pdb $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
+copy $(OutDir)\harmonyvm.exp $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\lib
+copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\lib
 "/>
 			<Tool
 				Name="VCPreBuildEventTool"/>
@@ -129,292 +134,6 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 	<References>
 	</References>
 	<Files>
-		<Filter
-			Name="include"
-			Filter="">
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\annotation.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\annotations.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\assertion_registry.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\atomics.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\bit_vector.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\bytereader.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\cci.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\Class.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\class_interface.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\class_member.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\classloader.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\classpath_const.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\compile.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\dll_em_intf.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\dll_gc.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\dll_jit_intf.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\dump.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\em_intf_cpp.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\environment.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\exceptions.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\exceptions_impl.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\exceptions_int.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\exceptions_jit.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\exceptions_type.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\finalize.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\GlobalClassLoaderIterator.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\hashtable.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\heap.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\ini.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\init.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\jarfile_support.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\jarfile_util.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\jit_export.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\jit_export_jpda.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\jit_export_rt.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\jit_intf_cpp.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\jit_runtime_support_common.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\jni_direct.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\jni_utils.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\jvmti_break_intf.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\jvmti_dasm.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\jvmti_direct.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\jvmti_interface.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\jvmti_internal.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\jvmti_utils.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\lock_manager.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\manifest.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\mem_alloc.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\method_lookup.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\mon_enter_exit.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\native_frame.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\native_modules.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\native_overrides.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\native_stack.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\native_utils.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\natives_support.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\nogc.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\object.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\object_generic.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\object_handles.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\object_layout.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\Package.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\platform_utils.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\primitives_support.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\properties.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\reflection.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\root_set_enum_internal.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\simplehashtable.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\stack_dump.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\stack_trace.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\stack_walker.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\String_Pool.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\suspend_checker.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\sync_bits.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\thread_dump.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\thread_generic.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\thread_manager.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\type.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\unloading.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\verifier.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\Verifier_stub.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\verify_stack_enumeration.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\version.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\version_svn_tag.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\version_svn_tag_orig.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\vm_arrays.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\vm_core_types.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\vm_import.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\vm_log.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\vm_stats.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\vm_strings.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\vm_synch.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\vm_threads.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\include\vtable.h">
-			</File>
-		</Filter>
 		<Filter
 			Name="class_support"
 			Filter="">
@@ -455,9 +174,6 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 				RelativePath="..\..\..\..\vm\vmcore\src\class_support\method.cpp">
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\class_support\method_lookup.cpp">
-			</File>
-			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\class_support\Prepare.cpp">
 			</File>
 			<File
@@ -468,6 +184,9 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\class_support\type.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\class_support\type_access.cpp">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\class_support\Verifier_stub.cpp">
@@ -705,189 +424,282 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 		<Filter
 			Name="kernel_classes"
 			Filter="">
+			<Filter
+				Name="native"
+				Filter="">
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_ClassLoader.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_EMThreadSupport.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_EMThreadSupport.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_FinalizerThread.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_FinalizerThread.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_reflect_VMField.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_reflect_VMField.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_reflect_VMReflection.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_reflect_VMReflection.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_Runtime_SubProcess.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_Runtime_SubProcess_SubInputStream.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_Runtime_SubProcess_SubOutputStream.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_System.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_System.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_VMClassRegistry.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_VMClassRegistry.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_VMExecutionEngine.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_VMExecutionEngine.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_VMMemoryManager.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_VMMemoryManager.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_VMThreadManager.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_VMThreadManager.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_security_AccessController.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_util_concurrent_locks_LockSupport.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_util_concurrent_locks_LockSupport.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_drlvm_VMHelper.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_drlvm_VMHelper.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_drlvm_VMHelperFastPath.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_drlvm_VMHelperFastPath.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_kernel_vm_VM.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_kernel_vm_VM.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_ClassLoadingMXBeanImpl.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_ClassLoadingMXBeanImpl.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_CompilationMXBeanImpl.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_CompilationMXBeanImpl.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_GarbageCollectorMXBeanImpl.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_GarbageCollectorMXBeanImpl.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_MemoryManagerMXBeanImpl.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_MemoryManagerMXBeanImpl.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_MemoryMXBeanImpl.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_MemoryMXBeanImpl.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_MemoryNotificationThread.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_MemoryNotificationThread.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_MemoryNotificationThreadShutdown.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_MemoryNotificationThreadShutdown.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_MemoryPoolMXBeanImpl.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_MemoryPoolMXBeanImpl.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_RuntimeMXBeanImpl.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_RuntimeMXBeanImpl.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_ThreadMXBeanImpl.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_ThreadMXBeanImpl.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_util_concurrent_Atomics.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_util_concurrent_Atomics.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_vm_VMDebug.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_vm_VMDebug.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_vm_VMGenericsAndAnnotations.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_vm_VMGenericsAndAnnotations.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_vm_VMStack.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_vm_VMStack.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\Runtime_win.cpp">
+				</File>
+			</Filter>
+		</Filter>
+		<Filter
+			Name="lil"
+			Filter="">
 			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_ClassLoader.h">
+				RelativePath="..\..\..\..\vm\vmcore\src\lil\lil.cpp">
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_EMThreadSupport.cpp">
+				RelativePath="..\..\..\..\vm\vmcore\src\lil\lil_code_generator.cpp">
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_EMThreadSupport.h">
+				RelativePath="..\..\..\..\vm\vmcore\src\lil\lil_code_generator_utils.cpp">
+			</File>
+			<Filter
+				Name="ia32"
+				Filter="">
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\lil\ia32\lil_code_generator_ia32.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\lil\ia32\m2n_ia32.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\lil\ia32\m2n_ia32_internal.h">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\lil\ia32\stack_iterator_ia32.cpp">
+				</File>
+			</Filter>
+			<Filter
+				Name="stack_iterator"
+				Filter="">
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\lil\stack_iterator\m2n.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\lil\stack_iterator\stack_iterator.cpp">
+				</File>
+			</Filter>
+		</Filter>
+		<Filter
+			Name="ncai"
+			Filter="">
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\ncai\ncai.cpp">
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_FinalizerThread.cpp">
+				RelativePath="..\..\..\..\vm\vmcore\src\ncai\ncai_break.cpp">
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_FinalizerThread.h">
+				RelativePath="..\..\..\..\vm\vmcore\src\ncai\ncai_event.cpp">
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_reflect_VMField.cpp">
+				RelativePath="..\..\..\..\vm\vmcore\src\ncai\ncai_memory.cpp">
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_reflect_VMField.h">
+				RelativePath="..\..\..\..\vm\vmcore\src\ncai\ncai_methods.cpp">
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_reflect_VMReflection.cpp">
+				RelativePath="..\..\..\..\vm\vmcore\src\ncai\ncai_modules.cpp">
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_reflect_VMReflection.h">
+				RelativePath="..\..\..\..\vm\vmcore\src\ncai\ncai_registers.cpp">
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_Runtime_SubProcess.h">
+				RelativePath="..\..\..\..\vm\vmcore\src\ncai\ncai_signals.cpp">
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_Runtime_SubProcess_SubInputStream.h">
+				RelativePath="..\..\..\..\vm\vmcore\src\ncai\ncai_stack.cpp">
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_Runtime_SubProcess_SubOutputStream.h">
+				RelativePath="..\..\..\..\vm\vmcore\src\ncai\ncai_step.cpp">
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_System.cpp">
+				RelativePath="..\..\..\..\vm\vmcore\src\ncai\ncai_thread.cpp">
 			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_System.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_VMClassRegistry.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_VMClassRegistry.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_VMExecutionEngine.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_VMExecutionEngine.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_VMMemoryManager.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_VMMemoryManager.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_VMStart.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_VMThreadManager.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_lang_VMThreadManager.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_security_AccessController.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_util_concurrent_locks_LockSupport.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\java_util_concurrent_locks_LockSupport.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_drlvm_VMHelper.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_drlvm_VMHelper.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_drlvm_VMHelperFastPath.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_drlvm_VMHelperFastPath.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_kernel_vm_VM.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_kernel_vm_VM.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_ClassLoadingMXBeanImpl.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_ClassLoadingMXBeanImpl.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_CompilationMXBeanImpl.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_CompilationMXBeanImpl.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_GarbageCollectorMXBeanImpl.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_GarbageCollectorMXBeanImpl.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_MemoryManagerMXBeanImpl.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_MemoryManagerMXBeanImpl.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_MemoryMXBeanImpl.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_MemoryMXBeanImpl.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_MemoryNotificationThread.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_MemoryNotificationThread.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_MemoryNotificationThreadShutdown.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_MemoryNotificationThreadShutdown.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_MemoryPoolMXBeanImpl.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_MemoryPoolMXBeanImpl.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_RuntimeMXBeanImpl.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_RuntimeMXBeanImpl.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_ThreadMXBeanImpl.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_lang_management_ThreadMXBeanImpl.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_util_concurrent_Atomics.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_util_concurrent_Atomics.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_vm_VMDebug.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_vm_VMDebug.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_vm_VMGenericsAndAnnotations.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_vm_VMGenericsAndAnnotations.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_vm_VMStack.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\org_apache_harmony_vm_VMStack.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\kernel_classes\native\Runtime_win.cpp">
-			</File>
+			<Filter
+				Name="utils"
+				Filter="">
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\ncai\utils\ncai_modules_win.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\ncai\utils\ncai_step_ia32.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\ncai\utils\ncai_utils_ia32.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\ncai\utils\ncai_utils_win.cpp">
+				</File>
+			</Filter>
 		</Filter>
 		<Filter
 			Name="object"
@@ -897,26 +709,6 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\object\vm_arrays.cpp">
-			</File>
-		</Filter>
-		<Filter
-			Name="reflection"
-			Filter="">
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\reflection\annotations.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\reflection\reflection.cpp">
-			</File>
-		</Filter>
-		<Filter
-			Name="stack"
-			Filter="">
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\stack\stack_dump.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\stack\stack_trace.cpp">
 			</File>
 		</Filter>
 		<Filter
@@ -939,9 +731,6 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\thread\thread_generic.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\thread\helpers\thread_helpers_ia32.cpp">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\thread\thread_java_attrs.cpp">
@@ -968,9 +757,6 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 				RelativePath="..\..\..\..\vm\vmcore\src\thread\thread_manager.cpp">
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\thread\thread_private.h">
-			</File>
-			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\thread\thread_ti_instr.cpp">
 			</File>
 			<File
@@ -986,10 +772,10 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 				RelativePath="..\..\..\..\vm\vmcore\src\thread\verify_stack_enumeration.cpp">
 			</File>
 			<Filter
-				Name="win"
+				Name="helpers"
 				Filter="">
 				<File
-					RelativePath="..\..\..\..\vm\vmcore\src\thread\win\atomics.cpp">
+					RelativePath="..\..\..\..\vm\vmcore\src\thread\helpers\thread_helpers_ia32.cpp">
 				</File>
 			</Filter>
 		</Filter>
@@ -1000,19 +786,19 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 				RelativePath="..\..\..\..\vm\vmcore\src\util\bytereader.cpp">
 			</File>
 			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\util\crash_dump.cpp">
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\util\jarfile_support.cpp">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\util\mem_alloc.cpp">
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\util\native_modules_common.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\util\native_stack.cpp">
-			</File>
-			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\util\natives_support.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\vmcore\src\util\signals.cpp">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\util\vm_stats.cpp">
@@ -1020,49 +806,6 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 			<File
 				RelativePath="..\..\..\..\vm\vmcore\src\util\vm_strings.cpp">
 			</File>
-			<Filter
-				Name="win"
-				Filter="">
-				<File
-					RelativePath="..\..\..\..\vm\vmcore\src\util\win\native_modules.cpp">
-				</File>
-				<File
-					RelativePath="..\..\..\..\vm\vmcore\src\util\win\nt_platform_utils.cpp">
-				</File>
-				<Filter
-					Name="ia32"
-					Filter="">
-					<File
-						RelativePath="..\..\..\..\vm\vmcore\src\util\win\ia32\nt_exception_filter.cpp">
-					</File>
-				</Filter>
-				<Filter
-					Name="include"
-					Filter="">
-					<File
-						RelativePath="..\..\..\..\vm\vmcore\src\util\win\include\exception_filter.h">
-					</File>
-					<File
-						RelativePath="..\..\..\..\vm\vmcore\src\util\win\include\java_lang_thread_nt.h">
-					</File>
-					<File
-						RelativePath="..\..\..\..\vm\vmcore\src\util\win\include\platform.h">
-					</File>
-					<File
-						RelativePath="..\..\..\..\vm\vmcore\src\util\win\include\platform_lowlevel.h">
-					</File>
-					<File
-						RelativePath="..\..\..\..\vm\vmcore\src\util\win\include\vm_process.h">
-					</File>
-				</Filter>
-				<Filter
-					Name="ia32_em64t"
-					Filter="">
-					<File
-						RelativePath="..\..\..\..\vm\vmcore\src\util\win\ia32_em64t\nt_exception_filter_common.cpp">
-					</File>
-				</Filter>
-			</Filter>
 			<Filter
 				Name="ia32"
 				Filter="">
@@ -1076,9 +819,6 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 						RelativePath="..\..\..\..\vm\vmcore\src\util\ia32\base\ini_iA32.cpp">
 					</File>
 					<File
-						RelativePath="..\..\..\..\vm\vmcore\src\util\ia32\base\invoke_native_stub_ia32.asm">
-					</File>
-					<File
 						RelativePath="..\..\..\..\vm\vmcore\src\util\ia32\base\jit_generic_rt_support_ia32.cpp">
 					</File>
 					<File
@@ -1086,9 +826,6 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 					</File>
 					<File
 						RelativePath="..\..\..\..\vm\vmcore\src\util\ia32\base\jit_runtime_support_ia32.cpp">
-					</File>
-					<File
-						RelativePath="..\..\..\..\vm\vmcore\src\util\ia32\base\native_stack_ia32.cpp">
 					</File>
 					<File
 						RelativePath="..\..\..\..\vm\vmcore\src\util\ia32\base\optimize_ia32.cpp">
@@ -1105,37 +842,23 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 					</File>
 				</Filter>
 			</Filter>
-		</Filter>
-		<Filter
-			Name="port_lil"
-			Filter="">
-			<File
-				RelativePath="..\..\..\..\vm\port\src\lil\lil.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\port\src\lil\lil_code_generator.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\port\src\lil\ia32\pim\lil_code_generator_ia32.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\port\src\lil\lil_code_generator_utils.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\port\src\lil\pim\m2n.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\port\src\lil\ia32\pim\m2n_ia32.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\port\src\lil\ia32\pim\m2n_ia32_internal.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\port\src\lil\pim\stack_iterator.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\port\src\lil\ia32\pim\stack_iterator_ia32.cpp">
-			</File>
+			<Filter
+				Name="win"
+				Filter="">
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\util\win\crash_dump_os.cpp">
+				</File>
+				<File
+					RelativePath="..\..\..\..\vm\vmcore\src\util\win\nt_platform_utils.cpp">
+				</File>
+				<Filter
+					Name="ia32_em64t"
+					Filter="">
+					<File
+						RelativePath="..\..\..\..\vm\vmcore\src\util\win\ia32_em64t\nt_exception_filter_common.cpp">
+					</File>
+				</Filter>
+			</Filter>
 		</Filter>
 		<Filter
 			Name="vmstart"
@@ -1148,177 +871,23 @@ copy $(OutDir)\harmonyvm.lib $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configuratio
 			</File>
 		</Filter>
 		<Filter
-			Name="vm_include"
+			Name="reflexion"
 			Filter="">
 			<File
-				RelativePath="..\..\..\..\vm\include\component_manager.h">
+				RelativePath="..\..\..\..\vm\vmcore\src\reflection\annotations.cpp">
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\include\em_intf.h">
+				RelativePath="..\..\..\..\vm\vmcore\src\reflection\reflection.cpp">
 			</File>
-			<File
-				RelativePath="..\..\..\..\vm\include\internal_jit_intf.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\include\interpreter.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\include\interpreter_exports.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\include\interpreter_imports.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\include\jit_import.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\include\jit_import_rt.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\include\jit_intf.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\include\jit_runtime_support.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\include\jni.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\include\jni_types.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\include\jvmti.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\include\jvmti_types.h">
-			</File>
-			<Filter
-				Name="open"
-				Filter="">
-				<File
-					RelativePath="..\..\..\..\vm\include\open\bytecodes.h">
-				</File>
-				<File
-					RelativePath="..\..\..\..\vm\include\open\common.h">
-				</File>
-				<File
-					RelativePath="..\..\..\..\vm\include\open\compmgr.h">
-				</File>
-				<File
-					RelativePath="..\..\..\..\vm\include\open\ee_em_intf.h">
-				</File>
-				<File
-					RelativePath="..\..\..\..\vm\include\open\em.h">
-				</File>
-				<File
-					RelativePath="..\..\..\..\vm\include\open\em_profile_access.h">
-				</File>
-				<File
-					RelativePath="..\..\..\..\vm\include\open\em_vm.h">
-				</File>
-				<File
-					RelativePath="..\..\..\..\vm\include\open\gc.h">
-				</File>
-				<File
-					RelativePath="..\..\..\..\vm\include\open\hycomp.h">
-				</File>
-				<File
-					RelativePath="..\..\..\..\vm\include\open\hythread.h">
-				</File>
-				<File
-					RelativePath="..\..\..\..\vm\include\open\hythread_ext.h">
-				</File>
-				<File
-					RelativePath="..\..\..\..\vm\include\open\jthread.h">
-				</File>
-				<File
-					RelativePath="..\..\..\..\vm\include\open\thread.h">
-				</File>
-				<File
-					RelativePath="..\..\..\..\vm\include\open\thread_externals.h">
-				</File>
-				<File
-					RelativePath="..\..\..\..\vm\include\open\thread_helpers.h">
-				</File>
-				<File
-					RelativePath="..\..\..\..\vm\include\open\ti_thread.h">
-				</File>
-				<File
-					RelativePath="..\..\..\..\vm\include\open\types.h">
-				</File>
-				<File
-					RelativePath="..\..\..\..\vm\include\open\vm.h">
-				</File>
-				<File
-					RelativePath="..\..\..\..\vm\include\open\vm_gc.h">
-				</File>
-				<File
-					RelativePath="..\..\..\..\vm\include\open\vm_kernel_classes.h">
-				</File>
-				<File
-					RelativePath="..\..\..\..\vm\include\open\vm_util.h">
-				</File>
-			</Filter>
 		</Filter>
 		<Filter
-			Name="cp_verifier"
+			Name="stack"
 			Filter="">
 			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\java5\context_5.cpp">
+				RelativePath="..\..\..\..\vm\vmcore\src\stack\native_stack.cpp">
 			</File>
 			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\java5\context_5.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\java6\context_6.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\java6\context_6.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\base\context_base.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\base\context_base.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\base\context_x.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\base\context_x.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\base\instr_props.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\java5\instr_props_5.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\base\stackmap.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\java5\stackmap_5.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\java6\stackmap_6.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\base\stackmap_x.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\base\tpool.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\base\tpool.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\base\ver.cpp">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\base\ver_utils.h">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\vmcore\src\verifier-3363\base\vf_resolve.cpp">
+				RelativePath="..\..\..\..\vm\vmcore\src\stack\stack_trace.cpp">
 			</File>
 		</Filter>
 	</Files>

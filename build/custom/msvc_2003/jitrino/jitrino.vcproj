@@ -20,12 +20,13 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\encoder\ia32_em64t&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\shared&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\vm\drl&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\main&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\vm&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\codegenerator&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\dynopt&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\translator&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\optimizer&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\translator\java&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\jet&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\apr\include\apr-1&quot;"
-				PreprocessorDefinitions="_IA32_;WIN32;_DEBUG;_WINDOWS;_USRDLL;PLATFORM_NT"
+				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\codegenerator&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\codegenerator\ia32&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\dynopt&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\jet&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\main&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\optimizer&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\optimizer\abcd&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\optimizer\ssa&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\shared&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\translator&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\translator\java&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\vm&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\encoder\ia32_em64t&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\util\win\include&quot;;&quot;$(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;"
+				PreprocessorDefinitions="_IA32_;WIN32;_DEBUG;_WINDOWS;_USRDLL;PROJECT_JITRINO;PLATFORM_NT;REFS_USE_UNCOMPRESSED;VM_STATS;JIT_LOGS;JIT_STATS;_WIN32_WINNT=0x0501;_REENTRANT;__SMP__;_CRT_SECURE_NO_DEPRECATE;_HAS_ITERATOR_DEBUGGING=0;_SECURE_SCL=0"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
-				RuntimeLibrary="1"
+				RuntimeLibrary="3"
 				EnableEnhancedInstructionSet="2"
+				ForceConformanceInForLoopScope="TRUE"
 				UsePrecompiledHeader="2"
 				WarningLevel="4"
 				WarnAsError="FALSE"
@@ -41,7 +42,7 @@
 				AdditionalLibraryDirectories=""
 				GenerateDebugInformation="TRUE"
 				ProgramDatabaseFile="$(OutDir)/jitrino.pdb"
-				SubSystem="2"
+				SubSystem="1"
 				ImportLibrary="$(OutDir)/jitrino.lib"
 				TargetMachine="1"/>
 			<Tool
@@ -49,8 +50,10 @@
 			<Tool
 				Name="VCPostBuildEventTool"
 				Description="       ... Copying files to bin/default folder ...."
-				CommandLine="copy $(OutDir)\jitrino.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
-copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
+				CommandLine="copy $(OutDir)\jitrino.dll   $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
+copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
+copy $(OutDir)\jitrino.exp $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\lib
+copy $(OutDir)\jitrino.lib $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\lib
 "/>
 			<Tool
 				Name="VCPreBuildEventTool"/>
@@ -81,13 +84,13 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 				InlineFunctionExpansion="2"
 				FavorSizeOrSpeed="1"
 				OmitFramePointers="TRUE"
-				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\encoder\ia32_em64t&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\shared&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\vm\drl&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\main&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\vm&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\codegenerator&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\dynopt&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\translator&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\optimizer&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\translator\java&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\jet&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\apr\include\apr-1&quot;"
-				PreprocessorDefinitions="_IA32_;WIN32;NDEBUG;_WINDOWS;_USRDLL;PLATFORM_NT"
-				RuntimeLibrary="0"
+				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\codegenerator&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\codegenerator\ia32&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\dynopt&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\jet&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\main&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\optimizer&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\optimizer\abcd&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\optimizer\ssa&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\shared&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\translator&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\translator\java&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\jitrino\src\vm&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\encoder\ia32_em64t&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\util\win\include&quot;;&quot;$(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;"
+				PreprocessorDefinitions="_IA32_;WIN32;NDEBUG;_WINDOWS;_USRDLL;PROJECT_JITRINO;PLATFORM_NT;REFS_USE_UNCOMPRESSED;VM_STATS;JIT_LOGS;JIT_STATS;_WIN32_WINNT=0x0501;_REENTRANT;__SMP__;_CRT_SECURE_NO_DEPRECATE;_HAS_ITERATOR_DEBUGGING=0;_SECURE_SCL=0"
+				RuntimeLibrary="2"
 				EnableEnhancedInstructionSet="2"
 				UsePrecompiledHeader="2"
 				WarningLevel="4"
-				WarnAsError="TRUE"
+				WarnAsError="FALSE"
 				Detect64BitPortabilityProblems="FALSE"
 				DebugInformationFormat="3"
 				DisableSpecificWarnings="4100;4127;4201;4511;4512;4702"/>
@@ -98,7 +101,7 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 				OutputFile="$(OutDir)/jitrino.dll"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories=""
-				GenerateDebugInformation="TRUE"
+				GenerateDebugInformation="FALSE"
 				SubSystem="2"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
@@ -109,8 +112,10 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 			<Tool
 				Name="VCPostBuildEventTool"
 				Description="       ... Copying files to bin/default folder ...."
-				CommandLine="copy $(OutDir)\jitrino.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
-copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
+				CommandLine="copy $(OutDir)\jitrino.dll   $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
+copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
+copy $(OutDir)\jitrino.exp $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\lib
+copy $(OutDir)\jitrino.lib $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\lib
 "/>
 			<Tool
 				Name="VCPreBuildEventTool"/>
@@ -168,6 +173,12 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\CSEHash.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\dabce.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\dabce.h">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\dataflow.h">
@@ -278,6 +289,12 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\loop_unroll.cpp">
 			</File>
 			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\LoopUtils.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\LoopUtils.h">
+			</File>
+			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\memoryopt.cpp">
 			</File>
 			<File
@@ -318,6 +335,12 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\optpass.h">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\osr.cpp">
+			</File>
+			<File
+				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\osr.h">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\optimizer\pidgenerator.cpp">
@@ -577,7 +600,7 @@ copy $(OutDir)\jitrino.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationN
 			</File>
 		</Filter>
 		<Filter
-			Name="codegen"
+			Name="codegenerator"
 			Filter="">
 			<File
 				RelativePath="..\..\..\..\vm\jitrino\src\codegenerator\CodeGenIntfc.h">

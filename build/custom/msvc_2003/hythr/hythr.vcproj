@@ -20,12 +20,12 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\apr\include\apr-1&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\thread\src&quot;"
-				PreprocessorDefinitions="PLATFORM_NT;APR_DECLARE_STATIC;WIN32;_DEBUG;_WINDOWS;_USRDLL;_WIN32_WINNT=0x0501"
+				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\thread\src&quot;"
+				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;_IA32_;REFS_USE_UNCOMPRESSED;VM_STATS;PLATFORM_NT;APR_DECLARE_STATIC;_WIN32_WINNT=0x0501"
 				MinimalRebuild="TRUE"
 				ExceptionHandling="FALSE"
 				BasicRuntimeChecks="3"
-				RuntimeLibrary="1"
+				RuntimeLibrary="3"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				Detect64BitPortabilityProblems="FALSE"
@@ -35,15 +35,15 @@
 				Name="VCCustomBuildTool"/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="port.lib apr-1.lib aprutil-1.lib log4cxx.lib mswsock.lib advapi32.lib ws2_32.lib"
+				AdditionalDependencies="apr-1.lib aprutil-1.lib log4cxx.lib mswsock.lib advapi32.lib ws2_32.lib"
 				OutputFile="$(OutDir)\hythr.dll"
 				LinkIncremental="2"
-				AdditionalLibraryDirectories="&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\aprutil\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\log4cxx\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\apr\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\vm\port\_bin&quot;"
+				AdditionalLibraryDirectories="&quot;$(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\lib&quot;"
 				IgnoreDefaultLibraryNames=""
 				ModuleDefinitionFile="$(ProjectDir)\..\..\..\..\vm\thread\src\hythr.def"
 				GenerateDebugInformation="TRUE"
 				ProgramDatabaseFile="$(OutDir)/hythr.pdb"
-				SubSystem="2"
+				SubSystem="1"
 				ImportLibrary="$(OutDir)/hythr.lib"
 				TargetMachine="1"/>
 			<Tool
@@ -51,8 +51,10 @@
 			<Tool
 				Name="VCPostBuildEventTool"
 				Description="       ... Copying files to bin/default folder ...."
-				CommandLine="copy $(OutDir)\hythr.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
-copy $(OutDir)\hythr.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
+				CommandLine="copy $(OutDir)\hythr.dll   $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
+copy $(OutDir)\hythr.pdb $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
+copy $(OutDir)\hythr.exp $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\lib
+copy $(OutDir)\hythr.lib $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\lib
 "/>
 			<Tool
 				Name="VCPreBuildEventTool"/>
@@ -79,10 +81,10 @@ copy $(OutDir)\hythr.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationNam
 			CharacterSet="2">
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\apr\include\apr-1&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\thread\src&quot;"
-				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;PLATFORM_NT;APR_DECLARE_STATIC;_WIN32_WINNT=0x0501"
+				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\thread\src&quot;"
+				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;_IA32_;REFS_USE_UNCOMPRESSED;VM_STATS;PLATFORM_NT;APR_DECLARE_STATIC;_WIN32_WINNT=0x0501"
 				ExceptionHandling="FALSE"
-				RuntimeLibrary="0"
+				RuntimeLibrary="2"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				Detect64BitPortabilityProblems="FALSE"
@@ -95,9 +97,9 @@ copy $(OutDir)\hythr.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationNam
 				AdditionalDependencies="port.lib apr-1.lib aprutil-1.lib log4cxx.lib mswsock.lib advapi32.lib ws2_32.lib"
 				OutputFile="$(OutDir)\hythr.dll"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\aprutil\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\log4cxx\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\apr\_bin&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\vm\port\_bin&quot;"
+				AdditionalLibraryDirectories="&quot;$(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\lib&quot;"
 				ModuleDefinitionFile="$(ProjectDir)\..\..\..\..\vm\thread\src\hythr.def"
-				GenerateDebugInformation="TRUE"
+				GenerateDebugInformation="FALSE"
 				ProgramDatabaseFile="$(OutDir)/hythr.pdb"
 				SubSystem="2"
 				OptimizeReferences="2"
@@ -109,8 +111,10 @@ copy $(OutDir)\hythr.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationNam
 			<Tool
 				Name="VCPostBuildEventTool"
 				Description="       ... Copying files to bin/default folder ...."
-				CommandLine="copy $(OutDir)\hythr.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
-copy $(OutDir)\hythr.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
+				CommandLine="copy $(OutDir)\hythr.dll   $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
+copy $(OutDir)\hythr.pdb $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
+copy $(OutDir)\hythr.exp $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\lib
+copy $(OutDir)\hythr.lib $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\lib
 "/>
 			<Tool
 				Name="VCPreBuildEventTool"/>
@@ -138,9 +142,6 @@ copy $(OutDir)\hythr.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationNam
 			Filter="">
 			<File
 				RelativePath="..\..\..\..\vm\thread\src\win\os_condvar.c">
-			</File>
-			<File
-				RelativePath="..\..\..\..\vm\thread\src\win\os_mutex.c">
 			</File>
 			<File
 				RelativePath="..\..\..\..\vm\thread\src\win\os_thread.c">
@@ -190,6 +191,12 @@ copy $(OutDir)\hythr.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationNam
 		</File>
 		<File
 			RelativePath="..\..\..\..\vm\thread\src\thread_native_tls.c">
+		</File>
+		<File
+			RelativePath="..\..\..\..\vm\thread\src\thread_ncai_common.c">
+		</File>
+		<File
+			RelativePath="..\..\..\..\vm\thread\src\thread_private.h">
 		</File>
 	</Files>
 	<Globals>

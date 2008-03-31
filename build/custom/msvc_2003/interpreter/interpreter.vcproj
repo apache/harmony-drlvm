@@ -19,11 +19,11 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\util\win\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\lil\ia32\pim\include&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\apr\include\apr-1&quot;"
-				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL"
+				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\encoder\ia32_em64t&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\lil\ia32\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\util\ia32\base_natives&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\util\win\include&quot;"
+				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;REFS_USE_UNCOMPRESSED;VM_STATS;PLATFORM_NT;_WIN32_WINNT=0x0501"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
-				RuntimeLibrary="1"
+				RuntimeLibrary="3"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				Detect64BitPortabilityProblems="FALSE"
@@ -45,8 +45,10 @@
 			<Tool
 				Name="VCPostBuildEventTool"
 				Description="       ... Copying files to bin/default folder ...."
-				CommandLine="copy $(OutDir)\interpreter.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
-copy $(OutDir)\interpreter.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
+				CommandLine="copy $(OutDir)\interpreter.dll $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
+copy $(OutDir)\interpreter.pdb $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
+copy $(OutDir)\interpreter.exp $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\lib
+copy $(OutDir)\interpreter.lib $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\lib
 "/>
 			<Tool
 				Name="VCPreBuildEventTool"/>
@@ -73,9 +75,9 @@ copy $(OutDir)\interpreter.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configurat
 			CharacterSet="2">
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\util\win\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\lil\ia32\pim\include&quot;;&quot;$(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\semis\extra\apr\include\apr-1&quot;"
-				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL"
-				RuntimeLibrary="0"
+				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\encoder\ia32_em64t&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\lil\ia32\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\util\ia32\base_natives&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\util\win\include&quot;"
+				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;REFS_USE_UNCOMPRESSED;VM_STATS;PLATFORM_NT;_WIN32_WINNT=0x0501"
+				RuntimeLibrary="2"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				Detect64BitPortabilityProblems="FALSE"
@@ -87,7 +89,7 @@ copy $(OutDir)\interpreter.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configurat
 				OutputFile="$(OutDir)/interpreter.dll"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories=""
-				GenerateDebugInformation="TRUE"
+				GenerateDebugInformation="FALSE"
 				ProgramDatabaseFile="$(OutDir)/$(ProjectName).pdb"
 				SubSystem="2"
 				OptimizeReferences="2"
@@ -99,8 +101,10 @@ copy $(OutDir)\interpreter.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(Configurat
 			<Tool
 				Name="VCPostBuildEventTool"
 				Description="       ... Copying files to bin/default folder ...."
-				CommandLine="copy $(OutDir)\interpreter.dll $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
-copy $(OutDir)\interpreter.pdb $(ProjectDir)\..\..\..\win_ia32_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
+				CommandLine="copy $(OutDir)\interpreter.dll $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
+copy $(OutDir)\interpreter.pdb $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\jdk\jre\bin\default
+copy $(OutDir)\interpreter.exp $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\lib
+copy $(OutDir)\interpreter.lib $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationName)\deploy\lib
 "/>
 			<Tool
 				Name="VCPreBuildEventTool"/>
