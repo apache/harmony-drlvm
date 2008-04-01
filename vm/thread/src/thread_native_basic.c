@@ -301,7 +301,10 @@ void VMCALL hythread_yield() {
  * @return none
  */
 void VMCALL hythread_yield_other(hythread_t thread) {
-    port_thread_yield_other(thread->os_handle);
+    assert(thread);
+    if (hythread_is_alive(thread)) {
+        port_thread_yield_other(thread->os_handle);
+    }
 }
 
 /** 

@@ -243,7 +243,7 @@ IDATA VMCALL hythread_unreserve_lock(hythread_thin_monitor_t *lockword_ptr) {
 
     // resume owner
     if (owner) {
-        port_thread_yield_other(owner->os_handle);
+        hythread_yield_other(owner);
         hythread_resume(owner);
     }
 
