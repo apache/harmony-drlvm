@@ -97,7 +97,7 @@ bool ClassLoader::Initialize( ManagedObject* loader )
         ? env->bootstrap_code_pool_size
         : env->user_code_pool_size;
 
-    CodeMemoryManager = new PoolManager(code_pool_size, env->system_page_size, env->use_large_pages, true/*is_code*/, true/*is_resize_allowed*/);
+    CodeMemoryManager = new PoolManager(code_pool_size, env->use_large_pages, true/*is_code*/);
     if(!CodeMemoryManager) return false;
 
     return true;

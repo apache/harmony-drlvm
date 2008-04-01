@@ -31,10 +31,6 @@
 
 // pool is used for common stub code
 #define DEFAULT_JIT_CODE_POOL_SIZE                  256*KBYTE
-// used for compressed VTable pointers
-#define DEFAULT_VTABLE_POOL_SIZE_NO_RESIZE          8*MBYTE
-// used for uncompressed VTable pointers
-#define DEFAULT_VTABLE_POOL_SIZE                    256*KBYTE
 // used for compiled code of a user class loader
 #define DEFAULT_CLASSLOADER_JIT_CODE_POOL_SIZE      256*KBYTE
 // used for compiled code of the bootstrap class loader
@@ -60,36 +56,58 @@ typedef struct PoolDescriptor {
 // if PoolDescriptors is filled less than (MEMORY_UTILIZATION_LIMIT)% of its size then it is considered to be passive,
 // otherwise it is active (allows further memory allocations from it)
 
-class PoolManager {
+class BasePoolManager {
 public:
-    PoolManager(size_t initial_size, size_t page_size, bool use_large_pages, bool is_code, bool is_resize_allowed);
-    virtual ~PoolManager();
+    BasePoolManager(size_t initial_size, bool use_large_pages, bool is_code);
+    virtual ~BasePoolManager();
     
-    // alloc is synchronized inside the class
-    void* alloc(size_t size, size_t alignment, Code_Allocation_Action action);
-    inline Byte* get_pool_base();
-
 protected:
-    PoolDescriptor*   _active_pool;
-    PoolDescriptor*   _passive_pool;
     size_t            _page_size;
     bool              _use_large_pages;
     size_t            _default_pool_size;
     bool              _is_code;
-    bool              _is_resize_allowed;
 
     apr_pool_t* aux_pool;
     apr_thread_mutex_t* aux_mutex;
 
-    Byte   *vtable_pool_start; // for compressed vtable pointers support only!
+protected:
+    inline void _lock();
+    inline void _unlock();
+    inline size_t round_up_to_page_size_multiple(size_t size);
+};
+
+class PoolManager : public BasePoolManager {
+public:
+    PoolManager(size_t initial_size, bool use_large_pages, bool is_code = false);
+    virtual ~PoolManager();
+
+    // alloc is synchronized inside the class
+    void* alloc(size_t size, size_t alignment, Code_Allocation_Action action);
+
+protected:
+    PoolDescriptor*   _active_pool;
+    PoolDescriptor*   _passive_pool;
 
 protected:
     inline PoolDescriptor* allocate_pool_storage(size_t size); // allocate memory for new PoolDescriptor
-    inline size_t round_up_to_page_size_multiple(size_t size);
-    inline void _lock();
-    inline void _unlock();
 };
 
 
-#endif //_MEM_ALLOC_H_
+class VirtualMemoryPool : public BasePoolManager {
+public:
+    VirtualMemoryPool(size_t initial_size, bool use_large_pages, bool is_code = false);
+    virtual ~VirtualMemoryPool();
 
+    // alloc is synchronized inside the class
+    void* alloc(size_t size, size_t alignment, Code_Allocation_Action action);
+    Byte* get_base();
+
+protected:
+    Byte* _base;
+    size_t _reserved;
+    size_t _committed;
+    size_t _allocated;
+    port_vmem_t* _vmem;
+};
+
+#endif //_MEM_ALLOC_H_

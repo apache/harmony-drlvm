@@ -37,6 +37,20 @@ typedef struct NSOTableItem NSOTableItem;
 typedef struct DynamicCode DynamicCode;
 typedef struct Assertion_Registry Assertion_Registry;
 
+#ifdef USE_COMPRESSED_VTABLE_POINTERS
+
+typedef VirtualMemoryPool VTablePool;
+// used for compressed VTable pointers
+#define DEFAULT_VTABLE_POOL_SIZE                    1*GBYTE
+
+#else //USE_COMPRESSED_VTABLE_POINTERS
+
+typedef PoolManager VTablePool;
+// used for uncompressed VTable pointers
+#define DEFAULT_VTABLE_POOL_SIZE                    256*KBYTE
+
+#endif //USE_COMPRESSED_VTABLE_POINTERS
+
 struct Global_Env {
   public:
      // Global VM states.
@@ -54,7 +68,7 @@ struct Global_Env {
     DynamicCode*              dcList;
     Assertion_Registry*       assert_reg;
     PoolManager*              GlobalCodeMemoryManager;
-    PoolManager*              VTableMemoryManager;
+    VTablePool*               VTableMemoryManager;
 
     hythread_library_t        hythread_lib;
     String_Pool               string_pool;  // string table

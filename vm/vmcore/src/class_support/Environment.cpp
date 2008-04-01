@@ -327,15 +327,12 @@ void Global_Env::init_pools() {
 
     pool_size = parse_size_prop("vm.code_pool_size.stubs", DEFAULT_JIT_CODE_POOL_SIZE);
     assert(pool_size);
-    GlobalCodeMemoryManager = new PoolManager(pool_size, system_page_size, use_large_pages, 
-        true/*is_code*/, true/*is_resize_allowed*/);
+    GlobalCodeMemoryManager = new PoolManager(pool_size, use_large_pages,
+        true/*is_code*/);
 
-    bool compress_vtables = vm_vtable_pointers_are_compressed();
-    pool_size = parse_size_prop("vm.vtable_pool_size",
-        compress_vtables?DEFAULT_VTABLE_POOL_SIZE_NO_RESIZE : DEFAULT_VTABLE_POOL_SIZE);
+    pool_size = parse_size_prop("vm.vtable_pool_size", DEFAULT_VTABLE_POOL_SIZE);
     assert(pool_size);
-    VTableMemoryManager = new PoolManager(pool_size, system_page_size, use_large_pages, 
-        false/*is_code*/, !compress_vtables/*is_resize_allowed*/);
+    VTableMemoryManager = new VTablePool(pool_size, use_large_pages);
 
     bootstrap_code_pool_size = pool_size = parse_size_prop("vm.code_pool_size.bootstrap_loader",
         DEFAULT_BOOTSTRAP_JIT_CODE_POOL_SIZE);
@@ -345,3 +342,16 @@ void Global_Env::init_pools() {
     assert(pool_size);
 }
 
+POINTER_SIZE_INT vm_get_vtable_base()
+{
+    assert (VM_Global_State::loader_env->VTableMemoryManager);
+
+#ifdef USE_COMPRESSED_VTABLE_POINTERS
+    assert (VM_Global_State::loader_env->VTableMemoryManager->get_base());
+    // Subtract a small number (like 1) from the real base so that
+    // no valid vtable offsets will ever be 0.
+    return (POINTER_SIZE_INT) (VM_Global_State::loader_env->VTableMemoryManager->get_base() - 8);
+#else
+    return 0;
+#endif
+} //vm_get_vtable_base
