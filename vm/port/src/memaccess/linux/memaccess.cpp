@@ -20,9 +20,9 @@
  */
 #include <sys/mman.h>
 #include <limits.h>
+#include <unistd.h>
 
 #include "port_general.h"
-#include "port_vmem.h"
 #include "port_barriers.h"
 
 #include "signals_internal.h"
@@ -55,8 +55,7 @@ static int memcpy_internal(void* dst, const void* src, size_t size, int from)
     }
 
     // Try changing memory access
-    size_t* page_sizes = port_vmem_page_sizes();
-    size_t page_size = page_sizes[0];
+    size_t page_size = (size_t)sysconf(_SC_PAGE_SIZE);
 
     const void* addr = from ? src : dst;
 
