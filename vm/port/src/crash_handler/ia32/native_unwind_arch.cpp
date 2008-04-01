@@ -116,7 +116,7 @@ static bool fill_regs_from_sp(UnwindContext* context, Registers* regs, void** sp
 
 
 // Max search depth for return address
-#define MAX_SPECIAL_DEPTH 0x400
+#define MAX_SPECIAL_DEPTH 0x2800
 #define NATIVE_STRICT_UNWINDING 1
 
 bool native_unwind_special(UnwindContext* context, Registers* regs)
