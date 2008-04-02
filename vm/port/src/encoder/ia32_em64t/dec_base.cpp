@@ -56,6 +56,7 @@ bool DecoderBase::is_prefix(const unsigned char * bytes)
     return false;
 }
 
+// Returns prefix count from 0 to 4, or ((unsigned int)-1) on error
 unsigned int DecoderBase::fill_prefs(const unsigned char * bytes, Inst * pinst)
 {
     const unsigned char * my_bytes = bytes;
@@ -112,9 +113,16 @@ unsigned int DecoderBase::fill_prefs(const unsigned char * bytes, Inst * pinst)
             return pinst->prefc;
         }
         }
-        assert( InstPrefix_Null == pinst->pref[where] ); //only one prefix in each group 
+        // Assertions are not allowed here.
+        // Error situations should result in returning error status
+        if (InstPrefix_Null != pinst->pref[where]) //only one prefix in each group
+            return (unsigned int)-1;
+
         pinst->pref[where] = (InstPrefix)by1;
-        assert( pinst->prefc < 4 ); //no more than 4 prefixes
+
+        if (pinst->prefc >= 4) //no more than 4 prefixes
+            return (unsigned int)-1;
+
         pinst->prefc++;
         ++my_bytes;
     }
@@ -130,15 +138,15 @@ unsigned DecoderBase::decode(const void * addr, Inst * pinst)
     
     const unsigned char * bytes = (unsigned char*)addr;
 
-    bytes += fill_prefs(bytes, &tmp); 
-    if (is_prefix(bytes)) {
-        // More than 4 prefixes together ?
-//        assert(false);
-        return 0;
-    }
-    
     // Load up to 4 prefixes
     // for each Mnemonic
+    unsigned int pref_count = fill_prefs(bytes, &tmp);
+
+    if (pref_count == (unsigned int)-1) // Wrong prefix sequence, or >4 prefixes
+        return 0; // Error
+
+    bytes += pref_count;
+    
     //  for each opcodedesc
     //      if (raw_len == 0) memcmp(, raw_len)
     //  else check the mixed state which is one of the following:
@@ -155,7 +163,7 @@ unsigned DecoderBase::decode(const void * addr, Inst * pinst)
         }
     }
     if (!found) {
-//        assert(false);
+        // Unknown opcode
         return 0;
     }
     tmp.size = (unsigned)(bytes-(const unsigned char*)addr);
@@ -250,8 +258,8 @@ bool DecoderBase::decode_aux(const EncoderBase::OpcodeDesc& odesc, unsigned aux,
         }
         return true;
     case OpcodeByteKind_cw:
-//        assert(false); // not an error, but not expected in current env
-        break;
+        // not an error, but not expected in current env
+        return false;
     case OpcodeByteKind_cd:
         {
         int offset = *(int*)*pbuf;
@@ -314,11 +322,9 @@ bool DecoderBase::decode_aux(const EncoderBase::OpcodeDesc& odesc, unsigned aux,
             return true;
         }
     case OpcodeByteKind_ZeroOpcodeByte: // cant be here
-//        assert(false);
-        break;
+        return false;
     default:
         // unknown kind ? how comes ?
-//        assert(false);
         break;
     }
     return false;
