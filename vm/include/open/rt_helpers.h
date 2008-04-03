@@ -594,31 +594,7 @@ enum VM_RT_SUPPORT {
  // Non-VM specific helpers for the JIT
  ///// 
 
-    VM_RT_F2I=900,
-    VM_RT_F2L=901,
-    VM_RT_D2I=902,
-    VM_RT_D2L=903,
-    // Conversions
 
-
-    /**
-     * @param The parameters are the following:
-     * (new version)
-     *  arg\ Long value to be shifted
-     *  arg\ Int value with count
-     * (old version)
-     *  arg\ (edx:eax) A long value to be shifted
-     *  arg\ (ecx)     Count 
-     * @return (edx:eax) The shifted value
-     */
-
-
-
-    VM_RT_FREM=940,
-    VM_RT_DREM=942,
-    // Float/double arithmetic
-
-    VM_RT_CHAR_ARRAYCOPY_NO_EXC=950,
 /**
  * @param The parameters are the following:
  *        arg\ Object reference for the source array. Must be non-null and refer to an array 

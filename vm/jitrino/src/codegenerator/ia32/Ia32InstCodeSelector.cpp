@@ -113,6 +113,67 @@ double  __stdcall   convF4F8    (float v) { return (double)v;   }
 float   __stdcall   convF8F4    (double v) stdcall__;
 float   __stdcall   convF8F4    (double v) {    return (float)v;    }
 
+int32   __stdcall   convF4I4    (float v) stdcall__;
+int32   __stdcall   convF4I4    (float v) { 
+#ifdef PLATFORM_POSIX
+    if (isnan(v))
+#else
+    if (_isnan(v))
+#endif
+        return 0;
+    if (v>(double)(int32)0x7fffffff)
+        return (int32)0x7fffffff;     // maxint
+    if (v<(double)(int32)0x80000000)
+        return (int32)0x80000000;     // minint
+    return (int32)v;
+}
+
+int64   __stdcall   convF4I8    (float v) stdcall__;
+int64   __stdcall   convF4I8    (float v) { 
+#ifdef PLATFORM_POSIX
+    if (isnan(v))
+#else
+    if (_isnan(v))
+#endif
+        return 0;
+    if (v >= (double)(int64)(__INT64_C(0x7fffffffffffffff)))
+        return (int64)
+        __INT64_C(0x7fffffffffffffff);      // maxint
+    else if (v < (double)(int64)__INT64_C(0x8000000000000000))
+            return (int64)__INT64_C(0x8000000000000000);     // minint
+    return (int64)v;
+}
+
+int32   __stdcall   convF8I4    (double v) stdcall__;
+int32   __stdcall   convF8I4    (double v) {
+#ifdef PLATFORM_POSIX
+    if (isnan(v))
+#else
+    if (_isnan(v))
+#endif
+        return 0;
+    if (v>(double)(int32)0x7fffffff)
+        return (int32)0x7fffffff;     // maxint
+    if (v<(double)(int32)0x80000000)
+        return (int32)0x80000000;     // minint
+    return (int32)v;
+}
+
+int64   __stdcall   convF8I8    (double v) stdcall__;
+int64   __stdcall   convF8I8    (double v) {
+#ifdef PLATFORM_POSIX
+    if (isnan(v))
+#else
+    if (_isnan(v))
+#endif
+        return 0;
+    if (v >= (double)(int64)(__INT64_C(0x7fffffffffffffff)))
+        return (int64)__INT64_C(0x7fffffffffffffff);      // maxint
+    else if (v < (double)(int64)__INT64_C(0x8000000000000000))
+            return (int64)__INT64_C(0x8000000000000000);     // minint
+    return (int64)v;
+}
+
 double  __stdcall   convI4F8    (uint32 v) stdcall__;
 double  __stdcall   convI4F8    (uint32 v) {
     return (double)(int32)v;    }
@@ -165,6 +226,10 @@ void InstCodeSelector::onCFGInit(IRManager& irManager)
 // FP conversion internal helpers (temp solution to be optimized)
     irManager.registerInternalHelperInfo("convF4F8", IRManager::InternalHelperInfo((void*)&convF4F8,&CallingConvention_STDCALL));
     irManager.registerInternalHelperInfo("convF8F4", IRManager::InternalHelperInfo((void*)&convF8F4,&CallingConvention_STDCALL));
+    irManager.registerInternalHelperInfo("convF4I4", IRManager::InternalHelperInfo((void*)&convF4I4,&CallingConvention_STDCALL));
+    irManager.registerInternalHelperInfo("convF4I8", IRManager::InternalHelperInfo((void*)&convF4I8,&CallingConvention_STDCALL));
+    irManager.registerInternalHelperInfo("convF8I4", IRManager::InternalHelperInfo((void*)&convF8I4,&CallingConvention_STDCALL));
+    irManager.registerInternalHelperInfo("convF8I8", IRManager::InternalHelperInfo((void*)&convF8I8,&CallingConvention_STDCALL));
     irManager.registerInternalHelperInfo("convI4F8", IRManager::InternalHelperInfo((void*)&convI4F8,&CallingConvention_STDCALL));
     irManager.registerInternalHelperInfo("convI4F4", IRManager::InternalHelperInfo((void*)&convI4F4,&CallingConvention_STDCALL));
     irManager.registerInternalHelperInfo("convI8F8", IRManager::InternalHelperInfo((void*)&convI8F8,&CallingConvention_STDCALL));
@@ -370,21 +435,21 @@ Opnd * InstCodeSelector::convertIntToFp(Opnd * srcOpnd, Type * dstType, Opnd * d
 Opnd * InstCodeSelector::convertFpToInt(Opnd * srcOpnd, Type * dstType, Opnd * dstOpnd)
 {
     assert(srcOpnd->getType()->isFP() && dstType->isInteger());
-    VM_RT_SUPPORT helperId;
+    const char * helperName;
     OpndSize dstSize=irManager.getTypeSize(dstType);
     if (dstSize<=OpndSize_32){
         if (dstOpnd==NULL)
             dstOpnd=irManager.newOpnd(typeManager.getInt32Type());
-        helperId=srcOpnd->getType()->isSingle()?VM_RT_F2I:VM_RT_D2I;
+        helperName=srcOpnd->getType()->isSingle()?"convF4I4":"convF8I4";
     }else{
         assert(dstSize==OpndSize_64);
         if (dstOpnd==NULL)
             dstOpnd=irManager.newOpnd(dstType);
-        helperId=srcOpnd->getType()->isSingle()?VM_RT_F2L:VM_RT_D2L;
+        helperName=srcOpnd->getType()->isSingle()?"convF4I8":"convF8I8";
     }
 
     Opnd * args[] = {srcOpnd};
-    appendInsts(irManager.newRuntimeHelperCallInst(helperId, 1, args, dstOpnd));
+    appendInsts(irManager.newInternalRuntimeHelperCallInst(helperName, 1, args, dstOpnd));
 
     if (dstSize<OpndSize_32)
         dstOpnd=convert(dstOpnd, dstType);

@@ -194,30 +194,6 @@ static JIT_RT_Function_Entry _jit_rt_function_entries_base[] = {
     {VM_RT_INITIALIZE_CLASS_WITHRESOLVE,           "VM_RT_INITIALIZE_CLASS_WITHRESOLVE",
             INTERRUPTIBLE_ALWAYS,                   CALLING_CONVENTION_STDCALL,         2,
             NULL,   NULL,   NULL,   NULL},
-
-
-    {VM_RT_F2I,                                "VM_RT_F2I",
-            INTERRUPTIBLE_NEVER,               CALLING_CONVENTION_STDCALL,              1,
-            NULL,   NULL,   NULL,   NULL},
-    {VM_RT_F2L,                                "VM_RT_F2L",
-            INTERRUPTIBLE_NEVER,               CALLING_CONVENTION_STDCALL,              1,
-            NULL,   NULL,   NULL,   NULL},
-    {VM_RT_D2I,                                "VM_RT_D2I",
-            INTERRUPTIBLE_NEVER,               CALLING_CONVENTION_STDCALL,              1,
-            NULL,   NULL,   NULL,   NULL},
-    {VM_RT_D2L,                                "VM_RT_D2L",
-            INTERRUPTIBLE_NEVER,               CALLING_CONVENTION_STDCALL,              1,
-            NULL,   NULL,   NULL,   NULL},
-    {VM_RT_FREM,                               "VM_RT_FREM",
-            INTERRUPTIBLE_NEVER,               CALLING_CONVENTION_STDCALL,              2,
-            NULL,   NULL,   NULL,   NULL},
-    {VM_RT_DREM,                               "VM_RT_DREM",
-            INTERRUPTIBLE_NEVER,               CALLING_CONVENTION_STDCALL,              2,
-            NULL,   NULL,   NULL,   NULL},
-
-    {VM_RT_CHAR_ARRAYCOPY_NO_EXC,              "VM_RT_CHAR_ARRAYCOPY_NO_EXC",
-            INTERRUPTIBLE_ALWAYS,              CALLING_CONVENTION_STDCALL,              5,
-            NULL,   NULL,   NULL,   NULL},
 };
 
 static JIT_RT_Function_Entry *jit_rt_function_entries = &(_jit_rt_function_entries_base[0]);

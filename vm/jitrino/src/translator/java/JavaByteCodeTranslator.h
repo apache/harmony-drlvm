@@ -276,7 +276,6 @@ private:
     bool    methodIsArraycopy(MethodDesc * methodDesc);
     bool    arraycopyOptimizable(MethodDesc * methodDesc, uint32 numArgs, Opnd ** srcOpnds, bool usingWriteBarriers);
 
-    bool    genCharArrayCopy(MethodDesc * methodDesc,uint32 numArgs,Opnd ** srcOpnds, Type * returnType);
     bool    genArrayCopyRepMove(MethodDesc * methodDesc,uint32 numArgs,Opnd ** srcOpnds);
     bool    genArrayCopy(MethodDesc * methodDesc,uint32 numArgs,Opnd ** srcOpnds);
     bool    genMinMax(MethodDesc * methodDesc,uint32 numArgs,Opnd ** srcOpnds, Type * returnType);

@@ -85,7 +85,7 @@ private:
     //
     Changed handleInst_MOV(Inst* inst);
     Changed handleInst_Call(Inst* inst);
-    Changed handleInst_HelperCall(Inst* inst, const  Opnd::RuntimeInfo* ri);
+    Changed handleInst_InternalHelperCall(Inst* inst, const  Opnd::RuntimeInfo* ri);
     Changed handleInst_Convert_F2I_D2I(Inst* inst);
     Changed handleInst_ALU(Inst* inst);
     Changed handleInst_MUL(Inst* inst);
@@ -241,25 +241,24 @@ PeepHoleOpt::Changed PeepHoleOpt::handleInst_Call(Inst* inst)
         rt_kind = ri->getKind();
     }
 
-    if (Opnd::RuntimeInfo::Kind_HelperAddress == rt_kind) {
-        return handleInst_HelperCall(inst, ri);
+    if (Opnd::RuntimeInfo::Kind_InternalHelperAddress == rt_kind) {
+        return handleInst_InternalHelperCall(inst, ri);
     }
     return Changed_Nothing;
 }
 
-PeepHoleOpt::Changed PeepHoleOpt::handleInst_HelperCall(
+PeepHoleOpt::Changed PeepHoleOpt::handleInst_InternalHelperCall(
     Inst* inst, 
     const Opnd::RuntimeInfo* ri)
 {
-    assert(Opnd::RuntimeInfo::Kind_HelperAddress == ri->getKind());
-    void* rt_data = ri->getValue(0);
-    POINTER_SIZE_INT helperId = (POINTER_SIZE_INT)rt_data;
-    switch(helperId) {
-    case VM_RT_F2I:
-    case VM_RT_D2I:
+    assert(Opnd::RuntimeInfo::Kind_InternalHelperAddress == ri->getKind());
+    /** The value of the operand is irManager.getInternalHelperInfo((const char*)[0]).pfn */
+    char* rt_data = (char*)(ri->getValue(0));
+
+    if (strcmp(rt_data,"convF4I4") == 0) {
         return handleInst_Convert_F2I_D2I(inst);
-    default:
-        break;
+    } else if (strcmp(rt_data,"convF8I4") == 0) {
+        return handleInst_Convert_F2I_D2I(inst);
     }
     return Changed_Nothing;
 }

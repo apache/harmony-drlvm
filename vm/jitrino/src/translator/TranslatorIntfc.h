@@ -50,7 +50,6 @@ class SessionAction;
     // to select which byte code translator optimizations are done
 struct TranslatorFlags {
     bool propValues         : 1;    // do value propagation
-    bool genCharArrayCopy   : 1;    // generate intrinsic calls to CharArrayCopy
     bool genArrayCopy       : 1;    // inline java/lang/System::arraycopy call as a copying loop
     bool genArrayCopyRepMove: 1;    // inline java/lang/System::arraycopy call as 'rep move' instruction
     bool onlyBalancedSync   : 1;    // treat all method synchronization as balanced

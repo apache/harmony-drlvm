@@ -1654,9 +1654,6 @@ JavaByteCodeTranslator::invokestatic(uint32 constPoolIndex) {
     } else if (translationFlags.genArrayCopy == true &&
         genArrayCopy(methodDesc,numArgs,srcOpnds)) {
         return;
-    } else if (translationFlags.genCharArrayCopy == true &&
-        genCharArrayCopy(methodDesc,numArgs,srcOpnds,returnType)) {
-        return;
     } else if (translationFlags.genMinMaxAbs == true &&
         genMinMax(methodDesc,numArgs,srcOpnds,returnType)) {
         return;
@@ -2847,108 +2844,6 @@ JavaByteCodeTranslator::genArrayCopy(MethodDesc * methodDesc,
     irBuilder.genLabel(L1);
     cfgBuilder.genBlockAfterCurrent(L1);
 
-    return true;
-}
-
-bool
-JavaByteCodeTranslator::genCharArrayCopy(MethodDesc * methodDesc, 
-                                         uint32       numArgs,
-                                         Opnd **      srcOpnds,
-                                         Type *       returnType) {
-    //
-    //  Check if method is java/lang/System.arraycopy
-    //  (Object src, int srcPos, Object dst, int dstPos, int len)
-    //
-    if (strcmp(methodDesc->getName(),"arraycopy") != 0 ||
-        strcmp(methodDesc->getParentType()->getName(),"java/lang/System") !=0)
-          return false;
-    //
-    //  Check if arguments are arrays of characters
-    //
-    assert(numArgs == 5);
-    Opnd * src = srcOpnds[0];
-    Opnd * srcPos = srcOpnds[1];
-    Opnd * dst = srcOpnds[2];
-    Opnd * dstPos = srcOpnds[3];
-    Opnd * len = srcOpnds[4];
-    assert(src->getType()->isObject() &&
-           srcPos->getType()->isInt4() &&
-           dst->getType()->isObject() &&
-           dstPos->getType()->isInt4() &&
-           len->getType()->isInt4());
-    Type * srcType = src->getType();
-    Type * dstType = dst->getType();
-    if (!(srcType->isArray() && dstType->isArray() &&
-         ((ArrayType *)srcType)->getElementType()->isChar() &&
-         ((ArrayType *)dstType)->getElementType()->isChar()))
-         return false;
-
-    if (Log::isEnabled()) {
-        Log::out() << "XXX char array copy: "; methodDesc->printFullName(Log::out()); Log::out() << ::std::endl;
-    }
-    //
-    //  Generate exception condition checks:
-    //      chknull src
-    //      chknull dst
-    //      cmpbr srcPos < 0, boundsException
-    //      cmpbr dstPos < 0, boundsException
-    //      cmpbr len < 0, boundsException
-    //      srcEnd = add srcPos, len
-    //      srcLen = src.length
-    //      cmpbr srcEnd > srcLen, boundsException
-    //      dstEnd = add dstPos, len
-    //      dstLen = dst.length
-    //      cmpbr dstEnd > dstLen, boundsException
-    //      callintr charArrayCopy(src,srcPos,dst,dstPos,len)
-    //      goto L1:
-    //  boundsException:
-    //      chkbounds -1, src
-    //  L1:
-    //
-    Opnd *tauSrcNullChecked = irBuilder.genTauCheckNull(src);
-    Opnd *tauDstNullChecked = irBuilder.genTauCheckNull(dst);
-
-    LabelInst * boundsException = irBuilder.createLabel();
-    LabelInst * L1 = irBuilder.createLabel();
-    Type * intType = typeManager.getInt32Type();
-
-    newFallthroughBlock();
-    Opnd * zero = irBuilder.genLdConstant((int32)0);
-    irBuilder.genBranch(Type::Int32,Cmp_GT,boundsException,zero,srcPos);        
-
-    newFallthroughBlock();
-    irBuilder.genBranch(Type::Int32,Cmp_GT,boundsException,zero,dstPos);
-
-    newFallthroughBlock();
-    irBuilder.genBranch(Type::Int32,Cmp_GT,boundsException,zero,len);
-
-    newFallthroughBlock();   
-    Opnd * srcLen = irBuilder.genArrayLen(intType,Type::Int32,src);
-    Opnd * srcEnd = irBuilder.genAdd(intType,Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No),srcPos,len);
-    irBuilder.genBranch(Type::Int32,Cmp_GT,boundsException,srcEnd,srcLen);
-    
-    newFallthroughBlock();
-    Opnd * dstEnd = irBuilder.genAdd(intType,Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No),dstPos,len);
-    Opnd * dstLen = irBuilder.genArrayLen(intType,Type::Int32,dst);
-    irBuilder.genBranch(Type::Int32,Cmp_GT,boundsException,dstEnd,dstLen);
-
-    newFallthroughBlock();
-    Opnd *tauNullCheckedRefArgs = 
-        irBuilder.genTauAnd(tauSrcNullChecked, tauDstNullChecked);
-    Opnd *tauTypesChecked = 0;
-    irBuilder.genIntrinsicCall(CharArrayCopy,returnType,
-                               tauNullCheckedRefArgs,
-                               tauTypesChecked,
-                               numArgs,srcOpnds);
-    irBuilder.genJump(L1);
-
-    irBuilder.genLabel(boundsException);
-    cfgBuilder.genBlockAfterCurrent(boundsException);
-    Opnd * minusOne = irBuilder.genLdConstant((int32)-1);
-    irBuilder.genTauCheckBounds(src,minusOne,tauSrcNullChecked);
-
-    irBuilder.genLabel(L1);
-    cfgBuilder.genBlockAfterCurrent(L1);
     return true;
 }
 

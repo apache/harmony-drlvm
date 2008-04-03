@@ -92,7 +92,6 @@ void TranslatorSession::postTranslatorCleanup() {
 
 static const char* help = \
     "  propValues[={ON|off}]    -  propagate values during translation\n"\
-    "  genCharArrayCopy[={on|off}] - generate intrinsic calls to char array copy\n"\
     "  genArrayCopy[={ON|off}] - inline java/lang/System::arraycopy call as a copying loop\n"\
     "  genArrayCopyRepMove[={ON|off}] - inline java/lang/System::arraycopy call as 'rep move' instruction\n"\
     "  balancedSync[={on|OFF}] - treat all synchronization as balanced\n"\
@@ -116,10 +115,8 @@ void TranslatorAction::init() {
 void TranslatorAction::readFlags() {
     flags.propValues = getBoolArg("propValues", true);
 #if defined(_IPF_)
-    flags.genCharArrayCopy = getBoolArg("genCharArrayCopy", true); 
     flags.optArrayInit = getBoolArg("optArrayInit", false);
 #else
-    flags.genCharArrayCopy = getBoolArg("genCharArrayCopy", false); 
     flags.optArrayInit = getBoolArg("optArrayInit", true);
 #endif
     flags.genArrayCopy = getBoolArg("genArrayCopy", false); 

@@ -66,9 +66,6 @@ using namespace std;
 char * gen_convert_managed_to_unmanaged_null_ia32(char * ss, 
                                                   unsigned stack_pointer_offset);
 
-void * get_generic_rt_support_addr_ia32(VM_RT_SUPPORT f);
-
-
 /////////////////////////////////////////////////////////////////
 // begin VM_Runtime_Support
 /////////////////////////////////////////////////////////////////
@@ -1083,14 +1080,6 @@ void *vm_helper_get_addr(VM_RT_SUPPORT f)
     case VM_RT_THROW_LINKING_EXCEPTION:
         return getaddress__vm_throw_linking_exception_naked();
 
-    case VM_RT_F2I:
-    case VM_RT_F2L:
-    case VM_RT_D2I:
-    case VM_RT_D2L:
-    case VM_RT_FREM:
-    case VM_RT_DREM:
-    case VM_RT_CHAR_ARRAYCOPY_NO_EXC:
-        return get_generic_rt_support_addr_ia32(f);
     case VM_RT_GC_HEAP_WRITE_REF:
         return (void*)gc_heap_slot_write_ref;
     default:

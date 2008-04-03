@@ -37,6 +37,17 @@ namespace IPF {
 #define IMM32U(o)  ((uint32)(((Opnd *)(o))->getValue()))
 #define IMM64U(o)  ((uint64)(((Opnd *)(o))->getValue()))
 
+// FP remainder internal helpers (temp solution to be optimized)
+float   remF4   (float v0, float v1);
+float   remF4   (float v0, float v1)   { 
+    return (float)fmod((double)v0,(double)v1);
+}
+
+double  remF8   (double v0, double v1);
+double  remF8   (double v0, double v1)  {
+    return fmod(v0,v1);
+} 
+
 //===========================================================================//
 // IpfInstCodeSelector
 //===========================================================================//
@@ -1314,18 +1325,9 @@ CG_OpndHandle *IpfInstCodeSelector::tau_callintr(uint32              numArgs,
                                                  CG_OpndHandle       *tauTypesChecked) {
 
     IPF_LOG << "      tau_callintr" << endl;
+    IPF_ASSERT(0);
 
-    VM_RT_SUPPORT hId = VM_RT_CHAR_ARRAYCOPY_NO_EXC;
-    uint64   address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
-    Opnd     *helperAddress = opndManager->newImm(address);
-    RegOpnd  *retOpnd       = NULL;
-
-    if(retType != NULL) 
-        retOpnd = opndManager->newRegOpnd(toOpndKind(retType->tag), toDataKind(retType->tag));
-    
-    directCall(numArgs, (Opnd **) args, retOpnd, helperAddress, p0);
-
-    return retOpnd;
+    return NULL;
 }
 
 //----------------------------------------------------------------------------//
@@ -2915,13 +2917,12 @@ void IpfInstCodeSelector::divDouble(RegOpnd *dst, CG_OpndHandle *src1, CG_OpndHa
 
         addNewInst(INST_FMA, CMPLT_PC_DOUBLE, CMPLT_SF0, pX, fRes, fr,   fy3,  fq3);
     } else {
-        // Call runtime helper to do FP remainder. We only inline the integer  
+        // Call internal helper to do FP remainder. We only inline the integer  
         // remainder sequence
         //
         Opnd *helperArgs[] = { (Opnd *)src1, (Opnd *)src2 };
     
-        VM_RT_SUPPORT hId = VM_RT_DREM;
-        uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
+        uint64  address        = (uint64) remF8;
         Opnd    *helperAddress = opndManager->newImm(address);
         
         directCall(2, helperArgs, dst, helperAddress, p0);
@@ -3030,13 +3031,12 @@ void IpfInstCodeSelector::divFloat(RegOpnd *dst, CG_OpndHandle *src1, CG_OpndHan
         addNewInst(INST_FMA,   CMPLT_PC_DOUBLE, CMPLT_SF1, pX, fq3,  fq2,  fe4,  fq2);
         addNewInst(INST_FNORM, CMPLT_PC_SINGLE, CMPLT_SF0, pX, fRes, fq3);
     } else {
-        // Call runtime helper to do FP remainder. We only inline the integer  
+        // Call internal helper to do FP remainder. We only inline the integer  
         // remainder sequence
         //
         Opnd *helperArgs[] = { (Opnd *)src1, (Opnd *)src2 };
     
-        VM_RT_SUPPORT hId = VM_RT_FREM;
-        uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
+        uint64  address        = (uint64) remF4;
         Opnd    *helperAddress = opndManager->newImm(address);
         
         directCall(2, helperArgs, dst, helperAddress, p0);
