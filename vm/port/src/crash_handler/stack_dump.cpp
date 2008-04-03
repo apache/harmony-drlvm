@@ -165,7 +165,7 @@ static void sd_print_stack(Registers* regs, port_unwind_compiled_frame unwind)
 
         // Print native frame info
         CFunInfo cfi = {0};
-        native_module_t* module = port_find_module(g_modules, locregs.get_ip());
+        native_module_t* module = port_find_module(uwcontext.modules, locregs.get_ip());
         sd_get_c_method_info(&cfi, module, locregs.get_ip());
         sd_print_c_line(stderr, framenum++, &cfi);
 
