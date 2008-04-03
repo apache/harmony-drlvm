@@ -157,7 +157,7 @@ void init_stack_info() {
 
     // maps unmapped part of the stack
     res = (char*) mmap(stack_addr - stack_size, stack_mapping_size,
-            PROT_READ | PROT_WRITE, STACK_MMAP_ATTRS, -1, 0);
+            PROT_READ | PROT_WRITE | PROT_EXEC, STACK_MMAP_ATTRS, -1, 0);
 
     // stack should be mapped, checks result
     assert(res == (stack_addr - stack_size));

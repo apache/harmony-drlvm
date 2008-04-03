@@ -16,6 +16,7 @@
  */
 
 
+#include <unistd.h>
 #include <pthread.h>
 #include "port_modules.h"
 #include "native_unwind.h"
@@ -65,6 +66,15 @@ bool native_get_stack_range(UnwindContext* context, Registers* regs, native_segm
         return false;
 
     pthread_attr_destroy(&pthread_attr);
+
+    if ((size_t)sp < (size_t)seg->base)
+    {
+        size_t page_size = (size_t)sysconf(_SC_PAGE_SIZE);
+        size_t base = (size_t)sp & ~(page_size - 1);
+        seg->size += (size_t)seg->base - base;
+        seg->base = (void*)base;
+    }
+
     return true;
 
 /*    for (native_module_t* module = context->modules; module; module = module->next)
