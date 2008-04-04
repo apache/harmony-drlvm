@@ -110,9 +110,9 @@ inline Partial_Reveal_Object* lspace_get_next_marked_object( Lspace* lspace, uns
 
     while(!reach_heap_end){
         //FIXME: This while shoudl be if, try it!
-        while(!*((POINTER_SIZE_INT*)next_area_start)){
+        while((next_area_start< (POINTER_SIZE_INT)lspace->heap_end)&&!*((POINTER_SIZE_INT*)next_area_start)){
             assert(((Free_Area*)next_area_start)->size);
-            next_area_start += ((Free_Area*)next_area_start)->size;
+            next_area_start += ((Free_Area*)next_area_start)->size;            
         }
         if(next_area_start < (POINTER_SIZE_INT)lspace->heap_end){
             //If there is a living object at this addr, return it, and update iterate_index
@@ -154,12 +154,12 @@ inline Partial_Reveal_Object* lspace_get_next_marked_object_by_oi( Lspace* lspac
     POINTER_SIZE_INT next_area_start = (POINTER_SIZE_INT)lspace->heap_start + (*iterate_index) * KB;
     BOOLEAN reach_heap_end = 0;
     unsigned int hash_extend_size = 0;
-
-    while(!reach_heap_end){
-        //FIXME: This while shoudl be if, try it!
-        while(!*((POINTER_SIZE_INT*)next_area_start)){
+   
+while(!reach_heap_end){        
+   //FIXME: This while shoudl be if, try it!
+        while((next_area_start<(POINTER_SIZE_INT)lspace->heap_end) && !*((POINTER_SIZE_INT*)next_area_start)){
             assert(((Free_Area*)next_area_start)->size);
-            next_area_start += ((Free_Area*)next_area_start)->size;
+            next_area_start += ((Free_Area*)next_area_start)->size;    
         }
         if(next_area_start < (POINTER_SIZE_INT)lspace->heap_end){
             //If there is a living object at this addr, return it, and update iterate_index

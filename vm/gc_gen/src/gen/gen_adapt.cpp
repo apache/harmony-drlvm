@@ -317,10 +317,17 @@ Boolean gc_compute_new_space_size(GC_Gen* gc, POINTER_SIZE_INT* mos_size, POINTE
 #ifdef STATIC_NOS_MAPPING
     total_size = max_heap_size_bytes - space_committed_size(los);
 #else
-    POINTER_SIZE_INT curr_heap_commit_end = 
-                              (POINTER_SIZE_INT)gc->heap_start + LOS_HEAD_RESERVE_FOR_HEAP_BASE + gc->committed_heap_size;
-    assert(curr_heap_commit_end > (POINTER_SIZE_INT)mos->heap_start);
-    total_size = curr_heap_commit_end - (POINTER_SIZE_INT)mos->heap_start;
+    POINTER_SIZE_INT curr_heap_commit_end;
+   
+    if(LOS_ADJUST_BOUNDARY) {
+      curr_heap_commit_end=(POINTER_SIZE_INT)gc->heap_start + LOS_HEAD_RESERVE_FOR_HEAP_BASE + gc->committed_heap_size;
+      assert(curr_heap_commit_end > (POINTER_SIZE_INT)mos->heap_start);
+      total_size = curr_heap_commit_end - (POINTER_SIZE_INT)mos->heap_start;
+    }else {/*LOS_ADJUST_BOUNDARY else */
+      curr_heap_commit_end =  (nos->committed_heap_size)? (POINTER_SIZE_INT) nos->heap_start + nos->committed_heap_size: 
+               (POINTER_SIZE_INT) mos->heap_start+mos->committed_heap_size;
+      total_size = curr_heap_commit_end - (POINTER_SIZE_INT) mos->heap_start;
+    }
 #endif
   assert(total_size >= used_mos_size);
   POINTER_SIZE_INT total_free = total_size - used_mos_size;
@@ -411,8 +418,11 @@ void gc_gen_adapt(GC_Gen* gc, int64 pause_time)
   }
 
   /* below are ajustment */  
-  POINTER_SIZE_INT curr_heap_commit_end = 
-                             (POINTER_SIZE_INT)gc->heap_start + LOS_HEAD_RESERVE_FOR_HEAP_BASE + gc->committed_heap_size;
+  POINTER_SIZE_INT curr_heap_commit_end;
+  if(LOS_ADJUST_BOUNDARY)
+    curr_heap_commit_end = (POINTER_SIZE_INT)gc->heap_start + LOS_HEAD_RESERVE_FOR_HEAP_BASE + gc->committed_heap_size;
+  else
+    curr_heap_commit_end = (POINTER_SIZE_INT)nos->heap_start + nos->committed_heap_size;
   
   void* new_nos_boundary = (void*)(curr_heap_commit_end - new_nos_size);
 

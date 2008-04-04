@@ -76,7 +76,6 @@ void blocked_space_shrink(Blocked_Space* space, unsigned int changed_size)
   void* new_base = (void*)&(space->blocks[space->num_managed_blocks - block_dec_count]);
  
   void* decommit_base = (void*)round_down_to_size((POINTER_SIZE_INT)new_base, SPACE_ALLOC_UNIT);
-  
   assert( ((Block_Header*)decommit_base)->block_idx >= space->free_block_idx);
   
   void* old_end = (void*)&space->blocks[space->num_managed_blocks];
@@ -85,7 +84,8 @@ void blocked_space_shrink(Blocked_Space* space, unsigned int changed_size)
   
   Boolean result = vm_decommit_mem(decommit_base, decommit_size);
   assert(result == TRUE);
-  
+
+  space->heap_end = decommit_base;
   space->committed_heap_size = (POINTER_SIZE_INT)decommit_base - (POINTER_SIZE_INT)space->heap_start;
   space->num_managed_blocks = (unsigned int)(space->committed_heap_size >> GC_BLOCK_SHIFT_COUNT);
   

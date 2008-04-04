@@ -54,6 +54,7 @@ POINTER_SIZE_INT HEAP_SIZE_DEFAULT = 256 * MB;
 POINTER_SIZE_INT min_heap_size_bytes = 16 * MB;
 POINTER_SIZE_INT max_heap_size_bytes = 0;
 
+Boolean share_los_boundary = FALSE;
 
 unsigned int GC_PROP;
 
@@ -345,6 +346,11 @@ GC* gc_parse_options()
     destroy_property_value(value);
   }
 
+  if (is_property_set("gc.share_los_boundary", VM_PROPERTIES) == 1){
+    share_los_boundary = get_boolean_property("gc.share_los_boundary");     
+  }
+
+
   if (is_property_set("gc.concurrent_gc", VM_PROPERTIES) == 1){
     Boolean use_all_concurrent_phase= get_boolean_property("gc.concurrent_gc");
     if(use_all_concurrent_phase){
@@ -377,7 +383,7 @@ GC* gc_parse_options()
       USE_CONCURRENT_GC = TRUE;
     }
   }
-
+ 
   char* concurrent_algo = NULL;
   
   if (is_property_set("gc.concurrent_algorithm", VM_PROPERTIES) == 1) {
@@ -418,5 +424,6 @@ GC* gc_parse_options()
 
   return gc;
 }
+
 
 

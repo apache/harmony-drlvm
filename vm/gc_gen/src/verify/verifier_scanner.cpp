@@ -337,7 +337,7 @@ void verifier_scan_nos_mos_objects(Space* space, Heap_Verifier* heap_verifier)
 inline Partial_Reveal_Object* lspace_get_next_object( Space* lspace, POINTER_SIZE_INT* & next_area_start){
   POINTER_SIZE_INT* ret_obj = NULL;
   
-  while(!*next_area_start && (POINTER_SIZE_INT)next_area_start < (POINTER_SIZE_INT)lspace->heap_end){
+  while(((POINTER_SIZE_INT)next_area_start < (POINTER_SIZE_INT)lspace->heap_end)&&!*next_area_start ){
     next_area_start =(POINTER_SIZE_INT*)((POINTER_SIZE_INT)next_area_start + ((Free_Area*)next_area_start)->size);
   }
   if((POINTER_SIZE_INT)next_area_start < (POINTER_SIZE_INT)lspace->heap_end){
@@ -440,6 +440,7 @@ void verifier_init_object_scanner(Heap_Verifier* heap_verifier)
   heap_verifier->live_obj_scanner = verifier_scan_live_objects;
   heap_verifier->all_obj_scanner   = verifier_scan_all_objects;
 }
+
 
 
 

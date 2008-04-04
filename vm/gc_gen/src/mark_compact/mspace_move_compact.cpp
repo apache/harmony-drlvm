@@ -193,6 +193,7 @@ void move_compact_mspace(Collector* collector)
   Blocked_Space* nos = (Blocked_Space*)gc_get_nos((GC_Gen*)gc);
   
   unsigned int num_active_collectors = gc->num_active_collectors;
+  Boolean is_fallback = collect_is_fallback();
   
   /* Pass 1: **************************************************
      mark all live objects in heap, and save all the slots that 
@@ -201,8 +202,8 @@ void move_compact_mspace(Collector* collector)
   TRACE2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]: pass1: mark live objects in heap ...");
 
   unsigned int old_num = atomic_cas32( &num_marking_collectors, 0, num_active_collectors+1);
-
-  if(!collect_is_fallback())
+  
+  if(!is_fallback)
        mark_scan_heap(collector);  
   else
        mark_scan_heap_for_fallback(collector);
@@ -222,6 +223,13 @@ void move_compact_mspace(Collector* collector)
     }
 #endif
     gc_identify_dead_weak_roots(gc);
+
+#ifndef LOS_ADJUST_BOUNDARY
+#ifdef USE_32BITS_HASHCODE
+    if(is_fallback)
+      fallback_clear_fwd_obj_oi_init(collector);
+#endif
+#endif
     debug_num_compact_blocks = 0;
     /* let other collectors go */
     num_marking_collectors++; 
@@ -236,6 +244,10 @@ void move_compact_mspace(Collector* collector)
   TRACE2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]: pass2: move object and set the forwarding offset table ...");
 
   atomic_cas32( &num_moving_collectors, 0, num_active_collectors+1);
+#ifdef USE_32BITS_HASHCODE
+  if(is_fallback)
+    fallback_clear_fwd_obj_oi(collector);
+#endif
 
   mspace_move_objects(collector, mspace);   
   
@@ -280,7 +292,7 @@ void move_compact_mspace(Collector* collector)
     lspace_fix_repointed_refs(collector, lspace);   
     gc_fix_rootset(collector, FALSE);
     if(lspace->move_object)  lspace_sliding_compact(collector, lspace);    
-    
+
     num_fixing_collectors++; 
   }
   while(num_fixing_collectors != num_active_collectors + 1);
@@ -309,6 +321,7 @@ void move_compact_mspace(Collector* collector)
      while(num_extending_collectors != num_active_collectors);  
   }
 
+ 
   TRACE2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]:  finish pass4");
 
   /* Leftover: **************************************************

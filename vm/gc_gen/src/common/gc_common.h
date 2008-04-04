@@ -480,7 +480,6 @@ void set_collection_end_time();
 extern Boolean NOS_PARTIAL_FORWARD;
 
 //#define STATIC_NOS_MAPPING
-
 #ifdef STATIC_NOS_MAPPING
 
   //#define NOS_BOUNDARY ((void*)0x2ea20000)  //this is for 512M
@@ -491,7 +490,8 @@ extern Boolean NOS_PARTIAL_FORWARD;
 #else /* STATIC_NOS_MAPPING */
 
         extern void* nos_boundary;
-
+    extern Boolean share_los_boundary;
+    extern Boolean LOS_ADJUST_BOUNDARY;
 #endif /* STATIC_NOS_MAPPING */
 
 void gc_init_collector_alloc(GC* gc, Collector* collector);

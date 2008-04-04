@@ -46,6 +46,8 @@ Boolean GEN_NONGEN_SWITCH = FALSE;
 
 Boolean JVMTI_HEAP_ITERATION = true;
 
+Boolean LOS_ADJUST_BOUNDARY = FALSE;
+
 GC* gc_gen_create()
 {
   GC* gc = (GC*)STD_MALLOC(sizeof(GC_Gen));  
@@ -170,19 +172,33 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
   }
   physical_start = reserved_base;
   
-#else /* NON_STATIC_NOS_MAPPING */
+#else  /* NON_STATIC_NOS_MAPPING */
 
+  LOS_ADJUST_BOUNDARY = share_los_boundary;
+
+  if(large_page_hint) 
+    LOS_ADJUST_BOUNDARY = TRUE;
+  
   reserved_base = NULL;
-  if(large_page_hint){
-    reserved_base = alloc_large_pages(max_heap_size, large_page_hint);
-    if(reserved_base){
-      WARN2("gc.base","GC use large pages.");
-    } else {
-      free(large_page_hint);
-      large_page_hint = NULL;
-      WARN2("gc.base","GC use small pages.");
+
+  if(!LOS_ADJUST_BOUNDARY) {
+     reserved_base = vm_reserve_mem(NULL, max_heap_size+max_heap_size + SPACE_ALLOC_UNIT);
+     if(!reserved_base) 
+       LOS_ADJUST_BOUNDARY= TRUE;
+   }
+  
+  if (LOS_ADJUST_BOUNDARY)  {
+    reserved_base = NULL;
+    if(large_page_hint){
+      reserved_base = alloc_large_pages(max_heap_size, large_page_hint);
+      if(reserved_base){
+        WARN2("gc.base","GC use large pages.");
+      } else {
+        free(large_page_hint);
+        large_page_hint = NULL;
+        WARN2("gc.base","GC use small pages.");
+      }
     }
-  }
   
   if(reserved_base == NULL){
     if(max_heap_size < min_heap_size){
@@ -214,7 +230,50 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
   /* Determine intial nos_boundary while NOS is not statically mapped */
   nos_base = (void*)((POINTER_SIZE_INT)reserved_base + mos_commit_size + los_size);
   nos_boundary = nos_base;
+  } else { /*LOS_ADJUST_BOUNDARY else*/
+   /*Large page not enabled at present for non LOS_ADJUST_BOUNDARY */
+#if 0  /* large page */
+    if(large_page_hint){
+      reserved_base = alloc_large_pages(max_heap_size+max_heap_size, large_page_hint);
+      if(reserved_base){
+      WARN2("gc.base","GC use large pages.");
+    } else {
+      free(large_page_hint);
+      large_page_hint = NULL;
+      WARN2("gc.base","GC use small pages.");
+    }
+  }
+  
+  if(reserved_base == NULL){
+    if(max_heap_size < min_heap_size){
+      DIE2("gc.base","Max heap size is smaller than min heap size. Please choose other values.");
+      exit(0);
+    }
 
+    unsigned int max_size_reduced = 0;
+    reserved_base = vm_reserve_mem(NULL, max_heap_size+max_heap_size + SPACE_ALLOC_UNIT);
+    while( !reserved_base ){
+      max_size_reduced += SPACE_ALLOC_UNIT;
+      max_heap_size -= SPACE_ALLOC_UNIT;
+      reserved_base = vm_reserve_mem(NULL, max_heap_size + max_heap_size + SPACE_ALLOC_UNIT);
+    }
+    
+    if(max_size_reduced){
+      DIE2("gc.base","Max heap size: can't be reserved. The max size can be reserved is "<< max_heap_size/MB<<" MB. ");
+      exit(0);
+    }
+#endif  /* large page */
+    physical_start = reserved_base;
+        
+    reserved_base = (void*)round_up_to_size((POINTER_SIZE_INT)reserved_base, SPACE_ALLOC_UNIT);
+    assert(!((POINTER_SIZE_INT)reserved_base % SPACE_ALLOC_UNIT));
+    
+    reserved_end = (void*)((POINTER_SIZE_INT)reserved_base + max_heap_size +max_heap_size );
+  
+    /* Determine intial nos_boundary while NOS is not statically mapped */
+    nos_base = (void*)((POINTER_SIZE_INT)reserved_base +max_heap_size+ mos_commit_size);
+    nos_boundary = nos_base;
+  }
 #endif  /* STATIC_NOS_MAPPING else */
 
   HEAP_BASE = (POINTER_SIZE_INT)reserved_base;
@@ -225,7 +284,10 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
 #ifdef STATIC_NOS_MAPPING
   gc_gen->reserved_heap_size = los_mos_reserve_size + nos_reserve_size;
 #else
-  gc_gen->reserved_heap_size = max_heap_size;
+  if (LOS_ADJUST_BOUNDARY)
+    gc_gen->reserved_heap_size = max_heap_size;
+  else
+    gc_gen->reserved_heap_size = max_heap_size+max_heap_size;
 #endif
   /* Commented out for that the frontmost reserved mem size in los is not counted in los' committed size.
    * gc_gen->committed_heap_size = min_heap_size;
@@ -238,10 +300,13 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
 
   max_heap_size_bytes = max_heap_size;
   min_heap_size_bytes = min_heap_size;
-  
+
   gc_los_initialize(gc_gen, reserved_base, los_size);
-  gc_mos_initialize(gc_gen, (void*)((POINTER_SIZE_INT)reserved_base + los_size), mos_reserve_size, mos_commit_size);
-  gc_nos_initialize(gc_gen, nos_base, nos_reserve_size, nos_commit_size);
+  if(LOS_ADJUST_BOUNDARY)
+    gc_mos_initialize(gc_gen, (void*)((POINTER_SIZE_INT)reserved_base + los_size), mos_reserve_size, mos_commit_size);
+  else
+    gc_mos_initialize(gc_gen, (void*)((POINTER_SIZE_INT)reserved_base + max_heap_size), mos_reserve_size, mos_commit_size);
+   gc_nos_initialize(gc_gen, nos_base, nos_reserve_size, nos_commit_size);
   
   gc_gen->committed_heap_size = space_committed_size(gc_get_nos(gc_gen))
                                                 + space_committed_size(gc_get_mos(gc_gen))
@@ -750,6 +815,7 @@ void gc_gen_reclaim_heap(GC_Gen *gc, int64 gc_start_time)
 #ifdef GC_GEN_STATS
       gc->stats->num_minor_collections++;
 #endif
+      if(LOS_ADJUST_BOUNDARY) gc->tuner->kind=TRANS_NOTHING;
       los_collection(los);
     }
     

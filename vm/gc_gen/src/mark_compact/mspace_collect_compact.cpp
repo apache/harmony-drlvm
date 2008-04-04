@@ -260,18 +260,23 @@ void mspace_collection(Mspace* mspace)
   mspace->num_collections++;
 
   GC* gc = mspace->gc;  
-
+  Transform_Kind kind= gc->tuner->kind;
+ 
   /* init the pool before starting multiple collectors */
 
   pool_iterator_init(gc->metadata->gc_rootset_pool);
 
   //For_LOS_extend
-  if(gc->tuner->kind != TRANS_NOTHING){
-    major_set_compact_slide();
-  }else if (collect_is_fallback()){
-    major_set_compact_slide();
-  }else{
-    major_set_compact_move();    
+  if(LOS_ADJUST_BOUNDARY){
+    if(gc->tuner->kind != TRANS_NOTHING){
+      major_set_compact_slide();
+    }else if (collect_is_fallback()){
+      major_set_compact_slide();
+    }else{
+      major_set_compact_move();    
+    }
+  }else {
+    gc->tuner->kind = TRANS_NOTHING;
   }
 
   if(major_is_compact_slide()){
@@ -291,8 +296,14 @@ void mspace_collection(Mspace* mspace)
     exit(0);
   }
 
+  if((!LOS_ADJUST_BOUNDARY)&&(kind != TRANS_NOTHING) ) {
+    gc->tuner->kind = kind;
+    gc_compute_space_tune_size_after_marking(gc);
+  }
+  
   return;  
 } 
+
 
 
 

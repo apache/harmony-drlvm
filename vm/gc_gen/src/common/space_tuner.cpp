@@ -90,7 +90,6 @@ extern POINTER_SIZE_INT min_none_los_size_bytes;
   *By default, we will use allocation speed computed in minor collection. */
 //#define SPACE_TUNE_BY_MAJOR_SPEED
 
-
 /* The tuning size computing before marking is not precise. We only estimate the probable direction of space tuning.
   * If this function decide to set TRANS_NOTHING, then we just call the normal marking function.
   * Else, we call the marking function for space tuning.  */
@@ -253,8 +252,13 @@ static void compute_space_tune_size_for_force_tune(GC *gc, POINTER_SIZE_INT max_
       max_tuning_size = max_tune_for_min_non_los;
 
     /*Round up to satisfy LOS alloc demand.*/
-    tuner->tuning_size = round_up_to_size(tuner->tuning_size, GC_BLOCK_SIZE_BYTES);
-    max_tuning_size = round_down_to_size(max_tuning_size, GC_BLOCK_SIZE_BYTES);
+    if(LOS_ADJUST_BOUNDARY)  {
+      tuner->tuning_size = round_up_to_size(tuner->tuning_size, GC_BLOCK_SIZE_BYTES);
+      max_tuning_size = round_down_to_size(max_tuning_size, GC_BLOCK_SIZE_BYTES);
+    }else {
+      tuner->tuning_size = round_up_to_size(tuner->tuning_size, SPACE_ALLOC_UNIT);
+      max_tuning_size = round_down_to_size(max_tuning_size, SPACE_ALLOC_UNIT);
+    }
 
     /*If the tuning size is too large, we did nothing and wait for the OOM of JVM*/
     /*Fixme: if the heap size is not mx, we can extend the whole heap size*/
@@ -274,7 +278,7 @@ static void compute_space_tune_size_for_force_tune(GC *gc, POINTER_SIZE_INT max_
         tuner->kind = TRANS_NOTHING;
       }else{
         /*We have tuner->tuning_size > max_tuning_size up there.*/
-        extend_heap_size = tuner->tuning_size - max_tuning_size;
+        extend_heap_size = tuner->tuning_size - max_tuning_size;    
         blocked_space_extend(fspace, (unsigned int)extend_heap_size);
         gc->committed_heap_size += extend_heap_size;
         tuner->kind = TRANS_FROM_MOS_TO_LOS;
@@ -358,7 +362,7 @@ static void check_tuning_size(GC* gc)
       tuner->reverse = 1;
     }
   }
-
+  
   return;  
 }
 
@@ -372,9 +376,15 @@ void gc_compute_space_tune_size_after_marking(GC *gc)
 
   POINTER_SIZE_INT max_tuning_size = 0;  
   POINTER_SIZE_INT non_los_size = mspace->committed_heap_size + fspace->committed_heap_size;
-
-  gc_compute_live_object_size_after_marking(gc, non_los_size);
-
+  if(LOS_ADJUST_BOUNDARY) 
+    gc_compute_live_object_size_after_marking(gc, non_los_size);
+  else {
+    unsigned int collector_num = gc->num_active_collectors;
+    POINTER_SIZE_INT reserve_size = collector_num <<(GC_BLOCK_SHIFT_COUNT+2);
+    los_live_obj_size = (POINTER_SIZE_INT) lspace->last_surviving_size + reserve_size;
+    non_los_live_obj_size = ((POINTER_SIZE_INT)(mspace->free_block_idx-mspace->first_block_idx)<<GC_BLOCK_SHIFT_COUNT)+reserve_size;
+    non_los_live_obj_size = round_up_to_size(non_los_live_obj_size, SPACE_ALLOC_UNIT); 
+  }
   check_tuning_size(gc);
   
   /*We should assure that the non_los area is no less than min_none_los_size_bytes*/
@@ -396,7 +406,11 @@ void gc_compute_space_tune_size_after_marking(GC *gc)
       if( tuner->tuning_size > max_tuning_size)
         tuner->tuning_size = max_tuning_size;
       /*Round down so as not to break max_tuning_size*/
-      tuner->tuning_size = round_down_to_size(tuner->tuning_size, GC_BLOCK_SIZE_BYTES);
+      if(LOS_ADJUST_BOUNDARY)
+        tuner->tuning_size = round_down_to_size(tuner->tuning_size, GC_BLOCK_SIZE_BYTES);
+      else
+        tuner->tuning_size = round_down_to_size(tuner->tuning_size, SPACE_ALLOC_UNIT);
+
        /*If tuning size is zero, we should reset kind to NOTHING, in case that gc_init_block_for_collectors relink the block list.*/
       if(tuner->tuning_size == 0)  tuner->kind = TRANS_NOTHING;
     }else{ 
@@ -414,7 +428,12 @@ void gc_compute_space_tune_size_after_marking(GC *gc)
       if(tuner->tuning_size > max_tuning_size) 
         tuner->tuning_size = max_tuning_size;
       /*Round down so as not to break max_tuning_size*/
-      tuner->tuning_size = round_down_to_size(tuner->tuning_size, GC_BLOCK_SIZE_BYTES);
+
+      if (LOS_ADJUST_BOUNDARY)
+        tuner->tuning_size = round_down_to_size(tuner->tuning_size, GC_BLOCK_SIZE_BYTES);
+      else
+        tuner->tuning_size = round_down_to_size(tuner->tuning_size, SPACE_ALLOC_UNIT);
+
       if(tuner->tuning_size == 0)  tuner->kind = TRANS_NOTHING;
     }else{
       /* this is possible because of the reservation in gc_compute_live_object_size_after_marking*/        
@@ -428,7 +447,6 @@ void gc_compute_space_tune_size_after_marking(GC *gc)
   POINTER_SIZE_INT failure_size = lspace_get_failure_size((Lspace*)lspace);  
   if( (tuner->kind == TRANS_FROM_MOS_TO_LOS) && (!tuner->reverse) && (tuner->tuning_size > failure_size) )
     doforce = FALSE;
-
   if( (tuner->force_tune) && (doforce) )
     compute_space_tune_size_for_force_tune(gc, max_tune_for_min_non_los);
 
@@ -537,6 +555,7 @@ void gc_space_tuner_release_fake_blocks_for_los_shrink(GC* gc)
   STD_FREE(tuner->interim_blocks);
   return;
 }
+
 
 
 
