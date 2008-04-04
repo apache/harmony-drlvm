@@ -30,10 +30,11 @@
 #include "jvmti.h"
 #include "jvmti_internal.h"
 #include "jvmti_utils.h"
+#include "open/vm_properties.h"
 #include "open/vm_util.h"
 #include "environment.h"
 #include <string.h>
-#include "properties.h"
+//#include "properties.h"
 #include "jvmti_break_intf.h"
 #include "interpreter_exports.h"
 
@@ -317,11 +318,11 @@ void DebugUtilsTI::setExecutionMode(Global_Env *p_env)
             !strncmp(option, "-Xrun", 5))
         {
             TRACE2("jvmti", "Enabling EM JVMTI mode");
-            set_property("vm.jvmti.enabled", "true", VM_PROPERTIES);
+            vm_properties_set_value("vm.jvmti.enabled", "true", VM_PROPERTIES);
             break;
         }
     }
-    if (TRUE == get_boolean_property("vm.jvmti.enabled", FALSE, VM_PROPERTIES)) {
+    if (TRUE == vm_property_get_boolean("vm.jvmti.enabled", FALSE, VM_PROPERTIES)) {
         p_env->TI->setEnabled();
     }
 }
@@ -517,14 +518,14 @@ static void generate_platform_lib_name(apr_pool_t* pool, JavaVM_Internal *vm,
                                        const char *lib_name,
                                        char **p_path1, char **p_path2)
 {
-    char *vm_libs = vm->vm_env->JavaProperties()->get("vm.boot.library.path");
+    char *vm_libs = vm_properties_get_value("vm.boot.library.path", JAVA_PROPERTIES);
     assert(vm_libs);
     char *path1 = apr_pstrdup(pool, vm_libs);
     char *path2 = port_dso_name_decorate(lib_name, pool);
     path1 = port_filepath_merge(path1, path2, pool);
     *p_path1 = path1;
     *p_path2 = path2;
-    vm->vm_env->VmProperties()->destroy(vm_libs);
+    vm_properties_destroy_value(vm_libs);
 }
 
 jint load_agentlib(Agent *agent, const char *str, JavaVM_Internal *vm)
@@ -656,7 +657,7 @@ jint DebugUtilsTI::Init(JavaVM *vm)
     {
         status = true;
 
-        cml_report_inlined = (bool) get_boolean_property(
+        cml_report_inlined = (bool) vm_property_get_boolean(
                 "vm.jvmti.compiled_method_load.inlined",
                 FALSE, VM_PROPERTIES);
 

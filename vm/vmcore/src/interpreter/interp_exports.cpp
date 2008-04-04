@@ -19,6 +19,7 @@
  * @version $Revision: 1.1.2.1.4.3 $
  */  
 #include <stdlib.h>
+#include "open/vm_properties.h"
 #include "mon_enter_exit.h"
 #include "interpreter.h"
 #include "interpreter_exports.h"
@@ -40,7 +41,7 @@ bool interpreter_enabled(void) {
     static bool val;
     if (!inited) {
         val = interp_enabled && 
-            get_boolean_property("vm.use_interpreter", FALSE, VM_PROPERTIES);
+            vm_property_get_boolean("vm.use_interpreter", FALSE, VM_PROPERTIES);
         inited = true;
         INFO2("init", "Use interpreter = " << val);
     }

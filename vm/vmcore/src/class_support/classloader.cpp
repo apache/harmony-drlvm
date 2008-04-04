@@ -26,6 +26,7 @@
 #include <sstream>
 
 #include "open/vm_method_access.h"
+#include "open/vm_properties.h"
 #include "classloader.h"
 #include "object_layout.h"
 #include "String_Pool.h"
@@ -1647,7 +1648,7 @@ bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
     STD_FREE(vmboot);
 
     // check if vm.bootclasspath.appendclasspath property is set to true
-    if( TRUE == get_boolean_property("vm.bootclasspath.appendclasspath", FALSE, VM_PROPERTIES) ) {
+    if( TRUE == vm_property_get_boolean("vm.bootclasspath.appendclasspath", FALSE, VM_PROPERTIES) ) {
         // append classpath to bootclasspath
         char * cp = m_env->JavaProperties()->get("java.class.path");
         SetClasspathFromString(cp, tmp_pool);

@@ -24,6 +24,7 @@
 #include <apr_dso.h>
 #include "port_dso.h"
 
+#include "open/vm_properties.h"
 #include "open/gc.h"
 #include "open/hythread_ext.h"
 #include "open/jthread.h"   // this is for jthread_self()
@@ -185,15 +186,15 @@ void* get_vm_interface(const char* func_name){
     } else if (strcmp(func_name,"vm_compiled_method_load") == 0) {
         return (void*)compiled_method_load;
     } else if (strcmp(func_name,"vm_properties_destroy_keys") == 0) {
-        return (void*)destroy_properties_keys;
+        return (void*)vm_properties_destroy_keys;
     } else if (strcmp(func_name,"vm_properties_destroy_value") == 0) {
-        return (void*)destroy_property_value;
+        return (void*)vm_properties_destroy_value;
     } else if (strcmp(func_name,"vm_properties_get_keys") == 0) {
-        return (void*)get_properties_keys;
+        return (void*)vm_properties_get_keys;
     } else if (strcmp(func_name,"vm_properties_get_keys_starting_with") == 0) {
-        return (void*)get_properties_keys_staring_with;
+        return (void*)vm_properties_get_keys_starting_with;
     } else if (strcmp(func_name,"vm_properties_get_value") == 0) {
-        return (void*)get_property;
+        return (void*)vm_properties_get_value;
     } else {
         return NULL;
     }
@@ -287,11 +288,11 @@ static jint process_compression_modes(Global_Env * vm_env)
         return JNI_OK;
     }
 
-    int64 ms = get_numerical_property("gc.ms", 0, VM_PROPERTIES);
-    int64 mx = get_numerical_property("gc.mx", 0, VM_PROPERTIES);
+    size_t ms = vm_property_get_size("gc.ms", 0, VM_PROPERTIES);
+    size_t mx = vm_property_get_size("gc.mx", 0, VM_PROPERTIES);
     // Currently 4Gb is maximum for compressed mode
     // If GC cannot allocate heap up to 4Gb, gc_init() will fail
-    int64 max_size = ((int64)4096)*1024*1024;
+    size_t max_size = ((int64)4096)*1024*1024;
 
 #ifdef REFS_USE_COMPRESSED
     if (ms >= max_size || mx >= max_size)
@@ -302,7 +303,7 @@ static jint process_compression_modes(Global_Env * vm_env)
 #elif defined(REFS_USE_RUNTIME_SWITCH)
     if (ms >= max_size || mx >= max_size)
     { // Large heap; use uncompressed references
-        set_property("vm.compress_references", "false", VM_PROPERTIES);
+        vm_properties_set_value("vm.compress_references", "false", VM_PROPERTIES);
         vm_env->compress_references = false;
         return JNI_OK;
     }
@@ -827,21 +828,21 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
         return JNI_ERR;
     }
 
-    tm_properties->use_soft_unreservation = get_boolean_property("thread.soft_unreservation", FALSE, VM_PROPERTIES);
+    tm_properties->use_soft_unreservation = vm_property_get_boolean("thread.soft_unreservation", FALSE, VM_PROPERTIES);
 
     parse_vm_arguments2(vm_env);
 
-    vm_env->verify = get_boolean_property("vm.use_verifier", TRUE, VM_PROPERTIES);
+    vm_env->verify = vm_property_get_boolean("vm.use_verifier", TRUE, VM_PROPERTIES);
 #ifdef REFS_USE_RUNTIME_SWITCH
-    vm_env->compress_references = get_boolean_property("vm.compress_references", TRUE, VM_PROPERTIES);
+    vm_env->compress_references = vm_property_get_boolean("vm.compress_references", TRUE, VM_PROPERTIES);
 #endif
     // use platform default values for field sorting and field compaction
     // if these values are not specifed on command line
     // see Global_Env::Global_Env for defaults
-    vm_env->sort_fields = get_boolean_property("vm.sort_fields", vm_env->sort_fields, VM_PROPERTIES);
-    vm_env->compact_fields = get_boolean_property("vm.compact_fields", vm_env->compact_fields, VM_PROPERTIES);
-    vm_env->use_common_jar_cache = get_boolean_property("vm.common_jar_cache", TRUE, VM_PROPERTIES);
-    vm_env->map_bootsrtap_jars = get_boolean_property("vm.map_bootstrap_jars", FALSE, VM_PROPERTIES);
+    vm_env->sort_fields = vm_property_get_boolean("vm.sort_fields", vm_env->sort_fields, VM_PROPERTIES);
+    vm_env->compact_fields = vm_property_get_boolean("vm.compact_fields", vm_env->compact_fields, VM_PROPERTIES);
+    vm_env->use_common_jar_cache = vm_property_get_boolean("vm.common_jar_cache", TRUE, VM_PROPERTIES);
+    vm_env->map_bootsrtap_jars = vm_property_get_boolean("vm.map_bootstrap_jars", FALSE, VM_PROPERTIES);
 
     vm_env->init_pools();
 
@@ -858,7 +859,7 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     parse_jit_arguments(&vm_env->vm_arguments);
 
     vm_env->pin_interned_strings = 
-        (bool)get_boolean_property("vm.pin_interned_strings", FALSE, VM_PROPERTIES);
+        (bool)vm_property_get_boolean("vm.pin_interned_strings", FALSE, VM_PROPERTIES);
 
     initialize_verify_stack_enumeration();
 
@@ -1059,7 +1060,7 @@ jint vm_init2(JNIEnv * jni_env) {
 
     hythread_suspend_enable();
 
-    if (get_boolean_property("vm.finalize", TRUE, VM_PROPERTIES)) {
+    if (vm_property_get_boolean("vm.finalize", TRUE, VM_PROPERTIES)) {
         // Load and initialize finalizer thread.
         vm_env->java_lang_FinalizerThread_Class =
             preload_class(vm_env, "java/lang/FinalizerThread");

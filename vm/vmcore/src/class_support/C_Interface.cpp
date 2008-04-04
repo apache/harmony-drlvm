@@ -22,6 +22,7 @@
 #define LOG_DOMAIN "vm.core"
 #include "cxxlog.h"
 
+#include "open/vm_properties.h"
 #include "classloader.h"
 #include "lock_manager.h"
 #include "compile.h"
@@ -2231,7 +2232,7 @@ CallingConvention vm_managed_calling_convention()
     return CC_Vm;
 } //vm_managed_calling_convention
 
-void set_property(const char* key, const char* value, PropertyTable table_number) 
+void vm_properties_set_value(const char* key, const char* value, PropertyTable table_number) 
 {
     assert(key);
     switch(table_number) {
@@ -2246,7 +2247,7 @@ void set_property(const char* key, const char* value, PropertyTable table_number
     }
 }
 
-char* get_property(const char* key, PropertyTable table_number)
+char* vm_properties_get_value(const char* key, PropertyTable table_number)
 {
     assert(key);
     char* value;
@@ -2264,7 +2265,7 @@ char* get_property(const char* key, PropertyTable table_number)
     return value;
 }
 
-void destroy_property_value(char* value)
+void vm_properties_destroy_value(char* value)
 {
     if (value)
     {
@@ -2273,7 +2274,7 @@ void destroy_property_value(char* value)
     }
 }
 
-int is_property_set(const char* key, PropertyTable table_number)
+int vm_property_is_set(const char* key, PropertyTable table_number)
 {
     int value;
     assert(key);
@@ -2291,22 +2292,7 @@ int is_property_set(const char* key, PropertyTable table_number)
     return value;
 }
 
-void unset_property(const char* key, PropertyTable table_number)
-{
-    assert(key);
-    switch(table_number) {
-    case JAVA_PROPERTIES: 
-        VM_Global_State::loader_env->JavaProperties()->unset(key);
-        break;
-    case VM_PROPERTIES: 
-        VM_Global_State::loader_env->VmProperties()->unset(key);
-        break;
-    default:
-        ASSERT(0, "Unknown property table: " << table_number);
-    }
-}
-
-char** get_properties_keys(PropertyTable table_number)
+char** vm_properties_get_keys(PropertyTable table_number)
 {
     char** value;
     switch(table_number) {
@@ -2323,7 +2309,7 @@ char** get_properties_keys(PropertyTable table_number)
     return value;
 }
 
-char** get_properties_keys_staring_with(const char* prefix, PropertyTable table_number)
+char** vm_properties_get_keys_starting_with(const char* prefix, PropertyTable table_number)
 {
     assert(prefix);
     char** value;
@@ -2341,7 +2327,7 @@ char** get_properties_keys_staring_with(const char* prefix, PropertyTable table_
     return value;
 }
 
-void destroy_properties_keys(char** keys)
+void vm_properties_destroy_keys(char** keys)
 {
     if (keys)
     {
@@ -2350,49 +2336,23 @@ void destroy_properties_keys(char** keys)
     }
 }
 
-int get_int_property(const char *property_name, int default_value, PropertyTable table_number)
+int vm_property_get_integer(const char *property_name, int default_value, PropertyTable table_number)
 {
     assert(property_name);
-    char *value = get_property(property_name, table_number);
+    char *value = vm_properties_get_value(property_name, table_number);
     int return_value = default_value;
     if (NULL != value)
     {
         return_value = atoi(value);
-        destroy_property_value(value);
+        vm_properties_destroy_value(value);
     }
     return return_value;
 }
 
-int64 get_numerical_property(const char *property_name, int64 default_value, PropertyTable table_number)
+BOOLEAN vm_property_get_boolean(const char *property_name, BOOLEAN default_value, PropertyTable table_number)
 {
     assert(property_name);
-    char *value = get_property(property_name, table_number);
-    int64 return_value = default_value;
-    if (NULL != value)
-    {
-        int64 size = atol(value);
-        int sizeModifier = tolower(value[strlen(value) - 1]);
-        destroy_property_value(value);
-
-        size_t unit = 1;
-        switch (sizeModifier) {
-        case 'k': unit = 1024; break;
-        case 'm': unit = 1024 * 1024; break;
-        case 'g': unit = 1024 * 1024 * 1024;break;
-        }
-
-        return_value = size * unit;
-        if (return_value / unit != size) {
-            /* overflow happened */
-            return_value = default_value;
-        }
-    }
-    return return_value;
-}
-Boolean get_boolean_property(const char *property_name, Boolean default_value, PropertyTable table_number)
-{
-    assert(property_name);
-    char *value = get_property(property_name, table_number);
+    char *value = vm_properties_get_value(property_name, table_number);
     if (NULL == value)
     {
         return default_value;
@@ -2412,18 +2372,18 @@ Boolean get_boolean_property(const char *property_name, Boolean default_value, P
     {
         return_value = TRUE;
     }
-    destroy_property_value(value);
+    vm_properties_destroy_value(value);
     return return_value;
 }
 
-size_t get_size_property(const char *property_name, size_t default_value, PropertyTable table_number) 
+size_t vm_property_get_size(const char *property_name, size_t default_value, PropertyTable table_number) 
 {
   char* size_string; 
   size_t size; 
   int sizeModifier;
   size_t unit = 1;
 
-  size_string = get_property(property_name, table_number);
+  size_string = vm_properties_get_value(property_name, table_number);
 
   if (size_string == NULL) {
     return default_value;
@@ -2431,7 +2391,7 @@ size_t get_size_property(const char *property_name, size_t default_value, Proper
 
   size = atol(size_string);
   sizeModifier = tolower(size_string[strlen(size_string) - 1]);
-  destroy_property_value(size_string);
+  vm_properties_destroy_value(size_string);
 
   switch (sizeModifier) {
   case 'k': unit = 1024; break;

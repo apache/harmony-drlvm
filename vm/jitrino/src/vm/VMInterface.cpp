@@ -24,6 +24,7 @@
 
 #define DYNAMIC_OPEN
 #include "VMInterface.h"
+#include "open/vm_properties.h"
 #include "open/vm_class_info.h"
 #include "open/vm_type_access.h"
 #include "open/vm_field_access.h"
@@ -196,11 +197,11 @@ static  vm_tls_get_request_offset_t  vm_tls_get_request_offset = 0; //DATA VMCAL
 static  vm_tls_is_fast_t  vm_tls_is_fast = 0;//UDATA VMCALL hythread_uses_fast_tls
 static  vm_get_tls_offset_in_segment_t  vm_get_tls_offset_in_segment = 0;//IDATA VMCALL hythread_get_hythread_offset_in_tls(void)
 
-static  vm_properties_destroy_keys_t  vm_properties_destroy_keys = 0;//void destroy_properties_keys(char** keys)
-static  vm_properties_destroy_value_t  vm_properties_destroy_value = 0;//void destroy_property_value(char* value)
-static  vm_properties_get_keys_t  vm_properties_get_keys = 0;//char** get_properties_keys(PropertyTable table_number);
+static  vm_properties_destroy_keys_t  vm_properties_destroy_keys = 0;//void vm_properties_destroy_keys(char** keys)
+static  vm_properties_destroy_value_t  vm_properties_destroy_value = 0;//void vm_properties_destroy_value(char* value)
+static  vm_properties_get_keys_t  vm_properties_get_keys = 0;//char** vm_properties_get_keys(PropertyTable table_number);
 static  vm_properties_get_keys_starting_with_t vm_properties_get_keys_starting_with = 0;
-static  vm_properties_get_value_t vm_properties_get_value = 0;//char* get_property(const char* key, PropertyTable table_number)
+static  vm_properties_get_value_t vm_properties_get_value = 0;//char* vm_properties_get_value(const char* key, PropertyTable table_number)
 
 
 static  vm_get_system_object_class_t  vm_get_system_object_class = 0; // get_system_object_class

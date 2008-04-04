@@ -22,6 +22,7 @@
 
 #include <open/jthread.h>
 #include <open/hythread_ext.h>
+#include "open/vm_properties.h"
 #include "vm_threads.h"
 #include "jni.h"
 
@@ -240,7 +241,7 @@ IDATA jthread_create_with_function(JNIEnv *jni_env,
 
     static size_t default_stacksize;
     if (0 == default_stacksize) {
-        size_t stack_size = get_size_property("thread.stacksize", 0, VM_PROPERTIES);
+        size_t stack_size = vm_property_get_size("thread.stacksize", 0, VM_PROPERTIES);
         default_stacksize = stack_size ? stack_size : TM_DEFAULT_STACKSIZE;
     }
 

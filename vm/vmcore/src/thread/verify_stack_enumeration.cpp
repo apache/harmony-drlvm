@@ -30,8 +30,9 @@
 #include <set>
 
 #define LOG_DOMAIN "verify.rse"
-#include "open/gc.h"
 #include "cxxlog.h"
+#include "open/gc.h"
+#include "open/vm_properties.h"
 
 #include "root_set_enum_internal.h"
 #include "verify_stack_enumeration.h"
@@ -209,15 +210,15 @@ static char* num_suffix(int n) {
 
 void initialize_verify_stack_enumeration()
 {
-    verify_stack_enumeration_flag = get_boolean_property("verify.rse", false, VM_PROPERTIES);
+    verify_stack_enumeration_flag = vm_property_get_boolean("verify.rse", false, VM_PROPERTIES);
     if (verify_stack_enumeration_flag) {
         INFO("verify stack enumeration mode");
 
-        int n = get_int_property("verify.rse.after", 0, VM_PROPERTIES);
+        int n = vm_property_get_integer("verify.rse.after", 0, VM_PROPERTIES);
         if (n > 0) verify_stack_enumeration_counter = n;
         INFO(">verify after " << verify_stack_enumeration_counter);
 
-        n = get_int_property("verify.rse.period", 0, VM_PROPERTIES);
+        n = vm_property_get_integer("verify.rse.period", 0, VM_PROPERTIES);
         if (n > 0) verify_stack_enumeration_period = n;
         INFO(">verify each " << verify_stack_enumeration_period 
                 << num_suffix(verify_stack_enumeration_period) << " iteration");

@@ -20,6 +20,7 @@
  */  
 #include <assert.h>
 
+#include "open/vm_properties.h"
 #include "open/hythread.h"
 
 #include "platform_lowlevel.h"
@@ -146,9 +147,9 @@ JavaVMInitArgs* JNICALL GetInitArgs(VMInterface *vmi)
 vmiError JNICALL 
 GetSystemProperty(VMInterface *vmi, char *key, char **valuePtr)
 {
-    char* value = get_property(key, JAVA_PROPERTIES);
+    char* value = vm_properties_get_value(key, JAVA_PROPERTIES);
     *valuePtr = value ? strdup(value) : NULL;
-    destroy_property_value(value);
+    vm_properties_destroy_value(value);
     return VMI_ERROR_NONE;
 }
 
@@ -158,13 +159,13 @@ SetSystemProperty(VMInterface *vmi, char *key, char *value)
     if (!value || !key) {
         return VMI_ERROR_ILLEGAL_ARG;
     }
-    set_property(key, value, JAVA_PROPERTIES);
+    vm_properties_set_value(key, value, JAVA_PROPERTIES);
     return VMI_ERROR_NONE;
 }
 
 vmiError JNICALL CountSystemProperties(VMInterface *vmi, int *countPtr)
 {
-    char** keys = get_properties_keys(JAVA_PROPERTIES);
+    char** keys = vm_properties_get_keys(JAVA_PROPERTIES);
     int count = 0;
 
     while(keys[count] != NULL) {
@@ -172,29 +173,29 @@ vmiError JNICALL CountSystemProperties(VMInterface *vmi, int *countPtr)
     }
 
     *countPtr = count;
-    destroy_properties_keys(keys);
+    vm_properties_destroy_keys(keys);
     return VMI_ERROR_NONE;
 }
 
 vmiError JNICALL IterateSystemProperties(VMInterface *vmi,
         vmiSystemPropertyIterator iterator, void *userData)
 {
-    char** keys = get_properties_keys(JAVA_PROPERTIES);
+    char** keys = vm_properties_get_keys(JAVA_PROPERTIES);
     int count = 0;
 
     while(keys[count] != NULL) {
-        char* value = get_property(keys[count], JAVA_PROPERTIES);
+        char* value = vm_properties_get_value(keys[count], JAVA_PROPERTIES);
         /* 
          * FIXME: possible inconsistency between iterator and 
          * properties count.
          */
         if (value) {
             iterator((char*)strdup(keys[count]), (char*)strdup(value), userData);
-            destroy_property_value(value);
+            vm_properties_destroy_value(value);
         }
         count++;
     }
-    destroy_properties_keys(keys);
+    vm_properties_destroy_keys(keys);
     return VMI_ERROR_NONE;
 }
 

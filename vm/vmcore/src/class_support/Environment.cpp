@@ -22,6 +22,7 @@
 #define LOG_DOMAIN util::CLASS_LOGGER
 #include "cxxlog.h"
 
+#include "open/vm_properties.h"
 #include "environment.h"
 #include "Package.h"
 #include "String_Pool.h"
@@ -312,13 +313,13 @@ size_t parse_size(const char* value) {
 }
 
 static size_t parse_size_prop(const char* name, size_t default_size) {
-    if(!is_property_set(name, VM_PROPERTIES)) {
+    if(!vm_property_is_set(name, VM_PROPERTIES)) {
         return default_size;
     }
 
-    char* value = get_property(name, VM_PROPERTIES);
+    char* value = vm_properties_get_value(name, VM_PROPERTIES);
     size_t size = parse_size(value);
-    destroy_property_value(value);
+    vm_properties_destroy_value(value);
     return size;
 }
 

@@ -30,6 +30,7 @@
 #endif
 
 #include "open/vm.h"
+#include "open/vm_properties.h"
 #include "open/hythread_ext.h"
 #include "open/vm_class_info.h"
 #include "open/vm_type_access.h"
@@ -1477,7 +1478,7 @@ void Compiler::initStatics(void)
     VTBL_BASE = (const char*)vm_get_vtable_base();
     NULL_REF  = g_refs_squeeze ? OBJ_BASE : NULL;
 
-    g_jvmtiMode = (bool)get_boolean_property("vm.jvmti.enabled", false, VM_PROPERTIES);
+    g_jvmtiMode = (bool)vm_property_get_boolean("vm.jvmti.enabled", false, VM_PROPERTIES);
     
     rt_helper_monitor_enter = 
                 (char*)vm_helper_get_addr(VM_RT_MONITOR_ENTER);

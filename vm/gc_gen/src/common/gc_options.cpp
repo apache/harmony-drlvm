@@ -16,6 +16,7 @@
  */
 
 #include "gc_common.h"
+#include "open/vm_properties.h"
 
 /* FIXME:: need refactoring this function to distribute the options 
    interpretation to their respective modules. */
@@ -94,75 +95,37 @@ static GC* gc_decide_collection_algo(char* unique_algo, Boolean has_los)
   return gc;
 }
 
-static int get_int_property(const char *property_name)
+static int vm_property_get_integer(const char *property_name)
 {
     assert(property_name);
-    char *value = get_property(property_name, VM_PROPERTIES);
-    int return_value;
-    if (NULL != value)
-    {
-        return_value = atoi(value);
-        destroy_property_value(value);
-    }else{
+    if(!vm_property_is_set(property_name, VM_PROPERTIES)) {
         DIE2("gc.base","Warning: property value "<<property_name<<"is not set!");
         exit(0);
     }
-      
-    return return_value;
+
+    return vm_property_get_integer(property_name, 0, VM_PROPERTIES);
 }
 
-static Boolean get_boolean_property(const char *property_name)
+static BOOLEAN vm_property_get_boolean(const char *property_name)
 {
   assert(property_name);
-  char *value = get_property(property_name, VM_PROPERTIES);
-  if (NULL == value){
+  if (!vm_property_is_set(property_name, VM_PROPERTIES)){
     DIE2("gc.base","Warning: property value "<<property_name<<" is not set!");
     exit(0);
   }
-  
-  Boolean return_value;
-  if (0 == strcmp("no", value)
-      || 0 == strcmp("off", value)
-      || 0 == strcmp("false", value)
-      || 0 == strcmp("0", value))
-  {
-    return_value = FALSE;
-  }
-  else if (0 == strcmp("yes", value)
-           || 0 == strcmp("on", value)
-           || 0 == strcmp("true", value)
-           || 0 == strcmp("1", value))
-  {
-    return_value = TRUE;
-  }else{
-    DIE2("gc.base","Warning: property value "<<property_name<<" is not set! Use upper case?");
-    exit(0);
-  }
-    
-  destroy_property_value(value);
-  return return_value;
+
+  return vm_property_get_boolean(property_name, FALSE, VM_PROPERTIES);
 }
 
-static size_t get_size_property(const char* name) 
+static size_t vm_property_get_size(const char* property_name)
 {
-  char* size_string = get_property(name, VM_PROPERTIES);
-  size_t size = atol(size_string);
-  int sizeModifier = tolower(size_string[strlen(size_string) - 1]);
-  destroy_property_value(size_string);
+    assert(property_name);
+    if(!vm_property_is_set(property_name, VM_PROPERTIES)) {
+        DIE2("gc.base","Warning: property value "<<property_name<<" is not set!");
+        exit(0);
+    }
 
-  size_t unit = 1;
-  switch (sizeModifier) {
-  case 'k': unit = 1024; break;
-  case 'm': unit = 1024 * 1024; break;
-  case 'g': unit = 1024 * 1024 * 1024;break;
-  }
-
-  size_t res = size * unit;
-  if (res / unit != size) {
-    /* overflow happened */
-    return 0;
-  }
-  return res;
+    return vm_property_get_size(property_name, 0, VM_PROPERTIES);
 }
 
 void gc_decide_concurrent_algorithm(char* concurrent_algo);
@@ -174,28 +137,28 @@ GC* gc_parse_options()
   TRACE2("gc.process", "GC: parse options ...\n");
 
   GC* gc;
-  
+
   /* GC algorithm decision */
   /* Step 1: */
   char* minor_algo = NULL;
   char* major_algo = NULL;
   char* unique_algo = NULL;
-  
-  if (is_property_set("gc.minor_algorithm", VM_PROPERTIES) == 1) {
-    minor_algo = get_property("gc.minor_algorithm", VM_PROPERTIES);
+
+  if (vm_property_is_set("gc.minor_algorithm", VM_PROPERTIES) == 1) {
+    minor_algo = vm_properties_get_value("gc.minor_algorithm", VM_PROPERTIES);
   }
-  
-  if (is_property_set("gc.major_algorithm", VM_PROPERTIES) == 1) {
-    major_algo = get_property("gc.major_algorithm", VM_PROPERTIES);
+
+  if (vm_property_is_set("gc.major_algorithm", VM_PROPERTIES) == 1) {
+    major_algo = vm_properties_get_value("gc.major_algorithm", VM_PROPERTIES);
   }
-    
-  if (is_property_set("gc.uniqe_algorithm", VM_PROPERTIES) == 1) {
-    unique_algo = get_property("gc.unique_algorithm", VM_PROPERTIES);
+
+  if (vm_property_is_set("gc.uniqe_algorithm", VM_PROPERTIES) == 1) {
+    unique_algo = vm_properties_get_value("gc.unique_algorithm", VM_PROPERTIES);
   }
 
   Boolean has_los = FALSE;
-  if (is_property_set("gc.has_los", VM_PROPERTIES) == 1) {
-    has_los = get_boolean_property("gc.has_los");
+  if (vm_property_is_set("gc.has_los", VM_PROPERTIES) == 1) {
+    has_los = vm_property_get_boolean("gc.has_los");
   }
 
   if(unique_algo){
@@ -203,24 +166,23 @@ GC* gc_parse_options()
       WARN2("gc.base","Warning: generational options cannot be set with unique_algo, ignored.");
     }
     gc = gc_decide_collection_algo(unique_algo, has_los);
-    destroy_property_value(unique_algo);  
-  
+    vm_properties_destroy_value(unique_algo);  
   }else{ /* default */
     gc = gc_gen_decide_collection_algo(minor_algo, major_algo, has_los);
-    if( minor_algo) destroy_property_value(minor_algo);
-    if( major_algo) destroy_property_value(major_algo);
+    if( minor_algo) vm_properties_destroy_value(minor_algo);
+    if( major_algo) vm_properties_destroy_value(major_algo);
   }
-  
-  if (is_property_set("gc.gen_mode", VM_PROPERTIES) == 1) {
-    Boolean gen_mode = get_boolean_property("gc.gen_mode");
+
+  if (vm_property_is_set("gc.gen_mode", VM_PROPERTIES) == 1) {
+    Boolean gen_mode = vm_property_get_boolean("gc.gen_mode");
     gc_set_gen_mode(gen_mode);
   }
 
   /* Step 2: */
 
   /* NOTE:: this has to stay after above!! */
-  if (is_property_set("gc.force_major_collect", VM_PROPERTIES) == 1) {
-    FORCE_FULL_COMPACT = get_boolean_property("gc.force_major_collect");
+  if (vm_property_is_set("gc.force_major_collect", VM_PROPERTIES) == 1) {
+    FORCE_FULL_COMPACT = vm_property_get_boolean("gc.force_major_collect");
     if(FORCE_FULL_COMPACT){
       gc_set_gen_mode(FALSE);
     }
@@ -230,8 +192,8 @@ GC* gc_parse_options()
   /* NOTE:: this has to stay after above!! */
   gc->generate_barrier = gc_is_gen_mode();
   
-  if (is_property_set("gc.generate_barrier", VM_PROPERTIES) == 1) {
-    Boolean generate_barrier = get_boolean_property("gc.generate_barrier");
+  if (vm_property_is_set("gc.generate_barrier", VM_PROPERTIES) == 1) {
+    Boolean generate_barrier = vm_property_get_boolean("gc.generate_barrier");
     gc->generate_barrier = (generate_barrier || gc->generate_barrier);
   }
   
@@ -240,8 +202,8 @@ GC* gc_parse_options()
   POINTER_SIZE_INT max_heap_size = HEAP_SIZE_DEFAULT;
   POINTER_SIZE_INT min_heap_size = min_heap_size_bytes;
   
-  if (is_property_set("gc.mx", VM_PROPERTIES) == 1) {
-    max_heap_size = get_size_property("gc.mx");
+  if (vm_property_is_set("gc.mx", VM_PROPERTIES) == 1) {
+    max_heap_size = vm_property_get_size("gc.mx");
 
     if (max_heap_size < min_heap_size){
       max_heap_size = min_heap_size;
@@ -259,8 +221,8 @@ GC* gc_parse_options()
     }
   }
 
-  if (is_property_set("gc.ms", VM_PROPERTIES) == 1) {
-    min_heap_size = get_size_property("gc.ms");
+  if (vm_property_is_set("gc.ms", VM_PROPERTIES) == 1) {
+    min_heap_size = vm_property_get_size("gc.ms");
     if (min_heap_size < min_heap_size_bytes){
       min_heap_size = min_heap_size_bytes;
       WARN2("gc.base","Warning: Min heap size you set is too small, reset to "<<min_heap_size/MB<<" MB!");
@@ -275,84 +237,82 @@ GC* gc_parse_options()
   min_heap_size_bytes = min_heap_size;
   max_heap_size_bytes = max_heap_size;
 
-  if (is_property_set("gc.nos_size", VM_PROPERTIES) == 1) {
-    NOS_SIZE = get_size_property("gc.nos_size");
+  if (vm_property_is_set("gc.nos_size", VM_PROPERTIES) == 1) {
+    NOS_SIZE = vm_property_get_size("gc.nos_size");
   }
 
-  if (is_property_set("gc.min_nos_size", VM_PROPERTIES) == 1) {
-    MIN_NOS_SIZE = get_size_property("gc.min_nos_size");
+  if (vm_property_is_set("gc.min_nos_size", VM_PROPERTIES) == 1) {
+    MIN_NOS_SIZE = vm_property_get_size("gc.min_nos_size");
   }
 
-  if (is_property_set("gc.init_los_size", VM_PROPERTIES) == 1) {
-    INIT_LOS_SIZE = get_size_property("gc.init_los_size");
+  if (vm_property_is_set("gc.init_los_size", VM_PROPERTIES) == 1) {
+    INIT_LOS_SIZE = vm_property_get_size("gc.init_los_size");
   }  
 
-  if (is_property_set("gc.num_collectors", VM_PROPERTIES) == 1) {
-    unsigned int num = get_int_property("gc.num_collectors");
+  if (vm_property_is_set("gc.num_collectors", VM_PROPERTIES) == 1) {
+    unsigned int num = vm_property_get_integer("gc.num_collectors");
     NUM_COLLECTORS = (num==0)? NUM_COLLECTORS:num;
   }
 
-  if (is_property_set("gc.num_markers", VM_PROPERTIES) == 1) {
-    unsigned int num = get_int_property("gc.num_markers");
+  if (vm_property_is_set("gc.num_markers", VM_PROPERTIES) == 1) {
+    unsigned int num = vm_property_get_integer("gc.num_markers");
     NUM_MARKERS = (num==0)? NUM_MARKERS:num;
   }
 
-  if (is_property_set("gc.tospace_size", VM_PROPERTIES) == 1) {
-    TOSPACE_SIZE = get_size_property("gc.tospace_size");
+  if (vm_property_is_set("gc.tospace_size", VM_PROPERTIES) == 1) {
+    TOSPACE_SIZE = vm_property_get_size("gc.tospace_size");
   }
 
-  if (is_property_set("gc.mos_reserve_size", VM_PROPERTIES) == 1) {
-    MOS_RESERVE_SIZE = get_size_property("gc.mos_reserve_size");
+  if (vm_property_is_set("gc.mos_reserve_size", VM_PROPERTIES) == 1) {
+    MOS_RESERVE_SIZE = vm_property_get_size("gc.mos_reserve_size");
   }
 
-  if (is_property_set("gc.nos_partial_forward", VM_PROPERTIES) == 1) {
-    NOS_PARTIAL_FORWARD = get_boolean_property("gc.nos_partial_forward");
+  if (vm_property_is_set("gc.nos_partial_forward", VM_PROPERTIES) == 1) {
+    NOS_PARTIAL_FORWARD = vm_property_get_boolean("gc.nos_partial_forward");
   }
     
-  if (is_property_set("gc.minor_collectors", VM_PROPERTIES) == 1) {
-    MINOR_COLLECTORS = get_int_property("gc.minor_collectors");
+  if (vm_property_is_set("gc.minor_collectors", VM_PROPERTIES) == 1) {
+    MINOR_COLLECTORS = vm_property_get_integer("gc.minor_collectors");
   }
 
-  if (is_property_set("gc.major_collectors", VM_PROPERTIES) == 1) {
-    MAJOR_COLLECTORS = get_int_property("gc.major_collectors");
+  if (vm_property_is_set("gc.major_collectors", VM_PROPERTIES) == 1) {
+    MAJOR_COLLECTORS = vm_property_get_integer("gc.major_collectors");
   }
 
-  if (is_property_set("gc.ignore_finref", VM_PROPERTIES) == 1) {
-    IGNORE_FINREF = get_boolean_property("gc.ignore_finref");
+  if (vm_property_is_set("gc.ignore_finref", VM_PROPERTIES) == 1) {
+    IGNORE_FINREF = vm_property_get_boolean("gc.ignore_finref");
   }
 
-  if (is_property_set("gc.verify", VM_PROPERTIES) == 1) {
-    char* value = get_property("gc.verify", VM_PROPERTIES);
+  if (vm_property_is_set("gc.verify", VM_PROPERTIES) == 1) {
+    char* value = vm_properties_get_value("gc.verify", VM_PROPERTIES);
     GC_VERIFY = strdup(value);
-    destroy_property_value(value);
+    vm_properties_destroy_value(value);
   }
 
-  if (is_property_set("gc.gen_nongen_switch", VM_PROPERTIES) == 1){
-    GEN_NONGEN_SWITCH= get_boolean_property("gc.gen_nongen_switch");
+  if (vm_property_is_set("gc.gen_nongen_switch", VM_PROPERTIES) == 1){
+    GEN_NONGEN_SWITCH= vm_property_get_boolean("gc.gen_nongen_switch");
     gc->generate_barrier = TRUE;
   }
 
-  if (is_property_set("gc.heap_iteration", VM_PROPERTIES) == 1) {
-    JVMTI_HEAP_ITERATION = get_boolean_property("gc.heap_iteration");
+  if (vm_property_is_set("gc.heap_iteration", VM_PROPERTIES) == 1) {
+    JVMTI_HEAP_ITERATION = vm_property_get_boolean("gc.heap_iteration");
   }
 
-  if (is_property_set("gc.ignore_vtable_tracing", VM_PROPERTIES) == 1) {
-    IGNORE_VTABLE_TRACING = get_boolean_property("gc.ignore_vtable_tracing");
+  if (vm_property_is_set("gc.ignore_vtable_tracing", VM_PROPERTIES) == 1) {
+    IGNORE_VTABLE_TRACING = vm_property_get_boolean("gc.ignore_vtable_tracing");
   }
 
-  if (is_property_set("gc.use_large_page", VM_PROPERTIES) == 1){
-    char* value = get_property("gc.use_large_page", VM_PROPERTIES);
+  if (vm_property_is_set("gc.use_large_page", VM_PROPERTIES) == 1){
+    char* value = vm_properties_get_value("gc.use_large_page", VM_PROPERTIES);
     large_page_hint = strdup(value);
-    destroy_property_value(value);
+    vm_properties_destroy_value(value);
   }
 
-  if (is_property_set("gc.share_los_boundary", VM_PROPERTIES) == 1){
-    share_los_boundary = get_boolean_property("gc.share_los_boundary");     
+  if (vm_property_is_set("gc.share_los_boundary", VM_PROPERTIES) == 1){
+    share_los_boundary = vm_property_get_boolean("gc.share_los_boundary");
   }
-
-
-  if (is_property_set("gc.concurrent_gc", VM_PROPERTIES) == 1){
-    Boolean use_all_concurrent_phase= get_boolean_property("gc.concurrent_gc");
+  if (vm_property_is_set("gc.concurrent_gc", VM_PROPERTIES) == 1){
+    Boolean use_all_concurrent_phase= vm_property_get_boolean("gc.concurrent_gc");
     if(use_all_concurrent_phase){
       USE_CONCURRENT_ENUMERATION = TRUE;
       USE_CONCURRENT_MARK = TRUE;
@@ -361,24 +321,24 @@ GC* gc_parse_options()
     }
   }
 
-  if (is_property_set("gc.concurrent_enumeration", VM_PROPERTIES) == 1){
-    USE_CONCURRENT_ENUMERATION= get_boolean_property("gc.concurrent_enumeration");
+  if (vm_property_is_set("gc.concurrent_enumeration", VM_PROPERTIES) == 1){
+    USE_CONCURRENT_ENUMERATION= vm_property_get_boolean("gc.concurrent_enumeration");
     if(USE_CONCURRENT_ENUMERATION){
       USE_CONCURRENT_GC = TRUE;      
       gc->generate_barrier = TRUE;
     }
   }
 
-  if (is_property_set("gc.concurrent_mark", VM_PROPERTIES) == 1){
-    USE_CONCURRENT_MARK= get_boolean_property("gc.concurrent_mark");
+  if (vm_property_is_set("gc.concurrent_mark", VM_PROPERTIES) == 1){
+    USE_CONCURRENT_MARK= vm_property_get_boolean("gc.concurrent_mark");
     if(USE_CONCURRENT_MARK){
       USE_CONCURRENT_GC = TRUE;      
       gc->generate_barrier = TRUE;
     }
   }
 
-  if (is_property_set("gc.concurrent_sweep", VM_PROPERTIES) == 1){
-    USE_CONCURRENT_SWEEP= get_boolean_property("gc.concurrent_sweep");
+  if (vm_property_is_set("gc.concurrent_sweep", VM_PROPERTIES) == 1){
+    USE_CONCURRENT_SWEEP= vm_property_get_boolean("gc.concurrent_sweep");
     if(USE_CONCURRENT_SWEEP){
       USE_CONCURRENT_GC = TRUE;
     }
@@ -386,39 +346,39 @@ GC* gc_parse_options()
  
   char* concurrent_algo = NULL;
   
-  if (is_property_set("gc.concurrent_algorithm", VM_PROPERTIES) == 1) {
-    concurrent_algo = get_property("gc.concurrent_algorithm", VM_PROPERTIES);
+  if (vm_property_is_set("gc.concurrent_algorithm", VM_PROPERTIES) == 1) {
+    concurrent_algo = vm_properties_get_value("gc.concurrent_algorithm", VM_PROPERTIES);
   }
   
   gc_decide_concurrent_algorithm(concurrent_algo);
 
 #if defined(ALLOC_ZEROING) && defined(ALLOC_PREFETCH)
-  if(is_property_set("gc.prefetch",VM_PROPERTIES) ==1) {
-    PREFETCH_ENABLED = get_boolean_property("gc.prefetch");
+  if(vm_property_is_set("gc.prefetch",VM_PROPERTIES) ==1) {
+    PREFETCH_ENABLED = vm_property_get_boolean("gc.prefetch");
   }
 
-  if(is_property_set("gc.prefetch_distance",VM_PROPERTIES)==1) {
-    PREFETCH_DISTANCE = get_size_property("gc.prefetch_distance");
+  if(vm_property_is_set("gc.prefetch_distance",VM_PROPERTIES)==1) {
+    PREFETCH_DISTANCE = vm_property_get_size("gc.prefetch_distance");
     if(!PREFETCH_ENABLED) {
       WARN2("gc.prefetch_distance","Warning: Prefetch distance set with Prefetch disabled!");
     }
   }
 
-  if(is_property_set("gc.prefetch_stride",VM_PROPERTIES)==1) {
-    PREFETCH_STRIDE = get_size_property("gc.prefetch_stride");
+  if(vm_property_is_set("gc.prefetch_stride",VM_PROPERTIES)==1) {
+    PREFETCH_STRIDE = vm_property_get_size("gc.prefetch_stride");
     if(!PREFETCH_ENABLED) {
       WARN2("gc.prefetch_stride","Warning: Prefetch stride set  with Prefetch disabled!");
     }  
   }
   
-  if(is_property_set("gc.zeroing_size",VM_PROPERTIES)==1) {
-    ZEROING_SIZE = get_size_property("gc.zeroing_size");
+  if(vm_property_is_set("gc.zeroing_size",VM_PROPERTIES)==1) {
+    ZEROING_SIZE = vm_property_get_size("gc.zeroing_size");
   }   
 #endif
 
 #ifdef PREFETCH_SUPPORTED
-  if(is_property_set("gc.mark_prefetch",VM_PROPERTIES) ==1) {
-    mark_prefetch = get_boolean_property("gc.mark_prefetch");
+  if(vm_property_is_set("gc.mark_prefetch",VM_PROPERTIES) ==1) {
+    mark_prefetch = vm_property_get_boolean("gc.mark_prefetch");
   }  
 #endif
 

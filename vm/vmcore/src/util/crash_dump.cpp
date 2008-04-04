@@ -17,6 +17,7 @@
 
 //#include <ctype.h>
 
+#include "open/vm_properties.h"
 #include "port_dso.h"
 #include "port_modules.h"
 #include "port_crash_handler.h"
@@ -308,10 +309,10 @@ int vm_initialize_signals()
 
 #ifdef PLATFORM_POSIX
     bool call_dbg = (VM_Global_State::loader_env == NULL) ||
-            get_boolean_property("vm.crash_handler", FALSE, VM_PROPERTIES);
+            vm_property_get_boolean("vm.crash_handler", FALSE, VM_PROPERTIES);
 #else // WIN
     bool call_dbg = (VM_Global_State::loader_env == NULL) ||
-            get_boolean_property("vm.assert_dialog", TRUE, VM_PROPERTIES);
+            vm_property_get_boolean("vm.assert_dialog", TRUE, VM_PROPERTIES);
 #endif
     if (!call_dbg)
         flags &= ~PORT_CRASH_CALL_DEBUGGER;

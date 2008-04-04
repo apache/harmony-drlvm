@@ -24,6 +24,7 @@
 
 #include <apr_file_info.h>
 
+#include "open/vm_properties.h"
 #include "jvmti_direct.h"
 #include "jvmti_utils.h"
 #include "environment.h"
@@ -78,7 +79,7 @@ jvmtiAddToBootstrapClassLoaderSearch(jvmtiEnv* env,
     const char* bcp_property = XBOOTCLASSPATH_A;
 
     // get bootclasspath property
-    char *bcp_prop = get_property(bcp_property, VM_PROPERTIES);
+    char *bcp_prop = vm_properties_get_value(bcp_property, VM_PROPERTIES);
 
     size_t len_bcp = 0;
 
@@ -94,17 +95,17 @@ jvmtiAddToBootstrapClassLoaderSearch(jvmtiEnv* env,
         strcpy(new_bcp + len_bcp + 1, segment);
 
         // update bootclasspath property
-        set_property(bcp_property, new_bcp, VM_PROPERTIES);
-        set_property(bcp_property, new_bcp, JAVA_PROPERTIES);
+        vm_properties_set_value(bcp_property, new_bcp, VM_PROPERTIES);
+        vm_properties_set_value(bcp_property, new_bcp, JAVA_PROPERTIES);
 
         STD_FREE(new_bcp);
     } else {
         // update bootclasspath property
-        set_property(bcp_property, segment, VM_PROPERTIES);
-        set_property(bcp_property, segment, JAVA_PROPERTIES);
+        vm_properties_set_value(bcp_property, segment, VM_PROPERTIES);
+        vm_properties_set_value(bcp_property, segment, JAVA_PROPERTIES);
     }
     
-    destroy_property_value(bcp_prop);
+    vm_properties_destroy_value(bcp_prop);
 
     return JVMTI_ERROR_NONE;
 }
@@ -145,7 +146,7 @@ jvmtiGetSystemProperties(jvmtiEnv* env,
 
     jint properties_count = 0;
 
-    char** keys = get_properties_keys(JAVA_PROPERTIES);
+    char** keys = vm_properties_get_keys(JAVA_PROPERTIES);
     while(keys[properties_count] != NULL)
         properties_count++;
 
@@ -164,7 +165,7 @@ jvmtiGetSystemProperties(jvmtiEnv* env,
             for (int jjj = 0; jjj < iii; jjj++)
                 _deallocate((unsigned char *)prop_names_array[iii]);
             _deallocate((unsigned char *)prop_names_array);
-            destroy_properties_keys(keys);
+            vm_properties_destroy_keys(keys);
             return errorCode;
         }
         strcpy(prop_names_array[iii], keys[iii]);
@@ -172,7 +173,7 @@ jvmtiGetSystemProperties(jvmtiEnv* env,
 
     *count_ptr = properties_count;
     *property_ptr = prop_names_array;
-    destroy_properties_keys(keys);
+    vm_properties_destroy_keys(keys);
 
     return JVMTI_ERROR_NONE;
 }
@@ -201,7 +202,7 @@ jvmtiGetSystemProperty(jvmtiEnv* env,
     if (NULL == property || NULL == value_ptr)
         return JVMTI_ERROR_NULL_POINTER;
 
-    char *value = get_property(property, JAVA_PROPERTIES);
+    char *value = vm_properties_get_value(property, JAVA_PROPERTIES);
     if (NULL == value)
         return JVMTI_ERROR_NOT_AVAILABLE;
 
@@ -211,7 +212,7 @@ jvmtiGetSystemProperty(jvmtiEnv* env,
         strcpy(ret, value);
         *value_ptr = ret;
     }
-    destroy_property_value(value);
+    vm_properties_destroy_value(value);
 
     return errorCode;
 }
@@ -244,7 +245,7 @@ jvmtiSetSystemProperty(jvmtiEnv* env,
         return JVMTI_ERROR_NOT_AVAILABLE;
 
     Global_Env *vm_env = ((TIEnv*)env)->vm->vm_env;
-    set_property(property, value, JAVA_PROPERTIES);
+    vm_properties_set_value(property, value, JAVA_PROPERTIES);
 
     return JVMTI_ERROR_NONE;
 }

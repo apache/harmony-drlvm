@@ -117,14 +117,6 @@ PROTOTYPE_WITH_NAME(UDATA       , vm_tls_get_request_offset, ()); //DATA VMCALL 
 PROTOTYPE_WITH_NAME(UDATA       , vm_tls_is_fast, (void));//UDATA VMCALL hythread_uses_fast_tls
 PROTOTYPE_WITH_NAME(IDATA       , vm_get_tls_offset_in_segment, (void));//IDATA VMCALL hythread_get_hythread_offset_in_tls(void)
 
-
-PROTOTYPE_WITH_NAME(void        , vm_properties_destroy_keys, (char** keys));//void destroy_properties_keys(char** keys)
-PROTOTYPE_WITH_NAME(void        , vm_properties_destroy_value, (char* value));//void destroy_property_value(char* value)
-PROTOTYPE_WITH_NAME(char**      , vm_properties_get_keys, (PropertyTable table_number));//char** get_properties_keys(PropertyTable table_number);
-PROTOTYPE_WITH_NAME(char**      , vm_properties_get_keys_starting_with, (const char* prefix, PropertyTable table_number));//get_properties_keys_staring_with
-PROTOTYPE_WITH_NAME(char*       , vm_properties_get_value, (const char* key, PropertyTable table_number));//char* get_property(const char* key, PropertyTable table_number)
-
-
 PROTOTYPE_WITH_NAME(Class_Handle, vm_get_system_object_class, ()); // get_system_object_class
 PROTOTYPE_WITH_NAME(Class_Handle, vm_get_system_class_class, ()); // get_system_class_class
 PROTOTYPE_WITH_NAME(Class_Handle, vm_get_system_string_class, ()); // get_system_string_class
