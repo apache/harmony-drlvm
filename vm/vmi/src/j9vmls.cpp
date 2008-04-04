@@ -18,9 +18,9 @@
  * @author Euguene Ostrovsky
  * @version $Revision: 1.1.2.1.4.5 $
  */  
-#include "hyvmls.h"
 
 #include "vm_trace.h"
+#include "hyvmls.h"
 
 UDATA JNICALL 
 HYVMLSAllocKeys(JNIEnv *env, UDATA *pInitCount,...)

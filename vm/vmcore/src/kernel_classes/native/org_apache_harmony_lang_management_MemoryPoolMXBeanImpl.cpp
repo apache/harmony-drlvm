@@ -31,6 +31,7 @@
 #include <jni.h>
 #include "org_apache_harmony_lang_management_MemoryPoolMXBeanImpl.h"
 #include "environment.h"
+#include "port_malloc.h"
 
 /* Native methods */
 
@@ -38,7 +39,7 @@
  * Method: org.apache.harmony.lang.management.MemoryPoolMXBeanImpl.getCollectionUsageImpl()Ljava/lang/management/MemoryUsage;
  */
 JNIEXPORT jobject JNICALL
-Java_org_apache_harmony_lang_management_MemoryPoolMXBeanImpl_getCollectionUsageImpl(JNIEnv *jenv_ext, jobject)
+Java_org_apache_harmony_lang_management_MemoryPoolMXBeanImpl_getCollectionUsageImpl(JNIEnv *jenv_ext, jobject this_been)
 {
     // TODO implement this method stub correctly
     TRACE2("management","getCollectionUsageImpl stub invocation");
@@ -49,6 +50,44 @@ Java_org_apache_harmony_lang_management_MemoryPoolMXBeanImpl_getCollectionUsageI
     jlong used = 1L<<20;
     jlong committed = 1L<<20;
     jlong max = 1L<<22;
+
+    jclass memoryPoolMXBeanClazz =jenv->FindClass(
+        "org/apache/harmony/lang/management/MemoryPoolMXBean");
+    if (jenv->ExceptionCheck()) {return NULL;};
+
+    jmethodID getNameMethod = jenv->GetMethodID(
+        memoryPoolMXBeanClazz,
+        "getName",
+        "()Ljava/lang/String;");
+    if (jenv->ExceptionCheck()) {return NULL;};
+
+    jobject jname = jenv->CallObjectMethod(this_been, getNameMethod);
+    if (jenv->ExceptionCheck()) {return NULL;};
+
+    jobject npname = jenv->NewStringUTF(NATIVE_POOL_NAME);
+    if (jenv->ExceptionCheck()) {return NULL;};
+
+    jclass javaLangStringClazz =jenv->FindClass(
+        "java/lang/String");
+    if (jenv->ExceptionCheck()) {return NULL;};
+
+    jmethodID compareToMethod = jenv->GetMethodID(
+        javaLangStringClazz,
+        "compareTo",
+        "(Ljava/lang/String;)I");
+    if (jenv->ExceptionCheck()) {return NULL;};
+
+    jint is_native = jenv->CallIntMethod(jname, compareToMethod, npname);
+    if (jenv->ExceptionCheck()) {return NULL;};
+
+    if (is_native==0) {
+#ifdef _MEMMGR
+        init = port_mem_used_size();
+        used = port_mem_committed_size() - port_mem_reserved_size();
+        committed = port_mem_committed_size();
+        max = port_mem_max_size();
+#endif
+    }
 
     jclass memoryUsageClazz =jenv->FindClass("java/lang/management/MemoryUsage");
     if (jenv->ExceptionCheck()) return NULL;

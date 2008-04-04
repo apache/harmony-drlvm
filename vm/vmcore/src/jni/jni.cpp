@@ -56,6 +56,7 @@
 #include "stack_trace.h"
 #include "finalizer_thread.h"
 #include "ref_enqueue_thread.h"
+#include "port_malloc.h"
 
 #ifdef _IPF_
 #include "stub_code_utils.h"
@@ -450,6 +451,10 @@ jint JNICALL JNI_CreateJavaVM(JavaVM ** p_vm, JNIEnv ** p_jni_env,
     status = jni_init();        
     
     if (status != JNI_OK) return status;
+
+#ifdef _MEMMGR
+    start_monitor_malloc();
+#endif
 
     apr_thread_mutex_lock(GLOBAL_LOCK);
 
@@ -1510,11 +1515,15 @@ VMEXPORT jint JNICALL DestroyJavaVM(JavaVM * vm)
     status = vm_destroy(java_vm, java_thread);
 
     // Destroy VM environment.
-    delete java_vm->vm_env;
+    java_vm->vm_env->~Global_Env();
     java_vm->vm_env = NULL;
     
     // Destroy VM pool.
     apr_pool_destroy(java_vm->pool);
+
+#ifdef _MEMMGR_REPORT
+    report_leaked_malloc();
+#endif
 
     return status;
 }

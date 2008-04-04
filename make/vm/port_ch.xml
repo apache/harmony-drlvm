@@ -95,6 +95,7 @@
 
             <defineset define="APR_DECLARE_EXPORT" />
             <defineset define="BUILDING_VM" />
+            <defineset define="STRESS_MALLOC" />
 
             <compiler id="c.compiler" extends="common.c.compiler">
                 <fileset dir="${vm.home}/port/src" >

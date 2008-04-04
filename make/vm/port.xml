@@ -62,6 +62,7 @@
             <include name="logger/**.cpp" />
             <include name="tl/*.cpp" />
             <include name="time/*.cpp" />
+            <include name="malloc/*.cpp" />
         </patternset>
 
         <depend-includes paths="port.includes"/>

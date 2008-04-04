@@ -30,6 +30,7 @@
 #include "org_apache_harmony_lang_management_MemoryManagerMXBeanImpl.h"
 #include <cxxlog.h>
 #include "environment.h"
+#include "port_malloc.h"
 
 /* Native methods */
 
@@ -48,13 +49,14 @@ Java_org_apache_harmony_lang_management_MemoryManagerMXBeanImpl_createMemoryPool
     jclass memoryManagerMXBeanImplClazz =jenv->FindClass(
         "org/apache/harmony/lang/management/MemoryManagerMXBeanImpl");
     if (jenv->ExceptionCheck()) {return;};
+
     jmethodID createMemoryPoolHelperMethod = jenv->GetMethodID(
         memoryManagerMXBeanImplClazz,
         "createMemoryPoolHelper",
         "(Ljava/lang/String;ZILorg/apache/harmony/lang/management/MemoryMXBeanImpl;)V");
     if (jenv->ExceptionCheck()) {return;};
 
-    jobject nameMP = jenv->NewStringUTF("Memory Pool #1");
+    jobject nameMP = jenv->NewStringUTF(NATIVE_POOL_NAME);
     if (jenv->ExceptionCheck()) {return;};
 
     jenv->CallVoidMethod(obj, createMemoryPoolHelperMethod, nameMP, JNI_TRUE, 1, memBean);
