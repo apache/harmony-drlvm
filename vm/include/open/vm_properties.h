@@ -21,6 +21,11 @@
 #include "open/common.h"
 #include "open/platform_types.h"
 
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef enum { VM_PROPERTIES  = 0, JAVA_PROPERTIES = 1 } PropertyTable;
 
 /**
@@ -84,5 +89,9 @@ DECLARE_OPEN(int, vm_property_get_integer, (const char *property_name, int defau
  * (for example, 32k is the same as 32768).
  */
 DECLARE_OPEN(size_t, vm_property_get_size, (const char *property_name, size_t default_value, PropertyTable table_number));
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
