@@ -106,7 +106,6 @@ static OpcodeInfo opcodeTable[] = {
     { Op_TauVirtualCall,        true,  MB::Call,          MK::Exception,                             "callvirt",      "callvrt   [%2.%d](%a) ((%0,%1)) -) %l  %b",  },
     { Op_IndirectCall,          true,  MB::Call,          MK::Exception,                             "calli",         "calli     [%0](%a) ((%1,%2)) -) %l",     },
     { Op_IndirectMemoryCall,    true,  MB::Call,          MK::Exception,                             "callimem",      "callimem  [%0](%a) ((%1,%2)) -) %l",     },
-    { Op_IntrinsicCall,         true,  MB::Call,          MK::Exception,                             "callintr",      "callintr  %d(%p) ((%0,%1)) -) %l",       },
     { Op_JitHelperCall,         true,  MB::Call,          MK::Exception,                             "callhelper",    "callhelper %d(%s) -) %l",       },
     { Op_VMHelperCall,          true,  MB::Call,          MK::Exception,                             "callvmhelper",  "callvmhelper %d(%s) -) %l  %b",    },
     { Op_Return,                true,  MB::ControlFlow,   MK::None,                                  "return",        "return    %s",                 },

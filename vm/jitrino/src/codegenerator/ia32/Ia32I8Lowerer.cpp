@@ -528,9 +528,9 @@ void I8Lowerer::applyMnemonic(Inst* inst, Opnd* dst,  Opnd* dst_1,  Opnd* dst_2,
                 // to regalloc and constraint resolver.
                 // However, this seems does not change anything currently,
                 // so leaving as-is.
-                //test 	    low, low
-                //setns 	hi		; if lo is positive, then load 1 into hi
-                //sub		hi, 1	; if lo is positive, then hi is now '0'. otherwise, it's -1
+                //test      low, low
+                //setns     hi      ; if lo is positive, then load 1 into hi
+                //sub       hi, 1   ; if lo is positive, then hi is now '0'. otherwise, it's -1
                 irManager->newInstEx(Mnemonic_CDQ, 1, dst_2, dst_1)->insertBefore(inst);
             } else {
                 //fill upper word with 0
@@ -1519,5 +1519,9 @@ static void checkIR(IRManager* irm) {
 }
 
 }}
+
+
+
+
 
 

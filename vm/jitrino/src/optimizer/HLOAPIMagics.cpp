@@ -25,6 +25,255 @@
 
 namespace Jitrino {
 
+bool arraycopyOptimizable(Inst* arraycopyCall, bool needWriteBarriers) {
+    //
+    //  an ArrayStoreException is thrown and the destination is not modified: 
+    //  
+    //  - The src argument refers to an object that is not an array. 
+    //  - The dest argument refers to an object that is not an array. 
+    //  - The src argument and dest argument refer to arrays whose component types are different primitive types. 
+    //  - The src argument refers to an array with a primitive component type and the dest argument
+    //    refers to an array with a reference component type. 
+    //  - The src argument refers to an array with a reference component type and the dest argument
+    //    refers to an array with a primitive component type. 
+    //
+    Opnd * src = arraycopyCall->getSrc(2);
+    Type * srcType = src->getType();
+    Opnd * dst = arraycopyCall->getSrc(4);
+    Type * dstType = dst->getType();
+    assert(srcType->isObject() &&
+           arraycopyCall->getSrc(3)->getType()->isInt4() && // 1 - srcPos
+           dstType->isObject() &&
+           arraycopyCall->getSrc(5)->getType()->isInt4() && // 3 - dstPos
+           arraycopyCall->getSrc(6)->getType()->isInt4());  // 4 - length
+
+    bool srcIsArray = srcType->isArray() && !srcType->isUnresolvedType();
+    bool dstIsArray = dstType->isArray() && !dstType->isUnresolvedType();
+
+    bool isOptimizable = true;
+
+    if ( srcIsArray && dstIsArray )  {
+        // these are arrays        
+
+        ArrayType* srcAsArrayType = srcType->asArrayType();
+        ArrayType* dstAsArrayType = dstType->asArrayType();
+        bool srcIsArrOfPrimitive = srcIsArray && VMInterface::isArrayOfPrimitiveElements(srcAsArrayType->getVMTypeHandle());
+        bool dstIsArrOfPrimitive = dstIsArray && VMInterface::isArrayOfPrimitiveElements(dstAsArrayType->getVMTypeHandle());
+
+        // are these primitive or reference arrays?
+        if ( srcIsArrOfPrimitive && dstIsArrOfPrimitive ) {
+            // both arrays are primitive
+
+            // if we are dealing with different primitive type arrays, reject optimization
+            // TODO: is that really necessary?
+            isOptimizable = (srcType == dstType); 
+
+        } else if ( srcIsArrOfPrimitive ^ dstIsArrOfPrimitive ) {
+            // arrays are mixed primitive and reference types
+            // reject optimization
+            isOptimizable = false;
+
+        } else {
+            // both arrays are reference
+
+            // if write barriers are enabled, reject optimization
+            // if not, check the types
+            if ( needWriteBarriers ) { 
+                isOptimizable = false;
+            } else {
+                // Here is some inaccuracy. If src is a subclass of dst there is no ASE for sure.
+                // If it is not, we should check the assignability of each element being copied.
+                // To avoid this we just reject the inlining of System::arraycopy call in this case.
+                NamedType* srcElemType = srcAsArrayType->getElementType();
+                NamedType* dstElemType = dstAsArrayType->getElementType();
+                isOptimizable = (srcElemType->getVMTypeHandle() == dstElemType->getVMTypeHandle());
+            }
+
+        }
+
+    } else {
+        // source or destination are not arrays
+        isOptimizable = false;
+    }
+
+    return isOptimizable;
+}
+
+
+void
+System_arraycopy_HLO_Handler::run()
+{
+    InstFactory&        instFactory = builder->getInstFactory();
+    ControlFlowGraph&   cfg         = builder->getControlFlowGraph();
+
+    Node* firstNode = callInst->getNode();
+    Edge* outEdge = firstNode->getOutEdge(Edge::Kind_Unconditional);
+    Node* exitNode = outEdge->getTargetNode();
+    Node* dispatch = firstNode->getExceptionEdgeTarget();
+    assert(dispatch);
+    callInst->unlink();
+    cfg.removeEdge(outEdge);
+
+    builder->setCurrentBCOffset(callInst->getBCOffset());
+    builder->setCurrentNode(firstNode);
+
+    // the fist two are tau operands
+    Opnd * src = callInst->getSrc(2);
+    Opnd * srcPos = callInst->getSrc(3);
+    Type * srcPosType = srcPos->getType();
+    Opnd * dst = callInst->getSrc(4);
+    Opnd * dstPos = callInst->getSrc(5);
+    Type * dstPosType = dstPos->getType();
+    Opnd * len = callInst->getSrc(6);
+
+    //
+    //  Generate exception condition checks:
+    //      chknull src
+    //      chknull dst
+    //      cmpbr srcPos < 0, boundsException
+    //      cmpbr dstPos < 0, boundsException
+    //      cmpbr len < 0, boundsException
+    //      srcEnd = add srcPos, len
+    //      srcLen = src.length
+    //      cmpbr srcEnd > srcLen, boundsException
+    //      dstEnd = add dstPos, len
+    //      dstLen = dst.length
+    //      cmpbr dstEnd > dstLen, boundsException
+    //  Skip trivial:
+    //      cmpbr (src == dst) && (dstPos == srcPos), Exit
+    //
+    //  Choose a direction:
+    //      cmpbr (dstPos > srcPos), Reverse
+    //
+    //  Direct:
+    //      JitHelperCall id=ArrayCopyDirect
+    //      goto Exit
+    //  Reverse:
+    //      srcPos = srcPos + len - 1
+    //      dstPos = dstPos + len - 1
+    //      JitHelperCall id=ArrayCopyReverse
+    //      goto Exit
+    //
+    //  boundsException:
+    //      chkbounds -1, src
+    //  Exit:
+    //
+
+    // Referenced nodes creation
+    LabelInst * reverseCopying = (LabelInst*)instFactory.makeLabel();
+    LabelInst * boundsException = (LabelInst*)instFactory.makeLabel();
+    LabelInst * Exit = (LabelInst*)exitNode->getLabelInst();
+
+    Node* BExcNode = cfg.createBlockNode(boundsException);
+    Node* RevCopyNode = cfg.createBlockNode(reverseCopying);
+
+    //Other nodes creation and filling
+    Opnd* tauSrcNullChecked = builder->genTauCheckNull(src);
+
+    // node
+    builder->genFallthroughNode(dispatch);
+    Opnd* tauDstNullChecked = builder->genTauCheckNull(dst);
+
+    // node
+    builder->genFallthroughNode();
+    builder->genEdgeFromCurrent(BExcNode, 0);
+
+    Opnd* tauNullCheckedRefArgs = builder->genTauAnd(tauSrcNullChecked, tauDstNullChecked);
+
+    Type * intType = builder->getTypeManager().getInt32Type();
+    Type::Tag intTag = intType->tag;
+
+    Opnd * zero = builder->genLdConstant(0);
+    builder->appendInst(instFactory.makeBranch(Cmp_GT,intTag,zero,srcPos,boundsException));
+
+    // node
+    builder->genFallthroughNode();
+    builder->genEdgeFromCurrent(BExcNode, 0);
+    builder->appendInst(instFactory.makeBranch(Cmp_GT,intTag,zero,dstPos,boundsException));
+
+    // node
+    builder->genFallthroughNode();
+    builder->genEdgeFromCurrent(BExcNode, 0);
+    builder->appendInst(instFactory.makeBranch(Cmp_GT,intTag,zero,len,boundsException));
+
+    Modifier mod = Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No);
+
+    // node
+    builder->genFallthroughNode();
+    builder->genEdgeFromCurrent(BExcNode, 0);
+
+    Opnd * srcLen = builder->genArrayLen(intType, intTag, src, tauSrcNullChecked);
+    Opnd * srcEnd = builder->genAdd(intType,mod,srcPos,len);
+    builder->appendInst(instFactory.makeBranch(Cmp_GT,intTag,srcEnd,srcLen,boundsException));
+    
+    // node
+    builder->genFallthroughNode();
+    builder->genEdgeFromCurrent(BExcNode, 0);
+
+    Opnd * dstEnd = builder->genAdd(intType,mod,dstPos,len);
+    Opnd * dstLen = builder->genArrayLen(intType, intTag, dst, tauDstNullChecked);
+    builder->appendInst(instFactory.makeBranch(Cmp_GT,intTag,dstEnd,dstLen,boundsException));
+
+    // node
+    builder->genFallthroughNode();
+    builder->genEdgeFromCurrent(exitNode, 0);
+
+    // The case of same arrays and same positions
+    Opnd * diff = builder->genCmp3(intType,intTag,Cmp_GT,dstPos,srcPos);
+    Opnd * sameArrays = builder->genCmp(intType,Type::IntPtr,Cmp_EQ,src,dst);
+    Opnd * zeroDiff = builder->genCmp(intType,intTag,Cmp_EQ,diff,zero);
+    Opnd * nothingToCopy = builder->genAnd(intType,sameArrays,zeroDiff);
+    builder->appendInst(instFactory.makeBranch(Cmp_NonZero,intTag,nothingToCopy,Exit));
+
+    // node
+    builder->genFallthroughNode();
+    builder->genEdgeFromCurrent(RevCopyNode,0);
+
+    Opnd* tauTypesChecked = builder->genTauSafe();
+
+    // Choosing direction
+    builder->appendInst(instFactory.makeBranch(Cmp_GT,intTag,dstPos,srcPos,reverseCopying));
+
+    // Direct Copying
+    builder->genFallthroughNode();
+    builder->genEdgeFromCurrent(exitNode,0);
+
+    Opnd* directArgs [5];
+    directArgs[0] = src;
+    directArgs[1] = srcPos;
+    directArgs[2] = dst;
+    directArgs[3] = dstPos;
+    directArgs[4] = len;
+    builder->appendInst(instFactory.makeJitHelperCall(OpndManager::getNullOpnd(), ArrayCopyDirect,
+                                                      tauNullCheckedRefArgs, tauTypesChecked,
+                                                      5, directArgs));
+
+    // Reverse Copying
+    builder->setCurrentNode(RevCopyNode);
+    builder->genEdgeFromCurrent(exitNode);
+
+    Opnd* one = builder->genLdConstant(1);
+    Opnd* lastSrcIdx = builder->genSub(srcPosType,mod,srcEnd,one);
+    Opnd* lastDstIdx = builder->genSub(dstPosType,mod,dstEnd,one);
+
+    Opnd* reverseArgs [5];
+    reverseArgs[0] = src;
+    reverseArgs[1] = lastSrcIdx;  // srcPos+len-1
+    reverseArgs[2] = dst;
+    reverseArgs[3] = lastDstIdx;  // dstPos+len-1
+    reverseArgs[4] = len;
+    builder->appendInst(instFactory.makeJitHelperCall(OpndManager::getNullOpnd(), ArrayCopyReverse,
+                                                      tauNullCheckedRefArgs, tauTypesChecked,
+                                                      5, reverseArgs));
+
+    // Bounds Exception
+    builder->setCurrentNode(BExcNode);
+    builder->genEdgeFromCurrent(exitNode);
+    builder->genEdgeFromCurrent(dispatch, 0);
+    Opnd* minusone = builder->genLdConstant(-1);
+    builder->genTauCheckBounds(src,minusone,tauSrcNullChecked);
+}
+
 void
 String_compareTo_HLO_Handler::run()
 {
@@ -110,7 +359,7 @@ String_compareTo_HLO_Handler::run()
     Opnd* opnds[] = {thisValue,thisStart,thisLength,trgtValue,trgtStart,trgtLength,counter};
 
     // This helper call will be processed in Ia32ApiMagics pass
-    builder->appendInst(instFactory.makeJitHelperCall(dst, StringCompareTo, 7, opnds));
+    builder->appendInst(instFactory.makeJitHelperCall(dst, StringCompareTo, NULL, NULL, 7, opnds));
 
     cfg.orderNodes(true);
 }
@@ -214,7 +463,7 @@ String_regionMatches_HLO_Handler::run()
     VarOpnd* resultVar = builder->createVarOpnd(dst->getType(),false);
     SsaVarOpnd* resVar = builder->createSsaVarOpnd(resultVar);
     Opnd* res = builder->createOpnd(dst->getType());
-    builder->appendInst(instFactory.makeJitHelperCall(res, StringRegionMatches, 5, opnds));
+    builder->appendInst(instFactory.makeJitHelperCall(res, StringRegionMatches, NULL, NULL, 5, opnds));
     builder->genStVar(resVar,res);
     builder->genEdgeFromCurrent(lastNode);
 
@@ -293,13 +542,13 @@ String_indexOf_HLO_Handler::run()
     // prefetch String objects
     Opnd * voidDst = builder->createOpnd(irm->getTypeManager().getVoidType());
     Opnd* prefetchThis[] = {thisStr, imm128, imm64};
-    builder->appendInst(instFactory.makeJitHelperCall(voidDst, Prefetch, 3, prefetchThis));
+    builder->appendInst(instFactory.makeJitHelperCall(voidDst, Prefetch, NULL, NULL, 3, prefetchThis));
 
     // node
     builder->genFallthroughNode(dispatch);
     
     Opnd* prefetchTrgt[] = {trgtStr, imm128, imm64};
-    builder->appendInst(instFactory.makeJitHelperCall(voidDst, Prefetch, 3, prefetchTrgt));
+    builder->appendInst(instFactory.makeJitHelperCall(voidDst, Prefetch, NULL, NULL, 3, prefetchTrgt));
 
     Opnd* thisLength = builder->genLdField(fieldCountDesc, thisStr, tauThisNullChecked, tauThisInRange);
     Opnd* trgtLength = builder->genLdField(fieldCountDesc, trgtStr, tauTrgtNullChecked, tauTrgtInRange);
@@ -315,20 +564,20 @@ String_indexOf_HLO_Handler::run()
 
     // prefetch character arrays
     Opnd* prefetchThisValue[] = {thisValue, imm128, imm64};
-    builder->appendInst(instFactory.makeJitHelperCall(voidDst, Prefetch, 3, prefetchThisValue));
+    builder->appendInst(instFactory.makeJitHelperCall(voidDst, Prefetch, NULL, NULL, 3, prefetchThisValue));
 
     // node
     builder->genFallthroughNode(dispatch);
     
     Opnd* prefetchTrgtValue[] = {trgtValue, imm128, imm64};
-    builder->appendInst(instFactory.makeJitHelperCall(voidDst, Prefetch, 3, prefetchTrgtValue));
+    builder->appendInst(instFactory.makeJitHelperCall(voidDst, Prefetch, NULL, NULL, 3, prefetchTrgtValue));
 
     // node
     builder->genFallthroughNode(dispatch);
 
     Opnd* opnds[] = {thisValue, thisOffset, thisLength, trgtValue, trgtOffset, trgtLength, start};
     // This helper call will be processed in Ia32ApiMagics pass
-    builder->appendInst(instFactory.makeJitHelperCall(dst, StringIndexOf, 7, opnds));
+    builder->appendInst(instFactory.makeJitHelperCall(dst, StringIndexOf, NULL, NULL, 7, opnds));
 
     builder->genEdgeFromCurrent(lastNode);
 
@@ -358,6 +607,7 @@ HLOAPIMagicIRBuilder::genFallthroughNode(Node* dispatch) {
 void
 HLOAPIMagicIRBuilder::appendInst(Inst* inst) {
     inst->setBCOffset(currentBCOffset);
+    assert(currentNode);
     currentNode->appendInst(inst);
 }
 
@@ -463,7 +713,6 @@ HLOAPIMagicIRBuilder::genSub(Type* dstType, Modifier mod, Opnd* src1, Opnd* src2
     return dst;
 }
 
-
 Opnd*
 HLOAPIMagicIRBuilder::genLdConstant(int32 val) {
     Opnd* dst = createOpnd(typeManager.getInt32Type());
@@ -522,7 +771,7 @@ HLOAPIMagicIRBuilder::genTauSafe() {
 
 Opnd*
 HLOAPIMagicIRBuilder::genTauCheckBounds(Opnd* array, Opnd* index, Opnd *tauNullChecked) {
-    Opnd *tauArrayTypeChecked = genTauHasType(array, array->getType());
+    Opnd* tauArrayTypeChecked = genTauHasType(array, array->getType());
     Opnd* arrayLen = genTauArrayLen(typeManager.getInt32Type(), Type::Int32, array, 
                                     tauNullChecked, tauArrayTypeChecked);
 
@@ -541,21 +790,6 @@ Opnd*
 HLOAPIMagicIRBuilder::genTauHasType(Opnd *src, Type *castType) {
     Opnd* dst = createOpnd(typeManager.getTauType());
     appendInst(instFactory.makeTauHasType(dst, src, castType));
-    return dst;
-}
-
-Opnd*
-HLOAPIMagicIRBuilder::genIntrinsicCall(IntrinsicCallId intrinsicId,
-                            Type* returnType,
-                            Opnd* tauNullCheckedRefArgs,
-                            Opnd* tauTypesChecked,
-                            uint32 numArgs,
-                            Opnd*  args[]) {
-    Opnd * dst = createOpnd(returnType);
-    appendInst(instFactory.makeIntrinsicCall(dst, intrinsicId, 
-                                             tauNullCheckedRefArgs,
-                                             tauTypesChecked,
-                                             numArgs, args));
     return dst;
 }
 

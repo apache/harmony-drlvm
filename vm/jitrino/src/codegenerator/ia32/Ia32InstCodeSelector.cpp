@@ -243,6 +243,8 @@ void InstCodeSelector::onCFGInit(IRManager& irManager)
     irManager.registerInternalHelperInfo("add_value_profile_value", IRManager::InternalHelperInfo((void*)&add_value_profile_value,&CallingConvention_STDCALL));
 
     irManager.registerInternalHelperInfo("fill_array_with_const", IRManager::InternalHelperInfo((void*)&fill_array_with_const,&CallingConvention_STDCALL));
+    irManager.registerInternalHelperInfo("memory_copy_direct", IRManager::InternalHelperInfo(NULL,&CallingConvention_STDCALL));
+    irManager.registerInternalHelperInfo("memory_copy_reverse", IRManager::InternalHelperInfo(NULL,&CallingConvention_STDCALL));
     irManager.registerInternalHelperInfo("String_compareTo", IRManager::InternalHelperInfo(NULL,&CallingConvention_STDCALL));
     irManager.registerInternalHelperInfo("String_regionMatches", IRManager::InternalHelperInfo(NULL,&CallingConvention_STDCALL));
     irManager.registerInternalHelperInfo("String_indexOf", IRManager::InternalHelperInfo(NULL,&CallingConvention_STDCALL));
@@ -585,11 +587,11 @@ Opnd * InstCodeSelector::convert(CG_OpndHandle * oph, Type * dstType, Opnd * dst
 //  Convert to integer
 
 CG_OpndHandle* InstCodeSelector::convToInt(ConvertToIntOp::Types       opType,
-                                                bool                        isSigned,
-						bool                        isZeroExtend,
-                                                ConvertToIntOp::OverflowMod ovfMod,
-                                                Type*                       dstType, 
-                                                CG_OpndHandle*              src) 
+                                           bool                        isSigned,
+                                           bool                        isZeroExtend,
+                                           ConvertToIntOp::OverflowMod ovfMod,
+                                           Type*                       dstType, 
+                                           CG_OpndHandle*              src) 
 {
     Type * sizeType=NULL;
     switch (opType){
@@ -600,16 +602,16 @@ CG_OpndHandle* InstCodeSelector::convToInt(ConvertToIntOp::Types       opType,
             sizeType=isSigned?typeManager.getInt16Type():typeManager.getUInt16Type();
             break;
 
-#ifdef _IA32_	    
+#ifdef _IA32_
         case ConvertToIntOp::I:
-#endif	
+#endif
         case ConvertToIntOp::I4:
             sizeType=isSigned?typeManager.getInt32Type():typeManager.getUInt32Type();
             break;
 
 #ifdef _EM64T_
         case ConvertToIntOp::I:
-#endif	
+#endif
         case ConvertToIntOp::I8:
             sizeType=isSigned?typeManager.getInt64Type():typeManager.getUInt64Type();
             break;
@@ -1927,7 +1929,7 @@ CG_OpndHandle*  InstCodeSelector::addElemIndexWithLEA(Type          * eType,
         
     uint32 elemSize = 0;
     if (elemType->isReference()
-        && Type::isCompressedReference(elemType->tag, compilationInterface) 
+        && Type::isCompressedReference(elemType->tag, compilationInterface)
         && !elemType->isCompressedReference()) {
         elemSize = 4;
     } else {
@@ -2576,98 +2578,6 @@ CG_OpndHandle* InstCodeSelector::call(uint32          numArgs,
 }
 
 //_______________________________________________________________________________________________________________
-//  reverse copying with 'rep move' instruction
-//  start indexes (args[1] and args[3] must be prepared respectively)
-
-CG_OpndHandle* InstCodeSelector::arraycopyReverse(uint32          numArgs, 
-                                                  CG_OpndHandle** args)
-{
-
-
-    appendInsts(irManager.newInst(Mnemonic_PUSHFD));
-    appendInsts(irManager.newInst(Mnemonic_STD));
-
-    arraycopy(numArgs,args);
-
-    appendInsts(irManager.newInst(Mnemonic_POPFD));
-
-    return NULL;
-}
-
-//_______________________________________________________________________________________________________________
-//  Transforming System::arraycopy call into 'rep move'
-
-CG_OpndHandle* InstCodeSelector::arraycopy(uint32          numArgs, 
-                                           CG_OpndHandle** args)
-{
-    assert(numArgs == 5);
-    
-#ifdef _EM64T_
-    RegName counterRegName = RegName_RCX;
-    RegName srcAddrRegName = RegName_RSI;
-    RegName dstAddrRegName = RegName_RDI;
-#else
-    RegName counterRegName = RegName_ECX;
-    RegName srcAddrRegName = RegName_ESI;
-    RegName dstAddrRegName = RegName_EDI;
-#endif
-
-    // prepare counter
-    Type* counterType = typeManager.getIntPtrType();
-    Opnd* counter = irManager.newRegOpnd(counterType,counterRegName);
-    copyOpnd(counter,(Opnd*)args[4]);
-
-    // prepare src position
-    Opnd* srcAddr = (Opnd*)addElemIndexWithLEA(NULL,args[0],args[1]);
-    Opnd* srcAddrReg = irManager.newRegOpnd(srcAddr->getType(),srcAddrRegName);
-    copyOpnd(srcAddrReg,srcAddr);
-
-    // prepare dst position
-    Opnd* dstAddr = (Opnd*)addElemIndexWithLEA(NULL,args[2],args[3]);
-    Opnd* dstAddrReg = irManager.newRegOpnd(dstAddr->getType(),dstAddrRegName);
-    copyOpnd(dstAddrReg,dstAddr);
-
-    // double counter if elem type is 64 bits long
-    PtrType* srcAddrType = srcAddr->getType()->asPtrType();
-    assert(srcAddrType);
-    Type::Tag tag = srcAddrType->getPointedToType()->tag;
-    Mnemonic mn = Mnemonic_NULL;
-    OpndSize typeSize = IRManager::getTypeSize(tag);
-    switch(typeSize) {
-        case OpndSize_8:   mn = Mnemonic_MOVS8; break;
-        case OpndSize_16:  mn = Mnemonic_MOVS16; break;
-        case OpndSize_32:  mn = Mnemonic_MOVS32; break;
-        case OpndSize_64: 
-            {
-                /**
-                 * FIXME 
-                 * Currently JIT erroneously supposes that compressed mode is always on.
-                 * So if type is object, it is actually compressed (32-bit sized).
-                 * But IRManager::getTypeSize() "correctly" returns OpndSize_64.
-                 */
-#ifdef _EM64T_
-                if (irManager.refsAreCompressed() && srcAddrType->getPointedToType()->isObject()) {
-                    mn = Mnemonic_MOVS32;
-                } else {
-                    mn = Mnemonic_MOVS64;
-                }
-#else
-                // there are no MOVSQ on ia32
-                assert(!srcAddrType->getPointedToType()->isObject());
-                appendInsts(irManager.newInst(Mnemonic_SHL, counter, irManager.newImmOpnd(counterType, (int32)1)));
-                mn = Mnemonic_MOVS32;
-#endif // _EM64T_
-            }
-            break;
-        default: assert(0); mn = Mnemonic_MOVS32; break;
-    }
-    Inst* copyInst = irManager.newInst(mn,dstAddrReg,srcAddrReg,counter);
-    copyInst->setPrefix(InstPrefix_REP);
-    appendInsts(copyInst);
-    return NULL;
-}
-
-//_______________________________________________________________________________________________________________
 //  Direct call to the method. Depending on the code generator flags we
 //  either expand direct call into loading method address into a register and
 //  indirect call or true direct call that will be patched if method is recompiled.
@@ -2719,32 +2629,6 @@ CG_OpndHandle* InstCodeSelector::tau_callvirt(uint32          numArgs,
 }
 
 //_______________________________________________________________________________________________________________
-//  Intrinsic call
-
-CG_OpndHandle* InstCodeSelector::callintr(uint32              numArgs, 
-                                             CG_OpndHandle**     args, 
-                                             Type*               retType,
-                                             IntrinsicCallOp::Id callId) 
-{
-    ICS_ASSERT(0);
-    return 0;
-}
-
-//_______________________________________________________________________________________________________________
-//  Intrinsic call
-
-CG_OpndHandle* InstCodeSelector::tau_callintr(uint32              numArgs, 
-                                                 CG_OpndHandle**     args, 
-                                                 Type*               retType,
-                                                 IntrinsicCallOp::Id callId,
-                                                 CG_OpndHandle*      tauNullsChecked,
-                                                 CG_OpndHandle*      tauTypesChecked) 
-{
-    ICS_ASSERT(0);
-    return 0;
-}
-
-//_______________________________________________________________________________________________________________
 //  JIT helper call
 
 CG_OpndHandle* InstCodeSelector::callhelper(uint32              numArgs, 
@@ -2761,16 +2645,16 @@ CG_OpndHandle* InstCodeSelector::callhelper(uint32              numArgs,
         Opnd* distance = (Opnd*) args[1];    
         Opnd* stride = (Opnd*) args[2];
 
-    	assert (distance->isPlacedIn(OpndKind_Imm) && stride->isPlacedIn(OpndKind_Imm));
-		assert(fit32(distance->getImmValue()));
-		assert(fit32(stride->getImmValue()));
-		int dist = (int)distance->getImmValue();
+        assert (distance->isPlacedIn(OpndKind_Imm) && stride->isPlacedIn(OpndKind_Imm));
+                assert(fit32(distance->getImmValue()));
+                assert(fit32(stride->getImmValue()));
+                int dist = (int)distance->getImmValue();
         int strd = (int)stride->getImmValue();
     
-    	for (int i=0; i< dist; i+=strd)
-    	{
+        for (int i=0; i< dist; i+=strd)
+        {
             Opnd* prefAddress = irManager.newMemOpnd(typeManager.getInt8Type(), address, 0, 0, irManager.newImmOpnd(typeManager.getInt32Type(), i));
-	    Inst* inst = irManager.newInst(Mnemonic_PREFETCH, prefAddress);
+            Inst* inst = irManager.newInst(Mnemonic_PREFETCH, prefAddress);
             appendInsts(inst);
         }
         break;
@@ -2783,29 +2667,29 @@ CG_OpndHandle* InstCodeSelector::callhelper(uint32              numArgs,
         Opnd *addr = opnds[0];
         Opnd *size = opnds[1];
 
-	RegName counterRegName = RegName_ECX;	
-	RegName dstRegName = RegName_EDI;
-	RegName zeroRegName = RegName_EAX;
-	
-	// prepare counter
-	Type* int32Type = typeManager.getInt32Type();
-	Opnd* counter = irManager.newRegOpnd(int32Type,counterRegName);
-	copyOpnd(counter,size);
-	appendInsts(irManager.newInst(Mnemonic_SHR, counter, irManager.newImmOpnd(int32Type,2)));
+        RegName counterRegName = RegName_ECX;   
+        RegName dstRegName = RegName_EDI;
+        RegName zeroRegName = RegName_EAX;
+        
+        // prepare counter
+        Type* int32Type = typeManager.getInt32Type();
+        Opnd* counter = irManager.newRegOpnd(int32Type,counterRegName);
+        copyOpnd(counter,size);
+        appendInsts(irManager.newInst(Mnemonic_SHR, counter, irManager.newImmOpnd(int32Type,2)));
 
-	// prepare dst	
-	Opnd* dst = irManager.newRegOpnd(int32Type,dstRegName);
-	copyOpnd(dst, addr);
-	
-	// prepare zero
-	Opnd* eax = irManager.newRegOpnd(int32Type,zeroRegName);
-	//appendInsts(irManager.newInst(Mnemonic_XOR, eax, eax));
-	Opnd* zero = irManager.newImmOpnd(int32Type,0);
-	appendInsts(irManager.newInst(Mnemonic_MOV, eax, zero));
-	
-	Inst* storeInst = irManager.newInst(Mnemonic_STOS, dst, counter, eax);
-	storeInst->setPrefix(InstPrefix_REP);
-	appendInsts(storeInst);
+        // prepare dst  
+        Opnd* dst = irManager.newRegOpnd(int32Type,dstRegName);
+        copyOpnd(dst, addr);
+        
+        // prepare zero
+        Opnd* eax = irManager.newRegOpnd(int32Type,zeroRegName);
+        //appendInsts(irManager.newInst(Mnemonic_XOR, eax, eax));
+        Opnd* zero = irManager.newImmOpnd(int32Type,0);
+        appendInsts(irManager.newInst(Mnemonic_MOV, eax, zero));
+        
+        Inst* storeInst = irManager.newInst(Mnemonic_STOS, dst, counter, eax);
+        storeInst->setPrefix(InstPrefix_REP);
+        appendInsts(storeInst);
           break;
     }
     case InitializeArray:
@@ -2887,6 +2771,20 @@ CG_OpndHandle* InstCodeSelector::callhelper(uint32              numArgs,
         assert(numArgs == 4);
         Opnd * newArgs[4] = {(Opnd *)args[0], (Opnd *)args[1], (Opnd *)args[2], (Opnd *)args[3]};
         appendInsts(irManager.newInternalRuntimeHelperCallInst("fill_array_with_const", numArgs, newArgs, dstOpnd));
+        break;
+    }
+    case ArrayCopyDirect:
+    {
+        assert(numArgs == 5);
+        Opnd * newArgs[5] = {(Opnd *)args[0], (Opnd *)args[1], (Opnd *)args[2], (Opnd *)args[3], (Opnd *)args[4]};
+        appendInsts(irManager.newInternalRuntimeHelperCallInst("memory_copy_direct", numArgs, newArgs, dstOpnd));
+        break;
+    }
+    case ArrayCopyReverse:
+    {
+        assert(numArgs == 5);
+        Opnd * newArgs[5] = {(Opnd *)args[0], (Opnd *)args[1], (Opnd *)args[2], (Opnd *)args[3], (Opnd *)args[4]};
+        appendInsts(irManager.newInternalRuntimeHelperCallInst("memory_copy_reverse", numArgs, newArgs, dstOpnd));
         break;
     }
     case StringCompareTo:

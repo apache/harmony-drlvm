@@ -388,29 +388,18 @@ default: assert(0);
     return ConvertToIntOp::NoOvf;    // to keep the compiler quiet
 }
 
-//
-//  Maps intrinsic id
-//
-IntrinsicCallOp::Id _BlockCodeSelector::convertIntrinsicId(IntrinsicCallId callId) {
-    switch(callId) {
-    case CharArrayCopy:      return IntrinsicCallOp::CharArrayCopy;
-    case ArrayCopyDirect:    return IntrinsicCallOp::ArrayCopyDirect;
-    case ArrayCopyReverse:   return IntrinsicCallOp::ArrayCopyReverse;
-    }
-    assert(0);
-    return IntrinsicCallOp::CharArrayCopy; // to keep compiler quiet
-}
-
 JitHelperCallOp::Id _BlockCodeSelector::convertJitHelperId(JitHelperCallId callId) {
     switch(callId) {
-        case Prefetch:           	return JitHelperCallOp::Prefetch;
-        case Memset0:           	return JitHelperCallOp::Memset0;
+        case Prefetch:                  return JitHelperCallOp::Prefetch;
+        case Memset0:                   return JitHelperCallOp::Memset0;
         case InitializeArray:           return JitHelperCallOp::InitializeArray;
         case SaveThisState:             return JitHelperCallOp::SaveThisState;
         case ReadThisState:             return JitHelperCallOp::ReadThisState;
         case LockedCompareAndExchange:  return JitHelperCallOp::LockedCompareAndExchange;
         case AddValueProfileValue:      return JitHelperCallOp::AddValueProfileValue;
         case FillArrayWithConst:        return JitHelperCallOp::FillArrayWithConst;
+        case ArrayCopyDirect:           return JitHelperCallOp::ArrayCopyDirect;
+        case ArrayCopyReverse:          return JitHelperCallOp::ArrayCopyReverse;
         case StringCompareTo:           return JitHelperCallOp::StringCompareTo;
         case StringRegionMatches:       return JitHelperCallOp::StringRegionMatches;
         case StringIndexOf:             return JitHelperCallOp::StringIndexOf;
@@ -722,11 +711,11 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback, I
                     (opType==CompareOp::S) ||
                     (opType==CompareOp::D)) {
                         switch (cmpOp) {
-        case CompareOp::Gt: cmpOp2 = CompareOp::Gtu; ifNaNResult = 1; break;
-        case CompareOp::Gtu: cmpOp2 = CompareOp::Gt; ifNaNResult = -1; break;
-        case CompareOp::Ge: cmpOp2 = CompareOp::Geu; ifNaNResult = 1; break;
-        case CompareOp::Geu: cmpOp2 = CompareOp::Ge; ifNaNResult = -1; break;
-        default: break;
+                        case CompareOp::Gt: cmpOp2 = CompareOp::Gtu; ifNaNResult = 1; break;
+                        case CompareOp::Gtu: cmpOp2 = CompareOp::Gt; ifNaNResult = -1; break;
+                        case CompareOp::Ge: cmpOp2 = CompareOp::Geu; ifNaNResult = 1; break;
+                        case CompareOp::Geu: cmpOp2 = CompareOp::Ge; ifNaNResult = -1; break;
+                        default: break;
                         };
                     }
 
@@ -797,11 +786,11 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback, I
                 uint32 numArgs = inst->getNumSrcOperands()-2; // also omit from count
                 cgInst = 
                     instructionCallback.tau_call(numArgs,
-                    args,
-                    inst->getDst()->getType(),
-                    methodDesc,
-                    getCGInst(tauNullChecked),
-                    getCGInst(tauTypesChecked));
+                                                 args,
+                                                 inst->getDst()->getType(),
+                                                 methodDesc,
+                                                 getCGInst(tauNullChecked),
+                                                 getCGInst(tauTypesChecked));
             }
             break;
         case Op_TauVirtualCall:
@@ -816,11 +805,11 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback, I
                 MethodDesc * methodDesc = call->getMethodDesc();
                 cgInst = 
                     instructionCallback.tau_callvirt(inst->getNumSrcOperands()-2, // omit taus
-                    genCallArgs(call, 2), // omit taus
-                    inst->getDst()->getType(),
-                    methodDesc,
-                    getCGInst(tauNullChecked),
-                    getCGInst(tauTypesChecked));
+                                                     genCallArgs(call, 2), // omit taus
+                                                     inst->getDst()->getType(),
+                                                     methodDesc,
+                                                     getCGInst(tauNullChecked),
+                                                     getCGInst(tauTypesChecked));
             }
             break;
         case Op_IndirectCall:
@@ -834,11 +823,11 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback, I
                 assert(inst->isCall());
                 cgInst = 
                     instructionCallback.tau_calli(inst->getNumSrcOperands() - 3, // omit taus and fnAddr
-                    genCallArgs(inst, 3), // omit taus and fnAddr
-                    inst->getDst()->getType(),
-                    getCGInst(fnAddr),
-                    getCGInst(tauNullChecked),
-                    getCGInst(tauTypesChecked));
+                                                  genCallArgs(inst, 3), // omit taus and fnAddr
+                                                  inst->getDst()->getType(),
+                                                  getCGInst(fnAddr),
+                                                  getCGInst(tauNullChecked),
+                                                  getCGInst(tauTypesChecked));
             }
             break;
         case Op_IndirectMemoryCall:
@@ -852,58 +841,29 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback, I
                 assert(inst->isCall());
                 cgInst = 
                     instructionCallback.tau_calli(inst->getNumSrcOperands() - 3, // omit taus andfnAddr
-                    genCallArgs(inst, 3), // omit taus and fnAddr
-                    inst->getDst()->getType(),
-                    getCGInst(fnAddr),
-                    getCGInst(tauNullChecked),
-                    getCGInst(tauTypesChecked));
-            }
-            break;
-        case Op_IntrinsicCall:
-            {
-                assert(inst->getNumSrcOperands() >= 2);
-                Opnd *tauNullChecked = inst->getSrc(0);
-                Opnd *tauTypesChecked = inst->getSrc(1);
-                assert(tauNullChecked->getType()->tag == Type::Tau);
-                assert(tauTypesChecked->getType()->tag == Type::Tau);
-
-                IntrinsicCallInst * call = (IntrinsicCallInst *)inst;
-                IntrinsicCallId callId = call->getIntrinsicId();
-
-                if (callId == ArrayCopyDirect)
-                {
-                    cgInst = 
-                        instructionCallback.arraycopy(inst->getNumSrcOperands()-2, // omit taus
-                        genCallArgs(call,2) // omit taus
-                        );
-                } else if (callId == ArrayCopyReverse)
-                {
-                    cgInst = 
-                        instructionCallback.arraycopyReverse(inst->getNumSrcOperands()-2, // omit taus
-                        genCallArgs(call,2) // omit taus
-                        );
-                } else {
-
-                    cgInst = 
-                        instructionCallback.tau_callintr(inst->getNumSrcOperands()-2, // omit taus
-                        genCallArgs(call,2), // omit taus
-                        inst->getDst()->getType(),
-                        convertIntrinsicId(callId),
-                        getCGInst(tauNullChecked),
-                        getCGInst(tauTypesChecked));
-                }
-
+                                                  genCallArgs(inst, 3), // omit taus and fnAddr
+                                                  inst->getDst()->getType(),
+                                                  getCGInst(fnAddr),
+                                                  getCGInst(tauNullChecked),
+                                                  getCGInst(tauTypesChecked));
             }
             break;
         case Op_JitHelperCall:
             {
                 JitHelperCallInst* call = inst->asJitHelperCallInst();
                 JitHelperCallId callId = call->getJitHelperId();
-                cgInst = 
+                if (callId == ArrayCopyDirect || callId == ArrayCopyReverse)                
+                    cgInst = 
+                    instructionCallback.callhelper(inst->getNumSrcOperands()-2, // omit taus
+                                                   genCallArgs(call,2), // omit taus
+                                                   inst->getDst()->getType(),
+                                                   convertJitHelperId(callId));
+                else                    
+                    cgInst = 
                     instructionCallback.callhelper(inst->getNumSrcOperands(),
-                    genCallArgs(call,0),
-                    inst->getDst()->getType(),
-                    convertJitHelperId(callId));
+                                                   genCallArgs(call,0),
+                                                   inst->getDst()->getType(),
+                                                   convertJitHelperId(callId));
             }
             break;
         case Op_VMHelperCall:
@@ -912,9 +872,9 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback, I
                 VM_RT_SUPPORT callId = call->getVMHelperId();
                 cgInst = 
                     instructionCallback.callvmhelper(inst->getNumSrcOperands(),
-                    genCallArgs(call,0),
-                    inst->getDst()->getType(),
-                    callId);
+                                                     genCallArgs(call,0),
+                                                     inst->getDst()->getType(),
+                                                     callId);
             }
             break;
         case Op_Return:

@@ -273,11 +273,6 @@ private:
     bool    genVMMagic(const char* mname, uint32 numArgs,Opnd ** srcOpnds,Type * returnType);
     bool    genVMHelper(const char* mname, uint32 numArgs,Opnd ** srcOpnds,Type * returnType);
     
-    bool    methodIsArraycopy(MethodDesc * methodDesc);
-    bool    arraycopyOptimizable(MethodDesc * methodDesc, uint32 numArgs, Opnd ** srcOpnds, bool usingWriteBarriers);
-
-    bool    genArrayCopyRepMove(MethodDesc * methodDesc,uint32 numArgs,Opnd ** srcOpnds);
-    bool    genArrayCopy(MethodDesc * methodDesc,uint32 numArgs,Opnd ** srcOpnds);
     bool    genMinMax(MethodDesc * methodDesc,uint32 numArgs,Opnd ** srcOpnds, Type * returnType);
     void    newFallthroughBlock();
 

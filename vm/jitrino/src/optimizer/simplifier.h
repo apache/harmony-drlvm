@@ -491,8 +491,6 @@ public:
 
     Inst* caseIndirectMemoryCall(CallInst* inst);
 
-    Inst* caseIntrinsicCall(IntrinsicCallInst* inst) {return caseDefault(inst);}
-
     Inst* caseJitHelperCall(JitHelperCallInst* inst) {return simplifyJitHelperCall(inst->asJitHelperCallInst());}
 
     Inst* caseVMHelperCall(VMHelperCallInst* inst) {return caseDefault(inst);}
@@ -539,9 +537,9 @@ public:
                                inst->getDst()->getType(),
                                inst->getToken(),
                                inst->getEnclosingMethod());
-	if (opnd != NULL)
-	    return opnd->getInst();
-	return inst;
+        if (opnd != NULL)
+            return opnd->getInst();
+        return inst;
     }
 
     Inst* caseLdVar(Inst* inst) {return caseDefault(inst);}

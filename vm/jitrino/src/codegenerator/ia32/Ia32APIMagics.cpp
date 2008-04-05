@@ -52,7 +52,8 @@ static Opnd* getCallSrc(CallInst* callInst, uint32 n) {
 
 class APIMagicHandler {
 public:
-    APIMagicHandler(IRManager* _irm, CallInst* _inst, MethodDesc* _md)   : irm(_irm), callInst(_inst), md(_md) {
+    APIMagicHandler(IRManager* _irm, CallInst* _inst, MethodDesc* _md)
+    : irm(_irm), callInst(_inst), md(_md), typeManager(irm->getTypeManager()) {
         cfg = irm->getFlowGraph();
     }
     virtual ~APIMagicHandler(){};
@@ -60,13 +61,14 @@ public:
     virtual void run()=0;
 protected:
 
-    void    convertIntToInt(Opnd* dst, Opnd* src, Node* node);
-    Opnd*   addElemIndexWithLEA(Opnd* array, Opnd* index, Node* node);
+    void   convertIntToInt(Opnd* dst, Opnd* src, Node* node);
+    Opnd*  addElemIndexWithLEA(Opnd* array, Opnd* index, RegName dstRegName, Node* node);
 
     IRManager* irm;
     CallInst* callInst;
     MethodDesc*  md;
     ControlFlowGraph* cfg;
+    TypeManager& typeManager;
 };
 
 #define DECLARE_HELPER_INLINER(name)\
@@ -82,6 +84,8 @@ DECLARE_HELPER_INLINER(Integer_numberOfLeadingZeros_Handler_x_I_x_I);
 DECLARE_HELPER_INLINER(Integer_numberOfTrailingZeros_Handler_x_I_x_I);
 DECLARE_HELPER_INLINER(Long_numberOfLeadingZeros_Handler_x_J_x_I);
 DECLARE_HELPER_INLINER(Long_numberOfTrailingZeros_Handler_x_J_x_I);
+DECLARE_HELPER_INLINER(System_arraycopyDirect_Handler);
+DECLARE_HELPER_INLINER(System_arraycopyReverse_Handler);
 DECLARE_HELPER_INLINER(String_compareTo_Handler_x_String_x_I);
 DECLARE_HELPER_INLINER(String_regionMatches_Handler_x_I_x_String_x_I_x_I_x_Z);
 DECLARE_HELPER_INLINER(String_indexOf_Handler_x_String_x_I_x_I);
@@ -130,7 +134,15 @@ void APIMagicsHandlerSession::runImpl() {
                         }
 #endif
                     } else if( ri->getKind() == Opnd::RuntimeInfo::Kind_InternalHelperAddress ) {
-                        if( strcmp((char*)ri->getValue(0),"String_compareTo")==0 ) {
+                        if( strcmp((char*)ri->getValue(0),"memory_copy_direct")==0 ) {
+                            if(getBoolArg("System_arraycopy_as_magic", true)) {
+                                handlers.push_back(new (tmpMM) System_arraycopyDirect_Handler(irm, callInst, NULL));
+                            } else { assert(0); }
+                        } else if( strcmp((char*)ri->getValue(0),"memory_copy_reverse")==0 ) {
+                            if(getBoolArg("System_arraycopy_as_magic", true)) {
+                                handlers.push_back(new (tmpMM) System_arraycopyReverse_Handler(irm, callInst, NULL));
+                            } else { assert(0); }
+                        } else if( strcmp((char*)ri->getValue(0),"String_compareTo")==0 ) {
                             if(getBoolArg("String_compareTo_as_magic", true))
                                 handlers.push_back(new (tmpMM) String_compareTo_Handler_x_String_x_I(irm, callInst, NULL));
                         } else if( strcmp((char*)ri->getValue(0),"String_regionMatches")==0 ) {
@@ -318,6 +330,78 @@ void Long_numberOfTrailingZeros_Handler_x_J_x_I::run() {
 #endif
 }
 
+void System_arraycopyDirect_Handler::run()
+{
+    Node* currNode = callInst->getNode();
+    assert( currNode->getOutEdge(Edge::Kind_Dispatch) == NULL);
+#ifdef _EM64T_
+    RegName counterRegName = RegName_RCX;
+    RegName srcAddrRegName = RegName_RSI;
+    RegName dstAddrRegName = RegName_RDI;
+#else
+    RegName counterRegName = RegName_ECX;
+    RegName srcAddrRegName = RegName_ESI;
+    RegName dstAddrRegName = RegName_EDI;
+#endif
+    
+    Opnd* src = getCallSrc(callInst, 0);
+    Opnd* srcPos = getCallSrc(callInst, 1);
+    Opnd* dst = getCallSrc(callInst, 2);
+    Opnd* dstPos = getCallSrc(callInst, 3);
+    Opnd* counterVal = getCallSrc(callInst, 4);
+
+    // prepare counter
+    Opnd* counter = irm->newRegOpnd(typeManager.getIntPtrType(),counterRegName);
+    convertIntToInt(counter, counterVal, currNode);
+
+    // prepare src/dst positions
+    Opnd* srcAddr = addElemIndexWithLEA(src,srcPos,srcAddrRegName,currNode);
+    Opnd* dstAddr = addElemIndexWithLEA(dst,dstPos,dstAddrRegName,currNode);
+
+    Opnd* one = irm->newImmOpnd(typeManager.getInt8Type(), 1);
+
+    Mnemonic mn = Mnemonic_NULL;
+    Type* elemType = src->getType()->asArrayType()->getElementType();
+    OpndSize typeSize = IRManager::getTypeSize(elemType->tag);
+    switch(typeSize) {
+        case OpndSize_8:   mn = Mnemonic_MOVS8; break;
+        case OpndSize_16:  mn = Mnemonic_MOVS16; break;
+        case OpndSize_32:  mn = Mnemonic_MOVS32; break;
+        case OpndSize_64:
+            {
+                /**
+                 * FIXME 
+                 * Currently JIT erroneously supposes that compressed mode is always on.
+                 * So if type is object, it is actually compressed (32-bit sized).
+                 * But IRManager::getTypeSize() "correctly" returns OpndSize_64.
+                 */
+                if (!elemType->isObject()) {
+                    currNode->appendInst(irm->newInstEx(Mnemonic_SHL, 1, counter, counter, one));
+                }
+                mn = Mnemonic_MOVS32;
+            }
+            break;
+        default: assert(0); mn = Mnemonic_MOVS32; break;
+    }
+
+    Inst* copyInst = irm->newInst(mn,dstAddr,srcAddr,counter);
+    copyInst->setPrefix(InstPrefix_REP);
+    currNode->appendInst(copyInst);
+
+    callInst->unlink();
+}
+
+void System_arraycopyReverse_Handler::run()
+{
+    Node* currNode = callInst->getNode();
+    currNode->appendInst(irm->newInst(Mnemonic_PUSHFD));
+    currNode->appendInst(irm->newInst(Mnemonic_STD));
+    System_arraycopyDirect_Handler directHandler(irm, callInst, NULL);
+    directHandler.run();
+
+    currNode->appendInst(irm->newInst(Mnemonic_POPFD));
+}
+
 void String_compareTo_Handler_x_String_x_I::run() {
     //mov ds:esi, this
     //mov es:edi, src
@@ -348,13 +432,12 @@ void String_compareTo_Handler_x_String_x_I::run() {
     RegName counterRegName = RegName_RCX;
     RegName thisAddrRegName = RegName_RSI;
     RegName trgtAddrRegName = RegName_RDI;
-    Type*   counterType = irm->getTypeManager().getInt64Type();
 #else
     RegName counterRegName = RegName_ECX;
     RegName thisAddrRegName = RegName_ESI;
     RegName trgtAddrRegName = RegName_EDI;
-    Type*   counterType = irm->getTypeManager().getInt32Type();
 #endif
+    Type*   counterType = typeManager.getIntPtrType();
 
     Node* counterIsZeroNode = irm->getFlowGraph()->createBlockNode();
     // if counter is zero jump to counterIsZeroNode immediately
@@ -372,15 +455,9 @@ void String_compareTo_Handler_x_String_x_I::run() {
     Opnd* counter = irm->newRegOpnd(counterType,counterRegName);
     convertIntToInt(counter, valForCounter, node);
 
-    // prepare this position
-    Opnd* thisAddr = addElemIndexWithLEA(thisArr,thisIdx,node);
-    Opnd* thisAddrReg = irm->newRegOpnd(thisAddr->getType(),thisAddrRegName);
-    node->appendInst(irm->newCopyPseudoInst(Mnemonic_MOV, thisAddrReg, thisAddr));
-
-    // prepare trgt position
-    Opnd* trgtAddr = addElemIndexWithLEA(trgtArr,trgtIdx,node);
-    Opnd* trgtAddrReg = irm->newRegOpnd(trgtAddr->getType(),trgtAddrRegName);
-    node->appendInst(irm->newCopyPseudoInst(Mnemonic_MOV, trgtAddrReg, trgtAddr));
+    // prepare this/trgt positions
+    Opnd* thisAddrReg = addElemIndexWithLEA(thisArr,thisIdx,thisAddrRegName,node);
+    Opnd* trgtAddrReg = addElemIndexWithLEA(trgtArr,trgtIdx,trgtAddrRegName,node);
 
     Inst* compareInst = irm->newInst(Mnemonic_CMPSW,thisAddrReg,trgtAddrReg,counter);
     compareInst->setPrefix(InstPrefix_REPZ);
@@ -402,7 +479,7 @@ void String_compareTo_Handler_x_String_x_I::run() {
 
     // strings are different
     Opnd* minustwo = irm->newImmOpnd(counterType,-2);
-    Type* charType = irm->getTypeManager().getCharType();
+    Type* charType = typeManager.getCharType();
     Opnd* thisChar = irm->newMemOpnd(charType, thisAddrReg, NULL, NULL, minustwo);
     Opnd* trgtChar = irm->newMemOpnd(charType, trgtAddrReg, NULL, NULL, minustwo);
     Type* intType = res->getType();
@@ -449,27 +526,20 @@ void String_regionMatches_Handler_x_I_x_String_x_I_x_I_x_Z::run() {
     RegName counterRegName = RegName_RCX;
     RegName thisAddrRegName = RegName_RSI;
     RegName trgtAddrRegName = RegName_RDI;
-    Type*   counterType = irm->getTypeManager().getInt64Type();
 #else
     RegName counterRegName = RegName_ECX;
     RegName thisAddrRegName = RegName_ESI;
     RegName trgtAddrRegName = RegName_EDI;
-    Type*   counterType = irm->getTypeManager().getInt32Type();
 #endif
+    Type*   counterType = typeManager.getIntPtrType();
 
     // prepare counter
     Opnd* counter = irm->newRegOpnd(counterType,counterRegName);
     convertIntToInt(counter, valForCounter, node);
 
-    // prepare this position
-    Opnd* thisAddr = addElemIndexWithLEA(thisArr,thisIdx,node);
-    Opnd* thisAddrReg = irm->newRegOpnd(thisAddr->getType(),thisAddrRegName);
-    node->appendInst(irm->newCopyPseudoInst(Mnemonic_MOV, thisAddrReg, thisAddr));
-
-    // prepare trgt position
-    Opnd* trgtAddr = addElemIndexWithLEA(trgtArr,trgtIdx,node);
-    Opnd* trgtAddrReg = irm->newRegOpnd(trgtAddr->getType(),trgtAddrRegName);
-    node->appendInst(irm->newCopyPseudoInst(Mnemonic_MOV, trgtAddrReg, trgtAddr));
+    // prepare this/trgt positions
+    Opnd* thisAddrReg = addElemIndexWithLEA(thisArr,thisIdx,thisAddrRegName,node);
+    Opnd* trgtAddrReg = addElemIndexWithLEA(trgtArr,trgtIdx,trgtAddrRegName,node);
 
     Inst* compareInst = irm->newInst(Mnemonic_CMPSW,thisAddrReg,trgtAddrReg,counter);
     compareInst->setPrefix(InstPrefix_REPZ);
@@ -639,10 +709,10 @@ void String_indexOf_Handler_x_String_x_I_x_I::run() {
     mainNode->appendInst(irm->newCopyPseudoInst(Mnemonic_MOV, offset, thisOffset)); // mov offset, this.offset
     if (!startIsZero)
         mainNode->appendInst(irm->newInst(Mnemonic_ADD, offset, start)); // add offset, start
-    Opnd* thisAddrReg = addElemIndexWithLEA(thisArr, offset, mainNode); // lea edi, [this.value + offset*sizeof(char) + 12]
+    Opnd* thisAddrReg = addElemIndexWithLEA(thisArr, offset, RegName_Null, mainNode); // lea edi, [this.value + offset*sizeof(char) + 12]
 
     // prepare trgt position
-    Opnd* trgtAddrReg = addElemIndexWithLEA(trgtArr, trgtOffset, mainNode);  // lea esi, [subString.value + subString.offset*sizeof(char) + 12]
+    Opnd* trgtAddrReg = addElemIndexWithLEA(trgtArr, trgtOffset, RegName_Null, mainNode);  // lea esi, [subString.value + subString.offset*sizeof(char) + 12]
     
     // lastIndex = this.count - subString.count - start
     Opnd* lastIndex = irm->newOpnd(counterType, regConstr);
@@ -704,14 +774,16 @@ void  APIMagicHandler::convertIntToInt(Opnd* dst, Opnd* src, Node* node)
     Type* srcType = src->getType();
 
     // this works only for equal types 
-    // or Int32 into Int64 conversion
+    // or Int32 into IntPtr conversion
     assert(srcType == dstType || (srcType == irm->getTypeManager().getInt32Type() &&
-                                  dstType == irm->getTypeManager().getInt64Type()));
+                                  dstType == irm->getTypeManager().getIntPtrType()));
 
     if(srcType != dstType) {
+#ifdef _EM64T_
         node->appendInst(irm->newInstEx(Mnemonic_MOVZX, 1, dst, src));
-    } else {
+#else
         node->appendInst(irm->newCopyPseudoInst(Mnemonic_MOV, dst, src));
+#endif
     }
 }
 
@@ -719,20 +791,28 @@ void  APIMagicHandler::convertIntToInt(Opnd* dst, Opnd* src, Node* node)
 //  address of the first element and index
 //  using 'LEA' instruction
 
-Opnd*  APIMagicHandler::addElemIndexWithLEA(Opnd* array, Opnd* index, Node* node) 
+Opnd*  APIMagicHandler::addElemIndexWithLEA(Opnd* array, Opnd* index, RegName dstRegName, Node* node) 
 {
-    ArrayType * arrayType=((Opnd*)array)->getType()->asArrayType();
-    Type * elemType=arrayType->getElementType();
-    Type * dstType=irm->getManagedPtrType(elemType);
+    ArrayType * arrayType = array->getType()->asArrayType();
+    Type * elemType = arrayType->getElementType();
+    Type * dstType = irm->getManagedPtrType(elemType);
+    //Opnd * dst = irm->newRegOpnd(dstType,dstRegName);
+    Opnd* dst;
+    if (dstRegName != RegName_Null)
+        dst = irm->newRegOpnd(dstType,dstRegName);
+    else
+    {
+        Constraint reg32Constr(OpndKind_GPReg, OpndSize_32);
+        dst = irm->newOpnd(dstType,reg32Constr);
+    }
 
-    TypeManager& typeManager = irm->getTypeManager();
+//    TypeManager& typeManager = typeManager;
 #ifdef _EM64T_
-    Type * indexType = typeManager.getInt64Type();
     Type * offType = typeManager.getInt64Type();
 #else
-    Type * indexType = typeManager.getInt32Type();
     Type * offType = typeManager.getInt32Type();
 #endif
+    Type * indexType = typeManager.getIntPtrType();
         
     uint32 elemSize = 0;
     if (elemType->isReference()
@@ -754,13 +834,16 @@ Opnd*  APIMagicHandler::addElemIndexWithLEA(Opnd* array, Opnd* index, Node* node
     } 
     Opnd * arrOffset = irm->newImmOpnd(offType, arrayType->getArrayElemOffset());
     Opnd * addr = irm->newMemOpnd(dstType,(Opnd*)array, indexOpnd, elemSizeOpnd, arrOffset);
-    Opnd * dst = irm->newOpnd(dstType);
     node->appendInst(irm->newInstEx(Mnemonic_LEA, 1, dst, addr));
+
     return dst;
 }
 
 
 }} //namespace
+
+
+
 
 
 

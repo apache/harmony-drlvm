@@ -346,7 +346,7 @@ static void estimateNode(StaticProfilerContext* c) {
                 double dprob = (*fn)(c);
                 assert(dprob>0 && dprob<1);
                 if (dprob!=PROB_HEURISTIC_FAIL) {
-                    double newprob = prob * dprob / (prob*dprob + (1-prob)*(1-dprob));
+                    double newprob = prob*dprob / (prob*dprob + (1-prob)*(1-dprob));
                     assert(newprob>0 && newprob<1);
                     prob = newprob;
                 }
@@ -415,8 +415,8 @@ static inline Inst* findInst(Node* node, Opcode opcode) {
 static double callHeuristic(const StaticProfilerContext* c) {
     Node* node1 = c->edge1->getTargetNode();
     Node* node2 = c->edge2->getTargetNode();
-    bool node1HasCall = findInst(node1, Op_DirectCall, Op_IntrinsicCall)!=NULL;
-    bool node2HasCall = findInst(node2, Op_DirectCall, Op_IntrinsicCall)!=NULL;
+    bool node1HasCall = findInst(node1, Op_DirectCall, Op_VMHelperCall)!=NULL;
+    bool node2HasCall = findInst(node2, Op_DirectCall, Op_VMHelperCall)!=NULL;
     
     if (!node1HasCall && !node2HasCall) {
         return PROB_HEURISTIC_FAIL;

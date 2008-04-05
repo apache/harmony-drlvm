@@ -440,26 +440,6 @@ void MethodInst::handlePrintEscape(::std::ostream& os, char code) const {
     }
 }
 
-void IntrinsicCallInst::handlePrintEscape(::std::ostream& os, char code) const {
-    switch(code) {
-    case 'd':
-        switch(intrinsicId) {
-        case CharArrayCopy:
-            os << "charArrayCopy"; break;
-        case ArrayCopyDirect:
-            os << "ArrayCopyDirect"; break;
-        case ArrayCopyReverse:
-            os << "ArrayCopyReverse"; break;
-        default:
-            assert(0); break;
-        }
-        break;
-    default:
-        Inst::handlePrintEscape(os, code);
-        break;
-    }
-}
-
 void JitHelperCallInst::handlePrintEscape(::std::ostream& os, char code) const {
     switch(code) {
     case 'd':
@@ -480,6 +460,10 @@ void JitHelperCallInst::handlePrintEscape(::std::ostream& os, char code) const {
         os << "AddValueProfileValue"; break;
     case FillArrayWithConst:
         os << "FillArrayWithConst"; break;
+    case ArrayCopyDirect:
+        os << "ArrayCopyDirect"; break;
+    case ArrayCopyReverse:
+        os << "ArrayCopyReverse"; break;
     case StringCompareTo:
         os << "StringCompareTo"; break;
     case StringIndexOf:
@@ -642,9 +626,6 @@ public:
         clone = instFactory.makeClone(inst, opndManager, renameTable);
     }
     void accept(CatchLabelInst* inst) {
-        clone = instFactory.makeClone(inst, opndManager, renameTable);
-    }
-    void accept(IntrinsicCallInst* inst) {
         clone = instFactory.makeClone(inst, opndManager, renameTable);
     }
     void accept(JitHelperCallInst* inst) {
@@ -1067,25 +1048,6 @@ InstFactory::makeClone(CallInst* inst,
                         table.rename(inst->getFunPtr()),
                         inst->getNumArgs(),
                         newArgs);
-    newInst->setPersistentInstructionId(inst->getPersistentInstructionId());
-    return newInst;
-}
-
-IntrinsicCallInst*
-InstFactory::makeClone(IntrinsicCallInst* inst,
-                       OpndManager& opndManager,
-                       OpndRenameTable& table) {
-    uint32 nsrcs = inst->getNumSrcOperands();
-    Opnd** newArgs = new (memManager) Opnd*[nsrcs];
-    for (uint32 i=0; i<nsrcs; i++)
-        newArgs[i] = table.rename(inst->getSrc(i));
-    IntrinsicCallInst *newInst = makeIntrinsicCallInst(inst->getOpcode(),
-                                 inst->getModifier(),
-                                 inst->getType(),
-                                 table.duplicate(opndManager, inst->getDst()),
-                                 nsrcs,
-                                 newArgs,
-                                 inst->getIntrinsicId());
     newInst->setPersistentInstructionId(inst->getPersistentInstructionId());
     return newInst;
 }
@@ -1605,19 +1567,6 @@ InstFactory::makeCallInst(Opcode op, Modifier mod,
     return inst;
 }
 
-IntrinsicCallInst* 
-InstFactory::makeIntrinsicCallInst(Opcode op, Modifier mod,
-                                 Type::Tag type,
-                                 Opnd* dst,
-                                 uint32 nArgs,
-                                 Opnd** args_,
-                                 IntrinsicCallId id) {
-    IntrinsicCallInst * inst = 
-        new (memManager) IntrinsicCallInst(op, mod, type, dst, nArgs, args_, id);
-    inst->id       = numInsts++;
-    return inst;
-}
-
 JitHelperCallInst* 
 InstFactory::makeJitHelperCallInst(Opcode op,
                                     Modifier mod,
@@ -2050,24 +1999,18 @@ InstFactory::makeIndirectMemoryCall(Opnd* dst,
 }
 
 Inst*
-InstFactory::makeIntrinsicCall(Opnd* dst, 
-                               IntrinsicCallId id,
-                               Opnd* tauNullChecked,
-                               Opnd* tauTypesChecked,
-                               uint32 numArgs, 
-                               Opnd** args) {
-    assert(tauNullChecked->getType()->tag == Type::Tau);
-    assert(tauTypesChecked->getType()->tag == Type::Tau);
+InstFactory::makeJitHelperCall(Opnd* dst, JitHelperCallId id,
+                               Opnd* tauNullChecked, Opnd* tauTypesChecked,
+                               uint32 numArgs, Opnd** args)
+{
     Type::Tag returnType = dst->isNull()? Type::Void : dst->getType()->tag;
-    args = copyOpnds(tauNullChecked, tauTypesChecked, args, numArgs);
-    return makeIntrinsicCallInst(Op_IntrinsicCall, Modifier(Exception_Sometimes), 
-                                 returnType, dst, numArgs+2, args, id);
-}
-
-Inst*
-InstFactory::makeJitHelperCall(Opnd* dst, JitHelperCallId id, uint32 numArgs, Opnd** args) {
-    Type::Tag returnType = dst->isNull()? Type::Void : dst->getType()->tag;
-    args = copyOpnds(args, numArgs);
+    if (id == ArrayCopyDirect || id == ArrayCopyReverse) // these three need taus
+    {
+        args = copyOpnds(tauNullChecked, tauTypesChecked, args, numArgs);
+        numArgs = numArgs+2;
+    } else {
+        args = copyOpnds(args, numArgs);
+    }
     Modifier mod;
     switch(id) {
         case StringCompareTo:
@@ -2726,7 +2669,6 @@ InstOptimizer::dispatch(Inst* inst) {
     case Op_TauVirtualCall:        return caseTauVirtualCall(inst->asMethodCallInst());
     case Op_IndirectCall:       return caseIndirectCall(inst->asCallInst());
     case Op_IndirectMemoryCall: return caseIndirectMemoryCall(inst->asCallInst());
-    case Op_IntrinsicCall:      return caseIntrinsicCall(inst->asIntrinsicCallInst());
     case Op_JitHelperCall:      return caseJitHelperCall(inst->asJitHelperCallInst());
     case Op_VMHelperCall:       return caseVMHelperCall(inst->asVMHelperCallInst());
     case Op_Return:             return caseReturn(inst);

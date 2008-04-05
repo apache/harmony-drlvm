@@ -892,7 +892,6 @@ LazyExceptionOpt::instHasSideEffect(Inst* inst) {
             }
 #endif
             return methodCallHasSideEffect(inst);  
-        case Op_IntrinsicCall:
         case Op_JitHelperCall:
         case Op_VMHelperCall:
             return true;
@@ -1103,6 +1102,10 @@ LazyExceptionOpt::instHasSideEffect(Inst* inst) {
     }
 }
 
-} //namespace Jitrino 
+} //namespace Jitrino
+
+
+
+
 
 

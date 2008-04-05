@@ -477,7 +477,6 @@ Opnd *TauWalkerState::findReplacement(Opnd *src, Type *type, bool exactType)
     case Op_TauVirtualCall:
     case Op_IndirectCall:
     case Op_IndirectMemoryCall:
-    case Op_IntrinsicCall:
         if (handleCalls) {
             return genTauSafe();
         } else {

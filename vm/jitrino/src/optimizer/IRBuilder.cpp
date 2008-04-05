@@ -940,7 +940,7 @@ IRBuilder::genConv(Type* dstType,
     }
     if (!dst) {
         dst = createOpnd(dstType);
-	Inst* inst = instFactory->makeConv(ovfMod, toType, dst, src);
+        Inst* inst = instFactory->makeConv(ovfMod, toType, dst, src);
         appendInst(inst);
     }
     insertHash(hashcode, src->getId(), dst->getInst());
@@ -992,7 +992,7 @@ IRBuilder::genConvZE(Type* dstType,
     }
     if (!dst) {
         dst = createOpnd(dstType);
-	Inst* inst = instFactory->makeConvZE(ovfMod, toType, dst, src);
+        Inst* inst = instFactory->makeConvZE(ovfMod, toType, dst, src);
         appendInst(inst);
     }
     insertHash(hashcode, src->getId(), dst->getInst());
@@ -1404,7 +1404,20 @@ IRBuilder::genTauVirtualCall(MethodDesc* methodDesc,
 }
 
 Opnd*
-IRBuilder::genIntrinsicCall(IntrinsicCallId intrinsicId,
+IRBuilder::genJitHelperCall(JitHelperCallId helperId,
+                            Type* returnType,
+                            uint32 numArgs,
+                            Opnd*  args[]) {
+    for (uint32 i=0; i<numArgs; i++) {
+        args[i] = propagateCopy(args[i]);
+    }
+    Opnd * dst = createOpnd(returnType);
+    appendInst(instFactory->makeJitHelperCall(dst, helperId, NULL, NULL, numArgs, args));
+    return dst;
+}
+
+Opnd*
+IRBuilder::genJitHelperCall(JitHelperCallId helperId,
                             Type* returnType,
                             Opnd* tauNullCheckedRefArgs,
                             Opnd* tauTypesChecked,
@@ -1414,34 +1427,7 @@ IRBuilder::genIntrinsicCall(IntrinsicCallId intrinsicId,
         args[i] = propagateCopy(args[i]);
     }
     Opnd * dst = createOpnd(returnType);
-    tauNullCheckedRefArgs = propagateCopy(tauNullCheckedRefArgs);
-    if (!tauTypesChecked) {
-        assert(intrinsicId == CharArrayCopy);
-        Opnd *tauTypesCheckedSrc = genTauHasType(args[0], args[0]->getType());
-        Opnd *tauTypesCheckedDst = genTauHasType(args[2], args[2]->getType());
-        tauTypesChecked = genTauAnd(tauTypesCheckedSrc,
-                                    tauTypesCheckedDst);
-    } else {
-        tauTypesChecked = propagateCopy(tauTypesChecked);
-    }
-
-    appendInst(instFactory->makeIntrinsicCall(dst, intrinsicId, 
-                                             tauNullCheckedRefArgs,
-                                             tauTypesChecked,
-                                             numArgs, args));
-    return dst;
-}
-
-Opnd*
-IRBuilder::genJitHelperCall(JitHelperCallId helperId,
-                            Type* returnType,
-                            uint32 numArgs,
-                            Opnd*  args[]) {
-    for (uint32 i=0; i<numArgs; i++) {
-        args[i] = propagateCopy(args[i]);
-    }
-    Opnd * dst = createOpnd(returnType);
-    appendInst(instFactory->makeJitHelperCall(dst, helperId, numArgs, args));
+    appendInst(instFactory->makeJitHelperCall(dst, helperId, tauNullCheckedRefArgs, tauTypesChecked, numArgs, args));
     return dst;
 }
 

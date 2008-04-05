@@ -263,12 +263,6 @@ enum NewModifier2 {
     NewModifier2_BitsConsumed = 2
 };
 
-enum IntrinsicCallId {
-    CharArrayCopy,
-    ArrayCopyDirect,
-    ArrayCopyReverse
-};
-
 enum JitHelperCallId {
     Prefetch,
     Memset0,
@@ -278,6 +272,8 @@ enum JitHelperCallId {
     ReadThisState, //todo: replace with GetTLS + offset sequence
     LockedCompareAndExchange,
     AddValueProfileValue,
+    ArrayCopyDirect,
+    ArrayCopyReverse,
     StringCompareTo,
     StringRegionMatches,
     StringIndexOf,
@@ -325,7 +321,6 @@ enum Opcode {
     Op_TauVirtualCall,
     Op_IndirectCall,
     Op_IndirectMemoryCall,
-    Op_IntrinsicCall,
     Op_JitHelperCall,               // call to a jit helper routine
     Op_VMHelperCall,                // call to a vm (runtime) helper routine 
     Op_Return,

@@ -136,6 +136,9 @@ Inliner::Inliner(SessionAction* argSource, MemoryManager& mm, IRManager& irm,
             _inlineSkipMethodTable->add_method_record("java/lang/Long", "numberOfTrailingZeros", "(J)I", des, false);
 
 #endif
+            if(argSource->getBoolArg("System_arraycopy_as_magic",true)) {
+                _inlineSkipMethodTable->add_method_record("java/lang/System", "arraycopy", "(Ljava/lang/Object;ILjava/lang/Object;II)V", des, false);
+            }
             if(argSource->getBoolArg("String_compareTo_as_magic",true)) {
                 _inlineSkipMethodTable->add_method_record("java/lang/String", "compareTo", "(Ljava/lang/String;)I", des, false);
             }

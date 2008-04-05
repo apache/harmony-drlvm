@@ -136,8 +136,6 @@ private:
 
     Inst* caseIndirectMemoryCall(CallInst* inst) {return caseDefault(inst);}
 
-    Inst* caseIntrinsicCall(IntrinsicCallInst* inst) {return caseDefault(inst);}
-
     Inst* caseJitHelperCall(JitHelperCallInst* inst) {return caseDefault(inst);}
 
     Inst* caseVMHelperCall(VMHelperCallInst* inst) {return caseDefault(inst);}

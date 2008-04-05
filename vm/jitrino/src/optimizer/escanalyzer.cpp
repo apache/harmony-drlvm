@@ -419,6 +419,8 @@ EscAnalyzer::instrExam(Node* node) {
                         case ReadThisState:
                         case LockedCompareAndExchange:
                         case AddValueProfileValue:
+                        case ArrayCopyDirect:
+                        case ArrayCopyReverse:
                         case StringCompareTo:
                         case StringIndexOf:
                         case StringRegionMatches:
@@ -517,25 +519,6 @@ EscAnalyzer::instrExam(Node* node) {
                     if (method_ea_level == 0) {
                         logMethod(methType);
                     }
-                }
-                break;
-
-            case Op_IntrinsicCall:   // callintr
-                if (!inst->getDst()->isNull()) {
-                    assert(0);
-                }
-                n=inst->getNumSrcOperands();
-                addinst=false;
-                for (uint32 i = 0; i < n; i++) {
-                    Type* tt = inst->getSrc(i)->getType();
-                    if (!tt->isReference()) {
-                        continue;
-                    }
-                    addinst=true;
-                    break;
-                }
-                if (addinst) {
-                    exam2Insts->push_back(inst);
                 }
                 break;
 
@@ -902,26 +885,6 @@ EscAnalyzer::instrExam2() {
                 }
                 break;
 
-            case Op_IntrinsicCall:   // callintr
-                n=inst->getNumSrcOperands();
-                switch(inst->asIntrinsicCallInst()->getIntrinsicId()) {
-                    case ArrayCopyDirect:
-                    case ArrayCopyReverse:
-                         cgnode = findCnGNode_op(inst->getSrc(4)->getId());
-                         assert(cgnode!=NULL);
-                         cgn_src = findCnGNode_op(inst->getSrc(2)->getId());
-                         assert(cgn_src!=NULL);
-                         addEdge(cgnode,cgn_src,ET_DEFER,inst);
-                         if (verboseLog) {
-                             Log::out() << "need to add edge from "<< cgnode->cngNodeId << " - " << cgnode->opndId << " to "
-                                 << cgn_src->cngNodeId << " - " << cgn_src->opndId << std::endl;
-                         }
-                         break;
-                    default:
-                         assert(0);
-                }
-                break;
-
             case Op_StVar:           // stvar
                 type = inst->getDst()->getType();
                 if (type->isObject()) {
@@ -1256,19 +1219,6 @@ EscAnalyzer::addEdge(CnGNode* cgnfrom, CnGNode* cgnto,
                             Log::out() << "++++ addEdge: ET_FIELD || cgn1==NT_ACTARG && *->cngNodeTo == cgn2" <<  std::endl;
                         }
                         return;
-                    }
-                    if (inst->getOpcode() == Op_IntrinsicCall) { //callintr
-                        uint32 iid = inst->asIntrinsicCallInst()->getIntrinsicId();
-                        switch(iid) {
-                            case ArrayCopyDirect:
-                            case ArrayCopyReverse:
-                                if (verboseLog) {
-                                    Log::out() << "++++ addEdge: callintr" <<  std::endl;
-                                }
-                                return;
-                            default:
-                               assert(0);
-                        }
                     }
                     if (inst->getOpcode() == Op_LdFieldAddr) {
                         FieldDesc* fd=inst->asFieldAccessInst()->getFieldDesc();
@@ -2711,8 +2661,6 @@ EscAnalyzer::what_inst(Inst* inst,::std::ostream& os) {
         fd->printFullName(os);
         os << std::endl;
     }
-    if (inst->asIntrinsicCallInst())
-        os << "        IntrinsicCallInst" << std::endl;
     if (inst->asMethodCallInst())
         os << "        MethodCallInst" << std::endl;
     if (inst->asMultiSrcInst())
@@ -3557,7 +3505,7 @@ EscAnalyzer::insertReadJitHelperCall() {
     Opnd** args = NULL;
     InstFactory& instfactory = irManager.getInstFactory();
     Inst* jhcinst = instfactory.makeJitHelperCall(
-            stThis, ReadThisState, 0, args);
+            stThis, ReadThisState, NULL, NULL, 0, args);
     jhcinst->insertAfter(inst_after);
     newBlock = fg.splitNodeAtInstruction(jhcinst,true, false,instfactory.makeLabel());
     fg.addEdge(oldBlock,fg.getUnwindNode());
@@ -3668,7 +3616,7 @@ EscAnalyzer::insertSaveJitHelperCall(Inst* inst_before, SsaTmpOpnd* stVal) {
     Opnd* args[1] = {stVal};
     InstFactory& instfactory = irManager.getInstFactory();
     Inst* jhcinst = instfactory.makeJitHelperCall(
-            OpndManager::getNullOpnd(), SaveThisState, 1, args);
+            OpndManager::getNullOpnd(), SaveThisState, NULL, NULL, 1, args);
        // insert jit helper
     if (inst_before->getNode()->getFirstInst() == inst_before) {
         jhcinst->insertAfter(inst_before);
@@ -5840,7 +5788,10 @@ static bool isVMHelperCall(Inst* inst, VM_RT_SUPPORT id) {
     return callInst->getVMHelperId() == id;
 }
 
-} //namespace Jitrino 
+} //namespace Jitrino
+
+
+
 
 
 

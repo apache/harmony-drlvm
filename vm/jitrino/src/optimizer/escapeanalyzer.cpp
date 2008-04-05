@@ -71,7 +71,6 @@ isPotentiallyEscapingInst(Inst* inst) {
     switch (inst->getOpcode()) {
     case Op_DirectCall:     case Op_TauVirtualCall:
     case Op_IndirectCall:   case Op_IndirectMemoryCall: 
-    case Op_IntrinsicCall:
     case Op_Return:         case Op_Throw:
     case Op_TauStInd:       case Op_TauStRef:  
     case Op_TauStField:     case Op_TauStElem:     case Op_TauStStatic:
@@ -107,7 +106,7 @@ isEscapingSrcObject(Inst* inst,uint32 srcIndex) {
         if (srcIndex == 0)
             return false;
         break;
-    case Op_DirectCall:    case Op_TauVirtualCall:   case Op_IntrinsicCall:
+    case Op_DirectCall:    case Op_TauVirtualCall:
         break;
         //
         // return & throw
@@ -182,7 +181,7 @@ markEscapingInst(Inst* inst,BitSet& escapingInsts) {
         //
         // calls should already be marked as escaping
         //
-    case Op_DirectCall:     case Op_TauVirtualCall:        case Op_IntrinsicCall:
+    case Op_DirectCall:     case Op_TauVirtualCall:
     case Op_IndirectCall:   case Op_IndirectMemoryCall: 
         break;
         //
@@ -339,7 +338,6 @@ initialize(Inst* inst,
             break;
         case Op_DirectCall:   
         case Op_TauVirtualCall:
-        case Op_IntrinsicCall:
             {
                 if (isRefOrPtrType(inst->getDst())) {
                     // this instruction creates a free ptr/ref

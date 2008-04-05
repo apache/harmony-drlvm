@@ -55,7 +55,7 @@ public:
     uint16 getCurrentBCOffset() {return currentBCOffset;}
     void   setCurrentBCOffset(uint16 offset) {currentBCOffset = offset;}
 
-    void  genEdgeFromCurrent(Node* target) {cfg.addEdge(currentNode, target);}
+    void  genEdgeFromCurrent(Node* target, double edgeProb = 1.0) {cfg.addEdge(currentNode, target, edgeProb);}
     void  genEdgeToCurrent(Node* source) {cfg.addEdge(source,currentNode);}
 
     Node* genNodeAfter(Node* node, LabelInst* label, Node* dispatch=NULL);
@@ -87,8 +87,6 @@ public:
     Opnd* genTauCheckBounds(Opnd* array, Opnd* index, Opnd *tauNullChecked);
     Opnd* genTauCheckBounds(Opnd* ub, Opnd *index);
     Opnd* genTauHasType(Opnd *src, Type *castType);
-    Opnd* genIntrinsicCall(IntrinsicCallId intrinsicId, Type* returnType, Opnd* tauNullCheckedRefArgs,
-                           Opnd* tauTypesChecked, uint32 numArgs, Opnd*  args[]);
 
 private:
     IRManager*          irm;
@@ -126,11 +124,14 @@ public:\
     virtual void run();\
 };\
 
+DECLARE_HLO_MAGIC_INLINER(System_arraycopy_HLO_Handler);
 DECLARE_HLO_MAGIC_INLINER(String_compareTo_HLO_Handler);
 DECLARE_HLO_MAGIC_INLINER(String_regionMatches_HLO_Handler);
 DECLARE_HLO_MAGIC_INLINER(String_indexOf_HLO_Handler);
 
 DEFINE_SESSION_ACTION(HLOAPIMagicSession, hlo_api_magic, "APIMagics HLO Pass")
+
+bool arraycopyOptimizable(Inst* arraycopyCall, bool needWriteBarriers);
 
 void
 HLOAPIMagicSession::_run(IRManager& irm)
@@ -153,6 +154,12 @@ HLOAPIMagicSession::_run(IRManager& irm)
                 const char* className = md->getParentType()->getName();
                 const char* methodName = md->getName();
                 const char* signature = md->getSignatureString();
+                if (!strcmp(className, "java/lang/System")) {
+                    if (!strcmp(methodName, "arraycopy") && !strcmp(signature, "(Ljava/lang/Object;ILjava/lang/Object;II)V")) {
+                        if(getBoolArg("System_arraycopy_as_magic", true) && arraycopyOptimizable(callInst, irm.getCompilationInterface().needWriteBarriers()))
+                            handlers.push_back(new (mm) System_arraycopy_HLO_Handler(callInst));
+                    }
+                }
                 if (!strcmp(className, "java/lang/String")) {
                     if (!strcmp(methodName, "compareTo") && !strcmp(signature, "(Ljava/lang/String;)I")) {
                         if(getBoolArg("String_compareTo_as_magic", true))

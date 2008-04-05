@@ -751,7 +751,7 @@ static bool isMethodTrivial( ControlFlowGraph& cfg ) {
         }
         Inst* last = (Inst*)node->getLastInst();
         // This method is not a leaf method.
-        if( last->getOpcode() >= Op_DirectCall && last->getOpcode() <= Op_IntrinsicCall ){
+        if( last->getOpcode() >= Op_DirectCall && last->getOpcode() <= Op_VMHelperCall ){
             return false;
         }
         Edges::const_iterator eiter;

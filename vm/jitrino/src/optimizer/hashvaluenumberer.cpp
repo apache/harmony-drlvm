@@ -208,8 +208,6 @@ public:
     
     Inst* caseIndirectMemoryCall(CallInst* inst) { return caseDefault(inst); }
     
-    Inst* caseIntrinsicCall(IntrinsicCallInst* inst) { return caseDefault(inst); }
-
     Inst* caseJitHelperCall(JitHelperCallInst* inst) {return caseDefault(inst);}
 
     Inst* caseVMHelperCall(VMHelperCallInst* inst) {return caseDefault(inst);}
@@ -2322,7 +2320,7 @@ void InstValueNumberer::addInfoFromPEI(Inst *pei, bool isExceptionEdge)
     case Op_TauCheckDivOpnds:
         break;
     case Op_DirectCall: case Op_TauVirtualCall: case Op_IndirectCall:
-    case Op_IndirectMemoryCall: case Op_IntrinsicCall:   case Op_InitType:
+    case Op_IndirectMemoryCall: case Op_JitHelperCall:   case Op_InitType:
         break;
     case Op_TauMonitorExit:
         break;

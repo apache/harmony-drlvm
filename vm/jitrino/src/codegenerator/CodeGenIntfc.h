@@ -152,26 +152,19 @@ public:
     };
 };
 
-class IntrinsicCallOp {
-public:
-    enum Id {
-        CharArrayCopy,
-        ArrayCopyDirect,
-        ArrayCopyReverse
-    };
-};
-
 class JitHelperCallOp {
 public:
     enum Id {
-	Prefetch,
-	Memset0,
+        Prefetch,
+        Memset0,
         InitializeArray,
         FillArrayWithConst,
         SaveThisState,
         ReadThisState,
         LockedCompareAndExchange,
         AddValueProfileValue,
+        ArrayCopyDirect,
+        ArrayCopyReverse,
         StringCompareTo,
         StringRegionMatches,
         StringIndexOf
@@ -263,8 +256,6 @@ public:
                                                 NamedType* vtableType) = 0;
     virtual CG_OpndHandle*  call(uint32 numArgs, CG_OpndHandle** args, Type* retType,
                                  MethodDesc *desc) = 0;
-    virtual CG_OpndHandle*  arraycopyReverse(uint32 numArgs, CG_OpndHandle** args) = 0;
-    virtual CG_OpndHandle*  arraycopy(uint32 numArgs, CG_OpndHandle** args) = 0;
     virtual CG_OpndHandle*  tau_call(uint32 numArgs, CG_OpndHandle** args, Type* retType,
                                      MethodDesc *desc,
                                      CG_OpndHandle *tauNullChecked,
@@ -277,10 +268,6 @@ public:
                                       CG_OpndHandle* methodPtr, 
                                       CG_OpndHandle* tauNullChecked,
                                       CG_OpndHandle* tauTypesChecked) = 0;
-    virtual CG_OpndHandle*  tau_callintr(uint32 numArgs, CG_OpndHandle** args, Type* retType,
-                                         IntrinsicCallOp::Id callId,
-                                         CG_OpndHandle* tauNullChecked,
-                                         CG_OpndHandle* tauTypesChecked) = 0;
     virtual CG_OpndHandle*  callhelper(uint32 numArgs, CG_OpndHandle** args, Type* retType,
                                        JitHelperCallOp::Id callId) = 0;
     virtual CG_OpndHandle*  callvmhelper(uint32 numArgs, CG_OpndHandle** args, Type* retType,

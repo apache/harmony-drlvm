@@ -110,7 +110,7 @@ void ValueProfilerInstrumentationPass::_run(IRManager& irm)
                 Opnd* valueOpnd = vtableInst->getDst();
                 const uint32 numArgs = 2;
                 Opnd* args[numArgs] = {indexOpnd, valueOpnd};
-                Inst* addValueInst = instFactory.makeJitHelperCall(opndManager.getNullOpnd(), AddValueProfileValue, numArgs, args);
+                Inst* addValueInst = instFactory.makeJitHelperCall(opndManager.getNullOpnd(), AddValueProfileValue, NULL, NULL, numArgs, args);
                 addValueInst->setBCOffset(call->getBCOffset());
                 ((CFGInst *)addValueInst)->insertBefore(call);
                 ((CFGInst *)loadIndexInst)->insertBefore(addValueInst);

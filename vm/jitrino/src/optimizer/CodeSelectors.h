@@ -104,9 +104,6 @@ public:
     //  Maps instruction to ConvertToIntOp::OverflowMod
     ConvertToIntOp::OverflowMod mapToIntConvertOvfMod(Inst *inst);
 
-    //  Maps intrinsic id
-    IntrinsicCallOp::Id convertIntrinsicId(IntrinsicCallId callId);
-
     JitHelperCallOp::Id convertJitHelperId(JitHelperCallId callId);
 
     CG_OpndHandle ** genCallArgs(Inst * call, uint32 arg0Pos);

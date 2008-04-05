@@ -69,7 +69,6 @@ class   MethodInst;
 class   TokenInst;
 class   LinkingExcInst;
 class   CallInst;
-class   IntrinsicCallInst;
 class   JitHelperCallInst;
 class   VMHelperCallInst;
 class   PhiInst;
@@ -89,7 +88,6 @@ public:
     virtual void accept(CatchLabelInst*) = 0;
     virtual void accept(ConstInst*) = 0;
     virtual void accept(DispatchLabelInst*) = 0;
-    virtual void accept(IntrinsicCallInst*) = 0;
     virtual void accept(JitHelperCallInst*) = 0;
     virtual void accept(VMHelperCallInst*) = 0;
     virtual void accept(FieldAccessInst*) = 0;
@@ -199,9 +197,6 @@ public:
     FieldAccessInst* asFieldAccessInst() const {
         if (isFieldAccess()) return (FieldAccessInst*)this; else return NULL;
     }
-    IntrinsicCallInst* asIntrinsicCallInst() const {
-        if (isIntrinsicCallInst()) return (IntrinsicCallInst*) this; else return NULL;
-    }
     JitHelperCallInst* asJitHelperCallInst() const {
         if (isJitHelperCallInst()) return (JitHelperCallInst*) this; else return NULL;
     }
@@ -256,7 +251,6 @@ public:
     virtual bool isConst() const { return false; };
     virtual bool isDispatchLabel() const { return false; };
     virtual bool isFieldAccess() const { return false; };
-    virtual bool isIntrinsicCallInst() const { return false; };
     virtual bool isJitHelperCallInst() const { return false; };
     virtual bool isVMHelperCallInst() const { return false; };
     virtual bool isMethodCall() const { return false; };
@@ -939,40 +933,6 @@ private:
     Opnd**    args;
 };
 
-// intrinsic calls
-class IntrinsicCallInst : public Inst {
-public:
-    void visit(InstFormatVisitor& visitor)  {visitor.accept(this);}
-    bool isIntrinsicCallInst() const { return true; }
-    IntrinsicCallId getIntrinsicId() const {return intrinsicId;}
-private:
-    virtual void handlePrintEscape(::std::ostream&, char code) const;
-    friend class InstFactory;
-    IntrinsicCallInst(Opcode op, Modifier mod,
-                      Type::Tag type,
-                      Opnd* dst,
-                      uint32 nArgs,
-                      Opnd** args_,
-                      IntrinsicCallId intr) : Inst(op, mod, type, dst, nArgs),
-                                              intrinsicId(intr) {
-        args = NULL;
-        switch (nArgs) {
-        default:    args = args_ + MAX_INST_SRCS;
-        case 2:     srcs[1] = args_[1];
-        case 1:     srcs[0] = args_[0];
-        case 0:     break;
-        }
-    }
-    Opnd* getSrcExtended(uint32 srcIndex) const {
-        return args[srcIndex - MAX_INST_SRCS];
-    }
-    void  setSrcExtended(uint32 srcIndex, Opnd* src) {
-        args[srcIndex - MAX_INST_SRCS] = src;
-    }
-    Opnd**    args;
-    IntrinsicCallId intrinsicId;
-};
-
 // JIT helper calls
 class JitHelperCallInst : public Inst {
 public:
@@ -1133,10 +1093,9 @@ public:
                                     Opnd *tauNullCheckedFirstArg, 
                                     Opnd *tauTypesChecked,
                                     uint32 numArgs, Opnd** args);
-    Inst*    makeIntrinsicCall(Opnd* dst, IntrinsicCallId id, 
+    Inst*    makeJitHelperCall(Opnd* dst, JitHelperCallId id, 
                                Opnd* tauNullChecked, Opnd* tauTypesChecked, 
                                uint32 numArgs, Opnd** args);
-    Inst*    makeJitHelperCall(Opnd* dst, JitHelperCallId id, uint32 numArgs, Opnd** args);
     Inst*    makeVMHelperCall(Opnd* dst, VM_RT_SUPPORT id, uint32 numArgs,
                                Opnd** args);
     
@@ -1347,7 +1306,6 @@ private:
     MethodInst*         makeClone(MethodInst*, OpndManager&, OpndRenameTable&);
     MethodCallInst*     makeClone(MethodCallInst*, OpndManager&, OpndRenameTable&);
     CallInst*           makeClone(CallInst*, OpndManager&, OpndRenameTable&);
-    IntrinsicCallInst*  makeClone(IntrinsicCallInst*, OpndManager&, OpndRenameTable&);
     JitHelperCallInst*  makeClone(JitHelperCallInst*, OpndManager&, OpndRenameTable&);
     VMHelperCallInst*   makeClone(VMHelperCallInst*, OpndManager&, OpndRenameTable&);
     PhiInst*            makeClone(PhiInst*, OpndManager&, OpndRenameTable&);
@@ -1499,13 +1457,6 @@ private:
                            Opnd* ptr,
                            uint32 nArgs,
                            Opnd** args);
-    IntrinsicCallInst* makeIntrinsicCallInst(Opcode op, 
-                                             Modifier mod,
-                                             Type::Tag,
-                                             Opnd* dst,
-                                             uint32 nArgs,
-                                             Opnd** args_,
-                                             IntrinsicCallId id);
     JitHelperCallInst* makeJitHelperCallInst(Opcode op, 
                                              Modifier mod,
                                              Type::Tag,
@@ -1652,9 +1603,6 @@ public:
 
     virtual Inst*
     caseIndirectMemoryCall(CallInst* inst)=0;//{return caseDefault(inst);}
-
-    virtual Inst*
-    caseIntrinsicCall(IntrinsicCallInst* inst)=0;//{return caseDefault(inst);}
 
     virtual Inst*
     caseJitHelperCall(JitHelperCallInst* inst)=0;//{return caseDefault(inst);}
@@ -2039,5 +1987,10 @@ protected:
 } //namespace Jitrino 
 
 #endif // _INST_H_
+
+
+
+
+
 
 

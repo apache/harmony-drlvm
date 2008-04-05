@@ -175,7 +175,6 @@ public:
     CG_OpndHandle *call(uint32, CG_OpndHandle**, Type*, MethodDesc*);
     CG_OpndHandle *tau_call(uint32, CG_OpndHandle**, Type*, MethodDesc*, CG_OpndHandle*, CG_OpndHandle*);
     CG_OpndHandle *tau_calli(uint32,CG_OpndHandle**, Type*, CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*);
-    CG_OpndHandle *tau_callintr(uint32, CG_OpndHandle**, Type*, IntrinsicCallOp::Id, CG_OpndHandle*, CG_OpndHandle*);
     void          ret();
     void          ret(CG_OpndHandle*);
 
@@ -307,8 +306,6 @@ public:
     CG_OpndHandle* convToUPtr(PtrType*, CG_OpndHandle*)                       { NOT_IMPLEMENTED_C("convToUPtr") }
     CG_OpndHandle *tau_ldIntfTableAddr(Type*, CG_OpndHandle*, NamedType*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("tau_ldIntfTableAddr"); }
     CG_OpndHandle* tau_ldIntfTableAddr(Type*, CG_OpndHandle*, NamedType*);
-    CG_OpndHandle* arraycopyReverse(unsigned int, CG_OpndHandle**);
-    CG_OpndHandle* arraycopy(unsigned int, CG_OpndHandle**);
     CG_OpndHandle* addElemIndexWithLEA(Type*, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("addElemIndexWithLEA") }
     CG_OpndHandle* ldRef(Type*, MethodDesc*, unsigned int, bool); 
     void           pseudoInst()                                               {}

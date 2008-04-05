@@ -92,8 +92,6 @@ void TranslatorSession::postTranslatorCleanup() {
 
 static const char* help = \
     "  propValues[={ON|off}]    -  propagate values during translation\n"\
-    "  genArrayCopy[={ON|off}] - inline java/lang/System::arraycopy call as a copying loop\n"\
-    "  genArrayCopyRepMove[={ON|off}] - inline java/lang/System::arraycopy call as 'rep move' instruction\n"\
     "  balancedSync[={on|OFF}] - treat all synchronization as balanced\n"\
     "  ignoreSync[={on|OFF}]   - do not generate synchronization\n"\
     "  syncAsEnterFence[={on|OFF}] - implement synchronization as monitor enter fence\n"\
@@ -119,8 +117,6 @@ void TranslatorAction::readFlags() {
 #else
     flags.optArrayInit = getBoolArg("optArrayInit", true);
 #endif
-    flags.genArrayCopy = getBoolArg("genArrayCopy", false); 
-    flags.genArrayCopyRepMove = getBoolArg("genArrayCopyRepMove", true);
     flags.onlyBalancedSync = getBoolArg("balancedSync", false);
 
     flags.ignoreSync       = getBoolArg("ignoreSync",false);

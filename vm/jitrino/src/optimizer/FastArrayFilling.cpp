@@ -349,7 +349,7 @@ FastArrayFillPass::_run(IRManager& irManager)
         // insert the helper.
         // this helper should be expanded in the code generator phase
         Inst* initInst = irManager.getInstFactory().makeJitHelperCall(
-            OpndManager::getNullOpnd(), FillArrayWithConst, 4, args);
+            OpndManager::getNullOpnd(), FillArrayWithConst, NULL, NULL, 4, args);
         prepNode->appendInst(initInst);
 
         fg.addEdge(prepNode, outEdge->getTargetNode());
@@ -357,5 +357,9 @@ FastArrayFillPass::_run(IRManager& irManager)
     }
 }
 }
+
+
+
+
 
 

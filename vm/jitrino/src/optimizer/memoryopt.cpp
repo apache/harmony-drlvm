@@ -618,42 +618,6 @@ MemoryOptInitWalker::applyToInst(Inst *i)
             thePass->effectAnyGlobal(n, i);
         }
         break;
-    case Op_IntrinsicCall:
-        {
-            IntrinsicCallInst *calli = i->asIntrinsicCallInst();
-            IntrinsicCallId callId = calli->getIntrinsicId();
-            switch (callId) {
-            case CharArrayCopy:
-            case ArrayCopyDirect:
-            case ArrayCopyReverse:
-                {
-                    assert(calli->getNumSrcOperands() == 7);
-#ifndef NDEBUG
-                    Opnd *tauNullChecked = calli->getSrc(0);
-                    assert(tauNullChecked->getType()->tag == Type::Tau);
-                    Opnd *tauTypesChecked = calli->getSrc(1);
-                    assert(tauTypesChecked->getType()->tag == Type::Tau);
-#endif
-                    Opnd *srcarray = calli->getSrc(2);
-                    Opnd *srcoffset = calli->getSrc(3);
-                    Opnd *dstarray = calli->getSrc(4);
-                    Opnd *dstoffset = calli->getSrc(5);
-                    Opnd *length = calli->getSrc(6);
-
-                    // effectXXXArrayElements actually does not depends on offset parameter
-                    // so we do not need any special managing for the case of reverse copying
-                    thePass->effectReadArrayLength(n, i, srcarray);
-                    thePass->effectReadArrayElements(n, i, srcarray, srcoffset, length);
-                    thePass->effectReadArrayLength(n, i, dstarray);
-                    thePass->effectWriteArrayElements(n, i, dstarray, dstoffset, length);
-                }
-                break;
-            default:
-                assert(0);
-                break;
-            }
-        }
-        break;
     case Op_VMHelperCall:
         break;
     case Op_JitHelperCall:
@@ -668,8 +632,10 @@ MemoryOptInitWalker::applyToInst(Inst *i)
             case ReadThisState:
             case LockedCompareAndExchange:
             case AddValueProfileValue:
+            case ArrayCopyDirect:
+            case ArrayCopyReverse:
             case StringCompareTo:
-	    case StringIndexOf:
+            case StringIndexOf:
             case StringRegionMatches:
             case FillArrayWithConst: 
             case ClassIsArray:

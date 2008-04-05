@@ -156,23 +156,21 @@ public:
                                  uint32 numArgs,
                                   Opnd* args[]);
 
-    Opnd*  genIntrinsicCall(
-                        IntrinsicCallId intrinsicId, //TR
-                                  Type* returnType,
-                                  Opnd* tauNullCheckedRefArgs, // 0 for unsafe
-                                  Opnd* tauTypesChecked,       // 0 to let IRBuilder find it
-                                 uint32 numArgs,
-                                  Opnd*  args[]);
-
     Opnd*  genJitHelperCall(JitHelperCallId helperId,
-                                  Type* returnType,
-                                  uint32 numArgs,
-                                  Opnd*  args[]);
-
-    Opnd*  genVMHelperCall(VM_RT_SUPPORT helperId,
                             Type* returnType,
                             uint32 numArgs,
                             Opnd*  args[]);
+    Opnd*  genJitHelperCall(JitHelperCallId helperId,
+                            Type* returnType,
+                            Opnd* tauNullCheckedRefArgs,
+                            Opnd* tauTypesChecked,
+                            uint32 numArgs,
+                            Opnd*  args[]);
+
+    Opnd*  genVMHelperCall(VM_RT_SUPPORT helperId,
+                           Type* returnType,
+                           uint32 numArgs,
+                           Opnd*  args[]);
 
     
     void       genReturn(Opnd* src, Type* retType);//TR

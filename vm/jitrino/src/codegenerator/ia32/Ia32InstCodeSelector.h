@@ -211,14 +211,10 @@ public:
                              CG_OpndHandle* methodPtr, CG_OpndHandle* nonNullFirstArgTau,
                              CG_OpndHandle* tauTypesChecked);
     CG_OpndHandle* call(uint32 numArgs, CG_OpndHandle** args, Type* retType, MethodDesc *desc);
-    CG_OpndHandle* arraycopyReverse(uint32 numArgs, CG_OpndHandle** args);
-    CG_OpndHandle* arraycopy(uint32 numArgs, CG_OpndHandle** args);
     CG_OpndHandle* tau_call(uint32 numArgs, CG_OpndHandle** args, Type* retType,
                             MethodDesc *desc, CG_OpndHandle *nonNullFirstArgTau,
                             CG_OpndHandle *tauTypesChecked);
     CG_OpndHandle* tau_callvirt(uint32 numArgs,CG_OpndHandle** args, Type* retType, MethodDesc *desc,             CG_OpndHandle* tauNullChecked, CG_OpndHandle* tauTypesChecked);
-    CG_OpndHandle* callintr(uint32 numArgs, CG_OpndHandle** args, Type* retType,IntrinsicCallOp::Id callId);
-    CG_OpndHandle* tau_callintr(uint32 numArgs, CG_OpndHandle** args, Type* retType,IntrinsicCallOp::Id callId,      CG_OpndHandle *tauNullsChecked, CG_OpndHandle *tauTypesChecked);
     CG_OpndHandle* callhelper(uint32 numArgs, CG_OpndHandle** args, Type* retType,JitHelperCallOp::Id callId);
     CG_OpndHandle* callvmhelper(uint32 numArgs, CG_OpndHandle** args, Type* retType,
                                 VM_RT_SUPPORT callId);

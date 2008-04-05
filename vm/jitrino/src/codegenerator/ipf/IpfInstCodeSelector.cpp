@@ -1315,22 +1315,6 @@ CG_OpndHandle *IpfInstCodeSelector::tau_calli(uint32        numArgs,
 }
 
 //----------------------------------------------------------------------------//
-// Intrinsic call
-
-CG_OpndHandle *IpfInstCodeSelector::tau_callintr(uint32              numArgs, 
-                                                 CG_OpndHandle       **args, 
-                                                 Type                *retType,
-                                                 IntrinsicCallOp::Id callId,
-                                                 CG_OpndHandle       *tauNullsChecked,
-                                                 CG_OpndHandle       *tauTypesChecked) {
-
-    IPF_LOG << "      tau_callintr" << endl;
-    IPF_ASSERT(0);
-
-    return NULL;
-}
-
-//----------------------------------------------------------------------------//
 
 void IpfInstCodeSelector::ret() {
 
@@ -1819,20 +1803,6 @@ CG_OpndHandle *IpfInstCodeSelector::tau_ldIntfTableAddr(Type          *dstType,
 
     directCall(2, helperArgs, retOpnd, helperAddress, p0);
     return retOpnd;
-}
-
-//----------------------------------------------------------------------------//
-
-CG_OpndHandle* IpfInstCodeSelector::arraycopy(unsigned int numArgs, 
-                                              CG_OpndHandle** args) { 
-    NOT_IMPLEMENTED_C("arraycopy") 
-}
-
-//----------------------------------------------------------------------------//
-
-CG_OpndHandle* IpfInstCodeSelector::arraycopyReverse(unsigned int numArgs, 
-                                                     CG_OpndHandle** args) { 
-    NOT_IMPLEMENTED_C("arraycopyReverse") 
 }
 
 //----------------------------------------------------------------------------//
