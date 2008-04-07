@@ -38,7 +38,7 @@ JNIEXPORT jboolean JNICALL Java_java_lang_EMThreadSupport_needProfilerThreadSupp
     (JNIEnv *jenv, jclass cls) 
 {
     return (jboolean) strcmp("false", 
-        VM_Global_State::loader_env->em_instance->intf->
+        VM_Global_State::loader_env->em_component->
         GetProperty(OPEN_EM_VM_PROFILER_NEEDS_THREAD_SUPPORT));
 }
 
@@ -53,7 +53,7 @@ Java_java_lang_EMThreadSupport_onTimeout(JNIEnv *jenv, jclass cls)
 JNIEXPORT jint JNICALL 
 Java_java_lang_EMThreadSupport_getTimeout(JNIEnv *jenv, jclass cls) 
 {
-    const char* timeout_string = VM_Global_State::loader_env->em_instance->intf->
+    const char* timeout_string = VM_Global_State::loader_env->em_component->
         GetProperty(OPEN_EM_VM_PROFILER_THREAD_TIMEOUT);
     return atoi(timeout_string);
 }

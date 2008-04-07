@@ -76,17 +76,18 @@ int CmLoadComponent(const char* path,
                     const char* initializer_function_name);
 
 /**
- * Deallocate all instances of a given component, unregister a component in a 
- * component manager, and free all component resources using
+ * Does nothing if there was more successful attempts to add the component than
+ * component releases, otherwise deallocates all instances of a given component, unregisters a
+ * component in the component manager, and frees all component resources using
  * <code>Free</code> function. If the component is loaded from a dynamic 
- * library and no components are using the library, then unload
+ * library and no other components are using the library, then unloads
  * the dynamic library.
  *
  * This function is safe to call from multiple threads.
  *
  * @return <code>APR_SUCCESS</code> if successful, or a non-zero error code.
  */
-int CmFreeComponent(const char* component_name);
+int CmReleaseComponent(const char* component_name);
 
 
 #ifdef __cplusplus

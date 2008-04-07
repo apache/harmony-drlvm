@@ -48,29 +48,15 @@
 #define LOG_DOMAIN "vm.core"
 #include "cxxlog.h"
 
-//------ Begin DYNOPT support --------------------------------------
-//
-#ifndef PLATFORM_POSIX       // for DYNOPT in Win64
-
-extern JIT      *dynopt_jitc;
-extern bool     dynamic_optimization;
-extern bool     software_profile;
-extern bool        data_ear;
-extern unsigned long    data_ear_interval;
-extern int              data_ear_filter;
-extern bool        branch_trace;
-extern unsigned long    btb_interval;
-
-#endif // !PLATFORM_POSIX
-//
-//------ End DYNOPT support ----------------------------------------
-
 #define EXECUTABLE_NAME "java"
 #define USE_JAVA_HELP LECHO(29, "Use {0} -help to get help on command line options" << EXECUTABLE_NAME)
 #define LECHO_VERSION LECHO(32, VERSION << VERSION_SVN_TAG << __DATE__ << VERSION_OS \
         << VERSION_ARCH << VERSION_COMPILER << VERSION_DEBUG_STRING)
 #define LECHO_VM_VERSION LECHO(33, VM_VERSION)
-#define STRING_POOL_SIZE_OPT "-XX:vm.stringPoolSize="
+#define STRING_POOL_SIZE_OPTION "-XX:vm.stringPoolSize="
+#define CLASS_DATA_SHARING_OFF_OPTION "-Xshare:off"
+#define CLASS_DATA_SHARING_ON_OPTION "-Xshare:on"
+#define PORTLIB_OPTION "_org.apache.harmony.vmi.portlib"
 
 extern bool dump_stubs;
 extern bool parallel_jit;
@@ -140,29 +126,25 @@ static void add_assert_rec(Global_Env *p_env, const char* option, const char* cm
     }
 }
 
-void* get_portlib_for_logger(Global_Env *p_env) {
-    for (int i = 0; i < p_env->vm_arguments.nOptions; i++) {
-        const char* option = p_env->vm_arguments.options[i].optionString;
-        if (strcmp(option, "_org.apache.harmony.vmi.portlib") == 0) {
-            return p_env->vm_arguments.options[i].extraInfo;
-        }
-    }
-    return NULL;
-}
-
-void parse_vm_arguments1(JavaVMInitArgs *vm_args, size_t *p_string_pool_size)
+void parse_vm_arguments1(JavaVMInitArgs *vm_args, size_t *p_string_pool_size, jboolean *p_is_class_data_shared, void **portlib)
 {
     *p_string_pool_size = DEFAULT_STRING_TABLE_SIZE;
     for (int i = 0; i < vm_args->nOptions; i++) {
         const char* option = vm_args->options[i].optionString;
-        if (begins_with(option, STRING_POOL_SIZE_OPT)) {
-            const char* arg = option + strlen(STRING_POOL_SIZE_OPT);
+        if (begins_with(option, STRING_POOL_SIZE_OPTION)) {
+            const char* arg = option + strlen(STRING_POOL_SIZE_OPTION);
             *p_string_pool_size = parse_size(arg);
             if (0 == *p_string_pool_size) {
                 LECHO(34, "Negative or invalid string pool size. A default value is used, " << DEFAULT_STRING_TABLE_SIZE << " bytes.");
                 *p_string_pool_size = DEFAULT_STRING_TABLE_SIZE;
             }
             TRACE2("init", "string_pool_size = " << *p_string_pool_size);
+        } else if (!strcmp(option, CLASS_DATA_SHARING_OFF_OPTION)) {
+            *p_is_class_data_shared = JNI_FALSE;
+        } else if (!strcmp(option, CLASS_DATA_SHARING_ON_OPTION)) {
+            *p_is_class_data_shared = JNI_TRUE;
+        } else if (!strcmp(option, PORTLIB_OPTION)) {
+            *portlib = vm_args->options[i].extraInfo;
         }
     }
 } // parse_vm_arguments1
@@ -308,7 +290,7 @@ void parse_vm_arguments2(Global_Env *p_env)
             }
             p_env->VmProperties()->set("thread.stacksize", arg);
     	}	  
-        else if (begins_with(option, STRING_POOL_SIZE_OPT)) {
+        else if (begins_with(option, STRING_POOL_SIZE_OPTION)) {
             // the pool is already created
         }
         else if (begins_with(option, "-agentlib:")) {

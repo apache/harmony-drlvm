@@ -29,6 +29,7 @@
 #include <apr_strings.h>
 
 #include "DrlEMImpl.h"
+#include "port_malloc.h"
 
 #include <assert.h>
 
@@ -96,7 +97,7 @@ GetDescription() {
 
 static const char*
 GetVendor() {
-    return "Intel";
+    return "Apache Software Foundation";
 }
 
 char* tbs_timeout = NULL;
@@ -126,8 +127,6 @@ ListInterfaceNames() {
     return interface_names;
 }
 
-static OpenComponentHandle component_interface = NULL;
-static OpenInstanceAllocatorHandle allocator_interface = NULL;
 static OpenEmVmHandle em_vm_interface = NULL;
 
 static int
@@ -149,15 +148,7 @@ Free() {
 static int
 CreateInstance(OpenInstanceHandle* p_instance,
                apr_pool_t* pool) {
-    struct _OpenInstance* instance = (struct _OpenInstance*) apr_palloc(pool, sizeof(_OpenComponent));
-
-    instance->intf = component_interface;
-    *p_instance = instance;
-    if (DrlEMFactory::createAndInitEMInstance()!=NULL) {
-        return JNI_OK;
-    } else {
-        return JNI_ERR;
-    }
+    return (DrlEMFactory::createAndInitEMInstance() != NULL) ? JNI_OK : JNI_ERR;
 }
 
 static int
@@ -172,14 +163,9 @@ int EmInitialize(OpenComponentHandle* p_component,
                  OpenInstanceAllocatorHandle* p_allocator,
                  apr_pool_t* pool)
 {
-    if (component_interface || allocator_interface || em_vm_interface) {
-        /* Virtual table already initialized */
-        return JNI_ERR;
-    }
     em_pool = pool;
 
-    struct _OpenComponent* c_intf = (struct _OpenComponent*) apr_palloc(pool, sizeof(_OpenComponent));
-
+    STD_PCALLOC_STRUCT(pool, _OpenComponent, c_intf);
     c_intf->GetName = GetName;
     c_intf->GetVersion = GetEmVersion;
     c_intf->GetDescription = GetDescription;
@@ -189,12 +175,11 @@ int EmInitialize(OpenComponentHandle* p_component,
     c_intf->GetInterface = GetInterface;
     c_intf->Free = Free;
 
-    _OpenInstanceAllocator* a_intf = (_OpenInstanceAllocator*)
-        apr_palloc(pool, sizeof(_OpenInstanceAllocator));
+    STD_PCALLOC_STRUCT(pool, _OpenInstanceAllocator, a_intf);
     a_intf->CreateInstance = CreateInstance;
     a_intf->FreeInstance = FreeInstance;
 
-    _OpenEmVm* vm_intf = (_OpenEmVm*) apr_palloc(pool, sizeof(_OpenEmVm));
+    STD_PCALLOC_STRUCT(pool, _OpenEmVm, vm_intf);
     vm_intf->ExecuteMethod = ExecuteMethod;
     vm_intf->CompileMethod = CompileMethod;
     vm_intf->RegisterCodeChunk = RegisterCodeChunk;
@@ -203,15 +188,12 @@ int EmInitialize(OpenComponentHandle* p_component,
     vm_intf->ProfilerThreadTimeout = ProfilerThreadTimeout;
     vm_intf->ClassloaderUnloadingCallback = ClassloaderUnloadingCallback;
 
-    component_interface = (OpenComponentHandle) c_intf;
-    allocator_interface = (OpenInstanceAllocatorHandle) a_intf;
+    *p_component = (OpenComponentHandle) c_intf;
+    *p_allocator = (OpenInstanceAllocatorHandle) a_intf;
     em_vm_interface = (OpenEmVmHandle) vm_intf;
 
-    *p_component = component_interface;
-    *p_allocator = allocator_interface;
     return JNI_OK;
 }
-
 
 
 #ifdef __cplusplus

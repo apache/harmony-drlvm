@@ -51,6 +51,10 @@ struct _ComponentInfo {
      * The list of instances of the component.
      */
     _InstanceInfo* instances;
+    /**
+     * Reference counter.
+     */
+    int num_clients;
     apr_pool_t* pool;
 };
 typedef const struct _ComponentInfo* ComponentInfoHandle;

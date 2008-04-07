@@ -57,6 +57,7 @@
 #include "finalizer_thread.h"
 #include "ref_enqueue_thread.h"
 #include "port_malloc.h"
+#include "component_manager.h"
 
 #ifdef _IPF_
 #include "stub_code_utils.h"
@@ -355,50 +356,101 @@ const struct JNIInvokeInterface_ java_vm_vtable = {
 };
 
 /**
- * List of all running in the current process.
+ * VM instances running in the current process.
  */ 
-APR_RING_HEAD(JavaVM_Internal_T, JavaVM_Internal) GLOBAL_VMS;
+union _OpenInstance {
+    JavaVM_Internal jvm;
+};
 
-/**
- * Memory pool to keep global data.
- */
-apr_pool_t * GLOBAL_POOL = NULL;
-
-/**
- * Used to synchronize VM creation and destruction.
- */
-apr_thread_mutex_t * GLOBAL_LOCK = NULL;
-
-static jboolean & get_init_status() {
-    static jboolean init_status = JNI_FALSE;
-    return init_status;
+static const char*
+GetName() {
+    return OPEN_VM;
 }
-/**
- * Initializes JNI module.
- * Should  be called before creating first VM.
- */
-static jint jni_init()
-{
-    jint status;
 
-    if (get_init_status() == JNI_FALSE) {
-         status = apr_initialize();
-        if (status != APR_SUCCESS) return JNI_ERR;
+static const char*
+GetVmVersion() {
+    return OPEN_VM_VERSION;
+}
 
-        if (port_atomic_cas8((volatile uint8 *)&get_init_status(), JNI_TRUE, JNI_FALSE) == JNI_FALSE) {
-            APR_RING_INIT(&GLOBAL_VMS, JavaVM_Internal, link);
-            status = apr_pool_create(&GLOBAL_POOL, 0);
-            if (status != APR_SUCCESS) return JNI_ERR;
+static const char*
+GetDescription() {
+    return "Java virtual machine core";
+}
 
-            status = apr_thread_mutex_create(&GLOBAL_LOCK, APR_THREAD_MUTEX_DEFAULT, GLOBAL_POOL);
-            if (status != APR_SUCCESS) {
-                apr_pool_destroy(GLOBAL_POOL);
-                return JNI_ERR;
-            }
-        }
+static const char*
+GetVendor() {
+    return "Apache Software Foundation";
+}
+
+static const char*
+GetProperty(const char* key) {
+    return NULL;
+}
+
+static const char* interface_names[] = {
+    OPEN_INTF_VM,
+    NULL
+};
+
+static const char**
+ListInterfaceNames() {
+    return interface_names;
+}
+
+static int
+GetInterface(OpenInterfaceHandle* p_intf,
+             const char* intf_name) {
+    if (!strcmp(intf_name, OPEN_INTF_VM)) {
+        *p_intf = NULL; // no interface for now
+        return JNI_OK;
+    } else {
+        return JNI_ERR;
     }
+}
+
+static int
+CreateInstance(OpenInstanceHandle* p_instance,
+               apr_pool_t* pool) {
+    STD_PCALLOC_STRUCT(pool, JavaVM_Internal, instance);
+
+    instance->pool1 = pool; // TODO rename pool1 bak to pool
+    *p_instance = (OpenInstanceHandle) instance;
     return JNI_OK;
 }
+
+static int
+FreeInstance(OpenInstanceHandle instance) {
+    return JNI_OK;
+}
+
+static int
+Free() {
+    return JNI_OK;
+}
+
+int VmInitialize(OpenComponentHandle* p_component,
+                 OpenInstanceAllocatorHandle* p_allocator,
+                 apr_pool_t* pool)
+{
+    STD_PCALLOC_STRUCT(pool, _OpenComponent, c_intf);
+    c_intf->GetName = GetName;
+    c_intf->GetVersion = GetVmVersion;
+    c_intf->GetDescription = GetDescription;
+    c_intf->GetVendor = GetVendor;
+    c_intf->GetProperty = GetProperty;
+    c_intf->ListInterfaceNames = ListInterfaceNames;
+    c_intf->GetInterface = GetInterface;
+    c_intf->Free = Free;
+
+    STD_PCALLOC_STRUCT(pool, _OpenInstanceAllocator, a_intf);
+    a_intf->CreateInstance = CreateInstance;
+    a_intf->FreeInstance = FreeInstance;
+
+    *p_component = (OpenComponentHandle) c_intf;
+    *p_allocator = (OpenInstanceAllocatorHandle) a_intf;
+    return JNI_OK;
+}
+
 
 /*    BEGIN: List of directly exported functions.    */
 
@@ -413,27 +465,19 @@ jint JNICALL JNI_GetDefaultJavaVMInitArgs(void * args)
 }
 
 jint JNICALL JNI_GetCreatedJavaVMs(JavaVM ** vmBuf,
-                                               jsize bufLen,
-                                               jsize * nVMs)
+                                   jsize bufLen,
+                                   jsize *nVMs)
 {
-    jint status = jni_init();
-    if (status != JNI_OK) {
+    OpenComponentManagerHandle cm;
+
+    int status  = CmAcquire(&cm);
+    if (APR_SUCCESS != status) {
         return status;
     }
 
-    apr_thread_mutex_lock(GLOBAL_LOCK);
-
-    *nVMs = 0;
-    JavaVM_Internal * current_vm = APR_RING_FIRST(&GLOBAL_VMS);
-    while (current_vm != APR_RING_SENTINEL(&GLOBAL_VMS, JavaVM_Internal, link)) {
-        if (*nVMs < bufLen) {
-            vmBuf[*nVMs] = (JavaVM *)current_vm;
-        }
-        ++(*nVMs);
-        current_vm = APR_RING_NEXT(current_vm, link);
-    }
-    apr_thread_mutex_unlock(GLOBAL_LOCK);
-    return JNI_OK;
+    status = cm->GetInstances((OpenInstanceHandle*) vmBuf, bufLen, nVMs, OPEN_VM);
+    int release_status = CmRelease();
+    return (status == JNI_OK) ? release_status : status;
 }
 
 jint JNICALL JNI_CreateJavaVM(JavaVM ** p_vm, JNIEnv ** p_jni_env,
@@ -441,85 +485,89 @@ jint JNICALL JNI_CreateJavaVM(JavaVM ** p_vm, JNIEnv ** p_jni_env,
     jboolean daemon = JNI_FALSE;
     char * name = "main";
     JNIEnv * jni_env;
-    JavaVMInitArgs * vm_args;
-    JavaVM_Internal * java_vm;
     Global_Env * vm_env;
-    apr_pool_t * vm_global_pool = NULL;
     jthread java_thread;
-    jint status;
-
-    status = jni_init();        
-    
-    if (status != JNI_OK) return status;
+    int n_vm = 0;
 
 #ifdef _MEMMGR
     start_monitor_malloc();
 #endif
 
-    apr_thread_mutex_lock(GLOBAL_LOCK);
-
-    // TODO: only one VM instance can be created in the process address space.
-    if (!APR_RING_EMPTY(&GLOBAL_VMS, JavaVM_Internal, link)) {
-        status = JNI_ERR;
-        goto done;
-    }
-
-    // Create global memory pool.
-    status = apr_pool_create(&vm_global_pool, NULL);
-    if (status != APR_SUCCESS) {
-        TRACE2("jni", "Unable to create memory pool for VM");
-        status = JNI_ENOMEM;
-        goto done;
-    }
-
-    // TODO: current implementation doesn't support JDK1_1InitArgs.
+    // TODO implement support for JDK1_1InitArgs
     if (((JavaVMInitArgs *)args)->version == JNI_VERSION_1_1) {
-        status = JNI_EVERSION;
-        goto done;
+        return JNI_EVERSION;
     }
-
-    vm_args = (JavaVMInitArgs *)args;
-    // Create JavaVM_Internal.
-    java_vm = (JavaVM_Internal *) apr_palloc(vm_global_pool, sizeof(JavaVM_Internal));
-    if (java_vm == NULL) {
-        status = JNI_ENOMEM;
-        goto done;
-    }
-
-    // Get a string pool size.
+    JavaVMInitArgs *vm_args = (JavaVMInitArgs *)args;
+ 
+    // get a string pool size and if the shared data pool should be read from cache
     size_t string_pool_size;
-    parse_vm_arguments1(vm_args, &string_pool_size);
+    jboolean is_class_data_shared;
+    void *portlib = NULL;
+    parse_vm_arguments1(vm_args, &string_pool_size, &is_class_data_shared, &portlib);
+
+    // initialize logging system as soon as possible
+    // log system supports the only instance
+    // TODO make the logging initialization thread and multi-instance safe
+    init_log_system(portlib);
+    set_log_levels_from_cmd(vm_args);
+
+    OpenComponentManagerHandle cm;
+    int status  = CmAcquire(&cm);
+    if (APR_SUCCESS != status) {
+        return status;
+    }
+
+    // Register VM component.
+    status = CmAddComponent(VmInitialize);
+    if (JNI_OK != status) {
+        goto component_allocation_error;
+    }
+
+    JavaVM_Internal* java_vm;
+    status = cm->CreateInstance((OpenInstanceHandle*) &java_vm, OPEN_VM);
+    if (JNI_OK != status) {
+        goto instance_allocation_error;
+    }
+
+    status = cm->GetInstances(NULL, 0, &n_vm, OPEN_VM);
+    // TODO implement support more than one VM instance in the process address space
+    if (1 != n_vm) {
+        status = JNI_ERR;
+        goto instance_number_error;
+    }
 
     // Create Global_Env.
-    vm_env = new(vm_global_pool) Global_Env(vm_global_pool, string_pool_size);
+    vm_env = new(java_vm->pool1) Global_Env(java_vm->pool1, string_pool_size);
     if (vm_env == NULL) {
         status = JNI_ENOMEM;
-        goto done;
+        goto error;
     }
 
+    vm_env->cm = cm;
     vm_env->start_time = apr_time_now()/1000;
 
     java_vm->functions = &java_vm_vtable;
-    java_vm->pool = vm_global_pool;
     java_vm->vm_env = vm_env;
     java_vm->reserved = (void *)0x1234abcd;
     *p_vm = java_vm;
         
     status = vm_init1(java_vm, vm_args);
     if (status != JNI_OK) {
-        goto done;
+        goto error;
     }
 
     // Attaches main thread to VM.
     status = vm_attach_internal(&jni_env, &java_thread, java_vm, NULL, name, daemon);
-    if (status != JNI_OK) goto done;
+    if (status != JNI_OK) {
+        goto error;
+    }
 
-    // Attaches main thread to TM.
+    // attaches a main thread to TM
     {
         IDATA jtstatus = jthread_attach(jni_env, java_thread, daemon);
         if (jtstatus != TM_ERROR_NONE) {
             status = JNI_ERR;
-            goto done;
+            goto error;
         }
     }
     assert(jthread_self() != NULL);
@@ -530,7 +578,7 @@ jint JNICALL JNI_CreateJavaVM(JavaVM ** p_vm, JNIEnv ** p_jni_env,
 
     status = vm_init2(jni_env);
     if (status != JNI_OK) {
-        goto done;
+        goto error;
     }
 
     // Send VM start event. JNI services are available now.
@@ -540,34 +588,35 @@ jint JNICALL JNI_CreateJavaVM(JavaVM ** p_vm, JNIEnv ** p_jni_env,
     finalizer_threads_init(java_vm, jni_env);   /* added for NATIVE FINALIZER THREAD */
     ref_enqueue_thread_init(java_vm, jni_env);  /* added for NATIVE REFERENCE ENQUEUE THREAD */
 
-    // The VM is fully initialized now.
+    // the VM is fully initialized now
     vm_env->vm_state = Global_Env::VM_RUNNING;
 
-    // Send VM init event.
+    // send VM init event
     jvmti_send_vm_init_event(vm_env);
 
-    // Thread start event for the main thread should be sent after VMInit callback has finished.
+    // thread start event for the main thread should be sent after VMInit callback has finished
     if (jvmti_should_report_event(JVMTI_EVENT_THREAD_START)) {
         jvmti_send_thread_start_end_event(p_TLS_vmthread, 1);
     }
 
-    // Register created VM.
-    APR_RING_INSERT_TAIL(&GLOBAL_VMS, java_vm, JavaVM_Internal, link);
+    // store Java heap memory size after initialization
+    vm_env->init_gc_used_memory = (size_t) gc_total_memory();
 
-    // Store Java heap memory size after initialization
-    vm_env->init_gc_used_memory = (size_t)gc_total_memory();
-
-    // Store native memory size after initialization
+    // store native memory size after initialization
     vm_env->init_used_memory = port_vmem_used_size();
 
-    status  = JNI_OK;
-done:
-    apr_thread_mutex_unlock(GLOBAL_LOCK);
+    return JNI_OK;
 
-    if (status != JNI_OK && NULL != vm_global_pool) {
-        apr_pool_destroy(vm_global_pool);
-    }
-
+    /* in case of error, frees resources in reverse order, ignores other errors */
+error:
+instance_number_error:
+    cm->FreeInstance((OpenInstanceHandle) java_vm);
+instance_allocation_error:
+    CmReleaseComponent(OPEN_VM);
+component_allocation_error:
+    CmRelease();
+    // TODO make the logging initialization thread and multi-instance safe
+    shutdown_log_system();
     return status;
 }
 
@@ -1505,21 +1554,14 @@ VMEXPORT jint JNICALL DestroyJavaVM(JavaVM * vm)
     }    
     assert(java_thread != NULL);
 
-    apr_thread_mutex_lock(GLOBAL_LOCK);
-
-    // Remove current VM from the list of all VMs running in the current adress space.
-    APR_RING_REMOVE(java_vm, link);
-    
-    apr_thread_mutex_unlock(GLOBAL_LOCK);
-
     status = vm_destroy(java_vm, java_thread);
 
     // Destroy VM environment.
     java_vm->vm_env->~Global_Env();
     java_vm->vm_env = NULL;
     
-    // Destroy VM pool.
-    apr_pool_destroy(java_vm->pool);
+    CmReleaseComponent(OPEN_VM);
+    CmRelease();
 
 #ifdef _MEMMGR_REPORT
     report_leaked_malloc();

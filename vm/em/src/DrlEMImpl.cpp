@@ -51,14 +51,16 @@
 
 DrlEMImpl* DrlEMFactory::emInstance = NULL;
 
+// TODO you may get a question why we get the same execution manager
+// for multiple VM instances the proper way is to get rid of static emInstance
 DrlEMImpl* DrlEMFactory::createAndInitEMInstance() {
-    assert(emInstance == NULL);
-    emInstance = new DrlEMImpl();
-    if (!emInstance->init()) {
-        delete emInstance;
-        emInstance = NULL;
+    if (emInstance == NULL) {
+        emInstance = new DrlEMImpl();
+        if (!emInstance->init()) {
+            delete emInstance;
+            emInstance = NULL;
+        }
     }
-        
     return emInstance;
 }
 

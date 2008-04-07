@@ -262,9 +262,6 @@ Global_Env::~Global_Env()
     // Unload jit instances.
     vm_delete_all_jits();
 
-    // Unload component manager and all registered components.
-    CmRelease();
-
     // Unload all system native libraries.
     natives_cleanup();
 

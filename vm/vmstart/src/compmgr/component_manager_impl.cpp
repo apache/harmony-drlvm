@@ -27,26 +27,12 @@
 #include "component_manager_impl.h"
 
 #define LOG_DOMAIN "compmgr"
-#include "cxxlog.h"
+#include "clog.h"
 
 /*
  * Private variables and functions. See public fuctions
  * at the end of file.
  */
-
-#ifndef NDEBUG
-/**
- * Instance sanity check.
- */
-static int
-is_instance_valid(OpenInstanceHandle instance) {
-    return apr_isdigit(*(instance->intf->GetVersion()));
-}
-#endif
-
-#define ASSERT_IS_INSTANCE_VALID(instance) ASSERT(is_instance_valid(instance), \
-    "Instance is not properly initialized, " \
-    "the first strucutre element should point to a default interface table");
 
 /**
  * Lock which synchronizes all component manager operations.
@@ -76,11 +62,47 @@ static _ComponentManagerImpl* component_manager_impl = NULL;
 #define MAX_ERROR_BUFFER_SIZE 1024
 
 /**
+ * Get an instance information structure for a given instance pointer.
+ * @param[out] pp_instance_info_next on return, points to a <code>next</code>
+ * slot which points to the corresponding instance info. The slot is used
+ * when the instance is to be removed from the list.
+ * @param[out] p_component_info on return, points to a handle of
+ * a component information structure
+ * @param instance the instance handle
+ * @return APR_SUCCESS if successful, APR_NOTFOUND if the instance was not
+ * found, or another non-zero error code
+ */
+static int
+GetInstanceInfoSlot(_InstanceInfo*** pp_instance_info,
+                ComponentInfoHandle* p_component_info,
+                OpenInstanceHandle instance) {
+    _ComponentInfo* component_info = component_manager_impl->components;
+    while (component_info) {
+        _InstanceInfo** p_instance_info = &component_info->instances;
+        _InstanceInfo* instance_info = component_info->instances;
+        while (instance_info) {
+            if (instance == instance_info->instance) {
+                /* found corresponding information structures */
+                *p_component_info = component_info;
+                *pp_instance_info = p_instance_info;
+                return APR_SUCCESS;
+            }
+            p_instance_info = &instance_info->next;
+            instance_info = instance_info->next;
+        }
+        component_info = component_info->next;
+    }
+    return APR_NOTFOUND;
+}
+
+/**
  * Get a component information structure for a component
  * with a given name.
  * @param[out] p_component_info on return, points to a handle of
  * a component information structure
  * @param name component name
+ * @return APR_SUCCESS if successful, APR_NOTFOUND if a component with
+ * the given name cannot be found, or another non-zero error code
  */
 static int
 GetComponentInfo(ComponentInfoHandle* p_component_info,
@@ -88,7 +110,7 @@ GetComponentInfo(ComponentInfoHandle* p_component_info,
     ComponentInfoHandle component_info = component_manager_impl->components;
     while (component_info) {
         if (!strcmp(name, component_info->component->GetName())) {
-            /* Found a component information structure */
+            /* found a component information structure */
             *p_component_info = component_info;
             return APR_SUCCESS;
         }
@@ -96,6 +118,24 @@ GetComponentInfo(ComponentInfoHandle* p_component_info,
     }
     return APR_NOTFOUND;
 }
+
+static int
+GetComponentInfoSlot(_ComponentInfo*** pp_component_info,
+                     const char* name) {
+    _ComponentInfo** p_component_info =
+        &component_manager_impl->components;
+    _ComponentInfo* component_info = component_manager_impl->components;
+    while (component_info) {
+        if (!strcmp(component_info->component->GetName(), name)) {
+            *pp_component_info = p_component_info;
+            return APR_SUCCESS;
+        }
+        p_component_info = &(component_info->next);
+        component_info = component_info->next;
+    }
+    return APR_NOTFOUND;
+}
+
 
 /**
  * Checks if DLL is still used by registered components.
@@ -117,6 +157,24 @@ IsDllInUse(const DllHandle lib) {
     return APR_NOTFOUND;
 }
 
+#ifndef NDEBUG
+/**
+ * Instance sanity check.
+ */
+static int
+is_instance_valid(OpenInstanceHandle instance) {
+    ComponentInfoHandle component_info;
+    _InstanceInfo** p_instance_info;
+    VERIFY_SUCCESS(GetInstanceInfoSlot(&p_instance_info, &component_info, instance));
+    return apr_isdigit(*(component_info->component->GetVersion()));
+}
+#endif
+
+#define ASSERT_IS_INSTANCE_VALID(instance) ASSERT(is_instance_valid(instance), \
+    ("Instance is not properly initialized, " \
+    "the first strucutre element should point to a default interface table"));
+
+
 /**
  * Allocate an instance info structure and add it
  * to a component manager list.
@@ -125,8 +183,7 @@ static int
 AddInstance(OpenInstanceHandle instance,
             ComponentInfoHandle component_info,
             apr_pool_t* pool) {
-    TRACE("Cm.AddInstance()"); 
-    ASSERT_IS_INSTANCE_VALID(instance);
+    TRACE(("Cm.AddInstance()")); 
 
     _InstanceInfo* instance_info =
         (_InstanceInfo*) apr_palloc(pool, sizeof(_InstanceInfo));
@@ -141,6 +198,8 @@ AddInstance(OpenInstanceHandle instance,
 
     instance_info->next = component_info->instances;
     ((struct _ComponentInfo*) component_info)->instances = instance_info;
+
+    ASSERT_IS_INSTANCE_VALID(instance);
     return APR_SUCCESS;
 }
 
@@ -156,52 +215,17 @@ AddInstance(OpenInstanceHandle instance,
 static int
 RemoveInstanceInfo(InstanceInfoHandle* p_instance_info,
                    OpenInstanceHandle instance) {
-
+    _InstanceInfo** p_instance_info_next;
     ComponentInfoHandle component_info;
-    GetComponentInfo(&component_info, instance->intf->GetName());
 
-    _InstanceInfo** p_instance_info_next =
-        &(((struct _ComponentInfo*) component_info)->instances);
-    _InstanceInfo* instance_info = component_info->instances;
-    while (instance_info) {
-        if (instance_info->instance == instance) {
-            *p_instance_info_next = instance_info->next;
-            *p_instance_info = instance_info;
-            return APR_SUCCESS;
-        }
-        p_instance_info_next = &(instance_info->next);
-        instance_info = instance_info->next;
+    int ret = GetInstanceInfoSlot(&p_instance_info_next, &component_info, instance);
+    if (APR_SUCCESS != ret) {
+        return ret;
     }
-    return APR_NOTFOUND;
-}
 
-/**
- * Unregister a component and return a pointer to a correspondent
- * component information structure.
- * @param[out] p_component_info on return, points to
- * <code>ComponentInfoHandle</code> handle which correspond to the
- * unregisterd component
- * @param name a component name to be unregistered
- * @return APR_SUCCESS if successful, or APR_NOTFOUND if the component
- * cannot be found
- */
-static int
-RemoveComponentInfo(ComponentInfoHandle* p_component_info,
-                     const char* name) {
-    _ComponentInfo** p_component_info_next =
-        &component_manager_impl->components;
-    _ComponentInfo* component_info = component_manager_impl->components;
-    while (component_info) {
-        if (!strcmp(component_info->component->GetName(),
-            name)) {
-            *p_component_info_next = component_info->next;
-            *p_component_info = component_info;
-            return APR_SUCCESS;
-        }
-        p_component_info_next = &(component_info->next);
-        component_info = component_info->next;
-    }
-    return APR_NOTFOUND;
+    *p_instance_info = *p_instance_info_next;
+    *p_instance_info_next = (*p_instance_info)->next;
+    return APR_SUCCESS;
 }
 
 /**
@@ -320,19 +344,58 @@ FreeComponentInfo(ComponentInfoHandle component_info) {
 }
 
 static int
+DumpComponent(OpenComponentHandle component) {
+    TRACE(("%s-%s (Vendor: %s)\nDescription:\t\nInterfaces:\t",
+        component->GetName(), component->GetVersion(),
+        component->GetVendor(), component->GetDescription()));
+
+    const char** p_name = component->ListInterfaceNames();
+    /*
+     * String array is NULL terminated. We increase a string pointer until
+     * it becomes NULL.
+     */
+    for(; *p_name; p_name++) {
+        TRACE((" %s", *p_name));
+    }
+    return APR_SUCCESS;
+}
+
+/**
+ * Decreases a component reference count. If the count becomes zero,
+ * unregisters a component and frees all associated instances.
+ * @param name a component name to be unregistered
+ * @return APR_SUCCESS if successful, or APR_NOTFOUND if the component
+ * cannot be found
+ */
+static int
 RemoveAndFreeComponentInfo(const char* component_name) {
-    ComponentInfoHandle component_info;
-    int ret = RemoveComponentInfo(&component_info, component_name);
+    TRACE(("static RemoveAndFreeComponentInfo()"));
+
+    _ComponentInfo** p_component_info;
+    int ret = GetComponentInfoSlot(&p_component_info, component_name);
     if (APR_SUCCESS != ret) {
         return ret;
     }
 
+    _ComponentInfo* component_info = *p_component_info;
+    DumpComponent(component_info->component);
+
+    assert(component_info->num_clients > 0);
+    TRACE(("Removing one of %d component subscribers", component_info->num_clients));
+
+    if (--component_info->num_clients > 0) {
+        /* there are still clients for this component, stop here */
+        return APR_SUCCESS;
+    }
+
+    /* since there are no more cllients, remove the component */
+    *p_component_info = component_info->next;
     return FreeComponentInfo(component_info);
 }
 
 static int
 InitializeGlobalLock() {
-   TRACE("Cm.InitializeGlobalLock()");
+   TRACE(("Cm.InitializeGlobalLock()"));
     apr_pool_t* pool;
     int ret = apr_pool_create(&pool, NULL);
     if (APR_SUCCESS != ret) {
@@ -377,7 +440,7 @@ InitializeGlobalLock() {
  */
 static int
 Destroy() {
-    TRACE("Cm.Destroy()");
+    TRACE(("Cm.Destroy()"));
     int ret = APR_SUCCESS, ret_new;
 
     /* Deallocate all components */
@@ -405,7 +468,7 @@ static int
 AddComponent(OpenComponentInitializer init_func,
              DllHandle lib,
              apr_pool_t* parent_pool) {
-    TRACE("Cm.AddComponent()");
+    TRACE(("static AddComponent()"));
 
     apr_pool_t* pool;
     int ret = apr_pool_create(&pool, parent_pool);
@@ -413,49 +476,47 @@ AddComponent(OpenComponentInitializer init_func,
         return ret;
     }
 
-    _ComponentInfo* component_info = (_ComponentInfo*)
+    _ComponentInfo* new_component_info = (_ComponentInfo*)
         apr_pcalloc(pool, sizeof(_ComponentInfo));
-
-    if (NULL == component_info) {
-        /* Out of memory */
-        apr_pool_destroy(pool);
-        return APR_ENOMEM;
+    if (NULL == new_component_info) {
+        /* out of memory */
+        ret = APR_ENOMEM;
+        goto error;
     }
 
     OpenComponentHandle component;
-    ret = init_func(&component,
-        &(component_info->instance_allocator),
+    ret = init_func(&component, &(new_component_info->instance_allocator),
         pool);
     if (APR_SUCCESS != ret) {
+        goto error;
+    }
+    new_component_info->component = component;
+    new_component_info->pool = pool;
+    new_component_info->declaring_library = lib;
+
+    DumpComponent(component);
+
+    /* check that the component does not exist */
+    ComponentInfoHandle component_info;
+    ret = GetComponentInfo(&component_info, component->GetName());
+
+    if (APR_SUCCESS == ret) {
+        /* the component with the same name is already registered */
         apr_pool_destroy(pool);
-        return ret;
+        ((struct _ComponentInfo*) component_info)->num_clients++;
+    } else if (APR_NOTFOUND == ret) {
+        /* add a new component to the global component manager list */
+        new_component_info->next = component_manager_impl->components;
+        component_manager_impl->components = new_component_info;
+        new_component_info->num_clients = 1;
+    } else {
+        goto error;
     }
-    component_info->component = component;
-    component_info->pool = pool;
-    component_info->declaring_library = lib;
-
-    TRACE("Cm.AddComponent():\t" << component->GetName()
-        << "-" << component->GetVersion()
-        << " (Vendor: "
-        << component->GetVendor()
-        << ")\n"
-        << "Description:\t"
-        << component->GetDescription() << "\n"
-        << "Interfaces:\t");
-
-    const char** p_name = component->ListInterfaceNames();
-    /*
-     * String array is NULL terminated. We increase a string pointer until
-     * it becomes NULL.
-     */
-    for(; *p_name; p_name++) {
-        TRACE(" " << *p_name);
-    }
-
-    /* Add to the global component manager list */
-    component_info->next = component_manager_impl->components;
-    component_manager_impl->components = component_info;
     return APR_SUCCESS;
+
+error:
+    apr_pool_destroy(pool);
+    return ret;
 }
 
 static int
@@ -489,14 +550,14 @@ FindLibrary(DllHandle* p_lib, const char* path) {
  */
 static int
 LoadLib(DllHandle* p_lib, const char* path) {
-    TRACE("Cm.LoadLibrary(\"" << path << "\")");
+    TRACE(("Cm.LoadLibrary(\"%s\")", path));
     int ret = FindLibrary(p_lib, path);
     if (APR_SUCCESS == ret) {
         return APR_SUCCESS;
     }
 
     ASSERT(APR_NOTFOUND == ret, \
-        "Unexpected return code from FindLibrary()");
+        ("Unexpected return code from FindLibrary()"));
 
     apr_pool_t* pool;
     ret = apr_pool_create(&pool, component_manager_impl->pool);
@@ -525,8 +586,7 @@ LoadLib(DllHandle* p_lib, const char* path) {
         char buffer[MAX_ERROR_BUFFER_SIZE];
         apr_dso_error(lib->descriptor,
                 buffer, MAX_ERROR_BUFFER_SIZE);
-        TRACE("Error loading " << path << ": " \
-            << buffer);
+        TRACE(("Error loading %s: %s", path, buffer));
         apr_pool_destroy(pool);
         return ret;
     }
@@ -542,74 +602,111 @@ LoadLib(DllHandle* p_lib, const char* path) {
  * by means of a component manager virtual table.
  */
 static int
-CmGetComponent(OpenComponentHandle* p_component,
-               const char* name) {
-    int ret = apr_thread_rwlock_rdlock(global_lock);
-    if (APR_SUCCESS != ret) {
-        return ret;
-    }
+GetComponent(OpenComponentHandle* p_component,
+             const char* name) {
+    VERIFY_SUCCESS(apr_thread_rwlock_rdlock(global_lock));
 
     ComponentInfoHandle component_info;
-    ret = GetComponentInfo(&component_info, name);
-    if (APR_SUCCESS != ret) {
-        apr_thread_rwlock_unlock(global_lock);
-        return ret;
+    int ret = GetComponentInfo(&component_info, name);
+    if (APR_SUCCESS == ret) {
+        *p_component = component_info->component;
     }
-    *p_component = component_info->component;
-    return apr_thread_rwlock_unlock(global_lock);
+
+    VERIFY_SUCCESS(apr_thread_rwlock_unlock(global_lock));
+    return ret;
 }
 
-
 static int
-CmCreateInstance(OpenInstanceHandle* p_instance,
-                    const char* name) {
-    int ret = apr_thread_rwlock_wrlock(global_lock);
-    if (APR_SUCCESS != ret) {
-        return ret;
-    }
+GetComponentByInstance(OpenComponentHandle* p_component,
+                       OpenInstanceHandle instance) {
+    VERIFY_SUCCESS(apr_thread_rwlock_rdlock(global_lock));
 
     ComponentInfoHandle component_info;
-    ret = GetComponentInfo(&component_info, name);
+    _InstanceInfo** p_instance_info;
+
+    int ret = GetInstanceInfoSlot(&p_instance_info, &component_info, instance);
+    if (APR_SUCCESS == ret) {
+        *p_component = component_info->component;
+    }
+
+    VERIFY_SUCCESS(apr_thread_rwlock_unlock(global_lock));
+    return ret;
+}
+
+static int
+CreateInstance(OpenInstanceHandle* p_instance,
+                    const char* name) {
+    VERIFY_SUCCESS(apr_thread_rwlock_wrlock(global_lock));
+
+    ComponentInfoHandle component_info;
+    int ret = GetComponentInfo(&component_info, name);
     if (APR_SUCCESS != ret) {
-        apr_thread_rwlock_unlock(global_lock);
-        return ret;
+        goto unlock;
     }
 
     apr_pool_t* pool;
     ret = apr_pool_create(&pool, component_info->pool);
-    if (APR_SUCCESS != ret) {
-        apr_thread_rwlock_unlock(global_lock);
-        return ret;
+    if (APR_SUCCESS != ret)  {
+        goto unlock;
     }
+
     ret = component_info->instance_allocator->CreateInstance(p_instance, pool);
-    if (APR_SUCCESS != ret) {
+    if (APR_SUCCESS != ret)  {
         apr_pool_destroy(pool);
-        apr_thread_rwlock_unlock(global_lock);
-        return ret;
+        goto unlock;
     }
 
     ret = AddInstance(*p_instance, component_info, pool);
-    if (APR_SUCCESS != ret) {
-        component_info->instance_allocator->FreeInstance(*p_instance); /* Ignore errors */
+    if (APR_SUCCESS != ret)  {
+         /* ignore errors */
+        component_info->instance_allocator->FreeInstance(*p_instance);
         apr_pool_destroy(pool);
-        apr_thread_rwlock_unlock(global_lock);
-        return ret;
     }
-    return apr_thread_rwlock_unlock(global_lock);
+
+unlock:
+    VERIFY_SUCCESS(apr_thread_rwlock_unlock(global_lock));
+    return ret;
 }
 
 
 static int
-CmFreeInstance(OpenInstanceHandle instance) {
-    int ret = apr_thread_rwlock_wrlock(global_lock);
-    if (APR_SUCCESS != ret) {
-        return ret;
+FreeInstance(OpenInstanceHandle instance) {
+    VERIFY_SUCCESS(apr_thread_rwlock_wrlock(global_lock));
+
+    int ret = RemoveAndFreeInstanceInfo(instance);
+
+    VERIFY_SUCCESS(apr_thread_rwlock_unlock(global_lock));
+    return ret;
+}
+
+static int
+GetInstances(OpenInstanceHandle* p_instance, int buf_len, int* len,
+             const char* name) {
+    VERIFY_SUCCESS(apr_thread_rwlock_rdlock(global_lock));
+
+    ComponentInfoHandle component_info;
+    int ret = GetComponentInfo(&component_info, name);
+
+    if (APR_SUCCESS == ret) {
+        *len = 0;
+        const OpenInstanceHandle* p_buf_end = p_instance + buf_len;
+        _InstanceInfo* instance_info = component_info->instances;
+
+        while (instance_info && p_instance < p_buf_end) {
+            *p_instance = instance_info->instance;
+            p_instance++;
+            (*len)++;
+            instance_info = instance_info->next;
+        }
+
+        while (instance_info) {
+            (*len)++;
+            instance_info = instance_info->next;
+        }
     }
 
-    ret = RemoveAndFreeInstanceInfo(instance);
-
-    int unlock_ret = apr_thread_rwlock_unlock(global_lock);
-    return (APR_SUCCESS == ret) ? unlock_ret : ret;
+    VERIFY_SUCCESS(apr_thread_rwlock_unlock(global_lock));
+    return ret;
 }
 
 /**
@@ -617,7 +714,7 @@ CmFreeInstance(OpenInstanceHandle instance) {
  */
 static int
 Create() {
-    TRACE("Cm.Create()");
+    TRACE(("Cm.Create()"));
 
     apr_pool_t* pool;
     int ret = apr_pool_create(&pool, global_pool);
@@ -634,9 +731,11 @@ Create() {
     }
 
     component_manager_impl->num_clients = 1;
-    component_manager_impl->cm.GetComponent = CmGetComponent;
-    component_manager_impl->cm.CreateInstance = CmCreateInstance;
-    component_manager_impl->cm.FreeInstance = CmFreeInstance;
+    component_manager_impl->cm.GetComponent = GetComponent;
+    component_manager_impl->cm.GetComponentByInstance = GetComponentByInstance;
+    component_manager_impl->cm.CreateInstance = CreateInstance;
+    component_manager_impl->cm.FreeInstance = FreeInstance;
+    component_manager_impl->cm.GetInstances = GetInstances;
     component_manager_impl->pool = pool;
 
     return APR_SUCCESS;
@@ -648,27 +747,28 @@ Create() {
  */
 int
 CmAcquire(OpenComponentManagerHandle* p_cm) {
-    TRACE("Cm.Acquire()");
+    TRACE(("Cm.Acquire()"));
     InitializeGlobalLock();
 
-    PORT_VERIFY_SUCCESS(apr_thread_rwlock_wrlock(global_lock));
+    VERIFY_SUCCESS(apr_thread_rwlock_wrlock(global_lock));
     if (NULL == component_manager_impl) {
         int ret = Create();
         if (APR_SUCCESS != ret) {
-            PORT_VERIFY_SUCCESS(apr_thread_rwlock_unlock(global_lock));
+            VERIFY_SUCCESS(apr_thread_rwlock_unlock(global_lock));
             return ret;
         }
     } else {
         component_manager_impl->num_clients++;
     }
+    TRACE(("Cm.Acquire(): component_manager_impl->num_clients = %d", component_manager_impl->num_clients));
     *p_cm = (OpenComponentManagerHandle) component_manager_impl;
-    PORT_VERIFY_SUCCESS(apr_thread_rwlock_unlock(global_lock));
+    VERIFY_SUCCESS(apr_thread_rwlock_unlock(global_lock));
     return APR_SUCCESS;
 }
 
 int
 CmRelease() {
-    PORT_VERIFY_SUCCESS(apr_thread_rwlock_wrlock(global_lock));
+    VERIFY_SUCCESS(apr_thread_rwlock_wrlock(global_lock));
     component_manager_impl->num_clients--;
 
     int ret = APR_SUCCESS;
@@ -676,63 +776,61 @@ CmRelease() {
         ret = Destroy();
     }
     
-    PORT_VERIFY_SUCCESS(apr_thread_rwlock_unlock(global_lock));
+    VERIFY_SUCCESS(apr_thread_rwlock_unlock(global_lock));
     return ret;
 }
 
 int
 CmAddComponent(OpenComponentInitializer init_func) {
-    TRACE("Cm.AddComponent()");
-    PORT_VERIFY_SUCCESS(apr_thread_rwlock_wrlock(global_lock));
+    TRACE(("Cm.AddComponent()"));
+    VERIFY_SUCCESS(apr_thread_rwlock_wrlock(global_lock));
 
     int ret = AddComponent(init_func, NULL, component_manager_impl->pool);
 
-    PORT_VERIFY_SUCCESS(apr_thread_rwlock_unlock(global_lock));
+    VERIFY_SUCCESS(apr_thread_rwlock_unlock(global_lock));
     return ret;
 }
 
 int
 CmLoadComponent(const char* path,
                 const char* init_func_name) {
-    TRACE("Cm.LoadComponent(\"" << path
-        << "\", " << init_func_name << "())");
+    TRACE(("Cm.LoadComponent(\"%s\", %s())", path, init_func_name));
 
-    PORT_VERIFY_SUCCESS(apr_thread_rwlock_wrlock(global_lock));
+    VERIFY_SUCCESS(apr_thread_rwlock_wrlock(global_lock));
 
     DllHandle lib;
     int ret = LoadLib(&lib, path);
     if (APR_SUCCESS != ret) {
-        PORT_VERIFY_SUCCESS(apr_thread_rwlock_unlock(global_lock));
-        printf("failed to load: %d %s\n", ret, path);
-        return ret;
+        TRACE(("failed to load: %d %s\n", ret, path));
+        goto load_error;
     }
     
     OpenComponentInitializer init_func;
     ret = GetOpenComponentInitializer(&init_func, lib, init_func_name);
     if (APR_SUCCESS != ret) {
-        /* Ignore error */
-        ReleaseLib(lib);
-        PORT_VERIFY_SUCCESS(apr_thread_rwlock_unlock(global_lock));
-        printf("failed to init: %d\n", ret);
-        return ret;
+        TRACE(("failed to init: %d\n", ret));
+        goto init_error;
     }
 
     ret = AddComponent(init_func, lib, lib->pool);
-    if (APR_SUCCESS != ret) {
-        /* Ignore error */
-        ReleaseLib(lib);
-        PORT_VERIFY_SUCCESS(apr_thread_rwlock_unlock(global_lock));
+    if (APR_SUCCESS == ret) {
+        VERIFY_SUCCESS(apr_thread_rwlock_unlock(global_lock));
+        return APR_SUCCESS;
     }
 
-    PORT_VERIFY_SUCCESS(apr_thread_rwlock_unlock(global_lock));
-    return APR_SUCCESS;
+    /* ignore errors */
+init_error:
+    ReleaseLib(lib);
+load_error:
+    VERIFY_SUCCESS(apr_thread_rwlock_unlock(global_lock));
+    return ret;
 }
 
 int
-CmFreeComponent(const char* component_name) {
-    PORT_VERIFY_SUCCESS(apr_thread_rwlock_wrlock(global_lock));
+CmReleaseComponent(const char* component_name) {
+    VERIFY_SUCCESS(apr_thread_rwlock_wrlock(global_lock));
     int ret = RemoveAndFreeComponentInfo(component_name);
-    PORT_VERIFY_SUCCESS(apr_thread_rwlock_unlock(global_lock));
+    VERIFY_SUCCESS(apr_thread_rwlock_unlock(global_lock));
     return ret;
 }
 

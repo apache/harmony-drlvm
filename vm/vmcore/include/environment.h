@@ -337,6 +337,7 @@ struct Global_Env {
      */
 
     OpenComponentManagerHandle cm;
+    OpenComponentHandle em_component;
     OpenInstanceHandle em_instance;
     OpenEmVmHandle em_interface;
 

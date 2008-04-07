@@ -157,7 +157,7 @@ LWARN2(LOG_DOMAIN, message_number, messagedef_and_params)
 #define VERIFY(expr, message) { \
     if (!(expr)) { \
     LoggerString logger_string; \
-    logger_string << "Assertion failed: " << #expr << "\n" << message; \
+    logger_string << "Internal error: " << #expr << " failed\n" << message; \
     log4cxx_from_c(LOG_DOMAIN, DIE, logger_string.release(), __FILE__, __LOG4CXX_FUNC__, __LINE__); \
     shutdown_log_system(); \
     assert(expr); \
@@ -166,12 +166,6 @@ LWARN2(LOG_DOMAIN, message_number, messagedef_and_params)
 #define ASSERT(expr, message)  VERIFY(expr, message)
 
 #endif // NDEBUG 
-
-#define PORT_VERIFY_SUCCESS(func) { \
-    int ret = func; \
-    VERIFY(APR_SUCCESS == ret, \
-        "Internal error: a call returned non-zero error code" #func); \
-}
 
 #endif // LOG_DOMAIN
 

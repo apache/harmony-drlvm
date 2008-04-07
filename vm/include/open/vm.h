@@ -23,17 +23,19 @@
 #ifndef _VM_EXPORT_H
 #define _VM_EXPORT_H
 
+#define OPEN_VM "vm"
+#define OPEN_VM_VERSION "1.0"
+#define OPEN_INTF_VM "open.interface.vm." OPEN_VM_VERSION
+
+#define O_A_H_VM_VMDIR  "org.apache.harmony.vm.vmdir"
+
 #ifdef WIN32
 #include <stddef.h>
 #else
 #include <unistd.h>
 #endif
-
-
-
 #include "open/types.h"
 
-#define O_A_H_VM_VMDIR         "org.apache.harmony.vm.vmdir"
 
 #ifdef __cplusplus
 extern "C" {

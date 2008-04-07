@@ -107,7 +107,7 @@
 #define VERIFY(expr, message) {\
         if(!(expr)) { \
         const char* formatted_msg = log_printf message; \
-        const char* complete_msg = log_printf("Assertion failed: %s\n %s", #expr, formatted_msg); \
+        const char* complete_msg = log_printf("Internal error: %s failed\n%s", #expr, formatted_msg); \
         log4cxx_from_c(LOG_DOMAIN, DIE, complete_msg, __FILE__, __LOG4CXX_FUNC__, __LINE__); \
         STD_FREE((void*)formatted_msg); \
         STD_FREE((void*)complete_msg); \
@@ -119,6 +119,12 @@
 #define ASSERT(expr, message)  VERIFY(expr, message)
 
 #endif //NDEBUG 
+
+#define VERIFY_SUCCESS(func) { \
+    int ret = func; \
+    VERIFY(0 == ret, \
+        ("a call to " #func " returned a non-zero error code %d", ret)); \
+}
 
 #endif // LOG_DOMAIN
 

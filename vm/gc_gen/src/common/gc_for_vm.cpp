@@ -67,7 +67,9 @@ static void init_gc_helpers()
 int gc_init() 
 {
   INFO2("gc.process", "GC: call GC init...\n");
-  assert(p_global_gc == NULL);
+  if (p_global_gc != NULL) {
+      return JNI_ERR;
+  }
 
   vm_gc_lock_init();
 

@@ -158,4 +158,10 @@
     #define STD_ALLOCA(s) alloca(s)
 #endif // _MEMMGR
 
+#define STD_PCALLOC_STRUCT(pool, type, name) \
+    type* name = (type*) apr_pcalloc(pool, sizeof(type)); \
+    if (NULL == name) { \
+        return ENOMEM; \
+    }
+
 #endif // _PORT_MALLOC_H_

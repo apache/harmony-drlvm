@@ -231,15 +231,19 @@ static jint process_properties_dlls(Global_Env * vm_env) {
         return status;
     }
 
-    status = vm_env->cm->CreateInstance(&(vm_env->em_instance), "em");
-    if (status != JNI_OK) {
+    status = vm_env->cm->GetComponent(&(vm_env->em_component), OPEN_EM);
+    if (JNI_OK != status) {
+        return status;
+    }
+
+    status = vm_env->cm->CreateInstance(&(vm_env->em_instance), OPEN_EM);
+    if (JNI_OK != status) {
         LWARN(14, "Cannot instantiate EM");
         return status;
     }
 
-    status = vm_env->em_instance->intf->GetInterface(
-        (OpenInterfaceHandle*) &(vm_env->em_interface), OPEN_INTF_EM_VM);
-    if (status != JNI_OK) {
+    status = vm_env->em_component->GetInterface((OpenInterfaceHandle*) &(vm_env->em_interface), OPEN_INTF_EM_VM);
+    if (JNI_OK != status) {
         LWARN(15, "Cannot get EM_VM interface");
         return status;
     }
@@ -801,17 +805,7 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     // Initialize arguments
     initialize_vm_cmd_state(vm_env, vm_arguments);
 
-    // Initialize logging system as soon as possible.
-    init_log_system(get_portlib_for_logger(vm_env));
-    set_log_levels_from_cmd(&vm_env->vm_arguments);
-
     vm_monitor_init();
-
-    status = CmAcquire(&vm_env->cm);
-    if (status != JNI_OK) {
-        LWARN(23, "Failed to initialize a \"Component Manager\".");
-        return status; 
-    }
 
     /*    BEGIN: Property processing.    */
 
@@ -822,7 +816,6 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     if (status != JNI_OK) return status;
 
     tm_properties = (struct tm_props*) STD_MALLOC(sizeof(struct tm_props));
-
     if (!tm_properties) {
         LWARN(30, "failed to allocate mem for tp properties");
         return JNI_ERR;
