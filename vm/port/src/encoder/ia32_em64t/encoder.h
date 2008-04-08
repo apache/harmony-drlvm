@@ -678,7 +678,6 @@ ENCODER_DECLARE_EXPORT char * fst(char * stream, unsigned i, bool pop_stk);
 ENCODER_DECLARE_EXPORT char * fprem(char * stream);
 ENCODER_DECLARE_EXPORT char * fprem1(char * stream);
 //!char *math_frndint(char * stream);
-//!char *math_fsqrt(char * stream);
 //!char *math_fptan(char * stream);
 
 //

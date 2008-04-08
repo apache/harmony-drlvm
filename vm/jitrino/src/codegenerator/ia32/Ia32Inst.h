@@ -756,7 +756,15 @@ public:
            m==Mnemonic_POPFD  ||
            m==Mnemonic_PUSHFD ||
            m==Mnemonic_POP    ||
-           m==Mnemonic_PUSH   )
+           m==Mnemonic_PUSH   ||
+           m==Mnemonic_FSTP   ||
+           m==Mnemonic_FST    ||
+           m==Mnemonic_FIST   ||
+           m==Mnemonic_FLD    ||
+           m==Mnemonic_FILD   || 
+           m==Mnemonic_FLDLN2 ||
+           m==Mnemonic_FLDLG2 ||
+           m==Mnemonic_FLD1   )
         {
             return true;
         }

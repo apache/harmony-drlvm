@@ -63,6 +63,7 @@ protected:
 
     void   convertIntToInt(Opnd* dst, Opnd* src, Node* node);
     Opnd*  addElemIndexWithLEA(Opnd* array, Opnd* index, RegName dstRegName, Node* node);
+    Opnd*   getOpnd(Opnd* arg);
 
     IRManager* irm;
     CallInst* callInst;
@@ -80,10 +81,27 @@ public:\
     virtual void run();\
 };\
 
+enum Math_function {SIN, COS, TAN, ASIN, ACOS, ATAN, ATAN2, LOG, LOG10, LOG1P, ABS, SQRT};\
+ 
+#define DECLARE_HELPER_INLINER_MATH(name)\
+class name : public APIMagicHandler {\
+public:\
+    enum Math_function func;\
+    Mnemonic mnemonic;\
+    name (IRManager* irm, CallInst* inst, MethodDesc* md, enum Math_function f, Mnemonic mn = Mnemonic_NULL)\
+    : APIMagicHandler(irm, inst, md){name::func = f; name::mnemonic = mn;}\
+    \
+    virtual void run();\
+}\
+
+
 DECLARE_HELPER_INLINER(Integer_numberOfLeadingZeros_Handler_x_I_x_I);
 DECLARE_HELPER_INLINER(Integer_numberOfTrailingZeros_Handler_x_I_x_I);
 DECLARE_HELPER_INLINER(Long_numberOfLeadingZeros_Handler_x_J_x_I);
 DECLARE_HELPER_INLINER(Long_numberOfTrailingZeros_Handler_x_J_x_I);
+
+DECLARE_HELPER_INLINER_MATH(Math_Handler_x_D_x_D);
+
 DECLARE_HELPER_INLINER(System_arraycopyDirect_Handler);
 DECLARE_HELPER_INLINER(System_arraycopyReverse_Handler);
 DECLARE_HELPER_INLINER(String_compareTo_Handler_x_String_x_I);
@@ -93,6 +111,7 @@ DECLARE_HELPER_INLINER(String_indexOf_Handler_x_String_x_I_x_I);
 void APIMagicsHandlerSession::runImpl() {
     CompilationContext* cc = getCompilationContext();
     MemoryManager tmpMM("Inline API methods");
+    bool mathAsMagic = getBoolArg("magic_math", true);
     //finding all api magic calls
     IRManager* irm = cc->getLIRManager();
     ControlFlowGraph* fg = irm->getFlowGraph();
@@ -131,6 +150,50 @@ void APIMagicsHandlerSession::runImpl() {
                             } else if (!strcmp(methodName, "numberOfTrailingZeros") && !strcmp(signature, "(J)I")) {
                                 handlers.push_back(new (tmpMM) Long_numberOfTrailingZeros_Handler_x_J_x_I(irm, callInst, md));
                             }
+                        } else if (mathAsMagic && !strcmp(className, "java/lang/Math")) {
+                            if (!strcmp(signature, "(D)D")) { 
+                                if (!strcmp(methodName, "sqrt")) {                                   
+                                       handlers.push_back(new (tmpMM) Math_Handler_x_D_x_D(irm, callInst, md, SQRT, Mnemonic_FSQRT)); 
+                                } 
+                                if (!strcmp(methodName, "sin")) {                                    
+                                       handlers.push_back(new (tmpMM) Math_Handler_x_D_x_D(irm, callInst, md, SIN, Mnemonic_FSIN)); 
+                                }      
+                                if (!strcmp(methodName, "cos")) {                                    
+                                       handlers.push_back(new (tmpMM) Math_Handler_x_D_x_D(irm, callInst, md, COS, Mnemonic_FCOS)); 
+                                } 
+                                if (!strcmp(methodName, "abs")) {                                    
+                                       handlers.push_back(new (tmpMM) Math_Handler_x_D_x_D(irm, callInst, md, ABS, Mnemonic_FABS)); 
+                                }
+                                if (!strcmp(methodName, "tan")) {                                    
+                                       handlers.push_back(new (tmpMM) Math_Handler_x_D_x_D(irm, callInst, md, TAN, Mnemonic_FPTAN)); 
+                                } 
+                                if (!strcmp(methodName, "log")) {                                    
+                                       handlers.push_back(new (tmpMM) Math_Handler_x_D_x_D(irm, callInst, md, LOG, Mnemonic_FLDLN2)); 
+                                }       
+                                if (!strcmp(methodName, "log10")) {                                   
+                                       handlers.push_back(new (tmpMM) Math_Handler_x_D_x_D(irm, callInst, md, LOG10, Mnemonic_FLDLG2)); 
+                                }
+                                if (!strcmp(methodName, "log1p")) {                                   
+                                       handlers.push_back(new (tmpMM) Math_Handler_x_D_x_D(irm, callInst, md, LOG1P, Mnemonic_FLDLN2)); 
+                                }       
+                                if (!strcmp(methodName, "atan")) {                                    
+                                       handlers.push_back(new (tmpMM) Math_Handler_x_D_x_D(irm, callInst, md, ATAN)); 
+                                }
+                                if (!strcmp(methodName, "atan2")) {                                   
+                                       handlers.push_back(new (tmpMM) Math_Handler_x_D_x_D(irm, callInst, md, ATAN2)); 
+                                }
+                                if (!strcmp(methodName, "asin")) {                                    
+                                       handlers.push_back(new (tmpMM) Math_Handler_x_D_x_D(irm, callInst, md, ASIN)); 
+                                }
+                                if (!strcmp(methodName, "acos")) {                                    
+                                       handlers.push_back(new (tmpMM) Math_Handler_x_D_x_D(irm, callInst, md, ACOS)); 
+                                }
+                            } else {
+                                if (!strcmp(methodName, "abs")) {                                    
+                                       handlers.push_back(new (tmpMM) Math_Handler_x_D_x_D(irm, callInst, md, ABS, Mnemonic_FABS)); 
+                                }
+                            }                                                                                                                                                              
+                                
                         }
 #endif
                     } else if( ri->getKind() == Opnd::RuntimeInfo::Kind_InternalHelperAddress ) {
@@ -188,6 +251,72 @@ void Integer_numberOfLeadingZeros_Handler_x_I_x_I::run() {
 
     callInst->unlink();
 }
+
+void Math_Handler_x_D_x_D::run() {
+     Opnd* arg = getCallSrc(callInst, 0);
+     Opnd* res = getCallDst(callInst);
+     
+     Opnd* fp0 = getOpnd(arg);        
+     Node* node = callInst->getNode();
+     switch (func) {
+         case SQRT: case SIN: case COS: case ABS: case TAN:  
+             node->appendInst(irm->newInst(Mnemonic_FLD, fp0, arg));                
+             node->appendInst(irm->newInst(mnemonic, fp0));             
+             if (func == TAN) {
+                 node->appendInst(irm->newInst(Mnemonic_FSTP, res, fp0));    
+             }                                                                        
+             break;
+         case LOG: case LOG10: case LOG1P:
+             node->appendInst(irm->newInst(mnemonic, fp0));
+             node->appendInst(irm->newInst(Mnemonic_FLD, fp0, arg));
+             if (func == LOG1P) {
+                 node->appendInst(irm->newInst(Mnemonic_FLD1, fp0));
+                 node->appendInst(irm->newInst(Mnemonic_FADDP, fp0));          
+             }                 
+             node->appendInst(irm->newInst(Mnemonic_FYL2X, fp0));        
+             break;
+         case ATAN: case ATAN2:
+             node->appendInst(irm->newInst(Mnemonic_FLD, fp0, arg));                 
+             if (func == ATAN2) {
+                 node->appendInst(irm->newInst(Mnemonic_FLD, fp0, 
+                                               getCallSrc(callInst, 1))); 
+                 node->appendInst(irm->newInst(Mnemonic_FDIVP, fp0));         
+             } 
+             node->appendInst(irm->newInst(Mnemonic_FLD1, fp0));                 
+             node->appendInst(irm->newInst(Mnemonic_FPATAN, fp0));        
+             break;
+         case ASIN: case ACOS:
+             node->appendInst(irm->newInst(Mnemonic_FLD, fp0, arg));         
+             node->appendInst(irm->newInst(Mnemonic_FLD1, fp0));                 
+             node->appendInst(irm->newInst(Mnemonic_FLD, fp0, arg));
+             node->appendInst(irm->newInst(Mnemonic_FLD, fp0, arg));                     
+             node->appendInst(irm->newInst(Mnemonic_FMULP, fp0));        
+             node->appendInst(irm->newInst(Mnemonic_FSUBP, fp0));         
+             node->appendInst(irm->newInst(Mnemonic_FSQRT, fp0)); 
+             if (func == ACOS) {
+                 node->appendInst(irm->newInst(Mnemonic_FXCH, fp0));     
+             }
+             node->appendInst(irm->newInst(Mnemonic_FPATAN, fp0));        
+             break;
+         default: assert(0);
+     } 
+     node->appendInst(irm->newInst(Mnemonic_FSTP, res, fp0));
+     callInst->unlink();
+}                                      
+
+
+Opnd* APIMagicHandler::getOpnd(Opnd* arg) {
+     if (arg->getSize() == OpndSize_64) {
+         Opnd * fp0Op64 = irm->newOpnd(irm->getTypeManager().getDoubleType(), RegName_FP0D);        
+         fp0Op64->assignRegName(RegName_FP0D);
+         return fp0Op64;
+     } else {
+         Opnd * fp0Op32 = irm->newOpnd(irm->getTypeManager().getSingleType(), RegName_FP0S);        
+         fp0Op32->assignRegName(RegName_FP0S);        
+         return fp0Op32;
+        
+     }
+}                                                                                                                
 
 void Integer_numberOfTrailingZeros_Handler_x_I_x_I::run() {
     //mov r2,32

@@ -618,10 +618,10 @@ END_MNEMONIC()
                  ***** FPU operations *****
 ****************************************************************************/
 
-BEGIN_MNEMONIC(FADDP, MF_NONE, U )
+BEGIN_MNEMONIC(FADDP, MF_NONE, DU )
 BEGIN_OPCODES()
-    {OpcodeInfo::all, {0xDE, 0xC1},       {FP0D, FP1D}, DU_U },
-    {OpcodeInfo::all, {0xDE, 0xC1},       {FP0S, FP1S}, DU_U },
+    {OpcodeInfo::all, {0xDE, 0xC1},       {FP0D}, DU },
+    {OpcodeInfo::all, {0xDE, 0xC1},       {FP0S}, DU },
 END_OPCODES()
 END_MNEMONIC()
     
@@ -639,10 +639,10 @@ BEGIN_OPCODES()
 END_OPCODES()
 END_MNEMONIC()
     
-BEGIN_MNEMONIC(FSUBP, MF_NONE, U )                       
+BEGIN_MNEMONIC(FSUBP, MF_NONE, DU )                       
 BEGIN_OPCODES()
-    {OpcodeInfo::all, {0xDE, 0xE9},       {FP0D, FP1D}, DU_U },
-    {OpcodeInfo::all, {0xDE, 0xE9},       {FP0S, FP1S}, DU_U },
+    {OpcodeInfo::all, {0xDE, 0xE9},       {FP0D}, DU },
+    {OpcodeInfo::all, {0xDE, 0xE9},       {FP0S}, DU },
 END_OPCODES()
 END_MNEMONIC()
     
@@ -652,6 +652,15 @@ BEGIN_OPCODES()
     {OpcodeInfo::all, {0xD8, _4},       {FP0S, m32}, DU_U },
 END_OPCODES()
 END_MNEMONIC()
+
+BEGIN_MNEMONIC(FISUB,   MF_NONE, U )                     
+BEGIN_OPCODES()
+    {OpcodeInfo::all, {0xDA, _4},       {FP0S, m32}, DU_U },
+//    {OpcodeInfo::all, {0xDE, _4},       {FP0S, m16}, DU_U },
+END_OPCODES()
+END_MNEMONIC()
+
+
     
 BEGIN_MNEMONIC(FMUL,   MF_NONE, DU_U )                     
 BEGIN_OPCODES()
@@ -660,17 +669,17 @@ BEGIN_OPCODES()
 END_OPCODES()
 END_MNEMONIC()
     
-BEGIN_MNEMONIC(FMULP, MF_NONE, U )                       
+BEGIN_MNEMONIC(FMULP, MF_NONE, DU )                       
 BEGIN_OPCODES()
-    {OpcodeInfo::all, {0xDE, 0xC9},       {FP0D, FP1D}, DU_U },
-    {OpcodeInfo::all, {0xDE, 0xC9},       {FP0S, FP1S}, DU_U },
+    {OpcodeInfo::all, {0xDE, 0xC9},       {FP0D}, DU }, 
+    {OpcodeInfo::all, {0xDE, 0xC9},       {FP0S}, DU }, 
 END_OPCODES()
 END_MNEMONIC()
     
-BEGIN_MNEMONIC(FDIVP, MF_NONE, U )                       
+BEGIN_MNEMONIC(FDIVP, MF_NONE, DU )                       
 BEGIN_OPCODES()
-    {OpcodeInfo::all, {0xDE, 0xF9},       {FP0D, FP1D}, DU_U },
-    {OpcodeInfo::all, {0xDE, 0xF9},       {FP0S, FP1S}, DU_U },
+    {OpcodeInfo::all, {0xDE, 0xF9},       {FP0D}, DU },
+    {OpcodeInfo::all, {0xDE, 0xF9},       {FP0S}, DU },
 END_OPCODES()
 END_MNEMONIC()
     
@@ -785,6 +794,28 @@ BEGIN_OPCODES()
 END_OPCODES()
 END_MNEMONIC()
 
+BEGIN_MNEMONIC(FLDLG2, MF_NONE, U )
+BEGIN_OPCODES()
+    {OpcodeInfo::all, {0xD9, 0xEC}, {FP0S},    D },
+    {OpcodeInfo::all, {0xD9, 0xEC}, {FP0D},    D },
+END_OPCODES()
+END_MNEMONIC()
+
+BEGIN_MNEMONIC(FLDLN2, MF_NONE, U )
+BEGIN_OPCODES()
+    {OpcodeInfo::all, {0xD9, 0xED}, {FP0S},    D },
+    {OpcodeInfo::all, {0xD9, 0xED}, {FP0D},    D }, 
+END_OPCODES()
+END_MNEMONIC()
+
+BEGIN_MNEMONIC(FLD1, MF_NONE, U )
+BEGIN_OPCODES()
+    {OpcodeInfo::all, {0xD9, 0xE8}, {FP0S},    D },
+    {OpcodeInfo::all, {0xD9, 0xE8}, {FP0D},    D }, 
+END_OPCODES()
+END_MNEMONIC()
+
+
 BEGIN_MNEMONIC(FPREM, MF_NONE, N)
   BEGIN_OPCODES()
           {OpcodeInfo::all, {0xD9, 0xF8},       {},     N },
@@ -820,6 +851,85 @@ BEGIN_OPCODES()
     {OpcodeInfo::all,   {0xDD, 0xD8|_i},        {fp64},         D },
 END_OPCODES()
 END_MNEMONIC()
+
+BEGIN_MNEMONIC(FSQRT, MF_NONE, DU)
+  BEGIN_OPCODES()
+          {OpcodeInfo::all, {0xD9, 0xFA},       {FP0S},     DU   },
+          {OpcodeInfo::all, {0xD9, 0xFA},       {FP0D},     DU   },
+  END_OPCODES()
+END_MNEMONIC()
+
+
+BEGIN_MNEMONIC(FYL2X, MF_NONE, DU)
+  BEGIN_OPCODES()
+          {OpcodeInfo::all, {0xD9, 0xF1},       {FP0S},     DU   },
+          {OpcodeInfo::all, {0xD9, 0xF1},       {FP0D},     DU   },
+  END_OPCODES()
+END_MNEMONIC()
+
+
+BEGIN_MNEMONIC(FYL2XP1, MF_NONE, DU)
+  BEGIN_OPCODES()
+          {OpcodeInfo::all, {0xD9, 0xF9},       {FP0S},     DU   },
+          {OpcodeInfo::all, {0xD9, 0xF9},       {FP0D},     DU   },
+  END_OPCODES()
+END_MNEMONIC()
+
+BEGIN_MNEMONIC(F2XM1, MF_NONE, DU)
+  BEGIN_OPCODES()
+          {OpcodeInfo::all, {0xD9, 0xF0},       {FP0S},     DU   },
+          {OpcodeInfo::all, {0xD9, 0xF0},       {FP0D},     DU   },
+  END_OPCODES()
+END_MNEMONIC()
+
+BEGIN_MNEMONIC(FPATAN, MF_NONE, DU)
+  BEGIN_OPCODES()
+          {OpcodeInfo::all, {0xD9, 0xF3},       {FP0S},     DU   },
+          {OpcodeInfo::all, {0xD9, 0xF3},       {FP0D},     DU   },
+  END_OPCODES()
+END_MNEMONIC()
+
+BEGIN_MNEMONIC(FXCH, MF_NONE, DU)
+  BEGIN_OPCODES()
+          {OpcodeInfo::all, {0xD9, 0xC9},       {FP0S},     DU   },
+          {OpcodeInfo::all, {0xD9, 0xC9},       {FP0D},     DU   },
+  END_OPCODES()
+END_MNEMONIC()
+
+BEGIN_MNEMONIC(FSCALE, MF_NONE, DU)
+  BEGIN_OPCODES()
+          {OpcodeInfo::all, {0xD9, 0xFD},       {FP0S},     DU   },
+          {OpcodeInfo::all, {0xD9, 0xFD},       {FP0D},     DU   },
+  END_OPCODES()
+END_MNEMONIC()    
+
+BEGIN_MNEMONIC(FABS, MF_NONE, DU)
+  BEGIN_OPCODES()
+          {OpcodeInfo::all, {0xD9, 0xE1},       {FP0S},     DU   },
+          {OpcodeInfo::all, {0xD9, 0xE1},       {FP0D},     DU   },
+  END_OPCODES()
+END_MNEMONIC()
+
+BEGIN_MNEMONIC(FSIN, MF_NONE, DU)
+  BEGIN_OPCODES()
+          {OpcodeInfo::all, {0xD9, 0xFE},       {FP0S},     DU   },
+          {OpcodeInfo::all, {0xD9, 0xFE},       {FP0D},     DU   },
+  END_OPCODES()
+END_MNEMONIC()
+
+BEGIN_MNEMONIC(FCOS, MF_NONE, DU)
+  BEGIN_OPCODES()
+          {OpcodeInfo::all, {0xD9, 0xFF},       {FP0S},     DU   },
+          {OpcodeInfo::all, {0xD9, 0xFF},       {FP0D},     DU   },
+  END_OPCODES()
+END_MNEMONIC()
+
+BEGIN_MNEMONIC(FPTAN, MF_NONE, DU)
+  BEGIN_OPCODES()
+          {OpcodeInfo::all, {0xD9, 0xF2},       {FP0S},     DU   },
+          {OpcodeInfo::all, {0xD9, 0xF2},       {FP0D},     DU   },
+  END_OPCODES()
+END_MNEMONIC()                    
 
 //
 // ~ FPU

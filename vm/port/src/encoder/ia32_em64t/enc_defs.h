@@ -478,6 +478,7 @@ Mnemonic_FLDZ,
 Mnemonic_FADD,                        
 Mnemonic_FSUBP,                        
 Mnemonic_FSUB,                        
+Mnemonic_FISUB,
 Mnemonic_FMUL,                        
 Mnemonic_FMULP,                        
 Mnemonic_FDIVP,                        
@@ -490,6 +491,10 @@ Mnemonic_FNSTSW,                         // Store FPU status word
 //Mnemonic_FDECSTP,                     // Decrement Stack-Top Pointer
 Mnemonic_FILD,                          // Load Integer
 Mnemonic_FLD,                           // Load Floating Point Value
+Mnemonic_FLDLG2,
+Mnemonic_FLDLN2,
+Mnemonic_FLD1,
+
 Mnemonic_FCLEX,                         // Clear Exceptions
 Mnemonic_FCHS,                          // Change sign of ST0
 Mnemonic_FNCLEX,                        // Clear Exceptions
@@ -502,6 +507,17 @@ Mnemonic_FPREM,                         // Partial Remainder
 Mnemonic_FPREM1,                        // Partial Remainder
 Mnemonic_FST,                           // Store Floating Point Value
 Mnemonic_FSTP,                          // Store Floating Point Value and pop the FP stack
+Mnemonic_FSQRT,                         //Computes the square root of the source value in the stack and pop the FP stack
+Mnemonic_FABS,                          //Computes the absolute value of the source value in the stack and pop the FP stack
+Mnemonic_FSIN,                          //Computes the sine of the source value in the stack and pop the FP stack
+Mnemonic_FCOS,                          //Computes the cosine of the source value in the stack and pop the FP stack
+Mnemonic_FPTAN,                         //Computes the tangent of the source value in the stack and pop the FP stack
+Mnemonic_FYL2X,
+Mnemonic_FYL2XP1,
+Mnemonic_F2XM1,
+Mnemonic_FPATAN,
+Mnemonic_FXCH,
+Mnemonic_FSCALE,
 
 Mnemonic_XCHG,
 Mnemonic_DIV,                           // Unsigned Divide

@@ -134,6 +134,25 @@ Inliner::Inliner(SessionAction* argSource, MemoryManager& mm, IRManager& irm,
             _inlineSkipMethodTable->add_method_record("java/lang/Integer", "numberOfTrailingZeros", "(I)I", des, false);
             _inlineSkipMethodTable->add_method_record("java/lang/Long", "numberOfLeadingZeros", "(J)I", des, false);
             _inlineSkipMethodTable->add_method_record("java/lang/Long", "numberOfTrailingZeros", "(J)I", des, false);
+            _inlineSkipMethodTable->add_method_record("java/lang/Math", "sqrt", "(D)D", des, false); 
+            _inlineSkipMethodTable->add_method_record("java/lang/Math", "sin", "(D)D", des, false); 
+            _inlineSkipMethodTable->add_method_record("java/lang/Math", "cos", "(D)D", des, false); 
+            _inlineSkipMethodTable->add_method_record("java/lang/Math", "abs", "(J)J", des, false);
+            _inlineSkipMethodTable->add_method_record("java/lang/Math", "abs", "(I)I", des, false); 
+            _inlineSkipMethodTable->add_method_record("java/lang/Math", "abs", "(J)J", des, false);
+            _inlineSkipMethodTable->add_method_record("java/lang/Math", "abs", "(F)F", des, false);            
+            _inlineSkipMethodTable->add_method_record("java/lang/Math", "abs", "(D)D", des, false); 
+            _inlineSkipMethodTable->add_method_record("java/lang/Math", "tan", "(D)D", des, false);           
+            _inlineSkipMethodTable->add_method_record("java/lang/Math", "atan", "(D)D", des, false);  
+            _inlineSkipMethodTable->add_method_record("java/lang/Math", "atan2", "(D)D", des, false);  
+            _inlineSkipMethodTable->add_method_record("java/lang/Math", "asin", "(D)D", des, false); 
+            _inlineSkipMethodTable->add_method_record("java/lang/Math", "acos", "(D)D", des, false);                         
+            _inlineSkipMethodTable->add_method_record("java/lang/Math", "log", "(D)D", des, false);           
+            _inlineSkipMethodTable->add_method_record("java/lang/Math", "log10", "(D)D", des, false);           
+            _inlineSkipMethodTable->add_method_record("java/lang/Math", "log1p", "(D)D", des, false);           
+
+
+            
 
 #endif
             if(argSource->getBoolArg("System_arraycopy_as_magic",true)) {
