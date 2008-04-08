@@ -111,7 +111,9 @@ DECLARE_HELPER_INLINER(String_indexOf_Handler_x_String_x_I_x_I);
 void APIMagicsHandlerSession::runImpl() {
     CompilationContext* cc = getCompilationContext();
     MemoryManager tmpMM("Inline API methods");
+#ifndef _EM64T_
     bool mathAsMagic = getBoolArg("magic_math", true);
+#endif
     //finding all api magic calls
     IRManager* irm = cc->getLIRManager();
     ControlFlowGraph* fg = irm->getFlowGraph();
