@@ -127,11 +127,11 @@ void CodeGen::gen_modification_watchpoint(JavaByteCodes opcode, jtype jt, Field_
 
 #ifndef _EM64T_
     // Workaround since do_mov do not put jlong on stack in gen_args on ia32
-    static const CallSig cs_ti_fmodif(CCONV_HELPERS, jvoid, jobj, jobj, i32, i32, jobj, jobj);
+    SYNC_FIRST(static const CallSig cs_ti_fmodif(CCONV_HELPERS, jvoid, jobj, jobj, i32, i32, jobj, jobj));
     Val vlocation((jlong)m_pc);
     Val vlocationHi((jlong)0);
 #else
-    static const CallSig cs_ti_fmodif(CCONV_HELPERS, jvoid, jobj, jobj, i64, jobj, jobj);
+    SYNC_FIRST(static const CallSig cs_ti_fmodif(CCONV_HELPERS, jvoid, jobj, jobj, i64, jobj, jobj));
     Val vlocation((jlong)m_pc);
 #endif
 
@@ -224,11 +224,11 @@ void CodeGen::gen_access_watchpoint(JavaByteCodes opcode, jtype jt, Field_Handle
 
 #ifndef _EM64T_
     // Workaround since do_mov do not put jlong on stack in gen_args on ia32
-    static const CallSig cs_ti_faccess(CCONV_HELPERS, jvoid, jobj, jobj, i32, i32, jobj);
+    SYNC_FIRST(static const CallSig cs_ti_faccess(CCONV_HELPERS, jvoid, jobj, jobj, i32, i32, jobj));
     Val vlocation((jlong)m_pc);
     Val vlocationHi((jlong)0);
 #else
-    static const CallSig cs_ti_faccess(CCONV_HELPERS, jvoid, jobj, jobj, i64, jobj);
+    SYNC_FIRST(static const CallSig cs_ti_faccess(CCONV_HELPERS, jvoid, jobj, jobj, i64, jobj));
     Val vlocation((jlong)m_pc);
 #endif
     rlock(cs_ti_faccess);
@@ -356,7 +356,7 @@ void CodeGen::gen_write_barrier(JavaByteCodes opcode, Field_Handle fieldHandle, 
 
     // WB4C has the following signature:
     //(object written to, slot written to, value written to slot)
-    static const CallSig wb4c_sig(CCONV_CDECL, jvoid, jobj, jobj, jobj);
+    SYNC_FIRST(static const CallSig wb4c_sig(CCONV_CDECL, jvoid, jobj, jobj, jobj));
     //static char* wb4c_helper = xxx_gc_heap_slot_write_ref
     static char* wb4c_helper = (char*)vm_helper_get_addr(VM_RT_GC_HEAP_WRITE_REF);
 
@@ -367,7 +367,7 @@ void CodeGen::gen_write_barrier(JavaByteCodes opcode, Field_Handle fieldHandle, 
     }
     // WB4J has the following signature:
     //(object written to, slot written to, value written to slot, metaA, metaB, mode)
-    static const CallSig wb4j_sig(CCONV_CDECL, jvoid, jobj, jobj, jobj, i32, i32, i32);
+    SYNC_FIRST(static const CallSig wb4j_sig(CCONV_CDECL, jvoid, jobj, jobj, jobj, i32, i32, i32));
     static char* wb4j_helper = NULL;
     
 

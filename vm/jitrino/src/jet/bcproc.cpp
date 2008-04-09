@@ -441,32 +441,32 @@ void Compiler::handle_ik_meth(const JInst& jinst) {
     }
     switch(jinst.opcode) {
     case OPCODE_IRETURN: {
-        static const CallSig cs(CCONV_MANAGED, i32);
+        SYNC_FIRST(static const CallSig cs(CCONV_MANAGED, i32));
         gen_return(cs);
         break;
     }
     case OPCODE_LRETURN: {
-        static const CallSig cs(CCONV_MANAGED, i64);
+        SYNC_FIRST(static const CallSig cs(CCONV_MANAGED, i64));
         gen_return(cs);
         break;
     }
     case OPCODE_FRETURN: {
-        static const CallSig cs(CCONV_MANAGED, flt32);
+        SYNC_FIRST(static const CallSig cs(CCONV_MANAGED, flt32));
         gen_return(cs);
         break;
     }
     case OPCODE_DRETURN: {
-        static const CallSig cs(CCONV_MANAGED, dbl64);
+        SYNC_FIRST(static const CallSig cs(CCONV_MANAGED, dbl64));
         gen_return(cs);
         break;
     }
     case OPCODE_ARETURN: {
-        static const CallSig cs(CCONV_MANAGED, jobj);
+        SYNC_FIRST(static const CallSig cs(CCONV_MANAGED, jobj));
         gen_return(cs);
         break;
     }
     case OPCODE_RETURN: {
-        static const CallSig cs(CCONV_MANAGED, jvoid);
+        SYNC_FIRST(static const CallSig cs(CCONV_MANAGED, jvoid));
         gen_return(cs);   
         break;
     }

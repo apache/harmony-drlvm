@@ -135,7 +135,7 @@ void CodeGen::gen_arr_store(jtype jt, bool helperOk)
     // stack: [.., aref, idx, val]
     if (jt == jobj && helperOk) {
         gen_write_barrier(m_curr_inst->opcode, NULL, Opnd(0));
-        static const CallSig cs_aastore(CCONV_HELPERS, jvoid, jobj, i32, jobj);
+        SYNC_FIRST(static const CallSig cs_aastore(CCONV_HELPERS, jvoid, jobj, i32, jobj));
         unsigned stackFix = gen_stack_to_args(true, cs_aastore, 0);
         gen_call_vm(cs_aastore, rt_helper_aastore, 3);
         if (stackFix != 0) {
@@ -242,7 +242,7 @@ Opnd CodeGen::get_field_addr(const FieldOpInfo& fieldOp, jtype jt) {
             Val& ref = vstack(ref_depth, true);
             where = Opnd(jt, ref.reg(), fld_offset);
         }  else { //field is not resolved -> generate code to request offset
-            static const CallSig cs_get_offset(CCONV_HELPERS, iplatf, iplatf, i32, i32);
+            SYNC_FIRST(static const CallSig cs_get_offset(CCONV_HELPERS, iplatf, iplatf, i32, i32));
             gen_call_vm(cs_get_offset, rt_helper_field_get_offset_withresolve, 0, fieldOp.enclClass, fieldOp.cpIndex, fieldOp.isPut());
             runlock(cs_get_offset);
             AR gr_ret = cs_get_offset.ret_reg(0);
@@ -257,7 +257,7 @@ Opnd CodeGen::get_field_addr(const FieldOpInfo& fieldOp, jtype jt) {
             char * fld_addr = (char*)field_get_address(fieldOp.fld);
             where = vaddr(jt, fld_addr);
         }  else { //field is not resolved -> generate code to request address
-            static const CallSig cs_get_addr(CCONV_HELPERS, iplatf, iplatf, i32, i32);
+            SYNC_FIRST(static const CallSig cs_get_addr(CCONV_HELPERS, iplatf, iplatf, i32, i32));
             gen_call_vm(cs_get_addr, rt_helper_field_get_address_withresolve, 0, fieldOp.enclClass, fieldOp.cpIndex, fieldOp.isPut());
             runlock(cs_get_addr);
             AR gr_ret = cs_get_addr.ret_reg(0);

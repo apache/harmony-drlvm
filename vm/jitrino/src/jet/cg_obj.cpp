@@ -57,7 +57,7 @@ void CodeGen::gen_new_array(Class_Handle enclClass, unsigned cpIndex)
         return;
     } 
     assert(lazy);
-    static const CallSig cs_newarray_withresolve(CCONV_HELPERS, jobj, iplatf, i32, i32);
+    SYNC_FIRST(static const CallSig cs_newarray_withresolve(CCONV_HELPERS, jobj, iplatf, i32, i32));
     Val sizeVal = vstack(0);
     // setup constant parameters first,
     Val vclass(iplatf, enclClass);
@@ -84,7 +84,7 @@ void CodeGen::gen_new_array(Allocation_Handle ah) {
         gen_call_throw(ci_helper_linkerr, rt_helper_throw_linking_exc, 0,
                        m_klass, jinst.op0, jinst.opcode);
     }
-    static const CallSig cs_new_arr(CCONV_HELPERS, jobj, i32, jobj);
+    SYNC_FIRST(static const CallSig cs_new_arr(CCONV_HELPERS, jobj, i32, jobj));
     unsigned stackFix = gen_stack_to_args(true, cs_new_arr, 0, 1);
     gen_call_vm(cs_new_arr, rt_helper_new_array, 1, ah);
     runlock(cs_new_arr);
@@ -120,7 +120,7 @@ void CodeGen::gen_multianewarray(Class_Handle enclClass, unsigned short cpIndex,
     bool resolve = !lazy || class_cp_is_entry_resolved(enclClass, cpIndex);
     if(!resolve) {
         assert(lazy);
-        static const CallSig ci_get_class_withresolve(CCONV_HELPERS, jobj, iplatf, i32);
+        SYNC_FIRST(static const CallSig ci_get_class_withresolve(CCONV_HELPERS, jobj, iplatf, i32));
         gen_call_vm(ci_get_class_withresolve, rt_helper_get_class_withresolve, 0, enclClass, cpIndex);
         runlock(ci_get_class_withresolve);
         AR gr_ret = ci_get_class_withresolve.ret_reg(0);
@@ -163,7 +163,7 @@ void CodeGen::gen_new(Class_Handle enclClass, unsigned short cpIndex)
     bool resolve = !lazy || class_cp_is_entry_resolved(enclClass, cpIndex);
     const CallSig* ci = NULL; 
     if (resolve) {
-        static const CallSig ci_new(CCONV_HELPERS, jobj, i32, jobj);
+        SYNC_FIRST(static const CallSig ci_new(CCONV_HELPERS, jobj, i32, jobj));
         ci = &ci_new;
 
         Class_Handle klass = resolve_class_new(m_compileHandle, enclClass, cpIndex);
@@ -179,7 +179,7 @@ void CodeGen::gen_new(Class_Handle enclClass, unsigned short cpIndex)
         }
     } else {
         assert(lazy);
-        static const CallSig ci_new_with_resolve(CCONV_HELPERS, jobj, iplatf, i32);
+        SYNC_FIRST(static const CallSig ci_new_with_resolve(CCONV_HELPERS, jobj, iplatf, i32));
         ci = &ci_new_with_resolve;
         gen_call_vm(ci_new_with_resolve, rt_helper_new_withresolve, 0, enclClass, cpIndex);
     }
@@ -200,8 +200,8 @@ void CodeGen::gen_instanceof_cast(JavaByteCodes opcode, Class_Handle enclClass, 
             // resolution has failed
             gen_call_throw(ci_helper_linkerr, rt_helper_throw_linking_exc, 0, enclClass, cpIdx, opcode);
         }
-        static const CallSig cs_checkcast(CCONV_HELPERS, jobj, jobj, jobj);
-        static const CallSig cs_instanceof(CCONV_HELPERS, i32, jobj, jobj);
+        SYNC_FIRST(static const CallSig cs_checkcast(CCONV_HELPERS, jobj, jobj, jobj));
+        SYNC_FIRST(static const CallSig cs_instanceof(CCONV_HELPERS, i32, jobj, jobj));
         const CallSig& cs = (opcode == OPCODE_CHECKCAST) ? cs_checkcast : cs_instanceof;   
         char * helper = (opcode == OPCODE_CHECKCAST) ? rt_helper_checkcast : rt_helper_instanceof;
         unsigned stackFix = gen_stack_to_args(true, cs, 0, 1);
@@ -213,8 +213,8 @@ void CodeGen::gen_instanceof_cast(JavaByteCodes opcode, Class_Handle enclClass, 
         gen_save_ret(cs);
     } else {
         assert(lazy);
-        static const CallSig cs_checkcast_with_resolve(CCONV_HELPERS, jobj, iplatf, i32, jobj);
-        static const CallSig cs_instanceof_with_resolve(CCONV_HELPERS, i32, iplatf, i32, jobj);
+        SYNC_FIRST(static const CallSig cs_checkcast_with_resolve(CCONV_HELPERS, jobj, iplatf, i32, jobj));
+        SYNC_FIRST(static const CallSig cs_instanceof_with_resolve(CCONV_HELPERS, i32, iplatf, i32, jobj));
         const CallSig& cs_with_resolve = (opcode == OPCODE_CHECKCAST) ? cs_checkcast_with_resolve : cs_instanceof_with_resolve;
         char * helper = (opcode == OPCODE_CHECKCAST) ? rt_helper_checkcast_withresolve : rt_helper_instanceof_withresolve;
         Val tos = vstack(0);
@@ -233,7 +233,7 @@ void CodeGen::gen_monitor_ee(void)
 {
     const JInst& jinst = *m_curr_inst;
     gen_check_null(0);
-    static const CallSig cs_mon(CCONV_HELPERS, jvoid, jobj);
+    SYNC_FIRST(static const CallSig cs_mon(CCONV_HELPERS, jvoid, jobj));
     unsigned stackFix = gen_stack_to_args(true, cs_mon, 0);
     gen_call_vm(cs_mon,
             jinst.opcode == OPCODE_MONITORENTER ? 
@@ -246,7 +246,7 @@ void CodeGen::gen_monitor_ee(void)
 
 void CodeGen::gen_athrow(void)
 {
-    static const CallSig cs_throw(CCONV_HELPERS, jvoid, jobj);
+    SYNC_FIRST(static const CallSig cs_throw(CCONV_HELPERS, jvoid, jobj));
     unsigned stackFix = gen_stack_to_args(true, cs_throw, 0);
     gen_call_vm(cs_throw, rt_helper_throw, 1);
     runlock(cs_throw);

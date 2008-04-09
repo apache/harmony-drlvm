@@ -137,7 +137,7 @@ void CodeGen::gen_dbg_rt(bool save_regs, const char * frmt, ...)
     strcpy(lost, tmp_buf);
     strcat(lost, id_buf);
     if (save_regs) { push_all(); }
-    static const CallSig cs(CCONV_STDCALL, jvoid, jobj);
+    SYNC_FIRST(static const CallSig cs(CCONV_STDCALL, jvoid, jobj));
     call(is_set(DBG_CHECK_STACK), gr0, (void*)&dbg_rt_out, cs, 0, lost);
     if (save_regs) { pop_all(); }
 }

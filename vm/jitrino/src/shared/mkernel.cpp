@@ -34,10 +34,14 @@
 
 namespace Jitrino {
 
+Mutex Mutex::appGlobal;
+
 #ifdef _WIN32
 typedef void (*RELEASE_FPTR)(void *);
 class FMAP : public map<TlsKey, RELEASE_FPTR>, public Mutex
 {};
+
+
 
 /**
  * Creates, initializes and caches the map to store RELEASE_FPTS functions.

@@ -142,13 +142,37 @@ private:
      * @brief Disallows copying.
      */
     const Mutex& operator=(const Mutex&);
+
+public:
+    static Mutex appGlobal;
+
 };
+
+
+#define _LINE_VAR_CAT( name, line ) name##line
+#define _LINE_VAR( name, line ) _LINE_VAR_CAT( name, line )
+#define LINE_VAR(name) _LINE_VAR( name, __LINE__ )
+
+#define SYNC_FIRST(Expression) \
+    static bool LINE_VAR(first) = true;\
+    bool LINE_VAR(locked) = false;\
+    if (LINE_VAR(first)) {\
+        Mutex::appGlobal.lock();\
+        LINE_VAR(locked) = true;\
+    }\
+    Expression;\
+    LINE_VAR(first) = false;\
+    if (LINE_VAR(locked)) {\
+        Mutex::appGlobal.unlock();\
+    }\
+
+
 
 /**
  * @brief Automatically unlocks a Mutex when AutoLock object goes out of 
  * scope.
  *
- * Class AutoUnlock is an utility class to handy acquire and [automagically]
+ * Class AutoUnlock is an utility class to handy acquire and [automatically]
  * release Mutex lock.
  *
  * A trivial C++ trick, which, I believe, is used everywhere with Mutexes - 

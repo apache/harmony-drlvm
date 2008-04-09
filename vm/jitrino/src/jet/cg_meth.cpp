@@ -515,7 +515,7 @@ void Compiler::gen_prolog(void) {
         alu(alu_cmp, mem, Opnd(0));
         unsigned br_off = br(z, 0, 0, taken);
         
-        static const CallSig cs_ti_menter(CCONV_HELPERS, jvoid, jobj);
+        SYNC_FIRST(static const CallSig cs_ti_menter(CCONV_HELPERS, jvoid, jobj));
         gen_call_vm(cs_ti_menter, rt_helper_ti_method_enter, 0, m_method);
         
         patch(br_off, ip());
@@ -609,7 +609,7 @@ void Compiler::gen_return(const CallSig& cs)
     if (compilation_params.exe_notify_method_exit) {
 
         // JVMTI helper takes pointer to return value and method handle
-        static const CallSig cs_ti_mexit(CCONV_HELPERS, jvoid, jobj, jobj);
+        SYNC_FIRST(static const CallSig cs_ti_mexit(CCONV_HELPERS, jvoid, jobj, jobj));
         // The call is a bit unusual, and is processed as follows:
         // we load an address of the top of the operand stack into 
         // a temporary register, and then pass this value as pointer
@@ -805,7 +805,7 @@ void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth, unsigned short
         AR gr_ret = ar_x;
         //1. get method address
         if (opcod == OPCODE_INVOKESTATIC || opcod == OPCODE_INVOKESPECIAL) {
-            static const CallSig cs_get_is_addr(CCONV_HELPERS, iplatf, iplatf, i32);
+            SYNC_FIRST(static const CallSig cs_get_is_addr(CCONV_HELPERS, iplatf, iplatf, i32));
             char* helper = opcod == OPCODE_INVOKESTATIC ?  rt_helper_get_invokestatic_addr_withresolve :
                                                            rt_helper_get_invokespecial_addr_withresolve;
             gen_call_vm(cs_get_is_addr, helper, 0, m_klass, cpIndex);
@@ -813,7 +813,7 @@ void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth, unsigned short
             gr_ret = cs_get_is_addr.ret_reg(0);
         } else {
             assert(opcod == OPCODE_INVOKEVIRTUAL || opcod == OPCODE_INVOKEINTERFACE);
-            static const CallSig cs_get_iv_addr(CCONV_HELPERS, iplatf, iplatf, i32, jobj);
+            SYNC_FIRST(static const CallSig cs_get_iv_addr(CCONV_HELPERS, iplatf, iplatf, i32, jobj));
             char * helper = opcod == OPCODE_INVOKEVIRTUAL ? rt_helper_get_invokevirtual_addr_withresolve : 
                                                             rt_helper_get_invokeinterface_addr_withresolve;
             // setup constant parameters first,

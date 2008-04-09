@@ -306,8 +306,8 @@ void CodeGen::gen_a(JavaByteCodes op, jtype jt)
         char * helper = NULL;
         bool is_dbl = jt == dbl64;
         if (op == OPCODE_INEG) {
-            static const CallSig cs_dbl(CCONV_STDCALL, dbl64, dbl64);
-            static const CallSig cs_flt(CCONV_STDCALL, flt32, flt32);
+            SYNC_FIRST(static const CallSig cs_dbl(CCONV_STDCALL, dbl64, dbl64));
+            SYNC_FIRST(static const CallSig cs_flt(CCONV_STDCALL, flt32, flt32));
             rcs = is_dbl? &cs_dbl : &cs_flt;
             stackFix = gen_stack_to_args(true, *rcs, 0, 1);
             helper = is_dbl ? (char*)&rt_h_neg_dbl64 : (char*)&rt_h_neg_flt32;
@@ -316,8 +316,8 @@ void CodeGen::gen_a(JavaByteCodes op, jtype jt)
         }
         else {
             //if (m_jframe->dip(1).stype == st_imm && )
-            static const CallSig cs_dbl(CCONV_STDCALL, dbl64, dbl64, dbl64, i32);
-            static const CallSig cs_flt(CCONV_STDCALL, flt32, flt32, flt32, i32);
+            SYNC_FIRST(static const CallSig cs_dbl(CCONV_STDCALL, dbl64, dbl64, dbl64, i32));
+            SYNC_FIRST(static const CallSig cs_flt(CCONV_STDCALL, flt32, flt32, flt32, i32));
             rcs = is_dbl? &cs_dbl : &cs_flt;
             stackFix = gen_stack_to_args(true, *rcs, 0, 2);
             helper = is_dbl ? (char*)&rt_h_dbl_a : (char*)&rt_h_flt_a;
@@ -327,21 +327,21 @@ void CodeGen::gen_a(JavaByteCodes op, jtype jt)
     }
     else if (jt==i64) {
         if (op == OPCODE_INEG) {
-            static const CallSig cs(CCONV_STDCALL, i64, i64);
+            SYNC_FIRST(static const CallSig cs(CCONV_STDCALL, i64, i64));
             rcs = &cs;
             stackFix = gen_stack_to_args(true, *rcs, 0, 1);
             gen_call_novm(*rcs, (void*)&rt_h_neg_i64, 1);
             runlock(*rcs);
         }
         else if (shft) {
-            static const CallSig cs(CCONV_STDCALL, i64, i64, i32, i32);
+            SYNC_FIRST(static const CallSig cs(CCONV_STDCALL, i64, i64, i32, i32));
             rcs = &cs;
             stackFix = gen_stack_to_args(true, *rcs, 0, 2);
             gen_call_novm(*rcs, (void*)&rt_h_i64_shift, 2, op);
             runlock(*rcs);
         }
         else {
-            static const CallSig cs(CCONV_STDCALL, i64, i64, i64, i32);
+            SYNC_FIRST(static const CallSig cs(CCONV_STDCALL, i64, i64, i64, i32));
             rcs = &cs;
             stackFix = gen_stack_to_args(true, *rcs, 0, 2);
             gen_call_novm(*rcs, (void*)&rt_h_i64_a, 2, op);
@@ -351,7 +351,7 @@ void CodeGen::gen_a(JavaByteCodes op, jtype jt)
     else {
         assert(jt==i32);
         if (op == OPCODE_INEG) {
-            static const CallSig cs(CCONV_STDCALL, i32, i32);
+            SYNC_FIRST(static const CallSig cs(CCONV_STDCALL, i32, i32));
             rcs = &cs;
             stackFix = gen_stack_to_args(true, *rcs, 0, 1);
             gen_call_novm(*rcs, (void*)&rt_h_neg_i32, 1);
@@ -375,7 +375,7 @@ void CodeGen::gen_a(JavaByteCodes op, jtype jt)
             return;
         }
         else {
-            static const CallSig cs(CCONV_STDCALL, i32, i32, i32, i32);
+            SYNC_FIRST(static const CallSig cs(CCONV_STDCALL, i32, i32, i32, i32));
             rcs = &cs;
             stackFix = gen_stack_to_args(true, *rcs, 0, 2);
             gen_call_novm(*rcs, (void*)&rt_h_i32_a, 2, op);
@@ -432,7 +432,7 @@ void CodeGen::gen_x_cmp(JavaByteCodes op, jtype jt)
     }
     assert(op == OPCODE_LCMP);
     char *helper = (char *)rt_h_lcmp;
-    static const CallSig cs(CCONV_STDCALL, i32, i64, i64);
+    SYNC_FIRST(static const CallSig cs(CCONV_STDCALL, i32, i64, i64));
     unsigned stackFix = gen_stack_to_args(true, cs, 0);
     gen_call_novm(cs, helper, 2);
     if (stackFix != 0) {
