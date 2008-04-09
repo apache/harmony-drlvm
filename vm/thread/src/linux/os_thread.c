@@ -47,6 +47,9 @@ int os_thread_create(/* out */osthread_t* phandle, UDATA stacksize, UDATA priori
     int r;
 
     pthread_attr_init(&attr);
+    // By default, threads are created in joinable state.
+    // Since we never use os_thread_join except for canceling a thread,
+    // we can create threads in detached state instead.
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 
     if (stacksize != 0) {
