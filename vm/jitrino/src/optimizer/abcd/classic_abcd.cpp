@@ -586,11 +586,11 @@ void ClassicAbcd::markRedundantInstructions
 
 void ClassicAbcd::runPass()
 {
-    static bool SYNC_FIRST = true;
-    if ( SYNC_FIRST && _runTests ) {
+    static bool run_once = true;
+    if ( run_once && _runTests ) {
         classic_abcd_test_main();
         _runTests = false;
-        SYNC_FIRST = false;
+        run_once = false;
     }
 
     MethodDesc& method_desc  = _irManager.getMethodDesc();
