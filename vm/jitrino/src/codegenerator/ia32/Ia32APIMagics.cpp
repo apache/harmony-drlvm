@@ -181,21 +181,17 @@ void APIMagicsHandlerSession::runImpl() {
                                 if (!strcmp(methodName, "atan")) {                                    
                                        handlers.push_back(new (tmpMM) Math_Handler_x_D_x_D(irm, callInst, md, ATAN)); 
                                 }
-                                if (!strcmp(methodName, "atan2")) {                                   
-                                       handlers.push_back(new (tmpMM) Math_Handler_x_D_x_D(irm, callInst, md, ATAN2)); 
-                                }
                                 if (!strcmp(methodName, "asin")) {                                    
                                        handlers.push_back(new (tmpMM) Math_Handler_x_D_x_D(irm, callInst, md, ASIN)); 
                                 }
                                 if (!strcmp(methodName, "acos")) {                                    
                                        handlers.push_back(new (tmpMM) Math_Handler_x_D_x_D(irm, callInst, md, ACOS)); 
                                 }
-                            } else {
-                                if (!strcmp(methodName, "abs")) {                                    
-                                       handlers.push_back(new (tmpMM) Math_Handler_x_D_x_D(irm, callInst, md, ABS, Mnemonic_FABS)); 
-                                }
-                            }                                                                                                                                                              
-                                
+                            } else if (!strcmp(signature, "(F)F") && !strcmp(methodName, "abs")) {
+                                handlers.push_back(new (tmpMM) Math_Handler_x_D_x_D(irm, callInst, md, ABS, Mnemonic_FABS));
+                            } else if (!strcmp(signature, "(DD)D") && !strcmp(methodName, "atan2")) {
+                                handlers.push_back(new (tmpMM) Math_Handler_x_D_x_D(irm, callInst, md, ATAN2)); 
+                            }
                         }
 #endif
                     } else if( ri->getKind() == Opnd::RuntimeInfo::Kind_InternalHelperAddress ) {
@@ -277,14 +273,14 @@ void Math_Handler_x_D_x_D::run() {
              }                 
              node->appendInst(irm->newInst(Mnemonic_FYL2X, fp0));        
              break;
-         case ATAN: case ATAN2:
-             node->appendInst(irm->newInst(Mnemonic_FLD, fp0, arg));                 
-             if (func == ATAN2) {
-                 node->appendInst(irm->newInst(Mnemonic_FLD, fp0, 
-                                               getCallSrc(callInst, 1))); 
-                 node->appendInst(irm->newInst(Mnemonic_FDIVP, fp0));         
-             } 
-             node->appendInst(irm->newInst(Mnemonic_FLD1, fp0));                 
+         case ATAN:
+             node->appendInst(irm->newInst(Mnemonic_FLD, fp0, arg));
+             node->appendInst(irm->newInst(Mnemonic_FLD1, fp0));
+             node->appendInst(irm->newInst(Mnemonic_FPATAN, fp0));
+             break;
+         case ATAN2:
+             node->appendInst(irm->newInst(Mnemonic_FLD, fp0, arg));
+             node->appendInst(irm->newInst(Mnemonic_FLD, fp0, getCallSrc(callInst, 1)));
              node->appendInst(irm->newInst(Mnemonic_FPATAN, fp0));        
              break;
          case ASIN: case ACOS:
