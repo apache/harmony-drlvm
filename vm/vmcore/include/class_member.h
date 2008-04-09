@@ -822,4 +822,10 @@ public:
 
 }; // Method
 
+struct _jmethodID : public Method
+{
+    // Empty declaration to make jmethodID
+    // autoconvertable to struct Method*
+};
+
 #endif
