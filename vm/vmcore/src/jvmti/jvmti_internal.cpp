@@ -26,6 +26,7 @@
 #include "cxxlog.h"
 
 #include "environment.h"
+#include "vtable.h"
 #include "jvmti_internal.h"
 
 static Boolean is_valid_instance(jobject obj, Class* clss)

@@ -28,6 +28,8 @@
 #include <assert.h>
 #include <sstream>
 #include "open/vm_method_access.h"
+#include "open/vm.h"
+#include "jit_intf.h"
 #include "port_mutex.h"
 
 

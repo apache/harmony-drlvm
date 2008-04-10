@@ -25,6 +25,7 @@
 #include "jni_direct.h"
 #include "jvmti.h"
 #include "open/hythread_ext.h"
+#include "open/rt_types.h"
 #include "vm_core_types.h"
 #include "vm_threads.h"
 

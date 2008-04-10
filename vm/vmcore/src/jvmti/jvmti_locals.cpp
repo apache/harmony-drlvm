@@ -37,6 +37,7 @@
 #include "jit_intf_cpp.h"
 #include "cci.h"
 #include "Class.h"
+#include "vtable.h"
 
 #define LOG_DOMAIN "jvmti.locals"
 
@@ -596,4 +597,5 @@ jvmtiSetLocalDouble(jvmtiEnv* env,
 
     return set_local(env, thread, depth, slot, VM_DATA_TYPE_F8, (void*) &value);
 }
+
 

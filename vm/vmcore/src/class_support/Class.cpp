@@ -205,7 +205,7 @@ bool Class::is_instanceof(Class* clss)
         VM_Statistics::get_vm_stats().num_type_checks_super_is_array++;
     else if(clss->is_interface())
         VM_Statistics::get_vm_stats().num_type_checks_super_is_interface ++;
-    else if(clss->m_depth >= vm_max_fast_instanceof_depth())
+    else if((unsigned)clss->m_depth >= vm_max_fast_instanceof_depth())
         VM_Statistics::get_vm_stats().num_type_checks_super_is_too_deep++;
     UNSAFE_REGION_END
 #endif // VM_STATS

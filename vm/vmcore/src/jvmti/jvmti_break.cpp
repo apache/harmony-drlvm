@@ -29,6 +29,7 @@
 #include "environment.h"
 #include "Class.h"
 #include "cxxlog.h"
+#include "vm_log.h"
 #include "cci.h"
 
 #include "suspend_checker.h"
@@ -45,12 +46,7 @@ bool jvmti_process_breakpoint_event(TIEnv *env, const VMBreakPoint* bp, const PO
     assert(bp);
 
     TRACE2("jvmti.break", "Process breakpoint: "
-            << (bp->method
-                ? class_get_name(method_get_class((Method*)bp->method)) : "(nil)")
-            << "."
-            << (bp->method ? method_get_name((Method*)bp->method) : "(nil)")
-            << (bp->method ? method_get_descriptor((Method*)bp->method) : "")
-            << " :" << bp->location << " :" << bp->addr );
+            << bp->method << " :" << bp->location << " :" << bp->addr );
 
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     if (ti->getPhase() != JVMTI_PHASE_LIVE)
@@ -76,18 +72,12 @@ bool jvmti_process_breakpoint_event(TIEnv *env, const VMBreakPoint* bp, const PO
         if (env->global_events[JVMTI_EVENT_BREAKPOINT - JVMTI_MIN_EVENT_TYPE_VAL])
         {
             TRACE2("jvmti.break", "Calling global breakpoint callback: "
-                << class_get_name(method_get_class((Method*)method)) << "."
-                << method_get_name((Method*)method)
-                << method_get_descriptor((Method*)method)
-                << " :" << location << " :" << addr);
+                << method << " :" << location << " :" << addr);
 
             func((jvmtiEnv*)env, jni_env, (jthread)hThread, method, location);
 
             TRACE2("jvmti.break", "Finished global breakpoint callback: "
-                << class_get_name(method_get_class((Method*)method)) << "."
-                << method_get_name((Method*)method)
-                << method_get_descriptor((Method*)method)
-                << " :" << location << " :" << addr);
+                << method << " :" << location << " :" << addr);
         }
         else
         {
@@ -102,18 +92,12 @@ bool jvmti_process_breakpoint_event(TIEnv *env, const VMBreakPoint* bp, const PO
                 if (et->thread == hythread_self())
                 {
                     TRACE2("jvmti.break", "Calling local breakpoint callback: "
-                        << class_get_name(method_get_class((Method*)method)) << "."
-                        << method_get_name((Method*)method)
-                        << method_get_descriptor((Method*)method)
-                        << " :" << location << " :" << addr);
+                        << method << " :" << location << " :" << addr);
 
                     func((jvmtiEnv*)env, jni_env, (jthread)hThread, method, location);
 
                     TRACE2("jvmti.break", "Finished local breakpoint callback: "
-                        << class_get_name(method_get_class((Method*)method)) << "."
-                        << method_get_name((Method*)method)
-                        << method_get_descriptor((Method*)method)
-                        << " :" << location << " :" << addr);
+                        << method << " :" << location << " :" << addr);
                 }
             }
         }
@@ -139,10 +123,7 @@ jvmtiSetBreakpoint(jvmtiEnv* env,
                    jmethodID method,
                    jlocation location)
 {
-    TRACE2("jvmti.break", "SetBreakpoint is called for method: "
-        << class_get_name(method_get_class((Method*)method)) << "."
-        << method_get_name((Method*)method)
-        << method_get_descriptor((Method*)method)
+    TRACE2("jvmti.break", "SetBreakpoint is called for method: " << method
         << " :" << location);
     SuspendEnabledChecker sec;
 
@@ -159,11 +140,7 @@ jvmtiSetBreakpoint(jvmtiEnv* env,
         return JVMTI_ERROR_INVALID_METHODID;
 
     Method *m = (Method*) method;
-    TRACE2("jvmti.break", "SetBreakpoint: "
-        << class_get_name(method_get_class((Method *)method)) << "."
-        << method_get_name((Method *)method)
-        << method_get_descriptor((Method *)method)
-        << " :" << location);
+    TRACE2("jvmti.break", "SetBreakpoint: " << method << " :" << location);
 
 #if defined (__INTEL_COMPILER) 
 #pragma warning( push )
@@ -218,10 +195,7 @@ jvmtiClearBreakpoint(jvmtiEnv* env,
                      jmethodID method,
                      jlocation location)
 {
-    TRACE2("jvmti.break", "ClearBreakpoint is called for method: "
-        << class_get_name(method_get_class((Method*)method)) << "."
-        << method_get_name((Method*)method)
-        << method_get_descriptor((Method*)method)
+    TRACE2("jvmti.break", "ClearBreakpoint is called for method: " << method
         << " :" << location);
     SuspendEnabledChecker sec;
     jvmtiError errorCode;
@@ -237,11 +211,7 @@ jvmtiClearBreakpoint(jvmtiEnv* env,
         return JVMTI_ERROR_INVALID_METHODID;
 
     Method *m = (Method*) method;
-    TRACE2("jvmti.break", "ClearBreakpoint: "
-        << class_get_name(method_get_class((Method*)method)) << "."
-        << method_get_name((Method*)method)
-        << method_get_descriptor((Method*)method)
-        << " :" << location);
+    TRACE2("jvmti.break", "ClearBreakpoint: " << method << " :" << location);
 
 #if defined (__INTEL_COMPILER) 
 #pragma warning( push )

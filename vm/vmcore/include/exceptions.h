@@ -25,6 +25,7 @@
 #include "exceptions_type.h"
 #include "jni.h"
 #include "open/types.h"
+//#include "open/jthread.h"
 
 /**
 @file
@@ -271,6 +272,7 @@ void exn_rethrow();
 void exn_rethrow_if_pending();
 
 bool set_guard_stack();
+typedef struct VM_thread * vm_thread_t;
 void remove_guard_stack(vm_thread_t vm_thread);
 void init_stack_info();
 void* get_exception_catch_stack_addr(void* curr_ip);

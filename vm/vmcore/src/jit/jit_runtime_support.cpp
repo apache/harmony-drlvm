@@ -377,7 +377,7 @@ static void rth_type_test_update_stats(VTable* sub, Class* super)
         VM_Statistics::get_vm_stats().num_type_checks_super_is_array ++;
     else if (super->is_interface())
         VM_Statistics::get_vm_stats().num_type_checks_super_is_interface ++;
-    else if (super->get_depth() >= vm_max_fast_instanceof_depth())
+    else if ((unsigned)super->get_depth() >= vm_max_fast_instanceof_depth())
         VM_Statistics::get_vm_stats().num_type_checks_super_is_too_deep ++;
     UNSAFE_REGION_END
 }
@@ -1944,7 +1944,7 @@ static void update_general_type_checking_stats(VTable *sub, Class *super)
         VM_Statistics::get_vm_stats().num_type_checks_super_is_array++;
     else if (super->is_interface())
         VM_Statistics::get_vm_stats().num_type_checks_super_is_interface++;
-    else if (super->get_depth() >= vm_max_fast_instanceof_depth())
+    else if ((unsigned)super->get_depth() >= vm_max_fast_instanceof_depth())
         VM_Statistics::get_vm_stats().num_type_checks_super_is_too_deep++;
     UNSAFE_REGION_END
 #endif // VM_STATS

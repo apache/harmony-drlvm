@@ -22,6 +22,7 @@
 #include "open/vm_method_access.h"
 #include <math.h>
 
+#include "vtable.h"
 #include "exceptions.h"
 #include "exceptions_int.h"
 #include "vm_arrays.h"

@@ -35,6 +35,7 @@
 #include "jvmti_break_intf.h"
 #include "cci.h"
 #include "clog.h"
+#include "open/vm_class_info.h"
 
 static void jvmti_pop_frame_callback()
 {

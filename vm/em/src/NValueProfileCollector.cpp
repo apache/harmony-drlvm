@@ -31,6 +31,7 @@
 
 #include "port_threadunsafe.h"
 #include "port_atomic.h"
+#include "open/vm.h"
 
 #define LOG_DOMAIN "em"
 

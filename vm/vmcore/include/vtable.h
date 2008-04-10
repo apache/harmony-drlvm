@@ -54,6 +54,15 @@ typedef struct Intfc_Table {
 #define GC_BYTES_IN_VTABLE (sizeof(void*))
 #define MAX_FAST_INSTOF_DEPTH 5
 
+/**
+* @return The number of superclass hierarchy elements that are
+*         stored within the vtable. This is for use with fast type checking.
+*/
+inline unsigned vm_max_fast_instanceof_depth()
+{
+    return MAX_FAST_INSTOF_DEPTH;
+}
+
 typedef struct VTable {
     Byte _gc_private_information[GC_BYTES_IN_VTABLE];
     ManagedObject*             jlC; 

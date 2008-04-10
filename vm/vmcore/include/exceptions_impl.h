@@ -24,6 +24,7 @@
 #include "exceptions_type.h"
 #include "jni.h"
 #include "open/types.h"
+#include "platform_lowlevel.h"
 
 #define VM_LAZY_EXCEPTION
 

@@ -27,7 +27,7 @@
 #include "interp_native.h"
 #include "interp_defs.h"
 #include "ini.h"
-//#include "open/jthread.h"
+#include "vtable.h"
 #include "open/vm_method_access.h"
 
 using namespace std;
@@ -84,10 +84,7 @@ interpreter_execute_native_method(
         jvalue *args) {
     assert(!hythread_is_suspend_enabled());
 
-    DEBUG_TRACE("\n<<< interpreter_invoke_native: "
-           << class_get_name(method_get_class(method)) << " "
-           << method->get_name()->bytes
-           << method->get_descriptor()->bytes << endl);
+    DEBUG_TRACE("\n<<< interpreter_invoke_native: " << method);
 
     GenericFunctionPointer f = interpreterGetNativeMethodAddr(method);
     if (f == 0) {
@@ -261,15 +258,8 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
         return;
     }
 
-    DEBUG_TRACE("\n<<< native_invoke_static     : "
-           << class_get_name(method_get_class(method)) << " "
-           << method->get_name()->bytes
-           << method->get_descriptor()->bytes << endl);
-
-    DEBUG_TRACE_PLAIN("interpreter static native: "
-            << class_get_name(method_get_class(frame.method))
-            << " " << frame.method->get_name()->bytes
-            << frame.method->get_descriptor()->bytes << endl);
+    DEBUG_TRACE("\n<<< native_invoke_static     : " << method);
+    DEBUG_TRACE_PLAIN("interpreter static native: " << frame.method);
 
     M2N_ALLOC_MACRO;
     
@@ -370,10 +360,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
                     if (!*ref) {
                         DEBUG2(
                         "VM WARNING: Reference with null value returned from jni function:\n"
-                        "VM WARNING: Method name: "
-                        << class_get_name(method_get_class(method))
-                        << "/" << method->get_name()->bytes
-                        << method->get_descriptor()->bytes <<
+                        "VM WARNING: Method name: " << method <<
                         "\nVM WARNING: Not allowed, return NULL (0) instead\n");
                     }
                     prevFrame.stack.pick().ref = *ref;
@@ -488,15 +475,8 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
     assert(method->is_native());
     assert(!method->is_static());
 
-    DEBUG_TRACE_PLAIN("interpreter virtual native: "
-            << class_get_name(method_get_class(frame.method))
-            << " " << frame.method->get_name()->bytes
-            << frame.method->get_descriptor()->bytes << endl);
-
-    DEBUG_TRACE("\n<<< native_invoke_virtual: "
-           << class_get_name(method_get_class(method)) << " "
-           << method->get_name()->bytes
-           << method->get_descriptor()->bytes << endl);
+    DEBUG_TRACE_PLAIN("interpreter virtual native: " << frame.method);
+    DEBUG_TRACE("\n<<< native_invoke_virtual: " << method);
 
     uword *args = (uword*) ALLOC_FRAME((sz + 1) * sizeof(uword));
     args[0] = (uword) get_jni_native_intf();
@@ -602,10 +582,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
                     if (!*ref) {
                         DEBUG2(
                         "VM WARNING: Reference with null value returned from jni function:\n"
-                        "VM WARNING: Method name: "
-                        << class_get_name(method_get_class(method))
-                        << "/" << method->get_name()->bytes
-                        << method->get_descriptor()->bytes <<
+                        "VM WARNING: Method name: " << method << 
                         "\nVM WARNING: Not allowed, return NULL (0) instead\n");
                     }
                     prevFrame.stack.pick().ref = *ref;

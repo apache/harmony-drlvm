@@ -23,6 +23,8 @@
 #define _JIT_EXPORT_JPDA_H
 
 #include "open/types.h"
+#include "open/rt_types.h"
+#include "open/em.h"
 
 #ifdef __cplusplus
 extern "C" {

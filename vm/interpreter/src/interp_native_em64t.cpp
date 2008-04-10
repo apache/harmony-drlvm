@@ -23,7 +23,7 @@
 #include "interpreter_exports.h"
 #include "interpreter_imports.h"
 
-//#include "find_natives.h"
+#include "vtable.h"
 #include "exceptions.h"
 #include "mon_enter_exit.h"
 #include "open/jthread.h"
@@ -75,10 +75,7 @@ interpreter_execute_native_method(
     assert(!hythread_is_suspend_enabled());
 
 
-    DEBUG_TRACE("\n<<< interpreter_invoke_native: "
-           << method->get_class()->get_name()->bytes << " "
-           << method->get_name()->bytes
-           << method->get_descriptor()->bytes << endl);
+    DEBUG_TRACE("\n<<< interpreter_invoke_native: " << method);
 
     GenericFunctionPointer f = interpreterGetNativeMethodAddr(method);
     if (f == 0) {
@@ -285,15 +282,8 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
         return;
     }
 
-    DEBUG_TRACE("\n<<< native_invoke_static     : "
-           << method->get_class()->get_name()->bytes << " "
-           << method->get_name()->bytes
-           << method->get_descriptor()->bytes << endl);
-
-    DEBUG_TRACE_PLAIN("interpreter static native: "
-            << frame.method->get_class()->get_name()->bytes
-            << " " << frame.method->get_name()->bytes
-            << frame.method->get_descriptor()->bytes << endl);
+    DEBUG_TRACE("\n<<< native_invoke_static     : " << method);
+    DEBUG_TRACE_PLAIN("interpreter static native: " << frame.method);
 
     M2N_ALLOC_MACRO;
     
@@ -572,15 +562,8 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
     assert(method->is_native());
     assert(!method->is_static());
 
-    DEBUG_TRACE_PLAIN("interpreter virtual native: "
-            << frame.method->get_class()->get_name()->bytes
-            << " " << frame.method->get_name()->bytes
-            << frame.method->get_descriptor()->bytes << endl);
-
-    DEBUG_TRACE("\n<<< native_invoke_virtual: "
-           << method->get_class()->get_name()->bytes << " "
-           << method->get_name()->bytes
-           << method->get_descriptor()->bytes << endl);
+    DEBUG_TRACE_PLAIN("interpreter virtual native: " << frame.method);
+    DEBUG_TRACE("\n<<< native_invoke_virtual: " << method);
 
     int n_ints = 0;
 #ifdef _WIN32 /* important difference in calling conventions */

@@ -22,7 +22,7 @@
 #ifndef _MEM_ALLOC_H_
 #define _MEM_ALLOC_H_
 
-#include "jit_import.h"
+#include "open/rt_types.h"
 #include "port_vmem.h"
 
 #define KBYTE 1024

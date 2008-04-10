@@ -20,6 +20,7 @@
 
 #include <vector>
 #include "open/types.h"
+#include "open/rt_types.h"
 #include "lock_manager.h"
 
 struct Method;

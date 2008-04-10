@@ -89,7 +89,7 @@ struct TITags {
 inline tag_pair** ti_get_object_tptr(Managed_Object_Handle obj)
 {
     ManagedObject *o = (ManagedObject*)obj;
-    if (class_is_array(o->vt()->clss)) {
+    if (o->vt()->clss->is_array()) {
         return (tag_pair**)((VM_Vector*)obj)->get_tag_pointer_address();
     } else {
         return (tag_pair**)((ManagedObject*)obj)->get_tag_pointer_address();

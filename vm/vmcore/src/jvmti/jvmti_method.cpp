@@ -682,10 +682,7 @@ void jvmti_method_enter_callback(Method_Handle method)
 {
     BEGIN_RAISE_AREA;
 
-    TRACE2("jvmti.event.method.entry", "MethodEntry: " <<
-        class_get_name(method_get_class(method)) << "." <<
-        method_get_name(method) << method_get_descriptor(method));
-
+    TRACE2("jvmti.event.method.entry", "MethodEntry: " << method);
     jvmti_process_method_entry_event(reinterpret_cast<jmethodID>(method));
 
     END_RAISE_AREA;
@@ -695,9 +692,7 @@ void jvmti_method_exit_callback(Method_Handle method, jvalue* return_value)
 {
     BEGIN_RAISE_AREA;
 
-    TRACE2("jvmti.event.method.exit", "MethodExit: " <<
-        class_get_name(method_get_class(method)) << "." <<
-        method_get_name(method) << method_get_descriptor(method));
+    TRACE2("jvmti.event.method.exit", "MethodExit: " << method);
 
     Method *m = reinterpret_cast<Method *>(method);
     jmethodID mid = reinterpret_cast<jmethodID>(method);

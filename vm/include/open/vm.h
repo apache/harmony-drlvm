@@ -358,12 +358,6 @@ VMEXPORT Boolean class_get_fast_instanceof_flag(Class_Handle cl);
  */ 
  DECLARE_OPEN(Class_Handle, vtable_get_class, (VTable_Handle vh));
 
-/**
- * @return The number of superclass hierarchy elements that are
- *         stored within the vtable. This is for use with fast type checking.
- */
- VMEXPORT int vm_max_fast_instanceof_depth();
-
 
 ////
 // begin class iterator related functions.

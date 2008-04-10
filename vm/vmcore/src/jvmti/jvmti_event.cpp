@@ -24,6 +24,7 @@
 
 #define LOG_DOMAIN "jvmti"
 #include "cxxlog.h"
+#include "vm_log.h"
 #include "port_mutex.h"
 
 #include "open/vm_method_access.h"
@@ -596,17 +597,13 @@ void jvmti_send_region_compiled_method_load_event(Method *method, uint32 codeSiz
             if (NULL != func)
             {
                 TRACE2("jvmti.event.cml",
-                    "Callback JVMTI_EVENT_COMPILED_METHOD_LOAD calling, method = " <<
-                    method->get_class()->get_name()->bytes << "." << method->get_name()->bytes <<
-                    method->get_descriptor()->bytes);
+                    "Callback JVMTI_EVENT_COMPILED_METHOD_LOAD calling, method = " << method);
 
                 func((jvmtiEnv*)ti_env, (jmethodID)method, codeSize,
                     codeAddr, mapLength, jvmtiLocationMap, NULL);
 
                 TRACE2("jvmti.event.cml",
-                    "Callback JVMTI_EVENT_COMPILED_METHOD_LOAD finished, method = " <<
-                    method->get_class()->get_name()->bytes << "." << method->get_name()->bytes <<
-                    method->get_descriptor()->bytes);
+                    "Callback JVMTI_EVENT_COMPILED_METHOD_LOAD finished, method = " << method);
             }
         }
 
@@ -639,9 +636,7 @@ void jvmti_send_chunks_compiled_method_load_event(Method *method)
             if (NULL != func)
             {
                 TRACE2("jvmti.event.cml",
-                    "Emitting JVMTI_EVENT_COMPILED_METHOD_LOAD for chuncks of " <<
-                    method->get_class()->get_name()->bytes << "." << method->get_name()->bytes <<
-                    method->get_descriptor()->bytes);
+                    "Emitting JVMTI_EVENT_COMPILED_METHOD_LOAD for chuncks of " << method);
 
                 for (CodeChunkInfo* cci = method->get_first_JIT_specific_info();  cci;  cci = cci->_next)
                 {
@@ -689,9 +684,7 @@ void jvmti_send_chunks_compiled_method_load_event(Method *method)
                 }
 
                 TRACE2("jvmti.event.cml",
-                    "Emitting JVMTI_EVENT_COMPILED_METHOD_LOAD done for chuncks of " <<
-                    method->get_class()->get_name()->bytes << "." << method->get_name()->bytes <<
-                    method->get_descriptor()->bytes);
+                    "Emitting JVMTI_EVENT_COMPILED_METHOD_LOAD done for chuncks of " << method);
             }
         }
 
@@ -763,8 +756,7 @@ static jvmtiError generate_events_compiled_method_load(jvmtiEnv* env)
                 for (int jjj = 0; jjj < (*klass)->get_number_of_methods(); jjj++)
                 {
                     Method* method = (*klass)->get_method(jjj);
-                    TRACE2("jvmti.event", "    Method = " << method->get_name()->bytes <<
-                        method->get_descriptor()->bytes <<
+                    TRACE2("jvmti.event", "    Method = " << method <<
                         (method->get_state() == Method::ST_Compiled ? " compiled" : " not compiled"));
                     if (method->get_state() == Method::ST_Compiled) {
                         jvmti_send_chunks_compiled_method_load_event(method);
@@ -938,10 +930,7 @@ jvmti_process_method_exit_event_internal(jmethodID method,
         JNIEnv *jni_env = p_TLS_vmthread->jni_env;
         jvmtiEnv *jvmti_env = (jvmtiEnv*) ti_env;
         if (NULL != ti_env->event_table.MethodExit) {
-            TRACE2("jvmti.stack", "Calling MethodExit callback for method: "
-                << class_get_name(method_get_class((Method*)method))
-                << "." << method_get_name((Method*)method)
-                << method_get_descriptor((Method*)method));
+            TRACE2("jvmti.stack", "Calling MethodExit callback for method: " << method);
             ti_env->event_table.MethodExit(jvmti_env, jni_env, thread, method, was_popped_by_exception, ret_val);
         }
         ti_env = next_env;
@@ -967,9 +956,7 @@ jvmti_process_method_exit_event_internal(jmethodID method,
 #ifndef NDEBUG
     if( curr_thread->jvmti_thread.frame_pop_listener ) {
         TRACE2("jvmti.stack", "Prepare to PopFrame callback for thread: "
-            << curr_thread << ", method: " << class_get_name(method_get_class((Method*)method))
-            << "." << method_get_name((Method*)method)
-            << method_get_descriptor((Method*)method)
+            << curr_thread << ", method: " << method
             << ", depth: " << depth
             << (was_popped_by_exception == JNI_TRUE ? " by exception" : ""));
     }
@@ -996,9 +983,7 @@ jvmti_process_method_exit_event_internal(jmethodID method,
             TRACE2("jvmti.stack", "Calling PopFrame callback for thread: "
                 << curr_thread << ", listener: " << report
                 << ", env: " << report->env << ", depth: " << report->depth
-                << " -> " << class_get_name(method_get_class((Method*)method))
-                << "." << method_get_name((Method*)method)
-                << method_get_descriptor((Method*)method));
+                << " -> " << method);
 
             jvmti_process_frame_pop_event(
                 reinterpret_cast<jvmtiEnv *>(report->env),
@@ -1092,10 +1077,7 @@ jvmti_process_frame_pop_event(jvmtiEnv *jvmti_env, jmethodID method, jboolean wa
     JNIEnv *jni_env = p_TLS_vmthread->jni_env;
 
     assert(method);
-    TRACE2("jvmti.event.popframe", "PopFrame event is called for method:"
-        << class_get_name(method_get_class((Method*)method)) << "."
-        << method_get_name((Method*)method)
-        << method_get_descriptor((Method*)method) );
+    TRACE2("jvmti.event.popframe", "PopFrame event is called for method:" << method);
 
     if (NULL != ti_env->event_table.FramePop)
         ti_env->event_table.FramePop(jvmti_env, jni_env, thread, method,
@@ -1135,11 +1117,8 @@ jvmti_process_native_method_bind_event(jmethodID method, NativeCodePtr address, 
 
         if (env->global_events[JVMTI_EVENT_NATIVE_METHOD_BIND - JVMTI_MIN_EVENT_TYPE_VAL])
         {
-            TRACE2("jvmti.event.bind", "Calling global NativeMethodBind event for method:"
-                << (method ? class_get_name(method_get_class((Method*)method)) : "(nil)") << "." 
-                << (method ? method_get_name((Method*)method) : "(nil)") 
-                << (method ? method_get_descriptor((Method*)method) : "" ) );
-
+            TRACE2("jvmti.event.bind", 
+                "Calling global NativeMethodBind event for method:" << method);
 
             callback((jvmtiEnv*)env, jni_env,
                 j_thread, method, address, new_address_ptr);
@@ -1157,11 +1136,8 @@ jvmti_process_native_method_bind_event(jmethodID method, NativeCodePtr address, 
 
             if (et->thread == thread)
             {
-                TRACE2("jvmti.event.bind", "Calling local NativeMethodBind event for method:"
-                    << (method ? class_get_name(method_get_class((Method*)method)) : "(nil)") << "." 
-                    << (method ? method_get_name((Method*)method) : "(nil)") 
-                    << (method ? method_get_descriptor((Method*)method) : "" ) );
-
+                TRACE2("jvmti.event.bind", 
+                    "Calling local NativeMethodBind event for method:" << method);
 
                 callback((jvmtiEnv *)env, jni_env,
                     j_thread, method, address, new_address_ptr);
@@ -1212,17 +1188,13 @@ jvmti_process_single_step_event(jmethodID method, jlocation location) {
         jvmtiEnv *jvmti_env = (jvmtiEnv*) ti_env;
 
         TRACE2("jvmti.break.ss", "Calling SingleStep callback for env " << jvmti_env << ": " <<
-            class_get_name(method_get_class((Method*)method)) << "." <<
-            method_get_name((Method*)method) <<
-            method_get_descriptor((Method*)method) << " :" << location);
+            method << " :" << location);
 
         if (NULL != ti_env->event_table.SingleStep)
             ti_env->event_table.SingleStep(jvmti_env, jni_env, thread, method, location);
 
         TRACE2("jvmti.break.ss", "Finished SingleStep callback for env " << jvmti_env << ": " <<
-            class_get_name(method_get_class((Method*)method)) << "." <<
-            method_get_name((Method*)method) <<
-            method_get_descriptor((Method*)method) << " :" << location);
+            method << " :" << location);
         ti_env = next_env;
     }
 }

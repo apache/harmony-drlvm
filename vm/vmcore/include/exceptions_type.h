@@ -24,13 +24,13 @@
 #ifndef _INTERFACE_EXCEPTIONS_TYPE_H_
 #define _INTERFACE_EXCEPTIONS_TYPE_H_
 
-//#include "jni.h"
 #include "open/types.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+struct Class;
 struct Exception {
     struct ManagedObject* exc_object;
     struct Class* exc_class;

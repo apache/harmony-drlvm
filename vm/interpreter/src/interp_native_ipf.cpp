@@ -27,7 +27,8 @@
 #include "interp_native.h"
 #include "interp_defs.h"
 #include "ini.h"
-#include "open/jthread.h"
+#include "vtable.h"
+//#include "open/jthread.h"
 #include "open/vm_method_access.h"
 
 
@@ -269,15 +270,8 @@ interpreter_execute_native_method(
 void
 interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *method) {
 
-    DEBUG_TRACE("\n<<< native_invoke_static     : "
-           << method->get_class()->get_name()->bytes << " "
-           << method->get_name()->bytes
-           << method->get_descriptor()->bytes << endl);
-
-    DEBUG_TRACE_PLAIN("interpreter static native: "
-            << frame.method->get_class()->get_name()->bytes
-            << " " << frame.method->get_name()->bytes
-            << frame.method->get_descriptor()->bytes << endl);
+    DEBUG_TRACE("\n<<< native_invoke_static     : " << method);
+    DEBUG_TRACE_PLAIN("interpreter static native: " << frame.method);
 
     GenericFunctionPointer f = interpreterGetNativeMethodAddr(method);
     if (f == 0) {
@@ -546,15 +540,8 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
     assert(method->is_native());
     assert(!method->is_static());
 
-    DEBUG_TRACE_PLAIN("interpreter virtual native: "
-            << frame.method->get_class()->get_name()->bytes
-            << " " << frame.method->get_name()->bytes
-            << frame.method->get_descriptor()->bytes << endl);
-
-    DEBUG_TRACE("\n<<< native_invoke_virtual: "
-           << method->get_class()->get_name()->bytes << " "
-           << method->get_name()->bytes
-           << method->get_descriptor()->bytes << endl);
+    DEBUG_TRACE_PLAIN("interpreter virtual native: " << frame.method);
+    DEBUG_TRACE("\n<<< native_invoke_virtual: " << method);
 
     uword *args = (uword*) ALLOC_FRAME((sz + 1) * sizeof(uword));
     uword fpargs[6 + 1 /* for fptypes */];

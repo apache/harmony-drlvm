@@ -23,6 +23,7 @@
 #include "jvmti.h"
 #include "Class.h"
 #include "cxxlog.h"
+#include "vm_log.h"
 #include "jvmti_utils.h"
 #include "jvmti_internal.h"
 #include "jit_intf_cpp.h"
@@ -441,12 +442,8 @@ jvmti_SingleStepLocation( VM_thread* thread,
     } while( true );
 
     for( unsigned index = 0; index < *count; index++ ) {
-        TRACE2( "jvmti.break.ss", "Step: " << class_get_name(method_get_class(method))
-            << "." << method_get_name(method) << method_get_descriptor(method)
-            << " :" << bytecode_index << "\n      -> "
-            << class_get_name(method_get_class((*next_step)[index].method))
-            << "." << method_get_name((*next_step)[index].method)
-            << method_get_descriptor((*next_step)[index].method)
+        TRACE2( "jvmti.break.ss", "Step: " << method
+            << ((*next_step)[index].method)
             << " :" << (*next_step)[index].location << " :"
             << (*next_step)[index].native_location << ", event: "
             << (*next_step)[index].no_event );
@@ -631,9 +628,7 @@ static bool jvmti_process_jit_single_step_event(TIEnv* UNREF unused_env,
     assert(bp);
 
     TRACE2("jvmti.break.ss", "SingleStep occured: "
-        << class_get_name(method_get_class((Method*)bp->method)) << "."
-        << method_get_name((Method*)bp->method)
-        << method_get_descriptor((Method*)bp->method)
+        << ((Method*)bp->method)
         << " :" << bp->location << " :" << bp->addr);
 
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
@@ -689,20 +684,14 @@ static bool jvmti_process_jit_single_step_event(TIEnv* UNREF unused_env,
             {
                 TRACE2("jvmti.break.ss",
                     "Calling JIT global SingleStep breakpoint callback: "
-                    << class_get_name(method_get_class((Method*)method)) << "."
-                    << method_get_name((Method*)method)
-                    << method_get_descriptor((Method*)method)
-                    << " :" << location << " :" << addr);
+                    << method << " :" << location << " :" << addr);
 
                 // fire global event
                 func((jvmtiEnv*)env, jni_env, (jthread)hThread, method, location);
 
                 TRACE2("jvmti.break.ss",
                     "Finished JIT global SingleStep breakpoint callback: "
-                    << class_get_name(method_get_class((Method*)method)) << "."
-                    << method_get_name((Method*)method)
-                    << method_get_descriptor((Method*)method)
-                    << " :" << location << " :" << addr);
+                    << method << " :" << location << " :" << addr);
 
                 env = next_env;
                 continue;
@@ -720,10 +709,7 @@ static bool jvmti_process_jit_single_step_event(TIEnv* UNREF unused_env,
                 {
                     TRACE2("jvmti.break.ss",
                         "Calling JIT local SingleStep breakpoint callback: "
-                        << class_get_name(method_get_class((Method*)method)) << "."
-                        << method_get_name((Method*)method)
-                        << method_get_descriptor((Method*)method)
-                        << " :" << location << " :" << addr);
+                        << method << " :" << location << " :" << addr);
                     found = true;
 
                     func((jvmtiEnv*)env, jni_env,
@@ -731,9 +717,7 @@ static bool jvmti_process_jit_single_step_event(TIEnv* UNREF unused_env,
 
                     TRACE2("jvmti.break.ss",
                         "Finished JIT local SingleStep breakpoint callback: "
-                        << class_get_name(method_get_class((Method*)method)) << "."
-                        << method_get_name((Method*)method)
-                        << method_get_descriptor((Method*)method)
+                        << ((Method*)method)
                         << " :" << location << " :" << addr);
                 }
             }
@@ -778,9 +762,7 @@ void jvmti_set_single_step_breakpoints(DebugUtilsTI *ti, jvmti_thread_t jvmti_th
     for (unsigned iii = 0; iii < locations_number; iii++)
     {
         TRACE2("jvmti.break.ss", "Set single step breakpoint: "
-            << class_get_name(method_get_class(locations[iii].method)) << "."
-            << method_get_name(locations[iii].method)
-            << method_get_descriptor(locations[iii].method)
+            << locations[iii].method
             << " :" << locations[iii].location
             << " :" << locations[iii].native_location);
 
@@ -927,9 +909,7 @@ jvmtiError jvmti_get_next_bytecodes_from_native(VM_thread *thread,
                 if (NULL == call_ip)
                 {
                     TRACE2("jvmti.break.ss", "SingleStep IP shifted in prediction to: "
-                        << class_get_name(method_get_class(func)) << "."
-                        << method_get_name(func)
-                        << method_get_descriptor(func)
+                        << func
                         << " :" << next_location << " :" << ip2);
                     bc = next_location;
                     ip = ip2;

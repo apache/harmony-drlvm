@@ -28,7 +28,7 @@
 #include <open/jthread.h>
 #include <open/hythread_ext.h>
 #include <jvmti_support.h>
-
+#include "jit_import_rt.h"
 // VM headers
 #include "Class.h"
 #include "cci.h"

@@ -18,10 +18,10 @@
  * @author Salikh Zakirov, Alexey V. Varlamov
  * @version $Revision: 1.1.2.2.2.1.2.3 $
  */  
-#ifndef _VM_LOG_H_
-#define _VM_LOG_H_
+#ifndef _VMCORE_LOG_H_
+#define _VMCORE_LOG_H_
 
-#include "loggerstring.h"
+#include "open/vm_log.h"
 #include "object_layout.h"
 #include "object_handles.h"
 #include "vtable.h"
@@ -31,7 +31,7 @@
 
 /**
  * @file
- * VM-specific enhancements to logger.
+ * VMcore-specific enhancements to logger.
  */
 
 /**
@@ -49,30 +49,14 @@ inline LoggerString& operator<<(LoggerString& log, const String* str) {
 /**
  * The convenience method for logging Class instances.
  */
-inline LoggerString& operator<<(LoggerString& log, const Class* clss) {
-    if (clss) {
-        log << clss->get_name(); 
-    } else {
-        log << "<null class>";
-    }
-    return log;
-}
-
-/**
- * The convenience method for logging jboolean values.
- */
-inline LoggerString& operator<<(LoggerString& log, const jboolean b) {
-    if (b == JNI_FALSE) {
-        log << "false";
-    } else if (b == JNI_TRUE) {
-        log << "true";
-    } else {
-        log << "(jboolean) " << ((unsigned) b);
-    }
-
-    return log;
-}
-
+//inline LoggerString& operator<<(LoggerString& log, const Class* clss) {
+//    if (clss) {
+//        log << clss->get_name(); 
+//    } else {
+//        log << "<null class>";
+//    }
+//    return log;
+//}
 
 /**
  * The convenience method for logging Method handles.
@@ -87,13 +71,6 @@ inline LoggerString& operator<<(LoggerString& log, const Class_Member* m) {
     }
 
     return log;
-}
-
-/**
- * The convenience method for logging JNI method IDs.
- */
-inline LoggerString& operator<<(LoggerString& log, const jmethodID m) {
-    return log << reinterpret_cast<const Method*>(m);
 }
 
 /**
@@ -123,4 +100,4 @@ inline LoggerString& operator<<(LoggerString& log, const jobject jobj) {
     return log;
 }
 
-#endif // _VM_LOG_H_
+#endif // _VMCORE_LOG_H_

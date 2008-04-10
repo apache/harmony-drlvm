@@ -23,7 +23,7 @@
 #define _EDGE_PROFILE_COLLECTOR_H_
 
 #include "DrlProfileCollectionFramework.h"
-#include "open/vm_util.h"
+#include "open/hythread_ext.h"
 
 #include <vector>
 #include <map>

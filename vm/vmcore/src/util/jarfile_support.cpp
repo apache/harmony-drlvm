@@ -20,6 +20,7 @@
  */
 #include "jarfile_support.h"
 
+#include "port_malloc.h"
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>

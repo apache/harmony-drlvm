@@ -18,6 +18,8 @@
  * @author Ivan Volosyuk
  * @version $Revision: 1.6.4.4.4.3 $
  */  
+//#include "open/vm_ee.h"
+//#include "open/vm_class_loading.h"
 #include "interp_vm_helpers.h"
 #include "interpreter_imports.h"
 #include "interp_native.h"
@@ -25,6 +27,7 @@
 #include "compile.h"
 #include "cxxlog.h"
 #include "interp_defs.h"
+#include "vtable.h"
 
 void interp_throw_exception(const char* exc_name) {
     M2N_ALLOC_MACRO;

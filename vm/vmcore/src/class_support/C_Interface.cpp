@@ -2089,11 +2089,6 @@ unsigned vm_get_vtable_ptr_size()
     }
 }
 
-int vm_max_fast_instanceof_depth()
-{
-    return MAX_FAST_INSTOF_DEPTH;
-}
-
 
 ////////////////////////////////////////////////////////////////////////////////////
 // Direct call-related functions that allow a JIT to be notified whenever a VM data

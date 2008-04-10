@@ -22,28 +22,6 @@
 #include "port_malloc.h"
 #include "open/types.h"
 
-#include "hythread_ext.h"
-
-inline IDATA wait_for_multiple_semaphores(int num, hysem_t *sems) {
-    for (int i = 0; i < num; i ++) {
-           IDATA stat = hysem_wait(sems[i]);
-           if (stat !=TM_ERROR_NONE) {
-                return stat;
-           }
-    }
-    return TM_ERROR_NONE;
-}
-
-typedef struct String String;
-
-// #include "String_Pool.h"
-// #include "Class.h"
-// #include "object_layout.h"
-#include "vm_threads.h"
-
-unsigned sizeof_java_lang_class();
-
-
 struct Global_Env;
 
 class VM_Global_State {
@@ -67,86 +45,6 @@ Boolean class_is_subtype(Class *sub, Class *super);
  */
 Boolean class_is_subtype_fast(VTable *sub, Class *super);
 
-
-#ifdef _DEBUG
-void __stdcall vm_dump_object_and_return_ip(void *obj, void *eip);
-#endif
-
-class ExpandableMemBlock
-{
-public:
-    ExpandableMemBlock(long nBlockLen = 2000, long nInc = 1000)
-            : m_nBlockLen(nBlockLen), m_nCurPos(0), m_nInc(nInc){
-        assert(nInc > 0);
-        m_pBlock = STD_MALLOC(m_nBlockLen);
-        assert(m_pBlock);
-    }
-    ~ExpandableMemBlock(){
-        if(m_pBlock)
-            STD_FREE(m_pBlock);
-    }
-    void AppendBlock(char *szBlock, long nLen = -1){
-        if(!szBlock)return;
-        if(nLen <= 0)nLen = (long) strlen(szBlock);
-        if(!nLen)return;
-        long nOweSpace = (m_nCurPos + nLen) - m_nBlockLen;
-        if(nOweSpace >= 0){ //change > 0 to >= 0, prevents assert in m_free(m_pBlock)
-            m_nBlockLen += (nOweSpace / m_nInc + 1)*m_nInc;
-            m_pBlock = STD_REALLOC(m_pBlock, m_nBlockLen);
-            assert(m_pBlock);
-        }
-        //memmove((char*)m_pBlock + m_nCurPos, szBlock, nLen);
-        memcpy((char*)m_pBlock + m_nCurPos, szBlock, nLen);
-        m_nCurPos += nLen;
-    }
-    void AppendFormatBlock(char *szfmt, ... ){
-        va_list arg;
-        //char *buf = (char*)calloc(1024, 1);
-        char buf[1024];
-        va_start( arg, szfmt );
-        vsprintf(buf, szfmt, arg );
-        va_end( arg );
-        AppendBlock(buf);
-        //m_free(buf);
-    }
-    void SetIncrement(long nInc){
-        assert(nInc > 0);
-        m_nInc = nInc;
-    }
-    void SetCurrentPos(long nPos){
-        assert((nPos >= 0) && (nPos < m_nBlockLen));
-        m_nCurPos = nPos;
-    }
-    long GetCurrentPos(){
-        return m_nCurPos;
-    }
-    const void *AccessBlock(){
-        return m_pBlock;
-    }
-    const char *toString(){
-        *((char*)m_pBlock + m_nCurPos) = '\0';
-        return (const char*)m_pBlock;
-    }
-    void EnsureCapacity(long capacity){
-        long nOweSpace = capacity - m_nBlockLen;
-        if(nOweSpace >= 0){ //change > 0 to >= 0, prevents assert in m_free(m_pBlock)
-            m_nBlockLen += (nOweSpace / m_nInc + 1)*m_nInc;
-            m_pBlock = STD_REALLOC(m_pBlock, m_nBlockLen);
-            assert(m_pBlock);
-        }
-    }
-    void CopyTo(ExpandableMemBlock &mb, long len = -1){
-        if(len == -1)
-            len = m_nBlockLen;
-        mb.SetCurrentPos(0);
-        mb.AppendBlock((char*)m_pBlock, len);
-    }
-protected:
-    void *m_pBlock;
-    long m_nBlockLen;
-    long m_nCurPos;
-    long m_nInc;
-};
 
 #ifdef __cplusplus
 extern "C" {

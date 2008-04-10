@@ -35,7 +35,7 @@
 #include "vm_arrays.h"
 #include "vm_strings.h"
 #include "cci.h"
-
+#include "ExpandableMemBlock.h"
 
 bool exn_raised()
 {

@@ -682,7 +682,7 @@ jclass FindClass(JNIEnv* env_ext, String* name)
     if(loader == NULL) {
         bool res = st_get_frame(0, &stf);
         if (res)
-            loader = (ClassLoader*)class_get_class_loader(method_get_class(stf.method));
+            loader = stf.method->get_class()->get_class_loader();
         else
             loader = env->vm->vm_env->system_class_loader;
     }

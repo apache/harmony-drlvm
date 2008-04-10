@@ -25,6 +25,7 @@
 
 #define LOG_DOMAIN "interpreter.unspecified"
 #include "cxxlog.h"
+#include "vm_log.h"
 
 #include "environment.h"
 #include "vm_threads.h"
@@ -839,6 +840,7 @@ enum interpreter_ti_events {
  * Bitwise or of enabled <code>interpreter_ti_events</code>
  */
 extern int interpreter_ti_notification_mode;
+
 
 
 

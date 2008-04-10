@@ -41,7 +41,7 @@
 #include "cci.h"
 #include "port_thread.h"
 #include "port_crash_handler.h"
-
+#include "open/vm_class_info.h"
 
 #if (defined _IA32_) || (defined _EM64T_)
 

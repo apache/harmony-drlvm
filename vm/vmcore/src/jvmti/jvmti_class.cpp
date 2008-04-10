@@ -412,9 +412,9 @@ jvmtiGetClassStatus(jvmtiEnv* env, jclass handle, jint* status_ptr)
 
     *status_ptr = 0;
 
-    if( class_is_primitive( cl ) ) {
+    if( cl->is_primitive() ) {
         *status_ptr = JVMTI_CLASS_STATUS_PRIMITIVE;
-    } else if( class_is_array( cl ) ) {
+    } else if( cl->is_array() ) {
         *status_ptr = JVMTI_CLASS_STATUS_ARRAY;
     } else {
         switch(cl->get_state())
@@ -826,4 +826,5 @@ jvmtiRedefineClasses(jvmtiEnv* env, jint UNREF class_count,
 
     return JVMTI_NYI;
 }
+
 

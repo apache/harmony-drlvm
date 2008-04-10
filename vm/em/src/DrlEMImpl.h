@@ -29,6 +29,7 @@
 #include "open/vm_util.h"
 #include "open/em_profile_access.h"
 
+#include <jni.h>
 #include <apr_dso.h>
 #include <string>
 #include <set>

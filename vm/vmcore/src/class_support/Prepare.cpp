@@ -29,7 +29,7 @@
 #include "classloader.h"
 #include "nogc.h"
 #include "Package.h"
-
+#include "vtable.h"
 #include "vm_strings.h"
 #include "open/vm_util.h"
 #include "open/gc.h"
@@ -787,9 +787,6 @@ void Class::assign_offsets_to_methods(Global_Env* env)
                             index = m->get_index();
                             // mark superclass' method "m" as being overridden
                             m->method_was_overridden();
-
-                            // notify interested JITs that "m" was overridden by "method"
-                            m->do_jit_overridden_method_callbacks(&method);
                         }
                         break;
                     }
@@ -882,7 +879,7 @@ void Class::create_vtable(unsigned n_vtable_entries)
         memcpy(&vtable->superclasses,
                &get_super_class()->m_vtable->superclasses,
                sizeof(vtable->superclasses));
-        for(int i = 0; i < vm_max_fast_instanceof_depth(); i++) {
+        for(unsigned i = 0; i < vm_max_fast_instanceof_depth(); i++) {
             if(vtable->superclasses[i] == NULL) {
                 vtable->superclasses[i] = this;
                 break;
@@ -890,7 +887,7 @@ void Class::create_vtable(unsigned n_vtable_entries)
         }
     }
     if(m_depth > 0
-        && m_depth < vm_max_fast_instanceof_depth()
+        && (unsigned)m_depth < vm_max_fast_instanceof_depth()
         && !is_array()
         && !is_interface())
     {

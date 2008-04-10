@@ -24,7 +24,8 @@
 
 #include "DrlProfileCollectionFramework.h"
 
-#include "open/vm_util.h"
+#include "open/hythread_ext.h"
+#include "platform_lowlevel.h"
 
 #include <map>
 

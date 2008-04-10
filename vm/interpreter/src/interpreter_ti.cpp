@@ -26,7 +26,8 @@
 #include "open/vm_field_access.h"
 #include "open/vm_method_access.h"
 #include "port_malloc.h"
-
+#include "open/vm_class_info.h"
+//#include "open/vm_ee.h"
 #include "thread_generic.h"
 
 static jint skip_old_frames(VM_thread *thread)

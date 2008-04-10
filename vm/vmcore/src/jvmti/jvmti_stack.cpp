@@ -40,6 +40,7 @@
 #include "jit_intf_cpp.h"
 #include "thread_manager.h"
 #include "cci.h"
+#include "open/vm_class_info.h"
 
 class JavaStackIterator
 {

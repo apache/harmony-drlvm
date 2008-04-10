@@ -26,6 +26,8 @@
 #include "stack_trace.h"
 #include "exceptions.h"
 #include "jvmti_support.h"
+#include "vtable.h"
+#include "jit_import_rt.h"
 
 // ppervov: HACK: allows using STL modifiers (dec/hex) and special constants (endl)
 using namespace std;
@@ -186,18 +188,13 @@ interp_enumerate_root_set_single_thread_on_stack(VM_thread *thread) {
         }
 
         if (method->is_native()) {
-            DEBUG_GC("[METHOD <native>]: "
-                    << method->get_class()->get_name()->bytes << "."
-                    << method->get_name()->bytes
-                    << method->get_descriptor()->bytes << endl);
+            DEBUG_GC("[METHOD <native>]: " << method);
             interp_si_goto_previous(si);
             continue;
         }
 
         DEBUG_GC("[METHOD "<< si->stack.size << " " << (int)si->locals.varNum << "]: "
-                << class_get_name(method_get_class(method)) << "."
-                << method->get_name()->bytes
-                << method->get_descriptor()->bytes << endl);
+                << method);
 
         if (si->stack.size)
             for(i = 0; i <= si->stack.index; i++) {
@@ -285,18 +282,13 @@ interp_ti_enumerate_root_set_single_thread_on_stack(jvmtiEnv* ti_env, VM_thread 
         }
 
         if (method->is_native()) {
-            DEBUG_GC("[METHOD <native>]: "
-                    << method->get_class()->get_name()->bytes << "."
-                    << method->get_name()->bytes
-                    << method->get_descriptor()->bytes << endl);
+            DEBUG_GC("[METHOD <native>]: " << method);
             interp_si_goto_previous(si);
             continue;
         }
 
         DEBUG_GC("[METHOD "<< si->stack.size << " " << (int)si->locals.varNum << "]: "
-                << method->get_class()->get_name()->bytes << "."
-                << method->get_name()->bytes
-                << method->get_descriptor()->bytes << endl);
+                << method);
 
         if (si->stack.size)
             for(i = 0; i <= si->stack.index; i++) {

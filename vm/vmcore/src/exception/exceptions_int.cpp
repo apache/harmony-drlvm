@@ -22,6 +22,7 @@
 #define LOG_DOMAIN "exn"
 #include "clog.h"
 
+#include "open/hythread_ext.h"
 #include "exceptions.h"
 #include "exceptions_impl.h"
 

@@ -19,13 +19,10 @@
  * @version $Revision: 1.1.2.1.4.4 $
  */  
 
-
-
-
 #ifndef _lock_manager_H_
 #define _lock_manager_H_ 
 
-#include "open/vm_util.h" 
+#include "open/hythread_ext.h"
 #include "open/types.h"
 
 #ifdef __cplusplus

@@ -36,6 +36,7 @@
 
 #include "jni.h"
 #include "lock_manager.h"
+#include "vtable.h"
 #include "Class.h"
 #include "classloader.h"
 #include "environment.h"

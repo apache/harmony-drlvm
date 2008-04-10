@@ -50,7 +50,7 @@
 
 #include <stdio.h>
 
-#include "open/vm_util.h"
+#include "ExpandableMemBlock.h"
 
 // Defines the StackTraceFrame structure
 #ifdef __cplusplus

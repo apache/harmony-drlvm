@@ -18,6 +18,7 @@
 #ifndef THREAD_MANAGER_HEADER
 #define THREAD_MANAGER_HEADER
 
+#include "open/hythread.h"
 #include "open/jthread.h"
 #include "exceptions_type.h"
 

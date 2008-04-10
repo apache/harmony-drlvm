@@ -29,6 +29,7 @@
 #include "jni_utils.h"
 #include "jni_direct.h"
 
+#include "vtable.h"
 #include "Class.h"
 #include "environment.h"
 #include "exceptions.h"

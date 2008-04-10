@@ -35,6 +35,7 @@
 #endif
 #include "apr_mmap.h"
 
+#include "tl/memory_pool.h"
 #include "properties.h"
 #include "manifest.h"
 #include "lock_manager.h"
