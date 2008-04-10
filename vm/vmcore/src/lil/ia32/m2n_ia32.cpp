@@ -21,6 +21,7 @@
 
 #include "open/types.h"
 #include "open/hythread.h"
+#include "thread_helpers.h"
 
 #include "m2n.h"
 #include "m2n_ia32_internal.h"
@@ -175,13 +176,11 @@ char* m2n_gen_ts_to_register(char* buf, R_Opnd* reg)
 {
     if (reg!=&eax_opnd)
         buf = push(buf,  eax_opnd);
-    buf = push(buf,  ecx_opnd);
-    buf = push(buf,  edx_opnd);
-    buf = call(buf, (char *)get_thread_ptr);
-    buf = pop(buf,  edx_opnd);
-    buf = pop(buf,  ecx_opnd);
+
+    buf = gen_hythread_self_helper(buf);
+
     if (reg!=&eax_opnd) {
-        buf = mov(buf, *reg,  eax_opnd);
+        buf = mov(buf, *reg, eax_opnd);
         buf = pop(buf,  eax_opnd);
     }
     return buf;
