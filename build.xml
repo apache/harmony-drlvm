@@ -260,13 +260,13 @@ Usage:
 
         <pathconvert pathsep=" " property="relocate.files.all" refid="relocate.files" />
 
-        <exec executable="editbin">
+        <exec executable="editbin" outputproperty="null" logerror="yes" failonerror="true">
             <arg value="/LARGEADDRESSAWARE" />
             <arg value="/BIND" />
             <arg value="${drlvm.deploy.dir}/jdk/jre/bin/java.exe" />
         </exec>
 
-        <exec executable="editbin">
+        <exec executable="editbin" outputproperty="null" logerror="yes" failonerror="true">
             <arg value="/LARGEADDRESSAWARE" />
             <arg value="/BIND" />
             <arg value="/rebase:base=0x500000" />
