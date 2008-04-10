@@ -511,9 +511,11 @@ JIT_Result Compiler::compile(Compile_Handle ch, Method_Handle method,
     //
     
     //register profiler counters  mapping info if present
+    std::vector<uint32> profiler_counters_vec; //will automatically be deleted on exit from this method
     if (!m_profileCountersMap.empty()) {
         m_infoBlock.num_profiler_counters = (uint32)m_profileCountersMap.size();
-        m_infoBlock.profiler_counters_map =  new uint32[m_infoBlock.num_profiler_counters];
+        profiler_counters_vec.resize(m_infoBlock.num_profiler_counters, 0);
+        m_infoBlock.profiler_counters_map = &profiler_counters_vec.front();
         for (size_t i =0; i<m_profileCountersMap.size(); i++) {
             ProfileCounterInfo& info = m_profileCountersMap[i];
             uint32 offset = ProfileCounterInfo::getInstOffset(info.offsetInfo) + (info.bb->addr - m_vmCode);
