@@ -139,6 +139,7 @@
     </target>
 
     <target name="download-eclipse" unless="eclipse.available">
+        <mkdir dir="${ECLIPSE_ARCHIVE.home}" />
         <get dest="${ECLIPSE_ARCHIVE.home}/${eclipse.zip}" src="${eclipse.url}"
             usetimestamp="true" verbose="true"/>
     </target>
