@@ -232,7 +232,9 @@ System_arraycopy_HLO_Handler::run()
     Opnd* tauTypesChecked = builder->genTauSafe();
 
     // Choosing direction
-    builder->appendInst(instFactory.makeBranch(Cmp_GT,intTag,dstPos,srcPos,reverseCopying));
+    Opnd * dstIsGreater = builder->genCmp(intType,intTag,Cmp_GT,diff,zero);
+    Opnd * reverseCopy = builder->genAnd(intType,sameArrays,dstIsGreater);
+    builder->appendInst(instFactory.makeBranch(Cmp_GT,intTag,reverseCopy,zero,reverseCopying));
 
     // Direct Copying
     builder->genFallthroughNode();
