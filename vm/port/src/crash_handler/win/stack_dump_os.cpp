@@ -129,6 +129,8 @@ void sd_get_c_method_info(CFunInfo* info, native_module_t* module, void* ip)
     if (!SymInitialize(GetCurrentProcess(), NULL, TRUE))
         return;
 
+    SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME);
+
     BYTE smBuf[sizeof(SYMBOL_INFO) + SD_MNAME_LENGTH - 1];
     PSYMBOL_INFO pSymb = (PSYMBOL_INFO)smBuf;
     pSymb->SizeOfStruct = sizeof(SYMBOL_INFO);
@@ -186,7 +188,7 @@ void sd_init_crash_handler()
 
         if (hdbghelp)
         {
-            SymSetOptions(SYMOPT_LOAD_LINES);
+            SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME);
             g_SymFromAddr = (SymFromAddr_type)::GetProcAddress(hdbghelp, "SymFromAddr");
             g_SymGetLineFromAddr64 = (SymGetLineFromAddr64_type)::GetProcAddress(hdbghelp, "SymGetLineFromAddr64");
             g_SymGetLineFromAddr = (SymGetLineFromAddr_type)::GetProcAddress(hdbghelp, "SymGetLineFromAddr");
