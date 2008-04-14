@@ -137,6 +137,7 @@ SD2_OPT.useProfile=EDGE_PROF,VALUE_PROF
 -XX:jit.SD2_OPT.arg.codegen.dce1.early=yes
 -XX:jit.SD2_OPT.arg.codegen.btr.insertCMOVs=no
 -XX:jit.SD2_OPT.arg.codegen.btr.removeConstCompare=yes
+-XX:jit.SD2_OPT.arg.codegen.btr.eliminateSignCheck=yes
 -XX:jit.arg.codegen.emitter.align=4
 
 #system properties
