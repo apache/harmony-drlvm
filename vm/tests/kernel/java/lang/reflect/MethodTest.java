@@ -332,30 +332,4 @@ import junit.framework.TestCase;
             fail("Error2: " + e.toString());
         }
     }
-
-    interface GenericSample {
-        public <T extends GenericSample, E extends Throwable> T test(T param) throws E;
-    }
-
-    /**
-     *  
-     */
-    public void test_getGeneric() {
-        // Regression for HARMONY-5622
-        Method method = GenericSample.class.getMethods()[0];
-        for (int i = 0; i < 5; i++) {
-            switch (i) {
-            case 0: method.getGenericParameterTypes();
-                    break;
-            case 1: method.getGenericReturnType();
-                    break;
-            case 2: method.getGenericExceptionTypes();
-                    break;
-            case 3: method.getTypeParameters();
-                    break;
-            case 4: method.toGenericString();
-                    break;
-            }
-        }
-    }
 }
