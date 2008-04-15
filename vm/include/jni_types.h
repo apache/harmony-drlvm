@@ -297,7 +297,6 @@ typedef union jvalue {
     jobject  l;
 } jvalue;
 
-struct _jfieldID;
 /**
  * Type which describes an identfier of a field inside of class
  *
@@ -305,7 +304,7 @@ struct _jfieldID;
  * field inside of the class described by #jclass.
  */
 typedef struct _jfieldID* jfieldID;
-struct _jmethodID;
+
 /**
  * Type which describes an identfier of a method inside of class
  *

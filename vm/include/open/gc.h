@@ -938,7 +938,7 @@ GCExport void *gc_heap_ceiling_address();
  * \section gc_finalization_and_weak_refs_requirements Adopted Requirements
  *
  * Current implementation of weak references places the following requirements
- * \li All reference objects must have exactly one non-regulur object reference,
+ * \li All reference objects must have exactly one non-regular object reference,
  *     and this reference must be at the same offset for references of all types.
  *     GC calls <code>class_is_reference()</code> to find out whether the class represents
  *     weak reference and finds out the referent offset by calling VM function 

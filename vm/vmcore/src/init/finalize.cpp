@@ -26,7 +26,7 @@
 #include "lock_manager.h"
 #include "object_layout.h"
 #include "open/types.h"
-#include <open/jthread.h>
+#include "open/jthread.h"
 #include "Class.h"
 #include "open/vm_util.h"
 #include "environment.h"
@@ -506,7 +506,7 @@ int Objects_To_Finalize::do_finalization(int quantity) {
             VM_Global_State::loader_env->VoidVoidDescriptor_String);
 
         assert(finalize);
-        TRACE2("finalize", "finalize object " << class_get_name(handle->object->vt()->clss));
+        TRACE2("finalize", "finalize object " << handle->object->vt()->clss->get_name()->bytes);
         vm_execute_java_method_array( (jmethodID) finalize, 0, args);
         tmn_suspend_enable();
 
@@ -517,7 +517,7 @@ int Objects_To_Finalize::do_finalization(int quantity) {
             INFO2("finalize", "Uncaught exception "
                 << exn_get_name()
                 << " while running a finalize of the object"
-                << class_get_name(object->vt()->clss) << ".");
+                << object->vt()->clss->get_name()->bytes << ".");
             tmn_suspend_enable();            
         }
 #endif
@@ -574,7 +574,7 @@ void References_To_Enqueue::enqueue_references()
             INFO2("ref", "Uncaught exception "
                 << exn_get_name()
                 << " while running a enqueue method of the object"
-                << class_get_name(object->vt()->clss) << ".");
+                << object->vt()->clss->get_name()->bytes << ".");
             tmn_suspend_enable();
             
         }

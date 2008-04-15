@@ -200,21 +200,6 @@ VMEXPORT void vm_enqueue_reference(Managed_Object_Handle p_obj);
 
 VMEXPORT void set_native_ref_enqueue_thread_flag(Boolean flag);
 
-enum WeakReferenceType {
-    NOT_REFERENCE = 0,
-    WEAK_REFERENCE,
-    SOFT_REFERENCE,
-    PHANTOM_REFERENCE
-};
-
-/**
- * Returns non-zero value if the class represented by Class_Handle
- * is a descendant of java.lang.ref.Reference. The particular type
- * of reference (weak, soft or phantom) is encoded by the return 
- * value of WeakReferenceType.
- */
-VMEXPORT WeakReferenceType class_is_reference(Class_Handle clss);
-
 /*
  * Returns handle of a class for a specified vtable
  *
@@ -230,23 +215,6 @@ VMEXPORT Class_Handle vtable_get_class(VTable_Handle vh);
  * @param clss - class of live object in Java heap
  */
 VMEXPORT void vm_notify_live_object_class(Class_Handle clss);
-
-/**
- * Returns the offset of the referent field 
- * in the <code>java.lang.ref.Reference</code> object.
- *
- * clss is assumed to represent the reference object,
- * i.e. class_is_reference() returned non-zero value.
- *
- * @note The returned value is most probably a constant,
- *       and is not dependent on the clss.
- *
- * @note This interface allows only one non-strong (i.e. weak
- *       soft or phantom) reference per object.
- *       It seems to be sufficient for JVM Spec.
- */
-VMEXPORT int class_get_referent_offset(Class_Handle clss);
-
 
 #define CL_PROP_ALIGNMENT_MASK      0x00FFF     ///< @sa <code>class_properties</code>
 #define CL_PROP_NON_REF_ARRAY_MASK  0x01000     ///< @sa <code>class_properties</code>

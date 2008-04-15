@@ -322,7 +322,7 @@ void gen_native_arraycopy_fastpath(Emitter_Handle h, Method *method)
 
     // Test whether the first object is of type [C.
     s = mov(s,  ebx_opnd,  M_Base_Opnd(esi_reg, object_get_vtable_offset())) ;     // mov ebx, [esi] ; src->vt
-    s = alu(s, cmp_opc,  ebx_opnd,  Imm_Opnd((int)class_get_vtable(env->ArrayOfChar_Class))); // cmp ebx, vtable_of_char_array
+    s = alu(s, cmp_opc,  ebx_opnd,  Imm_Opnd((int)(env->ArrayOfChar_Class->get_vtable()))); // cmp ebx, vtable_of_char_array
     s = branch32(s, Condition_NZ,  Imm_Opnd(0x0));
     patch[p_c++] =  s - 4 ;
 

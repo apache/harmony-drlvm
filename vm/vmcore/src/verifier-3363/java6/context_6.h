@@ -40,13 +40,13 @@ namespace CPVerifier_6 {
         vf_Context_6(SharedClasswideData &classwide) :
           vf_Context_x<vf_Context_6, WorkmapElement, _WorkmapElement, StackmapElement>(classwide) {}
 
-          vf_Result verify_method(method_handler method);
+          vf_Result verify_method(Method_Handle method);
     protected:
         // stackmaps for instructions
         InstrPropsBase props;
 
         //init method-wide data
-        void init(method_handler _m_method) {
+        void init(Method_Handle _m_method) {
             vf_Context_x<vf_Context_6, WorkmapElement, _WorkmapElement, StackmapElement>::init(_m_method);
             props.init(mem, m_code_length);
         }

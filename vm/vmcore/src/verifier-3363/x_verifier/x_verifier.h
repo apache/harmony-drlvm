@@ -23,10 +23,14 @@
 #ifndef __X_VERIFIER_H__
 #define __X_VERIFIER_H__
 
+#include "open/types.h"
 #include "verifier.h"
 
-typedef struct Context_* verification_context;
+#ifdef __cplusplus
+extern "C" {
+#endif
 
+typedef struct Context_* verification_context;
 
 /**
  * Allocates an empty verification context for a class, 
@@ -36,7 +40,7 @@ typedef struct Context_* verification_context;
  * @param klass - class handler
  * @return a verification context for the class
  */
-verification_context allocate_verification_context(class_handler klass);
+verification_context allocate_verification_context(Class_Handle klass);
 
 /**
  * Initializes the verification context with method's information. 
@@ -48,8 +52,8 @@ verification_context allocate_verification_context(class_handler klass);
  * method's defining class
  * @return error code 
  */
-vf_Result 
-init_verification_context_for_method(method_handler method, verification_context context);
+vf_Result
+init_verification_context_for_method(Method_Handle method, verification_context context);
 
 /**
  * Recomputes the StackMapTable of a method using the verification 
@@ -62,18 +66,24 @@ init_verification_context_for_method(method_handler method, verification_context
  * @param context - class and method verification context
  * @return error code
  */
-vf_Result recompute_stackmaptable(uint8 **attrBytes, 
-  method_handler method, verification_context context);
+vf_Result
+recompute_stackmaptable(uint8 **attrBytes,
+                        Method_Handle method,
+                        verification_context context);
 
 
 /**
  * Frees memory allocated for a StackMapTable attribute
  */
-void free_stackmaptable(uint8 *attrBytes);
+void free_stackmaptable(uint8* attrBytes);
 
 /**
  * Frees memory allocated for a verification context
  */
-void free_verification_context (verification_context context);
+void free_verification_context(verification_context context);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

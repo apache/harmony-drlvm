@@ -27,7 +27,7 @@
 #include "compiler.h"
 
 #include "../shared/mkernel.h"
-#include "open/vm_class_info.h"
+#include "open/vm_class_manipulation.h"
 #include "jit_intf.h"
 
 #ifdef _WIN32
@@ -512,23 +512,14 @@ void Compiler::dbg_trace_comp_end(bool success, const char * reason)
             case OPCODE_INVOKESPECIAL:
             case OPCODE_INVOKESTATIC:
             case OPCODE_INVOKEVIRTUAL:
-                lpClass = class_cp_get_method_class_name(m_klass, jinst.op0);
-                lpItem = class_cp_get_method_name(m_klass, jinst.op0);
-                lpDesc = class_cp_get_method_descriptor(m_klass, jinst.op0);
-            break;
             case OPCODE_INVOKEINTERFACE:
-                lpClass = 
-                class_cp_get_interface_method_class_name(m_klass, jinst.op0);
-                lpItem = class_cp_get_interface_method_name(m_klass, jinst.op0);
-                lpDesc = class_cp_get_interface_method_descriptor(m_klass, jinst.op0);
-                break;
             case OPCODE_GETFIELD:
             case OPCODE_PUTFIELD:
             case OPCODE_GETSTATIC:
             case OPCODE_PUTSTATIC:
-                lpClass = class_cp_get_field_class_name(m_klass, jinst.op0);
-                lpItem = class_cp_get_field_name(m_klass, jinst.op0);
-                lpDesc = class_cp_get_field_descriptor(m_klass, jinst.op0);
+                lpClass = class_cp_get_entry_class_name(m_klass, jinst.op0);
+                lpItem = class_cp_get_entry_name(m_klass, jinst.op0);
+                lpDesc = class_cp_get_entry_descriptor(m_klass, jinst.op0);
                 break;
             case OPCODE_NEW:
             case OPCODE_INSTANCEOF:

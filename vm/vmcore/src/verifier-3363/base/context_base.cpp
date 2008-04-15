@@ -18,6 +18,8 @@
  * @author Mikhail Loenko, Vladimir Molotkov
  */  
 
+#include "open/vm_class_loading.h"
+
 #include "verifier.h"
 #include "context_base.h"
 namespace CPVerifier {
@@ -340,11 +342,12 @@ namespace CPVerifier {
         if( !class_constraints ) return;
 
         vf_ClassLoaderData_t *cl_data;
-        classloader_handler currentClassLoader = class_get_class_loader(k_class);
+        ClassLoaderHandle currentClassLoader = class_get_class_loader(k_class);
 
         // lock data modification
-        cl_acquire_lock( currentClassLoader );
-        cl_data = (vf_ClassLoaderData_t*)cl_get_verify_data_ptr( currentClassLoader );
+        class_loader_lock( currentClassLoader );
+        cl_data =
+            (vf_ClassLoaderData_t*)class_loader_get_verifier_data_ptr( currentClassLoader );
 
         // create class loader data
         if( cl_data == NULL ) {
@@ -379,8 +382,8 @@ namespace CPVerifier {
         }
 
         // unlock data modification
-        cl_set_verify_data_ptr( currentClassLoader, cl_data );
-        cl_release_lock( currentClassLoader );
+        class_loader_set_verifier_data_ptr( currentClassLoader, cl_data );
+        class_loader_unlock( currentClassLoader );
         return;
     }
 

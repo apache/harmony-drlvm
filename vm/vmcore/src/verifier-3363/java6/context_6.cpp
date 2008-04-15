@@ -18,13 +18,16 @@
  * @author Mikhail Loenko, Vladimir Molotkov
  */  
 
+#include "open/vm_method_access.h"
+
 #include "context_6.h"
+
 namespace CPVerifier_6 {
 
     /*
     * Do Java6 verification of a method
     */
-    vf_Result vf_Context_6::verify_method(method_handler method) {
+    vf_Result vf_Context_6::verify_method(Method_Handle method) {
         vf_Result tcr;
 
         //nothing to verify

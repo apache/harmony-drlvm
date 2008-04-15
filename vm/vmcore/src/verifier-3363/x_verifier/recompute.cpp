@@ -39,9 +39,10 @@ static char err_message[5000];
 *
 */
 vf_Result
-vf_recompute_stackmaptable( method_handler method, uint8 **attrBytes, char **error, void *trustedPairs )
+vf_recompute_stackmaptable(Method_Handle method, uint8** attrBytes, char** error,
+                           void* trustedPairs )
 {
-    class_handler klass = method_get_class(method);
+    Class_Handle klass = method_get_class(method);
     vf_Result result = VF_OK;
 
     // Create context
@@ -61,7 +62,7 @@ vf_recompute_stackmaptable( method_handler method, uint8 **attrBytes, char **err
     return result;
 } // vf_recompute_stackmaptable
 
-vf_Result vf_Context_5e::recompute_stackmaptable( method_handler method ) {
+vf_Result vf_Context_5e::recompute_stackmaptable(Method_Handle method ) {
     written_stackmap = 0;
 
     //nothing to verify
@@ -562,11 +563,11 @@ void vf_Context_5e::parseTrustedData(SmConstant value, int knownly_interface) {
     }
 
     if( t->cls != CLASS_NOT_LOADED ) {
-        if( class_is_interface_(t->cls) ) {
+        if(class_is_interface(t->cls)) {
             parsedTrustedData[idx].set_interface();
             return;
         }
-        class_handler h_sup = class_get_super_class(t->cls);
+        Class_Handle h_sup = class_get_super_class(t->cls);
         if( h_sup ) {
             sup = tpool.get_ref_type( class_get_name(h_sup));
             int sup_idx = sup.getReferenceIdx();

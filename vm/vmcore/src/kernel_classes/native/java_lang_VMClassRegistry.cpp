@@ -29,6 +29,7 @@
 #define LOG_DOMAIN "vm.core.classes"
 #include "cxxlog.h"
 
+#include "open/vm_class_manipulation.h"
 #include "Package.h"
 #include "classloader.h"
 #include "jni_utils.h"
@@ -108,12 +109,12 @@ JNIEXPORT jclass JNICALL Java_java_lang_ClassLoader_findLoadedClass
     if (NULL == name) {
         return NULL;
     } 
-    
+
     const char* buf = GetStringUTFChars(jenv, name, NULL);
     ClassLoaderHandle loader = class_loader_lookup(cl);
     Class_Handle clss = class_find_loaded(loader, buf);
     ReleaseStringUTFChars(jenv, name, buf);
-    
+
     return clss ? jni_class_from_handle(jenv, clss) : NULL; 
 }
 
@@ -423,7 +424,7 @@ JNIEXPORT jboolean JNICALL Java_java_lang_VMClassRegistry_isArray
   (JNIEnv *jenv, jclass, jclass clazz)
 {
     Class_Handle ch = jni_get_class_handle(jenv, clazz);
-    return (jboolean)(class_is_array(ch) ? JNI_TRUE : JNI_FALSE);
+    return (jboolean)(ch->is_array() ? JNI_TRUE : JNI_FALSE);
 }
 
 /*
@@ -450,7 +451,7 @@ JNIEXPORT jboolean JNICALL Java_java_lang_VMClassRegistry_isAssignableFrom
     Class_Handle ch = jni_get_class_handle(jenv, fromClazz);
 
     // if primitive class
-    if (class_is_primitive(ch))
+    if (ch->is_primitive())
         return (jboolean)(IsSameObject(jenv, clazz, fromClazz) ? JNI_TRUE : JNI_FALSE);
 
     // if non primitive
@@ -480,7 +481,7 @@ JNIEXPORT jboolean JNICALL Java_java_lang_VMClassRegistry_isPrimitive
   (JNIEnv *jenv, jclass, jclass clazz)
 {
     Class_Handle ch = jni_get_class_handle(jenv, clazz);
-    return (jboolean)(class_is_primitive(ch) ? JNI_TRUE : JNI_FALSE);
+    return (jboolean)(ch->is_primitive() ? JNI_TRUE : JNI_FALSE);
 }
 
 /*

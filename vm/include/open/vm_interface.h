@@ -39,34 +39,17 @@ PROTOTYPE_WITH_NAME(Class_Handle, allocation_handle_get_class, (Allocation_Handl
 
 //Class
 PROTOTYPE_WITH_NAME(Class_Handle, class_get_array_element_class, (Class_Handle cl));
-PROTOTYPE_WITH_NAME(unsigned    , class_get_array_element_size, (Class_Handle ch)); 
-PROTOTYPE_WITH_NAME(Class_Handle, class_get_array_of_class, (Class_Handle cl));
-PROTOTYPE_WITH_NAME(Type_Info_Handle, class_get_element_type_info, (Class_Handle ch));
-PROTOTYPE_WITH_NAME(const char* , class_get_name, (Class_Handle cl));
 PROTOTYPE_WITH_NAME(Class_Handle, class_get_super_class, (Class_Handle cl));
 PROTOTYPE_WITH_NAME(int         , class_get_depth, (Class_Handle cl));
-PROTOTYPE_WITH_NAME(VTable_Handle, class_get_vtable, (Class_Handle cl));
 PROTOTYPE_WITH_NAME(Allocation_Handle, class_get_allocation_handle, (Class_Handle ch));
 PROTOTYPE_WITH_NAME(unsigned    , class_get_boxed_data_size, (Class_Handle ch));
 
-PROTOTYPE_WITH_NAME(Class_Handle, class_get_class_of_primitive_type, (VM_Data_Type typ));
 PROTOTYPE_WITH_NAME(Method_Handle, class_get_method_by_name, (Class_Handle ch, const char* name));
 PROTOTYPE_WITH_NAME(Field_Handle, class_get_field_by_name, (Class_Handle ch, const char* name));
 PROTOTYPE_WITH_NAME(ClassLoaderHandle, class_get_class_loader, (Class_Handle ch));
 
-PROTOTYPE_WITH_NAME(Boolean     , class_is_array, (Class_Handle cl));
-PROTOTYPE_WITH_NAME(Boolean     , class_is_enum, (Class_Handle ch));
-PROTOTYPE_WITH_NAME(Boolean     , class_is_final, (Class_Handle cl)); //class_is_final
-PROTOTYPE_WITH_NAME(Boolean     , class_is_throwable, (Class_Handle ch)); //class_hint_is_exceptiontype
-PROTOTYPE_WITH_NAME(BOOLEAN     , class_is_interface, (Class_Handle cl)); //class_is_interface2
-PROTOTYPE_WITH_NAME(Boolean     , class_is_abstract, (Class_Handle cl)); //class_is_abstract
-PROTOTYPE_WITH_NAME(Boolean     , class_is_initialized, (Class_Handle ch)); //class_needs_initialization && class_is_initialized()
-PROTOTYPE_WITH_NAME(BOOLEAN     , class_is_finalizable, (Class_Handle ch));
-PROTOTYPE_WITH_NAME(Boolean     , class_is_instanceof, (Class_Handle s, Class_Handle t));
 PROTOTYPE_WITH_NAME(Boolean     , class_is_support_fast_instanceof, (Class_Handle cl));// class_get_fast_instanceof_flag
-PROTOTYPE_WITH_NAME(Boolean     , class_is_primitive, (Class_Handle vmTypeHandle));
 
-PROTOTYPE_WITH_NAME(Class_Handle, class_lookup_class_by_name_using_bootstrap_class_loader, (const char *name));
 PROTOTYPE_WITH_NAME(Method_Handle, class_lookup_method_recursively,
                    (Class_Handle clss,
                     const char *name,
@@ -117,9 +100,6 @@ PROTOTYPE_WITH_NAME(UDATA       , vm_tls_get_request_offset, ()); //DATA VMCALL 
 PROTOTYPE_WITH_NAME(UDATA       , vm_tls_is_fast, (void));//UDATA VMCALL hythread_uses_fast_tls
 PROTOTYPE_WITH_NAME(IDATA       , vm_get_tls_offset_in_segment, (void));//IDATA VMCALL hythread_get_hythread_offset_in_tls(void)
 
-PROTOTYPE_WITH_NAME(Class_Handle, vm_get_system_object_class, ()); // get_system_object_class
-PROTOTYPE_WITH_NAME(Class_Handle, vm_get_system_class_class, ()); // get_system_class_class
-PROTOTYPE_WITH_NAME(Class_Handle, vm_get_system_string_class, ()); // get_system_string_class
 PROTOTYPE_WITH_NAME(void*       , vm_get_vtable_base, ()); //POINTER_SIZE_INT vm_get_vtable_base()
 PROTOTYPE_WITH_NAME(void*       , vm_get_heap_base_address, ()); //vm_heap_base_address
 PROTOTYPE_WITH_NAME(void*       , vm_get_heap_ceiling_address, ()); //vm_heap_ceiling_address

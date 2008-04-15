@@ -32,9 +32,10 @@
 
 #include "jdefs.h"
 #include "jframe.h"
-#include "open/vm.h"
+//#include "open/vm.h"
 #include "jit_import.h"
 #include "open/vm_method_access.h"
+#include "open/vm_class_manipulation.h"
 
 namespace Jitrino {
 namespace Jet {
@@ -573,7 +574,7 @@ struct MethInfo
     /** Tests whether the method is constructor of Exception. */
     bool meth_is_exc_ctor(void)
     {
-        return class_hint_is_exceptiontype(m_klass) && meth_is_ctor();
+        return class_is_throwable(m_klass) && meth_is_ctor();
     }
     
 protected:

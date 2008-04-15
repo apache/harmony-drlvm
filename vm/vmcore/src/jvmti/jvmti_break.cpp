@@ -14,10 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Gregory Shimansky
- * @version $Revision: 1.1.2.1.4.4 $
- */  
 /*
  * JVMTI API for working with breakpoints
  */
@@ -46,7 +42,7 @@ bool jvmti_process_breakpoint_event(TIEnv *env, const VMBreakPoint* bp, const PO
     assert(bp);
 
     TRACE2("jvmti.break", "Process breakpoint: "
-            << bp->method << " :" << bp->location << " :" << bp->addr );
+        << bp->method << " :" << bp->location << " :" << bp->addr );
 
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
     if (ti->getPhase() != JVMTI_PHASE_LIVE)
@@ -123,8 +119,8 @@ jvmtiSetBreakpoint(jvmtiEnv* env,
                    jmethodID method,
                    jlocation location)
 {
-    TRACE2("jvmti.break", "SetBreakpoint is called for method: " << method
-        << " :" << location);
+    TRACE2("jvmti.break", "SetBreakpoint is called for method: "
+        << method << " :" << location);
     SuspendEnabledChecker sec;
 
     jvmtiError errorCode;
@@ -195,8 +191,8 @@ jvmtiClearBreakpoint(jvmtiEnv* env,
                      jmethodID method,
                      jlocation location)
 {
-    TRACE2("jvmti.break", "ClearBreakpoint is called for method: " << method
-        << " :" << location);
+    TRACE2("jvmti.break", "ClearBreakpoint is called for method: "
+        << method << " :" << location);
     SuspendEnabledChecker sec;
     jvmtiError errorCode;
 

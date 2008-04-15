@@ -218,7 +218,7 @@ void CodeGen::gen_field_op(JavaByteCodes opcode,  Class_Handle enclClass, unsign
             if (fld != NULL) {
                 Class_Handle klass = field_get_class(fld);
                 assert(klass);
-                if (klass != m_klass && class_needs_initialization(klass)) {
+                if (klass != m_klass && !class_is_initialized(klass)) {
                     gen_call_vm(ci_helper_o, rt_helper_init_class, 0, klass);
                 }
                 fieldOp.fld = fld;
@@ -271,7 +271,7 @@ void CodeGen::do_field_op(const FieldOpInfo& fieldOp)
 {
     jtype jt = to_jtype(class_cp_get_field_type(fieldOp.enclClass, fieldOp.cpIndex));
     
-    const char* fieldDescName = class_cp_get_field_descriptor(fieldOp.enclClass, fieldOp.cpIndex);
+    const char* fieldDescName = class_cp_get_entry_descriptor(fieldOp.enclClass, fieldOp.cpIndex);
     bool fieldIsMagic = VMMagicUtils::isVMMagicClass(fieldDescName);
     if (fieldIsMagic) {
         jt = iplatf;

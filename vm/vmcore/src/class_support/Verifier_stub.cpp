@@ -61,7 +61,7 @@ bool Class::verify(const Global_Env * env)
         && (is_bootstrap == FALSE || is_forced == TRUE)) {
         char *error;
         vf_Result result =
-            vf_verify_class((class_handler) this, is_strict, &error);
+            vf_verify_class(this, is_strict, &error);
         if (VF_OK != result) {
             aulock.ForceUnlock();
             REPORT_FAILED_CLASS_CLASS(m_class_loader, this,
@@ -72,7 +72,7 @@ bool Class::verify(const Global_Env * env)
     m_state = ST_BytecodesVerified;
 
     return true;
-}                               // Class::verify
+} // Class::verify
 
 
 bool Class::verify_constraints(const Global_Env * env)
@@ -115,7 +115,7 @@ bool Class::verify_constraints(const Global_Env * env)
     // check method constraints
     char *error;
     vf_Result result =
-        vf_verify_class_constraints((class_handler) this, is_strict, &error);
+        vf_verify_class_constraints(this, is_strict, &error);
 
     // lock class and check result
     lock();
@@ -145,4 +145,4 @@ bool Class::verify_constraints(const Global_Env * env)
     unlock();
 
     return true;
-}                               // class_verify_method_constraints
+} // Class::verify_constraints

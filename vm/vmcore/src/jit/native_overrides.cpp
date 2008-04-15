@@ -339,7 +339,7 @@ LilCodeStub* nso_char_array_copy(LilCodeStub* cs, Method_Handle)
         VM_Global_State::loader_env->managed_null,
         VM_Global_State::loader_env->managed_null,
         (POINTER_SIZE_INT)object_get_vtable_offset(),
-        class_get_vtable(env->ArrayOfChar_Class),
+        env->ArrayOfChar_Class->get_vtable(),
         (POINTER_SIZE_INT)object_get_vtable_offset(),
         length_offset, length_offset);
     assert(cs);

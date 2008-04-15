@@ -102,8 +102,8 @@
 #include "interpreter.h"
 
 #include "open/bytecodes.h"
-#include "open/vm_class_info.h"
-#include "open/vm_util.h"
+#include "open/vm_class_manipulation.h"
+//#include "open/vm_util.h"
 
 
 static void class_report_failure(Class* target, uint16 cp_index, jthrowable exn)
@@ -1066,8 +1066,7 @@ void class_throw_linking_error(Class_Handle ch, unsigned index, unsigned opcode)
     tmn_suspend_disable();
 }
 
-Class *resolve_class_array_of_class1(Global_Env *env,
-                                     Class *cc)
+Class* resolve_class_array_of_class(Global_Env* env, Class* cc)
 {
     // If the element type is primitive, return one of the preloaded
     // classes of arrays of primitive types.
@@ -1103,7 +1102,7 @@ Class *resolve_class_array_of_class1(Global_Env *env,
     Class* arr_clss = cc->get_class_loader()->LoadVerifyAndPrepareClass(env, arr_str);
 
     return arr_clss;
-} //resolve_class_array_of_class1
+} // resolve_class_array_of_class
 
 //
 // Given a class handle cl construct a class handle of the type
@@ -1112,11 +1111,11 @@ Class *resolve_class_array_of_class1(Global_Env *env,
 Class_Handle class_get_array_of_class(Class_Handle cl)
 {
     Global_Env *env = VM_Global_State::loader_env;
-    Class *arr_clss = resolve_class_array_of_class1(env, cl);
+    Class *arr_clss = resolve_class_array_of_class(env, cl);
     assert(arr_clss || exn_raised());
 
     return arr_clss;
-} //class_get_array_of_class
+} // class_get_array_of_class
 
 
 static bool resolve_const_pool_item(Global_Env* env, Class* clss, unsigned cp_index)

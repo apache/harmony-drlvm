@@ -108,7 +108,7 @@ TypeDesc* type_desc_create_from_java_class(Class* c)
     return td;
 }
 
-Class *resolve_class_array_of_class1(Global_Env *env, Class *cc);
+Class *resolve_class_array_of_class(Global_Env *env, Class *cc);
 
 Class* TypeDesc::load_type_desc()
 {
@@ -137,7 +137,7 @@ Class* TypeDesc::load_type_desc()
         assert (component_type);
         element_clss = component_type->load_type_desc();
         if (!element_clss) return NULL;
-        clss = resolve_class_array_of_class1(env, element_clss);
+        clss = resolve_class_array_of_class(env, element_clss);
         return clss;
     default:
         // All other types are not Java types, so fail

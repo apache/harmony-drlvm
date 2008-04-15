@@ -108,6 +108,18 @@ DECLARE_OPEN(void, method_unlock, (Method_Handle method));
 DECLARE_OPEN(BOOLEAN, method_is_private, (Method_Handle method));
 
 /**
+ *  Checks whether the given method is protected.
+ *
+ * @param method - the method handle
+ *
+ * @return <code>TRUE</code> if the given method is protected; otherwise, <code>FALSE</code>.
+ *
+ * @note An assertion is raised if <i>method</i> equals to <code>NULL</code>. 
+ * @ingroup Extended 
+ */
+DECLARE_OPEN(BOOLEAN, method_is_protected, (Method_Handle method));
+
+/**
  *  Checks whether the given method is static.
  *
  * @param method - the method handle
@@ -316,8 +328,8 @@ DECLARE_OPEN(uint16, method_get_exc_handler_number, (Method_Handle method));
  * @note Replaces the method_get_handler_info function.
  */
 DECLARE_OPEN(void, method_get_exc_handler_info,
-    (Method_Handle method, uint32 index,
-     uint32* start_pc, uint32* end_pc, uint32* handler_pc, uint32* catch_type));
+    (Method_Handle method, uint16 index,
+     uint16* start_pc, uint16* end_pc, uint16* handler_pc, uint16* catch_type));
 
 /**
  * Returns type information for the return value.
@@ -360,6 +372,17 @@ DECLARE_OPEN(uint32, method_get_bytecode_length, (Method_Handle method));
  * @note Reference to type <i>Byte</i>.
  */
 DECLARE_OPEN(const Byte*, method_get_bytecode, (Method_Handle method));
+
+/**
+ * Returns StackMapTable attribute.
+ * Parameter <i>hmethod</i> must not be equal to <code>NULL</code>.
+ * If parameter <i>index</i> is out of range, returns <code>NULL</code>.
+ *
+ * @param hmethod  - method handle
+ *
+ * @return StackMapTable bytes
+ */
+DECLARE_OPEN(unsigned char*, method_get_stackmaptable, (Method_Handle hmethod));
 
 /**
  * Returns the maximum number of local variables for the given method.

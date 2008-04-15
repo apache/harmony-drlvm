@@ -22,8 +22,10 @@
 #include "cxxlog.h"
 #include "vm_log.h"
 
+#include "open/gc.h"
 #include "open/vm_type_access.h"
 #include "open/vm_method_access.h"
+#include "open/vm_class_manipulation.h"
 
 #include "apr_strings.h"
 #include "lock_manager.h"
@@ -42,7 +44,6 @@
 #include "jvmti_internal.h"
 #include "jvmti_break_intf.h"
 #include "cci.h"
-#include "open/gc.h"
 
 #include "vm_stats.h"
 #include "dump.h"
@@ -125,22 +126,20 @@ Target_Exception_Handler_Ptr CodeChunkInfo::get_target_exception_handler_info(un
 
 void CodeChunkInfo::print_name() const
 {
-    Method *meth = get_method();
-    assert(meth);
-    const char* c = class_get_name(method_get_class(meth));
-    const char* m = method_get_name(meth);
-    const char* d = method_get_descriptor(meth); 
+    assert(_method);
+    const char* c = _method->get_class()->get_name()->bytes;
+    const char* m = _method->get_name()->bytes;
+    const char* d = _method->get_descriptor()->bytes;
     printf("%d:%d:%s.%s%s", get_jit_index(), get_id(), c, m, d);
 } //CodeChunkInfo::print_name
 
 
 void CodeChunkInfo::print_name(FILE *file) const
 {
-    Method *meth = get_method();
-    assert(meth);
-    const char* c = class_get_name(method_get_class(meth));
-    const char* m = method_get_name(meth);
-    const char* d = method_get_descriptor(meth); 
+    assert(_method);
+    const char* c = _method->get_class()->get_name()->bytes;
+    const char* m = _method->get_name()->bytes;
+    const char* d = _method->get_descriptor()->bytes; 
     fprintf(file, "%d:%d:%s.%s%s", get_jit_index(), get_id(), c, m, d);
 } //CodeChunkInfo::print_name
 
@@ -208,11 +207,11 @@ static bool is_reference(Type_Info_Handle tih)
 NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, NativeStubOverride nso)
 {
     ASSERT_NO_INTERPRETER;
-    const Class_Handle clss = method_get_class(method);
-    bool is_static = (method_is_static(method) ? true : false);
-    bool is_synchronised = (method_is_synchronized(method) ? true : false);
+    const Class_Handle clss = method->get_class();
+    bool is_static = method->is_static();
+    bool is_synchronised = method->is_synchronized();
     Method_Signature_Handle msh = method_get_signature(method);
-    unsigned num_args = method_args_get_number(msh);
+    unsigned num_args = method->get_num_args();
     Type_Info_Handle ret_tih = method_ret_type_get_type_info(msh);
     VM_Data_Type ret_type = type_info_get_type(ret_tih);
     unsigned i;
@@ -519,7 +518,8 @@ NativeCodePtr compile_create_lil_jni_stub(Method_Handle method, void* func, Nati
 
 #ifndef NDEBUG
     char buf[100];
-    apr_snprintf(buf, sizeof(buf)-1, "jni_stub.%s::%s", class_get_name(clss), method_get_name(method));
+    apr_snprintf(buf, sizeof(buf)-1, "jni_stub.%s::%s", clss->get_name()->bytes,
+        method->get_name()->bytes);
     DUMP_STUB(addr, buf, lil_cs_get_code_size(cs));
 #endif
 
@@ -588,7 +588,7 @@ static NativeCodePtr compile_create_jni_stub(Method_Handle method, GenericFuncti
 
 static JIT_Result compile_prepare_native_method(Method* method)
 {
-    TRACE("compile_prepare_native_method(" << method_get_name(method) << ")");
+    TRACE("compile_prepare_native_method (" << method->get_name()->bytes << ")");
 #ifdef VM_STATS
     VM_Statistics::get_vm_stats().num_native_methods++;
 #endif
@@ -736,7 +736,7 @@ static JIT_Result compile_do_compilation(Method* method)
     ASSERT_RAISE_AREA;
     assert(hythread_is_suspend_enabled());
     tmn_suspend_disable();
-    class_initialize_ex(method->get_class());
+    class_initialize(method->get_class());
     tmn_suspend_enable();
    
     method->lock();

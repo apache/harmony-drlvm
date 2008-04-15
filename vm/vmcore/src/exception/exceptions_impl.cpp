@@ -23,6 +23,7 @@
 #define LOG_DOMAIN "exn"
 #include "clog.h"
 
+#include "open/vm_class_manipulation.h"
 #include "Class.h"
 #include "classloader.h"
 #include "exceptions.h"

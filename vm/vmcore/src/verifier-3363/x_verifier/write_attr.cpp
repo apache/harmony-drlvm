@@ -211,7 +211,7 @@ void vf_Context_5e::writeStackMapElements( uint32 start, uint32 cnt ) {
         if( el.isReference() ) {
             writeByte(ITEM_OBJECT);
 
-            uint16 cp_idx = class_get_cp_class_entry( k_class, tpool.sm_get_refname(el));
+            uint16 cp_idx = class_cp_get_class_entry( k_class, tpool.sm_get_refname(el));
             writeByte(cp_idx >> 8);
             writeByte(cp_idx & 0xFF);
         } else if( el.isNewObject() ) {

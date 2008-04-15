@@ -443,6 +443,7 @@ jvmti_SingleStepLocation( VM_thread* thread,
 
     for( unsigned index = 0; index < *count; index++ ) {
         TRACE2( "jvmti.break.ss", "Step: " << method
+            << " :" << bytecode_index << "\n      -> "
             << ((*next_step)[index].method)
             << " :" << (*next_step)[index].location << " :"
             << (*next_step)[index].native_location << ", event: "
@@ -628,7 +629,7 @@ static bool jvmti_process_jit_single_step_event(TIEnv* UNREF unused_env,
     assert(bp);
 
     TRACE2("jvmti.break.ss", "SingleStep occured: "
-        << ((Method*)bp->method)
+        << bp->method
         << " :" << bp->location << " :" << bp->addr);
 
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
@@ -710,6 +711,7 @@ static bool jvmti_process_jit_single_step_event(TIEnv* UNREF unused_env,
                     TRACE2("jvmti.break.ss",
                         "Calling JIT local SingleStep breakpoint callback: "
                         << method << " :" << location << " :" << addr);
+
                     found = true;
 
                     func((jvmtiEnv*)env, jni_env,
@@ -717,8 +719,7 @@ static bool jvmti_process_jit_single_step_event(TIEnv* UNREF unused_env,
 
                     TRACE2("jvmti.break.ss",
                         "Finished JIT local SingleStep breakpoint callback: "
-                        << ((Method*)method)
-                        << " :" << location << " :" << addr);
+                        << method << " :" << location << " :" << addr);
                 }
             }
 
@@ -909,8 +910,7 @@ jvmtiError jvmti_get_next_bytecodes_from_native(VM_thread *thread,
                 if (NULL == call_ip)
                 {
                     TRACE2("jvmti.break.ss", "SingleStep IP shifted in prediction to: "
-                        << func
-                        << " :" << next_location << " :" << ip2);
+                        << func << " :" << next_location << " :" << ip2);
                     bc = next_location;
                     ip = ip2;
                 }

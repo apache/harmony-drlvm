@@ -23,6 +23,10 @@
 
 #include <assert.h>
 #include <string.h>
+
+#include "open/vm_method_access.h"
+#include "open/vm_class_manipulation.h"
+
 #include "verifier.h"
 #include "memory.h"
 #include "instr_props.h"
@@ -33,7 +37,7 @@ namespace CPVerifier {
 
     class SharedClasswideData {
     public:
-        SharedClasswideData(class_handler _klass) :
+        SharedClasswideData(Class_Handle _klass) :
           class_constraints(0),
               k_class(_klass),
               k_major(class_get_version(_klass)),
@@ -53,7 +57,7 @@ namespace CPVerifier {
           Memory constraintPool;
 
           //class handler for the current class
-          class_handler  k_class;
+          Class_Handle k_class;
 
           //major version of current class
           unsigned short  k_major;
@@ -97,16 +101,16 @@ namespace CPVerifier {
         friend class vf_TypePool;
 
         //class handler for the current class
-        class_handler  k_class;
+        Class_Handle k_class;
 
         //major version of current class
         unsigned short  k_major;
 
         //method handler for the method being verified
-        method_handler m_method;
+        Method_Handle m_method;
 
         //method's bytecode
-        unsigned char  *m_bytecode;
+        Byte*         m_bytecode;
 
         //legth of the code in the method being verified
         unsigned       m_code_length;
@@ -176,15 +180,15 @@ namespace CPVerifier {
         }
 
         //init method-wide data
-        void init(method_handler _m_method) {
+        void init(Method_Handle _m_method) {
             //store method's parameters
             //TODO: it might be mot slower not to store them
             m_method = _m_method;
-            m_max_locals = method_get_max_local( m_method );
-            m_max_stack = method_get_max_stack( m_method );
-            m_code_length = method_get_bytecode_length( m_method );
-            m_handlecount = method_get_exc_handler_number( m_method );
-            m_bytecode = method_get_bytecode( m_method );
+            m_max_locals = method_get_max_locals(m_method);
+            m_max_stack = method_get_max_stack(m_method);
+            m_code_length = method_get_bytecode_length(m_method);
+            m_handlecount = method_get_exc_handler_number(m_method);
+            m_bytecode = const_cast<Byte*>(method_get_bytecode(m_method));
 
             m_is_constructor = !strcmp(method_get_name(m_method), "<init>") 
                 && class_get_super_class(k_class);
@@ -279,8 +283,7 @@ namespace CPVerifier {
 
 
     //check conatraints stored in the classloader data. force loading if necessary
-    vf_Result
-        vf_force_check_constraint(class_handler klass,
+    vf_Result vf_force_check_constraint(Class_Handle klass,
         vf_TypeConstraint *constraint);
 
 } // namespace CPVerifier

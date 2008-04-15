@@ -43,7 +43,7 @@ namespace CPVerifier_5 {
               stackmapattr_calculation = false;
           }
 
-          vf_Result verify_method(method_handler method);
+          vf_Result verify_method(Method_Handle method);
     protected:
         // various flags for all the method's bytecode instructions
         InstrProps props;
@@ -63,7 +63,7 @@ namespace CPVerifier_5 {
         static const short MARK_SUBROUTINE_DONE = -1;
 
         //init method-wide data
-        void init(method_handler _m_method) {
+        void init(Method_Handle _m_method) {
             vf_Context_x<vf_Context_5, WorkmapElement, _WorkmapElement, StackmapElement>::init(_m_method);
             stack.init();
             props.init(mem, m_code_length);

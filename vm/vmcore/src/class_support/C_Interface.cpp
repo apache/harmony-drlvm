@@ -14,10 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/**
- * @author Intel, Alexei Fedotov
- * @version $Revision: 1.1.2.6.2.1.2.4 $
- */
 
 #define LOG_DOMAIN "vm.core"
 #include "cxxlog.h"
@@ -36,21 +32,21 @@
 #include "cci.h"
 #include "nogc.h"
 
-#include "class_interface.h"
 #include "Package.h"
 
 #include "open/vm_type_access.h"
 #include "open/vm_field_access.h"
 #include "open/vm_method_access.h"
-#include "open/vm_class_info.h"
+#include "open/vm_class_manipulation.h"
+#include "open/vm_class_loading.h"
 #include "jit_intf.h"
 
-Boolean class_is_final(Class_Handle cl) {
+BOOLEAN class_is_final(Class_Handle cl) {
     assert(cl);
     return cl->is_final();
 }
 
-Boolean class_is_abstract(Class_Handle cl) {
+BOOLEAN class_is_abstract(Class_Handle cl) {
     assert(cl);
     return cl->is_abstract();
 }
@@ -61,13 +57,13 @@ BOOLEAN class_is_interface(Class_Handle cl) {
 }
 
 
-Boolean class_is_array(Class_Handle cl) {
+BOOLEAN class_is_array(Class_Handle cl) {
     assert(cl);
     return cl->is_array();
 } //class_is_array
 
 
-static uint32 countLeadingChars(const char* str, char c) {
+static unsigned countLeadingChars(const char* str, char c) {
     uint32 n=0;
     while (str[n]==c) {
         n++;
@@ -75,7 +71,7 @@ static uint32 countLeadingChars(const char* str, char c) {
     return n;
 }
  
-U_32 class_cp_get_num_array_dimensions(Class_Handle cl, U_16 cpIndex) {
+unsigned class_cp_get_num_array_dimensions(Class_Handle cl, unsigned short cpIndex) {
     ConstantPool& cp  = cl->get_constant_pool();
     unsigned char tag = cp.get_tag(cpIndex);
     char c = '[';
@@ -86,7 +82,7 @@ U_32 class_cp_get_num_array_dimensions(Class_Handle cl, U_16 cpIndex) {
             return countLeadingChars(str, c);
         }
         case CONSTANT_Fieldref: {
-            const char* str = class_cp_get_entry_signature(cl, cpIndex);
+            const char* str = class_cp_get_entry_descriptor(cl, cpIndex);
             return countLeadingChars(str, c);
         }
         default:
@@ -480,6 +476,11 @@ const char* class_get_name(Class_Handle cl)
     return cl->get_name()->bytes;
 } //class_get_name
 
+unsigned short class_get_version(Class_Handle klass)
+{
+    assert(klass);
+    return klass->get_version();
+} // class_get_version
 
 unsigned class_get_flags(Class_Handle cl)
 {
@@ -518,25 +519,34 @@ Class_Handle vtable_get_class(VTable_Handle vh) {
     return vh->clss;
 } // vtable_get_class
 
-Boolean class_is_initialized(Class_Handle ch)
+BOOLEAN class_is_initialized(Class_Handle ch)
 {
     assert(ch);
     return ch->is_initialized();
 } //class_is_initialized
 
-
-
-Boolean class_needs_initialization(Class_Handle ch)
-{
-    assert(ch);
-    return !ch->is_initialized();
-} //class_needs_initialization
-
 Class_Handle class_get_super_class(Class_Handle cl)
 {
     assert(cl);
     return cl->get_super_class();
-} //class_get_super_class
+} // class_get_super_class
+
+Class_Handle class_get_extended_class(Class_Handle klass, const char* super_name)
+{
+    assert(klass);
+    assert(super_name);
+
+    Global_Env* env = VM_Global_State::loader_env;
+    String* pooled_name = env->string_pool.lookup(super_name);
+
+    for(Class* clss = klass; clss; clss = clss->get_super_class()) {
+        if(clss->get_name() == pooled_name) {
+            // found class with given name
+            return clss;
+        }
+    }
+    return NULL;
+} // class_get_extended_class
 
 unsigned class_number_implements(Class_Handle ch)
 {
@@ -575,12 +585,12 @@ Class_Handle class_get_inner_class(Class_Handle ch, unsigned idx)
     return ch->_resolve_class(VM_Global_State::loader_env, cp_index);
 }
 
-Boolean class_is_instanceof(Class_Handle s, Class_Handle t)
+BOOLEAN class_is_instanceof(Class_Handle s, Class_Handle t)
 {
     assert(s);
     assert(t);
     return class_is_subtype(s, t);
-} //class_get_super_class
+} // class_is_instanceof
 
 
 
@@ -598,7 +608,7 @@ Class_Handle class_get_array_element_class(Class_Handle cl)
 
 
 
-Boolean class_hint_is_exceptiontype(Class_Handle ch)
+BOOLEAN class_is_throwable(Class_Handle ch)
 {
     assert(ch);
     Global_Env *env = VM_Global_State::loader_env;
@@ -611,19 +621,8 @@ Boolean class_hint_is_exceptiontype(Class_Handle ch)
         ch = class_get_super_class(ch);
     }
     return FALSE;
-} //class_hint_is_exceptiontype
+} // class_is_throwable
 
-
-
-
-/*
- * Procedure class_get_class_of_primitive_type
- *      Given an VM_Data_Type that describes a primitive type,
- *      returns the corresponding preloaded Class for that type.
- *
- * Side effects:
- *      None
- */
 Class_Handle class_get_class_of_primitive_type(VM_Data_Type typ)
 {
     Global_Env *env = VM_Global_State::loader_env;
@@ -662,13 +661,13 @@ Class_Handle class_get_class_of_primitive_type(VM_Data_Type typ)
     case VM_DATA_TYPE_UINT16:
     case VM_DATA_TYPE_UINT32:
     case VM_DATA_TYPE_UINT64:
-        clss = NULL;    // ts07.09.02 - to allow star jit initialization
+        clss = NULL;    // to allow star jit initialization
         break;
     default:
         ABORT("Unknown vm data type");          // We need a better way to indicate an internal error
     }
     return clss;
-} //class_get_class_of_primitive_type
+} // class_get_class_of_primitive_type
 
 VTable_Handle class_get_vtable(Class_Handle cl)
 {
@@ -697,7 +696,7 @@ const char* class_cp_get_const_string(Class_Handle cl, U_16 index)
 // Returns the address where the interned version of the string is stored: this will be the address
 // of a slot containing a Java_java_lang_String* or a uint32 compressed reference. Also interns the
 // string so that the JIT can load a reference to the interned string without checking if it is null.
-const void *class_get_const_string_intern_addr(Class_Handle cl, U_16 index)
+const void *class_get_const_string_intern_addr(Class_Handle cl, unsigned short index)
 {
     assert(cl);
     Global_Env* env = VM_Global_State::loader_env;
@@ -710,44 +709,38 @@ const void *class_get_const_string_intern_addr(Class_Handle cl, U_16 index)
 } //class_get_const_string_intern_addr
 
 
-const char* class_cp_get_entry_signature(Class_Handle src_class, U_16 index)
+const char* class_cp_get_entry_descriptor(Class_Handle src_class, unsigned short index)
 {
-    Class* clss = (Class*)src_class;
     ConstantPool& cp = src_class->get_constant_pool();
-
-    assert(cp.is_fieldref(index)
+    if(!(cp.is_fieldref(index)
         || cp.is_methodref(index)
-        || cp.is_interfacemethodref(index));
+        || cp.is_interfacemethodref(index)))
+    {
+        return NULL;
+    }
 
     index = cp.get_ref_name_and_type_index(index);
     index = cp.get_name_and_type_descriptor_index(index);
     return cp.get_utf8_chars(index);
-} // class_cp_get_entry_signature
+} // class_cp_get_entry_descriptor
 
 
 VM_Data_Type class_cp_get_field_type(Class_Handle src_class, U_16 cp_index)
 {
     assert(src_class->get_constant_pool().is_fieldref(cp_index));
 
-    char class_id = (class_cp_get_entry_signature(src_class, cp_index))[0];
+    char class_id = (class_cp_get_entry_descriptor(src_class, cp_index))[0];
     switch(class_id)
     {
     case VM_DATA_TYPE_BOOLEAN:
-        return VM_DATA_TYPE_BOOLEAN;
     case VM_DATA_TYPE_CHAR:
-        return VM_DATA_TYPE_CHAR;
     case VM_DATA_TYPE_INT8:
-        return VM_DATA_TYPE_INT8;
     case VM_DATA_TYPE_INT16:
-        return VM_DATA_TYPE_INT16;
     case VM_DATA_TYPE_INT32:
-        return VM_DATA_TYPE_INT32;
     case VM_DATA_TYPE_INT64:
-        return VM_DATA_TYPE_INT64;
     case VM_DATA_TYPE_F4:
-        return VM_DATA_TYPE_F4;
     case VM_DATA_TYPE_F8:
-        return VM_DATA_TYPE_F8;
+        return (VM_Data_Type)class_id;
     case VM_DATA_TYPE_ARRAY:
     case VM_DATA_TYPE_CLASS:
         return VM_DATA_TYPE_CLASS;
@@ -850,7 +843,7 @@ Class_Handle resolve_class_from_constant_pool(Class_Handle c_handle, unsigned in
 }
 
 
-Field* class_resolve_nonstatic_field(Class* clss, unsigned cp_index)
+Field_Handle class_resolve_nonstatic_field(Class_Handle clss, unsigned short cp_index)
 {
     Compilation_Handle ch;
     ch.env = VM_Global_State::loader_env;
@@ -884,7 +877,7 @@ class_load_class_by_name(const char *name,
 
 
 Class_Handle
-class_lookup_class_by_name_using_bootstrap_class_loader(const char *name)
+vm_lookup_class_with_bootstrap(const char* name)
 {
     Global_Env *env = VM_Global_State::loader_env;
     String *n = env->string_pool.lookup(name);
@@ -999,139 +992,38 @@ Class_Handle class_find_class_from_loader(ClassLoaderHandle loader, const char* 
 // The following do not cause constant pools to be resolve, if they are not
 // resolved already
 //
-const char* class_cp_get_field_name(Class_Handle cl, U_16 index)
+const char* class_cp_get_entry_name(Class_Handle cl, U_16 index)
 {
     assert(cl);
     ConstantPool& const_pool = cl->get_constant_pool();
-    if(!const_pool.is_fieldref(index)) {
+    if (!(const_pool.is_fieldref(index)
+        || const_pool.is_methodref(index)
+        || const_pool.is_interfacemethodref(index)))
+    {
         ABORT("Wrong index");
         return 0;
     }
     index = const_pool.get_ref_name_and_type_index(index);
     index = const_pool.get_name_and_type_name_index(index);
     return const_pool.get_utf8_chars(index);
-} // class_cp_get_field_name
+} // class_cp_get_entry_name
 
-
-
-const char* class_cp_get_field_class_name(Class_Handle cl, U_16 index)
+const char* class_cp_get_entry_class_name(Class_Handle cl, unsigned short index)
 {
     assert(cl);
     ConstantPool& const_pool = cl->get_constant_pool();
-    if(!const_pool.is_fieldref(index)) {
-        ABORT("Wrong index");
-        return 0;
-    }
-    index = const_pool.get_ref_class_index(index);
-    return class_cp_get_class_name(cl, index);
-} //class_cp_get_field_class_name
-
-
-
-const char* class_cp_get_field_descriptor(Class_Handle cl, U_16 index)
-{
-    assert(cl);
-    ConstantPool& const_pool = cl->get_constant_pool();
-    if (!const_pool.is_fieldref(index)) {
-        ABORT("Wrong index");
-        return 0;
-    }
-    index = const_pool.get_ref_name_and_type_index(index);
-    index = const_pool.get_name_and_type_descriptor_index(index);
-    return const_pool.get_utf8_chars(index);
-} // class_cp_get_field_descriptor
-
-
-
-const char* class_cp_get_method_name(Class_Handle cl, U_16 index)
-{
-    assert(cl);
-    ConstantPool& const_pool = cl->get_constant_pool();
-    if (!const_pool.is_methodref(index)) {
-        ABORT("Wrong index");
-        return 0;
-    }
-    index = const_pool.get_ref_name_and_type_index(index);
-    index = const_pool.get_name_and_type_name_index(index);
-    return const_pool.get_utf8_chars(index);
-} // class_cp_get_method_name
-
-
-
-const char *class_cp_get_method_class_name(Class_Handle cl, U_16 index)
-{
-    assert(cl);
-    ConstantPool& const_pool = cl->get_constant_pool();
-    if (!const_pool.is_methodref(index)) {
+    if (!(const_pool.is_fieldref(index)
+        || const_pool.is_methodref(index)
+        || const_pool.is_interfacemethodref(index)))
+    {
         ABORT("Wrong index");
         return 0;
     }
     index = const_pool.get_ref_class_index(index);
     return class_cp_get_class_name(cl,index);
-} //class_cp_get_method_class_name
+} // class_cp_get_entry_class_name
 
-
-
-const char* class_cp_get_interface_method_name(Class_Handle cl, U_16 index)
-{
-    assert(cl);
-    ConstantPool& const_pool = cl->get_constant_pool();
-    if(!const_pool.is_interfacemethodref(index)) {
-        ABORT("Wrong index");
-        return 0;
-    }
-    index = const_pool.get_ref_name_and_type_index(index);
-    index = const_pool.get_name_and_type_name_index(index);
-    return const_pool.get_utf8_chars(index);
-} // class_cp_get_interface_method_name
-
-
-
-const char* class_cp_get_interface_method_class_name(Class_Handle cl, U_16 index)
-{
-    assert(cl);
-    ConstantPool& const_pool = cl->get_constant_pool();
-    if (!const_pool.is_interfacemethodref(index)) {
-        ABORT("Wrong index");
-        return 0;
-    }
-    index = const_pool.get_ref_class_index(index);
-    return class_cp_get_class_name(cl,index);
-} //class_cp_get_interface_method_class_name
-
-
-
-const char* class_cp_get_method_descriptor(Class_Handle cl, U_16 index)
-{
-    assert(cl);
-    ConstantPool& const_pool = cl->get_constant_pool();
-    if (!const_pool.is_methodref(index)) {
-        ABORT("Wrong index");
-        return 0;
-    }
-    index = const_pool.get_ref_name_and_type_index(index);
-    index = const_pool.get_name_and_type_descriptor_index(index);
-    return const_pool.get_utf8_chars(index);
-} // class_cp_get_method_descriptor
-
-
-
-const char* class_cp_get_interface_method_descriptor(Class_Handle cl, U_16 index)
-{
-    assert(cl);
-    ConstantPool& const_pool = cl->get_constant_pool();
-    if (!const_pool.is_interfacemethodref(index)) {
-        ABORT("Wrong index");
-        return 0;
-    }
-    index = const_pool.get_ref_name_and_type_index(index);
-    index = const_pool.get_name_and_type_descriptor_index(index);
-    return const_pool.get_utf8_chars(index);
-} // class_cp_get_interface_method_descriptor
-
-
-
-const char* class_cp_get_class_name(Class_Handle cl, U_16 index)
+const char* class_cp_get_class_name(Class_Handle cl, unsigned short index)
 {
     assert(cl);
     ConstantPool& const_pool = cl->get_constant_pool();
@@ -1167,11 +1059,11 @@ uint16 method_get_exc_handler_number(Method_Handle m)
 
 
 void method_get_exc_handler_info(Method_Handle m,
-                                 uint32 handler_id,
-                                 uint32* begin_offset,
-                                 uint32* end_offset,
-                                 uint32* handler_offset,
-                                 uint32* handler_cpindex)
+                                 uint16 handler_id,
+                                 uint16* begin_offset,
+                                 uint16* end_offset,
+                                 uint16* handler_offset,
+                                 uint16* handler_cpindex)
 {
     assert(m);
     Handler* h = m->get_bc_exception_handler_info(handler_id);
@@ -1251,42 +1143,27 @@ int object_get_vtable_offset()
     return 0;
 } //object_get_vtable_offset
 
-////////////////////////////////////////////////////////////
-/// 20020220 New stuff for the interface
-
-
-////////////////////////////////////////////////////////////
-// begin declarations
-
-
-VMEXPORT Class_Handle class_get_class_of_primitive_type(VM_Data_Type ch);
-
-////////////////////////////////////////////////////////////
-// begin definitions
-
-
-
-Class_Handle get_system_object_class()
+Class_Handle vm_get_system_object_class()
 {
     Global_Env *env = VM_Global_State::loader_env;
     return env->JavaLangObject_Class;
-} //get_system_object_class
+} // vm_get_system_object_class
 
 
 
-Class_Handle get_system_class_class()
+Class_Handle vm_get_system_class_class()
 {
     Global_Env *env = VM_Global_State::loader_env;
     return env->JavaLangClass_Class;
-} //get_system_class_class
+} // vm_get_system_class_class
 
 
 
-Class_Handle get_system_string_class()
+Class_Handle vm_get_system_string_class()
 {
     Global_Env *env = VM_Global_State::loader_env;
     return env->JavaLangString_Class;
-} //get_system_string_class
+} // vm_get_system_string_class
 
 
 
@@ -1367,14 +1244,11 @@ Boolean class_is_valuetype(Class_Handle ch)
     return class_is_primitive(ch);
 } //class_is_valuetype
 
-Boolean class_is_enum(Class_Handle ch)
+BOOLEAN class_is_enum(Class_Handle ch)
 {
     assert(ch);
     return ch->is_enum() ? TRUE : FALSE;
-} //class_is_enum
-
-
-
+} // class_is_enum
 
 static Class *class_get_array_of_primitive_type(VM_Data_Type typ)
 {
@@ -1416,65 +1290,37 @@ static Class *class_get_array_of_primitive_type(VM_Data_Type typ)
         break;
     }
     return clss;
-} //class_get_array_of_primitive_type
+} // class_get_array_of_primitive_type
 
-
-
-Class_Handle class_get_array_of_unboxed(Class_Handle ch)
-{
-    assert(ch);
-    if(class_is_primitive(ch)) {
-        VM_Data_Type typ = class_get_primitive_type_of_class(ch);
-        return class_get_array_of_primitive_type(typ);
-    } else {
-        // 20020319 This should never happen for Java.
-        ABORT("The given class handle does not represent a primitive type");
-        return 0;
-    }
-} //class_get_array_of_unboxed
-
-
-Boolean class_is_primitive(Class_Handle ch)
+BOOLEAN class_is_primitive(Class_Handle ch)
 {
     assert(ch);
     return ch->is_primitive();
-} //class_is_primitive
-
-
-
-VM_Data_Type class_get_primitive_type_java(Class_Handle clss)
-{
-    assert(clss);
-    Global_Env *env = VM_Global_State::loader_env;
-    if (clss == env->Boolean_Class)
-        return VM_DATA_TYPE_BOOLEAN;
-    if (clss == env->Char_Class)
-        return VM_DATA_TYPE_CHAR;
-    if (clss == env->Byte_Class)
-        return VM_DATA_TYPE_INT8;
-    if (clss == env->Short_Class)
-        return VM_DATA_TYPE_INT16;
-    if (clss == env->Int_Class)
-        return VM_DATA_TYPE_INT32;
-    if (clss == env->Long_Class)
-        return VM_DATA_TYPE_INT64;
-    if (clss == env->Float_Class)
-        return VM_DATA_TYPE_F4;
-    if (clss == env->Double_Class)
-        return VM_DATA_TYPE_F8;
-
-    return VM_DATA_TYPE_CLASS;
-} //class_get_primitive_type_java
-
-
-
-
+} // class_is_primitive
 
 VM_Data_Type class_get_primitive_type_of_class(Class_Handle ch)
 {
     assert(ch);
-    return class_get_primitive_type_java(ch);
-} //class_get_primitive_type_of_class
+    Global_Env *env = VM_Global_State::loader_env;
+    if (ch == env->Boolean_Class)
+        return VM_DATA_TYPE_BOOLEAN;
+    if (ch == env->Char_Class)
+        return VM_DATA_TYPE_CHAR;
+    if (ch == env->Byte_Class)
+        return VM_DATA_TYPE_INT8;
+    if (ch == env->Short_Class)
+        return VM_DATA_TYPE_INT16;
+    if (ch == env->Int_Class)
+        return VM_DATA_TYPE_INT32;
+    if (ch == env->Long_Class)
+        return VM_DATA_TYPE_INT64;
+    if (ch == env->Float_Class)
+        return VM_DATA_TYPE_F4;
+    if (ch == env->Double_Class)
+        return VM_DATA_TYPE_F8;
+
+    return VM_DATA_TYPE_CLASS;
+} // class_get_primitive_type_of_class
 
 
 // Returns the number of arguments defined for the method.
@@ -1482,11 +1328,8 @@ VM_Data_Type class_get_primitive_type_of_class(Class_Handle ch)
 unsigned char method_args_get_number(Method_Signature_Handle mh)
 {
     assert(mh);
-    Method_Signature *ms = (Method_Signature *)mh;
-    assert(!ms->sig);
-    Method *m = ms->method;
-    assert(m);
-    return m->get_num_args();
+    assert(!mh->sig);
+    return mh->method->get_num_args();
 } // method_args_get_number
 
 
@@ -1665,15 +1508,6 @@ unsigned class_get_number_methods(Class_Handle ch)
 } // class_get_number_methods
 
 
-Method_Handle class_get_method(Class_Handle ch, unsigned index)
-{
-    assert(ch);
-    if(index >= ch->get_number_of_methods())
-        return NULL;
-    return ch->get_method(index);
-} // class_get_method
-
-
 // -gc magic needs this to do the recursive load.
 Class_Handle field_get_class_of_field_type(Field_Handle fh)
 {
@@ -1714,7 +1548,7 @@ Boolean field_is_enumerable_reference(Field_Handle fh)
 BOOLEAN field_is_injected(Field_Handle f)
 {
     assert(f);
-    return ((Field*)f)->is_injected();
+    return f->is_injected();
 } //field_is_injected
 
 
@@ -1790,7 +1624,7 @@ Type_Info_Handle class_get_element_type_info(Class_Handle ch)
 /////////////////////////////////////////////////////
 // New GC stuff
 
-Boolean class_is_non_ref_array(Class_Handle ch)
+BOOLEAN class_is_non_ref_array(Class_Handle ch)
 {
     assert(ch);
     // Use the if statement to normalize the value of TRUE
@@ -1803,15 +1637,6 @@ Boolean class_is_non_ref_array(Class_Handle ch)
     }
 } // class_is_non_ref_array
 
-
-Boolean class_is_pinned(Class_Handle ch)
-{
-    assert(ch);
-    return (ch->get_vtable()->class_properties & CL_PROP_PINNED_MASK) != 0
-        ? TRUE : FALSE;
-} // class_is_pinned
-
-
 BOOLEAN class_is_finalizable(Class_Handle ch)
 {
     assert(ch);
@@ -1823,17 +1648,17 @@ BOOLEAN class_is_finalizable(Class_Handle ch)
 WeakReferenceType class_is_reference(Class_Handle clss)
 {
     assert(clss);
-    if (class_is_extending_class( (class_handler)clss, "java/lang/ref/WeakReference"))
+    if(class_get_extended_class(clss, "java/lang/ref/WeakReference") != NULL)
         return WEAK_REFERENCE;
-    else if (class_is_extending_class( (class_handler)clss, "java/lang/ref/SoftReference"))
+    else if(class_get_extended_class(clss, "java/lang/ref/SoftReference") != NULL)
         return SOFT_REFERENCE;
-    else if (class_is_extending_class( (class_handler)clss, "java/lang/ref/PhantomReference"))
+    else if(class_get_extended_class(clss, "java/lang/ref/PhantomReference") != NULL)
         return PHANTOM_REFERENCE;
     else
         return NOT_REFERENCE;
 }
 
-int class_get_referent_offset(Class_Handle ch)
+unsigned class_get_referent_offset(Class_Handle ch)
 {
     Field_Handle referent =
         class_lookup_field_recursive(ch, "referent", "Ljava/lang/Object;");
@@ -2169,58 +1994,6 @@ JIT_Result vm_compile_method(JIT_Handle jit, Method_Handle method)
 {
     return compile_do_compilation_jit((Method*) method, (JIT*) jit);
 } // vm_compile_method
-
-
-
-Boolean class_iterator_initialize(ChaClassIterator *chaClassIterator, Class_Handle root_class)
-{
-    chaClassIterator->_current = NULL;
-    chaClassIterator->_is_valid = FALSE;
-    chaClassIterator->_root_class = root_class;
-
-    // Partial implementation for now.
-    if (!root_class->is_interface() && !root_class->is_array())
-    {
-        chaClassIterator->_is_valid = TRUE;
-        chaClassIterator->_current = root_class;
-    }
-
-    return chaClassIterator->_is_valid;
-} // class_iterator_initialize
-
-
-Class_Handle class_iterator_get_current(ChaClassIterator *chaClassIterator)
-{
-    return (chaClassIterator->_is_valid ? chaClassIterator->_current : NULL);
-} // class_iterator_get_current
-
-
-void class_iterator_advance(ChaClassIterator* chaClassIterator)
-{
-    if (!chaClassIterator->_is_valid)
-        return;
-    if (chaClassIterator->_current == NULL)
-        return;
-    Class* clss = (Class*)chaClassIterator->_current;
-    if(clss->get_first_child() != NULL)
-    {
-        chaClassIterator->_current = (Class_Handle)clss->get_first_child();
-        return;
-    }
-    Class* next = clss;
-    while(next != NULL)
-    {
-        if(next->get_next_sibling() != NULL)
-        {
-            next = next->get_next_sibling();
-            break;
-        }
-        next = next->get_super_class();
-    }
-    if(next != NULL && next->get_depth() <= chaClassIterator->_root_class->get_depth())
-        next = NULL;
-    chaClassIterator->_current = next;
-} // class_iterator_advance
 
 CallingConvention vm_managed_calling_convention()
 {

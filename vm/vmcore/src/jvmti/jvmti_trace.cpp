@@ -23,6 +23,7 @@
 
 #include "open/gc.h"
 #include "open/vm_field_access.h"
+#include "open/vm_class_manipulation.h"
 #include "slot.h"
 
 // VM internal headers
@@ -81,7 +82,7 @@ static void ti_trace_object(TIEnv *ti_env, ManagedObject* referrer)
     state->bytes += ti_get_object_size(ti_env, referrer);
     TRACE2("ti.trace", "tracing object " << (void*)referrer);
     Class* ch = ((ManagedObject*)referrer)->vt()->clss;
-    if (class_is_array(ch)) { 
+    if (ch->is_array()) { 
         if (class_is_non_ref_array(ch)) return;
 
         // trace reference array

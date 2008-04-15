@@ -357,7 +357,7 @@ JIT_Result Compiler::compile(Compile_Handle ch, Method_Handle method,
     // We need to report 'this' additionally for the following cases:
     // - non-static sync methods - to allow VM to call monitor_exit() for
     //      abrupt exit
-    // - constructors of classes with class_hint_is_exceptiontype == true
+    // - constructors of classes with class_is_throwable == true
     //      to allow correct handling of stack trace in VM (see 
     //      stack_trace.cpp + com_openintel_drl_vm_VMStack.cpp:
     //      Java_com_openintel_drl_vm_VMStack_getStackState.
@@ -1210,7 +1210,7 @@ bool Compiler::comp_resolve_ehandlers(void)
 
     bool eh_ok = true;
     for (unsigned i=0; i<num_handlers; i++) {
-        unsigned regStart, regEnd, handlerStart, klassType;
+        unsigned short regStart, regEnd, handlerStart, klassType;
         method_get_exc_handler_info(m_method, i,
                                 &regStart, &regEnd, &handlerStart,
                                 &klassType);
@@ -1278,16 +1278,17 @@ void Compiler::comp_set_ehandlers(void)
 void Compiler::get_args_info(bool is_static, unsigned cp_idx, 
                              ::std::vector<jtype>& args, jtype * retType)
 {
-    const char * cpentry = class_cp_get_entry_signature(m_klass, 
-                                                        (short)cp_idx);
+    const char* cpentry =
+        class_cp_get_entry_descriptor(m_klass, (unsigned short)cp_idx);
+
     // expecting an empty vector
     assert(args.size() == 0);
-    
+
     if (!is_static) {
         // all but static methods has 'this' as first argument
         args.push_back(jobj);
     }
-    
+
     if (!cpentry) {
         assert(false);
         *retType = jvoid;
@@ -1296,14 +1297,13 @@ void Compiler::get_args_info(bool is_static, unsigned cp_idx,
 
     // skip '('
     const char *p = cpentry + 1;
-    
+
     //
     // The presumption (cast of '*p' to VM_Data_Type) below is based on the 
     // VM_Data_Type values - they are equal to the appropriate characters: 
     // i.e. VM_Data_Type's long is 'J' - exactly as it's used in methods'
     // signatures
     //
-    
     for (; *p != ')'; p++) {
         jtype jt = to_jtype((VM_Data_Type)*p);
         if (jt == jvoid) {

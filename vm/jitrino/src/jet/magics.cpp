@@ -95,14 +95,14 @@ bool Compiler::gen_magic(void)
         return false;
     }
     
-    const char* kname = class_cp_get_method_class_name(m_klass, (unsigned short)jinst.op0);
+    const char* kname = class_cp_get_entry_class_name(m_klass, (unsigned short)jinst.op0);
 
     if (!VMMagicUtils::isVMMagicClass(kname)) {
         return false;
     }
     // This is a magic -> transform it
 
-    const char* mname = class_cp_get_method_name(m_klass, (unsigned short)jinst.op0);
+    const char* mname = class_cp_get_entry_name(m_klass, (unsigned short)jinst.op0);
 
     jtype magicType = iplatf;
 

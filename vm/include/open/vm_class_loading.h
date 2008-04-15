@@ -21,6 +21,9 @@
 #ifndef _VM_CLASS_LOADING_H
 #define _VM_CLASS_LOADING_H
 
+#include "open/types.h"
+#include "open/common.h"
+
 /**
  * @file
  * Class loading functionality of the class support interface. 
@@ -28,6 +31,9 @@
  * from the virtual machine and interested components.
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /** 
  * @defgroup Extended VM Class Loading Extended Interface
@@ -41,29 +47,42 @@
  * This class loader does not delegate the lookup operation to 
  * the parent loader or try to load any class.
  *
- * @param classloader    - the handle of the C++ class loader
- * @param name           - the name of the class to look up
+ * @param classloader - the handle of the C++ class loader. If <code>NULL</code>
+ *                      bootstrap class loader is assumed
+ * @param name           - the name of the class to look up. Name is accepted
+ *  both in internal and external forms (with '/'s and '.'s).
  *
  * @return The handle for C++ class representation, if found. Otherwise, <code>NULL</code>.
- *
- * @note Replaces cl_get_class.
  */
-Class_Handle
-class_loader_lookup_class(Open_Class_Loader_Handle classloader, const char* name);
+DECLARE_OPEN(Class_Handle, class_loader_lookup_class,
+    (ClassLoaderHandle classloader, const char* name));
 
 
 /**
  * Tries to load the class given its name and using the specified class loader.
  *
- * @param classloader    - the handle of the C++ class loader representation
+ * @param classloader    - the handle of the C++ class loader. If <code>NULL</code>
+ *                      bootstrap class loader is assumed
  * @param name           - the name of the class to load
  *
  * @return The handle for the C++ class representation, if loaded successfully; otherwise, <code>NULL</code>.
  *
  * @note Replaces cl_load_class. 
  */
-Class_Handle
-class_loader_load_class(Open_Class_Loader_Handle classloader, const char* name);
+DECLARE_OPEN(Class_Handle, class_loader_load_class,
+    (ClassLoaderHandle classloader, const char* name));
+
+/** @ingroup Extended 
+ *
+ * Finds already loaded class given its name and using the bootstrap class loader.
+ *
+ * @param name  - the name of the class to load
+ * @param exc   - the exception code for a class loading failure
+ *
+ * @result The handle for the C++ class representation, if found;
+ * otherwise, <code>NULL</code>.
+ */
+DECLARE_OPEN(Class_Handle, vm_lookup_class_with_bootstrap, (const char* name));
 
 /** @ingroup Extended 
  *
@@ -76,45 +95,49 @@ class_loader_load_class(Open_Class_Loader_Handle classloader, const char* name);
  *
  * @note Replaces class_load_class_by_name_using_system_class_loader. 
  */
-Class_Handle
-vm_load_class_with_bootstrap(const char* name);
+DECLARE_OPEN(Class_Handle, vm_load_class_with_bootstrap, (const char* name));
 
 /**
  * Returns the C++ class structure representing the system 
- * <code>java.lang.Object</code> class. 
+ * <code>java.lang.Object</code> class.
  *
- * This function is the fast equivalent of the <code>vm_load_class_with_bootstrap("java/lang/Object")</code> function.
+ * This function is the fast equivalent of the
+ * <code>vm_load_class_with_bootstrap("java/lang/Object")</code> function.
  *
- * @return the handle for the <code>java.lang.Object</code> C++ class representation. 
- *
- * @note Replaces get_system_object_class.
+ * @return the handle for the <code>java.lang.Object</code> C++ class representation.
  */
-Class_Handle
-vm_get_java_lang_object_class();
+DECLARE_OPEN(Class_Handle, vm_get_system_object_class, ());
+
+/**
+ * Returns the C++ class structure representing the system 
+ * <code>java.lang.Class</code> class.
+ *
+ * This function is the fast equivalent of the
+ * <code>vm_load_class_with_bootstrap("java/lang/Class")</code> function.
+ *
+ * @return the handle for the <code>java.lang.Class</code> C++ class representation.
+ */
+DECLARE_OPEN(Class_Handle, vm_get_system_class_class, ());
 
 /**
  * Returns the C++ class structure representing the system class
- * <code>java.lang.string</code>. 
+ * <code>java.lang.String</code>.
  * 
- * This function is the fast equivalent of the <code>vm_load_class_with_bootstrap("java/lang/String")</code> function.
+ * This function is the fast equivalent of the
+ * <code>vm_load_class_with_bootstrap("java/lang/String")</code> function.
  *
- * @return The handle of <code>java.lang.String</code> C++ class representation
- *
- * @note Replaces get_system_string_class.
+ * @return The handle of <code>java.lang.String</code> C++ class representation.
  */
-Class_Handle
-vm_get_java_lang_string_class();
+DECLARE_OPEN(Class_Handle, vm_get_system_string_class, ());
 
 /**
- * Stores the pointer to verifier-specific data into the class loader C++ structure. 
+ * Stores the pointer to verifier-specific data into the class loader C++ structure.
  *
  * @param classloader      - the handle to the class loader to set the verifier data in
  * @param data             - the pointer to the verifier data
- *
- * @note Replaces cl_set_verify_data_ptr.
  */
-void
-class_loader_set_verifier_data_ptr(Open_Class_Loader_Handle classloader, const void* data);
+DECLARE_OPEN(void, class_loader_set_verifier_data_ptr,
+    (ClassLoaderHandle classloader, void* data));
 
 /**
  * Returns the pointer to verifier-specific data associated with the given class loader.
@@ -125,8 +148,7 @@ class_loader_set_verifier_data_ptr(Open_Class_Loader_Handle classloader, const v
  *
  * @note Replaces cl_get_verify_data_ptr.
  */
-void*
-class_loader_get_verifier_data_ptr(Open_Class_Loader_Handle classloader);
+DECLARE_OPEN(void*, class_loader_get_verifier_data_ptr, (ClassLoaderHandle classloader));
 
 /**
  * Acquires the lock on a given class loader. 
@@ -135,8 +157,7 @@ class_loader_get_verifier_data_ptr(Open_Class_Loader_Handle classloader);
  * 
  * @note Replaces cl_acquire_lock.
  */
-void
-class_loader_lock(Open_Ñlass_Loader_Handle classloader);
+DECLARE_OPEN(void, class_loader_lock, (ClassLoaderHandle classloader));
 
 /**
  * Releases the lock on a given class loader. 
@@ -145,7 +166,10 @@ class_loader_lock(Open_Ñlass_Loader_Handle classloader);
  * 
  * @note Replaces cl_acquire_lock.
  */
-void
-class_loader_unlock(Open_Class_Loader_Handle classloader);
+DECLARE_OPEN(void, class_loader_unlock, (ClassLoaderHandle classloader));
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // _VM_CLASS_LOADING_H

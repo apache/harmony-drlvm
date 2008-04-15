@@ -97,11 +97,12 @@ jvmtiError jvmti_jit_pop_frame(jthread java_thread)
     // go to 2-d frame & check it's managed
     si_goto_previous(si);
     assert(! si_is_native(si));
+    Method* UNREF pop_method = si_get_code_chunk_info(si)->get_method();
     TRACE(("PopFrame is called for method %s.%s%s :%p",
-        class_get_name(method_get_class(si_get_code_chunk_info(si)->get_method())),
-        method_get_name(si_get_code_chunk_info(si)->get_method()),
-        method_get_descriptor(si_get_code_chunk_info(si)->get_method()),
-        si_get_ip(si) ));
+        pop_method->get_class()->get_name()->bytes,
+        pop_method->get_name()->bytes,
+        pop_method->get_descriptor()->bytes,
+        si_get_ip(si)));
 
     // go to 3-d frame & check its type
     si_goto_previous(si);
@@ -156,13 +157,14 @@ static void jvmti_jit_prepare_pop_frame(StackIterator* si, uint32* buf) {
 
     // save information about java method
     assert(cci);
-    Method *method = cci->get_method();
+    Method* method = cci->get_method();
     Class* method_class = method->get_class();
     bool is_method_static = method->is_static();
     TRACE(("PopFrame method %s.%s%s, stop IP: %p",
-        class_get_name(method_get_class(cci->get_method())),
-        method_get_name(cci->get_method()),
-        method_get_descriptor(cci->get_method()), si_get_ip(si) ));
+        method->get_class()->get_name()->bytes,
+        method->get_name()->bytes,
+        method->get_descriptor()->bytes,
+        si_get_ip(si)));
 
     // free lock of synchronized method
     /*
@@ -185,9 +187,9 @@ static void jvmti_jit_prepare_pop_frame(StackIterator* si, uint32* buf) {
     JIT *jit = cci->get_jit();
 
     TRACE(("PopFrame method %s.%s%s, set IP begin: %p",
-        class_get_name(method_get_class(si_get_code_chunk_info(si)->get_method())),
-        method_get_name(si_get_code_chunk_info(si)->get_method()),
-        method_get_descriptor(si_get_code_chunk_info(si)->get_method()), ip ));
+        method->get_class()->get_name()->bytes,
+        method->get_name()->bytes,
+        method->get_descriptor()->bytes, ip));
 
     uint16 bcOffset;
     NativeCodePtr bcip;
@@ -196,10 +198,12 @@ static void jvmti_jit_prepare_pop_frame(StackIterator* si, uint32* buf) {
     jit->get_native_location_for_bc(method, bcOffset, &bcip);
     si_set_ip(si, bcip, false);
 
+    method = si_get_code_chunk_info(si)->get_method();
+
     TRACE(("PopFrame method %s.%s%s, set IP end: %p",
-        class_get_name(method_get_class(si_get_code_chunk_info(si)->get_method())),
-        method_get_name(si_get_code_chunk_info(si)->get_method()),
-        method_get_descriptor(si_get_code_chunk_info(si)->get_method()), ip ));
+        method->get_class()->get_name()->bytes,
+        method->get_name()->bytes,
+        method->get_descriptor()->bytes, ip ));
 }
 
 void jvmti_jit_prepare_pop_frame() {

@@ -301,10 +301,10 @@ void vm_enumerate_root_set_single_thread_on_stack(StackIterator* si)
             vm_stats_inc(cci->num_unwind_java_frames_gc);
 #endif
             TRACE2("enumeration", "enumerating eip=" << (void *) si_get_ip(si)
-                << " is_first=" << !si_get_jit_context(si)->is_ip_past
-                << " " << class_get_name(method_get_class(cci->get_method()))
-                << "." << method_get_name(cci->get_method())
-                << method_get_descriptor(cci->get_method()));
+                << " is_first=" << !si_get_jit_context(si)->is_ip_past << " "
+                << cci->get_method()->get_class()->get_name()->bytes << "."
+                << cci->get_method()->get_name()->bytes
+                << cci->get_method()->get_descriptor()->bytes);
             cci->get_jit()->get_root_set_from_stack_frame(cci->get_method(), 0, si_get_jit_context(si));
             ClassLoader* cl = cci->get_method()->get_class()->get_class_loader();
             assert (cl);
@@ -327,19 +327,19 @@ void vm_enumerate_root_set_single_thread_on_stack(StackIterator* si)
                 }
             }
             TRACE2("enumeration", "enumerated eip=" << (void *) si_get_ip(si)
-                << " is_first=" << !si_get_jit_context(si)->is_ip_past
-                << " " << class_get_name(method_get_class(cci->get_method()))
-                << "." << method_get_name(cci->get_method())
-                << method_get_descriptor(cci->get_method()));
+                << " is_first=" << !si_get_jit_context(si)->is_ip_past << " "
+                << cci->get_method()->get_class()->get_name()->bytes << "."
+                << cci->get_method()->get_name()->bytes
+                << cci->get_method()->get_descriptor()->bytes);
         } else {
 #ifdef VM_STATS
             vm_stats_inc(VM_Statistics::get_vm_stats().num_unwind_native_frames_gc);
 #endif
-            TRACE2("enumeration", "enumeration local handles " 
-                << (m2n_get_method(si_get_m2n(si)) ? method_get_name(m2n_get_method(si_get_m2n(si))) : "")
-                << (m2n_get_method(si_get_m2n(si)) ? method_get_descriptor(m2n_get_method(si_get_m2n(si))) : ""));
-            oh_enumerate_handles(m2n_get_local_handles(si_get_m2n(si)));
             Method* m = m2n_get_method(si_get_m2n(si));
+            TRACE2("enumeration", "enumeration local handles " 
+                << (m ? m->get_name()->bytes : "")
+                << (m ? m->get_descriptor()->bytes : ""));
+            oh_enumerate_handles(m2n_get_local_handles(si_get_m2n(si)));
             if (m) {
                 ClassLoader* cl = m->get_class()->get_class_loader();
                 assert (cl);

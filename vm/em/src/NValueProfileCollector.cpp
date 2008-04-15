@@ -31,7 +31,8 @@
 
 #include "port_threadunsafe.h"
 #include "port_atomic.h"
-#include "open/vm.h"
+#include "open/vm_class_manipulation.h"
+#include "open/vm.h" // for vtable_get_class
 
 #define LOG_DOMAIN "em"
 

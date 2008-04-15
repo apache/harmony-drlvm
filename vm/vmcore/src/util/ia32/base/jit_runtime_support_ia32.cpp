@@ -29,7 +29,7 @@ using namespace std;
 
 #include "open/types.h"
 #include "open/gc.h"
-#include "open/vm_util.h"
+#include "open/vm_class_manipulation.h"
 
 #include "environment.h"
 #include "Class.h"
@@ -1099,8 +1099,7 @@ void *vm_helper_get_addr(VM_RT_SUPPORT f)
 
 /* ? 03/07/30: temporary interface change!!! */
 void *vm_helper_get_addr_optimized(VM_RT_SUPPORT f, Class_Handle c) {
-    Class *clss = (Class*) c;
-    if (clss == NULL)
+    if (c == NULL)
     {
         return vm_helper_get_addr(f);
     }
@@ -1113,7 +1112,7 @@ void *vm_helper_get_addr_optimized(VM_RT_SUPPORT f, Class_Handle c) {
             return vm_helper_get_addr(f);
         // break;// remark #111: statement is unreachable
     case VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE:
-        if (class_is_finalizable(c))
+        if (c->has_finalizer())
             return getaddress__vm_alloc_java_object_resolved_using_vtable_and_size_naked();
         else
             return vm_helper_get_addr(f);

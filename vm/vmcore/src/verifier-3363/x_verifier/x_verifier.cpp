@@ -42,7 +42,7 @@ using namespace CPVerifier_6;
  * @return a verification context for the class
  */
 verification_context
-allocate_verification_context(class_handler klass) {
+allocate_verification_context(Class_Handle klass) {
     return (verification_context) (new SharedClasswideData(klass));
 }
 
@@ -57,8 +57,8 @@ allocate_verification_context(class_handler klass) {
  * method's defining class
  * @return error code 
  */
-vf_Result 
-init_verification_context_for_method(method_handler method, verification_context context) {
+vf_Result
+init_verification_context_for_method(Method_Handle method, verification_context context) {
     vf_Context_6 context6( *((SharedClasswideData*)context) );
     return context6.verify_method(method);
 }
@@ -75,8 +75,10 @@ init_verification_context_for_method(method_handler method, verification_context
  * @param context - class and method verification context
  * @return error code
  */
-vf_Result recompute_stackmaptable(uint8 **attrBytes, method_handler method, verification_context context) {
-    char *error_message;
+vf_Result recompute_stackmaptable(uint8** attrBytes, Method_Handle method,
+                                  verification_context context)
+{
+    char* error_message;
     return vf_recompute_stackmaptable(method, attrBytes, &error_message, ((SharedClasswideData*)context)->class_constraints);
 }
 

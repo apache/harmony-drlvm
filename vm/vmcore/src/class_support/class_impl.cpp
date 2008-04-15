@@ -14,29 +14,157 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Pavel Pervov
- * @version $Revision: 1.1.2.1.4.4 $
- */  
-
-#define LOG_DOMAIN util::CLASS_LOGGER
-#include "cxxlog.h"
-
-#include "class_interface.h"
+#include <assert.h>
+#include "open/vm_method_access.h"
+#include "open/vm_field_access.h"
+#include "open/vm_class_manipulation.h"
+#include "open/vm_class_loading.h"
+#include "open/vm_util.h" // for VM_Global_State ???!!!
 #include "Class.h"
+#include "class_member.h"
 #include "classloader.h"
-#include "environment.h"
 
-/**
- * Function returns class major version.
- */
-unsigned short
-class_get_version( class_handler klass )
+unsigned short class_cp_get_size(Class_Handle klass)
 {
-    assert( klass );
-    Class *clss = (Class*)klass;
-    return clss->get_version();
-} // class_get_version
+    assert(klass);
+    return klass->get_constant_pool().get_size();
+} // class_cp_get_size
+
+unsigned char class_cp_get_tag(Class_Handle klass, unsigned short index)
+{
+    assert(klass);
+    return klass->get_constant_pool().get_tag(index);
+} // class_cp_get_tag
+
+const char* class_cp_get_utf8_bytes(Class_Handle klass, unsigned short index)
+{
+    assert(klass);
+    return klass->get_constant_pool().get_utf8_chars(index);
+} // class_cp_get_utf8_bytes
+
+unsigned short class_cp_get_class_name_index(Class_Handle klass, unsigned short index)
+{
+    assert(klass);
+    return klass->get_constant_pool().get_class_name_index(index);
+} // class_cp_get_class_name_index
+
+unsigned short class_cp_get_descriptor_index(Class_Handle klass, unsigned short index)
+{
+    assert(klass);
+    return klass->get_constant_pool().get_name_and_type_descriptor_index(index);
+} // class_cp_get_descriptor_index
+
+unsigned short class_cp_get_ref_name_and_type_index(Class_Handle klass, unsigned short index)
+{
+    assert(klass);
+    return klass->get_constant_pool().get_ref_name_and_type_index(index);
+} // class_cp_get_ref_name_and_type_index
+
+unsigned short class_cp_get_ref_class_index(Class_Handle klass, unsigned short index)
+{
+    assert(klass);
+    return klass->get_constant_pool().get_ref_class_index(index);
+} // class_cp_get_ref_class_index
+
+unsigned short class_cp_get_name_index(Class_Handle klass, unsigned short index)
+{
+    assert(klass);
+    return klass->get_constant_pool().get_name_and_type_name_index(index);
+} // class_cp_get_name_index
+
+Method_Handle class_resolve_method(Class_Handle klass, unsigned short index)
+{
+    assert(klass);
+    assert(index);
+    return klass->_resolve_method(VM_Global_State::loader_env, index);
+} // class_resolve_method
+
+BOOLEAN class_is_same_package(Class_Handle klass1, Class_Handle klass2)
+{
+    assert(klass1);
+    assert(klass2);
+    return (klass1->get_package() == klass2->get_package()) ? TRUE : FALSE;
+} // class_is_same_package
+
+unsigned short class_get_method_number(Class_Handle klass)
+{
+    assert(klass);
+    return klass->get_number_of_methods();
+} // class_get_method_number
+
+Method_Handle class_get_method(Class_Handle klass, unsigned short index)
+{
+    assert(klass);
+    if(index >= klass->get_number_of_methods())
+    {
+        assert(index < klass->get_number_of_methods());
+        return NULL;
+    }
+    return klass->get_method(index);
+} // class_get_method_number
+
+unsigned char* method_get_stackmaptable(Method_Handle hmethod)
+{
+    assert(hmethod);
+    return hmethod->get_stackmap();
+} // method_get_stackmaptable
+
+BOOLEAN method_is_protected(Method_Handle hmethod)
+{
+    assert(hmethod);
+    Method *method = (Method*)hmethod;
+    return hmethod->is_protected();
+} // method_is_protected
+
+BOOLEAN field_is_protected(Field_Handle hfield)
+{
+    assert(hfield);
+    return hfield->is_protected();
+} // field_is_protected
+
+void class_loader_set_verifier_data_ptr(ClassLoaderHandle classloader, void* data)
+{
+    assert(classloader);
+    classloader->SetVerifyData(data);
+} // class_loader_set_verifier_data_ptr
+
+void* class_loader_get_verifier_data_ptr(ClassLoaderHandle classloader)
+{
+    assert(classloader);
+    return classloader->GetVerifyData();
+} // class_loader_get_verifier_data_ptr
+
+void class_loader_lock(ClassLoaderHandle classloader)
+{
+    assert(classloader);
+    classloader->Lock();
+} // class_loader_lock
+
+void class_loader_unlock(ClassLoaderHandle classloader)
+{
+    assert(classloader);
+    classloader->Unlock();
+} // class_loader_unlock
+
+Class_Handle class_loader_lookup_class(ClassLoaderHandle classloader, const char* name)
+{
+    assert(classloader);
+    assert(name);
+    Global_Env *env = VM_Global_State::loader_env;
+    String* class_name = env->string_pool.lookup( name );
+    return classloader->LookupClass(class_name);
+} // class_loader_lookup_class
+
+Class_Handle class_loader_load_class(ClassLoaderHandle classloader, const char* name)
+{
+    assert(classloader);
+    assert(name);
+    Global_Env *env = VM_Global_State::loader_env;
+    String* class_name = env->string_pool.lookup(name);
+    return classloader->LoadClass(env, class_name);
+} // class_loader_load_class
+
+#if 0
 
 /**
  * Function returns class name.
@@ -81,19 +209,6 @@ class_is_same_class( class_handler klass1, class_handler klass2 )
     assert( klass2 );
     return (klass1 == klass2) ? 1 : 0;
 } // class_is_same_class
-
-/** 
- * Function checks if classes have the same package.
- */
-unsigned
-class_is_same_package(class_handler klass1, class_handler klass2)
-{
-    assert( klass1 );
-    assert( klass2 );
-    Class* clss1 = (Class*)klass1;
-    Class* clss2 = (Class*)klass2;
-    return (clss1->get_package() == clss2->get_package()) ? 1 : 0;
-} // class_is_same_package
 
 /**
  * Function checks if current class is interface.
@@ -168,104 +283,6 @@ class_get_array_element_class( class_handler klass )
     return (class_handler)clss->get_array_element_class();
 } // class_get_array_element_class
 
-/**
- * Function checks if class extends current class with given name.
- */
-class_handler
-class_is_extending_class( class_handler klass, const char *super_name )
-{
-    assert( klass );
-    assert( super_name );
-
-    Global_Env *env = VM_Global_State::loader_env;
-    String *pooled_name = env->string_pool.lookup( super_name );
-
-    for( Class *clss = (Class*)klass; clss; clss = clss->get_super_class() ) {
-        if( clss->get_name() == pooled_name ) {
-            // found class with given name
-            return (class_handler)clss;
-        }
-    }
-    return 0;
-} // class_is_extending_class
-
-/**
- * Function returns number of methods for current class.
- */
-unsigned short
-class_get_method_number( class_handler klass )
-{
-    assert( klass );
-    Class *clss = (Class*)klass;
-    return clss->get_number_of_methods();
-} // class_get_method_number
-
-/** 
- * Function returns method of current class.
- */
-method_handler
-class_get_method( class_handler klass, unsigned short index )
-{
-    assert( klass );
-    Class *clss = (Class*)klass;
-    return (method_handler)clss->get_method(index);
-} // class_get_method
-
-/** 
- * Function returns class constant pool size.
- */
-unsigned short
-class_get_cp_size( class_handler klass )
-{
-    assert(klass);
-    Class* clss = (Class*)klass;
-    return clss->get_constant_pool().get_size();
-} // class_get_cp_size
-
-/** 
- * Function returns constant pool entry tag.
- */
-unsigned char
-class_get_cp_tag( class_handler klass, unsigned short index )
-{
-    assert( klass );
-    Class* clss = (Class*)klass;
-    return clss->get_constant_pool().get_tag(index);
-} // class_get_cp_tag
-
-/** 
- * Function returns class name entry index in constant pool.
- */
-unsigned short
-class_get_cp_class_name_index( class_handler klass, unsigned short index )
-{
-    assert( klass );
-    Class* clss = (Class*)klass;
-    return clss->get_constant_pool().get_class_name_index(index);
-} // class_get_cp_class_name_index
-
-/** 
- * Function returns class name entry index in constant pool.
- */
-unsigned short
-class_get_cp_ref_class_index( class_handler klass, unsigned short index )
-{
-    assert( klass );
-    Class *clss = (Class*)klass;
-    return clss->get_constant_pool().get_ref_class_index(index);
-} // class_get_cp_ref_class_index
-
-/** 
- * Function returns name_and_type entry index in constant pool.
- */
-unsigned short
-class_get_cp_ref_name_and_type_index( class_handler klass, unsigned short index )
-{
-    assert( klass );
-    Class *clss = (Class*)klass;
-    return clss->get_constant_pool().get_ref_name_and_type_index(index);
-} // class_get_cp_ref_name_and_type_index
-
 /** 
  * Function returns string entry index in constant pool.
  */
@@ -278,17 +295,6 @@ class_get_cp_string_index(class_handler klass, unsigned short index)
 } // class_get_cp_string_index
 
 /** 
- * Function returns name entry index in constant pool.
- */
-unsigned short
-class_get_cp_name_index( class_handler klass, unsigned short index )
-{
-    assert( klass );
-    Class* clss = (Class*)klass;
-    return clss->get_constant_pool().get_name_and_type_name_index(index);
-} // class_get_cp_name_index
-
-/** 
  * Function returns descriptor entry index in constant pool.
  */
 unsigned short
@@ -298,17 +304,6 @@ class_get_cp_descriptor_index( class_handler klass, unsigned short index )
     Class* clss = (Class*)klass;
     return clss->get_constant_pool().get_name_and_type_descriptor_index(index);
 } // class_get_cp_descriptor_index
-
-/** 
- * Function returns bytes for UTF8 constant pool entry.
- */
-const char*
-class_get_cp_utf8_bytes( class_handler klass, unsigned short index )
-{
-    assert( klass );
-    Class* clss = (Class*)klass;
-    return clss->get_constant_pool().get_utf8_chars(index);
-} // class_get_cp_utf8_bytes
 
 /**
  * Function sets verify data to a given class.
@@ -329,32 +324,6 @@ void* class_get_verify_data_ptr(class_handler klass)
     Class* clss = (Class*)klass;
     return clss->get_verification_data();
 } // class_get_verify_data_ptr
-
-/**
- * Function resolves class nonstatic method for constant pool entry.
- */
-method_handler
-class_resolve_method( class_handler klass, unsigned short index )
-{
-    assert(klass);
-    assert(index);
-    Class* clss = (Class*)klass;
-    Method* method = clss->_resolve_method(VM_Global_State::loader_env, index);
-    return (method_handler)method;
-} // class_resolve_method
-
-/**
- * Function resolves class nonstatic field for constant pool entry.
- */
-field_handler
-class_resolve_nonstatic_field( class_handler klass, unsigned short index )
-{
-    assert( klass );
-    assert( index );
-    Class *clss = (Class*)klass;
-    Field *field = class_resolve_nonstatic_field( clss, index );
-    return (field_handler)field;
-} // class_resolve_nonstatic_field
 
 /**
  * Function returns a class in which the method is declared.
@@ -445,17 +414,6 @@ method_is_static( method_handler hmethod )
 } // method_is_static
 
 /**
- * Function checks if method is protected.
- */
-unsigned
-method_is_protected( method_handler hmethod )
-{
-    assert( hmethod );
-    Method *method = (Method*)hmethod;
-    return method->is_protected();
-} // method_is_protected
-
-/**
  * Function returns number of method exception handlers.
  */
 unsigned short
@@ -465,29 +423,6 @@ method_get_exc_handler_number( method_handler hmethod )
     Method *method = (Method*)hmethod;
     return (unsigned short)method->num_bc_exception_handlers();
 } // method_get_exc_handler_number
-
-/**
- * Function obtains method exception handler info.
- */
-void
-method_get_exc_handler_info( method_handler hmethod, unsigned short index,
-                             unsigned short *start_pc, unsigned short *end_pc,
-                             unsigned short *handler_pc, unsigned short *catch_type )
-{
-    assert( hmethod );
-    assert( start_pc );
-    assert( end_pc );
-    assert( handler_pc );
-    assert( catch_type );
-    Method *method = (Method*)hmethod;
-    assert( index < method->num_bc_exception_handlers() );
-    Handler *handler = method->get_bc_exception_handler_info( index );
-    *start_pc = (unsigned short)handler->get_start_pc();
-    *end_pc =   (unsigned short)handler->get_end_pc();
-    *handler_pc = (unsigned short)handler->get_handler_pc();
-    *catch_type = (unsigned short)handler->get_catch_type_index();
-    return;
-} // method_get_exc_handler_info
 
 /**
  * Gets number of exceptions a method can throw.
@@ -512,103 +447,4 @@ method_get_exc_method_can_throw( method_handler hmethod,
     return method->get_exception_name( index )->bytes;
 } // method_get_exc_method_can_throw
 
-/**
- * Gets StackMapTable attribute bytes.
- */
-unsigned char *
-method_get_stackmaptable( method_handler hmethod)
-{
-    assert( hmethod );
-    Method *method = (Method*)hmethod;
-    return method->get_stackmap();
-} // method_get_stackmaptable
-
-/**
- * Function sets verify data in class loader.
- */
-void
-cl_set_verify_data_ptr( classloader_handler classloader, void *data )
-{
-    assert(classloader);
-    ClassLoader *cl = (ClassLoader*)classloader;
-    cl->SetVerifyData( data );
-    return;
-} // cl_set_verify_data_ptr
-
-/**
- * Function returns verify data in class loader.
- */
-void *
-cl_get_verify_data_ptr( classloader_handler classloader )
-{
-    assert(classloader);
-    ClassLoader *cl = (ClassLoader*)classloader;
-    return cl->GetVerifyData();
-} // cl_get_verify_data_ptr
-
-/**
- * Function locks class loader.
- */
-void
-cl_acquire_lock( classloader_handler classloader )
-{
-    assert(classloader);
-    ClassLoader *cl = (ClassLoader*)classloader;
-    cl->Lock();
-    return;
-} // cl_acquire_lock
-
-/**
- * Function releases class loader.
- */
-void
-cl_release_lock( classloader_handler classloader )
-{
-    assert(classloader);
-    ClassLoader *cl = (ClassLoader*)classloader;
-    cl->Unlock();
-    return;
-} // cl_release_lock
-
-/**
- * Function returns loaded class in class loader.
- */
-class_handler
-cl_get_class( classloader_handler classloader, const char *name )
-{
-    assert(classloader);
-    assert(name);
-    ClassLoader *cl = (ClassLoader*)classloader;
-    Global_Env *env = VM_Global_State::loader_env;
-    String *class_name = env->string_pool.lookup( name );
-    return (class_handler)cl->LookupClass( class_name );
-} // cl_get_class
-
-/**
- * Function returns loaded class in class loader.
- */
-class_handler
-cl_load_class( classloader_handler classloader, const char *name )
-{
-    assert(classloader);
-    assert(name);
-    ClassLoader *cl = (ClassLoader*)classloader;
-    Global_Env *env = VM_Global_State::loader_env;
-    String *class_name = env->string_pool.lookup( name );
-    Class *klass = cl->LoadClass(env, class_name);
-    return (class_handler)klass;
-} // cl_load_class
-
-
-/**
- * Function checks if a given field is protected.
- */
-unsigned
-field_is_protected( field_handler hfield )
-{
-    assert( hfield );
-    Field *field = (Field*)hfield;
-    return field->is_protected();
-} // field_is_protected
-
-
+#endif

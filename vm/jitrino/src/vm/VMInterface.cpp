@@ -25,7 +25,8 @@
 #define DYNAMIC_OPEN
 #include "VMInterface.h"
 #include "open/vm_properties.h"
-#include "open/vm_class_info.h"
+#include "open/vm_class_manipulation.h"
+#include "open/vm_class_loading.h"
 #include "open/vm_type_access.h"
 #include "open/vm_field_access.h"
 #include "open/vm_method_access.h"
@@ -71,26 +72,26 @@ static  class_get_class_loader_t  class_get_class_loader = 0;
 
 static  class_is_array_t  class_is_array = 0;
 static  class_is_enum_t  class_is_enum = 0;
-static  class_is_final_t  class_is_final = 0; //class_is_final
-static  class_is_throwable_t  class_is_throwable = 0; //class_hint_is_exceptiontype
-static  class_is_interface_t  class_is_interface = 0; //class_is_interface2
-static  class_is_abstract_t  class_is_abstract = 0; //class_is_abstract
-static  class_is_initialized_t  class_is_initialized = 0; //class_needs_initialization && class_is_initialized()
+static  class_is_final_t  class_is_final = 0;
+static  class_is_throwable_t  class_is_throwable = 0;
+static  class_is_interface_t  class_is_interface = 0;
+static  class_is_abstract_t  class_is_abstract = 0;
+static  class_is_initialized_t  class_is_initialized = 0;
 static  class_is_finalizable_t  class_is_finalizable = 0;
 static  class_is_instanceof_t class_is_instanceof = 0;
 static  class_is_support_fast_instanceof_t  class_is_support_fast_instanceof = 0;// class_get_fast_instanceof_flag
 static  class_is_primitive_t  class_is_primitive = 0;
 
-static  class_lookup_class_by_name_using_bootstrap_class_loader_t  class_lookup_class_by_name_using_bootstrap_class_loader = 0;
+static  vm_lookup_class_with_bootstrap_t  vm_lookup_class_with_bootstrap = 0;
 static  class_lookup_method_recursively_t class_lookup_method_recursively = 0;
 
 // Const Pool
 static  class_cp_get_field_type_t class_cp_get_field_type = 0;// VM_Data_Type class_cp_get_field_type(Class_Handle src_class, unsigned short cp_index);
-static  class_cp_get_entry_signature_t class_cp_get_entry_signature = 0;//const char*  class_cp_get_entry_signature(Class_Handle src_class, unsigned short index); ? const char*  class_cp_get_field_descriptor(Class_Handle cl, unsigned index);
+static  class_cp_get_entry_class_name_t class_cp_get_entry_class_name = 0;//const char* class_cp_get_entry_class_name(Class_Handle cl, unsigned short index);
+static  class_cp_get_entry_name_t class_cp_get_entry_name = 0;//const char* class_cp_get_entry_name(Class_Handle cl, unsigned short index);
+static  class_cp_get_entry_descriptor_t class_cp_get_entry_descriptor = 0;//const char* class_cp_get_entry_descriptor(Class_Handle cl, unsigned short index);
 static  class_cp_is_entry_resolved_t class_cp_is_entry_resolved = 0;//bool class_cp_is_entry_resolved(Compile_Handle ch, Class_Handle clazz, unsigned cp_index);
 static  class_cp_get_class_name_t class_cp_get_class_name =0;//const char* class_cp_get_class_name(Class_Handle cl, unsigned index);
-static  class_cp_get_method_class_name_t class_cp_get_method_class_name = 0;//const char *class_cp_get_method_class_name(Class_Handle cl, unsigned index);
-static  class_cp_get_method_name_t class_cp_get_method_name = 0;//const char* class_cp_get_method_name(Class_Handle cl, unsigned index);
 
 
 //Field
@@ -204,9 +205,9 @@ static  vm_properties_get_keys_starting_with_t vm_properties_get_keys_starting_w
 static  vm_properties_get_value_t vm_properties_get_value = 0;//char* vm_properties_get_value(const char* key, PropertyTable table_number)
 
 
-static  vm_get_system_object_class_t  vm_get_system_object_class = 0; // get_system_object_class
+static  vm_get_system_object_class_t  vm_get_system_object_class = 0;
 static  vm_get_system_class_class_t  vm_get_system_class_class = 0; // get_system_class_class
-static  vm_get_system_string_class_t  vm_get_system_string_class = 0; // get_system_string_class
+static  vm_get_system_string_class_t  vm_get_system_string_class = 0;
 static  vm_get_vtable_base_t  vm_get_vtable_base = 0; //POINTER_SIZE_INT vm_get_vtable_base()
 static  vm_get_heap_base_address_t  vm_get_heap_base_address = 0; //vm_heap_base_address
 static  vm_get_heap_ceiling_address_t  vm_get_heap_ceiling_address = 0; //vm_heap_ceiling_address
@@ -275,16 +276,16 @@ static vm_enumerate_root_interior_pointer_t vm_enumerate_root_interior_pointer =
         class_is_support_fast_instanceof = GET_INTERFACE(vm, class_is_support_fast_instanceof);
         class_is_primitive = GET_INTERFACE(vm, class_is_primitive);
 
-        class_lookup_class_by_name_using_bootstrap_class_loader = GET_INTERFACE(vm, class_lookup_class_by_name_using_bootstrap_class_loader);
+        vm_lookup_class_with_bootstrap = GET_INTERFACE(vm, vm_lookup_class_with_bootstrap);
         class_lookup_method_recursively = GET_INTERFACE(vm, class_lookup_method_recursively);
 
         // Const Pool
         class_cp_get_field_type = GET_INTERFACE(vm, class_cp_get_field_type);
-        class_cp_get_entry_signature = GET_INTERFACE(vm, class_cp_get_entry_signature);
+        class_cp_get_entry_class_name = GET_INTERFACE(vm, class_cp_get_entry_class_name);
+        class_cp_get_entry_name = GET_INTERFACE(vm, class_cp_get_entry_name);
+        class_cp_get_entry_descriptor = GET_INTERFACE(vm, class_cp_get_entry_descriptor);
         class_cp_is_entry_resolved = GET_INTERFACE(vm, class_cp_is_entry_resolved);
         class_cp_get_class_name = GET_INTERFACE(vm, class_cp_get_class_name);
-        class_cp_get_method_class_name = GET_INTERFACE(vm, class_cp_get_method_class_name);
-        class_cp_get_method_name = GET_INTERFACE(vm, class_cp_get_method_name);
 
 
         //Field
@@ -554,7 +555,7 @@ VMInterface::getSystemStringVMTypeHandle() {
 void*
 VMInterface::getArrayVMTypeHandle(void* elemVMTypeHandle,bool isUnboxed) {
     //if (isUnboxed)
-      //  return class_get_array_of_unboxed((Class_Handle) elemVMTypeHandle);
+    //    return class_get_array_of_unboxed((Class_Handle) elemVMTypeHandle);
     return class_get_array_of_class((Class_Handle) elemVMTypeHandle);
 }
 
@@ -743,7 +744,12 @@ Class_Handle MethodDesc::getParentHandle() const {
     return method_get_class(drlMethod);
 }
 
-void MethodDesc::getHandlerInfo(unsigned index, unsigned* beginOffset, unsigned* endOffset, unsigned* handlerOffset, unsigned* handlerClassIndex) const {
+void MethodDesc::getHandlerInfo(unsigned short index,
+                                unsigned short* beginOffset,
+                                unsigned short* endOffset,
+                                unsigned short* handlerOffset,
+                                unsigned short* handlerClassIndex) const
+{
     method_get_exc_handler_info(drlMethod,index,beginOffset,endOffset,handlerOffset,handlerClassIndex);
 }
 
@@ -778,7 +784,7 @@ TypeMemberDesc::isParentClassIsLikelyExceptionType() const {
 const char*
 CompilationInterface::getSignatureString(MethodDesc* enclosingMethodDesc, uint32 methodToken) {
     Class_Handle enclosingDrlVMClass = enclosingMethodDesc->getParentHandle();
-    return class_cp_get_entry_signature(enclosingDrlVMClass, (unsigned short)methodToken);
+    return class_cp_get_entry_descriptor(enclosingDrlVMClass, (unsigned short)methodToken);
 }
 
 Method_Side_Effects
@@ -1067,7 +1073,7 @@ void * VMInterface::getHeapCeiling() {
 }
 
 ObjectType * CompilationInterface::findClassUsingBootstrapClassloader( const char * klassName ) {
-    Class_Handle cls = class_lookup_class_by_name_using_bootstrap_class_loader(klassName);
+    Class_Handle cls = vm_lookup_class_with_bootstrap(klassName);
     if( NULL == cls ) {
         return NULL;
     }
@@ -1329,7 +1335,7 @@ CompilationInterface::getFieldType(Class_Handle enclClass, uint32 cpIndex) {
         
         case VM_DATA_TYPE_CLASS:    
                 if (lazy) {
-                    const char* fieldTypeName = class_cp_get_entry_signature(enclClass, cpIndex);
+                    const char* fieldTypeName = class_cp_get_entry_descriptor(enclClass, cpIndex);
                     assert(fieldTypeName);
                     return getTypeFromDescriptor(enclClass, fieldTypeName);
                 } 
@@ -1345,17 +1351,17 @@ CompilationInterface::getFieldType(Class_Handle enclClass, uint32 cpIndex) {
 
 const char* 
 CompilationInterface::getMethodName(Class_Handle enclClass, uint32 cpIndex) {
-    return class_cp_get_method_name(enclClass, cpIndex);
+    return class_cp_get_entry_name(enclClass, cpIndex);
 }
 
 const char* 
 CompilationInterface::getMethodClassName(Class_Handle enclClass, uint32 cpIndex) {
-    return class_cp_get_method_class_name(enclClass, cpIndex);
+    return class_cp_get_entry_class_name(enclClass, cpIndex);
 }
 
 const char* 
 CompilationInterface::getFieldSignature(Class_Handle enclClass, uint32 cpIndex) {
-    return class_cp_get_entry_signature(enclClass, cpIndex);
+    return class_cp_get_entry_descriptor(enclClass, cpIndex);
 }
 
 ::std::ostream& operator<<(::std::ostream& os, Method_Handle method) { 

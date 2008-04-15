@@ -26,11 +26,12 @@
 #include <sstream>
 
 #include "open/vm_method_access.h"
+#include "open/vm_class_manipulation.h"
 #include "open/vm_properties.h"
 #include "classloader.h"
 #include "object_layout.h"
 #include "String_Pool.h"
-#include "open/vm.h"
+//#include "open/vm.h"
 #include "exceptions.h"
 #include "properties.h"
 #include "vm_strings.h"
@@ -826,7 +827,7 @@ Class* ClassLoader::SetupAsArray(Global_Env* env, const String* classNameString)
             REPORT_FAILED_CLASS_NAME(this, classNameString->bytes, "java/lang/NoClassDefFoundError", classNameString->bytes);
             return NULL;
         }
-        baseClass = (Class*)class_get_class_of_primitive_type((VM_Data_Type)*baseType);
+        baseClass = class_get_class_of_primitive_type((VM_Data_Type)*baseType);
         isArrayOfPrimitives = true;
         break;
     case 'L':
@@ -2121,12 +2122,9 @@ VMEXPORT GenericFunctionPointer
 classloader_find_native(const Method_Handle method)
 {
     assert(hythread_is_suspend_enabled());
-    assert( !exn_raised() );
-
-    // get class and class loader of a given method
-    Class_Handle klass = method_get_class( method );
-    ClassLoader *loader = (ClassLoader*)class_get_class_loader( klass );
-    return loader->LookupNative( method );
+    assert(!exn_raised());
+    assert(method);
+    return method->get_class()->get_class_loader()->LookupNative(method);
 }
 
 void ClassLoader::ReportException(const char* exn_name, std::stringstream& message_stream)

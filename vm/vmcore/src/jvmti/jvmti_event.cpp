@@ -1187,14 +1187,14 @@ jvmti_process_single_step_event(jmethodID method, jlocation location) {
         JNIEnv *jni_env = p_TLS_vmthread->jni_env;
         jvmtiEnv *jvmti_env = (jvmtiEnv*) ti_env;
 
-        TRACE2("jvmti.break.ss", "Calling SingleStep callback for env " << jvmti_env << ": " <<
-            method << " :" << location);
+        TRACE2("jvmti.break.ss", "Calling SingleStep callback for env " << jvmti_env << ": "
+            << method << " :" << location);
 
         if (NULL != ti_env->event_table.SingleStep)
             ti_env->event_table.SingleStep(jvmti_env, jni_env, thread, method, location);
 
-        TRACE2("jvmti.break.ss", "Finished SingleStep callback for env " << jvmti_env << ": " <<
-            method << " :" << location);
+        TRACE2("jvmti.break.ss", "Finished SingleStep callback for env " << jvmti_env << ": "
+            << method << " :" << location);
         ti_env = next_env;
     }
 }

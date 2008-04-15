@@ -21,7 +21,7 @@
 #ifndef _VMCORE_LOG_H_
 #define _VMCORE_LOG_H_
 
-#include "open/vm_log.h"
+//#include "open/vm_log.h"
 #include "object_layout.h"
 #include "object_handles.h"
 #include "vtable.h"

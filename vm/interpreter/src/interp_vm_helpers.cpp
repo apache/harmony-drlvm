@@ -18,8 +18,7 @@
  * @author Ivan Volosyuk
  * @version $Revision: 1.6.4.4.4.3 $
  */  
-//#include "open/vm_ee.h"
-//#include "open/vm_class_loading.h"
+#include "open/vm_class_manipulation.h"
 #include "interp_vm_helpers.h"
 #include "interpreter_imports.h"
 #include "interp_native.h"

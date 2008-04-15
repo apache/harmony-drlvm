@@ -15,17 +15,13 @@
  *  limitations under the License.
  */
 
-/** 
- * @author Pavel Pervov
- * @version $Revision: 1.1.2.3.4.4 $
- */  
-
 #define LOG_DOMAIN "classloader"
 #include "cxxlog.h"
 
+#include "open/vm_class_manipulation.h"
 #include "Class.h"
 #include "open/jthread.h"
-#include "open/gc.h"
+//#include "open/gc.h"
 #include "exceptions.h"
 #include "thread_manager.h"
 #include "vm_strings.h"
@@ -99,7 +95,7 @@ void Class::initialize()
     // ---  step 7 ------------------------------------------------------------
 
     if(has_super_class()) {
-        class_initialize_ex(get_super_class());
+        class_initialize(get_super_class());
 
         if(exn_raised()) { 
             jthread_monitor_enter(jlc);
@@ -208,7 +204,7 @@ void class_initialize_from_jni(Class *clss)
     }
 
     tmn_suspend_disable();
-    if (class_needs_initialization(clss)) {
+    if (!clss->is_initialized()) {
         clss->initialize();
     }
     tmn_suspend_enable();
@@ -216,12 +212,6 @@ void class_initialize_from_jni(Class *clss)
 
 
 void class_initialize(Class *clss)
-{
-    ASSERT_RAISE_AREA;
-    class_initialize_ex(clss);
-}
-
-void class_initialize_ex(Class *clss)
 {
     ASSERT_RAISE_AREA;
     assert(!hythread_is_suspend_enabled());
@@ -235,7 +225,7 @@ void class_initialize_ex(Class *clss)
     }
     tmn_suspend_disable();
     
-    if(class_needs_initialization(clss)) {
+    if(!clss->is_initialized()) {
         clss->initialize();
     }
-} // class_initialize_ex
+} // class_initialize

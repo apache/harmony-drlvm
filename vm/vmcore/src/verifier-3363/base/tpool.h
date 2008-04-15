@@ -21,6 +21,7 @@
 #ifndef __TPOOL_H_
 #define __TPOOL_H_
 
+#include "open/vm_class_manipulation.h"
 
 #include "verifier.h"
 #include "stackmap.h"
@@ -48,11 +49,11 @@ namespace CPVerifier {
 
 
     struct vf_ValidType {
-        class_handler cls;      //class handler
-        const char*   name;     //name of the class
+        Class_Handle cls;      //class handler
+        const char*  name;     //name of the class
     };
 
-#define CLASS_NOT_LOADED ((class_handler)-1)
+#define CLASS_NOT_LOADED ((Class_Handle)-1)
 
     class SharedClasswideData;
 
@@ -64,7 +65,7 @@ namespace CPVerifier {
     class vf_TypePool {
 
     public:
-        vf_TypePool(SharedClasswideData *_classwide, class_handler _klass, unsigned table_incr);
+        vf_TypePool(SharedClasswideData *_classwide, Class_Handle _klass, unsigned table_incr);
 
         ~vf_TypePool() {
             if( validTypes ) tc_free(validTypes);
@@ -107,7 +108,7 @@ namespace CPVerifier {
             return validTypes + index;
         }
 
-        class_handler sm_get_handler(SmConstant type) {
+        Class_Handle sm_get_handler(SmConstant type) {
             unsigned index = type.getReferenceIdx();
             return getVaildType(index)->cls;
         }
@@ -245,7 +246,7 @@ namespace CPVerifier {
         SharedClasswideData *classwide;
 
         //class handler of the class being verified
-        class_handler k_class;
+        Class_Handle k_class;
 
         //constantpool length
         unsigned k_cp_length;
@@ -281,8 +282,8 @@ namespace CPVerifier {
 
     };
 
-    class_handler vf_resolve_class( class_handler k_class, const char *name, bool need_load);
-    int vf_is_extending(class_handler from, class_handler to);
+    Class_Handle vf_resolve_class(Class_Handle k_class, const char* name, bool need_load);
+    int vf_is_extending(Class_Handle from, Class_Handle to);
 
 } // namespace CPVerifier
 

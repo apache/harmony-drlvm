@@ -103,7 +103,7 @@ inline jlong ti_get_object_class_tag(TIEnv *ti_env, Managed_Object_Handle obj)
 inline jint ti_get_object_size(TIEnv *ti_env, Managed_Object_Handle obj)
 {
     Class* clss = ((ManagedObject*)obj)->vt()->clss;
-    if (class_is_array(clss)) {
+    if (clss->is_array()) {
         return vm_vector_size(clss, get_vector_length(obj));
     } else {
         return class_get_boxed_data_size(clss);
@@ -141,8 +141,7 @@ inline bool is_jclass_valid(jclass jobj)
     bool r = false;
     if (is_object_valid(jobj->object)) {
         Class* cls = ((ManagedObject*)jobj->object)->vt()->clss;
-        r = class_is_instanceof(cls,
-            VM_Global_State::loader_env->JavaLangClass_Class);
+        r = cls->is_instanceof(VM_Global_State::loader_env->JavaLangClass_Class);
     }
     hythread_suspend_enable();
     return r;

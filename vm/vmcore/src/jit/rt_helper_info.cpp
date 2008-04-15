@@ -17,12 +17,15 @@
 
 #define LOG_DOMAIN "vm.helpers"
 #include "cxxlog.h"
+
+#include <map>
+
+#include "open/vm_class_manipulation.h"
 #include "jit_runtime_support.h"
 #include "Class.h"
 #include "environment.h"
 #include "exceptions.h"
 #include "init.h"
-#include <map>
 
 #ifndef _WIN32
     #define strcmpi strcasecmp

@@ -328,11 +328,10 @@ NativeCodePtr compile_gen_compile_me(Method_Handle method) {
     stub = jump(stub, (char *)compile_get_compile_me_generic());
     assert(stub - (char *)addr <= STUB_SIZE);
 
-
     char * name;
-    const char * c = class_get_name(method_get_class(method));
-    const char * m = method_get_name(method);
-    const char * d = method_get_descriptor(method);
+    const char* c = method->get_class()->get_name()->bytes;
+    const char* m = method->get_name()->bytes;
+    const char* d = method->get_descriptor()->bytes;
     size_t sz = strlen(c)+strlen(m)+strlen(d)+12;
     name = (char *)STD_MALLOC(sz);
     sprintf(name, "compileme.%s.%s%s", c, m, d);
@@ -347,9 +346,9 @@ NativeCodePtr compile_gen_compile_me(Method_Handle method) {
     // dump first 10 compileme stubs
     if (dump_stubs && ++done <= 10) {
         char * buf;
-        const char * c = class_get_name(method_get_class(method));
-        const char * m = method_get_name(method);
-        const char * d = method_get_descriptor(method);
+        const char* c = method->get_class()->get_name()->bytes;
+        const char* m = method->get_name()->bytes;
+        const char* d = method->get_descriptor()->bytes;
         size_t sz = strlen(c)+strlen(m)+strlen(d)+12;
         buf = (char *)STD_MALLOC(sz);
         sprintf(buf, "compileme.%s.%s%s", c, m, d);

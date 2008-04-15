@@ -25,9 +25,9 @@
 #include <string.h>
 #include "open/vm_method_access.h"
 #include "Class.h"
+#include "class_member.h"
 #include "vm_strings.h"
 #include "jvmti_direct.h"
-#include "Class.h"
 #include "object_handles.h"
 #include "jvmti_utils.h"
 #include "cxxlog.h"
@@ -681,28 +681,22 @@ jvmtiIsMethodObsolete(jvmtiEnv* env,
 void jvmti_method_enter_callback(Method_Handle method)
 {
     BEGIN_RAISE_AREA;
-
     TRACE2("jvmti.event.method.entry", "MethodEntry: " << method);
     jvmti_process_method_entry_event(reinterpret_cast<jmethodID>(method));
-
     END_RAISE_AREA;
 }
 
 void jvmti_method_exit_callback(Method_Handle method, jvalue* return_value)
 {
     BEGIN_RAISE_AREA;
-
     TRACE2("jvmti.event.method.exit", "MethodExit: " << method);
 
-    Method *m = reinterpret_cast<Method *>(method);
-    jmethodID mid = reinterpret_cast<jmethodID>(method);
-
-    if (m->get_return_java_type() != JAVA_TYPE_VOID)
-        jvmti_process_method_exit_event(mid, JNI_FALSE, *return_value);
+    if (method->get_return_java_type() != JAVA_TYPE_VOID)
+        jvmti_process_method_exit_event((jmethodID)method, JNI_FALSE, *return_value);
     else
     {
         jvalue jv = { 0 };
-        jvmti_process_method_exit_event(mid, JNI_FALSE, jv);
+        jvmti_process_method_exit_event((jmethodID)method, JNI_FALSE, jv);
     }
 
     END_RAISE_AREA;

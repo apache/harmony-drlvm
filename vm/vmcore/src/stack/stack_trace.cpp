@@ -241,9 +241,9 @@ void st_get_trace(VM_thread *p_vmthread, unsigned* res_depth, StackTraceFrame** 
 
 void st_print_frame(ExpandableMemBlock* buf, StackTraceFrame* stf)
 {
-    const char* cname = class_get_name(method_get_class(stf->method));
-    const char* mname = method_get_name(stf->method);
-    const char* dname = method_get_descriptor(stf->method);
+    const char* cname = stf->method->get_class()->get_name()->bytes;
+    const char* mname = stf->method->get_name()->bytes;
+    const char* dname = stf->method->get_descriptor()->bytes;
     buf->AppendFormatBlock("\tat %s.%s%s", cname, mname, dname);
     const char *file;
     int line;
@@ -321,13 +321,14 @@ void st_print(FILE* f, hythread_t thread)
                 if (inlined_depth) {
                     for (uint32 i = inlined_depth; i > 0; i--) {
                         Method *real_method = cci->get_jit()->get_inlined_method(cci->get_inline_info(), offset, i);
-                        fprintf(f, "%s.%s%s\n", class_get_name(method_get_class(real_method)), 
-                                method_get_name(real_method), method_get_descriptor(real_method));
+                        fprintf(f, "%s.%s%s\n", real_method->get_class()->get_name()->bytes, 
+                            real_method->get_name()->bytes, real_method->get_descriptor()->bytes);
                         depth++;
                     }
                 }
             }
-            fprintf(f, "%s.%s%s\n", class_get_name(method_get_class(m)), method_get_name(m), method_get_descriptor(m));
+            fprintf(f, "%s.%s%s\n", m->get_class()->get_name()->bytes,
+                m->get_name()->bytes, m->get_descriptor()->bytes);
         }
         depth++;
         si_goto_previous(si);

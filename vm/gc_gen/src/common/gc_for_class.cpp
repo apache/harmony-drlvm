@@ -21,6 +21,7 @@
 
 #include "gc_common.h"
 #include "open/vm_field_access.h"
+#include "open/vm_class_manipulation.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 
 /* Setter functions for the gc class property field. */
@@ -78,7 +79,7 @@ static unsigned int class_num_ref_fields(Class_Handle ch)
 
 #ifndef BUILD_IN_REFERENT
   if (is_reference != NOT_REFERENCE) {
-    int offset = class_get_referent_offset(ch);
+    unsigned int offset = class_get_referent_offset(ch);
     unsigned int gc_referent_offset = get_gc_referent_offset();
     if (gc_referent_offset == 0) {
       set_gc_referent_offset(offset);
@@ -158,7 +159,7 @@ void gc_class_prepared (Class_Handle ch, VTable_Handle vth)
     Class_Handle array_element_class = class_get_array_element_class(ch);
     gc_set_prop_array(gcvt);
     
-    gcvt->array_elem_size = class_element_size(ch);
+    gcvt->array_elem_size = class_get_array_element_size(ch);
     unsigned int the_offset = vector_first_element_offset_unboxed(array_element_class);
     gcvt->array_first_elem_offset = the_offset;
   

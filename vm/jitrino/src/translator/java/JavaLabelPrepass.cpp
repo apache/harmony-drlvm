@@ -298,7 +298,7 @@ public:
     uint32 parseHandlers() {
         uint32 numHandlers = enclosingMethod->getNumHandlers();
         for (uint32 i=0; i<numHandlers; i++) {
-            unsigned beginOffset,endOffset,handlerOffset,handlerClassIndex;
+            unsigned short beginOffset,endOffset,handlerOffset,handlerClassIndex;
             enclosingMethod->getHandlerInfo(i,&beginOffset,&endOffset,
                 &handlerOffset,&handlerClassIndex);
             if (!catchBlock(beginOffset,endOffset-beginOffset,

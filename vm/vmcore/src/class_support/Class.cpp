@@ -26,7 +26,7 @@
 
 #include <sstream>
 
-#include "open/vm_class_info.h"
+#include "open/vm_class_manipulation.h"
 #include "Class.h"
 #include "classloader.h"
 #include "environment.h"

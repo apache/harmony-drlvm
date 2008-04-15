@@ -28,7 +28,8 @@
 
 #include <vector>
 
-#include "open/vm_method_access.h"
+//#include "open/vm_method_access.h"
+#include "open/vm_class_manipulation.h"
 #include "open/jthread.h"
 #include "stack_trace.h"
 #include "jni_direct.h"
@@ -65,7 +66,7 @@ JNIEXPORT jclass JNICALL Java_org_apache_harmony_vm_VMStack_getCallerClass
 
     // obtain and return class of the frame
     assert(hythread_is_suspend_enabled());
-    return struct_Class_to_jclass((Class*)method_get_class(frame.method));
+    return struct_Class_to_jclass(frame.method->get_class());
 }
 
 inline static bool isReflectionFrame(Method* method, Global_Env* genv) {
@@ -163,7 +164,7 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getClasses
             continue;
 
         // obtain frame class
-        jclass clz = struct_Class_to_java_lang_Class_Handle(method_get_class(method));
+        jclass clz = struct_Class_to_java_lang_Class_Handle(method->get_class());
 
         jenv->SetObjectArrayElement(arr, i, clz);
 
@@ -546,7 +547,7 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getThreadStack
     Method_Handle method = frames[size-1].method;
     assert(method);
     // skip only for main application thread
-    if (!strcmp(method_get_name(method), "runImpl")
+    if (!strcmp(method->get_name()->bytes, "runImpl")
         && method->get_class()->get_name() == starter_String) {
 
         size --;

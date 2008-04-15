@@ -170,7 +170,7 @@ void CodeGen::gen_new(Class_Handle enclClass, unsigned short cpIndex)
         if (klass == NULL) {
             gen_call_throw(ci_helper_linkerr, rt_helper_throw_linking_exc, 0, enclClass, cpIndex, OPCODE_NEW);
         } else {
-            if ( klass!=enclClass && class_needs_initialization(klass)) {
+            if ( klass!=enclClass && !class_is_initialized(klass)) {
                 gen_call_vm(ci_helper_o, rt_helper_init_class, 0, klass);
             }
             unsigned size = class_get_boxed_data_size(klass);

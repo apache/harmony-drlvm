@@ -14,25 +14,20 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Pavel Pervov
- * @version $Revision: 1.1.2.2.4.4 $
- */  
-
 
 #include <assert.h>
-#include <stdlib.h>
+//#include <stdlib.h>
 
 #define LOG_DOMAIN "vm.core"
 #include "cxxlog.h"
 
+#include "open/types.h"
+#include "open/vm_class_manipulation.h"
+
 #include "Class.h"
 #include "environment.h"
 #include "lock_manager.h"
-#include "open/types.h"
-#include "open/vm_util.h"
 #include "type.h"
-#include "open/vm.h"
 #include "vm_core_types.h"
 
 Kind TypeDesc::get_kind()
@@ -142,7 +137,7 @@ TypeDesc* type_desc_create_from_class(Class* c)
 {
     TypeDesc* td;
 
-    if (class_is_primitive(c)) {
+    if (c->is_primitive()) {
         Kind k = K_UnmanagedPointer;
         switch (class_get_primitive_type_of_class(c)) {
         case VM_DATA_TYPE_INT8:    k = K_S1;      break;
@@ -164,7 +159,7 @@ TypeDesc* type_desc_create_from_class(Class* c)
             ABORT("Unexpected data type");
         }
         td = new TypeDesc(k, NULL, NULL, NULL, c->get_class_loader(), c);
-    } else if (class_is_array(c)) {
+    } else if (c->is_array()) {
         td = new TypeDesc(K_Vector, NULL, NULL, NULL, c->get_class_loader(), c);
     } else {
         Kind k = K_Object;

@@ -14,15 +14,9 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/**
- * @author Intel, Evgueni Brevnov, Ivan Volosyuk
- * @version $Revision: 1.1.2.5.4.4 $
- */
-
 
 #define LOG_DOMAIN "vm.helpers"
 #include "cxxlog.h"
-
 
 #include <assert.h>
 #include <float.h>
@@ -36,11 +30,15 @@ using namespace std;
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "open/gc.h"
+#include "open/types.h"
+#include "open/bytecodes.h"
+#include "open/vm_class_manipulation.h"
+
 #include "Class.h"
 #include "environment.h"
 #include "exceptions.h"
 #include "exceptions_jit.h"
-#include "open/gc.h"
 #include "ini.h"
 #include "jit_runtime_support.h"
 #include "jit_runtime_support_common.h"
@@ -53,9 +51,6 @@ using namespace std;
 #include "vm_arrays.h"
 #include "vm_strings.h"
 #include "vm_threads.h"
-#include "open/types.h"
-#include "open/bytecodes.h"
-#include "open/vm_util.h"
 
 #include "jvmti_interface.h"
 #include "compile.h"

@@ -18,6 +18,8 @@
  * @author Mikhail Loenko, Vladimir Molotkov
  */  
 
+#include "open/vm_method_access.h"
+
 #include "verifier.h"
 #include "context_5.h"
 namespace CPVerifier_5 {
@@ -404,7 +406,7 @@ namespace CPVerifier_5 {
         return error(VF_ErrorCodeEnd, "control went out of method bounds");
     }
 
-    vf_Result vf_Context_5::verify_method(method_handler method) {
+    vf_Result vf_Context_5::verify_method(Method_Handle method) {
         vf_Result tcr;
 
         //nothing to verify

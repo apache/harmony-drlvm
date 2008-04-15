@@ -110,7 +110,7 @@ const char* exn_get_name() {
         return NULL;
     }
 
-    return class_get_name(exc_class);
+    return exc_class->get_name()->bytes;
 }
 
 void exn_clear()

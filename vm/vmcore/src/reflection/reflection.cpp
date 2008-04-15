@@ -160,17 +160,16 @@ jobjectArray reflection_get_class_fields(JNIEnv* jenv, jclass clazz)
 {
     Class_Handle clss = jni_get_class_handle(jenv, clazz);
     assert(clss);
-    TRACE("get class fields : " << class_get_name(clss));
+    TRACE("get class fields : " << clss->get_name()->bytes);
 
-    unsigned num_fields = class_number_fields(clss);
+    unsigned num_fields = clss->get_number_of_fields();
     unsigned num_res_fields = 0;
 
     unsigned i;
     // Determine the number of elements in the result.
     for (i = 0; i < num_fields; i++) {
-        Field_Handle fh = class_get_field(clss, i);
-        if (field_is_injected(fh)) continue;
-        //if (class_is_array(clss) && 0 == strcmp("length", field_get_name(fh))) continue;
+        Field_Handle fh = clss->get_field(i);
+        if (fh->is_injected()) continue;
         num_res_fields++;
     }
 
@@ -204,16 +203,16 @@ jobjectArray reflection_get_class_fields(JNIEnv* jenv, jclass clazz)
 jobjectArray reflection_get_class_constructors(JNIEnv* jenv, jclass clazz)
 {
     Class_Handle clss = jni_get_class_handle(jenv, clazz);
-    unsigned num_methods = class_get_number_methods(clss);
+    unsigned num_methods = clss->get_number_of_methods();
     unsigned n_consts = 0;
-    TRACE("get class constructors : " << class_get_name(clss));
+    TRACE("get class constructors : " << clss->get_name()->bytes);
 
     unsigned i;
     // Determine the number of elements in the result. Note that fake methods never have the name "<init>".
     for (i = 0; i < num_methods; i++) {
-        Method_Handle mh = class_get_method(clss, i);
-        if (strcmp(method_get_name(mh), "<init>") == 0)
-            n_consts++;             
+        Method_Handle mh = clss->get_method(i);
+        if (strcmp(mh->get_name()->bytes, "<init>") == 0)
+            n_consts++;
     }
 
     // Create result array
@@ -225,8 +224,8 @@ jobjectArray reflection_get_class_constructors(JNIEnv* jenv, jclass clazz)
 
     // Fill in the array
     for (i = 0, n_consts = 0; i < num_methods; i++) {
-        Method_Handle mh = class_get_method(clss, i);
-        if (strcmp(method_get_name(mh), "<init>") != 0) continue;
+        Method_Handle mh = clss->get_method(i);
+        if (strcmp(mh->get_name()->bytes, "<init>") != 0) continue;
 
         jobject jconst = reflection_reflect_constructor(jenv, mh);
         if (!jconst){
@@ -243,20 +242,23 @@ jobjectArray reflection_get_class_constructors(JNIEnv* jenv, jclass clazz)
 jobjectArray reflection_get_class_methods(JNIEnv* jenv, jclass clazz)
 {
     Class_Handle clss = jni_get_class_handle(jenv, clazz);
-    unsigned num_methods = class_get_number_methods(clss);
+    unsigned num_methods = clss->get_number_of_methods();
     unsigned num_res_methods = 0;
-    TRACE("get class methods : " << class_get_name(clss));
+    TRACE("get class methods : " << clss->get_name()->bytes);
 
     unsigned i;
-    // Determine the number of elements in the result. Note that fake methods never have the name "<init>".
+    // Determine the number of elements in the result.
+    // Note that fake methods never have the name "<init>".
     for (i = 0; i < num_methods; i++) {
-        Method_Handle mh = class_get_method(clss, i);
-        if (strcmp(method_get_name(mh), "<init>") == 0 ||
-                strcmp(method_get_name(mh), "<clinit>") == 0 ||
-                mh->is_fake_method())
+        Method_Handle mh = clss->get_method(i);
+        if (strcmp(mh->get_name()->bytes, "<init>") == 0
+            || strcmp(mh->get_name()->bytes, "<clinit>") == 0
+            || mh->is_fake_method())
+        {
             continue;
+        }
 
-        num_res_methods++;             
+        num_res_methods++;
     }
 
     // Create result array
@@ -268,11 +270,13 @@ jobjectArray reflection_get_class_methods(JNIEnv* jenv, jclass clazz)
     // Fill in the array
     unsigned member_i = 0;
     for (i = 0; i < num_methods; i++) {
-        Method_Handle mh = class_get_method(clss, i);
-        if (strcmp(method_get_name(mh), "<init>") == 0 ||
-                strcmp(method_get_name(mh), "<clinit>") == 0 ||
-                mh->is_fake_method())
+        Method_Handle mh = clss->get_method(i);
+        if (strcmp(mh->get_name()->bytes, "<init>") == 0
+            || strcmp(mh->get_name()->bytes, "<clinit>") == 0
+            || mh->is_fake_method())
+        {
             continue;
+        }
 
         jobject member = reflection_reflect_method(jenv, mh);
         if (!member){
@@ -337,7 +341,7 @@ bool jobjectarray_to_jvaluearray(JNIEnv *jenv, jvalue **output, Method *method, 
 
 jobject reflection_get_enum_value(JNIEnv *jenv, Class* enum_type, String* name) 
 {
-    ASSERT(class_is_enum(enum_type), "Requested Class is not ENUM: " 
+    ASSERT(enum_type->is_enum(), "Requested Class is not ENUM: "
         << enum_type->get_name()->bytes);
 
     for (unsigned i=0; i<enum_type->get_number_of_fields(); i++) {

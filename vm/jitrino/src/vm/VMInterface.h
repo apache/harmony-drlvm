@@ -206,8 +206,9 @@ public:
         uint32       getByteCodeSize() const;
         uint16       getMaxStack() const;
         uint32       getNumHandlers() const;
-        void getHandlerInfo(unsigned index, unsigned* beginOffset, 
-            unsigned* endOffset, unsigned* handlerOffset, unsigned* handlerClassIndex) const;
+        void getHandlerInfo(unsigned short index, unsigned short* beginOffset, 
+            unsigned short* endOffset, unsigned short* handlerOffset,
+            unsigned short* handlerClassIndex) const;
         bool         hasAnnotation(NamedType* type) const;
 
         //

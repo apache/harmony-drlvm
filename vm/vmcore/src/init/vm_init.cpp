@@ -28,6 +28,7 @@
 #include "open/gc.h"
 #include "open/hythread_ext.h"
 #include "open/jthread.h"   // this is for jthread_self()
+#include "open/vm_class_manipulation.h"
 
 #include "init.h"
 #include "classloader.h"
@@ -149,12 +150,6 @@ void* get_vm_interface(const char* func_name){
         
     } else if (strcmp(func_name,"class_is_support_fast_instanceof") == 0) {
         return (void*)class_get_fast_instanceof_flag;
-    } else if (strcmp(func_name,"class_is_final") == 0) {
-        return (void*)class_is_final;
-    } else if (strcmp(func_name,"class_is_throwable") == 0) {
-        return (void*)class_hint_is_exceptiontype;
-    } else if (strcmp(func_name,"class_is_abstract") == 0) {
-        return (void*)class_is_abstract;
     } else if (strcmp(func_name,"vector_get_first_element_offset") == 0) {
         return (void*)vector_first_element_offset_class_handle;
     } else if (strcmp(func_name,"vector_get_length_offset") == 0) {
@@ -169,12 +164,6 @@ void* get_vm_interface(const char* func_name){
         return (void*)hythread_uses_fast_tls;
     } else if (strcmp(func_name,"vm_get_tls_offset_in_segment") == 0) {
         return (void*)hythread_get_hythread_offset_in_tls;
-    } else if (strcmp(func_name,"vm_get_system_object_class") == 0) {
-        return (void*)get_system_object_class;
-    } else if (strcmp(func_name,"vm_get_system_class_class") == 0) {
-        return (void*)get_system_class_class;
-    } else if (strcmp(func_name,"vm_get_system_string_class") == 0) {
-        return (void*)get_system_string_class;
     } else if (strcmp(func_name,"vm_get_heap_base_address") == 0) {
         return (void*)vm_heap_base_address;
     } else if (strcmp(func_name,"vm_get_heap_ceiling_address") == 0) {
@@ -910,18 +899,18 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     // Now the thread is attached to VM and it is valid to disable it.
     hythread_suspend_disable();
 
-    // Create java.lang.Object.    
+    // Create java.lang.Object.
     vm_env->java_lang_Object = oh_allocate_global_handle();
     vm_env->java_lang_Object->object =
-        class_alloc_new_object(vm_env->JavaLangObject_Class);    
+        class_alloc_new_object(vm_env->JavaLangObject_Class);
     // Create java.lang.OutOfMemoryError.
     class_initialize(vm_env->java_lang_OutOfMemoryError_Class);
     vm_env->java_lang_OutOfMemoryError = oh_allocate_global_handle();
-    vm_env->java_lang_OutOfMemoryError->object = 
+    vm_env->java_lang_OutOfMemoryError->object =
         class_alloc_new_object(vm_env->java_lang_OutOfMemoryError_Class);
     // Create java.lang.ThreadDeath.
     vm_env->java_lang_ThreadDeath = oh_allocate_global_handle();
-    vm_env->java_lang_ThreadDeath->object = 
+    vm_env->java_lang_ThreadDeath->object =
         class_alloc_new_object(vm_env->java_lang_ThreadDeath_Class);
 
     // Create pop frame exception.

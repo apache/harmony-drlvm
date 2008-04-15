@@ -412,9 +412,9 @@ jvmtiGetClassStatus(jvmtiEnv* env, jclass handle, jint* status_ptr)
 
     *status_ptr = 0;
 
-    if( cl->is_primitive() ) {
+    if(cl->is_primitive()) {
         *status_ptr = JVMTI_CLASS_STATUS_PRIMITIVE;
-    } else if( cl->is_array() ) {
+    } else if(cl->is_array()) {
         *status_ptr = JVMTI_CLASS_STATUS_ARRAY;
     } else {
         switch(cl->get_state())

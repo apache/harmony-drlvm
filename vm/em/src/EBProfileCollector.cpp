@@ -29,7 +29,7 @@
 
 #include <sstream>
 #include "open/vm_method_access.h"
-#include "open/vm.h"
+#include "open/vm_class_manipulation.h"
 #include "jit_intf.h"
 #include "port_mutex.h"
 

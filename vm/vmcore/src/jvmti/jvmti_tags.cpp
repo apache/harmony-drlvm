@@ -18,13 +18,13 @@
 #include <algorithm>
 
 // global
+#include "cxxlog.h"
 #include "open/gc.h"
 #include "open/vm_gc.h"
-#include "cxxlog.h"
 
 // VM-internal
 #include "environment.h"    // Global_Env
-#include "open/vm_util.h"   // VM_Global_State
+//#include "open/vm_util.h"   // VM_Global_State
 #include "jvmti_direct.h"   // TIEnv
 #include "vm_arrays.h"      // vm_array_size
 

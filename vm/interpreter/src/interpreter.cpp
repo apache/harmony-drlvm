@@ -17,9 +17,9 @@
 #include "interpreter.h"
 #include "interpreter_exports.h"
 #include "interpreter_imports.h"
-#include "open/vm_class_info.h"
 #include "open/vm_field_access.h"
 #include "open/vm_method_access.h"
+#include "open/vm_class_manipulation.h"
 #include <math.h>
 
 #include "vtable.h"

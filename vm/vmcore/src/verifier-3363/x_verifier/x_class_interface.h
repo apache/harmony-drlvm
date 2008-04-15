@@ -21,21 +21,53 @@
 #ifndef __X_CLASS_INTERFACE_H__
 #define __X_CLASS_INTERFACE_H__
 
+#include "open/types.h"
+#include "open/common.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /**
- * returns constantpool index for the given class
+ * Returns constant pool index of CONSTANT_Class for the given class name
+ * If such entry is not present in the constant pool, the function adds this entry
+ *
+ * @param k_class   - the class handle
+ * @param name      - name of the class to return constant pool index for
+ *
+ * @return constant pool index of the CONSTANT_Class entry with a given
+ * <code>name</code>
  */
-unsigned short class_get_cp_class_entry(class_handler k_class, const char* name);
+DECLARE_OPEN(unsigned short, class_cp_get_class_entry, (Class_Handle k_class, const char* name));
 
 /**
- * removes given exception handler (handlers with greater indexes shift)
+ * Removes given exception handler (handlers with greater indexes shift)
+ *
+ * @param method    - method to remove exception handler from
+ * @param idx       - index of exception handler in exception handlers array
  */
-void method_remove_exc_handler( method_handler method, unsigned short idx );
+DECLARE_OPEN(void, method_remove_exc_handler, (Method_Handle method, unsigned short idx));
 
 /**
- * modifies start_pc, end_pc 
+ * Modifies particular exception handler information.
+ *
+ * @param method    - method in which exception handler must be updated
+ * @param idx       - index of exception handler to update
+ * @param start_pc  - new start pc
+ * @param end_pc    - new end pc
+ * @param handler_pc - pc of the beginning of the exception handler
+ * @param handler_cp_index - index in the constant pool of the class
+ *                           of the handled exception
+ *
+ * @note Usually it is only needed to modify start_pc and end_pc
  */
-void method_modify_exc_handler_info( method_handler method, unsigned short idx, unsigned short start_pc, 
-                                    unsigned short end_pc, unsigned short handler_pc, unsigned short handler_cp_index );
+DECLARE_OPEN(void, method_modify_exc_handler_info,
+    (Method_Handle method, unsigned short idx,
+     unsigned short start_pc, unsigned short end_pc,
+     unsigned short handler_pc, unsigned short handler_cp_index));
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

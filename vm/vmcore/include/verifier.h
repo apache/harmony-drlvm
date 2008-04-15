@@ -21,7 +21,7 @@
 #ifndef _VERIFIER_H_
 #define _VERIFIER_H_
 
-#include "class_interface.h"
+#include "open/types.h"
 
 enum vf_Result
 {
@@ -60,7 +60,7 @@ enum vf_Result
  * @note Assertion is raised if klass is equal to null.
  */
 vf_Result
-vf_verify_class(class_handler klass, unsigned verifyAll, char **error);
+vf_verify_class(Class_Handle klass, unsigned verifyAll, char** error);
 
 /**
  * Function provides final constraint checks for a given class.
@@ -71,21 +71,21 @@ vf_verify_class(class_handler klass, unsigned verifyAll, char **error);
  * @note Assertion is raised if klass or error_message are equal to null.
  */
 vf_Result
-vf_verify_class_constraints(class_handler klass, unsigned verifyAll,
-                            char **error);
+vf_verify_class_constraints(Class_Handle klass, unsigned verifyAll,
+                            char** error);
 
 /**
  * Function provides final constraint checks for a given class.
  * @param error - error message of verifier
  * @note Assertion is raised if error_message is equal to null.
  */
-void vf_release_error_message(void *error);
+void vf_release_error_message(void* error);
 
 /**
  * Function releases verify data in class loader.
  * @param data - verify data
  * @note Assertion is raised if data is equal to null.
  */
-void vf_release_verify_data(void *data);
+void vf_release_verify_data(void* data);
 
 #endif // _VERIFIER_H_

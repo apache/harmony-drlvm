@@ -16,15 +16,20 @@
  */
 /** 
  * @author Mikhail Loenko, Vladimir Molotkov
- */  
+ */
 
 #include <assert.h>
+
+#include "open/vm_field_access.h"
+#include "open/vm_method_access.h"
+#include "class_interface.h"
+
 #include "tpool.h"
 #include "context_base.h"
 
 namespace CPVerifier {
 
-    vf_TypePool::vf_TypePool(SharedClasswideData *_classwide, class_handler _klass, unsigned table_incr)
+    vf_TypePool::vf_TypePool(SharedClasswideData *_classwide, Class_Handle _klass, unsigned table_incr)
         : classwide(_classwide), tableIncr(table_incr),
         validTypesTableMax(0), validTypesTableSz(1), validTypes(0)
     {
@@ -34,7 +39,7 @@ namespace CPVerifier {
             const_arrayref_of_object = const_this = SM_NONE;
 
         k_class = _klass;
-        k_cp_length = class_get_cp_size( k_class );
+        k_cp_length = class_cp_get_size( k_class );
     }
 
     /*
@@ -233,7 +238,7 @@ namespace CPVerifier {
 
             if( to_type->cls && to_type->cls != CLASS_NOT_LOADED ) {
                 //if to is loaded and it is an interface, treat it as an object
-                if( class_is_interface_( to_type->cls ) ) {
+                if(class_is_interface(to_type->cls)) {
                     return true;
                 }
             } else {
@@ -260,7 +265,7 @@ namespace CPVerifier {
     int vf_TypePool::checkSuperAndPackage(SmConstant expected_ref) {
         //check that expected ref is a super of 'this'
         vf_ValidType *expected_type = getVaildType(expected_ref.getReferenceIdx());
-        class_handler &referred = expected_type->cls;
+        Class_Handle& referred = expected_type->cls;
 
         if( !referred ) {
             //try to get class
@@ -273,7 +278,7 @@ namespace CPVerifier {
 
         if( referred == CLASS_NOT_LOADED ) {
             //referred class can't be resolved ==> still might be a super class
-            class_handler k = class_is_extending_class(k_class, expected_type->name);
+            Class_Handle k = class_get_extended_class(k_class, expected_type->name);
 
             if( k ) {
                 referred = k;
@@ -294,7 +299,7 @@ namespace CPVerifier {
 
         //check further
         //check that they are in different packages and method is protected
-        method_handler method = class_resolve_method(k_class, method_idx);
+        Method_Handle method = class_resolve_method(k_class, method_idx);
 
         if (!method || method_is_static(method)) {
             //it's not a VerifyError
@@ -314,7 +319,7 @@ namespace CPVerifier {
 
         //check further
         //check that they are in different packages and method is protected
-        field_handler field = class_resolve_nonstatic_field(k_class, field_idx);
+        Field_Handle field = class_resolve_nonstatic_field(k_class, field_idx);
 
         if (!field) {
             //it's not a VerifyError
@@ -352,7 +357,7 @@ namespace CPVerifier {
     SmConstant vf_TypePool::cpool_get_ldcarg(unsigned short cp_idx) {
         if( cp_idx >= k_cp_length || !cp_idx ) return SM_BOGUS;
 
-        switch (class_get_cp_tag( k_class, cp_idx ) ) {
+        switch (class_cp_get_tag( k_class, cp_idx ) ) {
         case _CONSTANT_String: 
             return sm_get_const_string();
 
@@ -375,7 +380,7 @@ namespace CPVerifier {
     SmConstant vf_TypePool::cpool_get_ldc2arg(unsigned short cp_idx) {
         if( cp_idx >= k_cp_length || !cp_idx ) return SM_BOGUS;
 
-        switch (class_get_cp_tag( k_class, cp_idx ) ) {
+        switch (class_cp_get_tag( k_class, cp_idx ) ) {
         case _CONSTANT_Double: 
             return SM_DOUBLE;
 
@@ -389,17 +394,17 @@ namespace CPVerifier {
 
 
     int vf_TypePool::cpool_is_reftype(unsigned short cp_idx) {
-        return cp_idx && cp_idx < k_cp_length && class_get_cp_tag( k_class, cp_idx ) == _CONSTANT_Class;
+        return cp_idx && cp_idx < k_cp_length && class_cp_get_tag( k_class, cp_idx ) == _CONSTANT_Class;
     }
 
 
     int vf_TypePool::cpool_get_class(unsigned short cp_idx, SmConstant *ref, int expected_dim) {
         if( !cpool_is_reftype(cp_idx) ) return false;
 
-        unsigned short name_idx = class_get_cp_class_name_index(k_class, cp_idx);
+        unsigned short name_idx = class_cp_get_class_name_index(k_class, cp_idx);
         if( name_idx >= k_cp_length ) return false;
 
-        const char* name = class_get_cp_utf8_bytes( k_class, name_idx );
+        const char* name = class_cp_get_utf8_bytes( k_class, name_idx );
 
         //validate dimensions
         int ptr = 0;
@@ -425,10 +430,10 @@ namespace CPVerifier {
         assert(ref);
         if( !cpool_is_reftype(cp_idx) ) return false;
 
-        unsigned short name_idx = class_get_cp_class_name_index(k_class, cp_idx);
+        unsigned short name_idx = class_cp_get_class_name_index(k_class, cp_idx);
         if( name_idx >= k_cp_length ) return false;
 
-        const char* name = class_get_cp_utf8_bytes( k_class, name_idx );
+        const char* name = class_cp_get_utf8_bytes( k_class, name_idx );
         int len = (int)strlen(name);
 
 
@@ -463,25 +468,25 @@ namespace CPVerifier {
 
     int vf_TypePool::cpool_get_field(unsigned short cp_idx, SmConstant *ref, SmConstant *value) {
         //check it is a field
-        if( !cp_idx || cp_idx >= k_cp_length || class_get_cp_tag( k_class, cp_idx ) != _CONSTANT_Fieldref ) {
+        if( !cp_idx || cp_idx >= k_cp_length || class_cp_get_tag( k_class, cp_idx ) != _CONSTANT_Fieldref ) {
             return false;
         }
 
-        unsigned short class_idx = class_get_cp_ref_class_index( k_class, cp_idx );
+        unsigned short class_idx = class_cp_get_ref_class_index( k_class, cp_idx );
         if( !cpool_get_class(class_idx, ref) ) return false;
 
-        unsigned short name_and_type_idx = class_get_cp_ref_name_and_type_index( k_class, cp_idx );
-        if( !name_and_type_idx || name_and_type_idx >= k_cp_length || class_get_cp_tag( k_class, name_and_type_idx ) != _CONSTANT_NameAndType ) return false;
+        unsigned short name_and_type_idx = class_cp_get_ref_name_and_type_index( k_class, cp_idx );
+        if( !name_and_type_idx || name_and_type_idx >= k_cp_length || class_cp_get_tag( k_class, name_and_type_idx ) != _CONSTANT_NameAndType ) return false;
 
         //TODO: do we need this check?
         //unsigned short name_idx = class_get_cp_name_index( k_class, name_and_type_idx );
-        //if( !name_idx || name_idx >= k_cp_length || class_get_cp_tag( k_class, name_idx ) != _CONSTANT_Utf8 ) return false;
+        //if( !name_idx || name_idx >= k_cp_length || class_cp_get_tag( k_class, name_idx ) != _CONSTANT_Utf8 ) return false;
 
         //get filed type
-        unsigned short type_idx = class_get_cp_descriptor_index( k_class, name_and_type_idx );
-        if( !type_idx || type_idx >= k_cp_length || class_get_cp_tag( k_class, type_idx ) != _CONSTANT_Utf8 ) return false;
+        unsigned short type_idx = class_cp_get_descriptor_index( k_class, name_and_type_idx );
+        if( !type_idx || type_idx >= k_cp_length || class_cp_get_tag( k_class, type_idx ) != _CONSTANT_Utf8 ) return false;
 
-        const char *type = class_get_cp_utf8_bytes( k_class, type_idx );
+        const char *type = class_cp_get_utf8_bytes( k_class, type_idx );
         *value = get_type(type);
 
         return true;
@@ -493,11 +498,11 @@ namespace CPVerifier {
             ClassConstantPoolTags expected_tag = opcode == OP_INVOKEINTERFACE ? _CONSTANT_InterfaceMethodref : _CONSTANT_Methodref;
 
             //check it is a method
-            if( !cp_idx || cp_idx >= k_cp_length || class_get_cp_tag( k_class, cp_idx ) != expected_tag ) {
+            if( !cp_idx || cp_idx >= k_cp_length || class_cp_get_tag( k_class, cp_idx ) != expected_tag ) {
                 return false;
             }
 
-            unsigned short class_idx = class_get_cp_ref_class_index( k_class, cp_idx );
+            unsigned short class_idx = class_cp_get_ref_class_index( k_class, cp_idx );
             if( opcode == OP_INVOKEVIRTUAL || opcode == OP_INVOKESPECIAL ) {
                 if( !cpool_get_class(class_idx, objectref) ) return false;
             } else {
@@ -505,18 +510,18 @@ namespace CPVerifier {
                 (*objectref) = sm_get_const_object();
             }
 
-            unsigned short name_and_type_idx = class_get_cp_ref_name_and_type_index( k_class, cp_idx );
-            if( !name_and_type_idx || name_and_type_idx >= k_cp_length || class_get_cp_tag( k_class, name_and_type_idx ) != _CONSTANT_NameAndType ) return false;
+            unsigned short name_and_type_idx = class_cp_get_ref_name_and_type_index( k_class, cp_idx );
+            if( !name_and_type_idx || name_and_type_idx >= k_cp_length || class_cp_get_tag( k_class, name_and_type_idx ) != _CONSTANT_NameAndType ) return false;
 
-            *name_idx = class_get_cp_name_index( k_class, name_and_type_idx );
+            *name_idx = class_cp_get_name_index( k_class, name_and_type_idx );
             //TODO: do we need this check?
-            if( !(*name_idx) || *name_idx >= k_cp_length || class_get_cp_tag( k_class, *name_idx ) != _CONSTANT_Utf8 ) return false;
+            if( !(*name_idx) || *name_idx >= k_cp_length || class_cp_get_tag( k_class, *name_idx ) != _CONSTANT_Utf8 ) return false;
 
             //get filed type or function args & rettype
-            unsigned short type_idx = class_get_cp_descriptor_index( k_class, name_and_type_idx );
-            if( !type_idx || type_idx >= k_cp_length || class_get_cp_tag( k_class, type_idx ) != _CONSTANT_Utf8 ) return false;
+            unsigned short type_idx = class_cp_get_descriptor_index( k_class, name_and_type_idx );
+            if( !type_idx || type_idx >= k_cp_length || class_cp_get_tag( k_class, type_idx ) != _CONSTANT_Utf8 ) return false;
 
-            (*state) = class_get_cp_utf8_bytes( k_class, type_idx );
+            (*state) = class_cp_get_utf8_bytes( k_class, type_idx );
             return true;
         }
 
@@ -579,7 +584,7 @@ namespace CPVerifier {
         }
 
         int vf_TypePool::cpool_method_is_constructor_call(unsigned short name_idx) {
-            return !strcmp(class_get_cp_utf8_bytes( k_class, name_idx ), "<init>");
+            return !strcmp(class_cp_get_utf8_bytes( k_class, name_idx ), "<init>");
         }
 
 } // namespace CPVerifier

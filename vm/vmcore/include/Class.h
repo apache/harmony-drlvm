@@ -1993,14 +1993,6 @@ Method* class_lookup_method(Class* clss, const char* name, const char* desc);
  * @param[in] offset - offset of the method in the vtable.
  * @return Method at the specified offset.*/
 Method* class_get_method_from_vt_offset(VTable* vt, unsigned offset);
-/** Resolves non-static field at the specified index in
- * the constant pool of the class.
- * @param[in] clss - class to resolve field in.
- * @param[in] cp_index - index in the constant pool of the class.
- * @return Resolved field, if resolution succeeded,
- * <code>NULL</code> otherwise.*/
-Field* class_resolve_nonstatic_field(Class* clss, unsigned cp_index);
-
 
 /** Loads a class and performs the first two parts of the link process:
  * verify and prepare.
@@ -2027,15 +2019,6 @@ Class* class_load_verify_prepare_from_jni(Global_Env* env,
 /** Executes static initializer of class.
  * @param[in] clss - class to initialize.*/
 void class_initialize_from_jni(Class *clss);
-/** Executes static initializer of class.
- * @param[in] clss - class to initialize.*/
-void class_initialize_ex(Class *clss);
-/** Executes static initializer of class.
- * @param[in] clss - class to initialize.
- * @note VMEXPORT specifier is solely for interpreter.*/
-VMEXPORT
-void class_initialize(Class *clss);
-
 
 /** Registers a number of native methods to a given class.
  * @param[in] klass       - a specified class

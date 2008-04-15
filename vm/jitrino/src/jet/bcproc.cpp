@@ -403,7 +403,7 @@ void Compiler::handle_ik_meth(const JInst& jinst) {
                                             jinst.op0);
             if (meth != NULL) {
                 Class_Handle klass = method_get_class(meth);
-                if (class_needs_initialization(klass)) {
+                if (!class_is_initialized(klass)) {
                     gen_call_vm(ci_helper_o, rt_helper_init_class, 0, klass);
                 }
             }

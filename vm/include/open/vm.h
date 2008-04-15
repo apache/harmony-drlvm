@@ -72,63 +72,10 @@ VMEXPORT void* get_vm_interface(const char*);
  * Begin class-related functions.
  */
 
-/** 
- * @return A handle for the <code>Object</code> class. For Java applications, it's
- *         <code>java.lang.Object</code>.
- */ 
-VMEXPORT Class_Handle get_system_object_class();
-
-/** 
- * @return  A handle for the <code>Class</code> class. For Java applications, it's
- *          <code>java.lang.Class</code>.
- */
-VMEXPORT Class_Handle get_system_class_class();
-
-/** 
- * @return  A handle for the string class. For Java applications, it's
- *          java.lang.String.
- */
- 
-VMEXPORT Class_Handle get_system_string_class();
-
-/** 
- * Find already loaded class of a given name. 
- *
- * @return <code>NULL</code> if a class is not loaded.
- */
-VMEXPORT Class_Handle
-class_lookup_class_by_name_using_bootstrap_class_loader(const char *name);
-
-/** 
- * The following three functions will be eventually renamed to
- * \arg <code>class_is_final</code>
- * \arg <code>class_is_abstract</code>
- * \arg <code>class_is_interface</code>
- * but right now that would conflict 
- * with the names of some internal macros.
- */
-
-VMEXPORT Boolean class_is_final(Class_Handle ch);
-VMEXPORT Boolean class_is_abstract(Class_Handle ch);
-VMEXPORT BOOLEAN class_is_interface(Class_Handle ch);
-
-/**
- * @return <code>TRUE</code> if the class is likely to be used as an exception object.
- *         This is a hint only. If the result is <code>FALSE</code>, the class may still
- *         be used for exceptions but it is less likely.
- */
-VMEXPORT Boolean class_hint_is_exceptiontype(Class_Handle ch);
-
 /**
  * @return <code>TRUE</code> if the class is a value type.
  */
  VMEXPORT Boolean class_is_valuetype(Class_Handle ch);
-
-/**
- * @return <code>TRUE</code> if the class represents an enum. 
- *         For Java 1.4 always returns <code>FALSE</code>.
- */
-VMEXPORT Boolean class_is_enum(Class_Handle ch);
 
 /**
  * This function can only be called if (<code>class_is_enum(ch)</code> == <code>TRUE</code>)
@@ -137,31 +84,11 @@ VMEXPORT Boolean class_is_enum(Class_Handle ch);
 VMEXPORT VM_Data_Type class_get_enum_int_type(Class_Handle ch);
 
 /**
- * @return <code>TRUE</code> if the class represents a primitive type (int, float, etc.)
- */
- VMEXPORT Boolean class_is_primitive(Class_Handle ch);
-
-/**
- * @return The name of the class.
- */
- VMEXPORT const char *class_get_name(Class_Handle ch);
-
-/**
- * @return The name of the package containing the class.
- */
- VMEXPORT const char *class_get_package_name(Class_Handle ch);
-
-/**
  * The super class of the current class. 
  * @return <code>NULL</code> for the system object class, i.e.
- *         <code>class_get_super_class</code>(get_system_object_class()) == NULL
+ *         <code>class_get_super_class</code>(vm_get_system_object_class()) == NULL
  */
 VMEXPORT Class_Handle class_get_super_class(Class_Handle ch);
-
-/**
- * @return The vtable handle of the given class.
- */
- VMEXPORT VTable_Handle class_get_vtable(Class_Handle ch);
 
 /**
  * @return The allocation handle to be used for the object allocation
@@ -173,63 +100,6 @@ VMEXPORT Allocation_Handle class_get_allocation_handle(Class_Handle ch);
  * @return The class handle corresponding to a given allocation handle.
  */
 VMEXPORT Class_Handle allocation_handle_get_class(Allocation_Handle ah);
-
-/**
- * @return An <code>VM_Data_Type</code> value for a given class.
- */
- VMEXPORT VM_Data_Type class_get_primitive_type_of_class(Class_Handle ch);
-
-/**
- * @return A class corresponding to a primitive type. For all primitive types t
- *         t == <code>class_get_primitive_type_of_class(class_get_class_of_primitive_type(t))</code>
- */
- VMEXPORT Class_Handle class_get_class_of_primitive_type(VM_Data_Type typ);
-
-/** 
- * @return <code>TRUE</code> is the class is an array.
- */
-VMEXPORT Boolean class_is_array(Class_Handle ch);
-
-/** 
- * @return <code>TRUE</code> if class <code>s</code> is assignment 
- * compatible with class <code>t</code>.
- */ 
-VMEXPORT Boolean class_is_instanceof(Class_Handle s, Class_Handle t);
-
-/**
- * Given a class handle <code>cl</code> construct a class handle of the type
- * representing array of <code>cl</code>. If class cl is value type, assume
- * that the element is a reference to a boxed instance of that type.
- */
- VMEXPORT Class_Handle class_get_array_of_class(Class_Handle ch);
-
-/**
- * Given a class handle <code>cl</code> construct a class handle of the type
- * representing array of <code>cl</code>. Class <code>cl</code> is assumed to be a
- * value type. 
- * 
- * @return <code>NULL</code> if cl is not a value type.
- */
- VMEXPORT Class_Handle class_get_array_of_unboxed(Class_Handle ch);
-
-/**
- * @return For a class that is an array return the type info for the elements
- *         of the array.
- */
- VMEXPORT Type_Info_Handle class_get_element_type_info(Class_Handle ch);
-
- /**
-  * @return <code>TRUE</code> if the class is already fully initialized.
-  */
-  VMEXPORT Boolean class_is_initialized(Class_Handle ch);
-
-/**
- * @return <code>TRUE</code> if the class is neither initialized nor in the process
- *         of being initialized. The intention is that the JIT will emit a call
- *         to <code>VM_RT_INITIALIZE_CLASS</code> before every access to a static 
- *         field in Java.
- */
- VMEXPORT Boolean class_needs_initialization(Class_Handle ch);
 
 /**
  * For Java returns <code>FALSE</code>.
@@ -279,29 +149,9 @@ VMEXPORT Field_Handle class_get_instance_field_recursive(Class_Handle ch, unsign
 VMEXPORT Boolean class_get_fast_instanceof_flag(Class_Handle cl);
 
 /**
- * Get handle for a method declared in class.
- */
- VMEXPORT Method_Handle class_get_method(Class_Handle ch, unsigned index);
-
-/**
- * @return <code>TRUE</code> if all instances of this class are pinned.
- */
- VMEXPORT Boolean class_is_pinned(Class_Handle ch);
-
-/**
  * @return <code>TRUE</code> if all instances of this class are pinned.
  */
  VMEXPORT void* class_alloc_via_classloader(Class_Handle ch, int32 size);
-
-/**
- * @return <code>TRUE</code> if this is an array of primitives.
- */
- VMEXPORT Boolean class_is_non_ref_array(Class_Handle ch);
-
-/**
- * @return <code>TRUE</code> if the class has a non-trivial finalizer.
- */
- VMEXPORT BOOLEAN class_is_finalizable(Class_Handle ch);
 
 /**
  * This exactly what I want.
@@ -315,12 +165,6 @@ VMEXPORT Boolean class_get_fast_instanceof_flag(Class_Handle cl);
  VMEXPORT unsigned class_get_alignment_unboxed(Class_Handle ch);
 
 /**
- * @return For a class handle that represents and array, return the size of the
- *         element of the array.
- */
- VMEXPORT unsigned class_element_size(Class_Handle ch);
-
-/**
  * @return The size in bytes of an instance in the heap.
  */
  VMEXPORT unsigned class_get_boxed_data_size(Class_Handle ch);
@@ -330,13 +174,6 @@ VMEXPORT Boolean class_get_fast_instanceof_flag(Class_Handle cl);
  *         instance.
  */
  VMEXPORT unsigned class_get_unboxed_data_offset(Class_Handle ch);
-
-
- /**
- * @return The size of array element for the given array class
- */
- VMEXPORT unsigned class_get_array_element_size(Class_Handle ch);
-
 
 /**
  * @return The class of the array element of the given class.
@@ -358,31 +195,6 @@ VMEXPORT Boolean class_get_fast_instanceof_flag(Class_Handle cl);
  */ 
  DECLARE_OPEN(Class_Handle, vtable_get_class, (VTable_Handle vh));
 
-
-////
-// begin class iterator related functions.
-////
-
-/**
- * Initializes the <code>CHA_Class_Iterator</code>, to iterate over all 
- * classes that descend from <code>root_class</code>, including 
- * <code>root_class</code> itself.
- *
- * @return <code>TRUE</code> if iteration is supported over 
- *         <code>root_class</code>, <code>FALSE</code> if not.
- */ 
- VMEXPORT Boolean class_iterator_initialize(ChaClassIterator*, Class_Handle root_class);
-
-/**
- * @return The current class of the iterator. <code>NULL</code> if
- *         there are no more classes.
- */
- VMEXPORT Class_Handle class_iterator_get_current(ChaClassIterator*);
-
-/**
- * Advances the iterator.
- */
- VMEXPORT void class_iterator_advance(ChaClassIterator*);
 
 ////
 // begin inner-class related functions.

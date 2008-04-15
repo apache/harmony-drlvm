@@ -135,6 +135,17 @@ DECLARE_OPEN(BOOLEAN, field_is_static, (Field_Handle field));
 DECLARE_OPEN(BOOLEAN, field_is_private, (Field_Handle field));
 
 /**
+ *  Checks whether the field is protected.
+ *
+ * @param field - the field handle
+ *
+ * @return <code>TRUE</code> if the field is protected; otherwise, <code>FALSE</code>. 
+ *
+ * @ingroup Extended 
+ */
+DECLARE_OPEN(BOOLEAN, field_is_protected, (Field_Handle field));
+
+/**
  *  Checks whether the field is public.
  *
  * @param field - the field handle

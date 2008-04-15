@@ -25,6 +25,8 @@
 #define LOG_DOMAIN "jvmti.stack"
 
 #include "open/vm_method_access.h"
+#include "open/jthread.h"
+
 #include "jvmti_direct.h"
 #include "jvmti_utils.h"
 #include "interpreter_exports.h"
@@ -33,7 +35,6 @@
 #include "Class.h"
 #include "cxxlog.h"
 #include "thread_generic.h"
-#include "open/jthread.h"
 #include "suspend_checker.h"
 #include "stack_trace.h"
 #include "stack_iterator.h"
@@ -71,13 +72,14 @@ class JavaStackIterator
         }
 
         // hide vm specific stack tail
-        if (0 == strcmp("runImpl", method_get_name(method))) {
-            const char* class_name = class_get_name(method_get_class(method));
+        if (0 == strcmp("runImpl", method->get_name()->bytes)) {
+            const char* class_name = method->get_class()->get_name()->bytes;
 
-            if (0 == strcmp("java/lang/VMStart$MainThread", class_name) ||
-                0 == strcmp("java/lang/Thread", class_name)) {
-                    past_end = true;
-                    return;
+            if (0 == strcmp("java/lang/VMStart$MainThread", class_name)
+                || 0 == strcmp("java/lang/Thread", class_name))
+            {
+                past_end = true;
+                return;
             }
         }
 

@@ -215,7 +215,7 @@ static jobject process_enum_value(JNIEnv* jenv, AnnotationValue& value, Class* c
     // FIXME this behaviour should be evaluated against JSR-175 spec
     Class* enum_type = field_descriptor_to_type(jenv, value.enum_const.type, clss);
     if (enum_type) {
-        if (class_is_enum(enum_type)) {
+        if (enum_type->is_enum()) {
             jobject enum_value = reflection_get_enum_value(jenv, enum_type, value.enum_const.name);
             if (enum_value) {
                 return enum_value;

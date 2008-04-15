@@ -16,7 +16,10 @@
  */
 /** 
  * @author Mikhail Loenko, Vladimir Molotkov
- */  
+ */
+
+#include "open/vm_class_manipulation.h"
+#include "open/vm_class_loading.h"
 
 #include "verifier.h"
 #include "context_base.h"
@@ -28,24 +31,23 @@ namespace CPVerifier {
     * Function checkes constraint for given class.
     * Function loads classes if it's needed.
     */
-    vf_Result
-        vf_force_check_constraint( class_handler klass, 
-        vf_TypeConstraint *constraint )    // class constraint
+    vf_Result vf_force_check_constraint(Class_Handle klass,
+        vf_TypeConstraint* constraint)    // class constraint
     {
         // get target class
-        class_handler target = vf_resolve_class( klass, constraint->target, true );
+        Class_Handle target = vf_resolve_class( klass, constraint->target, true );
         if( !target ) {
             return VF_ErrorLoadClass;
         }
 
         //no need to load the source
-        if( class_is_interface_(target) ){
+        if(class_is_interface(target)){
             return VF_OK;
         }
 
 
         // get stack reference class
-        class_handler source = vf_resolve_class( klass, constraint->source, true );
+        Class_Handle source = vf_resolve_class( klass, constraint->source, true );
         if( !source ) {
             return VF_ErrorLoadClass;
         }
@@ -61,7 +63,7 @@ namespace CPVerifier {
     /**
     * Returns true if 'from' is (not necessarily directly) extending 'to'
     */
-    int vf_is_extending(class_handler from, class_handler to) {
+    int vf_is_extending(Class_Handle from, Class_Handle to) {
         while (from) {
             if( from == to ) return true;
             from = class_get_super_class(from);
@@ -72,17 +74,19 @@ namespace CPVerifier {
     /**
     * Function receives class by given class name, loads it if it's needed.
     */
-    class_handler
-        vf_resolve_class( class_handler k_class,    // current class
+    Class_Handle
+        vf_resolve_class( Class_Handle k_class,    // current class
         const char *name,         // resolved class name
         bool need_load)      // load flag
     {
-        class_handler result;
+        Class_Handle result;
 
         // get class loader
-        classloader_handler class_loader = class_get_class_loader( k_class );
+        ClassLoaderHandle class_loader = class_get_class_loader( k_class );
 
-        result = need_load ? cl_load_class( class_loader, name ) : cl_get_class( class_loader, name );
+        result = need_load ?
+            class_loader_load_class( class_loader, name )
+            : class_loader_lookup_class( class_loader, name );
 
         //we assume that this pre-defined constant is not a valid class-handler
         assert(CLASS_NOT_LOADED != result);

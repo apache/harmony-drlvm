@@ -55,6 +55,13 @@ enum VM_Data_Type {
     VM_DATA_TYPE_END     = ')'         // For the iterator
 } VM_Data_Type; //VM_Data_Type
 
+typedef
+enum WeakReferenceType {
+    NOT_REFERENCE = 0,
+    WEAK_REFERENCE,
+    SOFT_REFERENCE,
+    PHANTOM_REFERENCE
+} WeakReferenceType;
 
 /**
  * Handles for Various VM Structures.

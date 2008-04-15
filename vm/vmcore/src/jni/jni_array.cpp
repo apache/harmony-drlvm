@@ -14,19 +14,15 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Gregory Shimansky
- * @version $Revision: 1.1.2.1.4.3 $
- */  
-
 
 #define LOG_DOMAIN "jni"
 #include "cxxlog.h"
 
+#include "open/vm_class_manipulation.h"
 #include "Class.h"
 #include "environment.h"
 #include "object_handles.h"
-#include "open/vm_util.h"
+//#include "open/vm_util.h"
 #include "vm_threads.h"
 
 #include "ini.h"

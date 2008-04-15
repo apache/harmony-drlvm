@@ -27,7 +27,7 @@
 #include "x_class_interface.h"
 
 
-vf_Result vf_recompute_stackmaptable( method_handler method, uint8 **attrBytes, char **error, void *trustedPairs );
+vf_Result vf_recompute_stackmaptable(Method_Handle method, uint8** attrBytes, char** error, void* trustedPairs);
 
 namespace CPVerifier_5 {
 
@@ -195,7 +195,7 @@ namespace CPVerifier_5 {
               stackmapattr_calculation = true;
           }
 
-        vf_Result recompute_stackmaptable( method_handler method );
+        vf_Result recompute_stackmaptable(Method_Handle method);
 
         ~vf_Context_5e() {
             tc_free(parsedTrustedData);
@@ -335,8 +335,8 @@ namespace CPVerifier_5 {
         int isObjectOrInterface(SmConstant ref) {
             if( ref == tpool.sm_get_const_object() ) return true;
 
-            class_handler h = tpool.sm_get_handler(ref);
-            if( h && h != CLASS_NOT_LOADED ) return class_is_interface_(h);
+            Class_Handle h = tpool.sm_get_handler(ref);
+            if( h && h != CLASS_NOT_LOADED ) return class_is_interface(h);
 
             parseTrustedData(ref);
             return parsedTrustedData[ref.getReferenceIdx()].is_interface();
@@ -358,7 +358,7 @@ namespace CPVerifier_5 {
 
             parseTrustedData(from); // it may change class_handler for 'to'
 
-            class_handler t = tpool.sm_get_handler(to);
+            Class_Handle t = tpool.sm_get_handler(to);
             assert(t);
 
             for( SmConstant *sm = parsedTrustedData[from.getReferenceIdx()].superclasses(); *sm != SM_NONE; sm++ ) {
@@ -367,9 +367,9 @@ namespace CPVerifier_5 {
                 }
 
                 if( t != CLASS_NOT_LOADED ) {
-                    class_handler f = tpool.sm_get_handler(*sm);
+                    Class_Handle f = tpool.sm_get_handler(*sm);
                     if( f != CLASS_NOT_LOADED && vf_is_extending(f, t) ) return true;
-                }                
+                }
             }
             return false;
         }

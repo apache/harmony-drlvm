@@ -35,8 +35,8 @@ extern "C" {
 VMEXPORT Class_Handle jni_get_class_handle(JNIEnv*, jclass);
 VMEXPORT jclass jni_class_from_handle(JNIEnv*, Class_Handle);
 VMEXPORT jobject jni_class_loader_from_handle(JNIEnv*, ClassLoaderHandle);
-VMEXPORT ClassLoaderHandle class_loader_lookup(jobject loader);
-VMEXPORT void class_loader_load_native_lib(const char* lib, ClassLoaderHandle loader);
+ClassLoaderHandle class_loader_lookup(jobject loader);
+void class_loader_load_native_lib(const char* lib, ClassLoaderHandle loader);
 
 VMEXPORT jvalue *get_jvalue_arg_array(Method *method, va_list args);
 

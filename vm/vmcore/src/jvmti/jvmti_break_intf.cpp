@@ -14,10 +14,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Ilya Berezhniuk, Gregory Shimansky
- * @version $Revision$
- */  
+
 /**
  * @file jvmti_break_intf.cpp
  * @brief JVMTI native breakpoints API implementation
@@ -150,9 +147,9 @@ VMBreakPoints::check_insert_breakpoint(VMBreakPoint* bp)
         return false;
     } else if( bp->method ) {
         TRACE2("jvmti.break", "Try to insert breakpoint: "
-            << class_get_name(method_get_class((Method*)bp->method)) << "."
-            << method_get_name((Method*)bp->method)
-            << method_get_descriptor((Method*)bp->method)
+            << bp->method->get_class()->get_name()->bytes << "."
+            << bp->method->get_name()->bytes
+            << bp->method->get_descriptor()->bytes
             << " :" << bp->location << " :" << bp->addr);
 
         VMBreakPoint* another = find_breakpoint(bp->method, bp->location);
@@ -162,10 +159,10 @@ VMBreakPoints::check_insert_breakpoint(VMBreakPoint* bp)
 
         TRACE2("jvmti.break", "Before inserting found another breakpoint: "
             << (another->method
-                ? class_get_name(method_get_class((Method*)another->method)): "(nil)")
+                ? another->method->get_class()->get_name()->bytes : "(nil)")
             << "."
-            << (another->method ? method_get_name((Method*)another->method) : "(nil)")
-            << (another->method ? method_get_descriptor((Method*)another->method) : "")
+            << (another->method ? another->method->get_name()->bytes : "(nil)")
+            << (another->method ? another->method->get_descriptor()->bytes : "")
             << " :" << another->location << " :" << another->addr);
 
         if( bp->addr == another->addr) {
@@ -182,10 +179,10 @@ VMBreakPoints::check_insert_breakpoint(VMBreakPoint* bp)
 
         TRACE2("jvmti.break", "Before inserting found another breakpoint: "
             << (another->method
-                ? class_get_name(method_get_class((Method*)another->method)) :"(nil)")
+                ? another->method->get_class()->get_name()->bytes :"(nil)")
             << "."
-            << (another->method ? method_get_name((Method*)another->method) :"(nil)")
-            << (another->method ? method_get_descriptor((Method*)another->method) :"")
+            << (another->method ? another->method->get_name()->bytes :"(nil)")
+            << (another->method ? another->method->get_descriptor()->bytes :"")
             << " :" << another->location << " :" << another->addr);
 
         if(another->method) {
@@ -203,10 +200,10 @@ VMBreakPoints::insert_breakpoint(VMBreakPoint* bp)
 {
     TRACE2("jvmti.break", "Insert breakpoint: "
         << (bp->method
-            ? class_get_name(method_get_class((Method*)bp->method)) : "(nil)")
+            ? bp->method->get_class()->get_name()->bytes : "(nil)")
         << "."
-        << (bp->method ? method_get_name((Method*)bp->method) : "(nil)")
-        << (bp->method ? method_get_descriptor((Method*)bp->method) : "")
+        << (bp->method ? bp->method->get_name()->bytes : "(nil)")
+        << (bp->method ? bp->method->get_descriptor()->bytes : "")
         << " :" << bp->location << " :" << bp->addr);
 
     // add breakpoint to the top of list
@@ -235,9 +232,9 @@ VMBreakPoints::insert_native_breakpoint(VMBreakPoint* bp)
         {
             assert(bp->addr == NULL);
             TRACE2("jvmti.break.intf", "Skipping setting breakpoint in method "
-                << class_get_name(method_get_class(m)) << "."
-                << method_get_name(m)
-                << method_get_descriptor(m)
+                << m->get_class()->get_name()->bytes << "."
+                << m->get_name()->bytes
+                << m->get_descriptor()->bytes
                 << " because it is not compiled yet");
             m->insert_pending_breakpoint();
         }
@@ -270,10 +267,10 @@ inline void
 VMBreakPoints::remove_breakpoint(VMBreakPoint* bp)
 {
     TRACE2("jvmti.break.intf", "Remove breakpoint: "
-        << (bp->method ? class_get_name(method_get_class((Method*)bp->method)) : "(nil)" )
+        << (bp->method ? bp->method->get_class()->get_name()->bytes : "(nil)" )
         << "."
-        << (bp->method ? method_get_name((Method*)bp->method) : "(nil)" )
-        << (bp->method ? method_get_descriptor((Method*)bp->method) : "" )
+        << (bp->method ? bp->method->get_name()->bytes : "(nil)" )
+        << (bp->method ? bp->method->get_descriptor()->bytes : "" )
         << " :" << bp->location << " :" << bp->addr);
 
     // remove breakpoint from list
@@ -294,10 +291,10 @@ VMBreakPoints::remove_breakpoint(VMBreakPoint* bp)
             TRACE2("jvmti.break", "Remove local thread breakpoint: "
                 << local << ", bp: "
                 << (bp->method
-                    ? class_get_name(method_get_class((Method*)bp->method)) : "(nil)")
+                    ? bp->method->get_class()->get_name()->bytes : "(nil)")
                 << "."
-                << (bp->method ? method_get_name((Method*)bp->method) : "(nil)")
-                << (bp->method ? method_get_descriptor((Method*)bp->method) : "")
+                << (bp->method ? bp->method->get_name()->bytes : "(nil)")
+                << (bp->method ? bp->method->get_descriptor()->bytes : "")
                 << " :" << bp->location << " :" << bp->addr);
 
             local->bp = NULL;
@@ -306,10 +303,10 @@ VMBreakPoints::remove_breakpoint(VMBreakPoint* bp)
             TRACE2("jvmti.break", "Set local thread next breakpoint: "
                 << local << ", next: "
                 << (bp->method
-                    ? class_get_name(method_get_class((Method*)bp->method)) : "(nil)")
+                    ? bp->method->get_class()->get_name()->bytes : "(nil)")
                 << "."
-                << (bp->method ? method_get_name((Method*)bp->method) : "(nil)")
-                << (bp->method ? method_get_descriptor((Method*)bp->method) : "")
+                << (bp->method ? bp->method->get_name()->bytes : "(nil)")
+                << (bp->method ? bp->method->get_descriptor()->bytes : "")
                 << " :" << bp->location << " :" << bp->addr);
             local->bp_next = bp->next;
         }
@@ -622,12 +619,11 @@ VMBreakPoints::process_native_breakpoint(Registers* regs)
     }
     assert(bp->addr == addr);
     TRACE2("jvmti.break", "Process native breakpoint: "
-        << (bp->method
-            ? class_get_name(method_get_class((Method*)bp->method)) : "(nil)")
+        << (bp->method ? bp->method->get_class()->get_name()->bytes : "(nil)")
         << "."
-        << (bp->method ? method_get_name((Method*)bp->method) : "(nil)")
-        << (bp->method ? method_get_descriptor((Method*)bp->method) : "")
-        << " :" << bp->location << " :" << bp->addr);
+        << (bp->method ? bp->method->get_name()->bytes : "(nil)")
+        << (bp->method ? bp->method->get_descriptor()->bytes : "")
+        << " : " << bp->location << " : " << bp->addr);
 
     // Save registers in TLS - mainly for single stepping in virtual methods
     vm_set_jvmti_saved_exception_registers(vm_thread, regs);
@@ -687,10 +683,10 @@ VMBreakPoints::process_native_breakpoint(Registers* regs)
                     TRACE2("jvmti.break",
                         "Calling native breakpoint callback function: "
                         << (method
-                            ? class_get_name(method_get_class(method)) : "(nil)")
+                            ? method->get_class()->get_name()->bytes : "(nil)")
                         << "."
-                        << (method ? method_get_name(method) : "(nil)")
-                        << (method ? method_get_descriptor(method) : "")
+                        << (method ? method->get_name()->bytes : "(nil)")
+                        << (method ? method->get_descriptor()->bytes : "")
                         << " :" << location << " :" << addr);
 
                     set_thread_local_break(&local);
@@ -705,10 +701,10 @@ VMBreakPoints::process_native_breakpoint(Registers* regs)
                     TRACE2("jvmti.break",
                         "Finished native breakpoint callback function: "
                         << (method
-                            ? class_get_name(method_get_class(method)) : "(nil)")
+                            ? method->get_class()->get_name()->bytes : "(nil)")
                         << "."
-                        << (method ? method_get_name(method) : "(nil)")
-                        << (method ? method_get_descriptor(method) : "")
+                        << (method ? method->get_name()->bytes : "(nil)")
+                        << (method ? method->get_descriptor()->bytes : "")
                         << " :" << location << " :" << addr);
 
                     if( !local.bp ) {
@@ -847,10 +843,10 @@ jbyte
 VMBreakPoints::process_interpreter_breakpoint(jmethodID method, jlocation location)
 {
     TRACE2("jvmti.break.intf", "Interpreter breakpoint occured: "
-        << class_get_name(method_get_class((Method*)method)) << "."
-        << method_get_name((Method*)method)
-        << method_get_descriptor((Method*)method)
-        << " :" << location );
+        << method->get_class()->get_name()->bytes << "."
+        << method->get_name()->bytes
+        << method->get_descriptor()->bytes
+        << " : " << location );
 
     assert(interpreter_enabled());
 
@@ -864,9 +860,9 @@ VMBreakPoints::process_interpreter_breakpoint(jmethodID method, jlocation locati
     assert(bp->method == method);
     assert(bp->location == location);
     TRACE2("jvmti.break", "Process interpreter breakpoint: "
-        << class_get_name(method_get_class((Method*)method)) << "."
-        << method_get_name((Method*)method)
-        << method_get_descriptor((Method*)method)
+        << method->get_class()->get_name()->bytes << "."
+        << method->get_name()->bytes
+        << method->get_descriptor()->bytes
         << " :" << location );
 
     jbyte orig_byte = bp->saved_byte;
@@ -905,9 +901,9 @@ VMBreakPoints::process_interpreter_breakpoint(jmethodID method, jlocation locati
 
                     TRACE2("jvmti.break.intf",
                         "Calling interpreter breakpoint callback function: "
-                        << class_get_name(method_get_class((Method*)method)) << "."
-                        << method_get_name((Method*)method)
-                        << method_get_descriptor((Method*)method)
+                        << method->get_class()->get_name()->bytes << "."
+                        << method->get_name()->bytes
+                        << method->get_descriptor()->bytes
                         << " :" << location );
 
                     set_thread_local_break(&local);
@@ -921,9 +917,9 @@ VMBreakPoints::process_interpreter_breakpoint(jmethodID method, jlocation locati
 
                     TRACE2("jvmti.break",
                         "Finished interpreter breakpoint callback function: "
-                        << class_get_name(method_get_class((Method*)method)) << "."
-                        << method_get_name((Method*)method)
-                        << method_get_descriptor((Method*)method)
+                        << method->get_class()->get_name()->bytes << "."
+                        << method->get_name()->bytes
+                        << method->get_descriptor()->bytes
                         << " :" << location );
 
                     if( !local.bp ) {
@@ -1003,10 +999,10 @@ VMBreakInterface::add_reference_internal(VMBreakPoint *bp, POINTER_SIZE_INT data
 
     TRACE2("jvmti.break.intf", "Added ref on breakpoint: "
         << (bp->method
-            ? class_get_name(method_get_class((Method*)bp->method)) : "(nil)" )
+            ? bp->method->get_class()->get_name()->bytes : "(nil)" )
         << "."
-        << (bp->method ? method_get_name((Method*)bp->method) : "(nil)")
-        << (bp->method ? method_get_descriptor((Method*)bp->method) : "")
+        << (bp->method ? bp->method->get_name()->bytes : "(nil)")
+        << (bp->method ? bp->method->get_descriptor()->bytes : "")
         << " :" << bp->location << " :" << bp->addr << ", data: " << data);
 
     return bp_ref;
@@ -1135,10 +1131,10 @@ VMBreakInterface::remove_reference(VMBreakPointRef* bp_ref)
 
     TRACE2("jvmti.break.intf", "Remove reference on breakpoint: "
         << (bp_ref->bp->method
-            ? class_get_name(method_get_class((Method*)bp_ref->bp->method)) : "(nil)")
+            ? bp_ref->bp->method->get_class()->get_name()->bytes : "(nil)")
         << "."
-        << (bp_ref->bp->method ? method_get_name((Method*)bp_ref->bp->method) : "(nil)")
-        << (bp_ref->bp->method ? method_get_descriptor((Method*)bp_ref->bp->method) : "")
+        << (bp_ref->bp->method ? bp_ref->bp->method->get_name()->bytes : "(nil)")
+        << (bp_ref->bp->method ? bp_ref->bp->method->get_descriptor()->bytes : "")
         << " :" << bp_ref->bp->location << " :" << bp_ref->bp->addr
         << ", data: " << bp_ref->data );
 
@@ -1264,9 +1260,9 @@ static bool set_jit_mode_breakpoint(VMBreakPoint* bp)
     }
 
     TRACE2("jvmti.break.intf", "Set JIT breakpoint: "
-        << class_get_name(method_get_class((Method*)bp->method)) << "."
-        << method_get_name((Method*)bp->method)
-        << method_get_descriptor((Method*)bp->method)
+        << bp->method->get_class()->get_name()->bytes << "."
+        << bp->method->get_name()->bytes
+        << bp->method->get_descriptor()->bytes
         << " :" << bp->location << " :" << bp->addr);
 
     return set_native_breakpoint(bp);
@@ -1279,10 +1275,10 @@ static bool set_native_breakpoint(VMBreakPoint* bp)
     assert(bp->addr);
 
     TRACE2("jvmti.break.intf", "Instrumenting native: "
-        << (bp->method ? class_get_name(method_get_class((Method*)bp->method)) : "(nil)" )
+        << (bp->method ? bp->method->get_class()->get_name()->bytes : "(nil)" )
         << "."
-        << (bp->method ? method_get_name((Method*)bp->method) : "(nil)" )
-        << (bp->method ? method_get_descriptor((Method*)bp->method) : "" )
+        << (bp->method ? bp->method->get_name()->bytes : "(nil)" )
+        << (bp->method ? bp->method->get_descriptor()->bytes : "" )
         << " :" << bp->location << " :" << bp->addr);
 
     VMBreakPoints* vm_brpt = VM_Global_State::loader_env->TI->vm_brpt;
@@ -1324,10 +1320,10 @@ static bool clear_native_breakpoint(VMBreakPoint* bp)
     if (!vm_brpt->find_breakpoint(bp->addr))
     {
         TRACE2("jvmti.break.intf", "Deinstrumentation native: "
-            << (bp->method ? class_get_name(method_get_class((Method*)bp->method)) : "" )
+            << (bp->method ? bp->method->get_class()->get_name()->bytes : "" )
             << "."
-            << (bp->method ? method_get_name((Method*)bp->method) : "" )
-            << (bp->method ? method_get_descriptor((Method*)bp->method) : "" )
+            << (bp->method ? bp->method->get_name()->bytes : "" )
+            << (bp->method ? bp->method->get_descriptor()->bytes : "" )
             << " :" << bp->location << " :" << bp->addr);
 
         if (port_clear_breakpoint(bp->addr, bp->saved_byte) != 0)

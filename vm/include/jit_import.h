@@ -173,14 +173,6 @@ VMEXPORT Field_Handle
 resolve_static_field(Compile_Handle h, Class_Handle ch, unsigned idx, unsigned putfield);
 
 /**
- * Resolve a method.
- * The <code>idx</code> parameter is interpreted as a constant pool index for JVM.
- */ 
-VMEXPORT Method_Handle 
-resolve_method(Compile_Handle h, Class_Handle ch, unsigned idx);
-
-
-/**
  * Resolve a method. Same as resolve_method() but the VM checks 
  * that the method can be used for a virtual dispatch.
  * The <code>idx</code> parameter is interpreted as a constant pool index for JVM.

@@ -29,6 +29,10 @@ using namespace std;
 #include "../java6/context_6.h"
 #include "time.h"
 
+#include "open/vm_class_manipulation.h"
+#include "open/vm_method_access.h"
+#include "open/vm_class_loading.h"
+
 using namespace CPVerifier;
 using namespace CPVerifier_5;
 using namespace CPVerifier_6;
@@ -44,7 +48,7 @@ static char err_message[5000];
 * "class A must be assignable to class B" is recorded into the classloader's data
 */
 vf_Result
-vf_verify5_class( class_handler klass, unsigned verifyAll, char **error )
+vf_verify5_class(Class_Handle klass, unsigned verifyAll, char** error)
 {
     int index;
     vf_Result result = VF_OK;
@@ -59,9 +63,9 @@ vf_verify5_class( class_handler klass, unsigned verifyAll, char **error )
 
         if (result != VF_OK) {
             *error = &(err_message[0]);
-            method_handler method = class_get_method( klass, index );
-            sprintf(*error, "%s/%s%s, pass: %d, instr: %d, reason: %s", class_get_name( klass ), method_get_name( method ), 
-                method_get_descriptor( method ), context.pass, context.processed_instruction, context.error_message );
+            Method_Handle method = class_get_method(klass, index);
+            sprintf(*error, "%s/%s%s, pass: %d, instr: %d, reason: %s", class_get_name(klass), method_get_name(method),
+                method_get_descriptor(method), context.pass, context.processed_instruction, context.error_message);
             break;
         }
     }
@@ -83,7 +87,7 @@ vf_verify5_class( class_handler klass, unsigned verifyAll, char **error )
 * "class A must be assignable to class B" is recorded into the classloader's data
 */
 vf_Result
-vf_verify6_class( class_handler klass, unsigned verifyAll, char **error )
+vf_verify6_class(Class_Handle klass, unsigned verifyAll, char **error )
 {
     int index;
     vf_Result result = VF_OK;
@@ -97,7 +101,7 @@ vf_verify6_class( class_handler klass, unsigned verifyAll, char **error )
 
     // Verify method
     for( index = 0; index < class_get_method_number( klass ); index++ ) {
-        method_handler method = class_get_method( klass, index );
+        Method_Handle method = class_get_method( klass, index );
 
         //try Java6 verifying (using StackMapTable attribute)
         if( !skip_java6_verification_attempt || method_get_stackmaptable(method) ) {
@@ -146,7 +150,7 @@ vf_verify6_class( class_handler klass, unsigned verifyAll, char **error )
 * "class A must be assignable to class B" is recorded into the classloader's data
 */
 vf_Result
-vf_verify_class( class_handler klass, unsigned verifyAll, char **error ) {
+vf_verify_class( Class_Handle klass, unsigned verifyAll, char **error ) {
     return class_get_version(klass) >= 50 ? vf_verify6_class(klass, verifyAll, error) : vf_verify5_class(klass, verifyAll, error);
 }
 
@@ -156,15 +160,15 @@ vf_verify_class( class_handler klass, unsigned verifyAll, char **error ) {
 * If some class is not loaded yet -- load it now
 */
 vf_Result
-vf_verify_class_constraints( class_handler klass, unsigned verifyAll, char **error )
+vf_verify_class_constraints(Class_Handle klass, unsigned verifyAll, char** error)
 {
 
     // get class loader of current class
-    classloader_handler class_loader = class_get_class_loader( klass );
+    ClassLoaderHandle class_loader = class_get_class_loader(klass);
 
     // get class loader verify data
     vf_ClassLoaderData_t *cl_data =
-        (vf_ClassLoaderData_t*)cl_get_verify_data_ptr( class_loader );
+        (vf_ClassLoaderData_t*)class_loader_get_verifier_data_ptr(class_loader);
 
     // check class loader data
     if( cl_data == NULL ) {
