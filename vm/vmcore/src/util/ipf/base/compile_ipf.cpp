@@ -42,6 +42,7 @@ using namespace std;
 #include "open/vm_type_access.h"
 #include "open/vm_field_access.h"
 #include "open/vm_method_access.h"
+#include "open/vm_class_manipulation.h"
 #include "Class.h"
 #include "environment.h"
 #include "m2n.h"
@@ -56,7 +57,6 @@ using namespace std;
 #include "object_layout.h"
 #include "nogc.h"
 #include "open/gc.h"
-#include "open/vm_util.h"
 #include "vm_threads.h"
 
 #include "ini.h"

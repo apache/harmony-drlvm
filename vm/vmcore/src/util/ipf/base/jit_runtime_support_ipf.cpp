@@ -39,7 +39,7 @@ using namespace std;
 
 #include "open/types.h"
 #include "open/gc.h"
-#include "open/vm_util.h"
+#include "open/vm_class_manipulation.h"
 
 #include "environment.h"
 #include "Class.h"
