@@ -2558,10 +2558,10 @@ public SignatureParser(ParserSharedInputState state) {
 					
 					prntS("      ===34===");  
 					assert(currentStackElem.dim == 0);
+					//System.out.println(m87.getText()+"|"+m87.getText().length());
 					
 					// put the InterimTypeVariable to the throwns list:
 					// to exclude first (official) "T" symbol (and last ";" symbol):
-					System.out.println(m87.getText()+"|"+m87.getText().length());
 					addElemToThrownList((InterimType)createInterimTypeVariable(m87.getText().substring(1, m87.getText().length()-1)));
 					
 					prntSS("   pr__THROWN 2 :", m87.getText());
