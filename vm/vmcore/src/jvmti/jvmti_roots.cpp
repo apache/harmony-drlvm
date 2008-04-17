@@ -23,13 +23,13 @@
 #include "cxxlog.h"
 
 // global headers
-#include <open/gc.h>
-#include <open/vm_gc.h>
-#include <open/jthread.h>
-#include <open/hythread_ext.h>
-#include <jvmti_support.h>
+#include "open/gc.h"
+#include "open/vm_gc.h"
+#include "open/hythread_ext.h"
 #include "jit_import_rt.h"
 // VM headers
+#include "jvmti_support.h"
+#include "jthread.h"
 #include "Class.h"
 #include "cci.h"
 #include "classloader.h"

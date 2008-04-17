@@ -16,8 +16,8 @@
  */
 
 
-#ifndef _OPEN_THREAD_GENERIC_H
-#define _OPEN_THREAD_GENERIC_H
+#ifndef __JTHREAD_H__
+#define __JTHREAD_H__
 
 /**
  * @file
@@ -39,7 +39,7 @@
 #include <jvmti.h>
 #include "open/types.h"
 #include "open/hythread_ext.h"
-#include "open/ti_thread.h"
+#include "ti_thread.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -168,4 +168,4 @@ VMEXPORT IDATA jthread_cancel_all();
 }
 #endif
 
-#endif  /* _OPEN_THREAD_GENERIC_H */
+#endif  /* __JTHREAD_H__ */

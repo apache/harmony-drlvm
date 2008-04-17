@@ -25,7 +25,7 @@
 #include "finalize.h"
 #include "vm_threads.h"
 #include "init.h"
-#include "open/jthread.h"
+#include "jthread.h"
 
 
 static Boolean native_ref_thread_flag = FALSE;

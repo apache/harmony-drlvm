@@ -14,10 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Evgueni Brevnov
- * @version $Revision$
- */  
 
 /*    MONITOR ENTER RUNTIME SUPPORT    */
 
@@ -26,10 +22,10 @@
 #include "environment.h"
 
 #include "open/hythread_ext.h"
-#include "open/jthread.h"
+#include "jthread.h"
 #include "thread_helpers.h"
 
-#include "open/vm_util.h"
+//#include "open/vm_util.h"
 #include "encoder.h"
 #include "nogc.h"
 #include "compile.h"

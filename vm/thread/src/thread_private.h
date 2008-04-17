@@ -21,7 +21,6 @@
 #include <stdlib.h>
 #include <open/types.h>
 #include <open/hythread_ext.h>
-#include <open/ti_thread.h>
 #include <open/ncai_thread.h>
 #include <apr_pools.h>
 #include <apr_thread_mutex.h>

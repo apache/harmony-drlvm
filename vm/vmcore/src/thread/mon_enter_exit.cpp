@@ -22,17 +22,12 @@
 #define LOG_DOMAIN "enumeration"
 #include "cxxlog.h"
 
-#include "platform_lowlevel.h"
+#include "open/types.h"
+
 #include <assert.h>
 
-//MVM
-#include <iostream>
-
-using namespace std;
-
-
-#include "open/types.h"
-#include "open/jthread.h"
+#include "platform_lowlevel.h"
+#include "jthread.h"
 #include "object_layout.h"
 #include "vm_threads.h"
 #include "jit_runtime_support.h"
@@ -41,16 +36,12 @@ using namespace std;
 #include "Class.h"
 #include "jit_intf_cpp.h"
 #include "cci.h"
-
 #include "mon_enter_exit.h"
 #include "thread_generic.h"
-
 #include "object_generic.h"
 #include "vm_stats.h"
 #include "object_handles.h"
-
 #include "vm_process.h"
-//#include "java_mrte.h"
 #include "port_atomic.h"
 
 static void vm_monitor_exit_default(ManagedObject *p_obj);

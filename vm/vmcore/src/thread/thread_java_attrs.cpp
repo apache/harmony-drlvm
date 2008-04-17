@@ -20,8 +20,8 @@
  * @brief Java thread priority related functions
  */
 
-#include <open/jthread.h>
 #include <open/hythread_ext.h>
+#include "jthread.h"
 #include "vm_threads.h"
 
 /**

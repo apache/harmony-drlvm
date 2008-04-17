@@ -43,6 +43,7 @@ using namespace std;
 
 #include "environment.h"
 #include "Class.h"
+#include "vtable.h"
 #include "object_generic.h"
 #include "object_layout.h"
 #include "mon_enter_exit.h"

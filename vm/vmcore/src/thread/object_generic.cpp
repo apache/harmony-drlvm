@@ -31,9 +31,8 @@
 
 using namespace std;
 
-
-#include "lock_manager.h"
 #include "open/types.h"
+#include "lock_manager.h"
 #include "environment.h"
 #include "exceptions.h"
 #include "jni_utils.h"
@@ -42,7 +41,7 @@ using namespace std;
 
 #include "thread_generic.h"
 
-#include "open/jthread.h"
+#include "jthread.h"
 #include "thread_manager.h"
 #include "object.h"
 #include "object_generic.h"

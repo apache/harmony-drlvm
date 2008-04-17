@@ -22,6 +22,8 @@
  * JVMTI timer API
  */
 
+#include <apr_time.h>
+
 #include "jvmti_direct.h"
 #include "jvmti_utils.h"
 #include "time.h"
@@ -29,9 +31,8 @@
 #include "port_sysinfo.h"
 #include "suspend_checker.h"
 #include "jvmti_internal.h"
-#include "open/jthread.h"
+#include "jthread.h"
 #include "jvmti.h"
-#include <apr_time.h>
 
 /**
 * Sets field values to provided jvmtiTimerInfo structure.

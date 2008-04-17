@@ -21,8 +21,8 @@
  */
 
 #include <apr_time.h>
-#include <open/jthread.h>
-#include <open/hythread_ext.h>
+#include "open/hythread_ext.h"
+#include "jthread.h"
 #include "vm_threads.h"
 
 /**

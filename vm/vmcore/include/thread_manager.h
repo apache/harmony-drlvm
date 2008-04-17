@@ -19,7 +19,8 @@
 #define THREAD_MANAGER_HEADER
 
 #include "open/hythread.h"
-#include "open/jthread.h"
+
+#include "jthread.h"
 #include "exceptions_type.h"
 
 #define GC_BYTES_IN_THREAD_LOCAL (20 * sizeof(void *))

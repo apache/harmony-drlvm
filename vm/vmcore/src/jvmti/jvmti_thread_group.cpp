@@ -24,8 +24,7 @@
 
 #include "jvmti_utils.h"
 #include "vm_threads.h"
-#include <open/jthread.h>
-#include "open/vm_util.h"
+#include "jthread.h"
 #include "cxxlog.h"
 #include "suspend_checker.h"
 #include "environment.h"

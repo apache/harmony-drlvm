@@ -19,8 +19,12 @@
  * @version $Revision: $
  */
 
+#include "open/bytecodes.h"
+#include "open/vm_method_access.h"
+
 #include "port_crash_handler.h"
 #include "jvmti.h"
+#include "jthread.h"
 #include "Class.h"
 #include "cxxlog.h"
 #include "vm_log.h"
@@ -30,9 +34,6 @@
 #include "stack_iterator.h"
 #include "interpreter.h"
 #include "cci.h"
-#include "open/bytecodes.h"
-#include "open/jthread.h"
-#include "open/vm_method_access.h"
 #include "jvmti_break_intf.h"
 #include "jni_utils.h"
 

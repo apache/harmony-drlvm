@@ -25,11 +25,11 @@
 #define LOG_DOMAIN "jvmti.stack"
 
 #include "open/vm_method_access.h"
-#include "open/jthread.h"
 
 #include "jvmti_direct.h"
 #include "jvmti_utils.h"
 #include "interpreter_exports.h"
+#include "jthread.h"
 #include "vm_threads.h"
 #include "environment.h"
 #include "Class.h"

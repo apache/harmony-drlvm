@@ -20,9 +20,9 @@
  * @brief Key threading operations like thread creation and pointer conversion.
  */
 
-#include <open/jthread.h>
-#include <open/hythread_ext.h>
+#include "open/hythread_ext.h"
 #include "open/vm_properties.h"
+#include "jthread.h"
 #include "vm_threads.h"
 #include "jni.h"
 

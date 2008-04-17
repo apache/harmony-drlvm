@@ -23,12 +23,12 @@
 #include <stdio.h>
 #include <assert.h>
 
+#include "open/types.h"
+
 #include "lock_manager.h"
 #include "object_layout.h"
-#include "open/types.h"
-#include "open/jthread.h"
+#include "jthread.h"
 #include "Class.h"
-#include "open/vm_util.h"
 #include "environment.h"
 #include "ini.h"
 #include "m2n.h"

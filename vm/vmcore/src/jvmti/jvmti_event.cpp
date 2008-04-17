@@ -25,10 +25,11 @@
 #define LOG_DOMAIN "jvmti"
 #include "cxxlog.h"
 #include "vm_log.h"
-#include "port_mutex.h"
 
 #include "open/vm_method_access.h"
 #include "open/gc.h"
+
+#include "port_mutex.h"
 #include "jvmti_direct.h"
 #include "jvmti_internal.h"
 #include "jvmti_utils.h"
@@ -36,7 +37,7 @@
 #include "interpreter_exports.h"
 #include "interpreter_imports.h"
 #include "classloader.h"
-#include "open/jthread.h"
+#include "jthread.h"
 #include "suspend_checker.h"
 #include "jit_intf_cpp.h"
 #include "vm_log.h"

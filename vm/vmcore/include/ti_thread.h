@@ -16,8 +16,8 @@
  */
 
 
-#ifndef OPEN_THREAD_TI_H
-#define OPEN_THREAD_TI_H
+#ifndef __TI_THREAD_H__
+#define __TI_THREAD_H__
 
 /**
  * @file ti_thread.h
@@ -29,9 +29,8 @@
  * All functions start with <code>jthread_*</code> prefix.
  */
 
+#include "open/hythread.h"
 #include "jvmti_types.h"
-#include "hythread.h"
-
 
 #ifdef __cplusplus
 extern "C" {
@@ -144,4 +143,4 @@ VMEXPORT IDATA jthread_iterator_release(jthread_iterator_t *it);
 }
 #endif
 
-#endif  /* OPEN_THREAD_TI_H */
+#endif  /* __TI_THREAD_H__ */

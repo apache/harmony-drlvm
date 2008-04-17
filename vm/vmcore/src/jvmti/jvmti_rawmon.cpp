@@ -31,7 +31,7 @@
 #include "vm_threads.h"
 #include "vm_process.h"
 #include "cxxlog.h"
-#include "open/ti_thread.h"
+#include "ti_thread.h"
 #include "suspend_checker.h"
 #include "exceptions.h"
 

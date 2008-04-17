@@ -23,10 +23,9 @@
 #include "cxxlog.h"
 
 #include "java_lang_VMThreadManager.h"
-#include "open/ti_thread.h"
 #include "open/hythread_ext.h"
-#include "open/jthread.h"
-#include "open/ti_thread.h"
+#include "jthread.h"
+#include "ti_thread.h"
 #include "jni_utils.h"
 #include "thread_manager.h"
 #include "vm_threads.h"

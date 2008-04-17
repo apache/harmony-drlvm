@@ -21,11 +21,9 @@
 #ifndef _EXCEPTIONS_H_
 #define _EXCEPTIONS_H_
 
-
+#include "open/types.h"
 #include "exceptions_type.h"
 #include "jni.h"
-#include "open/types.h"
-//#include "open/jthread.h"
 
 /**
 @file

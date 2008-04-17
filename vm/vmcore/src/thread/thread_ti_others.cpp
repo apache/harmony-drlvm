@@ -20,9 +20,9 @@
  * @brief JVMTI peak related functions
  */
 
-#include <open/jthread.h>
 #include <open/hythread_ext.h>
-#include <open/ti_thread.h>
+#include "jthread.h"
+#include "ti_thread.h"
 #include "vm_threads.h"
 
 #define THREAD_CONTENTION_MONITORING_SUPPORTED 1

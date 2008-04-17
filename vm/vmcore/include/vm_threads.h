@@ -30,14 +30,14 @@
 #include "open/types.h"
 #include "open/hythread.h"
 #include "open/hythread_ext.h"
-#include "open/ti_thread.h"
-#include "open/jthread.h"
 #include "open/vm_gc.h"
 
+#include "ti_thread.h"
+#include "jthread.h"
+#include "thread_manager.h"
 #include "jvmti.h"
 #include "jvmti_direct.h"
 #include "jni_direct.h"
-#include "thread_manager.h"
 #include "vm_core_types.h"
 #include "object_layout.h"
 

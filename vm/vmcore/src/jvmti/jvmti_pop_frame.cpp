@@ -21,12 +21,13 @@
 
 #define LOG_DOMAIN "jvmti.stack.popframe"
 
+#include "open/vm_method_access.h"
+
 #include "jvmti_direct.h"
 #include "jvmti_interface.h"
-#include "open/vm_method_access.h"
 #include "exceptions.h"
 #include "environment.h"
-#include "open/jthread.h"
+#include "jthread.h"
 #include "vm_threads.h"
 #include "jit_intf_cpp.h"
 #include "m2n.h"
@@ -35,7 +36,6 @@
 #include "jvmti_break_intf.h"
 #include "cci.h"
 #include "clog.h"
-#include "open/vm_class_info.h"
 
 static void jvmti_pop_frame_callback()
 {

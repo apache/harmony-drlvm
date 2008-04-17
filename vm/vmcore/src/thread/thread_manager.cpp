@@ -33,14 +33,12 @@ using namespace std;
 #endif
 
 #include "object_layout.h"
-#include "open/vm_util.h"
 #include "object_handles.h"
 //FIXME remove this code
 #include "exceptions.h"
 #include "Class.h"
 #include "environment.h"
 #include "vtable.h"
-#include "open/vm_util.h"
 #include "nogc.h"
 #include "sync_bits.h"
 
@@ -48,11 +46,10 @@ using namespace std;
 #include "thread_manager.h"
 #include "thread_generic.h"
 #include "thread_helpers.h"
-#include "open/jthread.h"
+#include "jthread.h"
 
 #include "vm_threads.h"
 #include "tl/memory_pool.h"
-#include "open/vm_util.h"
 #include "suspend_checker.h"
 #include "jni_utils.h"
 #include "heap.h"
@@ -249,7 +246,7 @@ void* jthread_get_tm_data(jobject thread)
 
 void jthread_set_tm_data(jobject thread, void *val)
 {
-    static unsigned offset = -1;
+    static unsigned offset = (unsigned)-1;
 
     hythread_suspend_disable();
 

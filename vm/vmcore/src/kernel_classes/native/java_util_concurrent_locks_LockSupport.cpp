@@ -18,11 +18,11 @@
  * @author Artem Aliev
  * @version $Revision: 1.1.2.1.4.4 $
  */  
-#include "vm_threads.h"
-#include "thread_generic.h"
 #include "java_util_concurrent_locks_LockSupport.h"
+#include "thread_generic.h"
+#include "jthread.h"
+#include "vm_threads.h"
 #include "jni.h"
-#include "open/jthread.h"
 
 /* Inaccessible static: parked */
 /*

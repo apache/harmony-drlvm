@@ -18,7 +18,9 @@
  * JVMTI API for working with breakpoints
  */
 
+#include "open/hythread_ext.h"
 #include "open/vm_method_access.h"
+
 #include "jvmti_direct.h"
 #include "jvmti_utils.h"
 #include "jvmti_internal.h"
@@ -32,8 +34,7 @@
 #include "interpreter_exports.h"
 #include "jvmti_break_intf.h"
 
-#include "open/jthread.h"
-#include "open/hythread_ext.h"
+#include "jthread.h"
 
 
 // Callback function for JVMTI breakpoint processing

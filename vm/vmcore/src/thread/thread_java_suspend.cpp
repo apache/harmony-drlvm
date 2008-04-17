@@ -23,9 +23,9 @@
 #define LOG_DOMAIN "tm.suspend"
 #include "clog.h"
 
-#include <open/jthread.h>
-#include <open/hythread_ext.h>
-#include <open/vm_util.h>
+#include "open/hythread_ext.h"
+
+#include "jthread.h"
 #include "vm_threads.h"
 #include "environment.h"
 

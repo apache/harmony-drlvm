@@ -20,9 +20,9 @@
  * @brief JVMTI timing related functions
  */
 
-#include <open/ti_thread.h>
 #include <open/hythread_ext.h>
-#include <open/jthread.h>
+#include "jthread.h"
+#include "ti_thread.h"
 #include "vm_threads.h"
 
 #define THREAD_CPU_TIME_SUPPORTED 1

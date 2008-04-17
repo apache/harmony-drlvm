@@ -27,9 +27,9 @@
 #include "open/vm_properties.h"
 #include "open/gc.h"
 #include "open/hythread_ext.h"
-#include "open/jthread.h"   // this is for jthread_self()
 #include "open/vm_class_manipulation.h"
 
+#include "jthread.h"
 #include "vtable.h"
 #include "init.h"
 #include "classloader.h"

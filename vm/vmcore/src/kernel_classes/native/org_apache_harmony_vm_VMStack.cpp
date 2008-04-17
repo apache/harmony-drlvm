@@ -28,10 +28,11 @@
 
 #include <vector>
 
-//#include "open/vm_method_access.h"
+#include "org_apache_harmony_vm_VMStack.h"
 #include "open/vm_class_manipulation.h"
-#include "open/jthread.h"
+
 #include "stack_trace.h"
+#include "jthread.h"
 #include "jni_direct.h"
 #include "jni_utils.h"
 #include "environment.h"
@@ -41,8 +42,6 @@
 #include "thread_generic.h"
 
 #include "java_lang_VMClassRegistry.h"
-
-#include "org_apache_harmony_vm_VMStack.h"
 #include "java_security_AccessController.h"
 
 /*

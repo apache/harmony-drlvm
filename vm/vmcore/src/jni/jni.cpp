@@ -22,19 +22,18 @@
 #define LOG_DOMAIN "jni"
 #include "cxxlog.h"
 
-#include <port_atomic.h>
 #include <apr_pools.h>
 #include <apr_thread_mutex.h>
 #include <apr_time.h>
+#include "port_atomic.h"
 #include "port_vmem.h"
 
 #include "open/gc.h"
 #include "open/types.h"
 #include "open/hythread.h"
-#include "open/jthread.h"
-#include "open/vm_util.h"
 
 #include "jni.h"
+#include "jthread.h"
 #include "lock_manager.h"
 #include "vtable.h"
 #include "Class.h"

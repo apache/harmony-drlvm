@@ -43,14 +43,12 @@ using namespace std;
 
 #include <apr_pools.h>
 
+#include "open/types.h"
+#include "open/gc.h"
 #include "open/hythread.h"
 #include "open/hythread_ext.h"
-#include "open/jthread.h"
 
-#include "open/types.h"
-#include "open/vm_util.h"
-#include "open/gc.h"
-
+#include "jthread.h"
 #include "environment.h"
 #include "vm_strings.h"
 #include "object_layout.h"

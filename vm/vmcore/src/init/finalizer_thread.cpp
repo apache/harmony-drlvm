@@ -25,7 +25,7 @@
 #include "finalize.h"
 #include "vm_threads.h"
 #include "init.h"
-#include "open/jthread.h"
+#include "jthread.h"
 #include "jni_direct.h"
 #include "jni_utils.h"
 #include "slot.h"

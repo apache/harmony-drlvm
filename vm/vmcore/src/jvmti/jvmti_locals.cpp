@@ -28,9 +28,8 @@
 #include "interpreter_exports.h"
 #include "object_handles.h"
 #include "environment.h"
-#include "open/vm_util.h"
 #include "thread_generic.h"
-#include "open/jthread.h"
+#include "jthread.h"
 #include "suspend_checker.h"
 #include "stack_iterator.h"
 #include "stack_trace.h"
@@ -40,7 +39,6 @@
 #include "vtable.h"
 
 #define LOG_DOMAIN "jvmti.locals"
-
 #include "cxxlog.h"
 
 /*

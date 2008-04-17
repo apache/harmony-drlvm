@@ -26,7 +26,7 @@
 
 #include <open/hythread_ext.h>
 #include <thread_helpers.h>
-#include "open/jthread.h"
+#include "jthread.h"
 #include "object_handles.h"
 #include "port_malloc.h"
 #include "m2n.h"

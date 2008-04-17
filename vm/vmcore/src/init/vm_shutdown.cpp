@@ -23,9 +23,9 @@
 #include <apr_thread_mutex.h>
 
 #include "open/hythread.h"
-#include "open/jthread.h"
 #include "open/gc.h"
 
+#include "jthread.h"
 #include "jni.h"
 #include "jni_direct.h"
 #include "environment.h"

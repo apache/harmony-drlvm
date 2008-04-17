@@ -22,7 +22,7 @@
 
 #include <open/hythread_ext.h>
 #include <thread_helpers.h>
-#include "open/jthread.h"
+#include "jthread.h"
 
 #include <assert.h>
 

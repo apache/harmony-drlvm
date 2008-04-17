@@ -33,7 +33,7 @@
 #include "environment.h"
 #include "java_lang_System.h"
 #include "org_apache_harmony_lang_management_ThreadMXBeanImpl.h"
-#include "open/jthread.h"
+#include "jthread.h"
 
 /* Native methods */
 

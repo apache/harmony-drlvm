@@ -30,11 +30,10 @@
 #include "vm_threads.h"
 #include "thread_generic.h"
 
-#include "open/ti_thread.h"
-#include "open/jthread.h"
+#include "ti_thread.h"
+#include "jthread.h"
 #include "thread_manager.h"
 #include "object_handles.h"
-#include "open/vm_util.h"
 #include "platform_lowlevel.h"
 #include "mon_enter_exit.h"
 #include "interpreter_exports.h"
@@ -42,8 +41,7 @@
 #include "suspend_checker.h"
 #include "stack_iterator.h"
 
-
-#include "Class.h" // FIXME: this is for Class::heap_base and Class::heap_end
+//#include "Class.h" // FIXME: this is for Class::heap_base and Class::heap_end
 
 #define MAX_JVMTI_ENV_NUMBER 10
 #define jvmti_test_jenv (p_TLS_vmthread->jni_env)

@@ -6,11 +6,11 @@
 #define LOG_DOMAIN "ncai.thread"
 #include "cxxlog.h"
 
+#include "open/ncai_thread.h"
+
 #include "suspend_checker.h"
 #include "ncai_utils.h"
-#include <open/jthread.h>
-#include <open/ncai_thread.h>
-//#include "lock_manager.h"
+#include "jthread.h"
 #include "Class.h"
 #include "jni_utils.h"
 #include "jvmti_internal.h"
