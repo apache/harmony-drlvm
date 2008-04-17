@@ -22,6 +22,7 @@
 #define LOG_DOMAIN "vm.stack"
 #include "cxxlog.h"
 #include "vm_log.h"
+#include "open/vm_class_info.h"
 
 #include "open/vm_method_access.h"
 #include "m2n.h"

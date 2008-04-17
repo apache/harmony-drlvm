@@ -50,7 +50,7 @@ enum VM_RT_SUPPORT {
  *
  * Like <code>VM_RT_NEW_VECTOR_USING_VTABLE</code>, allocates a new object of 
  * a class, but also takes a size argument. The size can be obtained using 
- * class_get_boxed_data_size(Class_Handle).
+ * class_get_object_size(Class_Handle).
  * This function should be used for classes which inherit the finalize method 
  * of <code>java.lang.Object</code>.
  */

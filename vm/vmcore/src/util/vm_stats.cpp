@@ -24,6 +24,7 @@
 #define LOG_DOMAIN "vm.stats"
 #include "cxxlog.h"
 
+#include "vtable.h"
 #include "environment.h"
 #include "open/vm_util.h"
 #include "jit_runtime_support.h"

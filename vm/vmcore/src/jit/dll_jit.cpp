@@ -39,8 +39,6 @@ _get_root_set_from_stack_frame(NULL),
 _get_root_set_for_thread_dump(NULL),
 _fix_handler_context(NULL),
 _get_address_of_this(NULL),
-_extended_class_callback(NULL),
-_overridden_method_callback(NULL),
 _recompiled_method_callback(NULL),
 _execute_method(NULL),
 _get_bc_location_for_native(NULL),
@@ -83,12 +81,6 @@ lib_handle(NULL)
 
     GET_OPTIONAL_FUNCTION(fn, handle, "JIT_next_command_line_argument");
     _next_command_line_argument = (void (*)(JIT_Handle, const char *, const char *)) fn;
-
-    GET_OPTIONAL_FUNCTION(fn, handle, "JIT_extended_class_callback");
-    _extended_class_callback = (Boolean (*)(JIT_Handle, Class_Handle, Class_Handle, void *)) fn;
-
-    GET_OPTIONAL_FUNCTION(fn, handle, "JIT_overridden_method_callback");
-    _overridden_method_callback = (Boolean (*)(JIT_Handle, Method_Handle, Method_Handle, void *)) fn;
 
     GET_OPTIONAL_FUNCTION(fn, handle, "JIT_recompiled_method_callback");
     _recompiled_method_callback = (Boolean (*)(JIT_Handle, Method_Handle, void *)) fn;

@@ -5777,7 +5777,6 @@ static void logMethod(MethodDesc* mdesc) {
     Log::out() << "    isVirtual: "  << mdesc->isVirtual() << std::endl;
     Log::out() << "    isAbstract: " << mdesc->isAbstract() << std::endl;
     Log::out() << "    isInstanceInitializer: "  << mdesc->isInstanceInitializer() << std::endl;
-    Log::out() << "    isOverridden: " << mdesc->isOverridden() << std::endl;
 }
 
 static bool isVMHelperCall(Inst* inst, VM_RT_SUPPORT id) {

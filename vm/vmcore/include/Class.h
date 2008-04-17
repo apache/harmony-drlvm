@@ -28,9 +28,9 @@
 
 #include <assert.h>
 #include "open/gc.h"
+#include "open/rt_types.h"
 #include "port_malloc.h"
 #include "String_Pool.h"
-#include "vtable.h"
 #include "jit_intf.h"
 
 #include <vector>
@@ -61,7 +61,8 @@ struct Global_Env;
 class Package;
 struct VM_thread;
 struct AnnotationTable;
-
+struct VTable;
+struct Intfc_Table;
 
 /** The constant pool entry descriptor.
 * For each constant pool entry, the descriptor content varies depending
@@ -800,9 +801,6 @@ private:
     // class; after super class is loaded, it becomes a pointer to class
     // structure of the super class.
     //
-    // The offset of this field is returned by class_get_super_offset.
-    // Make sure to update this function if the field is moved around.
-    //
     Class_Super m_super_class;
 
     // class name in internal (VM, class-file) format
@@ -817,7 +815,7 @@ private:
     Package* m_package;
 
     // Distance in the hierarchy from java/lang/Object
-    int m_depth;
+    uint32 m_depth;
 
     // The field m_is_suitable_for_fast_instanceof should be 0
     // if depth==0 or depth>=vm_max_fast_instanceof_depth()
@@ -942,9 +940,6 @@ private:
     // shift corresponding to size of element of array, undefined for non-arrays
     unsigned int m_array_element_shift;
 
-    // type descriptor for array element class
-    TypeDesc* m_array_element_type_desc;
-
     // Number of superinterfaces
     uint16 m_num_superinterfaces;
 
@@ -1015,10 +1010,6 @@ private:
  
     // thread, which currently executes <clinit>
     VM_thread* m_initializing_thread;
-
-    // Notify JITs whenever tis class is extended by calling their
-    // JIT_extended_class_callback callback function,
-    Class_Extended_Notification_Record* m_notify_extended_records;
 
     // These fields store information for
     // Class Hierarchy Analysis JIT optimizations
@@ -1131,7 +1122,7 @@ public:
     
     /** Gets depth in the hierarchy of the given class.
      * @return A number of classes in the super-class hierarchy.*/
-    int get_depth() const { return m_depth; }
+    uint32 get_depth() const { return m_depth; }
     bool get_fast_instanceof_flag() const { return m_is_suitable_for_fast_instanceof; }
 
     /** Gets the vtable for the given class.
@@ -1261,14 +1252,6 @@ public:
     Class* get_array_element_class() const {
         assert(is_array());
         return m_array_element_class;
-    }
-
-    /** Gets the array-element type descriptor.
-     * @return Type descriptor for the element of an array
-     * represented by this class.*/
-    TypeDesc* get_array_element_type_desc() const {
-        assert(is_array());
-        return m_array_element_type_desc;
     }
 
     /** Gets the class state.
@@ -1740,20 +1723,6 @@ public:
      * @return An interface vtable from object; <code>NULL</code>, if no 
      *         such interface exists for the object.*/
     static void* helper_get_interface_vtable(ManagedObject* obj, Class* iid);
-
-    /** Registers a callback that is called to notify the given JIT
-     * whenever the given class is extended. The <code>callback_data</code> 
-     * pointer will be passed back to the JIT during the callback. The JIT's callback
-     * function is <code>JIT_extended_class_callback</code>.
-     * @param[in] jit_to_be_notified - JIT to notify on extending the class
-     * @param[in] callback_data      - data to be passed back to JIT, when the callback
-     *                                 is called*/
-    void register_jit_extended_class_callback(JIT* jit_to_be_notified, void* callback_data);
-
-    /** Calls registered JITs callbacks to notify that the given class was 
-     * extended by <code>new_class</code>.
-     * @param[in] new_subclass - a subclass extending the given class*/
-    void do_jit_extended_class_callbacks(Class* new_subclass);
 
     // SourceDebugExtension class attribute support
 

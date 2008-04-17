@@ -24,6 +24,7 @@
 
 #include <stdlib.h>
 
+#include "jit_import_rt.h"
 #include "environment.h"
 #include "exceptions.h"
 #include "open/gc.h"
@@ -86,8 +87,8 @@ GcFrame::~GcFrame()
 void GcFrame::add_object(ManagedObject** p)
 {
     assert(p);
-    assert(NULL == *p || (*p >= vm_heap_base_address()
-        && *p < vm_heap_ceiling_address()));
+    assert(NULL == *p || (*p >= vm_get_heap_base_address()
+        && *p < vm_get_heap_ceiling_address()));
     assert(!hythread_is_suspend_enabled());
 
     ensure_capacity();

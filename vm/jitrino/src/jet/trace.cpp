@@ -28,6 +28,7 @@
 
 #include "../shared/mkernel.h"
 #include "open/vm_class_manipulation.h"
+#include "open/vm_ee.h"
 #include "jit_intf.h"
 
 #ifdef _WIN32

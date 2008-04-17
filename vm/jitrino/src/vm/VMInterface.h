@@ -85,9 +85,6 @@ public:
     // returns true if vtable pointers are compressed
     static bool          isVTableCompressed();
 
-    // returns size of vtable pointer (currently 4 if compressed and 8 otherwise)
-    //static uint32      getVTablePtrSize() {return vm_get_vtable_ptr_size();}
-
     // returns the offset of an object's virtual table
     static uint32      getVTableOffset();
     // returns the base for all vtables (addend to compressed vtable pointer)
@@ -238,7 +235,6 @@ public:
         //
         // DRL kernel
         //
-        bool         isOverridden() const;
         uint32       getOffset() const;
         void*        getIndirectAddress() const;
         void*        getNativeAddress() const;
@@ -381,8 +377,6 @@ public:
     void    unlockMethodData(void);
 
     // methods that register JIT to be notified of various events
-    void    setNotifyWhenClassIsExtended(ObjectType * type, void * callbackData);
-    void    setNotifyWhenMethodIsOverridden(MethodDesc * methodDesc, void * callbackData);
     void    setNotifyWhenMethodIsRecompiled(MethodDesc * methodDesc, void * callbackData);
 
     // write barrier instructions

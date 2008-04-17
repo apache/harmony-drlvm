@@ -81,11 +81,6 @@ void vm_register_jit_extended_class_callback(JIT_Handle jit, Class_Handle clss, 
  */
 void vm_recompile_method(JIT_Handle jit, Method_Handle method);
 
-/// FIXME - This isn't method interface function!
-// Replaces method_get_JIT_id
-JIT_Handle
-compilation_get_JIT_id(Compile_Handle compile_handle);
-
 /**
  * Returns the class handle corresponding to a given allocation handle.
  */
@@ -94,7 +89,7 @@ Class_Handle allocation_handle_get_class(Allocation_Handle ah);
 /**
  * Returns the offset to the vtable pointer in an object.
  */
-int object_get_vtable_offset();
+size_t object_get_vtable_offset();
 
 /**
  * Returns the offset from the start of the vtable at which the
@@ -107,7 +102,7 @@ int vtable_get_super_array_offset();
  * Returns TRUE if vtable pointers within objects are to be treated
  * as offsets rather than raw pointers.
  */
-Boolean vm_vtable_pointers_are_compressed();
+BOOLEAN vm_is_vtable_compressed();
 
 /**
  * @return the number of bytes allocated by VM in VTable
@@ -119,7 +114,7 @@ size_t vm_number_of_gc_bytes_in_vtable();
  * Returns the base address of the vtable memory area.  This value will
  * never change and can be cached at startup.
  */
-POINTER_SIZE_INT vm_get_vtable_base();
+void* vm_get_vtable_base_address();
 
 /**
  * Returns the width in bytes (e.g. 4 or 8) of the vtable type

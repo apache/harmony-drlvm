@@ -37,7 +37,8 @@
 #include "nogc.h"
 #include "jit_runtime_support.h"
 #include "finalize.h"
-
+#include "vtable.h"
+#include "jit_import_rt.h"
 #include "finalizer_thread.h"     /* added for NATIVE FINALIZER THREAD */
 #include "ref_enqueue_thread.h"   /* added for NATIVE REFERENCE ENQUEUE THREAD */
 
@@ -47,7 +48,7 @@
 #undef LOG_DOMAIN
 
 #include "cxxlog.h"
-
+#include "vm_log.h"
 #include "thread_generic.h"
 
 #ifndef USE_GC_STATIC
@@ -506,7 +507,7 @@ int Objects_To_Finalize::do_finalization(int quantity) {
             VM_Global_State::loader_env->VoidVoidDescriptor_String);
 
         assert(finalize);
-        TRACE2("finalize", "finalize object " << handle->object->vt()->clss->get_name()->bytes);
+        TRACE2("finalize", "finalize object " << handle->object->vt()->clss);
         vm_execute_java_method_array( (jmethodID) finalize, 0, args);
         tmn_suspend_enable();
 
@@ -517,7 +518,7 @@ int Objects_To_Finalize::do_finalization(int quantity) {
             INFO2("finalize", "Uncaught exception "
                 << exn_get_name()
                 << " while running a finalize of the object"
-                << object->vt()->clss->get_name()->bytes << ".");
+                << object->vt()->clss << ".");
             tmn_suspend_enable();            
         }
 #endif
@@ -574,7 +575,7 @@ void References_To_Enqueue::enqueue_references()
             INFO2("ref", "Uncaught exception "
                 << exn_get_name()
                 << " while running a enqueue method of the object"
-                << object->vt()->clss->get_name()->bytes << ".");
+                << object->vt()->clss << ".");
             tmn_suspend_enable();
             
         }

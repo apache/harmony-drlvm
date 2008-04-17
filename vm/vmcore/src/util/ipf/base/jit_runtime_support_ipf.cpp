@@ -679,11 +679,11 @@ static void emit_fast_type_check_without_vm_stats(Merced_Code_Emitter& emitter,
     // sc6 = super_class->get_offset_of_depth()
     // sc4 = offset(superclasses) - 8
     emitter.ipf_adds(sc1, offset_is_suitable, super_class);
-    if (vm_vtable_pointers_are_compressed())
+    if (vm_is_vtable_compressed())
     {
         emitter.ipf_ld(int_mem_size_4, mem_ld_none, mem_none, sc3, sub_object);
         emitter.ipf_adds(sc6, offset_depth, super_class);
-        emit_mov_imm_compactor(emitter, sc4, offset_superclasses + vm_get_vtable_base());
+        emit_mov_imm_compactor(emitter, sc4, offset_superclasses + vm_get_vtable_base_address());
     }
     else
     {
@@ -734,7 +734,7 @@ static void emit_fast_type_check_without_vm_stats(Merced_Code_Emitter& emitter,
         (void **)p_class_is_subtype,
         out0, save_pfs, save_b0, save_gp);
     // sc3 contains the vtable pointer or the vtable offset
-    emit_mov_imm_compactor(emitter, sc2, (vm_vtable_pointers_are_compressed() ? vm_get_vtable_base() : 0) + offset_clss);
+    emit_mov_imm_compactor(emitter, sc2, (vm_is_vtable_compressed() ? vm_get_vtable_base_address() : 0) + offset_clss);
     emitter.ipf_add(sc1, sc2, sc3);
     emitter.ipf_ld(int_mem_size_8, mem_ld_none, mem_none, out0+0, sc1);
     emitter.ipf_mov(out0+1, super_class);
@@ -962,10 +962,10 @@ static void emit_get_array_element_class(Merced_Code_Emitter& emitter, int src, 
     VTable *dummy_vtable = NULL;
     const int offset_clss = (int) ((Byte*)&dummy_vtable->clss - (Byte*)dummy_vtable);
 
-    if (vm_vtable_pointers_are_compressed())
+    if (vm_is_vtable_compressed())
     {
         emitter.ipf_ld(int_mem_size_4, mem_ld_none, mem_none, sc5, src);
-        emit_mov_imm_compactor(emitter, sc1, vm_get_vtable_base() + offset_clss);
+        emit_mov_imm_compactor(emitter, sc1, vm_get_vtable_base_address() + offset_clss);
     }
     else
     {
@@ -1117,33 +1117,6 @@ static void *vm_rt_get_interface_vtable(ManagedObject *object, Class *clss)
     void *vt = vm_get_interface_vtable(object, clss);
     return vt;
 } //vm_rt_get_interface_vtable
-
-
-
-
-Boolean jit_may_inline_object_synchronization(unsigned *thread_id_register,
-                                              unsigned *sync_header_offset,
-                                              unsigned *sync_header_width,
-                                              unsigned *lock_owner_offset,
-                                              unsigned *lock_owner_width,
-                                              Boolean  *jit_clears_ccv)
-{
-    // FIXME: code outdated
-    assert(0);
-    abort();
-#if 0
-    if (!vm_get_boolean_property_value_with_default("vm.jit_may_inline_sync"))
-         return FALSE;
-
-    *thread_id_register = THREAD_ID_REG;
-    *sync_header_offset = ManagedObject::header_offset();
-    *sync_header_width = 4;
-    *lock_owner_offset = ManagedObject::header_offset() + STACK_KEY_OFFSET;
-    *lock_owner_width = 2;
-    *jit_clears_ccv = jit_clears_ccv_in_monitor_enter();
-    return TRUE;
-#endif
-}
 
 
 

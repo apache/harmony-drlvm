@@ -22,7 +22,7 @@
 #include <string.h>
 #include <jni.h>
 #include "open/vm_field_access.h"
-#include "jit_intf.h"
+#include "open/vm_class_info.h"
 #include "java_support.h"
 
 Class_Handle GCHelper_clss;

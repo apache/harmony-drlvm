@@ -26,6 +26,7 @@
 
 #include <assert.h>
 
+#include "vtable.h"
 #include "environment.h"
 #include "exceptions.h"
 #include "object_handles.h"

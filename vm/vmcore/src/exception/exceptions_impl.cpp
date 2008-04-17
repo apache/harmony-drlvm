@@ -24,6 +24,7 @@
 #include "clog.h"
 
 #include "open/vm_class_manipulation.h"
+#include "vtable.h"
 #include "Class.h"
 #include "classloader.h"
 #include "exceptions.h"

@@ -19,6 +19,7 @@
 #include "cxxlog.h"
 
 #include "open/vm_class_manipulation.h"
+#include "vtable.h"
 #include "Class.h"
 #include "open/jthread.h"
 //#include "open/gc.h"

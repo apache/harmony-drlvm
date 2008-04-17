@@ -27,7 +27,9 @@
 #include "trace.h"
 #include "open/vm_field_access.h"
 #include "jit_runtime_support.h"
-#include "jit_intf.h"
+#include "open/vm_class_loading.h"
+#include "open/vm_class_info.h"
+#include "open/vm_ee.h"
 
 namespace Jitrino {
 namespace Jet {
@@ -385,8 +387,7 @@ void CodeGen::gen_write_barrier(JavaByteCodes opcode, Field_Handle fieldHandle, 
     static char* wbMethAddr = NULL;
 
     if (doGenWB4J && NULL == wbMethAddr) {
-        wbKlass = class_load_class_by_name(wbKlassName, m_klass);
-            //class_find_class_from_loader(NULL, wbKlassName, true);
+        wbKlass = vm_load_class_with_bootstrap(wbKlassName);
         if (wbKlass != NULL) {
             wbMeth = class_lookup_method_recursively(wbKlass, wbMethName, wbMethSig);
         }

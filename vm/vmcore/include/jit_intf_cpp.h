@@ -28,6 +28,7 @@
 
 
 #include "open/types.h"
+#include "open/rt_types.h"
 #include "jit_intf.h"
 #include "jit_export_jpda.h"
 #include "jni.h"
@@ -75,12 +76,6 @@ public:
                                Method_Handle             method,        // in
                                OpenMethodExecutionParams flags          // in
                                ) = 0;
-
-    virtual void
-    method_was_overridden(Method_Handle    UNREF   caller,
-                          Method_Handle    UNREF   callee
-                          ) {};
-
 
 
     //
@@ -203,23 +198,12 @@ public:
                         void * UNREF addr1,
                         void * UNREF addr2){ };
 
-
-    virtual Boolean
-    extended_class_callback(Class_Handle   UNREF extended_class,
-                            Class_Handle   UNREF new_class,
-                            void         * UNREF callback_data) { return FALSE; };
-
-    virtual Boolean
-    overridden_method_callback(Method_Handle  UNREF overridden_method,
-                                                           Method_Handle  UNREF new_method,
-                               void          * UNREF callback_data) { return FALSE; };
-
     virtual Boolean
     recompiled_method_callback(Method_Handle   UNREF recompiled_method,
                                void          * UNREF callback_data) { return FALSE; };
 
     // Returns TRUE if the JIT will compress references within objects and vector elements by representing 
-    // them as offsets rather than raw pointers. The JIT should call the VM function vm_references_are_compressed()
+    // them as offsets rather than raw pointers. The JIT should call the VM function vm_is_heap_compressed()
     // during initialization in order to decide whether it should compress references.
     virtual Boolean 
     supports_compressed_references() = 0;

@@ -194,7 +194,7 @@ static void emit_newinstance_override(Emitter_Handle eh, Method *method) {
 
         emitter.ipf_adds(SCRATCH_GENERAL_REG2, (int)offset_allocation_handle, SCRATCH_GENERAL_REG7, SCRATCH_PRED_REG3);
         emitter.ipf_ld(int_mem_size_8, mem_ld_none, mem_none, SCRATCH_GENERAL_REG3, SCRATCH_GENERAL_REG2, SCRATCH_PRED_REG3);
-        if (vm_vtable_pointers_are_compressed())
+        if (vm_is_vtable_compressed())
         {
             emitter.ipf_st(int_mem_size_4, mem_st_none, mem_none, RETURN_VALUE_REG,     SCRATCH_GENERAL_REG3, SCRATCH_PRED_REG3);
         }

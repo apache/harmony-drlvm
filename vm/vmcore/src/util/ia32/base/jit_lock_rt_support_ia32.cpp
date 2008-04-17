@@ -410,12 +410,3 @@ void * getaddress__vm_monitor_exit_static_naked()
     return addr;
 } //getaddress__vm_monitor_exit_static_naked
 
-Boolean jit_may_inline_object_synchronization(unsigned * UNREF thread_id_register,
-                                              unsigned * UNREF sync_header_offset,
-                                              unsigned * UNREF sync_header_width,
-                                              unsigned * UNREF lock_owner_offset,
-                                              unsigned * UNREF lock_owner_width,
-                                              Boolean  * UNREF jit_clears_ccv)
-{
-    return FALSE;
-}

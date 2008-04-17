@@ -29,7 +29,8 @@
 
 #include "jet.h"
 
-#include "jit_intf.h"
+#include "jit_import_rt.h"
+#include "open/vm_ee.h"
 
 #include "port_threadunsafe.h"
 #include "EMInterface.h"

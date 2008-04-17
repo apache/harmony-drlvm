@@ -31,11 +31,12 @@ using namespace std;
 #include "cxxlog.h"
 
 #include "open/types.h"
+#include "open/vm_ee.h"
 #include "environment.h"
 #include "encoder.h"
 #include "open/vm_util.h"
 #include "compile.h"
-
+#include "vtable.h"
 // *** This is for readInternal override
 #include "jni_utils.h"
 #include "vm_arrays.h"

@@ -39,7 +39,7 @@ using namespace std;
 #include "exceptions.h"
 #include "Class.h"
 #include "environment.h"
-
+#include "vtable.h"
 #include "open/vm_util.h"
 #include "nogc.h"
 #include "sync_bits.h"

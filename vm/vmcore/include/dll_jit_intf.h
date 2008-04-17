@@ -151,28 +151,6 @@ public:
     }
 
     Boolean
-    extended_class_callback(Class_Handle  extended_class,
-                            Class_Handle  new_class,
-                            void         *callback_data)
-    {
-        if (_extended_class_callback != NULL) {
-            return _extended_class_callback(this, extended_class, new_class, callback_data);
-        }
-        return FALSE;
-    }
-
-    Boolean
-    overridden_method_callback(Method_Handle  overridden_method,
-                               Method_Handle  new_method,
-                               void          *callback_data)
-    {
-        if (_overridden_method_callback != NULL) {
-            return _overridden_method_callback(this, overridden_method, new_method, callback_data);
-        }
-        return FALSE;
-    }
-
-    Boolean
     recompiled_method_callback(Method_Handle  recompiled_method,
                                void          *callback_data)
     {
@@ -305,18 +283,6 @@ private:
         Method_Handle                           method,
         const JitFrameContext*                  context
         );
-
-    Boolean
-    (*_extended_class_callback)(JIT_Handle jit,
-                                Class_Handle  extended_class,
-                                Class_Handle  new_class,
-                                void         *callback_data);
-
-    Boolean
-    (*_overridden_method_callback)(JIT_Handle jit,
-                                   Method_Handle  overridden_method,
-                                   Method_Handle  new_method,
-                                   void          *callback_data);
 
     Boolean
     (*_recompiled_method_callback)(JIT_Handle jit,

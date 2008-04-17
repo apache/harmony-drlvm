@@ -136,13 +136,13 @@ VMEXPORT ManagedObject* uncompress_compressed_reference(COMPRESSED_REFERENCE com
 inline ManagedObject *get_raw_reference_pointer(ManagedObject **slot_addr)
 {
 #ifdef REFS_USE_RUNTIME_SWITCH
-    if (vm_references_are_compressed()) {
+    if (vm_is_heap_compressed()) {
 #endif // REFS_USE_RUNTIME_SWITCH
 #ifdef REFS_RUNTIME_OR_COMPRESSED
     COMPRESSED_REFERENCE offset = *((COMPRESSED_REFERENCE *)slot_addr);
     assert(is_compressed_reference(offset));
     if (offset != 0) {
-        return (ManagedObject*)((POINTER_SIZE_INT)vm_heap_base_address() + offset);
+        return (ManagedObject*)((POINTER_SIZE_INT)vm_get_heap_base_address() + offset);
     }
 
     return NULL;
@@ -229,10 +229,10 @@ typedef struct ManagedObject {
     POINTER_SIZE_INT padding2;
     };
 
-    VTable *vt_unsafe() { return (VTable*)(vt_offset + vm_get_vtable_base()); }
+    VTable *vt_unsafe() { return (VTable*)(vt_offset + (UDATA)vm_get_vtable_base_address()); }
     VTable *vt() { assert(vt_offset); return vt_unsafe(); }
     static VTable *allocation_handle_to_vtable(Allocation_Handle ah) {
-        return (VTable *) ((POINTER_SIZE_INT)ah + vm_get_vtable_base());
+        return (VTable *) ((UDATA)ah + (UDATA)vm_get_vtable_base_address());
     }
     static bool are_vtable_pointers_compressed() { return true; }
 #else // USE_COMPRESSED_VTABLE_POINTERS
@@ -332,6 +332,7 @@ typedef struct VM_Vector
 #endif
 
 #endif // _OBJECT_LAYOUT_H_
+
 
 
 

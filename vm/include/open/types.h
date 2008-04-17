@@ -95,7 +95,7 @@ typedef struct ManagedObject Java_java_lang_String;
 /**
  * Used for opaques accesses to managed arrays. This handle points
  * to an array in the managed heap, so handling must be careful to account
- * for the possiblity of a moving GC.
+ * for the possibility of a moving GC.
  */
 typedef void *Vector_Handle;
 

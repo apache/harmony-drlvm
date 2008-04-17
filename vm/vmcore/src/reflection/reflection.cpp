@@ -34,6 +34,7 @@
 #include "open/vm_type_access.h"
 #include "open/vm_field_access.h"
 #include "open/vm_method_access.h"
+#include "open/vm_class_info.h"
 
 #include "exceptions.h"
 #include "heap.h"

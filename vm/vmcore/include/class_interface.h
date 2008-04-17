@@ -17,9 +17,6 @@
 #ifndef __CLASS_INTERFACE_H__
 #define __CLASS_INTERFACE_H__
 
-//#include "open/types.h"
-//#include "open/common.h"
-
 /**
  * Enum of constant pool tags
  */
@@ -37,72 +34,5 @@ typedef enum {
     _CONSTANT_InterfaceMethodref    = 11,
     _CONSTANT_NameAndType           = 12
 } ClassConstantPoolTags;
-
-/**
- * Class interface
- */
-
-/**
- * Class loader interface
- */
-#if 0
-/**
- * Function sets verify data in class loader.
- * @param classloader - class loader handler
- * @param data        - verify data
- * @note Assertion is raised if classloader is equal to null.
- * @note Function makes non thread save operation and 
- *       must be called in thread safe point.
- */
-void
-cl_set_verify_data_ptr( ClassLoaderHandle classloader, void *data );
-
-/**
- * Function returns verify data in class loader.
- * @param classloader - class loader handler
- * @return Verify data in class loader.
- * @note Assertion is raised if classloader is equal to null.
- */
-void *
-cl_get_verify_data_ptr( ClassLoaderHandle classloader );
-
-/**
- * Function locks class loader.
- * @param classloader - class loader handler
- * @note Assertion is raised if classloader is equal to null.
- */
-void
-cl_acquire_lock( ClassLoaderHandle classloader );
-
-/**
- * Function releases class loader.
- * @param classloader - class loader handler
- * @note Assertion is raised if classloader is equal to null.
- */
-void
-cl_release_lock( ClassLoaderHandle classloader );
-
-/**
- * Function returns loaded class in class loader.
- * @param classloader - class loader handler
- * @param name        - class name
- * @return Loaded class in classloader or null if class isn't loaded in class loader.
- * @note Assertion is raised if classloader or name are equal to null.
- */
-Class_Handle
-cl_get_class( ClassLoaderHandle classloader, const char *name );
-
-/**
- * Function returns loaded class in class loader.
- * @param classloader - class loader handler
- * @param name        - class name
- * @return Loaded class in classloader if class isn't loaded in class loader 
- *         function loads it.
- * @note Assertion is raised if classloader or name are equal to null.
- */
-Class_Handle
-cl_load_class( ClassLoaderHandle classloader, const char *name );
-
-#endif
 
 #endif

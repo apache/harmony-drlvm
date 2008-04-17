@@ -23,6 +23,7 @@
 #include "vm_log.h"
 
 #include "open/gc.h"
+#include "open/vm_ee.h"
 #include "open/vm_type_access.h"
 #include "open/vm_method_access.h"
 #include "open/vm_class_manipulation.h"
@@ -864,8 +865,8 @@ void compile_clear_dynamic_code_list(DynamicCode* list)
     }
 }
 
-VMEXPORT void compiled_method_load(Method_Handle method, uint32 codeSize, 
-                                  void* codeAddr, uint32 mapLength, 
+VMEXPORT void vm_compiled_method_load(Method_Handle method, U_32 codeSize, 
+                                  void* codeAddr, U_32 mapLength, 
                                   AddrLocation* addrLocationMap, 
                                   void* compileInfo, Method_Handle outer_method) 
 {

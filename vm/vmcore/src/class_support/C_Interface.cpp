@@ -25,6 +25,7 @@
 #include "vm_arrays.h"
 #include "vm_strings.h"
 #include "properties.h"
+#include "vtable.h"
 
 #include "open/hythread_ext.h"
 #include "port_mutex.h"
@@ -39,6 +40,8 @@
 #include "open/vm_method_access.h"
 #include "open/vm_class_manipulation.h"
 #include "open/vm_class_loading.h"
+#include "open/vm_class_info.h"
+#include "open/vm_ee.h"
 #include "jit_intf.h"
 
 BOOLEAN class_is_final(Class_Handle cl) {
@@ -397,7 +400,7 @@ uint16 method_get_max_stack(Method_Handle m)
 }
 
 
-unsigned    method_get_offset(Method_Handle m)
+size_t  method_get_vtable_offset(Method_Handle m)
 {
     assert(m);
     return m->get_offset();
@@ -461,15 +464,6 @@ BOOLEAN method_is_overridden(Method_Handle m)
 } // method_is_overridden
 
 
-JIT_Handle method_get_JIT_id(Compile_Handle h)
-{
-    assert(h);
-    Compilation_Handle* ch = (Compilation_Handle*)h;
-    return ch->jit;
-} //method_get_JIT_id
-
-
-
 const char* class_get_name(Class_Handle cl)
 {
     assert(cl);
@@ -489,26 +483,13 @@ unsigned class_get_flags(Class_Handle cl)
 } //class_get_flags
 
 
-int class_get_super_offset()
-{
-    return sizeof(VTable*);
-} //class_get_super_offset
-
-
-int vtable_get_super_array_offset()
-{
-    VTable *vtable = 0;
-    return (int) (((Byte *)&vtable->superclasses) - (Byte *)vtable);
-}//vtable_get_super_array_offset
-
-
-int class_get_depth(Class_Handle cl)
+U_32 class_get_depth(Class_Handle cl)
 {
     assert(cl);
     return cl->get_depth();
 } //class_get_depth
 
-Boolean class_get_fast_instanceof_flag(Class_Handle cl)
+BOOLEAN class_is_support_fast_instanceof(Class_Handle cl)
 {
     assert(cl);
     return cl->get_fast_instanceof_flag();
@@ -809,33 +790,6 @@ Arg_List_Iterator method_get_argument_list(Method_Handle m)
     return (Arg_List_Iterator)((Method *)m)->get_argument_list();
 }
 
-
-
-
-
-
-Class_Handle
-vm_resolve_class(Compile_Handle h,
-                  Class_Handle c,
-                 unsigned index)
-{
-    assert(c);
-    return (Class*) resolve_class(h, c, index);
-} //vm_resolve_class
-
-
-
-Class_Handle
-vm_resolve_class_new(Compile_Handle h,
-                     Class_Handle c,
-                     unsigned index)
-{
-    assert(c);
-    return resolve_class_new(h, c, index);
-} //vm_resolve_class_new
-
-
-
 Class_Handle resolve_class_from_constant_pool(Class_Handle c_handle, unsigned index)
 {
     assert(c_handle);
@@ -845,13 +799,9 @@ Class_Handle resolve_class_from_constant_pool(Class_Handle c_handle, unsigned in
 
 Field_Handle class_resolve_nonstatic_field(Class_Handle clss, unsigned short cp_index)
 {
-    Compilation_Handle ch;
-    ch.env = VM_Global_State::loader_env;
-    ch.jit = NULL;
-    Field_Handle fh = resolve_field(&ch, (Class_Handle)clss, cp_index);
-    if(!fh || field_is_static(fh))
-        return NULL;
-    return fh;
+    assert(clss);
+    Field* f = clss->_resolve_field(VM_Global_State::loader_env, cp_index);
+    return (!f || f->is_static()) ? NULL : f;
 } // class_resolve_nonstatic_field
 
 
@@ -862,19 +812,13 @@ class_get_class_loader(Class_Handle ch)
     return ch->get_class_loader();
 } //class_get_class_loader
 
-
-
 Class_Handle
-class_load_class_by_name(const char *name,
-                         Class_Handle ch)
+vm_load_class_with_bootstrap(const char *name)
 {
-    assert(ch);
     Global_Env *env = VM_Global_State::loader_env;
     String *n = env->string_pool.lookup(name);
-    return ch->get_class_loader()->LoadClass(env, n);
-} //class_load_class_by_name
-
-
+    return env->bootstrap_class_loader->LoadClass(env, n);
+} 
 
 Class_Handle
 vm_lookup_class_with_bootstrap(const char* name)
@@ -926,67 +870,6 @@ class_load_class_by_descriptor(const char *descr,
     assert(n);
     return ch->get_class_loader()->LoadClass(env, n);;
 } //class_load_class_by_descriptor
-
-
-Class_Handle class_find_loaded(ClassLoaderHandle loader, const char* name)
-{
-    char* name3 = strdup(name);
-    char* p = name3;
-    while (*p) {
-        if (*p=='.') *p='/';
-        p++;
-    }
-    Global_Env* env = VM_Global_State::loader_env;
-    String* name2 = env->string_pool.lookup(name3);
-    Class* ch;
-    if (loader) {
-        ch = loader->LookupClass(name2);
-    } else {
-        ch = env->bootstrap_class_loader->LookupClass(name2);
-    }
-    STD_FREE(name3);
-    if(ch && (!ch->verify(env) || !ch->prepare(env))) return NULL;
-    return ch;
-}
-
-Class_Handle class_find_class_from_loader(ClassLoaderHandle loader, const char* n, Boolean init)
-{
-    ASSERT_RAISE_AREA;
-    assert(hythread_is_suspend_enabled()); // -salikh
-    char *new_name = strdup(n);
-    char *p = new_name;
-    while (*p) {
-        if (*p == '.') *p = '/';
-        p++;
-    }
-    String* name = VM_Global_State::loader_env->string_pool.lookup(new_name);
-    STD_FREE(new_name);
-    Class* ch;
-    if (loader) {
-        ch = class_load_verify_prepare_by_loader_jni(
-            VM_Global_State::loader_env, name, loader);
-    } else {
-        assert(hythread_is_suspend_enabled());
-        ch = class_load_verify_prepare_from_jni(VM_Global_State::loader_env, name);
-    }
-    if (!ch) return NULL;
-    // All initialization from jni should not propagate exceptions and
-    // should return to calling native method.
-    if(init) {
-        class_initialize_from_jni(ch);
-
-        if (exn_raised()) {
-            return NULL;
-        }
-    }
-
-    if(exn_raised()) {
-        return 0;
-    }
-
-    return ch;
-}
-
 
 //
 // The following do not cause constant pools to be resolve, if they are not
@@ -1071,7 +954,7 @@ void method_get_exc_handler_info(Method_Handle m,
     *end_offset      = h->get_end_pc();
     *handler_offset  = h->get_handler_pc();
     *handler_cpindex = h->get_catch_type_index();
-} //method_get_handler_info
+}
 
 
 
@@ -1129,16 +1012,7 @@ Method_Handle class_lookup_method_recursively(Class_Handle clss,
 } //class_lookup_method_recursively
 
 
-struct ChList {
-    JIT_Handle          jit;
-    Compilation_Handle  ch;
-    ChList*             next;
-};
-
-static ChList* chs = NULL;
-
-
-int object_get_vtable_offset()
+size_t object_get_vtable_offset()
 {
     return 0;
 } //object_get_vtable_offset
@@ -1197,14 +1071,6 @@ int vector_first_element_offset_unboxed(Class_Handle element_type)
 } //vector_first_element_offset_unboxed
 
 
-int array_first_element_offset_unboxed(Class_Handle element_type)
-{
-    assert(element_type);
-    return vector_first_element_offset_unboxed(element_type);
-} //array_first_element_offset_unboxed
-
-
-
 int vector_first_element_offset(VM_Data_Type element_type)
 {
     switch(element_type) {
@@ -1233,16 +1099,6 @@ Boolean method_is_java(Method_Handle mh)
     return TRUE;
 } //method_is_java
 
-
-
-
-// 20020220 TO DO:
-// 1. Add the is_value_type field to the Java build of VM?
-Boolean class_is_valuetype(Class_Handle ch)
-{
-    assert(ch);
-    return class_is_primitive(ch);
-} //class_is_valuetype
 
 BOOLEAN class_is_enum(Class_Handle ch)
 {
@@ -1417,7 +1273,7 @@ Method_Signature_Handle method_get_signature(Method_Handle mh)
 } // method_get_signature
 
 
-unsigned class_number_fields(Class_Handle ch)
+U_16 class_number_fields(Class_Handle ch)
 {
     assert(ch);
     return ch->get_number_of_fields();
@@ -1443,7 +1299,7 @@ unsigned class_num_instance_fields_recursive(Class_Handle ch)
 } // class_num_instance_fields_recursive
 
 
-Field_Handle class_get_field(Class_Handle ch, unsigned idx)
+Field_Handle class_get_field(Class_Handle ch, U_16 idx)
 {
     assert(ch);
     if(idx >= ch->get_number_of_fields()) return NULL;
@@ -1595,13 +1451,6 @@ Type_Info_Handle method_ret_type_get_type_info(Method_Signature_Handle msh)
     return ms->return_type_desc;
 } //method_ret_type_get_type_info
 
-
-void free_string_buffer(char *buffer)
-{
-    STD_FREE(buffer);
-} //free_string_buffer
-
-
 Type_Info_Handle field_get_type_info(Field_Handle fh)
 {
     assert(fh);
@@ -1611,15 +1460,6 @@ Type_Info_Handle field_get_type_info(Field_Handle fh)
     return td;
 } // field_get_type_info
 
-
-
-Type_Info_Handle class_get_element_type_info(Class_Handle ch)
-{
-    assert(ch);
-    TypeDesc* td = ch->get_array_element_type_desc();
-    assert(td);
-    return td;
-} //class_get_element_type_info
 
 /////////////////////////////////////////////////////
 // New GC stuff
@@ -1684,15 +1524,6 @@ unsigned class_get_alignment(Class_Handle ch)
         & CL_PROP_ALIGNMENT_MASK);
 } //class_get_alignment
 
-
-
-// (20020313) Should it always be the same as class_get_alignment?
-unsigned class_get_alignment_unboxed(Class_Handle ch)
-{
-    assert(ch);
-    return class_get_alignment(ch);
-} //class_get_alignment_unboxed
-
 //
 // Returns the size of an element in the array class.
 //
@@ -1702,13 +1533,11 @@ unsigned class_element_size(Class_Handle ch)
     return ch->get_array_element_size();
 } //class_element_size
 
-
-
-unsigned class_get_boxed_data_size(Class_Handle ch)
+size_t class_get_object_size(Class_Handle ch)
 {
     assert(ch);
     return ch->get_allocated_size();
-} //class_get_boxed_data_size
+} //class_get_object_size
 
 
 
@@ -1737,8 +1566,6 @@ BOOLEAN method_is_no_inlining(Method_Handle mh)
     return FALSE;
 } // method_is_no_inlining
 
-
-#define QUAL_NAME_BUFF_SIZE 128
 
 // Class ch is a subclass of method_get_class(mh).  The function returns a method handle
 // for an accessible method overriding mh in ch or in its closest superclass that overrides mh.
@@ -1854,28 +1681,28 @@ size_t vm_number_of_gc_bytes_in_thread_local()
 }
 
 
-VMEXPORT Boolean vm_references_are_compressed()
+BOOLEAN vm_is_heap_compressed()
 {
     return REFS_IS_COMPRESSED_MODE;
-} //vm_references_are_compressed
+} //vm_is_heap_compressed
 
 
-VMEXPORT void *vm_heap_base_address()
+void *vm_get_heap_base_address()
 {
     return (void*)VM_Global_State::loader_env->heap_base;
-} //vm_heap_base_address
+} //vm_get_heap_base_address
 
 
-VMEXPORT void *vm_heap_ceiling_address()
+void *vm_get_heap_ceiling_address()
 {
     return (void *)VM_Global_State::loader_env->heap_end;
-} //vm_heap_ceiling_address
+} //vm_get_heap_ceiling_address
 
 
-Boolean vm_vtable_pointers_are_compressed()
+BOOLEAN vm_is_vtable_compressed()
 {
     return ManagedObject::are_vtable_pointers_compressed();
-} //vm_vtable_pointers_are_compressed
+} //vm_is_vtable_compressed
 
 
 Class_Handle allocation_handle_get_class(Allocation_Handle ah)
@@ -1883,9 +1710,9 @@ Class_Handle allocation_handle_get_class(Allocation_Handle ah)
     assert(ah);
     VTable *vt;
 
-    if (vm_vtable_pointers_are_compressed())
+    if (vm_is_vtable_compressed())
     {
-        vt = (VTable *) ((POINTER_SIZE_INT)ah + vm_get_vtable_base());
+        vt = (VTable *) ((UDATA)ah + (UDATA)vm_get_vtable_base_address());
     }
     else
     {
@@ -1901,49 +1728,10 @@ Allocation_Handle class_get_allocation_handle(Class_Handle ch)
     return ch->get_allocation_handle();
 }
 
-
-unsigned vm_get_vtable_ptr_size()
-{
-    if(vm_vtable_pointers_are_compressed())
-    {
-        return sizeof(uint32);
-    }
-    else
-    {
-        return sizeof(POINTER_SIZE_INT);
-    }
-}
-
-
 ////////////////////////////////////////////////////////////////////////////////////
 // Direct call-related functions that allow a JIT to be notified whenever a VM data
 // structure changes that would require code patching or recompilation.
 ////////////////////////////////////////////////////////////////////////////////////
-
-// Called by a JIT in order to be notified whenever the given class (or any of its subclasses?)
-// is extended. The callback_data pointer will be passed back to the JIT during the callback.
-// The callback function is JIT_extended_class_callback.
-void vm_register_jit_extended_class_callback(JIT_Handle jit, Class_Handle clss,
-                                             void* callback_data)
-{
-    assert(clss);
-    JIT* jit_to_be_notified = (JIT*)jit;
-    Class *c = (Class *)clss;
-    clss->register_jit_extended_class_callback(jit_to_be_notified, callback_data);
-} // vm_register_jit_extended_class_callback
-
-
-// Called by a JIT in order to be notified whenever the given method is overridden by a newly
-// loaded class. The callback_data pointer will be passed back to the JIT during the callback.
-// The callback function is JIT_overridden_method_callback.
-void vm_register_jit_overridden_method_callback(JIT_Handle jit, Method_Handle method,
-                                                void* callback_data)
-{
-    assert(method);
-    JIT* jit_to_be_notified = (JIT*)jit;
-    method->register_jit_overridden_method_callback(jit_to_be_notified, callback_data);
-} //vm_register_jit_overridden_method_callback
-
 
 // Called by a JIT in order to be notified whenever the given method is recompiled or
 // initially compiled. The callback_data pointer will be passed back to the JIT during the callback.
@@ -1977,17 +1765,6 @@ void vm_patch_code_block(Byte *code_block, Byte *new_code, size_t size)
 
 } //vm_patch_code_block
 
-
-// Called by a JIT to have the VM recompile a method using the specified JIT. After
-// recompilation, the corresponding vtable entries will be updated, and the necessary
-// callbacks to JIT_recompiled_method_callback will be made. It is a requirement that
-// the method has not already been compiled by the given JIT; this means that multiple
-// instances of a JIT may need to be active at the same time. 
-void vm_recompile_method(JIT_Handle jit, Method_Handle method)
-{
-    compile_do_compilation_jit((Method*) method, (JIT*) jit);
-} // vm_recompile_method
-
 // Called by JIT during compilation to have the VM synchronously request a JIT (maybe another one)
 // to compile another method.
 JIT_Result vm_compile_method(JIT_Handle jit, Method_Handle method)
@@ -1995,10 +1772,6 @@ JIT_Result vm_compile_method(JIT_Handle jit, Method_Handle method)
     return compile_do_compilation_jit((Method*) method, (JIT*) jit);
 } // vm_compile_method
 
-CallingConvention vm_managed_calling_convention()
-{
-    return CC_Vm;
-} //vm_managed_calling_convention
 
 void vm_properties_set_value(const char* key, const char* value, PropertyTable table_number) 
 {
@@ -2042,22 +1815,21 @@ void vm_properties_destroy_value(char* value)
     }
 }
 
-int vm_property_is_set(const char* key, PropertyTable table_number)
+BOOLEAN vm_property_is_set(const char* key, PropertyTable table_number)
 {
-    int value;
+    bool value = false;
     assert(key);
     switch(table_number) {
     case JAVA_PROPERTIES: 
-        value = VM_Global_State::loader_env->JavaProperties()->is_set(key) ? 1 : 0;
+        value = VM_Global_State::loader_env->JavaProperties()->is_set(key);
         break;
     case VM_PROPERTIES: 
-        value = VM_Global_State::loader_env->VmProperties()->is_set(key) ? 1 : 0;
+        value = VM_Global_State::loader_env->VmProperties()->is_set(key);
         break;
     default:
-        value = -1;
         ASSERT(0, "Unknown property table: " << table_number);
     }
-    return value;
+    return value ? TRUE : FALSE;
 }
 
 char** vm_properties_get_keys(PropertyTable table_number)
@@ -2181,6 +1953,7 @@ static Annotation* lookup_annotation(AnnotationTable* table, Class* owner, Class
         Annotation* antn = table->table[i];
         Type_Info_Handle tih = (Type_Info_Handle) type_desc_create_from_java_descriptor(antn->type->bytes, owner->get_class_loader());
         if (tih) {
+            //FIXME optimize: first check if class name matches
             Class* type = type_info_get_class(tih);
             if (antn_type == type) {
                 return antn;

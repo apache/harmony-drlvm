@@ -46,12 +46,8 @@ DECLARE_OPEN(void, vm_properties_destroy_value, (char* value));
 
 /**
  * Checks if the property is set. 
- *
- * @return -1 if <code>table_number</code> is incorrect.<BR>
- *          1 if property is set in <code>table_number</code> property table.<BR>
- *          0 otherwise.
  */
-DECLARE_OPEN(int, vm_property_is_set, (const char* key, PropertyTable table_number));
+DECLARE_OPEN(BOOLEAN, vm_property_is_set, (const char* key, PropertyTable table_number));
 
 /**
  * @return An array of keys from <code>table_number</code> properties table.

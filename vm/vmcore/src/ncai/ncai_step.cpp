@@ -531,7 +531,7 @@ void ncai_step_native_method_entry(Method* m)
     }
 
     Class_Handle klass = method_get_class((Method_Handle)m);
-    ClassLoader* loader = (ClassLoader*)class_get_class_loader(klass);
+    ClassLoader* loader = klass->get_class_loader();
     GenericFunctionPointer func = loader->LookupNative((Method_Handle)m);
     assert(func);
 

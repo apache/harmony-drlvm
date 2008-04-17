@@ -610,13 +610,3 @@ NativeCodePtr rth_get_lil_monitor_exit_non_null() {
     lil_free_code_stub(cs);
     return addr;
 }
-
-
-Boolean jit_may_inline_object_synchronization(unsigned * UNREF thread_id_register,
-                                              unsigned * UNREF sync_header_offset,
-                                              unsigned * UNREF sync_header_width,
-                                              unsigned * UNREF lock_owner_offset,
-                                              unsigned * UNREF lock_owner_width,
-                                              Boolean  * UNREF jit_clears_ccv) {
-    return FALSE;
-}

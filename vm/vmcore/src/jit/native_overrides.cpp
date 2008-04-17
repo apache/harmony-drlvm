@@ -19,7 +19,7 @@
  * @version $Revision: 1.1.2.1.4.4 $
  */  
 
-
+#include "vtable.h"
 #include "Class.h"
 #include "environment.h"
 #include "lil.h"
@@ -29,6 +29,7 @@
 #include "object_layout.h"
 #include "open/types.h"
 #include "open/vm_util.h"
+#include "open/vm_ee.h"
 #include "open/vm.h"
 
 // *** This is for readInternal override

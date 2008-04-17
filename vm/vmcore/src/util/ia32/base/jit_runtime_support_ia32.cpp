@@ -30,7 +30,7 @@ using namespace std;
 #include "open/types.h"
 #include "open/gc.h"
 #include "open/vm_class_manipulation.h"
-
+#include "vtable.h"
 #include "environment.h"
 #include "Class.h"
 #include "object_layout.h"

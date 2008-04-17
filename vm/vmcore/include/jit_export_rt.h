@@ -41,26 +41,6 @@ extern "C" {
 // to be notified whenever, e.g., a VM data structure changes that would require 
 // code patching or recompilation.
  
-// The callback that corresponds to vm_register_jit_extended_class_callback.  
-// The newly loaded class is new_class.  The JIT should return TRUE if any code was modified
-// (consequently the VM will ensure correctness such as synchronizing I- and D-caches), 
-// and FALSE otherwise.
-JITEXPORT Boolean 
-JIT_extended_class_callback(JIT_Handle jit, 
-                            Class_Handle  extended_class,
-                            Class_Handle  new_class,
-                            void         *callback_data);
-
-// The callback that corresponds to vm_register_jit_overridden_method_callback. 
-// The overriding method is new_method. The JIT should return TRUE if any code was modified
-// (consequently the VM will ensure correctness such as synchronizing I- and D-caches),
-// and FALSE otherwise.
-JITEXPORT Boolean 
-JIT_overridden_method_callback(JIT_Handle jit,
-                               Method_Handle  overridden_method,
-                               Method_Handle  new_method, 
-                               void          *callback_data);
-
 // The callback that corresponds to vm_register_jit_recompiled_method_callback.  
 // The JIT should return TRUE if any code was modified (consequently the VM will ensure 
 // correctness such as synchronizing I- and D-caches), and FALSE otherwise.
@@ -164,7 +144,7 @@ JIT_get_address_of_this(JIT_Handle               jit,
 
 
 // Returns TRUE if the JIT will compress references within objects and vector elements by representing 
-// them as offsets rather than raw pointers. The JIT should call the VM function vm_references_are_compressed()
+// them as offsets rather than raw pointers. The JIT should call the VM function vm_is_heap_compressed()
 // during initialization in order to decide whether it should compress references.
 JITEXPORT Boolean 
 JIT_supports_compressed_references(JIT_Handle jit);

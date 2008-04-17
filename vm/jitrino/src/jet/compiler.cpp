@@ -29,12 +29,14 @@
 #include <stdlib.h>
 #endif
 
+#include "open/vm_class_loading.h"
 #include "open/vm.h"
 #include "open/vm_properties.h"
 #include "open/hythread_ext.h"
 #include "open/vm_class_info.h"
 #include "open/vm_type_access.h"
 #include "open/vm_method_access.h"
+#include "open/vm_ee.h"
 #include "jit_import.h"
 #include "jit_runtime_support.h"
 #include "jit_intf.h"
@@ -1474,10 +1476,10 @@ void Compiler::initStatics(void)
     rt_helper_new = 
      (char*)vm_helper_get_addr(VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE);
 
-    g_refs_squeeze = vm_references_are_compressed();
-    g_vtbl_squeeze = vm_vtable_pointers_are_compressed();
-    OBJ_BASE  = (const char*)vm_heap_base_address();
-    VTBL_BASE = (const char*)vm_get_vtable_base();
+    g_refs_squeeze = vm_is_heap_compressed();
+    g_vtbl_squeeze = vm_is_vtable_compressed();
+    OBJ_BASE  = (const char*)vm_get_heap_base_address();
+    VTBL_BASE = (const char*)vm_get_vtable_base_address();
     NULL_REF  = g_refs_squeeze ? OBJ_BASE : NULL;
 
     g_jvmtiMode = (bool)vm_property_get_boolean("vm.jvmti.enabled", false, VM_PROPERTIES);

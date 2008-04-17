@@ -23,8 +23,10 @@
 #include "stats.h"
 
 #include "open/vm_class_info.h"
+#include "open/vm_class_loading.h"
 #include "jit_import.h"
-#include "jit_intf.h"
+//#include "jit_intf.h"
+#include "open/vm_ee.h"
 
 /**
  * @file

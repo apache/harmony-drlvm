@@ -106,7 +106,7 @@ inline jint ti_get_object_size(TIEnv *ti_env, Managed_Object_Handle obj)
     if (clss->is_array()) {
         return vm_vector_size(clss, get_vector_length(obj));
     } else {
-        return class_get_boxed_data_size(clss);
+        return class_get_object_size(clss);
     }
 }
 

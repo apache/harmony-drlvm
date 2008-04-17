@@ -97,7 +97,7 @@ void *get_vm_execute_java_method()
     emitter.ipf_mov(saved_heap_base, HEAP_BASE_REG);
     emitter.ipf_mov(THREAD_PTR_REG, thread_pointer);
     emitter.ipf_mov(THREAD_ID_REG, thread_id);
-    emit_mov_imm_compactor(emitter, HEAP_BASE_REG, (uint64)vm_heap_base_address());
+    emit_mov_imm_compactor(emitter, HEAP_BASE_REG, (uint64)vm_get_heap_base_address());
 
     /////// begin get args
     // First move int args to stacked registers

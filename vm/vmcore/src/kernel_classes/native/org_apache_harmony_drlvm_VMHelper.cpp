@@ -19,8 +19,10 @@
 #include "org_apache_harmony_drlvm_VMHelper.h"
 
 #include "open/vm.h"
+#include "open/vm_ee.h"
 #include "open/vm_util.h"
 #include "environment.h"
+#include "vtable.h"
 #include <assert.h>
 
 JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_VMHelper_getPointerTypeSize (JNIEnv *, jclass) {
@@ -44,7 +46,7 @@ JNIEXPORT jboolean JNICALL Java_org_apache_harmony_drlvm_VMHelper_isCompressedVT
 /** @return vtable base offset if is in compressed-refs mode or -1*/
 JNIEXPORT jlong JNICALL Java_org_apache_harmony_drlvm_VMHelper_getCompressedModeVTableBaseOffset(JNIEnv *, jclass) {
 #ifdef USE_COMPRESSED_VTABLE_POINTERS
-    return (jlong)vm_get_vtable_base();
+    return (jlong)vm_get_vtable_base_address();
 #else
     return -1;
 #endif

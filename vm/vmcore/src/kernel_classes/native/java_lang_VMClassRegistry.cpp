@@ -30,6 +30,7 @@
 #include "cxxlog.h"
 
 #include "open/vm_class_manipulation.h"
+#include "open/vm_class_loading.h"
 #include "Package.h"
 #include "classloader.h"
 #include "jni_utils.h"
@@ -40,6 +41,68 @@
 
 #include "java_lang_VMClassRegistry.h"
 #include "java_lang_ClassLoader.h"
+
+// This function is for native library support
+// It takes a class name with .s not /s. 
+// FIXME: caller could convert it itself
+Class_Handle class_find_loaded(ClassLoaderHandle loader, const char* name)
+{
+    char* name3 = strdup(name);
+    char* p = name3;
+    while (*p) {
+        if (*p=='.') *p='/';
+        p++;
+    }
+    Global_Env* env = VM_Global_State::loader_env;
+    String* name2 = env->string_pool.lookup(name3);
+    Class* ch;
+    if (loader) {
+        ch = loader->LookupClass(name2);
+    } else {
+        ch = env->bootstrap_class_loader->LookupClass(name2);
+    }
+    STD_FREE(name3);
+    if(ch && (!ch->verify(env) || !ch->prepare(env))) return NULL;
+    return ch;
+}
+
+Class_Handle class_find_class_from_loader(ClassLoaderHandle loader, const char* n, Boolean init)
+{
+    ASSERT_RAISE_AREA;
+    assert(hythread_is_suspend_enabled()); // -salikh
+    char *new_name = strdup(n);
+    char *p = new_name;
+    while (*p) {
+        if (*p == '.') *p = '/';
+        p++;
+    }
+    String* name = VM_Global_State::loader_env->string_pool.lookup(new_name);
+    STD_FREE(new_name);
+    Class* ch;
+    if (loader) {
+        ch = class_load_verify_prepare_by_loader_jni(
+            VM_Global_State::loader_env, name, loader);
+    } else {
+        assert(hythread_is_suspend_enabled());
+        ch = class_load_verify_prepare_from_jni(VM_Global_State::loader_env, name);
+    }
+    if (!ch) return NULL;
+    // All initialization from jni should not propagate exceptions and
+    // should return to calling native method.
+    if(init) {
+        class_initialize_from_jni(ch);
+
+        if (exn_raised()) {
+            return NULL;
+        }
+    }
+
+    if(exn_raised()) {
+        return 0;
+    }
+
+    return ch;
+}
 
 /*
  * Class:     java_lang_VMClassRegistry

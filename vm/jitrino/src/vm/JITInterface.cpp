@@ -151,29 +151,6 @@ JIT_profile_notification_callback(JIT_Handle jit, PC_Handle pc, Method_Handle mh
     } //opt does not support counters patching today.
 }
 
-// Called if JIT registered itself to be notified when the class is extended
-// Returns TRUE if any code was modified and FALSE otherwise.
-extern "C"
-JITEXPORT Boolean
-JIT_extended_class_callback(JIT_Handle jit, Class_Handle extended_class,
-                            Class_Handle new_class, void *callback_data)
-{
-    return FALSE;
-}
-
-// Called if JIT registered itself to be notified when the method is
-// overridden
-// Returns TRUE if any code was modified and FALSE otherwise
-extern "C"
-JITEXPORT Boolean
-JIT_overridden_method_callback(JIT_Handle jit,
-                               Method_Handle  overridden_method,
-                               Method_Handle  new_method,
-                               void *callback_data)
-{
-    return FALSE;
-}
-
 // Called if JIT registered itself to be notified when the method is
 // recompiled
 // Returns TRUE if any code was modified and FALSE otherwise
@@ -543,5 +520,6 @@ set_local_var(JIT_Handle jit, Method_Handle method,
 }
 
 } //namespace Jitrino
+
 
 

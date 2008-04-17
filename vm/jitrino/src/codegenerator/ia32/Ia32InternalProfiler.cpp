@@ -106,11 +106,10 @@ struct Filter {
         FilterAttr<bool>                                    isInstanceInitializer;
         FilterAttr<bool>                                    isStrict;
         FilterAttr<bool>                                    isInitLocals;
-        FilterAttr<bool>                                    isOverridden;
 
         StlMap<int, OpndFilter> operandFilters;
 
-        Filter() : isInitialized(false), isNegative(false), isOR(false), mnemonic(Mnemonic_NULL), operandNumber(-1), rtKind(Opnd::RuntimeInfo::Kind_Null), rtHelperID(VM_RT_UNKNOWN), rtIntHelperName("none"), isNative(false), isStatic(false), isSynchronized(false), isNoInlining(false), isInstance(false), isFinal(false), isVirtual(false), isAbstract(false), isClassInitializer(false), isInstanceInitializer(false), isStrict(false), isInitLocals(false), isOverridden(false), operandFilters(Jitrino::getGlobalMM()) {}
+        Filter() : isInitialized(false), isNegative(false), isOR(false), mnemonic(Mnemonic_NULL), operandNumber(-1), rtKind(Opnd::RuntimeInfo::Kind_Null), rtHelperID(VM_RT_UNKNOWN), rtIntHelperName("none"), isNative(false), isStatic(false), isSynchronized(false), isNoInlining(false), isInstance(false), isFinal(false), isVirtual(false), isAbstract(false), isClassInitializer(false), isInstanceInitializer(false), isStrict(false), isInitLocals(false), operandFilters(Jitrino::getGlobalMM()) {}
 
         Filter& operator=(const Filter& c) {
             Filter& f = *this;
@@ -134,7 +133,6 @@ struct Filter {
             f.isInstanceInitializer   =  c.isInstanceInitializer;     
             f.isStrict                =  c.isStrict;                  
             f.isInitLocals            =  c.isInitLocals;              
-            f.isOverridden            =  c.isOverridden;              
 
             for(StlMap<int, OpndFilter>::const_iterator it = c.operandFilters.begin(); it !=c.operandFilters.end(); it++) {
                 f.operandFilters[it->first] = it->second;
@@ -503,15 +501,6 @@ void InternalProfilerAct::readConfig(Config * config) {
                             config->counters[num].filter.isInitialized=true;
                             config->counters[num].filter.isInitLocals.value=(std::string(val) == "true")? true : false;
                             config->counters[num].filter.isInitLocals.isInitialized=true;
-                        }
-                    } else if ((int)line.find(".isOverridden") != -1) {
-                        char * val = (char *)std::strstr(line.c_str(),"=")+1;
-                        if ((std::string(val) == "true") && (std::strstr(line.c_str(), "IsNegative"))) {
-                            config->counters[num].filter.isOverridden.isNegative=true;
-                        } else {
-                            config->counters[num].filter.isInitialized=true;
-                            config->counters[num].filter.isOverridden.value=(std::string(val) == "true")? true : false;
-                            config->counters[num].filter.isOverridden.isInitialized=true;
                         }
                     }
                 } else if (std::strstr(c_line, "[begin]") == c_line) {
@@ -953,18 +942,6 @@ bool InternalProfiler::passFilter(Inst * inst, Filter& filter) {
             return false;
         res = filter.isInitLocals.value == false;
         if(filter.isInitLocals.isNegative)
-            res = !res;
-
-        if(filter.isOR && res)
-            return true;
-        if(!(filter.isOR || res))
-            return false;
-    }
-    if(filter.isOverridden.isInitialized) {
-        if(!rt || ((rt->getKind() != Opnd::RuntimeInfo::Kind_MethodDirectAddr) && (rt->getKind() != Opnd::RuntimeInfo::Kind_MethodDirectAddr)))
-            return false;
-        res = filter.isOverridden.value == ((MethodDesc *)rt->getValue(0))->isOverridden();
-        if(filter.isOverridden.isNegative)
             res = !res;
 
         if(filter.isOR && res)

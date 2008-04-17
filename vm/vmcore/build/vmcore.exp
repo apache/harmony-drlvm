@@ -13,7 +13,7 @@ VMCORE_0.1 {
     class_get_array_element_class;
     class_get_array_element_size;
     class_get_array_of_class;
-    class_get_boxed_data_size;
+    class_get_object_size;
     class_get_class_loader;
     class_get_class_of_primitive_type;
     class_initialize;
@@ -26,7 +26,7 @@ VMCORE_0.1 {
     class_get_declaring_class;
     class_get_depth;
     class_get_element_type_info;
-    class_get_fast_instanceof_flag;
+    class_is_support_fast_instanceof;
     class_get_field;
     class_get_field_by_name;
     class_get_flags;
@@ -59,7 +59,7 @@ VMCORE_0.1 {
     class_is_reference;
     class_is_valuetype;
     class_load_class_by_descriptor;
-    class_load_class_by_name;
+    vm_load_class_with_bootstrap;
     vm_lookup_class_with_bootstrap;
     class_lookup_method_recursively;
     class_number_fields;
@@ -70,7 +70,7 @@ VMCORE_0.1 {
     class_is_abstract;
     class_is_final;
     class_is_interface;
-    compiled_method_load;
+    vm_compiled_method_load;
     compress_reference;
     class_cp_get_class_name;
     class_cp_get_entry_name;
@@ -128,7 +128,7 @@ VMCORE_0.1 {
     class_loader_lock;
     class_loader_unlock;
     get_thread_ptr;
-    get_vm_interface;
+    vm_get_interface;
     initialize_arg_list_iterator;
     init_log_system;
     is_enabled;
@@ -494,7 +494,7 @@ VMCORE_0.1 {
     method_get_name;
     method_get_native_func_addr;
     method_get_exc_handler_number;
-    method_get_offset;
+    method_get_vtable_offset;
     method_get_return_type;
     method_get_side_effects;
     method_get_signature;
@@ -586,10 +586,10 @@ VMCORE_0.1 {
     vm_get_gc_thread_local;
     vm_helper_get_addr;
     vm_helper_get_addr_optimized;
-    vm_get_vtable_base;
+    vm_get_vtable_base_address;
     vm_get_vtable_ptr_size;
-    vm_heap_base_address;
-    vm_heap_ceiling_address;
+    vm_get_heap_base_address;
+    vm_get_heap_ceiling_address;
     vm_heavy_finalizer_block_mutator;
     vm_helper_get_by_name;
     vm_helper_get_calling_convention;
@@ -611,7 +611,7 @@ VMCORE_0.1 {
     vm_patch_code_block;
     vm_reclaim_native_objs;
     vm_recompile_method;
-    vm_references_are_compressed;
+    vm_is_heap_compressed;
     vm_register_jit_extended_class_callback;
     vm_register_jit_overridden_method_callback;
     vm_register_jit_recompiled_method_callback;
@@ -619,7 +619,7 @@ VMCORE_0.1 {
     vm_resolve_class_new;
     vm_resume_threads_after;
     vm_vector_size;
-    vm_vtable_pointers_are_compressed;
+    vm_is_vtable_compressed;
     vtable_get_class;
     vtable_get_super_array_offset;
 

@@ -42,69 +42,10 @@ extern "C" {
 #endif
 
 /**
- * This structure is meant to be opaque. External modules should not
- * attempt to directly access any of its fields.
- */ 
-typedef struct ChaClassIterator {
-    Class_Handle _root_class;
-    Class_Handle _current;
-    Boolean _is_valid;
-} ChaClassIterator;
-
-
-/**
- * This structure is meant to be opaque. External modules should not
- * attempt to directly access any of its fields.
+ * Dynamic interface adapter, returns specific API by its name.
  */
-typedef struct ChaMethodIterator {
-    Method_Handle _method;
-    Method_Handle _current;
-    ChaClassIterator _class_iter;
-} ChaMethodIterator;
+DECLARE_OPEN(void *, vm_get_interface, (const char*));
 
-
-/**
- * Dynamic interface adaptor, should return specific API by its name.
- */
-VMEXPORT void* get_vm_interface(const char*);
-
-/**
- * Begin class-related functions.
- */
-
-/**
- * @return <code>TRUE</code> if the class is a value type.
- */
- VMEXPORT Boolean class_is_valuetype(Class_Handle ch);
-
-/**
- * This function can only be called if (<code>class_is_enum(ch)</code> == <code>TRUE</code>)
- * The returned value is the type of the underlying int type.
- */
-VMEXPORT VM_Data_Type class_get_enum_int_type(Class_Handle ch);
-
-/**
- * The super class of the current class. 
- * @return <code>NULL</code> for the system object class, i.e.
- *         <code>class_get_super_class</code>(vm_get_system_object_class()) == NULL
- */
-VMEXPORT Class_Handle class_get_super_class(Class_Handle ch);
-
-/**
- * @return The allocation handle to be used for the object allocation
- *         routines, given a class handle.
- */
-VMEXPORT Allocation_Handle class_get_allocation_handle(Class_Handle ch);
-
-/**
- * @return The class handle corresponding to a given allocation handle.
- */
-VMEXPORT Class_Handle allocation_handle_get_class(Allocation_Handle ah);
-
-/**
- * For Java returns <code>FALSE</code>.
- */
- VMEXPORT Boolean class_is_before_field_init(Class_Handle ch);
 
 /**
  * Number of instance fields defined in a class. That doesn't include
@@ -145,9 +86,6 @@ VMEXPORT Field_Handle class_get_instance_field_recursive(Class_Handle ch, unsign
  */
  VMEXPORT unsigned class_get_number_methods(Class_Handle ch);
 
-/// Check if fast_instanceof is applicable for the class
-VMEXPORT Boolean class_get_fast_instanceof_flag(Class_Handle cl);
-
 /**
  * @return <code>TRUE</code> if all instances of this class are pinned.
  */
@@ -159,15 +97,14 @@ VMEXPORT Boolean class_get_fast_instanceof_flag(Class_Handle cl);
  */
  VMEXPORT unsigned class_get_alignment(Class_Handle ch);
 
-/**
- * Get the alignment of the class when it's unboxed.
+ /**
+ * Returns the size of an instance in the heap, in bytes.
+ * 
+ * @param klass - the class handle
+ *
+ * @return The size of an instance in the heap.
  */
- VMEXPORT unsigned class_get_alignment_unboxed(Class_Handle ch);
-
-/**
- * @return The size in bytes of an instance in the heap.
- */
- VMEXPORT unsigned class_get_boxed_data_size(Class_Handle ch);
+ DECLARE_OPEN(size_t, class_get_object_size, (Class_Handle ch));
 
 /**
  * @return The offset to the start of user data form the start of a boxed
@@ -183,12 +120,6 @@ VMEXPORT Boolean class_get_fast_instanceof_flag(Class_Handle cl);
  */
  VMEXPORT Class_Handle class_get_array_element_class(Class_Handle ch);
 
-/**
- * @return The offset from the start of the vtable at which the
- *         superclass hierarchy is stored. This is for use with fast type
- *         checking.
- */ 
- VMEXPORT int vtable_get_super_array_offset();
 
 /**
  * @return Class handle given object's <code>VTable_Handle</code>.
@@ -226,10 +157,6 @@ VMEXPORT Boolean class_get_fast_instanceof_flag(Class_Handle cl);
 ///
 
 ////
-// end class-related functions.
-////
-
-////
 // begin field-related functions.
 ////
 
@@ -264,10 +191,6 @@ VMEXPORT Boolean class_get_fast_instanceof_flag(Class_Handle cl);
  */
 VMEXPORT int vector_length_offset();
 
-/**
- * Deprecated. Please use <code>vector_length_offset</code> instead.
- */
-VMEXPORT int array_length_offset();
 
 /**
  * Return the offset to the first element of the vector of the given type.
@@ -275,11 +198,6 @@ VMEXPORT int array_length_offset();
  * element is not available.
  */
 VMEXPORT int vector_first_element_offset(VM_Data_Type element_type);
-
-/**
- * Deprecated. Please use <code>vector_first_element_offset</code> instead.
- */ 
-VMEXPORT int array_first_element_offset(VM_Data_Type element_type);
 
 
 /**
@@ -289,21 +207,11 @@ VMEXPORT int array_first_element_offset(VM_Data_Type element_type);
 VMEXPORT int vector_first_element_offset_class_handle(Class_Handle element_type);
 
 /**
- * Deprecated. Please use <code>vector_first_element_offset_class_handle</code> instead.
- */
-VMEXPORT int array_first_element_offset_class_handle(Class_Handle element_type);
-
-/**
  * Return the offset to the first element of the vector of the given type.
  * If the class is a value type, assume that elements are unboxed.
  * If the class is not a value type, assume that elements are references.
  */ 
 VMEXPORT int vector_first_element_offset_unboxed(Class_Handle element_type);
-
-/**
- * Deprecated. Please use <code>vector_first_element_offset_unboxed</code> instead.
- */
-VMEXPORT int array_first_element_offset_unboxed(Class_Handle element_type);
 
 /**
  * Return the length of a vector. The caller must ensure that GC will not
@@ -329,68 +237,34 @@ VMEXPORT unsigned vm_vector_size(Class_Handle vector_class, int length);
 // end vector layout functions.
 ////
 
-////
-// begin miscellaneous functions.
-////
 
 /**
  * @return <code>TRUE</code> if references within objects and vector elements are
  *          to be treated as offsets rather than raw pointers.
  */
-VMEXPORT Boolean vm_references_are_compressed();
+DECLARE_OPEN(BOOLEAN, vm_is_heap_compressed, ());
 
 /**
  * @return The starting address of the GC heap.
  */
-VMEXPORT void *vm_heap_base_address();
+DECLARE_OPEN(void *, vm_get_heap_base_address, ());
 
 /**
  * @return The ending address of the GC heap.
  */
-VMEXPORT void *vm_heap_ceiling_address();
+DECLARE_OPEN(void *, vm_get_heap_ceiling_address, ());
 
 /**
  * @return <code>TRUE</code> if vtable pointers within objects are to be treated
  *         as offsets rather than raw pointers.
  */
-VMEXPORT Boolean vm_vtable_pointers_are_compressed();
-
-/**
- * @return The offset to the vtable pointer in an object.
- */ 
-VMEXPORT int object_get_vtable_offset();
+DECLARE_OPEN(BOOLEAN, vm_is_vtable_compressed, ());
 
 /**
  * @return The base address of the vtable memory area. This value will
  *         never change and can be cached at startup.
  */
-VMEXPORT POINTER_SIZE_INT vm_get_vtable_base();
-
-/**
- * @return The width in bytes (e.g. 4 or 8) of the vtable type
- *         information in each object's header. This is typically used
- *         by the JIT for generating type-checking code, e.g. for inlined
- *         type checks or for inlining of virtual methods.
- */
-VMEXPORT unsigned vm_get_vtable_ptr_size();
-
-/**
- * Returns the address of the global flag that specifies whether
- * MethodEntry event is enabled. JIT should call this function in case
- * a method is compiled with exe_notify_method_entry flag set.
- */
-VMEXPORT char *get_method_entry_flag_address();
-
-/**
- * Returns the address of the global flag that specifies whether
- * MethodExit event is enabled. JIT should call this function in case
- * a method is compiled with exe_notify_method_exit flag set.
- */
-VMEXPORT char *get_method_exit_flag_address();
-
-////
-// end miscellaneous functions.
-////
+DECLARE_OPEN(void *, vm_get_vtable_base_address, ());
 
 #ifdef __cplusplus
 }

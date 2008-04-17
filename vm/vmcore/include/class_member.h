@@ -17,6 +17,7 @@
 #ifndef __CLASS_MEMBER_H__
 #define __CLASS_MEMBER_H__
 
+#include "open/rt_types.h"
 #include "annotation.h"
 #include "Class.h"
 #include "vm_java_support.h"
@@ -370,9 +371,6 @@ struct Method_Change_Notification_Record {
 };
 
 
-struct Inline_Record;
-
-
 // 20020222 This is only temporary to support the new JIT interface.
 // We will reimplement the signature support.
 struct Method_Signature {
@@ -569,10 +567,6 @@ public:
      * from multiple threads.
      */
     CodeChunkInfo *create_code_chunk_info_mt();
-
-    // Notify JITs whenever this method is overridden by a newly loaded class.
-    void register_jit_overridden_method_callback(JIT *jit_to_be_notified, void *callback_data);
-    void do_jit_overridden_method_callbacks(Method *overriding_method);
 
     // Notify JITs whenever this method is recompiled or initially compiled.
     void register_jit_recompiled_method_callback(JIT *jit_to_be_notified, void *callback_data);
@@ -785,12 +779,7 @@ public:
         return -1;
     }
 
-    Inline_Record *inline_records;
-    void set_inline_assumption(JIT *jit, Method *caller);
     void method_was_overridden();
-
-    Method_Change_Notification_Record *_notify_override_records;
-
     // Records JITs to be notified when a method is recompiled or initially compiled.
     Method_Change_Notification_Record *_notify_recompiled_records;
 

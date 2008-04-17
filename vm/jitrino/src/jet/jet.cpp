@@ -829,24 +829,6 @@ extern "C" JITEXPORT Boolean JIT_recompiled_method_callback(
     return FALSE;
 }
 
-extern "C" JITEXPORT
-Boolean JIT_extended_class_callback(JIT_Handle jit,
-                                    Class_Handle extended_class,
-                                    Class_Handle new_class,
-                                    void *callback_data)
-{
-    return FALSE;
-}
-
-extern "C" JITEXPORT
-Boolean JIT_overridden_method_callback(JIT_Handle jit,
-                                       Method_Handle overridden_method,
-                                       Method_Handle new_method,
-                                       void *callback_data)
-{
-    return FALSE;
-}
-
 /**
  * @see rt_unwind
  */
@@ -996,4 +978,5 @@ OpenExeJpdaError set_local_var(JIT_Handle jit,
 /// @} // ~ defgroup JITRINO_JET_STANDALONE
 
 #endif  // ~ifdef PROJECT_JET   // standalone interface
+
 

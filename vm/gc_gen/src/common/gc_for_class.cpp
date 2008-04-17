@@ -177,7 +177,7 @@ void gc_class_prepared (Class_Handle ch, VTable_Handle vth)
   WeakReferenceType type = class_is_reference(ch);
   gc_set_prop_reference(gcvt, type);
   
-  unsigned int size = class_get_boxed_data_size(ch);
+  unsigned int size = class_get_object_size(ch);
   gcvt->gc_allocated_size = size;
   
   gcvt->gc_class_name = class_get_name(ch);

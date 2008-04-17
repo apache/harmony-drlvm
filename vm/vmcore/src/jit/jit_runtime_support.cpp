@@ -31,6 +31,7 @@ using namespace std;
 #include <stdlib.h>
 
 #include "open/gc.h"
+#include "vtable.h"
 #include "open/types.h"
 #include "open/bytecodes.h"
 #include "open/vm_class_manipulation.h"
@@ -51,6 +52,7 @@ using namespace std;
 #include "vm_arrays.h"
 #include "vm_strings.h"
 #include "vm_threads.h"
+#include "open/vm_ee.h"
 
 #include "jvmti_interface.h"
 #include "compile.h"
@@ -258,7 +260,7 @@ static LilCodeStub* rth_gen_lil_type_test(LilCodeStub* cs, RthTypeTestNull null,
     // We need to get the vtable in more than one place below
     // Here are some macros to helper smooth over the compressed vtables
     const POINTER_SIZE_INT vtable_off = object_get_vtable_offset();
-    const POINTER_SIZE_INT vtable_add = vm_vtable_pointers_are_compressed() ? vm_get_vtable_base() : 0;
+    const POINTER_SIZE_INT vtable_add = vm_is_vtable_compressed() ? (POINTER_SIZE_INT)vm_get_vtable_base_address() : 0;
 
     // Setup locals
     cs = lil_parse_onto_end(cs, (type ? "locals 1;" : "locals 2;"));
@@ -286,7 +288,7 @@ static LilCodeStub* rth_gen_lil_type_test(LilCodeStub* cs, RthTypeTestNull null,
     if (type) {
         if(type->get_fast_instanceof_flag()) {
             cs = lil_parse_onto_end(cs,
-                vm_vtable_pointers_are_compressed() ? "ld l0,[i0+%0i:g4],zx;" : "ld l0,[i0+%0i:pint];",
+                vm_is_vtable_compressed() ? "ld l0,[i0+%0i:g4],zx;" : "ld l0,[i0+%0i:pint];",
                 vtable_off);            
             assert(cs);
             cs = lil_parse_onto_end(cs,
@@ -304,7 +306,7 @@ static LilCodeStub* rth_gen_lil_type_test(LilCodeStub* cs, RthTypeTestNull null,
             is_fast_off, depth_off);
         assert(cs);
         cs = lil_parse_onto_end(cs,
-            vm_vtable_pointers_are_compressed() ? "ld l0,[i0+%0i:g4],zx;" : "ld l0,[i0+%0i:pint];",
+            vm_is_vtable_compressed() ? "ld l0,[i0+%0i:g4],zx;" : "ld l0,[i0+%0i:pint];",
             vtable_off);
         assert(cs);
         cs = lil_parse_onto_end(cs,
@@ -328,7 +330,7 @@ static LilCodeStub* rth_gen_lil_type_test(LilCodeStub* cs, RthTypeTestNull null,
             "out platform:pint,pint:g4;");
         assert(cs);
         cs = lil_parse_onto_end(cs,
-            vm_vtable_pointers_are_compressed() ? "ld l0,[i0+%0i:g4],zx;" : "ld l0,[i0+%0i:pint];",
+            vm_is_vtable_compressed() ? "ld l0,[i0+%0i:g4],zx;" : "ld l0,[i0+%0i:pint];",
             vtable_off);
         assert(cs);
         cs = lil_parse_onto_end(cs,
@@ -372,7 +374,7 @@ static void rth_type_test_update_stats(VTable* sub, Class* super)
         VM_Statistics::get_vm_stats().num_type_checks_super_is_array ++;
     else if (super->is_interface())
         VM_Statistics::get_vm_stats().num_type_checks_super_is_interface ++;
-    else if ((unsigned)super->get_depth() >= vm_max_fast_instanceof_depth())
+    else if (super->get_depth() >= vm_max_fast_instanceof_depth())
         VM_Statistics::get_vm_stats().num_type_checks_super_is_too_deep ++;
     UNSAFE_REGION_END
 }
@@ -1939,7 +1941,7 @@ static void update_general_type_checking_stats(VTable *sub, Class *super)
         VM_Statistics::get_vm_stats().num_type_checks_super_is_array++;
     else if (super->is_interface())
         VM_Statistics::get_vm_stats().num_type_checks_super_is_interface++;
-    else if ((unsigned)super->get_depth() >= vm_max_fast_instanceof_depth())
+    else if (super->get_depth() >= vm_max_fast_instanceof_depth())
         VM_Statistics::get_vm_stats().num_type_checks_super_is_too_deep++;
     UNSAFE_REGION_END
 #endif // VM_STATS
@@ -2032,7 +2034,7 @@ static LilCodeStub* gen_lil_typecheck_slowpath(LilCodeStub *cs,
      * call class_is_subtype(o0, o1)
      */
     LilCodeStub *cs2;
-    if (vm_vtable_pointers_are_compressed())
+    if (vm_is_vtable_compressed())
     {
         cs2 = lil_parse_onto_end
             (cs,
@@ -2053,7 +2055,7 @@ static LilCodeStub* gen_lil_typecheck_slowpath(LilCodeStub *cs,
          "ld o0, [l0+%0i:ref];"
          "o1 = i1;"
          "call %1i;",
-         OFFSET(VTable, clss) + (vm_vtable_pointers_are_compressed() ? vm_get_vtable_base() : 0),
+         OFFSET(VTable, clss) + (vm_is_vtable_compressed() ? (UDATA)vm_get_vtable_base_address() : 0),
          (void*) class_is_subtype);
 
     if (is_checkcast) {
@@ -2093,7 +2095,7 @@ static LilCodeStub* gen_lil_typecheck_fastpath(LilCodeStub *cs,
      * check if i1 == l2
      */
     LilCodeStub *cs2;
-    if (vm_vtable_pointers_are_compressed())
+    if (vm_is_vtable_compressed())
     {
         cs2 = lil_parse_onto_end
             (cs,
@@ -2115,7 +2117,7 @@ static LilCodeStub* gen_lil_typecheck_fastpath(LilCodeStub *cs,
          "jc i1 != l2, failed;",
          Class::get_offset_of_depth(),
          (POINTER_SIZE_INT)sizeof(Class*),
-         OFFSET(VTable, superclasses) - sizeof(Class*) + (vm_vtable_pointers_are_compressed() ? vm_get_vtable_base() : 0)
+         OFFSET(VTable, superclasses) - sizeof(Class*) + (vm_is_vtable_compressed() ? (UDATA)vm_get_vtable_base_address() : 0)
          );
 
     if (is_checkcast) {

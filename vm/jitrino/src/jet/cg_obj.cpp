@@ -29,8 +29,9 @@
 #include <stdlib.h>
 
 #include "open/vm_class_info.h"
-#include "jit_import.h"
-#include "jit_intf.h"
+#include "open/vm_class_loading.h"
+#include "open/vm_ee.h"
+#include "open/vm.h"
 
 /**
  * @file
@@ -173,7 +174,7 @@ void CodeGen::gen_new(Class_Handle enclClass, unsigned short cpIndex)
             if ( klass!=enclClass && !class_is_initialized(klass)) {
                 gen_call_vm(ci_helper_o, rt_helper_init_class, 0, klass);
             }
-            unsigned size = class_get_boxed_data_size(klass);
+            unsigned size = class_get_object_size(klass);
             Allocation_Handle ah = class_get_allocation_handle(klass);
             gen_call_vm(ci_new, rt_helper_new, 0, size, ah);
         }

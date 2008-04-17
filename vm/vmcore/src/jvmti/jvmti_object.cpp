@@ -28,7 +28,7 @@
 #include "object_handles.h"
 #include "object_generic.h"
 #include "mon_enter_exit.h"
-
+#include "vtable.h"
 #include "thread_manager.h"
 #include "suspend_checker.h"
 #include "open/vm.h"
@@ -78,7 +78,7 @@ jvmtiGetObjectSize(jvmtiEnv* env,
     if(object_clss->is_array())
         *size_ptr = object_clss->calculate_array_size(get_vector_length((Vector_Handle)mo));
     else
-        *size_ptr = class_get_boxed_data_size(object_clss);
+        *size_ptr = class_get_object_size(object_clss);
     assert(*size_ptr > 0);
 
     tmn_suspend_enable();

@@ -14,10 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Pavel Pervov
- * @version $Revision: 1.6 $
- */  
 #ifndef _VM_CLASS_LOADING_H
 #define _VM_CLASS_LOADING_H
 
@@ -34,6 +30,27 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+DECLARE_OPEN(ClassLoaderHandle, class_get_class_loader, (Class_Handle ch));
+
+/**
+* @return A class corresponding to a primitive type. For all primitive types t
+*         t == <code>class_get_primitive_type_of_class(class_get_class_of_primitive_type(t))</code>
+*/
+DECLARE_OPEN(Class_Handle, class_get_class_of_primitive_type, (VM_Data_Type typ));
+
+
+/**
+* @return An <code>VM_Data_Type</code> value for a given class.
+*/
+DECLARE_OPEN(VM_Data_Type, class_get_primitive_type_of_class, (Class_Handle ch));
+
+/**
+* Given a class handle <code>cl</code> construct a class handle of the type
+* representing array of <code>cl</code>. If class cl is value type, assume
+* that the element is a reference to a boxed instance of that type.
+*/
+DECLARE_OPEN(Class_Handle, class_get_array_of_class, (Class_Handle ch));
 
 /** 
  * @defgroup Extended VM Class Loading Extended Interface
@@ -66,8 +83,6 @@ DECLARE_OPEN(Class_Handle, class_loader_lookup_class,
  * @param name           - the name of the class to load
  *
  * @return The handle for the C++ class representation, if loaded successfully; otherwise, <code>NULL</code>.
- *
- * @note Replaces cl_load_class. 
  */
 DECLARE_OPEN(Class_Handle, class_loader_load_class,
     (ClassLoaderHandle classloader, const char* name));
@@ -92,8 +107,6 @@ DECLARE_OPEN(Class_Handle, vm_lookup_class_with_bootstrap, (const char* name));
  * @param exc   - the exception code for a class loading failure
  *
  * @result The handle for the C++ class representation, if loaded successfully; otherwise, <code>NULL</code>.
- *
- * @note Replaces class_load_class_by_name_using_system_class_loader. 
  */
 DECLARE_OPEN(Class_Handle, vm_load_class_with_bootstrap, (const char* name));
 
@@ -145,8 +158,6 @@ DECLARE_OPEN(void, class_loader_set_verifier_data_ptr,
  * @param classloader - the handle to class loader to retrieve verifier pointer from
  * 
  * @return The pointer to the verifier data
- *
- * @note Replaces cl_get_verify_data_ptr.
  */
 DECLARE_OPEN(void*, class_loader_get_verifier_data_ptr, (ClassLoaderHandle classloader));
 
@@ -154,8 +165,6 @@ DECLARE_OPEN(void*, class_loader_get_verifier_data_ptr, (ClassLoaderHandle class
  * Acquires the lock on a given class loader. 
  *
  * @param classloader - the handle to the C++ class loader structure to acquire lock on.
- * 
- * @note Replaces cl_acquire_lock.
  */
 DECLARE_OPEN(void, class_loader_lock, (ClassLoaderHandle classloader));
 
@@ -163,8 +172,6 @@ DECLARE_OPEN(void, class_loader_lock, (ClassLoaderHandle classloader));
  * Releases the lock on a given class loader. 
  *
  * @param classloader - the handle to the C++ class loader structure to release lock on. 
- * 
- * @note Replaces cl_acquire_lock.
  */
 DECLARE_OPEN(void, class_loader_unlock, (ClassLoaderHandle classloader));
 

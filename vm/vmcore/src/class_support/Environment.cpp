@@ -340,7 +340,8 @@ void Global_Env::init_pools() {
     assert(pool_size);
 }
 
-POINTER_SIZE_INT vm_get_vtable_base()
+
+void* vm_get_vtable_base_address()
 {
     assert (VM_Global_State::loader_env->VTableMemoryManager);
 
@@ -348,8 +349,8 @@ POINTER_SIZE_INT vm_get_vtable_base()
     assert (VM_Global_State::loader_env->VTableMemoryManager->get_base());
     // Subtract a small number (like 1) from the real base so that
     // no valid vtable offsets will ever be 0.
-    return (POINTER_SIZE_INT) (VM_Global_State::loader_env->VTableMemoryManager->get_base() - 8);
+    return (void*) (VM_Global_State::loader_env->VTableMemoryManager->get_base() - 8);
 #else
-    return 0;
+    return NULL;
 #endif
 } //vm_get_vtable_base

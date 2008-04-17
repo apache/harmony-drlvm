@@ -22,6 +22,7 @@
 #define LOG_DOMAIN "exn"
 #include "clog.h"
 
+#include "vtable.h"
 #include "heap.h"
 #include "classloader.h"
 #include "exceptions.h"

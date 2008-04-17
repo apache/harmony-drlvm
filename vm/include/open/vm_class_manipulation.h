@@ -260,18 +260,6 @@ DECLARE_OPEN(VM_Data_Type, class_get_primitive_type_of_class, (Class_Handle klas
 DECLARE_OPEN(Class_Handle, class_get_class_of_primitive_type, (VM_Data_Type type));
 
 /**
- * Returns the size of an instance in the heap, in bytes.
- * 
- * @param klass - the class handle
- *
- * @return The size of an instance in the heap.
- *
- * @note Replaces class_get_boxed_data_size function.
- */
-unsigned
-class_get_instance_size(Class_Handle klass);
-
-/**
  * For given a class handle <i>klass</i> constructs a class of
  * the type representing on-dimentional array of <i>klass</i>.
  * For example, given the class of Ljava/lang/String; this function

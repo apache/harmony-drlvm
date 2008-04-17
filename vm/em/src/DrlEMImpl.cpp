@@ -25,7 +25,8 @@
 #include "NValueProfileCollector.h"
 
 #include "open/vm_properties.h"
-#include "jit_import.h"
+#include "open/vm_ee.h"
+#include "open/ee_em_intf.h"
 #include "em_intf.h"
 #include "open/vm.h"
 #include "open/vm_method_access.h"
@@ -383,7 +384,7 @@ bool DrlEMImpl::initJIT(const std::string& libName, apr_dso_handle_t* libHandle,
 
     void (*_init)(JIT_Handle, const char*, vm_adaptor_t) = 
         (void (*)(JIT_Handle, const char*, vm_adaptor_t)) fn;
-    _init(step.jit, step.jitName.c_str(), get_vm_interface);
+    _init(step.jit, step.jitName.c_str(), vm_get_interface);
 
     bool pcEnabled = false;
     if (apr_dso_sym(&fn, libHandle, "JIT_set_profile_access_interface") == APR_SUCCESS) {

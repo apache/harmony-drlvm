@@ -887,7 +887,7 @@ void Class::create_vtable(unsigned n_vtable_entries)
         }
     }
     if(m_depth > 0
-        && (unsigned)m_depth < vm_max_fast_instanceof_depth()
+        && m_depth < vm_max_fast_instanceof_depth()
         && !is_array()
         && !is_interface())
     {
@@ -1306,10 +1306,10 @@ bool Class::prepare(Global_Env* env)
         m_vtable->methods[i] = NULL;    // for now
     }
 
-    if(vm_vtable_pointers_are_compressed())
+    if(vm_is_vtable_compressed())
     {
         m_allocation_handle =
-            (Allocation_Handle)((POINTER_SIZE_INT)m_vtable - vm_get_vtable_base());
+            (Allocation_Handle)((UDATA)m_vtable - (UDATA)vm_get_vtable_base_address());
     }
     else
     {
@@ -1370,7 +1370,7 @@ bool Class::prepare(Global_Env* env)
 
     // Set up the class_properties field.
     if(is_array()) {
-        m_array_element_size = (vm_references_are_compressed()
+        m_array_element_size = (vm_is_heap_compressed()
             ? sizeof(COMPRESSED_REFERENCE) : sizeof(RAW_REFERENCE));
         m_array_element_shift = m_array_element_size == 8 ? 3 : 2;
         m_vtable->class_properties |= CL_PROP_ARRAY_MASK;

@@ -30,6 +30,7 @@
 #include "open/jthread.h"   // this is for jthread_self()
 #include "open/vm_class_manipulation.h"
 
+#include "vtable.h"
 #include "init.h"
 #include "classloader.h"
 #include "jni_utils.h"
@@ -137,7 +138,7 @@ static apr_dso_handle_t* get_harmonyvm_handle(){
 }
 
 extern "C" VMEXPORT 
-void* get_vm_interface(const char* func_name){
+void* vm_get_interface(const char* func_name){
     static apr_dso_handle_t* descriptor = get_harmonyvm_handle();
     void* p_func = NULL;
     int ret = apr_dso_sym((apr_dso_handle_sym_t*) &p_func, descriptor, func_name);
@@ -148,8 +149,6 @@ void* get_vm_interface(const char* func_name){
     if (p_func) {
         return p_func;
         
-    } else if (strcmp(func_name,"class_is_support_fast_instanceof") == 0) {
-        return (void*)class_get_fast_instanceof_flag;
     } else if (strcmp(func_name,"vector_get_first_element_offset") == 0) {
         return (void*)vector_first_element_offset_class_handle;
     } else if (strcmp(func_name,"vector_get_length_offset") == 0) {
@@ -164,26 +163,6 @@ void* get_vm_interface(const char* func_name){
         return (void*)hythread_uses_fast_tls;
     } else if (strcmp(func_name,"vm_get_tls_offset_in_segment") == 0) {
         return (void*)hythread_get_hythread_offset_in_tls;
-    } else if (strcmp(func_name,"vm_get_heap_base_address") == 0) {
-        return (void*)vm_heap_base_address;
-    } else if (strcmp(func_name,"vm_get_heap_ceiling_address") == 0) {
-        return (void*)vm_heap_ceiling_address;
-    } else if (strcmp(func_name,"vm_is_heap_compressed") == 0) {
-        return (void*)vm_references_are_compressed;
-    } else if (strcmp(func_name,"vm_is_vtable_compressed") == 0) {
-        return (void*)vm_vtable_pointers_are_compressed;
-    } else if (strcmp(func_name,"vm_compiled_method_load") == 0) {
-        return (void*)compiled_method_load;
-    } else if (strcmp(func_name,"vm_properties_destroy_keys") == 0) {
-        return (void*)vm_properties_destroy_keys;
-    } else if (strcmp(func_name,"vm_properties_destroy_value") == 0) {
-        return (void*)vm_properties_destroy_value;
-    } else if (strcmp(func_name,"vm_properties_get_keys") == 0) {
-        return (void*)vm_properties_get_keys;
-    } else if (strcmp(func_name,"vm_properties_get_keys_starting_with") == 0) {
-        return (void*)vm_properties_get_keys_starting_with;
-    } else if (strcmp(func_name,"vm_properties_get_value") == 0) {
-        return (void*)vm_properties_get_value;
     } else {
         return NULL;
     }
@@ -337,7 +316,7 @@ static jint check_platform() {
  */
 static jint check_compression() {
         // Check for a mismatch between whether the various VM components all compress references or not.
-    Boolean vm_compression = vm_references_are_compressed();
+    Boolean vm_compression = vm_is_heap_compressed();
     Boolean gc_compression = gc_supports_compressed_references();
     if (vm_compression) {
         if (!gc_compression) {
@@ -864,7 +843,7 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     // compressed references, so it never answers "true" to supports_compressed_references().
     // ppervov: this check is not correct since a call to
     // gc_supports_compressed_references returns capability while a call to
-    // vm_references_are_compressed returns current VM state, not potential
+    // vm_is_heap_compressed returns current VM state, not potential
     // ability to support compressed mode
     // So, this check is turned off for now and it is FIXME
     // 20071109 process_compression_modes() now automatically selects compression

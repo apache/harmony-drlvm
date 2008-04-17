@@ -23,9 +23,10 @@
 #define LOG_DOMAIN "exn"
 #include "clog.h"
 
+#include "open/vm_class_info.h"
 #include "Class.h"
 #include "open/types.h"
-
+#include "vtable.h"
 #include "classloader.h"
 #include "exceptions.h"
 #include "exceptions_impl.h"
@@ -1173,4 +1174,5 @@ NativeCodePtr exn_get_rth_throw_incompatible_class_change_exception()
     lil_free_code_stub(cs);
     return addr;
 }   //exn_get_rth_throw_incompatible_class_change_exception
+
 

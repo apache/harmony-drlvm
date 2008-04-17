@@ -52,7 +52,83 @@ DECLARE_OPEN(const char *, class_cp_get_const_string, (Class_Handle ch, U_16 idx
 */
 DECLARE_OPEN(VM_Data_Type, class_cp_get_field_type, (Class_Handle src_class, U_16 idx));
 
-/// Returns 'TRUE' if the entry by the given cp_index is resolved.
+
+DECLARE_OPEN(Method_Handle, class_lookup_method_recursively,
+                    (Class_Handle clss,
+                    const char *name,
+                    const char *descr));
+
+DECLARE_OPEN(U_16, class_number_fields, (Class_Handle ch));
+DECLARE_OPEN(Field_Handle, class_get_field, (Class_Handle ch, U_16 idx));
+
+DECLARE_OPEN(Field_Handle, class_get_field_by_name, (Class_Handle ch, const char* name));
+DECLARE_OPEN(Method_Handle, class_get_method_by_name, (Class_Handle ch, const char* name));
+
+DECLARE_OPEN(const char *, class_get_source_file_name, (Class_Handle cl));
+
+/**
+* @return The name of the class.
+*/
+DECLARE_OPEN(const char *, class_get_name, (Class_Handle ch));
+
+/**
+* @return The name of the package containing the class.
+*/
+DECLARE_OPEN(const char *, class_get_package_name, (Class_Handle ch));
+
+/**
+* The super class of the current class. 
+* @return <code>NULL</code> for the system object class, i.e.
+*         <code>class_get_super_class</code>(vm_get_java_lang_object_class()) == NULL
+*/
+DECLARE_OPEN(Class_Handle, class_get_super_class, (Class_Handle ch));
+
+/** 
+* @return <code>TRUE</code> if class <code>s</code> is assignment 
+* compatible with class <code>t</code>.
+*/ 
+DECLARE_OPEN(BOOLEAN, class_is_instanceof, (Class_Handle s, Class_Handle t));
+
+/**
+* @return <code>TRUE</code> if the class is already fully initialized.
+*/
+DECLARE_OPEN(BOOLEAN, class_is_initialized, (Class_Handle ch));
+
+/**
+* @return <code>TRUE</code> if the class represents an enum. 
+*         For Java 1.4 always returns <code>FALSE</code>.
+*/
+DECLARE_OPEN(BOOLEAN, class_is_enum, (Class_Handle ch));
+
+/**
+* @return <code>TRUE</code> if the class represents a primitive type (int, float, etc.)
+*/
+DECLARE_OPEN(BOOLEAN, class_is_primitive, (Class_Handle ch));
+
+/** 
+* @return <code>TRUE</code> is the class is an array.
+*/
+DECLARE_OPEN(BOOLEAN, class_is_array, (Class_Handle ch));
+
+/**
+* @return <code>TRUE</code> if this is an array of primitives.
+*/
+DECLARE_OPEN(BOOLEAN, class_is_non_ref_array, (Class_Handle ch));
+
+DECLARE_OPEN(BOOLEAN, class_is_final, (Class_Handle ch));
+DECLARE_OPEN(BOOLEAN, class_is_abstract, (Class_Handle ch));
+DECLARE_OPEN(BOOLEAN, class_is_interface, (Class_Handle ch));
+
+/**
+* @return <code>TRUE</code> if the class is likely to be used as an exception object.
+*         This is a hint only. If the result is <code>FALSE</code>, the class may still
+*         be used for exceptions but it is less likely.
+*/
+DECLARE_OPEN(BOOLEAN, class_is_throwable, (Class_Handle ch));
+/**
+* @return <code>TRUE</code> if the class has a non-trivial finalizer.
+*/
+DECLARE_OPEN(BOOLEAN, class_is_finalizable, (Class_Handle ch));
 
 #ifdef __cplusplus
 }

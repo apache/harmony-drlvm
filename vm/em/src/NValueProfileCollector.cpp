@@ -28,6 +28,8 @@
 #include <assert.h>
 #include "cxxlog.h"
 #include <sstream>
+#include "open/vm_class_info.h"
+#include "open/vm_ee.h"
 
 #include "port_threadunsafe.h"
 #include "port_atomic.h"

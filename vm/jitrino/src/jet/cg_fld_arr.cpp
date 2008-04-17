@@ -28,7 +28,7 @@
 #include <open/vm.h>
 #include <open/vm_class_info.h>
 #include <open/vm_field_access.h>
-#include <jit_intf.h>
+#include <open/vm_ee.h>
 
 #include "trace.h"
 #include "VMMagic.h"

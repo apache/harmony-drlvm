@@ -15,9 +15,7 @@
  *  limitations under the License.
  */
 
-#include "Class.h"
 #include "environment.h"
-#include "compile.h"
 #include "object_layout.h"
 
 

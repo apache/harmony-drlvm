@@ -29,7 +29,8 @@
 
 #include <open/vm.h>
 #include <jit_import.h>
-#include <jit_intf.h>
+//#include <jit_intf.h>
+#include "open/vm_ee.h"
 
 #if !defined(_IPF_)
     #include "enc_ia32.h"
@@ -863,7 +864,7 @@ void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth, unsigned short
         stackFix = gen_stack_to_args(true, cs, 0);
         vpark();
         gen_gc_stack(-1, true);
-        unsigned offset = method_get_offset(meth);
+        unsigned offset = method_get_vtable_offset(meth);
         //ld(jobj, gr_ret, m_base, voff(m_stack.scratch()));
         runlock(gr_ret);
         ld(jobj, gr_ret, gr_ret, offset);
@@ -871,7 +872,7 @@ void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth, unsigned short
     }
     else if (opcod == OPCODE_INVOKEVIRTUAL) {
         AR gr = valloc(jobj);
-        unsigned offset = method_get_offset(meth);
+        unsigned offset = method_get_vtable_offset(meth);
         Opnd ptr;
         if (g_vtbl_squeeze) {
             ld4(gr, thiz.reg(), rt_vtable_offset);

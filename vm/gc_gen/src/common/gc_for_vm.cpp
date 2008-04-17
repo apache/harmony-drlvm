@@ -87,8 +87,8 @@ int gc_init()
 
 /* VT pointer compression is a compile-time option, reference compression and vtable compression are orthogonal */
 #ifdef COMPRESS_VTABLE
-  assert(vm_vtable_pointers_are_compressed());
-  vtable_base = vm_get_vtable_base();
+  assert(vm_is_vtable_compressed());
+  vtable_base = (POINTER_SIZE_INT)vm_get_vtable_base_address();
 #endif
 
   gc_tls_init();
@@ -437,6 +437,7 @@ Boolean obj_belongs_to_gc_heap(Partial_Reveal_Object* p_obj)
 {
   return address_belongs_to_gc_heap(p_obj, p_global_gc);  
 }
+
 
 
 

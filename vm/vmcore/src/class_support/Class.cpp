@@ -41,7 +41,7 @@
 #include "cci.h"
 #include "interpreter.h"
 #include "port_threadunsafe.h"
-
+#include "vtable.h"
 #include "inline_info.h"
 
 #ifdef _IPF_
@@ -87,7 +87,6 @@ void Class::init_internals(const Global_Env* env, const String* name, ClassLoade
 
     m_num_dimensions = 0;
     m_array_base_class = m_array_element_class = NULL;
-    m_array_element_type_desc = NULL;
 
     m_access_flags = 0;
     m_num_superinterfaces = 0;
@@ -135,8 +134,6 @@ void Class::init_internals(const Global_Env* env, const String* name, ClassLoade
 
     m_num_field_padding_bytes = 0;
 
-    m_notify_extended_records = 0;
-
     m_depth = 0;
     m_is_suitable_for_fast_instanceof = 0;
 
@@ -167,12 +164,6 @@ void Class::clear_internals() {
 
     if(m_lock)
         delete m_lock;
-
-    if(m_array_element_type_desc)
-    {
-        delete m_array_element_type_desc;
-        m_array_element_type_desc = NULL;
-    }
 }
 
 
@@ -319,8 +310,6 @@ bool Class::load_ancestors(Global_Env* env)
             m_cha_next_sibling = get_super_class()->m_cha_first_child;
             get_super_class()->m_cha_first_child = this;
         }
-        // Notify interested JITs that the superclass has been extended.
-        superClass->do_jit_extended_class_callbacks(this);
     }
 
     //
@@ -380,7 +369,6 @@ void Class::setup_as_array(Global_Env* env, unsigned char num_dimensions,
     m_state = ST_Initialized;
 
     assert(elementClass);
-    m_array_element_type_desc = type_desc_create_from_class(elementClass);
 
     // insert Java field, required by spec - 'length I'
     m_num_fields = 1;
@@ -624,9 +612,7 @@ Method::Method()
     _jits = NULL;
     _side_effects = MSE_Unknown;
     _method_sig = 0;
-    inline_records = 0;
 
-    _notify_override_records   = NULL;
     _notify_recompiled_records = NULL;
     _index = 0;
     _max_stack=_max_locals=_n_exceptions=_n_handlers=0;
@@ -1114,47 +1100,6 @@ struct Class_Extended_Notification_Record {
     }
 };
 
-
-void Class::register_jit_extended_class_callback(JIT* jit_to_be_notified, void* callback_data)
-{
-    // Don't insert the same entry repeatedly on the notify_extended_records list.
-    Class_Extended_Notification_Record* nr = m_notify_extended_records;
-    while(nr != NULL) {
-        if(nr->equals(this, jit_to_be_notified, callback_data)) {
-            return;
-        }
-        nr = nr->next;
-    }
-
-    // Insert a new notification record.
-    Class_Extended_Notification_Record* new_nr =
-        (Class_Extended_Notification_Record*)STD_MALLOC(sizeof(Class_Extended_Notification_Record));
-    new_nr->class_of_interest = this;
-    new_nr->jit = jit_to_be_notified;
-    new_nr->callback_data = callback_data;
-    new_nr->next = m_notify_extended_records;
-    m_notify_extended_records = new_nr;
-} // Class::register_jit_extended_class_callback
-
-
-void Class::do_jit_extended_class_callbacks(Class* new_subclass)
-{
-    Class_Extended_Notification_Record* nr;
-    for(nr = m_notify_extended_records;  nr != NULL;  nr = nr->next) {
-        JIT* jit_to_be_notified = nr->jit;
-        Boolean code_was_modified =
-            jit_to_be_notified->extended_class_callback(this,
-                new_subclass, nr->callback_data);
-        if(code_was_modified) {
-#ifdef _IPF_
-            sync_i_cache();
-            do_mf();
-#endif // _IPF_
-        }
-    }
-} // Class::do_jit_extended_class_callbacks
-
-
 void Class::lock()
 {
     m_lock->_lock();
@@ -1184,11 +1129,6 @@ unsigned Class::calculate_size()
     size += m_static_data_size;
     if(!is_interface())
         size += sizeof(VTable);
-    for(Class_Extended_Notification_Record* mcnr = m_notify_extended_records;
-        mcnr != NULL; mcnr = mcnr->next)
-    {
-        size += sizeof(Class_Extended_Notification_Record);
-    }
     size += sizeof(Lock_Manager);
 
     return size;

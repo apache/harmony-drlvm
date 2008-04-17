@@ -96,14 +96,13 @@
 #include "Class.h"
 #include "classloader.h"
 #include "environment.h"
-#include "jit_intf.h"
 #include "compile.h"
 #include "exceptions.h"
 #include "interpreter.h"
 
 #include "open/bytecodes.h"
 #include "open/vm_class_manipulation.h"
-//#include "open/vm_util.h"
+#include "open/vm_ee.h"
 
 
 static void class_report_failure(Class* target, uint16 cp_index, jthrowable exn)
@@ -761,14 +760,6 @@ Method* resolve_interface_method_env(Global_Env *env,
     }
     return method;
 }
-
-
-Field_Handle resolve_field(Compile_Handle h,
-                           Class_Handle c,
-                           unsigned index)
-{
-    return c->_resolve_field(compile_handle_to_environment(h), index);
-} // resolve_field
 
 
 //

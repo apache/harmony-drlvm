@@ -26,7 +26,7 @@
 #include "DrlProfileCollectionFramework.h"
 #include "method_lookup.h"
 #include "open/em.h"
-#include "open/vm_util.h"
+#include "open/hythread_ext.h"
 #include "open/em_profile_access.h"
 
 #include <jni.h>

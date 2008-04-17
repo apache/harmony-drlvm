@@ -27,6 +27,7 @@
 
 #include "open/vm_method_access.h"
 #include "open/vm_class_manipulation.h"
+#include "jit_import_rt.h"
 #include "open/vm_properties.h"
 #include "classloader.h"
 #include "object_layout.h"

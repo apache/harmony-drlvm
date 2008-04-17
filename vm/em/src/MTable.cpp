@@ -24,7 +24,6 @@
 #include <algorithm>
 #include "open/vm_method_access.h"
 #include "open/vm_class_manipulation.h"
-//#include "jit_import.h"
 
 MTable::~MTable() {
     for (FiltersQueue::const_iterator it = methodFilters.begin(), end = methodFilters.end(); it!=end; ++it) {

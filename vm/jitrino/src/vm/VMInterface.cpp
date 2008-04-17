@@ -30,7 +30,11 @@
 #include "open/vm_type_access.h"
 #include "open/vm_field_access.h"
 #include "open/vm_method_access.h"
+#include "open/vm_class_loading.h"
+#include "open/vm_class_info.h"
 #include "open/vm_interface.h"
+#include "open/vm_ee.h"
+#include "open/vm.h"
 #include "jit_import_rt.h"
 #include "jit_runtime_support.h"
 
@@ -54,13 +58,13 @@ static  allocation_handle_get_class_t  allocation_handle_get_class = 0;
 static  class_get_array_element_class_t  class_get_array_element_class = 0;
 static  class_get_array_element_size_t  class_get_array_element_size = 0; 
 static  class_get_array_of_class_t  class_get_array_of_class = 0;
-static  class_get_element_type_info_t  class_get_element_type_info = 0;
+static  class_is_non_ref_array_t class_is_non_ref_array = 0;
 static  class_get_name_t class_get_name = 0;
 static  class_get_super_class_t  class_get_super_class = 0;
 static  class_get_depth_t  class_get_depth = 0;
 static  class_get_vtable_t  class_get_vtable = 0;
 static  class_get_allocation_handle_t  class_get_allocation_handle = 0;
-static  class_get_boxed_data_size_t  class_get_boxed_data_size = 0;
+static  class_get_object_size_t  class_get_object_size = 0;
 static  class_cp_get_num_array_dimensions_t class_cp_get_num_array_dimensions = 0;
 static  class_get_class_of_primitive_type_t  class_get_class_of_primitive_type = 0;
 static  class_get_const_string_intern_addr_t class_get_const_string_intern_addr = 0;
@@ -79,7 +83,7 @@ static  class_is_abstract_t  class_is_abstract = 0;
 static  class_is_initialized_t  class_is_initialized = 0;
 static  class_is_finalizable_t  class_is_finalizable = 0;
 static  class_is_instanceof_t class_is_instanceof = 0;
-static  class_is_support_fast_instanceof_t  class_is_support_fast_instanceof = 0;// class_get_fast_instanceof_flag
+static  class_is_support_fast_instanceof_t  class_is_support_fast_instanceof = 0;// class_is_support_fast_instanceof
 static  class_is_primitive_t  class_is_primitive = 0;
 
 static  vm_lookup_class_with_bootstrap_t  vm_lookup_class_with_bootstrap = 0;
@@ -119,7 +123,7 @@ static  method_get_bytecode_t method_get_bytecode = 0;
 static  method_get_bytecode_length_t  method_get_bytecode_length = 0;
 static  method_get_max_stack_t  method_get_max_stack = 0;
 static  method_get_exc_handler_number_t  method_get_exc_handler_number = 0;
-static  method_get_offset_t  method_get_offset = 0;
+static  method_get_vtable_offset_t  method_get_vtable_offset = 0;
 static  method_get_indirect_address_t  method_get_indirect_address = 0;
 static  method_get_native_func_addr_t  method_get_native_func_addr = 0;
 static  method_get_max_locals_t  method_get_max_locals = 0;
@@ -141,7 +145,6 @@ static  method_is_synchronized_t  method_is_synchronized = 0;
 static  method_is_final_t  method_is_final = 0;
 static  method_is_abstract_t  method_is_abstract = 0;
 static  method_is_strict_t  method_is_strict = 0;
-static  method_is_overridden_t  method_is_overridden = 0;
 static  method_is_no_inlining_t  method_is_no_inlining = 0;
 
 
@@ -208,15 +211,13 @@ static  vm_properties_get_value_t vm_properties_get_value = 0;//char* vm_propert
 static  vm_get_system_object_class_t  vm_get_system_object_class = 0;
 static  vm_get_system_class_class_t  vm_get_system_class_class = 0; // get_system_class_class
 static  vm_get_system_string_class_t  vm_get_system_string_class = 0;
-static  vm_get_vtable_base_t  vm_get_vtable_base = 0; //POINTER_SIZE_INT vm_get_vtable_base()
-static  vm_get_heap_base_address_t  vm_get_heap_base_address = 0; //vm_heap_base_address
-static  vm_get_heap_ceiling_address_t  vm_get_heap_ceiling_address = 0; //vm_heap_ceiling_address
-static  vm_is_heap_compressed_t  vm_is_heap_compressed = 0;//vm_references_are_compressed();
-static  vm_is_vtable_compressed_t  vm_is_vtable_compressed = 0;//vm_vtable_pointers_are_compressed();
+static  vm_get_vtable_base_address_t  vm_get_vtable_base_address = 0; //POINTER_SIZE_INT vm_get_vtable_base_address()
+static  vm_get_heap_base_address_t  vm_get_heap_base_address = 0; //vm_get_heap_base_address
+static  vm_get_heap_ceiling_address_t  vm_get_heap_ceiling_address = 0; //vm_get_heap_ceiling_address
+static  vm_is_heap_compressed_t  vm_is_heap_compressed = 0;//vm_is_heap_compressed();
+static  vm_is_vtable_compressed_t  vm_is_vtable_compressed = 0;//vm_is_vtable_compressed();
 static  vm_patch_code_block_t vm_patch_code_block = 0;
 static  vm_compile_method_t vm_compile_method = 0;
-static  vm_register_jit_extended_class_callback_t vm_register_jit_extended_class_callback = 0;
-static  vm_register_jit_overridden_method_callback_t vm_register_jit_overridden_method_callback = 0;
 static  vm_register_jit_recompiled_method_callback_t vm_register_jit_recompiled_method_callback = 0;
 static  vm_compiled_method_load_t vm_compiled_method_load = 0;
 static  vm_helper_get_addr_t vm_helper_get_addr = 0;
@@ -248,13 +249,13 @@ static vm_enumerate_root_interior_pointer_t vm_enumerate_root_interior_pointer =
         class_get_array_element_class = GET_INTERFACE(vm, class_get_array_element_class);
         class_get_array_element_size = GET_INTERFACE(vm, class_get_array_element_size); 
         class_get_array_of_class = GET_INTERFACE(vm, class_get_array_of_class);
-        class_get_element_type_info = GET_INTERFACE(vm, class_get_element_type_info);
+        class_is_non_ref_array = GET_INTERFACE(vm, class_is_non_ref_array);
         class_get_name = GET_INTERFACE(vm, class_get_name);
         class_get_super_class = GET_INTERFACE(vm, class_get_super_class);
         class_get_depth = GET_INTERFACE(vm, class_get_depth);
         class_get_vtable = GET_INTERFACE(vm, class_get_vtable);
         class_get_allocation_handle = GET_INTERFACE(vm, class_get_allocation_handle);
-        class_get_boxed_data_size = GET_INTERFACE(vm, class_get_boxed_data_size);
+        class_get_object_size = GET_INTERFACE(vm, class_get_object_size);
         class_cp_get_num_array_dimensions = GET_INTERFACE(vm, class_cp_get_num_array_dimensions);
         class_get_class_of_primitive_type = GET_INTERFACE(vm, class_get_class_of_primitive_type);
         class_get_const_string_intern_addr = GET_INTERFACE(vm, class_get_const_string_intern_addr);
@@ -313,7 +314,7 @@ static vm_enumerate_root_interior_pointer_t vm_enumerate_root_interior_pointer =
         method_get_bytecode_length = GET_INTERFACE(vm, method_get_bytecode_length);
         method_get_max_stack = GET_INTERFACE(vm, method_get_max_stack);
         method_get_exc_handler_number = GET_INTERFACE(vm, method_get_exc_handler_number);
-        method_get_offset = GET_INTERFACE(vm, method_get_offset);
+        method_get_vtable_offset = GET_INTERFACE(vm, method_get_vtable_offset);
         method_get_indirect_address = GET_INTERFACE(vm, method_get_indirect_address);
         method_get_native_func_addr = GET_INTERFACE(vm, method_get_native_func_addr);
         method_get_max_locals = GET_INTERFACE(vm, method_get_max_locals);
@@ -335,7 +336,6 @@ static vm_enumerate_root_interior_pointer_t vm_enumerate_root_interior_pointer =
         method_is_final = GET_INTERFACE(vm, method_is_final);
         method_is_abstract = GET_INTERFACE(vm, method_is_abstract);
         method_is_strict = GET_INTERFACE(vm, method_is_strict);
-        method_is_overridden = GET_INTERFACE(vm, method_is_overridden);
         method_is_no_inlining = GET_INTERFACE(vm, method_is_no_inlining);
 
 
@@ -402,15 +402,13 @@ static vm_enumerate_root_interior_pointer_t vm_enumerate_root_interior_pointer =
         vm_get_system_object_class = GET_INTERFACE(vm, vm_get_system_object_class);
         vm_get_system_class_class = GET_INTERFACE(vm, vm_get_system_class_class);
         vm_get_system_string_class = GET_INTERFACE(vm, vm_get_system_string_class);
-        vm_get_vtable_base = GET_INTERFACE(vm, vm_get_vtable_base);
+        vm_get_vtable_base_address = GET_INTERFACE(vm, vm_get_vtable_base_address);
         vm_get_heap_base_address = GET_INTERFACE(vm, vm_get_heap_base_address);
         vm_get_heap_ceiling_address = GET_INTERFACE(vm, vm_get_heap_ceiling_address);
         vm_is_heap_compressed = GET_INTERFACE(vm, vm_is_heap_compressed);
         vm_is_vtable_compressed = GET_INTERFACE(vm, vm_is_vtable_compressed);
         vm_patch_code_block = GET_INTERFACE(vm, vm_patch_code_block);
         vm_compile_method = GET_INTERFACE(vm, vm_compile_method);
-        vm_register_jit_extended_class_callback = GET_INTERFACE(vm, vm_register_jit_extended_class_callback);
-        vm_register_jit_overridden_method_callback = GET_INTERFACE(vm, vm_register_jit_overridden_method_callback);
         vm_register_jit_recompiled_method_callback = GET_INTERFACE(vm, vm_register_jit_recompiled_method_callback);
         vm_compiled_method_load = GET_INTERFACE(vm, vm_compiled_method_load);
         vm_helper_get_addr = GET_INTERFACE(vm, vm_helper_get_addr);
@@ -570,7 +568,7 @@ const char* VMInterface::getTypeName(void* vmTypeHandle) {
 
 bool
 VMInterface::isArrayOfPrimitiveElements(void* vmClassHandle) {
-    return type_info_is_primitive(class_get_element_type_info((Class_Handle) vmClassHandle))?true:false;
+    return class_is_non_ref_array((Class_Handle) vmClassHandle);
 }
 
 bool
@@ -626,7 +624,7 @@ VMInterface::getArrayElemSize(void * vmTypeHandle) {
 
 uint32
 VMInterface::getObjectSize(void * vmTypeHandle) {
-    return class_get_boxed_data_size((Class_Handle) vmTypeHandle);
+    return class_get_object_size((Class_Handle) vmTypeHandle);
 }
 
 void*       VMInterface::getSuperTypeVMTypeHandle(void* vmTypeHandle) {
@@ -672,7 +670,7 @@ uint32      VMInterface::getVTableOffset()
 
 uint64
 VMInterface::getVTableBase() {
-    return (uint64)vm_get_vtable_base();
+    return (uint64)vm_get_vtable_base_address();
 }
 
 void*       VMInterface::getTypeHandleFromAllocationHandle(void* vmAllocationHandle)
@@ -716,8 +714,7 @@ const Byte*  MethodDesc::getByteCodes() const   {return method_get_bytecode(drlM
 uint32       MethodDesc::getByteCodeSize() const {return (uint32) method_get_bytecode_length(drlMethod);}
 uint16       MethodDesc::getMaxStack() const    {return (uint16) method_get_max_stack(drlMethod);}
 uint32       MethodDesc::getNumHandlers() const {return method_get_exc_handler_number(drlMethod);}
-bool         MethodDesc::isOverridden() const   {return method_is_overridden(drlMethod)?true:false;}
-uint32       MethodDesc::getOffset() const      {return method_get_offset(drlMethod);}
+uint32       MethodDesc::getOffset() const      {return method_get_vtable_offset(drlMethod);}
 void*        MethodDesc::getIndirectAddress() const {return method_get_indirect_address(drlMethod);}
 void*        MethodDesc::getNativeAddress() const {return method_get_native_func_addr(drlMethod);}
 
@@ -1034,18 +1031,6 @@ CompilationInterface::getOverridingMethod(NamedType* type, MethodDesc *methodDes
     if (!m)
         return NULL;
     return getMethodDesc(m);
-}
-
-void         CompilationInterface::setNotifyWhenClassIsExtended(ObjectType * type, 
-                                                                   void * callbackData) {
-    void * typeHandle = type->getVMTypeHandle();
-    vm_register_jit_extended_class_callback(getJitHandle(), (Class_Handle) typeHandle,callbackData);
-}
-
-void         CompilationInterface::setNotifyWhenMethodIsOverridden(MethodDesc * methodDesc, 
-                                                                      void * callbackData) {
-    Method_Handle drlMethod = methodDesc->getMethodHandle();
-    vm_register_jit_overridden_method_callback(getJitHandle(), drlMethod, callbackData);
 }
 
 void         CompilationInterface::setNotifyWhenMethodIsRecompiled(MethodDesc * methodDesc, 

@@ -22,6 +22,7 @@
 #define LOG_DOMAIN "enumeration"
 #include "cxxlog.h"
 
+#include "vtable.h"
 #include "root_set_enum_internal.h"
 #include "GlobalClassLoaderIterator.h"
 #include <apr_time.h>
