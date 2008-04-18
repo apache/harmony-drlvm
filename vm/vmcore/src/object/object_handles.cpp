@@ -119,7 +119,7 @@ void GcFrame::enumerate()
         for(i=0; i<c->mp_size; i++)
       // ? 20030710: GC V4 does not support this, and a static build fails on Linux
 #ifdef PLATFORM_POSIX
-      ABORT("Not supported on this platform");
+      DIE(("Not supported on this platform"));
 #else
             gc_add_root_set_entry_managed_pointer(c->elements[c->obj_size+i], FALSE);
 #endif

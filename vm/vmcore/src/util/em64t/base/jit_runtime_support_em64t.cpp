@@ -18,8 +18,8 @@
  * @author Intel, Evgueni Brevnov
  * @version $Revision$
  */  
-
-#include <assert.h>
+#define LOG_DOMAIN "vm.helpers"
+#include "cxxlog.h"
 
 #include "open/types.h"
 #include "open/gc.h"
@@ -35,9 +35,6 @@
 #include "jit_runtime_support.h"
 #include "m2n.h"
 #include "../m2n_em64t_internal.h"
-
-#define LOG_DOMAIN "vm.helpers"
-#include "cxxlog.h"
 
 #include "vm_stats.h"
 #include "dump.h"
@@ -351,7 +348,7 @@ void * vm_helper_get_addr(VM_RT_SUPPORT f) {
     case VM_RT_NEW_VECTOR_USING_VTABLE:
         return rth_get_lil_new_vector_using_vtable();
     default:
-        ASSERT(false, "Unexpected helper id" << f);
+        DIE(("Unexpected helper id %d", f));
         return NULL;
     }
 }

@@ -18,7 +18,7 @@
 /**
  * @author Xiao-Feng Li, 2006/10/05
  */
-
+#define LOG_DOMAIN "gc.base"
 #include "gen.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 #include "../verify/verify_live_heap.h"
@@ -192,18 +192,17 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
     if(large_page_hint){
       reserved_base = alloc_large_pages(max_heap_size, large_page_hint);
       if(reserved_base){
-        WARN2("gc.base","GC use large pages.");
+        WARN(("GC use large pages."));
       } else {
         free(large_page_hint);
         large_page_hint = NULL;
-        WARN2("gc.base","GC use small pages.");
+        WARN(("GC use small pages."));
       }
     }
   
   if(reserved_base == NULL){
     if(max_heap_size < min_heap_size){
-      DIE2("gc.base","Max heap size is smaller than min heap size. Please choose other values.");
-      exit(0);
+      DIE(("Max heap size is smaller than min heap size. Please choose other values."));
     }
 
     unsigned int max_size_reduced = 0;
@@ -217,7 +216,7 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
     physical_start = reserved_base;
     
     if(max_size_reduced){
-      DIE2("gc.base","Max heap size: can't be reserved. The max size can be reserved is "<< max_heap_size/MB<<" MB. ");
+      DIE(("Max heap size: can't be reserved. The max size can be reserved is %dMB", max_heap_size/MB));
       exit(0);
     }
     
@@ -487,7 +486,7 @@ GC* gc_gen_decide_collection_algo(char* minor_algo, char* major_algo, Boolean ha
       GC_PROP |= ALGO_COPY_SEMISPACE;
     
     }else {
-      WARN2("gc.base","\nWarning: GC algorithm setting incorrect. Will use default value.\n");
+      WARN(("GC algorithm setting incorrect. Will use default value.\n"));
       use_default = TRUE;
     }
   }
@@ -510,7 +509,7 @@ GC* gc_gen_decide_collection_algo(char* minor_algo, char* major_algo, Boolean ha
       GC_PROP |= ALGO_MARKSWEEP;
     
     }else{
-     WARN2("gc.base","\nWarning: GC algorithm setting incorrect. Will use default value.\n");
+     WARN(("GC algorithm setting incorrect. Will use default value.\n"));
      use_default = TRUE; 
     }
   }
@@ -887,9 +886,7 @@ void gc_gen_reclaim_heap(GC_Gen *gc, int64 gc_start_time)
   }
   
   if( gc->collect_result == FALSE){
-    DIE2("gc.collect", "Out of Memory!\n");
-    assert(0);
-    exit(0);
+    DIE(("Out of Memory while collecting!\n"));
   }
   
   nos_reset_after_collection(nos);

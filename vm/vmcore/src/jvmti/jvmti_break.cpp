@@ -17,6 +17,8 @@
 /*
  * JVMTI API for working with breakpoints
  */
+#define LOG_DOMAIN "jvmti.break"
+#include "cxxlog.h"
 
 #include "open/hythread_ext.h"
 #include "open/vm_method_access.h"
@@ -26,7 +28,6 @@
 #include "jvmti_internal.h"
 #include "environment.h"
 #include "Class.h"
-#include "cxxlog.h"
 #include "vm_log.h"
 #include "cci.h"
 
@@ -42,7 +43,7 @@ bool jvmti_process_breakpoint_event(TIEnv *env, const VMBreakPoint* bp, const PO
 {
     assert(bp);
 
-    TRACE2("jvmti.break", "Process breakpoint: "
+    TRACE("Process breakpoint: "
         << bp->method << " :" << bp->location << " :" << bp->addr );
 
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
@@ -68,12 +69,12 @@ bool jvmti_process_breakpoint_event(TIEnv *env, const VMBreakPoint* bp, const PO
     {
         if (env->global_events[JVMTI_EVENT_BREAKPOINT - JVMTI_MIN_EVENT_TYPE_VAL])
         {
-            TRACE2("jvmti.break", "Calling global breakpoint callback: "
+            TRACE("Calling global breakpoint callback: "
                 << method << " :" << location << " :" << addr);
 
             func((jvmtiEnv*)env, jni_env, (jthread)hThread, method, location);
 
-            TRACE2("jvmti.break", "Finished global breakpoint callback: "
+            TRACE("Finished global breakpoint callback: "
                 << method << " :" << location << " :" << addr);
         }
         else
@@ -88,12 +89,12 @@ bool jvmti_process_breakpoint_event(TIEnv *env, const VMBreakPoint* bp, const PO
 
                 if (et->thread == hythread_self())
                 {
-                    TRACE2("jvmti.break", "Calling local breakpoint callback: "
+                    TRACE("Calling local breakpoint callback: "
                         << method << " :" << location << " :" << addr);
 
                     func((jvmtiEnv*)env, jni_env, (jthread)hThread, method, location);
 
-                    TRACE2("jvmti.break", "Finished local breakpoint callback: "
+                    TRACE("Finished local breakpoint callback: "
                         << method << " :" << location << " :" << addr);
                 }
             }
@@ -120,8 +121,8 @@ jvmtiSetBreakpoint(jvmtiEnv* env,
                    jmethodID method,
                    jlocation location)
 {
-    TRACE2("jvmti.break", "SetBreakpoint is called for method: "
-        << method << " :" << location);
+    TRACE("SetBreakpoint is called for method: " << method
+        << " :" << location);
     SuspendEnabledChecker sec;
 
     jvmtiError errorCode;
@@ -137,7 +138,7 @@ jvmtiSetBreakpoint(jvmtiEnv* env,
         return JVMTI_ERROR_INVALID_METHODID;
 
     Method *m = (Method*) method;
-    TRACE2("jvmti.break", "SetBreakpoint: " << method << " :" << location);
+    TRACE("SetBreakpoint: " << method << " :" << location);
 
 #if defined (__INTEL_COMPILER) 
 #pragma warning( push )
@@ -175,7 +176,7 @@ jvmtiSetBreakpoint(jvmtiEnv* env,
     if (!brpt_intf->add_reference(method, location, (POINTER_SIZE_INT)false))
         return JVMTI_ERROR_INTERNAL;
 
-    TRACE2("jvmti.break", "SetBreakpoint is successful");
+    TRACE("SetBreakpoint is successful");
     return JVMTI_ERROR_NONE;
 }
 
@@ -192,8 +193,8 @@ jvmtiClearBreakpoint(jvmtiEnv* env,
                      jmethodID method,
                      jlocation location)
 {
-    TRACE2("jvmti.break", "ClearBreakpoint is called for method: "
-        << method << " :" << location);
+    TRACE("ClearBreakpoint is called for method: " << method
+        << " :" << location);
     SuspendEnabledChecker sec;
     jvmtiError errorCode;
 
@@ -208,7 +209,7 @@ jvmtiClearBreakpoint(jvmtiEnv* env,
         return JVMTI_ERROR_INVALID_METHODID;
 
     Method *m = (Method*) method;
-    TRACE2("jvmti.break", "ClearBreakpoint: " << method << " :" << location);
+    TRACE("ClearBreakpoint: " << method << " :" << location);
 
 #if defined (__INTEL_COMPILER) 
 #pragma warning( push )
@@ -247,6 +248,6 @@ jvmtiClearBreakpoint(jvmtiEnv* env,
     if (!brpt_intf->remove_reference(bp_ref))
         return JVMTI_ERROR_INTERNAL;
 
-    TRACE2("jvmti.break", "ClearBreakpoint is successful");
+    TRACE("ClearBreakpoint is successful");
     return JVMTI_ERROR_NONE;
 }

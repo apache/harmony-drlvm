@@ -16,10 +16,9 @@
  */
 /** 
  * @author Salikh Zakirov, Alexey V. Varlamov
- * @version $Revision: 1.1.2.2.2.1.2.3 $
  */  
-#ifndef _VMCORE_LOG_H_
-#define _VMCORE_LOG_H_
+#ifndef _VMCORE_LOG_H
+#define _VMCORE_LOG_H
 
 //#include "open/vm_log.h"
 #include "object_layout.h"
@@ -28,6 +27,7 @@
 #include "String_Pool.h"
 #include "class_member.h"
 #include "Class.h"
+#include "open/hythread_ext.h"
 
 /**
  * @file
@@ -100,4 +100,4 @@ inline LoggerString& operator<<(LoggerString& log, const jobject jobj) {
     return log;
 }
 
-#endif // _VMCORE_LOG_H_
+#endif /* _VMCORE_LOG_H */

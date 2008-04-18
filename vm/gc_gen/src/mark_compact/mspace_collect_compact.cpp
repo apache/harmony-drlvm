@@ -292,8 +292,7 @@ void mspace_collection(Mspace* mspace)
     TRACE2("gc.process", "\nGC: end of move compact algo ... \n");
 
   }else{
-    DIE2("gc.collect", "The speficied major collection algorithm doesn't exist!");
-    exit(0);
+    DIE(("GC: The speficied major collection algorithm doesn't exist!"));
   }
 
   if((!LOS_ADJUST_BOUNDARY)&&(kind != TRANS_NOTHING) ) {

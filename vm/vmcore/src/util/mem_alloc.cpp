@@ -64,10 +64,8 @@ BasePoolManager::BasePoolManager(size_t initial_size,
     if (_use_large_pages && ps[1] != 0)
         _page_size = ps[1];
 
-    VERIFY(APR_SUCCESS == apr_pool_create(&aux_pool, 0), \
-        "Cannot initialize a memory pool");
-    VERIFY(APR_SUCCESS == apr_thread_mutex_create(&aux_mutex, APR_THREAD_MUTEX_NESTED, aux_pool), \
-        "Cannot initialize pool reallocation mutex");
+    VERIFY_SUCCESS(apr_pool_create(&aux_pool, 0));
+    VERIFY_SUCCESS(apr_thread_mutex_create(&aux_mutex, APR_THREAD_MUTEX_NESTED, aux_pool));
 
 #ifdef VM_STATS
     VM_Statistics::get_vm_stats().number_memorymanager_created++;
@@ -76,21 +74,18 @@ BasePoolManager::BasePoolManager(size_t initial_size,
 
 BasePoolManager::~BasePoolManager()
 {
-    VERIFY(APR_SUCCESS == apr_thread_mutex_destroy(aux_mutex), \
-        "Cannot destroy the mutex");
+    VERIFY_SUCCESS(apr_thread_mutex_destroy(aux_mutex));
     apr_pool_destroy(aux_pool);
 }
 
 void BasePoolManager::_lock()
 {
-    VERIFY(APR_SUCCESS == apr_thread_mutex_lock(aux_mutex), \
-        "Cannot lock the pool's mutex");
+    VERIFY_SUCCESS(apr_thread_mutex_lock(aux_mutex));
 }
 
 void BasePoolManager::_unlock()
 {
-    VERIFY(APR_SUCCESS == apr_thread_mutex_unlock(aux_mutex), \
-        "Cannot unlock the pool's mutex");
+    VERIFY_SUCCESS(apr_thread_mutex_unlock(aux_mutex));
 }
 
 size_t BasePoolManager::round_up_to_page_size_multiple(size_t size)

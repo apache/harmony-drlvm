@@ -318,7 +318,7 @@ void exn_throw_object_internal(jthrowable exc_object)
         tmn_suspend_disable();
     }
     assert(!hythread_is_suspend_enabled());
-    TRACE2("exn", ("%s", "exn_throw_object(), delegating to exn_throw_for_JIT()"));
+    CTRACE(("%s", "exn_throw_object(), delegating to exn_throw_for_JIT()"));
     exn_throw_for_JIT(exc_object->object, NULL, NULL, NULL, NULL);
     END_RAISE_AREA;
 }
@@ -341,14 +341,14 @@ void exn_throw_by_class_internal(Class* exc_class, const char* exc_message,
             exc_class, args, exc_message, exc_cause);
 
     if (NULL == exc_init) {
-        TRACE2("exn", ("%s",
+        CTRACE(("%s",
             "exn_throw_by_class(),create exception and delegating to exn_throw_for_JIT()"));
         jthrowable exc_object = exn_create(exc_class, exc_message, exc_cause);
         exn_rethrow_if_pending();
         //set_unwindable(true);
         exn_throw_object_internal(exc_object);
     } else {
-        TRACE2("exn", ("%s", "exn_throw_by_class(), lazy delegating to exn_throw_for_JIT()"));
+        CTRACE(("%s", "exn_throw_by_class(), lazy delegating to exn_throw_for_JIT()"));
         //set_unwindable(true);
 
         // no return, so enable isn't required
@@ -387,7 +387,7 @@ void exn_throw_by_name_internal(const char* exc_name, const char* exc_message,
 
 void exn_raise_object_internal(jthrowable exc_object)
 {
-    TRACE2("exn", ("%s", "exn_raise_object(), propagating non-destructively"));
+    CTRACE(("%s", "exn_raise_object(), propagating non-destructively"));
 
     tmn_suspend_disable_recursive();
     p_TLS_vmthread->thread_exception.exc_object = exc_object->object;
@@ -398,7 +398,7 @@ void exn_raise_by_class_internal(Class* exc_class, const char* exc_message,
     jthrowable exc_cause)
 {
 #ifdef VM_LAZY_EXCEPTION
-    TRACE2("exn", ("%s", "exn_raise_object(), propagating lazy & non-destructively"));
+    CTRACE(("%s", "exn_raise_object(), propagating lazy & non-destructively"));
 
     tmn_suspend_disable_recursive();
     p_TLS_vmthread->thread_exception.exc_class = exc_class;

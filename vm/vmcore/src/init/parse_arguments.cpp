@@ -15,15 +15,10 @@
  *  limitations under the License.
  */
 /** 
- * @author Intel, Alexey V. Varlamov, Gregory Shimansky
- * @version $Revision: 1.1.2.4.4.7 $
+ * @author Alexey V. Varlamov, Gregory Shimansky
  */  
-
-#include <string.h>
-#include <assert.h>
-#include <ctype.h>
-#include <apr_strings.h>
-#include <apr_env.h>
+#define LOG_DOMAIN "arguments"
+#include "cxxlog.h"
 
 #include "open/gc.h" 
 #include "open/vm_util.h"
@@ -44,9 +39,6 @@
 #include "jit_intf.h"
 #include "dll_jit_intf.h"
 #include "dll_gc.h"
-
-#define LOG_DOMAIN "vm.core"
-#include "cxxlog.h"
 
 #define EXECUTABLE_NAME "java"
 #define USE_JAVA_HELP LECHO(29, "Use {0} -help to get help on command line options" << EXECUTABLE_NAME)
@@ -115,7 +107,7 @@ static void add_assert_rec(Global_Env *p_env, const char* option, const char* cm
     } else if (':' != arg[0]) {
         LECHO(30, "Unknown option {0}" << option);
         USE_JAVA_HELP;
-        LOGGER_EXIT(1);
+        log_exit(1);
     } else {
         unsigned len = (unsigned)strlen(++arg);
         if (len >= 3 && strncmp("...", arg + len - 3, 3) == 0) {
@@ -126,36 +118,93 @@ static void add_assert_rec(Global_Env *p_env, const char* option, const char* cm
     }
 }
 
-void parse_vm_arguments1(JavaVMInitArgs *vm_args, size_t *p_string_pool_size, jboolean *p_is_class_data_shared, void **portlib)
+void parse_vm_arguments1(JavaVMInitArgs *vm_args, size_t *p_string_pool_size,
+                         jboolean *p_is_class_data_shared, apr_pool_t* pool)
 {
+    LogFormat logger_header = LOG_EMPTY;
     *p_string_pool_size = DEFAULT_STRING_TABLE_SIZE;
+
+    // initialize logging system as soon as possible
+    log_init(pool);
+
     for (int i = 0; i < vm_args->nOptions; i++) {
         const char* option = vm_args->options[i].optionString;
         if (begins_with(option, STRING_POOL_SIZE_OPTION)) {
             const char* arg = option + strlen(STRING_POOL_SIZE_OPTION);
             *p_string_pool_size = parse_size(arg);
             if (0 == *p_string_pool_size) {
-                LECHO(34, "Negative or invalid string pool size. A default value is used, " << DEFAULT_STRING_TABLE_SIZE << " bytes.");
+                LECHO(34, "Negative or invalid string pool size. A default value is used, "
+                    << DEFAULT_STRING_TABLE_SIZE << " bytes.");
                 *p_string_pool_size = DEFAULT_STRING_TABLE_SIZE;
             }
-            TRACE2("init", "string_pool_size = " << *p_string_pool_size);
+            TRACE("string_pool_size = " << *p_string_pool_size);
         } else if (!strcmp(option, CLASS_DATA_SHARING_OFF_OPTION)) {
             *p_is_class_data_shared = JNI_FALSE;
         } else if (!strcmp(option, CLASS_DATA_SHARING_ON_OPTION)) {
             *p_is_class_data_shared = JNI_TRUE;
         } else if (!strcmp(option, PORTLIB_OPTION)) {
-            *portlib = vm_args->options[i].extraInfo;
+            log_set_portlib((HyPortLibrary*) vm_args->options[i].extraInfo);
+        } else if (!strcmp(option, "vfprintf")) {
+            log_set_vfprintf(vm_args->options[i].extraInfo);
+        } else if (!strcmp(option, "exit")) {
+            log_set_exit(vm_args->options[i].extraInfo);
+        } else if (!strcmp(option, "abort")) {
+            log_set_abort(vm_args->options[i].extraInfo);
+        } else if (!strcmp(option, "-Xfileline")) {
+            logger_header |= LOG_FILELINE;
+        } else if (!strcmp(option, "-Xthread")) {
+            logger_header |= LOG_THREAD_ID;
+        } else if (!strcmp(option, "-Xcategory")) {
+            logger_header |= LOG_CATEGORY;
+        } else if (!strcmp(option, "-Xtimestamp")) {
+            logger_header |= LOG_TIMESTAMP;
+        } else if (!strcmp(option, "-Xfunction")) {
+            logger_header |= LOG_FUNCTION;
+        } else if (!strcmp(option, "-Xwarn")) {
+            logger_header |= LOG_WARN;
+        /*
+         * -verbose[:class|:gc|:jni] set specification log filters.
+         */
+        } else if (!strcmp(option, "-verbose")) {
+            log_enable_info_category(LOG_CLASS_INFO, 0);
+            log_enable_info_category(LOG_GC_INFO, 0);
+            log_enable_info_category(LOG_JNI_INFO, 0);
+        }  else if (!strcmp(option, "-verbose:class")) {
+            log_enable_info_category(LOG_CLASS_INFO, 0);
+        }  else if (!strcmp(option, "-verbose:gc")) {
+            log_enable_info_category(LOG_GC_INFO, 0);
+        }  else if (!strcmp(option, "-verbose:jni")) {
+            log_enable_info_category(LOG_JNI_INFO, 0);
+        } else if (begins_with(option, "-Xverboselog:")) {
+            const char* file_name = option + strlen("-Xverboselog:");
+            FILE *f = fopen(file_name, "w");
+            if (NULL != f) {
+                log_set_out(f);
+            } else {
+                WARN(("Cannot open: %s", file_name));
+            }
+        } else if (begins_with(option, "-Xverbose:")) {
+            log_enable_info_category(option + strlen("-Xverbose:"), 1);
+        } else if (begins_with(option, "-Xnoverbose:")) {
+            log_disable_info_category(option + strlen("-Xnoverbose:"), 1);
+#ifdef _DEBUG
+        } else if (begins_with(option, "-Xtrace:")) {
+            log_enable_trace_category(option + strlen("-Xtrace:"), 1);
+        } else if (begins_with(option, "-Xnotrace:")) {
+            log_disable_trace_category(option + strlen("-Xnotrace:"), 1);
+#endif //_DEBUG
         }
     }
+    log_set_header_format(logger_header);
 } // parse_vm_arguments1
 
 void parse_vm_arguments2(Global_Env *p_env)
 {
     bool version_printed = false;
 #ifdef _DEBUG
-    TRACE2("arguments", "p_env->vm_arguments.nOptions  = " << p_env->vm_arguments.nOptions);
+    TRACE("p_env->vm_arguments.nOptions  = " << p_env->vm_arguments.nOptions);
     for (int _i = 0; _i < p_env->vm_arguments.nOptions; _i++)
-        TRACE2("arguments", "p_env->vm_arguments.options[ " << _i << "] = " << p_env->vm_arguments.options[_i].optionString);
+        TRACE("p_env->vm_arguments.options[ " << _i << "] = " << p_env->vm_arguments.options[_i].optionString);
 #endif //_DEBUG
 
     apr_pool_t *pool;
@@ -238,7 +287,7 @@ void parse_vm_arguments2(Global_Env *p_env)
         } else if (strcmp(option, "-version") == 0) {
             // Print the version number and exit
             LECHO_VERSION;
-            LOGGER_EXIT(0);
+            log_exit(0);
         } else if (strcmp(option, "-showversion") == 0) {
             if (!version_printed) {
                 // Print the version number and continue
@@ -248,13 +297,13 @@ void parse_vm_arguments2(Global_Env *p_env)
         } else if (strcmp(option, "-fullversion") == 0) {
             // Print the version number and exit
             LECHO_VM_VERSION;
-            LOGGER_EXIT(0);
+            log_exit(0);
 
         } else if (begins_with(option, "-Xgc:")) {
             // make prop_key to be "gc.<something>"
             char* prop_key = strdup(option + strlen("-X"));
             prop_key[2] = '.';
-            TRACE2("init", prop_key << " = 1");
+            TRACE(prop_key << " = 1");
             p_env->VmProperties()->set(prop_key, "1");
             free(prop_key);
 
@@ -268,7 +317,7 @@ void parse_vm_arguments2(Global_Env *p_env)
         } else if (begins_with(option, "-Xms") || begins_with(option, "-ms")) {
             // cut -Xms || -ms
             const char* arg = option + (begins_with(option, "-ms") ? 3 : 4);
-            TRACE2("init", "gc.ms = " << arg);
+            TRACE("gc.ms = " << arg);
             if (atoi(arg) <= 0) {
                 LECHO(34, "Negative or invalid heap size. Default value will be used!");
             }
@@ -277,14 +326,14 @@ void parse_vm_arguments2(Global_Env *p_env)
         } else if (begins_with(option, "-Xmx") || begins_with(option, "-mx")) {
             // cut -Xmx
             const char* arg = option + (begins_with(option, "-mx") ? 3 : 4);
-            TRACE2("init", "gc.mx = " << arg);
+            TRACE("gc.mx = " << arg);
             if (atoi(arg) <= 0) {
                 LECHO(34, "Negative or invalid heap size. Default value will be used!");
             }
             p_env->VmProperties()->set("gc.mx", arg);
         } else if (begins_with(option, "-Xss")) {
             const char* arg = option + 4;
-            TRACE2("init", "thread.stacksize = " << arg);
+            TRACE("thread.stacksize = " << arg);
             if (atoi(arg) <= 0) {
                 LECHO(34, "Negative or invalid stack size. Default value will be used!");
             }
@@ -380,11 +429,11 @@ void parse_vm_arguments2(Global_Env *p_env)
               || strcmp(option, "-h") == 0
               || strcmp(option, "-?") == 0) {
             print_generic_help();
-            LOGGER_EXIT(0);
+            log_exit(0);
         }
         else if (strcmp(option,"-X") == 0) {
                 print_help_on_nonstandard_options();
-                LOGGER_EXIT(0);
+                log_exit(0);
         }
         else if (begins_with(option, "-enableassertions")) {
             add_assert_rec(p_env, option, "-enableassertions", true);
@@ -411,7 +460,7 @@ void parse_vm_arguments2(Global_Env *p_env)
         else {
             LECHO(30, "Unknown option {0}" << option);
             USE_JAVA_HELP;
-            LOGGER_EXIT(1);
+            log_exit(1);
        }
     } // for
 
@@ -434,125 +483,6 @@ void parse_jit_arguments(JavaVMInitArgs* vm_arguments)
         }
     }
 } //parse_jit_arguments
-
-// converts exposed verbosity category names 
-// to the internally used logger category names.
-static char* convert_logging_category(char* category) {
-    if (0 == strcmp("gc*", category) || 0 == strcmp("gc.*", category)) {
-        // handle the non-standard logging category specification
-        return "gc";
-    } else {
-        return category;
-    }
-} //convert_logging_category()
-
-static void set_threshold_list(char* list, LoggingLevel level, const char* file, bool convert) {
-    char *next;
-    while (list) {
-        if ( (next = strchr(list, ',')) ) {
-            *next = '\0';
-        }
-
-        char* category = (convert) ? convert_logging_category(list) : list;
-        if (0 == strcmp("*", category)) { //alias to root category
-            category = "root";
-        }
-        set_threshold(category, level);
-        if (file) {
-            set_out(category, file);
-        }
-
-        if (next) {
-            *next = ',';
-            list = next + 1;
-        } else {
-            break;
-        }
-    }
-}
-
-static void parse_logger_arg(char* arg, const char* cmd, LoggingLevel level) {
-    char* next_sym = arg + strlen(cmd);
-    if (*next_sym == '\0') {
-        set_threshold("root", level);
-    } else if (*next_sym == ':') { // -cmd:category
-        next_sym++;
-        char *out = strchr(next_sym, ':');
-        if (out) { // -cmd:category:file
-            *out = '\0';
-        }
-        set_threshold_list(next_sym, level, out ? out + 1 : NULL, false);
-        if (out){
-            *out = ':';
-        }
-    } else {
-        LECHO(30, "Unknown option {0}" << arg);
-        USE_JAVA_HELP;
-        LOGGER_EXIT(1); 
-    }
-}
-
-void set_log_levels_from_cmd(JavaVMInitArgs* vm_arguments)
-{
-    HeaderFormat logger_header = HEADER_EMPTY;
-    int arg_num = 0;
-    for (arg_num = 0; arg_num < vm_arguments->nOptions; arg_num++) {
-        char *option = vm_arguments->options[arg_num].optionString;
-
-        if (begins_with(option, "-Xfileline")) {
-            logger_header |= HEADER_FILELINE;
-        } else if (begins_with(option, "-Xthread")) {
-            logger_header |= HEADER_THREAD_ID;
-        } else if (begins_with(option, "-Xcategory")) {
-            logger_header |= HEADER_CATEGORY;
-        } else if (begins_with(option, "-Xtimestamp")) {
-            logger_header |= HEADER_TIMESTAMP;
-        } else if (begins_with(option, "-Xfunction")) {
-            logger_header |= HEADER_FUNCTION;
-        }
-    } 
-    // set logging filter if one is set
-    if (logger_header != HEADER_EMPTY) {
-        set_header_format("root", logger_header);
-    }
-
-    for (arg_num = 0; arg_num < vm_arguments->nOptions; arg_num++) {
-        char *option = vm_arguments->options[arg_num].optionString;
-
-        if (begins_with(option, "-verbose")) {
-            /*
-             * -verbose[:class|:gc|:jni] set specification log filters.
-             */
-            char* next_sym = option + 8;
-            if (*next_sym == '\0') {
-                set_threshold(util::CLASS_LOGGER, INFO);
-                set_threshold(util::GC_LOGGER, INFO);
-                set_threshold(util::JNI_LOGGER, INFO);
-            } else if (*next_sym == ':') { // -verbose:
-                next_sym++;
-                set_threshold_list(next_sym, INFO, NULL, true); // true = convert standard categories to internal
-            } else {
-                LECHO(30, "Unknown option {0}" << option);
-                USE_JAVA_HELP;
-                LOGGER_EXIT(1);
-            }
-        } else if (begins_with(option, "-Xverboseconf:")) {
-            set_logging_level_from_file(option + strlen("-Xverboseconf:"));
-        } else if (begins_with(option, "-Xverboselog:")) {
-            set_out("root", option + strlen("-Xverboselog:"));
-        } else if (begins_with(option, "-Xverbose")) {
-            parse_logger_arg(option, "-Xverbose", INFO);
-        } else if (begins_with(option, "-Xwarn")) {
-            parse_logger_arg(option, "-Xwarn", WARN);
-#ifdef _DEBUG
-        } else if (begins_with(option, "-Xlog")) {
-            parse_logger_arg(option, "-Xlog", LOG);
-        } else if (begins_with(option, "-Xtrace")) {
-            parse_logger_arg(option, "-Xtrace", TRACE);
-#endif //_DEBUG
-        }
-    } // for (arg_num)
-} //set_log_levels_from_cmd
 
 void initialize_vm_cmd_state(Global_Env *p_env, JavaVMInitArgs* arguments)
 {

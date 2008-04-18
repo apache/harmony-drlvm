@@ -216,7 +216,7 @@ private:
                     ++cur_tmp_reg;
                 }
             }
-            ASSERT(0,"LIL INTERNAL ERROR: Not enough temporary registers");
+            DIE(("LIL INTERNAL ERROR: Not enough temporary registers"));
         }
 
         virtual ~Tmp_GR_Opnd() {
@@ -240,8 +240,7 @@ private:
             // registers in the following order:
             // xmm8, xmm9, ... xmm15
             ASSERT(get_num_used_reg() < LcgEM64TContext::MAX_FR_TEMPORARY + LcgEM64TContext:: MAX_FR_LOCALS,
-            //ASSERT(get_num_used_reg() < LcgEM64TContext::MAX_FR_TEMPORARY ,
-                "LIL INTERNAL ERROR: Not enough temporary registers");
+                ("LIL INTERNAL ERROR: Not enough temporary registers"));
             m_idx = LcgEM64TContext::get_xmm_reg_from_map(
                 LcgEM64TContext::FR_TEMPORARY_OFFSET + get_num_used_reg()).get_idx();
             ++get_num_used_reg();
@@ -273,7 +272,7 @@ private:
     // returns the location of the n'th fp local
     const LcgEM64TLoc * get_fp_local(const unsigned n) const {
         // DO NOT SUPPORT FP LOCALS
-        ABORT("Not supported");
+        DIE(("Not supported"));
         return NULL;
         /*
         assert(n < context.get_num_fr_locals());
@@ -309,7 +308,7 @@ private:
         case LT_F8:
             return 8;
         default:
-            ASSERT(0, "Unknown LIL type");
+            DIE(("Unknown LIL type"));
         }
         return 0;
     }
@@ -512,7 +511,7 @@ private:
                 : new(mem) LcgEM64TLoc(LLK_Gr, LcgEM64TContext::GR_RETURNS_OFFSET);
         }
         default:
-            ASSERT(0, "Unknown variable kind");
+            DIE(("Unknown variable kind"));
         }
         return NULL;  // should never be reached
     }
@@ -766,7 +765,7 @@ private:
             shift_op_rm_imm(dest, src, imm_val);
             break;
         default:
-            ASSERT(0, "Unexpected operation");
+            DIE(("Unexpected operation"));
         }
     }
 
@@ -814,7 +813,7 @@ private:
             break;
         }
         default:
-            ASSERT(0, "Unexpected operation");  // control should never reach this point
+            DIE(("Unexpected operation"));  // control should never reach this point
         }
     }
 
@@ -857,7 +856,7 @@ private:
             buf = mov(buf, dest_reg, get_rm_opnd(src), size_32);
             break;
         default:
-            ASSERT(0, "Unexpected operation");  // control should never reach this point
+            DIE(("Unexpected operation"));  // control should never reach this point
         }
 
         if (dest->kind != LLK_Gr) {
@@ -905,7 +904,7 @@ private:
                     base_loc != NULL ? get_r_opnd(base_loc).reg_no() : n_reg,
                     tmp_reg.reg_no(), (uint32)offset, scale));
             }
-            ASSERT(0, "Should never reach this point");
+            DIE(("Should never reach this point"));
         }
 
         // need to perform manual calculation of the effective address
@@ -1193,7 +1192,7 @@ public:
                     result = op1_imm << op2_imm;
                     break;
                 default:
-                    ASSERT(0, "Unexpected operation");   // control should never reach this point
+                    DIE(("Unexpected operation"));   // control should never reach this point
                 }
                 move_imm(dest_loc, result);
             } else if (lil_operand_is_immed(op1)) {
@@ -1213,7 +1212,7 @@ public:
                     shift_op_imm_rm(dest_loc, op1_imm, op2_loc);
                     break;
                 default:
-                    ASSERT(0, "Unexpected operation");  // control should never reach this point
+                    DIE(("Unexpected operation"));  // control should never reach this point
                 }
             } else if (lil_operand_is_immed(op2)) {
                 const LcgEM64TLoc*  op1_loc = get_op_loc(op1, false);
@@ -1256,7 +1255,7 @@ public:
                     result = (int32) (uint64) (uint32) imm;
                     break;
                 default:
-                    ASSERT(0, "Unexpected operation");  // control should never reach this point
+                    DIE(("Unexpected operation"));  // control should never reach this point
                 }
                 move_imm(dest_loc, result);
             } else { // non-immediate operand
@@ -1338,7 +1337,7 @@ public:
             buf = mov(buf, *dest_reg, addr, size_64);
             goto move_to_destination;
         default:
-            ASSERT(0, "Unexpected LIL type");  // invalid value in type
+            DIE(("Unexpected LIL type"));  // invalid value in type
         }
 
         assert(size != n_size);
@@ -1484,7 +1483,7 @@ move_to_destination:
             cc = Condition_B;
             break;
         default:
-            ASSERT(0, "Unknown predicate");
+            DIE(("Unknown predicate"));
         }
 
         void * const mem_ptr = mem.alloc(sizeof(Tmp_GR_Opnd));
@@ -1654,7 +1653,7 @@ move_to_destination:
             break;
         }
         default:
-            ASSERT(0, "Unknown kind");
+            DIE(("Unknown kind"));
         }
     }
 

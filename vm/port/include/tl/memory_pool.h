@@ -14,27 +14,20 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/**
- * @author Evgueni Brevnov
- * @version $Revision: 1.1.2.1.4.4 $
- */
-
 #ifndef TL_MEMORY_POOL_H
 #define TL_MEMORY_POOL_H
 
-#include <assert.h>
-#include <stdio.h>
 #include <apr_pools.h>
 #include "open/types.h"
-#include "log_macro.h"
+#include "clog.h"
 
 namespace tl {
 
 class VMEXPORT MemoryPool {
 private:
     // denied functions
-    MemoryPool(const MemoryPool&) {ABORT("Not implemented");}
-    MemoryPool& operator=(const MemoryPool&) {ABORT("Not implemented"); return *this;}
+    MemoryPool(const MemoryPool&) {DIE(("Not implemented"));}
+    MemoryPool& operator=(const MemoryPool&) {DIE(("Not implemented")); return *this;}
 protected:
     apr_pool_t* pool;
 public:
@@ -48,8 +41,8 @@ public:
 class VMEXPORT MemoryPoolMT {
 private:
     // denied functions
-    MemoryPoolMT(const MemoryPoolMT&) {ABORT("Not implemented");}
-    MemoryPoolMT& operator=(const MemoryPoolMT&) {ABORT("Not implemented"); return *this;}
+    MemoryPoolMT(const MemoryPoolMT&) {DIE(("Not implemented"));}
+    MemoryPoolMT& operator=(const MemoryPoolMT&) {DIE(("Not implemented")); return *this;}
 
     MemoryPool unsync_pool;
     apr_thread_mutex_t *mutex;

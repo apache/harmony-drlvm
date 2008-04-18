@@ -20,13 +20,12 @@
  */  
 
 
-#include "log_macro.h"
+#include "clog.h"
 
 #ifdef PLATFORM_POSIX
 
-
-#define OS_HW_REGS_TO_VM_THREAD_REGS()    ABORT("Not supported");
-#define OS_VM_THREAD_REGS_TO_HW_REGS()    ABORT("Not supported");
+#define OS_HW_REGS_TO_VM_THREAD_REGS()    DIE(("Not supported"));
+#define OS_VM_THREAD_REGS_TO_HW_REGS()    DIE(("Not supported"));
 
 #else
 

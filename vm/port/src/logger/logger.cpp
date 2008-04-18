@@ -14,364 +14,416 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
-* @author Alexey V. Varlamov, Dmitry B. Yershov
-* @version $Revision: 1.1.2.1.4.3 $
-*/  
-
-// disable warning #4250 over /WX option in appach native interface for MS compiler
-#if defined(_MSC_VER) && !defined (__INTEL_COMPILER) /* Microsoft C Compiler ONLY */
-#pragma warning( push )
-#pragma warning (disable:4250) //Two or more members have the same name. The one in class2 is inherited because it is a base class for the other classes that contained this member.
-#endif
-
-#include <stdarg.h>
-#include "port_malloc.h"
-#include "logger.h"
-#include "logparams.h"
-#include <log4cxx/logger.h>
-#include <log4cxx/logmanager.h>
-#include <log4cxx/level.h>
-#include <log4cxx/consoleappender.h>
-#include <log4cxx/fileappender.h>
-#include <log4cxx/patternlayout.h>
-#include <log4cxx/spi/filter.h>
-#include <log4cxx/spi/location/locationinfo.h>
-#include <log4cxx/filter/stringmatchfilter.h>
-#include <log4cxx/helpers/transcoder.h>
-#include <log4cxx/propertyconfigurator.h>
 #include <apr_env.h>
+#include <apr_portable.h>
+#include <time.h>
+#include "logger.h"
+#include "port_atomic.h"
 #include "hyport.h"
 
-#if defined(_MSC_VER) && !defined (__INTEL_COMPILER)
-#pragma warning( pop )
-#endif
+/**
+ * A hook for <code>int vfprintf(va_list)</code> function.
+ */
+typedef int (*VfprintfHook)(FILE *fp, const char *format,  va_list args);
 
-#ifdef PLATFORM_NT
-#define vsnprintf _vsnprintf
-#endif
+/**
+ * A hook for <code>void exit(int)</code> function.
+ */
+typedef void (*ExitHook)(int code);
 
+/**
+ * A hook for <code>void abort()</code> function.
+ */
+typedef void (*AbortHook)();
 
-using namespace log4cxx;
-using std::string;
+struct LogCategory {
+    const char* name;
+    int len;
+    LogState enabled;
+    struct LogCategory* next;
+};
 
-static LevelPtr trace_levelPtr;
-static LoggingLevel max_level = INFO;
+/**
+ * Keeps a logger instance.
+ */
+struct Logger {
+    /**
+     * Serves as a primary source for a dynamic memory allocation.
+     */
+    apr_pool_t* pool;
 
-static LogSite unusedLogSite = {UNKNOWN, 0};
-static LogSite *lastLogSite = &unusedLogSite;
+    /**
+     * A pointer to vfprintf implementation. This pointer may be received via 
+     * JNI_CreateJavaVM arguments and is used as a base for all VM
+     * logging. A static pointer is used when a logger instance cannot be
+     * accessed.
+     */
+    VfprintfHook p_vfprintf;
 
-static void clear_cached_sites() {
-    //FIXME thread unsafe
-    LogSite *site = lastLogSite;
-    while(site != &unusedLogSite) {
-        site->state = UNKNOWN;
+    /**
+     * A pointer to exit implementation. This pointer may be received via 
+     * JNI_CreateJavaVM arguments and is used for VM graceful termination.
+     */
+    ExitHook p_exit;
+
+    /**
+     * A pointer to abort implementation. This pointer may be received via 
+     * JNI_CreateJavaVM arguments and is used for abnormal VM termination.
+     */
+    AbortHook p_abort;
+
+    /**
+     * A file to write log, <code>stdout</code> by default.
+     */
+    FILE* out;
+
+    /**
+     * A reference to localization library.
+     */
+    struct HyPortLibrary* portlib;
+
+    /**
+     * Format mask.
+     */
+    LogFormat format;
+
+    /**
+     * A head of a list of enabled info domains.
+     */
+    struct LogCategory* info;
+
+    /**
+     * A head of a list of enabled trace domains.
+     */
+    struct LogCategory* trace;
+
+    /**
+     * A head of a list of encountered log sites.
+     */
+    struct LogSite* log_site;
+}  light_logger = {
+    NULL, &vfprintf, &exit, &abort, stdout, NULL, LOG_EMPTY, NULL, NULL, NULL };
+
+Logger default_logger = {
+    NULL, &vfprintf, &exit, &abort, stdout, NULL, LOG_EMPTY, NULL, NULL, NULL };
+
+static Logger* get()
+{
+    return &default_logger;
+}
+
+/**
+ * Clears cached sites. If more sites are added in process from
+ * other threads, they won't be cleared.
+ */
+static void clear_cached_sites()
+{
+    LogSite *site = get()->log_site;
+    while(site) {
+        site->state = LOG_UNKNOWN;
         site = site->next;
     }
 }
 
-void* portlib_for_logger = NULL;
-
-const char* LogParams::release() {
-
-    if (portlib_for_logger) {
-        messageId = (char*) ((HyPortLibrary*)portlib_for_logger)->nls_lookup_message ((HyPortLibrary*)portlib_for_logger,
-        HYNLS_DO_NOT_PRINT_MESSAGE_TAG | HYNLS_DO_NOT_APPEND_NEWLINE ,
-        prefix, message_number, def_messageId);
-    } else {
-        messageId = def_messageId;
+static int add_category(const char* category, LogCategory** p_log_category_head,
+                        int copy, LogState enabled)
+{
+    Logger* logger = get();
+    if (!logger->pool) {
+        return 0;
     }
-    if (portlib_for_logger) {
-        messageId = ((HyPortLibrary *)portlib_for_logger)->buf_write_text((struct HyPortLibrary *)portlib_for_logger, (const char *)messageId, (IDATA) strlen(messageId));
-    }
-    int i = 0;
-    while(messageId[i] != '\0') {
-        if (messageId[i] == '{' && messageId[i + 1] >= '0' &&
-            messageId[i + 1] <= '9' && messageId[i + 2] == '}') {
-                int arg = messageId[i + 1] - '0';
-                result_string += values[arg];
-                i += 3;
-            } else {
-                result_string += messageId[i];
-                i++;
+
+    LogCategory* log_category = *p_log_category_head;
+    while (log_category) {
+        if (strcmp(log_category->name, category) == 0) {
+            if (log_category->enabled == enabled) {
+                return 0;
             }
-    }
-    if (portlib_for_logger) {
-        ((HyPortLibrary *)portlib_for_logger)->mem_free_memory ((struct HyPortLibrary *)portlib_for_logger, (void*)messageId);
-    }
-    return (const char*)result_string.c_str();
-}
-
-static LevelPtr get_log4cxx_level(LoggingLevel level) {
-    switch(level) {
-        case DIE:
-            return Level::getFatal();
-        case WARN:
-            return Level::getWarn();
-        case INFO:
-            return Level::getInfo();
-        case LOG:
-            return Level::getDebug();
-        case TRACE:
-            return trace_levelPtr;
-        default:
-            return Level::getWarn();
-    }
-}
-
-static LoggerPtr get_logger(const char* category) {
-    if (strcmp(category, "root") == 0) {
-        return Logger::getRootLogger();
-    } else {
-        return Logger::getLogger(category);
-    }
-}
-
-int set_locale(char* logger_locale) {
-    char* lang = strdup(logger_locale);
-    char* region = NULL;
-    char* variant = NULL;
-    if (portlib_for_logger) {
-        region = strchr(lang, '_');
-        if (region == NULL) {
-            ((HyPortLibrary *)portlib_for_logger)->nls_set_locale((HyPortLibrary *)portlib_for_logger, lang, "", "");
-            free((void*)lang);
+            log_category->enabled = enabled;
+            clear_cached_sites();
             return 1;
-        } else {
-            region[0] = 0;
-            region++;
-            variant = strchr(region, '.');
-            if (variant == NULL) {
-                ((HyPortLibrary *)portlib_for_logger)->nls_set_locale((HyPortLibrary *)portlib_for_logger, lang, region, "");
-                free((void*)lang);
-                return 1;
-            } else {
-                variant[0] = 0;
-                variant++;
-                ((HyPortLibrary *)portlib_for_logger)->nls_set_locale((HyPortLibrary *)portlib_for_logger, lang, region, variant);
-                free((void*)lang);
-                return 1;
-            }
         }
+        log_category = log_category->next;
     }
-    free((void*)lang);
-    return 0;
+
+    log_category = (LogCategory*) apr_palloc(logger->pool, sizeof(LogCategory));
+    if (!log_category) {
+        return 0;
+    }
+
+    log_category->len = (int) strlen(category);
+    log_category->enabled = enabled;
+    if (copy) {
+        char* name = (char*) apr_palloc(logger->pool, log_category->len + 1);
+        if (!name) {
+            return 0;
+        }
+        strncpy(name, category, log_category->len + 1);
+        log_category->name = name;
+    } else {
+        log_category->name = category;
+    }
+
+    LogCategory* old_value = *p_log_category_head;
+    do {
+        log_category->next = (LogCategory*) old_value;
+        old_value = (LogCategory*) port_atomic_casptr(
+            (volatile void **) p_log_category_head, log_category,
+            log_category->next);
+    } while (old_value != log_category->next);
+
+    clear_cached_sites();
+    return 1;
 }
 
-void init_log_system(void *portlib) {
-    int set_locale_success = 0;
-    trace_levelPtr = new Level(Level::TRACE_INT, LOG4CXX_STR("TRACE"), 7);
+int log_enable_info_category(const char* category, int copy)
+{
+    return add_category(category, &get()->info, copy, LOG_ENABLED);
+}
 
-    LoggerPtr logger = Logger::getRootLogger();
-    ConsoleAppenderPtr cap = new ConsoleAppender(new PatternLayout(LOG4CXX_STR("%m%n")),LOG4CXX_STR("System.err"));
-    logger->addAppender(cap);
-    logger->setLevel(Level::getWarn());
+int log_enable_trace_category(const char* category, int copy)
+{
+    return add_category(category, &get()->trace, copy, LOG_ENABLED);
+}
 
-    LoggerPtr info_logger = get_logger("info");
-    info_logger->setLevel(Level::getInfo());
+int log_disable_info_category(const char* category, int copy)
+{
+    return add_category(category, &get()->info, copy, LOG_DISABLED);
+}
 
-    portlib_for_logger = portlib;
+int log_disable_trace_category(const char* category, int copy)
+{
+    return add_category(category, &get()->trace, copy, LOG_DISABLED);
+}
 
+void log_init(apr_pool_t* parent_pool) 
+{
     apr_pool_t *pool;
-    apr_pool_create(&pool, 0);
-    char* value;
-
-    if (APR_SUCCESS == apr_env_get(&value, "LC_ALL", pool)) {
-        if (set_locale(value)) {
-            set_locale_success = 1;
-        }
-    } else if (APR_SUCCESS == apr_env_get(&value, "LC_MESSAGES", pool)) {
-        if (!set_locale_success) {
-            if (set_locale(value)) {
-                set_locale_success = 1;
-            }
-        }
-    } else if (APR_SUCCESS == apr_env_get(&value, "LANG", pool)) {
-        if (!set_locale_success) {
-            if (set_locale(value)) {
-                set_locale_success = 1;
-            }
-        }
+    apr_status_t status = apr_pool_create(&pool, parent_pool);
+    if (APR_SUCCESS != status) {
+        return;
     }
+
+    Logger* logger = get();
+    *logger = light_logger;
+    logger->pool = pool;
+
+    log_enable_info_category(LOG_INFO, 0);
+}
+
+static void log_close()
+{
+    Logger* logger = (Logger*) get();
+    if (stdout != logger->out) {
+        fclose(logger->out);
+        logger->out = stdout;
+    }
+}
+
+void log_shutdown()
+{
+    Logger* logger = (Logger*) get();
+    apr_pool_t* pool = logger->pool;
+    log_close();
+    *logger = light_logger;
+    clear_cached_sites();
     apr_pool_destroy(pool);
-
 }
 
-void shutdown_log_system() {
-    LogManager::shutdown();
+/**
+ * Parses locale.
+ */
+static int set_locale(const char* logger_locale)
+{
+    HyPortLibrary* portlib = get()->portlib;
+    assert(portlib);
+
+    char* lang = strdup(logger_locale);
+    if (NULL == lang) {
+        return 0; // out of C heap
+    }
+    char* region = "";
+    char* variant = "";
+
+    char* pos = strchr(lang, '_');
+    if (pos == NULL) {
+        goto set;
+    }
+    region = pos;
+    region[0] = 0;
+    region++;
+
+    pos = strchr(region, '.');
+    if (pos == NULL) {
+        goto set;
+    }
+    variant = pos;
+    variant[0] = 0;
+    variant++;
+
+set:
+    portlib->nls_set_locale(portlib, lang, region, variant);
+    free((void*)lang);
+    return 1;
 }
 
-void set_logging_level_from_file(const char* filename) {
-    string lfilename;
-    lfilename += filename;
-    try {
-        PropertyConfigurator::configure(lfilename);
-    } catch (...) {
-        LoggerPtr logger = get_logger("logger");
-        logger->log(get_log4cxx_level(WARN), "Couldn't initialize logging levels from file", 
-            spi::LocationInfo::LocationInfo(__FILE__, __LOG4CXX_FUNC__, __LINE__));
+void log_set_portlib(HyPortLibrary *portlib)
+{
+    Logger* logger = get();
+
+    logger->portlib = portlib;
+    if (!portlib) {
+        return;
     }
-    max_level = TRACE; // Not easy to obtain actual value
-    clear_cached_sites();
+
+    apr_pool_t* tmp_pool;
+    apr_status_t status = apr_pool_create(&tmp_pool, logger->pool);
+    if (APR_SUCCESS != status) {
+        return;
+    }
+    char* value;
+    if (APR_SUCCESS == apr_env_get(&value, "LC_ALL", tmp_pool)) {
+        set_locale(value);
+    } else if (APR_SUCCESS == apr_env_get(&value, "LC_MESSAGES", tmp_pool)) {
+        set_locale(value);
+    } else if (APR_SUCCESS == apr_env_get(&value, "LANG", tmp_pool)) {
+        set_locale(value);
+    }
+    apr_pool_destroy(tmp_pool);
 }
 
-void log4cxx_from_c(const char *category, LoggingLevel level, const char* message, 
-                    const char* file=0, const char* func = 0, int line=0) {
-    LoggerPtr logger = get_logger(category);
-    if (file == 0 || func == 0 || line == 0){
-        logger->log(get_log4cxx_level(level), message, spi::LocationInfo::getLocationUnavailable());
-    } else {
-        logger->log(get_log4cxx_level(level), message, spi::LocationInfo::LocationInfo(file, func, line));
-    }
+HyPortLibrary* log_get_portlib() {
+    return get()->portlib;
 }
 
-void set_threshold(const char *category, LoggingLevel level) {
-    LoggerPtr logger = get_logger(category);
-    logger->setLevel(get_log4cxx_level(level));
-    if (max_level < level) {
-        max_level = level;
-    }
-    clear_cached_sites();
+void log_set_vfprintf(void* p_vfprintf)
+{
+    get()->p_vfprintf = (VfprintfHook) p_vfprintf;
 }
 
-unsigned is_enabled(const char *category, LoggingLevel level) {
-    LoggerPtr logger = get_logger(category);
-    return logger->isEnabledFor(get_log4cxx_level(level));
+void log_set_exit(void* p_exit)
+{
+    get()->p_exit = (ExitHook) p_exit;
 }
 
-unsigned is_warn_enabled(const char *category) {
-    return (Logger::getLogger(category))->isEnabledFor(Level::getWarn());
-}
-unsigned is_info_enabled(const char *category) {
-    return (Logger::getLogger(category))->isEnabledFor(Level::getInfo());
-}
-unsigned is_log_enabled(const char *category, LogSite *logSite) {
-    if(!logSite->next) {
-        //FIXME thread unsafe
-        logSite->next = lastLogSite;
-        lastLogSite = logSite;
-    }
-    // return cached value
-    if (logSite->state != UNKNOWN) {
-        return (DISABLED != logSite->state);
-    }
-    // no cache, calculate
-    bool res = (max_level >= LOG) && Logger::getLogger(category)->isEnabledFor(Level::getDebug());
-    logSite->state = res ? ENABLED : DISABLED;
-    return res;
+void log_set_abort(void* p_abort)
+{
+    get()->p_abort = (AbortHook) p_abort;
 }
 
-unsigned is_trace_enabled(const char *category, LogSite *logSite) {
-    if(!logSite->next) {
-        //FIXME thread unsafe
-        logSite->next = lastLogSite;
-        lastLogSite = logSite;
-    }
-    // return cached value
-    if (logSite->state != UNKNOWN) {
-        return (DISABLED != logSite->state);
-    }
-    // no cache, calculate
-    bool res = (max_level >= TRACE) && Logger::getLogger(category)->isEnabledFor(trace_levelPtr);
-    logSite->state = res ? ENABLED : DISABLED;
-    return res;
+void log_set_header_format(LogFormat format)
+{
+    get()->format = format;
 }
 
-inline static AppenderList getEffectiveAppenders(LoggerPtr logger) {
-    AppenderList alist;
-    while (logger && (alist = logger->getAllAppenders()).size() == 0 && logger->getAdditivity()) {
-        logger = logger->getParent();
-    }
-    return alist;
-}
-void set_out(const char *category, const char* out) {   
-    LoggerPtr logger = get_logger(category);
-    if (out) {
-        LogString lout;
-        helpers::Transcoder::decode(out, strlen(out), lout);
-        AppenderList alist = getEffectiveAppenders(logger);
-        LayoutPtr layout;
-        if (alist.size() != 0) {
-            layout = alist[0]->getLayout();
-        } else {
-            layout = new PatternLayout(LOG4CXX_STR("%m%n"));
-        }
-        logger->removeAllAppenders();
-        AppenderPtr fileap = new FileAppender(layout, lout, false);
-        logger->setAdditivity(false);
-        logger->addAppender(fileap);
-    } else {
-        logger->removeAllAppenders();
-        logger->setAdditivity(true);
-    }
+void log_set_out(FILE* file)
+{
+    log_close();
+    get()->out = file;
 }
 
-void set_header_format(const char *category, HeaderFormat format) {
-    bool header_not_empty = false;
-    LogString str_format;
-    LoggerPtr logger = get_logger(category);
-
-    if (format & HEADER_LEVEL) {
-        str_format.append(LOG4CXX_STR("%-5p "));
-        header_not_empty = true;
-    }
-    if (format & HEADER_THREAD_ID) {
-        str_format.append(LOG4CXX_STR("[%t] "));
-        header_not_empty = true;
-    }
-    if (format & HEADER_TIMESTAMP) {
-        str_format.append(LOG4CXX_STR("[%d] "));
-        header_not_empty = true;
-    }
-    if (format & HEADER_CATEGORY) {
-        str_format.append(LOG4CXX_STR("%c "));
-        header_not_empty = true;
-    }
-    if (format & (HEADER_FILELINE | HEADER_FUNCTION)) {
-        str_format.append(LOG4CXX_STR("("));
-        if (format & HEADER_FUNCTION) {
-            str_format.append(LOG4CXX_STR("%C::%M()"));
-        }
-        if (format & HEADER_FUNCTION && format & HEADER_FILELINE) {
-            str_format.append(LOG4CXX_STR(" at "));
-        }
-        if (format & HEADER_FILELINE) {
-            str_format.append(LOG4CXX_STR("%F:%L"));
-        }
-        str_format.append(LOG4CXX_STR(") "));
-        header_not_empty = true;
-    }
-
-    if (header_not_empty) {
-        str_format.append(LOG4CXX_STR(": "));
-    }
-
-    str_format.append(LOG4CXX_STR("%m%n"));
-
-    AppenderList alist = getEffectiveAppenders(logger);
-    AppenderList::iterator appender;
-    for (appender = alist.begin(); appender != alist.end(); appender++)
-    {
-        (*appender)->setLayout(new PatternLayout(str_format));
-    }
+APR_DECLARE(void) log_exit(int code)
+{
+    log_shutdown();
+    get()->p_exit(code);
 }
 
-void set_thread_specific_out(const char* category, const char* pattern) {
-    return;
+APR_DECLARE(void) log_abort()
+{
+    log_shutdown();
+    assert(0);
+    get()->p_abort();
 }
 
-VMEXPORT const char* log_printf(const char* format, ...){
+APR_DECLARE(int) log_printf(const char* format, ...)
+{
     va_list args;
+    int ret;
+
     va_start(args, format);
-    int length = 255;
-    char *message = (char*)STD_MALLOC(sizeof(char)*length);
-    while(1){
-        int count = vsnprintf(message, length, format, args);
-        if(count > -1 && count < length)
-            break;
-        length *= 2;
-        message = (char*)STD_REALLOC(message, sizeof(char)*length);
-    }
+    ret = get()->p_vfprintf(get()->out, format, args);
     va_end(args);
-    return message;
+    fflush(get()->out);
+    return ret;
 }
+
+APR_DECLARE(void) log_header(const char* category, const char* file_line, const char* function_name)
+{
+    LogFormat format = get()->format;
+    if (format & LOG_THREAD_ID) {
+        log_printf("[%p] ", apr_os_thread_current());
+    }
+    if (format & LOG_TIMESTAMP) {
+        log_printf("[%umus] ", (unsigned) clock());
+    }
+    if (format & LOG_CATEGORY && strcmp(category, LOG_INFO)) {
+        log_printf("[%s] ", category);
+    }
+    if (format & LOG_FUNCTION) {
+        log_printf("%s:", file_line);
+    }
+    if (format & LOG_FILELINE) {
+        log_printf("%s:", function_name);
+    }
+    fflush(get()->out);
+}
+
+/**
+ * Checks if the warnings are enabled. 
+ */
+APR_DECLARE(LogState) log_is_warn_enabled()
+{
+    return (get()->format & LOG_WARN) ? LOG_ENABLED : LOG_DISABLED;
+}
+
+/**
+ * Finds the best matching category in the category list.
+ * @return if the category is enabled
+ */
+static LogState is_enabled(const char *category, LogCategory *log_category) {
+    int max_size = -1;
+    LogState enabled = LOG_DISABLED;
+    while (log_category) {
+        if (strncmp(log_category->name, category, log_category->len) == 0) {
+            if (log_category->len > max_size) {
+                max_size = log_category->len;
+                enabled = log_category->enabled;
+            }
+        }
+        log_category = log_category->next;
+    }
+    return enabled;
+}
+
+APR_DECLARE(LogState) log_is_info_enabled(const char *category)
+{
+    return is_enabled(category, get()->info);
+}
+
+APR_DECLARE(LogState) log_is_trace_enabled(const char *category)
+{
+    return is_enabled(category, get()->trace);
+}
+
+/**
+ * Adds a site to the site list.
+ */
+static void add_site(LogSite* log_site) {
+    LogSite** p_site_head = (LogSite**) &get()->log_site;
+    LogSite* old_value = *p_site_head;
+    do {
+        log_site->next = (LogSite*) old_value;
+        old_value = (LogSite*) port_atomic_casptr(
+            (volatile void **) p_site_head, log_site, log_site->next);
+    } while (old_value != log_site->next);
+}
+
+APR_DECLARE(LogState) log_cache(LogState enabled, struct LogSite* p_log_site)
+{
+    if(!p_log_site->next) {
+        add_site(p_log_site);
+    }
+    p_log_site->state = enabled ? LOG_ENABLED : LOG_DISABLED;
+    return enabled;
+}
+

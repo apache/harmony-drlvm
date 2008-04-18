@@ -59,7 +59,7 @@ VM_Data_Type type_info_get_type(Type_Info_Handle tih)
     case K_MethodPointer:
     case K_TypedRef:
     default:
-        ABORT("Invalid vm data type");
+        DIE(("Invalid vm data type"));
         return VM_DATA_TYPE_INVALID;
     }
 } //type_info_get_type
@@ -164,7 +164,7 @@ Class_Handle type_info_get_class_no_exn(Type_Info_Handle tih)
 
 Method_Signature_Handle type_info_get_method_sig(Type_Info_Handle UNREF tih)
 {
-    ABORT("Not implemented");
+    DIE(("Not implemented"));
     return 0;
 } //type_info_get_method_sig
 
@@ -182,7 +182,7 @@ Type_Info_Handle type_info_get_type_info(Type_Info_Handle tih)
     case K_UnmanagedPointer:
         return td->get_pointed_to_type();
     default:
-        ABORT("Unexpected kind");
+        DIE(("Unexpected kind"));
         return 0;
     }
 } //type_info_get_type_info
@@ -215,16 +215,16 @@ U_32 type_info_get_num_array_dimensions(Type_Info_Handle tih) {
 BOOLEAN type_info_is_resolved(Type_Info_Handle tih) {
     TypeDesc* td = (TypeDesc*)tih;
     switch (td->get_kind()) {
-        case K_Vector:
-            if (td->get_element_type()->is_primitive()) {
-                return true;
-            }
-            return type_info_is_resolved(td->get_element_type());
-        case K_Object:
-                return td->is_loaded();
-        default:
-            ABORT("Unexpected kind");
-            return 0;
+    case K_Vector:
+        if (td->get_element_type()->is_primitive()) {
+            return true;
+        }
+        return type_info_is_resolved(td->get_element_type());
+    case K_Object:
+        return td->is_loaded();
+    default:
+        DIE(("Unexpected kind"));
+        return 0;
     }
 }
 

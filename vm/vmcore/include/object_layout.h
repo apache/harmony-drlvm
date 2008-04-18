@@ -26,7 +26,7 @@
 
 #include <assert.h>
 #include "open/types.h"
-#include "open/hythread_ext.h"
+//#include "open/hythread_ext.h"
 #include "jni.h"
 #include "open/vm.h"
 #include "open/gc.h"
@@ -332,6 +332,7 @@ typedef struct VM_Vector
 #endif
 
 #endif // _OBJECT_LAYOUT_H_
+
 
 
 

@@ -223,7 +223,7 @@ const char* vm_helper_get_name(VM_RT_SUPPORT id) {
         assert(it->second);
         return it->second->name;
     } else {
-        ASSERT(VM_RT_UNKNOWN == id, "Unexpected helper id " << id);
+        ASSERT(VM_RT_UNKNOWN == id, ("Unexpected helper id %d", id));
         return "unknown";
     }
 }
@@ -242,38 +242,26 @@ VMEXPORT
 HELPER_INTERRUPTIBILITY_KIND vm_helper_get_interruptibility_kind(VM_RT_SUPPORT id)
 {
     HelperInfoMap::const_iterator it = helper_map->find(id);
-    if (helper_map->end() != it) {
-        assert(it->second);
-        return it->second->i_kind;
-    } else {
-        ASSERT(false, "Unexpected helper id " << id);
-        return INTERRUPTIBLE_SOMETIMES;
-    }
+    ASSERT(helper_map->end() != it, ("Unexpected helper id %d", id));
+    assert(it->second);
+    return it->second->i_kind;
 }
 
 VMEXPORT 
 HELPER_CALLING_CONVENTION vm_helper_get_calling_convention(VM_RT_SUPPORT id) 
 {
     HelperInfoMap::const_iterator it = helper_map->find(id);
-    if (helper_map->end() != it) {
-        assert(it->second);
-        return it->second->cc_kind;
-    } else {
-        ASSERT(false, "Unexpected helper id " << id);
-        return CALLING_CONVENTION_STDCALL;
-    }
+    ASSERT(helper_map->end() != it, ("Unexpected helper id %d", id));
+    assert(it->second);
+    return it->second->cc_kind;
 }
 
 U_32 vm_helper_get_numargs(VM_RT_SUPPORT id)
 {
     HelperInfoMap::const_iterator it = helper_map->find(id);
-    if (helper_map->end() != it) {
-        assert(it->second);
-        return it->second->number_of_args;
-    } else {
-        ASSERT(false, "Unexpected helper id " << id);
-        return 0;
-    }
+    ASSERT(helper_map->end() != it, ("Unexpected helper id %d", id));
+    assert(it->second);
+    return it->second->number_of_args;
 }
 
 static Class* load_magic_helper_class(Global_Env * vm_env, const char * class_name) {
@@ -285,7 +273,7 @@ static void init_magic_helper_class(Class* magic_helper_class){
     class_initialize(magic_helper_class);
 
     if (exn_raised()){
-        DIE("Exception raised while initializing helper class "  << magic_helper_class->get_name()->bytes);
+        DIE(("Exception raised while initializing helper class %s", magic_helper_class->get_name()->bytes));
     }
     tmn_suspend_enable();
 }
@@ -333,10 +321,7 @@ jint helper_magic_init(Global_Env * vm_env){
         assert (method_descr);
 
         Method_Handle method_handle = resolve_magic_helper(vm_env, class_name, method_name, method_descr);
-        if (!method_handle) {
-            ASSERT(method_handle, "Method " << class_name <<"."<< method_name << method_descr<<" not found.");
-            return JNI_ERR;
-        }
+        ASSERT(method_handle, ("Method %s.%s%s not found.", class_name, method_name, method_descr));
         jit_rt_function_entries[i].magic_mh = method_handle;
     }
     return JNI_OK;
@@ -350,30 +335,18 @@ jint vm_helper_register_magic_helper(VM_RT_SUPPORT id,
     assert (method_name);
     
     HelperInfoMap::const_iterator it = helper_map->find(id);
-    if (helper_map->end() != it) {
-        assert(it->second);
-        if (it->second->magic_method_name) {
-            ASSERT(it->second->magic_method_name == NULL, "Helper " << id << " is registered already.");
-            return JNI_ERR;
-        } else {
-            it->second->magic_class_name = class_name;
-            it->second->magic_method_name = method_name;
-            return JNI_OK;
-        }
-    } else {
-        ASSERT(VM_RT_UNKNOWN == id, "Unexpected helper id " << id);
-        return JNI_ERR;
-    }
+    ASSERT(helper_map->end() != it, ("Unexpected helper id %d", id));
+    assert(it->second);
+    ASSERT(it->second->magic_method_name == NULL, ("Helper %d is registered already.", id));
+    it->second->magic_class_name = class_name;
+    it->second->magic_method_name = method_name;
+    return JNI_OK;
 }
 
 VMEXPORT
 Method_Handle vm_helper_get_magic_helper(VM_RT_SUPPORT id) {
     HelperInfoMap::const_iterator it = helper_map->find(id);
-    if (helper_map->end() != it) {
-        assert(it->second);
-        return it->second->magic_mh;
-    } else {
-        ASSERT(false, "Unexpected helper id " << id);
-        return NULL;
-    }
+    ASSERT(helper_map->end() != it, ("Unexpected helper id %d", id));
+    assert(it->second);
+    return it->second->magic_mh;
 }

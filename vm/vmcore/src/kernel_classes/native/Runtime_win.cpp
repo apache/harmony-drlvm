@@ -133,7 +133,7 @@ void JNICALL Java_java_lang_Runtime_00024SubProcess_createProcess0 (
         env->ReleaseStringUTFChars(jo, strChain);
     }
 
-    LOG("Child process command-line : " << strCmnd);
+    TRACE("Child process command-line : " << strCmnd);
 
     char *strEnvp = NULL;
     // Get the array, each element of which has environment variable settings:

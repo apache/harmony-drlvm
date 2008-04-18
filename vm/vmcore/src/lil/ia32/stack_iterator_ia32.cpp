@@ -14,11 +14,11 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
 /** 
  * @author Intel, Pavel Afremov
- * @version $Revision$
  */  
+#define LOG_DOMAIN "exn"
+#include "clog.h"
 
 #include "environment.h"
 #include "jit_intf_cpp.h"
@@ -31,8 +31,6 @@
 #include "encoder.h"
 #include "interpreter.h"
 #include "cci.h"
-
-#include "clog.h"
 
 #include "dump.h"
 #include "port_threadunsafe.h"
@@ -75,12 +73,12 @@ static void si_unwind_from_m2n(StackIterator* si, bool over_popped = true)
 
     si->m2nfl   = m2n_get_previous_frame(m2nfl);
 
-    TRACE2("si", ("si_unwind_from_m2n, ip = %p",(void*)m2nfl->eip));
+    CTRACE(("si_unwind_from_m2n, ip = %p",(void*)m2nfl->eip));
 
     // Is it a normal M2nFrame or one for suspended managed code?
     if ((uint32)m2nfl->p_lm2nf==1) {
         // Suspended managed code, eip is at instruction, esp & registers are in regs structure
-        TRACE2("si", ("si_unwind_from_m2n from suspended managed code, ip = %p", 
+        CTRACE(("si_unwind_from_m2n from suspended managed code, ip = %p", 
             (void*)m2nfl->regs->eip));
         si->c.esp = m2nfl->regs->esp;
         si->c.p_eip = &(m2nfl->regs->eip);
@@ -336,7 +334,7 @@ void si_goto_previous(StackIterator* si, bool over_popped)
 {
     ASSERT_NO_INTERPRETER
     if (si->cci) {
-        TRACE2("si", ("si_goto_previous from ip = %p (%s%s)",
+        CTRACE(("si_goto_previous from ip = %p (%s%s)",
             (void*)si_get_ip(si),
             method_get_name(si->cci->get_method()),
             method_get_descriptor(si->cci->get_method())));
@@ -344,7 +342,7 @@ void si_goto_previous(StackIterator* si, bool over_popped)
         si->cci->get_jit()->unwind_stack_frame(si->cci->get_method(), si_get_jit_context(si));
         si->c.is_ip_past = TRUE;
     } else {
-        TRACE2("si", ("si_goto_previous from ip = %p (M2N)",
+        CTRACE(("si_goto_previous from ip = %p (M2N)",
             (void*)si_get_ip(si)));
         if (!si->m2nfl) return;
         si_unwind_from_m2n(si, over_popped);
@@ -357,12 +355,12 @@ void si_goto_previous(StackIterator* si, bool over_popped)
         si->cci = NULL;
 
     if (si->cci) {
-        TRACE2("si", ("si_goto_previous to ip = %p (%s%s)",
+        CTRACE(("si_goto_previous to ip = %p (%s%s)",
             (void*)si_get_ip(si),
             method_get_name(si->cci->get_method()),
             method_get_descriptor(si->cci->get_method())));
     } else {
-        TRACE2("si", ("si_goto_previous to ip = %p (M2N)",
+        CTRACE(("si_goto_previous to ip = %p (M2N)",
             (void*)si_get_ip(si)));
     }
 }
@@ -472,22 +470,21 @@ static void cpp_check_last_frame()
 
     void *lastFrame = p_TLS_vmthread->lastFrame;
 
-    TRACE2("exn",("  curr = 0x%p\n", lastFrame));
-    TRACE2("exn",(" handler=0x%p\n", handler));
+    CTRACE(("  curr = 0x%p\n", lastFrame));
+    CTRACE((" handler=0x%p\n", handler));
 
     if (!(handler < lastFrame)) {
-        TRACE2("exn",("all ok\n"));
+        CTRACE(("all ok\n"));
         return;
     }
 
-    // NO CXX LOGGER PLEASE! doesn't work with destructive unwinding!
-    INFO2("exn", ("ERROR: Destructive unwinding: C++ objects detected on stack!\n"));
+    WARN(("ERROR: Destructive unwinding: C++ objects detected on stack!\n"));
 
     while(handler < lastFrame) {
-        INFO2("exn", ("  droping 0x%p\n", handler));
+        WARN(("  droping 0x%p\n", handler));
         handler = *(int**)handler;
     }
-    INFO2("exn", (" setting curr 0x%p\n", handler));
+    WARN((" setting curr 0x%p\n", handler));
     __asm {
         mov eax, handler
         mov fs:[0], eax
@@ -527,10 +524,10 @@ void si_transfer_control(StackIterator* si)
     cpp_check_last_frame();
 #endif // _WIN32
 
-    TRACE2("exn", ("generating control transfer stub"));
+    CTRACE(("generating control transfer stub"));
     // 3. Call the stub
     transfer_control_stub_type tcs = gen_transfer_control_stub();
-    TRACE2("exn", ("tcs"));
+    CTRACE(("tcs"));
     tcs(&local_si);
 }
 

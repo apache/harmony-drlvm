@@ -18,6 +18,8 @@
  * @author Intel, Evgueni Brevnov
  * @version $Revision$
  */  
+#define LOG_DOMAIN "vm.helpers"
+#include "cxxlog.h"
 
 #include "open/types.h"
 #include "open/vm_type_access.h"
@@ -36,9 +38,6 @@
 #include "exceptions.h"
 #include "exceptions_jit.h"
 
-#define LOG_DOMAIN "vm.helpers"
-#include "cxxlog.h"
-
 #include "dump.h"
 #include "vm_stats.h"
 
@@ -51,7 +50,7 @@ void compile_flush_generated_code() {
 }
 
 void patch_code_with_threads_suspended(Byte * UNREF code_block, Byte * UNREF new_code, size_t UNREF size) {
-    ABORT("Not supported on EM64T currently");
+    DIE(("Not supported on EM64T currently"));
 }
 
 void compile_protect_arguments(Method_Handle method, GcFrame * gc) {
@@ -146,7 +145,7 @@ void compile_protect_arguments(Method_Handle method, GcFrame * gc) {
         case VM_DATA_TYPE_VALUE:
             LDIE(30, "This functionality is not currently supported");
         default:
-            ASSERT(0, "Unexpected data type: " << type_info_get_type(tih));
+            DIE(("Unexpected data type: %d", type_info_get_type(tih)));
         }
     }
 }

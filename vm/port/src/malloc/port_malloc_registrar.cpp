@@ -27,7 +27,6 @@
 #endif
 
 #include "port_malloc_registrar.h"
-#include "log_macro.h"
 #include "port_malloc.h"
 
 #ifdef _MEMMGR

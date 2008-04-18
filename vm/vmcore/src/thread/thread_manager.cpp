@@ -14,19 +14,9 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Andrey Chernyshev
- * @version $Revision: 1.1.2.1.4.5 $
- */
-
-
+#define LOG_DOMAIN "vmcore.thread"
+#include "cxxlog.h"
 #include "platform_lowlevel.h"
-#include <assert.h>
-
-//MVM
-#include <iostream>
-
-using namespace std;
 
 #ifndef PLATFORM_POSIX
 #include "vm_process.h"
@@ -65,8 +55,6 @@ using namespace std;
 #include "java_lang_thread_ia32.h"
 #endif
 
-#define LOG_DOMAIN "vmcore.thread"
-#include "cxxlog.h"
 
 
 jint jthread_allocate_vm_thread_pool(JavaVM *java_vm,

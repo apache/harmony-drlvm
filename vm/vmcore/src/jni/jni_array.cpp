@@ -775,7 +775,7 @@ void JNICALL ReleaseBooleanArrayElements(JNIEnv * jni_env,
         STD_FREE(elems);
         break;
     default:
-        ASSERT(0, "Unexpected value of 'mode' input parameter");
+        DIE(("Unexpected value of 'mode' input parameter"));
         break;
     }
 } //ReleaseBooleanArrayElements
@@ -828,7 +828,7 @@ void JNICALL ReleaseByteArrayElements(JNIEnv * jni_env,
         STD_FREE(elems);
         break;
     default:
-        ASSERT(0, "Unexpected value of 'mode' input parameter");
+        DIE(("Unexpected value of 'mode' input parameter"));
         break;
     }
 } //ReleaseByteArrayElements
@@ -882,7 +882,7 @@ void JNICALL ReleaseCharArrayElements(JNIEnv * jni_env,
         STD_FREE(elems);
         break;
     default:
-        ASSERT(0, "Unexpected value of 'mode' input parameter");
+        DIE(("Unexpected value of 'mode' input parameter"));
         break;
     }
 } //ReleaseCharArrayElements
@@ -936,7 +936,7 @@ void JNICALL ReleaseShortArrayElements(JNIEnv * jni_env,
         STD_FREE(elems);
         break;
     default:
-        ASSERT(0, "Unexpected value of 'mode' input parameter");
+        DIE(("Unexpected value of 'mode' input parameter"));
         break;
     }
 } //ReleaseShortArrayElements
@@ -990,7 +990,7 @@ void JNICALL ReleaseIntArrayElements(JNIEnv * jni_env,
         STD_FREE(elems);
         break;
     default:
-        ASSERT(0, "Unexpected value of 'mode' input parameter");
+        DIE(("Unexpected value of 'mode' input parameter"));
         break;
     }
 } //ReleaseIntArrayElements
@@ -1044,7 +1044,7 @@ void JNICALL ReleaseLongArrayElements(JNIEnv * jni_env,
         STD_FREE(elems);
         break;
     default:
-        ASSERT(0, "Unexpected value of 'mode' input parameter");
+        DIE(("Unexpected value of 'mode' input parameter"));
         break;
     }
 } //ReleaseLongArrayElements
@@ -1099,7 +1099,7 @@ void JNICALL ReleaseFloatArrayElements(JNIEnv * jni_env,
         STD_FREE(elems);
         break;
     default:
-        ASSERT(0, "Unexpected value of 'mode' input parameter");
+        DIE(("Unexpected value of 'mode' input parameter"));
         break;
     }
 } //ReleaseFloatArrayElements
@@ -1153,7 +1153,7 @@ void JNICALL ReleaseDoubleArrayElements(JNIEnv * jni_env,
         STD_FREE(elems);
         break;
     default:
-        ASSERT(0, "Unexpected value of 'mode' input parameter");
+        DIE(("Unexpected value of 'mode' input parameter"));
         break;
     }
 } //ReleaseDoubleArrayElements

@@ -44,9 +44,9 @@ EBProfileCollector::EBProfileCollector(EM_PC_Interface* em, const std::string& n
 {
     assert( (mode == EB_PCMODE_SYNC ? (initialTimeout==0 && timeout==0) : timeout > 0) );
     catName = std::string(LOG_DOMAIN) + ".profiler." + name;
-    loggingEnabled =  is_info_enabled(LOG_DOMAIN);
+    loggingEnabled =  log_is_info_enabled(LOG_DOMAIN);
     if (!loggingEnabled) {
-        loggingEnabled = is_info_enabled(catName.c_str());
+        loggingEnabled = log_is_info_enabled(catName.c_str());
     }
     if (loggingEnabled) {
         std::ostringstream msg;

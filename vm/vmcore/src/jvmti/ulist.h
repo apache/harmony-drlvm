@@ -221,7 +221,7 @@ TEST(push_few) {
         assert(0 <= *i && *i < N);
         c++;
     }
-    LOG("expected " << N << " elements, got " << c);
+    TRACE("expected " << N << " elements, got " << c);
     assert(c == N);
     for (int j = 0; j < N; j++) {
         list.push_back(j);
@@ -231,7 +231,7 @@ TEST(push_few) {
         assert(0 <= *i && *i < N);
         c++;
     }
-    LOG("expected " << (2*N) << "  elements, got " << c);
+    TRACE("expected " << (2*N) << "  elements, got " << c);
     assert(c == 2*N);
     assert(c == list.size());
 }
@@ -244,7 +244,7 @@ TEST(push_many) {
         list.push_back(j);
         c++;
     }
-    LOG("expected " << N << " elements, got " << c);
+    TRACE("expected " << N << " elements, got " << c);
     assert(c == N);
 }
 

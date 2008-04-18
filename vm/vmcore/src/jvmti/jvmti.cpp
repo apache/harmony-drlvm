@@ -231,7 +231,7 @@ static void JNICALL jvmtiUnimpStub(JNIEnv* UNREF env)
 {
     // If we ever get here, we are in an implemented JVMTI function
     // By looking at the call stack and assembly it should be clear which one
-    ABORT("Not implemented");
+    DIE(("Not implemented"));
 }
 
 jint JNICALL create_jvmti_environment(JavaVM *vm_ext, void **env, jint version)

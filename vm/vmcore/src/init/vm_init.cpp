@@ -14,10 +14,8 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Alexei Fedotov
- * @version $Revision: 1.1.2.4.4.3 $
- */  
+#define LOG_DOMAIN "vm.core.init"
+#include "cxxlog.h"
 
 #include <apr_env.h>
 #include <apr_general.h>
@@ -59,9 +57,6 @@
 // 20040427 Used to turn on heap checking on every allocation
 #include <crtdbg.h>
 #endif
-
-#define LOG_DOMAIN "vm.core.init"
-#include "cxxlog.h"
 
 VTable * cached_object_array_vtable_ptr;
 bool parallel_jit = true;

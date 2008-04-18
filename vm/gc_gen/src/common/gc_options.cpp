@@ -14,7 +14,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
+#define LOG_DOMAIN "gc.base"
 #include "gc_common.h"
 #include "open/vm_properties.h"
 
@@ -87,7 +87,7 @@ static GC* gc_decide_collection_algo(char* unique_algo, Boolean has_los)
     GC_PROP |= ALGO_MS_NORMAL;
     gc = gc_ms_create();
   }else{
-    WARN2("gc.base","\nWarning: GC algorithm setting incorrect. Will use default value.\n");
+    WARN(("\nGC algorithm setting incorrect. Will use default value.\n"));
     GC_PROP |= ALGO_COMPACT_MOVE;
     gc = gc_mc_create();  
   }
@@ -99,8 +99,7 @@ static int vm_property_get_integer(const char *property_name)
 {
     assert(property_name);
     if(!vm_property_is_set(property_name, VM_PROPERTIES)) {
-        DIE2("gc.base","Warning: property value "<<property_name<<"is not set!");
-        exit(0);
+        DIE(("Property value %s is not set!", property_name));
     }
 
     return vm_property_get_integer(property_name, 0, VM_PROPERTIES);
@@ -110,8 +109,7 @@ static BOOLEAN vm_property_get_boolean(const char *property_name)
 {
   assert(property_name);
   if (!vm_property_is_set(property_name, VM_PROPERTIES)){
-    DIE2("gc.base","Warning: property value "<<property_name<<" is not set!");
-    exit(0);
+        DIE(("Property value %s is not set!", property_name));
   }
 
   return vm_property_get_boolean(property_name, FALSE, VM_PROPERTIES);
@@ -121,8 +119,7 @@ static size_t vm_property_get_size(const char* property_name)
 {
     assert(property_name);
     if(!vm_property_is_set(property_name, VM_PROPERTIES)) {
-        DIE2("gc.base","Warning: property value "<<property_name<<" is not set!");
-        exit(0);
+        DIE(("Property value %s is not set!", property_name));
     }
 
     return vm_property_get_size(property_name, 0, VM_PROPERTIES);
@@ -163,7 +160,7 @@ GC* gc_parse_options()
 
   if(unique_algo){
     if(minor_algo || major_algo){
-      WARN2("gc.base","Warning: generational options cannot be set with unique_algo, ignored.");
+      WARN(("Generational options cannot be set with unique_algo, ignored."));
     }
     gc = gc_decide_collection_algo(unique_algo, has_los);
     vm_properties_destroy_value(unique_algo);  
@@ -207,11 +204,11 @@ GC* gc_parse_options()
 
     if (max_heap_size < min_heap_size){
       max_heap_size = min_heap_size;
-      WARN2("gc.base","Warning: Max heap size you set is too small, reset to "<<max_heap_size/MB<<" MB!");
+      WARN(("Max heap size you set is too small, reset to %dMB", max_heap_size/MB));
     }
     if (0 == max_heap_size){
       max_heap_size = HEAP_SIZE_DEFAULT;
-      WARN2("gc.base","Warning: Max heap size you set euqals to zero, reset to "<<max_heap_size/MB<<" MB!");
+      WARN(("Max heap size you set equals to zero, reset to %dMB", max_heap_size/MB));
     }
  
     min_heap_size = max_heap_size / 10;
@@ -225,13 +222,13 @@ GC* gc_parse_options()
     min_heap_size = vm_property_get_size("gc.ms");
     if (min_heap_size < min_heap_size_bytes){
       min_heap_size = min_heap_size_bytes;
-      WARN2("gc.base","Warning: Min heap size you set is too small, reset to "<<min_heap_size/MB<<" MB!");
+      WARN(("Min heap size you set is too small, reset to %dMB", min_heap_size/MB));
     } 
   }
 
   if (min_heap_size > max_heap_size){
     max_heap_size = min_heap_size;
-    WARN2("gc.base","Warning: Max heap size is too small, reset to "<<max_heap_size/MB<<" MB!");
+    WARN(("Max heap size is too small, reset to %dMB", max_heap_size/MB));
   }
 
   min_heap_size_bytes = min_heap_size;
@@ -360,14 +357,14 @@ GC* gc_parse_options()
   if(vm_property_is_set("gc.prefetch_distance",VM_PROPERTIES)==1) {
     PREFETCH_DISTANCE = vm_property_get_size("gc.prefetch_distance");
     if(!PREFETCH_ENABLED) {
-      WARN2("gc.prefetch_distance","Warning: Prefetch distance set with Prefetch disabled!");
+      WARN(("Prefetch distance set with Prefetch disabled!"));
     }
   }
 
   if(vm_property_is_set("gc.prefetch_stride",VM_PROPERTIES)==1) {
     PREFETCH_STRIDE = vm_property_get_size("gc.prefetch_stride");
     if(!PREFETCH_ENABLED) {
-      WARN2("gc.prefetch_stride","Warning: Prefetch stride set  with Prefetch disabled!");
+      WARN(("Prefetch stride set  with Prefetch disabled!"));
     }  
   }
   

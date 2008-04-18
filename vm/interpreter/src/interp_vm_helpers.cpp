@@ -26,9 +26,7 @@
 #include "interp_native.h"
 #include "exceptions.h"
 #include "compile.h"
-#include "cxxlog.h"
 #include "interp_defs.h"
-#include "vtable.h"
 
 void interp_throw_exception(const char* exc_name) {
     M2N_ALLOC_MACRO;

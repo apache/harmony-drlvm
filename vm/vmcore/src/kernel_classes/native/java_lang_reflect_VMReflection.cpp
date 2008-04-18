@@ -189,7 +189,7 @@ static jobject invoke_primitive_method(JNIEnv* jenv, jobject obj, jclass declari
         return NULL;
         break;
     default:
-        ABORT("Unexpected java type");
+        DIE(("Unexpected java type"));
     }
 
     return exn_raised() ? NULL : wrap_primitive(jenv, result, (char)return_type);

@@ -41,7 +41,7 @@ void set_log_levels_from_cmd(JavaVMInitArgs* vm_arguments);
  * Parses string pool size required for environment initialization.
  */
 void parse_vm_arguments1(JavaVMInitArgs *vm_args, size_t *p_string_pool_size,
-                         jboolean *p_is_class_data_shared, void **portlib);
+                         jboolean *p_is_class_data_shared, apr_pool_t* pool);
 /**
  * Collects all arguments in VM properties.
  */

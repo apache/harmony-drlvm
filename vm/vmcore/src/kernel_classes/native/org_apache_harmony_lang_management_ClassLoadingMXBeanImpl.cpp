@@ -26,7 +26,7 @@
  * It contains implementation for native methods of
  * org.apache.harmony.lang.management.ClassLoadingMXBeanImpl class.
  */
-
+#define LOG_DOMAIN "management"
 #include <cxxlog.h>
 #include "environment.h"
 #include "org_apache_harmony_lang_management_ClassLoadingMXBeanImpl.h"
@@ -38,7 +38,7 @@
 JNIEXPORT jint JNICALL Java_org_apache_harmony_lang_management_ClassLoadingMXBeanImpl_getLoadedClassCountImpl
 (JNIEnv * env, jobject this_bean)
 {
-    TRACE2("management", "ClassLoadingMXBeanImpl_getLoadedClassCountImpl invocation");
+    TRACE("ClassLoadingMXBeanImpl_getLoadedClassCountImpl invocation");
     return (jint)
         (Java_org_apache_harmony_lang_management_ClassLoadingMXBeanImpl_getTotalLoadedClassCountImpl(env, this_bean)
         - Java_org_apache_harmony_lang_management_ClassLoadingMXBeanImpl_getUnloadedClassCountImpl(env, this_bean));
@@ -52,7 +52,7 @@ JNIEXPORT jint JNICALL Java_org_apache_harmony_lang_management_ClassLoadingMXBea
 JNIEXPORT jlong JNICALL Java_org_apache_harmony_lang_management_ClassLoadingMXBeanImpl_getTotalLoadedClassCountImpl
 (JNIEnv * env, jobject)
 {
-    TRACE2("management", "ClassLoadingMXBeanImpl_getTotalLoadedClassCountImpl invocation");
+    TRACE("ClassLoadingMXBeanImpl_getTotalLoadedClassCountImpl invocation");
     JavaVM * vm = NULL;
     env->GetJavaVM(&vm);
     return ((JavaVM_Internal*)vm)->vm_env->total_loaded_class_count;
@@ -66,7 +66,7 @@ JNIEXPORT jlong JNICALL Java_org_apache_harmony_lang_management_ClassLoadingMXBe
 JNIEXPORT jlong JNICALL Java_org_apache_harmony_lang_management_ClassLoadingMXBeanImpl_getUnloadedClassCountImpl
 (JNIEnv * env, jobject)
 {
-    TRACE2("management", "ClassLoadingMXBeanImpl_getUnloadedClassCountImpl invocation");
+    TRACE("ClassLoadingMXBeanImpl_getUnloadedClassCountImpl invocation");
     JavaVM * vm = NULL;
     env->GetJavaVM(&vm);
     return ((JavaVM_Internal*)vm)->vm_env->unloaded_class_count;
@@ -80,10 +80,8 @@ JNIEXPORT jlong JNICALL Java_org_apache_harmony_lang_management_ClassLoadingMXBe
 JNIEXPORT jboolean JNICALL Java_org_apache_harmony_lang_management_ClassLoadingMXBeanImpl_isVerboseImpl
 (JNIEnv * env, jobject)
 {
-    TRACE2("management", "ClassLoadingMXBeanImpl_isVerboseImpl invocation");
-    JavaVM * vm = NULL;
-    env->GetJavaVM(&vm);
-    return ((JavaVM_Internal*)vm)->vm_env->class_loading_verbose;
+    TRACE("ClassLoadingMXBeanImpl_isVerboseImpl invocation");
+    return log_is_info_enabled(LOG_CLASS_INFO);
 }
 
 /*
@@ -92,18 +90,13 @@ JNIEXPORT jboolean JNICALL Java_org_apache_harmony_lang_management_ClassLoadingM
  * Signature: (Z)V
  */
 JNIEXPORT void JNICALL Java_org_apache_harmony_lang_management_ClassLoadingMXBeanImpl_setVerboseImpl
-(JNIEnv * env, jobject, jboolean new_value)
+(JNIEnv * env, jobject, jboolean value)
 {
-    TRACE2("management", "ClassLoadingMXBeanImpl_setVerboseImpl invocation");
-    JavaVM * vm = NULL;
-    env->GetJavaVM(&vm);
-    if (((JavaVM_Internal*)vm)->vm_env->class_loading_verbose != new_value) {
-        if (new_value) {
-            set_threshold(util::CLASS_LOGGER, INFO);
-        } else {
-            set_threshold(util::CLASS_LOGGER, WARN);
-        }
-        ((JavaVM_Internal*)vm)->vm_env->class_loading_verbose = new_value;
+    TRACE("ClassLoadingMXBeanImpl_setVerboseImpl invocation");
+    if (value) {
+        log_enable_info_category(LOG_CLASS_INFO, 0);
+    } else {
+        log_disable_info_category(LOG_CLASS_INFO, 0);
     }
 }
 

@@ -109,7 +109,7 @@ void verify_stack_enumeration() {
     // we are guaranteed that noone will start
     // enumeration while we are holding gc lock
 
-    LOG("--- verify_stack_enumeration started [" << counter << "]---");
+    TRACE("--- verify_stack_enumeration started [" << counter << "]---");
 
     // cache heap boundaries
     if (NULL == heap_base) { heap_base = gc_heap_base_address(); }
@@ -151,7 +151,7 @@ void verify_stack_enumeration() {
     vm_enumerate_thread(p_TLS_vmthread);
 
     // scan the stack
-    LOG("  stack is from " << stack_top << " to " << stack_end);
+    TRACE("  stack is from " << stack_top << " to " << stack_end);
     void** word = stack_top;
     std::set<void**>::iterator i;
     while (word < stack_end) {
@@ -163,7 +163,7 @@ void verify_stack_enumeration() {
                 // drop the root
                 roots.erase(i);
             } else {
-                LOG2("verify.rse.bug", 
+                TRACE2("verify.rse.bug", 
                     "pointer " << *word << " at " << word << " was not enumerated");
             }
         }
@@ -174,7 +174,7 @@ void verify_stack_enumeration() {
     while (i != roots.end()) {
         if (*i) {
             void** root = *i;
-            LOG2("verify.rse.bug", "the root " << *root << " at " << root
+            TRACE2("verify.rse.bug", "the root " << *root << " at " << root
                 << " was not found during conservative stack scan");
         }
         ++i;
@@ -190,7 +190,7 @@ void verify_stack_enumeration() {
     roots.clear();
     size = 0;
 
-    LOG("--- completed verify_stack_enumeration [" << counter++ << "]---");
+    TRACE("--- completed verify_stack_enumeration [" << counter++ << "]---");
     vm_gc_unlock_enum();
 
     // XXX: workaround to avoid infinite recursion

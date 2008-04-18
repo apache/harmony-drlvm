@@ -21,8 +21,11 @@
 /*
  * JVMTI method API
  */
-
+#define LOG_DOMAIN "jvmti.method"
+#include "cxxlog.h"
+#include "vm_log.h"
 #include <string.h>
+
 #include "open/vm_method_access.h"
 #include "Class.h"
 #include "class_member.h"
@@ -30,8 +33,6 @@
 #include "jvmti_direct.h"
 #include "object_handles.h"
 #include "jvmti_utils.h"
-#include "cxxlog.h"
-#include "vm_log.h"
 
 #include "jvmti_interface.h"
 #include "suspend_checker.h"
@@ -56,7 +57,7 @@ jvmtiGetMethodName(jvmtiEnv* env,
                    char** signature_ptr,
                    char** generic_ptr)
 {
-    TRACE2("jvmti.method", "GetMethodName called");
+    TRACE("GetMethodName called");
     SuspendEnabledChecker sec;
     /*
      * Check given env & current phase.
@@ -119,7 +120,7 @@ jvmtiGetMethodDeclaringClass(jvmtiEnv* env,
                              jmethodID method,
                              jclass* declaring_class_ptr)
 {
-    TRACE2("jvmti.method", "GetMethodDeclaringClass called for " << method);
+    TRACE("GetMethodDeclaringClass called for " << method);
     SuspendEnabledChecker sec;
     /*
      * Check given env & current phase.
@@ -155,7 +156,7 @@ jvmtiGetMethodModifiers(jvmtiEnv* env,
                         jmethodID method,
                         jint* modifiers_ptr)
 {
-    TRACE2("jvmti.method", "GetMethodModifiers called");
+    TRACE("GetMethodModifiers called");
     SuspendEnabledChecker sec;
     /*
      * Check given env & current phase.
@@ -195,7 +196,7 @@ jvmtiGetMaxLocals(jvmtiEnv* env,
                   jmethodID method,
                   jint* max_ptr)
 {
-    TRACE2("jvmti.method", "GetMaxLocals called");
+    TRACE("GetMaxLocals called");
     SuspendEnabledChecker sec;
     /*
      * Check given env & current phase.
@@ -226,7 +227,7 @@ jvmtiGetArgumentsSize(jvmtiEnv* env,
                       jmethodID method,
                       jint* size_ptr)
 {
-    TRACE2("jvmti.method", "GetArgumentsSize called");
+    TRACE("GetArgumentsSize called");
     SuspendEnabledChecker sec;
     /*
      * Check given env & current phase.
@@ -258,7 +259,7 @@ jvmtiGetLineNumberTable(jvmtiEnv* env,
                         jint* entry_count_ptr,
                         jvmtiLineNumberEntry** table_ptr)
 {
-    TRACE2("jvmti.method", "GetLineNumberTable called");
+    TRACE("GetLineNumberTable called");
     SuspendEnabledChecker sec;
     int index,
         count;
@@ -339,7 +340,7 @@ jvmtiGetMethodLocation(jvmtiEnv* env,
                        jlocation* start_location_ptr,
                        jlocation* end_location_ptr)
 {
-    TRACE2("jvmti.method", "GetMethodLocation called");
+    TRACE("GetMethodLocation called");
     SuspendEnabledChecker sec;
     /*
      * Check given env & current phase.
@@ -376,7 +377,7 @@ jvmtiGetLocalVariableTable(jvmtiEnv* env,
                            jint* entry_count_ptr,
                            jvmtiLocalVariableEntry** table_ptr)
 {
-    TRACE2("jvmti.method", "GetLocalVariableTable called");
+    TRACE("GetLocalVariableTable called");
     SuspendEnabledChecker sec;
     int len,
         index,
@@ -497,7 +498,7 @@ jvmtiGetBytecodes(jvmtiEnv* env,
                   jint* bytecode_count_ptr,
                   unsigned char** bytecodes_ptr)
 {
-    TRACE2("jvmti.method", "GetBytecodes called");
+    TRACE("GetBytecodes called");
     SuspendEnabledChecker sec;
     /*
      * Check given env & current phase.
@@ -561,7 +562,7 @@ jvmtiIsMethodNative(jvmtiEnv* env,
                     jmethodID method,
                     jboolean* is_native_ptr)
 {
-    TRACE2("jvmti.method", "IsMethodNative called for " << method);
+    TRACE("IsMethodNative called for " << method);
     SuspendEnabledChecker sec;
     /*
      * Check given env & current phase.
@@ -584,7 +585,7 @@ jvmtiIsMethodNative(jvmtiEnv* env,
     }
 
     *is_native_ptr = (jboolean)(reinterpret_cast<Method*>(method)->is_native()?JNI_TRUE:JNI_FALSE);
-    TRACE2("jvmti.method", "IsMethodNative(" << method << ") = " << *is_native_ptr);
+    TRACE("IsMethodNative(" << method << ") = " << *is_native_ptr);
 
     return JVMTI_ERROR_NONE;
 }
@@ -604,7 +605,7 @@ jvmtiIsMethodSynthetic(jvmtiEnv* env,
                        jmethodID method,
                        jboolean* is_synthetic_ptr)
 {
-    TRACE2("jvmti.method", "IsMethodSynthetic called");
+    TRACE("IsMethodSynthetic called");
     SuspendEnabledChecker sec;
     /*
      * Check given env & current phase.
@@ -647,7 +648,7 @@ jvmtiIsMethodObsolete(jvmtiEnv* env,
                       jmethodID method,
                       jboolean* is_obsolete_ptr)
 {
-    TRACE2("jvmti.method", "IsMethodObsolete called for " << method);
+    TRACE("IsMethodObsolete called for " << method);
     SuspendEnabledChecker sec;
     /*
      * Check given env & current phase.
@@ -674,7 +675,7 @@ jvmtiIsMethodObsolete(jvmtiEnv* env,
      */
     *is_obsolete_ptr = JNI_FALSE;
 
-    TRACE2("jvmti.method", "IsMethodObsolete(" << method << ") = " << *is_obsolete_ptr);
+    TRACE("IsMethodObsolete(" << method << ") = " << *is_obsolete_ptr);
     return JVMTI_ERROR_NONE;
 } // jvmtiIsMethodObsolete
 

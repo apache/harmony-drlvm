@@ -132,7 +132,7 @@ void LilCguLabelAddresses::apply_patch(LilCguLabelAddress * label_adress, LilCgu
         *(int32*)patch->addr = (int32)(POINTER_SIZE_INT)label_adress->addr;
         break;
     default:
-        ASSERT(0, "Unknown patch type");
+        DIE(("Unknown patch typ"));
     }
 }
 

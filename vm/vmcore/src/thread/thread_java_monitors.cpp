@@ -19,13 +19,13 @@
  * @file thread_java_monitors.c
  * @brief Java thread monitors related functions
  */
+#define LOG_DOMAIN "tm.monitor"
+#include "cxxlog.h"
+
 #include <open/hythread_ext.h>
 #include "jthread.h"
 #include "vm_threads.h"
 #include "jni.h"
-
-#define LOG_DOMAIN "tm.monitor"
-#include "cxxlog.h"
 
 static void jthread_add_owned_monitor(jobject monitor);
 static void jthread_remove_owned_monitor(jobject monitor);
@@ -323,7 +323,7 @@ jthread_monitor_timed_wait(jobject monitor, jlong millis, jint nanos)
     hythread_thin_monitor_t *lockword = vm_object_get_lockword_addr(monitor);
     if (!hythread_is_fat_lock(*lockword)) {
         if (!hythread_owns_thin_lock(native_thread, *lockword)) {
-            TRACE(("ILLEGAL_STATE wait %x\n", lockword));
+            CTRACE(("ILLEGAL_STATE wait %x\n", lockword));
             hythread_suspend_enable();
             return TM_ERROR_ILLEGAL_STATE;
         }
@@ -408,7 +408,7 @@ static void jthread_add_owned_monitor(jobject monitor)
         // nothing to do
         return;
     }
-    TRACE(("TM: add owned monitor: %x", monitor));
+    CTRACE(("TM: add owned monitor: %x", monitor));
 
     int disable_status = hythread_reset_suspend_disable();
 
@@ -426,7 +426,7 @@ static void jthread_add_owned_monitor(jobject monitor)
     if (jvmti_thread->owned_monitors_nmb >= jvmti_thread->owned_monitors_size) {
         int new_size = jvmti_thread->owned_monitors_size * 2;
 
-        TRACE(("Increasing owned_monitors_size to: %d", new_size));
+        CTRACE(("Increasing owned_monitors_size to: %d", new_size));
         jobject* new_monitors = (jobject*)apr_palloc(vm_thread->pool,
                 new_size * sizeof(jobject));
         assert(new_monitors);
@@ -453,7 +453,7 @@ static void jthread_remove_owned_monitor(jobject monitor)
         // nothing to do
         return;
     }
-    TRACE(("TM: remove owned monitor: %x", monitor));
+    CTRACE(("TM: remove owned monitor: %x", monitor));
 
     for (int i = jvmti_thread->owned_monitors_nmb - 1; i >= 0; i--) {
         if (vm_objects_are_equal(jvmti_thread->owned_monitors[i], monitor)) {
@@ -482,7 +482,7 @@ static void jthread_set_owned_monitor(jobject monitor)
         // nothing to do
         return;
     }
-    TRACE(("TM: set contended monitor: %x", monitor));
+    CTRACE(("TM: set contended monitor: %x", monitor));
 
     int disable_count = hythread_reset_suspend_disable();
     jvmti_thread->contended_monitor = vm_thread->jni_env->NewGlobalRef(monitor);
@@ -499,7 +499,7 @@ static void jthread_set_wait_monitor(jobject monitor)
         // nothing to do
         return;
     }
-    TRACE(("TM: set wait monitor: %x", monitor));
+    CTRACE(("TM: set wait monitor: %x", monitor));
 
     int disable_count = hythread_reset_suspend_disable();
     jvmti_thread->wait_monitor = vm_thread->jni_env->NewGlobalRef(monitor);

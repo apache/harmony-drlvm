@@ -19,7 +19,7 @@
  * @version $Revision: 1.1.2.3.4.4 $
  */  
 
-#define LOG_DOMAIN util::CLASS_LOGGER
+#define LOG_DOMAIN LOG_CLASS_INFO
 #include "cxxlog.h"
 
 #include "open/vm_properties.h"
@@ -47,7 +47,6 @@ assert_reg(NULL),
 string_pool(string_pool_size),
 total_loaded_class_count(0),
 unloaded_class_count(0),
-class_loading_verbose(false),
 total_compilation_time(0),
 bootstrapping(false),
 ready_for_exceptions(false)
@@ -285,7 +284,7 @@ Class* Global_Env::LoadCoreClass(const String* s)
     if(clss == NULL) {
         // print error diagnostics and exit VM
         LWARN(4, "Failed to load bootstrap class {0}" << s->bytes);
-        LOGGER_EXIT(1);
+        log_exit(1);
     }
     return clss;
 }

@@ -39,9 +39,9 @@ static unsigned int sspace_compute_num_tospace_blocks(Sspace* sspace)
     if( TOSPACE_SIZE != 0 ) TOSPACE_SIZE -= 1; 
 
     if( TOSPACE_SIZE >= MB ){
-      WARN2("gc.init", "TOSPACE_SIZE is too big, set it to be " << TOSPACE_SIZE/MB << "MB");
+        WARN(("GC Init: TOSPACE_SIZE is too big, set it to be %dMB", TOSPACE_SIZE/MB));
     }else{
-      WARN2("gc.init", "TOSPACE_SIZE is too big, set it to be " << TOSPACE_SIZE/KB << "KB");
+        WARN(("GC Init: TOSPACE_SIZE is too big, set it to be %dKB", TOSPACE_SIZE/KB));
     }
   }
 

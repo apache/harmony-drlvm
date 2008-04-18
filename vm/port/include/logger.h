@@ -14,137 +14,192 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
-* @author Roman S. Bushmanov, Dmitry B. Yershov
-* @version $Revision: 1.1.2.2.4.3 $
-*/  
+#ifndef _LOGGER_H
+#define _LOGGER_H
 
-#ifndef LOGGER_H
-#define LOGGER_H
-
-#define LOG4CXX
-#define LOG4CXX_STATIC 
-
-#include "open/types.h"
+#include <assert.h>
+#include <stdio.h>
+#include <apr_pools.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /**
-    * Enum of logging levels
-    */
-typedef enum {
-    DIE  = 0,
-    WARN,
-    INFO,
-    LOG,
-    TRACE
-} LoggingLevel;
-
-/**
- * Header format flags. Binary AND operation should be used to combine flags.
+ * Header format mask.
  */
-typedef unsigned HeaderFormat;
-#define HEADER_EMPTY 0
-#define HEADER_TIMESTAMP 1
-#define HEADER_FILELINE 2
-#define HEADER_CATEGORY 4
-#define HEADER_THREAD_ID 8
-#define HEADER_LEVEL 16
-#define HEADER_FUNCTION 32
-
-#if !defined(__LOG4CXX_FUNC__)
-#   if defined(_MSC_VER) && (defined(__INTEL_COMPILER) || _MSC_VER >= 1300)
-#       define __LOG4CXX_FUNC__ __FUNCSIG__
-#   elif defined(__GNUC__)
-#       define __LOG4CXX_FUNC__ __PRETTY_FUNCTION__
-#   else
-#       define __LOG4CXX_FUNC__ ""
-#   endif
-#endif
-
+typedef int LogFormat;
 
 /**
-* Inits log system.  
-*/
-VMEXPORT void init_log_system(void *portLib);
-
-/**
-* shutdown log system.  
-*/
-VMEXPORT void shutdown_log_system();
-
-/**
-* Sets loggers logging levels from file  
-*/
-VMEXPORT void set_logging_level_from_file(const char* filename);
-
-/**
- * Passes the message specified with level assigned to the category specified for logging.  
+ * Formats.
  */
-VMEXPORT void log4cxx_from_c(const char *category, LoggingLevel level, 
-                             const char* message, const char* file, 
-                             const char* func, int line);
+#define LOG_EMPTY       0
+#define LOG_TIMESTAMP   1
+#define LOG_FILELINE    2
+#define LOG_CATEGORY    4
+#define LOG_THREAD_ID   8
+#define LOG_FUNCTION    16
+#define LOG_WARN        32
 
 /**
- * Assigns threshold to a category. All the messages having a lower logging level will 
- * be ignored by the category.   
+ * Predefined classloader filter.
  */
-VMEXPORT void set_threshold(const char *category, LoggingLevel level);
-
+#define LOG_CLASS_INFO  "class"
 /**
- * Checks if the logging level specified is enabled for the category given. 
+ * Predefined gc filter.
  */
-VMEXPORT unsigned is_enabled(const char *category, LoggingLevel level);
-
-VMEXPORT unsigned is_warn_enabled(const char *category);
-VMEXPORT unsigned is_info_enabled(const char *category);
+#define LOG_GC_INFO     "gc"
+/**
+ * Predefined jni filter.
+ */
+#define LOG_JNI_INFO    "jni"
+/**
+ * A domain, which is enabled by default.
+ */
+#define LOG_INFO        "info"
 
 typedef enum {
-    DISABLED  = 0,
-    ENABLED,
-    UNKNOWN
-} CachedState;
+    LOG_DISABLED = 0,
+    LOG_ENABLED,
+    LOG_UNKNOWN
+} LogState;
 
 struct LogSite {
-    CachedState state;
+    LogState state;
     struct LogSite *next;
+    char* log_domain;
 };
 
-typedef struct LogSite LogSite;
-
-VMEXPORT unsigned is_log_enabled(const char *category, LogSite *site);
-VMEXPORT unsigned is_trace_enabled(const char *category, LogSite *site);
-
 /**
-* Redirects category (and all subcategories) output to a file. 
-* If the file is <code>NULL</code>, removes previously assigned redirection (if any).
-*/
-VMEXPORT void set_out(const char *category, const char* file);
-
-/**
- * Sets the header format for the category specified. Use <code>HeaderFormat</code>
- * flags combined by AND operation to configure format.
+ * Adds and enables an info category to log.
+ * @param category a category name
+ * @param copy true if the name should be stored internally
+ * @return true on success, false if the category already exists
+ * and is enabled, or the logger pool is not set.
  */
-VMEXPORT void set_header_format(const char *category, HeaderFormat format);
+int log_enable_info_category(const char* category, int copy);
 
 /**
- * Sets the log file path pattern to use for thread specific logging.
- * Specify <code>NULL</code> pattern to turn off per-thread output.
- * Use %t specifier to be replaced by a thread id.
+ * Adds and enables a trace category to log.
+ * @param category a category name
+ * @param copy true if the name should be stored internally
+ * @return true on success, false if the category already exists
+ * and is enabled, or the logger pool is not set.
  */
-VMEXPORT void set_thread_specific_out(const char* category, const char* pattern);    
+int log_enable_trace_category(const char* category, int copy);
 
 /**
- * Write formatted data to a newly allocated string. 
- * Use STD_FREE to release allocated memory.
+ * Adds and disables a given info category.
+ * @param category a category name
+ * @param copy true if the name should be stored internally
+ * @return true on success, false if the category already exists
+ * and is disabled, or the logger pool is not set.
  */
-VMEXPORT const char* log_printf(const char* format, ...);
+int log_disable_info_category(const char* category, int copy);
+
+/**
+ * Adds and disables a given trace category.
+ * @param category a category name
+ * @param copy true if the name should be stored internally
+ * @return true on success, false if the category already exists
+ * and is disabled, or the logger pool is not set.
+ */
+int log_disable_trace_category(const char* category, int copy);
+
+/**
+ * Inits log system. Allows further dynamic configuration of categories.
+ */
+void log_init(apr_pool_t* parent_pool);
+
+/**
+ * Frees dynamic memory associated with the logger.
+ */
+void log_shutdown();
+
+/**
+ * A native porting layer.
+ */
+struct HyPortLibrary;
+
+/**
+ * Sets a porting library for log system localization.
+ */
+void log_set_portlib(struct HyPortLibrary* portlib);
+
+/**
+ * Sets a porting library for log system localization.
+ */
+struct HyPortLibrary* log_get_portlib();
+
+/**
+ * Sets a <code>vfprintf</code> hook.
+ */
+void log_set_vfprintf(void* p_vfprintf);
+
+/**
+ * Sets a <code>exit</code> hook.
+ */
+void log_set_exit(void* p_exit);
+
+/**
+ * Sets a <code>abort</code> hook.
+ */
+void log_set_abort(void* p_abort);
+
+/**
+ * Sets the header format for the logger.
+ */
+void log_set_header_format(LogFormat format);
+
+/**
+ * Redirects output to a file. 
+ */
+void log_set_out(FILE* file);
+
+/**
+ * Terminates the program using specified return code.
+ */
+APR_DECLARE(void) log_exit(int code);
+
+/**
+ * Terminates the program abnormally.
+ */
+APR_DECLARE(void) log_abort();
+
+/**
+ * Writes formatted data to stdout via specified vfprinf function.
+ */
+APR_DECLARE(int) log_printf(const char* format, ...);
+
+/**
+ * Writes formatted header to stdout via specified vfprinf function.
+ */
+APR_DECLARE(void) log_header(const char* category, const char* file_line, const char* function_name);
+
+/**
+ * Checks if the warnings are enabled. 
+ */
+APR_DECLARE(LogState) log_is_warn_enabled();
+
+/**
+ * Checks if the info domain is enabled for the given category. 
+ */
+APR_DECLARE(LogState) log_is_info_enabled(const char *category);
+
+/**
+ * Checks if the trace is enabled for the given category. 
+ */
+APR_DECLARE(LogState) log_is_trace_enabled(const char *category);
+
+/**
+ * Caches a check in the corresponding log site.
+ * @return enabled
+ */
+APR_DECLARE(LogState) log_cache(LogState enabled, struct LogSite* p_log_site);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // LOGGER_H
+#endif /* _LOGGER_H */
 

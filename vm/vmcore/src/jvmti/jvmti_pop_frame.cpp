@@ -20,6 +20,7 @@
  */
 
 #define LOG_DOMAIN "jvmti.stack.popframe"
+#include "clog.h"
 
 #include "open/vm_method_access.h"
 
@@ -35,28 +36,27 @@
 #include "stack_iterator.h"
 #include "jvmti_break_intf.h"
 #include "cci.h"
-#include "clog.h"
 
 static void jvmti_pop_frame_callback()
 {
-    TRACE(("JVMTI PopFrame callback is called"));
+    CTRACE(("JVMTI PopFrame callback is called"));
     frame_type type =
 		m2n_get_frame_type((M2nFrame*)(p_TLS_vmthread->last_m2n_frame));
 
     // frame wasn't requested to be popped
     if (FRAME_POP_NOW != (FRAME_POP_NOW & type)) {
-        TRACE(("PopFrame callback is not FRAME_POP_NOW"));
+        CTRACE(("PopFrame callback is not FRAME_POP_NOW"));
         return;
     }
 
     // if we are in hythread_safe_point() frame is unwindable
     if (FRAME_SAFE_POINT == (FRAME_SAFE_POINT & type)) {
-        TRACE(("PopFrame callback is FRAME_SAFE_POINT"));
+        CTRACE(("PopFrame callback is FRAME_SAFE_POINT"));
         jvmti_jit_prepare_pop_frame();
 
     } else if (is_unwindable()) {
         // unwindable frame, wait for resume
-        TRACE(("PopFrame callback is FRAME_SAFE_POINT"));
+        CTRACE(("PopFrame callback is FRAME_SAFE_POINT"));
 
         // switch execution to the previous frame
         jvmti_jit_do_pop_frame();
@@ -64,7 +64,7 @@ static void jvmti_pop_frame_callback()
 
     } else {
         // nonunwindable frame, raise special exception object
-        TRACE(("PopFrame callback is raising exception"));
+        CTRACE(("PopFrame callback is raising exception"));
         exn_raise_object(VM_Global_State::loader_env->popFrameException);
     }
 } //jvmti_pop_frame_callback
@@ -72,7 +72,7 @@ static void jvmti_pop_frame_callback()
 jvmtiError jvmti_jit_pop_frame(jthread java_thread)
 {
     assert(hythread_is_suspend_enabled());
-    TRACE(("Called PopFrame for JIT"));
+    CTRACE(("Called PopFrame for JIT"));
 
     DebugUtilsTI *ti = VM_Global_State::loader_env->TI;
 
@@ -98,7 +98,7 @@ jvmtiError jvmti_jit_pop_frame(jthread java_thread)
     si_goto_previous(si);
     assert(! si_is_native(si));
     Method* UNREF pop_method = si_get_code_chunk_info(si)->get_method();
-    TRACE(("PopFrame is called for method %s.%s%s :%p",
+    CTRACE(("PopFrame is called for method %s.%s%s :%p",
         pop_method->get_class()->get_name()->bytes,
         pop_method->get_name()->bytes,
         pop_method->get_descriptor()->bytes,
@@ -145,7 +145,7 @@ void jvmti_jit_do_pop_frame(){
 
 // requires stack iterator and buffer to save intermediate information
 static void jvmti_jit_prepare_pop_frame(StackIterator* si, uint32* buf) {
-    TRACE(("Prepare PopFrame for JIT"));
+    CTRACE(("Prepare PopFrame for JIT"));
     // pop native frame
     assert(si_is_native(si));
     si_goto_previous(si);
@@ -160,7 +160,7 @@ static void jvmti_jit_prepare_pop_frame(StackIterator* si, uint32* buf) {
     Method* method = cci->get_method();
     Class* method_class = method->get_class();
     bool is_method_static = method->is_static();
-    TRACE(("PopFrame method %s.%s%s, stop IP: %p",
+    CTRACE(("PopFrame method %s.%s%s, stop IP: %p",
         method->get_class()->get_name()->bytes,
         method->get_name()->bytes,
         method->get_descriptor()->bytes,
@@ -186,7 +186,7 @@ static void jvmti_jit_prepare_pop_frame(StackIterator* si, uint32* buf) {
     NativeCodePtr ip = si_get_ip(si);
     JIT *jit = cci->get_jit();
 
-    TRACE(("PopFrame method %s.%s%s, set IP begin: %p",
+    CTRACE(("PopFrame method %s.%s%s, set IP begin: %p",
         method->get_class()->get_name()->bytes,
         method->get_name()->bytes,
         method->get_descriptor()->bytes, ip));
@@ -200,7 +200,7 @@ static void jvmti_jit_prepare_pop_frame(StackIterator* si, uint32* buf) {
 
     method = si_get_code_chunk_info(si)->get_method();
 
-    TRACE(("PopFrame method %s.%s%s, set IP end: %p",
+    CTRACE(("PopFrame method %s.%s%s, set IP end: %p",
         method->get_class()->get_name()->bytes,
         method->get_name()->bytes,
         method->get_descriptor()->bytes, ip ));
@@ -218,7 +218,7 @@ void jvmti_jit_prepare_pop_frame() {
     // create stack iterator from native
     StackIterator* si = si_create_from_native();
     si_transfer_all_preserved_registers(si);
-    TRACE(("PopFrame prepare for method IP: %p", si_get_ip(si) ));
+    CTRACE(("PopFrame prepare for method IP: %p", si_get_ip(si) ));
 
     // prepare pop frame - find regs values
     uint32 buf = 0;
@@ -266,7 +266,7 @@ jvmti_relocate_single_step_breakpoints( StackIterator *si)
 
 void jvmti_jit_complete_pop_frame() {
     // Destructive Unwinding!!! NO CXX Logging put here.
-    TRACE(("Complete PopFrame for JIT"));
+    CTRACE(("Complete PopFrame for JIT"));
 
     // Find top m2n frame
     M2nFrame* top_frame = m2n_get_last_frame();
@@ -288,13 +288,13 @@ void jvmti_jit_complete_pop_frame() {
     jvmti_relocate_single_step_breakpoints(si);
 
     // transfer control
-    TRACE(("PopFrame transfer control to: %p",  (void*)si_get_ip(si) ));
+    CTRACE(("PopFrame transfer control to: %p",  (void*)si_get_ip(si) ));
     si_transfer_control(si);
 }
 
 void jvmti_jit_do_pop_frame() {
     // Destructive Unwinding!!! NO CXX Logging put here.
-    TRACE(("Do PopFrame for JIT"));
+    CTRACE(("Do PopFrame for JIT"));
 
     // Find top m2n frame
     M2nFrame* top_frame = m2n_get_last_frame();
@@ -316,7 +316,7 @@ void jvmti_jit_do_pop_frame() {
     jvmti_relocate_single_step_breakpoints(si);
 
     // transfer control
-    TRACE(("PopFrame transfer control to: %p",  (void*)si_get_ip(si) ));
+    CTRACE(("PopFrame transfer control to: %p",  (void*)si_get_ip(si) ));
     si_transfer_control(si);
 }
 #endif // _IA32_
@@ -327,13 +327,13 @@ void jvmti_safe_point()
     M2nFrame* top_frame = m2n_get_last_frame();
     set_pop_frame_registers(top_frame, &regs);
 
-    TRACE(("entering exception_safe_point"));
+    CTRACE(("entering exception_safe_point"));
     hythread_exception_safe_point();
-    TRACE(("left exception_safe_point"));
+    CTRACE(("left exception_safe_point"));
 
-    TRACE(("entering safe_point"));
+    CTRACE(("entering safe_point"));
     hythread_safe_point();
-    TRACE(("left safe_point"));
+    CTRACE(("left safe_point"));
 
     // find frame type
     frame_type type = m2n_get_frame_type(top_frame);

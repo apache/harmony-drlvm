@@ -117,7 +117,7 @@ static Class* field_descriptor_to_type(JNIEnv* jenv, String* desc, Class* clss,
 
         assert(exn_raised());
         jthrowable jfailure = exn_get();
-        ASSERT(jfailure, "FIXME lazy exceptions handling");
+        ASSERT(jfailure, ("FIXME lazy exceptions handling"));
         exn_clear();
         jthrowable jnewfailure = exn_create("java/lang/TypeNotPresentException",
             tih->get_type_name()->bytes, jfailure);

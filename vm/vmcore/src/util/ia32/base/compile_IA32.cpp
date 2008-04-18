@@ -144,13 +144,13 @@ void compile_protect_arguments(Method_Handle method, GcFrame* gc) {
                 break;
             }
         default:
-            ASSERT(0, "Unexpected data type: " << type_info_get_type(tih));
+            DIE(("Unexpected data type: %d", type_info_get_type(tih)));
         }
     }
 }
 
 void patch_code_with_threads_suspended(Byte * UNREF code_block, Byte * UNREF new_code, size_t UNREF size) {
-    ABORT("Not supported on IA32 currently");
+    DIE(("Not supported on IA32 currently"));
 }
 
 // Convert a reference on the stack, if null, from a managed null

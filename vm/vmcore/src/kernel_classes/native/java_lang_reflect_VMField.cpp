@@ -90,7 +90,7 @@ static jvalue read_primitive(JNIEnv* jenv, jfieldID field_id, jobject obj, char 
         GetBooleanField(jenv, obj, field_id);
         break;
     default:
-        ASSERT(0, "Unexpected type descriptor: " << field_sig);
+        DIE(("Unexpected type descriptor: %c", field_sig));
     }
 
     return primitive_value;
@@ -270,7 +270,7 @@ static void write_primitive(JNIEnv* jenv, Field* field, jobject obj, jvalue prim
 
         break;
     default:
-        ASSERT(0, "Unexpected type descriptor");
+        DIE(("Unexpected type descriptor"));
     }
 
     return;

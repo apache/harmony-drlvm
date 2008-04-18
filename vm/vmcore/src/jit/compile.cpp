@@ -167,7 +167,7 @@ void vm_add_jit(JIT *jit)
 {
     int max_jit_num = sizeof(jit_compilers) / sizeof(JIT *) - 2;
     if(jit_compilers[max_jit_num]) {
-        ASSERT(0, "Can't add new JIT");
+        DIE(("Can't add new JIT"));
         return;
     }
 

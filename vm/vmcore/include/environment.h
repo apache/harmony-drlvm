@@ -311,11 +311,6 @@ struct Global_Env {
     unsigned unloaded_class_count;
 
     /**
-     * Total unloaded class count
-     */
-    jboolean class_loading_verbose;
-
-    /**
      * The initial amount of Java heap memory (bytes)
      */
     size_t init_gc_used_memory;

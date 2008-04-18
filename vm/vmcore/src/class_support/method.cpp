@@ -714,11 +714,11 @@ void Method::_set_nop()
             }
             break;
         default:
-            ABORT("Unexpected stack state");
+            DIE(("Unexpected stack state"));
             return;
         }
     }
-    ABORT("Should not get here");
+    DIE(("Should not get here"));
 } //Method::_set_nop
 
 

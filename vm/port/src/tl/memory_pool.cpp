@@ -14,25 +14,17 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Evgueni Brevnov
- * @version $Revision: 1.1.2.1.4.4 $
- */  
-#include "tl/memory_pool.h"
-
 #define LOG_DOMAIN "tl.memory"
-#include "cxxlog.h"
+#include "tl/memory_pool.h"
 
 tl::MemoryPool::MemoryPool()
 {
-    apr_status_t status = apr_pool_create(&pool, NULL);
-    VERIFY(APR_SUCCESS == status, "Cannot create a memory pool");
+    VERIFY_SUCCESS(apr_pool_create(&pool, NULL));
 }
 
 tl::MemoryPool::MemoryPool(const MemoryPool * parent)
 {
-    apr_status_t status = apr_pool_create(&pool, parent->pool);
-    VERIFY(APR_SUCCESS == status, "Cannot create a memory pool");
+    VERIFY_SUCCESS(apr_pool_create(&pool, parent->pool));
 }
 
 tl::MemoryPool::~MemoryPool()
@@ -52,27 +44,23 @@ apr_status_t tl::MemoryPool::create_mutex(apr_thread_mutex_t** mutex, unsigned i
 
 tl::MemoryPoolMT::MemoryPoolMT()
 {
-    apr_status_t status = unsync_pool.create_mutex(&mutex, APR_THREAD_MUTEX_UNNESTED);
-    VERIFY(APR_SUCCESS == status, "Cannot create a pool lock");
+    VERIFY_SUCCESS(unsync_pool.create_mutex(&mutex, APR_THREAD_MUTEX_UNNESTED));
 }
 
 tl::MemoryPoolMT::MemoryPoolMT(const MemoryPoolMT * parent) :
     unsync_pool(&parent->unsync_pool)
 {
-    apr_status_t status = unsync_pool.create_mutex(&mutex, APR_THREAD_MUTEX_UNNESTED);
-    VERIFY(APR_SUCCESS == status, "Cannot create a pool lock");
+    VERIFY_SUCCESS(unsync_pool.create_mutex(&mutex, APR_THREAD_MUTEX_UNNESTED));
 }
 
 tl::MemoryPoolMT::MemoryPoolMT(const MemoryPool * parent) : unsync_pool(parent)
 {
-    apr_status_t status = unsync_pool.create_mutex(&mutex, APR_THREAD_MUTEX_UNNESTED);
-    VERIFY(APR_SUCCESS == status, "Cannot create a pool lock");
+    VERIFY_SUCCESS(unsync_pool.create_mutex(&mutex, APR_THREAD_MUTEX_UNNESTED));
 }
 
 tl::MemoryPoolMT::~MemoryPoolMT()
 {
-    apr_status_t status = apr_thread_mutex_destroy(mutex);
-    VERIFY(APR_SUCCESS == status, "Cannot destroy a pool lock");
+    VERIFY_SUCCESS(apr_thread_mutex_destroy(mutex));
 }
 
 void * tl::MemoryPoolMT::alloc(size_t size)

@@ -90,7 +90,7 @@
 //  a class (static) method.
 //
 
-#define LOG_DOMAIN util::CLASS_LOGGER
+#define LOG_DOMAIN LOG_CLASS_INFO
 #include "cxxlog.h"
 
 #include "Class.h"

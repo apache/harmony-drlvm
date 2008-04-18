@@ -111,12 +111,12 @@ JNIEXPORT jlong JNICALL Java_java_lang_VMMemoryManager_getTotalMemory
 JNIEXPORT void JNICALL Java_java_lang_VMMemoryManager_runFinalization
   (JNIEnv *, jclass)
 {
-    LOG2("ref", "Enqueueing references");
+    TRACE2("ref", "Enqueueing references");
     vm_enqueue_references();
     
     // For now we run the finalizers immediately in the context of the thread which requested GC.
     // Eventually we may have a different scheme, e.g., a dedicated finalize thread.
-    LOG2("finalize", "Running pending finalizers");
+    TRACE2("finalize", "Running pending finalizers");
     vm_run_pending_finalizers();
 }
 

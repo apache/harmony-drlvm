@@ -16,14 +16,12 @@
  */
 /** 
  * @author Alexey V. Varlamov
- * @version $Revision: 1.1.2.1.4.4 $
  */  
-
-#include "port_vmem.h"
-
-#undef LOG_DOMAIN
 #define LOG_DOMAIN "port.vmem"
 #include "clog.h"
+
+#include "port_vmem.h"
+#include "open/platform_types.h"
 
 #include <windows.h>
 #include <psapi.h>
@@ -58,7 +56,7 @@ SetPrivilege (
 		NULL,            // lookup privilege on local system
 		lpszPrivilege,   // privilege to lookup 
 		&luid ) ) {      // receives LUID of privilege
-			TRACE(("LookupPrivilegeValue error: %u", GetLastError())); 
+			CTRACE(("LookupPrivilegeValue error: %u", GetLastError())); 
 			return FALSE; 
 		}
 
@@ -82,7 +80,7 @@ SetPrivilege (
 		// Call GetLastError to determine whether the function succeeded.
 
 		if (GetLastError() != ERROR_SUCCESS) { 
-			TRACE(("AdjustTokenPrivileges failed: %u", GetLastError())); 
+			CTRACE(("AdjustTokenPrivileges failed: %u", GetLastError())); 
 			return FALSE; 
 		}
 
@@ -101,7 +99,7 @@ static UINT adjustprivileges() {
 	if (!(OpenProcessToken (GetCurrentProcess (), 
 		TOKEN_ALL_ACCESS, &accessToken) 
 		&& SetPrivilege (accessToken, "SeLockMemoryPrivilege", TRUE))) {
-			TRACE(("Lock Page Privilege was not set."));
+			CTRACE(("Lock Page Privilege was not set."));
 			return 0;
 		}
 
@@ -109,7 +107,7 @@ static UINT adjustprivileges() {
 
 		m_GetLargePageMinimum = (PGetLargePageMinimum) GetProcAddress(h, "GetLargePageMinimum");
 		if (!m_GetLargePageMinimum) {
-			TRACE(("Cannot locate GetLargePageMinimum."));
+			CTRACE(("Cannot locate GetLargePageMinimum."));
 			return 0;
 		}	
 		return m_GetLargePageMinimum();

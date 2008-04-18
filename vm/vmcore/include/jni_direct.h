@@ -36,7 +36,7 @@ typedef struct JavaVM_Internal JavaVM_Internal;
 typedef struct JNIEnv_Internal JNIEnv_Internal;
 
 struct JavaVM_Internal : public JavaVM_External {
-    apr_pool_t * pool1;
+    apr_pool_t * pool;
     Global_Env * vm_env;   
     APR_RING_ENTRY(JavaVM_Internal) link;
     void* reserved;

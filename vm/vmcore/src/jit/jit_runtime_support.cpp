@@ -1899,7 +1899,7 @@ class_alloc_new_object_and_run_constructor(Class* clss,
             }
             break;
         default:
-            ABORT("Unexpected java type");
+            DIE(("Unexpected java type"));
             break;
         }
         iter = advance_arg_iterator(iter);
@@ -2002,20 +2002,6 @@ static LilCodeStub *gen_lil_throw_ClassCastException(LilCodeStub *cs) {
     assert(cs2 != NULL);
     return cs2;
 }  // gen_lil_throw_ClassCastException
-
-
-// appends code that throws a ClassCastException to a LIL stub
-static LilCodeStub *gen_lil_throw_ClassCastException_for_inlining(LilCodeStub *cs) {
-    ABORT("The function is deprecated, should be never called");
-    // if instanceof returns false, throw an exception
-    LilCodeStub *cs2 = lil_parse_onto_end
-        (cs,
-         "out lil::void;"
-         "call.noret %0i;",
-         NULL);
-    assert(cs2 != NULL);
-    return cs2;
-}  // gen_lil_throw_ClassCastException_for_inlining
 
 
 // emits the slow path of the instanceof / checkcast check

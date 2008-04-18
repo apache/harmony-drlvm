@@ -42,7 +42,7 @@
         </compiler>
 
         <linker id="linker" extends="common.linker">
-            <libset libs="port,log4cxx,aprutil-1,apr-1"
+            <libset libs="port,apr-1"
                     dir="${drlvm.lib.dir}" />
 
             <linkerarg value="/DEF:${vm.home}/thread/src/hythr.def" if="is.windows"/>

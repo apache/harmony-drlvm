@@ -22,11 +22,11 @@
 * Journal of Instruction-Level Parallelism, 1999>
 *
 */
+#define LOG_DOMAIN "em"
+#include "cxxlog.h"
 #include "NValueProfileCollector.h"
 
 #include <algorithm>
-#include <assert.h>
-#include "cxxlog.h"
 #include <sstream>
 #include "open/vm_class_info.h"
 #include "open/vm_ee.h"
@@ -36,7 +36,6 @@
 #include "open/vm_class_manipulation.h"
 #include "open/vm.h" // for vtable_get_class
 
-#define LOG_DOMAIN "em"
 
 VPInstructionProfileData* TNVTableManager::createProfileData()
 {
@@ -333,12 +332,8 @@ ValueProfileCollector::ValueProfileCollector(EM_PC_Interface* em, const std::str
             (_TNV_steady_size, _TNV_clear_size, _clear_interval, update_strategy);
     }
     catName = std::string(LOG_DOMAIN) + ".profiler." + name;
-    loggingEnabled =  is_info_enabled(LOG_DOMAIN) ||  is_info_enabled(catName.c_str());
-    if (loggingEnabled) {
-        std::ostringstream msg;
-        msg<< "EM: value profiler intialized: "<<name;
-        INFO2(catName.c_str(), msg.str().c_str());
-    }
+    loggingEnabled =  log_is_info_enabled(LOG_DOMAIN) || log_is_info_enabled(catName.c_str());
+    INFO2(catName.c_str(), "EM: value profiler intialized: " << name.c_str());
 }
 
 

@@ -602,7 +602,7 @@ jvalue new_field_value(Field *field, StackFrame& frame) {
         }
             break;
         default:
-            ABORT("Unexpected data type");
+            DIE(("Unexpected data type"));
     }
     return val;
 }

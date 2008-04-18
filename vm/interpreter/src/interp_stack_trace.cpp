@@ -29,9 +29,6 @@
 #include "vtable.h"
 #include "jit_import_rt.h"
 
-// ppervov: HACK: allows using STL modifiers (dec/hex) and special constants (endl)
-using namespace std;
-
 typedef struct StackFrame StackIterator_interp;
 
 static inline StackIterator_interp*
@@ -179,12 +176,12 @@ interp_enumerate_root_set_single_thread_on_stack(VM_thread *thread) {
 
         if (si->This) {
             vm_enumerate_root_reference((void**)&si->This, FALSE);
-            DEBUG_GC("  [THIS]: " << si->This->vt()->clss->get_name()->bytes << endl);
+            DEBUG_GC("  [THIS]: " << si->This);
         }
 
         if (si->exc) {
             vm_enumerate_root_reference((void**)&si->exc, FALSE);
-            DEBUG_GC("  [EXCEPTION]: " << si->exc->vt()->clss->get_name()->bytes << endl);
+            DEBUG_GC("  [EXCEPTION]: " << si->exc);
         }
 
         if (method->is_native()) {
@@ -205,7 +202,7 @@ interp_enumerate_root_set_single_thread_on_stack(VM_thread *thread) {
                     if (obj == 0) {
                         DEBUG_GC("NULL");
                     } else {
-                        DEBUG_GC(obj->vt()->clss->get_name()->bytes << endl);
+                        DEBUG_GC(obj);
                         vm_enumerate(ref, FALSE); // CHECK!!! can we enumerate uncompressed ref in compressed mode
                     }
                 }
@@ -221,7 +218,7 @@ interp_enumerate_root_set_single_thread_on_stack(VM_thread *thread) {
                     if (obj == 0) {
                         DEBUG_GC("NULL\n");
                     } else {
-                        DEBUG_GC(obj->vt()->clss->get_name()->bytes << endl);
+                        DEBUG_GC(obj);
                         vm_enumerate(ref, FALSE); // CHECK!!! can we enumerate uncompressed ref in compressed mode
                     }
                 }
@@ -270,7 +267,7 @@ interp_ti_enumerate_root_set_single_thread_on_stack(jvmtiEnv* ti_env, VM_thread 
                     (void**)&si->This, si->This,
                     JVMTI_HEAP_ROOT_STACK_LOCAL,
                     depth, method_id, slot++);
-            DEBUG_GC("  [THIS]: " << si->This->vt()->clss->get_name()->bytes << endl);
+            DEBUG_GC("  [THIS]: " << si->This);
         }
 
         if (si->exc) {
@@ -278,7 +275,7 @@ interp_ti_enumerate_root_set_single_thread_on_stack(jvmtiEnv* ti_env, VM_thread 
                 (void**)&si->exc, si->exc,
                 JVMTI_HEAP_ROOT_STACK_LOCAL,
                 depth, method_id, slot++);
-            DEBUG_GC("  [EXCEPTION]: " << si->exc->vt()->clss->get_name()->bytes << endl);
+            DEBUG_GC("  [EXCEPTION]: " << si->exc);
         }
 
         if (method->is_native()) {
@@ -299,7 +296,7 @@ interp_ti_enumerate_root_set_single_thread_on_stack(jvmtiEnv* ti_env, VM_thread 
                     if (obj == 0) {
                         DEBUG_GC("NULL");
                     } else {
-                        DEBUG_GC(obj->vt()->clss->get_name()->bytes << endl);
+                        DEBUG_GC(obj);
                         vm_ti_enumerate_stack_root(ti_env,
                             ref, (Managed_Object_Handle)obj, 
                             JVMTI_HEAP_ROOT_STACK_LOCAL,
@@ -318,7 +315,7 @@ interp_ti_enumerate_root_set_single_thread_on_stack(jvmtiEnv* ti_env, VM_thread 
                     if (obj == 0) {
                         DEBUG_GC("NULL\n");
                     } else {
-                        DEBUG_GC(obj->vt()->clss->get_name()->bytes << endl);
+                        DEBUG_GC(obj);
                         vm_ti_enumerate_stack_root(ti_env,
                             ref, (Managed_Object_Handle)obj, 
                             JVMTI_HEAP_ROOT_STACK_LOCAL,

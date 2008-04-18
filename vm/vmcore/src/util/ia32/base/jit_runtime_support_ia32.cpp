@@ -18,14 +18,8 @@
  * @author Intel, Evgueni Brevnov, Ivan Volosyuk
  * @version $Revision: 1.1.2.2.4.5 $
  */  
-
-
-//MVM
-#include <iostream>
-
-using namespace std;
-
-#include <assert.h>
+#define LOG_DOMAIN "vm.helpers"
+#include "cxxlog.h"
 
 #include "open/types.h"
 #include "open/gc.h"
@@ -57,9 +51,6 @@ using namespace std;
 #include "m2n.h"
 #include "../m2n_ia32_internal.h"
 
-#define LOG_DOMAIN "vm.helpers"
-#include "cxxlog.h"
-
 #include "dump.h"
 #include "vm_stats.h"
 
@@ -75,7 +66,7 @@ static void vm_throw_java_lang_ClassCastException()
     ASSERT_THROW_AREA;
     assert(!hythread_is_suspend_enabled());
     exn_throw_by_name("java/lang/ClassCastException");
-    ABORT("The last called function should not return");
+    DIE(("The last called function should not return"));
 } //vm_throw_java_lang_ClassCastException
 
 #ifdef VM_STATS // exclude remark in release mode (defined but not used)
@@ -785,7 +776,7 @@ static void vm_throw_java_lang_IncompatibleClassChangeError()
 {
     ASSERT_THROW_AREA;
     exn_throw_by_name("java/lang/IncompatibleClassChangeError");
-    ABORT("The last called function should not return");
+    DIE(("The last called function should not return"));
 } //vm_throw_java_lang_IncompatibleClassChangeError
 
 
@@ -859,7 +850,7 @@ static void vm_throw_java_lang_ArithmeticException()
     ASSERT_THROW_AREA;
     assert(!hythread_is_suspend_enabled());
     exn_throw_by_name("java/lang/ArithmeticException");
-    ABORT("The last called function should not return");
+    DIE(("The last called function should not return"));
 } //vm_throw_java_lang_ArithmeticException
 
 
@@ -957,7 +948,7 @@ vm_throw_linking_exception(Class *clss,
 {
     TRACE("vm_throw_linking_exception, idx=" << cp_index << "\n");
     vm_rt_class_throw_linking_error(clss, cp_index, opcode);
-    ABORT("The last called function should not return");
+    DIE(("The last called function should not return"));
 } //vm_throw_linking_exception
 
 
@@ -1083,7 +1074,7 @@ void *vm_helper_get_addr(VM_RT_SUPPORT f)
     case VM_RT_GC_HEAP_WRITE_REF:
         return (void*)gc_heap_slot_write_ref;
     default:
-        ABORT("Unexpected helper id");
+        DIE(("Unexpected helper id"));
         return 0;
     }
 } //vm_helper_get_addr

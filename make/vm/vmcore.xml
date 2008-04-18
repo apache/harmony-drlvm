@@ -74,7 +74,12 @@
     </target>
 
     <target name="-check-setup-win" if="is.windows">
-        <available file="${drlvm.bin.dir}/zlib1.dll" property="zlib.available"/>
+        <condition property="zlib.available">
+            <and>
+                <available file="${drlvm.bin.dir}/zlib1.dll"/>
+                <available file="${drlvm.include.dir}/zlib.h"/>
+            </and>
+        </condition>
         <condition property="win.setup.complete">
             <isset property="zlib.available"/>
         </condition>
@@ -212,7 +217,7 @@
         
         <link-lib name="harmonyvm" type="shared">
             <linker id="linker" extends="common.linker">
-                <libset libs="port,encoder,verifier,log4cxx,aprutil-1,apr-1"
+                <libset libs="port,encoder,verifier,apr-1"
                     dir="${drlvm.lib.dir}" />
                 <libset libs="hythr" dir="${drlvm.shlib.dir}" />
                 <libset libs="icuuc" dir="${drlvm.shlib.dir}"/>

@@ -2390,7 +2390,7 @@ jvmti_create_event_thread()
     IDATA status = hythread_create_ex((hythread_t)ti->event_thread, NULL, 0, 0, NULL,
         jvmti_event_thread_function, jni_env);
     if( status != TM_ERROR_NONE ) {
-        DIE("jvmti_create_event_thread: creating thread is failed!");
+        DIE(("jvmti_create_event_thread: creating thread is failed!"));
     }
     return;
 }

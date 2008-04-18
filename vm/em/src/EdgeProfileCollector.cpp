@@ -102,7 +102,7 @@ EdgeProfileCollector::EdgeProfileCollector(EM_PC_Interface* em, const std::strin
 {
     port_mutex_create(&profilesLock, APR_THREAD_MUTEX_NESTED);
     catName = std::string(LOG_DOMAIN) + ".profiler." + name;
-    loggingEnabled =  is_info_enabled(LOG_DOMAIN) ||  is_info_enabled(catName.c_str());
+    loggingEnabled =  log_is_info_enabled(LOG_DOMAIN) || log_is_info_enabled(catName.c_str());
     if (loggingEnabled) {
         std::ostringstream msg;
         msg<< "EM: edge profiler intialized: "<<name

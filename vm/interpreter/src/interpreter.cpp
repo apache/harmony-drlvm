@@ -43,9 +43,6 @@
 #define isnan _isnan
 #endif
 
-// ppervov: HACK: allows using STL modifiers (dec/hex) and special constants (endl)
-using namespace std;
-
 bool interpreter_enable_debug = true;
 int interpreter_enable_debug_trigger = -1;
 
@@ -971,19 +968,19 @@ ldc(StackFrame& frame, uint32 index) {
 #ifndef NDEBUG
     switch(cp.get_tag(index)) {
         case CONSTANT_String:
-            DEBUG_BYTECODE("#" << dec << (int)index << " String: \"" << cp.get_string_chars(index) << "\"");
+            DEBUG_BYTECODE("#" << (int)index << " String: \"" << cp.get_string_chars(index) << "\"");
             break;
         case CONSTANT_Integer:
-            DEBUG_BYTECODE("#" << dec << (int)index << " Integer: " << (int)cp.get_int(index));
+            DEBUG_BYTECODE("#" << (int)index << " Integer: " << (int)cp.get_int(index));
             break;
         case CONSTANT_Float:
-            DEBUG_BYTECODE("#" << dec << (int)index << " Float: " << cp.get_float(index));
+            DEBUG_BYTECODE("#" << (int)index << " Float: " << cp.get_float(index));
             break;
         case CONSTANT_Class:
-            DEBUG_BYTECODE("#" << dec << (int)index << " Class: \"" << class_cp_get_class_name(clazz, index) << "\"");
+            DEBUG_BYTECODE("#" << (int)index << " Class: \"" << class_cp_get_class_name(clazz, index) << "\"");
             break;
         default:
-            DEBUG_BYTECODE("#" << dec << (int)index << " Unknown type = " << cp.get_tag(index));
+            DEBUG_BYTECODE("#" << (int)index << " Unknown type = " << cp.get_tag(index));
             LDIE(4, "ldc instruction: unexpected type ({0}) of constant pool entry [{1}]"
                  << cp.get_tag(index) << index);
             break;
@@ -1042,7 +1039,7 @@ Opcode_LDC2_W(StackFrame& frame) {
     val.u64 = ((uint64)cp.get_8byte_high_word(index) << 32)
         | cp.get_8byte_low_word(index);
     frame.stack.setLong(0, val);
-    DEBUG_BYTECODE("#" << dec << (int)index << " (val = " << hex << val.d << ")");
+    DEBUG_BYTECODE("#" << (int)index << " (val = " << val.d << ")");
     frame.ip += 3;
 }
 
@@ -1074,7 +1071,7 @@ Opcode_NEWARRAY(StackFrame& frame) {
         case AR_SHORT:   clazz = env->ArrayOfShort_Class; break;
         case AR_INT:     clazz = env->ArrayOfInt_Class; break;
         case AR_LONG:    clazz = env->ArrayOfLong_Class; break;
-        default: ABORT("Invalid array type");
+        default: DIE(("Invalid array type"));
     }
     assert(clazz);
 
@@ -1095,7 +1092,7 @@ Opcode_NEWARRAY(StackFrame& frame) {
     }
    
     frame.stack.pick().ref = COMPRESS_INTERP((ManagedObject*)array);
-    DEBUG_BYTECODE(" (val = " << hex << (int)frame.stack.pick().i << ")");
+    DEBUG_BYTECODE(" (val = " << (int)frame.stack.pick().i << ")");
     frame.stack.ref() = FLAG_OBJECT;
     frame.ip += 2;
 }
@@ -1125,7 +1122,7 @@ Opcode_ANEWARRAY(StackFrame& frame) {
     }
 
     set_vector_length(array, length);
-    DEBUG_BYTECODE("length = " << dec << length);
+    DEBUG_BYTECODE("length = " << length);
 
     frame.stack.pick().ref = COMPRESS_INTERP((ManagedObject*)array);
     frame.stack.ref() = FLAG_OBJECT;
@@ -1232,7 +1229,7 @@ Opcode_MULTIANEWARRAY(StackFrame& frame) {
     }
 
     frame.stack.popClearRef(depth - 1);
-    DEBUG_BYTECODE(" (val = " << hex << (int)frame.stack.pick().i << ")");
+    DEBUG_BYTECODE(" (val = " << (int)frame.stack.pick().i << ")");
     frame.ip += 4;
 }
 
@@ -1264,7 +1261,7 @@ Opcode_NEW(StackFrame& frame) {
     frame.stack.push();
 
     frame.stack.pick().ref = COMPRESS_INTERP(obj);
-    DEBUG_BYTECODE(" (val = " << hex << (int)frame.stack.pick().i << ")");
+    DEBUG_BYTECODE(" (val = " << (int)frame.stack.pick().i << ")");
     frame.stack.ref() = FLAG_OBJECT;
     frame.ip += 3;
 }
@@ -1408,7 +1405,7 @@ Opcode_ARRAYLENGTH(StackFrame& frame) {
 
     frame.stack.ref() = FLAG_NONE;
     frame.stack.pick().i = get_vector_length((Vector_Handle)ref);
-    DEBUG_BYTECODE("length = " << dec << frame.stack.pick().i);
+    DEBUG_BYTECODE("length = " << frame.stack.pick().i);
     frame.ip++;
 }
 
@@ -1423,7 +1420,7 @@ Opcode_AALOAD(StackFrame& frame) {
     uint32 length = get_vector_length(array);
     uint32 pos = frame.stack.pick(0).u;
 
-    DEBUG_BYTECODE("length = " << dec << (int)length << " pos = " << (int)pos);
+    DEBUG_BYTECODE("length = " << (int)length << " pos = " << (int)pos);
 
     if (pos >= length) {
         throwAIOOBE(pos);
@@ -1454,7 +1451,7 @@ Opcode_ ## CODE(StackFrame& frame) {                                            
     uint32 length = get_vector_length(array);                                   \
     uint32 pos = frame.stack.pick(0).u;                                         \
                                                                                 \
-    DEBUG_BYTECODE("length = " << dec << (int)length << " pos = " << (int)pos); \
+    DEBUG_BYTECODE("length = " << (int)length << " pos = " << (int)pos); \
                                                                                 \
     if (pos >= length) {                                                        \
         throwAIOOBE(pos);                                                       \
@@ -1486,7 +1483,7 @@ Opcode_LALOAD(StackFrame& frame) {
     uint32 length = get_vector_length(array);
     uint32 pos = frame.stack.pick(0).u;
 
-    DEBUG_BYTECODE("length = " << dec << (int)length << " pos = " << (int)pos);
+    DEBUG_BYTECODE("length = " << (int)length << " pos = " << (int)pos);
 
     if (pos >= length) {
         throwAIOOBE(pos);
@@ -1511,7 +1508,7 @@ Opcode_AASTORE(StackFrame& frame) {
     uint32 length = get_vector_length(array);
     uint32 pos = frame.stack.pick(1).u;
 
-    DEBUG_BYTECODE("length = " << dec << (int)length << " pos = " << (int)pos);
+    DEBUG_BYTECODE("length = " << (int)length << " pos = " << (int)pos);
 
     if (pos >= length) {
         throwAIOOBE(pos);
@@ -1552,7 +1549,7 @@ Opcode_ ## CODE(StackFrame& frame) {                                            
     uint32 length = get_vector_length(array);                                   \
     uint32 pos = frame.stack.pick(1).u;                                         \
                                                                                 \
-    DEBUG_BYTECODE("length = " << dec << (int)length << " pos = " << (int)pos); \
+    DEBUG_BYTECODE("length = " << (int)length << " pos = " << (int)pos); \
                                                                                 \
     if (pos >= length) {                                                        \
         throwAIOOBE(pos);                                                       \
@@ -1592,7 +1589,7 @@ Opcode_LASTORE(StackFrame& frame) {
     uint32 length = get_vector_length(array);
     uint32 pos = frame.stack.pick(2).u;
 
-    DEBUG_BYTECODE("length = " << dec << (int)length << " pos = " << (int)pos);
+    DEBUG_BYTECODE("length = " << (int)length << " pos = " << (int)pos);
 
     if (pos >= length) {
         /* FIXME ivan 20041005: array index out of bounds exception */
@@ -1641,7 +1638,7 @@ Opcode_PUTSTATIC(StackFrame& frame) {
     void* addr = field_get_address(field);
 
     DEBUG_BYTECODE(field->get_name()->bytes << " " << field->get_descriptor()->bytes
-            << " (val = " << hex << (int)frame.stack.pick().i << ")");
+            << " (val = " << (int)frame.stack.pick().i << ")");
 
     switch (field->get_java_type()) {
 #ifdef COMPACT_FIELDS // use compact fields on ipf
@@ -1701,7 +1698,7 @@ Opcode_PUTSTATIC(StackFrame& frame) {
             }
 
         default:
-            ABORT("Unexpected data type");
+            DIE(("Unexpected data type"));
     }
     frame.ip += 3;
 }
@@ -1782,10 +1779,10 @@ Opcode_GETSTATIC(StackFrame& frame) {
             }
 
         default:
-            ABORT("Unexpected data type");
+            DIE(("Unexpected data type"));
     }
     DEBUG_BYTECODE(field->get_name()->bytes << " " << field->get_descriptor()->bytes
-            << " (val = " << hex << (int)frame.stack.pick().i << ")");
+            << " (val = " << (int)frame.stack.pick().i << ")");
     frame.ip += 3;
 }
 
@@ -1811,7 +1808,7 @@ Opcode_PUTFIELD(StackFrame& frame) {
     }
 
     DEBUG_BYTECODE(field->get_name()->bytes << " " << field->get_descriptor()->bytes
-            << " (val = " << hex << (int)frame.stack.pick().i << ")");
+            << " (val = " << (int)frame.stack.pick().i << ")");
 
     uint16 obj_ref_pos = 1;
 
@@ -1899,7 +1896,7 @@ Opcode_PUTFIELD(StackFrame& frame) {
             }
 
         default:
-            ABORT("Unexpected data type");
+            DIE(("Unexpected data type"));
     }
     frame.ip += 3;
 }
@@ -1980,10 +1977,10 @@ Opcode_GETFIELD(StackFrame& frame) {
             }
 
         default:
-            ABORT("Unexpected data type");
+            DIE(("Unexpected data type"));
     }
     DEBUG_BYTECODE(field->get_name()->bytes << " " << field->get_descriptor()->bytes
-            << " (val = " << hex << (int)frame.stack.pick().i << ")");
+            << " (val = " << (int)frame.stack.pick().i << ")");
 
     frame.ip += 3;
 }
@@ -1996,9 +1993,7 @@ Opcode_INVOKEVIRTUAL(StackFrame& frame) {
     Method *method = interp_resolve_virtual_method(clazz, methodId);
     if (!method) return; // exception
 
-    DEBUG_BYTECODE(class_get_name(method_get_class(method)) << "."
-            << method->get_name()->bytes << "/"
-            << method->get_descriptor()->bytes<< endl);
+    DEBUG_BYTECODE(method);
 
     hythread_exception_safe_point();
     if(check_current_thread_exception()) {
@@ -2016,9 +2011,7 @@ Opcode_INVOKEINTERFACE(StackFrame& frame) {
     Method *method = interp_resolve_interface_method(clazz, methodId);
     if (!method) return; // exception
     
-    DEBUG_BYTECODE(class_get_name(method_get_class(method)) << "."
-            << method->get_name()->bytes << "/"
-            << method->get_descriptor()->bytes << endl);
+    DEBUG_BYTECODE(method);
 
     hythread_exception_safe_point();
     if(check_current_thread_exception()) {
@@ -2036,9 +2029,7 @@ Opcode_INVOKESTATIC(StackFrame& frame) {
     Method *method = interp_resolve_static_method(clazz, methodId);
     if (!method) return; // exception
 
-    DEBUG_BYTECODE(class_get_name(method_get_class(method)) << "."
-            << method->get_name()->bytes << "/"
-            << method->get_descriptor()->bytes << endl);
+    DEBUG_BYTECODE(method);
 
     // FIXME: is it possible to move the code into !cp_is_resolved condition above?
     class_initialize(method->get_class());
@@ -2060,9 +2051,7 @@ Opcode_INVOKESPECIAL(StackFrame& frame) {
     Method *method = interp_resolve_special_method(clazz, methodId);
     if (!method) return; // exception
     
-    DEBUG_BYTECODE(class_get_name(method_get_class(method)) << "."
-            << method->get_name()->bytes << "/"
-             << method->get_descriptor()->bytes << endl);
+    DEBUG_BYTECODE(method);
 
     hythread_exception_safe_point();
     if (check_current_thread_exception()) {
@@ -2268,7 +2257,7 @@ Opcode_ATHROW(StackFrame& frame) {
         interp_throw_exception("java/lang/VerifyError");
         return;
     }
-    DEBUG_BYTECODE(" " << obj->vt()->clss->get_name()->bytes << endl);
+    DEBUG_BYTECODE(obj);
     assert(!hythread_is_suspend_enabled());
     set_current_thread_exception(obj);
 }
@@ -2280,13 +2269,10 @@ findExceptionHandler(StackFrame& frame, ManagedObject **exception, Handler **hh)
 
     Method *m = frame.method;
     DEBUG_BYTECODE("Searching for exception handler:");
-    DEBUG_BYTECODE("   In "
-            << class_get_name(method_get_class(m)) << "/"
-            << m->get_name()->bytes
-            << m->get_descriptor()->bytes << endl);
+    DEBUG_BYTECODE("   In " << m);
 
     uint32 ip = (uint32)(frame.ip - (uint8*)m->get_byte_code_addr());
-    DEBUG_BYTECODE("ip = " << dec << (int)ip << endl);
+    DEBUG_BYTECODE("ip = " << (int)ip);
 
     // When VM is in shutdown stage we need to execute final block to
     // release monitors and propogate an exception to the upper frames.
@@ -2308,7 +2294,7 @@ findExceptionHandler(StackFrame& frame, ManagedObject **exception, Handler **hh)
         Handler *h = m->get_bc_exception_handler_info(i);
         DEBUG_BYTECODE("handler" << (int) i
                 << ": start_pc=" << (int) h->get_start_pc()
-                << " end_pc=" << (int) h->get_end_pc() << endl);
+                << " end_pc=" << (int) h->get_end_pc());
 
         if (ip < h->get_start_pc()) continue;
         if (ip >= h->get_end_pc()) continue;
@@ -2319,7 +2305,7 @@ findExceptionHandler(StackFrame& frame, ManagedObject **exception, Handler **hh)
             // 0 - is handler for all
             // if !0 - check if the handler catches this exception type
 
-            DEBUG_BYTECODE("catch type index = " << (int)catch_type_index << endl);
+            DEBUG_BYTECODE("catch type index = " << (int)catch_type_index);
 
             // WARNING: GC may occur here !!!
             Class *obj = interp_resolve_class(clazz, catch_type_index);
@@ -2342,7 +2328,7 @@ processExceptionHandler(StackFrame& frame, ManagedObject **exception) {
     Method *m = frame.method;
     Handler *h;
     if (findExceptionHandler(frame, exception, &h)){
-        DEBUG_BYTECODE("Exception caught: " << (*exception)->vt()->clss->get_name()->bytes << endl);
+        DEBUG_BYTECODE("Exception caught: " << (*exception));
         DEBUG_BYTECODE("Found handler!\n");
         frame.ip = (uint8*)m->get_byte_code_addr() + h->get_handler_pc();
         return true;
@@ -2501,7 +2487,7 @@ method_exit_callback_with_frame(Method *method, StackFrame& frame) {
             break;
 
         default:
-            ABORT("Unexpected java type");
+            DIE(("Unexpected java type"));
     }
 
     method_exit_callback(method, false, val);
@@ -2515,10 +2501,7 @@ interpreter(StackFrame &frame) {
     int stackLength = 0;
     size_t available;
     
-    DEBUG_TRACE_PLAIN("interpreter: "
-            << class_get_name(method_get_class(frame.method))
-            << " " << frame.method->get_name()->bytes
-            << frame.method->get_descriptor()->bytes << endl);
+    DEBUG_TRACE_PLAIN("interpreter: " << frame.method);
 
     assert(frame.method->is_static() || frame.This);
     
@@ -2574,7 +2557,7 @@ interpreter(StackFrame &frame) {
     while (true) {
         ip0 = *frame.ip;
 
-        DEBUG_BYTECODE(endl << "(" << frame.stack.getIndex()
+        DEBUG_BYTECODE("\n(" << frame.stack.getIndex()
                    << ") " << opcodeNames[ip0] << ": ");
 
 restart:
@@ -2967,16 +2950,16 @@ restart:
                     case OPCODE_IINC: Opcode_WIDE_IINC(frame); break;
                     case OPCODE_RET: Opcode_WIDE_RET(frame); break;
                     default:
-                     DEBUG2("wide bytecode 0x" << hex << (int)*ip1 << " not implemented\n");
+                     DEBUG2("wide bytecode " << (int)*ip1 << " not implemented\n");
                      stackDump(stdout, frame);
-                     ABORT("Unexpected wide bytecode");
+                     DIE(("Unexpected wide bytecode"));
                 }
                 break;
             }
 
-            default: DEBUG2("bytecode 0x" << hex << (int)ip0 << " not implemented\n");
+            default: DEBUG2("bytecode " << (int)ip0 << " not implemented\n");
                      stackDump(stdout, frame);
-                     ABORT("Unexpected bytecode");
+                     DIE(("Unexpected bytecode"));
         }
         assert(&frame == getLastStackFrame());
         continue;
@@ -3095,10 +3078,7 @@ interpreter_execute_method(
         return;
     }
 
-    DEBUG_TRACE("\n{{{ interpreter_invoke: "
-           << class_get_name(method_get_class(method)) << " "
-           << method->get_name()->bytes
-           << method->get_descriptor()->bytes << endl);
+    DEBUG_TRACE("\n{{{ interpreter_invoke: " << method);
 
     DEBUG("\tmax stack = " << method->get_max_stack() << endl);
     DEBUG("\tmax locals = " << method->get_max_locals() << endl);
@@ -3237,7 +3217,7 @@ interpreter_execute_method(
             break;
 
         default:
-            ABORT("Unexpected java type");
+            DIE(("Unexpected java type"));
     }
     setLastStackFrame(frame.prev);
     DEBUG_TRACE("interpreter_invoke }}}\n");
@@ -3259,10 +3239,7 @@ interpreterInvokeStatic(StackFrame& prevFrame, Method *method) {
         return;
     }
 
-    DEBUG_TRACE("\n{{{ invoke_static     : "
-           << class_get_name(method_get_class(method)) << " "
-           << method->get_name()->bytes
-           << method->get_descriptor()->bytes << endl);
+    DEBUG_TRACE("\n{{{ invoke_static     : " << method);
 
     DEBUG("\tmax stack = " << method->get_max_stack() << endl);
     DEBUG("\tmax locals = " << method->get_max_locals() << endl);
@@ -3328,7 +3305,7 @@ interpreterInvokeStatic(StackFrame& prevFrame, Method *method) {
             break;
 
         default:
-            ABORT("Unexpected java type");
+            DIE(("Unexpected java type"));
     }
 
     setLastStackFrame(frame.prev);
@@ -3416,7 +3393,7 @@ interpreterInvoke(StackFrame& prevFrame, Method *method, int args, ManagedObject
             break;
 
         default:
-            ABORT("Unexpected java type");
+            DIE(("Unexpected java type"));
     }
 
     setLastStackFrame(frame.prev);
@@ -3440,17 +3417,14 @@ interpreterInvokeVirtual(StackFrame& prevFrame, Method *method) {
     method = objClass->get_method_from_vtable(method->get_index());
 
     if (method->is_abstract()) {
-        ostringstream str;
+        std::ostringstream str;
         str << class_get_name(method_get_class(method)) << "." <<
             method_get_name(method) << method_get_descriptor(method);
         throwAME(str.str().c_str());
         return;
     }
 
-    DEBUG_TRACE("\n{{{ invoke_virtual    : "
-           << class_get_name(method_get_class(method)) << " "
-           << method->get_name()->bytes
-           << method->get_descriptor()->bytes << endl);
+    DEBUG_TRACE("\n{{{ invoke_virtual    : " << method);
 
     interpreterInvoke(prevFrame, method, args, obj, false);
     DEBUG_TRACE("invoke_virtual }}}\n");
@@ -3487,7 +3461,7 @@ interpreterInvokeInterface(StackFrame& prevFrame, Method *method) {
     method = found_method;
 
     if (method->is_abstract()) {
-        ostringstream str;
+        std::ostringstream str;
         str << class_get_name(method_get_class(method)) << "." <<
             method_get_name(method) << method_get_descriptor(method);
         throwAME(str.str().c_str());
@@ -3495,17 +3469,14 @@ interpreterInvokeInterface(StackFrame& prevFrame, Method *method) {
     }
 
     if (!method->is_public()) {
-        ostringstream str;
+        std::ostringstream str;
         str << class_get_name(method_get_class(method)) << "." <<
             method_get_name(method) << method_get_descriptor(method);
         throwIAE(str.str().c_str());
         return;
     }
 
-    DEBUG_TRACE("\n{{{ invoke_interface  : "
-           << class_get_name(method_get_class(method)) << " "
-           << method->get_name()->bytes
-           << method->get_descriptor()->bytes << endl);
+    DEBUG_TRACE("\n{{{ invoke_interface  : " << method);
 
     interpreterInvoke(prevFrame, method, args, obj, true);
 
@@ -3524,7 +3495,7 @@ interpreterInvokeSpecial(StackFrame& prevFrame, Method *method) {
     }
 
     if (method->is_abstract()) {
-        ostringstream str;
+        std::ostringstream str;
         str << class_get_name(method_get_class(method)) << "." <<
             method_get_name(method) << method_get_descriptor(method);
         throwAME(str.str().c_str());
@@ -3548,10 +3519,7 @@ interpreterInvokeSpecial(StackFrame& prevFrame, Method *method) {
         return;
     }
 
-    DEBUG_TRACE("\n{{{ invoke_special    : "
-           << class_get_name(method_get_class(method)) << " "
-           << method->get_name()->bytes
-           << method->get_descriptor()->bytes << endl);
+    DEBUG_TRACE("\n{{{ invoke_special    : " << method);
 
     DEBUG("\tmax stack = " << method->get_max_stack() << endl);
     DEBUG("\tmax locals = " << method->get_max_locals() << endl);
@@ -3614,7 +3582,7 @@ interpreterInvokeSpecial(StackFrame& prevFrame, Method *method) {
             break;
 
         default:
-            ABORT("Unexpected java type");
+            DIE(("Unexpected java type"));
     }
     setLastStackFrame(frame.prev);
     DEBUG_TRACE("invoke_special }}}\n");

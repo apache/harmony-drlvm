@@ -19,15 +19,14 @@
  * @file thread_java_basic.c
  * @brief Key threading operations like thread creation and pointer conversion.
  */
+#define LOG_DOMAIN "tm.java"
+#include "cxxlog.h"
 
 #include "open/hythread_ext.h"
 #include "open/vm_properties.h"
 #include "jthread.h"
 #include "vm_threads.h"
 #include "jni.h"
-
-#define LOG_DOMAIN "tm.java"
-#include "cxxlog.h"
 
 static jmethodID jthread_get_run_method(JNIEnv * env, jthread java_thread);
 static jfieldID jthread_get_alive_field(JNIEnv * env, jthread java_thread);
@@ -86,7 +85,7 @@ int HYTHREAD_PROC jthread_wrapper_start_proc(void *arg)
         // zero hythread_self() because we don't do it in hythread_detach_ex()
         hythread_set_self(NULL);
 
-        TRACE(("TM: native thread terminated due to shutdown: native: %p tm: %p",
+        CTRACE(("TM: native thread terminated due to shutdown: native: %p tm: %p",
             apr_os_thread_current(), native_thread));
 
         // FIXME - uncomment after TM state transition complete
@@ -127,7 +126,7 @@ int HYTHREAD_PROC jthread_wrapper_start_proc(void *arg)
     vm_thread->jni_env = jni_env;
     vm_thread->daemon = start_proc_data.daemon;
 
-    TRACE(("TM: Java thread started: id=%d OS_handle=%p",
+    CTRACE(("TM: Java thread started: id=%d OS_handle=%p",
            hythread_get_id(native_thread), apr_os_thread_current()));
 
     if (!vm_thread->daemon) {
@@ -179,7 +178,7 @@ int HYTHREAD_PROC jthread_wrapper_start_proc(void *arg)
     status = hythread_set_state(native_thread, TM_THREAD_STATE_TERMINATED);
     assert(status == TM_ERROR_NONE);
 
-    TRACE(("TM: Java thread finished: id=%d OS_handle=%p",
+    CTRACE(("TM: Java thread finished: id=%d OS_handle=%p",
         hythread_get_id(native_thread), apr_os_thread_current()));
 
     hythread_detach_ex(native_thread);
@@ -252,7 +251,7 @@ IDATA jthread_create_with_function(JNIEnv *jni_env,
     status = hythread_create_ex(native_thread, NULL, attrs->stacksize,
                         attrs->priority, jthread_wrapper_start_proc, NULL, attrs);
 
-    TRACE(("TM: Created thread: id=%d", hythread_get_id(native_thread)));
+    CTRACE(("TM: Created thread: id=%d", hythread_get_id(native_thread)));
 
     return status;
 } // jthread_create_with_function
@@ -301,7 +300,7 @@ IDATA jthread_attach(JNIEnv *jni_env, jthread java_thread, jboolean daemon)
     }
     jthread_start_count();
 
-    TRACE(("TM: Current thread attached to jthread=%p", java_thread));
+    CTRACE(("TM: Current thread attached to jthread=%p", java_thread));
     return TM_ERROR_NONE;
 } // jthread_attach
 
@@ -390,7 +389,7 @@ IDATA jthread_vm_detach(vm_thread_t vm_thread)
     assert(vm_thread);
     assert(hythread_is_suspend_enabled());
 
-    TRACE(("TM: jthread_vm_detach(%p)", vm_thread));
+    CTRACE(("TM: jthread_vm_detach(%p)", vm_thread));
     if (!vm_thread->daemon) {
         hythread_t native_thread = (hythread_t)vm_thread;
         IDATA status = hythread_decrease_nondaemon_threads_count(native_thread, 1);
@@ -535,7 +534,7 @@ IDATA jthread_sleep(jlong millis, jint nanos)
     status = hythread_sleep_interruptable(millis, nanos);
 #ifndef NDEBUG
     if (status == TM_ERROR_INTERRUPT) {
-        TRACE(("TM: sleep interrupted status received, thread: %p",
+        CTRACE(("TM: sleep interrupted status received, thread: %p",
                hythread_self()));
     }
 #endif
@@ -618,12 +617,12 @@ jthread jthread_get_thread(jlong thread_id)
 jthread jthread_get_java_thread(hythread_t native_thread)
 {
     if (native_thread == NULL) {
-        TRACE(("TM: native thread is NULL"));
+        CTRACE(("TM: native thread is NULL"));
         return NULL;
     }
     vm_thread_t vm_thread = jthread_get_vm_thread(native_thread);
     if (vm_thread == NULL) {
-        TRACE(("TM: vm_thread_t thread is NULL"));
+        CTRACE(("TM: vm_thread_t thread is NULL"));
         return NULL;
     }
     return vm_thread->java_thread;
@@ -667,7 +666,7 @@ IDATA VMCALL jthread_wait_for_all_nondaemon_threads()
  */
 void throw_interrupted_exception(void)
 {
-    TRACE(("interrupted_exception thrown"));
+    CTRACE(("interrupted_exception thrown"));
     vm_thread_t vm_thread = p_TLS_vmthread;
     assert(vm_thread);
     JNIEnv *env = vm_thread->jni_env;

@@ -22,8 +22,6 @@
  * @file
  * Major interpreter-related definitions.
  */
-
-#define LOG_DOMAIN "interpreter.unspecified"
 #include "cxxlog.h"
 #include "vm_log.h"
 

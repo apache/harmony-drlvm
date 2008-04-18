@@ -18,11 +18,13 @@
 * @author Dmitry B. Yershov
 */  
 
-#ifndef LOG_PARAMS_H
-#define LOG_PARAMS_H
+#ifndef _LOG_PARAMS_H
+#define _LOG_PARAMS_H
 
 #include <iostream>
 #include <vector>
+#include <string.h>
+#include "open/platform_types.h"
 #include "port_malloc.h"
 
 using std::string;
@@ -34,13 +36,13 @@ private:
     const char* def_messageId;
     const char* messageId;
     string result_string;
-    int prefix, message_number, is_def_messageId_set;
+    int prefix, message_number;
 public:
 
     LogParams(int pref, int mess_num) {
         prefix = pref;
         message_number = mess_num;
-        is_def_messageId_set = 0;
+        def_messageId = NULL;
         messageId = NULL;
     }
 
@@ -51,52 +53,15 @@ public:
     VMEXPORT const char* release();
 
     LogParams& operator<<(const char* message) {
-        if (!is_def_messageId_set) {
+        if (!def_messageId) {
             def_messageId = strdup(message);
-            is_def_messageId_set = 1;
-            return *this;
         } else {
-            string logger_string;
-            logger_string += message;
-            values.push_back(logger_string);
-            return *this;
+            values.push_back(string(message));
         }
-    }
-
-    LogParams& operator<<(char* message) {
-        if (!is_def_messageId_set) {
-            def_messageId = strdup(message);
-            is_def_messageId_set = 1;
-            return *this;
-        } else {
-            string logger_string;
-            logger_string += message;
-            values.push_back(logger_string);
-            return *this;
-        }
-    }
-
-    LogParams& operator<<(volatile void* pointer) {
-        string logger_string;
-        char* buf = (char*)STD_MALLOC(21);
-        sprintf(buf, "%p", pointer);
-        logger_string += buf;
-        STD_FREE(buf);
-        values.push_back(logger_string);
         return *this;
     }
 
     LogParams& operator<<(const void* pointer) {
-        string logger_string;
-        char* buf = (char*)STD_MALLOC(21);
-        sprintf(buf, "%p", pointer);
-        logger_string += buf;
-        STD_FREE(buf);
-        values.push_back(logger_string);
-        return *this;
-    }
-
-    LogParams& operator<<(void *pointer) {
         string logger_string;
         char* buf = (char*)STD_MALLOC(21);
         sprintf(buf, "%p", pointer);
@@ -199,5 +164,5 @@ public:
     }
 };
 
-#endif //LOG_PARAMS_H
+#endif /* _LOG_PARAMS_H */
  

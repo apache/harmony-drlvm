@@ -14,17 +14,8 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Evgueni Brevnov
- * @version $Revision: 1.1.2.1.4.3 $
- */  
-
-//MVM
-#include <iostream>
-
-using namespace std;
-
-#include <assert.h>
+#define LOG_DOMAIN "invoke"
+#include "cxxlog.h"
 
 #include "open/types.h"
 #include "open/vm_util.h"
@@ -45,9 +36,6 @@ using namespace std;
 #include "interpreter.h"
 
 #include "port_malloc.h"
-
-#define LOG_DOMAIN "invoke"
-#include "cxxlog.h"
 
 #include "dump.h"
 
@@ -287,7 +275,7 @@ JIT_execute_method_default(JIT_Handle jit, jmethodID methodID, jvalue *return_va
                 argId -= 2;
                 break;
             default:
-                ABORT("Unexpected java type");
+                DIE(("Unexpected java type"));
         }
     }
     assert(argId >= 0);
@@ -343,7 +331,7 @@ JIT_execute_method_default(JIT_Handle jit, jmethodID methodID, jvalue *return_va
             break;
 
         default:
-            ABORT("Unexpected java type");
+            DIE(("Unexpected java type"));
     }
 
     if (exn_raised()) {
@@ -363,6 +351,7 @@ JIT_execute_method_default(JIT_Handle jit, jmethodID methodID, jvalue *return_va
     //printf("execute:  pop: prev = 0x%p, curr=0x%p\n", &lastFrame, lastFrame);
     p_TLS_vmthread->lastFrame = lastFrame;
 }
+
 
 
 

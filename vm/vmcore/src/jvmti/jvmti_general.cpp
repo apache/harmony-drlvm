@@ -21,12 +21,13 @@
 /*
  * JVMTI general API
  */
+#define LOG_DOMAIN "jvmti.general"
+#include "cxxlog.h"
 
 #include "jvmti_direct.h"
 #include "jvmti_utils.h"
 #include "jvmti_internal.h"
 #include "environment.h"
-#include "cxxlog.h"
 #include "suspend_checker.h"
 #include "jvmti_break_intf.h"
 
@@ -135,7 +136,7 @@ jvmtiError JNICALL
 jvmtiSetEnvironmentLocalStorage(jvmtiEnv* env,
                                 const void* data)
 {
-    TRACE2("jvmti.general", "SetEnvironmentLocalStorage called, data = " << data);
+    TRACE("SetEnvironmentLocalStorage called, data = " << data);
     SuspendEnabledChecker sec;
     /*
      * Check given env & current phase.
@@ -410,23 +411,27 @@ jvmtiSetVerboseFlag(jvmtiEnv* env,
 
     CHECK_EVERYTHING();
 
-    // FIXME: Add removing of filters if value == false
+    char* category = "";
     switch (flag)
     {
     case JVMTI_VERBOSE_OTHER:
-        // Which is other?
         break;
     case JVMTI_VERBOSE_GC:
-        set_threshold(util::GC_LOGGER, (value) ? INFO : WARN);
-        break;
+        category = LOG_GC_INFO;
     case JVMTI_VERBOSE_CLASS:
-        set_threshold(util::CLASS_LOGGER, (value) ? INFO : WARN);
+        category = LOG_CLASS_INFO;
         break;
     case JVMTI_VERBOSE_JNI:
-        set_threshold(util::JNI_LOGGER, (value) ? INFO : WARN);
+        category = LOG_JNI_INFO;
         break;
     default:
         return JVMTI_ERROR_ILLEGAL_ARGUMENT;
+    }
+
+    if (value) {
+        log_enable_info_category(category, 0);
+    } else {
+        log_disable_info_category(category, 0);
     }
 
     return JVMTI_ERROR_NONE;

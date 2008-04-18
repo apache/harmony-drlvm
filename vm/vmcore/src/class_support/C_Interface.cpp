@@ -14,35 +14,29 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
 #define LOG_DOMAIN "vm.core"
 #include "cxxlog.h"
 
 #include "open/vm_properties.h"
-#include "classloader.h"
-#include "lock_manager.h"
-#include "compile.h"
-#include "vm_arrays.h"
-#include "vm_strings.h"
-#include "properties.h"
-#include "vtable.h"
-
-#include "open/hythread_ext.h"
-#include "port_mutex.h"
-#include "thread_manager.h"
-#include "cci.h"
-#include "nogc.h"
-
-#include "Package.h"
-
 #include "open/vm_type_access.h"
 #include "open/vm_field_access.h"
 #include "open/vm_method_access.h"
-#include "open/vm_class_manipulation.h"
 #include "open/vm_class_loading.h"
+#include "open/vm_class_manipulation.h"
 #include "open/vm_class_info.h"
 #include "open/vm_ee.h"
-#include "jit_intf.h"
+
+#include "classloader.h"
+#include "class_interface.h"
+#include "Package.h"
+#include "vtable.h"
+
+#include "vm_arrays.h"
+#include "compile.h"
+#include "port_mutex.h"
+#include "cci.h"
+#include "nogc.h"
+#include "exceptions.h"
 
 BOOLEAN class_is_final(Class_Handle cl) {
     assert(cl);
@@ -645,7 +639,7 @@ Class_Handle class_get_class_of_primitive_type(VM_Data_Type typ)
         clss = NULL;    // to allow star jit initialization
         break;
     default:
-        ABORT("Unknown vm data type");          // We need a better way to indicate an internal error
+        DIE(("Unknown vm data type"));          // We need a better way to indicate an internal error
     }
     return clss;
 } // class_get_class_of_primitive_type
@@ -726,7 +720,7 @@ VM_Data_Type class_cp_get_field_type(Class_Handle src_class, U_16 cp_index)
     case VM_DATA_TYPE_CLASS:
         return VM_DATA_TYPE_CLASS;
     default:
-        ABORT("Unknown vm data type");
+        DIE(("Unknown vm data type"));
     }
     return VM_DATA_TYPE_INVALID;
 } // class_cp_get_field_type
@@ -883,7 +877,7 @@ const char* class_cp_get_entry_name(Class_Handle cl, U_16 index)
         || const_pool.is_methodref(index)
         || const_pool.is_interfacemethodref(index)))
     {
-        ABORT("Wrong index");
+        DIE(("Wrong index"));
         return 0;
     }
     index = const_pool.get_ref_name_and_type_index(index);
@@ -899,7 +893,7 @@ const char* class_cp_get_entry_class_name(Class_Handle cl, unsigned short index)
         || const_pool.is_methodref(index)
         || const_pool.is_interfacemethodref(index)))
     {
-        ABORT("Wrong index");
+        DIE(("Wrong index"));
         return 0;
     }
     index = const_pool.get_ref_class_index(index);
@@ -911,7 +905,7 @@ const char* class_cp_get_class_name(Class_Handle cl, unsigned short index)
     assert(cl);
     ConstantPool& const_pool = cl->get_constant_pool();
     if (!const_pool.is_class(index)) {
-        ABORT("Wrong index");
+        DIE(("Wrong index"));
         return 0;
     }
     return const_pool.get_utf8_chars(const_pool.get_class_name_index(index));
@@ -1142,7 +1136,7 @@ static Class *class_get_array_of_primitive_type(VM_Data_Type typ)
     case VM_DATA_TYPE_INTPTR:
     case VM_DATA_TYPE_UINTPTR:
     default:
-        ABORT("Unexpected vm data type");          // We need a better way to indicate an internal error
+        DIE(("Unexpected vm data type"));          // We need a better way to indicate an internal error
         break;
     }
     return clss;
@@ -1435,7 +1429,7 @@ Type_Info_Handle method_args_get_type_info(Method_Signature_Handle msh,
     assert(msh);
     Method_Signature *ms = (Method_Signature *)msh;
     if(idx >= ms->num_args) {
-        ABORT("Wrong index");
+        DIE(("Wrong index"));
         return 0;
     }
     assert(ms->arg_type_descs);
@@ -1784,7 +1778,7 @@ void vm_properties_set_value(const char* key, const char* value, PropertyTable t
         VM_Global_State::loader_env->VmProperties()->set(key, value);
         break;
     default:
-        ASSERT(0, "Unknown property table: " << table_number);
+        DIE(("Unknown property table: %d", table_number));
     }
 }
 
@@ -1801,7 +1795,7 @@ char* vm_properties_get_value(const char* key, PropertyTable table_number)
         break;
     default:
         value = NULL;
-        ASSERT(0, "Unknown property table: " << table_number);
+        DIE(("Unknown property table: %d", table_number));
     }
     return value;
 }
@@ -1827,7 +1821,7 @@ BOOLEAN vm_property_is_set(const char* key, PropertyTable table_number)
         value = VM_Global_State::loader_env->VmProperties()->is_set(key);
         break;
     default:
-        ASSERT(0, "Unknown property table: " << table_number);
+        DIE(("Unknown property table: %d", table_number));
     }
     return value ? TRUE : FALSE;
 }
@@ -1844,7 +1838,7 @@ char** vm_properties_get_keys(PropertyTable table_number)
         break;
     default:
         value = NULL;
-        ASSERT(0, "Unknown property table: " << table_number);
+        DIE(("Unknown property table: %d", table_number));
     }
     return value;
 }
@@ -1862,7 +1856,7 @@ char** vm_properties_get_keys_starting_with(const char* prefix, PropertyTable ta
         break;
     default:
         value = NULL;
-        ASSERT(0, "Unknown property table: " << table_number);
+        DIE(("Unknown property table: %d", table_number));
     }
     return value;
 }
@@ -1960,7 +1954,7 @@ static Annotation* lookup_annotation(AnnotationTable* table, Class* owner, Class
             }
         }
     }
-    LOG("No such annotation " << antn_type->get_name()->bytes);
+    TRACE("No such annotation " << antn_type->get_name()->bytes);
     return NULL;
 }
 

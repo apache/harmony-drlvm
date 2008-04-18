@@ -18,6 +18,8 @@
  * @author Pavel Rebriy
  * @version $Revision: $
  */
+#define LOG_DOMAIN "jvmti.step"
+#include "cxxlog.h"
 
 #include "open/bytecodes.h"
 #include "open/vm_method_access.h"
@@ -26,7 +28,6 @@
 #include "jvmti.h"
 #include "jthread.h"
 #include "Class.h"
-#include "cxxlog.h"
 #include "vm_log.h"
 #include "jvmti_utils.h"
 #include "jvmti_internal.h"
@@ -436,7 +437,7 @@ jvmti_SingleStepLocation( VM_thread* thread,
         // ret instruction
         case OPCODE_RET:            /* 0xa9 + u1|u2  */
             // FIXME - need to obtain return address from stack.
-            LDIE2("jvmti", 25, "SingleStepLocation: not implemented ret instruction");
+            LDIE(25, "SingleStepLocation: not implemented ret instruction");
             break;
         }
         break;

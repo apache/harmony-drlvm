@@ -21,6 +21,8 @@
 /*
  * JVMTI local variables API
  */
+#define LOG_DOMAIN "jvmti.locals"
+#include "cxxlog.h"
 
 #include "jvmti_direct.h"
 #include "jvmti_utils.h"
@@ -37,9 +39,6 @@
 #include "cci.h"
 #include "Class.h"
 #include "vtable.h"
-
-#define LOG_DOMAIN "jvmti.locals"
-#include "cxxlog.h"
 
 /*
  * Local Variable functions:
@@ -244,7 +243,7 @@ static jvmtiError set_local(jvmtiEnv* env,
                         depth, slot, *(int64*) p_value);
                 break;
             default:
-                DIE("Error: unrecognized local variable type");
+                DIE(("Error: unrecognized local variable type"));
         }
     }
     else
@@ -275,7 +274,7 @@ static jvmtiError set_local(jvmtiEnv* env,
                         p_value);
                 break;
             default:
-                DIE("Error: unrecognized local variable type");
+                DIE(("Error: unrecognized local variable type"));
         }
 
         si_free(si);

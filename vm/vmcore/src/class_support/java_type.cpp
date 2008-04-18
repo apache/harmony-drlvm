@@ -20,7 +20,7 @@
  */  
 
 
-#define LOG_DOMAIN util::CLASS_LOGGER
+#define LOG_DOMAIN LOG_CLASS_INFO
 #include "cxxlog.h"
 
 #include <assert.h>
@@ -81,7 +81,7 @@ TypeDesc* type_desc_create_from_java_descriptor(const char* d, ClassLoader* load
             return et->type_desc_create_vector();
         }
     default:
-        ABORT("Bad type descriptor");
+        DIE(("Bad type descriptor"));
         return NULL;
     }
 }
@@ -141,7 +141,7 @@ Class* TypeDesc::load_type_desc()
         return clss;
     default:
         // All other types are not Java types, so fail
-        ABORT("Unexpected kind");
+        DIE(("Unexpected kind"));
         return NULL;
     }
 }

@@ -19,7 +19,7 @@
  * @file jvmti_break_intf.cpp
  * @brief JVMTI native breakpoints API implementation
  */
-
+#define LOG_DOMAIN "jvmti.break"
 #include "cxxlog.h"
 
 #include "open/vm_method_access.h"
@@ -124,7 +124,7 @@ VMBreakPoints::release_intf(VMBreakInterface* intf)
             return;
         }
     }
-    LDIE2("jvmti.break", 23, "{0} try to release unknown interface" << "VMBreakPoints::release_intf:");
+    LDIE(23, "{0} try to release unknown interface" << "VMBreakPoints::release_intf:");
 }
 
 VMBreakInterface*

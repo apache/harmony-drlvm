@@ -20,7 +20,7 @@
  */  
 
 
-#define LOG_DOMAIN util::CLASS_LOGGER
+#define LOG_DOMAIN LOG_CLASS_INFO
 #include "cxxlog.h"
 
 #include <assert.h>
@@ -105,7 +105,7 @@ static unsigned sizeof_field_type(Field *field, bool do_field_compaction)
         sz = 8;
         break;
     default:
-        ABORT("Invalid type descriptor");
+        DIE(("Invalid type descriptor"));
     }
 
     return sz;
@@ -150,7 +150,7 @@ unsigned shift_of_primitive_array_element(Class *p_class)
         assert(OBJECT_REF_SIZE == 4);
         break;
     default:
-        ABORT("Unexpected type descriptor");
+        DIE(("Unexpected type descriptor"));
         return 0;
     }
     return sz;
@@ -173,7 +173,7 @@ is_vector_of_primitives(Class* p_class)
         return false;
     if(p_class->is_array())
         return true;
-    ABORT("Should never be called unless p_class is an array");
+    DIE(("Should never be called unless p_class is an array"));
     return true;
 }
 
@@ -465,7 +465,7 @@ bool assign_values_to_class_static_final_fields(Class *clss)
                         STORE_GLOBAL_REFERENCE(field_addr, str);
                         // ------------------------------------------------------------^^
                     } else {
-                        ABORT("Unexpected type descriptor");
+                        DIE(("Unexpected type descriptor"));
                     }
                     break;
                 }
@@ -1396,7 +1396,7 @@ bool Class::prepare(Global_Env* env)
             break;
         default:
             m_vtable->array_element_shift = 65535;
-            ASSERT(0, "Unexpected array element size: " << m_vtable->array_element_size);
+            DIE(("Unexpected array element size: %d", m_vtable->array_element_size));
             break;
         }
     }
@@ -1422,7 +1422,7 @@ bool Class::prepare(Global_Env* env)
         if(m_alignment != GC_OBJECT_ALIGNMENT) { 
             // The GC will align on 4 byte boundaries by default on IA32....
 #ifdef POINTER64
-            ASSERT(0, "Alignment is supposed to be appropriate");
+            DIE(("Alignment is supposed to be appropriate"));
 #endif
             // Make sure it is a legal mask.
             assert((m_alignment & CL_PROP_ALIGNMENT_MASK) <= CL_PROP_ALIGNMENT_MASK);

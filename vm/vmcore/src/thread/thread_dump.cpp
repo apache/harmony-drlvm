@@ -14,33 +14,11 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/**
- * @author Nikolay Kuznetsov
- * @version $Revision: 1.1.2.2.4.4 $
- */
+#define LOG_DOMAIN "thread.dump"
+#include "cxxlog.h"
 
 #include <set>
 #include "thread_dump.h"
-#include "m2n.h"
-#include "stack_iterator.h"
-#include "stack_trace.h"
-#include "mon_enter_exit.h"
-#include "jni_utils.h"
-#include "jit_intf_cpp.h"
-#include "dll_jit_intf.h"
-
-#include "object_generic.h"
-#include "Class.h"
-#include "vtable.h"
-#include "environment.h"
-#include "root_set_enum_internal.h"
-#include "lock_manager.h"
-#include "open/gc.h"
-#include "cci.h"
-
-#define LOG_DOMAIN "thread_dump"
-#include "cxxlog.h"
-
 
 static std::set < void *>unique_references;
 

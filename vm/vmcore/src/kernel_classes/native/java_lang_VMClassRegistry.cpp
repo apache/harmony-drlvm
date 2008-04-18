@@ -652,7 +652,7 @@ JNIEXPORT jobject JNICALL Java_java_lang_VMClassRegistry_getEnclosingMember
     unsigned method_idx = clazz->get_enclosing_method_index();
     if (method_idx) {
         unsigned c_idx = clazz->get_enclosing_class_index();
-        ASSERT(c_idx, "No class for enclosing method");
+        ASSERT(c_idx, ("No class for enclosing method"));
         Class* outer_clss = clazz->_resolve_class(VM_Global_State::loader_env, c_idx);
         if (outer_clss) 
         {

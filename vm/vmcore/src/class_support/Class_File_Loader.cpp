@@ -16,14 +16,10 @@
  *  limitations under the License.
  */
 
-#define LOG_DOMAIN util::CLASS_LOGGER
+#define LOG_DOMAIN LOG_CLASS_INFO
 #include "cxxlog.h"
 
-
-
 #include "port_filepath.h"
-#include <assert.h>
-
 #include "environment.h"
 #include "classloader.h"
 #include "Class.h"
@@ -356,7 +352,7 @@ parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* clss)
                 value.const_value.string = cp.get_utf8_string(const_idx);
                 break;
             default:
-                DIE("Annotation parsing internal error");
+                DIE(("Annotation parsing internal error"));
             }
         }
         break;

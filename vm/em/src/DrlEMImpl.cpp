@@ -17,6 +17,8 @@
 /**
 * @author Mikhail Y. Fursov
 */
+#define LOG_DOMAIN "em"
+#include "cxxlog.h"
 
 #include "DrlEMImpl.h"
 
@@ -32,18 +34,14 @@
 #include "open/vm_method_access.h"
 #include "open/vm_class_manipulation.h"
 #include "ini.h"
-#include "cxxlog.h"
 
 #include "vm_properties.h"
 
-#include <assert.h>
 #include <algorithm>
 #include <sstream>
 #include <fstream>
 #include "port_threadunsafe.h"
 #include "port_mutex.h"
-
-#define LOG_DOMAIN "em"
 
 #define EDGE_PROFILER_STR  "EDGE_PROFILER"
 #define VALUE_PROFILER_STR  "VALUE_PROFILER"
@@ -422,7 +420,7 @@ std::string DrlEMImpl::getJITLibFromCmdLine(const std::string& jitName) const {
 }
 
 void DrlEMImpl::buildChains(std::string& config) {
-    bool loggingEnabled =  is_info_enabled(LOG_DOMAIN);
+    bool loggingEnabled =  log_is_info_enabled(LOG_DOMAIN);
     StringList chainNames = getParamAsList(config, "chains", ',', true);
     if (chainNames.empty()) {
         LECHO(3, "EM: No 'chains' property found in configuration");
@@ -458,7 +456,7 @@ void DrlEMImpl::buildChains(std::string& config) {
                 break;
             }
             RStep* step = new RStep(jh, jitName, chain, libHandle);
-            step->loggingEnabled = loggingEnabled || is_info_enabled(step->catName.c_str());
+            step->loggingEnabled = loggingEnabled || log_is_info_enabled(step->catName.c_str());
             chain->steps.push_back(step);
 
             if (!initJIT(fullJitLibPath, libHandle, *step)) {

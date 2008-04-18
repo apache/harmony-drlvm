@@ -156,7 +156,7 @@ TypeDesc* type_desc_create_from_class(Class* c)
         case VM_DATA_TYPE_CHAR:    k = K_Char;    break;
         case VM_DATA_TYPE_VOID:    k = K_Void;    break;
         default:
-            ABORT("Unexpected data type");
+            DIE(("Unexpected data type"));
         }
         td = new TypeDesc(k, NULL, NULL, NULL, c->get_class_loader(), c);
     } else if (c->is_array()) {

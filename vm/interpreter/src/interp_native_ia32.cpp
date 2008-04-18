@@ -148,7 +148,7 @@ interpreter_execute_native_method(
                 arg_words[argId++] = val.v[1].i;
                 break;
             default:
-                ABORT("Invalid java type");
+                DIE(("Invalid java type"));
         }
     }
     assert(argId <= sz + 2);
@@ -222,7 +222,7 @@ interpreter_execute_native_method(
             break;
 
         default:
-            ABORT("Invalid java type");
+            DIE(("Invalid java type"));
     }
 
     if (exn_raised()) {
@@ -320,7 +320,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
                 pos -= 2;
                 break;
             default:
-                ABORT("Invalid java type");
+                DIE(("Invalid java type"));
         }
     }
     assert(*mtype == ')');
@@ -454,7 +454,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
             break;
 
         default:
-            ABORT("Invalid java type");
+            DIE(("Invalid java type"));
     }
 
     if (method->is_synchronized()) {
@@ -541,7 +541,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
                 pos -= 2;
                 break;
             default:
-                ABORT("Invalid java type");
+                DIE(("Invalid java type"));
         }
     }
     assert(*mtype == ')');
@@ -676,7 +676,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
             break;
 
         default:
-            ABORT("Invalid java type");
+            DIE(("Invalid java type"));
     }
 
     if (method->is_synchronized()) {

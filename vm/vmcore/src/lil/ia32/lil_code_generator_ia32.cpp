@@ -181,7 +181,7 @@ static void cc_to_cc_info(LcgIa32CcInfo* info, LilCc cc)
         info->arg_order = LAO_R2l;
         info->callee_pop = true;
         break;
-    default: ASSERT(0, "Unknown calling convention");
+    default: DIE(("Unknown calling convention"));
     }
 }
 
@@ -198,7 +198,7 @@ static bool type_in_two_regs(LilType t)
     case LT_G8:
     case LT_F8:
         return true;
-    default: ASSERT(0, "Unexpected LIL type"); for(;;);
+    default: DIE(("Unexpected LIL type")); for(;;);
     }
 }
 
@@ -232,7 +232,7 @@ static unsigned type_size_on_stack(LilType t)
     case LT_G8:
     case LT_F8:
         return 8;
-    default: ASSERT(0, "Unexpected LIL type"); for(;;);
+    default: DIE(("Unexpected LIL type")); for(;;);
     }
 }
 
@@ -312,7 +312,7 @@ static unsigned size_loc(LcgIa32OpLoc* loc)
     case LOLT_Stack: return (loc->u.v<124 ? 4 : 7); // 124 is used to work correctly for two words on the stack
     case LOLT_Immed: return 5;
     case LOLT_Tofs: return 8;
-    default: ASSERT(0, "Unexpected type"); for(;;);
+    default: DIE(("Unexpected type")); for(;;);
     }
 }
 
@@ -332,7 +332,7 @@ static R_Opnd* get_local_reg(unsigned i) {
     case 5:
         return &edx_opnd;
     default:
-        ASSERT(0, "Unexpected index");
+        DIE(("Unexpected index"));
         return NULL;
     }
 }
@@ -364,7 +364,7 @@ static R_Opnd* get_temp_register(LcgIa32Context* c, unsigned num)
             num--;
     if (n_std_places==0 && n_locals+num<=3)
         return get_local_reg(3-num);
-    ASSERT(0, "All the possible cases are supposed to be already covered");
+    DIE(("All the possible cases are supposed to be already covered"));
     return NULL;
 }
 
@@ -382,7 +382,7 @@ static void variable_to_location(LcgIa32OpLoc* loc, LcgIa32Context* c, LilVariab
         switch (lil_variable_get_index(v)) {
         case 0: loc->u.r.r1 = &edx_opnd; break;
         case 1: loc->u.r.r1 = &ecx_opnd; break;
-        default: ASSERT(0, "Unexpected index");
+        default: DIE(("Unexpected index"));
         }
         break;
     case LVK_Out:
@@ -413,7 +413,7 @@ static void variable_to_location(LcgIa32OpLoc* loc, LcgIa32Context* c, LilVariab
             loc->u.r.r2 = &edx_opnd;
         }
         break;
-    default: ASSERT(0, "Unknown kind");
+    default: DIE(("Unknown kind"));
     }
 }
 
@@ -602,7 +602,7 @@ public:
                 info->size += 2;
                 break;
             case LO_Not:
-                ASSERT(0, "Unexpected operation");
+                DIE(("Unexpected operation"));
             case LO_Sx1:
             case LO_Sx2:
             case LO_Zx1:
@@ -610,7 +610,7 @@ public:
                 ii->u.asgn.mov_to_r = false;
                 info->size += 1+size_loc(&ii->loc2);
                 break;
-            default: ASSERT(0, "Unknown operation");
+            default: DIE(("Unknown operation"));
             }
         }
         if (ii->u.asgn.mov_to_r) info->size += size_loc(&ii->loc2)*num_regs;
@@ -707,7 +707,7 @@ public:
                 ii->u.jc.stack = (ii->loc1.t==LOLT_Stack);
             } else if (ii->loc1.t==LOLT_Stack) {
                 if (ii->loc2.t==LOLT_Stack) {
-                    ASSERT(0, "Unexpected type");
+                    DIE(("Unexpected type"));
                 } else {
                     ii->u.jc.immed = false;
                     ii->u.jc.stack = true;
@@ -738,7 +738,7 @@ public:
         case LP_Lt: ii->u.jc.cc=Condition_L; break;
         case LP_Ule: ii->u.jc.cc=Condition_BE; break;
         case LP_Ult: ii->u.jc.cc=Condition_B; break;
-        default: ASSERT(0, "Unknown predicate");
+        default: DIE(("Unknown predicate"));
         }
         if (invert) {
             switch (ii->u.jc.cc) {
@@ -788,7 +788,7 @@ public:
             tailcalls++;
             info->size += size_loc(&ii->loc1);
             break;
-        default: ASSERT(0, "Unexpected call kind");
+        default: DIE(("Unexpected call kind"));
         }
     }
 
@@ -830,7 +830,7 @@ public:
         case LT_PInt:
             ii->u.pop_m2n = 1;
             break;
-        default: ASSERT(0, "Unknown LIL type");
+        default: DIE(("Unknown LIL type"));
         }
         info->size += m2n_pop_m2n_size(lil_ic_get_m2n_state(ctxt.ctxt)==LMS_Handles, 4, num, ii->u.pop_m2n);
     }
@@ -911,7 +911,7 @@ static R_Opnd* move_location_to_a_register(char** buf, LcgIa32Context* c, LcgIa3
         ++*temp_reg;
         *buf = mov(*buf, *tmp, Imm_Opnd(loc->u.v));
         return tmp;}
-    default: ASSERT(0, "Unknown type"); for(;;);
+    default: DIE(("Unknown type")); for(;;);
     }
 }
 
@@ -942,7 +942,7 @@ static void move_location_to_register(char** buf, R_Opnd* reg1, R_Opnd* reg2, Lc
         *buf = pop(*buf, *reg1);
         if (t==LT_F8) *buf = pop(*buf, *reg2);
         break;}
-    default: ASSERT(0, "Unknown type");
+    default: DIE(("Unknown type"));
     }
 }
 
@@ -966,7 +966,7 @@ static void move_register_to_location(char** buf, LcgIa32OpLoc* loc, R_Opnd* reg
         *buf = fld(*buf, M_Base_Opnd(esp_reg, 0), (t==LT_F8));
         *buf = alu(*buf, add_opc, esp_opnd, Imm_Opnd(t==LT_F4 ? 4 : 8));
         break;}
-    default: ASSERT(0, "Unknown type");
+    default: DIE(("Unknown type"));
     }
 }
 
@@ -991,7 +991,7 @@ static Opnd_Size type_to_opnd_size(LilType t)
         return size_32;
         //break;// remark #111: statement is unreachable
     default:
-        ASSERT(0, "Unknown LIL type"); for(;;);
+        DIE(("Unknown LIL type")); for(;;);
     }
 }
 
@@ -1083,7 +1083,7 @@ public:
                 case LOLT_Immed:{
                     *buf = imul(*buf, *(ii->r1), Imm_Opnd(ii->loc3.u.v));
                     break;}
-                default: ASSERT(0, "Unexpected type");
+                default: DIE(("Unexpected type"));
                 }            
                 break;
             case LO_Neg:
@@ -1093,17 +1093,17 @@ public:
                 switch (ii->loc3.t) {
                 case LOLT_Reg:
                 case LOLT_Stack:
-                    ASSERT(0, "Unexpected type");
+                    DIE(("Unexpected type"));
                 case LOLT_Immed:{
                     *buf = shift(*buf, shl_opc, *(ii->r1), Imm_Opnd(ii->loc3.u.v));
                     break;}
-                default: ASSERT(0, "Unexpected type");
+                default: DIE(("Unexpected type"));
                 }
                 break;
             case LO_And:
                 opc = and_opc; goto alu;
             case LO_Not:
-                ASSERT(0, "Unexpected operation");
+                DIE(("Unexpected operation"));
             case LO_Sx1: sign=true; sz = size_8; goto widden;
             case LO_Sx2: sign=true; sz = size_16; goto widden;
             case LO_Zx1: sign=false; sz = size_8; goto widden;
@@ -1119,7 +1119,7 @@ public:
                 case LOLT_Immed:{
                     *buf = alu(*buf, opc, *(ii->r1), Imm_Opnd(ii->loc3.u.v));
                     break;}
-                default: ASSERT(0, "Unexpected type");
+                default: DIE(("Unexpected type"));
                 }            
                 break;
             widden:
@@ -1140,10 +1140,10 @@ public:
                         *buf = movzx(*buf, *(ii->r1), M_Base_Opnd(esp_reg, ii->loc2.u.v), sz);
                     }
                     break;}
-                default: ASSERT(0, "Unexpected type");
+                default: DIE(("Unexpected type"));
                 }
                 break;
-            default: ASSERT(0, "Unexpected operartion");
+            default: DIE(("Unexpected operartion"));
             }
             break;
         case LSO_Lea:{
@@ -1189,7 +1189,7 @@ public:
             *buf = mov(*buf, *(ii->r1), *(ii->u.address.addr));
             break;
         case LT_G8:
-            ASSERT(0, "Unexpected type");
+            DIE(("Unexpected type"));
             //ASSERT(0 == 1, "Need proper implementation");
             //*buf = mov(*buf, *(ii->r1), *(ii->u.address.addr));
             // Bit of a hack to change this value, but it works
@@ -1197,7 +1197,7 @@ public:
             //*buf = mov(*buf, *(ii->r2), *(ii->u.address.addr));
             break;
         default:
-            ASSERT(0, "Unexpected LIL type"); // other types not allowed
+            DIE(("Unexpected LIL type")); // other types not allowed
         }
         if (ii->mov_to_dst) move_register_to_location(buf, &ii->loc1, ii->r1, ii->r2, t);
     }
@@ -1278,7 +1278,7 @@ public:
                 *buf = alu(*buf, or_opc, *reg, M_Base_Opnd(esp_reg, ii->loc1.u.v+4));
                 break;}
             default:
-                ASSERT(0, "Unexpected type");
+                DIE(("Unexpected type"));
             }
         }
         if (ctxt.info->short_jumps) {
@@ -1320,7 +1320,7 @@ public:
                 *buf = push(*buf, m1);
                 extra += 8;
                 break;}
-            default: ASSERT(0, "Unexpected type size");
+            default: DIE(("Unexpected type size"));
             }
             if (l2r) i++;
         }
@@ -1338,7 +1338,7 @@ public:
         case LOLT_Immed:
             *buf = ::call(*buf, (char*)l->u.v);
             break;
-        default: ASSERT(0, "Unexpected type");
+        default: DIE(("Unexpected type"));
         }
     }
 
@@ -1371,10 +1371,10 @@ public:
             case LOLT_Immed:
                 *buf = jump(*buf, (char*)ii->loc1.u.v);
                 break;
-            default: ASSERT(0, "Unexpected type");
+            default: DIE(("Unexpected type"));
             }
             break;
-        default: ASSERT(0, "Unexpected call kind");
+        default: DIE(("Unexpected call kind"));
         }
     }
 

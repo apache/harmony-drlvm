@@ -33,9 +33,6 @@
 
 
 
-// ppervov: HACK: allows using STL modifiers (dec/hex) and special constants (endl)
-using namespace std;
-
 extern "C" {
     int64 invokeJNI(uint64 *args, uword n_fps, uword n_stacks, GenericFunctionPointer f);
 }
@@ -174,7 +171,7 @@ interpreter_execute_native_method(
                 }
 
             default:
-                ABORT("Unexpected java type");
+                DIE(("Unexpected java type"));
         }
     }
 //    assert(argId <= sz + 2);
@@ -246,7 +243,7 @@ interpreter_execute_native_method(
             break;
 
         default:
-            ABORT("Unexpected java type");
+            DIE(("Unexpected java type"));
     }
 
     if (exn_raised()) {
@@ -404,7 +401,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
                 break;
 
             default:
-                ABORT("Unexpected java type");
+                DIE(("Unexpected java type"));
         }
     }
     assert(*mtype == ')');
@@ -540,7 +537,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
             break;
 
         default:
-            ABORT("Unexpected java type");
+            DIE(("Unexpected java type"));
     }
 
     if (method->is_synchronized()) {
@@ -682,7 +679,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
                 pos -= 2;
                 break;
             default:
-                ABORT("Unexpected java type");
+                DIE(("Unexpected java type"));
         }
     }
     assert(*mtype == ')');
@@ -819,7 +816,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
             break;
 
         default:
-            ABORT("Unexpected java type");
+            DIE(("Unexpected java type"));
     }
 
     if (method->is_synchronized()) {

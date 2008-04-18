@@ -264,7 +264,7 @@ jobject wrap_primitive(JNIEnv *env, jvalue value, char sig)
         break;
     }
     default:
-        ABORT("Unknown type descriptor");
+        DIE(("Unknown type descriptor"));
     }
 
     return retobj;
@@ -317,7 +317,7 @@ jvalue unwrap_primitive(JNIEnv *env, jobject wobj, char sig)
         value.d = GetDoubleField (env, wobj, value_id);
         break;
     default:
-        ABORT("Unknown type descriptor");
+        DIE(("Unknown type descriptor"));
     }
 
     return value;

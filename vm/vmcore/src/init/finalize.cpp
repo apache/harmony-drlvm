@@ -19,15 +19,16 @@
  * @version $Revision: 1.1.2.2.4.3 $
  */
 
-#include "vm_process.h"
-#include <stdio.h>
-#include <assert.h>
+#define LOG_DOMAIN "vm.object_queue"
+#include "cxxlog.h"
 
 #include "open/types.h"
 
 #include "lock_manager.h"
 #include "object_layout.h"
 #include "jthread.h"
+
+#include "vm_process.h"
 #include "Class.h"
 #include "environment.h"
 #include "ini.h"
@@ -41,14 +42,7 @@
 #include "jit_import_rt.h"
 #include "finalizer_thread.h"     /* added for NATIVE FINALIZER THREAD */
 #include "ref_enqueue_thread.h"   /* added for NATIVE REFERENCE ENQUEUE THREAD */
-
-
-#define LOG_DOMAIN "vm.object_queue"
 #include "classloader.h"
-#undef LOG_DOMAIN
-
-#include "cxxlog.h"
-#include "vm_log.h"
 #include "thread_generic.h"
 
 #ifndef USE_GC_STATIC

@@ -350,14 +350,14 @@ static LilType type_info_to_lil_type(Type_Info_Handle tih, bool handles)
         // ? 20030613: I really don't want this code here, but for now...
         Class_Handle UNUSED ch = type_info_get_class(tih);
         assert(ch);
-        ASSERT(0, "Unexpected data type");
+        DIE(("Unexpected data type"));
     }
     case VM_DATA_TYPE_MP:
     case VM_DATA_TYPE_UP:
         return LT_PInt;
     case VM_DATA_TYPE_STRING:
     case VM_DATA_TYPE_INVALID:
-    default: ASSERT(0, "Unknown data type"); for(;;);
+    default: DIE(("Unknown data type")); for(;;);
     }
 }
 
@@ -1186,7 +1186,7 @@ LilType lil_ic_get_type(LilCodeStub* cs, LilInstructionContext* c, LilVariable* 
         return c->out_sig->arg_types[v->index];
     case LVK_Ret:
         return c->ret;
-    default: ASSERT(0, "Unknown variable kind"); for(;;);
+    default: DIE(("Unknown variable kind")); for(;;);
     }
 }
 
@@ -1226,7 +1226,7 @@ static void lil_ic_set_type(LilInstructionContext* c, LilVariable* v, LilType t)
     case LVK_Ret:
         c->ret = t;
         break;
-    default: ASSERT(0, "Unknown variable kind");
+    default: DIE(("Unknown variable kind"));
     }
 }
 
@@ -1264,7 +1264,7 @@ static LilType lil_type_unary_op(LilOperation op, LilType t)
     case LO_Zx4:
         return t;
     default:
-        ASSERT(0, "Unexpected operation");
+        DIE(("Unexpected operation"));
         return LT_Void;
     }
 }
@@ -1371,7 +1371,7 @@ static void lil_next_context(LilInstructionContext* c, LilCodeStub* cs, LilInstr
     case LIT_Print:
         // nothing to do here
         break;
-    default: ASSERT(0, "Unknown instruction tag");
+    default: DIE(("Unknown instruction tag"));
     }
 }
 
@@ -1749,7 +1749,7 @@ void lil_visit_instruction(LilInstruction* i, LilInstructionVisitor* v)
     case LIT_Print:
         v->print(i->u.print.str, &i->u.print.arg);
         break;
-    default: ASSERT(0, "Unknown instruction tag");
+    default: DIE(("Unknown instruction tag"));
     }
 }
 
@@ -1795,7 +1795,7 @@ bool lil_predicate_is_binary(enum LilPredicate c)
     case LP_Ult:
         return true;
     default:
-        ASSERT(0, "Unknown predicate");
+        DIE(("Unknown predicate"));
         return false; // not reached
     }
 }
@@ -1824,7 +1824,7 @@ bool lil_operation_is_binary(enum LilOperation op)
     case LO_And:
         return true;
     default:
-        ASSERT(0, "Unknown operation");
+        DIE(("Unknown operation"));
         return false; // not reached
     }
 }
@@ -2083,7 +2083,7 @@ void lil_print_cc(FILE* out, enum LilCc cc)
     case LCC_Rth: fprintf(out, "rth"); break;
     case LCC_Jni: fprintf(out, "jni"); break;
     case LCC_StdCall: fprintf(out, "stdcall"); break;
-    default: ASSERT(0, "Unknown calling convention");
+    default: DIE(("Unknown calling convention"));
     }
     fflush(out);
 }
@@ -2100,7 +2100,7 @@ void lil_print_type(FILE* out, enum LilType t)
     case LT_Ref: fprintf(out, "ref"); break;
     case LT_PInt: fprintf(out, "pint"); break;
     case LT_Void: fprintf(out, "void"); break;
-    default: ASSERT(0, "Unknown LIL type");
+    default: DIE(("Unknown LIL type"));
     }
     fflush(out);
 }
@@ -2143,7 +2143,7 @@ void lil_print_variable(FILE* out, LilVariable* v)
         assert(v->index==0);
         fprintf(out, "r");
         return;
-    default: ASSERT(0, "Unknown kind");
+    default: DIE(("Unknown kind"));
     }
     fprintf(out, "%d", v->index);
     fflush(out);
@@ -2193,7 +2193,7 @@ void lil_print_address(FILE* out, LilInstruction* i)
     case LAR_None:    break;
     case LAR_Acquire: fprintf(out, ",acquire"); break;
     case LAR_Release: fprintf(out, ",release"); break;
-    default: ASSERT(0, "Unexpected acqrel value");
+    default: DIE(("Unexpected acqrel value"));
     }
     fprintf(out, "]");
     fflush(out);
@@ -2281,7 +2281,7 @@ void lil_print_instruction(FILE* out, LilInstruction* i)
             fprintf(out, "zx4 ");
             lil_print_operand(out, &(i->u.asgn.o1));
             break;
-        default: ASSERT(0, "Unknown operation");
+        default: DIE(("Unknown operation"));
         }
         break;
     case LIT_Ts:
@@ -2363,7 +2363,7 @@ void lil_print_instruction(FILE* out, LilInstruction* i)
             fprintf(out, " <u ");
             lil_print_operand(out, &(i->u.jc.c.o2));
             break;
-        default: ASSERT(0, "Unknown predicate");
+        default: DIE(("Unknown predicate"));
         }
         fprintf(out, ",%s", i->u.jc.l);
         break;
@@ -2388,7 +2388,7 @@ void lil_print_instruction(FILE* out, LilInstruction* i)
         case LCK_TailCall:
             fprintf(out, "tailcall ");
             break;
-        default: ASSERT(0, "Unknown call kind");
+        default: DIE(("Unknown call kind"));
         }
         lil_print_operand(out, &(i->u.call.target));
         break;
@@ -2411,7 +2411,7 @@ void lil_print_instruction(FILE* out, LilInstruction* i)
         fprintf(out, "\n");
         break;
     default:
-        ASSERT(0, "Unknown instruction tag");
+        DIE(("Unknown instruction tag"));
     };
     fprintf(out, ";\n");
     fflush(out);

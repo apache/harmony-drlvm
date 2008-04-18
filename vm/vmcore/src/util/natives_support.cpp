@@ -16,16 +16,15 @@
  */
 /** 
  * @author Pavel Rebriy, Ilya Berezhniuk
- * @version $Revision: 1.1.2.1.4.3 $
  */  
 
-
-#include <stdio.h>
 #include <string.h>
 #include <vector>
 #include <apr_strings.h>
 
-#include "assert.h"
+#define LOG_DOMAIN "natives"
+#include "cxxlog.h"
+
 #include "port_malloc.h"
 #include "port_dso.h"
 #include "exceptions.h"
@@ -38,9 +37,6 @@
 
 #include "jni_types.h"
 #include "jni_utils.h"
-
-#define LOG_DOMAIN "natives"
-#include "cxxlog.h"
 
 typedef jint (JNICALL *f_JNI_OnLoad) (JavaVM *vm, void *reserved);
 typedef void (JNICALL *f_JNI_OnUnload) (JavaVM *vm, void *reserved);
@@ -783,4 +779,5 @@ bool natives_is_library_loaded_slow(const char* libname)
     jni_libs.lock._unlock();
     return result;
 }
+
 

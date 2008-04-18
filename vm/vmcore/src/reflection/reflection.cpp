@@ -313,7 +313,7 @@ bool jobjectarray_to_jvaluearray(JNIEnv *jenv, jvalue **output, Method *method, 
         }
         else //unwrap to primitive
         {
-            ASSERT(arg, "Cannot unwrap NULL");
+            ASSERT(arg, ("Cannot unwrap NULL"));
             Class* arg_clss = jobject_to_struct_Class(arg);
             char arg_sig = is_wrapper_class(arg_clss->get_name()->bytes);
             char param_sig = (char)type;
@@ -342,13 +342,13 @@ bool jobjectarray_to_jvaluearray(JNIEnv *jenv, jvalue **output, Method *method, 
 
 jobject reflection_get_enum_value(JNIEnv *jenv, Class* enum_type, String* name) 
 {
-    ASSERT(enum_type->is_enum(), "Requested Class is not ENUM: "
-        << enum_type->get_name()->bytes);
+    ASSERT(enum_type->is_enum(), ("Requested Class is not ENUM: %s", 
+        enum_type->get_name()->bytes));
 
     for (unsigned i=0; i<enum_type->get_number_of_fields(); i++) {
         if (enum_type->get_field(i)->get_name() == name) {
 #ifndef NDEBUG
-            ASSERT(enum_type->get_field(i)->is_enum(), "Requested field is not ENUM: " << name->bytes);
+            ASSERT(enum_type->get_field(i)->is_enum(), ("Requested field is not ENUM: %d", name->bytes));
             const String* type = enum_type->get_name();
             const String* desc = enum_type->get_field(i)->get_descriptor();
             if (desc->len != (type->len + 2)

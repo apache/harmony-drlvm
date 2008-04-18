@@ -19,6 +19,9 @@
  * @version $Revision: 1.1 $
  */
 
+#define LOG_DOMAIN "vm.core.shutdown"
+#include "cxxlog.h"
+
 #include <stdlib.h>
 #include <apr_thread_mutex.h>
 
@@ -38,9 +41,6 @@
 #include "interpreter.h"
 #include "finalize.h"
 #include "signals.h"
-
-#define LOG_DOMAIN "vm.core.shutdown"
-#include "cxxlog.h"
 
 #define PROCESS_EXCEPTION(messageId, message) \
 { \

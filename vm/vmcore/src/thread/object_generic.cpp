@@ -85,7 +85,7 @@ jint default_hashcode(Managed_Object_Handle obj) {
     if ( *P_HASH_CONTENTION_BYTE(p_obj) & HASH_MASK)
         return *P_HASH_CONTENTION_BYTE(p_obj) & HASH_MASK;
 
-    ASSERT(0, "All the possible cases are supposed to be covered before");
+    DIE(("All the possible cases are supposed to be covered before"));
     return 0xff;
 }
 

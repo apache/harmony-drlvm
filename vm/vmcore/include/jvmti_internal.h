@@ -26,7 +26,7 @@
 #include "jit_export_jpda.h"
 #include <apr_dso.h>
 #include <apr_strings.h>
-#include "log_macro.h"
+#include "clog.h"
 #include "lock_manager.h"
 #include "jvmti_dasm.h"
 
@@ -134,7 +134,7 @@ public:
                 return;
             }
 
-        ABORT("Can't find the element");
+        DIE(("Can't find the element"));
     }
 };
 
@@ -284,7 +284,7 @@ class DebugUtilsTI {
                     return;
                 }
 
-            ABORT("Can't find the watch");
+            DIE(("Can't find the watch"));
         }
 
         void SetPendingNotifyLoadClass( Class *klass );

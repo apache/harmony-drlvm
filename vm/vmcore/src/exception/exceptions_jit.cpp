@@ -374,7 +374,7 @@ static ManagedObject * exn_propagate_exception(
                             jit, method, handler->get_handler_ip());
                     }
 
-                    TRACE2("exn", ("setting return pointer to %d", exn_obj));
+                    CTRACE(("setting return pointer to %d", exn_obj));
 
                     si_set_return_pointer(si, (void **) exn_obj);
                     //si_free(throw_si);
@@ -782,7 +782,7 @@ NativeCodePtr exn_get_rth_throw()
 static void rth_throw_lazy(Method * exn_constr)
 {
 #if defined(_IPF_) || defined(_EM64T_)
-    ABORT("Lazy exceptions are not supported on this platform");
+    DIE(("Lazy exceptions are not supported on this platform"));
 #else
     uint8 *args = (uint8 *) (m2n_get_args(m2n_get_last_frame()) + 1);   // +1 to skip constructor
     args += exn_constr->get_num_arg_slots() * 4 - 4;

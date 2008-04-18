@@ -113,8 +113,6 @@ Usage:
     <target name="build-extra" depends=""
         description="Compiles external dependencies">
         <ant antfile="make/extra/apr.xml"/>
-        <ant antfile="make/extra/aprutil.xml"/>
-        <ant antfile="make/extra/log4cxx.xml"/>
     </target>
 
     <target name="encoder">

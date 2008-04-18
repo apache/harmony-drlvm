@@ -355,7 +355,7 @@ jint initialize_properties(Global_Env * p_env)
         } 
         else if (strncmp(option, "-XD", 3) == 0)
         {
-            WARN("Deprecated syntax to set internal property, use -XX:key=value instead: " << option);
+            WARN(("Deprecated syntax to set internal property, use -XX:key=value instead: %s", option));
             TRACE("setting internal property " << option + 3);
             src = strdup(option + 3);
             tok = strchr(src, '=');

@@ -182,7 +182,7 @@ void Method_Lookup_Table::append_unlocked(Method_Code *m)
         if (code_block_addr < last_end_addr) {
             printf("Method_Lookup_Table::append_unlocked: New entry [%p..%p] is before last table entry [%p..%p]\n",
                    code_block_addr, code_end_addr, last_code_addr, last_end_addr);
-            ABORT("New entry is before last table entry"); 
+            DIE(("New entry is before last table entry")); 
         }
     }
 

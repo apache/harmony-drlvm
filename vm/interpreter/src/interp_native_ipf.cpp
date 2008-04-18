@@ -32,9 +32,6 @@
 
 
 
-// ppervov: HACK: allows using STL modifiers (dec/hex) and special constants (endl)
-using namespace std;
-
 /* implementation of "get_stacked_register_address" for interpreter */
 uint64* interpreter_get_stacked_register_address(uint64* bsp, unsigned reg) {
     M2nFrame *m2n = (M2nFrame*) bsp;

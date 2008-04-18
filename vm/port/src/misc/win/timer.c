@@ -35,7 +35,7 @@ static BOOL initNanoTime() {
     if (QueryPerformanceFrequency(&frequency)) {
         return TRUE;
     } else {
-        TRACE(("QueryPerformanceFrequency failed: %u", GetLastError())); 
+        CTRACE(("QueryPerformanceFrequency failed: %u", GetLastError())); 
         return FALSE;
     }
 }
@@ -52,7 +52,7 @@ APR_DECLARE(apr_nanotimer_t) port_nanotimer()
         if (QueryPerformanceCounter(&count)) {
             return (apr_nanotimer_t)((double)count.QuadPart / frequency.QuadPart * 1E9);
         } else {
-            TRACE(("QueryPerformanceCounter failed: %u", GetLastError())); 
+            CTRACE(("QueryPerformanceCounter failed: %u", GetLastError())); 
         }
     }
     return (apr_nanotimer_t)(GetTickCount() * 1E6);

@@ -19,7 +19,7 @@
  * @version $Revision: 1.1.2.11.2.1.2.6 $
  */  
 
-#define LOG_DOMAIN util::CLASS_LOGGER
+#define LOG_DOMAIN LOG_CLASS_INFO
 #include "cxxlog.h"
 #include "vm_log.h"
 
@@ -242,7 +242,7 @@ Class* ClassLoader::DefineClass(Global_Env* env, const char* class_name,
     assert(!exn_raised());
     const String *className;
     
-    LOG2("classloader.defineclass", "Defining class " << (NULL != class_name ? class_name : "NULL") << " with loader " << this);
+    TRACE2("classloader.defineclass", "Defining class " << (NULL != class_name ? class_name : "NULL") << " with loader " << this);
     if(class_name) {
         className = env->string_pool.lookup(class_name);
     } else {
@@ -574,9 +574,8 @@ void ClassLoader::StartUnloading()
             Class* c = it->second;
             if (*c->get_class_handle())
             {
-                DIE("FAILED on unloading classloader: \n" << (void*)m_table[i] << 
-                    "live j.l.Class of unloaded class is detected: " << c->get_name()->bytes);
-                assert (false);
+                DIE(("FAILED on unloading classloader: \n%p live j.l.Class of unloaded class is detected: %s",
+                    (void*)m_table[i], c->get_name()->bytes));
             }
          }
 #endif
@@ -711,7 +710,7 @@ Class* ClassLoader::StartLoadingClass(Global_Env* UNREF env, const String* class
 
 void ClassLoader::FailedLoadingClass(const String* className)
 {
-    LOG2("classloader", "Failed loading class " << className << " with loader " << this);
+    TRACE2("classloader", "Failed loading class " << className << " with loader " << this);
     tmn_suspend_disable();
     LMAutoUnlock aulock( &m_lock );
 
@@ -1845,7 +1844,7 @@ Class* UserDefinedClassLoader::DoLoadClass(Global_Env* env, const String* classN
                 exn_raise_object(new_exn);
             } else {
                 assert(exn_raised());
-                LOG("Failed to translate ClassNotFoundException "
+                TRACE("Failed to translate ClassNotFoundException "
                     "to NoClassDefFoundError for " << className->bytes);
             }
         }
@@ -1940,10 +1939,7 @@ void ClassLoader::InsertInitiatedClass(Class* clss)
 
 void BootstrapClassLoader::ReportAndExit(const char* exnclass, std::stringstream& exnmsg) 
 {
-    std::stringstream ss;
-    ss << exnclass << " : " << exnmsg.str().c_str();
-    WARN(ss.str().c_str());
-    LOGGER_EXIT(1);
+    DIE(("%s : %s", exnclass, exnmsg.str().c_str()));
 }
 
 Class* BootstrapClassLoader::LoadFromFile(const String* class_name)

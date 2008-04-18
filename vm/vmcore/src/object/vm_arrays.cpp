@@ -619,7 +619,7 @@ ArrayCopyResult array_copy(ManagedObject *src, int32 srcOffset, ManagedObject *d
         }
         break;
     default:
-        ABORT("Unexpected type specifier");
+        DIE(("Unexpected type specifier"));
     }
 
     return ACR_Okay;

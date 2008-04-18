@@ -48,13 +48,13 @@ IDATA VMCALL jthread_resume(jobject java_thread)
         // it is a fast path
         // thread is not alive or is not suspended, nothing to do
 
-        TRACE(("java resume exit, self: %p, thread: %p",
+        CTRACE(("java resume exit, self: %p, thread: %p",
             hythread_self(), vm_thread));
 
         return TM_ERROR_NONE;
     }
 
-    TRACE(("java resume enter, self: %p, thread: %p, "
+    CTRACE(("java resume enter, self: %p, thread: %p, "
         "suspend_flag: %d", hythread_self(), vm_thread,
         vm_thread->suspend_flag));
 
@@ -62,7 +62,7 @@ IDATA VMCALL jthread_resume(jobject java_thread)
     Lock_Manager *suspend_lock = VM_Global_State::loader_env->p_suspend_lock;
     suspend_lock->_lock();
 
-    TRACE(("java resume lock enter, self: %p, thread: %p, "
+    CTRACE(("java resume lock enter, self: %p, thread: %p, "
         "suspend_flag: %d", hythread_self(), vm_thread,
         vm_thread->suspend_flag));
 
@@ -71,7 +71,7 @@ IDATA VMCALL jthread_resume(jobject java_thread)
         // thread is not alive or is already suspended,
         // release the lock and exit
 
-        TRACE(("java resume exit, self: %p, thread: %p",
+        CTRACE(("java resume exit, self: %p, thread: %p",
             hythread_self(), vm_thread));
 
         suspend_lock->_unlock();
@@ -84,13 +84,13 @@ IDATA VMCALL jthread_resume(jobject java_thread)
         vm_thread->suspend_flag = 0;
     }
 
-    TRACE(("java resume lock exit, self: %p, thread: %p, "
+    CTRACE(("java resume lock exit, self: %p, thread: %p, "
         "suspend_flag: %d", hythread_self(), vm_thread,
         vm_thread->suspend_flag));
 
     suspend_lock->_unlock();
 
-    TRACE(("java resume exit, self: %p, thread: %p, "
+    CTRACE(("java resume exit, self: %p, thread: %p, "
         "suspend_flag: %d", hythread_self(), vm_thread,
         vm_thread->suspend_flag));
 
@@ -117,7 +117,7 @@ jthread_resume_all(jvmtiError *results,
         return TM_ERROR_NONE;
     }
 
-    TRACE(("java resume all"));
+    CTRACE(("java resume all"));
 
     Lock_Manager *suspend_lock = VM_Global_State::loader_env->p_suspend_lock;
     suspend_lock->_lock();
@@ -158,20 +158,20 @@ IDATA VMCALL jthread_suspend(jobject java_thread)
         // it is a fast path
         // thread is not alive or is already suspended, nothing to do
 
-        TRACE(("java suspend enter, self: %p, thread: %p",
+        CTRACE(("java suspend enter, self: %p, thread: %p",
             hythread_self(), vm_thread));
 
         return TM_ERROR_NONE;
     }
 
-    TRACE(("java suspend enter, self: %p, thread: %p, "
+    CTRACE(("java suspend enter, self: %p, thread: %p, "
            "suspend_flag: %d", hythread_self(), vm_thread,
            vm_thread->suspend_flag));
 
     Lock_Manager *suspend_lock = VM_Global_State::loader_env->p_suspend_lock;
     suspend_lock->_lock();
 
-    TRACE(("java suspend lock enter, self: %p, thread: %p, "
+    CTRACE(("java suspend lock enter, self: %p, thread: %p, "
            "suspend_flag: %d", hythread_self(), vm_thread,
            vm_thread->suspend_flag));
 
@@ -180,7 +180,7 @@ IDATA VMCALL jthread_suspend(jobject java_thread)
         // thread is not alive or is already suspended,
         // release the lock and exit
 
-        TRACE(("java suspend exit, self: %p, thread: %p, ",
+        CTRACE(("java suspend exit, self: %p, thread: %p, ",
             hythread_self(), vm_thread));
 
         suspend_lock->_unlock();
@@ -202,7 +202,7 @@ IDATA VMCALL jthread_suspend(jobject java_thread)
         status = hythread_thread_unlock(hy_thread);
         assert(status == TM_ERROR_NONE);
 
-        TRACE(("java suspend lock exit, self: %p, thread: %p, "
+        CTRACE(("java suspend lock exit, self: %p, thread: %p, "
             "suspend_flag: %d", hythread_self(), vm_thread,
             vm_thread->suspend_flag));
 
@@ -212,7 +212,7 @@ IDATA VMCALL jthread_suspend(jobject java_thread)
 
         suspend_lock->_lock();
 
-        TRACE(("java suspend lock enter, self: %p, thread: %p, "
+        CTRACE(("java suspend lock enter, self: %p, thread: %p, "
             "suspend_flag: %d", hythread_self(), vm_thread,
             vm_thread->suspend_flag));
     } else {
@@ -223,13 +223,13 @@ IDATA VMCALL jthread_suspend(jobject java_thread)
         vm_thread->suspend_flag = 1;
 
     }
-    TRACE(("java suspend lock exit, self: %p, thread: %p, "
+    CTRACE(("java suspend lock exit, self: %p, thread: %p, "
         "suspend_flag: %d", hythread_self(), vm_thread,
         vm_thread->suspend_flag));
 
     suspend_lock->_unlock();
 
-    TRACE(("java suspend exit, self: %p, thread: %p, "
+    CTRACE(("java suspend exit, self: %p, thread: %p, "
         "suspend_flag: %d", hythread_self(), vm_thread,
         vm_thread->suspend_flag));
 
@@ -268,7 +268,7 @@ jthread_suspend_all(jvmtiError *results,
         return TM_ERROR_NONE;
     }
 
-    TRACE(("java suspend all"));
+    CTRACE(("java suspend all"));
 
     Lock_Manager *suspend_lock = VM_Global_State::loader_env->p_suspend_lock;
     suspend_lock->_lock();

@@ -23,7 +23,7 @@
 #define __HASHTABLE_H__
 
 #include <assert.h>
-#include "log_macro.h"
+#include "clog.h"
 #include <map>
 
 // FIXME: we expect POINTER_SIZE_INT is already defined by some includes...
@@ -145,7 +145,7 @@ public:
             // check that this hash table does not contain element for this key
             Elem* elem = Lookup(key);
             if(elem) {
-                ABORT("Element is inserted second time");
+                DIE(("Element is inserted second time"));
             }
         }
         unsigned h = (*m_hashfunc)(key);
@@ -203,7 +203,7 @@ public:
             }
         }
         // this table entry is empty; thus contains no data at all
-        ABORT("Trying to remove data which was not inserted before");
+        DIE(("Trying to remove data which was not inserted before"));
     }
 
     unsigned GetItemCount() { return m_itemsnumber; }
@@ -266,7 +266,7 @@ public:
             return &(pr.first->second);
         else
         {
-            ABORT( "Element was inserted second time in MapEx!");
+            DIE(( "Element was inserted second time in MapEx!"));
             return NULL; // not reachable; to satisfy compiler warning
         }
     }

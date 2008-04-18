@@ -25,6 +25,7 @@
 
 #include "open/compmgr.h"
 #include "component_manager_impl.h"
+#include "port_atomic.h"
 
 #define LOG_DOMAIN "compmgr"
 #include "clog.h"
@@ -183,7 +184,7 @@ static int
 AddInstance(OpenInstanceHandle instance,
             ComponentInfoHandle component_info,
             apr_pool_t* pool) {
-    TRACE(("Cm.AddInstance()")); 
+    CTRACE(("Cm.AddInstance()")); 
 
     _InstanceInfo* instance_info =
         (_InstanceInfo*) apr_palloc(pool, sizeof(_InstanceInfo));
@@ -345,7 +346,7 @@ FreeComponentInfo(ComponentInfoHandle component_info) {
 
 static int
 DumpComponent(OpenComponentHandle component) {
-    TRACE(("%s-%s (Vendor: %s)\nDescription:\t\nInterfaces:\t",
+    CTRACE(("%s-%s (Vendor: %s)\nDescription:\t\nInterfaces:\t",
         component->GetName(), component->GetVersion(),
         component->GetVendor(), component->GetDescription()));
 
@@ -355,7 +356,7 @@ DumpComponent(OpenComponentHandle component) {
      * it becomes NULL.
      */
     for(; *p_name; p_name++) {
-        TRACE((" %s", *p_name));
+        CTRACE((" %s", *p_name));
     }
     return APR_SUCCESS;
 }
@@ -369,7 +370,7 @@ DumpComponent(OpenComponentHandle component) {
  */
 static int
 RemoveAndFreeComponentInfo(const char* component_name) {
-    TRACE(("static RemoveAndFreeComponentInfo()"));
+    CTRACE(("static RemoveAndFreeComponentInfo()"));
 
     _ComponentInfo** p_component_info;
     int ret = GetComponentInfoSlot(&p_component_info, component_name);
@@ -381,7 +382,7 @@ RemoveAndFreeComponentInfo(const char* component_name) {
     DumpComponent(component_info->component);
 
     assert(component_info->num_clients > 0);
-    TRACE(("Removing one of %d component subscribers", component_info->num_clients));
+    CTRACE(("Removing one of %d component subscribers", component_info->num_clients));
 
     if (--component_info->num_clients > 0) {
         /* there are still clients for this component, stop here */
@@ -395,25 +396,31 @@ RemoveAndFreeComponentInfo(const char* component_name) {
 
 static int
 InitializeGlobalLock() {
-   TRACE(("Cm.InitializeGlobalLock()"));
-    apr_pool_t* pool;
-    int ret = apr_pool_create(&pool, NULL);
+    CTRACE(("Cm.InitializeGlobalLock()"));
+    if (NULL != global_lock) {
+        return APR_SUCCESS;
+    }
+
+    int ret = apr_initialize();
     if (APR_SUCCESS != ret) {
         return ret;
+    }
+
+    apr_pool_t* pool;
+    ret = apr_pool_create(&pool, NULL);
+    if (APR_SUCCESS != ret) {
+        goto pool_error;
     }
 
     apr_thread_rwlock_t* lock;
     ret = apr_thread_rwlock_create(&lock, pool);
     if (APR_SUCCESS != ret) {
-        apr_pool_destroy(pool); /* Ignore errors */
-        return ret;
+        goto lock_error;
     }
 
     /* Atomic replacement of a global component manager lock */
-    void* old_value = apr_atomic_casptr((volatile void **) &global_lock,
-        (void*) lock, NULL);
-
-    if (NULL == old_value) {
+    if (NULL == port_atomic_casptr(
+        (volatile void **) &global_lock, (void*) lock, NULL)) {
         /* Successfully placed a lock to a static storage */
         global_pool = pool;
         return APR_SUCCESS;
@@ -429,9 +436,14 @@ InitializeGlobalLock() {
          * apr_pool_destroy(pool);
          * return ret;
          */
-        apr_pool_destroy(pool);
-        return APR_SUCCESS; 
+        goto lock_error;
     }
+
+lock_error:
+    apr_pool_destroy(pool); /* Ignore errors */
+pool_error:
+    apr_terminate();
+    return ret;
 }
 
 /*
@@ -440,7 +452,7 @@ InitializeGlobalLock() {
  */
 static int
 Destroy() {
-    TRACE(("Cm.Destroy()"));
+    CTRACE(("Cm.Destroy()"));
     int ret = APR_SUCCESS, ret_new;
 
     /* Deallocate all components */
@@ -468,7 +480,7 @@ static int
 AddComponent(OpenComponentInitializer init_func,
              DllHandle lib,
              apr_pool_t* parent_pool) {
-    TRACE(("static AddComponent()"));
+    CTRACE(("static AddComponent()"));
 
     apr_pool_t* pool;
     int ret = apr_pool_create(&pool, parent_pool);
@@ -550,7 +562,7 @@ FindLibrary(DllHandle* p_lib, const char* path) {
  */
 static int
 LoadLib(DllHandle* p_lib, const char* path) {
-    TRACE(("Cm.LoadLibrary(\"%s\")", path));
+    CTRACE(("Cm.LoadLibrary(\"%s\")", path));
     int ret = FindLibrary(p_lib, path);
     if (APR_SUCCESS == ret) {
         return APR_SUCCESS;
@@ -586,7 +598,7 @@ LoadLib(DllHandle* p_lib, const char* path) {
         char buffer[MAX_ERROR_BUFFER_SIZE];
         apr_dso_error(lib->descriptor,
                 buffer, MAX_ERROR_BUFFER_SIZE);
-        TRACE(("Error loading %s: %s", path, buffer));
+        CTRACE(("Error loading %s: %s", path, buffer));
         apr_pool_destroy(pool);
         return ret;
     }
@@ -714,7 +726,7 @@ GetInstances(OpenInstanceHandle* p_instance, int buf_len, int* len,
  */
 static int
 Create() {
-    TRACE(("Cm.Create()"));
+    CTRACE(("Cm.Create()"));
 
     apr_pool_t* pool;
     int ret = apr_pool_create(&pool, global_pool);
@@ -747,7 +759,7 @@ Create() {
  */
 int
 CmAcquire(OpenComponentManagerHandle* p_cm) {
-    TRACE(("Cm.Acquire()"));
+    CTRACE(("Cm.Acquire()"));
     InitializeGlobalLock();
 
     VERIFY_SUCCESS(apr_thread_rwlock_wrlock(global_lock));
@@ -760,7 +772,7 @@ CmAcquire(OpenComponentManagerHandle* p_cm) {
     } else {
         component_manager_impl->num_clients++;
     }
-    TRACE(("Cm.Acquire(): component_manager_impl->num_clients = %d", component_manager_impl->num_clients));
+    CTRACE(("Cm.Acquire(): component_manager_impl->num_clients = %d", component_manager_impl->num_clients));
     *p_cm = (OpenComponentManagerHandle) component_manager_impl;
     VERIFY_SUCCESS(apr_thread_rwlock_unlock(global_lock));
     return APR_SUCCESS;
@@ -782,7 +794,7 @@ CmRelease() {
 
 int
 CmAddComponent(OpenComponentInitializer init_func) {
-    TRACE(("Cm.AddComponent()"));
+    CTRACE(("Cm.AddComponent()"));
     VERIFY_SUCCESS(apr_thread_rwlock_wrlock(global_lock));
 
     int ret = AddComponent(init_func, NULL, component_manager_impl->pool);
@@ -794,21 +806,21 @@ CmAddComponent(OpenComponentInitializer init_func) {
 int
 CmLoadComponent(const char* path,
                 const char* init_func_name) {
-    TRACE(("Cm.LoadComponent(\"%s\", %s())", path, init_func_name));
+    CTRACE(("Cm.LoadComponent(\"%s\", %s())", path, init_func_name));
 
     VERIFY_SUCCESS(apr_thread_rwlock_wrlock(global_lock));
 
     DllHandle lib;
     int ret = LoadLib(&lib, path);
     if (APR_SUCCESS != ret) {
-        TRACE(("failed to load: %d %s\n", ret, path));
+        CTRACE(("failed to load: %d %s\n", ret, path));
         goto load_error;
     }
     
     OpenComponentInitializer init_func;
     ret = GetOpenComponentInitializer(&init_func, lib, init_func_name);
     if (APR_SUCCESS != ret) {
-        TRACE(("failed to init: %d\n", ret));
+        CTRACE(("failed to init: %d\n", ret));
         goto init_error;
     }
 

@@ -126,8 +126,7 @@ Vector_Block* gc_metadata_extend(Pool* pool)
  
   unsigned int num_alloced = metadata->num_alloc_segs;
   if(num_alloced == GC_METADATA_SEGMENT_NUM){
-    DIE2("gc.verbose","Warning: Run out GC metadata, please give it more segments!");
-    exit(0);
+    DIE(("GC: Run out GC metadata, please give it more segments!"));
   }
 
   unsigned int seg_size =  GC_METADATA_EXTEND_SIZE_BYTES + METADATA_BLOCK_SIZE_BYTES;
@@ -651,6 +650,7 @@ void gc_clear_dirty_set(GC* gc)
 
 void free_set_pool_put_entry(Vector_Block* block, GC_Metadata *metadata)
 { pool_put_entry(metadata->free_set_pool, block); }
+
 
 
 

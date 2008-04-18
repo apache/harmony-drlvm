@@ -31,12 +31,13 @@
 #include "open/vm.h"
 #include "lock_manager.h"
 #include "environment.h"
-#include "exceptions.h"
 #include "natives_support.h"
 #include "hashtable.h"
 #include "loggerstring.h"
 #include "jarfile_support.h"
 #include "type.h"
+#include "exceptions.h"
+#include "vm_log.h"
 
 class ClassTable : public MapEx<const String*, Class* > {};
 
@@ -294,13 +295,12 @@ private:
     void FieldClearInternals(Class*); // clean Field internals in Class
 }; // class ClassLoader
 
-inline LoggerString& operator << (LoggerString& log, ClassLoader::LoadingClass& lc)
+inline LoggerString& operator <<(LoggerString& log, ClassLoader::LoadingClass& lc)
 {
-    log 
 #ifdef _DEBUG
-        << lc.m_name->bytes
+    log_printf("%s", lc.m_name->bytes);
 #endif
-        << " thread: " << lc.m_defineOwner << " " << lc.m_initiatingThread;
+    log_printf(" thread: %p %p", lc.m_defineOwner, lc.m_initiatingThread);
     return log;
 }
 

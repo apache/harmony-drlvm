@@ -135,7 +135,7 @@ jvalue *get_jvalue_arg_array(Method *method, va_list args)
             jvalue_args[arg_number].d = va_arg(args, jdouble);
             break;
         default:
-            ABORT("Unexpected java type");
+            DIE(("Unexpected java type"));
             break;
         }
         iter = advance_arg_iterator(iter);
@@ -355,7 +355,7 @@ void PrimitiveSignatureToName (const char sig, char *classname)
         strcpy(classname, "void");
         break;
     default:
-        ABORT("Invalid type descriptor");
+        DIE(("Invalid type descriptor"));
         break;
     }
 } // PrimitiveSignatureToName
@@ -407,7 +407,7 @@ char PrimitiveNameToSignature (const char* name)
     case 'i': sig = 'I'; break;
     case 'l': sig = 'J'; break;
     case 'v': sig = 'V'; break;
-    default: ABORT("Invalid type name");
+    default: DIE(("Invalid type name"));
     }
     return sig;
 } // PrimitiveNameToSignature
@@ -480,7 +480,7 @@ jclass SignatureToClass (JNIEnv* env_ext, const char* sig, ClassLoader *class_lo
             clss = ge->Void_Class;
             break;
         default:
-            ABORT("Invalid type descriptor");
+            DIE(("Invalid type descriptor"));
             break;
     }
 
@@ -670,7 +670,7 @@ jclass FindClass(JNIEnv* env_ext, String* name)
     char *ch = strchr(name->bytes, '.');
     if (NULL != ch)
     {
-        ABORT("Class name should not contain dots");
+        DIE(("Class name should not contain dots"));
     }
 #endif
 

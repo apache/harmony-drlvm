@@ -147,7 +147,7 @@ void gen_native_newinstance(Emitter_Handle h, Method *m)
         s = mov(s,  ebx_opnd,  eax_opnd);
 #else
         // DO NOT RUN THIS OVERRIDE ON LINUX (it will not work)
-        ABORT("Not supported for this platform");
+        DIE(("Not supported for this platform"));
 #endif // !PLATFORM_POSIX
 
         s = mov(s,  eax_opnd,  M_Base_Opnd(ebx_reg, current_offset)); // ld r,[l1+current_offset]

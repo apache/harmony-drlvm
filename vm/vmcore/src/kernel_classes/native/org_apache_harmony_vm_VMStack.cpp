@@ -417,9 +417,8 @@ JNIEXPORT jobjectArray JNICALL Java_org_apache_harmony_vm_VMStack_getStackTrace
         }
     }
 
-    ASSERT(size >= skip, "Trying to skip " << skip 
-        << " frames but there are only "
-        << size << " frames in stack");
+    ASSERT(size >= skip, ("Trying to skip %u frames but there are only %u frames in stack",
+        skip, size));
     
     assert(hythread_is_suspend_enabled());
     jclass ste = struct_Class_to_java_lang_Class_Handle(genv->java_lang_StackTraceElement_Class);

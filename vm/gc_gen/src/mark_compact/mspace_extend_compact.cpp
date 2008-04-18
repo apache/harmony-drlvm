@@ -283,7 +283,7 @@ void mspace_extend_compact(Collector *collector)
   old_num = atomic_inc32(&num_space_changing_collectors);
   if( ++old_num == num_active_collectors ){
      if(NOS_SIZE) /* when NOS_SIZE is speficied, it can't be shrunk. */
-       WARN2("gc.process", "GC: collector["<<((POINTER_SIZE_INT)collector->thread_handle)<<"]: MOS is overflowed, have to reduce NOS size.");
+       WARN(("GC: collector[%p]: MOS is overflowed, have to reduce NOS size.", ((POINTER_SIZE_INT)collector->thread_handle)));
      Block *old_nos_boundary = nspace->blocks;
      nos_boundary = &mspace->blocks[mspace->free_block_idx - mspace->first_block_idx];
      if(nspace->num_managed_blocks != 0) /* FIXME:: why can it be 0 here?? Because mspace extend can't happen is NOS is zero size */
