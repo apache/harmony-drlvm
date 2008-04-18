@@ -244,7 +244,6 @@ Opnd CodeGen::get_field_addr(const FieldOpInfo& fieldOp, jtype jt) {
         }  else { //field is not resolved -> generate code to request offset
             SYNC_FIRST(static const CallSig cs_get_offset(CCONV_HELPERS, iplatf, iplatf, i32, i32));
             gen_call_vm(cs_get_offset, rt_helper_field_get_offset_withresolve, 0, fieldOp.enclClass, fieldOp.cpIndex, fieldOp.isPut());
-            runlock(cs_get_offset);
             AR gr_ret = cs_get_offset.ret_reg(0);
             rlock(gr_ret);
             Val& ref = vstack(ref_depth, true);
@@ -259,7 +258,6 @@ Opnd CodeGen::get_field_addr(const FieldOpInfo& fieldOp, jtype jt) {
         }  else { //field is not resolved -> generate code to request address
             SYNC_FIRST(static const CallSig cs_get_addr(CCONV_HELPERS, iplatf, iplatf, i32, i32));
             gen_call_vm(cs_get_addr, rt_helper_field_get_address_withresolve, 0, fieldOp.enclClass, fieldOp.cpIndex, fieldOp.isPut());
-            runlock(cs_get_addr);
             AR gr_ret = cs_get_addr.ret_reg(0);
             where = Opnd(jt, gr_ret, 0);
         }

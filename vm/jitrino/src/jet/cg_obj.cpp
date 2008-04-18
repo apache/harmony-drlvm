@@ -58,13 +58,16 @@ void CodeGen::gen_new_array(Class_Handle enclClass, unsigned cpIndex)
         return;
     } 
     assert(lazy);
+    vpark();
     SYNC_FIRST(static const CallSig cs_newarray_withresolve(CCONV_HELPERS, jobj, iplatf, i32, i32));
+    rlock(cs_newarray_withresolve);
     Val sizeVal = vstack(0);
     // setup constant parameters first,
     Val vclass(iplatf, enclClass);
     Val vcpIdx((int)cpIndex);
     gen_args(cs_newarray_withresolve, 0, &vclass, &vcpIdx, &sizeVal);
     gen_call_vm(cs_newarray_withresolve, rt_helper_new_array_withresolve, 3);
+    runlock(cs_newarray_withresolve);
     vpop();// pop array size
     gen_save_ret(cs_newarray_withresolve);
 
@@ -123,7 +126,6 @@ void CodeGen::gen_multianewarray(Class_Handle enclClass, unsigned short cpIndex,
         assert(lazy);
         SYNC_FIRST(static const CallSig ci_get_class_withresolve(CCONV_HELPERS, jobj, iplatf, i32));
         gen_call_vm(ci_get_class_withresolve, rt_helper_get_class_withresolve, 0, enclClass, cpIndex);
-        runlock(ci_get_class_withresolve);
         AR gr_ret = ci_get_class_withresolve.ret_reg(0);
         klassVal = Val(jobj, gr_ret);
     }  else {
@@ -214,9 +216,11 @@ void CodeGen::gen_instanceof_cast(JavaByteCodes opcode, Class_Handle enclClass, 
         gen_save_ret(cs);
     } else {
         assert(lazy);
+        vpark();
         SYNC_FIRST(static const CallSig cs_checkcast_with_resolve(CCONV_HELPERS, jobj, iplatf, i32, jobj));
         SYNC_FIRST(static const CallSig cs_instanceof_with_resolve(CCONV_HELPERS, i32, iplatf, i32, jobj));
         const CallSig& cs_with_resolve = (opcode == OPCODE_CHECKCAST) ? cs_checkcast_with_resolve : cs_instanceof_with_resolve;
+        rlock(cs_with_resolve);
         char * helper = (opcode == OPCODE_CHECKCAST) ? rt_helper_checkcast_withresolve : rt_helper_instanceof_withresolve;
         Val tos = vstack(0);
         // setup constant parameters first,

@@ -163,11 +163,8 @@ JIT_Result Compiler::compile(Compile_Handle ch, Method_Handle method,
     if (!get_bool_arg("bbp", true)) {
         compile_flags &= ~JMF_BBPOLLING;
     }
-#ifndef _EM64T_    
+
     m_lazy_resolution  = get_bool_arg("lazyResolution", true);
-#else
-    m_lazy_resolution  = get_bool_arg("lazyResolution", false);
-#endif
 
 #ifdef _DEBUG
     bool assertOnRecursion = get_bool_arg("assertOnRecursion", false);

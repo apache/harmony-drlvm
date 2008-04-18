@@ -1032,6 +1032,9 @@ jobject JNICALL AllocObject(JNIEnv * jni_env,
         ThrowNew_Quick(jni_env, "java/lang/InstantiationException", clss->get_name()->bytes);
         return NULL;
     }
+    if (!ensure_initialised(jni_env, clss)) {
+        return NULL;
+    }
 
     tmn_suspend_disable();      //---------------------------------v
     ManagedObject *new_obj = (ManagedObject *)class_alloc_new_object(clss);

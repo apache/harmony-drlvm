@@ -754,7 +754,6 @@ void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth, unsigned short
     rlock(cs);
     
     const bool is_static = opcod == OPCODE_INVOKESTATIC;
-    Val thiz = is_static ? Val() : vstack(thiz_depth, true);
     if (meth == NULL && !m_lazy_resolution) {
         runlock(cs); // was just locked above - unlock
         gen_call_throw(ci_helper_linkerr, rt_helper_throw_linking_exc, 0,
@@ -771,35 +770,6 @@ void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth, unsigned short
         return;
     }
     
-    if (!is_static) {
-        rlock(thiz);
-    }
-    
-    // INVOKEINTERFACE and lazy resolution must have VM helper call first, so will place 
-    // its args later, after the call, to avoid destruction of args 
-    // on registers.
-    if (opcod != OPCODE_INVOKEINTERFACE && meth != NULL) {
-        stackFix = gen_stack_to_args(true, cs, 0);
-        vpark();
-        gen_gc_stack(-1, true);
-    }
-    //
-    // Check for null here - we just spilled all the args and 
-    // parked all the registers, so we have a chance to use HW NPE 
-    // For INVOKEINTERFACE we did not spill args, but we'll call VM first,
-    // which is pretty expensive by itself, so the HW check does not give 
-    // much.
-    //
-    if (!is_static) {
-        // For invokeSPECIAL, we're using indirect address provided by 
-        // the VM. This means we do not read vtable, which means no 
-        // memory access, so we can't use HW checks - have to use 
-        // explicit one. Not a big loss, as the INVOKESPECIAL mostly
-        // comes right after NEW which guarantees non-null.
-        // in lazy resolution mode we must do manual check and provide helper with
-        // non-null results.
-        gen_check_null(thiz, opcod != OPCODE_INVOKESPECIAL && meth!=NULL);
-    }
     if (meth == NULL) {
         //lazy resolution mode: get method addr and call it.
         assert(m_lazy_resolution);
@@ -807,19 +777,41 @@ void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth, unsigned short
         //1. get method address
         if (opcod == OPCODE_INVOKESTATIC || opcod == OPCODE_INVOKESPECIAL) {
             SYNC_FIRST(static const CallSig cs_get_is_addr(CCONV_HELPERS, iplatf, iplatf, i32));
+            rlock(cs_get_is_addr);
+
+            if (!is_static)
+            {
+                Val &thiz = vstack(thiz_depth, false);
+                // For invokeSPECIAL, we're using indirect address provided by 
+                // the VM. This means we do not read vtable, which means no 
+                // memory access, so we can't use HW checks - have to use 
+                // explicit one. Not a big loss, as the INVOKESPECIAL mostly
+                // comes right after NEW which guarantees non-null.
+                // in lazy resolution mode we must do manual check and provide helper with
+                // non-null results.
+                gen_check_null(thiz, false);
+            }
+
             char* helper = opcod == OPCODE_INVOKESTATIC ?  rt_helper_get_invokestatic_addr_withresolve :
                                                            rt_helper_get_invokespecial_addr_withresolve;
+            vpark(); 
             gen_call_vm(cs_get_is_addr, helper, 0, m_klass, cpIndex);
             runlock(cs_get_is_addr);
             gr_ret = cs_get_is_addr.ret_reg(0);
         } else {
             assert(opcod == OPCODE_INVOKEVIRTUAL || opcod == OPCODE_INVOKEINTERFACE);
             SYNC_FIRST(static const CallSig cs_get_iv_addr(CCONV_HELPERS, iplatf, iplatf, i32, jobj));
+            rlock(cs_get_iv_addr);
+
+            Val &thiz = vstack(thiz_depth, false);
+            gen_check_null(thiz, false);
+
             char * helper = opcod == OPCODE_INVOKEVIRTUAL ? rt_helper_get_invokevirtual_addr_withresolve : 
                                                             rt_helper_get_invokeinterface_addr_withresolve;
             // setup constant parameters first,
             Val vclass(iplatf, m_klass);
             Val vcpIdx(cpIndex);
+            vpark();
             gen_args(cs_get_iv_addr, 0, &vclass, &vcpIdx, &thiz);
             gen_call_vm(cs_get_iv_addr, helper, 3);
             runlock(cs_get_iv_addr);
@@ -841,6 +833,12 @@ void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth, unsigned short
         // if it's INVOKEINTERFACE, then first resolve it
         Class_Handle klass = method_get_class(meth);
         const CallSig cs_vtbl(CCONV_HELPERS, iplatf, jobj, jobj);
+        rlock(cs_vtbl);
+
+        Val &thiz = vstack(thiz_depth, true);
+        rlock(thiz);
+        gen_check_null(thiz, true);
+
         // Prepare args for ldInterface helper
         if (cs_vtbl.reg(0) == gr_x) {
             assert(cs_vtbl.size() != 0);
@@ -854,8 +852,10 @@ void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth, unsigned short
             }
             mov(cs_vtbl.get(0), thiz.as_opnd());
         }
+        runlock(thiz);
         gen_call_vm(cs_vtbl, rt_helper_get_vtable, 1, klass);
         AR gr_ret = cs_vtbl.ret_reg(0);
+        runlock(cs_vtbl);
         //
         // Method's vtable is in gr_ret now, prepare stack
         //
@@ -871,9 +871,20 @@ void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth, unsigned short
         call(gr_ret, cs, is_set(DBG_CHECK_STACK));
     }
     else if (opcod == OPCODE_INVOKEVIRTUAL) {
+        Val &thiz = vstack(thiz_depth, true);
+        rlock(thiz);
+
+        stackFix = gen_stack_to_args(true, cs, 0);
+        vpark();
+        gen_gc_stack(-1, true);
+        // Check for null here - we just spilled all the args and 
+        // parked all the registers, so we have a chance to use HW NPE 
+        gen_check_null(thiz, true);
+
         AR gr = valloc(jobj);
         unsigned offset = method_get_vtable_offset(meth);
         Opnd ptr;
+
         if (g_vtbl_squeeze) {
             ld4(gr, thiz.reg(), rt_vtable_offset);
             AR gr_vtbase = valloc(jobj);
@@ -886,8 +897,30 @@ void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth, unsigned short
             ptr = Opnd(jobj, gr, offset);
         }
         call(ptr, cs, is_set(DBG_CHECK_STACK));
+        runlock(thiz);
     }
     else {
+        Val *thiz = NULL;
+
+        if (!is_static)
+            thiz = &vstack(thiz_depth, true);
+
+        stackFix = gen_stack_to_args(true, cs, 0);
+        vpark();
+        gen_gc_stack(-1, true);
+
+        if (!is_static)
+            // Check for null here - we just spilled all the args and 
+            // parked all the registers, so we have a chance to use HW NPE 
+            // For invokeSPECIAL, we're using indirect address provided by 
+            // the VM. This means we do not read vtable, which means no 
+            // memory access, so we can't use HW checks - have to use 
+            // explicit one. Not a big loss, as the INVOKESPECIAL mostly
+            // comes right after NEW which guarantees non-null.
+            // in lazy resolution mode we must do manual check and provide helper with
+            // non-null results.
+            gen_check_null(*thiz, false);
+
         void * paddr = method_get_indirect_address(meth);
 #ifdef _IA32_
         Opnd ptr(jobj, ar_x, paddr);
@@ -900,9 +933,6 @@ void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth, unsigned short
         call(ptr, cs, is_set(DBG_CHECK_STACK));
     }
     
-    if (!is_static) {
-        runlock(thiz);
-    }
     // to unlock after gen_stack_to_args()
     runlock(cs);
     // to unlock after explicit lock at the top of this method
@@ -931,7 +961,7 @@ void CodeGen::gen_args(const CallSig& cs, unsigned idx, const Val * parg0,
         if (args[i] == 0) {
             break;
         }
-        rlock(*args[0]);
+        rlock(*args[i]);
     }
     // 2nd, generate moves
     for (unsigned i=0; i<steps; i++) {
@@ -942,7 +972,7 @@ void CodeGen::gen_args(const CallSig& cs, unsigned idx, const Val * parg0,
         Opnd arg = cs.get(id);
         do_mov(arg, *args[i]);
         // 3d, unlock when not needed anymore
-        runlock(*args[0]);
+        runlock(*args[i]);
     }
 }
 

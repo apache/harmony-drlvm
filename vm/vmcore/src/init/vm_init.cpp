@@ -509,6 +509,15 @@ static jint preload_classes(Global_Env * vm_env) {
     vm_env->java_lang_ThreadDeath_Class = 
         preload_class(vm_env, "java/lang/ThreadDeath");
 
+    // String must be initialized before strings from intern pool are
+    // used. But for initializing l.j.String we need to have exception
+    // classes loaded, because the first call to compilations
+    // initializes all of the JIT helpers that hardcode class handles
+    // inside of the helpers.
+    hythread_suspend_disable();
+    class_initialize(vm_env->JavaLangString_Class);
+    hythread_suspend_enable();
+
     vm_env->java_lang_Cloneable_Class =
         preload_class(vm_env, vm_env->Clonable_String);
     vm_env->java_lang_Thread_Class =
@@ -899,10 +908,9 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     // Precompile InternalError.
     class_alloc_new_object_and_run_default_constructor(vm_env->java_lang_InternalError_Class);
 
-    //String must be initialized before strings from intern pool are used
-    class_initialize(vm_env->JavaLangString_Class);
-
-
+    // j.l.Class needs to be initialized for loading magics helper
+    // class
+    class_initialize(vm_env->JavaLangClass_Class);
     hythread_suspend_enable();
 
     Method * m;
