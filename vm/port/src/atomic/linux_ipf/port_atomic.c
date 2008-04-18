@@ -27,7 +27,7 @@
 extern "C" {
 #endif
 
-APR_DECLARE(void *) port_atomic_compare_exchange_pointer(volatile void ** data, void * value, const void * comp) {
+APR_DECLARE(void *) port_atomic_casptr(volatile void ** data, void * value, const void * comp) {
     return (void *) port_atomic_cas64((uint64 *)data, (uint64)value, (uint64)comp);
 }
 

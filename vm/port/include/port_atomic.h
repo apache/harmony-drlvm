@@ -85,9 +85,21 @@ APR_DECLARE(uint16) port_atomic_cas16(volatile uint16 * data,
 APR_DECLARE(uint64) port_atomic_cas64(volatile uint64 * data, 
                                                  uint64 value, uint64 comp);
 
+/**  
+* The atomic compare and exchange operation on a pointer. 
+* The function compares the current value of the specified <i>data</i>
+* with the <i>comp</i> value and if they match, swaps the <i>data</i>
+* with the <i>value</i>.
+* @param[in, out] data - the pointer to the value
+* @param[in] value     - the new value
+* @param[in] comp      - the value to compare with
+* @return The old value.
+*/
+APR_DECLARE(void *) port_atomic_casptr(volatile void ** data, 
+                                       void * value, const void * comp);
 /** @} */
 
-#elif defined(WIN32) && !defined(_WIN64)
+#elif defined(_WIN32) && !defined(_WIN64)
 
 PORT_INLINE uint8 port_atomic_cas8(volatile uint8 * data , uint8 value, uint8 comp) {
     __asm {
@@ -131,6 +143,10 @@ PORT_INLINE uint64 port_atomic_cas64(volatile uint64 * data , uint64 value, uint
     return comp;
 }
 
+PORT_INLINE void * port_atomic_casptr(volatile void ** data, void * value, const void * comp) {
+    return InterlockedCompareExchangePointer((volatile PVOID *) data, value, (PVOID) comp);
+}
+
 #elif defined(_EM64T_) && defined (_WIN64)
 
 #pragma intrinsic(_InterlockedCompareExchange16)
@@ -150,7 +166,10 @@ PORT_INLINE uint64 port_atomic_cas64(volatile uint64 * data,
 {
     return _InterlockedCompareExchange64((volatile LONG64 *)data, value, comp);
 }
-    
+
+PORT_INLINE void * port_atomic_casptr(volatile void ** data, void * value, const void * comp) {
+    return InterlockedCompareExchangePointer((volatile PVOID *) data, value, (PVOID) comp);
+}
 
 #elif defined (PLATFORM_POSIX)  
 
@@ -215,9 +234,8 @@ PORT_INLINE uint64 port_atomic_cas64(volatile uint64 * data , uint64 value, uint
 #endif
 }
 
-PORT_INLINE void * port_atomic_compare_exchange_pointer(volatile void ** data, void * value, const void * comp) {
+PORT_INLINE void * port_atomic_casptr(volatile void ** data, void * value, const void * comp) {
 #if defined(_IA32_)
-    //return (void *) port_atomic_compare_exchange32((uint32 *)data, (uint32)value, (uint32)comp);
     uint32 Exchange = (uint32)value;
     uint32 Comperand = (uint32)comp;
     __asm__ __volatile__(
@@ -228,7 +246,6 @@ PORT_INLINE void * port_atomic_compare_exchange_pointer(volatile void ** data, v
     return (void*)Comperand;
 
 #elif defined(_EM64T_) // defined(_IA32_)
-    //return (void *) port_atomic_cas64((uint64 *)data, (uint64)value, (uint64)comp);
     uint64 Exchange = (uint64)value;
     uint64 Comperand = (uint64)comp;
     __asm__(
