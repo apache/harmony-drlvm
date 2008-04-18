@@ -16,15 +16,16 @@
  */
 /** 
  * @author Euguene Ostrovsky
- * @version $Revision: 1.1.2.1.4.5 $
  */  
+#define LOG_DOMAIN "vmls"
+#include "cxxlog.h"
+
 #include <assert.h>
 
 #include "open/vm_properties.h"
 #include "open/hythread.h"
 
 #include "platform_lowlevel.h"
-#include "vm_trace.h"
 #include "zipsup.h"
 #include "environment.h"
 #include "properties.h"

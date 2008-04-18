@@ -16,10 +16,9 @@
  */
 /** 
  * @author Euguene Ostrovsky
- * @version $Revision: 1.1.2.1.4.5 $
  */  
-
-#include "vm_trace.h"
+#define LOG_DOMAIN "vmls"
+#include "cxxlog.h"
 #include "hyvmls.h"
 
 UDATA JNICALL 
