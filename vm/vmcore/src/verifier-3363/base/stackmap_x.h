@@ -14,27 +14,18 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Mikhail Loenko, Vladimir Molotkov
- */  
-
 #ifndef __STACKMAP_X_H__
 #define __STACKMAP_X_H__
 
 #include "stackmap.h"
 
-namespace CPVerifier {
-
 #pragma warning( push )
 #pragma warning( disable : 4200 )
-    //vector of StackMap or Workmap elements. the size is known at the moment of allocation
-    template<typename MapElement>
-    struct MapHead {
-        unsigned short depth;
-        MapElement elements[0];
-    };
+//vector of StackMap or Workmap elements. the size is known at the moment of allocation
+template<typename MapElement>
+struct MapHead {
+    unsigned short depth;
+    MapElement elements[0];
+};
 #pragma warning( pop )
-
-}
-
 #endif

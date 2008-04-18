@@ -34,17 +34,22 @@
 
 #else  // !PLATFORM_POSIX
 
-#if defined(BUILDING_VM) && !defined(STATIC_BUILD)
+#if defined(STATIC_BUILD)
+#define VMEXPORT
+#define JITEXPORT
+#define EMEXPORT
+#define VMIMPORT
+#elif defined(BUILDING_VM)
 #define VMEXPORT __declspec(dllexport)
 #define JITEXPORT __declspec(dllimport)
 #define EMEXPORT __declspec(dllimport)
 #define VMIMPORT __declspec(dllimport)
-#else  // !BUILDING_VM
+#else  // !BUILDING_VM & !STATIC_BUILD
 #define VMEXPORT __declspec(dllimport)
 #define JITEXPORT __declspec(dllexport)
 #define EMEXPORT __declspec(dllexport)
 #define VMIMPORT __declspec(dllexport)
-#endif // !BUILDING_VM
+#endif // !BUILDING_VM & !STATIC_BUILD
 
 #endif // !PLATFORM_POSIX
 

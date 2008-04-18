@@ -14,6 +14,7 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+#include <stdio.h>
 #include "verifier.h"
 #include "../java5/context_5.h"
 #include "../java6/context_6.h"
@@ -23,15 +24,11 @@
 #include "open/vm_method_access.h"
 #include "open/vm_class_loading.h"
 
-using namespace CPVerifier;
-using namespace CPVerifier_5;
-using namespace CPVerifier_6;
-
 static char err_message[5000];
 
 
 /**
-* Function provides initial java-5 verification of class.
+* Provides initial java-5 verification of class.
 *
 * If when verifying the class a check of type "class A must be assignable to class B" needs to be done 
 * and either A or B is not loaded at the moment then a constraint 
@@ -133,7 +130,7 @@ vf_verify6_class(Class_Handle klass, unsigned verifyAll, char **error )
 
 
 /**
-* Function provides initial verification of class.
+* Provides initial verification of a class.
 *
 * If when verifying the class a check of type "class A must be assignable to class B" needs to be done 
 * and either A or B is not loaded at the moment then a constraint 

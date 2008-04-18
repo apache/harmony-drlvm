@@ -14,17 +14,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Mikhail Loenko, Vladimir Molotkov
- */  
-
 #include "verifier.h"
 #include "context_x.h"
 #include "../java5/context_5.h"
 #include "../java6/context_6.h"
-
-namespace CPVerifier {
-
 
 // "virtual" methods
 
@@ -45,7 +38,7 @@ namespace CPVerifier {
 
 #define POP_x( TYPE )                                                    \
     /* check stack */                                                    \
-    if( !workmap_can_pop(1) ) return error(VF_ErrorDataFlow,            \
+    if( !workmap_can_pop(1) ) return error(VF_ErrorDataFlow,             \
             "unable to pop from empty operand stack");                   \
                                                                          \
     /* pop INs */                                                        \
@@ -53,7 +46,7 @@ namespace CPVerifier {
                                                                          \
     /* check INs */                                                      \
     if( !workmap_expect_strict(value, TYPE) ) {                          \
-        return error(VF_ErrorIncompatibleArgument,                      \
+        return error(VF_ErrorIncompatibleArgument,                       \
                 "incompartible argument");                               \
     }                                                                    \
 
@@ -62,7 +55,7 @@ namespace CPVerifier {
     \
 #define POP_x_x( TYPE )                                                  \
     /* check stack */                                                    \
-    if( !workmap_can_pop(2) ) return error(VF_ErrorDataFlow,            \
+    if( !workmap_can_pop(2) ) return error(VF_ErrorDataFlow,             \
             "unable to pop from empty operand stack");                   \
                                                                          \
     /* pop INs */                                                        \
@@ -73,7 +66,7 @@ namespace CPVerifier {
     if( !workmap_expect_strict(value1, TYPE) ||                          \
         !workmap_expect_strict(value2, TYPE) )                           \
     {                                                                    \
-        return error(VF_ErrorIncompatibleArgument,                      \
+        return error(VF_ErrorIncompatibleArgument,                       \
                 "incompartible argument");                               \
     }                                                                    \
 
@@ -81,18 +74,18 @@ namespace CPVerifier {
 
 #define POP_xx( TYPE )                                                   \
     /* check stack */                                                    \
-    if( !workmap_can_pop(2) ) return error(VF_ErrorDataFlow,            \
+    if( !workmap_can_pop(2) ) return error(VF_ErrorDataFlow,             \
             "unable to pop from empty operand stack");                   \
                                                                          \
     /* pop INs */                                                        \
-    WorkmapElement hi_word = workmap_pop();                             \
-    WorkmapElement low_word = workmap_pop();                              \
+    WorkmapElement hi_word = workmap_pop();                              \
+    WorkmapElement low_word = workmap_pop();                             \
                                                                          \
     /* check INs */                                                      \
     if( !workmap_expect_strict(hi_word, SM_HIGH_WORD) ||                 \
         !workmap_expect_strict(low_word, TYPE) )                         \
     {                                                                    \
-        return error(VF_ErrorIncompatibleArgument,                      \
+        return error(VF_ErrorIncompatibleArgument,                       \
                 "incompartible argument");                               \
     }                                                                    \
 
@@ -100,14 +93,14 @@ namespace CPVerifier {
 
 #define POP_xx_xx( TYPE )                                                \
     /* check stack */                                                    \
-    if( !workmap_can_pop(4) ) return error(VF_ErrorDataFlow,            \
+    if( !workmap_can_pop(4) ) return error(VF_ErrorDataFlow,             \
             "unable to pop from empty operand stack");                   \
                                                                          \
     /* pop INs */                                                        \
-    WorkmapElement hi_word1 = workmap_pop();                            \
-    WorkmapElement low_word1 = workmap_pop();                             \
-    WorkmapElement hi_word2 = workmap_pop();                            \
-    WorkmapElement low_word2 = workmap_pop();                             \
+    WorkmapElement hi_word1 = workmap_pop();                             \
+    WorkmapElement low_word1 = workmap_pop();                            \
+    WorkmapElement hi_word2 = workmap_pop();                             \
+    WorkmapElement low_word2 = workmap_pop();                            \
                                                                          \
     /* check INs */                                                      \
     if( !workmap_expect_strict(hi_word1, SM_HIGH_WORD) ||                \
@@ -115,7 +108,7 @@ namespace CPVerifier {
         !workmap_expect_strict(hi_word2, SM_HIGH_WORD) ||                \
         !workmap_expect_strict(low_word2, TYPE) )                        \
     {                                                                    \
-        return error(VF_ErrorIncompatibleArgument,                      \
+        return error(VF_ErrorIncompatibleArgument,                       \
             "incompartible argument");                                   \
     }                                                                    \
 
@@ -123,7 +116,7 @@ namespace CPVerifier {
 
 #define POP_ref( TYPE ) {                                                \
     /* check stack */                                                    \
-    if( !workmap_can_pop(1) ) return error(VF_ErrorDataFlow,            \
+    if( !workmap_can_pop(1) ) return error(VF_ErrorDataFlow,             \
             "unable to pop from empty operand stack");                   \
                                                                          \
     /* pop INs */                                                        \
@@ -131,7 +124,7 @@ namespace CPVerifier {
     \
     /* check INs */                                                      \
     if( !workmap_expect(object_ref, TYPE) ) {                            \
-        return error(VF_ErrorIncompatibleArgument,                      \
+        return error(VF_ErrorIncompatibleArgument,                       \
                 "incompartible argument");                               \
     }                                                                    \
 }
@@ -141,7 +134,7 @@ namespace CPVerifier {
         POP_xx(TYPE);                                                    \
     } else {                                                             \
         /* check stack */                                                \
-        if( !workmap_can_pop(1) ) return error(VF_ErrorDataFlow,        \
+        if( !workmap_can_pop(1) ) return error(VF_ErrorDataFlow,         \
                 "unable to pop from empty operand stack");               \
                                                                          \
         /* pop INs */                                                    \
@@ -149,7 +142,7 @@ namespace CPVerifier {
                                                                          \
         /* check INs */                                                  \
         if( !workmap_expect(value, TYPE) ) {                             \
-            return error(VF_ErrorIncompatibleArgument,                  \
+            return error(VF_ErrorIncompatibleArgument,                   \
                     "incompartible argument");                           \
         }                                                                \
     }                                                                    \
@@ -160,7 +153,7 @@ namespace CPVerifier {
                                                                          \
     /* check INs */                                                      \
     if( !workmap_expect(value, TYPE) ) {                                 \
-        return error(VF_ErrorIncompatibleArgument,                      \
+        return error(VF_ErrorIncompatibleArgument,                       \
                 "incompartible argument");                               \
     }                                                                    \
                                                                          \
@@ -170,7 +163,7 @@ namespace CPVerifier {
                                                                          \
         /* check INs */                                                  \
         if( !workmap_expect(value, SM_HIGH_WORD) ) {                     \
-            return error(VF_ErrorIncompatibleArgument,                  \
+            return error(VF_ErrorIncompatibleArgument,                   \
                     "incompartible argument");                           \
         }                                                                \
     }                                                                    \
@@ -179,12 +172,12 @@ namespace CPVerifier {
 #define PUSH_z( TYPE )                                                   \
     if( TYPE.isLongOrDouble() ) {                                        \
         if( !workmap_can_push(2) ) {                                     \
-            return error(VF_ErrorStackOverflow, "stack overflow");      \
+            return error(VF_ErrorStackOverflow, "stack overflow");       \
         }                                                                \
         workmap_2w_push_const(TYPE);                                     \
     } else {                                                             \
         if( !workmap_can_push(1) ) {                                     \
-            return error(VF_ErrorStackOverflow, "stack overflow");      \
+            return error(VF_ErrorStackOverflow, "stack overflow");       \
         }                                                                \
         workmap_push_const(TYPE);                                        \
     }                                                                    \
@@ -192,15 +185,15 @@ namespace CPVerifier {
 
 #define CHECK_xLOAD( idx, TYPE )                                         \
     if( !workmap_valid_local(idx) ) {                                    \
-        return error(VF_ErrorLocals, "invalid local index");            \
+        return error(VF_ErrorLocals, "invalid local index");             \
     }                                                                    \
-    if( !workmap_can_push(1) ) return error(VF_ErrorDataFlow,           \
+    if( !workmap_can_push(1) ) return error(VF_ErrorDataFlow,            \
             "operand stack overflow");                                   \
                                                                          \
     WorkmapElement value = workmap_get_local(idx);                       \
                                                                          \
     if( !workmap_expect_strict(value, TYPE) ) {                          \
-        return error(VF_ErrorIncompatibleArgument,                      \
+        return error(VF_ErrorIncompatibleArgument,                       \
                 "incompartible argument");                               \
     }                                                                    \
                                                                          \
@@ -210,9 +203,9 @@ namespace CPVerifier {
 
 #define CHECK_xxLOAD( idx, TYPE )                                        \
     if( !workmap_valid_2w_local(idx) ) {                                 \
-        return error(VF_ErrorLocals, "invalid local index");            \
+        return error(VF_ErrorLocals, "invalid local index");             \
     }                                                                    \
-    if( !workmap_can_push(2) ) return error(VF_ErrorDataFlow,           \
+    if( !workmap_can_push(2) ) return error(VF_ErrorDataFlow,            \
             "operand stack overflow");                                   \
                                                                          \
     WorkmapElement value_lo = workmap_get_local(idx);                    \
@@ -221,7 +214,7 @@ namespace CPVerifier {
     if( !workmap_expect_strict(value_lo, TYPE) ||                        \
         !workmap_expect_strict(value_hi, SM_HIGH_WORD) )                 \
     {                                                                    \
-        return error(VF_ErrorIncompatibleArgument,                      \
+        return error(VF_ErrorIncompatibleArgument,                       \
                 "incompartible argument");                               \
     }                                                                    \
                                                                          \
@@ -230,15 +223,15 @@ namespace CPVerifier {
 
 
 #define CHECK_ALOAD( idx )                                               \
-    if( !workmap_valid_local(idx) ) return error(VF_ErrorLocals,        \
+    if( !workmap_valid_local(idx) ) return error(VF_ErrorLocals,         \
             "invalid local index");                                      \
-    if( !workmap_can_push(1) ) return error(VF_ErrorDataFlow,           \
+    if( !workmap_can_push(1) ) return error(VF_ErrorDataFlow,            \
             "operand stack overflow");                                   \
                                                                          \
     WorkmapElement value = workmap_get_local(idx);                       \
                                                                          \
     if( !workmap_expect(value, SM_REF_OR_UNINIT) ) {                     \
-        return error(VF_ErrorIncompatibleArgument,                      \
+        return error(VF_ErrorIncompatibleArgument,                       \
                 "incompartible argument");                               \
     }                                                                    \
                                                                          \
@@ -248,7 +241,7 @@ namespace CPVerifier {
 
 #define CHECK_zALOAD( CHECK )                                            \
     /* check stack */                                                    \
-    if( !workmap_can_pop(2) ) return error(VF_ErrorDataFlow,            \
+    if( !workmap_can_pop(2) ) return error(VF_ErrorDataFlow,             \
             "unable to pop from empty operand stack");                   \
                                                                          \
     /* pop INs */                                                        \
@@ -257,11 +250,11 @@ namespace CPVerifier {
                                                                          \
     /* check INs */                                                      \
     if( !workmap_expect_strict( index, SM_INTEGER ) ) {                  \
-        return error(VF_ErrorIncompatibleArgument,                      \
+        return error(VF_ErrorIncompatibleArgument,                       \
                 "incompartible argument");                               \
     }                                                                    \
                                                                          \
-    if( !CHECK ) return error(VF_ErrorIncompatibleArgument,             \
+    if( !CHECK ) return error(VF_ErrorIncompatibleArgument,              \
             "incompartible argument");                                   \
 
 
@@ -271,7 +264,7 @@ namespace CPVerifier {
 
 
 #define CHECK_xSTORE( idx, TYPE )                                        \
-    if( !workmap_valid_local(idx) ) return error(VF_ErrorLocals,        \
+    if( !workmap_valid_local(idx) ) return error(VF_ErrorLocals,         \
             "invalid local index");                                      \
     POP_x( TYPE )                                                        \
     workmap_set_local_const(idx, TYPE);                                  \
@@ -279,7 +272,7 @@ namespace CPVerifier {
 
 
 #define CHECK_xxSTORE( idx, TYPE )                                       \
-    if( !workmap_valid_2w_local(idx) ) return error(VF_ErrorLocals,     \
+    if( !workmap_valid_2w_local(idx) ) return error(VF_ErrorLocals,      \
             "invalid local index");                                      \
     POP_xx( TYPE );                                                      \
     workmap_set_2w_local_const(idx, TYPE);                               \
@@ -287,15 +280,15 @@ namespace CPVerifier {
 
 
 #define CHECK_ASTORE( idx )                                              \
-    if( !workmap_valid_local(idx) ) return error(VF_ErrorLocals,        \
+    if( !workmap_valid_local(idx) ) return error(VF_ErrorLocals,         \
             "invalid local index");                                      \
                                                                          \
-    if( !workmap_can_pop(1) ) return error(VF_ErrorDataFlow,            \
+    if( !workmap_can_pop(1) ) return error(VF_ErrorDataFlow,             \
             "unable to pop from empty operand stack");                   \
                                                                          \
     WorkmapElement ref = workmap_pop();                                  \
     if( !workmap_expect(ref, SM_REF_OR_UNINIT_OR_RETADR) ) {             \
-        return error(VF_ErrorIncompatibleArgument,                      \
+        return error(VF_ErrorIncompatibleArgument,                       \
                 "incompartible argument");                               \
     }                                                                    \
                                                                          \
@@ -305,7 +298,7 @@ namespace CPVerifier {
 
 #define CHECK_xASTORE( CHECK, TYPE )                                     \
     /* check stack */                                                    \
-    if( !workmap_can_pop(3) ) return error(VF_ErrorDataFlow,            \
+    if( !workmap_can_pop(3) ) return error(VF_ErrorDataFlow,             \
             "unable to pop from empty operand stack");                   \
                                                                          \
     /* pop INs */                                                        \
@@ -318,14 +311,14 @@ namespace CPVerifier {
         !workmap_expect_strict( index, SM_INTEGER ) ||                   \
         !CHECK )                                                         \
     {                                                                    \
-        return error(VF_ErrorIncompatibleArgument,                      \
+        return error(VF_ErrorIncompatibleArgument,                       \
                 "incompartible argument");                               \
     }                                                                    \
 
 
 #define CHECK_xxASTORE( CHECK, TYPE )                                    \
     /* check stack */                                                    \
-    if( !workmap_can_pop(4) ) return error(VF_ErrorDataFlow,            \
+    if( !workmap_can_pop(4) ) return error(VF_ErrorDataFlow,             \
             "unable to pop from empty operand stack");                   \
                                                                          \
     /* pop INs */                                                        \
@@ -340,7 +333,7 @@ namespace CPVerifier {
         !workmap_expect_strict( index, SM_INTEGER ) ||                   \
         !CHECK )                                                         \
     {                                                                    \
-        return error(VF_ErrorIncompatibleArgument,                      \
+        return error(VF_ErrorIncompatibleArgument,                       \
                 "incompartible argument");                               \
     }                                                                    \
 
@@ -350,10 +343,9 @@ namespace CPVerifier {
 /////////////////////////////////////////////////////////////////////////////////////
 
 
-
 /**
-* check type-safety of a single instruction (second pass in case of java5 verification)
-*/
+ * check type-safety of a single instruction (second pass in case of java5 verification)
+ */
 template<typename ActualClass, typename WorkmapElement, typename _WorkmapElement, typename StackmapElement>
 vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapElement>::dataflow_instruction(Address instr) {
 
@@ -1814,16 +1806,16 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
 
 
 /**
-* check type-safety for exception handlers of a single instruction (second pass in case of java5 verification)
-*/
+ * check type-safety for exception handlers of a single instruction (second pass in case of java5 verification)
+ */
 template<typename ActualClass, typename WorkmapElement, typename _WorkmapElement, typename StackmapElement>
 vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapElement>::dataflow_handlers(Address instr) {
     if( !m_handlecount || instr < next_start_pc && !no_locals_info && !locals_changed ) return VF_OK;
 
-    unsigned short start_pc;
-    unsigned short end_pc;
-    unsigned short handler_pc;
-    unsigned short handler_cp_index;
+    uint16 start_pc;
+    uint16 end_pc;
+    uint16 handler_pc;
+    uint16 handler_cp_index;
 
     int clean_required = false;
     int new_loop_start = m_handlecount;
@@ -1898,8 +1890,8 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
 
 
 /**
-* create workmap for zero instruction from method's arguments (second pass in case of java5 verification)
-*/
+ * Creates a workmap for zero instruction from method's arguments (second pass in case of java5 verification).
+ */
 template<typename ActualClass, typename WorkmapElement, typename _WorkmapElement, typename StackmapElement>
 vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapElement>::create_method_initial_workmap() {
     // allocate memory for working stack map
@@ -1950,8 +1942,8 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
 
 
 /**
-* check conditions for accessing protected non-static fields in different package
-*/
+ * check conditions for accessing protected non-static fields in different package
+ */
 template<typename ActualClass, typename WorkmapElement, typename _WorkmapElement, typename StackmapElement>
 vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapElement>::popFieldRef(SmConstant expected_ref, unsigned short cp_idx) {
     int check = tpool.checkFieldAccess( expected_ref, cp_idx);
@@ -1974,8 +1966,8 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
 
 
 /**
-* check conditions for accessing protected virtual methods in different package
-*/
+ * check conditions for accessing protected virtual methods in different package
+ */
 template<typename ActualClass, typename WorkmapElement, typename _WorkmapElement, typename StackmapElement>
 vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapElement>::popVirtualRef(SmConstant expected_ref, unsigned short cp_idx) {
     int check = tpool.checkVirtualAccess( expected_ref, cp_idx);
@@ -2014,9 +2006,9 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
 
 
 /**
-* create constraint vector in case of a branch 
-* simple conatraints are created for pairs of both locals and stack (current must be assignable to target)
-*/
+ * create constraint vector in case of a branch 
+ * simple conatraints are created for pairs of both locals and stack (current must be assignable to target) 
+ */
 template<typename ActualClass, typename WorkmapElement, typename _WorkmapElement, typename StackmapElement>
 vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapElement>::new_generic_vector_constraint_impl(StackmapHead *target) {
     if( target->depth != workmap->depth ) return error(VF_ErrorStackDepth, "stack depth does not match");
@@ -2037,9 +2029,9 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
 
 
 /**
-* create constraint vector for exception handler
-* simple conatraints are created for pairs of local variable (current must be assignable to start of exception handler)
-*/
+ * create constraint vector for exception handler
+ * simple conatraints are created for pairs of local variable (current must be assignable to start of exception handler)
+ */
 template<typename ActualClass, typename WorkmapElement, typename _WorkmapElement, typename StackmapElement>
 vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapElement>::new_handler_vector_constraint(Address handler_instr) {
     vf_Result tcr;
@@ -2062,18 +2054,18 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
 
 
 /**
-* specail care for <init> calls in try blocks
-*/
+ * specail care for <init> calls in try blocks
+ */
 template<typename ActualClass, typename WorkmapElement, typename _WorkmapElement, typename StackmapElement>
 vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapElement>::propagate_bogus_to_handlers(Address instr, SmConstant uninit_value) {
     if( !m_handlecount ) return VF_OK;
 
     //loop start and loop finish calculated in dataflow_handlers
     for( unsigned short idx = loop_start; idx < loop_finish; idx++ ) {
-        unsigned short start_pc;
-        unsigned short end_pc;
-        unsigned short handler_pc;
-        unsigned short handler_cp_index;
+        uint16 start_pc;
+        uint16 end_pc;
+        uint16 handler_pc;
+        uint16 handler_cp_index;
 
         method_get_exc_handler_info( m_method, idx, &start_pc, &end_pc,
             &handler_pc, &handler_cp_index );
@@ -2097,11 +2089,6 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
     return VF_OK;
 }
 
-////////////////////////////////////////////////////////////////
-
-
-template class vf_Context_x<CPVerifier_5::vf_Context_5, CPVerifier_5::WorkmapElement, CPVerifier_5::_WorkmapElement, CPVerifier_5::StackmapElement>;
-template class vf_Context_x<CPVerifier_6::vf_Context_6, CPVerifier_6::WorkmapElement, CPVerifier_6::_WorkmapElement, CPVerifier_6::StackmapElement>;
-
-
-} // namespace CPVerifier
+#pragma warning (disable:4660)  // warning C4660: template-class specialization is already instantiated
+template class vf_Context_x<vf_Context_5, WorkmapElement_5, _WorkmapElement_5, StackmapElement_5>;
+template class vf_Context_x<vf_Context_6, WorkmapElement_6, _WorkmapElement_6, StackmapElement_6>;

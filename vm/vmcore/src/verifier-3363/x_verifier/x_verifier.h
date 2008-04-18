@@ -14,12 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Mikhail Loenko
- */  
-
-
-
 #ifndef __X_VERIFIER_H__
 #define __X_VERIFIER_H__
 

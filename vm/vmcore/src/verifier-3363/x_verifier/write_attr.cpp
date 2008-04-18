@@ -14,23 +14,9 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Mikhail Loenko
- */  
-
-
-
-#include <iostream>
-
-using namespace std;
-
 #include "recompute.h"
 #include "../java6/stackmap_6.h"
 #include "time.h"
-
-using namespace CPVerifier;
-using namespace CPVerifier_5;
-using namespace CPVerifier_6;
 
 static char err_message[5000];
 
@@ -38,7 +24,7 @@ static char err_message[5000];
 void vf_Context_5e::writeStackMapFrame( Address instr )
 {
     assert(instr < m_code_length || 1 + lastInstr < instr );
-    uint32 offset = lastInstr == -1 ? instr : instr - lastInstr - 1;
+    Address offset = lastInstr == -1 ? instr : instr - lastInstr - 1;
     lastInstr = instr;
 
     if( curFrame->depth == 0 ) {
@@ -57,20 +43,23 @@ void vf_Context_5e::writeStackMapFrame( Address instr )
         }
 
         if( all_locals_same ) {
-            return writeStackMapFrame_Same(offset);
+            writeStackMapFrame_Same(offset);
+            return;
         } 
 
         if( first_changed_local < lastLocalsNo ) {
             //check whether it's a CUT
             if( last_changed_local >= lastLocalsNo ) {
-                return writeStackMapFrame_Full(offset);
+                writeStackMapFrame_Full(offset);
+                return;
             }
 
             int cut_sz = 0; // number of elements cut in attribute (long and double are single size units)
             int cut_realsz = 0; // number of elements cut in workmap structure (long and double are double size units)
             for( unsigned i = first_changed_local; i < lastLocalsNo; i++ ) {
                 if( curFrame->elements[i].getConst() != SM_BOGUS ) {
-                    return writeStackMapFrame_Full(offset);
+                    writeStackMapFrame_Full(offset);
+                    return;
                 }
 
                 cut_realsz++;
@@ -80,9 +69,11 @@ void vf_Context_5e::writeStackMapFrame( Address instr )
                 }
             }
             if( cut_sz > 3 ) {
-                return writeStackMapFrame_Full(offset);
+                writeStackMapFrame_Full(offset);
+                return;
             }
-            return writeStackMapFrame_Cut(offset, cut_sz, cut_realsz);
+             writeStackMapFrame_Cut(offset, cut_sz, cut_realsz);
+            return;
         } else {
             //check whether it's an APPEND
             int app_sz = 0;  // number of elements appended in attribute (long and double are single size units)
@@ -97,24 +88,29 @@ void vf_Context_5e::writeStackMapFrame( Address instr )
             }
             if( app_sz > 3 ) {
                 //can't append more than 3 elements
-                return writeStackMapFrame_Full(offset);
+                writeStackMapFrame_Full(offset);
+                return;
             }
-            return writeStackMapFrame_Append(offset, app_sz, app_realsz);
+            writeStackMapFrame_Append(offset, app_sz, app_realsz);
+            return;
         }
     } else if( curFrame->depth == 1 || curFrame->depth == 2 && curFrame->elements[m_stack_start + 1].getConst() == SM_HIGH_WORD) {
         for( unsigned i = 0; i < m_max_locals; i++ ) {
             if( curFrame->elements[i].getConst() != workmap->elements[i].getConst() ) {
-                return writeStackMapFrame_Full(offset);
+                writeStackMapFrame_Full(offset);
+                return;
             }
         }
-        return writeStackMapFrame_SameLocalsOneStack(offset);
+        writeStackMapFrame_SameLocalsOneStack(offset);
+        return;
     } else {
-        return writeStackMapFrame_Full(offset);
+        writeStackMapFrame_Full(offset);
+        return; 
     }
 
 } // writeStackMapFrame
 
-void vf_Context_5e::writeStackMapFrame_Full( uint32 offset ) {
+void vf_Context_5e::writeStackMapFrame_Full( Address offset ) {
     writeByte(255); // full stack frame
 
     writeByte(offset >> 8); // offset
@@ -128,7 +124,8 @@ void vf_Context_5e::writeStackMapFrame_Full( uint32 offset ) {
     }
 
     unsigned locals_sz = 0; // number of elements in attribute (long and double are single size units)
-    for( unsigned i = 0; i < locals_realsz; i++ ) {
+    unsigned i;
+    for( i = 0; i < locals_realsz; i++ ) {
         if( curFrame->elements[i].getConst() != SM_HIGH_WORD ) {
              locals_sz++;
         }
@@ -143,7 +140,7 @@ void vf_Context_5e::writeStackMapFrame_Full( uint32 offset ) {
     /////////////////////////////////
 
     unsigned stack_sz = 0; // number of stack elements in attribute (long and double are single size units)
-    for( unsigned i = 0; i < curFrame->depth; i++ ) {
+    for( i = 0; i < curFrame->depth; i++ ) {
         if( curFrame->elements[m_stack_start + i].getConst() != SM_HIGH_WORD ) {
              stack_sz++;
         }
@@ -156,7 +153,7 @@ void vf_Context_5e::writeStackMapFrame_Full( uint32 offset ) {
 
 }
 
-void vf_Context_5e::writeStackMapFrame_SameLocalsOneStack( uint32 offset ) {
+void vf_Context_5e::writeStackMapFrame_SameLocalsOneStack( Address offset ) {
     
     if( offset < 64 ) {
         writeByte(offset + 64); // same locals one stack item
@@ -170,7 +167,7 @@ void vf_Context_5e::writeStackMapFrame_SameLocalsOneStack( uint32 offset ) {
     }
 }
 
-void vf_Context_5e::writeStackMapFrame_Same( uint32 offset ) {
+void vf_Context_5e::writeStackMapFrame_Same( Address offset ) {
 
     if( offset < 64 ) {
         writeByte(offset); // same
@@ -181,7 +178,7 @@ void vf_Context_5e::writeStackMapFrame_Same( uint32 offset ) {
     }
 }
 
-void vf_Context_5e::writeStackMapFrame_Cut( uint32 offset, int cut_sz, int cut_realsz ) {
+void vf_Context_5e::writeStackMapFrame_Cut( Address offset, int cut_sz, int cut_realsz ) {
 
     writeByte(251 - cut_sz); // same extended
 
@@ -191,7 +188,7 @@ void vf_Context_5e::writeStackMapFrame_Cut( uint32 offset, int cut_sz, int cut_r
     lastLocalsNo -= cut_realsz;
 }
 
-void vf_Context_5e::writeStackMapFrame_Append( uint32 offset, int app_sz, int app_realsz ) {
+void vf_Context_5e::writeStackMapFrame_Append( Address offset, int app_sz, int app_realsz ) {
 
     writeByte(251 + app_sz); // same extended
 
@@ -203,7 +200,7 @@ void vf_Context_5e::writeStackMapFrame_Append( uint32 offset, int app_sz, int ap
     lastLocalsNo += app_realsz;
 }
 
-void vf_Context_5e::writeStackMapElements( uint32 start, uint32 cnt ) {
+void vf_Context_5e::writeStackMapElements( Address start, uint32 cnt ) {
     while( cnt ) {
         SmConstant el = curFrame->elements[start].const_val;
         workmap->elements[start].const_val = el;

@@ -14,11 +14,11 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-#ifndef __CLASS_INTERFACE_H__
-#define __CLASS_INTERFACE_H__
+#ifndef _CLASS_INTERFACE_H
+#define _CLASS_INTERFACE_H
 
 /**
- * Enum of constant pool tags
+ * Constant pool tags.
  */
 typedef enum {
     _CONSTANT_Unknown               = 0,
@@ -35,4 +35,5 @@ typedef enum {
     _CONSTANT_NameAndType           = 12
 } ClassConstantPoolTags;
 
-#endif
+#endif /* _CLASS_INTERFACE_H */
+

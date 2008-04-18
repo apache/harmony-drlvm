@@ -14,30 +14,16 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Mikhail Loenko
- */  
-
-
-
-#include <iostream>
-
-using namespace std;
-
+#include <stdio.h>
 #include "recompute.h"
 #include "../java5/stackmap_5.h"
 #include "time.h"
 
-using namespace CPVerifier;
-using namespace CPVerifier_5;
-
-
 static char err_message[5000];
 
 /**
-* Function recomputes StackMapTable attribute.
-*
-*/
+ * Recomputes StackMapTable attribute.
+ */
 vf_Result
 vf_recompute_stackmaptable(Method_Handle method, uint8** attrBytes, char** error,
                            void* trustedPairs )
@@ -96,7 +82,7 @@ vf_Result vf_Context_5e::recompute_stackmaptable(Method_Handle method ) {
 
     curFrame = newWorkmap(m_stack_start + m_max_stack);
     for( Address instr = 0; instr < m_code_length; instr++) {
-        PropsHead *head = (PropsHead*)props.getInstrProps(instr);
+        PropsHead_5 *head = (PropsHead_5*)props.getInstrProps(instr);
         if (head) {
             if( (tcr=fillCurFrame(head)) != VF_OK ) {
                 return tcr;
@@ -107,32 +93,33 @@ vf_Result vf_Context_5e::recompute_stackmaptable(Method_Handle method ) {
 
             /////////////////////////////////
             workmap->depth = curFrame->depth;
-            tc_memcpy(&workmap->elements[0], &curFrame->elements[0], sizeof(WorkmapElement) * (m_stack_start + workmap->depth));
+            tc_memcpy(&workmap->elements[0], &curFrame->elements[0],
+                sizeof(WorkmapElement_5) * (m_stack_start + workmap->depth));
         }
     }
 
     if( written_stackmap ) {
-        written_stackmap[7] = entryNo & 0xFF;
+        written_stackmap[7] = (uint8) entryNo & 0xFF;
         entryNo >>= 8;
 
-        written_stackmap[6] = entryNo & 0xFF;
+        written_stackmap[6] = (uint8) entryNo & 0xFF;
         ////////////
-        written_stackmap[5] = attrLen & 0xFF;
+        written_stackmap[5] = (uint8) attrLen & 0xFF;
         attrLen >>= 8;
 
-        written_stackmap[4] = attrLen & 0xFF;
+        written_stackmap[4] = (uint8) attrLen & 0xFF;
         attrLen >>= 8;
 
-        written_stackmap[3] = attrLen & 0xFF;
+        written_stackmap[3] = (uint8) attrLen & 0xFF;
         attrLen >>= 8;
 
-        written_stackmap[2] = attrLen & 0xFF;
+        written_stackmap[2] = (uint8) attrLen & 0xFF;
     }
 
     return VF_OK;
 } // recompute_stackmaptable
 
-vf_Result vf_Context_5e::fillCurFrame(PropsHead *head) {
+vf_Result vf_Context_5e::fillCurFrame(PropsHead_5 *head) {
     curFrame->depth = head->is_workmap() ? head->getWorkmap()->depth : head->getStackmap()->depth;
     
     int high_word_expected = false;
@@ -156,6 +143,10 @@ vf_Result vf_Context_5e::do_recompute( ) {
     parseTrustedPairs();
 
     vf_Result tcr;
+
+    // iterator
+    int i;
+
     //we skip workmap vectors when do iteration
     //workmap vectors may contain constant, refs to stackmap elements that are parts of other vectrs
     //(and thus iterated thru), or temporary stackmap elements created by 
@@ -196,11 +187,11 @@ vf_Result vf_Context_5e::do_recompute( ) {
             //dead code start: place workmap here
             assert(!props.getInstrProps(dead_code_start));
 
-            PropsHead* dead = newWorkmapProps(m_stack_start + 1);
+            PropsHead_5* dead = newWorkmapProps(m_stack_start + 1);
             props.setInstrProps(dead_code_start, dead);
             WorkmapHead *wm = dead->getWorkmap();
 
-            PropsHead* alive = (PropsHead*)props.getInstrProps(instr);
+            PropsHead_5* alive = (PropsHead_5*)props.getInstrProps(instr);
             assert( alive );
 
             for( unsigned i = 0; i < m_stack_start; i++ ) {
@@ -218,7 +209,7 @@ vf_Result vf_Context_5e::do_recompute( ) {
 
 
 //insert reversed generic constraints
-void vf_Context_5e::insert_back_refs(StackmapElement *el) {
+void vf_Context_5e::insert_back_refs(StackmapElement_5 *el) {
     //stackmap is know already for this element ==> it won't participae in backtracking
     if (is_node_calculated(el)) return;
 
@@ -246,7 +237,7 @@ void vf_Context_5e::insert_back_refs(StackmapElement *el) {
 //when we have more classes loaded, list of candidates might be wider, but the "right" type would be the same
 //this difference is intended and maintained for future use, e.g. if we gt instrumentation and can't
 //build attribute for the class, we may consider further algorithm improving
-vf_Result vf_Context_5e::mantain_node_consistency(StackmapElement *el) {
+vf_Result vf_Context_5e::mantain_node_consistency(StackmapElement_5 *el) {
 
     vf_Result tcr;
 
@@ -412,7 +403,7 @@ vf_Result vf_Context_5e::mantain_arc_consistency(int depth) {
 //check that each stackmap candidates in the nodes accessible from the current one
 //has an arc-consitent value in the current mode 
 //the method is called each time set of candidates for the given node is changed
-vf_Result vf_Context_5e::arc_consistensy_in_node(StackmapElement *el, int depth) {
+vf_Result vf_Context_5e::arc_consistensy_in_node(StackmapElement_5 *el, int depth) {
 
     for( Constraint *adjacent = el->firstOthers(); adjacent; adjacent = adjacent->next() ) {
         if( !is_arc(adjacent) ) continue;
@@ -466,7 +457,7 @@ vf_Result vf_Context_5e::arc_consistensy_in_node(StackmapElement *el, int depth)
     return VF_OK;
 }
 
-void vf_Context_5e::push_subgraph(StackmapElement *el) {
+void vf_Context_5e::push_subgraph(StackmapElement_5 *el) {
     if( subgraph_stack.instack( el ) ) return;
 
     subgraph_stack.push( el );
@@ -477,7 +468,7 @@ void vf_Context_5e::push_subgraph(StackmapElement *el) {
 }
 
 
-vf_Result vf_Context_5e::calculate_subgraph(StackmapElement *el) {
+vf_Result vf_Context_5e::calculate_subgraph(StackmapElement_5 *el) {
     if( is_node_calculated(el) || no_stackmap_choice((StackmapElement_Ex*)el) ) return VF_OK;
 
     subgraph_stack.init();
@@ -506,13 +497,14 @@ vf_Result vf_Context_5e::do_backtracking(int old_depth) {
     }
 
     //first 'remove' all remaining stackmaps
-    for( StackmapAttrCnstr *sm = cur->firstStackmapAttrCnstr(); sm; sm = sm->next() ) {
+    StackmapAttrCnstr *sm;
+    for( sm = cur->firstStackmapAttrCnstr(); sm; sm = sm->next() ) {
         assert(sm->depth < depth);
         if( !sm->depth ) sm->depth = depth;
     }
 
     //then try to include them one-by-one 
-    for( StackmapAttrCnstr *sm = cur->firstStackmapAttrCnstr(); sm; sm = sm->next() ) {
+    for( sm = cur->firstStackmapAttrCnstr(); sm; sm = sm->next() ) {
         if( sm->depth != depth ) continue;
 
         sm->depth = 0;
@@ -630,13 +622,14 @@ void vf_Context_5e::parseTrustedPairs() {
     trustedPairsCnt = 0;
     if( !class_constraints ) return;
 
-    for( vf_TypeConstraint *constraint = (vf_TypeConstraint*)unparsedPairs; constraint; constraint = constraint->next ) {
+    vf_TypeConstraint *constraint;
+    for( constraint = (vf_TypeConstraint*)unparsedPairs; constraint; constraint = constraint->next ) {
         trustedPairsCnt++;
     }
     trustedPairs = (TrustedPair*)mem.malloc(trustedPairsCnt * sizeof(TrustedPair));
 
     int i = 0;
-    for( vf_TypeConstraint *constraint = (vf_TypeConstraint*)unparsedPairs; constraint; constraint = constraint->next ) {
+    for( constraint = (vf_TypeConstraint*)unparsedPairs; constraint; constraint = constraint->next ) {
         trustedPairs[i].from = tpool.get_ref_type(constraint->source);
         tryResolve(trustedPairs[i].from);
 

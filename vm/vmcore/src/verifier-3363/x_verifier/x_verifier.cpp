@@ -14,24 +14,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Mikhail Loenko
- */  
-
-
-
-#include <iostream>
-
-using namespace std;
-
 #include "recompute.h"
 #include "x_verifier.h"
 #include "../java6/context_6.h"
 #include "time.h"
-
-using namespace CPVerifier;
-using namespace CPVerifier_6;
-
 
 /**
  * Allocates an empty verification context for a class, 

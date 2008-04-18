@@ -14,10 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Mikhail Loenko, Vladimir Molotkov
- */  
-
 #ifndef __STACKMAP6_H__
 #define __STACKMAP6_H__
 
@@ -26,68 +22,64 @@
 #include <assert.h>
 #include "../base/stackmap_x.h"
 
-using namespace CPVerifier;
-
-namespace CPVerifier_6 {
-
-    //Constant for parsing StackMapTable attribute 
-    enum StackMapTableItems {
-        ITEM_TOP = 0,
-        ITEM_INTEGER = 1,
-        ITEM_FLOAT = 2,
-        ITEM_DOUBLE = 3,
-        ITEM_LONG = 4,
-        ITEM_NULL = 5,
-        ITEM_UNINITIALIZEDTHIS = 6,
-        ITEM_OBJECT = 7,
-        ITEM_UNINITIALIZED = 8
-    };
+//Constant for parsing StackMapTable attribute 
+enum StackMapTableItems {
+    ITEM_TOP = 0,
+    ITEM_INTEGER = 1,
+    ITEM_FLOAT = 2,
+    ITEM_DOUBLE = 3,
+    ITEM_LONG = 4,
+    ITEM_NULL = 5,
+    ITEM_UNINITIALIZEDTHIS = 6,
+    ITEM_OBJECT = 7,
+    ITEM_UNINITIALIZED = 8
+};
 
 
-    //StackMapElement structure represens recorded verification types
-    //it's read from class file StackMapTable attribute
-    struct StackmapElement {
-        //list of IncomingType constraint
-        _SmConstant const_val;
-    };
+//StackMapElement structure represens recorded verification types
+//it's read from class file StackMapTable attribute
+struct StackmapElement_6 {
+    //list of IncomingType constraint
+    _SmConstant const_val;
+};
 
-    //WorkMapElement structure represent an element of the workmap vector -- vector of the derived types
-    //in Java6 verification type might be constant (or known) only 
-    struct WorkmapElement {
-        //the value
-        _SmConstant const_val;      //either a constant (known-type)
+//WorkMapElement structure represent an element of the workmap vector -- vector of the derived types
+//in Java6 verification type might be constant (or known) only 
+struct WorkmapElement_6 {
+    //the value
+    _SmConstant const_val;      //either a constant (known-type)
 
-        //// Java5 anachonisms ////
-        void setJsrModified() {};
-        int isJsrModified() { return 1;};
-        SmConstant getAnyPossibleValue() { return const_val; }
-        SmConstant getConst() { return const_val; }
-    };
+    //// Java5 anachonisms ////
+    void setJsrModified() {};
+    int isJsrModified() { return 1;};
+    SmConstant getAnyPossibleValue() { return const_val; }
+    SmConstant getConst() { return const_val; }
+};
 
-    //WorkmapElement type with some constructors
-    struct _WorkmapElement : WorkmapElement {
-        _WorkmapElement(WorkmapElement other) {
-            const_val = other.const_val;
-        }
+//WorkmapElement type with some constructors
+struct _WorkmapElement_6 : WorkmapElement_6 {
+    _WorkmapElement_6(WorkmapElement_6 other) {
+        const_val = other.const_val;
+    }
 
-        _WorkmapElement(SmConstant c) {
-            const_val = c;
-        }
-    };
+    _WorkmapElement_6(SmConstant c) {
+        const_val = c;
+    }
+};
 
-    //Store stackmap data for the given instruction
-    // the list is used to organize storing Props as a HashTable
-    struct PropsHead : public PropsHeadBase {
-        typedef MapHead<StackmapElement> StackmapHead;
 
-        //possible properties
-        StackmapHead stackmap;
+//Store stackmap data for the given instruction
+// the list is used to organize storing Props as a HashTable
+struct PropsHead_6 : public PropsHeadBase {
+    typedef MapHead<StackmapElement_6> StackmapHead;
 
-        //get stackmap stored here
-        StackmapHead *getStackmap() {
-            return &stackmap;
-        }
-    };
-} // namespace CPVerifier_6
+    //possible properties
+    StackmapHead stackmap;
+
+    //get stackmap stored here
+    StackmapHead *getStackmap() {
+        return &stackmap;
+    }
+};
 
 #endif
