@@ -34,15 +34,15 @@
 #include <pthread.h>
 #endif // __linux__
 
-// temporary remove logging
-//#define TRACE(a) //printf a; printf("\n")
-
-#ifdef __linux__
-#include "clog.h"
+#if 1
+#define CTRACE(a)
 #else
-#define TRACE(a) //printf a; printf("\n")
-#define DIE(A) //exit(55);
+#define CTRACE(a) printf a; printf("\n"); fflush(stdout)
 #endif
+#define DIE(a) \
+    printf("Thread manager aborted\n"); \
+    printf a; printf("\n"); fflush(stdout); \
+    exit(55);
 
 // FIXME move to the global header, add error converter 
 #define RET_ON_ERROR(stat) if (stat) { return -1; }

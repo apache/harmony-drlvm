@@ -24,7 +24,6 @@
  * @brief hythread basic functions
  */
 
-#undef LOG_DOMAIN
 #define LOG_DOMAIN "tm.native"
 
 #ifdef PLATFORM_POSIX
@@ -184,7 +183,7 @@ IDATA hythread_attach_ex(hythread_t new_thread,
     }
     assert(new_thread->os_handle);
 
-    TRACE(("TM: native attached: native: %p ", new_thread));
+    CTRACE(("TM: native attached: native: %p ", new_thread));
 
     status = hythread_set_to_group(new_thread,
         (group == NULL ? TM_DEFAULT_GROUP : group));
@@ -754,7 +753,7 @@ static int HYTHREAD_PROC hythread_wrapper_start_proc(void *arg) {
     thread = start_proc_data.thread;
     start_proc = start_proc_data.proc;
 
-    TRACE(("TM: native thread started: native: %p tm: %p",
+    CTRACE(("TM: native thread started: native: %p tm: %p",
         apr_os_thread_current(), thread));
 
     // check hythread library state
@@ -774,7 +773,7 @@ static int HYTHREAD_PROC hythread_wrapper_start_proc(void *arg) {
         // zero hythread_self() because we don't do it in hythread_detach_ex()
         hythread_set_self(NULL);
 
-        TRACE(("TM: native thread terminated due to shutdown: native: %p tm: %p",
+        CTRACE(("TM: native thread terminated due to shutdown: native: %p tm: %p",
             apr_os_thread_current(), thread));
 
         // release hythread global lock
@@ -948,7 +947,7 @@ IDATA VMCALL hythread_wait_for_nondaemon_threads(hythread_t thread, IDATA thread
         // check interruption and other problems
         status = hycond_wait(&lib->nondaemon_thread_cond, &lib->TM_LOCK);
 
-        TRACE(("TM wait for nondaemons notified, count: %d",
+        CTRACE(("TM wait for nondaemons notified, count: %d",
                lib->nondaemon_thread_count));
 
         if (status != TM_ERROR_NONE) {
@@ -989,13 +988,13 @@ IDATA VMCALL hythread_decrease_nondaemon_threads_count(hythread_t thread, IDATA 
         return TM_ERROR_ILLEGAL_STATE;
     }
 
-    TRACE(("TM: nondaemons decreased, thread: %p count: %d\n", thread,
+    CTRACE(("TM: nondaemons decreased, thread: %p count: %d\n", thread,
            lib->nondaemon_thread_count));
 
     lib->nondaemon_thread_count--;
     if (lib->nondaemon_thread_count - threads_to_keep <= 0) {
         status = hycond_notify_all(&lib->nondaemon_thread_cond);
-        TRACE(("TM: nondaemons all dead, thread: %p count: %d\n", thread,
+        CTRACE(("TM: nondaemons all dead, thread: %p count: %d\n", thread,
                lib->nondaemon_thread_count));
         if (status != TM_ERROR_NONE) {
             port_mutex_unlock(&lib->TM_LOCK);

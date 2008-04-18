@@ -20,7 +20,6 @@
  * @brief Hythread suspend/resume related functions
  */
 
-#undef LOG_DOMAIN
 #define LOG_DOMAIN "tm.suspend"
 
 #include <open/hythread_ext.h>
@@ -131,13 +130,13 @@ static void thread_safe_point_impl(hythread_t thread)
     port_rw_barrier();
 
     do {
-        TRACE(("safe point enter: thread: %p, suspend_count: %d, request: %d",
+        CTRACE(("safe point enter: thread: %p, suspend_count: %d, request: %d",
                thread, thread->suspend_count, thread->request));
 
         // wait for resume event
         hysem_wait(thread->resume_event);
 
-        TRACE(("safe point exit: thread: %p, suspend_count: %d, request: %d",
+        CTRACE(("safe point exit: thread: %p, suspend_count: %d, request: %d",
                thread, thread->suspend_count, thread->request));
     } while (thread->suspend_count);
 
@@ -188,7 +187,7 @@ static IDATA wait_safe_region_event(hythread_t thread)
         }
         hythread_yield();
     }
-    TRACE(("suspend wait exit safe region thread: "
+    CTRACE(("suspend wait exit safe region thread: "
            "%p, suspend_count: %d, request: %d",
            thread, thread->suspend_count, thread->request));
     port_mutex_lock(&thread->mutex);
@@ -246,7 +245,7 @@ IDATA VMCALL hythread_suspend_other(hythread_t thread)
 {
     hythread_t self = tm_self_tls;
 
-    TRACE(("suspend enter, self: %p, thread: %p, "
+    CTRACE(("suspend enter, self: %p, thread: %p, "
            "suspend_count: %d, request: %d", self, thread,
            thread->suspend_count, thread->request));
 
@@ -262,7 +261,7 @@ IDATA VMCALL hythread_suspend_other(hythread_t thread)
         hythread_resume(thread);
         return TM_ERROR_EBUSY;
     }
-    TRACE(("suspend exit, self: %p, thread: %p, "
+    CTRACE(("suspend exit, self: %p, thread: %p, "
            "suspend_count: %d, request: %d", self, thread,
            thread->suspend_count, thread->request));
     return TM_ERROR_NONE;
@@ -283,7 +282,7 @@ void VMCALL hythread_resume(hythread_t thread)
     int count;
     hythread_t self = tm_self_tls;
 
-    TRACE(("start resume, self: %p, thread: %p, "
+    CTRACE(("start resume, self: %p, thread: %p, "
            "suspend_count: %d, request: %d", self, thread,
            thread->suspend_count, thread->request));
 
@@ -307,7 +306,7 @@ void VMCALL hythread_resume(hythread_t thread)
     thread->state &= ~TM_THREAD_STATE_SUSPENDED;
     port_mutex_unlock(&thread->mutex);
 
-    TRACE(("sent resume, self: %p, thread: %p, "
+    CTRACE(("sent resume, self: %p, thread: %p, "
            "suspend_count: %d, request: %d", self, thread,
            thread->suspend_count, thread->request));
 
@@ -369,7 +368,7 @@ IDATA VMCALL hythread_suspend_all(hythread_iterator_t* iter_ptr,
     hythread_t self = tm_self_tls;
     hythread_t next;
     hythread_iterator_t iter;
-    TRACE(("suspend all threads"));
+    CTRACE(("suspend all threads"));
 
     assert(hythread_is_suspend_enabled());
 
@@ -380,7 +379,7 @@ IDATA VMCALL hythread_suspend_all(hythread_iterator_t* iter_ptr,
     hythread_global_lock();
 
     // send suspend requests to all threads
-    TRACE(("send suspend requests"));
+    CTRACE(("send suspend requests"));
     iter = hythread_iterator_create(group);
     while ((next = hythread_iterator_next(&iter)) != NULL) {
         if (next != self) {
@@ -390,7 +389,7 @@ IDATA VMCALL hythread_suspend_all(hythread_iterator_t* iter_ptr,
     hythread_iterator_reset(&iter);
 
     // all threads should be stoped in safepoints or be in safe region.
-    TRACE(("wait suspend responses"));
+    CTRACE(("wait suspend responses"));
     while ((next = hythread_iterator_next(&iter)) != NULL) {
         if (next == self) {
             continue;
@@ -421,7 +420,7 @@ IDATA VMCALL hythread_resume_all(hythread_group_t group)
     hythread_t next;
     hythread_iterator_t iter;
 
-    TRACE(("resume all threads"));
+    CTRACE(("resume all threads"));
 
     // send resume requests to all threads
     iter = hythread_iterator_create(group);

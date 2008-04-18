@@ -19,8 +19,6 @@
  * @file thread_native_iterator.c
  * @brief Hythread iterator related functions
  */
-
-#undef LOG_DOMAIN
 #define LOG_DOMAIN "tm.iterator"
 
 #include "thread_private.h"
@@ -38,7 +36,7 @@ hythread_iterator_t VMCALL hythread_iterator_create(hythread_group_t group) {
     status = hythread_global_lock();
     assert(status == TM_ERROR_NONE);
     group = (group)?group:TM_DEFAULT_GROUP;
-    TRACE(("TM iterator created: %p head: %p", group->thread_list, group->thread_list->next));
+    CTRACE(("TM iterator created: %p head: %p", group->thread_list, group->thread_list->next));
     return (hythread_iterator_t)group->thread_list->next;
 }
 
@@ -49,7 +47,7 @@ hythread_iterator_t VMCALL hythread_iterator_create(hythread_group_t group) {
  * @param[in] it thread group iterator
  */
 IDATA VMCALL hythread_iterator_release(hythread_iterator_t *it) {
-    TRACE(("TM iterator released: %p", (*it)->group->thread_list));
+    CTRACE(("TM iterator released: %p", (*it)->group->thread_list));
     return hythread_global_unlock();
 }
 
@@ -60,7 +58,7 @@ IDATA VMCALL hythread_iterator_release(hythread_iterator_t *it) {
  */
 IDATA VMCALL hythread_iterator_reset(hythread_iterator_t *it) {
    (*it) = (*it)->group->thread_list->next;
-   TRACE(("TM iterator reset: %p head: %p", (*it)->group->thread_list, (*it))); 
+   CTRACE(("TM iterator reset: %p head: %p", (*it)->group->thread_list, (*it))); 
    return TM_ERROR_NONE;   
 }
 
@@ -74,13 +72,13 @@ hythread_t VMCALL hythread_iterator_next(hythread_iterator_t *it) {
     hythread_t res;
     
     if ((*it) == ((hythread_t)*it)->group->thread_list) {
-        TRACE(("TM iterator %p next: NULL", (*it)->group->thread_list));
+        CTRACE(("TM iterator %p next: NULL", (*it)->group->thread_list));
         return NULL;
     } 
     
     res = *it;
     (*it) = (*it)->next;
-    TRACE(("TM iterator %p next: %p", (*it)->group->thread_list, res));
+    CTRACE(("TM iterator %p next: %p", (*it)->group->thread_list, res));
     return res;
 } 
 
@@ -91,7 +89,7 @@ hythread_t VMCALL hythread_iterator_next(hythread_iterator_t *it) {
  */
 IDATA VMCALL hythread_iterator_has_next(hythread_iterator_t it) {
     IDATA res = (it != ((hythread_t)it)->group->thread_list)? 1 : 0 ;
-    TRACE(("TM iterator %p has next: %d", it->group->thread_list, res));
+    CTRACE(("TM iterator %p has next: %d", it->group->thread_list, res));
     return res;
     
 }
@@ -103,6 +101,6 @@ IDATA VMCALL hythread_iterator_has_next(hythread_iterator_t it) {
  */
 IDATA VMCALL hythread_iterator_size(hythread_iterator_t iterator) {
     IDATA size = ((hythread_t )iterator)->group->threads_count;
-    TRACE(("TM iterator %p size: %d", iterator->group->thread_list, size));
+    CTRACE(("TM iterator %p size: %d", iterator->group->thread_list, size));
     return size;
 }

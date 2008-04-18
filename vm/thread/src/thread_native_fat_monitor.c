@@ -24,8 +24,8 @@
  */
 //@{
 
-#undef LOG_DOMAIN
 #define LOG_DOMAIN "tm.locks"
+
 #include <open/hythread_ext.h>
 #include "port_mutex.h"
 #include "thread_private.h"
@@ -143,7 +143,7 @@ IDATA VMCALL hythread_monitor_exit(hythread_monitor_t mon_ptr) {
     assert(mon_ptr->recursion_count >= 0);
 
     if (mon_ptr->owner != tm_self_tls) {
-        TRACE(("exit TM_ERROR_ILLEGAL_STATE  owner: %d self: %d, rec: %d\n",
+        CTRACE(("exit TM_ERROR_ILLEGAL_STATE  owner: %d self: %d, rec: %d\n",
                 mon_ptr->owner ? mon_ptr->owner->thread_id : 0,
                 tm_self_tls->thread_id, mon_ptr->recursion_count));
         return TM_ERROR_ILLEGAL_STATE;
