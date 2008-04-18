@@ -18,8 +18,8 @@
 #include <stdio.h>
 #include "testframe.h"
 #include "thread_unit_test_utils.h"
-#include <open/jthread.h>
-#include <open/ti_thread.h>
+#include <jthread.h>
+#include <ti_thread.h>
 
 static hysem_t mon_enter;
 

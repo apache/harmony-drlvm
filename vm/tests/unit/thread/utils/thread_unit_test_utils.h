@@ -18,7 +18,7 @@
 #include <stdlib.h>
 #include "jvmti_types.h"
 #include "open/hycomp.h"
-#include "open/jthread.h"
+#include "jthread.h"
 #include "thread_manager.h"
 
 // Tested Thread Phases

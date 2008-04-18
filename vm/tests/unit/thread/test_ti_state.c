@@ -19,9 +19,9 @@
 #include <stdio.h>
 #include "testframe.h"
 #include "thread_unit_test_utils.h"
-#include <open/jthread.h>
+#include <jthread.h>
 #include <open/hythread_ext.h>
-#include <open/ti_thread.h>
+#include <ti_thread.h>
 
 /*
  * Test test_jthread_get_jvmti_state_1

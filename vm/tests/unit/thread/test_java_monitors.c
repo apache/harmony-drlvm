@@ -18,7 +18,7 @@
 #include <stdio.h>
 #include "testframe.h"
 #include "thread_unit_test_utils.h"
-#include <open/jthread.h>
+#include <jthread.h>
 #include <open/hythread_ext.h>
 
 static hysem_t mon_enter;

@@ -18,7 +18,7 @@
 #include <stdio.h>
 #include "testframe.h"
 #include "thread_unit_test_utils.h"
-#include <open/jthread.h>
+#include <jthread.h>
 
 /*
  * Test jthread_park(...)

@@ -15,7 +15,7 @@
  *  limitations under the License.
  */
 
-#include "open/ti_thread.h"
+#include "ti_thread.h"
 #include "testframe.h"
 #include "thread_unit_test_utils.h"
 
