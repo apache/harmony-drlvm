@@ -15,11 +15,6 @@
  *  limitations under the License.
  */
 /**
- * @author Ivan Volosyuk
- * @version $Revision: 1.2.12.2.4.3 $
- */
-
-/**
  * @file
  * Defines helper interfaces used by the interpreter.
  *

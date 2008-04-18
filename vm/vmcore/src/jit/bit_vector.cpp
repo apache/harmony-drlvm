@@ -14,13 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Alexei Fedotov
- * @version $Revision: 1.1.2.1.4.4 $
- */  
-
-
-
 //MVM
 #include <iostream>
 
@@ -289,4 +282,3 @@ void Bit_Vector_Array::print_in_range (ostream &cout, char *name) {
 
     cout << "})\n";
 }
-

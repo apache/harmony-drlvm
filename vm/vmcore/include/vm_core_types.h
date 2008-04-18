@@ -14,12 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Alexei Fedotov
- * @version $Revision: 1.1.2.3.4.3 $
- */  
-
-
 #ifndef _VM_CORE_TYPES_H_
 #define _VM_CORE_TYPES_H_
 
@@ -56,3 +50,4 @@ typedef LilCodeStub* (*NativeStubOverride)(LilCodeStub*, Method_Handle);
 
 
 #endif //!_VM_CORE_TYPES_H_
+

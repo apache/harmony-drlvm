@@ -14,11 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Alexei Fedotov
- * @version $Revision: 1.1.2.1.4.4 $
- */  
-
 #ifndef _JIT_EXPORT_JPDA_H
 #define _JIT_EXPORT_JPDA_H
 
@@ -144,4 +139,4 @@ JITEXPORT OpenExeJpdaError set_local_var(
     }
 #endif
 
-#endif //  _JIT_EXPORT_JPDA_H
+#endif /* _JIT_EXPORT_JPDA_H */

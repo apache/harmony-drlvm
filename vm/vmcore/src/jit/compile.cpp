@@ -14,10 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Alexei Fedotov
- * @version $Revision: 1.1.2.4.2.2.2.3 $
- */  
 #define LOG_DOMAIN "compile"
 #include "cxxlog.h"
 #include "vm_log.h"

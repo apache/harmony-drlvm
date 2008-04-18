@@ -14,18 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Alexei Fedotov
- * @version $Revision: 1.1.2.1.4.3 $
- */  
-
-
-//
-// Note: This file was moved from its original CVS location:
-//       vm/mains/vm/Dll_GC.h .
-//
-
-
 #ifndef _DLL_GC_H_
 #define _DLL_GC_H_
 

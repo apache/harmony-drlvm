@@ -14,13 +14,8 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/**
-* @author Mikhail Y. Fursov, Alexei Fedotov
-* @version $Revision: 1.1.2.3.4.3 $
-*/
-
-#ifndef _EM_CPP_H_
-#define _EM_CPP_H_
+#ifndef _EM_CPP_H
+#define _EM_CPP_H
 
 #include "open/types.h"
 #include "open/em_vm.h"
@@ -200,5 +195,4 @@ int EmInitialize(OpenComponentHandle* p_component,
 }
 #endif
 
-#endif 
-
+#endif /* _EM_CPP_H */

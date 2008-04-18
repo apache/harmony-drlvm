@@ -14,18 +14,8 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Alexei Fedotov
- * @version $Revision: 1.1.2.1.4.3 $
- */  
-
-
-
-
-
-#ifndef _JIT_INTF_CPP_H_
-#define _JIT_INTF_CPP_H_
-
+#ifndef _JIT_INTF_CPP_H
+#define _JIT_INTF_CPP_H
 
 #include "open/types.h"
 #include "open/rt_types.h"
@@ -230,4 +220,4 @@ public:
         void *value_ptr) = 0;
 }; //JIT
 
-#endif
+#endif /* _JIT_INTF_CPP_H */

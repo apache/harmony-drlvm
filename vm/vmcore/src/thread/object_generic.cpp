@@ -14,23 +14,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Andrey Chernyshev
- * @version $Revision: 1.1.2.2.4.5 $
- */  
-
-
 #define LOG_DOMAIN "notify"
 #include "cxxlog.h"
 
 #include "platform_lowlevel.h"
-#include <assert.h>
-
-//MVM
-#include <iostream>
-
-using namespace std;
-
 #include "open/types.h"
 #include "lock_manager.h"
 #include "environment.h"

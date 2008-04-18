@@ -14,10 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Ivan Volosyuk
- * @version $Revision: 1.23.20.3 $
- */  
 #include <stdlib.h>
 #include <stdio.h>
 #include "open/types.h"

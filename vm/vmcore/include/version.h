@@ -14,10 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/**
- * @author Alexei Fedotov, Gregory Shimansky
- * @version $Revision: 1.1.2.150.2.11.2.560 $
- */
 #ifndef _VERSION_H
 #define _VERSION_H
 
@@ -75,5 +71,5 @@
     VERSION_OS "/" VERSION_ARCH "/" VERSION_COMPILER ", " VERSION_DEBUG_STRING " build\n" \
     "http://harmony.apache.org"
 
-#endif // _VERSION_H
+#endif /* _VERSION_H */
 

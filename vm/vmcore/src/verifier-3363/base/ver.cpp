@@ -14,16 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Mikhail Loenko, Vladimir Molotkov
- */  
-
-
-
-#include <iostream>
-
-using namespace std;
-
 #include "verifier.h"
 #include "../java5/context_5.h"
 #include "../java6/context_6.h"

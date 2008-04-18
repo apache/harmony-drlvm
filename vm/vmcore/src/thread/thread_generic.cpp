@@ -14,23 +14,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Andrey Chernyshev
- * @version $Revision: 1.1.2.5.4.5 $
- */
-
-
 #define LOG_DOMAIN "thread"
 #include "cxxlog.h"
 
 #include "vm_process.h"
-#include <assert.h>
-
-//MVM
-#include <iostream>
-
-using namespace std;
-
 #include <signal.h>
 #include <stdlib.h>
 

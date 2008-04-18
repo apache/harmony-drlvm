@@ -28,8 +28,8 @@
 #include "open/em.h"
 #include "open/hythread_ext.h"
 #include "open/em_profile_access.h"
+#include "jni.h"
 
-#include <jni.h>
 #include <apr_dso.h>
 #include <string>
 #include <set>

@@ -14,19 +14,13 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Alexei Fedotov
- * @version $Revision: 1.1.2.1.4.3 $
- */  
-
-
 // This file contains the prototypes for allocation routines that are not currently supported by the GC.
 // The clients of these routines shouldn't be relying on gc_for_vm.h or the older garbage_collector.h. 
 // Instead, this stop gap header file...
 //
 
-#ifndef _NOGC_H_
-#define _NOGC_H_
+#ifndef _NOGC_H
+#define _NOGC_H
 
 #include <stdlib.h>
 #include "open/rt_types.h" // for the definition of Code_Allocation_Action
@@ -46,4 +40,4 @@
 
 void *malloc_fixed_code_for_jit(size_t size, size_t alignment, unsigned heat, Code_Allocation_Action action);
 
-#endif // _NOGC_H_
+#endif /* _NOGC_H */

@@ -14,10 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Ivan Volosyuk
- * @version $Revision: 1.27.12.3.4.3 $
- */  
 #include "open/vm_field_access.h"
 #include "open/vm_method_access.h"
 #include "open/vm_class_manipulation.h"

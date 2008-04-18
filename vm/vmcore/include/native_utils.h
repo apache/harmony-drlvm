@@ -14,16 +14,8 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Alexei Fedotov
- * @version $Revision: 1.1.2.2.4.3 $
- */  
-
-
-
-
-#ifndef _Included_native_utils
-#define _Included_native_utils
+#ifndef _NATIVE_UTILS
+#define _NATIVE_UTILS
 
 #include "Class.h"
 #include "jni.h"
@@ -42,4 +34,4 @@ void VerifyArray (JNIEnv* env, jarray array);
 char GetComponentSignature (JNIEnv *env, jarray array);
 
 extern jboolean IsNullRef(jobject jobj);
-#endif
+#endif /* _NATIVE_UTILS */

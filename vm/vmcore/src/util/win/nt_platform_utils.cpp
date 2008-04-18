@@ -25,7 +25,6 @@
 #include "platform_lowlevel.h"
 
 #include <stdlib.h>
-#include <stdio.h>
 #include <io.h>
 #include <string.h>
 #include <process.h>

@@ -14,20 +14,11 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
 #define LOG_DOMAIN "vm.helpers"
 #include "cxxlog.h"
 
-#include <assert.h>
 #include <float.h>
-
-//MVM
-#include <iostream>
-
-using namespace std;
-
 #include <math.h>
-#include <stdio.h>
 #include <stdlib.h>
 
 #include "open/gc.h"

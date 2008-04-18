@@ -14,13 +14,8 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Andrey Chernyshev
- * @version $Revision: 1.1.2.1.4.4 $
- */  
-
-#ifndef _lock_manager_H_
-#define _lock_manager_H_ 
+#ifndef _LOCK_MANAGER_H
+#define _LOCK_MANAGER_H 
 
 #include "open/hythread_ext.h"
 #include "open/types.h"
@@ -65,4 +60,4 @@ private:
 
 #endif // __cplusplus
 
-#endif // _lock_manager_H_
+#endif /* _LOCK_MANAGER_H */

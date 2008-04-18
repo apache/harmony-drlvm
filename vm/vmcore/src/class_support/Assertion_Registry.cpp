@@ -16,14 +16,7 @@
  */
 /** 
 * @author Alexey V. Varlamov
-* @version $Revision$
 */  
-
-#define LOG_DOMAIN "vm.core"
-#include "cxxlog.h"
-
-#include <apr_pools.h>
-
 #include "assertion_registry.h"
 
 void Assertion_Registry::add_class(const Global_Env* genv, const char* name, unsigned len, bool value) {

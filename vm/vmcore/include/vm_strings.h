@@ -14,12 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Alexei Fedotov
- * @version $Revision: 1.1.2.1.4.3 $
- */  
-
-
 // This describes the VM internal interface for manipulating strings
 
 #ifndef _VM_STRINGS_H_

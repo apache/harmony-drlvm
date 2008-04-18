@@ -15,11 +15,6 @@
  *  limitations under the License.
  */
 /**
- * @author Ivan Volosyuk
- * @version $Revision: 1.8.4.2.4.3 $
- */
-
-/**
  * @file
  * Defines native-related macros and functions used by the interpreter.
  */

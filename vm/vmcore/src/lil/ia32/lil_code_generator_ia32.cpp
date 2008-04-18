@@ -14,15 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Evgueni Brevnov, Ivan Volosyuk
- * @version $Revision: 1.1.2.2.4.5 $
- */  
-
-
-#include <assert.h>
-#include <stdio.h>
-
 #define LOG_DOMAIN "vm.helpers"
 #include "cxxlog.h"
 

@@ -14,19 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Evgueni Brevnov
- * @version $Revision: 1.1.2.1.4.3 $
- */  
-
-
-//MVM
-#include <iostream>
-
-using namespace std;
-
-#include <assert.h>
-
 #define LOG_DOMAIN "vm.optimize"
 #include "cxxlog.h"
 

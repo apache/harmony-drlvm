@@ -106,7 +106,7 @@ static void native_fill_frame_info(Registers* UNREF regs, native_frame_t* UNREF 
 #endif
 }
 
-void native_get_regs_from_jit_context(JitFrameContext* jfc, Registers* regs)
+static void native_get_regs_from_jit_context(JitFrameContext* jfc, Registers* regs)
 {
 #if defined(_IPF_)
     // Nothing

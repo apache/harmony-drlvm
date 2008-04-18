@@ -14,10 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Ivan Volosyuk
- * @version $Revision: 1.17.4.7.4.3 $
- */  
 #include "interpreter.h"
 #include "interpreter_exports.h"
 #include "interpreter_imports.h"

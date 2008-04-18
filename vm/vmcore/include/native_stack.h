@@ -48,9 +48,6 @@ bool native_is_ip_stub(void* ip);
 char* native_get_stub_name(void* ip, char* buf, size_t buflen);
 const char* native_get_stub_name_nocpy(void* ip);
 
-void native_get_regs_from_jit_context(JitFrameContext* jfc, Registers* regs);
-
-
 #ifdef __cplusplus
 }
 #endif

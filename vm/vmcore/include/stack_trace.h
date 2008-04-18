@@ -16,13 +16,9 @@
  */
 /** 
  * @author Pavel Afremov
- * @version $Revision: 1.1.2.1.4.4 $
  */  
-
-
-#ifndef _STACK_TRACE_H_
-#define _STACK_TRACE_H_
-
+#ifndef _STACK_TRACE_H
+#define _STACK_TRACE_H
 
 /**
  *@file
@@ -65,14 +61,6 @@ struct StackTraceFrame {
     int depth; // Inlined depth for inlined methods, or -1 otherwise
     void *outdated_this;
 };
-
-#ifdef __cplusplus
-}
-#endif
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 /**
  * Gets the depth of the stack trace for the specified thread.
@@ -187,4 +175,4 @@ void st_print(FILE* f, hythread_t thread);
  */
 void st_print();
 
-#endif //!_STACK_TRACE_H_
+#endif /* _STACK_TRACE_H */

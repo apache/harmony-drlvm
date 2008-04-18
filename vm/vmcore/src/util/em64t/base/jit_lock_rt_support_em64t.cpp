@@ -17,7 +17,8 @@
 
 /*    MONITOR ENTER RUNTIME SUPPORT    */
 
-#include <assert.h>
+#define LOG_DOMAIN "vm.helpers"
+#include "cxxlog.h"
 
 #include "environment.h"
 
@@ -42,9 +43,6 @@
 #include "mon_enter_exit.h"
 #include "exceptions.h"
 #include "exceptions_jit.h"
-
-#define LOG_DOMAIN "vm.helpers"
-#include "cxxlog.h"
 
 #include "dump.h"
 #include "vm_stats.h"

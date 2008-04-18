@@ -14,14 +14,8 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Evgueni Brevnov
- * @version $Revision: 1.1.2.1.4.3 $
- */
-
-#include <iostream>
-#include <stdio.h>
-#include <assert.h>
+#define LOG_DOMAIN "vm.helpers"
+#include "cxxlog.h"
 
 #include "jni_types.h"
 #include "jit_intf.h"
@@ -40,9 +34,6 @@
 #include "ini.h"
 #include "lil_code_generator_utils.h"
 #include "jit_runtime_support_common.h"
-
-#define LOG_DOMAIN "vm.helpers"
-#include "cxxlog.h"
 
 #include "dump.h"
 

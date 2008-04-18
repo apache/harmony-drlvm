@@ -14,11 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Alexei Fedotov
- * @version $Revision: 1.1.2.1.4.4 $
- */  
-
 
 //
 // These are the functions that a JIT built as a DLL must export.
@@ -83,4 +78,4 @@ JITEXPORT OpenMethodExecutionParams JIT_get_exe_capabilities (JIT_Handle jit);
 #endif // __cplusplus
 
 
-#endif // _JIT_EXPORT_H
+#endif /* _JIT_EXPORT_H */

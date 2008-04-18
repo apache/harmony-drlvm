@@ -14,18 +14,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Andrey Chernyshev
- * @version $Revision: 1.1.2.1.4.4 $
- */  
-
 #define LOG_DOMAIN "enumeration"
 #include "cxxlog.h"
 
 #include "open/types.h"
-
-#include <assert.h>
-
 #include "platform_lowlevel.h"
 #include "jthread.h"
 #include "object_layout.h"

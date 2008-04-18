@@ -14,10 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Ivan Volosyuk
- * @version $Revision: 1.6.4.4.4.3 $
- */  
 #include "open/vm_class_manipulation.h"
 #include "open/vm_ee.h"
 

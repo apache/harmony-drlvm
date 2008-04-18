@@ -14,10 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Ivan Volosyuk
- * @version $Revision: 1.19.4.5.4.3 $
- */  
 #include "interpreter.h"
 
 #include "open/vm_method_access.h"

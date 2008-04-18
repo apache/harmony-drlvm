@@ -14,13 +14,8 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Aleksey Ignatenko, Alexei Fedotov
- * @version $Revision: 1.1.2.1.4.3 $
- */  
-
-#ifndef _MEM_ALLOC_H_
-#define _MEM_ALLOC_H_
+#ifndef _MEM_ALLOC_H
+#define _MEM_ALLOC_H
 
 #include "open/rt_types.h"
 #include "port_vmem.h"
@@ -110,4 +105,4 @@ protected:
     port_vmem_t* _vmem;
 };
 
-#endif //_MEM_ALLOC_H_
+#endif /* _MEM_ALLOC_H */

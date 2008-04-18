@@ -14,12 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Alexei Fedotov
- * @version $Revision: 1.1.2.2.4.3 $
- */  
-
-
 // This file describes structures used to keep track of types, class, methods, fields, etc.
 
 #ifndef _TYPE_H_

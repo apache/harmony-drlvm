@@ -14,11 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Alexei Fedotov
- * @version $Revision: 1.1.2.2.4.4 $
- */  
-
 #ifndef _VM_COMPONENT_MANAGER_IMPL_H
 #define _VM_COMPONENT_MANAGER_IMPL_H
 

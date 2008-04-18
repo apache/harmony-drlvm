@@ -14,15 +14,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Alexei Fedotov
- * @version $Revision: 1.1.2.1.4.3 $
- */  
-
 // This describes the core VM interface to generic object functionality
 
-#ifndef _INTERFACE_OBJECT_H_
-#define _INTERFACE_OBJECT_H_
+#ifndef _INTERFACE_OBJECT_H
+#define _INTERFACE_OBJECT_H
 
 #include "jni_types.h"
 
@@ -39,4 +34,4 @@ jobject object_clone(JNIEnv*, jobject);
 #ifdef __cplusplus
 }
 #endif
-#endif /* _INTERFACE_OBJECT_H_ */
+#endif /* _INTERFACE_OBJECT_H */

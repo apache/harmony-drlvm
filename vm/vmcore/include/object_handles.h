@@ -14,11 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Alexei Fedotov
- * @version $Revision: 1.1.2.1.4.3 $
- */  
-
 #ifndef _OBJECT_HANDLES_H
 #define _OBJECT_HANDLES_H
 
@@ -252,8 +247,6 @@ struct ObjectHandlesNew {
     ObjectHandlesNew* next;
     ManagedObject* refs[1];
 };
-
-//MVM 20050202 Additional mnethod declaration
 
 // free and delete all local object handles
 VMEXPORT // temporary solution for interpreter unplug

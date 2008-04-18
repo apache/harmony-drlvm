@@ -14,12 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Evgueni Brevnov, Ivan Volosyuk
- * @version $Revision: 1.1.2.1.4.4 $
- */  
-
-
 #include "nogc.h"
 #include "jvmti_direct.h"
 #include "environment.h"

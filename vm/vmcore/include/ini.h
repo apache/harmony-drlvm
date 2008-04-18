@@ -14,11 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Alexei Fedotov
- * @version $Revision: 1.1.2.2.4.3 $
- */  
-
 
 //
 // VM Internal Native Interface
@@ -26,8 +21,8 @@
 
 
 
-#ifndef _INI_H_
-#define _INI_H_
+#ifndef _INI_H
+#define _INI_H
 
 #include "open/em.h"
 #include "jni_types.h"
@@ -51,4 +46,4 @@ vm_execute_java_method_array(jmethodID method,
 }
 #endif
 
-#endif
+#endif /* _INI_H */

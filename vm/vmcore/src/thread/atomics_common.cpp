@@ -14,11 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Andrey Chernyshev
- * @version $Revision: 1.1.2.1.4.4 $
- */  
-
 #include <apr_atomic.h>
 
 #include "jni.h"

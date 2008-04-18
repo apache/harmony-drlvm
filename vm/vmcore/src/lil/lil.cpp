@@ -14,29 +14,10 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Evgueni Brevnov, Ivan Volosyuk
- * @version $Revision: 1.1.2.2.4.4 $
- */  
-
-
-#include <assert.h>
-
-//MVM
-#include <iostream>
-
-using namespace std;
-
 #define LOG_DOMAIN "vm.helpers"
 #include "cxxlog.h"
 
-#include <stdarg.h>
-#include <stdio.h>
-#include <string.h>
-
 #include "lil.h"
-#include "open/types.h"
-#include "open/vm.h"
 #include "open/vm_type_access.h"
 #include "open/vm_method_access.h"
 #include "nogc.h"

@@ -23,14 +23,6 @@
 #include <thread_helpers.h>
 
 #include "platform_lowlevel.h"
-
-//MVM
-#include <iostream>
-
-using namespace std;
-
-#include <assert.h>
-
 #include "open/vm_util.h"
 #include "encoder.h"
 #include "nogc.h"

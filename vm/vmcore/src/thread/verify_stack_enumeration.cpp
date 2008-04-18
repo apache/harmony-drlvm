@@ -15,9 +15,6 @@
  *  limitations under the License.
  */
 /**
- * @author Salikh Zakirov
- * @version $Revision: 1.1.2.1.4.3 $
- *
  * @file 
  * Verify stack enumeration code by conservative scanning the stack
  */
