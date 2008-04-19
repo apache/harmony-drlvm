@@ -107,6 +107,8 @@ DECLARE_HELPER_INLINER(System_arraycopyReverse_Handler);
 DECLARE_HELPER_INLINER(String_compareTo_Handler_x_String_x_I);
 DECLARE_HELPER_INLINER(String_regionMatches_Handler_x_I_x_String_x_I_x_I_x_Z);
 DECLARE_HELPER_INLINER(String_indexOf_Handler_x_String_x_I_x_I);
+DECLARE_HELPER_INLINER(Float_floatToRawIntBits_x_F_x_I);
+DECLARE_HELPER_INLINER(Float_intBitsToFloat_x_I_x_F);
 
 void APIMagicsHandlerSession::runImpl() {
     CompilationContext* cc = getCompilationContext();
@@ -151,6 +153,12 @@ void APIMagicsHandlerSession::runImpl() {
                                 handlers.push_back(new (tmpMM) Long_numberOfLeadingZeros_Handler_x_J_x_I(irm, callInst, md));
                             } else if (!strcmp(methodName, "numberOfTrailingZeros") && !strcmp(signature, "(J)I")) {
                                 handlers.push_back(new (tmpMM) Long_numberOfTrailingZeros_Handler_x_J_x_I(irm, callInst, md));
+                            }
+                        } else if (!strcmp(className, "java/lang/Float")) {
+                            if (!strcmp(methodName, "floatToRawIntBits") && !strcmp(signature, "(F)I")) {
+                                handlers.push_back(new (tmpMM) Float_floatToRawIntBits_x_F_x_I(irm, callInst, md));
+                            } else if (!strcmp(methodName, "intBitsToFloat") && !strcmp(signature, "(I)F")) {
+                                handlers.push_back(new (tmpMM) Float_intBitsToFloat_x_I_x_F(irm, callInst, md));
                             }
                         } else if (mathAsMagic && !strcmp(className, "java/lang/Math")) {
                             if (!strcmp(signature, "(D)D")) { 
@@ -247,6 +255,24 @@ void Integer_numberOfLeadingZeros_Handler_x_I_x_I::run() {
     irm->newInstEx(Mnemonic_CMOVZ, 1, r1, r1, r2)->insertBefore(callInst);
     irm->newInstEx(Mnemonic_SUB, 1, res, irm->newImmOpnd(i32Type, 31), r1)->insertBefore(callInst);
 
+    callInst->unlink();
+}
+
+void Float_floatToRawIntBits_x_F_x_I::run() {
+
+    Opnd* arg = getCallSrc(callInst, 0);
+    Opnd* res = getCallDst(callInst);
+
+    irm->newCopyPseudoInst(Mnemonic_MOV, res, arg)->insertBefore(callInst);
+    callInst->unlink();
+}
+
+void Float_intBitsToFloat_x_I_x_F::run() {
+
+    Opnd* arg = getCallSrc(callInst, 0);
+    Opnd* res = getCallDst(callInst);
+
+    irm->newCopyPseudoInst(Mnemonic_MOV, res, arg)->insertBefore(callInst);
     callInst->unlink();
 }
 

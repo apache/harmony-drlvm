@@ -1166,6 +1166,14 @@ Inst * IRManager::newCopySequence(Opnd * targetBOpnd, Opnd * sourceBOpnd, uint32
     }else if (targetKind==OpndKind_Mem && sourceKind==OpndKind_FPReg){
         targetOpnd->setMemOpndAlignment(Opnd::MemOpndAlignment_16);
         return newInst(Mnemonic_FSTP, targetOpnd, sourceOpnd);
+    }else if (targetKind==OpndKind_XMMReg && (sourceKind==OpndKind_Mem || sourceKind==OpndKind_GPReg)){
+        if (sourceKind==OpndKind_Mem)
+            sourceOpnd->setMemOpndAlignment(Opnd::MemOpndAlignment_16);
+        return newInst(Mnemonic_MOVD, targetOpnd, sourceOpnd);
+    }else if ((targetKind==OpndKind_Mem || targetKind==OpndKind_GPReg) && sourceKind==OpndKind_XMMReg){
+        if (targetKind==OpndKind_Mem)
+            targetOpnd->setMemOpndAlignment(Opnd::MemOpndAlignment_16);
+        return newInst(Mnemonic_MOVD, targetOpnd, sourceOpnd);
     }else if (
         (targetKind==OpndKind_FPReg && sourceKind==OpndKind_XMMReg)||
         (targetKind==OpndKind_XMMReg && sourceKind==OpndKind_FPReg)
