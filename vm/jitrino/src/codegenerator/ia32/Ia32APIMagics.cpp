@@ -460,7 +460,15 @@ void Long_numberOfTrailingZeros_Handler_x_J_x_I::run() {
 void System_arraycopyDirect_Handler::run()
 {
     Node* currNode = callInst->getNode();
+    if (callInst!=currNode->getLastInst()) {
+        cfg->splitNodeAtInstruction(callInst, true, true, NULL);
+    }
+    UNUSED Node* nextNode = currNode->getUnconditionalEdgeTarget();
+    assert(nextNode!=NULL);
     assert( currNode->getOutEdge(Edge::Kind_Dispatch) == NULL);
+
+    callInst->unlink();
+
 #ifdef _EM64T_
     RegName counterRegName = RegName_RCX;
     RegName srcAddrRegName = RegName_RSI;
@@ -514,15 +522,13 @@ void System_arraycopyDirect_Handler::run()
     Inst* copyInst = irm->newInst(mn,dstAddr,srcAddr,counter);
     copyInst->setPrefix(InstPrefix_REP);
     currNode->appendInst(copyInst);
-
-    callInst->unlink();
 }
 
 void System_arraycopyReverse_Handler::run()
 {
     Node* currNode = callInst->getNode();
-    currNode->appendInst(irm->newInst(Mnemonic_PUSHFD));
-    currNode->appendInst(irm->newInst(Mnemonic_STD));
+    irm->newInst(Mnemonic_PUSHFD)->insertBefore(callInst);
+    irm->newInst(Mnemonic_STD)->insertBefore(callInst);
     System_arraycopyDirect_Handler directHandler(irm, callInst, NULL);
     directHandler.run();
 
