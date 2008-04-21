@@ -335,7 +335,7 @@ APR_DECLARE(void) log_abort()
     get()->p_abort();
 }
 
-APR_DECLARE(int) log_printf(const char* format, ...)
+APR_DECLARE_NONSTD(int) log_printf(const char* format, ...)
 {
     va_list args;
     int ret;

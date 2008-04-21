@@ -127,7 +127,7 @@ struct HyPortLibrary;
 void log_set_portlib(struct HyPortLibrary* portlib);
 
 /**
- * Sets a porting library for log system localization.
+ * Gets a porting library for log system localization.
  */
 struct HyPortLibrary* log_get_portlib();
 
@@ -169,7 +169,7 @@ APR_DECLARE(void) log_abort();
 /**
  * Writes formatted data to stdout via specified vfprinf function.
  */
-APR_DECLARE(int) log_printf(const char* format, ...);
+APR_DECLARE_NONSTD(int) log_printf(const char* format, ...);
 
 /**
  * Writes formatted header to stdout via specified vfprinf function.
