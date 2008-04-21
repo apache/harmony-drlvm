@@ -63,7 +63,7 @@
             <compilerarg value="/W3" if="is.windows"/>
             <compilerarg value="/WX" if="is.windows" unless="is.x86_64"/>
             <!-- C4996: 'function': was declared deprecated -->
-            <compilerarg value="/wd4996" if="is.windows" unless="is.x86"/>
+            <compilerarg value="/wd4996" if="is.windows"/>
 
 
             <defineset define="MACOSX" if="is.macosx"/>
@@ -102,9 +102,6 @@
 
             <defineset define="HY_NO_SIG" if="hy.skip.sig"/>
             <defineset define="HY_LOCAL_ZLIB" if="hy.skip.zlib"/>
-
-            <compilerarg value="/wd4996" if="is.windows" />
-
         </compiler>
 
         <compiler id="common.cpp.compiler" name="${hy.cpp.compiler}" extends="common.compiler">
@@ -134,7 +131,6 @@
 
             <syslibset libs="advapi32,odbc32,userenv,ws2_32,mswsock,psapi" if="is.windows"/>
 
-            <!--syslibset type="static" libs="z,pthread,xml2" if="is.unix.x86"/-->
             <syslibset type="shared" libs="m,dl,stdc++,rt" if="is.unix.x86"/>
             <!--linkerarg value="-lgcc_s" if="is.unix.x86" unless="is.icc"/-->
         </linker>
