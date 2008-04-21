@@ -20,8 +20,6 @@
 #define LOG_DOMAIN "vmls"
 #include "cxxlog.h"
 
-#include <assert.h>
-
 #include "open/vm_properties.h"
 #include "open/hythread.h"
 

@@ -161,7 +161,7 @@ vf_Result vf_Context_6::verify_method(Method_Handle method) {
             Address next_target_adr = (instr & (~3) ) + 4;
 
             //default target
-            Address target = instr + read_int32(m_bytecode + next_target_adr);
+            Address target = instr_get_int32_target(instr, m_bytecode + next_target_adr);
             new_generic_vector_constraint(target);
 
             // in tableswitch instruction target offsets are stored with shift = 4,
@@ -173,7 +173,7 @@ vf_Result vf_Context_6::verify_method(Method_Handle method) {
                 next_target_adr < instr + instr_len;
                 next_target_adr += shift)
             {
-                target = instr + read_int32(m_bytecode + next_target_adr);
+                target = instr_get_int32_target(instr, m_bytecode + next_target_adr);
                 new_generic_vector_constraint(target);
             }
         } else {

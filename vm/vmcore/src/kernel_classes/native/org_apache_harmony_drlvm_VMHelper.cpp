@@ -14,8 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-
-
 #include "org_apache_harmony_drlvm_VMHelper.h"
 
 #include "open/vm.h"

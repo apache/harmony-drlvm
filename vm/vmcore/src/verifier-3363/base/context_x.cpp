@@ -1755,8 +1755,8 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
             if( !workmap_can_push(1) ) return error(VF_ErrorDataFlow, "operand stack overflow");
 
             //extract JSR target. would be better to do it in dataflow_liner, but it's also not very good
-            Address target = instr + (opcode == OP_JSR_W ? 
-                read_int32(m_bytecode + instr + 1) : read_int16(m_bytecode + instr + 1));
+            Address target = opcode == OP_JSR_W ? instr_get_int32_target(instr, m_bytecode + instr + 1) :
+                instr_get_int16_target(instr, m_bytecode + instr + 1);
 
             //create OUTs
             SmConstant retaddr = SmConstant::getRetAddr(target);

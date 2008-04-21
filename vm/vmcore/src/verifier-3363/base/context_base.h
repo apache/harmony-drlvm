@@ -204,13 +204,23 @@ protected:
     int instr_get_len_compound(Address instr, OpCode opcode);
 
     //read two-byte value
-    static Address read_int16(Byte* ptr) {
+    static int16 read_int16(Byte* ptr) {
         return (ptr[0] << 8) | ptr[1];
     }
 
     //read four-byte value
-    static Address read_int32(Byte* ptr) {
+    static int32 read_int32(Byte* ptr) {
         return (ptr[0] << 24) | (ptr[1] << 16) | (ptr[2] << 8) | ptr[3];
+    }
+
+    //get a 16-bit jump target
+    static Address instr_get_int16_target(Address instr, Byte* ptr) {
+        return (Address) (instr + read_int16(ptr));
+    }
+
+    //get a 32-bit jump target
+    static Address instr_get_int32_target(Address instr, Byte* ptr) {
+        return (Address) (instr + read_int32(ptr));
     }
 
     //get properties specific for the given opcode
@@ -260,11 +270,8 @@ protected:
 
     //return the jump target for the given instruction
     static Address instr_get_jump_target(ParseInfo &pi, Byte* code, Address instr) {
-        if( pi.flags & PI_WIDEJUMP ) {
-            return instr + read_int32(code + instr + 1);
-        } else {
-            return instr + read_int16(code + instr + 1);
-        }        
+        return ( pi.flags & PI_WIDEJUMP ) ? instr_get_int32_target(instr, code + instr + 1) :
+            instr_get_int16_target(instr, code + instr + 1);
     }
 
     //is this opcode valid?

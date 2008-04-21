@@ -134,7 +134,7 @@ vf_Result vf_Context_5::parse(Address instr, int dead_code_parsing, FastStack<Ad
             Address next_target_adr = (instr & (~3) ) + 4;
 
             //default target
-            Address target = instr + read_int32(m_bytecode + next_target_adr);
+            Address target = instr_get_int32_target(instr, m_bytecode + next_target_adr);
             stack.push(target);
 
             mark_stackmap_point(target);
@@ -147,7 +147,7 @@ vf_Result vf_Context_5::parse(Address instr, int dead_code_parsing, FastStack<Ad
                 next_target_adr < instr + instr_len;
                 next_target_adr += shift)
             {
-                target = instr + read_int32(m_bytecode + next_target_adr);
+                target = instr_get_int32_target(instr, m_bytecode + next_target_adr);
                 // jump out of method or to the middle of an instruction
                 if( target >= m_code_length || props.isOperand(target) ) {
                     return error(VF_ErrorBranch, "jump out of method or to the middle of an instruction");
@@ -373,7 +373,7 @@ vf_Result vf_Context_5::DataflowLoop (Address instr, int workmap_is_a_copy_of_st
             Address next_target_adr = (instr & (~3) ) + 4;
 
             //default target
-            Address target = instr + read_int32(m_bytecode + next_target_adr);
+            Address target = instr_get_int32_target(instr, m_bytecode + next_target_adr);
             processSwitchTarget(target);
 
             // in tableswitch instruction target offsets are stored with shift = 4,
@@ -385,7 +385,7 @@ vf_Result vf_Context_5::DataflowLoop (Address instr, int workmap_is_a_copy_of_st
                 next_target_adr < instr + instr_len;
                 next_target_adr += shift)
             {
-                target = instr + read_int32(m_bytecode + next_target_adr);
+                target = instr_get_int32_target(instr, m_bytecode + next_target_adr);
                 processSwitchTarget(target);
             }
 

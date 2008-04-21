@@ -14,12 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Alexei Fedotov
- * @version $Revision: 1.1.2.2.4.5 $
- */  
-
-#include <apr_atomic.h>
 #include <apr_lib.h>
 #include <apr_strings.h>
 

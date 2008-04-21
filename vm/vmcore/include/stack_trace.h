@@ -45,7 +45,7 @@
  */
 
 #include <stdio.h>
-
+#include "open/hythread.h"
 #include "open/types.h"
 #include "ExpandableMemBlock.h"
 #include "vm_threads.h"
