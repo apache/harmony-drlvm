@@ -57,43 +57,6 @@
             <equals arg1="${hy.cfg}" arg2="debug" />
         </condition>
         
-        <condition property="is.unix.x86_64">
-            <and>
-                <isset property="is.unix"/>
-                <isset property="is.x86_64"/>
-            </and>
-        </condition>
-        <condition property="is.unix.x86">
-            <and>
-                <isset property="is.unix"/>
-                <isset property="is.x86"/>
-            </and>
-        </condition>
-        <condition property="is.unix.ia64">
-            <and>
-                <isset property="is.unix"/>
-                <isset property="is.ia64"/>
-            </and>
-        </condition>
-        <condition property="is.windows.x86">
-            <and>
-                <isset property="is.windows"/>
-                <isset property="is.x86"/>
-            </and>
-        </condition>
-        <condition property="is.windows.x86_64">
-            <and>
-                <isset property="is.windows"/>
-                <isset property="is.x86_64"/>
-            </and>
-        </condition>
-        <condition property="is.windows.ia64">
-            <and>
-                <isset property="is.windows"/>
-                <isset property="is.ia64"/>
-            </and>
-        </condition>
-
         <condition property="hy.asm.compiler" value="ml64">
             <and>
                 <isset property="is.windows"/>
