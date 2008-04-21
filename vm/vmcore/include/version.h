@@ -19,13 +19,6 @@
 
 #include "version_svn_tag.h"
 
-// These macros are automatically updated upon commit.
-// PLEASE DO NOT TOUCH
-#define PATCH_BRANCH "DRLVM HEAD"
-#define PATCH_LEVEL 4807
-#define PATCH_DATE "2006-05-02"
-// end of automatically updated macros
-
 #if defined(__INTEL_COMPILER)
 #if defined(__GNUC__)
 #define VERSION_COMPILER "icc " EXPAND(__INTEL_COMPILER)
@@ -47,8 +40,6 @@
 #else
 #define VERSION_DEBUG_STRING "debugging mode unknown"
 #endif
-
-#define BUILD_TIME "Build time " __DATE__ " " __TIME__
 
 #if defined(PLATFORM_POSIX)
 #define VERSION_OS "Linux"
