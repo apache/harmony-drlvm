@@ -253,13 +253,13 @@
         </copy>
     </target>
     
-    <target name="-check-version" if="svn.revision">
+    <target name="-check-version" if="is.svn">
         <uptodate property="skip.svn.stamp" 
             srcfile="${vm.home}/.svn/entries" 
             targetfile="${vm.home}/vmcore/include/version_svn_tag.h"/>
     </target>
 
-    <target name="-copy-version" unless="svn.revision">
+    <target name="-copy-version" unless="is.svn">
         <copy file="${vm.home}/vmcore/include/version_svn_tag_orig.h"
               tofile="${vm.home}/vmcore/include/version_svn_tag.h" overwrite="false">
         </copy>
