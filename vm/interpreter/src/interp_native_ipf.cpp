@@ -14,10 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Ivan Volosyuk
- * @version $Revision: 1.21.4.5.4.3 $
- */  
 #include "interpreter.h"
 #include "interpreter_exports.h"
 #include "interpreter_imports.h"
@@ -41,14 +37,14 @@ uint64* interpreter_get_stacked_register_address(uint64* bsp, unsigned reg) {
         case M2N_OBJECT_HANDLES:
             return (uint64*) &m2n->local_object_handles;
         case M2N_METHOD:
-            DEBUG2("get_stacked_register_address for method\n");
-            ABORT("Unexpected register");
+            INFO("get_stacked_register_address for method:");
+            DIE(("Unexpected register"));
         case M2N_FRAME_TYPE:
             return (uint64*) &m2n->current_frame_type;
             
         default:
-            DEBUG2("get_stacked_register_address: " << (int)reg);
-            ABORT("Unexpected register");
+            INFO("get_stacked_register_address: " << (int)reg);
+            DIE(("Unexpected register"));
     }
     return 0;
 }
@@ -76,7 +72,7 @@ interpreter_execute_native_method(
     DEBUG_TRACE("\n<<< interpreter_invoke_native: "
            << method->get_class()->get_name()->bytes << " "
            << method->get_name()->bytes
-           << method->get_descriptor()->bytes << endl);
+           << method->get_descriptor()->bytes);
 
     GenericFunctionPointer f = interpreterGetNativeMethodAddr(method);
     if (f == 0) {
@@ -157,7 +153,7 @@ interpreter_execute_native_method(
                 arg_words[argId++] = args[pos++].j;
                 break;
             default:
-                ABORT("Unexpected java type");
+                DIE(("Unexpected java type"));
         }
     }
     assert(argId <= sz + 2);
@@ -236,9 +232,9 @@ interpreter_execute_native_method(
             break;
 
         default:
-            ABORT("Unexpected java type");
+            DIE(("Unexpected java type"));
     }
-    DEBUG("invokeJNI: done\n");
+    TRACE("invokeJNI: done\n");
 
     if (exn_raised()) {
         if ((resultPtr != NULL) && (ret_type != JAVA_TYPE_VOID)) {   
@@ -267,7 +263,7 @@ void
 interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *method) {
 
     DEBUG_TRACE("\n<<< native_invoke_static     : " << method);
-    DEBUG_TRACE_PLAIN("interpreter static native: " << frame.method);
+    TRACE("interpreter static native: " << frame.method);
 
     GenericFunctionPointer f = interpreterGetNativeMethodAddr(method);
     if (f == 0) {
@@ -363,7 +359,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
                 pos-= 2;
                 break;
             default:
-                ABORT("Unexpected java type");
+                DIE(("Unexpected java type"));
         }
     }
     assert(*mtype == ')');
@@ -410,7 +406,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
                 if (ref != 0) {
                     ASSERT_OBJECT(*ref);
                     if (!*ref) {
-                        DEBUG2(
+                        INFO(
                         "VM WARNING: Reference with null value returned from jni function:\n"
                         "VM WARNING: Method name: "
                         << method->get_class()->get_name()->bytes
@@ -514,9 +510,9 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
             break;
 
         default:
-            ABORT("Unexpected java type");
+            DIE(("Unexpected java type"));
     }
-    DEBUG("invokeJNI: done\n");
+    TRACE("invokeJNI: done\n");
 
     if (method->is_synchronized()) {
         vm_monitor_exit_wrapper(frame.This);
@@ -536,7 +532,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
     assert(method->is_native());
     assert(!method->is_static());
 
-    DEBUG_TRACE_PLAIN("interpreter virtual native: " << frame.method);
+    TRACE("interpreter virtual native: " << frame.method);
     DEBUG_TRACE("\n<<< native_invoke_virtual: " << method);
 
     uword *args = (uword*) ALLOC_FRAME((sz + 1) * sizeof(uword));
@@ -631,7 +627,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
                 pos-=2;
                 break;
             default:
-                ABORT("Unexpected java type");
+                DIE(("Unexpected java type"));
         }
     }
     assert(*mtype == ')');
@@ -677,7 +673,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
                 if (ref != 0) {
                     ASSERT_OBJECT(*ref);
                     if (!*ref) {
-                        DEBUG2(
+                        INFO(
                         "VM WARNING: Reference with null value returned from jni function:\n"
                         "VM WARNING: Method name: "
                         << method->get_class()->get_name()->bytes
@@ -782,9 +778,9 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
             break;
 
         default:
-            ABORT("Unexpected java type");
+            DIE(("Unexpected java type"));
     }
-    DEBUG("invokeJNI: done\n");
+    TRACE("invokeJNI: done\n");
 
     if (method->is_synchronized()) {
         vm_monitor_exit_wrapper(frame.This);

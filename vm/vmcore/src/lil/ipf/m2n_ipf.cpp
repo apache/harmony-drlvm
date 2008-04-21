@@ -14,15 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Evgueni Brevnov, Ivan Volosyuk
- * @version $Revision: 1.1.2.1.4.4 $
- */  
-
-
-#define LOG_DOMAIN = "vm.m2n"
-#include "cxxlog.h"
-
 #include "Code_Emitter.h"
 #include "environment.h"
 #include "m2n.h"
@@ -149,21 +140,19 @@ NativeCodePtr m2n_get_ip(M2nFrame* m2nf)
 void m2n_set_ip(M2nFrame* lm2nf, NativeCodePtr ip)
 {
     assert(lm2nf);
-    ABORT("Not implemented");
+    DIE(("Not implemented"));
 }
 
 // sets pointer to the registers used for jvmti PopFrame
 void set_pop_frame_registers(M2nFrame* m2nf, Registers* regs) {
     // FIXME: not sure we want to support this function on IPF
-    assert(0);
-    abort();
+    DIE(("Not implemented"));
 }
 
 // returns pointer to the registers used for jvmti PopFrame
 Registers* get_pop_frame_registers(M2nFrame* m2nf) {
     // FIXME: not sure we want to support this function on IPF
-    assert(0);
-    abort();
+    DIE(("Not implemented"));
     return 0;
 }
 

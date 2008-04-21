@@ -14,21 +14,13 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Evgueni Brevnov
- * @version $Revision: 1.1.2.1.4.3 $
- */  
-
 #ifndef _MERCED_CODE_EMITTER_H
 #define _MERCED_CODE_EMITTER_H
 
-#include <stdio.h>
-
-#include "merced.h"
-#include "bit_vector.h"
 #include "open/types.h"
 #include "Emitter_IR.h"
-#include "log_macro.h"
+#include "merced.h"
+#include "bit_vector.h"
 #include "vm_java_support.h"
 
 typedef Encoder_Instr_IR   Instr_IR;
@@ -257,7 +249,7 @@ public:
 
     void ipf_nop (EM_Syllable_Type tv, unsigned imm21=0)
       { encoder->ipf_nop(tv, imm21);
-        ABORT("Not implemented");  //ToDo: nop assumes several form depending on which slot
+        DIE(("Not implemented"));  //ToDo: nop assumes several form depending on which slot
     }
 
     void ipf_add (unsigned dest, unsigned src1, unsigned src2, unsigned pred=0)
@@ -410,7 +402,7 @@ public:
     
     void ipf_brcall (Branch_Prefetch_Hint ph, Branch_Whether_Hint wh, Branch_Dealloc_Hint dh, unsigned b1, unsigned target25, unsigned pred=0)
       { // No relative address calls in JIT or VM
-        ABORT("No relative address calls in JIT or VM");}
+        DIE(("No relative address calls in JIT or VM"));}
 
     void ipf_bri (Branch_Type btype, Branch_Prefetch_Hint ph, Branch_Whether_Hint wh, Branch_Dealloc_Hint dh, unsigned b2, unsigned pred=0)
       { assert(btype == br_cond);
@@ -1362,7 +1354,7 @@ protected:
 
 private:
 
-    void operator delete (void *) { ABORT("Not implemented"); }
+    void operator delete (void *) { DIE(("Not implemented")); }
 
 
 protected: // data
@@ -1751,7 +1743,7 @@ public:
     }
 private: // functions
 
-    void operator delete (void *) { ABORT("Not implemented"); }
+    void operator delete (void *) { DIE(("Not implemented")); }
 
     virtual void emit_bundle(Bundle_IR * bundle);
     virtual void place_instr_into_slot(Bundle_IR * bundle, int slot, Unsch_Instr_IR& instr, unsigned need_stop);
@@ -1897,7 +1889,7 @@ public:
 
 private:
 
-    void operator delete (void *) { ABORT("Not implemented"); }
+    void operator delete (void *) { DIE(("Not implemented")); }
 
     // set whether instruction sets/resets reference
     void set_def_ref (bool def_ref) {
@@ -1942,6 +1934,5 @@ private:  // data
 //                     Statistics gathering
 ////////////////////////////////////////////////////////////////////////////////
 
-#endif // __CODE_EMITTER_H
-
+#endif /* _CODE_EMITTER_H */
 

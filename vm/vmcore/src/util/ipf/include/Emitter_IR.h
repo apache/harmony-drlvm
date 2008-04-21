@@ -14,18 +14,12 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Evgueni Brevnov
- * @version $Revision: 1.1.2.1.4.3 $
- */  
-
 #ifndef _EMITTER_IR_H
 #define _EMITTER_IR_H
 
+#include "tl/memory_pool.h"
 #include "merced.h"
 #include "open/types.h"
-#include "tl/memory_pool.h"
-#include "log_macro.h"
 
 // defines
 
@@ -45,7 +39,7 @@ class IPF_Encoder : public Merced_Encoder {
         // assure little-endian because get_slot01_code_image() needs it
     }
 
-    void code_emit() { ABORT("Not implemented"); }     // shouldn't be called
+    void code_emit() { DIE(("Not implemented")); }     // shouldn't be called
 
     void get_slot01_code_image(uint64 *p_code_image1, uint64 *p_code_image2) {
         uint64& code_image1 = *p_code_image1;

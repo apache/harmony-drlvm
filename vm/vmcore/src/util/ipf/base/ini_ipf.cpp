@@ -14,32 +14,20 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Evgueni Brevnov
- * @version $Revision: 1.1.2.1.4.3 $
- */  
-//
+#define LOG_DOMAIN "init.ipf"
+#include "cxxlog.h"
+
+#include "open/types.h"
+#include "open/vm_util.h"
+#include "open/hythread_ext.h"
 
 // Internal Native Interface
-//
-
-//MVM
-#include <iostream>
-
-using namespace std;
-
-#include <stdio.h>
-#include <assert.h>
-
 #include "environment.h"
-#include "open/types.h"
 #include "Class.h"
 #include "exceptions.h"
 #include "vm_threads.h"
 
 #include "compile.h"
-#include "open/vm_util.h"
-#include "open/hythread_ext.h"
 
 #include "merced.h"
 #include "vm_stats.h"
@@ -50,11 +38,8 @@ using namespace std;
 #include "nogc.h"
 #include "open/gc.h"
 #include "interpreter.h"
-#include "cxxlog.h"
-
-
 #include "ini.h"
-
+#include "vtable.h"
 
 
 void *get_vm_execute_java_method()

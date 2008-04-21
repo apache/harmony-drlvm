@@ -16,10 +16,10 @@
  */
 #ifndef TL_MEMORY_POOL_H
 #define TL_MEMORY_POOL_H
+#include "clog.h"
 
 #include <apr_pools.h>
 #include "open/types.h"
-#include "clog.h"
 
 namespace tl {
 

@@ -19,6 +19,7 @@
 
 tl::MemoryPool::MemoryPool()
 {
+    VERIFY_SUCCESS(apr_initialize());
     VERIFY_SUCCESS(apr_pool_create(&pool, NULL));
 }
 
@@ -30,6 +31,8 @@ tl::MemoryPool::MemoryPool(const MemoryPool * parent)
 tl::MemoryPool::~MemoryPool()
 {
     apr_pool_destroy(pool);
+    // decrease number of APR instances
+    apr_terminate();
 }
 
 void * tl::MemoryPool::alloc(size_t size)

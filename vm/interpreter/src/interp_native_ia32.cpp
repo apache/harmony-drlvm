@@ -255,7 +255,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
     }
 
     DEBUG_TRACE("\n<<< native_invoke_static     : " << method);
-    DEBUG_TRACE_PLAIN("interpreter static native: " << frame.method);
+    TRACE("interpreter static native: " << frame.method);
 
     M2N_ALLOC_MACRO;
     
@@ -354,7 +354,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
                 if (ref != 0) {
                     ASSERT_OBJECT(*ref);
                     if (!*ref) {
-                        DEBUG2(
+                        INFO(
                         "VM WARNING: Reference with null value returned from jni function:\n"
                         "VM WARNING: Method name: " << method <<
                         "\nVM WARNING: Not allowed, return NULL (0) instead\n");
@@ -471,7 +471,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
     assert(method->is_native());
     assert(!method->is_static());
 
-    DEBUG_TRACE_PLAIN("interpreter virtual native: " << frame.method);
+    TRACE("interpreter virtual native: " << frame.method);
     DEBUG_TRACE("\n<<< native_invoke_virtual: " << method);
 
     uword *args = (uword*) ALLOC_FRAME((sz + 1) * sizeof(uword));
@@ -576,7 +576,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
                     ASSERT_OBJECT(*ref);
 
                     if (!*ref) {
-                        DEBUG2(
+                        INFO(
                         "VM WARNING: Reference with null value returned from jni function:\n"
                         "VM WARNING: Method name: " << method << 
                         "\nVM WARNING: Not allowed, return NULL (0) instead\n");

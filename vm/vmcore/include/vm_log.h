@@ -20,7 +20,7 @@
 #ifndef _VMCORE_LOG_H
 #define _VMCORE_LOG_H
 
-//#include "open/vm_log.h"
+#include "cxxlog.h"
 #include "object_layout.h"
 #include "object_handles.h"
 #include "vtable.h"
@@ -101,3 +101,4 @@ inline LoggerString& operator<<(LoggerString& log, const jobject jobj) {
 }
 
 #endif /* _VMCORE_LOG_H */
+

@@ -14,26 +14,14 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Evgueni Brevnov, Ivan Volosyuk
- * @version $Revision: 1.1.2.1.4.4 $
- */  
-//
-
-
-
-//MVM
-#include <iostream>
+#define LOG_DOMAIN "vm.helpers"
+#include "cxxlog.h"
 
 #ifdef PLATFORM_POSIX
 #include <unistd.h>
 #endif
 
-using namespace std;
-
 #include <stdlib.h>
-#include <stdio.h>
-#include <assert.h>
 #include <float.h>
 #include <math.h>
 
@@ -68,9 +56,6 @@ using namespace std;
 #include "Code_Emitter.h"
 #include "stub_code_utils.h"
 #include "vm_ipf.h"
-
-#define LOG_DOMAIN "vm.helpers"
-#include "cxxlog.h"
 
 #include "dump.h"
 #include "vm_stats.h"
@@ -684,7 +669,7 @@ static void emit_fast_type_check_without_vm_stats(Merced_Code_Emitter& emitter,
     {
         emitter.ipf_ld(int_mem_size_4, mem_ld_none, mem_none, sc3, sub_object);
         emitter.ipf_adds(sc6, offset_depth, super_class);
-        emit_mov_imm_compactor(emitter, sc4, offset_superclasses + vm_get_vtable_base_address());
+        emit_mov_imm_compactor(emitter, sc4, offset_superclasses + (UDATA) vm_get_vtable_base_address());
     }
     else
     {
@@ -735,7 +720,7 @@ static void emit_fast_type_check_without_vm_stats(Merced_Code_Emitter& emitter,
         (void **)p_class_is_subtype,
         out0, save_pfs, save_b0, save_gp);
     // sc3 contains the vtable pointer or the vtable offset
-    emit_mov_imm_compactor(emitter, sc2, (vm_is_vtable_compressed() ? vm_get_vtable_base_address() : 0) + offset_clss);
+    emit_mov_imm_compactor(emitter, sc2, (vm_is_vtable_compressed() ? (UDATA) vm_get_vtable_base_address() : 0) + offset_clss);
     emitter.ipf_add(sc1, sc2, sc3);
     emitter.ipf_ld(int_mem_size_8, mem_ld_none, mem_none, out0+0, sc1);
     emitter.ipf_mov(out0+1, super_class);
@@ -966,7 +951,7 @@ static void emit_get_array_element_class(Merced_Code_Emitter& emitter, int src, 
     if (vm_is_vtable_compressed())
     {
         emitter.ipf_ld(int_mem_size_4, mem_ld_none, mem_none, sc5, src);
-        emit_mov_imm_compactor(emitter, sc1, vm_get_vtable_base_address() + offset_clss);
+        emit_mov_imm_compactor(emitter, sc1, (UDATA) vm_get_vtable_base_address() + offset_clss);
     }
     else
     {

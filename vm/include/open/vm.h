@@ -113,15 +113,6 @@ VMEXPORT Field_Handle class_get_instance_field_recursive(Class_Handle ch, unsign
  VMEXPORT unsigned class_get_unboxed_data_offset(Class_Handle ch);
 
 /**
- * @return The class of the array element of the given class.
- *
- * The behavior is undefined if the parameter does not represent
- * an array class.
- */
- VMEXPORT Class_Handle class_get_array_element_class(Class_Handle ch);
-
-
-/**
  * @return Class handle given object's <code>VTable_Handle</code>.
  */ 
  DECLARE_OPEN(Class_Handle, vtable_get_class, (VTable_Handle vh));

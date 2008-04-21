@@ -15,28 +15,18 @@
  *  limitations under the License.
  */
 /**
- * @version $Revision: 1.23.4.1.4.3 $
- */
-
-/**
  * @file
  * Major interpreter-related definitions.
  */
-#include "cxxlog.h"
-#include "vm_log.h"
-
 #include "environment.h"
 #include "vm_threads.h"
 #include "open/bytecodes.h"
 #include "open/vm_util.h"
 #include "ini.h"
 #include "jvmti_types.h"
+#include "vm_log.h"
 
 //#define INTERPRETER_DEEP_DEBUG
-/** \def DEBUG_PRINT(a)
-  * \brief Calls <code>TRACE2</code> with the interpreter category.*/
-#define DEBUG_PRINT(a) TRACE2("interpreter", a)
-
 /** \def DEBUG(a)
   * \brief Does nothing.*/
 #define DEBUG(a)
@@ -47,8 +37,8 @@
 #  define DEBUG_BYTECODE(a)
 #else
 /** \def DEBUG_BYTECODE(a)
-  * \brief If <code>DEBUG</code> is on, calls DEBUG_PRINT(a).*/
-#  define DEBUG_BYTECODE(a) { if (frame.dump_bytecodes)  DEBUG_PRINT(a); }
+  * \brief If <code>DEBUG</code> is on, calls TRACE(a).*/
+#  define DEBUG_BYTECODE(a) { if (frame.dump_bytecodes)  TRACE(a); }
 #endif
 
 /** \def DEBUG_GC(a)
@@ -57,15 +47,8 @@
   */
 #define DEBUG_GC(a)             TRACE2("gc_interpreter", a)
 
-/** \def DEBUG2(a)
-  * \brief Calls <code>INFO(a)</code>.*/
-#define DEBUG2(a) INFO(a)
 /** <code>TRUE</code> if the interpreter enables debug.*/
 extern bool interpreter_enable_debug;
-
-/** \def DEBUG_TRACE_PLAIN(a) 
-  * \brief Calls <code>TRACE2</code> with the interpreter category.*/
-#define DEBUG_TRACE_PLAIN(a)    TRACE2("interpreter", a)
 
 /** \def DEBUG_TRACE(a)
   * \brief Calls <code>TRACE2</code> with the <code>folded_interpreter</code>

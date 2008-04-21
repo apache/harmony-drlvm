@@ -14,19 +14,12 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/** 
- * @author Intel, Evgueni Brevnov
- * @version $Revision: 1.1.2.1.4.3 $
- */  
-//
-
+#define LOG_DOMAIN "emitter.ipf"
+#include "cxxlog.h"
 
 #include <memory.h> 
 #include "open/types.h"
 #include "Code_Emitter.h"
-
-#define LOG_DOMAIN "emitter.ipf"
-#include "cxxlog.h"
 
 /////////////////////////////////////////////////////////////////////////////
 //               Statistics gathering
@@ -249,8 +242,7 @@ Merced_Code_Emitter::Merced_Code_Emitter (tl::MemoryPool & m, unsigned byteCodeS
     memset(reg_map,0x80,ENC_N_REG);  
 
     // FIXME cannot use passed memory pool 
-    VERIFY(APR_SUCCESS == apr_allocator_create(&allocator), \
-        "Cannot create memory allocator");
+    VERIFY_SUCCESS(apr_allocator_create(&allocator));
     arena = apr_allocator_alloc(allocator, estimate_mem_size(byteCodeSize));
     arena->next = NULL;
 
@@ -417,7 +409,7 @@ static void encode_slot(Byte * bundle, uint64 instr, int slot)
         u=(uint64 *)(bundle + 8);
         *u |= instr << 23;
         break;
-    default: ASSERT(0, "Unexpected slot");
+    default: DIE(("Unexpected slot"));
     }
 }
  
@@ -448,7 +440,7 @@ static uint64 encode_nop_wo_imm(EM_Syllable_Type syl_type) {
         nop_code = 0x4000000000;
         break;
     default:
-        ASSERT(0, "Unexpected syllable type");
+        DIE(("Unexpected syllable type"));
     }
     return nop_code;
 }
@@ -472,7 +464,7 @@ static inline uint64 typed_nop(EM_Syllable_Type syl_type)
     case ST_i: return nop_i;
     case ST_b: return nop_b;
     case ST_f: return nop_f;
-    default: ASSERT(0, "Unexpected syllable type");
+    default: DIE(("Unexpected syllable type"));
     }
     return 0;
 }
@@ -1154,7 +1146,7 @@ void Merced_Code_Emitter::schedule_an_IR (Unsch_Instr_IR& ir) {
             schedule_two_IR_ne(prev_ir, ir, curr_instr_couple_is_unordered);
         coupled_instr_state = ENC_single_instr;
         break;
-    default: ASSERT(0, "Unknown instruction state");
+    default: DIE(("Unknown instruction state"));
     }
 }
 
@@ -1183,7 +1175,7 @@ void Branch_Patch::apply(char * code_buf, uint64* target_offset_tbl) {
         u=(uint64*)(code_buf+offset+8);
         *u |= imm21_fmt <<36;
         break;
-    default: ASSERT(0, "Unexpected slot");
+    default: DIE(("Unexpected slot"));
     }
 }
 
@@ -1358,7 +1350,7 @@ void Merced_Code_Emitter::emit_bundle(Bundle_IR * bundle_ir) {
                 patches=new(mem_pool) Movl_Patch(patches,curr_offset,sl_n, patch_target_id); 
                 break;
             default:
-                ASSERT(0, "Unexpected syllable type");
+                DIE(("Unexpected syllable type"));
             }
         }
     }

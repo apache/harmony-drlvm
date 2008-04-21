@@ -300,7 +300,7 @@ static void emit_convertToByteArray_override(Emitter_Handle eh, Method *method) 
 
 static unsigned default_override_size(Method *m)
 {
-    ABORT("Not implemented");
+    DIE(("Not implemented"));
     return 0;
 }
 
@@ -337,7 +337,7 @@ void compile_flush_generated_code() {
 
 // 20030711: This function might not be compressed references safe
 static void protect_value_type(Class_Handle c, uint64* start, GcFrame* gc) {
-    ABORT("It is supposed that the function is never called");
+    DIE(("It is supposed that the function is never called"));
     assert(!hythread_is_suspend_enabled());
     unsigned num_fields = class_num_instance_fields_recursive(c);
     for(unsigned i=0; i<num_fields; i++) {
@@ -415,7 +415,7 @@ void compile_protect_arguments(Method_Handle method, GcFrame* gc) {
         case VM_DATA_TYPE_VALUE:
         {
             // 20030711: Must verify this with the calling convention
-            ABORT("Unexpected data type");
+            DIE(("Unexpected data type"));
             // This should never cause loading
             Class_Handle c = type_info_get_class(tih);
             assert(c);
@@ -423,7 +423,7 @@ void compile_protect_arguments(Method_Handle method, GcFrame* gc) {
             break;
         }
         default:
-            ABORT("Unexpected data type");
+            DIE(("Unexpected data type"));
         }
     }
 }

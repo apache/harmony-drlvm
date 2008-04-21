@@ -2501,7 +2501,7 @@ interpreter(StackFrame &frame) {
     int stackLength = 0;
     size_t available;
     
-    DEBUG_TRACE_PLAIN("interpreter: " << frame.method);
+    TRACE("interpreter: " << frame.method);
 
     assert(frame.method->is_static() || frame.This);
     
@@ -2950,14 +2950,14 @@ restart:
                     case OPCODE_IINC: Opcode_WIDE_IINC(frame); break;
                     case OPCODE_RET: Opcode_WIDE_RET(frame); break;
                     default:
-                     DEBUG2("wide bytecode " << (int)*ip1 << " not implemented\n");
+                     INFO("wide bytecode " << (int)*ip1 << " not implemented\n");
                      stackDump(stdout, frame);
                      DIE(("Unexpected wide bytecode"));
                 }
                 break;
             }
 
-            default: DEBUG2("bytecode " << (int)ip0 << " not implemented\n");
+            default: INFO("bytecode " << (int)ip0 << " not implemented\n");
                      stackDump(stdout, frame);
                      DIE(("Unexpected bytecode"));
         }

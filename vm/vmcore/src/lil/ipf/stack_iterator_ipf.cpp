@@ -435,13 +435,13 @@ StackIterator* si_create_from_native(VM_thread* thread)
 // We do not support threads suspended in managed code yet.
 StackIterator* si_create_from_registers(Registers*, bool is_ip_past, M2nFrame*)
 {
-    ABORT("Not implemented");
+    DIE(("Not implemented"));
     return NULL;
 }
 
 void si_fill_from_registers(StackIterator* si, Registers*, bool is_ip_past, M2nFrame*)
 {
-    ABORT("Not implemented");
+    DIE(("Not implemented"));
 }
 
 size_t si_size(){
@@ -537,7 +537,7 @@ void si_set_ip(StackIterator* si, NativeCodePtr ip, bool also_update_stack_itsel
 // 20040713 Experimental: set the code chunk in the stack iterator
 void si_set_code_chunk_info(StackIterator* si, CodeChunkInfo* cci)
 {
-    ABORT("Not implemented");
+    DIE(("Not implemented"));
 }
 
 CodeChunkInfo* si_get_code_chunk_info(StackIterator* si)
@@ -612,11 +612,11 @@ void si_transfer_control(StackIterator* si)
 
 void si_copy_to_registers(StackIterator* si, Registers*)
 {
-    ABORT("Not implemented");
+    DIE(("Not implemented"));
 }
 
 void si_set_callback(StackIterator* si, NativeCodePtr* callback) {
-    ABORT("Not implemented");
+    DIE(("Not implemented"));
 }
 
 extern "C" void do_loadrs_asm(int loadrs);

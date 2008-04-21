@@ -364,7 +364,7 @@ public:
                 return i;
         }
 
-        ABORT("Label not found");
+        DIE(("Label not found"));
         return 0;
     }  // get_label_id
 
@@ -539,7 +539,7 @@ public:
         }
 
         default:
-            ASSERT(0, "Unklown variable kind");
+            DIE(("Unklown variable kind"));
             return new(mem) LcgIpfLoc(LLK_Gr, 0);  // should never be reached
         }
     }  // get_var_loc
@@ -918,7 +918,7 @@ private:
             emitter.ipf_shl(dest_reg, src1_reg, src2_reg, current_predicate);
             break;
         default:
-            ASSERT(0, "Unexpected operation");  // control should never reach this point
+            DIE(("Unexpected operation"));  // control should never reach this point
         }
 
         if (dest->kind == LLK_Stk) {
@@ -972,7 +972,7 @@ private:
                 emitter.ipf_and(dest_reg->addr, tmp_addl->addr, src_reg->addr, current_predicate);
             }
         } else {
-            ASSERT(0, "Unexpected operation");  // invalid value in o
+            DIE(("Unexpected operation"));  // invalid value in o
         }
 
         if (dest_reg != dest) {
@@ -1040,7 +1040,7 @@ private:
             emitter.ipf_zxt(sxt_size_4, dest_reg, src_reg, current_predicate);
             break;
         default:
-            ASSERT(0, "Unexpected operation");  // control should never reach this point
+            DIE(("Unexpected operation"));  // control should never reach this point
         }
 
         if (dest->kind == LLK_Stk) {
@@ -1106,7 +1106,7 @@ private:
                 emitter.ipf_stf(float_mem_size_d, mem_st_spill, mem_none, tmp_addr1->addr, src->addr, current_predicate);
             }
             else {
-                ASSERT(0, "Unexpected kind");  // src shouldn't be a GR!
+                DIE(("Unexpected kind"));  // src shouldn't be a GR!
             }
         }
         else if (dest->kind == LLK_Gr) {
@@ -1121,7 +1121,7 @@ private:
                 emitter.ipf_mov(dest->addr, src->addr, current_predicate);
             }
             else {
-                ASSERT(0, "Unexpected kind");  // src->kind shouldn't be LLK_Fr or LLK_Stk16
+                DIE(("Unexpected kind"));  // src->kind shouldn't be LLK_Fr or LLK_Stk16
             }
         }
         else if (dest->kind == LLK_Fr)  {
@@ -1142,11 +1142,11 @@ private:
                 emitter.ipf_fmov(dest->addr, src->addr, current_predicate);
             }
             else {
-                ASSERT(0, "Unexpected kind");  // src should not be GR!
+                DIE(("Unexpected kind"));  // src should not be GR!
             }
         }
         else {
-            ASSERT(0, "Unknown kind");  // dest->kind has illegal value!
+            DIE(("Unknown kind"));  // dest->kind has illegal value!
         }
     }  // move
 
@@ -1185,7 +1185,7 @@ private:
                 op1_reg = op1_loc->addr;
             }
             else {
-                ASSERT(0, "Wrong kind");  // comparisons available only for ints!
+                DIE(("Wrong kind"));  // comparisons available only for ints!
             }
         }
 
@@ -1208,7 +1208,7 @@ private:
                     op2_reg = op2_loc->addr;
                 }
                 else {
-                    ASSERT(0, "Wrong kind");  // comparisons available only for ints!
+                    DIE(("Wrong kind"));  // comparisons available only for ints!
                 }
             }
         }
@@ -1234,7 +1234,7 @@ private:
         case LP_Ult:
             emitter_p = icmp_ltu; break;
         default:
-            ASSERT(0, "Unknown predicate");  // should never be reached
+            DIE(("Unknown predicate"));  // should never be reached
         }
 
         emitter.ipf_cmp(emitter_p, cmp_unc, true_pr, false_pr, op1_reg, op2_reg, false, 0);
@@ -1310,7 +1310,7 @@ private:
                 if (iloc)
                     emitter.ipf_shladd(tmp_addr3->addr, iloc->addr, shift, 0, current_predicate);
                 else // no index
-                    ASSERT(0, "Can't have no base, no index and no offset");
+                    DIE(("Can't have no base, no index and no offset"));
             }
             return tmp_addr3;
         }  // else (bloc)
@@ -1542,7 +1542,7 @@ public:
                     result = op1_imm << op2_imm;
                     break;
                 default:
-                    ASSERT(0, "Unexpected LIL operation");   // control should never reach this point
+                    DIE(("Unexpected LIL operation"));   // control should never reach this point
                 }
                 move_imm(dest_loc, result);
             }
@@ -1561,7 +1561,7 @@ public:
                     bin_op(o, dest_loc, tmp_res, src2_loc);
                     break;
                 default:
-                    ASSERT(0, "Unexpected LIL operation");  // control should never reach this point
+                    DIE(("Unexpected LIL operation"));  // control should never reach this point
                 }
             }
             else if (lil_operand_is_immed(op2)) {
@@ -1604,7 +1604,7 @@ public:
                     result = (int64) (uint64) (uint32) imm;
                     break;
                 default:
-                    ASSERT(0, "Unexpected LIL operation");  // control should never reach this point
+                    DIE(("Unexpected LIL operation"));  // control should never reach this point
                 }
                 move_imm(dest_loc, result);
             }
@@ -1658,15 +1658,15 @@ public:
         case LT_F4:
         case LT_F8:
         case LT_Void:
-            ASSERT(0, "Unexpected LIL type");  // types not allowed in loads / stores
+            DIE(("Unexpected LIL type"));  // types not allowed in loads / stores
         default:
-            ASSERT(0, "Unknown LIL type");  // invalid value in type
+            DIE(("Unknown LIL type"));  // invalid value in type
         }
 
         Ld_Flag ld_flag = mem_ld_none;
         switch (acqrel) {
         case LAR_Acquire: ld_flag = mem_ld_acq; break;
-        case LAR_Release: ASSERT(0, "Unexpected acqrel value"); break;
+        case LAR_Release: DIE(("Unexpected acqrel value")); break;
         case LAR_None: break;
         }
 
@@ -1686,7 +1686,7 @@ public:
                 emitter.ipf_sxt(ext_size, dst_loc->addr, dst_loc->addr, current_predicate);
         }
         else {
-            ASSERT(0, "Unexpected kind");  // dst_loc shouldn't be FR or STK16
+            DIE(("Unexpected kind"));  // dst_loc shouldn't be FR or STK16
         }
     }  // ld
 
@@ -1712,14 +1712,14 @@ public:
         case LT_F4:
         case LT_F8:
         case LT_Void:
-            ASSERT(0, "Unexpected LIL type");  // types not allowed in loads / stores
+            DIE(("Unexpected LIL type"));  // types not allowed in loads / stores
         default:
-            ASSERT(0, "Unknown LIL type");  // invalid value in type
+            DIE(("Unknown LIL type"));  // invalid value in type
         }
 
         St_Flag st_flag = mem_st_none;
         switch (acqrel) {
-        case LAR_Acquire: ASSERT(0, "Unexpected value of acqrel"); break;
+        case LAR_Acquire: DIE(("Unexpected value of acqrel")); break;
         case LAR_Release: st_flag = mem_st_rel; break;
         case LAR_None: break;
         }
@@ -1752,7 +1752,7 @@ public:
             emitter.ipf_st(size, st_flag, mem_none, addr_loc->addr, src_loc->addr, current_predicate);
         }
         else {
-            ASSERT(0, "Unexpected kind");  // src_loc shouldn't be FR or STK16!
+            DIE(("Unexpected kind"));  // src_loc shouldn't be FR or STK16!
         }
     }  // st
 
@@ -1796,9 +1796,9 @@ public:
         case LT_F4:
         case LT_F8:
         case LT_Void:
-            ASSERT(0, "Unexpected LIL type");  // types not allowed in loads / stores
+            DIE(("Unexpected LIL type"));  // types not allowed in loads / stores
         default:
-            ASSERT(0, "Unknown LIL type");  // invalid value in type
+            DIE(("Unknown LIL type"));  // invalid value in type
         }
 
         Cmpxchg_Flag flag = mem_cmpxchg_acq;
@@ -1806,7 +1806,7 @@ public:
         case LAR_Acquire: flag = mem_cmpxchg_acq; break;
         case LAR_Release: flag = mem_cmpxchg_rel; break;
         default:
-            ASSERT(0, "Unexpected value of acqrel");
+            DIE(("Unexpected value of acqrel"));
         }
 
         const LcgIpfLoc* src_loc = NULL;
@@ -1950,7 +1950,7 @@ public:
                     call_addr_gr = tmp_res->addr;
                 }
                 else {
-                    ASSERT(0, "Unexpected kind");  // address can't be FP!
+                    DIE(("Unexpected kind"));  // address can't be FP!
                 }
                 emitter.ipf_mtbr(tmp_br, call_addr_gr);
                 emitter.ipf_bri(br_cond, br_many, br_sptk, br_none, tmp_br);
@@ -1998,7 +1998,7 @@ public:
                 call_addr_gr = tmp_res->addr;
             }
             else {
-                ASSERT(0, "Unexpected kind");  // address can't be FP!
+                DIE(("Unexpected kind"));  // address can't be FP!
             }
             if (context.has_push_m2n()) {
                 emitter.ipf_mtbr(BRANCH_CALL_REG, call_addr_gr);
