@@ -99,7 +99,7 @@
     </condition>
     <property name="base.test.dir" location="${drlvm.build.dir}/tests"/>
     
-    <target name="drlvm-echo" depends="svn-prop">
+    <target name="drlvm-echo" depends="svn-info">
         <echo message="DRLVM build Configuration:" />
         <echo message="     Hosting Java = ${java.version} (${java.vendor})" />
         <echo message="               os = ${hy.os}" />
