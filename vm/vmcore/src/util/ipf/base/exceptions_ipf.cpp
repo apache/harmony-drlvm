@@ -146,36 +146,6 @@ static void *gen_vm_rt_exception_throw(Class *exc, char *stub_name)
     return stub;
 } //gen_vm_rt_exception_throw
 
-
-
-void *get_vm_rt_idx_out_of_bounds_address()
-{
-    static void *addr = 0;
-    if(addr) {
-        return addr;
-    }
-    Class * exc_clss = VM_Global_State::loader_env->java_lang_ArrayIndexOutOfBoundsException_Class;
-
-    addr = gen_vm_rt_exception_throw(exc_clss, "rt_idx_out_of_bounds");
-    return addr;
-} //get_vm_rt_idx_out_of_bounds_address
-
-
-
-void *get_vm_rt_array_store_exception_address()
-{
-    static void *addr = 0;
-    if(addr) {
-        return addr;
-    }
-
-    addr = gen_vm_rt_exception_throw(VM_Global_State::loader_env->java_lang_ArrayStoreException_Class, "rt_array_store_exception");
-
-    return addr;
-} //get_vm_rt_array_store_exception_address
-
-
-
 void *get_vm_rt_null_ptr_exception_address()
 {
     static void *addr = 0;
@@ -188,17 +158,3 @@ void *get_vm_rt_null_ptr_exception_address()
 
     return addr;
 } //get_vm_rt_null_ptr_exception_address
-
-
-
-void *get_vm_rt_divide_by_zero_exception_address()
-{
-    static void *addr = 0;
-    if(addr) {
-        return addr;
-    }
-    Class * exc_clss = VM_Global_State::loader_env->java_lang_ArithmeticException_Class;
-
-    addr = gen_vm_rt_exception_throw(exc_clss, "rt_divide_by_zero_exception");
-    return addr;
-} //get_vm_rt_divide_by_zero_exception_address

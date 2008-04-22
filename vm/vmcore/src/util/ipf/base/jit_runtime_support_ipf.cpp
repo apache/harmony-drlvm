@@ -71,10 +71,7 @@ void gen_convert_unmanaged_to_managed_null_ipf(Emitter_Handle emitter,
 void *gen_vm_rt_exception_throw(Class *exc, char *stub_name);
 void gen_vm_rt_athrow_internal_compactor(Merced_Code_Emitter &emitter);
 void *get_vm_rt_athrow_naked_compactor();
-void *get_vm_rt_idx_out_of_bounds_address();
-void *get_vm_rt_array_store_exception_address();
 void *get_vm_rt_null_ptr_exception_address();
-void *get_vm_rt_divide_by_zero_exception_address();
 
 ///////// end exceptions
 
@@ -1817,22 +1814,6 @@ void *vm_helper_get_addr(VM_RT_SUPPORT f)
         break;
     case VM_RT_AASTORE_TEST:
         fptr = get_aastore_test_compactor();
-        dereference_fptr = false;
-        break;
-    case VM_RT_IDX_OUT_OF_BOUNDS:
-        fptr = get_vm_rt_idx_out_of_bounds_address();
-        dereference_fptr = false;
-        break;
-    case VM_RT_ARRAY_STORE_EXCEPTION:
-        fptr = get_vm_rt_array_store_exception_address();
-        dereference_fptr = false;
-        break;
-    case VM_RT_NULL_PTR_EXCEPTION:
-        fptr = get_vm_rt_null_ptr_exception_address();
-        dereference_fptr = false;
-        break;
-    case VM_RT_DIVIDE_BY_ZERO_EXCEPTION:
-        fptr = get_vm_rt_divide_by_zero_exception_address();
         dereference_fptr = false;
         break;
     case VM_RT_THROW:

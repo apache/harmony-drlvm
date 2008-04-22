@@ -1367,26 +1367,63 @@ void IpfInstCodeSelector::throwSystemException(CompilationInterface::SystemExcep
 
     IPF_LOG << "      throwSystemException" << endl;
     
-    VM_RT_SUPPORT hId = VM_RT_UNKNOWN;
+    //VM_RT_SUPPORT hId = VM_RT_UNKNOWN;
+    ObjectType* excType = NULL; 
     switch (id) {
         case CompilationInterface::Exception_NullPointer: 
-            hId = VM_RT_NULL_PTR_EXCEPTION;      break;
+            excType = compilationInterface.findClassUsingBootstrapClassloader(NULL_POINTER_EXCEPTION);
+            //hId = VM_RT_NULL_PTR_EXCEPTION;
+            break;
         case CompilationInterface::Exception_ArrayIndexOutOfBounds: 
-            hId = VM_RT_IDX_OUT_OF_BOUNDS;  break;
+            excType = compilationInterface.findClassUsingBootstrapClassloader(INDEX_OUT_OF_BOUNDS);
+            //hId = VM_RT_IDX_OUT_OF_BOUNDS;
+            break;
         case CompilationInterface::Exception_ArrayTypeMismatch: 
-            hId = VM_RT_ARRAY_STORE_EXCEPTION;     break;
+            excType = compilationInterface.findClassUsingBootstrapClassloader(ARRAY_STORE_EXCEPTION);
+            //hId = VM_RT_ARRAY_STORE_EXCEPTION;
+            break;
         case CompilationInterface::Exception_DivideByZero: 
-            hId = VM_RT_DIVIDE_BY_ZERO_EXCEPTION; break;
+            excType = compilationInterface.findClassUsingBootstrapClassloader(DIVIDE_BY_ZERO_EXCEPTION);
+            //hId = VM_RT_DIVIDE_BY_ZERO_EXCEPTION;
+            break;
         default: 
             IPF_ERR << "unexpected id " << id << endl;
     }
     
-    uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
-    Opnd    *helperAddress = opndManager->newImm(address);
-
-    directCall(0, NULL, NULL, helperAddress, p0);
+    throwException(excType);
 }
 
+void IpfInstCodeSelector::throwException(ObjectType* excType)
+{
+    assert(excType);
+
+    Opnd *helperOpnds1[] = {
+        opndManager->newImm((int64) excType->getObjectSize()),
+        opndManager->newImm((int64) excType->getAllocationHandle())
+    };
+    
+    VM_RT_SUPPORT hId = VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE;
+    uint64   address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
+    Opnd*    helperAddress = opndManager->newImm(address);
+    OpndKind opndKind       = toOpndKind(excType->tag);
+    DataKind dataKind       = toDataKind(excType->tag);
+    RegOpnd* retOpnd       = opndManager->newRegOpnd(opndKind, dataKind);
+    
+    directCall(2, helperOpnds1, retOpnd, helperAddress, p0);
+
+    Opnd * helperOpnds2[] = { (Opnd*)retOpnd };
+    MethodDesc* md = compilationInterface.resolveMethod( excType, 
+            DEFAUlT_COSTRUCTOR_NAME, DEFAUlT_COSTRUCTOR_DESCRIPTOR);
+    call(1, (CG_OpndHandle **)helperOpnds2, NULL, md);
+
+    Opnd * helperOpnds3[] = { (Opnd*)retOpnd };
+
+    hId = VM_RT_THROW;
+    address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
+    helperAddress = opndManager->newImm(address);
+
+    directCall(1, helperOpnds3, NULL, helperAddress, p0);
+}
 //----------------------------------------------------------------------------//
 // Throw linking exception
 
@@ -1446,10 +1483,12 @@ CG_OpndHandle *IpfInstCodeSelector::tau_checkNull(CG_OpndHandle *base, bool chec
     cmp(CMPLT_CMP_CREL_EQ, truePred, p0, base, zero);
 
     // p2  brl.call  b0 = helperAddress
-    VM_RT_SUPPORT hId = VM_RT_NULL_PTR_EXCEPTION;
-    uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
-    Opnd    *helperAddress = opndManager->newImm(address);
-    directCall(0, NULL, NULL, helperAddress, truePred, CMPLT_WH_DPNT);
+    ObjectType* excType = compilationInterface.findClassUsingBootstrapClassloader(NULL_POINTER_EXCEPTION);
+    throwException(excType);
+    //VM_RT_SUPPORT hId = VM_RT_NULL_PTR_EXCEPTION;
+    //uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
+    //Opnd    *helperAddress = opndManager->newImm(address);
+    //directCall(0, NULL, NULL, helperAddress, truePred, CMPLT_WH_DPNT);
 
     return opndManager->getTau();    // return fake value (we do not use tau)
 }
@@ -1467,10 +1506,12 @@ CG_OpndHandle *IpfInstCodeSelector::tau_checkBounds(CG_OpndHandle *arrayLen,
     cmp(CMPLT_CMP_CREL_GE, truePred, p0, index, arrayLen);
 
     // p2  brl.call  b0 = helperAddress
-    VM_RT_SUPPORT hId = VM_RT_IDX_OUT_OF_BOUNDS;
-    uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
-    Opnd    *helperAddress = opndManager->newImm(address);
-    directCall(0, NULL, NULL, helperAddress, truePred, CMPLT_WH_DPNT);
+    ObjectType* excType = compilationInterface.findClassUsingBootstrapClassloader(INDEX_OUT_OF_BOUNDS);
+    throwException(excType);
+    //VM_RT_SUPPORT hId = VM_RT_IDX_OUT_OF_BOUNDS;
+    //uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
+    //Opnd    *helperAddress = opndManager->newImm(address);
+    //directCall(0, NULL, NULL, helperAddress, truePred, CMPLT_WH_DPNT);
 
     return opndManager->getTau();    // return fake value (we do not use tau);
 }
@@ -1488,10 +1529,12 @@ CG_OpndHandle *IpfInstCodeSelector::tau_checkLowerBound(CG_OpndHandle *a,
     cmp(CMPLT_CMP_CREL_GT, truePred, p0, a, b);
 
     // p2  brl.call  b0 = helperAddress
-    VM_RT_SUPPORT hId = VM_RT_IDX_OUT_OF_BOUNDS;
-    uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
-    Opnd    *helperAddress = opndManager->newImm(address);
-    directCall(0, NULL, NULL, helperAddress, truePred, CMPLT_WH_DPNT);
+    ObjectType* excType = compilationInterface.findClassUsingBootstrapClassloader(INDEX_OUT_OF_BOUNDS);
+    throwException(excType);
+    //VM_RT_SUPPORT hId = VM_RT_IDX_OUT_OF_BOUNDS;
+    //uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
+    //Opnd    *helperAddress = opndManager->newImm(address);
+    //directCall(0, NULL, NULL, helperAddress, truePred, CMPLT_WH_DPNT);
 
     return opndManager->getTau();    // return fake value (we do not use tau);
 }
@@ -1509,10 +1552,12 @@ CG_OpndHandle *IpfInstCodeSelector::tau_checkUpperBound(CG_OpndHandle *a,
     cmp(CMPLT_CMP_CREL_GEU, truePred, p0, a, b);
 
     // p2  brl.call  b0 = helperAddress
-    VM_RT_SUPPORT hId = VM_RT_IDX_OUT_OF_BOUNDS;
-    uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
-    Opnd    *helperAddress = opndManager->newImm(address);
-    directCall(0, NULL, NULL, helperAddress, truePred, CMPLT_WH_DPNT);
+    ObjectType* excType = compilationInterface.findClassUsingBootstrapClassloader(INDEX_OUT_OF_BOUNDS);
+    throwException(excType);
+    //VM_RT_SUPPORT hId = VM_RT_IDX_OUT_OF_BOUNDS;
+    //uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
+    //Opnd    *helperAddress = opndManager->newImm(address);
+    //directCall(0, NULL, NULL, helperAddress, truePred, CMPLT_WH_DPNT);
 
     return opndManager->getTau();    // return fake value (we do not use tau);
 }
@@ -1549,10 +1594,12 @@ CG_OpndHandle *IpfInstCodeSelector::tau_checkElemType(CG_OpndHandle *array,
     cmp(CMPLT_CMP_CREL_EQ, truePred, p0, retOpnd, r0);
 
     // p3   brl.call b0, Helper_ElemTypeException
-    hId     = VM_RT_ARRAY_STORE_EXCEPTION;
-    address = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
-    Opnd    *helperAddress2 = opndManager->newImm(address);
-    directCall(0, NULL, NULL, helperAddress2, truePred, CMPLT_WH_DPNT);
+    ObjectType* excType = compilationInterface.findClassUsingBootstrapClassloader(ARRAY_STORE_EXCEPTION);
+    throwException(excType);
+    //hId     = VM_RT_ARRAY_STORE_EXCEPTION;
+    //address = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
+    //Opnd    *helperAddress2 = opndManager->newImm(address);
+    //directCall(0, NULL, NULL, helperAddress2, truePred, CMPLT_WH_DPNT);
     
     return opndManager->getTau();    // return fake value (we do not use tau);
 }
@@ -1571,10 +1618,12 @@ CG_OpndHandle *IpfInstCodeSelector::tau_checkZero(CG_OpndHandle *src_) {
     cmp(CMPLT_CMP_CREL_EQ, truePred, p0, src, r0);
 
     // p2  brl.call  b0 = helperAddress
-    VM_RT_SUPPORT hId = VM_RT_DIVIDE_BY_ZERO_EXCEPTION;
-    uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
-    Opnd    *helperAddress = opndManager->newImm(address);
-    directCall(0, NULL, NULL, helperAddress, truePred, CMPLT_WH_DPNT);
+    ObjectType* excType = compilationInterface.findClassUsingBootstrapClassloader(DIVIDE_BY_ZERO_EXCEPTION);
+    throwException(excType);
+    //VM_RT_SUPPORT hId = VM_RT_DIVIDE_BY_ZERO_EXCEPTION;
+    //uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
+    //Opnd    *helperAddress = opndManager->newImm(address);
+    //directCall(0, NULL, NULL, helperAddress, truePred, CMPLT_WH_DPNT);
 
     return opndManager->getTau();    // return fake value (we do not use tau)
 }

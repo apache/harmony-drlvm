@@ -375,6 +375,9 @@ public:
     /** expands SystemExceptionCheckPseudoInst */
     void expandSystemExceptions(uint32 reservedForFlags);
 
+    /** generater code to throw noted type exception, set for code BC offset and include into basic block*/
+    void throwException(ObjectType* excType, uint16 bcOffset, Node* basicBlock);
+
     /** changes all Extended insts to Native form by calling makeInstNative */
     void translateToNativeForm();
 

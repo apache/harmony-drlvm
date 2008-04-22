@@ -25,6 +25,14 @@
 #include "open/em.h"
 #include "open/ee_em_intf.h"
 
+#define NULL_POINTER_EXCEPTION          "java/lang/NullPointerException"
+#define INDEX_OUT_OF_BOUNDS             "java/lang/ArrayIndexOutOfBoundsException"
+#define ARRAY_STORE_EXCEPTION           "java/lang/ArrayStoreException"
+#define DIVIDE_BY_ZERO_EXCEPTION        "java/lang/ArithmeticException"
+#define DEFAUlT_COSTRUCTOR_NAME         "<init>"
+#define DEFAUlT_COSTRUCTOR_DESCRIPTOR   "()V"
+
+
 namespace Jitrino {
 
 // external and forward declarations

@@ -1504,29 +1504,79 @@ void InstCodeSelector::throwException(CG_OpndHandle* exceptionObj, bool createSt
 
 void InstCodeSelector::throwSystemException(CompilationInterface::SystemExceptionId id) 
 {
+#ifdef _EM64T_
+    bool lazy = false;
+#else
+    bool lazy = true;
+#endif
+    CallInst * callInst = NULL;
+    ObjectType* excType = NULL; 
 
-    CallInst * callInst=NULL;
     switch (id) {
         case CompilationInterface::Exception_NullPointer:
-            callInst=irManager.newRuntimeHelperCallInst(
-                VM_RT_NULL_PTR_EXCEPTION, 0, NULL, NULL);
+            {
+            excType = compilationInterface.findClassUsingBootstrapClassloader(NULL_POINTER_EXCEPTION);
+            //callInst=irManager.newRuntimeHelperCallInst(
+            //    VM_RT_NULL_PTR_EXCEPTION, 0, NULL, NULL);
+            };
             break;
         case CompilationInterface::Exception_ArrayIndexOutOfBounds:
-            callInst=irManager.newRuntimeHelperCallInst(
-                VM_RT_IDX_OUT_OF_BOUNDS, 0, NULL, NULL);
+            excType = compilationInterface.findClassUsingBootstrapClassloader(INDEX_OUT_OF_BOUNDS);
+            //callInst=irManager.newRuntimeHelperCallInst(
+            //    VM_RT_IDX_OUT_OF_BOUNDS, 0, NULL, NULL);
             break;
         case CompilationInterface::Exception_ArrayTypeMismatch:
-            callInst=irManager.newRuntimeHelperCallInst(
-                VM_RT_ARRAY_STORE_EXCEPTION, 0, NULL, NULL);
+            excType = compilationInterface.findClassUsingBootstrapClassloader(ARRAY_STORE_EXCEPTION);
+            //callInst=irManager.newRuntimeHelperCallInst(
+            //    VM_RT_ARRAY_STORE_EXCEPTION, 0, NULL, NULL);
             break;
         case CompilationInterface::Exception_DivideByZero:
-            callInst=irManager.newRuntimeHelperCallInst(
-                VM_RT_DIVIDE_BY_ZERO_EXCEPTION, 0, NULL, NULL);
+            excType = compilationInterface.findClassUsingBootstrapClassloader(DIVIDE_BY_ZERO_EXCEPTION);
+            //callInst=irManager.newRuntimeHelperCallInst(
+            //    VM_RT_DIVIDE_BY_ZERO_EXCEPTION, 0, NULL, NULL);
             break;
         default:
             assert(0);
     }
-    appendInsts(callInst);
+
+    assert(excType);
+
+    if (lazy){
+        Opnd * helperOpnds[] = {
+            // first parameter exception class
+            irManager.newImmOpnd(getRuntimeIdType(), Opnd::RuntimeInfo::Kind_TypeRuntimeId, excType),
+            // second is constructor method handle, 0 - means default constructor
+            irManager.newImmOpnd(getRuntimeIdType(), 0)
+        };
+        callInst=irManager.newRuntimeHelperCallInst(
+            VM_RT_THROW_LAZY, lengthof(helperOpnds), helperOpnds, NULL);
+        appendInsts(callInst);
+    } else {
+        Opnd * helperOpnds1[] = {
+            irManager.newImmOpnd(typeManager.getInt32Type(), Opnd::RuntimeInfo::Kind_Size, excType),
+            irManager.newImmOpnd(getRuntimeIdType(), Opnd::RuntimeInfo::Kind_AllocationHandle, excType)
+        };
+        Opnd * retOpnd=irManager.newOpnd(excType);
+        callInst=irManager.newRuntimeHelperCallInst(
+            VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE,
+            lengthof(helperOpnds1), helperOpnds1, retOpnd);
+        appendInsts(callInst);
+
+        MethodDesc* md = compilationInterface.resolveMethod( excType, 
+                DEFAUlT_COSTRUCTOR_NAME, DEFAUlT_COSTRUCTOR_DESCRIPTOR);
+        
+        Opnd * target=irManager.newImmOpnd(typeManager.getInt32Type(), Opnd::RuntimeInfo::Kind_MethodDirectAddr, md);
+        Opnd * helperOpnds2[] = { (Opnd*)retOpnd };
+        callInst=irManager.newCallInst(target, irManager.getDefaultManagedCallingConvention(), 
+            lengthof(helperOpnds2), helperOpnds2, NULL);
+        appendInsts(callInst);
+
+        Opnd * helperOpnds3[] = { (Opnd*)retOpnd };
+        callInst=irManager.newRuntimeHelperCallInst(
+            VM_RT_THROW, 
+            lengthof(helperOpnds3), helperOpnds3, NULL);
+        appendInsts(callInst);
+    }
 }
 
 //_______________________________________________________________________________________________________________
@@ -1638,10 +1688,13 @@ CG_OpndHandle* InstCodeSelector::tau_checkBounds(CG_OpndHandle* arrayLen,
         cmpType = CompareOp::I;
 
     Node* throwBasicBlock = irManager.getFlowGraph()->createBlockNode();
-    Inst* throwInst = irManager.newRuntimeHelperCallInst(VM_RT_IDX_OUT_OF_BOUNDS, 0, NULL, NULL);
-    throwInst->setBCOffset(currentHIRInstBCOffset);
-    throwBasicBlock->appendInst(throwInst);
-                
+
+    ObjectType* excType = compilationInterface.findClassUsingBootstrapClassloader(INDEX_OUT_OF_BOUNDS);
+    irManager.throwException(excType, currentHIRInstBCOffset, throwBasicBlock);
+
+    //Inst* throwInst = irManager.newRuntimeHelperCallInst(VM_RT_IDX_OUT_OF_BOUNDS, 0, NULL, NULL);
+    //throwInst->setBCOffset(currentHIRInstBCOffset);
+    //throwBasicBlock->appendInst(throwInst);
 
     branch(CompareOp::Geu, cmpType, (Opnd*)index, (Opnd*)arrayLen);
     codeSelector.genTrueEdge(currentBasicBlock, throwBasicBlock, 0);
@@ -1672,11 +1725,13 @@ CG_OpndHandle* InstCodeSelector::tau_checkLowerBound(CG_OpndHandle* a,
         cmpOp = CompareOp::Gtu;
     }
     Node* throwBasicBlock = irManager.getFlowGraph()->createBlockNode();
-    Inst* throwInst = irManager.newRuntimeHelperCallInst(VM_RT_IDX_OUT_OF_BOUNDS, 0, NULL, NULL);
-    throwInst->setBCOffset(currentHIRInstBCOffset);
-    throwBasicBlock->appendInst(throwInst);
+    ObjectType* excType = compilationInterface.findClassUsingBootstrapClassloader(INDEX_OUT_OF_BOUNDS);
+    irManager.throwException(excType, currentHIRInstBCOffset, throwBasicBlock);
     
-
+    //Inst* throwInst = irManager.newRuntimeHelperCallInst(VM_RT_IDX_OUT_OF_BOUNDS, 0, NULL, NULL);
+    //throwInst->setBCOffset(currentHIRInstBCOffset);
+    //throwBasicBlock->appendInst(throwInst);
+    
     branch(cmpOp, cmpType, (Opnd*)a, (Opnd*)b);
     codeSelector.genTrueEdge(currentBasicBlock, throwBasicBlock, 0);
     return getTauUnsafe();
@@ -1702,10 +1757,12 @@ CG_OpndHandle* InstCodeSelector::tau_checkElemType(CG_OpndHandle* array,
                                                       CG_OpndHandle* tauIsArray) 
 {
     Node* throwBasicBlock = irManager.getFlowGraph()->createBlockNode();
-    Inst* throwInst = irManager.newRuntimeHelperCallInst(VM_RT_ARRAY_STORE_EXCEPTION, 0, NULL, NULL);
     assert(currentHIRInstBCOffset!=ILLEGAL_BC_MAPPING_VALUE);
-    throwInst->setBCOffset(currentHIRInstBCOffset);
-    throwBasicBlock->appendInst(throwInst);
+    ObjectType* excType = compilationInterface.findClassUsingBootstrapClassloader(ARRAY_STORE_EXCEPTION);
+    irManager.throwException(excType, currentHIRInstBCOffset, throwBasicBlock);
+    //Inst* throwInst = irManager.newRuntimeHelperCallInst(VM_RT_ARRAY_STORE_EXCEPTION, 0, NULL, NULL);
+    //throwInst->setBCOffset(currentHIRInstBCOffset);
+    //throwBasicBlock->appendInst(throwInst);
 
     Opnd * args[] = { (Opnd*)src, (Opnd*)array };
     Opnd * flag = irManager.newOpnd(typeManager.getInt32Type());
@@ -1726,10 +1783,12 @@ CG_OpndHandle* InstCodeSelector::tau_checkElemType(CG_OpndHandle* array,
 CG_OpndHandle*  InstCodeSelector::tau_checkZero(CG_OpndHandle* src) 
 {
     Node* throwBasicBlock = irManager.getFlowGraph()->createBlockNode();
-    Inst* throwInst = irManager.newRuntimeHelperCallInst(VM_RT_DIVIDE_BY_ZERO_EXCEPTION, 0, NULL, NULL);
     assert(currentHIRInstBCOffset!=ILLEGAL_BC_MAPPING_VALUE);
-    throwInst->setBCOffset(currentHIRInstBCOffset);
-    throwBasicBlock->appendInst(throwInst);
+    ObjectType* excType = compilationInterface.findClassUsingBootstrapClassloader(DIVIDE_BY_ZERO_EXCEPTION);
+    irManager.throwException(excType, currentHIRInstBCOffset, throwBasicBlock);
+    //Inst* throwInst = irManager.newRuntimeHelperCallInst(VM_RT_DIVIDE_BY_ZERO_EXCEPTION, 0, NULL, NULL);
+    //throwInst->setBCOffset(currentHIRInstBCOffset);
+    //throwBasicBlock->appendInst(throwInst);
     Opnd * srcOpnd = (Opnd*)src;
     Type * type = srcOpnd->getType();
     CompareZeroOp::Types opType = CompareZeroOp::I;

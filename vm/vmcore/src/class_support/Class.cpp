@@ -463,6 +463,7 @@ Method* Class::lookup_method(const String* name, const String* desc)
 ManagedObject* Class::allocate_instance()
 {
     assert(!hythread_is_suspend_enabled());
+    //assert(is_initialized());
     ManagedObject* new_instance =
         (ManagedObject*)vm_alloc_and_report_ti(m_instance_data_size,
             m_allocation_handle, vm_get_gc_thread_local(), this);

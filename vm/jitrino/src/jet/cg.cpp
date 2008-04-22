@@ -35,6 +35,9 @@
 using std::min;
 
 #include <open/vm.h>
+#include <open/vm_ee.h>
+#include <open/vm_class_info.h>
+#include <open/vm_class_loading.h>
 #include <jit_runtime_support.h>
 #include <jit_intf.h>
 #include <jni_types.h>
@@ -51,6 +54,7 @@ namespace Jet {
 const CallSig ci_helper_o(CCONV_HELPERS, jvoid, jobj);
 const CallSig ci_helper_v(CCONV_HELPERS, jvoid);
 const CallSig ci_helper_oi(CCONV_HELPERS, jobj, jobj, i32);
+const CallSig ci_helper_lazy(CCONV_MANAGED, jvoid, jobj, jobj);
 const CallSig ci_helper_linkerr(CCONV_HELPERS, jvoid, jobj, i32, i32);
 
 void CodeGen::do_mov(const Val& dst_s, const Val& src_s, bool skipTypeCheck)
@@ -138,7 +142,10 @@ void CodeGen::gen_check_null(Val& obj, bool hw_ok)
     if (obj.is_imm()) {
         STATS_INC(Stats::npesEliminated,1);
         if (obj.pval() == NULL_REF) {
-            gen_call_throw(ci_helper_v, rt_helper_throw_npe, 0);
+            //gen_args(const CallSig& cs, unsigned idx, const Val * parg0 = NULL, 
+            //      const Val * parg1 = NULL, const Val * parg2 = NULL);
+            Class_Handle npeClass = vm_lookup_class_with_bootstrap(NULL_POINTER_EXCEPTION);
+            gen_throw(npeClass, false);
         }
         return;
     }
@@ -232,7 +239,9 @@ void CodeGen::gen_check_null(Val& obj, bool hw_ok)
         }
         runlock(obj);
         unsigned br_off = br(ne, 0, 0, taken);
-        gen_call_vm_restore(true, ci_helper_v, rt_helper_throw_npe, 0);
+        Class_Handle npeClass = vm_lookup_class_with_bootstrap(NULL_POINTER_EXCEPTION);
+        gen_throw(npeClass, true);
+
         patch(br_off, ip());
     } // if !useHW
     
@@ -269,7 +278,9 @@ void CodeGen::gen_check_bounds(unsigned ref_depth, unsigned index_depth)
     // Unsigned condition here - aka 'len > (unsigned)index' - this also 
     // covers 'index < 0' - in a single comparation.
     unsigned br_off = br(above, 0, 0, taken);
-    gen_call_vm_restore(true, ci_helper_v, rt_helper_throw_out_of_bounds, 0);
+    //gen_call_vm_restore(true, ci_helper_v, rt_helper_throw_out_of_bounds, 0);
+    Class_Handle ioobClass = vm_lookup_class_with_bootstrap(INDEX_OUT_OF_BOUNDS);
+    gen_throw(ioobClass, true);
     patch(br_off, ip());
     if (is_set(DBG_TRACE_CG)) {dbg(";;>~check.bounds\n");}
 }
@@ -288,7 +299,9 @@ void CodeGen::gen_check_div_by_zero(jtype jt, unsigned divizor_depth)
         // if it's i32, then nothing to do more - throw exception ...
         if (jt == i32) {
             // IS zero. Why do people want to divide on zero explicitly?..
-            gen_call_throw(ci_helper_v, rt_helper_throw_div_by_zero_exc, 0);
+            //gen_call_throw(ci_helper_v, rt_helper_throw_div_by_zero_exc, 0);
+            Class_Handle aeClass = vm_lookup_class_with_bootstrap(DIVIDE_BY_ZERO_EXCEPTION);
+            gen_throw(aeClass, false);
             if (is_set(DBG_TRACE_CG)) {dbg(";;>~check.div_by_zero\n");}
             return;
         }
@@ -298,7 +311,9 @@ void CodeGen::gen_check_div_by_zero(jtype jt, unsigned divizor_depth)
             if (shi.is_imm() && shi.ival() == 0) {
                 // ... yes, it's zero too - throw ...
                 // Why do people want to divide on zero explicitly?..
-                gen_call_throw(ci_helper_v, rt_helper_throw_div_by_zero_exc, 0);
+                //gen_call_throw(ci_helper_v, rt_helper_throw_div_by_zero_exc, 0);
+                Class_Handle aeClass = vm_lookup_class_with_bootstrap(DIVIDE_BY_ZERO_EXCEPTION);
+                gen_throw(aeClass, false);
                 if (is_set(DBG_TRACE_CG)) {dbg(";;>~check.div_by_zero\n");}
                 return;
             }
@@ -315,7 +330,9 @@ void CodeGen::gen_check_div_by_zero(jtype jt, unsigned divizor_depth)
     if (s.is_imm() && jt == i64 && !is_big(i64)) {
         if (s.lval() == 0) {
             // IS zero. Why do people want to divide on zero explicitly?..
-            gen_call_throw(ci_helper_v, rt_helper_throw_div_by_zero_exc, 0);
+            //gen_call_throw(ci_helper_v, rt_helper_throw_div_by_zero_exc, 0);
+            Class_Handle aeClass = vm_lookup_class_with_bootstrap(DIVIDE_BY_ZERO_EXCEPTION);
+            gen_throw(aeClass, false);
         }
         if (is_set(DBG_TRACE_CG)) {dbg(";;>~check.div_by_zero\n");}
         return;
@@ -335,7 +352,9 @@ void CodeGen::gen_check_div_by_zero(jtype jt, unsigned divizor_depth)
     }
     if (jt == i32 || !is_big(jt)) {
         unsigned br_off = br(nz, 0, 0, taken);
-        gen_call_vm_restore(true, ci_helper_v, rt_helper_throw_div_by_zero_exc, 0);
+        //gen_call_vm_restore(true, ci_helper_v, rt_helper_throw_div_by_zero_exc, 0);
+        Class_Handle aeClass = vm_lookup_class_with_bootstrap(DIVIDE_BY_ZERO_EXCEPTION);
+        gen_throw(aeClass, true);
         patch(br_off, ip());
         if (is_set(DBG_TRACE_CG)) {dbg(";;>~check.div_by_zero\n");}
         return;
@@ -363,7 +382,9 @@ void CodeGen::gen_check_div_by_zero(jtype jt, unsigned divizor_depth)
         alu(alu_cmp, mem, Opnd(0));
     }
     unsigned br_hi = br(nz, 0, 0, taken);
-    gen_call_vm_restore(true, ci_helper_v, rt_helper_throw_div_by_zero_exc, 0);
+    //gen_call_vm_restore(true, ci_helper_v, rt_helper_throw_div_by_zero_exc, 0);
+    Class_Handle aeClass = vm_lookup_class_with_bootstrap(DIVIDE_BY_ZERO_EXCEPTION);
+    gen_throw(aeClass, true);
     patch(br_hi, ip());
     if (!s.is_imm()) {
         // [1] --> connect to here
@@ -705,6 +726,70 @@ void CodeGen::gen_call_vm_restore(bool exc, const CallSig& cs,
     // then the memory was not corrupted.
     // So, just nothing to do with callee-save regs
     //
+}
+
+void CodeGen::gen_throw(Class_Handle exnClass, bool restore)
+{
+#ifdef _EM64T_
+    bool lazy = false;
+#else
+    bool lazy = true;
+#endif
+    BBState saveBB;
+
+    //TODO: Workaround for x86-64 stack should be aligned to half of 16
+#ifdef _EM64T_
+    alu(alu_sub, sp, (unsigned)STACK_SLOT_SIZE);
+    alu(alu_and, sp, ~((unsigned)STACK_SLOT_SIZE));
+    alu(alu_add, sp, (unsigned)STACK_SLOT_SIZE);
+#endif
+
+    if (restore){
+        saveBB = *m_bbstate;
+        for (unsigned i=0; i<ar_num; i++) {
+            AR ar = _ar(i);
+            if (rlocks(ar) != 0) {
+                runlock(ar, true);
+            }
+        }
+    }
+
+    if (lazy) {
+        gen_call_throw(ci_helper_lazy, rt_helper_throw_lazy, 0, exnClass, NULL);
+    } else {
+        static const CallSig ci_new(CCONV_HELPERS, jobj, i32, jobj);
+        unsigned size = class_get_object_size(exnClass);
+        unsigned stackFix;
+        Allocation_Handle ah = class_get_allocation_handle(exnClass);
+        gen_call_vm(ci_new, rt_helper_new, 0, size, ah);
+        gen_save_ret(ci_new);
+
+        static const CallSig cs_constructor(CCONV_MANAGED, jvoid, jobj);
+        static Method_Handle constructorMethDesc = 
+            class_lookup_method_recursively(exnClass, DEFAUlT_COSTRUCTOR_NAME, 
+                DEFAUlT_COSTRUCTOR_DESCRIPTOR);
+        static char* constructorMethAddr = 
+            *(char**)method_get_indirect_address(constructorMethDesc);
+        stackFix = gen_stack_to_args(false, cs_constructor, 0);
+        gen_call_vm(cs_constructor, constructorMethAddr, 1);
+        runlock(cs_constructor);
+        if (stackFix != 0) {
+            alu(alu_sub, sp, stackFix);
+        }
+
+        static const CallSig cs_throw(CCONV_HELPERS, jvoid, jobj);
+        stackFix = gen_stack_to_args(true, cs_throw, 0);
+        gen_call_vm(cs_throw, rt_helper_throw, 1);
+        runlock(cs_throw);
+        if (stackFix != 0) {
+            alu(alu_sub, sp, stackFix);
+        }
+    }
+
+    // Restore BBState first, so ref_counts for registers become valid
+    if (restore){
+        *m_bbstate = saveBB;
+    }
 }
 
 }};             // ~namespace Jitrino::Jet

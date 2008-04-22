@@ -1015,14 +1015,6 @@ void *vm_helper_get_addr(VM_RT_SUPPORT f)
         if (res) return res;
 
     switch(f) {
-    case VM_RT_NULL_PTR_EXCEPTION:
-        return exn_get_rth_throw_null_pointer();
-    case VM_RT_IDX_OUT_OF_BOUNDS:
-        return exn_get_rth_throw_array_index_out_of_bounds();
-    case VM_RT_ARRAY_STORE_EXCEPTION:
-        return exn_get_rth_throw_array_store();
-    case VM_RT_DIVIDE_BY_ZERO_EXCEPTION:
-        return exn_get_rth_throw_arithmetic();
     case VM_RT_THROW:
     case VM_RT_THROW_SET_STACK_TRACE:
         return exn_get_rth_throw();

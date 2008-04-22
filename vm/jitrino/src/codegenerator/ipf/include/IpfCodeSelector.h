@@ -183,6 +183,7 @@ public:
     //---------------------------------------------------------------------------//
 
     void          throwException(CG_OpndHandle*, bool);
+    void          throwException(ObjectType* excType);// generater code to throw noted type exception
     void          throwSystemException(CompilationInterface::SystemExceptionId);
     void          throwLinkingException(Class_Handle, uint32, uint32);
     CG_OpndHandle *catchException(Type*);

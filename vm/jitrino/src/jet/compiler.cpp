@@ -339,7 +339,7 @@ JIT_Result Compiler::compile(Compile_Handle ch, Method_Handle method,
     m_bc = method_get_bytecode(m_method);
     unsigned bc_size = (unsigned)method_get_bytecode_length(m_method);
     unsigned num_locals = method_get_max_locals(m_method);
-    unsigned max_stack = method_get_max_stack(m_method);
+    unsigned max_stack = method_get_max_stack(m_method) + NATIVE_STACK_SIZE_2_THROW_SYN_EXC;
     
     // Input arguments
     ::std::vector<jtype> inargs;
@@ -1497,17 +1497,12 @@ void Compiler::initStatics(void)
     rt_helper_get_vtable = 
               (char*)vm_helper_get_addr(VM_RT_GET_INTERFACE_VTABLE_VER0);
 
-    rt_helper_throw_npe = 
-                (char*)vm_helper_get_addr(VM_RT_NULL_PTR_EXCEPTION);
-
     rt_helper_throw = 
                 (char*)vm_helper_get_addr(VM_RT_THROW);
-    rt_helper_throw_out_of_bounds = 
-                (char*)vm_helper_get_addr(VM_RT_IDX_OUT_OF_BOUNDS);
+    rt_helper_throw_lazy = 
+                (char*)vm_helper_get_addr(VM_RT_THROW_LAZY);
     rt_helper_throw_linking_exc = 
                 (char*)vm_helper_get_addr(VM_RT_THROW_LINKING_EXCEPTION);
-    rt_helper_throw_div_by_zero_exc = 
-                (char*)vm_helper_get_addr(VM_RT_DIVIDE_BY_ZERO_EXCEPTION);
 
     rt_helper_checkcast = 
                 (char*)vm_helper_get_addr(VM_RT_CHECKCAST);

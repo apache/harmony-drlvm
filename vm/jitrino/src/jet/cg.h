@@ -493,6 +493,13 @@ public:
      */
     void gen_dbg_rt(bool save_regs, const char * fmt, ...);
 
+    /**
+     * @brief Generates code to throw specified tipe of exception.
+     *
+     * The generated code which throws exception of soecified type.
+     * Also it can updates GC info and synchronizes both stack and local vars.
+     */
+    void gen_throw(Class_Handle exnClass, bool restore);
     
     /**
      * The opcode may be one of AASTORE, PUTFIELD or PUTSTATIC.

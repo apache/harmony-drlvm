@@ -48,10 +48,8 @@ namespace Jet {
 class StaticConsts {
 public:
     static char *       rt_helper_throw;
-    static char *       rt_helper_throw_out_of_bounds;
+    static char *       rt_helper_throw_lazy;
     static char *       rt_helper_throw_linking_exc;
-    static char *       rt_helper_throw_npe;
-    static char *       rt_helper_throw_div_by_zero_exc;
 
     static char *       rt_helper_new;
     static char *       rt_helper_new_array;

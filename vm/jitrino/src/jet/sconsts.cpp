@@ -32,10 +32,8 @@ namespace Jitrino {
 namespace Jet {
 
 char *  StaticConsts::rt_helper_throw = NULL;
-char *  StaticConsts::rt_helper_throw_out_of_bounds = NULL;
-char *  StaticConsts::rt_helper_throw_npe = NULL;
+char *  StaticConsts::rt_helper_throw_lazy = NULL;
 char *  StaticConsts::rt_helper_throw_linking_exc = NULL;
-char *  StaticConsts::rt_helper_throw_div_by_zero_exc = NULL;
 
 char *  StaticConsts::rt_helper_monitor_enter = NULL;
 char *  StaticConsts::rt_helper_monitor_exit = NULL;

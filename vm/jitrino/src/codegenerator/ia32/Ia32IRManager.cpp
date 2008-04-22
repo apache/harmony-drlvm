@@ -1906,14 +1906,16 @@ void IRManager::expandSystemExceptions(uint32 reservedForFlags)
                     Node* dispatchNode= dispatchEdge->getTargetNode();
                     if ((dispatchNode!=fg->getUnwindNode()) ||(checkOpnds[opnd] == (POINTER_SIZE_INT)-1
 #ifdef _EM64T_
-                          ||!Type::isCompressedReference(opnd->getType()->tag)
+                            ||!Type::isCompressedReference(opnd->getType()->tag)
 #endif
-                       )){
+                            )){
                         Node* throwBasicBlock = fg->createBlockNode();
-                        Inst* throwInst = newRuntimeHelperCallInst(VM_RT_NULL_PTR_EXCEPTION, 0, NULL, NULL);
+                        ObjectType* excType = compilationInterface.findClassUsingBootstrapClassloader(NULL_POINTER_EXCEPTION);
                         assert(lastInst->getBCOffset()!=ILLEGAL_BC_MAPPING_VALUE);
-                        throwInst->setBCOffset(lastInst->getBCOffset());
-                        throwBasicBlock->appendInst(throwInst);
+                        throwException(excType, lastInst->getBCOffset(), throwBasicBlock);
+                        //Inst* throwInst = newRuntimeHelperCallInst(VM_RT_NULL_PTR_EXCEPTION, 0, NULL, NULL);
+                        //throwInst->setBCOffset(lastInst->getBCOffset());
+                        //throwBasicBlock->appendInst(throwInst);
                         int64 zero = 0;
                         if( refsCompressed && opnd->getType()->isReference() ) {
                             assert(!Type::isCompressedReference(opnd->getType()->tag));
@@ -1954,6 +1956,61 @@ void IRManager::expandSystemExceptions(uint32 reservedForFlags)
         lastInst->unlink();
     }
 }
+void IRManager::throwException(ObjectType* excType, uint16 bcOffset, Node* basicBlock){
+
+    assert(excType);
+
+#ifdef _EM64T_
+    bool lazy = false;
+#else
+    bool lazy = true;
+#endif
+    Inst* throwInst = NULL;
+    assert(bcOffset!=ILLEGAL_BC_MAPPING_VALUE);
+
+    if (lazy){
+        Opnd * helperOpnds[] = {
+            // first parameter exception class
+            newImmOpnd(typeManager.getUnmanagedPtrType(typeManager.getIntPtrType()),
+                Opnd::RuntimeInfo::Kind_TypeRuntimeId, excType),
+            // second is constructor method handle, 0 - means default constructor
+            newImmOpnd(typeManager.getUnmanagedPtrType(typeManager.getIntPtrType()), 0) 
+        };
+        throwInst=newRuntimeHelperCallInst(
+            VM_RT_THROW_LAZY, lengthof(helperOpnds), helperOpnds, NULL);
+    } else {
+        Opnd * helperOpnds1[] = {
+            newImmOpnd(typeManager.getInt32Type(), Opnd::RuntimeInfo::Kind_Size, excType),
+            newImmOpnd(typeManager.getUnmanagedPtrType(typeManager.getIntPtrType()),
+                Opnd::RuntimeInfo::Kind_AllocationHandle, excType)
+        };
+        Opnd * retOpnd=newOpnd(excType);
+        CallInst * callInst=newRuntimeHelperCallInst(
+            VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE,
+            lengthof(helperOpnds1), helperOpnds1, retOpnd);
+        
+        callInst->setBCOffset(bcOffset);
+        basicBlock->appendInst(callInst);
+
+        MethodDesc* md = compilationInterface.resolveMethod( excType, 
+                DEFAUlT_COSTRUCTOR_NAME, DEFAUlT_COSTRUCTOR_DESCRIPTOR);
+        
+        Opnd * target = newImmOpnd(typeManager.getIntPtrType(), Opnd::RuntimeInfo::Kind_MethodDirectAddr, md);
+        Opnd * helperOpnds2[] = { (Opnd*)retOpnd };
+        callInst=newCallInst(target, getDefaultManagedCallingConvention(), 
+            lengthof(helperOpnds2), helperOpnds2, NULL);
+        callInst->setBCOffset(bcOffset);
+        basicBlock->appendInst(callInst);
+
+        Opnd * helperOpnds3[] = { (Opnd*)retOpnd };
+        throwInst=newRuntimeHelperCallInst(
+            VM_RT_THROW, 
+            lengthof(helperOpnds3), helperOpnds3, NULL);
+    }
+    throwInst->setBCOffset(bcOffset);
+    basicBlock->appendInst(throwInst);
+}
+
 //_____________________________________________________________________________________________
 void IRManager::translateToNativeForm()
 {

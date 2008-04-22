@@ -79,7 +79,7 @@ NativeCodePtr exn_get_rth_throw_negative_array_size();
 NativeCodePtr exn_get_rth_throw_array_store();
 
 // rth_throw_arithmetic throws an arithmetic exception (lazily)
-NativeCodePtr exn_get_rth_throw_arithmetic();
+//NativeCodePtr exn_get_rth_throw_arithmetic();
 
 // rth_throw_class_cast_exception throws a class cast exception (lazily)
 NativeCodePtr exn_get_rth_throw_class_cast_exception();

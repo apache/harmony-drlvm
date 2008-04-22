@@ -216,16 +216,16 @@ void class_initialize(Class *clss)
     ASSERT_RAISE_AREA;
     assert(!hythread_is_suspend_enabled());
 
-    // check verifier constraints
-    tmn_suspend_enable();
-    if(!clss->verify_constraints(VM_Global_State::loader_env)) {
-        assert(exn_raised());
-        tmn_suspend_disable();
-        return;
-    }
-    tmn_suspend_disable();
-    
     if(!clss->is_initialized()) {
+        // check verifier constraints
+        tmn_suspend_enable();
+        if(!clss->verify_constraints(VM_Global_State::loader_env)) {
+            assert(exn_raised());
+            tmn_suspend_disable();
+            return;
+        }
+        tmn_suspend_disable();
+
         clss->initialize();
     }
 } // class_initialize

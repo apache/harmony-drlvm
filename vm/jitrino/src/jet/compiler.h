@@ -54,6 +54,7 @@ namespace Jet {
  * IA-64 and Intel-64.
  */
 #define NATIVE_CODE_SIZE_2_BC_SIZE_RATIO        (10)
+#define NATIVE_STACK_SIZE_2_THROW_SYN_EXC       (2)
 
 /**
  * The class represents a JIT compiler for the Java bytecode under DRLVM

@@ -1662,14 +1662,6 @@ NativeCodePtr rth_get_lil_helper(VM_RT_SUPPORT f)
         return rth_wrap_exn_throw(dyn_count, "rth_throw", exn_get_rth_throw());
     case VM_RT_THROW_LAZY:
         return rth_wrap_exn_throw(dyn_count, "rth_throw_lazy", exn_get_rth_throw_lazy());
-    case VM_RT_IDX_OUT_OF_BOUNDS:
-        return rth_wrap_exn_throw(dyn_count, "rth_throw_index_out_of_bounds", exn_get_rth_throw_array_index_out_of_bounds());
-    case VM_RT_NULL_PTR_EXCEPTION:
-        return rth_wrap_exn_throw(dyn_count, "rth_throw_null_pointer", exn_get_rth_throw_null_pointer());
-    case VM_RT_DIVIDE_BY_ZERO_EXCEPTION:
-        return rth_wrap_exn_throw(dyn_count, "rth_throw_arithmetic", exn_get_rth_throw_arithmetic());
-    case VM_RT_ARRAY_STORE_EXCEPTION:
-        return rth_wrap_exn_throw(dyn_count, "rth_throw_array_store", exn_get_rth_throw_array_store());
     case VM_RT_THROW_LINKING_EXCEPTION:
         return rth_get_lil_throw_linking_exception(dyn_count);
     // Type tests
@@ -1778,34 +1770,22 @@ ManagedObject* class_alloc_new_object(Class* c)
     assert(!hythread_is_suspend_enabled());
     assert(struct_Class_to_java_lang_Class(c)); 
 
+    class_initialize(c);
     ManagedObject* obj = c->allocate_instance();
     if(!obj) {
         exn_raise_object(
             VM_Global_State::loader_env->java_lang_OutOfMemoryError);
         return NULL; // whether this return is reached or not is solved via is_unwindable state
     }
-     return obj;
+    return obj;
 } // class_alloc_new_object
 
 ManagedObject *class_alloc_new_object_using_vtable(VTable *vtable)
 {
     ASSERT_RAISE_AREA;
     assert(!hythread_is_suspend_enabled());
-    assert(struct_Class_to_java_lang_Class(vtable->clss)); 
-#ifdef VM_STATS
-    VM_Statistics::get_vm_stats().num_class_alloc_new_object++;
-    vtable->clss->instance_allocated(vtable->allocated_size);
-#endif //VM_STATS
-    // From vm_types.h: this is the same as instance_data_size with the constraint bit cleared.
-    ManagedObject* o = (ManagedObject*) vm_alloc_and_report_ti(
-        vtable->allocated_size, vtable->clss->get_allocation_handle(),
-        vm_get_gc_thread_local(), vtable->clss);
-    if (!o) {
-        exn_raise_object(
-            VM_Global_State::loader_env->java_lang_OutOfMemoryError);
-        return NULL; // reached by interpreter and from JNI
-    }
-    return o;
+    assert(struct_Class_to_java_lang_Class(vtable->clss));
+    return class_alloc_new_object(vtable->clss);
 } //class_alloc_new_object_using_vtable
 
 ManagedObject* class_alloc_new_object_and_run_default_constructor(Class* clss)
@@ -1823,10 +1803,8 @@ class_alloc_new_object_and_run_constructor(Class* clss,
     assert(struct_Class_to_java_lang_Class(clss)); 
 
     ObjectHandle obj = oh_allocate_local_handle();
-    obj->object = clss->allocate_instance();
+    obj->object = class_alloc_new_object(clss);
     if(!obj->object) {
-        exn_raise_object(
-            VM_Global_State::loader_env->java_lang_OutOfMemoryError);
         return NULL;
     }
 

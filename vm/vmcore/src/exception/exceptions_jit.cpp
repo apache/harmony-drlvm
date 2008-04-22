@@ -785,7 +785,11 @@ static void rth_throw_lazy(Method * exn_constr)
     DIE(("Lazy exceptions are not supported on this platform"));
 #else
     uint8 *args = (uint8 *) (m2n_get_args(m2n_get_last_frame()) + 1);   // +1 to skip constructor
-    args += exn_constr->get_num_arg_slots() * 4 - 4;
+    if (NULL != exn_constr) {
+        args += exn_constr->get_num_arg_slots() * 4 - 4;
+    } else {
+        args += 1*4 /*default constructor*/ - 4;
+    }
     exn_athrow(NULL, *(Class_Handle *) args, exn_constr, args);
 #endif
 }   //rth_throw_lazy
@@ -1085,27 +1089,27 @@ NativeCodePtr exn_get_rth_throw_array_store()
 
 
 // rth_throw_arithmetic throws an arithmetic exception (lazily)
-NativeCodePtr exn_get_rth_throw_arithmetic()
-{
-    static NativeCodePtr addr = NULL;
-    if (addr) {
-        return addr;
-    }
-
-    Global_Env *env = VM_Global_State::loader_env;
-    LilCodeStub *cs = lil_parse_code_stub("entry 0:stdcall::void;"
-        "std_places 1;" "sp0=%0i;" "tailcall %1i;",
-        env->java_lang_ArithmeticException_Class,
-        lil_npc_to_fp(exn_get_rth_throw_lazy_trampoline()));
-    assert(lil_is_valid(cs));
-    addr = LilCodeGenerator::get_platform()->compile(cs);
-
-    DUMP_STUB(addr, "rth_throw_arithmetic", lil_cs_get_code_size(cs));
-
-    lil_free_code_stub(cs);
-
-    return addr;
-}   //exn_get_rth_throw_arithmetic
+//NativeCodePtr exn_get_rth_throw_arithmetic()
+//{
+//    static NativeCodePtr addr = NULL;
+//    if (addr) {
+//        return addr;
+//    }
+//
+//    Global_Env *env = VM_Global_State::loader_env;
+//    LilCodeStub *cs = lil_parse_code_stub("entry 0:stdcall::void;"
+//        "std_places 1;" "sp0=%0i;" "tailcall %1i;",
+//        env->java_lang_ArithmeticException_Class,
+//        lil_npc_to_fp(exn_get_rth_throw_lazy_trampoline()));
+//    assert(lil_is_valid(cs));
+//    addr = LilCodeGenerator::get_platform()->compile(cs);
+//
+//    DUMP_STUB(addr, "rth_throw_arithmetic", lil_cs_get_code_size(cs));
+//
+//    lil_free_code_stub(cs);
+//
+//    return addr;
+//}   //exn_get_rth_throw_arithmetic
 
 
 // Return the type of class cast exception

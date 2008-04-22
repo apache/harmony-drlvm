@@ -127,60 +127,7 @@ enum VM_RT_SUPPORT {
  */
 
     VM_RT_THROW_LAZY=201,
-/**
- * @param The parameters are the following:
- *        \arg Method handle
- *        \arg ...
- *        \arg arg 2
- *        \arg arg 1
- *        \arg Class handle
- *
- * @return None.
- *
- * The arguments to the constructor are pushed the same way they would have
- * been pushed to invoke the constructor, except that the (non-existing)
- * this pointer is replaced with the class handle of the exception.
- * The method handle representing the constructor is pushed last.
- *
- * This function never returns.
- */
-
-    VM_RT_IDX_OUT_OF_BOUNDS=202,
  
-/**
- * @param none
- *  
- * @return None.
- *
- * Throw the <code>java/lang/ArrayIndexOutOfBoundsException</code>.
- *
- * This function never returns.
- */
-    VM_RT_NULL_PTR_EXCEPTION=203,
- 
-/**
- * @param none
- *
- * @return None.
- *
- * Throw the <code>java/lang/NullPointerException</code>
- *
- * This function never returns.
- */
-    VM_RT_DIVIDE_BY_ZERO_EXCEPTION=204,
-  
-/**
- * @param none
- *
- * @return None.
- *
- * Throw the <code>java/lang/ArithmeticException</code>.
- *
- * This function never returns.
- */
-
-    VM_RT_ARRAY_STORE_EXCEPTION=205,
-   
 /**
  * @param none
  * 
