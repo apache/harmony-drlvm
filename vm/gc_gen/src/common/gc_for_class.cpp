@@ -159,7 +159,7 @@ void gc_class_prepared (Class_Handle ch, VTable_Handle vth)
     Class_Handle array_element_class = class_get_array_element_class(ch);
     gc_set_prop_array(gcvt);
     
-    gcvt->array_elem_size = class_get_array_element_size(ch);
+        gcvt->array_elem_size = class_get_array_element_size(ch);
     unsigned int the_offset = vector_first_element_offset_unboxed(array_element_class);
     gcvt->array_first_elem_offset = the_offset;
   
@@ -177,7 +177,7 @@ void gc_class_prepared (Class_Handle ch, VTable_Handle vth)
   WeakReferenceType type = class_is_reference(ch);
   gc_set_prop_reference(gcvt, type);
   
-  unsigned int size = class_get_object_size(ch);
+    unsigned int size = class_get_object_size(ch);
   gcvt->gc_allocated_size = size;
   
   gcvt->gc_class_name = class_get_name(ch);
@@ -197,6 +197,8 @@ void gc_class_prepared (Class_Handle ch, VTable_Handle vth)
 
   return;
 }  /* gc_class_prepared */
+
+
 
 
 

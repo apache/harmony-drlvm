@@ -218,7 +218,6 @@ void verifier_scan_resurrect_objects(Heap_Verifier* heap_verifier)
   GC* gc    =  heap_verifier->gc;
   Heap_Verifier_Metadata* verifier_metadata = heap_verifier->heap_verifier_metadata;
   verifier_update_info_before_resurrect(heap_verifier);
-  return;
 #ifndef BUILD_IN_REFERENT
   heap_verifier->gc_verifier->is_tracing_resurrect_obj = TRUE;
   if(heap_verifier->is_before_gc){
@@ -440,6 +439,8 @@ void verifier_init_object_scanner(Heap_Verifier* heap_verifier)
   heap_verifier->live_obj_scanner = verifier_scan_live_objects;
   heap_verifier->all_obj_scanner   = verifier_scan_all_objects;
 }
+
+
 
 
 

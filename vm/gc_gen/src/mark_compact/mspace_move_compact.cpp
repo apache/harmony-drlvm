@@ -224,11 +224,9 @@ void move_compact_mspace(Collector* collector)
 #endif
     gc_identify_dead_weak_roots(gc);
 
-#ifndef LOS_ADJUST_BOUNDARY
 #ifdef USE_32BITS_HASHCODE
-    if(is_fallback)
+    if((!LOS_ADJUST_BOUNDARY) && (is_fallback))
       fallback_clear_fwd_obj_oi_init(collector);
-#endif
 #endif
     debug_num_compact_blocks = 0;
     /* let other collectors go */

@@ -597,11 +597,37 @@ Chunk_Header *wspace_steal_pfc(Wspace *wspace, unsigned int seg_index, unsigned 
   return NULL;
 }
 
+static POINTER_SIZE_INT free_mem_in_used_chunk_list(Wspace *wspace, Boolean show_chunk_info)
+{
+  POINTER_SIZE_INT used_chunk_size = 0;
+  POINTER_SIZE_INT used_chunk_num  = 0;
+  POINTER_SIZE_INT free_mem_size   = 0;
+  Pool* used_chunk_pool = wspace->used_chunk_pool;
+  if(used_chunk_pool) {
+    pool_iterator_init(used_chunk_pool);
+    Chunk_Header* used_chunk = (Chunk_Header*)pool_iterator_next(used_chunk_pool);
+    while(used_chunk != NULL){
+      used_chunk_num ++;
+      used_chunk_size += CHUNK_SIZE(used_chunk);
+      if(used_chunk->status & CHUNK_NORMAL) {
+        free_mem_size += (used_chunk->slot_num - used_chunk->alloc_num) * used_chunk->slot_size;
+      }
+      used_chunk = (Chunk_Header*)pool_iterator_next(used_chunk_pool);
+    }
+  }
+#ifdef SSPACE_CHUNK_INFO
+      if(show_chunk_info)
+        printf("Used chunk num: %d\tTotal Size: %d\tFragmentation Ratio: %f\n", used_chunk_num, used_chunk_size, (float)free_mem_size/used_chunk_size);
+#endif
+  return free_mem_size;
+}
+
 static POINTER_SIZE_INT free_mem_in_pfc_pools(Wspace *wspace, Boolean show_chunk_info)
 {
   Size_Segment **size_segs = wspace->size_segments;
   Pool ***pfc_pools = wspace->pfc_pools;
   POINTER_SIZE_INT free_mem_size = 0;
+  POINTER_SIZE_INT total_pfc_size = 0;
   
   for(unsigned int i = 0; i < SIZE_SEGMENT_NUM; ++i){
     for(unsigned int j = 0; j < size_segs[i]->chunk_num; ++j){
@@ -627,9 +653,15 @@ static POINTER_SIZE_INT free_mem_in_pfc_pools(Wspace *wspace, Boolean show_chunk
         printf("Size: %x\tchunk num: %d\tLive Ratio: %f\n", NORMAL_INDEX_TO_SIZE(j, size_segs[i]), chunk_num, (float)alloc_num/total_slot_num);
 #endif
       free_mem_size += NORMAL_INDEX_TO_SIZE(j, size_segs[i]) * (total_slot_num-alloc_num);
+      total_pfc_size += NORMAL_INDEX_TO_SIZE(j, size_segs[i]) * total_slot_num;
       assert(free_mem_size < wspace->committed_heap_size);
     }
   }
+
+#ifdef SSPACE_CHUNK_INFO
+      if(show_chunk_info)
+        printf("Total PFC pool Size: %d\tFragmentation Ratio: %f\n", total_pfc_size,  (float)free_mem_size/total_pfc_size);
+#endif
   
   return free_mem_size;
 }
@@ -656,6 +688,11 @@ static POINTER_SIZE_INT free_mem_in_free_lists(Wspace *wspace, Free_Chunk_List *
       printf("Free Size: %x\tnum: %d\n", chunk_size, chunk_num);
 #endif
   }
+
+#ifdef SSPACE_CHUNK_INFO
+    if(show_chunk_info)
+      printf("Total Size in FreeList: %d\n", free_mem_size);
+#endif
   
   return free_mem_size;
 }
@@ -675,6 +712,11 @@ static POINTER_SIZE_INT free_mem_in_hyper_free_list(Wspace *wspace, Boolean show
     assert(free_mem_size <= wspace->committed_heap_size);
     chunk = chunk->next;
   }
+
+#ifdef SSPACE_CHUNK_INFO
+    if(show_chunk_info)
+      printf("Total Size in HyperFreeList: %d\n", free_mem_size);
+#endif
   
   return free_mem_size;
 }
@@ -717,6 +759,7 @@ void wspace_chunks_info(Wspace *wspace, Boolean show_info)
   if(!show_info) return;
   
   POINTER_SIZE_INT free_mem_size = free_mem_in_wspace(wspace, TRUE);
+  free_mem_size += free_mem_in_used_chunk_list(wspace, TRUE);
   
   float free_mem_ratio = (float)free_mem_size / wspace->committed_heap_size;
   printf("\n\nFree mem ratio: %f\n\n", free_mem_ratio);
@@ -852,7 +895,7 @@ void free_wrapper(int size)
 }
 
 unsigned int *shift_table;
-unsigned short *compact_table[MAX_SLOT_SIZE_AFTER_SHIFTING];
+unsigned short *compact_table[MAX_SLOT_SIZE_AFTER_SHIFTING+1];
 unsigned int mask[MAX_SLOT_SIZE_AFTER_SHIFTING];
 static int already_inited = 0;
 void fastdiv_init()
@@ -909,5 +952,7 @@ void fastdiv_init()
 }
 
 #endif
+
+
 
 

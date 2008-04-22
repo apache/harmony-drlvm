@@ -205,8 +205,6 @@ void* lspace_alloc(unsigned size, Allocator *allocator)
     POINTER_SIZE_INT alloc_size = ALIGN_UP_TO_KILO(size);
     Lspace* lspace = (Lspace*)gc_get_los((GC_Gen*)allocator->gc);
     Free_Area_Pool* pool = lspace->free_pool;
-
-    gc_try_schedule_collection(allocator->gc, GC_CAUSE_NIL);
     
     while( try_count < 2 ){
         if(p_result = lspace_try_alloc(lspace, alloc_size))
@@ -367,26 +365,26 @@ void lspace_reset_for_slide(Lspace* lspace)
             blocked_space_shrink((Blocked_Space*)nos, trans_size);
           } else {
             POINTER_SIZE_INT mos_free_size= blocked_space_free_mem_size((Blocked_Space*)mos);
-            void *uncommit_base=(void*)((POINTER_SIZE_INT)nos->heap_end-trans_size);
-            vm_decommit_mem(uncommit_base,trans_size);
+            void *decommit_base=(void*)((POINTER_SIZE_INT)nos->heap_end-trans_size);
+            vm_decommit_mem(decommit_base,trans_size);
             unsigned int reduced_mos_size = trans_size - nos->committed_heap_size;
             unsigned int size=round_down_to_size(mos_free_size-reduced_mos_size,SPACE_ALLOC_UNIT);
-            unsigned int nos_size=(unsigned int )(size*nos->survive_ratio/(nos->survive_ratio+mos->survive_ratio));
+            unsigned int nos_size= mos_free_size - reduced_mos_size ;
             if(nos_size<GC_BLOCK_SIZE_BYTES)  nos_size=GC_BLOCK_SIZE_BYTES;
             nos_size=round_up_to_size(nos_size, GC_BLOCK_SIZE_BYTES);
-            mos->num_managed_blocks-=((nos_size+reduced_mos_size)>>GC_BLOCK_SHIFT_COUNT);
+            mos->num_managed_blocks -= (( mos_free_size )>>GC_BLOCK_SHIFT_COUNT);
             mos->num_used_blocks = mos->free_block_idx-mos->first_block_idx;
             mos->num_total_blocks=mos->num_managed_blocks;
-            mos->ceiling_block_idx-=((nos_size+reduced_mos_size)>>GC_BLOCK_SHIFT_COUNT);
+            mos->ceiling_block_idx -= (( mos_free_size )>>GC_BLOCK_SHIFT_COUNT);
             assert(mos->num_used_blocks<=mos->num_managed_blocks);
             void *start_address=(void*)&(mos->blocks[mos->num_managed_blocks]);
-            assert(start_address< uncommit_base);
+            assert(start_address< decommit_base);
             mos->heap_end = start_address;
             mos->committed_heap_size = (POINTER_SIZE_INT) start_address - (POINTER_SIZE_INT) mos->heap_start;
-            nos->heap_start = start_address;
-            nos->heap_end = uncommit_base;
-            nos->committed_heap_size=nos->reserved_heap_size = (POINTER_SIZE_INT)uncommit_base- (POINTER_SIZE_INT) start_address;   
-            nos->num_total_blocks=nos->num_managed_blocks=nos_size>>GC_BLOCK_SHIFT_COUNT;
+            nos_boundary = nos->heap_start = start_address;
+            nos->heap_end = decommit_base;
+            nos->committed_heap_size = nos->reserved_heap_size = (POINTER_SIZE_INT)decommit_base- (POINTER_SIZE_INT) start_address;   
+            nos->num_total_blocks = nos->num_managed_blocks = nos_size>>GC_BLOCK_SHIFT_COUNT;
             nos->free_block_idx=nos->first_block_idx=GC_BLOCK_INDEX_FROM(gc->heap_start,start_address);
             nos->ceiling_block_idx=nos->first_block_idx+nos->num_managed_blocks-1;
             nos->num_used_blocks = 0;
@@ -540,6 +538,8 @@ void lspace_sweep(Lspace* lspace)
   TRACE2("gc.process", "GC: end of lspace sweep algo ...\n");
   return;
 }
+
+
 
 
 

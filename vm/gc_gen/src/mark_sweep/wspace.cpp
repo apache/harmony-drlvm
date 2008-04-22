@@ -125,15 +125,6 @@ void allocator_init_local_chunks(Allocator *allocator)
   allocator->local_chunks = local_chunks;
 }
 
-void allocator_register_new_obj_size(Allocator *allocator)
-{
-  Mutator* mutator = (Mutator*)allocator;
-  Wspace *wspace = gc_get_wspace(allocator->gc);
-  Space_Statistics* space_stat = wspace->space_statistic;
-  space_stat->size_new_obj += mutator->new_obj_size;
-}
-
-
 void allocactor_destruct_local_chunks(Allocator *allocator)
 {
   Wspace *wspace = gc_get_wspace(allocator->gc);
@@ -153,12 +144,12 @@ void allocactor_destruct_local_chunks(Allocator *allocator)
         /* Put local pfc to the according pools */
         for(unsigned int j = 0; j < chunk_ptr_num; ++j){
           if(chunk_ptrs[j]){
-            if(!USE_CONCURRENT_GC){
+            if(!gc_is_specify_con_gc()){
               wspace_put_pfc(wspace, chunk_ptrs[j]);
             }else{
               Chunk_Header* chunk_to_rem = chunk_ptrs[j];
               chunk_to_rem->status = CHUNK_USED | CHUNK_NORMAL;
-              wspace_register_used_chunk(wspace, chunk_to_rem);
+              wspace_reg_used_chunk(wspace, chunk_to_rem);
             }
           }
         }
@@ -243,13 +234,13 @@ void wspace_collection(Wspace *wspace)
   wspace_alloc_info_summary();
 #endif
 #ifdef SSPACE_CHUNK_INFO
-  wspace_chunks_info(wspace, FALSE);
+  wspace_chunks_info(wspace, TRUE);
 #endif
   wspace_clear_used_chunk_pool(wspace);
 
 
   wspace_decide_compaction_need(wspace);
-  if(wspace->need_compact && major_is_marksweep()){
+  if(wspace->need_compact && gc_is_kind(ALGO_MARKSWEEP)){
     assert(!collect_move_object());
     GC_PROP |= ALGO_MS_COMPACT;
   }
@@ -279,7 +270,7 @@ void wspace_collection(Wspace *wspace)
 #endif
 
 #ifdef SSPACE_CHUNK_INFO
-  wspace_chunks_info(wspace, FALSE);
+  wspace_chunks_info(wspace, TRUE);
 #endif
 
 }

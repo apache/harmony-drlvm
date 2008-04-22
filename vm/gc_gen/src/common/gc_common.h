@@ -427,10 +427,10 @@ typedef struct GC{
   unsigned int gc_concurrent_status; /*concurrent GC status: only support CONCURRENT_MARK_PHASE now*/
   Collection_Scheduler* collection_scheduler;
 
-  SpinLock concurrent_mark_lock;
-  SpinLock enumerate_rootset_lock;
-  SpinLock concurrent_sweep_lock;
-  SpinLock collection_scheduler_lock;
+  SpinLock lock_con_mark;
+  SpinLock lock_enum;
+  SpinLock lock_con_sweep;
+  SpinLock lock_collect_sched;
   
   /* system info */
   unsigned int _system_alloc_unit;

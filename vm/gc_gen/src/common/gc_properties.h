@@ -23,7 +23,8 @@ enum GC_CAUSE{
   GC_CAUSE_NOS_IS_FULL,
   GC_CAUSE_LOS_IS_FULL,
   GC_CAUSE_MOS_IS_FULL,
-  GC_CAUSE_RUNTIME_FORCE_GC
+  GC_CAUSE_RUNTIME_FORCE_GC,
+  GC_CAUSE_CONCURRENT_GC
 };
 
 extern unsigned int GC_PROP;
@@ -85,6 +86,10 @@ enum GC_Property{
   ALGO_CON_SWEEP        = 0x5000000,  /* ALGO_CON|0x4000000 */
   ALGO_CON_ENUM         = 0x9000000,  /* ALGO_CON|0x8000000 */
 
+  ALGO_CON_OTF_OBJ      = 0x10000000,
+  ALGO_CON_OTF_REF      = 0x20000000,
+  ALGO_CON_MOSTLY       = 0x40000000,
+  ALGO_CON_MASK         = 0x70000000,
 };
 
 FORCE_INLINE Boolean gc_is_kind(unsigned int kind)
@@ -223,7 +228,7 @@ FORCE_INLINE void collect_set_ms_normal()
    root slots after collection in an extra phase. i.e., collect_mark_and_move */
 FORCE_INLINE Boolean collect_need_update_repset()
 {
-  return (gc_is_kind(ALGO_MAJOR) || gc_is_kind(ALGO_MS_COMPACT));
+  return (gc_is_kind(ALGO_MAJOR) || gc_is_kind(ALGO_MS_COMPACT) || !gc_has_nos());
 }
 
 #endif /* #ifndef _GC_PROPERTIES */

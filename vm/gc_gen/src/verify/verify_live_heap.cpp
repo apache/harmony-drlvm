@@ -123,6 +123,9 @@ void event_gc_collect_kind_changed(GC* gc)
   assert(collect_is_fallback());
   if(!heap_verifier->need_verify_gc) return;
   
+  if(!major_is_marksweep())
+    verifier_cleanup_block_info(gc);
+
   /*finish the fallbacked gc verify*/
   heap_verifier->is_before_gc = FALSE;
   verifier_set_fallback_collection(heap_verifier->gc_verifier, TRUE);  
@@ -150,6 +153,8 @@ void event_mutator_allocate_newobj(Partial_Reveal_Object* p_newobj, POINTER_SIZE
 
 Heap_Verifier* get_heap_verifier()
 { return heap_verifier; }
+
+
 
 
 

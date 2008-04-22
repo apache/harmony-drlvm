@@ -64,6 +64,8 @@ void mutator_initialize(GC* gc, void *unused_gc_information)
   return;
 }
 
+void mutator_register_new_obj_size(Mutator * mutator);
+
 void mutator_destruct(GC* gc, void *unused_gc_information)
 {
 
@@ -75,9 +77,9 @@ void mutator_destruct(GC* gc, void *unused_gc_information)
   lock(gc->mutator_list_lock);     // vvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 
 #ifdef USE_UNIQUE_MARK_SWEEP_GC
-    allocactor_destruct_local_chunks((Allocator*)mutator);
-    allocator_register_new_obj_size((Allocator*)mutator);
+  allocactor_destruct_local_chunks((Allocator*)mutator);
 #endif
+  mutator_register_new_obj_size(mutator);
 
   volatile Mutator *temp = gc->mutator_list;
   if (temp == mutator) {  /* it is at the head of the list */
@@ -176,7 +178,7 @@ Vector_Block* gc_get_local_dirty_set(GC* gc, unsigned int shared_id)
   return NULL;
 }
 
-void gc_start_mutator_time_measurement(GC* gc)
+void gc_start_mutator_time_measure(GC* gc)
 {
   lock(gc->mutator_list_lock);
   Mutator* mutator = gc->mutator_list;
@@ -204,6 +206,31 @@ int64 gc_get_mutator_time(GC* gc)
   }  
   unlock(gc->mutator_list_lock);
   return time_mutator;
+}
+
+static POINTER_SIZE_INT size_new_obj_desturcted_mutator_alloced;
+
+void mutator_register_new_obj_size(Mutator * mutator)
+{
+  size_new_obj_desturcted_mutator_alloced += mutator->new_obj_size;
+}
+
+POINTER_SIZE_INT gc_get_new_object_size(GC* gc, Boolean need_reset)
+{
+  POINTER_SIZE_INT new_obj_size = 0;
+
+  lock(gc->mutator_list_lock);
+  Mutator* mutator = gc->mutator_list;
+  while (mutator) {
+    new_obj_size += mutator->new_obj_size;
+    if(need_reset) mutator->new_obj_size = 0;
+    mutator = mutator->next;
+  }  
+  unlock(gc->mutator_list_lock);
+
+  new_obj_size += size_new_obj_desturcted_mutator_alloced;
+  if(need_reset) size_new_obj_desturcted_mutator_alloced = 0;
+  return new_obj_size;
 }
 
 

@@ -151,7 +151,7 @@ static inline void resurrect_obj_tree(Collector *collector, REF *p_ref)
       else 
         assert(0);
     }
-  } else if(collect_is_major_normal()){
+  } else if(collect_is_major_normal() || !gc_has_nos()){
     p_ref_or_obj = p_obj;
     if(gc_has_space_tuner(gc) && (gc->tuner->kind != TRANS_NOTHING)){
       trace_object = trace_obj_in_space_tune_marking;
@@ -165,7 +165,7 @@ static inline void resurrect_obj_tree(Collector *collector, REF *p_ref)
       } else {
         collector->los_live_obj_size += round_up_to_size(obj_size, KB); 
       }
-    } else if(major_is_marksweep()){
+    } else if(!gc_has_nos()){
       trace_object = trace_obj_in_ms_marking;
     } else {
       trace_object = trace_obj_in_normal_marking;
@@ -195,7 +195,7 @@ static inline void resurrect_obj_tree(Collector *collector, REF *p_ref)
     while(!vector_block_iterator_end(task_block, iter)){
       void *p_ref_or_obj = (void*)*iter;
       assert(((collect_is_minor()||collect_is_fallback()) && *(Partial_Reveal_Object **)p_ref_or_obj)
-              || ((collect_is_major_normal()||major_is_marksweep()) && p_ref_or_obj));
+              || ((collect_is_major_normal()||major_is_marksweep()||!gc_has_nos()) && p_ref_or_obj));
       trace_object(collector, p_ref_or_obj);
       if(collector->result == FALSE)  break; /* Resurrection fallback happens; force return */
       
@@ -850,6 +850,8 @@ void gc_copy_finaliable_obj_to_rootset(GC *gc)
   finref_copy_pool(finalizable_obj_pool, finalizable_obj_pool_copy, gc);
   finref_copy_pool_to_rootset(gc, finalizable_obj_pool_copy);
 }
+
+
 
 
 

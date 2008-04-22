@@ -4,7 +4,7 @@
 #include "gc_ms.h"
 #include "../gen/gen.h"
 
-static void collector_sweep_normal_chunk_concurrent(Collector *collector, Wspace *wspace, Chunk_Header *chunk)
+static void collector_sweep_normal_chunk_con(Collector *collector, Wspace *wspace, Chunk_Header *chunk)
 {
   unsigned int slot_num = chunk->slot_num;
   unsigned int live_num = 0;
@@ -27,16 +27,17 @@ static void collector_sweep_normal_chunk_concurrent(Collector *collector, Wspace
 
   if(!live_num){  /* all objects in this chunk are dead */
     collector_add_free_chunk(collector, (Free_Chunk*)chunk);
-   } else if(!chunk_is_reusable(chunk)){  /* most objects in this chunk are swept, add chunk to pfc list*/
+   } else {
     chunk->alloc_num = live_num;
-    wspace_register_unreusable_normal_chunk(wspace, chunk);
+   if(!chunk_is_reusable(chunk)){  /* most objects in this chunk are swept, add chunk to pfc list*/
+    wspace_reg_unreusable_normal_chunk(wspace, chunk);
    } else {  /* most objects in this chunk are swept, add chunk to pfc list*/
-    chunk->alloc_num = live_num;
     wspace_put_pfc_backup(wspace, chunk);
+   }
   }
 }
 
-static inline void collector_sweep_abnormal_chunk_concurrent(Collector *collector, Wspace *wspace, Chunk_Header *chunk)
+static inline void collector_sweep_abnormal_chunk_con(Collector *collector, Wspace *wspace, Chunk_Header *chunk)
 {
   assert(chunk->status == (CHUNK_ABNORMAL | CHUNK_USED));
   POINTER_SIZE_INT *table = chunk->table;
@@ -45,20 +46,20 @@ static inline void collector_sweep_abnormal_chunk_concurrent(Collector *collecto
     collector_add_free_chunk(collector, (Free_Chunk*)chunk);
   }
   else {
-    wspace_register_live_abnormal_chunk(wspace, chunk);
+    wspace_reg_live_abnormal_chunk(wspace, chunk);
     collector->live_obj_size += CHUNK_SIZE(chunk);
     collector->live_obj_num++;
   }
 }
 
-static void wspace_sweep_chunk_concurrent(Wspace* wspace, Collector* collector, Chunk_Header_Basic* chunk)
+static void wspace_sweep_chunk_con(Wspace* wspace, Collector* collector, Chunk_Header_Basic* chunk)
 {  
   if(chunk->status & CHUNK_NORMAL){   /* chunk is used as a normal sized obj chunk */
     assert(chunk->status == (CHUNK_NORMAL | CHUNK_USED));
-    collector_sweep_normal_chunk_concurrent(collector, wspace, (Chunk_Header*)chunk);
+    collector_sweep_normal_chunk_con(collector, wspace, (Chunk_Header*)chunk);
   } else {  /* chunk is used as a super obj chunk */
     assert(chunk->status == (CHUNK_ABNORMAL | CHUNK_USED));
-    collector_sweep_abnormal_chunk_concurrent(collector, wspace, (Chunk_Header*)chunk);
+    collector_sweep_abnormal_chunk_con(collector, wspace, (Chunk_Header*)chunk);
   }
 }
 
@@ -248,7 +249,7 @@ static void gc_sweep_mutator_local_chunks(GC *gc)
   /* release local chunks of each mutator in unique mark-sweep GC */
   Mutator *mutator = gc->mutator_list;
   while(mutator){
-    wait_mutator_signal(mutator, DISABLE_COLLECTOR_SWEEP_LOCAL_CHUNKS);
+    wait_mutator_signal(mutator, HSIG_MUTATOR_SAFE);
     allocator_sweep_local_chunks((Allocator*)mutator);
     mutator = mutator->next;
   }
@@ -257,7 +258,7 @@ static void gc_sweep_mutator_local_chunks(GC *gc)
 #endif
 }
 
-static void gc_check_mutator_local_chunks(GC *gc, unsigned int handshake_signal)
+static void gc_wait_mutator_signal(GC *gc, unsigned int handshake_signal)
 {
   lock(gc->mutator_list_lock);     // vvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 
@@ -284,6 +285,9 @@ void wspace_sweep_concurrent(Collector* collector)
   GC *gc = collector->gc;
   Wspace *wspace = gc_get_wspace(gc);
 
+  collector->live_obj_size = 0;
+  collector->live_obj_num = 0;
+
   unsigned int num_active_collectors = gc->num_active_collectors;
   
   atomic_cas32(&num_sweeping_collectors, 0, num_active_collectors+1);
@@ -295,7 +299,7 @@ void wspace_sweep_concurrent(Collector* collector)
   /*1. Grab chunks from used list, sweep the chunk and push back to PFC backup list & free list.*/
   chunk_to_sweep = chunk_pool_get_chunk(used_chunk_pool);
   while(chunk_to_sweep != NULL){
-    wspace_sweep_chunk_concurrent(wspace, collector, chunk_to_sweep);
+    wspace_sweep_chunk_con(wspace, collector, chunk_to_sweep);
     chunk_to_sweep = chunk_pool_get_chunk(used_chunk_pool);
   }
 
@@ -308,7 +312,7 @@ void wspace_sweep_concurrent(Collector* collector)
       while(chunk_to_sweep != NULL){
         assert(chunk_to_sweep->status == (CHUNK_NORMAL | CHUNK_NEED_ZEROING));
         chunk_to_sweep->status = CHUNK_NORMAL | CHUNK_USED;
-        wspace_sweep_chunk_concurrent(wspace, collector, chunk_to_sweep);
+        wspace_sweep_chunk_con(wspace, collector, chunk_to_sweep);
         chunk_to_sweep = chunk_pool_get_chunk(pfc_pool);
       }
     }
@@ -323,8 +327,8 @@ void wspace_sweep_concurrent(Collector* collector)
     gc_sweep_mutator_local_chunks(wspace->gc);
 
     /*4. Sweep gloabl alloc normal chunks again*/
-    gc_set_sweeping_global_normal_chunk();
-    gc_check_mutator_local_chunks(wspace->gc, DISABLE_COLLECTOR_SWEEP_GLOBAL_CHUNKS);
+    gc_set_sweep_global_normal_chunk();
+    gc_wait_mutator_signal(wspace->gc, HSIG_MUTATOR_SAFE);
     wspace_init_pfc_pool_iterator(wspace);
     Pool* pfc_pool = wspace_grab_next_pfc_pool(wspace);
     while(pfc_pool != NULL){
@@ -333,7 +337,7 @@ void wspace_sweep_concurrent(Collector* collector)
         while(chunk_to_sweep != NULL){
           assert(chunk_to_sweep->status == (CHUNK_NORMAL | CHUNK_NEED_ZEROING));
           chunk_to_sweep->status = CHUNK_NORMAL | CHUNK_USED;
-          wspace_sweep_chunk_concurrent(wspace, collector, chunk_to_sweep);
+          wspace_sweep_chunk_con(wspace, collector, chunk_to_sweep);
           chunk_to_sweep = chunk_pool_get_chunk(pfc_pool);
         }
       }
@@ -344,20 +348,20 @@ void wspace_sweep_concurrent(Collector* collector)
     /*4. Check the used list again.*/
     chunk_to_sweep = chunk_pool_get_chunk(used_chunk_pool);
     while(chunk_to_sweep != NULL){
-      wspace_sweep_chunk_concurrent(wspace, collector, chunk_to_sweep);
+      wspace_sweep_chunk_con(wspace, collector, chunk_to_sweep);
       chunk_to_sweep = chunk_pool_get_chunk(used_chunk_pool);
     }
 
     /*5. Switch the PFC backup list to PFC list.*/
     wspace_exchange_pfc_pool(wspace);
     
-    gc_unset_sweeping_global_normal_chunk();
+    gc_unset_sweep_global_normal_chunk();
 
     /*6. Put back live abnormal chunk and normal unreusable chunk*/
     Chunk_Header* used_abnormal_chunk = wspace_get_live_abnormal_chunk(wspace);
     while(used_abnormal_chunk){      
       used_abnormal_chunk->status = CHUNK_USED | CHUNK_ABNORMAL;
-      wspace_register_used_chunk(wspace,used_abnormal_chunk);
+      wspace_reg_used_chunk(wspace,used_abnormal_chunk);
       used_abnormal_chunk = wspace_get_live_abnormal_chunk(wspace);
     }
     pool_empty(wspace->live_abnormal_chunk_pool);
@@ -365,7 +369,7 @@ void wspace_sweep_concurrent(Collector* collector)
     Chunk_Header* unreusable_normal_chunk = wspace_get_unreusable_normal_chunk(wspace);
     while(unreusable_normal_chunk){  
       unreusable_normal_chunk->status = CHUNK_USED | CHUNK_NORMAL;
-      wspace_register_used_chunk(wspace,unreusable_normal_chunk);
+      wspace_reg_used_chunk(wspace,unreusable_normal_chunk);
       unreusable_normal_chunk = wspace_get_unreusable_normal_chunk(wspace);
     }
     pool_empty(wspace->unreusable_normal_chunk_pool);
@@ -382,6 +386,8 @@ void wspace_sweep_concurrent(Collector* collector)
   while(num_sweeping_collectors != num_active_collectors + 1);  
   collector->time_measurement_end = time_now();
 }
+
+
 
 
 

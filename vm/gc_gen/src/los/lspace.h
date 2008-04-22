@@ -90,7 +90,7 @@ inline POINTER_SIZE_INT lspace_free_memory_size(Lspace* lspace)
 {
   if(!lspace) return 0;
   /* FIXME:: */
-  assert(lspace->committed_heap_size > (POINTER_SIZE_INT)lspace->last_surviving_size + (POINTER_SIZE_INT)lspace->last_alloced_size);
+  assert(lspace->committed_heap_size >= (POINTER_SIZE_INT)lspace->last_surviving_size + (POINTER_SIZE_INT)lspace->last_alloced_size);
   return (lspace->committed_heap_size - (POINTER_SIZE_INT)lspace->last_surviving_size - (POINTER_SIZE_INT)lspace->last_alloced_size);
 }
 

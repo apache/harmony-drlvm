@@ -62,19 +62,19 @@ void gc_prepare_mutator_remset(GC* gc);
 
 Boolean gc_local_dirtyset_is_empty(GC* gc);
 Vector_Block* gc_get_local_dirty_set(GC* gc, unsigned int shared_id);
-void gc_start_mutator_time_measurement(GC* gc);
+void gc_start_mutator_time_measure(GC* gc);
 int64 gc_get_mutator_time(GC* gc);
+POINTER_SIZE_INT gc_get_new_object_size(GC* gc, Boolean need_reset);
 
 inline void mutator_post_signal(Mutator* mutator, unsigned int handshake_signal)
 { 
-  //FIXME: Need barrier here.
   mem_fence();
   mutator->handshake_signal = handshake_signal; 
   mem_fence();
 }
 
 inline void wait_mutator_signal(Mutator* mutator, unsigned int handshake_signal)
-{ while(mutator->handshake_signal == handshake_signal); }
+{ while(mutator->handshake_signal != handshake_signal); }
 
 
 #endif /*ifndef _MUTATOR_H_ */

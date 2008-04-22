@@ -19,7 +19,7 @@
 #include "../finalizer_weakref/finalizer_weakref.h"
 #include "../thread/marker.h"
 
-volatile Boolean need_terminate_concurrent_mark;
+volatile Boolean need_terminate_mostly_con_mark;
 
 Boolean obj_is_marked_in_table(Partial_Reveal_Object *obj);
 
@@ -87,15 +87,15 @@ static void trace_object(Marker* marker, Partial_Reveal_Object *p_obj)
 }
 
 /* for marking phase termination detection */
-void wspace_mark_scan_mostly_concurrent_reset()
-{ need_terminate_concurrent_mark = FALSE; }
+void mostly_con_mark_terminate_reset()
+{ need_terminate_mostly_con_mark = FALSE; }
 
-void wspace_mark_scan_mostly_concurrent_terminate()
-{ need_terminate_concurrent_mark = TRUE; }
+void terminate_mostly_con_mark()
+{ need_terminate_mostly_con_mark = TRUE; }
 
 static Boolean concurrent_mark_need_terminating(GC* gc)
 {
-  if(need_terminate_concurrent_mark) return TRUE;
+  if(need_terminate_mostly_con_mark) return TRUE;
     
   GC_Metadata *metadata = gc->metadata;
   return pool_is_empty(metadata->gc_dirty_set_pool);
@@ -122,11 +122,9 @@ void wspace_mark_scan_mostly_concurrent(Marker* marker)
   while(root_set){
     POINTER_SIZE_INT *iter = vector_block_iterator_init(root_set);
     while(!vector_block_iterator_end(root_set,iter)){
-      REF *p_ref = (REF *)*iter;
+      Partial_Reveal_Object *p_obj = (Partial_Reveal_Object *)*iter;
       iter = vector_block_iterator_advance(root_set,iter);
       
-      Partial_Reveal_Object *p_obj = read_slot(p_ref);
-      /* root ref can't be NULL, (remset may have NULL ref entry, but this function is only for ALGO_MAJOR */
       assert(p_obj!=NULL);
       assert(address_belongs_to_gc_heap(p_obj, gc));
       if(obj_mark_gray_in_table(p_obj))
@@ -137,8 +135,6 @@ void wspace_mark_scan_mostly_concurrent(Marker* marker)
   /* put back the last trace_stack task */
   pool_put_entry(metadata->mark_task_pool, marker->trace_stack);
   
-  marker_notify_mark_root_done(marker);
-
   marker->trace_stack = free_task_pool_get_entry(metadata);
 
 retry:
@@ -223,6 +219,8 @@ void trace_obj_in_ms_mostly_concurrent_mark(Collector *collector, void *p_obj)
   obj_mark_gray_in_table((Partial_Reveal_Object*)p_obj);
   trace_object((Marker*)collector, (Partial_Reveal_Object *)p_obj);
 }
+
+
 
 
 

@@ -27,12 +27,12 @@
 extern volatile unsigned int write_barrier_function;
 
 enum Write_Barrier_Function{
-  WRITE_BARRIER_REM_NIL           = 0x00,
-  WRITE_BARRIER_REM_SOURCE_OBJ    = 0x01,
-  WRITE_BARRIER_REM_SOURCE_REF    = 0x02,
-  WRITE_BARRIER_REM_OLD_VAR       = 0x03,
-  WRITE_BARRIER_REM_NEW_VAR       = 0x04,
-  WRITE_BARRIER_REM_OBJ_SNAPSHOT  = 0x05
+  WB_REM_NIL           = 0x00,
+  WB_REM_SOURCE_OBJ    = 0x01,
+  WB_REM_SOURCE_REF    = 0x02,
+  WB_REM_OLD_VAR       = 0x03,
+  WB_REM_NEW_VAR       = 0x04,
+  WB_REM_OBJ_SNAPSHOT  = 0x05
 };
 
 inline void gc_set_barrier_function(unsigned int wb_function)
@@ -41,4 +41,6 @@ inline void gc_set_barrier_function(unsigned int wb_function)
 }
 
 #endif /* _GC_FOR_BARRIER_H_ */
+
+
 

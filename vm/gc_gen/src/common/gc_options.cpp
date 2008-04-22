@@ -17,6 +17,8 @@
 #define LOG_DOMAIN "gc.base"
 #include "gc_common.h"
 #include "open/vm_properties.h"
+#include "gc_concurrent.h"
+#include "concurrent_collection_scheduler.h"
 
 /* FIXME:: need refactoring this function to distribute the options 
    interpretation to their respective modules. */
@@ -44,12 +46,7 @@ extern Boolean IGNORE_VTABLE_TRACING;
 extern Boolean IGNORE_FINREF;
 
 extern Boolean JVMTI_HEAP_ITERATION ;
-
-extern Boolean USE_CONCURRENT_GC;
-extern Boolean USE_CONCURRENT_ENUMERATION;
-extern Boolean USE_CONCURRENT_MARK;
-extern Boolean USE_CONCURRENT_SWEEP;
-
+extern Boolean IGNORE_FORCE_GC;
 
 POINTER_SIZE_INT HEAP_SIZE_DEFAULT = 256 * MB;
 POINTER_SIZE_INT min_heap_size_bytes = 16 * MB;
@@ -125,7 +122,7 @@ static size_t vm_property_get_size(const char* property_name)
     return vm_property_get_size(property_name, 0, VM_PROPERTIES);
 }
 
-void gc_decide_concurrent_algorithm(char* concurrent_algo);
+void gc_decide_con_algo(char* concurrent_algo);
 GC* gc_gen_decide_collection_algo(char* minor_algo, char* major_algo, Boolean has_los);
 void gc_set_gen_mode(Boolean status);
 
@@ -149,7 +146,7 @@ GC* gc_parse_options()
     major_algo = vm_properties_get_value("gc.major_algorithm", VM_PROPERTIES);
   }
 
-  if (vm_property_is_set("gc.uniqe_algorithm", VM_PROPERTIES) == 1) {
+  if (vm_property_is_set("gc.unique_algorithm", VM_PROPERTIES) == 1) {
     unique_algo = vm_properties_get_value("gc.unique_algorithm", VM_PROPERTIES);
   }
 
@@ -308,46 +305,76 @@ GC* gc_parse_options()
   if (vm_property_is_set("gc.share_los_boundary", VM_PROPERTIES) == 1){
     share_los_boundary = vm_property_get_boolean("gc.share_los_boundary");
   }
+
+  if (vm_property_is_set("gc.ignore_force_gc", VM_PROPERTIES) == 1){
+    IGNORE_FORCE_GC = vm_property_get_boolean("gc.ignore_force_gc");
+  }
+  
   if (vm_property_is_set("gc.concurrent_gc", VM_PROPERTIES) == 1){
     Boolean use_all_concurrent_phase= vm_property_get_boolean("gc.concurrent_gc");
     if(use_all_concurrent_phase){
-      USE_CONCURRENT_ENUMERATION = TRUE;
-      USE_CONCURRENT_MARK = TRUE;
-      USE_CONCURRENT_SWEEP = TRUE;
+#ifndef USE_UNIQUE_MARK_SWEEP_GC
+      DIE(( "Please define USE_UNIQUE_MARK_SWEEP_GC macro."));
+#endif
+      gc_specify_con_enum();
+      gc_specify_con_mark();
+      gc_specify_con_sweep();
       gc->generate_barrier = TRUE;
     }
   }
 
   if (vm_property_is_set("gc.concurrent_enumeration", VM_PROPERTIES) == 1){
-    USE_CONCURRENT_ENUMERATION= vm_property_get_boolean("gc.concurrent_enumeration");
+    Boolean USE_CONCURRENT_ENUMERATION = vm_property_get_boolean("gc.concurrent_enumeration");
     if(USE_CONCURRENT_ENUMERATION){
-      USE_CONCURRENT_GC = TRUE;      
+#ifndef USE_UNIQUE_MARK_SWEEP_GC
+      DIE(("Please define USE_UNIQUE_MARK_SWEEP_GC macro."));
+#endif
+      gc_specify_con_enum();
       gc->generate_barrier = TRUE;
     }
   }
 
   if (vm_property_is_set("gc.concurrent_mark", VM_PROPERTIES) == 1){
-    USE_CONCURRENT_MARK= vm_property_get_boolean("gc.concurrent_mark");
+    Boolean USE_CONCURRENT_MARK = vm_property_get_boolean("gc.concurrent_mark");
     if(USE_CONCURRENT_MARK){
-      USE_CONCURRENT_GC = TRUE;      
+#ifndef USE_UNIQUE_MARK_SWEEP_GC
+      DIE(("Please define USE_UNIQUE_MARK_SWEEP_GC macro."));
+#endif
+      gc_specify_con_mark();
       gc->generate_barrier = TRUE;
+      IGNORE_FINREF = TRUE; /*TODO: finref is unsupported.*/
     }
   }
 
   if (vm_property_is_set("gc.concurrent_sweep", VM_PROPERTIES) == 1){
-    USE_CONCURRENT_SWEEP= vm_property_get_boolean("gc.concurrent_sweep");
+    Boolean USE_CONCURRENT_SWEEP= vm_property_get_boolean("gc.concurrent_sweep");
     if(USE_CONCURRENT_SWEEP){
-      USE_CONCURRENT_GC = TRUE;
+      /*currently, concurrent sweeping only starts after concurrent marking.*/
+      assert(gc_is_specify_con_mark());
+#ifndef USE_UNIQUE_MARK_SWEEP_GC
+      DIE(("Please define USE_UNIQUE_MARK_SWEEP_GC macro."));
+#endif
+      gc_specify_con_sweep();
+      IGNORE_FINREF = TRUE; /*TODO: finref is unsupported.*/
     }
   }
  
   char* concurrent_algo = NULL;
   
   if (vm_property_is_set("gc.concurrent_algorithm", VM_PROPERTIES) == 1) {
-    concurrent_algo = vm_properties_get_value("gc.concurrent_algorithm", VM_PROPERTIES);
+    concurrent_algo = vm_properties_get_value("gc.concurrent_algorithm", VM_PROPERTIES);    
+    gc_decide_con_algo(concurrent_algo);
+  }else if(gc_is_specify_con_gc()){
+    gc_set_default_con_algo();
   }
-  
-  gc_decide_concurrent_algorithm(concurrent_algo);
+
+  char* cc_scheduler = NULL;
+  if (vm_property_is_set("gc.cc_scheduler", VM_PROPERTIES) == 1) {
+    cc_scheduler = vm_properties_get_value("gc.cc_scheduler", VM_PROPERTIES);    
+    gc_decide_cc_scheduler_kind(cc_scheduler);
+  }else if(gc_is_specify_con_gc()){
+    gc_set_default_cc_scheduler_kind();
+  }
 
 #if defined(ALLOC_ZEROING) && defined(ALLOC_PREFETCH)
   if(vm_property_is_set("gc.prefetch",VM_PROPERTIES) ==1) {
@@ -381,6 +408,8 @@ GC* gc_parse_options()
 
   return gc;
 }
+
+
 
 
 

@@ -177,6 +177,34 @@ inline void hashcode_buf_add(Partial_Reveal_Object* p_obj, int32 hashcode, Hashc
   return;
 }
 
+inline void hashcode_buf_update(Partial_Reveal_Object* p_obj, int32 hashcode, Hashcode_Buf* hashcode_buf)
+{
+  POINTER_SIZE_INT obj_addr = (POINTER_SIZE_INT)p_obj;
+  lock(hashcode_buf->lock);
+  Seq_List* list = hashcode_buf->list; 
+  seq_list_iterate_init(list);
+  while(seq_list_has_next(list)){
+    Vector_Block* curr_block = (Vector_Block*)seq_list_iterate_next(list); 
+    POINTER_SIZE_INT *iter = vector_block_iterator_init(curr_block);
+    
+    while(!vector_block_iterator_end(curr_block, iter)){  
+      POINTER_SIZE_INT addr = (POINTER_SIZE_INT)*iter;
+      if(obj_addr != addr){
+        iter = vector_block_iterator_advance(curr_block, iter);
+        iter = vector_block_iterator_advance(curr_block, iter);
+      }else{
+        iter = vector_block_iterator_advance(curr_block, iter);
+        *iter = (POINTER_SIZE_INT)hashcode;
+        iter = vector_block_iterator_advance(curr_block, iter);
+        unlock(hashcode_buf->lock);
+        return;
+      }
+    }
+  }
+  unlock(hashcode_buf->lock);
+  hashcode_buf_add(p_obj, hashcode, hashcode_buf);
+}
+
 inline void hashcode_buf_refresh_all(Hashcode_Buf* hashcode_buf, POINTER_SIZE_INT dist)
 {
   Seq_List* list = hashcode_buf->list; 
@@ -288,6 +316,7 @@ inline void hashcode_buf_refresh_new_entry(Hashcode_Buf* hashcode_buf, POINTER_S
 }
 
 int obj_lookup_hashcode_in_buf(Partial_Reveal_Object *p_obj);
+int obj_lookup_hashcode_in_chunk_buf(Partial_Reveal_Object *p_obj);
 
 inline int hashcode_lookup(Partial_Reveal_Object* p_obj,Obj_Info_Type obj_info)
 {
@@ -297,7 +326,11 @@ inline int hashcode_lookup(Partial_Reveal_Object* p_obj,Obj_Info_Type obj_info)
     unsigned char* pos = (unsigned char *)p_obj;
     hash = *(int*) (pos + offset);
   }else if(hashcode_is_buffered(p_obj)){
+#ifdef  USE_UNIQUE_MARK_SWEEP_GC
+    hash = obj_lookup_hashcode_in_chunk_buf(p_obj);
+#else
     hash = obj_lookup_hashcode_in_buf(p_obj);
+#endif
   }
   return hash;
 }

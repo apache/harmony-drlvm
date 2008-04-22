@@ -52,11 +52,11 @@ enum Obj_Color {
   //#define DIRY_MASK_IN_TABLE   ((POINTER_SIZE_INT)0x44444444)
 #endif
 
-extern POINTER_SIZE_INT cur_alloc_color;
-extern POINTER_SIZE_INT cur_mark_gray_color;
-extern POINTER_SIZE_INT cur_mark_black_color;
-extern POINTER_SIZE_INT cur_alloc_mask;
-extern POINTER_SIZE_INT cur_mark_mask;
+extern volatile POINTER_SIZE_INT cur_alloc_color;
+extern volatile POINTER_SIZE_INT cur_mark_gray_color;
+extern volatile POINTER_SIZE_INT cur_mark_black_color;
+extern volatile POINTER_SIZE_INT cur_alloc_mask;
+extern volatile POINTER_SIZE_INT cur_mark_mask;
 
 inline Boolean is_super_obj(Partial_Reveal_Object *obj)
 {
@@ -155,20 +155,7 @@ FORCE_INLINE Boolean obj_is_mark_gray_in_table(Partial_Reveal_Object *obj)
     return FALSE;
 }
 
-FORCE_INLINE Boolean obj_is_mark_black_in_table(Partial_Reveal_Object *obj)
-{
-  POINTER_SIZE_INT *p_color_word;
-  unsigned int index_in_word;
-  p_color_word = get_color_word_in_table(obj, index_in_word);
-  POINTER_SIZE_INT current_word = *p_color_word;
-  POINTER_SIZE_INT mark_black_color = cur_mark_black_color << index_in_word;
-  
-  if(current_word & mark_black_color)
-    return TRUE;
-  else
-    return FALSE;
-  
-}
+Boolean obj_is_mark_black_in_table(Partial_Reveal_Object *obj);
 
 FORCE_INLINE Boolean obj_is_mark_black_in_table(Partial_Reveal_Object *obj, unsigned int size)
 {
@@ -431,7 +418,6 @@ inline void ops_color_flip(void)
 {
   POINTER_SIZE_INT temp = cur_alloc_color;
   cur_alloc_color = cur_mark_black_color;
-  //mem_fence();
   cur_mark_black_color = temp;
   cur_alloc_mask = (~cur_alloc_mask) & FLIP_COLOR_MASK_IN_TABLE;
   cur_mark_mask = (~cur_mark_mask) & FLIP_COLOR_MASK_IN_TABLE;

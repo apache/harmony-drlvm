@@ -44,16 +44,6 @@ void marker_notify_work_done(Marker* marker)
   vm_set_event(marker->task_finished_event);
 }
 
-void wait_marker_finish_mark_root(Marker* marker)
-{
-  vm_wait_event(marker->markroot_finished_event);
-}
-
-void marker_notify_mark_root_done(Marker* marker)
-{
-  vm_set_event(marker->markroot_finished_event);
-}
-
 static int marker_thread_func(void *arg) 
 {
   Marker* marker = (Marker *)arg;
@@ -205,7 +195,8 @@ void assign_marker_with_task(GC* gc, TaskType task_func, Space* space)
     
     marker_reset_thread(marker);
     marker->task_func = task_func;
-    marker->mark_space= space;
+    marker->mark_space= space;    
+    marker->marker_is_active = TRUE;
     notify_marker_to_work(marker);
   }
   return;
@@ -224,38 +215,15 @@ void assign_marker_with_task(GC* gc, TaskType task_func, Space* space, unsigned 
     marker_reset_thread(marker);
     marker->task_func = task_func;
     marker->mark_space= space;
-    notify_marker_to_work(marker);
+    marker->marker_is_active = TRUE;
+    notify_marker_to_work(marker);    
   }
-  return;
-}
-
-void wait_mark_root_finish(GC* gc)
-{
-  unsigned int num_marker = gc->num_active_markers;
-  for(unsigned int i=0; i<num_marker; i++)
-  {
-    Marker* marker = gc->markers[i];
-    wait_marker_finish_mark_root(marker);
-  }  
-  return;
-}
-
-void wait_mark_root_finish(GC* gc, unsigned int num_markers)
-{
-  unsigned int num_active_marker = gc->num_active_markers;
-  unsigned int i= num_active_marker - num_markers;
-  for(; i < num_active_marker; i++)
-  {
-    Marker* marker = gc->markers[i];
-    wait_marker_finish_mark_root(marker);
-  }  
   return;
 }
 
 void marker_execute_task(GC* gc, TaskType task_func, Space* space)
 {
   assign_marker_with_task(gc, task_func, space);  
-  wait_mark_root_finish(gc);
   wait_mark_finish(gc);    
   return;
 }
@@ -263,7 +231,6 @@ void marker_execute_task(GC* gc, TaskType task_func, Space* space)
 void marker_execute_task_concurrent(GC* gc, TaskType task_func, Space* space)
 {
   assign_marker_with_task(gc, task_func, space);
-  wait_mark_root_finish(gc);
   return;
 }
 
@@ -273,7 +240,6 @@ void marker_execute_task_concurrent(GC* gc, TaskType task_func, Space* space, un
   if(num_markers > num_free_markers) 
     num_markers = num_free_markers;
   assign_marker_with_task(gc, task_func, space,num_markers);
-  wait_mark_root_finish(gc, num_markers);
   return;
 }
 
@@ -290,6 +256,8 @@ int64 gc_get_marker_time(GC* gc)
   }
   return time_marker;
 }
+
+
 
 
 

@@ -17,7 +17,6 @@
 
 #include "wspace.h"
 #include "wspace_chunk.h"
-//#include "wspace_mark_sweep.h"
 #include "wspace_alloc.h"
 #include "gc_ms.h"
 #include "../gen/gen.h"
@@ -85,25 +84,28 @@ void *wspace_thread_local_alloc(unsigned size, Allocator *allocator)
   Chunk_Header **chunks = allocator->local_chunks[seg_index];
   Chunk_Header *chunk = chunks[index];  
   if(!chunk){
-    mutator_post_signal((Mutator*) allocator,DISABLE_COLLECTOR_SWEEP_LOCAL_CHUNKS);
+    mutator_post_signal((Mutator*) allocator,HSIG_DISABLE_SWEEP_LOCAL_CHUNKS);
     
     chunk = wspace_get_pfc(wspace, seg_index, index);
     //if(!chunk) chunk = wspace_steal_pfc(wspace, seg_index, index);
-    if(!chunk) return NULL;
+    if(!chunk){
+      mutator_post_signal((Mutator*) allocator,HSIG_MUTATOR_SAFE);
+      return NULL;
+    }
     chunk->status |= CHUNK_IN_USE;
     chunks[index] = chunk;
     
-    mutator_post_signal((Mutator*) allocator,ENABLE_COLLECTOR_SWEEP_LOCAL_CHUNKS);
+    mutator_post_signal((Mutator*) allocator,HSIG_MUTATOR_SAFE);
   }
   
-  mutator_post_signal((Mutator*) allocator,MUTATOR_ENTER_ALLOCATION_MARK);
+  mutator_post_signal((Mutator*) allocator,HSIG_MUTATOR_ENTER_ALLOC_MARK);
   void *p_obj = alloc_in_chunk(chunks[index]);
-  mutator_post_signal((Mutator*) allocator,MUTATOR_EXIT_ALLOCATION_MARK);
+  mutator_post_signal((Mutator*) allocator,HSIG_MUTATOR_SAFE);
 
   if(chunk->slot_index == MAX_SLOT_INDEX){
     chunk->status = CHUNK_USED | CHUNK_NORMAL;
     /*register to used chunk list.*/
-    wspace_register_used_chunk(wspace,chunk);
+    wspace_reg_used_chunk(wspace,chunk);
     chunks[index] = NULL;
     chunk = NULL;
   }
@@ -119,6 +121,7 @@ void *wspace_thread_local_alloc(unsigned size, Allocator *allocator)
   wspace_verify_alloc(p_obj, size);
 #endif
 
+  if(p_obj) ((Mutator*)allocator)->new_obj_size += size;
   return p_obj;
 }
 
@@ -137,38 +140,39 @@ static void *wspace_alloc_normal_obj(Wspace *wspace, unsigned size, Allocator *a
     Chunk_Header **chunks = allocator->local_chunks[seg_index];
     chunk = chunks[index];
     if(!chunk){
-      mutator_post_signal((Mutator*) allocator,DISABLE_COLLECTOR_SWEEP_LOCAL_CHUNKS);
+      mutator_post_signal((Mutator*) allocator,HSIG_DISABLE_SWEEP_LOCAL_CHUNKS);
       chunk = wspace_get_pfc(wspace, seg_index, index);
       if(!chunk){
         chunk = (Chunk_Header*)wspace_get_normal_free_chunk(wspace);
         if(chunk) normal_chunk_init(chunk, size);
       }
       //if(!chunk) chunk = wspace_steal_pfc(wspace, seg_index, index);
-      if(!chunk) return NULL;
+      if(!chunk){
+        mutator_post_signal((Mutator*) allocator,HSIG_MUTATOR_SAFE);
+        return NULL;
+      }
       chunk->status |= CHUNK_IN_USE;
       chunks[index] = chunk;
-      mutator_post_signal((Mutator*) allocator,ENABLE_COLLECTOR_SWEEP_LOCAL_CHUNKS);
+      mutator_post_signal((Mutator*) allocator,HSIG_MUTATOR_SAFE);
     }    
     
-    mutator_post_signal((Mutator*) allocator,MUTATOR_ENTER_ALLOCATION_MARK);
+    mutator_post_signal((Mutator*) allocator,HSIG_MUTATOR_ENTER_ALLOC_MARK);
     p_obj = alloc_in_chunk(chunks[index]);
-    mutator_post_signal((Mutator*) allocator,MUTATOR_EXIT_ALLOCATION_MARK);
+    mutator_post_signal((Mutator*) allocator,HSIG_MUTATOR_SAFE);
     
     if(chunk->slot_index == MAX_SLOT_INDEX){
       chunk->status = CHUNK_USED | CHUNK_NORMAL;
       /*register to used chunk list.*/
-      wspace_register_used_chunk(wspace,chunk);
+      wspace_reg_used_chunk(wspace,chunk);
       chunks[index] = NULL;
     }
     
-  } else {
-    gc_try_schedule_collection(allocator->gc, GC_CAUSE_NIL);
+  } else {  
+    mutator_post_signal((Mutator*) allocator,HSIG_DISABLE_SWEEP_GLOBAL_CHUNKS);
 
-    mutator_post_signal((Mutator*) allocator,DISABLE_COLLECTOR_SWEEP_GLOBAL_CHUNKS);
-
-    if(USE_CONCURRENT_SWEEP){
-      while(gc_is_sweeping_global_normal_chunk()){
-        mutator_post_signal((Mutator*) allocator,ENABLE_COLLECTOR_SWEEP_GLOBAL_CHUNKS);
+    if(gc_is_specify_con_sweep()){
+      while(gc_is_sweep_global_normal_chunk()){
+        mutator_post_signal((Mutator*) allocator,HSIG_MUTATOR_SAFE);
       }  
     }
 
@@ -178,13 +182,16 @@ static void *wspace_alloc_normal_obj(Wspace *wspace, unsigned size, Allocator *a
       if(chunk) normal_chunk_init(chunk, size);
     }
     //if(!chunk) chunk = wspace_steal_pfc(wspace, seg_index, index);
-    if(!chunk) return NULL;
+    if(!chunk) {
+      mutator_post_signal((Mutator*) allocator,HSIG_MUTATOR_SAFE);
+      return NULL;
+    }
     p_obj = alloc_in_chunk(chunk);
 
     if(chunk->slot_index == MAX_SLOT_INDEX){
       chunk->status = CHUNK_USED | CHUNK_NORMAL;
       /*register to used chunk list.*/
-      wspace_register_used_chunk(wspace,chunk);
+      wspace_reg_used_chunk(wspace,chunk);
       chunk = NULL;
     }
     
@@ -192,7 +199,7 @@ static void *wspace_alloc_normal_obj(Wspace *wspace, unsigned size, Allocator *a
       wspace_put_pfc(wspace, chunk);
     }
     
-    mutator_post_signal((Mutator*) allocator,ENABLE_COLLECTOR_SWEEP_GLOBAL_CHUNKS);
+    mutator_post_signal((Mutator*) allocator,HSIG_MUTATOR_SAFE);
   }
   
   return p_obj;
@@ -201,8 +208,6 @@ static void *wspace_alloc_normal_obj(Wspace *wspace, unsigned size, Allocator *a
 static void *wspace_alloc_super_obj(Wspace *wspace, unsigned size, Allocator *allocator)
 {
   assert(size > SUPER_OBJ_THRESHOLD);
-
-  gc_try_schedule_collection(allocator->gc, GC_CAUSE_NIL);
 
   unsigned int chunk_size = SUPER_SIZE_ROUNDUP(size);
   assert(chunk_size > SUPER_OBJ_THRESHOLD);
@@ -217,18 +222,17 @@ static void *wspace_alloc_super_obj(Wspace *wspace, unsigned size, Allocator *al
   if(!chunk) return NULL;
   abnormal_chunk_init(chunk, chunk_size, size);
   
-  mutator_post_signal((Mutator*) allocator,MUTATOR_ENTER_ALLOCATION_MARK);  
+  mutator_post_signal((Mutator*) allocator,HSIG_MUTATOR_ENTER_ALLOC_MARK);  
   if(is_obj_alloced_live()){
     chunk->table[0] |= cur_mark_black_color  ;
   } 
-  mutator_post_signal((Mutator*) allocator,MUTATOR_EXIT_ALLOCATION_MARK);
-  //mem_fence();
+  mutator_post_signal((Mutator*) allocator,HSIG_MUTATOR_SAFE);
   
   chunk->table[0] |= cur_alloc_color;
   set_super_obj_mask(chunk->base);
   assert(chunk->status == CHUNK_ABNORMAL);
   chunk->status = CHUNK_ABNORMAL| CHUNK_USED;
-  wspace_register_used_chunk(wspace, chunk);
+  wspace_reg_used_chunk(wspace, chunk);
   assert(get_obj_info_raw((Partial_Reveal_Object*)chunk->base) & SUPER_OBJ_MASK);
   return chunk->base;
 }
@@ -251,10 +255,8 @@ static void *wspace_try_alloc(unsigned size, Allocator *allocator)
 #endif
 
 #ifdef WSPACE_CONCURRENT_GC_STATS
-  if(p_obj && gc_is_concurrent_mark_phase()) ((Partial_Reveal_Object*)p_obj)->obj_info |= NEW_OBJ_MASK;
+  if(p_obj && gc_con_is_in_marking()) ((Partial_Reveal_Object*)p_obj)->obj_info |= NEW_OBJ_MASK;
 #endif
-
-  if(p_obj) ((Mutator*)allocator)->new_obj_size += size;
   
   return p_obj;
 }
@@ -263,6 +265,9 @@ static void *wspace_try_alloc(unsigned size, Allocator *allocator)
 void *wspace_alloc(unsigned size, Allocator *allocator)
 {
   void *p_obj = NULL;
+  
+  if(gc_is_specify_con_gc())
+    gc_sched_collection(allocator->gc, GC_CAUSE_CONCURRENT_GC);
   
   /* First, try to allocate object from TLB (thread local chunk) */
   p_obj = wspace_try_alloc(size, allocator);

@@ -91,7 +91,6 @@ void wspace_collection(Wspace *wspace);
 void allocator_init_local_chunks(Allocator *allocator);
 void allocactor_destruct_local_chunks(Allocator *allocator);
 void gc_init_collector_free_chunk_list(Collector *collector);
-void allocator_register_new_obj_size(Allocator *allocator);
 
 POINTER_SIZE_INT wspace_free_memory_size(Wspace *wspace);
 

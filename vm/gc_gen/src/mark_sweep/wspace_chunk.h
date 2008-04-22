@@ -18,6 +18,10 @@
 #ifndef _SSPACE_CHUNK_H_
 #define _SSPACE_CHUNK_H_
 
+#ifdef USE_32BITS_HASHCODE
+#include "hashcode.h"
+#endif
+
 #include "wspace.h"
 
 #define SSPACE_USE_FASTDIV
@@ -33,7 +37,7 @@
 #define INIT_ALLOC_SIZE (128 * 1024)
 
 extern unsigned int *shift_table;
-extern unsigned short *compact_table[MAX_SLOT_SIZE_AFTER_SHIFTING];
+extern unsigned short *compact_table[MAX_SLOT_SIZE_AFTER_SHIFTING+1];
 extern unsigned int mask[MAX_SLOT_SIZE_AFTER_SHIFTING];
 extern void fastdiv_init(void);
 
@@ -97,6 +101,9 @@ typedef struct Chunk_Header {
   unsigned int slot_num;
   unsigned int slot_index;      /* the index of which is the first free slot in this chunk */
   unsigned int alloc_num;       /* the index of which is the first free slot in this chunk */
+#ifdef USE_32BITS_HASHCODE
+  Hashcode_Buf* hashcode_buf; /*hash code entry list*/
+#endif  
   POINTER_SIZE_INT table[1];
 } Chunk_Header;
 
@@ -208,6 +215,7 @@ inline void free_list_detach_chunk(Free_Chunk_List *list, Free_Chunk *chunk)
     chunk->next->prev = chunk->prev;
   else
     list->tail = chunk->prev;
+  --list->chunk_num;
 }
 
 inline void move_free_chunks_between_lists(Free_Chunk_List *to_list, Free_Chunk_List *from_list)
@@ -269,7 +277,7 @@ inline void chunk_depad_last_index_word(Chunk_Header *chunk)
   chunk->table[last_word_index] &= depadding_mask;
 }
 
-extern POINTER_SIZE_INT cur_alloc_mask;
+extern volatile POINTER_SIZE_INT cur_alloc_mask;
 /* Used for allocating a fixed-size chunk from free area lists */
 inline void normal_chunk_init(Chunk_Header *chunk, unsigned int slot_size)
 {
@@ -285,6 +293,9 @@ inline void normal_chunk_init(Chunk_Header *chunk, unsigned int slot_size)
   chunk->slot_index = 0;
   chunk->alloc_num = 0;
   chunk->base = NORMAL_CHUNK_BASE(chunk);
+#ifdef USE_32BITS_HASHCODE
+  chunk->hashcode_buf = NULL;
+#endif
   memset(chunk->table, 0, NORMAL_CHUNK_TABLE_SIZE_BYTES(chunk));//memset table
   //chunk_pad_last_index_word(chunk, cur_alloc_mask);
   fastdiv_init();
@@ -304,6 +315,9 @@ inline void abnormal_chunk_init(Chunk_Header *chunk, unsigned int chunk_size, un
   chunk->slot_num = 1;
   chunk->slot_index = 0;
   chunk->base = ABNORMAL_CHUNK_BASE(chunk);
+#ifdef USE_32BITS_HASHCODE
+  chunk->hashcode_buf = NULL;
+#endif
 }
 
 
@@ -388,7 +402,7 @@ inline Chunk_Header *wspace_get_pfc(Wspace *wspace, unsigned int seg_index, unsi
   Chunk_Header *chunk = (Chunk_Header*)pool_get_entry(pfc_pool);
 
   /*2. If in concurrent sweeping phase, search PFC backup pool*/
-  if(!chunk && gc_is_concurrent_sweep_phase()){
+  if(!chunk && gc_con_is_in_sweeping()){
     pfc_pool = wspace->pfc_pools_backup[seg_index][index];
     chunk = (Chunk_Header*)pool_get_entry(pfc_pool);
   }
@@ -492,7 +506,7 @@ inline void chunk_pool_put_chunk(Pool* chunk_pool, Chunk_Header* chunk)
   return;
 }
 
-inline void wspace_register_used_chunk(Wspace* wspace, Chunk_Header* chunk)
+inline void wspace_reg_used_chunk(Wspace* wspace, Chunk_Header* chunk)
 {
   pool_put_entry(wspace->used_chunk_pool, chunk);
   return;
@@ -504,7 +518,7 @@ inline void wspace_clear_used_chunk_pool(Wspace* wspace)
   return;
 }
 
-inline void wspace_register_unreusable_normal_chunk(Wspace* wspace, Chunk_Header* chunk)
+inline void wspace_reg_unreusable_normal_chunk(Wspace* wspace, Chunk_Header* chunk)
 {
   pool_put_entry(wspace->unreusable_normal_chunk_pool, chunk);
   return;
@@ -515,7 +529,7 @@ inline Chunk_Header*  wspace_get_unreusable_normal_chunk(Wspace* wspace)
   return (Chunk_Header*)pool_get_entry(wspace->unreusable_normal_chunk_pool);
 }
 
-inline void wspace_register_live_abnormal_chunk(Wspace* wspace, Chunk_Header* chunk)
+inline void wspace_reg_live_abnormal_chunk(Wspace* wspace, Chunk_Header* chunk)
 {
   pool_put_entry(wspace->live_abnormal_chunk_pool, chunk);
   return;
@@ -550,5 +564,13 @@ extern void zeroing_free_chunk(Free_Chunk *chunk);
 extern void gc_clear_collector_local_chunks(GC *gc);
 
 extern void wspace_collect_free_chunks_to_list(Wspace *wspace, Free_Chunk_List *list);
+
+#ifdef USE_32BITS_HASHCODE  
+inline int obj_lookup_hashcode_in_chunk_buf(Partial_Reveal_Object *p_obj)
+{
+  Hashcode_Buf* hashcode_buf = NORMAL_CHUNK_HEADER(p_obj)->hashcode_buf;
+  return hashcode_buf_lookup(p_obj,hashcode_buf);
+}
+#endif
 
 #endif //#ifndef _SSPACE_CHUNK_H_

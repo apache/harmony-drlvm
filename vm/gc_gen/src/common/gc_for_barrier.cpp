@@ -229,12 +229,11 @@ void gc_heap_wrote_object (Managed_Object_Handle p_obj_written)
 {
   /*Concurrent Mark: Since object clone and array copy do not modify object slots, 
       we treat it as an new object. It has already been marked when dest object was created.
-      We use WRITE_BARRIER_REM_SOURCE_OBJ function here to debug.
+      We use WB_REM_SOURCE_OBJ function here to debug.
     */  
-  Mutator *mutator = (Mutator *)gc_get_tls();  
-  mutator_post_signal(mutator,MUTATOR_ENTER_BARRIER);
 
-  if(WRITE_BARRIER_REM_SOURCE_OBJ == write_barrier_function){
+  if(WB_REM_SOURCE_OBJ == write_barrier_function){    
+    Mutator *mutator = (Mutator *)gc_get_tls();  
     lock(mutator->dirty_set_lock);
     
     obj_dirty_in_table((Partial_Reveal_Object *) p_obj_written);
@@ -242,7 +241,6 @@ void gc_heap_wrote_object (Managed_Object_Handle p_obj_written)
     
     unlock(mutator->dirty_set_lock);
   }
-  mutator_post_signal(mutator,MUTATOR_EXIT_BARRIER);
 
   if( !gc_is_gen_mode() || !object_has_ref_field((Partial_Reveal_Object*)p_obj_written)) 
     return;
@@ -261,14 +259,11 @@ void gc_heap_wrote_object (Managed_Object_Handle p_obj_written)
 /* FIXME:: this is not the right interface for write barrier */
 void gc_heap_slot_write_ref (Managed_Object_Handle p_obj_holding_ref,Managed_Object_Handle *p_slot, Managed_Object_Handle p_target)
 { 
-  //Mutator *mutator = (Mutator *)gc_get_tls();  
-  //mutator_post_signal(mutator,MUTATOR_ENTER_BARRIER);
-
   switch(write_barrier_function){
-    case WRITE_BARRIER_REM_NIL:
+    case WB_REM_NIL:
       *p_slot = p_target;
       break;
-    case WRITE_BARRIER_REM_SOURCE_REF:
+    case WB_REM_SOURCE_REF:
       *p_slot = p_target;
 #ifdef USE_REM_SLOTS
       gen_write_barrier_rem_slot(p_slot, p_target); 
@@ -276,15 +271,15 @@ void gc_heap_slot_write_ref (Managed_Object_Handle p_obj_holding_ref,Managed_Obj
       gen_write_barrier_rem_obj(p_obj_holding_ref, p_target);
 #endif
       break;      
-    case WRITE_BARRIER_REM_SOURCE_OBJ:
+    case WB_REM_SOURCE_OBJ:
       *p_slot = p_target;
       write_barrier_rem_source_obj(p_obj_holding_ref);
       break;
-    case WRITE_BARRIER_REM_OBJ_SNAPSHOT:
+    case WB_REM_OBJ_SNAPSHOT:
       write_barrier_rem_obj_snapshot(p_obj_holding_ref);
       *p_slot = p_target;
       break;
-    case WRITE_BARRIER_REM_OLD_VAR:
+    case WB_REM_OLD_VAR:
       write_barrier_rem_slot_oldvar(p_slot);      
       *p_slot = p_target;
       break;
@@ -292,8 +287,6 @@ void gc_heap_slot_write_ref (Managed_Object_Handle p_obj_holding_ref,Managed_Obj
       assert(0);
       return;
   }
-
-  //mutator_post_signal(mutator,MUTATOR_EXIT_BARRIER);
   return;
 }
 

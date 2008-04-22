@@ -60,10 +60,10 @@ void gc_set_gen_mode(Boolean status)
 {
   if(status){
     gc_set_gen_flag(); 
-    gc_set_barrier_function(WRITE_BARRIER_REM_SOURCE_REF);
+    gc_set_barrier_function(WB_REM_SOURCE_REF);
   }else{
     gc_clear_gen_flag();
-    gc_set_barrier_function(WRITE_BARRIER_REM_NIL);
+    gc_set_barrier_function(WB_REM_NIL);
   }
  
   HelperClass_set_GenMode(status);   
@@ -780,7 +780,6 @@ void gc_gen_reclaim_heap(GC_Gen *gc, int64 gc_start_time)
   gc->collect_result = TRUE;
 #ifdef GC_GEN_STATS
   gc_gen_stats_reset_before_collection(gc);
-  gc_gen_collector_stats_reset(gc);
 #endif
 
   nos_prepare_for_collection(nos);
@@ -814,7 +813,6 @@ void gc_gen_reclaim_heap(GC_Gen *gc, int64 gc_start_time)
 #ifdef GC_GEN_STATS
       gc->stats->num_minor_collections++;
 #endif
-      if(LOS_ADJUST_BOUNDARY) gc->tuner->kind=TRANS_NOTHING;
       los_collection(los);
     }
     
@@ -912,10 +910,14 @@ void gc_gen_reclaim_heap(GC_Gen *gc, int64 gc_start_time)
   }
   
   gc_gen_update_space_info_after_gc(gc);
-
+  if(gc_is_gen_mode()) {
+    gc_reset_collectors_rem_set((GC*)gc);
+  }
+  
 #ifdef GC_GEN_STATS
   gc_gen_stats_update_after_collection(gc);
   gc_gen_stats_verbose(gc);
+  gc_gen_collector_stats_reset(gc);
 #endif
 
   INFO2("gc.process", "GC: end of GC_Gen\n");
@@ -987,12 +989,12 @@ void gc_gen_iterate_heap(GC_Gen *gc)
   }
 }
 
-void gc_gen_collection_verbose_info(GC_Gen *gc, int64 pause_time, int64 mutator_time)
+void gc_gen_collection_verbose_info(GC_Gen *gc, int64 pause_time, int64 time_mutator)
 {
 
 #ifdef GC_GEN_STATS
   GC_Gen_Stats* stats = ((GC_Gen*)gc)->stats;
-  stats->total_mutator_time += mutator_time;
+  stats->total_mutator_time += time_mutator;
   stats->total_pause_time += pause_time;
 #endif
 
@@ -1035,7 +1037,7 @@ void gc_gen_collection_verbose_info(GC_Gen *gc, int64 pause_time, int64 mutator_
   }
 
   INFO2("gc.collect","GC: pause time: "<<(pause_time>>10)<<"ms"
-    <<"\nGC: mutator time from last collection: "<<(mutator_time>>10)<<"ms\n");
+    <<"\nGC: mutator time from last collection: "<<(time_mutator>>10)<<"ms\n");
 
 }
 

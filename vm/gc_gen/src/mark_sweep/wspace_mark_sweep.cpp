@@ -25,16 +25,31 @@
 #include "../common/fix_repointed_refs.h"
 #include "../common/gc_concurrent.h"
 
-POINTER_SIZE_INT cur_alloc_mask = (~MARK_MASK_IN_TABLE) & FLIP_COLOR_MASK_IN_TABLE;
-POINTER_SIZE_INT cur_mark_mask = MARK_MASK_IN_TABLE;
-POINTER_SIZE_INT cur_alloc_color = OBJ_COLOR_WHITE;
-POINTER_SIZE_INT cur_mark_gray_color = OBJ_COLOR_GRAY;
-POINTER_SIZE_INT cur_mark_black_color = OBJ_COLOR_BLACK;
+volatile POINTER_SIZE_INT cur_alloc_mask = (~MARK_MASK_IN_TABLE) & FLIP_COLOR_MASK_IN_TABLE;
+volatile POINTER_SIZE_INT cur_mark_mask = MARK_MASK_IN_TABLE;
+volatile POINTER_SIZE_INT cur_alloc_color = OBJ_COLOR_WHITE;
+volatile POINTER_SIZE_INT cur_mark_gray_color = OBJ_COLOR_GRAY;
+volatile POINTER_SIZE_INT cur_mark_black_color = OBJ_COLOR_BLACK;
 
 static Chunk_Header_Basic *volatile next_chunk_for_fixing;
 
 
 /******************** General interfaces for Mark-Sweep-Compact ***********************/
+Boolean obj_is_mark_black_in_table(Partial_Reveal_Object *obj)
+{
+  POINTER_SIZE_INT *p_color_word;
+  unsigned int index_in_word;
+  p_color_word = get_color_word_in_table(obj, index_in_word);
+  POINTER_SIZE_INT current_word = *p_color_word;
+  POINTER_SIZE_INT mark_black_color = cur_mark_black_color << index_in_word;
+  
+  if(current_word & mark_black_color)
+    return TRUE;
+  else
+    return FALSE;
+  
+}
+
 void gc_init_collector_free_chunk_list(Collector *collector)
 {
   Free_Chunk_List *list = (Free_Chunk_List*)STD_MALLOC(sizeof(Free_Chunk_List));

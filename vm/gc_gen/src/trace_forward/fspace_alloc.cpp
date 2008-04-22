@@ -61,8 +61,6 @@ void* fspace_alloc(unsigned size, Allocator *allocator)
   p_return = thread_local_alloc(size, allocator);
   if (p_return)  return p_return;
 
-  gc_try_schedule_collection(allocator->gc, GC_CAUSE_NIL);
-
   /* ran out local block, grab a new one*/  
   Fspace* fspace = (Fspace*)allocator->alloc_space;
   int attempts = 0;
@@ -97,4 +95,6 @@ void* fspace_alloc(unsigned size, Allocator *allocator)
   return p_return;
   
 }
+
+
 

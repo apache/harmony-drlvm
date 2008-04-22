@@ -20,51 +20,48 @@
 #include "gc_common.h"
 
 enum GC_CONCURRENT_STATUS{
-  GC_CONCURRENT_STATUS_NIL = 0x00,
-  GC_CONCURRENT_MARK_PHASE = 0x01,  
-  GC_CONCURRENT_MARK_FINAL_PAUSE_PHASE = 0x11, // for mostly concurrent only.
-  GC_CONCURRENT_SWEEP_PHASE = 0x02
+  GC_CON_STATUS_NIL = 0x00,
+  GC_CON_MARK_PHASE = 0x01,  
+  GC_MOSTLY_CON_FINAL_MARK_PHASE = 0x11, // for mostly concurrent only.
+  GC_CON_SWEEP_PHASE = 0x02
 };
 
 enum HANDSHAKE_SINGAL{
-  HANDSHAKE_NIL = 0x00,
-    
-  /*mutator to collector*/
-  ENABLE_COLLECTOR_SWEEP_LOCAL_CHUNKS = 0x01,
-  DISABLE_COLLECTOR_SWEEP_LOCAL_CHUNKS = 0x02,
+  HSIG_MUTATOR_SAFE = 0x0,
 
-  
-  ENABLE_COLLECTOR_SWEEP_GLOBAL_CHUNKS = 0x03,
-  DISABLE_COLLECTOR_SWEEP_GLOBAL_CHUNKS = 0x04,
-
-  MUTATOR_ENTER_BARRIER = 0x05,
-  MUTATOR_EXIT_BARRIER = 0x06,
-
-  MUTATOR_ENTER_ALLOCATION_MARK = 0x07,
-  MUTATOR_EXIT_ALLOCATION_MARK = 0x08
+  HSIG_DISABLE_SWEEP_LOCAL_CHUNKS  = 0x01,
+  HSIG_DISABLE_SWEEP_GLOBAL_CHUNKS = 0x02,
+  HSIG_MUTATOR_ENTER_ALLOC_MARK    = 0x03,
 };
 
-extern Boolean USE_CONCURRENT_GC;
-extern Boolean USE_CONCURRENT_ENUMERATION;
-extern Boolean USE_CONCURRENT_MARK;
-extern Boolean USE_CONCURRENT_SWEEP;
+inline void gc_set_con_gc(unsigned int con_phase)
+{ GC_PROP |= con_phase;  }
 
-extern volatile Boolean concurrent_mark_phase;
+inline void gc_specify_con_enum()
+{ gc_set_con_gc(ALGO_CON_ENUM); }
+
+inline void gc_specify_con_mark()
+{ gc_set_con_gc(ALGO_CON_MARK);  }
+
+inline void gc_specify_con_sweep()
+{ gc_set_con_gc(ALGO_CON_SWEEP); }
+
+inline Boolean gc_is_specify_con_gc()
+{ return (GC_PROP & ALGO_CON) != 0; }
+
+inline Boolean gc_is_specify_con_enum()
+{ return (GC_PROP & ALGO_CON_ENUM) == ALGO_CON_ENUM;  }
+
+inline Boolean gc_is_specify_con_mark()
+{ return (GC_PROP & ALGO_CON_MARK) == ALGO_CON_MARK;  }
+
+inline Boolean gc_is_specify_con_sweep()
+{ return (GC_PROP & ALGO_CON_SWEEP) == ALGO_CON_SWEEP; }
+
+extern volatile Boolean concurrent_in_marking;
+extern volatile Boolean concurrent_in_sweeping;
 extern volatile Boolean mark_is_concurrent;
-extern volatile Boolean concurrent_sweep_phase;
 extern volatile Boolean sweep_is_concurrent;
-extern unsigned int CONCURRENT_ALGO; 
-
-enum CONCURRENT_MARK_ALGORITHM{
-  OTF_REM_OBJ_SNAPSHOT_ALGO = 0x01,
-  OTF_REM_NEW_TARGET_ALGO = 0x02,
-  MOSTLY_CONCURRENT_ALGO = 0x03
-};
-
-inline Boolean gc_concurrent_match_algorithm(unsigned int concurrent_algo)
-{
-  return CONCURRENT_ALGO == concurrent_algo;
-}
 
 inline Boolean gc_mark_is_concurrent()
 {
@@ -73,8 +70,7 @@ inline Boolean gc_mark_is_concurrent()
 
 inline void gc_mark_set_concurrent()
 {
-  if(gc_concurrent_match_algorithm(OTF_REM_OBJ_SNAPSHOT_ALGO)
-      ||gc_concurrent_match_algorithm(OTF_REM_NEW_TARGET_ALGO)) 
+  if(gc_is_kind(ALGO_CON_OTF_OBJ) || gc_is_kind(ALGO_CON_OTF_REF)) 
     gc_enable_alloc_obj_live();
   mark_is_concurrent = TRUE;
 }
@@ -85,14 +81,14 @@ inline void gc_mark_unset_concurrent()
   mark_is_concurrent = FALSE;
 }
 
-inline Boolean gc_is_concurrent_mark_phase()
+inline Boolean gc_con_is_in_marking()
 {
-  return concurrent_mark_phase;
+  return concurrent_in_marking;
 }
 
-inline Boolean gc_is_concurrent_mark_phase(GC* gc)
+inline Boolean gc_con_is_in_marking(GC* gc)
 {
-  return gc->gc_concurrent_status == GC_CONCURRENT_MARK_PHASE;
+  return gc->gc_concurrent_status == GC_CON_MARK_PHASE;
 }
 
 inline Boolean gc_sweep_is_concurrent()
@@ -110,62 +106,65 @@ inline void gc_sweep_unset_concurrent()
   sweep_is_concurrent = FALSE;
 }
 
-inline Boolean gc_is_concurrent_sweep_phase()
+inline Boolean gc_con_is_in_sweeping()
 {
-  return concurrent_sweep_phase;
+  return concurrent_in_sweeping;
 }
 
-inline Boolean gc_is_concurrent_sweep_phase(GC* gc)
+inline Boolean gc_con_is_in_sweeping(GC* gc)
 {
-  return gc->gc_concurrent_status == GC_CONCURRENT_SWEEP_PHASE;
+  return gc->gc_concurrent_status == GC_CON_SWEEP_PHASE;
 }
 
 inline void gc_set_concurrent_status(GC*gc, unsigned int status)
 {
   /*Reset status*/
-  concurrent_mark_phase = FALSE;
-  concurrent_sweep_phase = FALSE;
+  concurrent_in_marking = FALSE;
+  concurrent_in_sweeping = FALSE;
 
   gc->gc_concurrent_status = status;
   switch(status){
-    case GC_CONCURRENT_MARK_PHASE: 
+    case GC_CON_MARK_PHASE: 
       gc_mark_set_concurrent();
-      concurrent_mark_phase = TRUE;
+      concurrent_in_marking = TRUE;
       break;
-    case GC_CONCURRENT_SWEEP_PHASE:
+    case GC_CON_SWEEP_PHASE:
       gc_sweep_set_concurrent();
-      concurrent_sweep_phase = TRUE;
+      concurrent_in_sweeping = TRUE;
       break;
     default:
-      assert(!concurrent_mark_phase && !concurrent_sweep_phase);
+      assert(!concurrent_in_marking && !concurrent_in_sweeping);
   }
   
   return;
 }
 
-void gc_reset_concurrent_mark(GC* gc);
-void gc_start_concurrent_mark(GC* gc);
-void gc_finish_concurrent_mark(GC* gc, Boolean is_STW);
-int64 gc_get_concurrent_mark_time(GC* gc);
+void gc_reset_con_mark(GC* gc);
+void gc_start_con_mark(GC* gc);
+void gc_finish_con_mark(GC* gc, Boolean need_STW);
+int64 gc_get_con_mark_time(GC* gc);
 
-void gc_start_concurrent_sweep(GC* gc);
-void gc_finish_concurrent_sweep(GC * gc);
+void gc_start_con_sweep(GC* gc);
+void gc_finish_con_sweep(GC * gc);
 
-void gc_reset_after_concurrent_collection(GC* gc);
-void gc_check_concurrent_phase(GC * gc);
+void gc_reset_after_con_collect(GC* gc);
+void gc_try_finish_con_phase(GC * gc);
 
-void gc_decide_concurrent_algorithm(char* concurrent_algo);
+void gc_decide_con_algo(char* concurrent_algo);
+void gc_set_default_con_algo();
 
-void gc_reset_concurrent_sweep(GC* gc);
+void gc_reset_con_sweep(GC* gc);
 
-extern volatile Boolean gc_sweeping_global_normal_chunk;
+void gc_finish_con_GC(GC* gc, int64 time_mutator);
 
-inline Boolean gc_is_sweeping_global_normal_chunk()
-{ return gc_sweeping_global_normal_chunk; }
+extern volatile Boolean gc_sweep_global_normal_chunk;
 
-inline void gc_set_sweeping_global_normal_chunk()
-{ gc_sweeping_global_normal_chunk = TRUE; }
+inline Boolean gc_is_sweep_global_normal_chunk()
+{ return gc_sweep_global_normal_chunk; }
 
-inline void gc_unset_sweeping_global_normal_chunk()
-{ gc_sweeping_global_normal_chunk = FALSE; }
+inline void gc_set_sweep_global_normal_chunk()
+{ gc_sweep_global_normal_chunk = TRUE; }
+
+inline void gc_unset_sweep_global_normal_chunk()
+{ gc_sweep_global_normal_chunk = FALSE; }
 #endif

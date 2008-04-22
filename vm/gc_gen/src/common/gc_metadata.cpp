@@ -33,6 +33,7 @@
 #define METADATA_BLOCK_SIZE_BYTES VECTOR_BLOCK_DATA_SIZE_BYTES
 
 GC_Metadata gc_metadata;
+unsigned int rootset_type;
 
 void gc_metadata_initialize(GC* gc)
 {
@@ -282,17 +283,6 @@ void gc_set_rootset(GC* gc)
     pool_put_entry(mutator_remset_pool, mutator->rem_set);
     mutator->rem_set = NULL;
     mutator = mutator->next;
-  }
-
-  /* put back last remset block of each collector (saved in last collection) */  
-  unsigned int num_active_collectors = gc->num_active_collectors;
-  for(unsigned int i=0; i<num_active_collectors; i++)
-  {
-    Collector* collector = gc->collectors[i];
-    /* 1. in the first time GC, rem_set is NULL. 2. it should be NULL when NOS is forwarding_all */
-    if(collector->rem_set == NULL) continue;
-    pool_put_entry(metadata->collector_remset_pool, collector->rem_set);
-    collector->rem_set = NULL;
   }
   
   assert( collect_is_major_normal() || collect_is_minor());
@@ -608,10 +598,7 @@ void gc_reset_dirty_set(GC* gc)
       pool_put_entry(metadata->free_set_pool,dirty_set);
       dirty_set = pool_get_entry(global_dirty_set_pool);
     }
-  }
-
-
-  
+  }  
 }
 
 void gc_prepare_dirty_set(GC* gc)
@@ -651,6 +638,21 @@ void gc_clear_dirty_set(GC* gc)
 void free_set_pool_put_entry(Vector_Block* block, GC_Metadata *metadata)
 { pool_put_entry(metadata->free_set_pool, block); }
 
+
+void gc_reset_collectors_rem_set(GC *gc) 
+{  
+  /* put back last remset block of each collector (saved in last collection) */  
+  GC_Metadata* metadata = gc->metadata;
+  unsigned int num_active_collectors = gc->num_active_collectors;
+  for(unsigned int i=0; i<num_active_collectors; i++)
+  {
+    Collector* collector = gc->collectors[i];
+    /* 1. in the first time GC, rem_set is NULL. 2. it should be NULL when NOS is forwarding_all */
+    if(collector->rem_set == NULL) continue;
+    pool_put_entry(metadata->collector_remset_pool, collector->rem_set);
+    collector->rem_set = NULL;
+  }
+}
 
 
 

@@ -20,6 +20,10 @@
 #include "wspace_mark_sweep.h"
 #include "wspace_verify.h"
 
+#ifdef USE_32BITS_HASHCODE
+#include "../common/hashcode.h"
+#endif
+ 
 
 #define PFC_SORT_NUM  8
 
@@ -165,24 +169,61 @@ static inline void move_obj_between_chunks(Wspace *wspace, Chunk_Header **dest_p
   unsigned int alloc_num = src->alloc_num;
   assert(alloc_num);
   
+#ifdef USE_32BITS_HASHCODE
+  Hashcode_Buf*  old_hashcode_buf = src->hashcode_buf;
+  Hashcode_Buf* new_hashcode_buf = dest->hashcode_buf;
+#endif
+
   while(alloc_num && dest){
     Partial_Reveal_Object *p_obj = next_alloc_slot_in_chunk(src);
-    void *target = alloc_in_chunk(dest);
+    Partial_Reveal_Object *target = (Partial_Reveal_Object *)alloc_in_chunk(dest);
 
     if(dest->slot_index == MAX_SLOT_INDEX){
       dest->status = CHUNK_USED | CHUNK_NORMAL;      
-      wspace_register_used_chunk(wspace,dest);
+      wspace_reg_used_chunk(wspace,dest);
       dest = NULL;
     }
     
     assert(p_obj && target);
     memcpy(target, p_obj, slot_size);
+
+#ifdef USE_32BITS_HASHCODE
+  if(hashcode_is_set(p_obj)){
+    int hashcode;
+    if(new_hashcode_buf == NULL) {
+      new_hashcode_buf = hashcode_buf_create();
+      hashcode_buf_init(new_hashcode_buf);
+      dest->hashcode_buf = new_hashcode_buf;
+    }
+    if(hashcode_is_buffered(p_obj)){
+      /*already buffered objects;*/
+      hashcode = hashcode_buf_lookup(p_obj, old_hashcode_buf);
+      hashcode_buf_update(target, hashcode, new_hashcode_buf);
+    }else{
+      /*objects need buffering.*/
+      hashcode = hashcode_gen(p_obj);
+      hashcode_buf_update(target, hashcode, new_hashcode_buf);
+      Obj_Info_Type oi = get_obj_info_raw(target);
+      set_obj_info(target, oi | HASHCODE_BUFFERED_BIT);
+    }
+  }
+#endif
+
+
 #ifdef SSPACE_VERIFY
     wspace_modify_mark_in_compact(target, p_obj, slot_size);
 #endif
     obj_set_fw_in_oi(p_obj, target);
     --alloc_num;
   }
+
+#ifdef USE_32BITS_HASHCODE
+  if(alloc_num == 0) {
+    if(old_hashcode_buf) hashcode_buf_destory(old_hashcode_buf);
+    src->hashcode_buf = NULL;
+  }
+#endif
+
   
   /* dest might be set to NULL, so we use *dest_ptr here */
   assert((*dest_ptr)->alloc_num <= (*dest_ptr)->slot_num);
@@ -233,6 +274,8 @@ void wspace_compact(Collector *collector, Wspace *wspace)
     }
   }
 }
+
+
 
 
 

@@ -145,7 +145,8 @@ static void assign_collector_with_task(GC* gc, TaskType task_func, Space* space)
     collector_reset_thread(collector);
     collector->task_func = task_func;
     collector->collect_space = space;
-    notify_collector_to_work(collector);
+    collector->collector_is_active = TRUE;
+    notify_collector_to_work(collector);    
   }
   return;
 }
@@ -362,6 +363,8 @@ int64 gc_get_collector_time(GC* gc)
   }
   return time_collector;
 }
+
+
 
 
 

@@ -21,11 +21,11 @@
 
 #include <cxxlog.h>
 #include "open/vm_properties.h"
+#include "open/vm_properties.h"
 #include "port_sysinfo.h"
 #include "vm_threads.h"
 #include "jit_runtime_support.h"
 #include "compressed_ref.h"
-
 #include "../gen/gen.h"
 #include "../mark_sweep/gc_ms.h"
 #include "../move_compact/gc_mc.h"
@@ -111,8 +111,10 @@ int gc_init()
 #ifndef BUILD_IN_REFERENT
   gc_finref_metadata_initialize(gc);
 #endif
-  if(USE_CONCURRENT_GC){
-    collection_scheduler_initialize(gc);
+
+  collection_scheduler_initialize(gc);
+
+  if(gc_is_specify_con_gc()){
     marker_initialize(gc);
   }
   
@@ -231,12 +233,15 @@ void gc_add_weak_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinned, B
   gc_weak_rootset_add_entry(p_global_gc, p_ref, is_short_weak);
 }
 
+extern Boolean IGNORE_FORCE_GC;
+
 /* VM to force GC */
 void gc_force_gc() 
 {
   vm_gc_lock_enum();
-
-  gc_reclaim_heap(p_global_gc, GC_CAUSE_RUNTIME_FORCE_GC);  
+  
+  if(!IGNORE_FORCE_GC)
+    gc_reclaim_heap(p_global_gc, GC_CAUSE_RUNTIME_FORCE_GC);  
 
   vm_gc_unlock_enum();
 }
@@ -437,6 +442,7 @@ Boolean obj_belongs_to_gc_heap(Partial_Reveal_Object* p_obj)
 {
   return address_belongs_to_gc_heap(p_obj, p_global_gc);  
 }
+
 
 
 

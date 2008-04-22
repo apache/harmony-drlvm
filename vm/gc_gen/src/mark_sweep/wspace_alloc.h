@@ -23,9 +23,9 @@
 #include "../common/gc_concurrent.h"
 #include "../common/collection_scheduler.h"
 
-extern POINTER_SIZE_INT cur_alloc_color;
-extern POINTER_SIZE_INT cur_alloc_mask;
-extern POINTER_SIZE_INT cur_mark_mask;
+extern volatile POINTER_SIZE_INT cur_alloc_color;
+extern volatile POINTER_SIZE_INT cur_alloc_mask;
+extern volatile POINTER_SIZE_INT cur_mark_mask;
 
 
 inline Boolean slot_is_alloc_in_table(POINTER_SIZE_INT *table, unsigned int slot_index)
@@ -186,9 +186,7 @@ inline void *alloc_in_chunk(Chunk_Header* &chunk)
   /*mark black is placed here because of race condition between ops color flip. */
   if(p_obj && is_obj_alloced_live())
     obj_mark_black_in_table((Partial_Reveal_Object*)p_obj, chunk->slot_size);
-  
-  //mem_fence();
-  
+    
   alloc_slot_in_table(table, slot_index);
   if(chunk->status & CHUNK_NEED_ZEROING)
     memset(p_obj, 0, chunk->slot_size);

@@ -143,7 +143,7 @@ void gc_gen_collector_stats_reset(GC_Gen* gc)
 {
   Collector** collector = gc->collectors;
   GC_Gen_Collector_Stats* stats;
-  for (unsigned int i=0; i<gc->num_collectors; i++){
+  for (unsigned int i=0; i<gc->num_active_collectors; i++){
     stats = (GC_Gen_Collector_Stats*)collector[i]->stats;
     memset(stats, 0, sizeof(GC_Gen_Collector_Stats));
   }

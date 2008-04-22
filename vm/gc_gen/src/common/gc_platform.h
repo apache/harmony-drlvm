@@ -146,6 +146,21 @@ inline int vm_thread_is_suspend_enable()
   return (int)hythread_is_suspend_enabled();
 }
 
+inline int vm_suspend_all_threads()
+{
+  int disable_count = hythread_reset_suspend_disable();
+  hythread_suspend_all(NULL, NULL);
+  hythread_suspend_disable();
+  return disable_count;
+}
+
+inline void vm_resume_all_threads(int disable_count)
+{
+  hythread_suspend_enable();
+  hythread_resume_all(NULL);
+  hythread_set_suspend_disable(disable_count);
+}
+
 inline void *atomic_casptr(volatile void **mem, void *with, const void *cmp) 
 {  return apr_atomic_casptr(mem, with, cmp); }
 

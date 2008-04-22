@@ -72,7 +72,7 @@ void gc_clear_dirty_set(GC* gc);
 
 void gc_identify_dead_weak_roots(GC *gc);
 void gc_update_weak_roots(GC *gc, Boolean double_fix);
-
+void gc_reset_collectors_rem_set(GC *gc); 
 
 inline void  gc_task_pool_clear(Pool* task_pool)
 {
@@ -223,6 +223,19 @@ inline void gc_weak_rootset_add_entry(GC* gc, Partial_Reveal_Object** p_ref, Boo
   assert(gc->weakroot_set);
 }
 
+extern unsigned int rootset_type;
+
+enum ROOTSET_TYPE{
+  ROOTSET_IS_OBJ = 0x01,
+  ROOTSET_IS_REF = 0x02
+};
+
+
+inline void gc_set_rootset_type(unsigned int rs_type)
+{
+  rootset_type = rs_type;
+}
+
 #ifdef COMPRESS_REFERENCE
 
 inline void gc_rootset_add_entry(GC* gc, Partial_Reveal_Object** p_ref)
@@ -239,7 +252,10 @@ inline void gc_rootset_add_entry(GC* gc, Partial_Reveal_Object** p_ref)
   /* construct an Uncompressed_Root */
   vector_block_add_entry(uncompressed_root_set, (POINTER_SIZE_INT)p_ref);
   assert(!vector_block_is_full(uncompressed_root_set));
-  vector_block_add_entry(uncompressed_root_set, (POINTER_SIZE_INT)ref);
+  if(rootset_type == ROOTSET_IS_REF)
+    vector_block_add_entry(uncompressed_root_set, (POINTER_SIZE_INT)ref);
+  else if(rootset_type == ROOTSET_IS_OBJ)
+    vector_block_add_entry(uncompressed_root_set, (POINTER_SIZE_INT)p_obj);
   
   if(!vector_block_is_full(uncompressed_root_set)) return;
   
@@ -252,9 +268,15 @@ inline void gc_rootset_add_entry(GC* gc, Partial_Reveal_Object** p_ref)
 inline void gc_rootset_add_entry(GC* gc, Partial_Reveal_Object** p_ref)
 {
   assert( p_ref < gc_heap_base_address() || p_ref >= gc_heap_ceiling_address()); 
+
+  Partial_Reveal_Object *p_obj = *p_ref;
   
-  Vector_Block* root_set = gc->root_set;  
-  vector_block_add_entry(root_set, (POINTER_SIZE_INT)p_ref);
+  Vector_Block* root_set = gc->root_set;
+
+  if(rootset_type == ROOTSET_IS_REF)
+    vector_block_add_entry(root_set, (POINTER_SIZE_INT)p_ref);
+  else if(rootset_type == ROOTSET_IS_OBJ)
+    vector_block_add_entry(root_set, (POINTER_SIZE_INT)p_obj);
   
   if( !vector_block_is_full(root_set)) return;
     

@@ -94,12 +94,13 @@ void marker_execute_task(GC* gc, TaskType task_func, Space* space);
 void marker_execute_task_concurrent(GC* gc, TaskType task_func, Space* space, unsigned int num_markers);
 void marker_execute_task_concurrent(GC* gc, TaskType task_func, Space* space);
 
-void marker_notify_mark_root_done(Marker* marker);
 void wait_mark_finish(GC* gc);
 Boolean is_mark_finished(GC* gc);
 int64 gc_get_marker_time(GC* gc);
 
 #endif //_MARKER_H_
+
+
 
 
 

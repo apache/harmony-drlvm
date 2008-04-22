@@ -73,10 +73,10 @@ typedef struct GC_MS {
   unsigned int gc_concurrent_status;
   Collection_Scheduler* collection_scheduler;
 
-  SpinLock concurrent_mark_lock;
-  SpinLock enumerate_rootset_lock;
-  SpinLock concurrent_sweep_lock;
-  SpinLock collection_scheduler_lock;
+  SpinLock lock_con_mark;
+  SpinLock lock_enum;
+  SpinLock lock_con_sweep;
+  SpinLock lock_collect_sched;
   
   /* system info */
   unsigned int _system_alloc_unit;
@@ -115,12 +115,12 @@ void gc_ms_destruct(GC_MS *gc);
 void gc_ms_reclaim_heap(GC_MS *gc);
 void gc_ms_iterate_heap(GC_MS *gc);
 
-void gc_ms_start_concurrent_mark(GC_MS* gc);
-void gc_ms_start_concurrent_mark(GC_MS* gc, unsigned int num_markers);
-void gc_ms_update_space_statistics(GC_MS* gc);
-void gc_ms_start_concurrent_sweep(GC_MS* gc, unsigned int num_collectors);
-void gc_ms_start_most_concurrent_mark(GC_MS* gc, unsigned int num_markers);
-void gc_ms_start_final_mark_after_concurrent(GC_MS* gc, unsigned int num_markers);
-void gc_ms_reset_space_statistics(GC_MS* gc);
+void gc_ms_start_con_mark(GC_MS* gc);
+void gc_ms_start_con_mark(GC_MS* gc, unsigned int num_markers);
+void gc_ms_update_space_stat(GC_MS* gc);
+void gc_ms_start_con_sweep(GC_MS* gc, unsigned int num_collectors);
+void gc_ms_start_mostly_con_mark(GC_MS* gc, unsigned int num_markers);
+void gc_ms_start_mostly_con_final_mark(GC_MS* gc, unsigned int num_markers);
+void gc_ms_reset_space_stat(GC_MS* gc);
 
 #endif // _GC_MS_H_

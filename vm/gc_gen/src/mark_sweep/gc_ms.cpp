@@ -81,7 +81,7 @@ void gc_ms_reclaim_heap(GC_MS *gc)
 }
 
 void wspace_mark_scan_concurrent(Marker* marker);
-void gc_ms_start_concurrent_mark(GC_MS* gc, unsigned int num_markers)
+void gc_ms_start_con_mark(GC_MS* gc, unsigned int num_markers)
 {
   if(gc->num_active_markers == 0)
     pool_iterator_init(gc->metadata->gc_rootset_pool);
@@ -90,7 +90,7 @@ void gc_ms_start_concurrent_mark(GC_MS* gc, unsigned int num_markers)
 }
 
 void wspace_mark_scan_mostly_concurrent(Marker* marker);
-void gc_ms_start_most_concurrent_mark(GC_MS* gc, unsigned int num_markers)
+void gc_ms_start_mostly_con_mark(GC_MS* gc, unsigned int num_markers)
 {
   if(gc->num_active_markers == 0)
     pool_iterator_init(gc->metadata->gc_rootset_pool);
@@ -98,7 +98,7 @@ void gc_ms_start_most_concurrent_mark(GC_MS* gc, unsigned int num_markers)
   marker_execute_task_concurrent((GC*)gc,(TaskType)wspace_mark_scan_mostly_concurrent,(Space*)gc->wspace, num_markers);
 }
 
-void gc_ms_start_final_mark_after_concurrent(GC_MS* gc, unsigned int num_markers)
+void gc_ms_start_mostly_con_final_mark(GC_MS* gc, unsigned int num_markers)
 {
   pool_iterator_init(gc->metadata->gc_rootset_pool);
   
@@ -112,7 +112,7 @@ void gc_check_mutator_allocation(GC* gc)
 
   Mutator *mutator = gc->mutator_list;
   while(mutator){
-    wait_mutator_signal(mutator, MUTATOR_ENTER_ALLOCATION_MARK);
+    wait_mutator_signal(mutator, HSIG_MUTATOR_SAFE);
     mutator = mutator->next;
   }
 
@@ -120,12 +120,12 @@ void gc_check_mutator_allocation(GC* gc)
 }
 
 void wspace_sweep_concurrent(Collector* collector);
-void gc_ms_start_concurrent_sweep(GC_MS* gc, unsigned int num_collectors)
+void gc_ms_start_con_sweep(GC_MS* gc, unsigned int num_collectors)
 {
   ops_color_flip();
   mem_fence();
-  gc_disable_alloc_obj_live();
   gc_check_mutator_allocation((GC*)gc);
+  gc_disable_alloc_obj_live();
   wspace_init_pfc_pool_iterator(gc->wspace);
   
   collector_execute_task_concurrent((GC*)gc, (TaskType)wspace_sweep_concurrent, (Space*)gc->wspace, num_collectors);
@@ -133,14 +133,14 @@ void gc_ms_start_concurrent_sweep(GC_MS* gc, unsigned int num_collectors)
   collector_release_weakref_sets((GC*)gc, num_collectors);
 }
 
-void gc_ms_start_concurrent_mark(GC_MS* gc)
+void gc_ms_start_con_mark(GC_MS* gc)
 {
   pool_iterator_init(gc->metadata->gc_rootset_pool);
   
   marker_execute_task_concurrent((GC*)gc,(TaskType)wspace_mark_scan_concurrent,(Space*)gc->wspace);
 }
 
-void gc_ms_update_space_statistics(GC_MS* gc)
+void gc_ms_update_space_stat(GC_MS* gc)
 {
   POINTER_SIZE_INT num_live_obj = 0;
   POINTER_SIZE_INT size_live_obj = 0;  
@@ -157,25 +157,25 @@ void gc_ms_update_space_statistics(GC_MS* gc)
     size_live_obj += collector->live_obj_size;
   }
 
-  lock(gc->mutator_list_lock);
-  Mutator* mutator = gc->mutator_list;
-  while (mutator) {
-    new_obj_size += mutator->new_obj_size;
-    mutator->new_obj_size = 0;
-    mutator = mutator->next;
-  }  
-  unlock(gc->mutator_list_lock);
+  new_obj_size = gc_get_new_object_size((GC*)gc, TRUE);
 
-  wspace_stat->size_new_obj += new_obj_size;
+  wspace_stat->size_new_obj = new_obj_size;
   
   wspace_stat->num_live_obj = num_live_obj;
   wspace_stat->size_live_obj = size_live_obj;  
   wspace_stat->last_size_free_space = wspace_stat->size_free_space;
   wspace_stat->size_free_space = gc->committed_heap_size - size_live_obj;/*TODO:inaccurate value.*/  
-  wspace_stat->space_utilization_ratio = (float)wspace_stat->size_new_obj / wspace_stat->last_size_free_space;;
+  wspace_stat->space_utilization_ratio = (float)wspace_stat->size_new_obj / wspace_stat->last_size_free_space;
+
+  INFO2("gc.space.stat","[GC][Space Stat] num_live_obj        : "<<wspace_stat->num_live_obj<<" ");
+  INFO2("gc.space.stat","[GC][Space Stat] size_live_obj       : "<<wspace_stat->size_live_obj<<" ");
+  INFO2("gc.space.stat","[GC][Space Stat] size_free_space     : "<<wspace_stat->size_free_space<<" ");
+  INFO2("gc.space.stat","[GC][Space Stat] last_size_free_space: "<<wspace_stat->last_size_free_space<<" ");
+  INFO2("gc.space.stat","[GC][Space Stat] size_new_obj        : "<<wspace_stat->size_new_obj<<" ");  
+  INFO2("gc.space.stat","[GC][Space Stat] utilization_ratio   : "<<wspace_stat->space_utilization_ratio<<" ");
 }
 
-void gc_ms_reset_space_statistics(GC_MS* gc)
+void gc_ms_reset_space_stat(GC_MS* gc)
 {
   Space_Statistics* wspace_stat = gc->wspace->space_statistic;
   wspace_stat->size_new_obj = 0;

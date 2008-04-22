@@ -132,21 +132,21 @@ static void collector_sweep_normal_chunk(Collector *collector, Wspace *wspace, C
     }
   }
   assert(live_num <= slot_num);
-  //chunk->alloc_num = live_num;
   collector->live_obj_size += live_num * chunk->slot_size;
   collector->live_obj_num += live_num;
 
   if(!live_num){  /* all objects in this chunk are dead */
     collector_add_free_chunk(collector, (Free_Chunk*)chunk);
-  } else if(chunk_is_reusable(chunk)){  /* most objects in this chunk are swept, add chunk to pfc list*/
-    chunk->alloc_num = live_num;
+  } else {
+   chunk->alloc_num = live_num;    
+   if(chunk_is_reusable(chunk)){  /* most objects in this chunk are swept, add chunk to pfc list*/
     //chunk_pad_last_index_word((Chunk_Header*)chunk, cur_mark_mask);
     wspace_put_pfc(wspace, chunk);
     assert(chunk->next != chunk);
-  }else{  /* the rest: chunks with free rate < PFC_REUSABLE_RATIO. we don't use them */
-    chunk->alloc_num = live_num;    
+   }else{  /* the rest: chunks with free rate < PFC_REUSABLE_RATIO. we don't use them */
     chunk->status = CHUNK_USED | CHUNK_NORMAL;
-    wspace_register_used_chunk(wspace,chunk);
+    wspace_reg_used_chunk(wspace,chunk);
+   }
   }
 }
 
@@ -160,7 +160,7 @@ static inline void collector_sweep_abnormal_chunk(Collector *collector, Wspace *
   }
   else {
     chunk->status = CHUNK_ABNORMAL| CHUNK_USED;
-    wspace_register_used_chunk(wspace,chunk);
+    wspace_reg_used_chunk(wspace,chunk);
     collector->live_obj_size += CHUNK_SIZE(chunk);
     collector->live_obj_num++;
   }

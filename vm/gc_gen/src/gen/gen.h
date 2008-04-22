@@ -102,10 +102,10 @@ typedef struct GC_Gen {
   unsigned int gc_concurrent_status;
   Collection_Scheduler* collection_scheduler;
 
-  SpinLock concurrent_mark_lock;
-  SpinLock enumerate_rootset_lock;
-  SpinLock concurrent_sweep_lock;
-  SpinLock collection_scheduler_lock;
+  SpinLock lock_con_mark;
+  SpinLock lock_enum;
+  SpinLock lock_con_sweep;
+  SpinLock lock_collect_sched;
 
   
   /* system info */
@@ -133,7 +133,7 @@ typedef struct GC_Gen {
 
 void gc_gen_initialize(GC_Gen *gc, POINTER_SIZE_INT initial_heap_size, POINTER_SIZE_INT final_heap_size);
 void gc_gen_destruct(GC_Gen *gc);
-void gc_gen_collection_verbose_info(GC_Gen *gc, int64 pause_time, int64 mutator_time);
+void gc_gen_collection_verbose_info(GC_Gen *gc, int64 pause_time, int64 time_mutator);
 void gc_gen_space_verbose_info(GC_Gen *gc);
 void gc_gen_init_verbose(GC_Gen *gc);
 void gc_gen_wrapup_verbose(GC_Gen* gc);
@@ -213,6 +213,8 @@ void* nos_space_adjust(Space* space, void* new_nos_boundary, POINTER_SIZE_INT ne
 #endif
 
 #endif /* ifndef _GC_GEN_H_ */
+
+
 
 
 
