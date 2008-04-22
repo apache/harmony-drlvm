@@ -31,7 +31,7 @@
 extern "C" {
 #endif
 
-DECLARE_OPEN(ClassLoaderHandle, class_get_class_loader, (Class_Handle ch));
+DECLARE_OPEN(Class_Loader_Handle, class_get_class_loader, (Class_Handle ch));
 
 /**
 * @return A class corresponding to a primitive type. For all primitive types t
@@ -72,7 +72,7 @@ DECLARE_OPEN(Class_Handle, class_get_array_of_class, (Class_Handle ch));
  * @return The handle for C++ class representation, if found. Otherwise, <code>NULL</code>.
  */
 DECLARE_OPEN(Class_Handle, class_loader_lookup_class,
-    (ClassLoaderHandle classloader, const char* name));
+    (Class_Loader_Handle classloader, const char* name));
 
 
 /**
@@ -85,7 +85,7 @@ DECLARE_OPEN(Class_Handle, class_loader_lookup_class,
  * @return The handle for the C++ class representation, if loaded successfully; otherwise, <code>NULL</code>.
  */
 DECLARE_OPEN(Class_Handle, class_loader_load_class,
-    (ClassLoaderHandle classloader, const char* name));
+    (Class_Loader_Handle classloader, const char* name));
 
 /** @ingroup Extended 
  *
@@ -150,7 +150,7 @@ DECLARE_OPEN(Class_Handle, vm_get_system_string_class, ());
  * @param data             - the pointer to the verifier data
  */
 DECLARE_OPEN(void, class_loader_set_verifier_data_ptr,
-    (ClassLoaderHandle classloader, void* data));
+    (Class_Loader_Handle classloader, void* data));
 
 /**
  * Returns the pointer to verifier-specific data associated with the given class loader.
@@ -159,21 +159,21 @@ DECLARE_OPEN(void, class_loader_set_verifier_data_ptr,
  * 
  * @return The pointer to the verifier data
  */
-DECLARE_OPEN(void*, class_loader_get_verifier_data_ptr, (ClassLoaderHandle classloader));
+DECLARE_OPEN(void*, class_loader_get_verifier_data_ptr, (Class_Loader_Handle classloader));
 
 /**
  * Acquires the lock on a given class loader. 
  *
  * @param classloader - the handle to the C++ class loader structure to acquire lock on.
  */
-DECLARE_OPEN(void, class_loader_lock, (ClassLoaderHandle classloader));
+DECLARE_OPEN(void, class_loader_lock, (Class_Loader_Handle classloader));
 
 /**
  * Releases the lock on a given class loader. 
  *
  * @param classloader - the handle to the C++ class loader structure to release lock on. 
  */
-DECLARE_OPEN(void, class_loader_unlock, (ClassLoaderHandle classloader));
+DECLARE_OPEN(void, class_loader_unlock, (Class_Loader_Handle classloader));
 
 #ifdef __cplusplus
 }

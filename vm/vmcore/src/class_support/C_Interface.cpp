@@ -799,7 +799,7 @@ Field_Handle class_resolve_nonstatic_field(Class_Handle clss, unsigned short cp_
 } // class_resolve_nonstatic_field
 
 
-ClassLoaderHandle
+Class_Loader_Handle
 class_get_class_loader(Class_Handle ch)
 {
     assert(ch);

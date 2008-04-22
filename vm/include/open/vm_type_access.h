@@ -87,7 +87,7 @@ DECLARE_OPEN(VM_Data_Type, type_info_get_type, (Type_Info_Handle tih));
 * Gets Type_Info_Handle from the given type name.
 * Does'n resolve type if not resolved
 */
-DECLARE_OPEN(Type_Info_Handle, type_info_create_from_java_descriptor, (ClassLoaderHandle cl, const char* typeName));
+DECLARE_OPEN(Type_Info_Handle, type_info_create_from_java_descriptor, (Class_Loader_Handle cl, const char* typeName));
 
 /**
 * Get the name of the class referenced by this type info handle

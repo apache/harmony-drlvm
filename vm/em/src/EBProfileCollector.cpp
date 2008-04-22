@@ -205,11 +205,11 @@ void EBProfileCollector::syncModeJitCallback(MethodProfile* mp) {
     em->methodProfileIsReady(mp);
 }
 
-static void addProfilesForClassloader(ClassLoaderHandle h, EBProfiles& from, EBProfiles& to, bool erase) {
+static void addProfilesForClassloader(Class_Loader_Handle h, EBProfiles& from, EBProfiles& to, bool erase) {
     for (EBProfiles::iterator it = from.begin(), end = from.end(); it!=end; ++it) {
         EBMethodProfile* profile = *it;
         Class_Handle ch =  method_get_class(profile->mh);;
-        ClassLoaderHandle clh = class_get_class_loader(ch);
+        Class_Loader_Handle clh = class_get_class_loader(ch);
         if (clh == h) {
             to.push_back(profile);
             if (erase) {
@@ -239,7 +239,7 @@ void EBProfileCollector::cleanUnloadedProfiles(bool removeFromGreen) {
     }
 }
 
-void EBProfileCollector::classloaderUnloadingCallback(ClassLoaderHandle h) {
+void EBProfileCollector::classloaderUnloadingCallback(Class_Loader_Handle h) {
     port_mutex_lock(&profilesLock);
     
     //can't modify profiles map in async mode here -> it could be iterated by the checker thread without lock

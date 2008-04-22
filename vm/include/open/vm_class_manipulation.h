@@ -106,7 +106,7 @@ VMEXPORT WeakReferenceType class_is_reference(Class_Handle clss);
  *
  * @note An assertion is raised if <i>klass</i> equals to <code>NULL</code>.
  */
-DECLARE_OPEN(ClassLoaderHandle, class_get_class_loader, (Class_Handle klass));
+DECLARE_OPEN(Class_Loader_Handle, class_get_class_loader, (Class_Handle klass));
 
 /**
  * Checks whether the current class is a primitive type.

@@ -45,7 +45,7 @@
 // This function is for native library support
 // It takes a class name with .s not /s. 
 // FIXME: caller could convert it itself
-Class_Handle class_find_loaded(ClassLoaderHandle loader, const char* name)
+Class_Handle class_find_loaded(Class_Loader_Handle loader, const char* name)
 {
     char* name3 = strdup(name);
     char* p = name3;
@@ -66,7 +66,7 @@ Class_Handle class_find_loaded(ClassLoaderHandle loader, const char* name)
     return ch;
 }
 
-Class_Handle class_find_class_from_loader(ClassLoaderHandle loader, const char* n, Boolean init)
+Class_Handle class_find_class_from_loader(Class_Loader_Handle loader, const char* n, Boolean init)
 {
     ASSERT_RAISE_AREA;
     assert(hythread_is_suspend_enabled()); // -salikh
@@ -174,7 +174,7 @@ JNIEXPORT jclass JNICALL Java_java_lang_ClassLoader_findLoadedClass
     } 
 
     const char* buf = GetStringUTFChars(jenv, name, NULL);
-    ClassLoaderHandle loader = class_loader_lookup(cl);
+    Class_Loader_Handle loader = class_loader_lookup(cl);
     Class_Handle clss = class_find_loaded(loader, buf);
     ReleaseStringUTFChars(jenv, name, buf);
 
@@ -210,7 +210,7 @@ JNIEXPORT jobject JNICALL Java_java_lang_VMClassRegistry_getClassLoader0
   (JNIEnv *jenv, jclass, jclass clazz)
 {
     Class_Handle clss = jni_get_class_handle(jenv, clazz);
-    ClassLoaderHandle clh = class_get_class_loader(clss);
+    Class_Loader_Handle clh = class_get_class_loader(clss);
     return jni_class_loader_from_handle(jenv, clh);
 }
 
@@ -599,12 +599,12 @@ JNIEXPORT void JNICALL Java_java_lang_VMClassRegistry_loadLibrary
     const char *str_filename = GetStringUTFChars(jenv, filename, NULL);
 
     // load native library
-    ClassLoaderHandle loader;
+    Class_Loader_Handle loader;
     if( classLoader ) {
         loader = class_loader_lookup(classLoader);
     } else {
         // bootstrap class loader
-        loader = (ClassLoaderHandle)
+        loader = (Class_Loader_Handle)
             jni_get_vm_env(jenv)->bootstrap_class_loader;
     }
     class_loader_load_native_lib(str_filename, loader);

@@ -147,7 +147,7 @@ ClassLoader::~ClassLoader()
         natives_unload_library(info->handle);        
     }
 
-    env->em_interface->ClassloaderUnloadingCallback((ClassLoaderHandle)this);
+    env->em_interface->ClassloaderUnloadingCallback((Class_Loader_Handle)this);
     delete CodeMemoryManager;
     CodeMemoryManager = NULL;
 

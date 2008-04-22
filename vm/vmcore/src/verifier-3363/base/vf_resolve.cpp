@@ -74,7 +74,7 @@ Class_Handle
     Class_Handle result;
 
     // get class loader
-    ClassLoaderHandle class_loader = class_get_class_loader( k_class );
+    Class_Loader_Handle class_loader = class_get_class_loader( k_class );
 
     result = need_load ?
         class_loader_load_class( class_loader, name )

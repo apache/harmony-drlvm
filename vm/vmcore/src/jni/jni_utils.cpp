@@ -55,7 +55,7 @@ jclass jni_class_from_handle(JNIEnv* UNREF jenv, Class_Handle clss)
     return struct_Class_to_jclass((Class*)clss);
 }
 
-jobject jni_class_loader_from_handle(JNIEnv*, ClassLoaderHandle clh)
+jobject jni_class_loader_from_handle(JNIEnv*, Class_Loader_Handle clh)
 {
     if (!clh) return NULL;
     hythread_suspend_disable();
@@ -72,7 +72,7 @@ jobject jni_class_loader_from_handle(JNIEnv*, ClassLoaderHandle clh)
     return (jobject)res;
 }
 
-ClassLoaderHandle class_loader_lookup(jobject loader)
+Class_Loader_Handle class_loader_lookup(jobject loader)
 {
     if (!loader) return NULL;
 
@@ -86,7 +86,7 @@ ClassLoaderHandle class_loader_lookup(jobject loader)
 } //class_loader_lookup
 
 void class_loader_load_native_lib(const char* lib,
-                                   ClassLoaderHandle cl)
+                                   Class_Loader_Handle cl)
 {
     cl->LoadNativeLibrary(lib);
 }

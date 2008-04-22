@@ -71,7 +71,7 @@ ProfilerThreadTimeout()
 }
 
 static void 
-ClassloaderUnloadingCallback(ClassLoaderHandle class_handle) {
+ClassloaderUnloadingCallback(Class_Loader_Handle class_handle) {
     DrlEMFactory::getEMInstance()->classloaderUnloadingCallback(class_handle);        
 }
 

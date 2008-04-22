@@ -1213,7 +1213,7 @@ NamedType* CompilationInterface::getNamedType(Class_Handle enclClass, uint32 cpI
 }
 
 Type* CompilationInterface::getTypeFromDescriptor(Class_Handle enclClass, const char* descriptor) {
-    ClassLoaderHandle loader = class_get_class_loader(enclClass);
+    Class_Loader_Handle loader = class_get_class_loader(enclClass);
     Type_Info_Handle tih = type_info_create_from_java_descriptor(loader, descriptor);
     return getTypeFromDrlVMTypeHandle(tih);
 }

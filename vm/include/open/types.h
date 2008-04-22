@@ -78,7 +78,7 @@ typedef struct TypeDesc *Type_Info_Handle;
 typedef UDATA Allocation_Handle;
 typedef UDATA Runtime_Type_Handle;
 typedef void* NativeCodePtr;
-typedef struct ClassLoader* ClassLoaderHandle;
+typedef struct ClassLoader* Class_Loader_Handle;
 typedef struct ManagedObject* ManagedPointer;
 
 /**

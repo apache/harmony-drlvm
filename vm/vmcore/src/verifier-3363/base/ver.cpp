@@ -151,7 +151,7 @@ vf_verify_class_constraints(Class_Handle klass, unsigned verifyAll, char** error
 {
 
     // get class loader of current class
-    ClassLoaderHandle class_loader = class_get_class_loader(klass);
+    Class_Loader_Handle class_loader = class_get_class_loader(klass);
 
     // get class loader verify data
     vf_ClassLoaderData_t *cl_data =

@@ -291,18 +291,18 @@ void EdgeProfileCollector::cleanUnloadedProfiles() {
 }
 
 
-static void addProfilesForClassloader(ClassLoaderHandle h, EdgeProfiles& from, EdgeProfiles& to) {
+static void addProfilesForClassloader(Class_Loader_Handle h, EdgeProfiles& from, EdgeProfiles& to) {
     for (EdgeProfiles::iterator it = from.begin(), end = from.end(); it!=end; ++it) {
         EdgeMethodProfile* profile = *it;
         Class_Handle ch =  method_get_class(profile->mh);;
-        ClassLoaderHandle clh = class_get_class_loader(ch);
+        Class_Loader_Handle clh = class_get_class_loader(ch);
         if (clh == h) {
             to.push_back(profile);
         }
     }
 }
 
-void EdgeProfileCollector::classloaderUnloadingCallback(ClassLoaderHandle h) {
+void EdgeProfileCollector::classloaderUnloadingCallback(Class_Loader_Handle h) {
     port_mutex_lock(&profilesLock);
 
     //can't modify profiles map in async mode here -> it could be iterated by the checker thread without lock

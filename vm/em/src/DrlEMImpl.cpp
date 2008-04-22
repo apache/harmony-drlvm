@@ -874,7 +874,7 @@ int DrlEMImpl::getTbsTimeout() const {
 
 
 
-void DrlEMImpl::classloaderUnloadingCallback(ClassLoaderHandle class_handle) {
+void DrlEMImpl::classloaderUnloadingCallback(Class_Loader_Handle class_handle) {
     //notify every profile collector about classloader unloading
 }
 

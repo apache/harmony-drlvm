@@ -60,7 +60,7 @@ public:
     virtual uint32 getTimeout() const {return timeout;}
     virtual void onTimeout();
     virtual MethodProfile* getMethodProfile(Method_Handle mh) const ;
-    virtual void classloaderUnloadingCallback(ClassLoaderHandle h);
+    virtual void classloaderUnloadingCallback(Class_Loader_Handle h);
     
     EBMethodProfile* createProfile(Method_Handle mh);
     void syncModeJitCallback(MethodProfile* mp);

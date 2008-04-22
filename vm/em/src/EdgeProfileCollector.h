@@ -45,7 +45,7 @@ public:
     virtual uint32 getInitialTimeout() const {return initialTimeout;}
     virtual uint32 getTimeout() const {return timeout;}
     virtual void onTimeout();
-    virtual void classloaderUnloadingCallback(ClassLoaderHandle h);
+    virtual void classloaderUnloadingCallback(Class_Loader_Handle h);
 
     MethodProfile* getMethodProfile(Method_Handle mh) const ;
     EdgeMethodProfile* createProfile(Method_Handle mh, uint32 numCounters, uint32* counterKeys, uint32 checkSum);

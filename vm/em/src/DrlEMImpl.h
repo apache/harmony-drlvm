@@ -101,7 +101,7 @@ public:
     virtual Boolean unregisterCodeChunk(void *addr);
     virtual unsigned int getNumProfilerThreads() const { return tbsClients.empty() ? 0 : 1;}
 
-    virtual void classloaderUnloadingCallback(ClassLoaderHandle class_handle); 
+    virtual void classloaderUnloadingCallback(Class_Loader_Handle class_handle); 
 
 //EM_PC interface impl:
     virtual void methodProfileIsReady(MethodProfile* mp);

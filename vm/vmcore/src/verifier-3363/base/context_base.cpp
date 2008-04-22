@@ -335,7 +335,7 @@ void vf_Context_Base::set_class_constraints() {
     if( !class_constraints ) return;
 
     vf_ClassLoaderData_t *cl_data;
-    ClassLoaderHandle currentClassLoader = class_get_class_loader(k_class);
+    Class_Loader_Handle currentClassLoader = class_get_class_loader(k_class);
 
     // lock data modification
     class_loader_lock( currentClassLoader );

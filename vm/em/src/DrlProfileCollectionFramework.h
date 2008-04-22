@@ -64,7 +64,7 @@ public:
     
     virtual void addUseJit(JIT_Handle jit) { useJits.push_back(jit);}
     
-    virtual void classloaderUnloadingCallback(ClassLoaderHandle h) {}
+    virtual void classloaderUnloadingCallback(Class_Loader_Handle h) {}
 
     EM_PC_Interface* em;
     std::string name;

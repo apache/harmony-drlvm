@@ -122,31 +122,31 @@ BOOLEAN field_is_protected(Field_Handle hfield)
     return hfield->is_protected();
 } // field_is_protected
 
-void class_loader_set_verifier_data_ptr(ClassLoaderHandle classloader, void* data)
+void class_loader_set_verifier_data_ptr(Class_Loader_Handle classloader, void* data)
 {
     assert(classloader);
     classloader->SetVerifyData(data);
 } // class_loader_set_verifier_data_ptr
 
-void* class_loader_get_verifier_data_ptr(ClassLoaderHandle classloader)
+void* class_loader_get_verifier_data_ptr(Class_Loader_Handle classloader)
 {
     assert(classloader);
     return classloader->GetVerifyData();
 } // class_loader_get_verifier_data_ptr
 
-void class_loader_lock(ClassLoaderHandle classloader)
+void class_loader_lock(Class_Loader_Handle classloader)
 {
     assert(classloader);
     classloader->Lock();
 } // class_loader_lock
 
-void class_loader_unlock(ClassLoaderHandle classloader)
+void class_loader_unlock(Class_Loader_Handle classloader)
 {
     assert(classloader);
     classloader->Unlock();
 } // class_loader_unlock
 
-Class_Handle class_loader_lookup_class(ClassLoaderHandle classloader, const char* name)
+Class_Handle class_loader_lookup_class(Class_Loader_Handle classloader, const char* name)
 {
     assert(classloader);
     assert(name);
@@ -155,7 +155,7 @@ Class_Handle class_loader_lookup_class(ClassLoaderHandle classloader, const char
     return classloader->LookupClass(class_name);
 } // class_loader_lookup_class
 
-Class_Handle class_loader_load_class(ClassLoaderHandle classloader, const char* name)
+Class_Handle class_loader_load_class(Class_Loader_Handle classloader, const char* name)
 {
     assert(classloader);
     assert(name);

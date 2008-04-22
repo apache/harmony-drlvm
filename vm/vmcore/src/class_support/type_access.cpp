@@ -25,7 +25,7 @@
 #include "open/vm_type_access.h"
 
 Type_Info_Handle type_info_create_from_java_descriptor(
-    ClassLoaderHandle cl, const char* typeName) {
+    Class_Loader_Handle cl, const char* typeName) {
     return type_desc_create_from_java_descriptor(typeName, cl);
 }
 
