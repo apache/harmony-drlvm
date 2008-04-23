@@ -17,6 +17,8 @@
 
 package org.apache.harmony.lang.reflect.parser;
 
+import java.util.Arrays;
+
 /**
  * @author Serguei S. Zapreyev
  * @version $Revision: 1.1.2.1 $
@@ -27,4 +29,12 @@ public final class InterimParameterizedType implements InterimGenericType, Inter
     public InterimType parameters[]; 
     public InterimClassType rawType;
     public String signature;
+    
+    public String toString() { 
+        return "InterimParameterizedType: sig=" + signature
+        + " owner=" + ownerType 
+        + " raw=" + rawType
+        + " params=" +(parameters == null ? "[]" : Arrays.asList(parameters).toString());
+    }
+
 }

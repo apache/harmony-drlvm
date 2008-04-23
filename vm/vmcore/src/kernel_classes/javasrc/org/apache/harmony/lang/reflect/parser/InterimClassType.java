@@ -23,4 +23,8 @@ package org.apache.harmony.lang.reflect.parser;
  */
 public final class InterimClassType implements InterimType {
     public String classTypeName;
+    
+    public String toString() { 
+        return "InterimClassType: " + classTypeName;
+    }
 }

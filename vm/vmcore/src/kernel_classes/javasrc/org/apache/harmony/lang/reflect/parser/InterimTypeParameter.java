@@ -17,6 +17,8 @@
 
 package org.apache.harmony.lang.reflect.parser;
 
+import java.util.Arrays;
+
 /**
  * @author Serguei S. Zapreyev
  * @version $Revision: 1.1.2.1 $
@@ -25,4 +27,10 @@ public class InterimTypeParameter {
     public InterimType classBound;
     public InterimType interfaceBounds[];
     public String typeParameterName;
+    
+    public String toString() { 
+        return "InterimTypeParameter: " + typeParameterName
+        +" bounds=" + classBound + ", " 
+        + (interfaceBounds == null ? "[]" : Arrays.asList(interfaceBounds).toString());
+    }
 }

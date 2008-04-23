@@ -17,6 +17,8 @@
 
 package org.apache.harmony.lang.reflect.parser;
 
+import java.util.Arrays;
+
 /**
  * @author Serguei S. Zapreyev
  * @version $Revision: 1.1.2.1 $
@@ -25,4 +27,11 @@ public final class InterimClassGenericDecl implements InterimGenericDeclaration 
     public InterimType superClass;
     public InterimType superInterfaces[];
     public InterimTypeParameter typeParameters[];
+    
+    public String toString() { 
+        return "InterimClassGenericDecl: super=" + superClass
+        + " intfs=" + (superInterfaces == null ? "[]" : Arrays.asList(superInterfaces).toString())
+        + " params=" + (typeParameters == null ? "[]" : Arrays.asList(typeParameters).toString());
+    }
+
 }
