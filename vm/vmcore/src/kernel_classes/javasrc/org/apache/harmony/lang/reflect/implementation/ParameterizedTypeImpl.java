@@ -17,16 +17,9 @@
 
 package org.apache.harmony.lang.reflect.implementation;
 
-import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.TypeVariable;
-import java.lang.reflect.WildcardType;
 import java.lang.reflect.Type;
 
-/**
- * @author Serguei S. Zapreyev
- * @version $Revision: 1.1.2.2 $
- */
 public final class ParameterizedTypeImpl implements ParameterizedType {
     private final Type[] args;
     private final Type rawType;
@@ -39,8 +32,12 @@ public final class ParameterizedTypeImpl implements ParameterizedType {
     }
     
     public boolean equals(Object other) {
-        Type[] arr;
-        if (other == null || !(other instanceof ParameterizedType) || args.length != (arr = ((ParameterizedType)other).getActualTypeArguments()).length) {
+        if (!(other instanceof ParameterizedType)) { 
+            return false;
+        }
+        ParameterizedType otherType = (ParameterizedType)other;
+        Type[] arr = otherType.getActualTypeArguments(); 
+        if (args.length != arr.length) {
             return false;
         }
         for (int i = 0; i < args.length; i++) {
@@ -48,7 +45,10 @@ public final class ParameterizedTypeImpl implements ParameterizedType {
                 return false;
             }
         }
-        return rawType.equals(((ParameterizedType)other).getRawType()) && typeOwner.equals(((ParameterizedType)other).getOwnerType());
+        return rawType.equals(otherType.getRawType()) 
+        && (typeOwner == otherType.getOwnerType() 
+                || typeOwner != null 
+                && typeOwner.equals(otherType.getOwnerType()));
     }
 
     public Type[] getActualTypeArguments() {
@@ -64,19 +64,22 @@ public final class ParameterizedTypeImpl implements ParameterizedType {
     }
 
     public int hashCode() {
-        //return super.hashCode();
         int ah = 0; 
         for(int i = 0; i < args.length; i++) {
             ah += args[i].hashCode();
         }
-        return ah ^ rawType.hashCode() ^ typeOwner.hashCode();
+        if (typeOwner != null) {
+            ah ^= typeOwner.hashCode();
+        }
+        return ah ^ rawType.hashCode();
     }
     
     public String toString() {
-        // TODO: this body should be reimplemented effectively.
-        StringBuffer sb = new StringBuffer();
+        StringBuilder sb = new StringBuilder();
         if (typeOwner!=null) {
-            sb.append((typeOwner instanceof Class ? ((Class)typeOwner).getName() : typeOwner.toString())+"."+((Class)getRawType()).getSimpleName());
+            sb.append((typeOwner instanceof Class ? 
+                    ((Class)typeOwner).getName() : typeOwner.toString()));
+            sb.append('.').append(((Class)getRawType()).getSimpleName());
         } else {
             sb.append(((Class)getRawType()).getName());
         }
@@ -88,15 +91,9 @@ public final class ParameterizedTypeImpl implements ParameterizedType {
                 }
                 if (args[i] instanceof Class) {
                     sb.append(((Class)args[i]).getName());
-                } else if (args[i] instanceof ParameterizedType) {
+                } else {
                     sb.append(args[i].toString());
-                } else if (args[i] instanceof TypeVariable) {
-                    sb.append(args[i].toString());
-                } else if (args[i] instanceof WildcardType) {
-                    sb.append(args[i].toString());
-                } else if (args[i] instanceof GenericArrayType) {
-                    sb.append(args[i].toString());
-                }
+                } 
             }
             sb.append(">");
         }
