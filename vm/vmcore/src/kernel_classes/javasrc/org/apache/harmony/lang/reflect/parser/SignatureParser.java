@@ -97,6 +97,7 @@ class PTStack {          // stack of parsered nested parameterized types
     int  sigEnd;         // finish of the signature of the current nested parameterized type within CTPTsignature
     int dim;             // to indicate the number of consequent "[" symbols. ATTENTION: it used for all types: TVAR, TBASE, RETURN_BASE_TYPE, class type, parameterized type
     PTStack nextLevel;
+    boolean pendingTypeArg; // crutch to fix HARMONY-5752
 };
 private PTStack stack;
 private PTStack currentStackElem; // points to the current processed level element of the nested parameterized types chain
@@ -177,7 +178,7 @@ private void addElemToMethParamList(Object ref) {
     methParamList.add((InterimType)ref);
 }
 private void addElemToTypeArgsList(InterimType ref) {
-    prntS("      addElemToTypeArgsList");
+    prntS("      addElemToTypeArgsList: " + ref);
 
     // find the previous element for the current stack's element:
      PTStack p1 = stack, p2 = null;
@@ -1848,6 +1849,10 @@ public SignatureParser(ParserSharedInputState state) {
 				if ( inputState.guessing==0 ) {
 					prntSS("   pr__TYPE_ARGUMENT 2 :", "m40.getText()");
 				}
+                if (currentStackElem.pendingTypeArg) {
+                    addElemToTypeArgsList(highLevelType);
+                    currentStackElem.pendingTypeArg = false;
+                }
 				break;
 			}
 			case PLUS_SIGN:
@@ -1968,6 +1973,7 @@ public SignatureParser(ParserSharedInputState state) {
 					}
 					}
 					currentStackElem.dim = 0;
+                    currentStackElem.pendingTypeArg = true;
 					
 					highLevelType = /*(InterimGenericType)*/(InterimType)prsrT;
 					
@@ -2418,7 +2424,7 @@ public SignatureParser(ParserSharedInputState state) {
 					prntS("      ===30===");  
 					// put base type into the method params list:
 					addElemToMethParamList(highLevelType);
-					
+                    currentStackElem.pendingTypeArg = false;
 					highLevelType = null;
 					
 					prntSS("   pr__PARAMETER 1 :", "m79.getText()");

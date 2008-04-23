@@ -27,6 +27,9 @@ import junit.framework.TestCase;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+import java.lang.reflect.GenericArrayType;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 
 /*
  * Created on 28.05.2005
@@ -497,6 +500,33 @@ public class Class1_5Test extends TestCase {
                        e3.class.getGenericSuperclass().toString()
                            .indexOf("e2") == -1);
 		}
+        
+        static final class BC1 extends AC1<String, byte[]>{} 
+        static final class BC2 extends AC1<byte[][], Byte>{}
+        static abstract class AC1<ValueType, BoundType> {} 
+
+        /**
+         * A regression test for HARMONY-5752 
+         */
+        public void testGenericSupeclass_h5752() throws Exception {
+            Type t1 = BC1.class.getGenericSuperclass();
+            assertTrue("t1", t1 instanceof ParameterizedType);
+            Type[] args1 = ((ParameterizedType)t1).getActualTypeArguments();
+            assertEquals("num params t1", 2, args1.length);
+            assertEquals("1 param t1", String.class, args1[0]);
+            assertTrue("2 param t1 type", args1[1] instanceof GenericArrayType);
+            assertEquals("2 param t1", byte.class, ((GenericArrayType)args1[1]).getGenericComponentType());
+
+            Type t2 = BC2.class.getGenericSuperclass();
+            assertTrue("t2", t2 instanceof ParameterizedType);
+            Type[] args2 = ((ParameterizedType)t2).getActualTypeArguments();
+            assertEquals("num params t2", 2, args2.length);
+            assertTrue("2 param t2 type", args2[0] instanceof GenericArrayType);
+            Type at2 = ((GenericArrayType)args2[0]).getGenericComponentType();
+            assertTrue("2 param t2 type2", at2 instanceof GenericArrayType);
+            assertEquals("2 param t2", byte.class, ((GenericArrayType)at2).getGenericComponentType());
+            assertEquals("2 param t2", Byte.class, args2[1]);
+        }
 
 		/**
 		 *  

@@ -238,7 +238,7 @@ public Token nextToken() throws TokenStreamException {
                 case 'I':  case 'J':
                 case 'S':  case 'Z':
                 {
-                    if (Lflag2 == 1 && Lflag3 != 1) {
+                    if (Lflag2 == 1 && Lflag3 != 1 || prevLexeme == SQUAREOPEN_SIGN) {
                         if (DEBUGGING) {
                             System.out.println(".............lex:TBASE: \""+ String.valueOf(sgntr.charAt(ind))+"\"");
                         }
