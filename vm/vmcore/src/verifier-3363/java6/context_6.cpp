@@ -201,12 +201,12 @@ vf_Result vf_Context_6::load_stackmaptable() {
 
     read_ptr+=2; //skip uint16 attribute_name_index
 
-    uint32 attribute_length = read_int32(read_ptr); 
+    uint32 attribute_length = read_uint32(read_ptr); 
     read_ptr+=4;
     Byte *attribute_end = stackmaptable + attribute_length + 6;
 
     if( read_ptr + 2 > attribute_end ) return error(VF_ErrorStackmap, "corrupted StackMapTable");
-    uint16 number_of_entries = read_int16(read_ptr);
+    uint16 number_of_entries = read_uint16(read_ptr);
     read_ptr+=2;
 
     //create working copy fr previous stackmap frame, offeset, and number of locals
@@ -251,7 +251,7 @@ vf_Result vf_Context_6::load_stackmaptable() {
         } else if (frame_type == 247 ) {
             //same locals as previous, stack contains single element specified here. offset is explicitely specified
             if( read_ptr + 2 > attribute_end ) return error(VF_ErrorStackmap, "corrupted StackMapTable");
-            offset = read_int16(read_ptr);
+            offset = read_uint16(read_ptr);
             read_ptr+=2;
 
             unsigned k = 1; // k may change in read_types(): if it's LONG or DOUBLE stack size will be '2'
@@ -276,21 +276,21 @@ vf_Result vf_Context_6::load_stackmaptable() {
             }
 
             if( read_ptr + 2 > attribute_end ) return error(VF_ErrorStackmap, "corrupted StackMapTable");
-            offset = read_int16(read_ptr);
+            offset = read_uint16(read_ptr);
             read_ptr+=2;
 
             lastWorkmap->depth = 0;
         } else if (frame_type == 251 ) { // 251
             //same locals as previous, stack is empty. offset is explicitely specified
             if( read_ptr + 2 > attribute_end ) return error(VF_ErrorStackmap, "corrupted StackMapTable");
-            offset = read_int16(read_ptr);
+            offset = read_uint16(read_ptr);
             read_ptr+=2;
 
             lastWorkmap->depth = 0;
         } else if (frame_type <= 254 ) { // 252-254
             //stack is empty, locals are extended
             if( read_ptr + 2 > attribute_end ) return error(VF_ErrorStackmap, "corrupted StackMapTable");
-            offset = read_int16(read_ptr);
+            offset = read_uint16(read_ptr);
             read_ptr+=2;
 
             unsigned k = frame_type - 251; //may change in read_types()
@@ -305,10 +305,10 @@ vf_Result vf_Context_6::load_stackmaptable() {
             assert(frame_type == 255);
 
             if( read_ptr + 4 > attribute_end ) return error(VF_ErrorStackmap, "corrupted StackMapTable");
-            offset = read_int16(read_ptr);
+            offset = read_uint16(read_ptr);
             read_ptr+=2;
 
-            last_maxlocals = read_int16(read_ptr); //may change in read_types()
+            last_maxlocals = read_uint16(read_ptr); //may change in read_types()
             read_ptr+=2;
 
             if( (tcr=read_types(&read_ptr, attribute_end, &lastWorkmap->elements[0], &last_maxlocals, m_max_locals)) != VF_OK ) {
@@ -320,7 +320,7 @@ vf_Result vf_Context_6::load_stackmaptable() {
             }
 
             if( read_ptr + 2 > attribute_end ) return error(VF_ErrorStackmap, "corrupted StackMapTable");
-            unsigned depth = read_int16(read_ptr); //may change in read_types()
+            unsigned depth = read_uint16(read_ptr); //may change in read_types()
             read_ptr+=2;
 
             if( (tcr=read_types(&read_ptr, attribute_end, &lastWorkmap->elements[m_stack_start], &depth, m_max_stack)) != VF_OK ) {
@@ -412,7 +412,7 @@ vf_Result vf_Context_6::read_types(Byte **attr, Byte *end, WorkmapElement_6* ele
                 break;
             case ITEM_OBJECT: {
                 if( (*attr) + 2 > end ) return error(VF_ErrorStackmap, "corrupted StackMapTable");
-                uint16 cp_idx = read_int16(*attr);
+                uint16 cp_idx = read_uint16(*attr);
                 (*attr)+=2;
 
                 SmConstant c;
@@ -423,7 +423,7 @@ vf_Result vf_Context_6::read_types(Byte **attr, Byte *end, WorkmapElement_6* ele
                     }
             case ITEM_UNINITIALIZED: {
                 if( (*attr) + 2 > end ) return error(VF_ErrorStackmap, "corrupted StackMapTable");
-                uint16 address = read_int16(*attr);
+                uint16 address = read_uint16(*attr);
                 (*attr)+=2;
 
                 element[idx++].const_val = SmConstant::getNewObject(address);

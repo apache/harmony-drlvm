@@ -204,23 +204,23 @@ protected:
     int instr_get_len_compound(Address instr, OpCode opcode);
 
     //read two-byte value
-    static int16 read_int16(Byte* ptr) {
+    static uint16 read_uint16(Byte* ptr) {
         return (ptr[0] << 8) | ptr[1];
     }
 
     //read four-byte value
-    static int32 read_int32(Byte* ptr) {
+    static uint32 read_uint32(Byte* ptr) {
         return (ptr[0] << 24) | (ptr[1] << 16) | (ptr[2] << 8) | ptr[3];
     }
 
     //get a 16-bit jump target
     static Address instr_get_int16_target(Address instr, Byte* ptr) {
-        return (Address) (instr + read_int16(ptr));
+        return (Address) (instr + read_uint16(ptr));
     }
 
     //get a 32-bit jump target
     static Address instr_get_int32_target(Address instr, Byte* ptr) {
-        return (Address) (instr + read_int32(ptr));
+        return (Address) (instr + read_uint32(ptr));
     }
 
     //get properties specific for the given opcode

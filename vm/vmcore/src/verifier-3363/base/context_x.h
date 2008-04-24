@@ -176,7 +176,7 @@ protected:
         if( uninit_value.isNewObject() ) {
             Address addr = uninit_value.getNewInstr();
 
-            unsigned cp_idx = read_int16(m_bytecode + addr + 1);
+            unsigned cp_idx = read_uint16(m_bytecode + addr + 1);
             SmConstant new_type;
             if( !tpool.cpool_get_class(cp_idx, &new_type) ) {
                 assert(0);

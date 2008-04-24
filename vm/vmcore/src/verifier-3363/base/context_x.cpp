@@ -422,7 +422,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
 
         case OP_ALOAD: {
             //get local index from bytecode
-            unsigned local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
+            unsigned local_idx = wide ? read_uint16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
 
             //call macro
             CHECK_ALOAD( local_idx );
@@ -453,7 +453,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
 
             //get OUT type
             SmConstant arrayref;
-            unsigned short cp_idx = read_int16(m_bytecode + instr + 1);
+            unsigned short cp_idx = read_uint16(m_bytecode + instr + 1);
             if( !tpool.cpool_get_array(cp_idx, &arrayref) ) return error(VF_ErrorConstantPool, "incorrect type for anewarray");
 
             //push OUTs
@@ -485,7 +485,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
 
         case OP_ASTORE: {
             //get local index from bytecode
-            unsigned local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
+            unsigned local_idx = wide ? read_uint16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
 
             //call MACRO
             CHECK_ASTORE( local_idx );
@@ -579,7 +579,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
 
             //check instruction & create OUTs
             SmConstant outref;
-            unsigned short cp_idx = read_int16(m_bytecode + instr + 1);
+            unsigned short cp_idx = read_uint16(m_bytecode + instr + 1);
             if( !tpool.cpool_get_class(cp_idx, &outref) ) return error(VF_ErrorConstantPool, "incorrect constantpool entry");
 
             //push OUTs
@@ -664,7 +664,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
 
         case OP_DLOAD: {
             //get local index from bytecode
-            unsigned local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
+            unsigned local_idx = wide ? read_uint16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
 
             //call macro
             CHECK_xxLOAD( local_idx, SM_DOUBLE );
@@ -698,7 +698,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
 
         case OP_DSTORE: {
             //get local index from bytecode
-            unsigned local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
+            unsigned local_idx = wide ? read_uint16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
 
             CHECK_xxSTORE( local_idx, SM_DOUBLE );
 
@@ -942,7 +942,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
 
         case OP_FLOAD: {
             //get local index from bytecode
-            unsigned local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
+            unsigned local_idx = wide ? read_uint16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
 
             //call macro
             CHECK_xLOAD( local_idx, SM_FLOAT );
@@ -976,7 +976,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
 
         case OP_FSTORE: {
             //get local index from bytecode
-            unsigned local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
+            unsigned local_idx = wide ? read_uint16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
 
             CHECK_xSTORE( local_idx, SM_FLOAT );
 
@@ -1117,7 +1117,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
                              }
 
         case OP_IINC: {
-            unsigned local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
+            unsigned local_idx = wide ? read_uint16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
 
             if( !workmap_valid_local(local_idx) ) {
                 return error(VF_ErrorLocals, "invalid local index");
@@ -1132,7 +1132,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
 
         case OP_ILOAD: {
             //get local index from bytecode
-            unsigned local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
+            unsigned local_idx = wide ? read_uint16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
 
             //call macro
             CHECK_xLOAD( local_idx, SM_INTEGER );
@@ -1159,7 +1159,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
 
         case OP_INSTANCEOF: {
             //check instruction
-            unsigned cp_idx = read_int16(m_bytecode + instr + 1);
+            unsigned cp_idx = read_uint16(m_bytecode + instr + 1);
             if( !tpool.cpool_is_reftype(cp_idx) ) return error(VF_ErrorConstantPool, "incorrect constantpool entry");
 
             POP_ref( tpool.sm_get_const_object() );
@@ -1178,7 +1178,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
 
         case OP_ISTORE: {
             //get local index from bytecode
-            unsigned local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
+            unsigned local_idx = wide ? read_uint16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
 
             CHECK_xSTORE( local_idx, SM_INTEGER );
 
@@ -1285,7 +1285,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
 
         case OP_LDC_W: {
             //check instruction and create OUTs
-            unsigned cp_idx = read_int16(m_bytecode + instr + 1);
+            unsigned cp_idx = read_uint16(m_bytecode + instr + 1);
             SmConstant el = tpool.cpool_get_ldcarg(cp_idx);
             if( el == SM_BOGUS ) return error(VF_ErrorConstantPool, "incorrect constantpool entry");
 
@@ -1299,7 +1299,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
 
         case OP_LDC2_W: {
             //check instruction and create OUTs
-            unsigned cp_idx = read_int16(m_bytecode + instr + 1);
+            unsigned cp_idx = read_uint16(m_bytecode + instr + 1);
             SmConstant el = tpool.cpool_get_ldc2arg(cp_idx);
             if( el == SM_BOGUS ) return error(VF_ErrorConstantPool, "incorrect constantpool entry");
 
@@ -1313,7 +1313,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
 
         case OP_LLOAD: {
             //get local index from bytecode
-            unsigned local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
+            unsigned local_idx = wide ? read_uint16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
 
             //call macro
             CHECK_xxLOAD( local_idx, SM_LONG );
@@ -1347,7 +1347,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
 
         case OP_LSTORE: {
             //get local index from bytecode
-            unsigned local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
+            unsigned local_idx = wide ? read_uint16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
 
             CHECK_xxSTORE( local_idx, SM_LONG );
 
@@ -1392,7 +1392,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
 
             //get OUT type
             SmConstant arrayref;
-            unsigned short cp_idx = read_int16(m_bytecode + instr + 1);
+            unsigned short cp_idx = read_uint16(m_bytecode + instr + 1);
             if( !tpool.cpool_get_class(cp_idx, &arrayref, (int)dims) ) {
                 return error(VF_ErrorConstantPool, "incorrect type for multianewarray");
             }
@@ -1404,7 +1404,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
 
         case OP_NEW: {
             //check instruction
-            unsigned cp_idx = read_int16(m_bytecode + instr + 1);
+            unsigned cp_idx = read_uint16(m_bytecode + instr + 1);
 
             //TODO: unused variable?
             SmConstant new_type = SM_BOGUS;
@@ -1525,7 +1525,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
 
         case OP_GETFIELD: {
             //check and resolve instruction
-            unsigned short cp_idx = read_int16(m_bytecode + instr + 1);
+            unsigned short cp_idx = read_uint16(m_bytecode + instr + 1);
             SmConstant ref, value;
             if( !tpool.cpool_get_field(cp_idx, &ref, &value) ) return error(VF_ErrorUnknown, "incorrect constantpool entry");
 
@@ -1543,7 +1543,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
 
         case OP_GETSTATIC: {
             //check and resolve instruction
-            unsigned short cp_idx = read_int16(m_bytecode + instr + 1);
+            unsigned short cp_idx = read_uint16(m_bytecode + instr + 1);
             SmConstant value;
             if( !tpool.cpool_get_field(cp_idx, 0, &value) ) return error(VF_ErrorUnknown, "incorrect constantpool entry");
 
@@ -1555,7 +1555,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
 
         case OP_PUTFIELD: {
             //check and resolve instruction
-            unsigned short cp_idx = read_int16(m_bytecode + instr + 1);
+            unsigned short cp_idx = read_uint16(m_bytecode + instr + 1);
             SmConstant expected_ref, expected_val;
             if( !tpool.cpool_get_field(cp_idx, &expected_ref, &expected_val) ) {
                 return error(VF_ErrorUnknown, "incorrect constantpool entry");
@@ -1590,7 +1590,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
 
         case OP_PUTSTATIC: {
             //check and resolve instruction
-            unsigned short cp_idx = read_int16(m_bytecode + instr + 1);
+            unsigned short cp_idx = read_uint16(m_bytecode + instr + 1);
             SmConstant expected_val;
             if( !tpool.cpool_get_field(cp_idx, 0, &expected_val) ) return error(VF_ErrorUnknown, "incorrect constantpool entry");
 
@@ -1605,7 +1605,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
         case OP_INVOKESTATIC:
         case OP_INVOKEVIRTUAL: {
             //check instruction
-            unsigned short cp_idx = read_int16(m_bytecode + instr + 1);
+            unsigned short cp_idx = read_uint16(m_bytecode + instr + 1);
 
             //parse constant pool entrance
             const char *state;
@@ -1767,7 +1767,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
                      }
         case OP_RET: {
             //get local index from bytecode
-            unsigned local_idx = wide ? read_int16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
+            unsigned local_idx = wide ? read_uint16(m_bytecode + instr + 2) : m_bytecode[instr + 1];
 
             //check whether it is a valid local
             if( !workmap_valid_local(local_idx) ) {

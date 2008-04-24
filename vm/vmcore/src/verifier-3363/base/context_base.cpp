@@ -280,8 +280,8 @@ int vf_Context_Base::instr_get_len_compound(Address instr, OpCode opcode) {
 
     Address def_adr = (instr & (~3) ) + 4;
     if( opcode == OP_TABLESWITCH) {
-        int lowbyte = read_int32(m_bytecode + def_adr + 4);
-        int hibyte = read_int32(m_bytecode + def_adr + 8);
+        int lowbyte = read_uint32(m_bytecode + def_adr + 4);
+        int hibyte = read_uint32(m_bytecode + def_adr + 8);
 
         // protect from integer overflow
         if( hibyte < lowbyte || hibyte - lowbyte > 0x20000000) {
@@ -299,7 +299,7 @@ int vf_Context_Base::instr_get_len_compound(Address instr, OpCode opcode) {
             return 0x20000123;
         }
 
-        unsigned npairs = read_int32(m_bytecode + def_adr + 4);
+        unsigned npairs = read_uint32(m_bytecode + def_adr + 4);
 
         // protect from integer overflow
         if( npairs > 0x20000000) {
@@ -310,11 +310,11 @@ int vf_Context_Base::instr_get_len_compound(Address instr, OpCode opcode) {
         int next = def_adr + 8;
 
         if (npairs) {
-            int old_value = read_int32(m_bytecode + next);
+            int old_value = read_uint32(m_bytecode + next);
             next += 8;
             // integer values must be sorted - verify
             for( unsigned i = 1; i < npairs; i++) {
-                int new_value = read_int32(m_bytecode + next);
+                int new_value = read_uint32(m_bytecode + next);
                 next += 8;
                 if( old_value >= new_value ) {
                     // return some big value - error will occur later
