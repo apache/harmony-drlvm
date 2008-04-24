@@ -15,10 +15,6 @@
     limitations under the License.
 -->
 <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<!--
-Author: Alexey V. Varlamov
-Version: $Revision: 1.1.2.1.4.3 $
--->
 <html>
 
 <head>
@@ -26,6 +22,13 @@ Version: $Revision: 1.1.2.1.4.3 $
 </head>
 
 <body>
+
+<h3>0. Preliminary Notes</h3>
+
+The porting layer is a work-in-progress and is not yet shaped nicely.
+Currently it consists of quite heterogeneous pieces (APR extensions, logger, 
+encoder, utility templates etc) which do not form unified interface.
+
 
 <h3>1. Design  Notes</h3>
 
@@ -39,6 +42,7 @@ Portable Runtime libraries</a>), specifically:
 Detailed APIs mainly follow the APR standard, but there may not be strict correspondence
 in signatures. Pure C should be used for implementation.
 
+<!-- The below info is outdated
 <h4>Using APR binaries directly</h4>
 Harmony defines its own headers aligned with APR, but does not wrap APR functions
 in code (no delegating calls). Instead, signatures are mapped directly to APR functions
@@ -79,6 +83,8 @@ The key drawbacks of the current approach:
 <li>Potential confusion in the open community, especially for those experienced in
   APR applications.
 </ul>
+
+-->
 
 <h3>2. Directory structure</h3>
 
