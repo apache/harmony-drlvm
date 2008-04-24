@@ -227,13 +227,14 @@ JNIEXPORT jclass JNICALL Java_java_lang_VMClassRegistry_getComponentType
     return jni_class_from_handle(jenv, pCompClass);
 }
 
-// return true if iklass is not inner of klass
+// return true if iklass is a declared member of klass
 inline static bool
-class_is_inner_skip( Class_Handle klass, Class_Handle iklass )
+class_is_direct_member( Class_Handle klass, Class_Handle iklass )
 {
-    Class* outer = class_get_declaring_class(iklass);
-
-    if (outer != NULL && outer != klass) {
+    // A class must have an EnclosingMethod attribute 
+    // if and only if it is a local class or an anonymous class.
+    if (0 == iklass->get_enclosing_class_index() 
+        && klass == class_get_declaring_class(iklass)) {
         return true;
     }
 
@@ -261,7 +262,7 @@ JNIEXPORT jobjectArray JNICALL Java_java_lang_VMClassRegistry_getDeclaredClasses
         iclss = class_get_inner_class(clss, index);
         if (!iclss)
             return NULL;        
-        if( class_is_inner_skip( clss, iclss ) )
+        if( !class_is_direct_member( clss, iclss ) )
             num_res--;
     }
 
@@ -272,7 +273,7 @@ JNIEXPORT jobjectArray JNICALL Java_java_lang_VMClassRegistry_getDeclaredClasses
     // set array
     for( index = 0, num_res = 0; index < num_ic; index++) {
         iclss = class_get_inner_class(clss, index);
-        if( class_is_inner_skip( clss, iclss ) )
+        if( !class_is_direct_member( clss, iclss ) )
             continue;
         SetObjectArrayElement(jenv, res, num_res++, jni_class_from_handle(jenv, iclss));
     }

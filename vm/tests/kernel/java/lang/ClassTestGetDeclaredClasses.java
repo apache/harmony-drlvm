@@ -81,6 +81,18 @@ public class ClassTestGetDeclaredClasses extends TestCase {
         assertEquals("Array must be empty", 0, cs.length);
     }
 
+    /**
+     * Should not include non-member inner classes 
+     * (anonymous and local).
+     */
+    public void testAnonymousLocal() {
+        Class[] cs = this.getClass().getDeclaredClasses();
+        for (Class c: cs) {
+            assertFalse("anonymous " + c, c.isAnonymousClass());
+            assertFalse("local " + c.toString(), c.isLocalClass());
+        }
+    }
+
     public class Helper1 {
         class Inner1 {
         }
@@ -95,5 +107,13 @@ public class ClassTestGetDeclaredClasses extends TestCase {
     }
 
     private class Helper4 {
+    }
+    
+    static Object o1 = new Object() {};
+    static void m1() {
+        class CC{}
+    }
+    Object m2() {
+        return new Object() {};
     }
 }
