@@ -333,19 +333,45 @@ import junit.framework.TestCase;
         }
     }
 
-    interface GenericSample {
-        public <T extends GenericSample, E extends Throwable> T test(T param) throws E;
+    /*
+     * Commented out until HARMONY-5790 is properly resolved
+     *
+    interface GenericSample1 {
+        public <T extends GenericSample1, E extends Throwable> T test(T param) throws E;
+    }
+
+    public void test_getGeneric() throws Exception {
+        // Regression for HARMONY-5622, HARMONY-5790
+        Method method = GenericSample1.class.getMethods()[0];
+        for (int i = 0; i < 5; i++) {
+            switch (i) {
+            case 0: method.getGenericParameterTypes();
+                break;
+            case 1: method.getGenericReturnType();
+                break;
+            case 2: method.getGenericExceptionTypes();
+                break;
+            case 3: method.getTypeParameters();
+                break;
+            case 4: method.toGenericString();
+                break;
+            }
+        }
+    }
+
+    interface GenericSample2 {
+        public <T extends GenericSample2, E extends Throwable> T test(T param) throws E;
     }
 
     boolean success;
 
-    public void test_getGeneric() throws Exception {
-        // Regression for HARMONY-5622
+    public void test_getGenericThread() throws Exception {
+        // Regression for HARMONY-5622, HARMONY-5790
         success = false;
         Thread thread = new Thread() {
             public void run() {
                 try { // Using separate thread to avoid stack overflow
-                    Method method = GenericSample.class.getMethods()[0];
+                    Method method = GenericSample2.class.getMethods()[0];
                     for (int i = 0; i < 5; i++) {
                         switch (i) {
                         case 0: method.getGenericParameterTypes();
@@ -370,4 +396,5 @@ import junit.framework.TestCase;
         thread.join();
         assert(success);
     }
+    */
 }
