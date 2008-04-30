@@ -1455,12 +1455,11 @@ static void *rth_invokeinterface_addr_withresolve(Class_Handle klass, unsigned c
 
     hythread_suspend_enable();
     m = resolve_interface_method_env(env, klass, cp_idx, true);
-    assert(m);
     hythread_suspend_disable();
 
     obj = obj_h->object;
     oh_discard_local_handle(obj_h);
-    END_RAISE_AREA;
+    END_RAISE_AREA; // rethrow NoSuchMethodError if any
     assert(m!=NULL);
 
     assert(obj!=NULL);
