@@ -63,6 +63,7 @@ class Encoder;
  * @brief A signed integer type, with the same size as a pointer.
  */
 typedef POINTER_SIZE_SINT int_ptr;
+typedef POINTER_SIZE_INT uint_ptr;
 
 /**
  * @brief A dynamically grown byte array.
@@ -559,25 +560,29 @@ public:
         clear(); m_jt = i32; m_lval = ival;
     }
     
+#ifdef POINTER64
     /**
-     * @brief Constructs immediate operand of platform-dependent size.
+     * @brief Constructs #i64 immediate operand.
      *
-     * It's i32 on IA32 and i64 on EM64T and IPF.
+     * @note Using Opnd(int_ptr) on 32-bit architecture leads to ambiguity
+     * with Opnd(int), so Opnd(int_ptr) is under #ifdef.
      */
-    Opnd(long lval)
+    Opnd(int_ptr lval)
     {
         clear(); m_jt = iplatf; m_lval = lval;
     }
     
     /**
-     * @brief Constructs immediate operand of platform-dependent size.
+     * @brief Constructs i64 immediate operand.
      *
-     * It's i32 on IA32 and i64 on EM64T and IPF.
+     * @note Using Opnd(uint_ptr) on 32-bit architecture leads to ambiguity
+     * with Opnd(unsigned), so Opnd(uint_ptr) is under #ifdef.
      */
-    Opnd(unsigned long lval)
+    Opnd(uint_ptr lval)
     {
         clear(); m_jt = iplatf; m_lval = lval;
     }
+#endif
     
     /**
      * @brief Constructs memory operand with no type (jvoid).

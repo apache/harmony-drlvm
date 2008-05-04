@@ -167,7 +167,7 @@ void Compiler::gen_prolog(void) {
     }
     //
 #ifdef _EM64T_
-    mov(fill, (unsigned long)0xDEADBEEFDEADBEEF);
+    mov(fill, (uint_ptr)0xDEADBEEFDEADBEEF);
 #else
     mov(fill, 0xDEADBEEF);
 #endif

@@ -370,7 +370,7 @@ void Encoder::call_va(bool check_stack, AR ar, const void *target,
             }
             else {
 #ifdef _EM64T_
-                long val = va_arg(valist, long);
+                int_ptr val = va_arg(valist, int_ptr);
                 mov(Opnd(i64, sp, cs.off(i)), val);
 #else
                 int val = lo32((jlong)(int_ptr)addr);
@@ -382,7 +382,7 @@ void Encoder::call_va(bool check_stack, AR ar, const void *target,
         }
         else if (jt==i64) {
 #ifdef _EM64T_
-            long val = va_arg(valist, long);
+            int_ptr val = va_arg(valist, int_ptr);
             mov(gr == gr_x ? Opnd(i64, sp, cs.off(i)) : Opnd(i64, gr), val);
 #else
             assert(false);
