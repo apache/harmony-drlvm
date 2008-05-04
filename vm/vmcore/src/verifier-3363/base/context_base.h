@@ -281,8 +281,7 @@ protected:
 
 };
 
-
-//check conatraints stored in the classloader data. force loading if necessary
+//check constraints stored in the classloader data. force loading if necessary
 vf_Result vf_force_check_constraint(Class_Handle klass,
     vf_TypeConstraint *constraint);
 

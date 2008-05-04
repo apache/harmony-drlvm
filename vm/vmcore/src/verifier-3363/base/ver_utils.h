@@ -18,6 +18,8 @@
 #define __VER_UTILS_H_
 
 #include <assert.h>
+#include <stdlib.h>
+#include <string.h>
 #include "open/types.h"
 
 // convenience types
@@ -434,5 +436,12 @@ private:
     } // vf_Hash::HashFunc( key )
 
 }; // struct vf_Hash
+
+// external declarations for error reporting functions
+class vf_Context_Base;
+struct vf_TypeConstraint;
+
+void vf_create_error_message(Method_Handle method, vf_Context_Base context, char** msg);
+void vf_create_error_message(Class_Handle klass, vf_TypeConstraint* constraint, char** msg);
 
 #endif

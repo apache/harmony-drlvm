@@ -16,6 +16,7 @@
  */
 #include <stdio.h>
 #include "verifier.h"
+#include "ver_utils.h"
 #include "../java5/context_5.h"
 #include "../java6/context_6.h"
 #include "time.h"
@@ -23,9 +24,6 @@
 #include "open/vm_class_manipulation.h"
 #include "open/vm_method_access.h"
 #include "open/vm_class_loading.h"
-
-static char err_message[5000];
-
 
 /**
 * Provides initial java-5 verification of class.
@@ -49,10 +47,7 @@ vf_verify5_class(Class_Handle klass, unsigned verifyAll, char** error)
         result = context.verify_method(class_get_method( klass, index ));
 
         if (result != VF_OK) {
-            *error = &(err_message[0]);
-            Method_Handle method = class_get_method(klass, index);
-            sprintf(*error, "%s/%s%s, pass: %d, instr: %d, reason: %s", class_get_name(klass), method_get_name(method),
-                method_get_descriptor(method), context.pass, context.processed_instruction, context.error_message);
+            vf_create_error_message(class_get_method(klass, index), context, error);
             break;
         }
     }
@@ -99,9 +94,7 @@ vf_verify6_class(Class_Handle klass, unsigned verifyAll, char **error )
                 skip_java6_verification_attempt = true;
                 if (result == VF_ErrorStackmap) {
                     //corrupted StackMapTable ==> throw an Error?
-                    *error = &(err_message[0]);
-                    sprintf(*error, "%s/%s%s, reason: %s", class_get_name( klass ), method_get_name( method ), 
-                        method_get_descriptor( method ), context6.error_message );
+                    vf_create_error_message(method, context6, error);
                     return result;
                 }
             }
@@ -111,10 +104,7 @@ vf_verify6_class(Class_Handle klass, unsigned verifyAll, char **error )
             //try Java5 verifying
             result = context5.verify_method(method);
             if (result != VF_OK) {
-                //can't verify
-                *error = &(err_message[0]);
-                sprintf(*error, "%s/%s%s, pass: %d, instr: %d, reason: %s", class_get_name( klass ), method_get_name( method ), 
-                    method_get_descriptor( method ), context5.pass, context5.processed_instruction, context5.error_message );
+                vf_create_error_message(method, context5, error);
                 return result;
             }
         }
@@ -179,8 +169,7 @@ vf_verify_class_constraints(Class_Handle klass, unsigned verifyAll, char** error
     {
         vf_Result result = vf_force_check_constraint( klass, constraint );
         if( result != VF_OK ) {
-            *error = &(err_message[0]);
-            sprintf(*error, "constraint check failed, class: %s, source: %s, target: %s", class_get_name( klass ), constraint->source, constraint->target);
+            vf_create_error_message(klass, constraint, error);
             return result;
         }
     }
@@ -188,6 +177,11 @@ vf_verify_class_constraints(Class_Handle klass, unsigned verifyAll, char** error
     return VF_OK;
 } // vf_verify_method_constraints
 
+
+void vf_release_error_message(void* error)
+{
+    tc_free(error);
+}
 
 /**
 * Function releases verify data in class loader (used to store constraints)
@@ -201,3 +195,34 @@ vf_release_verify_data( void *data )
     delete cl_data->hash;
     delete cl_data->pool;
 } // vf_release_verify_data
+
+/**
+ * Creates error message to be reported with verify error
+ */
+void vf_create_error_message(Method_Handle method, vf_Context_Base context, char** error_msg)
+{
+    char pass[12], instr[12];
+    sprintf(pass, "%d", context.pass);
+    sprintf(instr, "%d", context.processed_instruction);
+    const char* cname = class_get_name(method_get_class(method));
+    const char* mname = method_get_name(method);
+    const char* mdesc = method_get_descriptor(method);
+    unsigned msg_len = strlen(cname) + strlen(mname) + strlen(mdesc)
+        + strlen(pass) + strlen(instr) + strlen(context.error_message) + 1;
+    *error_msg = (char*)tc_malloc(msg_len);
+    if(*error_msg != NULL) {
+        sprintf(*error_msg, "%s.%s%s, pass: %s, instr: %s, reason: %s",
+            cname, mname, mdesc, pass, instr, context.error_message);
+    }
+}
+
+void vf_create_error_message(Class_Handle klass, vf_TypeConstraint* constraint, char** error_msg)
+{
+    const char* cname = class_get_name(klass);
+    unsigned msg_len = strlen(cname) +
+        + strlen(constraint->source)
+        + strlen(constraint->target) + 1;
+    *error_msg = (char*)tc_malloc(msg_len);
+    sprintf(*error_msg, "constraint check failed, class: %s, source: %s, target: %s",
+        cname, constraint->source, constraint->target);
+}

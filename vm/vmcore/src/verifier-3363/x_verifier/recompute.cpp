@@ -19,8 +19,6 @@
 #include "../java5/stackmap_5.h"
 #include "time.h"
 
-static char err_message[5000];
-
 /**
  * Recomputes StackMapTable attribute.
  */
@@ -39,9 +37,7 @@ vf_recompute_stackmaptable(Method_Handle method, uint8** attrBytes, char** error
     result = context.recompute_stackmaptable(method);
 
     if (result != VF_OK) {
-        *error = &(err_message[0]);
-        sprintf(*error, "%s/%s%s, pass: %d, instr: %d, reason: %s", class_get_name( klass ), method_get_name( method ), 
-            method_get_descriptor( method ), context.pass, context.processed_instruction, context.error_message );
+        vf_create_error_message(method, context, error);
     }
 
     *attrBytes = context.written_stackmap;

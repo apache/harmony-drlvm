@@ -75,7 +75,7 @@ vf_verify_class_constraints(Class_Handle klass, unsigned verifyAll,
                             char** error);
 
 /**
- * Function provides final constraint checks for a given class.
+ * Function releases error message previously allocated to report an error.
  * @param error - error message of verifier
  * @note Assertion is raised if error_message is equal to null.
  */

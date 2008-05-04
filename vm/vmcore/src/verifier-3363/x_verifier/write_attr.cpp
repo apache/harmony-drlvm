@@ -18,9 +18,6 @@
 #include "../java6/stackmap_6.h"
 #include "time.h"
 
-static char err_message[5000];
-
-
 void vf_Context_5e::writeStackMapFrame( Address instr )
 {
     assert(instr < m_code_length || 1 + lastInstr < instr );
