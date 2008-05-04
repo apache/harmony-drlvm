@@ -40,8 +40,7 @@ struct IncomingType {
     IncomingType *nxt;
 
     //value of the verification type recorded as int
-    //TODO: don't remember why it's 'int' rather than 'SmConstant'
-    int value;
+    _SmConstant value;
 
     //simple next in the list
     IncomingType *next() {
@@ -161,7 +160,7 @@ struct StackmapElement_5 { //TODO: should be rewritten to save footprint
 
         in->nxt = value == SM_BOGUS ? 0 : incoming;
         //in->type = CT_INCOMING_VALUE;
-        in->value = value.c;
+        in->value = value;
 
         incoming = in;
 
@@ -219,7 +218,7 @@ struct StackmapElement_5 { //TODO: should be rewritten to save footprint
 struct WorkmapElement_5 {
     //value. two low bits a used to store flags
     union {
-        _SmConstant const_val;      //either a constant (known-type)
+        _SmConstant const_val;        //either a constant (known-type)
         StackmapElement_5 *var_ptr;   //or a variable (sub-definite type)
     };
 
@@ -242,7 +241,7 @@ struct WorkmapElement_5 {
     //when we need to compae to some unmergable type we don;t need to interate thru the list
     //also used to assert that an IncomingValue constraint exists
     SmConstant getAnyPossibleValue() {
-        SmConstant ret = isVariable() ? getVariable()->getAnyIncomingValue() : const_val;
+        SmConstant ret = isVariable() ? getVariable()->getAnyIncomingValue() : (SmConstant) const_val;
         assert(ret != SM_NONE);
         return ret;
     }

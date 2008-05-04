@@ -259,7 +259,7 @@ vf_Result vf_Context_5e::mantain_node_consistency(StackmapElement_5 *el) {
         //(we don't record expected values for constants that was the risk)
         
         //otherwise: nobody cares
-        el->firstIncoming()->value = SM_BOGUS;
+        el->firstIncoming()->value.c = SM_BOGUS;
         el->firstIncoming()->nxt = 0;
         return VF_OK;
     }
@@ -283,7 +283,7 @@ vf_Result vf_Context_5e::mantain_node_consistency(StackmapElement_5 *el) {
             ((StackmapElement_Ex*)el)->removeIncoming(inc);
         } else if( !SmConstant(inc->value).isReference() ) {
             //we can merge objects only: all other types produce SM_BOGUS
-            el->firstIncoming()->value = SM_BOGUS;
+            el->firstIncoming()->value.c = SM_BOGUS;
             el->firstIncoming()->nxt = 0;
             return VF_OK;
         } else {
@@ -312,7 +312,7 @@ vf_Result vf_Context_5e::mantain_node_consistency(StackmapElement_5 *el) {
 
         //if all dimensions are the same but there is an object or interface there
         //we also can calculate
-        el->firstIncoming()->value = get_object_array(min_arr_dims).c;
+        el->firstIncoming()->value = get_object_array(min_arr_dims);
         el->firstIncoming()->nxt = 0;
         return VF_OK;
     }
@@ -321,7 +321,7 @@ vf_Result vf_Context_5e::mantain_node_consistency(StackmapElement_5 *el) {
         //there is a mix of arrays of primitive and other arrays of the same dimensions
         assert(min_arr_dims);
         //reduce dimensions by one and create array ob objects
-        el->firstIncoming()->value = get_object_array(min_arr_dims - 1).c;
+        el->firstIncoming()->value = get_object_array(min_arr_dims - 1);
         el->firstIncoming()->nxt = 0;
         return VF_OK;
     }
