@@ -207,11 +207,13 @@ void vf_create_error_message(Method_Handle method, vf_Context_Base context, char
     const char* cname = class_get_name(method_get_class(method));
     const char* mname = method_get_name(method);
     const char* mdesc = method_get_descriptor(method);
+    const char *format = "%s.%s%s, pass: %s, instr: %s, reason: %s";
     unsigned msg_len = strlen(cname) + strlen(mname) + strlen(mdesc)
-        + strlen(pass) + strlen(instr) + strlen(context.error_message) + 1;
+        + strlen(pass) + strlen(instr) + strlen(context.error_message) +
+        strlen(format);
     *error_msg = (char*)tc_malloc(msg_len);
     if(*error_msg != NULL) {
-        sprintf(*error_msg, "%s.%s%s, pass: %s, instr: %s, reason: %s",
+        sprintf(*error_msg, format,
             cname, mname, mdesc, pass, instr, context.error_message);
     }
 }
@@ -219,10 +221,11 @@ void vf_create_error_message(Method_Handle method, vf_Context_Base context, char
 void vf_create_error_message(Class_Handle klass, vf_TypeConstraint* constraint, char** error_msg)
 {
     const char* cname = class_get_name(klass);
+    const char *format = "constraint check failed, class: %s, source: %s, target: %s";
     unsigned msg_len = strlen(cname) +
         + strlen(constraint->source)
-        + strlen(constraint->target) + 1;
+        + strlen(constraint->target) + strlen(format);
     *error_msg = (char*)tc_malloc(msg_len);
-    sprintf(*error_msg, "constraint check failed, class: %s, source: %s, target: %s",
+    sprintf(*error_msg, format,
         cname, constraint->source, constraint->target);
 }
