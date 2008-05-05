@@ -668,9 +668,9 @@ uint32      VMInterface::getVTableOffset()
     return object_get_vtable_offset();
 }
 
-uint64
+void*
 VMInterface::getVTableBase() {
-    return (uint64)vm_get_vtable_base_address();
+    return vm_get_vtable_base_address();
 }
 
 void*       VMInterface::getTypeHandleFromAllocationHandle(void* vmAllocationHandle)

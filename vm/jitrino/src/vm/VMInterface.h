@@ -96,7 +96,7 @@ public:
     // returns the offset of an object's virtual table
     static uint32      getVTableOffset();
     // returns the base for all vtables (addend to compressed vtable pointer)
-    static uint64      getVTableBase();
+    static void*      getVTableBase();
 
     // returns true if instance fields that are references are compressed
     static bool        areReferencesCompressed();
