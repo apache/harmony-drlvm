@@ -30,10 +30,11 @@
                 <pathelement location="${vm.home}/include" />
             </includepath>
             <compiler extends="common.cpp.compiler">
-                <fileset dir="${vm.home}/vmcore/src">
-                    <include name="verifier-3363/base/*.cpp" />
-                    <include name="verifier-3363/java5/*.cpp" />
-                    <include name="verifier-3363/java6/*.cpp" />
+                <fileset dir="${vm.home}/vmcore/src/verifier-3363">
+                    <include name="base/*.cpp" />
+                    <include name="java5/*.cpp" />
+                    <include name="java6/*.cpp" />
+                    <include name="x_verifier/*.cpp" if="cfg.is.debug" />
                 </fileset>
 	            <defineset define="BUILDING_VM" />
             </compiler>

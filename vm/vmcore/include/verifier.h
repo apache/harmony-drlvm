@@ -79,7 +79,7 @@ vf_verify_class_constraints(Class_Handle klass, unsigned verifyAll,
  * @param error - error message of verifier
  * @note Assertion is raised if error_message is equal to null.
  */
-void vf_release_error_message(void* error);
+void vf_release_memory(void* error);
 
 /**
  * Function releases verify data in class loader.

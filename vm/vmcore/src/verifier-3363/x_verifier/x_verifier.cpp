@@ -65,7 +65,13 @@ vf_Result recompute_stackmaptable(uint8** attrBytes, Method_Handle method,
                                   verification_context context)
 {
     char* error_message;
-    return vf_recompute_stackmaptable(method, attrBytes, &error_message, ((SharedClasswideData*)context)->class_constraints);
+    vf_Result result = vf_recompute_stackmaptable(method,
+        attrBytes, &error_message,
+        ((SharedClasswideData*)context)->class_constraints);
+    if(result != VF_OK) {
+        vf_release_memory(error_message);
+    }
+    return result;
 }
 
 

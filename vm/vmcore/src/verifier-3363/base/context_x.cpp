@@ -260,9 +260,6 @@
 
 
 
-
-
-
 #define CHECK_xSTORE( idx, TYPE )                                        \
     if( !workmap_valid_local(idx) ) return error(VF_ErrorLocals,         \
             "invalid local index");                                      \
@@ -350,10 +347,6 @@ template<typename ActualClass, typename WorkmapElement, typename _WorkmapElement
 vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapElement>::dataflow_instruction(Address instr) {
 
     vf_Result tcr;
-    if( (tcr=dataflow_handlers(instr)) != VF_OK ) {
-        return tcr;
-    }
-
     OpCode opcode = (OpCode)m_bytecode[instr];
     processed_instruction = instr;
 
@@ -1801,6 +1794,10 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
             assert(0);
             return error(VF_ErrorInternal, "unreachable statement");
     }
+
+    if( (tcr=dataflow_handlers(instr)) != VF_OK ) {
+        return tcr;
+    }
     return VF_OK;
 }
 
@@ -2070,7 +2067,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
         method_get_exc_handler_info( m_method, idx, &start_pc, &end_pc,
             &handler_pc, &handler_cp_index );
 
-        if( instr == end_pc - 1 && instr >= start_pc ) {
+        if( instr < end_pc && instr >= start_pc ) {
             vf_Result tcr;
 
             StackmapHead *handler = getStackmap(handler_pc);

@@ -15,6 +15,7 @@
  *  limitations under the License.
  */
 #include <assert.h>
+#include <stdio.h>
 
 #include "open/vm_field_access.h"
 #include "open/vm_method_access.h"
@@ -579,5 +580,49 @@ int vf_TypePool::cpool_method_next_arg(const char **state, SmConstant *argument)
 
 int vf_TypePool::cpool_method_is_constructor_call(unsigned short name_idx) {
     return !strcmp(class_cp_get_utf8_bytes( k_class, name_idx ), "<init>");
+}
+
+/* FIXME: deserve separate file probably */
+void vf_release_memory(void* error)
+{
+            tc_free(error);
+}
+
+/**
+ *  * Creates error message to be reported with verify error
+ *   */
+void vf_create_error_message(Method_Handle method, vf_Context_Base context, char
+        ** error_msg)
+{
+    char pass[12], instr[12];
+    sprintf(pass, "%d", context.pass);
+    sprintf(instr, "%d", context.processed_instruction);
+    const char* cname = class_get_name(method_get_class(method));
+    const char* mname = method_get_name(method);
+    const char* mdesc = method_get_descriptor(method);
+    const char *format = "%s.%s%s, pass: %s, instr: %s, reason: %s";
+    unsigned msg_len = strlen(cname) + strlen(mname) + strlen(mdesc)
+        + strlen(pass) + strlen(instr) + strlen(context.error_message)
+        + strlen(format);
+    *error_msg = (char*)tc_malloc(msg_len);
+    if(*error_msg != NULL) {
+        sprintf(*error_msg, format,
+            cname, mname, mdesc, pass, instr, context.error_message);
+    }
+}
+
+void vf_create_error_message(Class_Handle klass, vf_TypeConstraint* constraint,
+        char** error_msg)
+{
+    const char* cname = class_get_name(klass);
+    const char *format = "constraint check failed, class: %s, source: %s, target: %s";
+    unsigned msg_len = strlen(cname) +
+        + strlen(constraint->source)
+        + strlen(constraint->target) + strlen(format);
+    *error_msg = (char*)tc_malloc(msg_len);
+    if(*error_msg != NULL) {
+        sprintf(*error_msg, format,
+            cname, constraint->source, constraint->target);
+    }
 }
 

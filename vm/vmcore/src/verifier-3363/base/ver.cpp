@@ -14,12 +14,13 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-#include <stdio.h>
 #include "verifier.h"
-#include "ver_utils.h"
 #include "../java5/context_5.h"
 #include "../java6/context_6.h"
-#include "time.h"
+#ifndef _NDEBUG
+#include "../x_verifier/recompute.h"
+#include "class_interface.h"
+#endif
 
 #include "open/vm_class_manipulation.h"
 #include "open/vm_method_access.h"
@@ -60,9 +61,8 @@ vf_verify5_class(Class_Handle klass, unsigned verifyAll, char** error)
     return result;
 } // vf_verify5_class
 
-
 /**
-* Function provides initial java-6 verification of class.
+* Provides initial java-6 verification of class.
 *
 * If when verifying the class a check of type "class A must be assignable to class B" needs to be done 
 * and either A or B is not loaded at the moment then a constraint 
@@ -108,6 +108,17 @@ vf_verify6_class(Class_Handle klass, unsigned verifyAll, char **error )
                 return result;
             }
         }
+
+#ifndef _NDEBUG
+        vf_recompute_stackmaptable(method, &context6.substitution, error, classwide.class_constraints);
+
+        result = context6.verify_method(method);
+        if (result != VF_OK) {
+            vf_create_error_message(method, context6, error);
+        }
+        tc_free(context6.substitution);
+        context6.substitution = NULL;
+#endif  
     }
 
     /**
@@ -177,14 +188,8 @@ vf_verify_class_constraints(Class_Handle klass, unsigned verifyAll, char** error
     return VF_OK;
 } // vf_verify_method_constraints
 
-
-void vf_release_error_message(void* error)
-{
-    tc_free(error);
-}
-
 /**
-* Function releases verify data in class loader (used to store constraints)
+* Releases verify data in class loader (used to store constraints)
 */
 void
 vf_release_verify_data( void *data )
@@ -196,36 +201,30 @@ vf_release_verify_data( void *data )
     delete cl_data->pool;
 } // vf_release_verify_data
 
-/**
- * Creates error message to be reported with verify error
- */
-void vf_create_error_message(Method_Handle method, vf_Context_Base context, char** error_msg)
-{
-    char pass[12], instr[12];
-    sprintf(pass, "%d", context.pass);
-    sprintf(instr, "%d", context.processed_instruction);
-    const char* cname = class_get_name(method_get_class(method));
-    const char* mname = method_get_name(method);
-    const char* mdesc = method_get_descriptor(method);
-    const char *format = "%s.%s%s, pass: %s, instr: %s, reason: %s";
-    unsigned msg_len = strlen(cname) + strlen(mname) + strlen(mdesc)
-        + strlen(pass) + strlen(instr) + strlen(context.error_message) +
-        strlen(format);
-    *error_msg = (char*)tc_malloc(msg_len);
-    if(*error_msg != NULL) {
-        sprintf(*error_msg, format,
-            cname, mname, mdesc, pass, instr, context.error_message);
-    }
+#ifndef _NDEBUG
+void method_remove_exc_handler( Method_Handle method, unsigned short idx ) {
+    //unimplemented, needed for stack map re-computation testing
+    assert(0);
 }
 
-void vf_create_error_message(Class_Handle klass, vf_TypeConstraint* constraint, char** error_msg)
+void method_modify_exc_handler_info( Method_Handle method, unsigned short idx,
+                                     unsigned short start_pc, unsigned short end_pc,
+                                     unsigned short handler_pc, unsigned short handler_cp_index )
 {
-    const char* cname = class_get_name(klass);
-    const char *format = "constraint check failed, class: %s, source: %s, target: %s";
-    unsigned msg_len = strlen(cname) +
-        + strlen(constraint->source)
-        + strlen(constraint->target) + strlen(format);
-    *error_msg = (char*)tc_malloc(msg_len);
-    sprintf(*error_msg, format,
-        cname, constraint->source, constraint->target);
+    //unimplemented
+    assert(0);
 }
+
+unsigned short class_cp_get_class_entry(Class_Handle k_class, const char* name) {
+    for( unsigned short i = 1; i < class_cp_get_size( k_class ); i++ ) {
+        if( class_cp_get_tag( k_class, i ) == _CONSTANT_Class ) {
+            unsigned short name_idx = class_cp_get_class_name_index(k_class, i);
+            const char* cp_name = class_cp_get_utf8_bytes( k_class, name_idx );
+
+            if( !strcmp(name, cp_name) ) return i;
+        }
+    }
+    return 0;
+}
+#endif
+

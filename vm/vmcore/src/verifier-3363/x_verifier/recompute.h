@@ -450,9 +450,9 @@ protected:
 
 
 
-#define ITERATE_THRU_STACKMAP_VECTORS(CODE)                                         \
-for( i = 0; i < props.hash_size; i++ ) {                                    \
-    PropsHead_5 *pro = (PropsHead_5*)(props.propHashTable[i]);                      \
+#define ITERATE_THRU_STACKMAP_VECTORS(CODE)                                     \
+for( i = 0; i < props.hash_size; i++ ) {                                        \
+    PropsHead_5 *pro = (PropsHead_5*)(props.propHashTable[i]);                  \
     while(pro) {                                                                \
         if( !pro->is_workmap() ) {                                              \
             StackmapHead *sm = pro->getStackmap();                              \
@@ -461,11 +461,11 @@ for( i = 0; i < props.hash_size; i++ ) {                                    \
                 /*skip uninit flag*/                                            \
                 if( j == m_max_locals && j < m_stack_start ) continue;          \
                                                                                 \
-                StackmapElement_5 *el = &(sm->elements[j]);                       \
+                StackmapElement_5 *el = &(sm->elements[j]);                     \
                 CODE;                                                           \
             }                                                                   \
         }                                                                       \
-        pro=(PropsHead_5 *)pro->next;                                             \
+        pro=(PropsHead_5 *)pro->next;                                           \
     }                                                                           \
 }                                                                               \
 

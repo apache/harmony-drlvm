@@ -66,7 +66,7 @@ bool Class::verify(const Global_Env * env)
             aulock.ForceUnlock();
             REPORT_FAILED_CLASS_CLASS(m_class_loader, this,
                                       "java/lang/VerifyError", error);
-            vf_release_error_message(error);
+            vf_release_memory(error);
             return false;
         }
     }
@@ -137,7 +137,7 @@ bool Class::verify_constraints(const Global_Env * env)
         } else {
             REPORT_FAILED_CLASS_CLASS(m_class_loader, this,
                                       "java/lang/VerifyError", error);
-            vf_release_error_message(error);
+            vf_release_memory(error);
         }
         return false;
     }

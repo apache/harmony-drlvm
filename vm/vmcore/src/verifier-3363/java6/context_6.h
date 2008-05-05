@@ -25,10 +25,15 @@
 //
 // Context - main class of Type Checker
 //
-class vf_Context_6 : public vf_Context_x<vf_Context_6, WorkmapElement_6, _WorkmapElement_6, StackmapElement_6> {
+class vf_Context_6 : public vf_Context_x<vf_Context_6, WorkmapElement_6, _WorkmapElement_6, StackmapElement_6>
+{
 public:
     vf_Context_6(SharedClasswideData &classwide) :
-      vf_Context_x<vf_Context_6, WorkmapElement_6, _WorkmapElement_6, StackmapElement_6>(classwide) {}
+      vf_Context_x<vf_Context_6, WorkmapElement_6, _WorkmapElement_6, StackmapElement_6>(classwide)
+#ifndef _NDEBUG
+      , substitution(NULL)
+#endif
+      {}
 
       vf_Result verify_method(Method_Handle method);
 protected:
@@ -60,7 +65,6 @@ protected:
     //the specified element. If Long or Double happens in StackMapTable, record SM_HIGH_WORD after SM_LONG or SM_DOUBLE
     //to the workmap and increase cnt. Check space_available when record to the workmap
     vf_Result read_types(Byte **attr, Byte *end, WorkmapElement_6* element, unsigned *cnt, unsigned space_available);
-
 
     ///////////////////////////////////  "VIRTUAL" METHODS /////////////////////////////////////////////
 public:
@@ -133,6 +137,11 @@ public:
     void new_bogus_propagation_constraint(WorkmapElement_6 &wm_el, SmConstant init_val) {
         wm_el = _WorkmapElement_6 (init_val);
     }
+
+    //recomputed stack map used for testing
+#ifndef _NDEBUG
+    Byte *substitution;
+#endif
 };
 
 #endif

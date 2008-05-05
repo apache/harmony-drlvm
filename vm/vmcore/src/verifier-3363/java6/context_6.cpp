@@ -195,6 +195,10 @@ vf_Result vf_Context_6::load_stackmaptable() {
 
     Byte* stackmaptable = method_get_stackmaptable(m_method);
 
+#ifndef _NDEBUG
+    if (substitution) stackmaptable = substitution;
+#endif
+
     if(!stackmaptable) return VF_OK;
 
     Byte* read_ptr = stackmaptable;
