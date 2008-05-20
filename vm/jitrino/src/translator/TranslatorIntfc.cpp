@@ -125,7 +125,7 @@ void TranslatorAction::readFlags() {
     flags.genMinMaxAbs = getBoolArg("genMinMaxAbs", false);
     flags.genFMinMaxAbs = getBoolArg("genFMinMaxAbs", false);
 
-#ifdef _IA32_ 
+#ifndef _IPF_ 
     bool defaultIsLazy = true;
 #else
     bool defaultIsLazy = false;

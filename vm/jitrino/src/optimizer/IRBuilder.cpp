@@ -1994,7 +1994,7 @@ IRBuilder::genLdFieldAddrWithResolve(Type* type, Opnd* base, ObjectType* enclCla
     args[1] = genLdConstant((int)cpIndex);
     args[2] = genLdConstant((int)putfield?1:0);
     Opnd* offsetOpnd = genVMHelperCall(VM_RT_GET_NONSTATIC_FIELD_OFFSET_WITHRESOLVE, 
-                                    typeManager->getInt32Type(), 3, args);
+                                    typeManager->getIntPtrType(), 3, args);
     insertHash(Op_VMHelperCall, opcode, base->getId(), cpIndex, dst->getInst());
 
     //2. adding the offset to object opnd -> getting the address of the field
