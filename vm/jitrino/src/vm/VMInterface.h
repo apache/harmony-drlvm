@@ -108,13 +108,13 @@ public:
     static void*       getHeapCeiling();
 
 
-    static void        rewriteCodeBlock(Byte* codeBlock, Byte*  newCode, size_t size);
+    static void        rewriteCodeBlock(U_8* codeBlock, U_8* newCode, size_t size);
 
-	static bool setVmAdapter(vm_adaptor_t vm);
-	static bool isValidFeature(const char* id);
+    static bool setVmAdapter(vm_adaptor_t vm);
+    static bool isValidFeature(const char* id);
 
 protected:
-	static vm_adaptor_t vm;
+    static vm_adaptor_t vm;
 };
 
 
@@ -207,7 +207,7 @@ public:
         // Method info
         //
 
-        const Byte*  getByteCodes() const;
+        const U_8*  getByteCodes() const;
         uint32       getByteCodeSize() const;
         uint16       getMaxStack() const;
         uint32       getNumHandlers() const;
@@ -219,9 +219,9 @@ public:
         //
         // accessors for method info, code and data
         //
-        Byte*    getInfoBlock() const;
+        U_8*     getInfoBlock() const;
         uint32   getInfoBlockSize() const;
-        Byte*    getCodeBlockAddress(int32 id) const;
+        U_8*     getCodeBlockAddress(int32 id) const;
         uint32   getCodeBlockSize(int32 id) const;
 
         // sets and gets MethodSideEffect property for the compiled method
@@ -233,11 +233,11 @@ public:
         //
         void        setNumExceptionHandler(uint32 numHandlers);
         void        setExceptionHandlerInfo(uint32 exceptionHandlerNumber,
-            Byte*  startAddr,
-            Byte*  endAddr,
-            Byte*  handlerAddr,
-            NamedType*  exceptionType,
-            bool   exceptionObjIsDead);
+            U_8* startAddr,
+            U_8* endAddr,
+            U_8* handlerAddr,
+            NamedType* exceptionType,
+            bool exceptionObjIsDead);
 
 
         //
@@ -356,14 +356,14 @@ public:
 
     // Memory allocation API
     // all of these are for the method being compiled
-    Byte*   allocateCodeBlock(size_t size, size_t alignment, CodeBlockHeat heat, 
+    U_8*   allocateCodeBlock(size_t size, size_t alignment, CodeBlockHeat heat, 
         int32 id, bool simulate);
 
-    Byte*   allocateDataBlock(size_t size, size_t alignment);
+    U_8*   allocateDataBlock(size_t size, size_t alignment);
 
-    Byte*   allocateInfoBlock(size_t size);
+    U_8*   allocateInfoBlock(size_t size);
 
-    Byte*   allocateJITDataBlock(size_t size, size_t alignment);
+    U_8*   allocateJITDataBlock(size_t size, size_t alignment);
 
     /**
      * Acquires a lock to protect method's data modifications (i.e. code/info 

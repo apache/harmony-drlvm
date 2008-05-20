@@ -279,9 +279,9 @@ public:
 
 
     /** AOT support: serializes inst into stream */
-    Byte * serialize(Byte * stream, Inst * inst);
+    U_8* serialize(U_8* stream, Inst* inst);
     /** AOT support: deserializes inst from stream */
-    Byte * deserialize(Byte * stream, Inst *& inst);
+    U_8* deserialize(U_8* stream, Inst*& inst);
 
     //-----------------------------------------------------------------------------------------------
     /** calculate liveness information */

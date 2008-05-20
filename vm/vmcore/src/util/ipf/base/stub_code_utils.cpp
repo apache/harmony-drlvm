@@ -158,7 +158,7 @@ void *finalize_stub(Merced_Code_Emitter &emitter, const char *name)
     size_t stub_size = emitter.get_size();
     void *stub = (void *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_DEFAULT, CAA_Allocate);
     emitter.copy((char *)stub);
-    flush_hw_cache((Byte *)stub, stub_size);
+    flush_hw_cache((U_8*)stub, stub_size);
     sync_i_cache();
     return stub;
 } //finalize_stub

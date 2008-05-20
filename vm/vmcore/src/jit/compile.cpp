@@ -672,7 +672,7 @@ JIT_Result compile_do_compilation_jit(Method* method, JIT* jit)
     method->lock();
     for (CodeChunkInfo* cci = method->get_first_JIT_specific_info();  cci;  cci = cci->_next) {
         if (cci->get_jit() == jit) {
-            compile_flush_generated_code_block((Byte*)cci->get_code_block_addr(), cci->get_code_block_size());
+            compile_flush_generated_code_block((U_8*)cci->get_code_block_addr(), cci->get_code_block_size());
             // We assume the main chunk starts from entry point
             if (cci->get_id() == CodeChunkInfo::main_code_chunk_id) {
                 method->set_code_addr(cci->get_code_block_addr());

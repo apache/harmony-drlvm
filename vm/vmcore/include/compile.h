@@ -44,7 +44,7 @@ void compile_protect_arguments(Method_Handle method, GcFrame* gc);
  * The first function flushes a particular block of code,
  * another should be called after all blocks are flushed.
  */
-void compile_flush_generated_code_block(Byte*, size_t);
+void compile_flush_generated_code_block(U_8*, size_t);
 void compile_flush_generated_code();
 /**
  * Execution manager uses this method to call back to VM to compile
@@ -66,9 +66,9 @@ NativeCodePtr compile_gen_compile_me(Method_Handle method);
  */
 NativeCodePtr compile_me(Method* method);
 
-void patch_code_with_threads_suspended(Byte *code_block, Byte *new_code, size_t size);
+void patch_code_with_threads_suspended(U_8* code_block, U_8* new_code, size_t size);
 
-typedef char * Emitter_Handle;
+typedef char* Emitter_Handle;
 
 struct Compilation_Handle {
     Global_Env* env;

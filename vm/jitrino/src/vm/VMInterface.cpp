@@ -440,11 +440,11 @@ static vm_enumerate_root_interior_pointer_t vm_enumerate_root_interior_pointer =
 //    stack info
 //    GC info
 
-Byte*
+U_8*
 methodGetStacknGCInfoBlock(Method_Handle method, JIT_Handle jit)
 {
-    Byte*   addr = method_get_info_block_jit(method, jit);
-    addr += sizeof(void *);    // skip the header 
+    U_8* addr = method_get_info_block_jit(method, jit);
+    addr += sizeof(void*);    // skip the header
     return addr;
 }
 
@@ -531,7 +531,7 @@ TypeManager::getBuiltinValueTypeVMTypeHandle(Type::Tag type) {
 }
 
 void 
-VMInterface::rewriteCodeBlock(Byte* codeBlock, Byte*  newCode, size_t size) {
+VMInterface::rewriteCodeBlock(U_8* codeBlock, U_8*  newCode, size_t size) {
     vm_patch_code_block(codeBlock, newCode, size);
 }
 
@@ -710,7 +710,7 @@ bool         MethodDesc::isInstanceInitializer() const {return strcmp(getName(),
 // Method info
 //
 
-const Byte*  MethodDesc::getByteCodes() const   {return method_get_bytecode(drlMethod);}
+const U_8*   MethodDesc::getByteCodes() const   {return method_get_bytecode(drlMethod);}
 uint32       MethodDesc::getByteCodeSize() const {return (uint32) method_get_bytecode_length(drlMethod);}
 uint16       MethodDesc::getMaxStack() const    {return (uint16) method_get_max_stack(drlMethod);}
 uint32       MethodDesc::getNumHandlers() const {return method_get_exc_handler_number(drlMethod);}
@@ -751,7 +751,7 @@ void MethodDesc::getHandlerInfo(unsigned short index,
 }
 
 // accessors for method info, code and data
-Byte*        MethodDesc::getInfoBlock() const {
+U_8* MethodDesc::getInfoBlock() const {
     return methodGetStacknGCInfoBlock(drlMethod, getJitHandle());
 }
 
@@ -759,7 +759,7 @@ uint32       MethodDesc::getInfoBlockSize() const {
     return methodGetStacknGCInfoBlockSize(drlMethod, getJitHandle());
 }
 
-Byte*        MethodDesc::getCodeBlockAddress(int32 id) const {
+U_8* MethodDesc::getCodeBlockAddress(int32 id) const {
     return method_get_code_block_addr_jit_new(drlMethod,getJitHandle(), id);
 }
 
@@ -801,10 +801,10 @@ MethodDesc::setNumExceptionHandler(uint32 numHandlers) {
 
 void
 MethodDesc::setExceptionHandlerInfo(uint32 exceptionHandlerNumber,
-                                    Byte*  startAddr,
-                                    Byte*  endAddr,
-                                    Byte*  handlerAddr,
-                                    NamedType*  exceptionType,
+                                    U_8*   startAddr,
+                                    U_8*   endAddr,
+                                    U_8*   handlerAddr,
+                                    NamedType* exceptionType,
                                     bool   exceptionObjIsDead) 
 {
     void* exn_handle;
@@ -1142,26 +1142,29 @@ void CompilationInterface::unlockMethodData(void)  {
     method_unlock(mh);
 }
 
-Byte*   CompilationInterface::allocateCodeBlock(size_t size, size_t alignment, CodeBlockHeat heat, int32 id, 
+U_8* CompilationInterface::allocateCodeBlock(size_t size, size_t alignment, CodeBlockHeat heat, int32 id, 
 bool simulate) {
     return method_allocate_code_block(methodToCompile->getMethodHandle(), getJitHandle(), 
         size, alignment, heat, id, simulate ? CAA_Simulate : CAA_Allocate);
 }
-Byte*        CompilationInterface::allocateDataBlock(size_t size, size_t alignment) {
+
+U_8* CompilationInterface::allocateDataBlock(size_t size, size_t alignment) {
     return method_allocate_data_block(methodToCompile->getMethodHandle(),getJitHandle(),size, alignment);
 }
-Byte*        CompilationInterface::allocateInfoBlock(size_t size) {
+
+U_8* CompilationInterface::allocateInfoBlock(size_t size) {
     size += sizeof(void *);
-    Byte *addr = method_allocate_info_block(methodToCompile->getMethodHandle(),getJitHandle(),size);
+    U_8* addr = method_allocate_info_block(methodToCompile->getMethodHandle(),getJitHandle(),size);
     return (addr + sizeof(void *));
 }
-Byte*        CompilationInterface::allocateJITDataBlock(size_t size, size_t alignment) {
+
+U_8* CompilationInterface::allocateJITDataBlock(size_t size, size_t alignment) {
     return method_allocate_jit_data_block(methodToCompile->getMethodHandle(),getJitHandle(),size, alignment);
 }
+
 MethodDesc*     CompilationInterface::getMethodDesc(Method_Handle method) {
     return getMethodDesc(method, getJitHandle());
 }
-
 
 static uint32 getArrayDims(Class_Handle cl, uint32 cpIndex) {
     return class_cp_get_num_array_dimensions(cl, (unsigned short)cpIndex);

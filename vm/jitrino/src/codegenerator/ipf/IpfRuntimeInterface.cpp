@@ -40,7 +40,7 @@ void RuntimeInterface::unwindStack(MethodDesc      *methodDesc,
 
     // cout << "IPF::RuntimeInterface::unwindStack "  << methodDesc->getName() << endl;
 
-    Byte      *infoBlock = methodDesc->getInfoBlock();    // get method infoBlock
+    U_8*      infoBlock = methodDesc->getInfoBlock();    // get method infoBlock
     StackInfo stackInfo  = *((StackInfo*) infoBlock);     // read StackInfo structure
 
     uint64 sp            = jitFrameContext->sp;           // get current frame sp 
@@ -131,15 +131,15 @@ void RuntimeInterface::getGCRootSet(MethodDesc            *methodDesc,
 
     // cout << "IPF::RuntimeInterface::getGCRootSet" << endl;
 
-    gcInterface        = gcInterface_;
-    context            = context_;
-    Byte   *infoBlock  = methodDesc->getInfoBlock();
-    Byte   *gcInfo     = infoBlock + sizeof(StackInfo);
-    uint64 currIp      = *context->p_eip;
-    uint32 gcSize      = *((uint32 *)gcInfo);
+    gcInterface      = gcInterface_;
+    context          = context_;
+    U_8*   infoBlock = methodDesc->getInfoBlock();
+    U_8*   gcInfo    = infoBlock + sizeof(StackInfo);
+    uint64 currIp    = *context->p_eip;
+    uint32 gcSize    = *((uint32 *)gcInfo);
 
 //    cout << "getGCRootSet for ip " << hex << currIp << dec << " method " << methodDesc->getName() << endl;
-    Byte* safePoint = findSafePoint(gcInfo, gcSize, currIp);
+    U_8* safePoint = findSafePoint(gcInfo, gcSize, currIp);
     enumerateRootSet(gcInterface, context, safePoint);
 }
 
@@ -214,13 +214,13 @@ bool RuntimeInterface::getNativeLocationForBc(MethodDesc *methodDesc,  uint16 bc
 // GC Root Set 
 //----------------------------------------------------------------------------------------//
 
-Byte* RuntimeInterface::findSafePoint(Byte *info, uint32 size, uint64 currIp) {
-    
-    uint32 offset     = ROOT_SET_HEADER_SIZE;
-    Byte   *safePoint = NULL;
-    uint32 spSize     = 0;
-    uint64 spAddress  = 0;
-    
+U_8* RuntimeInterface::findSafePoint(U_8* info, uint32 size, uint64 currIp)
+{
+    uint32 offset    = ROOT_SET_HEADER_SIZE;
+    U_8*   safePoint = NULL;
+    uint32 spSize    = 0;
+    uint64 spAddress = 0;
+
     while (offset < size) {
         safePoint = info + offset;
         spSize    = *((uint32 *)safePoint);
@@ -229,7 +229,7 @@ Byte* RuntimeInterface::findSafePoint(Byte *info, uint32 size, uint64 currIp) {
         if (spAddress == currIp) return safePoint;
         offset += spSize;
     }
-    
+
     IPF_ERR << " No safe point found";
     return NULL;
 }
@@ -237,14 +237,14 @@ Byte* RuntimeInterface::findSafePoint(Byte *info, uint32 size, uint64 currIp) {
 //----------------------------------------------------------------------------------------//
 // 
 
-void RuntimeInterface::enumerateRootSet(GCInterface           *gcInterface, 
-                                        const JitFrameContext *context, 
-                                        Byte                  *safePoint) {
-
+void RuntimeInterface::enumerateRootSet(GCInterface*           gcInterface,
+                                        const JitFrameContext* context,
+                                        U_8*                   safePoint)
+{
     uint32 size   = *((uint32 *)(safePoint));
     int32* ptr    = (int32 *)(safePoint + SAFE_POINT_HEADER_SIZE);
     int32* maxPtr = (int32 *)(safePoint + size);
-    
+
     while (ptr < maxPtr) {
         if (isMptr(*ptr)) reportMptr(*(ptr++), *(ptr++));
         else              reportBase(*(ptr++));

@@ -705,9 +705,9 @@ void CodeEmitter::registerDirectCall(MethodDesc * md, void * instStartAddr)
 bool RuntimeInterface::recompiledMethodEvent(MethodDesc *recompiledMethodDesc, 
                            void *                    data) 
 {
-    Byte ** indirectAddr = (Byte **)recompiledMethodDesc->getIndirectAddress();
-    Byte * targetAddr = *indirectAddr;
-    Byte * callAddr = (Byte*)data;
+    U_8** indirectAddr = (U_8**)recompiledMethodDesc->getIndirectAddress();
+    U_8* targetAddr = *indirectAddr;
+    U_8* callAddr = (U_8*)data;
 
     uint64 offset = targetAddr - callAddr - 5;
 
@@ -719,14 +719,14 @@ bool RuntimeInterface::recompiledMethodEvent(MethodDesc *recompiledMethodDesc,
 #else
                      0; // no additional MOV on ia32
 #endif
-    Byte * movAddr = callAddr - movSize;
+    U_8* movAddr = callAddr - movSize;
 
     // there is a reserved region for this self-jump dumped with nops
     // it is from 'callAddr - movSize' (movAddr)
     //                   [- 10 (reserved for 'MOV r11, callTarget' if !fit32(offset))] (EM64T only)
     //                   - 3  (to provide self-jump aligned)
     // to 'callAddr - movSize' (movAddr)
-    Byte* jmpAddr = movAddr - 3;
+    U_8* jmpAddr = movAddr - 3;
     if( 0 != (POINTER_SIZE_INT(jmpAddr) & 0x1) ) {
         jmpAddr++;
     }
@@ -837,8 +837,8 @@ void CodeEmitter::registerExceptionHandlers()
 
         irManager->getMethodDesc().
             setExceptionHandlerInfo(i,
-                (Byte*)info.regionStart, (Byte*)info.regionEnd,
-                (Byte*)info.handlerAddr,
+                (U_8*)info.regionStart, (U_8*)info.regionEnd,
+                (U_8*)info.handlerAddr,
                 info.exceptionType,
                 info.exceptionObjectIsDead);
     }

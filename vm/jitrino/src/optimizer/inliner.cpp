@@ -469,8 +469,8 @@ protected:
 bool
 Inliner::isLeafMethod(MethodDesc& methodDesc) {
     uint32 size = methodDesc.getByteCodeSize();
-    const Byte* bytecodes = methodDesc.getByteCodes();
-    ByteCodeParser parser((const uint8*)bytecodes,size);
+    const U_8* bytecodes = methodDesc.getByteCodes();
+    ByteCodeParser parser(bytecodes,size);
     JavaByteCodeLeafSearchCallback leafTester;
     parser.parse(&leafTester);
     return leafTester.isLeaf();

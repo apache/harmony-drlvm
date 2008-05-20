@@ -53,15 +53,15 @@ typedef MptrDefMap::iterator      MptrDefMapIterator;
 //========================================================================================//
 
 struct TryRegion {
-    TryRegion(Byte*, Byte*, Byte*, ObjectType*, bool);
+    TryRegion(U_8*, U_8*, U_8*, ObjectType*, bool);
 
-    Byte       *startAddr;
-    Byte       *endAddr;
-    Byte       *handlerAddr;
-    ObjectType *exceptionType;
-    bool       isExceptionObjDead;
+    U_8*        startAddr;
+    U_8*        endAddr;
+    U_8*        handlerAddr;
+    ObjectType* exceptionType;
+    bool        isExceptionObjDead;
 };
-    
+
 //========================================================================================//
 // MptrDef
 //========================================================================================//

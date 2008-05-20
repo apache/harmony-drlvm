@@ -214,9 +214,9 @@ static void *gen_vm_rt_ljf_wrapper_compactor(void **func, int num_args, char* st
     addr = (void *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_MAX/2, CAA_Allocate);
     emitter.copy((char *)addr);
 
-    flush_hw_cache((Byte *)addr, stub_size);
+    flush_hw_cache((U_8*)addr, stub_size);
     sync_i_cache();
-    
+
     return addr;
 } //gen_vm_rt_ljf_wrapper_compactor
 
@@ -258,7 +258,7 @@ static void get_vm_rt_new_with_thread_pointer_compactor(Merced_Code_Emitter &emi
                                                          bool inlining_allowed)
 {
     Boolean use_inline_allocation_sequence = TRUE;
-    size_t offset_gc_local = (Byte *)&(p_TLS_vmthread->_gc_private_information) - (Byte *)p_TLS_vmthread;
+    size_t offset_gc_local = (U_8*)&(p_TLS_vmthread->_gc_private_information) - (U_8*)p_TLS_vmthread;
     unsigned current_offset = 1;
     unsigned limit_offset = 1;
     if (gc_supports_frontier_allocation(&current_offset, &limit_offset) && inlining_allowed)
@@ -360,8 +360,8 @@ static void get_vm_rt_new_vector_with_thread_pointer_compactor(Merced_Code_Emitt
                                                                 void **fast_obj_alloc_proc,
                                                                 void **slow_obj_alloc_proc)
 {
-    size_t offset_gc_local = (Byte *)&(p_TLS_vmthread->_gc_private_information) - (Byte *)p_TLS_vmthread;
-    
+    size_t offset_gc_local = (U_8*)&(p_TLS_vmthread->_gc_private_information) - (U_8*)p_TLS_vmthread;
+
     emitter.ipf_sxt(sxt_size_4, IN_REG1, IN_REG1);
 
 #ifdef VM_STATS
@@ -443,7 +443,7 @@ static void *generate_object_allocation_with_thread_pointer_stub_compactor(void 
     size_t stub_size = emitter.get_size();
     void *addr = (void *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_MAX/2, CAA_Allocate);
     emitter.copy((char *)addr);    
-    flush_hw_cache((Byte *)addr, stub_size);
+    flush_hw_cache((U_8*)addr, stub_size);
     sync_i_cache();
 
 
@@ -653,9 +653,9 @@ static void emit_fast_type_check_without_vm_stats(Merced_Code_Emitter& emitter,
     const int offset_is_suitable = (int)Class::get_offset_of_fast_instanceof_flag();
     const int offset_depth = (int)Class::get_offset_of_depth();
 
-    VTable *dummy_vtable = NULL;
-    const int offset_superclasses = (int) ((Byte*)&dummy_vtable->superclasses[-1] - (Byte*)dummy_vtable);
-    const int offset_clss = (int) ((Byte*)&dummy_vtable->clss - (Byte*)dummy_vtable);
+    VTable* dummy_vtable = NULL;
+    const int offset_superclasses = (int) ((U_8*)&dummy_vtable->superclasses[-1] - (U_8*)dummy_vtable);
+    const int offset_clss = (int) ((U_8*)&dummy_vtable->clss - (U_8*)dummy_vtable);
 
     // sc1 = super_class->get_offset_of_fast_instanceof_flag()
     // sc3 = [sub_object]
@@ -806,9 +806,9 @@ static void *get_vm_rt_aastore_address_compactor()
     size_t stub_size = emitter.get_size();
     addr = (void *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_MAX/2, CAA_Allocate);
     emitter.copy((char *)addr);
-    flush_hw_cache((Byte *)addr, stub_size);
+    flush_hw_cache((U_8*)addr, stub_size);
     sync_i_cache();
-    
+
     return addr;
 } //get_vm_rt_aastore_address_compactor
 
@@ -865,7 +865,7 @@ static void *get_vm_rt_checkcast_address_compactor()
     emitter.copy((char *)addr);
 
 
-    flush_hw_cache((Byte *)addr, stub_size);
+    flush_hw_cache((U_8*)addr, stub_size);
     sync_i_cache();
 
     DUMP_STUB(addr, "vm_rt_checkcast", stub_size);
@@ -921,7 +921,7 @@ static void *get_vm_rt_instanceof_address_compactor()
     emitter.copy((char *)addr);
 
 
-    flush_hw_cache((Byte *)addr, stub_size);
+    flush_hw_cache((U_8*)addr, stub_size);
     sync_i_cache();
 
     DUMP_STUB(addr, "vm_rt_instanceof", stub_size);
@@ -943,7 +943,7 @@ static void emit_get_array_element_class(Merced_Code_Emitter& emitter, int src, 
     const int offset_array_element_class = Class::get_offset_of_array_element_class();
 
     VTable *dummy_vtable = NULL;
-    const int offset_clss = (int) ((Byte*)&dummy_vtable->clss - (Byte*)dummy_vtable);
+    const int offset_clss = (int)((U_8*)&dummy_vtable->clss - (U_8*)dummy_vtable);
 
     if (vm_is_vtable_compressed())
     {
@@ -1015,9 +1015,8 @@ static void *get_vm_rt_aastore_test_address_compactor()
     addr = (void *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_MAX/2, CAA_Allocate);
     emitter.copy((char *)addr);
 
-    flush_hw_cache((Byte *)addr, stub_size);
+    flush_hw_cache((U_8*)addr, stub_size);
     sync_i_cache();
-
 
     return addr;
 } //get_vm_rt_aastore_test_address_compactor
@@ -1060,7 +1059,7 @@ static void *get_vm_rt_initialize_class_compactor()
 #endif // VM_STATS
 
     // Check clss->state==ST_Initialized, quick return if true.
-    //emitter.ipf_adds(SCRATCH_GENERAL_REG, (int)((Byte*)&dummy->state-(Byte*)dummy), IN_REG0);
+    //emitter.ipf_adds(SCRATCH_GENERAL_REG, (int)((U_8*)&dummy->state-(U_8*)dummy), IN_REG0);
     emitter.ipf_adds(SCRATCH_GENERAL_REG3, 0, 0);
 
     Boolean (*p_is_class_initialized)(Class *clss);
@@ -1086,7 +1085,7 @@ static void *get_vm_rt_initialize_class_compactor()
     addr = (void *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_COLD, CAA_Allocate);
     emitter.copy((char *)addr);
 
-    flush_hw_cache((Byte *)addr, stub_size);
+    flush_hw_cache((U_8*)addr, stub_size);
     sync_i_cache();
 
 
@@ -1352,7 +1351,7 @@ static void *gen_vm_rt_monitor_wrapper(void **slow_path_func, void (*gen_fast_pa
 
     void *stub = (void *)malloc_fixed_code_for_jit(total_stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_MAX/2, CAA_Allocate);
     emitter.copy((char *)stub);
-    flush_hw_cache((Byte *)stub, total_stub_size);
+    flush_hw_cache((U_8*)stub, total_stub_size);
     sync_i_cache();
 
     return stub;
@@ -1630,7 +1629,7 @@ static void *create_direct_helper_call_wrapper(void **fptr, int num_args, const 
     void *addr = (void *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_MAX/2, CAA_Allocate);
     emitter.copy((char *)addr);
 
-    flush_hw_cache((Byte *)addr, stub_size);
+    flush_hw_cache((U_8*)addr, stub_size);
     sync_i_cache();
     
     return addr;
@@ -1759,7 +1758,7 @@ void *emit_counting_wrapper_for_jit_helper(VM_RT_SUPPORT f, void *helper, int nu
     wrapper = (void *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_MAX/2, CAA_Allocate);
     emitter.copy((char *)wrapper);
 
-    flush_hw_cache((Byte *)wrapper, stub_size);
+    flush_hw_cache((U_8*)wrapper, stub_size);
     sync_i_cache();
     
     helper_wrapper_map.add((void *)f, /*value*/ 0, /*value1*/ wrapper);

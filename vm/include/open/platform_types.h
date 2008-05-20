@@ -70,8 +70,6 @@
 
 typedef unsigned Boolean;
 
-typedef unsigned char    Byte;
-
 //::For long long int, add the LL 
 #ifndef __WORDSIZE // exclude remark #193: zero used for undefined preprocessing identifier
 #define __WORDSIZE 0

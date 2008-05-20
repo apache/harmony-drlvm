@@ -236,7 +236,7 @@ JIT_compile_method_with_params(JIT_Handle jit, Compile_Handle compilation,
 
         if (result == JIT_SUCCESS) {
             unsigned size = md->getCodeBlockSize(0);
-            Byte *  start = size ? md->getCodeBlockAddress(0) : 0;
+            U_8*    start = size ? md->getCodeBlockAddress(0) : 0;
             info << "\tnative code size=" << size
                  << " code range=[" << (void*)start << "," << (void*)(start+size) << "]";
         }

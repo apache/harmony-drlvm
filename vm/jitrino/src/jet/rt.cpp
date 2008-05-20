@@ -641,13 +641,13 @@ void rt_profile_notification_callback(JIT_Handle jit, PC_Handle pch, Method_Hand
        //next instruction
        //2. Replace all the remaining bytes of counter instruction with nops
        //3. Atomically replace jump with 2 nops
-       Byte* methodAddr = method_get_code_block_jit(mh, jit);
+       U_8* methodAddr = method_get_code_block_jit(mh, jit);
        for (uint32 i = 0 ; i<infoBlock.num_profiler_counters; i++) {
            uint32 offsetInfo = infoBlock.profiler_counters_map[i];
            uint32 codeOffset = ProfileCounterInfo::getInstOffset(offsetInfo);
            uint32 patchedSize = ProfileCounterInfo::getInstSize(offsetInfo);
 
-           Byte* patchedAddr = methodAddr + codeOffset;
+           U_8* patchedAddr = methodAddr + codeOffset;
            //1. Generate jump to the next instruction
            char* jmpIP = (char*)patchedAddr;
            char jmpOffset = (char)(patchedSize - 2);

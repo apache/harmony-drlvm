@@ -249,29 +249,28 @@ BOOLEAN method_is_native(Method_Handle m)
 } // method_is_native
 
 
-Byte* method_allocate_info_block(Method_Handle m, JIT_Handle j, size_t size)
+U_8* method_allocate_info_block(Method_Handle m, JIT_Handle j, size_t size)
 {
     assert(m);
-    return (Byte *)((Method *)m)->allocate_jit_info_block(size, (JIT *)j);
+    return (U_8*)(m->allocate_jit_info_block(size, (JIT *)j));
 } //method_allocate_info_block
 
 
-Byte *method_allocate_jit_data_block(Method_Handle m, JIT_Handle j, size_t size, size_t alignment)
+U_8* method_allocate_jit_data_block(Method_Handle m, JIT_Handle j, size_t size, size_t alignment)
 {
     assert(m);
-    return (Byte *)((Method *)m)->allocate_JIT_data_block(size, (JIT *)j, alignment);
+    return (U_8*)(m->allocate_JIT_data_block(size, (JIT *)j, alignment));
 } //method_allocate_jit_data_block
 
 
-Byte *method_get_info_block_jit(Method_Handle m, JIT_Handle j)
+U_8* method_get_info_block_jit(Method_Handle m, JIT_Handle j)
 {
     assert(m);
-    Method* method = (Method*) m;
-    CodeChunkInfo *jit_info = method->get_chunk_info_no_create_mt((JIT *)j, CodeChunkInfo::main_code_chunk_id);
+    CodeChunkInfo *jit_info = m->get_chunk_info_no_create_mt((JIT *)j, CodeChunkInfo::main_code_chunk_id);
     if (jit_info == NULL) {
         return NULL;
     }
-    return (Byte *)jit_info->_jit_info_block;
+    return (U_8*)jit_info->_jit_info_block;
 } //method_get_info_block_jit
 
 
@@ -286,14 +285,14 @@ unsigned method_get_info_block_size_jit(Method_Handle m, JIT_Handle j)
 
 
 
-Byte *method_allocate_data_block(Method_Handle m, JIT_Handle j, size_t size, size_t alignment)
+U_8* method_allocate_data_block(Method_Handle m, JIT_Handle j, size_t size, size_t alignment)
 {
     assert(m);
-    return (Byte *)((Method *)m)->allocate_rw_data_block(size, alignment, (JIT *)j);
+    return (U_8*)(m->allocate_rw_data_block(size, alignment, (JIT*)j));
 } //method_allocate_data_block
 
 
-Byte *
+U_8*
 method_allocate_code_block(Method_Handle m,
                            JIT_Handle j,
                            size_t size,
@@ -302,8 +301,7 @@ method_allocate_code_block(Method_Handle m,
                            int id,
                            Code_Allocation_Action action)
 {
-    Method *method = (Method *)m;
-    assert(method);
+    assert(m);
 
     JIT *jit = (JIT *)j;
     assert(jit);
@@ -319,13 +317,13 @@ method_allocate_code_block(Method_Handle m,
     }
 
     // the following method is safe to call from multiple threads
-    Byte *code_block = (Byte *) method->allocate_code_block_mt(size, alignment, jit, drlHeat, id, action);
+    U_8* code_block = (U_8*)m->allocate_code_block_mt(size, alignment, jit, drlHeat, id, action);
 
     return code_block;
 } // method_allocate_code_block
 
 
-Byte* method_get_code_block_jit(Method_Handle m, JIT_Handle j)
+U_8* method_get_code_block_jit(Method_Handle m, JIT_Handle j)
 {
     assert(m);
     return method_get_code_block_addr_jit_new(m, j, 0);
@@ -341,14 +339,14 @@ unsigned method_get_code_block_size_jit(Method_Handle m, JIT_Handle j)
 
 
 
-Byte *method_get_code_block_addr_jit_new(Method_Handle method,
+U_8* method_get_code_block_addr_jit_new(Method_Handle method,
                                          JIT_Handle j,
                                          int id)
 {
     assert(method);
     CodeChunkInfo* jit_info = method->get_chunk_info_no_create_mt((JIT *)j, id);
     assert(jit_info);
-    return (Byte*)jit_info->get_code_block_addr();
+    return (U_8*)jit_info->get_code_block_addr();
 } //method_get_code_block_addr_jit_new
 
 
@@ -363,7 +361,7 @@ unsigned method_get_code_block_size_jit_new(Method_Handle method,
 } //method_get_code_block_size_jit_new
 
 
-const Byte* method_get_bytecode(Method_Handle m)
+const U_8* method_get_bytecode(Method_Handle m)
 {
     assert(m);
     return m->get_byte_code_addr();
@@ -1740,7 +1738,7 @@ void vm_register_jit_recompiled_method_callback(JIT_Handle jit, Method_Handle me
 } //vm_register_jit_recompiled_method_callback
 
 
-void vm_patch_code_block(Byte *code_block, Byte *new_code, size_t size)
+void vm_patch_code_block(U_8* code_block, U_8* new_code, size_t size)
 {
     assert(code_block != NULL);
     assert(new_code != NULL);

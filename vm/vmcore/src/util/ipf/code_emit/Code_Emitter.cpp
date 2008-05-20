@@ -83,7 +83,7 @@ void Merced_Code_Emitter::compute_n_dbl_slots() {
 //               Mappings
 /////////////////////////////////////////////////////////////////////////////
 
-const Byte Merced_Code_Emitter::cmp_ext_to_special_instr[cmp_last] = {
+const U_8 Merced_Code_Emitter::cmp_ext_to_special_instr[cmp_last] = {
     ENC_SI_none, ENC_SI_none, ENC_SI_cmp_and, ENC_SI_cmp_or, ENC_SI_none
 };
 
@@ -387,7 +387,7 @@ uint64 Merced_Code_Emitter::code_check_sum() {
 // Encode instruction slot by a given instruction
 // Assumes that the instruction slot contains zeros
 
-static void encode_slot(Byte * bundle, uint64 instr, int slot)
+static void encode_slot(U_8* bundle, uint64 instr, int slot)
 {
   // Instr is in bits 0:40, little endian.
     uint64 * u;
@@ -414,14 +414,14 @@ static void encode_slot(Byte * bundle, uint64 instr, int slot)
 }
  
   
-static inline void encode_template(Byte * bundle, EM_Templates tmplt, bool stop_bit) 
+static inline void encode_template(U_8* bundle, EM_Templates tmplt, bool stop_bit) 
 {
     *bundle |= (tmplt << 1);
     if (stop_bit)
         *bundle |= 0x1;
 }
 
-static inline void reset_bundle(Byte * bundle) {
+static inline void reset_bundle(U_8* bundle) {
     memset(bundle,0,IPF_INSTRUCTION_LEN);
 }    
 
@@ -503,7 +503,7 @@ void Merced_Code_Emitter::switch_to_slow_reg_dep_check() {
     // copy the register info from fast scheme storage to full bit vectors
 
     for (int r=0;r<ENC_N_REG; r++) { // for all registers
-        Byte pos = reg_map[r];
+        U_8 pos = reg_map[r];
         if (!(pos & 0x80)) { // if register is fast one
             uint64 z=((uint64)0x1)<<pos;
             i=0;
@@ -541,7 +541,7 @@ void Merced_Code_Emitter::switch_ir_to_slow_reg_dep_check(Instr_IR &ir,
     // copy the register info from fast scheme storage to full bit vectors
 
     for (int r=0;r<ENC_N_REG; r++) { // for all registers
-        Byte pos = reg_map[r];
+        U_8 pos = reg_map[r];
         if (!(pos & 0x80)) { // if register is fast one
             uint64 z=((uint64)0x1)<<pos;
             if (ir.written_regs.fast & z)
@@ -1555,7 +1555,7 @@ void Merced_Code_Emitter_GC2::emit_bundle(Bundle_IR * bundle) {
     Merced_Code_Emitter::emit_bundle(bundle);
 }
 
-void Merced_Code_Emitter_GC2::encode_def_ref_bit(Byte def_ref) {
+void Merced_Code_Emitter_GC2::encode_def_ref_bit(U_8 def_ref) {
     unsigned shift = n_ref_bit++ % 8;
     if (shift==0) {
         if (ref_bit_arena->first_avail >= ref_bit_arena->endp) {
@@ -1685,7 +1685,7 @@ static void print_header()
 
 
 
-static void dump_bytes(Byte *addr, int num_bytes)
+static void dump_bytes(U_8* addr, int num_bytes)
 {
     for(int i = 0; i < num_bytes; i++) {
         printf("%2d: %2x\n", i, addr[i]);
@@ -1694,13 +1694,13 @@ static void dump_bytes(Byte *addr, int num_bytes)
 
 
 
-void dump_ipf_instructions(void *addr, int num_instr)
+void dump_ipf_instructions(void* addr, int num_instr)
 {
     print_header();
     for(int i = 0; i < num_instr; i++) {
-        dump_ipf_instr((void *)(((Byte *)addr) + (16 * i)));
+        dump_ipf_instr((void *)(((U_8*)addr) + (16 * i)));
     }
-    dump_bytes((Byte *)addr, 16 * num_instr);
+    dump_bytes((U_8*)addr, 16 * num_instr);
 } //dump_ipf_instructions
 
 #endif //DUMP_IPF_INSTRUCTIONS
@@ -1738,7 +1738,7 @@ void Merced_Code_Emitter::apply_brl_patch(MCE_brl_patch *patch, char *code_buffe
 {
     uint64 target = patch->get_target();
     uint64 offset = patch->get_offset();
-    Byte *curr_ip = (((Byte *)code_buffer) + offset);
+    U_8* curr_ip = (((U_8*)code_buffer) + offset);
 #ifdef DUMP_IPF_INSTRUCTIONS
     printf("Merced_Code_Emitter::apply_brl_patch: code_buffer=%p, offset=%p (curr_ip=%p), target=%p\n",
            code_buffer, offset, curr_ip, target);

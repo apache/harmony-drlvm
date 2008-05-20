@@ -86,11 +86,11 @@ JNIEXPORT jboolean compareAndSetObjectField
 
     tmn_suspend_disable();
 
-    Byte *java_ref = (Byte *)h->object;
-    ManagedObject **field_addr = (ManagedObject **)(java_ref + offset);
+    U_8* java_ref = (U_8*)h->object;
+    ManagedObject** field_addr = (ManagedObject**)(java_ref + offset);
 
-    ManagedObject *val = (v==NULL)?NULL:v->object;
-    ManagedObject *exp = (e==NULL)?NULL:e->object;
+    ManagedObject* val = (v==NULL)?NULL:v->object;
+    ManagedObject* exp = (e==NULL)?NULL:e->object;
 
     bool result;
 
@@ -123,10 +123,10 @@ JNIEXPORT jboolean compareAndSetBooleanField
 
     tmn_suspend_disable();
 
-    Byte *java_ref = (Byte *)h->object;
-    jboolean *field_addr = (jboolean *)(java_ref + offset);
+    U_8* java_ref = (U_8*)h->object;
+    jboolean* field_addr = (jboolean*)(java_ref + offset);
     bool result =
-        (port_atomic_cas8((uint8 *)field_addr, (uint8)value, (uint8)expected) == (uint8)expected);
+        (port_atomic_cas8((uint8*)field_addr, (uint8)value, (uint8)expected) == (uint8)expected);
 
     tmn_suspend_enable();
     return (jboolean)(result?JNI_TRUE:JNI_FALSE);
@@ -142,10 +142,10 @@ JNIEXPORT jboolean compareAndSetIntField
 
     tmn_suspend_disable();
 
-    Byte *java_ref = (Byte *)h->object;
-    jint *field_addr = (jint *)(java_ref + offset);
+    U_8* java_ref = (U_8*)h->object;
+    jint* field_addr = (jint*)(java_ref + offset);
     bool result =
-      (apr_atomic_cas32((uint32 *)field_addr, (uint32)value, (uint32)expected) == (uint32)expected);
+      (apr_atomic_cas32((uint32*)field_addr, (uint32)value, (uint32)expected) == (uint32)expected);
 
     tmn_suspend_enable();
     return (jboolean)(result?JNI_TRUE:JNI_FALSE);
@@ -160,11 +160,11 @@ JNIEXPORT jboolean compareAndSetLongField
 
     tmn_suspend_disable();
 
-    Byte *java_ref = (Byte *)h->object;
-    jlong *field_addr = (jlong *)(java_ref + offset);
+    U_8* java_ref = (U_8*)h->object;
+    jlong* field_addr = (jlong*)(java_ref + offset);
 
     bool result =
-      (port_atomic_cas64((uint64 *)field_addr, (uint64)value, (uint64)expected) == (uint64)expected);
+      (port_atomic_cas64((uint64*)field_addr, (uint64)value, (uint64)expected) == (uint64)expected);
 
     tmn_suspend_enable();
     return (jboolean)(result?JNI_TRUE:JNI_FALSE);

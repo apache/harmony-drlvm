@@ -369,9 +369,8 @@ DECLARE_OPEN(uint32, method_get_bytecode_length, (Method_Handle method));
  * @return The method bytecode array.
  *
  * @note An assertion is raised if the method equals to <code>NULL</code>. 
- * @note Reference to type <i>Byte</i>.
  */
-DECLARE_OPEN(const Byte*, method_get_bytecode, (Method_Handle method));
+DECLARE_OPEN(const U_8*, method_get_bytecode, (Method_Handle method));
 
 /**
  * Returns StackMapTable attribute.
@@ -382,7 +381,7 @@ DECLARE_OPEN(const Byte*, method_get_bytecode, (Method_Handle method));
  *
  * @return StackMapTable bytes
  */
-DECLARE_OPEN(unsigned char*, method_get_stackmaptable, (Method_Handle hmethod));
+DECLARE_OPEN(U_8*, method_get_stackmaptable, (Method_Handle hmethod));
 
 /**
  * Returns the maximum number of local variables for the given method.
@@ -452,11 +451,9 @@ DECLARE_OPEN(void*, method_get_native_func_addr, (Method_Handle method));
  *
  * @return The pointer to the allocated info block.
  *
- * @note Reference to type <i>Byte</i>.
- *
  * @see method_allocate_data_block
  */
-DECLARE_OPEN(Byte*, method_allocate_info_block,
+DECLARE_OPEN(U_8*, method_allocate_info_block,
     (Method_Handle method, JIT_Handle jit, size_t size));
 
 /**
@@ -477,12 +474,11 @@ DECLARE_OPEN(Byte*, method_allocate_info_block,
  *
  * @return The pointer to the allocated data block.
  *
- * @note Reference to type <i>Byte</i>.
  * @note FIXME This has to go to the compilation infrastructure interface.
  *
  * @see method_allocate_info_block
  */
-DECLARE_OPEN(Byte*, method_allocate_data_block,
+DECLARE_OPEN(U_8*, method_allocate_data_block,
     (Method_Handle method, JIT_Handle jit, size_t size, size_t alignment));
 
 /**
@@ -493,7 +489,7 @@ DECLARE_OPEN(Byte*, method_allocate_data_block,
  * this interface to have more control over the layout of various
  * memory blocks allocated by the VM.
  */
-DECLARE_OPEN(Byte*, method_allocate_jit_data_block,
+DECLARE_OPEN(U_8*, method_allocate_jit_data_block,
     (Method_Handle method, JIT_Handle jit, size_t size, size_t alignment));
 
 /**
@@ -522,7 +518,7 @@ DECLARE_OPEN(Byte*, method_allocate_jit_data_block,
  *
  * @note FIXME This has to go to the compilation infrastructure interface. 
  */
-DECLARE_OPEN(Byte*, method_allocate_code_block,
+DECLARE_OPEN(U_8*, method_allocate_code_block,
     (Method_Handle method, JIT_Handle jit, size_t size, size_t alignment,
      CodeBlockHeat heat, int id, Code_Allocation_Action action));
 
@@ -537,7 +533,7 @@ DECLARE_OPEN(Byte*, method_allocate_code_block,
  *
  * @return address of the requested code block
  */
-DECLARE_OPEN(Byte*, method_get_code_block_jit,
+DECLARE_OPEN(U_8*, method_get_code_block_jit,
     (Method_Handle method, JIT_Handle j));/*, int id));*/
 
 /**
@@ -564,10 +560,8 @@ DECLARE_OPEN(unsigned, method_get_code_block_size_jit,
  * @param jit       - the JIT handle
  *
  * @return The pointer to the allocated info block.
- *
- * @note Reference to type <i>Byte</i>.
  */
-DECLARE_OPEN(Byte*, method_get_info_block_jit, (Method_Handle method, JIT_Handle jit));
+DECLARE_OPEN(U_8*, method_get_info_block_jit, (Method_Handle method, JIT_Handle jit));
 
 /**
  * Get the size of the memory block allocated earlier by

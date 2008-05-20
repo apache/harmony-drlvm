@@ -49,8 +49,8 @@ namespace Ia32 {
         void registerInsts(IRManager& irm);
 
         POINTER_SIZE_INT getByteSize() const ;
-        static POINTER_SIZE_INT readByteSize(const Byte* input);
-        void write(Byte*);
+        static POINTER_SIZE_INT readByteSize(const U_8* input);
+        void write(U_8*);
         const GCSafePointsInfo* getGCSafePointsInfo() const {return offsetsInfo;}
         
         static const POINTER_SIZE_INT* findGCSafePointStart(const POINTER_SIZE_INT* image, POINTER_SIZE_INT ip);

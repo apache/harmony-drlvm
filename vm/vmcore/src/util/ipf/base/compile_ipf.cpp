@@ -81,10 +81,10 @@ void emit_arraycopy_override(Emitter_Handle eh, Method *method);
 void emit_system_currenttimemillis_override(Emitter_Handle eh, Method *method);
 void emit_readinternal_override(Emitter_Handle eh, Method *method);
 
-void flush_hw_cache(Byte *addr, size_t len)
+void flush_hw_cache(U_8* addr, size_t len)
 {
     for(unsigned int i = 0; i < len; i += 32) {
-        flush_cache_line((void *)&(addr[i]));
+        flush_cache_line((void*)&(addr[i]));
     }
 } //flush_hw_cache
 
@@ -174,7 +174,7 @@ static void emit_newinstance_override(Emitter_Handle eh, Method *method) {
         // (p3) [r8] = g3                                // write vtable to the newly allocated object
         // (p3) [g1] = g4                                // set new current value
         // (p3) return
-        size_t offset_gc_local           = (Byte *)&(p_TLS_vmthread->_gc_private_information) - (Byte *)p_TLS_vmthread;
+        size_t offset_gc_local           = (U_8*)&(p_TLS_vmthread->_gc_private_information) - (U_8*)p_TLS_vmthread;
         size_t offset_allocation_handle  = env->Void_Class->get_offset_of_allocation_handle();
         size_t offset_instance_data_size = env->Void_Class->get_offset_of_instance_data_size();
         current_offset += (unsigned) offset_gc_local;
@@ -320,7 +320,7 @@ int sizeof_stub_override_entries = sizeof(_stub_override_entries_base) / sizeof(
 /*    END SUPPORT FOR STUB OVERRIDE CODE SEQUENCES    */
 
 
-void compile_flush_generated_code_block(Byte* b, size_t sz) {
+void compile_flush_generated_code_block(U_8* b, size_t sz) {
     flush_hw_cache(b, sz);
 }
 
@@ -428,7 +428,7 @@ void compile_protect_arguments(Method_Handle method, GcFrame* gc) {
     }
 }
 
-void patch_code_with_threads_suspended(Byte *code_block, Byte *new_code, size_t size) {
+void patch_code_with_threads_suspended(U_8* code_block, U_8* new_code, size_t size) {
     // Check that the code being modified is one or more complete bundles on IPF.
     assert((((size_t)code_block) % 16) == 0);  // else did not start at a possible bundle address
 

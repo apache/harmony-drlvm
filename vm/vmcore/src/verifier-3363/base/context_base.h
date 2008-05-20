@@ -103,7 +103,7 @@ protected:
     Method_Handle m_method;
 
     //method's bytecode
-    Byte*         m_bytecode;
+    U_8*          m_bytecode;
 
     //legth of the code in the method being verified
     unsigned       m_code_length;
@@ -181,7 +181,7 @@ protected:
         m_max_stack = method_get_max_stack(m_method);
         m_code_length = method_get_bytecode_length(m_method);
         m_handlecount = method_get_exc_handler_number(m_method);
-        m_bytecode = const_cast<Byte*>(method_get_bytecode(m_method));
+        m_bytecode = const_cast<U_8*>(method_get_bytecode(m_method));
 
         m_is_constructor = !strcmp(method_get_name(m_method), "<init>") 
             && class_get_super_class(k_class);
@@ -204,22 +204,22 @@ protected:
     int instr_get_len_compound(Address instr, OpCode opcode);
 
     //read two-byte value
-    static uint16 read_uint16(Byte* ptr) {
+    static uint16 read_uint16(U_8* ptr) {
         return (ptr[0] << 8) | ptr[1];
     }
 
     //read four-byte value
-    static uint32 read_uint32(Byte* ptr) {
+    static uint32 read_uint32(U_8* ptr) {
         return (ptr[0] << 24) | (ptr[1] << 16) | (ptr[2] << 8) | ptr[3];
     }
 
     //get a 16-bit jump target
-    static Address instr_get_int16_target(Address instr, Byte* ptr) {
+    static Address instr_get_int16_target(Address instr, U_8* ptr) {
         return (Address) (instr + read_uint16(ptr));
     }
 
     //get a 32-bit jump target
-    static Address instr_get_int32_target(Address instr, Byte* ptr) {
+    static Address instr_get_int32_target(Address instr, U_8* ptr) {
         return (Address) (instr + read_uint32(ptr));
     }
 
@@ -239,7 +239,7 @@ protected:
     }
 
     //whether this instruction GOTO, RETURN, ATHROW, or RET
-    static int instr_direct(ParseInfo &pi, OpCode opcode, Byte* code, Address instr) {
+    static int instr_direct(ParseInfo &pi, OpCode opcode, U_8* code, Address instr) {
         return (pi.flags & PI_DIRECT) || (opcode == OP_WIDE && code[instr + 1] == OP_RET);
     }
 
@@ -269,7 +269,7 @@ protected:
     }
 
     //return the jump target for the given instruction
-    static Address instr_get_jump_target(ParseInfo &pi, Byte* code, Address instr) {
+    static Address instr_get_jump_target(ParseInfo &pi, U_8* code, Address instr) {
         return ( pi.flags & PI_WIDEJUMP ) ? instr_get_int32_target(instr, code + instr + 1) :
             instr_get_int16_target(instr, code + instr + 1);
     }

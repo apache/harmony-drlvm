@@ -856,7 +856,7 @@ Class *java_lang_Class_to_struct_Class(ManagedObject *jlc)
     //assert(jlc->vt()->clss == VM_Global_State::loader_env->JavaLangClass_Class);
 
     assert(VM_Global_State::loader_env->vm_class_offset != 0);
-    Class **vm_class_ptr = (Class **)(((Byte *)jlc) + VM_Global_State::loader_env->vm_class_offset);
+    Class** vm_class_ptr = (Class**)(((U_8*)jlc) + VM_Global_State::loader_env->vm_class_offset);
     assert(vm_class_ptr != NULL);
 
     Class* clss = *vm_class_ptr;

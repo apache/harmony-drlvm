@@ -133,7 +133,7 @@ struct Global_Env {
      * Base address of Java heap.
      */
 
-    Byte* heap_base;
+    U_8* heap_base;
 
     /**
      * Ceiling of Java heap.
@@ -143,14 +143,14 @@ struct Global_Env {
      * @note We assume Java heap uses one continuous memory block.
      */
 
-    Byte* heap_end;
+    U_8* heap_end;
 
     /** 
      * This will be set to either <code>NULL</code> or <code>heap_base</code> depending
      * on whether compressed references are used.
      */
 
-    Byte* managed_null;
+    U_8* managed_null;
 
     /**
      * Preloaded strings

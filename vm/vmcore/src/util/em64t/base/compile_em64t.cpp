@@ -41,7 +41,7 @@
 #include "dump.h"
 #include "vm_stats.h"
 
-void compile_flush_generated_code_block(Byte*, size_t) {
+void compile_flush_generated_code_block(U_8*, size_t) {
     // Nothing to do on EM64T
 }
 
@@ -49,7 +49,7 @@ void compile_flush_generated_code() {
     // Nothing to do on EM64T
 }
 
-void patch_code_with_threads_suspended(Byte * UNREF code_block, Byte * UNREF new_code, size_t UNREF size) {
+void patch_code_with_threads_suspended(U_8* UNREF code_block, U_8* UNREF new_code, size_t UNREF size) {
     DIE(("Not supported on EM64T currently"));
 }
 

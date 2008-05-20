@@ -133,7 +133,7 @@ LilCodeStub* nso_newinstance(LilCodeStub* cs, Method_Handle)
         cs = lil_parse_onto_end(cs, "jc l1=0,fallback;");
 
         // Class supports fast allocation, now use frontier allocation technique
-        size_t offset_gc_local           = (Byte *)&(p_TLS_vmthread->_gc_private_information) - (Byte *)p_TLS_vmthread;
+        size_t offset_gc_local           = (U_8*)&(p_TLS_vmthread->_gc_private_information) - (U_8*)p_TLS_vmthread;
         size_t offset_allocation_handle  = env->Void_Class->get_offset_of_allocation_handle();
         size_t offset_instance_data_size = env->Void_Class->get_offset_of_instance_data_size();
         current_offset += (unsigned) offset_gc_local;

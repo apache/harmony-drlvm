@@ -107,11 +107,11 @@ extern "C" void *do_flushrs();
 extern "C" void do_mf();
 extern "C" void do_loadrs(int loadrs);
 
-void flush_hw_cache(Byte *addr, /*int*/ size_t len);
+void flush_hw_cache(U_8* addr, /*int*/ size_t len);
 
 // Save the unwind info passed as the first argument.  Verify that the address
 // passed as the second argument is correct.
-void *save_unwind_info(void *ar_bsp, void **saved_ar_bsp_addr);
+void* save_unwind_info(void* ar_bsp, void** saved_ar_bsp_addr);
 
 
 

@@ -121,9 +121,9 @@ jobject JNICALL GetObjectFieldOffset(JNIEnv* UNREF jni_env, jobject obj, jint of
 
     tmn_suspend_disable();       //---------------------------------v
 
-    Byte *java_ref = (Byte *)h->object;
-    ManagedObject **field_addr = (ManagedObject **)(java_ref + offset);
-    ManagedObject *val = get_raw_reference_pointer(field_addr);
+    U_8* java_ref = (U_8*) h->object;
+    ManagedObject** field_addr = (ManagedObject**)(java_ref + offset);
+    ManagedObject* val = get_raw_reference_pointer(field_addr);
     ObjectHandle new_handle = NULL; 
     if (val != NULL) {
         new_handle = oh_allocate_local_handle_from_jni();
@@ -165,7 +165,7 @@ jboolean JNICALL GetBooleanFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint
 
     tmn_suspend_disable();       //---------------------------------v
 
-    Byte *java_ref = (Byte *)h->object;
+    U_8* java_ref = (U_8*)h->object;
     jboolean val = *(jboolean *)(java_ref + offset);
 
     tmn_suspend_enable();        //---------------------------------^
@@ -197,7 +197,7 @@ jbyte JNICALL GetByteFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint offse
 
     tmn_suspend_disable();       //---------------------------------v
 
-    Byte *java_ref = (Byte *)h->object;
+    U_8* java_ref = (U_8*)h->object;
     jbyte val = *(jbyte *)(java_ref + offset);
 
     tmn_suspend_enable();        //---------------------------------^
@@ -231,7 +231,7 @@ jchar JNICALL GetCharFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint offse
 
     tmn_suspend_disable();     //---------------------------------v
 
-    Byte *java_ref = (Byte *)h->object;
+    U_8* java_ref = (U_8*)h->object;
     jchar val = *(jchar *)(java_ref + offset);
 
     tmn_suspend_enable();                        //---------------------------------^
@@ -265,7 +265,7 @@ jshort JNICALL GetShortFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint off
 
     tmn_suspend_disable();       //---------------------------------v
 
-    Byte *java_ref = (Byte *)h->object;
+    U_8* java_ref = (U_8*)h->object;
     jshort val = *(jshort *)(java_ref + offset);
 
     tmn_suspend_enable();        //---------------------------------^
@@ -299,7 +299,7 @@ jint JNICALL GetIntFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint offset)
 
     tmn_suspend_disable();       //---------------------------------v
 
-    Byte *java_ref = (Byte *)h->object;
+    U_8* java_ref = (U_8*)h->object;
     jint val = *(jint *)(java_ref + offset);
 
     tmn_suspend_enable();        //---------------------------------^
@@ -333,8 +333,8 @@ jlong JNICALL GetLongFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint offse
 
     tmn_suspend_disable();       //---------------------------------v
 
-    Byte *java_ref = (Byte *)h->object;
-    jlong val = *(jlong *)(java_ref + offset);
+    U_8* java_ref = (U_8*)h->object;
+    jlong val = *(jlong*)(java_ref + offset);
 
     tmn_suspend_enable();        //---------------------------------^
 
@@ -367,8 +367,8 @@ jfloat JNICALL GetFloatFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint off
 
     tmn_suspend_disable();       //---------------------------------v
 
-    Byte *java_ref = (Byte *)h->object;
-    jfloat val = *(jfloat *)(java_ref + offset);
+    U_8* java_ref = (U_8*)h->object;
+    jfloat val = *(jfloat*)(java_ref + offset);
 
     tmn_suspend_enable();        //---------------------------------^
 
@@ -401,8 +401,8 @@ jdouble JNICALL GetDoubleFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint o
     
     tmn_suspend_disable();       //---------------------------------v
 
-    Byte *java_ref = (Byte *)h->object;
-    jdouble val = *(jdouble *)(java_ref + offset);
+    U_8* java_ref = (U_8*)h->object;
+    jdouble val = *(jdouble*)(java_ref + offset);
 
     tmn_suspend_enable();        //---------------------------------^
 
@@ -446,7 +446,7 @@ void JNICALL SetObjectFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint offs
 
     tmn_suspend_disable();       //---------------------------------v
 
-    Byte *java_ref = (Byte *)h->object;
+    U_8* java_ref = (U_8*)h->object;
     ManagedObject **field_addr = (ManagedObject **)(java_ref + offset);
 
     ManagedObject *val;
@@ -488,8 +488,8 @@ void JNICALL SetBooleanFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint off
 
     tmn_suspend_disable();       //---------------------------------v
 
-    Byte *java_ref = (Byte *)h->object;
-    *(jboolean *)(java_ref + offset) = value;
+    U_8* java_ref = (U_8*)h->object;
+    *(jboolean*)(java_ref + offset) = value;
 
     tmn_suspend_enable();        //---------------------------------^
 }
@@ -520,11 +520,11 @@ void JNICALL SetByteFieldOffset(JNIEnv * jni_env, jobject obj, jint offset, jbyt
 
     tmn_suspend_disable();       //---------------------------------v
 
-    Byte *java_ref = (Byte *)h->object;
+    U_8* java_ref = (U_8*)h->object;
     if(vm_env->compact_fields)
-        *(jbyte *)(java_ref + offset) = value;
+        *(jbyte*)(java_ref + offset) = value;
     else
-        *(jint *)(java_ref + offset) = value;
+        *(jint*)(java_ref + offset) = value;
 
     tmn_suspend_enable();        //---------------------------------^
 }
@@ -556,8 +556,8 @@ void JNICALL SetCharFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint offset
 
     tmn_suspend_disable();       //---------------------------------v
 
-    Byte *java_ref = (Byte *)h->object;
-    *(jchar *)(java_ref + offset) = value;
+    U_8* java_ref = (U_8*)h->object;
+    *(jchar*)(java_ref + offset) = value;
 
     tmn_suspend_enable();        //---------------------------------^
 }
@@ -590,11 +590,11 @@ void JNICALL SetShortFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint offse
 
     tmn_suspend_disable();       //---------------------------------v
 
-    Byte *java_ref = (Byte *)h->object;
+    U_8* java_ref = (U_8*)h->object;
     if (vm_env->compact_fields)
-        *(jshort *)(java_ref + offset) = value;
+        *(jshort*)(java_ref + offset) = value;
     else
-        *(jint *)(java_ref + offset) = value;
+        *(jint*)(java_ref + offset) = value;
 
     tmn_suspend_enable();        //---------------------------------^
 }
@@ -626,8 +626,8 @@ void JNICALL SetIntFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint offset,
 
     tmn_suspend_disable();       //---------------------------------v
 
-    Byte *java_ref = (Byte *)h->object;
-    *(jint *)(java_ref + offset) = value;
+    U_8* java_ref = (U_8*)h->object;
+    *(jint*)(java_ref + offset) = value;
 
     tmn_suspend_enable();        //---------------------------------^
 }
@@ -659,8 +659,8 @@ void JNICALL SetLongFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint offset
 
     tmn_suspend_disable();       //---------------------------------v
 
-    Byte *java_ref = (Byte *)h->object;
-    *(jlong *)(java_ref + offset) = value;
+    U_8* java_ref = (U_8*)h->object;
+    *(jlong*)(java_ref + offset) = value;
 
     tmn_suspend_enable();        //---------------------------------^
 }
@@ -691,8 +691,8 @@ void JNICALL SetFloatFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint offse
 
     tmn_suspend_disable();       //---------------------------------v
 
-    Byte *java_ref = (Byte *)h->object;
-    *(jfloat *)(java_ref + offset) = value;
+    U_8* java_ref = (U_8*)h->object;
+    *(jfloat*)(java_ref + offset) = value;
 
     tmn_suspend_enable();        //---------------------------------^
 }
@@ -724,8 +724,8 @@ void JNICALL SetDoubleFieldOffset(JNIEnv * UNREF jni_env, jobject obj, jint offs
 
     tmn_suspend_disable();       //---------------------------------v
 
-    Byte *java_ref = (Byte *)h->object;
-    *(jdouble *)(java_ref + offset) = value;
+    U_8* java_ref = (U_8*)h->object;
+    *(jdouble*)(java_ref + offset) = value;
 
     tmn_suspend_enable();        //---------------------------------^
 }

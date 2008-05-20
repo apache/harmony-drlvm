@@ -115,7 +115,7 @@ void gen_native_newinstance(Emitter_Handle h, Method *m)
         s = branch8(s, Condition_Z,  Imm_Opnd(size_8, 50));
 
         // Class supports fast allocation, now use frontier allocation technique
-        size_t offset_gc_local           = (Byte *)&(p_TLS_vmthread->_gc_private_information) - (Byte *)p_TLS_vmthread;
+        size_t offset_gc_local           = (U_8*)&(p_TLS_vmthread->_gc_private_information) - (U_8*)p_TLS_vmthread;
         size_t offset_allocation_handle  = env->Void_Class->get_offset_of_allocation_handle();
         size_t offset_instance_data_size = env->Void_Class->get_offset_of_instance_data_size();
         current_offset += (unsigned) offset_gc_local;

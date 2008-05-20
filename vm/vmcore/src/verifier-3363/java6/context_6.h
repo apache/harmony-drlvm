@@ -64,7 +64,7 @@ protected:
     //Read cnt types from a row bytearray representing StackMapTable and record to workmap starting at 
     //the specified element. If Long or Double happens in StackMapTable, record SM_HIGH_WORD after SM_LONG or SM_DOUBLE
     //to the workmap and increase cnt. Check space_available when record to the workmap
-    vf_Result read_types(Byte **attr, Byte *end, WorkmapElement_6* element, unsigned *cnt, unsigned space_available);
+    vf_Result read_types(U_8** attr, U_8* end, WorkmapElement_6* element, unsigned* cnt, unsigned space_available);
 
     ///////////////////////////////////  "VIRTUAL" METHODS /////////////////////////////////////////////
 public:
@@ -140,7 +140,7 @@ public:
 
     //recomputed stack map used for testing
 #ifndef _NDEBUG
-    Byte *substitution;
+    U_8* substitution;
 #endif
 };
 

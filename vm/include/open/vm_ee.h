@@ -83,7 +83,7 @@ DECLARE_OPEN(size_t, method_get_vtable_offset, (Method_Handle method));
 *
 * @sa method_allocate_info_block
 */
-DECLARE_OPEN(Byte *, method_allocate_data_block, (Method_Handle method,
+DECLARE_OPEN(U_8*, method_allocate_data_block, (Method_Handle method,
                                           JIT_Handle j,
                                           size_t size,
                                           size_t alignment));
@@ -97,7 +97,7 @@ DECLARE_OPEN(Byte *, method_allocate_data_block, (Method_Handle method,
 * of various memory blocks allocated by the VM.
 */
 
-DECLARE_OPEN(Byte *, method_allocate_jit_data_block, (Method_Handle method,
+DECLARE_OPEN(U_8*, method_allocate_jit_data_block, (Method_Handle method,
                                               JIT_Handle j,
                                               size_t size,
                                               size_t alignment));
@@ -118,7 +118,7 @@ DECLARE_OPEN(Byte *, method_allocate_jit_data_block, (Method_Handle method,
 *         allocated - the same as pass parameter size = 0 - function returns 
 *         only current address for allocation in pool but no memory is allocated.  
 */
-DECLARE_OPEN(Byte *,
+DECLARE_OPEN(U_8*,
 method_allocate_code_block, (Method_Handle m,
                            JIT_Handle j,
                            size_t size,
@@ -135,7 +135,7 @@ method_allocate_code_block, (Method_Handle m,
 *
 * @sa method_allocate_data_block
 */
-DECLARE_OPEN(Byte *, method_allocate_info_block, (Method_Handle method,
+DECLARE_OPEN(U_8*, method_allocate_info_block, (Method_Handle method,
                                           JIT_Handle j,
                                           size_t size));
 
@@ -145,7 +145,7 @@ DECLARE_OPEN(Byte *, method_allocate_info_block, (Method_Handle method,
 * method_allocate_code_block().
 * A pair <code><method, jit></code> uniquely identifies a code block.
 */
-DECLARE_OPEN(Byte *, method_get_code_block_addr_jit, (Method_Handle method,
+DECLARE_OPEN(U_8*, method_get_code_block_addr_jit, (Method_Handle method,
                                               JIT_Handle j));
 
 /**
@@ -161,7 +161,7 @@ DECLARE_OPEN(unsigned, method_get_code_block_size_jit, (Method_Handle method,
 * A triple <code><method, jit, id></code> uniquely identifies a 
 * code block.
 */
-DECLARE_OPEN(Byte *, method_get_code_block_addr_jit_new, (Method_Handle method,
+DECLARE_OPEN(U_8*, method_get_code_block_addr_jit_new, (Method_Handle method,
                                                   JIT_Handle j,
                                                   int id));
 
@@ -180,7 +180,7 @@ DECLARE_OPEN(unsigned, method_get_code_block_size_jit_new, (Method_Handle method
 * method_allocate_info_block().
 * A pair <code><method, jit></code> uniquely identifies a JIT info block.
 */ 
-DECLARE_OPEN(Byte *, method_get_info_block_jit, (Method_Handle method,
+DECLARE_OPEN(U_8*, method_get_info_block_jit, (Method_Handle method,
                                          JIT_Handle j));
 
 /**
@@ -207,7 +207,7 @@ DECLARE_OPEN(void, vm_register_jit_recompiled_method_callback, (JIT_Handle jit, 
  * It may be a lot cheaper to batch up the patch requests, so we may need to 
  * extend this interface.
  */
-DECLARE_OPEN(void, vm_patch_code_block, (Byte *code_block, Byte *new_code, size_t size));
+DECLARE_OPEN(void, vm_patch_code_block, (U_8* code_block, U_8* new_code, size_t size));
 
 /** 
  * Called by a JIT to have VM synchronously (in the same thread) compile a method

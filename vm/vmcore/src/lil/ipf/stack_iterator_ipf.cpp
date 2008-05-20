@@ -342,7 +342,7 @@ static transfer_control_stub_type gen_transfer_control_stub()
     size_t stub_size = emitter.get_size();
     fp.addr = (NativeCodePtr)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_DEFAULT, CAA_Allocate);
     emitter.copy((char*)fp.addr);
-    flush_hw_cache((Byte*)fp.addr, stub_size);
+    flush_hw_cache((U_8*)fp.addr, stub_size);
     sync_i_cache();
 
     DUMP_STUB(fp.addr, "transfer_control_stub (non-LIL)", stub_size);

@@ -1688,7 +1688,7 @@ bool Encoder::patchCallAddr(char * callAddr, char * methodAddr)
     p[1] |= s[2] << 23;
 
     // write to callAddr
-    VMInterface::rewriteCodeBlock((Byte *)callAddr, (Byte *)p, IPF_BUNDLE_SIZE);
+    VMInterface::rewriteCodeBlock((U_8*)callAddr, (U_8*)p, IPF_BUNDLE_SIZE);
 
 //    IPF_LOG << "Patch brl.call to 0x" << hex
 //            << (uint64)methodAddr << " at 0x" << (uint64)callAddr << "\n"

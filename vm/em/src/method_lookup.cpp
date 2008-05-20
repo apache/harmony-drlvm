@@ -213,7 +213,7 @@ Method_Code *Method_Lookup_Table::find(void *addr, Boolean is_ip_past)
         return NULL;
     }
     if (is_ip_past) {
-        addr = (void *)((Byte*)addr - 1);
+        addr = (U_8*)addr - 1;
     }
 
 #ifdef USE_METHOD_LOOKUP_CACHE

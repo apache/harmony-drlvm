@@ -193,7 +193,7 @@ vf_Result vf_Context_6::verify_method(Method_Handle method) {
 vf_Result vf_Context_6::load_stackmaptable() {
     vf_Result tcr;
 
-    Byte* stackmaptable = method_get_stackmaptable(m_method);
+    U_8* stackmaptable = method_get_stackmaptable(m_method);
 
 #ifndef _NDEBUG
     if (substitution) stackmaptable = substitution;
@@ -201,13 +201,13 @@ vf_Result vf_Context_6::load_stackmaptable() {
 
     if(!stackmaptable) return VF_OK;
 
-    Byte* read_ptr = stackmaptable;
+    U_8* read_ptr = stackmaptable;
 
     read_ptr+=2; //skip uint16 attribute_name_index
 
     uint32 attribute_length = read_uint32(read_ptr); 
     read_ptr+=4;
-    Byte *attribute_end = stackmaptable + attribute_length + 6;
+    U_8* attribute_end = stackmaptable + attribute_length + 6;
 
     if( read_ptr + 2 > attribute_end ) return error(VF_ErrorStackmap, "corrupted StackMapTable");
     uint16 number_of_entries = read_uint16(read_ptr);
@@ -373,8 +373,8 @@ vf_Result vf_Context_6::load_stackmaptable() {
  * the specified element. If Long or Double happens in StackMapTable, record SM_HIGH_WORD after SM_LONG or SM_DOUBLE
  * to the workmap and increase cnt. Check space_available when record to the workmap
  */
-vf_Result vf_Context_6::read_types(Byte **attr, Byte *end, WorkmapElement_6* element,
-                                   unsigned *cnt, unsigned space_available) {
+vf_Result vf_Context_6::read_types(U_8** attr, U_8* end, WorkmapElement_6* element,
+                                   unsigned* cnt, unsigned space_available) {
     uint16 idx = 0;
     //read (*cnt) types
     while( idx < *cnt ) {

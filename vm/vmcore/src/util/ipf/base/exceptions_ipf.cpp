@@ -103,7 +103,7 @@ void *get_vm_rt_athrow_naked_compactor()
     size_t stub_size = emitter.get_size();
     void *stub = (void *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_COLD, CAA_Allocate);
     emitter.copy((char *)stub);
-    flush_hw_cache((Byte *)stub, stub_size);
+    flush_hw_cache((U_8*)stub, stub_size);
     sync_i_cache();
     addr = stub;
     return stub;
@@ -130,7 +130,7 @@ static void *gen_vm_rt_exception_throw_compactor(Class *exc, char *stub_name)
     size_t stub_size = emitter.get_size();
     void *stub = (void *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_COLD, CAA_Allocate);
     emitter.copy((char *)stub);
-    flush_hw_cache((Byte *)stub, stub_size);
+    flush_hw_cache((U_8*)stub, stub_size);
     sync_i_cache();
 
     return stub;

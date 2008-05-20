@@ -263,7 +263,7 @@ POINTER_SIZE_INT GCMap::getByteSize() const {
     return size;
 }
 
-POINTER_SIZE_INT GCMap::readByteSize(const Byte* input) {
+POINTER_SIZE_INT GCMap::readByteSize(const U_8* input) {
     POINTER_SIZE_INT* data = (POINTER_SIZE_INT*)input;
     POINTER_SIZE_INT gcMapSizeInBytes;
     
@@ -283,7 +283,7 @@ struct hwecompare {
 };
 #endif
 
-void GCMap::write(Byte* output)  {
+void GCMap::write(U_8* output)  {
     POINTER_SIZE_INT* data = (POINTER_SIZE_INT*)output;
     data[0] = getByteSize();
     data[1] = (POINTER_SIZE_INT)gcSafePoints.size();
@@ -522,8 +522,8 @@ void RuntimeInterface::getGCRootSet(MethodDesc* methodDesc, GCInterface* gcInter
 
     // Compute stack information
     uint32 stackInfoSize = (uint32)StackInfo::getByteSize(methodDesc);
-    Byte* infoBlock = methodDesc->getInfoBlock();
-    Byte* gcBlock = infoBlock + stackInfoSize;
+    U_8* infoBlock = methodDesc->getInfoBlock();
+    U_8* gcBlock = infoBlock + stackInfoSize;
 #ifdef _EM64T_
     const POINTER_SIZE_INT* gcPointImage = GCMap::findGCSafePointStart((POINTER_SIZE_INT*)gcBlock, *context->p_rip);
 #else
@@ -572,7 +572,7 @@ void InfoBlockWriter::runImpl() {
     uint32 bcMapSize = (uint32)bcMap->getByteSize(); // we should write at least the size of map  in the info block
     assert(bcMapSize >= 4);   // minimum size for empty  BCMap for all platforms
 
-    Byte* infoBlock = compIntf.allocateInfoBlock(stackInfoSize + gcInfoSize + bcMapSize);
+    U_8* infoBlock = compIntf.allocateInfoBlock(stackInfoSize + gcInfoSize + bcMapSize);
     stackInfo->write(infoBlock);
     gcMap->write(infoBlock+stackInfoSize);
 

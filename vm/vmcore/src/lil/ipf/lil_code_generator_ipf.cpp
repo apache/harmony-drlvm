@@ -2146,7 +2146,7 @@ NativeCodePtr LilCodeGeneratorIpf::compile_main(LilCodeStub* cs, size_t* stub_si
     *stub_size = emitter.get_size();
     NativeCodePtr buffer = allocate_memory(*stub_size, code_pool);
     emitter.copy((char*)buffer);
-    flush_hw_cache((Byte*)buffer, *stub_size);
+    flush_hw_cache((U_8*)buffer, *stub_size);
     sync_i_cache();
     
     return buffer;

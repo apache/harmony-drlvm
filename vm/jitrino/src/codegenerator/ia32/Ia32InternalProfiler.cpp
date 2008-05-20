@@ -652,7 +652,7 @@ void InternalProfiler::addCounters(MethodDesc& methodDesc) {
             *(ms->bbStats[node->getId()].bbExecCount)   = 0;
             node->prependInst(irManager->newInst(Mnemonic_POPFD));
 #ifndef _EM64T_
-            node->prependInst(irManager->newInst(Mnemonic_ADC, irManager->newMemOpnd(irManager->getTypeFromTag(Type::Int32), MemOpndKind_Heap, NULL, int((Byte*)(ms->bbStats[node->getId()].bbExecCount) + 4)), irManager->newImmOpnd(irManager->getTypeFromTag(Type::Int32),0)));
+            node->prependInst(irManager->newInst(Mnemonic_ADC, irManager->newMemOpnd(irManager->getTypeFromTag(Type::Int32), MemOpndKind_Heap, NULL, int((U_8*)(ms->bbStats[node->getId()].bbExecCount) + 4)), irManager->newImmOpnd(irManager->getTypeFromTag(Type::Int32),0)));
 
             node->prependInst(irManager->newInst(Mnemonic_ADD, irManager->newMemOpnd(irManager->getTypeFromTag(Type::Int32), MemOpndKind_Heap, NULL, int(ms->bbStats[node->getId()].bbExecCount)), irManager->newImmOpnd(irManager->getTypeFromTag(Type::Int32),1)));
 #endif

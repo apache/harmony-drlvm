@@ -145,8 +145,8 @@ PoolDescriptor* PoolManager::allocate_pool_storage(size_t size)
     VM_Statistics::get_vm_stats().total_memory_allocated += size;
 #endif
 
-    pDesc->_begin  = (Byte*)pool_storage;
-    pDesc->_end = ((Byte*)(pool_storage) + size);
+    pDesc->_begin  = (U_8*)pool_storage;
+    pDesc->_end = (U_8*)(pool_storage) + size;
 
     return pDesc;
 }
@@ -167,9 +167,9 @@ void* PoolManager::alloc(size_t size, size_t alignment, Code_Allocation_Action a
     _lock();
 
     assert(_active_pool);
-    Byte *pool_start = _active_pool->_begin;
-    pool_start = (Byte *) ((POINTER_SIZE_INT)(pool_start + mask) & ~(POINTER_SIZE_INT)mask);
-    Byte *pool_end = _active_pool->_end;
+    U_8* pool_start = _active_pool->_begin;
+    pool_start = (U_8*)((POINTER_SIZE_INT)(pool_start + mask) & ~(POINTER_SIZE_INT)mask);
+    U_8* pool_end = _active_pool->_end;
 
     size_t mem_left_in_pool = (pool_end - pool_start);
     while (size > mem_left_in_pool) {
@@ -186,7 +186,7 @@ void* PoolManager::alloc(size_t size, size_t alignment, Code_Allocation_Action a
                 _active_pool = pDesc;
 
                 pool_start = _active_pool->_begin;
-                pool_start = (Byte *) ((POINTER_SIZE_INT)(pool_start + mask) & ~(POINTER_SIZE_INT)mask);
+                pool_start = (U_8*)((POINTER_SIZE_INT)(pool_start + mask) & ~(POINTER_SIZE_INT)mask);
 
                 break;
             }
@@ -214,7 +214,7 @@ void* PoolManager::alloc(size_t size, size_t alignment, Code_Allocation_Action a
         }
 
         pool_start = p_pool->_begin;
-        pool_start = (Byte *) ((POINTER_SIZE_INT)(pool_start + mask) & ~(POINTER_SIZE_INT)mask);
+        pool_start = (U_8*)((POINTER_SIZE_INT)(pool_start + mask) & ~(POINTER_SIZE_INT)mask);
         break;
      }
     void *p = pool_start;
@@ -293,7 +293,7 @@ void* VirtualMemoryPool::alloc(size_t size, size_t alignment, Code_Allocation_Ac
         size_t new_committed = round_up_to_page_size_multiple(new_allocated);
 
         if (new_committed <= _reserved) {
-            Byte* commit_start = _base + _committed;
+            U_8* commit_start = _base + _committed;
             status = port_vmem_commit((void**) &commit_start, new_committed - _committed, _vmem);
         }
 
@@ -306,7 +306,7 @@ void* VirtualMemoryPool::alloc(size_t size, size_t alignment, Code_Allocation_Ac
 
     }
 
-    Byte* result = _base + _allocated;
+    U_8* result = _base + _allocated;
     _allocated = new_allocated;
 
     _unlock();
@@ -314,7 +314,7 @@ void* VirtualMemoryPool::alloc(size_t size, size_t alignment, Code_Allocation_Ac
     return result;
  }
 
-Byte* VirtualMemoryPool::get_base()
+U_8* VirtualMemoryPool::get_base()
 {
     assert(_base);
     return _base;

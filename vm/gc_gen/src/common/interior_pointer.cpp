@@ -52,7 +52,7 @@ void add_root_set_entry_interior_pointer(void **slot, int offset, Boolean is_pin
     interior_pointer_set.resize(size);
   }
 
-  Partial_Reveal_Object* p_obj = (Partial_Reveal_Object*) ((Byte*)*slot - offset);
+  Partial_Reveal_Object* p_obj = (Partial_Reveal_Object*) ((U_8*)*slot - offset);
   assert(p_obj->vt_raw);
   slot_offset_entry* push_back_entry = (slot_offset_entry*)&interior_pointer_set[interior_pointer_num_count++];
   push_back_entry->offset = offset;
@@ -79,7 +79,7 @@ void update_rootset_interior_pointer()
     void** root_slot = entry_traverser->slot;
     Partial_Reveal_Object* root_base = (Partial_Reveal_Object*)entry_traverser->base;
     unsigned int root_offset = entry_traverser->offset;
-    void *new_slot_contents = (void *)((Byte*)root_base + root_offset);  
+    void *new_slot_contents = (void *)((U_8*)root_base + root_offset);  
     *root_slot = new_slot_contents;
   }
   //can not reset the table here, for the rootset may be updated multi times

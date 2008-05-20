@@ -224,8 +224,8 @@ void* jthread_get_tm_data(jobject thread)
         Field *field = class_lookup_field_recursive(clazz, "vm_thread", "J");
         offset = field->get_offset();
     }
-    Byte *java_ref = (Byte *) thread_obj;
-    void **val = (void**)(java_ref + offset);
+    U_8* java_ref = (U_8*)thread_obj;
+    void** val = (void**)(java_ref + offset);
 
     hythread_suspend_enable();
 
@@ -244,8 +244,8 @@ void jthread_set_tm_data(jobject thread, void *val)
         Field *field = class_lookup_field_recursive(clazz, "vm_thread", "J");
         offset = field->get_offset();
     }
-    Byte *java_ref = (Byte *) thread_obj;
-    *(jlong *) (java_ref + offset) = (jlong) (POINTER_SIZE_INT) val;
+    U_8* java_ref = (U_8*)thread_obj;
+    *(jlong*)(java_ref + offset) = (jlong) (POINTER_SIZE_INT) val;
 
     hythread_suspend_enable();
 } // jthread_set_tm_data

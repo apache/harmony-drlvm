@@ -342,13 +342,13 @@ void *Method::allocate_rw_data_block(size_t size, size_t alignment, JIT *jit)
 void *Method::allocate_jit_info_block(size_t size, JIT *jit)
 {
     assert(size); // should be no need to allocate empty blocks
-    Byte* p_block = (Byte *) Alloc(size + sizeof(JIT **));
+    U_8* p_block = (U_8*) Alloc(size + sizeof(JIT **));
 
     // Store a pointer to the JIT before the JIT info block.
     *(JIT **) p_block = jit;
 
-    Byte* jit_info_block = p_block + sizeof(JIT **);
-    
+    U_8* jit_info_block = p_block + sizeof(JIT **);
+
     CodeChunkInfo *jit_info = get_chunk_info_mt(jit, CodeChunkInfo::main_code_chunk_id);
     assert(jit_info != NULL);
 
@@ -587,10 +587,10 @@ void Method::do_jit_recompiled_method_callbacks()
             CodeChunkInfo *jit_info;
             for (jit_info = get_first_JIT_specific_info(); jit_info; jit_info = jit_info->_next) {
                 if (jit_info->get_jit() == jit_to_be_notified) {
-                    flush_hw_cache((Byte *)jit_info->get_code_block_addr(), jit_info->get_code_block_size());
+                    flush_hw_cache((U_8*)jit_info->get_code_block_addr(), jit_info->get_code_block_size());
                 }
             }
-            sync_i_cache();            
+            sync_i_cache();
             do_mf();
 #endif //_IPF_
         }
@@ -627,13 +627,13 @@ void Method::_set_nop()
     if(!len) {
         return;
     }
-    Byte *bc = _byte_codes;
+    U_8* bc = _byte_codes;
     Nop_Stack_State stack_state = NS_StackEmpty;
     if(verbose) {
         printf("=========== nop[%d]: %s.%s%s\n", len, get_class()->get_name()->bytes, get_name()->bytes, get_descriptor()->bytes);
     }
     for (unsigned idx = 0; idx < len; idx++) {
-        Byte b = bc[idx];
+        U_8 b = bc[idx];
         if(verbose) {
             printf("\tbc[%d]=%d, state=%d\n", idx, b, stack_state);
         }

@@ -917,7 +917,7 @@ static void set_struct_Class_field_in_java_lang_Class(const Global_Env* env, Man
     assert(managed_object_is_java_lang_class(*jlc));
     assert(env->vm_class_offset != 0);
 
-    Class** vm_class_ptr = (Class **)(((Byte *)(*jlc)) + env->vm_class_offset);
+    Class** vm_class_ptr = (Class **)(((U_8*)(*jlc)) + env->vm_class_offset);
     *vm_class_ptr = clss;
 } // set_struct_Class_field_in_java_lang_Class
 

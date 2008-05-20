@@ -217,7 +217,7 @@ static void string_set_fields_separate(ManagedObject* str, unsigned length, unsi
 
     assert(f_value_offset);
 
-    Byte* str_raw = (Byte*)str;
+    U_8* str_raw = (U_8*)str;
     *(uint32*)(str_raw+f_count_offset) = length;
     *(uint32*)(str_raw+f_offset_offset) = offset;
     STORE_REFERENCE(str, str_raw+f_value_offset, chars);
@@ -368,7 +368,7 @@ unsigned string_get_length(ManagedObject* str)
     assert(str);
 
     if (f_count_offset == 0) init_fields();
-    Byte* str_raw = (Byte*)str;
+    U_8* str_raw = (U_8*)str;
     return *(uint32*)(str_raw+f_count_offset);
 }
 
@@ -415,8 +415,8 @@ static void string_get_buffer(ManagedObject* str, StringBuffer* buf)
     if (f_value_char_offset == 0) init_fields();
     assert(f_value_char_offset);
 
-    Byte* str_raw = (Byte*)str;
-    unsigned offset = *(uint32*)(str_raw+f_offset_offset);
+    U_8* str_raw = (U_8*)str;
+    unsigned offset = *(uint32*)(str_raw + f_offset_offset);
     Vector_Handle char_array = get_raw_reference_pointer((ManagedObject**)(str_raw+f_value_char_offset));
     if (char_array) {
         buf->is_compressed = false;

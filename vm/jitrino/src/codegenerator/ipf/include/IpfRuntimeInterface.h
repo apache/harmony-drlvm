@@ -48,13 +48,13 @@ public:
 protected:
 
     // getGCRootSet support
-    Byte           *findSafePoint(Byte*, uint32, uint64);
-    void           enumerateRootSet(GCInterface*, const JitFrameContext*, Byte*);
-    void           **getContextValue(int32);
+    U_8*           findSafePoint(U_8*, uint32, uint64);
+    void           enumerateRootSet(GCInterface*, const JitFrameContext*, U_8*);
+    void**         getContextValue(int32);
     void           reportMptr(int32, int32);
     void           reportBase(int32);
     bool           isMptr(int32);
-    
+
     GCInterface    *gcInterface;
     const JitFrameContext *context;
 };

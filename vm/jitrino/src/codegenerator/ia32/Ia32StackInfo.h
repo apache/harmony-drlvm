@@ -112,7 +112,7 @@ public:
 
     /** writes StackInfo data into memory
      */
-    void write(Byte* output);
+    void write(U_8* output);
 
     /** reads StackInfo data from MethodDesc
      */
@@ -182,7 +182,7 @@ public:
     /** read byte size from info block
     *                                                                      
     */
-    POINTER_SIZE_INT readByteSize(const Byte* input) const;
+    POINTER_SIZE_INT readByteSize(const U_8* input) const;
 
 private:
     POINTER_SIZE_INT byteSize;

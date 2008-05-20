@@ -478,7 +478,7 @@ public:
     // where memory is at a premium.
     // The value returned by getByteCodeAddr may be NULL in which case the
     // bytecodes are not available (presumably they have been garbage collected by VM).
-    const Byte  *get_byte_code_addr()   {return _byte_codes;}
+    const U_8*   get_byte_code_addr()   {return _byte_codes;}
     unsigned     get_byte_code_size()   {return _byte_code_length;}
 
     // From the class file (Sec. 4.7.4)
@@ -676,9 +676,9 @@ private:
     uint16 _max_locals;
     uint16 _n_exceptions;           // num exceptions method can throw
     uint16 _n_handlers;             // num exception handlers in byte codes
-    String  **_exceptions;          // array of exceptions method can throw
+    String** _exceptions;          // array of exceptions method can throw
     uint32 _byte_code_length;       // num bytes of byte code
-    Byte    *_byte_codes;           // method's byte codes
+    U_8*   _byte_codes;           // method's byte codes
     Handler *_handlers;             // array of exception handlers in code
     Method *_intf_method_for_fake_method;
     struct {

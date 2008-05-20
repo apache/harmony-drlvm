@@ -190,16 +190,16 @@ struct Encoder_Instr_IR {
         uint64              fast; // bit vector for 64 registers
         Enc_All_Reg_BV *    slow; // pointer to a bit vector for all registers
     } written_regs;
-       
+
     uint16              bytecode_addr;
     EM_Syllable_Type    syl_type;
-    Byte                flags;
-    Byte                special_instr;
-    Byte                def_ref;    
+    U_8                 flags;
+    U_8                 special_instr;
+    U_8                 def_ref;
     Encoder_Memory_Type mem_type;
     uint64              mem_value;
     unsigned            patch_target_id;
-    
+
     Encoder_Instr_IR () : code_image1(0), syl_type(ST_null),
         flags(0) {
         read_regs.fast=written_regs.fast=0;
@@ -326,7 +326,7 @@ struct Encoder_Bundle_IR {
     Encoder_Instr_IR * slots;
     uint16 avail_tmplts; // a bit vector for 12 templates
     EM_Templates  tmplt_number;
-    Byte   flags;
+    U_8      flags;
     unsigned target_id;
 
     void init(bool fast_reg_dep_check) {

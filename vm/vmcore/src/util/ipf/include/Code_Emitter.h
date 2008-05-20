@@ -803,8 +803,8 @@ private:
     // Return an integer with a register bit set according to a fast scheme.
     // If need to switch to a slow scheme return 0.
 
-    uint64 encode_a_fast_reg(Byte * reg_ptr) {
-        Byte b=*reg_ptr;
+    uint64 encode_a_fast_reg(U_8* reg_ptr) {
+        U_8 b=*reg_ptr;
         if (b & 0x80)  {  // reg is not in the map
             if (n_fast_reg >= ENC_N_FAST_REG)
                 return 0;
@@ -814,7 +814,7 @@ private:
     }
 
     // encode a write to a register
-    void encode_write_reg(Byte * reg_ptr, Encoder_Instr_IR &ir) {
+    void encode_write_reg(U_8* reg_ptr, Encoder_Instr_IR &ir) {
 #ifndef ENC_SLOW_REG_DEP
         if (fast_reg_dep_check) {
             uint64 u=encode_a_fast_reg(reg_ptr);
@@ -832,7 +832,7 @@ private:
     }
 
     // encode a read from a register
-    void encode_read_reg(Byte * reg_ptr, Encoder_Instr_IR &ir) {
+    void encode_read_reg(U_8* reg_ptr, Encoder_Instr_IR &ir) {
 #ifndef ENC_SLOW_REG_DEP
         if (fast_reg_dep_check) {
             uint64 u=encode_a_fast_reg(reg_ptr);
@@ -1399,12 +1399,12 @@ protected: // data
     // Fast scheme data:
     // a mapping from a register number to its bit position.
     // 8-th bit is 1 if register has not bit assigned a bit.
-    Byte     reg_map[ENC_N_REG];
-    Byte * const ireg_map;    // pointers to the beginning of the reg map parts
-    Byte * const freg_map;
-    Byte * const breg_map;
-    Byte * const areg_map;
-    Byte * const preg_map;
+    U_8     reg_map[ENC_N_REG];
+    U_8*    const ireg_map;    // pointers to the beginning of the reg map parts
+    U_8*    const freg_map;
+    U_8*    const breg_map;
+    U_8*    const areg_map;
+    U_8*    const preg_map;
     int    n_fast_reg;          // number of used regs with fast dependency check
 
     // Slow scheme data:
@@ -1428,7 +1428,7 @@ protected: // data
     // current instruction couple can be scheduled in any order
     bool     curr_instr_couple_is_unordered; 
     //mapping from compare extensions to speical instructions 
-    const static Byte     cmp_ext_to_special_instr[cmp_last];
+    const static U_8 cmp_ext_to_special_instr[cmp_last];
 #ifdef _DEBUG
     bool     emit_after_get_code_size;
     bool *   target_offset_is_set;
@@ -1907,7 +1907,7 @@ private:
 
     // Reference bit functions
 
-    void encode_def_ref_bit(Byte def_ref);
+    void encode_def_ref_bit(U_8 def_ref);
 
     // Methods that work with Instruction IR
     virtual void _init_ir (Encoder_Unscheduled_Instr_IR &ir,

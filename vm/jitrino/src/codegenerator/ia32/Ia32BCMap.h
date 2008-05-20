@@ -46,7 +46,7 @@ public:
         return 4 /*size*/+(uint32)theMap.size() * (4 + 2/*native offset + bc offset*/);
     }
 
-    void write(Byte* image) {
+    void write(U_8* image) {
         *((uint32*)image)=(uint32)theMap.size();
         uint32 imageOffset = 4;
         for (BCByNCMap::const_iterator it = theMap.begin(), end = theMap.end(); it!=end; it++) {
@@ -60,7 +60,7 @@ public:
         return;
     }
 
-    POINTER_SIZE_INT readByteSize(const Byte* image) const {
+    POINTER_SIZE_INT readByteSize(const U_8* image) const {
         uint32 sizeOfMap = *(uint32*)image;;
         return 4 + sizeOfMap * (4+2);
     }
@@ -70,7 +70,7 @@ public:
         theMap[key] =  value;
     }
 
-    static uint16 get_bc_offset_for_native_offset(uint32 ncOffset, Byte* image) {
+    static uint16 get_bc_offset_for_native_offset(uint32 ncOffset, U_8* image) {
         uint32 mapSize = *(uint32*)image; //read map size
         uint32 imageOffset=4;
         for (uint32 i = 0; i < mapSize; i++) {
@@ -85,7 +85,7 @@ public:
         return ILLEGAL_BC_MAPPING_VALUE;
     }
 
-    static uint32 get_native_offset_for_bc_offset(uint16 bcOff, Byte* image) {
+    static uint32 get_native_offset_for_bc_offset(uint16 bcOff, U_8* image) {
         uint32 mapSize = *(uint32*)image; //read map size
         uint32 imageOffset=4;
         for (uint32 i = 0; i < mapSize; i++) {

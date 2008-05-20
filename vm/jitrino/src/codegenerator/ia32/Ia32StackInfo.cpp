@@ -98,11 +98,11 @@ POINTER_SIZE_INT StackInfo::getByteSize() const     {
 }
 
 POINTER_SIZE_INT StackInfo::getByteSize(MethodDesc* md) {
-    Byte* data =  md->getInfoBlock();
+    U_8* data =  md->getInfoBlock();
     return *(POINTER_SIZE_INT*)data;
 }
 
-POINTER_SIZE_INT StackInfo::readByteSize(const Byte* bytes) const{
+POINTER_SIZE_INT StackInfo::readByteSize(const U_8* bytes) const{
     POINTER_SIZE_INT* data = (POINTER_SIZE_INT *) bytes;
     POINTER_SIZE_INT sizeInBytes = *data;
 
@@ -111,8 +111,8 @@ POINTER_SIZE_INT StackInfo::readByteSize(const Byte* bytes) const{
 
 typedef DepthEntry * EntryPtr;
 
-void StackInfo::write(Byte* bytes) {
-    Byte* data = bytes;
+void StackInfo::write(U_8* bytes) {
+    U_8* data = bytes;
     StackInfo* serializedInfo = (StackInfo*)data;
     *serializedInfo = *this;
     serializedInfo->byteSize = getByteSize();
@@ -124,7 +124,7 @@ void StackInfo::write(Byte* bytes) {
     for(DepthMap::iterator dmit = stackDepthInfo->begin(); dmit != stackDepthInfo->end(); dmit++) {
         hashSet(entries, dmit->first, hashTableSize, dmit->second, mm);
     }
-    Byte* next = data + hashTableSize * sizeof(POINTER_SIZE_INT);
+    U_8* next = data + hashTableSize * sizeof(POINTER_SIZE_INT);
     for(uint32 i = 0; i< hashTableSize; i++) {
         DepthEntry * e = entries[i];
         POINTER_SIZE_INT serializedEntryAddr = 0;
@@ -140,10 +140,10 @@ void StackInfo::write(Byte* bytes) {
         *((POINTER_SIZE_INT*)data)= serializedEntryAddr;
         data+=sizeof(POINTER_SIZE_INT);
     }
-    assert(getByteSize() == (POINTER_SIZE_INT) (((Byte*) next) - bytes));
+    assert(getByteSize() == (POINTER_SIZE_INT) (((U_8*)next) - bytes));
 }
 
-DepthEntry * getHashEntry(Byte * data, POINTER_SIZE_INT eip, uint32 size) 
+DepthEntry * getHashEntry(U_8* data, POINTER_SIZE_INT eip, uint32 size) 
 {
     if(!size)
         return NULL;
@@ -157,7 +157,7 @@ DepthEntry * getHashEntry(Byte * data, POINTER_SIZE_INT eip, uint32 size)
 }
 
 void StackInfo::read(MethodDesc* pMethodDesc, POINTER_SIZE_INT eip, bool isFirst) {
-    Byte* data = pMethodDesc->getInfoBlock();
+    U_8* data = pMethodDesc->getInfoBlock();
     byteSize = ((StackInfo *)data)->byteSize;
     hashTableSize = ((StackInfo *)data)->hashTableSize;
     frameSize = ((StackInfo *)data)->frameSize;

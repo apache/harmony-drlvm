@@ -42,11 +42,11 @@ bool greaterPriority(Edge *edge1, Edge *edge2) {
 // TryRegion
 //========================================================================================//
 
-TryRegion::TryRegion(Byte       *startAddr, 
-                     Byte       *endAddr, 
-                     Byte       *handlerAddr, 
-                     ObjectType *exceptionType, 
-                     bool       isExceptionObjDead) : 
+TryRegion::TryRegion(U_8*        startAddr,
+                     U_8*        endAddr,
+                     U_8*        handlerAddr,
+                     ObjectType* exceptionType,
+                     bool        isExceptionObjDead) :
     startAddr(startAddr),
     endAddr(endAddr),
     handlerAddr(handlerAddr),
@@ -90,22 +90,22 @@ void RuntimeSupport::makeRuntimeInfo() {
 
     IPF_LOG << endl << "  Register Exception Handlers" << dec << endl;
     registerExceptionHandlers();
-    
+
     IPF_LOG << endl << "  Make Stack Info" << endl;
     StackInfo *stackInfo = makeStackInfo();
     uint32 stackInfoSize = sizeof(StackInfo);
     IPF_LOG << "    stack info size (bytes): " << stackInfoSize << endl;
-    
+
     IPF_LOG << endl << "  Make Root Seet Info" << endl;
     Uint32Vector rootSetInfo(mm);
     makeRootSetInfo(rootSetInfo);
     uint32 rootSetInfoSize = ROOT_SET_HEADER_SIZE + rootSetInfo.size() * sizeof(uint32);
     IPF_LOG << "    GC root set info size (bytes): " << rootSetInfoSize << endl;
-    
+
     // create info block
     uint32 infoBlockSize = stackInfoSize + rootSetInfoSize;
-    Byte   *infoBlock    = compilationInterface.allocateInfoBlock(infoBlockSize);
-    
+    U_8*   infoBlock     = compilationInterface.allocateInfoBlock(infoBlockSize);
+
     // write stack info
     *((StackInfo *)infoBlock) = *stackInfo;
 
@@ -117,7 +117,7 @@ void RuntimeSupport::makeRuntimeInfo() {
         gcInfo[j] = rootSetInfo[i];
     }
 }
-    
+
 //----------------------------------------------------------------------------------------//
 // Exception registration
 //----------------------------------------------------------------------------------------//
@@ -182,19 +182,19 @@ void RuntimeSupport::makeRegion(BbNode *regionStart, BbNode *regionEnd, Node *di
 
     IPF_LOG << ", dispatch: node" << dispatchNode->getId();
 
-    Byte       *startAddr = (Byte *)regionStart->getAddress();
-    Byte       *endAddr   = (Byte *)regionEnd->getAddress();
+    U_8*        startAddr = (U_8*)regionStart->getAddress();
+    U_8*        endAddr   = (U_8*)regionEnd->getAddress();
     EdgeVector &outEdges  = dispatchNode->getOutEdges();     // get out edges   
     sort(outEdges.begin(), outEdges.end(), greaterPriority); // sort them by Priority
-    
+
     for (uint16 i=0; i<outEdges.size(); i++) {
         Edge *edge = outEdges[i];
         if (edge->getEdgeKind() == EDGE_EXCEPTION) {
 
-            BbNode     *handlerNode   = (BbNode *)edge->getTarget();
-            Byte       *handlerAddr   = (Byte *)handlerNode->getAddress();
-            ObjectType *exceptionType = (ObjectType *)((ExceptionEdge *)edge)->getExceptionType();
-            TryRegion  *region = new(mm) TryRegion(startAddr, endAddr, handlerAddr, exceptionType, false);
+            BbNode*     handlerNode   = (BbNode*)edge->getTarget();
+            U_8*        handlerAddr   = (U_8*)handlerNode->getAddress();
+            ObjectType* exceptionType = (ObjectType *)((ExceptionEdge *)edge)->getExceptionType();
+            TryRegion*  region = new(mm) TryRegion(startAddr, endAddr, handlerAddr, exceptionType, false);
 
             tryRegions.push_back(region);
             IPF_LOG << ", handler: node" << handlerNode->getId();

@@ -55,7 +55,7 @@
 #include "vm_stats.h"
 #include "dump.h"
 
-void compile_flush_generated_code_block(Byte*, size_t) {
+void compile_flush_generated_code_block(U_8*, size_t) {
     // Nothing to do on IA32
 }
 
@@ -140,7 +140,7 @@ void compile_protect_arguments(Method_Handle method, GcFrame* gc) {
     }
 }
 
-void patch_code_with_threads_suspended(Byte * UNREF code_block, Byte * UNREF new_code, size_t UNREF size) {
+void patch_code_with_threads_suspended(U_8* UNREF code_block, U_8* UNREF new_code, size_t UNREF size) {
     DIE(("Not supported on IA32 currently"));
 }
 

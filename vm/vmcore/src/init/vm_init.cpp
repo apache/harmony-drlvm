@@ -838,8 +838,8 @@ int vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments) {
     Slot::init(gc_heap_base_address(), gc_heap_ceiling_address());
 
     // TODO: find another way to initialize the following.
-    vm_env->heap_base = (Byte *)gc_heap_base_address();
-    vm_env->heap_end  = (Byte *)gc_heap_ceiling_address();
+    vm_env->heap_base = (U_8*)gc_heap_base_address();
+    vm_env->heap_end  = (U_8*)gc_heap_ceiling_address();
     vm_env->managed_null = REF_MANAGED_NULL;
 
     // 20030404 This handshaking protocol isn't quite correct. It doesn't

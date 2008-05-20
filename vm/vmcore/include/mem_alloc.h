@@ -36,9 +36,9 @@
 #define MEMORY_UTILIZATION_LIMIT 15
 
 typedef struct PoolDescriptor {
-    Byte    *_begin;     // next free byte in memory chunk
-    Byte    *_end;       // end of memory chunk
-    size_t   _size;      // size of memory chunk
+    U_8*    _begin;     // next free byte in memory chunk
+    U_8*    _end;       // end of memory chunk
+    size_t  _size;      // size of memory chunk
     port_vmem_t*    _descriptor; // for further memory deallocation
     PoolDescriptor* _next; 
 } PoolDescriptor;
@@ -95,10 +95,10 @@ public:
 
     // alloc is synchronized inside the class
     void* alloc(size_t size, size_t alignment, Code_Allocation_Action action);
-    Byte* get_base();
+    U_8* get_base();
 
 protected:
-    Byte* _base;
+    U_8*   _base;
     size_t _reserved;
     size_t _committed;
     size_t _allocated;

@@ -575,7 +575,7 @@ inline void exn_native_print_stack_trace(FILE * f, ManagedObject * exn)
     // ? 20030428: This code should be elsewhere!
     unsigned field_offset = ((Field *) gid_throwable_traceinfo)->get_offset();
     ManagedObject **field_addr =
-        (ManagedObject **) ((Byte *) exn + field_offset);
+        (ManagedObject **) ((U_8*) exn + field_offset);
     Vector_Handle stack_trace =
         (Vector_Handle) get_raw_reference_pointer(field_addr);
     if (stack_trace) {

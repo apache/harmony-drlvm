@@ -51,7 +51,7 @@ extern Boolean IGNORE_FINREF;
 inline REF *obj_get_referent_field(Partial_Reveal_Object *p_obj)
 {
   assert(p_obj);
-  return (REF*)(( Byte*)p_obj+get_gc_referent_offset());
+  return (REF*)((U_8*)p_obj+get_gc_referent_offset());
 }
 
 extern Boolean DURING_RESURRECTION;

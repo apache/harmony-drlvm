@@ -43,12 +43,11 @@
 /* Inclusion of all these functions into class support interface is yet to decide. */
 
 /* "through VM" method */
-/* NOTE: reference to internal type Byte */
 
 /**
  * Called by a EE to have the VM replace a section of executable code in a thread-safe fashion. 
  */
-void vm_patch_code_block(Byte* code_block, Byte* new_code, size_t size);
+void vm_patch_code_block(U_8* code_block, U_8* new_code, size_t size);
 
 /**
  * Called by a EE in order to be notified whenever the vtable entries for the given method 

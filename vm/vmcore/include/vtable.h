@@ -64,7 +64,7 @@ inline unsigned vm_max_fast_instanceof_depth()
 }
 
 typedef struct VTable {
-    Byte _gc_private_information[GC_BYTES_IN_VTABLE];
+    U_8 _gc_private_information[GC_BYTES_IN_VTABLE];
     ManagedObject*             jlC; 
     unsigned int             vtmark; 
     Class* clss;
