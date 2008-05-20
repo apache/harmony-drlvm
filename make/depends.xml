@@ -22,7 +22,7 @@
     
     <target name="check">
         <check-one-file dest="${cpptasks.jar}" src="${cpptasks.url}"/>
-        <poll-modules target="check-depends" dir="${dd.basedir}"/>
+        <poll-modules target="check-depends" dir="${dd.basedir}" includes="**/*.xml"/>
         <fail>
             <condition>
                 <not>
@@ -43,7 +43,7 @@ You may point to the correct location via "hy.hdk" property:
         
     <target name="fetch">
         <fetch dep="cpptasks"/>
-        <poll-modules target="fetch-depends" dir="${dd.basedir}"/>
+        <poll-modules target="fetch-depends" dir="${dd.basedir}" includes="**/*.xml"/>
     </target>
     
 </project>
