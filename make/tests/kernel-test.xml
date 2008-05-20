@@ -43,7 +43,7 @@
         <for list="${test.mode}" param="mode" trim="true">
             <sequential>
                 <antcall target="-run-kernel-test-batch"> 
-                    <param name="kernel.mode" value="@{mode}" />
+                    <param name="run.mode" value="@{mode}" />
                 </antcall>
             </sequential>
         </for>
@@ -98,19 +98,19 @@
     </target>
     
     <target name="-run-kernel-test-batch">
-        <propertycopy property="kernel.mode.name" from="${kernel.mode}.name" override="on"/>       
-        <propertycopy property="kernel.mode.switch" from="${kernel.mode}.switch" override="on"/>        
+        <propertycopy property="run.mode.name" from="${run.mode}.name" override="on"/>       
+        <propertycopy property="run.mode.switch" from="${run.mode}.switch" override="on"/>        
         <property name="report.dir"
-            location="${kernel.test.dir}/reports/${kernel.mode}.mode"/>
+            location="${kernel.test.dir}/reports/${run.mode}.mode"/>
         <mkdir dir="${report.dir}" />
 
         <echo>
         ==================================
-        Run kernel tests using ${kernel.mode.name} 
+        Run kernel tests using ${run.mode.name} 
         ==================================
         </echo>
         
-        <take-xlist name="exclude.file" file="${excludes.dir}/exclude.drlvm_kernel.${hy.platform}.${kernel.mode}"/>
+        <take-xlist name="exclude.file" file="${excludes.dir}/exclude.drlvm_kernel.${hy.platform}.${run.mode}"/>
 
         <junit fork="yes" failureproperty="kernel.failed"
             filtertrace="no" printsummary="on" showoutput="off"
@@ -121,7 +121,7 @@
             jvm="${test.jvm.exe}">
 
             <jvmarg line="-ea -esa" />
-            <jvmarg line="${kernel.mode.switch} ${test.vmargs}" />
+            <jvmarg line="${run.mode.switch} ${test.vmargs}" />
             <jvmarg value="-Dtest.resource.path=${test.resource.path}"/>
             <jvmarg value="-Xbootclasspath/a:${junit.jar}${path.separator}${test.class.path}" />
             <formatter type="xml"/>
@@ -140,6 +140,6 @@
         </condition>
 
         <concat append="on" destfile="${kernel.test.summary}" 
-            >      ${kernel.mode.name} ${kernel.status}${line.separator}</concat>
+            >      ${run.mode.name} ${kernel.status}${line.separator}</concat>
     </target>
 </project>
