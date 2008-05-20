@@ -353,4 +353,9 @@ Usage:
         <available property="test.failed" file="${base.test.dir}/reg.test.failed" />
     </target>
 
+    <target name="lazy.test">
+        <ant antfile="make/tests/lazy-test.xml" target="lazy-test"/>
+        <available property="test.failed" file="${base.test.dir}/lazy.test.failed" />
+    </target>
+
 </project>
