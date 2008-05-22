@@ -1,11 +1,6 @@
 Check.java
 PerfCheck.java
 
-# HARMONY-3338
-gc/LOS.java
-gc/MultiThreads.java
-perf/MultiThreadsSimple.java
-
 # HARMONY-2972 HARMONY-3010 HARMONY-4265 (HARMONY-4557) & HARMONY-4292
 StackTest.java
 exception/FinalizeStackTest.java

@@ -1,11 +1,6 @@
 Check.java
 PerfCheck.java
 
-# HARMONY-3338
-gc/LOS.java
-gc/MultiThreads.java
-perf/MultiThreadsSimple.java
-
 # HARMONY-3019
 stress/Stack.java
 
