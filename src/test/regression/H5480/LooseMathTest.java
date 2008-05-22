@@ -85,6 +85,12 @@ public class LooseMathTest extends TestCase {
         assertEquals("d=" + d + " ulp="+ulp, StrictMath.atan(d), Math.atan(d), ulp);
     }
     
+    public void testEXP() throws Exception {
+        double d = rnd.nextDouble();
+        double ulp = Math.ulp(StrictMath.exp(d));
+        assertEquals("d=" + d + " ulp="+ulp, StrictMath.exp(d), Math.exp(d), ulp);
+    }
+    
     public void testLOG() throws Exception {
         double d = rnd.nextInt() * rnd.nextDouble();
         d *= Math.signum(d);
@@ -106,6 +112,9 @@ public class LooseMathTest extends TestCase {
         assertEquals("d=" + d + " ulp="+ulp, StrictMath.log1p(d), Math.log1p(d), ulp);
 
         d = rnd.nextDouble();
+        //TODO current impl is less accurate for small values
+        double ulp = 1.e-9; //Math.ulp(StrictMath.tan(d));
+        
         ulp = Math.ulp(StrictMath.log1p(d));
         assertEquals("small d=" + d + " ulp="+ulp, StrictMath.log1p(d), Math.log1p(d), ulp);
     }
