@@ -516,6 +516,7 @@ public:
     Inst* caseLdFunAddr(MethodInst* inst)           { return hashInst(inst); }
     Inst* caseLdFunAddrSlot(MethodInst* inst)       { return hashInst(inst); }
     Inst* caseGetVTableAddr(TypeInst* inst)         { return hashInst(inst); }
+    Inst* caseGetClassObj(TypeInst* inst)           { return hashInst(inst); }
 
     // array access
     Inst* caseTauArrayLen(Inst* inst) { 

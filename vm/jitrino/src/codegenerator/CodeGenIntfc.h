@@ -252,6 +252,7 @@ public:
     virtual CG_OpndHandle*  tau_ldVTableAddr(Type *dstType, CG_OpndHandle* base,
                                              CG_OpndHandle *tauBaseNonNull) = 0;
     virtual CG_OpndHandle*  getVTableAddr(Type *dstType, ObjectType *base) = 0;
+    virtual CG_OpndHandle*  getClassObj(Type *dstType, ObjectType *base) = 0;
     virtual CG_OpndHandle*  tau_ldIntfTableAddr(Type *dstType, CG_OpndHandle* base, 
                                                 NamedType* vtableType) = 0;
     virtual CG_OpndHandle*  call(U_32 numArgs, CG_OpndHandle** args, Type* retType,

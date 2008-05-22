@@ -25,6 +25,7 @@
 #include "open/em.h"
 #include "open/ee_em_intf.h"
 
+#define JAVA_LANG_CLASS                 "java/lang/Class"
 #define NULL_POINTER_EXCEPTION          "java/lang/NullPointerException"
 #define INDEX_OUT_OF_BOUNDS             "java/lang/ArrayIndexOutOfBoundsException"
 #define ARRAY_STORE_EXCEPTION           "java/lang/ArrayStoreException"

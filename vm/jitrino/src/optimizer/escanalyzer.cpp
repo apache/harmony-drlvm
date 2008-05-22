@@ -326,6 +326,7 @@ EscAnalyzer::instrExam(Node* node) {
                 ntype=NT_OBJECT;        // for 3 cases above
             case Op_LdRef:           // ldref
             case Op_LdConstant:      // ldc
+            case Op_GetClassObj:     // getclassobj
                 if (ntype==0) 
                     ntype=NT_LDOBJ;         // loads refs
             case Op_DefArg:          // defarg

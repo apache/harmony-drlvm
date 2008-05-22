@@ -193,6 +193,8 @@ private:
 
     Inst* caseGetVTableAddr(TypeInst* inst) {return caseDefault(inst);}
 
+    Inst* caseGetClassObj(TypeInst* inst) {return caseDefault(inst);}
+
     Inst* caseAddScaledIndex(Inst* inst) {return caseDefault(inst);}
 
     Inst* caseStVar(Inst* inst) {return caseDefault(inst);}

@@ -308,36 +308,14 @@ void * vm_helper_get_addr(VM_RT_SUPPORT f) {
 
     switch(f) {
 #ifdef _WIN64
-    // Monitor enter runtime helpers
-    case VM_RT_MONITOR_ENTER_STATIC:
-        return rth_get_lil_monitor_enter_static();
     case VM_RT_MONITOR_ENTER:
         return rth_get_lil_monitor_enter();
-    case VM_RT_MONITOR_ENTER_NON_NULL:
-        return rth_get_lil_monitor_enter_non_null();
-
-   // Monitor exit runtime helpers
-    case VM_RT_MONITOR_EXIT_STATIC:
-        return rth_get_lil_monitor_exit_static();
     case VM_RT_MONITOR_EXIT:
         return rth_get_lil_monitor_exit();
-    case VM_RT_MONITOR_EXIT_NON_NULL:
-        return rth_get_lil_monitor_exit_non_null();
 #else
-    // Monitor enter runtime helpers
-    case VM_RT_MONITOR_ENTER_STATIC:
-        return getaddress__vm_monitor_enter_static_naked();
     case VM_RT_MONITOR_ENTER:
         return getaddress__vm_monitor_enter_naked();
-    case VM_RT_MONITOR_ENTER_NON_NULL:
-        return getaddress__vm_monitor_enter_naked();
-
-   // Monitor exit runtime helpers
-    case VM_RT_MONITOR_EXIT_STATIC:
-        return getaddress__vm_monitor_exit_static_naked();
     case VM_RT_MONITOR_EXIT:
-        return getaddress__vm_monitor_exit_naked();
-    case VM_RT_MONITOR_EXIT_NON_NULL:
         return getaddress__vm_monitor_exit_naked();
 #endif
 

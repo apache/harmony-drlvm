@@ -66,8 +66,8 @@ void HelperInlinerAction::init() {
     
     registerHelper(Op_NewObj, VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE);
     registerHelper(Op_NewArray, VM_RT_NEW_VECTOR_USING_VTABLE);
-    registerHelper(Op_TauMonitorEnter, VM_RT_MONITOR_ENTER_NON_NULL);
-    registerHelper(Op_TauMonitorExit, VM_RT_MONITOR_EXIT_NON_NULL);
+    registerHelper(Op_TauMonitorEnter, VM_RT_MONITOR_ENTER);
+    registerHelper(Op_TauMonitorExit, VM_RT_MONITOR_EXIT);
     registerHelper(Op_TauStRef, VM_RT_GC_HEAP_WRITE_REF);
     registerHelper(Op_TauLdIntfcVTableAddr, VM_RT_GET_INTERFACE_VTABLE_VER0);
     registerHelper(Op_TauCheckCast, VM_RT_CHECKCAST);

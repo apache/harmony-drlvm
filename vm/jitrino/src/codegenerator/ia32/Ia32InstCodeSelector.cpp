@@ -1616,6 +1616,19 @@ CG_OpndHandle* InstCodeSelector::getVTableAddr(Type *       dstType, ObjectType 
 }
 
 //_______________________________________________________________________________________________________________
+//  get java.lang.Object
+
+CG_OpndHandle* InstCodeSelector::getClassObj(Type *       dstType, ObjectType * base) 
+{
+    Opnd * helperOpnds[]={irManager.newImmOpnd(getRuntimeIdType(), Opnd::RuntimeInfo::Kind_TypeRuntimeId, base)};
+    Opnd * retOpnd=irManager.newOpnd(dstType);
+    CallInst * callInst=irManager.newRuntimeHelperCallInst(VM_RT_CLASS_2_JLC,
+        1, helperOpnds, retOpnd);
+    appendInsts(callInst);
+    return retOpnd;
+}
+
+//_______________________________________________________________________________________________________________
 //  Load double FP constant (unoptimized straightforward version)
 
 CG_OpndHandle* InstCodeSelector::ldc_s(float val) 
@@ -2915,8 +2928,8 @@ CG_OpndHandle* InstCodeSelector::callvmhelper(U_32              numArgs,
     //vmhelper slow paths
     case VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE:
     case VM_RT_NEW_VECTOR_USING_VTABLE:
-    case VM_RT_MONITOR_ENTER_NON_NULL:
-    case VM_RT_MONITOR_EXIT_NON_NULL:
+    case VM_RT_MONITOR_ENTER:
+    case VM_RT_MONITOR_EXIT:
     case VM_RT_GC_HEAP_WRITE_REF:
     case VM_RT_GET_INTERFACE_VTABLE_VER0:
     case VM_RT_CHECKCAST:
@@ -3005,7 +3018,7 @@ void  InstCodeSelector::copyValueObj(Type* objType, CG_OpndHandle *dstAddr, CG_O
 void InstCodeSelector::tau_monitorEnter(CG_OpndHandle* obj, CG_OpndHandle* tauIsNonNull) 
 {
     Opnd * helperOpnds[] = { (Opnd*)obj };
-    CallInst * callInst=irManager.newRuntimeHelperCallInst(VM_RT_MONITOR_ENTER_NON_NULL,
+    CallInst * callInst=irManager.newRuntimeHelperCallInst(VM_RT_MONITOR_ENTER,
         1, helperOpnds, NULL);
     appendInsts(callInst);
 }
@@ -3017,7 +3030,7 @@ void InstCodeSelector::tau_monitorExit(CG_OpndHandle* obj,
                                           CG_OpndHandle* tauIsNonNull) 
 {
     Opnd * helperOpnds[] = { (Opnd*)obj };
-    CallInst * callInst=irManager.newRuntimeHelperCallInst(VM_RT_MONITOR_EXIT_NON_NULL,
+    CallInst * callInst=irManager.newRuntimeHelperCallInst(VM_RT_MONITOR_EXIT,
         1, helperOpnds, NULL);
     appendInsts(callInst);
 }
@@ -3082,10 +3095,16 @@ void InstCodeSelector::monitorExitFence(CG_OpndHandle* obj)
 
 void InstCodeSelector::typeMonitorEnter(NamedType *type) 
 {
-    Opnd * helperOpnds[]={irManager.newImmOpnd(getRuntimeIdType(), Opnd::RuntimeInfo::Kind_TypeRuntimeId, type)};
-    CallInst * callInst=irManager.newRuntimeHelperCallInst(VM_RT_MONITOR_ENTER_STATIC,
-        1, helperOpnds, NULL);
-    appendInsts(callInst);
+    Opnd * helperOpnds1[]={irManager.newImmOpnd(getRuntimeIdType(), Opnd::RuntimeInfo::Kind_TypeRuntimeId, type)};
+    Opnd * retOpnd=irManager.newOpnd(type);
+    CallInst * callInst1=irManager.newRuntimeHelperCallInst(VM_RT_CLASS_2_JLC,
+        1, helperOpnds1, retOpnd);
+    appendInsts(callInst1);
+
+    Opnd * helperOpnds2[]={retOpnd};
+    CallInst * callInst2=irManager.newRuntimeHelperCallInst(VM_RT_MONITOR_ENTER,
+        1, helperOpnds2, NULL);
+    appendInsts(callInst2);
 }
 
 //_______________________________________________________________________________________________________________
@@ -3094,10 +3113,16 @@ void InstCodeSelector::typeMonitorEnter(NamedType *type)
 
 void InstCodeSelector::typeMonitorExit(NamedType *type) 
 {
-    Opnd * helperOpnds[]={irManager.newImmOpnd(getRuntimeIdType(), Opnd::RuntimeInfo::Kind_TypeRuntimeId, type)};
-    CallInst * callInst=irManager.newRuntimeHelperCallInst(VM_RT_MONITOR_EXIT_STATIC,
-        1, helperOpnds, NULL);
-    appendInsts(callInst);
+    Opnd * helperOpnds1[]={irManager.newImmOpnd(getRuntimeIdType(), Opnd::RuntimeInfo::Kind_TypeRuntimeId, type)};
+    Opnd * retOpnd=irManager.newOpnd(type);
+    CallInst * callInst1=irManager.newRuntimeHelperCallInst(VM_RT_CLASS_2_JLC,
+        1, helperOpnds1, retOpnd);
+    appendInsts(callInst1);
+
+    Opnd * helperOpnds2[]={retOpnd};
+    CallInst * callInst2=irManager.newRuntimeHelperCallInst(VM_RT_MONITOR_EXIT,
+        1, helperOpnds2, NULL);
+    appendInsts(callInst2);
 }
 
 //_______________________________________________________________________________________________________________

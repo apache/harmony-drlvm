@@ -2190,6 +2190,11 @@ Inst* InstFactory::makeGetVTableAddr(Opnd* dst, ObjectType *type) {
     return makeTypeInst(Op_GetVTableAddr, Modifier(), dst->getType()->tag, dst, type);
 }
 
+Inst* InstFactory::makeGetClassObj(Opnd* dst, ObjectType *type) {
+    //makeTypeInst(Op_TypeMonitorEnter, Modifier(), Type::Void, OpndManager::getNullOpnd(), type);
+    return makeTypeInst(Op_GetClassObj, Modifier(), dst->getType()->tag, dst, type);
+}
+
 Inst* InstFactory::makeTauArrayLen(Opnd* dst, Type::Tag type, Opnd* base,
                                    Opnd *tauBaseIsNonNull,
                                    Opnd *tauBaseIsArray) {
@@ -2704,6 +2709,7 @@ InstOptimizer::dispatch(Inst* inst) {
     case Op_LdFunAddr:          return caseLdFunAddr(inst->asMethodInst());
     case Op_LdFunAddrSlot:      return caseLdFunAddrSlot(inst->asMethodInst());
     case Op_GetVTableAddr:      return caseGetVTableAddr(inst->asTypeInst());
+    case Op_GetClassObj:      return caseGetClassObj(inst->asTypeInst());
     case Op_TauArrayLen:           return caseTauArrayLen(inst);
     case Op_LdArrayBaseAddr:    return caseLdArrayBaseAddr(inst);
     case Op_AddScaledIndex:     return caseAddScaledIndex(inst);

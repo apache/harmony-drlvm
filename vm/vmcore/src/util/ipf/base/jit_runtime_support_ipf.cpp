@@ -1390,40 +1390,6 @@ static void *get_vm_rt_monitor_exit_address(bool check_null)
 } //get_vm_rt_monitor_exit_address
 
 
-
-static void *get_vm_rt_monitor_enter_static_address()
-{
-    static void *addr = 0;
-    if (addr) {
-        return addr;
-    }
-    // 20030220 The "static" monitor enter function is only called with a struct Class pointer, which can't be NULL.
-    void (*p_vm_monitor_enter)(ManagedObject *p_obj);
-    p_vm_monitor_enter = vm_monitor_enter;
-    addr = gen_vm_rt_monitor_wrapper((void **)p_vm_monitor_enter, gen_vm_rt_monitorenter_fast_path, 
-                                      /*check_null*/ false, /*static_operation*/ true,
-                                      "rt_monitor_enter_static_slowpath", "rt_monitor_enter_static_fastpath");
-    return addr;
-} //get_vm_rt_monitor_enter_static_address
-
-
-
-static void *get_vm_rt_monitor_exit_static_address()
-{
-    static void *addr = 0;
-    if (addr) {
-        return addr;
-    }
-    // 20030220 The "static" monitor exit function is only called with a struct Class pointer, which can't be NULL.
-    void (*p_vm_monitor_exit)(ManagedObject *p_obj);
-    p_vm_monitor_exit = vm_monitor_exit;
-    addr = gen_vm_rt_monitor_wrapper((void **)p_vm_monitor_exit, gen_vm_rt_monitorexit_fast_path, 
-                                      /*check_null*/ false, /*static_operation*/ true,
-                                      "rt_monitor_exit_static_slowpath", "rt_monitor_exit_static_fastpath");
-    return addr;
-} //get_vm_rt_monitor_exit_static_address
-
-
 #ifdef VM_STATS // exclude remark in release mode (defined but not used)
 // Return the log base 2 of the integer operand. If the argument is less than or equal to zero, return zero.
 static int get_log2(int value)
@@ -1829,26 +1795,10 @@ void *vm_helper_get_addr(VM_RT_SUPPORT f)
         dereference_fptr = false;
         break;
     case VM_RT_MONITOR_ENTER:
-        fptr =  get_vm_rt_monitor_enter_address(true);
-        dereference_fptr = false;
-        break;
-    case VM_RT_MONITOR_ENTER_STATIC:
-        fptr =  get_vm_rt_monitor_enter_static_address();
-        dereference_fptr = false;
-        break;
-    case VM_RT_MONITOR_ENTER_NON_NULL:
         fptr =  get_vm_rt_monitor_enter_address(false);
         dereference_fptr = false;
         break;
     case VM_RT_MONITOR_EXIT:
-        fptr =  get_vm_rt_monitor_exit_address(true);
-        dereference_fptr = false;
-        break;
-    case VM_RT_MONITOR_EXIT_STATIC:
-        fptr =  get_vm_rt_monitor_exit_static_address();
-        dereference_fptr = false;
-        break;
-    case VM_RT_MONITOR_EXIT_NON_NULL:
         fptr =  get_vm_rt_monitor_exit_address(false);
         dereference_fptr = false;
         break;

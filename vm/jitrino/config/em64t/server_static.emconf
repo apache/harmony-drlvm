@@ -71,11 +71,11 @@ SS_OPT.file=jitrino
 -XX:jit.SS_OPT.arg.optimizer.inline_helpers.VM_RT_NEW_VECTOR_USING_VTABLE=off
 -XX:jit.SS_OPT.arg.optimizer.inline_helpers.VM_RT_NEW_VECTOR_USING_VTABLE_hotnessPercent=1
 
--XX:jit.SS_OPT.arg.optimizer.inline_helpers.VM_RT_MONITOR_ENTER_NON_NULL=on
--XX:jit.SS_OPT.arg.optimizer.inline_helpers.VM_RT_MONITOR_ENTER_NON_NULL_hotnessPercent=1
+-XX:jit.SS_OPT.arg.optimizer.inline_helpers.VM_RT_MONITOR_ENTER=on
+-XX:jit.SS_OPT.arg.optimizer.inline_helpers.VM_RT_MONITOR_ENTER_hotnessPercent=1
 
--XX:jit.SS_OPT.arg.optimizer.inline_helpers.VM_RT_MONITOR_EXIT_NON_NULL=on
--XX:jit.SS_OPT.arg.optimizer.inline_helpers.VM_RT_MONITOR_EXIT_NON_NULL_hotnessPercent=1
+-XX:jit.SS_OPT.arg.optimizer.inline_helpers.VM_RT_MONITOR_EXIT=on
+-XX:jit.SS_OPT.arg.optimizer.inline_helpers.VM_RT_MONITOR_EXIT_hotnessPercent=1
 
 -XX:jit.SS_OPT.arg.optimizer.inline_helpers.VM_RT_GET_INTERFACE_VTABLE_VER0=off
 -XX:jit.SS_OPT.arg.optimizer.inline_helpers.VM_RT_GET_INTERFACE_VTABLE_VER0_hotnessPercent=1

@@ -1150,6 +1150,7 @@ public:
     Inst*    makeLdFunAddr(Opnd* dst, MethodDesc*);
     Inst*    makeLdFunAddrSlot(Opnd* dst, MethodDesc*);
     Inst*    makeGetVTableAddr(Opnd* dst, ObjectType *type);
+    Inst*    makeGetClassObj(Opnd* dst, ObjectType *type);
     Inst*    makeTauArrayLen(Opnd* dst, Type::Tag type, Opnd* base, Opnd *tauBaseNonNull,
                              Opnd *tauBaseIsArray);
     Inst*    makeLdArrayBaseAddr(Type* type, Opnd* dst, Opnd* array);
@@ -1712,6 +1713,9 @@ public:
 
     virtual Inst*
     caseGetVTableAddr(TypeInst* inst)=0;//      {return caseDefault(inst);}
+
+    virtual Inst*
+    caseGetClassObj(TypeInst* inst)=0;//      {return caseDefault(inst);}
 
     virtual Inst*
     caseTauArrayLen(Inst* inst)=0;//           {return caseDefault(inst);}

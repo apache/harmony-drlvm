@@ -318,6 +318,7 @@ public:
                       Opnd *tauNonNullBase, Opnd *tauAddressInRange); // for simplifier use
     Opnd* genLdFunAddrSlot(MethodDesc* methodDesc); //SI
     Opnd* genGetVTable(ObjectType* type); //SI
+    Opnd* genGetClassObj(ObjectType* type);
     // compressed reference instructions
     Opnd* genUncompressRef(Opnd *compref); //SI
     Opnd* genCompressRef(Opnd *uncompref); //SI

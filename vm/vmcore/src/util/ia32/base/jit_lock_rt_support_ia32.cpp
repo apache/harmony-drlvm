@@ -46,27 +46,6 @@ char * gen_convert_managed_to_unmanaged_null_ia32(char * ss,
 
 #define INPUT_ARG_OFFSET 4
 
-
-// patch_addr_null_arg_ptr is the address of a variable holding the
-// address of a branch instruction byte to patch with the destination
-// to be taken if the struct Class* argument is NULL.
-static char * gen_convert_struct_class_to_object(char *ss, char **patch_addr_null_arg_ptr)
-{    
-    // First make sure the struct Class* argument is non-NULL.
-    ss = mov(ss,  ecx_opnd,  M_Base_Opnd(esp_reg, INPUT_ARG_OFFSET));
-    ss = test(ss,  ecx_opnd,   ecx_opnd);
-    ss = branch8(ss, Condition_Z,  Imm_Opnd(size_8, 0));
-    *patch_addr_null_arg_ptr = ((char *)ss) - 1;
-
-    // Convert the struct Class* argument to the corresponding java_lang_Class reference. 
-    ss = push(ss,  M_Base_Opnd(esp_reg, INPUT_ARG_OFFSET));
-    ss = call(ss, (char *)struct_Class_to_java_lang_Class);
-    ss = alu(ss, add_opc,  esp_opnd,  Imm_Opnd(4));
-    ss = mov(ss,  M_Base_Opnd(esp_reg, INPUT_ARG_OFFSET),  eax_opnd);  // overwrite the struct Class* with the raw java_lang_Class reference
-    return ss;
-} //gen_convert_struct_class_to_object
-
-
 /*
  * Helper for monenter intstruction
  */
@@ -82,9 +61,12 @@ static char * gen_restore_monitor_enter(char *ss, char *patch_addr_null_arg)
 #endif
     ss = mov(ss,  ecx_opnd,  M_Base_Opnd(esp_reg, INPUT_ARG_OFFSET));
     
+#ifdef _DEBUG_CHECK_NULL_ //_DEBUG    
+    //npe check
     ss = test(ss,  ecx_opnd,   ecx_opnd);
     ss = branch8(ss, Condition_Z,  Imm_Opnd(size_8, 0));
     char *backpatch_address__null_pointer = ((char *)ss) - 1;
+#endif
 
     // skip fast path if can_generate_monitor_events capability
     // was requested, so all TI events will be generated
@@ -109,6 +91,7 @@ static char * gen_restore_monitor_enter(char *ss, char *patch_addr_null_arg)
 
     ss = ret(ss,  Imm_Opnd(4));
 
+#ifdef _DEBUG_CHECK_NULL_//_DEBUG    
     // Handle NPE here
     signed npe_offset = (signed)ss - (signed)backpatch_address__null_pointer - 1;
     *backpatch_address__null_pointer = (char)npe_offset;
@@ -118,52 +101,9 @@ static char * gen_restore_monitor_enter(char *ss, char *patch_addr_null_arg)
     }
     // Object is null so throw a null pointer exception
     ss = jump(ss, (char*)exn_get_rth_throw_null_pointer());
-
+#endif
     return ss;
 } //gen_restore_monitor_enter
-
-
-void * restore__vm_monitor_enter_naked(void * code_addr)
-{
-    char *stub = (char *)code_addr;
-
-#ifdef _DEBUG
-    const int stub_size = 86;
-    memset(stub, 0xcc, stub_size);
-#endif
-    char *ss = stub;
-
-    ss = gen_restore_monitor_enter(ss, /*patch_addr_null_arg*/ NULL);
-
-    assert((ss - stub) < stub_size);
-
-    DUMP_STUB(stub, "getaddress__vm_monitor_enter_naked_mt", ss - stub);
-
-    return code_addr;
-} //restore__vm_monitor_enter_naked
-
-
-void * restore__vm_monitor_enter_static_naked(void * code_addr)
-{
-    char *stub = (char *)code_addr;
-
-#ifdef _DEBUG
-    const int stub_size = 107;
-    memset(stub, 0xcc, stub_size);
-#endif
-    char *ss = stub;
-
-    char *patch_addr_null_arg;
-    ss = gen_convert_struct_class_to_object(ss, &patch_addr_null_arg);
-    ss = gen_restore_monitor_enter(ss, patch_addr_null_arg);
-
-    assert((ss - stub) < stub_size);
-
-    DUMP_STUB(stub, "getaddress__vm_monitor_enter_static_naked_mt", ss - stub);
-
-    return code_addr;
-} //restore__vm_monitor_enter_static_naked
-
 
 static char * gen_restore_monitor_exit(char *ss, char *patch_addr_null_arg)
 {
@@ -174,9 +114,14 @@ static char * gen_restore_monitor_exit(char *ss, char *patch_addr_null_arg)
 #endif
 
     ss = mov(ss,  ecx_opnd,  M_Base_Opnd(esp_reg, INPUT_ARG_OFFSET));
+
+#ifdef _DEBUG_CHECK_NULL_//_DEBUG    
+    //check npe
     ss = test(ss,  ecx_opnd,   ecx_opnd);
     ss = branch8(ss, Condition_Z,  Imm_Opnd(size_8, 0));
     char *backpatch_address__null_pointer = ((char *)ss) - 1;
+#endif
+
     // skip fast path if can_generate_monitor_events capability
     // was requested, so all TI events will be generated
     if (!VM_Global_State::loader_env->TI->get_global_capability(
@@ -202,6 +147,8 @@ static char * gen_restore_monitor_exit(char *ss, char *patch_addr_null_arg)
     //  illegal state happend
     ss = jump(ss, (char*)exn_get_rth_throw_illegal_state_exception());
 
+#ifdef _DEBUG_CHECK_NULL_//_DEBUG    
+    //NPE
     offset = (signed)ss - (signed)backpatch_address__null_pointer - 1;
     *backpatch_address__null_pointer = (char)offset;
     if (patch_addr_null_arg != NULL) {
@@ -210,52 +157,10 @@ static char * gen_restore_monitor_exit(char *ss, char *patch_addr_null_arg)
     }
     // Object is null so throw a null pointer exception
     ss = jump(ss, (char*)exn_get_rth_throw_null_pointer());
-    
+#endif     
     return ss;
   
 } //gen_restore_monitor_exit
-
-
-void * restore__vm_monitor_exit_naked(void * code_addr)
-{
-    char *stub = (char *)code_addr;
-
-#ifdef _DEBUG
-    const int stub_size = /*106*/210;
-    memset(stub, 0xcc, stub_size);
-#endif
-    char *ss = stub;
-
-    ss = gen_restore_monitor_exit(ss, /*patch_addr_null_arg*/ NULL);
-
-    assert((ss - stub) < stub_size);
-
-    DUMP_STUB(stub, "getaddress__vm_monitor_exit_naked_mt", ss - stub);
-
-    return code_addr; 
-} //restore__vm_monitor_exit_naked
-
-
-void * restore__vm_monitor_exit_static_naked(void * code_addr)
-{
-    char *stub = (char *)code_addr;
-
-#ifdef _DEBUG
-    const int stub_size = /*106*/210;
-    memset(stub, 0xcc, stub_size);
-#endif
-    char *ss = stub;
-
-    char *patch_addr_null_arg;
-    ss = gen_convert_struct_class_to_object(ss, &patch_addr_null_arg);
-    ss = gen_restore_monitor_exit(ss, patch_addr_null_arg);
-
-    assert((ss - stub) < stub_size);
-
-    DUMP_STUB(stub, "getaddress__vm_monitor_exit_static_naked_mt", ss - stub);
-
-    return code_addr; 
-} //restore__vm_monitor_exit_static_naked
 
 
 void * getaddress__vm_monitor_enter_naked()
@@ -294,46 +199,6 @@ void * getaddress__vm_monitor_enter_naked()
 }
 
 
-void * getaddress__vm_monitor_enter_static_naked()
-{    
-    static void *addr = NULL;
-    if (addr != NULL) {
-        return addr;
-    }
-
-    const int stub_size = 250;
-    char *stub = (char *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_MAX/2, CAA_Allocate);
-#ifdef _DEBUG
-    memset(stub, 0xcc /*int 3*/, stub_size);
-#endif
-    char *ss = stub;
-
-#ifdef VM_STATS
-    int * value = VM_Statistics::get_vm_stats().rt_function_calls.lookup_or_add((void*)VM_RT_MONITOR_ENTER_STATIC, 0, NULL);
-    ss = inc(ss,  M_Opnd((unsigned)value));
-#endif
-
-    char *patch_addr_null_arg;
-    ss = gen_convert_struct_class_to_object(ss, &patch_addr_null_arg);
-    ss = gen_restore_monitor_enter(ss, patch_addr_null_arg);    
-
-    addr = stub;
-    assert((ss - stub) < stub_size);
-
-    compile_add_dynamic_generated_code_chunk("vm_monitor_enter_static_naked", false, stub, stub_size);
-
-    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
-        jvmti_send_dynamic_code_generated_event("vm_monitor_enter_static_naked", stub, stub_size);
-    }
-
-    DUMP_STUB(stub, "getaddress__vm_monitor_enter_static_naked", ss - stub);
-
-    return addr;
-} //getaddress__vm_monitor_enter_static_naked
-
-
-
-
 void * getaddress__vm_monitor_exit_naked()
 {
     static void *addr = NULL;
@@ -366,39 +231,4 @@ void * getaddress__vm_monitor_exit_naked()
 
     return addr;
 } //getaddress__vm_monitor_exit_naked
-
-
-void * getaddress__vm_monitor_exit_static_naked()
-{
-    static void *addr = NULL;
-    if (addr != NULL) {
-        return addr;
-    }
-
-    const int stub_size = /*126*/210;
-    char *stub = (char *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_MAX/2, CAA_Allocate);
-    char *ss = stub;
-
-#ifdef VM_STATS
-    int * value = VM_Statistics::get_vm_stats().rt_function_calls.lookup_or_add((void*)VM_RT_MONITOR_EXIT_STATIC, 0, NULL);
-    ss = inc(ss,  M_Opnd((unsigned)value));
-#endif
-
-    char *patch_addr_null_arg;
-    ss = gen_convert_struct_class_to_object(ss, &patch_addr_null_arg);
-    ss = gen_restore_monitor_exit(ss, patch_addr_null_arg);    
-
-    addr = stub;
-    assert((ss - stub) < stub_size);
-
-    compile_add_dynamic_generated_code_chunk("vm_monitor_exit_static_naked", false, stub, stub_size);
-
-    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
-        jvmti_send_dynamic_code_generated_event("vm_monitor_exit_static_naked", stub, stub_size);
-    }
-
-    DUMP_STUB(stub, "getaddress__vm_monitor_exit_static_naked", ss - stub);
-
-    return addr;
-} //getaddress__vm_monitor_exit_static_naked
 

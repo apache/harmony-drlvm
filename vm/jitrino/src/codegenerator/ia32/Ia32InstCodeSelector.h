@@ -204,6 +204,7 @@ public:
                                 MethodDesc *desc, CG_OpndHandle *tauVtableHasDesc);
     CG_OpndHandle* tau_ldVTableAddr(Type *dstType, CG_OpndHandle* base, CG_OpndHandle *tauBaseNonNull);
     CG_OpndHandle* getVTableAddr(Type *dstType, ObjectType *base);
+    CG_OpndHandle* getClassObj(Type *dstType, ObjectType *base);
     CG_OpndHandle* tau_ldIntfTableAddr(Type *dstType, CG_OpndHandle* base,NamedType* vtableTypeDesc);
     CG_OpndHandle* calli(U_32 numArgs,CG_OpndHandle** args, Type* retType,
                          CG_OpndHandle* methodPtr);

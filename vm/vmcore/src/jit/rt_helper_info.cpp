@@ -77,30 +77,14 @@ static JIT_RT_Function_Entry _jit_rt_function_entries_base[] = {
             "org/apache/harmony/drlvm/thread/ThreadHelper",   "monitorEnterUseReservation",
             "(Ljava/lang/Object;)V",   NULL},
 
-    {VM_RT_MONITOR_ENTER_NON_NULL,             "VM_RT_MONITOR_ENTER_NON_NULL",
-            INTERRUPTIBLE_SOMETIMES,           CALLING_CONVENTION_STDCALL,              1,
-            "org/apache/harmony/drlvm/thread/ThreadHelper",   "monitorEnterUseReservation",
-            "(Ljava/lang/Object;)V",   NULL},
-
     {VM_RT_MONITOR_EXIT,                       "VM_RT_MONITOR_EXIT",
             INTERRUPTIBLE_SOMETIMES,           CALLING_CONVENTION_STDCALL,              1,
             "org/apache/harmony/drlvm/thread/ThreadHelper",   "monitorExit",
             "(Ljava/lang/Object;)V",   NULL},
 
-    {VM_RT_MONITOR_EXIT_NON_NULL,              "VM_RT_MONITOR_EXIT_NON_NULL",
-            INTERRUPTIBLE_SOMETIMES,           CALLING_CONVENTION_STDCALL,              1,
-            "org/apache/harmony/drlvm/thread/ThreadHelper",   "monitorExit",
-            "(Ljava/lang/Object;)V",   NULL},
-
-    {VM_RT_MONITOR_ENTER_STATIC,               "VM_RT_MONITOR_ENTER_STATIC",
-            INTERRUPTIBLE_SOMETIMES,           CALLING_CONVENTION_STDCALL,              1,
-            "org/apache/harmony/drlvm/thread/ThreadHelper",   "monitorEnterUseReservation",
-            "(Ljava/lang/Object;)V",   NULL},
-
-    {VM_RT_MONITOR_EXIT_STATIC,                "VM_RT_MONITOR_EXIT_STATIC",
-            INTERRUPTIBLE_SOMETIMES,           CALLING_CONVENTION_STDCALL,              1,
-            "org/apache/harmony/drlvm/thread/ThreadHelper",   "monitorExit",
-            "(Ljava/lang/Object;)V",   NULL},
+    {VM_RT_CLASS_2_JLC,                        "VM_RT_CLASS_2_JLC",
+            INTERRUPTIBLE_NEVER,               CALLING_CONVENTION_STDCALL,              1,
+            NULL,   NULL,   NULL,   NULL},
 
     {VM_RT_CHECKCAST,                          "VM_RT_CHECKCAST",
             INTERRUPTIBLE_ALWAYS,              CALLING_CONVENTION_STDCALL,              2,

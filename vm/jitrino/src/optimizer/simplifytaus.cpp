@@ -548,6 +548,13 @@ Opnd *TauWalkerState::findReplacement(Opnd *src, Type *type, bool exactType)
     case Op_LdFunAddr:
     case Op_LdFunAddrSlot:
     case Op_GetVTableAddr:
+        assert(0);        // not an object type
+
+    case Op_GetClassObj:
+        {
+            return genTauSafe();
+        }
+
     case Op_TauArrayLen:
     case Op_LdArrayBaseAddr:
     case Op_AddScaledIndex:

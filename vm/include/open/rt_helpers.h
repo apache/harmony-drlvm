@@ -161,19 +161,10 @@ enum VM_RT_SUPPORT {
  * @return None.
  *
  * Acquire the monitor associated with the object.
- * Throw <code>java/lang/NullPointerException</code>, if the argument is null.
+ * Doesn't throw <code>java/lang/NullPointerException</code>, if the argument
+ * is null, it assumes that the argument is non-null. Passing a null argument
+ * will result in undefined behavior..
  */
-    VM_RT_MONITOR_ENTER_NON_NULL=304,
- /**
-  * @param Object
-  *
-  * @return None.
-  *
-  * Acquire the monitor associated with the object.
-  * This function is identical to <code>VM_RT_MONITOR_ENTER</code> except that it
-  * assumes that the argument is non-null. Passing a null argument
-  * will result in undefined behavior.
-  */
     VM_RT_MONITOR_EXIT=301,
 /**   
  * @param Object
@@ -181,41 +172,21 @@ enum VM_RT_SUPPORT {
  * @return None.
  *
  * Release the monitor associated with the object.
- * Throw <code>java/lang/NullPointerException</code>, if the argument is null.
+ * Doesn't throw <code>java/lang/NullPointerException</code>, if the argument
+ * is null, it assumes that the argument is non-null. Passing a null argument
+ * will result in undefined behavior.
  * Throw <code>java/lang/IllegalMonitorStateException</code>, if the current 
  * thread is not the owner of the lock.
  */
-    VM_RT_MONITOR_EXIT_NON_NULL=305,
-  
-/**
- * @param Object
- *
- * @return None.
- *
- * Release the monitor associated with the object.
- * This function is identical to <code>VM_RT_MONITOR_EXIT</code> except that it
- * assumes that the argument is non-null. Passing a null argument
- * will result in undefined behavior.
- * Throw <code>java/lang/IllegalMonitorStateException</code>, if the current thread
- * is not the owner of the lock.
- */
-    VM_RT_MONITOR_ENTER_STATIC=302,
+
+
+    VM_RT_CLASS_2_JLC=310,
 /**  
  * @param Class handle
  *
- * @return None.
+ * @return pointer to java/lang/Class object.
  *
- * Acquire the monitor associated with the class passed as the argument.
- */
-    VM_RT_MONITOR_EXIT_STATIC=303,
-/**
- * @param Class handle
- *
- * @return None.
- *
- * Release the monitor associated with the class passed as the argument.
- * Throw <code>java/lang/IllegalMonitorStateException</code>, if the current thread
- * is not the owner of the lock.
+ * Converts Class handle to java/lang/Class object.
  */
 
 ////

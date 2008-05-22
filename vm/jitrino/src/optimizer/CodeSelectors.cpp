@@ -1198,6 +1198,16 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback, I
                 isConstant = true;
             }
             break;
+        case Op_GetClassObj:
+            {
+                assert(inst->getNumSrcOperands() == 0);
+                Type *type = ((TypeInst*)inst)->getTypeInfo();
+                assert(type->isObject() || type->isUserValue());
+                Type * dstType = inst->getDst()->getType();
+                assert(type->isObject());
+                cgInst = instructionCallback.getClassObj( dstType,(ObjectType*)type);
+            }
+            break;
         case Op_TauLdIntfcVTableAddr:
             {
                 assert(inst->getNumSrcOperands() == 1);

@@ -143,7 +143,8 @@ static OpcodeInfo opcodeTable[] = {
     { Op_LdFunAddr,             false, MB::CSEable,       MK::None,                                  "ldfn  ",        "ldfn      [%d] -) %l",         },
     { Op_LdFunAddrSlot,         false, MB::CSEable,       MK::None,                                  "ldfnslot",      "ldfnslot  [%d] -) %l",         },
     { Op_GetVTableAddr,         false, MB::Movable,       MK::None,                                  "getvtable",     "getvtable %d -) %l",           }, // obtains the address of the vtable for a particular object type
-    { Op_TauArrayLen,           false, MB::CSEable,       MK::None,                                  "arraylen ",        "arraylen  %0 ((%1,%2)) -) %l",           },       
+    { Op_GetClassObj,           false, MB::Movable,       MK::None,                                  "getclassobj",   "getclassobj %d -) %l",           }, // obtains the java.lang.class  object for a particular type
+    { Op_TauArrayLen,           false, MB::CSEable,       MK::None,                                  "arraylen ",     "arraylen  %0 ((%1,%2)) -) %l",           },       
     { Op_LdArrayBaseAddr,       false, MB::CSEable,       MK::None,                                  "ldbase",        "ldbase    %s -) %l",           }, // load the base (zero'th element) address of array
     { Op_AddScaledIndex,        false, MB::Movable,       MK::None,                                  "addindex",      "addindex  %s -) %l",           }, // Add a scaled index to an array element address
     { Op_StVar,                 true,  MB::None,          MK::None,                                  "stvar ",        "stvar     %0 -) %l",           },

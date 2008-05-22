@@ -1639,7 +1639,15 @@ static NativeCodePtr rth_get_lil_instanceof_withresolve(int * dyn_count) {
 
 //end of lazy resolution helpers
 //////////////////////////////////////////////////////////////////////////
-
+#if (defined PLATFORM_POSIX) && (defined _IA32_)
+ManagedObject* __attribute__ ((__stdcall__)) rth_struct_Class_to_java_lang_Class(Class *clss) {
+#elif defined _IA32_
+ManagedObject* __stdcall rth_struct_Class_to_java_lang_Class(Class *clss) {
+#else
+ManagedObject* rth_struct_Class_to_java_lang_Class(Class *clss) {
+#endif
+    return struct_Class_to_java_lang_Class(clss);
+}
 
 
 
@@ -1663,6 +1671,10 @@ NativeCodePtr rth_get_lil_helper(VM_RT_SUPPORT f)
         return rth_wrap_exn_throw(dyn_count, "rth_throw_lazy", exn_get_rth_throw_lazy());
     case VM_RT_THROW_LINKING_EXCEPTION:
         return rth_get_lil_throw_linking_exception(dyn_count);
+
+    case VM_RT_CLASS_2_JLC:
+        return (NativeCodePtr)rth_struct_Class_to_java_lang_Class;
+
     // Type tests
     case VM_RT_CHECKCAST:
         return rth_get_lil_checkcast(dyn_count);

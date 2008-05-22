@@ -207,6 +207,7 @@ public:
     CG_OpndHandle *tau_ldVirtFunAddr(Type*, CG_OpndHandle*, MethodDesc*, CG_OpndHandle*);
     CG_OpndHandle *tau_ldVTableAddr(Type*, CG_OpndHandle*, CG_OpndHandle*);
     CG_OpndHandle *getVTableAddr(Type*, ObjectType*);
+    CG_OpndHandle *getClassObj(Type*, ObjectType*);
     CG_OpndHandle *ldFieldAddr(Type*, CG_OpndHandle*, FieldDesc*);
     CG_OpndHandle *ldStaticAddr(Type*, FieldDesc*);
 

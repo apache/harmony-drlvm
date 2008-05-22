@@ -113,11 +113,11 @@ SD2_OPT.useProfile=EDGE_PROF,VALUE_PROF
 -XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_NEW_VECTOR_USING_VTABLE=on
 -XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_NEW_VECTOR_USING_VTABLE_hotnessPercent=1
 
--XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_MONITOR_ENTER_NON_NULL=on
--XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_MONITOR_ENTER_NON_NULL_hotnessPercent=1
+-XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_MONITOR_ENTER=on
+-XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_MONITOR_ENTER_hotnessPercent=1
 
--XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_MONITOR_EXIT_NON_NULL=on
--XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_MONITOR_EXIT_NON_NULL_hotnessPercent=1
+-XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_MONITOR_EXIT=on
+-XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_MONITOR_EXIT_hotnessPercent=1
 
 -XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_GET_INTERFACE_VTABLE_VER0=on
 -XX:jit.SD2_OPT.arg.optimizer.inline_helpers.VM_RT_GET_INTERFACE_VTABLE_VER0_hotnessPercent=1

@@ -52,23 +52,6 @@ char * gen_convert_managed_to_unmanaged_null_em64t(char * ss,
                                                   const R_Opnd & input_param1);
 #define INPUT_ARG_OFFSET 8
 
-
-// patch_addr_null_arg_ptr is the address of a variable holding the
-// address of a branch instruction byte to patch with the destination
-// to be taken if the struct Class* argument is NULL.
-static char * gen_convert_struct_class_to_object(char *ss, char **patch_addr_null_arg_ptr)
-{
-    // First make sure the struct Class* argument is non-NULL.
-    ss = test(ss,  rdi_opnd,   rdi_opnd);
-    ss = branch8(ss, Condition_Z,  Imm_Opnd(size_8, 0));
-    *patch_addr_null_arg_ptr = ((char *)ss) - 1;
-
-    // Convert the struct Class* argument to the corresponding java_lang_Class reference.
-    ss = call(ss, (char *)struct_Class_to_java_lang_Class);
-    ss = mov(ss,  rdi_opnd,  rax_opnd);  // overwrite the struct Class* with the raw java_lang_Class reference
-    return ss;
-} //gen_convert_struct_class_to_object
-
 // Helper for monenter intstruction
 static char * gen_restore_monitor_enter(char *ss, char *patch_addr_null_arg)
 {
@@ -81,9 +64,12 @@ static char * gen_restore_monitor_enter(char *ss, char *patch_addr_null_arg)
 //    ss = inc(ss,  M_Opnd((int64)incr));
 #endif
 
+#ifdef _DEBUG_CHECK_NULL_//_DEBUG
+    // check on the null
     ss = test(ss,  rdi_opnd,   rdi_opnd);
     ss = branch8(ss, Condition_Z,  Imm_Opnd(size_8, 0));
     char *backpatch_address__null_pointer = ((char *)ss) - 1;
+#endif
 
     // skip fast path if can_generate_monitor_events capability
     // was requested, so all TI events will be generated
@@ -111,6 +97,7 @@ static char * gen_restore_monitor_enter(char *ss, char *patch_addr_null_arg)
 
     ss = ret(ss);
 
+#ifdef _DEBUG_CHECK_NULL_//_DEBUG
     // Handle NPE here
     int64 npe_offset = (int64)ss - (int64)backpatch_address__null_pointer - 1;
     *backpatch_address__null_pointer = (char)npe_offset;
@@ -121,7 +108,7 @@ static char * gen_restore_monitor_enter(char *ss, char *patch_addr_null_arg)
 
     // Object is null so throw a null pointer exception
     ss = jump(ss, (char*)exn_get_rth_throw_null_pointer());
-
+#endif
     return ss;
 } //gen_restore_monitor_enter
 
@@ -158,43 +145,6 @@ void * getaddress__vm_monitor_enter_naked()
     return addr;
 }
 
-void * getaddress__vm_monitor_enter_static_naked()
-{
-    static void *addr = NULL;
-    if (addr != NULL) {
-        return addr;
-    }
-
-    const int stub_size = 208;
-    char *stub = (char *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_MAX/2, CAA_Allocate);
-#ifdef _DEBUG
-    memset(stub, 0xcc /*int 3*/, stub_size);
-#endif
-    char *ss = stub;
-
-#ifdef VM_STATS
-    int * value = VM_Statistics::get_vm_stats().rt_function_calls.lookup_or_add((void*)VM_RT_MONITOR_ENTER_STATIC, 0, NULL);
-    ss = mov(ss,  rax_opnd,  Imm_Opnd(size_64, (int64)value));
-    ss = inc(ss,  M_Base_Opnd(rax_reg, 0));
-#endif
-
-    char *patch_addr_null_arg;
-    ss = gen_convert_struct_class_to_object(ss, &patch_addr_null_arg);
-    ss = gen_restore_monitor_enter(ss, patch_addr_null_arg);
-
-    addr = stub;
-    assert((ss - stub) < stub_size);
-
-    compile_add_dynamic_generated_code_chunk("vm_monitor_enter_static_naked", false, stub, stub_size);
-
-    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
-        jvmti_send_dynamic_code_generated_event("vm_monitor_enter_static_naked", stub, stub_size);
-    }
-
-    DUMP_STUB(stub, "getaddress__vm_monitor_enter_static_naked", ss - stub);
-
-    return addr;
-} //getaddress__vm_monitor_enter_static_naked
 
 static char * gen_restore_monitor_exit(char *ss, char *patch_addr_null_arg)
 {
@@ -205,9 +155,12 @@ static char * gen_restore_monitor_exit(char *ss, char *patch_addr_null_arg)
 //    ss = inc(ss,  M_Opnd((int64)incr));
 #endif
 
+#ifdef _DEBUG_CHECK_NULL_//_DEBUG
+    // check on teh null
     ss = test(ss, rdi_opnd, rdi_opnd);
     ss = branch8(ss, Condition_Z,  Imm_Opnd(size_8, 0));
     char *backpatch_address__null_pointer = ((char *)ss) - 1;
+#endif
 
     // skip fast path if can_generate_monitor_events capability
     // was requested, so all TI events will be generated
@@ -236,6 +189,8 @@ static char * gen_restore_monitor_exit(char *ss, char *patch_addr_null_arg)
     //  Monitor illegal state happend
     ss = jump(ss, (char*)exn_get_rth_throw_illegal_state_exception());
 
+#ifdef _DEBUG_CHECK_NULL_//_DEBUG
+    //NPE
     offset = (POINTER_SIZE_SINT)ss - (POINTER_SIZE_SINT)backpatch_address__null_pointer - 1;
     *backpatch_address__null_pointer = (char)offset;
     if (patch_addr_null_arg != NULL) {
@@ -245,7 +200,7 @@ static char * gen_restore_monitor_exit(char *ss, char *patch_addr_null_arg)
 
     // Object is null so throw a null pointer exception
     ss = jump(ss, (char*)exn_get_rth_throw_null_pointer());
-
+#endif
     return ss;
 } //gen_restore_monitor_exit
 
@@ -283,41 +238,6 @@ void * getaddress__vm_monitor_exit_naked()
     return addr;
 } //getaddress__vm_monitor_exit_naked
 
-void * getaddress__vm_monitor_exit_static_naked()
-{
-    static void *addr = NULL;
-    if (addr != NULL) {
-        return addr;
-    }
-
-    const int stub_size = 144;
-    char *stub = (char *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_MAX/2, CAA_Allocate);
-    char *ss = stub;
-
-#ifdef VM_STATS
-    int * value = VM_Statistics::get_vm_stats().rt_function_calls.lookup_or_add((void*)VM_RT_MONITOR_EXIT_STATIC, 0, NULL);
-    ss = mov(ss,  rax_opnd,  Imm_Opnd(size_64, (int64)value));
-    ss = inc(ss,  M_Base_Opnd(rax_reg, 0));
-#endif
-
-    char *patch_addr_null_arg;
-    ss = gen_convert_struct_class_to_object(ss, &patch_addr_null_arg);
-    ss = gen_restore_monitor_exit(ss, patch_addr_null_arg);
-
-    addr = stub;
-    assert((ss - stub) < stub_size);
-
-    compile_add_dynamic_generated_code_chunk("vm_monitor_exit_static_naked", false, stub, stub_size);
-
-    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
-        jvmti_send_dynamic_code_generated_event("vm_monitor_exit_static_naked", stub, stub_size);
-    }
-
-    DUMP_STUB(stub, "getaddress__vm_monitor_exit_static_naked", ss - stub);
-
-    return addr;
-} //getaddress__vm_monitor_exit_static_naked
-
 // Windows x86-64 helpers
 static LilCodeStub * rth_get_lil_monitor_enter_generic(LilCodeStub * cs) {
     if(VM_Global_State::loader_env->TI->isEnabled() &&
@@ -351,41 +271,6 @@ static LilCodeStub * rth_get_lil_monitor_enter_generic(LilCodeStub * cs) {
     }
 }
 
-NativeCodePtr rth_get_lil_monitor_enter_static() {    
-    static NativeCodePtr addr = NULL;
-    
-    if (addr != NULL) {
-        return addr;
-    }    
-
-    LilCodeStub * cs = lil_parse_code_stub("entry 0:stdcall:pint:void;");
-#ifdef VM_STATS
-//    int * value = VM_Statistics::get_vm_stats().rt_function_calls.lookup_or_add((void*)VM_RT_MONITOR_ENTER_STATIC, 0, NULL);
-//    cs = lil_parse_onto_end(cs, "inc [%0i:pint];", value);
-//    assert(cs);
-#endif
-        // convert struct Class into java_lang_Class
-    cs = lil_parse_onto_end(cs,
-        "in2out platform:ref;"
-        "call %0i;"
-        "locals 1;"
-        "l0 = r;",
-        struct_Class_to_java_lang_Class
-    );
-    assert(cs);
-
-    // append generic monitor enter code
-    cs = rth_get_lil_monitor_enter_generic(cs);
-    assert(cs && lil_is_valid(cs));
-
-    addr = LilCodeGenerator::get_platform()->compile(cs);
-
-    DUMP_STUB(addr, "monitor_enter_static", lil_cs_get_code_size(cs));
-
-    lil_free_code_stub(cs);
-    return addr;
-}
-
 NativeCodePtr rth_get_lil_monitor_enter() {
     static NativeCodePtr addr = NULL;
     
@@ -400,19 +285,27 @@ NativeCodePtr rth_get_lil_monitor_enter() {
 //    cs = lil_parse_onto_end(cs, "inc [%0i:pint];", value);
 //    assert(cs);
 #endif
+
+#ifdef _DEBUG_CHECK_NULL_//_DEBUG
     // check if object is null
     cs = lil_parse_onto_end(cs,
-        "jc i0 = %0i:ref, throw_null_pointer;"
-        "locals 1;"
-        "l0 = i0;",
+        "jc i0 = %0i:ref, throw_null_pointer;",
         (ManagedObject *) VM_Global_State::loader_env->managed_null
     );
     assert(cs);
-    
+#endif
+
+    cs = lil_parse_onto_end(cs,
+        "locals 1;"
+        "l0 = i0;"
+    );
+    assert(cs);
+
     // append generic monitor enter code
     cs = rth_get_lil_monitor_enter_generic(cs);
     assert(cs);
-    
+
+#ifdef _DEBUG_CHECK_NULL_//_DEBUG    
     // throw NullPointerException
     cs = lil_parse_onto_end(cs,
         ":throw_null_pointer;"
@@ -421,7 +314,8 @@ NativeCodePtr rth_get_lil_monitor_enter() {
         lil_npc_to_fp(exn_get_rth_throw_null_pointer())
     );
     assert(cs && lil_is_valid(cs));
-    
+#endif
+
     addr = LilCodeGenerator::get_platform()->compile(cs);
 
     DUMP_STUB((char *)addr, "monitor_enter", lil_cs_get_code_size(cs));
@@ -429,39 +323,6 @@ NativeCodePtr rth_get_lil_monitor_enter() {
     lil_free_code_stub(cs);
     return addr;
 }
-
-// this function doesn't throw NullPointerException in case of null object
-NativeCodePtr rth_get_lil_monitor_enter_non_null() {
-    static NativeCodePtr addr = NULL;
-    
-    if (addr != NULL) {
-        return addr;
-    }    
-
-    LilCodeStub * cs = lil_parse_code_stub(
-        "entry 0:stdcall:ref:void;"
-        "locals 1;"
-        "l0 = i0;"
-    );    
-    assert(cs);
-
-#ifdef VM_STATS
-//    int * value = VM_Statistics::get_vm_stats().rt_function_calls.lookup_or_add((void*)VM_RT_MONITOR_ENTER_NON_NULL, 0, NULL);
-//    cs = lil_parse_onto_end(cs, "inc [%0i:pint];", value);
-//    assert(cs);
-#endif
-    // append generic monitor enter code
-    cs = rth_get_lil_monitor_enter_generic(cs);
-    assert(cs && lil_is_valid(cs));
-    
-    addr = LilCodeGenerator::get_platform()->compile(cs);
-
-    DUMP_STUB(addr, "monitor_enter_non_null", lil_cs_get_code_size(cs));
-
-    lil_free_code_stub(cs);
-    return addr;
-}
-
 
 /*    MONITOR EXIT RUNTIME SUPPORT    */
 
@@ -494,41 +355,6 @@ static LilCodeStub * rth_get_lil_monitor_exit_generic(LilCodeStub * cs) {
     }
 }
 
-NativeCodePtr rth_get_lil_monitor_exit_static() {    
-    static NativeCodePtr addr = NULL;
-    
-    if (addr != NULL) {
-        return addr;
-    }    
-
-    LilCodeStub * cs = lil_parse_code_stub("entry 0:stdcall:pint:void;");
-#ifdef VM_STATS
-//    int * value = VM_Statistics::get_vm_stats().rt_function_calls.lookup_or_add((void*)VM_RT_MONITOR_EXIT_STATIC, 0, NULL);
-//    cs = lil_parse_onto_end(cs, "inc [%0i:pint];", value);
-//    assert(cs);
-#endif
-        // convert struct Class into java_lang_Class
-    cs = lil_parse_onto_end(cs,
-        "in2out platform:ref;"
-        "call %0i;"
-        "out platform:ref:g4;"
-        "o0 = r;",
-        struct_Class_to_java_lang_Class
-    );
-    assert(cs);
-    
-    // append generic monitor enter code
-    cs = rth_get_lil_monitor_exit_generic(cs);
-    assert(cs && lil_is_valid(cs));
-
-    addr = LilCodeGenerator::get_platform()->compile(cs);
-
-    DUMP_STUB(addr, "monitor_exit_static", lil_cs_get_code_size(cs));
-
-    lil_free_code_stub(cs);
-    return addr;
-}
-
 
 NativeCodePtr rth_get_lil_monitor_exit() {
     static NativeCodePtr addr = NULL;
@@ -544,19 +370,26 @@ NativeCodePtr rth_get_lil_monitor_exit() {
 //    cs = lil_parse_onto_end(cs, "inc [%0i:pint];", value);
 //    assert(cs);
 #endif
+
+#ifdef _DEBUG_CHECK_NULL_//_DEBUG    
     // check if object is null
     cs = lil_parse_onto_end(cs,
         "jc i0 = %0i:ref, throw_null_pointer;"
-        "in2out platform:g4;",
         (ManagedObject *) VM_Global_State::loader_env->managed_null
     );
+    assert(cs);
+#endif
 
+    cs = lil_parse_onto_end(cs,
+        "in2out platform:g4;"
+    );
     assert(cs);
     
     // append generic monitor enter code
     cs = rth_get_lil_monitor_exit_generic(cs);
     assert(cs);
-    
+
+#ifdef _DEBUG_CHECK_NULL_//_DEBUG    
     // throw NullPointerException
     cs = lil_parse_onto_end(cs,
         ":throw_null_pointer;"
@@ -565,7 +398,8 @@ NativeCodePtr rth_get_lil_monitor_exit() {
         lil_npc_to_fp(exn_get_rth_throw_null_pointer())
     );
     assert(cs && lil_is_valid(cs));
-    
+#endif
+
     addr = LilCodeGenerator::get_platform()->compile(cs);
 
     DUMP_STUB(addr, "monitor_exit", lil_cs_get_code_size(cs));
@@ -574,33 +408,3 @@ NativeCodePtr rth_get_lil_monitor_exit() {
     return addr;
 }
 
-// this function doesn't throw NullPointerException in case of null object
-NativeCodePtr rth_get_lil_monitor_exit_non_null() {
-    static NativeCodePtr addr = NULL;
-    
-    if (addr != NULL) {
-        return addr;
-    }    
-
-    LilCodeStub * cs = lil_parse_code_stub(
-        "entry 0:stdcall:ref:void;"
-        "in2out platform:g4;"
-    );    
-    assert(cs);
-
-#ifdef VM_STATS
-//    int * value = VM_Statistics::get_vm_stats().rt_function_calls.lookup_or_add((void*)VM_RT_MONITOR_EXIT_NON_NULL, 0, NULL);
-//    cs = lil_parse_onto_end(cs, "inc [%0i:pint];", value);
-//    assert(cs);
-#endif
-    // append generic monitor enter code
-    cs = rth_get_lil_monitor_exit_generic(cs);
-    assert(cs && lil_is_valid(cs));
-    
-    addr = LilCodeGenerator::get_platform()->compile(cs);
-
-    DUMP_STUB(addr, "monitor_exit_non_null", lil_cs_get_code_size(cs));
-
-    lil_free_code_stub(cs);
-    return addr;
-}

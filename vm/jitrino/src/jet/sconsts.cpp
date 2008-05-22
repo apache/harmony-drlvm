@@ -37,8 +37,8 @@ char *  StaticConsts::rt_helper_throw_linking_exc = NULL;
 
 char *  StaticConsts::rt_helper_monitor_enter = NULL;
 char *  StaticConsts::rt_helper_monitor_exit = NULL;
-char *  StaticConsts::rt_helper_monitor_enter_static = NULL;
-char *  StaticConsts::rt_helper_monitor_exit_static = NULL;
+
+char *  StaticConsts::rt_helper_class_2_jlc = NULL;
 
 char *  StaticConsts::rt_helper_ldc_string = NULL;
 char *  StaticConsts::rt_helper_new = NULL;

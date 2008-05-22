@@ -57,8 +57,8 @@ public:
 
     static char *       rt_helper_monitor_enter;
     static char *       rt_helper_monitor_exit;
-    static char *       rt_helper_monitor_enter_static;
-    static char *       rt_helper_monitor_exit_static;
+
+    static char *       rt_helper_class_2_jlc;
 
     static char *       rt_helper_ldc_string;
     static char *       rt_helper_init_class;

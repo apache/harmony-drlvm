@@ -189,7 +189,10 @@ JavaByteCodeTranslator::JavaByteCodeTranslator(CompilationInterface& ci,
     // check for synchronized methods
     if (methodToCompile.isSynchronized()) {
         if (methodToCompile.isStatic()) {
-            irBuilder.genTypeMonitorEnter(methodToCompile.getParentType());
+            //irBuilder.genTypeMonitorEnter(methodToCompile.getParentType());
+            Opnd* classObjectOpnd = irBuilder.genGetClassObj((ObjectType*) methodToCompile.getParentType());
+            pushOpnd(classObjectOpnd);
+            genMethodMonitorEnter();
         } else {
             genLdVar(0,JavaLabelPrepass::A);
             genMethodMonitorEnter();
@@ -1968,7 +1971,10 @@ JavaByteCodeTranslator::genReturn(JavaLabelPrepass::JavaVarType javaType, U_32 o
         // go to unwind.
         cfgBuilder.genBlock(irBuilder.createLabel());
         if (methodToCompile.isStatic()) {
-            irBuilder.genTypeMonitorExit(methodToCompile.getParentType());
+            //irBuilder.genTypeMonitorExit(methodToCompile.getParentType());
+            Opnd* classObjectOpnd = irBuilder.genGetClassObj((ObjectType*) methodToCompile.getParentType());
+            pushOpnd(classObjectOpnd);
+            genMethodMonitorExit();
         } else {
             genLdVar(0,JavaLabelPrepass::A);
             genMethodMonitorExit();
@@ -1986,7 +1992,10 @@ JavaByteCodeTranslator::genReturn(U_32 off) {
         // go to unwind.
         cfgBuilder.genBlock(irBuilder.createLabel());
         if (methodToCompile.isStatic()) {
-            irBuilder.genTypeMonitorExit(methodToCompile.getParentType());
+           // irBuilder.genTypeMonitorExit(methodToCompile.getParentType());
+            Opnd* classObjectOpnd = irBuilder.genGetClassObj((ObjectType*) methodToCompile.getParentType());
+            pushOpnd(classObjectOpnd);
+            genMethodMonitorExit();
         } else {
             genLdVar(0,JavaLabelPrepass::A);
             genMethodMonitorExit();
@@ -2996,13 +3005,13 @@ bool JavaByteCodeTranslator::genVMHelper(const char* mname, U_32 numArgs, Opnd *
 
     if (!strcmp(mname,"monitorEnter")) {
         assert(numArgs == 1);
-        irBuilder.genVMHelperCall(VM_RT_MONITOR_ENTER_NON_NULL, resType, numArgs, srcOpnds);
+        irBuilder.genVMHelperCall(VM_RT_MONITOR_ENTER, resType, numArgs, srcOpnds);
         return true;
     }
 
     if (!strcmp(mname,"monitorExit")) {
         assert(numArgs == 1);
-        irBuilder.genVMHelperCall(VM_RT_MONITOR_EXIT_NON_NULL, resType, numArgs, srcOpnds);
+        irBuilder.genVMHelperCall(VM_RT_MONITOR_EXIT, resType, numArgs, srcOpnds);
         return true;
     }
 

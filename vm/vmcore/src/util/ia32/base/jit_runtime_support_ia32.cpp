@@ -1043,18 +1043,10 @@ void *vm_helper_get_addr(VM_RT_SUPPORT f)
     return getaddress__vm_instanceof();
 
     case VM_RT_MONITOR_ENTER:
-    case VM_RT_MONITOR_ENTER_NON_NULL:
         return getaddress__vm_monitor_enter_naked();
-
-    case VM_RT_MONITOR_ENTER_STATIC:
-        return getaddress__vm_monitor_enter_static_naked();
-
     case VM_RT_MONITOR_EXIT:
-    case VM_RT_MONITOR_EXIT_NON_NULL:
         return getaddress__vm_monitor_exit_naked();
 
-    case VM_RT_MONITOR_EXIT_STATIC:
-        return getaddress__vm_monitor_exit_static_naked();
 
     case VM_RT_GET_INTERFACE_VTABLE_VER0:
         return getaddress__vm_get_interface_vtable_old_naked();  //tryitx

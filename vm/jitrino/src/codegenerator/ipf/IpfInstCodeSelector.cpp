@@ -1831,6 +1831,28 @@ CG_OpndHandle *IpfInstCodeSelector::getVTableAddr(Type       *dstType,
 }
 
 //----------------------------------------------------------------------------//
+// get java.langObject
+
+CG_OpndHandle *IpfInstCodeSelector::getClassObj(Type       *dstType, 
+                                                  ObjectType *base) {
+
+    IPF_LOG << "      getClassObj" << endl;
+
+    uint64 typeRuntimeId = (uint64) base->getRuntimeIdentifier();
+    Opnd   *helperArgs1[] = { opndManager->newImm(typeRuntimeId) };
+
+    VM_RT_SUPPORT hId1 = VM_RT_CLASS_2_JLC;
+    uint64  address1        = (uint64) compilationInterface.getRuntimeHelperAddress(hId1);
+    Opnd*   helperAddress1  = opndManager->newImm(address1);
+    OpndKind opndKind       = toOpndKind(dstType->tag);
+    DataKind dataKind       = toDataKind(dstType->tag);
+    RegOpnd* retOpnd        = opndManager->newRegOpnd(opndKind, dataKind);
+    
+    directCall(1, helperArgs1, retOpnd, helperAddress1, p0);
+    return retOpnd; 
+}
+
+//----------------------------------------------------------------------------//
 // Load interface table address
 
 CG_OpndHandle *IpfInstCodeSelector::tau_ldIntfTableAddr(Type          *dstType, 
@@ -2074,7 +2096,7 @@ void IpfInstCodeSelector::tau_monitorEnter(CG_OpndHandle *obj,
     
     Opnd *helperArgs[] = { (Opnd *)obj };
 
-    VM_RT_SUPPORT hId = VM_RT_MONITOR_ENTER_NON_NULL;
+    VM_RT_SUPPORT hId = VM_RT_MONITOR_ENTER;
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
     
@@ -2091,7 +2113,7 @@ void IpfInstCodeSelector::tau_monitorExit(CG_OpndHandle *obj,
 
     Opnd *helperArgs[] = { (Opnd *)obj };
 
-    VM_RT_SUPPORT hId = VM_RT_MONITOR_EXIT_NON_NULL;
+    VM_RT_SUPPORT hId = VM_RT_MONITOR_EXIT;
     uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
     Opnd    *helperAddress = opndManager->newImm(address);
     
@@ -2106,13 +2128,24 @@ void IpfInstCodeSelector::typeMonitorEnter(NamedType *type) {
     IPF_LOG << "      typeMonitorEnter" << endl;
 
     uint64 typeRuntimeId = (uint64) type->getRuntimeIdentifier();
-    Opnd   *helperArgs[] = { opndManager->newImm(typeRuntimeId) };
+    Opnd   *helperArgs1[] = { opndManager->newImm(typeRuntimeId) };
 
-    VM_RT_SUPPORT hId = VM_RT_MONITOR_ENTER_STATIC;
-    uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
-    Opnd    *helperAddress = opndManager->newImm(address);
+    VM_RT_SUPPORT hId1 = VM_RT_CLASS_2_JLC;
+    uint64  address1        = (uint64) compilationInterface.getRuntimeHelperAddress(hId1);
+    Opnd*   helperAddress1  = opndManager->newImm(address1);
+    OpndKind opndKind       = toOpndKind(type->tag);
+    DataKind dataKind       = toDataKind(type->tag);
+    RegOpnd* retOpnd        = opndManager->newRegOpnd(opndKind, dataKind);
     
-    directCall(1, helperArgs, NULL, helperAddress, p0);
+    directCall(1, helperArgs1, retOpnd, helperAddress1, p0);
+
+    Opnd   *helperArgs2[] = { retOpnd };
+
+    VM_RT_SUPPORT hId2 = VM_RT_MONITOR_ENTER;
+    uint64  address2        = (uint64) compilationInterface.getRuntimeHelperAddress(hId2);
+    Opnd*   helperAddress2  = opndManager->newImm(address2);
+    
+    directCall(1, helperArgs2, NULL, helperAddress2, p0);
 }
 
 //----------------------------------------------------------------------------//
@@ -2123,13 +2156,24 @@ void IpfInstCodeSelector::typeMonitorExit(NamedType *type) {
     IPF_LOG << "      typeMonitorExit" << endl;
 
     uint64 typeRuntimeId = (uint64) type->getRuntimeIdentifier();
-    Opnd   *helperArgs[] = { opndManager->newImm(typeRuntimeId) };
+    Opnd   *helperArgs1[] = { opndManager->newImm(typeRuntimeId) };
 
-    VM_RT_SUPPORT hId = VM_RT_MONITOR_EXIT_STATIC;
-    uint64  address        = (uint64) compilationInterface.getRuntimeHelperAddress(hId);
-    Opnd    *helperAddress = opndManager->newImm(address);
+    VM_RT_SUPPORT hId1 = VM_RT_CLASS_2_JLC;
+    uint64  address1        = (uint64) compilationInterface.getRuntimeHelperAddress(hId1);
+    Opnd*   helperAddress1  = opndManager->newImm(address1);
+    OpndKind opndKind       = toOpndKind(type->tag);
+    DataKind dataKind       = toDataKind(type->tag);
+    RegOpnd* retOpnd        = opndManager->newRegOpnd(opndKind, dataKind);
     
-    directCall(1, helperArgs, NULL, helperAddress, p0);
+    directCall(1, helperArgs1, retOpnd, helperAddress1, p0);
+
+    Opnd   *helperArgs2[] = { retOpnd };
+
+    VM_RT_SUPPORT hId2 = VM_RT_MONITOR_EXIT;
+    uint64  address2        = (uint64) compilationInterface.getRuntimeHelperAddress(hId2);
+    Opnd*   helperAddress2  = opndManager->newImm(address2);
+    
+    directCall(1, helperArgs2, NULL, helperAddress2, p0);
 }
 
 //----------------------------------------------------------------------------//

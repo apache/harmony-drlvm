@@ -609,6 +609,9 @@ public:
 
     Inst* caseGetVTableAddr(TypeInst* inst) {return caseDefault(inst);}
 
+    Inst* caseGetClassObj(TypeInst* inst) {return caseDefault(inst);}
+
+
     // array access
     Inst* caseTauArrayLen(Inst* inst) {
         Opnd* opnd = simplifyTauArrayLen(inst->getDst()->getType(),

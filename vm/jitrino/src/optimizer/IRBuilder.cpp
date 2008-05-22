@@ -2175,6 +2175,19 @@ IRBuilder::genGetVTable(ObjectType* type) {
 }
 
 Opnd*
+IRBuilder::genGetClassObj(ObjectType* type) {
+    assert(type->isClass() && (!type->isAbstract() || type->isArray()));
+    Opnd* dst = lookupHash(Op_GetClassObj, type->getId());
+    if (dst) return dst;
+
+    Type* dstType = irManager->getCompilationInterface().findClassUsingBootstrapClassloader(JAVA_LANG_CLASS);
+    dst = createOpnd(dstType);
+    appendInst(instFactory->makeGetClassObj(dst, type));
+    insertHash(Op_GetClassObj, type->getId(), dst->getInst());
+    return dst;
+}
+
+Opnd*
 IRBuilder::genLdVirtFunAddr(Opnd* base, MethodDesc* methodDesc) {
     base = propagateCopy(base);
     Opnd* dst = lookupHash(Op_TauLdVirtFunAddr, base->getId(), 

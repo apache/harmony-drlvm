@@ -753,6 +753,14 @@ MemoryOptInitWalker::applyToInst(Inst *i)
         }
         break;
 
+    case Op_GetClassObj:
+        {
+            thePass->effectNew(n, i, i->getDst());
+            thePass->effectWriteVtable(n, i, i->getDst());
+            thePass->effectReleaseObject(n, i, i->getDst());
+        }
+        break;
+
     case Op_TypeMonitorEnter:
         {
             TypeInst *tinst = i->asTypeInst();

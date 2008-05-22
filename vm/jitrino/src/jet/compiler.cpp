@@ -1485,10 +1485,9 @@ void Compiler::initStatics(void)
                 (char*)vm_helper_get_addr(VM_RT_MONITOR_ENTER);
     rt_helper_monitor_exit  = 
                 (char*)vm_helper_get_addr(VM_RT_MONITOR_EXIT);
-    rt_helper_monitor_enter_static = 
-                (char*)vm_helper_get_addr(VM_RT_MONITOR_ENTER_STATIC);
-    rt_helper_monitor_exit_static = 
-                (char*)vm_helper_get_addr(VM_RT_MONITOR_EXIT_STATIC);
+
+    rt_helper_class_2_jlc = 
+                (char*)vm_helper_get_addr(VM_RT_CLASS_2_JLC);
     
     rt_helper_new_array = 
                 (char*)vm_helper_get_addr(VM_RT_NEW_VECTOR_USING_VTABLE);

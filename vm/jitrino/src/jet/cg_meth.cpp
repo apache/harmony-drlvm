@@ -46,6 +46,10 @@ namespace Jet {
  * CallSig for monitor_enter and monitor_exit helpers.
  */
 static const CallSig cs_mon(CCONV_HELPERS, jvoid, jobj);
+/**
+ * CallSig for Class* to java.lang.Class helpers.
+ */
+static const CallSig cs_jlc(CCONV_HELPERS, jobj, jobj);
 
 
 void Compiler::gen_prolog(void) {
@@ -524,9 +528,13 @@ void Compiler::gen_prolog(void) {
     
     
     if (meth_is_sync()) {
+        unsigned stackFix = 0;
         if (is_set(DBG_TRACE_CG)) { dbg(";;>monitor_enter\n"); }
         if (method_is_static(m_method)) {
-            gen_call_vm(cs_mon, rt_helper_monitor_enter_static, 0, m_klass);
+            gen_call_vm(cs_jlc, rt_helper_class_2_jlc, 0, m_klass);
+            gen_save_ret(cs_jlc);
+            stackFix = gen_stack_to_args(true, cs_mon, 0);
+            //gen_call_vm(cs_mon, rt_helper_monitor_enter_static, 0, m_klass);
         }
         else {
             AR gr = gr0;
@@ -543,8 +551,17 @@ void Compiler::gen_prolog(void) {
                 ld(jobj, gr, m_base, voff(m_stack.thiz()));
                 st(jobj, gr, sp, cs_mon.off(0));
             }
-            gen_call_vm(cs_mon, rt_helper_monitor_enter, 1);
+            //gen_call_vm(cs_mon, rt_helper_monitor_enter, 1);
         }
+        gen_call_vm(cs_mon, rt_helper_monitor_enter, 1);
+
+        if (method_is_static(m_method)) {
+            runlock(cs_mon);
+            if (stackFix != 0) {
+                alu(alu_sub, sp, stackFix);
+            }
+        }
+
         if (is_set(DBG_TRACE_CG)) { dbg(";;>~monitor_enter\n"); }
     }
     
@@ -573,38 +590,49 @@ void Compiler::gen_return(const CallSig& cs)
     }
     
     bool is_sync = meth_is_sync();
-    if (is_sync && meth_is_static()) {
+    if (is_sync) {
+        unsigned stackFix = 0;
+
         if (is_set(DBG_TRACE_CG)) {
             dbg(";;>monitor_exit\n");
         }
-        gen_call_vm(cs_mon, rt_helper_monitor_exit_static, 0, m_klass);
-        if (is_set(DBG_TRACE_CG)) {
-            dbg(";;>~monitor_exit\n");
-        }
-    }
-    else if (is_sync) {
-        if (is_set(DBG_TRACE_CG)) {
-            dbg(";;>monitor_exit\n");
-        }
-        AR gr = valloc(jobj);
-        if (cs_mon.reg(0) != gr_x) {
-            if (cs_mon.size() != 0) {
-                assert(cs_mon.caller_pops());
-                alu(alu_sub, sp, cs_mon.size());                    
-            }            
-            vpark(cs_mon.reg(0));
-            ld(jobj, cs_mon.reg(0), m_base, voff(m_stack.thiz()));
-        }
-        else {
-            assert(cs_mon.size() != 0);
-            alu(alu_sub, sp, cs_mon.size());
-            ld(jobj, gr, m_base, voff(m_stack.thiz()));
-            st(jobj, gr, sp, cs_mon.off(0));
+
+        if (meth_is_static()) {
+            gen_call_vm(cs_jlc, rt_helper_class_2_jlc, 0, m_klass);
+            gen_save_ret(cs_jlc);
+            stackFix = gen_stack_to_args(true, cs_mon, 0);
+            //gen_call_vm(cs_mon, rt_helper_monitor_exit_static, 0, m_klass);
+        } else {
+            AR gr = valloc(jobj);
+            if (cs_mon.reg(0) != gr_x) {
+                if (cs_mon.size() != 0) {
+                    assert(cs_mon.caller_pops());
+                    alu(alu_sub, sp, cs_mon.size());                    
+                }            
+                vpark(cs_mon.reg(0));
+                ld(jobj, cs_mon.reg(0), m_base, voff(m_stack.thiz()));
+            }
+            else {
+                assert(cs_mon.size() != 0);
+                alu(alu_sub, sp, cs_mon.size());
+                ld(jobj, gr, m_base, voff(m_stack.thiz()));
+                st(jobj, gr, sp, cs_mon.off(0));
+            }
+            //gen_call_vm(cs_mon, rt_helper_monitor_exit, 1);
         }
         gen_call_vm(cs_mon, rt_helper_monitor_exit, 1);
+
+        if (meth_is_static()) {
+            runlock(cs_mon);
+            if (stackFix != 0) {
+                alu(alu_sub, sp, stackFix);
+            }
+        }
+
         if (is_set(DBG_TRACE_CG)) {
             dbg(";;>~monitor_exit\n");
         }
+
     }
     
     if (compilation_params.exe_notify_method_exit) {

@@ -941,6 +941,7 @@ LazyExceptionOpt::instHasSideEffect(Inst* inst) {
         case Op_LdFunAddr:
         case Op_LdFunAddrSlot:
         case Op_GetVTableAddr:
+        case Op_GetClassObj:
             return false;
         case Op_TauArrayLen:
         case Op_LdArrayBaseAddr:

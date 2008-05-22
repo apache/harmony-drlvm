@@ -364,6 +364,7 @@ enum Opcode {
     Op_LdFunAddrSlot,
     // Move these to the loads
     Op_GetVTableAddr,               // obtains the address of the vtable for a particular object type
+    Op_GetClassObj,
     // array manipulation
     Op_TauArrayLen,        
     Op_LdArrayBaseAddr,             // load the base (zero'th element) address of array
